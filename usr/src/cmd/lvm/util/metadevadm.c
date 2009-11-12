@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<stdarg.h>
@@ -47,10 +44,10 @@ static void
 usage(char *myname)
 {
 	(void) fprintf(stderr, gettext(
-"usage:  %s -h\n"
-"	%s [-s setname] -r [-lnv]\n"
-"	%s [-s setname] -u cxtxdx [-lnv]\n"),
-	myname, myname, myname);
+	    "usage:  %s -h\n"
+	    "	%s [-s setname] -r [-lnv]\n"
+	    "	%s [-s setname] -u cxtxdx [-lnv]\n"),
+	    myname, myname, myname);
 }
 
 int
@@ -83,15 +80,15 @@ main(int argc, char **argv)
 	(void) textdomain(TEXT_DOMAIN);
 
 	if ((sdssc_bind_library() == SDSSC_OKAY) &&
-		(sdssc_cmd_proxy(argc, argv, SDSSC_PROXY_PRIMARY,
-		    &error) == SDSSC_PROXY_DONE))
-			exit(error);
+	    (sdssc_cmd_proxy(argc, argv, SDSSC_PROXY_PRIMARY,
+	    &error) == SDSSC_PROXY_DONE))
+		exit(error);
 
 	openlog("metadevadm", LOG_ODELAY, LOG_USER);
 
 	/* initialize */
 	if (md_init(argc, argv, 0, 1, ep) != 0 ||
-			meta_check_root(ep) != 0) {
+	    meta_check_root(ep) != 0) {
 		closelog();
 		mde_perror(ep, "");
 		md_exit(sp, 1);
@@ -149,7 +146,7 @@ main(int argc, char **argv)
 			md_exit(sp, 1);
 		}
 		if (MD_MNSET_DESC(sd)) {
-			printf("%s\n", gettext("metadevadm cannot be "
+			(void) printf("%s\n", gettext("metadevadm cannot be "
 			    "run on multi-owner disksets\n"));
 			closelog();
 			md_exit(sp, 0);

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Modular Debugger (MDB)
@@ -1349,14 +1347,14 @@ mdb_set_config(const char *s)
 
 	if ((p = strchr(s, ';')) != NULL) {
 		size_t len = MIN(sizeof (mdb.m_ipathstr) - 1, p - s);
-		strncpy(mdb.m_ipathstr, s, len);
+		(void) strncpy(mdb.m_ipathstr, s, len);
 		mdb.m_ipathstr[len] = '\0';
 		s = p + 1;
 	}
 
 	if ((p = strchr(s, ';')) != NULL) {
 		size_t len = MIN(sizeof (mdb.m_lpathstr) - 1, p - s);
-		strncpy(mdb.m_lpathstr, s, len);
+		(void) strncpy(mdb.m_lpathstr, s, len);
 		mdb.m_lpathstr[len] = '\0';
 		s = p + 1;
 	}

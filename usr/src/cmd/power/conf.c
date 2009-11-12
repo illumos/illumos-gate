@@ -121,9 +121,10 @@ mesg(int code, char *fmt, ...)
 		 */
 		if (code == MDEBUG)
 			return;
-		fprintf(stderr, "%s: ", prog);
+		(void) fprintf(stderr, "%s: ", prog);
 		if (lineno)
-			fprintf(stderr, "\"%s\" line %d, ", power_conf, lineno);
+			(void) fprintf(stderr,
+			    "\"%s\" line %d, ", power_conf, lineno);
 	}
 
 	va_start(vargs, fmt);

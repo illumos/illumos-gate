@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Metadevice diskset utility.
@@ -313,7 +311,7 @@ printsets(mdsetname_t *sp, md_error_t *ep)
 static void
 printclusterversion()
 {
-	printf("%s\n", METASETIFVERSION);
+	(void) printf("%s\n", METASETIFVERSION);
 }
 
 /*
@@ -549,7 +547,7 @@ parse_add(int argc, char **argv)
 				sdssc_rval = sdssc_mo_create_begin(sname, argc,
 				    argv, SDSSC_PICK_SETNO);
 				if (sdssc_rval == SDSSC_NOT_BOUND_ERROR) {
-					mderror(ep, MDE_NOT_MN, NULL);
+					(void) mderror(ep, MDE_NOT_MN, NULL);
 					mde_perror(ep,
 					"Cluster node does not support "
 					"multi-owner diskset operations");
@@ -831,8 +829,8 @@ parse_add(int argc, char **argv)
 	 */
 	if ((!multi_node) &&
 	    (sdssc_notify_service(sname, Make_Primary) == SDSSC_ERROR)) {
-		meta_set_release(sp, ep);
-		printf(gettext(
+		(void) meta_set_release(sp, ep);
+		(void) printf(gettext(
 		    "Sun Clustering failed to make set primary\n"));
 	}
 
@@ -1434,7 +1432,7 @@ parse_releaseset(int argc, char **argv)
 	if (argc > 0)
 		usage(sp, gettext("too many args"));
 
-	memset(&vers, 0, sizeof (vers));
+	(void) memset(&vers, 0, sizeof (vers));
 
 	if ((sdssc_version(&vers) == SDSSC_OKAY) &&
 	    (vers.major == 3) &&
@@ -1449,7 +1447,7 @@ parse_releaseset(int argc, char **argv)
 		 */
 		rval = sdssc_notify_service(sname, Release_Primary);
 		if (rval == SDSSC_ERROR) {
-			printf(gettext(
+			(void) printf(gettext(
 			    "metaset: failed to notify DCS of release\n"));
 		}
 		md_exit(NULL, rval == SDSSC_ERROR);
@@ -1606,7 +1604,7 @@ parse_takeset(int argc, char **argv)
 		}
 	}
 
-	memset(&vers, 0, sizeof (vers));
+	(void) memset(&vers, 0, sizeof (vers));
 
 	if ((sdssc_version(&vers) == SDSSC_OKAY) &&
 	    (vers.major == 3) &&
@@ -1620,7 +1618,7 @@ parse_takeset(int argc, char **argv)
 		 */
 		if ((rval = sdssc_notify_service(sname, Make_Primary)) ==
 		    SDSSC_ERROR) {
-			printf(gettext(
+			(void) printf(gettext(
 			    "metaset: failed to notify DCS of take\n"));
 		}
 		md_exit(NULL, rval == SDSSC_ERROR);
@@ -2181,13 +2179,13 @@ parse_cluster(int argc, char **argv, int multi_node)
 		}
 
 		if ((new_argv = calloc(argc, sizeof (char *))) == NULL) {
-			printf(gettext("Out of memory\n"));
+			(void) printf(gettext("Out of memory\n"));
 			md_exit(sp, 1);
 		}
 
 		np = new_argv;
 		new_argc = 0;
-		memset(primary_node, '\0', SDSSC_NODE_NAME_LEN);
+		(void) memset(primary_node, '\0', SDSSC_NODE_NAME_LEN);
 
 		for (x = 0; x < argc; x++) {
 			if (strcmp(argv[x], "-C") == 0) {
@@ -2223,7 +2221,7 @@ parse_cluster(int argc, char **argv, int multi_node)
 		    primary_node, &error) == SDSSC_PROXY_DONE) {
 			md_exit(sp, error);
 		} else {
-			printf(gettext(
+			(void) printf(gettext(
 			    "Couldn't proxy command\n"));
 			md_exit(sp, 1);
 		}
@@ -2275,7 +2273,7 @@ main(int argc, char *argv[])
 
 	sdssc_res = sdssc_bind_library();
 	if (sdssc_res == SDSSC_ERROR) {
-		printf(gettext(
+		(void) printf(gettext(
 		    "%s: Interface error with libsds_sc.so\n"), argv[0]);
 		exit(1);
 	}
@@ -2517,7 +2515,7 @@ main(int argc, char *argv[])
 					(void) strlcpy(primary_node, hostname,
 					    SDSSC_NODE_NAME_LEN);
 				} else {
-					memset(primary_node, '\0',
+					(void) memset(primary_node, '\0',
 					    SDSSC_NODE_NAME_LEN);
 				}
 				break;
@@ -2567,7 +2565,7 @@ main(int argc, char *argv[])
 		 * mddoors itself takes care there will be only one
 		 * instance running, so starting it twice won't hurt
 		 */
-		pclose(popen("/usr/lib/lvm/mddoors", "w"));
+		(void) pclose(popen("/usr/lib/lvm/mddoors", "w"));
 		parse_joinset(argc, argv);
 		/*NOTREACHED*/
 	}
@@ -2606,7 +2604,7 @@ main(int argc, char *argv[])
 		 * only one instance running, so starting it twice won't hurt
 		 */
 		if (multi_node) {
-			pclose(popen("/usr/lib/lvm/mddoors", "w"));
+			(void) pclose(popen("/usr/lib/lvm/mddoors", "w"));
 		}
 
 		parse_add(argc, argv);

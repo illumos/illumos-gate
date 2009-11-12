@@ -202,8 +202,8 @@ mdmn_clnt_create(char *ignore, void *data, struct timeval *time_out)
 
 #define	FLUSH_DEBUGFILE() \
 	if (commdout != (FILE *)NULL) { \
-		fflush(commdout); \
-		fsync(fileno(commdout)); \
+		(void) fflush(commdout); \
+		(void) fsync(fileno(commdout)); \
 	}
 
 static void
@@ -219,21 +219,22 @@ panic_system(int nid, md_mn_msgtype_t type, int master_err, int master_exitval,
 	FLUSH_DEBUGFILE();
 
 	if (master_err != MDMNE_ACK) {
-		snprintf(msg_buf, MAXPATHLEN, "rpc.mdcommd: RPC fail on master "
-		    "when processing message type %d\n", type);
+		(void) snprintf(msg_buf, MAXPATHLEN, "rpc.mdcommd: RPC "
+		    "fail on master when processing message type %d\n", type);
 	} else if (slave_result == NULL) {
-		snprintf(msg_buf, MAXPATHLEN, "rpc.mdcommd: RPC fail on node "
-		    "%d when processing message type %d\n", nid, type);
+		(void) snprintf(msg_buf, MAXPATHLEN, "rpc.mdcommd: RPC fail "
+		    "on node %d when processing message type %d\n", nid, type);
 	} else {
-		snprintf(msg_buf, MAXPATHLEN, "rpc.mdcommd: Inconsistent "
-		    "return value from node %d when processing message "
-		    "type %d. Master exitval = %d, Slave exitval = %d\n",
-		    nid, type, master_exitval, slave_result->mmr_exitval);
+		(void) snprintf(msg_buf, MAXPATHLEN, "rpc.mdcommd: "
+		    "Inconsistent return value from node %d when processing "
+		    "message type %d. Master exitval = %d, "
+		    "Slave exitval = %d\n", nid, type, master_exitval,
+		    slave_result->mmr_exitval);
 	}
 	commd_err.size = strlen(msg_buf);
 	commd_err.md_message = (uint64_t)(uintptr_t)&msg_buf[0];
 
-	metaioctl(MD_MN_COMMD_ERR, &commd_err, &mne, "rpc.mdcommd");
+	(void) metaioctl(MD_MN_COMMD_ERR, &commd_err, &mne, "rpc.mdcommd");
 	(void) uadmin(A_DUMP, AD_BOOT, NULL);
 }
 
@@ -245,7 +246,7 @@ flush_fcout()
 	int warned = 0;
 
 	for (; ; ) {
-		sleep(10);
+		(void) sleep(10);
 		/* No output file, nothing to do */
 		if (commdout == (FILE *)NULL)
 			continue;
@@ -279,7 +280,7 @@ flush_fcout()
 			warned = 0;
 		}
 
-		fflush(commdout);
+		(void) fflush(commdout);
 	}
 }
 
@@ -388,7 +389,7 @@ check_timeouts()
 			for (class = MD_MSG_CLASS1; class < MD_MN_NCLASSES;
 			    class++) {
 				mx = mdmn_get_initiator_table_mx(setno, class);
-				mutex_lock(mx);
+				(void) mutex_lock(mx);
 
 				/* then is the registered time */
 				then =
@@ -396,18 +397,19 @@ check_timeouts()
 				if ((then != 0) && (now > then)) {
 					timeout_initiator(setno, class);
 				}
-				mutex_unlock(mx);
+				(void) mutex_unlock(mx);
 			}
 		}
 		/* it's ok to check only once per second */
-		sleep(1);
+		(void) sleep(1);
 
 		/* is there work to do? */
-		mutex_lock(&check_timeout_mutex);
+		(void) mutex_lock(&check_timeout_mutex);
 		if (messages_on_their_way == 0) {
-			cond_wait(&check_timeout_cv, &check_timeout_mutex);
+			(void) cond_wait(&check_timeout_cv,
+			    &check_timeout_mutex);
 		}
-		mutex_unlock(&check_timeout_mutex);
+		(void) mutex_unlock(&check_timeout_mutex);
 	}
 }
 
@@ -429,7 +431,7 @@ setup_debug(void)
 
 	/* if commdout is non-NULL it is an open FILE, we'd better close it */
 	if (commdout != (FILE *)NULL) {
-		fclose(commdout);
+		(void) fclose(commdout);
 	}
 
 	commdoutfile = commd_get_outfile();
@@ -547,7 +549,7 @@ global_init(void)
 
 	/* Make setup_debug() be the action in case of SIGHUP */
 	sighandler.sa_flags = 0;
-	sigfillset(&sighandler.sa_mask);
+	(void) sigfillset(&sighandler.sa_mask);
 	sighandler.sa_handler = (void (*)(int)) setup_debug;
 	sigaction(SIGHUP, &sighandler, NULL);
 
@@ -556,13 +558,13 @@ global_init(void)
 	commd_debug(MD_MMV_MISC, "global init called %s\n", ctime(&clock_val));
 
 	/* start a thread that flushes out the debug on a regular basis */
-	thr_create(NULL, 0, (void *(*)(void *))flush_fcout,
+	(void) thr_create(NULL, 0, (void *(*)(void *))flush_fcout,
 	    (void *) NULL, THR_DETACHED, NULL);
 
 	/* global rwlock's / mutex's / cond_t's go here */
-	mutex_init(&check_timeout_mutex, USYNC_THREAD, NULL);
-	cond_init(&check_timeout_cv, USYNC_THREAD, NULL);
-	mutex_init(&get_setdesc_mutex, USYNC_THREAD, NULL);
+	(void) mutex_init(&check_timeout_mutex, USYNC_THREAD, NULL);
+	(void) cond_init(&check_timeout_cv, USYNC_THREAD, NULL);
+	(void) mutex_init(&get_setdesc_mutex, USYNC_THREAD, NULL);
 
 	/* Make sure the initiator table is initialized correctly */
 	for (set = 0; set < MD_MAXSETS; set++) {
@@ -573,7 +575,7 @@ global_init(void)
 
 
 	/* setup the check for timeouts */
-	thr_create(NULL, 0, (void *(*)(void *))check_timeouts,
+	(void) thr_create(NULL, 0, (void *(*)(void *))check_timeouts,
 	    (void *) NULL, THR_DETACHED, NULL);
 
 	md_commd_global_state |= MD_CGS_INITED;
@@ -611,21 +613,25 @@ mdmn_init_client(set_t setno, md_mn_nodeid_t nid)
 	if (sd == NULL) {
 		mdsetname_t	*sp;
 
-		rw_unlock(&set_desc_rwlock[setno]); /* readlock -> writelock */
-		rw_wrlock(&set_desc_rwlock[setno]);
+		/* readlock -> writelock */
+		(void) rw_unlock(&set_desc_rwlock[setno]);
+		(void) rw_wrlock(&set_desc_rwlock[setno]);
 		sp = metasetnosetname(setno, &ep);
 		/* Only one thread is supposed to be in metaget_setdesc() */
-		mutex_lock(&get_setdesc_mutex);
+		(void) mutex_lock(&get_setdesc_mutex);
 		sd = metaget_setdesc(sp, &ep);
-		mutex_unlock(&get_setdesc_mutex);
+		(void) mutex_unlock(&get_setdesc_mutex);
 		if (sd == NULL) {
-			rw_unlock(&set_desc_rwlock[setno]); /* back to ... */
-			rw_rdlock(&set_desc_rwlock[setno]); /* ... readlock */
+			/* back to ... */
+			(void) rw_unlock(&set_desc_rwlock[setno]);
+			/* ... readlock */
+			(void) rw_rdlock(&set_desc_rwlock[setno]);
 			return (-1);
 		}
 		set_descriptor[setno] = sd;
-		rw_unlock(&set_desc_rwlock[setno]); /* back to readlock */
-		rw_rdlock(&set_desc_rwlock[setno]);
+		/* back to readlock */
+		(void) rw_unlock(&set_desc_rwlock[setno]);
+		(void) rw_rdlock(&set_desc_rwlock[setno]);
 	}
 
 	/* first we have to find the node name for this node id */
@@ -638,7 +644,7 @@ mdmn_init_client(set_t setno, md_mn_nodeid_t nid)
 	if (node == (md_mnnode_desc *)NULL) {
 		commd_debug(MD_MMV_SYSLOG,
 		    "FATAL: node %d not found in set %d\n", nid, setno);
-		rw_unlock(&set_desc_rwlock[setno]);
+		(void) rw_unlock(&set_desc_rwlock[setno]);
 		return (-2);
 	}
 
@@ -649,7 +655,7 @@ mdmn_init_client(set_t setno, md_mn_nodeid_t nid)
 	if ((node->nd_flags & MD_MN_NODE_OWN) == 0) {
 		commd_debug(MD_MMV_INIT, "init: %s didn't join set %d\n",
 		    node->nd_nodename ? node->nd_nodename : "NULL", setno);
-		rw_unlock(&set_desc_rwlock[setno]);
+		(void) rw_unlock(&set_desc_rwlock[setno]);
 		return (-2);
 	}
 
@@ -683,7 +689,7 @@ mdmn_init_client(set_t setno, md_mn_nodeid_t nid)
 
 		if (client[setno][nid] == (CLIENT *) NULL) {
 			clnt_pcreateerror(node->nd_nodename);
-			rw_unlock(&set_desc_rwlock[setno]);
+			(void) rw_unlock(&set_desc_rwlock[setno]);
 			return (-3);
 		}
 		/* this node has the license to send */
@@ -695,7 +701,7 @@ mdmn_init_client(set_t setno, md_mn_nodeid_t nid)
 		    (char *)&FOUR_SECS);
 
 	}
-	rw_unlock(&set_desc_rwlock[setno]);
+	(void) rw_unlock(&set_desc_rwlock[setno]);
 	return (0);
 }
 
@@ -718,13 +724,17 @@ check_client(set_t setno, md_mn_nodeid_t nodeid)
 	int ret = 0;
 
 	while ((client[setno][nodeid] == (CLIENT *)NULL) && (ret == 0)) {
-		rw_unlock(&client_rwlock[setno]); /* upgrade reader ... */
-		rw_wrlock(&client_rwlock[setno]); /* ... to writer lock. */
+		/* upgrade reader ... */
+		(void) rw_unlock(&client_rwlock[setno]);
+		/* ... to writer lock. */
+		(void) rw_wrlock(&client_rwlock[setno]);
 		if (mdmn_init_client(setno, nodeid) != 0) {
 			ret = MDMNE_RPC_FAIL;
 		}
-		rw_unlock(&client_rwlock[setno]); /* downgrade writer ... */
-		rw_rdlock(&client_rwlock[setno]); /* ... back to reader lock. */
+		/* downgrade writer ... */
+		(void) rw_unlock(&client_rwlock[setno]);
+		/* ... back to reader lock. */
+		(void) rw_rdlock(&client_rwlock[setno]);
 	}
 	return (ret);
 }
@@ -755,18 +765,18 @@ mdmn_init_set(set_t setno, int todo)
 	 */
 	if ((todo & MDMN_SET_MUTEXES) &&
 	    ((md_mn_set_inited[setno] & MDMN_SET_MUTEXES) == 0)) {
-		mutex_init(&mdmn_busy_mutex[setno], USYNC_THREAD, NULL);
-		cond_init(&mdmn_busy_cv[setno], USYNC_THREAD, NULL);
-		rwlock_init(&client_rwlock[setno], USYNC_THREAD, NULL);
-		rwlock_init(&set_desc_rwlock[setno], USYNC_THREAD, NULL);
+		(void) mutex_init(&mdmn_busy_mutex[setno], USYNC_THREAD, NULL);
+		(void) cond_init(&mdmn_busy_cv[setno], USYNC_THREAD, NULL);
+		(void) rwlock_init(&client_rwlock[setno], USYNC_THREAD, NULL);
+		(void) rwlock_init(&set_desc_rwlock[setno], USYNC_THREAD, NULL);
 
 		for (class = MD_MSG_CLASS1; class < MD_MN_NCLASSES; class++) {
-			mutex_init(mdmn_get_master_table_mx(setno, class),
+			(void) mutex_init(mdmn_get_master_table_mx(setno,
+			    class), USYNC_THREAD, NULL);
+			(void) cond_init(mdmn_get_master_table_cv(setno, class),
 			    USYNC_THREAD, NULL);
-			cond_init(mdmn_get_master_table_cv(setno, class),
-			    USYNC_THREAD, NULL);
-			mutex_init(mdmn_get_initiator_table_mx(setno, class),
-			    USYNC_THREAD, NULL);
+			(void) mutex_init(mdmn_get_initiator_table_mx(setno,
+			    class), USYNC_THREAD, NULL);
 		}
 		md_mn_set_inited[setno] |= MDMN_SET_MUTEXES;
 	}
@@ -796,8 +806,8 @@ mdmn_init_set(set_t setno, int todo)
 		 * To ensure that the file has the appropriate size,
 		 * we write a byte at the end of the file.
 		 */
-		lseek(fd, filesize + 1, SEEK_SET);
-		write(fd, "\0", 1);
+		(void) lseek(fd, filesize + 1, SEEK_SET);
+		(void) write(fd, "\0", 1);
 
 		/* at this point we have a file in place that we can mmap */
 		addr = mmap(0, filesize, PROT_READ | PROT_WRITE,
@@ -813,7 +823,7 @@ mdmn_init_set(set_t setno, int todo)
 
 		/* finally we initialize the mutexes that protect the mct */
 		for (class = MD_MSG_CLASS1; class < MD_MN_NCLASSES; class++) {
-			mutex_init(&(mct_mutex[setno][class]),
+			(void) mutex_init(&(mct_mutex[setno][class]),
 			    USYNC_THREAD, NULL);
 		}
 
@@ -838,9 +848,9 @@ mdmn_init_set(set_t setno, int todo)
 	/* flush local copy of rpc.metad data */
 	metaflushsetname(sp);
 
-	mutex_lock(&get_setdesc_mutex);
+	(void) mutex_lock(&get_setdesc_mutex);
 	sd = metaget_setdesc(sp, &ep);
-	mutex_unlock(&get_setdesc_mutex);
+	(void) mutex_unlock(&get_setdesc_mutex);
 
 	if (sd == NULL) {
 		commd_debug(MD_MMV_SYSLOG,
@@ -965,12 +975,12 @@ mdmn_send_to_work(void *arg)
 	setno = msg->msg_setno;
 
 	/* set the sender, so the master knows who to send the results */
-	rw_rdlock(&set_desc_rwlock[setno]);
+	(void) rw_rdlock(&set_desc_rwlock[setno]);
 	msg->msg_sender = set_descriptor[setno]->sd_mn_mynode->nd_nodeid;
 	set_master	= set_descriptor[setno]->sd_mn_master_nodeid;
 
 	mx = mdmn_get_initiator_table_mx(setno, class);
-	mutex_lock(mx);
+	(void) mutex_lock(mx);
 
 	/*
 	 * Here we check, if the initiator table slot for this set/class
@@ -999,12 +1009,12 @@ mdmn_send_to_work(void *arg)
 
 	try_master = 2; /* return failure after two retries */
 	while ((success == MDMNE_ACK) && (try_master--)) {
-		rw_rdlock(&client_rwlock[setno]);
+		(void) rw_rdlock(&client_rwlock[setno]);
 		/* is the rpc client to the master still around ? */
 		if (check_client(setno, set_master)) {
 			success = MDMNE_RPC_FAIL;
 			FLUSH_DEBUGFILE();
-			rw_unlock(&client_rwlock[setno]);
+			(void) rw_unlock(&client_rwlock[setno]);
 			break; /* out of try_master-loop */
 		}
 
@@ -1022,24 +1032,24 @@ mdmn_send_to_work(void *arg)
 			 * Probably something happened to the daemon on the
 			 * master. Kill the client, and try again...
 			 */
-			rw_unlock(&client_rwlock[setno]);
-			rw_wrlock(&client_rwlock[setno]);
+			(void) rw_unlock(&client_rwlock[setno]);
+			(void) rw_wrlock(&client_rwlock[setno]);
 			mdmn_clnt_destroy(client[setno][set_master]);
 			if (client[setno][set_master] != (CLIENT *)NULL) {
 				client[setno][set_master] = (CLIENT *)NULL;
 			}
-			rw_unlock(&client_rwlock[setno]);
+			(void) rw_unlock(&client_rwlock[setno]);
 			continue;
 
 		} else  if (*rpc_err != MDMNE_ACK) {
 			/* something went wrong, break out */
 			success = *rpc_err;
 			free(rpc_err);
-			rw_unlock(&client_rwlock[setno]);
+			(void) rw_unlock(&client_rwlock[setno]);
 			break; /* out of try_master-loop */
 		}
 
-		rw_unlock(&client_rwlock[setno]);
+		(void) rw_unlock(&client_rwlock[setno]);
 		free(rpc_err);
 
 		/*
@@ -1052,14 +1062,14 @@ mdmn_send_to_work(void *arg)
 		mdmn_register_initiator_table(setno, class, msg, transp);
 
 		/* tell check_timeouts, there's work to do */
-		mutex_lock(&check_timeout_mutex);
+		(void) mutex_lock(&check_timeout_mutex);
 		messages_on_their_way++;
-		cond_signal(&check_timeout_cv);
-		mutex_unlock(&check_timeout_mutex);
+		(void) cond_signal(&check_timeout_cv);
+		(void) mutex_unlock(&check_timeout_mutex);
 		break; /* out of try_master-loop */
 	}
 
-	rw_unlock(&set_desc_rwlock[setno]);
+	(void) rw_unlock(&set_desc_rwlock[setno]);
 
 	if (success == MDMNE_ACK) {
 		commd_debug(MD_MMV_SEND,
@@ -1091,7 +1101,7 @@ mdmn_send_to_work(void *arg)
 	free_msg(msg);
 	/* the alloc was done in mdmn_send_svc_2 */
 	Free(matp);
-	mutex_unlock(mx);
+	(void) mutex_unlock(mx);
 	return (NULL);
 
 }
@@ -1131,7 +1141,7 @@ do_message_locally(md_mn_msg_t *msg, md_mn_result_t *result)
 	result->mmr_flags	= msg->msg_flags;
 	MSGID_COPY(&(msg->msg_msgid), &(result->mmr_msgid));
 
-	mutex_lock(&mct_mutex[setno][class]);
+	(void) mutex_lock(&mct_mutex[setno][class]);
 	completed = mdmn_check_completion(msg, result);
 	if (completed == MDMN_MCT_NOT_DONE) {
 		/* message not yet processed locally */
@@ -1144,7 +1154,7 @@ do_message_locally(md_mn_msg_t *msg, md_mn_result_t *result)
 		 * so we won't start a second handler for it
 		 */
 		(void) mdmn_mark_completion(msg, NULL, MDMN_MCT_IN_PROGRESS);
-		mutex_unlock(&mct_mutex[setno][class]);
+		(void) mutex_unlock(&mct_mutex[setno][class]);
 
 		/* here we actually process the message on the master */
 		(*handler)(msg, MD_MSGF_ON_MASTER, result);
@@ -1154,7 +1164,7 @@ do_message_locally(md_mn_msg_t *msg, md_mn_result_t *result)
 		    MSGID_ELEMS(msg->msg_msgid), msgtype);
 
 		/* Mark the message as fully processed, store the result */
-		mutex_lock(&mct_mutex[setno][class]);
+		(void) mutex_lock(&mct_mutex[setno][class]);
 		(void) mdmn_mark_completion(msg, result, MDMN_MCT_DONE);
 	} else if (completed == MDMN_MCT_DONE) {
 		commd_debug(MD_MMV_PROC_M, "proc_mas: "
@@ -1166,7 +1176,7 @@ do_message_locally(md_mn_msg_t *msg, md_mn_result_t *result)
 		    MSGID_ELEMS(msg->msg_msgid), msgtype);
 	} else {
 		/* MCT error occurred (should never happen) */
-		mutex_unlock(&mct_mutex[setno][class]);
+		(void) mutex_unlock(&mct_mutex[setno][class]);
 		result->mmr_comm_state = MDMNE_LOG_FAIL;
 		commd_debug(MD_MMV_SYSLOG, "WARNING "
 		    "mdmn_check_completion returned %d "
@@ -1174,7 +1184,7 @@ do_message_locally(md_mn_msg_t *msg, md_mn_result_t *result)
 		    MSGID_ELEMS(msg->msg_msgid));
 		return (MDMNE_LOG_FAIL);
 	}
-	mutex_unlock(&mct_mutex[setno][class]);
+	(void) mutex_unlock(&mct_mutex[setno][class]);
 	return (MDMNE_ACK);
 
 }
@@ -1229,7 +1239,7 @@ retry_rpc:
 			return (MDMNE_ABORT);
 		}
 
-		rw_rdlock(&client_rwlock[setno]);
+		(void) rw_rdlock(&client_rwlock[setno]);
 		/* unable to create client? Ignore it */
 		if (check_client(setno, nid)) {
 			/*
@@ -1248,7 +1258,7 @@ retry_rpc:
 			commd_debug(MD_MMV_PROC_M, "proc_mas: (%d,0x%llx-%d) "
 			    "WARNING couldn't create client for %s\n",
 			    MSGID_ELEMS(msg->msg_msgid), node->nd_nodename);
-			rw_unlock(&client_rwlock[setno]);
+			(void) rw_unlock(&client_rwlock[setno]);
 			return (MDMNE_IGNORE_NODE);
 		}
 		/* let's be paranoid and check again before sending */
@@ -1259,15 +1269,15 @@ retry_rpc:
 			 * once again.
 			 */
 			commd_debug(MD_MMV_PROC_M, "client is NULL\n");
-			rw_unlock(&client_rwlock[setno]);
-			sleep(1);
+			(void) rw_unlock(&client_rwlock[setno]);
+			(void) sleep(1);
 			continue;
 		}
 
 		/* send it over, it will return immediately */
 		ret = mdmn_work_2(msg, client[setno][nid], nid);
 
-		rw_unlock(&client_rwlock[setno]);
+		(void) rw_unlock(&client_rwlock[setno]);
 
 		if (ret != NULL) {
 			commd_debug(MD_MMV_PROC_M,
@@ -1288,12 +1298,12 @@ retry_rpc:
 			 * Kill the client, and try again.
 			 * check_client() will create a new client
 			 */
-			rw_wrlock(&client_rwlock[setno]);
+			(void) rw_wrlock(&client_rwlock[setno]);
 			mdmn_clnt_destroy(client[setno][nid]);
 			if (client[setno][nid] != (CLIENT *)NULL) {
 				client[setno][nid] = (CLIENT *)NULL;
 			}
-			rw_unlock(&client_rwlock[setno]);
+			(void) rw_unlock(&client_rwlock[setno]);
 
 			/* ... but don't try infinitely */
 			--rpc_retries;
@@ -1305,7 +1315,7 @@ retry_rpc:
 		 * if we wait long enough
 		 */
 		if (*ret == MDMNE_CLASS_LOCKED) {
-			sleep(1);
+			(void) sleep(1);
 			free(ret);
 			ret = NULL;
 			continue;
@@ -1374,10 +1384,10 @@ retry_rpc:
 			/*
 			 * Destroy the client and try the rpc call again
 			 */
-			rw_wrlock(&client_rwlock[setno]);
+			(void) rw_wrlock(&client_rwlock[setno]);
 			mdmn_clnt_destroy(client[setno][nid]);
 			client[setno][nid] = (CLIENT *)NULL;
-			rw_unlock(&client_rwlock[setno]);
+			(void) rw_unlock(&client_rwlock[setno]);
 			goto retry_rpc;
 		}
 	} else if (err == EINTR) {
@@ -1442,7 +1452,7 @@ mdmn_master_process_msg(md_mn_msg_t *msg)
 	    "proc_mas: received (%d, 0x%llx-%d) set=%d, class=%d, type=%d\n",
 	    MSGID_ELEMS(msg->msg_msgid), setno, orig_class, msgtype);
 
-	rw_rdlock(&set_desc_rwlock[setno]);
+	(void) rw_rdlock(&set_desc_rwlock[setno]);
 	set_master = set_descriptor[setno]->sd_mn_master_nodeid;
 	result->mmr_sender	= set_master;
 	/*
@@ -1478,9 +1488,9 @@ mdmn_master_process_msg(md_mn_msg_t *msg)
 			 * Note that the mark_busy was already done by
 			 * mdmn_work_svc_2()
 			 */
-			mutex_lock(&mdmn_busy_mutex[setno]);
+			(void) mutex_lock(&mdmn_busy_mutex[setno]);
 			mdmn_mark_class_unbusy(setno, orig_class);
-			mutex_unlock(&mdmn_busy_mutex[setno]);
+			(void) mutex_unlock(&mdmn_busy_mutex[setno]);
 
 		}
 		if (err == MDMNE_CLASS_BUSY) {
@@ -1495,7 +1505,7 @@ mdmn_master_process_msg(md_mn_msg_t *msg)
 			result->mmr_comm_state = MDMNE_CLASS_BUSY;
 		}
 		ret = (int *)NULL;
-		rw_rdlock(&client_rwlock[setno]);
+		(void) rw_rdlock(&client_rwlock[setno]);
 
 		if (check_client(setno, sender)) {
 			commd_debug(MD_MMV_SYSLOG,
@@ -1504,7 +1514,7 @@ mdmn_master_process_msg(md_mn_msg_t *msg)
 			ret = mdmn_wakeup_initiator_2(result,
 			    client[setno][sender], sender);
 		}
-		rw_unlock(&client_rwlock[setno]);
+		(void) rw_unlock(&client_rwlock[setno]);
 
 		if (ret == (int *)NULL) {
 			commd_debug(MD_MMV_SYSLOG,
@@ -1521,7 +1531,7 @@ mdmn_master_process_msg(md_mn_msg_t *msg)
 		if (err == MDMNE_LOG_FAIL) {
 			/* we can't proceed here */
 			free_result(result);
-			rw_unlock(&set_desc_rwlock[setno]);
+			(void) rw_unlock(&set_desc_rwlock[setno]);
 			return;
 		} else if (err == MDMNE_CLASS_BUSY) {
 			mdmn_changelog_record_t *lr;
@@ -1622,12 +1632,12 @@ proceed:
 		 * Granularity could be finer (setno/class)
 		 */
 		if (class != orig_class) {
-			mutex_lock(&mdmn_busy_mutex[setno]);
+			(void) mutex_lock(&mdmn_busy_mutex[setno]);
 			while (mdmn_mark_class_busy(setno, class) == FALSE) {
-				cond_wait(&mdmn_busy_cv[setno],
+				(void) cond_wait(&mdmn_busy_cv[setno],
 				    &mdmn_busy_mutex[setno]);
 			}
-			mutex_unlock(&mdmn_busy_mutex[setno]);
+			(void) mutex_unlock(&mdmn_busy_mutex[setno]);
 		}
 
 		master_err = do_message_locally(cmsg, result);
@@ -1641,9 +1651,11 @@ proceed:
 				 * break out of the message loop
 				 */
 				if (class != orig_class) {
-					mutex_lock(&mdmn_busy_mutex[setno]);
+					(void) mutex_lock(
+					    &mdmn_busy_mutex[setno]);
 					mdmn_mark_class_unbusy(setno, class);
-					mutex_unlock(&mdmn_busy_mutex[setno]);
+					(void) mutex_unlock(
+					    &mdmn_busy_mutex[setno]);
 				}
 				break;
 			}
@@ -1656,9 +1668,9 @@ proceed:
 		if (cmsg->msg_flags & MD_MSGF_NO_BCAST) {
 			/* if appropriate, unbusy the class */
 			if (class != orig_class) {
-				mutex_lock(&mdmn_busy_mutex[setno]);
+				(void) mutex_lock(&mdmn_busy_mutex[setno]);
 				mdmn_mark_class_unbusy(setno, class);
-				mutex_unlock(&mdmn_busy_mutex[setno]);
+				(void) mutex_unlock(&mdmn_busy_mutex[setno]);
 			}
 			continue;
 		}
@@ -1675,7 +1687,7 @@ proceed:
 
 
 
-		rw_rdlock(&set_desc_rwlock[setno]);
+		(void) rw_rdlock(&set_desc_rwlock[setno]);
 		/* Send the message  to all other nodes */
 		for (node = set_descriptor[setno]->sd_nodelist; node;
 		    node = node->nd_next) {
@@ -1697,7 +1709,7 @@ proceed:
 				continue;
 			}
 
-			mutex_lock(mx);
+			(void) mutex_lock(mx);
 			/*
 			 * Register the node that is addressed,
 			 * so we can detect unsolicited messages
@@ -1724,10 +1736,10 @@ proceed:
 				    "proc_mas: got result for (%d,0x%llx-%d)\n",
 				    MSGID_ELEMS(cmsg->msg_msgid));
 			} else if (err == MDMNE_IGNORE_NODE) {
-				mutex_unlock(mx);
+				(void) mutex_unlock(mx);
 				continue; /* send to next node */
 			}
-			mutex_unlock(mx);
+			(void) mutex_unlock(mx);
 
 
 			/*
@@ -1815,14 +1827,14 @@ proceed:
 			}
 
 		} /* End of loop over the nodes */
-		rw_unlock(&set_desc_rwlock[setno]);
+		(void) rw_unlock(&set_desc_rwlock[setno]);
 
 
 		/* release the current class again */
 		if (class != orig_class) {
-			mutex_lock(&mdmn_busy_mutex[setno]);
+			(void) mutex_lock(&mdmn_busy_mutex[setno]);
 			mdmn_mark_class_unbusy(setno, class);
-			mutex_unlock(&mdmn_busy_mutex[setno]);
+			(void) mutex_unlock(&mdmn_busy_mutex[setno]);
 		}
 
 		/* are we supposed to quit entirely ? */
@@ -1862,7 +1874,7 @@ proceed:
 		commd_debug(MD_MMV_PROC_M,
 		    "proc_mas: calling unlog_msg for (%d,0x%llx-%d) type %d\n",
 		    MSGID_ELEMS(msg->msg_msgid), msgtype);
-		mdmn_unlog_msg(msg);
+		(void) mdmn_unlog_msg(msg);
 		commd_debug(MD_MMV_PROC_M,
 		    "proc_mas: done unlog_msg for (%d,0x%llx-%d) type %d\n",
 		    MSGID_ELEMS(msg->msg_msgid), msgtype);
@@ -1880,7 +1892,7 @@ proceed:
 	/* if we have an inited client, send result */
 	ret = (int *)NULL;
 
-	rw_rdlock(&client_rwlock[setno]);
+	(void) rw_rdlock(&client_rwlock[setno]);
 	if (check_client(setno, sender)) {
 		commd_debug(MD_MMV_SYSLOG,
 		    "proc_mas: unable to create client for initiator\n");
@@ -1888,7 +1900,7 @@ proceed:
 		ret = mdmn_wakeup_initiator_2(result, client[setno][sender],
 		    sender);
 	}
-	rw_unlock(&client_rwlock[setno]);
+	(void) rw_unlock(&client_rwlock[setno]);
 
 	if (ret == (int *)NULL) {
 		commd_debug(MD_MMV_PROC_M,
@@ -1902,7 +1914,7 @@ proceed:
 		free(ret);
 	}
 
-	rw_unlock(&set_desc_rwlock[setno]);
+	(void) rw_unlock(&set_desc_rwlock[setno]);
 	/* Free all submessages, if there were any */
 	if (nmsgs > 1) {
 		for (curmsg = 0; curmsg < nmsgs; curmsg++) {
@@ -1912,9 +1924,9 @@ proceed:
 	/* Free the result */
 	free_result(result);
 
-	mutex_lock(&mdmn_busy_mutex[setno]);
+	(void) mutex_lock(&mdmn_busy_mutex[setno]);
 	mdmn_mark_class_unbusy(setno, orig_class);
-	mutex_unlock(&mdmn_busy_mutex[setno]);
+	(void) mutex_unlock(&mdmn_busy_mutex[setno]);
 
 
 	/*
@@ -1960,9 +1972,9 @@ mdmn_slave_process_msg(md_mn_msg_t *msg)
 	sender	= msg->msg_sender; /* this is always the master of the set */
 	msgtype	= msg->msg_type;
 
-	rw_rdlock(&set_desc_rwlock[setno]);
+	(void) rw_rdlock(&set_desc_rwlock[setno]);
 	whoami		= set_descriptor[setno]->sd_mn_mynode->nd_nodeid;
-	rw_unlock(&set_desc_rwlock[setno]);
+	(void) rw_unlock(&set_desc_rwlock[setno]);
 
 	result = Zalloc(sizeof (md_mn_result_t));
 	result->mmr_flags	= msg->msg_flags;
@@ -1989,7 +2001,7 @@ mdmn_slave_process_msg(md_mn_msg_t *msg)
 	} else {
 
 		/* Did we already process this message ? */
-		mutex_lock(&mct_mutex[setno][class]);
+		(void) mutex_lock(&mct_mutex[setno][class]);
 		completed = mdmn_check_completion(msg, result);
 
 		if (completed == MDMN_MCT_NOT_DONE) {
@@ -2005,14 +2017,14 @@ mdmn_slave_process_msg(md_mn_msg_t *msg)
 			(void) mdmn_mark_completion(msg, NULL,
 			    MDMN_MCT_IN_PROGRESS);
 
-			mutex_unlock(&mct_mutex[setno][class]);
+			(void) mutex_unlock(&mct_mutex[setno][class]);
 			(*handler)(msg, MD_MSGF_ON_SLAVE, result);
 
 			commd_debug(MD_MMV_PROC_S,
 			    "proc_sla: finished handler for (%d, 0x%llx-%d)\n",
 			    MSGID_ELEMS(msg->msg_msgid));
 
-			mutex_lock(&mct_mutex[setno][class]);
+			(void) mutex_lock(&mct_mutex[setno][class]);
 			/* Mark the message as fully done, store the result */
 			(void) mdmn_mark_completion(msg, result, MDMN_MCT_DONE);
 
@@ -2028,7 +2040,7 @@ mdmn_slave_process_msg(md_mn_msg_t *msg)
 			 * This will be done by the initial message handling
 			 * thread
 			 */
-			mutex_unlock(&mct_mutex[setno][class]);
+			(void) mutex_unlock(&mct_mutex[setno][class]);
 			commd_debug(MD_MMV_PROC_M, "proc_sla: "
 			    "(%d, 0x%llx-%d) is currently being processed\n",
 			    MSGID_ELEMS(msg->msg_msgid), msgtype);
@@ -2043,20 +2055,20 @@ mdmn_slave_process_msg(md_mn_msg_t *msg)
 			    "proc_sla: MCT error for (%d, 0x%llx-%d)\n",
 			    MSGID_ELEMS(msg->msg_msgid));
 		}
-		mutex_unlock(&mct_mutex[setno][class]);
+		(void) mutex_unlock(&mct_mutex[setno][class]);
 	}
 
 	/*
 	 * At this point we have a result (even in an error case)
 	 * that we return to the master.
 	 */
-	rw_rdlock(&set_desc_rwlock[setno]);
+	(void) rw_rdlock(&set_desc_rwlock[setno]);
 	retries = 2; /* we will try two times to send the results */
 	successfully_returned = 0;
 
 	while (!successfully_returned && (retries != 0)) {
 		ret = (int *)NULL;
-		rw_rdlock(&client_rwlock[setno]);
+		(void) rw_rdlock(&client_rwlock[setno]);
 		if (check_client(setno, sender)) {
 			/*
 			 * If we cannot setup the rpc connection to the master,
@@ -2064,7 +2076,7 @@ mdmn_slave_process_msg(md_mn_msg_t *msg)
 			 */
 			commd_debug(MD_MMV_SYSLOG,
 			    "proc_mas: unable to create client for master\n");
-			rw_unlock(&client_rwlock[setno]);
+			(void) rw_unlock(&client_rwlock[setno]);
 			break;
 		} else {
 			ret = mdmn_wakeup_master_2(result,
@@ -2083,13 +2095,13 @@ mdmn_slave_process_msg(md_mn_msg_t *msg)
 				commd_debug(MD_MMV_PROC_S,
 				    "proc_sla: wakeup_master returned NULL\n");
 				/* release reader lock, grab writer lock */
-				rw_unlock(&client_rwlock[setno]);
-				rw_wrlock(&client_rwlock[setno]);
+				(void) rw_unlock(&client_rwlock[setno]);
+				(void) rw_wrlock(&client_rwlock[setno]);
 				mdmn_clnt_destroy(client[setno][sender]);
 				if (client[setno][sender] != (CLIENT *)NULL) {
 					client[setno][sender] = (CLIENT *)NULL;
 				}
-				rw_unlock(&client_rwlock[setno]);
+				(void) rw_unlock(&client_rwlock[setno]);
 				retries--;
 				commd_debug(MD_MMV_PROC_S,
 				    "retries = %d\n", retries);
@@ -2098,16 +2110,16 @@ mdmn_slave_process_msg(md_mn_msg_t *msg)
 			if (*ret != MDMNE_ACK) {
 				commd_debug(MD_MMV_PROC_S, "proc_sla: "
 				    "wakeup_master returned %d\n", *ret);
-				rw_unlock(&client_rwlock[setno]);
+				(void) rw_unlock(&client_rwlock[setno]);
 				break;
 			} else { /* Good case */
 				successfully_returned = 1;
-				rw_unlock(&client_rwlock[setno]);
+				(void) rw_unlock(&client_rwlock[setno]);
 			}
 		}
 	}
 
-	rw_unlock(&set_desc_rwlock[setno]);
+	(void) rw_unlock(&set_desc_rwlock[setno]);
 	commd_debug(MD_MMV_PROC_S, "proc_sla: done (%d, 0x%llx-%d)\n",
 	    MSGID_ELEMS(msg->msg_msgid));
 
@@ -2226,11 +2238,11 @@ mdmn_send_svc_2(md_mn_msg_t *omsg, struct svc_req *rqstp)
 	if (md_mn_set_inited[setno] != MDMN_SET_READY) {
 		/* Can only use the appropriate mutexes if they are inited */
 		if (md_mn_set_inited[setno] & MDMN_SET_MUTEXES) {
-			rw_wrlock(&set_desc_rwlock[setno]);
-			rw_wrlock(&client_rwlock[setno]);
+			(void) rw_wrlock(&set_desc_rwlock[setno]);
+			(void) rw_wrlock(&client_rwlock[setno]);
 			err = mdmn_init_set(setno, MDMN_SET_READY);
-			rw_unlock(&client_rwlock[setno]);
-			rw_unlock(&set_desc_rwlock[setno]);
+			(void) rw_unlock(&client_rwlock[setno]);
+			(void) rw_unlock(&set_desc_rwlock[setno]);
 		} else {
 			err = mdmn_init_set(setno, MDMN_SET_READY);
 		}
@@ -2249,10 +2261,10 @@ mdmn_send_svc_2(md_mn_msg_t *omsg, struct svc_req *rqstp)
 		}
 	}
 
-	mutex_lock(&mdmn_busy_mutex[setno]);
+	(void) mutex_lock(&mdmn_busy_mutex[setno]);
 	if ((mdmn_is_class_suspended(setno, class) == TRUE) &&
 	    ((msg->msg_flags & MD_MSGF_OVERRIDE_SUSPEND) == 0)) {
-		mutex_unlock(&mdmn_busy_mutex[setno]);
+		(void) mutex_unlock(&mdmn_busy_mutex[setno]);
 		resultp = Zalloc(sizeof (md_mn_result_t));
 		resultp->mmr_comm_state = MDMNE_SUSPENDED;
 		mdmn_svc_sendreply(transp, xdr_md_mn_result_t, (char *)resultp);
@@ -2264,7 +2276,7 @@ mdmn_send_svc_2(md_mn_msg_t *omsg, struct svc_req *rqstp)
 		    setno, class, msg->msg_type);
 		return (0);
 	}
-	mutex_unlock(&mdmn_busy_mutex[setno]);
+	(void) mutex_unlock(&mdmn_busy_mutex[setno]);
 
 	/* is this rpc request coming from the local node? */
 	if (check_license(rqstp, 0) == FALSE) {
@@ -2293,8 +2305,8 @@ mdmn_send_svc_2(md_mn_msg_t *omsg, struct svc_req *rqstp)
 	 * Make it a detached thread because it will not communicate with
 	 * anybody thru thr_* mechanisms
 	 */
-	thr_create(NULL, 0, mdmn_send_to_work, (void *) matp, THR_DETACHED,
-	    NULL);
+	(void) thr_create(NULL, 0, mdmn_send_to_work, (void *) matp,
+	    THR_DETACHED, NULL);
 
 	commd_debug(MD_MMV_SEND, "send: done (%d, 0x%llx-%d)\n",
 	    MSGID_ELEMS(msg->msg_msgid));
@@ -2352,11 +2364,11 @@ mdmn_work_svc_2(md_mn_msg_t *omsg, struct svc_req *rqstp)
 	if (md_mn_set_inited[setno] != MDMN_SET_READY) {
 		/* Can only use the appropriate mutexes if they are inited */
 		if (md_mn_set_inited[setno] & MDMN_SET_MUTEXES) {
-			rw_wrlock(&set_desc_rwlock[setno]);
-			rw_wrlock(&client_rwlock[setno]);
+			(void) rw_wrlock(&set_desc_rwlock[setno]);
+			(void) rw_wrlock(&client_rwlock[setno]);
 			err = mdmn_init_set(setno, MDMN_SET_READY);
-			rw_unlock(&client_rwlock[setno]);
-			rw_unlock(&set_desc_rwlock[setno]);
+			(void) rw_unlock(&client_rwlock[setno]);
+			(void) rw_unlock(&set_desc_rwlock[setno]);
 		} else {
 			err = mdmn_init_set(setno, MDMN_SET_READY);
 		}
@@ -2392,29 +2404,29 @@ mdmn_work_svc_2(md_mn_msg_t *omsg, struct svc_req *rqstp)
 		__savetime = gethrtime();
 	}
 
-	mutex_lock(&mdmn_busy_mutex[setno]);
+	(void) mutex_lock(&mdmn_busy_mutex[setno]);
 
 	/* check if class is locked via a call to mdmn_comm_lock_svc_2 */
 	if (mdmn_is_class_locked(setno, class) == TRUE) {
-		mutex_unlock(&mdmn_busy_mutex[setno]);
+		(void) mutex_unlock(&mdmn_busy_mutex[setno]);
 		*retval = MDMNE_CLASS_LOCKED;
 		free_msg(msg);
 		return (retval);
 	}
-	mutex_unlock(&mdmn_busy_mutex[setno]);
+	(void) mutex_unlock(&mdmn_busy_mutex[setno]);
 
 	/* Check if the class is busy right now. Do it only on the master */
-	rw_rdlock(&set_desc_rwlock[setno]);
+	(void) rw_rdlock(&set_desc_rwlock[setno]);
 	if (set_descriptor[setno]->sd_mn_am_i_master) {
-		rw_unlock(&set_desc_rwlock[setno]);
+		(void) rw_unlock(&set_desc_rwlock[setno]);
 		/*
 		 * If the class is currently suspended, don't accept new
 		 * messages, unless they are flagged with an override bit.
 		 */
-		mutex_lock(&mdmn_busy_mutex[setno]);
+		(void) mutex_lock(&mdmn_busy_mutex[setno]);
 		if ((mdmn_is_class_suspended(setno, class) == TRUE) &&
 		    ((msg->msg_flags & MD_MSGF_OVERRIDE_SUSPEND) == 0)) {
-			mutex_unlock(&mdmn_busy_mutex[setno]);
+			(void) mutex_unlock(&mdmn_busy_mutex[setno]);
 			*retval = MDMNE_SUSPENDED;
 			commd_debug(MD_MMV_SEND,
 			    "send: set %d is suspended\n", setno);
@@ -2422,12 +2434,12 @@ mdmn_work_svc_2(md_mn_msg_t *omsg, struct svc_req *rqstp)
 			return (retval);
 		}
 		if (mdmn_mark_class_busy(setno, class) == FALSE) {
-			mutex_unlock(&mdmn_busy_mutex[setno]);
+			(void) mutex_unlock(&mdmn_busy_mutex[setno]);
 			*retval = MDMNE_CLASS_BUSY;
 			free_msg(msg);
 			return (retval);
 		}
-		mutex_unlock(&mdmn_busy_mutex[setno]);
+		(void) mutex_unlock(&mdmn_busy_mutex[setno]);
 		/*
 		 * Because the real processing of the message takes time we
 		 * create a thread for it. So the master thread can continue
@@ -2437,7 +2449,7 @@ mdmn_work_svc_2(md_mn_msg_t *omsg, struct svc_req *rqstp)
 		    (void *(*)(void *))mdmn_master_process_msg, (void *)msg,
 		    THR_DETACHED|THR_SUSPENDED, &tid);
 	} else {
-		rw_unlock(&set_desc_rwlock[setno]);
+		(void) rw_unlock(&set_desc_rwlock[setno]);
 		*retval = thr_create(NULL, 0,
 		    (void *(*)(void *)) mdmn_slave_process_msg, (void *)msg,
 		    THR_DETACHED|THR_SUSPENDED, &tid);
@@ -2450,7 +2462,7 @@ mdmn_work_svc_2(md_mn_msg_t *omsg, struct svc_req *rqstp)
 	}
 
 	/* Now run the new thread */
-	thr_continue(tid);
+	(void) thr_continue(tid);
 
 	commd_debug(MD_MMV_WORK,
 	    "work: done (%d, 0x%llx-%d), set=%d, class=%d, type=%d\n",
@@ -2486,11 +2498,11 @@ mdmn_wakeup_initiator_svc_2(md_mn_result_t *res, struct svc_req *rqstp)
 		/* set not ready means we just crashed are restarted now */
 		/* Can only use the appropriate mutexes if they are inited */
 		if (md_mn_set_inited[setno] & MDMN_SET_MUTEXES) {
-			rw_wrlock(&set_desc_rwlock[setno]);
-			rw_wrlock(&client_rwlock[setno]);
+			(void) rw_wrlock(&set_desc_rwlock[setno]);
+			(void) rw_wrlock(&client_rwlock[setno]);
 			err = mdmn_init_set(setno, MDMN_SET_READY);
-			rw_unlock(&client_rwlock[setno]);
-			rw_unlock(&set_desc_rwlock[setno]);
+			(void) rw_unlock(&client_rwlock[setno]);
+			(void) rw_unlock(&set_desc_rwlock[setno]);
 		} else {
 			err = mdmn_init_set(setno, MDMN_SET_READY);
 		}
@@ -2517,7 +2529,7 @@ mdmn_wakeup_initiator_svc_2(md_mn_result_t *res, struct svc_req *rqstp)
 	    "wake_ini: received (%d, 0x%llx-%d) set=%d, class=%d, type=%d\n",
 	    MSGID_ELEMS(res->mmr_msgid), setno, class, res->mmr_msgtype);
 
-	mutex_lock(mx);
+	(void) mutex_lock(mx);
 
 	/*
 	 * Search the initiator wakeup table.
@@ -2543,9 +2555,9 @@ mdmn_wakeup_initiator_svc_2(md_mn_result_t *res, struct svc_req *rqstp)
 		    MSGID_ELEMS(res->mmr_msgid));
 		*retval = MDMNE_NO_WAKEUP_ENTRY;
 	}
-	mutex_unlock(mx);
+	(void) mutex_unlock(mx);
 	/* less work for check_timeouts */
-	mutex_lock(&check_timeout_mutex);
+	(void) mutex_lock(&check_timeout_mutex);
 	if (messages_on_their_way == 0) {
 		commd_debug(MD_MMV_WAKE_I,
 		    "Oops, messages_on_their_way < 0 (%d, 0x%llx-%d)\n",
@@ -2553,7 +2565,7 @@ mdmn_wakeup_initiator_svc_2(md_mn_result_t *res, struct svc_req *rqstp)
 	} else {
 		messages_on_their_way--;
 	}
-	mutex_unlock(&check_timeout_mutex);
+	(void) mutex_unlock(&check_timeout_mutex);
 	xdr_free(xdr_md_mn_result_t, (caddr_t)res);
 
 	return (retval);
@@ -2596,11 +2608,11 @@ mdmn_wakeup_master_svc_2(md_mn_result_t *ores, struct svc_req *rqstp)
 		/* set not ready means we just crashed are restarted now */
 		/* Can only use the appropriate mutexes if they are inited */
 		if (md_mn_set_inited[setno] & MDMN_SET_MUTEXES) {
-			rw_wrlock(&set_desc_rwlock[setno]);
-			rw_wrlock(&client_rwlock[setno]);
+			(void) rw_wrlock(&set_desc_rwlock[setno]);
+			(void) rw_wrlock(&client_rwlock[setno]);
 			err = mdmn_init_set(setno, MDMN_SET_READY);
-			rw_unlock(&client_rwlock[setno]);
-			rw_unlock(&set_desc_rwlock[setno]);
+			(void) rw_unlock(&client_rwlock[setno]);
+			(void) rw_unlock(&set_desc_rwlock[setno]);
 		} else {
 			err = mdmn_init_set(setno, MDMN_SET_READY);
 		}
@@ -2639,14 +2651,14 @@ mdmn_wakeup_master_svc_2(md_mn_result_t *ores, struct svc_req *rqstp)
 	 * We store the results in the appropriate slot and
 	 * wakeup the thread (mdmn_master_process_msg()) waiting for them.
 	 */
-	mutex_lock(mx);
+	(void) mutex_lock(mx);
 	mdmn_get_master_table_id(setno, class, &master_table_id);
 	sender = mdmn_get_master_table_addr(setno, class);
 
 	if (MSGID_CMP(&(master_table_id), &(res->mmr_msgid))) {
 		if (sender == res->mmr_sender) {
 			mdmn_set_master_table_res(setno, class, res);
-			cond_signal(cv);
+			(void) cond_signal(cv);
 			*retval = MDMNE_ACK;
 		} else {
 			/* id is correct but wrong sender (I smell a timeout) */
@@ -2668,7 +2680,7 @@ mdmn_wakeup_master_svc_2(md_mn_result_t *ores, struct svc_req *rqstp)
 		*retval = MDMNE_NO_WAKEUP_ENTRY;
 	}
 
-	mutex_unlock(mx);
+	(void) mutex_unlock(mx);
 
 	return (retval);
 }
@@ -2727,7 +2739,7 @@ mdmn_comm_lock_svc_2(md_mn_set_and_class_t *msc, struct svc_req *rqstp)
 	}
 
 	commd_debug(MD_MMV_MISC, "lock: set=%d, class=%d\n", setno, class);
-	mutex_lock(&mdmn_busy_mutex[setno]);
+	(void) mutex_lock(&mdmn_busy_mutex[setno]);
 	if (class != MD_MSG_CLASS0) {
 		mdmn_mark_class_locked(setno, class);
 	} else {
@@ -2736,7 +2748,7 @@ mdmn_comm_lock_svc_2(md_mn_set_and_class_t *msc, struct svc_req *rqstp)
 			mdmn_mark_class_locked(setno, class);
 		}
 	}
-	mutex_unlock(&mdmn_busy_mutex[setno]);
+	(void) mutex_unlock(&mdmn_busy_mutex[setno]);
 
 	*retval = MDMNE_ACK;
 	return (retval);
@@ -2783,7 +2795,7 @@ mdmn_comm_unlock_svc_2(md_mn_set_and_class_t *msc, struct svc_req *rqstp)
 	}
 	commd_debug(MD_MMV_MISC, "unlock: set=%d, class=%d\n", setno, class);
 
-	mutex_lock(&mdmn_busy_mutex[setno]);
+	(void) mutex_lock(&mdmn_busy_mutex[setno]);
 	if (class != MD_MSG_CLASS0) {
 		mdmn_mark_class_unlocked(setno, class);
 	} else {
@@ -2792,7 +2804,7 @@ mdmn_comm_unlock_svc_2(md_mn_set_and_class_t *msc, struct svc_req *rqstp)
 			mdmn_mark_class_unlocked(setno, class);
 		}
 	}
-	mutex_unlock(&mdmn_busy_mutex[setno]);
+	(void) mutex_unlock(&mdmn_busy_mutex[setno]);
 
 	*retval = MDMNE_ACK;
 	return (retval);
@@ -2896,7 +2908,7 @@ mdmn_comm_suspend_svc_2(md_mn_set_and_class_t *msc, struct svc_req *rqstp)
 			(void) mdmn_init_set(setno, MDMN_SET_MUTEXES);
 		}
 
-		mutex_lock(&mdmn_busy_mutex[setno]);
+		(void) mutex_lock(&mdmn_busy_mutex[setno]);
 		/* shall we drain all classes of this set? */
 		if (oclass == MD_COMM_ALL_CLASSES) {
 			for (class = 1; class < MD_MN_NCLASSES; class ++) {
@@ -2920,7 +2932,7 @@ mdmn_comm_suspend_svc_2(md_mn_set_and_class_t *msc, struct svc_req *rqstp)
 				failure++;
 			}
 		}
-		mutex_unlock(&mdmn_busy_mutex[setno]);
+		(void) mutex_unlock(&mdmn_busy_mutex[setno]);
 	}
 	/* If one or more sets are not entirely drained, failure is non-zero */
 	if (failure != 0) {
@@ -3012,7 +3024,7 @@ mdmn_comm_resume_svc_2(md_mn_set_and_class_t *msc, struct svc_req *rqstp)
 			(void) mdmn_init_set(setno, MDMN_SET_MUTEXES);
 		}
 
-		mutex_lock(&mdmn_busy_mutex[setno]);
+		(void) mutex_lock(&mdmn_busy_mutex[setno]);
 
 		if (oclass == MD_COMM_ALL_CLASSES) {
 			int end_class = 1;
@@ -3054,7 +3066,7 @@ mdmn_comm_resume_svc_2(md_mn_set_and_class_t *msc, struct svc_req *rqstp)
 			mdmn_mark_class_resumed(setno, oclass, MDMN_SUSPEND_1);
 		}
 
-		mutex_unlock(&mdmn_busy_mutex[setno]);
+		(void) mutex_unlock(&mdmn_busy_mutex[setno]);
 	}
 
 	*retval = MDMNE_ACK;
@@ -3084,14 +3096,14 @@ mdmn_comm_reinit_set_svc_2(set_t *setnop, struct svc_req *rqstp)
 
 	commd_debug(MD_MMV_MISC, "reinit: set=%d\n", setno);
 
-	rw_rdlock(&set_desc_rwlock[setno]);
+	(void) rw_rdlock(&set_desc_rwlock[setno]);
 	/*
 	 * We assume, that all messages have been suspended previously.
 	 *
 	 * As we are modifying lots of clients here we grab the client_rwlock
 	 * in writer mode. This ensures, no new messages come in.
 	 */
-	rw_wrlock(&client_rwlock[setno]);
+	(void) rw_wrlock(&client_rwlock[setno]);
 	/* This set is no longer initialized */
 
 	if ((set_descriptor[setno] != NULL) &&
@@ -3120,8 +3132,8 @@ mdmn_comm_reinit_set_svc_2(set_t *setnop, struct svc_req *rqstp)
 
 	commd_debug(MD_MMV_MISC, "reinit: done init_set(%d)\n", setno);
 
-	rw_unlock(&client_rwlock[setno]);
-	rw_unlock(&set_desc_rwlock[setno]);
+	(void) rw_unlock(&client_rwlock[setno]);
+	(void) rw_unlock(&set_desc_rwlock[setno]);
 	*retval = MDMNE_ACK;
 	return (retval);
 }

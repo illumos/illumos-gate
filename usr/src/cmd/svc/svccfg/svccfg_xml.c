@@ -230,7 +230,7 @@ lxml_init()
 		/*
 		 * DTD validation, with line numbers.
 		 */
-		xmlLineNumbersDefault(1);
+		(void) xmlLineNumbersDefault(1);
 		xmlLoadExtDtdDefaultValue |= XML_DETECT_IDS;
 		xmlLoadExtDtdDefaultValue |= XML_COMPLETE_ATTRS;
 	}

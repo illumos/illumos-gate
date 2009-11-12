@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -921,7 +921,8 @@ pt_exec(mdb_tgt_t *t, int vid, void *private)
 		state = mdb_get_config();
 		envlen = strlen(MDB_CONFIG_ENV_VAR) + 1 + strlen(state) + 1;
 		env = mdb_alloc(envlen, UM_SLEEP);
-		snprintf(env, envlen, "%s=%s", MDB_CONFIG_ENV_VAR, state);
+		(void) snprintf(env, envlen,
+		    "%s=%s", MDB_CONFIG_ENV_VAR, state);
 
 		(void) putenv(env);
 

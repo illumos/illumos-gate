@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Driver-side functions for loading and unloading dmods.
@@ -85,7 +83,7 @@ kctl_find_module(char *modname, char *fullname, size_t fullnamelen)
 			return (0);
 		kobj_close(fd);
 
-		strcpy(fullname, modname);
+		(void) strcpy(fullname, modname);
 
 		return (1);
 	}

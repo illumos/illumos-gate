@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<string.h>
 #include	"machdep.h"
@@ -129,7 +128,7 @@ apply_reloc(void *vrel, Reloc *reloc, const char *name, uchar_t *oaddr,
 
 		addr = (uintptr_t)oaddr - rel->r_offset;
 		/* LINTED */
-		elf_plt_write((uintptr_t)addr, vaddr, rel,
+		(void) elf_plt_write((uintptr_t)addr, vaddr, rel,
 		    (uintptr_t)value, reloc->r_pltndx);
 
 	} else if (type == R_SPARC_COPY) {

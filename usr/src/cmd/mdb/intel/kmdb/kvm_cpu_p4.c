@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This plugin supports debugging functionality unique to Intel processors based
@@ -90,11 +88,12 @@ kmt_p4_branch(uintptr_t from, uintptr_t to, int verbose)
 
 			if ((next = mdb_dis_ins2str(mdb.m_disasm, mdb.m_target,
 			    MDB_TGT_AS_VIRT, buf, sizeof (buf), addr)) == addr)
-				strcpy(buf, "???");
+				(void) strcpy(buf, "???");
 
 			for (c = buf + strlen(buf) - 1;
 			    c > buf && (*c == ' ' || *c == '\t');
-			    c--);
+			    c--)
+			;
 
 			if (*c == '>') {
 				while (c > buf && *c != '<')

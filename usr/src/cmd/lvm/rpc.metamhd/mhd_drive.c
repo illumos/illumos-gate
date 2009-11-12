@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -616,7 +616,7 @@ free_pln_cache(void)
 {
 	struct pln_cache	*p, *n = NULL;
 
-	mutex_lock(&mhd_pln_mx);
+	(void) mutex_lock(&mhd_pln_mx);
 	for (p = pln_cache_anchor; p != NULL; p = n) {
 		n = p->next;
 		Free(p->pln_name);
@@ -624,7 +624,7 @@ free_pln_cache(void)
 	}
 
 	pln_cache_anchor = NULL;
-	mutex_unlock(&mhd_pln_mx);
+	(void) mutex_unlock(&mhd_pln_mx);
 }
 
 /*
@@ -648,9 +648,9 @@ match_SSA200(
 	if ((pln_ctlr_name = get_pln_ctlr_name(path)) == NULL)
 		return;
 
-	mutex_lock(&mhd_pln_mx);
+	(void) mutex_lock(&mhd_pln_mx);
 	if (find_pln_cache(pln_ctlr_name, &ctype) == 1) {
-		mutex_unlock(&mhd_pln_mx);
+		(void) mutex_unlock(&mhd_pln_mx);
 		if (ctype != MHD_CTLR_SSA200)
 			return;
 
@@ -661,7 +661,7 @@ match_SSA200(
 	}
 
 	if ((fd = open(pln_ctlr_name, (O_RDONLY|O_NDELAY), 0)) < 0) {
-		mutex_unlock(&mhd_pln_mx);
+		(void) mutex_unlock(&mhd_pln_mx);
 		Free(pln_ctlr_name);
 		return;
 	}
@@ -678,7 +678,7 @@ match_SSA200(
 	ucmd.uscsi_flags = USCSI_READ | USCSI_ISOLATE | USCSI_DIAGNOSE;
 	ucmd.uscsi_timeout = 30;
 	if (ioctl(fd, USCSICMD, &ucmd)) {
-		mutex_unlock(&mhd_pln_mx);
+		(void) mutex_unlock(&mhd_pln_mx);
 		(void) close(fd);
 		MHDPRINTF(("%s: USCSICMD(SCMD_INQUIRY): failed errno %d\n",
 		    pln_ctlr_name, errno));
@@ -708,7 +708,7 @@ match_SSA200(
 
 out:
 	add_pln_cache(pln_ctlr_name, cinfop->mhc_ctype);
-	mutex_unlock(&mhd_pln_mx);
+	(void) mutex_unlock(&mhd_pln_mx);
 }
 
 /*

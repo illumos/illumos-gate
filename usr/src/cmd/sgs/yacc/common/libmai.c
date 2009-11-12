@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <locale.h>
 
@@ -39,6 +37,6 @@ int
 main(int argc, char **argv)
 {
 	(void) setlocale(LC_ALL, "");
-	yyparse();
+	(void) yyparse();
 	return (0);
 }

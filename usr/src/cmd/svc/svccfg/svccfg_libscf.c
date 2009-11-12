@@ -9624,7 +9624,7 @@ make_archive(int flags)
 		if (strcmp(exp_str, SCF_LEGACY_SERVICE) == 0)
 			continue;
 
-		xmlAddChild(sb, export_service(svc, flags));
+		(void) xmlAddChild(sb, export_service(svc, flags));
 	}
 
 	free(exp_str);
@@ -9831,7 +9831,7 @@ lscf_profile_extract(const char *filename)
 			scfdie();
 
 		if (snode->children != NULL)
-			xmlAddChild(sb, snode);
+			(void) xmlAddChild(sb, snode);
 		else
 			xmlFreeNode(snode);
 	}

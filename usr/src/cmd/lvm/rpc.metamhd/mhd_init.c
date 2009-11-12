@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mhd_local.h"
 
@@ -296,19 +294,19 @@ check_sys(
 		return (0);
 
 	/* single thread (not really needed if daemon stays single threaded) */
-	mutex_lock(&mx);
+	(void) mutex_lock(&mx);
 
 	/* check for remote root or METAMHD_GID */
 	/*LINTED*/
 	sys_credp = (struct authsys_parms *)rqstp->rq_clntcred;
 	if ((check_gid14(sys_credp->aup_uid) == 0) ||
 	    (check_host(rqstp) == 0)) {
-		mutex_unlock(&mx);
+		(void) mutex_unlock(&mx);
 		return (0);
 	}
 
 	/* return failure */
-	mutex_unlock(&mx);
+	(void) mutex_unlock(&mx);
 	return (mhd_error(mhep, EACCES, myname));
 }
 

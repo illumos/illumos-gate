@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <limits.h>
 #include <stdio.h>
@@ -688,7 +686,7 @@ update_field(fru_nodehdl_t nodehdl, char *field_name, char *field_value)
 
 	/* field not found add the the record in one of the segment */
 	for (cnt = 0; cnt < NUM_OF_SEGMENT; cnt++) {
-		fru_list_elems_in(nodehdl, segment_name[cnt], &elem);
+		(void) fru_list_elems_in(nodehdl, segment_name[cnt], &elem);
 		for (elem_cnt = 0; elem_cnt < elem.num; elem_cnt++) {
 			if ((strcmp(*ptr, elem.strs[elem_cnt])) == 0) {
 				add_flag = 0;

@@ -407,7 +407,7 @@ autos3_monitor(void)
 	ret = ioctl(fd, SRN_IOC_AUTOSX, NULL);
 	if (ret == -1) {
 		logerror("Ioctl SRN_IOC_AUTOSX failed: %s", strerror(errno));
-		close(fd);
+		(void) close(fd);
 		thr_exit((void *) errno);
 	}
 	poll_fd.fd = fd;
@@ -422,7 +422,7 @@ autos3_monitor(void)
 				continue;
 			default:
 				logerror("Poll error: %s", strerror(errno));
-				close(fd);
+				(void) close(fd);
 				thr_exit((void *) errno);
 			}
 		}
@@ -430,7 +430,7 @@ autos3_monitor(void)
 		ret = ioctl(fd, SRN_IOC_NEXTEVENT, &srn_event);
 		if (ret == -1) {
 			logerror("ioctl error: %s", strerror(errno));
-			close(fd);
+			(void) close(fd);
 			thr_exit((void *) errno);
 		}
 		switch (srn_event.ae_type) {
@@ -461,7 +461,7 @@ read_cpr_config(void)
 
 	if (read(asfd, (void *)&asinfo, sizeof (asinfo)) != sizeof (asinfo)) {
 		logerror("Unable to read CPR config file '%s'", CPR_CONFIG);
-		close(asfd);
+		(void) close(asfd);
 		return (-1);
 	}
 
@@ -720,14 +720,14 @@ check_shutdown(time_t *now, hrtime_t *hr_now)
 		"Since autowakeup time is less than 3 minutes away, "
 		"autoshutdown will not occur.");
 						shutdown_time = *now + 180;
-						close(tod_fd);
+						(void) close(tod_fd);
 						return;
 					}
 					if (ioctl(tod_fd, TOD_SET_ALARM,
 					    &wakeup_time) == -1) {
 						logerror("Unable to program TOD"
 						    " alarm for autowakeup.");
-						close(tod_fd);
+						(void) close(tod_fd);
 						return;
 					}
 				}
@@ -740,7 +740,7 @@ check_shutdown(time_t *now, hrtime_t *hr_now)
 					    NULL) == -1)
 						logerror("Unable to clear "
 						    "alarm in TOD device.");
-					close(tod_fd);
+					(void) close(tod_fd);
 				}
 
 				(void) time(now);
@@ -860,7 +860,7 @@ is_ok2shutdown(time_t *now)
 
 ckdone:
 	if (prom_fd != -1)
-		close(prom_fd);
+		(void) close(prom_fd);
 	return (ret);
 }
 
@@ -1007,7 +1007,7 @@ poweroff(const char *msg, char **cmd_argv)
 
 	if (stat("/dev/console", &statbuf) == -1 ||
 	    (pwd = getpwuid(statbuf.st_uid)) == NULL) {
-		mutex_unlock(&poweroff_mutex);
+		(void) mutex_unlock(&poweroff_mutex);
 		return (1);
 	}
 
@@ -1016,7 +1016,7 @@ poweroff(const char *msg, char **cmd_argv)
 
 	if (*cmd_argv == NULL) {
 		logerror("No command to run.");
-		mutex_unlock(&poweroff_mutex);
+		(void) mutex_unlock(&poweroff_mutex);
 		return (1);
 	}
 
@@ -1026,7 +1026,7 @@ poweroff(const char *msg, char **cmd_argv)
 		free(home);
 		free(user);
 		logerror("No memory.");
-		mutex_unlock(&poweroff_mutex);
+		(void) mutex_unlock(&poweroff_mutex);
 		return (1);
 	}
 	(void) strcpy(home, ehome);
@@ -1059,7 +1059,7 @@ poweroff(const char *msg, char **cmd_argv)
 		free(home);
 		free(user);
 		if (child == -1) {
-			mutex_unlock(&poweroff_mutex);
+			(void) mutex_unlock(&poweroff_mutex);
 			return (1);
 		}
 	}
@@ -1068,11 +1068,11 @@ poweroff(const char *msg, char **cmd_argv)
 		pid = wait(&status);
 	if (WEXITSTATUS(status)) {
 		(void) syslog(LOG_ERR, "Failed to exec \"%s\".", cmd_argv[0]);
-		mutex_unlock(&poweroff_mutex);
+		(void) mutex_unlock(&poweroff_mutex);
 		return (1);
 	}
 
-	mutex_unlock(&poweroff_mutex);
+	(void) mutex_unlock(&poweroff_mutex);
 	return (0);
 }
 
@@ -1251,7 +1251,7 @@ attach_devices(void *arg)
 {
 	di_node_t root_node;
 
-	sleep(60);	/* let booting finish first */
+	(void) sleep(60);	/* let booting finish first */
 
 	if ((root_node = di_init("/", DINFOFORCE)) == DI_NODE_NIL) {
 		logerror("Failed to attach devices.");

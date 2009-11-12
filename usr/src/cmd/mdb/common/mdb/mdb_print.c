@@ -531,7 +531,7 @@ cmd_enum(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		(void) mdb_snprintf(tn2, sizeof (tn2), "enum %s", type);
 
 		if (mdb_ctf_lookup_by_name(tn2, &id) == 0) {
-			strcpy(type, tn2);
+			(void) strcpy(type, tn2);
 		} else if (mdb_ctf_lookup_by_name(type, &id) != 0) {
 			mdb_warn("types '%s', '%s'", tn2, type);
 			return (DCMD_ERR);

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "metad_local.h"
 #include <metad.h>
@@ -1396,7 +1394,7 @@ mncreateset(
 	mnsr->sr_flags |= MD_SR_ADD;
 
 	mnsr->sr_flags |= MD_SR_MN;
-	strcpy(mnsr->sr_master_nodenm, master_nodenm);
+	(void) strcpy(mnsr->sr_master_nodenm, master_nodenm);
 	mnsr->sr_master_nodeid = master_nodeid;
 
 	mnsr->sr_mhiargs = defmhiargs;
@@ -2967,7 +2965,7 @@ upd_setmaster(
 
 	if (MD_MNSET_REC(sr)) {
 		mnsr = (struct md_mnset_record *)sr;
-		strlcpy(mnsr->sr_master_nodenm, master_nodenm,
+		(void) strlcpy(mnsr->sr_master_nodenm, master_nodenm,
 		    MD_MAX_NODENAME);
 		mnsr->sr_master_nodeid = master_nodeid;
 		if (master_nodeid != 0) {
@@ -3068,7 +3066,7 @@ joinset(
 	 * mddoors itself takes care there will be
 	 * only one instance running, so starting it twice won't hurt
 	 */
-	pclose(popen(MDDOORS, "w"));
+	(void) pclose(popen(MDDOORS, "w"));
 
 	/*
 	 * Get latest copy of data.  If a drive was just added causing
@@ -3136,7 +3134,7 @@ joinset(
 				mbp.c_blk_flags = MDDB_BLOCK_PARSE;
 				if (metaioctl(MD_MN_MDDB_BLOCK, &mbp,
 				    &mbp.c_mde, NULL)) {
-					mdstealerror(&xep, &mbp.c_mde);
+					(void) mdstealerror(&xep, &mbp.c_mde);
 					mde_perror(ep, gettext(
 					    "Could not block set %s"),
 					    sp->setname);
@@ -3160,7 +3158,7 @@ joinset(
 				 */
 				if (mdisok(ep) ||
 				    mdismddberror(ep, MDE_DB_ACCOK)) {
-					mdstealerror(ep, &xep);
+					(void) mdstealerror(ep, &xep);
 				}
 			}
 		}
@@ -5004,7 +5002,7 @@ mdrpc_mn_is_stale_2_svc(
 			return (TRUE);
 
 		if (metaioctl(MD_DB_GETDEV, &c, &c.c_mde, NULL) != 0) {
-			mdstealerror(ep, &c.c_mde);
+			(void) mdstealerror(ep, &c.c_mde);
 			return (TRUE);
 		}
 
@@ -5550,7 +5548,7 @@ mdrpc_mn_mirror_resync_all_2_svc(
 		/*
 		 * Need to invoke a metasync on a node newly added to a set.
 		 */
-		meta_mn_mirror_resync_all(&(setno_args->setno));
+		(void) meta_mn_mirror_resync_all(&(setno_args->setno));
 
 		err = svc_fini(ep);
 		return (TRUE);
@@ -5587,7 +5585,7 @@ mdrpc_mn_sp_update_abr_2_svc(
 			return (TRUE);
 		setno_args = &args->mdrpc_setno_2_args_u.rev1;
 
-		meta_mn_sp_update_abr(&(setno_args->setno));
+		(void) meta_mn_sp_update_abr(&(setno_args->setno));
 
 		err = svc_fini(ep);
 		return (TRUE);

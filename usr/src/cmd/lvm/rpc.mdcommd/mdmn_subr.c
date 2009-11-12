@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,7 +113,7 @@ mdmn_mark_class_unbusy(set_t setno, md_mn_msgclass_t class)
 	commd_debug(MD_MMV_MISC, "unbusy: set=%d, class=%d\n", setno, class);
 	mdmn_busy[setno][class] &= ~MDMN_BUSY;
 	/* something changed, inform threads waiting for that */
-	cond_signal(&mdmn_busy_cv[setno]);
+	(void) cond_signal(&mdmn_busy_cv[setno]);
 
 	if ((mdmn_busy[setno][class] & MDMN_SUSPEND_ALL) == 0) {
 		return;
@@ -410,7 +410,7 @@ commd_debug(uint_t debug_class, const char *message, ...)
 		/* Are timestamps activated ? */
 		if (md_commd_global_verb & MD_MMV_TIMESTAMP) {
 			/* print time since last TRESET in usecs */
-			fprintf(commdout, "[%s]",
+			(void) fprintf(commdout, "[%s]",
 			    meta_print_hrtime(gethrtime() - __savetime));
 		}
 		/* Now print the real message */
@@ -559,7 +559,7 @@ mdmn_mark_completion(md_mn_msg_t *msg, md_mn_result_t *result, uint_t flag)
 	}
 	offset_in_page = (uint_t)(caddr_t)mce % sysconf(_SC_PAGESIZE);
 
-	memset(mce, 0, sizeof (md_mn_mce_t));
+	(void) memset(mce, 0, sizeof (md_mn_mce_t));
 
 	MSGID_COPY(&msg->msg_msgid, &mce->mce_result.mmr_msgid);
 	if (flag == MDMN_MCT_IN_PROGRESS) {
@@ -593,14 +593,14 @@ mdmn_mark_completion(md_mn_msg_t *msg, md_mn_result_t *result, uint_t flag)
 	/* if mmr_exitval is zero, we store stdout, otherwise stderr */
 	if (result->mmr_exitval == 0) {
 		if (result->mmr_out_size > 0) {
-			memcpy(mce->mce_data, result->mmr_out,
+			(void) memcpy(mce->mce_data, result->mmr_out,
 			    result->mmr_out_size);
 			mce->mce_result.mmr_out_size = result->mmr_out_size;
 		}
 	} else {
 		if (result->mmr_err_size > 0) {
 			mce->mce_result.mmr_err_size = result->mmr_err_size;
-			memcpy(mce->mce_data, result->mmr_err,
+			(void) memcpy(mce->mce_data, result->mmr_err,
 			    result->mmr_err_size);
 		}
 	}
@@ -609,7 +609,7 @@ mdmn_mark_completion(md_mn_msg_t *msg, md_mn_result_t *result, uint_t flag)
 
 mmc_out:
 	/* now flush this entry to disk */
-	msync((caddr_t)mce - offset_in_page,
+	(void) msync((caddr_t)mce - offset_in_page,
 	    sizeof (md_mn_mce_t) + offset_in_page, MS_SYNC);
 	return (MDMN_MCT_DONE);
 }
@@ -683,12 +683,14 @@ mdmn_check_completion(md_mn_msg_t *msg, md_mn_result_t *result)
 		if (result->mmr_exitval == 0) {
 			if (outsize != 0) {
 				result->mmr_out = Zalloc(outsize);
-				memcpy(result->mmr_out, mce->mce_data, outsize);
+				(void) memcpy(result->mmr_out, mce->mce_data,
+				    outsize);
 			}
 		} else {
 			if (errsize != 0) {
 				result->mmr_err = Zalloc(errsize);
-				memcpy(result->mmr_err, mce->mce_data, errsize);
+				(void) memcpy(result->mmr_err, mce->mce_data,
+				    errsize);
 			}
 		}
 		commd_debug(MD_MMV_MISC,

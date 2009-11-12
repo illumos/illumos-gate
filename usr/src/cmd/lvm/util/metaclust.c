@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,7 +160,7 @@ sigalarmhandler(int sig)
 		 *	- signal sent but child not killed
 		 *	- waitpid failed/interrupted
 		 */
-		sleep(2);
+		(void) sleep(2);
 		while ((ret = waitpid(c_pid, &stat_loc, WNOHANG)) < 0) {
 			if (errno != EINTR) {
 				break;
@@ -633,7 +633,7 @@ usage(mdsetname_t *sp, int eval)
 	    "\t%s [-V | -? | -h]\n"),
 	    myname, myname, myname, myname);
 	if (!eval) {
-		fprintf(stderr, gettext("\n"
+		(void) fprintf(stderr, gettext("\n"
 		    "\tValid debug (-d) levels are 1-%d for increasing "
 		    "verbosity.\n\tDefault is -d 3.\n\n"
 		    "\tValid step values are: return | step1 | step2 | "
@@ -754,13 +754,13 @@ main(int argc, char **argv)
 			} else if (optopt == 'V') {
 				int	i;
 
-				fprintf(stdout, gettext(
+				(void) fprintf(stdout, gettext(
 				    "%s: Versions Supported:"), myname);
 				for (i = 0; i < version_table_size; i++) {
-					fprintf(stdout, " %s",
+					(void) fprintf(stdout, " %s",
 					    version_table[i]);
 				}
-				fprintf(stdout, "\n");
+				(void) fprintf(stdout, "\n");
 				md_exit(sp, 0);
 			}
 			/*FALLTHROUGH*/
@@ -932,7 +932,7 @@ main(int argc, char **argv)
 				mbp.c_blk_flags = MDDB_BLOCK_PARSE;
 				if (metaioctl(MD_MN_MDDB_BLOCK, &mbp,
 				    &mbp.c_mde, NULL)) {
-					mdstealerror(ep, &mbp.c_mde);
+					(void) mdstealerror(ep, &mbp.c_mde);
 					mde_perror(ep, gettext("Could not "
 					    "block set %s"), sp->setname);
 					md_exit(sp, 1);
@@ -943,7 +943,7 @@ main(int argc, char **argv)
 			while ((ret_val = mdmn_suspend(setno,
 			    MD_COMM_ALL_CLASSES, commd_timeout)) ==
 			    MDE_DS_COMMDCTL_SUSPEND_NYD) {
-				sleep(1);
+				(void) sleep(1);
 			}
 
 			if (ret_val) {
@@ -967,7 +967,7 @@ main(int argc, char **argv)
 			sf.sf_magic = MDDB_SETFLAGS_MAGIC;
 			if (metaioctl(MD_MN_SET_SETFLAGS, &sf,
 			    &sf.sf_mde, NULL)) {
-				mdstealerror(ep, &sf.sf_mde);
+				(void) mdstealerror(ep, &sf.sf_mde);
 				mde_perror(ep, gettext("Could not set "
 				    "start_step flag for set %s"), sp->setname);
 				md_exit(sp, 1);
@@ -1138,7 +1138,7 @@ main(int argc, char **argv)
 				mbp.c_blk_flags = MDDB_BLOCK_PARSE;
 				if (metaioctl(MD_MN_MDDB_BLOCK, &mbp,
 				    &mbp.c_mde, NULL)) {
-					mdstealerror(ep, &mbp.c_mde);
+					(void) mdstealerror(ep, &mbp.c_mde);
 					mde_perror(ep, gettext("Could not "
 					    "block set %s"), sp->setname);
 					md_exit(sp, 1);
@@ -1149,7 +1149,7 @@ main(int argc, char **argv)
 			while ((ret_val = mdmn_suspend(setno,
 			    MD_COMM_ALL_CLASSES, commd_timeout)) ==
 			    MDE_DS_COMMDCTL_SUSPEND_NYD) {
-				sleep(1);
+				(void) sleep(1);
 			}
 
 			if (ret_val) {
@@ -1577,7 +1577,7 @@ main(int argc, char **argv)
 					md_exit(sp, 1);
 				}
 				mdclrerror(ep);
-				meta_unlock(sp, ep);
+				(void) meta_unlock(sp, ep);
 				continue;
 			}
 
@@ -1599,7 +1599,7 @@ main(int argc, char **argv)
 			cfg.c_setno = sp->setno;
 			if (metaioctl(MD_DB_GETDEV, &cfg, &cfg.c_mde,
 			    NULL) != 0) {
-				mdstealerror(ep, &cfg.c_mde);
+				(void) mdstealerror(ep, &cfg.c_mde);
 				mde_perror(ep, gettext("Could "
 				    "not get set %s information"),
 				    sp->setname);
@@ -1608,7 +1608,7 @@ main(int argc, char **argv)
 
 			/* Don't do anything else if set is stale */
 			if (cfg.c_flags & MDDB_C_STALE) {
-				meta_unlock(sp, ep);
+				(void) meta_unlock(sp, ep);
 				mdclrerror(ep);
 				continue;
 			}
@@ -1618,7 +1618,7 @@ main(int argc, char **argv)
 				md_exit(sp, 1);
 			}
 
-			meta_unlock(sp, ep);
+			(void) meta_unlock(sp, ep);
 
 			meta_mc_log(MC_LOG3, gettext("Step3 - rpc.mdcommd "
 			    "re-initialised and mirror owners reset for "
@@ -1763,7 +1763,7 @@ main(int argc, char **argv)
 				cfg.c_setno = sp->setno;
 				if (metaioctl(MD_DB_GETDEV, &cfg, &cfg.c_mde,
 				    NULL) != 0) {
-					mdstealerror(ep, &cfg.c_mde);
+					(void) mdstealerror(ep, &cfg.c_mde);
 					mde_perror(ep, gettext("Could "
 					    "not get set %s information"),
 					    sp->setname);
@@ -1789,7 +1789,7 @@ main(int argc, char **argv)
 				mbp.c_blk_flags = MDDB_UNBLOCK_PARSE;
 				if (metaioctl(MD_MN_MDDB_BLOCK, &mbp,
 				    &mbp.c_mde, NULL)) {
-					mdstealerror(ep, &mbp.c_mde);
+					(void) mdstealerror(ep, &mbp.c_mde);
 					mde_perror(ep, gettext("Could not "
 					    "unblock set %s"), sp->setname);
 					md_exit(local_sp, 1);
@@ -1844,7 +1844,7 @@ main(int argc, char **argv)
 			sf.sf_magic = MDDB_SETFLAGS_MAGIC;
 			if (metaioctl(MD_MN_GET_SETFLAGS, &sf,
 			    &sf.sf_mde, NULL)) {
-				mdstealerror(ep, &sf.sf_mde);
+				(void) mdstealerror(ep, &sf.sf_mde);
 				mde_perror(ep, gettext("Could not get "
 				    "start_step flag for set %s"), sp->setname);
 				md_exit(local_sp, 1);
@@ -1868,7 +1868,7 @@ main(int argc, char **argv)
 				sf.sf_magic = MDDB_SETFLAGS_MAGIC;
 				if (metaioctl(MD_MN_SET_SETFLAGS, &sf,
 				    &sf.sf_mde, NULL)) {
-					mdstealerror(ep, &sf.sf_mde);
+					(void) mdstealerror(ep, &sf.sf_mde);
 					mde_perror(ep,
 					    gettext("Could not reset "
 					    "start_step flag for set %s"),
@@ -1917,7 +1917,7 @@ main(int argc, char **argv)
 				sf.sf_magic = MDDB_SETFLAGS_MAGIC;
 				if (metaioctl(MD_MN_SET_SETFLAGS, &sf,
 				    &sf.sf_mde, NULL)) {
-					mdstealerror(ep, &sf.sf_mde);
+					(void) mdstealerror(ep, &sf.sf_mde);
 					mde_perror(ep,
 					    gettext("Could not set "
 					    "submirror state flag for set %s"),
@@ -1935,7 +1935,7 @@ main(int argc, char **argv)
 					md_exit(local_sp, 1);
 				}
 				meta_mirror_resync_unblock(sp);
-				meta_unlock(sp, ep);
+				(void) meta_unlock(sp, ep);
 				continue;
 			}
 
@@ -1976,7 +1976,7 @@ main(int argc, char **argv)
 				md_exit(local_sp, 1);
 			}
 			meta_mirror_resync_unblock(sp);
-			meta_unlock(sp, ep);
+			(void) meta_unlock(sp, ep);
 
 			/* resync all mirrors in set */
 			if (meta_mirror_resync_all(sp, 0, ep) != 0) {

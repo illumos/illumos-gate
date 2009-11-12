@@ -65,7 +65,7 @@ delete_hotspares_impl(mdhspname_t *hspnp, md_hsp_t *hspp, boolean_e verbose)
 		cname = hsp->hsnamep->cname;
 		bname = hsp->hsnamep->bname;
 		nlp = NULL;
-		metanamelist_append(&nlp, hsp->hsnamep);
+		(void) metanamelist_append(&nlp, hsp->hsnamep);
 		hs_state = hs_state_to_name(hsp, NULL);
 		/* print hotspare */
 		if (verbose == True)
@@ -112,7 +112,7 @@ md_probe_ioctl(mdnamelist_t *nlp, int ndevs, char *drvname, boolean_e verbose)
 	 * the minor numbers.
 	 */
 
-	memset(&probe_ioc, 0, sizeof (probe_ioc));
+	(void) memset(&probe_ioc, 0, sizeof (probe_ioc));
 	iocp = &probe_ioc;
 
 	if ((iocp->mnum_list = (uintptr_t)calloc(ndevs, sizeof (minor_t)))

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * probedev issues ioctls for all the metadevices
@@ -110,7 +107,7 @@ catch_sig(int sig)
 		monitord_print(6, gettext(
 		    " starting probe from signal handler\n"));
 		probe_all_devs(startup, &status, sig_verbose);
-		setitimer(ITIMER_REAL, &itimer, NULL);
+		(void) setitimer(ITIMER_REAL, &itimer, NULL);
 	}
 	if (sig == SIGHUP)
 		monitord_exit(sig);
@@ -210,7 +207,7 @@ exit_daemon_lock(void)
 		    daemon_lock_file, strerror(errno));
 		monitord_exit(-1);
 	}
-	unlink(daemon_lock_file);
+	(void) unlink(daemon_lock_file);
 }
 
 
@@ -239,12 +236,12 @@ monitord_print(int level, char *message, ...)
 	} else {
 		if (logflag) {
 			(void) syslog(LOG_DEBUG, "%s[%ld]: ",
-				    prog, getpid());
+			    prog, getpid());
 			(void) vsyslog(LOG_DEBUG, message, ap);
 		} else {
 			if (newline) {
 				(void) fprintf(stdout, "%s[%ld]: ",
-					prog, getpid());
+				    prog, getpid());
 				(void) vfprintf(stdout, message, ap);
 			} else {
 				(void) vfprintf(stdout, message, ap);
@@ -288,7 +285,7 @@ probe_all_devs(boolean_e startup, md_error_t *statusp, boolean_e verbose)
 	set_t		max_sets, set_idx;
 
 	probe_started = True;
-	set_snarf(statusp);
+	(void) set_snarf(statusp);
 
 	if ((max_sets = get_max_sets(statusp)) == 0) {
 		mde_perror(statusp, gettext(
@@ -323,12 +320,12 @@ probe_all_devs(boolean_e startup, md_error_t *statusp, boolean_e verbose)
 
 		/* if we dont have ownership or cannot lock it continue. */
 		if ((meta_check_ownership(sp, statusp) == NULL) &&
-			meta_lock(sp, TRUE, statusp))
+		    meta_lock(sp, TRUE, statusp))
 			continue;
 
 		/* Skip if a MN set */
 		if (meta_is_mn_set(sp, statusp)) {
-			meta_unlock(sp, statusp);
+			(void) meta_unlock(sp, statusp);
 			continue;
 		}
 
@@ -336,7 +333,7 @@ probe_all_devs(boolean_e startup, md_error_t *statusp, boolean_e verbose)
 		probe_raid_devs(verbose);
 		probe_trans_devs(verbose);
 		probe_hotspare_devs(verbose);
-		meta_unlock(sp, statusp);
+		(void) meta_unlock(sp, statusp);
 	}
 	if (meta_notify_createq(MD_FF_Q, 0, statusp)) {
 		mde_perror(statusp, gettext(
@@ -350,7 +347,7 @@ probe_all_devs(boolean_e startup, md_error_t *statusp, boolean_e verbose)
 	 */
 
 	if (startup == True)
-		setitimer(ITIMER_REAL, &itimer, NULL);
+		(void) setitimer(ITIMER_REAL, &itimer, NULL);
 }
 
 evid_t
@@ -364,13 +361,13 @@ wait_for_event(md_error_t *statusp)
 
 	do {
 		if (meta_notify_getev(MD_FF_Q, EVFLG_WAIT, &event,
-								statusp) < 0) {
+		    statusp) < 0) {
 			monitord_print(8,
 			    "meta_notify_getev: errno 0x%x\n", -errno);
 			monitord_exit(-errno);
 		}
 	} while ((event.ev != EV_IOERR && event.ev != EV_ERRED &&
-					event.ev != EV_LASTERRED));
+	    event.ev != EV_LASTERRED));
 	return (event.ev);
 }
 
@@ -405,13 +402,13 @@ main(int argc, char **argv)
 	}
 
 	if (md_init(argc, argv, 0, 1, &status) != 0 ||
-			meta_check_root(&status) != 0) {
+	    meta_check_root(&status) != 0) {
 		mde_perror(&status, "");
 		monitord_exit(1);
 	}
 
 	(void) sigfillset(&mask);
-	thr_sigsetmask(SIG_BLOCK, &mask, NULL);
+	(void) thr_sigsetmask(SIG_BLOCK, &mask, NULL);
 
 	if (argc > 7) {
 		usage();
@@ -474,7 +471,7 @@ main(int argc, char **argv)
 	(void) sigemptyset(&mask);
 	(void) sigaddset(&mask, SIGALRM);
 	(void) sigaddset(&mask, SIGHUP);
-	thr_sigsetmask(SIG_UNBLOCK, &mask, NULL);
+	(void) thr_sigsetmask(SIG_UNBLOCK, &mask, NULL);
 
 	/* demonize ourselves */
 	if (debug_level < DEBUG_LEVEL_FORK) {

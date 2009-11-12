@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -107,7 +107,7 @@ exit_daemon_lock(void)
 		    daemon_lock_file, strerror(errno));
 		return;
 	}
-	unlink(daemon_lock_file);
+	(void) unlink(daemon_lock_file);
 }
 
 /*
@@ -160,7 +160,7 @@ door2rpc(void *cookie,		/* required by the doors infrastructure */
 		free_result(result);
 	}
 
-	door_return((char *)&kresult, sizeof (md_mn_kresult_t), NULL, 0);
+	(void) door_return((char *)&kresult, sizeof (md_mn_kresult_t), NULL, 0);
 }
 
 
@@ -210,7 +210,7 @@ main(void)
 	}
 
 	rl.rlim_max = 0;
-	getrlimit(RLIMIT_NOFILE, &rl);
+	(void) getrlimit(RLIMIT_NOFILE, &rl);
 	if ((size = rl.rlim_max) == 0) {
 		syslog(LOG_DAEMON | LOG_ERR, gettext("Cannot getrlimit"));
 		exit(1);
@@ -226,7 +226,7 @@ main(void)
 	i = open("/dev/null", 2);
 	(void) dup2(i, 1);
 	(void) dup2(i, 2);
-	setsid();
+	(void) setsid();
 
 	/* here endeth the daemonizing code */
 
@@ -236,7 +236,7 @@ main(void)
 	(void) signal(SIGQUIT, SIG_IGN);
 	(void) signal(SIGTERM, SIG_IGN);
 
-	atexit(daemon_cleanup);
+	(void) atexit(daemon_cleanup);
 
 	/* Resume any previously blocked resync */
 	meta_mirror_resync_unblock_all();

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -329,7 +329,7 @@ main()
 			exit(1);
 		}
 
-		atexit(exit_commd);
+		(void) atexit(exit_commd);
 
 		if (pmclose) {
 			(void) signal(SIGALRM, (void(*)()) closedown);
@@ -360,7 +360,7 @@ main()
 			closefrom(0);
 		else {
 			rl.rlim_max = 0;
-			getrlimit(RLIMIT_NOFILE, &rl);
+			(void) getrlimit(RLIMIT_NOFILE, &rl);
 			if ((size = rl.rlim_max) == 0)
 				exit(1);
 			for (i = 0; i < size; i++)
@@ -369,7 +369,7 @@ main()
 		i = open("/dev/null", 2);
 		(void) dup2(i, 1);
 		(void) dup2(i, 2);
-		setsid();
+		(void) setsid();
 		openlog("mdmn_commd", LOG_PID, LOG_DAEMON);
 #endif
 	}
@@ -378,7 +378,7 @@ main()
 		exit(1);
 	}
 
-	atexit(exit_commd);
+	(void) atexit(exit_commd);
 	(void) metaioctl(MD_MN_SET_COMMD_RUNNING, (void *)1, &ep,
 	    "rpc.mdcommd");
 

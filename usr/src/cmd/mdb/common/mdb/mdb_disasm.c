@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <mdb/mdb_disasm_impl.h>
 #include <mdb/mdb_modapi.h>
@@ -286,7 +284,7 @@ libdisasm_read(void *data, uint64_t pc, void *buf, size_t buflen)
 
 	len = MIN(buflen, db->db_bufsize - offset);
 
-	memcpy(buf, (char *)db->db_buf + offset, len);
+	(void) memcpy(buf, (char *)db->db_buf + offset, len);
 	db->db_nextaddr = pc + len;
 
 	return (len);

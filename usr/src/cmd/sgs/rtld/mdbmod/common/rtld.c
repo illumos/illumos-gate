@@ -304,11 +304,11 @@ Depends(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv,
 		return (DCMD_ERR);
 	}
 
-	mdb_inc_indent(4);
+	(void) mdb_inc_indent(4);
 	mdb_printf(MSG_ORIG(MSG_STR_DASHES));
 
 	if (dcmd_Bind((uintptr_t)bdp, flags, argc, argv) == DCMD_ERR) {
-		mdb_dec_indent(4);
+		(void) mdb_dec_indent(4);
 		return (DCMD_ERR);
 	}
 
@@ -322,11 +322,11 @@ Depends(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv,
 
 		mdb_printf(MSG_ORIG(MSG_STR_DASHES));
 		if (dcmd_Bind((uintptr_t)bdp, flags, argc, argv) == DCMD_ERR) {
-			mdb_dec_indent(4);
+			(void) mdb_dec_indent(4);
 			return (DCMD_ERR);
 		}
 	}
-	mdb_dec_indent(4);
+	(void) mdb_dec_indent(4);
 	return (DCMD_OK);
 }
 
@@ -499,8 +499,8 @@ rtmap_format(uintptr_t addr, const void *data, void *private)
 
 	if (wdp && (wdp->w_flags & RTLD_FLG_VERBOSE)) {
 		mdb_printf(MSG_ORIG(MSG_STR_DASHES));
-		mdb_call_dcmd(MSG_ORIG(MSG_RTMAP_STR), addr, DCMD_ADDRSPEC,
-		    NULL, NULL);
+		(void) mdb_call_dcmd(
+		    MSG_ORIG(MSG_RTMAP_STR), addr, DCMD_ADDRSPEC, NULL, NULL);
 		return (0);
 	}
 
@@ -598,7 +598,7 @@ dcmd_Rtmaps(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			return (DCMD_ERR);
 		}
 
-		mdb_inc_indent(2);
+		(void) mdb_inc_indent(2);
 		if (lm.lm_flags & LML_FLG_BASELM)
 			str = MSG_ORIG(MSG_LMLIST_BASE);
 		else if (lm.lm_flags & LML_FLG_RTLDLM)
@@ -612,7 +612,7 @@ dcmd_Rtmaps(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf(MSG_ORIG(MSG_LMLIST_TITLE2), datap, str);
 		mdb_printf(MSG_ORIG(MSG_STR_DASHES));
 
-		mdb_inc_indent(2);
+		(void) mdb_inc_indent(2);
 
 		if (((flags & DCMD_LOOPFIRST) || !(flags & DCMD_LOOP)) &&
 		    !(flg & RTLD_FLG_VERBOSE)) {
@@ -623,10 +623,10 @@ dcmd_Rtmaps(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		wdesc.w_flags = flg;
 		if (mdb_pwalk(MSG_ORIG(MSG_RTMAPS_STR), rtmap_format,
 		    (void *)&wdesc, (uintptr_t)lm.lm_head) == -1) {
-			mdb_dec_indent(4);
+			(void) mdb_dec_indent(4);
 			return (DCMD_ERR);
 		}
-		mdb_dec_indent(4);
+		(void) mdb_dec_indent(4);
 		flags &= ~DCMD_LOOPFIRST;
 	}
 	return (DCMD_OK);
@@ -843,13 +843,13 @@ _dcmd_Lm_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 		mdb_printf(MSG_ORIG(MSG_LMLIST_LINE0), addr,
 		    (size_t)al.al_nitems, (size_t)al.al_arritems);
-		mdb_inc_indent(2);
+		(void) mdb_inc_indent(2);
 		mdb_printf(MSG_ORIG(MSG_STR_DASHES));
 
 		if (al.al_nitems && (flg & RTLD_FLG_VERBOSE)) {
 			uintptr_t	nitems;
 
-			mdb_inc_indent(2);
+			(void) mdb_inc_indent(2);
 			mdb_printf(MSG_ORIG(MSG_LMC_LINE1), datap);
 			mdb_printf(MSG_ORIG(MSG_LMC_LINE2), lmc.lc_head,
 			    lmc.lc_tail);
@@ -865,7 +865,7 @@ _dcmd_Lm_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 				if (mdb_pwalk(MSG_ORIG(MSG_RTMAPS_STR),
 				    rtmap_format, (void *)0,
 				    (uintptr_t)lmc.lc_head) == -1) {
-					mdb_dec_indent(4);
+					(void) mdb_dec_indent(4);
 					return (DCMD_ERR);
 				}
 			} else
@@ -880,7 +880,7 @@ _dcmd_Lm_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 				    datap) == -1) {
 					mdb_warn(MSG_ORIG(MSG_ERR_READ),
 					    MSG_ORIG(MSG_LMLIST_STR), datap);
-					mdb_dec_indent(4);
+					(void) mdb_dec_indent(4);
 					return (DCMD_ERR);
 				}
 
@@ -900,7 +900,7 @@ _dcmd_Lm_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 					if (mdb_pwalk(MSG_ORIG(MSG_RTMAPS_STR),
 					    rtmap_format, (void *)0,
 					    (uintptr_t)lmc.lc_head) == -1) {
-						mdb_dec_indent(4);
+						(void) mdb_dec_indent(4);
 						return (DCMD_ERR);
 					}
 				} else
@@ -909,9 +909,9 @@ _dcmd_Lm_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 				mdb_printf(MSG_ORIG(MSG_STR_DASHES));
 			}
-			mdb_dec_indent(2);
+			(void) mdb_dec_indent(2);
 		}
-		mdb_dec_indent(2);
+		(void) mdb_dec_indent(2);
 	}
 
 	mdb_printf(MSG_ORIG(MSG_LMLIST_LINE1), lml.lm_head, lml.lm_tail);
@@ -988,13 +988,13 @@ dcmd_Lm_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			return (DCMD_ERR);
 		}
 
-		mdb_inc_indent(2);
+		(void) mdb_inc_indent(2);
 		if (_dcmd_Lm_list((uintptr_t)lml, flags, argc,
 		    argv) == DCMD_ERR) {
-			mdb_dec_indent(2);
+			(void) mdb_dec_indent(2);
 			return (DCMD_ERR);
 		}
-		mdb_dec_indent(2);
+		(void) mdb_dec_indent(2);
 		flags &= ~DCMD_LOOPFIRST;
 	}
 	return (DCMD_OK);
@@ -1105,7 +1105,7 @@ dcmd_GrpHdl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (((flg & RTLD_FLG_VERBOSE) == 0) || (al.al_nitems == 0))
 		return (DCMD_OK);
 
-	mdb_inc_indent(4);
+	(void) mdb_inc_indent(4);
 	mdb_printf(MSG_ORIG(MSG_STR_DASHES));
 
 	/*
@@ -1114,7 +1114,7 @@ dcmd_GrpHdl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 */
 	datap = ALIST_OFF_DATA + (uintptr_t)addr;
 	if (dcmd_GrpDesc(datap, flags, argc, argv) == DCMD_ERR) {
-		mdb_dec_indent(4);
+		(void) mdb_dec_indent(4);
 		return (DCMD_ERR);
 	}
 
@@ -1122,12 +1122,12 @@ dcmd_GrpHdl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		datap += al.al_size;
 		mdb_printf(MSG_ORIG(MSG_STR_DASHES));
 		if (dcmd_GrpDesc(datap, flags, argc, argv) == DCMD_ERR) {
-			mdb_dec_indent(4);
+			(void) mdb_dec_indent(4);
 			return (DCMD_ERR);
 		}
 	}
 
-	mdb_dec_indent(4);
+	(void) mdb_dec_indent(4);
 	return (DCMD_OK);
 }
 
@@ -1199,11 +1199,11 @@ dcmd_Handles(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	mdb_inc_indent(4);
+	(void) mdb_inc_indent(4);
 	mdb_printf(MSG_ORIG(MSG_STR_DASHES));
 
 	if (dcmd_GrpHdl((uintptr_t)ghp, flags, argc, argv) == DCMD_ERR) {
-		mdb_dec_indent(4);
+		(void) mdb_dec_indent(4);
 		return (DCMD_ERR);
 	}
 
@@ -1219,11 +1219,11 @@ dcmd_Handles(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf(MSG_ORIG(MSG_STR_DASHES));
 		if (dcmd_GrpHdl((uintptr_t)ghp, flags, argc,
 		    argv) == DCMD_ERR) {
-			mdb_dec_indent(4);
+			(void) mdb_dec_indent(4);
 			return (DCMD_ERR);
 		}
 	}
-	mdb_dec_indent(4);
+	(void) mdb_dec_indent(4);
 	return (DCMD_OK);
 }
 
@@ -1296,11 +1296,11 @@ dcmd_Groups(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	mdb_inc_indent(4);
+	(void) mdb_inc_indent(4);
 	mdb_printf(MSG_ORIG(MSG_STR_DASHES));
 
 	if (dcmd_GrpHdl((uintptr_t)ghp, flags, argc, argv) == DCMD_ERR) {
-		mdb_dec_indent(4);
+		(void) mdb_dec_indent(4);
 		return (DCMD_ERR);
 	}
 
@@ -1315,11 +1315,11 @@ dcmd_Groups(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf(MSG_ORIG(MSG_STR_DASHES));
 		if (dcmd_GrpHdl((uintptr_t)ghp, flags, argc,
 		    argv) == DCMD_ERR) {
-			mdb_dec_indent(4);
+			(void) mdb_dec_indent(4);
 			return (DCMD_ERR);
 		}
 	}
-	mdb_dec_indent(4);
+	(void) mdb_dec_indent(4);
 	return (DCMD_OK);
 }
 static void

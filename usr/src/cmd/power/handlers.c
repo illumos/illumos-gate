@@ -234,8 +234,8 @@ S3_helper(char *whitelist, char *blacklist, int yes, int no, char *keyword,
 
 	*didyes = 0;
 
-	strncpy(yesstr, pm_map(yes), sizeof (yesstr));
-	strncpy(nostr, pm_map(no), sizeof (nostr));
+	(void) strncpy(yesstr, pm_map(yes), sizeof (yesstr));
+	(void) strncpy(nostr, pm_map(no), sizeof (nostr));
 	mesg(MDEBUG, "S3_helper(%s, %s, %s, %s, %s, %s)\n", whitelist,
 	    blacklist, yesstr, nostr, keyword, behavior);
 	if ((kc = kstat_open()) == NULL) {
@@ -245,7 +245,7 @@ S3_helper(char *whitelist, char *blacklist, int yes, int no, char *keyword,
 	ksp = kstat_lookup(kc, "acpi", -1, "acpi");
 	if (ksp == NULL) {
 		mesg(MDEBUG, "kstat_lookup 'acpi', -1, 'acpi' failed\n");
-		kstat_close(kc);
+		(void) kstat_close(kc);
 		return (OKUP);
 	}
 	(void) kstat_read(kc, ksp,  NULL);
@@ -254,7 +254,7 @@ S3_helper(char *whitelist, char *blacklist, int yes, int no, char *keyword,
 		mesg(MDEBUG, "kstat_data_lookup 'S3' fails\n");
 		if (dp != NULL)
 			mesg(MDEBUG, "value.l %lx\n", dp->value.l);
-		kstat_close(kc);
+		(void) kstat_close(kc);
 		return (do_ioctl(no, keyword, behavior, suppress));
 	}
 	mesg(MDEBUG, "kstat indicates S3 support (%lx)\n", dp->value.l);
@@ -268,14 +268,14 @@ S3_helper(char *whitelist, char *blacklist, int yes, int no, char *keyword,
 		dp = kstat_data_lookup(ksp, "preferred_pm_profile");
 		if (dp == NULL) {
 			mesg(MDEBUG, "kstat_data_lookup 'ppmp fails\n");
-			kstat_close(kc);
+			(void) kstat_close(kc);
 			return (do_ioctl(no, keyword, behavior, suppress));
 		}
 		mesg(MDEBUG, "kstat indicates preferred_pm_profile is %lx\n",
 		    dp->value.l);
 		preferred_pm_profile = dp->value.l;
 	}
-	kstat_close(kc);
+	(void) kstat_close(kc);
 
 	if ((shp = smbios_open(NULL,
 	    SMB_VERSION, oflags, &ret)) == NULL) {
@@ -906,7 +906,7 @@ check_mount(char *sfile, dev_t sfdev, int ufs)
 			err_fmt = "ufs statefile with zfs root is not"
 			    " supported\n";
 			mesg(MERR, err_fmt, sfile);
-			fclose(fp);
+			(void) fclose(fp);
 			return (1);
 		}
 		resetmnttab(fp);
@@ -1014,7 +1014,7 @@ ztop(char *arg, char *diskname)
 		return (0);
 	}
 	arg += 14;
-	strncpy(pool_name, arg, MAXPATHLEN);
+	(void) strncpy(pool_name, arg, MAXPATHLEN);
 	if (p = strchr(pool_name, '/'))
 		*p = '\0';
 	STRCPYLIM(new_cc.cf_fs, p + 1, "statefile path");
@@ -1050,8 +1050,8 @@ ztop(char *arg, char *diskname)
 		libzfs_fini(lzfs);
 		return (-1);
 	}
-	strcpy(diskname, "/dev/dsk/");
-	strcat(diskname, vname);
+	(void) strcpy(diskname, "/dev/dsk/");
+	(void) strcat(diskname, vname);
 	free(vname);
 	zpool_close(zpool_handle);
 	libzfs_fini(lzfs);
@@ -1078,7 +1078,7 @@ is_good_slice(char *sfile, char **err)
 	y = strstr(sfile, "dsk/");
 	if (x != NULL) {
 		*x++ = 'r';
-		strcpy(x, y);
+		(void) strcpy(x, y);
 	}
 
 	if ((fd = open(rdskname, O_RDONLY)) == -1) {
@@ -1090,13 +1090,13 @@ is_good_slice(char *sfile, char **err)
 		 */
 		if (vtoc.v_part[rc].p_start < 2)
 			*err = "using '%s' would clobber the disk label\n";
-		close(fd);
+		(void) close(fd);
 		return (*err ? B_FALSE : B_TRUE);
 	} else if ((rc == VT_ENOTSUP) &&
 	    (efi_alloc_and_read(fd, &gpt)) >= 0) {
 		/* EFI slices don't clobber the disk label */
 		free(gpt);
-		close(fd);
+		(void) close(fd);
 		return (B_TRUE);
 	} else
 		*err = "could not read partition table from '%s'\n";

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Utility to import SVM disksets into an active SVM configuration.
@@ -255,8 +253,8 @@ report_overlap_recommendation()
 			continue;
 		}
 		(void) close(fd);
-		fprintf(stdout, "  %s ", d->mid_dnp->cname);
-		    (void) fprintf(stdout, "%s: %s\n",
+		(void) fprintf(stdout, "  %s ", d->mid_dnp->cname);
+		(void) fprintf(stdout, "%s: %s\n",
 		    gettext(" - must import with set "
 		    "created at "), meta_print_time((md_timeval32_t *)
 		    (&(mbp->mb_setcreatetime))));
@@ -339,8 +337,8 @@ static int process_disks(
 
 		/* is the current drive on the skip list? */
 		for (slp = *skiph; slp != NULL; slp = slp->next) {
-		    if (dp->drivenamep == slp->drivenamep)
-			    break;
+			if (dp->drivenamep == slp->drivenamep)
+				break;
 		}
 		/* drive on the skip list ? */
 		if (slp != NULL)
@@ -369,7 +367,8 @@ static int process_disks(
 				 * Go to the tail for the current set
 				 */
 				for (p = *mispp; p->mis_next != NULL;
-				    p = p->mis_next);
+				    p = p->mis_next)
+				;
 
 				/*
 				 * Now look for the set creation timestamp.
@@ -418,7 +417,7 @@ static int process_disks(
 					}
 					skipt =
 					    meta_drivenamelist_append_wrapper(
-						skipt, d->mid_dnp);
+					    skipt, d->mid_dnp);
 				}
 			}
 		}
@@ -476,7 +475,7 @@ main(int argc, char *argv[])
 	 * in a SunCluster environment.
 	 */
 	if (sdssc_bind_library() != SDSSC_NOT_BOUND) {
-		printf(gettext(
+		(void) printf(gettext(
 		    "%s: Import operation not supported under SunCluster\n"),
 		    argv[0]);
 		exit(0);
@@ -628,12 +627,12 @@ main(int argc, char *argv[])
 
 		dlist = Malloc(sizecnt);
 
-		strlcpy(dlist, ip->drive, sizecnt);
+		(void) strlcpy(dlist, ip->drive, sizecnt);
 
 		Free(ip->drive);
 		for (dp = dnlp->next; dp != NULL; dp = dp->next) {
-			strlcat(dlist, ", ", sizecnt);
-			strlcat(dlist, dp->drivenamep->cname, sizecnt);
+			(void) strlcat(dlist, ", ", sizecnt);
+			(void) strlcat(dlist, dp->drivenamep->cname, sizecnt);
 		}
 
 		ip->drive = dlist;
@@ -812,14 +811,14 @@ main(int argc, char *argv[])
 		 * this type of set until the offending disk(s) are turned
 		 * off to prevent data corruption.
 		 */
-		printf(gettext("To import this set, "));
+		(void) printf(gettext("To import this set, "));
 		for (d = pass1_misp->mis_drives;
 		    d != NULL;
 		    d = d->mid_next) {
 			if (d->overlapped_disk)
-				printf("%s ", d->mid_dnp->cname);
+				(void) printf("%s ", d->mid_dnp->cname);
 		}
-		printf(gettext("must be removed from the system\n"));
+		(void) printf(gettext("must be removed from the system\n"));
 		meta_free_im_set_desc(misp);
 		md_exit(sp, 1);
 	}

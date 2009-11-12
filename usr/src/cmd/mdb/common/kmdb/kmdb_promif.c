@@ -380,8 +380,8 @@ kmdb_get_ttyio_mode(kmdb_auxv_t *kav, char *devname)
 	char *modepname, *modepval;
 
 	modepname = mdb_alloc(strlen(devname) + 5 + 1, UM_SLEEP);
-	strcpy(modepname, devname);
-	strcat(modepname, "-mode");
+	(void) strcpy(modepname, devname);
+	(void) strcat(modepname, "-mode");
 
 	modepval = kmdb_prom_get_ddi_prop(kav, modepname);
 

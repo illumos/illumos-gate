@@ -366,7 +366,8 @@ pm_suspend(void)
 				 * if we don't already have one.
 				 */
 				if (event != NULL) {
-					adt_put_event(event, ADT_FAILURE, 0);
+					(void) adt_put_event(event,
+					    ADT_FAILURE, 0);
 				}
 			}
 		}
@@ -498,14 +499,14 @@ get_xauthority(char *xauthority)
 	 */
 	if ((home_dir = getenv("HOME")) == NULL) {
 		if ((pwd = getpwuid(uid)) == NULL) {
-			printf(gettext("Error: unable to get passwd "
+			(void) printf(gettext("Error: unable to get passwd "
 			    "entry for user.\n"));
 			exit(1);
 		}
 		home_dir = pwd->pw_dir;
 	}
 	if ((strlen(home_dir) + sizeof ("/.Xauthority")) >= MAXPATHLEN) {
-		printf(gettext("Error: path to home directory is too "
+		(void) printf(gettext("Error: path to home directory is too "
 		    "long.\n"));
 		exit(1);
 	}
@@ -590,9 +591,9 @@ main(int argc, char **argv)
 	 */
 	if (ttyname(0) == NULL) {
 		no_tty = 1;
-		dup2(open("/dev/console", O_RDONLY), 0);
-		dup2(open("/dev/console", O_WRONLY), 1);
-		dup2(open("/dev/console", O_WRONLY), 2);
+		(void) dup2(open("/dev/console", O_RDONLY), 0);
+		(void) dup2(open("/dev/console", O_WRONLY), 1);
+		(void) dup2(open("/dev/console", O_WRONLY), 2);
 	}
 
 	while ((c = getopt(argc, argv, "fnxhtd:")) != EOF) {
@@ -675,7 +676,7 @@ main(int argc, char **argv)
 	 * do it now, we at least prevent a lot of unneeded setup.
 	 */
 	pw = getpwuid(getuid());
-	strncpy(user, pw->pw_name, NMAX);
+	(void) strncpy(user, pw->pw_name, NMAX);
 
 	if ((flags & (FORCE|SHUTDOWN)) &&
 	    (chkauthattr(AUTHNAME_SHUTDOWN, pw->pw_name) != 1)) {
@@ -726,7 +727,7 @@ main(int argc, char **argv)
 	pm_suspend();
 
 	if (refresh_dt() == -1) {
-		printf("%s: Failed to refresh screen.\n", argv[0]);
+		(void) printf("%s: Failed to refresh screen.\n", argv[0]);
 		return (1);
 	}
 	return (0);
@@ -751,16 +752,17 @@ bringto_lowpower()
 	int	fd;
 
 	if ((fd = open("/dev/pm", O_RDWR)) < 0) {
-		printf(gettext("Can't open /dev/pm\n"));
+		(void) printf(gettext("Can't open /dev/pm\n"));
 		return (-1);
 	}
 
 	if (ioctl(fd, PM_IDLE_DOWN, NULL) < 0) {
-		printf(gettext("Failed to bring system to low power mode.\n"));
-		close(fd);
+		(void) printf(gettext("Failed to bring system "
+		    "to low power mode.\n"));
+		(void) close(fd);
 		return (-1);
 	}
-	close(fd);
+	(void) close(fd);
 	return (0);
 }
 
@@ -778,17 +780,17 @@ is_mou3()
 	int			found = 0;
 
 	if ((fd = open(CPR_CONFIG, O_RDONLY)) < 0) {
-		printf(gettext("Can't open /etc/.cpr_config file."));
+		(void) printf(gettext("Can't open /etc/.cpr_config file."));
 		return (found);
 	}
 
 	if (read(fd, (void *) &cf, sizeof (cf)) != sizeof (cf)) {
-		printf(gettext("Can't read /etc/.cpr_config file."));
+		(void) printf(gettext("Can't read /etc/.cpr_config file."));
 	} else {
 		found = cf.is_autopm_default;
 	}
 
-	close(fd);
+	(void) close(fd);
 	return (found);
 }
 

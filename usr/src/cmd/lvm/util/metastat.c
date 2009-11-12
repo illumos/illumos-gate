@@ -222,7 +222,7 @@ check_replica_state(mdsetname_t *sp, md_error_t *ep)
 
 	if (metaioctl(MD_DB_GETDEV, &c, &c.c_mde, NULL) != 0) {
 		if (mdismddberror(&c.c_mde, MDE_DB_INVALID))
-			mdstealerror(ep, &c.c_mde);
+			(void) mdstealerror(ep, &c.c_mde);
 		return (-1);
 	}
 
@@ -237,13 +237,14 @@ static void
 print_trans_msg(mdprtopts_t	options, int	meta_print_trans_msg)
 {
 	if (meta_print_trans_msg != 0) {
-		fprintf(stderr, "\n\n");
+		(void) fprintf(stderr, "\n\n");
 		if (options & PRINT_SHORT) {
-			fprintf(stderr, gettext(MD_SHORT_EOF_TRANS_MSG));
-			fprintf(stderr, gettext(MD_SHORT_EOF_TRANS_WARNING));
+			(void) fprintf(stderr, gettext(MD_SHORT_EOF_TRANS_MSG));
+			(void) fprintf(stderr,
+			    gettext(MD_SHORT_EOF_TRANS_WARNING));
 		} else {
-			fprintf(stderr, gettext(MD_EOF_TRANS_MSG));
-			fprintf(stderr, gettext(MD_EOF_TRANS_WARNING));
+			(void) fprintf(stderr, gettext(MD_EOF_TRANS_MSG));
+			(void) fprintf(stderr, gettext(MD_EOF_TRANS_WARNING));
 		}
 	}
 }
@@ -381,7 +382,7 @@ main(
 	argv += optind;
 
 	if (all_sets_flag && set_flg) {
-		fprintf(stderr, gettext("metastat: "
+		(void) fprintf(stderr, gettext("metastat: "
 		    "incompatible options: -a and -s\n"));
 		usage(sp, 1);
 	}
@@ -396,7 +397,7 @@ main(
 
 	if (check_replica_state(sp, ep)) {
 		if (mdismddberror(ep, MDE_DB_STALE)) {
-			fprintf(stdout, gettext(
+			(void) fprintf(stdout, gettext(
 			    "****\nWARNING: Stale "
 			    "state database replicas. Metastat output "
 			    "may be inaccurate.\n****\n\n"));
@@ -406,7 +407,7 @@ main(
 	/* if inquire is set. We probe first */
 	if (inquire) {
 		if (geteuid() != 0) {
-			fprintf(stderr, gettext("metastat: -i "
+			(void) fprintf(stderr, gettext("metastat: -i "
 			    "option requires super-user privilages\n"));
 			md_exit(sp, 1);
 		}
@@ -742,13 +743,13 @@ delete_hotspares_impl(mdsetname_t *sp, mdhspname_t *hspnp, md_hsp_t *hspp)
 		hsp = &hspp->hotspares.hotspares_val[hsi];
 		bname = hsp->hsnamep->bname;
 		nlp = NULL;
-		metanamelist_append(&nlp, hsp->hsnamep);
+		(void) metanamelist_append(&nlp, hsp->hsnamep);
 		/* print hotspare */
 		if (hsp->state == HSS_AVAILABLE) {
 			if (hotspare_ok(bname))
 				continue;
 
-			fprintf(stderr,
+			(void) fprintf(stderr,
 			    "NOTICE: Hotspare %s in %s has failed.\n"
 			    "\tDeleting %s since it not in use\n\n",
 			    bname, hspnp->hspname, bname);
@@ -787,7 +788,7 @@ md_probe_ioctl(mdsetname_t *sp, mdnamelist_t *nlp, int ndevs, char *drvname)
 	 * the minor numbers.
 	 */
 
-	memset(&probe_ioc, 0, sizeof (probe_ioc));
+	(void) memset(&probe_ioc, 0, sizeof (probe_ioc));
 	iocp = &probe_ioc;
 
 	if ((iocp->mnum_list = (uintptr_t)calloc(ndevs, sizeof (minor_t)))
@@ -1189,7 +1190,7 @@ print_concise_diskset(mdsetname_t *sp)
 			if (mdn == NULL) {
 				print_concise_entry(0, nlp->namep->cname,
 				    0, 'p');
-				printf("\n");
+				(void) printf("\n");
 				continue;
 			}
 
@@ -1322,7 +1323,7 @@ print_concise_namelist(mdsetname_t *sp, mdnamelist_t **nl, char mtype)
 		mdclrerror(&error);
 		if (mdn == NULL) {
 			print_concise_entry(0, nlp->namep->cname, 0, mtype);
-			printf("\n");
+			(void) printf("\n");
 			continue;
 		}
 

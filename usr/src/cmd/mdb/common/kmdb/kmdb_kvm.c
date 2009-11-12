@@ -690,7 +690,7 @@ kmt_mod_create(mdb_tgt_t *t, struct modctl *ctlp, char *name)
 	struct module *mod;
 
 	km->km_name = mdb_alloc(strlen(name) + 1, UM_SLEEP);
-	strcpy(km->km_name, name);
+	(void) strcpy(km->km_name, name);
 
 	bcopy(ctlp, &km->km_modctl, sizeof (struct modctl));
 

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Recover metadevice configurations that have been lost by scanning
@@ -82,13 +80,13 @@ main(
 	(void) textdomain(TEXT_DOMAIN);
 
 	if (sdssc_bind_library() == SDSSC_ERROR) {
-		printf(gettext(
+		(void) printf(gettext(
 		    "%s: Interface error with libsds_sc.so\n"), argv[0]);
 		exit(1);
 	}
 
 	if (md_init(argc, argv, 0, 1, ep) != 0 ||
-			meta_check_root(ep) != 0) {
+	    meta_check_root(ep) != 0) {
 		mde_perror(ep, "");
 		md_exit((mdsetname_t *)NULL, 1);
 	}
@@ -167,8 +165,8 @@ main(
 		if (!metaismeta(namep)) {
 			if (! meta_is_drive_in_thisset(sp, namep->drivenamep,
 			    FALSE, ep)) {
-				mddeverror(ep, MDE_NOT_IN_SET, namep->dev,
-				    namep->cname);
+				(void) mddeverror(ep, MDE_NOT_IN_SET,
+				    namep->dev, namep->cname);
 				mde_perror(ep, "");
 				md_exit(sp, 1);
 			}

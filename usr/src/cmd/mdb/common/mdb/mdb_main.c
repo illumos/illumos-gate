@@ -310,7 +310,7 @@ control_kmdb(int start)
 			die("failed to stop kmdb");
 	}
 
-	close(fd);
+	(void) close(fd);
 }
 
 static void

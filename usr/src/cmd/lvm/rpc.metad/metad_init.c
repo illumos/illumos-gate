@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "metad_local.h"
 #include <metad.h>
@@ -182,19 +179,19 @@ check_sys(
 		return (0);
 
 	/* single thread (not really needed if daemon stays single threaded) */
-	mutex_lock(&mx);
+	(void) mutex_lock(&mx);
 
 	/* check for remote root or METAD_GID */
 	/*LINTED*/
 	sys_credp = (struct authsys_parms *)rqstp->rq_clntcred;
 	if ((check_gid14(sys_credp->aup_uid) == 0) ||
 	    (check_host(rqstp) == 0)) {
-		mutex_unlock(&mx);
+		(void) mutex_unlock(&mx);
 		return (0);
 	}
 
 	/* return failure */
-	mutex_unlock(&mx);
+	(void) mutex_unlock(&mx);
 	return (mdsyserror(ep, EACCES, "rpc.metad"));
 }
 
@@ -214,7 +211,7 @@ svc_init(
 	SVCXPRT		*transp;
 
 	if (sdssc_bind_library() == SDSSC_ERROR) {
-		mdsyserror(ep, EACCES, "can't bind to cluster library");
+		(void) mdsyserror(ep, EACCES, "can't bind to cluster library");
 		return (1);
 	}
 
