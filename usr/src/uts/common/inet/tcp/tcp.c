@@ -525,7 +525,7 @@ uint_t tcp_free_list_max_cnt = 0;
 #define	TCP_XMIT_LOWATER	4096
 #define	TCP_XMIT_HIWATER	49152
 #define	TCP_RECV_LOWATER	2048
-#define	TCP_RECV_HIWATER	49152
+#define	TCP_RECV_HIWATER	128000
 
 /*
  *  PAWS needs a timer for 24 days.  This is the number of ticks in 24 days
