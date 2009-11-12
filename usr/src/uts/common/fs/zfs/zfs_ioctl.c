@@ -1921,7 +1921,8 @@ zfs_set_prop_nvlist(const char *dsname, zprop_source_t source, nvlist_t *nvl,
 {
 	nvpair_t *pair;
 	nvpair_t *propval;
-	int err, rv = 0;
+	int err = 0;
+	int rv = 0;
 	uint64_t intval;
 	char *strval;
 	nvlist_t *genericnvl;
