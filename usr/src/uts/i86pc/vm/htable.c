@@ -270,7 +270,6 @@ ptable_alloc(uintptr_t seed)
 	page_t *pp;
 
 	pfn = PFN_INVALID;
-	atomic_add_32(&active_ptables, 1);
 
 	/*
 	 * The first check is to see if there is memory in the system. If we
@@ -305,6 +304,7 @@ ptable_alloc(uintptr_t seed)
 	pfn = pp->p_pagenum;
 	if (pfn == PFN_INVALID)
 		panic("ptable_alloc(): Invalid PFN!!");
+	atomic_add_32(&active_ptables, 1);
 	HATSTAT_INC(hs_ptable_allocs);
 	return (pfn);
 }
@@ -695,7 +695,7 @@ htable_reap(void *handle)
 	 * Try to reap 5% of the page tables bounded by a maximum of
 	 * 5% of physmem and a minimum of 10.
 	 */
-	reap_cnt = MIN(MAX(physmem / 20, active_ptables / 20), 10);
+	reap_cnt = MAX(MIN(physmem / 20, active_ptables / 20), 10);
 
 	/*
 	 * Let htable_steal() do the work, we just call htable_free()
@@ -1186,7 +1186,6 @@ htable_release(htable_t *ht)
 			 * Handle release of a table and freeing the htable_t.
 			 * Unlink it from the table higher (ie. ht_parent).
 			 */
-			ASSERT(ht->ht_lock_cnt == 0);
 			higher = ht->ht_parent;
 			ASSERT(higher != NULL);
 
