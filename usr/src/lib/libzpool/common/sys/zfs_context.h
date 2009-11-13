@@ -440,8 +440,8 @@ extern vnode_t *rootdir;
 /*
  * Random stuff
  */
-#define	lbolt	(gethrtime() >> 23)
-#define	lbolt64	(gethrtime() >> 23)
+#define	ddi_get_lbolt()		(gethrtime() >> 23)
+#define	ddi_get_lbolt64()	(gethrtime() >> 23)
 #define	hz	119	/* frequency when using gethrtime() >> 23 for lbolt */
 
 extern void delay(clock_t ticks);

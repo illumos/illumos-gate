@@ -2111,6 +2111,7 @@ iscsi_login_connect(iscsi_conn_t *icp)
 	struct sockaddr		*addr;
 	idm_conn_req_t		cr;
 	idm_status_t		rval;
+	clock_t			lbolt;
 
 	ASSERT(icp != NULL);
 	isp = icp->conn_sess;

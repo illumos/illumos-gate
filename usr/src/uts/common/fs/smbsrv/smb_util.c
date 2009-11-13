@@ -392,7 +392,7 @@ microtime(timestruc_t *tvp)
 int32_t
 clock_get_milli_uptime()
 {
-	return (TICK_TO_MSEC(lbolt));
+	return (TICK_TO_MSEC(ddi_get_lbolt()));
 }
 
 int /*ARGSUSED*/
@@ -1105,15 +1105,14 @@ static boolean_t
 smb_thread_continue_timedwait_locked(smb_thread_t *thread, int ticks)
 {
 	boolean_t	result;
-	clock_t		finish_time = lbolt + ticks;
 
 	/* -1 means don't block */
 	if (ticks != -1 && !thread->sth_kill) {
 		if (ticks == 0) {
 			cv_wait(&thread->sth_cv, &thread->sth_mtx);
 		} else {
-			(void) cv_timedwait(&thread->sth_cv, &thread->sth_mtx,
-			    finish_time);
+			(void) cv_reltimedwait(&thread->sth_cv,
+			    &thread->sth_mtx, (clock_t)ticks, TR_CLOCK_TICK);
 		}
 	}
 	result = (thread->sth_kill == 0);
@@ -1258,8 +1257,8 @@ smb_rwx_rwwait(
 			rc = 1;
 			cv_wait(&rwx->rwx_cv, &rwx->rwx_mutex);
 		} else {
-			rc = cv_timedwait(&rwx->rwx_cv, &rwx->rwx_mutex,
-			    lbolt + timeout);
+			rc = cv_reltimedwait(&rwx->rwx_cv, &rwx->rwx_mutex,
+			    timeout, TR_CLOCK_TICK);
 		}
 	}
 	mutex_exit(&rwx->rwx_mutex);

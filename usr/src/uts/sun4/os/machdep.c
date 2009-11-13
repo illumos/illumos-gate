@@ -59,6 +59,8 @@
 #include <vm/seg_kmem.h>
 #include <sys/hold_page.h>
 #include <sys/cpu.h>
+#include <sys/ivintr.h>
+#include <sys/clock_impl.h>
 
 int maxphys = MMU_PAGESIZE * 16;	/* 128k */
 int klustsize = MMU_PAGESIZE * 16;	/* 128k */
@@ -679,11 +681,31 @@ kdi_plat_call(void (*platfn)(void))
 	}
 }
 
+/*
+ * kdi_system_claim and release are defined here for all sun4 platforms and
+ * pointed to by mach_kdi_init() to provide default callbacks for such systems.
+ * Specific sun4u or sun4v platforms may implement their own claim and release
+ * routines, at which point their respective callbacks will be updated.
+ */
+static void
+kdi_system_claim(void)
+{
+	lbolt_debug_entry();
+}
+
+static void
+kdi_system_release(void)
+{
+	lbolt_debug_return();
+}
+
 void
 mach_kdi_init(kdi_t *kdi)
 {
 	kdi->kdi_plat_call = kdi_plat_call;
 	kdi->kdi_kmdb_enter = kmdb_enter;
+	kdi->pkdi_system_claim = kdi_system_claim;
+	kdi->pkdi_system_release = kdi_system_release;
 	kdi->mkdi_cpu_index = kdi_cpu_index;
 	kdi->mkdi_trap_vatotte = kdi_trap_vatotte;
 	kdi->mkdi_kernpanic = kdi_kernpanic;
@@ -849,4 +871,24 @@ plat_release_page(page_t *pp)
 void
 progressbar_key_abort(ldi_ident_t li)
 {
+}
+
+/*
+ * We need to post a soft interrupt to reprogram the lbolt cyclic when
+ * switching from event to cyclic driven lbolt. The following code adds
+ * and posts the softint for sun4 platforms.
+ */
+static uint64_t lbolt_softint_inum;
+
+void
+lbolt_softint_add(void)
+{
+	lbolt_softint_inum = add_softintr(LOCK_LEVEL,
+	    (softintrfunc)lbolt_ev_to_cyclic, NULL, SOFTINT_MT);
+}
+
+void
+lbolt_softint_post(void)
+{
+	setsoftint(lbolt_softint_inum);
 }

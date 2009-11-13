@@ -590,8 +590,8 @@ tzmon_monitor(void *ctx)
 		mutex_enter(&tzp->lock);
 		ticks = drv_usectohz(tzp->polling_period * 1000000);
 		if (ticks > 0)
-			(void) cv_timedwait(&zone_list_condvar, &tzp->lock,
-			    ddi_get_lbolt() + ticks);
+			(void) cv_reltimedwait(&zone_list_condvar,
+			    &tzp->lock, ticks, TR_CLOCK_TICK);
 		mutex_exit(&tzp->lock);
 	} while (ticks > 0);
 }

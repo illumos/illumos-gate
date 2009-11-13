@@ -325,8 +325,8 @@ iscsi_thread_wait(
 	if (timeout == -1) {
 		cv_wait(&thread->sign.cdv, &thread->sign.mtx);
 	} else {
-		rtn = cv_timedwait(&thread->sign.cdv, &thread->sign.mtx,
-		    (ddi_get_lbolt() + timeout));
+		rtn = cv_reltimedwait(&thread->sign.cdv, &thread->sign.mtx,
+		    timeout, TR_CLOCK_TICK);
 	}
 
 	/* Check the signals. */

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1797,10 +1797,11 @@ done:
 			goto pass;
 		}
 		/* Have a valid expire and date so calc an lbolt expire */
-		uri->expire = lbolt + SEC_TO_TICK(http->expire - http->date);
+		uri->expire = ddi_get_lbolt() + SEC_TO_TICK(http->expire -
+		    http->date);
 	} else if (nl7c_uri_ttl != -1) {
 		/* No valid expire speced and we have a TTL */
-		uri->expire = lbolt + SEC_TO_TICK(nl7c_uri_ttl);
+		uri->expire = ddi_get_lbolt() + SEC_TO_TICK(nl7c_uri_ttl);
 	}
 
 chunked:

@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* from SVr4.0 1.23 */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1498,7 +1496,7 @@ ts_setrun(kthread_t *t)
 		else
 			setbackdq(t);
 	} else {
-		if (t->t_disp_time != lbolt)
+		if (t->t_disp_time != ddi_get_lbolt())
 			setbackdq(t);
 		else
 			setfrontdq(t);
@@ -1560,7 +1558,7 @@ ts_sleep(kthread_t *t)
 		if (DISP_MUST_SURRENDER(curthread))
 			cpu_surrender(curthread);
 	}
-	t->t_stime = lbolt;		/* time stamp for the swapper */
+	t->t_stime = ddi_get_lbolt();		/* time stamp for the swapper */
 	TRACE_2(TR_FAC_DISP, TR_SLEEP,
 	    "sleep:tid %p old pri %d", t, old_pri);
 }
@@ -1591,7 +1589,7 @@ ts_swapin(kthread_t *t, int flags)
 	if (t->t_state == TS_RUN && (t->t_schedflag & TS_LOAD) == 0) {
 		time_t swapout_time;
 
-		swapout_time = (lbolt - t->t_stime) / hz;
+		swapout_time = (ddi_get_lbolt() - t->t_stime) / hz;
 		if (INHERITED(t) || (tspp->ts_flags & (TSKPRI | TSIASET)))
 			epri = (long)DISP_PRIO(t) + swapout_time;
 		else {
@@ -1659,7 +1657,7 @@ ts_swapout(kthread_t *t, int flags)
 	 * We know that pri_t is a short.
 	 * Be sure not to overrun its range.
 	 */
-	swapin_time = (lbolt - t->t_stime) / hz;
+	swapin_time = (ddi_get_lbolt() - t->t_stime) / hz;
 	if (flags == SOFTSWAP) {
 		if (t->t_state == TS_SLEEP && swapin_time > maxslp) {
 			epri = 0;
@@ -1980,7 +1978,7 @@ ts_wakeup(kthread_t *t)
 
 	ASSERT(THREAD_LOCK_HELD(t));
 
-	t->t_stime = lbolt;		/* time stamp for the swapper */
+	t->t_stime = ddi_get_lbolt();		/* time stamp for the swapper */
 
 	if (tspp->ts_flags & TSKPRI) {
 		tspp->ts_flags &= ~TSBACKQ;
@@ -2017,7 +2015,7 @@ ts_wakeup(kthread_t *t)
 			else
 				setbackdq(t);
 		} else {
-			if (t->t_disp_time != lbolt)
+			if (t->t_disp_time != ddi_get_lbolt())
 				setbackdq(t);
 			else
 				setfrontdq(t);

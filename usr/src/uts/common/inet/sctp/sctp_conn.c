@@ -115,7 +115,7 @@ sctp_accept_comm(sctp_t *listener, sctp_t *acceptor, mblk_t *cr_pkt,
 	bcopy(listener->sctp_secret, acceptor->sctp_secret, SCTP_SECRET_LEN);
 	bcopy(listener->sctp_old_secret, acceptor->sctp_old_secret,
 	    SCTP_SECRET_LEN);
-	acceptor->sctp_last_secret_update = lbolt64;
+	acceptor->sctp_last_secret_update = ddi_get_lbolt64();
 
 	/*
 	 * After acceptor is inserted in the hash list, it can be found.
@@ -136,7 +136,7 @@ sctp_accept_comm(sctp_t *listener, sctp_t *acceptor, mblk_t *cr_pkt,
 	 */
 	/* XXXSCTP */
 	acceptor->sctp_state = SCTPS_ESTABLISHED;
-	acceptor->sctp_assoc_start_time = (uint32_t)lbolt;
+	acceptor->sctp_assoc_start_time = (uint32_t)ddi_get_lbolt();
 	/*
 	 * listener->sctp_rwnd should be the default window size or a
 	 * window size changed via SO_RCVBUF option.

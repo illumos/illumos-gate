@@ -778,7 +778,8 @@ ilb_rule_del_common(ilb_stack_t *ilbs, ilb_rule_t *tmp_rule)
 			 * by gc thread is intact.
 			 */
 			(void) atomic_swap_64(
-			    (uint64_t *)&server->iser_die_time, lbolt64 +
+			    (uint64_t *)&server->iser_die_time,
+			    ddi_get_lbolt64() +
 			    SEC_TO_TICK(tmp_rule->ir_conn_drain_timeout));
 		}
 		while (server->iser_refcnt > 1)
@@ -1176,7 +1177,7 @@ ilb_server_toggle(ilb_stack_t *ilbs, zoneid_t zoneid, const char *rule_name,
 			if (rule->ir_conn_drain_timeout != 0) {
 				(void) atomic_swap_64(
 				    (uint64_t *)&tmp_server->iser_die_time,
-				    lbolt64 + SEC_TO_TICK(
+				    ddi_get_lbolt64() + SEC_TO_TICK(
 				    rule->ir_conn_drain_timeout));
 			}
 		}
@@ -1499,7 +1500,8 @@ ilb_server_del(ilb_stack_t *ilbs, zoneid_t zoneid, const char *rule_name,
 	/* If there is a hard limit on when a server should die, set it. */
 	if (rule->ir_conn_drain_timeout != 0) {
 		(void) atomic_swap_64((uint64_t *)&server->iser_die_time,
-		    lbolt64 + SEC_TO_TICK(rule->ir_conn_drain_timeout));
+		    ddi_get_lbolt64() +
+		    SEC_TO_TICK(rule->ir_conn_drain_timeout));
 	}
 
 	if (server->iser_refcnt > 1) {

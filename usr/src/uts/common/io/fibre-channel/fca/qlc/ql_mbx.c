@@ -110,10 +110,9 @@ ql_mailbox_command(ql_adapter_state_t *vha, mbx_cmd_t *mcp)
 		}
 
 		/* Set timeout after command that is running. */
-		timer = ddi_get_lbolt();
-		timer += (mcp->timeout + 20) * drv_usectohz(1000000);
-		cv_stat = cv_timedwait_sig(&ha->cv_mbx_wait,
-		    &ha->pha->mbx_mutex, timer);
+		timer = (mcp->timeout + 20) * drv_usectohz(1000000);
+		cv_stat = cv_reltimedwait_sig(&ha->cv_mbx_wait,
+		    &ha->pha->mbx_mutex, timer, TR_CLOCK_TICK);
 		if (cv_stat == -1 || cv_stat == 0) {
 			/*
 			 * The timeout time 'timer' was
@@ -162,14 +161,12 @@ ql_mailbox_command(ql_adapter_state_t *vha, mbx_cmd_t *mcp)
 	    !(ha->task_daemon_flags & (TASK_THREAD_CALLED |
 	    TASK_DAEMON_POWERING_DOWN)) &&
 	    !ddi_in_panic()) {
+		timer = mcp->timeout * drv_usectohz(1000000);
 		while (!(ha->mailbox_flags & (MBX_INTERRUPT | MBX_ABORT)) &&
 		    !(ha->task_daemon_flags & ISP_ABORT_NEEDED)) {
 
-			/* 30 seconds from now */
-			timer = ddi_get_lbolt();
-			timer += mcp->timeout * drv_usectohz(1000000);
-			if (cv_timedwait(&ha->cv_mbx_intr, &ha->pha->mbx_mutex,
-			    timer) == -1) {
+			if (cv_reltimedwait(&ha->cv_mbx_intr,
+			    &ha->pha->mbx_mutex, timer, TR_CLOCK_TICK) == -1) {
 				/*
 				 * The timeout time 'timer' was
 				 * reached without the condition
@@ -3924,7 +3921,7 @@ ql_stop_firmware(ql_adapter_state_t *ha)
  *	ha:	adapter state pointer.
  *	mem:	pointer to dma memory object for command.
  *	dev:	Device address (A0h or A2h).
- *	addr:	Data address on SFP EEPROM (0–255).
+ *	addr:	Data address on SFP EEPROM (0-255).
  *
  * Returns:
  *	ql local function return status code.

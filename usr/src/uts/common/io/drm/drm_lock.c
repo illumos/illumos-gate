@@ -140,7 +140,7 @@ drm_lock(DRM_IOCTL_ARGS)
 	for (;;) {
 		if (drm_lock_take(&dev->lock, lock.context)) {
 			dev->lock.filp = fpriv;
-			dev->lock.lock_time = jiffies;
+			dev->lock.lock_time = ddi_get_lbolt();
 			break;  /* Got lock */
 		}
 		ret = cv_wait_sig(&(dev->lock.lock_cv),

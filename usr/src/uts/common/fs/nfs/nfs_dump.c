@@ -19,16 +19,15 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Dump memory to NFS swap file after a panic.
  * We have no timeouts, context switches, etc.
  */
+
 #include <rpc/types.h>
 #include <sys/param.h>
 #include <sys/errno.h>
@@ -452,7 +451,7 @@ nd_get_reply(TIUSER *tiptr, XDR *xdrp, uint32_t call_xid, int *badmsg)
 static int
 nd_poll(TIUSER *tiptr, int retry, int *eventp)
 {
-	clock_t		start_bolt = lbolt;
+	clock_t		start_bolt = ddi_get_lbolt();
 	clock_t		timout = TIMEOUT * (retry + 1);
 	int		error;
 
@@ -460,7 +459,7 @@ nd_poll(TIUSER *tiptr, int retry, int *eventp)
 
 	*eventp = 0;
 
-	while (!*eventp && ((lbolt - start_bolt) < timout)) {
+	while (!*eventp && ((ddi_get_lbolt() - start_bolt) < timout)) {
 		/*
 		 * Briefly enable interrupts before checking for a reply;
 		 * the network transports do not yet support do_polled_io.

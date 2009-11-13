@@ -5182,9 +5182,9 @@ vhci_pathinfo_offline(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 	VHCI_DEBUG(1, (CE_NOTE, vdip, "!vhci_pathinfo_offline: "
 	    "%d cmds pending on path: 0x%p\n", svp->svp_cmds, (void *)pip));
 	while (svp->svp_cmds != 0) {
-		if (cv_timedwait(&svp->svp_cv, &svp->svp_mutex,
-		    ddi_get_lbolt() +
-		    drv_usectohz(vhci_path_quiesce_timeout * 1000000)) == -1) {
+		if (cv_reltimedwait(&svp->svp_cv, &svp->svp_mutex,
+		    drv_usectohz(vhci_path_quiesce_timeout * 1000000),
+		    TR_CLOCK_TICK) == -1) {
 			/*
 			 * The timeout time reached without the condition
 			 * being signaled.
@@ -7369,9 +7369,9 @@ vhci_quiesce_lun(struct scsi_vhci_lun *vlun)
 		svp = (scsi_vhci_priv_t *)mdi_pi_get_vhci_private(pip);
 		mutex_enter(&svp->svp_mutex);
 		while (svp->svp_cmds != 0) {
-			if (cv_timedwait(&svp->svp_cv, &svp->svp_mutex,
-			    ddi_get_lbolt() + drv_usectohz
-			    (vhci_path_quiesce_timeout * 1000000)) == -1) {
+			if (cv_reltimedwait(&svp->svp_cv, &svp->svp_mutex,
+			    drv_usectohz(vhci_path_quiesce_timeout * 1000000),
+			    TR_CLOCK_TICK) == -1) {
 				mutex_exit(&svp->svp_mutex);
 				mdi_rele_path(pip);
 				VHCI_DEBUG(1, (CE_WARN, NULL,

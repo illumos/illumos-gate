@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1374,9 +1374,7 @@ xpvtap_user_response_get(xpvtap_state_t *state, blkif_response_t *resp,
 static void xpvtap_user_app_stop(caddr_t arg)
 {
 	xpvtap_state_t *state;
-	clock_t timeout;
 	clock_t rc;
-
 
 	state = (xpvtap_state_t *)arg;
 
@@ -1386,9 +1384,9 @@ static void xpvtap_user_app_stop(caddr_t arg)
 	 */
 	mutex_enter(&state->bt_open.bo_mutex);
 	if (state->bt_open.bo_opened) {
-		timeout = ddi_get_lbolt() + drv_usectohz(10000000);
-		rc = cv_timedwait(&state->bt_open.bo_exit_cv,
-		    &state->bt_open.bo_mutex, timeout);
+		rc = cv_reltimedwait(&state->bt_open.bo_exit_cv,
+		    &state->bt_open.bo_mutex, drv_usectohz(10000000),
+		    TR_CLOCK_TICK);
 		if (rc <= 0) {
 			cmn_err(CE_NOTE, "!user process still has driver open, "
 			    "deferring detach\n");

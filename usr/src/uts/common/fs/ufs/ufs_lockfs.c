@@ -277,7 +277,8 @@ ufs_quiesce(struct ulockfs *ulp)
 			if (!ulp->ul_vnops_cnt && !ULOCKFS_IS_FWLOCK(ulp))
 				goto out;
 		}
-		if (!cv_timedwait_sig(&ulp->ul_cv, &ulp->ul_lock, lbolt + hz)) {
+		if (!cv_reltimedwait_sig(&ulp->ul_cv, &ulp->ul_lock, hz,
+		    TR_CLOCK_TICK)) {
 			error = EINTR;
 			goto out;
 		}

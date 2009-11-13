@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,8 +30,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * segkp is a segment driver that administers the allocation and deallocation
@@ -133,12 +131,12 @@ ulong_t *segkp_bitmap;
  * then the stack situation has become quite serious;  if much more stack
  * is consumed, we have the potential of scrogging the next thread/LWP
  * structure.  To help debug the "can't happen" panics which may
- * result from this condition, we record lbolt and the calling thread
- * in red_deep_lbolt and red_deep_thread respectively.
+ * result from this condition, we record hrestime and the calling thread
+ * in red_deep_hires and red_deep_thread respectively.
  */
 #define	RED_DEEP_THRESHOLD	2000
 
-clock_t		red_deep_lbolt;
+hrtime_t	red_deep_hires;
 kthread_t	*red_deep_thread;
 
 uint32_t	red_nmapped;
@@ -854,10 +852,10 @@ segkp_map_red(void)
 		 * LWP structure.  That situation could result in
 		 * a very hard-to-debug panic, so, in the spirit of
 		 * recording the name of one's killer in one's own
-		 * blood, we're going to record lbolt and the calling
+		 * blood, we're going to record hrestime and the calling
 		 * thread.
 		 */
-		red_deep_lbolt = lbolt;
+		red_deep_hires = hrestime.tv_nsec;
 		red_deep_thread = curthread;
 	}
 
@@ -1325,7 +1323,7 @@ segkp_find(struct seg *seg, caddr_t vaddr)
 	mutex_enter(&segkp_lock);
 	do {
 		for (kpd = kpsd->kpsd_hash[i]; kpd != NULL;
-						kpd = kpd->kp_next) {
+		    kpd = kpd->kp_next) {
 			if (vaddr >= kpd->kp_base &&
 			    vaddr < kpd->kp_base + kpd->kp_len) {
 				mutex_exit(&segkp_lock);

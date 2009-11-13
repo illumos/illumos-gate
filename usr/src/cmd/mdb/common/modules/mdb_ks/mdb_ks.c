@@ -52,6 +52,7 @@
 #include <sys/refstr_impl.h>
 #include <sys/cpuvar.h>
 #include <sys/dlpi.h>
+#include <sys/clock_impl.h>
 #include <errno.h>
 
 #include <vm/seg_vn.h>
@@ -1584,4 +1585,82 @@ mdb_dlpi_prim(int prim)
 	case DL_PASSIVE_REQ:	return ("DL_PASSIVE_REQ");
 	default:		return (NULL);
 	}
+}
+
+/*
+ * mdb_gethrtime() returns the hires system time. This will be the timestamp at
+ * which we dropped into, if called from, kmdb(1); the core dump's hires time
+ * if inspecting one; or the running system's hires time if we're inspecting
+ * a live kernel.
+ */
+hrtime_t
+mdb_gethrtime(void)
+{
+	uintptr_t ptr;
+	lbolt_info_t lbi;
+	hrtime_t ts;
+
+#ifdef _KMDB
+	if (mdb_readvar(&ptr, "lb_info") == -1)
+		return (0);
+
+	if (mdb_vread(&lbi, sizeof (lbolt_info_t), ptr) !=
+	    sizeof (lbolt_info_t))
+		return (0);
+
+	ts = lbi.lbi_debug_ts;
+#else
+	if (mdb_prop_postmortem) {
+		if (mdb_readvar(&ptr, "lb_info") == -1)
+			return (0);
+
+		if (mdb_vread(&lbi, sizeof (lbolt_info_t), ptr) !=
+		    sizeof (lbolt_info_t))
+			return (0);
+
+		ts = lbi.lbi_debug_ts;
+	} else {
+		ts = gethrtime();
+	}
+#endif
+	return (ts);
+}
+
+/*
+ * mdb_get_lbolt() returns the number of clock ticks since system boot.
+ * Depending on the context in which it's called, the value will be derived
+ * from different sources per mdb_gethrtime(). If inspecting a panicked
+ * system, the routine returns the 'panic_lbolt64' variable from the core file.
+ */
+int64_t
+mdb_get_lbolt(void)
+{
+	lbolt_info_t lbi;
+	uintptr_t ptr;
+	int64_t pl;
+	hrtime_t ts;
+	int nsec;
+
+	if (mdb_readvar(&pl, "panic_lbolt64") != -1 && pl > 0)
+		return (pl);
+
+	/*
+	 * Load the time spent in kmdb, if any.
+	 */
+	if (mdb_readvar(&ptr, "lb_info") == -1)
+		return (0);
+
+	if (mdb_vread(&lbi, sizeof (lbolt_info_t), ptr) !=
+	    sizeof (lbolt_info_t))
+		return (0);
+
+	if ((ts = mdb_gethrtime()) <= 0)
+		return (0);
+
+	if (mdb_readvar(&nsec, "nsec_per_tick") == -1 || nsec == 0) {
+		mdb_warn("failed to read 'nsec_per_tick'");
+		return (-1);
+	}
+
+	return ((ts/nsec) - lbi.lbi_debug_time);
 }

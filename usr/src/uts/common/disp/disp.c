@@ -912,7 +912,7 @@ swtch()
 			restore_mstate(next);
 
 			CPU_STATS_ADDQ(cp, sys, pswitch, 1);
-			cp->cpu_last_swtch = t->t_disp_time = lbolt;
+			cp->cpu_last_swtch = t->t_disp_time = ddi_get_lbolt();
 			TRACE_0(TR_FAC_DISP, TR_RESUME_START, "resume_start");
 
 			if (dtrace_vtime_active)
@@ -1073,7 +1073,7 @@ swtch_to(kthread_t *next)
 	cp->cpu_disp_flags &= ~CPU_DISP_DONTSTEAL;
 
 	/* record last execution time */
-	cp->cpu_last_swtch = curthread->t_disp_time = lbolt;
+	cp->cpu_last_swtch = curthread->t_disp_time = ddi_get_lbolt();
 
 	/*
 	 * If t was previously in the TS_ONPROC state, setfrontdq and setbackdq
@@ -1152,7 +1152,7 @@ cpu_resched(cpu_t *cp, pri_t tpri)
  */
 #define	THREAD_HAS_CACHE_WARMTH(thread)	\
 	((thread == curthread) ||	\
-	((lbolt - thread->t_disp_time) <= rechoose_interval))
+	((ddi_get_lbolt() - thread->t_disp_time) <= rechoose_interval))
 /*
  * Put the specified thread on the back of the dispatcher
  * queue corresponding to its current priority.

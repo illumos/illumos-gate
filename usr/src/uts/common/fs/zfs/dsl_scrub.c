@@ -313,7 +313,7 @@ scrub_pause(dsl_pool_t *dp, const zbookmark_t *zb)
 
 	mintime = dp->dp_scrub_isresilver ? zfs_resilver_min_time :
 	    zfs_scrub_min_time;
-	elapsed_ticks = lbolt64 - dp->dp_scrub_start_time;
+	elapsed_ticks = ddi_get_lbolt64() - dp->dp_scrub_start_time;
 	if (elapsed_ticks > hz * zfs_txg_timeout ||
 	    (elapsed_ticks > hz * mintime && txg_sync_waiting(dp))) {
 		dprintf("pausing at %llx/%llx/%llx/%llx\n",
@@ -836,7 +836,7 @@ dsl_pool_scrub_sync(dsl_pool_t *dp, dmu_tx_t *tx)
 	}
 
 	dp->dp_scrub_pausing = B_FALSE;
-	dp->dp_scrub_start_time = lbolt64;
+	dp->dp_scrub_start_time = ddi_get_lbolt64();
 	dp->dp_scrub_isresilver = (dp->dp_scrub_min_txg != 0);
 	spa->spa_scrub_active = B_TRUE;
 

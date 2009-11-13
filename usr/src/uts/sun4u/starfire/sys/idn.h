@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Inter-Domain Network
@@ -27,8 +27,6 @@
 
 #ifndef	_SYS_IDN_H
 #define	_SYS_IDN_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef _ASM
 
@@ -3317,7 +3315,7 @@ extern struct idn_gkstat	sg_kstat;
 #define	IDN_GKSTAT_INC(vvv)		((sg_kstat.vvv)++)
 #define	IDN_GKSTAT_ADD(vvv, iii)	((sg_kstat.vvv) += (iii))
 #define	IDN_GKSTAT_GLOBAL_EVENT(vvv, ttt) \
-		((sg_kstat.vvv)++, ((sg_kstat.ttt) = lbolt))
+		((sg_kstat.vvv)++, ((sg_kstat.ttt) = ddi_get_lbolt()))
 
 #endif /* IDN_NO_KSTAT */
 

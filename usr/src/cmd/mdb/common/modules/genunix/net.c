@@ -1559,8 +1559,7 @@ dladm_show_bridge(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (argc == 1)
 		args->name = argv[0].a_un.a_str;
 
-	if (mdb_readvar(&args->lbolt,
-	    mdb_prop_postmortem ? "panic_lbolt" : "lbolt") == -1) {
+	if ((args->lbolt = mdb_get_lbolt()) == -1) {
 		mdb_warn("failed to read lbolt");
 		goto err;
 	}

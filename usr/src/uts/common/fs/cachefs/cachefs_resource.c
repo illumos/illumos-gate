@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -257,7 +256,7 @@ cachefs_rl_alloc(struct cachefscache *cachep, rl_entry_t *valp, uint_t *entnop)
 	entno = lhp->rli_front;
 	if (entno == 0) {
 		if (cachep->c_rlinfo.rl_entries >=
-			cachep->c_label.cl_maxinodes) {
+		    cachep->c_label.cl_maxinodes) {
 			error = ENOMEM;
 			goto out;
 		}
@@ -807,7 +806,7 @@ cachefs_garbage_collect(cachefscache_t *cachep)
 
 	cachep->c_gc_after = cachefs_gc_front_atime(cachep);
 	CACHEFS_TIME_TO_CFS_TIME_COPY(cachep->c_gc_after,
-			cachep->c_rlinfo.rl_gctime, error);
+	    cachep->c_rlinfo.rl_gctime, error);
 }
 
 /*
@@ -978,7 +977,7 @@ cachefs_cachep_worker_thread(cachefscache_t *cachep)
 	struct flock64 fl;
 	callb_cpr_t cprinfo;
 	kmutex_t cpr_lock;
-
+	clock_t wakeup;
 
 	/* lock the lock file for exclusive write access */
 	fl.l_type = F_WRLCK;
@@ -987,8 +986,8 @@ cachefs_cachep_worker_thread(cachefscache_t *cachep)
 	fl.l_len = (offset_t)1024;
 	fl.l_sysid = 0;
 	fl.l_pid = 0;
-	error = VOP_FRLOCK(cachep->c_lockvp, F_SETLK, &fl, FWRITE,
-		(offset_t)0, NULL, kcred, NULL);
+	error = VOP_FRLOCK(cachep->c_lockvp, F_SETLK, &fl, FWRITE, (offset_t)0,
+	    NULL, kcred, NULL);
 	if (error) {
 		cmn_err(CE_WARN,
 		    "cachefs: Can't lock Cache Lock File(r); Error %d\n",
@@ -1000,17 +999,16 @@ cachefs_cachep_worker_thread(cachefscache_t *cachep)
 	mutex_enter(&cpr_lock);
 	mutex_enter(&cachep->c_contentslock);
 
+	wakeup = (clock_t)(cachefs_ppend_time * hz);
+
 	/* loop while the thread is allowed to run */
 	while ((cachep->c_flags & CACHE_CACHEW_THREADEXIT) == 0) {
-		clock_t wakeup;
-
 		/* wait for a wakeup call */
 		cachep->c_flags &= ~CACHE_GARBAGE_COLLECT;
 		CALLB_CPR_SAFE_BEGIN(&cprinfo);
 		mutex_exit(&cpr_lock);
-		wakeup = (clock_t)(lbolt + (cachefs_ppend_time * hz));
-		(void) cv_timedwait(&cachep->c_cwcv,
-			&cachep->c_contentslock, wakeup);
+		(void) cv_reltimedwait(&cachep->c_cwcv,
+		    &cachep->c_contentslock, wakeup, TR_CLOCK_TICK);
 		mutex_enter(&cpr_lock);
 		CALLB_CPR_SAFE_END(&cprinfo, &cpr_lock);
 
@@ -1056,8 +1054,8 @@ cachefs_cachep_worker_thread(cachefscache_t *cachep)
 	fl.l_len = (offset_t)1024;
 	fl.l_sysid = 0;
 	fl.l_pid = 0;
-	error = VOP_FRLOCK(cachep->c_lockvp, F_SETLK, &fl,
-		FWRITE, (offset_t)0, NULL, kcred, NULL);
+	error = VOP_FRLOCK(cachep->c_lockvp, F_SETLK, &fl, FWRITE, (offset_t)0,
+	    NULL, kcred, NULL);
 	if (error) {
 		cmn_err(CE_WARN, "cachefs: Can't unlock lock file\n");
 	}
@@ -1119,7 +1117,7 @@ cachefs_rl_debug_reclaim(void *cdrarg)
 	int error;
 
 	for (cachep = cachefs_cachelist; cachep != NULL;
-		cachep = cachep->c_next) {
+	    cachep = cachep->c_next) {
 		mutex_enter(&cachep->c_contentslock);
 
 		for (index = 0;
@@ -1147,8 +1145,8 @@ cachefs_rl_debug_save(rl_entry_t *rlent)
 	if (cachefs_rl_debug_cache == NULL)
 		cachefs_rl_debug_cache =
 		    kmem_cache_create("cachefs_rl_debug",
-			sizeof (rl_debug_t), 0,
-			NULL, NULL, cachefs_rl_debug_reclaim, NULL, NULL, 0);
+		    sizeof (rl_debug_t), 0,
+		    NULL, NULL, cachefs_rl_debug_reclaim, NULL, NULL, 0);
 
 	rldb = kmem_cache_alloc(cachefs_rl_debug_cache, KM_SLEEP);
 	++cachefs_rl_debug_inuse;

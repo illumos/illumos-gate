@@ -1776,7 +1776,7 @@ sctp_sack(sctp_t *sctp, mblk_t *dups)
 	    (void *)sctp->sctp_lastdata,
 	    SCTP_PRINTADDR(sctp->sctp_lastdata->faddr)));
 
-	sctp->sctp_active = lbolt64;
+	sctp->sctp_active = ddi_get_lbolt64();
 
 	BUMP_MIB(&sctps->sctps_mib, sctpOutAck);
 
@@ -1918,7 +1918,8 @@ sctp_cumack(sctp_t *sctp, uint32_t tsn, mblk_t **first_unacked)
 				    xtsn == sctp->sctp_rtt_tsn) {
 					/* Got a new RTT measurement */
 					sctp_update_rtt(sctp, fp,
-					    lbolt64 - sctp->sctp_out_time);
+					    ddi_get_lbolt64() -
+					    sctp->sctp_out_time);
 					sctp->sctp_out_time = 0;
 				}
 				if (SCTP_CHUNK_ISACKED(mp))
@@ -3583,7 +3584,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 	gotdata = 0;
 	trysend = 0;
 
-	now = lbolt64;
+	now = ddi_get_lbolt64();
 	/* Process the chunks */
 	do {
 		dprint(3, ("sctp_dispatch_rput: state=%d, chunk id=%d\n",
@@ -3918,7 +3919,8 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 
 				}
 				sctp->sctp_state = SCTPS_ESTABLISHED;
-				sctp->sctp_assoc_start_time = (uint32_t)lbolt;
+				sctp->sctp_assoc_start_time =
+				    (uint32_t)ddi_get_lbolt();
 				BUMP_MIB(&sctps->sctps_mib, sctpActiveEstab);
 				if (sctp->sctp_cookie_mp) {
 					freemsg(sctp->sctp_cookie_mp);
@@ -3959,7 +3961,8 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 				if (sctp->sctp_unacked == 0)
 					sctp_stop_faddr_timers(sctp);
 				sctp->sctp_state = SCTPS_ESTABLISHED;
-				sctp->sctp_assoc_start_time = (uint32_t)lbolt;
+				sctp->sctp_assoc_start_time =
+				    (uint32_t)ddi_get_lbolt();
 				BUMP_MIB(&sctps->sctps_mib, sctpActiveEstab);
 				BUMP_LOCAL(sctp->sctp_ibchunks);
 				if (sctp->sctp_cookie_mp) {
@@ -4000,7 +4003,8 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 				if (sctp->sctp_unacked == 0)
 					sctp_stop_faddr_timers(sctp);
 				sctp->sctp_state = SCTPS_ESTABLISHED;
-				sctp->sctp_assoc_start_time = (uint32_t)lbolt;
+				sctp->sctp_assoc_start_time =
+				    (uint32_t)ddi_get_lbolt();
 				BUMP_MIB(&sctps->sctps_mib, sctpActiveEstab);
 				if (sctp->sctp_cookie_mp) {
 					freemsg(sctp->sctp_cookie_mp);

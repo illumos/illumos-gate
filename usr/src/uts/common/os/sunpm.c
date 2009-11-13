@@ -547,7 +547,7 @@ static dev_info_t *cfb_dip = 0;
 static dev_info_t *cfb_dip_detaching = 0;
 uint_t cfb_inuse = 0;
 static ddi_softintr_t pm_soft_id;
-static clock_t pm_soft_pending;
+static boolean_t pm_soft_pending;
 int	pm_scans_disabled = 0;
 
 /*
@@ -7732,7 +7732,7 @@ pm_cfb_softint(caddr_t int_handler_arg)
 		/* acquired in debug_enter before calling pm_cfb_trigger */
 		pm_cfb_rele();
 		mutex_enter(&pm_cfb_lock);
-		pm_soft_pending = 0;
+		pm_soft_pending = B_FALSE;
 		mutex_exit(&pm_cfb_lock);
 		rval = DDI_INTR_CLAIMED;
 	} else
@@ -7859,23 +7859,19 @@ pm_cfb_trigger(void)
 
 	mutex_enter(&pm_cfb_lock);
 	/*
-	 * If machine appears to be hung, pulling the keyboard connector of
+	 * If the machine appears to be hung, pulling the keyboard connector of
 	 * the console will cause a high level interrupt and go to debug_enter.
 	 * But, if the fb is powered down, this routine will be called to bring
-	 * it up (by generating a softint to do the work).  If soft interrupts
-	 * are not running, and the keyboard connector is pulled again, the
-	 * following code detects this condition and calls panic which allows
-	 * the fb to be brought up from high level.
-	 *
-	 * If two nearly simultaneous calls to debug_enter occur (both from
-	 * high level) the code described above will cause a panic.
+	 * it up (by generating a softint to do the work). If a second attempt
+	 * at triggering this softint happens before the first one completes,
+	 * we panic as softints are most likely not being handled.
 	 */
-	if (lbolt <= pm_soft_pending) {
-		panicstr = "pm_cfb_trigger: lbolt not advancing";
+	if (pm_soft_pending) {
+		panicstr = "pm_cfb_trigger: failed to enter the debugger";
 		panic(panicstr);	/* does a power up at any intr level */
 		/* NOTREACHED */
 	}
-	pm_soft_pending = lbolt;
+	pm_soft_pending = B_TRUE;
 	mutex_exit(&pm_cfb_lock);
 	ddi_trigger_softintr(pm_soft_id);
 }

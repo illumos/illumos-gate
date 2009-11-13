@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 /*
  * IOSRAM leaf driver to SBBC nexus driver.  This driver is used
@@ -3261,7 +3260,7 @@ iosram_log(caddr_t fmt, intptr_t a1, intptr_t a2, intptr_t a3, intptr_t a4)
 	seq = iosram_logseq++;
 	logp = &iosram_logbuf[seq % IOSRAM_MAXLOG];
 	logp->seq = seq;
-	logp->tstamp = lbolt;
+	logp->tstamp = ddi_get_lbolt();
 	logp->fmt = fmt;
 	logp->arg1 = a1;
 	logp->arg2 = a2;
@@ -3501,7 +3500,7 @@ iosram_print_log(int cnt)
 
 	cmn_err(CE_CONT,
 	    "\niosram_logseq: 0x%x  lbolt: %lx  iosram_log_level:%x\n",
-	    iosram_logseq, lbolt, iosram_log_level);
+	    iosram_logseq, ddi_get_lbolt(), iosram_log_level);
 	cmn_err(CE_CONT, "iosram_logbuf: %p  max entries:0x%x\n",
 	    iosram_logbuf, IOSRAM_MAXLOG);
 	for (i = iosram_logseq;  --i >= 0 && --cnt >= 0; ) {

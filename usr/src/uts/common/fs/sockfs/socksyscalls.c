@@ -1986,7 +1986,6 @@ snf_async_thread(void)
 	snf_req_t *sr;
 	callb_cpr_t cprinfo;
 	clock_t time_left = 1;
-	clock_t now;
 
 	CALLB_CPR_INIT(&cprinfo, &snfq->snfq_lock, callb_generic_cpr, "snfq");
 
@@ -2006,9 +2005,8 @@ snf_async_thread(void)
 			}
 			snfq->snfq_idle_cnt++;
 
-			time_to_wait(&now, snfq_timeout);
-			time_left = cv_timedwait(&snfq->snfq_cv,
-			    &snfq->snfq_lock, now);
+			time_left = cv_reltimedwait(&snfq->snfq_cv,
+			    &snfq->snfq_lock, snfq_timeout, TR_CLOCK_TICK);
 			snfq->snfq_idle_cnt--;
 
 			CALLB_CPR_SAFE_END(&cprinfo, &snfq->snfq_lock);

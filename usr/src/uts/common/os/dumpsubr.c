@@ -69,6 +69,7 @@
 #include <vm/pvn.h>
 #include <vm/seg.h>
 #include <vm/seg_kmem.h>
+#include <sys/clock_impl.h>
 
 #include <bzip2/bzlib.h>
 
@@ -2551,6 +2552,11 @@ dumpsys(void)
 			}
 		}
 	}
+
+	/*
+	 * Store a hires timestamp so we can look it up during debugging.
+	 */
+	lbolt_debug_entry();
 
 	/*
 	 * Leave room for the message and ereport save areas and terminal dump

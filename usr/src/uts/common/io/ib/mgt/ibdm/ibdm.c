@@ -4702,13 +4702,14 @@ void
 ibdm_ibnex_port_settle_wait(ib_guid_t hca_guid, int dft_wait)
 {
 	time_t wait_time;
+	clock_t delta;
 
 	mutex_enter(&ibdm.ibdm_hl_mutex);
 
 	while ((wait_time = ibdm_get_waittime(hca_guid, dft_wait)) > 0) {
-		(void) cv_timedwait(&ibdm.ibdm_port_settle_cv,
-		    &ibdm.ibdm_hl_mutex,
-		    ddi_get_lbolt() + drv_usectohz(wait_time * 1000000));
+		delta = wait_time * drv_usectohz(wait_time * 1000000);
+		(void) cv_reltimedwait(&ibdm.ibdm_port_settle_cv,
+		    &ibdm.ibdm_hl_mutex, delta, TR_CLOCK_TICK);
 	}
 
 	mutex_exit(&ibdm.ibdm_hl_mutex);

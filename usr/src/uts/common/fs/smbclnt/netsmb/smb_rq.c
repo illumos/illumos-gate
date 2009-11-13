@@ -261,11 +261,11 @@ smb_rq_simple_timed(struct smb_rq *rqp, int timeout)
 			break;
 		SMBRQ_LOCK(rqp);
 		if (rqp->sr_share) {
-			cv_timedwait(&rqp->sr_cond, &(rqp)->sr_lock,
-			    lbolt + (hz * SMB_RCNDELAY));
+			cv_reltimedwait(&rqp->sr_cond, &(rqp)->sr_lock,
+			    (hz * SMB_RCNDELAY), TR_CLOCK_TICK);
 
 		} else {
-			delay(lbolt + (hz * SMB_RCNDELAY));
+			delay(ddi_get_lbolt() + (hz * SMB_RCNDELAY));
 		}
 		SMBRQ_UNLOCK(rqp);
 		rqp->sr_rexmit--;
@@ -1409,10 +1409,10 @@ smb_t2_request(struct smb_t2rq *t2p)
 			break;
 		mutex_enter(&(t2p)->t2_lock);
 		if (t2p->t2_share) {
-			cv_timedwait(&t2p->t2_cond, &(t2p)->t2_lock,
-			    lbolt + (hz * SMB_RCNDELAY));
+			cv_reltimedwait(&t2p->t2_cond, &(t2p)->t2_lock,
+			    (hz * SMB_RCNDELAY), TR_CLOCK_TICK);
 		} else {
-			delay(lbolt + (hz * SMB_RCNDELAY));
+			delay(ddi_get_lbolt() + (hz * SMB_RCNDELAY));
 		}
 		mutex_exit(&(t2p)->t2_lock);
 	}
@@ -1442,11 +1442,11 @@ smb_nt_request(struct smb_ntrq *ntp)
 			break;
 		mutex_enter(&(ntp)->nt_lock);
 		if (ntp->nt_share) {
-			cv_timedwait(&ntp->nt_cond, &(ntp)->nt_lock,
-			    lbolt + (hz * SMB_RCNDELAY));
+			cv_reltimedwait(&ntp->nt_cond, &(ntp)->nt_lock,
+			    (hz * SMB_RCNDELAY), TR_CLOCK_TICK);
 
 		} else {
-			delay(lbolt + (hz * SMB_RCNDELAY));
+			delay(ddi_get_lbolt() + (hz * SMB_RCNDELAY));
 		}
 		mutex_exit(&(ntp)->nt_lock);
 	}

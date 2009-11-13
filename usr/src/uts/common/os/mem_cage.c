@@ -170,7 +170,7 @@ static struct kcage_stats_scan kcage_stats_scan_zero;
 	KCAGE_STAT_SETZ(scans[kcage_stats.scan_index].m, v)
 
 #define	KCAGE_STAT_INC_SCAN_INDEX \
-	KCAGE_STAT_SET_SCAN(scan_lbolt, lbolt); \
+	KCAGE_STAT_SET_SCAN(scan_lbolt, ddi_get_lbolt()); \
 	KCAGE_STAT_SET_SCAN(scan_id, kcage_stats.scan_index); \
 	kcage_stats.scan_index = \
 	(kcage_stats.scan_index + 1) % KCAGE_STATS_NSCANS; \
@@ -1721,7 +1721,7 @@ loop:
 	last_pass = 0;
 
 #ifdef KCAGE_STATS
-	scan_start = lbolt;
+	scan_start = ddi_get_lbolt();
 #endif
 
 again:
@@ -1943,7 +1943,7 @@ again:
 
 		KCAGE_STAT_SET_SCAN(kt_freemem_end, freemem);
 		KCAGE_STAT_SET_SCAN(kt_kcage_freemem_end, kcage_freemem);
-		KCAGE_STAT_SET_SCAN(kt_ticks, lbolt - scan_start);
+		KCAGE_STAT_SET_SCAN(kt_ticks, ddi_get_lbolt() - scan_start);
 		KCAGE_STAT_INC_SCAN_INDEX;
 		goto loop;
 	}

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1051,9 +1051,9 @@ nvpflush_daemon(void)
 	for (;;) {
 		CALLB_CPR_SAFE_BEGIN(&cprinfo);
 		while (do_nvpflush == 0) {
-			clk = cv_timedwait(&nvpflush_cv, &nvpflush_lock,
-			    ddi_get_lbolt() +
-			    (nvpdaemon_idle_time * TICKS_PER_SECOND));
+			clk = cv_reltimedwait(&nvpflush_cv, &nvpflush_lock,
+			    (nvpdaemon_idle_time * TICKS_PER_SECOND),
+			    TR_CLOCK_TICK);
 			if ((clk == -1 && do_nvpflush == 0 &&
 			    nvpflush_timer_busy == 0) || sys_shutdown) {
 				/*

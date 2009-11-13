@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -157,11 +155,11 @@ cachefs_cache_create(void)
 void
 cachefs_cache_destroy(cachefscache_t *cachep)
 {
-	clock_t tend;
 	int error = 0;
 #ifdef CFSRLDEBUG
 	uint_t index;
 #endif /* CFSRLDEBUG */
+	clock_t wakeup = (60 * hz);
 
 	/* stop async threads */
 	while (cachep->c_workq.wq_thread_count > 0)
@@ -172,9 +170,8 @@ cachefs_cache_destroy(cachefscache_t *cachep)
 	while (cachep->c_flags & CACHE_CACHEW_THREADRUN) {
 		cachep->c_flags |= CACHE_CACHEW_THREADEXIT;
 		cv_signal(&cachep->c_cwcv);
-		tend = lbolt + (60 * hz);
-		(void) cv_timedwait(&cachep->c_cwhaltcv,
-			&cachep->c_contentslock, tend);
+		(void) cv_reltimedwait(&cachep->c_cwhaltcv,
+		    &cachep->c_contentslock, wakeup, TR_CLOCK_TICK);
 	}
 
 	if ((cachep->c_flags & CACHE_ALLOC_PENDING) == 0) {
@@ -195,7 +192,7 @@ cachefs_cache_destroy(cachefscache_t *cachep)
 				rl_entry_t *rlent;
 
 				error = cachefs_rl_entry_get(cachep, index,
-									rlent);
+				    rlent);
 				/*
 				 * Since we are destroying the cache,
 				 * better to ignore and proceed
@@ -289,29 +286,29 @@ cachefs_cache_activate_ro(cachefscache_t *cachep, vnode_t *cdvp)
 
 	/* Get the lock file */
 	error = VOP_LOOKUP(cdvp, CACHEFS_LOCK_FILE, &lockvp, NULL, 0, NULL,
-		kcred, NULL, NULL, NULL);
+	    kcred, NULL, NULL, NULL);
 	if (error) {
 		cmn_err(CE_WARN, "cachefs: activate_a: cache corruption"
-			" run fsck.\n");
+		    " run fsck.\n");
 		goto out;
 	}
 
 	/* Get the label file */
 	error = VOP_LOOKUP(cdvp, CACHELABEL_NAME, &labelvp, NULL, 0, NULL,
-		kcred, NULL, NULL, NULL);
+	    kcred, NULL, NULL, NULL);
 	if (error) {
 		cmn_err(CE_WARN, "cachefs: activate_b: cache corruption"
-			" run fsck.\n");
+		    " run fsck.\n");
 		goto out;
 	}
 
 	/* read in the label */
 	error = vn_rdwr(UIO_READ, labelvp, (caddr_t)&cachep->c_label,
-			sizeof (struct cache_label), 0LL, UIO_SYSSPACE,
-			0, (rlim64_t)0, kcred, NULL);
+	    sizeof (struct cache_label), 0LL, UIO_SYSSPACE,
+	    0, (rlim64_t)0, kcred, NULL);
 	if (error) {
 		cmn_err(CE_WARN, "cachefs: activate_c: cache corruption"
-			" run fsck.\n");
+		    " run fsck.\n");
 		goto out;
 	}
 
@@ -327,17 +324,17 @@ cachefs_cache_activate_ro(cachefscache_t *cachep, vnode_t *cdvp)
 	    NULL, NULL, NULL);
 	if (error) {
 		cmn_err(CE_WARN, "cachefs: activate_d: cache corruption"
-			" run fsck.\n");
+		    " run fsck.\n");
 		goto out;
 	}
 
 	/*  Read the usage struct for this cache */
 	error = vn_rdwr(UIO_READ, rifvp, (caddr_t)&cachep->c_usage,
-			sizeof (struct cache_usage), 0LL, UIO_SYSSPACE, 0,
-			(rlim64_t)0, kcred, NULL);
+	    sizeof (struct cache_usage), 0LL, UIO_SYSSPACE, 0,
+	    (rlim64_t)0, kcred, NULL);
 	if (error) {
 		cmn_err(CE_WARN, "cachefs: activate_e: cache corruption"
-			" run fsck.\n");
+		    " run fsck.\n");
 		goto out;
 	}
 
@@ -350,11 +347,11 @@ cachefs_cache_activate_ro(cachefscache_t *cachep, vnode_t *cdvp)
 
 	/*  Read the rlinfo for this cache */
 	error = vn_rdwr(UIO_READ, rifvp, (caddr_t)&cachep->c_rlinfo,
-	sizeof (cachefs_rl_info_t), (offset_t)sizeof (struct cache_usage),
-			UIO_SYSSPACE, 0, 0, kcred, NULL);
+	    sizeof (cachefs_rl_info_t), (offset_t)sizeof (struct cache_usage),
+	    UIO_SYSSPACE, 0, 0, kcred, NULL);
 	if (error) {
 		cmn_err(CE_WARN, "cachefs: activate_f: cache corruption"
-			" run fsck.\n");
+		    " run fsck.\n");
 		goto out;
 	}
 
@@ -363,7 +360,7 @@ cachefs_cache_activate_ro(cachefscache_t *cachep, vnode_t *cdvp)
 	    NULL, 0, NULL, kcred, NULL, NULL, NULL);
 	if (error) {
 		cmn_err(CE_WARN, "cachefs: activate_g: cache corruption"
-			" run fsck.\n");
+		    " run fsck.\n");
 		goto out;
 	}
 
@@ -441,8 +438,8 @@ cachefs_stop_cache(cnode_t *cp)
 	cachefscache_t *cachep = fscp->fs_cache;
 	filegrp_t *fgp;
 	int i;
-	clock_t tend;
 	int error = 0;
+	clock_t wakeup = (60 * hz);
 
 	/* XXX verify lock-ordering for this function */
 
@@ -497,7 +494,7 @@ cachefs_stop_cache(cnode_t *cp)
 
 	for (i = 0; i < CFS_FS_FGP_BUCKET_SIZE; i++) {
 		for (fgp = fscp->fs_filegrp[i]; fgp != NULL;
-		fgp = fgp->fg_next) {
+		    fgp = fgp->fg_next) {
 			mutex_enter(&fgp->fg_mutex);
 
 			ASSERT((fgp->fg_flags &
@@ -552,9 +549,8 @@ cachefs_stop_cache(cnode_t *cp)
 	while (cachep->c_flags & CACHE_CACHEW_THREADRUN) {
 		cachep->c_flags |= CACHE_CACHEW_THREADEXIT;
 		cv_signal(&cachep->c_cwcv);
-		tend = lbolt + (60 * hz);
-		(void) cv_timedwait(&cachep->c_cwhaltcv,
-			&cachep->c_contentslock, tend);
+		(void) cv_reltimedwait(&cachep->c_cwhaltcv,
+		    &cachep->c_contentslock, wakeup, TR_CLOCK_TICK);
 	}
 
 	if (cachep->c_resfilevp) {
@@ -677,7 +673,7 @@ cachefs_cache_dirty(struct cachefscache *cachep, int lockit)
 		if (error = vn_rdwr(UIO_WRITE, cachep->c_resfilevp,
 		    (caddr_t)&cachep->c_usage, sizeof (struct cache_usage),
 		    0LL, UIO_SYSSPACE, FSYNC, (rlim64_t)RLIM_INFINITY,
-				kcred, NULL)) {
+		    kcred, NULL)) {
 			cmn_err(CE_WARN,
 			    "cachefs: clean flag write error: %d\n", error);
 		}
@@ -717,24 +713,25 @@ cachefs_cache_rssync(struct cachefscache *cachep)
 		    (offset_t)((cachep->c_rl_window + 1) * MAXBSIZE),
 		    UIO_SYSSPACE, FSYNC, RLIM_INFINITY, kcred, NULL);
 		if (error)
-		    cmn_err(CE_WARN, "cachefs: Can't Write rl entries Info\n");
+			cmn_err(CE_WARN,
+			    "cachefs: Can't Write rl entries Info\n");
 		cachefs_kmem_free(cachep->c_rl_entries, MAXBSIZE);
 		cachep->c_rl_entries = NULL;
 	}
 
 	/* write the usage struct for this cache */
 	error = vn_rdwr(UIO_WRITE, cachep->c_resfilevp,
-		(caddr_t)&cachep->c_usage, sizeof (struct cache_usage),
-		0LL, UIO_SYSSPACE, 0, (rlim64_t)RLIM_INFINITY, kcred, NULL);
+	    (caddr_t)&cachep->c_usage, sizeof (struct cache_usage),
+	    0LL, UIO_SYSSPACE, 0, (rlim64_t)RLIM_INFINITY, kcred, NULL);
 	if (error) {
 		cmn_err(CE_WARN, "cachefs: Can't Write Cache Usage Info\n");
 	}
 
 	/* write the rlinfo for this cache */
 	error = vn_rdwr(UIO_WRITE, cachep->c_resfilevp,
-			(caddr_t)&cachep->c_rlinfo, sizeof (cachefs_rl_info_t),
-			(offset_t)sizeof (struct cache_usage), UIO_SYSSPACE,
-			0, (rlim64_t)RLIM_INFINITY, kcred, NULL);
+	    (caddr_t)&cachep->c_rlinfo, sizeof (cachefs_rl_info_t),
+	    (offset_t)sizeof (struct cache_usage), UIO_SYSSPACE,
+	    0, (rlim64_t)RLIM_INFINITY, kcred, NULL);
 	if (error) {
 		cmn_err(CE_WARN, "cachefs: Can't Write Cache RL Info\n");
 	}
@@ -822,7 +819,7 @@ cachefs_cache_sync(struct cachefscache *cachep)
 					done = 1;
 				} else {
 					cachep->c_usage.cu_flags |=
-						CUSAGE_ACTIVE;
+					    CUSAGE_ACTIVE;
 				}
 			} else {
 				done = 1;
@@ -860,7 +857,7 @@ cachefs_cache_unique(cachefscache_t *cachep)
 
 	mutex_enter(&cachep->c_contentslock);
 	if (cachep->c_usage.cu_flags & CUSAGE_NEED_ADJUST ||
-		++(cachep->c_unique) == 0) {
+	    ++(cachep->c_unique) == 0) {
 		cachep->c_usage.cu_unique++;
 
 		if (cachep->c_unique == 0)
@@ -893,7 +890,7 @@ cachefs_createfrontfile(cnode_t *cp, struct filegrp *fgp)
 #ifdef CFSDEBUG
 	CFS_DEBUG(CFSDEBUG_FRONT)
 		printf("c_createfrontfile: ENTER cp %p fgp %p\n",
-			(void *)cp, (void *)fgp);
+		    (void *)cp, (void *)fgp);
 #endif
 
 	ASSERT(cp->c_frontvp == NULL);
@@ -1037,7 +1034,7 @@ out:
 #ifdef CFSDEBUG
 	CFS_DEBUG(CFSDEBUG_FRONT)
 		printf("c_createfrontfile: EXIT error = %d name %s\n", error,
-			name);
+		    name);
 #endif
 	return (error);
 }
@@ -1082,7 +1079,7 @@ cachefs_removefrontfile(cachefs_metadata_t *mdp, cfs_cid_t *cidp,
 		}
 		mdp->md_flags &= ~(MD_FILE | MD_POPULATED | MD_ACL | MD_ACLDIR);
 		bzero(&mdp->md_allocinfo, mdp->md_allocents *
-			sizeof (struct cachefs_allocmap));
+		    sizeof (struct cachefs_allocmap));
 		cachefs_freefile(fgp->fg_fscp->fs_cache);
 	}
 
@@ -1157,9 +1154,8 @@ cachefs_getfrontfile(cnode_t *cp)
 #ifdef CFSDEBUG
 		if (cp->c_frontvp != NULL)
 			CFS_DEBUG(CFSDEBUG_FRONT)
-				printf(
-		"c_getfrontfile: !MD_FILE and frontvp not null cp %p\n",
-				    (void *)cp);
+				printf("c_getfrontfile: !MD_FILE and frontvp "
+				    "not null cp %p\n", (void *)cp);
 #endif
 		if (CTOV(cp)->v_type == VDIR)
 			ASSERT((cp->c_metadata.md_flags & MD_POPULATED) == 0);
@@ -1174,14 +1170,14 @@ cachefs_getfrontfile(cnode_t *cp)
 		 */
 		if (fgp->fg_dirvp == NULL) {
 			cmn_err(CE_WARN, "cachefs: gff0: corrupted file system"
-				" run fsck\n");
+			    " run fsck\n");
 			cachefs_inval_object(cp);
 			cp->c_flags |= CN_NOCACHE;
 			error = ESTALE;
 			goto out;
 		}
 		error = VFS_VGET(fgp->fg_dirvp->v_vfsp, &cp->c_frontvp,
-				&cp->c_metadata.md_fid);
+		    &cp->c_metadata.md_fid);
 		if (error || (cp->c_frontvp == NULL)) {
 #ifdef CFSDEBUG
 			CFS_DEBUG(CFSDEBUG_FRONT)
@@ -1213,7 +1209,7 @@ cachefs_getfrontfile(cnode_t *cp)
 		error = VOP_GETATTR(cp->c_frontvp, &va, 0, kcred, NULL);
 		if (error) {
 			cmn_err(CE_WARN, "cachefs: gff2: front file"
-				" system error %d", error);
+			    " system error %d", error);
 			cachefs_inval_object(cp);
 			error = (cp->c_flags & CN_NOCACHE) ? ESTALE : 0;
 			goto out;
@@ -1228,11 +1224,11 @@ cachefs_getfrontfile(cnode_t *cp)
 				sec = cp->c_metadata.md_timestamp.tv_sec;
 				nsec = cp->c_metadata.md_timestamp.tv_nsec;
 				printf("c_getfrontfile: timestamps don't"
-					" match fileno %lld va %lx %lx"
-					" meta %lx %lx\n",
-					(u_longlong_t)cp->c_id.cid_fileno,
-					va.va_mtime.tv_sec,
-					va.va_mtime.tv_nsec, sec, nsec);
+				    " match fileno %lld va %lx %lx"
+				    " meta %lx %lx\n",
+				    (u_longlong_t)cp->c_id.cid_fileno,
+				    va.va_mtime.tv_sec,
+				    va.va_mtime.tv_nsec, sec, nsec);
 			}
 #endif
 			cachefs_inval_object(cp);
@@ -1240,7 +1236,6 @@ cachefs_getfrontfile(cnode_t *cp)
 		}
 	}
 out:
-
 #ifdef CFSDEBUG
 	CFS_DEBUG(CFSDEBUG_FRONT)
 		printf("c_getfrontfile: EXIT error = %d\n", error);
@@ -1258,7 +1253,7 @@ cachefs_inval_object(cnode_t *cp)
 	ASSERT(CFS_ISFS_BACKFS_NFSV4(C_TO_FSCACHE(cp)) == 0);
 	ASSERT(MUTEX_HELD(&cp->c_statelock));
 	ASSERT((cp->c_flags & CN_ASYNC_POP_WORKING) == 0 ||
-		cp->c_popthrp == curthread);
+	    cp->c_popthrp == curthread);
 #if 0
 	CFS_DEBUG(CFSDEBUG_SUBR)
 		printf("c_inval_object: ENTER cp %p\n", (void *)cp);
@@ -1282,7 +1277,7 @@ cachefs_inval_object(cnode_t *cp)
 		if (cp->c_frontvp == NULL) {
 
 			error = VFS_VGET(fgp->fg_dirvp->v_vfsp, &cp->c_frontvp,
-				&cp->c_metadata.md_fid);
+			    &cp->c_metadata.md_fid);
 			if (error || (cp->c_frontvp == NULL)) {
 #ifdef CFSDEBUG
 				CFS_DEBUG(CFSDEBUG_FRONT)
@@ -1463,7 +1458,7 @@ cachefs_check_allocmap(cnode_t *cp, u_offset_t off)
 
 	for (i = 0; i < cp->c_metadata.md_allocents; i++) {
 		struct cachefs_allocmap *allocp =
-				cp->c_metadata.md_allocinfo + i;
+		    cp->c_metadata.md_allocinfo + i;
 
 		if (off >= allocp->am_start_off) {
 			if ((off + size_to_look) <=
@@ -1508,7 +1503,7 @@ cachefs_coalesce_allocmap(struct cachefs_metadata *cmd)
 	allocp++;
 	for (i = 1; i < cmd->md_allocents; i++, allocp++) {
 		if (nallocp->am_start_off + nallocp->am_size ==
-						allocp->am_start_off) {
+		    allocp->am_start_off) {
 			nallocp->am_size += allocp->am_size;
 			reduced++;
 		} else {
@@ -1552,7 +1547,7 @@ again:
 			endoff = off + size;
 			if (endoff >= allocp->am_start_off) {
 				tmpendoff = allocp->am_start_off +
-						allocp->am_size;
+				    allocp->am_size;
 				if (endoff < tmpendoff)
 					endoff = tmpendoff;
 				allocp->am_size = endoff - off;
@@ -1657,7 +1652,7 @@ cachefs_populate(cnode_t *cp, u_offset_t off, size_t popsize, vnode_t *frontvp,
 			size = MAXBSIZE - n;
 
 		error = fbread(backvp, (offset_t)blkoff, n + size,
-			S_OTHER, &fbp);
+		    S_OTHER, &fbp);
 		if (CFS_TIMEOUT(C_TO_FSCACHE(cp), error))
 			goto out;
 		else if (error) {
@@ -1683,8 +1678,8 @@ cachefs_populate(cnode_t *cp, u_offset_t off, size_t popsize, vnode_t *frontvp,
 		}
 		resid = 0;
 		error = vn_rdwr(UIO_WRITE, frontvp, buf + n, size,
-				(offset_t)from, UIO_SYSSPACE, 0,
-				(rlim64_t)RLIM64_INFINITY, cr, &resid);
+		    (offset_t)from, UIO_SYSSPACE, 0,
+		    (rlim64_t)RLIM64_INFINITY, cr, &resid);
 		if (error) {
 #ifdef CFSDEBUG
 			CFS_DEBUG(CFSDEBUG_FRONT)
@@ -1724,8 +1719,8 @@ out:
  * occurred during large files project - XXX.
  */
 void
-cachefs_cluster_allocmap(u_offset_t off, u_offset_t *popoffp,
-    size_t *popsizep, size_t size, struct cnode *cp)
+cachefs_cluster_allocmap(u_offset_t off, u_offset_t *popoffp, size_t *popsizep,
+    size_t size, struct cnode *cp)
 {
 	int i;
 	u_offset_t lastoff = 0;
@@ -1737,11 +1732,11 @@ cachefs_cluster_allocmap(u_offset_t off, u_offset_t *popoffp,
 #ifdef CFSDEBUG
 	CFS_DEBUG(CFSDEBUG_SUBR)
 		printf("cachefs_cluster_allocmap: off %llx, size %llx, "
-			"c_size %llx\n", off, size, (longlong_t)cp->c_size);
+		    "c_size %llx\n", off, size, (longlong_t)cp->c_size);
 #endif /* CFSDEBUG */
 	for (i = 0; i < cp->c_metadata.md_allocents; i++) {
 		struct cachefs_allocmap *allocp =
-			cp->c_metadata.md_allocinfo + i;
+		    cp->c_metadata.md_allocinfo + i;
 
 		if (allocp->am_start_off > off) {
 			if ((off + size) > allocp->am_start_off) {
@@ -1756,7 +1751,7 @@ cachefs_cluster_allocmap(u_offset_t off, u_offset_t *popoffp,
 			}
 			*popoffp = (off - backward_diff) & (offset_t)PAGEMASK;
 			*popsizep = ((off + forward_diff) - *popoffp) &
-				(offset_t)PAGEMASK;
+			    (offset_t)PAGEMASK;
 			return;
 		} else {
 			lastoff = allocp->am_start_off + allocp->am_size;
@@ -1765,7 +1760,7 @@ cachefs_cluster_allocmap(u_offset_t off, u_offset_t *popoffp,
 	if ((lastoff + size) > off) {
 		*popoffp = (lastoff & (offset_t)PAGEMASK);
 	} else {
-		 *popoffp = off & (offset_t)PAGEMASK;
+		*popoffp = off & (offset_t)PAGEMASK;
 	}
 
 	/*
@@ -1774,17 +1769,16 @@ cachefs_cluster_allocmap(u_offset_t off, u_offset_t *popoffp,
 	 */
 	if ((*popoffp + size) > cp->c_size)
 		*popsizep = (cp->c_size - *popoffp + PAGEOFFSET) &
-			(offset_t)PAGEMASK;
+		    (offset_t)PAGEMASK;
 	else if (size < PAGESIZE)
-		*popsizep = (size + PAGEOFFSET) &
-			(offset_t)PAGEMASK;
+		*popsizep = (size + PAGEOFFSET) & (offset_t)PAGEMASK;
 	else
 		*popsizep = size & (offset_t)PAGEMASK;
 
 #ifdef CFSDEBUG
 	CFS_DEBUG(CFSDEBUG_SUBR)
 		printf("cachefs_cluster_allocmap: popoff %llx, popsize %llx\n",
-			(u_longlong_t)(*popoffp), (u_longlong_t)(*popsizep));
+		    (u_longlong_t)(*popoffp), (u_longlong_t)(*popsizep));
 #endif /* CFSDEBUG */
 }
 
@@ -1909,8 +1903,8 @@ cachefs_readlink_back(cnode_t *cp, cred_t *cr, caddr_t *bufp, int *buflenp)
 
 	/* get the link data */
 	CFS_DPRINT_BACKFS_NFSV4(fscp,
-		("cachefs_readlink (nfsv4): cnode %p, backvp %p\n",
-		cp, cp->c_backvp));
+	    ("cachefs_readlink (nfsv4): cnode %p, backvp %p\n",
+	    cp, cp->c_backvp));
 	error = VOP_READLINK(cp->c_backvp, &uio, cr, NULL);
 	if (error) {
 		cachefs_kmem_free(buf, MAXPATHLEN);
@@ -2138,10 +2132,10 @@ cachefs_async_start(struct cachefs_workq *qp)
 
 			CALLB_CPR_SAFE_BEGIN(&cprinfo);
 			/* sleep until there is something to do */
-			left = cv_timedwait(&qp->wq_req_cv,
-				&qp->wq_queue_lock, CFS_ASYNC_TIMEOUT + lbolt);
-			CALLB_CPR_SAFE_END(&cprinfo,
-				&qp->wq_queue_lock);
+			left = cv_reltimedwait(&qp->wq_req_cv,
+			    &qp->wq_queue_lock, CFS_ASYNC_TIMEOUT,
+			    TR_CLOCK_TICK);
+			CALLB_CPR_SAFE_END(&cprinfo, &qp->wq_queue_lock);
 			if ((qp->wq_head == NULL) && (qp->wq_logwork == 0))
 				continue;
 		}
@@ -2188,7 +2182,6 @@ int
 cachefs_async_halt(struct cachefs_workq *qp, int force)
 {
 	int error = 0;
-	clock_t tend;
 
 	mutex_enter(&qp->wq_queue_lock);
 	if (force)
@@ -2197,9 +2190,8 @@ cachefs_async_halt(struct cachefs_workq *qp, int force)
 	if (qp->wq_thread_count > 0) {
 		qp->wq_halt_request++;
 		cv_broadcast(&qp->wq_req_cv);
-		tend = lbolt + (60 * hz);
-		(void) cv_timedwait(&qp->wq_halt_cv,
-			&qp->wq_queue_lock, tend);
+		(void) cv_reltimedwait(&qp->wq_halt_cv,
+		    &qp->wq_queue_lock, (60 * hz), TR_CLOCK_TICK);
 		qp->wq_halt_request--;
 		if (qp->wq_thread_count > 0) {
 			if ((qp->wq_thread_count == 1) &&
@@ -2254,7 +2246,7 @@ cachefs_async_putpage(struct cachefs_putpage_req *prp, cred_t *cr)
 	ASSERT(CFS_ISFS_BACKFS_NFSV4(C_TO_FSCACHE(cp)) == 0);
 
 	(void) VOP_PUTPAGE(prp->cp_vp, prp->cp_off, prp->cp_len,
-		prp->cp_flags, cr, NULL);
+	    prp->cp_flags, cr, NULL);
 
 	mutex_enter(&cp->c_iomutex);
 	if (--cp->c_nio == 0)
@@ -2666,7 +2658,7 @@ cachefs_kmem_free(void *mp, size_t size)
 	ASSERT(n >= (size + 8));
 	front_kwp = (struct km_wrap *)((uintptr_t)mp - sizeof (struct km_wrap));
 	back_kwp = (struct km_wrap *)
-		((uintptr_t)front_kwp + n - sizeof (struct km_wrap));
+	    ((uintptr_t)front_kwp + n - sizeof (struct km_wrap));
 
 	ASSERT(front_kwp->kw_other == back_kwp);
 	ASSERT(front_kwp->kw_size == n);
@@ -2711,21 +2703,21 @@ cachefs_stats_kstat_snapshot(kstat_t *ksp, void *buf, int rw)
 		bcopy(buf, &fscp->fs_stats, sizeof (fscp->fs_stats));
 		cachep->c_gc_count = fscp->fs_stats.st_gc_count;
 		CACHEFS_CFS_TIME_TO_TIME_COPY(fscp->fs_stats.st_gc_time,
-			cachep->c_gc_time);
+		    cachep->c_gc_time);
 		CACHEFS_CFS_TIME_TO_TIME_COPY(fscp->fs_stats.st_gc_before_atime,
-			cachep->c_gc_before);
+		    cachep->c_gc_before);
 		CACHEFS_CFS_TIME_TO_TIME_COPY(fscp->fs_stats.st_gc_after_atime,
-			cachep->c_gc_after);
+		    cachep->c_gc_after);
 		return (error);
 	}
 
 	fscp->fs_stats.st_gc_count = cachep->c_gc_count;
 	CACHEFS_TIME_TO_CFS_TIME_COPY(cachep->c_gc_time,
-			fscp->fs_stats.st_gc_time, error);
+	    fscp->fs_stats.st_gc_time, error);
 	CACHEFS_TIME_TO_CFS_TIME_COPY(cachep->c_gc_before,
-			fscp->fs_stats.st_gc_before_atime, error);
+	    fscp->fs_stats.st_gc_before_atime, error);
 	CACHEFS_TIME_TO_CFS_TIME_COPY(cachep->c_gc_after,
-			fscp->fs_stats.st_gc_after_atime, error);
+	    fscp->fs_stats.st_gc_after_atime, error);
 	bcopy(&fscp->fs_stats, buf, sizeof (fscp->fs_stats));
 
 	return (error);

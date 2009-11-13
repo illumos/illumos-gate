@@ -673,8 +673,8 @@ balloon_worker_thread(void)
 			 * We weren't able to fully complete the request
 			 * last time through, so try again.
 			 */
-			(void) cv_timedwait(&bln_cv, &bln_mutex,
-			    lbolt + (bln_wait * hz));
+			(void) cv_reltimedwait(&bln_cv, &bln_mutex,
+			    (bln_wait * hz), TR_CLOCK_TICK);
 		} else {
 			cv_wait(&bln_cv, &bln_mutex);
 		}

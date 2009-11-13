@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -774,9 +774,9 @@ ecpp_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		 * Wait if there's any activity on the port
 		 */
 		if ((pp->e_busy == ECPP_BUSY) || (pp->e_busy == ECPP_FLUSH)) {
-			(void) cv_timedwait(&pp->pport_cv, &pp->umutex,
-			    ddi_get_lbolt() +
-			    SUSPEND_TOUT * drv_usectohz(1000000));
+			(void) cv_reltimedwait(&pp->pport_cv, &pp->umutex,
+			    SUSPEND_TOUT * drv_usectohz(1000000),
+			    TR_CLOCK_TICK);
 			if ((pp->e_busy == ECPP_BUSY) ||
 			    (pp->e_busy == ECPP_FLUSH)) {
 				pp->suspended = FALSE;

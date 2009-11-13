@@ -371,7 +371,7 @@ typedef struct fcoe_fcp_xfer_rdy {
 /*
  * timestamp (golbal variable in sys/systm.h)
  */
-#define	CURRENT_CLOCK lbolt
+#define	CURRENT_CLOCK		(ddi_get_lbolt())
 #define	FCOE_SEC2TICK(x_sec)	(drv_usectohz((x_sec) * 1000000))
 
 /*

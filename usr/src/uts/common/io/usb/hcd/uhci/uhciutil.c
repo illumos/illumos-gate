@@ -4750,7 +4750,7 @@ uhci_wait_for_sof(uhci_state_t *uhcip)
 	int	n, error;
 	ushort_t    cmd_reg;
 	usb_frame_number_t	before_frame_number, after_frame_number;
-	clock_t	time, rval;
+	clock_t	rval;
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
 	    "uhci_wait_for_sof: uhcip = %p", (void *)uhcip);
 
@@ -4768,9 +4768,8 @@ uhci_wait_for_sof(uhci_state_t *uhcip)
 		SetTD_ioc(uhcip, uhcip->uhci_sof_td, 1);
 		uhcip->uhci_cv_signal = B_TRUE;
 
-		time = ddi_get_lbolt() + UHCI_ONE_SECOND;
-		rval = cv_timedwait(&uhcip->uhci_cv_SOF,
-		    &uhcip->uhci_int_mutex, time);
+		rval = cv_reltimedwait(&uhcip->uhci_cv_SOF,
+		    &uhcip->uhci_int_mutex, UHCI_ONE_SECOND, TR_CLOCK_TICK);
 
 		after_frame_number = uhci_get_sw_frame_number(uhcip);
 		if ((rval == -1) &&

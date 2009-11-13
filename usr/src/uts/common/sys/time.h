@@ -359,6 +359,9 @@ extern	void		timevalsub(struct timeval *, struct timeval *);
 extern	void		timevalfix(struct timeval *);
 extern	void		dtrace_hres_tick(void);
 
+extern clock_t		ddi_get_lbolt(void);
+extern int64_t		ddi_get_lbolt64(void);
+
 #if defined(_SYSCALL32)
 extern	void		hrt2ts32(hrtime_t, timestruc32_t *);
 #endif

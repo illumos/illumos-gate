@@ -140,6 +140,7 @@ conn_ip_output(mblk_t *mp, ip_xmit_attr_t *ixa)
 	ill_t		*ill;
 	ip_stack_t	*ipst = ixa->ixa_ipst;
 	int		error;
+	int64_t		now;
 
 	/* We defer ipIfStatsHCOutRequests until an error or we have an ill */
 
@@ -285,8 +286,9 @@ conn_ip_output(mblk_t *mp, ip_xmit_attr_t *ixa)
 	 * To avoid a periodic timer to increase the path MTU we
 	 * look at dce_last_change_time each time we send a packet.
 	 */
+	now = ddi_get_lbolt64();
 	if ((dce->dce_flags & DCEF_PMTU) &&
-	    (TICK_TO_SEC(lbolt64) - dce->dce_last_change_time >
+	    (TICK_TO_SEC(now) - dce->dce_last_change_time >
 	    ipst->ips_ip_pathmtu_interval)) {
 		/*
 		 * Older than 20 minutes. Drop the path MTU information.
@@ -296,7 +298,7 @@ conn_ip_output(mblk_t *mp, ip_xmit_attr_t *ixa)
 		 */
 		mutex_enter(&dce->dce_lock);
 		dce->dce_flags &= ~(DCEF_PMTU|DCEF_TOO_SMALL_PMTU);
-		dce->dce_last_change_time = TICK_TO_SEC(lbolt64);
+		dce->dce_last_change_time = TICK_TO_SEC(now);
 		mutex_exit(&dce->dce_lock);
 		dce_increment_generation(dce);
 	}
@@ -810,6 +812,7 @@ ip_output_simple_v4(mblk_t *mp, ip_xmit_attr_t *ixa)
 	ip_stack_t	*ipst = ixa->ixa_ipst;
 	boolean_t	repeat = B_FALSE;
 	boolean_t	multirt = B_FALSE;
+	int64_t		now;
 
 	ipha = (ipha_t *)mp->b_rptr;
 	ASSERT(IPH_HDR_VERSION(ipha) == IPV4_VERSION);
@@ -928,14 +931,15 @@ repeat_ire:
 		 * To avoid a periodic timer to increase the path MTU we
 		 * look at dce_last_change_time each time we send a packet.
 		 */
-		if (TICK_TO_SEC(lbolt64) - dce->dce_last_change_time >
+		now = ddi_get_lbolt64();
+		if (TICK_TO_SEC(now) - dce->dce_last_change_time >
 		    ipst->ips_ip_pathmtu_interval) {
 			/*
 			 * Older than 20 minutes. Drop the path MTU information.
 			 */
 			mutex_enter(&dce->dce_lock);
 			dce->dce_flags &= ~(DCEF_PMTU|DCEF_TOO_SMALL_PMTU);
-			dce->dce_last_change_time = TICK_TO_SEC(lbolt64);
+			dce->dce_last_change_time = TICK_TO_SEC(now);
 			mutex_exit(&dce->dce_lock);
 			dce_increment_generation(dce);
 			ixa->ixa_fragsize = ip_get_base_mtu(nce->nce_ill, ire);

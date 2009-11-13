@@ -892,7 +892,7 @@ ire_round_robin(irb_t *irb_ptr, ire_ftable_args_t *margs, uint_t hash,
 		mutex_enter(&ire->ire_lock);
 		/* Look for stale ire_badcnt and clear */
 		if (ire->ire_badcnt != 0 &&
-		    (TICK_TO_SEC(lbolt64) - ire->ire_last_badcnt >
+		    (TICK_TO_SEC(ddi_get_lbolt64()) - ire->ire_last_badcnt >
 		    ipst->ips_ip_ire_badcnt_lifetime))
 			ire->ire_badcnt = 0;
 		mutex_exit(&ire->ire_lock);

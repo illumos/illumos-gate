@@ -105,6 +105,7 @@ CHKHDRS=			\
 	cladm.h			\
 	class.h			\
 	clconf.h		\
+	clock_impl.h		\
 	cmlb.h			\
 	cmn_err.h		\
 	compress.h		\

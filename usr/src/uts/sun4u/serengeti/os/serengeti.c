@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/time.h>
 #include <sys/cpuvar.h>
@@ -72,6 +70,7 @@
 #include <sys/plat_ecc_dimm.h>
 
 #include <sys/lgrp.h>
+#include <sys/clock_impl.h>
 
 static int sg_debug = 0;
 
@@ -1453,6 +1452,8 @@ sg_prom_cpci_dr_check(void)
 static void
 sg_system_claim(void)
 {
+	lbolt_debug_entry();
+
 	prom_interpret("sigb-sig! my-sigb-sig!", OBP_SIG, OBP_SIG, 0, 0, 0);
 }
 
@@ -1460,6 +1461,8 @@ static void
 sg_system_release(void)
 {
 	prom_interpret("sigb-sig! my-sigb-sig!", OS_SIG, OS_SIG, 0, 0, 0);
+
+	lbolt_debug_return();
 }
 
 static void

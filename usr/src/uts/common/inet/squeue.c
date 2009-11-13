@@ -311,7 +311,7 @@ squeue_worker_wakeup(squeue_t *sqp)
 	if (sqp->sq_wait == 0) {
 		ASSERT(tid == 0);
 		ASSERT(!(sqp->sq_state & SQS_TMO_PROG));
-		sqp->sq_awaken = lbolt;
+		sqp->sq_awaken = ddi_get_lbolt();
 		cv_signal(&sqp->sq_worker_cv);
 		mutex_exit(&sqp->sq_lock);
 		return;
@@ -325,7 +325,8 @@ squeue_worker_wakeup(squeue_t *sqp)
 		/*
 		 * Waiting for an enter() to process mblk(s).
 		 */
-		clock_t	waited = lbolt - sqp->sq_awaken;
+		clock_t now = ddi_get_lbolt();
+		clock_t	waited = now - sqp->sq_awaken;
 
 		if (TICK_TO_MSEC(waited) >= sqp->sq_wait) {
 			/*
@@ -333,7 +334,7 @@ squeue_worker_wakeup(squeue_t *sqp)
 			 * waiting for work, so schedule it.
 			 */
 			sqp->sq_tid = 0;
-			sqp->sq_awaken = lbolt;
+			sqp->sq_awaken = now;
 			cv_signal(&sqp->sq_worker_cv);
 			mutex_exit(&sqp->sq_lock);
 			(void) untimeout(tid);
@@ -691,7 +692,7 @@ squeue_fire(void *arg)
 		sqp->sq_state &= ~SQS_TMO_PROG;
 
 	if (!(state & SQS_PROC)) {
-		sqp->sq_awaken = lbolt;
+		sqp->sq_awaken = ddi_get_lbolt();
 		cv_signal(&sqp->sq_worker_cv);
 	}
 	mutex_exit(&sqp->sq_lock);
@@ -842,7 +843,7 @@ again:
 			goto again;
 		} else {
 			did_wakeup = B_TRUE;
-			sqp->sq_awaken = lbolt;
+			sqp->sq_awaken = ddi_get_lbolt();
 			cv_signal(&sqp->sq_worker_cv);
 		}
 	}
@@ -1113,7 +1114,7 @@ poll_again:
 				 */
 			}
 
-			sqp->sq_awaken = lbolt;
+			sqp->sq_awaken = ddi_get_lbolt();
 			/*
 			 * Put the SQS_PROC_HELD on so the worker
 			 * thread can distinguish where its called from. We
@@ -1464,7 +1465,7 @@ squeue_synch_exit(squeue_t *sqp, conn_t *connp)
 			 * worker thread right away when there are outstanding
 			 * requests.
 			 */
-			sqp->sq_awaken = lbolt;
+			sqp->sq_awaken = ddi_get_lbolt();
 			cv_signal(&sqp->sq_worker_cv);
 			mutex_exit(&sqp->sq_lock);
 		}

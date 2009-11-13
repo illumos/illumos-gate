@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Inter-Domain Network
@@ -449,11 +446,11 @@ idn_update_priority(int domid, int pri)
 		dp->dvote.v.priority = pri & IDNVOTE_PRI_MASK;
 
 		PR_PROTO("%s:%d: SETTING PRIORITY to req(%d) "
-			"(localpri = 0x%x)\n",
-			proc, domid, pri, IDNVOTE_PRIVALUE(dp->dvote));
+		    "(localpri = 0x%x)\n",
+		    proc, domid, pri, IDNVOTE_PRIVALUE(dp->dvote));
 	} else {
 		PR_PROTO("%s:%d: PRIORITIES UNCHANGED (pri = 0x%x)\n",
-			proc, domid, IDNVOTE_PRIVALUE(dp->dvote));
+		    proc, domid, IDNVOTE_PRIVALUE(dp->dvote));
 	}
 }
 
@@ -471,19 +468,19 @@ idn_link(int domid, int cpuid, int pri, int waittime, idnsb_error_t *sep)
 
 	if ((cpuid < 0) || (cpuid >= NCPU)) {
 		cmn_err(CE_WARN,
-			"IDN: 201: (LINK) invalid CPU ID (%d)", cpuid);
+		    "IDN: 201: (LINK) invalid CPU ID (%d)", cpuid);
 		return (EINVAL);
 	}
 	if (waittime < 0) {
 		cmn_err(CE_WARN,
-			"IDN: 202: (LINK) invalid time-out value (%d)",
-			waittime);
+		    "IDN: 202: (LINK) invalid time-out value (%d)",
+		    waittime);
 		return (EINVAL);
 	}
 	if (!VALID_DOMAINID(domid)) {
 		cmn_err(CE_WARN,
-			"IDN: 203: (LINK) invalid domain ID (%d)",
-			domid);
+		    "IDN: 203: (LINK) invalid domain ID (%d)",
+		    domid);
 		return (EINVAL);
 	}
 	if (domid == idn.localid)
@@ -501,8 +498,8 @@ idn_link(int domid, int cpuid, int pri, int waittime, idnsb_error_t *sep)
 	case IDNDS_CONNECTED:
 #ifdef DEBUG
 		cmn_err(CE_NOTE,
-			"!IDN: domain %d (CPU ID %d) already connected",
-			domid, cpuid);
+		    "!IDN: domain %d (CPU ID %d) already connected",
+		    domid, cpuid);
 #endif /* DEBUG */
 		IDN_DUNLOCK(domid);
 		IDN_SYNC_UNLOCK();
@@ -510,8 +507,8 @@ idn_link(int domid, int cpuid, int pri, int waittime, idnsb_error_t *sep)
 
 	default:
 		cmn_err(CE_WARN,
-			"IDN: 204: domain %d state (%s) inappropriate",
-			domid, idnds_str[dp->dstate]);
+		    "IDN: 204: domain %d state (%s) inappropriate",
+		    domid, idnds_str[dp->dstate]);
 		IDN_DUNLOCK(domid);
 		IDN_SYNC_UNLOCK();
 		return (EINVAL);
@@ -520,8 +517,8 @@ idn_link(int domid, int cpuid, int pri, int waittime, idnsb_error_t *sep)
 	rv = idn_open_domain(domid, cpuid, 0);
 	if (rv != 0) {
 		cmn_err(CE_WARN,
-			"IDN: 205: (%s) failed to open-domain(%d,%d)",
-			proc, domid, cpuid);
+		    "IDN: 205: (%s) failed to open-domain(%d,%d)",
+		    proc, domid, cpuid);
 		IDN_DUNLOCK(domid);
 		IDN_SYNC_UNLOCK();
 		return (EIO);
@@ -550,8 +547,8 @@ idn_link(int domid, int cpuid, int pri, int waittime, idnsb_error_t *sep)
 		 * Need to wait since it happens asynchronously.
 		 */
 		PR_PROTO("%s:%d: WAITING for op(%s) for (domset 0%x)...\n",
-			proc, domid, idnop_str[IDNOP_CONNECTED],
-			DOMAINSET(domid));
+		    proc, domid, idnop_str[IDNOP_CONNECTED],
+		    DOMAINSET(domid));
 
 		rv = idn_wait_op(opcookie, &domset, waittime);
 	}
@@ -560,14 +557,14 @@ idn_link(int domid, int cpuid, int pri, int waittime, idnsb_error_t *sep)
 	if (rv == 0) {
 		if (waittime > 0) {
 			PR_PROTO("%s:%d: connect SUCCEEDED (cpu %d)\n",
-					proc, domid, cpuid);
+			    proc, domid, cpuid);
 		} else {
 			PR_PROTO("%s:%d: connect KICKED OFF (cpu %d)\n",
-					proc, domid, cpuid);
+			    proc, domid, cpuid);
 		}
 	} else {
 		PR_PROTO("%s:%d: connect FAILED (cpu %d)\n",
-				proc, domid, cpuid);
+		    proc, domid, cpuid);
 	}
 #endif /* DEBUG */
 
@@ -596,16 +593,16 @@ idn_unlink(int domid, boardset_t idnset, idn_fin_t fintype,
 
 	if (waittime < 0) {
 		cmn_err(CE_WARN,
-			"IDN: 202: (UNLINK) invalid time-out value (%d)",
-			waittime);
+		    "IDN: 202: (UNLINK) invalid time-out value (%d)",
+		    waittime);
 		SET_IDNKERR_IDNERR(sep, IDNKERR_INVALID_WTIME);
 		SET_IDNKERR_PARAM0(sep, waittime);
 		return (EINVAL);
 	}
 	if (!VALID_DOMAINID(domid)) {
 		cmn_err(CE_WARN,
-			"IDN: 203: (UNLINK) invalid domain ID (%d)",
-			domid);
+		    "IDN: 203: (UNLINK) invalid domain ID (%d)",
+		    domid);
 		SET_IDNKERR_IDNERR(sep, IDNKERR_INVALID_DOMAIN);
 		SET_IDNKERR_PARAM0(sep, domid);
 		SET_IDNKERR_PARAM1(sep, -1);
@@ -614,8 +611,8 @@ idn_unlink(int domid, boardset_t idnset, idn_fin_t fintype,
 	if (idn.localid == IDN_NIL_DOMID) {
 #ifdef DEBUG
 		cmn_err(CE_NOTE,
-			"!IDN: %s: local domain not connected to an IDNnet",
-			proc);
+		    "!IDN: %s: local domain not connected to an IDNnet",
+		    proc);
 #endif /* DEBUG */
 		return (0);
 	}
@@ -632,8 +629,8 @@ idn_unlink(int domid, boardset_t idnset, idn_fin_t fintype,
 	if ((idn.state == IDNGS_OFFLINE) && !domset) {
 #ifdef DEBUG
 		cmn_err(CE_WARN,
-			"!IDN: %s: local domain not connected to an IDNnet",
-			proc);
+		    "!IDN: %s: local domain not connected to an IDNnet",
+		    proc);
 #endif /* DEBUG */
 		IDN_GUNLOCK();
 		IDN_SYNC_UNLOCK();
@@ -665,8 +662,8 @@ idn_unlink(int domid, boardset_t idnset, idn_fin_t fintype,
 		 * for it to complete.
 		 */
 		PR_PROTO("%s:%d: WAITING for op(%s) for (domset 0%x)...\n",
-			proc, domid, idnop_str[IDNOP_DISCONNECTED],
-			domset);
+		    proc, domid, idnop_str[IDNOP_DISCONNECTED],
+		    domset);
 
 		rv = idn_wait_op(opcookie, &domset, waittime);
 	}
@@ -674,10 +671,10 @@ idn_unlink(int domid, boardset_t idnset, idn_fin_t fintype,
 	if (rv == 0) {
 		if (waittime > 0) {
 			PR_PROTO("%s:%d: disconnect SUCCEEDED\n",
-				proc, domid);
+			    proc, domid);
 		} else {
 			PR_PROTO("%s:%d: disconnect KICKED OFF\n",
-				proc, domid);
+			    proc, domid);
 		}
 	} else {
 		PR_PROTO("%s:%d: disconnect FAILED\n", proc, domid);
@@ -702,9 +699,9 @@ idn_unlink_domainset(domainset_t domset, idn_fin_t fintype,
 	 * no active connections.
 	 */
 	offset = domset & ~(idn.domset.ds_trans_on |
-				idn.domset.ds_connected |
-				idn.domset.ds_trans_off |
-				idn.domset.ds_relink);
+	    idn.domset.ds_connected |
+	    idn.domset.ds_trans_off |
+	    idn.domset.ds_relink);
 	/*
 	 * Determine subset that are really candidates.
 	 * Note that we include those already down the path
@@ -728,11 +725,11 @@ idn_unlink_domainset(domainset_t domset, idn_fin_t fintype,
 #ifdef DEBUG
 		if (idn.domset.ds_hitlist & domset) {
 			PR_HITLIST("%s: domset=%x, hitlist=%x, trans_off=%x "
-				"-> relink = %x -> %x\n",
-				proc, domset, idn.domset.ds_hitlist,
-				idn.domset.ds_relink, idn.domset.ds_trans_off,
-				idn.domset.ds_relink |
-					(domset & ~idn.domset.ds_trans_off));
+			    "-> relink = %x -> %x\n",
+			    proc, domset, idn.domset.ds_hitlist,
+			    idn.domset.ds_relink, idn.domset.ds_trans_off,
+			    idn.domset.ds_relink |
+			    (domset & ~idn.domset.ds_trans_off));
 		}
 #endif /* DEBUG */
 
@@ -750,11 +747,11 @@ idn_unlink_domainset(domainset_t domset, idn_fin_t fintype,
 
 	if (domset == 0) {
 		if ((idn.domset.ds_trans_on |
-				idn.domset.ds_connected |
-				idn.domset.ds_trans_off |
-				idn.domset.ds_relink) == 0) {
+		    idn.domset.ds_connected |
+		    idn.domset.ds_trans_off |
+		    idn.domset.ds_relink) == 0) {
 			PR_HITLIST("%s:%x: HITLIST %x -> 0\n",
-				proc, domset, idn.domset.ds_hitlist);
+			    proc, domset, idn.domset.ds_hitlist);
 			idn.domset.ds_hitlist = 0;
 			IDN_GSTATE_TRANSITION(IDNGS_OFFLINE);
 		}
@@ -773,7 +770,7 @@ idn_unlink_domainset(domainset_t domset, idn_fin_t fintype,
 		dp = &idn_domain[d];
 		IDN_DLOCK_EXCL(d);
 		IDN_HISTORY_LOG(IDNH_RELINK, d, dp->dstate,
-					idn.domset.ds_relink);
+		    idn.domset.ds_relink);
 		ftype = fintype;
 		if ((dp->dcpu != IDN_NIL_DCPU) && dp->dhw.dh_boardset) {
 			/*
@@ -788,24 +785,24 @@ idn_unlink_domainset(domainset_t domset, idn_fin_t fintype,
 			 */
 			if ((idnset & dp->dhw.dh_boardset) == 0) {
 				PR_PROTO("%s:%d: boardset 0x%x "
-					"NOT in IDNSET 0x%x\n",
-					proc, d, dp->dhw.dh_boardset,
-					idnset);
+				    "NOT in IDNSET 0x%x\n",
+				    proc, d, dp->dhw.dh_boardset,
+				    idnset);
 				if (ftype != IDNFIN_FORCE_HARD)
 					cmn_err(CE_NOTE,
-						"!IDN: 222: no IDN linkage "
-						"found (b=0x%x, i=0x%x) "
-						"upgrading unlink %s to %s",
-						dp->dhw.dh_boardset,
-						idnset, idnfin_str[ftype],
-						idnfin_str[IDNFIN_FORCE_HARD]);
+					    "!IDN: 222: no IDN linkage "
+					    "found (b=0x%x, i=0x%x) "
+					    "upgrading unlink %s to %s",
+					    dp->dhw.dh_boardset,
+					    idnset, idnfin_str[ftype],
+					    idnfin_str[IDNFIN_FORCE_HARD]);
 
 				ftype = IDNFIN_FORCE_HARD;
 			} else {
 				PR_PROTO("%s:%d: boardset 0x%x "
-					"FOUND in IDNSET 0x%x\n",
-					proc, d, dp->dhw.dh_boardset,
-					idnset);
+				    "FOUND in IDNSET 0x%x\n",
+				    proc, d, dp->dhw.dh_boardset,
+				    idnset);
 			}
 		}
 		idn_disconnect(d, ftype, finarg, IDNDS_SYNC_TYPE(dp));
@@ -830,13 +827,13 @@ idn_connect(int domid)
 
 	if (dp->dstate != IDNDS_CLOSED) {
 		if (DOMAIN_IN_SET(idn.domset.ds_trans_on |
-				idn.domset.ds_connected, domid)) {
+		    idn.domset.ds_connected, domid)) {
 			PR_PROTO("%s:%d: already connected or "
-				"in-progress\n", proc, domid);
+			    "in-progress\n", proc, domid);
 		} else {
 			PR_PROTO("%s:%d: current state (%s) != "
-				"CLOSED\n", proc, domid,
-				idnds_str[dp->dstate]);
+			    "CLOSED\n", proc, domid,
+			    idnds_str[dp->dstate]);
 		}
 		return (-1);
 	}
@@ -857,7 +854,7 @@ idn_connect(int domid)
  */
 static int
 idn_disconnect(int domid, idn_fin_t fintype, idn_finarg_t finarg,
-		idn_finsync_t finsync)
+    idn_finsync_t finsync)
 {
 	int		new_masterid, new_cpuid = IDN_NIL_DCPU;
 	uint_t		token;
@@ -910,18 +907,18 @@ idn_disconnect(int domid, idn_fin_t fintype, idn_finarg_t finarg,
 
 	dp->dfin_sync = finsync;
 	PR_PROTO("%s:%d: disconnect synchronously = %s\n",
-		proc, domid, (finsync == IDNFIN_SYNC_OFF) ? "OFF" :
-		(finsync == IDNFIN_SYNC_NO) ? "NO" : "YES");
+	    proc, domid, (finsync == IDNFIN_SYNC_OFF) ? "OFF" :
+	    (finsync == IDNFIN_SYNC_NO) ? "NO" : "YES");
 
 	IDN_GLOCK_SHARED();
 	if (DOMAIN_IN_SET(idn.domset.ds_relink, domid) &&
-			(idn.state != IDNGS_DISCONNECT)) {
+	    (idn.state != IDNGS_DISCONNECT)) {
 		finopt = IDNFIN_OPT_RELINK;
 	} else {
 		finopt = IDNFIN_OPT_UNLINK;
 		PR_HITLIST("%s:%d: HITLIST %x -> %x\n",
-			proc, domid, idn.domset.ds_hitlist,
-			idn.domset.ds_hitlist | DOMAINSET(domid));
+		    proc, domid, idn.domset.ds_hitlist,
+		    idn.domset.ds_hitlist | DOMAINSET(domid));
 		DOMAINSET_ADD(idn.domset.ds_hitlist, domid);
 	}
 
@@ -956,7 +953,7 @@ idn_next_xstate(idn_xstate_t o_xstate, int err, uint_t msg)
 		index = (msg & IDNP_ACK) ? 3 : (msg & IDNP_NACK) ? 4 : -1;
 	else
 		index = (msg & IDNP_ACK) ? 2 :
-				!(msg & IDNP_ACKNACK_MASK) ? 1 : -1;
+		    !(msg & IDNP_ACKNACK_MASK) ? 1 : -1;
 
 	if (index == -1) {
 		STRING(str);
@@ -1011,8 +1008,8 @@ idn_select_candidate(domainset_t master_set)
 		dp = &idn_domain[d];
 
 		if ((dp->domid == IDN_NIL_DOMID) ||
-			(dp->dcpu == IDN_NIL_DCPU) ||
-			((v.ticket = dp->dvote.ticket) == 0))
+		    (dp->dcpu == IDN_NIL_DCPU) ||
+		    ((v.ticket = dp->dvote.ticket) == 0))
 			continue;
 
 		vote = IDNVOTE_ELECT(v);
@@ -1049,7 +1046,7 @@ idn_select_master(int domid, int rmasterid, int rcpuid)
 	ASSERT(IDN_DLOCK_IS_EXCL(domid));
 
 	PR_PROTO("%s:%d: lmasterid = %d, rmasterid = %d, rcpuid = %d\n",
-		proc, domid, IDN_GET_MASTERID(), rmasterid, rcpuid);
+	    proc, domid, IDN_GET_MASTERID(), rmasterid, rcpuid);
 
 	IDN_DLOCK_EXCL(idn.localid);
 
@@ -1067,14 +1064,14 @@ idn_select_master(int domid, int rmasterid, int rcpuid)
 	lmasterid = IDN_GET_MASTERID();
 
 	lindex = (lmasterid == IDN_NIL_DOMID) ? MASTER_IS_NONE :
-			(lmasterid == idn.localid) ? MASTER_IS_LOCAL :
-			(lmasterid == domid) ? MASTER_IS_REMOTE :
-			MASTER_IS_OTHER;
+	    (lmasterid == idn.localid) ? MASTER_IS_LOCAL :
+	    (lmasterid == domid) ? MASTER_IS_REMOTE :
+	    MASTER_IS_OTHER;
 
 	rindex = (rmasterid == IDN_NIL_DOMID) ? MASTER_IS_NONE :
-			(rmasterid == domid) ? MASTER_IS_REMOTE :
-			(rmasterid == idn.localid) ? MASTER_IS_LOCAL :
-			MASTER_IS_OTHER;
+	    (rmasterid == domid) ? MASTER_IS_REMOTE :
+	    (rmasterid == idn.localid) ? MASTER_IS_LOCAL :
+	    MASTER_IS_OTHER;
 
 	select = master_select_table[lindex][rindex];
 
@@ -1105,9 +1102,9 @@ idn_select_master(int domid, int rmasterid, int rcpuid)
 			 */
 		} else {
 			cmn_err(CE_WARN,
-				"IDN: 206: cannot link domains "
-				"with equal votes (L(%d),R(%d),0x%x)",
-				idn.localid, domid, rvote);
+			    "IDN: 206: cannot link domains "
+			    "with equal votes (L(%d),R(%d),0x%x)",
+			    idn.localid, domid, rvote);
 			IDN_GUNLOCK();
 		}
 		IDN_DUNLOCK(idn.localid);
@@ -1125,9 +1122,9 @@ idn_select_master(int domid, int rmasterid, int rcpuid)
 			rdp->dvote.v.master = 1;
 		} else {
 			cmn_err(CE_WARN,
-				"IDN: 206: cannot link domains "
-				"with equal votes (L(%d),R(%d),0x%x)",
-				idn.localid, domid, rvote);
+			    "IDN: 206: cannot link domains "
+			    "with equal votes (L(%d),R(%d),0x%x)",
+			    idn.localid, domid, rvote);
 		}
 		ASSERT(IDN_GET_MASTERID() == IDN_NIL_DOMID);
 		if (masterid != IDN_NIL_DOMID) {
@@ -1182,25 +1179,25 @@ idn_select_master(int domid, int rmasterid, int rcpuid)
 			IDN_GUNLOCK();
 			IDN_DLOCK_EXCL(rmasterid);
 			PR_PROTO("%s:%d: attempting connect w/remote "
-				"master %d\n",
-				proc, domid, rmasterid);
+			    "master %d\n",
+			    proc, domid, rmasterid);
 			rv = idn_open_domain(rmasterid, rcpuid, 0);
 			if (rv == 0) {
 				idn_connect(rmasterid);
 			} else if (rv < 0) {
 				cmn_err(CE_WARN,
-					"IDN: 205: (%s) failed to "
-					"open-domain(%d,%d)",
-					proc, rmasterid, rcpuid);
+				    "IDN: 205: (%s) failed to "
+				    "open-domain(%d,%d)",
+				    proc, rmasterid, rcpuid);
 			} else {
 				/*
 				 * Must already have a connection going.
 				 */
 				PR_PROTO("%s:%d: failed "
-					"idn_open_domain(%d,%d,0) "
-					"(rv = %d)\n",
-					proc, domid, rmasterid,
-					rcpuid, rv);
+				    "idn_open_domain(%d,%d,0) "
+				    "(rv = %d)\n",
+				    proc, domid, rmasterid,
+				    rcpuid, rv);
 			}
 			IDN_DUNLOCK(rmasterid);
 		}
@@ -1226,17 +1223,17 @@ idn_select_master(int domid, int rmasterid, int rcpuid)
 		 * Hit impossible condition.
 		 */
 		cmn_err(CE_WARN,
-			"IDN: 207: local/remote master-id conflict "
-			"(%d.lmasterid = %d, %d.rmasterid = %d)",
-			idn.localid, lmasterid, domid, rmasterid);
+		    "IDN: 207: local/remote master-id conflict "
+		    "(%d.lmasterid = %d, %d.rmasterid = %d)",
+		    idn.localid, lmasterid, domid, rmasterid);
 		IDN_GUNLOCK();
 		IDN_DUNLOCK(idn.localid);
 		break;
 
 	default:
 		cmn_err(CE_WARN,
-			"IDN: 208: %s: unknown case (%d)",
-			proc, (int)select);
+		    "IDN: 208: %s: unknown case (%d)",
+		    proc, (int)select);
 		IDN_GUNLOCK();
 		IDN_DUNLOCK(idn.localid);
 		ASSERT(0);
@@ -1245,12 +1242,12 @@ idn_select_master(int domid, int rmasterid, int rcpuid)
 
 	if (masterid == IDN_NIL_DOMID) {
 		PR_PROTO("%s:%d: NO MASTER SELECTED (rmstr=%d) sel=%s\n",
-			proc, domid, rmasterid, sel);
+		    proc, domid, rmasterid, sel);
 	} else {
 		PR_PROTO("%s:%d: MASTER SELECTED = %d (%s)\n",
-			proc, domid, masterid,
-			(masterid == idn.localid) ? "LOCAL" :
-			(masterid == domid) ? "REMOTE" : "OTHER");
+		    proc, domid, masterid,
+		    (masterid == idn.localid) ? "LOCAL" :
+		    (masterid == domid) ? "REMOTE" : "OTHER");
 	}
 
 	if (do_reconfig) {
@@ -1264,7 +1261,7 @@ idn_select_master(int domid, int rmasterid, int rcpuid)
 		IDN_GKSTAT_GLOBAL_EVENT(gk_reconfigs, gk_reconfig_last);
 
 		PR_PROTO("%s:%d: RECONFIG new masterid = %d\n",
-				proc, domid, domid);
+		    proc, domid, domid);
 
 		IDN_GSTATE_TRANSITION(IDNGS_RECONFIG);
 		IDN_SET_NEW_MASTERID(domid);
@@ -1273,9 +1270,8 @@ idn_select_master(int domid, int rmasterid, int rcpuid)
 		dis_set = idn.domset.ds_trans_on | idn.domset.ds_connected;
 		DOMAINSET_DEL(dis_set, domid);
 
-		idn_unlink_domainset(dis_set, IDNFIN_NORMAL,
-					IDNFIN_ARG_NONE, IDNFIN_OPT_RELINK,
-					BOARDSET_ALL);
+		idn_unlink_domainset(dis_set, IDNFIN_NORMAL, IDNFIN_ARG_NONE,
+		    IDNFIN_OPT_RELINK, BOARDSET_ALL);
 	}
 
 	return ((masterid == IDN_NIL_DOMID) ? -1 : 0);
@@ -1298,8 +1294,7 @@ idn_retry_query(uint_t token, void *arg)
 	switch (rtype) {
 	case IDNRETRY_CONQ:
 		sync_cmd = IDNSYNC_CONNECT;
-		my_ready_set = idn.domset.ds_ready_on |
-				idn.domset.ds_connected;
+		my_ready_set = idn.domset.ds_ready_on | idn.domset.ds_connected;
 		my_ready_set &= ~idn.domset.ds_trans_off;
 		DOMAINSET_ADD(my_ready_set, idn.localid);
 		break;
@@ -1307,7 +1302,7 @@ idn_retry_query(uint_t token, void *arg)
 	case IDNRETRY_FINQ:
 		sync_cmd = IDNSYNC_DISCONNECT;
 		my_ready_set = idn.domset.ds_ready_off |
-				~idn.domset.ds_connected;
+		    ~idn.domset.ds_connected;
 		break;
 
 	default:
@@ -1338,8 +1333,8 @@ idn_retry_query(uint_t token, void *arg)
 			IDN_DLOCK_EXCL(d);
 
 		if ((dp->dsync.s_cmd == sync_cmd) ||
-				(!dp->dcookie_send &&
-				(rtype == IDNRETRY_CONQ))) {
+		    (!dp->dcookie_send &&
+		    (rtype == IDNRETRY_CONQ))) {
 			if (d != domid)
 				IDN_DUNLOCK(d);
 			continue;
@@ -1351,8 +1346,7 @@ idn_retry_query(uint_t token, void *arg)
 			idn_send_con(d, NULL, IDNCON_QUERY, my_ready_set);
 		else
 			idn_send_fin(d, NULL, IDNFIN_QUERY, IDNFIN_ARG_NONE,
-					IDNFIN_OPT_NONE, my_ready_set,
-					NIL_FIN_MASTER);
+			    IDNFIN_OPT_NONE, my_ready_set, NIL_FIN_MASTER);
 		if (d != domid)
 			IDN_DUNLOCK(d);
 	}
@@ -1394,7 +1388,7 @@ idn_send_nego(int domid, idn_msgtype_t *mtp, domainset_t conset)
 	ldp = &idn_domain[idn.localid];
 
 	if ((idn.state == IDNGS_RECONFIG) ||
-			((masterid = IDN_GET_MASTERID()) == IDN_NIL_DOMID)) {
+	    ((masterid = IDN_GET_MASTERID()) == IDN_NIL_DOMID)) {
 		masterid = IDN_GET_NEW_MASTERID();
 		if ((masterid == idn.localid) || (masterid == domid)) {
 			/*
@@ -1420,9 +1414,9 @@ idn_send_nego(int domid, idn_msgtype_t *mtp, domainset_t conset)
 	 */
 	conset &= ~idn.domset.ds_hitlist;
 	if ((masterid != IDN_NIL_DOMID) &&
-			DOMAIN_IN_SET(idn.domset.ds_hitlist, masterid)) {
+	    DOMAIN_IN_SET(idn.domset.ds_hitlist, masterid)) {
 		PR_PROTO("%s:%d: masterid(%d) on hitlist(0x%x) -> -1\n",
-			proc, domid, masterid, idn.domset.ds_hitlist);
+		    proc, domid, masterid, idn.domset.ds_hitlist);
 		/*
 		 * Yikes, our chosen master is on the hitlist!
 		 */
@@ -1446,7 +1440,7 @@ idn_send_nego(int domid, idn_msgtype_t *mtp, domainset_t conset)
 	}
 	IDNNEG_DSET_SET_MASTER(dset, domid, masterid);
 	ASSERT((masterid != IDN_NIL_DOMID) ?
-		(idn_domain[masterid].dcpu != IDN_NIL_DCPU) : 1);
+	    (idn_domain[masterid].dcpu != IDN_NIL_DCPU) : 1);
 	IDN_GUNLOCK();
 
 	IDN_DLOCK_SHARED(idn.localid);
@@ -1462,14 +1456,14 @@ idn_send_nego(int domid, idn_msgtype_t *mtp, domainset_t conset)
 	 */
 
 	PR_PROTO("%s:%d: sending nego%sto (cpu %d) "
-		"[v=0x%x, cs=0x%x, mstr=%d]\n",
-		proc, domid,
-		(acknack & IDNP_ACK) ? "+ack " :
-		(acknack & IDNP_NACK) ? "+nack " : " ",
-		dp->dcpu, ticket, conset, masterid);
+	    "[v=0x%x, cs=0x%x, mstr=%d]\n",
+	    proc, domid,
+	    (acknack & IDNP_ACK) ? "+ack " :
+	    (acknack & IDNP_NACK) ? "+nack " : " ",
+	    dp->dcpu, ticket, conset, masterid);
 
 	IDN_MSGTIMER_START(domid, IDNP_NEGO, 0,
-			idn_msg_waittime[IDNP_NEGO], &mt.mt_cookie);
+	    idn_msg_waittime[IDNP_NEGO], &mt.mt_cookie);
 
 	IDNXDC(domid, &mt, ticket, dset[0], dset[1], dset[2]);
 
@@ -1480,7 +1474,7 @@ idn_send_nego(int domid, idn_msgtype_t *mtp, domainset_t conset)
 
 static int
 idn_recv_nego(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs,
-		ushort_t dcookie)
+    ushort_t dcookie)
 {
 	uint_t		msg = mtp->mt_mtype;
 	idn_msgtype_t	mt;
@@ -1496,9 +1490,9 @@ idn_recv_nego(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs,
 #ifdef DEBUG
 	if (DOMAIN_IN_SET(idn.domset.ds_hitlist, domid)) {
 		PR_HITLIST("%s:%d: dcpu=%d, dstate=%s, msg=%x, "
-			"hitlist=%x\n",
-			proc, domid, dp->dcpu, idnds_str[dp->dstate],
-			msg, idn.domset.ds_hitlist);
+		    "hitlist=%x\n",
+		    proc, domid, dp->dcpu, idnds_str[dp->dstate],
+		    msg, idn.domset.ds_hitlist);
 	}
 #endif /* DEBUG */
 
@@ -1514,15 +1508,15 @@ idn_recv_nego(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs,
 
 		if (idn_open_domain(domid, cpuid, ticket) != 0) {
 			PR_PROTO("%s:%d: FAILED to open doamin "
-				"(ticket = 0x%x)\n",
-				proc, domid, ticket);
+			    "(ticket = 0x%x)\n",
+			    proc, domid, ticket);
 			return (-1);
 		}
 	}
 
 	if ((msg & IDNP_MSGTYPE_MASK) == IDNP_NEGO) {
 		PR_PROTO("%s:%d: assigned SEND cookie 0x%x\n",
-			proc, domid, dcookie);
+		    proc, domid, dcookie);
 		dp->dcookie_send = dcookie;
 	}
 
@@ -1541,11 +1535,9 @@ idn_recv_nego(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs,
 			if (dp->dstate == IDNDS_CONNECTED) {
 				DOMAINSET_ADD(idn.domset.ds_relink, domid);
 				IDN_HISTORY_LOG(IDNH_RELINK, domid,
-						dp->dstate,
-						idn.domset.ds_relink);
+				    dp->dstate, idn.domset.ds_relink);
 				idn_disconnect(domid, IDNFIN_NORMAL,
-						IDNFIN_ARG_NONE,
-						IDNFIN_SYNC_YES);
+				    IDNFIN_ARG_NONE, IDNFIN_SYNC_YES);
 			} else {
 				mt.mt_mtype = IDNP_NACK;
 				mt.mt_atype = msg;
@@ -1553,20 +1545,20 @@ idn_recv_nego(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs,
 				CLR_XARGS(nargs);
 
 				if (DOMAIN_IN_SET(idn.domset.ds_hitlist,
-							domid)) {
+				    domid)) {
 					SET_XARGS_NACK_TYPE(nargs,
-							IDNNACK_EXIT);
+					    IDNNACK_EXIT);
 				} else {
 					int	new_masterid;
 					int	new_cpuid = IDN_NIL_DCPU;
 
 					SET_XARGS_NACK_TYPE(nargs,
-							IDNNACK_RETRY);
+					    IDNNACK_RETRY);
 					IDN_GLOCK_SHARED();
 					new_masterid = IDN_GET_NEW_MASTERID();
 					if (new_masterid == IDN_NIL_DOMID)
 						new_masterid =
-							IDN_GET_MASTERID();
+						    IDN_GET_MASTERID();
 					if (new_masterid != IDN_NIL_DOMID) {
 						idn_domain_t	*mdp;
 
@@ -1574,9 +1566,8 @@ idn_recv_nego(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs,
 						new_cpuid = mdp->dcpu;
 					}
 					SET_XARGS_NACK_ARG1(nargs,
-								new_masterid);
-					SET_XARGS_NACK_ARG2(nargs,
-								new_cpuid);
+					    new_masterid);
+					SET_XARGS_NACK_ARG2(nargs, new_cpuid);
 					IDN_GUNLOCK();
 				}
 				idn_send_acknack(domid, &mt, nargs);
@@ -1615,7 +1606,7 @@ idn_retry_nego(uint_t token, void *arg)
 #endif /* DEBUG */
 
 		PR_PROTO("%s:%d: dxp(%s) != NEGO...bailing...\n",
-			proc, domid, dp->dxp ? str : "NULL");
+		    proc, domid, dp->dxp ? str : "NULL");
 		IDN_DUNLOCK(domid);
 		IDN_SYNC_UNLOCK();
 		return;
@@ -1623,8 +1614,8 @@ idn_retry_nego(uint_t token, void *arg)
 
 	if (dp->dxstate != IDNXS_PEND) {
 		PR_PROTO("%s:%d: xstate(%s) != %s...bailing\n",
-			proc, domid, idnxs_str[dp->dxstate],
-			idnxs_str[IDNXS_PEND]);
+		    proc, domid, idnxs_str[dp->dxstate],
+		    idnxs_str[IDNXS_PEND]);
 		IDN_DUNLOCK(domid);
 		IDN_SYNC_UNLOCK();
 		return;
@@ -1637,9 +1628,9 @@ idn_retry_nego(uint_t token, void *arg)
 		 * reconfig has completed.
 		 */
 		PR_PROTO("%s:%d: reconfig in-progress...try later\n",
-			proc, domid);
+		    proc, domid);
 		idn_retry_submit(idn_retry_nego, NULL, token,
-				idn_msg_retrytime[IDNP_NEGO]);
+		    idn_msg_retrytime[IDNP_NEGO]);
 		IDN_GUNLOCK();
 		IDN_DUNLOCK(domid);
 		IDN_SYNC_UNLOCK();
@@ -1647,9 +1638,9 @@ idn_retry_nego(uint_t token, void *arg)
 	}
 	new_masterid = IDN_GET_NEW_MASTERID();
 	if ((idn.state == IDNGS_CONNECT) &&
-			(new_masterid != IDN_NIL_DOMID) &&
-			(domid != new_masterid) &&
-			(idn.localid != new_masterid)) {
+	    (new_masterid != IDN_NIL_DOMID) &&
+	    (domid != new_masterid) &&
+	    (idn.localid != new_masterid)) {
 		/*
 		 * We have a new master pending and this
 		 * guy isn't it.  Wait until the local domain
@@ -1658,9 +1649,9 @@ idn_retry_nego(uint_t token, void *arg)
 		 * guy.
 		 */
 		PR_PROTO("%s:%d: waiting for connect to new master %d\n",
-			proc, domid, IDN_GET_NEW_MASTERID());
+		    proc, domid, IDN_GET_NEW_MASTERID());
 		idn_retry_submit(idn_retry_nego, NULL, token,
-				idn_msg_retrytime[IDNP_NEGO]);
+		    idn_msg_retrytime[IDNP_NEGO]);
 		IDN_GUNLOCK();
 		IDN_DUNLOCK(domid);
 		IDN_SYNC_UNLOCK();
@@ -1695,10 +1686,10 @@ idn_check_nego(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 	if (msg & IDNP_NACK) {
 		if (GET_XARGS_NACK_TYPE(xargs) == IDNNACK_EXIT) {
 			PR_HITLIST("%s:%d(%s): (msg=%x) EXIT received, "
-				"adding to hitlist %x -> %x\n",
-				proc, domid, idnds_str[dp->dstate], msg,
-				idn.domset.ds_hitlist,
-				idn.domset.ds_hitlist | DOMAINSET(domid));
+			    "adding to hitlist %x -> %x\n",
+			    proc, domid, idnds_str[dp->dstate], msg,
+			    idn.domset.ds_hitlist,
+			    idn.domset.ds_hitlist | DOMAINSET(domid));
 
 			DOMAINSET_ADD(idn.domset.ds_hitlist, domid);
 			return (-1);
@@ -1709,15 +1700,14 @@ idn_check_nego(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 
 	if (DOMAIN_IN_SET(idn.domset.ds_hitlist, domid)) {
 		PR_HITLIST("%s:%d(%s): (msg=%x) domain in hitlist (%x) - "
-			"exiting phase\n",
-			proc, domid, idnds_str[dp->dstate], msg,
-			idn.domset.ds_hitlist);
+		    "exiting phase\n",
+		    proc, domid, idnds_str[dp->dstate], msg,
+		    idn.domset.ds_hitlist);
 		return (-1);
 	}
 
-	if ((dp->dstate == IDNDS_NEGO_PEND) &&
-			(msg & IDNP_MSGTYPE_MASK) &&
-			(msg & IDNP_ACK))		/* nego+ack */
+	if ((dp->dstate == IDNDS_NEGO_PEND) && (msg & IDNP_MSGTYPE_MASK) &&
+	    (msg & IDNP_ACK))		/* nego+ack */
 		return (1);
 
 	dmask = (uint_t)-1;
@@ -1725,7 +1715,7 @@ idn_check_nego(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 	IDN_GLOCK_EXCL();
 	if (idn.state == IDNGS_DISCONNECT) {
 		PR_PROTO("%s:%d: DISCONNECT in-progress >>> EXIT\n",
-			proc, domid);
+		    proc, domid);
 		IDN_GUNLOCK();
 		return (-1);
 	} else if (idn.state == IDNGS_OFFLINE) {
@@ -1739,25 +1729,25 @@ idn_check_nego(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 	if (!DOMAIN_IN_SET(idn.domset.ds_trans_on, domid)) {
 		DOMAINSET_ADD(idn.domset.ds_trans_on, domid);
 		IDN_HISTORY_LOG(IDNH_NEGO, domid,
-				idn.domset.ds_trans_on,
-				idn.domset.ds_connected);
+		    idn.domset.ds_trans_on,
+		    idn.domset.ds_connected);
 	}
 
 	switch (idn.state) {
 	case IDNGS_RECONFIG:
 		PR_PROTO("%s:%d: RECONFIG in-progress >>> RETRY\n",
-			proc, domid);
+		    proc, domid);
 		IDN_GUNLOCK();
 		return (1);
 
 	case IDNGS_CONNECT:
 		new_masterid = IDN_GET_NEW_MASTERID();
 		if ((new_masterid != IDN_NIL_DOMID) &&
-				(domid != new_masterid) &&
-				(idn.localid != new_masterid)) {
+		    (domid != new_masterid) &&
+		    (idn.localid != new_masterid)) {
 			PR_PROTO("%s:%d: waiting for connect to "
-				"new master %d\n",
-				proc, domid, IDN_GET_NEW_MASTERID());
+			    "new master %d\n",
+			    proc, domid, IDN_GET_NEW_MASTERID());
 			IDN_GUNLOCK();
 			return (1);
 		}
@@ -1799,7 +1789,7 @@ idn_check_nego(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 				m_cpuid = dp->dcpu;
 			} else {
 				IDNNEG_DSET_GET(dset, new_masterid, m_cpuid,
-						dmask);
+				    dmask);
 				if (m_cpuid == -1) {
 					/*
 					 * Something is bogus if remote domain
@@ -1807,12 +1797,12 @@ idn_check_nego(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 					 * doesn't have the cpuid for it.
 					 */
 					cmn_err(CE_WARN,
-						"IDN: 209: remote domain (ID "
-						"%d, CPU %d) reporting master "
-						"(ID %d) without CPU ID",
-						domid, dp->dcpu, new_masterid);
+					    "IDN: 209: remote domain (ID "
+					    "%d, CPU %d) reporting master "
+					    "(ID %d) without CPU ID",
+					    domid, dp->dcpu, new_masterid);
 					DOMAINSET_ADD(idn.domset.ds_hitlist,
-						domid);
+					    domid);
 					IDN_GUNLOCK();
 					return (-1);
 				}
@@ -1831,9 +1821,9 @@ idn_check_nego(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 #ifdef DEBUG
 		if (idn.domset.ds_hitlist) {
 			PR_HITLIST("%s:%d: con_set %x -> %x (hitlist = %x)\n",
-				proc, domid, con_set,
-				con_set & ~idn.domset.ds_hitlist,
-				idn.domset.ds_hitlist);
+			    proc, domid, con_set,
+			    con_set & ~idn.domset.ds_hitlist,
+			    idn.domset.ds_hitlist);
 		}
 #endif /* DEBUG */
 
@@ -1843,11 +1833,10 @@ idn_check_nego(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		ASSERT(!DOMAIN_IN_SET(con_set, domid));
 
 		if ((new_masterid != IDN_NIL_DOMID) &&
-				DOMAIN_IN_SET(idn.domset.ds_hitlist,
-						new_masterid)) {
+		    DOMAIN_IN_SET(idn.domset.ds_hitlist, new_masterid)) {
 			PR_HITLIST("%s:%d: new_mstr %d -> -1 (hitlist = %x)\n",
-				proc, domid, new_masterid,
-				idn.domset.ds_hitlist);
+			    proc, domid, new_masterid,
+			    idn.domset.ds_hitlist);
 			IDN_GUNLOCK();
 			return (1);
 		}
@@ -1872,8 +1861,8 @@ idn_check_nego(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 			if (masterid == idn.localid) {
 				if (idn_master_init() < 0) {
 					cmn_err(CE_WARN,
-						"IDN: 210: failed to init "
-						"MASTER context");
+					    "IDN: 210: failed to init "
+					    "MASTER context");
 					ldp->dvote.v.master = 0;
 					IDN_DUNLOCK(idn.localid);
 					IDN_GSTATE_TRANSITION(IDNGS_DISCONNECT);
@@ -1921,8 +1910,7 @@ idn_check_nego(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 			 * other domains.
 			 */
 			PR_PROTO("%s:%d: still exchanging CFG "
-				"w/master(%d)\n",
-				proc, domid, masterid);
+			    "w/master(%d)\n", proc, domid, masterid);
 			IDN_GUNLOCK();
 			return (1);
 		}
@@ -1948,9 +1936,8 @@ idn_check_nego(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 	if (dp->dsync.s_cmd != IDNSYNC_CONNECT) {
 		idn_sync_exit(domid, IDNSYNC_DISCONNECT);
 		idn_sync_enter(domid, IDNSYNC_CONNECT,
-				con_set, DOMAINSET(idn.localid),
-				idn_xstate_transfunc,
-				(void *)IDNP_CON);
+		    con_set, DOMAINSET(idn.localid), idn_xstate_transfunc,
+		    (void *)IDNP_CON);
 	}
 
 	/*
@@ -1982,8 +1969,8 @@ idn_check_nego(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		IDNNEG_DSET_GET(dset, d, cpuid, dmask);
 		if (cpuid == -1) {
 			PR_PROTO("%s:%d: failed to get cpuid from dset "
-				"for domain %d (pset = 0x%x)\n",
-				proc, domid, d, pending_set);
+			    "for domain %d (pset = 0x%x)\n",
+			    proc, domid, d, pending_set);
 			DOMAINSET_DEL(idn.domset.ds_trans_on, d);
 			continue;
 		}
@@ -1991,13 +1978,13 @@ idn_check_nego(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		IDN_DLOCK_EXCL(d);
 		if ((rv = idn_open_domain(d, cpuid, 0)) != 0) {
 			PR_PROTO("%s:%d: failed "
-				"idn_open_domain(%d,%d,0) (rv = %d)\n",
-				proc, domid, d, cpuid, rv);
+			    "idn_open_domain(%d,%d,0) (rv = %d)\n",
+			    proc, domid, d, cpuid, rv);
 			if (rv < 0) {
 				cmn_err(CE_WARN,
-					"IDN: 205: (%s) failed to "
-					"open-domain(%d,%d)",
-					proc, d, cpuid);
+				    "IDN: 205: (%s) failed to "
+				    "open-domain(%d,%d)",
+				    proc, d, cpuid);
 				DOMAINSET_DEL(idn.domset.ds_trans_on, d);
 			} else if (DOMAIN_IN_SET(idn.domset.ds_trans_off, d)) {
 				/*
@@ -2007,7 +1994,7 @@ idn_check_nego(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 				 */
 				DOMAINSET_ADD(idn.domset.ds_relink, d);
 				IDN_HISTORY_LOG(IDNH_RELINK, d, dp->dstate,
-						idn.domset.ds_relink);
+				    idn.domset.ds_relink);
 			}
 			IDN_DUNLOCK(d);
 			continue;
@@ -2105,12 +2092,12 @@ idn_error_nego(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 	if (retry) {
 		token = IDN_RETRY_TOKEN(domid, IDNRETRY_NEGO);
 		idn_retry_submit(idn_retry_nego, NULL, token,
-				idn_msg_retrytime[(int)IDNRETRY_NEGO]);
+		    idn_msg_retrytime[(int)IDNRETRY_NEGO]);
 	} else {
 		DOMAINSET_DEL(idn.domset.ds_relink, domid);
 		IDN_RESET_COOKIES(domid);
 		idn_disconnect(domid, IDNFIN_NORMAL, IDNFIN_ARG_NONE,
-				IDNDS_SYNC_TYPE(&idn_domain[domid]));
+		    IDNDS_SYNC_TYPE(&idn_domain[domid]));
 	}
 }
 
@@ -2164,8 +2151,7 @@ idn_action_nego_sent(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		}
 		IDNNEG_DSET_SET_MASTER(dset, domid, IDN_GET_MASTERID());
 		ASSERT((IDN_GET_MASTERID() != IDN_NIL_DOMID) ?
-			(idn_domain[IDN_GET_MASTERID()].dcpu != IDN_NIL_DCPU) :
-			1);
+		    (idn_domain[IDN_GET_MASTERID()].dcpu != IDN_NIL_DCPU) : 1);
 		vote.ticket = idn_domain[idn.localid].dvote.ticket;
 		vote.v.master = 0;
 		CLR_XARGS(nargs);
@@ -2209,12 +2195,12 @@ idn_action_nego_sent(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		if (retry) {
 			token = IDN_RETRY_TOKEN(domid, IDNRETRY_NEGO);
 			idn_retry_submit(idn_retry_nego, NULL, token,
-					idn_msg_retrytime[(int)IDNRETRY_NEGO]);
+			    idn_msg_retrytime[(int)IDNRETRY_NEGO]);
 		} else {
 			DOMAINSET_DEL(idn.domset.ds_relink, domid);
 			IDN_RESET_COOKIES(domid);
 			idn_disconnect(domid, IDNFIN_NORMAL, IDNFIN_ARG_NONE,
-					IDNDS_SYNC_TYPE(&idn_domain[domid]));
+			    IDNDS_SYNC_TYPE(&idn_domain[domid]));
 		}
 	}
 }
@@ -2262,12 +2248,12 @@ idn_action_nego_rcvd(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		if (retry) {
 			token = IDN_RETRY_TOKEN(domid, IDNRETRY_NEGO);
 			idn_retry_submit(idn_retry_nego, NULL, token,
-					idn_msg_retrytime[(int)IDNRETRY_NEGO]);
+			    idn_msg_retrytime[(int)IDNRETRY_NEGO]);
 		} else {
 			DOMAINSET_DEL(idn.domset.ds_relink, domid);
 			IDN_RESET_COOKIES(domid);
 			idn_disconnect(domid, IDNFIN_NORMAL, IDNFIN_ARG_NONE,
-					IDNDS_SYNC_TYPE(&idn_domain[domid]));
+			    IDNDS_SYNC_TYPE(&idn_domain[domid]));
 		}
 	}
 }
@@ -2316,10 +2302,10 @@ idn_exit_nego(int domid, uint_t msgtype)
 
 	IDN_GLOCK_SHARED();
 	if ((idn.state != IDNGS_DISCONNECT) &&
-			!DOMAIN_IN_SET(idn.domset.ds_hitlist, domid)) {
+	    !DOMAIN_IN_SET(idn.domset.ds_hitlist, domid)) {
 		DOMAINSET_ADD(idn.domset.ds_relink, domid);
 		IDN_HISTORY_LOG(IDNH_RELINK, domid, dp->dstate,
-				idn.domset.ds_relink);
+		    idn.domset.ds_relink);
 	} else {
 		idn_update_op(IDNOP_ERROR, DOMAINSET(domid), NULL);
 		DOMAINSET_DEL(idn.domset.ds_relink, domid);
@@ -2331,8 +2317,7 @@ idn_exit_nego(int domid, uint_t msgtype)
 	 * possible we may not have exchanged appropriate cookies.
 	 */
 	IDN_RESET_COOKIES(domid);
-	idn_disconnect(domid, fintype, IDNFIN_ARG_NONE,
-			IDNDS_SYNC_TYPE(dp));
+	idn_disconnect(domid, fintype, IDNFIN_ARG_NONE, IDNDS_SYNC_TYPE(dp));
 }
 
 static void
@@ -2350,7 +2335,7 @@ idn_nego_cleanup_check(int domid, int new_masterid, int new_cpuid)
 	IDN_GLOCK_EXCL();
 
 	if (((idn.state == IDNGS_ONLINE) && !idn.domset.ds_connected) ||
-			(idn.state == IDNGS_CONNECT)) {
+	    (idn.state == IDNGS_CONNECT)) {
 		domainset_t	trans_on;
 		int		masterid;
 		int		retry_domid = IDN_NIL_DOMID;
@@ -2358,7 +2343,7 @@ idn_nego_cleanup_check(int domid, int new_masterid, int new_cpuid)
 
 		IDN_DLOCK_EXCL(idn.localid);
 		masterid = (idn.state == IDNGS_ONLINE) ?
-				IDN_GET_MASTERID() : IDN_GET_NEW_MASTERID();
+		    IDN_GET_MASTERID() : IDN_GET_NEW_MASTERID();
 		trans_on = idn.domset.ds_trans_on;
 		DOMAINSET_DEL(trans_on, domid);
 		if (trans_on == 0) {
@@ -2369,8 +2354,8 @@ idn_nego_cleanup_check(int domid, int new_masterid, int new_cpuid)
 			 * to connect with.
 			 */
 			ASSERT((idn.state == IDNGS_ONLINE) ?
-				((idn.localid == masterid) ||
-					(domid == masterid)) : 1);
+			    ((idn.localid == masterid) ||
+			    (domid == masterid)) : 1);
 			if (idn.localid == masterid)
 				idn_master_deinit();
 			ldp->dvote.v.connected = 0;
@@ -2388,16 +2373,16 @@ idn_nego_cleanup_check(int domid, int new_masterid, int new_cpuid)
 			 * it's ourself.
 			 */
 			if ((new_masterid != IDN_NIL_DOMID) &&
-					(new_masterid != idn.localid) &&
-					(new_masterid != domid)) {
+			    (new_masterid != idn.localid) &&
+			    (new_masterid != domid)) {
 				IDN_DLOCK_EXCL(new_masterid);
 				rv = idn_open_domain(new_masterid,
-							new_cpuid, 0);
+				    new_cpuid, 0);
 				if (rv < 0) {
 					cmn_err(CE_WARN,
-						"IDN: 205: (%s) failed to "
-						"open-domain(%d,%d)",
-						proc, new_masterid, new_cpuid);
+					    "IDN: 205: (%s) failed to "
+					    "open-domain(%d,%d)",
+					    proc, new_masterid, new_cpuid);
 					IDN_GLOCK_EXCL();
 					IDN_SET_NEW_MASTERID(IDN_NIL_DOMID);
 					IDN_GUNLOCK();
@@ -2430,30 +2415,29 @@ idn_nego_cleanup_check(int domid, int new_masterid, int new_cpuid)
 
 			if (idn.state == IDNGS_ONLINE) {
 				IDN_GKSTAT_GLOBAL_EVENT(gk_reconfigs,
-							gk_reconfig_last);
+				    gk_reconfig_last);
 				IDN_GSTATE_TRANSITION(IDNGS_RECONFIG);
 				IDN_GUNLOCK();
 				idn_unlink_domainset(trans_on, IDNFIN_NORMAL,
-							IDNFIN_ARG_NONE,
-							IDNFIN_OPT_RELINK,
-							BOARDSET_ALL);
+				    IDNFIN_ARG_NONE,
+				    IDNFIN_OPT_RELINK,
+				    BOARDSET_ALL);
 			} else if ((new_masterid != IDN_NIL_DOMID) &&
-					(new_masterid != idn.localid) &&
-					(new_masterid != domid) &&
-					!DOMAIN_IN_SET(trans_on,
-							new_masterid)) {
+			    (new_masterid != idn.localid) &&
+			    (new_masterid != domid) &&
+			    !DOMAIN_IN_SET(trans_on, new_masterid)) {
 				IDN_GUNLOCK();
 				IDN_DLOCK_EXCL(new_masterid);
 				rv = idn_open_domain(new_masterid,
-							new_cpuid, 0);
+				    new_cpuid, 0);
 				IDN_GLOCK_EXCL();
 				IDN_DUNLOCK(new_masterid);
 				if (rv < 0) {
 					cmn_err(CE_WARN,
-						"IDN: 205: (%s) failed to "
-						"open-domain(%d,%d)",
-						proc, new_masterid,
-						new_cpuid);
+					    "IDN: 205: (%s) failed to "
+					    "open-domain(%d,%d)",
+					    proc, new_masterid,
+					    new_cpuid);
 					IDN_SET_NEW_MASTERID(IDN_NIL_DOMID);
 					new_masterid = IDN_NIL_DOMID;
 				} else {
@@ -2477,7 +2461,7 @@ idn_nego_cleanup_check(int domid, int new_masterid, int new_cpuid)
 			IDN_DUNLOCK(retry_domid);
 			token = IDN_RETRY_TOKEN(retry_domid, IDNRETRY_NEGO);
 			idn_retry_submit(idn_retry_nego, NULL, token,
-					idn_msg_retrytime[(int)IDNRETRY_NEGO]);
+			    idn_msg_retrytime[(int)IDNRETRY_NEGO]);
 		}
 	} else {
 		IDN_GUNLOCK();
@@ -2485,8 +2469,8 @@ idn_nego_cleanup_check(int domid, int new_masterid, int new_cpuid)
 }
 
 static int
-idn_send_con(int domid, idn_msgtype_t *mtp,
-		idn_con_t contype, domainset_t conset)
+idn_send_con(int domid, idn_msgtype_t *mtp, idn_con_t contype, domainset_t
+    conset)
 {
 	idn_msgtype_t	mt;
 	uint_t		acknack;
@@ -2518,14 +2502,14 @@ idn_send_con(int domid, idn_msgtype_t *mtp,
 	ASSERT((contype == IDNCON_QUERY) ? idn_domain[domid].dcookie_send : 1);
 
 	PR_PROTO("%s:%d: sending con%sto (cpu %d) [ct=%s, cs=0x%x]\n",
-		proc, domid,
-		(acknack & IDNP_ACK) ? "+ack " :
-		(acknack & IDNP_NACK) ? "+nack " : " ",
-		idn_domain[domid].dcpu,
-		idncon_str[contype], conset);
+	    proc, domid,
+	    (acknack & IDNP_ACK) ? "+ack " :
+	    (acknack & IDNP_NACK) ? "+nack " : " ",
+	    idn_domain[domid].dcpu,
+	    idncon_str[contype], conset);
 
 	IDN_MSGTIMER_START(domid, IDNP_CON, (ushort_t)contype,
-			idn_msg_waittime[IDNP_CON], &mt.mt_cookie);
+	    idn_msg_waittime[IDNP_CON], &mt.mt_cookie);
 
 	IDNXDC(domid, &mt, (uint_t)contype, (uint_t)conset, 0, 0);
 
@@ -2561,10 +2545,9 @@ idn_recv_con(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		domainset_t	query_set;
 
 		query_set = idn_sync_register(domid, IDNSYNC_CONNECT,
-						ready_set, IDNSYNC_REG_REG);
+		    ready_set, IDNSYNC_REG_REG);
 
-		my_ready_set = idn.domset.ds_connected |
-				idn.domset.ds_ready_on;
+		my_ready_set = idn.domset.ds_connected | idn.domset.ds_ready_on;
 		my_ready_set &= ~idn.domset.ds_trans_off;
 		DOMAINSET_ADD(my_ready_set, idn.localid);
 
@@ -2581,7 +2564,7 @@ idn_recv_con(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 
 			token = IDN_RETRY_TOKEN(domid, IDNRETRY_CONQ);
 			idn_retry_submit(idn_retry_query, NULL, token,
-					idn_msg_retrytime[(int)IDNRETRY_CONQ]);
+			    idn_msg_retrytime[(int)IDNRETRY_CONQ]);
 		}
 
 		return (0);
@@ -2599,7 +2582,7 @@ idn_recv_con(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		INUM2STR(msgarg, lstr);
 
 		PR_PROTO("%s:%d: ERROR: NOT YET REGISTERED (%s/%s)\n",
-			proc, domid, mstr, lstr);
+		    proc, domid, mstr, lstr);
 
 		if (msg & IDNP_MSGTYPE_MASK) {
 			mt.mt_mtype = IDNP_NACK;
@@ -2640,19 +2623,19 @@ idn_retry_con(uint_t token, void *arg)
 #endif /* DEBUG */
 
 		PR_PROTO("%s:%d: dxp(%s) != CON...bailing...\n",
-			proc, domid, dp->dxp ? str : "NULL");
+		    proc, domid, dp->dxp ? str : "NULL");
 		IDN_DUNLOCK(domid);
 		IDN_SYNC_UNLOCK();
 		return;
 	}
 
 	if ((dp->dsync.s_cmd != IDNSYNC_CONNECT) ||
-			(dp->dxstate != IDNXS_PEND)) {
+	    (dp->dxstate != IDNXS_PEND)) {
 		PR_PROTO("%s:%d: cmd (%s) and/or xstate (%s) not "
-			"expected (%s/%s)\n",
-			proc, domid, idnsync_str[dp->dsync.s_cmd],
-			idnxs_str[dp->dxstate], idnsync_str[IDNSYNC_CONNECT],
-			idnxs_str[IDNXS_PEND]);
+		    "expected (%s/%s)\n",
+		    proc, domid, idnsync_str[dp->dsync.s_cmd],
+		    idnxs_str[dp->dxstate], idnsync_str[IDNSYNC_CONNECT],
+		    idnxs_str[IDNXS_PEND]);
 		IDN_DUNLOCK(domid);
 		IDN_SYNC_UNLOCK();
 		return;
@@ -2679,13 +2662,12 @@ idn_check_con(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		return (0);
 
 	if ((dp->dstate == IDNDS_CON_PEND) &&
-			(msg & IDNP_MSGTYPE_MASK) &&
-			(msg & IDNP_ACK))		/* con+ack */
+	    (msg & IDNP_MSGTYPE_MASK) && (msg & IDNP_ACK))	/* con+ack */
 		return (1);
 
 	if (msg == 0) {
 		ready_set = idn.domset.ds_connected &
-				~idn.domset.ds_trans_off;
+		    ~idn.domset.ds_trans_off;
 	} else {
 		ready_set = GET_XARGS_CON_DOMSET(xargs);
 		DOMAINSET_ADD(idn.domset.ds_ready_on, domid);
@@ -2694,7 +2676,7 @@ idn_check_con(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 	DOMAINSET_ADD(ready_set, idn.localid);
 
 	query_set = idn_sync_register(domid, IDNSYNC_CONNECT,
-					ready_set, IDNSYNC_REG_REG);
+	    ready_set, IDNSYNC_REG_REG);
 	/*
 	 * No need to query this domain as he's already
 	 * in the CON sequence.
@@ -2711,7 +2693,7 @@ idn_check_con(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		int	d;
 
 		my_ready_set = idn.domset.ds_ready_on |
-				idn.domset.ds_connected;
+		    idn.domset.ds_connected;
 		my_ready_set &= ~idn.domset.ds_trans_off;
 		DOMAINSET_ADD(my_ready_set, idn.localid);
 
@@ -2723,7 +2705,7 @@ idn_check_con(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 
 			IDN_DLOCK_EXCL(d);
 			if ((dp->dsync.s_cmd == IDNSYNC_CONNECT) ||
-					!dp->dcookie_send) {
+			    !dp->dcookie_send) {
 				IDN_DUNLOCK(d);
 				continue;
 			}
@@ -2762,7 +2744,7 @@ idn_error_con(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 
 	token = IDN_RETRY_TOKEN(domid, IDNRETRY_CON);
 	idn_retry_submit(idn_retry_con, NULL, token,
-			idn_msg_retrytime[(int)IDNRETRY_CON]);
+	    idn_msg_retrytime[(int)IDNRETRY_CON]);
 }
 
 /*ARGSUSED*/
@@ -2777,8 +2759,8 @@ idn_action_con_pend(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 	ASSERT(IDN_SYNC_IS_LOCKED());
 	ASSERT(IDN_DLOCK_IS_EXCL(domid));
 
-	my_ready_set = dp->dsync.s_set_rdy |
-			idn.domset.ds_ready_on | idn.domset.ds_connected;
+	my_ready_set = dp->dsync.s_set_rdy | idn.domset.ds_ready_on |
+	    idn.domset.ds_connected;
 	my_ready_set &= ~idn.domset.ds_trans_off;
 	DOMAINSET_ADD(my_ready_set, idn.localid);
 
@@ -2806,9 +2788,8 @@ idn_action_con_sent(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 
 	mt.mt_cookie = mtp ? mtp->mt_cookie : 0;
 
-	my_ready_set = dp->dsync.s_set_rdy |
-				idn.domset.ds_ready_on |
-				idn.domset.ds_connected;
+	my_ready_set = dp->dsync.s_set_rdy | idn.domset.ds_ready_on |
+	    idn.domset.ds_connected;
 	my_ready_set &= ~idn.domset.ds_trans_off;
 	DOMAINSET_ADD(my_ready_set, idn.localid);
 
@@ -2840,7 +2821,7 @@ idn_action_con_sent(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		 */
 		token = IDN_RETRY_TOKEN(domid, IDNRETRY_CON);
 		idn_retry_submit(idn_retry_con, NULL, token,
-				idn_msg_retrytime[(int)IDNRETRY_CON]);
+		    idn_msg_retrytime[(int)IDNRETRY_CON]);
 	}
 }
 
@@ -2860,7 +2841,7 @@ idn_action_con_rcvd(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		 */
 		token = IDN_RETRY_TOKEN(domid, IDNRETRY_CON);
 		idn_retry_submit(idn_retry_con, NULL, token,
-				idn_msg_retrytime[(int)IDNRETRY_CON]);
+		    idn_msg_retrytime[(int)IDNRETRY_CON]);
 	}
 }
 
@@ -2893,17 +2874,17 @@ idn_final_con(int domid)
 	if (idn.domset.ds_trans_on == 0) {
 		if ((idn.domset.ds_trans_off | idn.domset.ds_relink) == 0) {
 			PR_HITLIST("%s:%d: HITLIST %x -> 0\n",
-				proc, domid, idn.domset.ds_hitlist);
+			    proc, domid, idn.domset.ds_hitlist);
 			idn.domset.ds_hitlist = 0;
 		}
 		PR_PROTO("%s:%d: ALL CONNECTED ************ "
-			"(0x%x + 0x%x) = 0x%x\n", proc, domid,
-			DOMAINSET(idn.localid), idn.domset.ds_connected,
-			DOMAINSET(idn.localid) | idn.domset.ds_connected);
+		    "(0x%x + 0x%x) = 0x%x\n", proc, domid,
+		    DOMAINSET(idn.localid), idn.domset.ds_connected,
+		    DOMAINSET(idn.localid) | idn.domset.ds_connected);
 	} else {
 		PR_PROTO("%s:%d: >>> ds_trans_on = 0x%x, ds_ready_on = 0x%x\n",
-			proc, domid,
-			idn.domset.ds_trans_on, idn.domset.ds_ready_on);
+		    proc, domid,
+		    idn.domset.ds_trans_on, idn.domset.ds_ready_on);
 	}
 
 	if (idn_verify_config_mbox(domid)) {
@@ -2927,7 +2908,7 @@ idn_final_con(int domid)
 		 * which is the effect we really want anyway.
 		 */
 		idn_disconnect(domid, IDNFIN_NORMAL, IDNFIN_ARG_SMRBAD,
-				IDNFIN_SYNC_YES);
+		    IDNFIN_SYNC_YES);
 
 		return;
 	}
@@ -2968,8 +2949,8 @@ idn_final_con(int domid)
 	(void) timeout(idn_link_established, (void *)(uintptr_t)targ, 50);
 
 	cmn_err(CE_NOTE,
-		"!IDN: 200: link (domain %d, CPU %d) connected",
-		dp->domid, dp->dcpu);
+	    "!IDN: 200: link (domain %d, CPU %d) connected",
+	    dp->domid, dp->dcpu);
 }
 
 static void
@@ -2992,20 +2973,18 @@ idn_exit_con(int domid, uint_t msgtype)
 	if (idn.state != IDNGS_DISCONNECT) {
 		DOMAINSET_ADD(idn.domset.ds_relink, domid);
 		IDN_HISTORY_LOG(IDNH_RELINK, domid, dp->dstate,
-				idn.domset.ds_relink);
+		    idn.domset.ds_relink);
 	} else {
 		DOMAINSET_DEL(idn.domset.ds_relink, domid);
 	}
 	IDN_GUNLOCK();
 
-	idn_disconnect(domid, fintype, IDNFIN_ARG_NONE,
-			IDNDS_SYNC_TYPE(dp));
+	idn_disconnect(domid, fintype, IDNFIN_ARG_NONE, IDNDS_SYNC_TYPE(dp));
 }
 
 static int
-idn_send_fin(int domid, idn_msgtype_t *mtp, idn_fin_t fintype,
-		idn_finarg_t finarg, idn_finopt_t finopt,
-		domainset_t finset, uint_t finmaster)
+idn_send_fin(int domid, idn_msgtype_t *mtp, idn_fin_t fintype, idn_finarg_t
+    finarg, idn_finopt_t finopt, domainset_t finset, uint_t finmaster)
 {
 	int		need_timer = 1;
 	uint_t		acknack;
@@ -3040,24 +3019,24 @@ idn_send_fin(int domid, idn_msgtype_t *mtp, idn_fin_t fintype,
 	}
 
 	PR_PROTO("%s:%d: sending fin%sto (cpu %d) "
-		"[ft=%s, fa=%s, fs=0x%x, fo=%s, fm=(%d,%d)]\n",
-		proc, domid,
-		(acknack & IDNP_ACK) ? "+ack " :
-		(acknack & IDNP_NACK) ? "+nack " : " ",
-		dp->dcpu, idnfin_str[fintype], idnfinarg_str[finarg],
-		(int)finset, idnfinopt_str[finopt],
-		FIN_MASTER_DOMID(finmaster), FIN_MASTER_CPUID(finmaster));
+	    "[ft=%s, fa=%s, fs=0x%x, fo=%s, fm=(%d,%d)]\n",
+	    proc, domid,
+	    (acknack & IDNP_ACK) ? "+ack " :
+	    (acknack & IDNP_NACK) ? "+nack " : " ",
+	    dp->dcpu, idnfin_str[fintype], idnfinarg_str[finarg],
+	    (int)finset, idnfinopt_str[finopt],
+	    FIN_MASTER_DOMID(finmaster), FIN_MASTER_CPUID(finmaster));
 
 	if (need_timer) {
 		IDN_MSGTIMER_START(domid, IDNP_FIN, (ushort_t)fintype,
-				idn_msg_waittime[IDNP_FIN], &mt.mt_cookie);
+		    idn_msg_waittime[IDNP_FIN], &mt.mt_cookie);
 	}
 
 	SET_FIN_TYPE(fintypearg, fintype);
 	SET_FIN_ARG(fintypearg, finarg);
 
-	IDNXDC(domid, &mt, fintypearg, (uint_t)finset,
-		(uint_t)finopt, finmaster);
+	IDNXDC(domid, &mt, fintypearg, (uint_t)finset, (uint_t)finopt,
+	    finmaster);
 
 	return (0);
 }
@@ -3092,23 +3071,23 @@ idn_recv_fin(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 
 	if (msg & IDNP_NACK) {
 		PR_PROTO("%s:%d: received NACK (type = %s)\n",
-			proc, domid, idnnack_str[xargs[0]]);
+		    proc, domid, idnnack_str[xargs[0]]);
 	} else {
 		PR_PROTO("%s:%d: fintype = %s, finopt = %s, "
-			"finarg = %s, ready_set = 0x%x\n",
-			proc, domid, idnfin_str[fintype],
-			idnfinopt_str[finopt],
-			idnfinarg_str[finarg], ready_set);
+		    "finarg = %s, ready_set = 0x%x\n",
+		    proc, domid, idnfin_str[fintype],
+		    idnfinopt_str[finopt],
+		    idnfinarg_str[finarg], ready_set);
 	}
 
 	if (!(msg & IDNP_NACK) && (fintype == IDNFIN_QUERY)) {
 		domainset_t	query_set;
 
 		query_set = idn_sync_register(domid, IDNSYNC_DISCONNECT,
-						ready_set, IDNSYNC_REG_REG);
+		    ready_set, IDNSYNC_REG_REG);
 
 		my_ready_set = ~idn.domset.ds_connected |
-					idn.domset.ds_ready_off;
+		    idn.domset.ds_ready_off;
 
 		if (msg & IDNP_MSGTYPE_MASK) {
 			mt.mt_mtype = IDNP_ACK;
@@ -3126,7 +3105,7 @@ idn_recv_fin(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 
 			token = IDN_RETRY_TOKEN(domid, IDNRETRY_FINQ);
 			idn_retry_submit(idn_retry_query, NULL, token,
-					idn_msg_retrytime[(int)IDNRETRY_FINQ]);
+			    idn_msg_retrytime[(int)IDNRETRY_FINQ]);
 		}
 
 		return (0);
@@ -3137,7 +3116,7 @@ idn_recv_fin(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 
 		if (IDNDS_IS_CLOSED(dp)) {
 			PR_PROTO("%s:%d: domain already closed (%s)\n",
-				proc, domid, idnds_str[dp->dstate]);
+			    proc, domid, idnds_str[dp->dstate]);
 			if (msg & IDNP_MSGTYPE_MASK) {
 				/*
 				 * fin or fin+ack.
@@ -3188,7 +3167,7 @@ idn_recv_fin(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 			 */
 			DOMAINSET_ADD(idn.domset.ds_ready_off, domid);
 			(void) idn_sync_register(domid, IDNSYNC_DISCONNECT,
-					DOMAINSET_ALL, IDNSYNC_REG_REG);
+			    DOMAINSET_ALL, IDNSYNC_REG_REG);
 			ready_set = (uint_t)DOMAINSET_ALL;
 			/*
 			 * Need to transform message to allow us to
@@ -3216,16 +3195,16 @@ idn_recv_fin(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 			default:
 #ifdef DEBUG
 				cmn_err(CE_PANIC,
-					"%s:%d: UNEXPECTED state = %s",
-					proc, domid,
-					idnds_str[dp->dstate]);
+				    "%s:%d: UNEXPECTED state = %s",
+				    proc, domid,
+				    idnds_str[dp->dstate]);
 #endif /* DEBUG */
 				break;
 			}
 		}
 		fintype = (uint_t)dp->dfin;
 		finopt = DOMAIN_IN_SET(idn.domset.ds_relink, domid) ?
-				IDNFIN_OPT_RELINK : IDNFIN_OPT_UNLINK;
+		    IDNFIN_OPT_RELINK : IDNFIN_OPT_UNLINK;
 
 		CLR_XARGS(xargs);
 		SET_XARGS_FIN_TYPE(xargs, fintype);
@@ -3259,7 +3238,7 @@ idn_retry_fin(uint_t token, void *arg)
 
 	if (dp->dxp != &xphase_fin) {
 		PR_PROTO("%s:%d: dxp(0x%p) != xstate_fin(0x%p)...bailing\n",
-			proc, domid, dp->dxp, &xphase_fin);
+		    proc, domid, dp->dxp, &xphase_fin);
 		IDN_DUNLOCK(domid);
 		IDN_SYNC_UNLOCK();
 		return;
@@ -3267,15 +3246,15 @@ idn_retry_fin(uint_t token, void *arg)
 
 	if (dp->dxstate != IDNXS_PEND) {
 		PR_PROTO("%s:%d: xstate(%s) != %s...bailing\n",
-			proc, domid, idnxs_str[dp->dxstate],
-			idnxs_str[IDNXS_PEND]);
+		    proc, domid, idnxs_str[dp->dxstate],
+		    idnxs_str[IDNXS_PEND]);
 		IDN_DUNLOCK(domid);
 		IDN_SYNC_UNLOCK();
 		return;
 	}
 
 	finopt = DOMAIN_IN_SET(idn.domset.ds_relink, domid) ?
-			IDNFIN_OPT_RELINK : IDNFIN_OPT_UNLINK;
+	    IDNFIN_OPT_RELINK : IDNFIN_OPT_UNLINK;
 
 	CLR_XARGS(xargs);
 	SET_XARGS_FIN_TYPE(xargs, dp->dfin);
@@ -3319,9 +3298,8 @@ idn_check_fin_pend(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 	if (msg & IDNP_NACK)
 		return (0);
 
-	if ((dp->dstate == IDNDS_FIN_PEND) &&
-			(msg & IDNP_MSGTYPE_MASK) &&
-			(msg & IDNP_ACK))		/* fin+ack */
+	if ((dp->dstate == IDNDS_FIN_PEND) && (msg & IDNP_MSGTYPE_MASK) &&
+	    (msg & IDNP_ACK))		/* fin+ack */
 		return (1);
 
 	query_set = 0;
@@ -3338,10 +3316,10 @@ idn_check_fin_pend(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 
 	IDN_GLOCK_SHARED();
 	conn_set = (idn.domset.ds_connected | idn.domset.ds_trans_on) &
-			~idn.domset.ds_trans_off;
+	    ~idn.domset.ds_trans_off;
 	if ((idn.state == IDNGS_DISCONNECT) ||
-		(idn.state == IDNGS_RECONFIG) ||
-		(domid == IDN_GET_MASTERID()) || !conn_set) {
+	    (idn.state == IDNGS_RECONFIG) ||
+	    (domid == IDN_GET_MASTERID()) || !conn_set) {
 		/*
 		 * If we're disconnecting, reconfiguring,
 		 * unlinking from the master, or unlinking
@@ -3354,8 +3332,7 @@ idn_check_fin_pend(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 	}
 	IDN_GUNLOCK();
 
-	idn_shutdown_datapath(shutdown_set,
-				(dp->dfin == IDNFIN_FORCE_HARD));
+	idn_shutdown_datapath(shutdown_set, (dp->dfin == IDNFIN_FORCE_HARD));
 
 	IDN_GLOCK_EXCL();
 	/*
@@ -3367,7 +3344,7 @@ idn_check_fin_pend(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 	 */
 	if ((domid == IDN_GET_MASTERID()) && (idn.smr.rempfn != PFN_INVALID)) {
 		PR_PROTO("%s:%d: deconfiging CURRENT MASTER - SMR remap\n",
-			proc, domid);
+		    proc, domid);
 		IDN_DLOCK_EXCL(idn.localid);
 		/*
 		 * We're going to remap the SMR,
@@ -3403,16 +3380,16 @@ idn_check_fin_pend(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		 * override it to a  NORMAL fin.
 		 */
 		PR_PROTO("%s:%d: WARNING invalid fintype (%d) -> %s(%d)\n",
-			proc, domid, (int)fintype,
-			idnfin_str[IDNFIN_NORMAL], (int)IDNFIN_NORMAL);
+		    proc, domid, (int)fintype,
+		    idnfin_str[IDNFIN_NORMAL], (int)IDNFIN_NORMAL);
 		fintype = IDNFIN_NORMAL;
 	}
 
 	if (!VALID_FINOPT(finopt)) {
 		PR_PROTO("%s:%d: WARNING invalid finopt (%d) -> %s(%d)\n",
-			proc, domid, (int)finopt,
-			idnfinopt_str[IDNFIN_OPT_UNLINK],
-			(int)IDNFIN_OPT_UNLINK);
+		    proc, domid, (int)finopt,
+		    idnfinopt_str[IDNFIN_OPT_UNLINK],
+		    (int)IDNFIN_OPT_UNLINK);
 		finopt = IDNFIN_OPT_UNLINK;
 	}
 
@@ -3421,7 +3398,7 @@ idn_check_fin_pend(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 	fincpuid = FIN_MASTER_CPUID(finmaster);
 
 	if ((finarg != IDNFIN_ARG_NONE) &&
-			!DOMAIN_IN_SET(idn.domset.ds_hitlist, domid)) {
+	    !DOMAIN_IN_SET(idn.domset.ds_hitlist, domid)) {
 		idnsb_error_t	idnerr;
 
 		INIT_IDNKERR(&idnerr);
@@ -3459,36 +3436,34 @@ idn_check_fin_pend(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 				DOMAINSET_DEL(domset, domid);
 
 				idn_update_op(IDNOP_ERROR, DOMAINSET_ALL,
-						&idnerr);
+				    &idnerr);
 
 				PR_HITLIST("%s:%d: unlink_domainset(%x) "
-					"due to CFG error (relink=%x, "
-					"hitlist=%x)\n", proc, domid, domset,
-					idn.domset.ds_relink,
-					idn.domset.ds_hitlist);
+				    "due to CFG error (relink=%x, "
+				    "hitlist=%x)\n", proc, domid, domset,
+				    idn.domset.ds_relink,
+				    idn.domset.ds_hitlist);
 
 				idn_unlink_domainset(domset, IDNFIN_NORMAL,
-						finarg, IDNFIN_OPT_UNLINK,
-						BOARDSET_ALL);
+				    finarg, IDNFIN_OPT_UNLINK, BOARDSET_ALL);
 				IDN_DLOCK_EXCL(domid);
 			}
 			PR_HITLIST("%s:%d: CFG error, (conn=%x, relink=%x, "
-				"hitlist=%x)\n",
-				proc, domid, idn.domset.ds_connected,
-				idn.domset.ds_relink, idn.domset.ds_hitlist);
+			    "hitlist=%x)\n",
+			    proc, domid, idn.domset.ds_connected,
+			    idn.domset.ds_relink, idn.domset.ds_hitlist);
 		}
 		idn_update_op(IDNOP_ERROR, DOMAINSET(domid), &idnerr);
 	}
 
-	if ((finmasterid != IDN_NIL_DOMID) &&
-			(!VALID_DOMAINID(finmasterid) ||
-			DOMAIN_IN_SET(idn.domset.ds_hitlist, domid))) {
+	if ((finmasterid != IDN_NIL_DOMID) && (!VALID_DOMAINID(finmasterid) ||
+	    DOMAIN_IN_SET(idn.domset.ds_hitlist, domid))) {
 		PR_HITLIST("%s:%d: finmasterid = %d -> -1, relink=%x, "
-			"hitlist=%x\n",
-			proc, domid, finmasterid, idn.domset.ds_relink,
-			idn.domset.ds_hitlist);
+		    "hitlist=%x\n",
+		    proc, domid, finmasterid, idn.domset.ds_relink,
+		    idn.domset.ds_hitlist);
 		PR_PROTO("%s:%d: WARNING invalid finmasterid (%d) -> -1\n",
-			proc, domid, finmasterid);
+		    proc, domid, finmasterid);
 		finmasterid = IDN_NIL_DOMID;
 	}
 
@@ -3497,20 +3472,19 @@ idn_check_fin_pend(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 	if ((finopt == IDNFIN_OPT_RELINK) && (idn.state != IDNGS_DISCONNECT)) {
 		DOMAINSET_ADD(idn.domset.ds_relink, domid);
 		IDN_HISTORY_LOG(IDNH_RELINK, domid, dp->dstate,
-					idn.domset.ds_relink);
+		    idn.domset.ds_relink);
 	} else {
 		DOMAINSET_DEL(idn.domset.ds_relink, domid);
 		DOMAINSET_ADD(idn.domset.ds_hitlist, domid);
 	}
 
 	if ((domid == IDN_GET_NEW_MASTERID()) &&
-			!DOMAIN_IN_SET(idn.domset.ds_relink, domid)) {
+	    !DOMAIN_IN_SET(idn.domset.ds_relink, domid)) {
 		IDN_SET_NEW_MASTERID(IDN_NIL_DOMID);
 	}
 
-	if ((idn.state != IDNGS_DISCONNECT) &&
-			(idn.state != IDNGS_RECONFIG) &&
-			(domid == IDN_GET_MASTERID())) {
+	if ((idn.state != IDNGS_DISCONNECT) && (idn.state != IDNGS_RECONFIG) &&
+	    (domid == IDN_GET_MASTERID())) {
 		domainset_t	dis_set, master_candidates;
 
 		IDN_GKSTAT_GLOBAL_EVENT(gk_reconfigs, gk_reconfig_last);
@@ -3519,14 +3493,14 @@ idn_check_fin_pend(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		IDN_GUNLOCK();
 
 		if ((finmasterid != IDN_NIL_DOMID) &&
-				(finmasterid != idn.localid)) {
+		    (finmasterid != idn.localid)) {
 			if (finmasterid != domid)
 				IDN_DLOCK_EXCL(finmasterid);
 			if (idn_open_domain(finmasterid, fincpuid, 0) < 0) {
 				cmn_err(CE_WARN,
-					"IDN: 205: (%s) failed to "
-					"open-domain(%d,%d)",
-					proc, finmasterid, fincpuid);
+				    "IDN: 205: (%s) failed to "
+				    "open-domain(%d,%d)",
+				    proc, finmasterid, fincpuid);
 				if (finmasterid != domid)
 					IDN_DUNLOCK(finmasterid);
 				finmasterid = IDN_NIL_DOMID;
@@ -3540,10 +3514,10 @@ idn_check_fin_pend(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 			int	m;
 
 			master_candidates = idn.domset.ds_trans_on |
-						idn.domset.ds_connected |
-						idn.domset.ds_relink;
+			    idn.domset.ds_connected |
+			    idn.domset.ds_relink;
 			master_candidates &= ~(idn.domset.ds_trans_off &
-						~idn.domset.ds_relink);
+			    ~idn.domset.ds_relink);
 			DOMAINSET_DEL(master_candidates, domid);
 			/*
 			 * Local domain gets to participate also.
@@ -3561,7 +3535,7 @@ idn_check_fin_pend(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		DOMAINSET_DEL(dis_set, domid);
 
 		idn_unlink_domainset(dis_set, IDNFIN_NORMAL, IDNFIN_ARG_NONE,
-					IDNFIN_OPT_RELINK, BOARDSET_ALL);
+		    IDNFIN_OPT_RELINK, BOARDSET_ALL);
 	} else {
 		IDN_GUNLOCK();
 	}
@@ -3649,14 +3623,13 @@ idn_check_fin_pend(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 
 	if (dp->dsync.s_cmd != IDNSYNC_DISCONNECT) {
 		idn_sync_exit(domid, IDNSYNC_CONNECT);
-		idn_sync_enter(domid, IDNSYNC_DISCONNECT,
-					DOMAINSET_ALL, my_ready_set,
-					idn_xstate_transfunc,
-					(void *)IDNP_FIN);
+		idn_sync_enter(domid, IDNSYNC_DISCONNECT, DOMAINSET_ALL,
+		    my_ready_set, idn_xstate_transfunc,	(void *)IDNP_FIN);
 	}
 
-	query_set = idn_sync_register(domid, IDNSYNC_DISCONNECT,
-					ready_set, IDNSYNC_REG_REG);
+	query_set = idn_sync_register(domid, IDNSYNC_DISCONNECT, ready_set,
+	    IDNSYNC_REG_REG);
+
 	/*
 	 * No need to query this domain as he's already
 	 * in the FIN sequence.
@@ -3673,7 +3646,7 @@ idn_check_fin_pend(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		int	d;
 
 		my_ready_set = idn.domset.ds_ready_off |
-				~idn.domset.ds_connected;
+		    ~idn.domset.ds_connected;
 
 		for (d = 0; d < MAX_DOMAINS; d++) {
 			if (!DOMAIN_IN_SET(query_set, d))
@@ -3691,8 +3664,7 @@ idn_check_fin_pend(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 			IDN_SYNC_QUERY_UPDATE(domid, d);
 
 			idn_send_fin(d, NULL, IDNFIN_QUERY, IDNFIN_ARG_NONE,
-					IDNFIN_OPT_NONE, my_ready_set,
-					NIL_FIN_MASTER);
+			    IDNFIN_OPT_NONE, my_ready_set, NIL_FIN_MASTER);
 			IDN_DUNLOCK(d);
 		}
 	}
@@ -3715,7 +3687,7 @@ idn_error_fin_pend(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 	 * we're forcing a hard disconnect.
 	 */
 	if ((idn_domain[domid].dfin != IDNFIN_FORCE_HARD) &&
-			(msg & IDNP_MSGTYPE_MASK)) {
+	    (msg & IDNP_MSGTYPE_MASK)) {
 		idn_msgtype_t	mt;
 		idn_xdcargs_t	nargs;
 
@@ -3729,7 +3701,7 @@ idn_error_fin_pend(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 
 	token = IDN_RETRY_TOKEN(domid, IDNRETRY_FIN);
 	idn_retry_submit(idn_retry_fin, NULL, token,
-			idn_msg_retrytime[(int)IDNRETRY_FIN]);
+	    idn_msg_retrytime[(int)IDNRETRY_FIN]);
 }
 
 static void
@@ -3747,15 +3719,14 @@ idn_action_fin_pend(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 	ASSERT(IDN_SYNC_IS_LOCKED());
 	ASSERT(IDN_DLOCK_IS_HELD(domid));
 
-	my_ready_set = dp->dsync.s_set_rdy |
-			idn.domset.ds_ready_off |
-			~idn.domset.ds_connected;
+	my_ready_set = dp->dsync.s_set_rdy | idn.domset.ds_ready_off |
+	    ~idn.domset.ds_connected;
 
 	ASSERT(xargs[0] != (uint_t)IDNFIN_QUERY);
 
 	finarg = GET_XARGS_FIN_ARG(xargs);
 	finopt = DOMAIN_IN_SET(idn.domset.ds_relink, domid) ?
-			IDNFIN_OPT_RELINK : IDNFIN_OPT_UNLINK;
+	    IDNFIN_OPT_RELINK : IDNFIN_OPT_UNLINK;
 
 	mt.mt_cookie = mtp ? mtp->mt_cookie : 0;
 
@@ -3778,16 +3749,16 @@ idn_action_fin_pend(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		}
 		idn_xphase_transition(domid, &mt, xargs);
 	} else if (!msg) {
-		idn_send_fin(domid, NULL, dp->dfin, finarg,
-				finopt, my_ready_set, finmaster);
+		idn_send_fin(domid, NULL, dp->dfin, finarg, finopt,
+		    my_ready_set, finmaster);
 	} else if ((msg & IDNP_ACKNACK_MASK) == 0) {
 		/*
 		 * fin
 		 */
 		mt.mt_mtype = IDNP_FIN | IDNP_ACK;
 		mt.mt_atype = 0;
-		idn_send_fin(domid, &mt, dp->dfin, finarg,
-				finopt, my_ready_set, finmaster);
+		idn_send_fin(domid, &mt, dp->dfin, finarg, finopt,
+		    my_ready_set, finmaster);
 	} else {
 		uint_t	token;
 		/*
@@ -3795,7 +3766,7 @@ idn_action_fin_pend(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		 */
 		token = IDN_RETRY_TOKEN(domid, IDNRETRY_FIN);
 		idn_retry_submit(idn_retry_fin, NULL, token,
-				idn_msg_retrytime[(int)IDNRETRY_FIN]);
+		    idn_msg_retrytime[(int)IDNRETRY_FIN]);
 	}
 }
 
@@ -3836,7 +3807,7 @@ idn_check_fin_sent(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 	if ((finopt == IDNFIN_OPT_RELINK) && (idn.state != IDNGS_DISCONNECT)) {
 		DOMAINSET_ADD(idn.domset.ds_relink, domid);
 		IDN_HISTORY_LOG(IDNH_RELINK, domid, dp->dstate,
-					idn.domset.ds_relink);
+		    idn.domset.ds_relink);
 	} else {
 		DOMAINSET_DEL(idn.domset.ds_relink, domid);
 	}
@@ -3883,7 +3854,7 @@ idn_check_fin_sent(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 	DOMAINSET_ADD(idn.domset.ds_ready_off, domid);
 
 	query_set = idn_sync_register(domid, IDNSYNC_DISCONNECT,
-					ready_set, IDNSYNC_REG_REG);
+	    ready_set, IDNSYNC_REG_REG);
 	/*
 	 * No need to query this domain as he's already
 	 * in the FIN sequence.
@@ -3901,7 +3872,7 @@ idn_check_fin_sent(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		domainset_t	my_ready_set;
 
 		my_ready_set = idn.domset.ds_ready_off |
-				~idn.domset.ds_connected;
+		    ~idn.domset.ds_connected;
 
 		for (d = 0; d < MAX_DOMAINS; d++) {
 			if (!DOMAIN_IN_SET(query_set, d))
@@ -3919,8 +3890,7 @@ idn_check_fin_sent(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 			IDN_SYNC_QUERY_UPDATE(domid, d);
 
 			idn_send_fin(d, NULL, IDNFIN_QUERY, IDNFIN_ARG_NONE,
-					IDNFIN_OPT_NONE, my_ready_set,
-					NIL_FIN_MASTER);
+			    IDNFIN_OPT_NONE, my_ready_set, NIL_FIN_MASTER);
 			IDN_DUNLOCK(d);
 		}
 	}
@@ -3943,7 +3913,7 @@ idn_error_fin_sent(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 	 * we're forcing a hard disconnect.
 	 */
 	if ((idn_domain[domid].dfin != IDNFIN_FORCE_HARD) &&
-			(msg & IDNP_MSGTYPE_MASK)) {
+	    (msg & IDNP_MSGTYPE_MASK)) {
 		idn_msgtype_t	mt;
 		idn_xdcargs_t	nargs;
 
@@ -3957,7 +3927,7 @@ idn_error_fin_sent(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 
 	token = IDN_RETRY_TOKEN(domid, IDNRETRY_FIN);
 	idn_retry_submit(idn_retry_fin, NULL, token,
-			idn_msg_retrytime[(int)IDNRETRY_FIN]);
+	    idn_msg_retrytime[(int)IDNRETRY_FIN]);
 }
 
 static void
@@ -3978,13 +3948,12 @@ idn_action_fin_sent(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 	mt.mt_cookie = mtp ? mtp->mt_cookie : 0;
 
 	finopt = DOMAIN_IN_SET(idn.domset.ds_relink, domid) ?
-				IDNFIN_OPT_RELINK : IDNFIN_OPT_UNLINK;
+	    IDNFIN_OPT_RELINK : IDNFIN_OPT_UNLINK;
 
 	finarg = GET_XARGS_FIN_ARG(xargs);
 
-	my_ready_set = dp->dsync.s_set_rdy |
-				idn.domset.ds_ready_off |
-				~idn.domset.ds_connected;
+	my_ready_set = dp->dsync.s_set_rdy | idn.domset.ds_ready_off |
+	    ~idn.domset.ds_connected;
 
 	IDN_GLOCK_SHARED();
 	new_masterid = IDN_GET_NEW_MASTERID();
@@ -4004,8 +3973,8 @@ idn_action_fin_sent(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		} else {
 			mt.mt_mtype = IDNP_FIN | IDNP_ACK;
 			mt.mt_atype = 0;
-			idn_send_fin(domid, &mt, dp->dfin, finarg,
-					finopt, my_ready_set, finmaster);
+			idn_send_fin(domid, &mt, dp->dfin, finarg, finopt,
+			    my_ready_set, finmaster);
 		}
 	} else if (msg & IDNP_MSGTYPE_MASK) {
 		/*
@@ -4031,7 +4000,7 @@ idn_action_fin_sent(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		 */
 		token = IDN_RETRY_TOKEN(domid, IDNRETRY_FIN);
 		idn_retry_submit(idn_retry_fin, NULL, token,
-				idn_msg_retrytime[(int)IDNRETRY_FIN]);
+		    idn_msg_retrytime[(int)IDNRETRY_FIN]);
 	}
 }
 
@@ -4051,7 +4020,7 @@ idn_action_fin_rcvd(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		 */
 		token = IDN_RETRY_TOKEN(domid, IDNRETRY_FIN);
 		idn_retry_submit(idn_retry_fin, NULL, token,
-				idn_msg_retrytime[(int)IDNRETRY_FIN]);
+		    idn_msg_retrytime[(int)IDNRETRY_FIN]);
 	}
 }
 
@@ -4120,18 +4089,17 @@ idn_final_fin(int domid)
 	if (idn.state == IDNGS_RECONFIG)
 		new_masterid = IDN_GET_NEW_MASTERID();
 
-	if ((idn.domset.ds_trans_on |
-			idn.domset.ds_trans_off |
-			idn.domset.ds_relink) == 0) {
+	if ((idn.domset.ds_trans_on | idn.domset.ds_trans_off |
+	    idn.domset.ds_relink) == 0) {
 		PR_HITLIST("%s:%d: HITLIST %x -> 0\n",
-			proc, domid, idn.domset.ds_hitlist);
+		    proc, domid, idn.domset.ds_hitlist);
 		idn.domset.ds_hitlist = 0;
 	}
 
 	if (idn.domset.ds_connected || idn.domset.ds_trans_off) {
 		PR_PROTO("%s:%d: ds_connected = 0x%x, ds_trans_off = 0x%x\n",
-			proc, domid, idn.domset.ds_connected,
-			idn.domset.ds_trans_off);
+		    proc, domid, idn.domset.ds_connected,
+		    idn.domset.ds_trans_off);
 		IDN_GUNLOCK();
 		goto fin_done;
 	}
@@ -4141,7 +4109,7 @@ idn_final_fin(int domid)
 
 	if (idn.domset.ds_trans_on != 0) {
 		ASSERT((idn.state != IDNGS_DISCONNECT) &&
-			(idn.state != IDNGS_OFFLINE));
+		    (idn.state != IDNGS_OFFLINE));
 
 		switch (idn.state) {
 		case IDNGS_CONNECT:
@@ -4177,9 +4145,9 @@ idn_final_fin(int domid)
 		case IDNGS_DISCONNECT:
 		case IDNGS_OFFLINE:
 			cmn_err(CE_WARN,
-				"IDN: 211: disconnect domain %d, "
-				"unexpected Gstate (%s)",
-				domid, idngs_str[idn.state]);
+			    "IDN: 211: disconnect domain %d, "
+			    "unexpected Gstate (%s)",
+			    domid, idngs_str[idn.state]);
 			IDN_DUNLOCK(idn.localid);
 			IDN_GUNLOCK();
 			goto fin_done;
@@ -4190,9 +4158,9 @@ idn_final_fin(int domid)
 			 * Go into FATAL state?
 			 */
 			cmn_err(CE_PANIC,
-				"IDN: 212: disconnect domain %d, "
-				"bad Gstate (%d)",
-				domid, idn.state);
+			    "IDN: 212: disconnect domain %d, "
+			    "bad Gstate (%d)",
+			    domid, idn.state);
 			/* not reached */
 			break;
 		}
@@ -4218,7 +4186,7 @@ idn_final_fin(int domid)
 	IDN_GSTATE_TRANSITION(next_gstate);
 
 	ASSERT((idn.state == IDNGS_OFFLINE) ?
-		(IDN_GET_MASTERID() == IDN_NIL_DOMID) : 1);
+	    (IDN_GET_MASTERID() == IDN_NIL_DOMID) : 1);
 
 	IDN_GUNLOCK();
 
@@ -4239,7 +4207,7 @@ idn_final_fin(int domid)
 		 * with the master only.
 		 */
 		relinkset = (new_masterid == idn.localid) ?
-				idn.domset.ds_relink : DOMAINSET(new_masterid);
+		    idn.domset.ds_relink : DOMAINSET(new_masterid);
 
 		DOMAINSET_DEL(relinkset, idn.localid);
 
@@ -4274,18 +4242,18 @@ idn_final_fin(int domid)
 				if (lock_held)
 					IDN_DUNLOCK(d);
 				cmn_err(CE_WARN,
-					"IDN: 205: (%s.1) failed to "
-					"open-domain(%d,%d)",
-					proc, domid, -1);
+				    "IDN: 205: (%s.1) failed to "
+				    "open-domain(%d,%d)",
+				    proc, domid, -1);
 				DOMAINSET_DEL(idn.domset.ds_relink, d);
 			} else {
 				if (lock_held)
 					IDN_DUNLOCK(d);
 				PR_PROTO("%s:%d: failed to "
-					"re-open domain %d "
-					"(cpu %d) [rv = %d]\n",
-					proc, domid, d, idn_domain[d].dcpu,
-					rv);
+				    "re-open domain %d "
+				    "(cpu %d) [rv = %d]\n",
+				    proc, domid, d, idn_domain[d].dcpu,
+				    rv);
 			}
 		}
 	}
@@ -4299,9 +4267,9 @@ fin_done:
 			(void) idn_connect(domid);
 		} else if (rv < 0) {
 			cmn_err(CE_WARN,
-				"IDN: 205: (%s.2) failed to "
-				"open-domain(%d,%d)",
-				proc, domid, -1);
+			    "IDN: 205: (%s.2) failed to "
+			    "open-domain(%d,%d)",
+			    proc, domid, -1);
 			DOMAINSET_DEL(idn.domset.ds_relink, domid);
 		}
 	}
@@ -4330,7 +4298,7 @@ idn_exit_fin(int domid, uint_t msgtype)
 	IDN_XSTATE_TRANSITION(dp, IDNXS_PEND);
 
 	idn_retry_submit(idn_retry_fin, NULL, token,
-			idn_msg_retrytime[(int)IDNRETRY_FIN]);
+	    idn_msg_retrytime[(int)IDNRETRY_FIN]);
 }
 
 /*
@@ -4364,8 +4332,8 @@ idn_xphase_transition(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 	dp = &idn_domain[domid];
 	if ((xp = dp->dxp) == NULL) {
 		PR_PROTO("%s:%d: WARNING: domain xsp is NULL (msg = %s, "
-			"msgarg = %s) <<<<<<<<<<<<\n",
-			proc, domid, mstr, astr);
+		    "msgarg = %s) <<<<<<<<<<<<\n",
+		    proc, domid, mstr, astr);
 		return (-1);
 	}
 	o_xstate = dp->dxstate;
@@ -4376,10 +4344,10 @@ idn_xphase_transition(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		msgtype = msgarg & IDNP_MSGTYPE_MASK;
 
 	if ((o_xstate == IDNXS_PEND) && msg &&
-			((msg & IDNP_ACKNACK_MASK) == msg)) {
+	    ((msg & IDNP_ACKNACK_MASK) == msg)) {
 		PR_PROTO("%s:%d: unwanted acknack received (o_xstate = %s, "
-			"msg = %s/%s - dropping message\n",
-			proc, domid, idnxs_str[(int)o_xstate], mstr, astr);
+		    "msg = %s/%s - dropping message\n",
+		    proc, domid, idnxs_str[(int)o_xstate], mstr, astr);
 		return (0);
 	}
 
@@ -4389,8 +4357,8 @@ idn_xphase_transition(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 	 */
 	if (idn_next_xstate(o_xstate, -1, msg) == IDNXS_NIL) {
 		PR_PROTO("%s:%d: WARNING: o_xstate = %s, msg = %s -> NIL "
-			"<<<<<<<<<\n",
-			proc, domid, idnxs_str[(int)o_xstate], mstr);
+		    "<<<<<<<<<\n",
+		    proc, domid, idnxs_str[(int)o_xstate], mstr);
 		if (xfunc)
 			(*xfunc)(domid, msgtype);
 		return (-1);
@@ -4408,10 +4376,10 @@ idn_xphase_transition(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 			INUM2STR(xp->xt_msgtype, xstr);
 			INUM2STR(msgtype, tstr);
 			PR_PROTO("%s:%d: WARNING: msg expected %s(0x%x), "
-				"actual %s(0x%x) [msg=%s(0x%x), "
-				"msgarg=%s(0x%x)]\n",
-				proc, domid, xstr, xp->xt_msgtype,
-				tstr, msgtype, mstr, msg, astr, msgarg);
+			    "actual %s(0x%x) [msg=%s(0x%x), "
+			    "msgarg=%s(0x%x)]\n",
+			    proc, domid, xstr, xp->xt_msgtype,
+			    tstr, msgtype, mstr, msg, astr, msgarg);
 			if (xfunc)
 				(*xfunc)(domid, msgtype);
 			return (-1);
@@ -4433,8 +4401,8 @@ idn_xphase_transition(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 
 	if (n_xstate == IDNXS_NIL) {
 		PR_PROTO("%s:%d: WARNING: n_xstate = %s, msg = %s -> NIL "
-			"<<<<<<<<<\n",
-			proc, domid, idnxs_str[(int)n_xstate], mstr);
+		    "<<<<<<<<<\n",
+		    proc, domid, idnxs_str[(int)n_xstate], mstr);
 		if (xfunc)
 			(*xfunc)(domid, msgtype);
 		return (-1);
@@ -4480,18 +4448,18 @@ idn_xstate_transfunc(int domid, void *transarg)
 
 	default:
 		PR_PROTO("%s:%d: ERROR: unknown msg (0x%x) <<<<<<<<\n",
-			proc, domid, msg);
+		    proc, domid, msg);
 		return (0);
 	}
 
 	token = IDN_RETRY_TOKEN(domid, (msg == IDNP_CON) ?
-					IDNRETRY_CON : IDNRETRY_FIN);
+	    IDNRETRY_CON : IDNRETRY_FIN);
 	if (msg == IDNP_CON)
 		idn_retry_submit(idn_retry_con, NULL, token,
-			idn_msg_retrytime[(int)IDNRETRY_CON]);
+		    idn_msg_retrytime[(int)IDNRETRY_CON]);
 	else
 		idn_retry_submit(idn_retry_fin, NULL, token,
-			idn_msg_retrytime[(int)IDNRETRY_FIN]);
+		    idn_msg_retrytime[(int)IDNRETRY_FIN]);
 
 	return (1);
 }
@@ -4500,9 +4468,8 @@ idn_xstate_transfunc(int domid, void *transarg)
  * Entered and returns w/DLOCK & SYNC_LOCK held.
  */
 static void
-idn_sync_enter(int domid, idn_synccmd_t cmd,
-	domainset_t xset, domainset_t rset,
-	int (*transfunc)(), void *transarg)
+idn_sync_enter(int domid, idn_synccmd_t cmd, domainset_t xset,
+    domainset_t rset, int (*transfunc)(), void *transarg)
 {
 	int		z;
 	idn_syncop_t	*sp;
@@ -4517,7 +4484,7 @@ idn_sync_enter(int domid, idn_synccmd_t cmd,
 	zp = &idn.sync.sz_zone[z];
 
 	PR_SYNC("%s:%d: cmd=%s(%d), z=%d, xs=0x%x, rx=0x%x, cnt=%d\n",
-		proc, domid, idnsync_str[cmd], cmd, z, xset, rset, zp->sc_cnt);
+	    proc, domid, idnsync_str[cmd], cmd, z, xset, rset, zp->sc_cnt);
 
 	sp = &idn_domain[domid].dsync;
 
@@ -4556,7 +4523,7 @@ idn_sync_exit(int domid, idn_synccmd_t cmd)
 	zone = IDN_SYNC_GETZONE(cmd);
 
 	PR_SYNC("%s:%d: cmd=%s(%d) (z=%d, zone=%d)\n",
-		proc, domid, idnsync_str[cmd], cmd, z, zone);
+	    proc, domid, idnsync_str[cmd], cmd, z, zone);
 
 #ifdef DEBUG
 	if (z != -1) {
@@ -4569,11 +4536,11 @@ idn_sync_exit(int domid, idn_synccmd_t cmd)
 				tot_queries += qv;
 				tot_domains++;
 				PR_SYNC("%s:%d: query_count = %d\n",
-					proc, domid, qv);
+				    proc, domid, qv);
 			}
 		}
 		PR_SYNC("%s:%d: tot_queries = %d, tot_domaines = %d\n",
-			proc, domid, tot_queries, tot_domains);
+		    proc, domid, tot_queries, tot_domains);
 	}
 #endif /* DEBUG */
 
@@ -4613,16 +4580,16 @@ idn_sync_exit(int domid, idn_synccmd_t cmd)
 			DOMAINSET_DEL(sp->s_set_rdy, domid);
 
 			if ((sp->s_set_exp == sp->s_set_rdy) &&
-					sp->s_transfunc) {
+			    sp->s_transfunc) {
 				int	delok;
 
 				ASSERT(sp->s_domid != domid);
 
 				PR_SYNC("%s:%d invoking transfunc "
-					"for domain %d\n",
-					proc, domid, sp->s_domid);
+				    "for domain %d\n",
+				    proc, domid, sp->s_domid);
 				delok = (*sp->s_transfunc)(sp->s_domid,
-							sp->s_transarg);
+				    sp->s_transarg);
 				if (delok) {
 					*spp = sp->s_next;
 					sp->s_next = NULL;
@@ -4638,8 +4605,8 @@ idn_sync_exit(int domid, idn_synccmd_t cmd)
  * Entered and returns w/DLOCK & SYNC_LOCK held.
  */
 static domainset_t
-idn_sync_register(int domid, idn_synccmd_t cmd,
-		domainset_t ready_set, idn_syncreg_t regtype)
+idn_sync_register(int domid, idn_synccmd_t cmd, domainset_t ready_set,
+    idn_syncreg_t regtype)
 {
 	int		z;
 	idn_synczone_t	*zp;
@@ -4652,7 +4619,7 @@ idn_sync_register(int domid, idn_synccmd_t cmd,
 
 	if ((z = IDN_SYNC_GETZONE(cmd)) == -1) {
 		PR_SYNC("%s:%d: ERROR: unexpected sync cmd(%d)\n",
-			proc, domid, cmd);
+		    proc, domid, cmd);
 		return (0);
 	}
 
@@ -4666,10 +4633,10 @@ idn_sync_register(int domid, idn_synccmd_t cmd,
 	zp = &idn.sync.sz_zone[z];
 
 	PR_SYNC("%s:%d: cmd=%s(%d), z=%d, rset=0x%x, "
-		"regtype=%s(%d), sc_op=%s\n",
-		proc, domid, idnsync_str[cmd], cmd, z, ready_set,
-		idnreg_str[regtype], regtype,
-		zp->sc_op ? idnsync_str[zp->sc_op->s_cmd] : "NULL");
+	    "regtype=%s(%d), sc_op=%s\n",
+	    proc, domid, idnsync_str[cmd], cmd, z, ready_set,
+	    idnreg_str[regtype], regtype,
+	    zp->sc_op ? idnsync_str[zp->sc_op->s_cmd] : "NULL");
 
 	for (spp = &zp->sc_op; *spp; spp = nspp) {
 		sp = *spp;
@@ -4678,7 +4645,7 @@ idn_sync_register(int domid, idn_synccmd_t cmd,
 		if (regtype == IDNSYNC_REG_NEW) {
 			DOMAINSET_ADD(sp->s_set_exp, domid);
 			PR_SYNC("%s:%d: adding new to %d (exp=0x%x)\n",
-				proc, domid, sp->s_domid, sp->s_set_exp);
+			    proc, domid, sp->s_domid, sp->s_set_exp);
 		} else if (regtype == IDNSYNC_REG_QUERY) {
 			query_set |= ~sp->s_set_rdy & sp->s_set_exp;
 			continue;
@@ -4705,9 +4672,9 @@ idn_sync_register(int domid, idn_synccmd_t cmd,
 		DOMAINSET_ADD(sp->s_set_rdy, domid);
 
 		PR_SYNC("%s:%d: mark READY for domain %d "
-			"(r=0x%x, x=0x%x)\n",
-			proc, domid, sp->s_domid,
-			sp->s_set_rdy, sp->s_set_exp);
+		    "(r=0x%x, x=0x%x)\n",
+		    proc, domid, sp->s_domid,
+		    sp->s_set_rdy, sp->s_set_exp);
 
 		query_set |= ~sp->s_set_rdy & sp->s_set_exp;
 
@@ -4716,9 +4683,9 @@ idn_sync_register(int domid, idn_synccmd_t cmd,
 			if (sp->s_msg == 0) {
 				sp->s_msg = 1;
 				PR_SYNC("%s:%d: >>>>>>>>>>> DOMAIN %d "
-					"ALL CHECKED IN (0x%x)\n",
-					proc, domid, sp->s_domid,
-					sp->s_set_exp);
+				    "ALL CHECKED IN (0x%x)\n",
+				    proc, domid, sp->s_domid,
+				    sp->s_set_exp);
 			}
 #endif /* DEBUG */
 
@@ -4726,10 +4693,10 @@ idn_sync_register(int domid, idn_synccmd_t cmd,
 				int	delok;
 
 				PR_SYNC("%s:%d invoking transfunc "
-					"for domain %d\n",
-					proc, domid, sp->s_domid);
+				    "for domain %d\n",
+				    proc, domid, sp->s_domid);
 				delok = (*sp->s_transfunc)(sp->s_domid,
-						sp->s_transarg);
+				    sp->s_transarg);
 				if (delok) {
 					*spp = sp->s_next;
 					sp->s_next = NULL;
@@ -4741,7 +4708,7 @@ idn_sync_register(int domid, idn_synccmd_t cmd,
 	}
 
 	PR_SYNC("%s:%d: trans_set = 0x%x, query_set = 0x%x -> 0x%x\n",
-		proc, domid, trans_set, query_set, query_set & ~trans_set);
+	    proc, domid, trans_set, query_set, query_set & ~trans_set);
 
 	query_set &= ~trans_set;
 
@@ -4761,14 +4728,14 @@ idn_sync_register_awol(int domid)
 
 	if ((z = IDN_SYNC_GETZONE(cmd)) == -1) {
 		PR_SYNC("%s:%d: ERROR: unexpected sync cmd(%d)\n",
-			proc, domid, cmd);
+		    proc, domid, cmd);
 		return;
 	}
 
 	zp = &idn.sync.sz_zone[z];
 
 	PR_SYNC("%s:%d: cmd=%s(%d), z=%d (domain %d = AWOL)\n",
-		proc, domid, idnsync_str[cmd], cmd, z, domid);
+	    proc, domid, idnsync_str[cmd], cmd, z, domid);
 
 	for (sp = zp->sc_op; sp; sp = sp->s_next) {
 		idn_domain_t	*dp;
@@ -4777,7 +4744,7 @@ idn_sync_register_awol(int domid)
 		if (dp->dfin == IDNFIN_FORCE_HARD) {
 			DOMAINSET_ADD(sp->s_set_rdy, domid);
 			PR_SYNC("%s:%d: adding new to %d (rdy=0x%x)\n",
-				proc, domid, sp->s_domid, sp->s_set_rdy);
+			    proc, domid, sp->s_domid, sp->s_set_rdy);
 		}
 	}
 }
@@ -4795,13 +4762,13 @@ idn_link_established(void *arg)
 	IDN_GLOCK_SHARED();
 	masterid = IDN_GET_MASTERID();
 	if ((masterid == IDN_NIL_DOMID) ||
-		(idn_domain[masterid].dstate != IDNDS_CONNECTED)) {
+	    (idn_domain[masterid].dstate != IDNDS_CONNECTED)) {
 		/*
 		 * No point in doing this unless we're connected
 		 * to the master.
 		 */
 		if ((masterid != IDN_NIL_DOMID) &&
-				(idn.state == IDNGS_ONLINE)) {
+		    (idn.state == IDNGS_ONLINE)) {
 			/*
 			 * As long as we're still online keep
 			 * trying.
@@ -4852,8 +4819,7 @@ idn_link_established(void *arg)
  *			  immediatetly retried.
  */
 int
-idn_send_data(int dst_domid, idn_netaddr_t dst_netaddr,
-						queue_t *wq, mblk_t *mp)
+idn_send_data(int dst_domid, idn_netaddr_t dst_netaddr, queue_t *wq, mblk_t *mp)
 {
 	int		pktcnt = 0;
 	int		msglen;
@@ -4888,7 +4854,7 @@ idn_send_data(int dst_domid, idn_netaddr_t dst_netaddr,
 
 	msglen = msgdsize(mp);
 	PR_DATA("%s:%d: (netaddr 0x%x) msgsize=%ld, msgdsize=%d\n",
-		proc, dst_domid, dst_netaddr.netaddr, msgsize(mp), msglen);
+	    proc, dst_domid, dst_netaddr.netaddr, msgsize(mp), msglen);
 
 	ASSERT(wq->q_ptr);
 
@@ -4901,7 +4867,7 @@ idn_send_data(int dst_domid, idn_netaddr_t dst_netaddr,
 		 * No data to send.  That was easy!
 		 */
 		PR_DATA("%s:%d: BAD msg length (%d) (netaddr 0x%x)\n",
-			proc, dst_domid, msglen, dst_netaddr.netaddr);
+		    proc, dst_domid, msglen, dst_netaddr.netaddr);
 		return (IDNXMIT_DROP);
 	}
 
@@ -4909,10 +4875,10 @@ idn_send_data(int dst_domid, idn_netaddr_t dst_netaddr,
 
 	if (dst_domid == IDN_NIL_DOMID) {
 		cmn_err(CE_WARN,
-			"IDN: 213: no destination specified "
-			"(d=%d, c=%d, n=0x%x)",
-			dst_domid, dst_netaddr.net.chan,
-			dst_netaddr.net.netid);
+		    "IDN: 213: no destination specified "
+		    "(d=%d, c=%d, n=0x%x)",
+		    dst_domid, dst_netaddr.net.chan,
+		    dst_netaddr.net.netid);
 		IDN_KSTAT_INC(sip, si_nolink);
 		IDN_KSTAT_INC(sip, si_macxmt_errors);
 		rv = IDNXMIT_DROP;
@@ -4927,7 +4893,7 @@ idn_send_data(int dst_domid, idn_netaddr_t dst_netaddr,
 		uchar_t	echn;
 
 		echn = (uchar_t)
-			ehp->ether_shost.ether_addr_octet[IDNETHER_CHANNEL];
+		    ehp->ether_shost.ether_addr_octet[IDNETHER_CHANNEL];
 		ASSERT((uchar_t)channel == echn);
 	}
 #endif /* DEBUG */
@@ -4979,7 +4945,7 @@ idn_send_data(int dst_domid, idn_netaddr_t dst_netaddr,
 		dst_netaddr.net.netid = dp->dnetid;
 
 		(void) idndl_domain_etheraddr(dst_domid, channel,
-						&ehp->ether_dhost);
+		    &ehp->ether_dhost);
 
 		if (dst_domid == idn.localid) {
 			mblk_t	*nmp;
@@ -4991,7 +4957,7 @@ idn_send_data(int dst_domid, idn_netaddr_t dst_netaddr,
 			 * transmitting to other domains.
 			 */
 			PR_DATA("%s:%d: dup broadcast msg for local domain\n",
-				proc, dst_domid);
+			    proc, dst_domid);
 			if ((nmp = copymsg(mp)) == NULL) {
 				/*
 				 * Couldn't get a duplicate copy.
@@ -5009,8 +4975,8 @@ idn_send_data(int dst_domid, idn_netaddr_t dst_netaddr,
 
 	if (dp->dnetid != dst_netaddr.net.netid) {
 		PR_DATA("%s:%d: dest netid (0x%x) != expected (0x%x)\n",
-			proc, dst_domid, (uint_t)dst_netaddr.net.netid,
-			(uint_t)dp->dnetid);
+		    proc, dst_domid, (uint_t)dst_netaddr.net.netid,
+		    (uint_t)dp->dnetid);
 		IDN_CHAN_UNLOCK_SEND(csp);
 		csp = NULL;
 		IDN_KSTAT_INC(sip, si_nolink);
@@ -5068,7 +5034,7 @@ idn_send_data(int dst_domid, idn_netaddr_t dst_netaddr,
 		 */
 		IDN_CHAN_UNLOCK_SEND(csp);
 		not_active = idn_activate_channel(CHANSET(channel),
-							IDNCHAN_OPEN);
+		    IDNCHAN_OPEN);
 		if (!not_active) {
 			/*
 			 * Only grab the lock for a recheck if we were
@@ -5100,7 +5066,7 @@ idn_send_data(int dst_domid, idn_netaddr_t dst_netaddr,
 			 * Channel is not active, should not be used.
 			 */
 			PR_DATA("%s:%d: dest channel %d NOT ACTIVE\n",
-				proc, dst_domid, channel);
+			    proc, dst_domid, channel);
 			IDN_KSTAT_INC(sip, si_linkdown);
 			rv = IDNXMIT_REQUEUE;
 			goto nocando;
@@ -5119,7 +5085,7 @@ idn_send_data(int dst_domid, idn_netaddr_t dst_netaddr,
 		 * whether it's active or not.
 		 */
 		PR_DATA("%s:%d: domain not registered with channel %d\n",
-			proc, dst_domid, channel);
+		    proc, dst_domid, channel);
 		/*
 		 * Set csp to NULL to prevent in-progress update below.
 		 */
@@ -5184,7 +5150,7 @@ idn_send_data(int dst_domid, idn_netaddr_t dst_netaddr,
 			int	hdr_length;
 			mblk_t	*nmp = mp;
 			uchar_t	*rptr = mp->b_rptr +
-					sizeof (struct ether_header);
+			    sizeof (struct ether_header);
 			if (nmp->b_wptr <= rptr) {
 				/*
 				 * Only the ethernet header was contained
@@ -5229,7 +5195,7 @@ idn_send_data(int dst_domid, idn_netaddr_t dst_netaddr,
 		IDN_ASSIGN_DCPU(dp, dstport);
 
 		PR_DATA("%s:%d: (dstport %d) assigned %d\n",
-			proc, dst_domid, (int)dstport, dp->dcpu);
+		    proc, dst_domid, (int)dstport, dp->dcpu);
 	}
 #endif /* XXX_DLPI_UNFRIENDLY */
 
@@ -5248,18 +5214,17 @@ retry:
 		 * there are up to IDN_RECLAIM_MAX if it's set.
 		 */
 		reclaim_req = dp->diowanted ? -1 : IDN_RECLAIM_MAX ?
-					MIN(dp->dio, IDN_RECLAIM_MAX) :
-					dp->dio;
+		    MIN(dp->dio, IDN_RECLAIM_MAX) : dp->dio;
 		(void) idn_reclaim_mboxdata(dst_domid, channel,
-					reclaim_req);
+		    reclaim_req);
 	}
 
 	if (dp->dio >= IDN_WINDOW_EMAX) {
 
 		if (lock_try(&dp->diocheck)) {
 			IDN_MSGTIMER_START(dst_domid, IDNP_DATA, 0,
-					idn_msg_waittime[IDNP_DATA],
-					&mt.mt_cookie);
+			    idn_msg_waittime[IDNP_DATA],
+			    &mt.mt_cookie);
 			/*
 			 * We have exceeded the minimum window for
 			 * outstanding I/O buffers to this domain.
@@ -5271,7 +5236,7 @@ retry:
 			 * is backed up (dio is global).
 			 */
 			IDNXDC(dst_domid, &mt,
-				(uint_t)dst_netaddr.net.chan, 0, 0, 0);
+			    (uint_t)dst_netaddr.net.chan, 0, 0, 0);
 		}
 
 		/*
@@ -5284,20 +5249,20 @@ retry:
 		rv = IDNXMIT_DROP;
 		goto nocando;
 	}
+
 	/*
 	 * Allocate a SMR I/O buffer and send it.
 	 */
-
 	if (msglen == 0) {
 		/*
 		 * A zero length messages is effectively a signal
 		 * to just send an interrupt to the remote domain.
 		 */
 		IDN_MSGTIMER_START(dst_domid, IDNP_DATA, 0,
-				idn_msg_waittime[IDNP_DATA],
-				&mt.mt_cookie);
+		    idn_msg_waittime[IDNP_DATA],
+		    &mt.mt_cookie);
 		IDNXDC(dst_domid, &mt,
-			(uint_t)dst_netaddr.net.chan, 0, 0, 0);
+		    (uint_t)dst_netaddr.net.chan, 0, 0, 0);
 	}
 	for (; (msglen > 0) && mp; msglen -= xfersize) {
 		int		xrv;
@@ -5312,8 +5277,8 @@ retry:
 		serrno = smr_buf_alloc(dst_domid, xfersize, &iobufp);
 		if (serrno) {
 			PR_DATA("%s:%d: failed to alloc SMR I/O buffer "
-				"(serrno = %d)\n",
-				proc, dst_domid, serrno);
+			    "(serrno = %d)\n",
+			    proc, dst_domid, serrno);
 			/*
 			 * Failure is either due to a timeout waiting
 			 * for the master to give us a slab, OR the
@@ -5374,7 +5339,7 @@ retry:
 
 		hdrp = IDN_BUF2HDR(iobufp);
 		bufoffset = (smr_offset_t)IDN_ALIGNPTR(sizeof (smr_pkthdr_t),
-							data_rptr);
+		    data_rptr);
 		/*
 		 * If the alignment of bufoffset took us pass the
 		 * length of a smr_pkthdr_t then we need to possibly
@@ -5387,19 +5352,19 @@ retry:
 #ifdef DEBUG
 		if (bufoffset != sizeof (smr_pkthdr_t))
 			PR_DATA("%s:%d: offset ALIGNMENT (%lu -> %u) "
-				"(data_rptr = %p)\n",
-				proc, dst_domid, sizeof (smr_pkthdr_t),
-				bufoffset, data_rptr);
+			    "(data_rptr = %p)\n",
+			    proc, dst_domid, sizeof (smr_pkthdr_t),
+			    bufoffset, data_rptr);
 
 		n_xfersize = MIN(xfersize, (IDN_SMR_BUFSIZE - bufoffset));
 		if (xfersize != n_xfersize) {
 			PR_DATA("%s:%d: xfersize ADJUST (%d -> %d)\n",
-				proc, dst_domid, xfersize, n_xfersize);
+			    proc, dst_domid, xfersize, n_xfersize);
 			cmn_err(CE_WARN, "%s: ERROR (xfersize = %d, > "
-					"bufsize(%d)-bufoffset(%d) = %d)",
-					proc, xfersize, IDN_SMR_BUFSIZE,
-					bufoffset,
-					IDN_SMR_BUFSIZE - bufoffset);
+			    "bufsize(%d)-bufoffset(%d) = %d)",
+			    proc, xfersize, IDN_SMR_BUFSIZE,
+			    bufoffset,
+			    IDN_SMR_BUFSIZE - bufoffset);
 		}
 #endif /* DEBUG */
 		xfersize = MIN(xfersize, (int)(IDN_SMR_BUFSIZE - bufoffset));
@@ -5426,12 +5391,12 @@ retry:
 			 * mblk packet.
 			 */
 			PR_DATA("%s:%d: DATA XFER to chan %d FAILED "
-				"(ret=%d)\n",
-				proc, dst_domid, channel, xrv);
+			    "(ret=%d)\n",
+			    proc, dst_domid, channel, xrv);
 			smr_buf_free(dst_domid, iobufp, xfersize);
 
 			PR_DATA("%s:%d: (line %d) dec(dio) -> %d\n",
-				proc, dst_domid, __LINE__, dp->dio);
+			    proc, dst_domid, __LINE__, dp->dio);
 
 			rv = IDNXMIT_DROP;
 			IDN_KSTAT_INC(sip, si_macxmt_errors);
@@ -5449,13 +5414,13 @@ retry:
 #ifdef DEBUG
 	if (pktcnt > 1)
 		cmn_err(CE_WARN,
-			"%s: ERROR: sent multi-pkts (%d), len = %ld",
-			proc, pktcnt, orig_msglen);
+		    "%s: ERROR: sent multi-pkts (%d), len = %ld",
+		    proc, pktcnt, orig_msglen);
 #endif /* DEBUG */
 
 	PR_DATA("%s:%d: SENT %d packets (%d @ 0x%x)\n",
-		proc, dst_domid, pktcnt, dst_netaddr.net.chan,
-		dst_netaddr.net.netid);
+	    proc, dst_domid, pktcnt, dst_netaddr.net.chan,
+	    dst_netaddr.net.netid);
 
 	IDN_CHAN_LOCK_SEND(csp);
 	IDN_CHAN_SEND_DONE(csp);
@@ -5513,8 +5478,8 @@ idn_send_data_loopback(idn_netaddr_t dst_netaddr, queue_t *wq, mblk_t *mp)
 
 	if (dst_netaddr.net.netid != idn_domain[idn.localid].dnetid) {
 		PR_DATA("%s: dst_netaddr.net.netid 0x%x != local 0x%x\n",
-			proc, dst_netaddr.net.netid,
-			idn_domain[idn.localid].dnetid);
+		    proc, dst_netaddr.net.netid,
+		    idn_domain[idn.localid].dnetid);
 		rv = EADDRNOTAVAIL;
 		goto done;
 	}
@@ -5628,12 +5593,12 @@ idn_recv_proto(idn_protomsg_t *hp)
 
 	if (!VALID_MSGTYPE(mtype)) {
 		PR_PROTO("%s:%d: ERROR: invalid message type (0x%x)\n",
-			proc, domid, mtype);
+		    proc, domid, mtype);
 		return;
 	}
 	if (!VALID_CPUID(cpuid)) {
 		PR_PROTO("%s:%d: ERROR: invalid cpuid (%d)\n",
-			proc, domid, cpuid);
+		    proc, domid, cpuid);
 		return;
 	}
 
@@ -5655,9 +5620,9 @@ idn_recv_proto(idn_protomsg_t *hp)
 		inum2str(hp->m_msgtype, str);
 
 		cmn_err(CE_WARN,
-			"IDN: 214: received message (%s[0x%x]) from self "
-			"(domid %d)",
-			str, hp->m_msgtype, domid);
+		    "IDN: 214: received message (%s[0x%x]) from self "
+		    "(domid %d)",
+		    str, hp->m_msgtype, domid);
 		return;
 	}
 
@@ -5691,8 +5656,7 @@ idn_recv_proto(idn_protomsg_t *hp)
 	 *	nack/fin - if received cookie is 0.
 	 */
 	if (((msgtype & IDNP_MSGTYPE_MASK) != IDNP_NEGO) &&
-			((mtype != IDNP_FIN) ||
-			(dcookie && dp->dcookie_recv))) {
+	    ((mtype != IDNP_FIN) || (dcookie && dp->dcookie_recv))) {
 		if (dp->dcookie_recv != dcookie) {
 			dp->dcookie_errcnt++;
 			if (dp->dcookie_err == 0) {
@@ -5703,14 +5667,14 @@ idn_recv_proto(idn_protomsg_t *hp)
 				 */
 				dp->dcookie_err = 1;
 				cmn_err(CE_WARN,
-					"IDN: 215: invalid cookie (0x%x) "
-					"for message (0x%x) from domain %d",
-					dcookie, hp->m_msgtype, domid);
+				    "IDN: 215: invalid cookie (0x%x) "
+				    "for message (0x%x) from domain %d",
+				    dcookie, hp->m_msgtype, domid);
 
 				PR_PROTO("%s:%d: received cookie (0x%x), "
-					"expected (0x%x) [errcnt = %d]\n",
-					proc, domid, dcookie,
-					dp->dcookie_recv, dp->dcookie_errcnt);
+				    "expected (0x%x) [errcnt = %d]\n",
+				    proc, domid, dcookie,
+				    dp->dcookie_recv, dp->dcookie_errcnt);
 			}
 			IDN_DUNLOCK(domid);
 			IDN_SYNC_UNLOCK();
@@ -5788,9 +5752,11 @@ idn_recv_proto(idn_protomsg_t *hp)
 #ifdef DEBUG
 		cmn_err(CE_PANIC,
 #else /* DEBUG */
-		cmn_err(CE_WARN,
+		    cmn_err(CE_WARN,
 #endif /* DEBUG */
+			/* CSTYLED */
 			"IDN: 216: (0x%x)msgtype/(0x%x)acktype rcvd from "
+			/* CSTYLED */
 			"domain %d", msgtype, acktype, domid);
 		break;
 	}
@@ -5839,7 +5805,7 @@ idn_send_config(int domid, int phase)
 	if (dp->dcfgsnddone) {
 		if (!dp->dcfgrcvdone) {
 			IDN_MSGTIMER_START(domid, IDNP_CFG, 0,
-					cfg_waittime, NULL);
+			    cfg_waittime, NULL);
 		}
 		return;
 	}
@@ -5847,9 +5813,9 @@ idn_send_config(int domid, int phase)
 	IDN_DLOCK_SHARED(idn.localid);
 
 	PR_PROTO("%s:%d: sending %s config (phase %d)\n",
-		proc, domid,
-		idn_domain[idn.localid].dvote.v.master ? "MASTER" : "SLAVE",
-		phase);
+	    proc, domid,
+	    idn_domain[idn.localid].dvote.v.master ? "MASTER" : "SLAVE",
+	    phase);
 
 	if (idn_domain[idn.localid].dvote.v.master)
 		rv = idn_send_master_config(domid, phase);
@@ -5865,11 +5831,11 @@ idn_send_config(int domid, int phase)
 			PR_PROTO("%s:%d: SEND config DONE\n", proc, domid);
 			if (!dp->dcfgrcvdone) {
 				IDN_MSGTIMER_START(domid, IDNP_CFG, 0,
-						cfg_waittime, NULL);
+				    cfg_waittime, NULL);
 			}
 		} else {
 			IDN_MSGTIMER_START(domid, IDNP_CFG, 0,
-						cfg_waittime, NULL);
+			    cfg_waittime, NULL);
 		}
 	}
 }
@@ -5894,8 +5860,8 @@ idn_reset_mboxtbl(idn_mboxtbl_t *mtp)
 }
 
 static int
-idn_get_mbox_config(int domid, int *mindex,
-		smr_offset_t *mtable, smr_offset_t *mdomain)
+idn_get_mbox_config(int domid, int *mindex, smr_offset_t *mtable,
+    smr_offset_t *mdomain)
 {
 	idn_domain_t	*dp, *ldp;
 
@@ -5995,19 +5961,18 @@ idn_send_master_config(int domid, int phase)
 
 	case 1:
 		mbox_table = mbox_domain = IDN_NIL_SMROFFSET;
-		idn_get_mbox_config(domid, NULL, &mbox_table,
-					&mbox_domain);
+		idn_get_mbox_config(domid, NULL, &mbox_table, &mbox_domain);
 		/*
 		 * ----------------------------------------------------
 		 * Send: SLABSIZE, DATAMBOX.DOMAIN, DATAMBOX.TABLE
 		 * ----------------------------------------------------
 		 */
 		cfg_subtype.param.p[0] = IDN_CFGPARAM(IDNCFG_SIZE,
-						IDNCFGARG_SIZE_SLAB);
+		    IDNCFGARG_SIZE_SLAB);
 		cfg_subtype.param.p[1] = IDN_CFGPARAM(IDNCFG_DATAMBOX,
-						IDNCFGARG_DATAMBOX_DOMAIN);
+		    IDNCFGARG_DATAMBOX_DOMAIN);
 		cfg_subtype.param.p[2] = IDN_CFGPARAM(IDNCFG_DATAMBOX,
-						IDNCFGARG_DATAMBOX_TABLE);
+		    IDNCFGARG_DATAMBOX_TABLE);
 		cfg_subtype.info.num = 3;
 		cfg_subtype.info.phase = phase;
 		dp->dcfgphase = phase;
@@ -6016,12 +5981,12 @@ idn_send_master_config(int domid, int phase)
 		ASSERT(mbox_table != IDN_NIL_SMROFFSET);
 
 		PR_PROTO("%s:%d:%d: sending SLABSIZE (%d), "
-			"DATAMBOX.DOMAIN (0x%x), DATAMBOX.TABLE (0x%x)\n",
-			proc, domid, phase, IDN_SLAB_BUFCOUNT, mbox_domain,
-			mbox_table);
+		    "DATAMBOX.DOMAIN (0x%x), DATAMBOX.TABLE (0x%x)\n",
+		    proc, domid, phase, IDN_SLAB_BUFCOUNT, mbox_domain,
+		    mbox_table);
 
 		IDNXDC(domid, &mt, cfg_subtype.val, IDN_SLAB_BUFCOUNT,
-			mbox_domain, mbox_table);
+		    mbox_domain, mbox_table);
 		break;
 
 	case 2:
@@ -6034,19 +5999,19 @@ idn_send_master_config(int domid, int phase)
 		 */
 		cfg_subtype.param.p[0] = IDN_CFGPARAM(IDNCFG_NETID, 0);
 		cfg_subtype.param.p[1] = IDN_CFGPARAM(IDNCFG_BARLAR,
-						IDNCFGARG_BARLAR_BAR);
+		    IDNCFGARG_BARLAR_BAR);
 		cfg_subtype.param.p[2] = IDN_CFGPARAM(IDNCFG_BARLAR,
-						IDNCFGARG_BARLAR_LAR);
+		    IDNCFGARG_BARLAR_LAR);
 		cfg_subtype.info.num = 3;
 		cfg_subtype.info.phase = phase;
 		dp->dcfgphase = phase;
 
 		PR_PROTO("%s:%d:%d: sending NETID (%d), "
-			"BARPFN/LARPFN (0x%x/0x%x)\n",
-			proc, domid, phase, ldp->dnetid, barpfn, larpfn);
+		    "BARPFN/LARPFN (0x%x/0x%x)\n",
+		    proc, domid, phase, ldp->dnetid, barpfn, larpfn);
 
 		IDNXDC(domid, &mt, cfg_subtype.val,
-			(uint_t)ldp->dnetid, barpfn, larpfn);
+		    (uint_t)ldp->dnetid, barpfn, larpfn);
 		break;
 
 	case 3:
@@ -6059,19 +6024,19 @@ idn_send_master_config(int domid, int phase)
 		 * ----------------------------------------------------
 		 */
 		cfg_subtype.param.p[0] = IDN_CFGPARAM(IDNCFG_CPUSET,
-						IDNCFGARG_CPUSET_UPPER);
+		    IDNCFGARG_CPUSET_UPPER);
 		cfg_subtype.param.p[1] = IDN_CFGPARAM(IDNCFG_CPUSET,
-						IDNCFGARG_CPUSET_LOWER);
+		    IDNCFGARG_CPUSET_LOWER);
 		cfg_subtype.param.p[2] = IDN_CFGPARAM(IDNCFG_NMCADR, 0);
 		cfg_subtype.info.num = 3;
 		cfg_subtype.info.phase = phase;
 		dp->dcfgphase = phase;
 
 		PR_PROTO("%s:%d:%d: sending CPUSET (0x%x.%x), NMCADR (%d)\n",
-			proc, domid, phase, cpus_u32, cpus_l32, nmcadr);
+		    proc, domid, phase, cpus_u32, cpus_l32, nmcadr);
 
 		IDNXDC(domid, &mt, cfg_subtype.val,
-			cpus_u32, cpus_l32, nmcadr);
+		    cpus_u32, cpus_l32, nmcadr);
 		break;
 
 	case 4:
@@ -6082,19 +6047,19 @@ idn_send_master_config(int domid, int phase)
 		 */
 		cfg_subtype.param.p[0] = IDN_CFGPARAM(IDNCFG_BOARDSET, 0);
 		cfg_subtype.param.p[1] = IDN_CFGPARAM(IDNCFG_SIZE,
-						IDNCFGARG_SIZE_MTU);
+		    IDNCFGARG_SIZE_MTU);
 		cfg_subtype.param.p[2] = IDN_CFGPARAM(IDNCFG_SIZE,
-						IDNCFGARG_SIZE_BUF);
+		    IDNCFGARG_SIZE_BUF);
 		cfg_subtype.info.num = 3;
 		cfg_subtype.info.phase = phase;
 		dp->dcfgphase = phase;
 
 		PR_PROTO("%s:%d:%d: sending BOARDSET (0x%x), MTU (0x%lx), "
-			"BUFSIZE (0x%x)\n", proc, domid, phase,
-			ldp->dhw.dh_boardset, IDN_MTU, IDN_SMR_BUFSIZE);
+		    "BUFSIZE (0x%x)\n", proc, domid, phase,
+		    ldp->dhw.dh_boardset, IDN_MTU, IDN_SMR_BUFSIZE);
 
 		IDNXDC(domid, &mt, cfg_subtype.val,
-			ldp->dhw.dh_boardset, IDN_MTU, IDN_SMR_BUFSIZE);
+		    ldp->dhw.dh_boardset, IDN_MTU, IDN_SMR_BUFSIZE);
 		break;
 
 	case 5:
@@ -6104,23 +6069,23 @@ idn_send_master_config(int domid, int phase)
 		 * ----------------------------------------------------
 		 */
 		cfg_subtype.param.p[0] = IDN_CFGPARAM(IDNCFG_DATASVR,
-						IDNCFGARG_DATASVR_MAXNETS);
+		    IDNCFGARG_DATASVR_MAXNETS);
 		cfg_subtype.param.p[1] = IDN_CFGPARAM(IDNCFG_DATASVR,
-						IDNCFGARG_DATASVR_MBXPERNET);
+		    IDNCFGARG_DATASVR_MBXPERNET);
 		cfg_subtype.param.p[2] = IDN_CFGPARAM(IDNCFG_OPTIONS,
-						IDNCFGARG_CHECKSUM);
+		    IDNCFGARG_CHECKSUM);
 		cfg_subtype.info.num = 3;
 		cfg_subtype.info.phase = phase;
 		dp->dcfgphase = phase;
 
 		PR_PROTO("%s:%d:%d: sending MAXNETS (%d), "
-			"MBOXPERNET (%d), CKSUM (%d)\n",
-			proc, domid, phase,
-			IDN_MAX_NETS, IDN_MBOX_PER_NET,
-			IDN_CHECKSUM);
+		    "MBOXPERNET (%d), CKSUM (%d)\n",
+		    proc, domid, phase,
+		    IDN_MAX_NETS, IDN_MBOX_PER_NET,
+		    IDN_CHECKSUM);
 
 		IDNXDC(domid, &mt, cfg_subtype.val,
-			IDN_MAX_NETS, IDN_MBOX_PER_NET, IDN_CHECKSUM);
+		    IDN_MAX_NETS, IDN_MBOX_PER_NET, IDN_CHECKSUM);
 		break;
 
 	case 6:
@@ -6130,7 +6095,7 @@ idn_send_master_config(int domid, int phase)
 		 * ----------------------------------------------------
 		 */
 		cfg_subtype.param.p[0] = IDN_CFGPARAM(IDNCFG_SIZE,
-						IDNCFGARG_SIZE_NWR);
+		    IDNCFGARG_SIZE_NWR);
 		mcadr[0] = IDN_NWR_SIZE;
 		m = 1;
 
@@ -6164,21 +6129,21 @@ idn_send_master_config(int domid, int phase)
 		if (m > 0) {
 			if (phase == 6) {
 				PR_PROTO("%s:%d:%d: sending NWRSIZE (%d), "
-					"MCADRs (0x%x, 0x%x)\n",
-					proc, domid, phase,
-					mcadr[0], mcadr[1], mcadr[2]);
+				    "MCADRs (0x%x, 0x%x)\n",
+				    proc, domid, phase,
+				    mcadr[0], mcadr[1], mcadr[2]);
 			} else {
 				PR_PROTO("%s:%d:%d: sending MCADRs "
-					"(0x%x, 0x%x, 0x%x)\n",
-					proc, domid, phase,
-					mcadr[0], mcadr[1], mcadr[2]);
+				    "(0x%x, 0x%x, 0x%x)\n",
+				    proc, domid, phase,
+				    mcadr[0], mcadr[1], mcadr[2]);
 			}
 			cfg_subtype.info.num = m;
 			cfg_subtype.info.phase = phase;
 			dp->dcfgphase = phase;
 
 			IDNXDC(domid, &mt, cfg_subtype.val,
-				mcadr[0], mcadr[1], mcadr[2]);
+			    mcadr[0], mcadr[1], mcadr[2]);
 		} else {
 			rv = 1;
 		}
@@ -6232,7 +6197,7 @@ idn_send_slave_config(int domid, int phase)
 		if (mbox_index == IDN_NIL_DOMID) {
 			ASSERT(mbox_domain != IDN_NIL_SMROFFSET);
 			cfg_subtype.param.p[0] = IDN_CFGPARAM(IDNCFG_DATAMBOX,
-						    IDNCFGARG_DATAMBOX_DOMAIN);
+			    IDNCFGARG_DATAMBOX_DOMAIN);
 		} else {
 			/*
 			 * Should only be sending Index to
@@ -6241,30 +6206,27 @@ idn_send_slave_config(int domid, int phase)
 			ASSERT(dp->dvote.v.master);
 			ASSERT(mbox_domain == IDN_NIL_SMROFFSET);
 			cfg_subtype.param.p[0] = IDN_CFGPARAM(IDNCFG_DATAMBOX,
-						    IDNCFGARG_DATAMBOX_INDEX);
+			    IDNCFGARG_DATAMBOX_INDEX);
 		}
 		cfg_subtype.param.p[1] = IDN_CFGPARAM(IDNCFG_DATASVR,
-						IDNCFGARG_DATASVR_MAXNETS);
+		    IDNCFGARG_DATASVR_MAXNETS);
 		cfg_subtype.param.p[2] = IDN_CFGPARAM(IDNCFG_DATASVR,
-						IDNCFGARG_DATASVR_MBXPERNET);
+		    IDNCFGARG_DATASVR_MBXPERNET);
 		cfg_subtype.info.num = 3;
 		cfg_subtype.info.phase = phase;
 		dp->dcfgphase = phase;
 
 		PR_PROTO("%s:%d:%d: sending DATAMBOX.%s (0x%x), "
-			"MAXNETS (%d), MBXPERNET (%d)\n",
-			proc, domid, phase,
-			(IDN_CFGPARAM_ARG(cfg_subtype.param.p[0])
-			    == IDNCFGARG_DATAMBOX_INDEX)
-			    ? "INDEX" : "DOMAIN",
-			(mbox_index == IDN_NIL_DOMID)
-			    ? mbox_domain : mbox_index,
-			    IDN_MAX_NETS, IDN_MBOX_PER_NET);
+		    "MAXNETS (%d), MBXPERNET (%d)\n",
+		    proc, domid, phase,
+		    (IDN_CFGPARAM_ARG(cfg_subtype.param.p[0])
+		    == IDNCFGARG_DATAMBOX_INDEX) ? "INDEX" : "DOMAIN",
+		    (mbox_index == IDN_NIL_DOMID) ? mbox_domain : mbox_index,
+		    IDN_MAX_NETS, IDN_MBOX_PER_NET);
 
 		IDNXDC(domid, &mt, cfg_subtype.val,
-			((mbox_index == IDN_NIL_DOMID)
-				? mbox_domain : mbox_index),
-			IDN_MAX_NETS, IDN_MBOX_PER_NET);
+		    ((mbox_index == IDN_NIL_DOMID) ? mbox_domain : mbox_index),
+		    IDN_MAX_NETS, IDN_MBOX_PER_NET);
 		break;
 
 	case 2:
@@ -6278,19 +6240,19 @@ idn_send_slave_config(int domid, int phase)
 		cfg_subtype.val = 0;
 		cfg_subtype.param.p[0] = IDN_CFGPARAM(IDNCFG_NETID, 0);
 		cfg_subtype.param.p[1] = IDN_CFGPARAM(IDNCFG_CPUSET,
-						    IDNCFGARG_CPUSET_UPPER);
+		    IDNCFGARG_CPUSET_UPPER);
 		cfg_subtype.param.p[2] = IDN_CFGPARAM(IDNCFG_CPUSET,
-						    IDNCFGARG_CPUSET_LOWER);
+		    IDNCFGARG_CPUSET_LOWER);
 		cfg_subtype.info.num = 3;
 		cfg_subtype.info.phase = phase;
 		dp->dcfgphase = phase;
 
 		PR_PROTO("%s:%d:%d: sending NETID (%d), "
-			"CPUSET (0x%x.%x)\n", proc, domid, phase,
-			ldp->dnetid, cpus_u32, cpus_l32);
+		    "CPUSET (0x%x.%x)\n", proc, domid, phase,
+		    ldp->dnetid, cpus_u32, cpus_l32);
 
 		IDNXDC(domid, &mt, cfg_subtype.val,
-			(uint_t)ldp->dnetid, cpus_u32, cpus_l32);
+		    (uint_t)ldp->dnetid, cpus_u32, cpus_l32);
 		break;
 
 	case 3:
@@ -6302,20 +6264,20 @@ idn_send_slave_config(int domid, int phase)
 		cfg_subtype.val = 0;
 		cfg_subtype.param.p[0] = IDN_CFGPARAM(IDNCFG_BOARDSET, 0);
 		cfg_subtype.param.p[1] = IDN_CFGPARAM(IDNCFG_SIZE,
-							IDNCFGARG_SIZE_MTU);
+		    IDNCFGARG_SIZE_MTU);
 		cfg_subtype.param.p[2] = IDN_CFGPARAM(IDNCFG_SIZE,
-							IDNCFGARG_SIZE_BUF);
+		    IDNCFGARG_SIZE_BUF);
 		cfg_subtype.info.num = 3;
 		cfg_subtype.info.phase = phase;
 		dp->dcfgphase = phase;
 
 		PR_PROTO("%s:%d:%d: sending BOARDSET (0x%x), MTU (0x%lx), "
-			"BUFSIZE (0x%x)\n",
-			proc, domid, phase, ldp->dhw.dh_boardset, IDN_MTU,
-			IDN_SMR_BUFSIZE);
+		    "BUFSIZE (0x%x)\n",
+		    proc, domid, phase, ldp->dhw.dh_boardset, IDN_MTU,
+		    IDN_SMR_BUFSIZE);
 
 		IDNXDC(domid, &mt, cfg_subtype.val,
-			ldp->dhw.dh_boardset, IDN_MTU, IDN_SMR_BUFSIZE);
+		    ldp->dhw.dh_boardset, IDN_MTU, IDN_SMR_BUFSIZE);
 		break;
 
 	case 4:
@@ -6326,22 +6288,22 @@ idn_send_slave_config(int domid, int phase)
 		 */
 		cfg_subtype.val = 0;
 		cfg_subtype.param.p[0] = IDN_CFGPARAM(IDNCFG_SIZE,
-						    IDNCFGARG_SIZE_SLAB);
+		    IDNCFGARG_SIZE_SLAB);
 		cfg_subtype.param.p[1] = IDN_CFGPARAM(IDNCFG_OPTIONS,
-						    IDNCFGARG_CHECKSUM);
+		    IDNCFGARG_CHECKSUM);
 		cfg_subtype.param.p[2] = IDN_CFGPARAM(IDNCFG_SIZE,
-						    IDNCFGARG_SIZE_NWR);
+		    IDNCFGARG_SIZE_NWR);
 		cfg_subtype.info.num = 3;
 		cfg_subtype.info.phase = phase;
 		dp->dcfgphase = phase;
 
 		PR_PROTO("%s:%d:%d: sending SLABSIZE (%d), CKSUM (%d), "
-			"NWRSIZE (%d)\n",
-			proc, domid, phase, IDN_SLAB_BUFCOUNT,
-			IDN_CHECKSUM, IDN_NWR_SIZE);
+		    "NWRSIZE (%d)\n",
+		    proc, domid, phase, IDN_SLAB_BUFCOUNT,
+		    IDN_CHECKSUM, IDN_NWR_SIZE);
 
 		IDNXDC(domid, &mt, cfg_subtype.val,
-			IDN_SLAB_BUFCOUNT, IDN_CHECKSUM, IDN_NWR_SIZE);
+		    IDN_SLAB_BUFCOUNT, IDN_CHECKSUM, IDN_NWR_SIZE);
 		break;
 
 	default:
@@ -6421,7 +6383,7 @@ idn_recv_config(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 	ASSERT(domid != idn.localid);
 
 	GET_XARGS(xargs, &cfg_subtype.val, &cfg_arg[0], &cfg_arg[1],
-			&cfg_arg[2]);
+	    &cfg_arg[2]);
 	cfg_arg[3] = 0;
 
 	dp = &idn_domain[domid];
@@ -6435,7 +6397,7 @@ idn_recv_config(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		 * timer continue and timeout if needed.
 		 */
 		PR_PROTO("%s:%d: WARNING state(%s) != CONFIG\n",
-			proc, domid, idnds_str[dp->dstate]);
+		    proc, domid, idnds_str[dp->dstate]);
 		return;
 	}
 
@@ -6450,7 +6412,7 @@ idn_recv_config(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		phase = GET_XARGS_CFG_PHASE(xargs);
 
 		PR_PROTO("%s:%d: received ACK for CFG phase %d\n",
-			proc, domid, phase);
+		    proc, domid, phase);
 		if (phase != (int)dp->dcfgphase) {
 			/*
 			 * Phase is not what we were
@@ -6460,7 +6422,7 @@ idn_recv_config(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 			 * and reestablish the connection.
 			 */
 			IDN_MSGTIMER_START(domid, IDNP_CFG, dp->dcfgphase,
-					idn_msg_waittime[IDNP_CFG], NULL);
+			    idn_msg_waittime[IDNP_CFG], NULL);
 		} else {
 			idn_send_config(domid, phase + 1);
 
@@ -6474,7 +6436,7 @@ idn_recv_config(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 					bzero(xargs, sizeof (xargs));
 
 					idn_xphase_transition(domid, NULL,
-								xargs);
+					    xargs);
 				}
 				IDN_SYNC_UNLOCK();
 			}
@@ -6525,9 +6487,9 @@ idn_recv_config(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 
 			default:
 				cmn_err(CE_WARN,
-					"IDN 217: unknown CFGARG type (%d) "
-					"from domain %d",
-					subtype_arg, domid);
+				    "IDN 217: unknown CFGARG type (%d) "
+				    "from domain %d",
+				    subtype_arg, domid);
 				break;
 			}
 			IDN_GUNLOCK();
@@ -6590,7 +6552,7 @@ idn_recv_config(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 
 		case IDNCFG_BOARDSET:
 			if ((dp->dhw.dh_boardset & cfg_arg[p])
-						== dp->dhw.dh_boardset) {
+			    == dp->dhw.dh_boardset) {
 				/*
 				 * Boardset better include what we
 				 * already know about.
@@ -6657,7 +6619,7 @@ idn_recv_config(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 				}
 				IDN_DLOCK_EXCL(idn.localid);
 				ldp->dmbox.m_tbl = (idn_mboxtbl_t *)
-						    IDN_OFFSET2ADDR(cfg_arg[p]);
+				    IDN_OFFSET2ADDR(cfg_arg[p]);
 				IDN_DUNLOCK(idn.localid);
 				dp->dncfgitems++;
 				RCVCFG("DATAMBOX.TABLE", cfg_arg[p]);
@@ -6668,7 +6630,7 @@ idn_recv_config(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 				    !VALID_NWROFFSET(cfg_arg[p], 4))
 					break;
 				mbtp = (idn_mboxtbl_t *)
-						IDN_OFFSET2ADDR(cfg_arg[p]);
+				    IDN_OFFSET2ADDR(cfg_arg[p]);
 				mmp = dp->dmbox.m_send;
 				for (c = 0; c < IDN_MAX_NETS; c++) {
 
@@ -6781,7 +6743,7 @@ idn_recv_config(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		}
 #ifdef DEBUG
 		PR_PROTO("%s:%d: received %s (0x%x)\n",
-			proc, domid, str ? str : "<empty>", val);
+		    proc, domid, str ? str : "<empty>", val);
 #endif /* DEBUG */
 	}
 
@@ -6836,7 +6798,7 @@ idn_recv_config(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 			 * restart CFG timer if we've sent everything..
 			 */
 			IDN_MSGTIMER_START(domid, IDNP_CFG, 0,
-					idn_msg_waittime[IDNP_CFG], NULL);
+			    idn_msg_waittime[IDNP_CFG], NULL);
 		}
 		break;
 
@@ -6867,10 +6829,10 @@ idn_recv_config(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 			 */
 			DOMAINSET_ADD(idn.domset.ds_relink, domid);
 			IDN_HISTORY_LOG(IDNH_RELINK, domid, dp->dstate,
-					idn.domset.ds_relink);
+			    idn.domset.ds_relink);
 			idn_disconnect(domid, IDNFIN_NORMAL,
-					IDNFIN_ARG_CFGERR_FATAL,
-					IDNFIN_SYNC_NO);
+			    IDNFIN_ARG_CFGERR_FATAL,
+			    IDNFIN_SYNC_NO);
 		}
 		IDN_SYNC_UNLOCK();
 		break;
@@ -6928,21 +6890,21 @@ idn_recv_config(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 			idn_update_op(IDNOP_ERROR, DOMAINSET_ALL, &idnerr);
 
 			PR_HITLIST("%s:%d: unlink_domainset(%x) due to "
-				"CFG error (relink=%x, hitlist=%x)\n",
-				proc, domid, domset, idn.domset.ds_relink,
-				idn.domset.ds_hitlist);
+			    "CFG error (relink=%x, hitlist=%x)\n",
+			    proc, domid, domset, idn.domset.ds_relink,
+			    idn.domset.ds_hitlist);
 
 			idn_unlink_domainset(domset, IDNFIN_NORMAL,
-						CFGERR2FINARG(rv),
-						IDNFIN_OPT_UNLINK,
-						BOARDSET_ALL);
+			    CFGERR2FINARG(rv),
+			    IDNFIN_OPT_UNLINK,
+			    BOARDSET_ALL);
 			IDN_SYNC_UNLOCK();
 			IDN_DLOCK_EXCL(domid);
 		} else {
 			PR_HITLIST("%s:%d: idn_disconnect(%d) due to CFG "
-				"error (conn=%x, relink=%x, hitlist=%x)\n",
-				proc, domid, domid, idn.domset.ds_connected,
-				idn.domset.ds_relink, idn.domset.ds_hitlist);
+			    "error (conn=%x, relink=%x, hitlist=%x)\n",
+			    proc, domid, domid, idn.domset.ds_connected,
+			    idn.domset.ds_relink, idn.domset.ds_hitlist);
 			/*
 			 * If we have other connections then
 			 * we're only going to blow away this
@@ -6952,7 +6914,7 @@ idn_recv_config(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 
 			DOMAINSET_DEL(idn.domset.ds_relink, domid);
 			idn_disconnect(domid, IDNFIN_NORMAL,
-					CFGERR2FINARG(rv), IDNFIN_SYNC_NO);
+			    CFGERR2FINARG(rv), IDNFIN_SYNC_NO);
 			IDN_SYNC_UNLOCK();
 		}
 		break;
@@ -6985,7 +6947,7 @@ idn_check_slave_config(int domid, uint_t *exp, uint_t *act)
 	ASSERT(dp->dstate == IDNDS_CONFIG);
 
 	PR_PROTO("%s:%d: number received %d, number expected %d\n",
-		proc, domid, (int)dp->dncfgitems, IDN_SLAVE_NCFGITEMS);
+	    proc, domid, (int)dp->dncfgitems, IDN_SLAVE_NCFGITEMS);
 
 	if ((int)dp->dncfgitems < IDN_SLAVE_NCFGITEMS)
 		return (CFG_CONTINUE);
@@ -7007,8 +6969,8 @@ idn_check_slave_config(int domid, uint_t *exp, uint_t *act)
 		 * close connection.
 		 */
 		cmn_err(CE_WARN,
-			"IDN: 218: missing some required config items from "
-			"domain %d", domid);
+		    "IDN: 218: missing some required config items from "
+		    "domain %d", domid);
 
 		rv = CFG_FATAL;
 		goto done;
@@ -7016,8 +6978,8 @@ idn_check_slave_config(int domid, uint_t *exp, uint_t *act)
 
 	if (!valid_mtu(dp->dmtu)) {
 		cmn_err(CE_WARN,
-			"IDN: 219: remote domain %d MTU (%d) invalid "
-			"(local.mtu = %d)", dp->domid, dp->dmtu, ldp->dmtu);
+		    "IDN: 219: remote domain %d MTU (%d) invalid "
+		    "(local.mtu = %d)", dp->domid, dp->dmtu, ldp->dmtu);
 
 		*exp = (uint_t)ldp->dmtu;
 		*act = (uint_t)dp->dmtu;
@@ -7025,9 +6987,9 @@ idn_check_slave_config(int domid, uint_t *exp, uint_t *act)
 	}
 	if (!valid_bufsize(dp->dbufsize)) {
 		cmn_err(CE_WARN,
-			"IDN: 220: remote domain %d BUFSIZE (%d) invalid "
-			"(local.bufsize = %d)", dp->domid, dp->dbufsize,
-			ldp->dbufsize);
+		    "IDN: 220: remote domain %d BUFSIZE (%d) invalid "
+		    "(local.bufsize = %d)", dp->domid, dp->dbufsize,
+		    ldp->dbufsize);
 
 		*exp = (uint_t)ldp->dbufsize;
 		*act = (uint_t)dp->dbufsize;
@@ -7035,9 +6997,9 @@ idn_check_slave_config(int domid, uint_t *exp, uint_t *act)
 	}
 	if (!valid_slabsize((int)dp->dslabsize)) {
 		cmn_err(CE_WARN,
-			"IDN: 221: remote domain %d SLABSIZE (%d) invalid "
-			"(local.slabsize = %d)",
-			dp->domid, dp->dslabsize, ldp->dslabsize);
+		    "IDN: 221: remote domain %d SLABSIZE (%d) invalid "
+		    "(local.slabsize = %d)",
+		    dp->domid, dp->dslabsize, ldp->dslabsize);
 
 		*exp = (uint_t)ldp->dslabsize;
 		*act = (uint_t)dp->dslabsize;
@@ -7045,9 +7007,9 @@ idn_check_slave_config(int domid, uint_t *exp, uint_t *act)
 	}
 	if (!valid_nwrsize((int)dp->dnwrsize)) {
 		cmn_err(CE_WARN,
-			"IDN: 223: remote domain %d NWRSIZE (%d) invalid "
-			"(local.nwrsize = %d)",
-			dp->domid, dp->dnwrsize, ldp->dnwrsize);
+		    "IDN: 223: remote domain %d NWRSIZE (%d) invalid "
+		    "(local.nwrsize = %d)",
+		    dp->domid, dp->dnwrsize, ldp->dnwrsize);
 
 		*exp = (uint_t)ldp->dnwrsize;
 		*act = (uint_t)dp->dnwrsize;
@@ -7055,9 +7017,9 @@ idn_check_slave_config(int domid, uint_t *exp, uint_t *act)
 	}
 	if ((int)dp->dmaxnets != IDN_MAX_NETS) {
 		cmn_err(CE_WARN,
-			"IDN: 224: remote domain %d MAX_NETS (%d) invalid "
-			"(local.maxnets = %d)",
-			dp->domid, (int)dp->dmaxnets, IDN_MAX_NETS);
+		    "IDN: 224: remote domain %d MAX_NETS (%d) invalid "
+		    "(local.maxnets = %d)",
+		    dp->domid, (int)dp->dmaxnets, IDN_MAX_NETS);
 
 		*exp = (uint_t)IDN_MAX_NETS;
 		*act = (uint_t)dp->dmaxnets;
@@ -7065,9 +7027,9 @@ idn_check_slave_config(int domid, uint_t *exp, uint_t *act)
 	}
 	if ((int)dp->dmboxpernet != IDN_MBOX_PER_NET) {
 		cmn_err(CE_WARN,
-			"IDN: 225: remote domain %d MBOX_PER_NET (%d) "
-			"invalid (local.mboxpernet = %d)",
-			dp->domid, (int)dp->dmboxpernet, IDN_MBOX_PER_NET);
+		    "IDN: 225: remote domain %d MBOX_PER_NET (%d) "
+		    "invalid (local.mboxpernet = %d)",
+		    dp->domid, (int)dp->dmboxpernet, IDN_MBOX_PER_NET);
 
 		*exp = (uint_t)IDN_MBOX_PER_NET;
 		*act = (uint_t)dp->dmboxpernet;
@@ -7075,9 +7037,9 @@ idn_check_slave_config(int domid, uint_t *exp, uint_t *act)
 	}
 	if ((dp->dcksum - 1) != (uchar_t)IDN_CHECKSUM) {
 		cmn_err(CE_WARN,
-			"IDN: 226: remote domain %d CHECKSUM flag (%d) "
-			"mismatches local domain's (%d)",
-			dp->domid, (int)dp->dcksum - 1, IDN_CHECKSUM);
+		    "IDN: 226: remote domain %d CHECKSUM flag (%d) "
+		    "mismatches local domain's (%d)",
+		    dp->domid, (int)dp->dcksum - 1, IDN_CHECKSUM);
 
 		*exp = (uint_t)IDN_CHECKSUM;
 		*act = (uint_t)(dp->dcksum - 1);
@@ -7122,7 +7084,7 @@ idn_check_master_config(int domid, uint_t *exp, uint_t *act)
 	ASSERT(dp->dstate == IDNDS_CONFIG);
 
 	PR_PROTO("%s:%d: number received %d, minimum number expected %d\n",
-		proc, domid, (int)dp->dncfgitems, IDN_MASTER_NCFGITEMS);
+	    proc, domid, (int)dp->dncfgitems, IDN_MASTER_NCFGITEMS);
 
 	if ((int)dp->dncfgitems < IDN_MASTER_NCFGITEMS)
 		return (CFG_CONTINUE);
@@ -7140,7 +7102,7 @@ idn_check_master_config(int domid, uint_t *exp, uint_t *act)
 		 * we're expecting.
 		 */
 		PR_PROTO("%s:%d: haven't received all MCADRs yet.\n",
-			proc, domid);
+		    proc, domid);
 		return (CFG_CONTINUE);
 	}
 
@@ -7172,8 +7134,8 @@ idn_check_master_config(int domid, uint_t *exp, uint_t *act)
 		 * close connection.
 		 */
 		cmn_err(CE_WARN,
-			"IDN: 227: missing some required config items from "
-			"domain %d", domid);
+		    "IDN: 227: missing some required config items from "
+		    "domain %d", domid);
 
 		rv = CFG_FATAL;
 		goto done;
@@ -7198,10 +7160,10 @@ idn_check_master_config(int domid, uint_t *exp, uint_t *act)
 		 *	 - Could reconfigure to use smaller SMR.
 		 */
 		cmn_err(CE_WARN,
-			"IDN: 228: master's SMR (%ld) larger than "
-			"local's SMR (%ld)",
-			idn.smr.rempfnlim - idn.smr.rempfn,
-			btop(MB2B(IDN_SMR_SIZE)));
+		    "IDN: 228: master's SMR (%ld) larger than "
+		    "local's SMR (%ld)",
+		    idn.smr.rempfnlim - idn.smr.rempfn,
+		    btop(MB2B(IDN_SMR_SIZE)));
 
 		*exp = (uint_t)IDN_SMR_SIZE;
 		*act = (uint_t)B2MB(ptob(idn.smr.rempfnlim - idn.smr.rempfn));
@@ -7211,8 +7173,8 @@ idn_check_master_config(int domid, uint_t *exp, uint_t *act)
 
 	if (!valid_mtu(dp->dmtu)) {
 		cmn_err(CE_WARN,
-			"IDN: 219: remote domain %d MTU (%d) invalid "
-			"(local.mtu = %d)", dp->domid, dp->dmtu, ldp->dmtu);
+		    "IDN: 219: remote domain %d MTU (%d) invalid "
+		    "(local.mtu = %d)", dp->domid, dp->dmtu, ldp->dmtu);
 
 		*exp = (uint_t)ldp->dmtu;
 		*act = (uint_t)dp->dmtu;
@@ -7220,9 +7182,9 @@ idn_check_master_config(int domid, uint_t *exp, uint_t *act)
 	}
 	if (!valid_bufsize(dp->dbufsize)) {
 		cmn_err(CE_WARN,
-			"IDN: 220: remote domain %d BUFSIZE (%d) invalid "
-			"(local.bufsize = %d)", dp->domid, dp->dbufsize,
-			ldp->dbufsize);
+		    "IDN: 220: remote domain %d BUFSIZE (%d) invalid "
+		    "(local.bufsize = %d)", dp->domid, dp->dbufsize,
+		    ldp->dbufsize);
 
 		*exp = (uint_t)ldp->dbufsize;
 		*act = (uint_t)dp->dbufsize;
@@ -7230,9 +7192,9 @@ idn_check_master_config(int domid, uint_t *exp, uint_t *act)
 	}
 	if (!valid_nwrsize((int)dp->dnwrsize)) {
 		cmn_err(CE_WARN,
-			"IDN: 223: remote domain %d NWRSIZE (%d) invalid "
-			"(local.nwrsize = %d)",
-			dp->domid, dp->dnwrsize, ldp->dnwrsize);
+		    "IDN: 223: remote domain %d NWRSIZE (%d) invalid "
+		    "(local.nwrsize = %d)",
+		    dp->domid, dp->dnwrsize, ldp->dnwrsize);
 
 		*exp = (uint_t)ldp->dnwrsize;
 		*act = (uint_t)dp->dnwrsize;
@@ -7240,9 +7202,9 @@ idn_check_master_config(int domid, uint_t *exp, uint_t *act)
 	}
 	if ((int)dp->dmaxnets != IDN_MAX_NETS) {
 		cmn_err(CE_WARN,
-			"IDN: 224: remote domain %d MAX_NETS (%d) invalid "
-			"(local.maxnets = %d)",
-			dp->domid, (int)dp->dmaxnets, IDN_MAX_NETS);
+		    "IDN: 224: remote domain %d MAX_NETS (%d) invalid "
+		    "(local.maxnets = %d)",
+		    dp->domid, (int)dp->dmaxnets, IDN_MAX_NETS);
 
 		*exp = (uint_t)IDN_MAX_NETS;
 		*act = (uint_t)dp->dmaxnets;
@@ -7250,9 +7212,9 @@ idn_check_master_config(int domid, uint_t *exp, uint_t *act)
 	}
 	if ((int)dp->dmboxpernet != IDN_MBOX_PER_NET) {
 		cmn_err(CE_WARN,
-			"IDN: 225: remote domain %d MBOX_PER_NET (%d) "
-			"invalid (local.mboxpernet = %d)",
-			dp->domid, (int)dp->dmboxpernet, IDN_MBOX_PER_NET);
+		    "IDN: 225: remote domain %d MBOX_PER_NET (%d) "
+		    "invalid (local.mboxpernet = %d)",
+		    dp->domid, (int)dp->dmboxpernet, IDN_MBOX_PER_NET);
 
 		*exp = (uint_t)IDN_MBOX_PER_NET;
 		*act = (uint_t)dp->dmboxpernet;
@@ -7260,9 +7222,9 @@ idn_check_master_config(int domid, uint_t *exp, uint_t *act)
 	}
 	if ((dp->dcksum - 1) != (uchar_t)IDN_CHECKSUM) {
 		cmn_err(CE_WARN,
-			"IDN: 226: remote domain %d CHECKSUM flag (%d) "
-			"mismatches local domain's (%d)",
-			dp->domid, (int)dp->dcksum - 1, IDN_CHECKSUM);
+		    "IDN: 226: remote domain %d CHECKSUM flag (%d) "
+		    "mismatches local domain's (%d)",
+		    dp->domid, (int)dp->dcksum - 1, IDN_CHECKSUM);
 
 		*exp = (uint_t)IDN_CHECKSUM;
 		*act = (uint_t)(dp->dcksum - 1);
@@ -7272,12 +7234,12 @@ idn_check_master_config(int domid, uint_t *exp, uint_t *act)
 	err = 0;
 	for (m = 0; m < MAX_BOARDS; m++) {
 		if (!BOARD_IN_SET(dp->dhw.dh_boardset, m) &&
-				dp->dhw.dh_mcadr[m]) {
+		    dp->dhw.dh_mcadr[m]) {
 			cmn_err(CE_WARN,
-				"IDN: 229: remote domain %d boardset (0x%x) "
-				"conflicts with MCADR(board %d) [0x%x]",
-				dp->domid, (uint_t)dp->dhw.dh_boardset, m,
-				dp->dhw.dh_mcadr[m]);
+			    "IDN: 229: remote domain %d boardset (0x%x) "
+			    "conflicts with MCADR(board %d) [0x%x]",
+			    dp->domid, (uint_t)dp->dhw.dh_boardset, m,
+			    dp->dhw.dh_mcadr[m]);
 			err++;
 		}
 		if (dp->dhw.dh_mcadr[m])
@@ -7289,9 +7251,9 @@ idn_check_master_config(int domid, uint_t *exp, uint_t *act)
 		rv |= CFG_ERR_MCADR;
 	} else if (nmcadr != dp->dhw.dh_nmcadr) {
 		cmn_err(CE_WARN,
-			"IDN: 230: remote domain %d reported number of "
-			"MCADRs (%d) mismatches received (%d)",
-			dp->domid, dp->dhw.dh_nmcadr, nmcadr);
+		    "IDN: 230: remote domain %d reported number of "
+		    "MCADRs (%d) mismatches received (%d)",
+		    dp->domid, dp->dhw.dh_nmcadr, nmcadr);
 		*exp = (uint_t)dp->dhw.dh_nmcadr;
 		*act = (uint_t)nmcadr;
 		rv |= CFG_ERR_NMCADR;
@@ -7344,21 +7306,21 @@ idn_recv_config_done(int domid)
 	if (b_conflicts || !CPUSET_ISNULL(p_conflicts)) {
 		if (b_conflicts) {
 			cmn_err(CE_WARN,
-				"IDN: 231: domain %d boardset "
-				"(0x%x) conflicts with existing "
-				"IDN boardset (0x%x)",
-				domid, dp->dhw.dh_boardset,
-				b_conflicts);
+			    "IDN: 231: domain %d boardset "
+			    "(0x%x) conflicts with existing "
+			    "IDN boardset (0x%x)",
+			    domid, dp->dhw.dh_boardset,
+			    b_conflicts);
 		}
 		if (!CPUSET_ISNULL(p_conflicts)) {
 			cmn_err(CE_WARN,
-				"IDN: 232: domain %d cpuset "
-				"(0x%x.%0x) conflicts with existing "
-				"IDN cpuset (0x%x.%0x)", domid,
-				UPPER32_CPUMASK(dp->dcpuset),
-				LOWER32_CPUMASK(dp->dcpuset),
-				UPPER32_CPUMASK(p_conflicts),
-				LOWER32_CPUMASK(p_conflicts));
+			    "IDN: 232: domain %d cpuset "
+			    "(0x%x.%0x) conflicts with existing "
+			    "IDN cpuset (0x%x.%0x)", domid,
+			    UPPER32_CPUMASK(dp->dcpuset),
+			    LOWER32_CPUMASK(dp->dcpuset),
+			    UPPER32_CPUMASK(p_conflicts),
+			    LOWER32_CPUMASK(p_conflicts));
 		}
 		IDN_GUNLOCK();
 		/*
@@ -7376,7 +7338,7 @@ idn_recv_config_done(int domid)
 		idn_update_op(IDNOP_ERROR, DOMAINSET(domid), &idnerr);
 
 		idn_disconnect(domid, IDNFIN_FORCE_HARD,
-				IDNFIN_ARG_CFGERR_FATAL, IDNFIN_SYNC_NO);
+		    IDNFIN_ARG_CFGERR_FATAL, IDNFIN_SYNC_NO);
 		IDN_SYNC_UNLOCK();
 
 		return (-1);
@@ -7398,10 +7360,10 @@ idn_recv_config_done(int domid)
 	 */
 	if (!idn_cpu_per_board((void *)NULL, dp->dcpuset, &dp->dhw)) {
 		cmn_err(CE_WARN,
-			"IDN: 233: domain %d missing CPU per "
-			"memory boardset (0x%x), CPU boardset (0x%x)",
-			domid, dp->dhw.dh_boardset,
-			cpuset2boardset(dp->dcpuset));
+		    "IDN: 233: domain %d missing CPU per "
+		    "memory boardset (0x%x), CPU boardset (0x%x)",
+		    domid, dp->dhw.dh_boardset,
+		    cpuset2boardset(dp->dcpuset));
 
 		IDN_GUNLOCK();
 		/*
@@ -7419,7 +7381,7 @@ idn_recv_config_done(int domid)
 		idn_update_op(IDNOP_ERROR, DOMAINSET(domid), &idnerr);
 
 		idn_disconnect(domid, IDNFIN_FORCE_HARD,
-				IDNFIN_ARG_CPUCFG, IDNFIN_SYNC_NO);
+		    IDNFIN_ARG_CPUCFG, IDNFIN_SYNC_NO);
 		IDN_SYNC_UNLOCK();
 
 		return (-1);
@@ -7451,9 +7413,9 @@ idn_recv_config_done(int domid)
 		 * Gotta bail.
 		 */
 		cmn_err(CE_WARN,
-			"IDN: 234: failed to program hardware for domain %d "
-			"(boardset = 0x%x)",
-			domid, dp->dhw.dh_boardset);
+		    "IDN: 234: failed to program hardware for domain %d "
+		    "(boardset = 0x%x)",
+		    domid, dp->dhw.dh_boardset);
 
 		IDN_DUNLOCK(domid);
 		/*
@@ -7476,7 +7438,7 @@ idn_recv_config_done(int domid)
 		idn_update_op(IDNOP_ERROR, DOMAINSET_ALL, &idnerr);
 
 		idn_unlink_domainset(domset, IDNFIN_NORMAL, IDNFIN_ARG_HWERR,
-					IDNFIN_OPT_UNLINK, BOARDSET_ALL);
+		    IDNFIN_OPT_UNLINK, BOARDSET_ALL);
 
 		IDN_SYNC_UNLOCK();
 		IDN_DLOCK_EXCL(domid);
@@ -7582,17 +7544,17 @@ idn_verify_config_mbox(int domid)
 		mbox_csum = IDN_CKSUM_MBOX(&mtp->mt_header);
 		if (!VALID_MBOXHDR(&mtp->mt_header, c, mbox_csum)) {
 			cmn_err(CE_WARN,
-				"IDN: 235: [recv] mailbox (domain %d, "
-				"channel %d) SMR CORRUPTED - RELINK",
-				domid, c);
+			    "IDN: 235: [recv] mailbox (domain %d, "
+			    "channel %d) SMR CORRUPTED - RELINK",
+			    domid, c);
 			cmn_err(CE_CONT,
-				"IDN: 235: [recv] expected (cookie 0x%x, "
-				"cksum 0x%x) actual (cookie 0x%x, "
-				"cksum 0x%x)\n",
-				IDN_GET_MBOXHDR_COOKIE(&mtp->mt_header),
-				(int)mtp->mt_header.mh_cksum,
-				IDN_MAKE_MBOXHDR_COOKIE(0, 0, c),
-				(int)mbox_csum);
+			    "IDN: 235: [recv] expected (cookie 0x%x, "
+			    "cksum 0x%x) actual (cookie 0x%x, "
+			    "cksum 0x%x)\n",
+			    IDN_GET_MBOXHDR_COOKIE(&mtp->mt_header),
+			    (int)mtp->mt_header.mh_cksum,
+			    IDN_MAKE_MBOXHDR_COOKIE(0, 0, c),
+			    (int)mbox_csum);
 			mutex_exit(&mmp[c].mm_mutex);
 			rv = -1;
 			break;
@@ -7603,23 +7565,21 @@ idn_verify_config_mbox(int domid)
 		 * Verify pointers are valid.
 		 */
 		if (!activeptr || !VALID_NWROFFSET(activeptr, 2) ||
-			!readyptr || !VALID_NWROFFSET(readyptr, 2)) {
+		    !readyptr || !VALID_NWROFFSET(readyptr, 2)) {
 			cmn_err(CE_WARN,
-				"IDN: 235: [recv] mailbox (domain %d, "
-				"channel %d) SMR CORRUPTED - RELINK",
-				domid, c);
+			    "IDN: 235: [recv] mailbox (domain %d, "
+			    "channel %d) SMR CORRUPTED - RELINK",
+			    domid, c);
 			cmn_err(CE_CONT,
-				"IDN: 235: [recv] activeptr (0x%x), "
-				"readyptr (0x%x)\n",
-				activeptr, readyptr);
+			    "IDN: 235: [recv] activeptr (0x%x), "
+			    "readyptr (0x%x)\n",
+			    activeptr, readyptr);
 			mutex_exit(&mmp[c].mm_mutex);
 			rv = -1;
 			break;
 		}
-		mmp[c].mm_smr_activep =
-			(ushort_t *)IDN_OFFSET2ADDR(activeptr);
-		mmp[c].mm_smr_readyp =
-			(ushort_t *)IDN_OFFSET2ADDR(readyptr);
+		mmp[c].mm_smr_activep =	(ushort_t *)IDN_OFFSET2ADDR(activeptr);
+		mmp[c].mm_smr_readyp =	(ushort_t *)IDN_OFFSET2ADDR(readyptr);
 		mutex_exit(&mmp[c].mm_mutex);
 		IDN_MBOXTBL_PTR_INC(mtp);
 	}
@@ -7646,17 +7606,17 @@ idn_verify_config_mbox(int domid)
 
 		if (!VALID_MBOXHDR(&mtp->mt_header, c, mbox_csum)) {
 			cmn_err(CE_WARN,
-				"IDN: 235: [send] mailbox (domain %d, "
-				"channel %d) SMR CORRUPTED - RELINK",
-				domid, c);
+			    "IDN: 235: [send] mailbox (domain %d, "
+			    "channel %d) SMR CORRUPTED - RELINK",
+			    domid, c);
 			cmn_err(CE_CONT,
-				"IDN: 235: [send] expected (cookie 0x%x, "
-				"cksum 0x%x) actual (cookie 0x%x, "
-				"cksum 0x%x)\n",
-				IDN_GET_MBOXHDR_COOKIE(&mtp->mt_header),
-				(int)mtp->mt_header.mh_cksum,
-				IDN_MAKE_MBOXHDR_COOKIE(0, 0, c),
-				(int)mbox_csum);
+			    "IDN: 235: [send] expected (cookie 0x%x, "
+			    "cksum 0x%x) actual (cookie 0x%x, "
+			    "cksum 0x%x)\n",
+			    IDN_GET_MBOXHDR_COOKIE(&mtp->mt_header),
+			    (int)mtp->mt_header.mh_cksum,
+			    IDN_MAKE_MBOXHDR_COOKIE(0, 0, c),
+			    (int)mbox_csum);
 			mutex_exit(&mmp->mm_mutex);
 			rv = -1;
 			break;
@@ -7667,15 +7627,15 @@ idn_verify_config_mbox(int domid)
 		 * Paranoid check.
 		 */
 		if (!activeptr || !VALID_NWROFFSET(activeptr, 2) ||
-			!readyptr || !VALID_NWROFFSET(readyptr, 2)) {
+		    !readyptr || !VALID_NWROFFSET(readyptr, 2)) {
 			cmn_err(CE_WARN,
-				"IDN: 235: [send] mailbox (domain %d, "
-				"channel %d) SMR CORRUPTED - RELINK",
-				domid, c);
+			    "IDN: 235: [send] mailbox (domain %d, "
+			    "channel %d) SMR CORRUPTED - RELINK",
+			    domid, c);
 			cmn_err(CE_CONT,
-				"IDN: 235: [send] activeptr (0x%x), "
-				"readyptr (0x%x)\n",
-				activeptr, readyptr);
+			    "IDN: 235: [send] activeptr (0x%x), "
+			    "readyptr (0x%x)\n",
+			    activeptr, readyptr);
 			mutex_exit(&mmp->mm_mutex);
 			rv = -1;
 			break;
@@ -7732,7 +7692,7 @@ idn_program_hardware(int domid)
 	procname_t	proc = "idn_program_hardware";
 
 	PR_PROTO("%s:%d: program hw in domain %d w.r.t remote domain %d\n",
-		proc, domid, idn.localid, domid);
+	    proc, domid, idn.localid, domid);
 
 	dp = &idn_domain[domid];
 
@@ -7757,7 +7717,7 @@ idn_program_hardware(int domid)
 		 */
 		is_master = 0;
 		if ((idn.localid == IDN_GET_MASTERID()) &&
-					lock_try(&idn.first_hwlink)) {
+		    lock_try(&idn.first_hwlink)) {
 			/*
 			 * This is our first HW link and I'm the
 			 * master, which means we need to program
@@ -7767,7 +7727,7 @@ idn_program_hardware(int domid)
 			idn.first_hwmasterid = (short)idn.localid;
 			rem_pfn = idn.smr.locpfn;
 			rem_pfnlimit = idn.smr.locpfn +
-					btop(MB2B(IDN_SMR_SIZE));
+			    btop(MB2B(IDN_SMR_SIZE));
 		} else {
 			/*
 			 * Otherwise, just a slave linking to
@@ -7791,11 +7751,10 @@ idn_program_hardware(int domid)
 		idn.first_hwmasterid = (short)domid;
 	}
 
-	PR_PROTO("%s:%d: ADD bset (0x%x)\n",
-		proc, domid, dp->dhw.dh_boardset);
+	PR_PROTO("%s:%d: ADD bset (0x%x)\n", proc, domid, dp->dhw.dh_boardset);
 
 	rv = idnxf_shmem_add(is_master, dp->dhw.dh_boardset,
-				rem_pfn, rem_pfnlimit, mcadrp);
+	    rem_pfn, rem_pfnlimit, mcadrp);
 
 	if (rv == 0) {
 		DOMAINSET_ADD(idn.domset.ds_hwlinked, domid);
@@ -7845,7 +7804,7 @@ idn_deprogram_hardware(int domid)
 	}
 
 	PR_PROTO("%s:%d: DEprogram hw in domain %d w.r.t remote domain %d\n",
-		proc, domid, idn.localid, domid);
+	    proc, domid, idn.localid, domid);
 
 	/*
 	 * It's possible to come through this flow for domains that
@@ -7859,8 +7818,7 @@ idn_deprogram_hardware(int domid)
 	 * CONFIG state, we need to go through the DMAP handshake.
 	 */
 
-	PR_PROTO("%s:%d: SUB bset (0x%x)\n",
-		proc, domid, dp->dhw.dh_boardset);
+	PR_PROTO("%s:%d: SUB bset (0x%x)\n", proc, domid, dp->dhw.dh_boardset);
 
 	if (idn.first_hwmasterid == (short)domid) {
 		is_master = 1;
@@ -7901,7 +7859,7 @@ idn_deconfig(int domid)
 	ASSERT(dp->dstate == IDNDS_DMAP);
 
 	PR_PROTO("%s:%d: (dio=%d, dioerr=%d, dnslabs=%d)\n",
-		proc, domid, dp->dio, dp->dioerr, dp->dnslabs);
+	    proc, domid, dp->dio, dp->dioerr, dp->dnslabs);
 
 	IDN_GLOCK_EXCL();
 	masterid = IDN_GET_MASTERID();
@@ -7926,7 +7884,7 @@ idn_deconfig(int domid)
 		DSLAB_LOCK_EXCL(domid);
 		if ((sp = dp->dslab) != NULL) {
 			PR_PROTO("%s:%d: freeing up %d dead slabs\n",
-				proc, domid, dp->dnslabs);
+			    proc, domid, dp->dnslabs);
 			smr_slab_free(domid, sp);
 			dp->dslab = NULL;
 			dp->dnslabs = 0;
@@ -7950,24 +7908,25 @@ idn_deconfig(int domid)
 			int	nbusy = 0;
 			uint_t	dommask = 0;
 			for (sp = ldp->dslab; sp; sp = sp->sl_next) {
-			    smr_slabbuf_t *bp;
+				smr_slabbuf_t *bp;
 
-			    if (!smr_slab_busy(sp))
-				continue;
-			    nbusy++;
-			    for (bp = sp->sl_inuse; bp; bp = bp->sb_next)
-				if (bp->sb_domid != IDN_NIL_DOMID)
-				    DOMAINSET_ADD(dommask, bp->sb_domid);
+				if (!smr_slab_busy(sp))
+					continue;
+				nbusy++;
+				for (bp = sp->sl_inuse; bp; bp = bp->sb_next)
+					if (bp->sb_domid != IDN_NIL_DOMID)
+						DOMAINSET_ADD(dommask,
+						    bp->sb_domid);
 			}
 			if (nbusy)
 				PR_PROTO("%s:%d: found %d busy slabs "
-					"(dommask = 0x%x)\n",
-					proc, domid, nbusy, dommask);
+				    "(dommask = 0x%x)\n",
+				    proc, domid, nbusy, dommask);
 		}
 #endif /* DEBUG */
 		if ((sp = ldp->dslab) != NULL) {
 			PR_PROTO("%s:%d: freeing up %d local slab "
-				"structs\n", proc, domid, ldp->dnslabs);
+			    "structs\n", proc, domid, ldp->dnslabs);
 			smr_slab_garbage_collection(sp);
 			ldp->dslab = NULL;
 			ldp->dnslabs = 0;
@@ -7976,14 +7935,13 @@ idn_deconfig(int domid)
 		DSLAB_UNLOCK(idn.localid);
 	}
 	if (dp->dio) {
-		PR_PROTO("%s:%d: reset dio (%d) to 0\n",
-			proc, domid, dp->dio);
+		PR_PROTO("%s:%d: reset dio (%d) to 0\n", proc, domid, dp->dio);
 		dp->dio = 0;
 	}
 	dp->dioerr = 0;
 
 	PR_PROTO("%s:%d: reset diocheck (%x) to 0\n",
-			proc, domid, dp->diocheck);
+	    proc, domid, dp->diocheck);
 	lock_clear(&dp->diocheck);
 
 	CHECKPOINT_CLOSED(IDNSB_CHKPT_LINK, dp->dhw.dh_boardset, 2);
@@ -8083,8 +8041,8 @@ idn_shutdown_datapath(domainset_t domset, int force)
 }
 
 void
-idn_send_cmd(int domid, idn_cmd_t cmdtype,
-		uint_t arg1, uint_t arg2, uint_t arg3)
+idn_send_cmd(int domid, idn_cmd_t cmdtype, uint_t arg1, uint_t arg2, uint_t
+    arg3)
 {
 	idn_msgtype_t	mt;
 	procname_t	proc = "idn_send_cmd";
@@ -8095,19 +8053,18 @@ idn_send_cmd(int domid, idn_cmd_t cmdtype,
 
 	ASSERT(IDN_DLOCK_IS_HELD(domid));
 
-	PR_PROTO("%s:%d: sending command %s\n",
-		proc, domid,
-		VALID_IDNCMD(cmdtype) ? idncmd_str[cmdtype] : "unknown");
+	PR_PROTO("%s:%d: sending command %s\n", proc, domid,
+	    VALID_IDNCMD(cmdtype) ? idncmd_str[cmdtype] : "unknown");
 
 	IDN_MSGTIMER_START(domid, IDNP_CMD, (ushort_t)cmdtype,
-				idn_msg_waittime[IDNP_CMD], &mt.mt_cookie);
+	    idn_msg_waittime[IDNP_CMD], &mt.mt_cookie);
 
 	IDNXDC(domid, &mt, (uint_t)cmdtype, arg1, arg2, arg3);
 }
 
 void
-idn_send_cmdresp(int domid, idn_msgtype_t *mtp, idn_cmd_t cmdtype,
-			uint_t arg1, uint_t arg2, uint_t cerrno)
+idn_send_cmdresp(int domid, idn_msgtype_t *mtp, idn_cmd_t cmdtype, uint_t arg1,
+    uint_t arg2, uint_t cerrno)
 {
 	idn_msgtype_t	mt;
 
@@ -8131,7 +8088,7 @@ idn_send_cmdresp(int domid, idn_msgtype_t *mtp, idn_cmd_t cmdtype,
 
 static void
 idn_send_cmd_nackresp(int domid, idn_msgtype_t *mtp, idn_cmd_t cmdtype,
-			idn_nack_t nacktype)
+    idn_nack_t nacktype)
 {
 	idn_msgtype_t	mt;
 
@@ -8158,8 +8115,8 @@ idn_broadcast_cmd(idn_cmd_t cmdtype, uint_t arg1, uint_t arg2, uint_t arg3)
 	DOMAINSET_DEL(domset, idn.localid);
 
 	PR_PROTO("%s: broadcasting command (%s) to domainset 0x%x\n",
-		proc, VALID_IDNCMD(cmdtype) ? idncmd_str[cmdtype] : "unknown",
-		domset);
+	    proc, VALID_IDNCMD(cmdtype) ? idncmd_str[cmdtype] : "unknown",
+	    domset);
 
 	mt.mt_mtype = IDNP_CMD;
 	mt.mt_atype = 0;
@@ -8205,26 +8162,26 @@ idn_recv_cmd(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 	ASSERT(!acknack || (acknack & IDNP_ACKNACK_MASK));
 
 	PR_PROTO("%s:%d: (local=%d) acknack=0x%x, cmdtype=%s(%d), "
-		"a1=0x%x, a2=0x%x, a3=0x%x\n",
-		proc, domid, islocal, acknack,
-		VALID_IDNCMD(cmdtype) ? idncmd_str[cmdtype] : "unknown",
-		cmdtype, cmdarg1, cmdarg2, cmdarg3);
+	    "a1=0x%x, a2=0x%x, a3=0x%x\n",
+	    proc, domid, islocal, acknack,
+	    VALID_IDNCMD(cmdtype) ? idncmd_str[cmdtype] : "unknown",
+	    cmdtype, cmdarg1, cmdarg2, cmdarg3);
 
 	unsup_cmd_sent = unsup_cmd_recvd = 0;
 
 	if ((IDN_GET_MASTERID() == IDN_NIL_DOMID) ||
-			(dp->dstate != IDNDS_CONNECTED)) {
+	    (dp->dstate != IDNDS_CONNECTED)) {
 		/*
 		 * Commands cannot be handled without a valid
 		 * master.  If this is a request then nack him.
 		 */
 		PR_PROTO("%s:%d: cannot process CMD w/o master (%d, %s)\n",
-			proc, domid, IDN_GET_MASTERID(),
-			idnds_str[dp->dstate]);
+		    proc, domid, IDN_GET_MASTERID(),
+		    idnds_str[dp->dstate]);
 
 		if (!islocal && !(acknack & IDNP_ACKNACK_MASK))
 			idn_send_cmd_nackresp(domid, mtp, cmdtype,
-						IDNNACK_NOCONN);
+			    IDNNACK_NOCONN);
 		IDN_GUNLOCK();
 		return;
 	}
@@ -8260,12 +8217,12 @@ idn_recv_cmd(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		switch (cmdtype) {
 		case IDNCMD_SLABALLOC:
 			idn_recv_slaballoc_resp(domid, cmdarg1, cmdarg2,
-						cmdarg3);
+			    cmdarg3);
 			break;
 
 		case IDNCMD_SLABFREE:
 			idn_recv_slabfree_resp(domid, cmdarg1, cmdarg2,
-						cmdarg3);
+			    cmdarg3);
 			break;
 
 		case IDNCMD_SLABREAP:
@@ -8273,14 +8230,12 @@ idn_recv_cmd(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 			 * We only care if successful.
 			 */
 			if (acknack & IDNP_ACK)
-				idn_recv_slabreap_resp(domid, cmdarg1,
-							cmdarg3);
+				idn_recv_slabreap_resp(domid, cmdarg1, cmdarg3);
 			break;
 
 		case IDNCMD_NODENAME:
 			if ((acknack & IDNP_NACK) == 0) {
-				idn_recv_nodename_resp(domid, cmdarg1,
-							cmdarg3);
+				idn_recv_nodename_resp(domid, cmdarg1, cmdarg3);
 				break;
 			}
 			switch (nack) {
@@ -8291,11 +8246,11 @@ idn_recv_cmd(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 				 * ready, try again.
 				 */
 				PR_PROTO("%s:%d: remote not ready "
-					"for %s - retrying "
-					"[dstate=%s]\n",
-					proc, domid,
-					idncmd_str[IDNCMD_NODENAME],
-					idnds_str[dp->dstate]);
+				    "for %s - retrying "
+				    "[dstate=%s]\n",
+				    proc, domid,
+				    idncmd_str[IDNCMD_NODENAME],
+				    idnds_str[dp->dstate]);
 
 				if (dp->dstate == IDNDS_CONNECTED)
 					(void) timeout(idn_retry_nodename_req,
@@ -8314,13 +8269,13 @@ idn_recv_cmd(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		}
 		if (unsup_cmd_sent) {
 			PR_PROTO("%s:%d: unsupported command "
-				"requested (0x%x)\n",
-				proc, domid, cmdtype);
+			    "requested (0x%x)\n",
+			    proc, domid, cmdtype);
 		}
 		if (unsup_cmd_recvd) {
 			PR_PROTO("%s:%d: unsupported command "
-				"response (0x%x)\n",
-				proc, domid, cmdtype);
+			    "response (0x%x)\n",
+			    proc, domid, cmdtype);
 		}
 	} else {
 		/*
@@ -8355,7 +8310,7 @@ idn_recv_cmd(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 			 * Received an unsupported IDN command.
 			 */
 			idn_send_cmd_nackresp(domid, mtp, cmdtype,
-					IDNNACK_BADCMD);
+			    IDNNACK_BADCMD);
 		}
 	}
 }
@@ -8375,8 +8330,8 @@ idn_local_cmd(idn_cmd_t cmdtype, uint_t arg1, uint_t arg2, uint_t arg3)
 	procname_t	proc = "idn_local_cmd";
 
 	PR_PROTO("%s: submitting local command %s on domain %d\n",
-		proc, VALID_IDNCMD(cmdtype) ? idncmd_str[cmdtype] : "unknown",
-		idn.localid);
+	    proc, VALID_IDNCMD(cmdtype) ? idncmd_str[cmdtype] : "unknown",
+	    idn.localid);
 
 
 	jp = idn_protojob_alloc(KM_SLEEP);
@@ -8414,7 +8369,7 @@ idn_terminate_cmd(int domid, int serrno)
 	 */
 	if (tplist == NULL) {
 		PR_PROTO("%s:%d: no outstanding cmds found\n",
-			proc, domid);
+		    proc, domid);
 		/*
 		 * There is a window where we may have caught a
 		 * request just prior to issuing the actual
@@ -8431,7 +8386,7 @@ idn_terminate_cmd(int domid, int serrno)
 		ASSERT(tp->t_type == IDNP_CMD);
 
 		PR_PROTO("%s:%d: found outstanding cmd: %s\n",
-			proc, domid, idncmd_str[tp->t_subtype]);
+		    proc, domid, idncmd_str[tp->t_subtype]);
 
 		switch (tp->t_subtype) {
 		case IDNCMD_SLABALLOC:
@@ -8493,7 +8448,7 @@ idn_terminate_cmd(int domid, int serrno)
 
 	} else if (dp->dvote.v.master) {
 		PR_PROTO("%s:%d: abort (local domain) slaballoc waiters\n",
-			proc, domid);
+		    proc, domid);
 		(void) smr_slabwaiter_abort(idn.localid, serrno);
 	}
 }
@@ -8517,19 +8472,19 @@ idn_send_acknack(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 
 		if (mtp->mt_mtype & IDNP_ACK) {
 			PR_PROTO("%s:%d: dstate=%s, msg=(%s/%s), "
-				"a1=0x%x, a2=0x%x, a3=0x%x, a4 = 0x%x\n",
-				proc, domid, idnds_str[dp->dstate],
-				astr, mstr, xargs[0], xargs[1],
-				xargs[2], xargs[3]);
+			    "a1=0x%x, a2=0x%x, a3=0x%x, a4 = 0x%x\n",
+			    proc, domid, idnds_str[dp->dstate],
+			    astr, mstr, xargs[0], xargs[1],
+			    xargs[2], xargs[3]);
 		} else {
 			idn_nack_t	nack;
 
 			nack = GET_XARGS_NACK_TYPE(xargs);
 			PR_PROTO("%s:%d: dstate=%s, msg=(%s/%s), "
-				"nack=%s(0x%x)\n",
-				proc, domid, idnds_str[dp->dstate],
-				astr, mstr, idnnack_str[nack],
-				(uint_t)nack);
+			    "nack=%s(0x%x)\n",
+			    proc, domid, idnds_str[dp->dstate],
+			    astr, mstr, idnnack_str[nack],
+			    (uint_t)nack);
 		}
 	}
 #endif /* DEBUG */
@@ -8567,7 +8522,7 @@ idn_prealloc_slab(int nslabs)
 		serrno = smr_slab_alloc(idn.localid, &sp);
 		if (serrno != 0) {
 			PR_PROTO("%s: FAILED to pre-alloc'd "
-				"slab (serrno = %d)\n", proc, serrno);
+			    "slab (serrno = %d)\n", proc, serrno);
 			break;
 		}
 		/*
@@ -8598,7 +8553,7 @@ idn_recv_slaballoc_req(int domid, idn_msgtype_t *mtp, uint_t slab_size)
 	procname_t		proc = "idn_recv_slaballoc_req";
 
 	PR_PROTO("%s: slaballoc req from domain %d (size=0x%x)\n",
-		proc, domid, slab_size);
+	    proc, domid, slab_size);
 
 	dp = &idn_domain[domid];
 
@@ -8669,23 +8624,23 @@ idn_recv_slaballoc_req(int domid, idn_msgtype_t *mtp, uint_t slab_size)
 		 * slab into domains respective idn_domain entry
 		 * to be associated with that domain.
 		 */
-		idn_send_slaballoc_resp(domid, mtp,
-					slab_offset, slab_size, serrno);
+		idn_send_slaballoc_resp(domid, mtp, slab_offset, slab_size,
+		    serrno);
 	}
 }
 
 static void
-idn_send_slaballoc_resp(int domid, idn_msgtype_t *mtp,
-			smr_offset_t slab_offset, uint_t slab_size, int serrno)
+idn_send_slaballoc_resp(int domid, idn_msgtype_t *mtp, smr_offset_t slab_offset,
+    uint_t slab_size, int serrno)
 {
 	procname_t	proc = "idn_send_slaballoc_resp";
 
 	PR_PROTO("%s: slaballoc resp to domain %d (off=0x%x, size=0x%x) "
-		"[serrno = %d]\n",
-		proc, domid, slab_offset, slab_size, serrno);
+	    "[serrno = %d]\n",
+	    proc, domid, slab_offset, slab_size, serrno);
 
-	idn_send_cmdresp(domid, mtp, IDNCMD_SLABALLOC,
-				slab_offset, slab_size, serrno);
+	idn_send_cmdresp(domid, mtp, IDNCMD_SLABALLOC, slab_offset, slab_size,
+	    serrno);
 }
 
 /*
@@ -8695,8 +8650,8 @@ idn_send_slaballoc_resp(int domid, idn_msgtype_t *mtp,
  * waiters.
  */
 static void
-idn_recv_slaballoc_resp(int domid, smr_offset_t slab_offset,
-			uint_t slab_size, int serrno)
+idn_recv_slaballoc_resp(int domid, smr_offset_t slab_offset, uint_t slab_size,
+    int serrno)
 {
 	smr_slab_t		*sp = NULL;
 	int			rv;
@@ -8706,8 +8661,8 @@ idn_recv_slaballoc_resp(int domid, smr_offset_t slab_offset,
 	ASSERT(IDN_DLOCK_IS_EXCL(domid));
 
 	PR_PROTO("%s: slaballoc resp from domain %d (off=0x%x, size=0x%x) "
-		"[serrno = %d]\n",
-		proc, domid, slab_offset, slab_size, serrno);
+	    "[serrno = %d]\n",
+	    proc, domid, slab_offset, slab_size, serrno);
 
 	if (!serrno) {
 		IDN_GLOCK_SHARED();
@@ -8718,18 +8673,17 @@ idn_recv_slaballoc_resp(int domid, smr_offset_t slab_offset,
 			 * or an old response.  In either case dump it.
 			 */
 			PR_PROTO("%s: BOGUS slaballoc resp from domid %d "
-				"(master = %d)\n",
-				proc, domid, IDN_GET_MASTERID());
+			    "(master = %d)\n",
+			    proc, domid, IDN_GET_MASTERID());
 			serrno = EPROTO;
 		}
 		IDN_GUNLOCK();
 
 		if (!serrno &&
-			!VALID_NWROFFSET(slab_offset, IDN_SMR_BUFSIZE)) {
-
+		    !VALID_NWROFFSET(slab_offset, IDN_SMR_BUFSIZE)) {
 			PR_PROTO("%s: slab offset (0x%x) out of range "
-				"(0-0x%lx)\n",
-				proc, slab_offset, MB2B(IDN_NWR_SIZE));
+			    "(0-0x%lx)\n",
+			    proc, slab_offset, MB2B(IDN_NWR_SIZE));
 			serrno = EPROTO;
 		} else if (!serrno) {
 			sp = GETSTRUCT(smr_slab_t, 1);
@@ -8759,13 +8713,13 @@ idn_recv_slaballoc_resp(int domid, smr_offset_t slab_offset,
 		 * just have to send it back.
 		 */
 		PR_PROTO("%s: failed to install response in waiting area\n",
-			proc);
+		    proc);
 		if (slab_size != 0) {
 			PR_PROTO("%s: sending slab back to domain %d "
-				"(master = %d)\n",
-				proc, domid, IDN_GET_MASTERID());
-			idn_send_cmd(domid, IDNCMD_SLABFREE,
-						slab_offset, slab_size, 0);
+			    "(master = %d)\n",
+			    proc, domid, IDN_GET_MASTERID());
+			idn_send_cmd(domid, IDNCMD_SLABFREE, slab_offset,
+			    slab_size, 0);
 		}
 		if (sp) {
 			smr_free_buflist(sp);
@@ -8825,12 +8779,12 @@ idn_recv_slabreap_resp(int domid, int nslabs, int serrno)
 
 	if ((idn.localid != IDN_GET_MASTERID()) || (idn.localid == domid)) {
 		PR_PROTO("%s: unexpected slabreap resp received "
-			"(domid = %d)\n", proc, domid);
+		    "(domid = %d)\n", proc, domid);
 		ASSERT(0);
 		return;
 	}
 	PR_PROTO("%s: recvd reap response from domain %d for %d slabs "
-		"[serrno = %d]\n", proc, domid, nslabs, serrno);
+	    "[serrno = %d]\n", proc, domid, nslabs, serrno);
 }
 
 /*
@@ -8849,8 +8803,8 @@ idn_send_slabreap_resp(int domid, idn_msgtype_t *mtp, int nslabs, int serrno)
  * Master never sends slabfree request to itself.
  */
 static void
-idn_recv_slabfree_req(int domid, idn_msgtype_t *mtp,
-			smr_offset_t slab_offset, uint_t slab_size)
+idn_recv_slabfree_req(int domid, idn_msgtype_t *mtp, smr_offset_t slab_offset,
+    uint_t slab_size)
 {
 	smr_slab_t	*sp;
 	int		serrno;
@@ -8861,16 +8815,16 @@ idn_recv_slabfree_req(int domid, idn_msgtype_t *mtp,
 
 	if (domid == IDN_GET_MASTERID()) {
 		PR_PROTO("%s: unexpected slabfree req received (domid = %d)\n",
-			proc, domid);
-		idn_send_slabfree_resp(domid, mtp,
-					slab_offset, slab_size, EACCES);
+		    proc, domid);
+		idn_send_slabfree_resp(domid, mtp, slab_offset, slab_size,
+		    EACCES);
 		return;
 	}
 	if (slab_size > IDN_SLAB_SIZE) {
 		PR_PROTO("%s: unexpected slab size. exp %d, recvd %d\n",
-			proc, IDN_SLAB_SIZE, slab_size);
-		idn_send_slabfree_resp(domid, mtp,
-					slab_offset, slab_size, EINVAL);
+		    proc, IDN_SLAB_SIZE, slab_size);
+		idn_send_slabfree_resp(domid, mtp, slab_offset, slab_size,
+		    EINVAL);
 		return;
 	}
 	s_start = IDN_OFFSET2ADDR(slab_offset);
@@ -8896,8 +8850,8 @@ idn_recv_slabfree_req(int domid, idn_msgtype_t *mtp,
  * Master -> Slave ONLY
  */
 static void
-idn_recv_slabfree_resp(int domid, uint_t slab_offset,
-			uint_t slab_size, int serrno)
+idn_recv_slabfree_resp(int domid, uint_t slab_offset, uint_t slab_size, int
+    serrno)
 {
 	procname_t	proc = "idn_recv_slabfree_resp";
 
@@ -8905,27 +8859,27 @@ idn_recv_slabfree_resp(int domid, uint_t slab_offset,
 
 	if (domid != IDN_GET_MASTERID()) {
 		PR_PROTO("%s: unexpected slabfree resp received (domid = %d)\n",
-			proc, domid);
+		    proc, domid);
 		ASSERT(0);
 		return;
 	}
 	if (slab_size > IDN_SLAB_SIZE) {
 		PR_PROTO("%s: unexpected slab size. exp %d, recvd %d\n",
-			proc, IDN_SLAB_SIZE, slab_size);
+		    proc, IDN_SLAB_SIZE, slab_size);
 		ASSERT(0);
 		return;
 	}
 	PR_PROTO("%s: recvd free resp from dom %d "
-		"- slab (off/size) 0x%x/0x%x [serrno = %d]\n",
-		proc, domid, slab_offset, slab_size, serrno);
+	    "- slab (off/size) 0x%x/0x%x [serrno = %d]\n",
+	    proc, domid, slab_offset, slab_size, serrno);
 }
 
 static void
-idn_send_slabfree_resp(int domid, idn_msgtype_t *mtp,
-			uint_t slab_offset, uint_t slab_size, int serrno)
+idn_send_slabfree_resp(int domid, idn_msgtype_t *mtp, uint_t slab_offset,
+    uint_t slab_size, int serrno)
 {
-	idn_send_cmdresp(domid, mtp, IDNCMD_SLABFREE,
-				slab_offset, slab_size, serrno);
+	idn_send_cmdresp(domid, mtp, IDNCMD_SLABFREE, slab_offset, slab_size,
+	    serrno);
 }
 
 static void
@@ -8957,7 +8911,7 @@ idn_send_nodename_req(int domid)
 		 * Lost connection.
 		 */
 		PR_PROTO("%s:%d: connection lost [dstate = %s]\n",
-			proc, domid, idnds_str[dp->dstate]);
+		    proc, domid, idnds_str[dp->dstate]);
 		IDN_DUNLOCK(domid);
 		if (!serrno)
 			(void) smr_buf_free(domid, b_bufp, MAXDNAME+1);
@@ -8970,7 +8924,7 @@ idn_send_nodename_req(int domid)
 		 * the master a little too earlier.
 		 */
 		PR_PROTO("%s:%d: buffer alloc failed [dstate = %s]\n",
-			proc, domid, idnds_str[dp->dstate]);
+		    proc, domid, idnds_str[dp->dstate]);
 		(void) timeout(idn_retry_nodename_req, (void *)(uintptr_t)domid,
 		    hz);
 		IDN_DUNLOCK(domid);
@@ -8985,11 +8939,11 @@ idn_send_nodename_req(int domid)
 }
 
 static void
-idn_send_nodename_resp(int domid, idn_msgtype_t *mtp,
-			smr_offset_t bufoffset, int serrno)
+idn_send_nodename_resp(int domid, idn_msgtype_t *mtp, smr_offset_t bufoffset,
+    int serrno)
 {
-	idn_send_cmdresp(domid, mtp, IDNCMD_NODENAME,
-			(uint_t)bufoffset, 0, serrno);
+	idn_send_cmdresp(domid, mtp, IDNCMD_NODENAME, (uint_t)bufoffset, 0,
+	    serrno);
 }
 
 static void
@@ -9009,7 +8963,7 @@ idn_recv_nodename_req(int domid, idn_msgtype_t *mtp, smr_offset_t bufoffset)
 			 */
 			IDN_DUNLOCK(idn.localid);
 			idn_send_cmd_nackresp(domid, mtp, IDNCMD_NODENAME,
-						IDNNACK_RETRY);
+			    IDNNACK_RETRY);
 			return;
 		}
 		strncpy(ldp->dname, utsname.nodename, MAXDNAME - 1);
@@ -9018,7 +8972,7 @@ idn_recv_nodename_req(int domid, idn_msgtype_t *mtp, smr_offset_t bufoffset)
 
 	if (!VALID_NWROFFSET(bufoffset, IDN_SMR_BUFSIZE)) {
 		PR_PROTO("%s:%d: invalid SMR offset received (0x%x)\n",
-			proc, domid, bufoffset);
+		    proc, domid, bufoffset);
 		IDN_DUNLOCK(idn.localid);
 		idn_send_nodename_resp(domid, mtp, bufoffset, EINVAL);
 		return;
@@ -9029,7 +8983,7 @@ idn_recv_nodename_req(int domid, idn_msgtype_t *mtp, smr_offset_t bufoffset)
 
 	if (length < strlen(ldp->dname)) {
 		PR_PROTO("%s:%d: buffer not big enough (req %lu, got %d)\n",
-			proc, domid, strlen(ldp->dname), length);
+		    proc, domid, strlen(ldp->dname), length);
 		IDN_DUNLOCK(idn.localid);
 		idn_send_nodename_resp(domid, mtp, bufoffset, EINVAL);
 		return;
@@ -9053,7 +9007,7 @@ idn_recv_nodename_resp(int domid, smr_offset_t bufoffset, int serrno)
 
 	if (!VALID_NWROFFSET(bufoffset, IDN_SMR_BUFSIZE)) {
 		PR_PROTO("%s:%d: invalid SMR offset received (0x%x)\n",
-			proc, domid, bufoffset);
+		    proc, domid, bufoffset);
 		return;
 	}
 
@@ -9064,7 +9018,7 @@ idn_recv_nodename_resp(int domid, smr_offset_t bufoffset, int serrno)
 		if (strlen(b_bufp) > 0) {
 			strncpy(dp->dname, b_bufp, MAXDNAME);
 			PR_PROTO("%s:%d: received nodename(%s)\n",
-				proc, domid, dp->dname);
+			    proc, domid, dp->dname);
 		}
 	}
 
@@ -9091,7 +9045,7 @@ idn_master_init()
 	}
 
 	PR_PROTO("%s: initializing master data (domid = %d)\n",
-		proc, idn.localid);
+	    proc, idn.localid);
 
 	/*
 	 * Reserve an area of the SMR for mailbox usage.
@@ -9101,12 +9055,12 @@ idn_master_init()
 	reserved_size = IDNROUNDUP(IDN_MBOXAREA_SIZE, IDN_SMR_BUFSIZE);
 
 	PR_PROTO("%s: reserving %lu bytes for mailbox area\n",
-		proc, reserved_size);
+	    proc, reserved_size);
 
 #ifdef DEBUG
 	if (reserved_size > (size_t)IDN_SLAB_SIZE) {
 		PR_PROTO("%s: WARNING mbox area (%ld) > slab size (%d)\n",
-			proc, reserved_size, IDN_SLAB_SIZE);
+		    proc, reserved_size, IDN_SLAB_SIZE);
 	}
 #endif /* DEBUG */
 	/*
@@ -9151,7 +9105,7 @@ idn_master_deinit()
 	ldp = &idn_domain[idn.localid];
 
 	PR_PROTO("%s: deinitializing master data (domid = %d)\n",
-		proc, idn.localid);
+	    proc, idn.localid);
 
 	ldp->dmbox.m_tbl = NULL;
 	idn.mboxarea = NULL;
@@ -9183,7 +9137,7 @@ idn_mark_awol(int domid, clock_t *atime)
 		DOMAINSET_ADD(idn.domset.ds_awol, domid);
 		idn.nawols++;
 	}
-	awol = lbolt;
+	awol = ddi_get_lbolt();
 	if (dp->dawol.a_count++ == 0)
 		dp->dawol.a_time = awol;
 	dp->dawol.a_last = awol;
@@ -9247,7 +9201,7 @@ idn_timer_expired(void *arg)
 
 	if (tp->t_onq == 0) {
 		PR_TIMER("%s: timer CAUGHT TERMINATION (type = %s)\n",
-			proc, str);
+		    proc, str);
 		/*
 		 * Timer was dequeued.  Somebody is trying
 		 * to shut it down.
@@ -9273,8 +9227,8 @@ idn_timer_expired(void *arg)
 
 #ifdef DEBUG
 	PR_TIMER("%s:%d: [%s] timer EXPIRED (C=0x%x, P=0x%llx, X=0x%llx)\n",
-		proc, tp->t_domid, str, tp->t_cookie,
-		tp->t_posttime, tp->t_exectime);
+	    proc, tp->t_domid, str, tp->t_cookie,
+	    tp->t_posttime, tp->t_exectime);
 #endif /* DEBUG */
 
 	/*
@@ -9303,8 +9257,8 @@ idn_timer_expired(void *arg)
 				 * go around.
 				 */
 				IDN_MSGTIMER_START(domid, IDNP_DATA, 0,
-						idn_msg_waittime[IDNP_DATA],
-						&mt.mt_cookie);
+				    idn_msg_waittime[IDNP_DATA],
+				    &mt.mt_cookie);
 			} else {
 				lock_clear(&dp->diocheck);
 			}
@@ -9326,12 +9280,12 @@ idn_timer_expired(void *arg)
 			IDN_GUNLOCK();
 
 			idn_nego_cleanup_check(domid, IDN_NIL_DOMID,
-						IDN_NIL_DCPU);
+			    IDN_NIL_DCPU);
 
 			IDN_XSTATE_TRANSITION(dp, IDNXS_PEND);
 			token = IDN_RETRY_TOKEN(domid, IDNRETRY_NEGO);
 			idn_retry_submit(idn_retry_nego, NULL, token,
-					idn_msg_retrytime[(int)IDNRETRY_NEGO]);
+			    idn_msg_retrytime[(int)IDNRETRY_NEGO]);
 		}
 		IDN_DUNLOCK(domid);
 		IDN_SYNC_UNLOCK();
@@ -9354,7 +9308,7 @@ idn_timer_expired(void *arg)
 		 */
 		if (tp->t_subtype == (ushort_t)IDNCMD_NODENAME) {
 			PR_PROTO("%s:%d: timedout waiting for nodename\n",
-				proc, domid);
+			    proc, domid);
 			IDN_DUNLOCK(domid);
 			IDN_SYNC_UNLOCK();
 			break;
@@ -9366,10 +9320,10 @@ idn_timer_expired(void *arg)
 			int		masterid = IDN_GET_MASTERID();
 
 			IDN_GKSTAT_GLOBAL_EVENT(gk_reconfigs,
-						gk_reconfig_last);
+			    gk_reconfig_last);
 
 			PR_PROTO("%s:%d: RECONFIG trying old masterid = %d\n",
-				proc, domid, masterid);
+			    proc, domid, masterid);
 
 			IDN_GSTATE_TRANSITION(IDNGS_RECONFIG);
 			IDN_SET_NEW_MASTERID(masterid);
@@ -9377,12 +9331,10 @@ idn_timer_expired(void *arg)
 			IDN_DUNLOCK(domid);
 
 			domset = idn.domset.ds_trans_on |
-					idn.domset.ds_connected;
+			    idn.domset.ds_connected;
 
 			idn_unlink_domainset(domset, IDNFIN_NORMAL,
-						IDNFIN_ARG_NONE,
-						IDNFIN_OPT_RELINK,
-						BOARDSET_ALL);
+			    IDNFIN_ARG_NONE, IDNFIN_OPT_RELINK,	BOARDSET_ALL);
 		} else {
 			IDN_GUNLOCK();
 			IDN_DUNLOCK(domid);
@@ -9402,7 +9354,7 @@ idn_timer_expired(void *arg)
 			IDN_GUNLOCK();
 			token = IDN_RETRY_TOKEN(domid, IDNRETRY_CONQ);
 			idn_retry_submit(idn_retry_query, NULL, token,
-					idn_msg_retrytime[(int)IDNRETRY_CONQ]);
+			    idn_msg_retrytime[(int)IDNRETRY_CONQ]);
 			IDN_DUNLOCK(domid);
 			IDN_SYNC_UNLOCK();
 			break;
@@ -9431,9 +9383,9 @@ idn_timer_expired(void *arg)
 		IDN_GUNLOCK();
 		DOMAINSET_ADD(idn.domset.ds_relink, domid);
 		IDN_HISTORY_LOG(IDNH_RELINK, domid, dp->dstate,
-				idn.domset.ds_relink);
+		    idn.domset.ds_relink);
 		idn_disconnect(domid, IDNFIN_FORCE_SOFT,
-				IDNFIN_ARG_NONE, IDNFIN_SYNC_NO);
+		    IDNFIN_ARG_NONE, IDNFIN_SYNC_NO);
 		IDN_DUNLOCK(domid);
 		IDN_SYNC_UNLOCK();
 		break;
@@ -9466,12 +9418,12 @@ idn_timer_expired(void *arg)
 			}
 			if (rdyset)
 				(void) idn_sync_register(domid,
-						IDNSYNC_DISCONNECT,
-						rdyset, IDNSYNC_REG_REG);
+				    IDNSYNC_DISCONNECT,
+				    rdyset, IDNSYNC_REG_REG);
 
 			token = IDN_RETRY_TOKEN(domid, IDNRETRY_FINQ);
 			idn_retry_submit(idn_retry_query, NULL, token,
-					idn_msg_retrytime[(int)IDNRETRY_FINQ]);
+			    idn_msg_retrytime[(int)IDNRETRY_FINQ]);
 			IDN_DUNLOCK(domid);
 			IDN_SYNC_UNLOCK();
 			break;
@@ -9491,7 +9443,7 @@ idn_timer_expired(void *arg)
 		IDN_XSTATE_TRANSITION(dp, IDNXS_PEND);
 		token = IDN_RETRY_TOKEN(domid, IDNRETRY_FIN);
 		idn_retry_submit(idn_retry_fin, NULL, token,
-				idn_msg_retrytime[(int)IDNRETRY_FIN]);
+		    idn_msg_retrytime[(int)IDNRETRY_FIN]);
 		IDN_DUNLOCK(domid);
 		IDN_SYNC_UNLOCK();
 		break;
@@ -9509,14 +9461,14 @@ idn_timer_expired(void *arg)
 	if (awol) {
 		if (strlen(dname) > 0) {
 			cmn_err(CE_WARN,
-				"IDN: 236: domain (%s) [ID %d] not "
-				"responding to %s [#%d]",
-				dname, domid, op, awolcount);
+			    "IDN: 236: domain (%s) [ID %d] not "
+			    "responding to %s [#%d]",
+			    dname, domid, op, awolcount);
 		} else {
 			cmn_err(CE_WARN,
-				"IDN: 236: domain [ID %d, CPU %d] not "
-				"responding to %s [#%d]",
-				domid, dcpu, op, awolcount);
+			    "IDN: 236: domain [ID %d, CPU %d] not "
+			    "responding to %s [#%d]",
+			    domid, dcpu, op, awolcount);
 		}
 	}
 }
@@ -9537,8 +9489,7 @@ idn_retry_check(uint_t token)
 
 	for (i = 0, rp = qp->rq_jobs; i < qp->rq_count; i++, rp = rp->rj_next)
 		if ((domid == IDN_RETRY_TOKEN2DOMID(rp->rj_token)) &&
-				((key == IDN_RETRY_TYPEALL) ||
-				(rp->rj_token == token)))
+		    ((key == IDN_RETRY_TYPEALL) || (rp->rj_token == token)))
 			count++;
 
 	mutex_exit(&qp->rq_mutex);
@@ -9582,8 +9533,8 @@ idn_retry_execute(void *arg)
  *
  */
 static void
-idn_retry_submit(void (*func)(uint_t token, void *arg),
-		void *arg, uint_t token, clock_t ticks)
+idn_retry_submit(void (*func)(uint_t token, void *arg), void *arg, uint_t token,
+    clock_t ticks)
 {
 	idn_retry_job_t		*rp, *cp;
 	idn_retry_queue_t	*qp;
@@ -9592,7 +9543,7 @@ idn_retry_submit(void (*func)(uint_t token, void *arg),
 
 	if (ticks < 0) {
 		PR_PROTO("%s: (token = 0x%x) WARNING ticks = %ld\n",
-			proc, token, ticks);
+		    proc, token, ticks);
 		return;
 	}
 	if (ticks == 0)		/* At least one tick to get into background */
@@ -9603,13 +9554,11 @@ idn_retry_submit(void (*func)(uint_t token, void *arg),
 	qp = &idn.retryqueue;
 
 	mutex_enter(&qp->rq_mutex);
-	for (c = 0, cp = qp->rq_jobs;
-			c < qp->rq_count;
-			cp = cp->rj_next, c++) {
+	for (c = 0, cp = qp->rq_jobs; c < qp->rq_count; cp = cp->rj_next, c++) {
 		if (cp->rj_token == token) {
 			PR_PROTO("%s: token = (%d,0x%x) already present\n",
-				proc, IDN_RETRY_TOKEN2DOMID(token),
-				IDN_RETRY_TOKEN2TYPE(token));
+			    proc, IDN_RETRY_TOKEN2DOMID(token),
+			    IDN_RETRY_TOKEN2TYPE(token));
 			break;
 		}
 	}
@@ -9657,8 +9606,8 @@ idn_retry_terminate(uint_t token)
 	for (i = count = 0, rp = qp->rq_jobs; i < qp->rq_count; i++) {
 		nrp = rp->rj_next;
 		if ((domid == IDN_RETRY_TOKEN2DOMID(rp->rj_token)) &&
-			((key == IDN_RETRY_TYPEALL) ||
-				(rp->rj_token == token))) {
+		    ((key == IDN_RETRY_TYPEALL) ||
+		    (rp->rj_token == token))) {
 			/*
 			 * Turn off onq field as a signal to
 			 * the execution routine that this
@@ -9687,7 +9636,7 @@ idn_retry_terminate(uint_t token)
 	mutex_exit(&qp->rq_mutex);
 
 	PR_PROTO("%s: token = (%d,0x%x), dequeued = %d\n",
-		proc, domid, key, count);
+	    proc, domid, key, count);
 
 	for (; fp; fp = nrp) {
 		(void) untimeout(fp->rj_id);
@@ -9719,18 +9668,16 @@ idn_protocol_init(int nservers)
 
 	if (nservers <= 0) {
 		cmn_err(CE_WARN,
-			"IDN: 237: invalid number (%d) of protocol servers",
-			nservers);
+		    "IDN: 237: invalid number (%d) of protocol servers",
+		    nservers);
 		return (-1);
 	}
 
 	idn.protocol.p_jobpool = kmem_cache_create("idn_protocol_jobcache",
-						sizeof (idn_protojob_t),
-						0, NULL, NULL, NULL,
-						NULL, NULL, 0);
+	    sizeof (idn_protojob_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
 	if (idn.protocol.p_jobpool == NULL) {
 		cmn_err(CE_WARN,
-			"IDN: 238: kmem_cache_create(jobcache) failed");
+		    "IDN: 238: kmem_cache_create(jobcache) failed");
 		return (-1);
 	}
 
@@ -9839,8 +9786,7 @@ idn_protocol_server(int *id)
 	procname_t		proc = "idn_protocol_server";
 
 	if (id == NULL) {
-		PR_PROTO("%s: id == NULL, thread exiting\n",
-			proc);
+		PR_PROTO("%s: id == NULL, thread exiting\n", proc);
 		return;
 	}
 	ASSERT((*id >= 0) && (*id < idn_protocol_nservers));
@@ -9849,8 +9795,7 @@ idn_protocol_server(int *id)
 
 	ASSERT(pq->q_id == *id);
 
-	PR_PROTO("%s: id %d starting up (pq = 0x%p)\n",
-		proc, pq->q_id, pq);
+	PR_PROTO("%s: id %d starting up (pq = 0x%p)\n", proc, pq->q_id, pq);
 
 	/*CONSTCOND*/
 	while (1) {
@@ -9869,7 +9814,7 @@ idn_protocol_server(int *id)
 			pq->q_threadp = NULL;
 			mutex_exit(&pq->q_mutex);
 			PR_PROTO("%s: thread (%d) killed...bye bye\n",
-				proc, pq->q_id);
+			    proc, pq->q_id);
 			for (jp = jl; jp; jp = jl) {
 				jl = jp->j_next;
 				idn_protojob_free(jp);
@@ -9903,7 +9848,7 @@ idn_protocol_server_killall()
 	procname_t	proc = "idn_protocol_server_killall";
 
 	PR_PROTO("%s: killing off %d protocol servers\n",
-		proc, idn.nservers);
+	    proc, idn.nservers);
 
 	pq = idn.protocol.p_serverq;
 	for (i = 0; i < idn.nservers; pq++, i++) {
@@ -9969,8 +9914,8 @@ idn_protojob_submit(int cookie, idn_protojob_t *jp)
 
 	INUM2STR(jp->j_msg.m_msgtype, str);
 	PR_PROTO("%s: job (d=%d, m=0x%x, %s) submitted to "
-		"protocol server %d\n", proc, jp->j_msg.m_domid,
-		jp->j_msg.m_msgtype, str, serverid);
+	    "protocol server %d\n", proc, jp->j_msg.m_domid,
+	    jp->j_msg.m_msgtype, str, serverid);
 
 	mutex_enter(&pq->q_mutex);
 	/*
@@ -9987,7 +9932,7 @@ idn_protojob_submit(int cookie, idn_protojob_t *jp)
 		cv_signal(&pq->q_cv);
 	} else {
 		PR_PROTO("%s: protocol server dead.  freeing protojob\n",
-			proc);
+		    proc);
 		idn_protojob_free(jp);
 	}
 	mutex_exit(&pq->q_mutex);
@@ -10003,8 +9948,7 @@ idn_mboxarea_init(idn_mboxtbl_t *mtp, register int ntbls)
 
 	ASSERT(mtp && (ntbls > 0));
 
-	PR_PROTO("%s: init mboxtbl (0x%p) ntbls = %d\n",
-		proc, mtp, ntbls);
+	PR_PROTO("%s: init mboxtbl (0x%p) ntbls = %d\n", proc, mtp, ntbls);
 
 	for (d = 0; d < ntbls; d++) {
 		register int	pd, sd;
@@ -10070,7 +10014,7 @@ idn_mainmbox_init(int domid, int mbx)
 	ASSERT(IDN_DLOCK_IS_HELD(domid));
 
 	PR_PROTO("%s: initializing main %s mailbox for domain %d\n",
-		proc, IDNMBOX_IS_RECV(mbx) ? "RECV" : "SEND", domid);
+	    proc, IDNMBOX_IS_RECV(mbx) ? "RECV" : "SEND", domid);
 
 	cmp = GETSTRUCT(idn_mainmbox_t, IDN_MAX_NETS);
 	for (c = 0; c < IDN_MAX_NETS; c++) {
@@ -10099,7 +10043,7 @@ idn_mainmbox_reset(int domid, idn_mainmbox_t *cmp)
 	ASSERT(IDN_DLOCK_IS_EXCL(domid));
 
 	PR_PROTO("%s: reseting main %s mailbox for domain %d\n",
-		proc, IDNMBOX_IS_RECV(cmp->mm_type) ? "RECV" : "SEND", domid);
+	    proc, IDNMBOX_IS_RECV(cmp->mm_type) ? "RECV" : "SEND", domid);
 
 	for (c = 0; c < IDN_MAX_NETS; c++) {
 		mmp = &cmp[c];
@@ -10122,7 +10066,7 @@ idn_mainmbox_deinit(int domid, idn_mainmbox_t *mmp)
 	ASSERT(IDN_DLOCK_IS_HELD(domid));
 
 	PR_PROTO("%s: deinitializing main %s mailbox for domain %d\n",
-		proc, IDNMBOX_IS_RECV(mmp->mm_type) ? "RECV" : "SEND", domid);
+	    proc, IDNMBOX_IS_RECV(mmp->mm_type) ? "RECV" : "SEND", domid);
 
 	ASSERT(idn_domain_is_registered(domid, -1, NULL) == 0);
 
@@ -10142,7 +10086,7 @@ idn_mainmbox_activate(int domid)
 
 	for (c = 0; c < IDN_MAX_NETS; c++)
 		idn_mainmbox_chan_register(domid, &dp->dmbox.m_send[c],
-						&dp->dmbox.m_recv[c], c);
+		    &dp->dmbox.m_recv[c], c);
 }
 
 /*
@@ -10162,17 +10106,17 @@ idn_mainmbox_deactivate(ushort_t domset)
 		return;
 
 	PR_PROTO("%s: %s deactivating main mailboxes for domset 0x%x\n",
-		proc, (domset == (ushort_t)-1) ? "STOP-ALL" : "NORMAL", domset);
+	    proc, (domset == (ushort_t)-1) ? "STOP-ALL" : "NORMAL", domset);
 
 	svr_count = idn_mainmbox_chan_unregister(domset, -1);
 
 	PR_PROTO("%s: deactivated %d chansvrs (domset 0x%x)\n",
-		proc, svr_count, domset);
+	    proc, svr_count, domset);
 }
 
 static void
 idn_mainmbox_chan_register(int domid, idn_mainmbox_t *send_mmp,
-					idn_mainmbox_t *recv_mmp, int channel)
+    idn_mainmbox_t *recv_mmp, int channel)
 {
 	ASSERT(IDN_DLOCK_IS_HELD(domid));
 
@@ -10230,9 +10174,8 @@ idn_mainmbox_chan_unregister(ushort_t domset, int channel)
 	int		min_chan, max_chan;
 	procname_t	proc = "idn_mainmbox_chan_unregister";
 
-
 	PR_CHAN("%s: deactivating main mailboxes (channel %d) "
-		"for domset 0x%x\n", proc, channel, domset);
+	    "for domset 0x%x\n", proc, channel, domset);
 
 	if (channel == -1) {
 		min_chan = 0;
@@ -10263,7 +10206,7 @@ idn_mainmbox_chan_unregister(ushort_t domset, int channel)
 		dd_count++;
 	}
 	PR_CHAN("%s: deactivated %d channel mboxes for domset 0x%x, chan %d\n",
-		proc, dd_count, domset, channel);
+	    proc, dd_count, domset, channel);
 	return (dd_count);
 }
 
@@ -10277,7 +10220,6 @@ idn_domain_is_registered(int domid, int channel, idn_chanset_t *chansetp)
 	int		c, min_chan, max_chan;
 	idn_chanset_t	chanset;
 	procname_t	proc = "idn_domain_is_registered";
-
 
 	CHANSET_ZERO(chanset);
 
@@ -10316,7 +10258,7 @@ idn_domain_is_registered(int domid, int channel, idn_chanset_t *chansetp)
 	}
 
 	PR_CHAN("%s: domid %d mbox reg'd with %d channels [0x%x] (req=%d)\n",
-		proc, domid, regcount, chanset, channel);
+	    proc, domid, regcount, chanset, channel);
 
 	if (chansetp)
 		*chansetp = chanset;
@@ -10345,7 +10287,7 @@ idn_mainmbox_flush(int domid, idn_mainmbox_t *mmp)
 
 	mbox_type = mmp->mm_type;
 	ASSERT((mbox_type == IDNMMBOX_TYPE_SEND) ||
-			(mbox_type == IDNMMBOX_TYPE_RECV));
+	    (mbox_type == IDNMMBOX_TYPE_RECV));
 
 	mbox_str = (mbox_type == IDNMMBOX_TYPE_SEND) ? "SEND" : "RECV";
 
@@ -10370,20 +10312,20 @@ idn_mainmbox_flush(int domid, idn_mainmbox_t *mmp)
 			 */
 			if (mmp[c].mm_smr_mboxp) {
 				PR_CHAN("%s:%d:%s: domain unregistered "
-					"w/chan %d - DUMPING SMR reference\n",
-					proc, domid, mbox_str, c);
+				    "w/chan %d - DUMPING SMR reference\n",
+				    proc, domid, mbox_str, c);
 				lost_io = IDN_MMBOXINDEX_DIFF(mmp[c].mm_qiput,
-							mmp[c].mm_qiget);
+				    mmp[c].mm_qiget);
 #ifdef DEBUG
 				if (mbox_type == IDNMMBOX_TYPE_RECV) {
 					PR_CHAN("%s:%d:%s: blowing away %d "
-						"incoming pkts\n",
-						proc, domid, mbox_str, lost_io);
+					    "incoming pkts\n",
+					    proc, domid, mbox_str, lost_io);
 				} else {
 					PR_CHAN("%s:%d:%s: blowing away %d/%d "
-						"outstanding pkts\n",
-						proc, domid, mbox_str, lost_io,
-						idn_domain[domid].dio);
+					    "outstanding pkts\n",
+					    proc, domid, mbox_str, lost_io,
+					    idn_domain[domid].dio);
 				}
 #endif /* DEBUG */
 			}
@@ -10393,22 +10335,22 @@ idn_mainmbox_flush(int domid, idn_mainmbox_t *mmp)
 		}
 		if (mmp[c].mm_smr_mboxp) {
 			mbox_csum =
-				IDN_CKSUM_MBOX(&mmp[c].mm_smr_mboxp->mt_header);
+			    IDN_CKSUM_MBOX(&mmp[c].mm_smr_mboxp->mt_header);
 			if (!VALID_NWRADDR(mmp[c].mm_smr_mboxp, 4) ||
 			    !VALID_MBOXHDR(&mmp[c].mm_smr_mboxp->mt_header,
-							c, mbox_csum)) {
+			    c, mbox_csum)) {
 				lost_io = IDN_MMBOXINDEX_DIFF(mmp[c].mm_qiput,
-							mmp[c].mm_qiget);
+				    mmp[c].mm_qiget);
 #ifdef DEBUG
 				if (mbox_type == IDNMMBOX_TYPE_RECV) {
 					PR_CHAN("%s:%d:%s: bad mbox.  blowing "
-						"away %d incoming pkts\n",
-						proc, domid, mbox_str, lost_io);
+					    "away %d incoming pkts\n",
+					    proc, domid, mbox_str, lost_io);
 				} else {
 					PR_CHAN("%s:%d:%s: bad mbox.  blowing "
-						"away %d/%d outstanding pkts\n",
-						proc, domid, mbox_str, lost_io,
-						idn_domain[domid].dio);
+					    "away %d/%d outstanding pkts\n",
+					    proc, domid, mbox_str, lost_io,
+					    idn_domain[domid].dio);
 				}
 #endif /* DEBUG */
 				mmp[c].mm_smr_mboxp = NULL;
@@ -10447,7 +10389,7 @@ idn_mainmbox_flush(int domid, idn_mainmbox_t *mmp)
 		total_count += count;
 
 		PR_CHAN("%s:%d:%s: flushed out %d mbox entries for chan %d\n",
-			proc, domid, mbox_str, count, c);
+		    proc, domid, mbox_str, count, c);
 	}
 
 	if (total_lost_io && (mbox_type == IDNMMBOX_TYPE_SEND)) {
@@ -10461,11 +10403,11 @@ idn_mainmbox_flush(int domid, idn_mainmbox_t *mmp)
 		lost_bufs = smr_buf_free_all(domid);
 
 		PR_CHAN("%s:%d:%s: flushed %d/%d buffers from slabs\n",
-			proc, domid, mbox_str, lost_bufs, total_lost_io);
+		    proc, domid, mbox_str, lost_bufs, total_lost_io);
 	}
 
 	PR_CHAN("%s:%d:%s: flushed total of %d mailbox entries (lost %d)\n",
-		proc, domid, mbox_str, total_count, total_lost_io);
+	    proc, domid, mbox_str, total_count, total_lost_io);
 
 	return (total_count);
 }
@@ -10488,9 +10430,9 @@ idn_chanserver_bind(int net, int cpuid)
 	if ((cpuid != -1) && ((cp == NULL) || !cpu_is_online(cp))) {
 		mutex_exit(&cpu_lock);
 		cmn_err(CE_WARN,
-			"IDN: 239: invalid CPU ID (%d) specified for "
-			"IDN net %d",
-			cpuid, net);
+		    "IDN: 239: invalid CPU ID (%d) specified for "
+		    "IDN net %d",
+		    cpuid, net);
 		IDN_CHAN_UNLOCK_GLOBAL(csp);
 		return;
 	}
@@ -10516,7 +10458,7 @@ idn_chanserver_bind(int net, int cpuid)
 	mutex_exit(&cpu_lock);
 
 	PR_CHAN("%s: bound net/channel (%d) from cpuid %d to%scpuid %d\n",
-		proc, net, ocpuid, tp ? " " : " (pending) ", cpuid);
+	    proc, net, ocpuid, tp ? " " : " (pending) ", cpuid);
 
 	IDN_CHAN_UNLOCK_GLOBAL(csp);
 }
@@ -10534,7 +10476,7 @@ idn_chan_server_syncheader(int channel)
 	idn_domain_t	*ldp = &idn_domain[idn.localid];
 	idn_mboxtbl_t	*mtp;
 	idn_mboxhdr_t	*mhp;
-	ushort_t		mbox_csum;
+	ushort_t	mbox_csum;
 	procname_t	proc = "idn_chan_server_syncheader";
 
 	ASSERT(IDN_CHAN_RECV_IS_LOCKED(&idn.chan_servers[channel]));
@@ -10555,24 +10497,23 @@ idn_chan_server_syncheader(int channel)
 	if (mhp != prev_mhp[channel]) {
 		prev_mhp[channel] = mhp;
 		PR_CHAN("%s: chan_server (%d) cookie = 0x%x (exp 0x%x)\n",
-			proc, channel, IDN_GET_MBOXHDR_COOKIE(mhp),
-			IDN_MAKE_MBOXHDR_COOKIE(0, 0, channel));
+		    proc, channel, IDN_GET_MBOXHDR_COOKIE(mhp),
+		    IDN_MAKE_MBOXHDR_COOKIE(0, 0, channel));
 		PR_CHAN("%s: chan_server (%d) actv_ptr = 0x%x (exp 0x%x)\n",
-			proc, channel, mhp->mh_svr_active_ptr,
-			IDN_ADDR2OFFSET(&mhp->mh_svr_active));
+		    proc, channel, mhp->mh_svr_active_ptr,
+		    IDN_ADDR2OFFSET(&mhp->mh_svr_active));
 		PR_CHAN("%s: chan_server (%d) ready_ptr = 0x%x (exp 0x%x)\n",
-			proc, channel, mhp->mh_svr_ready_ptr,
-			IDN_ADDR2OFFSET(&mhp->mh_svr_ready));
+		    proc, channel, mhp->mh_svr_ready_ptr,
+		    IDN_ADDR2OFFSET(&mhp->mh_svr_ready));
 		PR_CHAN("%s: chan_server (%d) mbox_cksum = 0x%x (exp 0x%x)\n",
-			proc, channel, (int)mhp->mh_cksum, (int)mbox_csum);
+		    proc, channel, (int)mhp->mh_cksum, (int)mbox_csum);
 	}
 #endif /* DEBUG */
 
 	if ((IDN_ADDR2OFFSET(&mhp->mh_svr_active) !=
-					mhp->mh_svr_active_ptr) ||
-			(IDN_ADDR2OFFSET(&mhp->mh_svr_ready) !=
-					mhp->mh_svr_ready_ptr) ||
-			!VALID_MBOXHDR(mhp, channel, mbox_csum)) {
+	    mhp->mh_svr_active_ptr) ||
+	    (IDN_ADDR2OFFSET(&mhp->mh_svr_ready) != mhp->mh_svr_ready_ptr) ||
+	    !VALID_MBOXHDR(mhp, channel, mbox_csum)) {
 		idn_chansvr_t	*csp;
 
 		csp = &idn.chan_servers[channel];
@@ -10580,24 +10521,24 @@ idn_chan_server_syncheader(int channel)
 			IDN_CHANSVC_MARK_RECV_CORRUPTED(csp);
 
 			cmn_err(CE_WARN,
-				"IDN: 240: (channel %d) SMR CORRUPTED "
-				"- RELINK", channel);
+			    "IDN: 240: (channel %d) SMR CORRUPTED "
+			    "- RELINK", channel);
 			cmn_err(CE_CONT,
-				"IDN: 240: (channel %d) cookie "
-				"(expected 0x%x, actual 0x%x)\n",
-				channel,
-				IDN_MAKE_MBOXHDR_COOKIE(0, 0, channel),
-				mhp->mh_cookie);
+			    "IDN: 240: (channel %d) cookie "
+			    "(expected 0x%x, actual 0x%x)\n",
+			    channel,
+			    IDN_MAKE_MBOXHDR_COOKIE(0, 0, channel),
+			    mhp->mh_cookie);
 			cmn_err(CE_CONT,
-				"IDN: 240: (channel %d) actv_flg "
-				"(expected 0x%x, actual 0x%x)\n",
-				channel, mhp->mh_svr_active_ptr,
-				IDN_ADDR2OFFSET(&mhp->mh_svr_active));
+			    "IDN: 240: (channel %d) actv_flg "
+			    "(expected 0x%x, actual 0x%x)\n",
+			    channel, mhp->mh_svr_active_ptr,
+			    IDN_ADDR2OFFSET(&mhp->mh_svr_active));
 			cmn_err(CE_CONT,
-				"IDN: 240: (channel %d) ready_flg "
-				"(expected 0x%x, actual 0x%x)\n",
-				channel, mhp->mh_svr_ready_ptr,
-				IDN_ADDR2OFFSET(&mhp->mh_svr_ready));
+			    "IDN: 240: (channel %d) ready_flg "
+			    "(expected 0x%x, actual 0x%x)\n",
+			    channel, mhp->mh_svr_ready_ptr,
+			    IDN_ADDR2OFFSET(&mhp->mh_svr_ready));
 		}
 
 		mhp = NULL;
@@ -10619,7 +10560,7 @@ idn_chan_server_syncheader(int channel)
 		for (_d = 0; _d < MAX_DOMAINS; _d++) { \
 			if (DOMAIN_IN_SET((csp)->ch_recv_domset, _d)) { \
 				(mmp)[_d] = \
-					&idn_domain[_d].dmbox.m_recv[chan]; \
+				    &idn_domain[_d].dmbox.m_recv[chan]; \
 			} else { \
 				(mmp)[_d] = NULL; \
 			} \
@@ -10678,7 +10619,7 @@ idn_chan_server(idn_chansvr_t **cspp)
 	ASSERT(sip);
 
 	PR_CHAN("%s: CHANNEL SERVER (channel %d) GOING ACTIVE...\n",
-		proc, channel);
+	    proc, channel);
 
 	IDN_CHAN_LOCK_RECV(csp);
 	IDN_CHAN_RECV_INPROGRESS(csp);
@@ -10697,9 +10638,9 @@ idn_chan_server(idn_chansvr_t **cspp)
 			 */
 			mutex_exit(&cpu_lock);
 			cmn_err(CE_WARN,
-				"IDN: 239: invalid CPU ID (%d) specified for "
-				"IDN net %d",
-				cpuid, channel);
+			    "IDN: 239: invalid CPU ID (%d) specified for "
+			    "IDN net %d",
+			    cpuid, channel);
 		} else {
 			csp->ch_bound_cpuid = cpuid;
 			affinity_set(csp->ch_bound_cpuid);
@@ -10711,7 +10652,7 @@ idn_chan_server(idn_chansvr_t **cspp)
 	}
 	if (csp->ch_bound_cpuid != -1) {
 		PR_CHAN("%s: thread bound to cpuid %d\n",
-			proc, csp->ch_bound_cpuid);
+		    proc, csp->ch_bound_cpuid);
 	}
 	/*
 	 * Only the first (main) mbox header is used for
@@ -10722,14 +10663,14 @@ idn_chan_server(idn_chansvr_t **cspp)
 	CHANSVR_SYNC_CACHE(csp, mmp, channel);
 
 	mainhp = ((csp->ch_recv_domcount > 0) &&
-		    IDN_CHANNEL_IS_RECV_ACTIVE(csp))
-			? idn_chan_server_syncheader(channel) : NULL;
+	    IDN_CHANNEL_IS_RECV_ACTIVE(csp))
+	    ? idn_chan_server_syncheader(channel) : NULL;
 
 	if (mainhp && IDN_CHANNEL_IS_RECV_ACTIVE(csp))
 		mainhp->mh_svr_active = 1;
 
 	ASSERT(csp->ch_recv_domcount ?
-		(csp->ch_recv_scanset && csp->ch_recv_domset) : 1);
+	    (csp->ch_recv_scanset && csp->ch_recv_domset) : 1);
 
 	IDN_CHAN_UNLOCK_RECV(csp);
 
@@ -10763,17 +10704,17 @@ idn_chan_server(idn_chansvr_t **cspp)
 			 * we wrap around.  Done for performance.
 			 */
 			if (!IDN_CHANNEL_IS_RECV_ACTIVE(csp) ||
-					csp->ch_recv.c_checkin ||
-					(idn.state != IDNGS_ONLINE)) {
+			    csp->ch_recv.c_checkin ||
+			    (idn.state != IDNGS_ONLINE)) {
 
 				PR_DATA("%s: (channel %d) %s\n",
-					proc, channel,
-					IDN_CHANNEL_IS_DETACHED(csp)
-					? "DEAD" :
-					IDN_CHANNEL_IS_PENDING(csp)
-					? "IDLED" :
-					IDN_CHANNEL_IS_ACTIVE(csp)
-					? "ACTIVE" : "DISABLED");
+				    proc, channel,
+				    IDN_CHANNEL_IS_DETACHED(csp)
+				    ? "DEAD" :
+				    IDN_CHANNEL_IS_PENDING(csp)
+				    ? "IDLED" :
+				    IDN_CHANNEL_IS_ACTIVE(csp)
+				    ? "ACTIVE" : "DISABLED");
 				goto cc_sleep;
 			}
 		}
@@ -10824,9 +10765,9 @@ idn_chan_server(idn_chansvr_t **cspp)
 			IDN_KSTAT_INC(sip, si_ierrors);
 			if (!(mmp[domid]->mm_flags & IDNMMBOX_FLAG_CORRUPTED)) {
 				cmn_err(CE_WARN,
-					"IDN: 241: [recv] (domain %d, "
-					"channel %d) SMR CORRUPTED - RELINK",
-					domid, channel);
+				    "IDN: 241: [recv] (domain %d, "
+				    "channel %d) SMR CORRUPTED - RELINK",
+				    domid, channel);
 				mmp[domid]->mm_flags |= IDNMMBOX_FLAG_CORRUPTED;
 			}
 			empty = 0;
@@ -10855,8 +10796,8 @@ idn_chan_server(idn_chansvr_t **cspp)
 
 		} else {
 			PR_DATA("%s: (channel %d) pkt (off 0x%x, "
-				"qiget %d) from domain %d\n",
-				proc, channel, bufoffset, qi, domid);
+			    "qiget %d) from domain %d\n",
+			    proc, channel, bufoffset, qi, domid);
 #ifdef DEBUG
 
 			hdrp = IDN_BUF2HDR(IDN_OFFSET2ADDR(bufoffset));
@@ -10865,17 +10806,17 @@ idn_chan_server(idn_chansvr_t **cspp)
 #endif /* DEBUG */
 
 			if (idn_recv_mboxdata(channel,
-					IDN_OFFSET2ADDR(bufoffset)) < 0) {
+			    IDN_OFFSET2ADDR(bufoffset)) < 0) {
 				mutex_enter(&mmp[domid]->mm_mutex);
 				if (!(mmp[domid]->mm_flags &
-					IDNMMBOX_FLAG_CORRUPTED)) {
+				    IDNMMBOX_FLAG_CORRUPTED)) {
 					cmn_err(CE_WARN,
-						"IDN: 241: [recv] (domain "
-						"%d, channel %d) SMR "
-						"CORRUPTED - RELINK",
-						domid, channel);
+					    "IDN: 241: [recv] (domain "
+					    "%d, channel %d) SMR "
+					    "CORRUPTED - RELINK",
+					    domid, channel);
 					mmp[domid]->mm_flags |=
-						IDNMMBOX_FLAG_CORRUPTED;
+					    IDNMMBOX_FLAG_CORRUPTED;
 				}
 				mutex_exit(&mmp[domid]->mm_mutex);
 			}
@@ -10904,7 +10845,7 @@ cc_next:
 			idleloops = 0;
 
 			PR_DATA("%s: (channel %d) dom=%d, pktcnt=%d\n",
-				proc, channel, domid, pktcount);
+			    proc, channel, domid, pktcount);
 		}
 
 		continue;
@@ -10914,7 +10855,7 @@ cc_slowdown:
 #ifdef DEBUG
 		if (idleloops == 0) {
 			PR_DATA("%s: (channel %d) going SOFT IDLE...\n",
-				proc, channel);
+			    proc, channel);
 		}
 #endif /* DEBUG */
 		if (idleloops++ < IDN_NETSVR_SPIN_COUNT) {
@@ -10938,28 +10879,27 @@ cc_die:
 		ASSERT(IDN_CHAN_RECV_IS_LOCKED(csp));
 
 		if (!IDN_CHANNEL_IS_RECV_ACTIVE(csp) &&
-					IDN_CHANNEL_IS_DETACHED(csp)) {
+		    IDN_CHANNEL_IS_DETACHED(csp)) {
 			/*
 			 * Time to die...
 			 */
 			PR_CHAN("%s: (channel %d) serviced %d "
-				"packets, drop = %d\n", proc, channel,
-				tot_pktcount, tot_dropcount);
+			    "packets, drop = %d\n", proc, channel,
+			    tot_pktcount, tot_dropcount);
 			PR_CHAN("%s: (channel %d) TERMINATING\n",
-				proc, channel);
+			    proc, channel);
 			PR_CHAN("%s: (channel %d) ch_morguep = %p\n",
-				proc, channel, csp->ch_recv_morguep);
+			    proc, channel, csp->ch_recv_morguep);
 
 			csp->ch_recv_threadp = NULL;
 #ifdef DEBUG
 			for (index = 0; index < csp->ch_recv_domcount;
-							index++) {
+			    index++) {
 				if ((int)((csp->ch_recv_scanset >>
-							(index*4)) & 0xf)
-							== domid) {
+				    (index*4)) & 0xf) == domid) {
 					PR_DATA("%s: WARNING (channel %d) "
-						"DROPPING domid %d...\n",
-						proc, channel, domid);
+					    "DROPPING domid %d...\n",
+					    proc, channel, domid);
 				}
 			}
 #endif /* DEBUG */
@@ -10976,20 +10916,19 @@ cc_die:
 		do {
 			if (IDN_CHANNEL_IS_DETACHED(csp)) {
 				PR_CHAN("%s: (channel %d) going to DIE...\n",
-					proc, channel);
+				    proc, channel);
 				goto cc_die;
 			}
 #ifdef DEBUG
 			if (IDN_CHANNEL_IS_RECV_ACTIVE(csp) &&
-					(csp->ch_recv_waittime <=
-						IDN_NETSVR_WAIT_MAX)) {
+			    (csp->ch_recv_waittime <= IDN_NETSVR_WAIT_MAX)) {
 				PR_CHAN("%s: (channel %d) going SOFT IDLE "
-					"(waittime = %d ticks)...\n",
-					proc, channel,
-					csp->ch_recv_waittime);
+				    "(waittime = %d ticks)...\n",
+				    proc, channel,
+				    csp->ch_recv_waittime);
 			} else {
 				PR_CHAN("%s: (channel %d) going "
-					"HARD IDLE...\n", proc, channel);
+				    "HARD IDLE...\n", proc, channel);
 			}
 #endif /* DEBUG */
 			IDN_CHAN_RECV_DONE(csp);
@@ -11001,16 +10940,15 @@ cc_die:
 			 */
 			while (csp->ch_recv.c_checkin)
 				cv_wait(&csp->ch_recv_cv,
-					&csp->ch_recv.c_mutex);
+				    &csp->ch_recv.c_mutex);
 
 			if (csp->ch_recv_waittime > IDN_NETSVR_WAIT_MAX)
 				cv_wait(&csp->ch_recv_cv,
-					&csp->ch_recv.c_mutex);
+				    &csp->ch_recv.c_mutex);
 			else
-				(void) cv_timedwait(&csp->ch_recv_cv,
-						&csp->ch_recv.c_mutex,
-						lbolt +
-						csp->ch_recv_waittime);
+				(void) cv_reltimedwait(&csp->ch_recv_cv,
+				    &csp->ch_recv.c_mutex,
+				    csp->ch_recv_waittime, TR_CLOCK_TICK);
 
 			IDN_CHAN_RECV_INPROGRESS(csp);
 
@@ -11018,7 +10956,7 @@ cc_die:
 
 			if (csp->ch_recv_waittime <= IDN_NETSVR_WAIT_MAX)
 				csp->ch_recv_waittime <<=
-						IDN_NETSVR_WAIT_SHIFT;
+				    IDN_NETSVR_WAIT_SHIFT;
 
 		} while (!IDN_CHANNEL_IS_RECV_ACTIVE(csp));
 
@@ -11110,7 +11048,7 @@ idn_chan_flush(idn_chansvr_t *csp)
 			 * enough to respond to us.
 			 */
 			PR_CHAN("%s: sending FLUSH (%x) to channel %d\n",
-				proc, flush_type, csp->ch_id);
+			    proc, flush_type, csp->ch_id);
 
 			(void) putnextctl1(rq, M_FLUSH, flush_type);
 		}
@@ -11154,7 +11092,7 @@ idn_chan_action(int channel, idn_chanaction_t chanaction, int wait)
 	csp = &idn.chan_servers[channel];
 
 	PR_CHAN("%s: requesting %s for channel %d\n",
-		proc, chanaction_str[(int)chanaction], channel);
+	    proc, chanaction_str[(int)chanaction], channel);
 
 	csend = &csp->ch_send;
 	crecv = &csp->ch_recv;
@@ -11184,7 +11122,7 @@ idn_chan_action(int channel, idn_chanaction_t chanaction, int wait)
 
 		is_running = 0;
 		if ((csend->c_inprogress || crecv->c_inprogress) &&
-			wait && (csp->ch_recv_threadp != curthread)) {
+		    wait && (csp->ch_recv_threadp != curthread)) {
 
 			rw_enter(&idn.struprwlock, RW_READER);
 			if ((sip = IDN_INST2SIP(channel)) != NULL) {
@@ -11265,7 +11203,7 @@ idn_chan_action(int channel, idn_chanaction_t chanaction, int wait)
 					while (csend->c_inprogress) {
 						csend->c_waiters++;
 						cv_wait(&csend->c_cv,
-							&csend->c_mutex);
+						    &csend->c_mutex);
 						csend->c_waiters--;
 					}
 					/*
@@ -11282,7 +11220,7 @@ idn_chan_action(int channel, idn_chanaction_t chanaction, int wait)
 					while (crecv->c_inprogress) {
 						crecv->c_waiters++;
 						cv_wait(&crecv->c_cv,
-							&crecv->c_mutex);
+						    &crecv->c_mutex);
 						crecv->c_waiters--;
 					}
 					mutex_enter(&csend->c_mutex);
@@ -11317,7 +11255,7 @@ idn_chan_action(int channel, idn_chanaction_t chanaction, int wait)
 		 * ALL leave with locks held.
 		 */
 		PR_CHAN("%s: action (%s) for channel %d - COMPLETED\n",
-			proc, chanaction_str[(int)chanaction], channel);
+		    proc, chanaction_str[(int)chanaction], channel);
 		break;
 
 	case IDNCHAN_ACTION_ATTACH:
@@ -11342,12 +11280,11 @@ idn_chan_action(int channel, idn_chanaction_t chanaction, int wait)
 		 * flow, so obviously no point in attempting to wake
 		 * ourself up!.
 		 */
-		if (csp->ch_recv_threadp &&
-				(csp->ch_recv_threadp != curthread))
+		if (csp->ch_recv_threadp && (csp->ch_recv_threadp != curthread))
 			cv_signal(&csp->ch_recv_cv);
 
 		PR_CHAN("%s: action (%s) for channel %d - COMPLETED\n",
-			proc, chanaction_str[(int)chanaction], channel);
+		    proc, chanaction_str[(int)chanaction], channel);
 
 		/*
 		 * Leaves with lock released.
@@ -11369,9 +11306,8 @@ idn_chan_addmbox(int channel, ushort_t domset)
 	register int	d;
 	procname_t	proc = "idn_chan_addmbox";
 
-
 	PR_CHAN("%s: adding domset 0x%x main mailboxes to channel %d\n",
-		proc, domset, channel);
+	    proc, domset, channel);
 
 	ASSERT(idn.chan_servers);
 
@@ -11399,13 +11335,13 @@ idn_chan_addmbox(int channel, ushort_t domset)
 		IDN_CHAN_DOMAIN_REGISTER(csp, d);
 
 		PR_CHAN("%s: domain %d (channel %d) RECV (pending) "
-			"scanset = 0x%lx\n", proc, d, channel,
-			csp->ch_recv_scanset_pending);
+		    "scanset = 0x%lx\n", proc, d, channel,
+		    csp->ch_recv_scanset_pending);
 		PR_CHAN("%s: domain %d (channel %d) domset = 0x%x\n",
-			proc, d, channel, (uint_t)csp->ch_reg_domset);
+		    proc, d, channel, (uint_t)csp->ch_reg_domset);
 
 		CHECKPOINT_OPENED(IDNSB_CHKPT_CHAN,
-					idn_domain[d].dhw.dh_boardset, 1);
+		    idn_domain[d].dhw.dh_boardset, 1);
 	}
 	if (domset)
 		csp->ch_recv_changed = 1;
@@ -11420,9 +11356,8 @@ idn_chan_delmbox(int channel, ushort_t domset)
 	register int	d;
 	procname_t	proc = "idn_chan_delmbox";
 
-
 	PR_CHAN("%s: deleting domset 0x%x main mailboxes from channel %d\n",
-		proc, domset, channel);
+	    proc, domset, channel);
 
 	ASSERT(idn.chan_servers);
 
@@ -11458,13 +11393,13 @@ idn_chan_delmbox(int channel, ushort_t domset)
 		IDN_CHAN_DOMAIN_UNREGISTER(csp, d);
 
 		PR_CHAN("%s: domain %d (channel %d) RECV (pending) "
-			"scanset = 0x%lx\n", proc, d, channel,
-			csp->ch_recv_scanset_pending);
+		    "scanset = 0x%lx\n", proc, d, channel,
+		    csp->ch_recv_scanset_pending);
 		PR_CHAN("%s: domain %d (channel %d) domset = 0x%x\n",
-			proc, d, channel, (uint_t)csp->ch_reg_domset);
+		    proc, d, channel, (uint_t)csp->ch_reg_domset);
 
 		CHECKPOINT_CLOSED(IDNSB_CHKPT_CHAN,
-					idn_domain[d].dhw.dh_boardset, 2);
+		    idn_domain[d].dhw.dh_boardset, 2);
 
 	}
 	if (domset)
@@ -11484,23 +11419,23 @@ idn_valid_etherheader(struct ether_header *ehp)
 		return (0);
 
 	if ((eap[IDNETHER_COOKIE1] != IDNETHER_COOKIE1_VAL) &&
-		(eap[IDNETHER_COOKIE1] != 0xff))
+	    (eap[IDNETHER_COOKIE1] != 0xff))
 		return (0);
 
 	if ((eap[IDNETHER_COOKIE2] != IDNETHER_COOKIE2_VAL) &&
-		(eap[IDNETHER_COOKIE2] != 0xff))
+	    (eap[IDNETHER_COOKIE2] != 0xff))
 		return (0);
 
 	if ((eap[IDNETHER_RESERVED] != IDNETHER_RESERVED_VAL) &&
-		(eap[IDNETHER_RESERVED] != 0xff))
+	    (eap[IDNETHER_RESERVED] != 0xff))
 		return (0);
 
 	if (!VALID_UCHANNEL(eap[IDNETHER_CHANNEL]) &&
-		(eap[IDNETHER_CHANNEL] != 0xff))
+	    (eap[IDNETHER_CHANNEL] != 0xff))
 		return (0);
 
 	if (!VALID_UDOMAINID(IDN_NETID2DOMID(eap[IDNETHER_NETID])) &&
-		(eap[IDNETHER_NETID] != 0xff))
+	    (eap[IDNETHER_NETID] != 0xff))
 		return (0);
 
 	return (1);
@@ -11539,7 +11474,7 @@ idn_send_mboxdata(int domid, struct idn *sip, int channel, caddr_t bufp)
 
 	if (mmp->mm_smr_mboxp == NULL) {
 		PR_DATA("%s: (d %d, chn %d) mm_smr_mboxp == NULL\n",
-			proc, domid, channel);
+		    proc, domid, channel);
 		IDN_KSTAT_INC(sip, si_linkdown);
 		rv = ENOLINK;
 		goto send_err;
@@ -11547,14 +11482,14 @@ idn_send_mboxdata(int domid, struct idn *sip, int channel, caddr_t bufp)
 	mbox_csum = IDN_CKSUM_MBOX(&mmp->mm_smr_mboxp->mt_header);
 	if (mbox_csum != mmp->mm_smr_mboxp->mt_header.mh_cksum) {
 		PR_DATA("%s: (d %d, chn %d) mbox hdr cksum (%d) "
-			"!= actual (%d)\n",
-			proc, domid, channel, mbox_csum,
-			mmp->mm_smr_mboxp->mt_header.mh_cksum);
+		    "!= actual (%d)\n",
+		    proc, domid, channel, mbox_csum,
+		    mmp->mm_smr_mboxp->mt_header.mh_cksum);
 		if ((mmp->mm_flags & IDNMMBOX_FLAG_CORRUPTED) == 0) {
 			cmn_err(CE_WARN,
-				"IDN: 241: [send] (domain %d, "
-				"channel %d) SMR CORRUPTED - RELINK",
-				domid, channel);
+			    "IDN: 241: [send] (domain %d, "
+			    "channel %d) SMR CORRUPTED - RELINK",
+			    domid, channel);
 			mmp->mm_flags |= IDNMMBOX_FLAG_CORRUPTED;
 		}
 		IDN_KSTAT_INC(sip, si_mboxcrc);
@@ -11574,7 +11509,7 @@ idn_send_mboxdata(int domid, struct idn *sip, int channel, caddr_t bufp)
 
 	if (mqp[qi].ms_owner) {
 		PR_DATA("%s: mailbox FULL (qiput=%d, qiget=%d)\n",
-			proc, mmp->mm_qiput, mmp->mm_qiget);
+		    proc, mmp->mm_qiput, mmp->mm_qiget);
 		IDN_KSTAT_INC(sip, si_txfull);
 		rv = ENOSPC;
 		goto send_err;
@@ -11592,8 +11527,8 @@ idn_send_mboxdata(int domid, struct idn *sip, int channel, caddr_t bufp)
 		recl_bufoffset = IDN_BFRAME2OFFSET(mqp[qi].ms_bframe);
 
 		PR_DATA("%s: attempting reclaim (domain %d) "
-			"(qiput=%d, b_off=0x%x)\n",
-			proc, domid, qi, recl_bufoffset);
+		    "(qiput=%d, b_off=0x%x)\n",
+		    proc, domid, qi, recl_bufoffset);
 
 		if (VALID_NWROFFSET(recl_bufoffset, IDN_SMR_BUFSIZE)) {
 			int		recl;
@@ -11614,17 +11549,17 @@ idn_send_mboxdata(int domid, struct idn *sip, int channel, caddr_t bufp)
 #ifdef DEBUG
 			if (recl == 0) {
 				PR_DATA("%s: SUCCESSFULLY reclaimed buf "
-					"(domain %d)\n", proc, domid);
+				    "(domain %d)\n", proc, domid);
 			} else {
 				PR_DATA("%s: WARNING: reclaim failed (FREE) "
-					"(domain %d)\n", proc, domid);
+				    "(domain %d)\n", proc, domid);
 			}
 #endif /* DEBUG */
 		} else {
 			IDN_KSTAT_INC(sip, si_smraddr);
 			IDN_KSTAT_INC(sip, si_reclaim);
 			PR_DATA("%s: WARNING: reclaim failed (BAD OFFSET) "
-				"(domain %d)\n", proc, domid);
+			    "(domain %d)\n", proc, domid);
 		}
 	}
 
@@ -11652,8 +11587,7 @@ idn_send_mboxdata(int domid, struct idn *sip, int channel, caddr_t bufp)
 		mt.mt_mtype = IDNP_DATA;
 		mt.mt_atype = 0;
 		IDN_KSTAT_INC(sip, si_xdcall);
-		(void) IDNXDC(domid, &mt, (uint_t)dst.net.chan,
-				0, 0, 0);
+		(void) IDNXDC(domid, &mt, (uint_t)dst.net.chan, 0, 0, 0);
 	}
 	mutex_exit(&mmp->mm_mutex);
 	IDN_KSTAT_INC(sip, si_opackets);
@@ -11698,7 +11632,7 @@ idn_recv_mboxdata(int channel, caddr_t bufp)
 
 	if (csum != hdrp->b_cksum) {
 		PR_DATA("%s: bad checksum(%x) != expected(%x)\n",
-			proc, (uint_t)csum, (uint_t)hdrp->b_cksum);
+		    proc, (uint_t)csum, (uint_t)hdrp->b_cksum);
 		IDN_KSTAT_INC(sip, si_crc);
 		IDN_KSTAT_INC(sip, si_fcs_errors);
 		rv = -1;
@@ -11713,7 +11647,7 @@ idn_recv_mboxdata(int channel, caddr_t bufp)
 
 	if (dst.netaddr != daddr.netaddr) {
 		PR_DATA("%s: wrong dest netaddr (0x%x), expected (0x%x)\n",
-			proc, dst.netaddr, daddr.netaddr);
+		    proc, dst.netaddr, daddr.netaddr);
 		IDN_KSTAT_INC(sip, si_nolink);
 		IDN_KSTAT_INC(sip, si_macrcv_errors);
 		goto recv_err;
@@ -11723,7 +11657,7 @@ idn_recv_mboxdata(int channel, caddr_t bufp)
 
 	if ((pktlen <= 0) || (pktlen > IDN_DATA_SIZE)) {
 		PR_DATA("%s: invalid packet length (%d) <= 0 || > %lu\n",
-			proc, pktlen, IDN_DATA_SIZE);
+		    proc, pktlen, IDN_DATA_SIZE);
 		IDN_KSTAT_INC(sip, si_buff);
 		IDN_KSTAT_INC(sip, si_toolong_errors);
 		goto recv_err;
@@ -11802,7 +11736,7 @@ idn_reclaim_mboxdata(int domid, int channel, int nbufs)
 	dp = &idn_domain[domid];
 
 	PR_DATA("%s: requested %d buffers from domain %d\n",
-		proc, nbufs, domid);
+	    proc, nbufs, domid);
 
 	if (lock_try(&dp->dreclaim_inprogress) == 0) {
 		/*
@@ -11835,7 +11769,7 @@ idn_reclaim_mboxdata(int domid, int channel, int nbufs)
 
 		if (mmp->mm_smr_mboxp == NULL) {
 			PR_DATA("%s: no smr pointer for domid %d, chan %d\n",
-				proc, domid, (int)mmp->mm_channel);
+			    proc, domid, (int)mmp->mm_channel);
 			ASSERT(mmp->mm_qiget == mmp->mm_qiput);
 			mutex_exit(&mmp->mm_mutex);
 			IDN_MBOXCHAN_INC(mi);
@@ -11844,9 +11778,9 @@ idn_reclaim_mboxdata(int domid, int channel, int nbufs)
 		mbox_csum = IDN_CKSUM_MBOX(&mmp->mm_smr_mboxp->mt_header);
 		if (mbox_csum != mmp->mm_smr_mboxp->mt_header.mh_cksum) {
 			PR_DATA("%s: (d %d, chn %d) mbox hdr "
-				"cksum (%d) != actual (%d)\n",
-				proc, domid, (int)mmp->mm_channel, mbox_csum,
-				mmp->mm_smr_mboxp->mt_header.mh_cksum);
+			    "cksum (%d) != actual (%d)\n",
+			    proc, domid, (int)mmp->mm_channel, mbox_csum,
+			    mmp->mm_smr_mboxp->mt_header.mh_cksum);
 			IDN_KSTAT_INC(sip, si_mboxcrc);
 			IDN_KSTAT_INC(sip, si_oerrors);
 			mutex_exit(&mmp->mm_mutex);
@@ -11857,8 +11791,8 @@ idn_reclaim_mboxdata(int domid, int channel, int nbufs)
 		qi  = mmp->mm_qiget;
 
 		while (!mqp[qi].ms_owner &&
-			(mqp[qi].ms_flag & IDN_MBOXMSG_FLAG_RECLAIM) &&
-			nbufs) {
+		    (mqp[qi].ms_flag & IDN_MBOXMSG_FLAG_RECLAIM) &&
+		    nbufs) {
 			idn_mboxmsg_t	*msp;
 			int		badbuf;
 
@@ -11867,11 +11801,11 @@ idn_reclaim_mboxdata(int domid, int channel, int nbufs)
 
 			if (msp->ms_flag & IDN_MBOXMSG_FLAG_ERRMASK) {
 				PR_DATA("%s: msg.flag ERROR(0x%x) (off=0x%x, "
-					"domid=%d, qiget=%d)\n", proc,
-					(uint_t)(msp->ms_flag &
-						IDN_MBOXMSG_FLAG_ERRMASK),
-					IDN_BFRAME2OFFSET(msp->ms_bframe),
-					domid, qi);
+				    "domid=%d, qiget=%d)\n", proc,
+				    (uint_t)(msp->ms_flag &
+				    IDN_MBOXMSG_FLAG_ERRMASK),
+				    IDN_BFRAME2OFFSET(msp->ms_bframe),
+				    domid, qi);
 			}
 			prev = curr;
 			curr = IDN_BFRAME2OFFSET(mqp[qi].ms_bframe);
@@ -11895,15 +11829,15 @@ idn_reclaim_mboxdata(int domid, int channel, int nbufs)
 					IDN_KSTAT_INC(sip, si_fcs_errors);
 					IDN_KSTAT_INC(sip, si_reclaim);
 					if (!(mmp->mm_flags &
-						IDNMMBOX_FLAG_CORRUPTED)) {
+					    IDNMMBOX_FLAG_CORRUPTED)) {
 						cmn_err(CE_WARN,
-							"IDN: 241: [send] "
-							"(domain %d, channel "
-							"%d) SMR CORRUPTED - "
-							"RELINK",
-							domid, channel);
+						    "IDN: 241: [send] "
+						    "(domain %d, channel "
+						    "%d) SMR CORRUPTED - "
+						    "RELINK",
+						    domid, channel);
 						mmp->mm_flags |=
-							IDNMMBOX_FLAG_CORRUPTED;
+						    IDNMMBOX_FLAG_CORRUPTED;
 					}
 
 				} else if (reclaim_list == IDN_NIL_SMROFFSET) {
@@ -11945,7 +11879,7 @@ idn_reclaim_mboxdata(int domid, int channel, int nbufs)
 	}
 
 	PR_DATA("%s: reclaimed %d buffers from domain %d\n",
-		proc, reclaim_cnt, domid);
+	    proc, reclaim_cnt, domid);
 
 	if (reclaim_cnt == 0) {
 		lock_clear(&dp->dreclaim_inprogress);
@@ -11970,8 +11904,8 @@ idn_reclaim_mboxdata(int domid, int channel, int nbufs)
 			 * These buffers are effectively lost.
 			 */
 			cmn_err(CE_WARN,
-				"IDN: 241: [send] (domain %d, channel %d) SMR "
-				"CORRUPTED - RELINK", domid, channel);
+			    "IDN: 241: [send] (domain %d, channel %d) SMR "
+			    "CORRUPTED - RELINK", domid, channel);
 			break;
 		}
 
@@ -11989,7 +11923,7 @@ idn_reclaim_mboxdata(int domid, int channel, int nbufs)
 #ifdef DEBUG
 	if (free_cnt != reclaim_cnt) {
 		PR_DATA("%s: *** WARNING *** freecnt(%d) != reclaim_cnt (%d)\n",
-			proc, free_cnt, reclaim_cnt);
+		    proc, free_cnt, reclaim_cnt);
 	}
 #endif /* DEBUG */
 
@@ -12069,12 +12003,12 @@ idn_signal_data_server(int domid, ushort_t channel)
 	}
 	if (channel == IDN_BROADCAST_ALLCHAN) {
 		PR_DATA("%s: requested signal to ALL channels on domain %d\n",
-			proc, domid);
+		    proc, domid);
 		min_chan = 0;
 		max_chan = IDN_MAX_NETS - 1;
 	} else {
 		PR_DATA("%s: requested signal to channel %d on domain %d\n",
-			proc, channel, domid);
+		    proc, channel, domid);
 		min_chan = max_chan = (int)channel;
 	}
 	mmp += min_chan;
@@ -12089,7 +12023,7 @@ idn_signal_data_server(int domid, ushort_t channel)
 
 		if (csp->ch_recv.c_checkin) {
 			PR_DATA("%s: chansvr (%d) for domid %d CHECK-IN\n",
-				proc, c, domid);
+			    proc, c, domid);
 			continue;
 		}
 
@@ -12098,7 +12032,7 @@ idn_signal_data_server(int domid, ushort_t channel)
 			 * Failed to grab lock, server must be active.
 			 */
 			PR_DATA("%s: chansvr (%d) for domid %d already actv\n",
-				proc, c, domid);
+			    proc, c, domid);
 			continue;
 		}
 
@@ -12118,7 +12052,7 @@ idn_signal_data_server(int domid, ushort_t channel)
 		if (IDN_CHANNEL_IS_RECV_ACTIVE(csp) == 0) {
 			IDN_CHAN_UNLOCK_RECV(csp);
 			PR_DATA("%s: chansvr (%d) for domid %d inactive\n",
-				proc, c, domid);
+			    proc, c, domid);
 			continue;
 		}
 
@@ -12152,14 +12086,14 @@ idn_signal_data_server(int domid, ushort_t channel)
 			 */
 			IDN_CHAN_UNLOCK_RECV(csp);
 			PR_DATA("%s: chansvr (%d) for domid %d already actv\n",
-				proc, c, domid);
+			    proc, c, domid);
 			continue;
 		}
 		ASSERT(csp == &idn.chan_servers[c]);
 
 
 		PR_DATA("%s: signaling data dispatcher for chan %d dom %d\n",
-			proc, c, domid);
+		    proc, c, domid);
 		ASSERT(csp);
 		cv_signal(&csp->ch_recv_cv);
 		IDN_CHAN_UNLOCK_RECV(csp);
@@ -12178,7 +12112,7 @@ idn_signal_data_server(int domid, ushort_t channel)
 send_dresp:
 
 	PR_DATA("%s: sending NACK (%s) back to domain %d (cpu %d)\n",
-		proc, idnnack_str[nacktype], domid, idn_domain[domid].dcpu);
+	    proc, idnnack_str[nacktype], domid, idn_domain[domid].dcpu);
 
 	idn_send_dataresp(domid, nacktype);
 
@@ -12195,9 +12129,9 @@ idn_recv_data(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 	procname_t	proc = "idn_recv_data";
 
 	PR_PROTO("%s:%d: DATA message received (msg = 0x%x, msgarg = 0x%x)\n",
-		proc, domid, msg, msgarg);
+	    proc, domid, msg, msgarg);
 	PR_PROTO("%s:%d: xargs = (0x%x, 0x%x, 0x%x, 0x%x)\n",
-		proc, domid, xargs[0], xargs[1], xargs[2], xargs[3]);
+	    proc, domid, xargs[0], xargs[1], xargs[2], xargs[3]);
 #endif /* DEBUG */
 
 	return (0);
@@ -12254,8 +12188,8 @@ idn_open_channel(int channel)
 
 	if (channel >= IDN_MAX_NETS) {
 		cmn_err(CE_WARN,
-			"IDN: 242: maximum channels (%d) already open",
-			IDN_MAX_NETS);
+		    "IDN: 242: maximum channels (%d) already open",
+		    IDN_MAX_NETS);
 		return (-1);
 	}
 	IDN_GLOCK_EXCL();
@@ -12297,10 +12231,10 @@ idn_open_channel(int channel)
 	 */
 	ASSERT(idn.nchannels > 0);
 	IDN_WINDOW_EMAX = IDN_WINDOW_MAX +
-				((idn.nchannels - 1) * IDN_WINDOW_INCR);
+	    ((idn.nchannels - 1) * IDN_WINDOW_INCR);
 
 	PR_CHAN("%s: channel %d is OPEN (nchannels = %d)\n",
-		proc, channel, idn.nchannels);
+	    proc, channel, idn.nchannels);
 
 	masterid = IDN_GET_MASTERID();
 	IDN_GUNLOCK();
@@ -12316,7 +12250,7 @@ idn_open_channel(int channel)
 		IDN_DLOCK_SHARED(masterid);
 		if (dp->dvote.v.master && (dp->dstate == IDNDS_CONNECTED))
 			(void) idn_activate_channel(CHANSET(channel),
-							IDNCHAN_ONLINE);
+			    IDNCHAN_ONLINE);
 		IDN_DUNLOCK(masterid);
 	}
 
@@ -12360,14 +12294,14 @@ idn_close_channel(int channel, idn_chanop_t chanop)
 			IDN_WINDOW_EMAX = 0;
 		else
 			IDN_WINDOW_EMAX = IDN_WINDOW_MAX +
-					((idn.nchannels - 1) * IDN_WINDOW_INCR);
+			    ((idn.nchannels - 1) * IDN_WINDOW_INCR);
 	}
 
 	PR_CHAN("%s: channel %d is (%s) CLOSED (nchannels = %d)\n",
-		proc, channel,
-		(chanop == IDNCHAN_SOFT_CLOSE) ? "SOFT"
-		: (chanop == IDNCHAN_HARD_CLOSE) ? "HARD" : "OFFLINE",
-		idn.nchannels);
+	    proc, channel,
+	    (chanop == IDNCHAN_SOFT_CLOSE) ? "SOFT"
+	    : (chanop == IDNCHAN_HARD_CLOSE) ? "HARD" : "OFFLINE",
+	    idn.nchannels);
 
 	IDN_CHAN_UNLOCK_GLOBAL(csp);
 	IDN_GUNLOCK();
@@ -12380,7 +12314,7 @@ idn_activate_channel(idn_chanset_t chanset, idn_chanop_t chanop)
 	procname_t	proc = "idn_activate_channel";
 
 	PR_CHAN("%s: chanset = 0x%x, chanop = %s\n",
-		proc, chanset, chanop_str[chanop]);
+	    proc, chanset, chanop_str[chanop]);
 
 	if (idn.state != IDNGS_ONLINE) {
 		/*
@@ -12388,7 +12322,7 @@ idn_activate_channel(idn_chanset_t chanset, idn_chanop_t chanop)
 		 * domain is connected and thus has a master.
 		 */
 		PR_CHAN("%s: local domain not connected.  no data servers\n",
-			proc);
+		    proc);
 		return (-1);
 	}
 
@@ -12412,8 +12346,8 @@ idn_activate_channel(idn_chanset_t chanset, idn_chanop_t chanop)
 			 */
 			if (IDN_CHAN_TRYLOCK_GLOBAL(csp) == 0) {
 				PR_CHAN("%s: failed to acquire global "
-					"lock for channel %d\n",
-					proc, c);
+				    "lock for channel %d\n",
+				    proc, c);
 				continue;
 			}
 		}
@@ -12444,12 +12378,12 @@ idn_activate_channel(idn_chanset_t chanset, idn_chanop_t chanop)
 
 			if (idn_activate_channel_services(c) >= 0) {
 				PR_CHAN("%s: Setting channel %d ACTIVE\n",
-					proc, c);
+				    proc, c);
 				IDN_CHANSVC_MARK_ACTIVE(csp);
 				rv++;
 			}
 		} else if (!IDN_CHANNEL_IS_PENDING(csp) &&
-					(chanop == IDNCHAN_ONLINE)) {
+		    (chanop == IDNCHAN_ONLINE)) {
 			PR_CHAN("%s: Setting channel %d PENDING\n", proc, c);
 
 			IDN_CHANSVC_MARK_PENDING(csp);
@@ -12461,9 +12395,9 @@ idn_activate_channel(idn_chanset_t chanset, idn_chanop_t chanop)
 		 * touch it.
 		 */
 		if (IDN_CHANNEL_IS_ENABLED(csp) &&
-			((mainhp = idn_chan_server_syncheader(c)) != NULL)) {
+		    ((mainhp = idn_chan_server_syncheader(c)) != NULL)) {
 			PR_CHAN("%s: marking chansvr (mhp=0x%p) %d READY\n",
-				proc, mainhp, c);
+			    proc, mainhp, c);
 			mainhp->mh_svr_ready = 1;
 		}
 
@@ -12491,9 +12425,8 @@ idn_deactivate_channel(idn_chanset_t chanset, idn_chanop_t chanop)
 	int		c;
 	procname_t	proc = "idn_deactivate_channel";
 
-
 	PR_CHAN("%s: chanset = 0x%x, chanop = %s\n",
-		proc, chanset, chanop_str[chanop]);
+	    proc, chanset, chanop_str[chanop]);
 
 	for (c = 0; c < IDN_MAX_NETS; c++) {
 		idn_chansvr_t	*csp;
@@ -12507,17 +12440,17 @@ idn_deactivate_channel(idn_chanset_t chanset, idn_chanop_t chanop)
 		IDN_CHAN_LOCK_GLOBAL(csp);
 
 		if (((chanop == IDNCHAN_SOFT_CLOSE) &&
-				!IDN_CHANNEL_IS_ACTIVE(csp)) ||
-			((chanop == IDNCHAN_HARD_CLOSE) &&
-				IDN_CHANNEL_IS_DETACHED(csp)) ||
-			((chanop == IDNCHAN_OFFLINE) &&
-				!IDN_CHANNEL_IS_ENABLED(csp))) {
+		    !IDN_CHANNEL_IS_ACTIVE(csp)) ||
+		    ((chanop == IDNCHAN_HARD_CLOSE) &&
+		    IDN_CHANNEL_IS_DETACHED(csp)) ||
+		    ((chanop == IDNCHAN_OFFLINE) &&
+		    !IDN_CHANNEL_IS_ENABLED(csp))) {
 
 			ASSERT(!IDN_CHANNEL_IS_RECV_ACTIVE(csp));
 			ASSERT(!IDN_CHANNEL_IS_SEND_ACTIVE(csp));
 
 			PR_CHAN("%s: channel %d already deactivated\n",
-				proc, c);
+			    proc, c);
 			IDN_CHAN_UNLOCK_GLOBAL(csp);
 			continue;
 		}
@@ -12551,9 +12484,9 @@ idn_deactivate_channel(idn_chanset_t chanset, idn_chanop_t chanop)
 		lock_clear(&csp->ch_initlck);
 
 		PR_CHAN("%s: DEACTIVATING channel %d (%s)\n", proc, c,
-			chanop_str[chanop]);
+		    chanop_str[chanop]);
 		PR_CHAN("%s: removing chanset 0x%x data svrs for "
-			"each domain link\n", proc, chanset);
+		    "each domain link\n", proc, chanset);
 
 		(void) idn_deactivate_channel_services(c, chanop);
 	}
@@ -12593,14 +12526,14 @@ idn_activate_channel_services(int channel)
 		 */
 		ASSERT(csp->ch_id == (uchar_t)channel);
 		PR_CHAN("%s: existing chansvr FOUND for (c=%d)\n",
-			proc, channel);
+		    proc, channel);
 
 		if (IDN_CHANNEL_IS_PENDING(csp) == 0)
 			return (-1);
 
 		PR_CHAN("%s: chansvr (c=%d) Rstate = 0x%x, Sstate = 0x%x\n",
-			proc, channel, csp->ch_recv.c_state,
-			csp->ch_send.c_state);
+		    proc, channel, csp->ch_recv.c_state,
+		    csp->ch_send.c_state);
 
 		cv_signal(&csp->ch_recv_cv);
 
@@ -12687,7 +12620,7 @@ idn_deactivate_channel_services(int channel, idn_chanop_t chanop)
 			 * At mark him idle incase we start him up.
 			 */
 			PR_CHAN("%s: no channel server found for chan %d\n",
-				proc, c);
+			    proc, c);
 			IDN_CHAN_UNLOCK_LOCAL(csp);
 			IDN_CHAN_UNLOCK_GLOBAL(csp);
 			continue;
@@ -12715,8 +12648,8 @@ idn_deactivate_channel_services(int channel, idn_chanop_t chanop)
 		}
 
 		PR_CHAN("%s: pointing chansvr %d to morgue (0x%p)\n",
-			proc, c, central_morguep ? central_morguep
-						: csp->ch_recv_morguep);
+		    proc, c, central_morguep ? central_morguep
+		    : csp->ch_recv_morguep);
 
 		if (central_morguep == NULL) {
 			central_morguep = csp->ch_recv_morguep;
@@ -12742,13 +12675,13 @@ idn_deactivate_channel_services(int channel, idn_chanop_t chanop)
 		cs_count++;
 	}
 	PR_CHAN("%s: signaled %d chansvrs for chanset 0x%x\n",
-		proc, cs_count, chanset);
+	    proc, cs_count, chanset);
 
 	if ((chanop == IDNCHAN_SOFT_CLOSE) || (chanop == IDNCHAN_OFFLINE))
 		return (cs_count);
 
 	PR_CHAN("%s: waiting for %d (chnset=0x%x) chan svrs to term\n",
-		proc, cs_count, chanset);
+	    proc, cs_count, chanset);
 	PR_CHAN("%s: morguep = 0x%p\n", proc, central_morguep);
 
 	ASSERT((cs_count > 0) ? (central_morguep != NULL) : 1);
@@ -12841,7 +12774,7 @@ idn_exec_chanactivate(void *chn)
 	if (IDN_CHANNEL_IS_PENDING(csp) && lock_try(&csp->ch_actvlck)) {
 		IDN_CHAN_UNLOCK_GLOBAL(csp);
 		not_active = idn_activate_channel(CHANSET(channel),
-							IDNCHAN_OPEN);
+		    IDNCHAN_OPEN);
 		if (not_active)
 			lock_clear(&csp->ch_actvlck);
 	} else {
@@ -12949,20 +12882,18 @@ idn_xmit_monitor(void *unused)
 		if (!IDN_CHAN_TRYLOCK_GLOBAL(csp))
 			continue;
 
-		pending_bits = csp->ch_state &
-				IDN_CHANSVC_PENDING_BITS;
+		pending_bits = csp->ch_state & IDN_CHANSVC_PENDING_BITS;
 
 		sip = IDN_INST2SIP(c);
 
 		if (!csp->ch_send.c_checkin &&
-			(pending_bits == IDN_CHANSVC_PENDING_BITS) &&
-			sip && (sip->si_flags & IDNRUNNING)) {
+		    (pending_bits == IDN_CHANSVC_PENDING_BITS) &&
+		    sip && (sip->si_flags & IDNRUNNING)) {
 
 			IDN_CHAN_UNLOCK_GLOBAL(csp);
 			CHANSET_ADD(wake_set, c);
 
-			PR_XMON("%s: QENABLE for channel %d\n",
-				proc, c);
+			PR_XMON("%s: QENABLE for channel %d\n", proc, c);
 
 			rw_enter(&idn.struprwlock, RW_READER);
 			mutex_enter(&idn.sipwenlock);
@@ -12985,7 +12916,7 @@ retry:
 		idn.xmit_tid = NULL;
 	else
 		idn.xmit_tid = timeout(idn_xmit_monitor, NULL,
-					idn_xmit_monitor_freq);
+		    idn_xmit_monitor_freq);
 
 	mutex_exit(&idn.xmit_lock);
 }
@@ -13017,7 +12948,7 @@ idn_xmit_monitor_kickoff(int chan_wanted)
 	}
 
 	PR_XMON("%s: xmit_mon kicked OFF (chanset = 0x%x)\n",
-		proc, idn.xmit_chanset_wanted);
+	    proc, idn.xmit_chanset_wanted);
 
 	idn.xmit_tid = timeout(idn_xmit_monitor, NULL, idn_xmit_monitor_freq);
 

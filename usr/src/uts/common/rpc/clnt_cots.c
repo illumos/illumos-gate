@@ -792,7 +792,7 @@ clnt_cots_kcallit(CLIENT *h, rpcproc_t procnum, xdrproc_t xdr_args,
 	enum clnt_stat status;
 	struct timeval cwait;
 	bool_t delay_first = FALSE;
-	clock_t ticks;
+	clock_t ticks, now;
 
 	RPCLOG(2, "clnt_cots_kcallit, procnum %u\n", procnum);
 	COTSRCSTAT_INCR(p->cku_stats, rccalls);
@@ -1154,7 +1154,7 @@ dispatch_again:
 	p->cku_recv_attempts = 1;
 
 #ifdef	RPCDEBUG
-	time_sent = lbolt;
+	time_sent = ddi_get_lbolt();
 #endif
 
 	/*
@@ -1182,7 +1182,7 @@ read_again:
 		if (lwp != NULL)
 			lwp->lwp_nostop++;
 
-		oldlbolt = lbolt;
+		oldlbolt = ddi_get_lbolt();
 		timout = wait.tv_sec * drv_usectohz(1000000) +
 		    drv_usectohz(wait.tv_usec) + oldlbolt;
 		/*
@@ -1267,19 +1267,20 @@ read_again:
 	if (status != RPC_SUCCESS) {
 		switch (status) {
 		case RPC_TIMEDOUT:
+			now = ddi_get_lbolt();
 			if (interrupted) {
 				COTSRCSTAT_INCR(p->cku_stats, rcintrs);
 				p->cku_err.re_status = RPC_INTR;
 				p->cku_err.re_errno = EINTR;
 				RPCLOG(1, "clnt_cots_kcallit: xid 0x%x",
 				    p->cku_xid);
-				RPCLOG(1, "signal interrupted at %ld", lbolt);
+				RPCLOG(1, "signal interrupted at %ld", now);
 				RPCLOG(1, ", was sent at %ld\n", time_sent);
 			} else {
 				COTSRCSTAT_INCR(p->cku_stats, rctimeouts);
 				p->cku_err.re_errno = ETIMEDOUT;
 				RPCLOG(1, "clnt_cots_kcallit: timed out at %ld",
-				    lbolt);
+				    now);
 				RPCLOG(1, ", was sent at %ld\n", time_sent);
 			}
 			break;
@@ -1715,7 +1716,7 @@ connmgr_cwait(struct cm_xprt *cm_entry, const struct timeval *waitp,
 	 */
 
 	timout = waitp->tv_sec * drv_usectohz(1000000) +
-	    drv_usectohz(waitp->tv_usec) + lbolt;
+	    drv_usectohz(waitp->tv_usec) + ddi_get_lbolt();
 
 	if (nosignal) {
 		while ((cv_stat = cv_timedwait(&cm_entry->x_conn_cv,
@@ -1933,7 +1934,7 @@ use_new_conn:
 			bcopy(lru_entry->x_src.buf, srcaddr->buf, srcaddr->len);
 			RPCLOG(2, "connmgr_get: call going out on %p\n",
 			    (void *)lru_entry);
-			lru_entry->x_time = lbolt;
+			lru_entry->x_time = ddi_get_lbolt();
 			CONN_HOLD(lru_entry);
 
 			if ((i > 1) && (prev != &cm_hd)) {
@@ -2052,7 +2053,7 @@ start_retry_loop:
 			} else {
 				CONN_HOLD(cm_entry);
 
-				cm_entry->x_time = lbolt;
+				cm_entry->x_time = ddi_get_lbolt();
 				mutex_exit(&connmgr_lock);
 				RPCLOG(2, "connmgr_get: found old "
 				    "transport %p for retry\n",
@@ -2250,7 +2251,7 @@ start_retry_loop:
 	cm_entry->x_src.len = cm_entry->x_src.maxlen = srcaddr->len;
 
 	cm_entry->x_tiptr = tiptr;
-	cm_entry->x_time = lbolt;
+	cm_entry->x_time = ddi_get_lbolt();
 
 	if (tiptr->tp_info.servtype == T_COTS_ORD)
 		cm_entry->x_ordrel = TRUE;
@@ -2281,7 +2282,7 @@ start_retry_loop:
 	 */
 	cm_entry->x_early_disc = FALSE;
 	cm_entry->x_needdis = (cm_entry->x_connected == FALSE);
-	cm_entry->x_ctime = lbolt;
+	cm_entry->x_ctime = ddi_get_lbolt();
 
 	/*
 	 * Notify any threads waiting that the connection attempt is done.
@@ -2407,7 +2408,7 @@ connmgr_wrapconnect(
 		 * actually timed out. So ensure that before the next
 		 * connection attempt we do a disconnect.
 		 */
-		cm_entry->x_ctime = lbolt;
+		cm_entry->x_ctime = ddi_get_lbolt();
 		cm_entry->x_thread = FALSE;
 
 		cv_broadcast(&cm_entry->x_conn_cv);
@@ -2436,7 +2437,7 @@ connmgr_wrapconnect(
 		}
 		bcopy(cm_entry->x_src.buf, srcaddr->buf, srcaddr->len);
 	}
-	cm_entry->x_time = lbolt;
+	cm_entry->x_time = ddi_get_lbolt();
 	mutex_exit(&connmgr_lock);
 	return (cm_entry);
 }
@@ -2462,16 +2463,13 @@ connmgr_dis_and_wait(struct cm_xprt *cm_entry)
 		}
 
 		if (cm_entry->x_waitdis == TRUE) {
-			clock_t curlbolt;
 			clock_t timout;
 
 			RPCLOG(8, "connmgr_dis_and_wait waiting for "
 			    "T_DISCON_REQ's ACK for connection %p\n",
 			    (void *)cm_entry);
-			curlbolt = ddi_get_lbolt();
 
-			timout = clnt_cots_min_conntout *
-			    drv_usectohz(1000000) + curlbolt;
+			timout = clnt_cots_min_conntout * drv_usectohz(1000000);
 
 			/*
 			 * The TPI spec says that the T_DISCON_REQ
@@ -2479,8 +2477,8 @@ connmgr_dis_and_wait(struct cm_xprt *cm_entry)
 			 * the ACK may never get sent. So don't
 			 * block forever.
 			 */
-			(void) cv_timedwait(&cm_entry->x_dis_cv,
-			    &connmgr_lock, timout);
+			(void) cv_reltimedwait(&cm_entry->x_dis_cv,
+			    &connmgr_lock, timout, TR_CLOCK_TICK);
 		}
 		/*
 		 * If we got the ACK, break. If we didn't,
@@ -3711,13 +3709,13 @@ waitforack(calllist_t *e, t_scalar_t ack_prim, const struct timeval *waitp,
 	while (e->call_reply == NULL) {
 		if (waitp != NULL) {
 			timout = waitp->tv_sec * drv_usectohz(MICROSEC) +
-			    drv_usectohz(waitp->tv_usec) + lbolt;
+			    drv_usectohz(waitp->tv_usec);
 			if (nosignal)
-				cv_stat = cv_timedwait(&e->call_cv,
-				    &clnt_pending_lock, timout);
+				cv_stat = cv_reltimedwait(&e->call_cv,
+				    &clnt_pending_lock, timout, TR_CLOCK_TICK);
 			else
-				cv_stat = cv_timedwait_sig(&e->call_cv,
-				    &clnt_pending_lock, timout);
+				cv_stat = cv_reltimedwait_sig(&e->call_cv,
+				    &clnt_pending_lock, timout, TR_CLOCK_TICK);
 		} else {
 			if (nosignal)
 				cv_wait(&e->call_cv, &clnt_pending_lock);

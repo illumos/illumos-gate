@@ -136,13 +136,13 @@ progressbar_step()
 static void
 progressbar_thread(void *arg)
 {
-	clock_t end;
+	clock_t end = drv_usectohz(150000);
 
 	mutex_enter(&pbar_lock);
 	while (graphics_mode) {
 		progressbar_step();
-		end = ddi_get_lbolt() + drv_usectohz(150000);
-		(void) cv_timedwait(&pbar_cv, &pbar_lock, end);
+		(void) cv_reltimedwait(&pbar_cv, &pbar_lock, end,
+		    TR_CLOCK_TICK);
 	}
 	mutex_exit(&pbar_lock);
 }

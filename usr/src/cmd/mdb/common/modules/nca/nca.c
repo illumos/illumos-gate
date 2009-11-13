@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * NCA mdb module.  Provides a collection of dcmds and walkers that
@@ -465,10 +462,8 @@ nca_timer(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	if (mdb_readvar(&lbolt, "lbolt") == -1) {
-		mdb_warn("cannot read symbol lbolt");
+	if ((lbolt = (clock_t)mdb_get_lbolt()) == -1)
 		return (DCMD_ERR);
-	}
 
 	mdb_printf("%0*p %0*p", NCA_ADDR_WIDTH, addr, NCA_ADDR_WIDTH, ti.ep);
 	mdb_inc_indent(24);
@@ -537,7 +532,7 @@ nca_node(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_USAGE);
 
 	if (mdb_getopts(argc, argv, 'v', MDB_OPT_SETBITS, TRUE, &verbose,
-		'r', MDB_OPT_SETBITS, TRUE, &request, 'p', NULL) != argc)
+	    'r', MDB_OPT_SETBITS, TRUE, &request, 'p', NULL) != argc)
 		return (DCMD_USAGE);
 
 	if (!DCMD_HDRSPEC(flags) && verbose)
@@ -545,9 +540,9 @@ nca_node(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (DCMD_HDRSPEC(flags) || verbose) {
 		mdb_printf("%<u>%-*s %4s %5s %8s %-*s %-*s %-*s %-*s%</u>\n",
-			NCA_ADDR_WIDTH, "ADDR", "REF", "STATE", "DATASIZE",
-			NCA_ADDR_WIDTH, "SQUEUE", NCA_ADDR_WIDTH, "REQUEST",
-			NCA_ADDR_WIDTH, "PLRUN", NCA_ADDR_WIDTH, "VLRUN");
+		    NCA_ADDR_WIDTH, "ADDR", "REF", "STATE", "DATASIZE",
+		    NCA_ADDR_WIDTH, "SQUEUE", NCA_ADDR_WIDTH, "REQUEST",
+		    NCA_ADDR_WIDTH, "PLRUN", NCA_ADDR_WIDTH, "VLRUN");
 	}
 
 	if (mdb_vread(&node, sizeof (node_t), addr) == -1) {

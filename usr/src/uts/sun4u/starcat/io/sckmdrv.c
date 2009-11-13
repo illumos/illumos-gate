@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -835,8 +835,8 @@ sckm_process_msg(uint32_t cmd, uint64_t transid,
 	cv_signal(&sckm_udata_cv);
 
 	/* wait for daemon to process request */
-	if (cv_timedwait(&sckm_cons_cv, &sckm_umutex,
-	    ddi_get_lbolt()+drv_usectohz(SCKM_DAEMON_TIMEOUT)) == -1) {
+	if (cv_reltimedwait(&sckm_cons_cv, &sckm_umutex,
+	    drv_usectohz(SCKM_DAEMON_TIMEOUT), TR_CLOCK_TICK) == -1) {
 		/*
 		 * Daemon did not process the data, report this
 		 * error to the SC.

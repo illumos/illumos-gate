@@ -110,6 +110,7 @@ sdev_wait4lookup(struct sdev_node *dv, int cmd)
 {
 	clock_t	expire;
 	clock_t rv;
+	clock_t wakeup = drv_usectohz(2 * 1000000);
 	int rval = ENOENT;
 	int is_lookup = (cmd == SDEV_LOOKUP);
 
@@ -129,9 +130,8 @@ sdev_wait4lookup(struct sdev_node *dv, int cmd)
 		while (DEVNAME_DEVFSADM_IS_RUNNING(devfsadm_state) &&
 		    !sdev_devfsadm_revoked()) {
 			/* wait 2 sec and check devfsadm completion */
-			rv = cv_timedwait_sig(&dv->sdev_lookup_cv,
-			    &dv->sdev_lookup_lock, ddi_get_lbolt() +
-			    drv_usectohz(2 * 1000000));
+			rv = cv_reltimedwait_sig(&dv->sdev_lookup_cv,
+			    &dv->sdev_lookup_lock, wakeup, TR_CLOCK_TICK);
 
 			if (is_lookup && (rv > 0)) {
 				/* was this node constructed ? */
@@ -233,9 +233,8 @@ sdev_open_upcall_door()
 
 	ASSERT(sdev_upcall_door == NULL);
 
-	/* tick value at which wait expires */
-	expire = ddi_get_lbolt() +
-	    drv_usectohz(dev_devfsadm_startup * 1000000);
+	/* timeout expires this many ticks in the future */
+	expire = ddi_get_lbolt() + drv_usectohz(dev_devfsadm_startup * 1000000);
 
 	if (sdev_door_upcall_filename == NULL) {
 		if ((error = sdev_start_devfsadmd()) != 0) {

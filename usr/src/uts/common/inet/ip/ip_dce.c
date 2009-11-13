@@ -125,7 +125,7 @@ dcb_reclaim(dcb_t *dcb, ip_stack_t *ipst, uint_t fraction)
 		/* Clear DCEF_PMTU if the pmtu is too old */
 		mutex_enter(&dce->dce_lock);
 		if ((dce->dce_flags & DCEF_PMTU) &&
-		    TICK_TO_SEC(lbolt64) - dce->dce_last_change_time >
+		    TICK_TO_SEC(ddi_get_lbolt64()) - dce->dce_last_change_time >
 		    ipst->ips_ip_pathmtu_interval) {
 			dce->dce_flags &= ~DCEF_PMTU;
 			mutex_exit(&dce->dce_lock);
@@ -220,7 +220,8 @@ dce_stack_init(ip_stack_t *ipst)
 	bzero(ipst->ips_dce_default, sizeof (dce_t));
 	ipst->ips_dce_default->dce_flags = DCEF_DEFAULT;
 	ipst->ips_dce_default->dce_generation = DCE_GENERATION_INITIAL;
-	ipst->ips_dce_default->dce_last_change_time = TICK_TO_SEC(lbolt64);
+	ipst->ips_dce_default->dce_last_change_time =
+	    TICK_TO_SEC(ddi_get_lbolt64());
 	ipst->ips_dce_default->dce_refcnt = 1;	/* Should never go away */
 	ipst->ips_dce_default->dce_ipst = ipst;
 
@@ -428,7 +429,7 @@ dce_lookup_and_add_v4(ipaddr_t dst, ip_stack_t *ipst)
 	dce->dce_v4addr = dst;
 	dce->dce_generation = DCE_GENERATION_INITIAL;
 	dce->dce_ipversion = IPV4_VERSION;
-	dce->dce_last_change_time = TICK_TO_SEC(lbolt64);
+	dce->dce_last_change_time = TICK_TO_SEC(ddi_get_lbolt64());
 	dce_refhold(dce);	/* For the hash list */
 
 	/* Link into list */
@@ -493,7 +494,7 @@ dce_lookup_and_add_v6(const in6_addr_t *dst, uint_t ifindex, ip_stack_t *ipst)
 	dce->dce_ifindex = ifindex;
 	dce->dce_generation = DCE_GENERATION_INITIAL;
 	dce->dce_ipversion = IPV6_VERSION;
-	dce->dce_last_change_time = TICK_TO_SEC(lbolt64);
+	dce->dce_last_change_time = TICK_TO_SEC(ddi_get_lbolt64());
 	dce_refhold(dce);	/* For the hash list */
 
 	/* Link into list */
@@ -560,7 +561,7 @@ dce_setuinfo(dce_t *dce, iulp_t *uinfo)
 			dce->dce_pmtu = MIN(uinfo->iulp_mtu, IP_MAXPACKET);
 			dce->dce_flags |= DCEF_PMTU;
 		}
-		dce->dce_last_change_time = TICK_TO_SEC(lbolt64);
+		dce->dce_last_change_time = TICK_TO_SEC(ddi_get_lbolt64());
 	}
 	if (uinfo->iulp_ssthresh != 0) {
 		if (dce->dce_uinfo.iulp_ssthresh != 0)
@@ -756,7 +757,7 @@ ip_snmp_get_mib2_ip_dce(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 	int			i;
 	uint64_t		current_time;
 
-	current_time = TICK_TO_SEC(lbolt64);
+	current_time = TICK_TO_SEC(ddi_get_lbolt64());
 
 	/*
 	 * make a copy of the original message

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * The "lombus" driver provides access to the LOMlite2 virtual registers,
@@ -827,7 +827,6 @@ lombus_cmd(HANDLE_TYPE *hdlp, ptrdiff_t vreg, uint_t val, uint_t cmd)
 {
 	struct lombus_state *ssp;
 	clock_t start;
-	clock_t tick;
 	uint8_t *p;
 
 	/*
@@ -891,10 +890,11 @@ lombus_cmd(HANDLE_TYPE *hdlp, ptrdiff_t vreg, uint_t val, uint_t cmd)
 	start = ddi_get_lbolt();
 	ssp->deadline = start + drv_usectohz(LOMBUS_CTS_TIMEOUT/1000);
 	while (!sio_lom_ready(ssp)) {
-		if ((tick = ddi_get_lbolt()) > ssp->deadline)
+		if (ddi_get_lbolt() > ssp->deadline)
 			break;
-		tick += drv_usectohz(LOMBUS_CTS_POLL/1000);
-		cv_timedwait(ssp->lo_cv, ssp->lo_mutex, tick);
+
+		cv_reltimedwait(ssp->lo_cv, ssp->lo_mutex,
+		    drv_usectohz(LOMBUS_CTS_POLL/1000), TR_CLOCK_TICK);
 	}
 
 	/*
@@ -926,8 +926,8 @@ lombus_cmd(HANDLE_TYPE *hdlp, ptrdiff_t vreg, uint_t val, uint_t cmd)
 	ssp->result = DUMMY_VALUE;
 	ssp->cmdstate = LOMBUS_CMDSTATE_WAITING;
 	while (ssp->cmdstate == LOMBUS_CMDSTATE_WAITING) {
-		tick = ddi_get_lbolt() + drv_usectohz(LOMBUS_CMD_POLL/1000);
-		if (cv_timedwait(ssp->lo_cv, ssp->lo_mutex, tick) == -1)
+		if (cv_reltimedwait(ssp->lo_cv, ssp->lo_mutex,
+		    drv_usectohz(LOMBUS_CMD_POLL/1000), TR_CLOCK_TICK) == -1)
 			lombus_receive(ssp);
 	}
 

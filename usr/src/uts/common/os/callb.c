@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/t_lock.h>
@@ -296,9 +294,9 @@ callb_generic_cpr(void *arg, int code)
 #ifdef CPR_NOT_THREAD_SAFE
 		while (!(cp->cc_events & CALLB_CPR_SAFE))
 			/* cv_timedwait() returns -1 if it times out. */
-			if ((ret = cv_timedwait(&cp->cc_callb_cv,
-			    cp->cc_lockp,
-			    lbolt + callb_timeout_sec * hz)) == -1)
+			if ((ret = cv_reltimedwait(&cp->cc_callb_cv,
+			    cp->cc_lockp, (callb_timeout_sec * hz),
+			    TR_CLOCK_TICK)) == -1)
 				break;
 #endif
 		break;

@@ -597,7 +597,7 @@ void
 rfs4_grace_start(rfs4_servinst_t *sip)
 {
 	rw_enter(&sip->rwlock, RW_WRITER);
-	sip->start_time = (time_t)TICK_TO_SEC(lbolt);
+	sip->start_time = (time_t)TICK_TO_SEC(ddi_get_lbolt());
 	sip->grace_period = rfs4_grace_period;
 	rw_exit(&sip->rwlock);
 }
@@ -630,7 +630,7 @@ rfs4_servinst_in_grace(rfs4_servinst_t *sip)
 	grace_expiry = sip->start_time + sip->grace_period;
 	rw_exit(&sip->rwlock);
 
-	return (((time_t)TICK_TO_SEC(lbolt)) < grace_expiry);
+	return (((time_t)TICK_TO_SEC(ddi_get_lbolt())) < grace_expiry);
 }
 
 int

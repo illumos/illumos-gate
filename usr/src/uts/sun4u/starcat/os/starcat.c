@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -60,6 +58,7 @@
 #include <sys/iosramreg.h>
 #include <sys/iosramvar.h>
 #include <sys/mc-us3.h>
+#include <sys/clock_impl.h>
 
 /* Preallocation of spare tsb's for DR */
 int starcat_tsb_spares = STARCAT_SPARE_TSB_MAX;
@@ -1286,6 +1285,8 @@ startup_platform(void)
 static void
 starcat_system_claim(void)
 {
+	lbolt_debug_entry();
+
 	prom_interpret("sigb-sig! my-sigb-sig!", OBP_SIG, OBP_SIG, 0, 0, 0);
 }
 
@@ -1293,6 +1294,8 @@ static void
 starcat_system_release(void)
 {
 	prom_interpret("sigb-sig! my-sigb-sig!", OS_SIG, OS_SIG, 0, 0, 0);
+
+	lbolt_debug_return();
 }
 
 void

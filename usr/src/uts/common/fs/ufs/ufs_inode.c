@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1192,7 +1192,7 @@ ufs_itrunc(struct inode *oip, u_offset_t length, int flags, cred_t *cr)
 	if (flags & I_FREE) {
 		i_genrand *= 16843009;  /* turns into shift and adds */
 		i_genrand++;
-		oip->i_gen += ((i_genrand + lbolt) & 0xffff) + 1;
+		oip->i_gen += ((i_genrand + ddi_get_lbolt()) & 0xffff) + 1;
 		oip->i_flag |= ICHG |IUPD;
 		oip->i_seq++;
 		if (length == oip->i_size)

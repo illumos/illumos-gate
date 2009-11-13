@@ -1101,8 +1101,8 @@ isnst_monitor(void *arg)
 			break;
 
 		DTRACE_PROBE(iscsit__isns__monitor__sleep);
-		(void) cv_timedwait(&isns_idle_cv, &isns_monitor_mutex,
-		    ddi_get_lbolt() + monitor_idle_interval);
+		(void) cv_reltimedwait(&isns_idle_cv, &isns_monitor_mutex,
+		    monitor_idle_interval, TR_CLOCK_TICK);
 		DTRACE_PROBE1(iscsit__isns__monitor__wakeup,
 		    boolean_t, isns_monitor_thr_running);
 	}

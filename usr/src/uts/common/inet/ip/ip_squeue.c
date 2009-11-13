@@ -686,7 +686,7 @@ ip_squeue_get(ill_rx_ring_t *ill_rx_ring)
 	squeue_t 	*sqp;
 
 	if ((ill_rx_ring == NULL) || ((sqp = ill_rx_ring->rr_sqp) == NULL))
-		return (IP_SQUEUE_GET(lbolt));
+		return (IP_SQUEUE_GET(CPU_PSEUDO_RANDOM()));
 
 	return (sqp);
 }

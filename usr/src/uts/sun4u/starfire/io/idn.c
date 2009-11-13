@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -3082,9 +3081,8 @@ idn_wait_op(void *cookie, domainset_t *domsetp, int wait_timeout)
 	mutex_enter(&idn.dopers->dop_mutex);
 
 	while (((dwl->dw_domset | dwl->dw_errset) != dwl->dw_reqset) && !err) {
-		rv = cv_timedwait_sig(&idn.dopers->dop_cv,
-		    &idn.dopers->dop_mutex,
-		    lbolt + (wait_timeout * hz));
+		rv = cv_reltimedwait_sig(&idn.dopers->dop_cv,
+		    &idn.dopers->dop_mutex, (wait_timeout * hz), TR_CLOCK_TICK);
 
 		if ((dwl->dw_domset | dwl->dw_errset) == dwl->dw_reqset)
 			break;
@@ -5141,7 +5139,7 @@ idn_gkstat_update(kstat_t *ksp, int rw)
 		sg_kstat.gk_reap_count	    = sgkp->sk_reap_count.value.ul;
 		sg_kstat.gk_dropped_intrs   = sgkp->sk_dropped_intrs.value.ul;
 	} else {
-		sgkp->sk_curtime.value.ul	  = lbolt;
+		sgkp->sk_curtime.value.ul	  = ddi_get_lbolt();
 		sgkp->sk_reconfigs.value.ul	  = sg_kstat.gk_reconfigs;
 		sgkp->sk_reconfig_last.value.ul	  = sg_kstat.gk_reconfig_last;
 		sgkp->sk_reaps.value.ul		  = sg_kstat.gk_reaps;
@@ -5183,7 +5181,7 @@ idn_rw_mem(idnop_t *idnop)
 	static int	orig_gstate = IDNGS_IGNORE;
 	extern struct  seg	ktextseg;
 
-#define	RANDOM_INIT()	(randx = lbolt)
+#define	RANDOM_INIT()	(randx = ddi_get_lbolt())
 #define	RANDOM(a, b)	\
 	(((a) >= (b)) ? \
 	(a) : (((randx = randx * 1103515245L + 12345) % ((b)-(a))) + (a)))
@@ -5293,7 +5291,8 @@ idn_rw_mem(idnop_t *idnop)
 			int	rv;
 
 			mutex_enter(&slock);
-			rv = cv_timedwait_sig(&scv, &slock, lbolt+hz);
+			rv = cv_reltimedwait_sig(&scv, &slock, hz,
+			    TR_CLOCK_TICK);
 			mutex_exit(&slock);
 			if (rv == 0)
 				break;

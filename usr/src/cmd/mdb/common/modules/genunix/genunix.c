@@ -3083,7 +3083,6 @@ cpu_walk_step(mdb_walk_state_t *wsp)
 
 typedef struct cpuinfo_data {
 	intptr_t cid_cpu;
-	uintptr_t cid_lbolt;
 	uintptr_t **cid_ithr;
 	char	cid_print_head;
 	char	cid_print_thr;
@@ -3210,13 +3209,8 @@ cpuinfo_walk_cpu(uintptr_t addr, const cpu_t *cpu, cpuinfo_data_t *cid)
 	    cpu->cpu_kprunrun ? "yes" : "no");
 
 	if (cpu->cpu_last_swtch) {
-		clock_t lbolt;
-
-		if (mdb_vread(&lbolt, sizeof (lbolt), cid->cid_lbolt) == -1) {
-			mdb_warn("failed to read lbolt at %p", cid->cid_lbolt);
-			return (WALK_ERR);
-		}
-		mdb_printf("t-%-4d ", lbolt - cpu->cpu_last_swtch);
+		mdb_printf("t-%-4d ",
+		    (clock_t)mdb_get_lbolt() - cpu->cpu_last_swtch);
 	} else {
 		mdb_printf("%-6s ", "-");
 	}
@@ -3395,8 +3389,6 @@ cpuinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	uint_t verbose = FALSE;
 	cpuinfo_data_t cid;
-	GElf_Sym sym;
-	clock_t lbolt;
 
 	cid.cid_print_ithr = FALSE;
 	cid.cid_print_thr = FALSE;
@@ -3433,26 +3425,6 @@ cpuinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			mdb_warn("couldn't walk thread");
 			return (DCMD_ERR);
 		}
-	}
-
-	if (mdb_lookup_by_name("panic_lbolt", &sym) == -1) {
-		mdb_warn("failed to find panic_lbolt");
-		return (DCMD_ERR);
-	}
-
-	cid.cid_lbolt = (uintptr_t)sym.st_value;
-
-	if (mdb_vread(&lbolt, sizeof (lbolt), cid.cid_lbolt) == -1) {
-		mdb_warn("failed to read panic_lbolt");
-		return (DCMD_ERR);
-	}
-
-	if (lbolt == 0) {
-		if (mdb_lookup_by_name("lbolt", &sym) == -1) {
-			mdb_warn("failed to find lbolt");
-			return (DCMD_ERR);
-		}
-		cid.cid_lbolt = (uintptr_t)sym.st_value;
 	}
 
 	if (mdb_walk("cpu", (mdb_walk_cb_t)cpuinfo_walk_cpu, &cid) == -1) {
@@ -4175,6 +4147,41 @@ panicinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+/*
+ * ::time dcmd, which will print a hires timestamp of when we entered the
+ * debugger, or the lbolt value if used with the -l option.
+ *
+ */
+/*ARGSUSED*/
+static int
+time(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	uint_t opt_lbolt = FALSE;
+
+	if (mdb_getopts(argc, argv, 'l', MDB_OPT_SETBITS, TRUE, &opt_lbolt,
+	    NULL) != argc)
+		return (DCMD_USAGE);
+
+	if (opt_lbolt)
+		mdb_printf("%ld\n", mdb_get_lbolt());
+	else
+		mdb_printf("%lld\n", mdb_gethrtime());
+
+	return (DCMD_OK);
+}
+
+void
+time_help(void)
+{
+	mdb_printf("Prints the system time in nanoseconds.\n\n"
+	    "::time will return the timestamp at which we dropped into, if "
+	    "called from, kmdb(1); the core dump's high resolution time if "
+	    "inspecting one; or the running hires time if we're inspecting "
+	    "a live system.\n\n"
+	    "Switches:\n"
+	    "  -l   prints the number of clock ticks since system boot\n");
+}
+
 static const mdb_dcmd_t dcmds[] = {
 
 	/* from genunix.c */
@@ -4216,6 +4223,7 @@ static const mdb_dcmd_t dcmds[] = {
 		"print sysevent subclass list", sysevent_subclass_list},
 	{ "system", NULL, "print contents of /etc/system file", sysfile },
 	{ "task", NULL, "display kernel task(s)", task },
+	{ "time", "[-l]", "display system time", time, time_help },
 	{ "vnode2path", ":[-F]", "vnode address to pathname", vnode2path },
 	{ "vnode2smap", ":[offset]", "translate vnode to smap", vnode2smap },
 	{ "whereopen", ":", "given a vnode, dumps procs which have it open",

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -424,7 +424,7 @@ ufs_sync_inode(struct inode *ip, void *arg)
 		 * flushed when I/Os start again.
 		 */
 		if (cheap && (ufsvfsp->vfs_dfritime & UFS_DFRATIME) &&
-		    (ufsvfsp->vfs_iotstamp + ufs_iowait < lbolt))
+		    (ufsvfsp->vfs_iotstamp + ufs_iowait < ddi_get_lbolt()))
 			return (0);
 		/*
 		 * an app issueing a sync() can take forever on a trans device
@@ -1103,7 +1103,7 @@ ufs_fbiwrite(struct fbuf *fbp, struct inode *ip, daddr_t bn, long bsize)
 	} else if (ufsvfsp->vfs_snapshot) {
 		fssnap_strategy(&ufsvfsp->vfs_snapshot, bp);
 	} else {
-		ufsvfsp->vfs_iotstamp = lbolt;
+		ufsvfsp->vfs_iotstamp = ddi_get_lbolt();
 		ub.ub_fbiwrites.value.ul++;
 		(void) bdev_strategy(bp);
 		lwp_stat_update(LWP_STAT_OUBLK, 1);

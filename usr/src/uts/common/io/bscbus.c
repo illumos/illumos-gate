@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * The "bscbus" driver provides access to the LOMlite2 virtual registers,
@@ -927,7 +927,6 @@ bscbus_cmd(HANDLE_TYPE *hdlp, ptrdiff_t vreg, uint_t val, uint_t cmd)
 {
 	struct bscbus_channel_state *csp;
 	clock_t start;
-	clock_t tick;
 	uint8_t status;
 
 	/*
@@ -1018,8 +1017,8 @@ bscbus_cmd(HANDLE_TYPE *hdlp, ptrdiff_t vreg, uint_t val, uint_t cmd)
 	    (csp->cmdstate != BSCBUS_CMDSTATE_ERROR)) {
 		ASSERT(csp->cmdstate != BSCBUS_CMDSTATE_IDLE);
 
-		tick = ddi_get_lbolt() + csp->poll_hz;
-		if ((cv_timedwait(csp->lo_cv, csp->lo_mutex, tick) == -1) &&
+		if ((cv_reltimedwait(csp->lo_cv, csp->lo_mutex,
+		    csp->poll_hz, TR_CLOCK_TICK) == -1) &&
 		    csp->cmdstate != BSCBUS_CMDSTATE_READY &&
 		    csp->cmdstate != BSCBUS_CMDSTATE_ERROR) {
 			if (!csp->interrupt_failed) {

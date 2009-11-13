@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,8 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -808,7 +806,7 @@ loop:
 	} else {
 		nscan_limit = desscan;
 	}
-	pageout_lbolt = lbolt;
+	pageout_lbolt = ddi_get_lbolt();
 	sample_start = gethrtime();
 
 	/*
@@ -830,7 +828,7 @@ loop:
 		 * just every once in a while.
 		 */
 		if ((pcount & PAGES_POLL_MASK) == PAGES_POLL_MASK) {
-			pageout_cycle_ticks = lbolt - pageout_lbolt;
+			pageout_cycle_ticks = ddi_get_lbolt() - pageout_lbolt;
 			if (pageout_cycle_ticks >= pageout_ticks) {
 				++pageout_timeouts;
 				break;

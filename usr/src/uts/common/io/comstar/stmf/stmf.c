@@ -5713,7 +5713,7 @@ stmf_worker_task(void *arg)
 	stmf_data_buf_t *dbuf;
 	stmf_lu_t *lu;
 	clock_t wait_timer = 0;
-	clock_t wait_ticks;
+	clock_t wait_ticks, wait_delta = 0;
 	uint32_t old, new;
 	uint8_t curcmd;
 	uint8_t abort_free;
@@ -5739,6 +5739,7 @@ stmf_worker_loop:;
 		dec_qdepth = 0;
 		if (wait_timer && (ddi_get_lbolt() >= wait_timer)) {
 			wait_timer = 0;
+			wait_delta = 0;
 			if (w->worker_wait_head) {
 				ASSERT(w->worker_wait_tail);
 				if (w->worker_task_head == NULL)
@@ -5815,6 +5816,7 @@ out_itask_flag_loop:
 			w->worker_wait_tail = itask;
 			if (wait_timer == 0) {
 				wait_timer = ddi_get_lbolt() + wait_ticks;
+				wait_delta = wait_ticks;
 			}
 		} else if ((--(itask->itask_ncmds)) != 0) {
 			itask->itask_worker_next = NULL;
@@ -5900,12 +5902,15 @@ out_itask_flag_loop:
 	if ((w->worker_flags & STMF_WORKER_TERMINATE) && (wait_timer == 0)) {
 		if (w->worker_ref_count == 0)
 			goto stmf_worker_loop;
-		else
+		else {
 			wait_timer = ddi_get_lbolt() + 1;
+			wait_delta = 1;
+		}
 	}
 	w->worker_flags &= ~STMF_WORKER_ACTIVE;
 	if (wait_timer) {
-		(void) cv_timedwait(&w->worker_cv, &w->worker_lock, wait_timer);
+		(void) cv_reltimedwait(&w->worker_cv, &w->worker_lock,
+		    wait_delta, TR_CLOCK_TICK);
 	} else {
 		cv_wait(&w->worker_cv, &w->worker_lock);
 	}
@@ -6902,8 +6907,8 @@ stmf_svc_loop:
 		}
 
 		stmf_state.stmf_svc_flags &= ~STMF_SVC_ACTIVE;
-		(void) cv_timedwait(&stmf_state.stmf_cv, &stmf_state.stmf_lock,
-		    ddi_get_lbolt() + td);
+		(void) cv_reltimedwait(&stmf_state.stmf_cv,
+		    &stmf_state.stmf_lock, td, TR_CLOCK_TICK);
 		stmf_state.stmf_svc_flags |= STMF_SVC_ACTIVE;
 	}
 	goto stmf_svc_loop;

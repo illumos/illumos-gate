@@ -142,6 +142,7 @@
 #include <sys/errorq.h>
 #include <sys/panic.h>
 #include <sys/fm/util.h>
+#include <sys/clock_impl.h>
 
 /*
  * Panic variables which are set once during the QUIESCE state by the
@@ -221,6 +222,11 @@ panicsys(const char *format, va_list alist, struct regs *rp, int on_panic_stack)
 	t->t_bound_cpu = cp;
 	t->t_preempt++;
 
+	/*
+	 * Switch lbolt to event driven mode.
+	 */
+	lbolt_hybrid = lbolt_event_driven;
+
 	panic_enter_hw(s);
 
 	/*
@@ -275,8 +281,8 @@ panicsys(const char *format, va_list alist, struct regs *rp, int on_panic_stack)
 
 		panicstr = (char *)format;
 		va_copy(panicargs, alist);
-		panic_lbolt = lbolt;
-		panic_lbolt64 = lbolt64;
+		panic_lbolt = (clock_t)LBOLT_NO_ACCOUNT;
+		panic_lbolt64 = LBOLT_NO_ACCOUNT;
 		panic_hrestime = hrestime;
 		panic_hrtime = gethrtime_waitfree();
 		panic_thread = t;

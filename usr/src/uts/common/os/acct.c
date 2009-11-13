@@ -19,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -406,7 +404,7 @@ acct(char st)
 	ag->acctbuf.ac_utime = acct_compress(NSEC_TO_TICK(p->p_acct[LMS_USER]));
 	ag->acctbuf.ac_stime = acct_compress(
 	    NSEC_TO_TICK(p->p_acct[LMS_SYSTEM] + p->p_acct[LMS_TRAP]));
-	ag->acctbuf.ac_etime = acct_compress(lbolt - ua->u_ticks);
+	ag->acctbuf.ac_etime = acct_compress(ddi_get_lbolt() - ua->u_ticks);
 	ag->acctbuf.ac_mem = acct_compress((ulong_t)ua->u_mem);
 	ag->acctbuf.ac_io = acct_compress((ulong_t)p->p_ru.ioch);
 	ag->acctbuf.ac_rw = acct_compress((ulong_t)(p->p_ru.inblock +

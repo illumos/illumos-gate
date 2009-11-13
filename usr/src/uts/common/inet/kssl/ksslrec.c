@@ -678,7 +678,7 @@ kssl_cache_sid(sslSessionID *sid, kssl_entry_t *kssl_entry)
 
 	/* set the values before creating the cache entry */
 	sid->cached = B_TRUE;
-	sid->time = lbolt;
+	sid->time = ddi_get_lbolt();
 
 	SET_HASH_INDEX(index, s, &sid->client_addr);
 	index %= kssl_entry->sid_cache_nentries;
@@ -747,7 +747,8 @@ kssl_lookup_sid(sslSessionID *sid, uchar_t *s, in6_addr_t *faddr,
 		return;
 	}
 
-	if (TICK_TO_SEC(lbolt - csid->time) > kssl_entry->sid_cache_timeout) {
+	if (TICK_TO_SEC(ddi_get_lbolt() - csid->time) >
+	    kssl_entry->sid_cache_timeout) {
 		csid->cached = B_FALSE;
 		mutex_exit(lock);
 		return;

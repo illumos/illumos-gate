@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	Asynchronous protocol handler for Z8530 chips
@@ -805,7 +802,7 @@ again:
 			if (speed > CBAUD) {
 				za->za_ttycommon.t_cflag |= CBAUDEXT;
 				za->za_ttycommon.t_cflag |=
-					((speed - CBAUD - 1) & CBAUD);
+				    ((speed - CBAUD - 1) & CBAUD);
 			} else {
 				za->za_ttycommon.t_cflag &= ~CBAUDEXT;
 				za->za_ttycommon.t_cflag |= (speed & CBAUD);
@@ -823,7 +820,7 @@ again:
 		zsa_program(za, za->za_ttycommon.t_cflag & (CIBAUDEXT|CIBAUD));
 		zsa_set_za_rcv_flags_mask(za);
 	} else if ((za->za_ttycommon.t_flags & TS_XCLUDE) &&
-						secpolicy_excl_open(cr) != 0) {
+	    secpolicy_excl_open(cr) != 0) {
 		mutex_exit(zs->zs_excl_hi);
 		if (set_zsoptinit && !(za->za_flags & ISOPEN))
 			zsopinit(zs, &zsops_null);
@@ -867,7 +864,7 @@ again:
 					mutex_exit(zs->zs_excl);
 					mutex_exit(zs->zs_ocexcl);
 					(void) ddi_dev_is_needed(zs->zs_dip,
-									0, 1);
+					    0, 1);
 					mutex_enter(zs->zs_ocexcl);
 					mutex_enter(zs->zs_excl);
 				}
@@ -1094,8 +1091,8 @@ nodrain:
 		 * bounce us back to the top; just continue
 		 * closing as if nothing had happened.
 		 */
-		tmp = cv_timedwait_sig(&zs->zs_flags_cv, zs->zs_excl,
-		    ddi_get_lbolt() + drv_usectohz(10000));
+		tmp = cv_reltimedwait_sig(&zs->zs_flags_cv, zs->zs_excl,
+		    drv_usectohz(10000), TR_CLOCK_TICK);
 		if (zs->zs_suspended) {
 			mutex_exit(zs->zs_excl);
 			(void) ddi_dev_is_needed(zs->zs_dip, 0, 1);
@@ -1473,27 +1470,28 @@ zsa_wput(queue_t *q, mblk_t *mp)
 			    (SCC_READ0() & ZSRR0_CD)) {
 				ZSA_KICK_RCV;
 			} else {
-			    ZSA_KICK_RCV;
-			    if (!(SCC_READ0() & ZSRR0_RX_READY)) {
-				/*
-				 * settle time for 1 character shift
-				 */
-				mutex_exit(zs->zs_excl_hi);
-				mutex_exit(zs->zs_excl);
-				delay(ztdelay(
-				    SPEED(za->za_ttycommon.t_cflag))/3 + 1);
-				mutex_enter(zs->zs_excl);
-				mutex_enter(zs->zs_excl_hi);
-				if (!(SCC_READ0() & ZSRR0_CD))
-					ZSA_KICK_RCV;
-			    }
-			    while ((SCC_READ0() &
-				(ZSRR0_CD|ZSRR0_RX_READY)) == ZSRR0_RX_READY) {
-				/*
-				 * Empty Receiver
-				 */
-				(void) SCC_READDATA();
-			    }
+				ZSA_KICK_RCV;
+				if (!(SCC_READ0() & ZSRR0_RX_READY)) {
+					/*
+					 * settle time for 1 character shift
+					 */
+					mutex_exit(zs->zs_excl_hi);
+					mutex_exit(zs->zs_excl);
+					delay(ztdelay(SPEED(
+					    za->za_ttycommon.t_cflag))/3 + 1);
+					mutex_enter(zs->zs_excl);
+					mutex_enter(zs->zs_excl_hi);
+					if (!(SCC_READ0() & ZSRR0_CD))
+						ZSA_KICK_RCV;
+				}
+				while ((SCC_READ0() &
+				    (ZSRR0_CD | ZSRR0_RX_READY)) ==
+				    ZSRR0_RX_READY) {
+					/*
+					 * Empty Receiver
+					 */
+					(void) SCC_READDATA();
+				}
 			}
 			mutex_exit(zs->zs_excl_hi);
 			flushq(RD(q), FLUSHDATA);
@@ -2142,38 +2140,39 @@ zsa_softint(struct zscom *zs)
 	za_kick_active = za->za_kick_active;
 
 	while (!za_kick_active) {
-	    ZSA_SEEQ(bp);
-	    if (!bp)
-		break;
+		ZSA_SEEQ(bp);
+		if (!bp)
+			break;
 
-	    allocbcount++;
+		allocbcount++;
 
-	    if (bp->b_datap->db_type <= QPCTL) {
-		if (!(canputnext(q))) {
-			if (za->za_grace_flow_control >=
-				zsa_grace_flow_control) {
-			    if (za->za_ttycommon.t_cflag & CRTSXOFF) {
-					allocbcount--;
-					break;
-			    }
-			    ZSA_GETQ(bp);
-			    freemsg(bp);
-			    do_ttycommon_qfull = 1;
-			    continue;
+		if (bp->b_datap->db_type <= QPCTL) {
+			if (!(canputnext(q))) {
+				if (za->za_grace_flow_control >=
+				    zsa_grace_flow_control) {
+					if (za->za_ttycommon.t_cflag &
+					    CRTSXOFF) {
+						allocbcount--;
+						break;
+					}
+					ZSA_GETQ(bp);
+					freemsg(bp);
+					do_ttycommon_qfull = 1;
+					continue;
+				} else
+					za->za_grace_flow_control++;
 			} else
-			    za->za_grace_flow_control++;
-		} else
-			za->za_grace_flow_control = 0;
-	    }
-	    ZSA_GETQ(bp);
-	    if (!head) {
-		head = bp;
-	    } else {
-		if (!tail)
-			tail = head;
-		tail->b_next = bp;
-		tail = bp;
-	    }
+				za->za_grace_flow_control = 0;
+		}
+		ZSA_GETQ(bp);
+		if (!head) {
+			head = bp;
+		} else {
+			if (!tail)
+				tail = head;
+			tail->b_next = bp;
+			tail = bp;
+		}
 	}
 
 	if (allocbcount)
@@ -2187,7 +2186,7 @@ zsa_softint(struct zscom *zs)
 		 * carrier up?
 		 */
 		if ((r0 & ZSRR0_CD) ||
-			(za->za_ttycommon.t_flags & TS_SOFTCAR)) {
+		    (za->za_ttycommon.t_flags & TS_SOFTCAR)) {
 			/*
 			 * carrier present
 			 */
@@ -2275,12 +2274,13 @@ zsa_softint(struct zscom *zs)
 	 * any cluster of overrun errrors.
 	 */
 	if ((!za->za_kick_rcv_id) && (zs->zs_rd_cur || za_kick_active)) {
-	    if (g_zsticks)
-		za->za_kick_rcv_id = timeout(zsa_kick_rcv, zs, g_zsticks);
-	    else
-		za->za_kick_rcv_id = timeout(zsa_kick_rcv, zs,
-		    zsticks[SPEED(za->za_ttycommon.t_cflag)]);
-	    za->za_kick_rcv_count = ZA_KICK_RCV_COUNT;
+		if (g_zsticks)
+			za->za_kick_rcv_id = timeout(zsa_kick_rcv, zs,
+			    g_zsticks);
+		else
+			za->za_kick_rcv_id = timeout(zsa_kick_rcv, zs,
+			    zsticks[SPEED(za->za_ttycommon.t_cflag)]);
+		za->za_kick_rcv_count = ZA_KICK_RCV_COUNT;
 	}
 	za->za_soft_active = 1;
 	mutex_exit(zs->zs_excl);
@@ -2518,17 +2518,19 @@ zsa_start_retransmit:
 	za->za_rcv_flags_mask &= ~DO_TRANSMIT;
 	if (za->za_ttycommon.t_cflag & CRTSCTS) {
 		if ((SCC_READ0() & (ZSRR0_CTS|ZSRR0_TX_READY)) !=
-			(ZSRR0_CTS|ZSRR0_TX_READY)) {
+		    (ZSRR0_CTS|ZSRR0_TX_READY)) {
 			za->za_rcv_flags_mask |= DO_RETRANSMIT;
 			za->za_flags |= ZAS_BUSY;
 			mutex_exit(zs->zs_excl_hi);
 			return;
 		}
 		za->za_rcv_flags_mask &= ~DO_RETRANSMIT;
-	} else if (!(SCC_READ0() & ZSRR0_TX_READY)) {
+	} else {
+		if (!(SCC_READ0() & ZSRR0_TX_READY)) {
 			za->za_flags |= ZAS_BUSY;
 			mutex_exit(zs->zs_excl_hi);
 			return;
+		}
 	}
 	/*
 	 * If the transmitter is ready, shove the first
@@ -2628,38 +2630,39 @@ zsa_kick_rcv(void *arg)
 
 
 	for (;;) {
-	    ZSA_SEEQ(mp);
-	    if (!mp)
-		break;
+		ZSA_SEEQ(mp);
+		if (!mp)
+			break;
 
-	    allocbcount++;
+		allocbcount++;
 
-	    if (mp->b_datap->db_type <= QPCTL) {
-		if (!(canputnext(q))) {
-			if (za->za_grace_flow_control >=
-				zsa_grace_flow_control) {
-			    if (za->za_ttycommon.t_cflag & CRTSXOFF) {
-					allocbcount--;
-					break;
-			    }
-			    ZSA_GETQ(mp);
-			    freemsg(mp);
-			    do_ttycommon_qfull = 1;
-			    continue;
+		if (mp->b_datap->db_type <= QPCTL) {
+			if (!(canputnext(q))) {
+				if (za->za_grace_flow_control >=
+				    zsa_grace_flow_control) {
+					if (za->za_ttycommon.t_cflag &
+					    CRTSXOFF) {
+						allocbcount--;
+						break;
+					}
+					ZSA_GETQ(mp);
+					freemsg(mp);
+					do_ttycommon_qfull = 1;
+					continue;
+				} else
+					za->za_grace_flow_control++;
 			} else
-			    za->za_grace_flow_control++;
-		} else
-			za->za_grace_flow_control = 0;
-	    }
-	    ZSA_GETQ(mp);
-	    if (!head) {
-		head = mp;
-	    } else {
-		if (!tail)
-			tail = head;
-		tail->b_next = mp;
-		tail = mp;
-	    }
+				za->za_grace_flow_control = 0;
+		}
+		ZSA_GETQ(mp);
+		if (!head) {
+			head = mp;
+		} else {
+			if (!tail)
+				tail = head;
+			tail->b_next = mp;
+			tail = mp;
+		}
 	}
 
 	if (allocbcount)
@@ -2987,11 +2990,11 @@ zsa_program(struct asyncline *za, int setibaud)
 		if (baudrate > CBAUD) {
 			za->za_ttycommon.t_cflag |= CIBAUDEXT;
 			za->za_ttycommon.t_cflag |=
-				(((baudrate - CBAUD - 1) << IBSHIFT) & CIBAUD);
+			    (((baudrate - CBAUD - 1) << IBSHIFT) & CIBAUD);
 		} else {
 			za->za_ttycommon.t_cflag &= ~CIBAUDEXT;
 			za->za_ttycommon.t_cflag |=
-				((baudrate << IBSHIFT) & CIBAUD);
+			    ((baudrate << IBSHIFT) & CIBAUD);
 		}
 	}
 

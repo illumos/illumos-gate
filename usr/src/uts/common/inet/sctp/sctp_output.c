@@ -257,7 +257,7 @@ sctp_sendmsg(sctp_t *sctp, mblk_t *mp, int flags)
 	sctp_msg_hdr->smh_ppid = ppid;
 	sctp_msg_hdr->smh_flags = msg_flags;
 	sctp_msg_hdr->smh_ttl = MSEC_TO_TICK(timetolive);
-	sctp_msg_hdr->smh_tob = lbolt64;
+	sctp_msg_hdr->smh_tob = ddi_get_lbolt64();
 	for (; mp != NULL; mp = mp->b_cont)
 		msg_len += MBLKL(mp);
 	sctp_msg_hdr->smh_msglen = msg_len;
@@ -979,7 +979,7 @@ sctp_fast_rexmit(sctp_t *sctp)
 	sctp_set_iplen(sctp, head, fp->ixa);
 	(void) conn_ip_output(head, fp->ixa);
 	BUMP_LOCAL(sctp->sctp_opkts);
-	sctp->sctp_active = fp->lastactive = lbolt64;
+	sctp->sctp_active = fp->lastactive = ddi_get_lbolt64();
 }
 
 void
@@ -998,7 +998,7 @@ sctp_output(sctp_t *sctp, uint_t num_pkt)
 	int32_t			pad = 0;
 	int32_t			pathmax;
 	int			extra;
-	int64_t			now = lbolt64;
+	int64_t			now = ddi_get_lbolt64();
 	sctp_faddr_t		*fp;
 	sctp_faddr_t		*lfp;
 	sctp_data_hdr_t		*sdc;
@@ -2051,7 +2051,7 @@ restart_timer:
 	 */
 	SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
 
-	sctp->sctp_active = lbolt64;
+	sctp->sctp_active = ddi_get_lbolt64();
 }
 
 /*

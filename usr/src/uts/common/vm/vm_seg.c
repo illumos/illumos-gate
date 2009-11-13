@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,8 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * VM - segment management.
@@ -212,7 +210,7 @@ extern struct seg_ops segspt_shmops;
 #define	IS_PFLAGS_WIRED(flags) ((flags) & SEGP_FORCE_WIRED)
 #define	IS_PCP_WIRED(pcp) IS_PFLAGS_WIRED((pcp)->p_flags)
 
-#define	LBOLT_DELTA(t)	((ulong_t)(lbolt - (t)))
+#define	LBOLT_DELTA(t)	((ulong_t)(ddi_get_lbolt() - (t)))
 
 #define	PCP_AGE(pcp)	LBOLT_DELTA((pcp)->p_lbolt)
 
@@ -643,7 +641,7 @@ again:
 					 * free it immediately since
 					 * it may be reactivated very soon.
 					 */
-					pcp->p_lbolt = lbolt;
+					pcp->p_lbolt = ddi_get_lbolt();
 					pcp->p_ref = 1;
 				}
 				mutex_exit(&hp->p_hmutex);
@@ -666,7 +664,7 @@ again:
 				 * Mark this entry as referenced just in case
 				 * we'll free our own pcp entry soon.
 				 */
-				pcp->p_lbolt = lbolt;
+				pcp->p_lbolt = ddi_get_lbolt();
 				pcp->p_ref = 1;
 			}
 			if (pmtx != NULL) {
@@ -1544,8 +1542,8 @@ seg_pasync_thread(void)
 	mutex_enter(&seg_pasync_mtx);
 	for (;;) {
 		CALLB_CPR_SAFE_BEGIN(&cpr_info);
-		(void) cv_timedwait(&seg_pasync_cv, &seg_pasync_mtx,
-		    lbolt + segpcache_reap_ticks);
+		(void) cv_reltimedwait(&seg_pasync_cv, &seg_pasync_mtx,
+		    segpcache_reap_ticks, TR_CLOCK_TICK);
 		CALLB_CPR_SAFE_END(&cpr_info, &seg_pasync_mtx);
 		if (seg_pdisabled == 0) {
 			seg_ppurge_async(0);

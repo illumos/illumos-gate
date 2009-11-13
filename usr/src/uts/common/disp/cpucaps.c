@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/disp.h>
 #include <sys/param.h>
@@ -383,13 +381,13 @@ cap_project_enable(kproject_t *kpj, hrtime_t value)
 		    KSTAT_TYPE_NAMED,
 		    sizeof (cap_kstat) / sizeof (kstat_named_t),
 		    KSTAT_FLAG_VIRTUAL)) != NULL) {
-		    cap->cap_kstat->ks_data_size +=
-			strlen(cap->cap_zone->zone_name) + 1;
-		    cap->cap_kstat->ks_lock = &cap_kstat_lock;
-		    cap->cap_kstat->ks_data = &cap_kstat;
-		    cap->cap_kstat->ks_update = cap_kstat_update;
-		    cap->cap_kstat->ks_private = cap;
-		    kstat_install(cap->cap_kstat);
+			cap->cap_kstat->ks_data_size +=
+			    strlen(cap->cap_zone->zone_name) + 1;
+			cap->cap_kstat->ks_lock = &cap_kstat_lock;
+			cap->cap_kstat->ks_data = &cap_kstat;
+			cap->cap_kstat->ks_update = cap_kstat_update;
+			cap->cap_kstat->ks_private = cap;
+			kstat_install(cap->cap_kstat);
 		}
 	}
 }
@@ -437,13 +435,13 @@ cap_zone_enable(zone_t *zone, hrtime_t value)
 		    KSTAT_TYPE_NAMED,
 		    sizeof (cap_kstat) / sizeof (kstat_named_t),
 		    KSTAT_FLAG_VIRTUAL)) != NULL) {
-		    cap->cap_kstat->ks_data_size +=
-			strlen(cap->cap_zone->zone_name) + 1;
-		    cap->cap_kstat->ks_lock = &cap_kstat_lock;
-		    cap->cap_kstat->ks_data = &cap_kstat;
-		    cap->cap_kstat->ks_update = cap_kstat_update;
-		    cap->cap_kstat->ks_private = cap;
-		    kstat_install(cap->cap_kstat);
+			cap->cap_kstat->ks_data_size +=
+			    strlen(cap->cap_zone->zone_name) + 1;
+			cap->cap_kstat->ks_lock = &cap_kstat_lock;
+			cap->cap_kstat->ks_data = &cap_kstat;
+			cap->cap_kstat->ks_update = cap_kstat_update;
+			cap->cap_kstat->ks_private = cap;
+			kstat_install(cap->cap_kstat);
 		}
 	}
 }
@@ -470,15 +468,18 @@ cap_zone_disable(zone_t *zone)
  * Apply specified callback to all caps contained in the list `l'.
  */
 static void
-cap_walk(list_t *l, void (*cb)(cpucap_t *))
+cap_walk(list_t *l, void (*cb)(cpucap_t *, int64_t))
 {
+	static uint64_t cpucap_walk_gen;
 	cpucap_t *cap;
 
 	ASSERT(MUTEX_HELD(&caps_lock));
 
 	for (cap = list_head(l); cap != NULL; cap = list_next(l, cap)) {
-		(*cb)(cap);
+		(*cb)(cap, cpucap_walk_gen);
 	}
+
+	atomic_inc_64(&cpucap_walk_gen);
 }
 
 /*
@@ -487,8 +488,9 @@ cap_walk(list_t *l, void (*cb)(cpucap_t *))
  * is placed on the waitq right after the check, it will be picked up during the
  * next invocation of cap_poke_waitq().
  */
+/* ARGSUSED */
 static void
-cap_poke_waitq(cpucap_t *cap)
+cap_poke_waitq(cpucap_t *cap, int64_t gen)
 {
 	ASSERT(MUTEX_HELD(&caps_lock));
 
@@ -511,7 +513,7 @@ cap_poke_waitq(cpucap_t *cap)
  * Kick off a thread from the cap waitq if cap is not reached.
  */
 static void
-cap_project_usage_walker(cpucap_t *cap)
+cap_project_usage_walker(cpucap_t *cap, int64_t gen)
 {
 	zone_t		*zone = cap->cap_zone;
 	hrtime_t	cap_usage = cap->cap_usage;
@@ -525,7 +527,7 @@ cap_project_usage_walker(cpucap_t *cap)
 	 * Set or clear the CAP_REACHED flag based on the current usage.
 	 * Only projects having their own caps are ever marked as CAP_REACHED.
 	 */
-	cap_poke_waitq(cap);
+	cap_poke_waitq(cap, 0);
 
 	/*
 	 * Add project's CPU usage to our zone's CPU usage.
@@ -537,15 +539,15 @@ cap_project_usage_walker(cpucap_t *cap)
 
 		/*
 		 * If we haven't reset this zone's usage during this clock tick
-		 * yet, then do it now. The cap_lbolt field is used to check
+		 * yet, then do it now. The cap_gen field is used to check
 		 * whether this is the first zone's project we see during this
 		 * tick or a subsequent one.
 		 */
-		if (zcap->cap_lbolt != lbolt64) {
+		if (zcap->cap_gen != gen) {
 			if (zcap->cap_usage > zcap->cap_maxusage)
 				zcap->cap_maxusage = zcap->cap_usage;
 			zcap->cap_usage = 0;
-			zcap->cap_lbolt = lbolt64;
+			zcap->cap_gen = gen;
 		}
 		DTRACE_PROBE2(cpucaps__zusage, cpucap_t *, zcap,
 		    hrtime_t, cap_usage);
@@ -1095,7 +1097,7 @@ cpucaps_enforce(kthread_t *t)
 			ASSERT(ttoproj(t)->kpj_cpucap != NULL);
 			t->t_schedflag &= ~TS_ANYWAITQ;
 			if (waitq_enqueue(&(ttoproj(t)->kpj_cpucap->cap_waitq),
-				t)) {
+			    t)) {
 				return (B_TRUE);
 			}
 		}
@@ -1103,7 +1105,7 @@ cpucaps_enforce(kthread_t *t)
 			ASSERT(ttozone(t)->zone_cpucap != NULL);
 			t->t_schedflag &= ~TS_ZONEWAITQ;
 			if (waitq_enqueue(&(ttozone(t)->zone_cpucap->cap_waitq),
-				t)) {
+			    t)) {
 				return (B_TRUE);
 			}
 		}

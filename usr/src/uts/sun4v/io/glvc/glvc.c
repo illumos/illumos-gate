@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -628,7 +628,6 @@ glvc_read(dev_t dev, struct uio *uiop, cred_t *credp)
 	int rv, error = DDI_SUCCESS;
 	uint64_t hverr, recv_count = 0;
 	uint64_t status_reg;
-	clock_t	tick;
 
 	instance = getminor(dev);
 
@@ -648,9 +647,9 @@ glvc_read(dev_t dev, struct uio *uiop, cred_t *credp)
 	 */
 	while (hverr == H_EOK && (status_reg & GLVC_REG_RECV) !=
 	    GLVC_REG_RECV) {
-		tick = ddi_get_lbolt() + softsp->polling_interval;
-		rv =  cv_timedwait_sig(&softsp->recv_cv,
-		    &softsp->recv_mutex, tick);
+		rv =  cv_reltimedwait_sig(&softsp->recv_cv,
+		    &softsp->recv_mutex, softsp->polling_interval,
+		    TR_CLOCK_TICK);
 		if (rv == 0) {
 			/*
 			 * We got interrupted.
@@ -718,7 +717,6 @@ glvc_write(dev_t dev, struct uio *uiop, cred_t *credp)
 	int instance;
 	int rv, error = DDI_SUCCESS;
 	uint64_t hverr, send_count = 0;
-	clock_t tick;
 
 	instance = getminor(dev);
 
@@ -733,9 +731,9 @@ glvc_write(dev_t dev, struct uio *uiop, cred_t *credp)
 
 	mutex_enter(&softsp->send_complete_mutex);
 	while (softsp->send_complete_flag == 0) {
-		tick = ddi_get_lbolt() + softsp->polling_interval;
-		rv = cv_timedwait_sig(&softsp->send_complete_cv,
-		    &softsp->send_complete_mutex, tick);
+		rv = cv_reltimedwait_sig(&softsp->send_complete_cv,
+		    &softsp->send_complete_mutex, softsp->polling_interval,
+		    TR_CLOCK_TICK);
 		if (rv == 0) {
 			/*
 			 * We got interrupted.
@@ -837,7 +835,6 @@ glvc_peek(glvc_soft_state_t *softsp, glvc_xport_msg_peek_t *msg_peek)
 	uint64_t hverr = H_EOK;
 	uint64_t recv_count = 0;
 	uint64_t status_reg;
-	clock_t tick;
 
 	mutex_enter(&softsp->recv_mutex);
 
@@ -852,9 +849,9 @@ glvc_peek(glvc_soft_state_t *softsp, glvc_xport_msg_peek_t *msg_peek)
 	 */
 	while (hverr == H_EOK && (status_reg & GLVC_REG_RECV) !=
 	    GLVC_REG_RECV) {
-		tick = ddi_get_lbolt() + softsp->polling_interval;
-		rv = cv_timedwait_sig(&softsp->recv_cv,
-		    &softsp->recv_mutex, tick);
+		rv = cv_reltimedwait_sig(&softsp->recv_cv,
+		    &softsp->recv_mutex, softsp->polling_interval,
+		    TR_CLOCK_TICK);
 		if (rv == 0) {
 			/*
 			 * We got interrupted.

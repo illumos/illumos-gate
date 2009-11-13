@@ -1040,7 +1040,7 @@ metaslab_alloc_dva(spa_t *spa, metaslab_class_t *mc, uint64_t psize,
 	/*
 	 * For testing, make some blocks above a certain size be gang blocks.
 	 */
-	if (psize >= metaslab_gang_bang && (lbolt & 3) == 0)
+	if (psize >= metaslab_gang_bang && (ddi_get_lbolt() & 3) == 0)
 		return (ENOSPC);
 
 	/*

@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +29,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Intel Wireless PRO/2200 mini-PCI adapter driver
@@ -376,7 +374,7 @@ ipw2200_load_fw(struct ipw2200_softc *sc, uint8_t *buf, size_t size)
 	uint32_t		src, dst, ctl, len, sum, off;
 	uint32_t		sentinel;
 	int			ntries, err, cnt, i;
-	clock_t			clk;
+	clock_t			clk = drv_usectohz(5000000);  /* 5 second */
 
 	ipw2200_imem_put32(sc, 0x3000a0, 0x27000);
 
@@ -500,8 +498,8 @@ ipw2200_load_fw(struct ipw2200_softc *sc, uint8_t *buf, size_t size)
 		/*
 		 * There is an enhancement! we just change from 1s to 5s
 		 */
-		clk = ddi_get_lbolt() + drv_usectohz(5000000);	/* 5 second */
-		if (cv_timedwait(&sc->sc_fw_cond, &sc->sc_ilock, clk) < 0)
+		if (cv_reltimedwait(&sc->sc_fw_cond, &sc->sc_ilock, clk,
+		    TR_CLOCK_TICK) < 0)
 			break;
 	}
 	mutex_exit(&sc->sc_ilock);

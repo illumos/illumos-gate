@@ -975,7 +975,7 @@ dam_addr_stable_cb(void *arg)
 	int tpend = 0;
 	int64_t	next_tmov = mapp->dam_stabletmo;
 	int64_t tmo_delta;
-	int64_t ts = lbolt64;
+	int64_t ts = ddi_get_lbolt64();
 
 	DTRACE_PROBE1(damap__addr__stable__cb__entry, dam_t *, mapp);
 	DAM_LOCK(mapp, MAP_LOCK);
@@ -1129,7 +1129,7 @@ dam_add_report(dam_t *mapp, dam_da_t *passp, id_t addrid, int report)
 	passp->da_last_report = gethrtime();
 	mapp->dam_last_update = gethrtime();
 	passp->da_report_cnt++;
-	passp->da_deadline = lbolt64 + mapp->dam_stabletmo;
+	passp->da_deadline = ddi_get_lbolt64() + mapp->dam_stabletmo;
 	if (report == RPT_ADDR_DEL)
 		passp->da_flags |= DA_RELE;
 	else if (report == RPT_ADDR_ADD)

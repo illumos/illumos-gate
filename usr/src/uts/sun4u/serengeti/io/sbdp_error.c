@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -254,7 +252,7 @@ sbdp_passthru_reset_error(sbdp_handle_t *hp, void *arg)
 int
 sbdp_inject_error(const char *func_name, uint_t entry)
 {
-	extern volatile clock_t lbolt;
+	extern clock_t ddi_get_lbolt(void);
 	int	index;
 	int	value;
 	static char *f = "sbdp_inject_error";
@@ -270,7 +268,7 @@ sbdp_inject_error(const char *func_name, uint_t entry)
 		 * value, use lbolt to generate the psuedo random
 		 * response.
 		 */
-		value = (-(int)(lbolt % 2));
+		value = (-(int)(ddi_get_lbolt() % 2));
 		break;
 
 	case SBDP_IE_FAILURE:

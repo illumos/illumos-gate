@@ -1071,13 +1071,14 @@ ipw2100_cmd(struct ipw2100_softc *sc, uint32_t type, void *buf, size_t len)
 	/*
 	 * wait for command done
 	 */
+	clk = drv_usectohz(1000000);	/* 1 second */
 	mutex_enter(&sc->sc_ilock);
 	while (sc->sc_done == 0) {
 		/*
 		 * pending for the response
 		 */
-		clk = ddi_get_lbolt() + drv_usectohz(1000000);  /* 1 second */
-		if (cv_timedwait(&sc->sc_cmd_cond, &sc->sc_ilock, clk) < 0)
+		if (cv_reltimedwait(&sc->sc_cmd_cond, &sc->sc_ilock,
+		    clk, TR_CLOCK_TICK) < 0)
 			break;
 	}
 	mutex_exit(&sc->sc_ilock);

@@ -6440,7 +6440,8 @@ page_capture_add_hash(page_t *pp, uint_t szc, uint_t flags, void *datap)
 		if (pc_cb[cb_index].duration == -1) {
 			bp1->expires = (clock_t)-1;
 		} else {
-			bp1->expires = lbolt + pc_cb[cb_index].duration;
+			bp1->expires = ddi_get_lbolt() +
+			    pc_cb[cb_index].duration;
 		}
 	} else {
 		/* There's no callback registered so don't add to the hash */
@@ -6878,7 +6879,7 @@ page_capture_take_action(page_t *pp, uint_t flags, void *datap)
 	 * Check for expiration time first as we can just free it up if it's
 	 * expired.
 	 */
-	if (lbolt > bp1->expires && bp1->expires != -1) {
+	if (ddi_get_lbolt() > bp1->expires && bp1->expires != -1) {
 		kmem_free(bp1, sizeof (*bp1));
 		return (ret);
 	}
@@ -7217,7 +7218,8 @@ page_capture_async()
 		bp1 = page_capture_hash[i].lists[0].next;
 		while (bp1 != &page_capture_hash[i].lists[0]) {
 			/* Check expiration time */
-			if ((lbolt > bp1->expires && bp1->expires != -1) ||
+			if ((ddi_get_lbolt() > bp1->expires &&
+			    bp1->expires != -1) ||
 			    page_deleted(bp1->pp)) {
 				page_capture_hash[i].lists[0].next = bp1->next;
 				bp1->next->prev =
@@ -7372,13 +7374,13 @@ page_capture_thread(void)
 		if (outstanding) {
 			page_capture_handle_outstanding();
 			CALLB_CPR_SAFE_BEGIN(&c);
-			(void) cv_timedwait(&pc_cv, &pc_thread_mutex,
-			    lbolt + pc_thread_shortwait);
+			(void) cv_reltimedwait(&pc_cv, &pc_thread_mutex,
+			    pc_thread_shortwait, TR_CLOCK_TICK);
 			CALLB_CPR_SAFE_END(&c, &pc_thread_mutex);
 		} else {
 			CALLB_CPR_SAFE_BEGIN(&c);
-			(void) cv_timedwait(&pc_cv, &pc_thread_mutex,
-			    lbolt + pc_thread_longwait);
+			(void) cv_reltimedwait(&pc_cv, &pc_thread_mutex,
+			    pc_thread_longwait, TR_CLOCK_TICK);
 			CALLB_CPR_SAFE_END(&c, &pc_thread_mutex);
 		}
 	}

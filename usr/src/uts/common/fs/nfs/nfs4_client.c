@@ -1412,8 +1412,9 @@ nfs4_async_start(struct vfs *vfsp)
 				zthread_exit();
 				/* NOTREACHED */
 			}
-			time_left = cv_timedwait(&mi->mi_async_work_cv,
-			    &mi->mi_async_lock, nfs_async_timeout + lbolt);
+			time_left = cv_reltimedwait(&mi->mi_async_work_cv,
+			    &mi->mi_async_lock, nfs_async_timeout,
+			    TR_CLOCK_TICK);
 
 			CALLB_CPR_SAFE_END(&cprinfo, &mi->mi_async_lock);
 
@@ -2619,6 +2620,7 @@ void
 nfs4_write_error(vnode_t *vp, int error, cred_t *cr)
 {
 	mntinfo4_t *mi;
+	clock_t now = ddi_get_lbolt();
 
 	mi = VTOMI4(vp);
 	/*
@@ -2640,7 +2642,7 @@ nfs4_write_error(vnode_t *vp, int error, cred_t *cr)
 	 * messages from the same file system.
 	 */
 	if ((error != ENOSPC && error != EDQUOT) ||
-	    lbolt - mi->mi_printftime > 0) {
+	    now - mi->mi_printftime > 0) {
 		zoneid_t zoneid = mi->mi_zone->zone_id;
 
 #ifdef DEBUG
@@ -2661,7 +2663,7 @@ nfs4_write_error(vnode_t *vp, int error, cred_t *cr)
 				    crgetuid(curthread->t_cred),
 				    crgetgid(curthread->t_cred));
 			}
-			mi->mi_printftime = lbolt +
+			mi->mi_printftime = now +
 			    nfs_write_error_interval * hz;
 		}
 		sfh4_printfhandle(VTOR4(vp)->r_fh);
@@ -3225,8 +3227,8 @@ nfs4_renew_lease_thread(nfs4_server_t *sp)
 			mutex_enter(&cpr_lock);
 			CALLB_CPR_SAFE_BEGIN(&cpr_info);
 			mutex_exit(&cpr_lock);
-			time_left = cv_timedwait(&sp->cv_thread_exit,
-			    &sp->s_lock, tick_delay + lbolt);
+			time_left = cv_reltimedwait(&sp->cv_thread_exit,
+			    &sp->s_lock, tick_delay, TR_CLOCK_TICK);
 			mutex_enter(&cpr_lock);
 			CALLB_CPR_SAFE_END(&cpr_info, &cpr_lock);
 			mutex_exit(&cpr_lock);
@@ -3261,8 +3263,8 @@ nfs4_renew_lease_thread(nfs4_server_t *sp)
 		mutex_enter(&cpr_lock);
 		CALLB_CPR_SAFE_BEGIN(&cpr_info);
 		mutex_exit(&cpr_lock);
-		time_left = cv_timedwait(&sp->cv_thread_exit, &sp->s_lock,
-		    tick_delay + lbolt);
+		time_left = cv_reltimedwait(&sp->cv_thread_exit, &sp->s_lock,
+		    tick_delay, TR_CLOCK_TICK);
 		mutex_enter(&cpr_lock);
 		CALLB_CPR_SAFE_END(&cpr_info, &cpr_lock);
 		mutex_exit(&cpr_lock);

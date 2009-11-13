@@ -268,7 +268,7 @@ static int sf_reset_flag = 1;		/* bool: to allow reset after LIP */
 static int sf_abort_flag = 0;		/* bool: to do just one abort */
 #endif
 
-extern volatile int64_t	lbolt64;
+extern int64_t ddi_get_lbolt64(void);
 
 /*
  * for converting between target number (switch) and hard address/AL_PA
@@ -834,7 +834,7 @@ sf_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 */
 		(void) soc_force_lip(sf->sf_sochandle, sf->sf_socp,
 		    sf->sf_sochandle->fcal_portno, 0, FCAL_NO_LIP);
-		sf->sf_reset_time = lbolt64;
+		sf->sf_reset_time = ddi_get_lbolt64();
 		return (DDI_SUCCESS);
 
 	default:
@@ -1225,7 +1225,7 @@ sf_scsi_bus_config(dev_info_t *parent, uint_t flag,
 	ASSERT(sf);
 
 	reset_delay = (int64_t)(USEC_TO_TICK(SF_INIT_WAIT_TIMEOUT)) -
-	    (lbolt64 - sf->sf_reset_time);
+	    (ddi_get_lbolt64() - sf->sf_reset_time);
 	if (reset_delay < 0)
 		reset_delay = 0;
 
@@ -6489,7 +6489,6 @@ sf_check_reset_delay(void *arg)
 	struct sf_reset_list *rp, *tp;
 	uint_t lip_cnt, reset_timeout_flag = FALSE;
 	clock_t lb;
-
 
 	lb = ddi_get_lbolt();
 

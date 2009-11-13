@@ -2699,8 +2699,8 @@ dca_drain(dca_t *dca)
 
 		/* give it up to a second to drain from the chip */
 		if (!QEMPTY(&wlp->dwl_runq)) {
-			(void) cv_timedwait(&wlp->dwl_cv, &wlp->dwl_lock,
-			    ddi_get_time() + drv_usectohz(STALETIME));
+			(void) cv_reltimedwait(&wlp->dwl_cv, &wlp->dwl_lock,
+			    drv_usectohz(STALETIME), TR_CLOCK_TICK);
 
 			if (!QEMPTY(&wlp->dwl_runq)) {
 				dca_error(dca, "unable to drain device");

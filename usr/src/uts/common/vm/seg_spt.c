@@ -2832,14 +2832,14 @@ segspt_shmadvise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 
 		mutex_enter(&sptd->spt_lock);
 
-		end_lbolt = lbolt + (hz * spt_pcache_wait);
+		end_lbolt = ddi_get_lbolt() + (hz * spt_pcache_wait);
 
 		/*
 		 * Try to wait for pages to get kicked out of the seg_pcache.
 		 */
 		while (sptd->spt_gen == gen &&
 		    (sptd->spt_flags & DISM_PPA_CHANGED) &&
-		    lbolt < end_lbolt) {
+		    ddi_get_lbolt() < end_lbolt) {
 			if (!cv_timedwait_sig(&sptd->spt_cv,
 			    &sptd->spt_lock, end_lbolt)) {
 				break;

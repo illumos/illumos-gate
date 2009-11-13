@@ -205,8 +205,6 @@ static void	*str_stack_init(netstackid_t stackid, netstack_t *ns);
 static void	str_stack_shutdown(netstackid_t stackid, void *arg);
 static void	str_stack_fini(netstackid_t stackid, void *arg);
 
-extern void	time_to_wait(clock_t *, clock_t);
-
 /*
  * run_queues is no longer used, but is kept in case some 3rd party
  * module/driver decides to use it.
@@ -521,7 +519,7 @@ struct  qinit passthru_winit = {
 			*qpp = qp;					\
 		}							\
 		qp->q_sqflags |= Q_SQQUEUED;				\
-		qp->q_sqtstamp = lbolt;					\
+		qp->q_sqtstamp = ddi_get_lbolt();			\
 		sq->sq_nqueues++;					\
 	}								\
 }
@@ -3689,14 +3687,11 @@ streams_bufcall_service(void)
 			mutex_enter(&strbcall_lock);
 		}
 		if (strbcalls.bc_head != NULL) {
-			clock_t wt, tick;
-
 			STRSTAT(bcwaits);
 			/* Wait for memory to become available */
 			CALLB_CPR_SAFE_BEGIN(&cprinfo);
-			tick = SEC_TO_TICK(60);
-			time_to_wait(&wt, tick);
-			(void) cv_timedwait(&memavail_cv, &strbcall_lock, wt);
+			(void) cv_reltimedwait(&memavail_cv, &strbcall_lock,
+			    SEC_TO_TICK(60), TR_CLOCK_TICK);
 			CALLB_CPR_SAFE_END(&cprinfo, &strbcall_lock);
 		}
 
@@ -3879,7 +3874,7 @@ sqenable(syncq_t *sq)
 		}
 	}
 
-	sq->sq_tstamp = lbolt;
+	sq->sq_tstamp = ddi_get_lbolt();
 	STRSTAT(sqenables);
 
 	/* Attempt a taskq dispatch */
@@ -7866,7 +7861,7 @@ link_rempassthru(queue_t *passq)
 clock_t
 str_cv_wait(kcondvar_t *cvp, kmutex_t *mp, clock_t tim, int nosigs)
 {
-	clock_t ret, now, tick;
+	clock_t ret;
 
 	if (tim < 0) {
 		if (nosigs) {
@@ -7879,12 +7874,12 @@ str_cv_wait(kcondvar_t *cvp, kmutex_t *mp, clock_t tim, int nosigs)
 		/*
 		 * convert milliseconds to clock ticks
 		 */
-		tick = MSEC_TO_TICK_ROUNDUP(tim);
-		time_to_wait(&now, tick);
 		if (nosigs) {
-			ret = cv_timedwait(cvp, mp, now);
+			ret = cv_reltimedwait(cvp, mp,
+			    MSEC_TO_TICK_ROUNDUP(tim), TR_CLOCK_TICK);
 		} else {
-			ret = cv_timedwait_sig(cvp, mp, now);
+			ret = cv_reltimedwait_sig(cvp, mp,
+			    MSEC_TO_TICK_ROUNDUP(tim), TR_CLOCK_TICK);
 		}
 	} else {
 		ret = -1;
@@ -8160,7 +8155,7 @@ qenable_locked(queue_t *q)
 		return;
 
 	/* Record the time of qenable */
-	q->q_qtstamp = lbolt;
+	q->q_qtstamp = ddi_get_lbolt();
 
 	/*
 	 * Put the queue in the stp list and schedule it for background

@@ -2015,8 +2015,9 @@ xdf_connect_locked(xdf_t *vdp, boolean_t wait)
 			rv = cv_wait_sig(&vdp->xdf_dev_cv, &vdp->xdf_dev_lk);
 		} else {
 			/* delay for 0.1 sec */
-			rv = cv_timedwait_sig(&vdp->xdf_dev_cv,
-			    &vdp->xdf_dev_lk, lbolt + drv_usectohz(100*1000));
+			rv = cv_reltimedwait_sig(&vdp->xdf_dev_cv,
+			    &vdp->xdf_dev_lk, drv_usectohz(100*1000),
+			    TR_CLOCK_TICK);
 			if (rv == -1)
 				timeouts++;
 		}

@@ -102,6 +102,8 @@
 #include <rpc/pmap_prot.h>
 #include <sys/callo.h>
 
+#include <sys/clock_impl.h>
+
 /*
  * TCP Notes: aka FireEngine Phase I (PSARC 2002/433)
  *
@@ -4437,7 +4439,7 @@ tcp_input_listener(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 		 * be to set the "tcp_syn_defense" flag now.
 		 */
 		TCP_STAT(tcps, tcp_listendropq0);
-		listener->tcp_last_rcv_lbolt = lbolt64;
+		listener->tcp_last_rcv_lbolt = ddi_get_lbolt64();
 		if (!tcp_drop_q0(listener)) {
 			mutex_exit(&listener->tcp_eager_lock);
 			BUMP_MIB(&tcps->tcps_mib, tcpListenDropQ0);
@@ -6689,7 +6691,7 @@ tcp_init_values(tcp_t *tcp)
 		tcp->tcp_rto = tcps->tcps_rexmit_interval_min;
 	tcp->tcp_timer_backoff = 0;
 	tcp->tcp_ms_we_have_waited = 0;
-	tcp->tcp_last_recv_time = lbolt;
+	tcp->tcp_last_recv_time = ddi_get_lbolt();
 	tcp->tcp_cwnd_max = tcps->tcps_cwnd_max_;
 	tcp->tcp_cwnd_ssthresh = TCP_MAX_LARGEWIN;
 	tcp->tcp_snd_burst = TCP_CWND_INFINITE;
@@ -7221,7 +7223,7 @@ tcp_keepalive_killer(void *arg)
 		return;
 	}
 
-	idletime = TICK_TO_MSEC(lbolt - tcp->tcp_last_recv_time);
+	idletime = TICK_TO_MSEC(ddi_get_lbolt() - tcp->tcp_last_recv_time);
 	/*
 	 * If we have not heard from the other side for a long
 	 * time, kill the connection unless the keepalive abort
@@ -7650,7 +7652,7 @@ tcp_create_common(cred_t *credp, boolean_t isv6, boolean_t issocket,
 	crhold(credp);
 	connp->conn_cred = credp;
 	connp->conn_cpid = curproc->p_pid;
-	connp->conn_open_time = lbolt64;
+	connp->conn_open_time = ddi_get_lbolt64();
 
 	connp->conn_zoneid = zoneid;
 	/* conn_allzones can not be set this early, hence no IPCL_ZONEID */
@@ -9246,7 +9248,7 @@ tcp_sack_rxmit(tcp_t *tcp, uint_t *flags)
 		/*
 		 * Update the send timestamp to avoid false retransmission.
 		 */
-		snxt_mp->b_prev = (mblk_t *)lbolt;
+		snxt_mp->b_prev = (mblk_t *)ddi_get_lbolt();
 
 		BUMP_MIB(&tcps->tcps_mib, tcpRetransSegs);
 		UPDATE_MIB(&tcps->tcps_mib, tcpRetransBytes, seg_len);
@@ -9323,7 +9325,7 @@ tcp_ss_rexmit(tcp_t *tcp)
 			 * Update the send timestamp to avoid false
 			 * retransmission.
 			 */
-			old_snxt_mp->b_prev = (mblk_t *)lbolt;
+			old_snxt_mp->b_prev = (mblk_t *)ddi_get_lbolt();
 			BUMP_MIB(&tcps->tcps_mib, tcpRetransSegs);
 			UPDATE_MIB(&tcps->tcps_mib, tcpRetransBytes, cnt);
 
@@ -9410,7 +9412,7 @@ tcp_process_options(tcp_t *tcp, tcpha_t *tcpha)
 
 		tcp->tcp_snd_ts_ok = B_TRUE;
 		tcp->tcp_ts_recent = tcpopt.tcp_opt_ts_val;
-		tcp->tcp_last_rcv_lbolt = lbolt64;
+		tcp->tcp_last_rcv_lbolt = ddi_get_lbolt64();
 		ASSERT(OK_32PTR(tmp_tcph));
 		ASSERT(connp->conn_ht_ulp_len == TCP_MIN_HEADER_LENGTH);
 
@@ -9648,7 +9650,7 @@ tcp_send_conn_ind(void *arg, mblk_t *mp, void *arg2)
 		if (listener->tcp_syn_defense &&
 		    listener->tcp_syn_rcvd_timeout <=
 		    (tcps->tcps_conn_req_max_q0 >> 5) &&
-		    10*MINUTES < TICK_TO_MSEC(lbolt64 -
+		    10*MINUTES < TICK_TO_MSEC(ddi_get_lbolt64() -
 		    listener->tcp_last_rcv_lbolt)) {
 			/*
 			 * Turn off the defense mode if we
@@ -9893,7 +9895,7 @@ tcp_input_data(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 		 * But that should not cause any harm.  And it is updated for
 		 * all kinds of incoming segments, not only for data segments.
 		 */
-		tcp->tcp_last_recv_time = lbolt;
+		tcp->tcp_last_recv_time = LBOLT_FASTPATH;
 	}
 
 	flags = (unsigned int)tcpha->tha_flags & 0xFF;
@@ -10638,7 +10640,7 @@ ok:;
 	    TSTMP_GEQ(tcpopt.tcp_opt_ts_val, tcp->tcp_ts_recent) &&
 	    SEQ_LEQ(seg_seq, tcp->tcp_rack)) {
 		tcp->tcp_ts_recent = tcpopt.tcp_opt_ts_val;
-		tcp->tcp_last_rcv_lbolt = lbolt64;
+		tcp->tcp_last_rcv_lbolt = ddi_get_lbolt64();
 	}
 
 	if (seg_seq != tcp->tcp_rnxt || tcp->tcp_reass_head) {
@@ -11660,7 +11662,7 @@ process_ack:
 	if (tcp->tcp_snd_ts_ok) {
 		/* Ignore zero timestamp echo-reply. */
 		if (tcpopt.tcp_opt_ts_ecr != 0) {
-			tcp_set_rto(tcp, (int32_t)lbolt -
+			tcp_set_rto(tcp, (int32_t)LBOLT_FASTPATH -
 			    (int32_t)tcpopt.tcp_opt_ts_ecr);
 		}
 
@@ -11682,7 +11684,7 @@ process_ack:
 		 */
 		if ((mp1->b_next != NULL) &&
 		    SEQ_GT(seg_ack, (uint32_t)(uintptr_t)(mp1->b_next)))
-			tcp_set_rto(tcp, (int32_t)lbolt -
+			tcp_set_rto(tcp, (int32_t)LBOLT_FASTPATH -
 			    (int32_t)(intptr_t)mp1->b_prev);
 		else
 			BUMP_MIB(&tcps->tcps_mib, tcpRttNoUpdate);
@@ -11713,7 +11715,8 @@ process_ack:
 			 */
 			if (SEQ_GT(seg_ack,
 			    (uint32_t)(uintptr_t)(mp1->b_next))) {
-				mp1->b_prev = (mblk_t *)(uintptr_t)lbolt;
+				mp1->b_prev =
+				    (mblk_t *)(uintptr_t)LBOLT_FASTPATH;
 				mp1->b_next = NULL;
 			}
 			break;
@@ -12211,7 +12214,8 @@ xmit_check:
 			    B_TRUE);
 
 			if (mp1 != NULL) {
-				tcp->tcp_xmit_head->b_prev = (mblk_t *)lbolt;
+				tcp->tcp_xmit_head->b_prev =
+				    (mblk_t *)LBOLT_FASTPATH;
 				tcp->tcp_csuna = tcp->tcp_snxt;
 				BUMP_MIB(&tcps->tcps_mib, tcpRetransSegs);
 				UPDATE_MIB(&tcps->tcps_mib,
@@ -12246,7 +12250,8 @@ xmit_check:
 			 * limited transmitted segment's ACK gets back.
 			 */
 			if (tcp->tcp_xmit_head != NULL)
-				tcp->tcp_xmit_head->b_prev = (mblk_t *)lbolt;
+				tcp->tcp_xmit_head->b_prev =
+				    (mblk_t *)LBOLT_FASTPATH;
 		}
 
 		/* Anything more to do? */
@@ -12407,8 +12412,8 @@ tcp_paws_check(tcp_t *tcp, tcpha_t *tcpha, tcp_opt_t *tcpoptp)
 		if ((flags & TH_RST) == 0 &&
 		    TSTMP_LT(tcpoptp->tcp_opt_ts_val,
 		    tcp->tcp_ts_recent)) {
-			if (TSTMP_LT(lbolt64, tcp->tcp_last_rcv_lbolt +
-			    PAWS_TIMEOUT)) {
+			if (TSTMP_LT(LBOLT_FASTPATH,
+			    tcp->tcp_last_rcv_lbolt + PAWS_TIMEOUT)) {
 				/* This segment is not acceptable. */
 				return (B_FALSE);
 			} else {
@@ -13368,7 +13373,7 @@ tcp_timer(void *arg)
 			BUMP_MIB(&tcps->tcps_mib, tcpTimRetrans);
 			if (!tcp->tcp_xmit_head)
 				break;
-			time_to_wait = lbolt -
+			time_to_wait = ddi_get_lbolt() -
 			    (clock_t)tcp->tcp_xmit_head->b_prev;
 			time_to_wait = tcp->tcp_rto -
 			    TICK_TO_MSEC(time_to_wait);
@@ -13536,7 +13541,7 @@ tcp_timer(void *arg)
 		 * time...
 		 */
 		if ((tcp->tcp_zero_win_probe == 0) ||
-		    (TICK_TO_MSEC(lbolt - tcp->tcp_last_recv_time) >
+		    (TICK_TO_MSEC(ddi_get_lbolt() - tcp->tcp_last_recv_time) >
 		    second_threshold)) {
 			BUMP_MIB(&tcps->tcps_mib, tcpTimRetransDrop);
 			/*
@@ -13558,8 +13563,8 @@ tcp_timer(void *arg)
 			/*
 			 * Set tcp_ms_we_have_waited to second_threshold
 			 * so that in next timeout, we will do the above
-			 * check (lbolt - tcp_last_recv_time).  This is
-			 * also to avoid overflow.
+			 * check (ddi_get_lbolt() - tcp_last_recv_time).
+			 * This is also to avoid overflow.
 			 *
 			 * We don't need to decrement tcp_timer_backoff
 			 * to avoid overflow because it will be decremented
@@ -13635,7 +13640,7 @@ tcp_timer(void *arg)
 		mss = tcp->tcp_swnd;
 
 	if ((mp = tcp->tcp_xmit_head) != NULL)
-		mp->b_prev = (mblk_t *)lbolt;
+		mp->b_prev = (mblk_t *)ddi_get_lbolt();
 	mp = tcp_xmit_mp(tcp, mp, mss, NULL, NULL, tcp->tcp_suna, B_TRUE, &mss,
 	    B_TRUE);
 
@@ -14003,7 +14008,8 @@ tcp_output(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 	 * Reinitialize tcp_cwnd after idle.
 	 */
 	if ((tcp->tcp_suna == snxt) && !tcp->tcp_localnet &&
-	    (TICK_TO_MSEC(lbolt - tcp->tcp_last_recv_time) >= tcp->tcp_rto)) {
+	    (TICK_TO_MSEC(ddi_get_lbolt() - tcp->tcp_last_recv_time) >=
+	    tcp->tcp_rto)) {
 		SET_TCP_INIT_CWND(tcp, mss, tcps->tcps_slow_start_after_idle);
 	}
 
@@ -14064,7 +14070,7 @@ tcp_output(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 
 	if ((mp1 = dupb(mp)) == 0)
 		goto no_memory;
-	mp->b_prev = (mblk_t *)(uintptr_t)lbolt;
+	mp->b_prev = (mblk_t *)(uintptr_t)ddi_get_lbolt();
 	mp->b_next = (mblk_t *)(uintptr_t)snxt;
 
 	/* adjust tcp header information */
@@ -14119,7 +14125,9 @@ tcp_output(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 
 	/* Fill in the timestamp option. */
 	if (tcp->tcp_snd_ts_ok) {
-		U32_TO_BE32((uint32_t)lbolt,
+		uint32_t llbolt = (uint32_t)LBOLT_FASTPATH;
+
+		U32_TO_BE32(llbolt,
 		    (char *)tcpha + TCP_MIN_HEADER_LENGTH+4);
 		U32_TO_BE32(tcp->tcp_ts_recent,
 		    (char *)tcpha + TCP_MIN_HEADER_LENGTH+8);
@@ -15552,7 +15560,8 @@ data_null:
 	}
 
 	if ((tcp->tcp_suna == snxt) && !tcp->tcp_localnet &&
-	    (TICK_TO_MSEC(lbolt - tcp->tcp_last_recv_time) >= tcp->tcp_rto)) {
+	    (TICK_TO_MSEC((clock_t)LBOLT_FASTPATH - tcp->tcp_last_recv_time) >=
+	    tcp->tcp_rto)) {
 		SET_TCP_INIT_CWND(tcp, mss, tcps->tcps_slow_start_after_idle);
 	}
 	if (tcpstate == TCPS_SYN_RCVD) {
@@ -15634,7 +15643,7 @@ data_null:
 		}
 	}
 
-	local_time = (mblk_t *)lbolt;
+	local_time = (mblk_t *)LBOLT_FASTPATH;
 
 	/*
 	 * "Our" Nagle Algorithm.  This is not the same as in the old
@@ -16795,7 +16804,9 @@ tcp_xmit_ctl(char *str, tcp_t *tcp, uint32_t seq, uint32_t ack, int ctl)
 	}
 	if (ctl & TH_ACK) {
 		if (tcp->tcp_snd_ts_ok) {
-			U32_TO_BE32(lbolt,
+			uint32_t llbolt = (uint32_t)ddi_get_lbolt();
+
+			U32_TO_BE32(llbolt,
 			    (char *)tcpha + TCP_MIN_HEADER_LENGTH+4);
 			U32_TO_BE32(tcp->tcp_ts_recent,
 			    (char *)tcpha + TCP_MIN_HEADER_LENGTH+8);
@@ -16838,7 +16849,7 @@ tcp_send_rst_chk(tcp_stack_t *tcps)
 	 * limited.
 	 */
 	if (tcps->tcps_rst_sent_rate_enabled != 0) {
-		now = lbolt;
+		now = ddi_get_lbolt();
 		/* lbolt can wrap around. */
 		if ((tcps->tcps_last_rst_intrvl > now) ||
 		    (TICK_TO_MSEC(now - tcps->tcps_last_rst_intrvl) >
@@ -17482,7 +17493,8 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 				flags = TH_SYN;
 
 				if (tcp->tcp_snd_ts_ok) {
-					uint32_t llbolt = (uint32_t)lbolt;
+					uint32_t llbolt =
+					    (uint32_t)ddi_get_lbolt();
 
 					wptr = mp1->b_wptr;
 					wptr[0] = TCPOPT_NOP;
@@ -17619,7 +17631,7 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 
 	if (tcp->tcp_snd_ts_ok) {
 		if (tcp->tcp_state != TCPS_SYN_SENT) {
-			uint32_t llbolt = (uint32_t)lbolt;
+			uint32_t llbolt = (uint32_t)ddi_get_lbolt();
 
 			U32_TO_BE32(llbolt,
 			    (char *)tcpha + TCP_MIN_HEADER_LENGTH+4);
@@ -17843,7 +17855,7 @@ tcp_ack_mp(tcp_t *tcp)
 
 		/* fill in timestamp option if in use */
 		if (tcp->tcp_snd_ts_ok) {
-			uint32_t llbolt = (uint32_t)lbolt;
+			uint32_t llbolt = (uint32_t)LBOLT_FASTPATH;
 
 			U32_TO_BE32(llbolt,
 			    (char *)tcpha + TCP_MIN_HEADER_LENGTH+4);
@@ -19339,7 +19351,7 @@ tcp_time_wait_processing(tcp_t *tcp, mblk_t *mp, uint32_t seg_seq,
 	    TSTMP_GEQ(tcpopt.tcp_opt_ts_val, tcp->tcp_ts_recent) &&
 	    SEQ_LEQ(seg_seq, tcp->tcp_rack)) {
 		tcp->tcp_ts_recent = tcpopt.tcp_opt_ts_val;
-		tcp->tcp_last_rcv_lbolt = lbolt64;
+		tcp->tcp_last_rcv_lbolt = ddi_get_lbolt64();
 	}
 
 	if (seg_seq != tcp->tcp_rnxt && seg_len > 0) {

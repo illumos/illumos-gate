@@ -1079,7 +1079,7 @@ void
 idm_wd_thread(void *arg)
 {
 	idm_conn_t	*ic;
-	clock_t		wake_time;
+	clock_t		wake_time = SEC_TO_TICK(IDM_WD_INTERVAL);
 	clock_t		idle_time;
 
 	/* Record the thread id for thread_join() */
@@ -1164,9 +1164,8 @@ idm_wd_thread(void *arg)
 			mutex_exit(&ic->ic_state_mutex);
 		}
 
-		wake_time = ddi_get_lbolt() + SEC_TO_TICK(IDM_WD_INTERVAL);
-		(void) cv_timedwait(&idm.idm_wd_cv, &idm.idm_global_mutex,
-		    wake_time);
+		(void) cv_reltimedwait(&idm.idm_wd_cv, &idm.idm_global_mutex,
+		    wake_time, TR_CLOCK_TICK);
 	}
 	mutex_exit(&idm.idm_global_mutex);
 

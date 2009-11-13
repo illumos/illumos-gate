@@ -786,10 +786,11 @@ smb_iod_waitrq(struct smb_rq *rqp)
 	 * start the timer(s) after the request is sent.
 	 */
 	if (smb_timo_notice && (smb_timo_notice < rqp->sr_timo))
-		tmo1 = lbolt + SEC_TO_TICK(smb_timo_notice);
+		tmo1 = SEC_TO_TICK(smb_timo_notice);
 	else
 		tmo1 = 0;
-	tmo2 = lbolt + SEC_TO_TICK(rqp->sr_timo);
+
+	tmo2 = ddi_get_lbolt() + SEC_TO_TICK(rqp->sr_timo);
 
 	/*
 	 * As above, we don't want to allow interrupt for some
@@ -802,11 +803,11 @@ smb_iod_waitrq(struct smb_rq *rqp)
 	 */
 	if (tmo1 && rqp->sr_rpgen == rqp->sr_rplast) {
 		if (rqp->sr_flags & SMBR_NOINTR_RECV)
-			tr = cv_timedwait(&rqp->sr_cond,
-			    &rqp->sr_lock, tmo1);
+			tr = cv_reltimedwait(&rqp->sr_cond,
+			    &rqp->sr_lock, tmo1, TR_CLOCK_TICK);
 		else
-			tr = cv_timedwait_sig(&rqp->sr_cond,
-			    &rqp->sr_lock, tmo1);
+			tr = cv_reltimedwait_sig(&rqp->sr_cond,
+			    &rqp->sr_lock, tmo1, TR_CLOCK_TICK);
 		if (tr == 0) {
 			error = EINTR;
 			goto out;
@@ -1064,7 +1065,7 @@ out:
 int
 smb_iod_vc_idle(struct smb_vc *vcp)
 {
-	clock_t tr, tmo;
+	clock_t tr, delta = SEC_TO_TICK(15);
 	int err = 0;
 
 	/*
@@ -1075,8 +1076,8 @@ smb_iod_vc_idle(struct smb_vc *vcp)
 
 	SMB_VC_LOCK(vcp);
 	while (vcp->vc_state == SMBIOD_ST_IDLE) {
-		tmo = lbolt + SEC_TO_TICK(15);
-		tr = cv_timedwait_sig(&vcp->iod_idle, &vcp->vc_lock, tmo);
+		tr = cv_reltimedwait_sig(&vcp->iod_idle, &vcp->vc_lock,
+		    delta, TR_CLOCK_TICK);
 		if (tr == 0) {
 			err = EINTR;
 			break;
@@ -1103,7 +1104,7 @@ smb_iod_vc_idle(struct smb_vc *vcp)
 int
 smb_iod_vc_rcfail(struct smb_vc *vcp)
 {
-	clock_t tr, tmo;
+	clock_t tr;
 	int err = 0;
 
 	/*
@@ -1125,8 +1126,8 @@ smb_iod_vc_rcfail(struct smb_vc *vcp)
 	 * (1) Give requests a chance to error out.
 	 * (2) Prevent immediate retry.
 	 */
-	tmo = lbolt + SEC_TO_TICK(5);
-	tr = cv_timedwait_sig(&vcp->iod_idle, &vcp->vc_lock, tmo);
+	tr = cv_reltimedwait_sig(&vcp->iod_idle, &vcp->vc_lock,
+	    SEC_TO_TICK(5), TR_CLOCK_TICK);
 	if (tr == 0)
 		err = EINTR;
 

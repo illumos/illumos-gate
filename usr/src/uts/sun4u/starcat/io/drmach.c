@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -648,8 +648,7 @@ drmach_node_ddi_walk(drmach_node_t *np, void *data,
 	/*
 	 * Root node doesn't have to be held in any way.
 	 */
-	ddi_walk_devs(ddi_root_node(), drmach_node_ddi_walk_cb,
-		(void *)&nargs);
+	ddi_walk_devs(ddi_root_node(), drmach_node_ddi_walk_cb, (void *)&nargs);
 
 	return (nargs.err);
 }
@@ -875,7 +874,7 @@ drmach_node_ddi_get_proplen(drmach_node_t *np, char *name, int *len)
 	if (ndip == NULL) {
 		rv = -1;
 	} else if (ddi_getproplen(DDI_DEV_T_ANY, ndip, DDI_PROP_DONTPASS,
-			name, len) != DDI_PROP_SUCCESS) {
+	    name, len) != DDI_PROP_SUCCESS) {
 		rv = -1;
 	}
 
@@ -1121,8 +1120,8 @@ drmach_device_new(drmach_node_t *node,
 
 		/* every node is expected to have a name */
 		err = drerr_new(1, ESTC_GETPROP,
-			"dip: 0x%p: property %s",
-			node->n_getdip(node), OBP_NAME);
+		    "dip: 0x%p: property %s",
+		    node->n_getdip(node), OBP_NAME);
 
 		return (err);
 	}
@@ -1241,8 +1240,8 @@ drmach_board_status(drmachid_t id, drmach_status_t *stat)
 	if (!bp->connected) {
 		obufp = kmem_zalloc(sizeof (dr_proto_hdr_t), KM_SLEEP);
 		err = drmach_mbox_trans(DRMSG_SHOWBOARD, bp->bnum, obufp,
-			sizeof (dr_proto_hdr_t), (caddr_t)&shb,
-			sizeof (dr_showboard_t));
+		    sizeof (dr_proto_hdr_t), (caddr_t)&shb,
+		    sizeof (dr_showboard_t));
 
 		kmem_free(obufp, sizeof (dr_proto_hdr_t));
 		if (err)
@@ -1269,14 +1268,14 @@ drmach_board_status(drmachid_t id, drmach_status_t *stat)
 			default:
 				stat->cond = bp->cond = SBD_COND_UNKNOWN;
 				DRMACH_PR("Unknown test status=0x%x from SC\n",
-					shb.test_status);
+				    shb.test_status);
 				break;
 
 		}
 
 		strncpy(stat->type, shb.board_type, sizeof (stat->type));
 		snprintf(stat->info, sizeof (stat->info), "Test Level=%d",
-			shb.test_level);
+		    shb.test_level);
 	} else {
 		stat->assigned = bp->assigned;
 		stat->powered = bp->powered;
@@ -1406,14 +1405,14 @@ drmach_mbox_prmsg(dr_mbox_msg_t *mbp, int dir)
 			} else {
 				DRMACH_PR("BOARDEVENT received:\n");
 				DRMACH_PR("init=%d ins=%d rem=%d asgn=%d\n",
-					mp->dm_be.initialized,
-					mp->dm_be.board_insertion,
-					mp->dm_be.board_removal,
-					mp->dm_be.slot_assign);
+				    mp->dm_be.initialized,
+				    mp->dm_be.board_insertion,
+				    mp->dm_be.board_removal,
+				    mp->dm_be.slot_assign);
 				DRMACH_PR("unasgn=%d avail=%d unavail=%d\n",
-					mp->dm_be.slot_unassign,
-					mp->dm_be.slot_avail,
-					mp->dm_be.slot_unavail);
+				    mp->dm_be.slot_unassign,
+				    mp->dm_be.slot_avail,
+				    mp->dm_be.slot_unavail);
 			}
 			break;
 		case DRMSG_MBOX_INIT:
@@ -1446,24 +1445,24 @@ drmach_mbox_prmsg(dr_mbox_msg_t *mbp, int dir)
 			DRMACH_PR("CLAIM Request:\n");
 			for (i = 0; i < 18; ++i) {
 				DRMACH_PR("exp%d: val=%d slice=0x%x\n", i,
-					mp->dm_cr.mem_slice[i].valid,
-					mp->dm_cr.mem_slice[i].slice);
+				    mp->dm_cr.mem_slice[i].valid,
+				    mp->dm_cr.mem_slice[i].slice);
 				memregs = &(mp->dm_cr.mem_regs[i]);
 				for (j = 0; j < S0_LPORT_COUNT; j++) {
 					DRMACH_PR("  MC %2d: "
-						"MADR[%d] = 0x%lx, "
-						"MADR[%d] = 0x%lx\n", j,
-						0, DRMACH_MCREG_TO_U64(
-						memregs->madr[j][0]),
-						1, DRMACH_MCREG_TO_U64(
-						memregs->madr[j][1]));
+					    "MADR[%d] = 0x%lx, "
+					    "MADR[%d] = 0x%lx\n", j,
+					    0, DRMACH_MCREG_TO_U64(
+					    memregs->madr[j][0]),
+					    1, DRMACH_MCREG_TO_U64(
+					    memregs->madr[j][1]));
 					DRMACH_PR("       : "
-						"MADR[%d] = 0x%lx, "
-						"MADR[%d] = 0x%lx\n",
-						2, DRMACH_MCREG_TO_U64(
-						memregs->madr[j][2]),
-						3, DRMACH_MCREG_TO_U64(
-						memregs->madr[j][3]));
+					    "MADR[%d] = 0x%lx, "
+					    "MADR[%d] = 0x%lx\n",
+					    2, DRMACH_MCREG_TO_U64(
+					    memregs->madr[j][2]),
+					    3, DRMACH_MCREG_TO_U64(
+					    memregs->madr[j][3]));
 				}
 			}
 			break;
@@ -1476,24 +1475,24 @@ drmach_mbox_prmsg(dr_mbox_msg_t *mbp, int dir)
 			DRMACH_PR("UNCLAIM Request:\n");
 			for (i = 0; i < 18; ++i) {
 				DRMACH_PR("exp%d: val=%d slice=0x%x\n", i,
-					mp->dm_ur.mem_slice[i].valid,
-					mp->dm_ur.mem_slice[i].slice);
+				    mp->dm_ur.mem_slice[i].valid,
+				    mp->dm_ur.mem_slice[i].slice);
 				memregs = &(mp->dm_ur.mem_regs[i]);
 				for (j = 0; j < S0_LPORT_COUNT; j++) {
 					DRMACH_PR("  MC %2d: "
-						"MADR[%d] = 0x%lx, "
-						"MADR[%d] = 0x%lx\n", j,
-						0, DRMACH_MCREG_TO_U64(
-						memregs->madr[j][0]),
-						1, DRMACH_MCREG_TO_U64(
-						memregs->madr[j][1]));
+					    "MADR[%d] = 0x%lx, "
+					    "MADR[%d] = 0x%lx\n", j,
+					    0, DRMACH_MCREG_TO_U64(
+					    memregs->madr[j][0]),
+					    1, DRMACH_MCREG_TO_U64(
+					    memregs->madr[j][1]));
 					DRMACH_PR("       : "
-						"MADR[%d] = 0x%lx, "
-						"MADR[%d] = 0x%lx\n",
-						2, DRMACH_MCREG_TO_U64(
-						memregs->madr[j][2]),
-						3, DRMACH_MCREG_TO_U64(
-						memregs->madr[j][3]));
+					    "MADR[%d] = 0x%lx, "
+					    "MADR[%d] = 0x%lx\n",
+					    2, DRMACH_MCREG_TO_U64(
+					    memregs->madr[j][2]),
+					    3, DRMACH_MCREG_TO_U64(
+					    memregs->madr[j][3]));
 				}
 			}
 			DRMACH_PR(" mem_clear=%d\n", mp->dm_ur.mem_clear);
@@ -1507,24 +1506,24 @@ drmach_mbox_prmsg(dr_mbox_msg_t *mbp, int dir)
 			DRMACH_PR("UNCONFIG Request:\n");
 			for (i = 0; i < 18; ++i) {
 				DRMACH_PR("exp%d: val=%d slice=0x%x\n", i,
-					mp->dm_uc.mem_slice[i].valid,
-					mp->dm_uc.mem_slice[i].slice);
+				    mp->dm_uc.mem_slice[i].valid,
+				    mp->dm_uc.mem_slice[i].slice);
 				memregs = &(mp->dm_uc.mem_regs[i]);
 				for (j = 0; j < S0_LPORT_COUNT; j++) {
 					DRMACH_PR("  MC %2d: "
-						"MADR[%d] = 0x%lx, "
-						"MADR[%d] = 0x%lx\n", j,
-						0, DRMACH_MCREG_TO_U64(
-						memregs->madr[j][0]),
-						1, DRMACH_MCREG_TO_U64(
-						memregs->madr[j][1]));
+					    "MADR[%d] = 0x%lx, "
+					    "MADR[%d] = 0x%lx\n", j,
+					    0, DRMACH_MCREG_TO_U64(
+					    memregs->madr[j][0]),
+					    1, DRMACH_MCREG_TO_U64(
+					    memregs->madr[j][1]));
 					DRMACH_PR("       : "
-						"MADR[%d] = 0x%lx, "
-						"MADR[%d] = 0x%lx\n",
-						2, DRMACH_MCREG_TO_U64(
-						memregs->madr[j][2]),
-						3, DRMACH_MCREG_TO_U64(
-						memregs->madr[j][3]));
+					    "MADR[%d] = 0x%lx, "
+					    "MADR[%d] = 0x%lx\n",
+					    2, DRMACH_MCREG_TO_U64(
+					    memregs->madr[j][2]),
+					    3, DRMACH_MCREG_TO_U64(
+					    memregs->madr[j][3]));
 				}
 			}
 			break;
@@ -1546,22 +1545,22 @@ drmach_mbox_prmsg(dr_mbox_msg_t *mbp, int dir)
 			if (dir) {
 				DRMACH_PR("TESTBOARD Request:\n");
 				DRMACH_PR("\tmemaddrhi=0x%x memaddrlo=0x%x ",
-					mp->dm_tb.memaddrhi,
-					mp->dm_tb.memaddrlo);
+				    mp->dm_tb.memaddrhi,
+				    mp->dm_tb.memaddrlo);
 				DRMACH_PR("memlen=0x%x cpu_portid=0x%x\n",
-					mp->dm_tb.memlen, mp->dm_tb.cpu_portid);
+				    mp->dm_tb.memlen, mp->dm_tb.cpu_portid);
 				DRMACH_PR("\tforce=0x%x imm=0x%x\n",
-					mp->dm_tb.force, mp->dm_tb.immediate);
+				    mp->dm_tb.force, mp->dm_tb.immediate);
 			} else {
 				DRMACH_PR("TESTBOARD Reply:\n");
 				DRMACH_PR("\tmemaddrhi=0x%x memaddrlo=0x%x ",
-					mp->dm_tr.memaddrhi,
-					mp->dm_tr.memaddrlo);
+				    mp->dm_tr.memaddrhi,
+				    mp->dm_tr.memaddrlo);
 				DRMACH_PR("memlen=0x%x cpu_portid=0x%x\n",
-					mp->dm_tr.memlen, mp->dm_tr.cpu_portid);
+				    mp->dm_tr.memlen, mp->dm_tr.cpu_portid);
 				DRMACH_PR("\trecovered=0x%x test status=0x%x\n",
-					mp->dm_tr.cpu_recovered,
-					mp->dm_tr.test_status);
+				    mp->dm_tr.cpu_recovered,
+				    mp->dm_tr.test_status);
 
 			}
 			break;
@@ -1573,10 +1572,10 @@ drmach_mbox_prmsg(dr_mbox_msg_t *mbp, int dir)
 			}
 
 			DRMACH_PR("\tmemaddrhi=0x%x memaddrlo=0x%x ",
-					mp->dm_ta.memaddrhi,
-					mp->dm_ta.memaddrlo);
+			    mp->dm_ta.memaddrhi,
+			    mp->dm_ta.memaddrlo);
 			DRMACH_PR("memlen=0x%x cpu_portid=0x%x\n",
-					mp->dm_ta.memlen, mp->dm_ta.cpu_portid);
+			    mp->dm_ta.memlen, mp->dm_ta.cpu_portid);
 			break;
 		case DRMSG_SHOWBOARD:
 			if (dir) {
@@ -1585,13 +1584,13 @@ drmach_mbox_prmsg(dr_mbox_msg_t *mbp, int dir)
 				DRMACH_PR("SHOWBOARD Reply:\n");
 
 				DRMACH_PR(": empty=%d power=%d assigned=%d",
-					mp->dm_sb.slot_empty,
-					mp->dm_sb.power_on,
-					mp->dm_sb.bd_assigned);
+				    mp->dm_sb.slot_empty,
+				    mp->dm_sb.power_on,
+				    mp->dm_sb.bd_assigned);
 				DRMACH_PR(": active=%d t_status=%d t_level=%d ",
-					mp->dm_sb.bd_active,
-					mp->dm_sb.test_status,
-					mp->dm_sb.test_level);
+				    mp->dm_sb.bd_active,
+				    mp->dm_sb.test_status,
+				    mp->dm_sb.test_level);
 				DRMACH_PR(": type=%s ", mp->dm_sb.board_type);
 			}
 			break;
@@ -1601,12 +1600,11 @@ drmach_mbox_prmsg(dr_mbox_msg_t *mbp, int dir)
 	}
 
 	DRMACH_PR("dr hdr:\n\tid=0x%x vers=0x%x cmd=0x%x exp=0x%x slot=0x%x\n",
-		php->message_id, php->drproto_version, php->command,
-		php->expbrd, php->slot);
+	    php->message_id, php->drproto_version, php->command,
+	    php->expbrd, php->slot);
 #endif
 	DRMACH_PR("\treply_status=0x%x error_code=0x%x\n", php->reply_status,
-		php->error_code);
-
+	    php->error_code);
 }
 
 /*
@@ -1636,13 +1634,13 @@ drmach_mbox_reinit(void *unused)
 		cmn_err(CE_NOTE, "!reinitializing DR mailbox");
 		obufp = kmem_zalloc(sizeof (dr_proto_hdr_t), KM_SLEEP);
 		serr = drmach_mbox_trans(DRMSG_MBOX_INIT, 0, obufp,
-			sizeof (dr_proto_hdr_t), (caddr_t)NULL, 0);
+		    sizeof (dr_proto_hdr_t), (caddr_t)NULL, 0);
 		kmem_free(obufp, sizeof (dr_proto_hdr_t));
 
 		if (serr) {
 			cmn_err(CE_WARN,
-				"mbox_init: MBOX_INIT failed ecode=0x%x",
-				serr->e_code);
+			    "mbox_init: MBOX_INIT failed ecode=0x%x",
+			    serr->e_code);
 			sbd_err_clear(&serr);
 		}
 		mutex_enter(&drmach_g_mbox_mutex);
@@ -1678,24 +1676,24 @@ drmach_mbox_event(void)
 	int		logsys = 0;
 
 	do {
-		err = mboxsc_getmsg(KEY_SCDR, &type, &command,
-			&transid, &length, (void *)msg, 0);
+		err = mboxsc_getmsg(KEY_SCDR, &type, &command, &transid,
+		    &length, (void *)msg, 0);
 	} while (err == EAGAIN);
 
 	/* don't try to interpret anything with the wrong version number */
 	if ((err == 0) && (msg->p_hdr.drproto_version != DRMBX_VERSION)) {
 		cmn_err(CE_WARN, "mailbox version mismatch 0x%x vs 0x%x",
-			msg->p_hdr.drproto_version, DRMBX_VERSION);
+		    msg->p_hdr.drproto_version, DRMBX_VERSION);
 		mutex_enter(&drmach_g_mbox_mutex);
 		drmach_mbox_iflag = 0;
 		/* schedule a reinit handshake if one isn't pending */
 		if (!drmach_mbox_ipending) {
 			if (taskq_dispatch(system_taskq, drmach_mbox_reinit,
-				NULL, TQ_NOSLEEP) != NULL) {
+			    NULL, TQ_NOSLEEP) != NULL) {
 				drmach_mbox_ipending = 1;
 			} else {
 				cmn_err(CE_WARN,
-					"failed to schedule mailbox reinit");
+				    "failed to schedule mailbox reinit");
 			}
 		}
 		mutex_exit(&drmach_g_mbox_mutex);
@@ -1704,8 +1702,8 @@ drmach_mbox_event(void)
 
 	if ((err != 0) || (msg->p_hdr.reply_status != DRMSG_REPLY_OK)) {
 		cmn_err(CE_WARN,
-			"Unsolicited mboxsc_getmsg failed: err=0x%x code=0x%x",
-				err, msg->p_hdr.error_code);
+		    "Unsolicited mboxsc_getmsg failed: err=0x%x code=0x%x",
+		    err, msg->p_hdr.error_code);
 	} else {
 		dr_boardevent_t	*be;
 		be = (dr_boardevent_t *)&msg->msgdata;
@@ -1717,12 +1715,12 @@ drmach_mbox_event(void)
 			/* schedule a reinit handshake if one isn't pending */
 			if (!drmach_mbox_ipending) {
 				if (taskq_dispatch(system_taskq,
-					drmach_mbox_reinit, NULL, TQ_NOSLEEP)
-					!= NULL) {
+				    drmach_mbox_reinit, NULL, TQ_NOSLEEP)
+				    != NULL) {
 					drmach_mbox_ipending = 1;
 				} else {
-					cmn_err(CE_WARN,
-					"failed to schedule mailbox reinit");
+					cmn_err(CE_WARN, "failed to schedule "
+					    "mailbox reinit");
 				}
 			}
 			mutex_exit(&drmach_g_mbox_mutex);
@@ -1768,9 +1766,8 @@ drmach_mbox_event(void)
 
 		if (logsys)
 			drmach_log_sysevent(
-				    DRMACH_EXPSLOT2BNUM(msg->p_hdr.expbrd,
-							msg->p_hdr.slot),
-				    hint, SE_NOSLEEP, 1);
+			    DRMACH_EXPSLOT2BNUM(msg->p_hdr.expbrd,
+			    msg->p_hdr.slot), hint, SE_NOSLEEP, 1);
 	}
 }
 
@@ -1844,8 +1841,8 @@ drmach_mbox_getmsg()
 		command = 0;
 		transid = 0;
 		length = DRMACH_MAX_MBOX_MSG_SIZE;
-		err = mboxsc_getmsg(KEY_SCDR, &type, &command,
-			&transid, &length, (void *)msg, drmach_to_getmsg);
+		err = mboxsc_getmsg(KEY_SCDR, &type, &command, &transid,
+		    &length, (void *)msg, drmach_to_getmsg);
 
 		if (err) {
 			/*
@@ -1862,7 +1859,7 @@ drmach_mbox_getmsg()
 			 */
 			if ((err != ETIMEDOUT) && (err != EAGAIN)) {
 				cmn_err(CE_WARN,
-				"mboxsc_getmsg failed, err=0x%x", err);
+				    "mboxsc_getmsg failed, err=0x%x", err);
 				delay(drmach_mbxerr_delay * hz);
 			}
 			continue;
@@ -1872,20 +1869,20 @@ drmach_mbox_getmsg()
 
 		if (php->drproto_version != DRMBX_VERSION) {
 			cmn_err(CE_WARN,
-				"mailbox version mismatch 0x%x vs 0x%x",
-				php->drproto_version, DRMBX_VERSION);
+			    "mailbox version mismatch 0x%x vs 0x%x",
+			    php->drproto_version, DRMBX_VERSION);
 
 			mutex_enter(&drmach_g_mbox_mutex);
 			drmach_mbox_iflag = 0;
 			/* schedule a reinit handshake if one isn't pending */
 			if (!drmach_mbox_ipending) {
 				if (taskq_dispatch(system_taskq,
-					drmach_mbox_reinit, NULL, TQ_NOSLEEP)
-					!= NULL) {
+				    drmach_mbox_reinit, NULL, TQ_NOSLEEP)
+				    != NULL) {
 					drmach_mbox_ipending = 1;
 				} else {
-					cmn_err(CE_WARN,
-					"failed to schedule mailbox reinit");
+					cmn_err(CE_WARN, "failed to schedule "
+					    "mailbox reinit");
 				}
 			}
 			mutex_exit(&drmach_g_mbox_mutex);
@@ -1912,7 +1909,7 @@ drmach_mbox_getmsg()
 			found->e_code = php->error_code;
 			if (found->i_buflen > 0)
 				bcopy((caddr_t)&msg->msgdata, found->i_buf,
-					found->i_buflen);
+				    found->i_buflen);
 			found->m_reply = 1;
 
 			cv_signal(&found->g_cv);
@@ -1976,8 +1973,8 @@ drmach_mbox_sendmsg()
 			drmach_mbox_prmsg(mp, 1);
 
 			err = mboxsc_putmsg(KEY_DRSC, MBOXSC_MSG_REQUEST,
-				php->command, NULL, entry->o_buflen, (void *)mp,
-				drmach_to_putmsg);
+			    php->command, NULL, entry->o_buflen, (void *)mp,
+			    drmach_to_putmsg);
 
 			if (err) {
 				switch (err) {
@@ -1991,17 +1988,17 @@ drmach_mbox_sendmsg()
 				case ETIMEDOUT:
 					if (--entry->o_nretry <= 0) {
 						mutex_enter(
-							&drmach_msglist_mutex);
+						    &drmach_msglist_mutex);
 						drmach_msglist_unlink(entry);
 						mutex_exit(
-							&drmach_msglist_mutex);
+						    &drmach_msglist_mutex);
 						entry->f_error = err;
 						entry->p_flag = 1;
 						cv_signal(&entry->s_cv);
 					} else {
 						++retry;
 						mutex_enter(
-							&drmach_msglist_mutex);
+						    &drmach_msglist_mutex);
 						continue;
 					}
 					break;
@@ -2027,8 +2024,8 @@ drmach_mbox_sendmsg()
 		mutex_exit(&drmach_msglist_mutex);
 
 		mutex_enter(&drmach_sendmsg_mutex);
-		(void) cv_timedwait(&drmach_sendmsg_cv,
-			&drmach_sendmsg_mutex, ddi_get_lbolt() + (5 * hz));
+		(void) cv_reltimedwait(&drmach_sendmsg_cv,
+		    &drmach_sendmsg_mutex, (5 * hz), TR_CLOCK_TICK);
 		mutex_exit(&drmach_sendmsg_mutex);
 	}
 	cmn_err(CE_WARN, "mbox_sendmsg: exiting");
@@ -2050,7 +2047,6 @@ drmach_mbox_sendmsg()
 
 	drmach_sendmsg_thread_run = -1;
 	thread_exit();
-
 }
 
 void
@@ -2128,12 +2124,11 @@ drmach_mbox_req_rply(dr_proto_hdr_t *hdrp, uint32_t olen, caddr_t ibufp,
 		cv_wait(&listp->s_cv, &listp->s_lock);
 	}
 
-	to_val =  ddi_get_lbolt() + (timeout * hz);
+	to_val = ddi_get_lbolt() + (timeout * hz);
 
 	if (listp->f_error) {
 		listp->p_flag = 0;
-		cmn_err(CE_WARN, "!mboxsc_putmsg failed: 0x%x",
-			listp->f_error);
+		cmn_err(CE_WARN, "!mboxsc_putmsg failed: 0x%x", listp->f_error);
 		php = (dr_proto_hdr_t *)listp->o_buf;
 		cmn_err(CE_WARN, "!    cmd = 0x%x, exb = %d, slot = %d",
 		    php->command, php->expbrd, php->slot);
@@ -2141,10 +2136,10 @@ drmach_mbox_req_rply(dr_proto_hdr_t *hdrp, uint32_t olen, caddr_t ibufp,
 		while (listp->m_reply == 0 && listp->f_error == 0) {
 			if (nosig)
 				crv = cv_timedwait(&listp->g_cv, &listp->g_lock,
-					to_val);
+				    to_val);
 			else
 				crv = cv_timedwait_sig(&listp->g_cv,
-					&listp->g_lock, to_val);
+				    &listp->g_lock, to_val);
 			switch (crv) {
 				case -1: /* timed out */
 					cmn_err(CE_WARN,
@@ -2188,7 +2183,7 @@ drmach_mbox_req_rply(dr_proto_hdr_t *hdrp, uint32_t olen, caddr_t ibufp,
 			to_val =  ddi_get_lbolt() + (timeout * hz);
 			while (link->m_reply == 0 && link->f_error == 0) {
 				crv = cv_timedwait(&link->g_cv, &link->g_lock,
-					to_val);
+				    to_val);
 				switch (crv) {
 				case -1: /* timed out */
 					cmn_err(CE_NOTE,
@@ -2250,8 +2245,8 @@ drmach_mbx2sbderr(drmach_msglist_t *mlp)
 		case DRERR_POWER_OFF:
 			return (drerr_new(0, ESTC_POWER_OFF, "%s", a_pnt));
 		case DRERR_TEST_IN_PROGRESS:
-			return (drerr_new(0, ESTC_TEST_IN_PROGRESS,
-					"%s", a_pnt));
+			return (drerr_new(0, ESTC_TEST_IN_PROGRESS, "%s",
+			    a_pnt));
 		case DRERR_TESTING_BUSY:
 			return (drerr_new(0, ESTC_TESTING_BUSY, "%s", a_pnt));
 		case DRERR_TEST_REQUIRED:
@@ -2259,11 +2254,11 @@ drmach_mbx2sbderr(drmach_msglist_t *mlp)
 		case DRERR_UNAVAILABLE:
 			return (drerr_new(0, ESTC_UNAVAILABLE, "%s", a_pnt));
 		case DRERR_RECOVERABLE:
-			return (drerr_new(0, ESTC_SMS_ERR_RECOVERABLE,
-				"%s", a_pnt));
+			return (drerr_new(0, ESTC_SMS_ERR_RECOVERABLE, "%s",
+			    a_pnt));
 		case DRERR_UNRECOVERABLE:
-			return (drerr_new(1, ESTC_SMS_ERR_UNRECOVERABLE,
-				"%s", a_pnt));
+			return (drerr_new(1, ESTC_SMS_ERR_UNRECOVERABLE, "%s",
+			    a_pnt));
 		default:
 			return (drerr_new(1, ESTC_MBOX_UNKNOWN, NULL));
 	}
@@ -2296,10 +2291,9 @@ drmach_mbox_trans(uint8_t msgtype, int bnum, caddr_t obufp, int olen,
 			imsg.expbrd = 0;
 			imsg.slot = 0;
 
-			cmn_err(CE_WARN,
-				"!reinitializing DR mailbox");
+			cmn_err(CE_WARN, "!reinitializing DR mailbox");
 			mlp = drmach_mbox_req_rply(&imsg, sizeof (imsg), 0, 0,
-				10, 5, 0, NULL);
+			    10, 5, 0, NULL);
 			err = drmach_mbx2sbderr(mlp);
 			/*
 			 * If framework failure incoming is encountered on
@@ -2400,15 +2394,15 @@ drmach_mbox_trans(uint8_t msgtype, int bnum, caddr_t obufp, int olen,
 			break;
 
 		default:
-			cmn_err(CE_WARN,
-				"Unknown outgoing message type 0x%x", msgtype);
+			cmn_err(CE_WARN, "Unknown outgoing message type 0x%x",
+			    msgtype);
 			err = DRMACH_INTERNAL_ERROR();
 			break;
 	}
 
 	if (err == NULL) {
-		mlp = drmach_mbox_req_rply(hdrp, olen, ibufp, ilen,
-			timeout, ntries, nosignals, NULL);
+		mlp = drmach_mbox_req_rply(hdrp, olen, ibufp, ilen, timeout,
+		    ntries, nosignals, NULL);
 		err = drmach_mbx2sbderr(mlp);
 
 		/*
@@ -2449,7 +2443,7 @@ drmach_mbox_init()
 	drmach_mbox_istate = 0;
 	/* register the outgoing mailbox */
 	if ((err = mboxsc_init(KEY_DRSC, MBOXSC_MBOX_OUT,
-		NULL)) != 0) {
+	    NULL)) != 0) {
 		cmn_err(CE_WARN, "DR - SC mboxsc_init failed: 0x%x", err);
 		return (-1);
 	}
@@ -2474,7 +2468,7 @@ drmach_mbox_init()
 
 	/* register the incoming mailbox */
 	if ((err = mboxsc_init(KEY_SCDR, MBOXSC_MBOX_IN,
-		drmach_mbox_event)) != 0) {
+	    drmach_mbox_event)) != 0) {
 		cmn_err(CE_WARN, "SC - DR mboxsc_init failed: 0x%x", err);
 		return (-1);
 	}
@@ -2511,11 +2505,11 @@ drmach_mbox_init()
 
 	obufp = kmem_zalloc(sizeof (dr_proto_hdr_t), KM_SLEEP);
 	serr = drmach_mbox_trans(DRMSG_MBOX_INIT, 0, obufp,
-		sizeof (dr_proto_hdr_t), (caddr_t)NULL, 0);
+	    sizeof (dr_proto_hdr_t), (caddr_t)NULL, 0);
 	kmem_free(obufp, sizeof (dr_proto_hdr_t));
 	if (serr) {
 		cmn_err(CE_WARN, "mbox_init: MBOX_INIT failed ecode=0x%x",
-			serr->e_code);
+		    serr->e_code);
 		sbd_err_clear(&serr);
 		return (-1);
 	}
@@ -2536,13 +2530,12 @@ drmach_mbox_fini()
 		drmach_getmsg_thread_run = 0;
 		drmach_sendmsg_thread_run = 0;
 		cmn_err(CE_WARN,
-			"drmach_mbox_fini: waiting for mbox threads...");
+		    "drmach_mbox_fini: waiting for mbox threads...");
 		while ((drmach_getmsg_thread_run == 0) ||
-			(drmach_sendmsg_thread_run == 0)) {
+		    (drmach_sendmsg_thread_run == 0)) {
 			continue;
 		}
-		cmn_err(CE_WARN,
-			"drmach_mbox_fini: mbox threads done.");
+		cmn_err(CE_WARN, "drmach_mbox_fini: mbox threads done.");
 		mutex_destroy(&drmach_msglist_mutex);
 
 	}
@@ -2550,7 +2543,7 @@ drmach_mbox_fini()
 		/* de-register the outgoing mailbox */
 		if ((err = mboxsc_fini(KEY_DRSC)) != 0) {
 			cmn_err(CE_WARN, "DR - SC mboxsc_fini failed: 0x%x",
-				err);
+			    err);
 			rv = -1;
 		}
 	}
@@ -2558,7 +2551,7 @@ drmach_mbox_fini()
 		/* de-register the incoming mailbox */
 		if ((err = mboxsc_fini(KEY_SCDR)) != 0) {
 			cmn_err(CE_WARN, "SC - DR mboxsc_fini failed: 0x%x",
-				err);
+			    err);
 			rv = -1;
 		}
 	}
@@ -2673,8 +2666,8 @@ drmach_init(void)
 		if (drmach_array_get(drmach_boards, bnum, &id) == -1) {
 			/* portid translated to an invalid board number */
 			cmn_err(CE_WARN, "OBP node 0x%x has"
-				" invalid property value, %s=%u",
-				nodeid, "portid", portid);
+			    " invalid property value, %s=%u",
+			    nodeid, "portid", portid);
 
 			/* clean up */
 			drmach_array_dispose(drmach_boards,
@@ -2711,26 +2704,26 @@ drmach_init(void)
 
 	if (gdcd->dcd_testcage_log2_mbytes_size != DCD_DR_TESTCAGE_DISABLED) {
 		ASSERT(gdcd->dcd_testcage_log2_mbytes_size ==
-				gdcd->dcd_testcage_log2_mbytes_align);
+		    gdcd->dcd_testcage_log2_mbytes_align);
 		drmach_iocage_paddr =
-			(uint64_t)gdcd->dcd_testcage_mbyte_PA << 20;
+		    (uint64_t)gdcd->dcd_testcage_mbyte_PA << 20;
 		drmach_iocage_size =
-			1 << (gdcd->dcd_testcage_log2_mbytes_size + 20);
+		    1 << (gdcd->dcd_testcage_log2_mbytes_size + 20);
 
 		drmach_iocage_vaddr = (caddr_t)vmem_alloc(heap_arena,
-			drmach_iocage_size, VM_SLEEP);
+		    drmach_iocage_size, VM_SLEEP);
 		hat_devload(kas.a_hat, drmach_iocage_vaddr, drmach_iocage_size,
-			mmu_btop(drmach_iocage_paddr),
-			PROT_READ | PROT_WRITE,
-			HAT_LOAD_LOCK | HAT_LOAD_NOCONSIST);
+		    mmu_btop(drmach_iocage_paddr),
+		    PROT_READ | PROT_WRITE,
+		    HAT_LOAD_LOCK | HAT_LOAD_NOCONSIST);
 
 		DRMACH_PR("gdcd size=0x%x align=0x%x PA=0x%x\n",
-			gdcd->dcd_testcage_log2_mbytes_size,
-			gdcd->dcd_testcage_log2_mbytes_align,
-			gdcd->dcd_testcage_mbyte_PA);
+		    gdcd->dcd_testcage_log2_mbytes_size,
+		    gdcd->dcd_testcage_log2_mbytes_align,
+		    gdcd->dcd_testcage_mbyte_PA);
 		DRMACH_PR("drmach size=0x%x PA=0x%lx VA=0x%p\n",
-			drmach_iocage_size, drmach_iocage_paddr,
-			drmach_iocage_vaddr);
+		    drmach_iocage_size, drmach_iocage_paddr,
+		    drmach_iocage_vaddr);
 	}
 
 	if (drmach_iocage_size == 0) {
@@ -2930,10 +2923,10 @@ drmach_prep_schizo_script(uint64_t *p, drmach_mem_t *mp, uint64_t new_basepa)
 
 				scsr  = lddphysio(io->scsr_pa);
 				scsr &= ~(DRMACH_LPA_BASE_MASK |
-						DRMACH_LPA_BND_MASK);
+				    DRMACH_LPA_BND_MASK);
 				scsr |= DRMACH_PA_TO_LPA_BASE(new_basepa);
 				scsr |= DRMACH_PA_TO_LPA_BND(
-					new_basepa + DRMACH_MEM_SLICE_SIZE);
+				    new_basepa + DRMACH_MEM_SLICE_SIZE);
 
 				*p++ = io->scsr_pa;
 				*p++ = scsr;
@@ -2991,34 +2984,34 @@ drmach_prep_rename_script(drmach_mem_t *s_mp, drmach_mem_t *t_mp,
 
 	/* verify supplied buffer space is adequate */
 	ASSERT(buflen >=
-		/* addr for all possible MC banks */
-		(sizeof (uint64_t) * 4 * 4 * 18) +
-		/* list section terminator */
-		(sizeof (uint64_t) * 1) +
-		/* addr/id tuple for local Panther MC idle reg */
-		(sizeof (uint64_t) * 2) +
-		/* list section terminator */
-		(sizeof (uint64_t) * 1) +
-		/* addr/id tuple for 2 boards with 4 Panther MC idle regs */
-		(sizeof (uint64_t) * 2 * 2 * 4) +
-		/* list section terminator */
-		(sizeof (uint64_t) * 1) +
-		/* addr/val tuple for 1 proc with 4 MC banks */
-		(sizeof (uint64_t) * 2 * 4) +
-		/* list section terminator */
-		(sizeof (uint64_t) * 1) +
-		/* addr/val tuple for 2 boards w/ 2 schizos each */
-		(sizeof (uint64_t) * 2 * 2 * 2) +
-		/* addr/val tuple for 2 boards w/ 16 MC banks each */
-		(sizeof (uint64_t) * 2 * 2 * 16) +
-		/* list section terminator */
-		(sizeof (uint64_t) * 1) +
-		/* addr/val tuple for 18 AXQs w/ two slots each */
-		(sizeof (uint64_t) * 2 * 2 * 18) +
-		/* list section terminator */
-		(sizeof (uint64_t) * 1) +
-		/* list terminator */
-		(sizeof (uint64_t) * 1));
+	    /* addr for all possible MC banks */
+	    (sizeof (uint64_t) * 4 * 4 * 18) +
+	    /* list section terminator */
+	    (sizeof (uint64_t) * 1) +
+	    /* addr/id tuple for local Panther MC idle reg */
+	    (sizeof (uint64_t) * 2) +
+	    /* list section terminator */
+	    (sizeof (uint64_t) * 1) +
+	    /* addr/id tuple for 2 boards with 4 Panther MC idle regs */
+	    (sizeof (uint64_t) * 2 * 2 * 4) +
+	    /* list section terminator */
+	    (sizeof (uint64_t) * 1) +
+	    /* addr/val tuple for 1 proc with 4 MC banks */
+	    (sizeof (uint64_t) * 2 * 4) +
+	    /* list section terminator */
+	    (sizeof (uint64_t) * 1) +
+	    /* addr/val tuple for 2 boards w/ 2 schizos each */
+	    (sizeof (uint64_t) * 2 * 2 * 2) +
+	    /* addr/val tuple for 2 boards w/ 16 MC banks each */
+	    (sizeof (uint64_t) * 2 * 2 * 16) +
+	    /* list section terminator */
+	    (sizeof (uint64_t) * 1) +
+	    /* addr/val tuple for 18 AXQs w/ two slots each */
+	    (sizeof (uint64_t) * 2 * 2 * 18) +
+	    /* list section terminator */
+	    (sizeof (uint64_t) * 1) +
+	    /* list terminator */
+	    (sizeof (uint64_t) * 1));
 
 	/* copy bank list to rename script */
 	mutex_enter(&drmach_bus_sync_lock);
@@ -3069,13 +3062,13 @@ drmach_prep_rename_script(drmach_mem_t *s_mp, drmach_mem_t *t_mp,
 	/* exchange base pa. include slice offset in new target base pa */
 	s_new_basepa = t_basepa & ~ (DRMACH_MEM_SLICE_SIZE - 1);
 	t_new_basepa = (s_basepa & ~ (DRMACH_MEM_SLICE_SIZE - 1)) +
-			t_slice_offset;
+	    t_slice_offset;
 
 	DRMACH_PR("s_new_basepa 0x%lx\n", s_new_basepa);
 	DRMACH_PR("t_new_basepa 0x%lx\n", t_new_basepa);
 
 	DRMACH_PR("preparing MC MADR rename script (master is CPU%d):\n",
-		CPU->cpu_id);
+	    CPU->cpu_id);
 
 	/*
 	 * Write rename script for MC on this processor.  A script will
@@ -3134,12 +3127,12 @@ drmach_prep_rename_script(drmach_mem_t *s_mp, drmach_mem_t *t_mp,
 	*p++ = 0;
 
 	DRMACH_PR("preparing AXQ CASM rename script (EXP%d <> EXP%d):\n",
-		DRMACH_BNUM2EXP(s_mp->dev.bp->bnum),
-		DRMACH_BNUM2EXP(t_mp->dev.bp->bnum));
+	    DRMACH_BNUM2EXP(s_mp->dev.bp->bnum),
+	    DRMACH_BNUM2EXP(t_mp->dev.bp->bnum));
 
 	rv = axq_do_casm_rename_script(&p,
-		DRMACH_PA_TO_SLICE(s_new_basepa),
-		DRMACH_PA_TO_SLICE(t_new_basepa));
+	    DRMACH_PA_TO_SLICE(s_new_basepa),
+	    DRMACH_PA_TO_SLICE(t_new_basepa));
 	if (rv == DDI_FAILURE)
 		return (DRMACH_INTERNAL_ERROR());
 
@@ -3188,9 +3181,7 @@ drmach_prep_rename_script(drmach_mem_t *s_mp, drmach_mem_t *t_mp,
 			uint64_t v = *q++;	/* new register value */
 
 			DRMACH_PR("0x%lx = 0x%lx, basepa 0x%lx\n",
-				r,
-				v,
-				DRMACH_MC_UM_TO_PA(v)|DRMACH_MC_LM_TO_PA(v));
+			    r, v, DRMACH_MC_UM_TO_PA(v)|DRMACH_MC_LM_TO_PA(v));
 		}
 
 		/* skip terminator */
@@ -3214,8 +3205,8 @@ drmach_prep_rename_script(drmach_mem_t *s_mp, drmach_mem_t *t_mp,
 		/* verify final terminator is present */
 		ASSERT(*(q + 1) == 0);
 
-		DRMACH_PR("copy-rename script 0x%p, len %d\n",
-			buf, (int)((intptr_t)p - (intptr_t)buf));
+		DRMACH_PR("copy-rename script 0x%p, len %d\n", buf,
+		    (int)((intptr_t)p - (intptr_t)buf));
 
 		if (drmach_debug)
 			DELAY(10000000);
@@ -3318,12 +3309,12 @@ drmach_copy_rename_init(drmachid_t t_id, uint64_t t_slice_offset,
 		x_ml = x_ml->next;
 
 	DRMACH_PR("source copy span: base pa 0x%lx, end pa 0x%lx\n",
-		s_copybasepa,
-		s_copybasepa + x_ml->address + x_ml->size);
+	    s_copybasepa,
+	    s_copybasepa + x_ml->address + x_ml->size);
 
 	DRMACH_PR("target copy span: base pa 0x%lx, end pa 0x%lx\n",
-		t_copybasepa,
-		t_copybasepa + x_ml->address + x_ml->size);
+	    t_copybasepa,
+	    t_copybasepa + x_ml->address + x_ml->size);
 
 	DRMACH_PR("copy memlist (relative to copy base pa):\n");
 	DRMACH_MEMLIST_DUMP(c_ml);
@@ -3338,9 +3329,9 @@ drmach_copy_rename_init(drmachid_t t_id, uint64_t t_slice_offset,
 	ASSERT(err == NULL);
 
 	DRMACH_PR("current source base pa 0x%lx, size 0x%lx\n",
-		s_basepa, s_size);
+	    s_basepa, s_size);
 	DRMACH_PR("current target base pa 0x%lx, size 0x%lx\n",
-		t_basepa, t_size);
+	    t_basepa, t_size);
 	}
 #endif /* DEBUG */
 
@@ -3370,12 +3361,12 @@ drmach_copy_rename_init(drmachid_t t_id, uint64_t t_slice_offset,
 	DRMACH_PR("drmach_rename function 0x%p, len %d\n", wp, len);
 	wp += (len + 15) & ~15;
 
-	err = drmach_prep_rename_script(s_mp, t_mp, t_slice_offset,
-		wp, PAGESIZE - (wp - bp));
+	err = drmach_prep_rename_script(s_mp, t_mp, t_slice_offset, wp,
+	    PAGESIZE - (wp - bp));
 	if (err) {
 cleanup:
 		xt_one(CPU->cpu_id, vtag_flushpage_tl1,
-			(uint64_t)drmach_cpu_sram_va, (uint64_t)ksfmmup);
+		    (uint64_t)drmach_cpu_sram_va, (uint64_t)ksfmmup);
 		return (err);
 	}
 
@@ -3408,11 +3399,11 @@ cleanup:
 
 	if (DRMACH_L1_SET_LPA(s_mp->dev.bp) && drmach_reprogram_lpa) {
 		drmach_prep_xt_mb_for_slice_update(s_mp->dev.bp,
-			DRMACH_PA_TO_SLICE(t_copybasepa));
+		    DRMACH_PA_TO_SLICE(t_copybasepa));
 	}
 	if (DRMACH_L1_SET_LPA(t_mp->dev.bp) && drmach_reprogram_lpa) {
 		drmach_prep_xt_mb_for_slice_update(t_mp->dev.bp,
-			DRMACH_PA_TO_SLICE(s_copybasepa));
+		    DRMACH_PA_TO_SLICE(s_copybasepa));
 	}
 
 	*cr_id = cr;
@@ -3434,7 +3425,7 @@ drmach_copy_rename_fini(drmachid_t id)
 	axq_cdc_enable_all();
 
 	xt_one(CPU->cpu_id, vtag_flushpage_tl1,
-		(uint64_t)drmach_cpu_sram_va, (uint64_t)ksfmmup);
+	    (uint64_t)drmach_cpu_sram_va, (uint64_t)ksfmmup);
 
 	switch (cr->ecode) {
 	case DRMACH_CR_OK:
@@ -3521,14 +3512,14 @@ drmach_copy_rename_fini(drmachid_t id)
 	drmach_msg_memregs_init(obufp->msgdata.dm_uc.mem_regs);
 	mutex_exit(&drmach_slice_table_lock);
 	(void) drmach_mbox_trans(DRMSG_UNCONFIG, cr->s_mp->dev.bp->bnum,
-		(caddr_t)obufp, sizeof (dr_mbox_msg_t), (caddr_t)NULL, 0);
+	    (caddr_t)obufp, sizeof (dr_mbox_msg_t), (caddr_t)NULL, 0);
 	kmem_free(obufp, sizeof (dr_mbox_msg_t));
 
 done:
 	vmem_free(static_alloc_arena, cr, sizeof (drmach_copy_rename_t));
 
 	DRMACH_PR("waited %d out of %d tries for drmach_rename_wait on %d cpus",
-		drmach_rename_ntries, drmach_cpu_ntries, drmach_rename_count);
+	    drmach_rename_ntries, drmach_cpu_ntries, drmach_rename_count);
 
 	return (err);
 }
@@ -3790,8 +3781,8 @@ drmach_pci_new(drmach_device_t *proto, drmachid_t *idp)
 
 		/* pci nodes are expected to have regs */
 		err = drerr_new(1, ESTC_GETPROP,
-			"Device Node 0x%x: property %s",
-			(uint_t)node->get_dnode(node), "reg");
+		    "Device Node 0x%x: property %s",
+		    (uint_t)node->get_dnode(node), "reg");
 		return (err);
 	}
 
@@ -3800,8 +3791,8 @@ drmach_pci_new(drmach_device_t *proto, drmachid_t *idp)
 		sbd_error_t *err;
 
 		err = drerr_new(1, ESTC_GETPROP,
-			"Device Node 0x%x: property %s",
-			(uint_t)node->get_dnode(node), "reg");
+		    "Device Node 0x%x: property %s",
+		    (uint_t)node->get_dnode(node), "reg");
 
 		return (err);
 	}
@@ -3848,7 +3839,7 @@ drmach_io_new(drmach_device_t *proto, drmachid_t *idp)
 	ip->dev.cm.status = drmach_io_status;
 
 	snprintf(ip->dev.cm.name, sizeof (ip->dev.cm.name), "%s%d",
-		ip->dev.type, ip->dev.unum);
+	    ip->dev.type, ip->dev.unum);
 
 	*idp = (drmachid_t)ip;
 	return (NULL);
@@ -3887,7 +3878,7 @@ drmach_pre_op(int cmd, drmachid_t id, drmach_opts_t *opts)
 
 				if (bp->cond == SBD_COND_UNUSABLE)
 					err = drerr_new(0,
-						ESBD_FATAL_STATE, NULL);
+					    ESBD_FATAL_STATE, NULL);
 				break;
 			case SBD_CMD_DISCONNECT:
 				if (!bp->connected)
@@ -3895,12 +3886,12 @@ drmach_pre_op(int cmd, drmachid_t id, drmach_opts_t *opts)
 
 				if (bp->cond == SBD_COND_UNUSABLE)
 					err = drerr_new(0,
-						ESBD_FATAL_STATE, NULL);
+					    ESBD_FATAL_STATE, NULL);
 				break;
 			default:
 				if (bp->cond == SBD_COND_UNUSABLE)
 					err = drerr_new(0,
-						ESBD_FATAL_STATE, NULL);
+					    ESBD_FATAL_STATE, NULL);
 				break;
 
 		}
@@ -3939,7 +3930,7 @@ drmach_board_assign(int bnum, drmachid_t *id)
 
 			obufp = kmem_zalloc(sizeof (dr_proto_hdr_t), KM_SLEEP);
 			err = drmach_mbox_trans(DRMSG_ASSIGN, bnum, obufp,
-				sizeof (dr_proto_hdr_t), (caddr_t)NULL, 0);
+			    sizeof (dr_proto_hdr_t), (caddr_t)NULL, 0);
 			kmem_free(obufp, sizeof (dr_proto_hdr_t));
 
 			if (!err) {
@@ -4041,7 +4032,7 @@ drmach_board_connect(drmachid_t id, drmach_opts_t *opts)
 	drmach_msg_memregs_init(obufp->msgdata.dm_cr.mem_regs);
 	mutex_exit(&drmach_slice_table_lock);
 	err = drmach_mbox_trans(DRMSG_CLAIM, bp->bnum, (caddr_t)obufp,
-		sizeof (dr_mbox_msg_t), (caddr_t)NULL, 0);
+	    sizeof (dr_mbox_msg_t), (caddr_t)NULL, 0);
 	kmem_free(obufp, sizeof (dr_mbox_msg_t));
 
 	if (err) {
@@ -4051,8 +4042,8 @@ drmach_board_connect(drmachid_t id, drmach_opts_t *opts)
 		 * unusable.
 		 */
 		if ((err->e_code == ESTC_SMS_ERR_UNRECOVERABLE) ||
-			(err->e_code == ESTC_MBXRPLY))
-				bp->cond = SBD_COND_UNUSABLE;
+		    (err->e_code == ESTC_MBXRPLY))
+			bp->cond = SBD_COND_UNUSABLE;
 		return (err);
 	}
 
@@ -4119,8 +4110,8 @@ drmach_board_connect(drmachid_t id, drmach_opts_t *opts)
 		drmach_msg_memregs_init(obufp->msgdata.dm_ur.mem_regs);
 		mutex_exit(&drmach_slice_table_lock);
 		(void) drmach_mbox_trans(DRMSG_UNCLAIM, bp->bnum,
-			(caddr_t)obufp, sizeof (dr_mbox_msg_t),
-			(caddr_t)NULL, 0);
+		    (caddr_t)obufp, sizeof (dr_mbox_msg_t),
+		    (caddr_t)NULL, 0);
 
 		kmem_free(obufp, sizeof (dr_mbox_msg_t));
 
@@ -4221,8 +4212,8 @@ drmach_slice_table_update(drmach_board_t *bp, int invalidate)
 		return;
 
 	s = DRMACH_BNUM2SLOT(bp->bnum);
-	DRMACH_PR("using AXQ casm %d.%d for slot%d.%d\n",
-		axq_exp, axq_slot, e, s);
+	DRMACH_PR("using AXQ casm %d.%d for slot%d.%d\n", axq_exp, axq_slot,
+	    e, s);
 
 	/* invalidate entry */
 	drmach_slice_table[e] &= ~0x20;
@@ -4269,13 +4260,11 @@ drmach_lpa_bb_get(drmach_board_t *s1bp, uint64_t *basep, uint64_t *boundp)
 
 	*basep = *boundp = 0;
 	if (drmach_array_get(drmach_boards, s1bp->bnum - 1, &s0id) == 0 &&
-		s0id != 0) {
+	    s0id != 0) {
 
 		uint32_t slice;
-		if ((slice =
-			drmach_slice_table[DRMACH_BNUM2EXP(s1bp->bnum)])
-				& 0x20) {
-
+		if ((slice = drmach_slice_table[DRMACH_BNUM2EXP(s1bp->bnum)])
+		    & 0x20) {
 			*basep = DRMACH_SLICE_TO_PA(slice & DRMACH_SLICE_MASK);
 			*boundp = *basep + DRMACH_MEM_SLICE_SIZE;
 		}
@@ -4308,7 +4297,7 @@ drmach_slot1_lpa_set(drmach_board_t *bp)
 		s1bp = bp;
 		if (s1bp->devices == NULL) {
 			DRMACH_PR("drmach...lpa_set: slot1=%d not present",
-				bp->bnum);
+			    bp->bnum);
 			return;
 		}
 	} else {
@@ -4317,7 +4306,7 @@ drmach_slot1_lpa_set(drmach_board_t *bp)
 		s1bp = id;
 		if (rv == -1 || s1bp == NULL || s1bp->devices == NULL) {
 			DRMACH_PR("drmach...lpa_set: slot1=%d not present",
-				bp->bnum + 1);
+			    bp->bnum + 1);
 			return;
 		}
 		ASSERT(DRMACH_IS_BOARD_ID(id));
@@ -4325,7 +4314,7 @@ drmach_slot1_lpa_set(drmach_board_t *bp)
 	mutex_enter(&drmach_slice_table_lock);
 	drmach_lpa_bb_get(s1bp, &new_basepa, &new_boundpa);
 	DRMACH_PR("drmach_...lpa_set: bnum=%d base=0x%lx bound=0x%lx\n",
-			s1bp->bnum, new_basepa, new_boundpa);
+	    s1bp->bnum, new_basepa, new_boundpa);
 
 	rv = drmach_array_first(s1bp->devices, &idx, &id);
 	while (rv == 0) {
@@ -4345,15 +4334,15 @@ drmach_slot1_lpa_set(drmach_board_t *bp)
 
 				scsr  = lddphysio(io->scsr_pa);
 				DRMACH_PR("drmach...lpa_set: old scsr=0x%lx\n",
-					scsr);
+				    scsr);
 				scsr &= ~(DRMACH_LPA_BASE_MASK |
-						DRMACH_LPA_BND_MASK);
+				    DRMACH_LPA_BND_MASK);
 				scsr |= DRMACH_PA_TO_LPA_BASE(new_basepa);
 				scsr |= DRMACH_PA_TO_LPA_BND(new_boundpa);
 
 				stdphysio(io->scsr_pa, scsr);
 				DRMACH_PR("drmach...lpa_set: new scsr=0x%lx\n",
-					scsr);
+				    scsr);
 
 				last_scsr_pa = io->scsr_pa;
 			}
@@ -4381,11 +4370,11 @@ drmach_slot1_lpa_set(drmach_board_t *bp)
 				 * MCPU cannot be xcalled.
 				 */
 				if ((cpu[cpuid] == NULL) ||
-					(cpu[cpuid]->cpu_flags &
-					CPU_READY) == 0) {
+				    (cpu[cpuid]->cpu_flags &
+				    CPU_READY) == 0) {
 
 					rv = drmach_array_next(s1bp->devices,
-						&idx, &id);
+					    &idx, &id);
 					continue;
 				}
 
@@ -4399,10 +4388,10 @@ drmach_slot1_lpa_set(drmach_board_t *bp)
 					mutex_enter(&drmach_iocage_lock);
 					while (drmach_iocage_is_busy)
 						cv_wait(&drmach_iocage_cv,
-							&drmach_iocage_lock);
+						    &drmach_iocage_lock);
 					drmach_iocage_is_busy = 1;
-					drmach_iocage_mem_scrub(
-						ecache_size * 2);
+					drmach_iocage_mem_scrub(ecache_size *
+					    2);
 					mutex_exit(&drmach_iocage_lock);
 				}
 
@@ -4433,7 +4422,7 @@ drmach_slot1_lpa_set(drmach_board_t *bp)
 					drmach_xt_mb[cpuid] = 0x80 | 0x40;
 				else
 					drmach_xt_mb[cpuid] = 0x80 |
-						DRMACH_PA_TO_SLICE(new_basepa);
+					    DRMACH_PA_TO_SLICE(new_basepa);
 
 				drmach_xt_ready = 0;
 
@@ -4455,8 +4444,8 @@ drmach_slot1_lpa_set(drmach_board_t *bp)
 				 */
 				if (drmach_is_cheetah) {
 					mutex_enter(&drmach_iocage_lock);
-					drmach_iocage_mem_scrub(
-						ecache_size * 2);
+					drmach_iocage_mem_scrub(ecache_size *
+					    2);
 					drmach_iocage_is_busy = 0;
 					cv_signal(&drmach_iocage_cv);
 					mutex_exit(&drmach_iocage_lock);
@@ -4524,7 +4513,7 @@ drmach_board_disconnect(drmachid_t id, drmach_opts_t *opts)
 	 * info now, for use by drmach_slot1_lpa_set()
 	 */
 	if (DRMACH_BNUM2SLOT(bp->bnum) == 0)
-			drmach_slice_table_update(bp, 1);
+		drmach_slice_table_update(bp, 1);
 
 	drmach_msg_memregs_init(obufp->msgdata.dm_ur.mem_regs);
 	mutex_exit(&drmach_slice_table_lock);
@@ -4567,11 +4556,11 @@ drmach_board_disconnect(drmachid_t id, drmach_opts_t *opts)
 	 * timeout value in the Safari/Fireplane Config Reg.
 	 */
 	if (drmach_panther_boards() > 0 || drmach_unclaim_delay_all) {
-		clock_t	stime = lbolt;
+		clock_t	stime = ddi_get_lbolt();
 
 		delay(drv_usectohz(drmach_unclaim_usec_delay));
 
-		stime = lbolt - stime;
+		stime = ddi_get_lbolt() - stime;
 		DRMACH_PR("delayed %ld ticks (%ld secs) before disconnecting "
 		    "board %s from domain\n", stime, stime / hz, bp->cm.name);
 	}
@@ -4580,7 +4569,7 @@ drmach_board_disconnect(drmachid_t id, drmach_opts_t *opts)
 		obufp->msgdata.dm_ur.mem_clear = 0;
 
 		err = drmach_mbox_trans(DRMSG_UNCLAIM, bp->bnum, (caddr_t)obufp,
-			sizeof (dr_mbox_msg_t), (caddr_t)NULL, 0);
+		    sizeof (dr_mbox_msg_t), (caddr_t)NULL, 0);
 
 		if (err) {
 			/*
@@ -4589,18 +4578,18 @@ drmach_board_disconnect(drmachid_t id, drmach_opts_t *opts)
 			 * unusable.
 			 */
 			if ((err->e_code == ESTC_SMS_ERR_UNRECOVERABLE) ||
-				(err->e_code == ESTC_MBXRPLY))
-					bp->cond = SBD_COND_UNUSABLE;
+			    (err->e_code == ESTC_MBXRPLY))
+				bp->cond = SBD_COND_UNUSABLE;
 			else {
 				DRMACH_PR("UNCLAIM failed for bnum=%d\n",
-					bp->bnum);
+				    bp->bnum);
 				DRMACH_PR("calling sc_probe_board: bnum=%d\n",
-					bp->bnum);
+				    bp->bnum);
 				scc = sc_probe_board(bp->bnum);
 				if (scc == NULL) {
 					cmn_err(CE_WARN,
 					"sc_probe_board failed for bnum=%d",
-						bp->bnum);
+					    bp->bnum);
 				} else {
 					if (DRMACH_BNUM2SLOT(bp->bnum) == 0) {
 						mutex_enter(
@@ -4856,8 +4845,8 @@ drmach_board_lookup(int bnum, drmachid_t *id)
 
 		obufp = kmem_zalloc(sizeof (dr_proto_hdr_t), KM_SLEEP);
 		err = drmach_mbox_trans(DRMSG_SHOWBOARD, bnum, obufp,
-			sizeof (dr_proto_hdr_t), (caddr_t)&shb,
-			sizeof (dr_showboard_t));
+		    sizeof (dr_proto_hdr_t), (caddr_t)&shb,
+		    sizeof (dr_showboard_t));
 		kmem_free(obufp, sizeof (dr_proto_hdr_t));
 
 		if (err) {
@@ -4887,7 +4876,7 @@ drmach_board_lookup(int bnum, drmachid_t *id)
 				default:
 					bp->cond = SBD_COND_UNKNOWN;
 				DRMACH_PR("Unknown test status=0x%x from SC\n",
-						shb.test_status);
+				    shb.test_status);
 					break;
 			}
 			strncpy(bp->type, shb.board_type, sizeof (bp->type));
@@ -4928,7 +4917,7 @@ drmach_board_poweroff(drmachid_t id)
 
 			obufp = kmem_zalloc(sizeof (dr_proto_hdr_t), KM_SLEEP);
 			err = drmach_mbox_trans(DRMSG_POWEROFF, bp->bnum, obufp,
-				sizeof (dr_proto_hdr_t), (caddr_t)NULL, 0);
+			    sizeof (dr_proto_hdr_t), (caddr_t)NULL, 0);
 			kmem_free(obufp, sizeof (dr_proto_hdr_t));
 			if (!err)
 				bp->powered = 0;
@@ -4950,7 +4939,7 @@ drmach_board_poweron(drmachid_t id)
 
 	obufp = kmem_zalloc(sizeof (dr_proto_hdr_t), KM_SLEEP);
 	err = drmach_mbox_trans(DRMSG_POWERON, bp->bnum, obufp,
-		sizeof (dr_proto_hdr_t), (caddr_t)NULL, 0);
+	    sizeof (dr_proto_hdr_t), (caddr_t)NULL, 0);
 	if (!err)
 		bp->powered = 1;
 
@@ -5013,7 +5002,7 @@ drmach_board_test(drmachid_t id, drmach_opts_t *opts, int force)
 	}
 
 	err = drmach_mbox_trans(DRMSG_TESTBOARD, bp->bnum, (caddr_t)obufp,
-		sizeof (dr_mbox_msg_t), (caddr_t)&tbr, sizeof (tbr));
+	    sizeof (dr_mbox_msg_t), (caddr_t)&tbr, sizeof (tbr));
 
 	if (!err)
 		bp->cond = SBD_COND_OK;
@@ -5025,29 +5014,25 @@ drmach_board_test(drmachid_t id, drmach_opts_t *opts, int force)
 		switch (tbr.test_status) {
 			case DR_TEST_STATUS_IPOST:
 				bp->cond = SBD_COND_UNKNOWN;
-				err = drerr_new(0, ESTC_TEST_IN_PROGRESS,
-					NULL);
+				err = drerr_new(0, ESTC_TEST_IN_PROGRESS, NULL);
 				break;
 			case DR_TEST_STATUS_UNKNOWN:
 				bp->cond = SBD_COND_UNKNOWN;
 				err = drerr_new(1,
-					ESTC_TEST_STATUS_UNKNOWN, NULL);
+				    ESTC_TEST_STATUS_UNKNOWN, NULL);
 				break;
 			case DR_TEST_STATUS_FAILED:
 				bp->cond = SBD_COND_FAILED;
-				err = drerr_new(1, ESTC_TEST_FAILED,
-					NULL);
+				err = drerr_new(1, ESTC_TEST_FAILED, NULL);
 				break;
 			case DR_TEST_STATUS_ABORTED:
 				bp->cond = SBD_COND_UNKNOWN;
-				err = drerr_new(1, ESTC_TEST_ABORTED,
-					NULL);
+				err = drerr_new(1, ESTC_TEST_ABORTED, NULL);
 				break;
 			default:
 				bp->cond = SBD_COND_UNKNOWN;
-				err = drerr_new(1,
-					ESTC_TEST_RESULT_UNKNOWN,
-					NULL);
+				err = drerr_new(1, ESTC_TEST_RESULT_UNKNOWN,
+				    NULL);
 				break;
 		}
 	}
@@ -5059,9 +5044,9 @@ drmach_board_test(drmachid_t id, drmach_opts_t *opts, int force)
 	 */
 	if (is_io) {
 		DRMACH_PR("drmach_board_test: tbr.cpu_recovered: %d",
-			tbr.cpu_recovered);
+		    tbr.cpu_recovered);
 		DRMACH_PR("drmach_board_test: port id: %d",
-			tbr.cpu_portid);
+		    tbr.cpu_portid);
 
 		/*
 		 * Check the cpu_recovered flag in the testboard reply, or
@@ -5125,7 +5110,7 @@ drmach_board_unassign(drmachid_t id)
 
 		obufp = kmem_zalloc(sizeof (dr_proto_hdr_t), KM_SLEEP);
 		err = drmach_mbox_trans(DRMSG_UNASSIGN, bp->bnum, obufp,
-			sizeof (dr_proto_hdr_t), (caddr_t)NULL, 0);
+		    sizeof (dr_proto_hdr_t), (caddr_t)NULL, 0);
 		kmem_free(obufp, sizeof (dr_proto_hdr_t));
 		if (!err) {
 			if (drmach_array_set(drmach_boards, bp->bnum, 0) != 0)
@@ -5313,9 +5298,9 @@ drmach_cpu_new(drmach_device_t *proto, drmachid_t *idp)
 	ASSERT(drmach_cpu_sram_tte[cp->cpuid].tte_inthi == 0 &&
 	    drmach_cpu_sram_tte[cp->cpuid].tte_intlo == 0);
 	drmach_cpu_sram_tte[cp->cpuid].tte_inthi = TTE_PFN_INTHI(pfn) |
-		TTE_VALID_INT | TTE_SZ_INT(TTE8K);
+	    TTE_VALID_INT | TTE_SZ_INT(TTE8K);
 	drmach_cpu_sram_tte[cp->cpuid].tte_intlo = TTE_PFN_INTLO(pfn) |
-		TTE_HWWR_INT | TTE_PRIV_INT | TTE_LCK_INT;
+	    TTE_HWWR_INT | TTE_PRIV_INT | TTE_LCK_INT;
 
 	DRMACH_PR("drmach_cpu_new: cpuid=%d, coreid=%d, stardrb_offset=0x%lx, "
 	    "cpu_sram_offset=0x%lx, idx=%d\n", cp->cpuid, cp->coreid,
@@ -5384,7 +5369,7 @@ drmach_cpu_start(struct cpu *cp)
 
 	if (prom_hotaddcpu(cpuid) != 0) {
 		cmn_err(CE_PANIC, "prom_hotaddcpu() for cpuid=%d failed.",
-			cpuid);
+		    cpuid);
 	}
 
 	restart_other_cpu(cpuid);
@@ -5421,7 +5406,7 @@ drmach_cpu_start(struct cpu *cp)
 		exp = (cpuid >> 5) & 0x1f;
 		if (drmach_slice_table[exp] & 0x20) {
 			drmach_xt_mb[cpuid] = 0x80 |
-				(drmach_slice_table[exp] & 0x1f);
+			    (drmach_slice_table[exp] & 0x1f);
 		} else {
 			drmach_xt_mb[cpuid] = 0x80 | 0x40;
 		}
@@ -5440,13 +5425,13 @@ drmach_cpu_start(struct cpu *cp)
 		mutex_exit(&drmach_xt_mb_lock);
 
 		DRMACH_PR(
-			"waited %d out of %d tries for drmach_set_lpa on cpu%d",
-			drmach_cpu_ntries - ntries, drmach_cpu_ntries,
-			cp->cpu_id);
+		    "waited %d out of %d tries for drmach_set_lpa on cpu%d",
+		    drmach_cpu_ntries - ntries, drmach_cpu_ntries,
+		    cp->cpu_id);
 	}
 
-	xt_one(cpuid, vtag_flushpage_tl1,
-		(uint64_t)drmach_cpu_sram_va, (uint64_t)ksfmmup);
+	xt_one(cpuid, vtag_flushpage_tl1, (uint64_t)drmach_cpu_sram_va,
+	    (uint64_t)ksfmmup);
 
 	return (0);
 }
@@ -5484,20 +5469,19 @@ drmach_cpu_start(struct cpu *cp)
 static void
 drmach_cpu_stop_self(void)
 {
-	extern void	drmach_shutdown_asm(
-				uint64_t, uint64_t, int, int, uint64_t);
-	extern void	drmach_shutdown_asm_end(void);
+	extern void drmach_shutdown_asm(uint64_t, uint64_t, int, int, uint64_t);
+	extern void drmach_shutdown_asm_end(void);
 
 	tte_t		*tte;
 	uint_t		*p, *q;
 	uint64_t	 stack_pointer;
 
 	ASSERT(((ptrdiff_t)drmach_shutdown_asm_end -
-		(ptrdiff_t)drmach_shutdown_asm) < PAGESIZE);
+	    (ptrdiff_t)drmach_shutdown_asm) < PAGESIZE);
 
 	tte = &drmach_cpu_sram_tte[CPU->cpu_id];
-	ASSERT(TTE_IS_VALID(tte) && TTE_IS_8K(tte) &&
-	    TTE_IS_PRIVILEGED(tte) && TTE_IS_LOCKED(tte));
+	ASSERT(TTE_IS_VALID(tte) && TTE_IS_8K(tte) && TTE_IS_PRIVILEGED(tte) &&
+	    TTE_IS_LOCKED(tte));
 	sfmmu_dtlb_ld_kva(drmach_cpu_sram_va, tte);
 	sfmmu_itlb_ld_kva(drmach_cpu_sram_va, tte);
 
@@ -5517,11 +5501,11 @@ drmach_cpu_stop_self(void)
 
 	/* call copy of drmach_shutdown_asm */
 	(*(void (*)())drmach_cpu_sram_va)(
-		stack_pointer,
-		drmach_iocage_paddr,
-		cpunodes[CPU->cpu_id].ecache_size,
-		cpunodes[CPU->cpu_id].ecache_linesize,
-		va_to_pa((void *)&drmach_xt_mb[CPU->cpu_id]));
+	    stack_pointer,
+	    drmach_iocage_paddr,
+	    cpunodes[CPU->cpu_id].ecache_size,
+	    cpunodes[CPU->cpu_id].ecache_linesize,
+	    va_to_pa((void *)&drmach_xt_mb[CPU->cpu_id]));
 }
 
 static void
@@ -5593,12 +5577,10 @@ drmach_cpu_status(drmachid_t id, drmach_status_t *stat)
 sbd_error_t *
 drmach_cpu_disconnect(drmachid_t id)
 {
-
 	if (!DRMACH_IS_CPU_ID(id))
 		return (drerr_new(0, ESTC_INAPPROP, NULL));
 
 	return (NULL);
-
 }
 
 sbd_error_t *
@@ -5706,7 +5688,7 @@ drmach_dip_is_schizo_xmits_0_pci_b(dev_info_t *dip)
 		return (0);
 
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, "device_type",
-		(caddr_t)dtype, &len) == DDI_PROP_SUCCESS) {
+	    (caddr_t)dtype, &len) == DDI_PROP_SUCCESS) {
 
 		if (strncmp(dtype, "pci", 3) == 0) {
 
@@ -5714,15 +5696,15 @@ drmach_dip_is_schizo_xmits_0_pci_b(dev_info_t *dip)
 			 * Get safari portid. All schizo/xmits 0
 			 * safari IDs end in 0x1C.
 			 */
-			rv = ddi_getproplen(DDI_DEV_T_ANY, dip, 0,
-				"portid", &len);
+			rv = ddi_getproplen(DDI_DEV_T_ANY, dip, 0, "portid",
+			    &len);
 
 			if ((rv != DDI_PROP_SUCCESS) ||
-				(len > sizeof (portid)))
-					return (0);
+			    (len > sizeof (portid)))
+				return (0);
 
 			rv = ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0,
-				"portid", (caddr_t)&portid, &len);
+			    "portid", (caddr_t)&portid, &len);
 
 			if (rv != DDI_PROP_SUCCESS)
 				return (0);
@@ -5731,11 +5713,11 @@ drmach_dip_is_schizo_xmits_0_pci_b(dev_info_t *dip)
 				return (0);
 
 			if (ddi_getlongprop(DDI_DEV_T_ANY, dip,
-				DDI_PROP_DONTPASS, "reg", (caddr_t)&regbuf,
-						&len) == DDI_PROP_SUCCESS) {
+			    DDI_PROP_DONTPASS, "reg", (caddr_t)&regbuf,
+			    &len) == DDI_PROP_SUCCESS) {
 
 				pci_csr_base = regbuf[0].pci_phys_mid &
-							PCI_CONF_ADDR_MASK;
+				    PCI_CONF_ADDR_MASK;
 				kmem_free(regbuf, len);
 				/*
 				 * All PCI B-Leafs are at configspace 0x70.0000.
@@ -5770,7 +5752,7 @@ drmach_dip_is_man_eri(dev_info_t *dip)
 	 * Verify if the parent is schizo(xmits)0 and pci B leaf.
 	 */
 	if (((parent_dip = ddi_get_parent(dip)) == NULL) ||
-		((name = ddi_binding_name(parent_dip)) == NULL))
+	    ((name = ddi_binding_name(parent_dip)) == NULL))
 		return (0);
 	if (strcmp(name, SCHIZO_BINDING_NAME) != 0) {
 		/*
@@ -5780,7 +5762,7 @@ drmach_dip_is_man_eri(dev_info_t *dip)
 		if ((parent_dip = ddi_get_parent(parent_dip)) == NULL)
 			return (0);
 		if (((name = ddi_binding_name(parent_dip)) == NULL) ||
-			(strcmp(name, XMITS_BINDING_NAME) != 0)) {
+		    (strcmp(name, XMITS_BINDING_NAME) != 0)) {
 			return (0);
 		}
 	}
@@ -5790,7 +5772,7 @@ drmach_dip_is_man_eri(dev_info_t *dip)
 	 * Finally make sure it is the MAN eri.
 	 */
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-			"reg", (caddr_t)&regbuf, &len) == DDI_PROP_SUCCESS) {
+	    "reg", (caddr_t)&regbuf, &len) == DDI_PROP_SUCCESS) {
 
 		pci_device = PCI_REG_DEV_G(regbuf->pci_phys_hi);
 		pci_function = PCI_REG_FUNC_G(regbuf->pci_phys_hi);
@@ -5829,7 +5811,7 @@ drmach_board_find_io_insts(dev_info_t *dip, void *args)
 	}
 
 	rv = ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0,
-			"portid", (caddr_t)&portid, &len);
+	    "portid", (caddr_t)&portid, &len);
 	if (rv != DDI_PROP_SUCCESS)
 		return (DDI_WALK_CONTINUE);
 
@@ -5838,13 +5820,12 @@ drmach_board_find_io_insts(dev_info_t *dip, void *args)
 		return (DDI_WALK_CONTINUE);
 
 	if ((ios->iosram_inst < 0) || (ios->eri_dip == NULL)) {
-		rv = ddi_getproplen(DDI_DEV_T_ANY, dip, 0,
-			"name", &len);
+		rv = ddi_getproplen(DDI_DEV_T_ANY, dip, 0, "name", &len);
 		if (rv == DDI_PROP_SUCCESS) {
 
 			rv = ddi_getlongprop_buf(DDI_DEV_T_ANY, dip,
-				0, "name",
-				(caddr_t)name, &len);
+			    0, "name",
+			    (caddr_t)name, &len);
 			if (rv != DDI_PROP_SUCCESS)
 				return (DDI_WALK_CONTINUE);
 
@@ -5895,10 +5876,10 @@ drmach_io_pre_release(drmachid_t id)
 
 	ndi_devi_enter(rdip, &circ);
 	ddi_walk_devs(ddi_get_child(rdip), drmach_board_find_io_insts,
-				(void *)&ios);
+	    (void *)&ios);
 
 	DRMACH_PR("drmach_io_pre_release: bnum=%d iosram=%d eri=0x%p\n",
-			ios.bnum, ios.iosram_inst, ios.eri_dip);
+	    ios.bnum, ios.iosram_inst, ios.eri_dip);
 	ndi_devi_exit(rdip, circ);
 
 	if (ios.eri_dip) {
@@ -5911,11 +5892,11 @@ drmach_io_pre_release(drmachid_t id)
 		/* call for tunnel switch */
 		do {
 			DRMACH_PR("calling iosram_switchfrom(%d)\n",
-				ios.iosram_inst);
+			    ios.iosram_inst);
 			rv = iosram_switchfrom(ios.iosram_inst);
 			if (rv)
 				DRMACH_PR("iosram_switchfrom returned %d\n",
-					rv);
+				    rv);
 		} while (rv == EAGAIN);
 
 		if (rv)
@@ -5943,7 +5924,7 @@ drmach_io_unrelease(drmachid_t id)
 		int (*func)(dev_info_t *dip);
 
 		func = (int (*)(dev_info_t *))kobj_getsymvalue("man_dr_attach",
-			0);
+		    0);
 
 		if (func) {
 			drmach_io_inst_t ios;
@@ -5967,8 +5948,8 @@ drmach_io_unrelease(drmachid_t id)
 			/*
 			 * Root node doesn't have to be held in any way.
 			 */
-			ddi_walk_devs(dip,
-				drmach_board_find_io_insts, (void *)&ios);
+			ddi_walk_devs(dip, drmach_board_find_io_insts,
+			    (void *)&ios);
 
 			if (pdip) {
 				ndi_devi_exit(pdip, circ);
@@ -5976,13 +5957,12 @@ drmach_io_unrelease(drmachid_t id)
 			}
 
 			DRMACH_PR("drmach_io_unrelease: bnum=%d eri=0x%p\n",
-				ios.bnum, ios.eri_dip);
+			    ios.bnum, ios.eri_dip);
 
 			if (ios.eri_dip) {
 				DRMACH_PR("calling man_dr_attach\n");
 				if ((*func)(ios.eri_dip))
-					err = drerr_new(0,
-						ESTC_NWSWITCH, NULL);
+					err = drerr_new(0, ESTC_NWSWITCH, NULL);
 				/*
 				 * Release hold acquired in
 				 * drmach_board_find_io_insts()
@@ -6014,7 +5994,7 @@ drmach_io_release(drmachid_t id)
 		int (*func)(dev_info_t *dip);
 
 		func = (int (*)(dev_info_t *))kobj_getsymvalue("man_dr_detach",
-			0);
+		    0);
 
 		if (func) {
 			drmach_io_inst_t ios;
@@ -6038,8 +6018,8 @@ drmach_io_release(drmachid_t id)
 			/*
 			 * Root node doesn't have to be held in any way.
 			 */
-			ddi_walk_devs(dip,
-				drmach_board_find_io_insts, (void *)&ios);
+			ddi_walk_devs(dip, drmach_board_find_io_insts,
+			    (void *)&ios);
 
 			if (pdip) {
 				ndi_devi_exit(pdip, circ);
@@ -6047,13 +6027,12 @@ drmach_io_release(drmachid_t id)
 			}
 
 			DRMACH_PR("drmach_io_release: bnum=%d eri=0x%p\n",
-				ios.bnum, ios.eri_dip);
+			    ios.bnum, ios.eri_dip);
 
 			if (ios.eri_dip) {
 				DRMACH_PR("calling man_dr_detach\n");
 				if ((*func)(ios.eri_dip))
-					err = drerr_new(0,
-						ESTC_NWSWITCH, NULL);
+					err = drerr_new(0, ESTC_NWSWITCH, NULL);
 				/*
 				 * Release hold acquired in
 				 * drmach_board_find_io_insts()
@@ -6152,21 +6131,20 @@ drmach_io_post_attach(drmachid_t id)
 	/*
 	 * Root node doesn't have to be held in any way.
 	 */
-	ddi_walk_devs(dip, drmach_board_find_io_insts,
-				(void *)&ios);
+	ddi_walk_devs(dip, drmach_board_find_io_insts, (void *)&ios);
 	if (pdip) {
 		ndi_devi_exit(pdip, circ);
 		ndi_rele_devi(pdip);
 	}
 
-	DRMACH_PR("drmach_io_post_attach: bnum=%d eri=0x%p\n",
-		ios.bnum, ios.eri_dip);
+	DRMACH_PR("drmach_io_post_attach: bnum=%d eri=0x%p\n", ios.bnum,
+	    ios.eri_dip);
 
 	if (ios.eri_dip) {
 		int (*func)(dev_info_t *dip);
 
 		func =
-		(int (*)(dev_info_t *))kobj_getsymvalue("man_dr_attach", 0);
+		    (int (*)(dev_info_t *))kobj_getsymvalue("man_dr_attach", 0);
 
 		if (func) {
 			DRMACH_PR("calling man_dr_attach\n");
@@ -6297,8 +6275,7 @@ drmach_mem_new(drmach_device_t *proto, drmachid_t *idp)
 	mp->dev.cm.status = drmach_mem_status;
 	mp->madr_pa = madr_pa;
 
-	snprintf(mp->dev.cm.name,
-		sizeof (mp->dev.cm.name), "%s", mp->dev.type);
+	snprintf(mp->dev.cm.name, sizeof (mp->dev.cm.name), "%s", mp->dev.type);
 
 	for (count = bank = 0; bank < DRMACH_MC_NBANKS; bank++) {
 		uint64_t madr;
@@ -6419,13 +6396,13 @@ drmach_mem_add_span(drmachid_t id, uint64_t basepa, uint64_t size)
 	rv = kcage_range_add(basepfn, npages, KCAGE_DOWN);
 	if (rv == ENOMEM) {
 		cmn_err(CE_WARN, "%lu megabytes not available"
-			" to kernel cage", size >> 20);
+		    " to kernel cage", size >> 20);
 	} else if (rv != 0) {
 		/* catch this in debug kernels */
 		ASSERT(0);
 
 		cmn_err(CE_WARN, "unexpected kcage_range_add"
-			" return value %d", rv);
+		    " return value %d", rv);
 	}
 
 	return (NULL);
@@ -6570,7 +6547,7 @@ drmach_mem_get_base_physaddr(drmachid_t id, uint64_t *base_addr)
 			drmach_mem_read_madr(mp, bank, &madr);
 			if (madr & DRMACH_MC_VALID_MASK) {
 				addr = DRMACH_MC_UM_TO_PA(madr) |
-					DRMACH_MC_LM_TO_PA(madr);
+				    DRMACH_MC_LM_TO_PA(madr);
 
 				if (addr < *base_addr)
 					*base_addr = addr;
@@ -6657,8 +6634,8 @@ drmach_mem_get_memlist(drmachid_t id, struct memlist **ml)
 	chunks = gdcd->dcd_chunk_list.dcl_chunks;
 	while (chunks-- != 0) {
 		if ((chunk->mc_base_pa & mask) == pa) {
-			mlist = memlist_add_span(mlist,
-				chunk->mc_base_pa, chunk->mc_mbytes * 1048576);
+			mlist = memlist_add_span(mlist, chunk->mc_base_pa,
+			    chunk->mc_mbytes * 1048576);
 		}
 
 		++chunk;
@@ -6863,11 +6840,11 @@ drmach_pt_showlpa(drmachid_t id, drmach_opts_t *opts)
 
 	dp = id;
 	uprintf("showlpa %s::%s portid %d, base pa %lx, bound pa %lx\n",
-		dp->bp->cm.name,
-		dp->cm.name,
-		dp->portid,
-		DRMACH_LPA_BASE_TO_PA(val),
-		DRMACH_LPA_BND_TO_PA(val));
+	    dp->bp->cm.name,
+	    dp->cm.name,
+	    dp->portid,
+	    DRMACH_LPA_BASE_TO_PA(val),
+	    DRMACH_LPA_BND_TO_PA(val));
 
 	return (NULL);
 }
@@ -6876,9 +6853,7 @@ drmach_pt_showlpa(drmachid_t id, drmach_opts_t *opts)
 static sbd_error_t *
 drmach_pt_ikprobe(drmachid_t id, drmach_opts_t *opts)
 {
-
 	drmach_board_t		*bp = (drmach_board_t *)id;
-
 	sbd_error_t		*err;
 	sc_gptwocfg_cookie_t	scc;
 
@@ -6900,7 +6875,6 @@ drmach_pt_ikprobe(drmachid_t id, drmach_opts_t *opts)
 static sbd_error_t *
 drmach_pt_ikdeprobe(drmachid_t id, drmach_opts_t *opts)
 {
-
 	drmach_board_t	*bp;
 	sbd_error_t	*err = NULL;
 	sc_gptwocfg_cookie_t	scc;
@@ -6919,7 +6893,6 @@ drmach_pt_ikdeprobe(drmachid_t id, drmach_opts_t *opts)
 		err = drmach_board_deprobe(id);
 
 	return (err);
-
 }
 
 static sbd_error_t *
@@ -7122,9 +7095,8 @@ drmach_unconfigure(drmachid_t id, int flags)
 		 */
 		ASSERT(e_ddi_branch_held(rdip));
 		if (e_ddi_branch_unconfigure(rdip, &fdip, 0) != 0) {
-			sbd_error_t	*err = NULL;
-			char		*path = kmem_alloc(MAXPATHLEN,
-					    KM_SLEEP);
+			sbd_error_t *err = NULL;
+			char *path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 
 			/*
 			 * If non-NULL, fdip is returned held and must be
@@ -7150,7 +7122,7 @@ drmach_unconfigure(drmachid_t id, int flags)
 				int (*func)(dev_info_t *dip);
 
 				func = (int (*)(dev_info_t *))kobj_getsymvalue\
-					("man_dr_attach", 0);
+				    ("man_dr_attach", 0);
 
 				if (func) {
 					drmach_io_inst_t ios;
@@ -7179,12 +7151,12 @@ drmach_unconfigure(drmachid_t id, int flags)
 					 */
 					ASSERT(e_ddi_branch_held(rdip));
 					ddi_walk_devs(rdip,
-						drmach_board_find_io_insts,
-						(void *)&ios);
+					    drmach_board_find_io_insts,
+					    (void *)&ios);
 
 					DRMACH_PR("drmach_unconfigure: bnum=%d"
-						" eri=0x%p\n",
-						ios.bnum, ios.eri_dip);
+					    " eri=0x%p\n",
+					    ios.bnum, ios.eri_dip);
 
 					if (pdip) {
 						ndi_devi_exit(pdip, circ);
@@ -7193,7 +7165,7 @@ drmach_unconfigure(drmachid_t id, int flags)
 
 					if (ios.eri_dip) {
 						DRMACH_PR("calling"
-							" man_dr_attach\n");
+						    " man_dr_attach\n");
 						(void) (*func)(ios.eri_dip);
 						/*
 						 * Release hold acquired in
@@ -7304,7 +7276,7 @@ drmach_cpu_poweroff(struct cpu *cp)
 	drmach_xt_mb[cpuid] = 0x80;
 
 	xt_one_unchecked(cp->cpu_id, (xcfunc_t *)idle_stop_xcall,
-		(uint64_t)drmach_cpu_shutdown_self, NULL);
+	    (uint64_t)drmach_cpu_shutdown_self, NULL);
 
 	ntries = drmach_cpu_ntries;
 	while (drmach_xt_mb[cpuid] && ntries) {
@@ -7330,8 +7302,8 @@ drmach_cpu_poweroff(struct cpu *cp)
 	}
 
 	DRMACH_PR("waited %d out of %d tries for "
-		"drmach_cpu_shutdown_self on cpu%d",
-		drmach_cpu_ntries - ntries, drmach_cpu_ntries, cp->cpu_id);
+	    "drmach_cpu_shutdown_self on cpu%d",
+	    drmach_cpu_ntries - ntries, drmach_cpu_ntries, cp->cpu_id);
 
 	/*
 	 * Do this here instead of drmach_cpu_shutdown_self() to
@@ -7356,8 +7328,7 @@ drmach_iocage_mem_scrub(uint64_t nbytes)
 	if (rv != 0) {
 		DRMACH_PR(
 		"iocage scrub failed, drmach_bc_bzero returned %d\n", rv);
-		rv = drmach_bc_bzero(drmach_iocage_vaddr,
-			drmach_iocage_size);
+		rv = drmach_bc_bzero(drmach_iocage_vaddr, drmach_iocage_size);
 		if (rv != 0)
 			cmn_err(CE_PANIC,
 			    "iocage scrub failed, drmach_bc_bzero rv=%d\n",
@@ -8482,7 +8453,7 @@ drmach_sr_insert(struct drmach_sr_list **lp, dev_info_t *dip)
 	DRMACH_PR("drmach_sr_insert: adding dip %p\n", dip);
 
 	np = (struct drmach_sr_list *)kmem_alloc(
-		sizeof (struct drmach_sr_list), KM_SLEEP);
+	    sizeof (struct drmach_sr_list), KM_SLEEP);
 
 	ndi_hold_devi(dip);
 	np->dip = dip;
@@ -8523,7 +8494,7 @@ drmach_sr_delete(struct drmach_sr_list **lp, dev_info_t *dip)
 				kmem_free(xp, sizeof (*xp));
 
 				DRMACH_PR("drmach_sr_delete:"
-					" disposed sr node for dip %p", dip);
+				    " disposed sr node for dip %p", dip);
 				return;
 			}
 
@@ -8555,14 +8526,14 @@ drmach_verify_sr(dev_info_t *dip, int sflag)
 	}
 
 	rv = ddi_getproplen(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-		"name", &len);
+	    "name", &len);
 	if (rv == DDI_PROP_SUCCESS) {
 		int		portid;
 		uint64_t	reg;
 		struct drmach_sr_ordered *op;
 
 		rv = ddi_getlongprop_buf(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS, "name", (caddr_t)name, &len);
+		    DDI_PROP_DONTPASS, "name", (caddr_t)name, &len);
 
 		if (rv != DDI_PROP_SUCCESS)
 			return (0);
@@ -8605,8 +8576,8 @@ drmach_sr_dip(dev_info_t *dip, int suspend)
 		name_addr = "<null>";
 
 	prom_printf("\t%s %s@%s (aka %s)\n",
-		suspend ? "suspending" : "resuming",
-		name, name_addr, aka);
+	    suspend ? "suspending" : "resuming",
+	    name, name_addr, aka);
 
 	if (suspend) {
 		rv = devi_detach(dip, DDI_SUSPEND);
@@ -8616,8 +8587,8 @@ drmach_sr_dip(dev_info_t *dip, int suspend)
 
 	if (rv != DDI_SUCCESS) {
 		prom_printf("\tFAILED to %s %s@%s\n",
-			suspend ? "suspend" : "resume",
-			name, name_addr);
+		    suspend ? "suspend" : "resume",
+		    name, name_addr);
 	}
 }
 
@@ -8661,7 +8632,7 @@ void
 drmach_resume_first()
 {
 	struct drmach_sr_ordered *op = drmach_sr_ordered +
-		(sizeof (drmach_sr_ordered) / sizeof (drmach_sr_ordered[0]));
+	    (sizeof (drmach_sr_ordered) / sizeof (drmach_sr_ordered[0]));
 
 	if (drmach_slot1_pause_debug) {
 		drmach_slot1_pause_update(drmach_slot1_paused,
@@ -8711,23 +8682,23 @@ drmach_log_sysevent(int board, char *hint, int flag, int verbose)
 	}
 	if (verbose)
 		DRMACH_PR("drmach_log_sysevent: %s %s, flag: %d, verbose: %d\n",
-			    attach_pnt, hint, flag, verbose);
+		    attach_pnt, hint, flag, verbose);
 
 	if ((ev = sysevent_alloc(EC_DR, ESC_DR_AP_STATE_CHANGE,
-				    SUNW_KERN_PUB"dr", km_flag)) == NULL) {
+	    SUNW_KERN_PUB"dr", km_flag)) == NULL) {
 		rv = -2;
 		goto logexit;
 	}
 	evnt_val.value_type = SE_DATA_TYPE_STRING;
 	evnt_val.value.sv_string = attach_pnt;
 	if ((rv = sysevent_add_attr(&evnt_attr_list, DR_AP_ID,
-				    &evnt_val, km_flag)) != 0)
+	    &evnt_val, km_flag)) != 0)
 		goto logexit;
 
 	evnt_val.value_type = SE_DATA_TYPE_STRING;
 	evnt_val.value.sv_string = hint;
 	if ((rv = sysevent_add_attr(&evnt_attr_list, DR_HINT,
-				    &evnt_val, km_flag)) != 0) {
+	    &evnt_val, km_flag)) != 0) {
 		sysevent_free_attr(evnt_attr_list);
 		goto logexit;
 	}
@@ -8745,8 +8716,8 @@ logexit:
 		sysevent_free(ev);
 	if ((rv != 0) && verbose)
 		cmn_err(CE_WARN,
-			    "drmach_log_sysevent failed (rv %d) for %s  %s\n",
-			    rv, attach_pnt, hint);
+		    "drmach_log_sysevent failed (rv %d) for %s  %s\n",
+		    rv, attach_pnt, hint);
 
 	return (rv);
 }
@@ -8806,7 +8777,7 @@ drmach_msg_memregs_init(dr_memregs_t regs_arr[]) {
 				drmach_mem_read_madr(mp, bank, &madr);
 				if (madr & DRMACH_MC_VALID_MASK) {
 					DRMACH_PR("%d.%d.%d.madr = 0x%lx\n",
-						exp, mcnum, bank, madr);
+					    exp, mcnum, bank, madr);
 					memregs->madr[mcnum][bank].hi =
 					    DRMACH_U64_TO_MCREGHI(madr);
 					memregs->madr[mcnum][bank].lo =

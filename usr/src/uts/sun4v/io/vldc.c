@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -830,8 +830,8 @@ i_vldc_close_port(vldc_t *vldcp, uint_t portno)
 			 * after waking up, check if the port has been closed
 			 * by another thread in the meantime.
 			 */
-			(void) cv_timedwait(&vminor->cv, &vminor->lock,
-			    ddi_get_lbolt() + drv_usectohz(vldc_close_delay));
+			(void) cv_reltimedwait(&vminor->cv, &vminor->lock,
+			    drv_usectohz(vldc_close_delay), TR_CLOCK_TICK);
 			rv = 0;
 		} while (vport->status != VLDC_PORT_CLOSED);
 

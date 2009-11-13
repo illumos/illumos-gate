@@ -2432,8 +2432,8 @@ wusb_wa_xfer_timeout_handler(void *arg)
 				 * aborted, wait it.
 				 */
 				if ((wr->wr_has_aborted == 0) &&
-				    (cv_timedwait(&wr->wr_cv, &hdl->rp_mutex,
-				    ddi_get_lbolt() + drv_usectohz(100 * 1000))
+				    (cv_reltimedwait(&wr->wr_cv, &hdl->rp_mutex,
+				    drv_usectohz(100 * 1000), TR_CLOCK_TICK)
 				    >= 0)) {
 				    /* 100ms, random number, long enough? */
 

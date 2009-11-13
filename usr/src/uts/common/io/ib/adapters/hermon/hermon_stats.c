@@ -729,6 +729,7 @@ hermon_kstat_perfcntr64_update_thread(void *arg)
 	hermon_state_t		*state = (hermon_state_t *)arg;
 	hermon_ks_info_t	*ksi = state->hs_ks_info;
 	uint_t			i;
+	clock_t			delta = drv_usectohz(1000000);
 
 	mutex_enter(&ksi->hki_perfcntr64_lock);
 	/*
@@ -743,9 +744,8 @@ hermon_kstat_perfcntr64_update_thread(void *arg)
 			}
 		}
 		/* sleep for a second */
-		(void) cv_timedwait(&ksi->hki_perfcntr64_cv,
-		    &ksi->hki_perfcntr64_lock,
-		    ddi_get_lbolt() + drv_usectohz(1000000));
+		(void) cv_reltimedwait(&ksi->hki_perfcntr64_cv,
+		    &ksi->hki_perfcntr64_lock, delta, TR_CLOCK_TICK);
 	}
 	ksi->hki_perfcntr64_flags = 0;
 	mutex_exit(&ksi->hki_perfcntr64_lock);

@@ -21,7 +21,7 @@
 /*
  * Routines for writing audit records.
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -547,9 +547,9 @@ au_door_upcall(au_kcontext_t *kctx, au_dbuf_t *aubuf)
 				return (rc);
 
 			mutex_enter(&(kctx->auk_eagain_mutex));
-			(void) cv_timedwait(&(kctx->auk_eagain_cv),
-			    &(kctx->auk_eagain_mutex),
-			    lbolt + ticks_to_wait);
+			(void) cv_reltimedwait(&(kctx->auk_eagain_cv),
+			    &(kctx->auk_eagain_mutex), ticks_to_wait,
+			    TR_CLOCK_TICK);
 			mutex_exit(&(kctx->auk_eagain_mutex));
 
 			retry = 1;

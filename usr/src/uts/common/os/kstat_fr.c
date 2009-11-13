@@ -845,7 +845,7 @@ system_misc_kstat_update(kstat_t *ksp, int rw)
 
 	if (curproc->p_zone->zone_id == 0) {
 		zone_boot_time = boot_time;
-		zone_lbolt = lbolt;
+		zone_lbolt = ddi_get_lbolt();
 	} else {
 		struct timeval tvp;
 		hrt2tv(curproc->p_zone->zone_zsched->p_mstart, &tvp);

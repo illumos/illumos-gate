@@ -362,7 +362,8 @@ log_conswitch(log_t *src, log_t *dst)
 		tmp = hmp->b_next;
 		hmp->b_next = NULL;
 		hlc = (log_ctl_t *)hmp->b_rptr;
-		hlc->ttime = gethrestime_sec() - (lbolt - hlc->ltime) / hz;
+		hlc->ttime = gethrestime_sec() -
+		    (ddi_get_lbolt() - hlc->ltime) / hz;
 		(void) putq(dst->log_q, hmp);
 		hmp = tmp;
 	}
@@ -611,7 +612,7 @@ log_sendmsg(mblk_t *mp, zoneid_t zoneid)
 	 * that contain good data.
 	 *
 	 */
-	lc->ltime = lbolt;
+	lc->ltime = ddi_get_lbolt();
 	if (timechanged) {
 		lc->ttime = gethrestime_sec();
 	} else {

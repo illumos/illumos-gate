@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -7537,8 +7537,8 @@ man_kstat_update(kstat_t *ksp, int rw)
 		wp->mw_flags = MAN_WFLAGS_CVWAITER;
 		man_work_add(man_iwork_q, wp);
 
-		wait_status = cv_timedwait_sig(&wp->mw_cv, &man_lock,
-		    ddi_get_lbolt() + drv_usectohz(manp->man_kstat_waittime));
+		wait_status = cv_reltimedwait_sig(&wp->mw_cv, &man_lock,
+		    drv_usectohz(manp->man_kstat_waittime), TR_CLOCK_TICK);
 
 		if (wp->mw_flags & MAN_WFLAGS_DONE) {
 			status = wp->mw_status;

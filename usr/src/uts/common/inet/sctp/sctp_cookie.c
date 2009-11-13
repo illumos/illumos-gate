@@ -736,7 +736,7 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 
 	/* timestamp */
 	now = (int64_t *)(cookieph + 1);
-	nowt = lbolt64;
+	nowt = ddi_get_lbolt64();
 	bcopy(&nowt, now, sizeof (*now));
 
 	/* cookie lifetime -- need configuration */
@@ -1279,7 +1279,7 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 	 * So it is lbolt64 - (ts + *lt).  If it is positive, it means
 	 * that the Cookie has expired.
 	 */
-	diff = lbolt64 - (ts + *lt);
+	diff = ddi_get_lbolt64() - (ts + *lt);
 	if (diff > 0 && (init->sic_inittag != sctp->sctp_fvtag ||
 	    iack->sic_inittag != sctp->sctp_lvtag)) {
 		uint32_t staleness;
@@ -1343,7 +1343,8 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 
 			if (sctp->sctp_state < SCTPS_ESTABLISHED) {
 				sctp->sctp_state = SCTPS_ESTABLISHED;
-				sctp->sctp_assoc_start_time = (uint32_t)lbolt;
+				sctp->sctp_assoc_start_time =
+				    (uint32_t)ddi_get_lbolt();
 			}
 
 			dprint(1, ("sctp peer %x:%x:%x:%x (%d) restarted\n",
@@ -1371,7 +1372,8 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 				if (!sctp_initialize_params(sctp, init, iack))
 					return (-1);	/* Drop? */
 				sctp->sctp_state = SCTPS_ESTABLISHED;
-				sctp->sctp_assoc_start_time = (uint32_t)lbolt;
+				sctp->sctp_assoc_start_time =
+				    (uint32_t)ddi_get_lbolt();
 			}
 
 			dprint(1, ("init collision with %x:%x:%x:%x (%d)\n",
@@ -1402,7 +1404,8 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 				if (!sctp_initialize_params(sctp, init, iack))
 					return (-1);	/* Drop? */
 				sctp->sctp_state = SCTPS_ESTABLISHED;
-				sctp->sctp_assoc_start_time = (uint32_t)lbolt;
+				sctp->sctp_assoc_start_time =
+				    (uint32_t)ddi_get_lbolt();
 			}
 			return (0);
 		} else {

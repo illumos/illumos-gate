@@ -2139,9 +2139,8 @@ _mii_task(void *_mh)
 			break;
 
 		default:
-			(void) cv_timedwait(&mh->m_cv, &mh->m_lock,
-			    ddi_get_lbolt() + drv_usectohz(wait));
-			break;
+			(void) cv_reltimedwait(&mh->m_cv, &mh->m_lock,
+			    drv_usectohz(wait), TR_CLOCK_TICK);
 		}
 	}
 

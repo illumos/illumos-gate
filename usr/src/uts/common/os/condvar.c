@@ -224,12 +224,34 @@ clock_t
 cv_timedwait(kcondvar_t *cvp, kmutex_t *mp, clock_t tim)
 {
 	hrtime_t hrtim;
+	clock_t now = ddi_get_lbolt();
 
-	if (tim <= lbolt)
+	if (tim <= now)
 		return (-1);
 
-	hrtim = TICK_TO_NSEC(tim - lbolt);
+	hrtim = TICK_TO_NSEC(tim - now);
 	return (cv_timedwait_hires(cvp, mp, hrtim, nsec_per_tick, 0));
+}
+
+/*
+ * Same as cv_timedwait() except that the third argument is a relative
+ * timeout value, as opposed to an absolute one. There is also a fourth
+ * argument that specifies how accurately the timeout must be implemented.
+ */
+clock_t
+cv_reltimedwait(kcondvar_t *cvp, kmutex_t *mp, clock_t delta, time_res_t res)
+{
+	hrtime_t exp;
+
+	ASSERT(TIME_RES_VALID(res));
+
+	if (delta <= 0)
+		return (-1);
+
+	if ((exp = TICK_TO_NSEC(delta)) < 0)
+		exp = CY_INFINITY;
+
+	return (cv_timedwait_hires(cvp, mp, exp, time_res[res], 0));
 }
 
 clock_t
@@ -445,8 +467,27 @@ cv_timedwait_sig(kcondvar_t *cvp, kmutex_t *mp, clock_t tim)
 {
 	hrtime_t hrtim;
 
-	hrtim = TICK_TO_NSEC(tim - lbolt);
+	hrtim = TICK_TO_NSEC(tim - ddi_get_lbolt());
 	return (cv_timedwait_sig_hires(cvp, mp, hrtim, nsec_per_tick, 0));
+}
+
+/*
+ * Same as cv_timedwait_sig() except that the third argument is a relative
+ * timeout value, as opposed to an absolute one. There is also a fourth
+ * argument that specifies how accurately the timeout must be implemented.
+ */
+clock_t
+cv_reltimedwait_sig(kcondvar_t *cvp, kmutex_t *mp, clock_t delta,
+    time_res_t res)
+{
+	hrtime_t exp;
+
+	ASSERT(TIME_RES_VALID(res));
+
+	if ((exp = TICK_TO_NSEC(delta)) < 0)
+		exp = CY_INFINITY;
+
+	return (cv_timedwait_sig_hires(cvp, mp, exp, time_res[res], 0));
 }
 
 /*
@@ -607,10 +648,10 @@ cv_wait_stop(kcondvar_t *cvp, kmutex_t *mp, int wakeup_time)
 	/*
 	 * Wakeup in wakeup_time milliseconds, i.e., human time.
 	 */
-	tim = lbolt + MSEC_TO_TICK(wakeup_time);
+	tim = ddi_get_lbolt() + MSEC_TO_TICK(wakeup_time);
 	mutex_enter(&t->t_wait_mutex);
 	id = realtime_timeout_default((void (*)(void *))cv_wakeup, t,
-	    tim - lbolt);
+	    tim - ddi_get_lbolt());
 	thread_lock(t);			/* lock the thread */
 	cv_block((condvar_impl_t *)cvp);
 	thread_unlock_nopreempt(t);

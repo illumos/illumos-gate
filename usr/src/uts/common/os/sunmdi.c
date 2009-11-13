@@ -3199,9 +3199,9 @@ mdi_pi_free(mdi_pathinfo_t *pip, int flags)
 		    "!%d cmds still pending on path: %s %p",
 		    MDI_PI(pip)->pi_ref_cnt,
 		    mdi_pi_spathname(pip), (void *)pip));
-		if (cv_timedwait(&MDI_PI(pip)->pi_ref_cv,
-		    &MDI_PI(pip)->pi_mutex,
-		    ddi_get_lbolt() + drv_usectohz(60 * 1000000)) == -1) {
+		if (cv_reltimedwait(&MDI_PI(pip)->pi_ref_cv,
+		    &MDI_PI(pip)->pi_mutex, drv_usectohz(60 * 1000000),
+		    TR_CLOCK_TICK) == -1) {
 			/*
 			 * The timeout time reached without ref_cnt being zero
 			 * being signaled.
@@ -3875,9 +3875,9 @@ i_mdi_pi_offline(mdi_pathinfo_t *pip, int flags)
 		    "!%d cmds still pending on path %s %p",
 		    MDI_PI(pip)->pi_ref_cnt, mdi_pi_spathname(pip),
 		    (void *)pip));
-		if (cv_timedwait(&MDI_PI(pip)->pi_ref_cv,
-		    &MDI_PI(pip)->pi_mutex,
-		    ddi_get_lbolt() + drv_usectohz(60 * 1000000)) == -1) {
+		if (cv_reltimedwait(&MDI_PI(pip)->pi_ref_cv,
+		    &MDI_PI(pip)->pi_mutex, drv_usectohz(60 * 1000000),
+		    TR_CLOCK_TICK) == -1) {
 			/*
 			 * The timeout time reached without ref_cnt being zero
 			 * being signaled.
@@ -8051,7 +8051,7 @@ lookup_vhcache_client(mdi_vhci_cache_t *vhcache, char *ct_name, char *ct_addr,
 	    (mod_hash_key_t)name_addr, &hv) == 0) {
 		if (token) {
 			token->lt_cct = (mdi_vhcache_client_t *)hv;
-			token->lt_cct_lookup_time = lbolt64;
+			token->lt_cct_lookup_time = ddi_get_lbolt64();
 		}
 	} else {
 		if (token) {
@@ -9097,7 +9097,7 @@ vhcache_do_discovery(mdi_vhci_config_t *vhc)
 	 * stale /dev/[r]dsk links.
 	 */
 	if (mdi_path_discovery_interval != -1 &&
-	    lbolt64 >= vhc->vhc_path_discovery_cutoff_time)
+	    ddi_get_lbolt64() >= vhc->vhc_path_discovery_cutoff_time)
 		goto out;
 
 	rv = 0;
@@ -9127,7 +9127,7 @@ vhcache_discover_paths(mdi_vhci_t *vh)
 		    NDI_NO_EVENT, BUS_CONFIG_ALL, DDI_MAJOR_T_NONE);
 
 		mutex_enter(&vhc->vhc_lock);
-		vhc->vhc_path_discovery_cutoff_time = lbolt64 +
+		vhc->vhc_path_discovery_cutoff_time = ddi_get_lbolt64() +
 		    mdi_path_discovery_interval * TICKS_PER_SECOND;
 		mutex_exit(&vhc->vhc_lock);
 		rv = 1;
@@ -9339,7 +9339,7 @@ clean_vhcache(mdi_vhci_config_t *vhc)
 			free_vhcache_phci(cphci);
 	}
 
-	vhcache->vhcache_clean_time = lbolt64;
+	vhcache->vhcache_clean_time = ddi_get_lbolt64();
 	rw_exit(&vhcache->vhcache_lock);
 	vhcache_dirty(vhc);
 }

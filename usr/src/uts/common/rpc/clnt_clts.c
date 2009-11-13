@@ -579,7 +579,7 @@ call_again:
 		goto done;
 	}
 
-	round_trip = lbolt;
+	round_trip = ddi_get_lbolt();
 
 	error = clnt_clts_dispatch_send(p->cku_endpnt->e_wq, mp,
 	    &p->cku_addr, call, p->cku_xid, p->cku_cred);
@@ -628,7 +628,7 @@ tryread:
 		if (lwp != NULL)
 			lwp->lwp_nostop++;
 
-		cv_timout += lbolt;
+		cv_timout += ddi_get_lbolt();
 
 		if (h->cl_nosignal)
 			while ((cv_wait_ret =
@@ -771,7 +771,7 @@ getresponse:
 		resp = tmp;
 	}
 
-	round_trip = lbolt - round_trip;
+	round_trip = ddi_get_lbolt() - round_trip;
 	/*
 	 * Van Jacobson timer algorithm here, only if NOT a retransmission.
 	 */
@@ -1006,7 +1006,6 @@ done:
 			 * and try again.
 			 */
 			(void) delay(hz/10);
-			/* (void) sleep((caddr_t)&lbolt, PZERO-4); */
 		}
 		if (stries-- > 0) {
 			RCSTAT_INCR(p->cku_stats, rcretrans);

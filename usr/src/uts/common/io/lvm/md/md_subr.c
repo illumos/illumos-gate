@@ -1346,6 +1346,7 @@ callb_md_cpr(void *arg, int code)
 {
 	callb_cpr_t *cp = (callb_cpr_t *)arg;
 	int ret = 0;				/* assume success */
+	clock_t delta;
 
 	mutex_enter(cp->cc_lockp);
 
@@ -1368,10 +1369,11 @@ callb_md_cpr(void *arg, int code)
 		mutex_exit(&md_cpr_resync.md_resync_mutex);
 
 		cp->cc_events |= CALLB_CPR_START;
+		delta = CPR_KTHREAD_TIMEOUT_SEC * hz;
 		while (!(cp->cc_events & CALLB_CPR_SAFE))
-			/* cv_timedwait() returns -1 if it times out. */
-			if ((ret = cv_timedwait(&cp->cc_callb_cv, cp->cc_lockp,
-			    lbolt + CPR_KTHREAD_TIMEOUT_SEC * hz)) == -1)
+			/* cv_reltimedwait() returns -1 if it times out. */
+			if ((ret = cv_reltimedwait(&cp->cc_callb_cv,
+			    cp->cc_lockp, delta, TR_CLOCK_TICK)) == -1)
 				break;
 			break;
 
@@ -4202,6 +4204,7 @@ callb_md_mrs_cpr(void *arg, int code)
 {
 	callb_cpr_t *cp = (callb_cpr_t *)arg;
 	int ret = 0;				/* assume success */
+	clock_t delta;
 
 	mutex_enter(cp->cc_lockp);
 
@@ -4214,10 +4217,11 @@ callb_md_mrs_cpr(void *arg, int code)
 		 */
 		md_mn_clear_commd_present();
 		cp->cc_events |= CALLB_CPR_START;
+		delta = CPR_KTHREAD_TIMEOUT_SEC * hz;
 		while (!(cp->cc_events & CALLB_CPR_SAFE))
 			/* cv_timedwait() returns -1 if it times out. */
-			if ((ret = cv_timedwait(&cp->cc_callb_cv, cp->cc_lockp,
-			    lbolt + CPR_KTHREAD_TIMEOUT_SEC * hz)) == -1)
+			if ((ret = cv_reltimedwait(&cp->cc_callb_cv,
+			    cp->cc_lockp, delta, TR_CLOCK_TICK)) == -1)
 				break;
 			break;
 

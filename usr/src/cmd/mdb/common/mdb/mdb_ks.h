@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_MDB_KS_H
 #define	_MDB_KS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/int_types.h>
@@ -67,6 +65,9 @@ extern int mdb_cpu2cpuid(uintptr_t);
 
 extern int mdb_cpuset_find(uintptr_t);
 
+extern hrtime_t mdb_gethrtime(void);
+extern int64_t mdb_get_lbolt(void);
+
 /*
  * Returns a pointer to the top of the soft state struct for the instance
  * specified, given the address of the global soft state pointer and size
@@ -90,7 +91,6 @@ extern int mdb_get_soft_state_byname(char *, uint_t, uintptr_t *, void *,
  * Just like ddi_pathname in sunddi.c.
  */
 extern char *mdb_ddi_pathname(uintptr_t, char *, size_t);
-
 
 /*
  * MDB Kernel STREAMS Subsystem:

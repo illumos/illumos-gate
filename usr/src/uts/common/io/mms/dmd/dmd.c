@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3349,7 +3349,6 @@ dmd_signal_drm(dmd_drm_t *drm)
 	drm_reply_t	*rep = &drm->drm_shr_rep;
 	int		inst = drm->drm_inst;
 	pid_t		pid = drm->drm_cur_pid;
-	clock_t		cur_ticks;
 	clock_t		to;
 	int		rc = 0;
 
@@ -3399,13 +3398,14 @@ dmd_signal_drm(dmd_drm_t *drm)
 	 */
 	DMD_DEBUG((CE_CONT, "[%d:%d] Waiting for drive manager "
 	    "to get request\n", inst, pid));
+
+	/* Seconds to wait for DM */
+	to = drv_usectohz(DMD_WAIT_DM_GET_SEC * 1000000);
+
 	while ((drm->drm_shr_flags & DRM_SHR_REQ_VALID) &&
 	    (drm->drm_shr_flags & DRM_SHR_WAIT_RESUME))	{
-		cur_ticks = ddi_get_lbolt();
-		to = cur_ticks + drv_usectohz(DMD_WAIT_DM_GET_SEC * 1000000);
-						/* Seconds to wait for DM */
-		rc = cv_timedwait(&drm->drm_shr_res_cv,
-		    &drm->drm_shr_mutex, to);
+		rc = cv_reltimedwait(&drm->drm_shr_res_cv,
+		    &drm->drm_shr_mutex, to, TR_CLOCK_TICK);
 		if (rc == -1) {
 			/* timedout */
 			DMD_DEBUG((CE_NOTE, "[%d:%d] dmd_signal_drm: "

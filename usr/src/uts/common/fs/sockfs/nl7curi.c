@@ -821,7 +821,8 @@ nexthash:
 		 * of requested URI, check for expire or request no cache
 		 * purge.
 		 */
-		if (uri->expire >= 0 && uri->expire <= lbolt || ruri->nocache) {
+		if (uri->expire >= 0 && uri->expire <= ddi_get_lbolt() ||
+		    ruri->nocache) {
 			/*
 			 * URI has expired or request specified to not use
 			 * the cached version, unlink the URI from the hash

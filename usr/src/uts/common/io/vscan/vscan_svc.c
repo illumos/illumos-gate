@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/stat.h>
 #include <sys/ddi.h>
@@ -502,9 +500,9 @@ vscan_svc_scan_file(vnode_t *vp, cred_t *cr, int async)
 	++(req->vsr_refcnt);
 	time_left = SEC_TO_TICK(vs_scan_wait);
 	while ((time_left > 0) && (req->vsr_state != VS_SVC_REQ_COMPLETE)) {
-		timeout = lbolt + time_left;
-		time_left = cv_timedwait_sig(&(req->vsr_cv),
-		    &vscan_svc_mutex, timeout);
+		timeout = time_left;
+		time_left = cv_reltimedwait_sig(&(req->vsr_cv),
+		    &vscan_svc_mutex, timeout, TR_CLOCK_TICK);
 	}
 
 	if (time_left == -1) {
@@ -589,8 +587,8 @@ vscan_svc_reql_handler(void)
 		DTRACE_PROBE2(vscan__req__counts, char *, "handler wait",
 		    vscan_svc_counts_t *, &vscan_svc_counts);
 
-		(void) cv_timedwait(&vscan_svc_reql_cv, &vscan_svc_mutex,
-		    lbolt + SEC_TO_TICK(VS_REQL_HANDLER_TIMEOUT));
+		(void) cv_reltimedwait(&vscan_svc_reql_cv, &vscan_svc_mutex,
+		    SEC_TO_TICK(VS_REQL_HANDLER_TIMEOUT), TR_CLOCK_TICK);
 
 		DTRACE_PROBE2(vscan__req__counts, char *, "handler wake",
 		    vscan_svc_counts_t *, &vscan_svc_counts);

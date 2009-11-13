@@ -20,15 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -339,7 +336,7 @@ top:
 	 * we are conservative.
 	 */
 	divisor = 1;
-	swapout_time = (lbolt - swapin_proc_time) / hz;
+	swapout_time = (ddi_get_lbolt() - swapin_proc_time) / hz;
 	if (swapout_time > maxslp / 2)
 		divisor = 2;
 
@@ -572,10 +569,10 @@ top:
 			stack_pages = btopr(stack_size);
 			/* Kernel probe */
 			TNF_PROBE_4(swapin_lwp, "vm swap swapin", /* CSTYLED */,
-				tnf_pid,	pid,		pp->p_pid,
-				tnf_lwpid,	lwpid,		tp->t_tid,
-				tnf_kthread_id,	tid,		tp,
-				tnf_ulong,	page_count,	stack_pages);
+			    tnf_pid,		pid,		pp->p_pid,
+			    tnf_lwpid,		lwpid,		tp->t_tid,
+			    tnf_kthread_id,	tid,		tp,
+			    tnf_ulong,		page_count,	stack_pages);
 
 			rw_enter(&kas.a_lock, RW_READER);
 			err = segkp_fault(segkp->s_as->a_hat, segkp,
@@ -604,7 +601,8 @@ top:
 				tp->t_schedflag |= TS_LOAD;
 				dq_sruninc(tp);
 
-				tp->t_stime = lbolt;	/* set swapin time */
+				/* set swapin time */
+				tp->t_stime = ddi_get_lbolt();
 				thread_unlock(tp);
 
 				nswapped--;
@@ -688,7 +686,7 @@ top:
 					 * sleeping.
 					 */
 					if (tp->t_state != TS_SLEEP)
-						tp->t_stime = lbolt;
+						tp->t_stime = ddi_get_lbolt();
 					thread_unlock(tp);
 
 					nswapped++;
@@ -707,13 +705,13 @@ top:
 					ws_pages += stack_pages;
 					/* Kernel probe */
 					TNF_PROBE_4(swapout_lwp,
-						"vm swap swapout",
-						/* CSTYLED */,
-						tnf_pid, pid, pp->p_pid,
-						tnf_lwpid, lwpid, tp->t_tid,
-						tnf_kthread_id, tid, tp,
-						tnf_ulong, page_count,
-							stack_pages);
+					    "vm swap swapout",
+					    /* CSTYLED */,
+					    tnf_pid, pid, pp->p_pid,
+					    tnf_lwpid, lwpid, tp->t_tid,
+					    tnf_kthread_id, tid, tp,
+					    tnf_ulong, page_count,
+					    stack_pages);
 
 					rw_enter(&kas.a_lock, RW_READER);
 					err = segkp_fault(segkp->s_as->a_hat,
@@ -764,8 +762,8 @@ top:
 		    "swapout: pp %p pages_pushed %lu", pp, ws_pages);
 		/* Kernel probe */
 		TNF_PROBE_2(swapout_process, "vm swap swapout", /* CSTYLED */,
-			tnf_pid,	pid,		pp->p_pid,
-			tnf_ulong,	page_count,	ws_pages);
+		    tnf_pid,	pid,		pp->p_pid,
+		    tnf_ulong,	page_count,	ws_pages);
 	}
 	*swrss = ws_pages;
 	return (swapped_lwps);
@@ -868,7 +866,7 @@ process_swap_queue(void)
 		ASSERT(tp->t_schedflag & (TS_LOAD | TS_ON_SWAPQ));
 
 		tp->t_schedflag &= ~(TS_LOAD | TS_ON_SWAPQ);
-		tp->t_stime = lbolt;		/* swapout time */
+		tp->t_stime = ddi_get_lbolt();		/* swapout time */
 		disp_lock_exit(&swapped_lock);
 		lock_clear(&tp->t_lock);
 
@@ -881,10 +879,10 @@ process_swap_queue(void)
 
 		/* Kernel probe */
 		TNF_PROBE_4(swapout_lwp, "vm swap swapout", /* CSTYLED */,
-			tnf_pid,	pid,		pp->p_pid,
-			tnf_lwpid,	lwpid,		tp->t_tid,
-			tnf_kthread_id,	tid,		tp,
-			tnf_ulong,	page_count,	stack_pages);
+		    tnf_pid,		pid,		pp->p_pid,
+		    tnf_lwpid,		lwpid,		tp->t_tid,
+		    tnf_kthread_id,	tid,		tp,
+		    tnf_ulong,		page_count,	stack_pages);
 
 		rw_enter(&kas.a_lock, RW_READER);
 		err = segkp_fault(segkp->s_as->a_hat, segkp, tp->t_swap,
@@ -930,9 +928,9 @@ process_swap_queue(void)
 			    pp, ws_pages);
 			/* Kernel probe */
 			TNF_PROBE_2(swapout_process, "vm swap swapout",
-				/* CSTYLED */,
-				tnf_pid,	pid,		pp->p_pid,
-				tnf_ulong,	page_count,	ws_pages);
+			    /* CSTYLED */,
+			    tnf_pid,	pid,		pp->p_pid,
+			    tnf_ulong,	page_count,	ws_pages);
 		}
 		pp->p_swrss += ws_pages;
 		disp_lock_enter(&swapped_lock);

@@ -157,7 +157,7 @@ sctp_listen(sctp_t *sctp)
 
 	sctp->sctp_state = SCTPS_LISTEN;
 	(void) random_get_pseudo_bytes(sctp->sctp_secret, SCTP_SECRET_LEN);
-	sctp->sctp_last_secret_update = lbolt64;
+	sctp->sctp_last_secret_update = ddi_get_lbolt64();
 	bzero(sctp->sctp_old_secret, SCTP_SECRET_LEN);
 	tf = &sctps->sctps_listen_fanout[SCTP_LISTEN_HASH(
 	    ntohs(connp->conn_lport))];

@@ -64,7 +64,6 @@ extern kthread_t *prchoose(proc_t *);
 #include "lx_proc.h"
 
 extern pgcnt_t swapfs_minfree;
-extern volatile clock_t lbolt;
 extern time_t boot_time;
 
 /*

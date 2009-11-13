@@ -40,7 +40,7 @@
 int zfs_vdev_max_pending = 10;
 int zfs_vdev_min_pending = 4;
 
-/* deadline = pri + (lbolt >> time_shift) */
+/* deadline = pri + ddi_get_lbolt64() >> time_shift) */
 int zfs_vdev_time_shift = 6;
 
 /* exponential I/O issue ramp-up rate */
@@ -359,7 +359,8 @@ vdev_queue_io(zio_t *zio)
 
 	mutex_enter(&vq->vq_lock);
 
-	zio->io_deadline = (lbolt64 >> zfs_vdev_time_shift) + zio->io_priority;
+	zio->io_deadline = (ddi_get_lbolt64() >> zfs_vdev_time_shift) +
+	    zio->io_priority;
 
 	vdev_queue_io_add(vq, zio);
 

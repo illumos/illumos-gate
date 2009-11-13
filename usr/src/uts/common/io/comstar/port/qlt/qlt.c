@@ -2446,8 +2446,8 @@ qlt_mailbox_command(qlt_state_t *qlt, mbox_cmd_t *mcp)
 
 qlt_mbox_wait_loop:;
 	/* Wait for mailbox command completion */
-	if (cv_timedwait(&qlt->mbox_cv, &qlt->mbox_lock, ddi_get_lbolt()
-	    + drv_usectohz(MBOX_TIMEOUT)) < 0) {
+	if (cv_reltimedwait(&qlt->mbox_cv, &qlt->mbox_lock,
+	    drv_usectohz(MBOX_TIMEOUT), TR_CLOCK_TICK) < 0) {
 		(void) snprintf(info, 80, "qlt_mailbox_command: qlt-%p, "
 		    "cmd-0x%02X timed out", (void *)qlt, qlt->mcp->to_fw[0]);
 		info[79] = 0;
@@ -3147,9 +3147,9 @@ qlt_deregister_remote_port(fct_local_port_t *port, fct_remote_port_t *rp)
 	qlt->rp_id_in_dereg = rp->rp_id;
 	qlt_submit_preq_entries(qlt, 1);
 
-	dereg_req_timer = ddi_get_lbolt() + drv_usectohz(DEREG_RP_TIMEOUT);
-	if (cv_timedwait(&qlt->rp_dereg_cv,
-	    &qlt->preq_lock, dereg_req_timer) > 0) {
+	dereg_req_timer = drv_usectohz(DEREG_RP_TIMEOUT);
+	if (cv_reltimedwait(&qlt->rp_dereg_cv, &qlt->preq_lock,
+	    dereg_req_timer, TR_CLOCK_TICK) > 0) {
 		ret = qlt->rp_dereg_status;
 	} else {
 		ret = FCT_BUSY;
@@ -4874,13 +4874,14 @@ qlt_firmware_dump(fct_local_port_t *port, stmf_state_change_info_t *ssci)
 	 */
 	mutex_enter(&qlt->mbox_lock);
 	if (qlt->mbox_io_state != MBOX_STATE_UNKNOWN) {
+		clock_t timeout = drv_usectohz(1000000);
 		/*
 		 * Wait to grab the mailboxes
 		 */
 		for (retries = 0; (qlt->mbox_io_state != MBOX_STATE_READY) &&
 		    (qlt->mbox_io_state != MBOX_STATE_UNKNOWN); retries++) {
-			(void) cv_timedwait(&qlt->mbox_cv, &qlt->mbox_lock,
-			    ddi_get_lbolt() + drv_usectohz(1000000));
+			(void) cv_reltimedwait(&qlt->mbox_cv, &qlt->mbox_lock,
+			    timeout, TR_CLOCK_TICK);
 			if (retries > 5) {
 				mutex_exit(&qlt->mbox_lock);
 				EL(qlt, "can't drain out mailbox commands\n");

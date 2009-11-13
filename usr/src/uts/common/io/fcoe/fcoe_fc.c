@@ -210,8 +210,8 @@ tx_frame:
 	    MAC_TX_NO_ENQUEUE, &ret_mblk);
 	if (ret_cookie != NULL) {
 		mutex_enter(&mac->fm_mutex);
-		(void) cv_timedwait(&mac->fm_tx_cv, &mac->fm_mutex,
-		    ddi_get_lbolt() + drv_usectohz(100000));
+		(void) cv_reltimedwait(&mac->fm_tx_cv, &mac->fm_mutex,
+		    drv_usectohz(100000), TR_CLOCK_TICK);
 		mutex_exit(&mac->fm_mutex);
 
 		if (mac->fm_state == FCOE_MAC_STATE_OFFLINE) {

@@ -2481,7 +2481,7 @@ ql_els_send(opaque_t fca_handle, fc_packet_t *pkt)
 {
 	ql_adapter_state_t	*ha;
 	int			rval;
-	clock_t			timer;
+	clock_t			timer = drv_usectohz(30000000);
 	ls_code_t		els;
 	la_els_rjt_t		rjt;
 	ql_srb_t		*sp = (ql_srb_t *)pkt->pkt_fca_private;
@@ -2501,11 +2501,8 @@ ql_els_send(opaque_t fca_handle, fc_packet_t *pkt)
 		ha->task_daemon_flags |= SUSPENDED_WAKEUP_FLG;
 
 		/* 30 seconds from now */
-		timer = ddi_get_lbolt();
-		timer += drv_usectohz(30000000);
-
-		if (cv_timedwait(&ha->pha->cv_dr_suspended,
-		    &ha->pha->task_daemon_mutex, timer) == -1) {
+		if (cv_reltimedwait(&ha->pha->cv_dr_suspended,
+		    &ha->pha->task_daemon_mutex, timer, TR_CLOCK_TICK) == -1) {
 			/*
 			 * The timeout time 'timer' was
 			 * reached without the condition
@@ -2832,7 +2829,7 @@ static int
 ql_getmap(opaque_t fca_handle, fc_lilpmap_t *mapbuf)
 {
 	ql_adapter_state_t	*ha;
-	clock_t			timer;
+	clock_t			timer = drv_usectohz(30000000);
 	int			rval = FC_SUCCESS;
 
 	ha = ql_fca_handle_to_state(fca_handle);
@@ -2852,11 +2849,8 @@ ql_getmap(opaque_t fca_handle, fc_lilpmap_t *mapbuf)
 		ha->task_daemon_flags |= SUSPENDED_WAKEUP_FLG;
 
 		/* 30 seconds from now */
-		timer = ddi_get_lbolt();
-		timer += drv_usectohz(30000000);
-
-		if (cv_timedwait(&ha->pha->cv_dr_suspended,
-		    &ha->pha->task_daemon_mutex, timer) == -1) {
+		if (cv_reltimedwait(&ha->pha->cv_dr_suspended,
+		    &ha->pha->task_daemon_mutex, timer, TR_CLOCK_TICK) == -1) {
 			/*
 			 * The timeout time 'timer' was
 			 * reached without the condition
@@ -11474,7 +11468,7 @@ static int
 ql_dump_firmware(ql_adapter_state_t *vha)
 {
 	int			rval;
-	clock_t			timer;
+	clock_t			timer = drv_usectohz(30000000);
 	ql_adapter_state_t	*ha = vha->pha;
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
@@ -11513,11 +11507,8 @@ ql_dump_firmware(ql_adapter_state_t *vha)
 		ha->task_daemon_flags |= SUSPENDED_WAKEUP_FLG;
 
 		/* 30 seconds from now */
-		timer = ddi_get_lbolt();
-		timer += drv_usectohz(30000000);
-
-		if (cv_timedwait(&ha->cv_dr_suspended,
-		    &ha->task_daemon_mutex, timer) == -1) {
+		if (cv_reltimedwait(&ha->cv_dr_suspended,
+		    &ha->task_daemon_mutex, timer, TR_CLOCK_TICK) == -1) {
 			/*
 			 * The timeout time 'timer' was
 			 * reached without the condition
@@ -11593,18 +11584,15 @@ ql_binary_fw_dump(ql_adapter_state_t *vha, int lock_needed)
 	if (lock_needed == TRUE) {
 		/* Acquire mailbox register lock. */
 		MBX_REGISTER_LOCK(ha);
-
+		timer = (ha->mcp->timeout + 2) * drv_usectohz(1000000);
 		/* Check for mailbox available, if not wait for signal. */
 		while (ha->mailbox_flags & MBX_BUSY_FLG) {
 			ha->mailbox_flags = (uint8_t)
 			    (ha->mailbox_flags | MBX_WANT_FLG);
 
 			/* 30 seconds from now */
-			timer = ddi_get_lbolt();
-			timer += (ha->mcp->timeout + 2) *
-			    drv_usectohz(1000000);
-			if (cv_timedwait(&ha->cv_mbx_wait, &ha->mbx_mutex,
-			    timer) == -1) {
+			if (cv_reltimedwait(&ha->cv_mbx_wait, &ha->mbx_mutex,
+			    timer, TR_CLOCK_TICK) == -1) {
 				/*
 				 * The timeout time 'timer' was
 				 * reached without the condition
@@ -15619,7 +15607,7 @@ ql_unbind_dma_buffer(ql_adapter_state_t *ha, dma_mem_t *mem)
 static int
 ql_suspend_adapter(ql_adapter_state_t *ha)
 {
-	clock_t timer;
+	clock_t timer = 32 * drv_usectohz(1000000);
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
@@ -15636,10 +15624,8 @@ ql_suspend_adapter(ql_adapter_state_t *ha)
 		    (ha->mailbox_flags | MBX_WANT_FLG);
 
 		/* 30 seconds from now */
-		timer = ddi_get_lbolt();
-		timer += 32 * drv_usectohz(1000000);
-		if (cv_timedwait(&ha->cv_mbx_wait, &ha->mbx_mutex,
-		    timer) == -1) {
+		if (cv_reltimedwait(&ha->cv_mbx_wait, &ha->mbx_mutex,
+		    timer, TR_CLOCK_TICK) == -1) {
 
 			/* Release mailbox register lock. */
 			MBX_REGISTER_UNLOCK(ha);

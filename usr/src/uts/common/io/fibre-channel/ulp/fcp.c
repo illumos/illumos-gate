@@ -10172,7 +10172,7 @@ fcp_handle_port_attach(opaque_t ulph, fc_ulp_port_info_t *pinfo,
 	}
 
 	/* note the attach time */
-	pptr->port_attach_time = lbolt64;
+	pptr->port_attach_time = ddi_get_lbolt64();
 
 	/* all done */
 	return (res);
@@ -15661,7 +15661,7 @@ fcp_scsi_bus_config(dev_info_t *parent, uint_t flag,
 	struct fcp_port *pptr = fcp_dip2port(parent);
 
 	reset_delay = (int64_t)(USEC_TO_TICK(FCP_INIT_WAIT_TIMEOUT)) -
-	    (lbolt64 - pptr->port_attach_time);
+	    (ddi_get_lbolt64() - pptr->port_attach_time);
 	if (reset_delay < 0) {
 		reset_delay = 0;
 	}
@@ -15706,7 +15706,7 @@ fcp_scsi_bus_config(dev_info_t *parent, uint_t flag,
 			    ddi_get_lbolt() + (clock_t)reset_delay);
 			reset_delay =
 			    (int64_t)(USEC_TO_TICK(FCP_INIT_WAIT_TIMEOUT)) -
-			    (lbolt64 - pptr->port_attach_time);
+			    (ddi_get_lbolt64() - pptr->port_attach_time);
 		}
 		mutex_exit(&pptr->port_mutex);
 		/* drain taskq to make sure nodes are created */

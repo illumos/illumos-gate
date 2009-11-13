@@ -159,7 +159,6 @@ static void
 hwahc_wait_for_xfer_completion(hwahc_state_t *hwahcp, hwahc_pipe_private_t *pp)
 {
 	wusb_wa_rpipe_hdl_t	*hdl = pp->pp_rp;
-	clock_t			xfer_cmpl_time_wait;
 
 	mutex_enter(&hdl->rp_mutex);
 	if (hdl->rp_state != WA_RPIPE_STATE_ACTIVE) {
@@ -170,9 +169,8 @@ hwahc_wait_for_xfer_completion(hwahc_state_t *hwahcp, hwahc_pipe_private_t *pp)
 	mutex_exit(&hdl->rp_mutex);
 
 	/* wait 3s */
-	xfer_cmpl_time_wait = drv_usectohz(3000000);
-	(void) cv_timedwait(&pp->pp_xfer_cmpl_cv, &hwahcp->hwahc_mutex,
-	    ddi_get_lbolt() + xfer_cmpl_time_wait);
+	(void) cv_reltimedwait(&pp->pp_xfer_cmpl_cv, &hwahcp->hwahc_mutex,
+	    drv_usectohz(3000000), TR_CLOCK_TICK);
 
 	mutex_enter(&hdl->rp_mutex);
 	if (hdl->rp_state == WA_RPIPE_STATE_ACTIVE) {

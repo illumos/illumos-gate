@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -105,9 +105,9 @@ vscan_door_close(void)
 	/* wait for any in-progress requests to complete */
 	time_left = SEC_TO_TICK(vs_door_close_timeout);
 	while ((vscan_door_call_count > 0) && (time_left > 0)) {
-		timeout = lbolt + time_left;
-		time_left = cv_timedwait(&vscan_door_cv,
-		    &vscan_door_mutex, timeout);
+		timeout = time_left;
+		time_left = cv_reltimedwait(&vscan_door_cv, &vscan_door_mutex,
+		    timeout, TR_CLOCK_TICK);
 	}
 
 	if (time_left == -1)

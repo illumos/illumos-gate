@@ -884,9 +884,9 @@ okm_mbox_init(okms_t *okmsp)
 			 */
 
 			DPRINTF(DBG_MBOX, ("okm_mbox_init: waiting...\n"));
-			tout = ddi_get_lbolt() + drv_usectohz(OKM_MB_TOUT);
-			ret = cv_timedwait_sig(&okmsp->km_wait,
-			    &okmsp->km_lock, tout);
+			tout = drv_usectohz(OKM_MB_TOUT);
+			ret = cv_reltimedwait_sig(&okmsp->km_wait,
+			    &okmsp->km_lock, tout, TR_CLOCK_TICK);
 			if (ret == 0) {
 				/* if interrupted, return immediately. */
 				DPRINTF(DBG_MBOX,

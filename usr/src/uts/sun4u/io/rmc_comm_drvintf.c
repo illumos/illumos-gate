@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +29,6 @@
  * response to the RMC
  *
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *  Header files
@@ -79,7 +77,7 @@ rmc_comm_request_response(rmc_comm_msg_t *request,
 	 * get the soft state struct (instance 0)
 	 */
 	if ((rcs = rmc_comm_getstate(NULL, 0,
-				"rmc_comm_request_response")) == NULL)
+	    "rmc_comm_request_response")) == NULL)
 		return (RCENOSOFTSTATE);
 
 	do {
@@ -111,7 +109,7 @@ rmc_comm_request_nowait(rmc_comm_msg_t *request, uint8_t flag)
 	 * get the soft state struct (instance 0)
 	 */
 	if ((rcs = rmc_comm_getstate(NULL, 0,
-				"rmc_comm_request_response")) == NULL)
+	    "rmc_comm_request_response")) == NULL)
 		return (RCENOSOFTSTATE);
 
 	/*
@@ -278,7 +276,7 @@ rmc_comm_send_req_resp(struct rmc_comm_state *rcs, rmc_comm_msg_t *request,
 	dp_req_resp_t		*drr;
 	dp_message_t		*exp_resp;
 	dp_message_t		req;
-	clock_t			resend_clockt;
+	clock_t			resend_clockt, delta;
 	clock_t			stop_clockt;
 	int			err;
 
@@ -385,16 +383,17 @@ rmc_comm_send_req_resp(struct rmc_comm_state *rcs, rmc_comm_msg_t *request,
 	 */
 	DPRINTF(rcs, DAPI, (CE_CONT, "send request=%x\n", request->msg_type));
 
+	delta = drv_usectohz(TX_RETRY_TIME * 1000);
+
 	while ((err = rmc_comm_dp_msend(rcs, &req)) == RCNOERR) {
 
-		resend_clockt = ddi_get_lbolt() +
-		    drv_usectohz(TX_RETRY_TIME * 1000);
+		resend_clockt = ddi_get_lbolt() + delta;
 
 		/*
 		 * wait for a reply or an acknowledgement
 		 */
-		(void) cv_timedwait(drr->cv_wait_reply, dps->dp_mutex,
-		    resend_clockt);
+		(void) cv_reltimedwait(drr->cv_wait_reply, dps->dp_mutex,
+		    delta, TR_CLOCK_TICK);
 
 		DPRINTF(rcs, DAPI, (CE_CONT,
 		    "reqresp send status: flags=%02x req=%x resp=%x tick=%ld\n",
@@ -494,7 +493,7 @@ rmc_comm_request_response_bp(rmc_comm_msg_t *request_bp,
 	 * get the soft state struct (instance 0)
 	 */
 	if ((rcs = rmc_comm_getstate(NULL, 0,
-				"rmc_comm_request_response_bp")) == NULL)
+	    "rmc_comm_request_response_bp")) == NULL)
 		return (RCENOSOFTSTATE);
 
 	/*
@@ -701,8 +700,8 @@ rmc_comm_unreg_intr(uint8_t msg_type, rmc_comm_intrfunc_t intr_handler)
 	msgintr = &rcs->dp_state.msg_intr;
 
 	if (msgintr->intr_handler != NULL &&
-		msgintr->intr_msg_type == msg_type &&
-		msgintr->intr_handler == intr_handler) {
+	    msgintr->intr_msg_type == msg_type &&
+	    msgintr->intr_handler == intr_handler) {
 
 		ddi_remove_softintr(msgintr->intr_id);
 		msgintr->intr_handler = NULL;
@@ -739,7 +738,7 @@ rmc_comm_send_srecord_bp(caddr_t buf, int buflen,
 	 * get the soft state struct (instance 0)
 	 */
 	if ((rcs = rmc_comm_getstate(NULL, 0,
-				"rmc_comm_request_response_bp")) == NULL)
+	    "rmc_comm_request_response_bp")) == NULL)
 		return (RCENOSOFTSTATE);
 
 	/*

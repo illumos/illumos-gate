@@ -1112,7 +1112,7 @@ getproc(proc_t **cpp, int kernel)
 	flist_fork(P_FINFO(pp), P_FINFO(cp));
 
 	gethrestime(&uarea->u_start);
-	uarea->u_ticks = lbolt;
+	uarea->u_ticks = ddi_get_lbolt();
 	uarea->u_mem = rm_asrss(pp->p_as);
 	uarea->u_acflag = AFORK;
 

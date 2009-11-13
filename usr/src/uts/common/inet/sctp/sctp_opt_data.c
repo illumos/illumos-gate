@@ -478,7 +478,7 @@ sctp_set_peer_addr_params(sctp_t *sctp, const void *invalp)
 		}
 	}
 
-	now = lbolt64;
+	now = ddi_get_lbolt64();
 	if (fp != NULL) {
 		if (spp->spp_hbinterval == UINT32_MAX) {
 			/*

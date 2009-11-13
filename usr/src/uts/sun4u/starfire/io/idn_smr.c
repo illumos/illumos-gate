@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Inter-Domain Network
  *
  * Shared Memory Region (SMR) supporting code.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -240,7 +237,7 @@ smr_slab_alloc_remote(int domid, smr_slab_t **spp)
 	 * First do a quick (no lock) check for global okayness.
 	 */
 	if ((idn.state != IDNGS_ONLINE) ||
-			((masterid = IDN_GET_MASTERID()) == IDN_NIL_DOMID)) {
+	    ((masterid = IDN_GET_MASTERID()) == IDN_NIL_DOMID)) {
 		bailout = 1;
 		serrno = ECANCELED;
 	}
@@ -301,10 +298,10 @@ smr_slab_alloc_remote(int domid, smr_slab_t **spp)
 		 * will be picked up when we attempt to wait.
 		 */
 		PR_SMR("%s: BAILING OUT on behalf domain %d "
-			"(err=%d, gs=%s, ms=%s)\n",
-			proc, domid, serrno, idngs_str[idn.state],
-			(masterid == IDN_NIL_DOMID)
-			? "unknown" : idnds_str[idn_domain[masterid].dstate]);
+		    "(err=%d, gs=%s, ms=%s)\n",
+		    proc, domid, serrno, idngs_str[idn.state],
+		    (masterid == IDN_NIL_DOMID)
+		    ? "unknown" : idnds_str[idn_domain[masterid].dstate]);
 		(void) smr_slabwaiter_abort(domid, serrno);
 
 	} else if (nwait == 1) {
@@ -312,8 +309,7 @@ smr_slab_alloc_remote(int domid, smr_slab_t **spp)
 		 * We are the original requester.  Initiate the
 		 * actual request to the master.
 		 */
-		idn_send_cmd(masterid, IDNCMD_SLABALLOC,
-				IDN_SLAB_SIZE, 0, 0);
+		idn_send_cmd(masterid, IDNCMD_SLABALLOC, IDN_SLAB_SIZE, 0, 0);
 		ASSERT(mdp);
 		IDN_DUNLOCK(masterid);
 	}
@@ -359,7 +355,7 @@ smr_slab_alloc(int domid, smr_slab_t **spp)
 	switch (dp->dslab_state) {
 	case DSLAB_STATE_UNKNOWN:
 		cmn_err(CE_WARN,
-			"IDN: 300: no slab allocations without a master");
+		    "IDN: 300: no slab allocations without a master");
 		serrno = EINVAL;
 		break;
 
@@ -371,7 +367,7 @@ smr_slab_alloc(int domid, smr_slab_t **spp)
 		 * not been exceeded.
 		 */
 		if (((int)dp->dnslabs < IDN_SLAB_MAXPERDOMAIN) ||
-						!IDN_SLAB_MAXPERDOMAIN)
+		    !IDN_SLAB_MAXPERDOMAIN)
 			serrno = smr_slab_alloc_local(domid, spp);
 		else
 			serrno = EDQUOT;
@@ -391,7 +387,7 @@ smr_slab_alloc(int domid, smr_slab_t **spp)
 		 * itself however it wishes.
 		 */
 		if (((int)dp->dnslabs < IDN_SLAB_MAXPERDOMAIN) ||
-						!IDN_SLAB_MAXPERDOMAIN)
+		    !IDN_SLAB_MAXPERDOMAIN)
 			serrno = smr_slab_alloc_remote(domid, spp);
 		else
 			serrno = EDQUOT;
@@ -399,16 +395,16 @@ smr_slab_alloc(int domid, smr_slab_t **spp)
 
 	default:
 		cmn_err(CE_WARN,
-			"IDN: 301: (ALLOC) unknown slab state (%d) "
-			"for domain %d", dp->dslab_state, domid);
+		    "IDN: 301: (ALLOC) unknown slab state (%d) "
+		    "for domain %d", dp->dslab_state, domid);
 		serrno = EINVAL;
 		break;
 	}
 
 	if (*spp == NULL) {
 		PR_SMR("%s: failed to allocate %s slab [serrno = %d]\n",
-			proc, (idn.localid == IDN_GET_MASTERID()) ?
-			"local" : "remote", serrno);
+		    proc, (idn.localid == IDN_GET_MASTERID()) ?
+		    "local" : "remote", serrno);
 	}
 
 	if (serrno) {
@@ -475,8 +471,8 @@ smr_slab_free_remote(int domid, smr_slab_t *sp)
 		FREESTRUCT(sp, smr_slab_t, 1);
 
 		IDN_DLOCK_SHARED(masterid);
-		idn_send_cmd(masterid, IDNCMD_SLABFREE,
-				slab_offset, slab_size, 0);
+		idn_send_cmd(masterid, IDNCMD_SLABFREE, slab_offset, slab_size,
+		    0);
 		IDN_DUNLOCK(masterid);
 	}
 }
@@ -498,8 +494,7 @@ smr_slab_free(int domid, smr_slab_t *sp)
 
 	switch (idn_domain[domid].dslab_state) {
 	case DSLAB_STATE_UNKNOWN:
-		cmn_err(CE_WARN,
-			"IDN: 302: no slab free without a master");
+		cmn_err(CE_WARN, "IDN: 302: no slab free without a master");
 		break;
 
 	case DSLAB_STATE_LOCAL:
@@ -526,9 +521,8 @@ smr_slab_free(int domid, smr_slab_t *sp)
 
 	default:
 		cmn_err(CE_WARN,
-			"IDN: 301: (FREE) unknown slab state "
-			"(%d) for domain %d",
-			idn_domain[domid].dslab_state, domid);
+		    "IDN: 301: (FREE) unknown slab state (%d) for domain %d",
+		    idn_domain[domid].dslab_state, domid);
 		break;
 	}
 }
@@ -603,8 +597,8 @@ smr_buf_alloc(int domid, uint_t len, caddr_t *bufpp)
 
 	if (len > IDN_DATA_SIZE) {
 		cmn_err(CE_WARN,
-			"IDN: 303: buffer len %d > IDN_DATA_SIZE (%lu)",
-			len, IDN_DATA_SIZE);
+		    "IDN: 303: buffer len %d > IDN_DATA_SIZE (%lu)",
+		    len, IDN_DATA_SIZE);
 		IDN_GKSTAT_GLOBAL_EVENT(gk_buffail, gk_buffail_last);
 		return (EINVAL);
 	}
@@ -628,11 +622,11 @@ smr_buf_alloc(int domid, uint_t len, caddr_t *bufpp)
 		if (sp == NULL) {
 			if ((serrno = smr_slab_alloc(idn.localid, &sp)) != 0) {
 				PR_SMR("%s:%d: failed to allocate "
-					"slab [serrno = %d]",
-					proc, domid, serrno);
+				    "slab [serrno = %d]",
+				    proc, domid, serrno);
 				DSLAB_UNLOCK(idn.localid);
 				IDN_GKSTAT_GLOBAL_EVENT(gk_buffail,
-							gk_buffail_last);
+				    gk_buffail_last);
 				return (serrno);
 			}
 			/*
@@ -642,11 +636,11 @@ smr_buf_alloc(int domid, uint_t len, caddr_t *bufpp)
 			 */
 			if (dp->dstate != IDNDS_CONNECTED) {
 				PR_SMR("%s:%d: state changed during slab "
-					"alloc (dstate = %s)\n",
-					proc, domid, idnds_str[dp->dstate]);
+				    "alloc (dstate = %s)\n",
+				    proc, domid, idnds_str[dp->dstate]);
 				DSLAB_UNLOCK(idn.localid);
 				IDN_GKSTAT_GLOBAL_EVENT(gk_buffail,
-							gk_buffail_last);
+				    gk_buffail_last);
 				return (ENOLINK);
 			}
 			/*
@@ -740,15 +734,15 @@ smr_buf_free(int domid, caddr_t bufp, uint_t len)
 	if (((uintptr_t)bufp & (IDN_SMR_BUFSIZE-1)) &&
 	    (IDN_ADDR2OFFSET(bufp) % IDN_SMR_BUFSIZE)) {
 		cmn_err(CE_WARN,
-			"IDN: 304: buffer (0x%p) from domain %d not on a "
-			"%d boundary", bufp, domid, IDN_SMR_BUFSIZE);
+		    "IDN: 304: buffer (0x%p) from domain %d not on a "
+		    "%d boundary", bufp, domid, IDN_SMR_BUFSIZE);
 		goto bfdone;
 	}
 	if (!lockheld && (len > IDN_DATA_SIZE)) {
 		cmn_err(CE_WARN,
-			"IDN: 305: buffer length (%d) from domain %d greater "
-			"than IDN_DATA_SIZE (%lu)",
-			len, domid, IDN_DATA_SIZE);
+		    "IDN: 305: buffer length (%d) from domain %d greater "
+		    "than IDN_DATA_SIZE (%lu)",
+		    len, domid, IDN_DATA_SIZE);
 		goto bfdone;
 	}
 
@@ -785,8 +779,8 @@ bfdone:
 		DIOCHECK(domid);
 	} else {
 		cmn_err(CE_WARN,
-			"IDN: 306: unknown buffer (0x%p) from domain %d",
-			bufp, domid);
+		    "IDN: 306: unknown buffer (0x%p) from domain %d",
+		    bufp, domid);
 		ATOMIC_INC(idn_domain[domid].dioerr);
 	}
 
@@ -828,8 +822,7 @@ smr_buf_free_all(int domid)
 	ASSERT(domid != idn.localid);
 
 	if (!VALID_DOMAINID(domid)) {
-		cmn_err(CE_WARN,
-			"IDN: 307: domain ID (%d) invalid", domid);
+		cmn_err(CE_WARN, "IDN: 307: domain ID (%d) invalid", domid);
 		return (-1);
 	}
 
@@ -866,8 +859,7 @@ smr_buf_free_all(int domid)
 
 	DSLAB_UNLOCK(idn.localid);
 
-	PR_SMR("%s: freed %d buffers for domain %d\n",
-		proc, nbufsfreed, domid);
+	PR_SMR("%s: freed %d buffers for domain %d\n", proc, nbufsfreed, domid);
 
 	return (nbufsfreed);
 }
@@ -893,8 +885,7 @@ smr_buf_reclaim(int domid, int nbufs)
 		return (0);
 	}
 
-	PR_SMR("%s: requested %d buffers from domain %d\n",
-		proc, nbufs, domid);
+	PR_SMR("%s: requested %d buffers from domain %d\n", proc, nbufs, domid);
 
 	if (dp->dio && nbufs) {
 		register smr_slab_t	*sp;
@@ -945,7 +936,7 @@ smr_buf_reclaim(int domid, int nbufs)
 	}
 
 	PR_SMR("%s: reclaimed %d buffers from domain %d\n",
-		proc, num_reclaimed, domid);
+	    proc, num_reclaimed, domid);
 
 	return (num_reclaimed);
 }
@@ -1107,8 +1098,7 @@ smr_slabwaiter_register(int domid)
 	nwait = ++(wp->w_nwaiters);
 	ASSERT(nwait > 0);
 
-	PR_SMR("%s: domain = %d, (new)nwaiters = %d\n",
-		proc, domid, nwait);
+	PR_SMR("%s: domain = %d, (new)nwaiters = %d\n", proc, domid, nwait);
 
 	if (nwait > 1) {
 		/*
@@ -1116,7 +1106,7 @@ smr_slabwaiter_register(int domid)
 		 * with respect to this domain.
 		 */
 		PR_SMR("%s: existing waiters for slabs for domain %d\n",
-			proc, domid);
+		    proc, domid);
 		mutex_exit(&wp->w_mutex);
 
 		return (nwait);
@@ -1161,8 +1151,7 @@ smr_slabwaiter_unregister(int domid, smr_slab_t **spp)
 
 	mutex_enter(&wp->w_mutex);
 
-	PR_SMR("%s: domain = %d, nwaiters = %d\n",
-		proc, domid, wp->w_nwaiters);
+	PR_SMR("%s: domain = %d, nwaiters = %d\n", proc, domid, wp->w_nwaiters);
 
 	if (wp->w_nwaiters <= 0) {
 		/*
@@ -1185,7 +1174,7 @@ smr_slabwaiter_unregister(int domid, smr_slab_t **spp)
 		 * Thus, late sleepers may still get a chance.
 		 */
 		PR_SMR("%s: bummer no slab allocated for domain %d\n",
-			proc, domid);
+		    proc, domid);
 		ASSERT(wp->w_sp == NULL);
 		(*spp) = NULL;
 		serrno = wp->w_closed ? ECANCELED : EBUSY;
@@ -1200,7 +1189,7 @@ smr_slabwaiter_unregister(int domid, smr_slab_t **spp)
 
 			ASSERT(wp->w_sp);
 			PR_SMR("%s: allocation succeeded (domain %d)\n",
-				proc, domid);
+			    proc, domid);
 
 			DSLAB_LOCK_SHARED(domid);
 			for (sp = idn_domain[domid].dslab; sp; sp = sp->sl_next)
@@ -1208,12 +1197,12 @@ smr_slabwaiter_unregister(int domid, smr_slab_t **spp)
 					break;
 			if (sp == NULL)
 				cmn_err(CE_WARN,
-					"%s:%d: slab ptr = NULL",
-					proc, domid);
+				    "%s:%d: slab ptr = NULL",
+				    proc, domid);
 			DSLAB_UNLOCK(domid);
 		} else {
 			PR_SMR("%s: allocation failed (domain %d) "
-				"[serrno = %d]\n", proc, domid, serrno);
+			    "[serrno = %d]\n", proc, domid, serrno);
 		}
 #endif /* DEBUG */
 	}
@@ -1222,7 +1211,7 @@ smr_slabwaiter_unregister(int domid, smr_slab_t **spp)
 		 * Last one turns out the lights.
 		 */
 		PR_SMR("%s: domain %d last waiter, turning out lights\n",
-			proc, domid);
+		    proc, domid);
 		wp->w_sp = NULL;
 		wp->w_done = 0;
 		wp->w_serrno = 0;
@@ -1269,14 +1258,13 @@ smr_slaballoc_wait(int domid, smr_slab_t **spp)
 	mutex_enter(&wp->w_mutex);
 
 	PR_SMR("%s: domain = %d, nwaiters = %d, wsp = 0x%p\n",
-		proc, domid, wp->w_nwaiters, wp->w_sp);
+	    proc, domid, wp->w_nwaiters, wp->w_sp);
 
 	if (wp->w_nwaiters <= 0) {
 		/*
 		 * Hmmm...no waiters registered.
 		 */
-		PR_SMR("%s: domain %d, no waiters!\n",
-			proc, domid);
+		PR_SMR("%s: domain %d, no waiters!\n", proc, domid);
 		mutex_exit(&wp->w_mutex);
 		return (EINVAL);
 	}
@@ -1289,17 +1277,15 @@ smr_slaballoc_wait(int domid, smr_slab_t **spp)
 		/*
 		 * Only wait if data hasn't arrived yet.
 		 */
-		PR_SMR("%s: domain %d, going to sleep...\n",
-			proc, domid);
+		PR_SMR("%s: domain %d, going to sleep...\n", proc, domid);
 
-
-		rv = cv_timedwait_sig(&wp->w_cv, &wp->w_mutex,
-				lbolt + IDN_SLABALLOC_WAITTIME);
+		rv = cv_reltimedwait_sig(&wp->w_cv, &wp->w_mutex,
+		    IDN_SLABALLOC_WAITTIME, TR_CLOCK_TICK);
 		if (rv == -1)
 			serrno = ETIMEDOUT;
 
 		PR_SMR("%s: domain %d, awakened (reason = %s)\n",
-			proc, domid, (rv == -1) ? "TIMEOUT" : "SIGNALED");
+		    proc, domid, (rv == -1) ? "TIMEOUT" : "SIGNALED");
 	}
 	/*
 	 * We've awakened or request already filled!
@@ -1362,9 +1348,9 @@ smr_slaballoc_put(int domid, smr_slab_t *sp, int forceflag, int serrno)
 	mutex_enter(&wp->w_mutex);
 
 	PR_SMR("%s: domain = %d, bufp = 0x%p, ebufp = 0x%p, "
-		"(f = %d, se = %d)\n", proc, domid,
-		(sp ? sp->sl_start : 0),
-		(sp ? sp->sl_end : 0), forceflag, serrno);
+	    "(f = %d, se = %d)\n", proc, domid,
+	    (sp ? sp->sl_start : 0),
+	    (sp ? sp->sl_end : 0), forceflag, serrno);
 
 	if (wp->w_nwaiters <= 0) {
 		/*
@@ -1372,7 +1358,7 @@ smr_slaballoc_put(int domid, smr_slab_t *sp, int forceflag, int serrno)
 		 * and left.  Oh well...
 		 */
 		PR_SMR("%s: no slaballoc waiters found for domain %d\n",
-			proc, domid);
+		    proc, domid);
 		if (!forceflag || serrno || !sp) {
 			/*
 			 * No waiters and caller doesn't want to force it.
@@ -1400,7 +1386,7 @@ smr_slaballoc_put(int domid, smr_slab_t *sp, int forceflag, int serrno)
 		 * trying to let everybody know.
 		 */
 		ASSERT(wp->w_serrno ?
-			(wp->w_sp == NULL) : (wp->w_sp != NULL));
+		    (wp->w_sp == NULL) : (wp->w_sp != NULL));
 
 		cv_broadcast(&wp->w_cv);
 		mutex_exit(&wp->w_mutex);
@@ -1412,8 +1398,7 @@ smr_slaballoc_put(int domid, smr_slab_t *sp, int forceflag, int serrno)
 		 * Bummer...allocation failed.  This call is simply
 		 * to wake up the sleepers and let them know.
 		 */
-		PR_SMR("%s: slaballoc failed for domain %d\n",
-			proc, domid);
+		PR_SMR("%s: slaballoc failed for domain %d\n", proc, domid);
 		wp->w_serrno = serrno;
 		wp->w_done = 1;
 		cv_broadcast(&wp->w_cv);
@@ -1422,7 +1407,7 @@ smr_slaballoc_put(int domid, smr_slab_t *sp, int forceflag, int serrno)
 		return (0);
 	}
 	PR_SMR("%s: putting slab into struct (domid=%d, localid=%d)\n",
-		proc, domid, idn.localid);
+	    proc, domid, idn.localid);
 	/*
 	 * Prep the slab structure.
 	 */
@@ -1506,15 +1491,14 @@ smr_slaballoc_get(int domid, caddr_t bufp, caddr_t ebufp)
 	procname_t	proc = "smr_slaballoc_get";
 
 	PR_SMR("%s: getting slab for domain %d [bufp=0x%p, ebufp=0x%p]\n",
-		proc, domid, bufp, ebufp);
+	    proc, domid, bufp, ebufp);
 
 	dp = &idn_domain[domid];
 
 	ASSERT(DSLAB_WRITE_HELD(domid));
 
 	if ((sp = dp->dslab) == NULL) {
-		PR_SMR("%s: oops, no slabs for domain %d\n",
-			proc, domid);
+		PR_SMR("%s: oops, no slabs for domain %d\n", proc, domid);
 		return (NULL);
 	}
 	/*
@@ -1532,7 +1516,7 @@ smr_slaballoc_get(int domid, caddr_t bufp, caddr_t ebufp)
 		nslabs = *(int *)ebufp;
 		if (nslabs == 0) {
 			PR_SMR("%s: requested nslabs (%d) <= 0\n",
-				proc, nslabs);
+			    proc, nslabs);
 			return (NULL);
 		} else if (nslabs < 0) {
 			/*
@@ -1554,8 +1538,8 @@ smr_slaballoc_get(int domid, caddr_t bufp, caddr_t ebufp)
 
 		if (bufp && (ebufp > sp->sl_end)) {
 			PR_SMR("%s: bufp/ebufp (0x%p/0x%p) "
-				"expected (0x%p/0x%p)\n", proc, bufp, ebufp,
-				sp->sl_start, sp->sl_end);
+			    "expected (0x%p/0x%p)\n", proc, bufp, ebufp,
+			    sp->sl_start, sp->sl_end);
 			ASSERT(0);
 		}
 		/*
@@ -1611,11 +1595,10 @@ smr_slaballoc_get(int domid, caddr_t bufp, caddr_t ebufp)
 	dp->dnslabs -= (short)foundit;
 
 	if (foundit) {
-		PR_SMR("%s: found %d free slabs (domid = %d)\n",
-			proc, foundit, domid);
+		PR_SMR("%s: found %d free slabs (domid = %d)\n", proc, foundit,
+		    domid);
 	} else {
-		PR_SMR("%s: no free slabs found (domid = %d)\n",
-			proc, domid);
+		PR_SMR("%s: no free slabs found (domid = %d)\n", proc, domid);
 	}
 
 	/*
@@ -1678,7 +1661,7 @@ smr_slabpool_init(size_t reserved_size, caddr_t *reserved_area)
 	idn.slabpool->ntotslabs = ntotslabs = nwr_available / IDN_SLAB_SIZE;
 	ASSERT(ntotslabs > 0);
 	minperpool = (ntotslabs < IDN_SLAB_MINPERPOOL) ?
-						1 : IDN_SLAB_MINPERPOOL;
+	    1 : IDN_SLAB_MINPERPOOL;
 	idn.slabpool->npools = (ntotslabs + (minperpool - 1)) / minperpool;
 
 	if ((idn.slabpool->npools & 1) == 0) {
@@ -1689,7 +1672,7 @@ smr_slabpool_init(size_t reserved_size, caddr_t *reserved_area)
 	}
 	ASSERT(idn.slabpool->npools > 0);
 	minperpool = (ntotslabs < idn.slabpool->npools) ?
-				1 : (ntotslabs / idn.slabpool->npools);
+	    1 : (ntotslabs / idn.slabpool->npools);
 
 	/*
 	 * Calculate the number of extra slabs that will need to
@@ -1704,7 +1687,7 @@ smr_slabpool_init(size_t reserved_size, caddr_t *reserved_area)
 	ASSERT((nxslabs >= 0) && (nxslabs < idn.slabpool->npools));
 
 	idn.slabpool->pool = GETSTRUCT(struct smr_slabtbl,
-					idn.slabpool->npools);
+	    idn.slabpool->npools);
 	sp = GETSTRUCT(smr_slab_t, idn.slabpool->ntotslabs);
 
 	idn.slabpool->savep = sp;
@@ -1737,9 +1720,8 @@ smr_slabpool_init(size_t reserved_size, caddr_t *reserved_area)
 	/*
 	 * We should be at the end of the SMR at this point.
 	 */
-	ASSERT(bufp == (idn.smr.vaddr
-			+ reserved_size
-			+ (idn.slabpool->ntotslabs * IDN_SLAB_SIZE)));
+	ASSERT(bufp == (idn.smr.vaddr + reserved_size
+	    + (idn.slabpool->ntotslabs * IDN_SLAB_SIZE)));
 
 	if (reserved_size != 0)
 		*reserved_area = idn.smr.vaddr;
@@ -1755,7 +1737,7 @@ smr_slabpool_deinit()
 
 	FREESTRUCT(idn.slabpool->savep, smr_slab_t, idn.slabpool->ntotslabs);
 	FREESTRUCT(idn.slabpool->pool, struct smr_slabtbl,
-			idn.slabpool->npools);
+	    idn.slabpool->npools);
 	FREESTRUCT(idn.slabpool, struct slabpool, 1);
 
 	idn.slabpool = NULL;
@@ -1849,8 +1831,8 @@ smr_slab_reserve(int domid)
 
 	if (foundone) {
 		ASSERT((&spa[s] >= idn.slabpool->savep) &&
-			(&spa[s] < (idn.slabpool->savep +
-					idn.slabpool->ntotslabs)));
+		    (&spa[s] < (idn.slabpool->savep +
+		    idn.slabpool->ntotslabs)));
 
 		spa[s].sl_domid = (short)domid;
 
@@ -1876,7 +1858,7 @@ smr_slab_reserve(int domid)
 			smr_alloc_buflist(nsp);
 			spa = nsp;
 			PR_SMR("%s: allocated full slab struct for domain %d\n",
-				proc, domid);
+			    proc, domid);
 		} else {
 			/*
 			 * Slab structure gets returned locked.
@@ -1885,11 +1867,11 @@ smr_slab_reserve(int domid)
 		}
 
 		PR_SMR("%s: allocated slab 0x%p (start=0x%p, size=%lu) for "
-			"domain %d\n", proc, spa, spa->sl_start,
-			spa->sl_end - spa->sl_start, domid);
+		    "domain %d\n", proc, spa, spa->sl_start,
+		    spa->sl_end - spa->sl_start, domid);
 	} else {
 		PR_SMR("%s: FAILED to allocate for domain %d\n",
-			proc, domid);
+		    proc, domid);
 		spa = NULL;
 	}
 
@@ -1931,8 +1913,8 @@ smr_slab_unreserve(int domid, smr_slab_t *sp)
 	}
 	if (foundit) {
 		ASSERT((&spa[s] >= idn.slabpool->savep) &&
-			(&spa[s] < (idn.slabpool->savep +
-					idn.slabpool->ntotslabs)));
+		    (&spa[s] < (idn.slabpool->savep +
+		    idn.slabpool->ntotslabs)));
 		ASSERT(!lock_try(&spa[s].sl_lock));
 		ASSERT(spa[s].sl_domid == (short)domid);
 
@@ -1943,7 +1925,7 @@ smr_slab_unreserve(int domid, smr_slab_t *sp)
 		ATOMIC_INC(idn.slabpool->pool[p].nfree);
 
 		PR_SMR("%s: freed (bufp=0x%p) for domain %d\n",
-			proc, bufp, domid);
+		    proc, bufp, domid);
 
 		if (domid == idn.localid) {
 			/*
@@ -1967,7 +1949,7 @@ smr_slab_unreserve(int domid, smr_slab_t *sp)
 		 * Couldn't find slab entry for given buf!
 		 */
 		PR_SMR("%s: FAILED to free (bufp=0x%p) for domain %d\n",
-			proc, bufp, domid);
+		    proc, bufp, domid);
 	}
 }
 
@@ -2009,23 +1991,25 @@ smr_slab_reap_global()
 	register struct smr_slabtbl	*tblp;
 	static clock_t	reap_last = 0;
 	procname_t	proc = "smr_slab_reap_global";
+	clock_t		now;
 
 	ASSERT(IDN_GET_MASTERID() != IDN_NIL_DOMID);
 
 	DSLAB_LOCK_SHARED(idn.localid);
 	if (idn_domain[idn.localid].dslab_state != DSLAB_STATE_LOCAL) {
 		PR_SMR("%s: only allowed by master (%d)\n",
-			proc, IDN_GET_MASTERID());
+		    proc, IDN_GET_MASTERID());
 		DSLAB_UNLOCK(idn.localid);
 		return;
 	}
 	DSLAB_UNLOCK(idn.localid);
 
-	if ((lbolt > 0) && (lbolt > reap_last) &&
-			((lbolt - reap_last) < IDN_REAP_INTERVAL))
+	now = ddi_get_lbolt();
+	if ((now > 0) && (now > reap_last) &&
+	    ((now - reap_last) < IDN_REAP_INTERVAL))
 		return;
 
-	reap_last = lbolt;
+	reap_last = now;
 
 	ASSERT(idn.slabpool);
 
@@ -2039,12 +2023,12 @@ smr_slab_reap_global()
 		int	diff, reap_per_domain;
 
 		PR_SMR("%s: kicking off reaping "
-			"(total_free = %d, min = %d)\n",
-			proc, total_free, IDN_SLAB_THRESHOLD);
+		    "(total_free = %d, min = %d)\n",
+		    proc, total_free, IDN_SLAB_THRESHOLD);
 
 		diff = IDN_SLAB_THRESHOLD - total_free;
-		reap_per_domain = (diff < idn.ndomains)
-					? 1 : (diff / idn.ndomains);
+		reap_per_domain = (diff < idn.ndomains) ?
+		    1 : (diff / idn.ndomains);
 
 		idn_broadcast_cmd(IDNCMD_SLABREAP, reap_per_domain, 0, 0);
 	}
@@ -2065,7 +2049,7 @@ smr_slab_reap(int domid, int *nslabs)
 	 */
 	if (domid != idn.localid) {
 		PR_SMR("%s: called by domain %d, should only be local (%d)\n",
-			proc, domid, idn.localid);
+		    proc, domid, idn.localid);
 		ASSERT(0);
 		return;
 	}
@@ -2119,7 +2103,7 @@ smr_slab_reap(int domid, int *nslabs)
 			IDN_DUNLOCK(idn.localid);
 		}
 		if ((dp->dstate == IDNDS_CONNECTED) &&
-				((nr = idn_reclaim_mboxdata(d, 0, -1)) > 0))
+		    ((nr = idn_reclaim_mboxdata(d, 0, -1)) > 0))
 			nreclaimed += nr;
 
 		IDN_DUNLOCK(d);
@@ -2151,7 +2135,7 @@ smr_remap(struct as *as, register caddr_t vaddr,
 
 	if (va_to_pfn(vaddr) == new_pfn) {
 		PR_REMAP("%s: vaddr (0x%p) already mapped to pfn (0x%lx)\n",
-			proc, vaddr, new_pfn);
+		    proc, vaddr, new_pfn);
 		return;
 	}
 
@@ -2160,7 +2144,7 @@ smr_remap(struct as *as, register caddr_t vaddr,
 	ASSERT(npgs != 0);
 
 	PR_REMAP("%s: va = 0x%p, pfn = 0x%lx, npgs = %ld, mb = %d MB (%ld)\n",
-		proc, vaddr, new_pfn, npgs, mblen, blen);
+	    proc, vaddr, new_pfn, npgs, mblen, blen);
 
 	/*
 	 * Unmap the SMR virtual address from it's current
@@ -2178,9 +2162,8 @@ smr_remap(struct as *as, register caddr_t vaddr,
 	 * i.e. space since it may beyond his physmax.
 	 */
 	for (p = 0; p < npgs; p++) {
-		sfmmu_memtte(&tte, new_pfn,
-				PROT_READ | PROT_WRITE | HAT_NOSYNC,
-				TTE8K);
+		sfmmu_memtte(&tte, new_pfn, PROT_READ | PROT_WRITE | HAT_NOSYNC,
+		    TTE8K);
 		sfmmu_tteload(as->a_hat, &tte, vaddr, NULL, HAT_LOAD_LOCK);
 
 		vaddr += MMU_PAGESIZE;
@@ -2188,5 +2171,5 @@ smr_remap(struct as *as, register caddr_t vaddr,
 	}
 
 	PR_REMAP("%s: remapped %ld pages (expected %ld)\n",
-		proc, npgs, btopr(MB2B(mblen)));
+	    proc, npgs, btopr(MB2B(mblen)));
 }

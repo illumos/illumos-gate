@@ -739,7 +739,7 @@ icmp_inbound_too_big_v6(icmp6_t *icmp6, ip_recv_attr_t *ira)
 	}
 	/* We now have a PMTU for sure */
 	dce->dce_flags |= DCEF_PMTU;
-	dce->dce_last_change_time = TICK_TO_SEC(lbolt64);
+	dce->dce_last_change_time = TICK_TO_SEC(ddi_get_lbolt64());
 	mutex_exit(&dce->dce_lock);
 	/*
 	 * After dropping the lock the new value is visible to everyone.

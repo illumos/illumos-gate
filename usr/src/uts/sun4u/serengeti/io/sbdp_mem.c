@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * memory management for serengeti dr memory
@@ -312,7 +310,7 @@ sbdp_move_memory(sbdp_handle_t *hp, int t_bd)
 	}
 
 	funclen = (int)((ulong_t)_sbdp_copy_rename_end -
-			(ulong_t)sbdp_copy_rename__relocatable);
+	    (ulong_t)sbdp_copy_rename__relocatable);
 
 	if (funclen > PAGESIZE) {
 		cmn_err(CE_WARN,
@@ -363,8 +361,7 @@ sbdp_move_memory(sbdp_handle_t *hp, int t_bd)
 	affinity_set(CPU_CURRENT);
 	scriptlen = sbdp_prep_rename_script(cph);
 	if (scriptlen <= 0) {
-		cmn_err(CE_WARN,
-			"sbdp failed to prep for copy-rename");
+		cmn_err(CE_WARN, "sbdp failed to prep for copy-rename");
 		sbdp_set_err(hp->h_err, ESGT_INTERNAL, NULL);
 		err = 1;
 		goto cleanup;
@@ -374,10 +371,9 @@ sbdp_move_memory(sbdp_handle_t *hp, int t_bd)
 	indexlen = sizeof (*indexp) << 1;
 
 	if ((funclen + scriptlen + indexlen) > PAGESIZE) {
-		cmn_err(CE_WARN,
-			"sbdp: func len (%d) + script len (%d) "
-			"+ index len (%d) > PAGESIZE (%d)",
-			funclen, scriptlen, indexlen, PAGESIZE);
+		cmn_err(CE_WARN, "sbdp: func len (%d) + script len (%d) "
+		    "+ index len (%d) > PAGESIZE (%d)", funclen, scriptlen,
+		    indexlen, PAGESIZE);
 		sbdp_set_err(hp->h_err, ESGT_INTERNAL, NULL);
 		err = 1;
 		goto cleanup;
@@ -396,22 +392,20 @@ sbdp_move_memory(sbdp_handle_t *hp, int t_bd)
 	availlen -= (int)(data_area - (ulong_t)mempage);
 
 	if (availlen < scriptlen) {
-		cmn_err(CE_WARN,
-			"sbdp: available len (%d) < script len (%d)",
-			availlen, scriptlen);
+		cmn_err(CE_WARN, "sbdp: available len (%d) < script len (%d)",
+		    availlen, scriptlen);
 		sbdp_set_err(hp->h_err, ESGT_INTERNAL, NULL);
 		err = 1;
 		goto cleanup;
 	}
 
 	SBDP_DBG_MEM("copy-rename script data area = 0x%lx\n",
-		data_area);
+	    data_area);
 
 	bcopy((caddr_t)rsbuffer, (caddr_t)data_area, scriptlen);
 	rsp = (sbdp_rename_script_t *)data_area;
 
-	index_area = data_area + (ulong_t)scriptlen +
-			(ulong_t)(linesize - 1);
+	index_area = data_area + (ulong_t)scriptlen + (ulong_t)(linesize - 1);
 	index_area &= ~((ulong_t)(linesize - 1));
 	indexp = (int *)index_area;
 	indexp[0] = 0;
@@ -421,8 +415,8 @@ sbdp_move_memory(sbdp_handle_t *hp, int t_bd)
 	e_page = (ulong_t)mempage + PAGESIZE;
 	if (e_area > e_page) {
 		cmn_err(CE_WARN,
-			"sbdp: index area size (%d) > available (%d)\n",
-			indexlen, (int)(e_page - index_area));
+		    "sbdp: index area size (%d) > available (%d)\n",
+		    indexlen, (int)(e_page - index_area));
 		sbdp_set_err(hp->h_err, ESGT_INTERNAL, NULL);
 		err = 1;
 		goto cleanup;
@@ -437,7 +431,7 @@ sbdp_move_memory(sbdp_handle_t *hp, int t_bd)
 
 	srhp->sr_flags = hp->h_flags;
 
-	copytime = lbolt;
+	copytime = ddi_get_lbolt();
 
 	mutex_enter(&s_bdp->bd_mutex);
 	mlist = sbdp_memlist_dup(s_bdp->ml);
@@ -458,8 +452,7 @@ sbdp_move_memory(sbdp_handle_t *hp, int t_bd)
 	 */
 	if (sbdp_suspend(srhp)) {
 		sbd_error_t	*sep;
-		cmn_err(CE_WARN,
-			"sbdp: failed to quiesce OS for copy-rename");
+		cmn_err(CE_WARN, "sbdp: failed to quiesce OS for copy-rename");
 		sep = &srhp->sep;
 		sbdp_set_err(hp->h_err, sep->e_code, sep->e_rsc);
 		sbdp_release_sr_handle(srhp);
@@ -517,13 +510,13 @@ sbdp_move_memory(sbdp_handle_t *hp, int t_bd)
 		err = 1;
 	}
 
-	copytime = lbolt - copytime;
+	copytime = ddi_get_lbolt() - copytime;
 
 	sbdp_release_sr_handle(srhp);
 	sbdp_del_memlist(hp, mlist);
 
 	SBDP_DBG_MEM("copy-rename elapsed time = %ld ticks (%ld secs)\n",
-		copytime, copytime / hz);
+	    copytime, copytime / hz);
 
 	switch (cr_err) {
 	case SBDP_CR_OK:
@@ -561,7 +554,7 @@ sbdp_move_memory(sbdp_handle_t *hp, int t_bd)
 	 * Source and target board numbers are packaged in arg.
 	 */
 	lgrp_plat_config(LGRP_CONFIG_MEM_RENAME,
-		(uintptr_t)(s_bdp->bd | (t_bdp->bd << 16)));
+	    (uintptr_t)(s_bdp->bd | (t_bdp->bd << 16)));
 
 	/*
 	 * swap list of banks
@@ -1046,7 +1039,7 @@ sbdp_prep_rename_script(sbdp_cr_handle_t *cph)
 		SBDP_DBG_MEM("dumping copy-rename script:\n");
 		for (i = 0; i < m; i++) {
 			SBDP_DBG_MEM("0x%lx = 0x%lx, asi 0x%x\n",
-				rsp[i].masr_addr, rsp[i].masr, rsp[i].asi);
+			    rsp[i].masr_addr, rsp[i].masr, rsp[i].asi);
 		}
 		DELAY(1000000);
 	}

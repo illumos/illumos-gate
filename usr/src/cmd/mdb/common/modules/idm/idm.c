@@ -23,7 +23,9 @@
  * Use is subject to license terms.
  */
 
-#include <sys/mdb_modapi.h>
+#include <mdb/mdb_modapi.h>
+#include <mdb/mdb_ks.h>
+
 #include <sys/cpuvar.h>
 #include <sys/conf.h>
 #include <sys/file.h>
@@ -2284,7 +2286,6 @@ iscsi_isns_targets(iscsi_dcmd_ctrl_t *idc)
 static int
 iscsi_isns_servers_cb(uintptr_t addr, const void *walker_data, void *data)
 {
-	GElf_Sym		sym;
 	iscsit_isns_svr_t	server;
 	char			server_addr[PORTAL_STR_LEN];
 	struct sockaddr_storage *ss;
@@ -2297,15 +2298,8 @@ iscsi_isns_servers_cb(uintptr_t addr, const void *walker_data, void *data)
 		return (WALK_ERR);
 	}
 
-	if (mdb_lookup_by_name("lbolt", &sym) == -1) {
-		mdb_warn("failed to find symbol 'lbolt'");
-		return (DCMD_ERR);
-	}
-
-	if (mdb_vread(&lbolt, sizeof (clock_t), sym.st_value) !=
-	    sizeof (clock_t)) {
+	if ((lbolt = (clock_t)mdb_get_lbolt()) == -1)
 		return (WALK_ERR);
-	}
 
 	mdb_printf("iSNS server %p:\n", addr);
 	mdb_inc_indent(4);

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1641,7 +1639,7 @@ fss_forkret(kthread_t *t, kthread_t *ct)
 	 */
 	fssproc->fss_flags &= ~FSSBACKQ;
 
-	if (t->t_disp_time != lbolt)
+	if (t->t_disp_time != ddi_get_lbolt())
 		setbackdq(t);
 	else
 		setfrontdq(t);
@@ -1844,7 +1842,7 @@ fss_swapin(kthread_t *t, int flags)
 	if (t->t_state == TS_RUN && (t->t_schedflag & TS_LOAD) == 0) {
 		time_t swapout_time;
 
-		swapout_time = (lbolt - t->t_stime) / hz;
+		swapout_time = (ddi_get_lbolt() - t->t_stime) / hz;
 		if (INHERITED(t) || (fssproc->fss_flags & FSSKPRI)) {
 			epri = (long)DISP_PRIO(t) + swapout_time;
 		} else {
@@ -1894,7 +1892,7 @@ fss_swapout(kthread_t *t, int flags)
 
 	ASSERT(t->t_state & (TS_SLEEP | TS_RUN));
 
-	swapin_time = (lbolt - t->t_stime) / hz;
+	swapin_time = (ddi_get_lbolt() - t->t_stime) / hz;
 
 	if (flags == SOFTSWAP) {
 		if (t->t_state == TS_SLEEP && swapin_time > maxslp) {
@@ -2098,7 +2096,7 @@ fss_setrun(kthread_t *t)
 	if ((fssproc->fss_flags & FSSKPRI) == 0)
 		THREAD_CHANGE_PRI(t, fssproc->fss_umdpri);
 
-	if (t->t_disp_time != lbolt)
+	if (t->t_disp_time != ddi_get_lbolt())
 		setbackdq(t);
 	else
 		setfrontdq(t);
@@ -2149,7 +2147,7 @@ fss_sleep(kthread_t *t)
 		if (DISP_MUST_SURRENDER(curthread))
 			cpu_surrender(t);
 	}
-	t->t_stime = lbolt;	/* time stamp for the swapper */
+	t->t_stime = ddi_get_lbolt();	/* time stamp for the swapper */
 }
 
 /*
@@ -2300,7 +2298,7 @@ fss_wakeup(kthread_t *t)
 
 	fss_active(t);
 
-	t->t_stime = lbolt;		/* time stamp for the swapper */
+	t->t_stime = ddi_get_lbolt();		/* time stamp for the swapper */
 	fssproc = FSSPROC(t);
 	fssproc->fss_flags &= ~FSSBACKQ;
 
@@ -2323,7 +2321,7 @@ fss_wakeup(kthread_t *t)
 		/*
 		 * Otherwise, we recalculate the priority.
 		 */
-		if (t->t_disp_time == lbolt) {
+		if (t->t_disp_time == ddi_get_lbolt()) {
 			setfrontdq(t);
 		} else {
 			fssproc->fss_timeleft = fss_quantum;

@@ -75,7 +75,7 @@ sctp_send_shutdown(sctp_t *sctp, int rexmit)
 		 * sending the shutdown, we can overload out_time
 		 * to track how long we have waited.
 		 */
-		sctp->sctp_out_time = lbolt64;
+		sctp->sctp_out_time = ddi_get_lbolt64();
 	}
 
 	/*

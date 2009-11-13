@@ -1315,8 +1315,8 @@ mptsas_update_flash(mptsas_t *mpt, caddr_t ptrbuffer, uint32_t size,
 	MPTSAS_START_CMD(mpt, request_desc_low, 0);
 
 	rvalue = 0;
-	(void) cv_timedwait(&mpt->m_fw_cv, &mpt->m_mutex,
-	    MPTSAS_CV_TIMEOUT(60));
+	(void) cv_reltimedwait(&mpt->m_fw_cv, &mpt->m_mutex,
+	    drv_usectohz(60 * MICROSEC), TR_CLOCK_TICK);
 	if (!(cmd->cmd_flags & CFLAG_FINISHED)) {
 		if ((mptsas_restart_ioc(mpt)) == DDI_FAILURE) {
 			mptsas_log(mpt, CE_WARN, "mptsas_restart_ioc failed");

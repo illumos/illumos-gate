@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/stream.h>
@@ -416,7 +415,7 @@ sctp_heartbeat_timer(sctp_t *sctp)
 		return;
 	}
 
-	now = lbolt64;
+	now = ddi_get_lbolt64();
 	earliest_expiry = 0;
 	cnt = sctps->sctps_maxburst;
 

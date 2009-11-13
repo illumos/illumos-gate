@@ -336,10 +336,8 @@ fail:
 	err = 0;
 	while (err != -1 && HECI_FILE_CONNECTED != file_ext->state &&
 	    HECI_FILE_DISCONNECTED != file_ext->state) {
-		clock_t tm;
-		tm = ddi_get_lbolt();
-		err = cv_timedwait(&dev->wait_recvd_msg,
-		    &dev->device_lock, tm + timeout * HZ);
+		err = cv_reltimedwait(&dev->wait_recvd_msg,
+		    &dev->device_lock, timeout * HZ, TR_CLOCK_TICK);
 	}
 	mutex_exit(&dev->device_lock);
 

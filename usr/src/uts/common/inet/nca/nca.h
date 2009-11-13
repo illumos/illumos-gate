@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -326,7 +326,7 @@ typedef struct tw_s {
 		}							\
 		if ((_lbolt) != NCA_TW_NONE) {				\
 			(twp)->tid = timeout((pfv_t)nca_tw_fire, (twp),	\
-			    (twp)->lbolt3 - lbolt);			\
+			    (twp)->lbolt3 - ddi_get_lbolt());		\
 		}							\
 	}								\
 }

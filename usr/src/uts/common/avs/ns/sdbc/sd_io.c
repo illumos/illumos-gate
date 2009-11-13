@@ -320,9 +320,6 @@ _sd_dealloc_dm(void)
 	int dealloc;
 	_dm_process_vars_t *ppvars;
 
-	/* clock_t ticker; */
-	unsigned long ticker;
-
 	int write_dealloc; /* remove after debugging */
 
 	ppvars = &dynmem_processing_dm;
@@ -384,10 +381,9 @@ _sd_dealloc_dm(void)
 			if (sd_dealloc_flag_dm == TIME_DELAY_LVL2)
 				tic_delay = sleep_tics_lvl3;
 
-		(void) drv_getparm(LBOLT, &ticker);
 		mutex_enter(&ppvars->thread_dm_lock);
-		(void) cv_timedwait(&ppvars->thread_dm_cv,
-		    &ppvars->thread_dm_lock, ticker+tic_delay);
+		(void) cv_reltimedwait(&ppvars->thread_dm_cv,
+		    &ppvars->thread_dm_lock, tic_delay, TR_CLOCK_TICK);
 		mutex_exit(&ppvars->thread_dm_lock);
 
 		/* check for special directives on wakeup */

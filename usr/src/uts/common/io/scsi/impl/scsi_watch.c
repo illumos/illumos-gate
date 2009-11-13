@@ -426,7 +426,6 @@ void
 scsi_watch_suspend(opaque_t token)
 {
 	struct scsi_watch_request *swr = (struct scsi_watch_request *)NULL;
-	clock_t	now;
 	clock_t halfsec_delay = drv_usectohz(500000);
 
 	SW_DEBUG(0, sw_label, SCSI_DEBUG, "scsi_watch_suspend:\n");
@@ -454,9 +453,8 @@ scsi_watch_suspend(opaque_t token)
 			 * till all outstanding cmds are complete
 			 */
 			swr->swr_what = SWR_SUSPEND_REQUESTED;
-			now = ddi_get_lbolt();
-			(void) cv_timedwait(&sw.sw_cv, &sw.sw_mutex,
-			    now + halfsec_delay);
+			(void) cv_reltimedwait(&sw.sw_cv, &sw.sw_mutex,
+			    halfsec_delay, TR_CLOCK_TICK);
 		} else {
 			swr->swr_what = SWR_SUSPENDED;
 			break;
@@ -656,7 +654,6 @@ static void
 scsi_watch_thread()
 {
 	struct scsi_watch_request	*swr, *next;
-	clock_t				now;
 	clock_t				last_delay = 0;
 	clock_t				next_delay = 0;
 	clock_t				onesec = drv_usectohz(1000000);
@@ -819,7 +816,6 @@ head:
 		} else {
 			next_delay = exit_delay;
 		}
-		now = ddi_get_lbolt();
 
 		mutex_enter(&cpr_mutex);
 		if (!sw_cmd_count) {
@@ -832,7 +828,8 @@ head:
 		 * signalled, the delay is not accurate but that doesn't
 		 * really matter
 		 */
-		(void) cv_timedwait(&sw.sw_cv, &sw.sw_mutex, now + next_delay);
+		(void) cv_reltimedwait(&sw.sw_cv, &sw.sw_mutex, next_delay,
+		    TR_CLOCK_TICK);
 		mutex_exit(&sw.sw_mutex);
 		mutex_enter(&cpr_mutex);
 		if (sw_cpr_flag == 1) {

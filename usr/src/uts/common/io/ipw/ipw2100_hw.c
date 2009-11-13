@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +29,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Intel Wireless PRO/2100 mini-PCI adapter driver
@@ -483,12 +481,13 @@ ipw2100_load_fw(struct ipw2100_softc *sc)
 	/*
 	 * wait for interrupt to notify fw initialization is done
 	 */
+	clk = drv_usectohz(5000000);  /* 5 second */
 	while (!(sc->sc_flags & IPW2100_FLAG_FW_INITED)) {
 		/*
 		 * wait longer for the fw  initialized
 		 */
-		clk = ddi_get_lbolt() + drv_usectohz(5000000);  /* 5 second */
-		if (cv_timedwait(&sc->sc_fw_cond, &sc->sc_ilock, clk) < 0)
+		if (cv_reltimedwait(&sc->sc_fw_cond, &sc->sc_ilock, clk,
+		    TR_CLOCK_TICK) < 0)
 			break;
 	}
 	mutex_exit(&sc->sc_ilock);

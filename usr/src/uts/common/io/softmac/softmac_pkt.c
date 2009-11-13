@@ -122,8 +122,8 @@ softmac_output(softmac_lower_t *slp, mblk_t *mp, t_uscalar_t dl_prim,
 
 	mutex_enter(&slp->sl_mutex);
 	while (slp->sl_pending_prim != DL_PRIM_INVAL) {
-		if (cv_timedwait(&slp->sl_cv, &slp->sl_mutex,
-		    lbolt + ACKTIMEOUT) == -1)
+		if (cv_reltimedwait(&slp->sl_cv, &slp->sl_mutex, ACKTIMEOUT,
+		    TR_CLOCK_TICK) == -1)
 			break;
 	}
 

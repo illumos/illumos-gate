@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3263,7 +3263,6 @@ rsm_unpublish(rsmseg_t *seg, int mode)
 	rsm_access_entry_t	*rsmpi_acl;
 	int			acl_len;
 	int			e;
-	clock_t			ticks;
 	adapter_t *adapter;
 	DBG_DEFINE(category, RSM_KERNEL_AGENT | RSM_EXPORT);
 
@@ -3377,10 +3376,9 @@ rsm_unpublish(rsmseg_t *seg, int mode)
 			/* can be fine tuned when we have better numbers */
 			/* A long term fix would be to send cv_signal	 */
 			/* from the intr callback routine		 */
-			(void) drv_getparm(LBOLT, &ticks);
-			ticks += drv_usectohz(1000);
-			/* currently nobody signals this wait		*/
-			(void) cv_timedwait(&seg->s_cv, &seg->s_lock, ticks);
+			/* currently nobody signals this wait		 */
+			(void) cv_reltimedwait(&seg->s_cv, &seg->s_lock,
+			    drv_usectohz(1000), TR_CLOCK_TICK);
 
 			DBG_PRINTF((category, RSM_ERR,
 			    "rsm_unpublish: SEG_IN_USE\n"));
@@ -5294,7 +5292,6 @@ rsmipc_send(rsm_node_id_t dest, rsmipc_request_t *req, rsmipc_reply_t *reply)
 	int		credit_check = 0;
 	int		retry_cnt = 0;
 	int		min_retry_cnt = 10;
-	clock_t		ticks;
 	rsm_send_t	is;
 	rsmipc_slot_t	*rslot;
 	adapter_t	*adapter;
@@ -5646,10 +5643,8 @@ again:
 		}
 
 		/* wait for a reply signal, a SIGINT, or 5 sec. timeout */
-		(void) drv_getparm(LBOLT, &ticks);
-		ticks += drv_usectohz(5000000);
-		e = cv_timedwait_sig(&rslot->rsmipc_cv, &rslot->rsmipc_lock,
-		    ticks);
+		e = cv_reltimedwait_sig(&rslot->rsmipc_cv, &rslot->rsmipc_lock,
+		    drv_usectohz(5000000), TR_CLOCK_TICK);
 		if (e < 0) {
 			/* timed out - retry */
 			e = RSMERR_TIMEOUT;
@@ -5878,7 +5873,6 @@ rsmipc_send_controlmsg(path_t *path, int msgtype)
 	int			e;
 	int			retry_cnt = 0;
 	int			min_retry_cnt = 10;
-	clock_t			timeout;
 	adapter_t		*adapter;
 	rsm_send_t		is;
 	rsm_send_q_handle_t	ipc_handle;
@@ -5946,9 +5940,8 @@ rsmipc_send_controlmsg(path_t *path, int msgtype)
 		    "rsmipc_send_controlmsg:rsm_send error=%d", e));
 
 		if (++retry_cnt == min_retry_cnt) { /* backoff before retry */
-			timeout  = ddi_get_lbolt() + drv_usectohz(10000);
-			(void) cv_timedwait(&path->sendq_token.sendq_cv,
-			    &path->mutex, timeout);
+			(void) cv_reltimedwait(&path->sendq_token.sendq_cv,
+			    &path->mutex, drv_usectohz(10000), TR_CLOCK_TICK);
 			retry_cnt = 0;
 		}
 	} while (path->state == RSMKA_PATH_ACTIVE);

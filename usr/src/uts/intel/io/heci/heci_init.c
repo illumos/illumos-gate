@@ -302,11 +302,8 @@ heci_hw_init(struct iamt_heci_device *dev)
 	/* wait for ME to turn on ME_RDY */
 	err = 0;
 	while (!dev->recvd_msg && err != -1) {
-		clock_t tm;
-		tm = ddi_get_lbolt();
-		err = cv_timedwait(&dev->wait_recvd_msg,
-		    &dev->device_lock,
-		    tm + HECI_INTEROP_TIMEOUT);
+		err = cv_reltimedwait(&dev->wait_recvd_msg,
+		    &dev->device_lock, HECI_INTEROP_TIMEOUT, TR_CLOCK_TICK);
 	}
 
 	if (err == -1 && !dev->recvd_msg) {
@@ -572,6 +569,7 @@ host_start_message(struct iamt_heci_device *dev)
 	struct hbm_host_version_request *host_start_req;
 	struct hbm_host_stop_request *host_stop_req;
 	int err = 0;
+	clock_t delta = (clock_t)(timeout * HZ);
 
 	/* host start message */
 	mutex_enter(&dev->device_lock);
@@ -600,10 +598,8 @@ host_start_message(struct iamt_heci_device *dev)
 	DBG("call wait_event_interruptible_timeout for response message.\n");
 	err = 0;
 	while (err != -1 && !dev->recvd_msg) {
-		clock_t tm;
-		tm = ddi_get_lbolt();
-		err = cv_timedwait(&dev->wait_recvd_msg,
-		    &dev->device_lock, tm + timeout * HZ);
+		err = cv_reltimedwait(&dev->wait_recvd_msg, &dev->device_lock,
+		    delta, TR_CLOCK_TICK);
 	}
 	if (err == -1 && !dev->recvd_msg) {
 		DBG("wait_timeout failed on host start response message.\n");
@@ -655,6 +651,7 @@ host_enum_clients_message(struct iamt_heci_device *dev)
 	struct hbm_host_enum_request *host_enum_req;
 	int err = 0;
 	uint8_t i, j;
+	clock_t delta = (clock_t)(timeout * HZ);
 
 	mutex_enter(&dev->device_lock);
 
@@ -680,11 +677,8 @@ host_enum_clients_message(struct iamt_heci_device *dev)
 	dev->recvd_msg = 0;
 	err = 0;
 	while (!dev->recvd_msg && err != -1) {
-		clock_t tm;
-		tm = ddi_get_lbolt();
-		err = cv_timedwait(&dev->wait_recvd_msg,
-		    &dev->device_lock,
-		    tm + timeout * HZ);
+		err = cv_reltimedwait(&dev->wait_recvd_msg, &dev->device_lock,
+		    delta, TR_CLOCK_TICK);
 	}
 	if (err == -1 && !dev->recvd_msg) {
 		DBG("wait_event_interruptible_timeout failed "
@@ -723,6 +717,7 @@ host_client_properties(struct iamt_heci_device *dev,
 	struct heci_msg_hdr *heci_hdr;
 	struct hbm_props_request *host_cli_req;
 	int err;
+	clock_t delta = 10 * HZ;
 
 	mutex_enter(&dev->device_lock);
 	heci_hdr = (struct heci_msg_hdr *)&dev->wr_msg_buf[0];
@@ -747,11 +742,8 @@ host_client_properties(struct iamt_heci_device *dev,
 
 	err = 0;
 	while (!dev->recvd_msg && err != -1) {
-		clock_t tm;
-		tm = ddi_get_lbolt();
-		err = cv_timedwait(&dev->wait_recvd_msg,
-		    &dev->device_lock,
-		    tm + 10 * HZ);
+		err = cv_reltimedwait(&dev->wait_recvd_msg, &dev->device_lock,
+		    delta, TR_CLOCK_TICK);
 	}
 	if (err == -1 && !dev->recvd_msg) {
 		DBG("wait failed on props resp msg.\n");
@@ -928,6 +920,7 @@ heci_connect_me_client(struct iamt_heci_device *dev,
 	long timeout)
 {
 	int err = 0;
+	clock_t delta = (clock_t)(timeout * HZ);
 
 	if ((dev == NULL) || (priv == NULL))
 		return (0);
@@ -943,11 +936,8 @@ heci_connect_me_client(struct iamt_heci_device *dev,
 	while (!(HECI_FILE_CONNECTED == priv->state ||
 	    HECI_FILE_DISCONNECTED == priv->state) &&
 	    err != -1) {
-		clock_t tm;
-		tm = ddi_get_lbolt();
-		err = cv_timedwait(&dev->wait_recvd_msg,
-		    &dev->device_lock,
-		    tm + timeout*HZ);
+		err = cv_reltimedwait(&dev->wait_recvd_msg, &dev->device_lock,
+		    delta, TR_CLOCK_TICK);
 	}
 	if (HECI_FILE_CONNECTED != priv->state) {
 		heci_remove_client_from_file_list(dev, priv->host_client_id);
@@ -1100,6 +1090,7 @@ heci_disconnect_host_client(struct iamt_heci_device *dev,
 	int rets, err;
 	long timeout = 15;	/* 15 seconds */
 	struct heci_cb_private *priv_cb;
+	clock_t delta = (clock_t)(timeout * HZ);
 
 	if ((!dev) || (!file_ext))
 		return (-ENODEV);
@@ -1136,11 +1127,8 @@ heci_disconnect_host_client(struct iamt_heci_device *dev,
 	while (err != -1 &&
 	    (HECI_FILE_DISCONNECTED != file_ext->state)) {
 
-	clock_t tm;
-	tm = ddi_get_lbolt();
-	err = cv_timedwait(&dev->wait_recvd_msg,
-	    &dev->device_lock,
-	    tm + timeout * HZ);
+		err = cv_reltimedwait(&dev->wait_recvd_msg, &dev->device_lock,
+		    delta, TR_CLOCK_TICK);
 	}
 	mutex_exit(&dev->device_lock);
 

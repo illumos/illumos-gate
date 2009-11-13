@@ -340,7 +340,7 @@ typedef struct {
 #define	SCTP_MSG_TO_BE_ABANDONED(meta, mhdr, sctp)			     \
 	(((!SCTP_CHUNK_ISSENT((meta)->b_cont) && (mhdr)->smh_ttl > 0) ||     \
 	((sctp)->sctp_prsctp_aware && ((mhdr)->smh_flags & MSG_PR_SCTP))) && \
-	((lbolt64 - (mhdr)->smh_tob) > (mhdr)->smh_ttl))
+	((ddi_get_lbolt64() - (mhdr)->smh_tob) > (mhdr)->smh_ttl))
 
 /* SCTP association hash function. */
 #define	SCTP_CONN_HASH(sctps, ports)			\

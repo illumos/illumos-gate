@@ -101,7 +101,7 @@ static int ilb_sticky_timeout = 15;
 {						\
 	mutex_enter(&(s)->hash->sticky_lock);	\
 	(s)->refcnt--;				\
-	(s)->atime = lbolt64;			\
+	(s)->atime = ddi_get_lbolt64();		\
 	mutex_exit(&s->hash->sticky_lock);	\
 }
 
@@ -211,7 +211,7 @@ ilb_conn_cleanup(void *arg)
 	c2s_hash = ilbs->ilbs_c2s_conn_hash;
 	ASSERT(c2s_hash != NULL);
 
-	now = lbolt64;
+	now = ddi_get_lbolt64();
 	for (i = timer->start; i < timer->end; i++) {
 		mutex_enter(&c2s_hash[i].ilb_conn_hash_lock);
 		if ((connp = c2s_hash[i].ilb_connp) == NULL) {
@@ -531,7 +531,7 @@ ilb_conn_add(ilb_stack_t *ilbs, ilb_rule_t *rule, ilb_server_t *server,
 	connp->conn_gc = B_FALSE;
 
 	connp->conn_expiry = rule->ir_nat_expiry;
-	connp->conn_cr_time = lbolt64;
+	connp->conn_cr_time = ddi_get_lbolt64();
 
 	/* Client to server info. */
 	connp->conn_c2s_saddr = *src;
@@ -539,7 +539,7 @@ ilb_conn_add(ilb_stack_t *ilbs, ilb_rule_t *rule, ilb_server_t *server,
 	connp->conn_c2s_daddr = *dst;
 	connp->conn_c2s_dport = dport;
 
-	connp->conn_c2s_atime = lbolt64;
+	connp->conn_c2s_atime = ddi_get_lbolt64();
 	/* The packet ths triggers this creation should be counted */
 	connp->conn_c2s_pkt_cnt = 1;
 	connp->conn_c2s_tcp_fin_sent = B_FALSE;
@@ -641,7 +641,7 @@ ilb_conn_add(ilb_stack_t *ilbs, ilb_rule_t *rule, ilb_server_t *server,
 		break;
 	}
 
-	connp->conn_s2c_atime = lbolt64;
+	connp->conn_s2c_atime = ddi_get_lbolt64();
 	connp->conn_s2c_pkt_cnt = 1;
 	connp->conn_s2c_tcp_fin_sent = B_FALSE;
 	connp->conn_s2c_tcp_fin_acked = B_FALSE;
@@ -766,7 +766,7 @@ ilb_find_conn(ilb_stack_t *ilbs, void *iph, void *tph, int l4, in6_addr_t *src,
 			    connp->conn_c2s_sport == sport &&
 			    IN6_ARE_ADDR_EQUAL(src, &connp->conn_c2s_saddr) &&
 			    IN6_ARE_ADDR_EQUAL(dst, &connp->conn_c2s_daddr)) {
-				connp->conn_c2s_atime = lbolt64;
+				connp->conn_c2s_atime = ddi_get_lbolt64();
 				connp->conn_c2s_pkt_cnt++;
 				*rule_cache = connp->conn_rule_cache;
 				*ip_sum = connp->conn_c2s_ip_sum;
@@ -785,7 +785,7 @@ ilb_find_conn(ilb_stack_t *ilbs, void *iph, void *tph, int l4, in6_addr_t *src,
 			    connp->conn_s2c_sport == sport &&
 			    IN6_ARE_ADDR_EQUAL(src, &connp->conn_s2c_saddr) &&
 			    IN6_ARE_ADDR_EQUAL(dst, &connp->conn_s2c_daddr)) {
-				connp->conn_s2c_atime = lbolt64;
+				connp->conn_s2c_atime = ddi_get_lbolt64();
 				connp->conn_s2c_pkt_cnt++;
 				*rule_cache = connp->conn_rule_cache;
 				*ip_sum = connp->conn_s2c_ip_sum;
@@ -966,7 +966,7 @@ ilb_check_icmp_conn(ilb_stack_t *ilbs, mblk_t *mp, int l3, void *out_iph,
 		    connp->conn_c2s_sport == *dport &&
 		    IN6_ARE_ADDR_EQUAL(in_dst_p, &connp->conn_c2s_saddr) &&
 		    IN6_ARE_ADDR_EQUAL(in_src_p, &connp->conn_c2s_daddr)) {
-			connp->conn_c2s_atime = lbolt64;
+			connp->conn_c2s_atime = ddi_get_lbolt64();
 			connp->conn_c2s_pkt_cnt++;
 			rule_cache = connp->conn_rule_cache;
 			adj_ip_sum = connp->conn_c2s_ip_sum;
@@ -1208,7 +1208,7 @@ ilb_sticky_add(ilb_sticky_hash_t *hash, ilb_rule_t *rule, ilb_server_t *server,
 	 * zero.  But just set it here for debugging purpose.  The
 	 * atime is set when a refrele is done on a sticky entry.
 	 */
-	s->atime = lbolt64;
+	s->atime = ddi_get_lbolt64();
 
 	list_insert_head(&hash->sticky_head, s);
 	hash->sticky_cnt++;
@@ -1314,7 +1314,7 @@ ilb_sticky_cleanup(void *arg)
 	hash = ilbs->ilbs_sticky_hash;
 	ASSERT(hash != NULL);
 
-	now = lbolt64;
+	now = ddi_get_lbolt64();
 	for (i = timer->start; i < timer->end; i++) {
 		mutex_enter(&hash[i].sticky_lock);
 		for (s = list_head(&hash[i].sticky_head); s != NULL;

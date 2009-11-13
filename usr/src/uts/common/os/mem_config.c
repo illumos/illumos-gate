@@ -1629,8 +1629,8 @@ delthr_get_freemem(struct mem_handle *mhp)
 		cv_signal(&proc_pageout->p_cv);
 
 		mutex_enter(&mhp->mh_mutex);
-		(void) cv_timedwait(&mhp->mh_cv, &mhp->mh_mutex,
-		    (lbolt + DEL_FREE_WAIT_TICKS));
+		(void) cv_reltimedwait(&mhp->mh_cv, &mhp->mh_mutex,
+		    DEL_FREE_WAIT_TICKS, TR_CLOCK_TICK);
 		mutex_exit(&mhp->mh_mutex);
 		page_needfree(-(spgcnt_t)free_get);
 
@@ -2249,8 +2249,8 @@ delete_memory_thread(caddr_t amhp)
 			 */
 			MDSTAT_INCR(mhp, ndelay);
 			CALLB_CPR_SAFE_BEGIN(&cprinfo);
-			(void) cv_timedwait(&mhp->mh_cv, &mhp->mh_mutex,
-			    (lbolt + DEL_BUSY_WAIT_TICKS));
+			(void) cv_reltimedwait(&mhp->mh_cv, &mhp->mh_mutex,
+			    DEL_BUSY_WAIT_TICKS, TR_CLOCK_TICK);
 			CALLB_CPR_SAFE_END(&cprinfo, &mhp->mh_mutex);
 		}
 	}

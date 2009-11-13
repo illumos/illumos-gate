@@ -2299,7 +2299,7 @@ zone_status_timedwait(zone_t *zone, clock_t tim, zone_status_t status)
 clock_t
 zone_status_timedwait_sig(zone_t *zone, clock_t tim, zone_status_t status)
 {
-	clock_t timeleft = tim - lbolt;
+	clock_t timeleft = tim - ddi_get_lbolt();
 
 	ASSERT(status > ZONE_MIN_STATE && status <= ZONE_MAX_STATE);
 
@@ -4169,8 +4169,8 @@ zone_empty(zone_t *zone)
 	 * which can be called from the exit path.
 	 */
 	ASSERT(MUTEX_NOT_HELD(&zonehash_lock));
-	while ((waitstatus = zone_status_timedwait_sig(zone, lbolt + hz,
-	    ZONE_IS_EMPTY)) == -1) {
+	while ((waitstatus = zone_status_timedwait_sig(zone,
+	    ddi_get_lbolt() + hz, ZONE_IS_EMPTY)) == -1) {
 		killall(zone->zone_id);
 	}
 	/*

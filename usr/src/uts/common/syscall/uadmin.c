@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -113,8 +112,8 @@ killall(zoneid_t zoneid)
 			} else {
 				sigtoproc(p, NULL, SIGKILL);
 				mutex_exit(&p->p_lock);
-				(void) cv_timedwait(&p->p_srwchan_cv, &pidlock,
-				    lbolt + hz);
+				(void) cv_reltimedwait(&p->p_srwchan_cv,
+				    &pidlock, hz, TR_CLOCK_TICK);
 				p = practive;
 			}
 		} else {

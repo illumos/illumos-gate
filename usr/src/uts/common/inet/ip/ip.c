@@ -2130,7 +2130,7 @@ icmp_inbound_too_big_v4(icmph_t *icmph, ip_recv_attr_t *ira)
 
 	/* We now have a PMTU for sure */
 	dce->dce_flags |= DCEF_PMTU;
-	dce->dce_last_change_time = TICK_TO_SEC(lbolt64);
+	dce->dce_last_change_time = TICK_TO_SEC(ddi_get_lbolt64());
 	mutex_exit(&dce->dce_lock);
 	/*
 	 * After dropping the lock the new value is visible to everyone.
@@ -3083,7 +3083,7 @@ icmp_pkt(mblk_t *mp, void *stuff, size_t len, ip_recv_attr_t *ira)
 boolean_t
 icmp_err_rate_limit(ip_stack_t *ipst)
 {
-	clock_t now = TICK_TO_MSEC(lbolt);
+	clock_t now = TICK_TO_MSEC(ddi_get_lbolt());
 	uint_t refilled; /* Number of packets refilled in tbf since last */
 	/* Guard against changes by loading into local variable */
 	uint_t err_interval = ipst->ips_ip_icmp_err_interval;
@@ -3893,14 +3893,14 @@ ip_get_pmtu(ip_xmit_attr_t *ixa)
 
 	/* Check if the PMTU is to old before we use it */
 	if ((dce->dce_flags & DCEF_PMTU) &&
-	    TICK_TO_SEC(lbolt64) - dce->dce_last_change_time >
+	    TICK_TO_SEC(ddi_get_lbolt64()) - dce->dce_last_change_time >
 	    ipst->ips_ip_pathmtu_interval) {
 		/*
 		 * Older than 20 minutes. Drop the path MTU information.
 		 */
 		mutex_enter(&dce->dce_lock);
 		dce->dce_flags &= ~(DCEF_PMTU|DCEF_TOO_SMALL_PMTU);
-		dce->dce_last_change_time = TICK_TO_SEC(lbolt64);
+		dce->dce_last_change_time = TICK_TO_SEC(ddi_get_lbolt64());
 		mutex_exit(&dce->dce_lock);
 		dce_increment_generation(dce);
 	}
@@ -14773,7 +14773,7 @@ sendit:
 			 * It should be o.k. to check the state without
 			 * a lock here, at most we lose an advice.
 			 */
-			ncec->ncec_last = TICK_TO_MSEC(lbolt64);
+			ncec->ncec_last = TICK_TO_MSEC(ddi_get_lbolt64());
 			if (ncec->ncec_state != ND_REACHABLE) {
 				mutex_enter(&ncec->ncec_lock);
 				ncec->ncec_state = ND_REACHABLE;
@@ -14792,7 +14792,7 @@ sendit:
 			return (0);
 		}
 
-		delta =  TICK_TO_MSEC(lbolt64) - ncec->ncec_last;
+		delta =  TICK_TO_MSEC(ddi_get_lbolt64()) - ncec->ncec_last;
 		ip1dbg(("ip_xmit: delta = %" PRId64
 		    " ill_reachable_time = %d \n", delta,
 		    ill->ill_reachable_time));

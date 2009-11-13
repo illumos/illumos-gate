@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,8 +33,6 @@
 
 #ifndef _SYS_CONDVAR_H
 #define	_SYS_CONDVAR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef	_ASM
 #include <sys/types.h>
@@ -64,6 +61,25 @@ typedef	enum {
 	CV_DRIVER
 } kcv_type_t;
 
+/*
+ * Time resolution values used in cv_reltimedwait() and cv_reltimedwait_sig()
+ * to specify how accurately a relative timeout must expire - if it can be
+ * anticipated or deferred.
+ */
+enum time_res {
+	TR_NANOSEC,
+	TR_MICROSEC,
+	TR_MILLISEC,
+	TR_SEC,
+	TR_CLOCK_TICK,
+	TR_COUNT
+};
+
+typedef enum time_res time_res_t;
+
+extern time_res_t time_res[];
+
+#define	TIME_RES_VALID(tr)	(tr >= TR_NANOSEC && tr < TR_COUNT)
 
 #if defined(_KERNEL)
 
@@ -76,8 +92,11 @@ extern  void	cv_destroy(kcondvar_t *);
 extern	void	cv_wait(kcondvar_t *, kmutex_t *);
 extern	void	cv_wait_stop(kcondvar_t *, kmutex_t *, int);
 extern	clock_t	cv_timedwait(kcondvar_t *, kmutex_t *, clock_t);
+extern	clock_t	cv_reltimedwait(kcondvar_t *, kmutex_t *, clock_t, time_res_t);
 extern	int	cv_wait_sig(kcondvar_t *, kmutex_t *);
 extern	clock_t	cv_timedwait_sig(kcondvar_t *, kmutex_t *, clock_t);
+extern	clock_t	cv_reltimedwait_sig(kcondvar_t *, kmutex_t *, clock_t,
+    time_res_t);
 extern	int	cv_wait_sig_swap(kcondvar_t *, kmutex_t *);
 extern	int	cv_wait_sig_swap_core(kcondvar_t *, kmutex_t *, int *);
 extern	void	cv_signal(kcondvar_t *);

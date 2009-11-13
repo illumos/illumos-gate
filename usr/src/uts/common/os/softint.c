@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -192,7 +190,7 @@ softcall_init(void)
 	mutex_init(&softcall_lock, NULL, MUTEX_SPIN,
 	    (void *)ipltospl(SPL8));
 	softcall_state = SOFT_IDLE;
-	softcall_tick = lbolt;
+	softcall_tick = ddi_get_lbolt();
 
 	/*
 	 * Since softcall_delay is expressed as 1 = 10 milliseconds.
@@ -345,11 +343,11 @@ softcall(void (*func)(void *), void *arg)
 intr:
 	if (softcall_state & SOFT_IDLE) {
 		softcall_state = SOFT_PEND;
-		softcall_tick = lbolt;
+		softcall_tick = ddi_get_lbolt();
 		mutex_exit(&softcall_lock);
 		siron();
 	} else if (softcall_state & (SOFT_DRAIN|SOFT_PEND)) {
-		now = lbolt;
+		now = ddi_get_lbolt();
 		w = now - softcall_tick;
 		if (w <= softcall_delay || ncpus == 1) {
 			mutex_exit(&softcall_lock);
@@ -379,7 +377,7 @@ intr:
 			 */
 			softcall_pokecount = 0;
 		}
-		softcall_lastpoke = lbolt;
+		softcall_lastpoke = now;
 		if (!(softcall_state & SOFT_STEAL)) {
 			softcall_state |= SOFT_STEAL;
 
@@ -387,7 +385,7 @@ intr:
 			 * We want to give some more chance before
 			 * fishing around again.
 			 */
-			softcall_tick = lbolt;
+			softcall_tick = now;
 		}
 
 		/* softcall_lock will be released by this routine */
@@ -472,7 +470,7 @@ softint(void)
 		CPUSET_ADD(*softcall_cpuset, cpu_id);
 
 	for (;;) {
-		softcall_tick = lbolt;
+		softcall_tick = ddi_get_lbolt();
 		if ((sc = softhead) != NULL) {
 			func = sc->sc_func;
 			arg = sc->sc_arg;

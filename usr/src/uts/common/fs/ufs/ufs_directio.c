@@ -314,7 +314,7 @@ directio_start(struct ufsvfs *ufsvfsp, struct inode *ip, size_t nbytes,
 	/*
 	 * Issue I/O request.
 	 */
-	ufsvfsp->vfs_iotstamp = lbolt;
+	ufsvfsp->vfs_iotstamp = ddi_get_lbolt();
 	if (ufsvfsp->vfs_snapshot)
 		fssnap_strategy(&ufsvfsp->vfs_snapshot, bp);
 	else

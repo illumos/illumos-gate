@@ -2370,7 +2370,7 @@ nfs4_ephemeral_harvester(nfs4_trigger_globals_t *ntg)
 	zone_t		*zone = curproc->p_zone;
 
 	for (;;) {
-		timeleft = zone_status_timedwait(zone, lbolt +
+		timeleft = zone_status_timedwait(zone, ddi_get_lbolt() +
 		    nfs4_trigger_thread_timer * hz, ZONE_IS_SHUTTING_DOWN);
 
 		/*

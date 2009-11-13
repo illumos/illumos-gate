@@ -130,6 +130,8 @@
 #include <sys/traptrace.h>
 #endif	/* TRAPTRACE */
 
+#include <sys/clock_impl.h>
+
 extern void audit_enterprom(int);
 extern void audit_exitprom(int);
 
@@ -1364,4 +1366,25 @@ dtrace_linear_pc(struct regs *rp, proc_t *p, caddr_t *linearp)
 	}
 
 	return (0);
+}
+
+/*
+ * We need to post a soft interrupt to reprogram the lbolt cyclic when
+ * switching from event to cyclic driven lbolt. The following code adds
+ * and posts the softint for x86.
+ */
+static ddi_softint_hdl_impl_t lbolt_softint_hdl =
+	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL};
+
+void
+lbolt_softint_add(void)
+{
+	(void) add_avsoftintr((void *)&lbolt_softint_hdl, LOCK_LEVEL,
+	    (avfunc)lbolt_ev_to_cyclic, "lbolt_ev_to_cyclic", NULL, NULL);
+}
+
+void
+lbolt_softint_post(void)
+{
+	(*setsoftint)(CBE_LOCK_PIL, lbolt_softint_hdl.ih_pending);
 }

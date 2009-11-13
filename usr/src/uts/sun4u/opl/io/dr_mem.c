@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * DR memory support routines.
@@ -496,7 +494,7 @@ dr_move_memory(dr_handle_t *hp, dr_mem_unit_t *s_mp, dr_mem_unit_t *t_mp)
 	srhp = dr_get_sr_handle(hp);
 	ASSERT(srhp);
 
-	copytime = lbolt;
+	copytime = ddi_get_lbolt();
 
 	/* Quiesce the OS.  */
 	if (dr_suspend(srhp)) {
@@ -527,7 +525,7 @@ dr_move_memory(dr_handle_t *hp, dr_mem_unit_t *s_mp, dr_mem_unit_t *t_mp)
 	/* Resume the OS.  */
 	dr_resume(srhp);
 
-	copytime = lbolt - copytime;
+	copytime = ddi_get_lbolt() - copytime;
 
 	if (err = drmach_copy_rename_fini(cr_id))
 		goto done;

@@ -686,11 +686,11 @@ static void
 wifi_wait_scan(struct ieee80211com *ic)
 {
 	ieee80211_impl_t *im = ic->ic_private;
+	clock_t delta = drv_usectohz(WAIT_SCAN_MAX * 1000);
 
 	while ((ic->ic_flags & (IEEE80211_F_SCAN | IEEE80211_F_ASCAN)) != 0) {
-		if (cv_timedwait_sig(&im->im_scan_cv, &ic->ic_genlock,
-		    ddi_get_lbolt() + drv_usectohz(WAIT_SCAN_MAX * 1000)) !=
-		    0) {
+		if (cv_reltimedwait_sig(&im->im_scan_cv, &ic->ic_genlock,
+		    delta, TR_CLOCK_TICK) != 0) {
 			break;
 		}
 	}

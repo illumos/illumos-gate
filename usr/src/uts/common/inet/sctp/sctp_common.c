@@ -619,7 +619,7 @@ sctp_redo_faddr_srcs(sctp_t *sctp)
 void
 sctp_faddr_alive(sctp_t *sctp, sctp_faddr_t *fp)
 {
-	int64_t now = lbolt64;
+	int64_t now = ddi_get_lbolt64();
 
 	fp->strikes = 0;
 	sctp->sctp_strikes = 0;
@@ -1779,7 +1779,7 @@ sctp_init_faddr(sctp_t *sctp, sctp_faddr_t *fp, in6_addr_t *addr,
 	fp->suna = 0;
 	fp->pba = 0;
 	fp->acked = 0;
-	fp->lastactive = lbolt64;
+	fp->lastactive = fp->hb_expiry = ddi_get_lbolt64();
 	fp->timer_mp = timer_mp;
 	fp->hb_pending = B_FALSE;
 	fp->hb_enabled = B_TRUE;
@@ -1789,7 +1789,6 @@ sctp_init_faddr(sctp_t *sctp, sctp_faddr_t *fp, in6_addr_t *addr,
 	fp->T3expire = 0;
 	(void) random_get_pseudo_bytes((uint8_t *)&fp->hb_secret,
 	    sizeof (fp->hb_secret));
-	fp->hb_expiry = lbolt64;
 	fp->rxt_unacked = 0;
 
 	sctp_get_dest(sctp, fp);

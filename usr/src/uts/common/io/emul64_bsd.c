@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1369,8 +1369,8 @@ emul64_yield_check()
 		ticks = drv_usectohz(emul64_yield_length);
 		if (ticks == 0)
 			ticks = 1;
-		(void) cv_timedwait(&emul64_yield_cv,
-		    &emul64_yield_mutex, ddi_get_lbolt() + ticks);
+		(void) cv_reltimedwait(&emul64_yield_cv, &emul64_yield_mutex,
+		    ticks, TR_CLOCK_TICK);
 		emul64_io_count = 0;
 		emul64_waiting = FALSE;
 

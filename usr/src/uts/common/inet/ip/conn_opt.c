@@ -2881,7 +2881,7 @@ conn_inherit_parent(conn_t *lconnp, conn_t *econnp)
 	econnp->conn_cred = credp = lconnp->conn_cred;
 	crhold(credp);
 	econnp->conn_cpid = lconnp->conn_cpid;
-	econnp->conn_open_time = lbolt64;
+	econnp->conn_open_time = ddi_get_lbolt64();
 
 	/*
 	 * Cache things in the ixa without any refhold.

@@ -83,6 +83,7 @@
 #include <net/if.h>
 #include <sys/rctl.h>
 #include <sys/zone.h>
+#include <sys/clock_impl.h>
 #include <sys/ddi.h>
 
 extern	pri_t	minclsyspri;
@@ -5630,7 +5631,13 @@ ddi_get_cred(void)
 clock_t
 ddi_get_lbolt(void)
 {
-	return (lbolt);
+	return ((clock_t)lbolt_hybrid());
+}
+
+int64_t
+ddi_get_lbolt64(void)
+{
+	return (lbolt_hybrid());
 }
 
 time_t

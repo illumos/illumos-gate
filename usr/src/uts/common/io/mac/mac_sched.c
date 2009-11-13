@@ -274,8 +274,9 @@ boolean_t mac_latency_optimize = B_TRUE;
 	ASSERT(MUTEX_HELD(&(mac_srs)->srs_lock));			\
 	ASSERT(((mac_srs)->srs_type & SRST_TX) ||			\
 	    MUTEX_HELD(&(mac_srs)->srs_bw->mac_bw_lock));		\
-	if ((mac_srs)->srs_bw->mac_bw_curr_time != lbolt) {    		\
-		(mac_srs)->srs_bw->mac_bw_curr_time = lbolt;   		\
+	clock_t now = ddi_get_lbolt();					\
+	if ((mac_srs)->srs_bw->mac_bw_curr_time != now) {		\
+		(mac_srs)->srs_bw->mac_bw_curr_time = now;		\
 		(mac_srs)->srs_bw->mac_bw_used = 0;	       		\
 		if ((mac_srs)->srs_bw->mac_bw_state & SRS_BW_ENFORCED)	\
 			(mac_srs)->srs_bw->mac_bw_state &= ~SRS_BW_ENFORCED; \
@@ -1813,14 +1814,16 @@ mac_rx_srs_drain_bw(mac_soft_ring_set_t *mac_srs, uint_t proc_type)
 	int			cnt = 0;
 	mac_client_impl_t	*mcip = mac_srs->srs_mcip;
 	mac_srs_rx_t		*srs_rx = &mac_srs->srs_rx;
+	clock_t			now;
 
 	ASSERT(MUTEX_HELD(&mac_srs->srs_lock));
 	ASSERT(mac_srs->srs_type & SRST_BW_CONTROL);
 again:
 	/* Check if we are doing B/W control */
 	mutex_enter(&mac_srs->srs_bw->mac_bw_lock);
-	if (mac_srs->srs_bw->mac_bw_curr_time != lbolt) {
-		mac_srs->srs_bw->mac_bw_curr_time = lbolt;
+	now = ddi_get_lbolt();
+	if (mac_srs->srs_bw->mac_bw_curr_time != now) {
+		mac_srs->srs_bw->mac_bw_curr_time = now;
 		mac_srs->srs_bw->mac_bw_used = 0;
 		if (mac_srs->srs_bw->mac_bw_state & SRS_BW_ENFORCED)
 			mac_srs->srs_bw->mac_bw_state &= ~SRS_BW_ENFORCED;
@@ -2860,6 +2863,7 @@ mac_tx_bw_mode(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
 	mblk_t			*tail;
 	mac_tx_cookie_t		cookie = NULL;
 	mac_srs_tx_t		*srs_tx = &mac_srs->srs_tx;
+	clock_t			now;
 
 	ASSERT(TX_BANDWIDTH_MODE(mac_srs));
 	ASSERT(mac_srs->srs_type & SRST_BW_CONTROL);
@@ -2886,8 +2890,9 @@ mac_tx_bw_mode(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
 		return (cookie);
 	}
 	MAC_COUNT_CHAIN(mac_srs, mp_chain, tail, cnt, sz);
-	if (mac_srs->srs_bw->mac_bw_curr_time != lbolt) {
-		mac_srs->srs_bw->mac_bw_curr_time = lbolt;
+	now = ddi_get_lbolt();
+	if (mac_srs->srs_bw->mac_bw_curr_time != now) {
+		mac_srs->srs_bw->mac_bw_curr_time = now;
 		mac_srs->srs_bw->mac_bw_used = 0;
 	} else if (mac_srs->srs_bw->mac_bw_used >
 	    mac_srs->srs_bw->mac_bw_limit) {
@@ -2962,6 +2967,7 @@ mac_tx_srs_drain(mac_soft_ring_set_t *mac_srs, uint_t proc_type)
 	boolean_t		is_subflow;
 	mac_tx_stats_t		stats;
 	mac_srs_tx_t		*srs_tx = &mac_srs->srs_tx;
+	clock_t			now;
 
 	saved_pkt_count = 0;
 	ASSERT(mutex_owned(&mac_srs->srs_lock));
@@ -3028,8 +3034,9 @@ mac_tx_srs_drain(mac_soft_ring_set_t *mac_srs, uint_t proc_type)
 			    mac_srs->srs_bw->mac_bw_limit)
 				continue;
 
-			if (mac_srs->srs_bw->mac_bw_curr_time != lbolt) {
-				mac_srs->srs_bw->mac_bw_curr_time = lbolt;
+			now = ddi_get_lbolt();
+			if (mac_srs->srs_bw->mac_bw_curr_time != now) {
+				mac_srs->srs_bw->mac_bw_curr_time = now;
 				mac_srs->srs_bw->mac_bw_used = sz;
 				continue;
 			}
@@ -3114,8 +3121,9 @@ mac_tx_srs_drain(mac_soft_ring_set_t *mac_srs, uint_t proc_type)
 			    mac_srs->srs_bw->mac_bw_limit)
 				continue;
 
-			if (mac_srs->srs_bw->mac_bw_curr_time != lbolt) {
-				mac_srs->srs_bw->mac_bw_curr_time = lbolt;
+			now = ddi_get_lbolt();
+			if (mac_srs->srs_bw->mac_bw_curr_time != now) {
+				mac_srs->srs_bw->mac_bw_curr_time = now;
 				mac_srs->srs_bw->mac_bw_used = 0;
 				continue;
 			}

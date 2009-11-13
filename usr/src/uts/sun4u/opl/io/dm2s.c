@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -675,7 +675,7 @@ static int
 dm2s_mbox_init(dm2s_t *dm2sp)
 {
 	int ret;
-	clock_t tout;
+	clock_t tout = drv_usectohz(DM2S_MB_TOUT);
 
 	ASSERT(MUTEX_HELD(&dm2sp->ms_lock));
 	dm2sp->ms_target = DM2S_TARGET_ID;
@@ -735,9 +735,8 @@ dm2s_mbox_init(dm2s_t *dm2sp)
 			 */
 
 			DPRINTF(DBG_MBOX, ("dm2s_mbox_init: waiting...\n"));
-			tout = ddi_get_lbolt() + drv_usectohz(DM2S_MB_TOUT);
-			ret = cv_timedwait_sig(&dm2sp->ms_wait,
-			    &dm2sp->ms_lock, tout);
+			ret = cv_reltimedwait_sig(&dm2sp->ms_wait,
+			    &dm2sp->ms_lock, tout, TR_CLOCK_TICK);
 			if (ret == 0) {
 				/* if interrupted, return immediately. */
 				DPRINTF(DBG_MBOX,

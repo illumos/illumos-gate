@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -718,9 +718,9 @@ sda_slot_thread(void *arg)
 
 			if ((slot->s_xfrp != NULL) || (slot->s_reap)) {
 				/* Wait 3 sec (reap attempts). */
-				(void) cv_timedwait(&slot->s_evcv,
-				    &slot->s_evlock,
-				    ddi_get_lbolt() + drv_usectohz(3000000));
+				(void) cv_reltimedwait(&slot->s_evcv,
+				    &slot->s_evlock, drv_usectohz(3000000),
+				    TR_CLOCK_TICK);
 			} else {
 				(void) cv_wait(&slot->s_evcv, &slot->s_evlock);
 			}

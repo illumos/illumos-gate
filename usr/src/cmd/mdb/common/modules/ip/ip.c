@@ -1621,8 +1621,8 @@ th_trace(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	} else {
 		thw.thw_match = B_TRUE;
 		thw.thw_matchkey = addr;
-		if (mdb_readvar(&thw.thw_lbolt,
-		    mdb_prop_postmortem ? "panic_lbolt" : "lbolt") == -1) {
+
+		if ((thw.thw_lbolt = (clock_t)mdb_get_lbolt()) == -1) {
 			mdb_warn("failed to read lbolt");
 			return (DCMD_ERR);
 		}

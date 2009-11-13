@@ -2419,7 +2419,7 @@ rib_send_resp(CONN *conn, struct clist *cl, uint32_t msgid)
 {
 	rdma_stat ret = RDMA_SUCCESS;
 	struct rdma_done_list *rd;
-	clock_t timout, cv_wait_ret;
+	clock_t cv_wait_ret;
 	caddr_t *wid = NULL;
 	rib_qp_t *qp = ctoqp(conn);
 
@@ -2435,11 +2435,9 @@ rib_send_resp(CONN *conn, struct clist *cl, uint32_t msgid)
 		/*
 		 * Wait for RDMA_DONE from remote end
 		 */
-		timout =
-		    drv_usectohz(REPLY_WAIT_TIME * 1000000) + ddi_get_lbolt();
-		cv_wait_ret = cv_timedwait(&rd->rdma_done_cv,
-		    &qp->rdlist_lock,
-		    timout);
+		cv_wait_ret = cv_reltimedwait(&rd->rdma_done_cv,
+		    &qp->rdlist_lock, drv_usectohz(REPLY_WAIT_TIME * 1000000),
+		    TR_CLOCK_TICK);
 
 		rdma_done_rm(qp, rd);
 

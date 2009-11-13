@@ -1647,7 +1647,7 @@ zil_replay(objset_t *os, void *arg, zil_replay_func_t *replay_func[TX_MAX_TYPE])
 	txg_wait_synced(zilog->zl_dmu_pool, 0);
 
 	zilog->zl_replay = B_TRUE;
-	zilog->zl_replay_time = lbolt;
+	zilog->zl_replay_time = ddi_get_lbolt();
 	ASSERT(zilog->zl_replay_blks == 0);
 	(void) zil_parse(zilog, zil_incr_blks, zil_replay_log_record, &zr,
 	    zh->zh_claim_txg);

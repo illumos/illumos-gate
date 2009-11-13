@@ -1719,9 +1719,9 @@ pcishpc_attn_btn_handler(pcie_hp_slot_t *slot_p)
 			    PCIE_HP_LED_BLINK);
 
 			/* wait for 5 seconds before taking any action */
-			if (cv_timedwait(&slot_p->hs_attn_btn_cv,
+			if (cv_reltimedwait(&slot_p->hs_attn_btn_cv,
 			    &slot_p->hs_ctrl->hc_mutex,
-			    ddi_get_lbolt() + SEC_TO_TICK(5)) == -1) {
+			    SEC_TO_TICK(5), TR_CLOCK_TICK) == -1) {
 				/*
 				 * It is a time out;
 				 * make sure the ATTN pending flag is

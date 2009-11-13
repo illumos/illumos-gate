@@ -16653,7 +16653,7 @@ sata_event_daemon(void *arg)
 	_NOTE(ARGUNUSED(arg))
 #endif
 	sata_hba_inst_t *sata_hba_inst;
-	clock_t lbolt;
+	clock_t delta;
 
 	SATADBG1(SATA_DBG_EVENTS_DAEMON, NULL,
 	    "SATA event daemon started\n", NULL);
@@ -16715,11 +16715,11 @@ loop:
 	 * wait timeout. Exit if there is a termination request (driver
 	 * unload).
 	 */
+	delta = drv_usectohz(SATA_EVNT_DAEMON_SLEEP_TIME);
 	do {
-		lbolt = ddi_get_lbolt();
-		lbolt += drv_usectohz(SATA_EVNT_DAEMON_SLEEP_TIME);
 		mutex_enter(&sata_event_mutex);
-		(void) cv_timedwait(&sata_event_cv, &sata_event_mutex, lbolt);
+		(void) cv_reltimedwait(&sata_event_cv, &sata_event_mutex,
+		    delta, TR_CLOCK_TICK);
 
 		if (sata_event_thread_active != 0) {
 			mutex_exit(&sata_event_mutex);

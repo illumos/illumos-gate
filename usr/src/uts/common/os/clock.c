@@ -21,12 +21,10 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
 
-
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #include <sys/param.h>
 #include <sys/t_lock.h>
@@ -75,6 +73,9 @@
  */
 #include <sys/timex.h>
 #include <sys/inttypes.h>
+
+#include <sys/sunddi.h>
+#include <sys/clock_impl.h>
 
 /*
  * clock() is called straight from the clock cyclic; see clock_init().
@@ -239,11 +240,73 @@ int32_t pps_calcnt = 0;		/* calibration intervals */
 int32_t pps_errcnt = 0;		/* calibration errors */
 int32_t pps_stbcnt = 0;		/* stability limit exceeded */
 
-/* The following variables require no explicit locking */
-volatile clock_t lbolt;		/* time in Hz since last boot */
-volatile int64_t lbolt64;	/* lbolt64 won't wrap for 2.9 billion yrs */
-
 kcondvar_t lbolt_cv;
+
+/*
+ * Hybrid lbolt implementation:
+ *
+ * The service historically provided by the lbolt and lbolt64 variables has
+ * been replaced by the ddi_get_lbolt() and ddi_get_lbolt64() routines, and the
+ * original symbols removed from the system. The once clock driven variables are
+ * now implemented in an event driven fashion, backed by gethrtime() coarsed to
+ * the appropriate clock resolution. The default event driven implementation is
+ * complemented by a cyclic driven one, active only during periods of intense
+ * activity around the DDI lbolt routines, when a lbolt specific cyclic is
+ * reprogramed to fire at a clock tick interval to serve consumers of lbolt who
+ * rely on the original low cost of consulting a memory position.
+ *
+ * The implementation uses the number of calls to these routines and the
+ * frequency of these to determine when to transition from event to cyclic
+ * driven and vice-versa. These values are kept on a per CPU basis for
+ * scalability reasons and to prevent CPUs from constantly invalidating a single
+ * cache line when modifying a global variable. The transition from event to
+ * cyclic mode happens once the thresholds are crossed, and activity on any CPU
+ * can cause such transition.
+ *
+ * The lbolt_hybrid function pointer is called by ddi_get_lbolt() and
+ * ddi_get_lbolt64(), and will point to lbolt_event_driven() or
+ * lbolt_cyclic_driven() according to the current mode. When the thresholds
+ * are exceeded, lbolt_event_driven() will reprogram the lbolt cyclic to
+ * fire at a nsec_per_tick interval and increment an internal variable at
+ * each firing. lbolt_hybrid will then point to lbolt_cyclic_driven(), which
+ * will simply return the value of such variable. lbolt_cyclic() will attempt
+ * to shut itself off at each threshold interval (sampling period for calls
+ * to the DDI lbolt routines), and return to the event driven mode, but will
+ * be prevented from doing so if lbolt_cyclic_driven() is being heavily used.
+ *
+ * lbolt_bootstrap is used during boot to serve lbolt consumers who don't wait
+ * for the cyclic subsystem to be intialized.
+ *
+ */
+static int64_t lbolt_bootstrap(void);
+int64_t lbolt_event_driven(void);
+int64_t lbolt_cyclic_driven(void);
+int64_t (*lbolt_hybrid)(void) = lbolt_bootstrap;
+uint_t lbolt_ev_to_cyclic(caddr_t, caddr_t);
+
+/*
+ * lbolt's cyclic, installed by clock_init().
+ */
+static void lbolt_cyclic(void);
+
+/*
+ * Tunable to keep lbolt in cyclic driven mode. This will prevent the system
+ * from switching back to event driven, once it reaches cyclic mode.
+ */
+static boolean_t lbolt_cyc_only = B_FALSE;
+
+/*
+ * Cache aligned, per CPU structure with lbolt usage statistics.
+ */
+static lbolt_cpu_t *lb_cpu;
+
+/*
+ * Single, cache aligned, structure with all the information required by
+ * the lbolt implementation.
+ */
+lbolt_info_t *lb_info;
+
+
 int one_sec = 1; /* turned on once every second */
 static int fsflushcnt;	/* counter for t_fsflushr */
 int	dosynctodr = 1;	/* patchable; enable/disable sync to TOD chip */
@@ -322,6 +385,8 @@ void (*cpucaps_clock_callout)() = NULL;
 
 extern clock_t clock_tick_proc_max;
 
+static int64_t deadman_counter = 0;
+
 static void
 clock(void)
 {
@@ -338,6 +403,7 @@ clock(void)
 	int s;
 	int do_lgrp_load;
 	int i;
+	clock_t now = LBOLT_NO_ACCOUNT;	/* current tick */
 
 	if (panicstr)
 		return;
@@ -405,8 +471,10 @@ clock(void)
 		do_lgrp_load = 1;
 	}
 
-	if (one_sec)
+	if (one_sec) {
 		loadavg_update();
+		deadman_counter++;
+	}
 
 	/*
 	 * First count the threads waiting on kpreempt queues in each
@@ -542,15 +610,6 @@ clock(void)
 	} while ((cp = cp->cpu_next) != cpu_list);
 
 	clock_tick_schedule(one_sec);
-
-	/*
-	 * bump time in ticks
-	 *
-	 * We rely on there being only one clock thread and hence
-	 * don't need a lock to protect lbolt.
-	 */
-	lbolt++;
-	atomic_add_64((uint64_t *)&lbolt64, (int64_t)1);
 
 	/*
 	 * Check for a callout that needs be called from the clock
@@ -753,7 +812,7 @@ clock(void)
 					 * the clock;  record that.
 					 */
 					clock_adj_hist[adj_hist_entry++ %
-					    CLOCK_ADJ_HIST_SIZE] = lbolt64;
+					    CLOCK_ADJ_HIST_SIZE] = now;
 					s = hr_clock_lock();
 					timedelta = (int64_t)drift*NANOSEC;
 					hr_clock_unlock(s);
@@ -882,30 +941,84 @@ clock(void)
 void
 clock_init(void)
 {
-	cyc_handler_t hdlr;
-	cyc_time_t when;
+	cyc_handler_t clk_hdlr, timer_hdlr, lbolt_hdlr;
+	cyc_time_t clk_when, lbolt_when;
+	int i, sz;
+	intptr_t buf;
 
-	hdlr.cyh_func = (cyc_func_t)clock;
-	hdlr.cyh_level = CY_LOCK_LEVEL;
-	hdlr.cyh_arg = NULL;
+	/*
+	 * Setup handler and timer for the clock cyclic.
+	 */
+	clk_hdlr.cyh_func = (cyc_func_t)clock;
+	clk_hdlr.cyh_level = CY_LOCK_LEVEL;
+	clk_hdlr.cyh_arg = NULL;
 
-	when.cyt_when = 0;
-	when.cyt_interval = nsec_per_tick;
-
-	mutex_enter(&cpu_lock);
-	clock_cyclic = cyclic_add(&hdlr, &when);
-	mutex_exit(&cpu_lock);
+	clk_when.cyt_when = 0;
+	clk_when.cyt_interval = nsec_per_tick;
 
 	/*
 	 * cyclic_timer is dedicated to the ddi interface, which
 	 * uses the same clock resolution as the system one.
 	 */
-	hdlr.cyh_func = (cyc_func_t)cyclic_timer;
-	hdlr.cyh_level = CY_LOCK_LEVEL;
-	hdlr.cyh_arg = NULL;
+	timer_hdlr.cyh_func = (cyc_func_t)cyclic_timer;
+	timer_hdlr.cyh_level = CY_LOCK_LEVEL;
+	timer_hdlr.cyh_arg = NULL;
 
+	/*
+	 * Setup the necessary structures for the lbolt cyclic and add the
+	 * soft interrupt which will switch from event to cyclic mode when
+	 * under high pil.
+	 */
+	lbolt_hdlr.cyh_func = (cyc_func_t)lbolt_cyclic;
+	lbolt_hdlr.cyh_level = CY_LOCK_LEVEL;
+	lbolt_hdlr.cyh_arg = NULL;
+
+	lbolt_when.cyt_interval = nsec_per_tick;
+
+	if (lbolt_cyc_only) {
+		lbolt_when.cyt_when = 0;
+		lbolt_hybrid = lbolt_cyclic_driven;
+	} else {
+		lbolt_when.cyt_when = CY_INFINITY;
+		lbolt_hybrid = lbolt_event_driven;
+	}
+
+	/*
+	 * Allocate cache line aligned space for the per CPU lbolt data and
+	 * lb_info structure. We also initialize these structures with their
+	 * default values and install the softint to change from event to
+	 * cyclic driven mode.
+	 */
+	sz = sizeof (lbolt_info_t) + CPU_CACHE_COHERENCE_SIZE;
+	buf = (intptr_t)kmem_zalloc(sz, KM_SLEEP);
+	lb_info = (lbolt_info_t *)P2ROUNDUP(buf, CPU_CACHE_COHERENCE_SIZE);
+
+	if (hz != HZ_DEFAULT)
+		lb_info->lbi_thresh_interval = LBOLT_THRESH_INTERVAL *
+		    hz/HZ_DEFAULT;
+	else
+		lb_info->lbi_thresh_interval = LBOLT_THRESH_INTERVAL;
+
+	lb_info->lbi_thresh_calls = LBOLT_THRESH_CALLS;
+
+	sz = (sizeof (lbolt_info_t) * max_ncpus) + CPU_CACHE_COHERENCE_SIZE;
+	buf = (intptr_t)kmem_zalloc(sz, KM_SLEEP);
+	lb_cpu = (lbolt_cpu_t *)P2ROUNDUP(buf, CPU_CACHE_COHERENCE_SIZE);
+
+	for (i = 0; i < max_ncpus; i++)
+		lb_cpu[i].lbc_counter = lb_info->lbi_thresh_calls;
+
+	lbolt_softint_add();
+
+	/*
+	 * Grab cpu_lock and install all three cyclics.
+	 */
 	mutex_enter(&cpu_lock);
-	ddi_timer_cyclic = cyclic_add(&hdlr, &when);
+
+	clock_cyclic = cyclic_add(&clk_hdlr, &clk_when);
+	ddi_timer_cyclic = cyclic_add(&timer_hdlr, &clk_when);
+	lb_info->lbi_cyclic_id = cyclic_add(&lbolt_hdlr, &lbolt_when);
+
 	mutex_exit(&cpu_lock);
 }
 
@@ -1631,8 +1744,8 @@ delay_common(clock_t ticks)
 		return;
 	}
 
-	deadline = lbolt + ticks;
-	while ((timeleft = deadline - lbolt) > 0) {
+	deadline = ddi_get_lbolt() + ticks;
+	while ((timeleft = deadline - ddi_get_lbolt()) > 0) {
 		mutex_enter(&t->t_delay_lock);
 		id = timeout_default(delay_wakeup, t, timeleft);
 		cv_wait(&t->t_delay_cv, &t->t_delay_lock);
@@ -1686,7 +1799,7 @@ delay_sig(clock_t ticks)
 		return (0);
 	}
 
-	deadline = lbolt + ticks;
+	deadline = ddi_get_lbolt() + ticks;
 	mutex_enter(&t->t_delay_lock);
 	do {
 		rc = cv_timedwait_sig(&t->t_delay_cv,
@@ -1807,15 +1920,6 @@ deadman(void)
 		if (CPU->cpu_id != panic_cpu.cpu_id)
 			return;
 
-		/*
-		 * If we're panicking, the deadman cyclic continues to increase
-		 * lbolt in case the dump device driver relies on this for
-		 * timeouts.  Note that we rely on deadman() being invoked once
-		 * per second, and credit lbolt and lbolt64 with hz ticks each.
-		 */
-		lbolt += hz;
-		lbolt64 += hz;
-
 		if (!deadman_panic_timers)
 			return; /* allow all timers to be manually disabled */
 
@@ -1840,8 +1944,8 @@ deadman(void)
 		return;
 	}
 
-	if (lbolt != CPU->cpu_deadman_lbolt) {
-		CPU->cpu_deadman_lbolt = lbolt;
+	if (deadman_counter != CPU->cpu_deadman_counter) {
+		CPU->cpu_deadman_counter = deadman_counter;
 		CPU->cpu_deadman_countdown = deadman_seconds;
 		return;
 	}
@@ -1879,7 +1983,7 @@ deadman(void)
 static void
 deadman_online(void *arg, cpu_t *cpu, cyc_handler_t *hdlr, cyc_time_t *when)
 {
-	cpu->cpu_deadman_lbolt = 0;
+	cpu->cpu_deadman_counter = 0;
 	cpu->cpu_deadman_countdown = deadman_seconds;
 
 	hdlr->cyh_func = (cyc_func_t)deadman;
@@ -1892,9 +1996,6 @@ deadman_online(void *arg, cpu_t *cpu, cyc_handler_t *hdlr, cyc_time_t *when)
 	 * more likely that only one CPU will panic in case of a
 	 * timeout.  This is (strictly speaking) an aesthetic, not a
 	 * technical consideration.
-	 *
-	 * The interval must be one second in accordance with the
-	 * code in deadman() above to increase lbolt during panic.
 	 */
 	when->cyt_when = cpu->cpu_id * (NANOSEC / NCPU);
 	when->cyt_interval = NANOSEC;
@@ -2183,4 +2284,227 @@ calcloadavg(int nrun, uint64_t *hp_ave)
 		r = (hp_ave[i]  & 0xffff) << 7;
 		hp_ave[i] += ((nrun - q) * f[i] - ((r * f[i]) >> 16)) >> 4;
 	}
+}
+
+/*
+ * lbolt_hybrid() is used by ddi_get_lbolt() and ddi_get_lbolt64() to
+ * calculate the value of lbolt according to the current mode. In the event
+ * driven mode (the default), lbolt is calculated by dividing the current hires
+ * time by the number of nanoseconds per clock tick. In the cyclic driven mode
+ * an internal variable is incremented at each firing of the lbolt cyclic
+ * and returned by lbolt_cyclic_driven().
+ *
+ * The system will transition from event to cyclic driven mode when the number
+ * of calls to lbolt_event_driven() exceeds the (per CPU) threshold within a
+ * window of time. It does so by reprograming lbolt_cyclic from CY_INFINITY to
+ * nsec_per_tick. The lbolt cyclic will remain ON while at least one CPU is
+ * causing enough activity to cross the thresholds.
+ */
+static int64_t
+lbolt_bootstrap(void)
+{
+	return (0);
+}
+
+/* ARGSUSED */
+uint_t
+lbolt_ev_to_cyclic(caddr_t arg1, caddr_t arg2)
+{
+	hrtime_t ts, exp;
+	int ret;
+
+	ASSERT(lbolt_hybrid != lbolt_cyclic_driven);
+
+	kpreempt_disable();
+
+	ts = gethrtime();
+	lb_info->lbi_internal = (ts/nsec_per_tick);
+
+	/*
+	 * Align the next expiration to a clock tick boundary.
+	 */
+	exp = ts + nsec_per_tick - 1;
+	exp = (exp/nsec_per_tick) * nsec_per_tick;
+
+	ret = cyclic_reprogram(lb_info->lbi_cyclic_id, exp);
+	ASSERT(ret);
+
+	lbolt_hybrid = lbolt_cyclic_driven;
+	lb_info->lbi_cyc_deactivate = B_FALSE;
+	lb_info->lbi_cyc_deac_start = lb_info->lbi_internal;
+
+	kpreempt_enable();
+
+	ret = atomic_dec_32_nv(&lb_info->lbi_token);
+	ASSERT(ret == 0);
+
+	return (1);
+}
+
+int64_t
+lbolt_event_driven(void)
+{
+	hrtime_t ts;
+	int64_t lb;
+	int ret, cpu = CPU->cpu_seqid;
+
+	ts = gethrtime();
+	ASSERT(ts > 0);
+
+	ASSERT(nsec_per_tick > 0);
+	lb = (ts/nsec_per_tick);
+
+	/*
+	 * Switch to cyclic mode if the number of calls to this routine
+	 * has reached the threshold within the interval.
+	 */
+	if ((lb - lb_cpu[cpu].lbc_cnt_start) < lb_info->lbi_thresh_interval) {
+
+		if (--lb_cpu[cpu].lbc_counter == 0) {
+			/*
+			 * Reached the threshold within the interval, reset
+			 * the usage statistics.
+			 */
+			lb_cpu[cpu].lbc_counter = lb_info->lbi_thresh_calls;
+			lb_cpu[cpu].lbc_cnt_start = lb;
+
+			/*
+			 * Make sure only one thread reprograms the
+			 * lbolt cyclic and changes the mode.
+			 */
+			if (panicstr == NULL &&
+			    atomic_cas_32(&lb_info->lbi_token, 0, 1) == 0) {
+
+				if (lbolt_hybrid == lbolt_cyclic_driven) {
+					ret = atomic_dec_32_nv(
+					    &lb_info->lbi_token);
+					ASSERT(ret == 0);
+					return (lb);
+				}
+
+				lbolt_softint_post();
+			}
+		}
+	} else {
+		/*
+		 * Exceeded the interval, reset the usage statistics.
+		 */
+		lb_cpu[cpu].lbc_counter = lb_info->lbi_thresh_calls;
+		lb_cpu[cpu].lbc_cnt_start = lb;
+	}
+
+	ASSERT(lb >= lb_info->lbi_debug_time);
+
+	return (lb - lb_info->lbi_debug_time);
+}
+
+int64_t
+lbolt_cyclic_driven(void)
+{
+	int64_t lb = lb_info->lbi_internal;
+	int cpu = CPU->cpu_seqid;
+
+	if ((lb - lb_cpu[cpu].lbc_cnt_start) < lb_info->lbi_thresh_interval) {
+
+		if (lb_cpu[cpu].lbc_counter == 0)
+			/*
+			 * Reached the threshold within the interval,
+			 * prevent the lbolt cyclic from turning itself
+			 * off.
+			 */
+			lb_info->lbi_cyc_deactivate = B_FALSE;
+		else
+			lb_cpu[cpu].lbc_counter--;
+	} else {
+		/*
+		 * Only reset the usage statistics when the interval has
+		 * exceeded.
+		 */
+		lb_cpu[cpu].lbc_counter = lb_info->lbi_thresh_calls;
+		lb_cpu[cpu].lbc_cnt_start = lb;
+	}
+
+	ASSERT(lb >= lb_info->lbi_debug_time);
+
+	return (lb - lb_info->lbi_debug_time);
+}
+
+/*
+ * The lbolt_cyclic() routine will fire at a nsec_per_tick rate to satisfy
+ * performance needs of ddi_get_lbolt() and ddi_get_lbolt64() consumers.
+ * It is inactive by default, and will be activated when switching from event
+ * to cyclic driven lbolt. The cyclic will turn itself off unless signaled
+ * by lbolt_cyclic_driven().
+ */
+static void
+lbolt_cyclic(void)
+{
+	int ret;
+
+	lb_info->lbi_internal++;
+
+	if (!lbolt_cyc_only) {
+
+		if (lb_info->lbi_cyc_deactivate) {
+			/*
+			 * Switching from cyclic to event driven mode.
+			 */
+			if (atomic_cas_32(&lb_info->lbi_token, 0, 1) == 0) {
+
+				if (lbolt_hybrid == lbolt_event_driven) {
+					ret = atomic_dec_32_nv(
+					    &lb_info->lbi_token);
+					ASSERT(ret == 0);
+					return;
+				}
+
+				kpreempt_disable();
+
+				lbolt_hybrid = lbolt_event_driven;
+				ret = cyclic_reprogram(lb_info->lbi_cyclic_id,
+				    CY_INFINITY);
+				ASSERT(ret);
+
+				kpreempt_enable();
+
+				ret = atomic_dec_32_nv(&lb_info->lbi_token);
+				ASSERT(ret == 0);
+			}
+		}
+
+		/*
+		 * The lbolt cyclic should not try to deactivate itself before
+		 * the sampling period has elapsed.
+		 */
+		if (lb_info->lbi_internal - lb_info->lbi_cyc_deac_start >=
+		    lb_info->lbi_thresh_interval) {
+			lb_info->lbi_cyc_deactivate = B_TRUE;
+			lb_info->lbi_cyc_deac_start = lb_info->lbi_internal;
+		}
+	}
+}
+
+/*
+ * Since the lbolt service was historically cyclic driven, it must be 'stopped'
+ * when the system drops into the kernel debugger. lbolt_debug_entry() is
+ * called by the KDI system claim callbacks to record a hires timestamp at
+ * debug enter time. lbolt_debug_return() is called by the sistem release
+ * callbacks to account for the time spent in the debugger. The value is then
+ * accumulated in the lb_info structure and used by lbolt_event_driven() and
+ * lbolt_cyclic_driven(), as well as the mdb_get_lbolt() routine.
+ */
+void
+lbolt_debug_entry(void)
+{
+	lb_info->lbi_debug_ts = gethrtime();
+}
+
+void
+lbolt_debug_return(void)
+{
+	if (nsec_per_tick > 0)
+		lb_info->lbi_debug_time +=
+		    ((gethrtime() - lb_info->lbi_debug_ts)/nsec_per_tick);
+
+	lb_info->lbi_debug_ts = 0;
 }

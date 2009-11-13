@@ -363,7 +363,8 @@ sctp_disconnect(sctp_t *sctp)
 
 			sctp->sctp_lingering = 1;
 			sctp->sctp_client_errno = 0;
-			stoptime = lbolt + connp->conn_lingertime * hz;
+			stoptime = ddi_get_lbolt() +
+			    connp->conn_lingertime * hz;
 
 			mutex_enter(&sctp->sctp_lock);
 			sctp->sctp_running = B_FALSE;
@@ -847,7 +848,7 @@ sctp_init_values(sctp_t *sctp, sctp_t *psctp, int sleep)
 
 	sctp->sctp_strikes = 0;
 
-	sctp->sctp_last_mtu_probe = lbolt64;
+	sctp->sctp_last_mtu_probe = ddi_get_lbolt64();
 	sctp->sctp_mtu_probe_intvl = sctps->sctps_mtu_probe_interval;
 
 	sctp->sctp_sack_gaps = 0;
@@ -1485,7 +1486,7 @@ sctp_create(void *ulpd, sctp_t *parent, int family, int type, int flags,
 		 * no IPCL_ZONEID
 		 */
 		connp->conn_ixa->ixa_zoneid = zoneid;
-		connp->conn_open_time = lbolt64;
+		connp->conn_open_time = ddi_get_lbolt64();
 		connp->conn_cred = credp;
 		crhold(credp);
 		connp->conn_cpid = curproc->p_pid;

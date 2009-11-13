@@ -3734,7 +3734,6 @@ ehci_wait_for_transfers_completion(
 	ehci_pipe_private_t	*pp)
 {
 	ehci_trans_wrapper_t	*next_tw = pp->pp_tw_head;
-	clock_t			xfer_cmpl_time_wait;
 	ehci_qtd_t		*qtd;
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS,
@@ -3781,12 +3780,8 @@ ehci_wait_for_transfers_completion(
 		return;
 	}
 
-	/* Get the number of clock ticks to wait */
-	xfer_cmpl_time_wait = drv_usectohz(EHCI_XFER_CMPL_TIMEWAIT * 1000000);
-
-	(void) cv_timedwait(&pp->pp_xfer_cmpl_cv,
-	    &ehcip->ehci_int_mutex,
-	    ddi_get_lbolt() + xfer_cmpl_time_wait);
+	(void) cv_reltimedwait(&pp->pp_xfer_cmpl_cv, &ehcip->ehci_int_mutex,
+	    drv_usectohz(EHCI_XFER_CMPL_TIMEWAIT * 1000000), TR_CLOCK_TICK);
 
 	if (pp->pp_count_done_qtds) {
 

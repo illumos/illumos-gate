@@ -4609,7 +4609,7 @@ hubd_reset_port(hubd_t *hubd, usb_port_t port)
 	uint16_t status;
 	uint16_t change;
 	int	i;
-	clock_t	current_time;
+	clock_t	delta;
 
 	USB_DPRINTF_L4(DPRINT_MASK_PORT, hubd->h_log_handle,
 	    "hubd_reset_port: port=%d", port);
@@ -4646,6 +4646,7 @@ hubd_reset_port(hubd_t *hubd, usb_port_t port)
 	/*
 	 * wait for port status change event
 	 */
+	delta = drv_usectohz(hubd_device_delay / 10);
 	for (i = 0; i < hubd_retry_enumerate; i++) {
 		/*
 		 * start polling ep1 for receiving notification on
@@ -4657,12 +4658,9 @@ hubd_reset_port(hubd_t *hubd, usb_port_t port)
 		 * sleep a max of 100ms for reset completion
 		 * notification to be received
 		 */
-		current_time = ddi_get_lbolt();
 		if (hubd->h_port_reset_wait & port_mask) {
-			rval = cv_timedwait(&hubd->h_cv_reset_port,
-			    &hubd->h_mutex,
-			    current_time +
-			    drv_usectohz(hubd_device_delay / 10));
+			rval = cv_reltimedwait(&hubd->h_cv_reset_port,
+			    &hubd->h_mutex, delta, TR_CLOCK_TICK);
 			if ((rval <= 0) &&
 			    (hubd->h_port_reset_wait & port_mask)) {
 				/* we got woken up because of a timeout */
@@ -8606,7 +8604,7 @@ usba_hubdi_decr_power_budget(dev_info_t *dip, usba_device_t *child_ud)
 static int
 hubd_wait_for_hotplug_exit(hubd_t *hubd)
 {
-	clock_t		until = ddi_get_lbolt() + drv_usectohz(1000000);
+	clock_t		until = drv_usectohz(1000000);
 	int		rval;
 
 	ASSERT(mutex_owned(HUBD_MUTEX(hubd)));
@@ -8614,8 +8612,8 @@ hubd_wait_for_hotplug_exit(hubd_t *hubd)
 	if (hubd->h_hotplug_thread) {
 		USB_DPRINTF_L3(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 		    "waiting for hubd hotplug thread exit");
-		rval = cv_timedwait(&hubd->h_cv_hotplug_dev,
-		    &hubd->h_mutex, until);
+		rval = cv_reltimedwait(&hubd->h_cv_hotplug_dev,
+		    &hubd->h_mutex, until, TR_CLOCK_TICK);
 
 		if ((rval <= 0) && (hubd->h_hotplug_thread)) {
 

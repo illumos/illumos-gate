@@ -733,7 +733,7 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 			first_packet = NULL;
 		}
 
-		packet->tickstamp = lbolt64;
+		packet->tickstamp = ddi_get_lbolt64();
 
 		previous_packet = packet;
 		packet = (p_tx_sw_packet_t)
@@ -1053,7 +1053,7 @@ e1000g_recycle(e1000g_tx_ring_t *tx_ring)
 			 * with then there is no reason to check the rest
 			 * of the queue.
 			 */
-			delta = lbolt64 - packet->tickstamp;
+			delta = ddi_get_lbolt64() - packet->tickstamp;
 			break;
 		}
 	}

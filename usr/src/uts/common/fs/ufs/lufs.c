@@ -1299,7 +1299,7 @@ lufs_read_strategy(ml_unit_t *ul, buf_t *bp)
 			bp->b_error = EIO;
 			biodone(bp);
 		} else {
-			ul->un_ufsvfs->vfs_iotstamp = lbolt;
+			ul->un_ufsvfs->vfs_iotstamp = ddi_get_lbolt();
 			logstats.ls_lreads.value.ui64++;
 			(void) bdev_strategy(bp);
 			lwp_stat_update(LWP_STAT_INBLK, 1);
@@ -1401,7 +1401,7 @@ lufs_write_strategy(ml_unit_t *ul, buf_t *bp)
 	    !(matamap_overlap(ul->un_matamap, mof, nb) &&
 	    ((bp->b_flags & B_PHYS) == 0)));
 
-	ul->un_ufsvfs->vfs_iotstamp = lbolt;
+	ul->un_ufsvfs->vfs_iotstamp = ddi_get_lbolt();
 	logstats.ls_lwrites.value.ui64++;
 
 	/* If snapshots are enabled, write through the snapshot driver */

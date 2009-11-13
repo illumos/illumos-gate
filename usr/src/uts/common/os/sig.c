@@ -1240,8 +1240,8 @@ utstop_timedwait(clock_t ticks)
 {
 	mutex_enter(&thread_stop_lock);
 	if (num_utstop > 0)
-		(void) cv_timedwait(&utstop_cv, &thread_stop_lock,
-		    ticks + lbolt);
+		(void) cv_reltimedwait(&utstop_cv, &thread_stop_lock, ticks,
+		    TR_CLOCK_TICK);
 	mutex_exit(&thread_stop_lock);
 }
 

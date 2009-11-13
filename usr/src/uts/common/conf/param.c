@@ -67,6 +67,7 @@
 
 #include <sys/vmem.h>
 #include <sys/clock.h>
+#include <sys/clock_impl.h>
 #include <sys/serializer.h>
 
 /*
@@ -149,15 +150,35 @@ const unsigned int	_nbpg		= (unsigned int)MMU_PAGESIZE;
  * of more than about 10 kHz seems utterly ridiculous, although
  * this observation will no doubt seem quaintly amusing one day.
  */
-int hz = 100;
-int hires_hz = 1000;
+#define	HIRES_HZ_DEFAULT	1000
+
+int hz = HZ_DEFAULT;
+int hires_hz = HIRES_HZ_DEFAULT;
+
 int hires_tick = 0;
 int cpu_decay_factor = 10;	/* this is no longer tied to clock */
-int tick_per_msec;	/* clock ticks per millisecond (zero if hz < 1000) */
-int msec_per_tick;	/* millseconds per clock tick (zero if hz > 1000) */
-int usec_per_tick;	/* microseconds per clock tick */
-int nsec_per_tick;	/* nanoseconds per clock tick */
 int max_hres_adj;	/* maximum adjustment of hrtime per tick */
+int tick_per_msec;	/* clock ticks per millisecond (zero if hz < 1000) */
+
+/*
+ * Milliseconds, Microseconds, and Nanoseconds per clock tick
+ *
+ * Note:
+ *  msec_per_tick is zero if hz > 1000
+ */
+int msec_per_tick;
+int usec_per_tick;
+int nsec_per_tick;
+
+/*
+ * Time Resolution values. These are defined in condvar.h and initialized in
+ * param_init(). Consumers of cv_reltimedwait() and cv_reltimedwait_sig()
+ * need to specify how accurate the timeout argument should be through
+ * one of these values. The intention is to allow the underlying implementation
+ * to anticipate or defer the expiration of timeouts, preventing unnecessary
+ * wakeups by batch processing similarly expiring events.
+ */
+time_res_t time_res[TR_COUNT];
 
 /*
  * Setting "snooping" to a non-zero value will cause a deadman panic if
@@ -661,6 +682,20 @@ param_init(void)
 	usec_per_tick = MICROSEC / hz;
 	nsec_per_tick = NANOSEC / hz;
 	max_hres_adj = nsec_per_tick >> ADJ_SHIFT;
+
+	/*
+	 * Consumers of relative timedwait functions must specify how accurately
+	 * the given timeout must expire. This is currently TR_CLOCK_TICK for
+	 * the vast majority of consumers, but nsec_per_tick becomes an
+	 * artificial value in a tickless world. Each caller of such routines
+	 * should re-evaluate their usage and specify the appropriate
+	 * resolution.
+	 */
+	time_res[TR_NANOSEC] = SEC;
+	time_res[TR_MICROSEC] = MILLISEC;
+	time_res[TR_MILLISEC] = MICROSEC;
+	time_res[TR_SEC] = NANOSEC;
+	time_res[TR_CLOCK_TICK] = nsec_per_tick;
 }
 
 /*

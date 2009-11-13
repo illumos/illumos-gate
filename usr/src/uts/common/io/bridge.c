@@ -429,7 +429,7 @@ bridge_ioc_listfwd(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 		bcopy(bfp->bf_dest, blf->blf_dest, ETHERADDRL);
 		blf->blf_trill_nick = bfp->bf_trill_nick;
 		blf->blf_ms_age =
-		    drv_hztousec(lbolt - bfp->bf_lastheard) / 1000;
+		    drv_hztousec(ddi_get_lbolt() - bfp->bf_lastheard) / 1000;
 		blf->blf_is_local =
 		    (bfp->bf_flags & BFF_LOCALADDR) != 0;
 		blf->blf_linkid = bfp->bf_links[0]->bl_linkid;
@@ -904,7 +904,7 @@ fwd_alloc(const uint8_t *addr, uint_t nlinks, uint16_t nick)
 	    KM_NOSLEEP);
 	if (bfp != NULL) {
 		bcopy(addr, bfp->bf_dest, ETHERADDRL);
-		bfp->bf_lastheard = lbolt;
+		bfp->bf_lastheard = ddi_get_lbolt();
 		bfp->bf_maxlinks = nlinks;
 		bfp->bf_links = (bridge_link_t **)(bfp + 1);
 		bfp->bf_trill_nick = nick;
@@ -1436,7 +1436,7 @@ bridge_timer(void *arg)
 		while ((bfp = bfnext) != NULL) {
 			bfnext = AVL_NEXT(&bip->bi_fwd, bfp);
 			if (!(bfp->bf_flags & BFF_LOCALADDR) &&
-			    (lbolt - bfp->bf_lastheard) > age_limit) {
+			    (ddi_get_lbolt() - bfp->bf_lastheard) > age_limit) {
 				ASSERT(bfp->bf_flags & BFF_INTREE);
 				avl_remove(&bip->bi_fwd, bfp);
 				bfp->bf_flags &= ~BFF_INTREE;
@@ -1608,7 +1608,7 @@ bridge_learn(bridge_link_t *blp, const uint8_t *saddr, uint16_t ingress_nick,
 		if (bfp->bf_trill_nick == ingress_nick) {
 			for (i = 0; i < bfp->bf_nlinks; i++) {
 				if (bfp->bf_links[i] == blp) {
-					bfp->bf_lastheard = lbolt;
+					bfp->bf_lastheard = ddi_get_lbolt();
 					fwd_unref(bfp);
 					return;
 				}

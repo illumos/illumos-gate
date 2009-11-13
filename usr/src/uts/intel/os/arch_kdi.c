@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Kernel/Debugger Interface (KDI) routines.  Called during debugger under
@@ -44,10 +42,13 @@
 #include <sys/trap.h>
 #include <sys/kobj.h>
 #include <sys/kobj_impl.h>
+#include <sys/clock_impl.h>
 
 static void
 kdi_system_claim(void)
 {
+	lbolt_debug_entry();
+
 	psm_notifyf(PSM_DEBUG_ENTER);
 }
 
@@ -55,6 +56,8 @@ static void
 kdi_system_release(void)
 {
 	psm_notifyf(PSM_DEBUG_EXIT);
+
+	lbolt_debug_return();
 }
 
 static cpu_t *

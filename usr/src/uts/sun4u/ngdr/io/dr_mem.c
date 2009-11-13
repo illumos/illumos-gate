@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,15 +62,14 @@ extern int		kcage_on;
 /* for the DR*INTERNAL_ERROR macros.  see sys/dr.h. */
 static char *dr_ie_fmt = "dr_mem.c %d";
 
-static int		dr_post_detach_mem_unit(dr_mem_unit_t *mp);
-static int		dr_reserve_mem_spans(memhandle_t *mhp,
-					struct memlist *mlist);
-static int		dr_select_mem_target(dr_handle_t *hp,
-				dr_mem_unit_t *mp, struct memlist *ml);
-static void		dr_init_mem_unit_data(dr_mem_unit_t *mp);
+static int	dr_post_detach_mem_unit(dr_mem_unit_t *mp);
+static int	dr_reserve_mem_spans(memhandle_t *mhp, struct memlist *mlist);
+static int	dr_select_mem_target(dr_handle_t *hp, dr_mem_unit_t *mp,
+    struct memlist *ml);
+static void	dr_init_mem_unit_data(dr_mem_unit_t *mp);
 
-static int		memlist_canfit(struct memlist *s_mlist,
-					struct memlist *t_mlist);
+static int 	memlist_canfit(struct memlist *s_mlist,
+    struct memlist *t_mlist);
 
 /*
  * dr_mem_unit_t.sbm_flags
@@ -134,9 +133,9 @@ dr_get_memlist(dr_mem_unit_t *mp)
 			endpa = _ptob64(physmax + 1);
 			if (endpa > basepa)
 				mlist = memlist_del_span(
-						mlist,
-						basepa,
-						endpa - basepa);
+				    mlist,
+				    basepa,
+				    endpa - basepa);
 		}
 
 		if (mlist) {
@@ -147,7 +146,7 @@ dr_get_memlist(dr_mem_unit_t *mp)
 		/* if no mlist yet, try platform layer */
 		if (!mlist) {
 			err = drmach_mem_get_memlist(
-				mp->sbm_cm.sbdev_id, &mlist);
+			    mp->sbm_cm.sbdev_id, &mlist);
 			if (err) {
 				DRERR_SET_C(&mp->sbm_cm.sbdev_error, &err);
 				mlist = NULL; /* paranoia */
@@ -209,8 +208,8 @@ dr_release_mem(dr_common_unit_t *cp)
 	cv_init(&rms.cond, NULL, CV_DRIVER, NULL);
 
 	mutex_enter(&rms.lock);
-	err = kphysm_del_start(mp->sbm_memhandle,
-			dr_mem_del_done, (void *) &rms);
+	err = kphysm_del_start(mp->sbm_memhandle, dr_mem_del_done,
+	    (void *) &rms);
 	if (err == KPHYSM_OK) {
 		/* wait for completion or interrupt */
 		while (!rms.done) {
@@ -266,9 +265,9 @@ dr_release_mem(dr_common_unit_t *cp)
 
 			default:
 				cmn_err(CE_WARN,
-					"%s: unexpected kphysm error code %d,"
-					" id 0x%p",
-					f, err, mp->sbm_cm.sbdev_id);
+				    "%s: unexpected kphysm error code %d,"
+				    " id 0x%p",
+				    f, err, mp->sbm_cm.sbdev_id);
 
 				e_code = ESBD_IO;
 				break;
@@ -306,8 +305,8 @@ dr_attach_mem(dr_handle_t *hp, dr_common_unit_t *cp)
 		sbd_error_t	*err;
 
 		rv = kphysm_add_memory_dynamic(
-				(pfn_t)(mc->address >> PAGESHIFT),
-				(pgcnt_t)(mc->size >> PAGESHIFT));
+		    (pfn_t)(mc->address >> PAGESHIFT),
+		    (pgcnt_t)(mc->size >> PAGESHIFT));
 		if (rv != KPHYSM_OK) {
 			/*
 			 * translate kphysm error and
@@ -335,7 +334,7 @@ dr_attach_mem(dr_handle_t *hp, dr_common_unit_t *cp)
 		}
 
 		err = drmach_mem_add_span(
-			mp->sbm_cm.sbdev_id, mc->address, mc->size);
+		    mp->sbm_cm.sbdev_id, mc->address, mc->size);
 		if (err) {
 			DRERR_SET_C(&mp->sbm_cm.sbdev_error, &err);
 			break;
@@ -348,7 +347,7 @@ dr_attach_mem(dr_handle_t *hp, dr_common_unit_t *cp)
 	if (mp->sbm_cm.sbdev_error != NULL) {
 		dr_lock_status(hp->h_bd);
 		err = drmach_unconfigure(cp->sbdev_id,
-			DEVI_BRANCH_DESTROY);
+		    DEVI_BRANCH_DESTROY);
 		if (err)
 			sbd_err_clear(&err);
 		dr_unlock_status(hp->h_bd);
@@ -361,7 +360,7 @@ static void
 dr_mem_ecache_scrub(dr_mem_unit_t *mp, struct memlist *mlist)
 {
 #ifdef DEBUG
-	clock_t		stime = lbolt;
+	clock_t		stime = ddi_get_lbolt();
 #endif /* DEBUG */
 
 	struct memlist	*ml;
@@ -384,14 +383,14 @@ dr_mem_ecache_scrub(dr_mem_unit_t *mp, struct memlist *mlist)
 		dst_pa = ml->address;
 		if (ml->address & PAGEOFFSET)
 			cmn_err(CE_WARN,
-				"%s: address (0x%lx) not on "
-				"page boundary", f, ml->address);
+			    "%s: address (0x%lx) not on "
+			    "page boundary", f, ml->address);
 
 		nbytes = ml->size;
 		if (ml->size & PAGEOFFSET)
 			cmn_err(CE_WARN,
-				"%s: size (0x%lx) not on "
-				"page boundary", f, ml->size);
+			    "%s: size (0x%lx) not on "
+			    "page boundary", f, ml->size);
 
 		/*LINTED*/
 		while (nbytes > 0) {
@@ -413,7 +412,7 @@ dr_mem_ecache_scrub(dr_mem_unit_t *mp, struct memlist *mlist)
 	affinity_clear();
 
 #ifdef DEBUG
-	stime = lbolt - stime;
+	stime = ddi_get_lbolt() - stime;
 	PR_MEM("%s: scrub ticks = %ld (%ld secs)\n", f, stime, stime / hz);
 #endif /* DEBUG */
 }
@@ -429,9 +428,9 @@ dr_move_memory(dr_handle_t *hp, dr_mem_unit_t *s_mp, dr_mem_unit_t *t_mp)
 	static fn_t	 f = "dr_move_memory";
 
 	PR_MEM("%s: (INLINE) moving memory from %s to %s\n",
-		f,
-		s_mp->sbm_cm.sbdev_path,
-		t_mp->sbm_cm.sbdev_path);
+	    f,
+	    s_mp->sbm_cm.sbdev_path,
+	    t_mp->sbm_cm.sbdev_path);
 
 	ASSERT(s_mp->sbm_flags & DR_MFLAG_SOURCE);
 	ASSERT(s_mp->sbm_peer == t_mp);
@@ -457,8 +456,8 @@ dr_move_memory(dr_handle_t *hp, dr_mem_unit_t *s_mp, dr_mem_unit_t *t_mp)
 	affinity_set(drmach_mem_cpu_affinity(t_mp->sbm_cm.sbdev_id));
 
 	err = drmach_copy_rename_init(
-		t_mp->sbm_cm.sbdev_id, _ptob64(t_mp->sbm_slice_offset),
-		s_mp->sbm_cm.sbdev_id, c_ml, &cr_id);
+	    t_mp->sbm_cm.sbdev_id, _ptob64(t_mp->sbm_slice_offset),
+	    s_mp->sbm_cm.sbdev_id, c_ml, &cr_id);
 	if (err) {
 		DRERR_SET_C(&s_mp->sbm_cm.sbdev_error, &err);
 		affinity_clear();
@@ -468,12 +467,12 @@ dr_move_memory(dr_handle_t *hp, dr_mem_unit_t *s_mp, dr_mem_unit_t *t_mp)
 	srhp = dr_get_sr_handle(hp);
 	ASSERT(srhp);
 
-	copytime = lbolt;
+	copytime = ddi_get_lbolt();
 
 	/* Quiesce the OS.  */
 	if (dr_suspend(srhp)) {
 		cmn_err(CE_WARN, "%s: failed to quiesce OS"
-			" for copy-rename", f);
+		    " for copy-rename", f);
 
 		dr_release_sr_handle(srhp);
 		err = drmach_copy_rename_fini(cr_id);
@@ -508,7 +507,7 @@ dr_move_memory(dr_handle_t *hp, dr_mem_unit_t *s_mp, dr_mem_unit_t *t_mp)
 		t_bp = t_mp->sbm_cm.sbdev_bp;
 
 		lgrp_plat_config(LGRP_CONFIG_MEM_RENAME,
-			(uintptr_t)(s_bp->b_num | (t_bp->b_num << 16)));
+		    (uintptr_t)(s_bp->b_num | (t_bp->b_num << 16)));
 	}
 
 	drmach_copy_rename(cr_id);
@@ -516,7 +515,7 @@ dr_move_memory(dr_handle_t *hp, dr_mem_unit_t *s_mp, dr_mem_unit_t *t_mp)
 	/* Resume the OS.  */
 	dr_resume(srhp);
 
-	copytime = lbolt - copytime;
+	copytime = ddi_get_lbolt() - copytime;
 
 	dr_release_sr_handle(srhp);
 	err = drmach_copy_rename_fini(cr_id);
@@ -526,7 +525,7 @@ dr_move_memory(dr_handle_t *hp, dr_mem_unit_t *s_mp, dr_mem_unit_t *t_mp)
 	affinity_clear();
 
 	PR_MEM("%s: copy-rename elapsed time = %ld ticks (%ld secs)\n",
-		f, copytime, copytime / hz);
+	    f, copytime, copytime / hz);
 
 	/* return -1 if dr_suspend or copy/rename recorded an error */
 	return (err == NULL ? 0 : -1);
@@ -607,10 +606,10 @@ dr_detach_mem(dr_handle_t *hp, dr_common_unit_t *cp)
 	} else {
 		rv = dr_move_memory(hp, s_mp, t_mp);
 		PR_MEM("%s: %s memory COPY-RENAME (board %d -> %d)\n",
-			f,
-			rv ? "FAILED" : "COMPLETED",
-			s_mp->sbm_cm.sbdev_bp->b_num,
-			t_mp->sbm_cm.sbdev_bp->b_num);
+		    f,
+		    rv ? "FAILED" : "COMPLETED",
+		    s_mp->sbm_cm.sbdev_bp->b_num,
+		    t_mp->sbm_cm.sbdev_bp->b_num);
 
 		if (rv != 0)
 			(void) dr_cancel_mem(s_mp);
@@ -656,8 +655,7 @@ dr_del_span_query(pfn_t base, pgcnt_t npages, memquery_t *mp)
 again:
 	for (ml = mlist; ml; ml = ml->next) {
 		if ((ml->address & sm) != sa) {
-			mlist = memlist_del_span(mlist,
-				ml->address, ml->size);
+			mlist = memlist_del_span(mlist, ml->address, ml->size);
 			goto again;
 		}
 	}
@@ -672,7 +670,7 @@ again:
 		memquery_t mq;
 
 		rv = kphysm_del_span_query(
-			_b64top(ml->address), _b64top(ml->size), &mq);
+		    _b64top(ml->address), _b64top(ml->size), &mq);
 		if (rv)
 			break;
 
@@ -683,10 +681,10 @@ again:
 		if (mq.nonrelocatable != 0) {
 			if (mq.first_nonrelocatable < mp->first_nonrelocatable)
 				mp->first_nonrelocatable =
-					mq.first_nonrelocatable;
+				    mq.first_nonrelocatable;
 			if (mq.last_nonrelocatable > mp->last_nonrelocatable)
 				mp->last_nonrelocatable =
-					mq.last_nonrelocatable;
+				    mq.last_nonrelocatable;
 		}
 	}
 
@@ -749,7 +747,7 @@ dr_mem_status(dr_handle_t *hp, dr_devset_t devset, sbd_dev_stat_t *dsp)
 		bzero((caddr_t)msp, sizeof (*msp));
 
 		strncpy(msp->ms_cm.c_id.c_name, pstat.type,
-			sizeof (msp->ms_cm.c_id.c_name));
+		    sizeof (msp->ms_cm.c_id.c_name));
 		msp->ms_cm.c_id.c_type = mp->sbm_cm.sbdev_type;
 		msp->ms_cm.c_id.c_unit = SBD_NULL_UNIT;
 		msp->ms_cm.c_cond = mp->sbm_cm.sbdev_cond;
@@ -892,13 +890,13 @@ dr_pre_attach_mem(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 		switch (state) {
 		case DR_STATE_UNCONFIGURED:
 			PR_MEM("%s: recovering from UNCONFIG for %s\n",
-				f,
-				mp->sbm_cm.sbdev_path);
+			    f,
+			    mp->sbm_cm.sbdev_path);
 
 			/* use memlist cached by dr_post_detach_mem_unit */
 			ASSERT(mp->sbm_mlist != NULL);
 			PR_MEM("%s: re-configuring cached memlist for %s:\n",
-				f, mp->sbm_cm.sbdev_path);
+			    f, mp->sbm_cm.sbdev_path);
 			PR_MEMLIST_DUMP(mp->sbm_mlist);
 
 			/* kphysm del handle should be have been freed */
@@ -908,10 +906,10 @@ dr_pre_attach_mem(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 
 		case DR_STATE_CONNECTED:
 			PR_MEM("%s: reprogramming mem hardware on %s\n",
-				f, mp->sbm_cm.sbdev_bp->b_path);
+			    f, mp->sbm_cm.sbdev_bp->b_path);
 
 			PR_MEM("%s: enabling %s\n",
-				f, mp->sbm_cm.sbdev_path);
+			    f, mp->sbm_cm.sbdev_path);
 
 			err = drmach_mem_enable(mp->sbm_cm.sbdev_id);
 			if (err) {
@@ -965,7 +963,7 @@ dr_post_attach_mem(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 			DR_DEV_INTERNAL_ERROR(&mp->sbm_cm);
 
 			PR_MEM("%s: %s memlist not in phys_install",
-				f, mp->sbm_cm.sbdev_path);
+			    f, mp->sbm_cm.sbdev_path);
 
 			memlist_delete(mlist);
 			continue;
@@ -976,9 +974,9 @@ dr_post_attach_mem(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 			sbd_error_t *err;
 
 			err = drmach_mem_add_span(
-				mp->sbm_cm.sbdev_id,
-				ml->address,
-				ml->size);
+			    mp->sbm_cm.sbdev_id,
+			    ml->address,
+			    ml->size);
 			if (err)
 				DRERR_SET_C(&mp->sbm_cm.sbdev_error, &err);
 		}
@@ -1082,19 +1080,19 @@ dr_add_memory_spans(dr_mem_unit_t *mp, struct memlist *ml)
 		rv = kphysm_add_memory_dynamic(base, npgs);
 
 		err = drmach_mem_add_span(
-			mp->sbm_cm.sbdev_id,
-			ml->address,
-			ml->size);
+		    mp->sbm_cm.sbdev_id,
+		    ml->address,
+		    ml->size);
 
 		if (err)
 			DRERR_SET_C(&mp->sbm_cm.sbdev_error, &err);
 
 		if (rv != KPHYSM_OK) {
 			cmn_err(CE_WARN, "%s:"
-				" unexpected kphysm_add_memory_dynamic"
-				" return value %d;"
-				" basepfn=0x%lx, npages=%ld\n",
-				f, rv, base, npgs);
+			    " unexpected kphysm_add_memory_dynamic"
+			    " return value %d;"
+			    " basepfn=0x%lx, npages=%ld\n",
+			    f, rv, base, npgs);
 
 			continue;
 		}
@@ -1120,12 +1118,12 @@ dr_post_detach_mem_unit(dr_mem_unit_t *s_mp)
 
 	/* s_mp->sbm_del_mlist could be NULL, meaning no deleted spans */
 	PR_MEM("%s: %s: deleted memlist (EMPTY maybe okay):\n",
-		f, s_mp->sbm_cm.sbdev_path);
+	    f, s_mp->sbm_cm.sbdev_path);
 	PR_MEMLIST_DUMP(s_mp->sbm_del_mlist);
 
 	/* sanity check */
 	ASSERT(s_mp->sbm_del_mlist == NULL ||
-		(s_mp->sbm_flags & DR_MFLAG_RELDONE) != 0);
+	    (s_mp->sbm_flags & DR_MFLAG_RELDONE) != 0);
 
 	if (s_mp->sbm_flags & DR_MFLAG_SOURCE) {
 		t_mp = s_mp->sbm_peer;
@@ -1137,7 +1135,7 @@ dr_post_detach_mem_unit(dr_mem_unit_t *s_mp)
 		ASSERT(t_mp->sbm_del_mlist);
 
 		PR_MEM("%s: target %s: deleted memlist:\n",
-			f, t_mp->sbm_cm.sbdev_path);
+		    f, t_mp->sbm_cm.sbdev_path);
 		PR_MEMLIST_DUMP(t_mp->sbm_del_mlist);
 	} else {
 		/* this is no target unit */
@@ -1171,7 +1169,7 @@ dr_post_detach_mem_unit(dr_mem_unit_t *s_mp)
 	rv = 0;
 	if (s_mp->sbm_cm.sbdev_error) {
 		PR_MEM("%s: %s flags=%x", f,
-			s_mp->sbm_cm.sbdev_path, s_mp->sbm_flags);
+		    s_mp->sbm_cm.sbdev_path, s_mp->sbm_flags);
 		DR_DEV_CLR_UNREFERENCED(&s_mp->sbm_cm);
 		DR_DEV_CLR_RELEASED(&s_mp->sbm_cm);
 		dr_device_transition(&s_mp->sbm_cm, DR_STATE_CONFIGURED);
@@ -1179,7 +1177,7 @@ dr_post_detach_mem_unit(dr_mem_unit_t *s_mp)
 	}
 	if (t_mp != NULL && t_mp->sbm_cm.sbdev_error != NULL) {
 		PR_MEM("%s: %s flags=%x", f,
-			s_mp->sbm_cm.sbdev_path, s_mp->sbm_flags);
+		    s_mp->sbm_cm.sbdev_path, s_mp->sbm_flags);
 		DR_DEV_CLR_UNREFERENCED(&t_mp->sbm_cm);
 		DR_DEV_CLR_RELEASED(&t_mp->sbm_cm);
 		dr_device_transition(&t_mp->sbm_cm, DR_STATE_CONFIGURED);
@@ -1308,8 +1306,8 @@ dr_post_detach_mem_unit(dr_mem_unit_t *s_mp)
 			PR_MEMLIST_DUMP(t_mp->sbm_dyn_segs);
 
 			PR_MEM("%s: adding back remaining portion"
-				" of %s, memlist:\n",
-				f, t_mp->sbm_cm.sbdev_path);
+			    " of %s, memlist:\n",
+			    f, t_mp->sbm_cm.sbdev_path);
 			PR_MEMLIST_DUMP(t_excess_mlist);
 
 			dr_add_memory_spans(s_mp, t_excess_mlist);
@@ -1336,8 +1334,8 @@ dr_post_detach_mem_unit(dr_mem_unit_t *s_mp)
 
 	if (t_mp != NULL) {
 		/* delete target's entire address space */
-		err = drmach_mem_del_span(
-			t_mp->sbm_cm.sbdev_id, t_old_basepa & ~ sm, sz);
+		err = drmach_mem_del_span(t_mp->sbm_cm.sbdev_id,
+		    t_old_basepa & ~ sm, sz);
 		if (err)
 			DRERR_SET_C(&t_mp->sbm_cm.sbdev_error, &err);
 		ASSERT(err == NULL);
@@ -1350,7 +1348,7 @@ dr_post_detach_mem_unit(dr_mem_unit_t *s_mp)
 		 * info and keeping the slice offset from t_new_basepa.
 		 */
 		err = drmach_mem_del_span(s_mp->sbm_cm.sbdev_id,
-				s_old_basepa & ~ sm, t_new_basepa & sm);
+		    s_old_basepa & ~ sm, t_new_basepa & sm);
 		if (err)
 			DRERR_SET_C(&s_mp->sbm_cm.sbdev_error, &err);
 		ASSERT(err == NULL);
@@ -1358,7 +1356,7 @@ dr_post_detach_mem_unit(dr_mem_unit_t *s_mp)
 	} else {
 		/* delete board's entire address space */
 		err = drmach_mem_del_span(s_mp->sbm_cm.sbdev_id,
-						s_old_basepa & ~ sm, sz);
+		    s_old_basepa & ~ sm, sz);
 		if (err)
 			DRERR_SET_C(&s_mp->sbm_cm.sbdev_error, &err);
 		ASSERT(err == NULL);
@@ -1381,7 +1379,7 @@ cleanup:
 		if (t_new_smallsize > 0) {
 			t_mp->sbm_npages = _b64top(t_new_smallsize);
 			PR_MEM("%s: target new size 0x%lx bytes\n",
-				f, t_new_smallsize);
+			    f, t_new_smallsize);
 		}
 	}
 	if (t_mp != NULL && t_mp->sbm_cm.sbdev_error == NULL) {
@@ -1478,8 +1476,8 @@ dr_pre_release_mem(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 		 * copy-rename.
 		 */
 		ASSERT(mp->sbm_npages != 0);
-		rv = kphysm_del_span_query(
-			mp->sbm_basepfn, mp->sbm_npages, &mq);
+		rv = kphysm_del_span_query(mp->sbm_basepfn, mp->sbm_npages,
+		    &mq);
 		if (rv != KPHYSM_OK) {
 			DR_DEV_INTERNAL_ERROR(&mp->sbm_cm);
 			err_flag = 1;
@@ -1488,10 +1486,10 @@ dr_pre_release_mem(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 
 		if (mq.nonrelocatable != 0) {
 			if (!(dr_cmd_flags(hp) &
-				(SBD_FLAG_FORCE | SBD_FLAG_QUIESCE_OKAY))) {
+			    (SBD_FLAG_FORCE | SBD_FLAG_QUIESCE_OKAY))) {
 				/* caller wasn't prompted for a suspend */
 				dr_dev_err(CE_WARN, &mp->sbm_cm,
-					ESBD_QUIESCE_REQD);
+				    ESBD_QUIESCE_REQD);
 				err_flag = 1;
 				break;
 			}
@@ -1511,7 +1509,7 @@ dr_pre_release_mem(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 		if (ml == NULL) {
 			err_flag = 1;
 			PR_MEM("%s: no memlist found for %s\n",
-				f, mp->sbm_cm.sbdev_path);
+			    f, mp->sbm_cm.sbdev_path);
 			continue;
 		}
 
@@ -1527,7 +1525,7 @@ dr_pre_release_mem(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 		mp->sbm_flags |= DR_MFLAG_RELOWNER;
 
 		if ((mq.nonrelocatable != 0) ||
-			dr_reserve_mem_spans(&mp->sbm_memhandle, ml)) {
+		    dr_reserve_mem_spans(&mp->sbm_memhandle, ml)) {
 			/*
 			 * Either the detaching memory node contains
 			 * non-reloc memory or we failed to reserve the
@@ -1554,9 +1552,9 @@ dr_pre_release_mem(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 					 * and hope helpful for debug
 					 */
 					cmn_err(CE_WARN, "%s: unexpected"
-						" kphysm_del_release return"
-						" value %d",
-						f, rv);
+					    " kphysm_del_release return"
+					    " value %d",
+					    f, rv);
 				}
 				mp->sbm_flags &= ~DR_MFLAG_RELOWNER;
 
@@ -1565,8 +1563,8 @@ dr_pre_release_mem(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 				/* make sure sbm_flags is clean */
 				ASSERT(mp->sbm_flags == 0);
 
-				dr_dev_err(CE_WARN,
-					&mp->sbm_cm, ESBD_NO_TARGET);
+				dr_dev_err(CE_WARN, &mp->sbm_cm,
+				    ESBD_NO_TARGET);
 
 				err_flag = 1;
 				break;
@@ -1590,13 +1588,13 @@ dr_pre_release_mem(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 
 		if (mp->sbm_flags & DR_MFLAG_SOURCE) {
 			PR_MEM("%s: release of %s requires copy/rename;"
-				" selected target board %s\n",
-				f,
-				mp->sbm_cm.sbdev_path,
-				mp->sbm_peer->sbm_cm.sbdev_path);
+			    " selected target board %s\n",
+			    f,
+			    mp->sbm_cm.sbdev_path,
+			    mp->sbm_peer->sbm_cm.sbdev_path);
 		} else {
 			PR_MEM("%s: copy/rename not required to release %s\n",
-				f, mp->sbm_cm.sbdev_path);
+			    f, mp->sbm_cm.sbdev_path);
 		}
 
 		ASSERT(mp->sbm_flags & DR_MFLAG_RELOWNER);
@@ -1640,7 +1638,7 @@ dr_release_mem_done(dr_common_unit_t *cp)
 		 * and hope helpful for debug
 		 */
 		cmn_err(CE_WARN, "%s: unexpected kphysm_del_release"
-			" return value %d", f, rv);
+		    " return value %d", f, rv);
 	}
 	s_mp->sbm_flags &= ~DR_MFLAG_RELOWNER;
 
@@ -1651,9 +1649,9 @@ dr_release_mem_done(dr_common_unit_t *cp)
 /* XXX Can we know that sbdev_error was encountered during release? */
 	if (s_mp->sbm_cm.sbdev_error != NULL) {
 		PR_MEM("%s: %s: error %d noted\n",
-			f,
-			s_mp->sbm_cm.sbdev_path,
-			s_mp->sbm_cm.sbdev_error->e_code);
+		    f,
+		    s_mp->sbm_cm.sbdev_path,
+		    s_mp->sbm_cm.sbdev_error->e_code);
 
 		if (t_mp != NULL) {
 			ASSERT(t_mp->sbm_del_mlist == t_mp->sbm_mlist);
@@ -1727,11 +1725,11 @@ dr_release_mem_done(dr_common_unit_t *cp)
 	memlist_read_unlock();
 	if (rv) {
 		cmn_err(CE_WARN, "%s: %smem-unit (%d.%d): "
-			"deleted memory still found in phys_install",
-			f,
-			(mp == t_mp ? "target " : ""),
-			mp->sbm_cm.sbdev_bp->b_num,
-			mp->sbm_cm.sbdev_unum);
+		    "deleted memory still found in phys_install",
+		    f,
+		    (mp == t_mp ? "target " : ""),
+		    mp->sbm_cm.sbdev_bp->b_num,
+		    mp->sbm_cm.sbdev_unum);
 
 		DR_DEV_INTERNAL_ERROR(&s_mp->sbm_cm);
 		return;
@@ -1749,7 +1747,7 @@ dr_release_mem_done(dr_common_unit_t *cp)
 	}
 
 	PR_MEM("%s: marking %s release DONE\n",
-		f, s_mp->sbm_cm.sbdev_path);
+	    f, s_mp->sbm_cm.sbdev_path);
 
 	s_mp->sbm_cm.sbdev_ostate = SBD_STAT_UNCONFIGURED;
 
@@ -1763,7 +1761,7 @@ dr_release_mem_done(dr_common_unit_t *cp)
 		}
 
 		PR_MEM("%s: marking %s release DONE\n",
-			f, t_mp->sbm_cm.sbdev_path);
+		    f, t_mp->sbm_cm.sbdev_path);
 
 		t_mp->sbm_cm.sbdev_ostate = SBD_STAT_UNCONFIGURED;
 	}
@@ -1778,8 +1776,7 @@ dr_disconnect_mem(dr_mem_unit_t *mp)
 
 #ifdef DEBUG
 	int state = mp->sbm_cm.sbdev_state;
-	ASSERT(state == DR_STATE_CONNECTED ||
-		state == DR_STATE_UNCONFIGURED);
+	ASSERT(state == DR_STATE_CONNECTED || state == DR_STATE_UNCONFIGURED);
 #endif
 
 	PR_MEM("%s...\n", f);
@@ -1838,7 +1835,7 @@ dr_cancel_mem(dr_mem_unit_t *s_mp)
 
 		if (t_mp != NULL && t_mp->sbm_del_mlist != NULL) {
 			PR_MEM("%s: undoing target %s memory delete\n",
-				f, t_mp->sbm_cm.sbdev_path);
+			    f, t_mp->sbm_cm.sbdev_path);
 			dr_add_memory_spans(t_mp, t_mp->sbm_del_mlist);
 
 			DR_DEV_CLR_UNREFERENCED(&t_mp->sbm_cm);
@@ -1846,7 +1843,7 @@ dr_cancel_mem(dr_mem_unit_t *s_mp)
 
 		if (s_mp->sbm_del_mlist != NULL) {
 			PR_MEM("%s: undoing %s memory delete\n",
-				f, s_mp->sbm_cm.sbdev_path);
+			    f, s_mp->sbm_cm.sbdev_path);
 
 			dr_add_memory_spans(s_mp, s_mp->sbm_del_mlist);
 		}
@@ -1874,8 +1871,8 @@ dr_cancel_mem(dr_mem_unit_t *s_mp)
 
 			DR_DEV_CLR_RELEASED(&t_mp->sbm_cm);
 
-			dr_device_transition(
-				&t_mp->sbm_cm, DR_STATE_CONFIGURED);
+			dr_device_transition(&t_mp->sbm_cm,
+			    DR_STATE_CONFIGURED);
 		}
 
 		if (s_mp->sbm_del_mlist != s_mp->sbm_mlist)
@@ -1896,7 +1893,7 @@ dr_cancel_mem(dr_mem_unit_t *s_mp)
 
 	default:
 		PR_MEM("%s: WARNING unexpected state (%d) for %s\n",
-			f, (int)state, s_mp->sbm_cm.sbdev_path);
+		    f, (int)state, s_mp->sbm_cm.sbdev_path);
 
 		return (-1);
 	}
@@ -1971,8 +1968,8 @@ dr_init_mem_unit_data(dr_mem_unit_t *mp)
 		 */
 /* TODO: curious comment. it suggests pda query should happen if this fails */
 		PR_MEM("%s: PDA query failed for npages."
-			" Checking memlist for %s\n",
-			f, mp->sbm_cm.sbdev_path);
+		    " Checking memlist for %s\n",
+		    f, mp->sbm_cm.sbdev_path);
 
 		mlist = dr_get_memlist(mp);
 		for (ml = mlist; ml; ml = ml->next)
@@ -2004,7 +2001,7 @@ dr_init_mem_unit_data(dr_mem_unit_t *mp)
 	lgrp_plat_config(LGRP_CONFIG_MEM_ADD, (uintptr_t)&umb);
 
 	PR_MEM("%s: %s (basepfn = 0x%lx, npgs = %ld)\n",
-		f, mp->sbm_cm.sbdev_path, mp->sbm_basepfn, mp->sbm_npages);
+	    f, mp->sbm_cm.sbdev_path, mp->sbm_basepfn, mp->sbm_npages);
 }
 
 static int
@@ -2030,9 +2027,9 @@ dr_reserve_mem_spans(memhandle_t *mhp, struct memlist *ml)
 		err = kphysm_del_span(*mhp, base, npgs);
 		if (err != KPHYSM_OK) {
 			cmn_err(CE_WARN, "%s memory reserve failed."
-				" unexpected kphysm_del_span return value %d;"
-				" basepfn=0x%lx npages=%ld",
-				f, err, base, npgs);
+			    " unexpected kphysm_del_span return value %d;"
+			    " basepfn=0x%lx npages=%ld",
+			    f, err, base, npgs);
 
 			return (-1);
 		}
@@ -2204,18 +2201,19 @@ dr_select_mem_target(dr_handle_t *hp,
 					 * source board.
 					 */
 					rv = kphysm_del_span_query(
-						s_mp->sbm_basepfn,
-						s_mp->sbm_npages, &s_mq);
+					    s_mp->sbm_basepfn,
+					    s_mp->sbm_npages, &s_mq);
 					if (rv != KPHYSM_OK) {
 						PR_MEM("%s: %s: unexpected"
-						" kphysm_del_span_query"
-						" return value %d;"
-						" basepfn 0x%lx, npages %ld\n",
-						f,
-						s_mp->sbm_cm.sbdev_path,
-						rv,
-						s_mp->sbm_basepfn,
-						s_mp->sbm_npages);
+						    " kphysm_del_span_query"
+						    " return value %d;"
+						    " basepfn 0x%lx,"
+						    " npages %ld\n",
+						    f,
+						    s_mp->sbm_cm.sbdev_path,
+						    rv,
+						    s_mp->sbm_basepfn,
+						    s_mp->sbm_npages);
 
 						/* paranoia */
 						s_mq.phys_pages = 0;
@@ -2237,11 +2235,11 @@ dr_select_mem_target(dr_handle_t *hp,
 						continue;
 
 					PR_MEM("%s: %s: nonrelocatable"
-						" span (0x%lx..0x%lx)\n",
-						f,
-						s_mp->sbm_cm.sbdev_path,
-						s_mq.first_nonrelocatable,
-						s_mq.last_nonrelocatable);
+					    " span (0x%lx..0x%lx)\n",
+					    f,
+					    s_mp->sbm_cm.sbdev_path,
+					    s_mq.first_nonrelocatable,
+					    s_mq.last_nonrelocatable);
 				}
 
 				/*
@@ -2251,11 +2249,11 @@ dr_select_mem_target(dr_handle_t *hp,
 				 * with this target candidate.
 				 */
 				pfn = s_mq.first_nonrelocatable &
-					~t_mp->sbm_alignment_mask;
+				    ~t_mp->sbm_alignment_mask;
 
 				/* skip candidate if memory is too small */
 				if (pfn + t_mp->sbm_npages <
-					s_mq.last_nonrelocatable)
+				    s_mq.last_nonrelocatable)
 					continue;
 
 				/*
@@ -2293,8 +2291,8 @@ dr_select_mem_target(dr_handle_t *hp,
 					p = p & ~t_mp->sbm_alignment_mask;
 
 					if ((p > s_mq.first_nonrelocatable) ||
-						(p + t_mp->sbm_npages <
-						s_mq.last_nonrelocatable)) {
+					    (p + t_mp->sbm_npages <
+					    s_mq.last_nonrelocatable)) {
 
 						/*
 						 * alternative starting addr
@@ -2319,10 +2317,10 @@ dr_select_mem_target(dr_handle_t *hp,
 				 */
 				t_mp->sbm_slice_offset = pfn & sm;
 				PR_MEM("%s: %s:"
-					"  proposed mc offset 0x%lx\n",
-					f,
-					t_mp->sbm_cm.sbdev_path,
-					t_mp->sbm_slice_offset);
+				    "  proposed mc offset 0x%lx\n",
+				    f,
+				    t_mp->sbm_cm.sbdev_path,
+				    t_mp->sbm_slice_offset);
 			}
 
 			dr_smt_preference[preference]++;
@@ -2365,10 +2363,10 @@ dr_select_mem_target(dr_handle_t *hp,
 		t_ml = dr_get_memlist(t_mp);
 		if (t_ml == NULL) {
 			cmn_err(CE_WARN, "%s: no memlist for"
-				" mem-unit %d, board %d",
-				f,
-				t_mp->sbm_cm.sbdev_bp->b_num,
-				t_mp->sbm_cm.sbdev_unum);
+			    " mem-unit %d, board %d",
+			    f,
+			    t_mp->sbm_cm.sbdev_bp->b_num,
+			    t_mp->sbm_cm.sbdev_unum);
 
 			continue;
 		}
@@ -2400,9 +2398,9 @@ dr_select_mem_target(dr_handle_t *hp,
 
 			if (excess > 0) {
 				x_ml = memlist_del_span(
-					x_ml,
-					_ptob64(s_mp->sbm_basepfn),
-					_ptob64(excess));
+				    x_ml,
+				    _ptob64(s_mp->sbm_basepfn),
+				    _ptob64(excess));
 			}
 			ASSERT(x_ml);
 
@@ -2417,19 +2415,19 @@ dr_select_mem_target(dr_handle_t *hp,
 
 			/* trim off upper portion */
 			excess = (s_mp->sbm_basepfn + s_mp->sbm_npages)
-				- (s_mq.last_nonrelocatable + 1);
+			    - (s_mq.last_nonrelocatable + 1);
 			if (excess > 0) {
 				pfn_t p;
 
 				p  = s_mq.last_nonrelocatable + 1;
 				x_ml = memlist_del_span(
-					x_ml,
-					_ptob64(p),
-					_ptob64(excess));
+				    x_ml,
+				    _ptob64(p),
+				    _ptob64(excess));
 			}
 
 			PR_MEM("%s: %s: edited source memlist:\n",
-				f, s_mp->sbm_cm.sbdev_path);
+			    f, s_mp->sbm_cm.sbdev_path);
 			PR_MEMLIST_DUMP(x_ml);
 
 #ifdef DEBUG
@@ -2439,7 +2437,7 @@ dr_select_mem_target(dr_handle_t *hp,
 				d_ml = d_ml->next;
 
 			ASSERT(d_ml->address + d_ml->size ==
-				_ptob64(s_mq.last_nonrelocatable + 1));
+			    _ptob64(s_mq.last_nonrelocatable + 1));
 #endif
 
 			/*
@@ -2456,7 +2454,7 @@ dr_select_mem_target(dr_handle_t *hp,
 		/* verify target can support source memory spans. */
 		if (memlist_canfit(d_ml, t_ml) == 0) {
 			PR_MEM("%s: source memlist won't"
-				" fit in target memlist\n", f);
+			    " fit in target memlist\n", f);
 			PR_MEM("%s: source memlist:\n", f);
 			PR_MEMLIST_DUMP(d_ml);
 			PR_MEM("%s: target memlist:\n", f);
@@ -2468,28 +2466,28 @@ dr_select_mem_target(dr_handle_t *hp,
 		/* NOTE: the value of d_ml is not used beyond this point */
 
 		PR_MEM("%s: checking for no-reloc in %s, "
-			" basepfn=0x%lx, npages=%ld\n",
-			f,
-			t_mp->sbm_cm.sbdev_path,
-			t_mp->sbm_basepfn,
-			t_mp->sbm_npages);
+		    " basepfn=0x%lx, npages=%ld\n",
+		    f,
+		    t_mp->sbm_cm.sbdev_path,
+		    t_mp->sbm_basepfn,
+		    t_mp->sbm_npages);
 
 		rv = kphysm_del_span_query(
-			t_mp->sbm_basepfn, t_mp->sbm_npages, &mq);
+		    t_mp->sbm_basepfn, t_mp->sbm_npages, &mq);
 		if (rv != KPHYSM_OK) {
 			PR_MEM("%s: kphysm_del_span_query:"
-				" unexpected return value %d\n", f, rv);
+			    " unexpected return value %d\n", f, rv);
 
 			continue;
 		}
 
 		if (mq.nonrelocatable != 0) {
 			PR_MEM("%s: candidate %s has"
-				" nonrelocatable span [0x%lx..0x%lx]\n",
-				f,
-				t_mp->sbm_cm.sbdev_path,
-				mq.first_nonrelocatable,
-				mq.last_nonrelocatable);
+			    " nonrelocatable span [0x%lx..0x%lx]\n",
+			    f,
+			    t_mp->sbm_cm.sbdev_path,
+			    mq.first_nonrelocatable,
+			    mq.last_nonrelocatable);
 
 			continue;
 		}
@@ -2503,10 +2501,10 @@ dr_select_mem_target(dr_handle_t *hp,
 		 * favorite debugger.
 		 */
 		if (dr_ignore_board &
-			(1 << (t_mp->sbm_cm.sbdev_bp->b_num - 1))) {
+		    (1 << (t_mp->sbm_cm.sbdev_bp->b_num - 1))) {
 			PR_MEM("%s: dr_ignore_board flag set,"
-				" ignoring %s as candidate\n",
-				f, t_mp->sbm_cm.sbdev_path);
+			    " ignoring %s as candidate\n",
+			    f, t_mp->sbm_cm.sbdev_path);
 			continue;
 		}
 #endif
@@ -2558,12 +2556,12 @@ dr_select_mem_target(dr_handle_t *hp,
 			    s_del_pa - _ptob64(pfn));
 
 			PR_MEM("%s: %s: reserving src brd memlist:\n",
-				f, s_mp->sbm_cm.sbdev_path);
+			    f, s_mp->sbm_cm.sbdev_path);
 			PR_MEMLIST_DUMP(d_ml);
 
 			/* reserve excess spans */
-			if (dr_reserve_mem_spans(
-				&s_mp->sbm_memhandle, d_ml) != 0) {
+			if (dr_reserve_mem_spans(&s_mp->sbm_memhandle, d_ml)
+			    != 0) {
 
 				/* likely more non-reloc pages appeared */
 				/* TODO: restart from top? */
@@ -2586,7 +2584,7 @@ dr_select_mem_target(dr_handle_t *hp,
 		 */
 		if (dr_reserve_mem_spans(&s_mp->sbm_memhandle, t_ml) == 0) {
 			PR_MEM("%s: %s: target board memory reserved\n",
-				f, t_mp->sbm_cm.sbdev_path);
+			    f, t_mp->sbm_cm.sbdev_path);
 
 			/* a candidate target board is now reserved */
 			t_mp->sbm_flags |= DR_MFLAG_RESERVED;
@@ -2598,7 +2596,7 @@ dr_select_mem_target(dr_handle_t *hp,
 
 		/* did not successfully reserve the target board. */
 		PR_MEM("%s: could not reserve target %s\n",
-			f, t_mp->sbm_cm.sbdev_path);
+		    f, t_mp->sbm_cm.sbdev_path);
 
 		/*
 		 * NOTE: an undo of the dr_reserve_mem_span work
@@ -2621,7 +2619,7 @@ dr_select_mem_target(dr_handle_t *hp,
 	 */
 	if (c_mp == NULL) {
 		PR_MEM("%s: %s: target selection failed.\n",
-			f, s_mp->sbm_cm.sbdev_path);
+		    f, s_mp->sbm_cm.sbdev_path);
 
 		if (t_ml != NULL)
 			memlist_delete(t_ml);
@@ -2630,9 +2628,9 @@ dr_select_mem_target(dr_handle_t *hp,
 	}
 
 	PR_MEM("%s: found target %s for source %s\n",
-		f,
-		c_mp->sbm_cm.sbdev_path,
-		s_mp->sbm_cm.sbdev_path);
+	    f,
+	    c_mp->sbm_cm.sbdev_path,
+	    s_mp->sbm_cm.sbdev_path);
 
 	s_mp->sbm_peer = c_mp;
 	s_mp->sbm_flags |= DR_MFLAG_SOURCE;
@@ -2650,11 +2648,11 @@ dr_select_mem_target(dr_handle_t *hp,
 	if (c_mp->sbm_npages > s_mp->sbm_npages) {
 		s_mp->sbm_flags |= DR_MFLAG_MEMUPSIZE;
 		PR_MEM("%s: upsize detected (source=%ld < target=%ld)\n",
-			f, s_mp->sbm_npages, c_mp->sbm_npages);
+		    f, s_mp->sbm_npages, c_mp->sbm_npages);
 	} else if (c_mp->sbm_npages < s_mp->sbm_npages) {
 		s_mp->sbm_flags |= DR_MFLAG_MEMDOWNSIZE;
 		PR_MEM("%s: downsize detected (source=%ld > target=%ld)\n",
-			f, s_mp->sbm_npages, c_mp->sbm_npages);
+		    f, s_mp->sbm_npages, c_mp->sbm_npages);
 	}
 
 	return (0);

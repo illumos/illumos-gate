@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #include <sys/stat.h>
 #include <sys/ddi.h>
@@ -519,10 +518,9 @@ vscan_drv_close(dev_t dev, int flag, int otyp, cred_t *credp)
 static void
 vscan_drv_delayed_disable(void)
 {
-	clock_t timeout = lbolt + SEC_TO_TICK(vs_reconnect_timeout);
-
 	mutex_enter(&vscan_drv_mutex);
-	(void) cv_timedwait(&vscan_drv_cv, &vscan_drv_mutex, timeout);
+	(void) cv_reltimedwait(&vscan_drv_cv, &vscan_drv_mutex,
+	    SEC_TO_TICK(vs_reconnect_timeout), TR_CLOCK_TICK);
 
 	if (vscan_drv_state == VS_DRV_DELAYED_DISABLE) {
 		vscan_svc_disable();

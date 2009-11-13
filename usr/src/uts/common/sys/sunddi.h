@@ -1511,9 +1511,6 @@ ddivoid();
 cred_t *
 ddi_get_cred(void);
 
-clock_t
-ddi_get_lbolt(void);
-
 time_t
 ddi_get_time(void);
 

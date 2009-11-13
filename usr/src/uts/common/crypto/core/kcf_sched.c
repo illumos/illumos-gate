@@ -1045,7 +1045,7 @@ kcf_svc_do_run(void)
 {
 	int error = 0;
 	clock_t rv;
-	clock_t timeout_val;
+	clock_t timeout_val = drv_usectohz(kcf_idlethr_timeout);
 	kcf_areq_node_t *req;
 	kcf_context_t *ictx;
 	kcf_provider_desc_t *pd;
@@ -1056,12 +1056,9 @@ kcf_svc_do_run(void)
 		mutex_enter(&gswq->gs_lock);
 
 		while ((req = kcf_dequeue()) == NULL) {
-			timeout_val = ddi_get_lbolt() +
-			    drv_usectohz(kcf_idlethr_timeout);
-
 			KCF_ATOMIC_INCR(kcfpool->kp_idlethreads);
-			rv = cv_timedwait_sig(&gswq->gs_cv, &gswq->gs_lock,
-			    timeout_val);
+			rv = cv_reltimedwait_sig(&gswq->gs_cv,
+			    &gswq->gs_lock, timeout_val, TR_CLOCK_TICK);
 			KCF_ATOMIC_DECR(kcfpool->kp_idlethreads);
 
 			switch (rv) {
@@ -1462,7 +1459,7 @@ int
 kcf_svc_wait(int *nthrs)
 {
 	clock_t rv;
-	clock_t timeout_val;
+	clock_t timeout_val = drv_usectohz(kcf_idlethr_timeout);
 
 	if (kcfpool == NULL)
 		return (ENOENT);
@@ -1479,11 +1476,8 @@ kcf_svc_wait(int *nthrs)
 
 	/* Go to sleep, waiting for the signaled flag. */
 	while (!kcfpool->kp_signal_create_thread) {
-		timeout_val = ddi_get_lbolt() +
-		    drv_usectohz(kcf_idlethr_timeout);
-
-		rv = cv_timedwait_sig(&kcfpool->kp_user_cv,
-		    &kcfpool->kp_user_lock, timeout_val);
+		rv = cv_reltimedwait_sig(&kcfpool->kp_user_cv,
+		    &kcfpool->kp_user_lock, timeout_val, TR_CLOCK_TICK);
 		switch (rv) {
 		case 0:
 			/* Interrupted, return to handle exit or signal */

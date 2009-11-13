@@ -318,7 +318,7 @@ zio_handle_ignored_writes(zio_t *zio)
 		 */
 		if (handler->zi_record.zi_timer == 0) {
 			if (handler->zi_record.zi_duration > 0)
-				handler->zi_record.zi_timer = lbolt64;
+				handler->zi_record.zi_timer = ddi_get_lbolt64();
 			else
 				handler->zi_record.zi_timer = zio->io_txg;
 		}
@@ -355,7 +355,8 @@ spa_handle_ignored_writes(spa_t *spa)
 		if (handler->zi_record.zi_duration > 0) {
 			VERIFY(handler->zi_record.zi_timer == 0 ||
 			    handler->zi_record.zi_timer +
-			    handler->zi_record.zi_duration * hz > lbolt64);
+			    handler->zi_record.zi_duration * hz >
+			    ddi_get_lbolt64());
 		} else {
 			/* duration is negative so the subtraction here adds */
 			VERIFY(handler->zi_record.zi_timer == 0 ||

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/systm.h>
 #include <sys/types.h>
@@ -92,8 +90,8 @@ trans_roll_wait(mt_map_t *logmap, callb_cpr_t *cprinfop)
 	}
 	logmap->mtm_flags &= ~(MTM_FORCE_ROLL | MTM_ROLLING);
 	CALLB_CPR_SAFE_BEGIN(cprinfop);
-	(void) cv_timedwait(&logmap->mtm_to_roll_cv, &logmap->mtm_mutex,
-	    lbolt + trans_roll_tics);
+	(void) cv_reltimedwait(&logmap->mtm_to_roll_cv, &logmap->mtm_mutex,
+	    trans_roll_tics, TR_CLOCK_TICK);
 	CALLB_CPR_SAFE_END(cprinfop, &logmap->mtm_mutex);
 	logmap->mtm_flags |= MTM_ROLLING;
 	mutex_exit(&logmap->mtm_mutex);

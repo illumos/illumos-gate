@@ -118,6 +118,7 @@ ip_output_simple_v6(mblk_t *mp, ip_xmit_attr_t *ixa)
 	boolean_t	repeat = B_FALSE;
 	boolean_t	multirt = B_FALSE;
 	uint_t		ifindex;
+	int64_t		now;
 
 	ip6h = (ip6_t *)mp->b_rptr;
 	ASSERT(IPH_HDR_VERSION(ip6h) == IPV6_VERSION);
@@ -237,14 +238,15 @@ repeat_ire:
 		 * To avoid a periodic timer to increase the path MTU we
 		 * look at dce_last_change_time each time we send a packet.
 		 */
-		if (TICK_TO_SEC(lbolt64) - dce->dce_last_change_time >
+		now = ddi_get_lbolt64();
+		if (TICK_TO_SEC(now) - dce->dce_last_change_time >
 		    ipst->ips_ip_pathmtu_interval) {
 			/*
 			 * Older than 20 minutes. Drop the path MTU information.
 			 */
 			mutex_enter(&dce->dce_lock);
 			dce->dce_flags &= ~(DCEF_PMTU|DCEF_TOO_SMALL_PMTU);
-			dce->dce_last_change_time = TICK_TO_SEC(lbolt64);
+			dce->dce_last_change_time = TICK_TO_SEC(now);
 			mutex_exit(&dce->dce_lock);
 			dce_increment_generation(dce);
 			ixa->ixa_fragsize = ip_get_base_mtu(nce->nce_ill, ire);

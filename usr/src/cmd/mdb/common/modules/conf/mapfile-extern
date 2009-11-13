@@ -93,6 +93,8 @@
 		mdb_gelf_destroy =		EXTERN;
 		mdb_gelf_sect_by_name =		EXTERN;
 		mdb_gelf_sect_load =		EXTERN;
+		mdb_gethrtime =			EXTERN;
+		mdb_get_lbolt =			EXTERN;
 		mdb_inc_indent =		EXTERN;
 		mdb_io_destroy =		EXTERN;
 		mdb_iob_clrflags =		EXTERN;

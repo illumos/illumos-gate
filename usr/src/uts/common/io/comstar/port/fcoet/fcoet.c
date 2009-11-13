@@ -759,9 +759,8 @@ fcoet_watchdog(void *arg)
 		}
 
 		atomic_or_32(&ss->ss_flags, SS_FLAG_DOG_WAITING);
-		(void) cv_timedwait(&ss->ss_watch_cv,
-		    &ss->ss_watch_mutex, ddi_get_lbolt() +
-		    (clock_t)tmp_delay);
+		(void) cv_reltimedwait(&ss->ss_watch_cv, &ss->ss_watch_mutex,
+		    (clock_t)tmp_delay, TR_CLOCK_TICK);
 		atomic_and_32(&ss->ss_flags, ~SS_FLAG_DOG_WAITING);
 	}
 

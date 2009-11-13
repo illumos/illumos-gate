@@ -967,13 +967,6 @@ typedef struct mptsas_dma_alloc_state
 #define	MPTSAS_PASS_THRU_TIME_DEFAULT	60	/* 60 seconds */
 
 /*
- * macro for getting value in micro-seconds since last boot to be used as
- * timeout in cv_timedwait call.
- */
-#define	MPTSAS_CV_TIMEOUT(timeout)  (ddi_get_lbolt() + \
-    drv_usectohz(timeout * MICROSEC))
-
-/*
  * macro to return the effective address of a given per-target field
  */
 #define	EFF_ADDR(start, offset)		((start) + (offset))

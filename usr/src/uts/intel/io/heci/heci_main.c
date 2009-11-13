@@ -411,11 +411,8 @@ heci_detach(dev_info_t *dip,  ddi_detach_cmd_t cmd)
 
 		err = 0;
 		while (!dev->wd_stoped && err != -1) {
-			clock_t tm;
-			tm = ddi_get_lbolt();
-			err = cv_timedwait(&dev->wait_stop_wd,
-			    &dev->device_lock,
-			    tm + 10*HZ);
+			err = cv_reltimedwait(&dev->wait_stop_wd,
+			    &dev->device_lock, 10*HZ, TR_CLOCK_TICK);
 		}
 
 		if (!dev->wd_stoped) {
@@ -1450,11 +1447,8 @@ heci_quiesce(dev_info_t *dip)
 
 		err = 0;
 		while (!dev->wd_stoped && err != -1) {
-			clock_t tm;
-			tm = ddi_get_lbolt();
-			err = cv_timedwait(&dev->wait_stop_wd,
-			    &dev->device_lock,
-			    tm + 10*HZ);
+			err = cv_reltimedwait(&dev->wait_stop_wd,
+			    &dev->device_lock, 10*HZ, TR_CLOCK_TICK);
 		}
 
 		if (!dev->wd_stoped) {
@@ -1527,11 +1521,8 @@ heci_suspend(dev_info_t *dip)
 
 		err = 0;
 		while (!device->wd_stoped && err != -1) {
-			clock_t tm;
-			tm = ddi_get_lbolt();
-			err = cv_timedwait(&device->wait_stop_wd,
-			    &device->device_lock,
-			    tm + 10*HZ);
+			err = cv_reltimedwait(&device->wait_stop_wd,
+			    &device->device_lock, 10*HZ, TR_CLOCK_TICK);
 		}
 
 		if (!device->wd_stoped) {

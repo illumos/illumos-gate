@@ -3875,7 +3875,7 @@ void
 mod_uninstall_daemon(void)
 {
 	callb_cpr_t	cprinfo;
-	clock_t		ticks = 0;
+	clock_t		ticks;
 
 	mod_aul_thread = curthread;
 
@@ -3890,10 +3890,9 @@ mod_uninstall_daemon(void)
 		 * the default for a non-DEBUG kernel.
 		 */
 		if (mod_uninstall_interval) {
-			ticks = ddi_get_lbolt() +
-			    drv_usectohz(mod_uninstall_interval * 1000000);
-			(void) cv_timedwait(&mod_uninstall_cv,
-			    &mod_uninstall_lock, ticks);
+			ticks = drv_usectohz(mod_uninstall_interval * 1000000);
+			(void) cv_reltimedwait(&mod_uninstall_cv,
+			    &mod_uninstall_lock, ticks, TR_CLOCK_TICK);
 		} else {
 			cv_wait(&mod_uninstall_cv, &mod_uninstall_lock);
 		}

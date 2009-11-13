@@ -222,22 +222,22 @@ typedef struct drm_wait_queue {
 	mutex_exit(&(q)->lock);	\
 }
 
-#define	jiffies			ddi_get_lbolt()
-#define	DRM_WAIT_ON(ret, q, timeout, condition)  \
-mutex_enter(&(q)->lock);	\
-while (!(condition)) {	\
-	ret = cv_timedwait_sig(&(q)->cv, &(q)->lock, jiffies + timeout); \
-	if (ret == -1) {					\
-		ret = EBUSY;				\
-		break;					\
-	} else if (ret == 0) {				\
-		ret = EINTR;  \
-		break; \
-	} else { \
-		ret = 0; \
-	} \
-} \
-mutex_exit(&(q)->lock);
+#define	DRM_WAIT_ON(ret, q, timeout, condition)  			\
+	mutex_enter(&(q)->lock);					\
+	while (!(condition)) {						\
+		ret = cv_reltimedwait_sig(&(q)->cv, &(q)->lock, timeout,\
+		    TR_CLOCK_TICK);					\
+		if (ret == -1) {					\
+			ret = EBUSY;					\
+			break;						\
+		} else if (ret == 0) {					\
+			ret = EINTR;  					\
+			break; 						\
+		} else { 						\
+			ret = 0; 					\
+		} 							\
+	} 								\
+	mutex_exit(&(q)->lock);
 
 #define	DRM_GETSAREA()  					\
 {                                				\
@@ -397,7 +397,7 @@ typedef struct drm_lock_data {
 	/* Uniq. identifier of holding process */
 	kcondvar_t	lock_cv;	/* lock queue - SOLARIS Specific */
 	kmutex_t	lock_mutex;	/* lock - SOLARIS Specific */
-	unsigned long	lock_time;	/* Time of last lock in jiffies */
+	unsigned long	lock_time;	/* Time of last lock in clock ticks */
 } drm_lock_data_t;
 
 /*

@@ -804,7 +804,7 @@ static void
 reaper_thread(caddr_t *arg)
 {
 	rfs4_table_t *table = (rfs4_table_t *)arg;
-	clock_t rc, time;
+	clock_t rc, time, wakeup;
 
 	NFS4_DEBUG(table->dbt_debug,
 	    (CE_NOTE, "rfs4_reaper_thread starting for %s", table->dbt_name));
@@ -813,12 +813,13 @@ reaper_thread(caddr_t *arg)
 	    callb_generic_cpr, "nfsv4Reaper");
 
 	time = MIN(rfs4_reap_interval, table->dbt_max_cache_time);
+	wakeup = SEC_TO_TICK(time);
+
 	mutex_enter(&table->dbt_reaper_cv_lock);
 	do {
 		CALLB_CPR_SAFE_BEGIN(&table->dbt_reaper_cpr_info);
-		rc = cv_timedwait_sig(&table->dbt_reaper_wait,
-		    &table->dbt_reaper_cv_lock,
-		    lbolt + SEC_TO_TICK(time));
+		rc = cv_reltimedwait_sig(&table->dbt_reaper_wait,
+		    &table->dbt_reaper_cv_lock, wakeup, TR_CLOCK_TICK);
 		CALLB_CPR_SAFE_END(&table->dbt_reaper_cpr_info,
 		    &table->dbt_reaper_cv_lock);
 		rfs4_dbe_reap(table, table->dbt_max_cache_time, 0);

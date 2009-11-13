@@ -2677,7 +2677,7 @@ nce_update(ncec_t *ncec, uint16_t new_state, uchar_t *new_ll_addr)
 		ASSERT((int16_t)new_state <= ND_STATE_VALID_MAX);
 		need_stop_timer = B_TRUE;
 		if (new_state == ND_REACHABLE)
-			ncec->ncec_last = TICK_TO_MSEC(lbolt64);
+			ncec->ncec_last = TICK_TO_MSEC(ddi_get_lbolt64());
 		else {
 			/* We force NUD in this case */
 			ncec->ncec_last = 0;
@@ -3392,7 +3392,7 @@ ncec_cache_reclaim(ncec_t *ncec, char *arg)
 		return;
 	}
 
-	rand = (uint_t)lbolt +
+	rand = (uint_t)ddi_get_lbolt() +
 	    NCE_ADDR_HASH_V6(ncec->ncec_addr, NCE_TABLE_SIZE);
 	if ((rand/fraction)*fraction == rand) {
 		IP_STAT(ipst, ip_nce_reclaim_deleted);
@@ -4557,12 +4557,12 @@ nce_add_common(ill_t *ill, uchar_t *hw_addr, uint_t hw_addr_len,
 	ncec->ncec_state = state;
 
 	if (state == ND_REACHABLE) {
-		ncec->ncec_last = TICK_TO_MSEC(lbolt64);
-		ncec->ncec_init_time = TICK_TO_MSEC(lbolt64);
+		ncec->ncec_last = ncec->ncec_init_time =
+		    TICK_TO_MSEC(ddi_get_lbolt64());
 	} else {
 		ncec->ncec_last = 0;
 		if (state == ND_INITIAL)
-			ncec->ncec_init_time = TICK_TO_MSEC(lbolt64);
+			ncec->ncec_init_time = TICK_TO_MSEC(ddi_get_lbolt64());
 	}
 	list_create(&ncec->ncec_cb, sizeof (ncec_cb_t),
 	    offsetof(ncec_cb_t, ncec_cb_node));

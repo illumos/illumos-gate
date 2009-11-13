@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1089,8 +1087,9 @@ ufsfx_thread_fix_failures(void *ignored)
 			if (retry) {
 				mutex_enter(&ufs_fix.uq_mutex);
 				CALLB_CPR_SAFE_BEGIN(&cprinfo);
-				(void) cv_timedwait(&ufs_fix.uq_cv,
-				    &ufs_fix.uq_mutex, lbolt + (hz * retry));
+				(void) cv_reltimedwait(&ufs_fix.uq_cv,
+				    &ufs_fix.uq_mutex, (hz * retry),
+				    TR_CLOCK_TICK);
 				CALLB_CPR_SAFE_END(&cprinfo,
 				    &ufs_fix.uq_mutex);
 				mutex_exit(&ufs_fix.uq_mutex);

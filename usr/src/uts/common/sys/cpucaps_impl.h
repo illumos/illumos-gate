@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_CPUCAPS_IMPL_H
 #define	_SYS_CPUCAPS_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -67,7 +65,7 @@ typedef struct cpucap {
 	struct zone	*cap_zone;	/* zone for the cap		*/
 	waitq_t		cap_waitq;	/* waitq for capped threads	*/
 	kstat_t		*cap_kstat;	/* cpucaps specific kstat	*/
-	int64_t		cap_lbolt;	/* zone cap specific 		*/
+	int64_t		cap_gen;	/* zone cap specific 		*/
 	hrtime_t	cap_value;	/* scaled CPU usage cap		*/
 	hrtime_t	cap_usage;	/* current CPU usage		*/
 	disp_lock_t	cap_usagelock;	/* protects cap_usage above	*/

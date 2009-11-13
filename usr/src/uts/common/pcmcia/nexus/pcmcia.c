@@ -2379,7 +2379,7 @@ pcmcia_1275_name(int socket, struct pcm_device_info *info,
 
 void
 pcmcia_vers1_name(int socket, struct pcm_device_info *info,
-			client_handle_t handle)
+    client_handle_t handle)
 {
 	cistpl_vers_1_t vers1;
 	tuple_t tuple;
@@ -2396,6 +2396,7 @@ pcmcia_vers1_name(int socket, struct pcm_device_info *info,
 	    (i = csx_GetFirstTuple(handle, &tuple)) == SUCCESS) {
 		i = csx_Parse_CISTPL_VERS_1(handle, &tuple, &vers1);
 		if (i == SUCCESS) {
+			/* BEGIN CSTYLED */
 			for (i = 0, len = 0, space = 0; i < vers1.ns; i++) {
 			    if ((space + len + strlen(info->pd_vers1_name)) >=
 				sizeof (info->pd_vers1_name))
@@ -2412,6 +2413,7 @@ pcmcia_vers1_name(int socket, struct pcm_device_info *info,
 				    len--;
 			    space = 1;
 			}
+			/* END CSTYLED */
 			info->pd_vers1_name[len] = '\0';
 			info->pd_flags |= PCM_NAME_VERS1;
 		}
@@ -2673,34 +2675,33 @@ pcmcia_get_mem_regs(struct pcm_regs *regs, struct pcm_device_info *info,
 			    &device);
 
 		if (ret == CS_SUCCESS) {
-		    curr_base = 0;
-		    for (ret = 0; ret < device.num_devices;
-			ret++) {
-			    /* need to order these for real mem first */
-			    if (device.devnode[ret].type !=
-				CISTPL_DEVICE_DTYPE_NULL) {
-				    /* how to represent types??? */
-				    regs[num_regs].phys_hi =
-					PC_REG_PHYS_HI(0, 0,
+			curr_base = 0;
+			for (ret = 0; ret < device.num_devices; ret++) {
+				/* need to order these for real mem first */
+				if (device.devnode[ret].type !=
+				    CISTPL_DEVICE_DTYPE_NULL) {
+					/* how to represent types??? */
+					regs[num_regs].phys_hi =
+					    PC_REG_PHYS_HI(0, 0,
 					    pctype,
 					    space,
 					    info->pd_socket,
 					    info->pd_function,
 					    0);
-				    regs[num_regs].phys_lo = curr_base;
-				    len = device.devnode[ret].size_in_bytes;
-				    curr_base += len;
-				    regs[num_regs].phys_len = len;
-				    num_regs++;
-			    } else {
-				/*
-				 * NULL device is a "hole"
-				 */
-				    curr_base +=
+					regs[num_regs].phys_lo = curr_base;
+					len = device.devnode[ret].size_in_bytes;
+					curr_base += len;
+					regs[num_regs].phys_len = len;
+					num_regs++;
+				} else {
+					/*
+					 * NULL device is a "hole"
+					 */
+					curr_base +=
 					    device.devnode[ret].size_in_bytes;
-			    }
+				}
 			}
-	    }
+		}
 	}
 	return (num_regs);
 }
@@ -2729,22 +2730,25 @@ pcmcia_get_io_regs(struct pcm_regs *regs, struct pcm_device_info *info,
 	len = 0;
 
 	if (csx_GetFirstTuple(info->pd_handle, &tuple) == CS_SUCCESS) {
-	    if (csx_Parse_CISTPL_CONFIG(info->pd_handle,
-					&tuple, &config) != CS_SUCCESS) {
-		info->pd_flags |= PCM_NO_CONFIG; /* must be memory */
-		return (0);
-	}
-	curr = 0;
+		if (csx_Parse_CISTPL_CONFIG(info->pd_handle,
+		    &tuple, &config) != CS_SUCCESS) {
+			info->pd_flags |= PCM_NO_CONFIG; /* must be memory */
+			return (0);
+		}
+		curr = 0;
 
-	tuple.DesiredTuple = CISTPL_CFTABLE_ENTRY;
-	tuple.Socket = info->pd_socket;
-	tuple.Attributes = 0;
-	bzero(tmp, sizeof (tmp));
+		tuple.DesiredTuple = CISTPL_CFTABLE_ENTRY;
+		tuple.Socket = info->pd_socket;
+		tuple.Attributes = 0;
+		bzero(tmp, sizeof (tmp));
+
 	while (csx_GetNextTuple(info->pd_handle, &tuple) == CS_SUCCESS) {
-	    bzero(&cftable, sizeof (cftable));
-	    if (csx_Parse_CISTPL_CFTABLE_ENTRY(info->pd_handle,
-						&tuple, &cftable) ==
-		CS_SUCCESS) {
+		bzero(&cftable, sizeof (cftable));
+
+		if (csx_Parse_CISTPL_CFTABLE_ENTRY(info->pd_handle,
+		    &tuple, &cftable) == CS_SUCCESS) {
+
+		/* BEGIN CSTYLED */
 		if (cftable.flags & CISTPL_CFTABLE_TPCE_FS_IO) {
 		    /* we have an I/O entry */
 		    if (cftable.io.flags &
@@ -2808,7 +2812,8 @@ pcmcia_get_io_regs(struct pcm_regs *regs, struct pcm_device_info *info,
 		    if (config.last == cftable.index)
 			    break;
 		}
-	    }
+		/* END CSTYLE */
+		}
 	}
 	if (found == 1) {
 		/*
@@ -3086,50 +3091,50 @@ pcmcia_create_dev_info(int socket)
 			card_info.pd_flags |= PCM_MULTI_FUNCTION;
 		}
 		for (i = 0; i < functions; i++) {
-		    register int flags;
-		    lsocket = CS_MAKE_SOCKET_NUMBER(socket, i);
-		    card_info.pd_socket = socket;
-		    card_info.pd_function = i;
+			register int flags;
+			lsocket = CS_MAKE_SOCKET_NUMBER(socket, i);
+			card_info.pd_socket = socket;
+			card_info.pd_function = i;
 			/*
 			 * new name construction
 			 */
-		    if (functions != 1) {
-			    /* need per function handle */
-			    card_info.pd_function = i;
-			    /* get new handle */
-		    }
-		    pcmcia_1275_name(lsocket, &card_info,
-			card_info.pd_handle);
-		    pcmcia_vers1_name(lsocket, &card_info,
-			card_info.pd_handle);
-		    pcmcia_generic_name(lsocket, &card_info,
-			card_info.pd_handle);
-		    flags = card_info.pd_flags;
-		    if (!(flags & PCM_NAME_1275)) {
-			if (flags & PCM_NAME_VERS1) {
-			    (void) strcpy(card_info.pd_bind_name,
-				PCMDEV_NAMEPREF);
-			    card_info.pd_bind_name[sizeof (PCMDEV_NAMEPREF)] =
-				',';
-			    (void) strncpy(card_info.pd_bind_name +
-				sizeof (PCMDEV_NAMEPREF),
-				card_info.pd_vers1_name,
-				MODMAXNAMELEN -
-				sizeof (PCMDEV_NAMEPREF));
-			    pcmcia_fix_string(card_info.pd_bind_name);
-			} else {
-				/*
-				 * have a CIS but not the right info
-				 * so treat as generic "pccard"
-				 */
-				(void) strcpy(card_info.pd_generic_name,
-				    "pccard,memory");
-				card_info.pd_flags |= PCM_NAME_GENERIC;
-				(void) strcpy(card_info.pd_bind_name,
-				    "pccard,memory");
+			if (functions != 1) {
+				/* need per function handle */
+				card_info.pd_function = i;
+				/* get new handle */
 			}
-		    }
-		    pcmcia_init_devinfo(pdip, &card_info);
+			pcmcia_1275_name(lsocket, &card_info,
+			card_info.pd_handle);
+			pcmcia_vers1_name(lsocket, &card_info,
+			card_info.pd_handle);
+			pcmcia_generic_name(lsocket, &card_info,
+			card_info.pd_handle);
+			flags = card_info.pd_flags;
+			if (!(flags & PCM_NAME_1275)) {
+				if (flags & PCM_NAME_VERS1) {
+				    (void) strcpy(card_info.pd_bind_name,
+					PCMDEV_NAMEPREF);
+				    card_info.pd_bind_name[
+				        sizeof (PCMDEV_NAMEPREF)] = ',';
+				    (void) strncpy(card_info.pd_bind_name +
+					sizeof (PCMDEV_NAMEPREF),
+					card_info.pd_vers1_name,
+					MODMAXNAMELEN -
+					sizeof (PCMDEV_NAMEPREF));
+				    pcmcia_fix_string(card_info.pd_bind_name);
+				} else {
+					/*
+					 * have a CIS but not the right info
+					 * so treat as generic "pccard"
+					 */
+					(void) strcpy(card_info.pd_generic_name,
+					    "pccard,memory");
+					card_info.pd_flags |= PCM_NAME_GENERIC;
+					(void) strcpy(card_info.pd_bind_name,
+					    "pccard,memory");
+				}
+			}
+			pcmcia_init_devinfo(pdip, &card_info);
 		}
 		return;
 	}
@@ -4276,7 +4281,6 @@ void
 pcmcia_wait_insert(dev_info_t *dip)
 {
 	int i, f, tries, done;
-	clock_t tm;
 	struct pcmcia_adapter *adapt = NULL;
 	anp_t *nexus;
 
@@ -4313,10 +4317,9 @@ pcmcia_wait_insert(dev_info_t *dip)
 				}
 		}
 		if (!done) {
-			tm = ddi_get_lbolt();
-			(void) cv_timedwait(&pcmcia_condvar,
-			    &pcmcia_global_lock,
-			    tm + drv_usectohz(100000));
+			(void) cv_reltimedwait(&pcmcia_condvar,
+			    &pcmcia_global_lock, drv_usectohz(100000),
+			    TR_CLOCK_TICK);
 		} else {
 			tries = 0;
 		}

@@ -1580,7 +1580,8 @@ arc_evict(arc_state_t *state, uint64_t spa, int64_t bytes, boolean_t recycle,
 		if (HDR_IO_IN_PROGRESS(ab) ||
 		    (spa && ab->b_spa != spa) ||
 		    (ab->b_flags & (ARC_PREFETCH|ARC_INDIRECT) &&
-		    lbolt - ab->b_arc_access < arc_min_prefetch_lifespan)) {
+		    ddi_get_lbolt() - ab->b_arc_access <
+		    arc_min_prefetch_lifespan)) {
 			skipped++;
 			continue;
 		}
@@ -2051,12 +2052,12 @@ arc_reclaim_thread(void)
 			}
 
 			/* reset the growth delay for every reclaim */
-			growtime = lbolt + (arc_grow_retry * hz);
+			growtime = ddi_get_lbolt() + (arc_grow_retry * hz);
 
 			arc_kmem_reap_now(last_reclaim);
 			arc_warm = B_TRUE;
 
-		} else if (arc_no_grow && lbolt >= growtime) {
+		} else if (arc_no_grow && ddi_get_lbolt() >= growtime) {
 			arc_no_grow = FALSE;
 		}
 
@@ -2070,7 +2071,7 @@ arc_reclaim_thread(void)
 		/* block until needed, or one second, whichever is shorter */
 		CALLB_CPR_SAFE_BEGIN(&cpr);
 		(void) cv_timedwait(&arc_reclaim_thr_cv,
-		    &arc_reclaim_thr_lock, (lbolt + hz));
+		    &arc_reclaim_thr_lock, (ddi_get_lbolt() + hz));
 		CALLB_CPR_SAFE_END(&cpr, &arc_reclaim_thr_lock);
 	}
 
@@ -2285,6 +2286,8 @@ out:
 static void
 arc_access(arc_buf_hdr_t *buf, kmutex_t *hash_lock)
 {
+	clock_t now;
+
 	ASSERT(MUTEX_HELD(hash_lock));
 
 	if (buf->b_state == arc_anon) {
@@ -2295,11 +2298,13 @@ arc_access(arc_buf_hdr_t *buf, kmutex_t *hash_lock)
 		 */
 
 		ASSERT(buf->b_arc_access == 0);
-		buf->b_arc_access = lbolt;
+		buf->b_arc_access = ddi_get_lbolt();
 		DTRACE_PROBE1(new_state__mru, arc_buf_hdr_t *, buf);
 		arc_change_state(arc_mru, buf, hash_lock);
 
 	} else if (buf->b_state == arc_mru) {
+		now = ddi_get_lbolt();
+
 		/*
 		 * If this buffer is here because of a prefetch, then either:
 		 * - clear the flag if this is a "referencing" read
@@ -2315,7 +2320,7 @@ arc_access(arc_buf_hdr_t *buf, kmutex_t *hash_lock)
 				buf->b_flags &= ~ARC_PREFETCH;
 				ARCSTAT_BUMP(arcstat_mru_hits);
 			}
-			buf->b_arc_access = lbolt;
+			buf->b_arc_access = now;
 			return;
 		}
 
@@ -2324,13 +2329,13 @@ arc_access(arc_buf_hdr_t *buf, kmutex_t *hash_lock)
 		 * but it is still in the cache. Move it to the MFU
 		 * state.
 		 */
-		if (lbolt > buf->b_arc_access + ARC_MINTIME) {
+		if (now > buf->b_arc_access + ARC_MINTIME) {
 			/*
 			 * More than 125ms have passed since we
 			 * instantiated this buffer.  Move it to the
 			 * most frequently used state.
 			 */
-			buf->b_arc_access = lbolt;
+			buf->b_arc_access = now;
 			DTRACE_PROBE1(new_state__mfu, arc_buf_hdr_t *, buf);
 			arc_change_state(arc_mfu, buf, hash_lock);
 		}
@@ -2353,7 +2358,7 @@ arc_access(arc_buf_hdr_t *buf, kmutex_t *hash_lock)
 			DTRACE_PROBE1(new_state__mfu, arc_buf_hdr_t *, buf);
 		}
 
-		buf->b_arc_access = lbolt;
+		buf->b_arc_access = ddi_get_lbolt();
 		arc_change_state(new_state, buf, hash_lock);
 
 		ARCSTAT_BUMP(arcstat_mru_ghost_hits);
@@ -2372,7 +2377,7 @@ arc_access(arc_buf_hdr_t *buf, kmutex_t *hash_lock)
 			ASSERT(list_link_active(&buf->b_arc_node));
 		}
 		ARCSTAT_BUMP(arcstat_mfu_hits);
-		buf->b_arc_access = lbolt;
+		buf->b_arc_access = ddi_get_lbolt();
 	} else if (buf->b_state == arc_mfu_ghost) {
 		arc_state_t	*new_state = arc_mfu;
 		/*
@@ -2390,7 +2395,7 @@ arc_access(arc_buf_hdr_t *buf, kmutex_t *hash_lock)
 			new_state = arc_mru;
 		}
 
-		buf->b_arc_access = lbolt;
+		buf->b_arc_access = ddi_get_lbolt();
 		DTRACE_PROBE1(new_state__mfu, arc_buf_hdr_t *, buf);
 		arc_change_state(new_state, buf, hash_lock);
 
@@ -2400,7 +2405,7 @@ arc_access(arc_buf_hdr_t *buf, kmutex_t *hash_lock)
 		 * This buffer is on the 2nd Level ARC.
 		 */
 
-		buf->b_arc_access = lbolt;
+		buf->b_arc_access = ddi_get_lbolt();
 		DTRACE_PROBE1(new_state__mfu, arc_buf_hdr_t *, buf);
 		arc_change_state(arc_mfu, buf, hash_lock);
 	} else {
@@ -3741,7 +3746,7 @@ l2arc_write_size(l2arc_dev_t *dev)
 static clock_t
 l2arc_write_interval(clock_t began, uint64_t wanted, uint64_t wrote)
 {
-	clock_t interval, next;
+	clock_t interval, next, now;
 
 	/*
 	 * If the ARC lists are busy, increase our write rate; if the
@@ -3754,7 +3759,8 @@ l2arc_write_interval(clock_t began, uint64_t wanted, uint64_t wrote)
 	else
 		interval = hz * l2arc_feed_secs;
 
-	next = MAX(lbolt, MIN(lbolt + interval, began + interval));
+	now = ddi_get_lbolt();
+	next = MAX(now, MIN(now + interval, began + interval));
 
 	return (next);
 }
@@ -4365,7 +4371,7 @@ l2arc_feed_thread(void)
 	l2arc_dev_t *dev;
 	spa_t *spa;
 	uint64_t size, wrote;
-	clock_t begin, next = lbolt;
+	clock_t begin, next = ddi_get_lbolt();
 
 	CALLB_CPR_INIT(&cpr, &l2arc_feed_thr_lock, callb_generic_cpr, FTAG);
 
@@ -4376,7 +4382,7 @@ l2arc_feed_thread(void)
 		(void) cv_timedwait(&l2arc_feed_thr_cv, &l2arc_feed_thr_lock,
 		    next);
 		CALLB_CPR_SAFE_END(&cpr, &l2arc_feed_thr_lock);
-		next = lbolt + hz;
+		next = ddi_get_lbolt() + hz;
 
 		/*
 		 * Quick check for L2ARC devices.
@@ -4387,7 +4393,7 @@ l2arc_feed_thread(void)
 			continue;
 		}
 		mutex_exit(&l2arc_dev_mtx);
-		begin = lbolt;
+		begin = ddi_get_lbolt();
 
 		/*
 		 * This selects the next l2arc device to write to, and in

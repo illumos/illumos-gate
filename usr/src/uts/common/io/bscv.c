@@ -3128,9 +3128,8 @@ bscv_event_daemon(void *arg)
 		if (ssp->event_sleep) {
 			ssp->task_flags |= TASK_SLEEPING_FLG;
 			/* Sleep until there is something to do */
-			(void) cv_timedwait(&ssp->task_cv,
-			    &ssp->task_mu,
-			    poll_period + ddi_get_lbolt());
+			(void) cv_reltimedwait(&ssp->task_cv,
+			    &ssp->task_mu, poll_period, TR_CLOCK_TICK);
 			ssp->task_flags &= ~TASK_SLEEPING_FLG;
 			ssp->event_sleep = B_FALSE;
 		}

@@ -166,7 +166,8 @@ txg_thread_wait(tx_state_t *tx, callb_cpr_t *cpr, kcondvar_t *cv, uint64_t time)
 	CALLB_CPR_SAFE_BEGIN(cpr);
 
 	if (time)
-		(void) cv_timedwait(cv, &tx->tx_sync_lock, lbolt + time);
+		(void) cv_timedwait(cv, &tx->tx_sync_lock,
+		    ddi_get_lbolt() + time);
 	else
 		cv_wait(cv, &tx->tx_sync_lock);
 
@@ -377,7 +378,7 @@ txg_sync_thread(dsl_pool_t *dp)
 			dprintf("waiting; tx_synced=%llu waiting=%llu dp=%p\n",
 			    tx->tx_synced_txg, tx->tx_sync_txg_waiting, dp);
 			txg_thread_wait(tx, &cpr, &tx->tx_sync_more_cv, timer);
-			delta = lbolt - start;
+			delta = ddi_get_lbolt() - start;
 			timer = (delta > timeout ? 0 : timeout - delta);
 		}
 
@@ -409,9 +410,9 @@ txg_sync_thread(dsl_pool_t *dp)
 		    txg, tx->tx_quiesce_txg_waiting, tx->tx_sync_txg_waiting);
 		mutex_exit(&tx->tx_sync_lock);
 
-		start = lbolt;
+		start = ddi_get_lbolt();
 		spa_sync(dp->dp_spa, txg);
-		delta = lbolt - start;
+		delta = ddi_get_lbolt() - start;
 
 		mutex_enter(&tx->tx_sync_lock);
 		tx->tx_synced_txg = txg;
@@ -478,7 +479,7 @@ void
 txg_delay(dsl_pool_t *dp, uint64_t txg, int ticks)
 {
 	tx_state_t *tx = &dp->dp_tx;
-	int timeout = lbolt + ticks;
+	int timeout = ddi_get_lbolt() + ticks;
 
 	/* don't delay if this txg could transition to quiesing immediately */
 	if (tx->tx_open_txg > txg ||
@@ -491,7 +492,7 @@ txg_delay(dsl_pool_t *dp, uint64_t txg, int ticks)
 		return;
 	}
 
-	while (lbolt < timeout &&
+	while (ddi_get_lbolt() < timeout &&
 	    tx->tx_syncing_txg < txg-1 && !txg_stalled(dp))
 		(void) cv_timedwait(&tx->tx_quiesce_more_cv, &tx->tx_sync_lock,
 		    timeout);

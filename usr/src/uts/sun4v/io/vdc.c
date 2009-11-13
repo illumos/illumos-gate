@@ -6636,7 +6636,7 @@ vdc_eio_thread(void *arg)
 {
 	int status;
 	vdc_t *vdc = (vdc_t *)arg;
-	clock_t timeout, starttime;
+	clock_t starttime, timeout = drv_usectohz(vdc->failfast_interval);
 
 	mutex_enter(&vdc->lock);
 
@@ -6832,8 +6832,7 @@ vdc_ownership_thread(void *arg)
 		if (vdc->ownership & VDC_OWNERSHIP_GRANTED)
 			timeout = 0;
 		else
-			timeout = ddi_get_lbolt() +
-			    drv_usectohz(vdc_ownership_delay);
+			timeout = drv_usectohz(vdc_ownership_delay);
 
 		/* Release the ownership_lock and wait on the vdc lock */
 		mutex_exit(&vdc->ownership_lock);
@@ -6841,8 +6840,8 @@ vdc_ownership_thread(void *arg)
 		if (timeout == 0)
 			(void) cv_wait(&vdc->ownership_cv, &vdc->lock);
 		else
-			(void) cv_timedwait(&vdc->ownership_cv,
-			    &vdc->lock, timeout);
+			(void) cv_reltimedwait(&vdc->ownership_cv, &vdc->lock,
+			    timeout, TR_CLOCK_TICK);
 
 		mutex_exit(&vdc->lock);
 

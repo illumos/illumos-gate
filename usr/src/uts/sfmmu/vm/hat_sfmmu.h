@@ -796,7 +796,7 @@ struct ctx_trace {
 	(ptr)->sc_sfmmu_stealing = (stealing_sfmmu);			\
 	(ptr)->sc_cnum = (cnum);					\
 	(ptr)->sc_type = (type);					\
-	(ptr)->sc_time = lbolt;						\
+	(ptr)->sc_time = ddi_get_lbolt();				\
 	(ptr) = NEXT_CTXTR(ptr);					\
 	num_ctx_stolen += (type);					\
 	mutex_exit(mutex);

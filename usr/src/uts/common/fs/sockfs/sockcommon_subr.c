@@ -311,11 +311,8 @@ so_snd_wait_qnotfull_locked(struct sonode *so, boolean_t dontblock)
 			 */
 			error = cv_wait_sig(&so->so_snd_cv, &so->so_lock);
 		} else {
-			clock_t now;
-
-			time_to_wait(&now, so->so_sndtimeo);
-			error = cv_timedwait_sig(&so->so_snd_cv, &so->so_lock,
-			    now);
+			error = cv_reltimedwait_sig(&so->so_snd_cv,
+			    &so->so_lock, so->so_sndtimeo, TR_CLOCK_TICK);
 		}
 		if (error == 0)
 			return (EINTR);
@@ -971,10 +968,9 @@ try_again:
 					error = cv_wait_sig(&so->so_rcv_cv,
 					    &so->so_lock);
 				} else {
-					clock_t now;
-					time_to_wait(&now, so->so_rcvtimeo);
-					error = cv_timedwait_sig(&so->so_rcv_cv,
-					    &so->so_lock, now);
+					error = cv_reltimedwait_sig(
+					    &so->so_rcv_cv, &so->so_lock,
+					    so->so_rcvtimeo, TR_CLOCK_TICK);
 				}
 				so->so_rcv_wakeup = B_FALSE;
 				so->so_rcv_wanted = 0;
@@ -1558,6 +1554,7 @@ so_strioc_nread(struct sonode *so, intptr_t arg, int mode, int32_t *rvalp)
 	int retval;
 	int count = 0;
 	mblk_t *mp;
+	clock_t wakeup = drv_usectohz(10);
 
 	if (so->so_downcalls == NULL ||
 	    so->so_downcalls->sd_recv_uio != NULL)
@@ -1575,8 +1572,8 @@ so_strioc_nread(struct sonode *so, intptr_t arg, int mode, int32_t *rvalp)
 
 		so->so_flag |= SOWANT;
 		/* Do a timed sleep, in case the reader goes to sleep. */
-		(void) cv_timedwait(&so->so_state_cv, &so->so_lock,
-		    lbolt + drv_usectohz(10));
+		(void) cv_reltimedwait(&so->so_state_cv, &so->so_lock, wakeup,
+		    TR_CLOCK_TICK);
 	}
 
 	/*

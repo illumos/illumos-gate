@@ -54,6 +54,7 @@
 #include <sys/hsvc.h>
 #include <sys/ldoms.h>
 #include <sys/kldc.h>
+#include <sys/clock_impl.h>
 #include <sys/dumphdr.h>
 
 /*
@@ -1110,6 +1111,8 @@ static hsvc_info_t soft_state_hsvc = {
 static void
 sun4v_system_claim(void)
 {
+	lbolt_debug_entry();
+
 	watchdog_suspend();
 	kldc_debug_enter();
 	/*
@@ -1141,6 +1144,8 @@ sun4v_system_release(void)
 		    &SOLARIS_SOFT_STATE_SAVED_MSG);
 		soft_state_saved_state = -1;
 	}
+
+	lbolt_debug_return();
 }
 
 void

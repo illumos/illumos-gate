@@ -422,7 +422,7 @@ loop:
 			ASSERT(bp->b_flags & B_DELWRI);
 
 			if ((bp->b_flags & B_DELWRI) &&
-			    (lbolt - bp->b_start >= autoup) &&
+			    (ddi_get_lbolt() - bp->b_start >= autoup) &&
 			    sema_tryp(&bp->b_sem)) {
 				bp->b_flags |= B_ASYNC;
 				hp->b_length--;
@@ -461,7 +461,7 @@ loop:
 	 * inode flushing until after fsflush_iflush_delay secs have elapsed.
 	 */
 	if ((boothowto & RB_SINGLE) == 0 &&
-	    (lbolt64 / hz) < fsflush_iflush_delay)
+	    (ddi_get_lbolt64() / hz) < fsflush_iflush_delay)
 		goto loop;
 
 	/*

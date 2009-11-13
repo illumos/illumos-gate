@@ -1078,11 +1078,8 @@ sowaitack(struct sonode *so, mblk_t **mpp, clock_t wait)
 			/*
 			 * Only wait for the time limit.
 			 */
-			clock_t now;
-
-			time_to_wait(&now, wait);
-			if (cv_timedwait(&sti->sti_ack_cv, &so->so_lock,
-			    now) == -1) {
+			if (cv_reltimedwait(&sti->sti_ack_cv, &so->so_lock,
+			    wait, TR_CLOCK_TICK) == -1) {
 				eprintsoline(so, ETIME);
 				return (ETIME);
 			}

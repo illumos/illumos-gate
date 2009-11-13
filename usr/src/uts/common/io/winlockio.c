@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1402,8 +1402,8 @@ seglock_lockfault(devmap_cookie_t dhp, SegProc *sdp, SegLock *lp, uint_t rw)
 			 * locksleep cv and thus kick the other timed waiters
 			 * and cause everyone to restart in a new timedwait
 			 */
-			rval = cv_timedwait_sig(&lp->locksleep,
-			    &lp->mutex, ddi_get_lbolt() + lp->timeout);
+			rval = cv_reltimedwait_sig(&lp->locksleep,
+			    &lp->mutex, lp->timeout, TR_CLOCK_TICK);
 		}
 
 		/*

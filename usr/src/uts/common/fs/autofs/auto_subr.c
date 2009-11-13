@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/kmem.h>
@@ -2604,7 +2602,7 @@ auto_do_unmount(struct autofs_globals *fngp)
 		CALLB_CPR_SAFE_BEGIN(&cprinfo);
 newthread:
 		mutex_exit(&fngp->fng_unmount_threads_lock);
-		timeleft = zone_status_timedwait(zone, lbolt +
+		timeleft = zone_status_timedwait(zone, ddi_get_lbolt() +
 		    autofs_unmount_thread_timer * hz, ZONE_IS_SHUTTING_DOWN);
 		mutex_enter(&fngp->fng_unmount_threads_lock);
 

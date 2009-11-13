@@ -607,7 +607,7 @@ i_ddi_irm_set_cb(dev_info_t *dip, boolean_t has_cb_flag)
 static void
 irm_balance_thread(ddi_irm_pool_t *pool_p)
 {
-	clock_t		interval, wakeup;
+	clock_t		interval;
 
 	DDI_INTR_IRMDBG((CE_CONT, "irm_balance_thread: pool_p %p\n",
 	    (void *)pool_p));
@@ -637,9 +637,8 @@ irm_balance_thread(ddi_irm_pool_t *pool_p)
 		if ((interval > 0) &&
 		    !(pool_p->ipool_flags & DDI_IRM_FLAG_WAITERS) &&
 		    !(pool_p->ipool_flags & DDI_IRM_FLAG_EXIT)) {
-			wakeup = ddi_get_lbolt() + interval;
-			(void) cv_timedwait(&pool_p->ipool_cv,
-			    &pool_p->ipool_lock, wakeup);
+			(void) cv_reltimedwait(&pool_p->ipool_cv,
+			    &pool_p->ipool_lock, interval, TR_CLOCK_TICK);
 		}
 
 		/* Check if awakened to exit */

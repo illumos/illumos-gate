@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -205,7 +205,7 @@ ldl_strategy(ml_unit_t *ul, buf_t *pb)
 		} else {
 			if (read) {
 				logstats.ls_ldlreads.value.ui64++;
-				ufsvfsp->vfs_iotstamp = lbolt;
+				ufsvfsp->vfs_iotstamp = ddi_get_lbolt();
 				lwp_stat_update(LWP_STAT_INBLK, 1);
 			} else {
 				logstats.ls_ldlwrites.value.ui64++;

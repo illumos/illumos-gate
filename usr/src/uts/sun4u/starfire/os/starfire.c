@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -45,6 +43,7 @@
 #include <sys/cpu_sgnblk_defs.h>
 #include <sys/cpu_sgn.h>
 #include <sys/kdi_impl.h>
+#include <sys/clock_impl.h>
 
 extern cpu_sgnblk_t *cpu_sgnblkp[];
 
@@ -151,7 +150,7 @@ set_platform_cage_params(void)
 		pgcnt_t preferred_cage_size;
 
 		preferred_cage_size =
-			MAX(starfire_startup_cage_size, total_pages / 256);
+		    MAX(starfire_startup_cage_size, total_pages / 256);
 
 #ifdef DEBUG
 		if (starfire_cage_size_limit)
@@ -289,7 +288,7 @@ plat_freelist_process(int mnode)
 				bd_cnt = 0;
 				bd_flags = 0;
 				for (idx = 0; idx < STARFIRE_MAX_BOARDS;
-						idx++) {
+				    idx++) {
 					bdlist[idx] = NULL;
 					sortlist[idx] = NULL;
 				}
@@ -348,7 +347,7 @@ plat_freelist_process(int mnode)
 				 */
 				bds = 0;
 				for (idx = 0; idx < STARFIRE_MAX_BOARDS;
-						idx++) {
+				    idx++) {
 					if (bdlist[idx])
 						sortlist[bds++] = &bdlist[idx];
 				}
@@ -418,6 +417,7 @@ plat_freelist_process(int mnode)
 						    idy++) {
 							if (bdlist[idy]) {
 								sortlist[bds++]
+								/* CSTYLED */
 								= &bdlist[idy];
 							}
 						}
@@ -550,14 +550,14 @@ sgn_update_all_cpus(ushort_t sgn, uchar_t state, uchar_t sub_state)
 		cpu_sub_state = sub_state;
 
 		if ((sblkp != NULL) && (cpu[i] != NULL && (cpu[i]->cpu_flags &
-				(CPU_EXISTS|CPU_QUIESCED)))) {
+		    (CPU_EXISTS|CPU_QUIESCED)))) {
 
 			if (sub_state == EXIT_REBOOT) {
 				cpu_sub_state =
-					sblkp->sigb_signature.state_t.sub_state;
+				    sblkp->sigb_signature.state_t.sub_state;
 
 				if ((cpu_sub_state == EXIT_PANIC1) ||
-					(cpu_sub_state == EXIT_PANIC2))
+				    (cpu_sub_state == EXIT_PANIC2))
 					cpu_sub_state = EXIT_PANIC_REBOOT;
 				else
 					cpu_sub_state = EXIT_REBOOT;
@@ -573,10 +573,10 @@ sgn_update_all_cpus(ushort_t sgn, uchar_t state, uchar_t sub_state)
 			cpu_state = sblkp->sigb_signature.state_t.state;
 			if (cpu_state == SIGBST_WATCHDOG_SYNC)
 				cpu_sgn_update(sgn, SIGBST_WATCHDOG_SYNC,
-					cpu_sub_state, i);
+				    cpu_sub_state, i);
 			else if (cpu_state == SIGBST_REDMODE_SYNC)
 				cpu_sgn_update(sgn, SIGBST_REDMODE_SYNC,
-					cpu_sub_state, i);
+				    cpu_sub_state, i);
 			else
 				cpu_sgn_update(sgn, state, cpu_sub_state, i);
 		}
@@ -617,6 +617,8 @@ get_cpu_sgn_state(int cpuid)
 static void
 starfire_system_claim(void)
 {
+	lbolt_debug_entry();
+
 	prom_interpret("sigb-sig! my-sigb-sig!", OBP_SIG, OBP_SIG, 0, 0, 0);
 }
 
@@ -624,6 +626,8 @@ static void
 starfire_system_release(void)
 {
 	prom_interpret("sigb-sig! my-sigb-sig!", OS_SIG, OS_SIG, 0, 0, 0);
+
+	lbolt_debug_return();
 }
 
 void

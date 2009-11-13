@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/ddi.h>
@@ -214,8 +212,8 @@ promif_ldom_setprop(char *name, void *value, int valuelen)
 	kmem_free(req, sizeof (var_config_hdr_t) + paylen);
 
 	mutex_enter(&promif_prop_lock);
-	if (cv_timedwait(&promif_prop_cv,
-	    &promif_prop_lock, lbolt + PROMIF_DS_TIMEOUT_SEC * hz) == -1) {
+	if (cv_reltimedwait(&promif_prop_cv, &promif_prop_lock,
+	    PROMIF_DS_TIMEOUT_SEC * hz, TR_CLOCK_TICK) == -1) {
 		cmn_err(CE_WARN, "%s: ds response timeout", me);
 		rv = -1;
 		goto out;

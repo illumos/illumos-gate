@@ -640,6 +640,7 @@ smb_session_create(ksocket_t new_so, uint16_t port, smb_server_t *sv,
 	socklen_t		slen;
 	struct sockaddr_in6	sin6;
 	smb_session_t		*session;
+	int64_t			now;
 
 	session = kmem_cache_alloc(sv->si_cache_session, KM_SLEEP);
 	bzero(session, sizeof (smb_session_t));
@@ -649,12 +650,14 @@ smb_session_create(ksocket_t new_so, uint16_t port, smb_server_t *sv,
 		return (NULL);
 	}
 
+	now = ddi_get_lbolt64();
+
 	session->s_kid = SMB_NEW_KID();
 	session->s_state = SMB_SESSION_STATE_INITIALIZED;
 	session->native_os = NATIVE_OS_UNKNOWN;
-	session->opentime = lbolt64;
+	session->opentime = now;
 	session->keep_alive = smb_keep_alive;
-	session->activity_timestamp = lbolt64;
+	session->activity_timestamp = now;
 
 	smb_slist_constructor(&session->s_req_list, sizeof (smb_request_t),
 	    offsetof(smb_request_t, sr_session_lnd));

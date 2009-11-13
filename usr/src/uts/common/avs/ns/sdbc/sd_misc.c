@@ -1212,15 +1212,9 @@ sdbcioctl(dev_t dev, int cmd, void *arg, int mode, cred_t *crp, int *rvp)
 void
 _sd_timed_block(clock_t ticks, kcondvar_t *cvp)
 {
-	clock_t ticker;
-
-	if (drv_getparm(LBOLT, &ticker) != 0)
-		cmn_err(CE_WARN, "!_sd_timed_block:failed to get current time");
-
 	mutex_enter(&_sd_block_lk);
-	(void) cv_timedwait(cvp, &_sd_block_lk, ticks + ticker);
+	(void) cv_reltimedwait(cvp, &_sd_block_lk, ticks, TR_CLOCK_TICK);
 	mutex_exit(&_sd_block_lk);
-
 }
 
 

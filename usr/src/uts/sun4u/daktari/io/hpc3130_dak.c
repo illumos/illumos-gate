@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1805,7 +1805,8 @@ hpc3130_verify_slot_power(hpc3130_unit_t *hpc3130_p, i2c_client_hdl_t handle,
 	uint8_t			tries = 0;
 	uint8_t			status;
 	int			result = HPC_SUCCESS;
-	clock_t			tm, timeleft;
+	clock_t			timeleft;
+	clock_t			tm = drv_usectohz(300000);
 	boolean_t		slot_actual_state;
 	boolean_t		failure = B_FALSE;
 	hpc3130_slot_table_entry_t *ste;
@@ -1823,10 +1824,8 @@ hpc3130_verify_slot_power(hpc3130_unit_t *hpc3130_p, i2c_client_hdl_t handle,
 
 	while ((slot_actual_state != slot_target_state) &&
 	    (failure != B_TRUE)) {
-		tm = ddi_get_lbolt();
-		tm += drv_usectohz(300000);
-		timeleft = cv_timedwait(&hpc3130_p->hpc3130_cond,
-		    &hpc3130_p->hpc3130_mutex, tm);
+		timeleft = cv_reltimedwait(&hpc3130_p->hpc3130_cond,
+		    &hpc3130_p->hpc3130_mutex, tm, TR_CLOCK_TICK);
 		if (timeleft == -1) {
 			if (tries++ < HPC3130_POWER_TRIES) {
 				/*

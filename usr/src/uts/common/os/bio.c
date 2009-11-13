@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,8 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -231,7 +229,7 @@ bread_common(void *arg, dev_t dev, daddr_t blkno, long bsize)
 							/* ufs && snapshots */
 		(*bio_snapshot_strategy)(&ufsvfsp->vfs_snapshot, bp);
 	} else {
-		ufsvfsp->vfs_iotstamp = lbolt;
+		ufsvfsp->vfs_iotstamp = ddi_get_lbolt();
 		ub.ub_breads.value.ul++;		/* ufs && !logging */
 		(void) bdev_strategy(bp);
 	}
@@ -374,7 +372,7 @@ bdwrite(struct buf *bp)
 	ASSERT(SEMA_HELD(&bp->b_sem));
 	CPU_STATS_ADD_K(sys, lwrite, 1);
 	if ((bp->b_flags & B_DELWRI) == 0)
-		bp->b_start = lbolt;
+		bp->b_start = ddi_get_lbolt();
 	/*
 	 * B_DONE allows others to use the buffer, B_DELWRI causes the
 	 * buffer to be written before being reused, and setting b_resid
@@ -443,7 +441,7 @@ brelse(struct buf *bp)
 		if ((bp->b_flags & (B_READ | B_RETRYWRI)) == B_RETRYWRI) {
 			bp->b_flags |= B_DELWRI;
 			/* keep fsflush from trying continuously to flush */
-			bp->b_start = lbolt;
+			bp->b_start = ddi_get_lbolt();
 		} else
 			bp->b_flags |= B_AGE|B_STALE;
 		bp->b_flags &= ~B_ERROR;
@@ -559,7 +557,7 @@ struct buf *
 getblk(dev_t dev, daddr_t blkno, long bsize)
 {
 	return (getblk_common(/* ufsvfsp */ NULL, dev,
-			blkno, bsize, /* errflg */ 0));
+	    blkno, bsize, /* errflg */ 0));
 }
 
 /*
@@ -1147,9 +1145,9 @@ binit(void)
 		 * Invalid user specified value, emit a warning.
 		 */
 		cmn_err(CE_WARN, "binit: bufhwm_pct(%d) out of \
-			range(1..%d). Using %d as default.",
-			bufhwm_pct,
-			100 / BIO_MAX_PERCENT, 100 / BIO_BUF_PERCENT);
+		    range(1..%d). Using %d as default.",
+		    bufhwm_pct,
+		    100 / BIO_MAX_PERCENT, 100 / BIO_BUF_PERCENT);
 	}
 
 	bio_default_hwm = MIN(physmem / pct,
@@ -1165,10 +1163,10 @@ binit(void)
 		 * Invalid user specified value, emit a warning.
 		 */
 		cmn_err(CE_WARN,
-			"binit: bufhwm(%d) out \
-			of range(%d..%lu). Using %lu as default",
-			bufhwm,
-			BIO_MIN_HWM, bio_max_hwm, bio_max_hwm);
+		    "binit: bufhwm(%d) out \
+		    of range(%d..%lu). Using %lu as default",
+		    bufhwm,
+		    BIO_MIN_HWM, bio_max_hwm, bio_max_hwm);
 	}
 
 	/*
@@ -1243,9 +1241,9 @@ biodone_tnf_probe(struct buf *bp)
 {
 	/* Kernel probe */
 	TNF_PROBE_3(biodone, "io blockio", /* CSTYLED */,
-		tnf_device,	device,		bp->b_edev,
-		tnf_diskaddr,	block,		bp->b_lblkno,
-		tnf_opaque,	buf,		bp);
+	    tnf_device,		device,		bp->b_edev,
+	    tnf_diskaddr,	block,		bp->b_lblkno,
+	    tnf_opaque,		buf,		bp);
 }
 
 /*
@@ -1329,23 +1327,22 @@ pageio_setup(struct page *pp, size_t len, struct vnode *vp, int flags)
 			CPU_STATS_ADDQ(cpup, vm, maj_fault, 1);
 			/* Kernel probe */
 			TNF_PROBE_2(major_fault, "vm pagefault", /* CSTYLED */,
-				tnf_opaque,	vnode,		pp->p_vnode,
-				tnf_offset,	offset,		pp->p_offset);
+			    tnf_opaque,		vnode,		pp->p_vnode,
+			    tnf_offset,		offset,		pp->p_offset);
 		}
 		/*
 		 * Update statistics for pages being paged in
 		 */
 		if (pp != NULL && pp->p_vnode != NULL) {
 			if (IS_SWAPFSVP(pp->p_vnode)) {
-				CPU_STATS_ADDQ(cpup, vm, anonpgin,
-						btopr(len));
+				CPU_STATS_ADDQ(cpup, vm, anonpgin, btopr(len));
 			} else {
 				if (pp->p_vnode->v_flag & VVMEXEC) {
 					CPU_STATS_ADDQ(cpup, vm, execpgin,
-							btopr(len));
+					    btopr(len));
 				} else {
 					CPU_STATS_ADDQ(cpup, vm, fspgin,
-							btopr(len));
+					    btopr(len));
 				}
 			}
 		}
@@ -1354,9 +1351,9 @@ pageio_setup(struct page *pp, size_t len, struct vnode *vp, int flags)
 		    "page_ws_in:pp %p", pp);
 		/* Kernel probe */
 		TNF_PROBE_3(pagein, "vm pageio io", /* CSTYLED */,
-			tnf_opaque,	vnode,		pp->p_vnode,
-			tnf_offset,	offset,		pp->p_offset,
-			tnf_size,	size,		len);
+		    tnf_opaque,	vnode,	pp->p_vnode,
+		    tnf_offset,	offset,	pp->p_offset,
+		    tnf_size,	size,	len);
 	}
 
 	bp = kmem_zalloc(sizeof (struct buf), KM_SLEEP);
@@ -1872,7 +1869,7 @@ top:
 	 */
 	mutex_enter(&bfree_lock);
 	bfreelist.b_flags |= B_WANTED;
-	(void) cv_timedwait(&bio_mem_cv, &bfree_lock, lbolt+hz);
+	(void) cv_reltimedwait(&bio_mem_cv, &bfree_lock, hz, TR_CLOCK_TICK);
 	mutex_exit(&bfree_lock);
 	goto top;
 }
@@ -1985,7 +1982,7 @@ biomodified(struct buf *bp)
 
 	while (npf > 0) {
 		ppattr = hat_pagesync(pp, HAT_SYNC_DONTZERO |
-				HAT_SYNC_STOPON_MOD);
+		    HAT_SYNC_STOPON_MOD);
 		if (ppattr & P_MOD)
 			return (1);
 		pp = pp->p_next;
@@ -2058,7 +2055,7 @@ bioclone(struct buf *bp, off_t off, size_t len, dev_t dev, daddr_t blkno,
 		ASSERT(bp->b_flags & B_PHYS);
 
 		bufp->b_shadow = bp->b_shadow +
-			btop(((uintptr_t)bp->b_un.b_addr & PAGEOFFSET) + off);
+		    btop(((uintptr_t)bp->b_un.b_addr & PAGEOFFSET) + off);
 		bufp->b_un.b_addr = (caddr_t)((uintptr_t)bp->b_un.b_addr + off);
 		if (bp->b_flags & B_REMAPPED)
 			bufp->b_proc = NULL;
@@ -2077,7 +2074,7 @@ bioclone(struct buf *bp, off_t off, size_t len, dev_t dev, daddr_t blkno,
 			bufp->b_un.b_addr = (caddr_t)(o & PAGEOFFSET);
 		} else {
 			bufp->b_un.b_addr =
-				(caddr_t)((uintptr_t)bp->b_un.b_addr + off);
+			    (caddr_t)((uintptr_t)bp->b_un.b_addr + off);
 			if (bp->b_flags & B_REMAPPED)
 				bufp->b_proc = NULL;
 		}

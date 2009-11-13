@@ -52,6 +52,7 @@ usr/include/bsm/audit_private.h		i386
 usr/include/bsm/devalloc.h		i386
 usr/include/sys/ieeefp.h		i386
 usr/include/sys/winlockio.h		i386
+usr/include/sys/clock_impl.h		i386
 usr/include/security/pam_impl.h		i386
 usr/include/passwdutil.h		i386
 #

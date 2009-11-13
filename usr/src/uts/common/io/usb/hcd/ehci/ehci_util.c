@@ -1197,8 +1197,8 @@ ehci_init_check_status(ehci_state_t	*ehcip)
 	ehcip->ehci_flags |= EHCI_CV_INTR;
 
 	/* We need to add a delay to allow the chip time to start running */
-	(void) cv_timedwait(&ehcip->ehci_async_schedule_advance_cv,
-	    &ehcip->ehci_int_mutex, ddi_get_lbolt() + sof_time_wait);
+	(void) cv_reltimedwait(&ehcip->ehci_async_schedule_advance_cv,
+	    &ehcip->ehci_int_mutex, sof_time_wait, TR_CLOCK_TICK);
 
 	/*
 	 * Check EHCI host controller is running, otherwise return failure.

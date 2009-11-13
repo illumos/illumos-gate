@@ -1687,8 +1687,8 @@ ohci_init_ctlr(ohci_state_t	*ohcip)
 
 	ASSERT(Get_OpReg(hcr_intr_enable) & HCR_INTR_SOF);
 
-	(void) cv_timedwait(&ohcip->ohci_SOF_cv,
-	    &ohcip->ohci_int_mutex, ddi_get_lbolt() + sof_time_wait);
+	(void) cv_reltimedwait(&ohcip->ohci_SOF_cv,
+	    &ohcip->ohci_int_mutex, sof_time_wait, TR_CLOCK_TICK);
 
 	/* Wait for the SOF or timeout event */
 	if (ohcip->ohci_sof_flag == B_FALSE) {
@@ -10221,8 +10221,8 @@ ohci_wait_for_sof(ohci_state_t	*ohcip)
 		ASSERT(Get_OpReg(hcr_intr_enable) & HCR_INTR_SOF);
 
 		/* Wait for the SOF or timeout event */
-		rval = cv_timedwait(&ohcip->ohci_SOF_cv,
-		    &ohcip->ohci_int_mutex, ddi_get_lbolt() + sof_time_wait);
+		rval = cv_reltimedwait(&ohcip->ohci_SOF_cv,
+		    &ohcip->ohci_int_mutex, sof_time_wait, TR_CLOCK_TICK);
 
 		/*
 		 * Get the current usb frame number after woken up either
@@ -10412,7 +10412,6 @@ ohci_wait_for_transfers_completion(
 {
 	ohci_trans_wrapper_t	*head_tw = pp->pp_tw_head;
 	ohci_trans_wrapper_t	*next_tw;
-	clock_t			xfer_cmpl_time_wait;
 	ohci_td_t		*tailp, *headp, *nextp;
 	ohci_td_t		*head_td, *next_td;
 	ohci_ed_t		*ept = pp->pp_ept;
@@ -10488,12 +10487,8 @@ ohci_wait_for_transfers_completion(
 		return;
 	}
 
-	/* Get the number of clock ticks to wait */
-	xfer_cmpl_time_wait = drv_usectohz(OHCI_XFER_CMPL_TIMEWAIT * 1000000);
-
-	(void) cv_timedwait(&pp->pp_xfer_cmpl_cv,
-	    &ohcip->ohci_int_mutex,
-	    ddi_get_lbolt() + xfer_cmpl_time_wait);
+	(void) cv_reltimedwait(&pp->pp_xfer_cmpl_cv, &ohcip->ohci_int_mutex,
+	    drv_usectohz(OHCI_XFER_CMPL_TIMEWAIT * 1000000), TR_CLOCK_TICK);
 
 	if (pp->pp_count_done_tds) {
 

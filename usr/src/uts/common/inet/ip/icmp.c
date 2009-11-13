@@ -1714,7 +1714,7 @@ rawip_do_open(int family, cred_t *credp, int *err, int flags)
 	crhold(credp);
 	connp->conn_cred = credp;
 	connp->conn_cpid = curproc->p_pid;
-	connp->conn_open_time = lbolt64;
+	connp->conn_open_time = ddi_get_lbolt64();
 	/* Cache things in ixa without an extra refhold */
 	connp->conn_ixa->ixa_cred = connp->conn_cred;
 	connp->conn_ixa->ixa_cpid = connp->conn_cpid;

@@ -180,8 +180,8 @@ fct_port_worker(void *arg)
 			}
 			atomic_or_32(&iport->iport_flags,
 			    IPORT_WORKER_DOING_TIMEDWAIT);
-			(void) cv_timedwait(&iport->iport_worker_cv,
-			    &iport->iport_worker_lock, ddi_get_lbolt() + dl);
+			(void) cv_reltimedwait(&iport->iport_worker_cv,
+			    &iport->iport_worker_lock, dl, TR_CLOCK_TICK);
 			atomic_and_32(&iport->iport_flags,
 			    ~IPORT_WORKER_DOING_TIMEDWAIT);
 		} else {
@@ -192,9 +192,9 @@ fct_port_worker(void *arg)
 			if (tmp_delay < 0) {
 				tmp_delay = (int64_t)short_delay;
 			}
-			(void) cv_timedwait(&iport->iport_worker_cv,
-			    &iport->iport_worker_lock, ddi_get_lbolt() +
-			    (clock_t)tmp_delay);
+			(void) cv_reltimedwait(&iport->iport_worker_cv,
+			    &iport->iport_worker_lock, (clock_t)tmp_delay,
+			    TR_CLOCK_TICK);
 			atomic_and_32(&iport->iport_flags,
 			    ~IPORT_WORKER_DOING_WAIT);
 		}

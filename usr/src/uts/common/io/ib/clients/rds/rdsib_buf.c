@@ -963,8 +963,8 @@ rds_get_send_buf(rds_ep_t *ep, uint_t nbuf)
 	if (spool->pool_nfree < nbuf) {
 		/* wait for buffers to become available */
 		spool->pool_cv_count += nbuf;
-		ret = cv_timedwait_sig(&spool->pool_cv, &spool->pool_lock,
-		    ddi_get_lbolt() + drv_usectohz(waittime));
+		ret = cv_reltimedwait_sig(&spool->pool_cv, &spool->pool_lock,
+		    drv_usectohz(waittime), TR_CLOCK_TICK);
 		/* ret = cv_wait_sig(&spool->pool_cv, &spool->pool_lock); */
 		if (ret == 0) {
 			/* signal pending */

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -266,8 +266,6 @@ ehci_wait_for_isoc_completion(
 	ehci_state_t		*ehcip,
 	ehci_pipe_private_t	*pp)
 {
-	clock_t			xfer_cmpl_time_wait;
-
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 
 	if (pp->pp_itw_head == NULL) {
@@ -275,12 +273,8 @@ ehci_wait_for_isoc_completion(
 		return;
 	}
 
-	/* Get the number of clock ticks to wait */
-	xfer_cmpl_time_wait = drv_usectohz(EHCI_XFER_CMPL_TIMEWAIT * 1000000);
-
-	(void) cv_timedwait(&pp->pp_xfer_cmpl_cv,
-	    &ehcip->ehci_int_mutex,
-	    ddi_get_lbolt() + xfer_cmpl_time_wait);
+	(void) cv_reltimedwait(&pp->pp_xfer_cmpl_cv, &ehcip->ehci_int_mutex,
+	    drv_usectohz(EHCI_XFER_CMPL_TIMEWAIT * 1000000), TR_CLOCK_TICK);
 
 	if (pp->pp_itw_head) {
 		USB_DPRINTF_L2(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,

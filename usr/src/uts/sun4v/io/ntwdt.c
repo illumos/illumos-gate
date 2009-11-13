@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 /*
  * sun4v application watchdog driver
@@ -669,8 +668,8 @@ ntwdt_cyclic_softint(caddr_t arg)
 	}
 
 	NTWDT_DBG(NTWDT_DBG_IOCTL, ("cyclic_softint: %d"
-	    "lbolt64: %d\n", ntwdt_state->ntwdt_watchdog_timeout,
-	    (int)TICK_TO_MSEC(lbolt64)));
+	    "ddi_get_lbolt64(): %d\n", ntwdt_state->ntwdt_watchdog_timeout,
+	    (int)TICK_TO_MSEC(ddi_get_lbolt64())));
 
 	/*
 	 * Decrement the virtual watchdog timer and check if it has expired.

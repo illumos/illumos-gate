@@ -2044,8 +2044,8 @@ svc_poll(SVCPOOL *pool, SVCMASTERXPRT *xprt, SVCXPRT *clone_xprt)
 		 * for suspend and wait for a request.
 		 */
 		pool->p_asleep++;
-		timeleft = cv_timedwait_sig(&pool->p_req_cv, &pool->p_req_lock,
-		    pool->p_timeout + lbolt);
+		timeleft = cv_reltimedwait_sig(&pool->p_req_cv,
+		    &pool->p_req_lock, pool->p_timeout, TR_CLOCK_TICK);
 
 		/*
 		 * If the drowsy flag is on this means that

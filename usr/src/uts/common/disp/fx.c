@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1195,7 +1193,7 @@ fx_setrun(kthread_t *t)
 	ASSERT(THREAD_LOCK_HELD(t));	/* t should be in transition */
 	fxpp->fx_flags &= ~FXBACKQ;
 
-	if (t->t_disp_time != lbolt)
+	if (t->t_disp_time != ddi_get_lbolt())
 		setbackdq(t);
 	else
 		setfrontdq(t);
@@ -1222,7 +1220,7 @@ fx_sleep(kthread_t *t)
 	if (FX_HAS_CB(fxpp)) {
 		FX_CB_SLEEP(FX_CALLB(fxpp), fxpp->fx_cookie);
 	}
-	t->t_stime = lbolt;		/* time stamp for the swapper */
+	t->t_stime = ddi_get_lbolt();		/* time stamp for the swapper */
 }
 
 
@@ -1394,7 +1392,7 @@ fx_wakeup(kthread_t *t)
 
 	ASSERT(THREAD_LOCK_HELD(t));
 
-	t->t_stime = lbolt;		/* time stamp for the swapper */
+	t->t_stime = ddi_get_lbolt();		/* time stamp for the swapper */
 	if (FX_HAS_CB(fxpp)) {
 		clock_t new_quantum =  (clock_t)fxpp->fx_pquantum;
 		pri_t	newpri = fxpp->fx_pri;
@@ -1415,7 +1413,7 @@ fx_wakeup(kthread_t *t)
 
 	fxpp->fx_flags &= ~FXBACKQ;
 
-	if (t->t_disp_time != lbolt)
+	if (t->t_disp_time != ddi_get_lbolt())
 		setbackdq(t);
 	else
 		setfrontdq(t);

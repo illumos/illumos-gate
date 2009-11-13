@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1996 by Sun Microsystems, Inc.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -192,12 +190,10 @@ cic_read_domain_mask(int board, int bus)
 
 	ASSERT(CPUID_TO_BOARDID(CPU->cpu_id) == board);
 
-	csr_addr = MAKE_CIC_CSR_PA(board,
-				    CSR_TYPE_CIC,
-				    CIC_DOMAIN_MASK_ADDR,
-				    bus);
+	csr_addr = MAKE_CIC_CSR_PA(board, CSR_TYPE_CIC, CIC_DOMAIN_MASK_ADDR,
+	    bus);
 	PR_XF("%s: (bd=%d, bs=%d) csr_addr = 0x%llx\n",
-			proc, board, bus, csr_addr);
+	    proc, board, bus, csr_addr);
 
 	domain_mask = (boardset_t)PHYSIO_LDH(csr_addr);
 
@@ -213,12 +209,10 @@ cic_read_sm_mask(int board, int bus)
 
 	ASSERT(CPUID_TO_BOARDID(CPU->cpu_id) == board);
 
-	csr_addr = MAKE_CIC_CSR_PA(board,
-				    CSR_TYPE_CIC,
-				    CIC_SM_MASK_ADDR,
-				    bus);
+	csr_addr = MAKE_CIC_CSR_PA(board, CSR_TYPE_CIC, CIC_SM_MASK_ADDR,
+	    bus);
 	PR_XF("%s: (bd=%d, bs=%d) csr_addr = 0x%llx\n",
-			proc, board, bus, csr_addr);
+	    proc, board, bus, csr_addr);
 
 	sm_mask = (boardset_t)PHYSIO_LDH(csr_addr);
 
@@ -245,14 +239,12 @@ cic_write_sm_mask(int board, int bus, boardset_t sm_mask)
 	/*
 	 * Now we can write to the CIC.
 	 */
-	csr_addr = MAKE_CIC_CSR_PA(board,
-				    CSR_TYPE_CIC,
-				    CIC_SM_MASK_ADDR,
-				    bus);
+	csr_addr = MAKE_CIC_CSR_PA(board, CSR_TYPE_CIC, CIC_SM_MASK_ADDR,
+	    bus);
 	PR_XF("%s: (bd=%d, bs=%d) csr_addr = 0x%llx\n",
-		proc, board, bus, csr_addr);
+	    proc, board, bus, csr_addr);
 	PR_XF("%s: writing sm_mask = 0x%x\n",
-		proc, (ushort_t)sm_mask);
+	    proc, (ushort_t)sm_mask);
 
 	UPDATE_CIC_HISTORY(CICREG_SMMASK, board, bus, sm_mask);
 
@@ -275,22 +267,18 @@ cic_read_sm_bar(int board, int bus)
 
 	ASSERT(CPUID_TO_BOARDID(CPU->cpu_id) == board);
 
-	csr_addr = MAKE_CIC_CSR_PA(board,
-				    CSR_TYPE_CIC,
-				    CIC_SM_BAR_MSB_ADDR,
-				    bus);
+	csr_addr = MAKE_CIC_CSR_PA(board, CSR_TYPE_CIC, CIC_SM_BAR_MSB_ADDR,
+	    bus);
 	PR_XF("%s:MSB: (bd=%d, bs=%d) csr_addr = 0x%llx\n",
-		proc, board, bus, csr_addr);
+	    proc, board, bus, csr_addr);
 
 	sm_bar = (uint_t)PHYSIO_LDH(csr_addr);
 	sm_bar <<= 16;
 
-	csr_addr = MAKE_CIC_CSR_PA(board,
-				    CSR_TYPE_CIC,
-				    CIC_SM_BAR_LSB_ADDR,
-				    bus);
+	csr_addr = MAKE_CIC_CSR_PA(board, CSR_TYPE_CIC, CIC_SM_BAR_LSB_ADDR,
+	    bus);
 	PR_XF("%s:LSB: (bd=%d, bs=%d) csr_addr = 0x%llx\n",
-		proc, board, bus, csr_addr);
+	    proc, board, bus, csr_addr);
 
 	sm_bar |= (uint_t)PHYSIO_LDH(csr_addr);
 
@@ -317,14 +305,12 @@ cic_write_sm_bar(int board, int bus, uint_t sm_bar)
 	if (pc_prep_cic_buffer(CPU->cpu_id, sm_bar_msb) < 0)
 		return (-1);
 
-	csr_addr = MAKE_CIC_CSR_PA(board,
-				    CSR_TYPE_CIC,
-				    CIC_SM_BAR_MSB_ADDR,
-				    bus);
+	csr_addr = MAKE_CIC_CSR_PA(board, CSR_TYPE_CIC, CIC_SM_BAR_MSB_ADDR,
+	    bus);
 	PR_XF("%s:MSB: (bd=%d, bs=%d) csr_addr = 0x%llx\n",
-		proc, board, bus, csr_addr);
+	    proc, board, bus, csr_addr);
 	PR_XF("%s:MSB: sm_bar[31:16] = 0x%x\n",
-		proc, (ushort_t)sm_bar_msb);
+	    proc, (ushort_t)sm_bar_msb);
 
 	UPDATE_CIC_HISTORY(CICREG_SMBAR, board, bus, sm_bar);
 
@@ -335,8 +321,8 @@ cic_write_sm_bar(int board, int bus, uint_t sm_bar)
 		;
 	if (cnt == 10) {
 		cmn_err(CE_WARN,
-			"IDN: 500: failed to write sm_bar (msb) (0x%x)",
-			(uint_t)sm_bar_msb);
+		    "IDN: 500: failed to write sm_bar (msb) (0x%x)",
+		    (uint_t)sm_bar_msb);
 		return (-1);
 	}
 
@@ -346,14 +332,12 @@ cic_write_sm_bar(int board, int bus, uint_t sm_bar)
 	if (pc_prep_cic_buffer(CPU->cpu_id, sm_bar_lsb) < 0)
 		return (-1);
 
-	csr_addr = MAKE_CIC_CSR_PA(board,
-				    CSR_TYPE_CIC,
-				    CIC_SM_BAR_LSB_ADDR,
-				    bus);
+	csr_addr = MAKE_CIC_CSR_PA(board, CSR_TYPE_CIC, CIC_SM_BAR_LSB_ADDR,
+	    bus);
 	PR_XF("%s:LSB: (bd=%d, bs=%d) csr_addr = 0x%llx\n",
-		proc, board, bus, csr_addr);
+	    proc, board, bus, csr_addr);
 	PR_XF("%s:LSB: sm_bar[15:0] = 0x%x\n",
-		proc, (ushort_t)sm_bar_lsb);
+	    proc, (ushort_t)sm_bar_lsb);
 
 	PHYSIO_STH(csr_addr, (ushort_t)sm_bar_lsb);
 	for (cnt = 0;
@@ -362,8 +346,8 @@ cic_write_sm_bar(int board, int bus, uint_t sm_bar)
 		;
 	if (cnt == 10) {
 		cmn_err(CE_WARN,
-			"IDN: 500: failed to write sm_bar (lsb) (0x%x)",
-			(uint_t)sm_bar_lsb);
+		    "IDN: 500: failed to write sm_bar (lsb) (0x%x)",
+		    (uint_t)sm_bar_lsb);
 		return (-1);
 	}
 
@@ -379,22 +363,18 @@ cic_read_sm_lar(int board, int bus)
 
 	ASSERT(CPUID_TO_BOARDID(CPU->cpu_id) == board);
 
-	csr_addr = MAKE_CIC_CSR_PA(board,
-				    CSR_TYPE_CIC,
-				    CIC_SM_LAR_MSB_ADDR,
-				    bus);
+	csr_addr = MAKE_CIC_CSR_PA(board, CSR_TYPE_CIC, CIC_SM_LAR_MSB_ADDR,
+	    bus);
 	PR_XF("%s:MSB: (bd=%d, bs=%d) csr_addr = 0x%llx\n",
-		proc, board, bus, csr_addr);
+	    proc, board, bus, csr_addr);
 
 	sm_lar = (uint_t)PHYSIO_LDH(csr_addr);
 	sm_lar <<= 16;
 
-	csr_addr = MAKE_CIC_CSR_PA(board,
-				    CSR_TYPE_CIC,
-				    CIC_SM_LAR_LSB_ADDR,
-				    bus);
+	csr_addr = MAKE_CIC_CSR_PA(board, CSR_TYPE_CIC, CIC_SM_LAR_LSB_ADDR,
+	    bus);
 	PR_XF("%s:LSB: (bd=%d, bs=%d) csr_addr = 0x%llx\n",
-		proc, board, bus, csr_addr);
+	    proc, board, bus, csr_addr);
 
 	sm_lar |= (uint_t)PHYSIO_LDH(csr_addr);
 
@@ -421,14 +401,12 @@ cic_write_sm_lar(int board, int bus, uint_t sm_lar)
 	if (pc_prep_cic_buffer(CPU->cpu_id, sm_lar_msb) < 0)
 		return (-1);
 
-	csr_addr = MAKE_CIC_CSR_PA(board,
-				    CSR_TYPE_CIC,
-				    CIC_SM_LAR_MSB_ADDR,
-				    bus);
+	csr_addr = MAKE_CIC_CSR_PA(board, CSR_TYPE_CIC, CIC_SM_LAR_MSB_ADDR,
+	    bus);
 	PR_XF("%s:MSB: (bd=%d, bs=%d) csr_addr = 0x%llx\n",
-		proc, board, bus, csr_addr);
+	    proc, board, bus, csr_addr);
 	PR_XF("%s:MSB: sm_lar[31:16] = 0x%x\n",
-		proc, (ushort_t)sm_lar_msb);
+	    proc, (ushort_t)sm_lar_msb);
 
 	UPDATE_CIC_HISTORY(CICREG_SMLAR, board, bus, sm_lar);
 
@@ -439,8 +417,8 @@ cic_write_sm_lar(int board, int bus, uint_t sm_lar)
 		;
 	if (cnt == 10) {
 		cmn_err(CE_WARN,
-			"IDN: 501: failed to write sm_lar (msb) (0x%x)",
-			(uint_t)sm_lar_msb);
+		    "IDN: 501: failed to write sm_lar (msb) (0x%x)",
+		    (uint_t)sm_lar_msb);
 		return (-1);
 	}
 
@@ -450,14 +428,12 @@ cic_write_sm_lar(int board, int bus, uint_t sm_lar)
 	if (pc_prep_cic_buffer(CPU->cpu_id, sm_lar_lsb) < 0)
 		return (-1);
 
-	csr_addr = MAKE_CIC_CSR_PA(board,
-				    CSR_TYPE_CIC,
-				    CIC_SM_LAR_LSB_ADDR,
-				    bus);
+	csr_addr = MAKE_CIC_CSR_PA(board, CSR_TYPE_CIC, CIC_SM_LAR_LSB_ADDR,
+	    bus);
 	PR_XF("%s:LSB: (bd=%d, bs=%d) csr_addr = 0x%llx\n",
-		proc, board, bus, csr_addr);
+	    proc, board, bus, csr_addr);
 	PR_XF("%s:LSB: sm_lar[15:0] = 0x%x\n",
-		proc, (ushort_t)sm_lar_lsb);
+	    proc, (ushort_t)sm_lar_lsb);
 
 	PHYSIO_STH(csr_addr, (ushort_t)sm_lar_lsb);
 	for (cnt = 0;
@@ -466,8 +442,8 @@ cic_write_sm_lar(int board, int bus, uint_t sm_lar)
 		;
 	if (cnt == 10) {
 		cmn_err(CE_WARN,
-			"IDN: 501: failed to write sm_lar (lsb) (0x%x)",
-			(uint_t)sm_lar_lsb);
+		    "IDN: 501: failed to write sm_lar (lsb) (0x%x)",
+		    (uint_t)sm_lar_lsb);
 		return (-1);
 	}
 
@@ -489,12 +465,9 @@ cic_get_smmask_bit(void)
 	 * Now that I'm stuck on this cpu I can go look at this
 	 * board's CIC registers.
 	 */
-	csr_addr = MAKE_CIC_CSR_PA(board,
-				    CSR_TYPE_CIC,
-				    CIC_CONFIG1_ADDR,
-				    0);
+	csr_addr = MAKE_CIC_CSR_PA(board, CSR_TYPE_CIC, CIC_CONFIG1_ADDR, 0);
 	PR_XF("%s: (bd=%d) csr_addr = 0x%llx (via cpu %d)\n",
-		proc, board, csr_addr, (int)CPU->cpu_id);
+	    proc, board, csr_addr, (int)CPU->cpu_id);
 
 	config1 = (uint_t)PHYSIO_LDH(csr_addr);
 
@@ -541,13 +514,13 @@ pc_prep_cic_buffer(int cpuid, uint_t cicdata)
 	rv = 0;
 	if (cnt == 10) {
 		cmn_err(CE_WARN,
-			"IDN: 502: unable to store data (0x%x) to "
-			"CIC buffer (0x%llx)",
-			cicdata, csr_addr);
+		    "IDN: 502: unable to store data (0x%x) to "
+		    "CIC buffer (0x%llx)",
+		    cicdata, csr_addr);
 		rv = -1;
 	} else if (cnt >= 1) {
 		PR_XF("%s: MULTIPLE READS (cpu=%d) cnt = %d\n",
-			proc, cpuid, cnt);
+		    proc, cpuid, cnt);
 	}
 
 	return (rv);
@@ -589,7 +562,7 @@ pc_write_madr(pda_handle_t ph, int lboard, int rboard, uint_t madr)
 			continue;
 
 		pc_madr_addr = (u_longlong_t)STARFIRE_PC_MADR_ADDR(lboard,
-							rboard, p);
+		    rboard, p);
 
 		/*
 		 * On this first iteration of updating the PC
@@ -605,8 +578,8 @@ pc_write_madr(pda_handle_t ph, int lboard, int rboard, uint_t madr)
 			madr &= ~STARFIRE_PC_MADR_VALIDBIT;
 		}
 		PR_XF("%s: write madr(0x%x) to pc_addr(0x%llx) "
-			"[lb=%d, rb=%d, cpu=%d]\n",
-			proc, madr, pc_madr_addr, lboard, rboard, p);
+		    "[lb=%d, rb=%d, cpu=%d]\n",
+		    proc, madr, pc_madr_addr, lboard, rboard, p);
 		DEBUG_DELAY();
 
 		for (i = 0; i < 20; i++) {
@@ -620,14 +593,14 @@ pc_write_madr(pda_handle_t ph, int lboard, int rboard, uint_t madr)
 		}
 		if (i > 0) {
 			PR_XF("%s: WARNING: (1) lb=%d, rb=%d, "
-				"madr=0x%x (i=%d)\n",
-				proc, lboard, rboard, madr, i);
+			    "madr=0x%x (i=%d)\n",
+			    proc, lboard, rboard, madr, i);
 		}
 		if (rd_madr != madr) {
 			cmn_err(CE_WARN,
-				"IDN: 503: (invalidate) failed to update "
-				"PC madr (expected 0x%x, actual 0x%x)",
-				madr, rd_madr);
+			    "IDN: 503: (invalidate) failed to update "
+			    "PC madr (expected 0x%x, actual 0x%x)",
+			    madr, rd_madr);
 			rv++;
 			continue;
 		}
@@ -640,8 +613,8 @@ pc_write_madr(pda_handle_t ph, int lboard, int rboard, uint_t madr)
 			madr |= STARFIRE_PC_MADR_VALIDBIT;
 		}
 		PR_XF("%s: write madr(0x%x) to pc_addr(0x%llx) "
-			"[lb=%d, rb=%d, cpu=%d]\n",
-			proc, madr, pc_madr_addr, lboard, rboard, p);
+		    "[lb=%d, rb=%d, cpu=%d]\n",
+		    proc, madr, pc_madr_addr, lboard, rboard, p);
 		DEBUG_DELAY();
 
 		for (i = 0; i < 20; i++) {
@@ -655,14 +628,14 @@ pc_write_madr(pda_handle_t ph, int lboard, int rboard, uint_t madr)
 		}
 		if (i > 0) {
 			PR_XF("%s: WARNING: (2) lb=%d, rb=%d, "
-				"madr=0x%x (i=%d)\n",
-				proc, lboard, rboard, madr, i);
+			    "madr=0x%x (i=%d)\n",
+			    proc, lboard, rboard, madr, i);
 		}
 		if (rd_madr != madr) {
 			cmn_err(CE_WARN,
-				"IDN: 503: (validate) failed to update "
-				"PC madr (expected 0x%x, actual 0x%x)",
-				madr, rd_madr);
+			    "IDN: 503: (validate) failed to update "
+			    "PC madr (expected 0x%x, actual 0x%x)",
+			    madr, rd_madr);
 			rv++;
 		}
 	}
@@ -676,7 +649,7 @@ pc_write_madr(pda_handle_t ph, int lboard, int rboard, uint_t madr)
 			continue;
 
 		pc_madr_addr = (u_longlong_t)STARFIRE_PC_MADR_ADDR(lboard,
-							rboard, ioc + 4);
+		    rboard, ioc + 4);
 
 		if (madr != 0) {
 			/*
@@ -686,8 +659,8 @@ pc_write_madr(pda_handle_t ph, int lboard, int rboard, uint_t madr)
 			madr &= ~STARFIRE_PC_MADR_VALIDBIT;
 		}
 		PR_XF("%s: write madr(0x%x) to iopc_madr_addr(0x%llx) "
-			"[lb=%d, rb=%d, ioc=%d]\n",
-			proc, madr, pc_madr_addr, lboard, rboard, ioc);
+		    "[lb=%d, rb=%d, ioc=%d]\n",
+		    proc, madr, pc_madr_addr, lboard, rboard, ioc);
 		DEBUG_DELAY();
 
 		for (i = 0; i < 20; i++) {
@@ -701,14 +674,14 @@ pc_write_madr(pda_handle_t ph, int lboard, int rboard, uint_t madr)
 		}
 		if (i > 0) {
 			PR_XF("%s: WARNING: (3) lb=%d, rb=%d, "
-				"madr=0x%x (i=%d)\n",
-				proc, lboard, rboard, madr, i);
+			    "madr=0x%x (i=%d)\n",
+			    proc, lboard, rboard, madr, i);
 		}
 		if (rd_madr != madr) {
 			cmn_err(CE_WARN,
-				"IDN: 504: (invalidate) failed to update "
-				"IOPC madr (expected 0x%x, actual 0x%x)",
-				madr, rd_madr);
+			    "IDN: 504: (invalidate) failed to update "
+			    "IOPC madr (expected 0x%x, actual 0x%x)",
+			    madr, rd_madr);
 			rv++;
 			continue;
 		}
@@ -723,8 +696,8 @@ pc_write_madr(pda_handle_t ph, int lboard, int rboard, uint_t madr)
 		}
 
 		PR_XF("%s: write madr(0x%x) to iopc_madr_addr(0x%llx) "
-			"[lb=%d, rb=%d, ioc=%d]\n",
-			proc, madr, pc_madr_addr, lboard, rboard, ioc);
+		    "[lb=%d, rb=%d, ioc=%d]\n",
+		    proc, madr, pc_madr_addr, lboard, rboard, ioc);
 		DEBUG_DELAY();
 
 		for (i = 0; i < 20; i++) {
@@ -738,14 +711,14 @@ pc_write_madr(pda_handle_t ph, int lboard, int rboard, uint_t madr)
 		}
 		if (i > 0) {
 			PR_XF("%s: WARNING: (4) lb=%d, rb=%d, "
-				"madr=0x%x (i=%d)\n",
-				proc, lboard, rboard, madr, i);
+			    "madr=0x%x (i=%d)\n",
+			    proc, lboard, rboard, madr, i);
 		}
 		if (rd_madr != madr) {
 			cmn_err(CE_WARN,
-				"IDN: 504: (validate) failed to update "
-				"IOPC madr (expected 0x%x, actual 0x%x)",
-				madr, rd_madr);
+			    "IDN: 504: (validate) failed to update "
+			    "IOPC madr (expected 0x%x, actual 0x%x)",
+			    madr, rd_madr);
 			rv++;
 		}
 	}
@@ -790,8 +763,8 @@ pc_read_madr(pda_handle_t ph, int lboard, uint_t mc_adr[], int local_only)
 				break;
 		if (ioc == MAX_IOCS) {
 			cmn_err(CE_WARN,
-				"IDN: 505: board %d missing any valid PCs",
-				lboard);
+			    "IDN: 505: board %d missing any valid PCs",
+			    lboard);
 			return;
 		}
 		p = ioc + 4;
@@ -808,14 +781,13 @@ pc_read_madr(pda_handle_t ph, int lboard, uint_t mc_adr[], int local_only)
 		 * entries corresponding to our boards.
 		 */
 		lbp = pda_get_board_info(ph, brd);
-		if (!local_only ||
-				((lbp->bda_board & BDAN_MASK) == BDAN_GOOD))
+		if (!local_only || ((lbp->bda_board & BDAN_MASK) == BDAN_GOOD))
 			mc_adr[brd] = PHYSIO_LD(pc_madr_addr);
 		else
 			mc_adr[brd] = 0;
 
 		pc_madr_addr += ((u_longlong_t)1 <<
-					STARFIRE_PC_MADR_BOARD_SHIFT);
+		    STARFIRE_PC_MADR_BOARD_SHIFT);
 	}
 }
 
@@ -883,13 +855,13 @@ update_local_hw_config(idn_domain_t *ldp, struct hwconfig *loc_hw)
 		int	c;
 
 		PR_PROTO("%s: NEW HW CONFIG (old_bset = 0x%x, "
-			"new_bset = 0x%x)\n",
-			proc, ldp->dhw.dh_boardset, loc_hw->dh_boardset);
+		    "new_bset = 0x%x)\n",
+		    proc, ldp->dhw.dh_boardset, loc_hw->dh_boardset);
 
 		PR_PROTO("%s: clearing boardset 0x%x\n", proc,
-			ldp->dhw.dh_boardset & ~loc_hw->dh_boardset);
+		    ldp->dhw.dh_boardset & ~loc_hw->dh_boardset);
 		PR_PROTO("%s: setting boardset  0x%x\n", proc,
-			loc_hw->dh_boardset & ~ldp->dhw.dh_boardset);
+		    loc_hw->dh_boardset & ~ldp->dhw.dh_boardset);
 
 		idn.dc_boardset &= ~ldp->dhw.dh_boardset;
 		idn.dc_boardset |= loc_hw->dh_boardset;
@@ -939,7 +911,7 @@ get_hw_config(struct hwconfig *loc_hw)
 		 * IDN operations.
 		 */
 		cmn_err(CE_WARN,
-			"IDN: 506: cic sm_mask is not writeable");
+		    "IDN: 506: cic sm_mask is not writeable");
 		return (-1);
 	}
 	/*
@@ -949,7 +921,7 @@ get_hw_config(struct hwconfig *loc_hw)
 	ph = pda_open();
 	if (ph == (pda_handle_t)NULL) {
 		cmn_err(CE_WARN,
-			"IDN: 507: failed to map-in post2obp structure");
+		    "IDN: 507: failed to map-in post2obp structure");
 		return (-1);
 	} else if (!pda_is_valid(ph)) {
 		cmn_err(CE_WARN, "IDN: 508: post2obp checksum invalid");
@@ -990,7 +962,7 @@ get_hw_config(struct hwconfig *loc_hw)
 		for (brd = 0; brd < MAX_BOARDS; brd++)
 			if (loc_hw->dh_mcadr[brd] != 0) {
 				PR_XF("%s: brd %d, mc = 0x%x\n",
-					proc, brd, loc_hw->dh_mcadr[brd]);
+				    proc, brd, loc_hw->dh_mcadr[brd]);
 			}
 	}
 #endif /* DEBUG */
@@ -1015,7 +987,8 @@ idnxf_shmem_wakeup(void *arg)
 	int		expired;
 	procname_t	proc = "idnxf_shmem_wakeup";
 
-	expired = ((lbolt - idnxfp->xf_start_time) >= IDNCIC_TIMEOUT) ? 1 : 0;
+	expired = ((ddi_get_lbolt() - idnxfp->xf_start_time) >=
+	    IDNCIC_TIMEOUT) ? 1 : 0;
 
 	if ((count = idnxfp->xf_count) == 0) {
 		/*
@@ -1039,7 +1012,7 @@ idnxf_shmem_wakeup(void *arg)
 		 */
 		if ((idn_debug | o_idn_debug) & IDNDBG_REGS)
 			printf("%s: TIMEOUT...bailing on %d lost CIC "
-				"updates...\n", proc, count);
+			    "updates...\n", proc, count);
 #endif /* DEBUG */
 
 		ATOMIC_SUB(idnxfp->xf_count, count);
@@ -1050,7 +1023,7 @@ idnxf_shmem_wakeup(void *arg)
 
 	} else {
 		(void) timeout(idnxf_shmem_wakeup, (caddr_t)idnxfp,
-						(clock_t)IDNCIC_TIMECHK);
+		    (clock_t)IDNCIC_TIMECHK);
 	}
 }
 
@@ -1100,15 +1073,15 @@ idnxf_shmem_update_one(uint64_t arg1, uint64_t arg2)
 
 			if (idnxfp->xf_smbase != (uint_t)-1) {
 				(void) cic_write_sm_bar(brd, bus,
-							idnxfp->xf_smbase);
+				    idnxfp->xf_smbase);
 				(void) cic_write_sm_lar(brd, bus,
-							idnxfp->xf_smlimit);
+				    idnxfp->xf_smlimit);
 			}
 			/*
 			 * Verify data got there!
 			 */
 			rv = verify_smregs(brd, bus, smmask, idnxfp->xf_smbase,
-							idnxfp->xf_smlimit);
+			    idnxfp->xf_smlimit);
 		} else {
 			smmask &= ~idnxfp->xf_boardset;
 			(void) cic_write_sm_mask(brd, bus, smmask);
@@ -1128,7 +1101,7 @@ idnxf_shmem_update_one(uint64_t arg1, uint64_t arg2)
 				rv = verify_smregs(brd, bus, smmask, 1, 0);
 			} else {
 				rv = verify_smregs(brd, bus, smmask,
-							(uint_t)-1, (uint_t)-1);
+				    (uint_t)-1, (uint_t)-1);
 			}
 		}
 		if (rv) {
@@ -1197,7 +1170,7 @@ idnxf_shmem_update_all(pda_handle_t ph, boardset_t boardset,
 	 * Let's set up the global structure all the xcall
 	 * recepients will read.
 	 */
-	start_time = lbolt;
+	start_time = ddi_get_lbolt();
 	/*
 	 * Set the start time.  Make sure it's different
 	 * then the previous run.
@@ -1226,9 +1199,9 @@ idnxf_shmem_update_all(pda_handle_t ph, boardset_t boardset,
 		tu32 = UPPER32_CPUMASK(target_cpuset);
 		tl32 = LOWER32_CPUMASK(target_cpuset);
 		PR_REGS("%s: (start %ld) broadcasting CIC - "
-			"%s to cpus 0x%x.%0x\n",
-			proc, start_time, doadd ? "LINK" : "UNLINK",
-			tu32, tl32);
+		    "%s to cpus 0x%x.%0x\n",
+		    proc, start_time, doadd ? "LINK" : "UNLINK",
+		    tu32, tl32);
 	}
 
 	/*
@@ -1241,7 +1214,7 @@ idnxf_shmem_update_all(pda_handle_t ph, boardset_t boardset,
 	xc_attention(target_cpuset);
 
 	xc_some(target_cpuset, idnxf_shmem_update_one,
-			(uint64_t)&idnxf_cic_info, (uint64_t)start_time);
+	    (uint64_t)&idnxf_cic_info, (uint64_t)start_time);
 
 	xc_dismissed(target_cpuset);
 
@@ -1253,9 +1226,9 @@ idnxf_shmem_update_all(pda_handle_t ph, boardset_t boardset,
 #endif /* DEBUG */
 
 	PR_REGS("%s: waiting for completion of %d CIC - %s...\n",
-		proc, idnxf_cic_info.xf_count, doadd ? "LINKS" : "UNLINKS");
+	    proc, idnxf_cic_info.xf_count, doadd ? "LINKS" : "UNLINKS");
 	PR_REGS("%s: CIC - %s have checked IN.\n",
-		proc, doadd ? "LINKS" : "UNLINKS");
+	    proc, doadd ? "LINKS" : "UNLINKS");
 
 	/*
 	 * Modifying xf_start_time effectively disables any
@@ -1266,7 +1239,7 @@ idnxf_shmem_update_all(pda_handle_t ph, boardset_t boardset,
 	idnxf_cic_info.xf_start_time++;
 
 	PR_REGS("%s: xf_errcnt = %d, xf_errtimer = %d\n",
-		proc, idnxf_cic_info.xf_errcnt, idnxf_cic_info.xf_errtimer);
+	    proc, idnxf_cic_info.xf_errcnt, idnxf_cic_info.xf_errtimer);
 	DUMP_CIC_HISTORY();
 	/*
 	 * Should errors be fatal? (panic).
@@ -1291,23 +1264,23 @@ idnxf_shmem_update_all(pda_handle_t ph, boardset_t boardset,
 				if (!idnxf_cic_info.xf_errtimer)
 					break;
 				cmn_err(CE_WARN,
-					"IDN: 509: CPU %d never responded "
-					"to CIC update", c);
+				    "IDN: 509: CPU %d never responded "
+				    "to CIC update", c);
 				/*FALLTHROUGH*/
 
 			case IDNCIC_ERR:
 				cmn_err(CE_WARN,
-					"IDN: 510: failed write-smregs "
-					"(bd=%d, bs=%d, sm(bar=0x%x, "
-					"lar=0x%x))",
-					brd, bus, smbase, smlimit);
+				    "IDN: 510: failed write-smregs "
+				    "(bd=%d, bs=%d, sm(bar=0x%x, "
+				    "lar=0x%x))",
+				    brd, bus, smbase, smlimit);
 				rv++;
 				break;
 
 			case IDNCIC_BUSY:
 				cmn_err(CE_WARN, "IDN: 511: update-one "
-					"(cpu=%d, bd=%d) time conflict",
-					c, brd);
+				    "(cpu=%d, bd=%d) time conflict",
+				    c, brd);
 				/*
 				 * Should never occur.  Not fatal,
 				 * just continue.
@@ -1316,8 +1289,8 @@ idnxf_shmem_update_all(pda_handle_t ph, boardset_t boardset,
 
 			default:
 				PR_REGS("%s: board %d, bus %d "
-					"(bar=0x%x,lar=0x%x) - update OK\n",
-					proc, brd, bus, smbase, smlimit);
+				    "(bar=0x%x,lar=0x%x) - update OK\n",
+				    proc, brd, bus, smbase, smlimit);
 				break;
 			}
 		}
@@ -1333,9 +1306,8 @@ idnxf_shmem_update_all(pda_handle_t ph, boardset_t boardset,
  * is_master	Indicates remote domain is a master.
  */
 int
-idnxf_shmem_add(int is_master, boardset_t boardset,
-		pfn_t pfnbase, pfn_t pfnlimit,
-		uint_t *mcadr)
+idnxf_shmem_add(int is_master, boardset_t boardset, pfn_t pfnbase,
+    pfn_t pfnlimit, uint_t *mcadr)
 {
 	int		rv = 0;
 	register int	brd, rbrd;
@@ -1358,7 +1330,7 @@ idnxf_shmem_add(int is_master, boardset_t boardset,
 		smbase = smlimit = (uint_t)-1;
 	}
 	PR_REGS("%s: is_master=%d, boardset=0x%x, smbase=0x%x, smlimit=%x\n",
-		proc, is_master, boardset, smbase, smlimit);
+	    proc, is_master, boardset, smbase, smlimit);
 
 	/*
 	 * Need to serialize hardware access so we don't have multiple
@@ -1376,7 +1348,7 @@ idnxf_shmem_add(int is_master, boardset_t boardset,
 	ph = pda_open();
 	if (ph == (pda_handle_t)NULL) {
 		cmn_err(CE_WARN,
-			"IDN: 507: failed to map-in post2obp structure");
+		    "IDN: 507: failed to map-in post2obp structure");
 		rv = -1;
 		goto done;
 
@@ -1400,7 +1372,7 @@ idnxf_shmem_add(int is_master, boardset_t boardset,
 	 * then we need to deprogram our PCs.
 	 */
 	PR_REGS("%s: updating PC regs (lboardset=0x%x, rboardset=0x%x)\n",
-		proc, localboardset, boardset);
+	    proc, localboardset, boardset);
 
 	for (brd = 0; brd < MAX_BOARDS; brd++) {
 
@@ -1423,9 +1395,9 @@ idnxf_shmem_add(int is_master, boardset_t boardset,
 			 */
 			if (pc_write_madr(ph, brd, rbrd, madr) < 0) {
 				cmn_err(CE_WARN,
-					"IDN: 512: failed [add] write-madr "
-					"(bd=%d, rbd=%d, madr=0x%x)",
-					brd, rbrd, madr);
+				    "IDN: 512: failed [add] write-madr "
+				    "(bd=%d, rbd=%d, madr=0x%x)",
+				    brd, rbrd, madr);
 				rv = -1;
 				goto done;
 			}
@@ -1467,7 +1439,7 @@ idnxf_shmem_sub(int is_master, boardset_t boardset)
 	ASSERT(localboardset && boardset && ((localboardset & boardset) == 0));
 
 	PR_REGS("%s: is_master=%d, boardset=0x%x\n",
-		proc, is_master, boardset);
+	    proc, is_master, boardset);
 
 	/*
 	 * Need to serialize hardware access so we don't have multiple
@@ -1485,7 +1457,7 @@ idnxf_shmem_sub(int is_master, boardset_t boardset)
 	ph = pda_open();
 	if (ph == (pda_handle_t)NULL) {
 		cmn_err(CE_WARN,
-			"IDN: 507: failed to map-in post2obp structure");
+		    "IDN: 507: failed to map-in post2obp structure");
 		rv = -1;
 		goto done;
 
@@ -1509,7 +1481,7 @@ idnxf_shmem_sub(int is_master, boardset_t boardset)
 	 * then we need to deprogram our PCs.
 	 */
 	PR_REGS("%s: reseting PC regs (lboardset=0x%x, rboardset=0x%x)\n",
-		proc, localboardset, boardset);
+	    proc, localboardset, boardset);
 
 	for (brd = 0; brd < MAX_BOARDS; brd++) {
 
@@ -1527,9 +1499,9 @@ idnxf_shmem_sub(int is_master, boardset_t boardset)
 			 */
 			if (pc_write_madr(ph, brd, rbrd, 0) < 0) {
 				cmn_err(CE_WARN,
-					"IDN: 512: failed [del] write-madr "
-					"(bd=%d, rbd=%d, madr=0x%x)",
-					brd, rbrd, 0);
+				    "IDN: 512: failed [del] write-madr "
+				    "(bd=%d, rbd=%d, madr=0x%x)",
+				    brd, rbrd, 0);
 				rv = -1;
 				goto done;
 			}
@@ -1581,9 +1553,8 @@ idnxf_flushall_ecache()
 	procname_t	proc = "idnxf_flushall_ecache";
 
 
-	PR_XF("%s: flushing ecache (cpu_ready_set = 0x%x.%x)\n",
-		proc, UPPER32_CPUMASK(cpu_ready_set),
-		LOWER32_CPUMASK(cpu_ready_set));
+	PR_XF("%s: flushing ecache (cpu_ready_set = 0x%x.%x)\n", proc,
+	    UPPER32_CPUMASK(cpu_ready_set), LOWER32_CPUMASK(cpu_ready_set));
 
 	CHECKPOINT_CACHE_CLEAR_DEBUG(1);
 	CHECKPOINT_CACHE_STEP_DEBUG(0x1, 2);
@@ -1615,8 +1586,8 @@ idnxf_flushall_ecache()
  * --------------------------------------------------
  */
 static int
-verify_smregs(int brd, int bus, boardset_t smmask,
-		uint_t smbase, uint_t smlimit)
+verify_smregs(int brd, int bus, boardset_t smmask, uint_t smbase, uint_t
+    smlimit)
 {
 	int		rv = 0;
 	uint_t		smreg;
@@ -1625,9 +1596,9 @@ verify_smregs(int brd, int bus, boardset_t smmask,
 		smreg = (uint_t)cic_read_sm_mask(brd, bus);
 		if (smreg != (uint_t)smmask) {
 			cmn_err(CE_WARN,
-				"IDN: 513: sm-mask error "
-				"(expected = 0x%x, actual = 0x%x)",
-				(uint_t)smmask, smreg);
+			    "IDN: 513: sm-mask error "
+			    "(expected = 0x%x, actual = 0x%x)",
+			    (uint_t)smmask, smreg);
 			rv++;
 		}
 	}
@@ -1636,9 +1607,9 @@ verify_smregs(int brd, int bus, boardset_t smmask,
 		smreg = cic_read_sm_bar(brd, bus);
 		if (smreg != smbase) {
 			cmn_err(CE_WARN,
-				"IDN: 514: sm-base error "
-				"(expected = 0x%x, actual = 0x%x)",
-				smbase, smreg);
+			    "IDN: 514: sm-base error "
+			    "(expected = 0x%x, actual = 0x%x)",
+			    smbase, smreg);
 			rv++;
 		}
 	}
@@ -1647,9 +1618,9 @@ verify_smregs(int brd, int bus, boardset_t smmask,
 		smreg = cic_read_sm_lar(brd, bus);
 		if (smreg != smlimit) {
 			cmn_err(CE_WARN,
-				"IDN: 515: sm-limit error "
-				"(expected = 0x%x, actual = 0x%x)",
-				smlimit, smreg);
+			    "IDN: 515: sm-limit error "
+			    "(expected = 0x%x, actual = 0x%x)",
+			    smlimit, smreg);
 			rv++;
 		}
 	}
@@ -1708,13 +1679,13 @@ idn_cpu_per_board(pda_handle_t ph, cpuset_t cset, struct hwconfig *hwp)
 		lbp = ph ? pda_get_board_info(ph, b) : NULL;
 
 		if ((lbp &&
-			(BDA_NBL(lbp->bda_board, BDA_MC_NBL) == BDAN_GOOD)) ||
-			(!lbp && hwp->dh_mcadr[b])) {
+		    (BDA_NBL(lbp->bda_board, BDA_MC_NBL) == BDAN_GOOD)) ||
+		    (!lbp && hwp->dh_mcadr[b])) {
 			err++;
 			cmn_err(CE_WARN,
-				"IDN: 516: (%s) board %d has memory, "
-				"but no CPUs - CPU per memory board REQUIRED",
-				ph ? "local" : "remote", b);
+			    "IDN: 516: (%s) board %d has memory, "
+			    "but no CPUs - CPU per memory board REQUIRED",
+			    ph ? "local" : "remote", b);
 		}
 	}
 

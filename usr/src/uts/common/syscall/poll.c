@@ -323,10 +323,11 @@ poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 		t->t_hold = *ksetp;
 		t->t_flag |= T_TOMASK;
 		/*
-		 * Call cv_timedwait_sig() just to check for signals.
+		 * Call cv_reltimedwait_sig() just to check for signals.
 		 * We will return immediately with either 0 or -1.
 		 */
-		if (!cv_timedwait_sig(&t->t_delay_cv, &p->p_lock, lbolt)) {
+		if (!cv_reltimedwait_sig(&t->t_delay_cv, &p->p_lock, 0,
+		    TR_CLOCK_TICK)) {
 			mutex_exit(&p->p_lock);
 			error = EINTR;
 			goto pollout;

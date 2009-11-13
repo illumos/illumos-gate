@@ -23,11 +23,9 @@
 
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * UNIX Device Driver Interface functions
@@ -305,7 +303,7 @@ drv_getparm(unsigned int parm, void *valuep)
 		mutex_exit(&p->p_lock);
 		break;
 	case LBOLT:
-		*(clock_t *)valuep = lbolt;
+		*(clock_t *)valuep = ddi_get_lbolt();
 		break;
 	case TIME:
 		if ((now = gethrestime_sec()) == 0) {
@@ -1220,5 +1218,5 @@ kvtoppid(caddr_t addr)
 void
 time_to_wait(clock_t *now, clock_t time)
 {
-	*now = lbolt + time;
+	*now = ddi_get_lbolt() + time;
 }

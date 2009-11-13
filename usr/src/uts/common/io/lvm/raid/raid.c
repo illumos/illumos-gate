@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -959,7 +959,8 @@ raid_build_incore(void *p, int snarfing)
 							    MD_RAID_COPY_RESYNC;
 						else
 							preserve_flags |=
-							   MD_RAID_REGEN_RESYNC;
+							/* CSTYLED */
+							    MD_RAID_REGEN_RESYNC;
 					}
 				}
 			} else { /* no hot spares */
@@ -3307,7 +3308,6 @@ raid_write(mr_unit_t *un, md_raidcs_t *cs)
 	md_raidps_t	*ps;
 	mdi_unit_t	*ui;
 	minor_t		mnum;
-	clock_t		timeout;
 
 	ASSERT(IO_READER_HELD(un));
 	ps = cs->cs_ps;
@@ -3333,11 +3333,10 @@ raid_write(mr_unit_t *un, md_raidcs_t *cs)
 	 */
 	while (raid_check_pw(cs)) {
 		mutex_enter(&un->un_mx);
-		(void) drv_getparm(LBOLT, &timeout);
-		timeout += md_wr_wait;
 		un->un_rflags |= MD_RFLAG_NEEDPW;
 		STAT_INC(raid_prewrite_waits);
-		(void) cv_timedwait(&un->un_cv, &un->un_mx, timeout);
+		(void) cv_reltimedwait(&un->un_cv, &un->un_mx, md_wr_wait,
+		    TR_CLOCK_TICK);
 		un->un_rflags &= ~MD_RFLAG_NEEDPW;
 		mutex_exit(&un->un_mx);
 	}

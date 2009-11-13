@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,8 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -1166,7 +1164,7 @@ dnlc_dir_lookup(dcanchor_t *dcap, char *name, uint64_t *handle)
 	mutex_enter(&dcap->dca_lock);
 	dcp = (dircache_t *)dcap->dca_dircache;
 	if (VALID_DIR_CACHE(dcp)) {
-		dcp->dc_actime = lbolt64;
+		dcp->dc_actime = ddi_get_lbolt64();
 		DNLC_DIR_HASH(name, hash, namlen);
 		dep = dcp->dc_namehash[hash & dcp->dc_nhash_mask];
 		while (dep != NULL) {
@@ -1385,7 +1383,7 @@ ok:
 		bcopy(name, dep->de_name, namlen);
 		dep->de_next = *hp;
 		*hp = dep;
-		dcp->dc_actime = lbolt64;
+		dcp->dc_actime = ddi_get_lbolt64();
 		mutex_exit(&dcap->dca_lock);
 		ncs.ncs_dir_num_ents.value.ui64++;
 		return (DOK);
@@ -1474,7 +1472,7 @@ ok:
 		 */
 		dfp->df_handle = handle;
 		dfp->df_len = len;
-		dcp->dc_actime = lbolt64;
+		dcp->dc_actime = ddi_get_lbolt64();
 		hp = &(dcp->dc_freehash[DDFHASH(handle, dcp)]);
 		dfp->df_next = *hp;
 		*hp = dfp;
@@ -1601,7 +1599,7 @@ dnlc_dir_rem_entry(dcanchor_t *dcap, char *name, uint64_t *handlep)
 	mutex_enter(&dcap->dca_lock);
 	dcp = (dircache_t *)dcap->dca_dircache;
 	if (VALID_DIR_CACHE(dcp)) {
-		dcp->dc_actime = lbolt64;
+		dcp->dc_actime = ddi_get_lbolt64();
 		if (dcp->dc_nhash_mask > 0) { /* ie not minimum */
 			capacity = (dcp->dc_nhash_mask + 1) <<
 			    dnlc_dir_hash_size_shift;
@@ -1677,7 +1675,7 @@ dnlc_dir_rem_space_by_len(dcanchor_t *dcap, uint_t len, uint64_t *handlep)
 	mutex_enter(&dcap->dca_lock);
 	dcp = (dircache_t *)dcap->dca_dircache;
 	if (VALID_DIR_CACHE(dcp)) {
-		dcp->dc_actime = lbolt64;
+		dcp->dc_actime = ddi_get_lbolt64();
 		if (dcp->dc_fhash_mask > 0) { /* ie not minimum */
 			capacity = (dcp->dc_fhash_mask + 1) <<
 			    dnlc_dir_hash_size_shift;
@@ -1740,7 +1738,7 @@ dnlc_dir_rem_space_by_handle(dcanchor_t *dcap, uint64_t handle)
 	mutex_enter(&dcap->dca_lock);
 	dcp = (dircache_t *)dcap->dca_dircache;
 	if (VALID_DIR_CACHE(dcp)) {
-		dcp->dc_actime = lbolt64;
+		dcp->dc_actime = ddi_get_lbolt64();
 		if (dcp->dc_fhash_mask > 0) { /* ie not minimum */
 			capacity = (dcp->dc_fhash_mask + 1) <<
 			    dnlc_dir_hash_size_shift;
@@ -1799,7 +1797,7 @@ dnlc_dir_update(dcanchor_t *dcap, char *name, uint64_t handle)
 	mutex_enter(&dcap->dca_lock);
 	dcp = (dircache_t *)dcap->dca_dircache;
 	if (VALID_DIR_CACHE(dcp)) {
-		dcp->dc_actime = lbolt64;
+		dcp->dc_actime = ddi_get_lbolt64();
 		DNLC_DIR_HASH(name, hash, namlen);
 		dep = dcp->dc_namehash[hash & dcp->dc_nhash_mask];
 		while (dep != NULL) {

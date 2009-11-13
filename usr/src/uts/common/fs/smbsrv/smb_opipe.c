@@ -232,7 +232,7 @@ smb_opipe_fid(void)
 	mutex_enter(&smb_opipe_fid_mutex);
 
 	if (opipe_fid == 0)
-		opipe_fid = lbolt << 11;
+		opipe_fid = ddi_get_lbolt() << 11;
 
 	do {
 		++opipe_fid;

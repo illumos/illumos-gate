@@ -168,7 +168,7 @@ typedef struct cpu {
 
 	ftrace_data_t	cpu_ftrace;		/* per cpu ftrace data */
 
-	clock_t		cpu_deadman_lbolt;	/* used by deadman() */
+	clock_t		cpu_deadman_counter;	/* used by deadman() */
 	uint_t		cpu_deadman_countdown;	/* used by deadman() */
 
 	kmutex_t	cpu_cpc_ctxlock; /* protects context for idle thread */

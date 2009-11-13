@@ -158,7 +158,7 @@ sctp_send_heartbeat(sctp_t *sctp, sctp_faddr_t *fp)
 	 * Copy the current time to the heartbeat and we can use it to
 	 * calculate the RTT when we get it back in the heartbeat ACK.
 	 */
-	now = lbolt64;
+	now = ddi_get_lbolt64();
 	t = (int64_t *)(hpp + 1);
 	bcopy(&now, t, sizeof (now));
 
@@ -209,7 +209,7 @@ sctp_validate_peer(sctp_t *sctp)
 	int64_t		earliest_expiry;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
-	now = lbolt64;
+	now = ddi_get_lbolt64();
 	earliest_expiry = 0;
 	cnt = sctps->sctps_maxburst;
 
@@ -329,7 +329,7 @@ sctp_process_heartbeat(sctp_t *sctp, sctp_chunk_hdr_t *cp)
 
 	/* This address is now confirmed and alive. */
 	sctp_faddr_alive(sctp, fp);
-	now = lbolt64;
+	now = ddi_get_lbolt64();
 	sctp_update_rtt(sctp, fp, now - sent);
 
 	/*

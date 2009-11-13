@@ -2140,7 +2140,7 @@ ire_delete_reclaim(ire_t *ire, char *arg)
 	    (ire->ire_type & IRE_IF_CLONE)) {
 
 		/* Pick a random number */
-		rand = (uint_t)lbolt +
+		rand = (uint_t)ddi_get_lbolt() +
 		    IRE_ADDR_HASH_V6(ire->ire_addr_v6, 256);
 
 		/* Use truncation */
@@ -3092,7 +3092,7 @@ ire_no_good(ire_t *ire)
 	 */
 	mutex_enter(&ire->ire_lock);
 	ire->ire_badcnt++;
-	ire->ire_last_badcnt = TICK_TO_SEC(lbolt64);
+	ire->ire_last_badcnt = TICK_TO_SEC(ddi_get_lbolt64());
 	nce = ire->ire_nce_cache;
 	if (nce != NULL && nce->nce_is_condemned &&
 	    nce->nce_common->ncec_state == ND_UNREACHABLE)

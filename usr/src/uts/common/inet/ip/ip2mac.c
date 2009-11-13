@@ -238,7 +238,7 @@ ip2mac(uint_t op, ip2mac_t *ip2m, ip2mac_callback_t *cb, void *cbarg,
 			goto done;
 		}
 		ncec = nce->nce_common;
-		delta = TICK_TO_MSEC(lbolt64) - ncec->ncec_last;
+		delta = TICK_TO_MSEC(ddi_get_lbolt64()) - ncec->ncec_last;
 		mutex_enter(&ncec->ncec_lock);
 		if (NCE_ISREACHABLE(ncec) &&
 		    delta < (uint64_t)ill->ill_reachable_time) {
@@ -256,7 +256,7 @@ ip2mac(uint_t op, ip2mac_t *ip2m, ip2mac_callback_t *cb, void *cbarg,
 		}
 	}
 	ncec = nce->nce_common;
-	delta = TICK_TO_MSEC(lbolt64) - ncec->ncec_last;
+	delta = TICK_TO_MSEC(ddi_get_lbolt64()) - ncec->ncec_last;
 	mutex_enter(&ncec->ncec_lock);
 	if (NCE_ISCONDEMNED(ncec)) {
 		ip2m->ip2mac_err = ESRCH;

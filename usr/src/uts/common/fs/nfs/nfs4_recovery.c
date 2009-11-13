@@ -2479,8 +2479,8 @@ recov_openfiles(recov_info_t *recovp, nfs4_server_t *sp)
 	mutex_enter(&sp->s_lock);
 	if ((sp->s_flags & (N4S_CB_PINGED | N4S_CB_WAITER)) == 0) {
 		sp->s_flags |= N4S_CB_WAITER;
-		(void) cv_timedwait(&sp->wait_cb_null, &sp->s_lock,
-		    (lbolt + drv_usectohz(N4S_CB_PAUSE_TIME)));
+		(void) cv_reltimedwait(&sp->wait_cb_null, &sp->s_lock,
+		    drv_usectohz(N4S_CB_PAUSE_TIME), TR_CLOCK_TICK);
 	}
 	mutex_exit(&sp->s_lock);
 

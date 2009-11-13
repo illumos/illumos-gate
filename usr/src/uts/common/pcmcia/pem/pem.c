@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -311,6 +311,7 @@ pem_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			return (DDI_FAILURE);
 		mutex_enter(&pem_intr_lock);
 		(void) pcmcia_set_em_handler(NULL, NULL, 0, 0x1234, NULL, NULL);
+		tm = drv_usectohz(100000);
 
 		while (pem_softint_posted > 0) {
 			/*
@@ -318,9 +319,8 @@ pem_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			 * interrupts to be processed before removing the
 			 * soft interrupt handler.
 			 */
-			tm = ddi_get_lbolt();
-			(void) cv_timedwait(&pem_condvar, &pem_intr_lock,
-			    tm + drv_usectohz(100000));
+			(void) cv_reltimedwait(&pem_condvar, &pem_intr_lock,
+			    tm, TR_CLOCK_TICK);
 		}
 
 		ddi_remove_softintr(pem_intr_id);

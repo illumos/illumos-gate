@@ -61,8 +61,6 @@ typedef uintptr_t pc_t;
 extern int hz;			/* system clock rate */
 extern struct vnode *rootdir;	/* pointer to vnode of root directory */
 extern struct vnode *devicesdir;	/* pointer to /devices vnode */
-extern volatile clock_t lbolt;	/* time in HZ since last boot */
-extern volatile int64_t lbolt64;	/* lbolt computed as 64-bit value */
 extern int interrupts_unleashed;	/* set after the spl0() in main() */
 
 extern char runin;		/* scheduling flag */

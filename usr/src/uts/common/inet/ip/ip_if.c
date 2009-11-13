@@ -2426,6 +2426,7 @@ ill_frag_prune(ill_t *ill, uint_t max_count)
 	ipfb_t	*ipfb;
 	ipf_t	*ipf;
 	size_t	count;
+	clock_t now;
 
 	/*
 	 * If we are here within ip_min_frag_prune_time msecs remove
@@ -2433,7 +2434,8 @@ ill_frag_prune(ill_t *ill, uint_t max_count)
 	 * ill_frag_free_num_pkts.
 	 */
 	mutex_enter(&ill->ill_lock);
-	if (TICK_TO_MSEC(lbolt - ill->ill_last_frag_clean_time) <=
+	now = ddi_get_lbolt();
+	if (TICK_TO_MSEC(now - ill->ill_last_frag_clean_time) <=
 	    (ip_min_frag_prune_time != 0 ?
 	    ip_min_frag_prune_time : msec_per_tick)) {
 
@@ -2442,7 +2444,7 @@ ill_frag_prune(ill_t *ill, uint_t max_count)
 	} else {
 		ill->ill_frag_free_num_pkts = 0;
 	}
-	ill->ill_last_frag_clean_time = lbolt;
+	ill->ill_last_frag_clean_time = now;
 	mutex_exit(&ill->ill_lock);
 
 	/*
@@ -4994,7 +4996,7 @@ th_trace_rrecord(th_trace_t *th_trace)
 		lastref = 0;
 	th_trace->th_trace_lastref = lastref;
 	tr_buf = &th_trace->th_trbuf[lastref];
-	tr_buf->tr_time = lbolt;
+	tr_buf->tr_time = ddi_get_lbolt();
 	tr_buf->tr_depth = getpcstack(tr_buf->tr_stack, TR_STACK_DEPTH);
 }
 
@@ -6528,8 +6530,8 @@ ipsq_enter(ill_t *ill, boolean_t force, int type)
 		} else {
 			mutex_exit(&ipx->ipx_lock);
 			mutex_exit(&ipsq->ipsq_lock);
-			(void) cv_timedwait(&ill->ill_cv,
-			    &ill->ill_lock, lbolt + ENTER_SQ_WAIT_TICKS);
+			(void) cv_reltimedwait(&ill->ill_cv,
+			    &ill->ill_lock, ENTER_SQ_WAIT_TICKS, TR_CLOCK_TICK);
 			waited_enough = B_TRUE;
 		}
 		mutex_exit(&ill->ill_lock);

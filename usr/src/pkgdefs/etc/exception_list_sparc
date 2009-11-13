@@ -43,6 +43,7 @@ usr/include/bsm/audit_private.h		sparc
 usr/include/bsm/devalloc.h		sparc
 usr/include/security/pam_impl.h		sparc
 usr/include/passwdutil.h		sparc
+usr/include/sys/clock_impl.h		sparc
 #
 # Private/Internal libraries of the Cryptographic Framework.
 #

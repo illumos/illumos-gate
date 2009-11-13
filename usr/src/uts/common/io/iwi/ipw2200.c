@@ -1014,12 +1014,12 @@ ipw2200_cmd(struct ipw2200_softc *sc,
 	/*
 	 * Wait for command done
 	 */
+	clk = drv_usectohz(5000000);
 	mutex_enter(&sc->sc_ilock);
 	while (sc->sc_done[idx] == 0) {
 		/* pending */
-		clk = ddi_get_lbolt() + drv_usectohz(5000000);  /* 5 second */
-		if (cv_timedwait(&sc->sc_cmd_status_cond, &sc->sc_ilock, clk)
-		    < 0)
+		if (cv_reltimedwait(&sc->sc_cmd_status_cond, &sc->sc_ilock,
+		    clk, TR_CLOCK_TICK) < 0)
 			break;
 	}
 	mutex_exit(&sc->sc_ilock);

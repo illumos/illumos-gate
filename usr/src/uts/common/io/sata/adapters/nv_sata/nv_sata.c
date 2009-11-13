@@ -6898,8 +6898,8 @@ nv_sgp_activity_led_ctl(void *arg)
 		mutex_enter(&cmn->nvs_tlock);
 		ticks = drv_usectohz(cmn->nvs_taskq_delay);
 		if (ticks > 0)
-			(void) cv_timedwait(&cmn->nvs_cv, &cmn->nvs_tlock,
-			    ddi_get_lbolt() + ticks);
+			(void) cv_reltimedwait(&cmn->nvs_cv, &cmn->nvs_tlock,
+			    ticks, TR_CLOCK_TICK);
 		mutex_exit(&cmn->nvs_tlock);
 	} while (ticks > 0);
 }

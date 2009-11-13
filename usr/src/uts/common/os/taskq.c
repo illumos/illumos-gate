@@ -1254,7 +1254,7 @@ taskq_thread_wait(taskq_t *tq, kmutex_t *mx, kcondvar_t *cv,
 	if (timeout < 0)
 		cv_wait(cv, mx);
 	else
-		ret = cv_timedwait(cv, mx, lbolt + timeout);
+		ret = cv_reltimedwait(cv, mx, timeout, TR_CLOCK_TICK);
 
 	if (!(tq->tq_flags & TASKQ_CPR_SAFE)) {
 		CALLB_CPR_SAFE_END(cprinfo, mx);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1154,8 +1154,8 @@ ufs_thread_hlock(void *ignore)
 			if (retry) {
 				mutex_enter(&ufs_hlock.uq_mutex);
 				CALLB_CPR_SAFE_BEGIN(&cprinfo);
-				(void) cv_timedwait(&ufs_hlock.uq_cv,
-				    &ufs_hlock.uq_mutex, lbolt + hz);
+				(void) cv_reltimedwait(&ufs_hlock.uq_cv,
+				    &ufs_hlock.uq_mutex, hz, TR_CLOCK_TICK);
 				CALLB_CPR_SAFE_END(&cprinfo,
 				    &ufs_hlock.uq_mutex);
 				mutex_exit(&ufs_hlock.uq_mutex);

@@ -446,8 +446,8 @@ mc_polling_thread()
 	mc_pollthr_running = 1;
 	while (!(mc_poll_cmd & MC_POLL_EXIT)) {
 		mc_polling();
-		cv_timedwait(&mc_polling_cv, &mc_polling_lock,
-		    ddi_get_lbolt() + mc_timeout_period);
+		cv_reltimedwait(&mc_polling_cv, &mc_polling_lock,
+		    mc_timeout_period, TR_CLOCK_TICK);
 	}
 	mc_pollthr_running = 0;
 
