@@ -38,10 +38,10 @@
 #include "libfrup.h"
 #include "fru_tag.h"
 #include "libfrureg.h"
-
+#include "nvfru.h"
 
 #define	NUM_ITER_BYTES	4
-#define	HEAD_ITER 	0
+#define	HEAD_ITER	0
 #define	TAIL_ITER	1
 #define	NUM_ITER	2
 #define	MAX_ITER	3

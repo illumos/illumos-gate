@@ -40,7 +40,7 @@ _msg :=         TARGET= _msg
 sparc_HDRS=
 sparcv9_HDRS=
 i386_HDRS=
-HDRS=	$($(MACH)_HDRS)
+HDRS=		nvfru.h $($(MACH)_HDRS)
 ROOTHDRDIR=     $(ROOT)/usr/include
 ROOTHDRS=       $(HDRS:%=$(ROOTHDRDIR)/%)
 CHECKHDRS=      $(HDRS:%.h=%.check)
@@ -57,6 +57,8 @@ $(ROOTHDRDIR)/%: %
 
 $(ROOTHDRDIR):
 	$(INS.dir)
+
+install_h: $(ROOTHDRS)
 
 check: $(CHECKHDRS)
 

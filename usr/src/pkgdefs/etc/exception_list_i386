@@ -1258,3 +1258,5 @@ usr/lib/librstp.so		i386
 usr/lib/llib-lrstp		i386
 usr/lib/llib-lrstp.ln		i386
 
+# Private nvfru API
+usr/include/nvfru.h			i386

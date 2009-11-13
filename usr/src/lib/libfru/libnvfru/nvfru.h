@@ -34,7 +34,7 @@
 extern "C" {
 #endif
 
-int rawfru_to_nvlist(uint8_t *, size_t, char *, nvlist_t **);
+extern int rawfru_to_nvlist(uint8_t *, size_t, char *, nvlist_t **);
 
 #ifdef  __cplusplus
 	}

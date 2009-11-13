@@ -23,50 +23,24 @@
 # Use is subject to license terms.
 #
 
-LIBRARY=	libnvfru.a
-VERS=		.1
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
 
-OBJECTS=	nvfru.o
+SUNWprivate_1.1 {
+    global:
+	rawfru_to_nvlist;
 
-# include library definitions
-include $(SRC)/lib/Makefile.lib
-
-CLOBBERFILES += $(LIBLINKS)
-
-LIBS =		$(DYNLIB)
-
-LINTFLAGS =	-uxn
-LINTFLAGS64 =	$(LINTFLAGS) -m64
-LINTOUT=	lint.out
-LINTSRC =       $(LINTLIB:%.ln=%)
-ROOTLINTDIR =   $(ROOTLIBDIR)
-ROOTLINT =      $(LINTSRC:%=$(ROOTLINTDIR)/%)
-
-CLEANFILES=	$(LINTOUT)
-
-CPPFLAGS +=	-I.. \
-		-I$(SRC)/lib/libfru/include \
-		-I$(SRC)/lib/libfruutils
-CPPFLAGS += 	-D_REENTRANT
-CFLAGS +=	$(CCVERBOSE)
-
-$(LINTLIB) :=	LINTFLAGS = -nvx -I..
-$(LINTLIB) :=	LINTFLAGS64 = -nvx -m64 -I..
-
-XGETFLAGS += -a
-
-.KEEP_STATE:
-
-all : $(LIBS)
-
-lint :	lintcheck
-
-# include library targets
-include $(SRC)/lib/Makefile.targ
-
-pics/%.o:	../%.c
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
-
-$(ROOTLINTDIR)/%: ../%
-	$(INS.file)
+    local:
+	*;
+};

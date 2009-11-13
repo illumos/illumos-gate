@@ -1347,3 +1347,6 @@ usr/include/stp_vectors.h	sparc
 usr/lib/librstp.so		sparc
 usr/lib/llib-lrstp		sparc
 usr/lib/llib-lrstp.ln		sparc
+
+# Private nvfru API
+usr/include/nvfru.h			sparc
