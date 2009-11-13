@@ -4149,6 +4149,23 @@ crypto_cleanup()
 }
 
 #
+# Remove old fips-140 entry from kcf.conf if it is found
+#
+cleanup_kcf_fips140()
+{
+
+	kcfconf=$rootprefix/etc/crypto/kcf.conf
+	kcfconftmp=/tmp/kcfconf.tmp.$$
+
+	if grep '^fips-140:' $kcfconf >/dev/null ; then
+		grep -v '^fips-140:' $kcfconf > $kcfconftmp
+		print "Removing obsolete fips-140 entry from kcf.conf"
+		cp $kcfconftmp $kcfconf
+		rm -f $kcfconftmp
+	fi 
+}
+
+#
 # Add metaslot configuration to pkcs11.conf if it doesn't already exist
 #
 enable_crypto_metaslot()
@@ -8660,6 +8677,11 @@ mondo_loop() {
 
 	# Remove bsmrecord.  Renamed to auditrecord.
 	rm -f $root/usr/sbin/bsmrecord
+
+	# Remove old fips-140 entry from kcf.conf
+	if [ -f $rootprefix/etc/crypto/kcf.conf ] ; then
+		cleanup_kcf_fips140
+	fi
 
 	print "\nFor each file in conflict, your version has been restored."
 	print "The new versions are under $rootprefix/bfu.conflicts."
