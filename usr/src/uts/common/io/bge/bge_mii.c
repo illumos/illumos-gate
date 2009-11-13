@@ -418,6 +418,7 @@ bge_phy_reset_and_check(bge_t *bgep)
 	boolean_t reset_success;
 	boolean_t phy_locked;
 	uint16_t extctrl;
+	uint16_t gigctrl;
 	uint_t retries;
 
 	for (retries = 0; retries < 5; ++retries) {
@@ -444,6 +445,7 @@ bge_phy_reset_and_check(bge_t *bgep)
 		bge_mii_put16(bgep, 0x0, 0x0140);
 
 		/* Set to Master mode */
+		gigctrl = bge_mii_get16(bgep, 0x9);
 		bge_mii_put16(bgep, 0x9, 0x1800);
 
 		/* Enable SM_DSP_CLOCK & 6dB */
@@ -485,6 +487,9 @@ bge_phy_reset_and_check(bge_t *bgep)
 
 	/* Restore PHY back to operating state */
 	bge_mii_put16(bgep, 0x18, 0x0400);
+
+	/* Restore 1000BASE-T Control Register */
+	bge_mii_put16(bgep, 0x9, gigctrl);
 
 	/* Enable transmitter and interrupt */
 	extctrl = bge_mii_get16(bgep, 0x10);
@@ -825,15 +830,15 @@ bge_update_copper(bge_t *bgep)
 	if ((*bgep->physops->phys_restart)(bgep, B_FALSE) == DDI_FAILURE)
 		return (DDI_FAILURE);
 	bge_mii_put16(bgep, MII_AN_ADVERT, anar);
-	bge_mii_put16(bgep, MII_CONTROL, control);
 	if (auxctrl & MII_AUX_CTRL_NORM_EXT_LOOPBACK)
 		bge_mii_put16(bgep, MII_AUX_CONTROL, auxctrl);
 	bge_mii_put16(bgep, MII_MSCONTROL, gigctrl);
+	bge_mii_put16(bgep, MII_CONTROL, control);
 
 	BGE_DEBUG(("bge_update_copper: anar <- 0x%x", anar));
-	BGE_DEBUG(("bge_update_copper: control <- 0x%x", control));
 	BGE_DEBUG(("bge_update_copper: auxctrl <- 0x%x", auxctrl));
 	BGE_DEBUG(("bge_update_copper: gigctrl <- 0x%x", gigctrl));
+	BGE_DEBUG(("bge_update_copper: control <- 0x%x", control));
 
 #if	BGE_COPPER_WIRESPEED
 	/*

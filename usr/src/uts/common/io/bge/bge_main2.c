@@ -37,7 +37,7 @@ static char bge_ident[] = "Broadcom Gb Ethernet";
 /*
  * Make sure you keep the version ID up to date!
  */
-static char bge_version[] = "Broadcom Gb Ethernet v1.12";
+static char bge_version[] = "Broadcom Gb Ethernet v1.13";
 
 /*
  * Property names
