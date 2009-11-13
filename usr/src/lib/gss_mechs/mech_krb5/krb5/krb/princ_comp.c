@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/princ_comp.c
  *
@@ -27,6 +26,11 @@
  *
  * compare two principals, returning a krb5_boolean true if equal, false if
  * not.
+ */
+
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #include <k5-int.h>
@@ -63,6 +67,35 @@ krb5_principal_compare(krb5_context context, krb5_const_principal princ1, krb5_c
 	register const krb5_data *p2 = krb5_princ_component(context, princ2, i);
 	if (p1->length != p2->length ||
 	    memcmp(p1->data, p2->data, p1->length))
+	    return FALSE;
+    }
+    return TRUE;
+}
+
+/*
+ * Solaris Kerberos: MS Interop requires that case insensitive comparisons of
+ * service and host components are performed for key table lookup, etc.  Only
+ * called if the private environment variable MS_INTEROP is defined.
+ */
+krb5_boolean KRB5_CALLCONV
+__krb5_principal_compare_case_ins(krb5_context context,
+    krb5_const_principal princ1, krb5_const_principal princ2)
+{
+    register int i;
+    krb5_int32 nelem;
+
+    nelem = krb5_princ_size(context, princ1);
+    if (nelem != krb5_princ_size(context, princ2))
+	return FALSE;
+
+    if (! krb5_realm_compare(context, princ1, princ2))
+	return FALSE;
+
+    for (i = 0; i < (int) nelem; i++) {
+	register const krb5_data *p1 = krb5_princ_component(context, princ1, i);
+	register const krb5_data *p2 = krb5_princ_component(context, princ2, i);
+	if (p1->length != p2->length ||
+	    strncasecmp(p1->data, p2->data, p1->length))
 	    return FALSE;
     }
     return TRUE;

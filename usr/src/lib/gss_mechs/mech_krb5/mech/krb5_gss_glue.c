@@ -1326,8 +1326,13 @@ gss_mechanism
 gss_mech_initialize(oid)
      const gss_OID oid;
 {
+    /*
+     * Solaris Kerberos: We also want to use the same functions for KRB5 as
+     * we do for the MS KRB5 (krb5_mechanism_wrong).  So both are valid.
+     */
     /* ensure that the requested oid matches our oid */
-    if (oid == NULL || !g_OID_equal(oid, &krb5_mechanism.mech_type)) {
+    if (oid == NULL || (!g_OID_equal(oid, &krb5_mechanism.mech_type) &&
+	!g_OID_equal(oid, &krb5_mechanism_wrong.mech_type))) {
       (void) syslog(LOG_INFO, "krb5mech: gss_mech_initialize: bad oid");
       return (NULL);
     }
@@ -1379,16 +1384,13 @@ gsskrb5_extract_authz_data_from_sec_context(
         return major_status;
     }
 
-
     /*
      * SUNW17PACresync / Solaris Kerberos
-     * MIT17 expects just 1 but our testing with Win2008 shows
-     * it returns 2.  So we now handle that and rewhack mem mgmt as appro.
+     * MIT17 allows only count==1 which is correct for pre-Win2008 but
+     * our testing with Win2008 shows count==2 and Win7 count==3.
      */
-    if (data_set == GSS_C_NO_BUFFER_SET ||
-        (data_set->count != 1 && data_set->count != 2)) {
+    if ((data_set == GSS_C_NO_BUFFER_SET) || (data_set->count == 0)) {
 	    gss_release_buffer_set(minor_status, &data_set);
-
 	    return GSS_S_FAILURE;
     }
 

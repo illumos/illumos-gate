@@ -381,7 +381,7 @@ void
 usage()
 {
 	(void) fprintf(stderr, gettext("Usage: %s [-c ccache] [-k keytab] "
-	    "[-e enctype_list] [-n] princ\n"), whoami);
+	    "[-e enctype_list] [-s salt_name] [-n] princ\n"), whoami);
 	(void) fprintf(stderr,
 	    gettext("\t-n\tDon't set the principal's password\n"));
 	(void) fprintf(stderr, gettext("\tenctype_list is a comma or whitespace"

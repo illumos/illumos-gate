@@ -29,6 +29,7 @@
 # be generated and local host's keytab file setup. The script
 # can also optionally setup the system to do kerberized nfs and
 # bringover a master krb5.conf copy from a specified location.
+#
 
 function cleanup {
 
@@ -1156,6 +1157,8 @@ function getKDCDC {
 
 function join_domain {
 	typeset -u upcase_nodename
+	typeset -l locase_nodename
+	typeset -L15 string15
 	typeset netbios_nodename fqdn
 	
 	container=Computers
@@ -1175,7 +1178,16 @@ function join_domain {
 
 	dom=$domain
 	realm=$domain
-	upcase_nodename=$hostname
+
+	if [[ ${#hostname} -gt 15 ]]; then
+		string15=$hostname
+		upcase_nodename=$string15
+		locase_nodename=$string15
+	else
+		upcase_nodename=$hostname
+		locase_nodename=$hostname
+	fi
+
 	netbios_nodename="${upcase_nodename}\$"
 	fqdn=$hostname.$domain
 	upn=host/${fqdn}@${realm}
@@ -1313,9 +1325,10 @@ function join_domain {
 		fi
 	fi
 
+	[[ -z $dn ]] && dn="CN=${upcase_nodename},${baseDN}"
 	if $modify_existing; then
 		cat > "$object" <<EOF
-dn: CN=$upcase_nodename,$baseDN
+dn: $dn
 changetype: modify
 replace: userPrincipalName
 userPrincipalName: $upn
@@ -1333,12 +1346,13 @@ EOF
 		printf "$(gettext "A machine account already exists; updating it").\n"
 		ldapadd -h "$dc" $ldap_args -f "$object" > /dev/null 2>&1
 		if [[ $? -ne 0 ]]; then
-			printf "$(gettext "Failed to create the AD object via LDAP").\n" >&2
+			printf "$(gettext "Failed to modify the AD object via LDAP").\n" >&2
 			error_message
 		fi
 	else
+		dn="CN=${upcase_nodename},${baseDN}"
 		cat > "$object" <<EOF
-dn: CN=$upcase_nodename,$baseDN
+dn: $dn
 objectClass: computer
 cn: $upcase_nodename
 sAMAccountName: ${netbios_nodename}
@@ -1446,7 +1460,7 @@ EOF
 	# encryption type attributes.
 	if [[ $level -gt 2 ]]; then
 		cat > "$object" <<EOF
-dn: CN=$upcase_nodename,$baseDN
+dn: $dn
 changetype: modify
 replace: msDS-SupportedEncryptionTypes
 msDS-SupportedEncryptionTypes: $val
@@ -1469,7 +1483,7 @@ EOF
 	# and possibly UseDesOnly (2097152) (see above)
 	#
 	cat > "$object" <<EOF
-dn: CN=$upcase_nodename,$baseDN
+dn: $dn
 changetype: modify
 replace: userAccountControl
 userAccountControl: $userAccountControl
@@ -1491,13 +1505,14 @@ EOF
 	rm $new_keytab > /dev/null 2>&1
 
 	cat > "$object" <<EOF
-dn: CN=$upcase_nodename,$baseDN
+dn: $dn
 changetype: modify
 add: servicePrincipalName
 servicePrincipalName: nfs/${fqdn}
 servicePrincipalName: HTTP/${fqdn}
 servicePrincipalName: root/${fqdn}
 servicePrincipalName: cifs/${fqdn}
+servicePrincipalName: host/${upcase_nodename}
 EOF
 	ldapmodify -h "$dc" $ldap_args -f "$object" >/dev/null 2>&1
 	if [[ $? -ne 0 ]]; then
@@ -1507,10 +1522,10 @@ EOF
 
 	#
 	# In Windows, unlike MIT based implementations we salt the keys with
-	# the UPN, which is based on the host/fqdn@realm elements, not with the
-	# individual SPN strings.
+	# the UPN, which is based on the host/string15@realm elements, not
+	# with the individual SPN strings.
 	#
-	salt=host/${fqdn}@${realm}
+	salt=host/${locase_nodename}.${domain}@${realm}
 
 	printf "%s" $newpw | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" host/${fqdn}@${realm} > /dev/null 2>&1
 	if [[ $? -ne 0 ]]
@@ -1518,16 +1533,6 @@ EOF
 		printf "$(gettext "Failed to set account password").\n" >&2
 		error_message
 	fi
-
-	printf "%s" $newpw | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" HOST/${fqdn}@${realm} > /dev/null 2>&1
-	if [[ $? -ne 0 ]]
-	then
-		printf "$(gettext "Failed to set account password").\n" >&2
-		error_message
-	fi
-
-	# Could be setting ${netbios_nodename}@${realm}, but for now no one
-	# is requesting this.
 
 	printf "%s" $newpw | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" nfs/${fqdn}@${realm} > /dev/null 2>&1
 	if [[ $? -ne 0 ]]
@@ -1557,13 +1562,20 @@ EOF
 		error_message
 	fi
 
+	printf "%s" $newpw | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" ${netbios_nodename}@${realm} > /dev/null 2>&1
+	if [[ $? -ne 0 ]]
+	then
+		printf "$(gettext "Failed to set account password").\n" >&2
+		error_message
+	fi
+
 	doKRB5config
 
 	addDNSRR $dom
 
 	setSMB $dom $dc
 
-	printf -- "\n---------------------------------------------------\n"
+	printf -- "---------------------------------------------------\n"
 	printf "$(gettext "Setup COMPLETE").\n\n"
 
 	kdestroy -q 1>$TMP_FILE 2>&1

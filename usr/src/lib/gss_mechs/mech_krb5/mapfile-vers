@@ -219,6 +219,7 @@ SUNWprivate_1.1 {
 	gss_krb5_copy_ccache;
 	gss_mech_krb5;
 	gss_mech_krb5_old;
+	gss_mech_krb5_wrong;
 	gss_mech_set_krb5;
 	gss_mech_set_krb5_both;
 	gss_mech_set_krb5_old;

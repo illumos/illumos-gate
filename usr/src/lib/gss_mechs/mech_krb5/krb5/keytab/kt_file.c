@@ -1,8 +1,7 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 /*
  * lib/krb5/keytab/kt_file.c
@@ -76,6 +75,10 @@ typedef struct _krb5_ktfile_data {
 
 extern const struct _krb5_kt_ops krb5_ktf_ops;
 extern const struct _krb5_kt_ops krb5_ktf_writable_ops;
+
+extern krb5_boolean KRB5_CALLCONV
+__krb5_principal_compare_case_ins(krb5_context context,
+    krb5_const_principal princ1, krb5_const_principal princ2);
 
 krb5_error_code KRB5_CALLCONV krb5_ktfile_resolve 
 	(krb5_context,
@@ -291,7 +294,20 @@ krb5_ktfile_get_entry(krb5_context context, krb5_keytab id,
 	/* if the principal isn't the one requested, free new_entry
 	   and continue to the next. */
 
-	if (!krb5_principal_compare(context, principal, new_entry.principal)) {
+	/*
+	 * Solaris Kerberos: MS Interop requires that case insensitive
+	 * comparisons of service and host components are performed for key
+	 * table lookup, etc.  Only called if the private environment variable
+	 * MS_INTEROP is defined.
+	 */
+	if (krb5_getenv("MS_INTEROP")) {
+	  if (!__krb5_principal_compare_case_ins(context, principal,
+	    new_entry.principal)) {
+	    	krb5_kt_free_entry(context, &new_entry);
+	    	continue;
+	  }
+	} else if (!krb5_principal_compare(context, principal,
+	  new_entry.principal)) {
 	    krb5_kt_free_entry(context, &new_entry);
 	    continue;
 	}

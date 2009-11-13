@@ -2598,6 +2598,21 @@ get_available_mechs(OM_uint32 *minor_status,
 		    memcmp(mechs->elements[i].elements,
 			spnego_mechanism.mech_type.elements,
 			spnego_mechanism.mech_type.length)) {
+			/*
+			 * Solaris Kerberos: gss_indicate_mechs is stupid as
+			 * it never inferences any of the related OIDs of the
+			 * mechanisms configured, e.g. KRB5_OLD, KRB5_WRONG.
+			 * We add KRB5_WRONG here so that old MS clients can
+			 * negotiate this mechanism, which allows extensions
+			 * in Kerberos (clock skew adjustment, refresh ccache).
+			 */
+			if (is_kerb_mech(&mechs->elements[i])) {
+			    extern gss_OID_desc * const gss_mech_krb5_wrong;
+
+				major_status =
+				  gss_add_oid_set_member(minor_status,
+				  gss_mech_krb5_wrong, rmechs);
+			}
 
 			major_status = gss_add_oid_set_member(minor_status,
 							      &mechs->elements[i],
@@ -3098,10 +3113,18 @@ negotiate_mech_type(OM_uint32 *minor_status,
 	for (i = 0; i < mechset->count; i++) {
 		gss_OID mech_oid = &mechset->elements[i];
 
+		/*
+		 * Solaris Kerberos: MIT compares against MS' wrong OID, but
+		 * we actually want to select it if the client supports, as this
+		 * will enable features on MS clients that allow credential
+		 * refresh on rekeying and caching system times from servers.
+		 */ 
+#if 0
 		/* Accept wrong mechanism OID from MS clients */
 		if (mech_oid->length == gss_mech_krb5_wrong_oid.length &&
 		    memcmp(mech_oid->elements, gss_mech_krb5_wrong_oid.elements, mech_oid->length) == 0)
-			mech_oid = (gss_OID)&gss_mech_krb5_oid;;
+			mech_oid = (gss_OID)&gss_mech_krb5_oid;
+#endif
 
 		gss_test_oid_set_member(minor_status, mech_oid, supported_mechSet, &present);
 		if (!present)

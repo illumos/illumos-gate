@@ -1,8 +1,4 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-/*
  * Copyright 2000, 2004  by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -72,6 +68,11 @@
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+ */
+
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #include "k5-int.h"
@@ -380,6 +381,12 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
 				      &ptr, KG_TOK_CTX_AP_REQ,
 				      input_token->length, 1))) {
        mech_used = gss_mech_krb5;
+   } else if ((code == G_WRONG_MECH) &&
+		!(code = g_verify_token_header(gss_mech_krb5_wrong,
+						(uint32_t *)&(ap_req.length),
+						&ptr, KG_TOK_CTX_AP_REQ,
+						input_token->length, 1))) {
+	mech_used = gss_mech_krb5_wrong;
    } else if ((code == G_WRONG_MECH) &&
 	      !(code = g_verify_token_header(gss_mech_krb5_old,
 					     (uint32_t *)&(ap_req.length),
@@ -1169,16 +1176,17 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
 	*/
        memset(&krb_error_data, 0, sizeof(krb_error_data));
 
-       code -= ERROR_TABLE_BASE_krb5;
-       if (code < 0 || code > 128)
-	   code = 60 /* KRB_ERR_GENERIC */;
+       /*
+        * Solaris Kerberos: We need to remap error conditions for buggy
+        * Windows clients if the MS_INTEROP env var has been set.
+        */
+       if ((code == KRB5KRB_AP_ERR_BAD_INTEGRITY ||
+	  code == KRB5KRB_AP_ERR_NOKEY || code == KRB5KRB_AP_ERR_BADKEYVER)
+	  && krb5_getenv("MS_INTEROP")) {
+           code = KRB5KRB_AP_ERR_MODIFIED;
+	   major_status = GSS_S_CONTINUE_NEEDED;
+       }
 
-       krb_error_data.error = code;
-       (void) krb5_us_timeofday(context, &krb_error_data.stime,
-				&krb_error_data.susec);
-       krb_error_data.server = cred->princ;
-
-       if (code == KRB5KRB_AP_ERR_SKEW) {
 	    /*
 	     * SUNW17PACresync / Solaris Kerberos
 	     * Set e-data to Windows constant.
@@ -1187,6 +1195,7 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
 	     * This facilitates the Windows CIFS client clock skew
 	     * recovery feature.
 	     */
+       if (code == KRB5KRB_AP_ERR_SKEW && krb5_getenv("MS_INTEROP")) {
 	    char *ms_e_data = "\x30\x05\xa1\x03\x02\x01\x02";
 	    int len = strlen(ms_e_data);
 
@@ -1195,7 +1204,17 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
 		    (void) memcpy(krb_error_data.e_data.data, ms_e_data, len);
 		    krb_error_data.e_data.length = len;
 	    }
-       }
+	    major_status = GSS_S_CONTINUE_NEEDED;
+	}
+
+       code -= ERROR_TABLE_BASE_krb5;
+       if (code < 0 || code > 128)
+	   code = 60 /* KRB_ERR_GENERIC */;
+
+       krb_error_data.error = code;
+       (void) krb5_us_timeofday(context, &krb_error_data.stime,
+				&krb_error_data.susec);
+       krb_error_data.server = cred->princ;
 
        code = krb5_mk_error(context, &krb_error_data, &scratch);
        if (code)
