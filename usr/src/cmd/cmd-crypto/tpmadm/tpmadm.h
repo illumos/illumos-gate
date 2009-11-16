@@ -44,8 +44,10 @@ void print_bytes(BYTE *bytes, size_t len, int formatted);
 void print_error(TSS_RESULT ret, char *msg);
 int get_tpm_capability(TSS_HCONTEXT hContext, TSS_HOBJECT hTPM,
     UINT32 cap, UINT32 subcap, void *buf, size_t bufsize);
-int set_object_policy(TSS_HOBJECT handle, TSS_FLAG mode, UINT32 len,
-    BYTE *secret);
+int set_policy_options(TSS_HPOLICY hPolicy, TSS_FLAG mode, char *prompt,
+    UINT32 secret_len, BYTE *secret);
+int set_object_policy(TSS_HOBJECT handle, TSS_FLAG mode, char *prompt,
+    UINT32 secret_len, BYTE *secret);
 int tpm_preamble(TSS_HCONTEXT *hContext, TSS_HOBJECT *hTPM);
 int tpm_postamble(TSS_HCONTEXT hContext);
 

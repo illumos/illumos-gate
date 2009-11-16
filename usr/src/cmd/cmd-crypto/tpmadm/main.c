@@ -33,6 +33,7 @@
 #include <locale.h>
 
 #include <tss/tspi.h>
+#include <trousers/trousers.h>
 #include "tpmadm.h"
 
 extern cmdtable_t commands[];
@@ -124,7 +125,6 @@ void
 print_error(TSS_RESULT ret, char *msg)
 {
 	char *err_string;
-	extern char *Trspi_Error_String();
 
 	/* Print the standard error string and error code. */
 	err_string = Trspi_Error_String(ret);
@@ -132,12 +132,12 @@ print_error(TSS_RESULT ret, char *msg)
 
 	/* For a few special cases, add a more verbose error message. */
 	switch (ret) {
-	    case TPM_E_DEACTIVATED:
-	    case TPM_E_DISABLED:
+	case TPM_E_DEACTIVATED:
+	case TPM_E_DISABLED:
 		(void) fprintf(stderr,
 		    gettext("Enable the TPM and restart Solaris.\n"));
 		break;
-	    case TSP_ERROR(TSS_E_COMM_FAILURE):
+	case TSP_ERROR(TSS_E_COMM_FAILURE):
 		(void) fprintf(stderr,
 		    gettext("Make sure the tcsd service "
 		    "(svc:/application/security/tcsd) is running.\n"));
@@ -178,7 +178,35 @@ UINT32 subcap, void *buf, size_t bufsize)
 }
 
 int
-set_object_policy(TSS_HOBJECT handle, TSS_FLAG mode, UINT32 len, BYTE *secret)
+set_policy_options(TSS_HPOLICY hPolicy, TSS_FLAG mode, char *prompt,
+UINT32 secret_len, BYTE *secret)
+{
+	TSS_RESULT ret;
+	BYTE *unicode_prompt;
+	UINT32 len;
+
+	ret = Tspi_Policy_SetSecret(hPolicy, mode, secret_len, secret);
+	if (ret) {
+		print_error(ret, gettext("Set policy secret"));
+		return (ERR_FAIL);
+	}
+	if (prompt != NULL) {
+		unicode_prompt = Trspi_Native_To_UNICODE((BYTE *)prompt, &len);
+		ret = Tspi_SetAttribData(hPolicy,
+		    TSS_TSPATTRIB_POLICY_POPUPSTRING,
+		    NULL, len, unicode_prompt);
+		if (ret) {
+			print_error(ret, gettext("Set policy prompt"));
+			return (ERR_FAIL);
+		}
+	}
+
+	return (0);
+}
+
+int
+set_object_policy(TSS_HOBJECT handle, TSS_FLAG mode, char *prompt,
+UINT32 secret_len, BYTE *secret)
 {
 	TSS_HPOLICY hPolicy;
 	TSS_RESULT ret;
@@ -189,13 +217,7 @@ set_object_policy(TSS_HOBJECT handle, TSS_FLAG mode, UINT32 len, BYTE *secret)
 		return (ERR_FAIL);
 	}
 
-	ret = Tspi_Policy_SetSecret(hPolicy, mode, len, secret);
-	if (ret) {
-		print_error(ret, gettext("Set policy secret"));
-		return (ERR_FAIL);
-	}
-
-	return (0);
+	return (set_policy_options(hPolicy, mode, prompt, secret_len, secret));
 }
 
 int

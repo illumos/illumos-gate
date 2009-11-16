@@ -190,7 +190,7 @@ print_tpm_pcrs(TSS_HCONTEXT hContext, TSS_HOBJECT hTPM)
 int
 cmd_status(TSS_HCONTEXT hContext, TSS_HTPM hTPM, int argc, char *argv[])
 {
-	if (set_object_policy(hTPM, TSS_SECRET_MODE_POPUP, 0, NULL))
+	if (set_object_policy(hTPM, TSS_SECRET_MODE_POPUP, NULL, 0, NULL))
 		return (ERR_FAIL);
 
 	(void) print_tpm_version(hContext, hTPM);
@@ -429,7 +429,7 @@ cmd_keyinfo(TSS_HCONTEXT hContext, TSS_HTPM hTPM, int argc, char *argv[])
 	} uuid;
 
 	switch (argc) {
-		case 1:
+	case 1:
 		/* Print key hierarchy */
 		ret = Tspi_Context_GetRegisteredKeysByUUID2(hContext,
 		    TSS_PS_TYPE_USER, NULL, &num_keys, &keys);
@@ -456,7 +456,7 @@ cmd_keyinfo(TSS_HCONTEXT hContext, TSS_HTPM hTPM, int argc, char *argv[])
 		}
 		return (0);
 
-		case 2:
+	case 2:
 		/* Print detailed info about a single key */
 		if (uuid_parse(argv[1], uuid.arr_uuid))
 			return (ERR_FAIL);
@@ -473,7 +473,7 @@ cmd_keyinfo(TSS_HCONTEXT hContext, TSS_HTPM hTPM, int argc, char *argv[])
 		print_key_info(hContext, hKey);
 		return (0);
 
-		default:
+	default:
 		(void) fprintf(stderr, gettext("Usage:\n"));
 		(void) fprintf(stderr, "\tkeyinfo [uuid]\n");
 		return (ERR_USAGE);
@@ -520,7 +520,8 @@ clearowner(TSS_HTPM hTPM)
 {
 	TSS_RESULT ret;
 
-	if (set_object_policy(hTPM, TSS_SECRET_MODE_POPUP, 0, NULL))
+	if (set_object_policy(hTPM, TSS_SECRET_MODE_POPUP,
+	    gettext("= TPM owner passphrase ="), 0, NULL))
 		return (ERR_FAIL);
 
 	ret = Tspi_TPM_ClearOwner(hTPM, FALSE);
@@ -536,7 +537,8 @@ resetlock(TSS_HTPM hTPM)
 {
 	TSS_RESULT ret;
 
-	if (set_object_policy(hTPM, TSS_SECRET_MODE_POPUP, 0, NULL))
+	if (set_object_policy(hTPM, TSS_SECRET_MODE_POPUP,
+	    gettext("= TPM owner passphrase ="), 0, NULL))
 		return (ERR_FAIL);
 
 	ret = Tspi_TPM_SetStatus(hTPM, TSS_TPMSTATUS_RESETLOCK, TRUE);
@@ -644,7 +646,8 @@ cmd_init(TSS_HCONTEXT hContext, TSS_HTPM hTPM, int argc, char *argv[])
 	TSS_RESULT ret;
 	TSS_HOBJECT hKeySRK;
 
-	if (set_object_policy(hTPM, TSS_SECRET_MODE_POPUP, 0, NULL))
+	if (set_object_policy(hTPM, TSS_SECRET_MODE_POPUP,
+	    gettext("= TPM owner passphrase ="), 0, NULL))
 		return (ERR_FAIL);
 
 	ret = Tspi_Context_CreateObject(hContext, TSS_OBJECT_TYPE_RSAKEY,
@@ -654,7 +657,7 @@ cmd_init(TSS_HCONTEXT hContext, TSS_HTPM hTPM, int argc, char *argv[])
 		return (ERR_FAIL);
 	}
 
-	if (set_object_policy(hKeySRK, TSS_SECRET_MODE_SHA1,
+	if (set_object_policy(hKeySRK, TSS_SECRET_MODE_SHA1, NULL,
 	    sizeof (well_known), well_known))
 		return (ERR_FAIL);
 
@@ -683,27 +686,26 @@ cmd_auth(TSS_HCONTEXT hContext, TSS_HTPM hTPM, int argc, char *argv[])
 	TSS_RESULT ret;
 	TSS_HPOLICY hNewPolicy;
 
-	if (set_object_policy(hTPM, TSS_SECRET_MODE_POPUP, 0, NULL))
+	if (set_object_policy(hTPM, TSS_SECRET_MODE_POPUP,
+	    gettext("= TPM owner passphrase ="), 0, NULL))
 		return (ERR_FAIL);
 
-	/* new policy object */
+	/* policy object for new passphrase */
 	ret = Tspi_Context_CreateObject(hContext, TSS_OBJECT_TYPE_POLICY,
 	    TSS_POLICY_USAGE, &hNewPolicy);
 	if (ret) {
 		print_error(ret, gettext("Create policy object"));
 		return (ERR_FAIL);
 	}
-	ret = Tspi_Policy_SetSecret(hNewPolicy, TSS_SECRET_MODE_POPUP,
-	    0, NULL);
-	if (ret) {
-		print_error(ret, gettext("Set policy object secret"));
+	if (set_policy_options(hNewPolicy, TSS_SECRET_MODE_POPUP,
+	    gettext("= New TPM owner passphrase ="), 0, NULL))
 		return (ERR_FAIL);
-	}
 
 	ret = Tspi_ChangeAuth(hTPM, NULL, hNewPolicy);
-	if (ret) {
+	if (ret && ret != TSP_ERROR(TSS_E_POLICY_NO_SECRET)) {
 		print_error(ret, gettext("Change authorization"));
 		return (ERR_FAIL);
 	}
+
 	return (0);
 }
