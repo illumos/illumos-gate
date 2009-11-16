@@ -84,11 +84,15 @@ extern "C" {
 /*
  * damap_t:		Handle to a delta address map
  * damap_id_t:  	Handle to an entry of damap_t
- * damap_id_list_t:	List of damap_id_handles
  */
 typedef struct __damap_dm *damap_t;
-typedef struct __damap_id_list *damap_id_list_t;
 typedef id_t damap_id_t;
+
+/*
+ * damap_id_list_t:	List of damap_id_handles
+ * NB. Not Used
+ */
+typedef struct __damap_id_list *damap_id_list_t;
 
 #define	NODAM (damap_id_t)0
 
@@ -102,17 +106,23 @@ typedef id_t damap_id_t;
 typedef void (*damap_activate_cb_t)(void *, char *, int, void **);
 typedef void (*damap_deactivate_cb_t)(void *, char *, int, void *);
 
-typedef void (*damap_configure_cb_t)(void *, damap_t *, damap_id_list_t);
-typedef void (*damap_unconfig_cb_t)(void *, damap_t *, damap_id_list_t);
+typedef int (*damap_configure_cb_t)(void *, damap_t *, damap_id_t);
+typedef int (*damap_unconfig_cb_t)(void *, damap_t *, damap_id_t);
 
 /*
  * Map reporting mode
  */
 typedef enum {DAMAP_REPORT_PERADDR, DAMAP_REPORT_FULLSET} damap_rptmode_t;
 
-#define	DAMAP_RESET 1		/* flag to damap_addrset_end */
+/*
+ * Map create options flags
+ * DAMAP_SERIALCONFIG - serialize activate/deactivate operations
+ * DAMAP_MTCONFIG - multithread config/unconfg operations
+ */
+#define	DAMAP_SERIALCONFIG	0
+#define	DAMAP_MTCONFIG		1
 
-int	damap_create(char *, size_t, damap_rptmode_t, clock_t,
+int	damap_create(char *, damap_rptmode_t, int, clock_t,
 	    void *, damap_activate_cb_t, damap_deactivate_cb_t,
 	    void *, damap_configure_cb_t, damap_unconfig_cb_t,
 	    damap_t **);
@@ -125,11 +135,17 @@ int	damap_addr_add(damap_t *, char *, damap_id_t *, nvlist_t *, void *);
 int	damap_addr_del(damap_t *, char *);
 int	damap_addrid_del(damap_t *, int);
 
-int	damap_addrset_begin(damap_t *);
-int	damap_addrset_add(damap_t *, char *, damap_id_t *, nvlist_t *, void *);
-int	damap_addrset_end(damap_t *, int);
-int	damap_addrset_reset(damap_t *, int);
+/*
+ * modifiers to damap_addrset_end()
+ */
+#define	DAMAP_END_RESET	1
+#define	DAMAP_END_ABORT	2
 
+int		damap_addrset_begin(damap_t *);
+int		damap_addrset_add(damap_t *, char *, damap_id_t *,
+		    nvlist_t *, void *);
+int		damap_addrset_end(damap_t *, int);
+int		damap_addrset_reset(damap_t *, int);
 damap_id_t	damap_id_next(damap_t *, damap_id_list_t, damap_id_t);
 char		*damap_id2addr(damap_t *, damap_id_t);
 nvlist_t	*damap_id2nvlist(damap_t *, damap_id_t);

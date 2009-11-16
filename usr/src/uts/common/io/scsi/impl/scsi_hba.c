@@ -6578,8 +6578,7 @@ scsi_hba_thread_taddrs(dev_info_t *self, char **taddrs, int mt,
 		h->h_thr_count++;
 		mutex_exit(&h->h_lock);
 
-		mt |= scsi_hba_log_mt_disable;
-		if (mt & SCSI_ENUMERATION_MT_LUN_DISABLE)
+		if (mt & SCSI_ENUMERATION_MT_TARGET_DISABLE)
 			callback((void *)td);
 		else
 			(void) thread_create(NULL, 0, callback, (void *)td,
@@ -6946,8 +6945,7 @@ scsi_hba_enum_lsf_of_t(struct scsi_device *sd0,
 				h->h_thr_count++;
 				mutex_exit(&h->h_lock);
 
-				mt |= scsi_hba_log_mt_disable;
-				if (mt & SCSI_ENUMERATION_MT_TARGET_DISABLE)
+				if (mt & SCSI_ENUMERATION_MT_LUN_DISABLE)
 					scsi_hba_enum_lsf_of_tgt_thr(
 					    (void *)ld);
 				else
@@ -7007,9 +7005,7 @@ scsi_hba_enum_lsf_of_t(struct scsi_device *sd0,
 				mutex_enter(&h->h_lock);
 				h->h_thr_count++;
 				mutex_exit(&h->h_lock);
-
-				mt |= scsi_hba_log_mt_disable;
-				if (mt & SCSI_ENUMERATION_MT_TARGET_DISABLE)
+				if (mt & SCSI_ENUMERATION_MT_LUN_DISABLE)
 					scsi_hba_enum_lsf_of_tgt_thr(
 					    (void *)ld);
 				else
@@ -7056,9 +7052,7 @@ scsi_hba_enum_lsf_of_t(struct scsi_device *sd0,
 			mutex_enter(&h->h_lock);
 			h->h_thr_count++;
 			mutex_exit(&h->h_lock);
-
-			mt |= scsi_hba_log_mt_disable;
-			if (mt & SCSI_ENUMERATION_MT_TARGET_DISABLE)
+			if (mt & SCSI_ENUMERATION_MT_LUN_DISABLE)
 				scsi_hba_enum_lsf_of_tgt_thr((void *)ld);
 			else
 				(void) thread_create(NULL, 0,
@@ -7372,6 +7366,8 @@ scsi_hba_bus_configone(dev_info_t *self, uint_t flags, char *arg,
 			mt = ddi_prop_get_int(DDI_DEV_T_ANY, self,
 			    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 			    "scsi-enumeration", scsi_enumeration);
+			mt |= scsi_hba_log_mt_disable;
+
 			SCSI_HBA_LOG((_LOG(2), self, NULL,
 			    "%s@%s lun enumeration triggered", name, addr));
 			*lcp = '\0';		/* turn ',' into '\0' */
@@ -7507,6 +7503,8 @@ scsi_hba_bus_config_spi(dev_info_t *self, uint_t flags,
 	mt = ddi_prop_get_int(DDI_DEV_T_ANY, self,
 	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 	    "scsi-enumeration", scsi_enumeration);
+	mt |= scsi_hba_log_mt_disable;
+
 	if ((mt & SCSI_ENUMERATION_ENABLE) == 0) {
 		/*
 		 * Static driver.conf file enumeration:
@@ -7576,6 +7574,8 @@ scsi_hba_bus_unconfig_spi(dev_info_t *self, uint_t flags,
 	mt = ddi_prop_get_int(DDI_DEV_T_ANY, self,
 	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 	    "scsi-enumeration", scsi_enumeration);
+	mt |= scsi_hba_log_mt_disable;
+
 	if ((mt & SCSI_ENUMERATION_ENABLE) == 0)
 		return (ndi_busop_bus_unconfig(self, flags, op, arg));
 
@@ -7845,141 +7845,102 @@ scsi_hba_bus_unconfig(dev_info_t *self, uint_t flags,
 	return (ret);
 }
 
-static void
-scsi_tgtmap_scsi_config(void *arg, damap_t *mapp, damap_id_list_t id_list)
+static int
+scsi_tgtmap_scsi_config(void *arg, damap_t *mapp, damap_id_t tgtid)
 {
 	scsi_hba_tran_t		*tran = (scsi_hba_tran_t *)arg;
 	dev_info_t		*self = tran->tran_iport_dip;
 	impl_scsi_tgtmap_t	*tgtmap;
-	int			mt;
-	damap_id_t		tgtid;
-	int			ntargets;
-	char			**tgt_addrv;
-	char			**tgt_addr;
+	char			*tgtaddr;
+	int			cfg_status, mt;
 
 	tgtmap = (impl_scsi_tgtmap_t *)tran->tran_tgtmap;
-	mt = ddi_prop_get_int(DDI_DEV_T_ANY, self,
-	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
-	    "scsi-enumeration", scsi_enumeration);
+	tgtaddr = damap_id2addr(mapp, tgtid);
 
-	/* count the number of targets we need to config */
-	for (ntargets = 0,
-	    tgtid = damap_id_next(mapp, id_list, NODAM);
-	    tgtid != NODAM;
-	    tgtid = damap_id_next(mapp, id_list, tgtid))
-		ntargets++;
-
-	SCSI_HBA_LOG((_LOGTGT, self, NULL, "%s %d target%s",
-	    damap_name(mapp), ntargets, (ntargets == 1) ? "" : "s"));
-	if (ntargets == 0)
-		return;
-
-	/* allocate and form vector of addresses */
-	tgt_addrv = kmem_zalloc(sizeof (char *) * (ntargets + 1), KM_SLEEP);
-	for (tgt_addr = tgt_addrv,
-	    tgtid = damap_id_next(mapp, id_list, NODAM);
-	    tgtid != NODAM;
-	    tgtid = damap_id_next(mapp, id_list, tgtid),
-	    tgt_addr++) {
-		*tgt_addr = damap_id2addr(mapp, tgtid);
-
-		if (scsi_lunmap_create(self, tgtmap, *tgt_addr) != DDI_SUCCESS)
-			SCSI_HBA_LOG((_LOG_NF(WARN),
-			    "failed to create lunmap for %s", *tgt_addr));
-		else
-			SCSI_HBA_LOG((_LOGTGT, self, NULL,
-			    "%s @%s", damap_name(mapp), *tgt_addr));
+	if (scsi_lunmap_create(self, tgtmap, tgtaddr) != DDI_SUCCESS) {
+		SCSI_HBA_LOG((_LOG_NF(WARN),
+		    "failed to create lunmap for %s", tgtaddr));
 	}
 
-	/* null terminate vector */
-	*tgt_addr = NULL;
+	mt = ddi_prop_get_int(DDI_DEV_T_ANY, self,
+	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, "scsi-enumeration",
+	    scsi_enumeration);
+	mt |= scsi_hba_log_mt_disable;
 
-	/* configure vector of addresses (with multi-threading) */
-	scsi_hba_thread_taddrs(self, tgt_addrv, mt, SE_HP,
-	    scsi_hba_taddr_config_thr);
+	cfg_status = scsi_hba_bus_config_taddr(self, tgtaddr, mt, SE_HP);
+	if (cfg_status != NDI_SUCCESS) {
+		SCSI_HBA_LOG((_LOGCFG, self, NULL, "%s @%s config status %d",
+		    damap_name(mapp), tgtaddr, cfg_status));
+		return (DAM_FAILURE);
+	}
 
-	/* free vector */
-	kmem_free(tgt_addrv, sizeof (char *) * (ntargets + 1));
+	return (DAM_SUCCESS);
 }
 
-static void
-scsi_tgtmap_scsi_unconfig(void *arg, damap_t *mapp, damap_id_list_t id_list)
+
+static int
+scsi_tgtmap_scsi_unconfig(void *arg, damap_t *mapp, damap_id_t tgtid)
 {
 	scsi_hba_tran_t		*tran = (scsi_hba_tran_t *)arg;
 	dev_info_t		*self = tran->tran_iport_dip;
 	impl_scsi_tgtmap_t	*tgtmap;
-	damap_id_t		tgtid;
 	char			*tgt_addr;
 
 	tgtmap = (impl_scsi_tgtmap_t *)tran->tran_tgtmap;
+	tgt_addr = damap_id2addr(mapp, tgtid);
 
-	for (tgtid = damap_id_next(mapp, id_list, NODAM);
-	    tgtid != NODAM;
-	    tgtid = damap_id_next(mapp, id_list, tgtid)) {
-		tgt_addr = damap_id2addr(mapp, tgtid);
-
-		SCSI_HBA_LOG((_LOGTGT, self, NULL,
-		    "%s @%s", damap_name(mapp), tgt_addr));
-		scsi_lunmap_destroy(self, tgtmap, tgt_addr);
-	}
+	SCSI_HBA_LOG((_LOGUNCFG, self, NULL, "%s @%s", damap_name(mapp),
+	    tgt_addr));
+	scsi_lunmap_destroy(self, tgtmap, tgt_addr);
+	return (DAM_SUCCESS);
 }
 
-static void
-scsi_tgtmap_smp_config(void *arg, damap_t *mapp, damap_id_list_t id_list)
+static int
+scsi_tgtmap_smp_config(void *arg, damap_t *mapp, damap_id_t tgtid)
 {
 	scsi_hba_tran_t	*tran = (scsi_hba_tran_t *)arg;
 	dev_info_t	*self = tran->tran_iport_dip;
-	damap_id_t	tgtid;
 	char		*addr;
 
-	for (tgtid = damap_id_next(mapp, id_list, NODAM);
-	    tgtid != NODAM;
-	    tgtid = damap_id_next(mapp, id_list, tgtid)) {
-		addr = damap_id2addr(mapp, tgtid);
-		SCSI_HBA_LOG((_LOGTGT, self, NULL,
-		    "%s @%s", damap_name(mapp), addr));
+	addr = damap_id2addr(mapp, tgtid);
+	SCSI_HBA_LOG((_LOGCFG, self, NULL, "%s @%s", damap_name(mapp), addr));
 
-		(void) smp_hba_bus_config_taddr(self, addr);
-	}
+	return ((smp_hba_bus_config_taddr(self, addr) == NDI_SUCCESS) ?
+	    DAM_SUCCESS : DAM_FAILURE);
 }
 
-static void
-scsi_tgtmap_smp_unconfig(void *arg, damap_t *mapp, damap_id_list_t id_list)
+static int
+scsi_tgtmap_smp_unconfig(void *arg, damap_t *mapp, damap_id_t tgtid)
 {
 	scsi_hba_tran_t	*tran = (scsi_hba_tran_t *)arg;
 	dev_info_t	*self = tran->tran_iport_dip;
-	damap_id_t	tgtid;
 	char		*addr;
 	dev_info_t	*child;
 	char		nameaddr[SCSI_MAXNAMELEN];
 	int		circ;
 
-	for (tgtid = damap_id_next(mapp, id_list, NODAM);
-	    tgtid != NODAM;
-	    tgtid = damap_id_next(mapp, id_list, tgtid)) {
-		addr = damap_id2addr(mapp, tgtid);
-		SCSI_HBA_LOG((_LOGTGT, self, NULL,
-		    "%s @%s", damap_name(mapp), addr));
+	addr = damap_id2addr(mapp, tgtid);
+	SCSI_HBA_LOG((_LOGUNCFG, self, NULL, "%s @%s", damap_name(mapp), addr));
 
-		(void) snprintf(nameaddr, sizeof (nameaddr), "smp@%s", addr);
-		scsi_hba_devi_enter(self, &circ);
-		if ((child = ndi_devi_findchild(self, nameaddr)) == NULL) {
-			scsi_hba_devi_exit(self, circ);
-			continue;
-		}
-
-		if (ndi_devi_offline(child,
-		    NDI_DEVFS_CLEAN | NDI_DEVI_REMOVE) == DDI_SUCCESS) {
-			SCSI_HBA_LOG((_LOGUNCFG, self, NULL,
-			    "devinfo smp@%s offlined and removed", addr));
-		} else if (ndi_devi_device_remove(child)) {
-			/* Offline/remove failed, note new device_remove */
-			SCSI_HBA_LOG((_LOGUNCFG, self, NULL,
-			    "devinfo smp@%s offline failed, device_remove",
-			    addr));
-		}
+	(void) snprintf(nameaddr, sizeof (nameaddr), "smp@%s", addr);
+	scsi_hba_devi_enter(self, &circ);
+	if ((child = ndi_devi_findchild(self, nameaddr)) == NULL) {
 		scsi_hba_devi_exit(self, circ);
+		return (DAM_SUCCESS);
 	}
+
+	if (ndi_devi_offline(child,
+	    NDI_DEVFS_CLEAN | NDI_DEVI_REMOVE) == DDI_SUCCESS) {
+		SCSI_HBA_LOG((_LOGUNCFG, self, NULL,
+		    "devinfo smp@%s offlined and removed", addr));
+	} else if (ndi_devi_device_remove(child)) {
+		/* Offline/remove failed, note new device_remove */
+		SCSI_HBA_LOG((_LOGUNCFG, self, NULL,
+		    "devinfo smp@%s offline failed, device_remove",
+		    addr));
+	}
+	scsi_hba_devi_exit(self, circ);
+	return (DAM_SUCCESS);
 }
 
 /* ARGSUSED1 */
@@ -8012,7 +7973,6 @@ scsi_tgtmap_smp_deactivate(void *map_priv, char *tgt_addr, int addrid,
 		SCSI_HBA_LOG((_LOGTGT, self, NULL, "%s @%s deactivated",
 		    damap_name(tgtmap->tgtmap_dam[SCSI_TGT_SMP_DEVICE]),
 		    tgt_addr));
-
 
 		(*tgtmap->tgtmap_deactivate_cb)(tgtmap->tgtmap_mappriv,
 		    tgt_addr, SCSI_TGT_SMP_DEVICE, tgt_privp);
@@ -8059,10 +8019,8 @@ scsi_tgtmap_scsi_deactivate(void *map_priv, char *tgt_addr, int addrid,
 
 int
 scsi_hba_tgtmap_create(dev_info_t *self, scsi_tgtmap_mode_t mode,
-    clock_t settle, int n_entries,
-    void *tgtmap_priv, scsi_tgt_activate_cb_t activate_cb,
-    scsi_tgt_deactivate_cb_t deactivate_cb,
-    scsi_hba_tgtmap_t **handle)
+    clock_t settle, void *tgtmap_priv, scsi_tgt_activate_cb_t activate_cb,
+    scsi_tgt_deactivate_cb_t deactivate_cb, scsi_hba_tgtmap_t **handle)
 {
 	scsi_hba_tran_t		*tran;
 	damap_t			*mapp;
@@ -8070,8 +8028,9 @@ scsi_hba_tgtmap_create(dev_info_t *self, scsi_tgtmap_mode_t mode,
 	impl_scsi_tgtmap_t	*tgtmap;
 	damap_rptmode_t		rpt_style;
 	char			*scsi_binding_set;
+	int			optflags;
 
-	if (self == NULL || settle == 0 || n_entries == 0 || handle == NULL)
+	if (self == NULL || settle == 0 || handle == NULL)
 		return (DDI_FAILURE);
 
 	*handle = NULL;
@@ -8101,10 +8060,15 @@ scsi_hba_tgtmap_create(dev_info_t *self, scsi_tgtmap_mode_t mode,
 	tgtmap->tgtmap_deactivate_cb = deactivate_cb;
 	tgtmap->tgtmap_mappriv = tgtmap_priv;
 
+	optflags = (ddi_prop_get_int(DDI_DEV_T_ANY, self,
+	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, "scsi-enumeration",
+	    scsi_enumeration) & SCSI_ENUMERATION_MT_TARGET_DISABLE) ?
+	    DAMAP_SERIALCONFIG : DAMAP_MTCONFIG;
+
 	(void) snprintf(context, sizeof (context), "%s%d.tgtmap.scsi",
 	    ddi_driver_name(self), ddi_get_instance(self));
 	SCSI_HBA_LOG((_LOGTGT, self, NULL, "%s", context));
-	if (damap_create(context, n_entries, rpt_style, settle,
+	if (damap_create(context, rpt_style, optflags, settle,
 	    tgtmap, scsi_tgtmap_scsi_activate, scsi_tgtmap_scsi_deactivate,
 	    tran, scsi_tgtmap_scsi_config, scsi_tgtmap_scsi_unconfig,
 	    &mapp) != DAM_SUCCESS) {
@@ -8116,8 +8080,9 @@ scsi_hba_tgtmap_create(dev_info_t *self, scsi_tgtmap_mode_t mode,
 	(void) snprintf(context, sizeof (context), "%s%d.tgtmap.smp",
 	    ddi_driver_name(self), ddi_get_instance(self));
 	SCSI_HBA_LOG((_LOGTGT, self, NULL, "%s", context));
-	if (damap_create(context, n_entries, rpt_style, settle,
-	    tgtmap, scsi_tgtmap_smp_activate, scsi_tgtmap_smp_deactivate,
+	if (damap_create(context, rpt_style, optflags,
+	    settle, tgtmap, scsi_tgtmap_smp_activate,
+	    scsi_tgtmap_smp_deactivate,
 	    tran, scsi_tgtmap_smp_config, scsi_tgtmap_smp_unconfig,
 	    &mapp) != DAM_SUCCESS) {
 		damap_destroy(tgtmap->tgtmap_dam[SCSI_TGT_SCSI_DEVICE]);
@@ -8157,7 +8122,6 @@ scsi_hba_tgtmap_destroy(scsi_hba_tgtmap_t *handle)
 		if (tgtmap->tgtmap_dam[i]) {
 			SCSI_HBA_LOG((_LOGTGT, self, NULL,
 			    "%s", damap_name(tgtmap->tgtmap_dam[i])));
-
 			damap_destroy(tgtmap->tgtmap_dam[i]);
 		}
 	}
@@ -8266,7 +8230,6 @@ scsi_hba_tgtmap_set_end(scsi_hba_tgtmap_t *handle, uint_t flags)
 	for (i = 0; i < SCSI_TGT_NTYPES; i++) {
 		if (tgtmap->tgtmap_dam[i] == NULL)
 			continue;
-
 		context = damap_name(tgtmap->tgtmap_dam[i]);
 		if (damap_addrset_end(
 		    tgtmap->tgtmap_dam[i], 0) != DAM_SUCCESS) {
@@ -8797,108 +8760,95 @@ typedef struct impl_scsi_iportmap {
 	damap_t		*iportmap_dam;
 } impl_scsi_iportmap_t;
 
-static void
-scsi_iportmap_config(void *arg, damap_t *mapp, damap_id_list_t id_list)
+static int
+scsi_iportmap_config(void *arg, damap_t *mapp, damap_id_t tgtid)
 {
 	dev_info_t	*self = (dev_info_t *)arg;
 	int		circ;
-	damap_id_t	tgtid;
 	char		nameaddr[SCSI_MAXNAMELEN];
 	char		*iport_addr;
+	dev_info_t	*childp;
 
 	scsi_hba_devi_enter(self, &circ);
 
-	for (tgtid = damap_id_next(mapp, id_list, NODAM);
-	    tgtid != NODAM;
-	    tgtid = damap_id_next(mapp, id_list, tgtid)) {
-		iport_addr = damap_id2addr(mapp, tgtid);
-		SCSI_HBA_LOG((_LOGIPT, self, NULL,
-		    "%s @%s", damap_name(mapp), iport_addr));
+	iport_addr = damap_id2addr(mapp, tgtid);
+	SCSI_HBA_LOG((_LOGIPT, self, NULL,
+	    "%s @%s", damap_name(mapp), iport_addr));
 
-		(void) snprintf(nameaddr, sizeof (nameaddr),
-		    "iport@%s", iport_addr);
-		(void) scsi_hba_bus_config_port(self, nameaddr, SE_HP);
-	}
-
+	(void) snprintf(nameaddr, sizeof (nameaddr), "iport@%s", iport_addr);
+	childp = scsi_hba_bus_config_port(self, nameaddr, SE_HP);
 	scsi_hba_devi_exit(self, circ);
+	return (childp != NULL ? DAM_SUCCESS : DAM_FAILURE);
 }
 
-static void
-scsi_iportmap_unconfig(void *arg, damap_t *mapp, damap_id_list_t id_list)
+static int
+scsi_iportmap_unconfig(void *arg, damap_t *mapp, damap_id_t tgtid)
 {
 	dev_info_t	*self = arg;
-	dev_info_t	*child;		/* iport child of HBA node */
-	int		circ;
-	damap_id_t	tgtid;
+	dev_info_t	*childp;	/* iport child of HBA node */
+	int		circ, empty;
 	char		*addr;
 	char		nameaddr[SCSI_MAXNAMELEN];
 	scsi_hba_tran_t	*tran;
-	int		empty;
 
-	for (tgtid = damap_id_next(mapp, id_list, NODAM);
-	    tgtid != NODAM;
-	    tgtid = damap_id_next(mapp, id_list, tgtid)) {
-		addr = damap_id2addr(mapp, tgtid);
-		SCSI_HBA_LOG((_LOGIPT, self, NULL,
-		    "%s @%s", damap_name(mapp), addr));
+	addr = damap_id2addr(mapp, tgtid);
+	SCSI_HBA_LOG((_LOGIPT, self, NULL, "%s @%s", damap_name(mapp), addr));
 
-		(void) snprintf(nameaddr, sizeof (nameaddr), "iport@%s", addr);
-		scsi_hba_devi_enter(self, &circ);
-		if ((child = ndi_devi_findchild(self, nameaddr)) == NULL) {
-			scsi_hba_devi_exit(self, circ);
-			continue;
-		}
-
-		tran = ddi_get_driver_private(child);
-		ASSERT(tran);
-
-		ndi_hold_devi(child);
+	(void) snprintf(nameaddr, sizeof (nameaddr), "iport@%s", addr);
+	scsi_hba_devi_enter(self, &circ);
+	if ((childp = ndi_devi_findchild(self, nameaddr)) == NULL) {
 		scsi_hba_devi_exit(self, circ);
-
-		/*
-		 * A begin/end (clear) against the iport's
-		 * tgtmap will trigger unconfigure of all
-		 * targets on the iport.
-		 *
-		 * Future: This bit of code only works if the
-		 * target map reporting style is are full
-		 * reports and not per-address. Maybe we
-		 * should plan on handling this by
-		 * auto-unconfiguration when destroying the
-		 * target map(s).
-		 */
-		(void) scsi_hba_tgtmap_set_begin(
-		    tran->tran_tgtmap);
-		(void) scsi_hba_tgtmap_set_end(
-		    tran->tran_tgtmap, 0);
-
-		/* wait for unconfigure */
-		empty = scsi_tgtmap_sync(tran->tran_tgtmap);
-
-		scsi_hba_devi_enter(self, &circ);
-		ndi_rele_devi(child);
-
-		/* If begin/end/sync ends in empty map, offline/remove. */
-		if (empty) {
-			if (ndi_devi_offline(child,
-			    NDI_DEVFS_CLEAN | NDI_DEVI_REMOVE) == DDI_SUCCESS) {
-				SCSI_HBA_LOG((_LOGUNCFG, self, NULL,
-				    "devinfo iport@%s offlined and removed",
-				    addr));
-			} else if (ndi_devi_device_remove(child)) {
-				/* Offline/rem failed, note new device_remove */
-				SCSI_HBA_LOG((_LOGUNCFG, self, NULL,
-				    "devinfo iport@%s offline failed, "
-				    "device_remove", addr));
-			}
-		}
-		scsi_hba_devi_exit(self, circ);
+		return (DAM_FAILURE);
 	}
 
+	tran = ddi_get_driver_private(childp);
+	ASSERT(tran);
+
+	ndi_hold_devi(childp);
+	scsi_hba_devi_exit(self, circ);
+
+	/*
+	 * A begin/end (clear) against the iport's
+	 * tgtmap will trigger unconfigure of all
+	 * targets on the iport.
+	 *
+	 * Future: This bit of code only works if the
+	 * target map reporting style is are full
+	 * reports and not per-address. Maybe we
+	 * should plan on handling this by
+	 * auto-unconfiguration when destroying the
+	 * target map(s).
+	 */
+	(void) scsi_hba_tgtmap_set_begin(tran->tran_tgtmap);
+	(void) scsi_hba_tgtmap_set_end(tran->tran_tgtmap, 0);
+
+	/* wait for unconfigure */
+	empty = scsi_tgtmap_sync(tran->tran_tgtmap);
+
+	scsi_hba_devi_enter(self, &circ);
+	ndi_rele_devi(childp);
+
+	/* If begin/end/sync ends in empty map, offline/remove. */
+	if (empty) {
+		if (ndi_devi_offline(childp,
+		    NDI_DEVFS_CLEAN | NDI_DEVI_REMOVE) == DDI_SUCCESS) {
+			SCSI_HBA_LOG((_LOGUNCFG, self, NULL,
+			    "devinfo iport@%s offlined and removed",
+			    addr));
+		} else if (ndi_devi_device_remove(childp)) {
+			/* Offline/rem failed, note new device_remove */
+			SCSI_HBA_LOG((_LOGUNCFG, self, NULL,
+			    "devinfo iport@%s offline failed, "
+			    "device_remove", addr));
+		}
+	}
+	scsi_hba_devi_exit(self, circ);
+	return (empty ? DAM_SUCCESS : DAM_FAILURE);
 }
 
+
 int
-scsi_hba_iportmap_create(dev_info_t *self, clock_t settle, int n_entries,
+scsi_hba_iportmap_create(dev_info_t *self, clock_t settle,
     scsi_hba_iportmap_t **handle)
 {
 	scsi_hba_tran_t		*tran;
@@ -8906,7 +8856,7 @@ scsi_hba_iportmap_create(dev_info_t *self, clock_t settle, int n_entries,
 	char			context[64];
 	impl_scsi_iportmap_t	*iportmap;
 
-	if (self == NULL || settle == 0 || n_entries == 0 || handle == NULL)
+	if (self == NULL || settle == 0 || handle == NULL)
 		return (DDI_FAILURE);
 
 	*handle = NULL;
@@ -8922,8 +8872,8 @@ scsi_hba_iportmap_create(dev_info_t *self, clock_t settle, int n_entries,
 	(void) snprintf(context, sizeof (context), "%s%d.iportmap",
 	    ddi_driver_name(self), ddi_get_instance(self));
 
-	if (damap_create(context, n_entries, DAMAP_REPORT_PERADDR, settle,
-	    NULL, NULL, NULL, self,
+	if (damap_create(context, DAMAP_REPORT_PERADDR, DAMAP_SERIALCONFIG,
+	    settle, NULL, NULL, NULL, self,
 	    scsi_iportmap_config, scsi_iportmap_unconfig, &mapp) !=
 	    DAM_SUCCESS) {
 		return (DDI_FAILURE);
@@ -9003,45 +8953,38 @@ scsi_hba_iportmap_lookup(scsi_hba_iportmap_t *handle,
 	return (DDI_FAILURE);
 }
 
-static void
-scsi_lunmap_config(void *arg, damap_t *lundam, damap_id_list_t id_list)
+
+static int
+scsi_lunmap_config(void *arg, damap_t *lundam, damap_id_t lunid)
 {
 	impl_scsi_tgtmap_t	*tgtmap = (impl_scsi_tgtmap_t *)arg;
 	scsi_hba_tran_t		*tran = tgtmap->tgtmap_tran;
 	dev_info_t		*self = tran->tran_iport_dip;
-	damap_id_t		lunid;
 	char			*addr;
 
-	/* iterate over the LUNS we need to config */
-	for (lunid = damap_id_next(lundam, id_list, NODAM);
-	    lunid != NODAM;
-	    lunid = damap_id_next(lundam, id_list, lunid)) {
-		addr = damap_id2addr(lundam, lunid);
-		SCSI_HBA_LOG((_LOGLUN, self, NULL,
-		    "%s @%s", damap_name(lundam), addr));
-
-		(void) scsi_hba_bus_configone_addr(self, addr, SE_HP);
-	}
+	addr = damap_id2addr(lundam, lunid);
+	SCSI_HBA_LOG((_LOGLUN, self, NULL,
+	    "%s @%s", damap_name(lundam), addr));
+	if (scsi_hba_bus_configone_addr(self, addr, SE_HP) != NULL)
+		return (DAM_SUCCESS);
+	else
+		return (DAM_FAILURE);
 }
 
-static void
-scsi_lunmap_unconfig(void *arg, damap_t *lundam, damap_id_list_t id_list)
+static int
+scsi_lunmap_unconfig(void *arg, damap_t *lundam, damap_id_t lunid)
 {
 	impl_scsi_tgtmap_t	*tgtmap = (impl_scsi_tgtmap_t *)arg;
 	scsi_hba_tran_t		*tran = tgtmap->tgtmap_tran;
 	dev_info_t		*self = tran->tran_iport_dip;
-	damap_id_t		lunid;
 	char			*addr;
 
-	for (lunid = damap_id_next(lundam, id_list, NODAM);
-	    lunid != NODAM;
-	    lunid = damap_id_next(lundam, id_list, lunid)) {
-		addr = damap_id2addr(lundam, lunid);
-		SCSI_HBA_LOG((_LOGLUN, self, NULL,
-		    "%s @%s", damap_name(lundam), addr));
+	addr = damap_id2addr(lundam, lunid);
+	SCSI_HBA_LOG((_LOGLUN, self, NULL, "%s @%s", damap_name(lundam),
+	    addr));
 
-		scsi_hba_bus_unconfigone_addr(self, addr);
-	}
+	scsi_hba_bus_unconfigone_addr(self, addr);
+	return (DAM_SUCCESS);
 }
 
 static int
@@ -9051,6 +8994,7 @@ scsi_lunmap_create(dev_info_t *self, impl_scsi_tgtmap_t *tgtmap, char *taddr)
 	damap_t			*tgtdam;
 	damap_id_t		tgtid;
 	damap_t			*lundam;
+	int			optflags;
 
 	(void) snprintf(context, sizeof (context), "%s%d.%s.lunmap",
 	    ddi_driver_name(self), ddi_get_instance(self), taddr);
@@ -9071,14 +9015,19 @@ scsi_lunmap_create(dev_info_t *self, impl_scsi_tgtmap_t *tgtmap, char *taddr)
 		return (DDI_FAILURE);
 	}
 
+	optflags = (ddi_prop_get_int(DDI_DEV_T_ANY, self,
+	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, "scsi-enumeration",
+	    scsi_enumeration) & SCSI_ENUMERATION_MT_LUN_DISABLE) ?
+	    DAMAP_SERIALCONFIG : DAMAP_MTCONFIG;
+
 	/* NOTE: expected ref at tgtid/taddr: 2: caller + lookup. */
+	ASSERT(damap_id_ref(tgtdam, tgtid) == 2);
 	SCSI_HBA_LOG((_LOGLUN, self, NULL, "%s creat, id %d ref %d",
 	    context, tgtid, damap_id_ref(tgtdam, tgtid)));
 
 	/* create lundam */
-	if (damap_create(context, LUNMAPSIZE, DAMAP_REPORT_FULLSET, 1,
-	    NULL, NULL, NULL,
-	    tgtmap, scsi_lunmap_config, scsi_lunmap_unconfig,
+	if (damap_create(context, DAMAP_REPORT_FULLSET, optflags, 1,
+	    NULL, NULL, NULL, tgtmap, scsi_lunmap_config, scsi_lunmap_unconfig,
 	    &lundam) != DAM_SUCCESS) {
 		SCSI_HBA_LOG((_LOG(1), self, NULL,
 		    "%s create failed, id %d ref %d",
@@ -9123,6 +9072,7 @@ scsi_lunmap_destroy(dev_info_t *self, impl_scsi_tgtmap_t *tgtmap, char *taddr)
 	}
 
 	/* NOTE: expected ref at tgtid/taddr: 3: priv_set + caller + lookup. */
+	ASSERT(damap_id_ref(tgtdam, tgtid) == 3);
 	SCSI_HBA_LOG((_LOGLUN, self, NULL, "%s, id %d ref %d",
 	    damap_name(lundam), tgtid, damap_id_ref(tgtdam, tgtid)));
 
@@ -9294,13 +9244,11 @@ sas_phymap_bitset2phymaskua(bitset_t *phys, char *buf)
 	}
 }
 
-static void
-sas_phymap_config(void *arg, damap_t *phydam, damap_id_list_t dl)
+static int
+sas_phymap_config(void *arg, damap_t *phydam, damap_id_t phyid)
 {
 	impl_sas_phymap_t	*phymap = (impl_sas_phymap_t *)arg;
 	char			*context = damap_name(phymap->phymap_dam);
-	int			pairs;
-	damap_id_t		phyid;
 	char			*damn;
 	char			*name;
 	bitset_t		*phys;
@@ -9312,119 +9260,103 @@ sas_phymap_config(void *arg, damap_t *phydam, damap_id_list_t dl)
 	mutex_enter(&phymap->phymap_lock);
 	phymap->phymap_reports = phymap->phymap_phys_noisy = 0;
 
-	/* count the number of local,remove pairs we need to config */
-	for (pairs = 0, phyid = damap_id_next(phydam, dl, NODAM);
-	    phyid != NODAM;
-	    phyid = damap_id_next(phydam, dl, phyid))
-		pairs++;
-	SCSI_HBA_LOG((_LOGPHY, phymap->phymap_self, NULL,
-	    "%s: config %d local,remote pairs", context, pairs));
+	/* Get the name ("local,remote" address string) from damap. */
+	damn = damap_id2addr(phydam, phyid);
 
-	for (phyid = damap_id_next(phydam, dl, NODAM);
-	    phyid != NODAM;
-	    phyid = damap_id_next(phydam, dl, phyid)) {
-		/* Get the name ("local,remote" address string) from damap. */
-		damn = damap_id2addr(phydam, phyid);
-
-		/* Get the bitset of phys currently forming the port. */
-		phys = ddi_soft_state_bystr_get(phymap->phymap_name2phys, damn);
-		if (phys == NULL) {
-			SCSI_HBA_LOG((_LOG_NF(WARN),
-			    "%s: %s: no phys", context, damn));
-			continue;
-		}
-
-		/* allocate, get, and initialize name index of name2ua map */
-		if (ddi_soft_state_bystr_zalloc(
-		    phymap->phymap_name2ua, damn) != DDI_SUCCESS) {
-			SCSI_HBA_LOG((_LOG_NF(WARN),
-			    "%s: %s: failed name2ua alloc", context, damn));
-			continue;
-		}
-		ua = ddi_soft_state_bystr_get(phymap->phymap_name2ua, damn);
-		if (ua == NULL) {
-			SCSI_HBA_LOG((_LOG_NF(WARN),
-			    "%s: %s: no name2ua", context, damn));
-			continue;
-		}
-		sas_phymap_bitset2phymaskua(phys, ua);		/* set ua */
-
-		/* see if phymask ua index already allocated in ua2name map */
-		name = ddi_soft_state_bystr_get(phymap->phymap_ua2name, ua);
-		if (name) {
-			/*
-			 * The 'phymask' sas_phymap_bitset2phymaskua ua is
-			 * already in use. This means that original phys have
-			 * formed into a new port, and that the original port
-			 * still exists (it has migrated to some completely
-			 * different set of phys). In this corner-case we use
-			 * "local,remote" name as a 'temporary' unit address.
-			 * Reset ua in name2ua map.
-			 */
-			(void) strlcpy(ua, damn, SAS_PHY_NAME_LEN);
-
-			name = ddi_soft_state_bystr_get(
-			    phymap->phymap_ua2name, ua);
-			if (name) {
-				/* The "local,remote" ua should be new... */
-				SCSI_HBA_LOG((_LOG_NF(WARN),
-				    "%s: %s ua already configured",
-				    context, ua));
-				continue;
-			}
-		}
-
-		/* allocate, get, and init ua index of ua2name map */
-		if (ddi_soft_state_bystr_zalloc(
-		    phymap->phymap_ua2name, ua) != DDI_SUCCESS) {
-			ddi_soft_state_bystr_free(
-			    phymap->phymap_name2ua, damn);
-			SCSI_HBA_LOG((_LOG_NF(WARN),
-			    "%s: %s: failed ua2name alloc",
-			    context, damn));
-			continue;
-		}
-		name = ddi_soft_state_bystr_get(
-		    phymap->phymap_ua2name, ua);
-		if (name == NULL) {
-			ddi_soft_state_bystr_free(
-			    phymap->phymap_name2ua, damn);
-			SCSI_HBA_LOG((_LOG_NF(WARN),
-			    "%s: %s: no ua2name", context, ua));
-			continue;
-		}
-
-		/* set name in ua2name map */
-		(void) strlcpy(name, damn, SAS_PHY_NAME_LEN);
-
-		SCSI_HBA_LOG((_LOGPHY, phymap->phymap_self, NULL,
-		    "%s: %s: ua %s: activate", context, damn, ua));
-		if (phymap->phymap_acp) {
-			mutex_exit(&phymap->phymap_lock);
-			ua_priv = NULL;
-			(phymap->phymap_acp)(phymap->phymap_private,
-			    ua, &ua_priv);
-			mutex_enter(&phymap->phymap_lock);
-
-			damap_id_priv_set(phydam, phyid, ua_priv);
-		}
-		SCSI_HBA_LOG((_LOGPHY, phymap->phymap_self, NULL,
-		    "%s: %s: ua %s: activate complete", context, damn, ua));
+	/* Get the bitset of phys currently forming the port. */
+	phys = ddi_soft_state_bystr_get(phymap->phymap_name2phys, damn);
+	if (phys == NULL) {
+		SCSI_HBA_LOG((_LOG_NF(WARN), "%s: %s: no phys",
+		    context, damn));
+		mutex_exit(&phymap->phymap_lock);
+		return (DAM_FAILURE);
 	}
 
+	/* allocate, get, and initialize name index of name2ua map */
+	if (ddi_soft_state_bystr_zalloc(phymap->phymap_name2ua, damn) !=
+	    DDI_SUCCESS) {
+		SCSI_HBA_LOG((_LOG_NF(WARN),
+		    "%s: %s: failed name2ua alloc", context, damn));
+		mutex_exit(&phymap->phymap_lock);
+		return (DAM_FAILURE);
+	}
+	if (!(ua = ddi_soft_state_bystr_get(phymap->phymap_name2ua, damn))) {
+		SCSI_HBA_LOG((_LOG_NF(WARN),
+		    "%s: %s: no name2ua", context, damn));
+		mutex_exit(&phymap->phymap_lock);
+		return (DAM_FAILURE);
+	}
+	sas_phymap_bitset2phymaskua(phys, ua);		/* set ua */
+
+	/* see if phymask ua index already allocated in ua2name map */
+	if (name = ddi_soft_state_bystr_get(phymap->phymap_ua2name, ua)) {
+		/*
+		 * The 'phymask' sas_phymap_bitset2phymaskua ua is
+		 * already in use. This means that original phys have
+		 * formed into a new port, and that the original port
+		 * still exists (it has migrated to some completely
+		 * different set of phys). In this corner-case we use
+		 * "local,remote" name as a 'temporary' unit address.
+		 * Reset ua in name2ua map.
+		 */
+		(void) strlcpy(ua, damn, SAS_PHY_NAME_LEN);
+		name = ddi_soft_state_bystr_get(phymap->phymap_ua2name, ua);
+		if (name) {
+			/* The "local,remote" ua should be new... */
+			SCSI_HBA_LOG((_LOG_NF(WARN),
+			    "%s: %s ua already configured",
+			    context, ua));
+			mutex_exit(&phymap->phymap_lock);
+			return (DAM_SUCCESS);
+		}
+	}
+
+	/* allocate, get, and init ua index of ua2name map */
+	if (ddi_soft_state_bystr_zalloc(phymap->phymap_ua2name, ua) !=
+	    DDI_SUCCESS) {
+		ddi_soft_state_bystr_free(phymap->phymap_name2ua, damn);
+		SCSI_HBA_LOG((_LOG_NF(WARN), "%s: %s: failed ua2name alloc",
+		    context, damn));
+		mutex_exit(&phymap->phymap_lock);
+		return (DAM_FAILURE);
+	}
+	name = ddi_soft_state_bystr_get(phymap->phymap_ua2name, ua);
+	if (name == NULL) {
+		ddi_soft_state_bystr_free(phymap->phymap_name2ua, damn);
+		SCSI_HBA_LOG((_LOG_NF(WARN),
+		    "%s: %s: no ua2name", context, ua));
+		mutex_exit(&phymap->phymap_lock);
+		return (DAM_FAILURE);
+	}
+
+	/* set name in ua2name map */
+	(void) strlcpy(name, damn, SAS_PHY_NAME_LEN);
+
 	SCSI_HBA_LOG((_LOGPHY, phymap->phymap_self, NULL,
-	    "%s: config complete", context));
+	    "%s: %s: ua %s: activate", context, damn, ua));
+
+	if (phymap->phymap_acp) {
+		/*
+		 * drop our lock and invoke the activation callback
+		 */
+		mutex_exit(&phymap->phymap_lock);
+		ua_priv = NULL;
+		(phymap->phymap_acp)(phymap->phymap_private, ua, &ua_priv);
+		mutex_enter(&phymap->phymap_lock);
+		damap_id_priv_set(phydam, phyid, ua_priv);
+	}
+	SCSI_HBA_LOG((_LOGPHY, phymap->phymap_self, NULL,
+	    "%s: %s: ua %s: activate complete", context, damn, ua));
 	mutex_exit(&phymap->phymap_lock);
+	return (DAM_SUCCESS);
 }
 
 /*ARGSUSED*/
-static void
-sas_phymap_unconfig(void *arg, damap_t *phydam, damap_id_list_t dl)
+static int
+sas_phymap_unconfig(void *arg, damap_t *phydam, damap_id_t phyid)
 {
 	impl_sas_phymap_t	*phymap = (impl_sas_phymap_t *)arg;
 	char			*context = damap_name(phymap->phymap_dam);
-	int			pairs;
-	damap_id_t		phyid;
 	char			*damn;
 	char			*ua;
 	void			*ua_priv;
@@ -9434,47 +9366,32 @@ sas_phymap_unconfig(void *arg, damap_t *phydam, damap_id_list_t dl)
 	mutex_enter(&phymap->phymap_lock);
 	phymap->phymap_reports = phymap->phymap_phys_noisy = 0;
 
-	/* count the number of local,remove pairs we need to unconfig */
-	for (pairs = 0, phyid = damap_id_next(phydam, dl, NODAM);
-	    phyid != NODAM;
-	    phyid = damap_id_next(phydam, dl, phyid))
-		pairs++;
-	SCSI_HBA_LOG((_LOGPHY, phymap->phymap_self, NULL,
-	    "%s: unconfig %d local,remote pairs", context, pairs));
+	/* Get the name ("local,remote" address string) from damap. */
+	damn = damap_id2addr(phydam, phyid);
 
-	for (phyid = damap_id_next(phydam, dl, NODAM);
-	    phyid != NODAM;
-	    phyid = damap_id_next(phydam, dl, phyid)) {
-		/* Get the name ("local,remote" address string) from damap. */
-		damn = damap_id2addr(phydam, phyid);
-
-		ua = ddi_soft_state_bystr_get(phymap->phymap_name2ua, damn);
-		if (ua == NULL) {
-			SCSI_HBA_LOG((_LOG_NF(WARN),
-			    "%s: %s: no name2ua", context, damn));
-			continue;
-		}
-
-		SCSI_HBA_LOG((_LOGPHY, phymap->phymap_self, NULL,
-		    "%s: %s: ua %s: deactivate", context, damn, ua));
-		if (phymap->phymap_dcp) {
-			ua_priv = damap_id_priv_get(phydam, phyid);
-			mutex_exit(&phymap->phymap_lock);
-			(phymap->phymap_dcp)(phymap->phymap_private,
-			    ua, ua_priv);
-			mutex_enter(&phymap->phymap_lock);
-		}
-		SCSI_HBA_LOG((_LOGPHY, phymap->phymap_self, NULL,
-		    "%s: %s: ua %s: deactivate complete", context, damn, ua));
-
-		/* delete ua<->name mappings */
-		ddi_soft_state_bystr_free(phymap->phymap_ua2name, ua);
-		ddi_soft_state_bystr_free(phymap->phymap_name2ua, damn);
+	if (!(ua = ddi_soft_state_bystr_get(phymap->phymap_name2ua, damn))) {
+		SCSI_HBA_LOG((_LOG_NF(WARN),
+		    "%s: %s: no name2ua", context, damn));
+		mutex_exit(&phymap->phymap_lock);
+		return (DAM_FAILURE);
 	}
 
 	SCSI_HBA_LOG((_LOGPHY, phymap->phymap_self, NULL,
-	    "%s: unconfig complete", context));
+	    "%s: %s: ua %s: deactivate", context, damn, ua));
+	if (phymap->phymap_dcp) {
+		ua_priv = damap_id_priv_get(phydam, phyid);
+		mutex_exit(&phymap->phymap_lock);
+		(phymap->phymap_dcp)(phymap->phymap_private, ua, ua_priv);
+		mutex_enter(&phymap->phymap_lock);
+	}
+	SCSI_HBA_LOG((_LOGPHY, phymap->phymap_self, NULL,
+	    "%s: %s: ua %s: deactivate complete", context, damn, ua));
+
+	/* delete ua<->name mappings */
+	ddi_soft_state_bystr_free(phymap->phymap_ua2name, ua);
+	ddi_soft_state_bystr_free(phymap->phymap_name2ua, damn);
 	mutex_exit(&phymap->phymap_lock);
+	return (DAM_SUCCESS);
 }
 
 int
@@ -9506,8 +9423,8 @@ sas_phymap_create(dev_info_t *self, clock_t settle,
 	    ddi_driver_name(self), ddi_get_instance(self));
 	SCSI_HBA_LOG((_LOGPHY, self, NULL, "%s", context));
 
-	if (damap_create(context, SAS_PHY_NPHY, DAMAP_REPORT_PERADDR, settle,
-	    NULL, NULL, NULL,
+	if (damap_create(context, DAMAP_REPORT_PERADDR, DAMAP_SERIALCONFIG,
+	    settle, NULL, NULL, NULL,
 	    phymap, sas_phymap_config, sas_phymap_unconfig,
 	    &phymap->phymap_dam) != DAM_SUCCESS)
 		goto fail;

@@ -49,19 +49,21 @@
 static int damap_debug = 0;
 #endif /* DEBUG */
 
+extern taskq_t *system_taskq;
+
 static void dam_addrset_activate(dam_t *, bitset_t *);
-static void dam_addrset_release(dam_t *, bitset_t *);
-static void dam_activate_taskq(void *);
+static void dam_addrset_deactivate(dam_t *, bitset_t *);
+static void dam_stabilize_map(void *);
 static void dam_addr_stable_cb(void *);
-static void dam_set_stable_cb(void *);
+static void dam_addrset_stable_cb(void *);
 static void dam_sched_tmo(dam_t *, clock_t, void (*tmo_cb)());
-static void dam_add_report(dam_t *, dam_da_t *, id_t, int);
-static void dam_release(dam_t *, id_t);
-static void dam_release_report(dam_t *, id_t);
-static void dam_deactivate_addr(dam_t *, id_t);
+static void dam_addr_report(dam_t *, dam_da_t *, id_t, int);
+static void dam_addr_release(dam_t *, id_t);
+static void dam_addr_report_release(dam_t *, id_t);
+static void dam_addr_deactivate(dam_t *, id_t);
 static id_t dam_get_addrid(dam_t *, char *);
 static int dam_kstat_create(dam_t *);
-static void dam_kstat_destroy(dam_t *);
+static int dam_map_alloc(dam_t *);
 
 #define	DAM_INCR_STAT(mapp, stat)				\
 	if ((mapp)->dam_kstatsp) {				\
@@ -75,12 +77,28 @@ static void dam_kstat_destroy(dam_t *);
 		stp->stat.value.ui32 = (val);			\
 	}
 
+
+/*
+ * increase damap size by 64 entries at a time
+ */
+#define	DAM_SIZE_BUMP	64
+
+/*
+ * config/unconfig taskq data
+ */
+typedef struct {
+	dam_t *tqd_mapp;
+	id_t tqd_id;
+} cfg_tqd_t;
+
+extern pri_t maxclsyspri;
+
 /*
  * Create new device address map
  *
- * ident:		map name (kstat)
+ * name:		map name (kstat unique)
  * size:		max # of map entries
- * rptmode:		type or mode of reporting
+ * mode:		style of address reports: per-address or fullset
  * stable_usec:		# of quiescent microseconds before report/map is stable
  *
  * activate_arg:	address provider activation-callout private
@@ -98,71 +116,89 @@ static void dam_kstat_destroy(dam_t *);
  *		DAM_FAILURE	General failure
  */
 int
-damap_create(char *ident, size_t size, damap_rptmode_t rptmode,
-    clock_t stable_usec,
-    void *activate_arg, damap_activate_cb_t activate_cb,
+damap_create(char *name, damap_rptmode_t mode, int map_opts,
+    clock_t stable_usec, void *activate_arg, damap_activate_cb_t activate_cb,
     damap_deactivate_cb_t deactivate_cb,
     void *config_arg, damap_configure_cb_t configure_cb,
     damap_unconfig_cb_t unconfig_cb,
     damap_t **damapp)
 {
 	dam_t *mapp;
-	void *softstate_p;
 
-	DTRACE_PROBE1(damap__create__entry, char *, ident);
-	if ((configure_cb == NULL) || (unconfig_cb == NULL))
+	if (configure_cb == NULL || unconfig_cb == NULL || name == NULL)
 		return (DAM_EINVAL);
 
-	if (ddi_soft_state_init(&softstate_p, sizeof (dam_da_t), size) !=
-	    DDI_SUCCESS)
-		return (DAM_FAILURE);
+	DTRACE_PROBE3(damap__create, char *, name,
+	    damap_rptmode_t, mode, clock_t, stable_usec);
 
 	mapp = kmem_zalloc(sizeof (*mapp), KM_SLEEP);
-	if (ddi_strid_init(&mapp->dam_addr_hash, size) != DDI_SUCCESS) {
-		ddi_soft_state_fini(&softstate_p);
-		kmem_free(mapp, sizeof (*mapp));
-		return (DAM_FAILURE);
-	}
-
-	mapp->dam_da = softstate_p;
+	mapp->dam_options = map_opts;
 	mapp->dam_stabletmo = drv_usectohz(stable_usec);
-	mapp->dam_size = size;
-	mapp->dam_high = 1;
-	mapp->dam_rptmode = rptmode;
-
+	mapp->dam_size = 0;
+	mapp->dam_rptmode = mode;
 	mapp->dam_activate_arg = activate_arg;
 	mapp->dam_activate_cb = (activate_cb_t)activate_cb;
 	mapp->dam_deactivate_cb = (deactivate_cb_t)deactivate_cb;
-
 	mapp->dam_config_arg = config_arg;
 	mapp->dam_configure_cb = (configure_cb_t)configure_cb;
 	mapp->dam_unconfig_cb = (unconfig_cb_t)unconfig_cb;
-
-	if (ident)
-		mapp->dam_name = i_ddi_strdup(ident, KM_SLEEP);
-
-	bitset_init(&mapp->dam_active_set);
-	bitset_resize(&mapp->dam_active_set, size);
-	bitset_init(&mapp->dam_stable_set);
-	bitset_resize(&mapp->dam_stable_set, size);
-	bitset_init(&mapp->dam_report_set);
-	bitset_resize(&mapp->dam_report_set, size);
+	mapp->dam_name = i_ddi_strdup(name, KM_SLEEP);
 	mutex_init(&mapp->dam_lock, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&mapp->dam_cv, NULL, CV_DRIVER, NULL);
-	mapp->dam_taskqp = ddi_taskq_create(NULL, ident, 1, TASKQ_DEFAULTPRI,
-	    0);
+	bitset_init(&mapp->dam_active_set);
+	bitset_init(&mapp->dam_stable_set);
+	bitset_init(&mapp->dam_report_set);
 	*damapp = (damap_t *)mapp;
-	if (dam_kstat_create(mapp) != DDI_SUCCESS) {
-		damap_destroy((damap_t *)mapp);
-		return (DAM_FAILURE);
-	}
-
-	DTRACE_PROBE1(damap__create__exit, dam_t *, mapp);
 	return (DAM_SUCCESS);
 }
 
 /*
- * Destroy device address map
+ * Allocate backing resources
+ *
+ * DAMs are lightly backed on create - major allocations occur
+ * at the time a report is made to the map, and are extended on
+ * a demand basis.
+ */
+static int
+dam_map_alloc(dam_t *mapp)
+{
+	void *softstate_p;
+
+	ASSERT(mutex_owned(&mapp->dam_lock));
+	if (mapp->dam_flags & DAM_DESTROYPEND)
+		return (DAM_FAILURE);
+
+	/*
+	 * dam_high > 0 signals map allocation complete
+	 */
+	if (mapp->dam_high)
+		return (DAM_SUCCESS);
+
+	mapp->dam_size = DAM_SIZE_BUMP;
+	if (ddi_soft_state_init(&softstate_p, sizeof (dam_da_t),
+	    mapp->dam_size) != DDI_SUCCESS)
+		return (DAM_FAILURE);
+
+	if (ddi_strid_init(&mapp->dam_addr_hash, mapp->dam_size) !=
+	    DDI_SUCCESS) {
+		ddi_soft_state_fini(softstate_p);
+		return (DAM_FAILURE);
+	}
+	if (dam_kstat_create(mapp) != DDI_SUCCESS) {
+		ddi_soft_state_fini(softstate_p);
+		ddi_strid_fini(&mapp->dam_addr_hash);
+		return (DAM_FAILURE);
+	}
+	mapp->dam_da = softstate_p;
+	mapp->dam_high = 1;
+	bitset_resize(&mapp->dam_active_set, mapp->dam_size);
+	bitset_resize(&mapp->dam_stable_set, mapp->dam_size);
+	bitset_resize(&mapp->dam_report_set, mapp->dam_size);
+	return (DAM_SUCCESS);
+}
+
+/*
+ * Destroy address map
  *
  * damapp:	address map
  *
@@ -178,41 +214,56 @@ damap_destroy(damap_t *damapp)
 
 	ASSERT(mapp);
 
-	DTRACE_PROBE2(damap__destroy__entry, dam_t *, mapp, char *,
-	    mapp->dam_name);
+	DTRACE_PROBE1(damap__destroy, char *, mapp->dam_name);
 
-	DAM_FLAG_SET(mapp, DAM_DESTROYPEND);
-	(void) damap_sync(damapp);
+	mutex_enter(&mapp->dam_lock);
 
 	/*
-	 * cancel pending timeouts and kill off the taskq
+	 * prevent new reports from being added to the map
 	 */
-	dam_sched_tmo(mapp, 0, NULL);
-	ddi_taskq_wait(mapp->dam_taskqp);
-	ddi_taskq_destroy(mapp->dam_taskqp);
+	mapp->dam_flags |= DAM_DESTROYPEND;
 
-	for (i = 1; i < mapp->dam_high; i++) {
-		if (ddi_get_soft_state(mapp->dam_da, i) == NULL)
-			continue;
-		if (DAM_IN_REPORT(mapp, i))
-			dam_release_report(mapp, i);
-		if (DAM_IS_STABLE(mapp, i))
-			dam_deactivate_addr(mapp, i);
-		ddi_strid_free(mapp->dam_addr_hash, i);
-		ddi_soft_state_free(mapp->dam_da, i);
+	if (mapp->dam_high) {
+		mutex_exit(&mapp->dam_lock);
+		/*
+		 * wait for outstanding reports to stabilize and cancel
+		 * the timer for this map
+		 */
+		(void) damap_sync(damapp);
+		mutex_enter(&mapp->dam_lock);
+		dam_sched_tmo(mapp, 0, NULL);
+
+		/*
+		 * map is at full stop
+		 * release the contents of the map, invoking the
+		 * detactivation protocol as addresses are released
+		 */
+		mutex_exit(&mapp->dam_lock);
+		for (i = 1; i < mapp->dam_high; i++) {
+			if (ddi_get_soft_state(mapp->dam_da, i) == NULL)
+				continue;
+
+			ASSERT(DAM_IN_REPORT(mapp, i) == 0);
+
+			if (DAM_IS_STABLE(mapp, i)) {
+				dam_addr_deactivate(mapp, i);
+			} else {
+				ddi_strid_free(mapp->dam_addr_hash, i);
+				ddi_soft_state_free(mapp->dam_da, i);
+			}
+		}
+		ddi_strid_fini(&mapp->dam_addr_hash);
+		ddi_soft_state_fini(&mapp->dam_da);
+		kstat_delete(mapp->dam_kstatsp);
 	}
-	ddi_strid_fini(&mapp->dam_addr_hash);
-	ddi_soft_state_fini(&mapp->dam_da);
 	bitset_fini(&mapp->dam_active_set);
 	bitset_fini(&mapp->dam_stable_set);
 	bitset_fini(&mapp->dam_report_set);
-	dam_kstat_destroy(mapp);
 	mutex_destroy(&mapp->dam_lock);
 	cv_destroy(&mapp->dam_cv);
 	if (mapp->dam_name)
 		kmem_free(mapp->dam_name, strlen(mapp->dam_name) + 1);
 	kmem_free(mapp, sizeof (*mapp));
-	DTRACE_PROBE(damap__destroy__exit);
 }
 
 /*
@@ -223,26 +274,35 @@ damap_destroy(damap_t *damapp)
 int
 damap_sync(damap_t *damapp)
 {
-
-#define	WAITFOR_FLAGS (DAM_SETADD | DAM_SPEND | MAP_LOCK)
+#define	WAITFOR_FLAGS (DAM_SETADD | DAM_SPEND)
 
 	dam_t *mapp = (dam_t *)damapp;
 	int   none_active;
 
 	ASSERT(mapp);
 
-	DTRACE_PROBE1(damap__sync__entry, dam_t *, mapp);
+	DTRACE_PROBE2(damap__map__sync__start, char *, mapp->dam_name,
+	    dam_t *, mapp);
 
+	/*
+	 * block where waiting for
+	 * a) stabilization pending or a fullset update pending
+	 * b) any scheduled timeouts to fire
+	 * c) the report set to finalize (bitset is null)
+	 */
 	mutex_enter(&mapp->dam_lock);
 	while ((mapp->dam_flags & WAITFOR_FLAGS) ||
 	    (!bitset_is_null(&mapp->dam_report_set)) || (mapp->dam_tid != 0)) {
+		DTRACE_PROBE2(damap__map__sync__waiting, char *, mapp->dam_name,
+		    dam_t *, mapp);
 		cv_wait(&mapp->dam_cv, &mapp->dam_lock);
 	}
 
 	none_active = bitset_is_null(&mapp->dam_active_set);
 
 	mutex_exit(&mapp->dam_lock);
-	DTRACE_PROBE2(damap__sync__exit, dam_t *, mapp, int, none_active);
+	DTRACE_PROBE3(damap__map__sync__end, char *, mapp->dam_name, int,
+	    none_active, dam_t *, mapp);
 
 	return (none_active);
 }
@@ -267,7 +327,7 @@ damap_name(damap_t *damapp)
  *
  * damapp:	address map handle
  * address:	address in ascii string representation
- * rindx:	index if address stabilizes
+ * addridp:	address ID
  * nvl:		optional nvlist of configuration-private data
  * addr_priv:	optional provider-private (passed to activate/deactivate cb)
  *
@@ -276,22 +336,23 @@ damap_name(damap_t *damapp)
  *		DAM_MAPFULL	address map exhausted
  */
 int
-damap_addr_add(damap_t *damapp, char *address, damap_id_t *ridx, nvlist_t *nvl,
-    void *addr_priv)
+damap_addr_add(damap_t *damapp, char *address, damap_id_t *addridp,
+    nvlist_t *nvl, void *addr_priv)
 {
 	dam_t *mapp = (dam_t *)damapp;
 	id_t addrid;
 	dam_da_t *passp;
 
-	DTRACE_PROBE2(damap__addr__add__entry, dam_t *, mapp,
-	    char *, address);
-	if (!mapp || !address || (mapp->dam_rptmode != DAMAP_REPORT_PERADDR) ||
-	    (mapp->dam_flags & DAM_DESTROYPEND))
+	if (!mapp || !address || (mapp->dam_rptmode != DAMAP_REPORT_PERADDR))
 		return (DAM_EINVAL);
 
-	DAM_LOCK(mapp, ADDR_LOCK);
-	if ((addrid = dam_get_addrid(mapp, address)) == 0) {
-		DAM_UNLOCK(mapp, ADDR_LOCK);
+	DTRACE_PROBE3(damap__addr__add, char *, mapp->dam_name,
+	    char *, address, dam_t *, mapp);
+
+	mutex_enter(&mapp->dam_lock);
+	if ((dam_map_alloc(mapp) != DAM_SUCCESS) ||
+	    ((addrid = dam_get_addrid(mapp, address)) == 0)) {
+		mutex_exit(&mapp->dam_lock);
 		return (DAM_MAPFULL);
 	}
 
@@ -303,20 +364,20 @@ damap_addr_add(damap_t *damapp, char *address, damap_id_t *ridx, nvlist_t *nvl,
 	 * the existing report
 	 */
 	if (DAM_IN_REPORT(mapp, addrid)) {
-		DAM_INCR_STAT(mapp, dam_rereport);
-		dam_release_report(mapp, addrid);
+		DTRACE_PROBE3(damap__addr__add__jitter, char *, mapp->dam_name,
+		    char *, address, dam_t *, mapp);
+		DAM_INCR_STAT(mapp, dam_jitter);
+		dam_addr_report_release(mapp, addrid);
 		passp->da_jitter++;
 	}
 	passp->da_ppriv_rpt = addr_priv;
 	if (nvl)
 		(void) nvlist_dup(nvl, &passp->da_nvl_rpt, KM_SLEEP);
 
-	dam_add_report(mapp, passp, addrid, RPT_ADDR_ADD);
-	if (ridx != NULL)
-		*ridx = (damap_id_t)addrid;
-	DAM_UNLOCK(mapp, ADDR_LOCK);
-	DTRACE_PROBE3(damap__addr__add__exit, dam_t *, mapp, char *,
-	    address, int, addrid);
+	dam_addr_report(mapp, passp, addrid, RPT_ADDR_ADD);
+	if (addridp != NULL)
+		*addridp = (damap_id_t)addrid;
+	mutex_exit(&mapp->dam_lock);
 	return (DAM_SUCCESS);
 }
 
@@ -337,28 +398,36 @@ damap_addr_del(damap_t *damapp, char *address)
 	id_t addrid;
 	dam_da_t *passp;
 
-	DTRACE_PROBE2(damap__addr__del__entry, dam_t *, mapp,
-	    char *, address);
-	if (!mapp || !address || (mapp->dam_rptmode != DAMAP_REPORT_PERADDR) ||
-	    (mapp->dam_flags & DAM_DESTROYPEND))
+	if (!mapp || !address || (mapp->dam_rptmode != DAMAP_REPORT_PERADDR))
 		return (DAM_EINVAL);
 
-	DAM_LOCK(mapp, ADDR_LOCK);
+	DTRACE_PROBE3(damap__addr__del, char *, mapp->dam_name,
+	    char *, address, dam_t *, mapp);
+	mutex_enter(&mapp->dam_lock);
+	if (dam_map_alloc(mapp) != DAM_SUCCESS) {
+		mutex_exit(&mapp->dam_lock);
+		return (DAM_MAPFULL);
+	}
+
+	/*
+	 * if reporting the removal of an address which is not in the map
+	 * return success
+	 */
 	if (!(addrid = ddi_strid_str2id(mapp->dam_addr_hash, address))) {
-		DAM_UNLOCK(mapp, ADDR_LOCK);
+		mutex_exit(&mapp->dam_lock);
 		return (DAM_SUCCESS);
 	}
 	passp = ddi_get_soft_state(mapp->dam_da, addrid);
 	ASSERT(passp);
 	if (DAM_IN_REPORT(mapp, addrid)) {
-		DAM_INCR_STAT(mapp, dam_rereport);
-		dam_release_report(mapp, addrid);
+		DTRACE_PROBE3(damap__addr__del__jitter, char *, mapp->dam_name,
+		    char *, address, dam_t *, mapp);
+		DAM_INCR_STAT(mapp, dam_jitter);
+		dam_addr_report_release(mapp, addrid);
 		passp->da_jitter++;
 	}
-	dam_add_report(mapp, passp, addrid, RPT_ADDR_DEL);
-	DAM_UNLOCK(mapp, ADDR_LOCK);
-	DTRACE_PROBE3(damap__addr__del__exit, dam_t *, mapp,
-	    char *, address, int, addrid);
+	dam_addr_report(mapp, passp, addrid, RPT_ADDR_DEL);
+	mutex_exit(&mapp->dam_lock);
 	return (DAM_SUCCESS);
 }
 
@@ -376,35 +445,36 @@ damap_addrset_begin(damap_t *damapp)
 	dam_t *mapp = (dam_t *)damapp;
 	int i;
 
-	DTRACE_PROBE1(damap__addrset__begin__entry, dam_t *, mapp);
-
-	if ((mapp->dam_rptmode != DAMAP_REPORT_FULLSET) ||
-	    (mapp->dam_flags & DAM_DESTROYPEND))
+	if (!mapp || (mapp->dam_rptmode != DAMAP_REPORT_FULLSET))
 		return (DAM_EINVAL);
 
-	DAM_LOCK(mapp, MAP_LOCK);
-	/*
-	 * reset any pending reports
-	 */
+	DTRACE_PROBE2(damap__addrset__begin, char *, mapp->dam_name, dam_t *,
+	    mapp);
+	mutex_enter(&mapp->dam_lock);
+	if (dam_map_alloc(mapp) != DAM_SUCCESS) {
+		mutex_exit(&mapp->dam_lock);
+		return (DAM_MAPFULL);
+	}
 	if (mapp->dam_flags & DAM_SETADD) {
+		DTRACE_PROBE2(damap__addrset__begin__reset, char *,
+		    mapp->dam_name, dam_t *, mapp);
 		/*
 		 * cancel stabilization timeout
 		 */
 		dam_sched_tmo(mapp, 0, NULL);
-		DAM_INCR_STAT(mapp, dam_rereport);
-		DAM_UNLOCK(mapp, MAP_LOCK);
-		DAM_LOCK(mapp, ADDR_LOCK);
+		DAM_INCR_STAT(mapp, dam_jitter);
+
+		/*
+		 * clear pending reports
+		 */
 		for (i = 1; i < mapp->dam_high; i++) {
 			if (DAM_IN_REPORT(mapp, i))
-				dam_release_report(mapp, i);
+				dam_addr_report_release(mapp, i);
 		}
-		DAM_UNLOCK(mapp, ADDR_LOCK);
-		DAM_LOCK(mapp, MAP_LOCK);
 	}
-	DAM_FLAG_SET(mapp, DAM_SETADD);
 	bitset_zero(&mapp->dam_report_set);
-	DAM_UNLOCK(mapp, MAP_LOCK);
-	DTRACE_PROBE(damap__addrset__begin__exit);
+	mapp->dam_flags |= DAM_SETADD;
+	mutex_exit(&mapp->dam_lock);
 	return (DAM_SUCCESS);
 }
 
@@ -430,39 +500,38 @@ damap_addrset_add(damap_t *damapp, char *address, damap_id_t *ridx,
 	id_t addrid;
 	dam_da_t *passp;
 
-	DTRACE_PROBE2(damap__addrset__add__entry, dam_t *, mapp,
-	    char *, address);
-
-	if (!mapp || !address || (mapp->dam_rptmode != DAMAP_REPORT_FULLSET) ||
-	    (mapp->dam_flags & DAM_DESTROYPEND))
+	if (!mapp || !address || (mapp->dam_rptmode != DAMAP_REPORT_FULLSET))
 		return (DAM_EINVAL);
 
-	if (!(mapp->dam_flags & DAM_SETADD))
-		return (DAM_FAILURE);
+	DTRACE_PROBE3(damap__addrset__add, char *, mapp->dam_name,
+	    char *, address, dam_t *, mapp);
 
-	DAM_LOCK(mapp, ADDR_LOCK);
+	mutex_enter(&mapp->dam_lock);
+	if (!(mapp->dam_flags & DAM_SETADD)) {
+		mutex_exit(&mapp->dam_lock);
+		return (DAM_FAILURE);
+	}
+
 	if ((addrid = dam_get_addrid(mapp, address)) == 0) {
-		DAM_UNLOCK(mapp, ADDR_LOCK);
+		mutex_exit(&mapp->dam_lock);
 		return (DAM_MAPFULL);
 	}
 
 	passp = ddi_get_soft_state(mapp->dam_da, addrid);
 	ASSERT(passp);
 	if (DAM_IN_REPORT(mapp, addrid)) {
-		dam_release_report(mapp, addrid);
+		DTRACE_PROBE3(damap__addrset__add__jitter, char *,
+		    mapp->dam_name, char *, address, dam_t *, mapp);
+		dam_addr_report_release(mapp, addrid);
 		passp->da_jitter++;
 	}
 	passp->da_ppriv_rpt = addr_priv;
 	if (nvl)
 		(void) nvlist_dup(nvl, &passp->da_nvl_rpt, KM_SLEEP);
-	DAM_LOCK(mapp, MAP_LOCK);
 	bitset_add(&mapp->dam_report_set, addrid);
-	DAM_UNLOCK(mapp, MAP_LOCK);
 	if (ridx)
 		*ridx = (damap_id_t)addrid;
-	DAM_UNLOCK(mapp, ADDR_LOCK);
-	DTRACE_PROBE3(damap__addr__addset__exit, dam_t *, mapp, char *,
-	    address, int, addrid);
+	mutex_exit(&mapp->dam_lock);
 	return (DAM_SUCCESS);
 }
 
@@ -482,31 +551,30 @@ damap_addrset_end(damap_t *damapp, int flags)
 	dam_t *mapp = (dam_t *)damapp;
 	int i;
 
-	DTRACE_PROBE1(damap__addrset__end__entry, dam_t *, mapp);
-
-	if (!mapp || (mapp->dam_rptmode != DAMAP_REPORT_FULLSET) ||
-	    (mapp->dam_flags & DAM_DESTROYPEND))
+	if (!mapp || (mapp->dam_rptmode != DAMAP_REPORT_FULLSET))
 		return (DAM_EINVAL);
 
-	if (!(mapp->dam_flags & DAM_SETADD))
-		return (DAM_FAILURE);
+	DTRACE_PROBE2(damap__addrset__end, char *, mapp->dam_name,
+	    dam_t *, mapp);
 
-	if (flags & DAMAP_RESET) {
-		DAM_LOCK(mapp, MAP_LOCK);
+	mutex_enter(&mapp->dam_lock);
+	if (!(mapp->dam_flags & DAM_SETADD)) {
+		mutex_exit(&mapp->dam_lock);
+		return (DAM_FAILURE);
+	}
+
+	if (flags & DAMAP_END_RESET) {
+		DTRACE_PROBE2(damap__addrset__end__reset, char *,
+		    mapp->dam_name, dam_t *, mapp);
 		dam_sched_tmo(mapp, 0, NULL);
-		DAM_UNLOCK(mapp, MAP_LOCK);
-		DAM_LOCK(mapp, ADDR_LOCK);
 		for (i = 1; i < mapp->dam_high; i++)
 			if (DAM_IN_REPORT(mapp, i))
-				dam_release_report(mapp, i);
-		DAM_UNLOCK(mapp, ADDR_LOCK);
+				dam_addr_report_release(mapp, i);
 	} else {
 		mapp->dam_last_update = gethrtime();
-		DAM_LOCK(mapp, MAP_LOCK);
-		dam_sched_tmo(mapp, mapp->dam_stabletmo, dam_set_stable_cb);
-		DAM_UNLOCK(mapp, MAP_LOCK);
+		dam_sched_tmo(mapp, mapp->dam_stabletmo, dam_addrset_stable_cb);
 	}
-	DTRACE_PROBE(damap__addrset__end__exit);
+	mutex_exit(&mapp->dam_lock);
 	return (DAM_SUCCESS);
 }
 
@@ -514,7 +582,7 @@ damap_addrset_end(damap_t *damapp, int flags)
  * Return nvlist registered with reported address
  *
  * damapp:	address map handle
- * aid:		address ID
+ * addrid:	address ID
  *
  * Returns:	nvlist_t *	provider supplied via damap_addr{set}_add())
  *		NULL
@@ -523,11 +591,10 @@ nvlist_t *
 damap_id2nvlist(damap_t *damapp, damap_id_t addrid)
 {
 	dam_t *mapp = (dam_t *)damapp;
-	id_t aid = (id_t)addrid;
 	dam_da_t *pass;
 
-	if (ddi_strid_id2str(mapp->dam_addr_hash, aid)) {
-		if (pass = ddi_get_soft_state(mapp->dam_da, aid))
+	if (mapp->dam_high && ddi_strid_id2str(mapp->dam_addr_hash, addrid)) {
+		if (pass = ddi_get_soft_state(mapp->dam_da, addrid))
 			return (pass->da_nvl);
 	}
 	return (NULL);
@@ -537,83 +604,73 @@ damap_id2nvlist(damap_t *damapp, damap_id_t addrid)
  * Return address string
  *
  * damapp:	address map handle
- * aid:		address ID
+ * addrid:	address ID
  *
  * Returns:	char *		Address string
  *		NULL
  */
 char *
-damap_id2addr(damap_t *damapp, damap_id_t aid)
+damap_id2addr(damap_t *damapp, damap_id_t addrid)
 {
 	dam_t *mapp = (dam_t *)damapp;
 
-	return (ddi_strid_id2str(mapp->dam_addr_hash, (id_t)aid));
-}
-
-/*
- * Hold address reference in map
- *
- * damapp:	address map handle
- * aid:		address ID
- *
- * Returns:	DAM_SUCCESS
- *		DAM_FAILURE
- */
-int
-damap_id_hold(damap_t *damapp, damap_id_t aid)
-{
-	dam_t *mapp = (dam_t *)damapp;
-	dam_da_t *passp;
-
-
-	DAM_LOCK(mapp, ADDR_LOCK);
-	passp = ddi_get_soft_state(mapp->dam_da, (id_t)aid);
-	if (!passp) {
-		DAM_UNLOCK(mapp, ADDR_LOCK);
-		return (DAM_FAILURE);
-	}
-	passp->da_ref++;
-	DAM_UNLOCK(mapp, ADDR_LOCK);
-	return (DAM_SUCCESS);
+	if (mapp->dam_high)
+		return (ddi_strid_id2str(mapp->dam_addr_hash, addrid));
+	else
+		return (NULL);
 }
 
 /*
  * Release address reference in map
  *
  * damapp:	address map handle
- * aid:		address ID
+ * addrid:	address ID
  */
 void
 damap_id_rele(damap_t *damapp, damap_id_t addrid)
 {
 	dam_t *mapp = (dam_t *)damapp;
+	dam_da_t *passp;
+	char *addr;
 
-	DAM_LOCK(mapp, ADDR_LOCK);
-	dam_release(mapp, (id_t)addrid);
-	DAM_UNLOCK(mapp, ADDR_LOCK);
+	passp = ddi_get_soft_state(mapp->dam_da, (id_t)addrid);
+	ASSERT(passp);
+
+	addr = damap_id2addr(damapp, addrid);
+	DTRACE_PROBE4(damap__id__rele, char *, mapp->dam_name, char *, addr,
+	    dam_t *, mapp, int, passp->da_ref);
+
+	mutex_enter(&mapp->dam_lock);
+
+	/*
+	 * teardown address if last outstanding reference
+	 */
+	if (--passp->da_ref == 0)
+		dam_addr_release(mapp, (id_t)addrid);
+
+	mutex_exit(&mapp->dam_lock);
 }
 
 /*
  * Return current reference count on address reference in map
  *
  * damapp:	address map handle
- * aid:		address ID
+ * addrid:	address ID
  *
  * Returns:	DAM_SUCCESS
  *		DAM_FAILURE
  */
 int
-damap_id_ref(damap_t *damapp, damap_id_t aid)
+damap_id_ref(damap_t *damapp, damap_id_t addrid)
 {
 	dam_t *mapp = (dam_t *)damapp;
 	dam_da_t *passp;
 	int ref = -1;
 
-	DAM_LOCK(mapp, ADDR_LOCK);
-	passp = ddi_get_soft_state(mapp->dam_da, (id_t)aid);
+	passp = ddi_get_soft_state(mapp->dam_da, (id_t)addrid);
 	if (passp)
 		ref = passp->da_ref;
-	DAM_UNLOCK(mapp, ADDR_LOCK);
+
 	return (ref);
 }
 
@@ -639,9 +696,11 @@ damap_id_next(damap_t *damapp, damap_id_list_t damap_list, damap_id_t last)
 		return ((damap_id_t)0);
 
 	start = (int)last + 1;
-	for (i = start; i < mapp->dam_high; i++)
-		if (bitset_in_set(dam_list, i))
+	for (i = start; i < mapp->dam_high; i++) {
+		if (bitset_in_set(dam_list, i)) {
 			return ((damap_id_t)i);
+		}
+	}
 	return ((damap_id_t)0);
 }
 
@@ -649,51 +708,49 @@ damap_id_next(damap_t *damapp, damap_id_list_t damap_list, damap_id_t last)
  * Set config private data
  *
  * damapp:	address map handle
- * aid:		address ID
+ * addrid:	address ID
  * cfg_priv:	configuration private data
  *
  */
 void
-damap_id_priv_set(damap_t *damapp, damap_id_t aid, void *cfg_priv)
+damap_id_priv_set(damap_t *damapp, damap_id_t addrid, void *cfg_priv)
 {
 	dam_t *mapp = (dam_t *)damapp;
 	dam_da_t *passp;
 
-
-	DAM_LOCK(mapp, ADDR_LOCK);
-	passp = ddi_get_soft_state(mapp->dam_da, (id_t)aid);
+	mutex_enter(&mapp->dam_lock);
+	passp = ddi_get_soft_state(mapp->dam_da, (id_t)addrid);
 	if (!passp) {
-		DAM_UNLOCK(mapp, ADDR_LOCK);
+		mutex_exit(&mapp->dam_lock);
 		return;
 	}
 	passp->da_cfg_priv = cfg_priv;
-	DAM_UNLOCK(mapp, ADDR_LOCK);
+	mutex_exit(&mapp->dam_lock);
 }
 
 /*
  * Get config private data
  *
  * damapp:	address map handle
- * aid:		address ID
+ * addrid:	address ID
  *
  * Returns:	configuration private data
  */
 void *
-damap_id_priv_get(damap_t *damapp, damap_id_t aid)
+damap_id_priv_get(damap_t *damapp, damap_id_t addrid)
 {
 	dam_t *mapp = (dam_t *)damapp;
 	dam_da_t *passp;
 	void *rv;
 
-
-	DAM_LOCK(mapp, ADDR_LOCK);
-	passp = ddi_get_soft_state(mapp->dam_da, (id_t)aid);
+	mutex_enter(&mapp->dam_lock);
+	passp = ddi_get_soft_state(mapp->dam_da, (id_t)addrid);
 	if (!passp) {
-		DAM_UNLOCK(mapp, ADDR_LOCK);
+		mutex_exit(&mapp->dam_lock);
 		return (NULL);
 	}
 	rv = passp->da_cfg_priv;
-	DAM_UNLOCK(mapp, ADDR_LOCK);
+	mutex_exit(&mapp->dam_lock);
 	return (rv);
 }
 
@@ -715,10 +772,14 @@ damap_lookup(damap_t *damapp, char *address)
 	id_t addrid = 0;
 	dam_da_t *passp = NULL;
 
-	DAM_LOCK(mapp, ADDR_LOCK);
-	addrid = ddi_strid_str2id(mapp->dam_addr_hash, address);
+	DTRACE_PROBE3(damap__lookup, char *, mapp->dam_name,
+	    char *, address, dam_t *, mapp);
+	mutex_enter(&mapp->dam_lock);
+	if (!mapp->dam_high)
+		addrid = 0;
+	else
+		addrid = ddi_strid_str2id(mapp->dam_addr_hash, address);
 	if (addrid) {
-		DAM_LOCK(mapp, MAP_LOCK);
 		if (DAM_IS_STABLE(mapp, addrid)) {
 			passp = ddi_get_soft_state(mapp->dam_da, addrid);
 			ASSERT(passp);
@@ -730,9 +791,10 @@ damap_lookup(damap_t *damapp, char *address)
 		} else {
 			addrid = 0;
 		}
-		DAM_UNLOCK(mapp, MAP_LOCK);
 	}
-	DAM_UNLOCK(mapp, ADDR_LOCK);
+	mutex_exit(&mapp->dam_lock);
+	DTRACE_PROBE4(damap__lookup__return, char *, mapp->dam_name,
+	    char *, address, dam_t *, mapp, int, addrid);
 	return ((damap_id_t)addrid);
 }
 
@@ -752,33 +814,46 @@ damap_lookup_all(damap_t *damapp, damap_id_list_t *id_listp)
 	int mapsz = mapp->dam_size;
 	int n_ids, i;
 	bitset_t *bsp;
+	char	 *addrp;
 	dam_da_t *passp;
 
+	DTRACE_PROBE2(damap__lookup__all, char *, mapp->dam_name,
+	    dam_t *, mapp);
+	mutex_enter(&mapp->dam_lock);
+	if (!mapp->dam_high) {
+		*id_listp = (damap_id_list_t)NULL;
+		mutex_exit(&mapp->dam_lock);
+		DTRACE_PROBE3(damap__lookup__all__nomap, char *,
+		    mapp->dam_name, dam_t *, mapp, int, 0);
+		return (0);
+	}
 	bsp = kmem_alloc(sizeof (*bsp), KM_SLEEP);
 	bitset_init(bsp);
 	bitset_resize(bsp, mapsz);
-	DAM_LOCK(mapp, MAP_LOCK);
 	bitset_copy(&mapp->dam_active_set, bsp);
-	DAM_UNLOCK(mapp, MAP_LOCK);
-	DAM_LOCK(mapp, ADDR_LOCK);
 	for (n_ids = 0, i = 1; i < mapsz; i++) {
 		if (bitset_in_set(bsp, i)) {
 			passp = ddi_get_soft_state(mapp->dam_da, i);
 			ASSERT(passp);
 			if (passp) {
+				addrp = damap_id2addr(damapp, i);
+				DTRACE_PROBE3(damap__lookup__all__item, char *,
+				    mapp->dam_name, char *, addrp, dam_t *,
+				    mapp);
 				passp->da_ref++;
 				n_ids++;
 			}
 		}
 	}
-	DAM_UNLOCK(mapp, ADDR_LOCK);
 	if (n_ids) {
 		*id_listp = (damap_id_list_t)bsp;
+		mutex_exit(&mapp->dam_lock);
 		return (n_ids);
 	} else {
 		*id_listp = (damap_id_list_t)NULL;
 		bitset_fini(bsp);
 		kmem_free(bsp, sizeof (*bsp));
+		mutex_exit(&mapp->dam_lock);
 		return (0);
 	}
 }
@@ -798,111 +873,267 @@ damap_id_list_rele(damap_t *damapp, damap_id_list_t id_list)
 	if (id_list == NULL)
 		return;
 
-	DAM_LOCK(mapp, ADDR_LOCK);
+	mutex_enter(&mapp->dam_lock);
 	for (i = 1; i < mapp->dam_high; i++) {
 		if (bitset_in_set((bitset_t *)id_list, i))
-			(void) dam_release(mapp, i);
+			(void) dam_addr_release(mapp, i);
 	}
-	DAM_UNLOCK(mapp, ADDR_LOCK);
+	mutex_exit(&mapp->dam_lock);
 	bitset_fini((bitset_t *)id_list);
 	kmem_free((void *)id_list, sizeof (bitset_t));
+}
+
+/*
+ * activate an address that has passed the stabilization interval
+ */
+static void
+dam_addr_activate(dam_t *mapp, id_t addrid)
+{
+	dam_da_t *passp;
+	int config_rv;
+	char *addrstr;
+
+	mutex_enter(&mapp->dam_lock);
+	bitset_add(&mapp->dam_active_set, addrid);
+	passp = ddi_get_soft_state(mapp->dam_da, addrid);
+	ASSERT(passp);
+
+	/*
+	 * copy the reported nvlist and provider private data
+	 */
+	addrstr = ddi_strid_id2str(mapp->dam_addr_hash, addrid);
+	DTRACE_PROBE3(damap__addr__activate__start, char *, mapp->dam_name,
+	    char *, addrstr, dam_t *, mapp);
+	passp->da_nvl = passp->da_nvl_rpt;
+	passp->da_ppriv = passp->da_ppriv_rpt;
+	passp->da_ppriv_rpt = NULL;
+	passp->da_nvl_rpt = NULL;
+	passp->da_last_stable = gethrtime();
+	passp->da_stable_cnt++;
+	mutex_exit(&mapp->dam_lock);
+	if (mapp->dam_activate_cb) {
+		(*mapp->dam_activate_cb)(mapp->dam_activate_arg, addrstr,
+		    addrid, &passp->da_ppriv_rpt);
+	}
+
+	/*
+	 * call the address-specific configuration action as part of
+	 * activation.
+	 */
+	config_rv = (*mapp->dam_configure_cb)(mapp->dam_config_arg, mapp,
+	    addrid);
+	if (config_rv != DAM_SUCCESS) {
+		mutex_enter(&mapp->dam_lock);
+		passp->da_flags |= DA_FAILED_CONFIG;
+		mutex_exit(&mapp->dam_lock);
+		DTRACE_PROBE3(damap__addr__activate__config__failure,
+		    char *, mapp->dam_name, char *, addrstr, dam_t *, mapp);
+	}
+	DTRACE_PROBE3(damap__addr__activate__end, char *, mapp->dam_name,
+	    char *, addrstr, dam_t *, mapp);
+}
+
+/*
+ * deactivate a previously stable address
+ */
+static void
+dam_addr_deactivate(dam_t *mapp, id_t addrid)
+{
+	dam_da_t *passp;
+	char *addrstr;
+
+	addrstr = ddi_strid_id2str(mapp->dam_addr_hash, addrid);
+	DTRACE_PROBE3(damap__addr__deactivate__start, char *, mapp->dam_name,
+	    char *, addrstr, dam_t *, mapp);
+
+	/*
+	 * call the unconfiguration callback
+	 */
+	(*mapp->dam_unconfig_cb)(mapp->dam_config_arg, mapp, addrid);
+	passp = ddi_get_soft_state(mapp->dam_da, addrid);
+	ASSERT(passp);
+	if (mapp->dam_deactivate_cb)
+		(*mapp->dam_deactivate_cb)(mapp->dam_activate_arg,
+		    ddi_strid_id2str(mapp->dam_addr_hash, addrid),
+		    addrid, passp->da_ppriv);
+
+	/*
+	 * clear the active bit and free the backing info for
+	 * this address
+	 */
+	mutex_enter(&mapp->dam_lock);
+	bitset_del(&mapp->dam_active_set, addrid);
+	passp->da_ppriv = NULL;
+	if (passp->da_nvl)
+		nvlist_free(passp->da_nvl);
+	passp->da_nvl = NULL;
+	passp->da_ppriv_rpt = NULL;
+	if (passp->da_nvl_rpt)
+		nvlist_free(passp->da_nvl_rpt);
+	passp->da_nvl_rpt = NULL;
+
+	DTRACE_PROBE3(damap__addr__deactivate__end, char *, mapp->dam_name,
+	    char *, addrstr, dam_t *, mapp);
+
+	(void) dam_addr_release(mapp, addrid);
+	mutex_exit(&mapp->dam_lock);
+}
+
+/*
+ * taskq callback for multi-thread activation
+ */
+static void
+dam_tq_config(void *arg)
+{
+	cfg_tqd_t *tqd = (cfg_tqd_t *)arg;
+
+	dam_addr_activate(tqd->tqd_mapp, tqd->tqd_id);
+	kmem_free(tqd, sizeof (*tqd));
+}
+
+/*
+ * taskq callback for multi-thread deactivation
+ */
+static void
+dam_tq_unconfig(void *arg)
+{
+	cfg_tqd_t *tqd = (cfg_tqd_t *)arg;
+
+	dam_addr_deactivate(tqd->tqd_mapp, tqd->tqd_id);
+	kmem_free(tqd, sizeof (*tqd));
 }
 
 /*
  * Activate a set of stabilized addresses
  */
 static void
-dam_addrset_activate(dam_t *mapp, bitset_t *active_set)
+dam_addrset_activate(dam_t *mapp, bitset_t *activate)
 {
-	dam_da_t *passp;
-	char *addrstr;
-	int i;
-	uint32_t n_active = 0;
 
-	for (i = 1; i < mapp->dam_high; i++) {
-		if (bitset_in_set(&mapp->dam_active_set, i))
-			n_active++;
-		if (!bitset_in_set(active_set, i))
-			continue;
-		n_active++;
-		passp = ddi_get_soft_state(mapp->dam_da, i);
-		ASSERT(passp);
-		if (mapp->dam_activate_cb) {
-			addrstr = ddi_strid_id2str(mapp->dam_addr_hash, i);
-			(*mapp->dam_activate_cb)(
-			    mapp->dam_activate_arg, addrstr, i,
-			    &passp->da_ppriv_rpt);
-		}
-		DTRACE_PROBE2(damap__addrset__activate, dam_t *, mapp, int, i);
-		DAM_LOCK(mapp, MAP_LOCK);
-		bitset_add(&mapp->dam_active_set, i);
+	int i, nset;
+	taskq_t *tqp = NULL;
+	cfg_tqd_t *tqd = NULL;
+	char tqn[TASKQ_NAMELEN];
+	extern pri_t maxclsyspri;
+
+	if (mapp->dam_options & DAMAP_MTCONFIG) {
 		/*
-		 * copy the reported nvlist and provider private data
+		 * calculate the # of taskq threads to create
 		 */
-		passp->da_nvl = passp->da_nvl_rpt;
-		passp->da_ppriv = passp->da_ppriv_rpt;
-		passp->da_ppriv_rpt = NULL;
-		passp->da_nvl_rpt = NULL;
-		passp->da_last_stable = gethrtime();
-		passp->da_stable_cnt++;
-		DAM_UNLOCK(mapp, MAP_LOCK);
-		DAM_SET_STAT(mapp, dam_numstable, n_active);
+		for (i = 1, nset = 0; i < mapp->dam_high; i++)
+			if (bitset_in_set(activate, i))
+				nset++;
+		ASSERT(nset);
+		(void) snprintf(tqn, sizeof (tqn), "actv-%s", mapp->dam_name);
+		tqp = taskq_create(tqn, nset, maxclsyspri, 1,
+		    INT_MAX, TASKQ_PREPOPULATE);
 	}
-}
-
-/*
- * Release a set of stabilized addresses
- */
-static void
-dam_addrset_release(dam_t *mapp, bitset_t *release_set)
-{
-	int i;
-
-	DAM_LOCK(mapp, ADDR_LOCK);
 	for (i = 1; i < mapp->dam_high; i++) {
-		if (bitset_in_set(release_set, i)) {
-			DTRACE_PROBE2(damap__addrset__release, dam_t *, mapp,
-			    int, i);
-			DAM_LOCK(mapp, MAP_LOCK);
-			bitset_del(&mapp->dam_active_set, i);
-			DAM_UNLOCK(mapp, MAP_LOCK);
-			(void) dam_release(mapp, i);
+		if (bitset_in_set(activate, i)) {
+			if (!tqp)
+				dam_addr_activate(mapp, i);
+			else {
+				/*
+				 * multi-threaded activation
+				 */
+				tqd = kmem_alloc(sizeof (*tqd), KM_SLEEP);
+				tqd->tqd_mapp = mapp;
+				tqd->tqd_id = i;
+				(void) taskq_dispatch(tqp, dam_tq_config,
+				    tqd, KM_SLEEP);
+			}
 		}
 	}
-	DAM_UNLOCK(mapp, ADDR_LOCK);
+	if (tqp) {
+		taskq_wait(tqp);
+		taskq_destroy(tqp);
+	}
 }
 
 /*
- * release a previously activated address
+ * Deactivate a set of stabilized addresses
  */
 static void
-dam_release(dam_t *mapp, id_t addrid)
+dam_addrset_deactivate(dam_t *mapp, bitset_t *deactivate)
+{
+	int i, nset;
+	taskq_t *tqp = NULL;
+	cfg_tqd_t *tqd = NULL;
+	char tqn[TASKQ_NAMELEN];
+
+	DTRACE_PROBE2(damap__addrset__deactivate, char *, mapp->dam_name,
+	    dam_t *, mapp);
+
+	if (mapp->dam_options & DAMAP_MTCONFIG) {
+		/*
+		 * compute the # of taskq threads to dispatch
+		 */
+		for (i = 1, nset = 0; i < mapp->dam_high; i++)
+			if (bitset_in_set(deactivate, i))
+				nset++;
+		(void) snprintf(tqn, sizeof (tqn), "deactv-%s",
+		    mapp->dam_name);
+		tqp = taskq_create(tqn, nset, maxclsyspri, 1,
+		    INT_MAX, TASKQ_PREPOPULATE);
+	}
+	for (i = 1; i < mapp->dam_high; i++) {
+		if (bitset_in_set(deactivate, i)) {
+			if (!tqp) {
+				dam_addr_deactivate(mapp, i);
+			} else {
+				tqd = kmem_alloc(sizeof (*tqd), KM_SLEEP);
+				tqd->tqd_mapp = mapp;
+				tqd->tqd_id = i;
+				(void) taskq_dispatch(tqp,
+				    dam_tq_unconfig, tqd, KM_SLEEP);
+			}
+		}
+	}
+
+	if (tqp) {
+		taskq_wait(tqp);
+		taskq_destroy(tqp);
+	}
+}
+
+/*
+ * Release a previously activated address
+ */
+static void
+dam_addr_release(dam_t *mapp, id_t addrid)
 {
 	dam_da_t *passp;
+	char	 *addrstr;
 
-	DAM_ASSERT_LOCKED(mapp, ADDR_LOCK);
+
+	ASSERT(mutex_owned(&mapp->dam_lock));
 	passp = ddi_get_soft_state(mapp->dam_da, addrid);
 	ASSERT(passp);
 
-	/*
-	 * invoke the deactivation callback to notify
-	 * this address is no longer active
-	 */
-	dam_deactivate_addr(mapp, addrid);
+	addrstr = ddi_strid_id2str(mapp->dam_addr_hash, addrid);
+	DTRACE_PROBE3(damap__addr__release, char *, mapp->dam_name,
+	    char *, addrstr, dam_t *, mapp);
 
 	/*
-	 * allow pending reports for this address to stabilize
+	 * defer releasing the address until outstanding references
+	 * are released
 	 */
-	if (DAM_IN_REPORT(mapp, addrid))
-		return;
-
-	/*
-	 * defer teardown until outstanding references are released
-	 */
-	if (--passp->da_ref) {
-		passp->da_flags |= DA_RELE;
+	if (passp->da_ref > 1) {
+		DTRACE_PROBE4(damap__addr__release__outstanding__refs,
+		    char *, mapp->dam_name, char *, addrstr, dam_t *, mapp,
+		    int, passp->da_ref);
 		return;
 	}
+
+	/*
+	 * allow pending reports to stabilize
+	 */
+	if (DAM_IN_REPORT(mapp, addrid)) {
+		DTRACE_PROBE3(damap__addr__release__report__pending,
+		    char *, mapp->dam_name, char *, addrstr, dam_t *, mapp);
+		return;
+	}
+
 	ddi_strid_free(mapp->dam_addr_hash, addrid);
 	ddi_soft_state_free(mapp->dam_da, addrid);
 }
@@ -911,13 +1142,17 @@ dam_release(dam_t *mapp, id_t addrid)
  * process stabilized address reports
  */
 static void
-dam_activate_taskq(void *arg)
+dam_stabilize_map(void *arg)
 {
 	dam_t *mapp = (dam_t *)arg;
 	bitset_t delta;
 	bitset_t cfg;
 	bitset_t uncfg;
 	int has_cfg, has_uncfg;
+	uint32_t i, n_active;
+
+	DTRACE_PROBE2(damap__stabilize__map, char *, mapp->dam_name,
+	    dam_t *, mapp);
 
 	bitset_init(&delta);
 	bitset_resize(&delta, mapp->dam_size);
@@ -926,40 +1161,81 @@ dam_activate_taskq(void *arg)
 	bitset_init(&uncfg);
 	bitset_resize(&uncfg, mapp->dam_size);
 
-	DTRACE_PROBE1(damap__activate__taskq__entry, dam_t, mapp);
-	DAM_LOCK(mapp, MAP_LOCK);
+	/*
+	 * determine which addresses have changed during
+	 * this stabilization cycle
+	 */
+	mutex_enter(&mapp->dam_lock);
+	ASSERT(mapp->dam_flags & DAM_SPEND);
 	if (!bitset_xor(&mapp->dam_active_set, &mapp->dam_stable_set,
 	    &delta)) {
+		/*
+		 * no difference
+		 */
 		bitset_zero(&mapp->dam_stable_set);
-		DAM_FLAG_CLR(mapp, DAM_SPEND);
-		DAM_UNLOCK(mapp, MAP_LOCK);
+		mapp->dam_flags  &= ~DAM_SPEND;
+		cv_signal(&mapp->dam_cv);
+		mutex_exit(&mapp->dam_lock);
 		bitset_fini(&uncfg);
 		bitset_fini(&cfg);
 		bitset_fini(&delta);
+		DTRACE_PROBE2(damap__stabilize__map__nochange, char *,
+		    mapp->dam_name, dam_t *, mapp);
 		return;
 	}
+
+	/*
+	 * compute the sets of addresses to be activated and deactivated
+	 */
 	has_cfg = bitset_and(&delta, &mapp->dam_stable_set, &cfg);
 	has_uncfg = bitset_and(&delta, &mapp->dam_active_set, &uncfg);
-	DAM_UNLOCK(mapp, MAP_LOCK);
-	if (has_cfg) {
+
+	/*
+	 * drop map lock while invoking callouts
+	 */
+	mutex_exit(&mapp->dam_lock);
+
+	/*
+	 * activate all newly stable addresss
+	 */
+	if (has_cfg)
 		dam_addrset_activate(mapp, &cfg);
-		(*mapp->dam_configure_cb)(mapp->dam_config_arg, mapp, &cfg);
-	}
-	if (has_uncfg) {
-		(*mapp->dam_unconfig_cb)(mapp->dam_config_arg, mapp, &uncfg);
-		dam_addrset_release(mapp, &uncfg);
-	}
-	DAM_LOCK(mapp, MAP_LOCK);
+
+	/*
+	 * deactivate addresss which are no longer in the map
+	 */
+	if (has_uncfg)
+		dam_addrset_deactivate(mapp, &uncfg);
+
+
+	/*
+	 * timestamp the last stable time and increment the kstat keeping
+	 * the # of of stable cycles for the map
+	 */
+	mutex_enter(&mapp->dam_lock);
 	bitset_zero(&mapp->dam_stable_set);
-	DAM_FLAG_CLR(mapp, DAM_SPEND);
 	mapp->dam_last_stable = gethrtime();
 	mapp->dam_stable_cnt++;
-	DAM_INCR_STAT(mapp, dam_stable);
-	DAM_UNLOCK(mapp, MAP_LOCK);
+	DAM_INCR_STAT(mapp, dam_cycles);
+
+	/*
+	 * determine the number of stable addresses
+	 * and update the n_active kstat for this map
+	 */
+	for (i = 1, n_active = 0; i < mapp->dam_high; i++)
+		if (bitset_in_set(&mapp->dam_active_set, i))
+			n_active++;
+	DAM_SET_STAT(mapp, dam_active, n_active);
+
+	DTRACE_PROBE3(damap__map__stable__end, char *, mapp->dam_name,
+	    dam_t *, mapp, int, n_active);
+
+	mapp->dam_flags  &= ~DAM_SPEND;
+	cv_signal(&mapp->dam_cv);
+	mutex_exit(&mapp->dam_lock);
 	bitset_fini(&uncfg);
 	bitset_fini(&cfg);
 	bitset_fini(&delta);
-	DTRACE_PROBE1(damap__activate__taskq__exit, dam_t, mapp);
 }
 
 /*
@@ -977,61 +1253,59 @@ dam_addr_stable_cb(void *arg)
 	int64_t tmo_delta;
 	int64_t ts = ddi_get_lbolt64();
 
-	DTRACE_PROBE1(damap__addr__stable__cb__entry, dam_t *, mapp);
-	DAM_LOCK(mapp, MAP_LOCK);
+	mutex_enter(&mapp->dam_lock);
 	if (mapp->dam_tid == 0) {
-		DAM_UNLOCK(mapp, MAP_LOCK);
+		DTRACE_PROBE2(damap__map__addr__stable__cancelled, char *,
+		    mapp->dam_name, dam_t *, mapp);
+		mutex_exit(&mapp->dam_lock);
 		return;
 	}
 	mapp->dam_tid = 0;
+
 	/*
 	 * If still under stabilization, reschedule timeout,
-	 * else dispatch the task to activate & deactivate the stable
-	 * set.
+	 * otherwise dispatch the task to activate and deactivate the
+	 * new stable address
 	 */
 	if (mapp->dam_flags & DAM_SPEND) {
-		DAM_INCR_STAT(mapp, dam_stable_blocked);
+		DAM_INCR_STAT(mapp, dam_overrun);
 		mapp->dam_stable_overrun++;
 		dam_sched_tmo(mapp, mapp->dam_stabletmo, dam_addr_stable_cb);
-		DAM_UNLOCK(mapp, MAP_LOCK);
-		DTRACE_PROBE1(damap__addr__stable__cb__overrun,
-		    dam_t *, mapp);
+		DTRACE_PROBE2(damap__map__addr__stable__overrun, char *,
+		    mapp->dam_name, dam_t *, mapp);
+		mutex_exit(&mapp->dam_lock);
 		return;
 	}
 
+	DAM_SET_STAT(mapp, dam_overrun, 0);
+	mapp->dam_stable_overrun = 0;
+
+	/*
+	 * copy the current active set to the stable map
+	 * for each address being reported, decrement its
+	 * stabilize deadline, and if stable, add or remove the
+	 * address from the stable set
+	 */
 	bitset_copy(&mapp->dam_active_set, &mapp->dam_stable_set);
 	for (i = 1; i < mapp->dam_high; i++) {
 		if (!bitset_in_set(&mapp->dam_report_set, i))
 			continue;
-		/*
-		 * Stabilize each address
-		 */
 		passp = ddi_get_soft_state(mapp->dam_da, i);
 		ASSERT(passp);
-		if (!passp) {
-			cmn_err(CE_WARN, "Clearing report no softstate %d", i);
-			bitset_del(&mapp->dam_report_set, i);
-			continue;
-		}
 
 		/* report has stabilized */
 		if (passp->da_deadline <= ts) {
 			bitset_del(&mapp->dam_report_set, i);
-			if (passp->da_flags & DA_RELE) {
-				DTRACE_PROBE2(damap__addr__stable__del,
-				    dam_t *, mapp, int, i);
+			if (passp->da_flags & DA_RELE)
 				bitset_del(&mapp->dam_stable_set, i);
-			} else {
-				DTRACE_PROBE2(damap__addr__stable__add,
-				    dam_t *, mapp, int, i);
+			else
 				bitset_add(&mapp->dam_stable_set, i);
-			}
 			spend++;
 			continue;
 		}
 
 		/*
-		 * not stabilized, determine next (future) map timeout
+		 * not stabilized, determine next map timeout
 		 */
 		tpend++;
 		tmo_delta = passp->da_deadline - ts;
@@ -1040,149 +1314,155 @@ dam_addr_stable_cb(void *arg)
 	}
 
 	/*
-	 * schedule taskq activation of stabilized reports
+	 * schedule system_taskq activation of stabilized reports
 	 */
 	if (spend) {
-		if (ddi_taskq_dispatch(mapp->dam_taskqp, dam_activate_taskq,
-		    mapp, DDI_NOSLEEP) == DDI_SUCCESS) {
-			DAM_FLAG_SET(mapp, DAM_SPEND);
-		} else
+		if (taskq_dispatch(system_taskq, dam_stabilize_map,
+		    mapp, TQ_NOSLEEP)) {
+			mapp->dam_flags  |= DAM_SPEND;
+			DTRACE_PROBE2(damap__map__addr__stable__start, char *,
+			    mapp->dam_name, dam_t *, mapp);
+		} else {
 			tpend++;
+		}
 	}
 
 	/*
-	 * schedule timeout to handle future stabalization of active reports
+	 * reschedule the stabilization timer if there are reports
+	 * still pending
 	 */
 	if (tpend)
 		dam_sched_tmo(mapp, (clock_t)next_tmov, dam_addr_stable_cb);
-	DAM_UNLOCK(mapp, MAP_LOCK);
-	DTRACE_PROBE1(damap__addr__stable__cb__exit, dam_t *, mapp);
+
+	mutex_exit(&mapp->dam_lock);
 }
 
 /*
- * fullset stabilization timeout
+ * fullset stabilization timeout callback
  */
 static void
-dam_set_stable_cb(void *arg)
+dam_addrset_stable_cb(void *arg)
 {
 	dam_t *mapp = (dam_t *)arg;
 
-	DTRACE_PROBE1(damap__set__stable__cb__enter, dam_t *, mapp);
-
-	DAM_LOCK(mapp, MAP_LOCK);
+	mutex_enter(&mapp->dam_lock);
 	if (mapp->dam_tid == 0) {
-		DAM_UNLOCK(mapp, MAP_LOCK);
+		mutex_exit(&mapp->dam_lock);
+		DTRACE_PROBE2(damap__map__addrset__stable__cancelled,
+		    char *, mapp->dam_name, dam_t *, mapp);
 		return;
 	}
 	mapp->dam_tid = 0;
 
 	/*
-	 * If still under stabilization, reschedule timeout,
-	 * else dispatch the task to activate & deactivate the stable
-	 * set.
+	 * If map still underoing stabilization reschedule timeout,
+	 * else dispatch the task to configure the new stable set of
+	 * addresses.
 	 */
-	if (mapp->dam_flags & DAM_SPEND) {
-		DAM_INCR_STAT(mapp, dam_stable_blocked);
+	if ((mapp->dam_flags & DAM_SPEND) || (taskq_dispatch(system_taskq,
+	    dam_stabilize_map, mapp, TQ_NOSLEEP) == NULL)) {
+		DAM_INCR_STAT(mapp, dam_overrun);
 		mapp->dam_stable_overrun++;
-		dam_sched_tmo(mapp, mapp->dam_stabletmo, dam_set_stable_cb);
-		DTRACE_PROBE1(damap__set__stable__cb__overrun,
-		    dam_t *, mapp);
-	} else if (ddi_taskq_dispatch(mapp->dam_taskqp, dam_activate_taskq,
-	    mapp, DDI_NOSLEEP) == DDI_FAILURE) {
-		dam_sched_tmo(mapp, mapp->dam_stabletmo, dam_set_stable_cb);
-	} else {
-		bitset_copy(&mapp->dam_report_set, &mapp->dam_stable_set);
-		bitset_zero(&mapp->dam_report_set);
-		DAM_FLAG_CLR(mapp, DAM_SETADD);
-		DAM_FLAG_SET(mapp, DAM_SPEND);
+		dam_sched_tmo(mapp, mapp->dam_stabletmo, dam_addrset_stable_cb);
+		DTRACE_PROBE2(damap__map__addrset__stable__overrun, char *,
+		    mapp->dam_name, dam_t *, mapp);
+		mutex_exit(&mapp->dam_lock);
+		return;
 	}
-	DAM_UNLOCK(mapp, MAP_LOCK);
-	DTRACE_PROBE1(damap__set__stable__cb__exit, dam_t *, mapp);
+
+	DAM_SET_STAT(mapp, dam_overrun, 0);
+	mapp->dam_stable_overrun = 0;
+	bitset_copy(&mapp->dam_report_set, &mapp->dam_stable_set);
+	bitset_zero(&mapp->dam_report_set);
+	mapp->dam_flags |= DAM_SPEND;
+	mapp->dam_flags &= ~DAM_SETADD;
+	DTRACE_PROBE2(damap__map__addrset__stable__start, char *,
+	    mapp->dam_name, dam_t *, mapp);
+	mutex_exit(&mapp->dam_lock);
 }
 
 /*
- * reschedule map timeout 'tmo_ms' ticks
+ * schedule map timeout 'tmo_ms' ticks
+ * if map timer is currently running, cancel if tmo_ms == 0
  */
 static void
 dam_sched_tmo(dam_t *mapp, clock_t tmo_ms, void (*tmo_cb)())
 {
 	timeout_id_t tid;
 
-	if ((tid = mapp->dam_tid) != 0) {
-		mapp->dam_tid = 0;
-		DAM_UNLOCK(mapp, MAP_LOCK);
-		(void) untimeout(tid);
-		DAM_LOCK(mapp, MAP_LOCK);
-	}
+	DTRACE_PROBE3(damap__sched__tmo, char *, mapp->dam_name, dam_t *, mapp,
+	    clock_t, tmo_ms);
 
-	if (tmo_cb && (tmo_ms != 0))
-		mapp->dam_tid = timeout(tmo_cb, mapp, tmo_ms);
+	ASSERT(mutex_owned(&mapp->dam_lock));
+	if ((tid = mapp->dam_tid) != 0) {
+		if (tmo_ms == 0) {
+			mapp->dam_tid = 0;
+			mutex_exit(&mapp->dam_lock);
+			(void) untimeout(tid);
+			mutex_enter(&mapp->dam_lock);
+		}
+	} else {
+		if (tmo_cb && (tmo_ms != 0))
+			mapp->dam_tid = timeout(tmo_cb, mapp, tmo_ms);
+	}
 }
 
 /*
- * record report addition or removal of an address
+ * report addition or removal of an address
  */
 static void
-dam_add_report(dam_t *mapp, dam_da_t *passp, id_t addrid, int report)
+dam_addr_report(dam_t *mapp, dam_da_t *passp, id_t addrid, int rpt_type)
 {
+	char *addrstr = damap_id2addr((damap_t *)mapp, addrid);
+
+	DTRACE_PROBE4(damap__addr__report, char *, mapp->dam_name,
+	    char *, addrstr, dam_t *, mapp, int, rpt_type);
+
+	ASSERT(mutex_owned(&mapp->dam_lock));
 	ASSERT(!DAM_IN_REPORT(mapp, addrid));
 	passp->da_last_report = gethrtime();
 	mapp->dam_last_update = gethrtime();
 	passp->da_report_cnt++;
 	passp->da_deadline = ddi_get_lbolt64() + mapp->dam_stabletmo;
-	if (report == RPT_ADDR_DEL)
+	if (rpt_type == RPT_ADDR_DEL)
 		passp->da_flags |= DA_RELE;
-	else if (report == RPT_ADDR_ADD)
+	else if (rpt_type == RPT_ADDR_ADD)
 		passp->da_flags &= ~DA_RELE;
-	DAM_LOCK(mapp, MAP_LOCK);
 	bitset_add(&mapp->dam_report_set, addrid);
 	dam_sched_tmo(mapp, mapp->dam_stabletmo, dam_addr_stable_cb);
-	DAM_UNLOCK(mapp, MAP_LOCK);
-
 }
 
 /*
  * release an address report
  */
 static void
-dam_release_report(dam_t *mapp, id_t addrid)
+dam_addr_report_release(dam_t *mapp, id_t addrid)
 {
 	dam_da_t *passp;
+	char *addrstr = damap_id2addr((damap_t *)mapp, addrid);
 
+	DTRACE_PROBE3(damap__addr__report__release, char *, mapp->dam_name,
+	    char *, addrstr, dam_t *, mapp);
+
+	ASSERT(mutex_owned(&mapp->dam_lock));
 	passp = ddi_get_soft_state(mapp->dam_da, addrid);
 	ASSERT(passp);
+	/*
+	 * clear the report bit
+	 * if the address has a registered deactivation handler and
+	 * the address has not stabilized, deactivate the address
+	 */
+	bitset_del(&mapp->dam_report_set, addrid);
+	if (!DAM_IS_STABLE(mapp, addrid) && mapp->dam_deactivate_cb) {
+		mutex_exit(&mapp->dam_lock);
+		(*mapp->dam_deactivate_cb)(mapp->dam_activate_arg,
+		    ddi_strid_id2str(mapp->dam_addr_hash, addrid),
+		    addrid, passp->da_ppriv_rpt);
+		mutex_enter(&mapp->dam_lock);
+	}
 	passp->da_ppriv_rpt = NULL;
 	if (passp->da_nvl_rpt)
 		nvlist_free(passp->da_nvl_rpt);
-	passp->da_nvl_rpt = NULL;
-	DAM_LOCK(mapp, MAP_LOCK);
-	bitset_del(&mapp->dam_report_set, addrid);
-	DAM_UNLOCK(mapp, MAP_LOCK);
-}
-
-/*
- * deactivate a previously stable address
- */
-static void
-dam_deactivate_addr(dam_t *mapp, id_t addrid)
-{
-	dam_da_t *passp;
-
-	passp = ddi_get_soft_state(mapp->dam_da, addrid);
-	ASSERT(passp);
-	if (passp == NULL)
-		return;
-	DAM_UNLOCK(mapp, ADDR_LOCK);
-	if (mapp->dam_deactivate_cb)
-		(*mapp->dam_deactivate_cb)(
-		    mapp->dam_activate_arg,
-		    ddi_strid_id2str(mapp->dam_addr_hash,
-		    addrid), addrid, passp->da_ppriv);
-	DAM_LOCK(mapp, ADDR_LOCK);
-	passp->da_ppriv = NULL;
-	if (passp->da_nvl)
-		nvlist_free(passp->da_nvl);
-	passp->da_nvl = NULL;
 }
 
 /*
@@ -1194,8 +1474,9 @@ dam_get_addrid(dam_t *mapp, char *address)
 	damap_id_t addrid;
 	dam_da_t *passp;
 
+	ASSERT(mutex_owned(&mapp->dam_lock));
 	if ((addrid = ddi_strid_str2id(mapp->dam_addr_hash, address)) == 0) {
-		if ((addrid = ddi_strid_fixed_alloc(mapp->dam_addr_hash,
+		if ((addrid = ddi_strid_alloc(mapp->dam_addr_hash,
 		    address)) == (damap_id_t)0) {
 			return (0);
 		}
@@ -1204,16 +1485,25 @@ dam_get_addrid(dam_t *mapp, char *address)
 			ddi_strid_free(mapp->dam_addr_hash, addrid);
 			return (0);
 		}
+
 		if (addrid >= mapp->dam_high)
 			mapp->dam_high = addrid + 1;
+
+		/*
+		 * expand bitmaps if ID has outgrown old map size
+		 */
+		if (mapp->dam_high > mapp->dam_size) {
+			mapp->dam_size = mapp->dam_size + DAM_SIZE_BUMP;
+			bitset_resize(&mapp->dam_active_set, mapp->dam_size);
+			bitset_resize(&mapp->dam_stable_set, mapp->dam_size);
+			bitset_resize(&mapp->dam_report_set, mapp->dam_size);
+		}
+
+		passp = ddi_get_soft_state(mapp->dam_da, addrid);
+		passp->da_ref = 1;
+		passp->da_addr = ddi_strid_id2str(mapp->dam_addr_hash,
+		    addrid); /* for mdb */
 	}
-	passp = ddi_get_soft_state(mapp->dam_da, addrid);
-	if (passp == NULL)
-		return (0);
-	passp->da_ref++;
-	if (passp->da_addr == NULL)
-		passp->da_addr = ddi_strid_id2str(
-		    mapp->dam_addr_hash, addrid); /* for mdb */
 	return (addrid);
 }
 
@@ -1229,30 +1519,16 @@ dam_kstat_create(dam_t *mapp)
 	mapsp = kstat_create("dam", 0, mapp->dam_name, "damap",
 	    KSTAT_TYPE_NAMED,
 	    sizeof (struct dam_kstats) / sizeof (kstat_named_t), 0);
-	if (mapsp == NULL) {
+
+	if (mapsp == NULL)
 		return (DDI_FAILURE);
-	}
 
 	statsp = (struct dam_kstats *)mapsp->ks_data;
-	kstat_named_init(&statsp->dam_stable, "stable cycles",
-	    KSTAT_DATA_UINT32);
-	kstat_named_init(&statsp->dam_stable_blocked,
-	    "stable cycle overrun", KSTAT_DATA_UINT32);
-	kstat_named_init(&statsp->dam_rereport,
-	    "restarted reports", KSTAT_DATA_UINT32);
-	kstat_named_init(&statsp->dam_numstable,
-	    "# of stable map entries", KSTAT_DATA_UINT32);
+	kstat_named_init(&statsp->dam_cycles, "cycles", KSTAT_DATA_UINT32);
+	kstat_named_init(&statsp->dam_overrun, "overrun", KSTAT_DATA_UINT32);
+	kstat_named_init(&statsp->dam_jitter, "jitter", KSTAT_DATA_UINT32);
+	kstat_named_init(&statsp->dam_active, "active", KSTAT_DATA_UINT32);
 	kstat_install(mapsp);
 	mapp->dam_kstatsp = mapsp;
 	return (DDI_SUCCESS);
-}
-
-/*
- * destroy map stats
- */
-static void
-dam_kstat_destroy(dam_t *mapp)
-{
-
-	kstat_delete(mapp->dam_kstatsp);
 }

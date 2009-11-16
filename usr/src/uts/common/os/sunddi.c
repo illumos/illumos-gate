@@ -6679,6 +6679,8 @@ ddi_strid_init(ddi_strid **strid_p, int n_items)
 		hash_sz = SS_MAX_HASH_SZ;
 
 	ss = kmem_alloc(sizeof (*ss), KM_SLEEP);
+	ss->strid_chunksz = n_items;
+	ss->strid_spacesz = n_items;
 	ss->strid_space = id_space_create("strid", 1, n_items);
 	ss->strid_bystr = mod_hash_create_strhash("strid_bystr", hash_sz,
 	    mod_hash_null_valdtor);
@@ -6688,11 +6690,9 @@ ddi_strid_init(ddi_strid **strid_p, int n_items)
 	return (DDI_SUCCESS);
 }
 
-#define	ID_FIXED_SIZE	0x1
-
 /* allocate an id mapping within the specified set for str, return id */
 static id_t
-i_ddi_strid_alloc(ddi_strid *strid, char *str, int flags)
+i_ddi_strid_alloc(ddi_strid *strid, char *str)
 {
 	i_ddi_strid	*ss = (i_ddi_strid *)strid;
 	id_t		id;
@@ -6708,15 +6708,16 @@ i_ddi_strid_alloc(ddi_strid *strid, char *str, int flags)
 	 * the amount of space used when the id is used as a ddi_soft_state
 	 * index by the caller.
 	 *
-	 * If ID_FIXED_SIZE, use the _nosleep variant to fail rather
-	 * than sleep in id_allocff()
+	 * If the id list is exhausted, increase the size of the list
+	 * by the chuck size specified in ddi_strid_init and reattempt
+	 * the allocation
 	 */
-	if (flags & ID_FIXED_SIZE) {
-		id = id_allocff_nosleep(ss->strid_space);
-		if (id == (id_t)-1)
+	if ((id = id_allocff_nosleep(ss->strid_space)) == (id_t)-1) {
+		id_space_extend(ss->strid_space, ss->strid_spacesz,
+		    ss->strid_spacesz + ss->strid_chunksz);
+		ss->strid_spacesz += ss->strid_chunksz;
+		if ((id = id_allocff_nosleep(ss->strid_space)) == (id_t)-1)
 			return (0);
-	} else {
-		id = id_allocff(ss->strid_space);
 	}
 
 	/*
@@ -6744,14 +6745,7 @@ i_ddi_strid_alloc(ddi_strid *strid, char *str, int flags)
 id_t
 ddi_strid_alloc(ddi_strid *strid, char *str)
 {
-	return (i_ddi_strid_alloc(strid, str, 0));
-}
-
-/* allocate an id mapping within the specified set for str, return id */
-id_t
-ddi_strid_fixed_alloc(ddi_strid *strid, char *str)
-{
-	return (i_ddi_strid_alloc(strid, str, ID_FIXED_SIZE));
+	return (i_ddi_strid_alloc(strid, str));
 }
 
 /* return the id within the specified strid given the str */

@@ -1897,7 +1897,7 @@ pmcs_iport_tgtmap_create(pmcs_iport_t *iport)
 
 	/* create target map */
 	if (scsi_hba_tgtmap_create(iport->dip, SCSI_TM_FULLSET, tgtmap_usec,
-	    2048, NULL, NULL, NULL, &iport->iss_tgtmap) != DDI_SUCCESS) {
+	    NULL, NULL, NULL, &iport->iss_tgtmap) != DDI_SUCCESS) {
 		pmcs_prt(iport->pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: failed to create tgtmap", __func__);
 		return (B_FALSE);

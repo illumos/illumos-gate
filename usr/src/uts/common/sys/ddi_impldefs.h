@@ -778,6 +778,8 @@ typedef struct i_ddi_soft_state_bystr {
  * This data structure is private to the ddi_strid_* implementation
  */
 typedef struct i_ddi_strid {
+	size_t		strid_chunksz;
+	size_t		strid_spacesz;
 	id_space_t	*strid_space;
 	mod_hash_t	*strid_byid;
 	mod_hash_t	*strid_bystr;

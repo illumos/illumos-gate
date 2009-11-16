@@ -1623,8 +1623,6 @@ ddi_strid_init(ddi_strid **strid_p, int n_items);
 id_t
 ddi_strid_alloc(ddi_strid *strid, char *str);
 id_t
-ddi_strid_fixed_alloc(ddi_strid *strid, char *str);
-id_t
 ddi_strid_str2id(ddi_strid *strid, char *str);
 char *
 ddi_strid_id2str(ddi_strid *strid, id_t id);

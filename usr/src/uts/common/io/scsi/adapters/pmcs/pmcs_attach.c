@@ -982,7 +982,7 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/*
 	 * Create the iportmap for this HBA instance
 	 */
-	if (scsi_hba_iportmap_create(dip, iportmap_usec, pwp->nphy,
+	if (scsi_hba_iportmap_create(dip, iportmap_usec,
 	    &pwp->hss_iportmap) != DDI_SUCCESS) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: pmcs%d iportmap_create failed", __func__, inst);

@@ -578,7 +578,6 @@ dev_info_t	*scsi_hba_iport_find(
 int	scsi_hba_iportmap_create(
 				dev_info_t		*hba_dip,
 				clock_t			stable_ms,
-				int			n_entries,
 				scsi_hba_iportmap_t	**iportmapp);
 
 int	scsi_hba_iportmap_iport_add(
@@ -614,7 +613,6 @@ int	scsi_hba_tgtmap_create(
 				dev_info_t		*iport_dip,
 				scsi_tgtmap_mode_t	rpt_mode,
 				clock_t			stable_ms,
-				int			n_entries,
 				void			*tgtmap_priv,
 				scsi_tgt_activate_cb_t	activate_cb,
 				scsi_tgt_deactivate_cb_t deactivate_cb,

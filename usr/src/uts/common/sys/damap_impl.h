@@ -57,13 +57,14 @@ typedef struct dam dam_t;
 typedef void (*activate_cb_t)(void *, char *addr, int idx, void **privp);
 typedef void (*deactivate_cb_t)(void *, char *addr, int idx, void *priv);
 
-typedef void (*configure_cb_t)(void *, dam_t *mapp, bitset_t *config_ids);
-typedef void (*unconfig_cb_t)(void *, dam_t *mapp, bitset_t *unconfig_ids);
+typedef int (*configure_cb_t)(void *, dam_t *mapp, id_t map_id);
+typedef int (*unconfig_cb_t)(void *, dam_t *mapp, id_t map_id);
+
 
 struct dam {
 	char		*dam_name;
-	int		dam_flags;		/* state and locks */
-	int		dam_options;		/* options at map creation */
+	int		dam_flags;		/* map state and cv flags */
+	int		dam_options;		/* map options */
 	int		dam_rptmode;		/* report mode */
 	clock_t		dam_stabletmo;		/* stabilization (ticks) */
 	uint_t		dam_size;		/* max index for addr hash */
@@ -83,7 +84,6 @@ struct dam {
 	bitset_t	dam_stable_set;		/* stable address set */
 	bitset_t	dam_report_set;		/* reported address set */
 	void		*dam_da;		/* per-address soft state */
-	ddi_taskq_t	*dam_taskqp;		/* taskq for map activation */
 	hrtime_t	dam_last_update;	/* last map update */
 	hrtime_t	dam_last_stable;	/* last map stable */
 	int		dam_stable_cnt;		/* # of times map stabilized */
@@ -93,46 +93,16 @@ struct dam {
 	kstat_t		*dam_kstatsp;
 };
 
-/*
- * damap.dam_flags
- */
-#define	ADDR_LOCK		0x1000	/* per-addr lock */
-#define	MAP_LOCK		0x2000	/* global map lock */
-#define	DAM_LOCK(m, l)		{					\
-	mutex_enter(&(m)->dam_lock);					\
-	while ((m)->dam_flags & (l))					\
-		cv_wait(&(m)->dam_cv, &(m)->dam_lock);			\
-	(m)->dam_flags |= (l);						\
-	mutex_exit(&(m)->dam_lock);					\
-}
-#define	DAM_UNLOCK(m, l)	{					\
-	mutex_enter(&(m)->dam_lock);					\
-	(m)->dam_flags &= ~(l);						\
-	cv_signal(&(m)->dam_cv);					\
-	mutex_exit(&(m)->dam_lock);					\
-}
-#define	DAM_ASSERT_LOCKED(m, l) ASSERT((m)->dam_flags & (l))
-
 #define	DAM_SPEND		0x10	/* stable pending */
 #define	DAM_DESTROYPEND		0x20	/* in process of being destroyed */
 #define	DAM_SETADD		0x100	/* fullset update pending */
-#define	DAM_FLAG_SET(m, f)	{					\
-	mutex_enter(&(m)->dam_lock);					\
-	(m)->dam_flags |= f;						\
-	mutex_exit(&(m)->dam_lock);					\
-}
-#define	DAM_FLAG_CLR(m, f)	{					\
-	mutex_enter(&(m)->dam_lock);					\
-	(m)->dam_flags &= ~f;						\
-	mutex_exit(&(m)->dam_lock);					\
-}
 
 /*
  * per address softstate stucture
  */
 typedef struct {
 	uint_t		da_flags;	/* flags */
-	int		da_jitter;	/* address report count */
+	int		da_jitter;	/* address re-report count */
 	int		da_ref;		/* refcount on address */
 	void		*da_ppriv;	/* stable provider private */
 	void		*da_cfg_priv;	/* config/unconfig private */
@@ -151,7 +121,7 @@ typedef struct {
  * dam_da_t.da_flags
  */
 #define	DA_INIT			0x1	/* address initizized */
-#define	DA_ACTIVE		0x2	/* address stable */
+#define	DA_FAILED_CONFIG	0x2	/* address failed configure */
 #define	DA_RELE			0x4	/* adddress released */
 
 
@@ -168,10 +138,10 @@ typedef struct {
  * DAM statistics
  */
 struct dam_kstats {
-	struct kstat_named dam_stable;
-	struct kstat_named dam_stable_blocked;
-	struct kstat_named dam_rereport;
-	struct kstat_named dam_numstable;
+	struct kstat_named dam_cycles;
+	struct kstat_named dam_overrun;
+	struct kstat_named dam_jitter;
+	struct kstat_named dam_active;
 };
 
 #ifdef	__cplusplus
