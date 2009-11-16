@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -133,6 +133,8 @@ extern void cmd_bank_close(fmd_hdl_t *, void *);
 #ifdef sun4v
 extern void cmd_branch_close(fmd_hdl_t *, void *);
 extern cmd_evdisp_t cmd_fb(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
+extern cmd_evdisp_t cmd_fw_defect(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
 extern cmd_evdisp_t cmd_fb_train(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);

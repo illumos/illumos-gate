@@ -59,10 +59,14 @@
 #define	UTS2_CPUS_PER_CHIP	64
 #define	FBR_ERROR	".fbr"
 #define	DSU_ERROR	".dsu"
+#define	FERG_INVALID	".invalid"
+#define	DBU_ERROR 	".dbu"
 
 extern ldom_hdl_t *cpumem_diagnosis_lhp;
 
 static fmd_hdl_t *cpumem_hdl = NULL;
+
+#define	ERR_CLASS(x, y)	(strcmp(strrchr(x, '.'), y))
 
 static void *
 cpumem_alloc(size_t size)
@@ -389,7 +393,7 @@ cmd_fb(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 		    &branch->branch_header, CMD_PTR_BRANCH_CASE, &uuid);
 	}
 
-	if (strcmp(strrchr(class, '.'), FBR_ERROR) == 0) {
+	if (ERR_CLASS(class, FBR_ERROR) == 0) {
 		if (nvlist_lookup_uint64(nvl, FM_EREPORT_PAYLOAD_NAME_TS3_FCR,
 		    &ts3_fcr) == 0 && (ts3_fcr != VF_TS3_FCR)) {
 			fmd_hdl_debug(hdl,
@@ -422,7 +426,7 @@ cmd_fb(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 			cmd_branch_create_fault(hdl, branch,
 			    "fault.memory.link-c", det);
 		}
-	} else if (strcmp(strrchr(class, '.'), DSU_ERROR) == 0) {
+	} else if (ERR_CLASS(class, DSU_ERROR) == 0) {
 		fmd_hdl_debug(hdl, "Processing dsu event");
 		cmd_branch_create_fault(hdl, branch, "fault.memory.bank", det);
 	} else {
@@ -468,6 +472,58 @@ cmd_fb_train(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 		    clcode, rc1);
 
 	return (rc);
+}
+
+
+/*ARGSUSED*/
+cmd_evdisp_t
+cmd_fw_defect(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
+    cmd_errcl_t clcode)
+{
+	const char *fltclass = NULL;
+	nvlist_t *rsc = NULL;
+	int solve = 0;
+
+	if ((rsc = init_mb(hdl)) == NULL)
+		return (CMD_EVD_UNUSED);
+
+	if (ERR_CLASS(class, FERG_INVALID) == 0) {
+		fltclass = "defect.fw.generic-sparc.erpt-gen";
+	} else if (ERR_CLASS(class, DBU_ERROR) == 0) {
+		cmd_evdisp_t rc;
+		fltclass = "defect.fw.generic-sparc.addr-oob";
+		/*
+		 * add dbu to nop error train
+		 */
+		rc = cmd_xxcu_initial(hdl, ep, nvl, class, clcode,
+		    CMD_XR_HDLR_NOP);
+		if (rc != 0)
+			fmd_hdl_debug(hdl,
+			    "Failed to add error (%llx) to the train, rc = %d",
+			    clcode, rc);
+	} else {
+		fmd_hdl_debug(hdl, "Unexpected fw defect event %s", class);
+	}
+
+	if (fltclass) {
+		fmd_case_t *cp = NULL;
+		nvlist_t *fault = NULL;
+
+		fault = fmd_nvl_create_fault(hdl, fltclass, 100, NULL,
+		    NULL, rsc);
+		if (fault != NULL) {
+			cp = fmd_case_open(hdl, NULL);
+			fmd_case_add_ereport(hdl, cp, ep);
+			fmd_case_add_suspect(hdl, cp, fault);
+			fmd_case_solve(hdl, cp);
+			solve = 1;
+		}
+	}
+
+	if (rsc)
+		nvlist_free(rsc);
+
+	return (solve ? CMD_EVD_OK : CMD_EVD_UNUSED);
 }
 
 void
