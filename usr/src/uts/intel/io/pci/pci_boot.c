@@ -186,6 +186,7 @@ pci_process_acpi_device(ACPI_HANDLE hdl, UINT32 level, void *ctx, void **rv)
 	ACPI_BUFFER	rb;
 	ACPI_OBJECT	ro;
 	ACPI_DEVICE_INFO *adi;
+	int		busnum;
 
 	/*
 	 * Use AcpiGetObjectInfo() to find the device _HID
@@ -224,10 +225,24 @@ pci_process_acpi_device(ACPI_HANDLE hdl, UINT32 level, void *ctx, void **rv)
 	rb.Length = sizeof (ro);
 	if (ACPI_SUCCESS(AcpiEvaluateObjectTyped(hdl, "_BBN",
 	    NULL, &rb, ACPI_TYPE_INTEGER))) {
-		/* PCI with _BBN, process it, go no deeper */
-		if (pci_bus_res[ro.Integer.Value].par_bus == (uchar_t)-1 &&
-		    pci_bus_res[ro.Integer.Value].dip == NULL)
-			create_root_bus_dip((uchar_t)ro.Integer.Value);
+		busnum = ro.Integer.Value;
+
+		/*
+		 * Ignore invalid _BBN return values here (rather
+		 * than panic) and emit a warning; something else
+		 * may suffer failure as a result of the broken BIOS.
+		 */
+		if ((busnum < 0) || (busnum > pci_bios_maxbus)) {
+			cmn_err(CE_WARN,
+			    "pci_process_acpi_device: invalid _BBN 0x%x\n",
+			    busnum);
+			return (AE_CTRL_DEPTH);
+		}
+
+		/* PCI with valid _BBN */
+		if (pci_bus_res[busnum].par_bus == (uchar_t)-1 &&
+		    pci_bus_res[busnum].dip == NULL)
+			create_root_bus_dip((uchar_t)busnum);
 		return (AE_CTRL_DEPTH);
 	}
 

@@ -108,6 +108,7 @@
 			<value_node value='VMware Virtual Platform' />
 			<value_node value='MCP55' />
 			<value_node value='Precision WorkStation 650    ' />
+			<value_node value='PowerEdge 1600SC           ' />
 		    </astring_list>
 		</property>
 	</property_group>
