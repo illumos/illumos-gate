@@ -592,6 +592,7 @@ show_sockopts(struct ps_prochandle *Pr, int fd)
 	    { SOL_SOCKET, SO_MAC_EXEMPT,	"SO_MAC_EXEMPT," },
 	    { SOL_SOCKET, SO_MAC_IMPLICIT,	"SO_MAC_IMPLICIT," },
 	    { SOL_SOCKET, SO_EXCLBIND,		"SO_EXCLBIND," },
+	    { SOL_SOCKET, SO_VRRP,		"SO_VRRP," },
 	    { IPPROTO_UDP, UDP_NAT_T_ENDPOINT,	"UDP_NAT_T_ENDPOINT," },
 	};
 	struct linger l;

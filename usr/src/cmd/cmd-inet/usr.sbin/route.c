@@ -2551,9 +2551,11 @@ static char *msgtypes[] = {
 	"RTM_OLDADD: caused by SIOCADDRT",
 	"RTM_OLDDEL: caused by SIOCDELRT",
 	"RTM_RESOLVE: Route created by cloning",
-	"RTM_NEWADDR: address being added to iface",
-	"RTM_DELADDR: address being removed from iface",
+	"RTM_NEWADDR: address being brought up on iface",
+	"RTM_DELADDR: address being brought down on iface",
 	"RTM_IFINFO: iface status change",
+	"RTM_CHGADDR: address being changed on iface",
+	"RTM_FREEADDR: address being removed from iface",
 	0,
 };
 
@@ -2618,6 +2620,8 @@ print_rtmsg(struct rt_msghdr *rtm, int msglen)
 		break;
 	case RTM_NEWADDR:
 	case RTM_DELADDR:
+	case RTM_CHGADDR:
+	case RTM_FREEADDR:
 		ifam = (struct ifa_msghdr *)rtm;
 		(void) printf("metric %d, flags:", ifam->ifam_metric);
 		bprintf(stdout, ifam->ifam_flags, routeflags);

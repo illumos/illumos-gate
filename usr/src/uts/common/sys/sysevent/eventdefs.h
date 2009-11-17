@@ -52,6 +52,7 @@ extern "C" {
 #define	EC_FM		"EC_fm"		/* FMA error report event */
 #define	EC_ZFS		"EC_zfs"	/* ZFS event */
 #define	EC_DATALINK	"EC_datalink"	/* datalink event */
+#define	EC_VRRP		"EC_vrrp"	/* VRRP event */
 
 /*
  * The following event class is reserved for exclusive use
@@ -260,6 +261,12 @@ extern "C" {
  * datalink subclass definitions.
  */
 #define	ESC_DATALINK_PHYS_ADD	"ESC_datalink_phys_add"	/* new physical link */
+
+/*
+ * VRRP subclass definitions. Supporting attributes (name/value paris) are
+ * found in sys/sysevent/vrrp.h
+ */
+#define	ESC_VRRP_STATE_CHANGE	"ESC_vrrp_state_change"
 
 #ifdef	__cplusplus
 }

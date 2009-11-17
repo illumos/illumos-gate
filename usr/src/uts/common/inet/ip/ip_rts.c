@@ -1791,6 +1791,8 @@ rts_header_msg_size(int type)
 	switch (type) {
 	case RTM_DELADDR:
 	case RTM_NEWADDR:
+	case RTM_CHGADDR:
+	case RTM_FREEADDR:
 		return (sizeof (ifa_msghdr_t));
 	case RTM_IFINFO:
 		return (sizeof (if_msghdr_t));
@@ -1935,15 +1937,13 @@ ip_rts_xifmsg(const ipif_t *ipif, uint64_t set, uint64_t clear, uint_t flags)
 }
 
 /*
- * This is called to generate messages to the routing socket
- * indicating a network interface has had addresses associated with it.
- * The structure of the code is based on the 4.4BSD-Lite2 <net/rtsock.c>.
+ * If cmd is RTM_ADD or RTM_DELETE, generate the rt_msghdr_t message;
+ * otherwise (RTM_NEWADDR, RTM_DELADDR, RTM_CHGADDR and RTM_FREEADDR)
+ * generate the ifa_msghdr_t message.
  */
-void
-ip_rts_newaddrmsg(int cmd, int error, const ipif_t *ipif, uint_t flags)
+static void
+rts_new_rtsmsg(int cmd, int error, const ipif_t *ipif, uint_t flags)
 {
-	int		pass;
-	int		ncmd;
 	int		rtm_addrs;
 	mblk_t		*mp;
 	ifa_msghdr_t	*ifam;
@@ -1952,15 +1952,93 @@ ip_rts_newaddrmsg(int cmd, int error, const ipif_t *ipif, uint_t flags)
 	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
 
 	/*
-	 * Let conn_ixa caching know that source address selection
-	 * changed
+	 * Do not report unspecified address if this is the RTM_CHGADDR or
+	 * RTM_FREEADDR message.
 	 */
-	ip_update_source_selection(ipst);
+	if (cmd == RTM_CHGADDR || cmd == RTM_FREEADDR) {
+		if (!ipif->ipif_isv6) {
+			if (ipif->ipif_lcl_addr == INADDR_ANY)
+				return;
+		} else if (IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6lcl_addr)) {
+			return;
+		}
+	}
 
 	if (ipif->ipif_isv6)
 		af = AF_INET6;
 	else
 		af = AF_INET;
+
+	if (cmd == RTM_ADD || cmd == RTM_DELETE)
+		rtm_addrs = (RTA_DST | RTA_NETMASK);
+	else
+		rtm_addrs = (RTA_IFA | RTA_NETMASK | RTA_BRD | RTA_IFP);
+
+	mp = rts_alloc_msg(cmd, rtm_addrs, af, 0);
+	if (mp == NULL)
+		return;
+
+	if (cmd != RTM_ADD && cmd != RTM_DELETE) {
+		switch (af) {
+		case AF_INET:
+			rts_fill_msg(cmd, rtm_addrs, 0,
+			    ipif->ipif_net_mask, 0, ipif->ipif_lcl_addr,
+			    ipif->ipif_pp_dst_addr, 0,
+			    ipif->ipif_lcl_addr, ipif->ipif_ill,
+			    mp, NULL);
+			break;
+		case AF_INET6:
+			rts_fill_msg_v6(cmd, rtm_addrs,
+			    &ipv6_all_zeros, &ipif->ipif_v6net_mask,
+			    &ipv6_all_zeros, &ipif->ipif_v6lcl_addr,
+			    &ipif->ipif_v6pp_dst_addr, &ipv6_all_zeros,
+			    &ipif->ipif_v6lcl_addr, ipif->ipif_ill,
+			    mp, NULL);
+			break;
+		}
+		ifam = (ifa_msghdr_t *)mp->b_rptr;
+		ifam->ifam_index =
+		    ipif->ipif_ill->ill_phyint->phyint_ifindex;
+		ifam->ifam_metric = ipif->ipif_metric;
+		ifam->ifam_flags = ((cmd == RTM_NEWADDR) ? RTF_UP : 0);
+		ifam->ifam_addrs = rtm_addrs;
+	} else {
+		switch (af) {
+		case AF_INET:
+			rts_fill_msg(cmd, rtm_addrs,
+			    ipif->ipif_lcl_addr, ipif->ipif_net_mask, 0,
+			    0, 0, 0, 0, NULL, mp, NULL);
+			break;
+		case AF_INET6:
+			rts_fill_msg_v6(cmd, rtm_addrs,
+			    &ipif->ipif_v6lcl_addr,
+			    &ipif->ipif_v6net_mask, &ipv6_all_zeros,
+			    &ipv6_all_zeros, &ipv6_all_zeros,
+			    &ipv6_all_zeros, &ipv6_all_zeros,
+			    NULL, mp, NULL);
+			break;
+		}
+		rtm = (rt_msghdr_t *)mp->b_rptr;
+		rtm->rtm_index =
+		    ipif->ipif_ill->ill_phyint->phyint_ifindex;
+		rtm->rtm_flags = ((cmd == RTM_ADD) ? RTF_UP : 0);
+		rtm->rtm_errno = error;
+		if (error == 0)
+			rtm->rtm_flags |= RTF_DONE;
+		rtm->rtm_addrs = rtm_addrs;
+	}
+	rts_queue_input(mp, NULL, af, flags, ipst);
+}
+
+/*
+ * This is called to generate messages to the routing socket
+ * indicating a network interface has had addresses associated with it.
+ * The structure of the code is based on the 4.4BSD-Lite2 <net/rtsock.c>.
+ */
+void
+ip_rts_newaddrmsg(int cmd, int error, const ipif_t *ipif, uint_t flags)
+{
+	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
 
 	if (flags & RTSQ_DEFAULT) {
 		flags = RTSQ_ALL;
@@ -1973,74 +2051,29 @@ ip_rts_newaddrmsg(int cmd, int error, const ipif_t *ipif, uint_t flags)
 	}
 
 	/*
+	 * Let conn_ixa caching know that source address selection
+	 * changed
+	 */
+	if (cmd == RTM_ADD || cmd == RTM_DELETE)
+		ip_update_source_selection(ipst);
+
+	/*
 	 * If the request is DELETE, send RTM_DELETE and RTM_DELADDR.
 	 * if the request is ADD, send RTM_NEWADDR and RTM_ADD.
+	 * otherwise simply send the request.
 	 */
-	for (pass = 1; pass < 3; pass++) {
-		if ((cmd == RTM_ADD && pass == 1) ||
-		    (cmd == RTM_DELETE && pass == 2)) {
-			ncmd = ((cmd == RTM_ADD) ? RTM_NEWADDR : RTM_DELADDR);
-
-			rtm_addrs = (RTA_IFA | RTA_NETMASK | RTA_BRD | RTA_IFP);
-			mp = rts_alloc_msg(ncmd, rtm_addrs, af, 0);
-			if (mp == NULL)
-				continue;
-			switch (af) {
-			case AF_INET:
-				rts_fill_msg(ncmd, rtm_addrs, 0,
-				    ipif->ipif_net_mask, 0, ipif->ipif_lcl_addr,
-				    ipif->ipif_pp_dst_addr, 0,
-				    ipif->ipif_lcl_addr, ipif->ipif_ill,
-				    mp, NULL);
-				break;
-			case AF_INET6:
-				rts_fill_msg_v6(ncmd, rtm_addrs,
-				    &ipv6_all_zeros, &ipif->ipif_v6net_mask,
-				    &ipv6_all_zeros, &ipif->ipif_v6lcl_addr,
-				    &ipif->ipif_v6pp_dst_addr, &ipv6_all_zeros,
-				    &ipif->ipif_v6lcl_addr, ipif->ipif_ill,
-				    mp, NULL);
-				break;
-			}
-			ifam = (ifa_msghdr_t *)mp->b_rptr;
-			ifam->ifam_index =
-			    ipif->ipif_ill->ill_phyint->phyint_ifindex;
-			ifam->ifam_metric = ipif->ipif_metric;
-			ifam->ifam_flags = ((cmd == RTM_ADD) ? RTF_UP : 0);
-			ifam->ifam_addrs = rtm_addrs;
-			rts_queue_input(mp, NULL, af, flags, ipst);
-		}
-		if ((cmd == RTM_ADD && pass == 2) ||
-		    (cmd == RTM_DELETE && pass == 1)) {
-			rtm_addrs = (RTA_DST | RTA_NETMASK);
-			mp = rts_alloc_msg(cmd, rtm_addrs, af, 0);
-			if (mp == NULL)
-				continue;
-			switch (af) {
-			case AF_INET:
-				rts_fill_msg(cmd, rtm_addrs,
-				    ipif->ipif_lcl_addr, ipif->ipif_net_mask, 0,
-				    0, 0, 0, 0, NULL, mp, NULL);
-				break;
-			case AF_INET6:
-				rts_fill_msg_v6(cmd, rtm_addrs,
-				    &ipif->ipif_v6lcl_addr,
-				    &ipif->ipif_v6net_mask, &ipv6_all_zeros,
-				    &ipv6_all_zeros, &ipv6_all_zeros,
-				    &ipv6_all_zeros, &ipv6_all_zeros,
-				    NULL, mp, NULL);
-				break;
-			}
-			rtm = (rt_msghdr_t *)mp->b_rptr;
-			rtm->rtm_index =
-			    ipif->ipif_ill->ill_phyint->phyint_ifindex;
-			rtm->rtm_flags = ((cmd == RTM_ADD) ? RTF_UP : 0);
-			rtm->rtm_errno = error;
-			if (error == 0)
-				rtm->rtm_flags |= RTF_DONE;
-			rtm->rtm_addrs = rtm_addrs;
-			rts_queue_input(mp, NULL, af, flags, ipst);
-		}
+	switch (cmd) {
+	case RTM_ADD:
+		rts_new_rtsmsg(RTM_NEWADDR, error, ipif, flags);
+		rts_new_rtsmsg(RTM_ADD, error, ipif, flags);
+		break;
+	case RTM_DELETE:
+		rts_new_rtsmsg(RTM_DELETE, error, ipif, flags);
+		rts_new_rtsmsg(RTM_DELADDR, error, ipif, flags);
+		break;
+	default:
+		rts_new_rtsmsg(cmd, error, ipif, flags);
+		break;
 	}
 }
 

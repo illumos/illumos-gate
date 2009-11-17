@@ -283,6 +283,23 @@ get_group()
 }
 
 #
+# Given the interface name and the address family (inet or inet6), determine
+# whether this is a VRRP VNIC.
+#
+# This is used to determine whether to bring the interface up
+#
+not_vrrp_interface() {
+	macaddrtype=`/sbin/dladm show-vnic $1 -o MACADDRTYPE -p 2>/dev/null`
+
+	case "$macaddrtype" in
+	'vrrp'*''$2'')	vrrp=1
+			;;
+        *)		vrrp=0
+			;;
+	esac
+	return $vrrp
+}
+
 # doDHCPhostname interface
 # Pass to this function the name of an interface.  It will return
 # true if one should enable the use of DHCP client-side host name
@@ -315,6 +332,9 @@ doDHCPhostname()
 # the old style address which results in the interface being brought up 
 # and the netmask and broadcast address being set ($inet_oneline_epilogue).
 #
+# Note that if the interface is a VRRP interface, do not bring the address
+# up ($inet_oneline_epilogue_no_up).
+#
 # If there are multiple lines we assume the file contains a list of
 # commands to the processor with neither the implied bringing up of the
 # interface nor the setting of the default netmask and broadcast address.
@@ -322,6 +342,7 @@ doDHCPhostname()
 # Return non-zero if any command fails so that the caller may alert
 # users to errors in the configuration.
 #
+inet_oneline_epilogue_no_up="netmask + broadcast +"
 inet_oneline_epilogue="netmask + broadcast + up"
 
 inet_process_hostname()
@@ -365,8 +386,17 @@ inet_process_hostname()
 			#
 			[ -z "$ifcmds" ] && return $retval
 			if [ $multiple_lines = false ]; then
+				#
 				# The traditional one-line hostname file.
-				ifcmds="$ifcmds $inet_oneline_epilogue"
+				# Note that we only bring it up if the
+				# interface is not a VRRP VNIC.
+				#
+				if not_vrrp_interface $2 $3; then
+					estr="$inet_oneline_epilogue"
+				else
+					estr="$inet_oneline_epilogue_no_up"
+				fi
+				ifcmds="$ifcmds $estr"
 			fi
 
 			#
@@ -547,7 +577,13 @@ if_configure()
 		if [ $? != 0 ]; then
 			fail="$fail $1"
 		elif [ "$type" = inet6 ]; then
-		    	/sbin/ifconfig $1 inet6 up || fail="$fail $1"
+			#
+			# only bring the interface up if it is not a
+			# VRRP VNIC
+			#
+			if not_vrrp_interface $1 $type; then
+			    	/sbin/ifconfig $1 inet6 up || fail="$fail $1"
+			fi
 		fi
 		echo " $1\c"
 		shift

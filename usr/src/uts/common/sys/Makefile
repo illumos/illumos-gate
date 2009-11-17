@@ -962,7 +962,8 @@ SYSEVENTHDRS=		\
 	eventdefs.h	\
 	ipmp.h		\
 	pwrctl.h	\
-	svm.h
+	svm.h		\
+	vrrp.h
 
 CONTRACTHDRS=		\
 	process.h	\

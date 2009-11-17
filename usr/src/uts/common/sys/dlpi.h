@@ -599,6 +599,8 @@ union	DL_qos_types {
 					/* dl_data is dl_capab_zerocopy_t */
 #define	DL_CAPAB_DLD		0x06	/* dld capability */
 					/* dl_data is dl_capab_dld_t */
+#define	DL_CAPAB_VRRP		0x07	/* vrrp capability */
+					/* dl_data is dl_capab_vrrp_t */
 
 typedef struct {
 	t_uscalar_t	dl_cap;		/* capability type */
@@ -678,6 +680,13 @@ typedef struct {
 #define	HCKSUM_IPHDRCKSUM	0x10	/* IPv4 Header checksum offload */
 					/* capability */
 #ifdef _KERNEL
+
+/*
+ * VRRP sub-capability (follows dl_capability_sub_t)
+ */
+typedef struct {
+	int	vrrp_af;	/* IPv4 or IPv6 */
+} dl_capab_vrrp_t;
 
 /*
  * The DL_CAPAB_DLD capability enables the capabilities of gldv3-based drivers

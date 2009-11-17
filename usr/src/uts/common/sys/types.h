@@ -379,6 +379,7 @@ typedef	unsigned int uid_t;		/* UID type		*/
 typedef	uid_t	gid_t;			/* GID type		*/
 
 typedef uint32_t	datalink_id_t;
+typedef	uint32_t	vrid_t;
 
 typedef id_t    taskid_t;
 typedef id_t    projid_t;

@@ -1552,6 +1552,8 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	dl_capab_dld_t		dld;
 	dl_capab_hcksum_t	hcksum;
 	dl_capab_zerocopy_t	zcopy;
+	dl_capab_vrrp_t		vrrp;
+	mac_capab_vrrp_t	vrrp_capab;
 	uint8_t			*ptr;
 	queue_t			*q = dsp->ds_wq;
 	mblk_t			*mp1;
@@ -1559,6 +1561,7 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	boolean_t		hcksum_capable = B_FALSE;
 	boolean_t		zcopy_capable = B_FALSE;
 	boolean_t		dld_capable = B_FALSE;
+	boolean_t		vrrp_capable = B_FALSE;
 
 	/*
 	 * Initially assume no capabilities.
@@ -1602,6 +1605,16 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 		dld_capable = B_TRUE;
 		subsize += sizeof (dl_capability_sub_t) +
 		    sizeof (dl_capab_dld_t);
+	}
+
+	/*
+	 * Check if vrrp is supported on this interface. If so, reserve
+	 * space for that capability.
+	 */
+	if (mac_capab_get(dsp->ds_mh, MAC_CAPAB_VRRP, &vrrp_capab)) {
+		vrrp_capable = B_TRUE;
+		subsize += sizeof (dl_capability_sub_t) +
+		    sizeof (dl_capab_vrrp_t);
 	}
 
 	/*
@@ -1657,6 +1670,21 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 		dlcapabsetqid(&(zcopy.zerocopy_mid), dsp->ds_rq);
 		bcopy(&zcopy, ptr, sizeof (dl_capab_zerocopy_t));
 		ptr += sizeof (dl_capab_zerocopy_t);
+	}
+
+	/*
+	 * VRRP capability negotiation
+	 */
+	if (vrrp_capable) {
+		dlsp = (dl_capability_sub_t *)ptr;
+		dlsp->dl_cap = DL_CAPAB_VRRP;
+		dlsp->dl_length = sizeof (dl_capab_vrrp_t);
+		ptr += sizeof (dl_capability_sub_t);
+
+		bzero(&vrrp, sizeof (dl_capab_vrrp_t));
+		vrrp.vrrp_af = vrrp_capab.mcv_af;
+		bcopy(&vrrp, ptr, sizeof (dl_capab_vrrp_t));
+		ptr += sizeof (dl_capab_vrrp_t);
 	}
 
 	/*

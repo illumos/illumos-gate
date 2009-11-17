@@ -210,6 +210,7 @@ vnic_ioc_create(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 
 	switch (mac_addr_type) {
 	case VNIC_MAC_ADDR_TYPE_FIXED:
+	case VNIC_MAC_ADDR_TYPE_VRID:
 		mac_len = create_arg->vc_mac_len;
 		/*
 		 * Sanity check the MAC address length. vnic_dev_create()
@@ -265,8 +266,11 @@ vnic_ioc_create(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 create:
 	err = vnic_dev_create(create_arg->vc_vnic_id, create_arg->vc_link_id,
 	    &mac_addr_type, &mac_len, mac_addr, &mac_slot, mac_prefix_len,
-	    create_arg->vc_vid, &create_arg->vc_resource_props,
-	    create_arg->vc_flags, &diag, cred);
+	    create_arg->vc_vid, create_arg->vc_vrid, create_arg->vc_af,
+	    &create_arg->vc_resource_props, create_arg->vc_flags, &diag,
+	    cred);
+
+
 	if (err != 0)
 		goto bail;
 

@@ -79,6 +79,7 @@ COMMON_SUBDIRS = \
 	cmd/cmd-inet/usr.lib/inetd \
 	cmd/cmd-inet/usr.lib/pppoe \
 	cmd/cmd-inet/usr.lib/slpd \
+	cmd/cmd-inet/usr.lib/vrrpd \
 	cmd/cmd-inet/usr.lib/wpad \
 	cmd/cmd-inet/usr.lib/wanboot \
 	cmd/cmd-inet/usr.sadm \
@@ -298,6 +299,7 @@ COMMON_SUBDIRS = \
 	cmd/utmp_update \
 	cmd/utmpd \
 	cmd/valtools \
+	cmd/vrrpadm \
 	cmd/vt \
 	cmd/wall \
 	cmd/wbem \
@@ -427,6 +429,7 @@ COMMON_SUBDIRS = \
 	lib/libunistat \
 	lib/libuuid \
 	lib/libuutil \
+	lib/libvrrpadm \
 	lib/libwanboot \
 	lib/libwanbootutil \
 	lib/libxnet \

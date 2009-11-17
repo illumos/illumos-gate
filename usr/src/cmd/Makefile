@@ -428,6 +428,7 @@ COMMON_SUBDIRS=		\
 	vi		\
 	volcheck	\
 	volrmmount	\
+	vrrpadm		\
 	vscan		\
 	vt		\
 	w		\
@@ -718,6 +719,7 @@ MSGSUBDIRS=		\
 	vi		\
 	volcheck	\
 	volrmmount	\
+	vrrpadm		\
 	w		\
 	wbem		\
 	who		\

@@ -147,7 +147,7 @@ struct ifnet {
 
 #define	IFF_IPV4	0x0001000000	/* IPv4 interface */
 #define	IFF_IPV6	0x0002000000	/* IPv6 interface */
-					/* 0x0004000000 was IFF_MIPRUNNING */
+#define	IFF_NOACCEPT	0x0004000000	/* no-accept mode VRRP ill */
 #define	IFF_NOFAILOVER	0x0008000000	/* in.mpathd(1M) test address */
 
 #define	IFF_FAILED	0x0010000000	/* Interface has failed */
@@ -168,20 +168,22 @@ struct ifnet {
 #define	IFF_VIRTUAL	0x2000000000ll	/* Does not send or receive packets */
 #define	IFF_DUPLICATE	0x4000000000ll	/* Local address already in use */
 #define	IFF_IPMP	0x8000000000ll	/* IPMP IP interface */
+#define	IFF_VRRP	0x10000000000ll	/* Managed by VRRP */
 
 /* flags that cannot be changed by userland on any interface */
 #define	IFF_CANTCHANGE \
 	(IFF_BROADCAST | IFF_POINTOPOINT | IFF_RUNNING | IFF_PROMISC | \
 	IFF_MULTICAST | IFF_MULTI_BCAST | IFF_UNNUMBERED | IFF_IPV4 | \
 	IFF_IPV6 | IFF_IPMP | IFF_FIXEDMTU | IFF_VIRTUAL | \
-	IFF_LOOPBACK | IFF_ALLMULTI | IFF_DUPLICATE | IFF_COS_ENABLED)
+	IFF_LOOPBACK | IFF_ALLMULTI | IFF_DUPLICATE | IFF_COS_ENABLED | \
+	IFF_VRRP)
 
 /* flags that cannot be changed by userland on an IPMP interface */
 #define	IFF_IPMP_CANTCHANGE 	IFF_FAILED
 
 /* flags that can never be set on an IPMP interface */
 #define	IFF_IPMP_INVALID	(IFF_STANDBY | IFF_INACTIVE | IFF_OFFLINE | \
-	IFF_NOFAILOVER | IFF_NOARP | IFF_NONUD | IFF_XRESOLV)
+	IFF_NOFAILOVER | IFF_NOARP | IFF_NONUD | IFF_XRESOLV | IFF_NOACCEPT)
 
 /*
  * Output queues (ifp->if_snd) and internetwork datagram level (pup level 1)

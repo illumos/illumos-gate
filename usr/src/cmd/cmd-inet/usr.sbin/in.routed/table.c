@@ -687,8 +687,8 @@ rtm_type_name(uchar_t type)
 		"RTM_NEWADDR",
 		"RTM_DELADDR",
 		"RTM_IFINFO",
-		"RTM_NEWMADDR",
-		"RTM_DELMADDR"
+		"RTM_CHGMADDR",
+		"RTM_FREEMADDR"
 	};
 #define	NEW_RTM_PAT	"RTM type %#x"
 	static char name0[sizeof (NEW_RTM_PAT) + 2];
@@ -716,6 +716,8 @@ dump_rt_msg(const char *act, struct rt_msghdr *rtm, int mlen)
 	switch (rtm->rtm_type) {
 	case RTM_NEWADDR:
 	case RTM_DELADDR:
+	case RTM_FREEADDR:
+	case RTM_CHGADDR:
 		mtype = "ifam";
 		break;
 	case RTM_IFINFO:
@@ -737,6 +739,8 @@ dump_rt_msg(const char *act, struct rt_msghdr *rtm, int mlen)
 	switch (rtm->rtm_type) {
 	case RTM_NEWADDR:
 	case RTM_DELADDR:
+	case RTM_CHGADDR:
+	case RTM_FREEADDR:
 		ifam = (struct ifa_msghdr *)rtm;
 		trace_misc("ifam: msglen %d version %d type %d addrs %X",
 		    ifam->ifam_msglen, ifam->ifam_version, ifam->ifam_type,
@@ -1637,6 +1641,9 @@ read_rt(void)
 			    ((ifp->int_if_flags ^ m.ifm.ifm_flags) &
 			    IFF_UP) != 0)
 				ifscan_timer.tv_sec = now.tv_sec;
+			continue;
+		} else if (m.r.rtm.rtm_type == RTM_CHGADDR ||
+		    m.r.rtm.rtm_type == RTM_FREEADDR) {
 			continue;
 		} else {
 			if (m.r.rtm.rtm_index != 0)

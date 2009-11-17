@@ -429,11 +429,12 @@ if_process(int s, char *ifname, boolean_t first)
 	}
 
 	/*
-	 * Ignore loopback and point-to-multipoint interfaces.
+	 * Ignore loopback, point-to-multipoint and VRRP interfaces.
+	 * The IP addresses over VRRP interfaces cannot be auto-configured.
 	 * Point-to-point interfaces always have IFF_MULTICAST set.
 	 */
 	if (!(lifr.lifr_flags & IFF_MULTICAST) ||
-	    (lifr.lifr_flags & IFF_LOOPBACK)) {
+	    (lifr.lifr_flags & (IFF_LOOPBACK|IFF_VRRP))) {
 		return;
 	}
 

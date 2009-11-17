@@ -375,7 +375,8 @@ struct conn_s {
 		conn_mac_mode : 2,		/* normal/loose/implicit MAC */
 		conn_anon_priv_bind : 1,	/* *_ANON_PRIV_BIND state */
 		conn_zone_is_global : 1,	/* GLOBAL_ZONEID */
-		conn_spare : 24;
+		conn_isvrrp : 1,		/* VRRP control socket */
+		conn_spare : 23;
 
 	boolean_t	conn_flow_cntrld;
 	netstack_t	*conn_netstack;	/* Corresponds to a netstack_hold */

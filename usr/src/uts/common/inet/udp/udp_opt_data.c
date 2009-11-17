@@ -75,6 +75,7 @@ opdes_t	udp_opt_arr[] = {
 	},
 { SO_ALLZONES, SOL_SOCKET, OA_R, OA_RW, OP_CONFIG, 0, sizeof (int),
 	0 },
+{ SO_VRRP, SOL_SOCKET, OA_RW, OA_RW, OP_CONFIG, 0, sizeof (int), 0 },
 { SO_TIMESTAMP, SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0
 	},
 { SO_ANON_MLP, SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int),

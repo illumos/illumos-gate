@@ -140,13 +140,9 @@ ire_init_v6(ire_t *ire, const in6_addr_t *v6addr, const in6_addr_t *v6mask,
 	case IRE_LOCAL:
 		ire->ire_sendfn = ire_send_local_v6;
 		ire->ire_recvfn = ire_recv_local_v6;
-#ifdef SO_VRRP
 		ASSERT(ire->ire_ill != NULL);
-		if (ire->ire_ill->ill_flags & ILLF_NOACCEPT) {
-			ire->ire_noaccept = B_TRUE;
+		if (ire->ire_ill->ill_flags & ILLF_NOACCEPT)
 			ire->ire_recvfn = ire_recv_noaccept_v6;
-		}
-#endif
 		break;
 	case IRE_LOOPBACK:
 		ire->ire_sendfn = ire_send_local_v6;

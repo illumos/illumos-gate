@@ -97,6 +97,7 @@ solaris.network.ilb.enable:::Network ILB Enable Configuration::help=NetworkILBen
 solaris.network.link.security:::Link Security::help=LinkSecurity.html
 solaris.network.wifi.config:::Wifi Config::help=WifiConfig.html
 solaris.network.wifi.wep:::Wifi Wep::help=WifiWep.html
+solaris.network.vrrp:::Administer VRRP::help=NetworkVRRP.html
 #
 solaris.print.:::Printer Management::help=PrintHeader.html
 solaris.print.admin:::Administer Printer::help=PrintAdmin.html

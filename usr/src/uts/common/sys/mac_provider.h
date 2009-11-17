@@ -90,6 +90,7 @@ typedef enum {
 	MAC_CAPAB_NO_NATIVEVLAN	= 0x0008, /* boolean only, no data */
 	MAC_CAPAB_NO_ZCOPY	= 0x0010, /* boolean only, no data */
 	MAC_CAPAB_LEGACY	= 0x0020, /* data is mac_capab_legacy_t */
+	MAC_CAPAB_VRRP		= 0x0040, /* data is mac_capab_vrrp_t */
 
 	/*
 	 * Public Capabilities
@@ -392,6 +393,11 @@ typedef struct  mac_capab_share_s {
 	mac_bind_share_t	ms_sbind;	/* Bind a share */
 	mac_unbind_share_t	ms_sunbind;	/* Unbind a share */
 } mac_capab_share_t;
+
+typedef struct mac_capab_vrrp_s {
+	/* IPv6 or IPv4? */
+	int		mcv_af;
+} mac_capab_vrrp_t;
 
 /*
  * MAC registration interface

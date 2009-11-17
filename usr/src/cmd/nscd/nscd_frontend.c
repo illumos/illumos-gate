@@ -1522,6 +1522,8 @@ rts_mon(void)
 		case RTM_OLDDEL:
 		case RTM_RESOLVE:
 		case RTM_IFINFO:
+		case RTM_CHGADDR:
+		case RTM_FREEADDR:
 			break;
 		default:
 			_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)

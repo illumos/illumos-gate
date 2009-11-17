@@ -80,7 +80,7 @@ extern "C" {
 
 #define	IFF_PHYINTINST_FLAGS	(IFF_DEBUG|IFF_NOTRAILERS|IFF_NOARP| \
     IFF_MULTICAST|IFF_ROUTER|IFF_NONUD|IFF_NORTEXCH|IFF_IPV4|IFF_IPV6| \
-    IFF_COS_ENABLED|IFF_FIXEDMTU)
+    IFF_COS_ENABLED|IFF_FIXEDMTU|IFF_VRRP|IFF_NOACCEPT)
 
 #define	IFF_LOGINT_FLAGS	(IFF_UP|IFF_BROADCAST|IFF_POINTOPOINT| \
     IFF_UNNUMBERED|IFF_DHCPRUNNING|IFF_PRIVATE|IFF_NOXMIT|IFF_NOLOCAL| \
@@ -111,6 +111,8 @@ extern "C" {
 #define	ILLF_IPV6		IFF_IPV6	/* IPv6 interface */
 #define	ILLF_COS_ENABLED	IFF_COS_ENABLED	/* Is CoS marking supported */
 #define	ILLF_FIXEDMTU		IFF_FIXEDMTU	/* set with SIOCSLIFMTU */
+#define	ILLF_VRRP		IFF_VRRP	/* managed by VRRP */
+#define	ILLF_NOACCEPT		IFF_NOACCEPT	/* accept only ND messagees */
 
 #define	IPIF_UP			IFF_UP		/* interface is up */
 #define	IPIF_BROADCAST		IFF_BROADCAST	/* broadcast address valid */
@@ -311,6 +313,7 @@ extern	ip_extract_func_t ip_extract_arpreq, ip_extract_lifreq;
 
 extern	int	ip_addr_availability_check(ipif_t *);
 extern	void	ip_ll_subnet_defaults(ill_t *, mblk_t *);
+extern	void	ill_capability_send(ill_t *, mblk_t *);
 
 extern	int	ip_rt_add(ipaddr_t, ipaddr_t, ipaddr_t, ipaddr_t, int,
     ill_t *, ire_t **, boolean_t, struct rtsa_s *, ip_stack_t *, zoneid_t);

@@ -658,11 +658,9 @@ conn_opt_get(conn_opt_arg_t *coa, t_scalar_t level, t_scalar_t name,
 		case SO_TIMESTAMP:
 			*i1 = connp->conn_recv_ancillary.crb_timestamp;
 			break;	/* goto sizeof (int) option return */
-#ifdef SO_VRRP
 		case SO_VRRP:
 			*i1 = connp->conn_isvrrp;
 			break;	/* goto sizeof (int) option return */
-#endif
 		case SO_ANON_MLP:
 			*i1 = connp->conn_anon_mlp;
 			break;	/* goto sizeof (int) option return */
@@ -1058,12 +1056,10 @@ conn_opt_set_socket(conn_opt_arg_t *coa, t_scalar_t name, uint_t inlen,
 		if (IPCL_IS_BOUND(connp))
 			return (EINVAL);
 		break;
-#ifdef SO_VRRP
 	case SO_VRRP:
 		if (secpolicy_ip_config(cr, checkonly) != 0)
 			return (EACCES);
 		break;
-#endif
 	case SO_MAC_EXEMPT:
 		if (secpolicy_net_mac_aware(cr) != 0)
 			return (EACCES);
@@ -1153,11 +1149,9 @@ conn_opt_set_socket(conn_opt_arg_t *coa, t_scalar_t name, uint_t inlen,
 	case SO_TIMESTAMP:
 		connp->conn_recv_ancillary.crb_timestamp = onoff;
 		break;
-#ifdef SO_VRRP
 	case SO_VRRP:
 		connp->conn_isvrrp = onoff;
 		break;
-#endif
 	case SO_ANON_MLP:
 		connp->conn_anon_mlp = onoff;
 		break;

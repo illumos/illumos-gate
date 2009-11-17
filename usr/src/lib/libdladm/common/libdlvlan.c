@@ -19,12 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include <libdlvlan.h>
 #include <libdlvnic.h>
+#include <libvrrpadm.h>
 
 /*
  * VLAN Administration Library.
@@ -62,8 +63,8 @@ dladm_vlan_create(dladm_handle_t handle, const char *vlan, datalink_id_t linkid,
     datalink_id_t *vlan_id_out)
 {
 	return (dladm_vnic_create(handle, vlan, linkid,
-	    VNIC_MAC_ADDR_TYPE_PRIMARY, NULL, 0, NULL, 0, vid, vlan_id_out,
-	    proplist, flags | DLADM_OPT_VLAN));
+	    VNIC_MAC_ADDR_TYPE_PRIMARY, NULL, 0, NULL, 0, vid, VRRP_VRID_NONE,
+	    AF_UNSPEC, vlan_id_out, proplist, flags | DLADM_OPT_VLAN));
 }
 
 /*

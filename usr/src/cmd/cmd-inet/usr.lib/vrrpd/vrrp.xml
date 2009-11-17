@@ -1,0 +1,107 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ CDDL HEADER START
+ 
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+	Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+	Use is subject to license terms.
+
+	NOTE:  This service manifest is not editable; its contents will
+	be overwritten by package or patch operations, including
+	operating system upgrade.  Make customizations in a different
+	file.
+-->
+
+<service_bundle type='manifest' name='SUNWvrrpr:vrrp'>
+
+<service
+	name='network/vrrp'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='true' />
+
+	<single_instance/>
+
+        <dependency
+		name='physical'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/network/physical' />
+	</dependency>
+
+        <dependency
+		name='filesystem'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/system/filesystem/minimal' />
+	</dependency>
+
+	<exec_method
+	    type='method'
+	    name='start'
+	    exec='/lib/svc/method/svc-vrrp start'
+	    timeout_seconds='60' >
+		<method_context>
+			<!--
+			    We need net_icmpaccess and net_rawaccess
+			    privileges to open the raw socket, the
+			    sys_ip_config privilege to bring up/down
+			    the virtual IP addresses, and the sys_resource
+			    privilege to setrlimit().
+			-->
+			<method_credential
+			user='root'
+			group='root'
+			limit_privileges=':default'
+			privileges='zone,net_icmpaccess,net_rawaccess,sys_ip_config,sys_resource'
+			/>
+		</method_context>
+	</exec_method>
+
+	<exec_method
+	    type='method'
+	    name='stop'
+	    exec=':kill'
+	    timeout_seconds='60' />
+
+	<property_group name='startd' type='framework'>
+		<!-- sub-process core dumps shouldn't restart session -->
+		<propval name='ignore_error' type='astring'
+		     value='core,signal' />
+	</property_group>
+
+	<stability value='Unstable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'> VRRP service daemon
+			</loctext>
+		</common_name>
+		<documentation> 
+			<manpage title='vrrpd' section='1M' 
+				manpath='/usr/share/man' /> 
+		</documentation> 
+	</template>
+</service>
+
+</service_bundle>

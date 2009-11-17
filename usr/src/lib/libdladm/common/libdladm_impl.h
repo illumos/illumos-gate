@@ -93,6 +93,8 @@ extern void		dladm_free_args(dladm_arg_list_t *);
 #define	FMADDRSLOT	"maddrslot"	/* uint64_t */
 #define	FMADDRPREFIXLEN	"maddrpreflen"	/* uint64_t */
 #define	FHWRINGS	"hwrings"	/* boolean_t */
+#define	FVRID		"vrid"		/* uint64_t */
+#define	FVRAF		"vraf"		/* uint64_t */
 
 /*
  * Set for simlinks only

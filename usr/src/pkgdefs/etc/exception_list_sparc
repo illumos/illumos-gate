@@ -1351,3 +1351,11 @@ usr/lib/llib-lrstp.ln		sparc
 
 # Private nvfru API
 usr/include/nvfru.h			sparc
+
+# vrrp
+usr/include/libvrrpadm.h		sparc
+usr/lib/libvrrpadm.so			sparc
+usr/lib/llib-lvrrpadm.ln		sparc
+usr/lib/sparcv9/libvrrpadm.so		sparc
+usr/lib/sparcv9/llib-lvrrpadm.ln	sparc
+usr/lib/llib-lvrrpadm			sparc

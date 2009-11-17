@@ -68,7 +68,9 @@ static if_flags_t	if_flags_tbl[] = {
 	{ IFF_FIXEDMTU,		"FIXEDMTU" },
 	{ IFF_VIRTUAL,		"VIRTUAL" },
 	{ IFF_DUPLICATE,	"DUPLICATE" },
-	{ IFF_IPMP,		"IPMP"}
+	{ IFF_IPMP,		"IPMP"},
+	{ IFF_VRRP,		"VRRP"},
+	{ IFF_NOACCEPT,		"NOACCEPT"}
 };
 
 typedef struct {

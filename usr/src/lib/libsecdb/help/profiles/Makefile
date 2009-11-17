@@ -68,6 +68,7 @@ HTMLENTS = \
 	RtNetWifiMngmnt.html \
 	RtNetWifiSecure.html \
 	RtNetLinkSecure.html \
+	RtNetVRRP.html \
 	RtObAccessMngmnt.html \
 	RtPrntAdmin.html \
 	RtProcManagement.html \

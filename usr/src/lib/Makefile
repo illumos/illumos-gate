@@ -22,7 +22,6 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
 
 include ../Makefile.master
 
@@ -252,6 +251,7 @@ SUBDIRS += \
 	libadutils	\
 	libipmi		\
 	libexacct/demo	\
+	libvrrpadm	\
 	libvscan	\
 	libgrubmgmt	\
 	smbsrv		\
@@ -352,6 +352,7 @@ MSGSUBDIRS=		\
 	libsum		\
 	libtsol		\
 	libuutil	\
+	libvrrpadm	\
 	libvscan	\
 	libwanboot	\
 	libwanbootutil	\
@@ -464,6 +465,7 @@ HDRSUBDIRS=		\
 	libtnfprobe	\
 	libtsnet	\
 	libtsol		\
+	libvrrpadm	\
 	libvolmgt	\
 	libumem		\
 	libunistat	\
@@ -639,6 +641,7 @@ libexacct/demo:	libexacct libproject libsocket libnsl
 libtsalarm:	libpcp
 smbsrv:		libsocket libnsl libmd libxnet libpthread librt \
 		libshare libidmap pkcs11 libsqlite
+libvrrpadm:	libsocket libdladm
 libvscan:	libscf
 scsi:		libnvpair
 mpapi:		libpthread libdevinfo libsysevent libnvpair

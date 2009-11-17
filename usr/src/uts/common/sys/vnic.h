@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,11 +87,13 @@ typedef enum {
  */
 
 typedef enum {
+	VNIC_MAC_ADDR_TYPE_UNKNOWN = -1,
 	VNIC_MAC_ADDR_TYPE_FIXED,
 	VNIC_MAC_ADDR_TYPE_RANDOM,
 	VNIC_MAC_ADDR_TYPE_FACTORY,
 	VNIC_MAC_ADDR_TYPE_AUTO,
-	VNIC_MAC_ADDR_TYPE_PRIMARY
+	VNIC_MAC_ADDR_TYPE_PRIMARY,
+	VNIC_MAC_ADDR_TYPE_VRID
 } vnic_mac_addr_type_t;
 
 #if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
@@ -121,6 +123,8 @@ typedef struct vnic_ioc_create {
 	uint_t		vc_mac_prefix_len;
 	int		vc_mac_slot;
 	uint16_t	vc_vid;
+	vrid_t		vc_vrid;
+	int		vc_af;
 	uint_t		vc_status;
 	uint_t		vc_flags;
 	vnic_ioc_diag_t	vc_diag;
@@ -144,6 +148,8 @@ typedef struct vnic_info {
 	uint_t		vn_mac_slot;
 	uint32_t	vn_mac_prefix_len;
 	uint16_t	vn_vid;
+	vrid_t		vn_vrid;
+	int		vn_af;
 	boolean_t	vn_force;
 	mac_resource_props_t vn_resource_props;
 } vnic_info_t;

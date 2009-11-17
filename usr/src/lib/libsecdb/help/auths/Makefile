@@ -124,6 +124,7 @@ HTMLENTS = \
 	NetworkILBconf.html \
 	NetworkILBenable.html \
 	NetworkHeader.html \
+	NetworkVRRP.html \
 	WifiConfig.html \
 	WifiWep.html \
 	LinkSecurity.html \

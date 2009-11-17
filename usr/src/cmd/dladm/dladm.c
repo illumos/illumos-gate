@@ -60,6 +60,7 @@
 #include <libdlsim.h>
 #include <libdlbridge.h>
 #include <libinetutil.h>
+#include <libvrrpadm.h>
 #include <bsm/adt.h>
 #include <bsm/adt_event.h>
 #include <libdlvnic.h>
@@ -317,9 +318,9 @@ static cmd_t	cmds[] = {
 	{ "show-linkmap",	do_show_linkmap,	NULL		},
 	{ "create-vnic",	do_create_vnic,
 	    "    create-vnic      [-t] -l <link> [-m <value> | auto |\n"
-	    "\t\t     {factory [-n <slot-id>]} | {random [-r <prefix>]}]\n"
-	    "\t\t     [-v <vid> [-f]] [-p <prop>=<value>[,...]] [-H] "
-	    "<vnic-link>"						},
+	    "\t\t     {factory [-n <slot-id>]} | {random [-r <prefix>]} |\n"
+	    "\t\t     {vrrp -V <vrid> -A {inet | inet6}} [-v <vid> [-f]]\n"
+	    "\t\t     [-H] [-p <prop>=<value>[,...]] <vnic-link>"	},
 	{ "delete-vnic",	do_delete_vnic,
 	    "    delete-vnic      [-t] <vnic-link>"			},
 	{ "show-vnic",		do_show_vnic,
@@ -477,6 +478,8 @@ static const struct option vnic_lopts[] = {
 	{"bw-limit",	required_argument,	0, 'b'	},
 	{"slot",	required_argument,	0, 'n'	},
 	{"mac-prefix",	required_argument,	0, 'r'	},
+	{"vrid",	required_argument,	0, 'V'	},
+	{"address-family",	required_argument,	0, 'A'	},
 	{ 0, 0, 0, 0 }
 };
 
@@ -4431,17 +4434,20 @@ do_create_vnic(int argc, char *argv[], const char *use)
 	int			option;
 	char			*endp = NULL;
 	dladm_status_t		status;
-	vnic_mac_addr_type_t	mac_addr_type = VNIC_MAC_ADDR_TYPE_AUTO;
-	uchar_t			*mac_addr;
-	int			mac_slot = -1, maclen = 0, mac_prefix_len = 0;
+	vnic_mac_addr_type_t	mac_addr_type = VNIC_MAC_ADDR_TYPE_UNKNOWN;
+	uchar_t			*mac_addr = NULL;
+	int			mac_slot = -1;
+	uint_t			maclen = 0, mac_prefix_len = 0;
 	char			propstr[DLADM_STRSIZE];
 	dladm_arg_list_t	*proplist = NULL;
 	int			vid = 0;
+	int			af = AF_UNSPEC;
+	vrid_t			vrid = VRRP_VRID_NONE;
 
 	opterr = 0;
 	bzero(propstr, DLADM_STRSIZE);
 
-	while ((option = getopt_long(argc, argv, ":tfR:l:m:n:p:r:v:H",
+	while ((option = getopt_long(argc, argv, ":tfR:l:m:n:p:r:v:V:A:H",
 	    vnic_lopts, NULL)) != -1) {
 		switch (option) {
 		case 't':
@@ -4457,6 +4463,9 @@ do_create_vnic(int argc, char *argv[], const char *use)
 			l_arg = B_TRUE;
 			break;
 		case 'm':
+			if (mac_addr_type != VNIC_MAC_ADDR_TYPE_UNKNOWN)
+				die("cannot specify -m option twice");
+
 			if (strcmp(optarg, "fixed") == 0) {
 				/*
 				 * A fixed MAC address must be specified
@@ -4468,9 +4477,9 @@ do_create_vnic(int argc, char *argv[], const char *use)
 			    &mac_addr_type) != DLADM_STATUS_OK) {
 				mac_addr_type = VNIC_MAC_ADDR_TYPE_FIXED;
 				/* MAC address specified by value */
-				mac_addr = _link_aton(optarg, &maclen);
+				mac_addr = _link_aton(optarg, (int *)&maclen);
 				if (mac_addr == NULL) {
-					if (maclen == -1)
+					if (maclen == (uint_t)-1)
 						die("invalid MAC address");
 					else
 						die("out of memory");
@@ -4490,13 +4499,28 @@ do_create_vnic(int argc, char *argv[], const char *use)
 				die("property list too long '%s'", propstr);
 			break;
 		case 'r':
-			mac_addr = _link_aton(optarg, &mac_prefix_len);
+			mac_addr = _link_aton(optarg, (int *)&mac_prefix_len);
 			if (mac_addr == NULL) {
-				if (mac_prefix_len == -1)
+				if (mac_prefix_len == (uint_t)-1)
 					die("invalid MAC address");
 				else
 					die("out of memory");
 			}
+			break;
+		case 'V':
+			if (!str2int(optarg, (int *)&vrid) ||
+			    vrid < VRRP_VRID_MIN || vrid > VRRP_VRID_MAX) {
+				die("invalid VRRP identifier '%s'", optarg);
+			}
+
+			break;
+		case 'A':
+			if (strcmp(optarg, "inet") == 0)
+				af = AF_INET;
+			else if (strcmp(optarg, "inet6") == 0)
+				af = AF_INET6;
+			else
+				die("invalid address family '%s'", optarg);
 			break;
 		case 'v':
 			if (vid != 0)
@@ -4517,6 +4541,9 @@ do_create_vnic(int argc, char *argv[], const char *use)
 		}
 	}
 
+	if (mac_addr_type == VNIC_MAC_ADDR_TYPE_UNKNOWN)
+		mac_addr_type = VNIC_MAC_ADDR_TYPE_AUTO;
+
 	/*
 	 * 'f' - force, flag can be specified only with 'v' - vlan.
 	 */
@@ -4526,6 +4553,16 @@ do_create_vnic(int argc, char *argv[], const char *use)
 	if (mac_prefix_len != 0 && mac_addr_type != VNIC_MAC_ADDR_TYPE_RANDOM &&
 	    mac_addr_type != VNIC_MAC_ADDR_TYPE_FIXED)
 		usage();
+
+	if (mac_addr_type == VNIC_MAC_ADDR_TYPE_VRID) {
+		if (vrid == VRRP_VRID_NONE || af == AF_UNSPEC ||
+		    mac_addr != NULL || maclen != 0 || mac_slot != -1 ||
+		    mac_prefix_len != 0) {
+			usage();
+		}
+	} else if ((af != AF_UNSPEC || vrid != VRRP_VRID_NONE)) {
+		usage();
+	}
 
 	/* check required options */
 	if (!l_arg)
@@ -4556,12 +4593,13 @@ do_create_vnic(int argc, char *argv[], const char *use)
 		die("invalid vnic property");
 
 	status = dladm_vnic_create(handle, name, dev_linkid, mac_addr_type,
-	    mac_addr, maclen, &mac_slot, mac_prefix_len, vid, &linkid, proplist,
-	    flags);
+	    mac_addr, maclen, &mac_slot, mac_prefix_len, vid, vrid, af,
+	    &linkid, proplist, flags);
 	if (status != DLADM_STATUS_OK)
 		die_dlerr(status, "vnic creation over %s failed", devname);
 
 	dladm_free_props(proplist);
+	free(mac_addr);
 }
 
 static void
@@ -4835,6 +4873,13 @@ print_vnic(show_vnic_state_t *state, datalink_id_t linkid)
 				    gettext("factory, slot %d"),
 				    vnic->va_mac_slot);
 				break;
+			case VNIC_MAC_ADDR_TYPE_VRID:
+				(void) snprintf(vbuf.vnic_macaddrtype,
+				    sizeof (vbuf.vnic_macaddrtype),
+				    gettext("vrrp, %d/%s"),
+				    vnic->va_vrid, vnic->va_af == AF_INET ?
+				    "inet" : "inet6");
+				break;
 			}
 
 			if (strlen(vbuf.vnic_macaddrtype) > 0) {
@@ -5048,8 +5093,8 @@ do_create_etherstub(int argc, char *argv[], const char *use)
 		altroot_cmd(altroot, argc, argv);
 
 	status = dladm_vnic_create(handle, name, DATALINK_INVALID_LINKID,
-	    VNIC_MAC_ADDR_TYPE_AUTO, mac_addr, ETHERADDRL, NULL, 0, 0, NULL,
-	    NULL, flags);
+	    VNIC_MAC_ADDR_TYPE_AUTO, mac_addr, ETHERADDRL, NULL, 0, 0,
+	    VRRP_VRID_NONE, AF_UNSPEC, NULL, NULL, flags);
 	if (status != DLADM_STATUS_OK)
 		die_dlerr(status, "etherstub creation failed");
 }

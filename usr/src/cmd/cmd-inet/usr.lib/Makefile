@@ -26,9 +26,9 @@
 SUBDIRS=	bridged dhcp dsvclockd ilbd in.chargend in.daytimed \
 		in.discardd in.echod in.dhcpd in.mpathd in.ndpd \
 		in.ripngd in.timed inetd mdnsd ncaconfd pppoe \
-		slpd wanboot wpad
+		slpd vrrpd wanboot wpad
 
-MSGSUBDIRS=	dsvclockd ilbd in.dhcpd inetd ncaconfd wanboot
+MSGSUBDIRS=	dsvclockd ilbd in.dhcpd inetd ncaconfd vrrpd wanboot
 
 include ../../Makefile.cmd
 
@@ -37,7 +37,7 @@ $(CLOSED_BUILD)SUBDIRS += \
 	$(CLOSED)/cmd/cmd-inet/usr.lib/in.iked
 
 POFILES=	dsvclockd/dsvclockd.po in.dhcpd/in.dhcpd.po \
-		inetd/inetd.po ncaconfd/ncaconfd.po \
+		inetd/inetd.po ncaconfd/ncaconfd.po vrrpd/vrrpd.po \
 		wanboot/wanboot.po
 POFILE=		usr.lib.po
 

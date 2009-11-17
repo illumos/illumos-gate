@@ -111,6 +111,23 @@ insert_pif(const char *pname, boolean_t isv6, int *error)
 	}
 	pif->pif_index = lifr.lifr_index;
 
+	/*
+	 * Check if this is a VRRP interface. If yes, its IP addresses (the
+	 * VRRP virtual addresses) cannot be configured using DHCP.
+	 */
+	if (ioctl(fd, SIOCGLIFFLAGS, &lifr) == -1) {
+		*error = (errno == ENXIO) ? DHCP_IPC_E_INVIF : DHCP_IPC_E_INT;
+		dhcpmsg(MSG_ERR, "insert_pif: SIOCGLIFFLAGS for %s", pname);
+		goto failure;
+	}
+
+	if (lifr.lifr_flags & IFF_VRRP) {
+		*error = DHCP_IPC_E_INVIF;
+		dhcpmsg(MSG_ERROR, "insert_pif: VRRP virtual addresses over %s "
+		    "cannot be configured using DHCP", pname);
+		goto failure;
+	}
+
 	if (ioctl(fd, SIOCGLIFMTU, &lifr) == -1) {
 		*error = (errno == ENXIO) ? DHCP_IPC_E_INVIF : DHCP_IPC_E_INT;
 		dhcpmsg(MSG_ERR, "insert_pif: SIOCGLIFMTU for %s", pname);

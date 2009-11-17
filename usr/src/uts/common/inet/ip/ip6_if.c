@@ -1152,6 +1152,7 @@ ipif_setlinklocal(ipif_t *ipif)
 		    ipif->ipif_v6subnet);
 	}
 
+	ip_rts_newaddrmsg(RTM_CHGADDR, 0, ipif, RTSQ_DEFAULT);
 }
 
 /*
@@ -1405,7 +1406,8 @@ ip_common_prefix_v6(const in6_addr_t *a1, const in6_addr_t *a2)
 
 #define	IPIF_VALID_IPV6_SOURCE(ipif) \
 	(((ipif)->ipif_flags & IPIF_UP) && \
-	!((ipif)->ipif_flags & (IPIF_NOLOCAL|IPIF_ANYCAST)))
+	!((ipif)->ipif_flags & (IPIF_NOLOCAL|IPIF_ANYCAST)) && \
+	!((ipif)->ipif_ill->ill_flags & ILLF_NOACCEPT))
 
 /* source address candidate */
 typedef struct candidate {
@@ -2224,6 +2226,7 @@ ill_dl_phys(ill_t *ill, ipif_t *ipif, mblk_t *mp, queue_t *q)
 	mblk_t	*bind_mp = NULL;
 	mblk_t	*unbind_mp = NULL;
 	mblk_t	*notify_mp = NULL;
+	mblk_t  *capab_mp = NULL;
 
 	ip1dbg(("ill_dl_phys(%s:%u)\n", ill->ill_name, ipif->ipif_id));
 	ASSERT(ill->ill_dlpi_style_set);
@@ -2280,6 +2283,12 @@ ill_dl_phys(ill_t *ill, ipif_t *ipif, mblk_t *mp, queue_t *q)
 	if (info_mp == NULL)
 		goto bad;
 
+	ASSERT(ill->ill_dlpi_capab_state == IDCS_UNKNOWN);
+	capab_mp = ip_dlpi_alloc(sizeof (dl_capability_req_t),
+	    DL_CAPABILITY_REQ);
+	if (capab_mp == NULL)
+		goto bad;
+
 	bind_mp = ip_dlpi_alloc(sizeof (dl_bind_req_t) + sizeof (long),
 	    DL_BIND_REQ);
 	if (bind_mp == NULL)
@@ -2322,6 +2331,12 @@ ill_dl_phys(ill_t *ill, ipif_t *ipif, mblk_t *mp, queue_t *q)
 	}
 	ill_dlpi_send(ill, bind_mp);
 	ill_dlpi_send(ill, info_mp);
+
+	/*
+	 * Send the capability request to get the VRRP capability information.
+	 */
+	ill_capability_send(ill, capab_mp);
+
 	if (v6token_mp != NULL)
 		ill_dlpi_send(ill, v6token_mp);
 	if (v6lla_mp != NULL)
@@ -2345,6 +2360,7 @@ bad:
 	freemsg(info_mp);
 	freemsg(attach_mp);
 	freemsg(bind_mp);
+	freemsg(capab_mp);
 	freemsg(unbind_mp);
 	freemsg(notify_mp);
 	return (ENOMEM);

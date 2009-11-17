@@ -1261,3 +1261,11 @@ usr/lib/llib-lrstp.ln		i386
 
 # Private nvfru API
 usr/include/nvfru.h			i386
+
+# vrrp
+usr/include/libvrrpadm.h		i386
+usr/lib/libvrrpadm.so			i386
+usr/lib/llib-lvrrpadm.ln		i386
+usr/lib/amd64/libvrrpadm.so		i386
+usr/lib/amd64/llib-lvrrpadm.ln		i386
+usr/lib/llib-lvrrpadm			i386

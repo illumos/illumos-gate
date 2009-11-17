@@ -167,6 +167,7 @@ static void	ill_delete_interface_type(ill_if_t *);
 static int	ill_dl_up(ill_t *ill, ipif_t *ipif, mblk_t *mp, queue_t *q);
 static void	ill_dl_down(ill_t *ill);
 static void	ill_down(ill_t *ill);
+static void	ill_down_ipifs(ill_t *, boolean_t);
 static void	ill_free_mib(ill_t *ill);
 static void	ill_glist_delete(ill_t *);
 static void	ill_phyint_reinit(ill_t *ill);
@@ -189,6 +190,7 @@ static void	phyint_free(phyint_t *);
 
 static void ill_capability_dispatch(ill_t *, mblk_t *, dl_capability_sub_t *);
 static void ill_capability_id_ack(ill_t *, mblk_t *, dl_capability_sub_t *);
+static void ill_capability_vrrp_ack(ill_t *, mblk_t *, dl_capability_sub_t *);
 static void ill_capability_hcksum_ack(ill_t *, mblk_t *, dl_capability_sub_t *);
 static void ill_capability_hcksum_reset_fill(ill_t *, mblk_t *);
 static void ill_capability_zerocopy_ack(ill_t *, mblk_t *,
@@ -200,7 +202,6 @@ static void	ill_capability_dld_ack(ill_t *, mblk_t *,
 static void	ill_capability_dld_enable(ill_t *);
 static void	ill_capability_ack_thr(void *);
 static void	ill_capability_lso_enable(ill_t *);
-static void	ill_capability_send(ill_t *, mblk_t *);
 
 static ill_t	*ill_prev_usesrc(ill_t *);
 static int	ill_relink_usesrc_ills(ill_t *, ill_t *, uint_t);
@@ -1446,6 +1447,16 @@ ill_capability_dld_reset_fill(ill_t *ill, mblk_t *mp)
 static void
 ill_capability_dispatch(ill_t *ill, mblk_t *mp, dl_capability_sub_t *subp)
 {
+	/*
+	 * If no ipif was brought up over this ill, this DL_CAPABILITY_REQ/ACK
+	 * is only to get the VRRP capability.
+	 */
+	if (ill->ill_ipif_up_count == 0) {
+		if (subp->dl_cap == DL_CAPAB_VRRP)
+			ill_capability_vrrp_ack(ill, mp, subp);
+		return;
+	}
+
 	switch (subp->dl_cap) {
 	case DL_CAPAB_HCKSUM:
 		ill_capability_hcksum_ack(ill, mp, subp);
@@ -1456,9 +1467,49 @@ ill_capability_dispatch(ill_t *ill, mblk_t *mp, dl_capability_sub_t *subp)
 	case DL_CAPAB_DLD:
 		ill_capability_dld_ack(ill, mp, subp);
 		break;
+	case DL_CAPAB_VRRP:
+		break;
 	default:
 		ip1dbg(("ill_capability_dispatch: unknown capab type %d\n",
 		    subp->dl_cap));
+	}
+}
+
+/*
+ * Process the vrrp capability received from a DLS Provider. isub must point
+ * to the sub-capability (DL_CAPAB_VRRP) of a DL_CAPABILITY_ACK message.
+ */
+static void
+ill_capability_vrrp_ack(ill_t *ill, mblk_t *mp, dl_capability_sub_t *isub)
+{
+	dl_capab_vrrp_t	*vrrp;
+	uint_t		sub_dl_cap = isub->dl_cap;
+	uint8_t		*capend;
+
+	ASSERT(IAM_WRITER_ILL(ill));
+	ASSERT(sub_dl_cap == DL_CAPAB_VRRP);
+
+	/*
+	 * Note: range checks here are not absolutely sufficient to
+	 * make us robust against malformed messages sent by drivers;
+	 * this is in keeping with the rest of IP's dlpi handling.
+	 * (Remember, it's coming from something else in the kernel
+	 * address space)
+	 */
+	capend = (uint8_t *)(isub + 1) + isub->dl_length;
+	if (capend > mp->b_wptr) {
+		cmn_err(CE_WARN, "ill_capability_vrrp_ack: "
+		    "malformed sub-capability too long for mblk");
+		return;
+	}
+	vrrp = (dl_capab_vrrp_t *)(isub + 1);
+
+	/*
+	 * Compare the IP address family and set ILLF_VRRP for the right ill.
+	 */
+	if ((vrrp->vrrp_af == AF_INET6 && ill->ill_isv6) ||
+	    (vrrp->vrrp_af == AF_INET && !ill->ill_isv6)) {
+		ill->ill_flags |= ILLF_VRRP;
 	}
 }
 
@@ -2138,7 +2189,7 @@ ill_taskq_dispatch(ip_stack_t *ipst)
 
 /*
  * Consume a new-style hardware capabilities negotiation ack.
- * Called via taskq on receipt of DL_CAPABBILITY_ACK.
+ * Called via taskq on receipt of DL_CAPABILITY_ACK.
  */
 static void
 ill_capability_ack_thr(void *arg)
@@ -3752,6 +3803,8 @@ ill_lookup_on_name(char *name, boolean_t do_alloc, boolean_t isv6,
 	 * ill_index set. Pass on ipv6_loopback as the old address.
 	 */
 	sctp_update_ipif_addr(ipif, ov6addr);
+
+	ip_rts_newaddrmsg(RTM_CHGADDR, 0, ipif, RTSQ_DEFAULT);
 
 	/*
 	 * ill_glist_insert() -> ill_phyint_reinit() may have merged IPSQs.
@@ -9480,6 +9533,8 @@ ip_sioctl_addr_tail(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	sctp_update_ipif_addr(ipif, ov6addr);
 	ipif->ipif_addr_ready = 0;
 
+	ip_rts_newaddrmsg(RTM_CHGADDR, 0, ipif, RTSQ_DEFAULT);
+
 	/*
 	 * If the interface was previously marked as a duplicate, then since
 	 * we've now got a "new" address, it should no longer be considered a
@@ -9800,6 +9855,33 @@ ip_sioctl_get_dstaddr(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 }
 
 /*
+ * Check which flags will change by the given flags being set
+ * silently ignore flags which userland is not allowed to control.
+ * (Because these flags may change between SIOCGLIFFLAGS and
+ * SIOCSLIFFLAGS, and that's outside of userland's control,
+ * we need to silently ignore them rather than fail.)
+ */
+static void
+ip_sioctl_flags_onoff(ipif_t *ipif, uint64_t flags, uint64_t *onp,
+    uint64_t *offp)
+{
+	ill_t		*ill = ipif->ipif_ill;
+	phyint_t 	*phyi = ill->ill_phyint;
+	uint64_t	cantchange_flags, intf_flags;
+	uint64_t	turn_on, turn_off;
+
+	intf_flags = ipif->ipif_flags | ill->ill_flags | phyi->phyint_flags;
+	cantchange_flags = IFF_CANTCHANGE;
+	if (IS_IPMP(ill))
+		cantchange_flags |= IFF_IPMP_CANTCHANGE;
+	turn_on = (flags ^ intf_flags) & ~cantchange_flags;
+	turn_off = intf_flags & turn_on;
+	turn_on ^= turn_off;
+	*onp = turn_on;
+	*offp = turn_off;
+}
+
+/*
  * Set interface flags.  Many flags require special handling (e.g.,
  * bringing the interface down); see below for details.
  *
@@ -9822,7 +9904,8 @@ ip_sioctl_flags(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	int	err = 0;
 	phyint_t *phyi;
 	ill_t *ill;
-	uint64_t intf_flags, cantchange_flags;
+	conn_t *connp;
+	uint64_t intf_flags;
 	boolean_t phyint_flags_modified = B_FALSE;
 	uint64_t flags;
 	struct ifreq *ifr;
@@ -9868,22 +9951,9 @@ ip_sioctl_flags(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	if (IS_IPMP(ill) && ((flags ^ intf_flags) & IFF_IPMP_INVALID))
 		return (EINVAL);
 
-	/*
-	 * Check which flags will change; silently ignore flags which userland
-	 * is not allowed to control.  (Because these flags may change between
-	 * SIOCGLIFFLAGS and SIOCSLIFFLAGS, and that's outside of userland's
-	 * control, we need to silently ignore them rather than fail.)
-	 */
-	cantchange_flags = IFF_CANTCHANGE;
-	if (IS_IPMP(ill))
-		cantchange_flags |= IFF_IPMP_CANTCHANGE;
-
-	turn_on = (flags ^ intf_flags) & ~cantchange_flags;
-	if (turn_on == 0)
+	ip_sioctl_flags_onoff(ipif, flags, &turn_on, &turn_off);
+	if ((turn_on|turn_off) == 0)
 		return (0);	/* No change */
-
-	turn_off = intf_flags & turn_on;
-	turn_on ^= turn_off;
 
 	/*
 	 * All test addresses must be IFF_DEPRECATED (to ensure source address
@@ -9893,6 +9963,27 @@ ip_sioctl_flags(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	if ((turn_off & (IFF_DEPRECATED|IFF_NOFAILOVER)) == IFF_DEPRECATED &&
 	    (turn_on|intf_flags) & IFF_NOFAILOVER)
 		return (EINVAL);
+
+	if ((connp = Q_TO_CONN(q)) == NULL)
+		return (EINVAL);
+
+	/*
+	 * Only vrrp control socket is allowed to change IFF_UP and
+	 * IFF_NOACCEPT flags when IFF_VRRP is set.
+	 */
+	if ((intf_flags & IFF_VRRP) && ((turn_off | turn_on) & IFF_UP)) {
+		if (!connp->conn_isvrrp)
+			return (EINVAL);
+	}
+
+	/*
+	 * The IFF_NOACCEPT flag can only be set on an IFF_VRRP IP address by
+	 * VRRP control socket.
+	 */
+	if ((turn_off | turn_on) & IFF_NOACCEPT) {
+		if (!connp->conn_isvrrp || !(intf_flags & IFF_VRRP))
+			return (EINVAL);
+	}
 
 	if (turn_on & IFF_NOFAILOVER) {
 		turn_on |= IFF_DEPRECATED;
@@ -10091,12 +10182,21 @@ ip_sioctl_flags(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	}
 
 	/*
-	 * The only flag changes that we currently take specific action on are
+	 * If we are going to change one or more of the flags that are
 	 * IPIF_UP, IPIF_DEPRECATED, IPIF_NOXMIT, IPIF_NOLOCAL, ILLF_NOARP,
 	 * ILLF_NONUD, IPIF_PRIVATE, IPIF_ANYCAST, IPIF_PREFERRED, and
-	 * IPIF_NOFAILOVER.  This is done by bring the ipif down, changing the
-	 * flags and bringing it back up again.  For IPIF_NOFAILOVER, the act
-	 * of bringing it back up will trigger the address to be moved.
+	 * IPIF_NOFAILOVER, we will take special action.  This is
+	 * done by bring the ipif down, changing the flags and bringing
+	 * it back up again.  For IPIF_NOFAILOVER, the act of bringing it
+	 * back up will trigger the address to be moved.
+	 *
+	 * If we are going to change IFF_NOACCEPT, we need to bring
+	 * all the ipifs down then bring them up again.	 The act of
+	 * bringing all the ipifs back up will trigger the local
+	 * ires being recreated with "no_accept" set/cleared.
+	 *
+	 * Note that ILLF_NOACCEPT is always set separately from the
+	 * other flags.
 	 */
 	if ((turn_on|turn_off) &
 	    (IPIF_UP|IPIF_DEPRECATED|IPIF_NOXMIT|IPIF_NOLOCAL|ILLF_NOARP|
@@ -10118,6 +10218,27 @@ ip_sioctl_flags(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		if (err == EINPROGRESS)
 			return (err);
 		(void) ipif_down_tail(ipif);
+	} else if ((turn_on|turn_off) & ILLF_NOACCEPT) {
+		/*
+		 * If we can quiesce the ill, then continue.  If not, then
+		 * ip_sioctl_flags_tail() will be called from
+		 * ipif_ill_refrele_tail().
+		 */
+		ill_down_ipifs(ill, B_TRUE);
+
+		mutex_enter(&connp->conn_lock);
+		mutex_enter(&ill->ill_lock);
+		if (!ill_is_quiescent(ill)) {
+			boolean_t success;
+
+			success = ipsq_pending_mp_add(connp, ill->ill_ipif,
+			    q, mp, ILL_DOWN);
+			mutex_exit(&ill->ill_lock);
+			mutex_exit(&connp->conn_lock);
+			return (success ? EINPROGRESS : EINTR);
+		}
+		mutex_exit(&ill->ill_lock);
+		mutex_exit(&connp->conn_lock);
 	}
 	return (ip_sioctl_flags_tail(ipif, flags, q, mp));
 }
@@ -10128,7 +10249,6 @@ ip_sioctl_flags_tail(ipif_t *ipif, uint64_t flags, queue_t *q, mblk_t *mp)
 	ill_t	*ill;
 	phyint_t *phyi;
 	uint64_t turn_on, turn_off;
-	uint64_t intf_flags, cantchange_flags;
 	boolean_t phyint_flags_modified = B_FALSE;
 	int	err = 0;
 	boolean_t set_linklocal = B_FALSE;
@@ -10141,14 +10261,13 @@ ip_sioctl_flags_tail(ipif_t *ipif, uint64_t flags, queue_t *q, mblk_t *mp)
 	ill = ipif->ipif_ill;
 	phyi = ill->ill_phyint;
 
-	intf_flags = ipif->ipif_flags | ill->ill_flags | phyi->phyint_flags;
-	cantchange_flags = IFF_CANTCHANGE | IFF_UP;
-	if (IS_IPMP(ill))
-		cantchange_flags |= IFF_IPMP_CANTCHANGE;
+	ip_sioctl_flags_onoff(ipif, flags, &turn_on, &turn_off);
 
-	turn_on = (flags ^ intf_flags) & ~cantchange_flags;
-	turn_off = intf_flags & turn_on;
-	turn_on ^= turn_off;
+	/*
+	 * IFF_UP is handled separately.
+	 */
+	turn_on &= ~IFF_UP;
+	turn_off &= ~IFF_UP;
 
 	if ((turn_on|turn_off) & IFF_PHYINT_FLAGS)
 		phyint_flags_modified = B_TRUE;
@@ -10193,7 +10312,17 @@ ip_sioctl_flags_tail(ipif_t *ipif, uint64_t flags, queue_t *q, mblk_t *mp)
 			ipmp_phyint_refresh_active(phyi);
 	}
 
-	if ((flags & IFF_UP) && !(ipif->ipif_flags & IPIF_UP)) {
+	if ((turn_on|turn_off) & ILLF_NOACCEPT) {
+		/*
+		 * If the ILLF_NOACCEPT flag is changed, bring up all the
+		 * ipifs that were brought down.
+		 *
+		 * The routing sockets messages are sent as the result
+		 * of ill_up_ipifs(), further, SCTP's IPIF list was updated
+		 * as well.
+		 */
+		err = ill_up_ipifs(ill, q, mp);
+	} else if ((flags & IFF_UP) && !(ipif->ipif_flags & IPIF_UP)) {
 		/*
 		 * XXX ipif_up really does not know whether a phyint flags
 		 * was modified or not. So, it sends up information on
@@ -10242,17 +10371,26 @@ ip_sioctl_flags_restart(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	uint64_t flags;
 	struct ifreq *ifr = if_req;
 	struct lifreq *lifr = if_req;
+	uint64_t turn_on, turn_off;
 
 	ip1dbg(("ip_sioctl_flags_restart(%s:%u %p)\n",
 	    ipif->ipif_ill->ill_name, ipif->ipif_id, (void *)ipif));
 
-	(void) ipif_down_tail(ipif);
 	if (ipip->ipi_cmd_type == IF_CMD) {
 		/* cast to uint16_t prevents unwanted sign extension */
 		flags = (uint16_t)ifr->ifr_flags;
 	} else {
 		flags = lifr->lifr_flags;
 	}
+
+	/*
+	 * If this function call is a result of the ILLF_NOACCEPT flag
+	 * change, do not call ipif_down_tail(). See ip_sioctl_flags().
+	 */
+	ip_sioctl_flags_onoff(ipif, flags, &turn_on, &turn_off);
+	if (!((turn_on|turn_off) & ILLF_NOACCEPT))
+		(void) ipif_down_tail(ipif);
+
 	return (ip_sioctl_flags_tail(ipif, flags, q, mp));
 }
 
@@ -12339,7 +12477,7 @@ ill_dlpi_send(ill_t *ill, mblk_t *mp)
 	ill_dlpi_dispatch(ill, mp);
 }
 
-static void
+void
 ill_capability_send(ill_t *ill, mblk_t *mp)
 {
 	ill->ill_capab_pending_cnt++;
@@ -13047,6 +13185,7 @@ ipif_free_tail(ipif_t *ipif)
 
 	/* Ask SCTP to take it out of it list */
 	sctp_update_ipif(ipif, SCTP_IPIF_REMOVE);
+	ip_rts_newaddrmsg(RTM_FREEADDR, 0, ipif, RTSQ_DEFAULT);
 
 	/* Get it out of the ILL interface list. */
 	ipif_remove(ipif);
@@ -14685,6 +14824,9 @@ retry:
 			continue;
 		/* Always skip NOLOCAL and ANYCAST interfaces */
 		if (ipif->ipif_flags & (IPIF_NOLOCAL|IPIF_ANYCAST))
+			continue;
+		/* Always skip NOACCEPT interfaces */
+		if (ipif->ipif_ill->ill_flags & ILLF_NOACCEPT)
 			continue;
 		if (!(ipif->ipif_flags & IPIF_UP))
 			continue;

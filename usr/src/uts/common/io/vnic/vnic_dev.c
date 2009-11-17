@@ -197,6 +197,7 @@ vnic_unicast_add(vnic_t *vnic, vnic_mac_addr_type_t vnic_addr_type,
 
 	switch (vnic_addr_type) {
 	case VNIC_MAC_ADDR_TYPE_FIXED:
+	case VNIC_MAC_ADDR_TYPE_VRID:
 		/*
 		 * The MAC address value to assign to the VNIC
 		 * is already provided in mac_addr_arg. addr_len_ptr_arg
@@ -319,8 +320,8 @@ vnic_unicast_add(vnic_t *vnic, vnic_mac_addr_type_t vnic_addr_type,
 int
 vnic_dev_create(datalink_id_t vnic_id, datalink_id_t linkid,
     vnic_mac_addr_type_t *vnic_addr_type, int *mac_len, uchar_t *mac_addr,
-    int *mac_slot, uint_t mac_prefix_len, uint16_t vid,
-    mac_resource_props_t *mrp, uint32_t flags, vnic_ioc_diag_t *diag,
+    int *mac_slot, uint_t mac_prefix_len, uint16_t vid, vrid_t vrid,
+    int af, mac_resource_props_t *mrp, uint32_t flags, vnic_ioc_diag_t *diag,
     cred_t *credp)
 {
 	vnic_t *vnic;
@@ -354,6 +355,8 @@ vnic_dev_create(datalink_id_t vnic_id, datalink_id_t linkid,
 
 	vnic->vn_id = vnic_id;
 	vnic->vn_link_id = linkid;
+	vnic->vn_vrid = vrid;
+	vnic->vn_af = af;
 
 	if (!is_anchor) {
 		if (linkid == DATALINK_INVALID_LINKID) {
@@ -759,6 +762,16 @@ vnic_m_capab_get(void *arg, mac_capab_t cap, void *cap_data)
 	case MAC_CAPAB_NO_NATIVEVLAN:
 	case MAC_CAPAB_NO_ZCOPY:
 		return (B_TRUE);
+	case MAC_CAPAB_VRRP: {
+		mac_capab_vrrp_t *vrrp_capab = cap_data;
+
+		if (vnic->vn_vrid != 0) {
+			if (vrrp_capab != NULL)
+				vrrp_capab->mcv_af = vnic->vn_af;
+			return (B_TRUE);
+		}
+		return (B_FALSE);
+	}
 	default:
 		return (B_FALSE);
 	}
@@ -896,6 +909,8 @@ vnic_info(vnic_info_t *info, cred_t *credp)
 	info->vn_mac_prefix_len = 0;
 	info->vn_vid = vnic->vn_vid;
 	info->vn_force = vnic->vn_force;
+	info->vn_vrid = vnic->vn_vrid;
+	info->vn_af = vnic->vn_af;
 
 	bzero(&info->vn_resource_props, sizeof (mac_resource_props_t));
 	if (vnic->vn_mch != NULL)

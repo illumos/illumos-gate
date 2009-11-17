@@ -554,13 +554,9 @@ ire_init_v4(ire_t *ire, uchar_t *addr, uchar_t *mask, uchar_t *gateway,
 	case IRE_LOCAL:
 		ire->ire_sendfn = ire_send_local_v4;
 		ire->ire_recvfn = ire_recv_local_v4;
-#ifdef SO_VRRP
 		ASSERT(ire->ire_ill != NULL);
-		if (ire->ire_ill->ill_flags & ILLF_NOACCEPT) {
-			ire->ire_noaccept = B_TRUE;
+		if (ire->ire_ill->ill_flags & ILLF_NOACCEPT)
 			ire->ire_recvfn = ire_recv_noaccept_v6;
-		}
-#endif
 		break;
 	case IRE_LOOPBACK:
 		ire->ire_sendfn = ire_send_local_v4;
