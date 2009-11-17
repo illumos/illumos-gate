@@ -246,10 +246,22 @@ iser_xfer_ctrlpdu(iser_chan_t *chan, idm_pdu_t *pdu)
 		return (ISER_STATUS_FAIL);
 	}
 
+	ic = chan->ic_conn->ic_idmc;
+
+	/* Pull the BHS out of the PDU handle */
+	bhs = (iscsi_data_hdr_t *)pdu->isp_hdr;
+
 	/*
 	 * All SCSI command PDU (except SCSI Read and SCSI Write) and the SCSI
 	 * Response PDU are sent to the remote end using the SendSE Message.
 	 *
+	 * The StatSN may need to be sent (and possibly advanced) at this time
+	 * for some PDUs, identified by the IDM_PDU_SET_STATSN flag.
+	 */
+	if (pdu->isp_flags & IDM_PDU_SET_STATSN) {
+		(ic->ic_conn_ops.icb_update_statsn)(NULL, pdu);
+	}
+	/*
 	 * Setup a Send Message for carrying the iSCSI control-type PDU
 	 * preceeded by an iSER header.
 	 */
@@ -267,11 +279,6 @@ iser_xfer_ctrlpdu(iser_chan_t *chan, idm_pdu_t *pdu)
 		mutex_exit(&chan->ic_conn->ic_lock);
 		return (ISER_STATUS_FAIL);
 	}
-
-	/* Pull the BHS out of the PDU handle */
-	bhs = (iscsi_data_hdr_t *)pdu->isp_hdr;
-
-	ic = chan->ic_conn->ic_idmc;
 
 	hdr = (iser_ctrl_hdr_t *)(uintptr_t)msg->msg_ds.ds_va;
 

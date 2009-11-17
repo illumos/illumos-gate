@@ -149,6 +149,9 @@ typedef void (idm_task_cb_t)(struct idm_task_s *task, idm_status_t status);
 typedef void (idm_build_hdr_cb_t)(
     struct idm_task_s *task, struct idm_pdu_s *pdu, uint8_t opcode);
 
+typedef void (idm_update_statsn_cb_t)(
+    struct idm_task_s *task, struct idm_pdu_s *pdu);
+
 typedef void (idm_keepalive_cb_t)(struct idm_conn_s *ic);
 
 typedef union idm_sockaddr {
@@ -169,6 +172,7 @@ typedef struct {
 	idm_task_cb_t		*icb_task_aborted;
 	idm_client_notify_cb_t	*icb_client_notify;
 	idm_build_hdr_cb_t	*icb_build_hdr;
+	idm_update_statsn_cb_t	*icb_update_statsn; /* advance statsn */
 	idm_keepalive_cb_t	*icb_keepalive;
 } idm_conn_ops_t;
 

@@ -1026,7 +1026,7 @@ idm_task_constructor(void *hdl, void *arg, int flags)
 	 * transport that requires a different size, we'll revisit this.
 	 */
 	idt->idt_transport_hdr = (void *)(idt + 1); /* pointer arithmetic */
-
+	idt->idt_flags = 0;
 	return (0);
 }
 

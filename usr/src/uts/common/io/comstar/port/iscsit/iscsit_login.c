@@ -890,8 +890,8 @@ login_sm_send_next_response(iscsit_conn_t *ict, idm_pdu_t *pdu)
 	hton24(lh_resp->dlength, pdu->isp_datalen);
 
 	/*
-	 * If this is going to be the last PDU of a login response
-	 * that moves us to FFP then generate the ILE_LOGIN_FFP event.
+	 * If the login is successful, this login response will contain
+	 * the next StatSN and advance the StatSN for the connection.
 	 */
 	if (lh_resp->status_class == ISCSI_STATUS_CLASS_SUCCESS) {
 		ASSERT(ict->ict_sess != NULL);
@@ -911,6 +911,7 @@ login_sm_send_next_response(iscsit_conn_t *ict, idm_pdu_t *pdu)
 		}
 
 		iscsit_conn_hold(ict);
+		pdu->isp_flags |= IDM_PDU_SET_STATSN | IDM_PDU_ADVANCE_STATSN;
 		iscsit_pdu_tx(pdu);
 	} else {
 		/*

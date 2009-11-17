@@ -2298,8 +2298,10 @@ idm_i_so_tx(idm_pdu_t *pdu)
  * DataSN starts with 0 for the first data PDU of an input command and advances
  * by 1 for each subsequent data PDU. Each sequence will have its own F bit,
  * which is set to 1 for the last data PDU of a sequence.
+ * If the initiator supports phase collapse, the status bit must be set along
+ * with the F bit to indicate that the status is shipped together with the last
+ * Data-In PDU.
  *
- * Scope for Prototype build:
  * The data PDUs within a sequence will be sent in order with the buffer offset
  * in increasing order. i.e. initiator and target must have negotiated the
  * "DataPDUInOrder" to "Yes". The order between sequences is not enforced.
@@ -2391,6 +2393,7 @@ idm_so_buf_rx_from_ini(idm_task_t *idt, idm_buf_t *idb)
 
 	pdu = kmem_cache_alloc(idm.idm_sotx_pdu_cache, KM_SLEEP);
 	pdu->isp_ic = idt->idt_ic;
+	pdu->isp_flags = 0;	/* initialize isp_flags */
 	bzero(pdu->isp_hdr, sizeof (iscsi_rtt_hdr_t));
 
 	/* iSCSI layer fills the TTT, ITT, StatSN, ExpCmdSN, MaxCmdSN */
@@ -2588,6 +2591,7 @@ idm_so_send_buf_region(idm_task_t *idt, idm_buf_t *idb,
 		/* Data PDU headers will always be sizeof (iscsi_hdr_t) */
 		pdu = kmem_cache_alloc(idm.idm_sotx_pdu_cache, KM_SLEEP);
 		pdu->isp_ic = ic;
+		pdu->isp_flags = 0;	/* initialize isp_flags */
 
 		/*
 		 * We've already built a build a header template
@@ -2609,9 +2613,26 @@ idm_so_send_buf_region(idm_task_t *idt, idm_buf_t *idb,
 		hton24(bhs->dlength, chunk);
 		bhs->offset = htonl(idb->idb_bufoffset + data_offset);
 
+		/* setup data */
+		pdu->isp_data	=  (uint8_t *)idb->idb_buf + data_offset;
+		pdu->isp_datalen = (uint_t)chunk;
+
 		if (chunk == remainder) {
 			bhs->flags = ISCSI_FLAG_FINAL; /* F bit set to 1 */
+			/* Piggyback the status with the last data PDU */
+			if (idt->idt_flags & IDM_TASK_PHASECOLLAPSE_REQ) {
+				pdu->isp_flags |= IDM_PDU_SET_STATSN |
+				    IDM_PDU_ADVANCE_STATSN;
+				(*idt->idt_ic->ic_conn_ops.icb_update_statsn)
+				    (idt, pdu);
+				idt->idt_flags |=
+				    IDM_TASK_PHASECOLLAPSE_SUCCESS;
+
+			}
 		}
+
+		remainder	-= chunk;
+		data_offset	+= chunk;
 
 		/* Instrument the data-send DTrace probe. */
 		if (IDM_PDU_OPCODE(pdu) == ISCSI_OP_SCSI_DATA_RSP) {
@@ -2620,11 +2641,6 @@ idm_so_send_buf_region(idm_task_t *idt, idm_buf_t *idb,
 			    iscsi_data_rsp_hdr_t *,
 			    (iscsi_data_rsp_hdr_t *)pdu->isp_hdr);
 		}
-		/* setup data */
-		pdu->isp_data	=  (uint8_t *)idb->idb_buf + data_offset;
-		pdu->isp_datalen = (uint_t)chunk;
-		remainder	-= chunk;
-		data_offset	+= chunk;
 
 		/*
 		 * Now that we're done working with idt_exp_datasn,
@@ -2767,13 +2783,18 @@ idm_sotx_thread(void *arg)
 		mutex_exit(&so_conn->ic_tx_mutex);
 
 		switch (object->idm_tx_obj_magic) {
-		case IDM_PDU_MAGIC:
+		case IDM_PDU_MAGIC: {
+			idm_pdu_t *pdu = (idm_pdu_t *)object;
 			DTRACE_PROBE2(soconn__tx__pdu, idm_conn_t *, ic,
 			    idm_pdu_t *, (idm_pdu_t *)object);
 
+			if (pdu->isp_flags & IDM_PDU_SET_STATSN) {
+				/* No IDM task */
+				(ic->ic_conn_ops.icb_update_statsn)(NULL, pdu);
+			}
 			status = idm_i_so_tx((idm_pdu_t *)object);
 			break;
-
+		}
 		case IDM_BUF_MAGIC: {
 			idm_buf_t *idb = (idm_buf_t *)object;
 			idm_task_t *idt = idb->idb_task_binding;

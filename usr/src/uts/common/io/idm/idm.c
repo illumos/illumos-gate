@@ -1285,7 +1285,7 @@ idm_task_alloc(idm_conn_t *ic)
 	idt->idt_private 	= NULL;
 	idt->idt_exp_datasn	= 0;
 	idt->idt_exp_rttsn	= 0;
-
+	idt->idt_flags		= 0;
 	return (idt);
 }
 

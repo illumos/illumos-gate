@@ -397,6 +397,8 @@ iscsit_send_next_text_response(iscsit_conn_t *ict, idm_pdu_t *rx_pdu)
 	 */
 	resp = idm_pdu_alloc(sizeof (iscsi_hdr_t), len);
 	idm_pdu_init(resp, ict->ict_ic, ict, iscsit_text_resp_complete_cb);
+	/* Advance the StatSN for each Text Response sent */
+	resp->isp_flags |= IDM_PDU_SET_STATSN | IDM_PDU_ADVANCE_STATSN;
 	base = ict->ict_text_rsp_buf + ict->ict_text_rsp_off;
 	bcopy(base, resp->isp_data, len);
 	/*

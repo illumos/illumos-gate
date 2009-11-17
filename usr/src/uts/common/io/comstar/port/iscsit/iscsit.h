@@ -491,6 +491,7 @@ typedef struct iscsit_conn_s {
 	iscsit_op_params_t	ict_op;
 	uint16_t		ict_cid;
 	uint32_t		ict_statsn;
+	kmutex_t		ict_statsn_mutex;
 	uint32_t		ict_keepalive_ttt;
 	struct iscsit_conn_s	*ict_reinstate_conn;
 	uint32_t		ict_reinstating:1,
@@ -622,6 +623,7 @@ idm_rx_pdu_error_cb_t	iscsit_rx_pdu_error;
 idm_task_cb_t		iscsit_task_aborted;
 idm_client_notify_cb_t	iscsit_client_notify;
 idm_build_hdr_cb_t	iscsit_build_hdr;
+idm_update_statsn_cb_t	iscsit_update_statsn;
 idm_keepalive_cb_t	iscsit_keepalive;
 
 /*
