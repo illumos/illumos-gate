@@ -598,6 +598,25 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	zilog = zfsvfs->z_log;
 
 	/*
+	 * Validate file offset
+	 */
+	woff = ioflag & FAPPEND ? zp->z_phys->zp_size : uio->uio_loffset;
+	if (woff < 0) {
+		ZFS_EXIT(zfsvfs);
+		return (EINVAL);
+	}
+
+	/*
+	 * Check for mandatory locks before calling zfs_range_lock()
+	 * in order to prevent a deadlock with locks set via fcntl().
+	 */
+	if (MANDMODE((mode_t)zp->z_phys->zp_mode) &&
+	    (error = chklock(vp, FWRITE, woff, n, uio->uio_fmode, ct)) != 0) {
+		ZFS_EXIT(zfsvfs);
+		return (error);
+	}
+
+	/*
 	 * Pre-fault the pages to ensure slow (eg NFS) pages
 	 * don't hold up txg.
 	 */
@@ -608,34 +627,25 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	 */
 	if (ioflag & FAPPEND) {
 		/*
-		 * Range lock for a file append:
-		 * The value for the start of range will be determined by
-		 * zfs_range_lock() (to guarantee append semantics).
-		 * If this write will cause the block size to increase,
-		 * zfs_range_lock() will lock the entire file, so we must
-		 * later reduce the range after we grow the block size.
+		 * Obtain an appending range lock to guarantee file append
+		 * semantics.  We reset the write offset once we have the lock.
 		 */
 		rl = zfs_range_lock(zp, 0, n, RL_APPEND);
+		woff = rl->r_off;
 		if (rl->r_len == UINT64_MAX) {
-			/* overlocked, zp_size can't change */
-			woff = uio->uio_loffset = zp->z_phys->zp_size;
-		} else {
-			woff = uio->uio_loffset = rl->r_off;
+			/*
+			 * We overlocked the file because this write will cause
+			 * the file block size to increase.
+			 * Note that zp_size cannot change with this lock held.
+			 */
+			woff = zp->z_phys->zp_size;
 		}
+		uio->uio_loffset = woff;
 	} else {
-		woff = uio->uio_loffset;
 		/*
-		 * Validate file offset
-		 */
-		if (woff < 0) {
-			ZFS_EXIT(zfsvfs);
-			return (EINVAL);
-		}
-
-		/*
-		 * If we need to grow the block size then zfs_range_lock()
-		 * will lock a wider range than we request here.
-		 * Later after growing the block size we reduce the range.
+		 * Note that if the file block size will change as a result of
+		 * this write, then this range lock will lock the entire file
+		 * so that we can re-write the block safely.
 		 */
 		rl = zfs_range_lock(zp, woff, n, RL_WRITER);
 	}
@@ -649,15 +659,6 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	if ((woff + n) > limit || woff > (limit - n))
 		n = limit - woff;
 
-	/*
-	 * Check for mandatory locks
-	 */
-	if (MANDMODE((mode_t)zp->z_phys->zp_mode) &&
-	    (error = chklock(vp, FWRITE, woff, n, uio->uio_fmode, ct)) != 0) {
-		zfs_range_unlock(rl);
-		ZFS_EXIT(zfsvfs);
-		return (error);
-	}
 	end_size = MAX(zp->z_phys->zp_size, woff + n);
 
 	/*
