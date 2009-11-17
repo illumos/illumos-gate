@@ -2436,9 +2436,8 @@ hat_unload_callback(
 }
 
 /*
- * Invalidate a virtual address translation for the local CPU.
- * For best performance ensure that the va range is completely
- * mapped, otherwise the entire TLB will be flushed.
+ * Invalidate a virtual address translation on a slave CPU during
+ * panic() dumps.
  */
 void
 hat_flush_range(hat_t *hat, caddr_t va, size_t size)
@@ -2448,18 +2447,19 @@ hat_flush_range(hat_t *hat, caddr_t va, size_t size)
 
 	while (va < endva) {
 		sz = hat_getpagesize(hat, va);
-		if (sz < 0)
-			va = (caddr_t)DEMAP_ALL_ADDR;
+		if (sz < 0) {
 #ifdef __xpv
-		if (va == (caddr_t)DEMAP_ALL_ADDR)
 			xen_flush_tlb();
-		else
-			xen_flush_va(va);
 #else
-		(void) hati_demap_func((xc_arg_t)hat, (xc_arg_t)va, NULL);
+			flush_all_tlb_entries();
 #endif
-		if (sz < 0)
 			break;
+		}
+#ifdef __xpv
+		xen_flush_va(va);
+#else
+		mmu_tlbflush_entry(va);
+#endif
 		va += sz;
 	}
 }
