@@ -65,8 +65,6 @@ $(SPARC_BLD)include ../../Makefile.cmd.64
 ROOTALIASPROG= $(ALIASPROG:%=$(ROOTBIN)/%)
 
 FILEMODE= 555
-OWNER= root
-GROUP= bin
 
 .KEEP_STATE:
 
@@ -85,7 +83,6 @@ OBJECTS= \
 
 SRCS=	$(OBJECTS:%.o=%.c)
 
-GROUP= bin
 LDLIBS += -lshell -lcmd -last
 
 CPPFLAGS = \
