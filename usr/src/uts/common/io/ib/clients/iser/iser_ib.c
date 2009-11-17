@@ -474,7 +474,7 @@ iser_ib_alloc_rc_channel(iser_hca_t *hca, uint8_t hca_port)
 
 	chan = kmem_zalloc(sizeof (iser_chan_t), KM_SLEEP);
 
-	mutex_init(&chan->ic_lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&chan->ic_chan_lock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&chan->ic_sq_post_lock, NULL, MUTEX_DRIVER, NULL);
 
 	/* Set up the iSER channel handle with HCA */
@@ -515,7 +515,7 @@ iser_ib_alloc_rc_channel(iser_hca_t *hca, uint8_t hca_port)
 	    &chan->ic_sendcq);
 	if (status != ISER_STATUS_SUCCESS) {
 		iser_ib_fini_qp(&chan->ic_qp);
-		mutex_destroy(&chan->ic_lock);
+		mutex_destroy(&chan->ic_chan_lock);
 		mutex_destroy(&chan->ic_sq_post_lock);
 		kmem_free(chan, sizeof (iser_chan_t));
 		return (NULL);
@@ -529,7 +529,7 @@ iser_ib_alloc_rc_channel(iser_hca_t *hca, uint8_t hca_port)
 	if (status != ISER_STATUS_SUCCESS) {
 		(void) ibt_free_cq(chan->ic_sendcq);
 		iser_ib_fini_qp(&chan->ic_qp);
-		mutex_destroy(&chan->ic_lock);
+		mutex_destroy(&chan->ic_chan_lock);
 		mutex_destroy(&chan->ic_sq_post_lock);
 		kmem_free(chan, sizeof (iser_chan_t));
 		return (NULL);
@@ -549,7 +549,7 @@ iser_ib_alloc_rc_channel(iser_hca_t *hca, uint8_t hca_port)
 		(void) ibt_free_cq(chan->ic_sendcq);
 		(void) ibt_free_cq(chan->ic_recvcq);
 		iser_ib_fini_qp(&chan->ic_qp);
-		mutex_destroy(&chan->ic_lock);
+		mutex_destroy(&chan->ic_chan_lock);
 		mutex_destroy(&chan->ic_sq_post_lock);
 		kmem_free(chan, sizeof (iser_chan_t));
 		return (NULL);
@@ -574,7 +574,7 @@ iser_ib_open_rc_channel(iser_chan_t *chan)
 	ibt_rc_returns_t	ocreturns;
 	int			status;
 
-	mutex_enter(&chan->ic_lock);
+	mutex_enter(&chan->ic_chan_lock);
 
 	/*
 	 * For connection establishment, the initiator sends a CM REQ using the
@@ -601,7 +601,7 @@ iser_ib_open_rc_channel(iser_chan_t *chan)
 	    sizeof (iser_private_data_t), &iser_priv_data);
 	if (status != IBT_SUCCESS) {
 		ISER_LOG(CE_NOTE, "iser_ib_open_rc_channel failed: %d", status);
-		mutex_exit(&chan->ic_lock);
+		mutex_exit(&chan->ic_chan_lock);
 		return (status);
 	}
 
@@ -630,11 +630,11 @@ iser_ib_open_rc_channel(iser_chan_t *chan)
 
 	if (status != IBT_SUCCESS) {
 		ISER_LOG(CE_NOTE, "iser_ib_open_rc_channel failed: %d", status);
-		mutex_exit(&chan->ic_lock);
+		mutex_exit(&chan->ic_chan_lock);
 		return (status);
 	}
 
-	mutex_exit(&chan->ic_lock);
+	mutex_exit(&chan->ic_chan_lock);
 	return (IDM_STATUS_SUCCESS);
 }
 
@@ -648,14 +648,14 @@ iser_ib_close_rc_channel(iser_chan_t *chan)
 {
 	int			status;
 
-	mutex_enter(&chan->ic_lock);
+	mutex_enter(&chan->ic_chan_lock);
 	status = ibt_close_rc_channel(chan->ic_chanhdl, IBT_BLOCKING, NULL,
 	    0, NULL, NULL, 0);
 	if (status != IBT_SUCCESS) {
 		ISER_LOG(CE_NOTE, "iser_ib_close_rc_channel: "
 		    "ibt_close_rc_channel failed: status (%d)", status);
 	}
-	mutex_exit(&chan->ic_lock);
+	mutex_exit(&chan->ic_chan_lock);
 }
 
 /*
@@ -706,7 +706,7 @@ iser_ib_free_rc_channel(iser_chan_t *chan)
 	ibt_free_cq(chan->ic_recvcq);
 
 	/* Free the chan handle */
-	mutex_destroy(&chan->ic_lock);
+	mutex_destroy(&chan->ic_chan_lock);
 	kmem_free(chan, sizeof (iser_chan_t));
 }
 

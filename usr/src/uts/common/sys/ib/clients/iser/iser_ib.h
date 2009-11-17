@@ -115,7 +115,7 @@ typedef struct iser_qp_s {
  * iSER RC channel information
  */
 typedef struct iser_chan_s {
-	kmutex_t		ic_lock;
+	kmutex_t		ic_chan_lock;
 
 	/* IBT channel handle */
 	ibt_channel_hdl_t	ic_chanhdl;

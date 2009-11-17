@@ -388,6 +388,11 @@ idm_svc_conn_create(idm_svc_t *is, idm_transport_type_t tt,
 	idm_conn_t	*ic;
 	idm_status_t	rc;
 
+	/*
+	 * Skip some work if we can already tell we are going offline.
+	 * Otherwise we will destroy this connection later as part of
+	 * shutting down the svc.
+	 */
 	mutex_enter(&is->is_mutex);
 	if (!is->is_online) {
 		mutex_exit(&is->is_mutex);

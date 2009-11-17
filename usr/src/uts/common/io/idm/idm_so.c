@@ -1317,7 +1317,7 @@ idm_so_svc_port_watcher(void *arg)
 static idm_status_t
 idm_so_free_task_rsrc(idm_task_t *idt)
 {
-	idm_buf_t	*idb;
+	idm_buf_t	*idb, *next_idb;
 
 	/*
 	 * There is nothing to cleanup on initiator connections
@@ -1336,8 +1336,8 @@ idm_so_free_task_rsrc(idm_task_t *idt)
 	 */
 	mutex_enter(&idt->idt_mutex);
 
-	for (idb = list_head(&idt->idt_outbufv); idb != NULL;
-	    idb = list_next(&idt->idt_outbufv, idb)) {
+	for (idb = list_head(&idt->idt_outbufv); idb != NULL; idb = next_idb) {
+		next_idb = list_next(&idt->idt_outbufv, idb);
 		if (idb->idb_in_transport) {
 			/*
 			 * idm_buf_rx_from_ini_done releases idt->idt_mutex
@@ -1353,8 +1353,8 @@ idm_so_free_task_rsrc(idm_task_t *idt)
 		}
 	}
 
-	for (idb = list_head(&idt->idt_inbufv); idb != NULL;
-	    idb = list_next(&idt->idt_inbufv, idb)) {
+	for (idb = list_head(&idt->idt_inbufv); idb != NULL; idb = next_idb) {
+		next_idb = list_next(&idt->idt_inbufv, idb);
 		/*
 		 * We want to remove these items from the tx_list as well,
 		 * but knowing it's in the idt_inbufv list is not a guarantee

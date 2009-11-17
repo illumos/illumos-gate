@@ -1260,20 +1260,23 @@ idm_task_alloc(idm_conn_t *ic)
 	ASSERT(ic != NULL);
 
 	/* Don't allocate new tasks if we are not in FFP */
-	mutex_enter(&ic->ic_state_mutex);
 	if (!ic->ic_ffp) {
-		mutex_exit(&ic->ic_state_mutex);
 		return (NULL);
 	}
 	idt = kmem_cache_alloc(idm.idm_task_cache, KM_NOSLEEP);
 	if (idt == NULL) {
-		mutex_exit(&ic->ic_state_mutex);
 		return (NULL);
 	}
 
 	ASSERT(list_is_empty(&idt->idt_inbufv));
 	ASSERT(list_is_empty(&idt->idt_outbufv));
 
+	mutex_enter(&ic->ic_state_mutex);
+	if (!ic->ic_ffp) {
+		mutex_exit(&ic->ic_state_mutex);
+		kmem_cache_free(idm.idm_task_cache, idt);
+		return (NULL);
+	}
 	idm_conn_hold(ic);
 	mutex_exit(&ic->ic_state_mutex);
 
@@ -1355,7 +1358,7 @@ idm_task_free(idm_task_t *idt)
 
 	/*
 	 * It's possible for items to still be in the idt_inbufv list if
-	 * they were added after idm_task_cleanup was called.  We rely on
+	 * they were added after idm_free_task_rsrc was called.  We rely on
 	 * STMF to free all buffers associated with the task however STMF
 	 * doesn't know that we have this reference to the buffers.
 	 * Use list_create so that we don't end up with stale references
@@ -1699,51 +1702,6 @@ idm_task_aborted(idm_task_t *idt, idm_status_t status)
 {
 	(*idt->idt_ic->ic_conn_ops.icb_task_aborted)(idt, status);
 }
-
-void
-idm_task_cleanup(idm_task_t *idt)
-{
-	idm_buf_t *idb, *next_idb;
-	list_t		tmp_buflist;
-	ASSERT((idt->idt_state == TASK_SUSPENDED) ||
-	    (idt->idt_state == TASK_ABORTED));
-
-	list_create(&tmp_buflist, sizeof (idm_buf_t),
-	    offsetof(idm_buf_t, idb_buflink));
-
-	/*
-	 * Remove all the buffers from the task and add them to a
-	 * temporary local list -- we do this so that we can hold
-	 * the task lock and prevent the task from going away if
-	 * the client decides to call idm_task_done/idm_task_free.
-	 * This could happen during abort in iscsit.
-	 */
-	mutex_enter(&idt->idt_mutex);
-	for (idb = list_head(&idt->idt_inbufv);
-	    idb != NULL;
-	    idb = next_idb) {
-		next_idb = list_next(&idt->idt_inbufv, idb);
-		idm_buf_unbind_in_locked(idt, idb);
-		list_insert_tail(&tmp_buflist, idb);
-	}
-
-	for (idb = list_head(&idt->idt_outbufv);
-	    idb != NULL;
-	    idb = next_idb) {
-		next_idb = list_next(&idt->idt_outbufv, idb);
-		idm_buf_unbind_out_locked(idt, idb);
-		list_insert_tail(&tmp_buflist, idb);
-	}
-	mutex_exit(&idt->idt_mutex);
-
-	for (idb = list_head(&tmp_buflist); idb != NULL; idb = next_idb) {
-		next_idb = list_next(&tmp_buflist, idb);
-		list_remove(&tmp_buflist, idb);
-		(*idb->idb_buf_cb)(idb, IDM_STATUS_ABORTED);
-	}
-	list_destroy(&tmp_buflist);
-}
-
 
 /*
  * idm_pdu_tx

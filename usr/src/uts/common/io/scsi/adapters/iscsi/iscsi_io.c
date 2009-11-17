@@ -1422,6 +1422,9 @@ iscsi_rx_process_async_rsp(idm_conn_t *ic, idm_pdu_t *pdu)
 		icp->conn_async_logout = B_TRUE;
 		mutex_exit(&icp->conn_state_mutex);
 
+		/* Hold is released in iscsi_handle_logout. */
+		idm_conn_hold(ic);
+
 		/* Target has requested this connection to logout. */
 		itp = kmem_zalloc(sizeof (iscsi_task_t), KM_SLEEP);
 		itp->t_arg = icp;
@@ -1429,6 +1432,7 @@ iscsi_rx_process_async_rsp(idm_conn_t *ic, idm_pdu_t *pdu)
 		if (ddi_taskq_dispatch(isp->sess_taskq,
 		    (void(*)())iscsi_logout_start, itp, DDI_SLEEP) !=
 		    DDI_SUCCESS) {
+			idm_conn_rele(ic);
 			/* Disconnect if we couldn't dispatch the task */
 			idm_ini_conn_disconnect(ic);
 		}
@@ -1478,6 +1482,9 @@ iscsi_rx_process_async_rsp(idm_conn_t *ic, idm_pdu_t *pdu)
 		 * now we will request a logout.  We can't
 		 * just ignore this or it might force corruption?
 		 */
+
+		/* Hold is released in iscsi_handle_logout */
+		idm_conn_hold(ic);
 		itp = kmem_zalloc(sizeof (iscsi_task_t), KM_SLEEP);
 		itp->t_arg = icp;
 		itp->t_blocking = B_FALSE;
@@ -1485,6 +1492,7 @@ iscsi_rx_process_async_rsp(idm_conn_t *ic, idm_pdu_t *pdu)
 		    (void(*)())iscsi_logout_start, itp, DDI_SLEEP) !=
 		    DDI_SUCCESS) {
 			/* Disconnect if we couldn't dispatch the task */
+			idm_conn_rele(ic);
 			idm_ini_conn_disconnect(ic);
 		}
 		break;
@@ -2656,7 +2664,8 @@ iscsi_handle_reset(iscsi_sess_t *isp, int level, iscsi_lun_t *ilp)
 }
 
 /*
- * iscsi_lgoout_start - task handler for deferred logout
+ * iscsi_logout_start - task handler for deferred logout
+ * Acquire a hold before call, released in iscsi_handle_logout
  */
 static void
 iscsi_logout_start(void *arg)
@@ -2674,6 +2683,7 @@ iscsi_logout_start(void *arg)
 /*
  * iscsi_handle_logout - This function will issue a logout for
  * the session from a specific connection.
+ * Acquire idm_conn_hold before call.  Released internally.
  */
 iscsi_status_t
 iscsi_handle_logout(iscsi_conn_t *icp)
@@ -2691,11 +2701,17 @@ iscsi_handle_logout(iscsi_conn_t *icp)
 	ASSERT(mutex_owned(&icp->conn_state_mutex));
 
 	/*
-	 * We may want to explicitly disconnect if something goes wrong so
-	 * grab a hold to ensure that the IDM connection context can't
-	 * disappear.
+	 * If the connection has already gone down (e.g. if the transport
+	 * failed between when this LOGOUT was generated and now) then we
+	 * can and must skip sending the LOGOUT.  Check the same condition
+	 * we use below to determine that connection has "settled".
 	 */
-	idm_conn_hold(ic);
+	if ((icp->conn_state == ISCSI_CONN_STATE_FREE) ||
+	    (icp->conn_state == ISCSI_CONN_STATE_FAILED) ||
+	    (icp->conn_state == ISCSI_CONN_STATE_POLLING)) {
+		idm_conn_rele(ic);
+		return (0);
+	}
 
 	icmdp = iscsi_cmd_alloc(icp, KM_SLEEP);
 	ASSERT(icmdp != NULL);

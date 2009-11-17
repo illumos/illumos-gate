@@ -220,6 +220,8 @@ idm_conn_event_locked(idm_conn_t *ic, idm_conn_event_t event,
 {
 	idm_conn_event_ctx_t	*event_ctx;
 
+	ASSERT(mutex_owned(&ic->ic_state_mutex));
+
 	idm_sm_audit_event(&ic->ic_state_audit, SAS_IDM_CONN,
 	    (int)ic->ic_state, (int)event, event_info);
 
@@ -573,6 +575,7 @@ idm_state_s4_in_login(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 		ic->ic_client_callback = NULL;
 		idm_pdu_complete(pdu, pdu->isp_status);
 		(void) idm_notify_client(ic, CN_LOGIN_FAIL, NULL);
+		(void) untimeout(ic->ic_state_timeout);
 		idm_update_state(ic, CS_S9_INIT_ERROR, event_ctx);
 		break;
 	case CE_LOGIN_FAIL_SND:
@@ -681,6 +684,7 @@ idm_state_s5_logged_in(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 	case CE_MISC_RX:
 	case CE_TX_PROTOCOL_ERROR:
 	case CE_RX_PROTOCOL_ERROR:
+	case CE_LOGIN_TIMEOUT:
 		/* Don't care */
 		break;
 	default:
@@ -796,6 +800,7 @@ idm_state_s6_in_logout(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 	case CE_RX_PROTOCOL_ERROR:
 	case CE_MISC_TX:
 	case CE_MISC_RX:
+	case CE_LOGIN_TIMEOUT:
 		/* Don't care */
 		break;
 	default:
@@ -875,6 +880,7 @@ idm_state_s7_logout_req(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 	case CE_RX_PROTOCOL_ERROR:
 	case CE_MISC_TX:
 	case CE_MISC_RX:
+	case CE_LOGIN_TIMEOUT:
 		/* Don't care */
 		break;
 	default:
@@ -930,6 +936,7 @@ idm_state_s8_cleanup(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 	case CE_MISC_TX:
 	case CE_MISC_RX:
 	case CE_TRANSPORT_FAIL:
+	case CE_LOGIN_TIMEOUT:
 	case CE_LOGOUT_TIMEOUT:
 		/* Don't care */
 		break;
@@ -992,6 +999,7 @@ idm_state_s10_in_cleanup(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 	case CE_RX_PROTOCOL_ERROR:
 	case CE_MISC_TX:
 	case CE_MISC_RX:
+	case CE_LOGIN_TIMEOUT:
 	case CE_LOGOUT_TIMEOUT:
 		/* Don't care */
 		break;
@@ -1149,8 +1157,8 @@ idm_update_state(idm_conn_t *ic, idm_conn_state_t new_state,
 
 		if (ic->ic_reinstate_conn) {
 			/* Connection reinstatement is complete */
-			idm_conn_event_locked(ic->ic_reinstate_conn,
-			    CE_CONN_REINSTATE_SUCCESS, NULL, CT_NONE);
+			idm_conn_event(ic->ic_reinstate_conn,
+			    CE_CONN_REINSTATE_SUCCESS, NULL);
 		}
 		break;
 	case CS_S6_IN_LOGOUT:

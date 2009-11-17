@@ -253,9 +253,11 @@ iscsi_conn_offline(iscsi_conn_t *icp)
 	case ISCSI_CONN_STATE_FREE:
 		break;
 	case ISCSI_CONN_STATE_LOGGED_IN:
-		if (icp->conn_state_ffp)
+		if (icp->conn_state_ffp) {
+			/* Hold is released in iscsi_handle_logout */
+			idm_conn_hold(icp->conn_ic);
 			(void) iscsi_handle_logout(icp);
-		else {
+		} else {
 			icp->conn_state_destroy = B_FALSE;
 			mutex_exit(&icp->conn_state_mutex);
 			return (ISCSI_STATUS_INTERNAL_ERROR);
