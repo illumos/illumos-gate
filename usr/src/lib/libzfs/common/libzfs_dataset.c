@@ -1751,11 +1751,11 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zprop_source_t *src,
 			/*
 			 * If we tried to use a default value for a
 			 * readonly property, it means that it was not
-			 * present; return an error.
+			 * present.
 			 */
 			if (zfs_prop_readonly(prop) &&
-			    *source && (*source)[0] == '\0') {
-				return (-1);
+			    *source != NULL && (*source)[0] == '\0') {
+				*source = NULL;
 			}
 			break;
 
