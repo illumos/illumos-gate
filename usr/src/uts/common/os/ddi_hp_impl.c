@@ -56,7 +56,6 @@ static int ddihp_cn_post_change_state(ddi_hp_cn_handle_t *hdlp,
 static int ddihp_cn_handle_state_change(ddi_hp_cn_handle_t *hdlp);
 static int ddihp_cn_change_children_state(ddi_hp_cn_handle_t *hdlp,
     boolean_t online);
-static int ddihp_change_node_state(dev_info_t *dip, void *arg);
 /* Port operations */
 static int ddihp_port_change_state(ddi_hp_cn_handle_t *hdlp,
     ddi_hp_cn_state_t target_state);
@@ -743,7 +742,6 @@ ddihp_cn_handle_state_change(ddi_hp_cn_handle_t *hdlp)
 static int
 ddihp_cn_change_children_state(ddi_hp_cn_handle_t *hdlp, boolean_t online)
 {
-	ddi_hp_cn_cfg_t		cn_cfg;
 	dev_info_t		*dip = hdlp->cn_dip;
 	dev_info_t		*cdip;
 	ddi_hp_cn_handle_t	*h;
@@ -753,7 +751,6 @@ ddihp_cn_change_children_state(ddi_hp_cn_handle_t *hdlp, boolean_t online)
 	    " dip %p hdlp %p, online %x\n",
 	    (void *)dip, (void *)hdlp, online));
 
-	cn_cfg.online = online;
 	ASSERT(DEVI_BUSY_OWNED(dip));
 
 	/*
@@ -810,33 +807,6 @@ ddihp_cn_change_children_state(ddi_hp_cn_handle_t *hdlp, boolean_t online)
 
 				continue;
 			}
-			cn_cfg.rv = NDI_SUCCESS;
-			if (ddi_get_child(cdip)) {
-				/* Continue to online grand children */
-				int c;
-
-				ndi_devi_enter(cdip, &c);
-				ddi_walk_devs(ddi_get_child(cdip),
-				    ddihp_change_node_state,
-				    (void *)&cn_cfg);
-				ndi_devi_exit(cdip, c);
-			}
-			if (cn_cfg.rv != NDI_SUCCESS) {
-				/*
-				 * one of the grand children is not ONLINE'd.
-				 */
-				cmn_err(CE_WARN,
-				    "(%s%d):"
-				    " failed to attach driver for a grandchild"
-				    "device (%s%d) in the Connection %s\n",
-				    ddi_driver_name(dip), ddi_get_instance(dip),
-				    ddi_driver_name(cdip),
-				    ddi_get_instance(cdip),
-				    hdlp->cn_info.cn_name);
-
-				rv = DDI_FAILURE;
-			}
-
 		} else {
 			/* offline children */
 			if (ndi_devi_offline(cdip, NDI_UNCONFIG) !=
@@ -856,40 +826,6 @@ ddihp_cn_change_children_state(ddi_hp_cn_handle_t *hdlp, boolean_t online)
 	}
 
 	return (rv);
-}
-
-/*
- * This function is called to online or offline the dev_info nodes for an
- * Hotplug Connection (CN).
- */
-static int
-ddihp_change_node_state(dev_info_t *dip, void *arg)
-{
-	ddi_hp_cn_cfg_t		*cn_cfg_p = (ddi_hp_cn_cfg_t *)arg;
-	int			rv;
-
-	if (cn_cfg_p->online) {
-		/* It is online operation */
-		if (!ddihp_check_status_prop(dip))
-			return (DDI_WALK_PRUNECHILD);
-
-		rv = ndi_devi_online(dip, NDI_ONLINE_ATTACH | NDI_CONFIG);
-	} else {
-		/* It is offline operation */
-		(void) devfs_clean(ddi_get_parent(dip), NULL, DV_CLEAN_FORCE);
-		rv = ndi_devi_offline(dip, NDI_UNCONFIG);
-	}
-	if (rv != NDI_SUCCESS) {
-		DDI_HP_IMPLDBG((CE_CONT, "ddihp_change_devinfo_node_state:"
-		    " failed op %x rv %d\n", cn_cfg_p->online, rv));
-		cn_cfg_p->rv = rv;
-
-		/* Failed to attach/detach the driver(s) */
-		return (DDI_WALK_PRUNECHILD);
-	}
-
-	/* Continue the walk */
-	return (DDI_WALK_CONTINUE);
 }
 
 /*

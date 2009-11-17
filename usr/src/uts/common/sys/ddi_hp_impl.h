@@ -99,15 +99,6 @@ typedef enum {
 } ddi_hp_cn_sysevent_t;
 
 /*
- * Control structure for tree walk during configure/unconfigure operation.
- */
-typedef struct ddi_hp_cn_cfg {
-	boolean_t	online;		/* TRUE for online children; */
-					/* FALSE for offline children. */
-	int		rv;		/* Return error code */
-} ddi_hp_cn_cfg_t;
-
-/*
  * Misc
  */
 
