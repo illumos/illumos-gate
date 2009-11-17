@@ -2141,14 +2141,14 @@ ahci_deliver_satapkt(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	/*
 	 * For NCQ command (READ/WRITE FPDMA QUEUED), sector count 7:0 is
 	 * filled into features field, and sector count 8:15 is filled into
-	 * features (exp) field. TAG is filled into sector field.
+	 * features (exp) field. The hba driver doesn't need to anything
+	 * special with regard to this, since sata framework has already
+	 * done so.
+	 *
+	 * However the driver needs to make sure TAG is filled into sector
+	 * field.
 	 */
 	if (command_type == AHCI_NCQ_CMD) {
-		SET_FIS_FEATURES(h2d_register_fisp,
-		    scmd->satacmd_sec_count_lsb);
-		SET_FIS_FEATURES_EXP(h2d_register_fisp,
-		    scmd->satacmd_sec_count_msb);
-
 		SET_FIS_SECTOR_COUNT(h2d_register_fisp,
 		    (cmd_slot << SATA_TAG_QUEUING_SHIFT));
 	}
