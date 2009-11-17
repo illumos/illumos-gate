@@ -52,3 +52,4 @@ P SUNWcslr	Core Solaris Libraries (Root)
 P SUNWlibmsr	Math & Microtasking Libraries (Root)
 P SUNWfmd	Fault Management Daemon and Utilities
 P SUNWfsr	FP Scrubber configuration files (ROOT)
+P SUNWpiclu	PICL Libraries, and Plugin Modules (Usr)
