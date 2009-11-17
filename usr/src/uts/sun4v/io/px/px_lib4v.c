@@ -76,7 +76,7 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 	 */
 	if ((hsvc_version(HSVC_GROUP_INTR, &mjrnum, &mnrnum) == 0) &&
 	    (mjrnum > 1)) {
-		cmn_err(CE_WARN, "niumx: unsupported intr api group: "
+		cmn_err(CE_WARN, "px: unsupported intr api group: "
 		    "maj:0x%lx, min:0x%lx", mjrnum, mnrnum);
 		return (ENOTSUP);
 	}
