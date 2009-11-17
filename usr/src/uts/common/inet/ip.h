@@ -939,6 +939,7 @@ typedef struct ipif_s {
 	boolean_t	ipif_bound;	/* B_TRUE if we successfully bound */
 
 	struct ire_s	*ipif_ire_local; /* Our IRE_LOCAL or LOOPBACK */
+	struct ire_s	*ipif_ire_if;	 /* Our IRE_INTERFACE */
 } ipif_t;
 
 /*
@@ -990,6 +991,7 @@ typedef struct ipif_s {
  * ipif_bound		ipsq			ipsq
  *
  * ipif_ire_local	ipsq + ips_ill_g_lock	ipsq OR ips_ill_g_lock
+ * ipif_ire_if		ipsq + ips_ill_g_lock	ipsq OR ips_ill_g_lock
  */
 
 /*

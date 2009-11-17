@@ -814,7 +814,7 @@ igmp_joingroup(ilm_t *ilm)
 		/*
 		 * We are holding ill_mcast_lock here and the timeout
 		 * handler (igmp_timeout_handler_per_ill) acquires that
-		 * lock. Hence we can't call igmp_start_timer since it could
+		 * lock. Hence we can't call igmp_start_timers since it could
 		 * deadlock in untimeout().
 		 * Instead the thread which drops ill_mcast_lock will have
 		 * to call ill_mcast_timer_start().
@@ -896,7 +896,7 @@ mld_joingroup(ilm_t *ilm)
 		/*
 		 * We are holding ill_mcast_lock here and the timeout
 		 * handler (mld_timeout_handler_per_ill) acquires that
-		 * lock. Hence we can't call mld_start_timer since it could
+		 * lock. Hence we can't call mld_start_timers since it could
 		 * deadlock in untimeout().
 		 * Instead the thread which drops ill_mcast_lock will have
 		 * to call ill_mcast_timer_start().

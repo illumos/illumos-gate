@@ -2492,14 +2492,12 @@ ipif_add_ires_v6(ipif_t *ipif, boolean_t loopback)
 {
 	ill_t		*ill = ipif->ipif_ill;
 	ip_stack_t	*ipst = ill->ill_ipst;
-	ire_t		*ire_array[20];
-	ire_t		**irep = ire_array;
-	ire_t		**irep1;
 	in6_addr_t	v6addr;
 	in6_addr_t	route_mask;
 	int		err;
 	char		buf[INET6_ADDRSTRLEN];
 	ire_t		*ire_local = NULL;	/* LOCAL or LOOPBACK */
+	ire_t		*ire_if = NULL;
 
 	if (!IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6lcl_addr) &&
 	    !(ipif->ipif_flags & IPIF_NOLOCAL)) {
@@ -2570,7 +2568,7 @@ ipif_add_ires_v6(ipif_t *ipif, boolean_t loopback)
 		    ill->ill_net_type,
 		    inet_ntop(AF_INET6, &v6addr, buf, sizeof (buf))));
 
-		*irep++ = ire_create_v6(
+		ire_if = ire_create_v6(
 		    &v6addr,			/* dest pref */
 		    &route_mask,		/* mask */
 		    &ipif->ipif_v6lcl_addr,	/* gateway */
@@ -2581,14 +2579,8 @@ ipif_add_ires_v6(ipif_t *ipif, boolean_t loopback)
 		    RTF_PRIVATE : 0) | RTF_KERNEL,
 		    NULL,
 		    ipst);
-	}
-
-	/* If an earlier ire_create failed, get out now */
-	for (irep1 = irep; irep1 > ire_array; ) {
-		irep1--;
-		if (*irep1 == NULL) {
-			ip1dbg(("ipif_add_ires_v6: NULL ire found in"
-			    " ire_array\n"));
+		if (ire_if == NULL) {
+			ip1dbg(("ipif_up_done: NULL ire_if\n"));
 			err = ENOMEM;
 			goto bad;
 		}
@@ -2627,46 +2619,68 @@ ipif_add_ires_v6(ipif_t *ipif, boolean_t loopback)
 
 	/*
 	 * Add in all newly created IREs.
+	 * We add the IRE_INTERFACE before the IRE_LOCAL to ensure
+	 * that lookups find the IRE_LOCAL even if the IRE_INTERFACE is
+	 * a /128 route.
 	 */
+	if (ire_if != NULL) {
+		ire_if = ire_add(ire_if);
+		if (ire_if == NULL) {
+			err = ENOMEM;
+			goto bad2;
+		}
+#ifdef DEBUG
+		ire_refhold_notr(ire_if);
+		ire_refrele(ire_if);
+#endif
+	}
 	if (ire_local != NULL) {
 		ire_local = ire_add(ire_local);
-#ifdef DEBUG
-		if (ire_local != NULL) {
-			ire_refhold_notr(ire_local);
-			ire_refrele(ire_local);
+		if (ire_local == NULL) {
+			err = ENOMEM;
+			goto bad2;
 		}
+#ifdef DEBUG
+		ire_refhold_notr(ire_local);
+		ire_refrele(ire_local);
 #endif
 	}
 	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
 	if (ire_local != NULL)
 		ipif->ipif_ire_local = ire_local;
+	if (ire_if != NULL)
+		ipif->ipif_ire_if = ire_if;
 	rw_exit(&ipst->ips_ill_g_lock);
 	ire_local = NULL;
-
-	for (irep1 = irep; irep1 > ire_array; ) {
-		irep1--;
-		/* Shouldn't be adding any bcast ire's */
-		ASSERT((*irep1)->ire_type != IRE_BROADCAST);
-		ASSERT(!MUTEX_HELD(&ipif->ipif_ill->ill_lock));
-		/* refheld by ire_add */
-		*irep1 = ire_add(*irep1);
-		if (*irep1 != NULL) {
-			ire_refrele(*irep1);
-			*irep1 = NULL;
-		}
-	}
+	ire_if = NULL;
 
 	if (ipif->ipif_addr_ready)
 		ipif_up_notify(ipif);
 	return (0);
 
+bad2:
+	ill->ill_ipif_up_count--;
+	ipif->ipif_flags &= ~IPIF_UP;
+
 bad:
 	if (ire_local != NULL)
 		ire_delete(ire_local);
-	while (irep > ire_array) {
-		irep--;
-		if (*irep != NULL)
-			ire_delete(*irep);
+	if (ire_if != NULL)
+		ire_delete(ire_if);
+
+	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
+	ire_local = ipif->ipif_ire_local;
+	ipif->ipif_ire_local = NULL;
+	ire_if = ipif->ipif_ire_if;
+	ipif->ipif_ire_if = NULL;
+	rw_exit(&ipst->ips_ill_g_lock);
+	if (ire_local != NULL) {
+		ire_delete(ire_local);
+		ire_refrele_notr(ire_local);
+	}
+	if (ire_if != NULL) {
+		ire_delete(ire_if);
+		ire_refrele_notr(ire_if);
 	}
 	(void) ip_srcid_remove(&ipif->ipif_v6lcl_addr, ipif->ipif_zoneid, ipst);
 
@@ -2679,22 +2693,13 @@ ipif_delete_ires_v6(ipif_t *ipif)
 {
 	ill_t		*ill = ipif->ipif_ill;
 	ip_stack_t	*ipst = ill->ill_ipst;
-	in6_addr_t	v6addr;
-	in6_addr_t	route_mask;
 	ire_t		*ire;
-	int		match_args;
-	boolean_t	loopback;
-
-	/* Check if this is a loopback interface */
-	loopback = (ipif->ipif_ill->ill_wq == NULL);
-
-	match_args = MATCH_IRE_TYPE | MATCH_IRE_ILL | MATCH_IRE_MASK |
-	    MATCH_IRE_ZONEONLY;
 
 	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
-	if ((ire = ipif->ipif_ire_local) != NULL) {
-		ipif->ipif_ire_local = NULL;
-		rw_exit(&ipst->ips_ill_g_lock);
+	ire = ipif->ipif_ire_local;
+	ipif->ipif_ire_local = NULL;
+	rw_exit(&ipst->ips_ill_g_lock);
+	if (ire != NULL) {
 		/*
 		 * Move count to ipif so we don't loose the count due to
 		 * a down/up dance.
@@ -2703,47 +2708,14 @@ ipif_delete_ires_v6(ipif_t *ipif)
 
 		ire_delete(ire);
 		ire_refrele_notr(ire);
-	} else {
-		rw_exit(&ipst->ips_ill_g_lock);
 	}
-
-	match_args |= MATCH_IRE_GW;
-
-	/*
-	 * Delete the IRE_IF_RESOLVER or IRE_IF_NORESOLVER, as appropriate.
-	 * Note that atun interfaces have an all-zero ipif_v6subnet.
-	 * Thus we allow a zero subnet as long as the mask is non-zero.
-	 */
-	if (IS_UNDER_IPMP(ill))
-		match_args |= MATCH_IRE_TESTHIDDEN;
-
-	if (!loopback && !(ipif->ipif_flags & IPIF_NOXMIT) &&
-	    !(IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6subnet) &&
-	    IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6net_mask))) {
-		/* ipif_v6subnet is ipif_v6pp_dst_addr for pt-pt */
-		v6addr = ipif->ipif_v6subnet;
-
-		if (ipif->ipif_flags & IPIF_POINTOPOINT) {
-			route_mask = ipv6_all_ones;
-		} else {
-			route_mask = ipif->ipif_v6net_mask;
-		}
-
-		ire = ire_ftable_lookup_v6(
-		    &v6addr,			/* dest pref */
-		    &route_mask,		/* mask */
-		    &ipif->ipif_v6lcl_addr,	/* gateway */
-		    ill->ill_net_type,		/* IF_[NO]RESOLVER */
-		    ipif->ipif_ill,
-		    ipif->ipif_zoneid,
-		    NULL,
-		    match_args,
-		    0,
-		    ipst,
-		    NULL);
-		ASSERT(ire != NULL);
+	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
+	ire = ipif->ipif_ire_if;
+	ipif->ipif_ire_if = NULL;
+	rw_exit(&ipst->ips_ill_g_lock);
+	if (ire != NULL) {
 		ire_delete(ire);
-		ire_refrele(ire);
+		ire_refrele_notr(ire);
 	}
 }
 

@@ -13194,6 +13194,7 @@ ipif_free_tail(ipif_t *ipif)
 	ASSERT(!(ipif->ipif_flags & (IPIF_UP | IPIF_DUPLICATE)));
 	ASSERT(ipif->ipif_recovery_id == 0);
 	ASSERT(ipif->ipif_ire_local == NULL);
+	ASSERT(ipif->ipif_ire_if == NULL);
 
 	/* Free the memory. */
 	mi_free(ipif);
@@ -14332,6 +14333,7 @@ ipif_add_ires_v4(ipif_t *ipif, boolean_t loopback)
 	ipaddr_t	subnet_mask, route_mask;
 	int		err;
 	ire_t		*ire_local = NULL;	/* LOCAL or LOOPBACK */
+	ire_t		*ire_if = NULL;
 
 	if ((ipif->ipif_lcl_addr != INADDR_ANY) &&
 	    !(ipif->ipif_flags & IPIF_NOLOCAL)) {
@@ -14414,20 +14416,24 @@ ipif_add_ires_v4(ipif_t *ipif, boolean_t loopback)
 
 		ip1dbg(("ipif_add_ires: ipif 0x%p ill 0x%p "
 		    "creating if IRE ill_net_type 0x%x for 0x%x\n",
-		    (void *)ipif, (void *)ill,
-		    ill->ill_net_type,
+		    (void *)ipif, (void *)ill, ill->ill_net_type,
 		    ntohl(ipif->ipif_subnet)));
-		*irep++ = ire_create(
-		    (uchar_t *)&ipif->ipif_subnet,	/* dest address */
-		    (uchar_t *)&route_mask,		/* mask */
-		    (uchar_t *)&ipif->ipif_lcl_addr,	/* gateway */
-		    ill->ill_net_type,			/* IF_[NO]RESOLVER */
+		ire_if = ire_create(
+		    (uchar_t *)&ipif->ipif_subnet,
+		    (uchar_t *)&route_mask,
+		    (uchar_t *)&ipif->ipif_lcl_addr,
+		    ill->ill_net_type,
 		    ill,
 		    ipif->ipif_zoneid,
 		    ((ipif->ipif_flags & IPIF_PRIVATE) ?
 		    RTF_PRIVATE: 0) | RTF_KERNEL,
 		    NULL,
 		    ipst);
+		if (ire_if == NULL) {
+			ip1dbg(("ipif_up_done: NULL ire_if\n"));
+			err = ENOMEM;
+			goto bad;
+		}
 	}
 
 	/*
@@ -14479,28 +14485,59 @@ ipif_add_ires_v4(ipif_t *ipif, boolean_t loopback)
 	/*
 	 * Add in all newly created IREs.  ire_create_bcast() has
 	 * already checked for duplicates of the IRE_BROADCAST type.
+	 * We add the IRE_INTERFACE before the IRE_LOCAL to ensure
+	 * that lookups find the IRE_LOCAL even if the IRE_INTERFACE is
+	 * a /32 route.
 	 */
-	if (ire_local != NULL) {
-		ire_local = ire_add(ire_local);
-#ifdef DEBUG
-		if (ire_local != NULL) {
-			ire_refhold_notr(ire_local);
-			ire_refrele(ire_local);
+	if (ire_if != NULL) {
+		ire_if = ire_add(ire_if);
+		if (ire_if == NULL) {
+			err = ENOMEM;
+			goto bad2;
 		}
+#ifdef DEBUG
+		ire_refhold_notr(ire_if);
+		ire_refrele(ire_if);
 #endif
 	}
-
+	if (ire_local != NULL) {
+		ire_local = ire_add(ire_local);
+		if (ire_local == NULL) {
+			err = ENOMEM;
+			goto bad2;
+		}
+#ifdef DEBUG
+		ire_refhold_notr(ire_local);
+		ire_refrele(ire_local);
+#endif
+	}
 	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
 	if (ire_local != NULL)
 		ipif->ipif_ire_local = ire_local;
+	if (ire_if != NULL)
+		ipif->ipif_ire_if = ire_if;
 	rw_exit(&ipst->ips_ill_g_lock);
 	ire_local = NULL;
+	ire_if = NULL;
 
+	/*
+	 * We first add all of them, and if that succeeds we refrele the
+	 * bunch. That enables us to delete all of them should any of the
+	 * ire_adds fail.
+	 */
 	for (irep1 = irep; irep1 > ire_array; ) {
 		irep1--;
 		ASSERT(!MUTEX_HELD(&((*irep1)->ire_ill->ill_lock)));
-		/* refheld by ire_add. */
 		*irep1 = ire_add(*irep1);
+		if (*irep1 == NULL) {
+			err = ENOMEM;
+			goto bad2;
+		}
+	}
+
+	for (irep1 = irep; irep1 > ire_array; ) {
+		irep1--;
+		/* refheld by ire_add. */
 		if (*irep1 != NULL) {
 			ire_refrele(*irep1);
 			*irep1 = NULL;
@@ -14538,10 +14575,32 @@ ipif_add_ires_v4(ipif_t *ipif, boolean_t loopback)
 	}
 	return (0);
 
+bad2:
+	ill->ill_ipif_up_count--;
+	ipif->ipif_flags &= ~IPIF_UP;
+
 bad:
 	ip1dbg(("ipif_add_ires: FAILED \n"));
 	if (ire_local != NULL)
 		ire_delete(ire_local);
+	if (ire_if != NULL)
+		ire_delete(ire_if);
+
+	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
+	ire_local = ipif->ipif_ire_local;
+	ipif->ipif_ire_local = NULL;
+	ire_if = ipif->ipif_ire_if;
+	ipif->ipif_ire_if = NULL;
+	rw_exit(&ipst->ips_ill_g_lock);
+	if (ire_local != NULL) {
+		ire_delete(ire_local);
+		ire_refrele_notr(ire_local);
+	}
+	if (ire_if != NULL) {
+		ire_delete(ire_if);
+		ire_refrele_notr(ire_if);
+	}
+
 	while (irep > ire_array) {
 		irep--;
 		if (*irep != NULL) {
@@ -14559,22 +14618,13 @@ ipif_delete_ires_v4(ipif_t *ipif)
 {
 	ill_t		*ill = ipif->ipif_ill;
 	ip_stack_t	*ipst = ill->ill_ipst;
-	ipaddr_t	net_mask = 0;
-	ipaddr_t	subnet_mask, route_mask;
-	int		match_args;
 	ire_t		*ire;
-	boolean_t	loopback;
-
-	/* Check if this is a loopback interface */
-	loopback = (ipif->ipif_ill->ill_wq == NULL);
-
-	match_args = MATCH_IRE_TYPE | MATCH_IRE_ILL | MATCH_IRE_MASK |
-	    MATCH_IRE_ZONEONLY;
 
 	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
-	if ((ire = ipif->ipif_ire_local) != NULL) {
-		ipif->ipif_ire_local = NULL;
-		rw_exit(&ipst->ips_ill_g_lock);
+	ire = ipif->ipif_ire_local;
+	ipif->ipif_ire_local = NULL;
+	rw_exit(&ipst->ips_ill_g_lock);
+	if (ire != NULL) {
 		/*
 		 * Move count to ipif so we don't loose the count due to
 		 * a down/up dance.
@@ -14583,62 +14633,18 @@ ipif_delete_ires_v4(ipif_t *ipif)
 
 		ire_delete(ire);
 		ire_refrele_notr(ire);
-	} else {
-		rw_exit(&ipst->ips_ill_g_lock);
 	}
-
-	match_args |= MATCH_IRE_GW;
-
-	if ((ipif->ipif_lcl_addr != INADDR_ANY) &&
-	    !(ipif->ipif_flags & IPIF_NOLOCAL)) {
-		net_mask = ip_net_mask(ipif->ipif_lcl_addr);
-	} else {
-		net_mask = htonl(IN_CLASSA_NET);	/* fallback */
-	}
-
-	subnet_mask = ipif->ipif_net_mask;
-
-	/*
-	 * If mask was not specified, use natural netmask of
-	 * interface address. Also, store this mask back into the
-	 * ipif struct.
-	 */
-	if (subnet_mask == 0)
-		subnet_mask = net_mask;
-
-	/* Delete the IRE_IF_RESOLVER or IRE_IF_NORESOLVER, as appropriate. */
-	if (IS_UNDER_IPMP(ill))
-		match_args |= MATCH_IRE_TESTHIDDEN;
-
-	if (!loopback && !(ipif->ipif_flags & IPIF_NOXMIT) &&
-	    ipif->ipif_subnet != INADDR_ANY) {
-		/* ipif_subnet is ipif_pp_dst_addr for pt-pt */
-
-		if (ipif->ipif_flags & IPIF_POINTOPOINT) {
-			route_mask = IP_HOST_MASK;
-		} else {
-			route_mask = subnet_mask;
-		}
-
-		ire = ire_ftable_lookup_v4(
-		    ipif->ipif_subnet,			/* dest address */
-		    route_mask,				/* mask */
-		    ipif->ipif_lcl_addr,		/* gateway */
-		    ill->ill_net_type,			/* IF_[NO]RESOLVER */
-		    ill,
-		    ipif->ipif_zoneid,
-		    NULL,
-		    match_args,
-		    0,
-		    ipst,
-		    NULL);
-		ASSERT(ire != NULL);
+	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
+	ire = ipif->ipif_ire_if;
+	ipif->ipif_ire_if = NULL;
+	rw_exit(&ipst->ips_ill_g_lock);
+	if (ire != NULL) {
 		ire_delete(ire);
-		ire_refrele(ire);
+		ire_refrele_notr(ire);
 	}
 
 	/*
-	 * Create any necessary broadcast IREs.
+	 * Delete the broadcast IREs.
 	 */
 	if ((ipif->ipif_flags & IPIF_BROADCAST) &&
 	    !(ipif->ipif_flags & IPIF_NOXMIT))

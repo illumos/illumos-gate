@@ -98,9 +98,6 @@
 	NCE_F_AUTHORITY | NCE_F_PUBLISH | NCE_F_STATIC)
 
 /*
- * Function names with nce_ prefix are static while function
- * names with ndp_ prefix are used by rest of the IP.
- *
  * Lock ordering:
  *
  *	ndp_g_lock -> ill_lock -> ncec_lock
@@ -219,7 +216,6 @@ nce_advert_flags(const ncec_t *ncec)
 
 /*
  * NDP Cache Entry creation routine.
- * Mapped entries will never do NUD .
  * This routine must always be called with ndp6->ndp_g_lock held.
  */
 int
@@ -1028,9 +1024,7 @@ nce_set_multicast_v6(ill_t *ill, const in6_addr_t *dst,
 		}
 		ip_mcast_mapping(ill, (uchar_t *)dst, hw_addr);
 	} else {
-		/*
-		 * So no hw_addr is needed for IRE_IF_NORESOLVER.
-		 */
+		/* No hw_addr is needed for IRE_IF_NORESOLVER. */
 		hw_addr = NULL;
 	}
 	ASSERT((flags & NCE_F_MCAST) != 0);
@@ -1269,7 +1263,6 @@ ip_addr_recover(ipsq_t *ipsq, queue_t *rq, mblk_t *mp, void *dummy_arg)
 }
 
 /*
- *
  * Attempt to recover an IPv6 interface that's been shut down as a duplicate.
  * As long as someone else holds the address, the interface will stay down.
  * When that conflict goes away, the interface is brought back up.  This is
@@ -2350,13 +2343,18 @@ nce_timer(void *arg)
 		ncec->ncec_pcnt = ND_MAX_UNICAST_SOLICIT;
 		if (isv6) {
 			mutex_exit(&ncec->ncec_lock);
-			(void) ndp_xmit(src_ill, ND_NEIGHBOR_SOLICIT,
+			dropped = ndp_xmit(src_ill, ND_NEIGHBOR_SOLICIT,
 			    src_ill->ill_phys_addr,
 			    src_ill->ill_phys_addr_length,
 			    &sender6, &ncec->ncec_addr,
 			    NDP_UNICAST);
 		} else {
-			(void) arp_request(ncec, sender4, src_ill);
+			dropped = arp_request(ncec, sender4, src_ill);
+			mutex_exit(&ncec->ncec_lock);
+		}
+		if (!dropped) {
+			mutex_enter(&ncec->ncec_lock);
+			ncec->ncec_pcnt--;
 			mutex_exit(&ncec->ncec_lock);
 		}
 		if (ip_debug > 3) {
@@ -2391,10 +2389,9 @@ nce_timer(void *arg)
 				nce_dad(ncec, src_ill, B_TRUE);
 			} else {
 				ASSERT(src_ill != NULL);
-				ncec->ncec_pcnt--;
 				if (isv6) {
 					mutex_exit(&ncec->ncec_lock);
-					(void) ndp_xmit(src_ill,
+					dropped = ndp_xmit(src_ill,
 					    ND_NEIGHBOR_SOLICIT,
 					    src_ill->ill_phys_addr,
 					    src_ill->ill_phys_addr_length,
@@ -2406,8 +2403,13 @@ nce_timer(void *arg)
 					 * the ARP request will be sent out
 					 * as a link-layer unicast.
 					 */
-					(void) arp_request(ncec, sender4,
+					dropped = arp_request(ncec, sender4,
 					    src_ill);
+					mutex_exit(&ncec->ncec_lock);
+				}
+				if (!dropped) {
+					mutex_enter(&ncec->ncec_lock);
+					ncec->ncec_pcnt--;
 					mutex_exit(&ncec->ncec_lock);
 				}
 				nce_restart_timer(ncec,
@@ -3257,7 +3259,7 @@ nce_fastpath_match_dlur(ill_t *ill, nce_t *nce, void *arg)
 	 * fastpath ack is used to update the nce.
 	 */
 	if (ud_mp == NULL)
-		return (0); /* MH_WALK_CONTINUE */
+		return (0);
 	mp_rptr = mp->b_rptr;
 	cmplen = mp->b_wptr - mp_rptr;
 	ASSERT(cmplen >= 0);
@@ -3277,10 +3279,10 @@ nce_fastpath_match_dlur(ill_t *ill, nce_t *nce, void *arg)
 		nce_fp_marg->nce_fp_match_res = nce;
 		mutex_exit(&ncec->ncec_lock);
 		nce_refhold(nce);
-		return (1); /* MH_WALK_TERMINATE */
+		return (1);
 	}
 	mutex_exit(&ncec->ncec_lock);
-	return (0); /* MH_WALK_CONTINUE */
+	return (0);
 }
 
 /*
@@ -3635,7 +3637,6 @@ nce_lookup_then_add_v4(ill_t *ill, uchar_t *hw_addr, uint_t hw_addr_len,
 
 /*
  * NDP Cache Entry creation routine for IPv4.
- * Mapped entries are handled in arp.
  * This routine must always be called with ndp4->ndp_g_lock held.
  * Prior to return, ncec_refcnt is incremented.
  *

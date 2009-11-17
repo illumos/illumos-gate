@@ -806,7 +806,7 @@ tsol_prepend_option(uchar_t *optbuf, ipha_t *ipha, int buflen)
  * point to NULL.
  *
  * Returns:
- *      0		Label on (was|is now) correct
+ *      0		Label (was|is now) correct
  *      EACCES		The packet failed the remote host accreditation.
  *      ENOMEM		Memory allocation failure.
  *	EINVAL		Label cannot be computed
@@ -1356,7 +1356,7 @@ tsol_prepend_option_v6(uchar_t *optbuf, ip6_t *ip6h, int buflen)
  * point to NULL.
  *
  * Returns:
- *      0		Label on (was|is now) correct
+ *      0		Label (was|is now) correct
  *      EACCES		The packet failed the remote host accreditation.
  *      ENOMEM		Memory allocation failure.
  *	EINVAL		Label cannot be computed

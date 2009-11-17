@@ -922,6 +922,9 @@ ill_join_allmulti(ill_t *ill)
 
 	ASSERT(RW_WRITE_HELD(&ill->ill_mcast_lock));
 
+	if (IS_LOOPBACK(ill))
+		return (0);
+
 	if (!ill->ill_dl_up) {
 		/*
 		 * Nobody there. All multicast addresses will be re-joined
@@ -991,6 +994,9 @@ ill_leave_allmulti(ill_t *ill)
 	ill_t	*release_ill = NULL;
 
 	ASSERT(RW_WRITE_HELD(&ill->ill_mcast_lock));
+
+	if (IS_LOOPBACK(ill))
+		return;
 
 	if (!ill->ill_dl_up) {
 		/*

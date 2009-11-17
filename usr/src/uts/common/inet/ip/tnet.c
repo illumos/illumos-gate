@@ -829,18 +829,15 @@ tsol_get_pkt_label(mblk_t *mp, int version, ip_recv_attr_t *ira)
 		if (credp == NULL)
 			return (B_FALSE);
 	} else {
-		cred_t	*newcr;
-
-		newcr = copycred_from_bslabel(ira->ira_cred, &sl, doi,
+		credp = copycred_from_bslabel(ira->ira_cred, &sl, doi,
 		    KM_NOSLEEP);
-		if (newcr == NULL)
+		if (credp == NULL)
 			return (B_FALSE);
 		if (ira->ira_free_flags & IRA_FREE_CRED) {
 			crfree(ira->ira_cred);
 			ira->ira_free_flags &= ~IRA_FREE_CRED;
 			ira->ira_cred = NULL;
 		}
-		credp = newcr;
 	}
 
 	/*
@@ -880,7 +877,7 @@ tsol_receive_local(const mblk_t *mp, const void *addr, uchar_t version,
 	 *	- MLD packets. (Anything between ICMPv6 code 130 and 138.)
 	 *	- IGMP packets.
 	 *	- IPv4 router discovery.
-	 * In those cases ire_cred is NULL.
+	 * In those cases ira_cred is NULL.
 	 */
 	credp = ira->ira_cred;
 	if (credp == NULL)

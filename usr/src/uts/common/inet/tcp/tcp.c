@@ -5290,8 +5290,6 @@ tcp_connect_ipv4(tcp_t *tcp, ipaddr_t *dstaddrp, in_port_t dstport,
 
 	/*
 	 * Lookup the route to determine a source address and the uinfo.
-	 * If there was a source route we have tcp_ipha->ipha_dst as the first
-	 * hop.
 	 * Setup TCP parameters based on the metrics/DCE.
 	 */
 	error = tcp_set_destination(tcp);
@@ -5385,8 +5383,6 @@ tcp_connect_ipv6(tcp_t *tcp, in6_addr_t *dstaddrp, in_port_t dstport,
 
 	/*
 	 * Lookup the route to determine a source address and the uinfo.
-	 * If there was a source route we have tcp_ip6h->ip6_dst as the first
-	 * hop.
 	 * Setup TCP parameters based on the metrics/DCE.
 	 */
 	error = tcp_set_destination(tcp);
@@ -5413,7 +5409,6 @@ tcp_connect_ipv6(tcp_t *tcp, in6_addr_t *dstaddrp, in_port_t dstport,
 static int
 tcp_disconnect_common(tcp_t *tcp, t_scalar_t seqnum)
 {
-	tcp_t	*ltcp = NULL;
 	conn_t		*lconnp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	conn_t		*connp = tcp->tcp_connp;
@@ -5424,7 +5419,7 @@ tcp_disconnect_common(tcp_t *tcp, t_scalar_t seqnum)
 	 * since the destination IP address is not valid, and it can
 	 * be the initialized value of all zeros (broadcast address).
 	 */
-	if (tcp->tcp_state <= TCPS_BOUND || tcp->tcp_hard_binding) {
+	if (tcp->tcp_state <= TCPS_BOUND) {
 		if (connp->conn_debug) {
 			(void) strlog(TCP_MOD_ID, 0, 1, SL_ERROR|SL_TRACE,
 			    "tcp_disconnect: bad state, %d", tcp->tcp_state);
@@ -5456,7 +5451,6 @@ tcp_disconnect_common(tcp_t *tcp, t_scalar_t seqnum)
 		ASSERT(tcp->tcp_time_wait_next == NULL);
 		ASSERT(tcp->tcp_time_wait_prev == NULL);
 		ASSERT(tcp->tcp_time_wait_expire == 0);
-		ltcp = NULL;
 		/*
 		 * If it used to be a listener, check to make sure no one else
 		 * has taken the port before switching back to LISTEN state.
@@ -5464,8 +5458,6 @@ tcp_disconnect_common(tcp_t *tcp, t_scalar_t seqnum)
 		if (connp->conn_ipversion == IPV4_VERSION) {
 			lconnp = ipcl_lookup_listener_v4(connp->conn_lport,
 			    connp->conn_laddr_v4, IPCL_ZONEID(connp), ipst);
-			if (lconnp != NULL)
-				ltcp = lconnp->conn_tcp;
 		} else {
 			uint_t ifindex = 0;
 
@@ -5476,16 +5468,14 @@ tcp_disconnect_common(tcp_t *tcp, t_scalar_t seqnum)
 			lconnp = ipcl_lookup_listener_v6(connp->conn_lport,
 			    &connp->conn_laddr_v6, ifindex, IPCL_ZONEID(connp),
 			    ipst);
-			if (lconnp != NULL)
-				ltcp = lconnp->conn_tcp;
 		}
-		if (tcp->tcp_conn_req_max && ltcp == NULL) {
+		if (tcp->tcp_conn_req_max && lconnp == NULL) {
 			tcp->tcp_state = TCPS_LISTEN;
 		} else if (old_state > TCPS_BOUND) {
 			tcp->tcp_conn_req_max = 0;
 			tcp->tcp_state = TCPS_BOUND;
 		}
-		if (ltcp != NULL)
+		if (lconnp != NULL)
 			CONN_DEC_REF(lconnp);
 		if (old_state == TCPS_SYN_SENT || old_state == TCPS_SYN_RCVD) {
 			BUMP_MIB(&tcps->tcps_mib, tcpAttemptFails);
