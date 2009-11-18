@@ -2440,7 +2440,8 @@ bind_path:
 			 * vs. a condition of being temporarily out of
 			 * some resource
 			 */
-			if (geterror(vpkt->vpkt_tgt_init_bp))
+			if (vpkt->vpkt_tgt_init_bp == NULL ||
+			    geterror(vpkt->vpkt_tgt_init_bp))
 				return (TRAN_FATAL_ERROR);
 			else
 				return (TRAN_BUSY);
