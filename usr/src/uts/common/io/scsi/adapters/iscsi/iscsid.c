@@ -341,6 +341,7 @@ iscsid_start(iscsi_hba_t *ihp) {
 boolean_t
 iscsid_stop(iscsi_hba_t *ihp) {
 	boolean_t		rval = B_FALSE;
+	iscsi_sess_t		*isp = NULL;
 
 	if (iscsid_disable_discovery(ihp,
 	    ISCSI_ALL_DISCOVERY_METHODS) == B_FALSE) {
@@ -353,6 +354,19 @@ iscsid_stop(iscsi_hba_t *ihp) {
 	rw_enter(&ihp->hba_sess_list_rwlock, RW_READER);
 	if (ihp->hba_sess_list == NULL) {
 		rval = B_TRUE;
+	} else {
+		/*
+		 * If only boot session is left, that is OK.
+		 * Otherwise, we should consider stop failed.
+		 */
+		rval = B_TRUE;
+		for (isp = ihp->hba_sess_list; isp != NULL;
+		    isp = isp->sess_next) {
+			if (isp->sess_boot == B_FALSE) {
+				rval = B_FALSE;
+				break;
+			}
+		}
 	}
 	rw_exit(&ihp->hba_sess_list_rwlock);
 

@@ -53,6 +53,8 @@
 #define	ISCSI_DOOR_DAEMON_SYSLOG_PP		"iscsid"
 #define	ISCSI_DISCOVERY_POLL_DELAY1		1	/* Seconds */
 #define	ISCSI_DISCOVERY_POLL_DELAY2		60	/* Seconds */
+#define	ISCSI_SMF_OFFLINE_DELAY			10	/* Seconds */
+#define	ISCSI_SMF_OFFLINE_MAX_RETRY_TIMES	60
 
 #if !defined(SMF_EXIT_ERR_OTHER)
 #define	SMF_EXIT_ERR_OTHER	-1
@@ -126,6 +128,8 @@ main(
 {
 	int			i;
 	int			sig;
+	int			ret = -1;
+	int			retry = 0;
 	sigset_t		sigs, allsigs;
 	struct sigaction	act;
 
@@ -256,18 +260,21 @@ main(
 		case SIGQUIT:
 		case SIGINT:
 		case SIGTERM:
-			if (ioctl(
-			    iscsi_dev_handle,
-			    ISCSI_SMF_OFFLINE,
-			    NULL) == -1) {
-				perror(gettext("ioctl: disable"
-				    " iscsi initiator"));
-				/*
-				 * Keep running if unable
-				 * to stop
-				 */
-				break;
-			}
+			do {
+				ret = ioctl(iscsi_dev_handle,
+				    ISCSI_SMF_OFFLINE, NULL);
+				if (ret == -1) {
+					perror(gettext("ioctl: disable"
+					    " iscsi initiator"));
+					/*
+					 * Keep retrying if unable
+					 * to stop
+					 */
+					(void) sleep(ISCSI_SMF_OFFLINE_DELAY);
+					retry++;
+				}
+			} while (ret == -1 &&
+			    retry < ISCSI_SMF_OFFLINE_MAX_RETRY_TIMES);
 			(void) close(iscsi_dev_handle);
 			return (0);
 			break;

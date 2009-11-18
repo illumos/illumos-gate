@@ -1044,20 +1044,38 @@ iscsi_rx_process_reject_rsp(idm_conn_t *ic, idm_pdu_t *pdu)
 	iscsi_hdr_t		*old_ihp	= NULL;
 	iscsi_conn_t		*icp		= ic->ic_handle;
 	uint8_t			*data 		= pdu->isp_data;
-	iscsi_hdr_t		*ihp		= (iscsi_hdr_t *)irrhp;
-	idm_status_t		status;
-	iscsi_cmd_t		*icmdp	= NULL;
+	idm_status_t		status		= IDM_STATUS_SUCCESS;
+	int			i		= 0;
 
 	ASSERT(data != NULL);
 	isp = icp->conn_sess;
 	ASSERT(isp != NULL);
 
-	mutex_enter(&icp->conn_queue_active.mutex);
-	if ((status = iscsi_rx_chk(icp, isp, (iscsi_scsi_rsp_hdr_t *)irrhp,
-	    &icmdp)) != IDM_STATUS_SUCCESS) {
-		mutex_exit(&icp->conn_queue_active.mutex);
-		return (status);
+	/*
+	 * In RFC3720 section 10.17, this 4 bytes should be all 0xff.
+	 */
+	for (i = 0; i < 4; i++) {
+		if (irrhp->must_be_ff[i] != 0xff) {
+			return (IDM_STATUS_PROTOCOL_ERROR);
+		}
 	}
+	mutex_enter(&isp->sess_cmdsn_mutex);
+
+	if (icp->conn_expstatsn == ntohl(irrhp->statsn)) {
+		icp->conn_expstatsn++;
+	} else {
+		cmn_err(CE_WARN, "iscsi connection(%u/%x) protocol error - "
+		    "received status out of order statsn:0x%x "
+		    "expstatsn:0x%x", icp->conn_oid, irrhp->opcode,
+		    ntohl(irrhp->statsn), icp->conn_expstatsn);
+		mutex_exit(&isp->sess_cmdsn_mutex);
+		return (IDM_STATUS_PROTOCOL_ERROR);
+	}
+	/* update expcmdsn and maxcmdsn */
+	iscsi_update_flow_control(isp, ntohl(irrhp->maxcmdsn),
+	    ntohl(irrhp->expcmdsn));
+
+	mutex_exit(&isp->sess_cmdsn_mutex);
 
 	/* If we don't have the rejected header we can't do anything */
 	dlength = n2h24(irrhp->dlength);
@@ -1098,7 +1116,8 @@ iscsi_rx_process_reject_rsp(idm_conn_t *ic, idm_pdu_t *pdu)
 			 */
 			break;
 		case ISCSI_OP_SCSI_TASK_MGT_MSG:
-			(void) iscsi_rx_process_rejected_tsk_mgt(ic, old_ihp);
+			status =
+			    iscsi_rx_process_rejected_tsk_mgt(ic, old_ihp);
 			break;
 		default:
 			cmn_err(CE_WARN, "iscsi connection(%u) protocol error "
@@ -1126,14 +1145,14 @@ iscsi_rx_process_reject_rsp(idm_conn_t *ic, idm_pdu_t *pdu)
 	case ISCSI_REJECT_LONG_OPERATION_REJECT:
 	case ISCSI_REJECT_NEGOTIATION_RESET:
 	default:
-		cmn_err(CE_WARN, "iscsi connection(%u) closing connection - "
-		    "target requested itt:0x%x reason:0x%x",
-		    icp->conn_oid, ihp->itt, irrhp->reason);
+		cmn_err(CE_WARN, "iscsi connection(%u/%x) closing connection - "
+		    "target requested reason:0x%x",
+		    icp->conn_oid, irrhp->opcode, irrhp->reason);
 		status = IDM_STATUS_PROTOCOL_ERROR;
 		break;
 	}
 
-	return (IDM_STATUS_SUCCESS);
+	return (status);
 }
 
 
