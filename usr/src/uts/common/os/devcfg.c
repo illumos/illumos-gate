@@ -4401,7 +4401,7 @@ i_ddi_unbind_devs_by_alias(major_t major, char *alias)
 	ub->unbind_errors = 0;
 
 	/* flush devfs so that ndi_devi_unbind_driver will work when possible */
-	devfs_clean(top_devinfo, NULL, 0);
+	(void) devfs_clean(top_devinfo, NULL, 0);
 	ddi_walk_devs(top_devinfo, unbind_children_by_alias,
 	    (void *)(uintptr_t)ub);
 
@@ -4458,7 +4458,7 @@ void
 i_ddi_unbind_devs(major_t major)
 {
 	/* flush devfs so that ndi_devi_unbind_driver will work when possible */
-	devfs_clean(top_devinfo, NULL, 0);
+	(void) devfs_clean(top_devinfo, NULL, 0);
 	ddi_walk_devs(top_devinfo, unbind_children_by_driver,
 	    (void *)(uintptr_t)major);
 }
