@@ -8527,15 +8527,30 @@ tcp_build_hdrs(tcp_t *tcp)
 {
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	conn_t		*connp = tcp->tcp_connp;
+	char		buf[TCP_MAX_HDR_LENGTH];
+	uint_t		buflen;
+	uint_t		ulplen = TCP_MIN_HEADER_LENGTH;
+	uint_t		extralen = TCP_MAX_TCP_OPTIONS_LENGTH;
 	tcpha_t		*tcpha;
 	uint32_t	cksum;
 	int		error;
 
+	/*
+	 * We might be called after the connection is set up, and we might
+	 * have TS options already in the TCP header. Thus we  save any
+	 * existing tcp header.
+	 */
+	buflen = connp->conn_ht_ulp_len;
+	if (buflen != 0) {
+		bcopy(connp->conn_ht_ulp, buf, buflen);
+		extralen -= buflen - ulplen;
+		ulplen = buflen;
+	}
+
 	/* Grab lock to satisfy ASSERT; TCP is serialized using squeue */
 	mutex_enter(&connp->conn_lock);
-	error = conn_build_hdr_template(connp, TCP_MIN_HEADER_LENGTH,
-	    TCP_MAX_TCP_OPTIONS_LENGTH, &connp->conn_laddr_v6,
-	    &connp->conn_faddr_v6, connp->conn_flowinfo);
+	error = conn_build_hdr_template(connp, ulplen, extralen,
+	    &connp->conn_laddr_v6, &connp->conn_faddr_v6, connp->conn_flowinfo);
 	mutex_exit(&connp->conn_lock);
 	if (error != 0)
 		return (error);
@@ -8547,10 +8562,15 @@ tcp_build_hdrs(tcp_t *tcp)
 	tcpha = (tcpha_t *)connp->conn_ht_ulp;
 	tcp->tcp_tcpha = tcpha;
 
-	tcpha->tha_lport = connp->conn_lport;
-	tcpha->tha_fport = connp->conn_fport;
-	tcpha->tha_sum = 0;
-	tcpha->tha_offset_and_reserved = (5 << 4);
+	/* restore any old tcp header */
+	if (buflen != 0) {
+		bcopy(buf, connp->conn_ht_ulp, buflen);
+	} else {
+		tcpha->tha_lport = connp->conn_lport;
+		tcpha->tha_fport = connp->conn_fport;
+		tcpha->tha_sum = 0;
+		tcpha->tha_offset_and_reserved = (5 << 4);
+	}
 
 	/*
 	 * IP wants our header length in the checksum field to
