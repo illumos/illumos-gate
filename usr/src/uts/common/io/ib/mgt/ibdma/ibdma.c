@@ -303,7 +303,7 @@ ibdma_ibt_init()
 #ifdef	DEBUG_IBDMA
 		cmn_err(CE_NOTE, "ibt_init, no HCA(s) found");
 #endif
-		ibt_detach(ibdma->ms_ibt_hdl);
+		(void) ibt_detach(ibdma->ms_ibt_hdl);
 		return (DDI_FAILURE);
 	}
 

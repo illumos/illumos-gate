@@ -342,7 +342,7 @@ iser_tgt_svc_create(idm_svc_req_t *sr, idm_svc_t *is)
 	if (rc != DDI_SUCCESS) {
 		ISER_LOG(CE_NOTE, "iser_tgt_svc_create: iser_register_service "
 		    "failed on port (%d): rc (0x%x)", sr->sr_port, rc);
-		ibt_release_ip_sid(iser_svc->is_svcid);
+		(void) ibt_release_ip_sid(iser_svc->is_svcid);
 		list_destroy(&iser_svc->is_sbindlist);
 		idm_refcnt_destroy(&iser_svc->is_refcnt);
 		kmem_free(iser_svc, sizeof (iser_svc_t));

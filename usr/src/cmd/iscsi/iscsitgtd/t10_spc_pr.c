@@ -343,7 +343,7 @@ spc_cmd_reserve6(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 		return;
 	}
 
-	pthread_rwlock_wrlock(&res->res_rwlock);
+	(void) pthread_rwlock_wrlock(&res->res_rwlock);
 	/*
 	 * The ways to get in here are,
 	 * 1) to be the owner of the reservation (SPC-2 section 7.21.2)
@@ -359,7 +359,7 @@ spc_cmd_reserve6(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 		res->res_owner = cmd->c_lu;
 	}
 	res->res_type = RT_NPR;
-	pthread_rwlock_unlock(&res->res_rwlock);
+	(void) pthread_rwlock_unlock(&res->res_rwlock);
 
 	trans_send_complete(cmd, STATUS_GOOD);
 }
@@ -385,7 +385,7 @@ spc_cmd_release6(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 		return;
 	}
 
-	pthread_rwlock_wrlock(&res->res_rwlock);
+	(void) pthread_rwlock_wrlock(&res->res_rwlock);
 	/*
 	 * The ways to get in here are,
 	 * 1) to be the owner of the reservation
@@ -400,7 +400,7 @@ spc_cmd_release6(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 		res->res_owner = NULL;
 		res->res_type = RT_NONE;
 	}
-	pthread_rwlock_unlock(&res->res_rwlock);
+	(void) pthread_rwlock_unlock(&res->res_rwlock);
 
 	trans_send_complete(cmd, STATUS_GOOD);
 }

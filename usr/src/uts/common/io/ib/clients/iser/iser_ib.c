@@ -288,7 +288,7 @@ iser_ib_unbind_service(idm_svc_t *idm_svc)
 		    is_sbind != NULL;
 		    is_sbind = next_sb) {
 			next_sb = list_next(&iser_svc->is_sbindlist, is_sbind);
-			ibt_unbind_service(iser_svc->is_srvhdl,
+			(void) ibt_unbind_service(iser_svc->is_srvhdl,
 			    is_sbind->is_sbindhdl);
 			list_remove(&iser_svc->is_sbindlist, is_sbind);
 			kmem_free(is_sbind, sizeof (iser_sbind_t));
@@ -305,9 +305,9 @@ iser_ib_deregister_service(idm_svc_t *idm_svc)
 	if (idm_svc != NULL && idm_svc->is_iser_svc != NULL) {
 
 		iser_svc = (iser_svc_t *)idm_svc->is_iser_svc;
-		ibt_deregister_service(iser_state->is_ibhdl,
+		(void) ibt_deregister_service(iser_state->is_ibhdl,
 		    iser_svc->is_srvhdl);
-		ibt_release_ip_sid(iser_svc->is_svcid);
+		(void) ibt_release_ip_sid(iser_svc->is_svcid);
 	}
 }
 
@@ -521,7 +521,7 @@ iser_ib_alloc_rc_channel(iser_hca_t *hca, uint8_t hca_port)
 		return (NULL);
 	}
 	ibt_set_cq_handler(chan->ic_sendcq, iser_ib_sendcq_handler, chan);
-	ibt_enable_cq_notify(chan->ic_sendcq, IBT_NEXT_COMPLETION);
+	(void) ibt_enable_cq_notify(chan->ic_sendcq, IBT_NEXT_COMPLETION);
 
 	/* Set up the Receive Completion Queue */
 	status = iser_ib_setup_cq(hca->hca_hdl, chan->ic_recvcq_sz,
@@ -535,7 +535,7 @@ iser_ib_alloc_rc_channel(iser_hca_t *hca, uint8_t hca_port)
 		return (NULL);
 	}
 	ibt_set_cq_handler(chan->ic_recvcq, iser_ib_recvcq_handler, chan);
-	ibt_enable_cq_notify(chan->ic_recvcq, IBT_NEXT_COMPLETION);
+	(void) ibt_enable_cq_notify(chan->ic_recvcq, IBT_NEXT_COMPLETION);
 
 	/* Setup the channel arguments */
 	iser_ib_setup_chanargs(hca_port, chan->ic_sendcq, chan->ic_recvcq,
@@ -702,8 +702,8 @@ iser_ib_free_rc_channel(iser_chan_t *chan)
 	chan->ic_chanhdl = NULL;
 
 	/* Free the CQs */
-	ibt_free_cq(chan->ic_sendcq);
-	ibt_free_cq(chan->ic_recvcq);
+	(void) ibt_free_cq(chan->ic_sendcq);
+	(void) ibt_free_cq(chan->ic_recvcq);
 
 	/* Free the chan handle */
 	mutex_destroy(&chan->ic_chan_lock);
@@ -1726,7 +1726,7 @@ iser_ib_deactivate_port(ib_guid_t hca_guid, ib_gid_t gid)
 		is_sbind = iser_ib_get_bind(iser_svc, hca_guid, gid);
 		if (is_sbind != NULL) {
 			/* This service is still bound, tear it down */
-			ibt_unbind_service(iser_svc->is_srvhdl,
+			(void) ibt_unbind_service(iser_svc->is_srvhdl,
 			    is_sbind->is_sbindhdl);
 			list_remove(&iser_svc->is_sbindlist, is_sbind);
 			kmem_free(is_sbind, sizeof (iser_sbind_t));

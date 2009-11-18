@@ -286,9 +286,9 @@ create_target(tgt_node_t *x)
 		(void) snprintf(path, sizeof (path), "%s/%s",
 		    target_basedir, name);
 		(void) unlink(path);
-		tgt_node_remove(targets_config, n, MatchBoth);
+		(void) tgt_node_remove(targets_config, n, MatchBoth);
 	} else
-		tgt_node_remove(c, l, MatchBoth);
+		(void) tgt_node_remove(c, l, MatchBoth);
 
 	xml_rtn_msg(&msg, code);
 
@@ -568,7 +568,7 @@ create_zfs(tgt_node_t *x, ucred_t *cred)
 	 * information are not stored as part of the iscsioptions properity, but
 	 * are retained in the in-core targets_config
 	 */
-	tgt_update_value_str(n, XML_ELEMENT_TARG, dataset);
+	(void) tgt_update_value_str(n, XML_ELEMENT_TARG, dataset);
 	c = tgt_node_alloc(XML_ELEMENT_ALIAS, String, dataset);
 	tgt_node_add(n, c);
 

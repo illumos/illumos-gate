@@ -341,7 +341,7 @@ err_exit_3:
 	srpt_ioc_detach();
 
 err_exit_2:
-	stmf_deregister_port_provider(srpt_ctxt->sc_pp);
+	(void) stmf_deregister_port_provider(srpt_ctxt->sc_pp);
 
 err_exit_1:
 	stmf_free(srpt_ctxt->sc_pp);
@@ -479,7 +479,7 @@ srpt_disable_srp_services(void)
 	srpt_ioc_detach();
 
 	/* De-register ourselves as an STMF port provider */
-	stmf_deregister_port_provider(srpt_ctxt->sc_pp);
+	(void) stmf_deregister_port_provider(srpt_ctxt->sc_pp);
 	stmf_free(srpt_ctxt->sc_pp);
 	srpt_ctxt->sc_pp = NULL;
 

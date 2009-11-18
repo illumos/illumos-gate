@@ -585,7 +585,7 @@ iser_reg_mem(iser_hca_t *hca, ib_vaddr_t vaddr, ib_memlen_t len,
 void
 iser_dereg_mem(iser_hca_t *hca, iser_mr_t *mr)
 {
-	ibt_deregister_mr(hca->hca_hdl, mr->is_mrhdl);
+	(void) ibt_deregister_mr(hca->hca_hdl, mr->is_mrhdl);
 	kmem_free(mr, sizeof (iser_mr_t));
 }
 

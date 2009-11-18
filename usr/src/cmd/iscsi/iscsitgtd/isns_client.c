@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -406,7 +406,7 @@ isns_server_connection_thr(void *arg)
 	while (isns_shutdown == False &&
 	    connection_thr_bail_out == False) {
 		/* current server */
-		strcpy(server, isns_args.server);
+		(void) strcpy(server, isns_args.server);
 
 		if (is_isns_server_up(server) == 0) {
 			if (registered_targets == False) {
@@ -661,7 +661,8 @@ isns_populate_and_update_server_info(Boolean_t update) {
 	int retcode = 0;
 
 	/* get isns server info */
-	tgt_find_value_str(main_config, XML_ELEMENT_ISNS_SERV, &isns_srv);
+	(void) tgt_find_value_str(main_config, XML_ELEMENT_ISNS_SERV,
+	    &isns_srv);
 	if (isns_srv == NULL) {
 		syslog(LOG_INFO,
 		    "The server has not been setup, "
@@ -688,7 +689,7 @@ isns_populate_and_update_server_info(Boolean_t update) {
 			    "Detected a new isns server, deregistering"
 			    " %s", isns_args.server);
 			(void) isns_dereg_all();
-			strcpy(isns_args.server, isns_srv);
+			(void) strcpy(isns_args.server, isns_srv);
 			/* Register with the new server */
 			if (isns_reg_all() == 0) {
 				/* scn register all targets */
@@ -736,7 +737,7 @@ isns_init(target_queue_t *q)
 	    esi_scn_thr, (void *)&isns_args) !=
 	    0) {
 		syslog(LOG_ALERT, "isns_init failed to pthread_create");
-		pthread_kill(isns_tid, SIGKILL);
+		(void) pthread_kill(isns_tid, SIGKILL);
 		return (-1);
 	}
 
@@ -783,8 +784,8 @@ isns_update()
 		if (is_isns_enabled == False) {
 			isns_shutdown = True;
 			/* pthread_join for the isns thread */
-			pthread_join(isns_tid, NULL);
-			pthread_join(scn_tid, NULL);
+			(void) pthread_join(isns_tid, NULL);
+			(void) pthread_join(scn_tid, NULL);
 			isns_server_connection_thr_running = False;
 		} else {
 			/*

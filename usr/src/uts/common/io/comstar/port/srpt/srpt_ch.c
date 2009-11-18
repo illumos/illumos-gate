@@ -118,8 +118,8 @@ srpt_ch_alloc(srpt_target_port_t *tgt, uint8_t port)
 
 	ibt_set_cq_handler(ch->ch_scq_hdl, srpt_ch_scq_hdlr, ch);
 	ibt_set_cq_handler(ch->ch_rcq_hdl, srpt_ch_rcq_hdlr, ch);
-	ibt_enable_cq_notify(ch->ch_scq_hdl, IBT_NEXT_COMPLETION);
-	ibt_enable_cq_notify(ch->ch_rcq_hdl, IBT_NEXT_COMPLETION);
+	(void) ibt_enable_cq_notify(ch->ch_scq_hdl, IBT_NEXT_COMPLETION);
+	(void) ibt_enable_cq_notify(ch->ch_rcq_hdl, IBT_NEXT_COMPLETION);
 
 	ch_args.rc_flags   = IBT_WR_SIGNALED;
 
@@ -171,7 +171,7 @@ srpt_ch_alloc(srpt_target_port_t *tgt, uint8_t port)
 	    KM_SLEEP);
 	if (ch->ch_swqe == NULL) {
 		SRPT_DPRINTF_L2("ch_alloc, SWQE alloc error");
-		ibt_free_channel(ch->ch_chan_hdl);
+		(void) ibt_free_channel(ch->ch_chan_hdl);
 		goto qp_alloc_err;
 	}
 	mutex_init(&ch->ch_swqe_lock, NULL, MUTEX_DRIVER, NULL);
@@ -185,10 +185,10 @@ srpt_ch_alloc(srpt_target_port_t *tgt, uint8_t port)
 	return (ch);
 
 qp_alloc_err:
-	ibt_free_cq(ch->ch_rcq_hdl);
+	(void) ibt_free_cq(ch->ch_rcq_hdl);
 
 rcq_alloc_err:
-	ibt_free_cq(ch->ch_scq_hdl);
+	(void) ibt_free_cq(ch->ch_scq_hdl);
 
 scq_alloc_err:
 	cv_destroy(&ch->ch_cv_complete);
@@ -257,15 +257,15 @@ srpt_ch_release_ref(srpt_channel_t *ch, uint_t wait)
 	SRPT_DPRINTF_L3("ch_release_ref - release resources");
 	if (ch->ch_chan_hdl) {
 		SRPT_DPRINTF_L3("ch_release_ref - free channel");
-		ibt_free_channel(ch->ch_chan_hdl);
+		(void) ibt_free_channel(ch->ch_chan_hdl);
 	}
 
 	if (ch->ch_scq_hdl) {
-		ibt_free_cq(ch->ch_scq_hdl);
+		(void) ibt_free_cq(ch->ch_scq_hdl);
 	}
 
 	if (ch->ch_rcq_hdl) {
-		ibt_free_cq(ch->ch_rcq_hdl);
+		(void) ibt_free_cq(ch->ch_rcq_hdl);
 	}
 
 	/*
@@ -657,7 +657,7 @@ srpt_ch_scq_hdlr(ibt_cq_hdl_t cq_hdl, void *arg)
 			 * we are done.
 			 */
 			if (cq_rearmed == 0) {
-				ibt_enable_cq_notify(ch->ch_scq_hdl,
+				(void) ibt_enable_cq_notify(ch->ch_scq_hdl,
 				    IBT_NEXT_COMPLETION);
 				cq_rearmed = 1;
 				continue;
@@ -763,7 +763,7 @@ srpt_ch_rcq_hdlr(ibt_cq_hdl_t cq_hdl, void *arg)
 			 * we are done.
 			 */
 			if (cq_rearmed == 0) {
-				ibt_enable_cq_notify(ch->ch_rcq_hdl,
+				(void) ibt_enable_cq_notify(ch->ch_rcq_hdl,
 				    IBT_NEXT_COMPLETION);
 				cq_rearmed = 1;
 				continue;

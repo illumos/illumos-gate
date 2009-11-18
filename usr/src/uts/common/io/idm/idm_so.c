@@ -1049,10 +1049,10 @@ idm_so_conn_connect_common(idm_conn_t *ic)
 	t_addrlen = sizeof (struct sockaddr_in6);
 
 	/* Set the local and remote addresses in the idm conn handle */
-	ksocket_getsockname(so_conn->ic_so, (struct sockaddr *)&t_addr,
+	(void) ksocket_getsockname(so_conn->ic_so, (struct sockaddr *)&t_addr,
 	    &t_addrlen, CRED());
 	bcopy(&t_addr, &ic->ic_laddr, t_addrlen);
-	ksocket_getpeername(so_conn->ic_so, (struct sockaddr *)&t_addr,
+	(void) ksocket_getpeername(so_conn->ic_so, (struct sockaddr *)&t_addr,
 	    &t_addrlen, CRED());
 	bcopy(&t_addr, &ic->ic_raddr, t_addrlen);
 
@@ -3036,10 +3036,10 @@ idm_so_timed_socket_connect(ksocket_t ks,
 
 	/* resume blocking mode */
 	nonblocking = 0;
-	(void)  ksocket_ioctl(ks, FIONBIO, (intptr_t)&nonblocking, &rval,
+	(void) ksocket_ioctl(ks, FIONBIO, (intptr_t)&nonblocking, &rval,
 	    CRED());
 cleanup:
-	ksocket_setcallbacks(ks, NULL, NULL, CRED());
+	(void) ksocket_setcallbacks(ks, NULL, NULL, CRED());
 	cv_destroy(&it.it_cv);
 	if (rc != 0) {
 		idm_soshutdown(ks);

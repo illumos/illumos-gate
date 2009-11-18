@@ -162,7 +162,7 @@ srpt_ioc_attach()
 	hca_cnt = ibt_get_hca_list(&guid);
 	if (hca_cnt < 1) {
 		SRPT_DPRINTF_L2("ioc_attach, no HCA found");
-		ibt_detach(srpt_ctxt->sc_ibt_hdl);
+		(void) ibt_detach(srpt_ctxt->sc_ibt_hdl);
 		srpt_ctxt->sc_ibt_hdl = NULL;
 		return (DDI_FAILURE);
 	}
@@ -216,7 +216,7 @@ srpt_ioc_detach()
 
 	list_destroy(&srpt_ctxt->sc_ioc_list);
 
-	ibt_detach(srpt_ctxt->sc_ibt_hdl);
+	(void) ibt_detach(srpt_ctxt->sc_ibt_hdl);
 	srpt_ctxt->sc_ibt_hdl = NULL;
 }
 
@@ -776,7 +776,7 @@ srpt_ioc_svc_bind(srpt_target_port_t *tgt, uint_t portnum)
 		    new_gid.gid_prefix != port->hwp_gid.gid_prefix) {
 			SRPT_DPRINTF_L2("ioc_svc_bind, unregister current"
 			    " bind");
-			ibt_unbind_service(tgt->tp_ibt_svc_hdl,
+			(void) ibt_unbind_service(tgt->tp_ibt_svc_hdl,
 			    port->hwp_bind_hdl);
 			port->hwp_bind_hdl = NULL;
 		}
@@ -838,7 +838,8 @@ srpt_ioc_svc_unbind(srpt_target_port_t *tgt, uint_t portnum)
 
 	if (tgt->tp_ibt_svc_hdl != NULL && port->hwp_bind_hdl != NULL) {
 		SRPT_DPRINTF_L2("ioc_svc_unbind, unregister current bind");
-		ibt_unbind_service(tgt->tp_ibt_svc_hdl, port->hwp_bind_hdl);
+		(void) ibt_unbind_service(tgt->tp_ibt_svc_hdl,
+		    port->hwp_bind_hdl);
 	}
 	port->hwp_bind_hdl = NULL;
 	port->hwp_gid.gid_prefix = 0;

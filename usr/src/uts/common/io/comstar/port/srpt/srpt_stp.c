@@ -173,7 +173,7 @@ srp_start_err:
 	tgt->tp_srp_enabled = 0;
 	srpt_ioc_svc_unbind_all(tgt);
 	if (tgt->tp_ibt_svc_hdl != NULL) {
-		ibt_deregister_service(srpt_ctxt->sc_ibt_hdl,
+		(void) ibt_deregister_service(srpt_ctxt->sc_ibt_hdl,
 		    tgt->tp_ibt_svc_hdl);
 		tgt->tp_ibt_svc_hdl = NULL;
 	}
