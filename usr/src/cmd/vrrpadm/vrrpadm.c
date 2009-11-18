@@ -763,7 +763,7 @@ str2opt(char *opts, uint32_t *modify_mask, boolean_t *preempt,
 	char		*value;
 	int		opt;
 	uint32_t	mask = 0;
-	static enum { o_preempt = 0, o_un_preempt, o_accept, o_no_accept };
+	enum { o_preempt = 0, o_un_preempt, o_accept, o_no_accept };
 	static char	*myopts[] = {
 		"preempt",
 		"un_preempt",
