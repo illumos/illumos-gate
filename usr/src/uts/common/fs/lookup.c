@@ -229,7 +229,7 @@ lookuppnvp(
 	vnode_t *startvp;
 	vnode_t *zonevp = curproc->p_zone->zone_rootvp;		/* zone root */
 	int must_be_directory = 0;
-	boolean_t retry_with_kcred = B_FALSE;
+	boolean_t retry_with_kcred;
 
 	CPU_STATS_ADDQ(CPU, sys, namei, 1);
 	nlink = 0;
@@ -259,6 +259,8 @@ lookuppnvp(
 
 	startvp = vp;
 next:
+	retry_with_kcred = B_FALSE;
+
 	/*
 	 * Make sure we have a directory.
 	 */
