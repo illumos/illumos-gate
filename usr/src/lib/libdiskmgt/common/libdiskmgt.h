@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _LIBDISKMGT_H
 #define	_LIBDISKMGT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -116,6 +114,13 @@ typedef enum {
     DM_SLICE_STAT_USE = 0
 } dm_slice_stat_t;
 
+/* partition type */
+typedef enum {
+	DM_PRIMARY = 0,
+	DM_EXTENDED,
+	DM_LOGICAL
+} dm_partition_type_t;
+
 /* attribute definitions */
 
 /* drive */
@@ -190,7 +195,8 @@ typedef enum {
 #define	DM_ECYL			"ecyl"
 #define	DM_EHEAD		"ehead"
 #define	DM_ESECT		"esect"
-#define	DM_PTYPE		"ptype"
+#define	DM_PTYPE		"ptype" /* this references the partition id */
+#define	DM_PARTITION_TYPE	"part_type" /* primary, extended, logical */
 #define	DM_RELSECT		"relsect"
 
 /* slice */

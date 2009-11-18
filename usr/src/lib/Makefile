@@ -651,6 +651,7 @@ libreparse:	libnvpair
 libhotplug:	libnvpair
 cfgadm_plugins:	libhotplug
 libilb:		libsocket
+$(INTEL_BUILD)libdiskmgt:libfdisk
 
 #
 # The reason this rule checks for the existence of the

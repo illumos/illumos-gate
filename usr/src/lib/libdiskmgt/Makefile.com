@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -34,8 +34,10 @@ OBJECTS =	assoc_types.o \
 include ../../Makefile.lib
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-ldevinfo -ladm -ldevid -lkstat -lsysevent \
-		-lnvpair -lefi -lc
+i386_LDLIBS =   -lfdisk
+sparc_LDLIBS =
+LDLIBS +=       -ldevinfo -ladm -ldevid -lkstat -lsysevent \
+                -lnvpair -lefi -lc $($(MACH)_LDLIBS)
 DYNFLAGS +=	-R/opt/VRTSvxvm/lib
 
 SRCDIR =	../common
