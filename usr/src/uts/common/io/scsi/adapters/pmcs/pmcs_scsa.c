@@ -423,6 +423,15 @@ pmcs_scsa_tran_tgt_free(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	ASSERT(target->phy);
 	phyp = target->phy;
 
+	if (target->recover_wait) {
+		mutex_exit(&target->statlock);
+		mutex_exit(&pwp->lock);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, phyp, target, "%s: "
+		    "Target 0x%p in device state recovery, fail tran_tgt_free",
+		    __func__, (void *)target);
+		return;
+	}
+
 	/*
 	 * If this target still has a PHY pointer and that PHY's target pointer
 	 * has been cleared, then that PHY has been reaped. In that case, there

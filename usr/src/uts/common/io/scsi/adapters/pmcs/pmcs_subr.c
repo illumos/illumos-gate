@@ -2875,6 +2875,9 @@ pmcs_clear_phy(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 	/* keep phynum */
 	pptr->width = 0;
 	pptr->ds_recovery_retries = 0;
+	pptr->ds_prev_good_recoveries = 0;
+	pptr->last_good_recovery = 0;
+	pptr->prev_recovery = 0;
 	/* keep dtype */
 	pptr->config_stop = 0;
 	pptr->spinup_hold = 0;
@@ -6982,20 +6985,25 @@ pmcs_dev_state_recovery(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 		}
 
 		tgt = pptr->target;
-		if (tgt == NULL || tgt->dev_gone) {
-			if (pptr->dtype != NOTHING) {
-				pmcs_prt(pwp, PMCS_PRT_DEBUG2, pptr, tgt,
-				    "%s: no target for DS error recovery for "
-				    "PHY 0x%p", __func__, (void *)pptr);
+
+		if (tgt != NULL) {
+			mutex_enter(&tgt->statlock);
+			if (tgt->recover_wait == 0) {
+				goto next_phy;
 			}
-			goto next_phy;
 		}
 
-		mutex_enter(&tgt->statlock);
-
-		if (tgt->recover_wait == 0) {
-			goto next_phy;
+		if (pptr->prev_recovery) {
+			if (ddi_get_lbolt() - pptr->prev_recovery <
+			    drv_usectohz(PMCS_DS_RECOVERY_INTERVAL)) {
+				pmcs_prt(pwp, PMCS_PRT_DEBUG2, pptr, tgt,
+				    "%s: DS recovery on PHY %s "
+				    "re-invoked too soon. Skipping...",
+				    __func__, pptr->path);
+				goto next_phy;
+			}
 		}
+		pptr->prev_recovery = ddi_get_lbolt();
 
 		/*
 		 * Step 1: Put the device into the IN_RECOVERY state
@@ -7101,7 +7109,22 @@ pmcs_dev_state_recovery(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 		    PMCS_DEVICE_STATE_OPERATIONAL);
 		if (rc == 0) {
 			tgt->recover_wait = 0;
+
 			pptr->ds_recovery_retries = 0;
+			if ((pptr->ds_prev_good_recoveries == 0) ||
+			    (ddi_get_lbolt() - pptr->last_good_recovery >
+			    drv_usectohz(PMCS_MAX_DS_RECOVERY_TIME))) {
+				pptr->last_good_recovery = ddi_get_lbolt();
+				pptr->ds_prev_good_recoveries = 1;
+			} else if (ddi_get_lbolt() < pptr->last_good_recovery +
+			    drv_usectohz(PMCS_MAX_DS_RECOVERY_TIME)) {
+				pptr->ds_prev_good_recoveries++;
+			} else {
+				pmcs_handle_ds_recovery_error(pptr, tgt, pwp,
+				    __func__, __LINE__, "Max recovery"
+				    "attempts reached. Declaring PHY dead");
+			}
+
 			/*
 			 * Don't bother to run the work queues if the PHY
 			 * is dead.
@@ -8260,6 +8283,7 @@ pmcs_handle_ds_recovery_error(pmcs_phy_t *phyp, pmcs_xscsi_t *tgt,
     pmcs_hw_t *pwp, const char *func_name, int line, char *reason_string)
 {
 	ASSERT(mutex_owned(&phyp->phy_lock));
+	ASSERT((tgt == NULL) || mutex_owned(&tgt->statlock));
 
 	phyp->ds_recovery_retries++;
 
@@ -8267,7 +8291,22 @@ pmcs_handle_ds_recovery_error(pmcs_phy_t *phyp, pmcs_xscsi_t *tgt,
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, phyp, tgt,
 		    "%s: retry limit reached after %s to PHY %s failed",
 		    func_name, reason_string, phyp->path);
-		tgt->recover_wait = 0;
+		if (tgt != NULL) {
+			tgt->recover_wait = 0;
+		}
+		phyp->dead = 1;
+		PHY_CHANGED_AT_LOCATION(pwp, phyp, func_name, line);
+		RESTART_DISCOVERY(pwp);
+	} else if ((phyp->ds_prev_good_recoveries >
+	    PMCS_MAX_DS_RECOVERY_RETRIES) &&
+	    (phyp->last_good_recovery + drv_usectohz(PMCS_MAX_DS_RECOVERY_TIME)
+	    < ddi_get_lbolt())) {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, phyp, tgt, "%s: max number of "
+		    "successful recoveries reached, declaring PHY %s dead",
+		    __func__, phyp->path);
+		if (tgt != NULL) {
+			tgt->recover_wait = 0;
+		}
 		phyp->dead = 1;
 		PHY_CHANGED_AT_LOCATION(pwp, phyp, func_name, line);
 		RESTART_DISCOVERY(pwp);

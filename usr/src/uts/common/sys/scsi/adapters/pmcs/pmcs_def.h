@@ -72,6 +72,10 @@ struct pmcs_phy {
 	uint8_t		phynum;		/* phy number on parent expander */
 	uint8_t		width;		/* how many phys wide */
 	uint8_t		ds_recovery_retries; /* # error retry attempts */
+	uint8_t		ds_prev_good_recoveries; /* # successful recoveries */
+	clock_t		prev_recovery;	/* previous successful recovery */
+	clock_t		last_good_recovery; /* oldest successful recovery */
+			/* within PMCS_MAX_DS_RECOVERY_TIME time frame */
 	pmcs_dtype_t	dtype;		/* current dtype of the phy */
 	pmcs_dtype_t	pend_dtype;	/* new dtype (pending change) */
 	uint32_t
@@ -112,6 +116,12 @@ struct pmcs_phy {
 
 /* maximum number of ds recovery retries (ds_recovery_retries) */
 #define	PMCS_MAX_DS_RECOVERY_RETRIES	4
+
+/* max time allowed for successful recovery */
+#define	PMCS_MAX_DS_RECOVERY_TIME	(60 * 1000000) /* 60 seconds */
+
+/* ds recovery on same same phy is not allowed within this interval */
+#define	PMCS_DS_RECOVERY_INTERVAL	(1000000) /* 1 second */
 
 
 /*
