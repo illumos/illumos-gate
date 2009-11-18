@@ -4258,8 +4258,9 @@ mod_release_requisites(struct modctl *modp)
 	struct modctl *req;
 	struct modctl_list *start = NULL, *mod_garbage;
 
+	ASSERT(!quiesce_active);
 	ASSERT(modp->mod_busy);
-	ASSERT(!MUTEX_HELD(&mod_lock));
+	ASSERT(MUTEX_NOT_HELD(&mod_lock));
 
 	mutex_enter(&mod_lock);		/* needed for manipulation of req */
 	for (modl = modp->mod_requisites; modl; modl = next) {

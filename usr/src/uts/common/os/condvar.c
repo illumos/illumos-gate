@@ -189,6 +189,7 @@ cv_wait(kcondvar_t *cvp, kmutex_t *mp)
 {
 	if (panicstr)
 		return;
+	ASSERT(!quiesce_active);
 
 	ASSERT(curthread->t_schedflag & TS_DONT_SWAP);
 	thread_lock(curthread);			/* lock the thread */
@@ -266,6 +267,7 @@ cv_timedwait_hires(kcondvar_t *cvp, kmutex_t *mp, hrtime_t tim,
 
 	if (panicstr)
 		return (-1);
+	ASSERT(!quiesce_active);
 
 	limit = (flag & CALLOUT_FLAG_ABSOLUTE) ? gethrtime() : 0;
 	if (tim <= limit)
@@ -309,6 +311,7 @@ cv_wait_sig(kcondvar_t *cvp, kmutex_t *mp)
 
 	if (panicstr)
 		return (rval);
+	ASSERT(!quiesce_active);
 
 	/*
 	 * The check for t_intr is to catch an interrupt thread
@@ -368,6 +371,7 @@ cv_timedwait_sig_hires(kcondvar_t *cvp, kmutex_t *mp, hrtime_t tim,
 
 	if (panicstr)
 		return (rval);
+	ASSERT(!quiesce_active);
 
 	/*
 	 * If there is no lwp, then we don't need to wait for a signal.
