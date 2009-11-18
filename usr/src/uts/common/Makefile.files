@@ -900,7 +900,7 @@ NSKERN_OBJS +=	nsc_ddi.o \
 
 SV_OBJS +=	sv.o
 
-PMCS_OBJS += pmcs_attach.o pmcs_intr.o pmcs_nvram.o pmcs_sata.o \
+PMCS_OBJS += pmcs_attach.o pmcs_ds.o pmcs_intr.o pmcs_nvram.o pmcs_sata.o \
 		pmcs_scsa.o pmcs_smhba.o pmcs_subr.o pmcs_fwlog.o
 
 #

@@ -342,12 +342,13 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		pptr = pwp->root_phys + phynum;
 		pmcs_lock_phy(pptr);
 
+		/*
+		 * No need to lock the primary root PHY.  It can never go
+		 * away, and we're only concerned with the port width and
+		 * the portid, both of which only ever change in this function.
+		 */
 		rp = pwp->ports[portid];
 
-		/* rp and pptr may be the same */
-		if (rp && (rp != pptr)) {
-			pmcs_lock_phy(rp);
-		}
 		mutex_exit(&pwp->lock);
 
 		pmcs_endian_transform(pwp, &af, &((uint32_t *)iomb)[4],
@@ -361,9 +362,6 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		 */
 		if (rp) {
 			if (rp->portid != portid) {
-				if (rp != pptr) {
-					pmcs_unlock_phy(rp);
-				}
 				pmcs_unlock_phy(pptr);
 				pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 				    "PortID 0x%x: PHY 0x%x SAS LINK UP IS FOR "
@@ -385,10 +383,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 			    pmcs_link_rate(IOP_EVENT_LINK_RATE(w1));
 			pptr->portid = portid;
 			pptr->dead = 0;
-
-			if (pptr != rp) {
-				pmcs_unlock_phy(pptr);
-			}
+			pmcs_unlock_phy(pptr);
 
 			rp->width = IOP_EVENT_NPIP(w3);
 
@@ -404,10 +399,9 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 			}
 
 			/* Get our iport, if attached, and set it up */
-			if (pptr != rp) {
-				pmcs_lock_phy(pptr);
-			}
+			pmcs_lock_phy(pptr);
 			iport = pmcs_get_iport_by_phy(pwp, pptr);
+			pmcs_unlock_phy(pptr);
 			if (iport) {
 				pptr->iport = iport;
 				primary = !pptr->subsidiary;
@@ -427,10 +421,6 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 			    "PortID 0x%x: PHY 0x%x SAS LINK UP WIDENS PORT "
 			    "TO %d PHYS", portid, phynum, rp->width);
 
-			if (pptr != rp) {
-				pmcs_unlock_phy(pptr);
-			}
-			pmcs_unlock_phy(rp);
 			break;
 		}
 
@@ -517,6 +507,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		/* Get a pointer to our iport and set it up if attached */
 		pmcs_lock_phy(pptr);
 		iport = pmcs_get_iport_by_phy(pwp, pptr);
+		pmcs_unlock_phy(pptr);
 		if (iport) {
 			pptr->iport = iport;
 			primary = !pptr->subsidiary;
@@ -532,6 +523,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 			pmcs_rele_iport(iport);
 		}
 
+		pmcs_lock_phy(pptr);
 		pmcs_smhba_log_sysevent(pwp, ESC_SAS_PHY_EVENT,
 		    SAS_PHY_ONLINE, pptr);
 		pmcs_unlock_phy(pptr);
@@ -610,6 +602,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		/* Get our iport, if attached, and set it up */
 		pmcs_lock_phy(pptr);
 		iport = pmcs_get_iport_by_phy(pwp, pptr);
+		pmcs_unlock_phy(pptr);
 		if (iport) {
 			pptr->iport = iport;
 
@@ -624,6 +617,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 			pmcs_rele_iport(iport);
 		}
 
+		pmcs_lock_phy(pptr);
 		pmcs_smhba_log_sysevent(pwp, ESC_SAS_PHY_EVENT,
 		    SAS_PHY_ONLINE, pptr);
 		pmcs_unlock_phy(pptr);

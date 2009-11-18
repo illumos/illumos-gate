@@ -468,6 +468,7 @@ typedef struct {
 /*
  * Device State definitions
  */
+#define	PMCS_DEVICE_STATE_NOT_AVAILABLE		0x0	/* Unconfigured tgt */
 #define	PMCS_DEVICE_STATE_OPERATIONAL		0x1
 #define	PMCS_DEVICE_STATE_PORT_IN_RESET		0x2
 #define	PMCS_DEVICE_STATE_IN_RECOVERY		0x3

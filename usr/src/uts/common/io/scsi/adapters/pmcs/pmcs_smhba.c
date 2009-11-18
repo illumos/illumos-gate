@@ -58,11 +58,15 @@ pmcs_smhba_add_hba_prop(pmcs_hw_t *pwp, data_type_t dt,
 }
 
 
+/*
+ * Called with iport lock held.
+ */
 void
 pmcs_smhba_add_iport_prop(pmcs_iport_t *iport, data_type_t dt,
     char *prop_name, void *prop_val)
 {
 	ASSERT(iport != NULL);
+	ASSERT(mutex_owned(&iport->lock));
 
 	switch (dt) {
 	case DATA_TYPE_INT32:
@@ -84,6 +88,8 @@ pmcs_smhba_add_iport_prop(pmcs_iport_t *iport, data_type_t dt,
 		    "Unhandled datatype(%d) for(%s). Skipping prop update.",
 		    __func__, dt, prop_name);
 	}
+
+	pmcs_smhba_set_phy_props(iport);
 }
 
 
@@ -157,9 +163,8 @@ pmcs_smhba_set_phy_props(pmcs_iport_t *iport)
 	nvlist_t	**phy_props;
 	nvlist_t	*nvl;
 
-	mutex_enter(&iport->lock);
+	ASSERT(mutex_owned(&iport->lock));
 	if (iport->nphy == 0) {
-		mutex_exit(&iport->lock);
 		return;
 	}
 
@@ -209,7 +214,6 @@ pmcs_smhba_set_phy_props(pmcs_iport_t *iport)
 	}
 	nvlist_free(nvl);
 	kmem_free(phy_props, sizeof (nvlist_t *) * iport->nphy);
-	mutex_exit(&iport->lock);
 	kmem_free(packed_data, packed_size);
 }
 

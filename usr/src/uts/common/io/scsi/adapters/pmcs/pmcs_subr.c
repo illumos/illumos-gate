@@ -64,9 +64,6 @@ static boolean_t pmcs_configure_phy(pmcs_hw_t *, pmcs_phy_t *);
 static void pmcs_reap_dead_phy(pmcs_phy_t *);
 static pmcs_iport_t *pmcs_get_iport_by_ua(pmcs_hw_t *, char *);
 static boolean_t pmcs_phy_target_match(pmcs_phy_t *);
-static void pmcs_handle_ds_recovery_error(pmcs_phy_t *phyp,
-    pmcs_xscsi_t *tgt, pmcs_hw_t *pwp, const char *func_name, int line,
-    char *reason_string);
 
 /*
  * Often used strings
@@ -1972,8 +1969,8 @@ pmcs_iport_configure_phys(pmcs_iport_t *iport)
 		/*
 		 * Finally, insert the phy into our list
 		 */
-		pmcs_add_phy_to_iport(iport, pptr);
 		pmcs_unlock_phy(pptr);
+		pmcs_add_phy_to_iport(iport, pptr);
 
 		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL, "%s: found "
 		    "phy %d [0x%p] on iport%d, refcnt(%d)", __func__, phynum,
@@ -2518,9 +2515,6 @@ pmcs_report_observations(pmcs_hw_t *pwp)
 	 */
 	for (iport = list_head(&pwp->iports); iport != NULL;
 	    iport = list_next(&pwp->iports, iport)) {
-		/* Set up the DDI properties on each phy */
-		pmcs_smhba_set_phy_props(iport);
-
 		/* Set up the 'attached-port' property on the iport */
 		ap = kmem_zalloc(PMCS_MAX_UA_SIZE, KM_SLEEP);
 		mutex_enter(&iport->lock);
@@ -2878,6 +2872,7 @@ pmcs_clear_phy(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 	pptr->ds_prev_good_recoveries = 0;
 	pptr->last_good_recovery = 0;
 	pptr->prev_recovery = 0;
+
 	/* keep dtype */
 	pptr->config_stop = 0;
 	pptr->spinup_hold = 0;
@@ -4543,7 +4538,7 @@ pmcs_abort(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint32_t tag, int all_cmds,
 				    "%s: Trying DS error recovery for tgt 0x%p",
 				    __func__, (void *)tgt);
 				(void) pmcs_send_err_recovery_cmd(pwp,
-				    PMCS_DEVICE_STATE_IN_RECOVERY, tgt);
+				    PMCS_DEVICE_STATE_IN_RECOVERY, pptr, tgt);
 			}
 			mutex_exit(&tgt->statlock);
 		}
@@ -4583,7 +4578,7 @@ pmcs_abort(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint32_t tag, int all_cmds,
 			    "%s: Restoring OPERATIONAL dev_state for tgt 0x%p",
 			    __func__, (void *)tgt);
 			(void) pmcs_send_err_recovery_cmd(pwp,
-			    PMCS_DEVICE_STATE_OPERATIONAL, tgt);
+			    PMCS_DEVICE_STATE_OPERATIONAL, pptr, tgt);
 		}
 		mutex_exit(&tgt->statlock);
 	}
@@ -4719,7 +4714,8 @@ pmcs_ssp_tmf(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint8_t tmf, uint32_t tag,
 				    " for tgt 0x%p (status = %s)",
 				    __func__, (void *)xp,
 				    pmcs_status_str(status));
-				(void) pmcs_send_err_recovery_cmd(pwp, ds, xp);
+				(void) pmcs_send_err_recovery_cmd(pwp, ds,
+				    pptr, xp);
 			}
 			mutex_exit(&xp->statlock);
 		}
@@ -4734,7 +4730,8 @@ pmcs_ssp_tmf(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint8_t tmf, uint32_t tag,
 				    " for tgt 0x%p (status = %s)",
 				    __func__, (void *)xp,
 				    pmcs_status_str(status));
-				(void) pmcs_send_err_recovery_cmd(pwp, ds, xp);
+				(void) pmcs_send_err_recovery_cmd(pwp, ds,
+				    pptr, xp);
 			}
 			mutex_exit(&xp->statlock);
 		}
@@ -4897,7 +4894,7 @@ pmcs_sata_abort_ncq(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, tgt, "%s: Trying "
 			    "SATA DS Recovery for tgt(0x%p) for status(%s)",
 			    __func__, (void *)tgt, pmcs_status_str(status));
-			(void) pmcs_send_err_recovery_cmd(pwp, ds, tgt);
+			(void) pmcs_send_err_recovery_cmd(pwp, ds, pptr, tgt);
 		}
 
 		mutex_exit(&tgt->statlock);
@@ -6768,497 +6765,6 @@ pmcs_destroy_target(pmcs_xscsi_t *target)
 }
 
 /*
- * Get device state.  Called with statlock and PHY lock held.
- */
-int
-pmcs_get_dev_state(pmcs_hw_t *pwp, pmcs_xscsi_t *xp, uint8_t *ds)
-{
-	uint32_t htag, *ptr, msg[PMCS_MSG_SIZE];
-	int result;
-	struct pmcwork *pwrk;
-	pmcs_phy_t *phyp;
-
-	pmcs_prt(pwp, PMCS_PRT_DEBUG3, NULL, xp, "%s: tgt(0x%p)", __func__,
-	    (void *)xp);
-	if (xp == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, xp,
-		    "%s: Target is NULL", __func__);
-		return (-1);
-	}
-
-	ASSERT(mutex_owned(&xp->statlock));
-	phyp = xp->phy;
-	ASSERT(mutex_owned(&phyp->phy_lock));
-
-	pwrk = pmcs_gwork(pwp, PMCS_TAG_TYPE_WAIT, phyp);
-	if (pwrk == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_ERR, phyp, xp, pmcs_nowrk, __func__);
-		return (-1);
-	}
-	pwrk->arg = msg;
-	pwrk->dtype = phyp->dtype;
-
-	if (phyp->valid_device_id == 0) {
-		pmcs_pwork(pwp, pwrk);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, phyp, xp,
-		    "%s: Invalid DeviceID", __func__);
-		return (-1);
-	}
-	htag = pwrk->htag;
-	msg[0] = LE_32(PMCS_HIPRI(pwp, PMCS_OQ_GENERAL,
-	    PMCIN_GET_DEVICE_STATE));
-	msg[1] = LE_32(pwrk->htag);
-	msg[2] = LE_32(phyp->device_id);
-
-	mutex_enter(&pwp->iqp_lock[PMCS_IQ_OTHER]);
-	ptr = GET_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
-	if (ptr == NULL) {
-		mutex_exit(&pwp->iqp_lock[PMCS_IQ_OTHER]);
-		pmcs_pwork(pwp, pwrk);
-		pmcs_prt(pwp, PMCS_PRT_ERR, phyp, xp, pmcs_nomsg, __func__);
-		return (-1);
-	}
-	COPY_MESSAGE(ptr, msg, PMCS_MSG_SIZE);
-	pwrk->state = PMCS_WORK_STATE_ONCHIP;
-	INC_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
-	mutex_exit(&xp->statlock);
-	pmcs_unlock_phy(phyp);
-	WAIT_FOR(pwrk, 1000, result);
-	pmcs_lock_phy(phyp);
-	pmcs_pwork(pwp, pwrk);
-	mutex_enter(&xp->statlock);
-
-	if (result) {
-		pmcs_timed_out(pwp, htag, __func__);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, phyp, xp,
-		    "%s: cmd timed out, returning ", __func__);
-		return (-1);
-	}
-	if (LE_32(msg[2]) == 0) {
-		*ds = (uint8_t)(LE_32(msg[4]));
-		if (*ds !=  xp->dev_state) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, phyp, xp,
-			    "%s: retrieved_ds=0x%x, target_ds=0x%x", __func__,
-			    *ds, xp->dev_state);
-		}
-		return (0);
-	} else {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, phyp, xp,
-		    "%s: cmd failed Status(0x%x), returning ", __func__,
-		    LE_32(msg[2]));
-		return (-1);
-	}
-}
-
-/*
- * Set device state.  Called with target's statlock and PHY lock held.
- */
-int
-pmcs_set_dev_state(pmcs_hw_t *pwp, pmcs_xscsi_t *xp, uint8_t ds)
-{
-	uint32_t htag, *ptr, msg[PMCS_MSG_SIZE];
-	int result;
-	uint8_t pds, nds;
-	struct pmcwork *pwrk;
-	pmcs_phy_t *phyp;
-
-	pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, NULL, xp,
-	    "%s: ds(0x%x), tgt(0x%p)", __func__, ds, (void *)xp);
-	if (xp == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, xp,
-		    "%s: Target is Null", __func__);
-		return (-1);
-	}
-
-	phyp = xp->phy;
-	pwrk = pmcs_gwork(pwp, PMCS_TAG_TYPE_WAIT, phyp);
-	if (pwrk == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_ERR, phyp, xp, pmcs_nowrk, __func__);
-		return (-1);
-	}
-	if (phyp == NULL) {
-		pmcs_pwork(pwp, pwrk);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, phyp, xp,
-		    "%s: PHY is Null", __func__);
-		return (-1);
-	}
-	if (phyp->valid_device_id == 0) {
-		pmcs_pwork(pwp, pwrk);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, phyp, xp,
-		    "%s: Invalid DeviceID", __func__);
-		return (-1);
-	}
-	pwrk->arg = msg;
-	pwrk->dtype = phyp->dtype;
-	htag = pwrk->htag;
-	msg[0] = LE_32(PMCS_HIPRI(pwp, PMCS_OQ_GENERAL,
-	    PMCIN_SET_DEVICE_STATE));
-	msg[1] = LE_32(pwrk->htag);
-	msg[2] = LE_32(phyp->device_id);
-	msg[3] = LE_32(ds);
-
-	mutex_enter(&pwp->iqp_lock[PMCS_IQ_OTHER]);
-	ptr = GET_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
-	if (ptr == NULL) {
-		mutex_exit(&pwp->iqp_lock[PMCS_IQ_OTHER]);
-		pmcs_pwork(pwp, pwrk);
-		pmcs_prt(pwp, PMCS_PRT_ERR, phyp, xp, pmcs_nomsg, __func__);
-		return (-1);
-	}
-	COPY_MESSAGE(ptr, msg, PMCS_MSG_SIZE);
-	pwrk->state = PMCS_WORK_STATE_ONCHIP;
-	INC_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
-
-	mutex_exit(&xp->statlock);
-	pmcs_unlock_phy(phyp);
-	WAIT_FOR(pwrk, 1000, result);
-	pmcs_lock_phy(phyp);
-	pmcs_pwork(pwp, pwrk);
-	mutex_enter(&xp->statlock);
-
-	if (result) {
-		pmcs_timed_out(pwp, htag, __func__);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, phyp, xp,
-		    "%s: cmd timed out, returning", __func__);
-		return (-1);
-	}
-	if (LE_32(msg[2]) == 0) {
-		pds = (uint8_t)(LE_32(msg[4]) >> 4);
-		nds = (uint8_t)(LE_32(msg[4]) & 0x0000000f);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, phyp, xp,
-		    "%s: previous_ds=0x%x, new_ds=0x%x", __func__, pds, nds);
-		xp->dev_state = nds;
-		return (0);
-	} else {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, phyp, xp,
-		    "%s: cmd failed Status(0x%x), returning ", __func__,
-		    LE_32(msg[2]));
-		return (-1);
-	}
-}
-
-void
-pmcs_dev_state_recovery(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
-{
-	uint8_t	ds;
-	int rc;
-	pmcs_xscsi_t *tgt;
-	pmcs_phy_t *pptr, *pnext, *pchild;
-
-	/*
-	 * First time, check to see if we're already performing recovery
-	 */
-	if (phyp == NULL) {
-		mutex_enter(&pwp->lock);
-		if (pwp->ds_err_recovering) {
-			mutex_exit(&pwp->lock);
-			SCHEDULE_WORK(pwp, PMCS_WORK_DS_ERR_RECOVERY);
-			return;
-		}
-
-		pwp->ds_err_recovering = 1;
-		pptr = pwp->root_phys;
-		mutex_exit(&pwp->lock);
-	} else {
-		pptr = phyp;
-	}
-
-	while (pptr) {
-		/*
-		 * Since ds_err_recovering is set, we can be assured these
-		 * PHYs won't disappear on us while we do this.
-		 */
-		pmcs_lock_phy(pptr);
-		pchild = pptr->children;
-		pnext = pptr->sibling;
-		pmcs_unlock_phy(pptr);
-
-		if (pchild) {
-			pmcs_dev_state_recovery(pwp, pchild);
-		}
-
-		tgt = NULL;
-		pmcs_lock_phy(pptr);
-
-		if (pptr->dead) {
-			goto next_phy;
-		}
-
-		tgt = pptr->target;
-
-		if (tgt != NULL) {
-			mutex_enter(&tgt->statlock);
-			if (tgt->recover_wait == 0) {
-				goto next_phy;
-			}
-		}
-
-		if (pptr->prev_recovery) {
-			if (ddi_get_lbolt() - pptr->prev_recovery <
-			    drv_usectohz(PMCS_DS_RECOVERY_INTERVAL)) {
-				pmcs_prt(pwp, PMCS_PRT_DEBUG2, pptr, tgt,
-				    "%s: DS recovery on PHY %s "
-				    "re-invoked too soon. Skipping...",
-				    __func__, pptr->path);
-				goto next_phy;
-			}
-		}
-		pptr->prev_recovery = ddi_get_lbolt();
-
-		/*
-		 * Step 1: Put the device into the IN_RECOVERY state
-		 */
-		rc = pmcs_get_dev_state(pwp, tgt, &ds);
-		if (rc != 0) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, tgt,
-			    "%s: pmcs_get_dev_state on PHY %s "
-			    "failed (rc=%d)",
-			    __func__, pptr->path, rc);
-
-			pmcs_handle_ds_recovery_error(pptr, tgt, pwp,
-			    __func__, __LINE__, "pmcs_get_dev_state");
-
-			goto next_phy;
-		}
-
-		if ((tgt->dev_state == ds) &&
-		    (ds == PMCS_DEVICE_STATE_IN_RECOVERY)) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, pptr, tgt,
-			    "%s: Target 0x%p already IN_RECOVERY", __func__,
-			    (void *)tgt);
-		} else {
-			tgt->dev_state = ds;
-			ds = PMCS_DEVICE_STATE_IN_RECOVERY;
-			rc = pmcs_send_err_recovery_cmd(pwp, ds, tgt);
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, pptr, tgt,
-			    "%s: pmcs_send_err_recovery_cmd "
-			    "result(%d) tgt(0x%p) ds(0x%x) tgt->ds(0x%x)",
-			    __func__, rc, (void *)tgt, ds, tgt->dev_state);
-
-			if (rc) {
-				pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, tgt,
-				    "%s: pmcs_send_err_recovery_cmd to PHY %s "
-				    "failed (rc=%d)",
-				    __func__, pptr->path, rc);
-
-				pmcs_handle_ds_recovery_error(pptr, tgt, pwp,
-				    __func__, __LINE__,
-				    "pmcs_send_err_recovery_cmd");
-
-				goto next_phy;
-			}
-		}
-
-		/*
-		 * Step 2: Perform a hard reset on the PHY
-		 */
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, pptr, tgt,
-		    "%s: Issue HARD_RESET to PHY %s", __func__, pptr->path);
-		/*
-		 * Must release statlock here because pmcs_reset_phy will
-		 * drop and reacquire the PHY lock.
-		 */
-		mutex_exit(&tgt->statlock);
-		rc = pmcs_reset_phy(pwp, pptr, PMCS_PHYOP_HARD_RESET);
-		mutex_enter(&tgt->statlock);
-		if (rc) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, tgt,
-			    "%s: HARD_RESET to PHY %s failed (rc=%d)",
-			    __func__, pptr->path, rc);
-
-			pmcs_handle_ds_recovery_error(pptr, tgt, pwp,
-			    __func__, __LINE__, "HARD_RESET");
-
-			goto next_phy;
-		}
-
-		/*
-		 * Step 3: Abort all I/Os to the device
-		 */
-		if (pptr->abort_all_start) {
-			while (pptr->abort_all_start) {
-				pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, tgt,
-				    "%s: Waiting for outstanding ABORT_ALL on "
-				    "PHY 0x%p", __func__, (void *)pptr);
-				cv_wait(&pptr->abort_all_cv, &pptr->phy_lock);
-			}
-		} else {
-			mutex_exit(&tgt->statlock);
-			rc = pmcs_abort(pwp, pptr, pptr->device_id, 1, 1);
-			mutex_enter(&tgt->statlock);
-			if (rc != 0) {
-				pptr->abort_pending = 1;
-				pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, tgt,
-				    "%s: pmcs_abort to PHY %s failed (rc=%d)",
-				    __func__, pptr->path, rc);
-
-				pmcs_handle_ds_recovery_error(pptr, tgt,
-				    pwp, __func__, __LINE__, "pmcs_abort");
-
-				goto next_phy;
-			}
-		}
-
-		/*
-		 * Step 4: Set the device back to OPERATIONAL state
-		 */
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, pptr, tgt,
-		    "%s: Set PHY/tgt 0x%p/0x%p to OPERATIONAL state",
-		    __func__, (void *)pptr, (void *)tgt);
-		rc = pmcs_set_dev_state(pwp, tgt,
-		    PMCS_DEVICE_STATE_OPERATIONAL);
-		if (rc == 0) {
-			tgt->recover_wait = 0;
-
-			pptr->ds_recovery_retries = 0;
-			if ((pptr->ds_prev_good_recoveries == 0) ||
-			    (ddi_get_lbolt() - pptr->last_good_recovery >
-			    drv_usectohz(PMCS_MAX_DS_RECOVERY_TIME))) {
-				pptr->last_good_recovery = ddi_get_lbolt();
-				pptr->ds_prev_good_recoveries = 1;
-			} else if (ddi_get_lbolt() < pptr->last_good_recovery +
-			    drv_usectohz(PMCS_MAX_DS_RECOVERY_TIME)) {
-				pptr->ds_prev_good_recoveries++;
-			} else {
-				pmcs_handle_ds_recovery_error(pptr, tgt, pwp,
-				    __func__, __LINE__, "Max recovery"
-				    "attempts reached. Declaring PHY dead");
-			}
-
-			/*
-			 * Don't bother to run the work queues if the PHY
-			 * is dead.
-			 */
-			if (tgt->phy && !tgt->phy->dead) {
-				SCHEDULE_WORK(pwp, PMCS_WORK_RUN_QUEUES);
-				(void) ddi_taskq_dispatch(pwp->tq, pmcs_worker,
-				    pwp, DDI_NOSLEEP);
-			}
-		} else {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, pptr, tgt,
-			    "%s: Failed to SET tgt 0x%p to OPERATIONAL state",
-			    __func__, (void *)tgt);
-
-			pmcs_handle_ds_recovery_error(pptr, tgt, pwp,
-			    __func__, __LINE__, "SET tgt to OPERATIONAL state");
-
-			goto next_phy;
-		}
-
-next_phy:
-		if (tgt) {
-			mutex_exit(&tgt->statlock);
-		}
-		pmcs_unlock_phy(pptr);
-		pptr = pnext;
-	}
-
-	/*
-	 * Only clear ds_err_recovering if we're exiting for good and not
-	 * just unwinding from recursion
-	 */
-	if (phyp == NULL) {
-		mutex_enter(&pwp->lock);
-		pwp->ds_err_recovering = 0;
-		mutex_exit(&pwp->lock);
-	}
-}
-
-/*
- * Called with target's statlock and PHY lock held.
- */
-int
-pmcs_send_err_recovery_cmd(pmcs_hw_t *pwp, uint8_t dev_state, pmcs_xscsi_t *tgt)
-{
-	pmcs_phy_t *pptr;
-	int rc = -1;
-
-	ASSERT(tgt != NULL);
-	ASSERT(mutex_owned(&tgt->statlock));
-
-	if (tgt->recovering) {
-		return (0);
-	}
-
-	tgt->recovering = 1;
-	pptr = tgt->phy;
-
-	if (pptr == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, pptr, tgt,
-		    "%s: PHY is Null", __func__);
-		return (-1);
-	}
-
-	ASSERT(mutex_owned(&pptr->phy_lock));
-
-	pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, pptr, tgt,
-	    "%s: ds: 0x%x, tgt ds(0x%x)", __func__, dev_state, tgt->dev_state);
-
-	switch (dev_state) {
-	case PMCS_DEVICE_STATE_IN_RECOVERY:
-		if (tgt->dev_state == PMCS_DEVICE_STATE_IN_RECOVERY) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, pptr, tgt,
-			    "%s: Target 0x%p already IN_RECOVERY", __func__,
-			    (void *)tgt);
-			rc = 0;	/* This is not an error */
-			goto no_action;
-		}
-
-		rc = pmcs_set_dev_state(pwp, tgt,
-		    PMCS_DEVICE_STATE_IN_RECOVERY);
-		if (rc != 0) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, pptr, tgt,
-			    "%s(1): Failed to SET tgt(0x%p) to _IN_RECOVERY",
-			    __func__, (void *)tgt);
-		}
-
-		break;
-
-	case PMCS_DEVICE_STATE_OPERATIONAL:
-		if (tgt->dev_state != PMCS_DEVICE_STATE_IN_RECOVERY) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, pptr, tgt,
-			    "%s: Target 0x%p not ready to go OPERATIONAL",
-			    __func__, (void *)tgt);
-			goto no_action;
-		}
-
-		rc = pmcs_set_dev_state(pwp, tgt,
-		    PMCS_DEVICE_STATE_OPERATIONAL);
-		tgt->reset_success = 1;
-		if (rc != 0) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, pptr, tgt,
-			    "%s(2): Failed to SET tgt(0x%p) to OPERATIONAL",
-			    __func__, (void *)tgt);
-			tgt->reset_success = 0;
-		}
-
-		break;
-
-	case PMCS_DEVICE_STATE_NON_OPERATIONAL:
-		PHY_CHANGED(pwp, pptr);
-		RESTART_DISCOVERY(pwp);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, pptr, tgt,
-		    "%s: Device at %s is non-operational",
-		    __func__, pptr->path);
-		tgt->dev_state = PMCS_DEVICE_STATE_NON_OPERATIONAL;
-		rc = 0;
-
-		break;
-
-	default:
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, pptr, tgt,
-		    "%s: Invalid state requested (%d)", __func__,
-		    dev_state);
-		break;
-
-	}
-
-no_action:
-	tgt->recovering = 0;
-	return (rc);
-}
-
-/*
  * pmcs_lock_phy_impl
  *
  * This function is what does the actual work for pmcs_lock_phy.  It will
@@ -7476,277 +6982,6 @@ pmcs_free_dma_chunklist(pmcs_hw_t *pwp)
 		}
 		kmem_free(pchunk, sizeof (pmcs_chunk_t));
 	}
-}
-
-
-/*
- * Start ssp event recovery. We have to schedule recovery operation because
- * it involves sending multiple commands to device and we should not do it
- * in the interrupt context.
- * If it is failure of a recovery command, let the recovery thread deal with it.
- * Called with pmcwork lock held.
- */
-
-void
-pmcs_start_ssp_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
-    size_t amt)
-{
-	pmcs_xscsi_t *tgt = pwrk->xp;
-	uint32_t event = LE_32(iomb[2]);
-	pmcs_phy_t *pptr = pwrk->phy;
-	uint32_t tag;
-
-	if (tgt != NULL) {
-		mutex_enter(&tgt->statlock);
-		if (!tgt->assigned) {
-			if (pptr) {
-				pmcs_dec_phy_ref_count(pptr);
-			}
-			pptr = NULL;
-			pwrk->phy = NULL;
-		}
-		mutex_exit(&tgt->statlock);
-	}
-	if (pptr == NULL) {
-		/*
-		 * No target, need to run RE-DISCOVERY here.
-		 */
-		if (pwrk->state != PMCS_WORK_STATE_TIMED_OUT) {
-			pwrk->state = PMCS_WORK_STATE_INTR;
-		}
-		/*
-		 * Although we cannot mark phy to force abort nor mark phy
-		 * as changed, killing of a target would take care of aborting
-		 * commands for the device.
-		 */
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
-		    "%s: No valid target for event processing found. "
-		    "Scheduling RECONFIGURE",  __func__);
-		pmcs_pwork(pwp, pwrk);
-		RESTART_DISCOVERY(pwp);
-		return;
-	} else {
-		pmcs_lock_phy(pptr);
-		mutex_enter(&tgt->statlock);
-		if (event == PMCOUT_STATUS_OPEN_CNX_ERROR_IT_NEXUS_LOSS) {
-			if (tgt->dev_state !=
-			    PMCS_DEVICE_STATE_NON_OPERATIONAL) {
-				pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, tgt,
-				    "%s: Device at %s is non-operational",
-				    __func__, pptr->path);
-				tgt->dev_state =
-				    PMCS_DEVICE_STATE_NON_OPERATIONAL;
-			}
-			pptr->abort_pending = 1;
-			mutex_exit(&tgt->statlock);
-			pmcs_unlock_phy(pptr);
-			mutex_exit(&pwrk->lock);
-			SCHEDULE_WORK(pwp, PMCS_WORK_ABORT_HANDLE);
-			RESTART_DISCOVERY(pwp);
-			return;
-		}
-
-		/*
-		 * If this command is run in WAIT mode, it is a failing recovery
-		 * command. If so, just wake up recovery thread waiting for
-		 * command completion.
-		 */
-		tag = PMCS_TAG_TYPE(pwrk->htag);
-		if (tag == PMCS_TAG_TYPE_WAIT) {
-			pwrk->htag |= PMCS_TAG_DONE;
-			if (pwrk->arg && amt) {
-				(void) memcpy(pwrk->arg, iomb, amt);
-			}
-			cv_signal(&pwrk->sleep_cv);
-			mutex_exit(&tgt->statlock);
-			pmcs_unlock_phy(pptr);
-			mutex_exit(&pwrk->lock);
-			return;
-		}
-
-		/*
-		 * To recover from primary failures,
-		 * we need to schedule handling events recovery.
-		 */
-		tgt->event_recovery = 1;
-		mutex_exit(&tgt->statlock);
-		pmcs_unlock_phy(pptr);
-		pwrk->ssp_event = event;
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, tgt,
-		    "%s: Scheduling SSP event recovery for tgt(0x%p) "
-		    "pwrk(%p) tag(0x%x)", __func__, (void *)tgt, (void *)pwrk,
-		    pwrk->htag);
-		mutex_exit(&pwrk->lock);
-		SCHEDULE_WORK(pwp, PMCS_WORK_SSP_EVT_RECOVERY);
-	}
-
-	/* Work cannot be completed until event recovery is completed. */
-}
-
-/*
- * SSP target event recovery
- * Entered with a phy lock held
- * Pwrk lock is not needed - pwrk is on the target aq and no other thread
- * will do anything with it until this thread starts the chain of recovery.
- * Statlock may be acquired and released.
- */
-
-void
-pmcs_tgt_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk)
-{
-	pmcs_phy_t *pptr = pwrk->phy;
-	pmcs_cmd_t *sp = pwrk->arg;
-	pmcs_lun_t *lun = sp->cmd_lun;
-	pmcs_xscsi_t *tgt = pwrk->xp;
-	uint32_t event;
-	uint32_t htag;
-	uint32_t status;
-	uint8_t dstate;
-	int rv;
-
-	ASSERT(pwrk->arg != NULL);
-	ASSERT(pwrk->xp != NULL);
-	pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, tgt, "%s: event recovery for "
-	    "target 0x%p", __func__, (void *)pwrk->xp);
-	htag = pwrk->htag;
-	event = pwrk->ssp_event;
-	pwrk->ssp_event = 0xffffffff;
-	if (event == PMCOUT_STATUS_XFER_ERR_BREAK ||
-	    event == PMCOUT_STATUS_XFER_ERR_PHY_NOT_READY ||
-	    event == PMCOUT_STATUS_XFER_ERROR_CMD_ISSUE_ACK_NAK_TIMEOUT) {
-		/* Command may be still pending on device */
-		rv = pmcs_ssp_tmf(pwp, pptr, SAS_QUERY_TASK, htag,
-		    lun->lun_num, &status);
-		if (rv != 0) {
-			goto out;
-		}
-		if (status == SAS_RSP_TMF_COMPLETE) {
-			/* Command NOT pending on a device */
-			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, tgt,
-			    "%s: No pending command for tgt 0x%p",
-			    __func__, (void *)tgt);
-			/* Nothing more to do, just abort it on chip */
-			htag = 0;
-		}
-	}
-	/*
-	 * All other events left the command pending in the host
-	 * Send abort task and abort it on the chip
-	 */
-	if (htag != 0) {
-		if (pmcs_ssp_tmf(pwp, pptr, SAS_ABORT_TASK, htag,
-		    lun->lun_num, &status))
-			goto out;
-	}
-	(void) pmcs_abort(pwp, pptr, pwrk->htag, 0, 1);
-	/*
-	 * Abort either took care of work completion, or put device in
-	 * a recovery state
-	 */
-	return;
-out:
-	/* Abort failed, do full device recovery */
-	mutex_enter(&tgt->statlock);
-	if (!pmcs_get_dev_state(pwp, tgt, &dstate))
-		tgt->dev_state = dstate;
-
-	if ((tgt->dev_state != PMCS_DEVICE_STATE_IN_RECOVERY) &&
-	    (tgt->dev_state != PMCS_DEVICE_STATE_NON_OPERATIONAL)) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, tgt,
-		    "%s: Setting IN_RECOVERY for tgt 0x%p",
-		    __func__, (void *)tgt);
-		(void) pmcs_send_err_recovery_cmd(pwp,
-		    PMCS_DEVICE_STATE_IN_RECOVERY, tgt);
-	}
-	mutex_exit(&tgt->statlock);
-}
-
-/*
- * SSP event recovery task.
- */
-void
-pmcs_ssp_event_recovery(pmcs_hw_t *pwp)
-{
-	int idx;
-	pmcs_xscsi_t *tgt;
-	pmcs_cmd_t *cp;
-	pmcwork_t *pwrk;
-	pmcs_phy_t *pphy;
-	int er_flag;
-	uint32_t idxpwrk;
-
-restart:
-	for (idx = 0; idx < pwp->max_dev; idx++) {
-		mutex_enter(&pwp->lock);
-		tgt = pwp->targets[idx];
-		mutex_exit(&pwp->lock);
-		if (tgt != NULL) {
-			mutex_enter(&tgt->statlock);
-			if (!tgt->assigned) {
-				mutex_exit(&tgt->statlock);
-				continue;
-			}
-			pphy = tgt->phy;
-			er_flag = tgt->event_recovery;
-			mutex_exit(&tgt->statlock);
-			if (pphy != NULL && er_flag != 0) {
-				pmcs_lock_phy(pphy);
-				mutex_enter(&tgt->statlock);
-				pmcs_prt(pwp, PMCS_PRT_DEBUG, pphy, tgt,
-				    "%s: found target(0x%p)", __func__,
-				    (void *) tgt);
-
-				/* Check what cmd expects recovery */
-				mutex_enter(&tgt->aqlock);
-				STAILQ_FOREACH(cp, &tgt->aq, cmd_next) {
-					/*
-					 * Since work structure is on this
-					 * target aq, and only this thread
-					 * is accessing it now, we do not need
-					 * to lock it
-					 */
-					idxpwrk = PMCS_TAG_INDEX(cp->cmd_tag);
-					pwrk = &pwp->work[idxpwrk];
-					if (pwrk->htag != cp->cmd_tag) {
-						/*
-						 * aq may contain TMF commands,
-						 * so we may not find work
-						 * structure with htag
-						 */
-						break;
-					}
-					if (pwrk->ssp_event != 0 &&
-					    pwrk->ssp_event !=
-					    PMCS_REC_EVENT) {
-						pmcs_prt(pwp,
-						    PMCS_PRT_DEBUG, pphy, tgt,
-						    "%s: pwrk(%p) ctag(0x%x)",
-						    __func__, (void *) pwrk,
-						    cp->cmd_tag);
-						mutex_exit(&tgt->aqlock);
-						mutex_exit(&tgt->statlock);
-						pmcs_tgt_event_recovery(
-						    pwp, pwrk);
-						/*
-						 * We dropped statlock, so
-						 * restart scanning from scratch
-						 */
-						pmcs_unlock_phy(pphy);
-						goto restart;
-					}
-				}
-				mutex_exit(&tgt->aqlock);
-				tgt->event_recovery = 0;
-				pmcs_prt(pwp, PMCS_PRT_DEBUG, pphy, tgt,
-				    "%s: end of SSP event recovery for "
-				    "target(0x%p)", __func__, (void *) tgt);
-				mutex_exit(&tgt->statlock);
-				pmcs_unlock_phy(pphy);
-			}
-		}
-	}
-	pmcs_prt(pwp, PMCS_PRT_DEBUG, pphy, tgt, "%s: "
-	    "end of SSP event recovery for pwp(0x%p)", __func__, (void *) pwp);
 }
 
 /*ARGSUSED2*/
@@ -8176,9 +7411,9 @@ pmcs_add_phy_to_iport(pmcs_iport_t *iport, pmcs_phy_t *phyp)
 	ASSERT(phyp);
 	ASSERT(!list_link_active(&phyp->list_node));
 	iport->nphy++;
+	list_insert_tail(&iport->phys, phyp);
 	pmcs_smhba_add_iport_prop(iport, DATA_TYPE_INT32, PMCS_NUM_PHYS,
 	    &iport->nphy);
-	list_insert_tail(&iport->phys, phyp);
 	mutex_enter(&iport->refcnt_lock);
 	iport->refcnt++;
 	mutex_exit(&iport->refcnt_lock);
@@ -8215,9 +7450,9 @@ pmcs_remove_phy_from_iport(pmcs_iport_t *iport, pmcs_phy_t *phyp)
 	ASSERT(iport->nphy > 0);
 	ASSERT(list_link_active(&phyp->list_node));
 	iport->nphy--;
+	list_remove(&iport->phys, phyp);
 	pmcs_smhba_add_iport_prop(iport, DATA_TYPE_INT32, PMCS_NUM_PHYS,
 	    &iport->nphy);
-	list_remove(&iport->phys, phyp);
 	pmcs_rele_iport(iport);
 }
 
@@ -8249,68 +7484,4 @@ pmcs_phy_target_match(pmcs_phy_t *phyp)
 	}
 
 	return (rval);
-}
-
-void
-pmcs_start_dev_state_recovery(pmcs_xscsi_t *xp, pmcs_phy_t *phyp)
-{
-	ASSERT(mutex_owned(&xp->statlock));
-	ASSERT(xp->pwp != NULL);
-
-	if (xp->recover_wait == 0) {
-		pmcs_prt(xp->pwp, PMCS_PRT_DEBUG_DEV_STATE, phyp, xp,
-		    "%s: Start ds_recovery for tgt 0x%p/PHY 0x%p (%s)",
-		    __func__, (void *)xp, (void *)phyp, phyp->path);
-		xp->recover_wait = 1;
-
-		/*
-		 * Rather than waiting for the watchdog timer, we'll
-		 * kick it right now.
-		 */
-		SCHEDULE_WORK(xp->pwp, PMCS_WORK_DS_ERR_RECOVERY);
-		(void) ddi_taskq_dispatch(xp->pwp->tq, pmcs_worker, xp->pwp,
-		    DDI_NOSLEEP);
-	}
-}
-
-/*
- * Increment the phy ds error retry count.
- * If too many retries, mark phy dead and restart discovery;
- * otherwise schedule ds recovery.
- */
-static void
-pmcs_handle_ds_recovery_error(pmcs_phy_t *phyp, pmcs_xscsi_t *tgt,
-    pmcs_hw_t *pwp, const char *func_name, int line, char *reason_string)
-{
-	ASSERT(mutex_owned(&phyp->phy_lock));
-	ASSERT((tgt == NULL) || mutex_owned(&tgt->statlock));
-
-	phyp->ds_recovery_retries++;
-
-	if (phyp->ds_recovery_retries > PMCS_MAX_DS_RECOVERY_RETRIES) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, phyp, tgt,
-		    "%s: retry limit reached after %s to PHY %s failed",
-		    func_name, reason_string, phyp->path);
-		if (tgt != NULL) {
-			tgt->recover_wait = 0;
-		}
-		phyp->dead = 1;
-		PHY_CHANGED_AT_LOCATION(pwp, phyp, func_name, line);
-		RESTART_DISCOVERY(pwp);
-	} else if ((phyp->ds_prev_good_recoveries >
-	    PMCS_MAX_DS_RECOVERY_RETRIES) &&
-	    (phyp->last_good_recovery + drv_usectohz(PMCS_MAX_DS_RECOVERY_TIME)
-	    < ddi_get_lbolt())) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, phyp, tgt, "%s: max number of "
-		    "successful recoveries reached, declaring PHY %s dead",
-		    __func__, phyp->path);
-		if (tgt != NULL) {
-			tgt->recover_wait = 0;
-		}
-		phyp->dead = 1;
-		PHY_CHANGED_AT_LOCATION(pwp, phyp, func_name, line);
-		RESTART_DISCOVERY(pwp);
-	} else {
-		SCHEDULE_WORK(pwp, PMCS_WORK_DS_ERR_RECOVERY);
-	}
 }

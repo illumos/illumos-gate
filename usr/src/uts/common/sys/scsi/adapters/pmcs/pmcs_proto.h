@@ -305,10 +305,9 @@ void pmcs_complete_work_impl(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
 void pmcs_flush_target_queues(pmcs_hw_t *, pmcs_xscsi_t *, uint8_t);
 boolean_t pmcs_iport_has_targets(pmcs_hw_t *, pmcs_iport_t *);
 void pmcs_free_dma_chunklist(pmcs_hw_t *);
-int pmcs_get_dev_state(pmcs_hw_t *, pmcs_xscsi_t *, uint8_t *);
-int pmcs_set_dev_state(pmcs_hw_t *, pmcs_xscsi_t *, uint8_t);
 void pmcs_dev_state_recovery(pmcs_hw_t *, pmcs_phy_t *);
-int pmcs_send_err_recovery_cmd(pmcs_hw_t *, uint8_t, pmcs_xscsi_t *);
+int pmcs_send_err_recovery_cmd(pmcs_hw_t *, uint8_t, pmcs_phy_t *,
+    pmcs_xscsi_t *);
 void pmcs_start_ssp_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk,
     uint32_t *iomb, size_t amt);
 void pmcs_ssp_event_recovery(pmcs_hw_t *);

@@ -361,6 +361,8 @@ pmcs_iport_attach(dev_info_t *dip)
 		(void) scsi_wwn_to_wwnstr(pwp->sas_wwns[0], 1,
 		    init_port);
 	}
+
+	mutex_enter(&iport->lock);
 	pmcs_smhba_add_iport_prop(iport, DATA_TYPE_STRING,
 	    SCSI_ADDR_PROP_INITIATOR_PORT, init_port);
 	kmem_free(init_port, PMCS_MAX_UA_SIZE);
@@ -368,6 +370,7 @@ pmcs_iport_attach(dev_info_t *dip)
 	/* Set up a 'num-phys' DDI property for the iport node */
 	pmcs_smhba_add_iport_prop(iport, DATA_TYPE_INT32, PMCS_NUM_PHYS,
 	    &iport->nphy);
+	mutex_exit(&iport->lock);
 
 	/* Create kstats for each of the phys in this port */
 	pmcs_create_phy_stats(iport);
@@ -1929,13 +1932,13 @@ pmcs_check_commands(pmcs_hw_t *pwp)
 		/*
 		 * No point attempting recovery if the device is gone
 		 */
-		if (pwrk->xp->dev_gone) {
+		if (target->dev_gone) {
 			mutex_exit(&target->statlock);
 			pmcs_unlock_phy(phyp);
 			pmcs_prt(pwp, PMCS_PRT_DEBUG, phyp, target,
 			    "%s: tgt(0x%p) is gone. Returning CMD_DEV_GONE "
 			    "for htag 0x%08x", __func__,
-			    (void *)pwrk->xp, pwrk->htag);
+			    (void *)target, pwrk->htag);
 			mutex_enter(&pwrk->lock);
 			if (!PMCS_COMMAND_DONE(pwrk)) {
 				/* Complete this command here */
