@@ -70,9 +70,10 @@ clobber:  po_clean
 po_clean:
 	$(RM) $(POFILE)
 
-check: $(CHECKHDRS)
-
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
+
+install_h check: $(CHECKHDRS)
+	@cd libnvfru; pwd; $(MAKE) $@
 
 FRC:

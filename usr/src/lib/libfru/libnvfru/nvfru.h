@@ -30,14 +30,14 @@
 #include <sys/types.h>
 #include <libnvpair.h>
 
-#ifdef  __cplusplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
 extern int rawfru_to_nvlist(uint8_t *, size_t, char *, nvlist_t **);
 
-#ifdef  __cplusplus
-	}
+#ifdef __cplusplus
+}
 #endif
 
 #endif /* _NVFRU_H */

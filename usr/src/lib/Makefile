@@ -405,6 +405,7 @@ HDRSUBDIRS=		\
 	libdtrace_jni	\
 	libelfsign	\
 	libeti		\
+	libfru		\
 	libfstyp	\
 	libgen		\
 	libwanboot	\
