@@ -183,6 +183,7 @@ SUBDIRS += \
 	libdhcpagent	\
 	libdhcpdu	\
 	libdhcputil	\
+	libxnet		\
 	libipsecutil
 $(CLOSED_BUILD)SUBDIRS += \
 	$(CLOSED)/lib/libike
@@ -206,7 +207,6 @@ SUBDIRS += \
 	libwrap		\
 	libxcurses	\
 	libxcurses2	\
-	libxnet		\
 	libbrand	.WAIT   \
 	libzonecfg	\
 	libzoneinfo	\
@@ -596,7 +596,9 @@ libmapid:	libresolv
 libnwam:	libdoor
 librdc:		libsocket libnsl libnsctl libunistat libdscfg
 libuuid:	libdlpi
+$(CLOSED_BUILD)libike:	libipsecutil libxnet libcryptoutil
 libinetutil:	libsocket
+libipsecutil:	libtecla libsocket
 libinstzones:	libzonecfg libcontract
 libpkg:		libwanboot libscf libadm
 libsecdb:	libnsl
