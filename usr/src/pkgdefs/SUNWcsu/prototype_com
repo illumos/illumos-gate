@@ -978,6 +978,7 @@ f none usr/sbin/traceroute 4555 root bin
 l none usr/sbin/trapstat=../../usr/lib/platexec
 f none usr/sbin/ttyadm 755 root sys
 s none usr/sbin/tunefs=../lib/fs/ufs/tunefs
+s none usr/sbin/tzreload=../../sbin/tzreload
 s none usr/sbin/uadmin=../../sbin/uadmin
 s none usr/sbin/ufsdump=../lib/fs/ufs/ufsdump
 s none usr/sbin/ufsrestore=../lib/fs/ufs/ufsrestore
@@ -1730,6 +1731,7 @@ l none usr/share/lib/zoneinfo/Universal=../../../../usr/share/lib/zoneinfo/Etc/U
 l none usr/share/lib/zoneinfo/W-SU=../../../../usr/share/lib/zoneinfo/Europe/Moscow
 f none usr/share/lib/zoneinfo/WET 644 root bin
 l none usr/share/lib/zoneinfo/Zulu=../../../../usr/share/lib/zoneinfo/Etc/UTC
+s none usr/share/lib/zoneinfo/posixrules=./US/Eastern
 d none usr/share/lib/zoneinfo/src 755 root bin
 f none usr/share/lib/zoneinfo/src/README 644 root bin
 f none usr/share/lib/zoneinfo/src/africa 644 root bin

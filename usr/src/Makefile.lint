@@ -293,6 +293,7 @@ COMMON_SUBDIRS = \
 	cmd/touch \
 	cmd/truss \
 	cmd/tty \
+	cmd/tzreload \
 	cmd/uadmin \
 	cmd/ul \
 	cmd/users \

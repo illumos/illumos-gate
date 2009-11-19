@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -123,13 +123,40 @@ xmalloc(size_t size)
 	return (p);
 }
 
+void *
+xcalloc(size_t nElements, size_t size)
+{
+	void *p;
+
+	if ((p = calloc(nElements, size)) == NULL) {
+		perror("calloc");
+		exit(55);
+	}
+	return (p);
+}
+
+char *
+xstrdup(const char *str)
+{
+	int	len;
+	char	*p;
+
+	len = strlen(str);
+	p = xmalloc(len + 1);
+	(void) memcpy(p, str, len);
+	p[len] = '\0';
+
+	return (p);
+}
+
 void
 cron_sendmsg(char action, char *login, char *fname, char etype)
 {
 	static int	msgfd = -2;
-	struct message	*pmsg;
+	struct message	*pmsg, msgbuf;
 	int	i;
 
+	(void) memset(&msgbuf, 0, sizeof (msgbuf));
 	pmsg = &msgbuf;
 	if (msgfd == -2) {
 		if ((msgfd = open(FIFO, O_WRONLY|O_NDELAY)) < 0) {
@@ -158,14 +185,14 @@ char
 *errmsg(int errnum)
 {
 	char *msg;
-	static char msgbuf[32];
+	static char msg_buf[32];
 
 	msg = strerror(errnum);
 
 	if (msg == NULL) {
-		(void) snprintf(msgbuf, sizeof (msgbuf),
+		(void) snprintf(msg_buf, sizeof (msg_buf),
 		    gettext("Error %d"), errnum);
-		return (msgbuf);
+		return (msg_buf);
 	} else
 		return (msg);
 }
@@ -188,18 +215,6 @@ filewanted(struct dirent *direntry)
 	if (audit_cron_is_anc_name(direntry->d_name))
 		return (0);
 	return (1);
-}
-
-void *
-xcalloc(size_t nElements, size_t size)
-{
-	void *p;
-
-	if ((p = calloc(nElements, size)) == NULL) {
-		perror("calloc");
-		exit(55);
-	}
-	return (p);
 }
 
 int

@@ -45,10 +45,6 @@ d none usr 755 root sys
 s none usr/5bin=./bin
 d none usr/bin 755 root bin
 d none usr/lib 755 root bin
-d none usr/share 755 root sys
-d none usr/share/lib 755 root sys
-d none usr/share/lib/zoneinfo 755 root bin
-s none usr/share/lib/zoneinfo/posixrules=./US/Eastern
 d none usr/ucb 755 root bin
 s none usr/ucb/Mail=../bin/mailx
 s none usr/ucb/arch=../bin/arch

@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -12,8 +12,6 @@
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *
@@ -132,7 +130,7 @@ main(int argc, char **argv)
 		if (uidlist == NULL)
 			atabortperror("can't allocate list of users");
 		for (i = 0; i < argc; i++) {
-			if ((chkauthattr(CRONADMIN_AUTH, pr.pw_name)) ||
+			if (cron_admin(pr.pw_name) ||
 			    strcmp(pr.pw_name, argv[i]) == 0) {
 				if ((pp = getpwnam(argv[i])) == NULL) {
 					(void) fprintf(stderr,
@@ -155,7 +153,7 @@ main(int argc, char **argv)
 				    "users\n");
 				exit(1);
 			}
-	} else if (!chkauthattr(CRONADMIN_AUTH, pr.pw_name)) {
+	} else if (!cron_admin(pr.pw_name)) {
 		/* no argument specified and the invoker is not root */
 		++namewanted;
 		argnum = 1;

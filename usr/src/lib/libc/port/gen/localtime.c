@@ -107,13 +107,14 @@
 #include <errno.h>
 #include <deflt.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
 
 /* JAN_01_1902 cast to (int) - negative number of seconds from 1970 */
 #define	JAN_01_1902		(int)0x8017E880
 #define	LEN_TZDIR		(sizeof (TZDIR) - 1)
 #define	TIMEZONE		"/etc/default/init"
 #define	TZSTRING		"TZ="
-#define	HASHTABLE		109
+#define	HASHTABLE		31
 
 #define	LEAPS_THRU_END_OF(y)	((y) / 4 - (y) / 100 + (y) / 400)
 
@@ -282,21 +283,28 @@ typedef struct state {
 	uchar_t		types[TZ_MAX_TIMES];	/* Type indices */
 	ttinfo_t	ttis[TZ_MAX_TYPES];	/* Zone types */
 	lsinfo_t	lsis[TZ_MAX_LEAPS];	/* Leap sec trans */
+	int		last_ats_idx;		/* last ats index */
 	rule_t		start_rule;		/* For POSIX w/rules */
 	rule_t		end_rule;		/* For POSIX w/rules */
 } state_t;
 
-typedef struct systemtz {
-	const char	*tz;
-	state_t		*entry;
-	int		flag;
-} systemtz_t;
+typedef struct tznmlist {
+	struct tznmlist *link;
+	char	name[1];
+} tznmlist_t;
+
+static const char	*systemTZ;
+static tznmlist_t	*systemTZrec;
 
 static const char	*namecache;
 
-static state_t	*tzcache[HASHTABLE];
+static state_t		*tzcache[HASHTABLE];
 
-static state_t	*lclzonep;
+#define	TZNMC_SZ	43
+static tznmlist_t	*tznmhash[TZNMC_SZ];
+static const char	*last_tzname[2];
+
+static state_t		*lclzonep;
 
 static struct tm	tm;		/* For non-reentrant use */
 static int		is_in_dst;	/* Set if t is in DST */
@@ -305,6 +313,11 @@ static int		cached_year;	/* mktime() perf. enhancement */
 static long long	cached_secs_since_1970;	/* mktime() perf. */
 static int		year_is_cached = FALSE;	/* mktime() perf. */
 
+#define	TZSYNC_FILE	"/var/run/tzsync"
+static uint32_t		zoneinfo_seqno;
+static uint32_t		zoneinfo_seqno_init = 1;
+static uint32_t		*zoneinfo_seqadr = &zoneinfo_seqno_init;
+#define	RELOAD_INFO()	(zoneinfo_seqno != *zoneinfo_seqadr)
 
 #define	_2AM		(2 * SECS_PER_HOUR)
 #define	FIRSTWEEK	1
@@ -400,7 +413,7 @@ static const __usa_rules_t	__usa_rules[] = {
 /*
  * Prototypes for static functions.
  */
-static systemtz_t *getsystemTZ(systemtz_t *);
+static const char *getsystemTZ(void);
 static const char *getzname(const char *, int);
 static const char *getnum(const char *, int *, int, int);
 static const char *getsecs(const char *, long *);
@@ -408,11 +421,16 @@ static const char *getoffset(const char *, long *);
 static const char *getrule(const char *, rule_t *, int);
 static int	load_posixinfo(const char *, state_t *);
 static int	load_zoneinfo(const char *, state_t *);
-static void	ltzset_u(time_t, systemtz_t *);
+static void	load_posix_transitions(state_t *, long, long, zone_rules_t);
+static void	adjust_posix_default(state_t *, long, long);
+static void	*ltzset_u(time_t);
 static struct tm *offtime_u(time_t, long, struct tm *);
 static int	posix_check_dst(long long, state_t *);
 static int	posix_daylight(long long *, int, posix_daylight_t *);
 static void	set_zone_context(time_t);
+static void	reload_counter(void);
+static void	purge_zone_cache(void);
+static void	set_tzname(const char **);
 
 /*
  * definition of difftime
@@ -490,14 +508,12 @@ gmtime(const time_t *timep)
 static int
 get_hashid(const char *id)
 {
-	const unsigned char	*s = (const unsigned char *)id;
 	unsigned char	c;
 	unsigned int	h;
 
-	h = *s++;
-	while ((c = *s++) != '\0') {
-		h = (h << 5) - h + c;
-	}
+	h = *id++;
+	while ((c = *id++) != '\0')
+		h += c;
 	return ((int)(h % HASHTABLE));
 }
 
@@ -505,19 +521,16 @@ get_hashid(const char *id)
  * find_zone() gets the hashid for zonename, then uses the hashid
  * to search the hash table for the appropriate timezone entry.  If
  * the entry for zonename is found in the hash table, return a pointer
- * to the entry.  Otherwise, update the input link_prev and link_next
- * to the addresses of pointers for the caller to update to add the new
- * entry to the hash table.
+ * to the entry.
  */
 static state_t *
-find_zone(const char *zonename, state_t ***link_prev, state_t **link_next)
+find_zone(const char *zonename)
 {
 	int	hashid;
-	state_t	*cur, *prv;
+	state_t	*cur;
 
 	hashid = get_hashid(zonename);
 	cur = tzcache[hashid];
-	prv = NULL;
 	while (cur) {
 		int	res;
 		res = strcmp(cur->zonename, zonename);
@@ -526,19 +539,42 @@ find_zone(const char *zonename, state_t ***link_prev, state_t **link_next)
 		} else if (res > 0) {
 			break;
 		}
-		prv = cur;
 		cur = cur->next;
-	}
-	if (prv) {
-		*link_prev = &prv->next;
-		*link_next = cur;
-	} else {
-		*link_prev = &tzcache[hashid];
-		*link_next = NULL;
 	}
 	return (NULL);
 }
 
+/*
+ * Register new state in the cache.
+ */
+static void
+reg_zone(state_t *new)
+{
+	int	hashid, res;
+	state_t	*cur, *prv;
+
+	hashid = get_hashid(new->zonename);
+	cur = tzcache[hashid];
+	prv = NULL;
+	while (cur != NULL) {
+		res = strcmp(cur->zonename, new->zonename);
+		if (res == 0) {
+			/* impossible, but just in case */
+			return;
+		} else if (res > 0) {
+			break;
+		}
+		prv = cur;
+		cur = cur->next;
+	}
+	if (prv != NULL) {
+		new->next = prv->next;
+		prv->next = new;
+	} else {
+		new->next = tzcache[hashid];
+		tzcache[hashid] = new;
+	}
+}
 
 /*
  * Returns tm struct based on input time_t argument, correcting
@@ -584,27 +620,24 @@ localtime_r(const time_t *timep, struct tm *p_tm)
 {
 	long	offset;
 	struct tm *rt;
+	void	*unused;
 	int	my_is_in_dst;
-	systemtz_t	stz;
-	systemtz_t	*tzp;
-
-	tzp = getsystemTZ(&stz);
 
 	lmutex_lock(&_time_lock);
-	ltzset_u(*timep, tzp);
+	unused = ltzset_u(*timep);
 	if (lclzonep == NULL) {
 		lmutex_unlock(&_time_lock);
-		if (tzp->flag)
-			free(tzp->entry);
+		if (unused != NULL)
+			free(unused);
 		return (offtime_u(*timep, 0L, p_tm));
 	}
 	my_is_in_dst = is_in_dst;
 	offset = (my_is_in_dst) ? -altzone : -timezone;
 	lmutex_unlock(&_time_lock);
+	if (unused != NULL)
+		free(unused);
 	rt = offtime_u(*timep, offset, p_tm);
 	p_tm->tm_isdst = my_is_in_dst;
-	if (tzp->flag)
-		free(tzp->entry);
 	return (rt);
 }
 
@@ -648,16 +681,11 @@ mktime(struct tm *tmptr)
 	int	temp;
 	int	mketimerrno;
 	int	overflow;
-	systemtz_t	stz;
-	systemtz_t	*tzp;
+	void	*unused;
 
 	mketimerrno = errno;
 
-	tzp = getsystemTZ(&stz);
-
 	/* mktime leaves errno unchanged if no error is encountered */
-
-	lmutex_lock(&_time_lock);
 
 	/* Calculate time_t from tm arg.  tm may need to be normalized. */
 	t = tmptr->tm_sec + SECSPERMIN * tmptr->tm_min +
@@ -677,6 +705,8 @@ mktime(struct tm *tmptr)
 		}
 	}
 
+	lmutex_lock(&_time_lock);
+
 	/* Avoid numerous calculations embedded in macro if possible */
 	if (!year_is_cached || (cached_year != tmptr->tm_year))	 {
 		cached_year = tmptr->tm_year;
@@ -692,7 +722,8 @@ mktime(struct tm *tmptr)
 	else
 		t += SECSPERDAY * __yday_to_month[tmptr->tm_mon];
 
-	ltzset_u((time_t)t, tzp);
+	unused = ltzset_u((time_t)t);
+
 	/* Attempt to convert time to GMT based on tm_isdst setting */
 	t += (tmptr->tm_isdst > 0) ? altzone : timezone;
 
@@ -769,9 +800,9 @@ mktime(struct tm *tmptr)
 	}
 
 	lmutex_unlock(&_time_lock);
+	if (unused != NULL)
+		free(unused);
 
-	if (tzp->flag)
-		free(tzp->entry);
 	errno = mketimerrno;
 	return ((time_t)t);
 }
@@ -784,77 +815,108 @@ mktime(struct tm *tmptr)
 void
 tzset(void)
 {
-	systemtz_t	stz;
-	systemtz_t	*tzp;
-
-	tzp = getsystemTZ(&stz);
+	void	*unused;
 
 	lmutex_lock(&_time_lock);
-	ltzset_u(time(NULL), tzp);
+	unused = ltzset_u(time(NULL));
 	lmutex_unlock(&_time_lock);
-	if (tzp->flag)
-		free(tzp->entry);
+	if (unused != NULL)
+		free(unused);
 }
 
 void
 _ltzset(time_t tim)
 {
-	systemtz_t	stz;
-	systemtz_t	*tzp;
-
-	tzp = getsystemTZ(&stz);
+	void	*unused;
 
 	lmutex_lock(&_time_lock);
-	ltzset_u(tim, tzp);
+	unused = ltzset_u(tim);
 	lmutex_unlock(&_time_lock);
-	if (tzp->flag)
-		free(tzp->entry);
+	if (unused != NULL)
+		free(unused);
 }
 
 /*
  * Loads local zone information if TZ changed since last time zone
  * information was loaded, or if this is the first time thru.
  * We already hold _time_lock; no further locking is required.
+ * Return a memory block which can be free'd at safe place.
  */
-static void
-ltzset_u(time_t t, systemtz_t *tzp)
+static void *
+ltzset_u(time_t t)
 {
-	const char	*zonename = tzp->tz;
-	state_t	*entry, **p, *q;
+	const char	*zonename;
+	state_t		*entry, *new_entry;
+	const char	*newtzname[2];
 
-	if (zonename == NULL || *zonename == '\0')
-		zonename = _posix_gmt0;
-
-	if (curr_zonerules != ZONERULES_INVALID &&
-	    strcmp(namecache, zonename) == 0) {
-		set_zone_context(t);
-		return;
+	if (RELOAD_INFO()) {
+		reload_counter();
+		purge_zone_cache();
 	}
 
-	entry = find_zone(zonename, &p, &q);
+	if ((zonename = getsystemTZ()) == NULL || *zonename == '\0')
+		zonename = _posix_gmt0;
+
+	if (namecache != NULL && strcmp(namecache, zonename) == 0) {
+		set_zone_context(t);
+		return (NULL);
+	}
+
+	entry = find_zone(zonename);
 	if (entry == NULL) {
 		/*
+		 * We need to release _time_lock to call out malloc().
+		 * We can release _time_lock as far as global variables
+		 * can remain consistent. Here, we haven't touch any
+		 * variables, so it's okay to release lock.
+		 */
+		lmutex_unlock(&_time_lock);
+		new_entry = malloc(sizeof (state_t));
+		lmutex_lock(&_time_lock);
+
+		/*
+		 * check it again, since zone may have been loaded while
+		 * time_lock was unlocked.
+		 */
+		entry = find_zone(zonename);
+	} else {
+		new_entry = NULL;
+		goto out;
+	}
+
+	/*
+	 * We are here because the 1st attemp failed.
+	 * new_entry points newly allocated entry. If it was NULL, it
+	 * indicates that the memory allocation also failed.
+	 */
+	if (entry == NULL) {
+		/*
+		 * 2nd attemp also failed.
 		 * No timezone entry found in hash table, so load it,
 		 * and create a new timezone entry.
 		 */
 		char	*newzonename, *charsbuf;
 
-		/* Invalidate the current timezone */
-		curr_zonerules = ZONERULES_INVALID;
-
 		newzonename = libc_strdup(zonename);
 		daylight = 0;
-		entry = tzp->entry;
+		entry = new_entry;
 
 		if (entry == NULL || newzonename == NULL) {
 			/* something wrong happened. */
+failed:
 			if (newzonename != NULL)
 				libc_free(newzonename);
+
+			/* Invalidate the current timezone */
+			curr_zonerules = ZONERULES_INVALID;
+			namecache = NULL;
+
 			timezone = altzone = 0;
 			is_in_dst = 0;
-			tzname[0] = (char *)_tz_gmt;
-			tzname[1] = (char *)_tz_spaces;
-			return;
+			newtzname[0] = (char *)_tz_gmt;
+			newtzname[1] = (char *)_tz_spaces;
+			set_tzname(newtzname);
+			return (entry);
 		}
 
 		/*
@@ -878,15 +940,10 @@ ltzset_u(time_t t, systemtz_t *tzp)
 		 * Otherwise the initial parse of PST8PDT as a POSIX zone will
 		 * succeed and be used.
 		 */
-		if ((charsbuf = libc_malloc(TZ_MAX_CHARS)) == NULL) {
-			libc_free(newzonename);
+		if ((charsbuf = libc_malloc(TZ_MAX_CHARS)) == NULL)
+			goto failed;
 
-			timezone = altzone = 0;
-			is_in_dst = 0;
-			tzname[0] = (char *)_tz_gmt;
-			tzname[1] = (char *)_tz_spaces;
-			return;
-		}
+		entry->zonerules = ZONERULES_INVALID;
 		entry->charsbuf_size = TZ_MAX_CHARS;
 		entry->chars = charsbuf;
 		entry->default_tzname0 = _tz_gmt;
@@ -902,21 +959,30 @@ ltzset_u(time_t t, systemtz_t *tzp)
 				(void) load_posixinfo(_posix_gmt0, entry);
 			}
 		}
+		entry->last_ats_idx = -1;
+
 		/*
 		 * The pre-allocated buffer is used; reset the free flag
 		 * so the buffer won't be freed.
 		 */
-		tzp->flag = 0;
-		entry->next = q;
-		*p = entry;
+		reg_zone(entry);
+		new_entry = NULL;
 	}
 
+out:
 	curr_zonerules = entry->zonerules;
 	namecache = entry->zonename;
 	daylight = entry->daylight;
 	lclzonep = entry;
 
 	set_zone_context(t);
+
+	/*
+	 * We shouldn't release lock beyond this point since lclzonep
+	 * can refer to invalid address if cache is invalidated.
+	 * We defer the call to free till it can be done safely.
+	 */
+	return (new_entry);
 }
 
 /*
@@ -948,31 +1014,43 @@ ltzset_u(time_t t, systemtz_t *tzp)
  * 	transition in cache for positive values of t.
  */
 static void
+set_zone_default_context(void)
+{
+	const char	*newtzname[2];
+
+	/* Retrieve suitable defaults for this zone */
+	altzone = lclzonep->default_altzone;
+	timezone = lclzonep->default_timezone;
+	newtzname[0] = (char *)lclzonep->default_tzname0;
+	newtzname[1] = (char *)lclzonep->default_tzname1;
+	is_in_dst = 0;
+
+	set_tzname(newtzname);
+}
+
+static void
 set_zone_context(time_t t)
 {
 	prev_t		*prevp;
-	int    		lo, hi, tidx;
+	int    		lo, hi, tidx, lidx;
 	ttinfo_t	*ttisp, *std, *alt;
+	const char	*newtzname[2];
 
 	/* If state data not loaded or TZ busted, just use GMT */
 	if (lclzonep == NULL || curr_zonerules == ZONERULES_INVALID) {
 		timezone = altzone = 0;
 		daylight = is_in_dst = 0;
-		tzname[0] = (char *)_tz_gmt;
-		tzname[1] = (char *)_tz_spaces;
+		newtzname[0] = (char *)_tz_gmt;
+		newtzname[1] = (char *)_tz_spaces;
+		set_tzname(newtzname);
 		return;
 	}
 
-	/* Retrieve suitable defaults for this zone */
-	altzone = lclzonep->default_altzone;
-	timezone = lclzonep->default_timezone;
-	tzname[0] = (char *)lclzonep->default_tzname0;
-	tzname[1] = (char *)lclzonep->default_tzname1;
-	is_in_dst = 0;
-
-	if (lclzonep->timecnt <= 0 || lclzonep->typecnt < 2)
+	if (lclzonep->timecnt <= 0 || lclzonep->typecnt < 2) {
 		/* Loaded zone incapable of transitioning. */
+		set_zone_default_context();
 		return;
+	}
 
 	/*
 	 * At least one alt. zone and one transistion exist. Locate
@@ -982,37 +1060,48 @@ set_zone_context(time_t t)
 	hi = lclzonep->timecnt - 1;
 
 	if (t < lclzonep->ats[0] || t >= lclzonep->ats[hi]) {
-
-		/*  CACHE MISS.  Calculate DST as best as possible */
+		/*
+		 * Date which is out of definition.
+		 * Calculate DST as best as possible
+		 */
 		if (lclzonep->zonerules == POSIX_USA ||
 		    lclzonep->zonerules == POSIX) {
-			/* Must nvoke calculations to determine DST */
+			/* Must invoke calculations to determine DST */
+			set_zone_default_context();
 			is_in_dst = (daylight) ?
 			    posix_check_dst(t, lclzonep) : 0;
 			return;
 		} else if (t < lclzonep->ats[0]) {   /* zoneinfo... */
 			/* t precedes 1st transition.  Use defaults */
+			set_zone_default_context();
 			return;
 		} else	{    /* zoneinfo */
 			/* t follows final transistion.  Use final */
 			tidx = hi;
 		}
-
 	} else {
-
-		/*  CACHE HIT.  Locate transition using binary search. */
-
-		while (lo <= hi) {
-			tidx = (lo + hi) / 2;
-			if (t == lclzonep->ats[tidx])
-				break;
-			else if (t < lclzonep->ats[tidx])
-				hi = tidx - 1;
-			else
-				lo = tidx + 1;
+		if ((lidx = lclzonep->last_ats_idx) != -1 &&
+		    lidx != hi &&
+		    t >= lclzonep->ats[lidx] &&
+		    t < lclzonep->ats[lidx + 1]) {
+			/* CACHE HIT. Nothing needs to be done */
+			tidx = lidx;
+		} else {
+			/*
+			 * CACHE MISS.  Locate transition using binary search.
+			 */
+			while (lo <= hi) {
+				tidx = (lo + hi) / 2;
+				if (t == lclzonep->ats[tidx])
+					break;
+				else if (t < lclzonep->ats[tidx])
+					hi = tidx - 1;
+				else
+					lo = tidx + 1;
+			}
+			if (lo > hi)
+				tidx = hi;
 		}
-		if (lo > hi)
-			tidx = hi;
 	}
 
 	/*
@@ -1024,19 +1113,28 @@ set_zone_context(time_t t)
 
 	if ((is_in_dst = ttisp->tt_isdst) == 0) { /* std. time */
 		timezone = -ttisp->tt_gmtoff;
-		tzname[0] = &lclzonep->chars[ttisp->tt_abbrind];
+		newtzname[0] = &lclzonep->chars[ttisp->tt_abbrind];
 		if ((alt = prevp->alt) != NULL) {
 			altzone = -alt->tt_gmtoff;
-			tzname[1] = &lclzonep->chars[alt->tt_abbrind];
+			newtzname[1] = &lclzonep->chars[alt->tt_abbrind];
+		} else {
+			altzone = lclzonep->default_altzone;
+			newtzname[1] = (char *)lclzonep->default_tzname1;
 		}
 	} else { /* alt. time */
 		altzone = -ttisp->tt_gmtoff;
-		tzname[1] = &lclzonep->chars[ttisp->tt_abbrind];
+		newtzname[1] = &lclzonep->chars[ttisp->tt_abbrind];
 		if ((std = prevp->std) != NULL) {
 			timezone = -std->tt_gmtoff;
-			tzname[0] = &lclzonep->chars[std->tt_abbrind];
+			newtzname[0] = &lclzonep->chars[std->tt_abbrind];
+		} else {
+			timezone = lclzonep->default_timezone;
+			newtzname[0] = (char *)lclzonep->default_tzname0;
 		}
 	}
+
+	lclzonep->last_ats_idx = tidx;
+	set_tzname(newtzname);
 }
 
 /*
@@ -1094,8 +1192,9 @@ offtime_u(time_t t, long offset, struct tm *tmptr)
 	tmptr->tm_yday = (int)days;
 	ip = __mon_lengths[yleap];
 	for (tmptr->tm_mon = 0; days >=
-	    (long)ip[tmptr->tm_mon]; ++(tmptr->tm_mon))
+	    (long)ip[tmptr->tm_mon]; ++(tmptr->tm_mon)) {
 		days = days - (long)ip[tmptr->tm_mon];
+	}
 	tmptr->tm_mday = (int)(days + 1);
 	tmptr->tm_isdst = 0;
 
@@ -1534,6 +1633,90 @@ load_zoneinfo(const char *name, state_t *sp)
 	return (0);
 }
 
+#ifdef	_TZ_DEBUG
+static void
+print_state(state_t *sp)
+{
+	struct tm	tmp;
+	int	i, c;
+
+	(void) fprintf(stderr, "=========================================\n");
+	(void) fprintf(stderr, "zonename: \"%s\"\n", sp->zonename);
+	(void) fprintf(stderr, "next: 0x%p\n", (void *)sp->next);
+	(void) fprintf(stderr, "zonerules: %s\n",
+	    sp->zonerules == ZONERULES_INVALID ? "ZONERULES_INVALID" :
+	    sp->zonerules == POSIX ? "POSIX" :
+	    sp->zonerules == POSIX_USA ? "POSIX_USA" :
+	    sp->zonerules == ZONEINFO ? "ZONEINFO" : "UNKNOWN");
+	(void) fprintf(stderr, "daylight: %d\n", sp->daylight);
+	(void) fprintf(stderr, "default_timezone: %ld\n", sp->default_timezone);
+	(void) fprintf(stderr, "default_altzone: %ld\n", sp->default_altzone);
+	(void) fprintf(stderr, "default_tzname0: \"%s\"\n",
+	    sp->default_tzname0);
+	(void) fprintf(stderr, "default_tzname1: \"%s\"\n",
+	    sp->default_tzname1);
+	(void) fprintf(stderr, "leapcnt: %d\n", sp->leapcnt);
+	(void) fprintf(stderr, "timecnt: %d\n", sp->timecnt);
+	(void) fprintf(stderr, "typecnt: %d\n", sp->typecnt);
+	(void) fprintf(stderr, "charcnt: %d\n", sp->charcnt);
+	(void) fprintf(stderr, "chars: \"%s\"\n", sp->chars);
+	(void) fprintf(stderr, "charsbuf_size: %u\n", sp->charsbuf_size);
+	(void) fprintf(stderr, "prev: skipping...\n");
+	(void) fprintf(stderr, "ats = {\n");
+	for (c = 0, i = 0; i < sp->timecnt; i++) {
+		char	buf[64];
+		size_t	len;
+		if (c != 0) {
+			(void) fprintf(stderr, ", ");
+		}
+		(void) asctime_r(gmtime_r(&sp->ats[i], &tmp),
+		    buf, sizeof (buf));
+		len = strlen(buf);
+		buf[len-1] = '\0';
+		(void) fprintf(stderr, "%s", buf);
+		if (c == 1) {
+			(void) fprintf(stderr, "\n");
+			c = 0;
+		} else {
+			c++;
+		}
+	}
+	(void) fprintf(stderr, "}\n");
+	(void) fprintf(stderr, "types = {\n");
+	for (c = 0, i = 0; i < sp->timecnt; i++) {
+		if (c == 0) {
+			(void) fprintf(stderr, "\t");
+		} else {
+			(void) fprintf(stderr, ", ");
+		}
+		(void) fprintf(stderr, "%d", sp->types[i]);
+		if (c == 7) {
+			(void) fprintf(stderr, "\n");
+			c = 0;
+		} else {
+			c++;
+		}
+	}
+	(void) fprintf(stderr, "}\n");
+	(void) fprintf(stderr, "ttis = {\n");
+	for (i = 0; i < sp->typecnt; i++) {
+		(void) fprintf(stderr, "\t{\n");
+		(void) fprintf(stderr, "\t\ttt_gmtoff: %ld\n",
+		    sp->ttis[i].tt_gmtoff);
+		(void) fprintf(stderr, "\t\ttt_ttisdst: %d\n",
+		    sp->ttis[i].tt_isdst);
+		(void) fprintf(stderr, "\t\ttt_abbrind: %d\n",
+		    sp->ttis[i].tt_abbrind);
+		(void) fprintf(stderr, "\t\ttt_tt_isstd: %d\n",
+		    sp->ttis[i].tt_ttisstd);
+		(void) fprintf(stderr, "\t\ttt_ttisgmt: %d\n",
+		    sp->ttis[i].tt_ttisgmt);
+		(void) fprintf(stderr, "\t}\n");
+	}
+	(void) fprintf(stderr, "}\n");
+}
+#endif
+
 /*
  * Given a POSIX section 8-style TZ string, fill in transition tables.
  *
@@ -1574,18 +1757,13 @@ load_posixinfo(const char *name, state_t *sp)
 	size_t		dstlen;
 	long		stdoff = 0;
 	long		dstoff = 0;
-	time_t		*tranp;
-	uchar_t		*typep;
-	prev_t		*prevp;
 	char		*cp;
-	int		year;
 	int		i;
-	long long	janfirst;
 	ttinfo_t	*dst;
 	ttinfo_t	*std;
 	int		quoted;
 	zone_rules_t	zonetype;
-	posix_daylight_t	pdaylight;
+
 
 	zonetype = POSIX_USA;
 	stdname = name;
@@ -1628,8 +1806,19 @@ load_posixinfo(const char *name, state_t *sp)
 			dstoff = stdoff - SECSPERHOUR;
 		}
 
-		/* If any present, extract POSIX transitions from TZ */
-		if (*name == ',' || *name == ';') {
+		if (*name != ',' && *name != ';') {
+			/* no transtition specified; using default rule */
+			if (load_zoneinfo(TZDEFRULES, sp) == 0 &&
+			    sp->daylight == 1) {
+				/* loading TZDEFRULES zoneinfo succeeded */
+				adjust_posix_default(sp, stdoff, dstoff);
+			} else {
+				/* loading TZDEFRULES zoneinfo failed */
+				load_posix_transitions(sp, stdoff, dstoff,
+				    zonetype);
+			}
+		} else {
+			/* extract POSIX transitions from TZ */
 			/* Backward compatibility using ';' separator */
 			int	compat_flag = (*name == ';');
 			++name;
@@ -1644,87 +1833,10 @@ load_posixinfo(const char *name, state_t *sp)
 			if (*name != '\0')
 				return (-1);
 			zonetype = POSIX;
+			load_posix_transitions(sp, stdoff, dstoff, zonetype);
 		}
-
-		/*
-		 * We know STD and DST zones are specified with this timezone
-		 * therefore the cache will be set up with 2 transitions per
-		 * year transitioning to their respective std and dst zones.
-		 */
-		sp->daylight = 1;
-		sp->typecnt = 2;
-		sp->timecnt = 272;
-
-		/*
-		 * Insert zone data from POSIX TZ into state table
-		 * The Olson public domain POSIX code sets up ttis[0] to be DST,
-		 * as we are doing here.  It seems to be the correct behavior.
-		 * The US/Pacific zoneinfo file also lists DST as first type.
-		 */
 		dst = &sp->ttis[0];
-		dst->tt_gmtoff = -dstoff;
-		dst->tt_isdst = 1;
-
 		std = &sp->ttis[1];
-		std->tt_gmtoff = -stdoff;
-		std->tt_isdst = 0;
-
-		sp->prev[0].std = NULL;
-		sp->prev[0].alt = NULL;
-
-		/* Create transition data based on POSIX TZ */
-		tranp = sp->ats;
-		prevp  = &sp->prev[1];
-		typep  = sp->types;
-
-		/*
-		 * We only cache from 1902 to 2037 to avoid transistions
-		 * that wrap at the 32-bit boundries, since 1901 and 2038
-		 * are not full years in 32-bit time.  The rough edges
-		 * will be handled as transition cache misses.
-		 */
-
-		janfirst = JAN_01_1902;
-
-		pdaylight.rules[0] = &sp->start_rule;
-		pdaylight.rules[1] = &sp->end_rule;
-		pdaylight.offset[0] = stdoff;
-		pdaylight.offset[1] = dstoff;
-
-		for (i = MAX_RULE_TABLE; i >= 0; i--) {
-			if (zonetype == POSIX_USA) {
-				pdaylight.rules[0] =
-				    (rule_t *)&__usa_rules[i].start;
-				pdaylight.rules[1] =
-				    (rule_t *)&__usa_rules[i].end;
-			}
-			for (year = __usa_rules[i].s_year;
-			    year <= __usa_rules[i].e_year;
-			    year++) {
-				int	idx, ridx;
-				idx =
-				    posix_daylight(&janfirst, year, &pdaylight);
-				ridx = !idx;
-
-				/*
-				 * Two transitions per year. Since there are
-				 * only two zone types for this POSIX zone,
-				 * previous std and alt are always set to
-				 * &ttis[0] and &ttis[1].
-				 */
-				*tranp++ = (time_t)pdaylight.rtime[idx];
-				*typep++ = idx;
-				prevp->std = std;
-				prevp->alt = dst;
-				++prevp;
-
-				*tranp++ = (time_t)pdaylight.rtime[ridx];
-				*typep++ = ridx;
-				prevp->std = std;
-				prevp->alt = dst;
-				++prevp;
-			}
-		}
 	} else {  /* DST wasn't specified in POSIX TZ */
 
 		/*  Since we only have STD time, there are no transitions */
@@ -1735,7 +1847,6 @@ load_posixinfo(const char *name, state_t *sp)
 		std = &sp->ttis[0];
 		std->tt_gmtoff = -stdoff;
 		std->tt_isdst = 0;
-
 	}
 
 	/* Setup zone name character data for state table */
@@ -1795,6 +1906,184 @@ load_posixinfo(const char *name, state_t *sp)
 	return (0);
 }
 
+/*
+ * We loaded the TZDEFAULT which usually the one in US zones. We
+ * adjust the GMT offset for the zone which has stdoff/dstoff
+ * offset.
+ */
+static void
+adjust_posix_default(state_t *sp, long stdoff, long dstoff)
+{
+	long	zone_stdoff = 0;
+	long	zone_dstoff = 0;
+	int	zone_stdoff_flag = 0;
+	int	zone_dstoff_flag = 0;
+	int	isdst;
+	int	i;
+
+	/*
+	 * Initial values of zone_stdoff and zone_dstoff
+	 */
+	for (i = 0; (zone_stdoff_flag == 0 || zone_dstoff_flag == 0) &&
+	    i < sp->timecnt; i++) {
+		ttinfo_t	*zone;
+
+		zone = &sp->ttis[sp->types[i]];
+
+		if (zone_stdoff_flag == 0 && zone->tt_isdst == 0) {
+			zone_stdoff = -zone->tt_gmtoff;
+			zone_stdoff_flag = 1;
+		} else if (zone_dstoff_flag == 0 && zone->tt_isdst != 0) {
+			zone_dstoff = -zone->tt_gmtoff;
+			zone_dstoff_flag = 1;
+		}
+	}
+	if (zone_dstoff_flag == 0)
+		zone_dstoff = zone_stdoff;
+
+	/*
+	 * Initially we're assumed to be in standard time.
+	 */
+	isdst = 0;
+
+	for (i = 0; i < sp->timecnt; i++) {
+		ttinfo_t	*zone;
+		int	next_isdst;
+
+		zone = &sp->ttis[sp->types[i]];
+		next_isdst = zone->tt_isdst;
+
+		sp->types[i] = next_isdst ? 0 : 1;
+
+		if (zone->tt_ttisgmt == 0) {
+			/*
+			 * If summer time is in effect, and the transition time
+			 * was not specified as standard time, add the summer
+			 * time offset to the transition time;
+			 * otherwise, add the standard time offset to the
+			 * transition time.
+			 */
+			/*
+			 * Transitions from DST to DDST will effectively
+			 * disappear since POSIX provides for only one DST
+			 * offset.
+			 */
+			if (isdst != 0 && zone->tt_ttisstd == 0)
+				sp->ats[i] += dstoff - zone_dstoff;
+			else
+				sp->ats[i] += stdoff - zone_stdoff;
+		}
+		if (next_isdst != 0)
+			zone_dstoff = -zone->tt_gmtoff;
+		else
+			zone_stdoff = -zone->tt_gmtoff;
+		isdst = next_isdst;
+	}
+	/*
+	 * Finally, fill in ttis.
+	 * ttisstd and ttisgmt need not be handled.
+	 */
+	sp->ttis[0].tt_gmtoff = -dstoff;
+	sp->ttis[0].tt_isdst = 1;
+	sp->ttis[1].tt_gmtoff = -stdoff;
+	sp->ttis[1].tt_isdst = 0;
+	sp->typecnt = 2;
+	sp->daylight = 1;
+}
+
+/*
+ *
+ */
+static void
+load_posix_transitions(state_t *sp, long stdoff, long dstoff,
+    zone_rules_t zonetype)
+{
+	ttinfo_t	*std, *dst;
+	time_t	*tranp;
+	uchar_t	*typep;
+	prev_t	*prevp;
+	int	year;
+	int	i;
+	long long	janfirst;
+	posix_daylight_t	pdaylight;
+
+	/*
+	 * We know STD and DST zones are specified with this timezone
+	 * therefore the cache will be set up with 2 transitions per
+	 * year transitioning to their respective std and dst zones.
+	 */
+	sp->daylight = 1;
+	sp->typecnt = 2;
+	sp->timecnt = 272;
+
+	/*
+	 * Insert zone data from POSIX TZ into state table
+	 * The Olson public domain POSIX code sets up ttis[0] to be DST,
+	 * as we are doing here.  It seems to be the correct behavior.
+	 * The US/Pacific zoneinfo file also lists DST as first type.
+	 */
+
+	dst = &sp->ttis[0];
+	dst->tt_gmtoff = -dstoff;
+	dst->tt_isdst = 1;
+
+	std = &sp->ttis[1];
+	std->tt_gmtoff = -stdoff;
+	std->tt_isdst = 0;
+
+	sp->prev[0].std = NULL;
+	sp->prev[0].alt = NULL;
+
+	/* Create transition data based on POSIX TZ */
+	tranp = sp->ats;
+	prevp  = &sp->prev[1];
+	typep  = sp->types;
+
+	/*
+	 * We only cache from 1902 to 2037 to avoid transistions
+	 * that wrap at the 32-bit boundries, since 1901 and 2038
+	 * are not full years in 32-bit time.  The rough edges
+	 * will be handled as transition cache misses.
+	 */
+
+	janfirst = JAN_01_1902;
+
+	pdaylight.rules[0] = &sp->start_rule;
+	pdaylight.rules[1] = &sp->end_rule;
+	pdaylight.offset[0] = stdoff;
+	pdaylight.offset[1] = dstoff;
+
+	for (i = MAX_RULE_TABLE; i >= 0; i--) {
+		if (zonetype == POSIX_USA) {
+			pdaylight.rules[0] = (rule_t *)&__usa_rules[i].start;
+			pdaylight.rules[1] = (rule_t *)&__usa_rules[i].end;
+		}
+		for (year = __usa_rules[i].s_year;
+		    year <= __usa_rules[i].e_year; year++) {
+			int	idx, ridx;
+			idx = posix_daylight(&janfirst, year, &pdaylight);
+			ridx = !idx;
+
+			/*
+			 * Two transitions per year. Since there are
+			 * only two zone types for this POSIX zone,
+			 * previous std and alt are always set to
+			 * &ttis[0] and &ttis[1].
+			 */
+			*tranp++ = (time_t)pdaylight.rtime[idx];
+			*typep++ = idx;
+			prevp->std = std;
+			prevp->alt = dst;
+			++prevp;
+
+			*tranp++ = (time_t)pdaylight.rtime[ridx];
+			*typep++ = ridx;
+			prevp->std = std;
+			prevp->alt = dst;
+			++prevp;
+		}
+	}
+}
 
 /*
  * Given a pointer into a time zone string, scan until a character that is not
@@ -1808,13 +2097,15 @@ getzname(const char *strp, int quoted)
 
 	if (quoted) {
 		while ((c = *strp) != '\0' && c != '>' &&
-		    isgraph((unsigned char)c))
+		    isgraph((unsigned char)c)) {
 			++strp;
+		}
 	} else {
 		while ((c = *strp) != '\0' && isgraph((unsigned char)c) &&
 		    !isdigit((unsigned char)c) && c != ',' && c != '-' &&
-		    c != '+')
+		    c != '+') {
 			++strp;
+		}
 	}
 
 	/* Found an excessively invalid character.  Discredit whole name */
@@ -1992,6 +2283,8 @@ get_default_tz(void)
 	int	flags;
 	void	*defp;
 
+	assert_no_libc_locks_held();
+
 	if ((defp = defopen_r(TIMEZONE)) != NULL) {
 		flags = defcntl_r(DC_GETFLAGS, 0, defp);
 		TURNON(flags, DC_STRIP_QUOTES);
@@ -2008,7 +2301,7 @@ get_default_tz(void)
 				tzq++;
 			*tzq = '\0';
 			if (*tzp != '\0')
-				tz = strdup((char *)tzp);
+				tz = libc_strdup((char *)tzp);
 		}
 
 		defclose_r(defp);
@@ -2016,109 +2309,223 @@ get_default_tz(void)
 	return (tz);
 }
 
-static state_t *
-get_zone(systemtz_t *tzp)
+/*
+ * Purge all cache'd state_t
+ */
+static void
+purge_zone_cache(void)
 {
 	int	hashid;
-	state_t	*m, *p;
-	const char *zonename = tzp->tz;
+	state_t	*p, *n, *r;
 
-	hashid = get_hashid(zonename);
-	m = tzcache[hashid];
-	while (m) {
-		int	r;
-		r = strcmp(m->zonename, zonename);
-		if (r == 0) {
-			/* matched */
-			return (NULL);
-		} else if (r > 0) {
-			break;
+	/*
+	 * Create a single list of caches which are detached
+	 * from hash table.
+	 */
+	r = NULL;
+	for (hashid = 0; hashid < HASHTABLE; hashid++) {
+		for (p = tzcache[hashid]; p != NULL; p = n) {
+			n = p->next;
+			p->next = r;
+			r = p;
 		}
-		m = m->next;
+		tzcache[hashid] = NULL;
 	}
-	/* malloc() return value is also checked for NULL in ltzset_u() */
-	p = malloc(sizeof (state_t));
+	namecache = NULL;
 
-	/* ltzset_u() resets the free flag to 0 if it uses the p buffer */
-	if (p != NULL)
-		tzp->flag = 1;
-	return (p);
+	/* last_tzname[] may point cache being freed */
+	last_tzname[0] = NULL;
+	last_tzname[1] = NULL;
+
+	/* We'll reload system TZ as well */
+	systemTZ = NULL;
+
+	/*
+	 * Hash table has been cleared, and all elements are detached from
+	 * the hash table. Now we are safe to release _time_lock.
+	 * We need to unlock _time_lock because we need to call out to
+	 * free().
+	 */
+	lmutex_unlock(&_time_lock);
+
+	assert_no_libc_locks_held();
+
+	while (r != NULL) {
+		n = r->next;
+		libc_free((char *)r->zonename);
+		libc_free((char *)r->chars);
+		free(r);
+		r = n;
+	}
+
+	lmutex_lock(&_time_lock);
+}
+
+/*
+ * When called first time, open the counter device and load
+ * the initial value. If counter is updated, copy value to
+ * private memory.
+ */
+static void
+reload_counter(void)
+{
+	int	fd;
+	caddr_t	addr;
+
+	if (zoneinfo_seqadr != &zoneinfo_seqno_init) {
+		zoneinfo_seqno = *zoneinfo_seqadr;
+		return;
+	}
+
+	if ((fd = open(TZSYNC_FILE, O_RDONLY)) < 0)
+		return;
+
+	addr = mmap(0, sizeof (uint32_t), PROT_READ, MAP_SHARED, fd, 0);
+	(void) close(fd);
+
+	if (addr == MAP_FAILED)
+		return;
+	/*LINTED*/
+	zoneinfo_seqadr = (uint32_t *)addr;
+	zoneinfo_seqno = *zoneinfo_seqadr;
 }
 
 /*
  * getsystemTZ() returns the TZ value if it is set in the environment, or
- * it returns the system TZ;  if the systemTZ has not yet been set,
- * get_default_tz() is called to read the /etc/default/init file to get
- * the value.
- *
- * getsystemTZ() also calls get_zone() to do an initial check to see if the
- * timezone is the current timezone, or one that is already loaded in the
- * hash table.  If get_zone() determines the timezone has not yet been loaded,
- * it pre-allocates a buffer for a state_t struct, which ltzset_u() can use
- * later to load the timezone and add to the hash table.
- *
- * The large state_t buffer is allocated here to avoid calls to malloc()
- * within mutex_locks.
+ * it returns the system TZ;  if the systemTZ has not yet been set, or
+ * cleared by tzreload, get_default_tz() is called to read the
+ * /etc/default/init file to get the value.
  */
-static systemtz_t *
-getsystemTZ(systemtz_t *stzp)
+static const char *
+getsystemTZ()
 {
-	static const char	*systemTZ = NULL;
+	tznmlist_t *tzn;
 	char	*tz;
 
-	assert_no_libc_locks_held();
-
-	stzp->flag = 0;
-
 	tz = getenv("TZ");
-	if (tz != NULL && *tz != '\0') {
-		stzp->tz = (const char *)tz;
-		goto get_entry;
-	}
+	if (tz != NULL && *tz != '\0')
+		return ((const char *)tz);
 
-	if (systemTZ != NULL) {
-		stzp->tz = systemTZ;
-		goto get_entry;
-	}
+	if (systemTZ != NULL)
+		return (systemTZ);
 
+	/*
+	 * get_default_tz calls out stdio functions via defread.
+	 */
+	lmutex_unlock(&_time_lock);
 	tz = get_default_tz();
 	lmutex_lock(&_time_lock);
-	if (systemTZ == NULL) {
-		if ((systemTZ = tz) != NULL)	/* found TZ entry in the file */
-			tz = NULL;
-		else
-			systemTZ = _posix_gmt0;	/* no TZ entry in the file */
+
+	if (tz == NULL) {
+		/* no TZ entry in the file */
+		systemTZ = _posix_gmt0;
+		return (systemTZ);
 	}
-	lmutex_unlock(&_time_lock);
 
-	if (tz != NULL)		/* someone beat us to it; free our entry */
-		free(tz);
-
-	stzp->tz = systemTZ;
-
-get_entry:
 	/*
-	 * The object referred to by the 1st 'namecache'
-	 * may be different from the one by the 2nd 'namecache' below.
-	 * But, it does not matter.  The bottomline is at this point
-	 * 'namecache' points to non-NULL and whether the string pointed
-	 * to by 'namecache' is equivalent to stzp->tz or not.
+	 * look up timezone used previously. We will not free the
+	 * old timezone name, because ltzset_u() can release _time_lock
+	 * while it has references to systemTZ (via zonename). If we
+	 * free the systemTZ, the reference via zonename can access
+	 * invalid memory when systemTZ is reset.
 	 */
-	if (namecache != NULL && strcmp(namecache, stzp->tz) == 0) {
-		/*
-		 * At this point, we found the entry having the same
-		 * zonename as stzp->tz exists.  Later we will find
-		 * the exact one, so we don't need to allocate
-		 * the memory here.
-		 */
-		stzp->entry = NULL;
-	} else {
-		/*
-		 * At this point, we could not get the evidence that this
-		 * zonename had been cached.  We will look into the cache
-		 * further.
-		 */
-		stzp->entry = get_zone(stzp);
+	for (tzn = systemTZrec; tzn != NULL; tzn = tzn->link) {
+		if (strcmp(tz, tzn->name) == 0)
+			break;
 	}
-	return (stzp);
+	if (tzn == NULL) {
+		/* This is new timezone name */
+		tzn = lmalloc(sizeof (tznmlist_t *) + strlen(tz) + 1);
+		(void) strcpy(tzn->name, tz);
+		tzn->link = systemTZrec;
+		systemTZrec = tzn;
+	}
+
+	libc_free(tz);
+
+	return (systemTZ = tzn->name);
+}
+
+/*
+ * tzname[] is the user visible string which applications may have
+ * references. Even though TZ was changed, references to the old tzname
+ * may continue to remain in the application, and those references need
+ * to be valid. They were valid by our implementation because strings being
+ * pointed by tzname were never be freed nor altered by the change of TZ.
+ * However, this will no longer be the case.
+ *
+ * state_t is now freed when cache is purged. Therefore, reading string
+ * from old tzname[] addr may end up with accessing a stale data(freed area).
+ * To avoid this, we maintain a copy of all timezone name strings which will
+ * never be freed, and tzname[] will point those copies.
+ *
+ */
+static int
+set_one_tzname(const char *name, int idx)
+{
+	const unsigned char *nm;
+	int	hashid, i;
+	char	*s;
+	tznmlist_t *tzn;
+
+	if (name == _tz_gmt || name == _tz_spaces) {
+		tzname[idx] = (char *)name;
+		return (0);
+	}
+
+	nm = (const unsigned char *)name;
+	hashid = (nm[0] * 29 + nm[1] * 3) % TZNMC_SZ;
+	for (tzn = tznmhash[hashid]; tzn != NULL; tzn = tzn->link) {
+		s = tzn->name;
+		/* do the strcmp() */
+		for (i = 0; s[i] == name[i]; i++) {
+			if (s[i] == '\0') {
+				tzname[idx] = tzn->name;
+				return (0);
+			}
+		}
+	}
+	/*
+	 * allocate new entry. This entry is never freed, so use lmalloc
+	 */
+	tzn = lmalloc(sizeof (tznmlist_t *) + strlen(name) + 1);
+	if (tzn == NULL)
+		return (1);
+
+	(void) strcpy(tzn->name, name);
+
+	/* link it */
+	tzn->link = tznmhash[hashid];
+	tznmhash[hashid] = tzn;
+
+	tzname[idx] = tzn->name;
+	return (0);
+}
+
+/*
+ * Set tzname[] after testing parameter to see if we are setting
+ * same zone name. If we got same address, it should be same zone
+ * name as tzname[], unless cache have been purged.
+ * Note, purge_zone_cache() resets last_tzname[].
+ */
+static void
+set_tzname(const char **namep)
+{
+	if (namep[0] != last_tzname[0]) {
+		if (set_one_tzname(namep[0], 0)) {
+			tzname[0] = (char *)_tz_gmt;
+			last_tzname[0] = NULL;
+		} else {
+			last_tzname[0] = namep[0];
+		}
+	}
+
+	if (namep[1] != last_tzname[1]) {
+		if (set_one_tzname(namep[1], 1)) {
+			tzname[1] = (char *)_tz_spaces;
+			last_tzname[1] = NULL;
+		} else {
+			last_tzname[1] = namep[1];
+		}
+	}
 }

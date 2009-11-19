@@ -187,7 +187,7 @@ main(int argc, char **argv)
 		if ((pwp = getpwnam(*argv)) == NULL)
 			crabort(INVALIDUSER);
 
-		if (!chkauthattr(CRONADMIN_AUTH, real_login)) {
+		if (!cron_admin(real_login)) {
 			if (pwp->pw_uid != ruid)
 				crabort(NOTROOT);
 			else

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,11 +28,6 @@
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#include <dirent.h>
-#include <auth_attr.h>
-#include <auth_list.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -52,6 +47,7 @@ extern "C" {
 #define	DELETE		'd'
 #define	AT		'a'
 #define	CRON		'c'
+#define	REFRESH		'r'
 
 #define	QUE(x)		('a'+(x))
 #define	RCODE(x)	(((x)>>8)&0377)
@@ -68,7 +64,7 @@ struct	message {
 	char	action;
 	char	fname[FLEN];
 	char	logname[LLEN];
-} msgbuf;
+};
 
 /* anything below here can be changed */
 
@@ -93,16 +89,19 @@ struct	message {
 #define	CTLINESIZE	1000	/* max chars in a crontab line */
 #define	UNAMESIZE	20	/* max chars in a user name */
 
-int	allowed(char *, char *, char *);
-int	days_in_mon(int, int);
-char	*errmsg(int);
-char	*getuser(uid_t);
-void	cron_sendmsg(char, char *, char *, char);
-time_t	 num(char **);
-void	*xmalloc(size_t);
-void	*xcalloc(size_t, size_t);
-int	isvalid_shell(const char *shell);
-int	isvalid_dir(const char *dir);
+extern int	allowed(char *, char *, char *);
+extern int	days_in_mon(int, int);
+extern char	*errmsg(int);
+extern char	*getuser(uid_t);
+extern void	cron_sendmsg(char, char *, char *, char);
+extern time_t	 num(char **);
+extern void	*xmalloc(size_t);
+extern void	*xcalloc(size_t, size_t);
+extern char	*xstrdup(const char *);
+extern int	isvalid_shell(const char *shell);
+extern int	isvalid_dir(const char *dir);
+
+extern int	cron_admin(const char *);
 
 #ifdef	__cplusplus
 }

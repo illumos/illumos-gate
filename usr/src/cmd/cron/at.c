@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,14 +20,12 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/resource.h>
 #include <sys/stat.h>
@@ -220,8 +217,8 @@ main(int argc, char **argv)
 					else {
 						(void) fprintf(stderr,
 						    gettext("at: user %s is "
-							"not a member of "
-							"project %s (%d)\n"),
+						    "not a member of "
+						    "project %s (%d)\n"),
 						    login, pprj->pj_name,
 						    project);
 						exit(2);
@@ -239,8 +236,8 @@ main(int argc, char **argv)
 					else {
 						(void) fprintf(stderr,
 						    gettext("at: user %s is "
-							"not a member of "
-							"project %s (%d)\n"),
+						    "not a member of "
+						    "project %s (%d)\n"),
 						    login, pprj->pj_name,
 						    project);
 						exit(2);
@@ -283,14 +280,14 @@ main(int argc, char **argv)
 
 	if (lflag) {
 		if (cshflag || kshflag || shflag || mflag ||
-			fflag || tflag || rflag)
+		    fflag || tflag || rflag)
 			usage();
 		return (list_jobs(argc, argv, qflag, jobtype));
 	}
 
 	if (rflag) {
 		if (cshflag || kshflag || shflag || mflag ||
-			fflag || tflag || qflag)
+		    fflag || tflag || qflag)
 			usage();
 		return (remove_jobs(argc, argv, login));
 	}
@@ -715,7 +712,7 @@ copy(char *jobfile, FILE *inputfile, int when)
 						printf("ulimit unlimited\n");
 					else
 						printf("ulimit %lld\n",
-							rlp.rlim_cur / 512);
+						    rlp.rlim_cur / 512);
 				}
 			}
 			/*
@@ -769,12 +766,12 @@ remove_jobs(int argc, char **argv, char *login)
 			fprintf(stderr, "at: %s: ", argv[i]);
 			perror("");
 		} else if ((user != buf.st_uid) &&
-		    (!chkauthattr(CRONADMIN_AUTH, pw->pw_name))) {
+		    (!cron_admin(pw->pw_name))) {
 			fprintf(stderr, "at: you don't own %s\n",
 			    argv[i]);
 			error = 1;
 		} else {
-			if (chkauthattr(CRONADMIN_AUTH, pw->pw_name)) {
+			if (cron_admin(pw->pw_name)) {
 				login = getuser((uid_t)buf.st_uid);
 				if (login == NULL) {
 					if (per_errno == 2)
@@ -842,10 +839,10 @@ list_jobs(int argc, char **argv, int qflag, int queue)
 			if (stat(dentry->d_name, &buf)) {
 				unlink(dentry->d_name);
 				audit_cron_delete_anc_file(dentry->d_name,
-								NULL);
+				    NULL);
 				continue;
 			}
-			if ((!chkauthattr(CRONADMIN_AUTH, pwd->pw_name)) &&
+			if ((!cron_admin(pwd->pw_name)) &&
 			    (buf.st_uid != user))
 				continue;
 			ptr = dentry->d_name;
@@ -856,7 +853,7 @@ list_jobs(int argc, char **argv, int qflag, int queue)
 			if (pflag && not_this_project(job_file))
 				continue;
 			ascftime(timebuf, FORMAT, localtime(&t));
-			if ((chkauthattr(CRONADMIN_AUTH, pwd->pw_name)) &&
+			if ((cron_admin(pwd->pw_name)) &&
 			    ((pw = getpwuid(buf.st_uid)) != NULL)) {
 				if (!qflag || (qflag &&
 				    check_queue(ptr, queue)))
@@ -884,7 +881,7 @@ list_jobs(int argc, char **argv, int qflag, int queue)
 				perror("");
 				error = 1;
 			} else if ((user != buf.st_uid) &&
-			    (!chkauthattr(CRONADMIN_AUTH, pwd->pw_name))) {
+			    (!cron_admin(pwd->pw_name))) {
 				fprintf(stderr, gettext(
 				    "at: you don't own %s\n"), argv[i]);
 				error = 1;

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,13 +21,10 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright (c) 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6 */
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -36,6 +32,9 @@
 #include <string.h>
 #include <ctype.h>
 #include <pwd.h>
+#include <auth_attr.h>
+#include <auth_list.h>
+
 #include "cron.h"
 
 struct stat globstat;
@@ -115,4 +114,10 @@ char *username, *filename;
 	}
 	fclose(cap);
 	return (0);
+}
+
+int
+cron_admin(const char *name)
+{
+	return (chkauthattr(CRONADMIN_AUTH, name));
 }

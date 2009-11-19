@@ -414,6 +414,7 @@ COMMON_SUBDIRS=		\
 	tsol		\
 	tty		\
 	ttymon		\
+	tzreload	\
 	uadmin		\
 	ul		\
 	uname		\
@@ -709,6 +710,7 @@ MSGSUBDIRS=		\
 	tsol		\
 	tty		\
 	ttymon		\
+	tzreload	\
 	ul		\
 	uname		\
 	units		\

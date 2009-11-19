@@ -438,6 +438,7 @@ f none sbin/su.static 555 root sys
 s none sbin/su=../usr/bin/su
 f none sbin/swapadd 744 root sys
 f none sbin/sync 555 root bin
+f none sbin/tzreload 555 root bin
 f none sbin/uadmin 555 root sys
 f none sbin/umount 555 root bin
 f none sbin/umountall 555 root sys

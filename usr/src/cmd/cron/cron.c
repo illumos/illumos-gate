@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -168,6 +168,8 @@ error for each of your commands."
 
 #define	FORMAT	"%a %b %e %H:%M:%S %Y"
 static char	timebuf[80];
+
+static struct message msgbuf;
 
 struct shared {
 	int count;			/* usage count */
@@ -351,8 +353,8 @@ static void *get_obj(struct shared *obj);
 static time_t last_time, init_time, t_old;
 static int reset_needed; /* set to 1 when cron(1M) needs to re-initialize */
 
-static int		accept_sigcld, notifypipe[2];
-static sigset_t		defmask, childmask;
+static int		refresh;
+static sigset_t		defmask, sigmask;
 
 /*
  * BSM hooks
@@ -476,27 +478,25 @@ begin:
 	quedefs(DEFAULT);	/* load default queue definitions */
 	cron_pid = getpid();
 	msg("*** cron started ***   pid = %d", cron_pid);
-	(void) sigset(SIGTHAW, thaw_handler);
-	/*
-	 * setup SIGCLD handler/mask
-	 */
+
+	/* setup THAW handler */
+	act.sa_handler = thaw_handler;
+	act.sa_flags = 0;
+	(void) sigemptyset(&act.sa_mask);
+	(void) sigaction(SIGTHAW, &act, NULL);
+
+	/* setup CHLD handler */
 	act.sa_handler = child_handler;
 	act.sa_flags = 0;
 	(void) sigemptyset(&act.sa_mask);
 	(void) sigaddset(&act.sa_mask, SIGCLD);
 	(void) sigaction(SIGCLD, &act, NULL);
-	(void) sigemptyset(&childmask);
-	(void) sigaddset(&childmask, SIGCLD);
-	(void) sigprocmask(SIG_BLOCK, &childmask, &defmask);
 
-	if (pipe(notifypipe) != 0) {
-		crabort("cannot create pipe", REMOVE_FIFO|CONSOLE_MSG);
-	}
-	/*
-	 * will set O_NONBLOCK, so that the write() from child_handler
-	 * never be blocked.
-	 */
-	(void) fcntl(notifypipe[0], F_SETFL, O_WRONLY|O_NONBLOCK);
+	(void) sigemptyset(&defmask);
+	(void) sigemptyset(&sigmask);
+	(void) sigaddset(&sigmask, SIGCLD);
+	(void) sigaddset(&sigmask, SIGTHAW);
+	(void) sigprocmask(SIG_BLOCK, &sigmask, NULL);
 
 	t_old = init_time;
 	last_time = t_old;
@@ -504,8 +504,14 @@ begin:
 		t = time(NULL);
 		if ((t_old > t) || (t-last_time > CUSHION) || reset_needed) {
 			reset_needed = 0;
-			/* the time was set backwards or forward */
-			msg("time was reset, re-initializing");
+			/*
+			 * the time was set backwards or forward or
+			 * refresh is requested.
+			 */
+			if (refresh)
+				msg("re-scheduling jobs");
+			else
+				msg("time was reset, re-initializing");
 			el_delete();
 			u = uhead;
 			while (u != NULL) {
@@ -827,10 +833,8 @@ create_ulist(char *name, int type)
 {
 	struct usr	*u;
 
-	u = xmalloc(sizeof (struct usr));
-	u->name = xmalloc(strlen(name) + 1);
-	(void) strcpy(u->name, name);
-	u->home = NULL;
+	u = xcalloc(1, sizeof (struct usr));
+	u->name = xstrdup(name);
 	if (type == CRONEVENT) {
 		u->ctexists = TRUE;
 		u->ctid = ecid++;
@@ -838,10 +842,8 @@ create_ulist(char *name, int type)
 		u->ctexists = FALSE;
 		u->ctid = 0;
 	}
-	u->ctevents = NULL;
-	u->atevents = NULL;
-	u->aruncnt = 0;
-	u->cruncnt = 0;
+	u->uid = (uid_t)-1;
+	u->gid = (uid_t)-1;
 	u->nextusr = uhead;
 	uhead = u;
 	return (u);
@@ -1045,8 +1047,7 @@ mod_atjob(char *name, time_t reftime)
 		    pw->pw_name, name);
 #endif
 		u = create_ulist(pw->pw_name, ATEVENT);
-		u->home = xmalloc(strlen(pw->pw_dir) + 1);
-		(void) strcpy(u->home, pw->pw_dir);
+		u->home = xstrdup(pw->pw_dir);
 		u->uid = pw->pw_uid;
 		u->gid = pw->pw_gid;
 		add_atevent(u, name, tim, jobtype);
@@ -1054,8 +1055,7 @@ mod_atjob(char *name, time_t reftime)
 		u->uid = pw->pw_uid;
 		u->gid = pw->pw_gid;
 		free(u->home);
-		u->home = xmalloc(strlen(pw->pw_dir) + 1);
-		(void) strcpy(u->home, pw->pw_dir);
+		u->home = xstrdup(pw->pw_dir);
 		update_atevent(u, name, tim, jobtype);
 	}
 }
@@ -2207,8 +2207,8 @@ ex(struct event *e)
 		resched(qp->nwait);
 		return (0);
 	}
-	rp = rinfo_get(0); /* allocating a new runinfo struct */
 
+	rp = rinfo_get(0); /* allocating a new runinfo struct */
 
 	/*
 	 * the tempnam() function uses malloc(3C) to allocate space for the
@@ -2566,13 +2566,19 @@ ex(struct event *e)
 	/*NOTREACHED*/
 }
 
+/*
+ * Main idle loop.
+ * When timed out to run the job, return 0.
+ * If for some reasons we need to reschedule jobs, return 1.
+ */
 static int
 idle(long t)
 {
 	time_t	now;
 
-	while (t > 0L) {
+	refresh = 0;
 
+	while (t > 0L) {
 		if (msg_wait(t) != 0) {
 			/* we need to run next job immediately */
 			return (0);
@@ -2580,15 +2586,21 @@ idle(long t)
 
 		reap_child();
 
+		if (refresh) {
+			/* We got THAW or REFRESH message  */
+			return (1);
+		}
+
 		now = time(NULL);
 		if (last_time > now) {
-			/* clock has been reset */
+			/* clock has been reset to backward */
 			return (1);
 		}
 
 		if (next_event == NULL && !el_empty()) {
 			next_event = (struct event *)el_first();
 		}
+
 		if (next_event == NULL)
 			t = INFINITY;
 		else
@@ -2748,9 +2760,8 @@ msg_wait(long tim)
 	struct	message	msg;
 	int	cnt;
 	time_t	reftime;
-	struct	pollfd pfd[2];
-	int64_t	tl;
-	int	timeout;
+	fd_set	fds;
+	struct timespec tout, *toutp;
 	static int	pending_msg;
 	static time_t	pending_reftime;
 
@@ -2760,68 +2771,30 @@ msg_wait(long tim)
 		return (0);
 	}
 
-	/*
-	 * We are opening the signal mask to receive SIGCLD. The notifypipe
-	 * is used to avoid race condition between SIGCLD and poll system
-	 * call.
-	 * If SIGCLD is delivered in poll(), poll will be interrupted, and
-	 * we will return to idle() to reap the dead children.
-	 * If SIGCLD is delivered between sigprocmask() below and poll(),
-	 * there is no way we can detect the SIGCLD because poll() won't
-	 * be interrupted. In such case, the dead children can't be wait'ed
-	 * until poll returns by timeout or a new job. To avoid this race
-	 * condition, child_handler write to the notifypipe, so that
-	 * poll() will be able to return with POLLIN which indicates that
-	 * we have received SIGCLD.
-	 *
-	 * Since the notifypipe is used to just let poll return from
-	 * system call, the data in the pipe won't be read. Therefore,
-	 * any data in the pipe needs to be flushed before opening signal
-	 * mask.
-	 *
-	 * Note that we can probably re-write this code with pselect()
-	 * which can handle this situation easily.
-	 */
-	(void) ioctl(notifypipe[0], I_FLUSH, FLUSHW);
+	FD_ZERO(&fds);
+	FD_SET(msgfd, &fds);
 
-	pfd[0].fd = msgfd;
-	pfd[0].events = POLLIN;
-	pfd[1].fd = notifypipe[1];
-	pfd[1].events = POLLIN;
-
+	toutp = NULL;
+	if (tim != INFINITY) {
 #ifdef CRON_MAXSLEEP
-	/*
-	 * CRON_MAXSLEEP can be defined to have cron periodically wake
-	 * up, so that cron can detect a change of TOD and adjust the
-	 * sleep time accordingly.
-	 */
-	tim = (tim > CRON_MAXSLEEP) ? CRON_MAXSLEEP : tim;
+		/*
+		 * CRON_MAXSLEEP can be defined to have cron periodically wake
+		 * up, so that cron can detect a change of TOD and adjust the
+		 * sleep time more frequently.
+		 */
+		tim = (tim > CRON_MAXSLEEP) ? CRON_MAXSLEEP : tim;
 #endif
-	tl = (tim == INFINITY) ? -1ll : (int64_t)tim * 1000;
+		tout.tv_nsec = 0;
+		tout.tv_sec = tim;
+		toutp = &tout;
+	}
 
-	accept_sigcld = 1;
-	(void) sigprocmask(SIG_UNBLOCK, &childmask, NULL);
-	do {
-		timeout = (tl > INT_MAX ? INT_MAX : (int)tl);
-		tl -= timeout;
-		cnt = poll(pfd, 2, timeout);
-		if (cnt == -1 && errno != EINTR) {
-			perror("! poll");
-		}
-	} while (tl > 0 && cnt == 0);
-	(void) sigprocmask(SIG_BLOCK, &childmask, NULL);
-	accept_sigcld = 0;
+	cnt = pselect(msgfd + 1, &fds, NULL, NULL, toutp, &defmask);
+	if (cnt == -1 && errno != EINTR)
+		perror("! pselect");
 
-	/*
-	 * poll timeout or interrupted.
-	 */
+	/* pselect timeout or interrupted */
 	if (cnt <= 0)
-		return (0);
-
-	/*
-	 * Not the timeout or new job, but a SIGCLD has been delivered.
-	 */
-	if ((pfd[0].revents & POLLIN) == 0)
 		return (0);
 
 	errno = 0;
@@ -2868,6 +2841,10 @@ process_msg(struct message *pmsg, time_t reftime)
 		else
 			mod_ctab(pmsg->fname, reftime);
 		break;
+	case REFRESH:
+		refresh = 1;
+		pmsg->etype = 0;
+		return;
 	default:
 		msg("message received - bad format");
 		break;
@@ -2892,7 +2869,7 @@ process_msg(struct message *pmsg, time_t reftime)
 		next_event = NULL;
 	}
 	(void) fflush(stdout);
-	pmsg->etype = NULL;
+	pmsg->etype = 0;
 }
 
 /*
@@ -2944,7 +2921,7 @@ rinfo_free(struct runinfo *entry)
 static void
 thaw_handler(int sig)
 {
-	;
+	refresh = 1;
 }
 
 
@@ -2959,13 +2936,7 @@ cronend(int sig)
 static void
 child_handler(int sig)
 {
-	/*
-	 * Just in case someone changes the signal mask.
-	 * we don't want to notify the SIGCLD.
-	 */
-	if (accept_sigcld) {
-		(void) write(notifypipe[0], &sig, 1);
-	}
+	;
 }
 
 static void

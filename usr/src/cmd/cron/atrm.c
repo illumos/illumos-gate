@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -12,8 +12,6 @@
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	synopsis: atrm [-f] [-i] [-a] [[job #] [user] ...]
@@ -161,7 +159,7 @@ main(int argc, char **argv)
 	 */
 	if (allflag) {
 		for (i = 0; i < numjobs; ++i) {
-			if (chkauthattr(CRONADMIN_AUTH, login_authchk) ||
+			if (cron_admin(login_authchk) ||
 			    user == statlist[i]->st_uid)
 				(void) removentry(namelist[i]->d_name,
 				    statlist[i], user);
@@ -261,8 +259,7 @@ removentry(char *filename, struct stat *statptr, uid_t user)
 	if (!fflag)
 		printf("%s: ", filename);
 
-	if (user != statptr->st_uid &&
-	    !chkauthattr(CRONADMIN_AUTH, login_authchk)) {
+	if (user != statptr->st_uid && !cron_admin(login_authchk)) {
 
 		if (!fflag) {
 			printf("permission denied\n");
@@ -271,7 +268,7 @@ removentry(char *filename, struct stat *statptr, uid_t user)
 
 	} else {
 		if (iflag) {
-			if (chkauthattr(CRONADMIN_AUTH, login_authchk)) {
+			if (cron_admin(login_authchk)) {
 				printf("\t(owned by ");
 				powner(filename);
 				printf(") ");
@@ -281,7 +278,7 @@ removentry(char *filename, struct stat *statptr, uid_t user)
 				return (0);
 		}
 
-		if (chkauthattr(CRONADMIN_AUTH, login_authchk)) {
+		if (cron_admin(login_authchk)) {
 			pp = getuser((uid_t)statptr->st_uid);
 			if (pp == NULL)
 				atabort(INVALIDUSER);
