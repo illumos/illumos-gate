@@ -100,11 +100,6 @@ LIBPLAT_DEP_L =	$(LIBPLAT_DIR)/$(LIBPLAT_L_LIBS)
 PSMLIBS +=      $(LIBPLAT_LIBS:lib%.a=-l%)
 PSMLIB_DIRS +=  $(LIBPLAT_DIR)
 
-
-#	MPSAS support
-MPSAS_BUILD:sh=		echo \\043
-$(MPSAS_BUILD)ARCHOPTS += -DMPSAS
-
 include ../Makefile.com
 
 # re-define ELFCONV for 4u--- sun4u can boot ELF directly

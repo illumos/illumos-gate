@@ -673,12 +673,7 @@ start_other_cpus(int flag)
 	 * initializing it.
 	 */
 	if (CPUSET_ISNULL(cpu_bringup_set)) {
-#ifdef MPSAS
-		/* just CPU 0 */
-		CPUSET_ADD(cpu_bringup_set, 0);
-#else
 		CPUSET_ALL(cpu_bringup_set);
-#endif
 	}
 
 	if (&cpu_feature_init)

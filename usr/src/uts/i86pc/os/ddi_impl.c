@@ -193,7 +193,7 @@ FP hardware exhibits Pentium floating point divide problem\n");
 	 * is present, and builds a tree of prototype dev_info nodes
 	 * corresponding to the hardware which identified itself.
 	 */
-#if !defined(SAS) && !defined(MPSAS)
+
 	/*
 	 * Initialize root node.
 	 */
@@ -219,8 +219,6 @@ FP hardware exhibits Pentium floating point divide problem\n");
 	else
 		(void) i_ddi_attach_hw_nodes("isa");
 #endif
-
-#endif	/* !SAS && !MPSAS */
 }
 
 /*

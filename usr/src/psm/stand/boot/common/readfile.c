@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/sysmacros.h>
 #include <sys/types.h>
@@ -177,10 +175,6 @@ extern int 	verbosemode;
 extern int	boothowto;
 extern int	pagesize;
 extern char	filename[];
-
-#ifdef MPSAS
-extern void sas_symtab(int start, int end);
-#endif
 
 /*
  * repeat reads (forever) until size of request is satisfied
@@ -587,10 +581,6 @@ read_elf32(int fd, int print, Elf32_Ehdr *elfhdrp)
 				    (caddr_t)(uintptr_t)phdr->p_vaddr,
 				    phdr->p_memsz);
 			}
-#ifdef	MPSAS
-			sas_symtab(phdr->p_vaddr,
-			    phdr->p_vaddr + phdr->p_memsz);
-#endif
 		} else if (phdr->p_type == PT_INTERP) {
 			/*
 			 * Dynamically-linked executable.
@@ -981,10 +971,6 @@ read_elf64(int fd, int print, Elf64_Ehdr *elfhdrp)
 				sync_instruction_memory((caddr_t)(uintptr_t)
 				    phdr->p_vaddr, phdr->p_memsz);
 
-#ifdef	MPSAS
-			sas_symtab(phdr->p_vaddr,
-			    phdr->p_vaddr + phdr->p_memsz);
-#endif
 		} else if (phdr->p_type == PT_INTERP) {
 			/*
 			 * Dynamically-linked executable.

@@ -656,11 +656,6 @@ $(CODE_COVERAGE)$(OBJS_DIR)/unix_bb.ln  := CPPFLAGS     += -DKCOV
 $(OBJS_DIR)/unix_bb.o	:= XAOPT =
 
 #
-#	MPSAS support
-#
-MPSAS_BUILD:sh=		echo \\043
-
-#
 # Privilege files
 #
 PRIVS_AWK = $(SRC)/uts/common/os/privs.awk

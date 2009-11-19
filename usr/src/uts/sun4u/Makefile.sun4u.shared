@@ -245,8 +245,6 @@ FDOFFSETS 	 = $(UTSBASE)/sun/io/fd_offsets.in
 
 MACHINE_DEFS	= -D$(PLATFORM) -D_MACHDEP -DSFMMU
 
-$(MPSAS_BUILD)MACHINE_DEFS      += -DMPSAS
-
 #
 #	Software workarounds for hardware "features"
 #

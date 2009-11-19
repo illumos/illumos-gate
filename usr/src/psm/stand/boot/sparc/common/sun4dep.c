@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -91,47 +89,6 @@ setup_aux(void)
 	} else
 		prom_panic("no cpu node");
 }
-
-
-#ifdef MPSAS
-
-void sas_symtab(int start, int end);
-extern int sas_command(char *cmdstr);
-
-/*
- * SAS support - inform SAS of new symbols being dynamically added
- * during simulation via the first standalone.
- */
-
-#ifndef	BUFSIZ
-#define	BUFSIZ	1024		/* for cmd string buffer allocation */
-#endif
-
-int	sas_symdebug = 0;		/* SAS support */
-
-void
-sas_symtab(int start, int end)
-{
-	char *addstr = "symtab add $LD_KERNEL_PATH/%s%s 0x%x 0x%x\n";
-	char *file, *prefix, cmdstr[BUFSIZ];
-	extern char filename[];
-
-	file = filename;
-	prefix = *file == '/' ? "../../.." : "";
-
-	(void) sprintf(cmdstr, addstr, prefix, file, start, end);
-
-	/* add the symbol table */
-	if (sas_symdebug) (void) printf("sas_symtab: %s", cmdstr);
-	sas_command(cmdstr);
-}
-
-void
-sas_bpts()
-{
-	sas_command("file $KERN_SCRIPT_FILE\n");
-}
-#endif	/* MPSAS */
 
 /*
  * Allocate a region of virtual address space, unmapped.

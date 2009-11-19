@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _BOOT_PLAT_H
 #define	_BOOT_PLAT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -85,11 +83,6 @@ extern int  vac;
 
 extern void	fiximp(void);
 extern void	retain_nvram_page();
-
-#ifdef MPSAS
-extern void	sas_bpts(void);
-#endif
-
 extern int	cpu_is_ultrasparc_1(void);
 
 

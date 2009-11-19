@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,10 +83,11 @@ _init(void)
 		 */
 		if (watchdog_enable) {
 			if (!watchdog_available) {
-			    cmn_err(CE_WARN, "Hardware watchdog unavailable");
+				cmn_err(CE_WARN,
+				    "Hardware watchdog unavailable");
 			} else if (boothowto & RB_DEBUG) {
-			    cmn_err(CE_WARN, "Hardware watchdog disabled"
-				" [debugger]");
+				cmn_err(CE_WARN, "Hardware watchdog disabled"
+				    " [debugger]");
 			}
 		}
 	}
@@ -118,7 +119,6 @@ static timestruc_t
 todm_get(void)
 {
 	timestruc_t ts;
-#ifndef	MPSAS
 	todinfo_t tod;
 	int s;
 
@@ -147,10 +147,6 @@ todm_get(void)
 
 	ts.tv_sec = tod_to_utc(tod);
 	ts.tv_nsec = 0;
-#else
-	ts.tv_sec = 0;
-	ts.tv_nsec = 0;
-#endif
 	return (ts);
 }
 
@@ -162,7 +158,6 @@ todm_get(void)
 static void
 todm_set(timestruc_t ts)
 {
-#ifndef	MPSAS
 	todinfo_t tod = utc_to_tod(ts.tv_sec);
 
 	ASSERT(MUTEX_HELD(&tod_lock));
@@ -176,7 +171,6 @@ todm_set(timestruc_t ts)
 	CLOCK->clk_min		= BYTE_TO_BCD(tod.tod_min);
 	CLOCK->clk_sec		= BYTE_TO_BCD(tod.tod_sec);
 	CLOCK->clk_ctrl &= ~CLK_CTRL_WRITE;	/* load values */
-#endif
 }
 
 
@@ -190,8 +184,8 @@ todm_set_watchdog_timer(uint_t timeoutval)
 	ASSERT(MUTEX_HELD(&tod_lock));
 
 	if (watchdog_enable == 0 || watchdog_available == 0 ||
-		(boothowto & RB_DEBUG))
-			return (0);
+	    (boothowto & RB_DEBUG))
+		return (0);
 
 	watchdog_timeout = timeoutval;
 	watchdog_bits = CLK_WATCHDOG_BITS(timeoutval);
@@ -212,9 +206,7 @@ todm_clear_watchdog_timer(void)
 	if (watchdog_activated == 0)
 		return (0);
 
-#ifndef	MPSAS
 	CLOCK->clk_watchdog = 0;
-#endif /* MPSAS */
 
 	watchdog_bits = 0;
 	watchdog_activated = 0;
@@ -227,7 +219,6 @@ todm_clear_watchdog_timer(void)
 static void
 todm_set_power_alarm(timestruc_t ts)
 {
-#ifndef	MPSAS
 	todinfo_t	tod;
 	uchar_t	c;
 
@@ -248,7 +239,6 @@ todm_set_power_alarm(timestruc_t ts)
 	CLOCK->clk_alm_secs = BYTE_TO_BCD(tod.tod_sec);
 
 	CLOCK->clk_interrupts |= CLK_ALARM_ENABLE; /* enable alarm intr */
-#endif /* MPSAS */
 }
 
 /*
@@ -257,7 +247,6 @@ todm_set_power_alarm(timestruc_t ts)
 static void
 todm_clear_power_alarm()
 {
-#ifndef	MPSAS
 	uchar_t	c;
 
 	ASSERT(MUTEX_HELD(&tod_lock));
@@ -269,7 +258,6 @@ todm_clear_power_alarm()
 #endif
 
 	CLOCK->clk_interrupts &= ~CLK_ALARM_ENABLE; /* disable alarm intr */
-#endif /* MPSAS */
 }
 
 /*
@@ -280,11 +268,7 @@ todm_clear_power_alarm()
 uint64_t
 todm_get_cpufrequency(void)
 {
-#ifndef	MPSAS
 	ASSERT(MUTEX_HELD(&tod_lock));
 
 	return (find_cpufrequency(&(TIMECHECK_CLOCK->clk_sec)));
-#else
-	return (cpunodes[CPU->cpu_id].clock_freq);
-#endif /* MPSAS */
 }

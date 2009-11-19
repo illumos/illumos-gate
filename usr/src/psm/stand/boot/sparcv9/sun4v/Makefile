@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -78,11 +78,6 @@ LIBPLAT_DEP_L =	$(LIBPLAT_DIR)/$(LIBPLAT_L_LIBS)
 #
 PSMLIBS +=      $(LIBPLAT_LIBS:lib%.a=-l%)
 PSMLIB_DIRS +=  $(LIBPLAT_DIR)
-
-
-#	MPSAS support
-MPSAS_BUILD:sh=		echo \\043
-$(MPSAS_BUILD)ARCHOPTS += -DMPSAS
 
 include ../Makefile.com
 
