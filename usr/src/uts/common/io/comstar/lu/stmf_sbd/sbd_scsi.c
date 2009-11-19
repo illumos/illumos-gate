@@ -1138,6 +1138,7 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	uint16_t cmd_size;
 	uint32_t xfer_size = 4;
 	uint32_t mgmt_url_size = 0;
+	char *mgmt_url = NULL;
 
 
 	byte0 = DTYPE_DIRECT;
@@ -1166,10 +1167,6 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		}
 		stmf_scsilib_send_status(task, STATUS_GOOD, 0);
 		return;
-	}
-
-	if (sl->sl_mgmt_url) {
-		mgmt_url_size = strlen(sl->sl_mgmt_url);
 	}
 
 	/*
@@ -1270,6 +1267,15 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		return;
 	}
 
+	rw_enter(&sbd_global_prop_lock, RW_READER);
+	if (sl->sl_mgmt_url) {
+		mgmt_url_size = strlen(sl->sl_mgmt_url);
+		mgmt_url = sl->sl_mgmt_url;
+	} else if (sbd_mgmt_url) {
+		mgmt_url_size = strlen(sbd_mgmt_url);
+		mgmt_url = sbd_mgmt_url;
+	}
+
 	/*
 	 * EVPD handling
 	 */
@@ -1325,8 +1331,7 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		if (mgmt_url_size == 0) {
 			stmf_scsilib_send_status(task, STATUS_CHECK,
 			    STMF_SAA_INVALID_FIELD_IN_CDB);
-			kmem_free(p, bsize);
-			return;
+			goto err_done;
 		}
 		{
 			uint16_t idx, newidx, sz, url_size;
@@ -1336,7 +1341,7 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 			p[1] = 0x85;
 
 			idx = 4;
-			url = sl->sl_mgmt_url;
+			url = mgmt_url;
 			url_size = sbd_parse_mgmt_url(&url);
 			/* Creating Network Service Descriptors */
 			while (url_size != 0) {
@@ -1390,13 +1395,14 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	default:
 		stmf_scsilib_send_status(task, STATUS_CHECK,
 		    STMF_SAA_INVALID_FIELD_IN_CDB);
-		kmem_free(p, bsize);
-		return;
+		goto err_done;
 	}
 
 	sbd_handle_short_read_transfers(task, initial_dbuf, p, cmd_size,
 	    min(cmd_size, xfer_size));
+err_done:
 	kmem_free(p, bsize);
+	rw_exit(&sbd_global_prop_lock);
 }
 
 stmf_status_t

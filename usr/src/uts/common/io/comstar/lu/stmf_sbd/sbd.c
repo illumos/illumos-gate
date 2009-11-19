@@ -77,6 +77,10 @@ int sbd_import_lu(sbd_import_lu_t *ilu, int struct_sz, uint32_t *err_ret,
 int sbd_import_active_lu(sbd_import_lu_t *ilu, sbd_lu_t *sl, uint32_t *err_ret);
 int sbd_delete_lu(sbd_delete_lu_t *dlu, int struct_sz, uint32_t *err_ret);
 int sbd_modify_lu(sbd_modify_lu_t *mlu, int struct_sz, uint32_t *err_ret);
+int sbd_set_global_props(sbd_global_props_t *mlu, int struct_sz,
+    uint32_t *err_ret);
+int sbd_get_global_props(sbd_global_props_t *oslp, uint32_t oslp_sz,
+    uint32_t *err_ret);
 int sbd_get_lu_props(sbd_lu_props_t *islp, uint32_t islp_sz,
     sbd_lu_props_t *oslp, uint32_t oslp_sz, uint32_t *err_ret);
 char *sbd_get_zvol_name(sbd_lu_t *sl);
@@ -98,9 +102,15 @@ static sbd_lu_t		*sbd_lu_list = NULL;
 static kmutex_t		sbd_lock;
 static dev_info_t	*sbd_dip;
 static uint32_t		sbd_lu_count = 0;
+
+/* Global property settings for the logical unit */
 char sbd_vendor_id[]	= "SUN     ";
 char sbd_product_id[]	= "COMSTAR         ";
 char sbd_revision[]	= "1.0 ";
+char *sbd_mgmt_url = NULL;
+uint16_t sbd_mgmt_url_alloc_size = 0;
+krwlock_t sbd_global_prop_lock;
+
 static char sbd_name[] = "sbd";
 
 static struct cb_ops sbd_cb_ops = {
@@ -176,6 +186,7 @@ _init(void)
 		return (EINVAL);
 	}
 	mutex_init(&sbd_lock, NULL, MUTEX_DRIVER, NULL);
+	rw_init(&sbd_global_prop_lock, NULL, RW_DRIVER, NULL);
 	return (0);
 }
 
@@ -222,6 +233,7 @@ _fini(void)
 	}
 	stmf_free(sbd_lp);
 	mutex_destroy(&sbd_lock);
+	rw_destroy(&sbd_global_prop_lock);
 	ldi_ident_release(sbd_zfs_ident);
 	return (0);
 }
@@ -383,6 +395,30 @@ stmf_sbd_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 		}
 		ret = sbd_modify_lu((sbd_modify_lu_t *)ibuf,
 		    iocd->stmf_ibuf_size, &iocd->stmf_error);
+		break;
+	case SBD_IOCTL_SET_GLOBAL_LU:
+		if (iocd->stmf_ibuf_size < (sizeof (sbd_global_props_t) - 8)) {
+			ret = EFAULT;
+			break;
+		}
+		if (iocd->stmf_obuf_size) {
+			ret = EINVAL;
+			break;
+		}
+		ret = sbd_set_global_props((sbd_global_props_t *)ibuf,
+		    iocd->stmf_ibuf_size, &iocd->stmf_error);
+		break;
+	case SBD_IOCTL_GET_GLOBAL_LU:
+		if (iocd->stmf_ibuf_size) {
+			ret = EINVAL;
+			break;
+		}
+		if (iocd->stmf_obuf_size < sizeof (sbd_global_props_t)) {
+			ret = EINVAL;
+			break;
+		}
+		ret = sbd_get_global_props((sbd_global_props_t *)obuf,
+		    iocd->stmf_obuf_size, &iocd->stmf_error);
 		break;
 	case SBD_IOCTL_GET_LU_PROPS:
 		if (iocd->stmf_ibuf_size < (sizeof (sbd_lu_props_t) - 8)) {
@@ -2743,6 +2779,74 @@ smm_err_out:
 	return (ret);
 }
 
+int
+sbd_set_global_props(sbd_global_props_t *mlu, int struct_sz,
+    uint32_t *err_ret)
+{
+	sbd_lu_t *sl = NULL;
+	int ret = 0;
+	sbd_it_data_t *it;
+	uint32_t sz;
+
+	sz = struct_sz - sizeof (*mlu) + 8 + 1;
+
+	/* if there is data in the buf, null terminate it */
+	if (struct_sz > sizeof (*mlu)) {
+		mlu->mlu_buf[struct_sz - sizeof (*mlu) + 8 - 1] = 0;
+	}
+
+	*err_ret = 0;
+
+	/* Lets validate offsets */
+	if (((mlu->mlu_mgmt_url_valid) &&
+	    (mlu->mlu_mgmt_url_off >= sz))) {
+		return (EINVAL);
+	}
+
+	if (mlu->mlu_mgmt_url_valid) {
+		uint16_t url_sz;
+
+		url_sz = strlen((char *)mlu->mlu_buf + mlu->mlu_mgmt_url_off);
+		if (url_sz > 0)
+			url_sz++;
+
+		rw_enter(&sbd_global_prop_lock, RW_WRITER);
+		if (sbd_mgmt_url_alloc_size > 0 &&
+		    (url_sz == 0 || sbd_mgmt_url_alloc_size < url_sz)) {
+			kmem_free(sbd_mgmt_url, sbd_mgmt_url_alloc_size);
+			sbd_mgmt_url = NULL;
+			sbd_mgmt_url_alloc_size = 0;
+		}
+		if (url_sz > 0) {
+			if (sbd_mgmt_url_alloc_size == 0) {
+				sbd_mgmt_url = kmem_alloc(url_sz, KM_SLEEP);
+				sbd_mgmt_url_alloc_size = url_sz;
+			}
+			(void) strcpy(sbd_mgmt_url, (char *)mlu->mlu_buf +
+			    mlu->mlu_mgmt_url_off);
+		}
+		/*
+		 * check each lu to determine whether a UA is needed.
+		 */
+		mutex_enter(&sbd_lock);
+		for (sl = sbd_lu_list; sl; sl = sl->sl_next) {
+			if (sl->sl_mgmt_url) {
+				continue;
+			}
+			mutex_enter(&sl->sl_lock);
+			for (it = sl->sl_it_list; it != NULL;
+			    it = it->sbd_it_next) {
+				it->sbd_it_ua_conditions |=
+				    SBD_UA_MODE_PARAMETERS_CHANGED;
+			}
+			mutex_exit(&sl->sl_lock);
+		}
+		mutex_exit(&sbd_lock);
+		rw_exit(&sbd_global_prop_lock);
+	}
+	return (ret);
+}
+
 /* ARGSUSED */
 int
 sbd_delete_locked_lu(sbd_lu_t *sl, uint32_t *err_ret,
@@ -2946,6 +3050,38 @@ over_sl_data_write:
 }
 
 int
+sbd_get_global_props(sbd_global_props_t *oslp, uint32_t oslp_sz,
+    uint32_t *err_ret)
+{
+	uint32_t sz = 0;
+	uint16_t off;
+
+	rw_enter(&sbd_global_prop_lock, RW_READER);
+	if (sbd_mgmt_url) {
+		sz += strlen(sbd_mgmt_url) + 1;
+	}
+	bzero(oslp, sizeof (*oslp) - 8);
+	oslp->mlu_buf_size_needed = sz;
+
+	if (sz > (oslp_sz - sizeof (*oslp) + 8)) {
+		*err_ret = SBD_RET_INSUFFICIENT_BUF_SPACE;
+		rw_exit(&sbd_global_prop_lock);
+		return (ENOMEM);
+	}
+
+	off = 0;
+	if (sbd_mgmt_url) {
+		oslp->mlu_mgmt_url_valid = 1;
+		oslp->mlu_mgmt_url_off = off;
+		(void) strcpy((char *)&oslp->mlu_buf[off], sbd_mgmt_url);
+		off += strlen(sbd_mgmt_url) + 1;
+	}
+
+	rw_exit(&sbd_global_prop_lock);
+	return (0);
+}
+
+int
 sbd_get_lu_props(sbd_lu_props_t *islp, uint32_t islp_sz,
     sbd_lu_props_t *oslp, uint32_t oslp_sz, uint32_t *err_ret)
 {
@@ -2984,8 +3120,11 @@ sbd_get_lu_props(sbd_lu_props_t *islp, uint32_t islp_sz,
 		sz += strlen(sl->sl_alias) + 1;
 	}
 
+	rw_enter(&sbd_global_prop_lock, RW_READER);
 	if (sl->sl_mgmt_url) {
 		sz += strlen(sl->sl_mgmt_url) + 1;
+	} else if (sbd_mgmt_url) {
+		sz += strlen(sbd_mgmt_url) + 1;
 	}
 	bzero(oslp, sizeof (*oslp) - 8);
 	oslp->slp_buf_size_needed = sz;
@@ -2993,6 +3132,7 @@ sbd_get_lu_props(sbd_lu_props_t *islp, uint32_t islp_sz,
 	if (sz > (oslp_sz - sizeof (*oslp) + 8)) {
 		sl->sl_trans_op = SL_OP_NONE;
 		*err_ret = SBD_RET_INSUFFICIENT_BUF_SPACE;
+		rw_exit(&sbd_global_prop_lock);
 		return (ENOMEM);
 	}
 
@@ -3028,6 +3168,11 @@ sbd_get_lu_props(sbd_lu_props_t *islp, uint32_t islp_sz,
 		oslp->slp_mgmt_url_off = off;
 		(void) strcpy((char *)&oslp->slp_buf[off], sl->sl_mgmt_url);
 		off += strlen(sl->sl_mgmt_url) + 1;
+	} else if (sbd_mgmt_url) {
+		oslp->slp_mgmt_url_valid = 1;
+		oslp->slp_mgmt_url_off = off;
+		(void) strcpy((char *)&oslp->slp_buf[off], sbd_mgmt_url);
+		off += strlen(sbd_mgmt_url) + 1;
 	}
 	if (sl->sl_serial_no_size) {
 		oslp->slp_serial_off = off;
@@ -3072,6 +3217,7 @@ sbd_get_lu_props(sbd_lu_props_t *islp, uint32_t islp_sz,
 
 	sl->sl_trans_op = SL_OP_NONE;
 
+	rw_exit(&sbd_global_prop_lock);
 	return (0);
 }
 

@@ -34,6 +34,10 @@ typedef	stmf_status_t	sbd_status_t;
 extern char sbd_vendor_id[];
 extern char sbd_product_id[];
 extern char sbd_revision[];
+extern char *sbd_mgmt_url;
+extern uint16_t sbd_mgmt_url_alloc_size;
+extern krwlock_t sbd_global_prop_lock;
+
 /*
  * Error codes
  */

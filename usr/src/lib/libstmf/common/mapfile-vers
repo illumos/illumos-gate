@@ -53,6 +53,7 @@ SUNW_1.1 {
 	    stmfDevidFromWwn;
 	    stmfFreeLuResource;
 	    stmfFreeMemory;
+	    stmfGetGlobalLuProp;
 	    stmfGetHostGroupList;
 	    stmfGetHostGroupMembers;
 	    stmfGetLuProp;
@@ -85,6 +86,7 @@ SUNW_1.1 {
 	    stmfRemoveViewEntry;
 	    stmfSetAluaState;
 	    stmfGetAluaState;
+	    stmfSetGlobalLuProp;
 	    stmfSetPersistMethod;
 	    stmfSetProviderData;
 	    stmfSetProviderDataProt;

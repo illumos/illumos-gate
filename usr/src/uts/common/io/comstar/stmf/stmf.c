@@ -5481,7 +5481,9 @@ stmf_scsilib_handle_task_mgmt(scsi_task_t *task)
 	case TM_LUN_RESET:
 		stmf_handle_lun_reset(task);
 		/* issue the reset to the proxy node as well */
-		(void) stmf_proxy_scsi_cmd(task, NULL);
+		if (stmf_state.stmf_alua_state == 1) {
+			(void) stmf_proxy_scsi_cmd(task, NULL);
+		}
 		return;
 	case TM_TARGET_RESET:
 	case TM_TARGET_COLD_RESET:

@@ -323,6 +323,8 @@ int stmfDevidFromWwn(uchar_t wwn[8], stmfDevid *devid);
 int stmfFreeLuResource(luResource hdl);
 void stmfFreeMemory(void *);
 int stmfGetAluaState(boolean_t *enabled, uint32_t *node);
+int stmfGetGlobalLuProp(uint16_t dType, uint32_t prop, char *propVal,
+    size_t *propLen);
 int stmfGetHostGroupList(stmfGroupList **initiatorGroupList);
 int stmfGetHostGroupMembers(stmfGroupName *hostGroupName,
     stmfGroupProperties **groupProperties);
@@ -371,6 +373,7 @@ int stmfRemoveFromTargetGroup(stmfGroupName *targetGroupName,
     stmfDevid *targetName);
 int stmfRemoveViewEntry(stmfGuid *lu, uint32_t viewEntryIndex);
 int stmfSetAluaState(boolean_t enabled, uint32_t node);
+int stmfSetGlobalLuProp(uint16_t dType, uint32_t propType, const char *propVal);
 int stmfSetLuProp(luResource hdl, uint32_t propType, const char *propVal);
 int stmfSetPersistMethod(uint8_t persistType, boolean_t serviceSet);
 int stmfSetProviderData(char *providerName, nvlist_t *nvl, int providerType);

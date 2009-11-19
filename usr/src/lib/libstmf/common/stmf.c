@@ -48,6 +48,7 @@
 #include <sys/stmf_ioctl.h>
 #include <sys/stmf_sbd_ioctl.h>
 #include <sys/pppt_ioctl.h>
+#include <macros.h>
 
 #define	STMF_PATH    "/devices/pseudo/stmf@0:admin"
 #define	SBD_PATH    "/devices/pseudo/stmf_sbd@0:admin"
@@ -124,6 +125,7 @@ static int removeGuidFromDiskStore(stmfGuid *);
 static int addGuidToDiskStore(stmfGuid *, char *);
 static int persistDiskGuid(stmfGuid *, char *, boolean_t);
 static int setDiskProp(luResourceImpl *, uint32_t, const char *);
+static int getDiskGlobalProp(uint32_t prop, char *propVal, size_t *propLen);
 static int checkHexUpper(char *);
 static int strToShift(const char *);
 static int niceStrToNum(const char *, uint64_t *);
@@ -138,6 +140,7 @@ static int iLoadGroupFromPs(stmfGroupList **, int);
 static int groupMemberListIoctl(stmfGroupName *, stmfGroupProperties **, int);
 static int getProviderData(char *, nvlist_t **, int, uint64_t *);
 static int setDiskStandby(stmfGuid *luGuid);
+static int setDiskGlobalProp(uint32_t, const char *);
 static int viewEntryCompare(const void *, const void *);
 static void deleteNonActiveLus();
 
@@ -2346,6 +2349,256 @@ loadDiskPropsFromDriver(luResourceImpl *hdl, sbd_lu_props_t *sbdProps)
 
 	diskLu->accessState = sbdProps->slp_access_state;
 
+	return (ret);
+}
+
+/*
+ * stmfGetGlobalLuProp
+ *
+ * Purpose: get a global property for a device type
+ *
+ */
+int
+stmfGetGlobalLuProp(uint16_t dType, uint32_t prop, char *propVal,
+    size_t *propLen)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	if (dType != STMF_DISK || propVal == NULL) {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	ret = getDiskGlobalProp(prop, propVal, propLen);
+
+	return (ret);
+}
+
+/*
+ * getDiskGlobalProp
+ *
+ * Purpose: get global property from sbd driver
+ *
+ */
+static int
+getDiskGlobalProp(uint32_t prop, char *propVal, size_t *propLen)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	int fd;
+	sbd_global_props_t *sbdProps;
+	void *sbd_realloc;
+	int retryCnt = 0;
+	boolean_t retry;
+	int ioctlRet;
+	int savedErrno;
+	int sbdPropsSize = sizeof (*sbdProps) + MAX_SBD_PROPS;
+	stmf_iocdata_t sbdIoctl = {0};
+	size_t reqLen;
+
+	switch (prop) {
+		case STMF_LU_PROP_MGMT_URL:
+			break;
+		default:
+			return (STMF_ERROR_INVALID_PROP);
+	}
+
+	/*
+	 * Open control node for sbd
+	 */
+	if ((ret = openSbd(OPEN_SBD, &fd)) != STMF_STATUS_SUCCESS)
+		return (ret);
+
+	sbdProps = calloc(1, sbdPropsSize);
+	if (sbdProps == NULL) {
+		(void) close(fd);
+		return (STMF_ERROR_NOMEM);
+	}
+
+	do {
+		retry = B_FALSE;
+		sbdIoctl.stmf_version = STMF_VERSION_1;
+		sbdIoctl.stmf_obuf_size = sbdPropsSize;
+		sbdIoctl.stmf_obuf = (uint64_t)(unsigned long)sbdProps;
+		ioctlRet = ioctl(fd, SBD_IOCTL_GET_GLOBAL_LU, &sbdIoctl);
+		if (ioctlRet != 0) {
+			savedErrno = errno;
+			switch (savedErrno) {
+				case EBUSY:
+					ret = STMF_ERROR_BUSY;
+					break;
+				case EPERM:
+				case EACCES:
+					ret = STMF_ERROR_PERM;
+					break;
+				case ENOMEM:
+					if (sbdIoctl.stmf_error ==
+					    SBD_RET_INSUFFICIENT_BUF_SPACE &&
+					    retryCnt++ < 3) {
+						sbdPropsSize =
+						    sizeof (*sbdProps) +
+						    sbdProps->
+						    mlu_buf_size_needed;
+
+						sbd_realloc = sbdProps;
+						sbdProps = realloc(sbdProps,
+						    sbdPropsSize);
+						if (sbdProps == NULL) {
+							free(sbd_realloc);
+							ret = STMF_ERROR_NOMEM;
+							break;
+						}
+						retry = B_TRUE;
+					} else {
+						ret = STMF_ERROR_NOMEM;
+					}
+					break;
+				default:
+					syslog(LOG_DEBUG,
+					    "getDiskGlobalProp:ioctl error(%d)"
+					    "(%d)(%d)", ioctlRet,
+					    sbdIoctl.stmf_error, savedErrno);
+					ret = STMF_STATUS_ERROR;
+					break;
+			}
+
+		}
+	} while (retry);
+
+	if (ret != STMF_STATUS_SUCCESS) {
+		goto done;
+	}
+
+	switch (prop) {
+		case STMF_LU_PROP_MGMT_URL:
+			if (sbdProps->mlu_mgmt_url_valid == 0) {
+				ret = STMF_ERROR_NO_PROP;
+				goto done;
+			}
+			if ((reqLen = strlcpy(propVal, (char *)&(
+			    sbdProps->mlu_buf[sbdProps->mlu_mgmt_url_off]),
+			    *propLen)) >= *propLen) {
+				*propLen = reqLen + 1;
+				ret = STMF_ERROR_INVALID_ARG;
+				goto done;
+			}
+			break;
+	}
+
+done:
+	free(sbdProps);
+	(void) close(fd);
+	return (ret);
+}
+
+/*
+ * stmfSetGlobalLuProp
+ *
+ * Purpose: set a global property for a device type
+ *
+ */
+int
+stmfSetGlobalLuProp(uint16_t dType, uint32_t prop, const char *propVal)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	if (dType != STMF_DISK || propVal == NULL) {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	ret = setDiskGlobalProp(prop, propVal);
+
+	return (ret);
+}
+
+/*
+ * setDiskGlobalProp
+ *
+ * Purpose: set properties for resource of type disk
+ *
+ * resourceProp - valid resource identifier
+ * propVal - valid resource value
+ */
+static int
+setDiskGlobalProp(uint32_t resourceProp, const char *propVal)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	sbd_global_props_t *sbdGlobalProps = NULL;
+	int sbdGlobalPropsSize = 0;
+	int propLen;
+	int mluBufSize = 0;
+	int fd;
+	int savedErrno;
+	int ioctlRet;
+	stmf_iocdata_t sbdIoctl = {0};
+
+	switch (resourceProp) {
+		case STMF_LU_PROP_MGMT_URL:
+			break;
+		default:
+			return (STMF_ERROR_INVALID_PROP);
+			break;
+	}
+
+	/*
+	 * Open control node for sbd
+	 */
+	if ((ret = openSbd(OPEN_SBD, &fd)) != STMF_STATUS_SUCCESS)
+		return (ret);
+
+	propLen = strlen(propVal);
+	mluBufSize += propLen + 1;
+	sbdGlobalPropsSize += sizeof (sbd_global_props_t) - 8 +
+	    max(8, mluBufSize);
+	/*
+	 * 8 is the size of the buffer set aside for
+	 * concatenation of variable length fields
+	 */
+	sbdGlobalProps = (sbd_global_props_t *)calloc(1, sbdGlobalPropsSize);
+	if (sbdGlobalProps == NULL) {
+		(void) close(fd);
+		return (STMF_ERROR_NOMEM);
+	}
+
+	sbdGlobalProps->mlu_struct_size = sbdGlobalPropsSize;
+
+	switch (resourceProp) {
+		case STMF_LU_PROP_MGMT_URL:
+			sbdGlobalProps->mlu_mgmt_url_valid = 1;
+			bcopy(propVal, &(sbdGlobalProps->mlu_buf),
+			    propLen + 1);
+			break;
+		default:
+			ret = STMF_ERROR_NO_PROP;
+			goto done;
+	}
+
+	sbdIoctl.stmf_version = STMF_VERSION_1;
+	sbdIoctl.stmf_ibuf_size = sbdGlobalProps->mlu_struct_size;
+	sbdIoctl.stmf_ibuf = (uint64_t)(unsigned long)sbdGlobalProps;
+
+	ioctlRet = ioctl(fd, SBD_IOCTL_SET_GLOBAL_LU, &sbdIoctl);
+	if (ioctlRet != 0) {
+		savedErrno = errno;
+		switch (savedErrno) {
+			case EBUSY:
+				ret = STMF_ERROR_BUSY;
+				break;
+			case EPERM:
+			case EACCES:
+				ret = STMF_ERROR_PERM;
+				break;
+			default:
+				diskError(sbdIoctl.stmf_error, &ret);
+				if (ret == STMF_STATUS_ERROR) {
+					syslog(LOG_DEBUG,
+					"modifyDiskLu:ioctl "
+					"error(%d) (%d) (%d)", ioctlRet,
+					    sbdIoctl.stmf_error, savedErrno);
+				}
+				break;
+		}
+	}
+
+done:
+	free(sbdGlobalProps);
+	(void) close(fd);
 	return (ret);
 }
 

@@ -74,6 +74,8 @@ typedef enum sbd_ret {
 #define	SBD_IOCTL_GET_LU_PROPS				SBD_IOCTL_DEF(5)
 #define	SBD_IOCTL_GET_LU_LIST				SBD_IOCTL_DEF(6)
 #define	SBD_IOCTL_SET_LU_STANDBY			SBD_IOCTL_DEF(7)
+#define	SBD_IOCTL_SET_GLOBAL_LU				SBD_IOCTL_DEF(8)
+#define	SBD_IOCTL_GET_GLOBAL_LU				SBD_IOCTL_DEF(9)
 
 typedef struct sbd_create_and_reg_lu {
 	uint32_t	slu_struct_size;
@@ -109,6 +111,29 @@ typedef struct sbd_create_and_reg_lu {
 	uint8_t		slu_guid[16];
 	char		slu_buf[8];	/* likely more than 8 */
 } sbd_create_and_reg_lu_t;
+
+typedef struct sbd_global_props {
+	uint32_t	mlu_struct_size;
+	uint32_t	mlu_vid_valid:1,
+			mlu_pid_valid:1,
+			mlu_rev_valid:1,
+			mlu_serial_valid:1,
+			mlu_mgmt_url_valid:1,
+			mlu_company_id_valid:1,
+			mlu_host_id_valid:1;
+	uint16_t	mlu_serial_off;
+	uint8_t		mlu_serial_size;
+	uint8_t		mlu_rsvd1;
+	uint32_t	mlu_company_id;
+	uint16_t	mlu_mgmt_url_off;
+	uint16_t	rsvd1;
+	uint32_t	mlu_host_id;
+	uint32_t	mlu_buf_size_needed;
+	char		mlu_rev[4];
+	char		mlu_vid[8];
+	char		mlu_pid[16];
+	char		mlu_buf[8];	/* likely more than 8 */
+} sbd_global_props_t;
 
 typedef struct sbd_set_lu_standby {
 	uint8_t		stlu_guid[16];
