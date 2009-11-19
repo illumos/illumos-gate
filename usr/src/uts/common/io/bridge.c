@@ -201,7 +201,7 @@ static trill_ln_dstr_t trill_lndstr_fn;
 /* special settings to accommodate DLD flow control; see dld_str.c */
 static struct module_info bridge_dld_modinfo = {
 	0,			/* mi_idnum */
-	"bridge",		/* mi_idname */
+	BRIDGE_DEV_NAME,	/* mi_idname */
 	0,			/* mi_minpsz */
 	INFPSZ,			/* mi_maxpsz */
 	1,			/* mi_hiwat */
@@ -561,7 +561,7 @@ kstat_setup(kstat_named_t *knt, const char **names, int nstat,
 	for (i = 0; i < nstat; i++)
 		kstat_named_init(&knt[i], names[i], KSTAT_DATA_UINT64);
 
-	ksp = kstat_create_zone("bridge", 0, unitname, "net",
+	ksp = kstat_create_zone(BRIDGE_DEV_NAME, 0, unitname, "net",
 	    KSTAT_TYPE_NAMED, nstat, KSTAT_FLAG_VIRTUAL, GLOBAL_ZONEID);
 	if (ksp != NULL) {
 		ksp->ks_data = knt;
@@ -756,19 +756,17 @@ lookup_retry:
 		goto lookup_retry;
 	}
 
-	if (bip != NULL) {
-		/* We weren't expecting to find anything */
-		bip = NULL;
-		err = EEXIST;
-	} else {
+	if (bip == NULL) {
 		bip = bipnew;
 		bipnew = NULL;
 		list_insert_tail(&inst_list, bip);
 	}
 
 	mutex_exit(&inst_lock);
-	if (bip == NULL)
-		goto fail;
+	if (bipnew != NULL) {
+		inst_free(bipnew);
+		return (EEXIST);
+	}
 
 	bip->bi_ksp = kstat_setup((kstat_named_t *)&bip->bi_kstats,
 	    inst_kstats_list, Dim(inst_kstats_list), bip->bi_name);
@@ -793,13 +791,9 @@ lookup_retry:
 	return (0);
 
 fail_create:
-	if (bmp != NULL)
-		bmac_disconnect(bip->bi_mac);
-	bipnew = bip;
-fail:
-	ASSERT(bipnew->bi_trilldata == NULL);
-	bipnew->bi_flags |= BIF_SHUTDOWN;
-	inst_free(bipnew);
+	ASSERT(bip->bi_trilldata == NULL);
+	bip->bi_flags |= BIF_SHUTDOWN;
+	bridge_unref(bip);
 	return (err);
 }
 
@@ -3392,7 +3386,8 @@ bridge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	bridge_dev_info = dip;
 	bridge_major = ddi_driver_major(dip);
-	bridge_taskq = ddi_taskq_create(dip, "bridge", 1, TASKQ_DEFAULTPRI, 0);
+	bridge_taskq = ddi_taskq_create(dip, BRIDGE_DEV_NAME, 1,
+	    TASKQ_DEFAULTPRI, 0);
 	return (DDI_SUCCESS);
 }
 
@@ -3449,7 +3444,7 @@ bridge_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 
 static struct module_info bridge_modinfo = {
 	2105,			/* mi_idnum */
-	"bridge",		/* mi_idname */
+	BRIDGE_DEV_NAME,	/* mi_idname */
 	0,			/* mi_minpsz */
 	16384,			/* mi_maxpsz */
 	65536,			/* mi_hiwat */
@@ -3503,6 +3498,7 @@ _init(void)
 {
 	int retv;
 
+	mac_init_ops(NULL, BRIDGE_DEV_NAME);
 	bridge_inst_init();
 	if ((retv = mod_install(&modlinkage)) != 0)
 		bridge_inst_fini();

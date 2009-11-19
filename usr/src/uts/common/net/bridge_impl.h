@@ -49,6 +49,8 @@ extern "C" {
 #include <sys/vlan.h>
 #include <net/bridge.h>
 
+#define	BRIDGE_DEV_NAME	"bridge"
+
 #define	KSINST_NAMES	"recv", "sent", "drops", \
 	"forward_direct", "forward_unknown", "forward_mbcast",	\
 	"learn_source", "learn_moved", "learn_expire", "learn_size"
