@@ -601,7 +601,7 @@ get_parts(disk_t *disk, struct ipart *iparts, char *opath, int opath_len)
 	 * that might create confusing results.
 	 */
 	for (i = 0;  i < TOTAL_NUMPART; i++) {
-		memset(&iparts[i], 0, sizeof (struct ipart));
+		(void) memset(&iparts[i], 0, sizeof (struct ipart));
 		iparts[i].systid = UNUSED;
 	}
 
