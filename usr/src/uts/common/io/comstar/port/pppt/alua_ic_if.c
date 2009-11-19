@@ -629,7 +629,6 @@ stmf_ic_scsi_cmd_msg_alloc(
 	stmf_ic_scsi_cmd_msg_t *icsc = NULL;
 	scsi_devid_desc_t *ini_devid = task->task_session->ss_rport_id;
 	scsi_devid_desc_t *tgt_devid = task->task_lport->lport_id;
-	uint8_t *lun_id = task->task_lu->lu_id->ident;
 
 	icm = stmf_ic_alloc_msg_header(STMF_ICM_SCSI_CMD, msgid);
 	icsc = (stmf_ic_scsi_cmd_msg_t *)kmem_zalloc(sizeof (*icsc), KM_SLEEP);
@@ -640,7 +639,10 @@ stmf_ic_scsi_cmd_msg_alloc(
 	icsc->icsc_tgt_devid = scsi_devid_desc_dup(tgt_devid);
 	icsc->icsc_session_id = task->task_session->ss_session_id;
 
-	bcopy(lun_id, icsc->icsc_lun_id, sizeof (icsc->icsc_lun_id));
+	if (!task->task_mgmt_function && task->task_lu->lu_id) {
+		bcopy(task->task_lu->lu_id->ident,
+		    icsc->icsc_lun_id, sizeof (icsc->icsc_lun_id));
+	}
 
 	bcopy(task->task_lun_no, icsc->icsc_task_lun_no,
 	    sizeof (icsc->icsc_task_lun_no));

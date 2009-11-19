@@ -51,6 +51,7 @@ static uint64_t stmf_session_counter = 0;
 static uint16_t stmf_rtpid_counter = 0;
 /* start messages at 1 */
 static uint64_t stmf_proxy_msg_id = 1;
+#define	MSG_ID_TM_BIT	0x8000000000000000
 
 static int stmf_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static int stmf_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
@@ -1654,6 +1655,11 @@ stmf_ic_rx_scsi_status(stmf_ic_scsi_status_msg_t *msg)
 {
 	scsi_task_t *task;
 
+	/* is this a task management command */
+	if (msg->icss_task_msgid & MSG_ID_TM_BIT) {
+		return (STMF_SUCCESS);
+	}
+
 	task = find_task_from_msgid(msg->icss_lun_id, msg->icss_task_msgid);
 
 	if (task == NULL) {
@@ -1679,6 +1685,11 @@ stmf_ic_rx_scsi_data(stmf_ic_scsi_data_msg_t *msg)
 	stmf_xfer_data_t *xd = NULL;
 	stmf_data_buf_t *dbuf;
 	uint32_t sz, minsz, xd_sz, asz;
+
+	/* is this a task management command */
+	if (msg->icsd_task_msgid & MSG_ID_TM_BIT) {
+		return (STMF_SUCCESS);
+	}
 
 	task = find_task_from_msgid(msg->icsd_lun_id, msg->icsd_task_msgid);
 	if (task == NULL) {
@@ -1780,9 +1791,17 @@ stmf_proxy_scsi_cmd(scsi_task_t *task, stmf_data_buf_t *dbuf)
 	/*
 	 * stmf will now take over the task handling for this task
 	 * but it still needs to be treated differently from other
-	 * default handled tasks, hence the ITASK_PROXY_TASK
+	 * default handled tasks, hence the ITASK_PROXY_TASK.
+	 * If this is a task management function, we're really just
+	 * duping the command to the peer. Set the TM bit so that
+	 * we can recognize this on return since we won't be completing
+	 * the proxied task in that case.
 	 */
-	itask->itask_flags |= ITASK_DEFAULT_HANDLING | ITASK_PROXY_TASK;
+	if (task->task_mgmt_function) {
+		itask->itask_proxy_msg_id |= MSG_ID_TM_BIT;
+	} else {
+		itask->itask_flags |= ITASK_DEFAULT_HANDLING | ITASK_PROXY_TASK;
+	}
 	if (dbuf) {
 		ic_cmd_msg = ic_scsi_cmd_msg_alloc(itask->itask_proxy_msg_id,
 		    task, dbuf->db_data_size, dbuf->db_sglist[0].seg_addr,
@@ -6314,7 +6333,6 @@ stmf_dlun0_abort(struct stmf_lu *lu, int abort_cmd, void *arg, uint32_t flags)
 	int i;
 	uint8_t map;
 
-	ASSERT(abort_cmd == STMF_LU_ABORT_TASK);
 	if ((task->task_mgmt_function) && (itask->itask_flags &
 	    (ITASK_CAUSING_LU_RESET | ITASK_CAUSING_TARGET_RESET))) {
 		switch (task->task_mgmt_function) {
