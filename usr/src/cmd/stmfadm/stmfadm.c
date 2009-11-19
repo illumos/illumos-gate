@@ -411,6 +411,11 @@ addTargetGroupMemberFunc(int operandLen, char *operands[],
 				    gettext("STMF service version incorrect"));
 				ret++;
 				break;
+			case STMF_ERROR_TG_ONLINE:
+				(void) fprintf(stderr, "%s: %s\n", cmdName,
+				    gettext("STMF target must be offline"));
+				ret++;
+				break;
 			default:
 				(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
 				    operands[i], gettext("unknown error"));

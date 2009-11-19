@@ -1458,6 +1458,16 @@ stmf_add_group_member(uint8_t *grpname, uint16_t grpname_size,
 		else
 			return (0);
 	}
+
+	/* verify target is offline */
+	if (entry_type == STMF_ID_TYPE_TARGET) {
+		ilport = stmf_targetident_to_ilport(entry_ident, entry_size);
+		if (ilport && ilport->ilport_state != STMF_STATE_OFFLINE) {
+			*err_detail = STMF_IOCERR_TG_NEED_TG_OFFLINE;
+			return (EBUSY);
+		}
+	}
+
 	id_member = stmf_alloc_id(entry_size, entry_type,
 	    entry_ident, 0);
 	stmf_append_id((stmf_id_list_t *)id_grp->id_impl_specific, id_member);
