@@ -17943,8 +17943,13 @@ arp_bringup_done(ill_t *ill, int err)
 				ip0dbg(("arp_bringup_done: init failed\n"));
 		} else {
 			err = ipif_arp_up_done_tail(ipif, Res_act_initial);
-			if (err != 0 || (err = ipif_up_done(ipif)) != 0)
-				ip0dbg(("arp_bringup_done: init failed\n"));
+			if (err != 0 ||
+			    (err = ipif_up_done(ipif)) != 0) {
+				ip0dbg(("arp_bringup_done: "
+				    "init failed err %x\n", err));
+				(void) ipif_arp_down(ipif);
+			}
+
 		}
 	} else {
 		ip0dbg(("arp_bringup_done: DL_BIND_REQ failed\n"));

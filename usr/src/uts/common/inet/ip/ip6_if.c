@@ -1244,13 +1244,8 @@ ipif_ndp_up(ipif_t *ipif, boolean_t initial)
 			hw_addr_len = bound_ill->ill_phys_addr_length;
 		} else {
 			bound_ill = ill;
-			if (ill->ill_net_type == IRE_IF_RESOLVER) {
-				hw_addr = ill->ill_nd_lla;
-				hw_addr_len = ill->ill_phys_addr_length;
-			} else {
-				hw_addr = NULL;
-				hw_addr_len = 0;
-			}
+			hw_addr = ill->ill_nd_lla;
+			hw_addr_len = ill->ill_phys_addr_length;
 		}
 
 		/*
