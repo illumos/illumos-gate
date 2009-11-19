@@ -2853,6 +2853,7 @@ sbd_delete_locked_lu(sbd_lu_t *sl, uint32_t *err_ret,
     stmf_state_change_info_t *ssi)
 {
 	int i;
+	stmf_status_t ret;
 
 	if ((sl->sl_state == STMF_STATE_OFFLINE) &&
 	    !sl->sl_state_not_acked) {
@@ -2863,22 +2864,21 @@ sbd_delete_locked_lu(sbd_lu_t *sl, uint32_t *err_ret,
 	    sl->sl_state_not_acked) {
 		return (EBUSY);
 	}
-	if (stmf_ctl(STMF_CMD_LU_OFFLINE, sl->sl_lu, ssi) != STMF_SUCCESS) {
+
+	ret = stmf_ctl(STMF_CMD_LU_OFFLINE, sl->sl_lu, ssi);
+	if ((ret != STMF_SUCCESS) && (ret != STMF_ALREADY)) {
 		return (EBUSY);
 	}
 
 	for (i = 0; i < 500; i++) {
-		if (sl->sl_state == STMF_STATE_OFFLINE)
-			break;
+		if ((sl->sl_state == STMF_STATE_OFFLINE) &&
+		    !sl->sl_state_not_acked) {
+			goto sdl_do_dereg;
+		}
 		delay(drv_usectohz(10000));
 	}
-
-	if ((sl->sl_state == STMF_STATE_OFFLINE) &&
-	    !sl->sl_state_not_acked) {
-		goto sdl_do_dereg;
-	}
-
 	return (EBUSY);
+
 sdl_do_dereg:;
 	if (stmf_deregister_lu(sl->sl_lu) != STMF_SUCCESS)
 		return (EBUSY);

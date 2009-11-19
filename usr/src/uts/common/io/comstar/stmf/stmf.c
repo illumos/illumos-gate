@@ -4860,7 +4860,8 @@ stmf_ctl(int cmd, void *obj, void *arg)
 
 	switch (cmd) {
 	case STMF_CMD_LU_ONLINE:
-		if (ilu->ilu_state == STMF_STATE_ONLINE) {
+		if ((ilu->ilu_state == STMF_STATE_ONLINE) ||
+		    (ilu->ilu_state == STMF_STATE_ONLINING)) {
 			ret = STMF_ALREADY;
 			goto stmf_ctl_lock_exit;
 		}
@@ -4894,7 +4895,8 @@ stmf_ctl(int cmd, void *obj, void *arg)
 		goto stmf_ctl_lock_exit;
 
 	case STMF_CMD_LU_OFFLINE:
-		if (ilu->ilu_state == STMF_STATE_OFFLINE) {
+		if ((ilu->ilu_state == STMF_STATE_OFFLINE) ||
+		    (ilu->ilu_state == STMF_STATE_OFFLINING)) {
 			ret = STMF_ALREADY;
 			goto stmf_ctl_lock_exit;
 		}
