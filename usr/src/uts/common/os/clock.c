@@ -985,9 +985,8 @@ clock_init(void)
 
 	/*
 	 * Allocate cache line aligned space for the per CPU lbolt data and
-	 * lb_info structure. We also initialize these structures with their
-	 * default values and install the softint to change from event to
-	 * cyclic driven mode.
+	 * lbolt info structures, and initialize them with their default
+	 * values. Note that these structures are also cache line sized.
 	 */
 	sz = sizeof (lbolt_info_t) + CPU_CACHE_COHERENCE_SIZE;
 	buf = (intptr_t)kmem_zalloc(sz, KM_SLEEP);
@@ -1001,7 +1000,7 @@ clock_init(void)
 
 	lb_info->lbi_thresh_calls = LBOLT_THRESH_CALLS;
 
-	sz = (sizeof (lbolt_info_t) * max_ncpus) + CPU_CACHE_COHERENCE_SIZE;
+	sz = (sizeof (lbolt_cpu_t) * max_ncpus) + CPU_CACHE_COHERENCE_SIZE;
 	buf = (intptr_t)kmem_zalloc(sz, KM_SLEEP);
 	lb_cpu = (lbolt_cpu_t *)P2ROUNDUP(buf, CPU_CACHE_COHERENCE_SIZE);
 

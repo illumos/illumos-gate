@@ -12422,7 +12422,7 @@ tcp_paws_check(tcp_t *tcp, tcpha_t *tcpha, tcp_opt_t *tcpoptp)
 		if ((flags & TH_RST) == 0 &&
 		    TSTMP_LT(tcpoptp->tcp_opt_ts_val,
 		    tcp->tcp_ts_recent)) {
-			if (TSTMP_LT(LBOLT_FASTPATH,
+			if (TSTMP_LT(LBOLT_FASTPATH64,
 			    tcp->tcp_last_rcv_lbolt + PAWS_TIMEOUT)) {
 				/* This segment is not acceptable. */
 				return (B_FALSE);
@@ -15570,7 +15570,7 @@ data_null:
 	}
 
 	if ((tcp->tcp_suna == snxt) && !tcp->tcp_localnet &&
-	    (TICK_TO_MSEC((clock_t)LBOLT_FASTPATH - tcp->tcp_last_recv_time) >=
+	    (TICK_TO_MSEC(LBOLT_FASTPATH - tcp->tcp_last_recv_time) >=
 	    tcp->tcp_rto)) {
 		SET_TCP_INIT_CWND(tcp, mss, tcps->tcps_slow_start_after_idle);
 	}

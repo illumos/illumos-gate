@@ -87,34 +87,40 @@ extern void lbolt_debug_return(void);
 extern lbolt_info_t *lb_info;
 
 /*
- * LBOLT_WAITFREE provides a non-waiting version of lbolt.
+ * LBOLT_WAITFREE{,64} provide a non-waiting version of lbolt.
  */
-#define	LBOLT_WAITFREE							\
+#define	LBOLT_WAITFREE64						\
 	(lbolt_hybrid == lbolt_event_driven ?                           \
 	    ((gethrtime_waitfree()/nsec_per_tick) -			\
 	    lb_info->lbi_debug_time) :					\
 	    (lb_info->lbi_internal - lb_info->lbi_debug_time))
 
-/*
- * LBOLT_FASTPATH should *only* be used where the cost of calling
- * ddi_get_lbolt() affects performance. This is currently only used by the
- * TCP/IP code and will be removed once it's no longer required.
- */
-#define	LBOLT_FASTPATH							\
-	(lbolt_hybrid == lbolt_event_driven ? ddi_get_lbolt() :		\
-	    (clock_t)(lb_info->lbi_internal - lb_info->lbi_debug_time))
+#define	LBOLT_WAITFREE		(clock_t)LBOLT_WAITFREE64
 
 /*
- * LBOLT_NO_ACCOUNT is used by lbolt consumers who fire at a periodic rate,
- * such as clock(), for which the lbolt usage statistics are not updated.
- * This is specially important for consumers whose rate may be modified by
+ * LBOLT_FASTPATH{,64} should *only* be used where the cost of calling the
+ * DDI lbolt routines affects performance. This is currently only used by
+ * the TCP/IP code and will be removed once it's no longer required.
+ */
+#define	LBOLT_FASTPATH64						\
+	(lbolt_hybrid == lbolt_event_driven ? ddi_get_lbolt64() :	\
+	    (lb_info->lbi_internal - lb_info->lbi_debug_time))
+
+#define	LBOLT_FASTPATH		(clock_t)LBOLT_FASTPATH64
+
+/*
+ * LBOLT_NO_ACCOUNT{,64} is used by lbolt consumers who fire at a periodic
+ * rate, such as clock(), for which the lbolt usage statistics are not updated.
+ * This is especially important for consumers whose rate may be modified by
  * the user, resulting in an unaccounted for increase in activity around the
  * lbolt routines that could cause a mode switch.
  */
-#define	LBOLT_NO_ACCOUNT						\
+#define	LBOLT_NO_ACCOUNT64						\
 	(lbolt_hybrid == lbolt_event_driven ?				\
 	    ((gethrtime()/nsec_per_tick) - lb_info->lbi_debug_time) :	\
 	    (lb_info->lbi_internal - lb_info->lbi_debug_time))
+
+#define	LBOLT_NO_ACCOUNT	(clock_t)LBOLT_NO_ACCOUNT64
 
 #endif	/* _KERNEL || _KMEMUSER */
 

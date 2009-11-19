@@ -275,7 +275,7 @@ clock_tick_schedule_one(clock_tick_set_t *csp, int pending, processorid_t cid)
 	 */
 	ctp = clock_tick_cpu[cid];
 	mutex_enter(&ctp->ct_lock);
-	ctp->ct_lbolt = (clock_t)LBOLT_NO_ACCOUNT;
+	ctp->ct_lbolt = LBOLT_NO_ACCOUNT;
 	ctp->ct_pending += pending;
 	ctp->ct_start = csp->ct_start;
 	ctp->ct_end = csp->ct_end;
@@ -443,7 +443,7 @@ clock_tick_schedule(int one_sec)
 			clock_tick_scan = 0;
 
 		clock_tick_execute_common(0, clock_tick_scan, end,
-		    (clock_t)LBOLT_NO_ACCOUNT, 1);
+		    LBOLT_NO_ACCOUNT, 1);
 
 		return;
 	}
@@ -476,7 +476,7 @@ clock_tick_schedule(int one_sec)
 	 * we want to handle this before we block on anything and allow
 	 * the pinned thread below the current thread to escape.
 	 */
-	clock_tick_process(CPU, (clock_t)LBOLT_NO_ACCOUNT, clock_tick_pending);
+	clock_tick_process(CPU, LBOLT_NO_ACCOUNT, clock_tick_pending);
 
 	mutex_enter(&clock_tick_lock);
 

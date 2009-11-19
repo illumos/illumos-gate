@@ -281,8 +281,8 @@ panicsys(const char *format, va_list alist, struct regs *rp, int on_panic_stack)
 
 		panicstr = (char *)format;
 		va_copy(panicargs, alist);
-		panic_lbolt = (clock_t)LBOLT_NO_ACCOUNT;
-		panic_lbolt64 = LBOLT_NO_ACCOUNT;
+		panic_lbolt = LBOLT_NO_ACCOUNT;
+		panic_lbolt64 = LBOLT_NO_ACCOUNT64;
 		panic_hrestime = hrestime;
 		panic_hrtime = gethrtime_waitfree();
 		panic_thread = t;
