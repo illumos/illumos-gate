@@ -4965,6 +4965,48 @@ ipf_stack_t *ifs;
 	SPL_X(s);
 }
 
+#if SOLARIS2 >= 10
+/* ------------------------------------------------------------------------ */
+/* Function:	fr_natifindexsync					    */
+/* Returns:	void							    */
+/* Parameters:	ifp	  - interface, which is being sync'd		    */
+/*		newifp	  - new ifindex value for interface		    */
+/*              ifs	  - IPF's stack					    */
+/*                                                                          */
+/* Write Locks: assumes ipf_mutex is locked				    */
+/*                                                                          */
+/* Updates all interface index references in NAT rules and NAT entries.	    */
+/* the index, which is about to be updated must match ifp value.	    */
+/* ------------------------------------------------------------------------ */
+void fr_natifindexsync(ifp, newifp, ifs)
+void *ifp;
+void *newifp;
+ipf_stack_t *ifs;
+{
+	nat_t *nat;
+	ipnat_t *n;
+
+	WRITE_ENTER(&ifs->ifs_ipf_nat);
+
+	for (nat = ifs->ifs_nat_instances; nat != NULL; nat = nat->nat_next) {
+		if (ifp == nat->nat_ifps[0])
+			nat->nat_ifps[0] = newifp;
+
+		if (ifp == nat->nat_ifps[1])
+			nat->nat_ifps[1] = newifp;
+	}
+
+	for (n = ifs->ifs_nat_list; n != NULL; n = n->in_next) {
+		if (ifp == n->in_ifps[0])
+			n->in_ifps[0] = newifp;
+
+		if (ifp == n->in_ifps[1])
+			n->in_ifps[1] = newifp;
+	}
+
+	RWLOCK_EXIT(&ifs->ifs_ipf_nat);
+}
+#endif
 
 /* ------------------------------------------------------------------------ */
 /* Function:    nat_icmpquerytype4                                          */

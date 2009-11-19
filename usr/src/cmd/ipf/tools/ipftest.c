@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -108,6 +108,7 @@ char *argv[];
 	RWLOCK_INIT(&ifs->ifs_ipf_global, "ipf filter load/unload mutex");
 	RWLOCK_INIT(&ifs->ifs_ipf_mutex, "ipf filter rwlock");
 	RWLOCK_INIT(&ifs->ifs_ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
+	RWLOCK_INIT(&ifs->ifs_ipf_frcache, "ipf rule cache rwlock");
 
 	fr_loginit(ifs);
 	fr_authinit(ifs);

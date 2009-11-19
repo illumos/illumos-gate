@@ -3935,6 +3935,101 @@ ipf_stack_t *ifs;
 	RWLOCK_EXIT(&ifs->ifs_ipf_mutex);
 }
 
+#if SOLARIS2 >= 10
+/* ------------------------------------------------------------------------ */
+/* Function:    fr_syncindex						    */
+/* Returns:     void							    */
+/* Parameters:  rules	  - list of rules to be sync'd			    */
+/*		ifp	  - interface, which is being sync'd		    */
+/*		newifp	  - new ifindex value for interface		    */
+/*                                                                          */
+/* Function updates all NIC indecis, which match ifp, in every rule. Every  */
+/* NIC index matching ifp, will be updated to newifp.			    */
+/* ------------------------------------------------------------------------ */
+static void fr_syncindex(rules, ifp, newifp)
+frentry_t *rules;
+void *ifp;
+void *newifp;
+{
+	int i;
+	frentry_t *fr;
+
+	for (fr = rules; fr != NULL; fr = fr->fr_next) {
+		/*
+		 * Lookup all the interface names that are part of the rule.
+		 */
+		for (i = 0; i < 4; i++)
+			if (fr->fr_ifas[i] == ifp)
+				fr->fr_ifas[i] = newifp;
+
+		for (i = 0; i < 2; i++) {
+			if (fr->fr_tifs[i].fd_ifp == ifp)
+				fr->fr_tifs[i].fd_ifp = newifp;
+		}
+
+		if (fr->fr_dif.fd_ifp == ifp)
+			fr->fr_dif.fd_ifp = newifp;
+	}
+}
+
+/* ------------------------------------------------------------------------ */
+/* Function:    fr_ifindexsync						    */
+/* Returns:     void							    */
+/* Parameters:	ifp	  - interface, which is being sync'd		    */
+/*		newifp	  - new ifindex value for interface		    */
+/*              ifs	  - IPF's stack					    */
+/*                                                                          */
+/* Function assumes ipf_mutex is locked exclusively.			    */
+/* 									    */
+/* Function updates the NIC references in rules with new interfaces index   */
+/* (newifp). Function must process active lists:			    */
+/*	with accounting rules (IPv6 and IPv4)				    */
+/*	with inbound rules (IPv6 and IPv4)				    */
+/*	with outbound rules (IPv6 and IPv4)				    */
+/* Function also has to take care of rule groups.			    */
+/*                                                                          */
+/* NOTE: The ipf_mutex is grabbed exclusively by caller (which is always    */
+/* nic_event_hook). The hook function also updates state entries, NAT rules */
+/* and NAT entries. We want to do all these update atomically to keep the   */
+/* NIC references consistent. The ipf_mutex will synchronize event with	    */
+/* fr_check(), which processes packets,	so no packet will enter fr_check(), */
+/* while NIC references will be synchronized.				    */
+/* ------------------------------------------------------------------------ */
+void fr_ifindexsync(ifp, newifp, ifs)
+void *ifp;
+void *newifp;
+ipf_stack_t *ifs;
+{
+	unsigned int	i;
+	frentry_t *rule_lists[8];
+	unsigned int	rules = sizeof (rule_lists) / sizeof (frentry_t *);
+
+	rule_lists[0] = ifs->ifs_ipacct[0][ifs->ifs_fr_active];
+	rule_lists[1] =	ifs->ifs_ipacct[1][ifs->ifs_fr_active];
+	rule_lists[2] =	ifs->ifs_ipfilter[0][ifs->ifs_fr_active];
+	rule_lists[3] =	ifs->ifs_ipfilter[1][ifs->ifs_fr_active];
+	rule_lists[4] =	ifs->ifs_ipacct6[0][ifs->ifs_fr_active];
+	rule_lists[5] =	ifs->ifs_ipacct6[1][ifs->ifs_fr_active];
+	rule_lists[6] =	ifs->ifs_ipfilter6[0][ifs->ifs_fr_active];
+	rule_lists[7] =	ifs->ifs_ipfilter6[1][ifs->ifs_fr_active];
+
+	for (i = 0; i < rules; i++) {
+		fr_syncindex(rule_lists[i], ifp, newifp);
+	} 
+
+	/*
+	 * Update rule groups.
+	 */
+	for (i = 0; i < IPL_LOGSIZE; i++) {
+		frgroup_t *g;
+
+		for (g = ifs->ifs_ipfgroups[i][0]; g != NULL; g = g->fg_next)
+			fr_syncindex(g->fg_start, ifp, newifp);
+		for (g = ifs->ifs_ipfgroups[i][1]; g != NULL; g = g->fg_next)
+			fr_syncindex(g->fg_start, ifp, newifp);
+	}
+}
+#endif
 
 /*
  * In the functions below, bcopy() is called because the pointer being

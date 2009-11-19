@@ -495,6 +495,9 @@ extern	u_short	*nat_proto __P((fr_info_t *, nat_t *, u_int));
 extern	void	nat_update __P((fr_info_t *, nat_t *, ipnat_t *));
 extern	void	fr_setnatqueue __P((nat_t *, int, ipf_stack_t *));
 extern  void    fr_hostmapdel __P((hostmap_t **));
+#if SOLARIS2 >= 10
+extern	void	fr_natifindexsync __P((void *, void *, ipf_stack_t *));
+#endif
 
 extern	nat_t	*fr_natclone __P((fr_info_t *, nat_t *));
 extern	void	nat_delrdr __P((struct ipnat *));

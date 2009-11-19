@@ -6,7 +6,7 @@
  * @(#)ip_state.h	1.3 1/12/96 (C) 1995 Darren Reed
  * $Id: ip_state.h,v 2.68.2.5 2005/08/11 19:58:04 darrenr Exp $
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -246,5 +246,8 @@ extern	void	fr_updatestate __P((fr_info_t *, ipstate_t *, ipftq_t *));
 extern	void	fr_statederef __P((ipstate_t **, ipf_stack_t *));
 extern	void	fr_setstatequeue __P((ipstate_t *, int, ipf_stack_t *));
 extern	int	fr_delstate __P((ipstate_t *, int, ipf_stack_t *));
+#if SOLARIS2 >= 10
+extern	void	fr_stateifindexsync __P((void *, void *, ipf_stack_t *));
+#endif
 
 #endif /* __IP_STATE_H__ */

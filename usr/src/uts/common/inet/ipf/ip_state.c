@@ -3219,6 +3219,41 @@ ipf_stack_t *ifs;
 }
 
 
+#if SOLARIS2 >= 10
+/* ------------------------------------------------------------------------ */
+/* Function:    fr_stateifindexsync					    */
+/* Returns:     void							    */
+/* Parameters:	ifp	- current network interface descriptor (ifindex)    */
+/*              newifp	- new interface descriptor (new ifindex)	    */
+/*		ifs	- pointer to IPF stack				    */
+/*									    */
+/* Write Locks: assumes ipf_mutex is locked				    */
+/*                                                                          */
+/* Updates all interface indeces matching to ifp with new interface index   */
+/* value.								    */
+/* ------------------------------------------------------------------------ */
+void fr_stateifindexsync(ifp, newifp, ifs)
+void *ifp;
+void *newifp;
+ipf_stack_t *ifs;
+{
+	ipstate_t *is;
+	int i;
+
+	WRITE_ENTER(&ifs->ifs_ipf_state);
+
+	for (is = ifs->ifs_ips_list; is != NULL; is = is->is_next) {
+
+		for (i = 0; i < 4; i++) {
+			if (is->is_ifp[i] == ifp)
+				is->is_ifp[i] = newifp;
+		}
+	}
+
+	RWLOCK_EXIT(&ifs->ifs_ipf_state);
+}
+#endif
+
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_delstate                                                 */
 /* Returns:     int - 0 = entry deleted, else ref count on entry            */

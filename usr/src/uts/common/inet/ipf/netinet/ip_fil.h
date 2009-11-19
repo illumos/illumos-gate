@@ -1515,6 +1515,9 @@ extern	int		fr_delipftune __P((ipftuneable_t *, ipf_stack_t *));
 
 extern	int	frflush __P((minor_t, int, int, ipf_stack_t *));
 extern	void	frsync __P((int, int, void *, char *, ipf_stack_t *));
+#if SOLARIS2 >= 10
+extern	void	fr_ifindexsync __P((void *, void *, ipf_stack_t *));
+#endif
 extern	frgroup_t *fr_addgroup __P((char *, void *, u_32_t, minor_t, int,
 				    ipf_stack_t *));
 extern	int	fr_derefrule __P((frentry_t **, ipf_stack_t *));
