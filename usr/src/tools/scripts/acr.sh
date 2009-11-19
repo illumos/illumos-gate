@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -227,7 +227,7 @@ acr_a_root() {
 			msg=`printf "$column_fmt" \
 			    $filename "upgrade_default_copy"`
 			cp $root/bfu.conflicts/$filename $root/$filename
-			if [ $? != 0 ]; then
+			if [ $? = 0 ]; then
 				printf "$msg ok\n"
 				continue
 			else
