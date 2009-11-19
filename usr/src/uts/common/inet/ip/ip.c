@@ -121,9 +121,10 @@
 #include <sys/tsol/label.h>
 #include <sys/tsol/tnet.h>
 
-#include <rpc/pmap_prot.h>
 #include <sys/squeue_impl.h>
 #include <inet/ip_arp.h>
+
+#include <sys/clock_impl.h>	/* For LBOLT_FASTPATH{,64} */
 
 /*
  * Values for squeue switch:
@@ -14593,6 +14594,7 @@ ip_xmit(mblk_t *mp, nce_t *nce, iaflags_t ixaflags, uint_t pkt_len,
 	boolean_t	isv6 = ill->ill_isv6;
 	boolean_t	fp_mp;
 	ncec_t		*ncec = nce->nce_common;
+	int64_t		now = LBOLT_FASTPATH64;
 
 	DTRACE_PROBE1(ip__xmit, nce_t *, nce);
 
@@ -14773,7 +14775,7 @@ sendit:
 			 * It should be o.k. to check the state without
 			 * a lock here, at most we lose an advice.
 			 */
-			ncec->ncec_last = TICK_TO_MSEC(ddi_get_lbolt64());
+			ncec->ncec_last = TICK_TO_MSEC(now);
 			if (ncec->ncec_state != ND_REACHABLE) {
 				mutex_enter(&ncec->ncec_lock);
 				ncec->ncec_state = ND_REACHABLE;
@@ -14792,7 +14794,7 @@ sendit:
 			return (0);
 		}
 
-		delta =  TICK_TO_MSEC(ddi_get_lbolt64()) - ncec->ncec_last;
+		delta =  TICK_TO_MSEC(now) - ncec->ncec_last;
 		ip1dbg(("ip_xmit: delta = %" PRId64
 		    " ill_reachable_time = %d \n", delta,
 		    ill->ill_reachable_time));

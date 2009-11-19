@@ -120,7 +120,7 @@
 #include <sys/tsol/label.h>
 #include <sys/tsol/tnet.h>
 
-#include <rpc/pmap_prot.h>
+#include <sys/clock_impl.h>	/* For LBOLT_FASTPATH{,64} */
 
 #ifdef	DEBUG
 extern boolean_t skip_sctp_cksum;
@@ -1437,7 +1437,7 @@ ire_recv_local_v6(ire_t *ire, mblk_t *mp, void *iph_arg, ip_recv_attr_t *ira)
 	ill_t		*ire_ill = ire->ire_ill;
 
 	/* Make a note for DAD that this address is in use */
-	ire->ire_last_used_time = ddi_get_lbolt();
+	ire->ire_last_used_time = LBOLT_FASTPATH;
 
 	/* Only target the IRE_LOCAL with the right zoneid. */
 	ira->ira_zoneid = ire->ire_zoneid;

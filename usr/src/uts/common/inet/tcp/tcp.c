@@ -102,7 +102,7 @@
 #include <rpc/pmap_prot.h>
 #include <sys/callo.h>
 
-#include <sys/clock_impl.h>
+#include <sys/clock_impl.h>	/* For LBOLT_FASTPATH{,64} */
 
 /*
  * TCP Notes: aka FireEngine Phase I (PSARC 2002/433)
@@ -10650,7 +10650,7 @@ ok:;
 	    TSTMP_GEQ(tcpopt.tcp_opt_ts_val, tcp->tcp_ts_recent) &&
 	    SEQ_LEQ(seg_seq, tcp->tcp_rack)) {
 		tcp->tcp_ts_recent = tcpopt.tcp_opt_ts_val;
-		tcp->tcp_last_rcv_lbolt = ddi_get_lbolt64();
+		tcp->tcp_last_rcv_lbolt = LBOLT_FASTPATH64;
 	}
 
 	if (seg_seq != tcp->tcp_rnxt || tcp->tcp_reass_head) {
@@ -13928,6 +13928,7 @@ tcp_output(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 	uint32_t	msize;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	ip_xmit_attr_t	*ixa;
+	clock_t		now;
 
 	/*
 	 * Try and ASSERT the minimum possible references on the
@@ -14017,9 +14018,9 @@ tcp_output(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 	 *
 	 * Reinitialize tcp_cwnd after idle.
 	 */
+	now = LBOLT_FASTPATH;
 	if ((tcp->tcp_suna == snxt) && !tcp->tcp_localnet &&
-	    (TICK_TO_MSEC(ddi_get_lbolt() - tcp->tcp_last_recv_time) >=
-	    tcp->tcp_rto)) {
+	    (TICK_TO_MSEC(now - tcp->tcp_last_recv_time) >= tcp->tcp_rto)) {
 		SET_TCP_INIT_CWND(tcp, mss, tcps->tcps_slow_start_after_idle);
 	}
 
@@ -14080,7 +14081,7 @@ tcp_output(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 
 	if ((mp1 = dupb(mp)) == 0)
 		goto no_memory;
-	mp->b_prev = (mblk_t *)(uintptr_t)ddi_get_lbolt();
+	mp->b_prev = (mblk_t *)(uintptr_t)now;
 	mp->b_next = (mblk_t *)(uintptr_t)snxt;
 
 	/* adjust tcp header information */
@@ -15415,6 +15416,7 @@ tcp_wput_data(tcp_t *tcp, mblk_t *mp, boolean_t urgent)
 	int		rc;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	conn_t		*connp = tcp->tcp_connp;
+	clock_t		now = LBOLT_FASTPATH;
 
 	tcpstate = tcp->tcp_state;
 	if (mp == NULL) {
@@ -15570,8 +15572,7 @@ data_null:
 	}
 
 	if ((tcp->tcp_suna == snxt) && !tcp->tcp_localnet &&
-	    (TICK_TO_MSEC(LBOLT_FASTPATH - tcp->tcp_last_recv_time) >=
-	    tcp->tcp_rto)) {
+	    (TICK_TO_MSEC(now - tcp->tcp_last_recv_time) >= tcp->tcp_rto)) {
 		SET_TCP_INIT_CWND(tcp, mss, tcps->tcps_slow_start_after_idle);
 	}
 	if (tcpstate == TCPS_SYN_RCVD) {
@@ -15653,7 +15654,7 @@ data_null:
 		}
 	}
 
-	local_time = (mblk_t *)LBOLT_FASTPATH;
+	local_time = (mblk_t *)now;
 
 	/*
 	 * "Our" Nagle Algorithm.  This is not the same as in the old
@@ -16814,7 +16815,7 @@ tcp_xmit_ctl(char *str, tcp_t *tcp, uint32_t seq, uint32_t ack, int ctl)
 	}
 	if (ctl & TH_ACK) {
 		if (tcp->tcp_snd_ts_ok) {
-			uint32_t llbolt = (uint32_t)ddi_get_lbolt();
+			uint32_t llbolt = (uint32_t)LBOLT_FASTPATH;
 
 			U32_TO_BE32(llbolt,
 			    (char *)tcpha + TCP_MIN_HEADER_LENGTH+4);
@@ -17504,7 +17505,7 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 
 				if (tcp->tcp_snd_ts_ok) {
 					uint32_t llbolt =
-					    (uint32_t)ddi_get_lbolt();
+					    (uint32_t)LBOLT_FASTPATH;
 
 					wptr = mp1->b_wptr;
 					wptr[0] = TCPOPT_NOP;
@@ -17641,7 +17642,7 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 
 	if (tcp->tcp_snd_ts_ok) {
 		if (tcp->tcp_state != TCPS_SYN_SENT) {
-			uint32_t llbolt = (uint32_t)ddi_get_lbolt();
+			uint32_t llbolt = (uint32_t)LBOLT_FASTPATH;
 
 			U32_TO_BE32(llbolt,
 			    (char *)tcpha + TCP_MIN_HEADER_LENGTH+4);

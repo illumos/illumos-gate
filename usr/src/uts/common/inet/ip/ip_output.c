@@ -96,6 +96,8 @@
 #include <sys/tsol/label.h>
 #include <sys/tsol/tnet.h>
 
+#include <sys/clock_impl.h>	/* For LBOLT_FASTPATH{,64} */
+
 #ifdef	DEBUG
 extern boolean_t skip_sctp_cksum;
 #endif
@@ -140,7 +142,6 @@ conn_ip_output(mblk_t *mp, ip_xmit_attr_t *ixa)
 	ill_t		*ill;
 	ip_stack_t	*ipst = ixa->ixa_ipst;
 	int		error;
-	int64_t		now;
 
 	/* We defer ipIfStatsHCOutRequests until an error or we have an ill */
 
@@ -286,21 +287,23 @@ conn_ip_output(mblk_t *mp, ip_xmit_attr_t *ixa)
 	 * To avoid a periodic timer to increase the path MTU we
 	 * look at dce_last_change_time each time we send a packet.
 	 */
-	now = ddi_get_lbolt64();
-	if ((dce->dce_flags & DCEF_PMTU) &&
-	    (TICK_TO_SEC(now) - dce->dce_last_change_time >
-	    ipst->ips_ip_pathmtu_interval)) {
-		/*
-		 * Older than 20 minutes. Drop the path MTU information.
-		 * Since the path MTU changes as a result of this, twiddle
-		 * ixa_dce_generation to make us go through the dce
-		 * verification code in conn_ip_output.
-		 */
-		mutex_enter(&dce->dce_lock);
-		dce->dce_flags &= ~(DCEF_PMTU|DCEF_TOO_SMALL_PMTU);
-		dce->dce_last_change_time = TICK_TO_SEC(now);
-		mutex_exit(&dce->dce_lock);
-		dce_increment_generation(dce);
+	if (dce->dce_flags & DCEF_PMTU) {
+		int64_t		now = LBOLT_FASTPATH64;
+
+		if ((TICK_TO_SEC(now) - dce->dce_last_change_time >
+		    ipst->ips_ip_pathmtu_interval)) {
+			/*
+			 * Older than 20 minutes. Drop the path MTU information.
+			 * Since the path MTU changes as a result of this,
+			 * twiddle ixa_dce_generation to make us go through the
+			 * dce verification code in conn_ip_output.
+			 */
+			mutex_enter(&dce->dce_lock);
+			dce->dce_flags &= ~(DCEF_PMTU|DCEF_TOO_SMALL_PMTU);
+			dce->dce_last_change_time = TICK_TO_SEC(now);
+			mutex_exit(&dce->dce_lock);
+			dce_increment_generation(dce);
+		}
 	}
 
 	if (dce->dce_generation != ixa->ixa_dce_generation) {

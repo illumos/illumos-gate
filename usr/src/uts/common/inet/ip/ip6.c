@@ -102,8 +102,6 @@
 #include <sys/tsol/label.h>
 #include <sys/tsol/tnet.h>
 
-#include <rpc/pmap_prot.h>
-
 /* Temporary; for CR 6451644 work-around */
 #include <sys/ethernet.h>
 
