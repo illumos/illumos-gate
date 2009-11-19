@@ -1402,13 +1402,6 @@ hubd_bus_config(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 		found = hubd_config_one(hubd, port);
 
 		if (found == 0) {
-			if (!consconfig_console_is_ready()) {
-				cmn_err(CE_WARN,
-				    "hubd_bus_config: %s not found under"
-				    " parent %s@%s", (char *)arg,
-				    (DEVI(dip))->devi_node_name,
-				    (DEVI(dip))->devi_addr);
-			}
 			return (NDI_FAILURE);
 		}
 
