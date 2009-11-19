@@ -32,6 +32,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <strings.h>
+#include <libscf.h>	/* for SMF error exit codes */
 
 #include <srpt_ioctl.h>
 
@@ -48,6 +49,7 @@ main(int argc, char *argv[])
 	int		fd = -1;
 	int		saverr;
 	char		*txt;
+	struct stat	statbuf;
 
 	(void) setlocale(LC_ALL, "");
 
@@ -68,17 +70,27 @@ main(int argc, char *argv[])
 	if (fd < 0) {
 		saverr = errno;
 
-		(void) fprintf(stderr, "%s: %s", cmdName,
-		    gettext("Could not open SRP Target pseudodevice."));
+		(void) fprintf(stderr, "%s: %s (%s): %s\n", cmdName,
+		    gettext("Could not open SRP Target pseudodevice"),
+		    SRPT_NODE, strerror(saverr));
 
 		if (saverr == ENOENT) {
-			(void) fprintf(stderr,
-			    gettext("  Driver may not be loaded."));
+			/* avoid having the service go into maintenance */
+			if ((stat("/devices/ib", &statbuf)) != 0) {
+				(void) fprintf(stderr, "%s: %s\n", cmdName,
+				    gettext(
+				    "No InfiniBand devices on this system."));
+			}
+			ret = 0;
+
 		} else {
-			(void) fprintf(stderr, gettext("  error = %d"), saverr);
+			ret = SMF_EXIT_ERR_FATAL; /* avoid retries */
 		}
-		(void) fprintf(stderr, "\n");
-		return (1);
+
+		(void) fprintf(stderr, "%s: %s\n", cmdName,
+		    gettext("SRPT Driver may not be loaded."));
+
+		return (ret);
 	}
 
 	ret = ioctl(fd, srpt_ioctl, NULL);
@@ -90,7 +102,7 @@ main(int argc, char *argv[])
 		}
 
 		(void) fprintf(stderr, "%s: %d", txt, ret);
-		ret = 1;
+		ret = SMF_EXIT_ERR_FATAL;
 	}
 
 	(void) close(fd);

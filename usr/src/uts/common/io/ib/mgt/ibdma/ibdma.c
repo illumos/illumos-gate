@@ -298,17 +298,17 @@ ibdma_ibt_init()
 		return (status);
 	}
 
+	list_create(&ibdma->ms_hca_list, sizeof (ibdma_hca_t),
+	    offsetof(ibdma_hca_t, ih_node));
+
 	hca_cnt = ibt_get_hca_list(&guid);
 	if (hca_cnt < 1) {
 #ifdef	DEBUG_IBDMA
 		cmn_err(CE_NOTE, "ibt_init, no HCA(s) found");
 #endif
-		(void) ibt_detach(ibdma->ms_ibt_hdl);
-		return (DDI_FAILURE);
+		/* not an error if no HCAs, but nothing more to do here */
+		return (DDI_SUCCESS);
 	}
-
-	list_create(&ibdma->ms_hca_list, sizeof (ibdma_hca_t),
-	    offsetof(ibdma_hca_t, ih_node));
 
 	mutex_enter(&ibdma->ms_hca_list_lock);
 
@@ -364,7 +364,7 @@ ibdma_ibt_fini()
 	}
 	list_destroy(&ibdma->ms_hca_list);
 
-	ibt_detach(ibdma->ms_ibt_hdl);
+	(void) ibt_detach(ibdma->ms_ibt_hdl);
 	ibdma->ms_ibt_hdl   = NULL;
 	ibdma->ms_num_hcas  = 0;
 	mutex_exit(&ibdma->ms_hca_list_lock);

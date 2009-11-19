@@ -158,6 +158,9 @@ _init(void)
 	/* Start-up state is DISABLED.  SMF will tell us if we should enable. */
 	srpt_ctxt->sc_svc_state = SRPT_SVC_DISABLED;
 
+	list_create(&srpt_ctxt->sc_ioc_list, sizeof (srpt_ioc_t),
+	    offsetof(srpt_ioc_t, ioc_node));
+
 	status = mod_install(&srpt_modlinkage);
 	if (status != DDI_SUCCESS) {
 		cmn_err(CE_CONT, "_init, failed mod_install %d", status);
@@ -190,6 +193,8 @@ _fini(void)
 	if (status != DDI_SUCCESS) {
 		return (status);
 	}
+
+	list_destroy(&srpt_ctxt->sc_ioc_list);
 
 	rw_destroy(&srpt_ctxt->sc_rwlock);
 	kmem_free(srpt_ctxt, sizeof (srpt_ctxt_t));
@@ -309,10 +314,10 @@ srpt_enable_srp_services(void)
 		goto err_exit_2;
 	}
 
+	/* Not an error if no iocs yet; we will listen for ATTACH events */
 	if (srpt_ctxt->sc_num_iocs == 0) {
 		SRPT_DPRINTF_L2("enable_srp: no IB I/O Controllers found");
-		status = DDI_FAILURE;
-		goto err_exit_3;
+		return (DDI_SUCCESS);
 	}
 
 	/*
@@ -336,9 +341,6 @@ srpt_enable_srp_services(void)
 	}
 
 	return (DDI_SUCCESS);
-
-err_exit_3:
-	srpt_ioc_detach();
 
 err_exit_2:
 	(void) stmf_deregister_port_provider(srpt_ctxt->sc_pp);

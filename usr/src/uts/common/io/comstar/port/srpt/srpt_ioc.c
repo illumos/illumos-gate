@@ -161,14 +161,13 @@ srpt_ioc_attach()
 
 	hca_cnt = ibt_get_hca_list(&guid);
 	if (hca_cnt < 1) {
+		/*
+		 * not a fatal error.  Service will be up and
+		 * waiting for ATTACH events.
+		 */
 		SRPT_DPRINTF_L2("ioc_attach, no HCA found");
-		(void) ibt_detach(srpt_ctxt->sc_ibt_hdl);
-		srpt_ctxt->sc_ibt_hdl = NULL;
-		return (DDI_FAILURE);
+		return (DDI_SUCCESS);
 	}
-
-	list_create(&srpt_ctxt->sc_ioc_list, sizeof (srpt_ioc_t),
-	    offsetof(srpt_ioc_t, ioc_node));
 
 	for (hca_ndx = 0; hca_ndx < hca_cnt; hca_ndx++) {
 		SRPT_DPRINTF_L2("ioc_attach, adding I/O"
@@ -213,8 +212,6 @@ srpt_ioc_detach()
 		    (void *)ioc->ioc_ibt_hdl);
 		srpt_ioc_fini(ioc);
 	}
-
-	list_destroy(&srpt_ctxt->sc_ioc_list);
 
 	(void) ibt_detach(srpt_ctxt->sc_ibt_hdl);
 	srpt_ctxt->sc_ibt_hdl = NULL;
