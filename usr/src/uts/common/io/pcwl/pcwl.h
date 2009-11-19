@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,8 +42,6 @@
 
 #ifndef _SYS_PCWL_H
 #define	_SYS_PCWL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -762,6 +760,8 @@ typedef struct pcwl_macinfo {
 #define	PCWL_CARD_READY		0x80
 #define	PCWL_CARD_FAILED	0x100
 #define	PCWL_CARD_INTR		0x200
+#define	PCWL_CARD_PLUMBED	0x400
+#define	PCWL_CARD_SUSPEND	0x800
 
 #define	PCWL_STATE_IDLE		0x1
 

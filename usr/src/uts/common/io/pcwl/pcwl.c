@@ -40,6 +40,7 @@
 #include <sys/sunddi.h>
 #include <sys/dlpi.h>
 #include <sys/ethernet.h>
+#include <sys/strsubr.h>
 #include <sys/strsun.h>
 #include <sys/stat.h>
 #include <sys/byteorder.h>
@@ -86,6 +87,8 @@ static int	pcwl_m_setprop(void *arg, const char *pr_name,
 static int	pcwl_m_getprop(void *arg, const char *pr_name,
     mac_prop_id_t wldp_pr_num, uint_t pr_flags,
     uint_t wldp_length, void *wldp_buf, uint_t *perm);
+static void
+pcwl_delay(pcwl_maci_t *, clock_t);
 
 mac_callbacks_t pcwl_m_callbacks = {
 	MC_IOCTL | MC_SETPROP | MC_GETPROP,
@@ -479,15 +482,15 @@ pcwl_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	mutex_exit(&pcwl_p->pcwl_scanlist_lock);
 	(void) mac_unregister(pcwl_p->pcwl_mh);
 
-	mutex_enter(&pcwl_p->pcwl_glock);
 	if (pcwl_p->pcwl_device_type == PCWL_DEVICE_PCI) {
+		mutex_enter(&pcwl_p->pcwl_glock);
 		ddi_remove_intr(dip, 0, pcwl_p->pcwl_ib_cookie);
 		ddi_regs_map_free(&pcwl_p->pcwl_handle);
 		ddi_regs_map_free(&pcwl_p->pcwl_cfg_handle);
+		mutex_exit(&pcwl_p->pcwl_glock);
 	} else if (pcwl_p->pcwl_device_type == PCWL_DEVICE_PCCARD) {
 		pcwl_unregister_cs(pcwl_p);
 	}
-	mutex_exit(&pcwl_p->pcwl_glock);
 	pcwl_destroy_locks(pcwl_p);
 	ddi_remove_minor_node(dip, NULL);
 	ddi_soft_state_free(pcwl_soft_state_p, ddi_get_instance(dip));
@@ -607,6 +610,9 @@ pcwl_destroy_locks(pcwl_maci_t *pcwl_p)
 	mutex_destroy(&pcwl_p->pcwl_glock);
 }
 
+static void
+pcwl_do_suspend(pcwl_maci_t *pcwl_p);
+
 static int
 pcwl_ev_hdlr(event_t event, int priority, event_callback_args_t *arg)
 {
@@ -641,6 +647,9 @@ pcwl_ev_hdlr(event_t event, int priority, event_callback_args_t *arg)
 		(void) strcpy(ci_p->VendorName, CS_SUN_VENDOR_DESCRIPTION);
 		ci_p->Attributes |= CS_CLIENT_INFO_VALID;
 		break;
+	case CS_EVENT_PM_SUSPEND:
+		pcwl_do_suspend(pcwl_p);
+		break;
 	default:
 		ret = CS_UNSUPPORTED_EVENT;
 		break;
@@ -648,6 +657,52 @@ pcwl_ev_hdlr(event_t event, int priority, event_callback_args_t *arg)
 	mutex_exit(&pcwl_p->pcwl_cslock);
 	return (ret);
 }
+
+/*
+ * assume card is already removed, don't touch the hardware
+ */
+static void
+pcwl_do_suspend(pcwl_maci_t *pcwl_p)
+{
+	int ret;
+
+	if (pcwl_p->pcwl_flag & PCWL_CARD_LINKUP) {
+		if (pcwl_p->pcwl_connect_timeout_id != 0) {
+			(void) untimeout(pcwl_p->pcwl_connect_timeout_id);
+			pcwl_p->pcwl_connect_timeout_id = 0;
+		}
+		mutex_enter(&pcwl_p->pcwl_glock);
+		pcwl_p->pcwl_flag &= ~PCWL_CARD_LINKUP;
+		(void) pcwl_set_cmd(pcwl_p, WL_CMD_DISABLE, 0);
+		/*
+		 * A workaround here: If the card is in ad-hoc mode, the
+		 * following scan will not work correctly, so any
+		 * 'dladm connect-wifi' which need a scan first will not
+		 * succeed. software reset the card here as a workround.
+		 */
+		if ((pcwl_p->pcwl_rf.rf_porttype == WL_BSS_IBSS) &&
+		    (pcwl_p->pcwl_chip_type == PCWL_CHIP_LUCENT)) {
+			(void) pcwl_reset_backend(pcwl_p);
+			(void) pcwl_init_nicmem(pcwl_p);
+			pcwl_start_locked(pcwl_p);
+		}
+		if (ret = pcwl_loaddef_rf(pcwl_p)) {
+			PCWLDBG((CE_WARN, "cfg_loaddef_err %d\n", ret));
+		}
+		if (ret = pcwl_set_cmd(pcwl_p, WL_CMD_ENABLE, 0)) {
+			PCWLDBG((CE_WARN, "set enable cmd err\n"));
+		}
+		pcwl_delay(pcwl_p, 1000000);
+		if (ret = pcwl_set_cmd(pcwl_p, WL_CMD_DISABLE, 0)) {
+			PCWLDBG((CE_WARN, "set disable cmd err\n"));
+		}
+		mac_link_update(GLD3(pcwl_p), LINK_STATE_DOWN);
+		mutex_exit(&pcwl_p->pcwl_glock);
+	}
+	pcwl_p->pcwl_flag |= PCWL_CARD_SUSPEND;
+	PCWLDBG((CE_WARN, "pcwl: do suspend\n"));
+}
+
 
 static int
 pcwl_card_insert(pcwl_maci_t *pcwl_p)
@@ -661,6 +716,7 @@ pcwl_card_insert(pcwl_maci_t *pcwl_p)
 	cistpl_config_t config;
 	cistpl_cftable_entry_t *tbl_p;
 	register client_handle_t chdl = pcwl_p->pcwl_chdl;
+	modify_config_t cfgmod;
 
 	bzero(&tuple, sizeof (tuple));
 	tuple.DesiredTuple = CISTPL_MANFID;
@@ -785,6 +841,29 @@ pcwl_card_insert(pcwl_maci_t *pcwl_p)
 		cmn_err(CE_WARN, "pcwl: RequestConfiguration failed %x\n", ret);
 		goto un_irq;
 	}
+
+	if (pcwl_p->pcwl_flag & PCWL_CARD_SUSPEND) {
+		mutex_enter(&pcwl_p->pcwl_glock);
+		pcwl_reset_backend(pcwl_p);
+		/* turn on CS interrupt */
+		cfgmod.Attributes = CONF_ENABLE_IRQ_STEERING |
+		    CONF_IRQ_CHANGE_VALID;
+		cfgmod.Vpp1 = 50;
+		cfgmod.Vpp2 = 50;
+		(void) csx_ModifyConfiguration(pcwl_p->pcwl_chdl, &cfgmod);
+
+		(void) pcwl_init_nicmem(pcwl_p);
+		pcwl_chip_type(pcwl_p);
+		(void) pcwl_loaddef_rf(pcwl_p);
+		(void) pcwl_set_cmd(pcwl_p, WL_CMD_DISABLE, 0);
+		pcwl_stop_locked(pcwl_p);	/* leaves interface down */
+		pcwl_p->pcwl_flag &= ~PCWL_CARD_SUSPEND;
+		mutex_exit(&pcwl_p->pcwl_glock);
+	}
+	if (pcwl_p->pcwl_flag & PCWL_CARD_PLUMBED) {
+		pcwl_start(pcwl_p);
+		pcwl_p->pcwl_flag &= ~PCWL_CARD_PLUMBED;
+	}
 	return (CS_SUCCESS);
 un_irq:
 	(void) csx_ReleaseIRQ(chdl, &irq);
@@ -814,6 +893,23 @@ pcwl_card_remove(pcwl_maci_t *pcwl_p)
 	 */
 	if (!(pcwl_p->pcwl_flag & PCWL_CARD_READY))
 		return;
+
+	if (pcwl_p->pcwl_connect_timeout_id != 0) {
+		(void) untimeout(pcwl_p->pcwl_connect_timeout_id);
+		pcwl_p->pcwl_connect_timeout_id = 0;
+	}
+
+	if (pcwl_p->pcwl_flag & PCWL_CARD_LINKUP) {
+		pcwl_p->pcwl_flag &= ~PCWL_CARD_LINKUP;
+		mac_link_update(GLD3(pcwl_p), LINK_STATE_DOWN);
+	}
+	mutex_enter(&pcwl_p->pcwl_glock);
+	if (pcwl_p->pcwl_flag & PCWL_CARD_INTREN) {
+		pcwl_stop_locked(pcwl_p);
+		pcwl_p->pcwl_flag |= PCWL_CARD_PLUMBED;
+	}
+	pcwl_p->pcwl_flag &= ~PCWL_CARD_READY;
+	mutex_exit(&pcwl_p->pcwl_glock);
 	if (ret = csx_ReleaseConfiguration(pcwl_p->pcwl_chdl, NULL))
 		cmn_err(CE_WARN, "pcwl: ReleaseConfiguration failed %x\n", ret);
 
@@ -830,7 +926,6 @@ pcwl_card_remove(pcwl_maci_t *pcwl_p)
 		cmn_err(CE_WARN, "pcwl: ReleaseIO failed %x\n", ret);
 
 	pcwl_p->pcwl_port = 0;
-	pcwl_p->pcwl_flag &= ~PCWL_CARD_READY;
 }
 
 /*
@@ -1030,7 +1125,8 @@ pcwl_tx(void *arg, mblk_t *mp)
 	if ((pcwl_p->pcwl_flag & (PCWL_CARD_LINKUP | PCWL_CARD_READY)) !=
 	    (PCWL_CARD_LINKUP | PCWL_CARD_READY)) {
 		mutex_exit(&pcwl_p->pcwl_glock);
-		return (mp);
+		freemsgchain(mp);
+		return (NULL);
 	}
 	mutex_exit(&pcwl_p->pcwl_glock);
 	while (mp != NULL) {

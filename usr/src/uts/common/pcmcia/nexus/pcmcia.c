@@ -3738,7 +3738,8 @@ SSSetSocket(set_socket_t *socket)
 	newsock = *socket;
 	/* note: we force CS to always get insert/removal events */
 	sockp->ls_cs_events = pcm_mapevents(newsock.SCIntMask) |
-	    PCE_E2M(PCE_CARD_INSERT) | PCE_E2M(PCE_CARD_REMOVAL);
+	    PCE_E2M(PCE_CARD_INSERT) | PCE_E2M(PCE_CARD_REMOVAL) |
+	    PCE_E2M(PCE_PM_SUSPEND);
 #if defined(PCMCIA_DEBUG)
 	if (pcmcia_debug > 1)
 		cmn_err(CE_CONT,

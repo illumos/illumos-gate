@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,8 +38,6 @@
 
 #ifndef _SYS_PCAN_H
 #define	_SYS_PCAN_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -1212,6 +1210,8 @@ typedef struct pcan_macinfo {
 #define	PCAN_CARD_SEND		0x20
 #define	PCAN_CARD_READY		0x40
 #define	PCAN_CARD_FAILED	0x80
+#define	PCAN_PLUMBED		0x100
+#define	PCAN_SUSPENDED		0x200
 
 #define	PCAN_STATE_IDLE		0x1
 
@@ -1230,6 +1230,7 @@ static int	pcan_card_insert(pcan_maci_t *pcan_p);
 static int	pcan_ev_hdlr(event_t ev, int pri, event_callback_args_t *arg);
 static void	pcan_card_remove(pcan_maci_t *pcan_p);
 static int	pcan_init_nicmem(pcan_maci_t *pcan_p);
+static void	pcan_do_suspend(pcan_maci_t *pcan_p);
 
 /*
  * high level device access primitives, glock must held before calling

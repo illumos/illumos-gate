@@ -40,6 +40,7 @@
 #include <sys/sunddi.h>
 #include <sys/dlpi.h>
 #include <sys/ethernet.h>
+#include <sys/strsubr.h>
 #include <sys/strsun.h>
 #include <sys/stat.h>
 #include <sys/byteorder.h>
@@ -526,8 +527,8 @@ pcan_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	(void) mac_unregister(pcan_p->pcan_mh);
 
-	mutex_enter(&pcan_p->pcan_glock);
 	if (pcan_p->pcan_device_type == PCAN_DEVICE_PCI) {
+		mutex_enter(&pcan_p->pcan_glock);
 		ddi_remove_intr(dip, 0, pcan_p->pcan_ib_cookie);
 		pcan_free_dma(pcan_p);
 		if (pcan_p->pcan_handle0)
@@ -536,12 +537,12 @@ pcan_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			ddi_regs_map_free(&pcan_p->pcan_handle1);
 		if (pcan_p->pcan_handle2)
 			ddi_regs_map_free(&pcan_p->pcan_handle2);
+		mutex_exit(&pcan_p->pcan_glock);
 	} else if (pcan_p->pcan_device_type == PCAN_DEVICE_PCCARD) {
 		pcan_unregister_cs(pcan_p);
 	} else {
 		cmn_err(CE_WARN, "pcan detach: unsupported device type\n");
 	}
-	mutex_exit(&pcan_p->pcan_glock);
 	pcan_destroy_locks(pcan_p);
 	if (pcan_p->pcan_info_softint_id)
 		ddi_remove_softintr(pcan_p->pcan_info_softint_id);
@@ -652,7 +653,6 @@ pcan_unregister_cs(pcan_maci_t *pcan_p)
 
 	if (pcan_p->pcan_flag & PCAN_CARD_READY) {
 		pcan_card_remove(pcan_p);
-		pcan_p->pcan_flag &= ~PCAN_CARD_READY;
 	}
 	mutex_destroy(&pcan_p->pcan_cslock);
 	cv_destroy(&pcan_p->pcan_cscv);
@@ -701,6 +701,9 @@ pcan_ev_hdlr(event_t event, int priority, event_callback_args_t *arg)
 		(void) strcpy(ci_p->VendorName, CS_SUN_VENDOR_DESCRIPTION);
 		ci_p->Attributes |= CS_CLIENT_INFO_VALID;
 		break;
+	case CS_EVENT_PM_SUSPEND:
+		pcan_do_suspend(pcan_p);
+		break;
 	default:
 		ret = CS_UNSUPPORTED_EVENT;
 		break;
@@ -721,6 +724,7 @@ pcan_card_insert(pcan_maci_t *pcan_p)
 	cistpl_config_t config;
 	cistpl_cftable_entry_t *tbl_p;
 	register client_handle_t chdl = pcan_p->pcan_chdl;
+	modify_config_t cfgmod;
 
 	bzero(&tuple, sizeof (tuple));
 	tuple.DesiredTuple = CISTPL_MANFID;
@@ -845,6 +849,33 @@ pcan_card_insert(pcan_maci_t *pcan_p)
 		cmn_err(CE_WARN, "pcan: RequestConfiguration failed %x\n", ret);
 		goto un_irq;
 	}
+
+	if (pcan_p->pcan_flag & PCAN_SUSPENDED) {
+		mutex_enter(&pcan_p->pcan_glock);
+		pcan_reset_backend(pcan_p, pcan_p->pcan_reset_delay);
+		/* turn on CS interrupt */
+		cfgmod.Attributes = CONF_ENABLE_IRQ_STEERING |
+		    CONF_IRQ_CHANGE_VALID;
+		cfgmod.Vpp1 = 50;
+		cfgmod.Vpp2 = 50;
+		(void) csx_ModifyConfiguration(pcan_p->pcan_chdl, &cfgmod);
+
+		if (ret = pcan_init_nicmem(pcan_p)) {
+			cmn_err(CE_WARN, "pcan insert: init_nicmem failed %x\n",
+			    ret);
+		}
+		PCAN_DISABLE_INTR_CLEAR(pcan_p);
+		ret = pcan_set_cmd(pcan_p, AN_CMD_DISABLE, 0);
+		PCANDBG((CE_NOTE, "pcan insert set cmd ret =%x\n", ret));
+		pcan_p->pcan_flag &= ~PCAN_SUSPENDED;
+		mutex_exit(&pcan_p->pcan_glock);
+	}
+
+	if (pcan_p->pcan_flag & PCAN_PLUMBED) {
+		pcan_start(pcan_p);
+		pcan_p->pcan_flag &= ~PCAN_PLUMBED;
+		PCANDBG((CE_NOTE, "pcan insert: active interrupt\n"));
+	}
 	return (CS_SUCCESS);
 un_irq:
 	(void) csx_ReleaseIRQ(chdl, &irq);
@@ -862,6 +893,33 @@ insert_ret:
  * assume card is already removed, don't touch the hardware
  */
 static void
+pcan_do_suspend(pcan_maci_t *pcan_p)
+{
+	int ret;
+	if (pcan_p->pcan_flag & PCAN_CARD_LINKUP) {
+		if (pcan_p->pcan_connect_timeout_id != 0) {
+			(void) untimeout(pcan_p->pcan_connect_timeout_id);
+			pcan_p->pcan_connect_timeout_id = 0;
+		}
+		mutex_enter(&pcan_p->pcan_glock);
+		pcan_p->pcan_flag &= ~PCAN_CARD_LINKUP;
+		if (ret = pcan_set_cmd(pcan_p, AN_CMD_DISABLE, 0))
+			PCANDBG((CE_NOTE, "pcan: disable failed, ret %d\n",
+			    ret));
+		if (ret = pcan_loaddef(pcan_p))
+			PCANDBG((CE_NOTE, "pcan: loaddef failed, ret %d\n",
+			    ret));
+		mac_link_update(GLD3(pcan_p), LINK_STATE_DOWN);
+		mutex_exit(&pcan_p->pcan_glock);
+	}
+	pcan_p->pcan_flag |= PCAN_SUSPENDED;
+}
+
+
+/*
+ * assume card is already removed, don't touch the hardware
+ */
+static void
 pcan_card_remove(pcan_maci_t *pcan_p)
 {
 	int ret;
@@ -870,6 +928,23 @@ pcan_card_remove(pcan_maci_t *pcan_p)
 
 	if (!(pcan_p->pcan_flag & PCAN_CARD_READY))
 		return;
+	if (pcan_p->pcan_connect_timeout_id != 0) {
+		(void) untimeout(pcan_p->pcan_connect_timeout_id);
+		pcan_p->pcan_connect_timeout_id = 0;
+	}
+
+	if (pcan_p->pcan_flag & PCAN_CARD_LINKUP) {
+		pcan_p->pcan_flag &= ~PCAN_CARD_LINKUP;
+		mac_link_update(GLD3(pcan_p), LINK_STATE_DOWN);
+	}
+	mutex_enter(&pcan_p->pcan_glock);
+	if (pcan_p->pcan_flag & PCAN_CARD_INTREN) {
+		pcan_stop_locked(pcan_p);
+		pcan_p->pcan_flag |= PCAN_PLUMBED;
+	}
+	pcan_p->pcan_flag &= ~PCAN_CARD_READY;
+	mutex_exit(&pcan_p->pcan_glock);
+
 	if (ret = csx_ReleaseConfiguration(pcan_p->pcan_chdl, NULL))
 		cmn_err(CE_WARN, "pcan: ReleaseConfiguration failed %x\n", ret);
 
@@ -878,6 +953,7 @@ pcan_card_remove(pcan_maci_t *pcan_p)
 		cmn_err(CE_WARN, "pcan: ReleaseIRQ failed %x\n", ret);
 
 	ddi_remove_softintr(pcan_p->pcan_softint_id);
+	pcan_p->pcan_softint_id  = 0;
 
 	bzero(&io, sizeof (io));
 	io.BasePort1.handle = pcan_p->pcan_port;
@@ -886,7 +962,7 @@ pcan_card_remove(pcan_maci_t *pcan_p)
 		cmn_err(CE_WARN, "pcan: Release IO failed %x\n", ret);
 
 	pcan_p->pcan_port = 0;
-	pcan_p->pcan_flag &= ~PCAN_CARD_READY;
+	PCANDBG((CE_NOTE, "pcan: removed\n"));
 }
 
 /*
@@ -973,7 +1049,7 @@ pcan_send(pcan_maci_t *pcan_p, mblk_t *mblk_p)
 #ifdef PCAN_SEND_DEBUG
 	struct an_ltv_status radio_status;
 #endif /* PCAN_SEND_DEBUG */
-	uint16_t pkt_len, xmt_id, ring_idx;
+	uint16_t pkt_len, xmt_id, ring_idx, r = 0;
 	struct ieee80211_frame *wh;
 	int i = 0;
 
@@ -1084,7 +1160,7 @@ pcan_send(pcan_maci_t *pcan_p, mblk_t *mblk_p)
 	(void) WRCH1(pcan_p, xmt_id, 0, (uint16_t *)buf_p, 0x38); /* frm */
 	(void) WRPKT(pcan_p, xmt_id, 0x38, (uint16_t *)(buf_p + 0x38),
 	    pkt_len + 12);
-	ring_idx = pcan_set_cmd(pcan_p, AN_CMD_TX, xmt_id);
+	r = pcan_set_cmd(pcan_p, AN_CMD_TX, xmt_id);
 	mutex_exit(&pcan_p->pcan_glock);
 
 	PCANDBG((CE_NOTE, "pcan: pkt_len=0x44+%x=%x xmt=%x ret=%x\n",
@@ -1097,7 +1173,7 @@ pcan_send(pcan_maci_t *pcan_p, mblk_t *mblk_p)
 		PCANDBG((CE_NOTE, "pcan: radio status:\n"));
 	}
 #endif /* PCAN_SEND_DEBUG */
-	if (ring_idx)
+	if (r)
 		return (PCAN_FAIL);
 	else {
 		freemsg(mblk_p);
@@ -1214,7 +1290,8 @@ pcan_tx(void *arg, mblk_t *mp)
 	if ((pcan_p->pcan_flag & (PCAN_CARD_LINKUP | PCAN_CARD_READY)) !=
 	    (PCAN_CARD_LINKUP | PCAN_CARD_READY)) {
 		mutex_exit(&pcan_p->pcan_glock);
-		return (mp);
+		freemsgchain(mp);
+		return (NULL);
 	}
 	mutex_exit(&pcan_p->pcan_glock);
 	while (mp != NULL) {
@@ -2336,7 +2413,6 @@ pcan_scanresult_ltv(int rw, pcan_maci_t *pcan_p, uint16_t type,
     struct an_ltv_scanresult *scanresult_p)
 {
 	uint16_t ret, len;
-
 	if (rw != PCAN_READ_LTV) {
 		cmn_err(CE_WARN, "pcan scan_ltv: readonly rid %x\n", type);
 		return (PCAN_FAIL);
@@ -4206,6 +4282,10 @@ pcan_getset(mblk_t *mp, pcan_maci_t *pcan_p, uint32_t cmd)
 			pcan_p->pcan_connect_timeout_id = 0;
 		}
 		mutex_enter(&pcan_p->pcan_glock);
+		if (!(pcan_p->pcan_flag & PCAN_CARD_READY)) {
+			mutex_exit(&pcan_p->pcan_glock);
+			return (PCAN_FAIL);
+		}
 		ret = pcan_cmd_scan(pcan_p);
 		/*
 		 * a trick here.
@@ -4239,6 +4319,10 @@ pcan_getset(mblk_t *mp, pcan_maci_t *pcan_p, uint32_t cmd)
 			pcan_p->pcan_connect_timeout_id = 0;
 		}
 		mutex_enter(&pcan_p->pcan_glock);
+		if (!(pcan_p->pcan_flag & PCAN_CARD_READY)) {
+			mutex_exit(&pcan_p->pcan_glock);
+			return (PCAN_FAIL);
+		}
 		pcan_p->pcan_flag &= ~PCAN_CARD_LINKUP;
 		if (ret = pcan_set_cmd(pcan_p, AN_CMD_DISABLE, 0)) {
 			ret = (int)WL_HW_ERROR;
@@ -4258,6 +4342,10 @@ pcan_getset(mblk_t *mp, pcan_maci_t *pcan_p, uint32_t cmd)
 			pcan_p->pcan_connect_timeout_id = 0;
 		}
 		mutex_enter(&pcan_p->pcan_glock);
+		if (!(pcan_p->pcan_flag & PCAN_CARD_READY)) {
+			mutex_exit(&pcan_p->pcan_glock);
+			return (PCAN_FAIL);
+		}
 		if (ret = pcan_set_cmd(pcan_p, AN_CMD_DISABLE, 0)) {
 			ret = (int)WL_HW_ERROR;
 			break;
@@ -4507,7 +4595,7 @@ pcan_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 	case MAC_PROP_WL_SETOPTIE:
 	case MAC_PROP_WL_MLME:
 		cmn_err(CE_WARN, "pcan_getprop:"
-		    "opmode not support\n");
+		    "opmode not support %x\n", wldp_pr_num);
 		err = ENOTSUP;
 		break;
 	default:
