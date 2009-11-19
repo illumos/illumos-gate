@@ -136,6 +136,15 @@ srpt_stp_start_srp(srpt_target_port_t *tgt)
 			goto srp_start_err;
 		}
 	}
+
+	/* don't online if we have no active ports */
+	if (tgt->tp_num_active_ports == 0) {
+		SRPT_DPRINTF_L2("start_srp, no ports active for svc_id %016llx",
+		    (u_longlong_t)tgt->tp_ibt_svc_id);
+		status = IBT_HCA_PORT_NOT_ACTIVE;
+		goto srp_start_err;
+	}
+
 	tgt->tp_srp_enabled = 1;
 
 	/*
@@ -153,7 +162,9 @@ srpt_stp_start_srp(srpt_target_port_t *tgt)
 		    &ioc->ioc_profile, &ioc->ioc_svc);
 		if (ioc->ioc_ibdma_hdl == NULL) {
 			SRPT_DPRINTF_L1("start_srp, Unable to register"
-			    " I/O Profile (%d)", status);
+			    " I/O Profile for svc_id %016llx",
+			    (u_longlong_t)tgt->tp_ibt_svc_id);
+			status = IBT_FAILURE;
 			goto srp_start_err;
 		}
 	} else {
@@ -162,7 +173,9 @@ srpt_stp_start_srp(srpt_target_port_t *tgt)
 		    &ioc->ioc_profile, &ioc->ioc_svc);
 		if (dma_status != IBDMA_SUCCESS) {
 			SRPT_DPRINTF_L1("start_srp, Unable to update I/O"
-			    " Profile (%d)", dma_status);
+			    " Profile for svc_id %016llxi (%d)",
+			    (u_longlong_t)tgt->tp_ibt_svc_id, dma_status);
+			status = IBT_FAILURE;
 			goto srp_start_err;
 		}
 	}
@@ -172,6 +185,7 @@ srpt_stp_start_srp(srpt_target_port_t *tgt)
 srp_start_err:
 	tgt->tp_srp_enabled = 0;
 	srpt_ioc_svc_unbind_all(tgt);
+	tgt->tp_num_active_ports = 0;
 	if (tgt->tp_ibt_svc_hdl != NULL) {
 		(void) ibt_deregister_service(srpt_ctxt->sc_ibt_hdl,
 		    tgt->tp_ibt_svc_hdl);
@@ -333,8 +347,11 @@ srpt_stp_alloc_port(srpt_ioc_t *ioc, ib_guid_t guid)
 	tgt->tp_nports  = ioc->ioc_attr.hca_nports;
 	tgt->tp_hw_port =
 	    kmem_zalloc(sizeof (srpt_hw_port_t) * tgt->tp_nports, KM_SLEEP);
+	tgt->tp_num_active_ports = 0;
+	tgt->tp_requested_state = SRPT_TGT_STATE_OFFLINE;
 
 	tgt->tp_scsi_devid = srpt_stp_alloc_scsi_devid_desc(tgt->tp_ibt_svc_id);
+
 	lport->lport_id = tgt->tp_scsi_devid;
 	lport->lport_pp = srpt_ctxt->sc_pp;
 	lport->lport_ds	= ioc->ioc_stmf_ds;
@@ -976,6 +993,7 @@ srpt_stp_ctl(struct stmf_local_port *lport, int cmd, void *arg)
 	stmf_change_status_t		cstatus;
 	stmf_status_t			status;
 	srpt_target_port_t		*tgt;
+	char				*why;
 
 	ASSERT(sc_info != NULL);
 	ASSERT(lport != NULL);
@@ -983,8 +1001,13 @@ srpt_stp_ctl(struct stmf_local_port *lport, int cmd, void *arg)
 	tgt = lport->lport_port_private;
 	ASSERT(tgt->tp_ioc != NULL);
 
-	SRPT_DPRINTF_L2("stp_ctl, invoked for LPORT (0x%016llx), cmd (%d)",
-	    (u_longlong_t)tgt->tp_ibt_svc_id, cmd);
+	why = sc_info->st_additional_info;
+	if (why == NULL) {
+		why = "<null>";
+	}
+
+	SRPT_DPRINTF_L2("stp_ctl, invoked for LPORT (0x%016llx), cmd (%d), "
+	    "info (%s)", (u_longlong_t)tgt->tp_ibt_svc_id, cmd, why);
 
 	cstatus.st_completion_status = STMF_SUCCESS;
 	cstatus.st_additional_info = NULL;
@@ -1000,21 +1023,32 @@ srpt_stp_ctl(struct stmf_local_port *lport, int cmd, void *arg)
 		 * either go away or become enabled.
 		 */
 		mutex_enter(&tgt->tp_lock);
+
+		tgt->tp_requested_state = SRPT_TGT_STATE_ONLINE;
+
 		if (tgt->tp_drv_disabled != 0) {
 			SRPT_DPRINTF_L1("stp_ctl, set LPORT_ONLINE failed - "
 			    "LPORT (0x%016llx) BUSY",
 			    (u_longlong_t)tgt->tp_ibt_svc_id);
 			cstatus.st_completion_status = STMF_BUSY;
-		} else if (tgt->tp_state == SRPT_TGT_STATE_ONLINE) {
+		} else if ((tgt->tp_state == SRPT_TGT_STATE_ONLINE) ||
+		    (tgt->tp_state == SRPT_TGT_STATE_ONLINING)) {
 			cstatus.st_completion_status = STMF_ALREADY;
 		} else if (tgt->tp_state != SRPT_TGT_STATE_OFFLINE) {
 			cstatus.st_completion_status = STMF_INVALID_ARG;
 		} else {
 			tgt->tp_state = SRPT_TGT_STATE_ONLINING;
 			status = srpt_stp_start_srp(tgt);
-			if (status != STMF_SUCCESS) {
+			if (status != IBT_SUCCESS) {
 				tgt->tp_state = SRPT_TGT_STATE_OFFLINE;
 				cstatus.st_completion_status = STMF_INVALID_ARG;
+				if (tgt->tp_num_active_ports == 0) {
+					SRPT_DPRINTF_L1(
+					    "stp_ctl, no ports active "
+					    "for HCA 0x%016llx. Target will "
+					    "not be placed online.",
+					    (u_longlong_t)tgt->tp_ibt_svc_id);
+				}
 			}
 		}
 		mutex_exit(&tgt->tp_lock);
@@ -1030,9 +1064,23 @@ srpt_stp_ctl(struct stmf_local_port *lport, int cmd, void *arg)
 		break;
 
 	case STMF_CMD_LPORT_OFFLINE:
-		SRPT_DPRINTF_L2("stp_ctl, LPORT_OFFLINE");
+		SRPT_DPRINTF_L2("stp_ctl, LPORT_OFFLINE command,"
+		    " st_rflags(0x%llx)", (u_longlong_t)sc_info->st_rflags);
 		mutex_enter(&tgt->tp_lock);
-		if (tgt->tp_state == SRPT_TGT_STATE_OFFLINE) {
+
+		/*
+		 * Only keep persistent state if explicitly requested by user
+		 * action, such as stmfadm offline-target or
+		 * svcadm disable stmf.
+		 * If not requested by the user, this was likely triggered by
+		 * not having any HCA ports active.
+		 */
+		if (sc_info->st_rflags & STMF_RFLAG_USER_REQUEST) {
+			tgt->tp_requested_state = SRPT_TGT_STATE_OFFLINE;
+		}
+
+		if ((tgt->tp_state == SRPT_TGT_STATE_OFFLINE) ||
+		    (tgt->tp_state == SRPT_TGT_STATE_OFFLINING)) {
 			cstatus.st_completion_status = STMF_ALREADY;
 		} else if (tgt->tp_state != SRPT_TGT_STATE_ONLINE) {
 			cstatus.st_completion_status = STMF_INVALID_ARG;

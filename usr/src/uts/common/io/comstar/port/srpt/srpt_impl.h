@@ -298,6 +298,13 @@ typedef struct srpt_target_port_s {
 
 	uint_t			tp_nports;
 	srpt_hw_port_t		*tp_hw_port;
+	/*
+	 * track the number of active ports so we can offline the target if
+	 * none
+	 */
+	uint32_t		tp_num_active_ports;
+	/* state STMF wants the target in.  We may be offline due to no ports */
+	srpt_target_state_t	tp_requested_state;
 } srpt_target_port_t;
 
 /*
