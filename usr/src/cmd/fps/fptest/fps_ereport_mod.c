@@ -197,7 +197,7 @@ fps_post_ereport(nvlist_t *ereport)
 	(void) sleep(1);
 
 	(void) fflush(NULL);
-	sysevent_evc_unbind(scp);
+	(void) sysevent_evc_unbind(scp);
 
 	return (0);
 }

@@ -6060,7 +6060,7 @@ zonecfg_notify_bind(int(*func)(const char *zonename, zoneid_t zid,
 
 	return (zevtchan);
 out1:
-	sysevent_evc_unbind(zevtchan->zn_eventchan);
+	(void) sysevent_evc_unbind(zevtchan->zn_eventchan);
 out2:
 	(void) pthread_mutex_destroy(&zevtchan->zn_mutex);
 	(void) pthread_cond_destroy(&zevtchan->zn_cond);
@@ -6077,7 +6077,7 @@ zonecfg_notify_unbind(void *handle)
 
 	int ret;
 
-	sysevent_evc_unbind(((struct znotify *)handle)->zn_eventchan);
+	(void) sysevent_evc_unbind(((struct znotify *)handle)->zn_eventchan);
 	/*
 	 * Check that all evc threads have gone away. This should be
 	 * enforced by sysevent_evc_unbind.

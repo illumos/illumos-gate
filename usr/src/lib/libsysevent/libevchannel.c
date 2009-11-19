@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <ctype.h>
@@ -35,6 +32,9 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <strings.h>
+#include <pthread.h>
+#include <atomic.h>
+#include <signal.h>
 #include <sys/types.h>
 #include <sys/varargs.h>
 #include <sys/sysevent.h>
@@ -54,7 +54,33 @@
  * sysevent_evc_control	    - various channel based control operation
  */
 
+static void kill_door_servers(evchan_subscr_t *);
+
 #define	misaligned(p)	((uintptr_t)(p) & 3)	/* 4-byte alignment required */
+
+static pthread_key_t nrkey = PTHREAD_ONCE_KEY_NP;
+
+/*
+ * If the current thread is a door server thread servicing a door created
+ * for us in sysevent_evc_xsubscribe, then an attempt to unsubscribe from
+ * within door invocation context on the same channel will deadlock in the
+ * kernel waiting for our own invocation to complete.  Such calls are
+ * forbidden, and we abort if they are encountered (better than hanging
+ * unkillably).
+ *
+ * We'd like to offer this detection to subscriptions established with
+ * sysevent_evc_subscribe, but we don't have control over the door service
+ * threads in that case.  Perhaps the fix is to always use door_xcreate
+ * even for sysevent_evc_subscribe?
+ */
+static boolean_t
+will_deadlock(evchan_t *scp)
+{
+	evchan_subscr_t *subp = pthread_getspecific(nrkey);
+	evchan_impl_hdl_t *hdl = EVCHAN_IMPL_HNDL(scp);
+
+	return (subp != NULL && subp->ev_subhead == hdl ? B_TRUE : B_FALSE);
+}
 
 /*
  * Check syntax of a channel name
@@ -173,14 +199,18 @@ sysevent_evc_bind(const char *channel, evchan_t **scpp, uint32_t flags)
 /*
  * sysevent_evc_unbind - Unbind from previously bound/created channel
  */
-void
+int
 sysevent_evc_unbind(evchan_t *scp)
 {
 	sev_unsubscribe_args_t uargs;
-	evchan_subscr_t *subp, *tofree;
+	evchan_subscr_t *subp;
+	int errcp;
 
 	if (scp == NULL || misaligned(scp))
-		return;
+		return (errno = EINVAL);
+
+	if (will_deadlock(scp))
+		return (errno = EDEADLK);
 
 	(void) mutex_lock(EV_LOCK(scp));
 
@@ -195,19 +225,24 @@ sysevent_evc_unbind(evchan_t *scp)
 		 * drained.
 		 */
 		if (ioctl(EV_FD(scp), SEV_UNSUBSCRIBE, (intptr_t)&uargs) != 0) {
+			errcp = errno;
 			(void) mutex_unlock(EV_LOCK(scp));
-			return;
+			return (errno = errcp);
 		}
 	}
 
-	subp =  (evchan_subscr_t *)(void*)EV_SUB(scp);
-	while (subp->evsub_next != NULL) {
-		tofree = subp->evsub_next;
-		subp->evsub_next = tofree->evsub_next;
-		if (door_revoke(tofree->evsub_door_desc) != 0 && errno == EPERM)
-			(void) close(tofree->evsub_door_desc);
-		free(tofree->evsub_sid);
-		free(tofree);
+	while ((subp =  EV_SUB_NEXT(scp)) != NULL) {
+		EV_SUB_NEXT(scp) = subp->evsub_next;
+
+		/* If door_xcreate was applied we can clean up */
+		if (subp->evsub_attr)
+			kill_door_servers(subp);
+
+		if (door_revoke(subp->evsub_door_desc) != 0 && errno == EPERM)
+			(void) close(subp->evsub_door_desc);
+
+		free(subp->evsub_sid);
+		free(subp);
 	}
 
 	(void) mutex_unlock(EV_LOCK(scp));
@@ -219,6 +254,8 @@ sysevent_evc_unbind(evchan_t *scp)
 	(void) close(EV_FD(scp));
 	(void) mutex_destroy(EV_LOCK(scp));
 	free(scp);
+
+	return (0);
 }
 
 /*
@@ -287,6 +324,13 @@ door_upcall(void *cookie, char *args, size_t alen,
 	evchan_subscr_t *subp = EVCHAN_SUBSCR(cookie);
 	int rval = 0;
 
+	/*
+	 * If we've been invoked simply to kill the thread then
+	 * exit now.
+	 */
+	if (subp->evsub_state == EVCHAN_SUB_STATE_CLOSING)
+		pthread_exit(NULL);
+
 	if (args == NULL || alen <= (size_t)0) {
 		/* Skip callback execution */
 		rval = EINVAL;
@@ -304,13 +348,106 @@ door_upcall(void *cookie, char *args, size_t alen,
 	(void) door_return(args, alen, NULL, 0);
 }
 
+static pthread_once_t xsub_thrattr_once = PTHREAD_ONCE_INIT;
+static pthread_attr_t xsub_thrattr;
+
+static void
+xsub_thrattr_init(void)
+{
+	(void) pthread_attr_init(&xsub_thrattr);
+	(void) pthread_attr_setdetachstate(&xsub_thrattr,
+	    PTHREAD_CREATE_DETACHED);
+	(void) pthread_attr_setscope(&xsub_thrattr, PTHREAD_SCOPE_SYSTEM);
+}
+
 /*
- * sysevent_evc_subscribe - Subscribe to an existing event channel
+ * Our door server create function is only called during initial
+ * door_xcreate since we specify DOOR_NO_DEPLETION_CB.
  */
 int
-sysevent_evc_subscribe(evchan_t *scp, const char *sid, const char *class,
+xsub_door_server_create(door_info_t *dip, void *(*startf)(void *),
+    void *startfarg, void *cookie)
+{
+	evchan_subscr_t *subp = EVCHAN_SUBSCR(cookie);
+	struct sysevent_subattr_impl *xsa = subp->evsub_attr;
+	pthread_attr_t *thrattr;
+	sigset_t oset;
+	int err;
+
+	if (subp->evsub_state == EVCHAN_SUB_STATE_CLOSING)
+		return (0);	/* shouldn't happen, but just in case */
+
+	/*
+	 * If sysevent_evc_xsubscribe was called electing to use a
+	 * different door server create function then let it take it
+	 * from here.
+	 */
+	if (xsa->xs_thrcreate) {
+		return (xsa->xs_thrcreate(dip, startf, startfarg,
+		    xsa->xs_thrcreate_cookie));
+	}
+
+	if (xsa->xs_thrattr == NULL) {
+		(void) pthread_once(&xsub_thrattr_once, xsub_thrattr_init);
+		thrattr = &xsub_thrattr;
+	} else {
+		thrattr = xsa->xs_thrattr;
+	}
+
+	(void) pthread_sigmask(SIG_SETMASK, &xsa->xs_sigmask, &oset);
+	err = pthread_create(NULL, thrattr, startf, startfarg);
+	(void) pthread_sigmask(SIG_SETMASK, &oset, NULL);
+
+	return (err == 0 ? 1 : -1);
+}
+
+void
+xsub_door_server_setup(void *cookie)
+{
+	evchan_subscr_t *subp = EVCHAN_SUBSCR(cookie);
+	struct sysevent_subattr_impl *xsa = subp->evsub_attr;
+
+	if (xsa->xs_thrsetup == NULL) {
+		(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
+		(void) pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
+	}
+
+	(void) pthread_setspecific(nrkey, (void *)subp);
+
+	if (xsa->xs_thrsetup)
+		xsa->xs_thrsetup(xsa->xs_thrsetup_cookie);
+}
+
+/*
+ * Cause private door server threads to exit.  We have already performed the
+ * unsubscribe ioctl which stops new invocations and waits until all
+ * existing invocations are complete.  So all server threads should be
+ * blocked in door_return.  The door has not yet been revoked.  We will
+ * invoke repeatedly after setting the evsub_state to be noticed on
+ * wakeup; each invocation will result in the death of one server thread.
+ *
+ * You'd think it would be easier to kill these threads, such as through
+ * pthread_cancel.  Unfortunately door_return is not a cancellation point,
+ * and if you do cancel a thread blocked in door_return the EINTR check in
+ * the door_return assembly logic causes us to loop with EINTR forever!
+ */
+static void
+kill_door_servers(evchan_subscr_t *subp)
+{
+	door_arg_t da;
+	int i;
+
+	bzero(&da, sizeof (da));
+	subp->evsub_state = EVCHAN_SUB_STATE_CLOSING;
+	membar_producer();
+
+	(void) door_call(subp->evsub_door_desc, &da);
+}
+
+static int
+sysevent_evc_subscribe_cmn(evchan_t *scp, const char *sid, const char *class,
     int (*event_handler)(sysevent_t *ev, void *cookie),
-    void *cookie, uint32_t flags)
+    void *cookie, uint32_t flags, struct sysevent_subattr_impl *xsa)
 {
 	evchan_subscr_t *subp;
 	int upcall_door;
@@ -342,6 +479,9 @@ sysevent_evc_subscribe(evchan_t *scp, const char *sid, const char *class,
 		return (errno = EINVAL);
 	}
 
+	if (pthread_key_create_once_np(&nrkey, NULL) != 0)
+		return (errno);	/* ENOMEM or EAGAIN */
+
 	/* Create subscriber data */
 	if ((subp = calloc(1, sizeof (evchan_subscr_t))) == NULL) {
 		return (errno);
@@ -361,8 +501,29 @@ sysevent_evc_subscribe(evchan_t *scp, const char *sid, const char *class,
 		class_len = 0;
 	}
 
-	upcall_door = door_create(door_upcall, (void *)subp,
-	    DOOR_REFUSE_DESC | DOOR_NO_CANCEL);
+	/*
+	 * Fill this in now for the xsub_door_server_setup dance
+	 */
+	subp->ev_subhead = EVCHAN_IMPL_HNDL(scp);
+	subp->evsub_state = EVCHAN_SUB_STATE_ACTIVE;
+
+	if (xsa == NULL) {
+		upcall_door = door_create(door_upcall, (void *)subp,
+		    DOOR_REFUSE_DESC | DOOR_NO_CANCEL);
+	} else {
+		subp->evsub_attr = xsa;
+
+		/*
+		 * Create a private door with exactly one thread to
+		 * service the callbacks (the GPEC kernel implementation
+		 * serializes deliveries for each subscriber id).
+		 */
+		upcall_door = door_xcreate(door_upcall, (void *)subp,
+		    DOOR_REFUSE_DESC | DOOR_NO_CANCEL | DOOR_NO_DEPLETION_CB,
+		    xsub_door_server_create, xsub_door_server_setup,
+		    (void *)subp, 1);
+	}
+
 	if (upcall_door == -1) {
 		ec = errno;
 		free(subp->evsub_sid);
@@ -377,8 +538,6 @@ sysevent_evc_subscribe(evchan_t *scp, const char *sid, const char *class,
 
 	(void) mutex_lock(EV_LOCK(scp));
 
-	subp->ev_subhead = EVCHAN_IMPL_HNDL(scp);
-
 	uargs.sid.name = (uintptr_t)sid;
 	uargs.sid.len = sid_len;
 	uargs.class_info.name = (uintptr_t)class;
@@ -388,6 +547,8 @@ sysevent_evc_subscribe(evchan_t *scp, const char *sid, const char *class,
 	if (ioctl(EV_FD(scp), SEV_SUBSCRIBE, (intptr_t)&uargs) != 0) {
 		ec = errno;
 		(void) mutex_unlock(EV_LOCK(scp));
+		if (xsa)
+			kill_door_servers(subp);
 		(void) door_revoke(upcall_door);
 		free(subp->evsub_sid);
 		free(subp);
@@ -404,27 +565,145 @@ sysevent_evc_subscribe(evchan_t *scp, const char *sid, const char *class,
 }
 
 /*
+ * sysevent_evc_subscribe - subscribe to an existing event channel
+ * using a non-private door (which will create as many server threads
+ * as the apparent maximum concurrency requirements suggest).
+ */
+int
+sysevent_evc_subscribe(evchan_t *scp, const char *sid, const char *class,
+    int (*event_handler)(sysevent_t *ev, void *cookie),
+    void *cookie, uint32_t flags)
+{
+	return (sysevent_evc_subscribe_cmn(scp, sid, class, event_handler,
+	    cookie, flags, NULL));
+}
+
+static void
+subattr_dfltinit(struct sysevent_subattr_impl *xsa)
+{
+	(void) sigfillset(&xsa->xs_sigmask);
+	(void) sigdelset(&xsa->xs_sigmask, SIGABRT);
+}
+
+static struct sysevent_subattr_impl dfltsa;
+pthread_once_t dfltsa_inited = PTHREAD_ONCE_INIT;
+
+static void
+init_dfltsa(void)
+{
+	subattr_dfltinit(&dfltsa);
+}
+
+/*
+ * sysevent_evc_subscribe - subscribe to an existing event channel
+ * using a private door with control over thread creation.
+ */
+int
+sysevent_evc_xsubscribe(evchan_t *scp, const char *sid, const char *class,
+    int (*event_handler)(sysevent_t *ev, void *cookie),
+    void *cookie, uint32_t flags, sysevent_subattr_t *attr)
+{
+	struct sysevent_subattr_impl sa;
+	struct sysevent_subattr_impl *xsa;
+
+	if (attr != NULL) {
+		xsa = (struct sysevent_subattr_impl *)attr;
+	} else {
+		xsa = &dfltsa;
+		(void) pthread_once(&dfltsa_inited, init_dfltsa);
+	}
+
+	return (sysevent_evc_subscribe_cmn(scp, sid, class, event_handler,
+	    cookie, flags, xsa));
+}
+
+sysevent_subattr_t *
+sysevent_subattr_alloc(void)
+{
+	struct sysevent_subattr_impl *xsa = calloc(1, sizeof (*xsa));
+
+	if (xsa != NULL)
+		subattr_dfltinit(xsa);
+
+	return (xsa != NULL ? (sysevent_subattr_t *)xsa : NULL);
+}
+
+void
+sysevent_subattr_free(sysevent_subattr_t *attr)
+{
+	struct sysevent_subattr_impl *xsa =
+	    (struct sysevent_subattr_impl *)attr;
+
+	free(xsa);
+}
+
+void
+sysevent_subattr_thrcreate(sysevent_subattr_t *attr,
+    door_xcreate_server_func_t *thrcreate, void *cookie)
+{
+	struct sysevent_subattr_impl *xsa =
+	    (struct sysevent_subattr_impl *)attr;
+
+	xsa->xs_thrcreate = thrcreate;
+	xsa->xs_thrcreate_cookie = cookie;
+}
+
+void
+sysevent_subattr_thrsetup(sysevent_subattr_t *attr,
+    door_xcreate_thrsetup_func_t *thrsetup, void *cookie)
+{
+	struct sysevent_subattr_impl *xsa =
+	    (struct sysevent_subattr_impl *)attr;
+
+	xsa->xs_thrsetup = thrsetup;
+	xsa->xs_thrsetup_cookie = cookie;
+}
+
+void
+sysevent_subattr_sigmask(sysevent_subattr_t *attr, sigset_t *set)
+{
+	struct sysevent_subattr_impl *xsa =
+	    (struct sysevent_subattr_impl *)attr;
+
+	if (set) {
+		xsa->xs_sigmask = *set;
+	} else {
+		(void) sigfillset(&xsa->xs_sigmask);
+		(void) sigdelset(&xsa->xs_sigmask, SIGABRT);
+	}
+}
+
+void
+sysevent_subattr_thrattr(sysevent_subattr_t *attr, pthread_attr_t *thrattr)
+{
+	struct sysevent_subattr_impl *xsa =
+	    (struct sysevent_subattr_impl *)attr;
+
+	xsa->xs_thrattr = thrattr;
+}
+
+/*
  * sysevent_evc_unsubscribe - Unsubscribe from an existing event channel
  */
-void
+int
 sysevent_evc_unsubscribe(evchan_t *scp, const char *sid)
 {
 	int all_subscribers = 0;
 	sev_unsubscribe_args_t uargs;
-	evchan_subscr_t *subp, *tofree;
+	evchan_subscr_t *subp, *prevsubp, *tofree;
+	int errcp;
 	int rc;
 
 	if (scp == NULL || misaligned(scp))
-		return;
+		return (errno = EINVAL);
 
 	if (sid == NULL || strlen(sid) == 0 ||
 	    (strlen(sid) >= MAX_SUBID_LEN))
-		return;
+		return (errno = EINVAL);
 
 	/* No inheritance of binding handles via fork() */
-	if (EV_PID(scp) != getpid()) {
-		return;
-	}
+	if (EV_PID(scp) != getpid())
+		return (errno = EINVAL);
 
 	if (strcmp(sid, EVCH_ALLSUB) == 0) {
 		all_subscribers++;
@@ -436,6 +715,9 @@ sysevent_evc_unsubscribe(evchan_t *scp, const char *sid)
 		uargs.sid.len = strlen(sid) + 1;
 	}
 
+	if (will_deadlock(scp))
+		return (errno = EDEADLK);
+
 	(void) mutex_lock(EV_LOCK(scp));
 
 	/*
@@ -444,31 +726,50 @@ sysevent_evc_unsubscribe(evchan_t *scp, const char *sid)
 	rc = ioctl(EV_FD(scp), SEV_UNSUBSCRIBE, (intptr_t)&uargs);
 
 	if (rc != 0) {
+		errcp = errno;
 		(void) mutex_unlock(EV_LOCK(scp));
-		return;
+		return (errno = errcp); /* EFAULT, ENXIO, EINVAL possible */
 	}
 
-	/* Search for the matching subscriber */
-	subp =  (evchan_subscr_t *)(void*)EV_SUB(scp);
-	while (subp->evsub_next != NULL) {
 
-		if (all_subscribers ||
-		    (strcmp(subp->evsub_next->evsub_sid, sid) == 0)) {
+	/*
+	 * Search for the matching subscriber.  If EVCH_ALLSUB was specified
+	 * then the ioctl above will have returned 0 even if there are
+	 * no subscriptions, so the initial EV_SUB_NEXT can be NULL.
+	 */
+	prevsubp = NULL;
+	subp =  EV_SUB_NEXT(scp);
+	while (subp != NULL) {
+		if (all_subscribers || strcmp(subp->evsub_sid, sid) == 0) {
+			if (prevsubp == NULL) {
+				EV_SUB_NEXT(scp) = subp->evsub_next;
+			} else {
+				prevsubp->evsub_next = subp->evsub_next;
+			}
 
-			tofree = subp->evsub_next;
-			subp->evsub_next = tofree->evsub_next;
+			tofree = subp;
+			subp = subp->evsub_next;
+
+			/* If door_xcreate was applied we can clean up */
+			if (tofree->evsub_attr)
+				kill_door_servers(tofree);
+
 			(void) door_revoke(tofree->evsub_door_desc);
 			free(tofree->evsub_sid);
 			free(tofree);
-			/* Freed single subscriber already */
-			if (all_subscribers == 0) {
+
+			/* Freed single subscriber already? */
+			if (all_subscribers == 0)
 				break;
-			}
-		} else
+		} else {
+			prevsubp = subp;
 			subp = subp->evsub_next;
+		}
 	}
 
 	(void) mutex_unlock(EV_LOCK(scp));
+
+	return (0);
 }
 
 /*

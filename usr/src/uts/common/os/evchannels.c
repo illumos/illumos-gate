@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains the source of the general purpose event channel extension
@@ -69,6 +67,9 @@
 
 #define	EVCH_EVQ_EVCOUNT(x)	((&(x)->eq_eventq)->sq_count)
 #define	EVCH_EVQ_HIGHWM(x)	((&(x)->eq_eventq)->sq_highwm)
+
+#define	CH_HOLD_PEND		1
+#define	CH_HOLD_PEND_INDEF	2
 
 struct evch_globals {
 	evch_dlist_t evch_list;
@@ -320,7 +321,8 @@ evch_zonefree(zoneid_t zoneid, void *arg)
 		 */
 		mutex_enter(&chp->ch_mutex);
 		ASSERT(chp->ch_bindings == 0);
-		ASSERT(evch_dl_getnum(&chp->ch_subscr) != 0);
+		ASSERT(evch_dl_getnum(&chp->ch_subscr) != 0 ||
+		    chp->ch_holdpend == CH_HOLD_PEND_INDEF);
 
 		/* Forcibly unsubscribe each remaining subscription */
 		while ((sdp = evch_dl_next(&chp->ch_subscr, NULL)) != NULL) {
@@ -800,17 +802,50 @@ evch_namecmp(evch_dlelem_t *ep, char *s)
 }
 
 /*
+ * Simple wildcarded match test of event class string 'class' to
+ * wildcarded subscription string 'pat'.  Recursive only if
+ * 'pat' includes a wildcard, otherwise essentially just strcmp.
+ */
+static int
+evch_clsmatch(char *class, const char *pat)
+{
+	char c;
+
+	do {
+		if ((c = *pat++) == '\0')
+			return (*class == '\0');
+
+		if (c == '*') {
+			while (*pat == '*')
+				pat++; /* consecutive *'s can be collapsed */
+
+			if (*pat == '\0')
+				return (1);
+
+			while (*class != '\0') {
+				if (evch_clsmatch(class++, pat) != 0)
+					return (1);
+			}
+
+			return (0);
+		}
+	} while (c == *class++);
+
+	return (0);
+}
+
+/*
  * Sysevent filter callback routine. Enables event delivery only if it matches
- * the event class string given by parameter cookie.
+ * the event class pattern string given by parameter cookie.
  */
 static int
 evch_class_filter(void *ev, void *cookie)
 {
-	char *class = (char *)cookie;
+	const char *pat = (const char *)cookie;
 
-	if (class == NULL || strcmp(SE_CLASS_NAME(ev), class) == 0) {
+	if (pat == NULL || evch_clsmatch(SE_CLASS_NAME(ev), pat))
 		return (EVQ_DELIVER);
-	}
+
 	return (EVQ_IGNORE);
 }
 
@@ -1061,8 +1096,13 @@ evch_chbind(const char *chnam, evch_bind_t **scpp, uint32_t flags)
 			p->ch_maxsubscr = EVCH_MAX_SUBSCRIPTIONS;
 			p->ch_maxbinds = evch_bindings_max;
 			p->ch_ctime = gethrestime_sec();
-			if (flags & EVCH_HOLD_PEND) {
-				p->ch_holdpend = 1;
+
+			if (flags & (EVCH_HOLD_PEND | EVCH_HOLD_PEND_INDEF)) {
+				if (flags & EVCH_HOLD_PEND_INDEF)
+					p->ch_holdpend = CH_HOLD_PEND_INDEF;
+				else
+					p->ch_holdpend = CH_HOLD_PEND;
+
 				evch_evq_stop(p->ch_queue);
 			}
 
@@ -1114,9 +1154,13 @@ evch_chunbind(evch_bind_t *bp)
 	ASSERT(chp->ch_bindings > 0);
 	chp->ch_bindings--;
 	kmem_free(bp, sizeof (evch_bind_t));
-	if (chp->ch_bindings == 0 && evch_dl_getnum(&chp->ch_subscr) == 0) {
+	if (chp->ch_bindings == 0 && evch_dl_getnum(&chp->ch_subscr) == 0 &&
+	    (chp->ch_nevents == 0 || chp->ch_holdpend != CH_HOLD_PEND_INDEF)) {
 		/*
-		 * No more bindings or persistent subscriber, destroy channel.
+		 * No more bindings and no persistent subscriber(s).  If there
+		 * are no events in the channel then destroy the channel;
+		 * otherwise destroy the channel only if we're not holding
+		 * pending events indefinitely.
 		 */
 		mutex_exit(&chp->ch_mutex);
 		evch_dl_del(&eg->evch_list, &chp->ch_link);
@@ -1129,6 +1173,23 @@ evch_chunbind(evch_bind_t *bp)
 	} else
 		mutex_exit(&chp->ch_mutex);
 	mutex_exit(&eg->evch_list_lock);
+}
+
+static int
+wildcard_count(const char *class)
+{
+	int count = 0;
+	char c;
+
+	if (class == NULL)
+		return (0);
+
+	while ((c = *class++) != '\0') {
+		if (c == '*')
+			count++;
+	}
+
+	return (count);
 }
 
 /*
@@ -1155,6 +1216,14 @@ evch_chsubscribe(evch_bind_t *bp, int dtype, const char *sid, const char *class,
 	 */
 	if (flags & ~(EVCH_SUB_KEEP | EVCH_SUB_DUMP))
 		return (EINVAL);
+
+	/*
+	 * Enforce a limit on the number of wildcards allowed in the class
+	 * subscription string (limits recursion in pattern matching).
+	 */
+	if (wildcard_count(class) > EVCH_WILDCARD_MAX)
+		return (EINVAL);
+
 	/*
 	 * Check if we have already a subscription with that name and if we
 	 * have to reconnect the subscriber to a persistent subscription.
@@ -1757,7 +1826,7 @@ sysevent_evc_bind(const char *ch_name, evchan_t **scpp, uint32_t flags)
 	return (evch_chbind(ch_name, (evch_bind_t **)scpp, flags));
 }
 
-void
+int
 sysevent_evc_unbind(evchan_t *scp)
 {
 	evch_bind_t *bp = (evch_bind_t *)scp;
@@ -1765,6 +1834,8 @@ sysevent_evc_unbind(evchan_t *scp)
 	ASSERT(scp != NULL);
 	evch_chunsubscribe(bp, NULL, 0);
 	evch_chunbind(bp);
+
+	return (0);
 }
 
 int
@@ -1784,7 +1855,7 @@ sysevent_evc_subscribe(evchan_t *scp, const char *sid, const char *class,
 	    (void *)callb, cookie, 0, 0));
 }
 
-void
+int
 sysevent_evc_unsubscribe(evchan_t *scp, const char *sid)
 {
 	ASSERT(scp != NULL && sid != NULL);
@@ -1792,6 +1863,8 @@ sysevent_evc_unsubscribe(evchan_t *scp, const char *sid)
 		sid = NULL;
 	}
 	evch_chunsubscribe((evch_bind_t *)scp, sid, 0);
+
+	return (0);
 }
 
 /*

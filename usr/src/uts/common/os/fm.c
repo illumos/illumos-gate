@@ -517,10 +517,10 @@ fm_ereport_post(nvlist_t *ereport, int evc_flag)
 	if (sysevent_evc_publish(error_chan, EC_FM, ESC_FM_ERROR,
 	    SUNW_VENDOR, FM_PUB, ereport, evc_flag) != 0) {
 		atomic_add_64(&erpt_kstat_data.erpt_dropped.value.ui64, 1);
-		sysevent_evc_unbind(error_chan);
+		(void) sysevent_evc_unbind(error_chan);
 		return;
 	}
-	sysevent_evc_unbind(error_chan);
+	(void) sysevent_evc_unbind(error_chan);
 }
 
 /*

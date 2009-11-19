@@ -533,8 +533,8 @@ void
 sysev_fini(fmd_hdl_t *hdl)
 {
 	if (strcmp(sysev_channel, FM_ERROR_CHAN) != 0) {
-		sysevent_evc_unsubscribe(sysev_evc, sysev_sid);
-		sysevent_evc_unbind(sysev_evc);
+		(void) sysevent_evc_unsubscribe(sysev_evc, sysev_sid);
+		(void) sysevent_evc_unbind(sysev_evc);
 	}
 
 	if (fmd.d_sysev_hdl != NULL)

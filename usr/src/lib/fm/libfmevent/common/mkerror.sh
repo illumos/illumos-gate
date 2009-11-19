@@ -1,3 +1,4 @@
+#!/bin/ksh -p
 #
 # CDDL HEADER START
 #
@@ -18,37 +19,47 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-include ../Makefile.lib
+cat <<EOM
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
-common_SUBDIRS = \
-	libfmd_agent \
-	libdiagcode \
-	libdiskstatus \
-	libfmd_adm \
-	libfmd_log \
-	libfmd_msg \
-	libfmd_snmp \
-	libfmevent \
-	topo
+/*
+ * This file was generated during make.
+ */
 
-sparc_SUBDIRS = \
-	libmdesc \
-	libldom
+#include <fm/libfmevent.h>
 
-i386_SUBDIRS =
+static const char *_fmev_errstrs[] = {
+EOM
 
-SUBDIRS = $(common_SUBDIRS) $($(MACH)_SUBDIRS)
+pattern='^    \(FMEVERR_[A-Z0-9_]*\).*\/\* *\(.*\) *\*\/.*'
+replace='	"\2" \/\* \1 \*\/,'
 
-libldom: libmdesc libfmd_agent
+sed -n "s/$pattern/$replace/p" $1 || exit 1
 
-libfmd_snmp: libfmd_adm topo
+cat <<EOM
+};
 
-topo: $($(MACH)_SUBDIRS) libfmd_agent
+static const int _fmev_nerrs =
+    sizeof (_fmev_errstrs) / sizeof (_fmev_errstrs[0]);
 
-include ./Makefile.subdirs
+const char *
+fmev_strerror(fmev_err_t err)
+{
+	const char *s;
+
+	if (err >= FMEVERR_UNKNOWN && (err - FMEVERR_UNKNOWN < _fmev_nerrs))
+		s = _fmev_errstrs[err - FMEVERR_UNKNOWN];
+	else
+		s = _fmev_errstrs[0];
+
+	return (s);
+}
+EOM

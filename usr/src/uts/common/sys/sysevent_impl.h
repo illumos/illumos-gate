@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -476,9 +476,9 @@ typedef struct {
 
 /*
  * Project private flags for sysevent_evc_subscribe. Bits 0 to 7 are reserved
- * for the consolidation private interface.
+ * for the consolidation private interface, so we must use bits 8-15 here.
  */
-#define	EVCH_SUB_DUMP		0x0100
+#define	EVCH_SUB_DUMP		(0x01 << 8)
 
 /*
  * Permission flags

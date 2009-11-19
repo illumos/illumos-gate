@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,7 +37,6 @@
 	ANSI_PRAGMA_WEAK2(door_info,__door_info,function)
 	ANSI_PRAGMA_WEAK2(door_revoke,__door_revoke,function)
 	ANSI_PRAGMA_WEAK2(door_setparam,__door_setparam,function)
-	ANSI_PRAGMA_WEAK2(door_unbind,__door_unbind,function)
 
 /*
  * Offsets within struct door_results
@@ -105,16 +104,7 @@ door_restart:
 	 * this is the last server thread - call creation func for more
 	 */
 	save	%sp, -SA(MINFRAME), %sp
-	PIC_SETUP(g1)
-#ifdef __sparcv9
-	sethi	%hi(door_server_func), %g5
-	or	%g5, %lo(door_server_func), %g5
-	ldn	[%g5 + %g1], %g1
-#else
-	ldn	[%g1 + door_server_func], %g1
-#endif
-	ldn	[%g1], %g1
-	jmpl	%g1, %o7			/* call create function */
+	call	door_depletion_cb
 	ldn	[%fp + DOOR_INFO_PTR], %o0	/* (delay) load door_info ptr */
 	restore
 1:

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,7 +37,6 @@
 	ANSI_PRAGMA_WEAK2(door_info,__door_info,function)
 	ANSI_PRAGMA_WEAK2(door_revoke,__door_revoke,function)
 	ANSI_PRAGMA_WEAK2(door_setparam,__door_setparam,function)
-	ANSI_PRAGMA_WEAK2(door_unbind,__door_unbind,function)
 
 /*
  * Offsets within struct door_results
@@ -153,13 +152,9 @@ door_restart:
 	 * this is the last server thread - call creation func for more
 	 */
 	movl	DOOR_INFO_PTR(%esp), %eax
-	_prologue_
 	pushl	%eax		/* door_info_t * */
-	movl	_daref_(door_server_func), %eax
-	movl	0(%eax), %eax
-	call	*%eax		/* call create function */
+	call	door_depletion_cb@PLT
 	addl	$4, %esp
-	_epilogue_
 1:
 	/* Call the door server function now */
 	movl	DOOR_PC(%esp), %eax
@@ -192,7 +187,6 @@ door_restart:
 	cmpl	%eax, %edx		/* same process? */
 	movl	$EINTR, %eax	/* if no, return EINTR (child of forkall) */
 	jne	4f
-
 	movl	$0, 4(%esp)		/* clear arguments and restart */
 	movl	$0, 8(%esp)
 	movl	$0, 12(%esp)

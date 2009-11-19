@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,11 +30,28 @@
 #ifndef	_SYS_DOOR_H
 #define	_SYS_DOOR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+/*
+ * Attributes associated with doors.
+ */
+
+/* Attributes originally obtained from door_create operation */
+#define	DOOR_UNREF	0x01	/* Deliver an unref notification with door */
+#define	DOOR_PRIVATE	0x02	/* Use a private pool of server threads */
+#define	DOOR_UNREF_MULTI 0x10	/* Deliver unref notification more than once */
+#define	DOOR_REFUSE_DESC 0x40	/* Do not accept descriptors from callers */
+#define	DOOR_NO_CANCEL	0x80	/* No server thread cancel on client abort */
+#define	DOOR_NO_DEPLETION_CB 0x100 /* No thread create callbacks on depletion */
+
+/* Attributes (additional) returned with door_info and door_desc_t data */
+#define	DOOR_LOCAL	0x04	/* Descriptor is local to current process */
+#define	DOOR_REVOKED	0x08	/* Door has been revoked */
+#define	DOOR_IS_UNREF	0x20	/* Door is currently unreferenced */
+#define	DOOR_PRIVCREATE	0x200	/* Door has a private thread creation func */
+#define	DOOR_DEPLETION_CB 0x400	/* Set only during depletion callbacks */
 
 #if !defined(_ASM)
 
@@ -62,25 +79,10 @@ typedef struct __door_handle *door_handle_t;	/* opaque kernel door handle */
 /* Door descriptor passed to door_info to get current thread's binding */
 #define	DOOR_QUERY -2
 
-/*
- * Attributes associated with doors.
- */
-
-/* Attributes originally obtained from door_create operation */
-#define	DOOR_UNREF	0x01	/* Deliver an unref notification with door */
-#define	DOOR_PRIVATE	0x02	/* Use a private pool of server threads */
-#define	DOOR_UNREF_MULTI 0x10	/* Deliver unref notification more than once */
-#define	DOOR_REFUSE_DESC 0x40	/* Do not accept descriptors from callers */
-#define	DOOR_NO_CANCEL	0x80	/* No server thread cancel on client abort */
-
-/* Attributes (additional) returned with door_info and door_desc_t data */
-#define	DOOR_LOCAL	0x04	/* Descriptor is local to current process */
-#define	DOOR_REVOKED	0x08	/* Door has been revoked */
-#define	DOOR_IS_UNREF	0x20	/* Door is currently unreferenced */
-
 /* Masks of applicable flags */
 #define	DOOR_CREATE_MASK	(DOOR_UNREF | DOOR_PRIVATE | \
-	    DOOR_UNREF_MULTI | DOOR_REFUSE_DESC | DOOR_NO_CANCEL)
+	    DOOR_UNREF_MULTI | DOOR_REFUSE_DESC | DOOR_NO_CANCEL | \
+	    DOOR_NO_DEPLETION_CB | DOOR_PRIVCREATE)
 #define	DOOR_KI_CREATE_MASK	(DOOR_UNREF | DOOR_UNREF_MULTI)
 
 /* Mask of above attributes */

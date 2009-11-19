@@ -84,6 +84,7 @@ SUNWprivate_1.1 {
 	sysevent_evc_subscribe;
 	sysevent_evc_unbind;
 	sysevent_evc_unsubscribe;
+	sysevent_evc_xsubscribe;
 	sysevent_get_class;
 	sysevent_get_pub;
 	sysevent_get_subclass;
@@ -95,6 +96,12 @@ SUNWprivate_1.1 {
 	sysevent_unbind_publisher;
 	sysevent_unbind_subscriber;
 	sysevent_unregister_event;
+	sysevent_subattr_alloc;
+	sysevent_subattr_free;
+	sysevent_subattr_sigmask;
+	sysevent_subattr_thrattr;
+	sysevent_subattr_thrcreate;
+	sysevent_subattr_thrsetup;
     local:
 	*;
 };

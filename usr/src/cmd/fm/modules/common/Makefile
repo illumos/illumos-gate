@@ -27,6 +27,9 @@ SUBDIRS = cpumem-retire \
 	disk-monitor	\
 	disk-transport	\
 	eversholt 	\
+	ext-event-transport \
+	fabric-xlate \
+	fdd-msg \
 	io-retire	\
 	ip-transport	\
 	sensor-transport \
@@ -34,8 +37,6 @@ SUBDIRS = cpumem-retire \
 	sp-monitor	\
 	syslog-msgs	\
 	zfs-diagnosis	\
-	zfs-retire	\
-	fdd-msg		\
-	fabric-xlate
+	zfs-retire
 
 include ../../Makefile.subdirs

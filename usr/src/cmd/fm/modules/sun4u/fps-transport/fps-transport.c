@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <unistd.h>
@@ -122,8 +120,8 @@ void
 _fmd_fini(fmd_hdl_t *handle)
 {
 	if (h_event != NULL) {
-		sysevent_evc_unsubscribe(h_event, SUBSCRIBE_ID);
-		sysevent_evc_unbind(h_event);
+		(void) sysevent_evc_unsubscribe(h_event, SUBSCRIBE_ID);
+		(void) sysevent_evc_unbind(h_event);
 	}
 
 	if (h_fmd != NULL && h_xprt != NULL)

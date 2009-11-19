@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <fcntl.h>
@@ -103,9 +101,9 @@ sysevent_alloc(char *class, int class_sz, char *subclass, int subclass_sz,
 	aligned_pub_sz = SE_ALIGN(pub_sz);
 
 	payload_sz = (aligned_class_sz - sizeof (uint64_t)) +
-		(aligned_subclass_sz - sizeof (uint64_t)) +
-		(aligned_pub_sz - sizeof (uint64_t)) - sizeof (uint64_t) +
-		nvlist_sz;
+	    (aligned_subclass_sz - sizeof (uint64_t)) +
+	    (aligned_pub_sz - sizeof (uint64_t)) - sizeof (uint64_t) +
+	    nvlist_sz;
 
 	/*
 	 * Allocate event buffer plus additional payload overhead.
@@ -163,8 +161,7 @@ sysevent_post_event(char *class, char *subclass, char *vendor, char *pub_name,
 	}
 
 	error = modctl(MODEVENTS, (uintptr_t)MODEVENTS_POST_EVENT,
-		(uintptr_t)ev, (uintptr_t)SE_SIZE(ev),
-		(uintptr_t)eid, 0);
+	    (uintptr_t)ev, (uintptr_t)SE_SIZE(ev), (uintptr_t)eid, 0);
 
 	sysevent_free(ev);
 
@@ -692,7 +689,7 @@ se_print(FILE *fp, sysevent_t *ev)
 
 	(void) sysevent_get_time(ev, &hrt);
 	(void) fprintf(fp, "received sysevent id = 0X%llx:%llx\n",
-		hrt, (longlong_t)sysevent_get_seq(ev));
+	    hrt, (longlong_t)sysevent_get_seq(ev));
 	(void) fprintf(fp, "\tclass = %s\n", sysevent_get_class_name(ev));
 	(void) fprintf(fp, "\tsubclass = %s\n", sysevent_get_subclass_name(ev));
 	if ((vendor =  sysevent_get_vendor_name(ev)) != NULL) {
@@ -807,6 +804,7 @@ struct reg_args {
  *		is called in response to a door call to post an event.
  *
  */
+/*ARGSUSED*/
 static void
 event_deliver_service(void *cookie, char *args, size_t alen,
     door_desc_t *ddp, uint_t ndid)
@@ -1087,6 +1085,7 @@ dealloc_subscribers(sysevent_handle_t *shp)
 	}
 }
 
+/*ARGSUSED*/
 static int
 alloc_subscriber(sysevent_handle_t *shp, uint32_t sub_id, int oflag)
 {
@@ -1470,6 +1469,7 @@ create_failed:
  *		is called in response to a registration cache update.
  *
  */
+/*ARGSUSED*/
 static void
 cache_update_service(void *cookie, char *args, size_t alen,
     door_desc_t *ddp, uint_t ndid)
@@ -1490,6 +1490,7 @@ cache_update_service(void *cookie, char *args, size_t alen,
 		goto return_from_door;
 	}
 
+	/* LINTED: E_BAD_PTR_CAST_ALIGN */
 	rargs = (struct reg_args *)args;
 	shp = (sysevent_handle_t *)cookie;
 
@@ -1833,8 +1834,8 @@ sysevent_open_channel(const char *channel)
 
 	while (getextmntent(fp, &m, sizeof (struct extmnttab)) == 0) {
 		if (strcmp(m.mnt_mountp, "/var/run") == 0 &&
-			strcmp(m.mnt_fstype, "tmpfs") == 0) {
-				(void) fclose(fp);
+		    strcmp(m.mnt_fstype, "tmpfs") == 0) {
+			(void) fclose(fp);
 			var_run_mounted = 1;
 			break;
 		}
@@ -2127,7 +2128,7 @@ sysevent_bind_subscriber(sysevent_handle_t *shp,
 	if ((SH_DOOR_DESC(shp) = door_create(event_deliver_service,
 	    (void *)shp, DOOR_REFUSE_DESC | DOOR_NO_CANCEL)) == -1) {
 		dprint("sysevent_bind_subscriber: door create failed: "
-			"%s\n", strerror(errno));
+		    "%s\n", strerror(errno));
 		error = EFAULT;
 		goto fail;
 	}
@@ -2154,7 +2155,7 @@ sysevent_bind_subscriber(sysevent_handle_t *shp,
 
 	/* Create an event handler thread */
 	if (thr_create(NULL, NULL, (void *(*)(void *))subscriber_event_handler,
-		shp, THR_BOUND, &sub_info->sp_handler_tid) != 0) {
+	    shp, THR_BOUND, &sub_info->sp_handler_tid) != 0) {
 		error = EFAULT;
 		goto fail;
 	}

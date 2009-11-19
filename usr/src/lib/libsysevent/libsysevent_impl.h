@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,15 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_LIBSYSEVENT_IMPL_H
 #define	_LIBSYSEVENT_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -137,6 +135,15 @@ typedef struct evchan_impl_handle {
 #define	EV_SUB(evcp)		(&(EVCHAN_IMPL_HNDL(evcp)->ev_sub))
 #define	EV_SUB_NEXT(evcp)	(EVCHAN_IMPL_HNDL(evcp)->ev_sub.evchan_sub_next)
 
+struct sysevent_subattr_impl {
+	door_xcreate_server_func_t *xs_thrcreate;
+	void *xs_thrcreate_cookie;
+	door_xcreate_thrsetup_func_t *xs_thrsetup;
+	void *xs_thrsetup_cookie;
+	pthread_attr_t *xs_thrattr;
+	sigset_t xs_sigmask;
+};
+
 /*
  * Subscriber private data
  */
@@ -147,7 +154,12 @@ struct evchan_subscriber {
 	char *evsub_sid;		/* identifier of subscriber */
 	void *evsub_cookie;		/* subscriber cookie */
 	int (*evsub_func)(sysevent_t *, void *); /* subscriber event handler */
+	struct sysevent_subattr_impl *evsub_attr;
+	uint32_t evsub_state;
 };
+
+#define	EVCHAN_SUB_STATE_ACTIVE		1
+#define	EVCHAN_SUB_STATE_CLOSING	2
 
 /* Access to subscriber data */
 #define	EVCHAN_SUBSCR(subp)	((evchan_subscr_t *)(subp))

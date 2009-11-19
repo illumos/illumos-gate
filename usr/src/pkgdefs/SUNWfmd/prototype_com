@@ -34,6 +34,7 @@ d none usr/include/fm 755 root bin
 f none usr/include/fm/fmd_agent.h 644 root bin
 f none usr/include/fm/diagcode.h 644 root bin
 f none usr/include/fm/libdiskstatus.h 644 root bin
+f none usr/include/fm/libfmevent.h 644 root bin
 f none usr/include/fm/fmd_adm.h 644 root bin
 f none usr/include/fm/fmd_api.h 644 root bin
 f none usr/include/fm/fmd_fmri.h 644 root bin
@@ -78,6 +79,8 @@ f none usr/lib/fm/fmd/plugins/disk-monitor.conf 644 root bin
 f none usr/lib/fm/fmd/plugins/disk-monitor.so 555 root bin
 f none usr/lib/fm/fmd/plugins/eft.conf 644 root bin
 f none usr/lib/fm/fmd/plugins/eft.so 555 root bin
+f none usr/lib/fm/fmd/plugins/ext-event-transport.conf 644 root bin
+f none usr/lib/fm/fmd/plugins/ext-event-transport.so 555 root bin
 f none usr/lib/fm/fmd/plugins/fabric-xlate.conf 644 root bin
 f none usr/lib/fm/fmd/plugins/fabric-xlate.so 555 root bin
 f none usr/lib/fm/fmd/plugins/fdd-msg.conf 644 root bin
@@ -137,6 +140,10 @@ f none usr/lib/fm/libfmd_snmp.so.1 755 root bin
 s none usr/lib/fm/libfmd_snmp.so=libfmd_snmp.so.1
 f none usr/lib/fm/llib-lfmd_snmp 644 root bin
 f none usr/lib/fm/llib-lfmd_snmp.ln 644 root bin
+f none usr/lib/fm/libfmevent.so.1 755 root bin
+s none usr/lib/fm/libfmevent.so=libfmevent.so.1
+f none usr/lib/fm/llib-lfmevent 644 root bin
+f none usr/lib/fm/llib-lfmevent.ln 644 root bin
 f none usr/lib/fm/libtopo.so.1 755 root bin
 s none usr/lib/fm/libtopo.so=libtopo.so.1
 f none usr/lib/fm/llib-ltopo 644 root bin

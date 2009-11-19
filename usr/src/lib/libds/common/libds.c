@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -316,7 +316,7 @@ ds_init_sysev(void)
 	}
 	if (sysevent_evc_subscribe(ds_evchan, ds_sid_name, EC_VLDS,
 	    ds_recv, NULL, 0) != 0) {
-		sysevent_evc_unbind(ds_evchan);
+		(void) sysevent_evc_unbind(ds_evchan);
 		ds_evchan = NULL;
 		return (errno);
 	}

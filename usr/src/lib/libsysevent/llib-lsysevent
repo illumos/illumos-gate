@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ *  You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,13 +21,11 @@
 /*LINTLIBRARY*/
 /*PROTOLIB1*/
 /*
- * Copyright 2000-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *  usr/src/lib/libsysevent/llib-lsysevent
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <synch.h>
 #include <thread.h>
@@ -118,7 +115,7 @@ void se_print(FILE *fp, sysevent_t *ev);
 int sysevent_evc_bind(const char *channel_path, evchan_t **scpp,
     uint32_t flags);
 
-void sysevent_evc_unbind(evchan_t *scp);
+int sysevent_evc_unbind(evchan_t *scp);
 
 int sysevent_evc_publish(evchan_t *scp, const char *event_class,
     const char *event_subclass, const char *vendor, const char *pub_name,
@@ -128,7 +125,24 @@ int sysevent_evc_subscribe(evchan_t *scp, const char *sid,
     const char *event_class,
     int (*event_handler)(sysevent_t *ev, void *cookie),
     void *cookie, uint32_t flags);
+int sysevent_evc_xsubscribe(evchan_t *scp, const char *sid,
+    const char *event_class,
+    int (*event_handler)(sysevent_t *ev, void *cookie),
+    void *cookie, uint32_t flags,
+    sysevent_subattr_t *xs);
 
-void sysevent_evc_unsubscribe(evchan_t *scp, const char *sid);
+int sysevent_evc_unsubscribe(evchan_t *scp, const char *sid);
 
 int sysevent_evc_control(evchan_t *scp, int cmd, ...);
+
+sysevent_subattr_t *sysevent_subattr_alloc(void);
+void sysevent_subattr_free(sysevent_subattr_t *attr);
+
+void sysevent_subattr_thrcreate(sysevent_subattr_t *attr,
+    door_xcreate_server_func_t *func, void *cookie);
+void sysevent_subattr_thrsetup(sysevent_subattr_t *attr,
+    door_xcreate_thrsetup_func_t *func, void *cookie);
+
+void sysevent_subattr_thrattr(sysevent_subattr_t *attr,
+    pthread_attr_t *thrattr);
+

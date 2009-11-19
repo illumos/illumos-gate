@@ -784,7 +784,7 @@ bofi_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (reset_bus_ops(nexus_name, &save_bus_ops) == 0)
 		return (DDI_FAILURE);
 
-	sysevent_evc_unbind(bofi_error_chan);
+	(void) sysevent_evc_unbind(bofi_error_chan);
 
 	mutex_destroy(&clone_tab_mutex);
 	mutex_destroy(&bofi_mutex);

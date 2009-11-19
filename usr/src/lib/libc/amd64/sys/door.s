@@ -37,7 +37,6 @@
 	ANSI_PRAGMA_WEAK2(door_info,__door_info,function)
 	ANSI_PRAGMA_WEAK2(door_revoke,__door_revoke,function)
 	ANSI_PRAGMA_WEAK2(door_setparam,__door_setparam,function)
-	ANSI_PRAGMA_WEAK2(door_unbind,__door_unbind,function)
 
 /*
  * Offsets within struct door_results
@@ -110,10 +109,8 @@ door_restart:
 	/*
 	 * this is the last server thread - call creation func for more
 	 */
-	movq	_daref_(door_server_func), %rax
-	movq	0(%rax), %rax
 	movq	DOOR_INFO_PTR(%rsp), %rdi
-	call	*%rax		/* call create function */
+	call	door_depletion_cb@PLT
 1:
 	/* Call the door server function now */
 	movq	DOOR_COOKIE(%rsp), %rdi

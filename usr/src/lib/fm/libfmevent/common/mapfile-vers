@@ -1,7 +1,4 @@
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -21,6 +18,10 @@
 #
 # CDDL HEADER END
 #
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 
 #
 # MAPFILE HEADER START
@@ -36,19 +37,37 @@
 # MAPFILE HEADER END
 #
 
-SUNWprivate_1.1 {
+SUNW_1.1 {
     global:
-	door_bind = FUNCTION;
-	door_call = FUNCTION;
-	door_create = FUNCTION;
-	door_cred = FUNCTION;
-	door_info = FUNCTION;
-	door_return = FUNCTION;
-	door_revoke = FUNCTION;
-	door_server_create = FUNCTION;
-	door_ucred = FUNCTION;
-	door_unbind = FUNCTION;
-	door_xcreate = FUNCTION;
+	fmev_attr_list;
+	fmev_class;
+	fmev_dup;
+	fmev_hold;
+	fmev_localtime;
+	fmev_rele;
+	fmev_shdl_alloc;
+	fmev_shdl_init;
+	fmev_shdl_fini;
+	fmev_shdl_free;
+	fmev_shdl_subscribe;
+	fmev_shdl_unsubscribe;
+	fmev_shdl_zalloc;
+	fmev_shdlctl_serialize;
+	fmev_shdlctl_sigmask;
+	fmev_shdlctl_thrattr;
+	fmev_shdlctl_thrcreate;
+	fmev_shdlctl_thrsetup;
+	fmev_strerror;
+	fmev_timespec;
+	fmev_time_nsec;
+	fmev_time_sec;
+    local:
+	*;
+};
+
+SUNWprivate {
+    global:
+	__fmev_errno;
     local:
 	*;
 };

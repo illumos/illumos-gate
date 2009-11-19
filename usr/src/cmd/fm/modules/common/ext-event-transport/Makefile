@@ -1,7 +1,4 @@
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -21,34 +18,17 @@
 #
 # CDDL HEADER END
 #
-
 #
-# MAPFILE HEADER START
-#
-# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
-# Object versioning must comply with the rules detailed in
-#
-#	usr/src/lib/README.mapfiles
-#
-# You should not be making modifications here until you've read the most current
-# copy of that file. If you need help, contact a gatekeeper for guidance.
-#
-# MAPFILE HEADER END
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
-SUNWprivate_1.1 {
-    global:
-	door_bind = FUNCTION;
-	door_call = FUNCTION;
-	door_create = FUNCTION;
-	door_cred = FUNCTION;
-	door_info = FUNCTION;
-	door_return = FUNCTION;
-	door_revoke = FUNCTION;
-	door_server_create = FUNCTION;
-	door_ucred = FUNCTION;
-	door_unbind = FUNCTION;
-	door_xcreate = FUNCTION;
-    local:
-	*;
-};
+MODULE = ext-event-transport
+CLASS = common
+SRCS = fmevt_main.c fmevt_outbound.c 
+
+include ../../Makefile.plugin
+
+CFLAGS += $(INCS)
+LINTFLAGS += $(INCS)
+LDLIBS += -lsysevent

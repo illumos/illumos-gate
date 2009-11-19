@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -407,7 +407,7 @@ vlds_close(dev_t dev, int flag, int otyp, cred_t *credp)
 	}
 
 	if (sp->evchan) {
-		sysevent_evc_unbind(sp->evchan);
+		(void) sysevent_evc_unbind(sp->evchan);
 		sp->evchan = NULL;
 	}
 

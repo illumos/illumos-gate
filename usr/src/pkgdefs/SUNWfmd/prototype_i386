@@ -33,6 +33,8 @@ f none usr/lib/fm/amd64/libdiagcode.so.1 755 root bin
 s none usr/lib/fm/amd64/libdiagcode.so=./libdiagcode.so.1
 f none usr/lib/fm/amd64/libdiskstatus.so.1 755 root bin
 s none usr/lib/fm/amd64/libdiskstatus.so=./libdiskstatus.so.1
+f none usr/lib/fm/amd64/libfmevent.so.1 755 root bin
+s none usr/lib/fm/amd64/libfmevent.so=./libfmevent.so.1
 f none usr/lib/fm/amd64/libfmd_adm.so.1 755 root bin
 s none usr/lib/fm/amd64/libfmd_adm.so=./libfmd_adm.so.1
 f none usr/lib/fm/amd64/libfmd_log.so.1 755 root bin
@@ -50,6 +52,7 @@ f none usr/lib/fm/amd64/llib-lfmd_adm.ln 644 root bin
 f none usr/lib/fm/amd64/llib-lfmd_log.ln 644 root bin
 f none usr/lib/fm/amd64/llib-lfmd_msg.ln 644 root bin
 f none usr/lib/fm/amd64/llib-lfmd_snmp.ln 644 root bin
+f none usr/lib/fm/amd64/llib-lfmevent.ln 644 root bin
 f none usr/lib/fm/amd64/llib-ltopo.ln 644 root bin
 d none usr/lib/fm/fmd/schemes/amd64 755 root bin
 f none usr/lib/fm/fmd/schemes/amd64/cpu.so 555 root bin
