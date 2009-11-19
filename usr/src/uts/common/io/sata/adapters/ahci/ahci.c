@@ -1319,7 +1319,8 @@ ahci_tran_probe_port(dev_info_t *dip, sata_device_t *sd)
 	} else if (sd->satadev_addr.qual & SATA_ADDR_PMULT) {
 		/* Check pmports hotplug events */
 		(void) ahci_probe_pmult(ahci_ctlp, ahci_portp, &addr);
-	} else if (sd->satadev_addr.qual & SATA_ADDR_PMPORT) {
+	} else if (sd->satadev_addr.qual & (SATA_ADDR_PMPORT |
+	    SATA_ADDR_DPMPORT)) {
 		if (ahci_probe_pmport(ahci_ctlp, ahci_portp,
 		    &addr, sd) != AHCI_SUCCESS) {
 			rval = SATA_FAILURE;

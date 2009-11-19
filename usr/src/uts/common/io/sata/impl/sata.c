@@ -2433,7 +2433,7 @@ sata_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 			/* scsi callback required */
 			if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
 			    (task_func_t *)pkt->pkt_comp,
-			    (void *)pkt, TQ_SLEEP) == NULL)
+			    (void *)pkt, TQ_NOSLEEP) == NULL)
 				/* Scheduling the callback failed */
 				return (TRAN_BUSY);
 			return (TRAN_ACCEPT);
@@ -6196,8 +6196,8 @@ sata_hba_start(sata_pkt_txlate_t *spx, int *rval)
 		 * because original packet's sata address refered to a device
 		 * attached to some port.
 		 */
-		if (sdinfo->satadrv_addr.qual == SATA_ADDR_DPMPORT ||
-		    sdinfo->satadrv_addr.qual == SATA_ADDR_PMPORT) {
+		if (sata_device->satadev_addr.qual == SATA_ADDR_DPMPORT ||
+		    sata_device->satadev_addr.qual == SATA_ADDR_PMPORT) {
 			mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst, cport)));
 			mutex_enter(&pmportinfo->pmport_mutex);
 			sata_update_pmport_info(sata_hba_inst, sata_device);
@@ -10622,7 +10622,6 @@ sata_alloc_pmult(sata_hba_inst_t *sata_hba_inst, sata_device_t *sata_device)
 	mutex_enter(&cportinfo->cport_mutex);
 
 	/* dev_type's not updated when get called from sata_reprobe_port() */
-	cportinfo->cport_dev_type = SATA_DTYPE_PMULT;
 	if (SATA_CPORTINFO_PMULT_INFO(cportinfo) == NULL) {
 		/* Create a pmult_info structure */
 		SATA_CPORTINFO_PMULT_INFO(cportinfo) =
@@ -10699,6 +10698,7 @@ sata_alloc_pmult(sata_hba_inst_t *sata_hba_inst, sata_device_t *sata_device)
 
 	pmultinfo->pmult_state &= ~SATA_STATE_PROBING;
 	pmultinfo->pmult_state |= (SATA_STATE_PROBED|SATA_STATE_READY);
+	cportinfo->cport_dev_type = SATA_DTYPE_PMULT;
 
 	mutex_exit(&cportinfo->cport_mutex);
 	return (SATA_SUCCESS);
@@ -10727,6 +10727,7 @@ sata_free_pmult(sata_hba_inst_t *sata_hba_inst, sata_device_t *sata_device)
 	/* This function might be called while port-mult is hot plugged. */
 	mutex_enter(&cportinfo->cport_mutex);
 
+	cportinfo->cport_dev_type = SATA_DTYPE_NONE;
 	pmultinfo = SATA_CPORTINFO_PMULT_INFO(cportinfo);
 	ASSERT(pmultinfo != NULL);
 
@@ -10812,7 +10813,6 @@ sata_free_pmult(sata_hba_inst_t *sata_hba_inst, sata_device_t *sata_device)
 	kmem_free(pmultinfo, sizeof (sata_pmult_info_t));
 
 	cportinfo->cport_devp.cport_sata_pmult = NULL;
-	cportinfo->cport_dev_type = SATA_DTYPE_NONE;
 
 	sata_log(sata_hba_inst, CE_WARN,
 	    "SATA port multiplier detached at port %d", cport);
