@@ -172,9 +172,7 @@ xen_set_version(xen_version_t idx)
 
 	xenver[idx].xv_is_xvm = 0;
 
-	if (strlen(xenver[idx].xv_ver) >= 4 &&
-	    strncmp(xenver[idx].xv_ver + strlen(xenver[idx].xv_ver) - 4,
-	    "-xvm", 4) == 0)
+	if (strstr(xenver[idx].xv_ver, "-xvm") != NULL)
 		xenver[idx].xv_is_xvm = 1;
 
 	(void) HYPERVISOR_xen_version(XENVER_changeset,
@@ -1186,16 +1184,17 @@ done:
 int
 xen_get_mc_physcpuinfo(xen_mc_logical_cpu_t *log_cpus, uint_t *ncpus)
 {
-	struct xen_mc_physcpuinfo cpi;
+	xen_mc_t xmc;
+	struct xen_mc_physcpuinfo *cpi = &xmc.u.mc_physcpuinfo;
 
-	cpi.ncpus = *ncpus;
+	cpi->ncpus = *ncpus;
 	/*LINTED: constant in conditional context*/
-	set_xen_guest_handle(cpi.info, log_cpus);
+	set_xen_guest_handle(cpi->info, log_cpus);
 
-	if (HYPERVISOR_mca(XEN_MC_physcpuinfo, (xen_mc_arg_t *)&cpi) != 0)
+	if (HYPERVISOR_mca(XEN_MC_physcpuinfo, &xmc) != 0)
 		return (-1);
 
-	*ncpus = cpi.ncpus;
+	*ncpus = cpi->ncpus;
 	return (0);
 }
 

@@ -28,18 +28,6 @@
 
 #include "../xen.h"
 
-/* if ACM_DEBUG defined, all hooks should
- * print a short trace message (comment it out
- * when not in testing mode )
- */
-/* #define ACM_DEBUG */
-
-#ifdef ACM_DEBUG
-#  define printkd(fmt, args...) printk(fmt,## args)
-#else
-#  define printkd(fmt, args...)
-#endif
-
 /* default ssid reference value if not supplied */
 #define ACM_DEFAULT_SSID  0x0
 #define ACM_DEFAULT_LOCAL_SSID  0x0

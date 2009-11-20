@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_XPV_IMPL_H
 #define	_SYS_XPV_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,6 +38,7 @@ extern "C" {
 #define	__XEN_INTERFACE_VERSION__	__XEN_LATEST_INTERFACE_VERSION__
 
 #include <xen/public/xen.h>
+#include <xen/public/arch-x86/xen-mca.h>
 
 #ifdef __cplusplus
 }

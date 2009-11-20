@@ -289,7 +289,7 @@ struct xen_psd_package {
 
 struct xen_processor_performance {
     uint32_t flags;     /* flag for Px sub info type */
-    uint32_t ppc;       /* Platform limitation on freq usage */
+    uint32_t platform_limit;  /* Platform limitation on freq usage */
     struct xen_pct_register control_register;
     struct xen_pct_register status_register;
     uint32_t state_count;     /* total available performance states */

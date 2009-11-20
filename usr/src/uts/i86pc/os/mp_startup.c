@@ -1405,7 +1405,8 @@ start_other_cpus(int cprboot)
 	}
 
 done:
-	workaround_errata_end();
+	if (get_hwenv() == HW_NATIVE)
+		workaround_errata_end();
 	mach_cpucontext_fini();
 
 	cmi_post_mpstartup();

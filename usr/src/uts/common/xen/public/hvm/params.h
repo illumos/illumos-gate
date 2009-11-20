@@ -100,6 +100,12 @@
 /* ACPI S state: currently support S0 and S3 on x86. */
 #define HVM_PARAM_ACPI_S_STATE 14
 
-#define HVM_NR_PARAMS          15
+/* TSS used on Intel when CR0.PE=0. */
+#define HVM_PARAM_VM86_TSS     15
+
+/* Boolean: Enable aligning all periodic vpts to reduce interrupts */
+#define HVM_PARAM_VPT_ALIGN    16
+
+#define HVM_NR_PARAMS          17
 
 #endif /* __XEN_PUBLIC_HVM_PARAMS_H__ */

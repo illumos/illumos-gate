@@ -202,19 +202,20 @@ gcpu_xpv_mci_process(mc_info_t *mi, int type,
 int
 gcpu_xpv_telem_read(mc_info_t *mci, int type, uint64_t *idp)
 {
-	xen_mc_fetch_t mcf;
+	xen_mc_t xmc;
+	xen_mc_fetch_t *mcf = &xmc.u.mc_fetch;
 	long err;
 
-	mcf.flags = type;
-	set_xen_guest_handle(mcf.data, mci);
+	mcf->flags = type;
+	set_xen_guest_handle(mcf->data, mci);
 
-	if ((err = HYPERVISOR_mca(XEN_MC_fetch, (xen_mc_arg_t *)&mcf)) != 0) {
+	if ((err = HYPERVISOR_mca(XEN_MC_fetch, &xmc)) != 0) {
 		gcpu_xpv_mca_hcall_fails[err < 16 ? err : 0]++;
 		return (0);
 	}
 
-	if (mcf.flags == XEN_MC_OK) {
-		*idp = mcf.fetch_id;
+	if (mcf->flags == XEN_MC_OK) {
+		*idp = mcf->fetch_id;
 		return (1);
 	} else {
 		*idp = 0;
@@ -225,11 +226,12 @@ gcpu_xpv_telem_read(mc_info_t *mci, int type, uint64_t *idp)
 void
 gcpu_xpv_telem_ack(int type, uint64_t fetch_id)
 {
-	struct xen_mc_fetch mcf;
+	xen_mc_t xmc;
+	struct xen_mc_fetch *mcf = &xmc.u.mc_fetch;
 
-	mcf.flags = type | XEN_MC_ACK;
-	mcf.fetch_id = fetch_id;
-	(void) HYPERVISOR_mca(XEN_MC_fetch, (xen_mc_arg_t *)&mcf);
+	mcf->flags = type | XEN_MC_ACK;
+	mcf->fetch_id = fetch_id;
+	(void) HYPERVISOR_mca(XEN_MC_fetch, &xmc);
 }
 
 static void

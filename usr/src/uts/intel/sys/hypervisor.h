@@ -87,6 +87,7 @@ extern "C" {
 #include <xen/public/vcpu.h>
 #include <xen/public/version.h>
 #include <xen/public/hvm/params.h>
+#include <xen/public/arch-x86/xen-mca.h>
 
 extern shared_info_t *HYPERVISOR_shared_info;
 extern void *HYPERVISOR_console_page;
@@ -243,7 +244,9 @@ extern long HYPERVISOR_event_channel_op(int, void *); /* does return long */
 extern long HYPERVISOR_physdev_op(int, void *);
 extern long HYPERVISOR_hvm_op(int cmd, void *);
 /* *** __HYPERVISOR_kexec_op *** NOT IMPLEMENTED */
-extern long HYPERVISOR_mca(uint32_t, xen_mc_arg_t *);
+#if defined(__xpv)
+extern long HYPERVISOR_mca(uint32_t, xen_mc_t *);
+#endif
 
 /*
  * HYPERCALL HELPER ROUTINES

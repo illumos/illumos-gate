@@ -713,7 +713,6 @@ privcmd_HYPERVISOR_memory_op(int cmd, void *arg)
 		struct xen_memory_reservation resv;
 		struct xen_machphys_mfn_list xmml;
 		struct xen_add_to_physmap xatp;
-		struct xen_translate_gpfn_list tgl;
 		struct xen_memory_map mm;
 		struct xen_foreign_memory_map fmm;
 	} op_arg;
@@ -794,19 +793,6 @@ privcmd_HYPERVISOR_memory_op(int cmd, void *arg)
 		    op_arg.xatp.domid, uint_t, op_arg.xatp.space, ulong_t,
 		    op_arg.xatp.idx, ulong_t, op_arg.xatp.gpfn);
 		break;
-
-	case XENMEM_translate_gpfn_list: {
-		if (import_buffer(&op_ie, arg, &op_arg, sizeof (op_arg.tgl),
-		    IE_IMPEXP) != 0)
-			return (-X_EFAULT);
-
-		error = import_handle(&gpfn_ie, &op_arg.tgl.gpfn_list,
-		    (op_arg.tgl.nr_gpfns * sizeof (long)), IE_IMPORT);
-		if (error == 0)
-			error = import_handle(&mfn_ie, &op_arg.tgl.mfn_list,
-			    (op_arg.tgl.nr_gpfns * sizeof (long)), IE_EXPORT);
-		break;
-	}
 
 	case XENMEM_memory_map:
 	case XENMEM_machine_memory_map: {

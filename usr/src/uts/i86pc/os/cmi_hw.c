@@ -1025,7 +1025,8 @@ xpv_rdmsr(cmi_hdl_impl_t *hdl, uint_t msr, uint64_t *valp)
 static cmi_errno_t
 xpv_wrmsr_cmn(cmi_hdl_impl_t *hdl, uint_t msr, uint64_t val, boolean_t intpose)
 {
-	struct xen_mc_msrinject mci;
+	xen_mc_t xmc;
+	struct xen_mc_msrinject *mci = &xmc.u.mc_msrinject;
 
 	if (!(hdl->cmih_flags & CMIH_F_INJACTV))
 		return (CMIERR_NOTSUP);		/* for injection use only! */
@@ -1036,13 +1037,13 @@ xpv_wrmsr_cmn(cmi_hdl_impl_t *hdl, uint_t msr, uint64_t val, boolean_t intpose)
 	if (panicstr)
 		return (CMIERR_DEADLOCK);
 
-	mci.mcinj_cpunr = xen_physcpu_logical_id(HDLPRIV(hdl));
-	mci.mcinj_flags = intpose ? MC_MSRINJ_F_INTERPOSE : 0;
-	mci.mcinj_count = 1;	/* learn to batch sometime */
-	mci.mcinj_msr[0].reg = msr;
-	mci.mcinj_msr[0].value = val;
+	mci->mcinj_cpunr = xen_physcpu_logical_id(HDLPRIV(hdl));
+	mci->mcinj_flags = intpose ? MC_MSRINJ_F_INTERPOSE : 0;
+	mci->mcinj_count = 1;	/* learn to batch sometime */
+	mci->mcinj_msr[0].reg = msr;
+	mci->mcinj_msr[0].value = val;
 
-	return (HYPERVISOR_mca(XEN_MC_msrinject, (xen_mc_arg_t *)&mci) ==
+	return (HYPERVISOR_mca(XEN_MC_msrinject, &xmc) ==
 	    0 ?  CMI_SUCCESS : CMIERR_NOTSUP);
 }
 
@@ -1062,7 +1063,8 @@ xpv_msrinterpose(cmi_hdl_impl_t *hdl, uint_t msr, uint64_t val)
 static void
 xpv_int(cmi_hdl_impl_t *hdl, int int_no)
 {
-	struct xen_mc_mceinject mce;
+	xen_mc_t xmc;
+	struct xen_mc_mceinject *mce = &xmc.u.mc_mceinject;
 
 	if (!(hdl->cmih_flags & CMIH_F_INJACTV))
 		return;
@@ -1072,9 +1074,9 @@ xpv_int(cmi_hdl_impl_t *hdl, int int_no)
 		    int_no);
 	}
 
-	mce.mceinj_cpunr = xen_physcpu_logical_id(HDLPRIV(hdl));
+	mce->mceinj_cpunr = xen_physcpu_logical_id(HDLPRIV(hdl));
 
-	(void) HYPERVISOR_mca(XEN_MC_mceinject, (xen_mc_arg_t *)&mce);
+	(void) HYPERVISOR_mca(XEN_MC_mceinject, &xmc);
 }
 
 static int

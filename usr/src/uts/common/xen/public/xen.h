@@ -243,6 +243,13 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
  * cmd: MMUEXT_SET_LDT
  * linear_addr: Linear address of LDT base (NB. must be page-aligned).
  * nr_ents: Number of entries in LDT.
+ *
+ * cmd: MMUEXT_CLEAR_PAGE
+ * mfn: Machine frame number to be cleared.
+ *
+ * cmd: MMUEXT_COPY_PAGE
+ * mfn: Machine frame number of the destination page.
+ * src_mfn: Machine frame number of the source page.
  */
 #define MMUEXT_PIN_L1_TABLE      0
 #define MMUEXT_PIN_L2_TABLE      1
@@ -259,12 +266,15 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #define MMUEXT_FLUSH_CACHE      12
 #define MMUEXT_SET_LDT          13
 #define MMUEXT_NEW_USER_BASEPTR 15
+#define MMUEXT_CLEAR_PAGE       16
+#define MMUEXT_COPY_PAGE        17
 
 #ifndef __ASSEMBLY__
 struct mmuext_op {
     unsigned int cmd;
     union {
-        /* [UN]PIN_TABLE, NEW_BASEPTR, NEW_USER_BASEPTR */
+        /* [UN]PIN_TABLE, NEW_BASEPTR, NEW_USER_BASEPTR
+         * CLEAR_PAGE, COPY_PAGE */
         xen_pfn_t     mfn;
         /* INVLPG_LOCAL, INVLPG_ALL, SET_LDT */
         unsigned long linear_addr;
@@ -274,10 +284,12 @@ struct mmuext_op {
         unsigned int nr_ents;
         /* TLB_FLUSH_MULTI, INVLPG_MULTI */
 #if __XEN_INTERFACE_VERSION__ >= 0x00030205
-        XEN_GUEST_HANDLE(void) vcpumask;
+        XEN_GUEST_HANDLE(const_void) vcpumask;
 #else
-        void *vcpumask;
+        const void *vcpumask;
 #endif
+        /* COPY_PAGE */
+        xen_pfn_t src_mfn;
     } arg2;
 };
 typedef struct mmuext_op mmuext_op_t;
@@ -354,6 +366,9 @@ typedef uint16_t domid_t;
  * the caller is privileged.
  */
 #define DOMID_XEN  (0x7FF2U)
+
+/* DOMID_INVALID is used to identity invalid domid */
+#define DOMID_INVALID (0x7FFFU)
 
 /*
  * Send an array of these to HYPERVISOR_mmu_update().
@@ -514,6 +529,7 @@ typedef struct shared_info shared_info_t;
  *      a. relocated kernel image
  *      b. initial ram disk              [mod_start, mod_len]
  *      c. list of allocated page frames [mfn_list, nr_pages]
+ *         (unless relocated due to XEN_ELFNOTE_INIT_P2M)
  *      d. start_info_t structure        [register ESI (x86)]
  *      e. bootstrap page tables         [pt_base, CR3 (x86)]
  *      f. bootstrap stack               [register ESP (x86)]
@@ -555,6 +571,9 @@ struct start_info {
     unsigned long mod_start;    /* VIRTUAL address of pre-loaded module.  */
     unsigned long mod_len;      /* Size (bytes) of pre-loaded module.     */
     int8_t cmd_line[MAX_GUEST_CMDLINE];
+    /* The pfn range here covers both page table and p->m table frames.   */
+    unsigned long first_p2m_pfn;/* 1st pfn forming initial P->M table.    */
+    unsigned long nr_p2m_frames;/* # of pfns forming initial P->M table.  */
 };
 typedef struct start_info start_info_t;
 

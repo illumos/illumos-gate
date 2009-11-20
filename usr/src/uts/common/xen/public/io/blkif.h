@@ -84,6 +84,13 @@
  */
 #define BLKIF_MAX_SEGMENTS_PER_REQUEST 11
 
+/* 
+ * NB. first_sect and last_sect in blkif_request_segment, as well as
+ * sector_number in blkif_request, are always expressed in 512-byte units.
+ * However they must be properly aligned to the real sector size of the
+ * physical disk, which is reported in the "sector-size" node in the backend
+ * xenbus info. Also the xenbus "sectors" node is expressed in 512-byte units.
+ */
 struct blkif_request_segment {
     grant_ref_t gref;        /* reference to I/O buffer frame        */
     /* @first_sect: first sector in frame to transfer (inclusive).   */

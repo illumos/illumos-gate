@@ -41,6 +41,21 @@ typedef struct physdev_eoi physdev_eoi_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_eoi_t);
 
 /*
+ * Register a shared page for the hypervisor to indicate whether the guest
+ * must issue PHYSDEVOP_eoi. The semantics of PHYSDEVOP_eoi change slightly
+ * once the guest used this function in that the associated event channel
+ * will automatically get unmasked. The page registered is used as a bit
+ * array indexed by Xen's PIRQ value.
+ */
+#define PHYSDEVOP_pirq_eoi_gmfn         17
+struct physdev_pirq_eoi_gmfn {
+    /* IN */
+    xen_pfn_t gmfn;
+};
+typedef struct physdev_pirq_eoi_gmfn physdev_pirq_eoi_gmfn_t;
+DEFINE_XEN_GUEST_HANDLE(physdev_pirq_eoi_gmfn_t);
+
+/*
  * Query the status of an IRQ line.
  * @arg == pointer to physdev_irq_status_query structure.
  */
@@ -167,6 +182,31 @@ struct physdev_manage_pci {
 
 typedef struct physdev_manage_pci physdev_manage_pci_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_manage_pci_t);
+
+#define PHYSDEVOP_restore_msi            19
+struct physdev_restore_msi {
+    /* IN */
+    uint8_t bus;
+    uint8_t devfn;
+};
+typedef struct physdev_restore_msi physdev_restore_msi_t;
+DEFINE_XEN_GUEST_HANDLE(physdev_restore_msi_t);
+
+#define PHYSDEVOP_manage_pci_add_ext     20
+struct physdev_manage_pci_ext {
+    /* IN */
+    uint8_t bus;
+    uint8_t devfn;
+    unsigned is_extfn;
+    unsigned is_virtfn;
+    struct {
+        uint8_t bus;
+        uint8_t devfn;
+    } physfn;
+};
+
+typedef struct physdev_manage_pci_ext physdev_manage_pci_ext_t;
+DEFINE_XEN_GUEST_HANDLE(physdev_manage_pci_ext_t);
 
 /*
  * Argument to physdev_op_compat() hypercall. Superceded by new physdev_op()

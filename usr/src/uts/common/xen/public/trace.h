@@ -37,6 +37,8 @@
 #define TRC_HVM      0x0008f000    /* Xen HVM trace            */
 #define TRC_MEM      0x0010f000    /* Xen memory trace         */
 #define TRC_PV       0x0020f000    /* Xen PV traces            */
+#define TRC_SHADOW   0x0040f000    /* Xen shadow tracing       */
+#define TRC_PM       0x0080f000    /* Xen power management trace */
 #define TRC_ALL      0x0ffff000
 #define TRC_HD_TO_EVENT(x) ((x)&0x0fffffff)
 #define TRC_HD_CYCLE_FLAG (1UL<<31)
@@ -50,26 +52,31 @@
 #define TRC_HVM_ENTRYEXIT 0x00081000   /* VMENTRY and #VMEXIT       */
 #define TRC_HVM_HANDLER   0x00082000   /* various HVM handlers      */
 
+#define TRC_SCHED_MIN       0x00021000   /* Just runstate changes */
+#define TRC_SCHED_VERBOSE   0x00028000   /* More inclusive scheduling */
+
 /* Trace events per class */
 #define TRC_LOST_RECORDS        (TRC_GEN + 1)
 #define TRC_TRACE_WRAP_BUFFER  (TRC_GEN + 2)
 #define TRC_TRACE_CPU_CHANGE    (TRC_GEN + 3)
 
-#define TRC_SCHED_DOM_ADD       (TRC_SCHED +  1)
-#define TRC_SCHED_DOM_REM       (TRC_SCHED +  2)
-#define TRC_SCHED_SLEEP         (TRC_SCHED +  3)
-#define TRC_SCHED_WAKE          (TRC_SCHED +  4)
-#define TRC_SCHED_YIELD         (TRC_SCHED +  5)
-#define TRC_SCHED_BLOCK         (TRC_SCHED +  6)
-#define TRC_SCHED_SHUTDOWN      (TRC_SCHED +  7)
-#define TRC_SCHED_CTL           (TRC_SCHED +  8)
-#define TRC_SCHED_ADJDOM        (TRC_SCHED +  9)
-#define TRC_SCHED_SWITCH        (TRC_SCHED + 10)
-#define TRC_SCHED_S_TIMER_FN    (TRC_SCHED + 11)
-#define TRC_SCHED_T_TIMER_FN    (TRC_SCHED + 12)
-#define TRC_SCHED_DOM_TIMER_FN  (TRC_SCHED + 13)
-#define TRC_SCHED_SWITCH_INFPREV (TRC_SCHED + 14)
-#define TRC_SCHED_SWITCH_INFNEXT (TRC_SCHED + 15)
+#define TRC_SCHED_RUNSTATE_CHANGE   (TRC_SCHED_MIN + 1)
+#define TRC_SCHED_CONTINUE_RUNNING  (TRC_SCHED_MIN + 2)
+#define TRC_SCHED_DOM_ADD        (TRC_SCHED_VERBOSE +  1)
+#define TRC_SCHED_DOM_REM        (TRC_SCHED_VERBOSE +  2)
+#define TRC_SCHED_SLEEP          (TRC_SCHED_VERBOSE +  3)
+#define TRC_SCHED_WAKE           (TRC_SCHED_VERBOSE +  4)
+#define TRC_SCHED_YIELD          (TRC_SCHED_VERBOSE +  5)
+#define TRC_SCHED_BLOCK          (TRC_SCHED_VERBOSE +  6)
+#define TRC_SCHED_SHUTDOWN       (TRC_SCHED_VERBOSE +  7)
+#define TRC_SCHED_CTL            (TRC_SCHED_VERBOSE +  8)
+#define TRC_SCHED_ADJDOM         (TRC_SCHED_VERBOSE +  9)
+#define TRC_SCHED_SWITCH         (TRC_SCHED_VERBOSE + 10)
+#define TRC_SCHED_S_TIMER_FN     (TRC_SCHED_VERBOSE + 11)
+#define TRC_SCHED_T_TIMER_FN     (TRC_SCHED_VERBOSE + 12)
+#define TRC_SCHED_DOM_TIMER_FN   (TRC_SCHED_VERBOSE + 13)
+#define TRC_SCHED_SWITCH_INFPREV (TRC_SCHED_VERBOSE + 14)
+#define TRC_SCHED_SWITCH_INFNEXT (TRC_SCHED_VERBOSE + 15)
 
 #define TRC_MEM_PAGE_GRANT_MAP      (TRC_MEM + 1)
 #define TRC_MEM_PAGE_GRANT_UNMAP    (TRC_MEM + 2)
@@ -88,6 +95,22 @@
 #define TRC_PV_PTWR_EMULATION_PAE    (TRC_PV + 12)
   /* Indicates that addresses in trace record are 64 bits */
 #define TRC_64_FLAG               (0x100) 
+
+#define TRC_SHADOW_NOT_SHADOW                 (TRC_SHADOW +  1)
+#define TRC_SHADOW_FAST_PROPAGATE             (TRC_SHADOW +  2)
+#define TRC_SHADOW_FAST_MMIO                  (TRC_SHADOW +  3)
+#define TRC_SHADOW_FALSE_FAST_PATH            (TRC_SHADOW +  4)
+#define TRC_SHADOW_MMIO                       (TRC_SHADOW +  5)
+#define TRC_SHADOW_FIXUP                      (TRC_SHADOW +  6)
+#define TRC_SHADOW_DOMF_DYING                 (TRC_SHADOW +  7)
+#define TRC_SHADOW_EMULATE                    (TRC_SHADOW +  8)
+#define TRC_SHADOW_EMULATE_UNSHADOW_USER      (TRC_SHADOW +  9)
+#define TRC_SHADOW_EMULATE_UNSHADOW_EVTINJ    (TRC_SHADOW + 10)
+#define TRC_SHADOW_EMULATE_UNSHADOW_UNHANDLED (TRC_SHADOW + 11)
+#define TRC_SHADOW_WRMAP_BF                   (TRC_SHADOW + 12)
+#define TRC_SHADOW_PREALLOC_UNPIN             (TRC_SHADOW + 13)
+#define TRC_SHADOW_RESYNC_FULL                (TRC_SHADOW + 14)
+#define TRC_SHADOW_RESYNC_ONLY                (TRC_SHADOW + 15)
 
 /* trace events per subclass */
 #define TRC_HVM_VMENTRY         (TRC_HVM_ENTRYEXIT + 0x01)
@@ -119,11 +142,23 @@
 #define TRC_HVM_INVLPG          (TRC_HVM_HANDLER + 0x14)
 #define TRC_HVM_INVLPG64        (TRC_HVM_HANDLER + TRC_64_FLAG + 0x14)
 #define TRC_HVM_MCE             (TRC_HVM_HANDLER + 0x15)
-#define TRC_HVM_IO_ASSIST       (TRC_HVM_HANDLER + 0x16)
-#define TRC_HVM_MMIO_ASSIST     (TRC_HVM_HANDLER + 0x17)
+#define TRC_HVM_IOPORT_READ     (TRC_HVM_HANDLER + 0x16)
+#define TRC_HVM_IOMEM_READ      (TRC_HVM_HANDLER + 0x17)
 #define TRC_HVM_CLTS            (TRC_HVM_HANDLER + 0x18)
 #define TRC_HVM_LMSW            (TRC_HVM_HANDLER + 0x19)
 #define TRC_HVM_LMSW64          (TRC_HVM_HANDLER + TRC_64_FLAG + 0x19)
+#define TRC_HVM_INTR_WINDOW     (TRC_HVM_HANDLER + 0x20)
+#define TRC_HVM_IOPORT_WRITE    (TRC_HVM_HANDLER + 0x216)
+#define TRC_HVM_IOMEM_WRITE     (TRC_HVM_HANDLER + 0x217)
+
+/* trace subclasses for power management */
+#define TRC_PM_FREQ     0x00801000      /* xen cpu freq events */
+#define TRC_PM_IDLE     0x00802000      /* xen cpu idle events */
+
+/* trace events for per class */
+#define TRC_PM_FREQ_CHANGE      (TRC_PM_FREQ + 0x01)
+#define TRC_PM_IDLE_ENTRY       (TRC_PM_IDLE + 0x01)
+#define TRC_PM_IDLE_EXIT        (TRC_PM_IDLE + 0x02)
 
 /* This structure represents a single trace buffer record. */
 struct t_rec {

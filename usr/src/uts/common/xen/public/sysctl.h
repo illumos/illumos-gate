@@ -266,9 +266,9 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_get_pmstat_t);
  * Status codes. Must be greater than 0 to avoid confusing
  * sysctl callers that see 0 as a plain successful return.
  */
-#define XEN_CPU_HOTPLUG_STATUS_OFFLINE	1
-#define XEN_CPU_HOTPLUG_STATUS_ONLINE	2
-#define XEN_CPU_HOTPLUG_STATUS_NEW	3
+#define XEN_CPU_HOTPLUG_STATUS_OFFLINE 1
+#define XEN_CPU_HOTPLUG_STATUS_ONLINE  2
+#define XEN_CPU_HOTPLUG_STATUS_NEW     3
 
 #define XEN_SYSCTL_cpu_hotplug       11
 struct xen_sysctl_cpu_hotplug {
@@ -282,6 +282,177 @@ struct xen_sysctl_cpu_hotplug {
 typedef struct xen_sysctl_cpu_hotplug xen_sysctl_cpu_hotplug_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cpu_hotplug_t);
 
+/*
+ * Get/set xen power management, include 
+ * 1. cpufreq governors and related parameters
+ */
+#define XEN_SYSCTL_pm_op        12
+struct xen_userspace {
+    uint32_t scaling_setspeed;
+};
+typedef struct xen_userspace xen_userspace_t;
+
+struct xen_ondemand {
+    uint32_t sampling_rate_max;
+    uint32_t sampling_rate_min;
+
+    uint32_t sampling_rate;
+    uint32_t up_threshold;
+};
+typedef struct xen_ondemand xen_ondemand_t;
+
+/* 
+ * cpufreq para name of this structure named 
+ * same as sysfs file name of native linux
+ */
+#define CPUFREQ_NAME_LEN 16
+struct xen_get_cpufreq_para {
+    /* IN/OUT variable */
+    uint32_t cpu_num;
+    uint32_t freq_num;
+    uint32_t gov_num;
+
+    /* for all governors */
+    /* OUT variable */
+    XEN_GUEST_HANDLE_64(uint32) affected_cpus;
+    XEN_GUEST_HANDLE_64(uint32) scaling_available_frequencies;
+    XEN_GUEST_HANDLE_64(char)   scaling_available_governors;
+    char scaling_driver[CPUFREQ_NAME_LEN];
+
+    uint32_t cpuinfo_cur_freq;
+    uint32_t cpuinfo_max_freq;
+    uint32_t cpuinfo_min_freq;
+    uint32_t scaling_cur_freq;
+
+    char scaling_governor[CPUFREQ_NAME_LEN];
+    uint32_t scaling_max_freq;
+    uint32_t scaling_min_freq;
+
+    /* for specific governor */
+    union {
+        struct  xen_userspace userspace;
+        struct  xen_ondemand ondemand;
+    } u;
+};
+
+struct xen_set_cpufreq_gov {
+    char scaling_governor[CPUFREQ_NAME_LEN];
+};
+
+struct xen_set_cpufreq_para {
+    #define SCALING_MAX_FREQ           1
+    #define SCALING_MIN_FREQ           2
+    #define SCALING_SETSPEED           3
+    #define SAMPLING_RATE              4
+    #define UP_THRESHOLD               5
+
+    uint32_t ctrl_type;
+    uint32_t ctrl_value;
+};
+
+/* Get physical CPU topology information. */
+#define INVALID_TOPOLOGY_ID  (~0U)
+struct xen_get_cputopo {
+     /* IN: maximum addressable entry in
+      * the caller-provided cpu_to_core/socket.
+      */
+    uint32_t max_cpus;
+    XEN_GUEST_HANDLE_64(uint32) cpu_to_core;
+    XEN_GUEST_HANDLE_64(uint32) cpu_to_socket;
+
+    /* OUT: number of cpus returned
+     * If OUT is greater than IN then the cpu_to_core/socket is truncated!
+     */
+    uint32_t nr_cpus;
+};
+
+struct xen_sysctl_pm_op {
+    #define PM_PARA_CATEGORY_MASK      0xf0
+    #define CPUFREQ_PARA               0x10
+
+    /* cpufreq command type */
+    #define GET_CPUFREQ_PARA           (CPUFREQ_PARA | 0x01)
+    #define SET_CPUFREQ_GOV            (CPUFREQ_PARA | 0x02)
+    #define SET_CPUFREQ_PARA           (CPUFREQ_PARA | 0x03)
+    #define GET_CPUFREQ_AVGFREQ        (CPUFREQ_PARA | 0x04)
+
+    /* get CPU topology */
+    #define XEN_SYSCTL_pm_op_get_cputopo  0x20
+
+    /* set/reset scheduler power saving option */
+    #define XEN_SYSCTL_pm_op_set_sched_opt_smt    0x21
+
+    /* cpuidle max_cstate access command */
+    #define XEN_SYSCTL_pm_op_get_max_cstate       0x22
+    #define XEN_SYSCTL_pm_op_set_max_cstate       0x23
+
+    /* set scheduler migration cost value */
+    #define XEN_SYSCTL_pm_op_set_vcpu_migration_delay   0x24
+    #define XEN_SYSCTL_pm_op_get_vcpu_migration_delay   0x25
+
+    uint32_t cmd;
+    uint32_t cpuid;
+    union {
+        struct xen_get_cpufreq_para get_para;
+        struct xen_set_cpufreq_gov  set_gov;
+        struct xen_set_cpufreq_para set_para;
+        uint64_t get_avgfreq;
+        struct xen_get_cputopo      get_topo;
+        uint32_t                    set_sched_opt_smt;
+        uint32_t                    get_max_cstate;
+        uint32_t                    set_max_cstate;
+        uint32_t                    get_vcpu_migration_delay;
+        uint32_t                    set_vcpu_migration_delay;
+    } u;
+};
+
+#define XEN_SYSCTL_page_offline_op        14
+struct xen_sysctl_page_offline_op {
+    /* IN: range of page to be offlined */
+#define sysctl_page_offline     1
+#define sysctl_page_online      2
+#define sysctl_query_page_offline  3
+    uint32_t cmd;
+    uint32_t start;
+    uint32_t end;
+    /* OUT: result of page offline request */
+    /*
+     * bit 0~15: result flags
+     * bit 16~31: owner
+     */
+    XEN_GUEST_HANDLE(uint32) status;
+};
+
+#define PG_OFFLINE_STATUS_MASK    (0xFFUL)
+
+/* The result is invalid, i.e. HV does not handle it */
+#define PG_OFFLINE_INVALID   (0x1UL << 0)
+
+#define PG_OFFLINE_OFFLINED  (0x1UL << 1)
+#define PG_OFFLINE_PENDING   (0x1UL << 2)
+#define PG_OFFLINE_FAILED    (0x1UL << 3)
+
+#define PG_ONLINE_FAILED     PG_OFFLINE_FAILED
+#define PG_ONLINE_ONLINED    PG_OFFLINE_OFFLINED
+
+#define PG_OFFLINE_STATUS_OFFLINED              (0x1UL << 1)
+#define PG_OFFLINE_STATUS_ONLINE                (0x1UL << 2)
+#define PG_OFFLINE_STATUS_OFFLINE_PENDING       (0x1UL << 3)
+#define PG_OFFLINE_STATUS_BROKEN                (0x1UL << 4)
+
+#define PG_OFFLINE_MISC_MASK    (0xFFUL << 4)
+
+/* only valid when PG_OFFLINE_FAILED */
+#define PG_OFFLINE_XENPAGE   (0x1UL << 8)
+#define PG_OFFLINE_DOM0PAGE  (0x1UL << 9)
+#define PG_OFFLINE_ANONYMOUS (0x1UL << 10)
+#define PG_OFFLINE_NOT_CONV_RAM   (0x1UL << 11)
+#define PG_OFFLINE_OWNED     (0x1UL << 12)
+
+#define PG_OFFLINE_BROKEN    (0x1UL << 13)
+#define PG_ONLINE_BROKEN     PG_OFFLINE_BROKEN
+
+#define PG_OFFLINE_OWNER_SHIFT 16
 
 struct xen_sysctl {
     uint32_t cmd;
@@ -298,6 +469,8 @@ struct xen_sysctl {
         struct xen_sysctl_availheap         availheap;
         struct xen_sysctl_get_pmstat        get_pmstat;
         struct xen_sysctl_cpu_hotplug       cpu_hotplug;
+        struct xen_sysctl_pm_op             pm_op;
+        struct xen_sysctl_page_offline_op   page_offline;
         uint8_t                             pad[128];
     } u;
 };

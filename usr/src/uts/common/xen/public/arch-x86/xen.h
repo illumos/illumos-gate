@@ -76,10 +76,6 @@ typedef unsigned long xen_pfn_t;
 /* Maximum number of virtual CPUs in multi-processor guests. */
 #define MAX_VIRT_CPUS 32
 
-
-/* Machine check support */
-#include "xen-mca.h"
-
 #ifndef __ASSEMBLY__
 
 typedef unsigned long xen_ulong_t;

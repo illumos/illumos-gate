@@ -406,9 +406,8 @@ HYPERVISOR_suspend(ulong_t start_info_mfn)
 }
 
 long
-HYPERVISOR_mca(uint32_t cmd, xen_mc_arg_t *arg)
+HYPERVISOR_mca(uint32_t cmd, xen_mc_t *xmcp)
 {
-	xen_mc_t xmc;
 	long rv;
 
 	switch (cmd) {
@@ -416,8 +415,6 @@ HYPERVISOR_mca(uint32_t cmd, xen_mc_arg_t *arg)
 	case XEN_MC_physcpuinfo:
 	case XEN_MC_msrinject:
 	case XEN_MC_mceinject:
-		if (arg == NULL)
-			return (EINVAL);
 		break;
 
 	case XEN_MC_notifydomain:
@@ -427,15 +424,10 @@ HYPERVISOR_mca(uint32_t cmd, xen_mc_arg_t *arg)
 		return (EINVAL);
 	}
 
-	xmc.interface_version = XEN_MCA_INTERFACE_VERSION;
-	xmc.cmd = cmd;
-	if (arg != NULL)
-		xmc.u = *arg;
+	xmcp->interface_version = XEN_MCA_INTERFACE_VERSION;
+	xmcp->cmd = cmd;
 
-	rv = __hypercall1(__HYPERVISOR_mca, (ulong_t)&xmc);
-
-	if (rv == 0 && arg != NULL)
-		*arg = xmc.u;
+	rv = __hypercall1(__HYPERVISOR_mca, (ulong_t)xmcp);
 
 	return (rv);
 }
