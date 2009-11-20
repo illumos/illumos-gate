@@ -20,14 +20,11 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG=bsmconv
-STARTUP=/etc/security/audit_startup
 DEVALLOC=/etc/security/device_allocate
 DEVMAPS=/etc/security/device_maps
 TEXTDOMAIN="SUNW_OST_OSCMD"
@@ -98,20 +95,6 @@ done
 
 bsmconvert()
 {
-
-# If there is no startup file to be read by /lib/svc/method/svc-auditd,
-# then gripe about it.
-
-form=`gettext "%s: INFO: checking startup file."`
-printf "${form}\n" $PROG 
-
-if [ ! -f ${ROOT}/${STARTUP} ]
-then
-	form=`gettext "%s: ERROR: no %s file."`
-	printf "${form}\n" $PROG $STARTUP
-	form=`gettext "%s: Continuing ..."`
-	printf "${form}\n" $PROG
-fi
 
 # Prevent automount of removable and hotpluggable volumes
 # by forcing volume.ignore HAL property on all such volumes.

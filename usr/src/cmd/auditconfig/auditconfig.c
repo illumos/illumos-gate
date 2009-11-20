@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-
 /*
  * auditconfig - set and display audit parameters
  */
@@ -50,21 +49,17 @@
 #include <pwd.h>
 #include <libintl.h>
 #include <zone.h>
-
+#include <libscf_priv.h>
 #include <tsol/label.h>
-#include <bsm/audit.h>
-#include <bsm/audit_record.h>
 #include <bsm/libbsm.h>
-
-#if !defined(TEXT_DOMAIN)
-#define	TEXT_DOMAIN	"SUNW_OST_OSCMD"
-#endif
+#include "auditconfig_impl.h"
+#include "audit_scf.h"
 
 enum	commands {
-	AC_ARG_AUDIT,
 	AC_ARG_ACONF,
-	AC_ARG_CHKCONF,
+	AC_ARG_AUDIT,
 	AC_ARG_CHKACONF,
+	AC_ARG_CHKCONF,
 	AC_ARG_CONF,
 	AC_ARG_GETASID,
 	AC_ARG_GETAUDIT,
@@ -95,14 +90,15 @@ enum	commands {
 	AC_ARG_SETKMASK,
 	AC_ARG_SETPMASK,
 	AC_ARG_SETPOLICY,
-	AC_ARG_SETSMASK,
-	AC_ARG_SETSTAT,
 	AC_ARG_SETQBUFSZ,
 	AC_ARG_SETQCTRL,
 	AC_ARG_SETQDELAY,
 	AC_ARG_SETQHIWATER,
 	AC_ARG_SETQLOWATER,
-	AC_ARG_SETUMASK
+	AC_ARG_SETSMASK,
+	AC_ARG_SETSTAT,
+	AC_ARG_SETUMASK,
+	AC_ARG_SET_TEMPORARY
 };
 
 #define	AC_KERN_EVENT 		0
@@ -110,128 +106,90 @@ enum	commands {
 
 #define	NONE(s) (!strlen(s) ? gettext("none") : s)
 
-#define	ALL_POLICIES   (AUDIT_AHLT|\
-			AUDIT_ARGE|\
-			AUDIT_ARGV|\
-			AUDIT_CNT|\
-			AUDIT_GROUP|\
-			AUDIT_WINDATA|\
-			AUDIT_SEQ|\
-			AUDIT_TRAIL|\
-			AUDIT_PATH|\
-			AUDIT_PUBLIC|\
-			AUDIT_ZONENAME|\
-			AUDIT_PERZONE|\
-			AUDIT_WINDATA_DOWN|\
-			AUDIT_WINDATA_UP)
-
-#define	NO_POLICIES  (0)
-
 #define	ONEK 1024
 
 /*
  * remove this after the audit.h is fixed
  */
-
 struct arg_entry {
 	char		*arg_str;
 	char		*arg_opts;
 	enum commands	auditconfig_cmd;
+	boolean_t	temporary_allowed;	/* -t allowed for the option */
+};
+typedef struct arg_entry arg_entry_t;
+
+/* arg_table - command option and usage message table */
+static arg_entry_t arg_table[] = {
+	{ "-aconf",	"",			AC_ARG_ACONF,	B_FALSE},
+	{ "-audit",	" event sorf retval string", AC_ARG_AUDIT, B_FALSE},
+	{ "-chkaconf",	"",			AC_ARG_CHKACONF, B_FALSE},
+	{ "-chkconf",	"",			AC_ARG_CHKCONF,	B_FALSE},
+	{ "-conf",	"",			AC_ARG_CONF,	B_FALSE},
+	{ "-getasid",	"",			AC_ARG_GETASID,	B_FALSE},
+	{ "-getaudit",	"",			AC_ARG_GETAUDIT, B_FALSE},
+	{ "-getauid",	"",			AC_ARG_GETAUID, B_FALSE},
+	{ "-getcar",	"",			AC_ARG_GETCAR,	B_FALSE},
+	{ "-getclass",	" event",		AC_ARG_GETCLASS, B_FALSE},
+	{ "-getcond",	"",			AC_ARG_GETCOND,	B_FALSE},
+	{ "-getcwd",	"",			AC_ARG_GETCWD,	B_FALSE},
+	{ "-getestate",	" event",		AC_ARG_GETESTATE, B_FALSE},
+	{ "-getkaudit",	"",			AC_ARG_GETKAUDIT, B_FALSE},
+	{ "-getkmask",	"",			AC_ARG_GETKMASK, B_FALSE},
+	{ "-getpinfo",	" pid",			AC_ARG_GETPINFO, B_FALSE},
+	{ "-getpolicy",	"",			AC_ARG_GETPOLICY, B_TRUE},
+	{ "-getqbufsz",	"",			AC_ARG_GETQBUFSZ, B_TRUE},
+	{ "-getqctrl",	"",			AC_ARG_GETQCTRL, B_TRUE},
+	{ "-getqdelay",	"",			AC_ARG_GETQDELAY, B_TRUE},
+	{ "-getqhiwater", "",			AC_ARG_GETQHIWATER, B_TRUE},
+	{ "-getqlowater", "",			AC_ARG_GETQLOWATER, B_TRUE},
+	{ "-getstat",	"",			AC_ARG_GETSTAT,	B_FALSE},
+	{ "-gettid",	"",			AC_ARG_GETTERMID, B_FALSE},
+	{ "-lsevent",	"",			AC_ARG_LSEVENT,	B_FALSE},
+	{ "-lspolicy",	"",			AC_ARG_LSPOLICY, B_FALSE},
+	{ "-setasid",	" asid [cmd]",		AC_ARG_SETASID,	B_FALSE},
+	{ "-setaudit",	" auid audit_flags termid asid [cmd]",
+						AC_ARG_SETAUDIT, B_FALSE},
+	{ "-setauid",	" auid [cmd]",		AC_ARG_SETAUID,	B_FALSE},
+	{ "-setclass",	" event audit_flags",	AC_ARG_SETCLASS, B_FALSE},
+	{ "-setkaudit",	" type IP_address",	AC_ARG_SETKAUDIT, B_FALSE},
+	{ "-setkmask",	" audit_flags",		AC_ARG_SETKMASK, B_FALSE},
+	{ "-setpmask",	" pid audit_flags",	AC_ARG_SETPMASK, B_FALSE},
+	{ "-setpolicy",	" [+|-]policy_flags",	AC_ARG_SETPOLICY, B_TRUE},
+	{ "-setqbufsz",	" bufsz",		AC_ARG_SETQBUFSZ, B_TRUE},
+	{ "-setqctrl",	" hiwater lowater bufsz delay",
+						AC_ARG_SETQCTRL, B_TRUE},
+	{ "-setqdelay",	" delay",		AC_ARG_SETQDELAY, B_TRUE},
+	{ "-setqhiwater", " hiwater",		AC_ARG_SETQHIWATER, B_TRUE},
+	{ "-setqlowater", " lowater",		AC_ARG_SETQLOWATER, B_TRUE},
+	{ "-setsmask",	" asid audit_flags",	AC_ARG_SETSMASK, B_FALSE},
+	{ "-setstat",	"",			AC_ARG_SETSTAT, B_FALSE},
+	{ "-setumask",	" user audit_flags",	AC_ARG_SETUMASK, B_FALSE},
+	{ "-t",		"",			AC_ARG_SET_TEMPORARY, B_FALSE},
 };
 
-struct policy_entry {
-	char *policy_str;
-	uint_t policy_mask;
-	char *policy_desc;
-};
+#define	ARG_TBL_SZ (sizeof (arg_table) / sizeof (arg_entry_t))
 
-static struct arg_entry arg_table[] = {
-	{ "-aconf",		"",			AC_ARG_ACONF},
-	{ "-audit",	"event sorf retval string",	AC_ARG_AUDIT},
-	{ "-chkaconf",		"",			AC_ARG_CHKACONF},
-	{ "-chkconf",		"",			AC_ARG_CHKCONF},
-	{ "-conf",		"",			AC_ARG_CONF},
-	{ "-getasid",		"",			AC_ARG_GETASID},
-	{ "-getaudit",		"",			AC_ARG_GETAUDIT},
-	{ "-getauid",		"",			AC_ARG_GETAUID},
-	{ "-getcar",		"",			AC_ARG_GETCAR},
-	{ "-getclass",		"event",		AC_ARG_GETCLASS},
-	{ "-getcond",		"",			AC_ARG_GETCOND},
-	{ "-getcwd",		"",			AC_ARG_GETCWD},
-	{ "-getestate",		"event",		AC_ARG_GETESTATE},
-	{ "-getkaudit",		"",			AC_ARG_GETKAUDIT},
-	{ "-getkmask",		"",			AC_ARG_GETKMASK},
-	{ "-getpinfo",		"pid",			AC_ARG_GETPINFO},
-	{ "-getpolicy",		"",			AC_ARG_GETPOLICY},
-	{ "-getqbufsz",		"",			AC_ARG_GETQBUFSZ},
-	{ "-getqctrl",		"",			AC_ARG_GETQCTRL},
-	{ "-getqdelay",		"",			AC_ARG_GETQDELAY},
-	{ "-getqhiwater",	"",			AC_ARG_GETQHIWATER},
-	{ "-getqlowater",	"",			AC_ARG_GETQLOWATER},
-	{ "-getstat",		"",			AC_ARG_GETSTAT},
-	{ "-gettid",		"",			AC_ARG_GETTERMID},
-	{ "-lsevent",		"",			AC_ARG_LSEVENT},
-	{ "-lspolicy",		"",			AC_ARG_LSPOLICY},
-	{ "-setasid",		"asid [cmd]",		AC_ARG_SETASID},
-	{ "-setaudit",		"auid audit_flags termid asid [cmd]",
-							AC_ARG_SETAUDIT},
-	{ "-setauid",		"auid [cmd]",		AC_ARG_SETAUID},
-	{ "-setclass",		"event audit_flags",	AC_ARG_SETCLASS},
-	{ "-setkaudit",		"type IP_address",	AC_ARG_SETKAUDIT},
-	{ "-setkmask",		"audit_flags",		AC_ARG_SETKMASK},
-	{ "-setpmask",		"pid audit_flags",	AC_ARG_SETPMASK},
-	{ "-setpolicy",		"[+|-]policy_flags",	AC_ARG_SETPOLICY},
-	{ "-setqbufsz",		"bufsz",		AC_ARG_SETQBUFSZ},
-	{ "-setqctrl",	"hiwater lowater bufsz delay",	AC_ARG_SETQCTRL},
-	{ "-setqdelay",		"delay",		AC_ARG_SETQDELAY},
-	{ "-setqhiwater",	"hiwater",		AC_ARG_SETQHIWATER},
-	{ "-setqlowater",	"lowater",		AC_ARG_SETQLOWATER},
-	{ "-setsmask",		"asid audit_flags",	AC_ARG_SETSMASK},
-	{ "-setstat",		"",			AC_ARG_SETSTAT},
-	{ "-setumask",		"user audit_flags",	AC_ARG_SETUMASK},
-};
+char	*progname = "auditconfig";
 
-#define	ARG_TBL_SZ (sizeof (arg_table) / sizeof (struct arg_entry))
-
-static struct policy_entry policy_table[] = {
-	{"ahlt",  AUDIT_AHLT,   "halt machine if it can not record an "
-	    "async event"},
-	{"all",   ALL_POLICIES,	"all policies"},
-	{"arge",  AUDIT_ARGE,   "include exec environment args in audit recs"},
-	{"argv",  AUDIT_ARGV,   "include exec command line args in audit recs"},
-	{"cnt",   AUDIT_CNT,    "when no more space, drop recs and keep a cnt"},
-	{"group", AUDIT_GROUP,	"include supplementary groups in audit recs"},
-	{"none",  NO_POLICIES,	"no policies"},
-	{"path",  AUDIT_PATH,	"allow multiple paths per event"},
-	{"perzone", AUDIT_PERZONE,      "use a separate queue and auditd per "
-	    "zone"},
-	{"public",  AUDIT_PUBLIC,    "audit public files"},
-	{"seq",   AUDIT_SEQ,    "include a sequence number in audit recs"},
-	{"trail", AUDIT_TRAIL,	"include trailer token in audit recs"},
-	{"windata_down", AUDIT_WINDATA_DOWN,  "include downgraded window "
-	    "information in audit recs"},
-	{"windata_up",  AUDIT_WINDATA_UP,     "include upgraded window "
-	    "information in audit recs"},
-	{"zonename", AUDIT_ZONENAME,    "generate zonename token"}
-};
-
-#define	POLICY_TBL_SZ (sizeof (policy_table) / sizeof (struct policy_entry))
-
-static char *progname = "auditconfig";
+/*
+ * temporary_set true to get/set only kernel settings,
+ *		 false to get/set kernel settings and service properties
+ */
+static boolean_t temporary_set = B_FALSE;
 
 static au_event_ent_t *egetauevnam(char *event_name);
 static au_event_ent_t *egetauevnum(au_event_t event_number);
 static int arg_ent_compare(const void *aep1, const void *aep2);
 static char *cond2str(void);
-static int policy2str(uint_t policy, char *policy_str, size_t len);
+static int policy2str(uint32_t policy, char *policy_str, size_t len);
 static int str2type(char *s, uint_t *type);
-static int str2policy(char *policy_str, uint_t *policy_mask);
+static int str2policy(char *policy_str, uint32_t *policy_mask);
 static int str2ipaddr(char *s, uint32_t *addr, uint32_t type);
 static int strisflags(char *s);
 static int strisipaddr(char *s);
 static int strisnum(char *s);
-static struct arg_entry *get_arg_ent(char *arg_str);
-static struct policy_entry *get_policy_ent(char *policy);
+static arg_entry_t *get_arg_ent(char *arg_str);
 static uid_t get_user_id(char *user);
 static void chk_event_num(int etype, au_event_t event);
 static void chk_event_str(int etype, char *event_str);
@@ -295,11 +253,15 @@ static void esetauid(au_id_t *auid);
 static void execit(char **argv);
 static void exit_error(char *fmt, ...);
 static void exit_usage(int status);
-static void parse_args(char **argv);
+static void parse_args(int argc, char **argv);
 static void print_asid(au_asid_t asid);
 static void print_auid(au_id_t auid);
 static void print_mask(char *desc, au_mask_t *pmp);
 static void print_tid_ex(au_tid_addr_t *tidp);
+
+#if !defined(TEXT_DOMAIN)
+#define	TEXT_DOMAIN	"SUNW_OST_OSCMD"
+#endif
 
 int
 main(int argc, char **argv)
@@ -309,16 +271,16 @@ main(int argc, char **argv)
 
 	if (argc == 1) {
 		exit_usage(0);
-		exit(0);
 	}
 
 	if (argc == 2 &&
-		(argv[1][0] == '?' ||
-		strcmp(argv[1], "-h") == 0 ||
-		strcmp(argv[1], "-?") == 0))
+	    (argv[1][0] == '?' ||
+	    strcmp(argv[1], "-h") == 0 ||
+	    strcmp(argv[1], "-?") == 0)) {
 		exit_usage(0);
+	}
 
-	parse_args(argv);
+	parse_args(argc, argv);
 	do_args(argv);
 
 	return (0);
@@ -333,9 +295,9 @@ main(int argc, char **argv)
  *              parse_args() returns without a value.
  */
 static void
-parse_args(char **argv)
+parse_args(int argc, char **argv)
 {
-	struct arg_entry *ae;
+	arg_entry_t *ae;
 
 	au_mask_t mask;
 	uint_t type;
@@ -354,7 +316,7 @@ parse_args(char **argv)
 				exit_usage(1);
 			if (strisnum(*argv)) {
 				chk_event_num(AC_USER_EVENT,
-					(au_event_t)atol(*argv));
+				    (au_event_t)atol(*argv));
 			} else {
 				chk_event_str(AC_USER_EVENT, *argv);
 			}
@@ -429,14 +391,14 @@ parse_args(char **argv)
 				exit_usage(1);
 			if (str2type (*argv, &type))
 				exit_error(gettext(
-					"Invalid IP address type specified."));
+				    "Invalid IP address type specified."));
 			++argv;
 			if (!*argv)
 				exit_usage(1);
 
 			if (str2ipaddr(*argv, addr, type))
-				exit_error(gettext(
-					"Invalid IP address specified."));
+				exit_error(
+				    gettext("Invalid IP address specified."));
 			break;
 
 		case AC_ARG_SETCLASS:
@@ -445,7 +407,7 @@ parse_args(char **argv)
 				exit_usage(1);
 			if (strisnum(*argv))
 				chk_event_num(AC_KERN_EVENT,
-					(au_event_t)atol(*argv));
+				    (au_event_t)atol(*argv));
 			else
 				chk_event_str(AC_KERN_EVENT, *argv);
 			++argv;
@@ -499,14 +461,14 @@ parse_args(char **argv)
 			if (!*argv)
 				exit_usage(1);
 			if (!strisnum(*argv))
-				exit_error(gettext(
-					"Invalid hiwater specified."));
+				exit_error(
+				    gettext("Invalid hiwater specified."));
 			++argv;
 			if (!*argv)
 				exit_usage(1);
 			if (!strisnum(*argv))
-				exit_error(gettext(
-					gettext("Invalid lowater specified.")));
+				exit_error(
+				    gettext("Invalid lowater specified."));
 			++argv;
 			if (!*argv)
 				exit_usage(1);
@@ -532,8 +494,8 @@ parse_args(char **argv)
 			if (!*argv)
 				exit_usage(1);
 			if (!strisnum(*argv)) {
-				exit_error(gettext(
-				    "Invalid hiwater specified."));
+				exit_error(
+				    gettext("Invalid hiwater specified."));
 			}
 			break;
 
@@ -542,8 +504,8 @@ parse_args(char **argv)
 			if (!*argv)
 				exit_usage(1);
 			if (!strisnum(*argv)) {
-				exit_error(gettext(
-				    "Invalid lowater specified."));
+				exit_error(
+				    gettext("Invalid lowater specified."));
 			}
 			break;
 
@@ -558,6 +520,16 @@ parse_args(char **argv)
 			str2mask(*argv, &mask);
 			break;
 
+		case AC_ARG_SET_TEMPORARY:
+			/* Do not accept single -t option. */
+			if (argc == 2) {
+				exit_error(
+				    gettext("Only the -t option specified "
+				    "(it is not a standalone option)."));
+			}
+			temporary_set = B_TRUE;
+			break;
+
 		default:
 			exit_error(gettext("Internal error #1."));
 			break;
@@ -567,13 +539,15 @@ parse_args(char **argv)
 
 
 /*
- * do_args()
- *     Desc: Do command line arguments in the order in which they appear.
+ * do_args() - do command line arguments in the order in which they appear.
+ * Function return values returned by the underlying functions; the semantics
+ * they should follow is to return B_TRUE on successful execution, B_FALSE
+ * otherwise.
  */
 static void
 do_args(char **argv)
 {
-	struct arg_entry *ae;
+	arg_entry_t	*ae;
 
 	for (++argv; *argv; argv++) {
 		ae = get_arg_ent(*argv);
@@ -731,8 +705,8 @@ do_args(char **argv)
 				++argv;
 				sid_str = *argv;
 				++argv;
-				do_setaudit(user_str, mask_str,
-				    tid_str, sid_str, argv);
+				do_setaudit(user_str, mask_str, tid_str,
+				    sid_str, argv);
 			}
 			break;
 
@@ -848,6 +822,8 @@ do_args(char **argv)
 				do_setumask(auid_str, audit_flags);
 			}
 			break;
+		case AC_ARG_SET_TEMPORARY:
+			break;
 
 		default:
 			exit_error(gettext("Internal error #2."));
@@ -857,10 +833,9 @@ do_args(char **argv)
 }
 
 /*
- * The returned value is for the global zone unless AUDIT_PERZONE is
- * set.
+ * do_chkconf() - the returned value is for the global zone unless AUDIT_PERZONE
+ * is set.
  */
-
 static void
 do_chkconf(void)
 {
@@ -878,8 +853,8 @@ do_chkconf(void)
 
 	setauevent();
 	if (getauevent() == NULL) {
-		(void) exit_error(gettext(
-		    "NO AUDIT EVENTS: Could not read %s\n."), AUDITEVENTFILE);
+		exit_error(gettext("NO AUDIT EVENTS: Could not read %s\n."),
+		    AUDITEVENTFILE);
 	}
 
 	setauevent();
@@ -900,11 +875,11 @@ do_chkconf(void)
 					pmask.am_success = class;
 					pmask.am_failure = class;
 					(void) getauditflagschar(run_aflags,
-						&pmask, 0);
+					    &pmask, 0);
 					pmask.am_success = evp->ae_class;
 					pmask.am_failure = evp->ae_class;
 					(void) getauditflagschar(conf_aflags,
-						&pmask, 0);
+					    &pmask, 0);
 
 					(void) printf(gettext(
 					    "%s(%hu): CLASS MISMATCH: "
@@ -921,8 +896,8 @@ do_chkconf(void)
 }
 
 /*
- * The returned value is for the global zone unless AUDIT_PERZONE is
- * set.
+ * do_conf() - configure the kernel events. The value returned to the user is
+ * for the global zone unless AUDIT_PERZONE is set.
  */
 static void
 do_conf(void)
@@ -950,15 +925,15 @@ do_conf(void)
 }
 
 /*
- * The returned value is for the global zone unless AUDIT_PERZONE is
- * set.
+ * do_chkaconf() - report a mismatch if the runtime class mask of a kernel audit
+ * event does not match the configured class mask. The value returned to the
+ * user is for the global zone unless AUDIT_PERZONE is set.
  */
-
 static void
 do_chkaconf(void)
 {
-	char buf[1024];
-	au_mask_t pmask, kmask;
+	char 		buf[1024];
+	au_mask_t 	pmask, kmask;
 
 	if (getacna(buf, sizeof (buf)) < 0) {
 		(void) fprintf(stderr,
@@ -989,10 +964,9 @@ do_chkaconf(void)
 }
 
 /*
- * The returned value is for the global zone unless AUDIT_PERZONE is
- * set.
+ * do_aconf - configures the non-attributable events. The value returned to the
+ * user is for the global zone unless AUDIT_PERZONE is set.
  */
-
 static void
 do_aconf(void)
 {
@@ -1015,6 +989,12 @@ do_aconf(void)
 	(void) printf(gettext("Configured non-attributable events.\n"));
 }
 
+/*
+ * do_audit() - construct an audit record for audit event event using the
+ * process's audit characteristics containing a text token string audit_str. The
+ * return token is constructed from the success/failure flag sort. Returned
+ * value retval is an errno value.
+ */
 static void
 do_audit(char *event, char sorf, int retval, char *audit_str)
 {
@@ -1047,25 +1027,25 @@ do_audit(char *event, char sorf, int retval, char *audit_str)
 	/* record is preselected */
 	if (rtn == 1) {
 		if ((rd = au_open()) == -1) {
-			exit_error(gettext("Could not get and audit record "
-			    "descriptor\n"));
+			exit_error(gettext(
+			    "Could not get and audit record descriptor\n"));
 		}
 		if ((tokp = au_to_me()) == NULL) {
-			exit_error(gettext("Could not allocate subject "
-			    "token\n"));
+			exit_error(
+			    gettext("Could not allocate subject token\n"));
 		}
 		if (au_write(rd, tokp) == -1) {
-			exit_error(gettext("Could not construct subject "
-			    "token of audit record\n"));
+			exit_error(gettext("Could not construct subject token "
+			    "of audit record\n"));
 		}
 		if (is_system_labeled()) {
 			if ((tokp = au_to_mylabel()) == NULL) {
-				exit_error(gettext("Could not allocate "
-				    "label token\n"));
+				exit_error(gettext(
+				    "Could not allocate label token\n"));
 			}
 			if (au_write(rd, tokp) == -1) {
-				exit_error(gettext("Could not construct "
-				    "label token of audit record\n"));
+				exit_error(gettext("Could not "
+				    "construct label token of audit record\n"));
 			}
 		}
 
@@ -1079,19 +1059,23 @@ do_audit(char *event, char sorf, int retval, char *audit_str)
 #else
 		if ((tokp = au_to_return32(sorf, retval)) == NULL)
 #endif
-			exit_error(gettext("Could not allocate return "
-			    "token\n"));
+			exit_error(
+			    gettext("Could not allocate return token\n"));
 		if (au_write(rd, tokp) == -1) {
 			exit_error(gettext("Could not construct return token "
 			    "of audit record\n"));
 		}
 		if (au_close(rd, 1, evp->ae_number) == -1) {
-			exit_error(gettext("Could not write audit record: "
-			    "%s\n"), strerror(errno));
+			exit_error(
+			    gettext("Could not write audit record: %s\n"),
+			    strerror(errno));
 		}
 	}
 }
 
+/*
+ * do_getauid() - print the audit id of the current process.
+ */
 static void
 do_getauid(void)
 {
@@ -1101,6 +1085,9 @@ do_getauid(void)
 	print_auid(auid);
 }
 
+/*
+ * do_getaudit() - print the audit characteristics of the current process.
+ */
 static void
 do_getaudit(void)
 {
@@ -1113,6 +1100,9 @@ do_getaudit(void)
 	print_asid(ai.ai_asid);
 }
 
+/*
+ * do_getkaudit() - print the audit characteristics of the current zone.
+ */
 static void
 do_getkaudit(void)
 {
@@ -1126,9 +1116,9 @@ do_getkaudit(void)
 }
 
 /*
- * per zone if AUDIT_PERZONE set, else only in global zone.
+ * do_setkaudit() - set IP address_type/address of machine to specified values;
+ * valid per zone if AUDIT_PERZONE is set, else only in global zone.
  */
-
 static void
 do_setkaudit(char *t, char *s)
 {
@@ -1143,9 +1133,8 @@ do_setkaudit(char *t, char *s)
 }
 
 /*
- * returns zone-relative root
+ * do_getcar() - print the zone-relative root
  */
-
 static void
 do_getcar(void)
 {
@@ -1156,10 +1145,10 @@ do_getcar(void)
 }
 
 /*
- * The returned value is for the global zone unless AUDIT_PERZONE is
- * set.
+ * do_getclass() - print the preselection mask associated with the specified
+ * kernel audit event. The displayed value is for the global zone unless
+ * AUDIT_PERZONE is set.
  */
-
 static void
 do_getclass(char *event_str)
 {
@@ -1191,11 +1180,10 @@ do_getclass(char *event_str)
 }
 
 /*
- * The returned value is for the global zone unless AUDIT_PERZONE is
- * set.  (AUC_DISABLED is always global, the other states are per zone
- * if AUDIT_PERZONE is set)
+ * do_getcond() - the printed value is for the global zone unless
+ * AUDIT_PERZONE is set. (AUC_DISABLED is always global, the other states are
+ * per zone if AUDIT_PERZONE is set)
  */
-
 static void
 do_getcond(void)
 {
@@ -1203,9 +1191,8 @@ do_getcond(void)
 }
 
 /*
- * returned path is relative to zone root
+ * do_getcwd() - the printed path is relative to the current zone root
  */
-
 static void
 do_getcwd(void)
 {
@@ -1216,10 +1203,9 @@ do_getcwd(void)
 }
 
 /*
- * The returned value is for the global zone unless AUDIT_PERZONE is
- * set.
+ * do_getkmask() - the printed value is for the global zone unless AUDIT_PERZONE
+ * is set.
  */
-
 static void
 do_getkmask(void)
 {
@@ -1230,22 +1216,34 @@ do_getkmask(void)
 }
 
 /*
- * The returned value is for the global zone unless AUDIT_PERZONE is
- * set. (some policies can only be set from the global zone, but all
- * can be read from anywhere.)
+ * do_getpolicy() - print active and configured kernel audit policy relative to
+ * the current zone.
  */
-
 static void
 do_getpolicy(void)
 {
-	char policy_str[1024];
-	uint_t policy;
+	char 			policy_str[1024];
+	uint32_t		policy;
+
+	if (!temporary_set) {
+		if (!do_getpolicy_scf(&policy)) {
+			exit_error(gettext("Could not get configured values."));
+		}
+		(void) policy2str(policy, policy_str, sizeof (policy_str));
+		(void) printf(gettext("configured audit policies = %s\n"),
+		    policy_str);
+	}
 
 	eauditon(A_GETPOLICY, (caddr_t)&policy, 0);
 	(void) policy2str(policy, policy_str, sizeof (policy_str));
-	(void) printf(gettext("audit policies = %s\n"), policy_str);
+	(void) printf(gettext("active audit policies = %s\n"), policy_str);
 }
 
+
+/*
+ * do_getpinfo() - print the audit ID, preselection mask, terminal ID, and
+ * audit session ID for the specified process.
+ */
 static void
 do_getpinfo(char *pid_str)
 {
@@ -1265,86 +1263,176 @@ do_getpinfo(char *pid_str)
 }
 
 /*
- * The returned value is for the global zone unless AUDIT_PERZONE is
- * set.
+ * do_getqbufsz() - print the active and configured audit queue write buffer
+ * size relative to the current zone.
  */
-
 static void
 do_getqbufsz(void)
 {
 	struct au_qctrl qctrl;
 
+	if (!temporary_set) {
+		if (!do_getqbufsz_scf(&qctrl.aq_bufsz)) {
+			exit_error(gettext("Could not get configured value."));
+		}
+
+		if (qctrl.aq_bufsz == 0) {
+			(void) printf(gettext(
+			    "no configured audit queue buffer size\n"));
+		} else {
+			(void) printf(gettext("configured audit queue "
+			    "buffer size (bytes) = %d\n"), qctrl.aq_bufsz);
+		}
+	}
+
 	eauditon(A_GETQCTRL, (caddr_t)&qctrl, 0);
-	(void) printf(gettext("audit queue buffer size (bytes) = %ld\n"),
-		qctrl.aq_bufsz);
+	(void) printf(gettext("active audit queue buffer size (bytes) = %d\n"),
+	    qctrl.aq_bufsz);
 }
 
 /*
- * The returned value is for the global zone unless AUDIT_PERZONE is
- * set.
+ * do_getqctrl() - print the configured and active audit queue write buffer
+ * size, audit queue hiwater mark, audit queue lowater mark, audit queue prod
+ * interval (ticks) relative to the current zone.
  */
-
 static void
 do_getqctrl(void)
 {
-	struct au_qctrl qctrl;
+	struct au_qctrl	qctrl;
+
+	if (!temporary_set) {
+		if (!do_getqctrl_scf(&qctrl)) {
+			exit_error(gettext("Could not get configured values."));
+		}
+
+		if (qctrl.aq_hiwater == 0) {
+			(void) printf(gettext(
+			    "no configured audit queue hiwater mark\n"));
+		} else {
+			(void) printf(gettext("configured audit queue "
+			    "hiwater mark (records) = %d\n"), qctrl.aq_hiwater);
+		}
+		if (qctrl.aq_lowater == 0) {
+			(void) printf(gettext(
+			    "no configured audit queue lowater mark\n"));
+		} else {
+			(void) printf(gettext("configured audit queue "
+			    "lowater mark (records) = %d\n"), qctrl.aq_lowater);
+		}
+		if (qctrl.aq_bufsz == 0) {
+			(void) printf(gettext(
+			    "no configured audit queue buffer size\n"));
+		} else {
+			(void) printf(gettext("configured audit queue "
+			    "buffer size (bytes) = %d\n"), qctrl.aq_bufsz);
+		}
+		if (qctrl.aq_delay == 0) {
+			(void) printf(gettext(
+			    "no configured audit queue delay\n"));
+		} else {
+			(void) printf(gettext("configured audit queue "
+			    "delay (ticks) = %ld\n"), qctrl.aq_delay);
+		}
+	}
 
 	eauditon(A_GETQCTRL, (caddr_t)&qctrl, 0);
-	(void) printf(gettext("audit queue hiwater mark (records) = %ld\n"),
-	    qctrl.aq_hiwater);
-	(void) printf(gettext("audit queue lowater mark (records) = %ld\n"),
-	    qctrl.aq_lowater);
-	(void) printf(gettext("audit queue buffer size (bytes) = %ld\n"),
+	(void) printf(gettext("active audit queue hiwater mark "
+	    "(records) = %d\n"), qctrl.aq_hiwater);
+	(void) printf(gettext("active audit queue lowater mark "
+	    "(records) = %d\n"), qctrl.aq_lowater);
+	(void) printf(gettext("active audit queue buffer size (bytes) = %d\n"),
 	    qctrl.aq_bufsz);
-	(void) printf(gettext("audit queue delay (ticks) = %ld\n"),
+	(void) printf(gettext("active audit queue delay (ticks) = %ld\n"),
 	    qctrl.aq_delay);
 }
 
 /*
- * The returned value is for the global zone unless AUDIT_PERZONE is
- * set.
+ * do_getqdelay() - print, relative to the current zone, the configured and
+ * active interval at which audit queue is prodded to start output.
  */
-
 static void
 do_getqdelay(void)
 {
 	struct au_qctrl qctrl;
 
+	if (!temporary_set) {
+		if (!do_getqdelay_scf(&qctrl.aq_delay)) {
+			exit_error(gettext("Could not get configured value."));
+		}
+
+		if (qctrl.aq_delay == 0) {
+			(void) printf(gettext(
+			    "no configured audit queue delay\n"));
+		} else {
+			(void) printf(gettext("configured audit queue "
+			    "delay (ticks) = %ld\n"), qctrl.aq_delay);
+		}
+	}
+
 	eauditon(A_GETQCTRL, (caddr_t)&qctrl, 0);
-	(void) printf(gettext("audit queue delay (ticks) = %ld\n"),
+	(void) printf(gettext("active audit queue delay (ticks) = %ld\n"),
 	    qctrl.aq_delay);
 }
 
 /*
- * The returned value is for the global zone unless AUDIT_PERZONE is
- * set.
+ * do_getqhiwater() - print, relative to the current zone, the high water
+ * point in undelivered audit records when audit generation will block.
  */
-
 static void
 do_getqhiwater(void)
 {
 	struct au_qctrl qctrl;
 
+	if (!temporary_set) {
+		if (!do_getqhiwater_scf(&qctrl.aq_hiwater)) {
+			exit_error(gettext("Could not get configured value."));
+		}
+
+		if (qctrl.aq_hiwater == 0) {
+			(void) printf(gettext(
+			    "no configured audit queue hiwater mark\n"));
+		} else {
+			(void) printf(gettext("configured audit queue "
+			    "hiwater mark (records) = %d\n"), qctrl.aq_hiwater);
+		}
+	}
+
 	eauditon(A_GETQCTRL, (caddr_t)&qctrl, 0);
-	(void) printf(gettext("audit queue hiwater mark (records) = %ld\n"),
-	    qctrl.aq_hiwater);
+	(void) printf(gettext("active audit queue hiwater mark "
+	    "(records) = %d\n"), qctrl.aq_hiwater);
 }
 
 /*
- * The returned value is for the global zone unless AUDIT_PERZONE is
- * set.
+ * do_getqlowater() - print, relative to the current zone, the low water point
+ * in undelivered audit records where blocked processes will resume.
  */
-
 static void
 do_getqlowater(void)
 {
 	struct au_qctrl qctrl;
 
+	if (!temporary_set) {
+		if (!do_getqlowater_scf(&qctrl.aq_lowater)) {
+			exit_error(gettext("Could not get configured value."));
+		}
+
+		if (qctrl.aq_lowater == 0) {
+			(void) printf(gettext(
+			    "no configured audit queue lowater mark\n"));
+		} else {
+			(void) printf(gettext("configured audit queue "
+			    "lowater mark (records) = %d\n"), qctrl.aq_lowater);
+		}
+	}
+
 	eauditon(A_GETQCTRL, (caddr_t)&qctrl, 0);
-	(void) printf(gettext("audit queue lowater mark (records) = %ld\n"),
-		qctrl.aq_lowater);
+	(void) printf(gettext("active audit queue lowater mark "
+	    "(records) = %d\n"), qctrl.aq_lowater);
 }
 
+/*
+ * do_getasid() - print out the audit session-ID.
+ */
 static void
 do_getasid(void)
 {
@@ -1357,9 +1445,9 @@ do_getasid(void)
 }
 
 /*
- * The stats are for the entire system unless AUDIT_PERZONE is set.
+ * do_getstat() - the printed statistics are for the entire system unless
+ * AUDIT_PERZONE is set.
  */
-
 static void
 do_getstat(void)
 {
@@ -1388,22 +1476,25 @@ do_getstat(void)
 	 *	Print a properly aligned header.
 	 */
 	(void) printf("%*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s\n",
-		offset[0] - 1,			gettext("gen"),
-		offset[1] - offset[0] -1,	gettext("nona"),
-		offset[2] - offset[1] -1,	gettext("kern"),
-		offset[3] - offset[2] -1,	gettext("aud"),
-		offset[4] - offset[3] -1,	gettext("ctl"),
-		offset[5] - offset[4] -1,	gettext("enq"),
-		offset[6] - offset[5] -1,	gettext("wrtn"),
-		offset[7] - offset[6] -1,	gettext("wblk"),
-		offset[8] - offset[7] -1,	gettext("rblk"),
-		offset[9] - offset[8] -1,	gettext("drop"),
-		offset[10] - offset[9] -1,	gettext("tot"),
-		offset[11] - offset[10],	gettext("mem"));
+	    offset[0] - 1,		gettext("gen"),
+	    offset[1] - offset[0] -1,	gettext("nona"),
+	    offset[2] - offset[1] -1,	gettext("kern"),
+	    offset[3] - offset[2] -1,	gettext("aud"),
+	    offset[4] - offset[3] -1,	gettext("ctl"),
+	    offset[5] - offset[4] -1,	gettext("enq"),
+	    offset[6] - offset[5] -1,	gettext("wrtn"),
+	    offset[7] - offset[6] -1,	gettext("wblk"),
+	    offset[8] - offset[7] -1,	gettext("rblk"),
+	    offset[9] - offset[8] -1,	gettext("drop"),
+	    offset[10] - offset[9] -1,	gettext("tot"),
+	    offset[11] - offset[10],	gettext("mem"));
 
 	(void) printf("%s\n", buf);
 }
 
+/*
+ * do_gettermid() - print audit terminal ID for current process.
+ */
 static void
 do_gettermid(void)
 {
@@ -1416,10 +1507,10 @@ do_gettermid(void)
 }
 
 /*
- * The returned value is for the global zone unless AUDIT_PERZONE is
- * set.
+ * do_lsevent() - display the active kernel and user level audit event
+ * information. The printed events are for the global zone unless AUDIT_PERZONE
+ * is set.
  */
-
 static void
 do_lsevent(void)
 {
@@ -1429,8 +1520,8 @@ do_lsevent(void)
 
 	setauevent();
 	if (getauevent() == NULL) {
-		(void) exit_error(gettext(
-		    "NO AUDIT EVENTS: Could not read %s\n."), AUDITEVENTFILE);
+		exit_error(gettext("NO AUDIT EVENTS: Could not read %s\n."),
+		    AUDITEVENTFILE);
 	}
 
 	setauevent();
@@ -1445,10 +1536,9 @@ do_lsevent(void)
 }
 
 /*
- * The returned value is for the global zone unless AUDIT_PERZONE is
- * set.
+ * do_lspolicy() - display the kernel audit policies with a description  of each
+ * policy. The printed value is for the global zone unless AUDIT_PERZONE is set.
  */
-
 static void
 do_lspolicy(void)
 {
@@ -1465,6 +1555,9 @@ do_lspolicy(void)
 	}
 }
 
+/*
+ * do_setasid() - execute shell or cmd with specified session-ID.
+ */
 static void
 do_setasid(char *sid_str, char **argv)
 {
@@ -1480,6 +1573,9 @@ do_setasid(char *sid_str, char **argv)
 	execit(argv);
 }
 
+/*
+ * do_setaudit() - execute shell or cmd with specified audit characteristics.
+ */
 static void
 do_setaudit(char *user_str, char *mask_str, char *tid_str, char *sid_str,
     char **argv)
@@ -1488,13 +1584,16 @@ do_setaudit(char *user_str, char *mask_str, char *tid_str, char *sid_str,
 
 	ai.ai_auid = (au_id_t)get_user_id(user_str);
 	str2mask(mask_str, &ai.ai_mask),
-	str2tid(tid_str, &ai.ai_termid);
+	    str2tid(tid_str, &ai.ai_termid);
 	ai.ai_asid = (au_asid_t)atol(sid_str);
 
 	esetaudit(&ai, sizeof (ai));
 	execit(argv);
 }
 
+/*
+ * do_setauid() - execute shell or cmd with specified audit-ID.
+ */
 static void
 do_setauid(char *user, char **argv)
 {
@@ -1505,6 +1604,10 @@ do_setauid(char *user, char **argv)
 	execit(argv);
 }
 
+/*
+ * do_setpmask() - set the preselection mask of the specified process; valid
+ * per zone if AUDIT_PERZONE is set, else only in global zone.
+ */
 static void
 do_setpmask(char *pid_str, char *audit_flags)
 {
@@ -1520,6 +1623,11 @@ do_setpmask(char *pid_str, char *audit_flags)
 	eauditon(A_SETPMASK, (caddr_t)&ap, (int)sizeof (ap));
 }
 
+/*
+ * do_setsmask() - set the preselection mask of all processes with the specified
+ * audit session-ID; valid per zone if AUDIT_PERZONE is set, else only in global
+ * zone.
+ */
 static void
 do_setsmask(char *asid_str, char *audit_flags)
 {
@@ -1535,6 +1643,11 @@ do_setsmask(char *asid_str, char *audit_flags)
 	eauditon(A_SETSMASK, (caddr_t)&ainfo, (int)sizeof (ainfo));
 }
 
+/*
+ * do_setumask() -  set the preselection mask of all processes with the
+ * specified audit-ID; valid per zone if AUDIT_PERZONE is set, else only in
+ * global zone.
+ */
 static void
 do_setumask(char *auid_str, char *audit_flags)
 {
@@ -1551,10 +1664,9 @@ do_setumask(char *auid_str, char *audit_flags)
 }
 
 /*
- * local zone use is valid if AUDIT_PERZONE is set, otherwise the
- * syscall returns EPERM.
+ * do_setstat() - reset audit statistics counters; local zone use is valid if
+ * AUDIT_PERZONE is set, otherwise the syscall returns EPERM.
  */
-
 static void
 do_setstat(void)
 {
@@ -1577,10 +1689,10 @@ do_setstat(void)
 }
 
 /*
- * AUDIT_PERZONE set:  valid in all zones
- * AUDIT_PERZONE not set: valid in global zone only
+ * do_setclass() - map the kernel event event_str to the classes specified by
+ * audit flags audit_flags; valid per zone if AUDIT_PERZONE is set, else only in
+ * global zone.
  */
-
 static void
 do_setclass(char *event_str, char *audit_flags)
 {
@@ -1610,10 +1722,9 @@ do_setclass(char *event_str, char *audit_flags)
 }
 
 /*
- * AUDIT_PERZONE set:  valid in all zones
- * AUDIT_PERZONE not set: valid in global zone only
+ * do_setkmask() - set non-attributes selection flags of machine; valid per zone
+ * if AUDIT_PERZONE is set, else only in global zone.
  */
-
 static void
 do_setkmask(char *audit_flags)
 {
@@ -1625,107 +1736,162 @@ do_setkmask(char *audit_flags)
 }
 
 /*
- * ahlt and perzone are global zone only; the other policies are valid
- * in a local zone if AUDIT_PERZONE is set.  The kernel insures that
- * a local zone can't change ahlt and perzone (EINVAL).
+ * do_setpolicy() - set the active and configured kernel audit policy; active
+ * values can be changed per zone if AUDIT_PERZONE is set, else only in global
+ * zone.
+ *
+ * ahlt and perzone are global zone only. The kernel ensures that a local zone
+ * can't change ahlt and perzone (EINVAL).
  */
-
 static void
 do_setpolicy(char *policy_str)
 {
-	uint_t	policy;
+	uint32_t	policy = 0;
 
 	switch (str2policy(policy_str, &policy)) {
-	case 2:
-		exit_error(gettext(
-			"policy (%s) invalid in a local zone."),
-			policy_str);
+	case 0:
+		if (!temporary_set) {
+			if (!do_getpolicy_scf(&policy)) {
+				exit_error(gettext("Unable to get current "
+				    "policy values from the SMF repository"));
+			}
+			(void) str2policy(policy_str, &policy);
+
+			if (!do_setpolicy_scf(policy)) {
+				exit_error(gettext("Could not store "
+				    "configuration values."));
+			}
+		}
+		eauditon(A_SETPOLICY, (caddr_t)&policy, 0);
 		break;
-	default:
-		exit_error(gettext(
-		    "Invalid policy (%s) specified."),
+	case 2:
+		exit_error(gettext("policy (%s) invalid in a local zone."),
 		    policy_str);
 		break;
-	case 0:
-		eauditon(A_SETPOLICY, (caddr_t)&policy, 0);
+	default:
+		exit_error(gettext("Invalid policy (%s) specified."),
+		    policy_str);
 		break;
 	}
 }
 
 /*
- * AUDIT_PERZONE set:  valid in all zones
- * AUDIT_PERZONE not set: valid in global zone only
+ * do_setqbufsz() - set the active and configured audit queue write buffer size
+ * (bytes); active values can be changed per zone if AUDIT_PERZONE is set, else
+ * only in global zone.
  */
-
 static void
 do_setqbufsz(char *bufsz)
 {
 	struct au_qctrl qctrl;
 
+	if (!temporary_set) {
+		qctrl.aq_bufsz = (size_t)atol(bufsz);
+		if (!do_setqbufsz_scf(&qctrl.aq_bufsz)) {
+			exit_error(gettext(
+			    "Could not store configuration value."));
+		}
+	}
+
 	eauditon(A_GETQCTRL, (caddr_t)&qctrl, 0);
-	qctrl.aq_bufsz = atol(bufsz);
+	qctrl.aq_bufsz = (size_t)atol(bufsz);
 	eauditon(A_SETQCTRL, (caddr_t)&qctrl, 0);
 }
 
 /*
- * AUDIT_PERZONE set:  valid in all zones
- * AUDIT_PERZONE not set: valid in global zone only
+ * do_setqctrl() - set the active and configured audit queue write buffer size
+ * (bytes), hiwater audit record count, lowater audit record count, and wakeup
+ * interval (ticks); active values can be changed per zone if AUDIT_PERZONE is
+ * set, else only in global zone.
  */
-
 static void
 do_setqctrl(char *hiwater, char *lowater, char *bufsz, char *delay)
 {
-	struct au_qctrl qctrl;
+	struct au_qctrl	qctrl;
 
-	qctrl.aq_hiwater = atol(hiwater);
-	qctrl.aq_lowater = atol(lowater);
-	qctrl.aq_bufsz = atol(bufsz);
-	qctrl.aq_delay = atol(delay);
+	qctrl.aq_hiwater = (size_t)atol(hiwater);
+	qctrl.aq_lowater = (size_t)atol(lowater);
+	qctrl.aq_bufsz = (size_t)atol(bufsz);
+	qctrl.aq_delay = (clock_t)atol(delay);
+
+	if (!temporary_set) {
+		if (!do_setqctrl_scf(&qctrl)) {
+			exit_error(gettext(
+			    "Could not store configuration values."));
+		}
+	}
+
 	eauditon(A_SETQCTRL, (caddr_t)&qctrl, 0);
 }
 
 /*
- * AUDIT_PERZONE set:  valid in all zones
- * AUDIT_PERZONE not set: valid in global zone only
+ * do_setqdelay() - set the active and configured audit queue wakeup interval
+ * (ticks); active values can be changed per zone if AUDIT_PERZONE is set, else
+ * only in global zone.
  */
-
 static void
 do_setqdelay(char *delay)
 {
 	struct au_qctrl qctrl;
 
+	if (!temporary_set) {
+		qctrl.aq_delay = (clock_t)atol(delay);
+		if (!do_setqdelay_scf(&qctrl.aq_delay)) {
+			exit_error(gettext(
+			    "Could not store configuration value."));
+		}
+	}
+
 	eauditon(A_GETQCTRL, (caddr_t)&qctrl, 0);
-	qctrl.aq_delay = atol(delay);
+	qctrl.aq_delay = (clock_t)atol(delay);
 	eauditon(A_SETQCTRL, (caddr_t)&qctrl, 0);
 }
 
 /*
- * AUDIT_PERZONE set:  valid in all zones
- * AUDIT_PERZONE not set: valid in global zone only
+ * do_setqhiwater() - sets the active and configured number of undelivered audit
+ * records in the audit queue at which audit record generation blocks; active
+ * values can be changed per zone if AUDIT_PERZONE is set, else only in global
+ * zone.
  */
-
 static void
 do_setqhiwater(char *hiwater)
 {
 	struct au_qctrl qctrl;
 
+	if (!temporary_set) {
+		qctrl.aq_hiwater = (size_t)atol(hiwater);
+		if (!do_setqhiwater_scf(&qctrl.aq_hiwater)) {
+			exit_error(gettext(
+			    "Could not store configuration value."));
+		}
+	}
+
 	eauditon(A_GETQCTRL, (caddr_t)&qctrl, 0);
-	qctrl.aq_hiwater = atol(hiwater);
+	qctrl.aq_hiwater = (size_t)atol(hiwater);
 	eauditon(A_SETQCTRL, (caddr_t)&qctrl, 0);
 }
 
 /*
- * AUDIT_PERZONE set:  valid in all zones
- * AUDIT_PERZONE not set: valid in global zone only
+ * do_setqlowater() - set the active and configured number of undelivered audit
+ * records in the audit queue at which blocked auditing processes unblock;
+ * active values can be changed per zone if AUDIT_PERZONE is set, else only in
+ * global zone.
  */
-
 static void
 do_setqlowater(char *lowater)
 {
 	struct au_qctrl qctrl;
 
+	if (!temporary_set) {
+		qctrl.aq_lowater = (size_t)atol(lowater);
+		if (!do_setqlowater_scf(&qctrl.aq_lowater)) {
+			exit_error(gettext(
+			    "Could not store configuration value."));
+		}
+	}
+
 	eauditon(A_GETQCTRL, (caddr_t)&qctrl, 0);
-	qctrl.aq_lowater = atol(lowater);
+	qctrl.aq_lowater = (size_t)atol(lowater);
 	eauditon(A_SETQCTRL, (caddr_t)&qctrl, 0);
 }
 
@@ -1839,17 +2005,17 @@ get_user_id(char *user)
 /*
  * get_arg_ent()
  *     Inputs: command line argument string
- *     Returns ptr to policy_entry if found; null, if not found
+ *     Returns ptr to struct arg_entry if found; null, if not found
  */
-static struct arg_entry *
+static arg_entry_t *
 get_arg_ent(char *arg_str)
 {
-	struct arg_entry key;
+	arg_entry_t key;
 
 	key.arg_str = arg_str;
 
-	return ((struct arg_entry *)bsearch((char *)&key, (char *)arg_table,
-	    ARG_TBL_SZ, sizeof (struct arg_entry), arg_ent_compare));
+	return ((arg_entry_t *)bsearch((char *)&key, (char *)arg_table,
+	    ARG_TBL_SZ, sizeof (arg_entry_t), arg_ent_compare));
 }
 
 /*
@@ -1864,8 +2030,8 @@ get_arg_ent(char *arg_str)
 static int
 arg_ent_compare(const void *aep1, const void *aep2)
 {
-	return (strcmp(((struct arg_entry *)aep1)->arg_str,
-	    ((struct arg_entry *)aep2)->arg_str));
+	return (strcmp(((arg_entry_t *)aep1)->arg_str,
+	    ((arg_entry_t *)aep2)->arg_str));
 }
 
 /*
@@ -1912,7 +2078,6 @@ str2mask(char *mask_str, au_mask_t *mp)
 /*
  * tid_str is major,minor,host  -- host is a name or an ip address
  */
-
 static void
 str2tid(char *tid_str, au_tid_addr_t *tp)
 {
@@ -2018,37 +2183,20 @@ cond2str(void)
 	}
 }
 
-static struct policy_entry *
-get_policy_ent(char *policy)
-{
-	int i;
-
-	for (i = 0; i < POLICY_TBL_SZ; i++) {
-		if (strcasecmp(policy,
-		    policy_table[i].policy_str) == 0) {
-			return (&policy_table[i]);
-		}
-	}
-
-	return (NULL);
-}
-
 /*
  * 	exit = 0, success
  *	       1, error
  *	       2, bad zone
  */
-
 static int
-str2policy(char *policy_str, uint_t *policy_mask)
+str2policy(char *policy_str, uint32_t *policy_mask)
 {
 	char		*buf;
 	char		*tok;
 	char		pfix;
-	boolean_t	is_all = 0;
-	uint_t		pm = 0;
-	uint_t		curp = 0;
-	struct		policy_entry *pep;
+	boolean_t	is_all = B_FALSE;
+	uint32_t	pm = 0;
+	uint32_t	curp;
 
 	pfix = *policy_str;
 
@@ -2059,16 +2207,26 @@ str2policy(char *policy_str, uint_t *policy_mask)
 		return (1);
 
 	for (tok = strtok(buf, ","); tok != NULL; tok = strtok(NULL, ",")) {
-		if ((pep = get_policy_ent(tok)) == NULL) {
+		uint32_t tok_pm;
+		if (((tok_pm = get_policy(tok)) == 0) &&
+		    ((strcasecmp(tok, "none") != 0))) {
+			free(buf);
 			return (1);
 		} else {
-			pm |= pep->policy_mask;
-			if (pep->policy_mask == ALL_POLICIES) {
-				is_all = 1;
+			pm |= tok_pm;
+			if (tok_pm == ALL_POLICIES) {
+				is_all = B_TRUE;
 			}
 		}
 	}
 	free(buf);
+
+	/* reuse policy mask if already set to some value */
+	if (*policy_mask != 0) {
+		curp = *policy_mask;
+	} else {
+		(void) auditon(A_GETPOLICY, (caddr_t)&curp, 0);
+	}
 
 	if (pfix == '-') {
 		if (!is_all &&
@@ -2076,10 +2234,11 @@ str2policy(char *policy_str, uint_t *policy_mask)
 		    (pm & ~AUDIT_LOCAL)) {
 			return (2);
 		}
-		eauditon(A_GETPOLICY, (caddr_t)&curp, 0);
+
 		if (getzoneid() != GLOBAL_ZONEID)
 			curp &= AUDIT_LOCAL;
 		*policy_mask = curp & ~pm;
+
 	} else if (pfix == '+') {
 		/*
 		 * In a local zone, accept specifying "all", but not
@@ -2092,7 +2251,7 @@ str2policy(char *policy_str, uint_t *policy_mask)
 		    (pm & ~AUDIT_LOCAL)) {
 			return (2);
 		}
-		eauditon(A_GETPOLICY, (caddr_t)&curp, 0);
+
 		if (getzoneid() != GLOBAL_ZONEID) {
 			curp &= AUDIT_LOCAL;
 			if (is_all) {
@@ -2100,7 +2259,20 @@ str2policy(char *policy_str, uint_t *policy_mask)
 			}
 		}
 		*policy_mask = curp | pm;
+
 	} else {
+		/*
+		 * In a local zone, accept specifying "all", but not
+		 * individually specifying global-zone only policies.
+		 * Limit to all locally allowed, so system call doesn't
+		 * fail.
+		 */
+		if (!is_all &&
+		    (getzoneid() != GLOBAL_ZONEID) &&
+		    (pm & ~AUDIT_LOCAL)) {
+			return (2);
+		}
+
 		if (is_all && (getzoneid() != GLOBAL_ZONEID)) {
 			pm &= AUDIT_LOCAL;
 		}
@@ -2110,7 +2282,7 @@ str2policy(char *policy_str, uint_t *policy_mask)
 }
 
 static int
-policy2str(uint_t policy, char *policy_str, size_t len)
+policy2str(uint32_t policy, char *policy_str, size_t len)
 {
 	int i, j;
 
@@ -2229,8 +2401,8 @@ chk_event_num(int etype, au_event_t event)
 
 	if (etype == AC_KERN_EVENT) {
 		if (event > as.as_numevent) {
-			exit_error(gettext("Invalid kernel audit event "
-			    "number specified.\n"
+			exit_error(gettext(
+			    "Invalid kernel audit event number specified.\n"
 			    "\t%hu is outside allowable range 0-%d."),
 			    event, as.as_numevent);
 		}
@@ -2253,14 +2425,14 @@ chk_event_str(int etype, char *event_str)
 
 	evp = egetauevnam(event_str);
 	if (etype == AC_KERN_EVENT && (evp->ae_number > as.as_numevent)) {
-		exit_error(
-		    gettext("Invalid kernel audit event string specified.\n"
+		exit_error(gettext(
+		    "Invalid kernel audit event string specified.\n"
 		    "\t\"%s\" appears to be a user level event. "
 		    "Check configuration."), event_str);
 	} else if (etype == AC_USER_EVENT &&
 	    (evp->ae_number < as.as_numevent)) {
-		exit_error(
-		    gettext("Invalid user audit event string specified.\n"
+		exit_error(gettext(
+		    "Invalid user audit event string specified.\n"
 		    "\t\"%s\" appears to be a kernel event. "
 		    "Check configuration."), event_str);
 	}
@@ -2295,8 +2467,7 @@ execit(char **argv)
 
 		if ((args = malloc(len + 1)) == NULL)
 			exit_error(
-				gettext("Allocation for command/arguments "
-					"failed"));
+			    gettext("Allocation for command/arguments failed"));
 
 		args_pos = args;
 		for (argv_pos = argv; *argv_pos; argv_pos++) {
@@ -2314,33 +2485,6 @@ execit(char **argv)
 	exit_error(gettext("exec(2) failed"));
 }
 
-/*
- * exit_error()
- *     Desc: Prints an error message along with corresponding system
- *                  error number and error message, then exits.
- *     Inputs: Program name, program error message.
- */
-/*PRINTFLIKE1*/
-static void
-exit_error(char *fmt, ...)
-{
-	va_list args;
-
-	(void) fprintf(stderr, "%s: ", progname);
-
-	va_start(args, fmt);
-	(void) vfprintf(stderr, fmt, args);
-	va_end(args);
-
-	(void) fputc('\n', stderr);
-	if (errno)
-		(void) fprintf(stderr, gettext("%s: error = %s(%d)\n"),
-			progname, strerror(errno), errno);
-	(void) fflush(stderr);
-
-	exit(1);
-}
-
 static void
 exit_usage(int status)
 {
@@ -2350,9 +2494,16 @@ exit_usage(int status)
 	fp = (status ? stderr : stdout);
 	(void) fprintf(fp, gettext("usage: %s option ...\n"), progname);
 
-	for (i = 0; i < ARG_TBL_SZ; i++)
-		(void) fprintf(fp, " %s %s\n",
-			arg_table[i].arg_str, arg_table[i].arg_opts);
+	for (i = 0; i < ARG_TBL_SZ; i++) {
+		/* skip the -t option; it's not a standalone option */
+		if (arg_table[i].auditconfig_cmd == AC_ARG_SET_TEMPORARY) {
+			continue;
+		}
+
+		(void) fprintf(fp, " %s%s%s\n",
+		    arg_table[i].arg_str, arg_table[i].arg_opts,
+		    (arg_table[i].temporary_allowed ? " [-t]" : ""));
+	}
 
 	exit(status);
 }
@@ -2413,7 +2564,7 @@ print_tid_ex(au_tid_addr_t *tidp)
 		ia.s_addr = tidp->at_addr[0];
 
 		(void) printf(gettext(
-		    "terminal id (maj,min,host) = %u,%u,%s(%s)\n"),
+		    "terminal id (maj,min,host) = %lu,%lu,%s(%s)\n"),
 		    major(tidp->at_port), minor(tidp->at_port),
 		    hostname, inet_ntoa(ia));
 	} else {
@@ -2430,7 +2581,7 @@ print_tid_ex(au_tid_addr_t *tidp)
 		}
 
 		(void) printf(gettext(
-		    "terminal id (maj,min,host) = %u,%u,%s(%s)\n"),
+		    "terminal id (maj,min,host) = %lu,%lu,%s(%s)\n"),
 		    major(tidp->at_port), minor(tidp->at_port),
 		    bufp, buf);
 		if (phe) {
@@ -2496,4 +2647,22 @@ str2type(char *s, uint_t *type)
 	}
 
 	return (1);
+}
+
+/*
+ * exit_error() - print an error message along with corresponding system error
+ * number and error message, then exit. Inputs - program error format and
+ * message.
+ */
+/*PRINTFLIKE1*/
+static void
+exit_error(char *fmt, ...)
+{
+	va_list	args;
+
+	va_start(args, fmt);
+	prt_error_va(fmt, args);
+	va_end(args);
+
+	exit(1);
 }

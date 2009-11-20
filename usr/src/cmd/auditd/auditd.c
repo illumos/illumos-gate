@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* Audit daemon server */
 /*
@@ -46,8 +44,10 @@
  * handled by the audit_binfile plugin
  */
 
-#define	DEBUG 		0
-#define	MEM_TEST	0	/* set to one to generate core dump on exit */
+/* #define	DEBUG    - define for debug messages to be generated */
+/* #define	MEM_TEST - define to generate core dump on exit */
+#define	DEBUG		0
+#define	MEM_TEST	0
 
 #include <assert.h>
 #include <bsm/adt.h>
@@ -78,6 +78,7 @@
 #include "plugin.h"
 #include "audit_sig_infc.h"
 #include <audit_plugin.h>
+#include <audit_scf.h>
 
 #if !defined(TEXT_DOMAIN)
 #define	TEXT_DOMAIN	"SUNW_OST_OSCMD"
@@ -92,13 +93,6 @@
  */
 #define	ALRM_TIME	2
 #define	SLEEP_TIME	20	/* # of seconds to sleep in all hard loop */
-
-#if DEBUG
-#define	DPRINT(x) {(void) fprintf x; }
-static FILE	*dbfp;	/* debug file */
-#else
-#define	DPRINT(x)
-#endif /* DEBUG */
 
 static plugin_t	*binfile = NULL;
 
@@ -130,6 +124,32 @@ static void	loadauditlist();
 static void	block_signals();
 static int	do_sethost();
 
+static void	conf_to_kernel();
+static void	aconf_to_kernel();
+static void	scf_to_kernel_qctrl();
+static void	scf_to_kernel_policy();
+
+/*
+ * err_exit() - exit function after the unsuccessful call to auditon();
+ * prints_out / saves_via_syslog the necessary error messages.
+ */
+static void
+err_exit(int rc, char *msg)
+{
+	if (msg != NULL) {
+		DPRINT((dbfp, "%s\n", msg));
+		__audit_syslog("auditd", LOG_PID | LOG_CONS | LOG_NOWAIT,
+		    LOG_DAEMON, LOG_ALERT, msg);
+		free(msg);
+	} else {
+		DPRINT((dbfp, "the memory allocation failed\n"));
+		__audit_syslog("auditd", LOG_PID | LOG_CONS | LOG_NOWAIT,
+		    LOG_DAEMON, LOG_ALERT, gettext("no memory"));
+	}
+	auditd_thread_close();
+	auditd_exit(rc);
+}
+
 /* common exit function */
 void
 auditd_exit(int status)
@@ -148,6 +168,10 @@ auditd_exit(int status)
 		(void) auditon(A_SETCOND, (caddr_t)&turn_audit_off,
 		    (int)sizeof (int));
 
+#if DEBUG
+	(void) fclose(dbfp);
+#endif
+
 	exit(status);
 }
 
@@ -164,7 +188,9 @@ main(int argc, char *argv[])
 #if DEBUG
 	/* LINTED */
 	char			*envp;
-	dbfp = __auditd_debug_file_open();
+	if (dbfp == NULL) {
+		dbfp = __auditd_debug_file_open();
+	}
 #endif
 	(void) setsid();
 
@@ -204,10 +230,6 @@ main(int argc, char *argv[])
 
 	block_signals();
 
-#if DEBUG
-	/* output to dbfp shouldn't be duplicated by parent and child */
-	(void) fflush(dbfp);
-#endif
 	/*
 	 * wait for "ready" signal before exit -- for greenline
 	 */
@@ -276,9 +298,16 @@ main(int argc, char *argv[])
 		 * with unload_plugin().
 		 */
 		if (reset_list || reset_file) {
-			(void) pthread_mutex_lock(&plugin_mutex);
-			if (reset_list)
+			if (reset_list) {
+				conf_to_kernel();
+				aconf_to_kernel();
+				scf_to_kernel_qctrl();
+				scf_to_kernel_policy();
+				(void) pthread_mutex_lock(&plugin_mutex);
 				loadauditlist();
+			} else {
+				(void) pthread_mutex_lock(&plugin_mutex);
+			}
 
 			if (auditd_thread_init()) {
 				auditd_thread_close();
@@ -286,6 +315,12 @@ main(int argc, char *argv[])
 			}
 			(void) pthread_mutex_unlock(&plugin_mutex);
 			reset_list = 0;
+
+			if (reset_list && reset_file) {
+				(void) printf(gettext("auditd started\n"));
+			} else {
+				(void) printf(gettext("auditd refreshed\n"));
+			}
 		}
 		/*
 		 * tell parent I'm running whether or not the initialization
@@ -584,11 +619,11 @@ loadauditlist()
 	    "continue" : "block"));
 
 #if DEBUG
-	if (auditon(A_GETCOND, (caddr_t)&acresult, (int)sizeof (int)) !=
-	    0)
+	if (auditon(A_GETCOND, (caddr_t)&acresult, (int)sizeof (int)) != 0)
 		DPRINT((dbfp, "auditon(A_GETCOND...) failed (exit)\n"));
-#endif
+
 	DPRINT((dbfp, "audit cond = %d (1 is on)\n", acresult));
+#endif
 
 
 	if (auditon(A_GETQCTRL, (char *)&kqmax, sizeof (struct au_qctrl)) !=
@@ -608,8 +643,8 @@ loadauditlist()
 	 * active.
 	 */
 	while (p != NULL) {
-		DPRINT((dbfp, "loadauditlist:  %X, %s previously created\n",
-		    p, p->plg_path));
+		DPRINT((dbfp, "loadauditlist:  %p, %s previously created\n",
+		    (void *)p, p->plg_path));
 		p->plg_to_be_removed = 1;	/* tentative removal */
 		p = p->plg_next;
 	}
@@ -697,7 +732,7 @@ loadauditlist()
 		 * list or remote host info from the audit_control file
 		 */
 		wait_count++;
-#if	DEBUG
+#if DEBUG
 		if (wait_count < 2)
 			DPRINT((dbfp,
 			    "auditd: problem getting directory "
@@ -827,4 +862,160 @@ fail:
 	__audit_syslog("auditd", LOG_PID | LOG_CONS | LOG_NOWAIT, LOG_DAEMON,
 	    LOG_ALERT, msg);
 	return (-1);
+}
+
+/*
+ * conf_to_kernel() - configure the event to class mapping; see also
+ * auditconfig(1M) -conf option.
+ */
+static void
+conf_to_kernel(void)
+{
+	register au_event_ent_t *evp;
+	register int 		i;
+	char			*msg;
+	au_evclass_map_t 	ec;
+	au_stat_t 		as;
+
+	if (auditon(A_GETSTAT, (caddr_t)&as, 0) != 0) {
+		(void) asprintf(&msg, gettext("Audit module does not appear "
+		    "to be loaded."));
+		err_exit(1, msg);
+	}
+
+	i = 0;
+	setauevent();
+	while ((evp = getauevent()) != NULL) {
+		if (evp->ae_number <= as.as_numevent) {
+			++i;
+			ec.ec_number = evp->ae_number;
+			ec.ec_class = evp->ae_class;
+
+			if (auditon(A_SETCLASS, (caddr_t)&ec,
+			    (int)sizeof (ec)) != 0) {
+				(void) asprintf(&msg,
+				    gettext("Could not configure kernel audit "
+				    "event to class mappings."));
+				err_exit(1, msg);
+			}
+		}
+	}
+	endauevent();
+
+	DPRINT((dbfp, "configured %d kernel events.\n", i));
+}
+
+/*
+ * aconf_to_kernel() - set the non-attributable audit mask from the
+ * audit_control(4); see also auditconfig(1M) -aconf option.
+ */
+static void
+aconf_to_kernel(void)
+{
+	char		*msg;
+	char		buf[2048];
+	au_mask_t	pmask;
+
+	if (getacna(buf, sizeof (buf)) < 0) {
+		(void) asprintf(&msg,
+		    gettext("bad non-attributable flags in audit_control(4)"));
+		err_exit(1, msg);
+	}
+
+	if (getauditflagsbin(buf, &pmask) < 0) {
+		(void) asprintf(&msg,
+		    gettext("bad audit flag value encountered"));
+		err_exit(1, msg);
+	}
+
+	if (auditon(A_SETKMASK, (caddr_t)&pmask, (int)sizeof (pmask)) != 0) {
+		(void) asprintf(&msg,
+		    gettext("Could not configure non-attributable events."));
+		err_exit(1, msg);
+	}
+
+	DPRINT((dbfp, "configured non-attributable events.\n"));
+}
+
+/*
+ * scf_to_kernel_qctrl() - update the kernel queue control parameters
+ */
+static void
+scf_to_kernel_qctrl(void)
+{
+	struct au_qctrl	act_qctrl;
+	struct au_qctrl	cfg_qctrl;
+	char		*msg;
+
+	if (!do_getqctrl_scf(&cfg_qctrl)) {
+		(void) asprintf(&msg, gettext("Unable to gather audit queue "
+		    "control parameters from the SMF repository."));
+		err_exit(1, msg);
+	}
+
+	DPRINT((dbfp, "will check and set qctrl parameters:\n"));
+	DPRINT((dbfp, "\thiwater: %d\n", cfg_qctrl.aq_hiwater));
+	DPRINT((dbfp, "\tlowater: %d\n", cfg_qctrl.aq_lowater));
+	DPRINT((dbfp, "\tbufsz: %d\n", cfg_qctrl.aq_bufsz));
+	DPRINT((dbfp, "\tdelay: %ld\n", cfg_qctrl.aq_delay));
+
+	if (auditon(A_GETQCTRL, (caddr_t)&act_qctrl, 0) != 0) {
+		(void) asprintf(&msg, gettext("Could not retrieve "
+		    "audit queue controls from kernel."));
+		err_exit(1, msg);
+	}
+
+	/* overwrite the default (zeros) from the qctrl configuration */
+	if (cfg_qctrl.aq_hiwater == 0) {
+		cfg_qctrl.aq_hiwater = act_qctrl.aq_hiwater;
+		DPRINT((dbfp, "hiwater changed to active value: %u\n",
+		    cfg_qctrl.aq_hiwater));
+	}
+	if (cfg_qctrl.aq_lowater == 0) {
+		cfg_qctrl.aq_lowater = act_qctrl.aq_lowater;
+		DPRINT((dbfp, "lowater changed to active value: %u\n",
+		    cfg_qctrl.aq_lowater));
+	}
+	if (cfg_qctrl.aq_bufsz == 0) {
+		cfg_qctrl.aq_bufsz = act_qctrl.aq_bufsz;
+		DPRINT((dbfp, "bufsz changed to active value: %u\n",
+		    cfg_qctrl.aq_bufsz));
+	}
+	if (cfg_qctrl.aq_delay == 0) {
+		cfg_qctrl.aq_delay = act_qctrl.aq_delay;
+		DPRINT((dbfp, "delay changed to active value: %ld\n",
+		    cfg_qctrl.aq_delay));
+	}
+
+	if (auditon(A_SETQCTRL, (caddr_t)&cfg_qctrl, 0) != 0) {
+		(void) asprintf(&msg,
+		    gettext("Could not configure audit queue controls."));
+		err_exit(1, msg);
+	}
+
+	DPRINT((dbfp, "qctrl parameters set\n"));
+}
+
+/*
+ * scf_to_kernel_policy() - update the audit service policies
+ */
+static void
+scf_to_kernel_policy(void)
+{
+	uint32_t	policy;
+	char		*msg;
+
+	if (!do_getpolicy_scf(&policy)) {
+		(void) asprintf(&msg, gettext("Unable to get audit policy "
+		    "configuration from the SMF repository."));
+		err_exit(1, msg);
+	}
+
+	if (auditon(A_SETPOLICY, (caddr_t)&policy, 0) != 0) {
+		(void) asprintf(&msg,
+		    gettext("Could not update active policy settings."));
+		err_exit(1, msg);
+	}
+
+	DPRINT((dbfp, "kernel policy settings updated\n"));
 }

@@ -76,11 +76,6 @@ ESSRC =			$(ESFILES:%=%.txt)
 ETCSECURITYFILES =	$(ESFILES:%=$(ROOTETCSECURITY)/%)
 $(ETCSECURITYFILES) :=	FILEMODE = 0644
 
-EESFILES =		audit_startup
-EESSRC =		$(EESFILES:%=%.txt)
-EETCSECURITYFILES =	$(EESFILES:%=$(ROOTETCSECURITY)/%)
-$(EETCSECURITYFILES) :=	FILEMODE = 0744
-
 #
 # /etc/security/audit/localhost/files is a symbolic link to /var/audit.
 # This is provided so that auditreduce will work in the default configuration.
@@ -138,7 +133,7 @@ check:	$(CHECKHDRS) $(CHECKCHDRS)
 	xmllint --schema $(ADTXSDFILE) --noout $(ADTXMLFILE)
 
 install_data: $(ESSRC) $(RESSRC) $(ROOTETCSECURITY) $(ETCSECURITYFILES) \
-	$(EETCSECURITYFILES) $(ROOTXMLFILES)
+	$(ROOTXMLFILES)
 
 install_dirs: $(AUDITDIRS) $(ARSYMLNK) $(ROOTXMLDIRS)
 
@@ -156,7 +151,7 @@ clean_files:
 $(GENSRCS): $(ADTXMLFILE) $(AUDITXML)
 	$(PERL) $(AUDITXML) -o $(COMMONDIR) $(ADTXMLFILE)
 
-$(ETCSECURITYFILES) $(EETCSECURITYFILES) $(RESA): \
+$(ETCSECURITYFILES) $(RESA): \
 	$(ETCSECURITY) \
 	$(ROOTETCSECURITY)
 

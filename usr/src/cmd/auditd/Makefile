@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG = auditd
@@ -30,22 +28,28 @@ PROG = auditd
 MANIFEST = auditd.xml
 SVCMETHOD = svc-auditd
 
-include ../Makefile.cmd
+include $(SRC)/cmd/Makefile.cmd
 
 ROOTMANIFESTDIR = $(ROOTSVCSYSTEM)
 
 LIBBSM = $(SRC)/lib/libbsm/common
+AUDITCONFIG = $(SRC)/cmd/auditconfig
+AUDITD = $(SRC)/cmd/auditd
 
 CPPFLAGS += -D_REENTRANT
-CPPFLAGS += -I$(LIBBSM)
+CPPFLAGS += -I$(LIBBSM) -I$(AUDITCONFIG) -I$(AUDITD)
 
 LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
 LINTFLAGS += -m
 
-LDLIBS += -lbsm -lsecdb
+LDLIBS += -lbsm -lsecdb -lscf
 
-OBJS= auditd.o doorway.o queue.o
-SRCS= $(OBJS:%.o=%.c)
+OBJS = audit_scf_shared.o auditd.o doorway.o queue.o
+SRCS = $(AUDITCONFIG)/audit_scf_shared.c auditd.c doorway.c queue.c
+
+POFILE =	auditd.po
+MSGFILES =	$(SRCS)
+
 
 .KEEP_STATE:
 
@@ -54,15 +58,32 @@ all:		$(PROG)
 install:	all $(ROOTUSRSBINPROG) \
 		$(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
-$(PROG):	$(OBJS)
+$(PROG):	$(SRCS) $(OBJS)
 		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 
+audit_scf%.o:
+		$(COMPILE.c) $(AUDITCONFIG)/$(@:%.o=%.c)
+
 lint:		lint_SRCS
 
+$(POFILE): $(MSGFILES)
+		$(BUILDPO.msgfiles)
+
+#_msg: $(MSGDOMAINPOFILE)
+
 clean:
-	$(RM) $(OBJS)
+		$(RM) $(OBJS)
 
 check:		$(CHKMANIFEST)
 
-include ../Makefile.targ
+include $(SRC)/cmd/Makefile.targ
+#include $(SRC)/Makefile.msg.targ
+BUILDPO.msgfiles = \
+	$(RM) messages.po $(TEXT_DOMAIN).po; \
+	$(TOUCH) $(TEXT_DOMAIN).po; \
+	$(XGETTEXT) $(XGETFLAGS) $(MSGFILES); \
+	$(SED) -e '/^\# msgid/,/^\# msgstr/d' -e '/^domain/d' \
+	-e '/^\#$$/d' -e '/^\#, /d' \
+	messages.po $(TEXT_DOMAIN).po > $(POFILE); \
+	$(RM) messages.po $(TEXT_DOMAIN).po

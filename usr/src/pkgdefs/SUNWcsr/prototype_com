@@ -268,7 +268,6 @@ s none etc/security/audit/localhost/files=../../../../var/audit
 e renamenew etc/security/audit_class 644 root sys
 e renamenew etc/security/audit_control 644 root sys
 e renamenew etc/security/audit_event 644 root sys
-e renamenew etc/security/audit_startup 744 root sys
 e renamenew etc/security/audit_user 644 root sys
 e renamenew etc/security/audit_warn 740 root sys
 f none etc/security/bsmconv 740 root sys

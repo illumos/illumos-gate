@@ -20,44 +20,170 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
-# if the audit state is "disabled" auditconfig returns
-# non-zero exit status unless the c2audit module is loaded;
-# if c2audit is loaded, "disabled" becomes "noaudit" early
-# in the boot cycle and "auditing" only after auditd starts.
 
 . /lib/svc/share/smf_include.sh
 
 AUDITCONFIG=/usr/sbin/auditconfig
+AUDITD=/usr/sbin/auditd
+AWK=/usr/bin/awk
+EGREP=/usr/bin/egrep
+MV=/usr/bin/mv
+PKILL=/usr/bin/pkill
+SLEEP=/usr/bin/sleep
+SVCADM=/usr/sbin/svcadm
+SVCCFG=/usr/sbin/svccfg
+SVCS=/usr/bin/svcs
 
-AUDITCOND=`$AUDITCONFIG -getcond 2> /dev/null`
+AUDIT_STARTUP=/etc/security/audit_startup
+AUDITD_FMRI="system/auditd:default"
 
-if [ $? -ne 0 ]; then
-	# The decision whether to start
-	# auditing is driven by bsmconv / bsmunconv
-	/usr/sbin/svcadm mark maintenance system/auditd
-	exit $SMF_EXIT_MON_OFFLINE;
-fi
+
+#
+# main - the execution starts there.
+main()
+{
+	#
+	# Do the basic argument inspection and take the appropriate action.
+	case "$SMF_METHOD" in
+	start)
+		do_common
+		do_start
+		;;
+	refresh)
+		do_common
+		do_refresh
+		;;
+	*)
+		if [ -z "$SMF_METHOD" ]; then
+			echo "$0:  No SMF method defined."
+		else
+			echo "$0:  Unsupported SMF method: $SMF_METHOD."
+		fi
+		exit $SMF_EXIT_ERR_NOSMF
+		;;
+	esac
+}
 	
-# In a non-global zone, auditd is started only if the "perzone"
-# audit policy has been set.
-if smf_is_nonglobalzone; then
-	echo `$AUDITCONFIG -getpolicy` | grep perzone > /dev/null
 
-	if [ $? -eq 1 ]; then
-		echo "$0:  auditd is not configured to run in a local"
-		echo "   zone, perzone policy not set (see auditconfig(1M))"
-		/usr/sbin/svcadm disable svc:/system/auditd:default 
-		sleep 5 &
-		exit $SMF_EXIT_OK;
-	fi		
-fi
+#
+# do_common - executes all the code common to all supported service methods.
+do_common()
+{ 
+	#
+	# If the audit state is "disabled" auditconfig returns non-zero exit
+	# status unless the c2audit module is loaded; if c2audit is loaded,
+	# "disabled" becomes "noaudit" early in the boot cycle and "auditing"
+	# only after auditd starts.
+	AUDITCOND="`$AUDITCONFIG -getcond 2>/dev/null`"
+	if [ $? -ne 0 ]; then
+		# The decision whether to start
+		# auditing is driven by bsmconv(1M) / bsmunconv(1M)
+		echo "$0: Unable to get current kernel auditing condition."
+		$SVCADM mark maintenance $AUDITD_FMRI
+		exit $SMF_EXIT_MON_OFFLINE
+	fi
+	#
+	# In a non-global zone, auditd is started/refreshed only if the
+	# "perzone" audit policy has been set.
+	if smf_is_nonglobalzone; then
+		$AUDITCONFIG -t -getpolicy | \
+		    $EGREP "perzone|all" 1>/dev/null 2>&1
+		if [ $? -eq 1 ]; then
+			echo "$0:  auditd is not configured to run in a local"
+			echo "   zone, perzone policy not set" \
+			    "(see auditconfig(1M))."
+			$SVCADM disable $AUDITD_FMRI
+			$SLEEP 5 &
+			exit $SMF_EXIT_OK
+		fi
+	fi
+}
 
-/etc/security/audit_startup
-# daemon forks, parent exits when child says it's ready
-exec /usr/sbin/auditd
+#
+# do_start - service start method helper.
+do_start()
+{
+	#
+	# The transition of the audit_startup(1M) has to be performed.
+	if [ -f "$AUDIT_STARTUP" ]; then
+		
+		if [ -x "$AUDIT_STARTUP" ]; then
+			$AUDIT_STARTUP
+		else
+			echo "$0: Unable to execute $AUDIT_STARTUP"
+			$SVCADM mark maintenance $AUDITD_FMRI
+			exit $SMF_EXIT_MON_OFFLINE
+		fi
+		
+		echo "$0: Transition of audit_startup(1M) started."
 
+		$MV $AUDIT_STARTUP $AUDIT_STARTUP._transitioned_
+		if [ $? -ne 0 ]; then
+			# Unable to perform the backup of $AUDIT_STARTUP
+			echo "$0: The $AUDIT_STARTUP was not moved to"
+			echo "   $AUDIT_STARTUP._transitioned_"
+		fi
+
+		#
+		# Refreshing service to make the newly created properties
+		# available for any other consequent svcprop(1).
+		$SVCCFG -s $AUDITD_FMRI refresh
+		if [ $? -ne 0 ]; then
+			echo "$0: Refresh of $AUDITD_FMRI configuration failed."
+			$SVCADM mark maintenance $AUDITD_FMRI
+			exit $SMF_EXIT_ERR_CONFIG
+		fi
+
+		echo "$0: Transition of audit_startup(1M) finished."
+	fi
+
+	#
+	# Daemon forks, parent exits when child says it's ready.
+	exec $AUDITD
+}
+
+#
+# do_refresh - service refresh method helper.
+do_refresh()
+{
+	#
+	# The refresh capability is available only for those systems
+	# with already transformed audit_startup(1M) into $AUDITD_FMRI
+	# service properties. See do_start() for more information.
+	if [ ! -f "$AUDIT_STARTUP" ]; then
+		#
+		# Find the contract_id.
+		contract_id=`$SVCS -l $AUDITD_FMRI | \
+		    $AWK '/^contract_id/ {print $2}'`
+		if [ -z "${contract_id}" ]; then
+			echo "$0: Service $AUDITD_FMRI has no associated" \
+			    "contract. Service cannot be refreshed."
+			exit $SMF_EXIT_ERR_FATAL
+		fi
+		#
+		# signal to auditd(1M):
+		$PKILL -HUP -c ${contract_id}
+		if [ $? -ne 0 ]; then
+			echo "$0: SIGHUP was not successfully delivered to" \
+			    "the related contract (${contract_id}/err:$?)."
+			$SVCADM mark maintenance $AUDITD_FMRI
+			exit $SMF_EXIT_ERR_FATAL
+		fi
+		$SLEEP 5 &
+	else 
+		echo "$0: Service refresh method not supported on systems" \
+		   "without converted audit_startup(1M) into auditd service" \
+		   "SMF configuration. Clear the service (svcadm(1M))."
+		$SVCADM mark maintenance $AUDITD_FMRI
+		exit $SMF_EXIT_ERR_CONFIG
+	fi
+}
+
+
+#
+# Call main() to start the own script execution.
+main
