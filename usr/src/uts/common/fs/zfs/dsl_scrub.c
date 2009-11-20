@@ -50,8 +50,8 @@ static dsl_syncfunc_t dsl_pool_scrub_cancel_sync;
 static void scrub_visitdnode(dsl_pool_t *dp, dnode_phys_t *dnp, arc_buf_t *buf,
     uint64_t objset, uint64_t object);
 
-int zfs_scrub_min_time = 1; /* scrub for at least 1 sec each txg */
-int zfs_resilver_min_time = 3; /* resilver for at least 3 sec each txg */
+int zfs_scrub_min_time = 1000; /* (millisec) min time to scrub per txg */
+int zfs_resilver_min_time = 3000; /* (millisec) min time to resilver per txg */
 boolean_t zfs_no_scrub_io = B_FALSE; /* set to disable scrub i/o */
 enum ddt_class zfs_scrub_ddt_class_max = DDT_CLASS_DUPLICATE;
 
@@ -322,7 +322,7 @@ bookmark_is_before(dnode_phys_t *dnp, const zbookmark_t *zb1,
 static boolean_t
 scrub_pause(dsl_pool_t *dp, const zbookmark_t *zb, const ddt_bookmark_t *ddb)
 {
-	int elapsed_ticks;
+	uint64_t elapsed_nanosecs;
 	int mintime;
 
 	if (dp->dp_scrub_pausing)
@@ -337,9 +337,9 @@ scrub_pause(dsl_pool_t *dp, const zbookmark_t *zb, const ddt_bookmark_t *ddb)
 
 	mintime = dp->dp_scrub_isresilver ? zfs_resilver_min_time :
 	    zfs_scrub_min_time;
-	elapsed_ticks = ddi_get_lbolt64() - dp->dp_scrub_start_time;
-	if (elapsed_ticks > hz * zfs_txg_timeout ||
-	    (elapsed_ticks > hz * mintime && txg_sync_waiting(dp))) {
+	elapsed_nanosecs = gethrtime() - dp->dp_scrub_start_time;
+	if (elapsed_nanosecs / NANOSEC > zfs_txg_timeout ||
+	    (elapsed_nanosecs / MICROSEC > mintime && txg_sync_waiting(dp))) {
 		if (zb) {
 			dprintf("pausing at bookmark %llx/%llx/%llx/%llx\n",
 			    (longlong_t)zb->zb_objset,
@@ -908,7 +908,7 @@ dsl_pool_scrub_sync(dsl_pool_t *dp, dmu_tx_t *tx)
 	}
 
 	dp->dp_scrub_pausing = B_FALSE;
-	dp->dp_scrub_start_time = ddi_get_lbolt64();
+	dp->dp_scrub_start_time = gethrtime();
 	dp->dp_scrub_isresilver = (dp->dp_scrub_min_txg != 0);
 	spa->spa_scrub_active = B_TRUE;
 

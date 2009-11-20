@@ -39,7 +39,7 @@
 
 int zfs_no_write_throttle = 0;
 int zfs_write_limit_shift = 3;			/* 1/8th of physical memory */
-int zfs_txg_synctime = 5;			/* target secs to sync a txg */
+int zfs_txg_synctime = 5000;		/* target millisecs to sync a txg */
 
 uint64_t zfs_write_limit_min = 32 << 20;	/* min write limit is 32MB */
 uint64_t zfs_write_limit_max = 0;		/* max data payload per txg */
@@ -438,7 +438,7 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 			dp->dp_throughput = throughput;
 		dp->dp_write_limit = MIN(zfs_write_limit_inflated,
 		    MAX(zfs_write_limit_min,
-		    dp->dp_throughput * zfs_txg_synctime));
+		    dp->dp_throughput * zfs_txg_synctime / MILLISEC));
 	}
 }
 
