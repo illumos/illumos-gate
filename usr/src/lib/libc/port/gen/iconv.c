@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lint.h"
 #include <sys/types.h>
@@ -46,16 +44,43 @@
 static iconv_p	iconv_open_all(const char *, const char *, char *);
 static iconv_p	iconv_open_private(const char *, const char *);
 static iconv_p	iconv_search_alias(const char *, const char *, char *);
+static size_t	passthru_icv_iconv(iconv_t, const char **, size_t *, char **,
+	size_t *);
+static void	passthru_icv_close(iconv_t);
+
+#define	PASSTHRU_MAGIC_NUMBER	(0x53756e)
+
 
 /*
- * These functions are implemented using a shared object and the dlopen()
- * functions.   Then, the actual conversion  algorithm for a particular
- * conversion is implemented as a shared object in a separate file in
- * a loadable conversion module and linked dynamically at run time.
- * The loadable conversion module resides in
+ * These functions are mainly implemented by using a shared object and
+ * the dlopen() functions. The actual conversion algorithm for a particular
+ * conversion is implemented via a shared object as a loadable conversion
+ * module which is linked dynamically at run time.
+ *
+ * The loadable conversion module resides as either:
+ *
+ *	/usr/lib/iconv/geniconvtbl.so
+ *
+ * if the conversion is supported through a geniconvtbl code conversion
+ * binary table or as a module that directly specifies the conversion at:
+ *
  *	/usr/lib/iconv/fromcode%tocode.so
+ *
  * where fromcode is the source encoding and tocode is the target encoding.
- * The module has 3 entries: _icv_open(), _icv_iconv(),  _icv_close().
+ * The modules have 3 entries: _icv_open(), _icv_iconv(), and _icv_close().
+ *
+ * If there is no code conversion supported and if the fromcode and the tocode
+ * are specifying the same codeset, then, the byte-by-byte, pass-through code
+ * conversion that is embedded in the libc is used instead.
+ *
+ * The following are the related PSARC cases:
+ *
+ *	PSARC/1993/153 iconv/iconv_open/iconv_close
+ *	PSARC/1999/292 Addition of geniconvtbl(1)
+ *	PSARC/2001/072 GNU gettext support
+ *	PSARC/2009/561 Pass-through iconv code conversion
+ *
+ * The PSARC/2001/072 includes the /usr/lib/iconv/alias interface.
  */
 
 iconv_t
@@ -89,11 +114,37 @@ iconv_open(const char *tocode, const char *fromcode)
 	cd->_conv = iconv_search_alias(tocode, fromcode, ipath);
 	free(ipath);
 	if (cd->_conv == (iconv_p)-1) {
-		/* no valid module for this conversion found */
-		free(cd);
-		/* errno set by iconv_search_alias */
-		return ((iconv_t)-1);
+		/*
+		 * As the last resort, check if the tocode and the fromcode
+		 * are referring to the same codeset name or not. If so,
+		 * assign the embedded pass-through code conversion.
+		 */
+		if (strcasecmp(tocode, fromcode) != 0) {
+			/*
+			 * No valid conversion available. Do failure retrun
+			 * with the errno set by iconv_search_alias().
+			 */
+			free(cd);
+			return ((iconv_t)-1);
+		}
+
+		/*
+		 * For a pass-through byte-by-byte code conversion, allocate
+		 * an internal conversion descriptor and initialize the data
+		 * fields appropriately and we are done.
+		 */
+		cd->_conv = malloc(sizeof (struct _iconv_fields));
+		if (cd->_conv == NULL) {
+			free(cd);
+			return ((iconv_t)-1);
+		}
+
+		cd->_conv->_icv_handle = NULL;
+		cd->_conv->_icv_iconv = passthru_icv_iconv;
+		cd->_conv->_icv_close = passthru_icv_close;
+		cd->_conv->_icv_state = (void *)PASSTHRU_MAGIC_NUMBER;
 	}
+
 	/* found a valid module for this conversion */
 	return (cd);
 }
@@ -362,10 +413,21 @@ iconv_close(iconv_t cd)
 		return (-1);
 	}
 	(*(cd->_conv)->_icv_close)(cd->_conv->_icv_state);
-	(void) dlclose(cd->_conv->_icv_handle);
+	if (cd->_conv->_icv_handle != NULL)
+		(void) dlclose(cd->_conv->_icv_handle);
 	free(cd->_conv);
 	free(cd);
 	return (0);
+}
+
+/*
+ * To have minimal performance impact to the existing run-time behavior,
+ * we supply a dummy passthru_icv_close() that will just return.
+ */
+static void
+/*LINTED E_FUNC_ARG_UNUSED*/
+passthru_icv_close(iconv_t cd)
+{
 }
 
 size_t
@@ -381,4 +443,55 @@ iconv(iconv_t cd, const char **inbuf, size_t *inbytesleft,
 	/* direct conversion */
 	return ((*(cd->_conv)->_icv_iconv)(cd->_conv->_icv_state,
 	    inbuf, inbytesleft, outbuf, outbytesleft));
+}
+
+static size_t
+passthru_icv_iconv(iconv_t cd, const char **inbuf, size_t *inbufleft,
+	char **outbuf, size_t *outbufleft)
+{
+	size_t ibl;
+	size_t obl;
+	size_t len;
+	size_t ret_val;
+
+	/* Check if the conversion descriptor is a valid one. */
+	if (cd != (iconv_t)PASSTHRU_MAGIC_NUMBER) {
+		errno = EBADF;
+		return ((size_t)-1);
+	}
+
+	/* For any state reset request, return success. */
+	if (inbuf == NULL || *inbuf == NULL)
+		return (0);
+
+	/*
+	 * Initialize internally used variables for a better performance
+	 * and prepare for a couple of the return values before the actual
+	 * copying of the bytes.
+	 */
+	ibl = *inbufleft;
+	obl = *outbufleft;
+
+	if (ibl > obl) {
+		len = obl;
+		errno = E2BIG;
+		ret_val = (size_t)-1;
+	} else {
+		len = ibl;
+		ret_val = 0;
+	}
+
+	/*
+	 * Do the copy using memmove(). There are no EILSEQ or EINVAL
+	 * checkings since this is a simple copying.
+	 */
+	(void) memmove((void *)*outbuf, (const void *)*inbuf, len);
+
+	/* Update the return values related to the buffers then do return. */
+	*inbuf = *inbuf + len;
+	*outbuf = *outbuf + len;
+	*inbufleft = ibl - len;
+	*outbufleft = obl - len;
+
+	return (ret_val);
 }
