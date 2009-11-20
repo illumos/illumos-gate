@@ -414,8 +414,9 @@ vdds_process_dds_msg_task(void *arg)
 		} else {
 			vdds->hio_dip = dip;
 			vdds->hio_cookie = hio_cookie;
-			sprintf(vdds->hio_ifname, "%s%d", ddi_driver_name(dip),
-			    ddi_get_instance(dip));
+			(void) snprintf(vdds->hio_ifname,
+			    sizeof (vdds->hio_ifname), "%s%d",
+			    ddi_driver_name(dip), ddi_get_instance(dip));
 
 			rv = vnet_hio_mac_init(vnetp, vdds->hio_ifname);
 			if (rv != 0) {
