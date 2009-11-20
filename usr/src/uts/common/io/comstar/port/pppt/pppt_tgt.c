@@ -92,6 +92,9 @@ static void
 tgt_sm_deleting(pppt_tgt_t *tgt, tgt_event_ctx_t *ctx);
 
 static void
+pppt_tgt_offline_task(void *arg);
+
+static void
 pppt_tgt_dereg_retry(void *arg);
 
 static void
@@ -295,6 +298,12 @@ tgt_sm_event_locked(pppt_tgt_t *tgt, pppt_tgt_event_t event)
 {
 	tgt_event_ctx_t *ctx;
 
+	event = (event < TE_MAX_EVENT) ? event : TE_UNDEFINED;
+	DTRACE_PROBE2(pppt__tgt__event, pppt_tgt_t *, tgt,
+	    pppt_tgt_event_t, event);
+	stmf_trace("pppt", "pppt_tgt_event: tgt %p event %s(%d)",
+	    (void *)tgt, pppt_te_name[event], event);
+
 	tgt->target_refcount++;
 
 	ctx = kmem_zalloc(sizeof (*ctx), KM_SLEEP);
@@ -329,10 +338,7 @@ tgt_sm_event_locked(pppt_tgt_t *tgt, pppt_tgt_event_t event)
 static void
 tgt_sm_event_dispatch(pppt_tgt_t *tgt, tgt_event_ctx_t *ctx)
 {
-	DTRACE_PROBE2(pppt__tgt__event, pppt_tgt_t *, tgt,
-	    tgt_event_ctx_t *, ctx);
-
-	PPPT_LOG(CE_NOTE, "tgt_sm_event_dispatch: tgt %p event %s(%d)",
+	stmf_trace("pppt", "pppt_tgt_event_dispatch: tgt %p event %s(%d)",
 	    (void *)tgt, pppt_te_name[ctx->te_ctx_event], ctx->te_ctx_event);
 
 	/* State independent actions */
@@ -747,21 +753,26 @@ tgt_sm_deleting(pppt_tgt_t *tgt, tgt_event_ctx_t *ctx)
 }
 
 static void
-pppt_tgt_offline(void *arg)
+pppt_tgt_offline(pppt_tgt_t *tgt)
+{
+	(void) taskq_dispatch(pppt_global.global_dispatch_taskq,
+	    pppt_tgt_offline_task, tgt, KM_SLEEP);
+}
+
+static void
+pppt_tgt_offline_task(void *arg)
 {
 	pppt_tgt_t		*tgt = arg;
 	pppt_sess_t		*ps, *next_ps;
 	stmf_change_status_t	scs;
 
-	PPPT_LOG(CE_NOTE, "pppt_tgt_offline %p", (void *)tgt);
+	stmf_trace("pppt", "pppt_tgt_offline %p", (void *)tgt);
 
 	PPPT_GLOBAL_LOCK();
 	mutex_enter(&tgt->target_mutex);
 	for (ps = avl_first(&tgt->target_sess_list); ps != NULL; ps = next_ps) {
 		next_ps = AVL_NEXT(&tgt->target_sess_list, ps);
 		mutex_enter(&ps->ps_mutex);
-		PPPT_LOG(CE_NOTE, "pppt_tgt_offline closing session %p(%d)",
-		    (void *)ps, ps->ps_closed);
 		if (!ps->ps_closed) {
 			pppt_sess_close_locked(ps);
 		}
@@ -777,7 +788,7 @@ pppt_tgt_offline(void *arg)
 	(void) stmf_ctl(STMF_CMD_LPORT_OFFLINE_COMPLETE,
 	    tgt->target_stmf_lport, &scs);
 
-	PPPT_LOG(CE_NOTE, "pppt_tgt_offline complete %p", (void *)tgt);
+	stmf_trace("pppt", "pppt_tgt_offline complete %p", (void *)tgt);
 }
 
 static void
@@ -829,7 +840,8 @@ tgt_sm_new_state(pppt_tgt_t *tgt, tgt_event_ctx_t *ctx,
 	new_state = (new_state < TS_MAX_STATE) ?
 	    new_state : TS_UNDEFINED;
 
-	PPPT_LOG(CE_NOTE, "tgt_sm_new_state: tgt %p, %s(%d) --> %s(%d)\n",
+	stmf_trace("pppt", "pppt_target_state_change: "
+	    "tgt %p, %s(%d) --> %s(%d)\n",
 	    (void *) tgt, pppt_ts_name[tgt->target_state], tgt->target_state,
 	    pppt_ts_name[new_state], new_state);
 	DTRACE_PROBE3(pppt__target__state__change,

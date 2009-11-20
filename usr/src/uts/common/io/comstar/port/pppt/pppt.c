@@ -34,6 +34,7 @@
 #include <sys/sysmacros.h>
 #include <sys/nvpair.h>
 #include <sys/door.h>
+#include <sys/sdt.h>
 
 #include <sys/stmf.h>
 #include <sys/stmf_ioctl.h>
@@ -1058,7 +1059,7 @@ pppt_sess_lookup_create(scsi_devid_desc_t *lport_devid,
 	avl_add(&pppt_global.global_sess_list, ps);
 	mutex_exit(&tgt->target_mutex);
 	PPPT_GLOBAL_UNLOCK();
-	PPPT_LOG(CE_NOTE, "New session %p", (void *)ps);
+	stmf_trace("pppt", "New session %p", (void *)ps);
 
 	return (ps);
 }
@@ -1086,7 +1087,7 @@ static void pppt_sess_destroy_task(void *ps_void)
 	pppt_sess_t *ps = ps_void;
 	stmf_scsi_session_t	*ss;
 
-	PPPT_LOG(CE_NOTE, "Session destroy task %p", (void *)ps);
+	stmf_trace("pppt", "Session destroy task %p", (void *)ps);
 
 	ss = ps->ps_stmf_sess;
 	mutex_enter(&ps->ps_mutex);
@@ -1101,7 +1102,7 @@ static void pppt_sess_destroy_task(void *ps_void)
 	stmf_free(ps->ps_stmf_sess);
 	kmem_free(ps, sizeof (*ps));
 
-	PPPT_LOG(CE_NOTE, "Session destroy task complete %p", (void *)ps);
+	stmf_trace("pppt", "Session destroy task complete %p", (void *)ps);
 }
 
 int
@@ -1170,7 +1171,7 @@ pppt_sess_close_locked(pppt_sess_t *ps)
 	pppt_tgt_t	*tgt = ps->ps_target;
 	pppt_task_t	*ptask;
 
-	PPPT_LOG(CE_NOTE, "Session close %p", (void *)ps);
+	stmf_trace("pppt", "Session close %p", (void *)ps);
 
 	ASSERT(mutex_owned(&pppt_global.global_lock));
 	ASSERT(mutex_owned(&tgt->target_mutex));
@@ -1201,7 +1202,7 @@ pppt_sess_close_locked(pppt_sess_t *ps)
 	(void) taskq_dispatch(pppt_global.global_sess_taskq,
 	    &pppt_sess_destroy_task, ps, KM_SLEEP);
 
-	PPPT_LOG(CE_NOTE, "Session close complete %p", (void *)ps);
+	stmf_trace("pppt", "Session close complete %p", (void *)ps);
 }
 
 pppt_task_t *
