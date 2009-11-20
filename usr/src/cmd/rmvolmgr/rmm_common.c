@@ -256,6 +256,7 @@ rmm_hal_volume_findby(LibHalContext *hal_ctx, const char *property,
 	char		**udis;
 	int		num_udis;
 	int		i;
+	int		i_drive = -1;
 
 	*volumes = NULL;
 
@@ -268,7 +269,7 @@ rmm_hal_volume_findby(LibHalContext *hal_ctx, const char *property,
 		return (NULL);
 	}
 
-	/* find volumes among these devices */
+	/* find volumes and drives among these devices */
 	for (i = 0; i < num_udis; i++) {
 		rmm_dbus_error_free(&error);
 		if (libhal_device_query_capability(hal_ctx, udis[i], "volume",
@@ -277,11 +278,15 @@ rmm_hal_volume_findby(LibHalContext *hal_ctx, const char *property,
 			if (v != NULL) {
 				*volumes = g_slist_prepend(*volumes, v);
 			}
+		} else if ((*volumes == NULL) &&
+		    libhal_device_query_capability(hal_ctx, udis[i], "storage",
+		    &error)) {
+			i_drive = i;
 		}
 	}
 
-	/* used prepend, preserve original order */
 	if (*volumes != NULL) {
+		/* used prepend, preserve original order */
 		*volumes = g_slist_reverse(*volumes);
 
 		v = (LibHalVolume *)(*volumes)->data;
@@ -291,6 +296,8 @@ rmm_hal_volume_findby(LibHalContext *hal_ctx, const char *property,
 			rmm_volumes_free (*volumes);
 			*volumes = NULL;
 		}
+	} else if (i_drive >= 0) {
+		drive = libhal_drive_from_udi(hal_ctx, udis[i_drive]);
 	}
 
 	libhal_free_string_array(udis);
@@ -949,14 +956,13 @@ rmm_action(LibHalContext *hal_ctx, const char *name, action_t action,
 			(void) vold_postprocess(hal_ctx, udi, aap);
 		}
 
-		libhal_volume_free(v);
 		if (aap == &aa_local) {
 			rmm_volume_aa_free(aap);
 		}
 	}
 
 out:
-	g_slist_free(volumes);
+	rmm_volumes_free(volumes);
 	libhal_drive_free(d);
 
 	return (ret);
