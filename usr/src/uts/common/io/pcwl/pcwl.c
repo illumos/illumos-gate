@@ -844,7 +844,7 @@ pcwl_card_insert(pcwl_maci_t *pcwl_p)
 
 	if (pcwl_p->pcwl_flag & PCWL_CARD_SUSPEND) {
 		mutex_enter(&pcwl_p->pcwl_glock);
-		pcwl_reset_backend(pcwl_p);
+		(void) pcwl_reset_backend(pcwl_p);
 		/* turn on CS interrupt */
 		cfgmod.Attributes = CONF_ENABLE_IRQ_STEERING |
 		    CONF_IRQ_CHANGE_VALID;
@@ -861,7 +861,7 @@ pcwl_card_insert(pcwl_maci_t *pcwl_p)
 		mutex_exit(&pcwl_p->pcwl_glock);
 	}
 	if (pcwl_p->pcwl_flag & PCWL_CARD_PLUMBED) {
-		pcwl_start(pcwl_p);
+		(void) pcwl_start(pcwl_p);
 		pcwl_p->pcwl_flag &= ~PCWL_CARD_PLUMBED;
 	}
 	return (CS_SUCCESS);

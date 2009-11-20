@@ -872,7 +872,7 @@ pcan_card_insert(pcan_maci_t *pcan_p)
 	}
 
 	if (pcan_p->pcan_flag & PCAN_PLUMBED) {
-		pcan_start(pcan_p);
+		(void) pcan_start(pcan_p);
 		pcan_p->pcan_flag &= ~PCAN_PLUMBED;
 		PCANDBG((CE_NOTE, "pcan insert: active interrupt\n"));
 	}
