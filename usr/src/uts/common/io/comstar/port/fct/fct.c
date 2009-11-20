@@ -1207,6 +1207,8 @@ fct_register_local_port(fct_local_port_t *port)
 	lport->lport_ctl = fct_ctl;
 	lport->lport_info = fct_info;
 	lport->lport_event_handler = fct_event_handler;
+	/* set up as alua participating port */
+	stmf_set_port_alua(lport);
 	if (stmf_register_local_port(port->port_lport) != FCT_SUCCESS) {
 		goto fct_regport_fail1;
 	}

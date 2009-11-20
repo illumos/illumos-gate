@@ -1975,8 +1975,9 @@ stmf_set_alua_state(stmf_alua_state_desc_t *alua_state)
 		/* register existing local ports with ppp */
 		for (ilport = stmf_state.stmf_ilportlist; ilport != NULL;
 		    ilport = ilport->ilport_next) {
-			/* skip standby ports */
-			if (ilport->ilport_standby == 1) {
+			/* skip standby ports and non-alua participants */
+			if (ilport->ilport_standby == 1 ||
+			    ilport->ilport_alua == 0) {
 				continue;
 			}
 			if (alua_state->alua_node != 0) {
@@ -3093,6 +3094,14 @@ stmf_set_port_standby(stmf_local_port_t *lport, uint16_t rtpid)
 	ilport->ilport_standby = 1;
 }
 
+void
+stmf_set_port_alua(stmf_local_port_t *lport)
+{
+	stmf_i_local_port_t *ilport =
+	    (stmf_i_local_port_t *)lport->lport_stmf_private;
+	ilport->ilport_alua = 1;
+}
+
 stmf_status_t
 stmf_register_local_port(stmf_local_port_t *lport)
 {
@@ -3125,13 +3134,15 @@ stmf_register_local_port(stmf_local_port_t *lport)
 	/*
 	 * rtpid will/must be set if this is a standby port
 	 * only register ports that are not standby (proxy) ports
+	 * and ports that are alua participants (ilport_alua == 1)
 	 */
 	if (ilport->ilport_standby == 0) {
 		ilport->ilport_rtpid = atomic_add_16_nv(&stmf_rtpid_counter, 1);
 	}
 
 	if (stmf_state.stmf_alua_state == 1 &&
-	    ilport->ilport_standby == 0) {
+	    ilport->ilport_standby == 0 &&
+	    ilport->ilport_alua == 1) {
 		stmf_ic_msg_t *ic_reg_port;
 		stmf_ic_msg_status_t ic_ret;
 		stmf_local_port_t *lport;
@@ -3189,7 +3200,8 @@ stmf_deregister_local_port(stmf_local_port_t *lport)
 	 * deregister ports that are not standby (proxy)
 	 */
 	if (stmf_state.stmf_alua_state == 1 &&
-	    ilport->ilport_standby == 0) {
+	    ilport->ilport_standby == 0 &&
+	    ilport->ilport_alua == 1) {
 		stmf_ic_msg_t *ic_dereg_port;
 		stmf_ic_msg_status_t ic_ret;
 		ic_dereg_port = ic_dereg_port_msg_alloc(
@@ -3314,7 +3326,9 @@ try_dereg_ss_again:
 	}
 
 	/* dereg proxy session if not standby port */
-	if (stmf_state.stmf_alua_state == 1 && ilport->ilport_standby == 0) {
+	if (stmf_state.stmf_alua_state == 1 &&
+	    ilport->ilport_standby == 0 &&
+	    ilport->ilport_alua == 1) {
 		ic_session_dereg = ic_session_dereg_msg_alloc(
 		    ss, stmf_proxy_msg_id);
 		if (ic_session_dereg) {

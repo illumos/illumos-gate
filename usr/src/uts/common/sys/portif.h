@@ -113,6 +113,7 @@ stmf_status_t stmf_register_scsi_session(stmf_local_port_t *lport,
 void stmf_deregister_scsi_session(stmf_local_port_t *lport,
 				stmf_scsi_session_t *ss);
 void stmf_set_port_standby(stmf_local_port_t *lport, uint16_t rtpid);
+void stmf_set_port_alua(stmf_local_port_t *lport);
 
 #ifdef	__cplusplus
 }

@@ -364,6 +364,9 @@ srpt_stp_alloc_port(srpt_ioc_t *ioc, ib_guid_t guid)
 	lport->lport_info	= &srpt_stp_info;
 	lport->lport_event_handler = &srpt_stp_event_handler;
 
+	/* set up as alua participating port */
+	stmf_set_port_alua(lport);
+
 	SRPT_DPRINTF_L3("stp_alloc_port, register STMF LPORT");
 
 retry_registration:

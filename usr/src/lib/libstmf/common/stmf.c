@@ -5293,7 +5293,7 @@ stmfSetAluaState(boolean_t enabled, uint32_t node)
 				break;
 		}
 	}
-	if (ret == STMF_STATUS_SUCCESS) {
+	if (!enabled && ret == STMF_STATUS_SUCCESS) {
 		deleteNonActiveLus();
 	}
 
