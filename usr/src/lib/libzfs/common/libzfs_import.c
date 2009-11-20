@@ -959,6 +959,12 @@ check_one_slice(avl_tree_t *r, char *diskname, uint_t partno,
 	tmpnode.rn_name = &sname[0];
 	(void) snprintf(tmpnode.rn_name, MAXNAMELEN, "%s%u",
 	    diskname, partno);
+	/*
+	 * protect against division by zero for disk labels that
+	 * contain a bogus sector size
+	 */
+	if (blksz == 0)
+		blksz = DEV_BSIZE;
 	/* too small to contain a zpool? */
 	if ((size < (SPA_MINDEVSIZE / blksz)) &&
 	    (node = avl_find(r, &tmpnode, NULL)))
