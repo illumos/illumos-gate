@@ -4958,6 +4958,11 @@ ipsec_alg_free(ipsec_alginfo_t *alg)
 		    (alg->alg_nblock_sizes + 1) * sizeof (uint16_t));
 		alg->alg_block_sizes = NULL;
 	}
+	if (alg->alg_params != NULL) {
+		kmem_free(alg->alg_params,
+		    (alg->alg_nparams + 1) * sizeof (uint16_t));
+		alg->alg_params = NULL;
+	}
 	kmem_free(alg, sizeof (*alg));
 }
 

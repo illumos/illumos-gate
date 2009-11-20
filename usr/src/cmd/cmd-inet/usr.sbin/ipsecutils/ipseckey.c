@@ -3613,14 +3613,40 @@ main(int argc, char *argv[])
 		case 'f':
 			if (dosave)
 				usage();
+
+			/*
+			 * Use stat() to check and see if the user inadvertently
+			 * passed in a bad pathname, or the name of a directory.
+			 * We should also check to see if the filename is a
+			 * pipe. We use stat() here because fopen() will block
+			 * unless the other end of the pipe is open. This would
+			 * be undesirable, especially if this is called at boot
+			 * time. If we ever need to support reading from a pipe
+			 * or special file, this should be revisited.
+			 */
+			if (stat(optarg, &sbuf) == -1) {
+				EXIT_BADCONFIG2("Invalid pathname: %s\n",
+				    optarg);
+			}
+			if (!(sbuf.st_mode & S_IFREG)) {
+				EXIT_BADCONFIG2("%s - Not a regular file\n",
+				    optarg);
+			}
 			infile = fopen(optarg, "r");
 			if (infile == NULL) {
 				EXIT_BADCONFIG2("Unable to open configuration "
 				    "file: %s\n", optarg);
 			}
 			/*
-			 * Check file permissions/ownership and warn or
-			 * fail depending on state of SMF control.
+			 * The input file contains keying information, because
+			 * this is sensative, we should only accept data from
+			 * this file if the file is root owned and only readable
+			 * by privileged users. If the command is being run by
+			 * the administrator, issue a warning, if this is run by
+			 * smf(5) (IE: boot time) and the permissions are too
+			 * open, we will fail, the SMF service will end up in
+			 * maintenace mode. The check is made with fstat() to
+			 * eliminate any possible TOT to TOU window.
 			 */
 			if (fstat(fileno(infile), &sbuf) == -1) {
 				(void) fclose(infile);
@@ -3634,10 +3660,10 @@ main(int argc, char *argv[])
 					    "%s has insecure permissions.",
 					    optarg);
 				} else 	{
-					(void) fprintf(stderr, "%s %s\n",
-					    optarg, gettext(
-					    "has insecure permissions, will be "
-					    "rejected in permanent config."));
+					(void) fprintf(stderr, gettext(
+					    "Config file %s has insecure "
+					    "permissions, will be rejected in "
+					    "permanent config.\n"), optarg);
 				}
 			}
 			configfile = strdup(optarg);

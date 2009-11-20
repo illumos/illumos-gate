@@ -2549,6 +2549,7 @@ spdsock_do_updatealg(spd_ext_t *extv[], spd_stack_t *spds)
 
 #define	ALG_KEY_SIZES(a)   (((a)->alg_nkey_sizes + 1) * sizeof (uint16_t))
 #define	ALG_BLOCK_SIZES(a) (((a)->alg_nblock_sizes + 1) * sizeof (uint16_t))
+#define	ALG_PARAM_SIZES(a) (((a)->alg_nparams + 1) * sizeof (uint16_t))
 
 	while (attr < endattr) {
 		switch (attr->spd_attr_tag) {
@@ -2665,14 +2666,14 @@ spdsock_do_updatealg(spd_ext_t *extv[], spd_stack_t *spds)
 		case SPD_ATTR_ALG_NPARAMS:
 			if (alg->alg_params != NULL) {
 				kmem_free(alg->alg_params,
-				    ALG_BLOCK_SIZES(alg));
+				    ALG_PARAM_SIZES(alg));
 			}
 			alg->alg_nparams = attr->spd_attr_value;
 			/*
 			 * Allocate room for the trailing zero block size
 			 * value as well.
 			 */
-			alg->alg_params = kmem_zalloc(ALG_BLOCK_SIZES(alg),
+			alg->alg_params = kmem_zalloc(ALG_PARAM_SIZES(alg),
 			    KM_SLEEP);
 			cur_block = 0;
 			break;
@@ -2737,6 +2738,7 @@ spdsock_do_updatealg(spd_ext_t *extv[], spd_stack_t *spds)
 
 #undef	ALG_KEY_SIZES
 #undef	ALG_BLOCK_SIZES
+#undef	ALG_PARAM_SIZES
 
 	/* update the algorithm tables */
 	spdsock_merge_algs(spds);

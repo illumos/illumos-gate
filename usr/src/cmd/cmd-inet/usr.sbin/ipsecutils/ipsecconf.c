@@ -3456,6 +3456,7 @@ static int
 parse_ipsec_alg(char *str, ips_act_props_t *iap, int alg_type)
 {
 	int alg_value;
+	int remainder;
 	char tstr[VALID_ALG_LEN];
 	char *lens = NULL;
 	char *l1_str;
@@ -3471,8 +3472,10 @@ parse_ipsec_alg(char *str, ips_act_props_t *iap, int alg_type)
 	 * Make sure that we get a null terminated string.
 	 * For a bad input, we truncate at VALID_ALG_LEN.
 	 */
+	remainder = strlen(str);
 	(void) strlcpy(tstr, str, VALID_ALG_LEN);
 	lens = strtok(tstr, "()");
+	remainder -= strlen(lens);
 	lens = strtok(NULL, "()");
 
 	if (lens != NULL) {
@@ -3480,6 +3483,15 @@ parse_ipsec_alg(char *str, ips_act_props_t *iap, int alg_type)
 		int len2 = SPD_MAX_MAXBITS;
 		int len_all = strlen(lens);
 		int dot_start = (lens[0] == '.');
+
+		/*
+		 * Check to see if the keylength arg is at the end of the
+		 * token, the "()" is 2 characters.
+		 */
+		remainder -= strlen(lens);
+		if (remainder > 2)
+			return (1);
+
 		l1_str = strtok(lens, ".");
 		l2_str = strtok(NULL, ".");
 		if (l1_str != NULL) {
