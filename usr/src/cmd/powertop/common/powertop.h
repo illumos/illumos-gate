@@ -41,12 +41,9 @@
 #define	__INCLUDE_GUARD_POWERTOP_H_
 
 #include <sys/types.h>
-#include <libintl.h>
 #include <sys/processor.h>
 
 #define	max(A, B)		(((A) < (B)) ? (B) : (A))
-
-#define	_(STRING)		gettext(STRING)
 
 #define	TITLE			"OpenSolaris PowerTOP version 1.2"
 #define	COPYRIGHT_INTEL		"(C) 2009 Intel Corporation"
@@ -69,7 +66,7 @@
 #define	BIT_DEPTH_BUF		10
 
 #define	INTERVAL_DEFAULT	5.0
-#define	INTERVAL_MAX		100.0
+#define	INTERVAL_MAX		30.0
 #define	INTERVAL_UPDATE(l)						\
 	((l/INTERVAL_DEFAULT) * INTERVAL_DEFAULT + INTERVAL_DEFAULT)
 
@@ -79,17 +76,20 @@
 #define	NSTATES			32
 
 /*
- * Available op modes
+ * Available op modes. The PT_ON_* macros allow for a simple way of checking
+ * under which mode PowerTOP is operating.
  */
 #define	PT_MODE_DEFAULT		0x01
 #define	PT_MODE_DUMP		0x02
 #define	PT_MODE_VERBOSE		0x04
 #define	PT_MODE_CPU		0x08
+#define	PT_MODE_TIME		0x10
 
 #define	PT_ON_DEFAULT		(g_op_mode & PT_MODE_DEFAULT)
 #define	PT_ON_DUMP		(g_op_mode & PT_MODE_DUMP)
 #define	PT_ON_VERBOSE		(g_op_mode & PT_MODE_VERBOSE)
 #define	PT_ON_CPU		(g_op_mode & PT_MODE_CPU)
+#define	PT_ON_TIME		(g_op_mode & PT_MODE_TIME)
 
 /*
  * Structures and typedefs
@@ -160,12 +160,6 @@ extern int 			g_total_events;
 extern int 			g_top_events;
 
 /*
- * Interval
- */
-extern double 			g_ticktime, g_ticktime_usr;
-extern double 			g_interval;
-
-/*
  * Command line arguments
  */
 extern uchar_t			g_op_mode;
@@ -192,6 +186,11 @@ extern int			g_longest_cstate;
  * Total time, used to display different idle states
  */
 extern hrtime_t			g_total_c_time;
+
+/*
+ * Current interval length
+ */
+extern double			g_interval_length;
 
 /*
  * P/C state info arrays
@@ -235,6 +234,13 @@ extern const char		*g_msg_freq_state;
 extern const char		*g_msg_freq_enable;
 
 /*
+ * Flags for signal handling
+ */
+extern boolean_t		g_sig_resize;
+
+extern void		pt_sig_handler(int);
+
+/*
  * Suggestions related
  */
 extern void 		pt_cpufreq_suggest(void);
@@ -245,11 +251,11 @@ extern void		pt_sugg_as_root(void);
  */
 extern void 		pt_error(char *, ...);
 extern void 		pt_set_progname(char *);
-extern uint_t		enumerate_cpus(void);
-extern void		usage(void);
-extern int		get_bit_depth(void);
-extern void		battery_mod_lookup(void);
-extern int		event_compare(const void *, const void *);
+extern uint_t		pt_enumerate_cpus(void);
+extern void		pt_usage(void);
+extern int		pt_get_bit_depth(void);
+extern void		pt_battery_mod_lookup(void);
+extern int		pt_event_compare(const void *, const void *);
 
 /*
  * Display/curses related
@@ -266,6 +272,7 @@ extern void		pt_display_acpi_power(uint32_t, double, double, double,
 extern void 		pt_display_wakeups(double);
 extern void 		pt_display_events(double);
 extern void 		pt_display_suggestions(char *);
+extern void		pt_display_resize(void);
 
 /*
  * Suggestions

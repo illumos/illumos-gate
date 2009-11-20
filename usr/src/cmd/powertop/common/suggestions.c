@@ -226,7 +226,7 @@ search:
 			/*
 			 * Don't need to re-suggest the current suggestion.
 			 */
-			if (g_curr_sugg == n)
+			if (g_curr_sugg == n && !g_sig_resize)
 				return;
 
 			/*

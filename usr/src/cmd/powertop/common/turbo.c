@@ -85,7 +85,7 @@ pt_turbo_init(void)
 
 	knp = kstat_data_lookup(ksp, "turbo_supported");
 	if (knp == NULL) {
-		pt_error("%s : couldn't find item turbo_supported\n", __FILE__);
+		pt_error("couldn't find 'turbo_supported' kstat\n");
 		g_turbo_supported = B_FALSE;
 		(void) kstat_close(kc);
 		return (-2);
@@ -124,23 +124,23 @@ pt_turbo_snapshot(turbo_info_t *turbo_snapshot)
 		turbo_info = &turbo_snapshot[cpu];
 		ksp = kstat_lookup(kc, "turbo", g_cpu_table[cpu], NULL);
 		if (ksp == NULL) {
-			pt_error("%s : couldn't find turbo kstat for CPU "
-			"%d\n", __FILE__, cpu);
+			pt_error("couldn't find 'turbo' kstat for CPU %d\n",
+			    cpu);
 			(void) kstat_close(kc);
 			return (-1);
 		}
 
 		if (kstat_read(kc, ksp, NULL) == -1) {
-			pt_error("%s : couldn't read turbo kstat for "
-			    "CPU %d\n", __FILE__, cpu);
+			pt_error("couldn't read 'turbo' kstat for CPU %d\n",
+			    cpu);
 			(void) kstat_close(kc);
 			return (-2);
 		}
 
 		knp = kstat_data_lookup(ksp, "turbo_mcnt");
 		if (knp == NULL) {
-			pt_error("%s : couldn't find turbo mcnt "
-			    "kstat for CPU %d\n", __FILE__, cpu);
+			pt_error("couldn't find 'turbo_mcnt' kstat for CPU "
+			    "%d\n", cpu);
 			(void) kstat_close(kc);
 			return (-3);
 		}
@@ -152,8 +152,8 @@ pt_turbo_snapshot(turbo_info_t *turbo_snapshot)
 
 		knp = kstat_data_lookup(ksp, "turbo_acnt");
 		if (knp == NULL) {
-			pt_error("%s : couldn't find turbo acnt "
-			    "kstat for CPU %d\n", __FILE__, cpu);
+			pt_error("couldn't find 'turbo_acnt' kstat for CPU "
+			    "%d\n", cpu);
 			(void) kstat_close(kc);
 			return (-4);
 		}
@@ -165,7 +165,7 @@ pt_turbo_snapshot(turbo_info_t *turbo_snapshot)
 	}
 
 	if (kstat_close(kc) != 0)
-		pt_error("%s : couldn't close kstat\n", __FILE__);
+		pt_error("couldn't close 'turbo' kstat\n");
 
 	return (0);
 }
@@ -176,19 +176,13 @@ pt_turbo_snapshot(turbo_info_t *turbo_snapshot)
 int
 pt_turbo_stat_prepare(void)
 {
-	int	ret;
+	int ret = 0;
 
-	ret = pt_turbo_init();
-
-	if (ret != 0) {
+	if ((ret = pt_turbo_init()) != 0)
 		return (ret);
-	}
 
-	ret = pt_turbo_snapshot(cpu_turbo_info);
-
-	if (ret != 0) {
-		pt_error("%s : turbo snapshot failed\n", __FILE__);
-	}
+	if ((ret = pt_turbo_snapshot(cpu_turbo_info)) != 0)
+		pt_error("failed to snapshot 'turbo' kstat\n");
 
 	return (ret);
 }
@@ -210,9 +204,8 @@ pt_turbo_stat_collect(void)
 	 * Take a snapshot of turbo information to setup turbo_info_t
 	 * structure
 	 */
-	ret = pt_turbo_snapshot(t_new);
-	if (ret != 0) {
-		pt_error("%s : turbo stat collection failed\n", __FILE__);
+	if ((ret = pt_turbo_snapshot(t_new)) != 0) {
+		pt_error("failed to snapshot 'turbo' kstat\n");
 		return (ret);
 	}
 

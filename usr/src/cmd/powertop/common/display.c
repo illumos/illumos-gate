@@ -100,10 +100,25 @@ static WINDOW *sw[SW_COUNT];
 static int win_cols, win_rows;
 static sb_slot_t *status_bar;
 
+/*
+ * Delete all subwindows and reset the terminal to a non-visual mode. This
+ * routine is used during resize events and before exiting.
+ */
 static void
 pt_display_cleanup(void)
 {
+	int i;
+
+	for (i = 0; i < SW_COUNT; i++) {
+		if (sw[i] != NULL) {
+			(void) delwin(sw[i]);
+			sw[i] = NULL;
+		}
+	}
+
 	(void) endwin();
+	(void) fflush(stdout);
+	(void) putchar('\r');
 }
 
 static void
@@ -119,32 +134,30 @@ pt_display_get_size(void)
 	}
 }
 
-/*
- * Signal handler, currently only used for window resizing.
- */
-static void
-pt_display_resize(int sig)
+void
+pt_display_resize(void)
 {
-	int i;
+	pt_display_cleanup();
+	(void) pt_display_init_curses();
+	pt_display_setup(B_TRUE);
 
-	switch (sig) {
-	case SIGWINCH:
-		for (i = 0; i < SW_COUNT; i++)
-			if (sw[i] != NULL) {
-				(void) delwin(sw[i]);
-				sw[i] = NULL;
-			}
+	pt_display_title_bar();
 
-		pt_display_cleanup();
-		(void) pt_display_init_curses();
-		pt_display_setup(B_TRUE);
+	pt_display_states();
 
-		pt_display_title_bar();
-
-		pt_display_update();
-
-		break;
+	if (g_features & FEATURE_EVENTS) {
+		pt_display_wakeups(g_interval_length);
+		pt_display_events(g_interval_length);
 	}
+
+	pt_battery_print();
+	pt_sugg_pick();
+	pt_display_status_bar();
+
+	pt_display_update();
+
+	g_sig_resize = B_FALSE;
+	(void) signal(SIGWINCH, pt_sig_handler);
 }
 
 /*
@@ -204,11 +217,9 @@ pt_display_setup(boolean_t resized)
 	if (!resized) {
 		status_bar = NULL;
 
-		pt_display_mod_status_bar(_("Q - Quit"));
-		pt_display_mod_status_bar(_("R - Refresh"));
+		pt_display_mod_status_bar("Q - Quit");
+		pt_display_mod_status_bar("R - Refresh");
 	}
-
-	pt_display_status_bar();
 }
 
 /*
@@ -220,7 +231,6 @@ pt_display_init_curses(void)
 	(void) initscr();
 
 	(void) atexit(pt_display_cleanup);
-	(void) signal(SIGWINCH, pt_display_resize);
 
 	pt_display_get_size();
 
@@ -270,7 +280,7 @@ pt_display_update(void)
 void
 pt_display_title_bar(void)
 {
-	char	title_pad[10];
+	char title_pad[10];
 
 	(void) wattrset(sw[SW_TITLE], COLOR_PAIR(PT_COLOR_HEADER_BAR));
 	(void) wbkgd(sw[SW_TITLE], COLOR_PAIR(PT_COLOR_HEADER_BAR));
@@ -316,7 +326,7 @@ pt_display_mod_status_bar(char *msg)
 	boolean_t found = B_FALSE, first = B_FALSE;
 
 	if (msg == NULL) {
-		pt_error("%s : can't add an empty status bar item.", __FILE__);
+		pt_error("can't add an empty status bar item\n");
 		return;
 	}
 
@@ -362,7 +372,7 @@ pt_display_mod_status_bar(char *msg)
 	}
 
 	if ((new = calloc(1, sizeof (sb_slot_t))) == NULL) {
-		pt_error("%s : failed to allocate a new slot\n", __FILE__);
+		pt_error("failed to allocate a new status bar slot\n");
 	} else {
 		new->msg = strdup(msg);
 
@@ -500,7 +510,7 @@ pt_display_acpi_power(uint32_t flag, double rate, double rem_cap, double cap,
 {
 	char	buffer[1024];
 
-	(void) sprintf(buffer,  _("no ACPI power usage estimate available"));
+	(void) sprintf(buffer, "no ACPI power usage estimate available");
 
 	if (!PT_ON_DUMP)
 		(void) werase(sw[SW_POWER]);
@@ -594,7 +604,7 @@ pt_display_events(double interval)
 		g_top_events = EVENT_NUM_MAX;
 
 	qsort((void *)g_event_info, g_top_events, sizeof (event_info_t),
-	    event_compare);
+	    pt_event_compare);
 
 	if (PT_ON_CPU)
 		(void) sprintf(c, "Top causes for wakeups on CPU %d:\n",
@@ -634,6 +644,4 @@ pt_display_suggestions(char *sug)
 		print(sw[SW_SUGG], 0, 0, "%s", sug);
 
 	(void) wnoutrefresh(sw[SW_SUGG]);
-
-	pt_display_update();
 }

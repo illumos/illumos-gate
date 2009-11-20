@@ -44,16 +44,13 @@
 #include <signal.h>
 #include <string.h>
 #include <ctype.h>
-#include <locale.h>
+#include <poll.h>
 #include "powertop.h"
 
 /*
  * Global variables, see powertop.h for comments and extern declarations.
  * These are ordered by type, grouped by usage.
  */
-double 			g_ticktime, g_ticktime_usr;
-double 			g_interval;
-
 int			g_bit_depth;
 int 			g_total_events, g_top_events;
 int			g_npstates, g_max_cstate, g_longest_cstate;
@@ -63,6 +60,7 @@ uint_t			g_ncpus_observed;
 
 processorid_t 		*g_cpu_table;
 
+double			g_interval_length;
 hrtime_t		g_total_c_time;
 
 uchar_t			g_op_mode;
@@ -75,6 +73,7 @@ freq_state_info_t	g_pstate_info[NSTATES];
 cpu_power_info_t	*g_cpu_power_states;
 
 boolean_t		g_turbo_supported;
+boolean_t		g_sig_resize;
 
 uint_t			g_argc;
 char			**g_argv;
@@ -83,15 +82,25 @@ char			*optarg;
 
 static const int	true = 1;
 
+void
+pt_sig_handler(int sig)
+{
+	switch (sig) {
+	case SIGWINCH:
+		g_sig_resize = B_TRUE;
+		break;
+	}
+}
+
 int
 main(int argc, char **argv)
 {
-	hrtime_t 	last, now;
-	uint_t		user_interval = 0;
-	int		index2 = 0, c, ret, dump_count = 0;
-	double		last_time;
-	char		*endptr;
+	double		interval, interval_usr;
+	hrtime_t 	interval_start;
+	int		index2 = 0, c, dump_count = 0;
+	char		*endptr, key;
 	boolean_t	root_user = B_FALSE;
+	struct pollfd	pollset;
 
 	static struct option opts[] = {
 		{ "dump", 1, NULL, 'd' },
@@ -102,75 +111,85 @@ main(int argc, char **argv)
 		{ 0, 0, NULL, 0 }
 	};
 
-	(void) setlocale(LC_ALL, "");
-	(void) bindtextdomain("powertop", "/usr/share/locale");
-	(void) textdomain("powertop");
-
 	pt_set_progname(argv[0]);
 
 	/*
 	 * Enumerate the system's CPUs, populate cpu_table, g_ncpus
 	 */
-	if ((g_ncpus = g_ncpus_observed = enumerate_cpus()) == 0)
+	if ((g_ncpus = g_ncpus_observed = pt_enumerate_cpus()) == 0)
 		exit(EXIT_FAILURE);
 
-	if ((g_bit_depth = get_bit_depth()) < 0)
+	if ((g_bit_depth = pt_get_bit_depth()) < 0)
 		exit(EXIT_FAILURE);
 
 	g_features = 0;
-	g_ticktime = g_ticktime_usr = INTERVAL_DEFAULT;
+	interval = interval_usr = INTERVAL_DEFAULT;
 	g_op_mode = PT_MODE_DEFAULT;
-	g_gui = B_FALSE;
 	g_max_cstate = 0;
 	g_argv = NULL;
 	g_argc = 0;
 	g_observed_cpu = 0;
 	g_turbo_supported = B_FALSE;
+	g_sig_resize = B_FALSE;
 	g_curr_sugg = NULL;
 
-	while ((c = getopt_long(argc, argv, "d:t:h:vc:", opts, &index2))
+	while ((c = getopt_long(argc, argv, "d:t:hvc:", opts, &index2))
 	    != EOF) {
 		if (c == -1)
 			break;
 
 		switch (c) {
 		case 'd':
-			if (PT_ON_DUMP)
-				usage();
+			if (PT_ON_DUMP) {
+				pt_usage();
+				exit(EXIT_USAGE);
+			}
 
 			g_op_mode |= PT_MODE_DUMP;
+			g_gui = B_FALSE;
 			dump_count = (int)strtod(optarg, &endptr);
 
 			if (dump_count <= 0 || *endptr != NULL)
-				usage();
+				pt_usage();
 			break;
 		case 't':
-			if (user_interval)
-				usage();
+			if (PT_ON_TIME) {
+				pt_usage();
+				exit(EXIT_USAGE);
+			}
 
-			user_interval = 1;
-			g_ticktime = g_ticktime_usr = (double)strtod(optarg,
+			g_op_mode |= PT_MODE_TIME;
+			interval = interval_usr = (double)strtod(optarg,
 			    &endptr);
 
-			if (*endptr != NULL || g_ticktime < 1 ||
-			    g_ticktime > INTERVAL_MAX)
-				usage();
+			if (*endptr != NULL || interval < 1 ||
+			    interval > INTERVAL_MAX) {
+				pt_usage();
+				exit(EXIT_USAGE);
+			}
+
 			break;
 		case 'v':
-			if (PT_ON_CPU || PT_ON_VERBOSE)
-				usage();
+			if (PT_ON_CPU || PT_ON_VERBOSE) {
+				pt_usage();
+				exit(EXIT_USAGE);
+			}
 
 			g_op_mode |= PT_MODE_VERBOSE;
 			break;
 		case 'c':
-			if (PT_ON_CPU || PT_ON_VERBOSE)
-				usage();
+			if (PT_ON_CPU || PT_ON_VERBOSE) {
+				pt_usage();
+				exit(EXIT_USAGE);
+			}
 
 			g_op_mode |= PT_MODE_CPU;
 			g_observed_cpu = (uint_t)strtod(optarg, &endptr);
 
-			if (g_observed_cpu >= g_ncpus)
-				usage();
+			if (g_observed_cpu >= g_ncpus) {
+				pt_usage();
+				exit(EXIT_USAGE);
+			}
 
 			g_argc = 1;
 			g_ncpus_observed = 1;
@@ -184,27 +203,28 @@ main(int argc, char **argv)
 			(void) snprintf(*g_argv, 5, "%d\0", g_observed_cpu);
 			break;
 		case 'h':
+			pt_usage();
+			exit(EXIT_SUCCESS);
 		default:
-			usage();
-			return (EXIT_USAGE);
+			pt_usage();
+			exit(EXIT_USAGE);
 		}
 	}
 
 	if (optind < argc)
-		usage();
+		pt_usage();
 
 	(void) printf("%s   %s\n\n", TITLE, COPYRIGHT_INTEL);
 
-	(void) printf(_("Collecting data for %.2f second(s) \n"),
-	    (float)g_ticktime);
+	(void) printf("Collecting data for %.2f second(s) \n",
+	    (float)interval);
 
 	/* Prepare P-state statistics */
 	if (pt_cpufreq_stat_prepare() == 0)
 		g_features |= FEATURE_PSTATE;
 
 	/* Prepare C-state statistics */
-	ret = pt_cpuidle_stat_prepare();
-	if (ret == 0)
+	if (pt_cpuidle_stat_prepare() == 0)
 		g_features |= FEATURE_CSTATE;
 	else
 		/*
@@ -212,20 +232,6 @@ main(int argc, char **argv)
 		 * most likely for lack of permissions.
 		 */
 		exit(EXIT_FAILURE);
-
-	/*
-	 * We need to initiate the display to make sure there's enough space
-	 * in the terminal for all of PowerTOP's subwindows, but after
-	 * pt_cpufreq_stat_prepare() which finds out how many states the
-	 * system supports.
-	 */
-	if (!PT_ON_DUMP) {
-		pt_display_init_curses();
-		pt_display_setup(B_FALSE);
-		g_gui = B_TRUE;
-		pt_display_title_bar();
-		pt_display_status_bar();
-	}
 
 	/* Prepare event statistics */
 	if (pt_events_stat_prepare() != -1)
@@ -235,53 +241,60 @@ main(int argc, char **argv)
 	 * If the system is running on battery, find out what's
 	 * the kstat module for it
 	 */
-	battery_mod_lookup();
+	pt_battery_mod_lookup();
 
 	/* Prepare turbo statistics */
 	if (pt_turbo_stat_prepare() == 0)
 		g_features |= FEATURE_TURBO;
 
 	/*
+	 * Initialize the display.
+	 */
+	if (!PT_ON_DUMP) {
+		pt_display_init_curses();
+		pt_display_setup(B_FALSE);
+		(void) signal(SIGWINCH, pt_sig_handler);
+
+		pt_display_title_bar();
+		pt_display_status_bar();
+
+		g_gui = B_TRUE;
+		pollset.fd = STDIN_FILENO;
+		pollset.events = POLLIN;
+	}
+
+	/*
 	 * Installs the initial suggestions, running as root and turning CPU
 	 * power management ON.
 	 */
-	if (geteuid() != 0)
+	if (geteuid() != 0) {
 		pt_sugg_as_root();
-	else {
+	} else {
 		root_user = B_TRUE;
 		pt_cpufreq_suggest();
 	}
 
-	last = gethrtime();
-
 	while (true) {
-		fd_set 	rfds;
-		struct 	timeval tv;
-		int 	key;
-		char 	keychar;
+		key = 0;
 
-		/*
-		 * Sleep for a while waiting either for input (if we're not
-		 * in dump mode) or for the timeout to elapse
-		 */
-		FD_ZERO(&rfds);
-		FD_SET(0, &rfds);
+		if (g_sig_resize)
+			pt_display_resize();
 
-		tv.tv_sec = (long)g_ticktime;
-		tv.tv_usec = (long)((g_ticktime - tv.tv_sec) * MICROSEC);
+		interval_start = gethrtime();
 
 		if (!PT_ON_DUMP) {
-			key = select(1, &rfds, NULL, NULL, &tv);
-		} else
-			key = select(1, NULL, NULL, NULL, &tv);
+			if (poll(&pollset, (nfds_t)1,
+			    (int)(interval * MILLISEC)) > 0)
+				(void) read(STDIN_FILENO, &key, 1);
+		} else {
+			(void) sleep((int)interval);
+		}
 
-		now = gethrtime();
+		g_interval_length = (double)(gethrtime() - interval_start)
+		    /NANOSEC;
 
-		g_interval = (double)(now - last)/NANOSEC;
-		last = now;
-
-		g_top_events 	= 0;
-		g_total_events 	= 0;
+		g_top_events = 0;
+		g_total_events = 0;
 
 		(void) memset(g_event_info, 0,
 		    EVENT_NUM_MAX * sizeof (event_info_t));
@@ -290,7 +303,7 @@ main(int argc, char **argv)
 
 		/* Collect idle state transition stats */
 		if (g_features & FEATURE_CSTATE &&
-		    pt_cpuidle_stat_collect(g_interval) < 0) {
+		    pt_cpuidle_stat_collect(g_interval_length) < 0) {
 			/* Reinitialize C-state statistics */
 			if (pt_cpuidle_stat_prepare() != 0)
 				exit(EXIT_FAILURE);
@@ -300,7 +313,7 @@ main(int argc, char **argv)
 
 		/* Collect frequency change stats */
 		if (g_features & FEATURE_PSTATE &&
-		    pt_cpufreq_stat_collect(g_interval) < 0) {
+		    pt_cpufreq_stat_collect(g_interval_length) < 0) {
 			/* Reinitialize P-state statistics */
 			if (pt_cpufreq_stat_prepare() != 0)
 				exit(EXIT_FAILURE);
@@ -328,22 +341,20 @@ main(int argc, char **argv)
 
 		/* Show wakeups events affecting PM */
 		if (g_features & FEATURE_EVENTS) {
-			pt_display_wakeups(g_interval);
-			pt_display_events(g_interval);
+			pt_display_wakeups(g_interval_length);
+			pt_display_events(g_interval_length);
 		}
 
 		pt_battery_print();
 
 		if (key && !PT_ON_DUMP) {
-			keychar = toupper(fgetc(stdin));
-
-			switch (keychar) {
+			switch (toupper(key)) {
 			case 'Q':
 				exit(EXIT_SUCCESS);
 				break;
 
 			case 'R':
-				g_ticktime = 3;
+				interval = 3;
 				break;
 			}
 
@@ -352,7 +363,8 @@ main(int argc, char **argv)
 			 * suggestion.
 			 */
 			if (g_curr_sugg != NULL &&
-			    keychar == g_curr_sugg->key && g_curr_sugg->func)
+			    toupper(key) == g_curr_sugg->key &&
+			    g_curr_sugg->func)
 				g_curr_sugg->func();
 		}
 
@@ -379,22 +391,23 @@ main(int argc, char **argv)
 		 * longest c-state during the last snapshot. If the user
 		 * specified an interval we skip this bit and keep it fixed.
 		 */
-		if (g_features & FEATURE_CSTATE && !user_interval) {
-			last_time = (((double)
+		if (g_features & FEATURE_CSTATE && !PT_ON_TIME &&
+		    g_longest_cstate > 0) {
+			double deep_idle_res = (((double)
 			    g_cstate_info[g_longest_cstate].total_time/MICROSEC
 			    /g_ncpus)/g_cstate_info[g_longest_cstate].events);
 
-			if (last_time < INTERVAL_DEFAULT ||
-			    (g_total_events/g_ticktime) < 1)
-				g_ticktime = INTERVAL_DEFAULT;
+			if (deep_idle_res < INTERVAL_DEFAULT ||
+			    (g_total_events/interval) < 1)
+				interval = INTERVAL_DEFAULT;
 			else
-				g_ticktime = INTERVAL_UPDATE(last_time);
+				interval = INTERVAL_UPDATE(deep_idle_res);
 		} else {
 			/*
 			 * Restore interval after a refresh.
 			 */
 			if (key)
-				g_ticktime = g_ticktime_usr;
+				interval = interval_usr;
 		}
 	}
 

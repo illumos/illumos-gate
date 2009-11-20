@@ -102,8 +102,8 @@ pt_cpuidle_stat_prepare(void)
 	char			*prog_ptr;
 
 	if ((dtp = dtrace_open(DTRACE_VERSION, 0, &err)) == NULL) {
-		pt_error("%s : cannot open dtrace library: %s\n", __FILE__,
-		    dtrace_errmsg(NULL, err));
+		pt_error("cannot open dtrace library for the %s report: %s\n",
+		    g_msg_idle_state, dtrace_errmsg(NULL, err));
 		return (-1);
 	}
 
@@ -118,34 +118,31 @@ pt_cpuidle_stat_prepare(void)
 
 	if ((prog = dtrace_program_strcompile(dtp, prog_ptr,
 	    DTRACE_PROBESPEC_NAME, 0, g_argc, g_argv)) == NULL) {
-		pt_error("%s : C-State DTrace probes unavailable\n", __FILE__);
+		pt_error("failed to compile %s program\n", g_msg_idle_state);
 		return (dtrace_errno(dtp));
 	}
 
 	if (dtrace_program_exec(dtp, prog, &info) == -1) {
-		pt_error("%s : failed to enable C State probes\n", __FILE__);
+		pt_error("failed to enable %s probes\n", g_msg_idle_state);
 		return (dtrace_errno(dtp));
 	}
 
-	if (dtrace_setopt(dtp, "aggsize", "128k") == -1) {
-		pt_error("%s : failed to set C-state 'aggsize'\n", __FILE__);
-	}
+	if (dtrace_setopt(dtp, "aggsize", "128k") == -1)
+		pt_error("failed to set %s 'aggsize'\n", g_msg_idle_state);
 
-	if (dtrace_setopt(dtp, "aggrate", "0") == -1) {
-		pt_error("%s : failed to set C-state'aggrate'\n", __FILE__);
-	}
+	if (dtrace_setopt(dtp, "aggrate", "0") == -1)
+		pt_error("failed to set %s 'aggrate'\n", g_msg_idle_state);
 
-	if (dtrace_setopt(dtp, "aggpercpu", 0) == -1) {
-		pt_error("%s : failed to set C-state 'aggpercpu'\n", __FILE__);
-	}
+	if (dtrace_setopt(dtp, "aggpercpu", 0) == -1)
+		pt_error("failed to set %s 'aggpercpu'\n", g_msg_idle_state);
 
 	if (dtrace_go(dtp) != 0) {
-		pt_error("%s : failed to start C-state observation", __FILE__);
+		pt_error("failed to start %s observation\n", g_msg_idle_state);
 		return (dtrace_errno(dtp));
 	}
 
 	if (dtrace_getopt(dtp, "statusrate", &statustime) == -1) {
-		pt_error("%s : failed to get C-state 'statusrate'\n", __FILE__);
+		pt_error("failed to get %s 'statusrate'\n", g_msg_idle_state);
 		return (dtrace_errno(dtp));
 	}
 
@@ -161,8 +158,8 @@ pt_cpuidle_stat_prepare(void)
 int
 pt_cpuidle_stat_collect(double interval)
 {
-	int 		i;
-	hrtime_t	t = 0;
+	int i;
+	hrtime_t t = 0;
 
 	/*
 	 * Assume that all the time spent in this interval will
@@ -177,11 +174,11 @@ pt_cpuidle_stat_collect(double interval)
 		return (-1);
 
 	if (dtrace_aggregate_snap(dtp) != 0)
-		pt_error("%s : failed to add to aggregation", __FILE__);
+		pt_error("failed to collect data for %s\n", g_msg_idle_state);
 
 	if (dtrace_aggregate_walk_keyvarsorted(dtp, pt_cpuidle_dtrace_walk,
 	    NULL) != 0)
-		pt_error("%s : failed to sort aggregation", __FILE__);
+		pt_error("failed to sort %s data\n", g_msg_idle_state);
 
 	dtrace_aggregate_clear(dtp);
 
@@ -218,13 +215,23 @@ pt_cpuidle_dtrace_walk(const dtrace_aggdata_t *data, void *arg)
 {
 	dtrace_aggdesc_t 	*aggdesc = data->dtada_desc;
 	dtrace_recdesc_t 	*rec;
-	uint64_t 		n = 0;
-	int32_t 		state;
+	uint64_t 		n = 0, state;
 	int 			i;
 
 	rec = &aggdesc->dtagd_rec[1];
-	/* LINTED - alignment */
-	state = *(int32_t *)(data->dtada_data + rec->dtrd_offset);
+
+	switch (g_bit_depth) {
+		case 32:
+			/* LINTED - alignment */
+			state = *(uint32_t *)(data->dtada_data +
+			    rec->dtrd_offset);
+			break;
+		case 64:
+			/* LINTED - alignment */
+			state = *(uint64_t *)(data->dtada_data +
+			    rec->dtrd_offset);
+			break;
+	}
 
 	if (strcmp(aggdesc->dtagd_name, "number") == 0) {
 		for (i = 0; i < g_ncpus; i++) {

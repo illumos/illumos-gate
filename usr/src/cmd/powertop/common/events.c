@@ -235,8 +235,8 @@ pt_events_stat_prepare(void)
 	event = g_event_info;
 
 	if ((dtp = dtrace_open(DTRACE_VERSION, 0, &err)) == NULL) {
-		pt_error("%s : cannot open dtrace library: %s\n", __FILE__,
-		    dtrace_errmsg(NULL, err));
+		pt_error("cannot open dtrace library for the event report: "
+		    "%s\n", dtrace_errmsg(NULL, err));
 		return (-1);
 	}
 
@@ -255,37 +255,37 @@ pt_events_stat_prepare(void)
 
 	if ((prog = dtrace_program_strcompile(dtp, prog_ptr,
 	    DTRACE_PROBESPEC_NAME, 0, g_argc, g_argv)) == NULL) {
-		pt_error("%s : failed to compile DTrace program\n", __FILE__);
+		pt_error("failed to compile the event report program\n");
 		return (dtrace_errno(dtp));
 	}
 
 	if (dtrace_program_exec(dtp, prog, &info) == -1) {
-		pt_error("%s : failed to enable probes\n", __FILE__);
+		pt_error("failed to enable probes for the event report\n");
 		return (dtrace_errno(dtp));
 	}
 
 	if (dtrace_setopt(dtp, "aggsize", "128k") == -1) {
-		pt_error("%s : failed to set 'aggsize'\n", __FILE__);
+		pt_error("failed to set 'aggsize' for the event report\n");
 		return (dtrace_errno(dtp));
 	}
 
 	if (dtrace_setopt(dtp, "aggrate", "0") == -1) {
-		pt_error("%s : failed to set 'aggrate'\n", __FILE__);
+		pt_error("failed to set 'aggrate' for the event report\n");
 		return (dtrace_errno(dtp));
 	}
 
 	if (dtrace_setopt(dtp, "aggpercpu", 0) == -1) {
-		pt_error("%s : failed to set 'aggpercpu'\n", __FILE__);
+		pt_error("failed to set 'aggpercpu' for the event report\n");
 		return (dtrace_errno(dtp));
 	}
 
 	if (dtrace_go(dtp) != 0) {
-		pt_error("%s : dtrace_go() failed\n", __FILE__);
+		pt_error("failed to start the event report observation\n");
 		return (dtrace_errno(dtp));
 	}
 
 	if (dtrace_getopt(dtp, "statusrate", &statustime) == -1) {
-		pt_error("%s : failed to get 'statusrate'\n", __FILE__);
+		pt_error("failed to get 'statusrate' for the event report\n");
 		return (dtrace_errno(dtp));
 	}
 
@@ -302,10 +302,10 @@ pt_events_stat_collect(void)
 		return (-1);
 
 	if (dtrace_aggregate_snap(dtp) != 0)
-		pt_error("%s : failed to add to aggregate", __FILE__);
+		pt_error("failed to collect data for the event report\n");
 
 	if (dtrace_aggregate_walk_keyvarsorted(dtp, pt_events_walk, NULL) != 0)
-		pt_error("%s : failed to sort aggregate", __FILE__);
+		pt_error("failed to sort data for the event report\n");
 
 	dtrace_aggregate_clear(dtp);
 

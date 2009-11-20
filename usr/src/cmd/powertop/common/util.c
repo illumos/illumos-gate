@@ -75,14 +75,14 @@ pt_error(char *format, ...)
 	va_end(alist);
 
 	if (strchr(format, '\n') == NULL)
-		(void) fprintf(stderr, gettext(ERR_FMT), strerror(err));
+		(void) fprintf(stderr, ERR_FMT, strerror(err));
 }
 
 /*
  * Returns the number of online CPUs.
  */
 uint_t
-enumerate_cpus(void)
+pt_enumerate_cpus(void)
 {
 	int	cpuid;
 	int	max, cpus_conf;
@@ -109,26 +109,24 @@ enumerate_cpus(void)
 }
 
 void
-usage(void)
+pt_usage(void)
 {
 	(void) fprintf(stderr, "%s   %s\n\n", TITLE, COPYRIGHT_INTEL);
-	(void) fprintf(stderr, "Usage: powertop [option]\n");
+	(void) fprintf(stderr, "usage: powertop [option]\n");
 	(void) fprintf(stderr, "  -d, --dump [count]	Read wakeups count "
 	    "times and print list of top offenders\n");
 	(void) fprintf(stderr, "  -t, --time [interval]	Default time to gather "
-	    "data in seconds [1-100s]\n");
+	    "data in seconds [1-30s]\n");
 	(void) fprintf(stderr, "  -v, --verbose		Verbose mode, reports "
 	    "kernel cyclic activity\n");
 	(void) fprintf(stderr, "  -c, --cpu [CPU]	Only observe a specific"
 	    " CPU\n");
 	(void) fprintf(stderr, "  -h, --help		Show this help "
 	    "message\n");
-
-	exit(EXIT_USAGE);
 }
 
 int
-get_bit_depth(void)
+pt_get_bit_depth(void)
 {
 	/*
 	 * This little routine was derived from isainfo.c to look up
@@ -156,7 +154,7 @@ get_bit_depth(void)
  * Simple integer comparison routine for the event report qsort(3C).
  */
 int
-event_compare(const void *p1, const void *p2)
+pt_event_compare(const void *p1, const void *p2)
 {
 	event_info_t i = *((event_info_t *)p1);
 	event_info_t j = *((event_info_t *)p2);

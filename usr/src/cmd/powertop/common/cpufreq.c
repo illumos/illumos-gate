@@ -131,11 +131,11 @@ static int
 pt_cpufreq_setup(void)
 {
 	if ((dtp_argv = malloc(sizeof (char *) * DTP_ARG_COUNT)) == NULL)
-		return (EXIT_FAILURE);
+		return (1);
 
 	if ((dtp_argv[0] = malloc(sizeof (char) * DTP_ARG_LENGTH)) == NULL) {
 		free(dtp_argv);
-		return (EXIT_FAILURE);
+		return (1);
 	}
 
 	(void) snprintf(dtp_argv[0], 5, "%d\0", g_ncpus_observed);
@@ -145,7 +145,7 @@ pt_cpufreq_setup(void)
 		    == NULL) {
 			free(dtp_argv[0]);
 			free(dtp_argv);
-			return (EXIT_FAILURE);
+			return (1);
 		}
 		(void) snprintf(dtp_argv[1], 5, "%d\0", g_observed_cpu);
 	}
@@ -170,7 +170,8 @@ pt_cpufreq_stat_prepare(void)
 	int 			err;
 
 	if ((err = pt_cpufreq_setup()) != 0) {
-		pt_error("%s : failed to setup", __FILE__);
+		pt_error("failed to setup %s report (couldn't allocate "
+		    "memory)\n", g_msg_freq_state);
 		return (errno);
 	}
 
@@ -201,7 +202,7 @@ pt_cpufreq_stat_prepare(void)
 	g_npstates = 0;
 
 	for (token = strtok(s, ":"), s = NULL;
-	    NULL != token && g_npstates < NSTATES;
+	    token != NULL && g_npstates < NSTATES;
 	    token = strtok(NULL, ":")) {
 
 		state->speed = HZ2MHZ(atoll(token));
@@ -216,7 +217,8 @@ pt_cpufreq_stat_prepare(void)
 	}
 
 	if (token != NULL)
-		pt_error("%s : exceeded NSTATES\n", __FILE__);
+		pt_error("CPU exceeds the supported number of %s\n",
+		    g_msg_freq_state);
 
 	(void) kstat_close(kc);
 
@@ -230,8 +232,8 @@ pt_cpufreq_stat_prepare(void)
 	 * Setup DTrace to look for CPU frequency changes
 	 */
 	if ((dtp = dtrace_open(DTRACE_VERSION, 0, &err)) == NULL) {
-		pt_error("%s : cannot open dtrace library: %s\n", __FILE__,
-		    dtrace_errmsg(NULL, err));
+		pt_error("cannot open dtrace library for the %s report: %s\n",
+		    g_msg_freq_state, dtrace_errmsg(NULL, err));
 		return (-2);
 	}
 
@@ -246,34 +248,31 @@ pt_cpufreq_stat_prepare(void)
 
 	if ((prog = dtrace_program_strcompile(dtp, prog_ptr,
 	    DTRACE_PROBESPEC_NAME, 0, (1 + g_argc), dtp_argv)) == NULL) {
-		pt_error("%s : cpu-change-speed probe unavailable\n", __FILE__);
+		pt_error("failed to compile %s program\n", g_msg_freq_state);
 		return (dtrace_errno(dtp));
 	}
 
 	if (dtrace_program_exec(dtp, prog, &info) == -1) {
-		pt_error("%s : failed to enable speed probe\n", __FILE__);
+		pt_error("failed to enable %s probes\n", g_msg_freq_state);
 		return (dtrace_errno(dtp));
 	}
 
-	if (dtrace_setopt(dtp, "aggsize", "128k") == -1) {
-		pt_error("%s : failed to set speed 'aggsize'\n", __FILE__);
-	}
+	if (dtrace_setopt(dtp, "aggsize", "128k") == -1)
+		pt_error("failed to set %s 'aggsize'\n", g_msg_freq_state);
 
-	if (dtrace_setopt(dtp, "aggrate", "0") == -1) {
-		pt_error("%s : failed to set speed 'aggrate'\n", __FILE__);
-	}
+	if (dtrace_setopt(dtp, "aggrate", "0") == -1)
+		pt_error("failed to set %s 'aggrate'\n", g_msg_freq_state);
 
-	if (dtrace_setopt(dtp, "aggpercpu", 0) == -1) {
-		pt_error("%s : failed to set speed 'aggpercpu'\n", __FILE__);
-	}
+	if (dtrace_setopt(dtp, "aggpercpu", 0) == -1)
+		pt_error("failed to set %s 'aggpercpu'\n", g_msg_freq_state);
 
 	if (dtrace_go(dtp) != 0) {
-		pt_error("%s : failed to start speed observation", __FILE__);
+		pt_error("failed to start %s observation\n", g_msg_freq_state);
 		return (dtrace_errno(dtp));
 	}
 
 	if (dtrace_getopt(dtp, "statusrate", &statustime) == -1) {
-		pt_error("%s : failed to get speed 'statusrate'\n", __FILE__);
+		pt_error("failed to get %s 'statusrate'\n", g_msg_freq_state);
 		return (dtrace_errno(dtp));
 	}
 
@@ -309,16 +308,16 @@ pt_cpufreq_stat_collect(double interval)
 		return (-1);
 
 	if (dtrace_aggregate_snap(dtp) != 0)
-		pt_error("%s : failed to add to stats aggregation", __FILE__);
+		pt_error("failed to collect data for %s\n", g_msg_freq_state);
 
 	if (dtrace_aggregate_walk_keyvarsorted(dtp, pt_cpufreq_dtrace_walk,
 	    NULL) != 0)
-		pt_error("%s : failed to sort stats aggregation", __FILE__);
+		pt_error("failed to sort data for %s\n", g_msg_freq_state);
 
 	dtrace_aggregate_clear(dtp);
 
 	if ((ret = pt_cpufreq_snapshot()) != 0) {
-		pt_error("%s : failed to add to stats aggregation", __FILE__);
+		pt_error("failed to snapshot %s state\n", g_msg_freq_state);
 		return (ret);
 	}
 
@@ -392,7 +391,7 @@ pt_cpufreq_snapshot(void)
 	}
 
 	if (kstat_close(kc) != 0)
-		pt_error("%s : couldn't close kstat\n", __FILE__);
+		pt_error("couldn't close %s kstat\n", g_msg_freq_state);
 
 	return (ret);
 }
@@ -405,21 +404,21 @@ pt_cpufreq_snapshot_cpu(kstat_ctl_t *kc, uint_t cpu)
 
 	ksp = kstat_lookup(kc, "cpu_info", g_cpu_table[cpu], NULL);
 	if (ksp == NULL) {
-		pt_error("%s : couldn't find cpu_info kstat for CPU "
-		"%d\n", __FILE__, cpu);
+		pt_error("couldn't find 'cpu_info' kstat for CPU %d\n while "
+		    "taking a snapshot of %s\n", cpu, g_msg_freq_state);
 		return (1);
 	}
 
 	if (kstat_read(kc, ksp, NULL) == -1) {
-		pt_error("%s : couldn't read cpu_info kstat for "
-		    "CPU %d\n", __FILE__, cpu);
+		pt_error("couldn't read 'cpu_info' kstat for CPU %d\n while "
+		    "taking a snapshot of %s\n", cpu, g_msg_freq_state);
 		return (2);
 	}
 
 	knp = kstat_data_lookup(ksp, "current_clock_Hz");
 	if (knp == NULL) {
-		pt_error("%s : couldn't find current_clock_Hz "
-		    "kstat for CPU %d\n", __FILE__, cpu);
+		pt_error("couldn't find 'current_clock_Hz' kstat for CPU %d "
+		    "while taking a snapshot of %s\n", cpu, g_msg_freq_state);
 		return (3);
 	}
 
@@ -569,5 +568,6 @@ pt_cpufreq_enable(void)
 	(void) system(default_pmconf);
 
 	if (pt_sugg_remove(pt_cpufreq_enable) == 0)
-		pt_error("%s : failed to remove a sugg.\n", __FILE__);
+		pt_error("failed to remove a %s suggestion\n",
+		    g_msg_freq_state);
 }

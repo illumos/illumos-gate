@@ -57,14 +57,14 @@ static char		*kstat_batt_mod[3] = {NULL, "battery", "acpi_drv"};
 static uint_t		kstat_batt_idx;
 static battery_state_t	battery_state;
 
-static int		battery_stat_snapshot(void);
+static int		pt_battery_stat_snapshot(void);
 
 /*
  * Checks if the kstat module for battery information is present and
  * whether it's called 'battery' or 'acpi_drv'
  */
 void
-battery_mod_lookup(void)
+pt_battery_mod_lookup(void)
 {
 	kstat_ctl_t *kc = kstat_open();
 
@@ -87,7 +87,7 @@ pt_battery_print(void)
 	(void) memset(&battery_state, 0, sizeof (battery_state_t));
 
 	/*
-	 * The return value of battery_stat_snapshot() can be used for
+	 * The return value of pt_battery_stat_snapshot() can be used for
 	 * debug or to show/hide the acpi power line. We currently don't
 	 * make the distinction of a system that runs only on AC and one
 	 * that runs on battery but has no kstat battery info.
@@ -96,13 +96,12 @@ pt_battery_print(void)
 	 * running on AC with a fully charged battery because some
 	 * batteries may still consume power.
 	 *
-	 * If battery_mod_lookup() didn't find a kstat battery module, don't
+	 * If pt_battery_mod_lookup() didn't find a kstat battery module, don't
 	 * bother trying to take the snapshot
 	 */
 	if (kstat_batt_idx > 0) {
-		if ((err = battery_stat_snapshot()) < 0)
-			pt_error("%s : battery kstat not found %d\n", __FILE__,
-			    err);
+		if ((err = pt_battery_stat_snapshot()) < 0)
+			pt_error("battery kstat not found (%d)\n", err);
 	}
 
 	pt_display_acpi_power(battery_state.exist, battery_state.present_rate,
@@ -111,7 +110,7 @@ pt_battery_print(void)
 }
 
 static int
-battery_stat_snapshot(void)
+pt_battery_stat_snapshot(void)
 {
 	kstat_ctl_t	*kc;
 	kstat_t		*ksp;
