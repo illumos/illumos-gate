@@ -840,8 +840,8 @@ spa_l2cache_activate(vdev_t *vd)
 uint64_t
 spa_vdev_enter(spa_t *spa)
 {
-	mutex_enter(&spa_namespace_lock);
 	mutex_enter(&spa->spa_vdev_top_lock);
+	mutex_enter(&spa_namespace_lock);
 	return (spa_vdev_config_enter(spa));
 }
 
@@ -937,8 +937,8 @@ int
 spa_vdev_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error)
 {
 	spa_vdev_config_exit(spa, vd, txg, error, FTAG);
-	mutex_exit(&spa->spa_vdev_top_lock);
 	mutex_exit(&spa_namespace_lock);
+	mutex_exit(&spa->spa_vdev_top_lock);
 
 	return (error);
 }

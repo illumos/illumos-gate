@@ -375,7 +375,8 @@ traverse_dataset(dsl_dataset_t *ds, uint64_t txg_start, int flags,
  * NB: pool must not be changing on-disk (eg, from zdb or sync context).
  */
 int
-traverse_pool(spa_t *spa, blkptr_cb_t func, void *arg, uint64_t txg_start)
+traverse_pool(spa_t *spa, uint64_t txg_start, int flags,
+    blkptr_cb_t func, void *arg)
 {
 	int err;
 	uint64_t obj;
@@ -384,7 +385,7 @@ traverse_pool(spa_t *spa, blkptr_cb_t func, void *arg, uint64_t txg_start)
 
 	/* visit the MOS */
 	err = traverse_impl(spa, 0, spa_get_rootblkptr(spa),
-	    txg_start, TRAVERSE_PRE | TRAVERSE_PREFETCH, func, arg);
+	    txg_start, flags, func, arg);
 	if (err)
 		return (err);
 
@@ -408,8 +409,7 @@ traverse_pool(spa_t *spa, blkptr_cb_t func, void *arg, uint64_t txg_start)
 				return (err);
 			if (ds->ds_phys->ds_prev_snap_txg > txg)
 				txg = ds->ds_phys->ds_prev_snap_txg;
-			err = traverse_dataset(ds, txg,
-			    TRAVERSE_PRE | TRAVERSE_PREFETCH, func, arg);
+			err = traverse_dataset(ds, txg, flags, func, arg);
 			dsl_dataset_rele(ds, FTAG);
 			if (err)
 				return (err);

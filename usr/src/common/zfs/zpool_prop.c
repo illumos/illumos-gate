@@ -90,6 +90,8 @@ zpool_prop_init(void)
 	/* default number properties */
 	register_number(ZPOOL_PROP_VERSION, "version", SPA_VERSION,
 	    PROP_DEFAULT, ZFS_TYPE_POOL, "<version>", "VERSION");
+	register_number(ZPOOL_PROP_DEDUPDITTO, "dedupditto", 0,
+	    PROP_DEFAULT, ZFS_TYPE_POOL, "<threshold (min 100)>", "DEDUPDITTO");
 
 	/* default index (boolean) properties */
 	register_index(ZPOOL_PROP_DELEGATION, "delegation", 1, PROP_DEFAULT,
@@ -109,8 +111,6 @@ zpool_prop_init(void)
 	/* hidden properties */
 	register_hidden(ZPOOL_PROP_NAME, "name", PROP_TYPE_STRING,
 	    PROP_READONLY, ZFS_TYPE_POOL, "NAME");
-	register_hidden(ZPOOL_PROP_DEDUPDITTO, "dedupditto", PROP_TYPE_NUMBER,
-	    PROP_READONLY, ZFS_TYPE_POOL, "DEDUPDITTO");
 }
 
 /*

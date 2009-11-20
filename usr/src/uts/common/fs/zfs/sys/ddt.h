@@ -153,6 +153,19 @@ struct ddt {
 	avl_node_t	ddt_node;
 };
 
+/*
+ * In-core and on-disk bookmark for DDT walks
+ */
+typedef struct ddt_bookmark {
+	uint64_t	ddb_class;
+	uint64_t	ddb_type;
+	uint64_t	ddb_checksum;
+	uint64_t	ddb_cursor;
+} ddt_bookmark_t;
+
+/*
+ * Ops vector to access a specific DDT object type.
+ */
 typedef struct ddt_ops {
 	char ddt_op_name[32];
 	int (*ddt_op_create)(objset_t *os, uint64_t *object, dmu_tx_t *tx,
@@ -173,7 +186,7 @@ typedef struct ddt_ops {
 extern void ddt_object_name(ddt_t *ddt, enum ddt_type type,
     enum ddt_class class, char *name);
 extern int ddt_object_walk(ddt_t *ddt, enum ddt_type type,
-    enum ddt_class class, ddt_entry_t *dde, uint64_t *walk);
+    enum ddt_class class, uint64_t *walk, ddt_entry_t *dde);
 extern uint64_t ddt_object_count(ddt_t *ddt, enum ddt_type type,
     enum ddt_class class);
 extern int ddt_object_info(ddt_t *ddt, enum ddt_type type,
@@ -183,7 +196,7 @@ extern boolean_t ddt_object_exists(ddt_t *ddt, enum ddt_type type,
 
 extern void ddt_bp_fill(const ddt_phys_t *ddp, blkptr_t *bp,
     uint64_t txg);
-extern void ddt_bp_create(const ddt_t *ddt, const ddt_key_t *ddk,
+extern void ddt_bp_create(enum zio_checksum checksum, const ddt_key_t *ddk,
     const ddt_phys_t *ddp, blkptr_t *bp);
 
 extern void ddt_key_fill(ddt_key_t *ddk, const blkptr_t *bp);
@@ -214,12 +227,13 @@ extern size_t ddt_compress(void *src, uchar_t *dst, size_t s_len, size_t d_len);
 extern void ddt_decompress(uchar_t *src, void *dst, size_t s_len, size_t d_len);
 
 extern ddt_t *ddt_select(spa_t *spa, const blkptr_t *bp);
-extern ddt_t *ddt_select_by_checksum(spa_t *spa, enum zio_checksum c);
-
 extern void ddt_enter(ddt_t *ddt);
 extern void ddt_exit(ddt_t *ddt);
 extern ddt_entry_t *ddt_lookup(ddt_t *ddt, const blkptr_t *bp, boolean_t add);
 extern void ddt_remove(ddt_t *ddt, ddt_entry_t *dde);
+
+extern boolean_t ddt_class_contains(spa_t *spa, enum ddt_class max_class,
+    const blkptr_t *bp);
 
 extern ddt_entry_t *ddt_repair_start(ddt_t *ddt, const blkptr_t *bp);
 extern void ddt_repair_done(ddt_t *ddt, ddt_entry_t *dde);
@@ -230,6 +244,7 @@ extern void ddt_create(spa_t *spa);
 extern int ddt_load(spa_t *spa);
 extern void ddt_unload(spa_t *spa);
 extern void ddt_sync(spa_t *spa, uint64_t txg);
+extern int ddt_walk(spa_t *spa, ddt_bookmark_t *ddb, ddt_entry_t *dde);
 
 extern const ddt_ops_t ddt_zap_ops;
 

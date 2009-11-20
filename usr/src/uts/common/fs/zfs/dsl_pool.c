@@ -171,9 +171,21 @@ dsl_pool_open(spa_t *spa, uint64_t txg, dsl_pool_t **dpp)
 		if (err)
 			goto out;
 		err = zap_lookup(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
-		    DMU_POOL_SCRUB_BOOKMARK, sizeof (uint64_t), 4,
+		    DMU_POOL_SCRUB_BOOKMARK, sizeof (uint64_t),
+		    sizeof (dp->dp_scrub_bookmark) / sizeof (uint64_t),
 		    &dp->dp_scrub_bookmark);
 		if (err)
+			goto out;
+		err = zap_lookup(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
+		    DMU_POOL_SCRUB_DDT_BOOKMARK, sizeof (uint64_t),
+		    sizeof (dp->dp_scrub_ddt_bookmark) / sizeof (uint64_t),
+		    &dp->dp_scrub_ddt_bookmark);
+		if (err && err != ENOENT)
+			goto out;
+		err = zap_lookup(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
+		    DMU_POOL_SCRUB_DDT_CLASS_MAX, sizeof (uint64_t), 1,
+		    &dp->dp_scrub_ddt_class_max);
+		if (err && err != ENOENT)
 			goto out;
 		err = zap_lookup(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
 		    DMU_POOL_SCRUB_ERRORS, sizeof (uint64_t), 1,

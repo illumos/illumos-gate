@@ -211,6 +211,10 @@ typedef void dmu_buf_evict_func_t(struct dmu_buf *db, void *user_ptr);
 
 /* 4x8 zbookmark_t */
 #define	DMU_POOL_SCRUB_BOOKMARK		"scrub_bookmark"
+/* 4x8 ddt_bookmark_t */
+#define	DMU_POOL_SCRUB_DDT_BOOKMARK	"scrub_ddt_bookmark"
+/* 1x8 max_class */
+#define	DMU_POOL_SCRUB_DDT_CLASS_MAX	"scrub_ddt_class_max"
 /* 1x8 zap obj DMU_OT_SCRUB_QUEUE */
 #define	DMU_POOL_SCRUB_QUEUE		"scrub_queue"
 /* 1x8 txg */

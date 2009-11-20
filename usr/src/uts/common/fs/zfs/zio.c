@@ -867,6 +867,9 @@ zio_read_bp_init(zio_t *zio)
 	if (!dmu_ot[BP_GET_TYPE(bp)].ot_metadata && BP_GET_LEVEL(bp) == 0)
 		zio->io_flags |= ZIO_FLAG_DONT_CACHE;
 
+	if (BP_GET_TYPE(bp) == DMU_OT_DDT_ZAP)
+		zio->io_flags |= ZIO_FLAG_DONT_CACHE;
+
 	if (BP_GET_DEDUP(bp) && zio->io_child_type == ZIO_CHILD_LOGICAL)
 		zio->io_pipeline = ZIO_DDT_READ_PIPELINE;
 
@@ -1736,7 +1739,8 @@ zio_ddt_read_start(zio_t *zio)
 		for (int p = 0; p < DDT_PHYS_TYPES; p++, ddp++) {
 			if (ddp->ddp_phys_birth == 0 || ddp == ddp_self)
 				continue;
-			ddt_bp_create(ddt, &dde->dde_key, ddp, &blk);
+			ddt_bp_create(ddt->ddt_checksum, &dde->dde_key, ddp,
+			    &blk);
 			zio_nowait(zio_read(zio, zio->io_spa, &blk,
 			    zio_buf_alloc(zio->io_size), zio->io_size,
 			    zio_ddt_child_read_done, dde, zio->io_priority,

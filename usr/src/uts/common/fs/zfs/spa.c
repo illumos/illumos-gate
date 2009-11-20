@@ -1230,8 +1230,8 @@ spa_load_verify(spa_t *spa)
 	rio = zio_root(spa, NULL, &sle,
 	    ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE);
 
-	error = traverse_pool(spa, spa_load_verify_cb, rio,
-	    spa->spa_verify_min_txg);
+	error = traverse_pool(spa, spa->spa_verify_min_txg,
+	    TRAVERSE_PRE | TRAVERSE_PREFETCH, spa_load_verify_cb, rio);
 
 	(void) zio_wait(rio);
 

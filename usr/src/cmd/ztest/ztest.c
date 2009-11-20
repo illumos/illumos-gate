@@ -837,7 +837,6 @@ ztest_dsl_prop_set_uint64(char *osname, zfs_prop_t prop, uint64_t value,
 	return (error);
 }
 
-#if 0
 static int
 ztest_spa_prop_set_uint64(ztest_shared_t *zs, zpool_prop_t prop, uint64_t value)
 {
@@ -860,7 +859,6 @@ ztest_spa_prop_set_uint64(ztest_shared_t *zs, zpool_prop_t prop, uint64_t value)
 
 	return (error);
 }
-#endif
 
 static void
 ztest_rll_init(rll_t *rll)
@@ -4134,10 +4132,8 @@ ztest_spa_prop_get_set(ztest_ds_t *zd, uint64_t id)
 
 	(void) rw_rdlock(&zs->zs_name_lock);
 
-#if 0
 	(void) ztest_spa_prop_set_uint64(zs, ZPOOL_PROP_DEDUPDITTO,
 	    ZIO_DEDUPDITTO_MIN + ztest_random(ZIO_DEDUPDITTO_MIN));
-#endif
 
 	VERIFY3U(spa_prop_get(zs->zs_spa, &props), ==, 0);
 

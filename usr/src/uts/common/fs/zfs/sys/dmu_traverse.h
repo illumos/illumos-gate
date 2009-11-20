@@ -47,9 +47,10 @@ typedef int (blkptr_cb_t)(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 #define	TRAVERSE_PREFETCH_DATA		(1<<3)
 #define	TRAVERSE_PREFETCH (TRAVERSE_PREFETCH_METADATA | TRAVERSE_PREFETCH_DATA)
 
-int traverse_dataset(struct dsl_dataset *ds, uint64_t txg_start,
-    int flags, blkptr_cb_t func, void *arg);
-int traverse_pool(spa_t *spa, blkptr_cb_t func, void *arg, uint64_t txg_start);
+int traverse_dataset(struct dsl_dataset *ds,
+    uint64_t txg_start, int flags, blkptr_cb_t func, void *arg);
+int traverse_pool(spa_t *spa,
+    uint64_t txg_start, int flags, blkptr_cb_t func, void *arg);
 
 #ifdef	__cplusplus
 }

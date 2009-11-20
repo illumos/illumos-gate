@@ -32,6 +32,7 @@
 #include <sys/zap.h>
 #include <sys/dmu_tx.h>
 #include <sys/arc.h>
+#include <sys/dsl_pool.h>
 #include <sys/zio_checksum.h>
 #include <sys/zio_compress.h>
 
@@ -158,7 +159,7 @@ ddt_object_remove(ddt_t *ddt, enum ddt_type type, enum ddt_class class,
 
 int
 ddt_object_walk(ddt_t *ddt, enum ddt_type type, enum ddt_class class,
-    ddt_entry_t *dde, uint64_t *walk)
+    uint64_t *walk, ddt_entry_t *dde)
 {
 	ASSERT(ddt_object_exists(ddt, type, class));
 
@@ -212,8 +213,8 @@ ddt_bp_fill(const ddt_phys_t *ddp, blkptr_t *bp, uint64_t txg)
 }
 
 void
-ddt_bp_create(const ddt_t *ddt, const ddt_key_t *ddk, const ddt_phys_t *ddp,
-    blkptr_t *bp)
+ddt_bp_create(enum zio_checksum checksum,
+    const ddt_key_t *ddk, const ddt_phys_t *ddp, blkptr_t *bp)
 {
 	BP_ZERO(bp);
 
@@ -225,7 +226,7 @@ ddt_bp_create(const ddt_t *ddt, const ddt_key_t *ddk, const ddt_phys_t *ddp,
 	BP_SET_LSIZE(bp, DDK_GET_LSIZE(ddk));
 	BP_SET_PSIZE(bp, DDK_GET_PSIZE(ddk));
 	BP_SET_COMPRESS(bp, DDK_GET_COMPRESS(ddk));
-	BP_SET_CHECKSUM(bp, ddt->ddt_checksum);
+	BP_SET_CHECKSUM(bp, checksum);
 	BP_SET_TYPE(bp, DMU_OT_NONE);
 	BP_SET_LEVEL(bp, 0);
 	BP_SET_DEDUP(bp, 0);
@@ -277,7 +278,7 @@ ddt_phys_free(ddt_t *ddt, ddt_key_t *ddk, ddt_phys_t *ddp, uint64_t txg)
 {
 	blkptr_t blk;
 
-	ddt_bp_create(ddt, ddk, ddp, &blk);
+	ddt_bp_create(ddt->ddt_checksum, ddk, ddp, &blk);
 	ddt_phys_clear(ddp);
 	zio_free(ddt->ddt_spa, txg, &blk);
 }
@@ -750,6 +751,30 @@ ddt_unload(spa_t *spa)
 	}
 }
 
+boolean_t
+ddt_class_contains(spa_t *spa, enum ddt_class max_class, const blkptr_t *bp)
+{
+	ddt_t *ddt;
+	ddt_entry_t dde;
+
+	if (!BP_GET_DEDUP(bp))
+		return (B_FALSE);
+
+	if (max_class == DDT_CLASS_UNIQUE)
+		return (B_TRUE);
+
+	ddt = spa->spa_ddt[BP_GET_CHECKSUM(bp)];
+
+	ddt_key_fill(&dde.dde_key, bp);
+
+	for (enum ddt_type type = 0; type < DDT_TYPES; type++)
+		for (enum ddt_class class = 0; class <= max_class; class++)
+			if (ddt_object_lookup(ddt, type, class, &dde) == 0)
+				return (B_TRUE);
+
+	return (B_FALSE);
+}
+
 ddt_entry_t *
 ddt_repair_start(ddt_t *ddt, const blkptr_t *bp)
 {
@@ -820,7 +845,7 @@ ddt_repair_entry(ddt_t *ddt, ddt_entry_t *dde, ddt_entry_t *rdde, zio_t *rio)
 		    ddp->ddp_phys_birth != rddp->ddp_phys_birth ||
 		    bcmp(ddp->ddp_dva, rddp->ddp_dva, sizeof (ddp->ddp_dva)))
 			continue;
-		ddt_bp_create(ddt, ddk, ddp, &blk);
+		ddt_bp_create(ddt->ddt_checksum, ddk, ddp, &blk);
 		zio_nowait(zio_rewrite(zio, zio->io_spa, 0, &blk,
 		    rdde->dde_repair_data, DDK_GET_PSIZE(rddk), NULL, NULL,
 		    ZIO_PRIORITY_SYNC_WRITE, ZIO_DDT_CHILD_FLAGS(zio), NULL));
@@ -845,7 +870,7 @@ ddt_repair_table(ddt_t *ddt, zio_t *rio)
 		rdde_next = AVL_NEXT(t, rdde);
 		avl_remove(&ddt->ddt_repair_tree, rdde);
 		ddt_exit(ddt);
-		ddt_bp_create(ddt, &rdde->dde_key, NULL, &blk);
+		ddt_bp_create(ddt->ddt_checksum, &rdde->dde_key, NULL, &blk);
 		dde = ddt_repair_start(ddt, &blk);
 		ddt_repair_entry(ddt, dde, rdde, rio);
 		ddt_repair_done(ddt, dde);
@@ -857,6 +882,7 @@ ddt_repair_table(ddt_t *ddt, zio_t *rio)
 static void
 ddt_sync_entry(ddt_t *ddt, ddt_entry_t *dde, dmu_tx_t *tx, uint64_t txg)
 {
+	dsl_pool_t *dp = ddt->ddt_spa->spa_dsl_pool;
 	ddt_phys_t *ddp = dde->dde_phys;
 	ddt_key_t *ddk = &dde->dde_key;
 	enum ddt_type otype = dde->dde_type;
@@ -905,6 +931,11 @@ ddt_sync_entry(ddt_t *ddt, ddt_entry_t *dde, dmu_tx_t *tx, uint64_t txg)
 		if (!ddt_object_exists(ddt, ntype, nclass))
 			ddt_object_create(ddt, ntype, nclass, tx);
 		VERIFY(ddt_object_update(ddt, ntype, nclass, dde, tx) == 0);
+
+		if (dp->dp_scrub_func != SCRUB_FUNC_NONE &&
+		    oclass > dp->dp_scrub_ddt_class_max &&
+		    nclass <= dp->dp_scrub_ddt_class_max)
+			dsl_pool_scrub_ddt_entry(dp, ddt->ddt_checksum, dde);
 	}
 }
 
@@ -967,4 +998,32 @@ ddt_sync(spa_t *spa, uint64_t txg)
 	(void) zio_wait(rio);
 
 	dmu_tx_commit(tx);
+}
+
+int
+ddt_walk(spa_t *spa, ddt_bookmark_t *ddb, ddt_entry_t *dde)
+{
+	do {
+		do {
+			do {
+				ddt_t *ddt = spa->spa_ddt[ddb->ddb_checksum];
+				int error = ENOENT;
+				if (ddt_object_exists(ddt, ddb->ddb_type,
+				    ddb->ddb_class)) {
+					error = ddt_object_walk(ddt,
+					    ddb->ddb_type, ddb->ddb_class,
+					    &ddb->ddb_cursor, dde);
+				}
+				if (error == 0)
+					return (0);
+				if (error != ENOENT)
+					return (error);
+				ddb->ddb_cursor = 0;
+			} while (++ddb->ddb_checksum < ZIO_CHECKSUM_FUNCTIONS);
+			ddb->ddb_checksum = 0;
+		} while (++ddb->ddb_type < DDT_TYPES);
+		ddb->ddb_type = 0;
+	} while (++ddb->ddb_class < DDT_CLASSES);
+
+	return (ENOENT);
 }

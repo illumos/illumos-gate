@@ -94,14 +94,15 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr,
-	    "Usage: %s [-CumdibcsvhL] [-S user:cksumalg] "
+	    "Usage: %s [-CumdibcsvhL] "
 	    "poolname [object...]\n"
 	    "       %s [-div] dataset [object...]\n"
 	    "       %s -m [-L] poolname [vdev [metaslab...]]\n"
 	    "       %s -R poolname vdev:offset:size[:flags]\n"
+	    "       %s -S poolname\n"
 	    "       %s -l device\n"
 	    "       %s -C\n\n",
-	    cmdname, cmdname, cmdname, cmdname, cmdname, cmdname);
+	    cmdname, cmdname, cmdname, cmdname, cmdname, cmdname, cmdname);
 
 	(void) fprintf(stderr, "    Dataset name must include at least one "
 	    "separator character '/' or '@'\n");
@@ -549,7 +550,7 @@ dump_dde(const ddt_t *ddt, const ddt_entry_t *dde, uint64_t index)
 	for (int p = 0; p < DDT_PHYS_TYPES; p++, ddp++) {
 		if (ddp->ddp_phys_birth == 0)
 			continue;
-		ddt_bp_create(ddt, ddk, ddp, &blk);
+		ddt_bp_create(ddt->ddt_checksum, ddk, ddp, &blk);
 		sprintf_blkptr(blkbuf, &blk);
 		(void) printf("index %llx refcnt %llu %s %s\n",
 		    (u_longlong_t)index, (u_longlong_t)ddp->ddp_refcnt,
@@ -686,7 +687,7 @@ dump_ddt(ddt_t *ddt, enum ddt_type type, enum ddt_class class)
 
 	(void) printf("%s contents:\n\n", name);
 
-	while ((error = ddt_object_walk(ddt, type, class, &dde, &walk)) == 0)
+	while ((error = ddt_object_walk(ddt, type, class, &walk, &dde)) == 0)
 		dump_dde(ddt, &dde, walk);
 
 	ASSERT(error == ENOENT);
@@ -1344,7 +1345,8 @@ dump_object(objset_t *os, uint64_t object, int verbosity, int *print_header)
 	nicenum(doi.doi_physical_blocks_512 << 9, asize);
 	nicenum(doi.doi_bonus_size, bonus_size);
 	(void) sprintf(fill, "%6.2f", 100.0 * doi.doi_fill_count *
-	    doi.doi_data_block_size / doi.doi_max_offset);
+	    doi.doi_data_block_size / (object == 0 ? DNODES_PER_BLOCK : 1) /
+	    doi.doi_max_offset);
 
 	aux[0] = '\0';
 
@@ -1865,26 +1867,28 @@ static space_map_ops_t zdb_space_map_ops = {
 };
 
 static void
-zdb_ddt_leak_init(ddt_t *ddt, enum ddt_type type, enum ddt_class class,
-    zdb_cb_t *zcb)
+zdb_ddt_leak_init(spa_t *spa, zdb_cb_t *zcb)
 {
-	uint64_t walk = 0;
+	ddt_bookmark_t ddb = { 0 };
 	ddt_entry_t dde;
 	int error;
 
-	if (class == DDT_CLASS_UNIQUE || !ddt_object_exists(ddt, type, class))
-		return;
-
-	while ((error = ddt_object_walk(ddt, type, class, &dde, &walk)) == 0) {
+	while ((error = ddt_walk(spa, &ddb, &dde)) == 0) {
 		blkptr_t blk;
 		ddt_phys_t *ddp = dde.dde_phys;
+
+		if (ddb.ddb_class == DDT_CLASS_UNIQUE)
+			return;
+
 		ASSERT(ddt_phys_total_refcnt(&dde) > 1);
+
 		for (int p = 0; p < DDT_PHYS_TYPES; p++, ddp++) {
 			if (ddp->ddp_phys_birth == 0)
 				continue;
-			ddt_bp_create(ddt, &dde.dde_key, ddp, &blk);
+			ddt_bp_create(ddb.ddb_checksum,
+			    &dde.dde_key, ddp, &blk);
 			if (p == DDT_PHYS_DITTO) {
-				zdb_count_block(ddt->ddt_spa, NULL, zcb, &blk,
+				zdb_count_block(spa, NULL, zcb, &blk,
 				    ZDB_OT_DITTO);
 			} else {
 				zcb->zcb_dedup_asize +=
@@ -1893,6 +1897,7 @@ zdb_ddt_leak_init(ddt_t *ddt, enum ddt_type type, enum ddt_class class,
 			}
 		}
 		if (!dump_opt['L']) {
+			ddt_t *ddt = spa->spa_ddt[ddb.ddb_checksum];
 			ddt_enter(ddt);
 			VERIFY(ddt_lookup(ddt, &blk, B_TRUE) != NULL);
 			ddt_exit(ddt);
@@ -1924,12 +1929,7 @@ zdb_leak_init(spa_t *spa, zdb_cb_t *zcb)
 
 	spa_config_enter(spa, SCL_CONFIG, FTAG, RW_READER);
 
-	for (enum zio_checksum c = 0; c < ZIO_CHECKSUM_FUNCTIONS; c++)
-		for (enum ddt_type type = 0; type < DDT_TYPES; type++)
-			for (enum ddt_class class = 0; class < DDT_CLASSES;
-			    class++)
-				zdb_ddt_leak_init(spa->spa_ddt[c],
-				    type, class, zcb);
+	zdb_ddt_leak_init(spa, zcb);
 
 	spa_config_exit(spa, SCL_CONFIG, FTAG);
 }
@@ -1957,6 +1957,7 @@ dump_block_stats(spa_t *spa)
 	zdb_cb_t zcb = { 0 };
 	zdb_blkstats_t *zb, *tzb;
 	uint64_t norm_alloc, norm_space, total_alloc, total_found;
+	int flags = TRAVERSE_PRE | TRAVERSE_PREFETCH_METADATA;
 	int leaks = 0;
 
 	(void) printf("\nTraversing all blocks %s%s%s%s%s...\n",
@@ -2000,7 +2001,10 @@ dump_block_stats(spa_t *spa)
 		bplist_close(bpl);
 	}
 
-	zcb.zcb_haderrors |= traverse_pool(spa, zdb_blkptr_cb, &zcb, 0);
+	if (dump_opt['c'] > 1)
+		flags |= TRAVERSE_PREFETCH_DATA;
+
+	zcb.zcb_haderrors |= traverse_pool(spa, 0, flags, zdb_blkptr_cb, &zcb);
 
 	if (zcb.zcb_haderrors) {
 		(void) printf("\nError counts:\n\n");
@@ -2170,7 +2174,8 @@ zdb_ddt_add_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 		    avl_numnodes(t));
 	}
 
-	if (BP_GET_LEVEL(bp) > 0 || dmu_ot[BP_GET_TYPE(bp)].ot_metadata)
+	if (BP_IS_HOLE(bp) || BP_GET_CHECKSUM(bp) == ZIO_CHECKSUM_OFF ||
+	    BP_GET_LEVEL(bp) > 0 || dmu_ot[BP_GET_TYPE(bp)].ot_metadata)
 		return (0);
 
 	ddt_key_fill(&zdde_search.zdde_key, bp);
@@ -2205,7 +2210,8 @@ dump_simulated_ddt(spa_t *spa)
 
 	spa_config_enter(spa, SCL_CONFIG, FTAG, RW_READER);
 
-	(void) traverse_pool(spa, zdb_ddt_add_cb, &t, 0);
+	(void) traverse_pool(spa, 0, TRAVERSE_PRE | TRAVERSE_PREFETCH_METADATA,
+	    zdb_ddt_add_cb, &t);
 
 	spa_config_exit(spa, SCL_CONFIG, FTAG);
 
