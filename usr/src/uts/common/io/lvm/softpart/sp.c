@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -335,12 +335,14 @@ sp_send_stat_msg(mp_unit_t *un, sp_status_t status)
 	set_t		setno = MD_UN2SET(un);
 	int		rval;
 	const char	*str = (status == MD_SP_ERR) ? "MD_SP_ERR" : "MD_SP_OK";
+	int		nretries = 0;
 
 	sp_msg.sp_setstat_mnum = MD_SID(un);
 	sp_msg.sp_setstat_status = status;
 
 	kres = kmem_alloc(sizeof (md_mn_kresult_t), KM_SLEEP);
 
+spss_msg:
 	rval = mdmn_ksend_message(setno, MD_MN_MSG_SP_SETSTAT2, MD_MSGF_NO_LOG,
 	    0, (char *)&sp_msg, sizeof (sp_msg), kres);
 
@@ -351,6 +353,13 @@ sp_send_stat_msg(mp_unit_t *un, sp_status_t status)
 			while (!md_mn_is_commd_present()) {
 				delay(md_hz);
 			}
+			/*
+			 * commd is available again. Retry the message once.
+			 * If it fails we panic as the system is in an
+			 * unexpected state.
+			 */
+			if (nretries++ == 0)
+				goto spss_msg;
 		}
 		/*
 		 * Panic as we are now in an inconsistent state.

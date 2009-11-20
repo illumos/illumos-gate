@@ -6936,7 +6936,7 @@ mddb_setexit(
 			mddb_parse_msg->msg_lb_flags[i] =
 			    lbp->lb_locators[i].l_flags;
 		}
-		kresult = kmem_zalloc(sizeof (md_mn_kresult_t), KM_SLEEP);
+		kresult = kmem_alloc(sizeof (md_mn_kresult_t), KM_SLEEP);
 		while (rval != 0) {
 			rval = mdmn_ksend_message(s->s_setno,
 			    MD_MN_MSG_MDDB_PARSE, 0, 0,
@@ -9739,7 +9739,7 @@ mddb_commitrec(
 			 * the master node.  Once devids are turned on
 			 * for MN disksets, can send devid.
 			 */
-			kres = kmem_zalloc(sizeof (md_mn_kresult_t), KM_SLEEP);
+			kres = kmem_alloc(sizeof (md_mn_kresult_t), KM_SLEEP);
 			msg_recerr = kmem_zalloc(
 			    sizeof (md_mn_msg_mddb_optrecerr_t), KM_SLEEP);
 			while (!(md_get_setstatus(s->s_setno) &

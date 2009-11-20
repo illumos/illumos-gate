@@ -716,7 +716,7 @@ md_ioctl_lock_exit(int code, int flags, mdi_unit_t *ui, int ioctl_end)
 				mddb_parse_msg->msg_lb_flags[i] =
 				    lbp->lb_locators[i].l_flags;
 			}
-			kresult = kmem_zalloc(sizeof (md_mn_kresult_t),
+			kresult = kmem_alloc(sizeof (md_mn_kresult_t),
 			    KM_SLEEP);
 			while (rval != 0) {
 				flag = 0;
@@ -3921,9 +3921,11 @@ md_vtoc_to_efi_record(mddb_recid_t vtoc_recid, set_t setno)
  * mirror owner, and MD_MSGF_DIRECTED will be set in the flags.  Non-owner
  * nodes will not receive these messages.
  *
- * For the case where md_mn_is_commd_present() is false, we rely on the
- * "result" having been kmem_zalloc()ed which, in effect, sets MDMNE_NULL for
- * kmmr_comm_state making MDMN_KSEND_MSG_OK() result in 0.
+ * For the case where md_mn_is_commd_present() is false, we simply pre-set
+ * the result->kmmr_comm_state to MDMNE_RPC_FAIL.
+ * This covers the case where the service mdcommd has been killed and so we do
+ * not get a 'new' result structure copied back. Instead we return with the
+ * supplied result field, and we need to flag a failure to the caller.
  */
 int
 mdmn_ksend_message(
@@ -3941,6 +3943,15 @@ mdmn_ksend_message(
 	uint_t		retry_noise_cnt = 0;
 	int		rval;
 	k_sigset_t	oldmask, newmask;
+
+	/*
+	 * Ensure that we default to a recoverable failure state if the
+	 * door upcall cannot pass the request on to rpc.mdcommd.
+	 * This may occur when shutting the node down while there is still
+	 * a mirror resync or metadevice state update occurring.
+	 */
+	result->kmmr_comm_state = MDMNE_RPC_FAIL;
+	result->kmmr_exitval = ~0;
 
 	if (size > MDMN_MAX_KMSG_DATA)
 		return (ENOMEM);
@@ -4096,7 +4107,7 @@ mdmn_send_capability_message(minor_t mnum, volcap_t vc, IOLOCK *lockp)
 
 	if (lockp)
 		IOLOCK_RETURN_RELEASE(0, lockp);
-	kres = kmem_zalloc(sizeof (md_mn_kresult_t), KM_SLEEP);
+	kres = kmem_alloc(sizeof (md_mn_kresult_t), KM_SLEEP);
 
 	/*
 	 * Mask signals for the mdmd_ksend_message call.  This keeps the door
@@ -4143,7 +4154,7 @@ mdmn_clear_all_capabilities(minor_t mnum)
 	 * The check open message doesn't have to be logged, nor should the
 	 * result be stored in the MCT. We want an up-to-date state.
 	 */
-	kresult = kmem_zalloc(sizeof (md_mn_kresult_t), KM_SLEEP);
+	kresult = kmem_alloc(sizeof (md_mn_kresult_t), KM_SLEEP);
 
 	/*
 	 * Mask signals for the mdmd_ksend_message call.  This keeps the door

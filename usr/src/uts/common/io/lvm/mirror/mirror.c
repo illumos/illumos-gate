@@ -216,6 +216,7 @@ static void
 send_poke_hotspares_msg(daemon_request_t *drq)
 {
 	int			rval;
+	int			nretries = 0;
 	md_mn_msg_pokehsp_t	pokehsp;
 	md_mn_kresult_t		*kresult;
 	set_t			setno = (set_t)drq->dq.qlen;
@@ -223,6 +224,8 @@ send_poke_hotspares_msg(daemon_request_t *drq)
 	pokehsp.pokehsp_setno = setno;
 
 	kresult = kmem_alloc(sizeof (md_mn_kresult_t), KM_SLEEP);
+
+retry_sphmsg:
 	rval = mdmn_ksend_message(setno, MD_MN_MSG_POKE_HOTSPARES,
 	    MD_MSGF_NO_LOG | MD_MSGF_NO_BCAST, 0, (char *)&pokehsp,
 	    sizeof (pokehsp), kresult);
@@ -234,6 +237,13 @@ send_poke_hotspares_msg(daemon_request_t *drq)
 			while (!md_mn_is_commd_present()) {
 				delay(md_hz);
 			}
+			/*
+			 * commd has become reachable again, so retry once.
+			 * If this fails we'll panic as the system is in an
+			 * unexpected state.
+			 */
+			if (nretries++ == 0)
+				goto retry_sphmsg;
 		}
 		cmn_err(CE_PANIC,
 		    "ksend_message failure: POKE_HOTSPARES");
@@ -419,6 +429,7 @@ check_comp_4_hotspares(
 	md_mn_kresult_t		*kresult;
 	mm_unit_t		*new_un;
 	int			rval;
+	int			nretries = 0;
 
 	mnum = MD_SID(un);
 	setno = MD_UN2SET(un);
@@ -475,6 +486,8 @@ check_comp_4_hotspares(
 		}
 
 		kresult = kmem_alloc(sizeof (md_mn_kresult_t), KM_SLEEP);
+
+cc4hs_msg:
 		rval = mdmn_ksend_message(setno, msgtype, msgflags, 0,
 		    (char *)&allochspmsg, sizeof (allochspmsg),
 		    kresult);
@@ -503,6 +516,13 @@ check_comp_4_hotspares(
 				while (!md_mn_is_commd_present()) {
 					delay(md_hz);
 				}
+				/*
+				 * commd has become reachable again, so retry
+				 * once. If this fails we'll panic as the
+				 * system is in an unexpected state.
+				 */
+				if (nretries++ == 0)
+					goto cc4hs_msg;
 			}
 			cmn_err(CE_PANIC,
 			    "ksend_message failure: ALLOCATE_HOTSPARE");
@@ -2411,6 +2431,7 @@ set_sm_comp_state(
 	md_mn_msgtype_t		msgtype;
 	int			save_lock = 0;
 	mdi_unit_t		*ui_sm;
+	int			nretries = 0;
 
 	sm = &un->un_sm[smi];
 	smic = &un->un_smic[smi];
@@ -2569,6 +2590,7 @@ set_sm_comp_state(
 		}
 
 		kresult = kmem_alloc(sizeof (md_mn_kresult_t), KM_SLEEP);
+sscs_msg:
 		rval = mdmn_ksend_message(setno, msgtype, msgflags, 0,
 		    (char *)&stchmsg, sizeof (stchmsg), kresult);
 
@@ -2579,6 +2601,13 @@ set_sm_comp_state(
 				while (!md_mn_is_commd_present()) {
 					delay(md_hz);
 				}
+				/*
+				 * commd is now available; retry the message
+				 * one time. If that fails we fall through and
+				 * panic as the system is in an unexpected state
+				 */
+				if (nretries++ == 0)
+					goto sscs_msg;
 			}
 			cmn_err(CE_PANIC,
 			    "ksend_message failure: STATE_UPDATE");

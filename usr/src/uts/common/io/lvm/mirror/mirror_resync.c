@@ -1018,6 +1018,7 @@ send_mn_resync_done_message(
 	md_mn_kresult_t		*kres;
 	int			dont_send = 0;
 	int			rval;
+	int			nretries = 0;
 
 	rmsg = (md_mn_msg_resync_t *)un->un_rs_msg;
 
@@ -1073,6 +1074,7 @@ send_mn_resync_done_message(
 	md_unit_writerexit(ui);
 	kres = kmem_alloc(sizeof (md_mn_kresult_t), KM_SLEEP);
 
+smrd_msg:
 	mutex_enter(&un->un_rs_cpr_mx);
 	CALLB_CPR_SAFE_BEGIN(&un->un_rs_cprinfo);
 
@@ -1091,6 +1093,13 @@ send_mn_resync_done_message(
 			while (!md_mn_is_commd_present()) {
 				delay(md_hz);
 			}
+			/*
+			 * commd is now available again. Retry the message once.
+			 * If this fails we panic as the system is in an
+			 * unexpected state.
+			 */
+			if (nretries++ == 0)
+				goto smrd_msg;
 		}
 		cmn_err(CE_PANIC, "ksend_message failure: RESYNC_PHASE_DONE");
 	}
@@ -1122,6 +1131,7 @@ send_mn_resync_next_message(
 	md_mps_t		*ps;
 	mm_submirror_t		*sm;
 	int			smi;
+	int			nretries = 0;
 
 	ASSERT(rmsg != NULL);
 #ifdef DEBUG
@@ -1159,6 +1169,7 @@ send_mn_resync_next_message(
 	md_unit_readerexit(ui);
 	kres = kmem_alloc(sizeof (md_mn_kresult_t), KM_SLEEP);
 
+smrn_msg:
 	mutex_enter(&un->un_rs_cpr_mx);
 	CALLB_CPR_SAFE_BEGIN(&un->un_rs_cprinfo);
 
@@ -1175,6 +1186,13 @@ send_mn_resync_next_message(
 			while (!md_mn_is_commd_present()) {
 				delay(md_hz);
 			}
+			/*
+			 * commd is now available again. Retry the message once.
+			 * If this fails we panic as the system is in an
+			 * unexpected state.
+			 */
+			if (nretries++ == 0)
+				goto smrn_msg;
 		}
 		cmn_err(CE_PANIC, "ksend_message failure: RESYNC_NEXT");
 	}
@@ -2330,6 +2348,7 @@ resync_unit(minor_t mnum)
 	char		cpr_name[23];	/* Unique CPR name */
 	int		rs_copysize;
 	char		*rs_buffer;
+	int		nretries = 0;
 
 resync_restart:
 #ifdef DEBUG
@@ -2652,6 +2671,7 @@ bail_out:
 
 			kres = kmem_alloc(sizeof (md_mn_kresult_t), KM_SLEEP);
 
+smrf_msg:
 			mutex_enter(&un->un_rs_cpr_mx);
 			CALLB_CPR_SAFE_BEGIN(&un->un_rs_cprinfo);
 
@@ -2671,6 +2691,14 @@ bail_out:
 					while (!md_mn_is_commd_present()) {
 						delay(md_hz);
 					}
+					/*
+					 * commd is now available again. Retry
+					 * the message once. If this fails we
+					 * panic as the system is in an
+					 * unexpected state.
+					 */
+					if (nretries++ == 0)
+						goto smrf_msg;
 				}
 				cmn_err(CE_PANIC,
 				    "ksend_message failure: RESYNC_FINISH");
@@ -3122,7 +3150,7 @@ mirror_mark_resync_region_non_owner(struct mm_unit *un,
 	 * TODO: make this a kmem_cache pool to improve
 	 * alloc/free performance ???
 	 */
-	kres = (md_mn_kresult_t *)kmem_zalloc(sizeof (md_mn_kresult_t),
+	kres = (md_mn_kresult_t *)kmem_alloc(sizeof (md_mn_kresult_t),
 	    KM_SLEEP);
 	rr = (md_mn_msg_rr_dirty_t *)kmem_alloc(sizeof (md_mn_msg_rr_dirty_t),
 	    KM_SLEEP);
