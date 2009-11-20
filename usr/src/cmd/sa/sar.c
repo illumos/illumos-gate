@@ -19,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * sar generates a report either from an input data file or by invoking sadc to
@@ -805,6 +803,8 @@ update_counters(void)
 			= nio->kios.wtime - oio->kios.wtime;
 		aio->kios.rtime += dio->kios.rtime
 			= nio->kios.rtime - oio->kios.rtime;
+		aio->ks.ks_snaptime += dio->ks.ks_snaptime
+		    = nio->ks.ks_snaptime - oio->ks.ks_snaptime;
 		nio++;
 		oio++;
 		aio++;
@@ -839,13 +839,16 @@ prt_b_opt(struct sa64 *xx)
 static void
 prt_d_opt(int ii, iodevinfo_t *xio)
 {
-	double etime, hr_etime, tps, avq, avs;
+	double etime, hr_etime, tps, avq, avs, pbusy;
 
 	tsttab();
 
-	hr_etime = (double)xio[ii].kios.wlastupdate;
+	hr_etime = (double)xio[ii].ks.ks_snaptime;
 	if (hr_etime == 0.0)
 		hr_etime = (double)NANOSEC;
+	pbusy = (double)xio[ii].kios.rtime * 100.0 / hr_etime;
+	if (pbusy > 100.0)
+		pbusy = 100.0;
 	etime = hr_etime / (double)NANOSEC;
 	tps = (double)(xio[ii].kios.reads + xio[ii].kios.writes) / etime;
 	avq = (double)xio[ii].kios.wlentime / hr_etime;
@@ -853,7 +856,7 @@ prt_d_opt(int ii, iodevinfo_t *xio)
 
 	(void) printf("   %-8.8s    ", nxio[ii].ks.ks_name);
 	(void) printf("%7.0f %7.1f %7.0f %7.0f %7.1f %7.1f\n",
-		(double)xio[ii].kios.rtime * 100.0 / hr_etime,
+                pbusy,
 		avq + avs,
 		tps,
 		BLKS(xio[ii].kios.nread + xio[ii].kios.nwritten) / etime,
