@@ -341,7 +341,7 @@ configure_mpxio()
 					reboot_needed=`$EXPR $reboot_needed + 1`
 				else
 					$RM -f $TMPDRVCONF $TMPDRVCONF_MPXIO_ENTRY $TMPDRVCONF_SATA_ENTRY > /dev/null 2>&1
-					continue;
+					return 0;
 				fi
 			fi
 
