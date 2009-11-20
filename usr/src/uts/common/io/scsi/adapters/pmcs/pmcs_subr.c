@@ -1917,6 +1917,38 @@ pmcs_iport_tgtmap_destroy(pmcs_iport_t *iport)
 }
 
 /*
+ * Remove all phys from an iport's phymap and empty it's phylist.
+ * Called when a port has been reset by the host (see pmcs_intr.c).
+ */
+void
+pmcs_iport_teardown_phys(pmcs_iport_t *iport)
+{
+	pmcs_hw_t		*pwp;
+	sas_phymap_phys_t	*phys;
+	int			phynum;
+
+	ASSERT(iport);
+	ASSERT(mutex_owned(&iport->lock));
+	pwp = iport->pwp;
+	ASSERT(pwp);
+
+	/*
+	 * Remove all phys from the iport handle's phy list, unset its
+	 * primary phy and update its state.
+	 */
+	pmcs_remove_phy_from_iport(iport, NULL);
+	iport->pptr = NULL;
+	iport->ua_state = UA_PEND_DEACTIVATE;
+
+	/* Remove all phys from the phymap */
+	phys = sas_phymap_ua2phys(pwp->hss_phymap, iport->ua);
+	while ((phynum = sas_phymap_phys_next(phys)) != -1) {
+		sas_phymap_phy_rem(pwp->hss_phymap, phynum);
+	}
+	sas_phymap_phys_free(phys);
+}
+
+/*
  * Query the phymap and populate the iport handle passed in.
  * Called with iport lock held.
  */
@@ -2036,6 +2068,79 @@ pmcs_get_iport_by_phy(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 	}
 
 	return (iport);
+}
+
+/*
+ * Promote the next phy on this iport to primary, and return it.
+ * Called when the primary PHY on a port is going down, but the port
+ * remains up (see pmcs_intr.c).
+ */
+pmcs_phy_t *
+pmcs_promote_next_phy(pmcs_phy_t *prev_primary)
+{
+	pmcs_iport_t *iport;
+	pmcs_phy_t *pptr, *next_pptr, *child;
+
+	mutex_enter(&prev_primary->phy_lock);
+	iport = prev_primary->iport;
+	mutex_exit(&prev_primary->phy_lock);
+	ASSERT(iport);
+
+	mutex_enter(&iport->lock);
+	for (pptr = list_head(&iport->phys); pptr != NULL; pptr = next_pptr) {
+		next_pptr = list_next(&iport->phys, pptr);
+
+		/* Use the first PHY in the list that is not the primary */
+		if (pptr != prev_primary) {
+			break;
+		}
+	}
+	iport->pptr = pptr;
+	mutex_exit(&iport->lock);
+
+	if (pptr == NULL) {
+		pmcs_prt(iport->pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
+		    "%s: unable to promote to new primary phy on iport [0x%p]",
+		    __func__, (void *)iport);
+		return (NULL);
+	}
+
+	/* Update the phy handle with the data from the previous primary */
+	mutex_enter(&pptr->phy_lock);
+	pmcs_lock_phy(prev_primary);
+
+	ASSERT(pptr->subsidiary);
+
+	pptr->children		= prev_primary->children;
+	child = pptr->children;
+	while (child) {
+		child->parent = pptr;
+		child = child->sibling;
+	}
+	pptr->ncphy		= prev_primary->ncphy;
+	pptr->width		= prev_primary->width;
+	pptr->dtype		= prev_primary->dtype;
+	pptr->pend_dtype	= prev_primary->pend_dtype;
+	pptr->tolerates_sas2	= prev_primary->tolerates_sas2;
+	pptr->atdt		= prev_primary->atdt;
+	pptr->portid		= prev_primary->portid;
+	pptr->link_rate		= prev_primary->link_rate;
+	pptr->configured	= prev_primary->configured;
+	pptr->iport		= prev_primary->iport;
+	pptr->target		= prev_primary->target;
+	pptr->subsidiary = 0;
+
+	prev_primary->subsidiary = 1;
+	prev_primary->children = NULL;
+	pmcs_unlock_phy(prev_primary);
+
+	/*
+	 * We call pmcs_unlock_phy() on pptr because it now contains the
+	 * list of children.
+	 */
+	pmcs_unlock_phy(pptr);
+
+	return (pptr);
 }
 
 void

@@ -676,6 +676,16 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 			pmcs_prt(pwp, PMCS_PRT_INFO, NULL, NULL,
 			    "PortID 0x%x: PHY 0x%x IN RESET",
 			    portid, phynum);
+			/* Entire port is down due to a host-initiated reset */
+			mutex_enter(&pptr->phy_lock);
+			iport = pptr->iport;
+			mutex_exit(&pptr->phy_lock);
+			if (iport) {
+				mutex_enter(&iport->lock);
+				pmcs_iport_teardown_phys(iport);
+				mutex_exit(&iport->lock);
+			}
+
 			break;
 		}
 		if (IOP_EVENT_PORT_STATE(w3) == IOP_EVENT_PS_LOSTCOMM) {
@@ -687,6 +697,33 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		}
 
 		if (IOP_EVENT_PORT_STATE(w3) == IOP_EVENT_PS_VALID) {
+			/*
+			 * This is not the last phy in the port, so if this
+			 * is the primary PHY, promote another PHY to primary.
+			 */
+			if (pptr == subphy) {
+				primary = !subphy->subsidiary;
+				ASSERT(primary);
+
+				tphyp = pptr;
+				pptr = pmcs_promote_next_phy(tphyp);
+
+				if (pptr) {
+					/* Update primary pptr in ports */
+					pwp->ports[portid] = pptr;
+					pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr,
+					    NULL, "PortID 0x%x: PHY 0x%x "
+					    "promoted to primary", portid,
+					    pptr->phynum);
+				} else {
+					/* This should not happen */
+					pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr,
+					    NULL, "PortID 0x%x: PHY 0x%x: "
+					    "unable to promote phy", portid,
+					    phynum);
+				}
+			}
+
 			/*
 			 * Drop port width on the primary phy handle
 			 * No need to lock the entire tree for this

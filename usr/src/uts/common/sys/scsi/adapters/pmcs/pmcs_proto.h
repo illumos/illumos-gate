@@ -313,8 +313,10 @@ void pmcs_start_ssp_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk,
 void pmcs_ssp_event_recovery(pmcs_hw_t *);
 
 pmcs_iport_t *pmcs_get_iport_by_phy(pmcs_hw_t *pwp, pmcs_phy_t *pptr);
+pmcs_phy_t *pmcs_promote_next_phy(pmcs_phy_t *pptr);
 void pmcs_rele_iport(pmcs_iport_t *iport);
 int pmcs_iport_configure_phys(pmcs_iport_t *iport);
+void pmcs_iport_teardown_phys(pmcs_iport_t *iport);
 
 void pmcs_lock_phy(pmcs_phy_t *);
 void pmcs_unlock_phy(pmcs_phy_t *);
