@@ -18,12 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#define	_STRUCTURED_PROC	1
 
 #include <stdlib.h>
 #include <ctype.h>
@@ -321,8 +322,8 @@ mkprstatus32(struct ps_prochandle *P, const lwpstatus_t *lsp,
 	(void) strncpy(psp->pr_clname, lsp->pr_clname, sizeof (psp->pr_clname));
 	psp->pr_syscall = lsp->pr_syscall;
 	psp->pr_nsysarg = lsp->pr_nsysarg;
-	bcopy(lsp->pr_sysarg, psp->pr_sysarg,
-	    sizeof (psp->pr_sysarg)); psp->pr_who = lsp->pr_lwpid;
+	bcopy(lsp->pr_sysarg, psp->pr_sysarg, sizeof (psp->pr_sysarg));
+	psp->pr_who = lsp->pr_lwpid;
 	psp->pr_lwppend = lsp->pr_lwppend;
 	psp->pr_oldcontext = (caddr32_t)lsp->pr_oldcontext;
 	psp->pr_brkbase = (caddr32_t)P->status.pr_brkbase;
@@ -721,7 +722,7 @@ dump_sections(pgcore_t *pgc)
 			    sym->sym_strs != NULL) {
 				symindex = index;
 				if (dump_symtab(pgc, fptr, index, dynsym) != 0)
-				    return (-1);
+					return (-1);
 				index += 2;
 			}
 
@@ -1263,12 +1264,12 @@ Pfgcore(struct ps_prochandle *P, int fd, core_content_t content)
 
 		psinfo_n_to_32(&P->psinfo, &pi32);
 		if (write_note(fd, NT_PSINFO, &pi32, sizeof (psinfo32_t),
-			    &doff) != 0) {
+		    &doff) != 0) {
 			goto err;
 		}
 		pstatus_n_to_32(&P->status, &ps32);
 		if (write_note(fd, NT_PSTATUS, &ps32, sizeof (pstatus32_t),
-			    &doff) != 0) {
+		    &doff) != 0) {
 			goto err;
 		}
 		if ((av32 = malloc(size)) == NULL)

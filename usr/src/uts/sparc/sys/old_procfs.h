@@ -18,14 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 #ifndef _SYS_OLD_PROCFS_H
 #define	_SYS_OLD_PROCFS_H
@@ -34,8 +34,6 @@
  * This file contains the definitions for the old ioctl()-based
  * version of the process file system.  It is obsolete but will
  * continue to be supported in SunOS until the next major release.
- * Note that <sys/procfs.h> and <sys/old_procfs.h> contain conflicting
- * definitions and cannot be included together in the same source file.
  */
 
 #include <sys/types.h>
@@ -55,6 +53,31 @@ extern "C" {
 #endif
 
 #if _STRUCTURED_PROC == 0
+
+/*
+ * The old (ioctl-based) and new (structured) /proc interfaces define
+ * related structures of the same name, but slightly diferent contents:
+ *	prmap_t
+ *	prcred_t
+ * This doesn't hurt because you can't include both of these
+ * in the same compilation unit:
+ *	<sys/procfs.h>
+ *	<sys/old_procfs.h>
+ * unless _STRUCTURED_PROC is first defined to be 1.
+ * (Including <procfs.h> defines it to be 1.)
+ *
+ * However, the latest version of lint goes overboard in hunting
+ * down and reporting differences in functions and data of the
+ * same name across multiple compilation units, even though there
+ * is no real problem.  To mitigate this, we redefine the old procfs
+ * names when performing lint.
+ */
+#if defined(__lint)
+#define	prmap		Prmap
+#define	prmap_t		Prmap_t
+#define	prcred		Prcred
+#define	prcred_t	Prcred_t
+#endif	/* __lint */
 
 /*
  * ioctl codes and system call interfaces for /proc.
