@@ -59,9 +59,17 @@ extern "C" {
 #define	IRE_ADDR_HASH_V6(addr, table_size) 				\
 	IRE_ADDR_HASH((addr).s6_addr32[3], table_size)
 
-/* This assumes that the ftable size is a power of 2. */
+/*
+ * This assumes that the ftable size is a power of 2.
+ * We include some high-order bytes to avoid all IRE_LOCALs in the same
+ * bucket for performance reasons.
+ */
 #define	IRE_ADDR_MASK_HASH_V6(addr, mask, table_size) 			\
-	((((addr).s6_addr8[8] & (mask).s6_addr8[8]) ^ 			\
+	((((addr).s6_addr8[0] & (mask).s6_addr8[0]) ^ 			\
+	((addr).s6_addr8[1] & (mask).s6_addr8[1]) ^ 			\
+	((addr).s6_addr8[6] & (mask).s6_addr8[6]) ^ 			\
+	((addr).s6_addr8[7] & (mask).s6_addr8[7]) ^ 			\
+	((addr).s6_addr8[8] & (mask).s6_addr8[8]) ^ 			\
 	((addr).s6_addr8[9] & (mask).s6_addr8[9]) ^			\
 	((addr).s6_addr8[10] & (mask).s6_addr8[10]) ^ 			\
 	((addr).s6_addr8[13] & (mask).s6_addr8[13]) ^ 			\

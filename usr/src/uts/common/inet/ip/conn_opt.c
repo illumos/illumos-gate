@@ -2447,6 +2447,10 @@ void
 ip_attr_nexthop(const ip_pkt_t *ipp, const ip_xmit_attr_t *ixa,
     const in6_addr_t *dst, in6_addr_t *nexthop)
 {
+	if (!(ipp->ipp_fields & (IPPF_IPV4_OPTIONS|IPPF_RTHDR))) {
+		*nexthop = *dst;
+		return;
+	}
 	if (ixa->ixa_flags & IXAF_IS_IPV4) {
 		ipaddr_t v4dst;
 		ipaddr_t v4nexthop;
@@ -2908,6 +2912,7 @@ conn_inherit_parent(conn_t *lconnp, conn_t *econnp)
 	 * SO_SNDBUF:	conn_sndbuf is set.
 	 */
 
+	/* Could we define a struct and use a struct copy for this? */
 	econnp->conn_sndbuf = lconnp->conn_sndbuf;
 	econnp->conn_rcvbuf = lconnp->conn_rcvbuf;
 	econnp->conn_sndlowat = lconnp->conn_sndlowat;

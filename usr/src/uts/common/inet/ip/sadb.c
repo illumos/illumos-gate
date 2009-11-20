@@ -5122,7 +5122,7 @@ sadb_acquire(mblk_t *datamp, ip_xmit_attr_t *ixa, boolean_t need_ah,
 	 * Construct an extended ACQUIRE.  There are logging
 	 * opportunities here in failure cases.
 	 */
-	(void) memset(&sel, 0, sizeof (sel));
+	bzero(&sel, sizeof (sel));
 	sel.ips_isv4 = (ixa->ixa_flags & IXAF_IS_IPV4) != 0;
 	if (tunnel_mode) {
 		sel.ips_protocol = (ixa->ixa_ipsec_inaf == AF_INET) ?

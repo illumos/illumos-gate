@@ -2095,15 +2095,6 @@ ip_set_destination_v6(in6_addr_t *src_addrp, const in6_addr_t *dst_addr,
 	}
 
 	/*
-	 * We use use ire_nexthop_ill to avoid the under ipmp
-	 * interface for source address selection. Note that for ipmp
-	 * probe packets, ixa_ifindex would have been specified, and
-	 * the ip_select_route() invocation would have picked an ire
-	 * will ire_ill pointing at an under interface.
-	 */
-	ill = ire_nexthop_ill(ire);
-
-	/*
 	 * If the source address is a loopback address, the
 	 * destination had best be local or multicast.
 	 * If we are sending to an IRE_LOCAL using a loopback source then
@@ -2127,6 +2118,15 @@ ip_set_destination_v6(in6_addr_t *src_addrp, const in6_addr_t *dst_addr,
 	 */
 	if (flags & IPDF_SELECT_SRC) {
 		in6_addr_t	src_addr;
+
+		/*
+		 * We use use ire_nexthop_ill to avoid the under ipmp
+		 * interface for source address selection. Note that for ipmp
+		 * probe packets, ixa_ifindex would have been specified, and
+		 * the ip_select_route() invocation would have picked an ire
+		 * will ire_ill pointing at an under interface.
+		 */
+		ill = ire_nexthop_ill(ire);
 
 		/* If unreachable we have no ill but need some source */
 		if (ill == NULL) {

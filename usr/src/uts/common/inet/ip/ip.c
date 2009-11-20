@@ -3655,15 +3655,6 @@ ip_set_destination_v4(ipaddr_t *src_addrp, ipaddr_t dst_addr, ipaddr_t firsthop,
 	}
 
 	/*
-	 * We use use ire_nexthop_ill to avoid the under ipmp
-	 * interface for source address selection. Note that for ipmp
-	 * probe packets, ixa_ifindex would have been specified, and
-	 * the ip_select_route() invocation would have picked an ire
-	 * will ire_ill pointing at an under interface.
-	 */
-	ill = ire_nexthop_ill(ire);
-
-	/*
 	 * If the source address is a loopback address, the
 	 * destination had best be local or multicast.
 	 * If we are sending to an IRE_LOCAL using a loopback source then
@@ -3698,6 +3689,15 @@ ip_set_destination_v4(ipaddr_t *src_addrp, ipaddr_t dst_addr, ipaddr_t firsthop,
 	 */
 	if (flags & IPDF_SELECT_SRC) {
 		ipaddr_t	src_addr;
+
+		/*
+		 * We use use ire_nexthop_ill to avoid the under ipmp
+		 * interface for source address selection. Note that for ipmp
+		 * probe packets, ixa_ifindex would have been specified, and
+		 * the ip_select_route() invocation would have picked an ire
+		 * will ire_ill pointing at an under interface.
+		 */
+		ill = ire_nexthop_ill(ire);
 
 		/* If unreachable we have no ill but need some source */
 		if (ill == NULL) {
@@ -15043,6 +15043,10 @@ ip_pkt_copy(ip_pkt_t *src, ip_pkt_t *dst, int kmflag)
 	dst->ipp_hoplimit = src->ipp_hoplimit;
 	dst->ipp_tclass = src->ipp_tclass;
 	dst->ipp_type_of_service = src->ipp_type_of_service;
+
+	if (!(fields & (IPPF_HOPOPTS | IPPF_RTHDRDSTOPTS | IPPF_DSTOPTS |
+	    IPPF_RTHDR | IPPF_IPV4_OPTIONS | IPPF_LABEL_V4 | IPPF_LABEL_V6)))
+		return (0);
 
 	if (fields & IPPF_HOPOPTS) {
 		dst->ipp_hopopts = kmem_alloc(src->ipp_hopoptslen, kmflag);

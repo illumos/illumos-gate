@@ -861,12 +861,9 @@ boolean_t
 ire_walk_ill_match(uint_t match_flags, uint_t ire_type, ire_t *ire,
     ill_t *ill, zoneid_t zoneid, ip_stack_t *ipst)
 {
-	ill_t *dst_ill = NULL;
+	ill_t *dst_ill = ire->ire_ill;
 
 	ASSERT(match_flags != 0 || zoneid != ALL_ZONES);
-	if (match_flags & MATCH_IRE_ILL) {
-		dst_ill = ire->ire_ill;
-	}
 
 	if (zoneid != ALL_ZONES && zoneid != ire->ire_zoneid &&
 	    ire->ire_zoneid != ALL_ZONES) {
@@ -880,8 +877,6 @@ ire_walk_ill_match(uint_t match_flags, uint_t ire_type, ire_t *ire,
 		 * Note that ealier we only did the IRE_OFFLINK check for
 		 * IRE_DEFAULT (and only when we had multiple IRE_DEFAULTs).
 		 */
-		dst_ill = ire->ire_ill;
-
 		if (ire->ire_type & IRE_ONLINK) {
 			uint_t	ifindex;
 
@@ -903,7 +898,6 @@ ire_walk_ill_match(uint_t match_flags, uint_t ire_type, ire_t *ire,
 				return (B_FALSE);
 			}
 		}
-
 		if (dst_ill != NULL && (ire->ire_type & IRE_OFFLINK)) {
 			ipif_t	*tipif;
 
@@ -921,31 +915,27 @@ ire_walk_ill_match(uint_t match_flags, uint_t ire_type, ire_t *ire,
 				return (B_FALSE);
 			}
 		}
+	}
+	/*
+	 * Except for ALL_ZONES, we only match the offlink routes
+	 * where ire_gateway_addr has an IRE_INTERFACE for the zoneid.
+	 */
+	if ((ire->ire_type & IRE_OFFLINK) && zoneid != ALL_ZONES) {
+		in6_addr_t gw_addr_v6;
 
-		/*
-		 * Match all offlink routes from the global zone, irrespective
-		 * of reachability. For a non-global zone only match those
-		 * where ire_gateway_addr has an IRE_INTERFACE for the zoneid.
-		 */
-		if ((ire->ire_type & IRE_OFFLINK) && zoneid != GLOBAL_ZONEID &&
-		    zoneid != ALL_ZONES) {
-			in6_addr_t gw_addr_v6;
+		if (ire->ire_ipversion == IPV4_VERSION) {
+			if (!ire_gateway_ok_zone_v4(ire->ire_gateway_addr,
+			    zoneid, dst_ill, NULL, ipst, B_FALSE))
+				return (B_FALSE);
+		} else {
+			ASSERT(ire->ire_ipversion == IPV6_VERSION);
+			mutex_enter(&ire->ire_lock);
+			gw_addr_v6 = ire->ire_gateway_addr_v6;
+			mutex_exit(&ire->ire_lock);
 
-			if (ire->ire_ipversion == IPV4_VERSION) {
-				if (!ire_gateway_ok_zone_v4(
-				    ire->ire_gateway_addr, zoneid,
-				    dst_ill, NULL, ipst, B_FALSE))
-					return (B_FALSE);
-			} else {
-				ASSERT(ire->ire_ipversion == IPV6_VERSION);
-				mutex_enter(&ire->ire_lock);
-				gw_addr_v6 = ire->ire_gateway_addr_v6;
-				mutex_exit(&ire->ire_lock);
-
-				if (!ire_gateway_ok_zone_v6(&gw_addr_v6, zoneid,
-				    dst_ill, NULL, ipst, B_FALSE))
-					return (B_FALSE);
-			}
+			if (!ire_gateway_ok_zone_v6(&gw_addr_v6, zoneid,
+			    dst_ill, NULL, ipst, B_FALSE))
+				return (B_FALSE);
 		}
 	}
 
@@ -1035,7 +1025,7 @@ ire_walk_ill_tables(uint_t match_flags, uint_t ire_type, pfv_t func,
 			}
 		}
 	} else {
-		(void) memset(&rtfarg, 0, sizeof (rtfarg));
+		bzero(&rtfarg, sizeof (rtfarg));
 		rtfarg.rt_func = func;
 		rtfarg.rt_arg = arg;
 		if (match_flags != 0) {
@@ -2061,6 +2051,9 @@ ire_find_zoneid(struct radix_node *rn, void *arg)
 		if (IRE_IS_CONDEMNED(ire))
 			continue;
 
+		if (!(ire->ire_type & IRE_INTERFACE))
+			continue;
+
 		if (ire->ire_zoneid != ALL_ZONES &&
 		    ire->ire_zoneid != margs->ift_zoneid)
 			continue;
@@ -2098,6 +2091,7 @@ ire_gateway_ok_zone_v4(ipaddr_t gateway, zoneid_t zoneid, ill_t *ill,
 	else
 		RADIX_NODE_HEAD_RLOCK(ipst->ips_ip_ftable);
 
+	bzero(&rdst, sizeof (rdst));
 	rdst.rt_sin_len = sizeof (rdst);
 	rdst.rt_sin_family = AF_INET;
 	rdst.rt_sin_addr.s_addr = gateway;
@@ -2106,7 +2100,7 @@ ire_gateway_ok_zone_v4(ipaddr_t gateway, zoneid_t zoneid, ill_t *ill,
 	 * We only use margs for ill, zoneid, and tsl matching in
 	 * ire_find_zoneid
 	 */
-	(void) memset(&margs, 0, sizeof (margs));
+	bzero(&margs, sizeof (margs));
 	margs.ift_ill = ill;
 	margs.ift_zoneid = zoneid;
 	margs.ift_tsl = tsl;

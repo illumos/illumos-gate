@@ -942,7 +942,7 @@ ire_ftable_lookup_v6(const in6_addr_t *addr, const in6_addr_t *mask,
 			ire_t	*next_ire;
 			ire_ftable_args_t margs;
 
-			(void) memset(&margs, 0, sizeof (margs));
+			bzero(&margs, sizeof (margs));
 			margs.ift_addr_v6 = *addr;
 			if (mask != NULL)
 				margs.ift_mask_v6 = *mask;
@@ -1196,8 +1196,8 @@ ire_route_recursive_impl_v6(ire_t *ire,
 
 		ASSERT(!(ire->ire_type & IRE_MULTICAST)); /* Not in ftable */
 
-		prefs[i] = ire_pref(ire);
 		if (i != 0) {
+			prefs[i] = ire_pref(ire);
 			/*
 			 * Don't allow anything unusual past the first
 			 * iteration.
@@ -1254,7 +1254,6 @@ ire_route_recursive_impl_v6(ire_t *ire,
 			ire = NULL;
 			goto done;
 		}
-
 		ASSERT(!(ire->ire_type & IRE_IF_CLONE));
 		/*
 		 * For an IRE_INTERFACE we create an IRE_IF_CLONE for this
@@ -1326,7 +1325,12 @@ ire_route_recursive_impl_v6(ire_t *ire,
 			ill_refhold(ill);
 			match_args |= MATCH_IRE_ILL;
 		}
-
+		/*
+		 * We set the prefs[i] value above if i > 0. We've already
+		 * done i++ so i is one in the case of the first time around.
+		 */
+		if (i == 1)
+			prefs[0] = ire_pref(ire);
 		ire = NULL;
 	}
 	ASSERT(ire == NULL);
@@ -1365,7 +1369,7 @@ done:
 		ill_refrele(ill);
 
 	/* Build dependencies */
-	if (!ire_dep_build(ires, generations, i)) {
+	if (i > 1 && !ire_dep_build(ires, generations, i)) {
 		/* Something in chain was condemned; tear it apart */
 		ire = ire_blackhole(ipst, B_TRUE);
 		goto cleanup;
@@ -1395,7 +1399,10 @@ done:
 		 * ip_select_route to be called again so we can redo the
 		 * recursive lookup next time we send a packet.
 		 */
-		generation = ire_dep_validate_generations(ires[0]);
+		if (ires[0]->ire_dep_parent == NULL)
+			generation = ires[0]->ire_generation;
+		else
+			generation = ire_dep_validate_generations(ires[0]);
 		if (generations[0] != ires[0]->ire_generation) {
 			/* Something changed at the top */
 			generation = IRE_GENERATION_VERIFY;

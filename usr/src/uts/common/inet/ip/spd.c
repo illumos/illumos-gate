@@ -3578,7 +3578,7 @@ ipsec_policy_delete_index(ipsec_policy_head_t *php, uint64_t policy_index,
 	ipsec_policy_t *ip;
 	avl_index_t where;
 
-	(void) memset(&ipkey, 0, sizeof (ipkey));
+	bzero(&ipkey, sizeof (ipkey));
 	ipkey.ipsp_index = policy_index;
 
 	rw_enter(&php->iph_lock, RW_WRITER);

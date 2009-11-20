@@ -107,17 +107,17 @@ ire_ftable_lookup_v4(ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 	if ((flags & MATCH_IRE_ILL) && (ill == NULL))
 		return (NULL);
 
-	(void) memset(&rdst, 0, sizeof (rdst));
+	bzero(&rdst, sizeof (rdst));
 	rdst.rt_sin_len = sizeof (rdst);
 	rdst.rt_sin_family = AF_INET;
 	rdst.rt_sin_addr.s_addr = addr;
 
-	(void) memset(&rmask, 0, sizeof (rmask));
+	bzero(&rmask, sizeof (rmask));
 	rmask.rt_sin_len = sizeof (rmask);
 	rmask.rt_sin_family = AF_INET;
 	rmask.rt_sin_addr.s_addr = mask;
 
-	(void) memset(&margs, 0, sizeof (margs));
+	bzero(&margs, sizeof (margs));
 	margs.ift_addr = addr;
 	margs.ift_mask = mask;
 	margs.ift_gateway = gateway;
@@ -279,7 +279,7 @@ ire_ftable_lookup_simple_v4(ipaddr_t addr, uint32_t xmit_hint, ip_stack_t *ipst,
 			ire_t	*next_ire;
 			ire_ftable_args_t margs;
 
-			(void) memset(&margs, 0, sizeof (margs));
+			bzero(&margs, sizeof (margs));
 			margs.ift_addr = addr;
 			margs.ift_zoneid = ALL_ZONES;
 
@@ -379,9 +379,11 @@ ire_delete_host_redirects(ipaddr_t gateway, ip_stack_t *ipst)
 {
 	struct rtfuncarg rtfarg;
 
-	(void) memset(&rtfarg, 0, sizeof (rtfarg));
+	bzero(&rtfarg, sizeof (rtfarg));
 	rtfarg.rt_func = ire_del_host_redir;
 	rtfarg.rt_arg = (void *)&gateway;
+	rtfarg.rt_zoneid = ALL_ZONES;
+	rtfarg.rt_ipst = ipst;
 	(void) ipst->ips_ip_ftable->rnh_walktree_mt(ipst->ips_ip_ftable,
 	    rtfunc, &rtfarg, irb_refhold_rn, irb_refrele_rn);
 }
@@ -409,12 +411,12 @@ ire_get_bucket(ire_t *ire)
 	ASSERT(ipst->ips_ip_ftable != NULL);
 
 	/* first try to see if route exists (based on rtalloc1) */
-	(void) memset(&rdst, 0, sizeof (rdst));
+	bzero(&rdst, sizeof (rdst));
 	rdst.rt_sin_len = sizeof (rdst);
 	rdst.rt_sin_family = AF_INET;
 	rdst.rt_sin_addr.s_addr = ire->ire_addr;
 
-	(void) memset(&rmask, 0, sizeof (rmask));
+	bzero(&rmask, sizeof (rmask));
 	rmask.rt_sin_len = sizeof (rmask);
 	rmask.rt_sin_family = AF_INET;
 	rmask.rt_sin_addr.s_addr = ire->ire_mask;
@@ -427,7 +429,7 @@ ire_get_bucket(ire_t *ire)
 	if (rt == NULL)
 		return (NULL);
 
-	(void) memset(rt, 0, sizeof (*rt));
+	bzero(rt, sizeof (*rt));
 	rt->rt_nodes->rn_key = (char *)&rt->rt_dst;
 	rt->rt_dst = rdst;
 	irb = &rt->rt_irb;
@@ -789,7 +791,7 @@ irb_refrele_ftable(irb_t *irb)
  * For CGTP, where an IRE_BROADCAST and IRE_HOST can exist for the same
  * address and bucket, we compare against ire_type for the orig_ire. We also
  * have IRE_BROADCASTs with and without RTF_MULTIRT, with the former being
- * first in the bucket. Thus we compare that ire_flags match the orig_ire.
+ * first in the bucket. Thus we compare that RTF_MULTIRT match the orig_ire.
  *
  * Due to shared-IP zones we check that an IRE_OFFLINK has a gateway that is
  * reachable from the zone i.e., that the ire_gateway_addr is in a subnet
@@ -837,7 +839,7 @@ ire_round_robin(irb_t *irb_ptr, ire_ftable_args_t *margs, uint_t hash,
 
 		/* See CGTP comment above */
 		if (ire->ire_type != orig_ire->ire_type ||
-		    ire->ire_flags != orig_ire->ire_flags)
+		    ((ire->ire_flags ^ orig_ire->ire_flags) & RTF_MULTIRT) != 0)
 			goto next_ire;
 
 		/*
@@ -1268,8 +1270,8 @@ ire_route_recursive_impl_v4(ire_t *ire,
 
 		ASSERT(!(ire->ire_type & IRE_MULTICAST)); /* Not in ftable */
 
-		prefs[i] = ire_pref(ire);
 		if (i != 0) {
+			prefs[i] = ire_pref(ire);
 			/*
 			 * Don't allow anything unusual past the first
 			 * iteration.
@@ -1399,6 +1401,12 @@ ire_route_recursive_impl_v4(ire_t *ire,
 			ill_refhold(ill);
 			match_args |= MATCH_IRE_ILL;
 		}
+		/*
+		 * We set the prefs[i] value above if i > 0. We've already
+		 * done i++ so i is one in the case of the first time around.
+		 */
+		if (i == 1)
+			prefs[0] = ire_pref(ire);
 		ire = NULL;
 	}
 	ASSERT(ire == NULL);
@@ -1439,7 +1447,7 @@ done:
 	}
 
 	/* Build dependencies */
-	if (!ire_dep_build(ires, generations, i)) {
+	if (i > 1 && !ire_dep_build(ires, generations, i)) {
 		/* Something in chain was condemned; tear it apart */
 		ire = ire_reject(ipst, B_FALSE);
 		goto cleanup;
@@ -1469,7 +1477,10 @@ done:
 		 * ip_select_route to be called again so we can redo the
 		 * recursive lookup next time we send a packet.
 		 */
-		generation = ire_dep_validate_generations(ires[0]);
+		if (ires[0]->ire_dep_parent == NULL)
+			generation = ires[0]->ire_generation;
+		else
+			generation = ire_dep_validate_generations(ires[0]);
 		if (generations[0] != ires[0]->ire_generation) {
 			/* Something changed at the top */
 			generation = IRE_GENERATION_VERIFY;
