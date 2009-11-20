@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -37,8 +37,6 @@
  * Well, at least the API doesn't involve pointers-to-static.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * netname utility routines convert from netnames to unix names (uid, gid)
  *
@@ -52,6 +50,8 @@
 #include "rpc_mt.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <alloca.h>
 #include <sys/types.h>
 #include <ctype.h>
 #include <grp.h>
@@ -71,10 +71,6 @@ static const char    NETID[]	= "netid.byname";
 static const char    PKTABLE[]  = "cred.org_dir";
 #define	PKTABLE_LEN 12
 #define	OPSYS_LEN 4
-
-#ifndef NGROUPS
-#define	NGROUPS 16
-#endif
 
 extern int _getgroupsbymember(const char *, gid_t[], int, int);
 
@@ -505,7 +501,8 @@ netname2user_ldap(int *err, char *netname, struct netid_userdata *argp)
 	int ngroups = 0;
 	int count;
 	char pwbuf[NSS_LINELEN_PASSWD];
-	gid_t groups[NGROUPS_MAX];
+	int maxgrp = sysconf(_SC_NGROUPS_MAX);
+	gid_t *groups = alloca(maxgrp * sizeof (gid_t));
 
 	if (strlcpy(buf, netname, NSS_LINELEN_PASSWD) >= NSS_LINELEN_PASSWD) {
 		*err = __NSW_UNAVAIL;
@@ -539,7 +536,7 @@ netname2user_ldap(int *err, char *netname, struct netid_userdata *argp)
 
 	groups[0] = pw.pw_gid;
 
-	ngroups = _getgroupsbymember(pw.pw_name, groups, NGROUPS_MAX,
+	ngroups = _getgroupsbymember(pw.pw_name, groups, maxgrp,
 				(pw.pw_gid <= MAXUID) ? 1 : 0);
 
 	if (ngroups < 0) {

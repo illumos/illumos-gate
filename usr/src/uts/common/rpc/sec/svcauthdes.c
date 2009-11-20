@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,8 +30,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * svcauth_des.c, server-side des authentication
@@ -416,7 +414,7 @@ struct bsdcred {
 	gid_t gid;		/* cached gid */
 	short valid;		/* valid creds */
 	short grouplen;	/* length of cached groups */
-	gid_t groups[NGROUPS_UMAX];	/* cached groups */
+	gid_t groups[1];	/* cached groups - allocate ngroups_max */
 };
 
 /*
@@ -508,8 +506,8 @@ authdes_cache_new(char *fullname, des_block *sessionkey, uint32_t window) {
 		return (NULL);
 	}
 
-	if (!(ucred = (struct bsdcred *)kmem_alloc(sizeof (struct bsdcred),
-			KM_NOSLEEP))) {
+	if (!(ucred = kmem_alloc(sizeof (struct bsdcred) +
+	    (ngroups_max - 1) * sizeof (gid_t), KM_NOSLEEP))) {
 		kmem_free(new->rname, strlen(fullname) + 1);
 		kmem_cache_free(authdes_cache_handle, new);
 		return (NULL);
@@ -619,7 +617,8 @@ authdes_cache_reclaim(void *pdata) {
 		lru_last = p->lru_prev;
 
 		kmem_free(p->rname, strlen(p->rname) + 1);
-		kmem_free(p->localcred, sizeof (struct bsdcred));
+		kmem_free(p->localcred, sizeof (struct bsdcred) +
+		    (ngroups_max - 1) * sizeof (gid_t));
 		mutex_destroy(&p->lock);
 		kmem_cache_free(authdes_cache_handle, p);
 
@@ -667,7 +666,8 @@ sweep_cache() {
 		lru_last = p->lru_prev;
 
 		kmem_free(p->rname, strlen(p->rname) + 1);
-		kmem_free(p->localcred, sizeof (struct bsdcred));
+		kmem_free(p->localcred, sizeof (struct bsdcred) +
+		    (ngroups_max - 1) * sizeof (gid_t));
 		mutex_destroy(&p->lock);
 		kmem_cache_free(authdes_cache_handle, p);
 

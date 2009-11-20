@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -31,8 +30,6 @@
  * 4.3 BSD under license from the Regents of the University of
  * California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * auth_sys.c, Implements UNIX (system) style authentication parameters.
@@ -45,6 +42,7 @@
  */
 #include "mt.h"
 #include "rpc_mt.h"
+#include <alloca.h>
 #include <stdio.h>
 #include <syslog.h>
 #include <stdlib.h>
@@ -100,13 +98,13 @@ authsys_create(const char *machname, const uid_t uid, const gid_t gid,
 	auth = malloc(sizeof (*auth));
 	if (auth == NULL) {
 		(void) syslog(LOG_ERR, auth_sys_str, authsys_create_str,
-			__no_mem_auth);
+		    __no_mem_auth);
 		return (NULL);
 	}
 	au = malloc(sizeof (*au));
 	if (au == NULL) {
 		(void) syslog(LOG_ERR, auth_sys_str, authsys_create_str,
-			__no_mem_auth);
+		    __no_mem_auth);
 		free(auth);
 		return (NULL);
 	}
@@ -132,21 +130,21 @@ authsys_create(const char *machname, const uid_t uid, const gid_t gid,
 	xdrmem_create(&xdrs, mymem, MAX_AUTH_BYTES, XDR_ENCODE);
 	if (!xdr_authsys_parms(&xdrs, &aup)) {
 		(void) syslog(LOG_ERR, auth_sys_str, authsys_create_str,
-			":  xdr_authsys_parms failed");
+		    ":  xdr_authsys_parms failed");
 		return (NULL);
 	}
 	au->au_origcred.oa_length = XDR_GETPOS(&xdrs);
 	au->au_origcred.oa_flavor = AUTH_SYS;
 	if ((au->au_origcred.oa_base = malloc(au->au_origcred.oa_length)) ==
-									NULL) {
+	    NULL) {
 		(void) syslog(LOG_ERR, auth_sys_str, authsys_create_str,
-			__no_mem_auth);
+		    __no_mem_auth);
 		free(au);
 		free(auth);
 		return (NULL);
 	}
 	(void) memcpy(au->au_origcred.oa_base, mymem,
-					(size_t)au->au_origcred.oa_length);
+	    (size_t)au->au_origcred.oa_length);
 
 	/*
 	 * set auth handle to reflect new cred.
@@ -173,7 +171,8 @@ authsys_create_default(void)
 	char machname[MAX_MACHINE_NAME + 1];
 	uid_t uid;
 	gid_t gid;
-	gid_t gids[NGRPS];
+	int maxgrp = getgroups(0, NULL);
+	gid_t *gids = alloca(maxgrp * sizeof (gid_t));
 
 	if (gethostname(machname, MAX_MACHINE_NAME) == -1) {
 		(void) syslog(LOG_ERR, authsys_def_str, "hostname");
@@ -182,10 +181,12 @@ authsys_create_default(void)
 	machname[MAX_MACHINE_NAME] = 0;
 	uid = geteuid();
 	gid = getegid();
-	if ((len = getgroups(NGRPS, gids)) < 0) {
+	if ((len = getgroups(maxgrp, gids)) < 0) {
 		(void) syslog(LOG_ERR, authsys_def_str, "groups");
 		return (NULL);
 	}
+	if (len > NGRPS)
+		len = NGRPS;
 	return (authsys_create(machname, uid, gid, len, gids));
 }
 
@@ -205,22 +206,25 @@ authsys_create_ruid(void)
 	char machname[MAX_MACHINE_NAME + 1];
 	uid_t uid;
 	gid_t gid;
-	gid_t gids[NGRPS];
+	int maxgrp = getgroups(0, NULL);
+	gid_t *gids = alloca(maxgrp * sizeof (gid_t));
 	AUTH *res;
 
 	if (gethostname(machname, MAX_MACHINE_NAME) == -1) {
 		(void) syslog(LOG_ERR,
-			"authsys_create_ruid:gethostname failed");
+		    "authsys_create_ruid:gethostname failed");
 		return (NULL);
 	}
 	machname[MAX_MACHINE_NAME] = 0;
 	uid = getuid();
 	gid = getgid();
-	if ((len = getgroups(NGRPS, gids)) < 0) {
+	if ((len = getgroups(maxgrp, gids)) < 0) {
 		(void) syslog(LOG_ERR,
-			"authsys_create_ruid:getgroups failed");
+		    "authsys_create_ruid:getgroups failed");
 		return (NULL);
 	}
+	if (len > NGRPS)
+		len = NGRPS;
 	res = authsys_create(machname, uid, gid, len, gids);
 	return (res);
 }
@@ -255,7 +259,7 @@ authsys_validate(AUTH *auth, struct opaque_auth *verf)
 /* LINTED pointer alignment */
 		au = AUTH_PRIVATE(auth);
 		xdrmem_create(&xdrs, verf->oa_base,
-			verf->oa_length, XDR_DECODE);
+		    verf->oa_length, XDR_DECODE);
 
 		if (au->au_shcred.oa_base != NULL) {
 			free(au->au_shcred.oa_base);

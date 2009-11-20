@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +36,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <limits.h>
 #include <stdio.h>
@@ -62,6 +60,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <grp.h>
+#include <alloca.h>
 #include <arpa/inet.h>
 
 #include <priv_utils.h>
@@ -565,7 +564,8 @@ ruserok(const char *rhost, int superuser, const char *ruser, const char *luser)
 	char pbuf[MAXPATHLEN];
 	uid_t uid = (uid_t)-1;
 	gid_t gid = (gid_t)-1;
-	gid_t grouplist[NGROUPS_MAX];
+	int maxgrp = getgroups(0, NULL);
+	gid_t *grouplist = alloca(maxgrp * sizeof (gid_t));
 	int ngroups;
 
 	sp = rhost;
@@ -605,7 +605,7 @@ ruserok(const char *rhost, int superuser, const char *ruser, const char *luser)
 	 */
 	gid = getegid();
 	uid = geteuid();
-	if ((ngroups = getgroups(NGROUPS_MAX, grouplist)) == -1)
+	if ((ngroups = getgroups(maxgrp, grouplist)) == -1)
 		return (-1);
 
 	(void) setegid(pwd->pw_gid);

@@ -73,7 +73,7 @@
 #include <sys/zfs_rlock.h>
 #include <sys/extdirent.h>
 #include <sys/kidmap.h>
-#include <sys/cred_impl.h>
+#include <sys/cred.h>
 #include <sys/attr.h>
 
 /*

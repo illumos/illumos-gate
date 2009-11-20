@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,20 +27,19 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	<sys/types.h>
 #include	<stdio.h>
+#include	<stdlib.h>
 #include	<sys/param.h>
+#include	<unistd.h>
 #include	<users.h>
 #include	<userdefs.h>
 #include	"messages.h"
 
-extern int get_ngm();
 extern void exit();
 extern char *strtok();
 
-static gid_t grplist[ NGROUPS_UMAX + 1 ];
+static gid_t *grplist;
 static int ngroups_max = 0;
 
 /* Validate a list of groups */
@@ -56,6 +54,11 @@ valid_lgroup(char *list, gid_t gid)
 
 	if( !list || !*list )
 		return( (int **) NULL );
+
+	if (ngroups_max == 0) {
+		ngroups_max = sysconf(_SC_NGROUPS_MAX);
+		grplist = malloc((ngroups_max + 1) * sizeof (gid_t));
+	}
 
 	while (ptr = strtok(((i || n_invalid || dup_prim)? NULL: list), ",")) {
 
@@ -97,10 +100,6 @@ valid_lgroup(char *list, gid_t gid)
 		}
 		if (warning)
 			warningmsg(warning, ptr);
-
-		if( !ngroups_max )
-			ngroups_max = get_ngm();
-
 
 		if( i >= ngroups_max ) {
 			errmsg( M_MAXGROUPS, ngroups_max );

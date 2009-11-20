@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_LXPROC_H
 #define	_LXPROC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -52,7 +50,8 @@ extern "C" {
 #include <sys/user.h>
 #include <sys/t_lock.h>
 #include <sys/sysmacros.h>
-#include <sys/cred_impl.h>
+#include <sys/cred.h>
+#include <sys/priv.h>
 #include <sys/vnode.h>
 #include <sys/vfs.h>
 #include <sys/statvfs.h>

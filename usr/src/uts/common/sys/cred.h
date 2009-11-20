@@ -56,6 +56,7 @@ struct prcred;
 struct ksid;
 struct ksidlist;
 struct credklpd;
+struct credgrp;
 
 struct auditinfo_addr;			/* cred.h is included in audit.h */
 
@@ -103,6 +104,7 @@ extern struct auditinfo_addr *crgetauinfo_modifiable(cred_t *);
 extern uint_t crgetref(const cred_t *);
 
 extern const gid_t *crgetgroups(const cred_t *);
+extern const gid_t *crgetggroups(const struct credgrp *);
 
 extern int crgetngroups(const cred_t *);
 
@@ -119,7 +121,13 @@ extern int crsetresgid(cred_t *, gid_t, gid_t, gid_t);
  */
 extern int crsetugid(cred_t *, uid_t, gid_t);
 
+/*
+ * Functions to handle the supplemental group list.
+ */
 extern int crsetgroups(cred_t *, int, gid_t *);
+extern struct credgrp *crgrpcopyin(int, gid_t *);
+extern void crgrprele(struct credgrp *);
+extern void crsetcredgrp(cred_t *, struct credgrp *);
 
 /*
  * Private interface for setting zone association of credential.

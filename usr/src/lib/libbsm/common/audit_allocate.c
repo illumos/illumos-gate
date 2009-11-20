@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <tsol/label.h>
@@ -35,6 +33,7 @@
 #include <bsm/audit_uevents.h>
 #include <generic.h>
 #include <stdlib.h>
+#include <alloca.h>
 
 static int s_audit;	/* successful audit event */
 static int f_audit;	/* failure audit event */
@@ -92,7 +91,6 @@ audit_allocate_record(status)
 	au_event_t	event;		/* audit event number */
 	int		policy;		/* audit policy */
 	int		ng;		/* number of groups in process */
-	gid_t		grplst[NGROUPS_UMAX];
 
 #ifdef DEBUG
 	printf(("audit_allocate_record(%d)\n", status));
@@ -130,8 +128,12 @@ audit_allocate_record(status)
 		(void) au_write(ad, au_to_mylabel());
 
 	if (policy & AUDIT_GROUP) {	/* add optional group token */
-		(void) memset(grplst, 0, sizeof (grplst));
-		if ((ng = getgroups(NGROUPS_UMAX, grplst)) < 0) {
+		gid_t	*grplst;
+		int	maxgrp = getgroups(0, NULL);
+
+		grplst = alloca(maxgrp * sizeof (gid_t));
+
+		if ((ng = getgroups(maxgrp, grplst)) < 0) {
 			(void) au_close(ad, 0, 0);
 			if (!status)
 				return (1);

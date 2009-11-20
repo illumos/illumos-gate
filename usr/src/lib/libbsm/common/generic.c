@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,7 @@
 #include <sys/types.h>
 #include <string.h>
 #include <unistd.h>
+#include <alloca.h>
 #include <stdlib.h>
 #include <tsol/label.h>
 #include <bsm/audit.h>
@@ -174,14 +175,14 @@ aug_get_machine(const char *hostname, uint32_t *buf, uint32_t *type)
 	case AF_INET:
 		/* LINTED */
 		p = &((struct sockaddr_in *)ai->ai_addr)->sin_addr,
-		(void) memcpy(buf, p,
+		    (void) memcpy(buf, p,
 		    sizeof (((struct sockaddr_in *)0)->sin_addr));
 		*type = AU_IPv4;
 		break;
 	case AF_INET6:
 		/* LINTED */
 		p = &((struct sockaddr_in6 *)ai->ai_addr)->sin6_addr,
-		(void) memcpy(buf, p,
+		    (void) memcpy(buf, p,
 		    sizeof (((struct sockaddr_in6 *)0)->sin6_addr));
 		*type = AU_IPv6;
 		break;
@@ -280,8 +281,8 @@ aug_save_me(void)
 	aug_save_pid(getpid());
 	aug_save_asid(ai.ai_asid);
 	aug_save_tid_ex(ai.ai_termid.at_port,
-		ai.ai_termid.at_addr,
-		ai.ai_termid.at_type);
+	    ai.ai_termid.at_addr,
+	    ai.ai_termid.at_type);
 	return (0);
 }
 
@@ -414,15 +415,15 @@ aug_audit(void)
 	}
 
 	(void) au_write(ad, au_to_subject_ex(aug_auid, aug_euid, aug_egid,
-		aug_uid, aug_gid, aug_pid, aug_asid, &aug_tid));
+	    aug_uid, aug_gid, aug_pid, aug_asid, &aug_tid));
 	if (is_system_labeled())
 		(void) au_write(ad, au_to_mylabel());
 	if (aug_policy & AUDIT_GROUP) {
 		int ng;
-		gid_t grplst[NGROUPS_UMAX];
+		int maxgrp = getgroups(0, NULL);
+		gid_t *grplst = alloca(maxgrp * sizeof (gid_t));
 
-		(void) memset(grplst, 0, sizeof (grplst));
-		if ((ng = getgroups(NGROUPS_UMAX, grplst))) {
+		if ((ng = getgroups(maxgrp, grplst)) > 0) {
 			(void) au_write(ad, au_to_newgroups(ng, grplst));
 		}
 	}

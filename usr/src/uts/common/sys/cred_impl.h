@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_CRED_IMPL_H
 #define	_SYS_CRED_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/cred.h>
@@ -74,15 +72,13 @@ struct cred {
 	gid_t		cr_rgid;	/* real group id */
 	uid_t		cr_suid;	/* "saved" user id (from exec) */
 	gid_t		cr_sgid;	/* "saved" group id (from exec) */
-	uint_t		cr_ngroups;	/* number of groups returned by */
-					/* crgroups() */
 	cred_priv_t	cr_priv;	/* privileges */
 	projid_t	cr_projid;	/* project */
 	struct zone	*cr_zone;	/* pointer to per-zone structure */
 	struct ts_label_s *cr_label;	/* pointer to the effective label */
 	struct credklpd *cr_klpd;	/* pointer to the cred's klpd */
 	credsid_t	*cr_ksid;	/* pointer to SIDs */
-	gid_t		cr_groups[1];	/* cr_groups size not fixed */
+	struct credgrp	*cr_grps;	/* supplemental groups */
 					/* audit info is defined dynamically */
 					/* and valid only when audit enabled */
 	/* auditinfo_addr_t	cr_auinfo;	audit info */

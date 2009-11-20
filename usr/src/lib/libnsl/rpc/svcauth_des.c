@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -31,8 +30,6 @@
  * 4.3 BSD under license from the Regents of the University of
  * California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * svcauth_des.c, server-side des authentication
@@ -54,6 +51,7 @@
 #include <rpc/des_crypt.h>
 #include <rpc/rpc.h>
 #include <sys/types.h>
+#include <sys/param.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
@@ -62,10 +60,6 @@
 #include <syslog.h>
 
 extern int key_decryptsession_pk(const char *, netobj *, des_block *);
-
-#ifndef NGROUPS
-#define	NGROUPS 16
-#endif
 
 #define	USEC_PER_SEC	((ulong_t)1000000L)
 #define	BEFORE(t1, t2) timercmp(t1, t2, < /* EMPTY */)
@@ -611,7 +605,7 @@ struct bsdcred {
 	uid_t uid;		/* cached uid */
 	gid_t gid;		/* cached gid */
 	short grouplen;	/* length of cached groups */
-	short groups[NGROUPS];	/* cached groups */
+	gid_t groups[1];	/* cached groups allocate _SC_NGROUPS_MAX */
 };
 
 static void
@@ -649,7 +643,13 @@ authdes_getucred(const struct authdes_cred *adc, uid_t *uid, gid_t *gid,
 	/* LINTED pointer cast */
 	cred = (struct bsdcred *)_rpc_authdes_cache[sid].localcred;
 	if (cred == NULL) {
-		cred = malloc(sizeof (struct bsdcred));
+		static size_t bsdcred_sz;
+
+		if (bsdcred_sz == 0) {
+			bsdcred_sz = sizeof (struct bsdcred) +
+			    (sysconf(_SC_NGROUPS_MAX) - 1) * sizeof (gid_t);
+		}
+		cred = malloc(bsdcred_sz);
 		if (cred == NULL) {
 			__msgout2(__getucredstr, "out of memory");
 			(void) mutex_unlock(&authdes_lock);
@@ -675,7 +675,7 @@ authdes_getucred(const struct authdes_cred *adc, uid_t *uid, gid_t *gid,
 		*gid = cred->gid = i_gid;
 		*grouplen = cred->grouplen = i_grouplen;
 		for (i = i_grouplen - 1; i >= 0; i--) {
-			cred->groups[i] = groups[i];	/* int to short */
+			cred->groups[i] = groups[i];
 		}
 		(void) mutex_unlock(&authdes_lock);
 		return (1);
@@ -695,7 +695,7 @@ authdes_getucred(const struct authdes_cred *adc, uid_t *uid, gid_t *gid,
 	*gid = cred->gid;
 	*grouplen = cred->grouplen;
 	for (i = cred->grouplen - 1; i >= 0; i--) {
-		groups[i] = cred->groups[i];	/* short to int */
+		groups[i] = cred->groups[i];
 	}
 	(void) mutex_unlock(&authdes_lock);
 	return (1);

@@ -60,7 +60,7 @@
 #include <sys/disp.h>		/* for servicing_interrupt() */
 #include <sys/devpolicy.h>
 #include <sys/crypto/ioctladmin.h>
-#include <sys/cred_impl.h>
+#include <sys/cred.h>
 #include <inet/kssl/kssl.h>
 #include <net/pfpolicy.h>
 
@@ -2405,8 +2405,8 @@ audit_pf_policy(int cmd, cred_t *cred, netstack_t *ns, char *tun,
 		nszone = zone_find_by_id(netstackid_to_zoneid(
 		    ns->netstack_stackid));
 		if (nszone != NULL) {
-			if (strncmp(cred->cr_zone->zone_name, nszone->zone_name,
-			    ZONENAME_MAX) != 0) {
+			if (strncmp(crgetzone(cred)->zone_name,
+			    nszone->zone_name, ZONENAME_MAX) != 0) {
 				token_t *ztoken;
 
 				ztoken = au_to_zonename(0, nszone);

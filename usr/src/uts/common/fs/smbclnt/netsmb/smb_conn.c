@@ -50,7 +50,6 @@
 #include <sys/stropts.h>
 #include <sys/socketvar.h>
 #include <sys/cred.h>
-#include <sys/cred_impl.h>
 #include <netinet/in.h>
 #include <inet/ip.h>
 #include <inet/ip6.h>

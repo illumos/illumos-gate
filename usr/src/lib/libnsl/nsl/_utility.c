@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,11 +23,9 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mt.h"
 #include <stdlib.h>
@@ -48,6 +45,7 @@
 #include <assert.h>
 #include <syslog.h>
 #include <limits.h>
+#include <ucred.h>
 #include "tx.h"
 
 #define	DEFSIZE 2048
@@ -61,7 +59,7 @@
 static struct _ti_user	*find_tilink(int s);
 static struct _ti_user	*add_tilink(int s);
 static void _t_free_lookbufs(struct _ti_user *tiptr);
-static unsigned int _t_setsize(t_scalar_t infosize);
+static unsigned int _t_setsize(t_scalar_t infosize, boolean_t option);
 static int _t_cbuf_alloc(struct _ti_user *tiptr, char **retbuf);
 static int _t_rbuf_alloc(struct _ti_user *tiptr, char **retbuf);
 static int _t_adjust_state(int fd, int instate);
@@ -510,8 +508,8 @@ _t_alloc_bufs(int fd, struct _ti_user *tiptr, struct T_info_ack *tsap)
 	char *ctlbuf, *rcvbuf;
 	char *lookdbuf, *lookcbuf;
 
-	csize = _t_setsize(tsap->CDATA_size);
-	dsize = _t_setsize(tsap->DDATA_size);
+	csize = _t_setsize(tsap->CDATA_size, B_FALSE);
+	dsize = _t_setsize(tsap->DDATA_size, B_FALSE);
 
 	size1 = _T_MAX(csize, dsize);
 
@@ -527,13 +525,13 @@ _t_alloc_bufs(int fd, struct _ti_user *tiptr, struct T_info_ack *tsap)
 		lookdbuf = NULL;
 	}
 
-	asize = _t_setsize(tsap->ADDR_size);
+	asize = _t_setsize(tsap->ADDR_size, B_FALSE);
 	if (tsap->OPT_size >= 0)
 		/* compensate for XTI level options */
 		optsize = tsap->OPT_size + TX_XTI_LEVEL_MAX_OPTBUF;
 	else
 		optsize = tsap->OPT_size;
-	osize = _t_setsize(optsize);
+	osize = _t_setsize(optsize, B_TRUE);
 
 	/*
 	 * We compute the largest buffer size needed for this provider by
@@ -593,10 +591,22 @@ _t_alloc_bufs(int fd, struct _ti_user *tiptr, struct T_info_ack *tsap)
  * set sizes of buffers
  */
 static unsigned int
-_t_setsize(t_scalar_t infosize)
+_t_setsize(t_scalar_t infosize, boolean_t option)
 {
+	static size_t optinfsize;
+
 	switch (infosize) {
 	case T_INFINITE /* -1 */:
+		if (option) {
+			if (optinfsize == 0) {
+				size_t uc = ucred_size();
+				if (uc < DEFSIZE/2)
+					optinfsize = DEFSIZE;
+				else
+					optinfsize = ucred_size() + DEFSIZE/2;
+			}
+			return ((unsigned int)optinfsize);
+		}
 		return (DEFSIZE);
 	case T_INVALID /* -2 */:
 		return (0);

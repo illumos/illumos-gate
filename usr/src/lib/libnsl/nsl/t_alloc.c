@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,11 +23,9 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.4.1.2 */
 
 #include "mt.h"
 #include <stdlib.h>
@@ -41,6 +38,7 @@
 #include <xti.h>
 #include <stdio.h>
 #include <errno.h>
+#include <ucred.h>
 #include <signal.h>
 #include "tx.h"
 
@@ -48,7 +46,7 @@
  * Function protoypes
  */
 static int _alloc_buf(struct netbuf *buf, t_scalar_t n, int fields,
-    int api_semantics);
+    int api_semantics, boolean_t option);
 
 char *
 _tx_alloc(int fd, int struct_type, int fields, int api_semantics)
@@ -115,7 +113,7 @@ _tx_alloc(int fd, int struct_type, int fields, int api_semantics)
 		if (fields & T_ADDR) {
 			if (_alloc_buf(&p.bind->addr,
 			    info.ADDR_size,
-			    fields, api_semantics) < 0)
+			    fields, api_semantics, B_FALSE) < 0)
 				goto errout;
 		}
 		sig_mutex_unlock(&tiptr->ti_lock);
@@ -127,7 +125,7 @@ _tx_alloc(int fd, int struct_type, int fields, int api_semantics)
 		if (fields & T_ADDR) {
 			if (_alloc_buf(&p.call->addr,
 			    info.ADDR_size,
-			    fields, api_semantics) < 0)
+			    fields, api_semantics, B_FALSE) < 0)
 				goto errout;
 		}
 		if (fields & T_OPT) {
@@ -138,14 +136,14 @@ _tx_alloc(int fd, int struct_type, int fields, int api_semantics)
 			else
 				optsize = info.OPT_size;
 			if (_alloc_buf(&p.call->opt, optsize,
-			    fields, api_semantics) < 0)
+			    fields, api_semantics, B_TRUE) < 0)
 				goto errout;
 		}
 		if (fields & T_UDATA) {
 			dsize = _T_MAX((int)info.CDATA_size,
-					(int)info.DDATA_size);
+			    (int)info.DDATA_size);
 			if (_alloc_buf(&p.call->udata, (t_scalar_t)dsize,
-					fields, api_semantics) < 0)
+			    fields, api_semantics, B_FALSE) < 0)
 				goto errout;
 		}
 		sig_mutex_unlock(&tiptr->ti_lock);
@@ -162,7 +160,7 @@ _tx_alloc(int fd, int struct_type, int fields, int api_semantics)
 			else
 				optsize = info.OPT_size;
 			if (_alloc_buf(&p.opt->opt, optsize,
-				fields, api_semantics) < 0)
+			    fields, api_semantics, B_TRUE) < 0)
 				goto errout;
 		}
 		sig_mutex_unlock(&tiptr->ti_lock);
@@ -173,7 +171,7 @@ _tx_alloc(int fd, int struct_type, int fields, int api_semantics)
 			goto errout;
 		if (fields & T_UDATA) {
 			if (_alloc_buf(&p.dis->udata, info.DDATA_size,
-				fields, api_semantics) < 0)
+			    fields, api_semantics, B_FALSE) < 0)
 				goto errout;
 		}
 		sig_mutex_unlock(&tiptr->ti_lock);
@@ -184,7 +182,7 @@ _tx_alloc(int fd, int struct_type, int fields, int api_semantics)
 			goto errout;
 		if (fields & T_ADDR) {
 			if (_alloc_buf(&p.udata->addr, info.ADDR_size,
-				fields, api_semantics) < 0)
+			    fields, api_semantics, B_FALSE) < 0)
 				goto errout;
 		}
 		if (fields & T_OPT) {
@@ -195,12 +193,12 @@ _tx_alloc(int fd, int struct_type, int fields, int api_semantics)
 			else
 				optsize = info.OPT_size;
 			if (_alloc_buf(&p.udata->opt, optsize,
-				fields, api_semantics) < 0)
+			    fields, api_semantics, B_TRUE) < 0)
 				goto errout;
 		}
 		if (fields & T_UDATA) {
 			if (_alloc_buf(&p.udata->udata, info.TSDU_size,
-				fields, api_semantics) < 0)
+			    fields, api_semantics, B_FALSE) < 0)
 				goto errout;
 		}
 		sig_mutex_unlock(&tiptr->ti_lock);
@@ -211,7 +209,7 @@ _tx_alloc(int fd, int struct_type, int fields, int api_semantics)
 			goto errout;
 		if (fields & T_ADDR) {
 			if (_alloc_buf(&p.uderr->addr, info.ADDR_size,
-				fields, api_semantics) < 0)
+			    fields, api_semantics, B_FALSE) < 0)
 				goto errout;
 		}
 		if (fields & T_OPT) {
@@ -222,7 +220,7 @@ _tx_alloc(int fd, int struct_type, int fields, int api_semantics)
 			else
 				optsize = info.OPT_size;
 			if (_alloc_buf(&p.uderr->opt, optsize,
-				fields, api_semantics) < 0)
+			    fields, api_semantics, B_FALSE) < 0)
 				goto errout;
 		}
 		sig_mutex_unlock(&tiptr->ti_lock);
@@ -262,7 +260,8 @@ errout:
 }
 
 static int
-_alloc_buf(struct netbuf *buf, t_scalar_t n, int fields, int api_semantics)
+_alloc_buf(struct netbuf *buf, t_scalar_t n, int fields, int api_semantics,
+    boolean_t option)
 {
 	switch (n) {
 	case T_INFINITE /* -1 */:
@@ -277,6 +276,25 @@ _alloc_buf(struct netbuf *buf, t_scalar_t n, int fields, int api_semantics)
 				errno = EINVAL;
 				return (-1);
 			}
+		} else if (option) { /* TX_TLI_API */
+			static size_t infalloc;
+
+			/*
+			 * retain TLI behavior; ucred_t can vary in size,
+			 * we need to make sure that we can receive one.
+			 */
+			if (infalloc == 0) {
+				size_t uc = ucred_size();
+				if (uc < 1024/2)
+					infalloc = 1024;
+				else
+					infalloc = uc + 1024/2;
+			}
+			if ((buf->buf = calloc(1, infalloc)) == NULL) {
+				errno = ENOMEM;
+				return (-1);
+			} else
+				buf->maxlen = infalloc;
 		} else {	/* TX_TLI_API */
 			/*
 			 * retain TLI behavior

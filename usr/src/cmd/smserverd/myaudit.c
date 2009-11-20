@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <alloca.h>
 #include <sys/smedia.h>
 #include <tsol/label.h>
 #include "smserver.h"
@@ -129,7 +130,7 @@ audit_save_me(door_data_t	*door_dp)
 		return (ret_val);
 	door_dp->audit_ap.ap_pid = client_cred.dc_pid;
 	ret_val = auditon(A_GETPINFO_ADDR, (caddr_t)&door_dp->audit_ap,
-		sizeof (door_dp->audit_ap));
+	    sizeof (door_dp->audit_ap));
 	if (ret_val == -1)
 		return (ret_val);
 
@@ -144,7 +145,7 @@ audit_save_me(door_data_t	*door_dp)
 	door_dp->audit_tid.at_type = door_dp->audit_ap.ap_termid.at_type;
 	for (i = 0; i < (door_dp->audit_ap.ap_termid.at_type/4); i++)
 		door_dp->audit_tid.at_addr[i] =
-			door_dp->audit_ap.ap_termid.at_addr[i];
+		    door_dp->audit_ap.ap_termid.at_addr[i];
 	(void) audit_save_policy(door_dp);
 	return (0);
 }
@@ -205,19 +206,19 @@ audit_audit(door_data_t *door_dp)
 	}
 
 	(void) au_write(ad, au_to_subject_ex(door_dp->audit_auid,
-		door_dp->audit_euid,
-		door_dp->audit_egid,
-		door_dp->audit_uid, door_dp->audit_gid, door_dp->audit_pid,
-		door_dp->audit_asid, &door_dp->audit_tid));
+	    door_dp->audit_euid,
+	    door_dp->audit_egid,
+	    door_dp->audit_uid, door_dp->audit_gid, door_dp->audit_pid,
+	    door_dp->audit_asid, &door_dp->audit_tid));
 	if (is_system_labeled())
 		(void) au_write(ad, au_to_mylabel());
 	if (door_dp->audit_policy & AUDIT_GROUP) {
 
 		int ng;
-		gid_t grplst[NGROUPS_MAX];
+		int maxgrp = getgroups(0, NULL);
+		gid_t *grplst = alloca(maxgrp * sizeof (gid_t));
 
-		(void) memset(grplst, 0, sizeof (grplst));
-		if ((ng = getgroups(NGROUPS_UMAX, grplst))) {
+		if ((ng = getgroups(maxgrp, grplst))) {
 			(void) au_write(ad, au_to_newgroups(ng, grplst));
 		}
 	}
@@ -232,10 +233,10 @@ audit_audit(door_data_t *door_dp)
 	}
 #ifdef _LP64
 	(void) au_write(ad, au_to_return64((door_dp->audit_sorf == 0) ? 0 : -1,
-		(int64_t)door_dp->audit_sorf));
+	    (int64_t)door_dp->audit_sorf));
 #else
 	(void) au_write(ad, au_to_return32((door_dp->audit_sorf == 0) ? 0 : -1,
-		(int32_t)door_dp->audit_sorf));
+	    (int32_t)door_dp->audit_sorf));
 #endif
 	if (au_close(ad, 1, door_dp->audit_event) < 0) {
 		(void) au_close(ad, 0, 0);
@@ -253,7 +254,7 @@ audit_na_selected(door_data_t *door_dp)
 	}
 
 	return (selected(door_dp->audit_event,
-		&door_dp->audit_namask, door_dp->audit_sorf));
+	    &door_dp->audit_namask, door_dp->audit_sorf));
 }
 
 static int
@@ -266,7 +267,7 @@ audit_selected(door_data_t *door_dp)
 	}
 
 	return (selected(door_dp->audit_event,
-		&door_dp->audit_ap.ap_mask, door_dp->audit_sorf));
+	    &door_dp->audit_ap.ap_mask, door_dp->audit_sorf));
 }
 
 static int

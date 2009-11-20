@@ -48,6 +48,7 @@
 #include <syslog.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ucred.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -121,6 +122,7 @@ svc_dg_create_private(int fd, uint_t sendsize, uint_t recvsize)
 	SVCXPRT *xprt;
 	struct svc_dg_data *su = NULL;
 	struct t_info tinfo;
+	size_t ucred_sz = ucred_size();
 
 	if (RPC_FD_NOTIN_FDSET(fd)) {
 		errno = EBADF;
@@ -148,7 +150,7 @@ svc_dg_create_private(int fd, uint_t sendsize, uint_t recvsize)
 /* LINTED pointer alignment */
 	svc_flags(xprt) |= SVC_DGRAM;
 
-	su = malloc(sizeof (*su));
+	su = malloc(sizeof (*su) + ucred_sz);
 	if (su == NULL)
 		goto freedata;
 	su->su_iosz = ((MAX(sendsize, recvsize) + 3) / 4) * 4;
@@ -167,7 +169,7 @@ svc_dg_create_private(int fd, uint_t sendsize, uint_t recvsize)
 	su->su_tudata.udata.buf = (char *)rpc_buffer(xprt);
 	su->su_tudata.opt.buf = (char *)su->opts;
 	su->su_tudata.udata.maxlen = su->su_iosz;
-	su->su_tudata.opt.maxlen = MAX_OPT_WORDS << 2;  /* no of bytes */
+	su->su_tudata.opt.maxlen = MAX_OPT_WORDS * sizeof (int) + ucred_sz;
 /* LINTED pointer alignment */
 	SVC_XP_AUTH(xprt).svc_ah_ops = svc_auth_any_ops;
 /* LINTED pointer alignment */
@@ -195,6 +197,7 @@ svc_dg_xprtcopy(SVCXPRT *parent)
 {
 	SVCXPRT			*xprt;
 	struct svc_dg_data	*su;
+	size_t			ucred_sz = ucred_size();
 
 	if ((xprt = svc_xprt_alloc()) == NULL)
 		return (NULL);
@@ -237,7 +240,7 @@ svc_dg_xprtcopy(SVCXPRT *parent)
 	    xprt->xp_rtaddr.maxlen);
 	xprt->xp_type = parent->xp_type;
 
-	if ((su = malloc(sizeof (struct svc_dg_data))) == NULL) {
+	if ((su = malloc(sizeof (struct svc_dg_data) + ucred_sz)) == NULL) {
 		svc_dg_xprtfree(xprt);
 		return (NULL);
 	}
@@ -255,7 +258,7 @@ svc_dg_xprtcopy(SVCXPRT *parent)
 	su->su_tudata.udata.buf = (char *)rpc_buffer(xprt);
 	su->su_tudata.opt.buf = (char *)su->opts;
 	su->su_tudata.udata.maxlen = su->su_iosz;
-	su->su_tudata.opt.maxlen = MAX_OPT_WORDS << 2;  /* no of bytes */
+	su->su_tudata.opt.maxlen = MAX_OPT_WORDS * sizeof (int) + ucred_sz;
 	xprt->xp_p2 = (caddr_t)su;	/* get_svc_dg_data(xprt) = su */
 	xprt->xp_verf.oa_base = su->su_verfbody;
 

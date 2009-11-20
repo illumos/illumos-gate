@@ -22,7 +22,6 @@ static const char rcsid[] = "@(#)$Id: ip_fil_solaris.c,v 2.62.2.19 2005/07/13 21
 #include <sys/systm.h>
 #include <sys/strsubr.h>
 #include <sys/cred.h>
-#include <sys/cred_impl.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/ksynch.h>
@@ -554,7 +553,7 @@ int *rp;
 		return EBUSY;
 	}
 
-	error = fr_ioctlswitch(unit, (caddr_t)data, cmd, mode, cp->cr_uid,
+	error = fr_ioctlswitch(unit, (caddr_t)data, cmd, mode, crgetuid(cp),
 			       curproc, ifs);
 	if (error != -1) {
 		RWLOCK_EXIT(&ifs->ifs_ipf_global);
@@ -759,12 +758,12 @@ int *rp;
 #endif
 		break;
 	case SIOCIPFITER :
-		error = ipf_frruleiter((caddr_t)data, cp->cr_uid,
+		error = ipf_frruleiter((caddr_t)data, crgetuid(cp),
 				       curproc, ifs);
 		break;
 
 	case SIOCGENITER :
-		error = ipf_genericiter((caddr_t)data, cp->cr_uid,
+		error = ipf_genericiter((caddr_t)data, crgetuid(cp),
 					curproc, ifs);
 		break;
 
@@ -773,7 +772,7 @@ int *rp;
 		if (error != 0) {
 			error = EFAULT;
 		} else {
-			error = ipf_deltoken(tmp, cp->cr_uid, curproc, ifs);
+			error = ipf_deltoken(tmp, crgetuid(cp), curproc, ifs);
 		}
 		break;
 

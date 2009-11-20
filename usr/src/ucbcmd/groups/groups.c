@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -13,14 +13,13 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * groups
  */
 
 #include <sys/types.h>
 #include <sys/param.h>
+#include <alloca.h>
 #include <grp.h>
 #include <pwd.h>
 #include <stdio.h>
@@ -36,7 +35,10 @@ main(int argc, char *argv[])
 	int ngroups, i;
 	char *sep = "";
 	struct group *gr;
-	gid_t groups[NGROUPS_UMAX];
+	gid_t *groups;
+	int maxgrp = sysconf(_SC_NGROUPS_MAX);
+
+	groups = alloca(maxgrp * sizeof (gid_t));
 
 	if (argc > 1) {
 		for (i = 1; i < argc; i++)
@@ -44,7 +46,7 @@ main(int argc, char *argv[])
 		exit(0);
 	}
 
-	ngroups = getgroups(NGROUPS_UMAX, groups);
+	ngroups = getgroups(maxgrp, groups);
 	if (getpwuid(getuid()) == NULL) {
 		(void) fprintf(stderr, "groups: could not find passwd entry\n");
 		exit(1);
@@ -86,9 +88,9 @@ showgroups(char *user)
 			 * To avoid duplicate group entries
 			 */
 			if (pwgid_printed == 0) {
-			    (void) printf("%s%s", sep, gr->gr_name);
-			    sep = " ";
-			    pwgid_printed = 1;
+				(void) printf("%s%s", sep, gr->gr_name);
+				sep = " ";
+				pwgid_printed = 1;
 			}
 			continue;
 		}

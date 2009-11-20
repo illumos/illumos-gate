@@ -26,7 +26,7 @@
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/systm.h>
-#include <sys/cred_impl.h>
+#include <sys/cred.h>
 #include <sys/proc.h>
 #include <sys/user.h>
 #include <sys/time.h>

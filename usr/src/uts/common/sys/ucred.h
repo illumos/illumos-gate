@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * File with private definitions for the ucred structure for use by the
@@ -28,8 +28,6 @@
 
 #ifndef	_SYS_UCRED_H
 #define	_SYS_UCRED_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/procfs.h>
@@ -88,8 +86,6 @@ struct ucred_s {
 #define	UCLABEL(uc)	(bslabel_t *)(((uc)->uc_labeloff == 0) ? NULL : \
 				((char *)(uc)) + (uc)->uc_labeloff)
 
-#define	UCRED_CRED_OFF	(sizeof (struct ucred_s))
-
 #endif /* _KERNEL || _STRUCTURED_PROC != 0 */
 
 /*
@@ -100,13 +96,19 @@ struct ucred_s {
 
 #ifdef _KERNEL
 
-extern uint32_t ucredsize;
+extern uint32_t ucredminsize(const cred_t *);
 
-#define	UCRED_PRIV_OFF	(UCRED_CRED_OFF + sizeof (prcred_t) + \
-			    (ngroups_max - 1) * sizeof (gid_t))
+#define	UCRED_PRIV_OFF	(sizeof (struct ucred_s))
 #define	UCRED_AUD_OFF	(UCRED_PRIV_OFF + priv_prgetprivsize(NULL))
 #define	UCRED_LABEL_OFF	(UCRED_AUD_OFF + get_audit_ucrsize())
-#define	UCRED_SIZE	(UCRED_LABEL_OFF + sizeof (bslabel_t))
+
+/* The prcred_t has a variable size; it should be last. */
+#define	UCRED_CRED_OFF	(UCRED_LABEL_OFF + \
+			    (is_system_labeled() ? sizeof (bslabel_t) : 0))
+
+#define	UCRED_SIZE	(UCRED_CRED_OFF + sizeof (prcred_t) + \
+			    (ngroups_max - 1) * sizeof (gid_t))
+
 
 struct proc;
 

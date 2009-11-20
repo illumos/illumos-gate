@@ -1,3 +1,7 @@
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 /*    doio.c
  *
  *    Copyright (C) 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
@@ -32,6 +36,10 @@
     extern Shmat_t shmat (int, char *, int);
 # endif
 #endif
+#endif
+
+#if defined(HAS_GETGROUPS) && defined(__sun)
+#include <alloca.h>
 #endif
 
 #ifdef I_UTIME
@@ -1877,13 +1885,21 @@ Perl_ingroup(pTHX_ Gid_t testgid, Uid_t effective)
 	return TRUE;
 #ifdef HAS_GETGROUPS
 #ifndef NGROUPS
-#define NGROUPS 32
+#define	NGROUPS 32
 #endif
     {
-	Groups_t gary[NGROUPS];
 	I32 anum;
+#ifdef __sun
+	int maxgrp = getgroups(0, NULL);
+	Groups_t *gary = alloca(maxgrp * sizeof (Groups_t));
+
+	anum = getgroups(maxgrp,gary);
+#else
+	Groups_t gary[NGROUPS];
 
 	anum = getgroups(NGROUPS,gary);
+#endif
+
 	while (--anum >= 0)
 	    if (gary[anum] == testgid)
 		return TRUE;

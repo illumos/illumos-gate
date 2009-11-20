@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* sysconf(3C) - returns system configuration information */
 
@@ -57,6 +55,7 @@ sysconf(int name)
 	static int _hz = 0;
 	static pid_t _maxpid = 0;
 	static int _stackprot = 0;
+	static int _ngroups_max;
 	extern int __xpg4;
 
 	switch (name) {
@@ -82,7 +81,9 @@ sysconf(int name)
 			return (_sysconfig(_CONFIG_CHILD_MAX));
 
 		case _SC_NGROUPS_MAX:
-			return (_sysconfig(_CONFIG_NGROUPS));
+			if (_ngroups_max <= 0)
+				_ngroups_max = _sysconfig(_CONFIG_NGROUPS);
+			return (_ngroups_max);
 
 		case _SC_OPEN_MAX:
 			return (_sysconfig(_CONFIG_OPEN_FILES));

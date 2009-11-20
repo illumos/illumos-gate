@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,6 +37,7 @@
 #include <libintl.h>
 #endif
 #include <pwd.h>
+#include <alloca.h>
 
 #include <ns.h>
 #include <list.h>
@@ -54,8 +53,9 @@ authorized()
 {
 	struct passwd *pw;
 	uid_t uid;
-	gid_t list[NGROUPS_MAX];
+	gid_t *list;
 	int len;
+	int maxgrp;
 
 	if ((uid = getuid()) == 0)
 		return (1);	/* "root" is authorized */
@@ -69,8 +69,12 @@ authorized()
 	if (chkauthattr("solaris.print.admin", pw->pw_name) == 1)
 		return (1);	/* "solaris.print.admin" is authorized */
 
-	if ((len = getgroups(sizeof (list), list)) != -1)
-		for (; len >= 0; len--)
+	/* How many supplemental groups do we have? */
+	maxgrp = getgroups(0, NULL);
+	list = alloca(maxgrp * sizeof (gid_t));
+
+	if ((len = getgroups(maxgrp, list)) != -1)
+		while (len-- > 0)
 			if (list[len] == 14)
 				return (1);	/* group 14 is authorized */
 

@@ -51,7 +51,6 @@
 #include <sys/errno.h>
 #include <sys/stat.h>
 #include <sys/cred.h>
-#include <sys/cred_impl.h>
 #include <sys/dirent.h>
 #include <sys/pathname.h>
 #include <sys/cmn_err.h>

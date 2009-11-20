@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,8 +34,6 @@
  */
 
 %{
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "config.h"
 #include <sys/param.h>
 #include <sys/types.h>
@@ -60,6 +58,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+#include <alloca.h>
 #include "extensions.h"
 #include "pathnames.h"
 #include "proto.h"
@@ -2495,10 +2494,15 @@ void cdpath(void)
 
 void print_groups(void)
 {
-    gid_t groups[NGROUPS_MAX];
-    int ngroups = 0;
+    gid_t *groups;
+    int ngroups;
+    int maxgrp;
 
-    if ((ngroups = getgroups(NGROUPS_MAX, groups)) < 0) {
+    maxgrp = getgroups(0, NULL);
+
+    groups = alloca(maxgrp * sizeof (gid_t));
+
+    if ((ngroups = getgroups(maxgrp, groups)) < 0) {
 	return;
     }
 

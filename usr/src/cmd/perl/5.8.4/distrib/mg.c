@@ -1,3 +1,7 @@
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 /*    mg.c
  *
  *    Copyright (C) 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
@@ -28,6 +32,10 @@
 #  ifdef I_GRP
 #    include <grp.h>
 #  endif
+#ifdef __sun
+#include <alloca.h>
+#include <unistd.h>
+#endif
 #endif
 
 #ifdef __hpux
@@ -891,8 +899,14 @@ Perl_magic_get(pTHX_ SV *sv, MAGIC *mg)
       add_groups:
 #ifdef HAS_GETGROUPS
 	{
+#ifdef __sun
+	    int maxgrp = getgroups(0, NULL);
+	    Groups_t *gary = alloca(maxgrp * sizeof (Groups_t));
+	    i = getgroups(maxgrp,gary);
+#else
 	    Groups_t gary[NGROUPS];
 	    i = getgroups(NGROUPS,gary);
+#endif
 	    while (--i >= 0)
 		Perl_sv_catpvf(aTHX_ sv, " %"Gid_t_f, gary[i]);
 	}
@@ -2368,12 +2382,18 @@ Perl_magic_set(pTHX_ SV *sv, MAGIC *mg)
 #ifdef HAS_SETGROUPS
 	{
 	    char *p = SvPV(sv, len);
+#ifdef _SC_NGROUPS_MAX
+	    int maxgrp = sysconf(_SC_NGROUPS_MAX);
+	    Groups_t *gary = alloca(maxgrp * sizeof (Groups_t));
+#else
+	    int maxgrp = NGROUPS;
 	    Groups_t gary[NGROUPS];
+#endif
 
 	    while (isSPACE(*p))
 		++p;
 	    PL_egid = Atol(p);
-	    for (i = 0; i < NGROUPS; ++i) {
+	    for (i = 0; i < maxgrp; ++i) {
 		while (*p && !isSPACE(*p))
 		    ++p;
 		while (isSPACE(*p))

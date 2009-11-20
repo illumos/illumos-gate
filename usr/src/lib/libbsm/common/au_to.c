@@ -1090,7 +1090,7 @@ au_to_newgroups(int n, gid_t *groups)
 	char data_header = AUT_NEWGROUPS;	/* header for this token */
 	short n_groups;
 
-	if (n < NGROUPS_UMIN || n > NGROUPS_UMAX || groups == NULL)
+	if (n < 0 || n > SHRT_MAX || groups == NULL)
 		return (NULL);
 	token = get_token(sizeof (char) + sizeof (short) + n * sizeof (gid_t));
 	if (token == NULL)

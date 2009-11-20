@@ -36,7 +36,7 @@
 #include <sys/vfs.h>
 #include <sys/session.h>	/* for session structure (auditctl(2) */
 #include <sys/kmem.h>		/* for KM_SLEEP */
-#include <sys/cred_impl.h>
+#include <sys/cred.h>
 #include <sys/types.h>
 #include <sys/proc.h>
 #include <sys/uio.h>

@@ -1779,7 +1779,7 @@ udp_do_opt_set(conn_opt_arg_t *coa, int level, int name,
 				break;
 
 			ucr = (struct ucred_s *)invalp;
-			if (inlen != ucredsize ||
+			if (inlen < sizeof (*ucr) + sizeof (bslabel_t) ||
 			    ucr->uc_labeloff < sizeof (*ucr) ||
 			    ucr->uc_labeloff + sizeof (bslabel_t) > inlen)
 				return (EINVAL);

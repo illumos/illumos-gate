@@ -713,8 +713,17 @@ param_check(void)
 		physmem = original_physmem;
 	}
 #endif
-	if (ngroups_max < NGROUPS_UMIN || ngroups_max > NGROUPS_UMAX)
-		ngroups_max = NGROUPS_MAX_DEFAULT;
+	if (ngroups_max < NGROUPS_UMIN)
+		ngroups_max = NGROUPS_UMIN;
+	if (ngroups_max > NGROUPS_UMAX)
+		ngroups_max = NGROUPS_UMAX;
+
+	/* If we have many groups then the ucred proto message also grows. */
+	if (ngroups_max > NGROUPS_OLDMAX &&
+	    strctlsz < (ngroups_max - NGROUPS_OLDMAX) * sizeof (gid_t) + 1024) {
+		strctlsz = (ngroups_max - NGROUPS_OLDMAX) * sizeof (gid_t) +
+		    1024;
+	}
 
 	if (autoup <= 0) {
 		autoup = DEFAULT_AUTOUP;

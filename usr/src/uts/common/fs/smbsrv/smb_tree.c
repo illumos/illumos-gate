@@ -169,7 +169,7 @@
 #include <sys/vfs.h>
 #include <sys/stat.h>
 #include <sys/varargs.h>
-#include <sys/cred_impl.h>
+#include <sys/cred.h>
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/lmerr.h>
 #include <smbsrv/smb_fsops.h>
@@ -1268,7 +1268,7 @@ smb_tree_set_execsub_info(smb_tree_t *tree, smb_execsub_info_t *subs)
 		subs->e_srv_ipaddr = tree->t_session->local_ipaddr;
 		subs->e_cli_ipaddr = tree->t_session->ipaddr;
 		subs->e_cli_netbiosname = tree->t_session->workstation;
-		subs->e_uid = tree->t_user->u_cred->cr_uid;
+		subs->e_uid = crgetuid(tree->t_user->u_cred);
 }
 
 /*

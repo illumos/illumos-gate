@@ -84,7 +84,14 @@ opdes_t	udp_opt_arr[] = {
     0 },
 { SO_MAC_IMPLICIT, SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int),
     0 },
-{ SCM_UCRED, SOL_SOCKET, OA_W, OA_W, OP_NP, OP_VARLEN|OP_NODEFAULT, 512, 0 },
+/*
+ * The maximum size reported here depends on the maximum value for
+ * ucredsize; unfortunately, we can't add ucredsize here so we need
+ * to estimate here.  Before it was 512 or 384 + NGROUPS_UMAX * sizeof (gid_t);
+ * as we're changing NGROUPS_UMAX we now codify this here using NGROUPS_UMAX.
+ */
+{ SCM_UCRED, SOL_SOCKET, OA_W, OA_W, OP_NP, OP_VARLEN|OP_NODEFAULT,
+    384 + NGROUPS_UMAX * sizeof (gid_t), 0 },
 { SO_EXCLBIND, SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
 { SO_DOMAIN,	SOL_SOCKET, OA_R, OA_R, OP_NP, 0, sizeof (int), 0 },
 { SO_PROTOTYPE,	SOL_SOCKET, OA_R, OA_R, OP_NP, 0, sizeof (int), 0 },

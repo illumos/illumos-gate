@@ -46,7 +46,8 @@ static gid_t	saved_egid = 0;
 /* Saved effective uid. */
 static int	privileged = 0;
 static int	temporarily_use_uid_effective = 0;
-static gid_t	saved_egroups[NGROUPS_UMAX], user_groups[NGROUPS_UMAX];
+static int	ngroups_max = -1;
+static gid_t	*saved_egroups, *user_groups;
 static int	saved_egroupslen = -1, user_groupslen = -1;
 
 /*
@@ -76,7 +77,16 @@ temporarily_use_uid(struct passwd *pw)
 
 	privileged = 1;
 	temporarily_use_uid_effective = 1;
-	saved_egroupslen = getgroups(NGROUPS_UMAX, saved_egroups);
+
+	if (ngroups_max < 0) {
+		ngroups_max = sysconf(_SC_NGROUPS_MAX);
+		saved_egroups = malloc(ngroups_max * sizeof (gid_t));
+		user_groups = malloc(ngroups_max * sizeof (gid_t));
+		if (saved_egroups == NULL || user_groups == NULL)
+			fatal("malloc(gid array): %.100s", strerror(errno));
+	}
+
+	saved_egroupslen = getgroups(ngroups_max, saved_egroups);
 	if (saved_egroupslen < 0)
 		fatal("getgroups: %.100s", strerror(errno));
 
@@ -85,7 +95,7 @@ temporarily_use_uid(struct passwd *pw)
 		if (initgroups(pw->pw_name, pw->pw_gid) < 0)
 			fatal("initgroups: %s: %.100s", pw->pw_name,
 			    strerror(errno));
-		user_groupslen = getgroups(NGROUPS_UMAX, user_groups);
+		user_groupslen = getgroups(ngroups_max, user_groups);
 		if (user_groupslen < 0)
 			fatal("getgroups: %.100s", strerror(errno));
 	}

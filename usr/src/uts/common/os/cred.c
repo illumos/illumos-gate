@@ -62,6 +62,7 @@
 #include <sys/idmap.h>
 #include <sys/klpd.h>
 #include <sys/varargs.h>
+#include <util/qsort.h>
 
 
 /* Ephemeral IDs Zones specific data */
@@ -74,6 +75,16 @@ typedef struct ephemeral_zsd {
 	cred_t		*eph_nobody;
 } ephemeral_zsd_t;
 
+/* Supplemental groups list. */
+typedef struct credgrp {
+	uint_t		crg_ref;
+	uint_t		crg_ngroups;
+	gid_t		crg_groups[1];
+} credgrp_t;
+
+static void crgrphold(credgrp_t *);
+
+#define	CREDGRPSZ(ngrp)	(sizeof (credgrp_t) + ((ngrp - 1) * sizeof (gid_t)))
 
 static kmutex_t		ephemeral_zone_mutex;
 static zone_key_t	ephemeral_zone_key;
@@ -94,6 +105,7 @@ static int get_c2audit_load(void);
 
 #define	REMOTE_PEER_CRED(c)	((c)->cr_gid == -1)
 
+#define	BIN_GROUP_SEARCH_CUTOFF	16
 
 static boolean_t hasephids = B_FALSE;
 
@@ -160,11 +172,7 @@ cred_init(void)
 {
 	priv_init();
 
-	crsize = sizeof (cred_t) + sizeof (gid_t) * (ngroups_max - 1);
-	/*
-	 * Make sure it's word-aligned.
-	 */
-	crsize = (crsize + sizeof (int) - 1) & ~(sizeof (int) - 1);
+	crsize = sizeof (cred_t);
 
 	if (get_c2audit_load() > 0) {
 #ifdef _LP64
@@ -251,6 +259,7 @@ cralloc_flags(int flgs)
 	cr->cr_label = NULL;
 	cr->cr_ksid = NULL;
 	cr->cr_klpd = NULL;
+	cr->cr_grps = NULL;
 	return (cr);
 }
 
@@ -287,6 +296,7 @@ crget(void)
 	if (cr->cr_label)
 		label_hold(cr->cr_label);
 	ASSERT(cr->cr_klpd == NULL);
+	ASSERT(cr->cr_grps == NULL);
 	return (cr);
 }
 
@@ -357,6 +367,9 @@ crfree(cred_t *cr)
 			zone_cred_rele(cr->cr_zone);
 		if (cr->cr_ksid)
 			kcrsid_rele(cr->cr_ksid);
+		if (cr->cr_grps)
+			crgrprele(cr->cr_grps);
+
 		kmem_cache_free(cred_cache, cr);
 	}
 }
@@ -381,6 +394,8 @@ crcopy(cred_t *cr)
 		kcrsid_hold(newcr->cr_ksid);
 	if (newcr->cr_klpd)
 		crklpd_hold(newcr->cr_klpd);
+	if (newcr->cr_grps)
+		crgrphold(newcr->cr_grps);
 	crfree(cr);
 	newcr->cr_ref = 2;		/* caller gets two references */
 	return (newcr);
@@ -405,6 +420,8 @@ crcopy_to(cred_t *oldcr, cred_t *newcr)
 		label_hold(newcr->cr_label);
 	if (newcr->cr_klpd)
 		crklpd_hold(newcr->cr_klpd);
+	if (newcr->cr_grps)
+		crgrphold(newcr->cr_grps);
 	if (nkcr) {
 		newcr->cr_ksid = nkcr;
 		kcrsidcopy_to(oldcr->cr_ksid, newcr->cr_ksid);
@@ -437,6 +454,8 @@ crdup_flags(const cred_t *cr, int flgs)
 		crklpd_hold(newcr->cr_klpd);
 	if (newcr->cr_ksid)
 		kcrsid_hold(newcr->cr_ksid);
+	if (newcr->cr_grps)
+		crgrphold(newcr->cr_grps);
 	newcr->cr_ref = 1;
 	return (newcr);
 }
@@ -465,6 +484,8 @@ crdup_to(cred_t *oldcr, cred_t *newcr)
 		label_hold(newcr->cr_label);
 	if (newcr->cr_klpd)
 		crklpd_hold(newcr->cr_klpd);
+	if (newcr->cr_grps)
+		crgrphold(newcr->cr_grps);
 	if (nkcr) {
 		newcr->cr_ksid = nkcr;
 		kcrsidcopy_to(oldcr->cr_ksid, newcr->cr_ksid);
@@ -519,12 +540,38 @@ groupmember(gid_t gid, const cred_t *cr)
 int
 supgroupmember(gid_t gid, const cred_t *cr)
 {
+	int hi, lo;
+	credgrp_t *grps = cr->cr_grps;
 	const gid_t *gp, *endgp;
 
-	endgp = &cr->cr_groups[cr->cr_ngroups];
-	for (gp = cr->cr_groups; gp < endgp; gp++)
-		if (*gp == gid)
+	if (grps == NULL)
+		return (0);
+
+	/* For a small number of groups, use sequentials search. */
+	if (grps->crg_ngroups <= BIN_GROUP_SEARCH_CUTOFF) {
+		endgp = &grps->crg_groups[grps->crg_ngroups];
+		for (gp = grps->crg_groups; gp < endgp; gp++)
+			if (*gp == gid)
+				return (1);
+		return (0);
+	}
+
+	/* We use binary search when we have many groups. */
+	lo = 0;
+	hi = grps->crg_ngroups - 1;
+	gp = grps->crg_groups;
+
+	do {
+		int m = (lo + hi) / 2;
+
+		if (gid > gp[m])
+			lo = m + 1;
+		else if (gid < gp[m])
+			hi = m - 1;
+		else
 			return (1);
+	} while (lo <= hi);
+
 	return (0);
 }
 
@@ -603,6 +650,7 @@ prochasprocperm(proc_t *tp, proc_t *sp, const cred_t *scrp)
 int
 crcmp(const cred_t *cr1, const cred_t *cr2)
 {
+	credgrp_t *grp1, *grp2;
 
 	if (cr1 == cr2)
 		return (0);
@@ -611,10 +659,12 @@ crcmp(const cred_t *cr1, const cred_t *cr2)
 	    cr1->cr_gid == cr2->cr_gid &&
 	    cr1->cr_ruid == cr2->cr_ruid &&
 	    cr1->cr_rgid == cr2->cr_rgid &&
-	    cr1->cr_ngroups == cr2->cr_ngroups &&
 	    cr1->cr_zone == cr2->cr_zone &&
-	    bcmp(cr1->cr_groups, cr2->cr_groups,
-	    cr1->cr_ngroups * sizeof (gid_t)) == 0) {
+	    ((grp1 = cr1->cr_grps) == (grp2 = cr2->cr_grps) ||
+	    (grp1 != NULL && grp2 != NULL &&
+	    grp1->crg_ngroups == grp2->crg_ngroups &&
+	    bcmp(grp1->crg_groups, grp2->crg_groups,
+	    grp1->crg_ngroups * sizeof (gid_t)) == 0))) {
 		return (!priv_isequalset(&CR_OEPRIV(cr1), &CR_OEPRIV(cr2)));
 	}
 	return (1);
@@ -764,6 +814,20 @@ crsetugid(cred_t *cr, uid_t uid, gid_t gid)
 	return (0);
 }
 
+static int
+gidcmp(const void *v1, const void *v2)
+{
+	gid_t g1 = *(gid_t *)v1;
+	gid_t g2 = *(gid_t *)v2;
+
+	if (g1 < g2)
+		return (-1);
+	else if (g1 > g2)
+		return (1);
+	else
+		return (0);
+}
+
 int
 crsetgroups(cred_t *cr, int n, gid_t *grp)
 {
@@ -772,10 +836,18 @@ crsetgroups(cred_t *cr, int n, gid_t *grp)
 	if (n > ngroups_max || n < 0)
 		return (-1);
 
-	cr->cr_ngroups = n;
+	if (cr->cr_grps != NULL)
+		crgrprele(cr->cr_grps);
 
-	if (n > 0)
-		bcopy(grp, cr->cr_groups, n * sizeof (gid_t));
+	if (n > 0) {
+		cr->cr_grps = kmem_alloc(CREDGRPSZ(n), KM_SLEEP);
+		bcopy(grp, cr->cr_grps->crg_groups, n * sizeof (gid_t));
+		cr->cr_grps->crg_ref = 1;
+		cr->cr_grps->crg_ngroups = n;
+		qsort(cr->cr_grps->crg_groups, n, sizeof (gid_t), gidcmp);
+	} else {
+		cr->cr_grps = NULL;
+	}
 
 	return (0);
 }
@@ -788,19 +860,21 @@ crsetprojid(cred_t *cr, projid_t projid)
 }
 
 /*
- * This routine returns the pointer to the first element of the cr_groups
+ * This routine returns the pointer to the first element of the crg_groups
  * array.  It can move around in an implementation defined way.
+ * Note that when we have no grouplist, we return one element but the
+ * caller should never reference it.
  */
 const gid_t *
 crgetgroups(const cred_t *cr)
 {
-	return (cr->cr_groups);
+	return (cr->cr_grps == NULL ? &cr->cr_gid : cr->cr_grps->crg_groups);
 }
 
 int
 crgetngroups(const cred_t *cr)
 {
-	return (cr->cr_ngroups);
+	return (cr->cr_grps == NULL ? 0 : cr->cr_grps->crg_ngroups);
 }
 
 void
@@ -812,12 +886,12 @@ cred2prcred(const cred_t *cr, prcred_t *pcrp)
 	pcrp->pr_egid = cr->cr_gid;
 	pcrp->pr_rgid = cr->cr_rgid;
 	pcrp->pr_sgid = cr->cr_sgid;
-	pcrp->pr_ngroups = MIN(cr->cr_ngroups, (uint_t)ngroups_max);
-	pcrp->pr_groups[0] = 0;	/* in case ngroups == 0 */
+	pcrp->pr_groups[0] = 0; /* in case ngroups == 0 */
+	pcrp->pr_ngroups = cr->cr_grps == NULL ? 0 : cr->cr_grps->crg_ngroups;
 
 	if (pcrp->pr_ngroups != 0)
-		bcopy(cr->cr_groups, pcrp->pr_groups,
-		    sizeof (gid_t) * cr->cr_ngroups);
+		bcopy(cr->cr_grps->crg_groups, pcrp->pr_groups,
+		    sizeof (gid_t) * pcrp->pr_ngroups);
 }
 
 static int
@@ -867,46 +941,74 @@ struct ucred_s *
 cred2ucred(const cred_t *cr, pid_t pid, void *buf, const cred_t *rcr)
 {
 	struct ucred_s *uc;
+	uint32_t realsz = ucredminsize(cr);
+	ts_label_t *tslp = is_system_labeled() ? crgetlabel(cr) : NULL;
 
 	/* The structure isn't always completely filled in, so zero it */
 	if (buf == NULL) {
-		uc = kmem_zalloc(ucredsize, KM_SLEEP);
+		uc = kmem_zalloc(realsz, KM_SLEEP);
 	} else {
-		bzero(buf, ucredsize);
+		bzero(buf, realsz);
 		uc = buf;
 	}
-	uc->uc_size = ucredsize;
-	uc->uc_credoff = UCRED_CRED_OFF;
-	uc->uc_privoff = UCRED_PRIV_OFF;
-	uc->uc_audoff = UCRED_AUD_OFF;
-	uc->uc_labeloff = UCRED_LABEL_OFF;
+	uc->uc_size = realsz;
 	uc->uc_pid = pid;
 	uc->uc_projid = cr->cr_projid;
 	uc->uc_zoneid = crgetzoneid(cr);
 
-	/*
-	 * Note that cred2uclabel() call should not be factored out
-	 * to the bottom of the if-else. UCXXX() macros depend on
-	 * uc_xxxoff values to work correctly.
-	 */
 	if (REMOTE_PEER_CRED(cr)) {
 		/*
-		 * other than label, the rest of cred info about a
-		 * remote peer isn't available.
+		 * Other than label, the rest of cred info about a
+		 * remote peer isn't available. Copy the label directly
+		 * after the header where we generally copy the prcred.
+		 * That's why we use sizeof (struct ucred_s).  The other
+		 * offset fields are initialized to 0.
 		 */
-		cred2uclabel(cr, UCLABEL(uc));
-		uc->uc_credoff = 0;
-		uc->uc_privoff = 0;
-		uc->uc_audoff = 0;
+		uc->uc_labeloff = tslp == NULL ? 0 : sizeof (struct ucred_s);
 	} else {
+		uc->uc_credoff = UCRED_CRED_OFF;
+		uc->uc_privoff = UCRED_PRIV_OFF;
+		uc->uc_audoff = UCRED_AUD_OFF;
+		uc->uc_labeloff = tslp == NULL ? 0 : UCRED_LABEL_OFF;
+
 		cred2prcred(cr, UCCRED(uc));
 		cred2prpriv(cr, UCPRIV(uc));
+
 		if (audoff == 0 || cred2ucaud(cr, UCAUD(uc), rcr) != 0)
 			uc->uc_audoff = 0;
-		cred2uclabel(cr, UCLABEL(uc));
 	}
+	if (tslp != NULL)
+		bcopy(&tslp->tsl_label, UCLABEL(uc), sizeof (bslabel_t));
 
 	return (uc);
+}
+
+/*
+ * Don't allocate the non-needed group entries.  Note: this function
+ * must match the code in cred2ucred; they must agree about the
+ * minimal size of the ucred.
+ */
+uint32_t
+ucredminsize(const cred_t *cr)
+{
+	int ndiff;
+
+	if (cr == NULL)
+		return (ucredsize);
+
+	if (REMOTE_PEER_CRED(cr)) {
+		if (is_system_labeled())
+			return (sizeof (struct ucred_s) + sizeof (bslabel_t));
+		else
+			return (sizeof (struct ucred_s));
+	}
+
+	if (cr->cr_grps == NULL)
+		ndiff = ngroups_max - 1;	/* Needs one for prcred_t */
+	else
+		ndiff = ngroups_max - cr->cr_grps->crg_ngroups;
+
+	return (ucredsize - ndiff * sizeof (gid_t));
 }
 
 /*
@@ -1325,4 +1427,53 @@ crsetcrklpd(cred_t *cr, struct credklpd *crklpd)
 	if (cr->cr_klpd != NULL)
 		crklpd_rele(cr->cr_klpd);
 	cr->cr_klpd = crklpd;
+}
+
+credgrp_t *
+crgrpcopyin(int n, gid_t *gidset)
+{
+	credgrp_t *mem;
+	size_t sz = CREDGRPSZ(n);
+
+	ASSERT(n > 0);
+
+	mem = kmem_alloc(sz, KM_SLEEP);
+
+	if (copyin(gidset, mem->crg_groups, sizeof (gid_t) * n)) {
+		kmem_free(mem, sz);
+		return (NULL);
+	}
+	mem->crg_ref = 1;
+	mem->crg_ngroups = n;
+	return (mem);
+}
+
+const gid_t *
+crgetggroups(const credgrp_t *grps)
+{
+	return (grps->crg_groups);
+}
+
+void
+crsetcredgrp(cred_t *cr, credgrp_t *grps)
+{
+	ASSERT(cr->cr_ref <= 2);
+
+	if (cr->cr_grps != NULL)
+		crgrprele(cr->cr_grps);
+
+	cr->cr_grps = grps;
+}
+
+void
+crgrprele(credgrp_t *grps)
+{
+	if (atomic_add_32_nv(&grps->crg_ref, -1) == 0)
+		kmem_free(grps, CREDGRPSZ(grps->crg_ngroups));
+}
+
+static void
+crgrphold(credgrp_t *grps)
+{
+	atomic_add_32(&grps->crg_ref, 1);
 }

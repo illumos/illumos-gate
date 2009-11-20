@@ -1808,6 +1808,8 @@ attribute64_token(pr_context_t *context)
  * return codes 	: -1 - error
  *			:  0 - successful
  * NOTE: At the time of call, the group token id has been retrieved
+ * NOTE: This token is obsolete; it supports exactly NGROUPS_MAX
+ * groups.
  *
  * Format of group token:
  *	group token id		adr_char

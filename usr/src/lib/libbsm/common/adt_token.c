@@ -32,6 +32,7 @@
 #include <bsm/audit.h>
 
 #include <adt_xlate.h>
+#include <alloca.h>
 #include <assert.h>
 #include <netdb.h>
 #include <priv.h>
@@ -598,10 +599,10 @@ adt_to_subject(datadef *def, void *p_data, int required,
 	if (sp->as_session_model == ADT_PROCESS_MODEL) {
 		if (sp->as_kernel_audit_policy & AUDIT_GROUP) {
 			int group_count;
-			gid_t grouplist[NGROUPS_MAX];
+			int maxgrp = getgroups(0, NULL);
+			gid_t *grouplist = alloca(maxgrp * sizeof (gid_t));
 
-			if ((group_count = getgroups(NGROUPS_UMAX,
-			    grouplist)) > 0) {
+			if ((group_count = getgroups(maxgrp, grouplist)) > 0) {
 				(void) au_write(event->ae_event_handle,
 				    au_to_newgroups(group_count, grouplist));
 			}

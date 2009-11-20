@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,7 +119,8 @@ extern "C" {
  * configurable parameter NGROUPS_MAX.
  */
 #define	NGROUPS_UMIN	0
-#define	NGROUPS_UMAX	32
+#define	NGROUPS_UMAX	1024
+#define	NGROUPS_OLDMAX	32
 
 /*
  * NGROUPS_MAX_DEFAULT: *MUST* match NGROUPS_MAX value in limits.h.

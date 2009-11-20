@@ -221,7 +221,8 @@ conn_recvancillary_size(conn_t *connp, crb_t recv_ancillary,
 		IP_STAT(ipst, conn_in_recvdstopts);
 	}
 	if (recv_ancillary.crb_recvucred && ira->ira_cred != NULL) {
-		ancil_size += sizeof (struct T_opthdr) + ucredsize;
+		ancil_size += sizeof (struct T_opthdr) +
+		    ucredminsize(ira->ira_cred);
 		IP_STAT(ipst, conn_in_recvucred);
 	}
 
@@ -527,7 +528,8 @@ conn_recvancillary_add(conn_t *connp, crb_t recv_ancillary,
 		toh = (struct T_opthdr *)ancil_buf;
 		toh->level = SOL_SOCKET;
 		toh->name = SCM_UCRED;
-		toh->len = sizeof (struct T_opthdr) + ucredsize;
+		toh->len = sizeof (struct T_opthdr) +
+		    ucredminsize(ira->ira_cred);
 		toh->status = 0;
 		(void) cred2ucred(ira->ira_cred, ira->ira_cpid, &toh[1], rcr);
 		ancil_buf += toh->len;

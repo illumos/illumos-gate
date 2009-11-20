@@ -3059,6 +3059,8 @@ tl_conn_req_ser(mblk_t *mp, tl_endpt_t *tep)
 	t_scalar_t	ooff = creq->OPT_offset;
 	size_t 		ci_msz;
 	size_t		size;
+	cred_t		*cr = NULL;
+	pid_t		cpid;
 
 	if (tep->te_closing) {
 		TL_UNCONNECT(tep->te_oconp);
@@ -3100,16 +3102,20 @@ tl_conn_req_ser(mblk_t *mp, tl_endpt_t *tep)
 	/*
 	 * calculate length of T_CONN_IND message
 	 */
-	if (peer_tep->te_flag & TL_SETCRED) {
-		ooff = 0;
-		olen = (t_scalar_t) sizeof (struct opthdr) +
-		    OPTLEN(sizeof (tl_credopt_t));
-		/* 1 option only */
-	} else if (peer_tep->te_flag & TL_SETUCRED) {
-		ooff = 0;
-		olen = (t_scalar_t)sizeof (struct opthdr) +
-		    OPTLEN(ucredsize);
-		/* 1 option only */
+	if (peer_tep->te_flag & (TL_SETCRED|TL_SETUCRED)) {
+		cr = msg_getcred(mp, &cpid);
+		ASSERT(cr != NULL);
+		if (peer_tep->te_flag & TL_SETCRED) {
+			ooff = 0;
+			olen = (t_scalar_t) sizeof (struct opthdr) +
+			    OPTLEN(sizeof (tl_credopt_t));
+			/* 1 option only */
+		} else {
+			ooff = 0;
+			olen = (t_scalar_t)sizeof (struct opthdr) +
+			    OPTLEN(ucredminsize(cr));
+			/* 1 option only */
+		}
 	}
 	ci_msz = sizeof (struct T_conn_ind) + tep->te_alen;
 	ci_msz = T_ALIGN(ci_msz) + olen;
@@ -3247,14 +3253,10 @@ tl_conn_req_ser(mblk_t *mp, tl_endpt_t *tep)
 	addr_startp = cimp->b_rptr + ci->SRC_offset;
 	bcopy(tep->te_abuf, addr_startp, tep->te_alen);
 	if (peer_tep->te_flag & (TL_SETCRED|TL_SETUCRED)) {
-		cred_t *cr;
-		pid_t cpid;
 
 		ci->OPT_offset = (t_scalar_t)T_ALIGN(ci->SRC_offset +
 		    ci->SRC_length);
 		ci->OPT_length = olen; /* because only 1 option */
-		cr = msg_getcred(cimp, &cpid);
-		ASSERT(cr != NULL);
 		tl_fill_option(cimp->b_rptr + ci->OPT_offset,
 		    cr, cpid,
 		    peer_tep->te_flag, peer_tep->te_credp);
@@ -3591,7 +3593,7 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 				    OPTLEN(sizeof (tl_credopt_t));
 			} else if (cl_ep->te_flag & TL_SETUCRED) {
 				olen = (t_scalar_t)sizeof (struct opthdr) +
-				    OPTLEN(ucredsize);
+				    OPTLEN(ucredminsize(acc_ep->te_credp));
 			}
 			size = T_ALIGN(sizeof (struct T_conn_con) +
 			    acc_ep->te_alen) + olen;
@@ -4989,6 +4991,8 @@ tl_unitdata(mblk_t *mp, tl_endpt_t *tep)
 	ssize_t			msz, ui_sz;
 	t_scalar_t		alen, aoff, olen, ooff;
 	t_scalar_t		oldolen = 0;
+	cred_t			*cr = NULL;
+	pid_t			cpid;
 
 	udreq = (struct T_unitdata_req *)mp->b_rptr;
 	msz = MBLKL(mp);
@@ -5159,19 +5163,25 @@ tl_unitdata(mblk_t *mp, tl_endpt_t *tep)
 	/*
 	 * calculate length of message
 	 */
-	if (peer_tep->te_flag & TL_SETCRED) {
-		ASSERT(olen == 0);
-		olen = (t_scalar_t)sizeof (struct opthdr) +
-		    OPTLEN(sizeof (tl_credopt_t));
-					/* 1 option only */
-	} else if (peer_tep->te_flag & TL_SETUCRED) {
-		ASSERT(olen == 0);
-		olen = (t_scalar_t)sizeof (struct opthdr) + OPTLEN(ucredsize);
-					/* 1 option only */
-	} else if (peer_tep->te_flag & TL_SOCKUCRED) {
-		/* Possibly more than one option */
-		olen += (t_scalar_t)sizeof (struct T_opthdr) +
-		    OPTLEN(ucredsize);
+	if (peer_tep->te_flag & (TL_SETCRED|TL_SETUCRED|TL_SOCKUCRED)) {
+		cr = msg_getcred(mp, &cpid);
+		ASSERT(cr != NULL);
+
+		if (peer_tep->te_flag & TL_SETCRED) {
+			ASSERT(olen == 0);
+			olen = (t_scalar_t)sizeof (struct opthdr) +
+			    OPTLEN(sizeof (tl_credopt_t));
+						/* 1 option only */
+		} else if (peer_tep->te_flag & TL_SETUCRED) {
+			ASSERT(olen == 0);
+			olen = (t_scalar_t)sizeof (struct opthdr) +
+			    OPTLEN(ucredminsize(cr));
+						/* 1 option only */
+		} else {
+			/* Possibly more than one option */
+			olen += (t_scalar_t)sizeof (struct T_opthdr) +
+			    OPTLEN(ucredminsize(cr));
+		}
 	}
 
 	ui_sz = T_ALIGN(sizeof (struct T_unitdata_ind) + tep->te_alen) +
@@ -5217,8 +5227,6 @@ tl_unitdata(mblk_t *mp, tl_endpt_t *tep)
 		    (t_scalar_t)T_ALIGN(udind->SRC_offset + udind->SRC_length);
 		udind->OPT_length = olen;
 		if (peer_tep->te_flag & (TL_SETCRED|TL_SETUCRED|TL_SOCKUCRED)) {
-			cred_t *cr;
-			pid_t cpid;
 
 			if (oldolen != 0) {
 				bcopy((void *)((uintptr_t)udreq + ooff),
@@ -5226,7 +5234,6 @@ tl_unitdata(mblk_t *mp, tl_endpt_t *tep)
 				    udind->OPT_offset),
 				    oldolen);
 			}
-			cr = msg_getcred(mp, &cpid);
 			ASSERT(cr != NULL);
 
 			tl_fill_option(ui_mp->b_rptr + udind->OPT_offset +
@@ -5981,7 +5988,7 @@ tl_fill_option(uchar_t *buf, cred_t *cr, pid_t cpid, int flag, cred_t *pcr)
 
 		opt->level = TL_PROT_LEVEL;
 		opt->name = TL_OPT_PEER_UCRED;
-		opt->len = (t_uscalar_t)OPTLEN(ucredsize);
+		opt->len = (t_uscalar_t)OPTLEN(ucredminsize(cr));
 
 		(void) cred2ucred(cr, cpid, (void *)(opt + 1), pcr);
 	} else {
@@ -5990,7 +5997,7 @@ tl_fill_option(uchar_t *buf, cred_t *cr, pid_t cpid, int flag, cred_t *pcr)
 
 		topt->level = SOL_SOCKET;
 		topt->name = SCM_UCRED;
-		topt->len = ucredsize + sizeof (*topt);
+		topt->len = ucredminsize(cr) + sizeof (*topt);
 		topt->status = 0;
 		(void) cred2ucred(cr, cpid, (void *)(topt + 1), pcr);
 	}
