@@ -338,6 +338,7 @@ e1000_init_hw_82540(struct e1000_hw *hw)
 	/* Initialize identification LED */
 	ret_val = mac->ops.id_led_init(hw);
 	if (ret_val) {
+		/* EMPTY */
 		DEBUGOUT("Error initializing identification LED\n");
 		/* This is not fatal and we should not stop init due to this */
 	}

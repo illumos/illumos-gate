@@ -201,7 +201,7 @@ e1000_init_phy_params_pchlan(struct e1000_hw *hw)
 	phy->autoneg_mask = AUTONEG_ADVERTISE_SPEED_DEFAULT;
 
 	phy->id = e1000_phy_unknown;
-	e1000_get_phy_id(hw);
+	(void) e1000_get_phy_id(hw);
 	phy->type = e1000_get_phy_type_from_id(phy->id);
 
 	if (phy->type == e1000_phy_82577) {
@@ -529,7 +529,7 @@ e1000_check_for_copper_link_ich8lan(struct e1000_hw *hw)
 	 * Check if there was DownShift, must be checked
 	 * immediately after link-up
 	 */
-	e1000_check_downshift_generic(hw);
+	(void) e1000_check_downshift_generic(hw);
 
 	/*
 	 * If we are forcing speed/duplex, then we simply return since
@@ -554,8 +554,10 @@ e1000_check_for_copper_link_ich8lan(struct e1000_hw *hw)
 	 * different link partner.
 	 */
 	ret_val = e1000_config_fc_after_link_up_generic(hw);
-	if (ret_val)
+	if (ret_val) {
+		/* EMPTY */
 		DEBUGOUT("Error configuring flow control\n");
+	}
 
 out:
 	return (ret_val);
@@ -1112,7 +1114,7 @@ e1000_hv_phy_workarounds_ich8lan(struct e1000_hw *hw)
 		 * writing 0x3140 to the control register.
 		 */
 		if (hw->phy.revision < 2) {
-			e1000_phy_sw_reset_generic(hw);
+			(void) e1000_phy_sw_reset_generic(hw);
 			ret_val = hw->phy.ops.write_reg(hw, PHY_CONTROL,
 			    0x3140);
 		}
@@ -1192,8 +1194,10 @@ e1000_lan_init_done_ich8lan(struct e1000_hw *hw)
 	 * count reaches 0, loading the configuration from NVM will
 	 * leave the PHY in a bad state possibly resulting in no link.
 	 */
-	if (loop == 0)
+	if (loop == 0) {
+		/* EMPTY */
 		DEBUGOUT("LAN_INIT_DONE not set, increase timeout\n");
+	}
 
 	/* Clear the Init Done bit for the next init event */
 	data = E1000_READ_REG(hw, E1000_STATUS);
@@ -1699,8 +1703,10 @@ e1000_read_nvm_ich8lan(struct e1000_hw *hw, u16 offset, u16 words,
 	nvm->ops.release(hw);
 
 out:
-	if (ret_val)
+	if (ret_val) {
+		/* EMPTY */
 		DEBUGOUT1("NVM read error: %d\n", ret_val);
+	}
 
 	return (ret_val);
 }
@@ -1776,6 +1782,7 @@ e1000_flash_cycle_init_ich8lan(struct e1000_hw *hw)
 			    ICH_FLASH_HSFSTS,
 			    hsfsts.regval);
 		} else {
+			/* EMPTY */
 			DEBUGOUT("Flash controller busy, cannot get access");
 		}
 	}
@@ -2161,8 +2168,10 @@ e1000_update_nvm_checksum_ich8lan(struct e1000_hw *hw)
 	msec_delay(10);
 
 out:
-	if (ret_val)
+	if (ret_val) {
+		/* EMPTY */
 		DEBUGOUT1("NVM update error: %d\n", ret_val);
+	}
 
 	return (ret_val);
 }
@@ -2619,8 +2628,10 @@ e1000_reset_hw_ich8lan(struct e1000_hw *hw)
 	 * on the last TLP read/write transaction when MAC is reset.
 	 */
 	ret_val = e1000_disable_pcie_master_generic(hw);
-	if (ret_val)
+	if (ret_val) {
+		/* EMPTY */
 		DEBUGOUT("PCI-E Master disable polling has failed.\n");
+	}
 
 	DEBUGOUT("Masking off all interrupts\n");
 	E1000_WRITE_REG(hw, E1000_IMC, 0xffffffff);
@@ -2691,6 +2702,7 @@ e1000_reset_hw_ich8lan(struct e1000_hw *hw)
 	} else {
 		ret_val = e1000_get_auto_rd_done_generic(hw);
 		if (ret_val) {
+			/* EMPTY */
 			/*
 			 * When auto config read does not complete, do not
 			 * return with an error. This can happen in situations
@@ -2768,9 +2780,11 @@ e1000_init_hw_ich8lan(struct e1000_hw *hw)
 
 	/* Initialize identification LED */
 	ret_val = mac->ops.id_led_init(hw);
-	if (ret_val)
+	if (ret_val) {
+		/* EMPTY */
 		/* This is not fatal and we should not stop init due to this */
 		DEBUGOUT("Error initializing identification LED\n");
+	}
 
 	/* Setup the receive address. */
 	e1000_init_rx_addrs_generic(hw, mac->rar_entry_count);
@@ -3291,7 +3305,7 @@ e1000_disable_gig_wol_ich8lan(struct e1000_hw *hw)
 		E1000_WRITE_REG(hw, E1000_PHY_CTRL, phy_ctrl);
 
 	if (hw->mac.type == e1000_pchlan)
-		e1000_phy_hw_reset_ich8lan(hw);
+		(void) e1000_phy_hw_reset_ich8lan(hw);
 	default:
 		break;
 	}
@@ -3486,6 +3500,7 @@ e1000_get_cfg_done_ich8lan(struct e1000_hw *hw)
 			E1000_WRITE_REG(hw, E1000_STATUS, status &
 			    ~E1000_STATUS_PHYRA);
 		} else
+		/* EMPTY */
 		DEBUGOUT("PHY Reset Asserted not set - needs delay\n");
 	}
 

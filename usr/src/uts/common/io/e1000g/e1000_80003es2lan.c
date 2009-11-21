@@ -890,8 +890,10 @@ e1000_reset_hw_80003es2lan(struct e1000_hw *hw)
 	 * on the last TLP read/write transaction when MAC is reset.
 	 */
 	ret_val = e1000_disable_pcie_master_generic(hw);
-	if (ret_val)
+	if (ret_val) {
+		/* EMPTY */
 		DEBUGOUT("PCI-E Master disable polling has failed.\n");
+	}
 
 	DEBUGOUT("Masking off all interrupts\n");
 	E1000_WRITE_REG(hw, E1000_IMC, 0xffffffff);
@@ -945,6 +947,7 @@ e1000_init_hw_80003es2lan(struct e1000_hw *hw)
 	/* Initialize identification LED */
 	ret_val = mac->ops.id_led_init(hw);
 	if (ret_val) {
+		/* EMPTY */
 		DEBUGOUT("Error initializing identification LED\n");
 		/* This is not fatal and we should not stop init due to this */
 	}

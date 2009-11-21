@@ -1013,7 +1013,7 @@ e1000g_alloc_dma_buffer_82546(struct e1000g *Adapter,
 	ASSERT(count == 1);
 	if (count != 1) {
 		if (buf->dma_handle != NULL) {
-			ddi_dma_unbind_handle(buf->dma_handle);
+			(void) ddi_dma_unbind_handle(buf->dma_handle);
 		}
 		if (buf->acc_handle != NULL) {
 			ddi_dma_mem_free(&buf->acc_handle);

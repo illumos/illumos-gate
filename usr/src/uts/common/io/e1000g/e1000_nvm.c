@@ -912,8 +912,10 @@ e1000_update_nvm_checksum_generic(struct e1000_hw *hw)
 	}
 	checksum = (u16)NVM_SUM - checksum;
 	ret_val = hw->nvm.ops.write(hw, NVM_CHECKSUM_REG, 1, &checksum);
-	if (ret_val)
+	if (ret_val) {
+		/* EMPTY */
 		DEBUGOUT("NVM Write Error while updating checksum.\n");
+	}
 
 out:
 	return (ret_val);

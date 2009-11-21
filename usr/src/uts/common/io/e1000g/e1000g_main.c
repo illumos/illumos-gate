@@ -46,7 +46,7 @@
 
 static char ident[] = "Intel PRO/1000 Ethernet";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.3.17";
+static char e1000g_version[] = "Driver Ver. 5.3.18";
 
 /*
  * Proto types for DDI entry points
@@ -2833,6 +2833,7 @@ e1000g_ring_start(mac_ring_driver_t rh, uint64_t mr_gen_num)
  * Though not offering virtualization ability per se, exposing the
  * group/ring still enables the polling and interrupt toggling.
  */
+/* ARGSUSED */
 void
 e1000g_fill_ring(void *arg, mac_ring_type_t rtype, const int grp_index,
     const int ring_index, mac_ring_info_t *infop, mac_ring_handle_t rh)
@@ -2860,6 +2861,7 @@ e1000g_fill_ring(void *arg, mac_ring_type_t rtype, const int grp_index,
 	mintr->mi_disable = e1000g_rx_ring_intr_disable;
 }
 
+/* ARGSUSED */
 static void
 e1000g_fill_group(void *arg, mac_ring_type_t rtype, const int grp_index,
     mac_group_info_t *infop, mac_group_handle_t gh)
@@ -5545,6 +5547,7 @@ e1000g_add_intrs(struct e1000g *Adapter)
 		rc = e1000g_intr_add(Adapter, DDI_INTR_TYPE_MSI);
 
 		if (rc != DDI_SUCCESS) {
+			/* EMPTY */
 			E1000G_DEBUGLOG_0(Adapter, E1000G_WARN_LEVEL,
 			    "Add MSI failed, trying Legacy interrupts\n");
 		} else {
@@ -5607,6 +5610,7 @@ e1000g_intr_add(struct e1000g *Adapter, int intr_type)
 	}
 
 	if (avail < count) {
+		/* EMPTY */
 		E1000G_DEBUGLOG_2(Adapter, E1000G_WARN_LEVEL,
 		    "Interrupts count: %d, available: %d\n",
 		    count, avail);
@@ -5632,6 +5636,7 @@ e1000g_intr_add(struct e1000g *Adapter, int intr_type)
 	}
 
 	if (actual < count) {
+		/* EMPTY */
 		E1000G_DEBUGLOG_2(Adapter, E1000G_WARN_LEVEL,
 		    "Interrupts requested: %d, received: %d\n",
 		    count, actual);

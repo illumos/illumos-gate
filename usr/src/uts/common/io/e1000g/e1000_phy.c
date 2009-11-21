@@ -1214,8 +1214,10 @@ e1000_phy_setup_autoneg(struct e1000_hw *hw)
 	}
 
 	/* We do not allow the Phy to advertise 1000 Mb Half Duplex */
-	if (phy->autoneg_advertised & ADVERTISE_1000_HALF)
+	if (phy->autoneg_advertised & ADVERTISE_1000_HALF) {
+		/* EMPTY */
 		DEBUGOUT("Advertise 1000mb Half duplex request denied!\n");
+	}
 
 	/* Do we want to advertise 1000 Mb Full Duplex? */
 	if (phy->autoneg_advertised & ADVERTISE_1000_FULL) {
@@ -1355,6 +1357,7 @@ e1000_setup_copper_link_generic(struct e1000_hw *hw)
 		e1000_config_collision_dist_generic(hw);
 		ret_val = e1000_config_fc_after_link_up_generic(hw);
 	} else {
+		/* EMPTY */
 		DEBUGOUT("Unable to establish link!!!\n");
 	}
 
@@ -1419,8 +1422,10 @@ e1000_phy_force_speed_duplex_igp(struct e1000_hw *hw)
 		if (ret_val)
 			goto out;
 
-		if (!link)
+		if (!link) {
+			/* EMPTY */
 			DEBUGOUT("Link taking longer than expected.\n");
+		}
 
 		/* Try once more */
 		ret_val = e1000_phy_has_link_generic(hw,
@@ -1603,8 +1608,10 @@ e1000_phy_force_speed_duplex_ife(struct e1000_hw *hw)
 		if (ret_val)
 			goto out;
 
-		if (!link)
+		if (!link) {
+			/* EMPTY */
 			DEBUGOUT("Link taking longer than expected.\n");
+		}
 
 		/* Try once more */
 		ret_val = e1000_phy_has_link_generic(hw,
@@ -2840,8 +2847,10 @@ e1000_access_phy_wakeup_reg_bm(struct e1000_hw *hw,
 	/* Gig must be disabled for MDIO accesses to page 800 */
 	if ((hw->mac.type == e1000_pchlan) &&
 	    (!(E1000_READ_REG(hw, E1000_PHY_CTRL) &
-	    E1000_PHY_CTRL_GBE_DISABLE)))
+	    E1000_PHY_CTRL_GBE_DISABLE))) {
+		/* EMPTY */
 		DEBUGOUT("Attempting to access page 800 while gig enabled.\n");
+	}
 
 	/* All operations in this function are phy address 1 */
 	hw->phy.addr = 1;
@@ -3432,8 +3441,10 @@ e1000_phy_force_speed_duplex_82577(struct e1000_hw *hw)
 		if (ret_val)
 			goto out;
 
-		if (!link)
+		if (!link) {
+			/* EMPTY */
 			DEBUGOUT("Link taking longer than expected.\n");
+		}
 
 		/* Try once more */
 		ret_val = e1000_phy_has_link_generic(hw,

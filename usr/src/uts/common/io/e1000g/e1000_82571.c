@@ -414,6 +414,7 @@ e1000_init_mac_params_82571(struct e1000_hw *hw)
 		/* Make sure SWSM.SMBI is clear */
 		swsm = E1000_READ_REG(hw, E1000_SWSM);
 		if (swsm & E1000_SWSM_SMBI) {
+			/* EMPTY */
 			/*
 			 * This bit should not be set on a first interface, and
 			 * indicates that the bootagent or EFI code has
@@ -957,8 +958,10 @@ e1000_reset_hw_82571(struct e1000_hw *hw)
 	 * on the last TLP read/write transaction when MAC is reset.
 	 */
 	ret_val = e1000_disable_pcie_master_generic(hw);
-	if (ret_val)
+	if (ret_val) {
+		/* EMPTY */
 		DEBUGOUT("PCI-E Master disable polling has failed.\n");
+	}
 
 	DEBUGOUT("Masking off all interrupts\n");
 	E1000_WRITE_REG(hw, E1000_IMC, 0xffffffff);
@@ -1070,6 +1073,7 @@ e1000_init_hw_82571(struct e1000_hw *hw)
 	/* Initialize identification LED */
 	ret_val = mac->ops.id_led_init(hw);
 	if (ret_val) {
+		/* EMPTY */
 		DEBUGOUT("Error initializing identification LED\n");
 		/* This is not fatal and we should not stop init due to this */
 	}
@@ -1108,7 +1112,7 @@ e1000_init_hw_82571(struct e1000_hw *hw)
 	case e1000_82573:
 	case e1000_82574:
 	case e1000_82583:
-		e1000_enable_tx_pkt_filtering_generic(hw);
+		(void) e1000_enable_tx_pkt_filtering_generic(hw);
 		reg_data = E1000_READ_REG(hw, E1000_GCR);
 		reg_data |= E1000_GCR_L1_ACT_WITHOUT_L0S_RX;
 		E1000_WRITE_REG(hw, E1000_GCR, reg_data);

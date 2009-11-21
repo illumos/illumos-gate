@@ -799,8 +799,10 @@ e1000_check_for_copper_link_generic(struct e1000_hw *hw)
 	 * have had to re-autoneg with a different link partner.
 	 */
 	ret_val = e1000_config_fc_after_link_up_generic(hw);
-	if (ret_val)
+	if (ret_val) {
+		/* EMPTY */
 		DEBUGOUT("Error configuring flow control\n");
+	}
 
 out:
 	return (ret_val);
@@ -1105,6 +1107,7 @@ e1000_setup_fiber_serdes_link_generic(struct e1000_hw *hw)
 	    (E1000_READ_REG(hw, E1000_CTRL) & E1000_CTRL_SWDPIN1)) {
 		ret_val = e1000_poll_fiber_serdes_link_generic(hw);
 	} else {
+		/* EMPTY */
 		DEBUGOUT("No signal detected\n");
 	}
 

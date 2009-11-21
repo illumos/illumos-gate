@@ -152,7 +152,9 @@ e1000g_update_stats(kstat_t *ksp, int rw)
 	p_e1000g_stat_t e1000g_ksp;
 	e1000g_tx_ring_t *tx_ring;
 	e1000g_rx_ring_t *rx_ring;
+#ifdef E1000G_DEBUG
 	e1000g_rx_data_t *rx_data;
+#endif
 	uint64_t val;
 	uint32_t low_val, high_val;
 
@@ -167,7 +169,9 @@ e1000g_update_stats(kstat_t *ksp, int rw)
 
 	tx_ring = Adapter->tx_ring;
 	rx_ring = Adapter->rx_ring;
+#ifdef E1000G_DEBUG
 	rx_data = rx_ring->rx_data;
+#endif
 
 	rw_enter(&Adapter->chip_lock, RW_WRITER);
 

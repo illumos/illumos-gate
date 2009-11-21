@@ -325,18 +325,18 @@ e1000g_rx_setup(struct e1000g *Adapter)
 	if ((hw->mac.type == e1000_pchlan) &&
 	    (Adapter->default_mtu > ETHERMTU)) {
 
-		e1000_read_phy_reg(hw, PHY_REG(770, 26), &phy_data);
+		(void) e1000_read_phy_reg(hw, PHY_REG(770, 26), &phy_data);
 		phy_data &= 0xfff8;
 		phy_data |= (1 << 2);
-		e1000_write_phy_reg(hw, PHY_REG(770, 26), phy_data);
+		(void) e1000_write_phy_reg(hw, PHY_REG(770, 26), phy_data);
 
 		if (hw->phy.type == e1000_phy_82577) {
-			e1000_read_phy_reg(hw, 22, &phy_data);
+			(void) e1000_read_phy_reg(hw, 22, &phy_data);
 			phy_data &= 0x0fff;
 			phy_data |= (1 << 14);
-			e1000_write_phy_reg(hw, 0x10, 0x2823);
-			e1000_write_phy_reg(hw, 0x11, 0x0003);
-			e1000_write_phy_reg(hw, 22, phy_data);
+			(void) e1000_write_phy_reg(hw, 0x10, 0x2823);
+			(void) e1000_write_phy_reg(hw, 0x11, 0x0003);
+			(void) e1000_write_phy_reg(hw, 22, phy_data);
 		}
 	}
 
@@ -647,6 +647,7 @@ e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t sz)
 
 				need_copy = B_FALSE;
 			} else {
+				/* EMPTY */
 				E1000G_DEBUG_STAT(rx_ring->stat_no_freepkt);
 			}
 		}

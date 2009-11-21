@@ -392,6 +392,7 @@ e1000_init_hw_82541(struct e1000_hw *hw)
 	/* Initialize identification LED */
 	ret_val = mac->ops.id_led_init(hw);
 	if (ret_val) {
+		/* EMPTY */
 		DEBUGOUT("Error initializing identification LED\n");
 		/* This is not fatal and we should not stop init due to this */
 	}
@@ -666,6 +667,7 @@ e1000_check_for_link_82541(struct e1000_hw *hw)
 	 */
 	ret_val = e1000_config_fc_after_link_up_generic(hw);
 	if (ret_val) {
+		/* EMPTY */
 		DEBUGOUT("Error configuring flow control\n");
 	}
 
