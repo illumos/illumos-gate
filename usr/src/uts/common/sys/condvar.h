@@ -61,27 +61,25 @@ typedef	enum {
 	CV_DRIVER
 } kcv_type_t;
 
+#if defined(_KERNEL)
+
 /*
  * Time resolution values used in cv_reltimedwait() and cv_reltimedwait_sig()
  * to specify how accurately a relative timeout must expire - if it can be
  * anticipated or deferred.
  */
-enum time_res {
+typedef enum {
 	TR_NANOSEC,
 	TR_MICROSEC,
 	TR_MILLISEC,
 	TR_SEC,
 	TR_CLOCK_TICK,
 	TR_COUNT
-};
-
-typedef enum time_res time_res_t;
+} time_res_t;
 
 extern time_res_t time_res[];
 
 #define	TIME_RES_VALID(tr)	(tr >= TR_NANOSEC && tr < TR_COUNT)
-
-#if defined(_KERNEL)
 
 /*
  * condition variable function prototypes
