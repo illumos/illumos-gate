@@ -71,7 +71,7 @@ static struct modlinkage modlinkage = {
 /* to extract the digest length passed as mechanism parameter */
 #define	PROV_SHA1_GET_DIGEST_LEN(m, len) {				\
 	if (IS_P2ALIGNED((m)->cm_param, sizeof (ulong_t)))		\
-		(len) = (uint32_t)*((ulong_t *)mechanism->cm_param);	\
+		(len) = (uint32_t)*((ulong_t *)(void *)mechanism->cm_param); \
 	else {								\
 		ulong_t tmp_ulong;					\
 		bcopy((m)->cm_param, &tmp_ulong, sizeof (ulong_t));	\

@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -8,8 +8,6 @@
  * implementation provided in RFC 1321.  See RSA Copyright information
  * below.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * MD5C.C - RSA Data Security, Inc., MD5 message-digest algorithm
@@ -37,6 +35,10 @@
  * These notices must be retained in any copies of any part of this
  * documentation and/or software.
  */
+
+#ifndef _KERNEL
+#include <stdint.h>
+#endif /* _KERNEL */
 
 #include <sys/types.h>
 #include <sys/md5.h>
@@ -538,37 +540,21 @@ MD5Transform(uint32_t a, uint32_t b, uint32_t c, uint32_t d,
 		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		x_0  = LOAD_LITTLE_32_0(block);
 #else
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		x_15 = LOAD_LITTLE_32(block + 60);
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		x_14 = LOAD_LITTLE_32(block + 56);
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		x_13 = LOAD_LITTLE_32(block + 52);
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		x_12 = LOAD_LITTLE_32(block + 48);
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		x_11 = LOAD_LITTLE_32(block + 44);
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		x_10 = LOAD_LITTLE_32(block + 40);
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		x_9  = LOAD_LITTLE_32(block + 36);
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		x_8  = LOAD_LITTLE_32(block + 32);
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		x_7  = LOAD_LITTLE_32(block + 28);
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		x_6  = LOAD_LITTLE_32(block + 24);
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		x_5  = LOAD_LITTLE_32(block + 20);
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		x_4  = LOAD_LITTLE_32(block + 16);
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		x_3  = LOAD_LITTLE_32(block + 12);
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		x_2  = LOAD_LITTLE_32(block +  8);
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		x_1  = LOAD_LITTLE_32(block +  4);
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		x_0  = LOAD_LITTLE_32(block +  0);
 #endif /* sun4v */
 	}

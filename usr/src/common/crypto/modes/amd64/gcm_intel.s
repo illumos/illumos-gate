@@ -56,26 +56,22 @@
  *
  * 2. Formatted code, added comments, and added #includes and #defines.
  *
- * 3. Commented out pclmulqdq and pshufb instructions and replaced with
- * .byte sequences (as pclmulqdq isn't supported yet by all of the gas, as,
- * and aw assemblers).
- *
- * 4. If bit CR0.TS is set, clear and set the TS bit, after and before
+ * 3. If bit CR0.TS is set, clear and set the TS bit, after and before
  * calling kpreempt_disable() and kpreempt_enable().
  * If the TS bit is not set, Save and restore %xmm registers at the beginning
  * and end of function calls (%xmm* registers are not saved and restored by
  * during kernel thread preemption).
  *
- * 5. Removed code to perform hashing.  This is already done with C macro
+ * 4. Removed code to perform hashing.  This is already done with C macro
  * GHASH in gcm.c.  For better performance, this removed code should be
  * reintegrated in the future to replace the C GHASH macro.
  *
- * 6. Added code to byte swap 16-byte input and output.
+ * 5. Added code to byte swap 16-byte input and output.
  *
- * 7. Folded in comments from the original C source with embedded assembly
+ * 6. Folded in comments from the original C source with embedded assembly
  * (SB_w_shift_xor.c)
  *
- * 8. Renamed function and reordered parameters to match OpenSolaris:
+ * 7. Renamed function and reordered parameters to match OpenSolaris:
  * Intel interface:
  *	void galois_hash_asm(unsigned char *hk, unsigned char *s,
  *		unsigned char *d, int length)
@@ -128,7 +124,7 @@ gcm_mul_pclmulqdq(uint64_t *x_in, uint64_t *y, uint64_t *res) {
 #define	CLEAR_TS_OR_PUSH_XMM_REGISTERS(tmpreg) \
 	push	%rbp; \
 	mov	%rsp, %rbp; \
-	movq    %cr0, tmpreg; \
+	movq	%cr0, tmpreg; \
 	testq	$CR0_TS, tmpreg; \
 	jnz	1f; \
 	and	$-XMM_ALIGN, %rsp; \
@@ -199,7 +195,7 @@ gcm_mul_pclmulqdq(uint64_t *x_in, uint64_t *y, uint64_t *res) {
  * void gcm_mul_pclmulqdq(uint64_t *x_in, uint64_t *y, uint64_t *res);
  *
  * Perform a carry-less multiplication (that is, use XOR instead of the
- * multiply operator) on  P1 and P2 and place the result in P3.
+ * multiply operator) on P1 and P2 and place the result in P3.
  *
  * Byte swap the input and the output.
  *
@@ -209,7 +205,7 @@ gcm_mul_pclmulqdq(uint64_t *x_in, uint64_t *y, uint64_t *res) {
  * Note2: For kernel code, caller is responsible for ensuring
  * kpreempt_disable() has been called.  This is because %xmm registers are
  * not saved/restored.  Clear and set the CR0.TS bit on entry and exit,
- * respectively,  if TS is set on entry.  Otherwise, if TS is not set,
+ * respectively, if TS is set on entry.  Otherwise, if TS is not set,
  * save and restore %xmm registers on the stack.
  *
  * Note3: Original Intel definition:
@@ -233,37 +229,31 @@ ENTRY_NP(gcm_mul_pclmulqdq)
 	//
 	// Copy Parameters
 	//
-	movdqu	(%rdi), %xmm0 // P1
-	movdqu	(%rsi), %xmm1 // P2
+	movdqu	(%rdi), %xmm0	// P1
+	movdqu	(%rsi), %xmm1	// P2
 
 	//
 	// Byte swap 16-byte input
 	//
 	lea	.Lbyte_swap16_mask(%rip), %rax
 	movaps	(%rax), %xmm10
-	//pshufb	%xmm10, %xmm0
-	.byte	0x66, 0x41, 0x0f, 0x38, 0x00, 0xc2
-	//pshufb	%xmm10, %xmm1
-	.byte	0x66, 0x41, 0x0f, 0x38, 0x00, 0xca
+	pshufb	%xmm10, %xmm0
+	pshufb	%xmm10, %xmm1
 
 
 	//
 	// Multiply with the hash key
 	//
 	movdqu	%xmm0, %xmm3
-	//pclmulqdq $0, %xmm1, %xmm3	// xmm3 holds a0*b0
-	.byte	0x66, 0x0f, 0x3a, 0x44, 0xd9, 0x00
+	pclmulqdq $0, %xmm1, %xmm3	// xmm3 holds a0*b0
 
 	movdqu	%xmm0, %xmm4
-	//pclmulqdq $16, %xmm1, %xmm4	// xmm4 holds a0*b1
-	.byte	0x66, 0x0f, 0x3a, 0x44, 0xe1, 0x10
+	pclmulqdq $16, %xmm1, %xmm4	// xmm4 holds a0*b1
 
 	movdqu	%xmm0, %xmm5
-	//pclmulqdq $1, %xmm1, %xmm5	// xmm5 holds a1*b0
-	.byte	0x66, 0x0f, 0x3a, 0x44, 0xe9, 0x01
+	pclmulqdq $1, %xmm1, %xmm5	// xmm5 holds a1*b0
 	movdqu	%xmm0, %xmm6
-	//pclmulqdq $17, %xmm1, %xmm6	// xmm6 holds a1*b1
-	.byte	0x66, 0x0f, 0x3a, 0x44, 0xf1, 0x11
+	pclmulqdq $17, %xmm1, %xmm6	// xmm6 holds a1*b1
 
 	pxor	%xmm5, %xmm4	// xmm4 holds a0*b1 + a1*b0
 
@@ -329,13 +319,12 @@ ENTRY_NP(gcm_mul_pclmulqdq)
 	//
 	// Byte swap 16-byte result
 	//
-	//pshufb	%xmm10, %xmm6	// %xmm10 has the swap mask
-	.byte	0x66, 0x41, 0x0f, 0x38, 0x00, 0xf2
+	pshufb	%xmm10, %xmm6	// %xmm10 has the swap mask
 
 	//
 	// Store the result
 	//
-	movdqu	%xmm6, (%rdx) // P3
+	movdqu	%xmm6, (%rdx)	// P3
 
 
 	//
@@ -345,4 +334,4 @@ ENTRY_NP(gcm_mul_pclmulqdq)
 	ret
 	SET_SIZE(gcm_mul_pclmulqdq)
 
-#endif  /* lint || __lint */
+#endif	/* lint || __lint */

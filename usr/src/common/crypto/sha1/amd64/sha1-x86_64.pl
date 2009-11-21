@@ -43,104 +43,13 @@
 # 2. Added OpenSolaris ENTRY_NP/SET_SIZE macros from
 # /usr/include/sys/asm_linkage.h, .ident keywords, and lint(1B) guards.
 #
-# 3. Added perl function &lea_offset_eax_register_register() to handle
-#	Solaris as(1) bug.
-#
-# 4. Removed x86_64-xlate.pl script (not needed for as(1) or gas(1) assemblers).
+# 3. Removed x86_64-xlate.pl script (not needed for as(1) or gas(1) assemblers).
 #
 
 use strict;
 my ($code, $ctx, $inp, $num, $xi, $t0, $t1, $i, @V, $A, $B, $C, $D, $E, $T);
 my $output = shift;
 open STDOUT,">$output";
-
-
-sub lea_offset_eax_register_register
-# Workaround for a Solaris "gas" assembler bug where compiling the source
-# errors out and does not generate a valid "lea" instruction.  Specifically,
-#	&lea OFFSET(%eax, SOURCE_REGISTER),DESTINATION_REGISTER
-#
-# For Solaris as, "as -a32" must be used to compile this.
-# For Solaris gas 2.15, this errors out with this message:
-# Error: `0x5a827999(%eax,%r11d)' is not a valid 64 bit base/index expression
-#
-# This should be fixed in Solaris gas 2.16.
-# It assembles with the Linux "as --64" gas 2.17 assembler and runs OK.
-#
-# For the ONBLD NV tools, the aw wrapper script fails when -a32 is used:
-# /ws/onnv-tools/onbld/bin/i386/aw -xarch=amd64 -P -a32 -o lea.o lea.s
-# aw: as->gas mapping failed at or near arg '-a32'
-#
-# For more information, see CRs 6644870 and 6628627.
-{
-	use Switch;
-	my ($offset, $reg_src, $reg_dest) = @_;
-
-	# Failed "lea" instruction.
-	# This instruction errors out from the Solaris as assembler.
-	# It assembles with the Linux "as --64" assembler and runs OK.
-	$code .= "	/lea	$offset(%eax,$reg_src),$reg_dest\n";
-
-	# Workaround
-	# This workaround hand-generates hex machine code for lea.
-	$code .= "	/ Solaris as assembly bug CR 6628627 errors out for\n";
-	$code .= "	/ the above, so we specify the machine code in hex:\n";
-	$code .= "	.byte	0x67	/ lea\n";
-
-	switch ($reg_src) {
-	case "%ebp"	{
-			switch ($reg_dest) {
-			case "%r11d" { $code .=
-				"	.byte	0x44,0x8d,0x9c,0x28	"
-				. "/ (%eax,$reg_src),$reg_dest\n"; }
-			else	{ $code .= "Unknown register $reg_dest\n"; }
-			}
-	}
-	case "%edi"	{
-			switch ($reg_dest) {
-			case "%ebp" { $code .=
-				"	.byte	0x8d,0xac,0x38	"
-				. "/ (%eax,$reg_src),$reg_dest\n"; }
-			else	{ $code .= "Unknown register $reg_dest\n"; }
-			}
-	}
-	case "%edx"	{
-			switch ($reg_dest) {
-			case "%esi" { $code .=
-				"	.byte	0x8d,0xb4,0x10	"
-				. "/ (%eax,$reg_src),$reg_dest\n"; }
-			else	{ $code .= "Unknown register $reg_dest\n"; }
-			}
-	}
-	case "%esi"	{
-			switch ($reg_dest) {
-			case "%edi" { $code .=
-				"	.byte	0x8d,0xbc,0x30	"
-				. "/ (%eax,$reg_src),$reg_dest\n"; }
-			else	{ $code .= "Unknown register $reg_dest\n"; }
-			}
-	}
-	case "%r11d"	{
-			switch ($reg_dest) {
-			case "%r12d" { $code .=
-				"	.byte	0x46,0x8d,0xa4,0x18	"
-				. "/ (%eax,$reg_src),$reg_dest\n"; }
-			else	{ $code .= "Unknown register $reg_dest\n"; }
-			}
-	}
-	case "%r12d"	{
-			switch ($reg_dest) {
-			case "%edx" { $code .=
-				"	.byte	0x42,0x8d,0x94,0x20	"
-				. "/ (%eax,$reg_src),$reg_dest\n"; }
-			else	{ $code .= "Unknown register $reg_dest\n"; }
-			}
-	}
-	else		{ $code .= "Unknown register $reg_src\n"; }
-	}
-
-	$code .= "	.long	$offset	/ offset\n";
-}
 
 
 #
@@ -215,9 +124,8 @@ $code.=<<___ if ($i==0);
 	`"bswap	$xi"	if(!defined($host))`
 	mov	$xi,`4*$i`(%rsp)
 ___
-	&lea_offset_eax_register_register("0x5a827999", $e, $f) if ($i < 15);
 $code.=<<___ if ($i<15);
-	/lea	0x5a827999($xi,$e),$f
+	lea	0x5a827999($xi,$e),$f
 	mov	$c,$t0
 	mov	`4*$j`($inp),$xi
 	mov	$a,$e
@@ -231,9 +139,8 @@ $code.=<<___ if ($i<15);
 	rol	\$30,$b
 	add	$t0,$f
 ___
-	&lea_offset_eax_register_register("0x5a827999", $e, $f) if ($i >= 15);
 $code.=<<___ if ($i>=15);
-	/lea	0x5a827999($xi,$e),$f
+	lea	0x5a827999($xi,$e),$f
 	mov	`4*($j%16)`(%rsp),$xi
 	mov	$c,$t0
 	mov	$a,$e
@@ -256,9 +163,8 @@ sub BODY_20_39 {
 my ($i,$a,$b,$c,$d,$e,$f)=@_;
 my $j=$i+1;
 my $K=($i<40)?0x6ed9eba1:0xca62c1d6;
-	&lea_offset_eax_register_register($K, $e, $f) if ($i < 79);
 $code.=<<___ if ($i<79);
-	/lea	$K($xi,$e),$f
+	lea	$K($xi,$e),$f
 	mov	`4*($j%16)`(%rsp),$xi
 	mov	$c,$t0
 	mov	$a,$e
@@ -276,9 +182,8 @@ ___
 $code.=<<___ if ($i<76);
 	mov	$xi,`4*($j%16)`(%rsp)
 ___
-	&lea_offset_eax_register_register($K, $e, $f) if ($i == 79);
 $code.=<<___ if ($i==79);
-	/lea	$K($xi,$e),$f
+	lea	$K($xi,$e),$f
 	mov	$c,$t0
 	mov	$a,$e
 	xor	$b,$t0
@@ -293,9 +198,8 @@ ___
 sub BODY_40_59 {
 my ($i,$a,$b,$c,$d,$e,$f)=@_;
 my $j=$i+1;
-	&lea_offset_eax_register_register("0x8f1bbcdc", $e, $f);
 $code.=<<___;
-	/lea	0x8f1bbcdc($xi,$e),$f
+	lea	0x8f1bbcdc($xi,$e),$f
 	mov	`4*($j%16)`(%rsp),$xi
 	mov	$b,$t0
 	mov	$b,$t1
@@ -316,9 +220,23 @@ $code.=<<___;
 ___
 }
 
+
+#
+# Execution begins here
+#
+
 $code=<<___;
-#if !defined(lint) && !defined(__lint)
-	.ident	"%Z%%M%	%I%	%E% SMI"
+#if defined(lint) || defined(__lint)
+#include <sys/stdint.h>
+#include <sys/sha1.h>
+
+/* ARGSUSED */
+void
+sha1_block_data_order(SHA1_CTX *ctx, const void *inpp, size_t blocks)
+{
+}
+
+#else
 #include <sys/asm_linkage.h>
 ___
 
@@ -355,10 +273,7 @@ ___
 $code.=<<___;
 .asciz	"SHA1 block transform for x86_64, CRYPTOGAMS by <appro\@openssl.org>"
 
-#else
-	/* LINTED */
-	/* Nothing to be linted in this file--it's pure assembly source. */
-#endif /* !lint && !__lint */
+#endif /* lint || __lint */
 ___
 
 ####################################################################

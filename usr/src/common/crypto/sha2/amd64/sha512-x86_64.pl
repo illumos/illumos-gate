@@ -209,8 +209,18 @@ ___
 #
 
 $code=<<___;
-#if !defined(lint) && !defined(__lint)
-	.ident	"%Z%%M%	%I%	%E% SMI"
+#if defined(lint) || defined(__lint)
+#include <sys/stdint.h>
+#include <sys/sha2.h>
+
+/* ARGSUSED */
+void
+$func(SHA2_CTX *ctx, const void *in, size_t num)
+{
+}
+
+
+#else
 #include <sys/asm_linkage.h>
 
 ENTRY_NP($func)
@@ -384,10 +394,6 @@ $TABLE:
 ___
 }
 $code.=<<___;
-
-#else
-	/* LINTED */
-	/* Nothing to be linted in this file--it's pure assembly source. */
 #endif /* !lint && !__lint */
 ___
 

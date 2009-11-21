@@ -40,11 +40,11 @@ COMDIR = $(COMMONBASE)/crypto
 #	Define the module and object file sets.
 #
 MODULE		= sha1
-LINTS		= $(SHA1_OBJS:%.o=$(LINTS_DIR)/%.ln)
 SHA1_OBJS_32	=
 SHA1_OBJS_64	= sha1-x86_64.o
 SHA1_OBJS	+= $(SHA1_OBJS_$(CLASS))
 OBJECTS		= $(SHA1_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(SHA1_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_CRYPTO_DIR)/$(MODULE)
 ROOTLINK	= $(ROOT_MISC_DIR)/$(MODULE)
 
@@ -65,14 +65,6 @@ LDFLAGS += -dy -Nmisc/kcf
 
 CFLAGS += -I$(COMDIR)
 LINTFLAGS	+= -I$(COMDIR)
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 
 
 #
@@ -114,7 +106,7 @@ include $(UTSBASE)/intel/Makefile.targ
 $(OBJS_DIR)/sha1-x86_64.o: sha1-x86_64.s
 	$(COMPILE.s) -o $@ ${@F:.o=.s}
 	$(POST_PROCESS_O)
- 
+
 $(OBJS_DIR)/sha1-x86_64.ln: sha1-x86_64.s
 	@($(LHEAD) $(LINT.c) ${@F:.ln=.s} $(LTAIL))
 

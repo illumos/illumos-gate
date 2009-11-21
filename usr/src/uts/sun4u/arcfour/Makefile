@@ -21,10 +21,8 @@
 #
 # uts/sun4u/arcfour/Makefile
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the arcfour kernel module.
 #
@@ -70,13 +68,6 @@ LINTFLAGS	+= -I$(COM_DIR)
 # Turn on doubleword alignment for 64 bit registers
 #
 CFLAGS += -dalign
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 
 #
 #	Default build targets.

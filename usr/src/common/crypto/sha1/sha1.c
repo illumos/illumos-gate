@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,19 +32,20 @@
  * and appreciated.
  */
 
+#ifndef _KERNEL
+#include <stdint.h>
+#include <strings.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <sys/systeminfo.h>
+#endif  /* !_KERNEL */
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysmacros.h>
 #include <sys/sha1.h>
 #include <sys/sha1_consts.h>
-
-#ifndef	_KERNEL
-#include <strings.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <sys/systeminfo.h>
-#endif  /* !_KERNEL */
 
 #ifdef _LITTLE_ENDIAN
 #include <sys/byteorder.h>
@@ -578,37 +579,37 @@ SHA1Transform(uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t e,
 		w_1  = LOAD_BIG_32(ctx->buf_un.buf32 +  1);
 		w_0  = LOAD_BIG_32(ctx->buf_un.buf32 +  0);
 	} else {
-		/*LINTED*/
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		w_15 = LOAD_BIG_32(blk + 60);
-		/*LINTED*/
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		w_14 = LOAD_BIG_32(blk + 56);
-		/*LINTED*/
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		w_13 = LOAD_BIG_32(blk + 52);
-		/*LINTED*/
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		w_12 = LOAD_BIG_32(blk + 48);
-		/*LINTED*/
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		w_11 = LOAD_BIG_32(blk + 44);
-		/*LINTED*/
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		w_10 = LOAD_BIG_32(blk + 40);
-		/*LINTED*/
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		w_9  = LOAD_BIG_32(blk + 36);
-		/*LINTED*/
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		w_8  = LOAD_BIG_32(blk + 32);
-		/*LINTED*/
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		w_7  = LOAD_BIG_32(blk + 28);
-		/*LINTED*/
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		w_6  = LOAD_BIG_32(blk + 24);
-		/*LINTED*/
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		w_5  = LOAD_BIG_32(blk + 20);
-		/*LINTED*/
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		w_4  = LOAD_BIG_32(blk + 16);
-		/*LINTED*/
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		w_3  = LOAD_BIG_32(blk + 12);
-		/*LINTED*/
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		w_2  = LOAD_BIG_32(blk +  8);
-		/*LINTED*/
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		w_1  = LOAD_BIG_32(blk +  4);
-		/*LINTED*/
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		w_0  = LOAD_BIG_32(blk +  0);
 	}
 #else	/* !defined(__sparc) */
@@ -1012,7 +1013,7 @@ Encode(uint8_t *_RESTRICT_KYWD output, const uint32_t *_RESTRICT_KYWD input,
 #if	defined(__sparc)
 	if (IS_P2ALIGNED(output, sizeof (uint32_t))) {
 		for (i = 0, j = 0; j < len; i++, j += 4) {
-			/* LINTED: pointer alignment */
+			/* LINTED E_BAD_PTR_CAST_ALIGN */
 			*((uint32_t *)(output + j)) = input[i];
 		}
 	} else {

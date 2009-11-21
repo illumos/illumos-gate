@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,7 +66,7 @@ extern "C" {
 #define	_MD5_CHECK_ALIGNMENT
 #endif /* !__i386 && !__amd64 */
 
-#define	LOAD_LITTLE_32(addr)	(*(uint32_t *)(addr))
+#define	LOAD_LITTLE_32(addr)	(*(uint32_t *)(void *)(addr))
 
 #else	/* !_LITTLE_ENDIAN */
 
@@ -85,7 +85,7 @@ extern "C" {
 
 /* Define alignment check because we can 4-byte load as little endian. */
 #define	_MD5_CHECK_ALIGNMENT
-#define	LOAD_LITTLE_32(addr)    load_little_32((uint32_t *)(addr))
+#define	LOAD_LITTLE_32(addr)    load_little_32((uint32_t *)(void *)(addr))
 
 #if !defined(__lint) && defined(__GNUC__)
 

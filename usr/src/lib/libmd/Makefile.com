@@ -56,12 +56,6 @@ CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(C_BIGPICFLAGS)
 CPPFLAGS += -I$(SRCDIR)
 
-# The md5 and sha1 code is very careful about data alignment
-# but lint doesn't know that, so just shut lint up.
-LINTFLAGS += -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
-LINTFLAGS64 += -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
-
-
 ROOTLINT= $(LINTSRC:%=$(ROOTLIBDIR)/%)
 
 .KEEP_STATE:

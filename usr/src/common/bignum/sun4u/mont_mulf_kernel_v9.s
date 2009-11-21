@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file is mostly a result of compiling the mont_mulf.c file to generate an
@@ -45,8 +42,40 @@
 #include <sys/machsig.h>
 
 #if defined(lint) || defined(__lint)
-	/* LINTED */
-	/* Nothing to be linted in this file, its pure assembly source */
+#include <sys/types.h>
+
+/* ARGSUSED */
+uint64_t
+double2uint64_t(double* d)
+{
+	return (0ULL);
+}
+
+/* ARGSUSED */
+void
+conv_d16_to_i32(uint32_t *i32, double *d16, int64_t *tmp, int ilen)
+{
+}
+
+/* ARGSUSED */
+void
+conv_i32_to_d32(double *d32, uint32_t *i32, int len)
+{
+}
+
+/* ARGSUSED */
+void
+conv_i32_to_d16(double *d16, uint32_t *i32, int len)
+{
+}
+
+/* ARGSUSED */
+void
+mont_mulf_noconv(uint32_t *result, double *dm1, double *dm2, double *dt,
+    double *dn, uint32_t *nint, int nlen, double dn0)
+{
+}
+
 #else	/* lint || __lint */
 
 	.section	".text",#alloc,#execinstr

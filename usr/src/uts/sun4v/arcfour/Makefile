@@ -21,10 +21,8 @@
 #
 # uts/sun4v/arcfour/Makefile
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the arcfour kernel module.
 #
@@ -80,13 +78,6 @@ COPTIMIZE	= -xO5 -xbuiltin=%all
 # Override the default -xspace setting
 #
 sparc_SPACEFLAG	= -W0,-Lt
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 
 #
 #	Default build targets.

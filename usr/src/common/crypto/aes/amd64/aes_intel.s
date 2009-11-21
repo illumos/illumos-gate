@@ -38,7 +38,7 @@
  *    distribution.
  *
  * 3. All advertising materials mentioning features or use of this
- *    software must display the following acknowleoudgment:
+ *    software must display the following acknowledgment:
  *    "This product includes software developed by the OpenSSL Project
  *    for use in the OpenSSL Toolkit. (http://www.openssl.org/)"
  *
@@ -88,16 +88,13 @@
  *
  * 2. Formatted code, added comments, and added #includes and #defines.
  *
- * 3. Replaced aes* and palignr instructions with .byte sequences
- * (as they are not supported yet by all of the gas, as, and aw assemblers).
- *
- * 4. If bit CR0.TS is set, clear and set the TS bit, after and before
+ * 3. If bit CR0.TS is set, clear and set the TS bit, after and before
  * calling kpreempt_disable() and kpreempt_enable().
  * If the TS bit is not set, Save and restore %xmm registers at the beginning
  * and end of function calls (%xmm* registers are not saved and restored by
  * during kernel thread preemption).
  *
- * 5. Renamed functions, reordered parameters, and changed return value
+ * 4. Renamed functions, reordered parameters, and changed return value
  * to match OpenSolaris:
  *
  * OpenSSL interface:
@@ -146,7 +143,9 @@
  * Note: ks is the AES key schedule, Nr is number of rounds, pt is plain text,
  * ct is crypto text, and MAX_AES_NR is 14.
  * For the x86 64-bit architecture, OpenSolaris OS uses ks32 instead of ks64.
+ *
  * Note2: aes_ks_t must be aligned on a 0 mod 128 byte boundary.
+ *
  * ====================================================================
  */
 
@@ -208,7 +207,7 @@ rijndael_key_setup_dec_intel(uint32_t rk[], const uint32_t cipherKey[],
 #define	CLEAR_TS_OR_PUSH_XMM0_XMM1(tmpreg) \
 	push	%rbp; \
 	mov	%rsp, %rbp; \
-	movq    %cr0, tmpreg; \
+	movq	%cr0, tmpreg; \
 	testq	$CR0_TS, tmpreg; \
 	jnz	1f; \
 	and	$-XMM_ALIGN, %rsp; \
@@ -243,7 +242,7 @@ rijndael_key_setup_dec_intel(uint32_t rk[], const uint32_t cipherKey[],
 #define	CLEAR_TS_OR_PUSH_XMM0_TO_XMM6(tmpreg) \
 	push	%rbp; \
 	mov	%rsp, %rbp; \
-	movq    %cr0, tmpreg; \
+	movq	%cr0, tmpreg; \
 	testq	$CR0_TS, tmpreg; \
 	jnz	1f; \
 	and	$-XMM_ALIGN, %rsp; \
@@ -442,7 +441,7 @@ ENTRY_NP(rijndael_key_setup_enc_intel)
 	cmp	$256, %KEYSIZE32
 	jnz	.Lenc_key192
 
-	/ AES 256: 14 rounds
+	/ AES 256: 14 rounds in encryption key schedule
 #ifdef OPENSSL_INTERFACE
 	mov	$14, %ROUNDS32
 	movl	%ROUNDS32, 240(%AESKEY)		/ key.rounds = 14
@@ -452,44 +451,31 @@ ENTRY_NP(rijndael_key_setup_enc_intel)
 	movaps	%xmm2, (%rcx)
 	add	$0x10, %rcx
 
-	/ aeskeygenassist $0x1, %xmm2, %xmm1	/ round 1
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xca, 0x01
+	aeskeygenassist $0x1, %xmm2, %xmm1	/ expand the key
 	call	_key_expansion_256a
-	/ aeskeygenassist $0x1, %xmm0, %xmm1
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xc8, 0x01
+	aeskeygenassist $0x1, %xmm0, %xmm1
 	call	_key_expansion_256b
-	/ aeskeygenassist $0x2, %xmm2, %xmm1	/ round 2
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xca, 0x02
+	aeskeygenassist $0x2, %xmm2, %xmm1	/ expand the key
 	call	_key_expansion_256a
-	/ aeskeygenassist $0x2, %xmm0, %xmm1
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xc8, 0x02
+	aeskeygenassist $0x2, %xmm0, %xmm1
 	call	_key_expansion_256b
-	/ aeskeygenassist $0x4, %xmm2, %xmm1	/ round 3
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xca, 0x04
+	aeskeygenassist $0x4, %xmm2, %xmm1	/ expand the key
 	call	_key_expansion_256a
-	/ aeskeygenassist $0x4, %xmm0, %xmm1
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xc8, 0x04
+	aeskeygenassist $0x4, %xmm0, %xmm1
 	call	_key_expansion_256b
-	/ aeskeygenassist $0x8, %xmm2, %xmm1	/ round 4
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xca, 0x08
+	aeskeygenassist $0x8, %xmm2, %xmm1	/ expand the key
 	call	_key_expansion_256a
-	/ aeskeygenassist $0x8, %xmm0, %xmm1
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xc8, 0x08
+	aeskeygenassist $0x8, %xmm0, %xmm1
 	call	_key_expansion_256b
-	/ aeskeygenassist $0x10, %xmm2, %xmm1	/ round 5
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xca, 0x10
+	aeskeygenassist $0x10, %xmm2, %xmm1	/ expand the key
 	call	_key_expansion_256a
-	/ aeskeygenassist $0x10, %xmm0, %xmm1
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xc8, 0x10
+	aeskeygenassist $0x10, %xmm0, %xmm1
 	call	_key_expansion_256b
-	/ aeskeygenassist $0x20, %xmm2, %xmm1	/ round 6
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xca, 0x20
+	aeskeygenassist $0x20, %xmm2, %xmm1	/ expand the key
 	call	_key_expansion_256a
-	/ aeskeygenassist $0x20, %xmm0, %xmm1
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xc8, 0x20
+	aeskeygenassist $0x20, %xmm0, %xmm1
 	call	_key_expansion_256b
-	/ aeskeygenassist $0x40, %xmm2, %xmm1	/ round 7
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xca, 0x40
+	aeskeygenassist $0x40, %xmm2, %xmm1	/ expand the key
 	call	_key_expansion_256a
 
 	SET_TS_OR_POP_XMM0_TO_XMM6(%r10)
@@ -505,36 +491,28 @@ ENTRY_NP(rijndael_key_setup_enc_intel)
 	cmp	$192, %KEYSIZE32
 	jnz	.Lenc_key128
 
-	/ AES 192: 12 rounds
+	/ AES 192: 12 rounds in encryption key schedule
 #ifdef OPENSSL_INTERFACE
 	mov	$12, %ROUNDS32
 	movl	%ROUNDS32, 240(%AESKEY)	/ key.rounds = 12
 #endif	/* OPENSSL_INTERFACE */
 
 	movq	0x10(%USERCIPHERKEY), %xmm2	/ other user key
-	/ aeskeygenassist $0x1, %xmm2, %xmm1	/ round 1
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xca, 0x01
+	aeskeygenassist $0x1, %xmm2, %xmm1	/ expand the key
 	call	_key_expansion_192a
-	/ aeskeygenassist $0x2, %xmm2, %xmm1	/ round 2
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xca, 0x02
+	aeskeygenassist $0x2, %xmm2, %xmm1	/ expand the key
 	call	_key_expansion_192b
-	/ aeskeygenassist $0x4, %xmm2, %xmm1	/ round 3
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xca, 0x04
+	aeskeygenassist $0x4, %xmm2, %xmm1	/ expand the key
 	call	_key_expansion_192a
-	/ aeskeygenassist $0x8, %xmm2, %xmm1	/ round 4
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xca, 0x08
+	aeskeygenassist $0x8, %xmm2, %xmm1	/ expand the key
 	call	_key_expansion_192b
-	/ aeskeygenassist $0x10, %xmm2, %xmm1	/ round 5
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xca, 0x10
+	aeskeygenassist $0x10, %xmm2, %xmm1	/ expand the key
 	call	_key_expansion_192a
-	/ aeskeygenassist $0x20, %xmm2, %xmm1	/ round 6
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xca, 0x20
+	aeskeygenassist $0x20, %xmm2, %xmm1	/ expand the key
 	call	_key_expansion_192b
-	/ aeskeygenassist $0x40, %xmm2, %xmm1	/ round 7
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xca, 0x40
+	aeskeygenassist $0x40, %xmm2, %xmm1	/ expand the key
 	call	_key_expansion_192a
-	/ aeskeygenassist $0x80, %xmm2, %xmm1	/ round 8
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xca, 0x80
+	aeskeygenassist $0x80, %xmm2, %xmm1	/ expand the key
 	call	_key_expansion_192b
 
 	SET_TS_OR_POP_XMM0_TO_XMM6(%r10)
@@ -549,40 +527,32 @@ ENTRY_NP(rijndael_key_setup_enc_intel)
 .Lenc_key128:
 	cmp $128, %KEYSIZE32
 	jnz .Lenc_key_invalid_key_bits
+
+	/ AES 128: 10 rounds in encryption key schedule
 #ifdef OPENSSL_INTERFACE
 	mov	$10, %ROUNDS32
 	movl	%ROUNDS32, 240(%AESKEY)		/ key.rounds = 10
 #endif	/* OPENSSL_INTERFACE */
 
-	/ aeskeygenassist $0x1, %xmm0, %xmm1	/ round 1
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xc8, 0x01
+	aeskeygenassist $0x1, %xmm0, %xmm1	/ expand the key
 	call	_key_expansion_128
-	/ aeskeygenassist $0x2, %xmm0, %xmm1	/ round 2
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xc8, 0x02
+	aeskeygenassist $0x2, %xmm0, %xmm1	/ expand the key
 	call	_key_expansion_128
-	/ aeskeygenassist $0x4, %xmm0, %xmm1	/ round 3
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xc8, 0x04
+	aeskeygenassist $0x4, %xmm0, %xmm1	/ expand the key
 	call	_key_expansion_128
-	/ aeskeygenassist $0x8, %xmm0, %xmm1	/ round 4
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xc8, 0x08
+	aeskeygenassist $0x8, %xmm0, %xmm1	/ expand the key
 	call	_key_expansion_128
-	/ aeskeygenassist $0x10, %xmm0, %xmm1	/ round 5
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xc8, 0x10
+	aeskeygenassist $0x10, %xmm0, %xmm1	/ expand the key
 	call	_key_expansion_128
-	/ aeskeygenassist $0x20, %xmm0, %xmm1	/ round 6
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xc8, 0x20
+	aeskeygenassist $0x20, %xmm0, %xmm1	/ expand the key
 	call	_key_expansion_128
-	/ aeskeygenassist $0x40, %xmm0, %xmm1	/ round 7
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xc8, 0x40
+	aeskeygenassist $0x40, %xmm0, %xmm1	/ expand the key
 	call	_key_expansion_128
-	/ aeskeygenassist $0x80, %xmm0, %xmm1	/ round 8
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xc8, 0x80
+	aeskeygenassist $0x80, %xmm0, %xmm1	/ expand the key
 	call	_key_expansion_128
-	/ aeskeygenassist $0x1b, %xmm0, %xmm1	/ round 9
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xc8, 0x1b
+	aeskeygenassist $0x1b, %xmm0, %xmm1	/ expand the key
 	call	_key_expansion_128
-	/ aeskeygenassist $0x36, %xmm0, %xmm1	/ round 10
-	.byte	0x66, 0x0f, 0x3a, 0xdf, 0xc8, 0x36
+	aeskeygenassist $0x36, %xmm0, %xmm1	/ expand the key
 	call	_key_expansion_128
 
 	SET_TS_OR_POP_XMM0_TO_XMM6(%r10)
@@ -638,6 +608,7 @@ ENTRY_NP(rijndael_key_setup_enc_intel)
  */
 ENTRY_NP(rijndael_key_setup_dec_intel)
 	/* EXPORT DELETE START */
+	/ Generate round keys used for encryption
 	call	rijndael_key_setup_enc_intel
 	test	%rax, %rax
 #ifdef	OPENSSL_INTERFACE
@@ -648,6 +619,10 @@ ENTRY_NP(rijndael_key_setup_dec_intel)
 
 	CLEAR_TS_OR_PUSH_XMM0_XMM1(%r10)
 
+	/*
+	 * Convert round keys used for encryption
+	 * to a form usable for decryption
+	 */
 #ifndef	OPENSSL_INTERFACE		/* OpenSolaris Interface */
 	mov	%rax, %ROUNDS64		/ set # rounds (10, 12, or 14)
 					/ (already set for OpenSSL)
@@ -672,8 +647,9 @@ ENTRY_NP(rijndael_key_setup_dec_intel)
 .align 4
 .Ldec_key_inv_loop:
 	movaps	(%rcx), %xmm0
-	/aesimc	%xmm0, %xmm1
-	.byte	0x66, 0x0f, 0x38, 0xdb, 0xc8
+	/ Convert an encryption round key to a form usable for decryption
+	/ with the "AES Inverse Mix Columns" instruction
+	aesimc	%xmm0, %xmm1
 	movaps	%xmm1, (%rcx)
 	lea	0x10(%rcx), %rcx
 	cmp	%ENDAESKEY, %rcx
@@ -756,55 +732,41 @@ ENTRY_NP(aes_encrypt_intel)
 	/ AES 256
 	lea	0x20(%KEYP), %KEYP
 	movaps	-0x60(%KEYP), %KEY
-	/aesenc	%KEY, %STATE
-	.byte	0x66, 0x0f, 0x38, 0xdc, 0xc1
+	aesenc	%KEY, %STATE
 	movaps	-0x50(%KEYP), %KEY
-	/aesenc	%KEY, %STATE
-	.byte	0x66, 0x0f, 0x38, 0xdc, 0xc1
+	aesenc	%KEY, %STATE
 
 .align 4
 .Lenc192:
 	/ AES 192 and 256
 	movaps	-0x40(%KEYP), %KEY
-	/aesenc	%KEY, %STATE
-	.byte	0x66, 0x0f, 0x38, 0xdc, 0xc1
+	aesenc	%KEY, %STATE
 	movaps	-0x30(%KEYP), %KEY
-	/aesenc	%KEY, %STATE
-	.byte	0x66, 0x0f, 0x38, 0xdc, 0xc1
+	aesenc	%KEY, %STATE
 
 .align 4
 .Lenc128:
 	/ AES 128, 192, and 256
 	movaps	-0x20(%KEYP), %KEY
-	/aesenc	%KEY, %STATE
-	.byte	0x66, 0x0f, 0x38, 0xdc, 0xc1
+	aesenc	%KEY, %STATE
 	movaps	-0x10(%KEYP), %KEY
-	/aesenc	%KEY, %STATE
-	.byte	0x66, 0x0f, 0x38, 0xdc, 0xc1
+	aesenc	%KEY, %STATE
 	movaps	(%KEYP), %KEY
-	/aesenc	%KEY, %STATE
-	.byte	0x66, 0x0f, 0x38, 0xdc, 0xc1
+	aesenc	%KEY, %STATE
 	movaps	0x10(%KEYP), %KEY
-	/aesenc	%KEY, %STATE
-	.byte	0x66, 0x0f, 0x38, 0xdc, 0xc1
+	aesenc	%KEY, %STATE
 	movaps	0x20(%KEYP), %KEY
-	/aesenc	%KEY, %STATE
-	.byte	0x66, 0x0f, 0x38, 0xdc, 0xc1
+	aesenc	%KEY, %STATE
 	movaps	0x30(%KEYP), %KEY
-	/aesenc	%KEY, %STATE
-	.byte	0x66, 0x0f, 0x38, 0xdc, 0xc1
+	aesenc	%KEY, %STATE
 	movaps	0x40(%KEYP), %KEY
-	/aesenc	%KEY, %STATE
-	.byte	0x66, 0x0f, 0x38, 0xdc, 0xc1
+	aesenc	%KEY, %STATE
 	movaps	0x50(%KEYP), %KEY
-	/aesenc	%KEY, %STATE
-	.byte	0x66, 0x0f, 0x38, 0xdc, 0xc1
+	aesenc	%KEY, %STATE
 	movaps	0x60(%KEYP), %KEY
-	/aesenc	%KEY, %STATE
-	.byte	0x66, 0x0f, 0x38, 0xdc, 0xc1
+	aesenc	%KEY, %STATE
 	movaps	0x70(%KEYP), %KEY
-	/aesenclast	 %KEY, %STATE		/ last round
-	.byte	0x66, 0x0f, 0x38, 0xdd, 0xc1
+	aesenclast	 %KEY, %STATE		/ last round
 	movups	%STATE, (%OUTP)			/ output
 
 	SET_TS_OR_POP_XMM0_XMM1(%r10)
@@ -857,55 +819,41 @@ ENTRY_NP(aes_decrypt_intel)
 	/ AES 256
 	lea	0x20(%KEYP), %KEYP
 	movaps	-0x60(%KEYP), %KEY
-	/aesdec	%KEY, %STATE
-	.byte	0x66, 0x0f, 0x38, 0xde, 0xc1
+	aesdec	%KEY, %STATE
 	movaps	-0x50(%KEYP), %KEY
-	/aesdec	%KEY, %STATE
-	.byte	0x66, 0x0f, 0x38, 0xde, 0xc1
+	aesdec	%KEY, %STATE
 
 .align 4
 .Ldec192:
 	/ AES 192 and 256
 	movaps	-0x40(%KEYP), %KEY
-	/aesdec	%KEY, %STATE
-	.byte	0x66, 0x0f, 0x38, 0xde, 0xc1
+	aesdec	%KEY, %STATE
 	movaps	-0x30(%KEYP), %KEY
-	/aesdec	%KEY, %STATE
-	.byte	0x66, 0x0f, 0x38, 0xde, 0xc1
+	aesdec	%KEY, %STATE
 
 .align 4
 .Ldec128:
 	/ AES 128, 192, and 256
 	movaps	-0x20(%KEYP), %KEY
-	/aesdec	%KEY, %STATE
-	.byte	0x66, 0x0f, 0x38, 0xde, 0xc1
+	aesdec	%KEY, %STATE
 	movaps	-0x10(%KEYP), %KEY
-	/aesdec	%KEY, %STATE
-	.byte	0x66, 0x0f, 0x38, 0xde, 0xc1
+	aesdec	%KEY, %STATE
 	movaps	(%KEYP), %KEY
-	/aesdec	%KEY, %STATE
-	.byte	0x66, 0x0f, 0x38, 0xde, 0xc1
+	aesdec	%KEY, %STATE
 	movaps	0x10(%KEYP), %KEY
-	/aesdec	%KEY, %STATE
-	.byte	0x66, 0x0f, 0x38, 0xde, 0xc1
+	aesdec	%KEY, %STATE
 	movaps	0x20(%KEYP), %KEY
-	/aesdec	%KEY, %STATE
-	.byte	0x66, 0x0f, 0x38, 0xde, 0xc1
+	aesdec	%KEY, %STATE
 	movaps	0x30(%KEYP), %KEY
-	/aesdec	%KEY, %STATE
-	.byte	0x66, 0x0f, 0x38, 0xde, 0xc1
+	aesdec	%KEY, %STATE
 	movaps	0x40(%KEYP), %KEY
-	/aesdec	%KEY, %STATE
-	.byte	0x66, 0x0f, 0x38, 0xde, 0xc1
+	aesdec	%KEY, %STATE
 	movaps	0x50(%KEYP), %KEY
-	/aesdec	%KEY, %STATE
-	.byte	0x66, 0x0f, 0x38, 0xde, 0xc1
+	aesdec	%KEY, %STATE
 	movaps	0x60(%KEYP), %KEY
-	/aesdec	%KEY, %STATE
-	.byte	0x66, 0x0f, 0x38, 0xde, 0xc1
+	aesdec	%KEY, %STATE
 	movaps	0x70(%KEYP), %KEY
-	/aesdeclast	%KEY, %STATE		/ last round
-	.byte	0x66, 0x0f, 0x38, 0xdf, 0xc1
+	aesdeclast	%KEY, %STATE		/ last round
 	movups	%STATE, (%OUTP)			/ output
 
 	SET_TS_OR_POP_XMM0_XMM1(%r10)
@@ -913,4 +861,4 @@ ENTRY_NP(aes_decrypt_intel)
 	/* EXPORT DELETE END */
 	SET_SIZE(aes_decrypt_intel)
 
-#endif  /* lint || __lint */
+#endif	/* lint || __lint */

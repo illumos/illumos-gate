@@ -69,7 +69,7 @@ static struct modlinkage modlinkage = {
 /* to extract the digest length passed as mechanism parameter */
 #define	PROV_SHA2_GET_DIGEST_LEN(m, len) {				\
 	if (IS_P2ALIGNED((m)->cm_param, sizeof (ulong_t)))		\
-		(len) = (uint32_t)*((ulong_t *)(m)->cm_param);	\
+		(len) = (uint32_t)*((ulong_t *)(void *)(m)->cm_param);	\
 	else {								\
 		ulong_t tmp_ulong;					\
 		bcopy((m)->cm_param, &tmp_ulong, sizeof (ulong_t));	\
@@ -930,7 +930,7 @@ sha2_mac_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 	uint_t sha_digest_len, sha_hmac_block_size;
 
 	/*
-	 * Set the digest length and block size to values approriate to the
+	 * Set the digest length and block size to values appropriate to the
 	 * mechanism
 	 */
 	switch (mechanism->cm_type) {
@@ -1051,7 +1051,7 @@ sha2_mac_final(crypto_ctx_t *ctx, crypto_data_t *mac, crypto_req_handle_t req)
 
 	ASSERT(ctx->cc_provider_private != NULL);
 
-	/* Set the digest lengths to values approriate to the mechanism */
+	/* Set the digest lengths to values appropriate to the mechanism */
 	switch (PROV_SHA2_HMAC_CTX(ctx)->hc_mech_type) {
 	case SHA256_HMAC_MECH_INFO_TYPE:
 		sha_digest_len = digest_len = SHA256_DIGEST_LENGTH;
@@ -1175,7 +1175,7 @@ sha2_mac_atomic(crypto_provider_handle_t provider,
 	uint_t keylen_in_bytes = CRYPTO_BITS2BYTES(key->ck_length);
 
 	/*
-	 * Set the digest length and block size to values approriate to the
+	 * Set the digest length and block size to values appropriate to the
 	 * mechanism
 	 */
 	switch (mechanism->cm_type) {
@@ -1317,7 +1317,7 @@ sha2_mac_verify_atomic(crypto_provider_handle_t provider,
 	uint_t keylen_in_bytes = CRYPTO_BITS2BYTES(key->ck_length);
 
 	/*
-	 * Set the digest length and block size to values approriate to the
+	 * Set the digest length and block size to values appropriate to the
 	 * mechanism
 	 */
 	switch (mechanism->cm_type) {
@@ -1535,7 +1535,7 @@ sha2_create_ctx_template(crypto_provider_handle_t provider,
 	uint32_t sha_digest_len, sha_hmac_block_size;
 
 	/*
-	 * Set the digest length and block size to values approriate to the
+	 * Set the digest length and block size to values appropriate to the
 	 * mechanism
 	 */
 	switch (mechanism->cm_type) {

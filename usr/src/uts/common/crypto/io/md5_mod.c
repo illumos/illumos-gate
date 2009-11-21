@@ -114,7 +114,7 @@ typedef struct md5_hmac_ctx {
 
 #define	PROV_MD5_GET_DIGEST_LEN(m, len) {				\
 	if (IS_P2ALIGNED((m)->cm_param, sizeof (ulong_t)))		\
-		(len) = (uint32_t)*((ulong_t *)mechanism->cm_param);	\
+		(len) = (uint32_t)*((ulong_t *)(void *)mechanism->cm_param); \
 	else {								\
 		ulong_t tmp_ulong;					\
 		bcopy((m)->cm_param, &tmp_ulong, sizeof (ulong_t));	\

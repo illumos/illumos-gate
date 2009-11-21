@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,13 @@
  * and appreciated.
  */
 
+#ifndef _KERNEL
+#include <stdint.h>
+#include <strings.h>
+#include <stdlib.h>
+#include <errno.h>
+#endif /* _KERNEL */
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -45,10 +52,6 @@
 #include <sys/cmn_err.h>
 
 #else
-#include <strings.h>
-#include <stdlib.h>
-#include <errno.h>
-
 #pragma weak SHA256Update = SHA2Update
 #pragma weak SHA384Update = SHA2Update
 #pragma weak SHA512Update = SHA2Update
@@ -624,7 +627,7 @@ Encode(uint8_t *_RESTRICT_KYWD output, uint32_t *_RESTRICT_KYWD input,
 #if	defined(__sparc)
 	if (IS_P2ALIGNED(output, sizeof (uint32_t))) {
 		for (i = 0, j = 0; j < len; i++, j += 4) {
-			/* LINTED: pointer alignment */
+			/* LINTED E_BAD_PTR_CAST_ALIGN */
 			*((uint32_t *)(output + j)) = input[i];
 		}
 	} else {
@@ -649,7 +652,7 @@ Encode64(uint8_t *_RESTRICT_KYWD output, uint64_t *_RESTRICT_KYWD input,
 #if	defined(__sparc)
 	if (IS_P2ALIGNED(output, sizeof (uint64_t))) {
 		for (i = 0, j = 0; j < len; i++, j += 8) {
-			/* LINTED: pointer alignment */
+			/* LINTED E_BAD_PTR_CAST_ALIGN */
 			*((uint64_t *)(output + j)) = input[i];
 		}
 	} else {
@@ -721,7 +724,7 @@ SHA2Init(uint64_t mech, SHA2_CTX *ctx)
 #endif /* _KERNEL */
 	}
 
-	ctx->algotype = mech;
+	ctx->algotype = (uint32_t)mech;
 	ctx->count.c64[0] = ctx->count.c64[1] = 0;
 }
 

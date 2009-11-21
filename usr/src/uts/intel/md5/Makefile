@@ -21,10 +21,8 @@
 #
 # uts/intel/md5/Makefile
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the md5 crypto kernel module.
 #
@@ -41,11 +39,11 @@ COMDIR = $(COMMONBASE)/crypto/md5
 #	Define the module and object file sets.
 #
 MODULE		= md5
-LINTS		= $(MD5_OBJS:%.o=$(LINTS_DIR)/%.ln)
 MD5_OBJS_32	=
 MD5_OBJS_64	= md5_amd64.o
 MD5_OBJS	+= $(MD5_OBJS_$(CLASS))
 OBJECTS		= $(MD5_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(MD5_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_CRYPTO_DIR)/$(MODULE)
 ROOTLINK	= $(ROOT_MISC_DIR)/$(MODULE)
 
@@ -70,14 +68,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
 # md5 depends on the kcf framework
 #
 LDFLAGS		+= -dy -Nmisc/kcf
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 
 #
 #	Default build targets.

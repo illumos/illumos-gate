@@ -25,6 +25,10 @@
 
 #define	ARCFOUR_LOOP_OPTIMIZED
 
+#ifndef _KERNEL
+#include <stdint.h>
+#endif	/* _KERNEL */
+
 #include "arcfour.h"
 
 #if defined(__amd64)
@@ -231,16 +235,27 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 #ifdef	__amd64
 /*
  * Return 1 if executing on Intel, otherwise 0 (e.g., AMD64).
+ * Cache the result, as the CPU can't change.
+ *
+ * Note: the userland version uses getisax() and checks for an AMD-64-only
+ * feature.  The kernel version uses cpuid_getvendor().
  */
 int
 arcfour_crypt_on_intel(void)
 {
+	static int	cached_result = -1;
+
+	if (cached_result == -1) { /* first time */
 #ifdef _KERNEL
-	return (cpuid_getvendor(CPU) == X86_VENDOR_Intel);
+		cached_result = (cpuid_getvendor(CPU) == X86_VENDOR_Intel);
 #else
-	uint_t	ui;
-	(void) getisax(&ui, 1);
-	return ((ui & AV_386_AMD_MMX) == 0);
+		uint_t	ui;
+
+		(void) getisax(&ui, 1);
+		cached_result = ((ui & AV_386_AMD_MMX) == 0);
 #endif	/* _KERNEL */
+	}
+
+	return (cached_result);
 }
 #endif	/* __amd64 */
