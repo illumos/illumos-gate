@@ -166,7 +166,7 @@ static const char *script = "\n"
  */
 "if [[ \"${cmd}\" != ~(Elr)(alias|unalias|command) ]] && "
 	"! alias \"${cmd}\" >/dev/null 2>&1 ; then\n"
-	"builtin \"${cmd}\"\n"
+	"PATH='' builtin \"${cmd}\"\n"
 "fi\n"
 /* command is a keyword and needs to be handled separately */
 "if [[ \"${cmd}\" == \"command\" ]] ; then\n"
