@@ -426,7 +426,6 @@ reset:
 		}
 	}
 
-
 	if ((sli_mode == EMLXS_HBA_SLI3_MODE) && (vpd->sli3FwRev == 0)) {
 		if (vpd->sli2FwRev) {
 			sli_mode = EMLXS_HBA_SLI2_MODE;

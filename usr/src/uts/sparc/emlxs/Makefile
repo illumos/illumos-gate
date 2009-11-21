@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This makefile drives the production of the emlxs driver kernel module.
@@ -28,9 +28,6 @@
 #
 UTSBASE		= ../../
 COMMON_BASE	= ../../../common
-
-
-ARCHDIR:sh = cd ..; basename `pwd`
 
 #
 #	Define the module and object file sets.
@@ -44,6 +41,7 @@ CONF_SRCDIR	= $(UTSBASE)/common/io/fibre-channel/fca/emlxs
 #
 #	Include common rules.
 #
+ARCHDIR		= sparc
 include ../Makefile.$(ARCHDIR)
 
 #
@@ -52,9 +50,6 @@ include ../Makefile.$(ARCHDIR)
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
-
-BUILD_DATE:sh            = date +%\Y%m%d
-BUILD_DATE_TIME:sh       = date +%Y.%m.%d.%H.%M
 
 EMLXS_FLAGS             = -DEMLXS_SPARC
 EMLXS_FLAGS             += -DS11
@@ -69,8 +64,6 @@ LINTTAGS                += $(EMLXS_LFLAGS) -DEMLXS_ARCH=\"64\"
 #
 #	Overrides and depends_on
 #
-MODSTUBS_DIR	 = $(OBJS_DIR)
-
 INC_PATH	+= -I$(ROOT)/usr/include
 INC_PATH	+= -I$(UTSBASE)/common/sys
 INC_PATH	+= -I$(COMMON_BASE)/bignum
@@ -82,9 +75,6 @@ INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/ulp
 
 LDFLAGS		+= -dy -Nmisc/md5 -Nmisc/sha1
 LDFLAGS		+= -Nmisc/bignum
-
-C99MODE=	-xc99=%all
-C99LMODE=	-Xc99=%all
 
 #
 # For now, disable these lint checks; maintainers should endeavor

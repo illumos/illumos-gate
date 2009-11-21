@@ -363,12 +363,13 @@ emlxs_els_handle_unsol_req(emlxs_port_t *port, CHANNEL *cp, IOCBQ *iocbq,
 	cmd_code = *((uint32_t *)mp->virt) & ELS_CMD_MASK;
 
 	if (!(port->flag & EMLXS_PORT_BOUND)) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_invalid_els_msg,
-		    "ELS rcvd (0x%x): sid=%x Port not bound: Rejecting.",
-		    cmd_code, iocbq->iocb.un.elsreq.remoteID);
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
+		    "%s: sid=%x. Port not bound: Rejecting.",
+		    emlxs_elscmd_xlate(cmd_code),
+		    iocbq->iocb.un.elsreq.remoteID);
 
 		(void) emlxs_els_reply(port, iocbq, ELS_CMD_LS_RJT,
-		    ELS_CMD_RSCN, LSRJT_LOGICAL_BSY, LSEXP_OUT_OF_RESOURCE);
+		    cmd_code, LSRJT_LOGICAL_BSY, LSEXP_OUT_OF_RESOURCE);
 
 		return (0);
 	}

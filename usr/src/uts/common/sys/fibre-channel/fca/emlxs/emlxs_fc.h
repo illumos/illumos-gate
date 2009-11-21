@@ -166,8 +166,7 @@ typedef struct emlxs_buf
 #define	PACKET_IN_TIMEOUT	0x00010000
 #define	PACKET_IN_FLUSH		0x00020000
 #define	PACKET_IN_ABORT		0x00040000
-#define	PACKET_XRI_CLOSED	0x00080000	/* An XRI abort or */
-						/* XRI close was issued */
+#define	PACKET_XRI_CLOSED	0x00080000 /* An XRI abort/close was issued */
 
 #define	PACKET_CHIP_COMP	0x00100000
 #define	PACKET_COMPLETED	0x00200000
@@ -1080,9 +1079,10 @@ typedef struct emlxs_port
 	fct_local_port_t	*fct_port;
 	uint32_t		fct_flags;
 
-#define	FCT_STATE_PORT_ONLINE	0x00000001
-#define	FCT_STATE_NOT_ACKED	0x00000002
-#define	FCT_STATE_LINK_UP	0x00000010
+#define	FCT_STATE_PORT_ONLINE		0x00000001
+#define	FCT_STATE_NOT_ACKED		0x00000002
+#define	FCT_STATE_LINK_UP		0x00000010
+#define	FCT_STATE_LINK_UP_ACKED		0x00000020
 
 	emlxs_tgtport_stat_t	fct_stat;
 
@@ -1092,7 +1092,7 @@ typedef struct emlxs_port
 
 	/* Used to save context for deferred unsol FLOGIs */
 	fct_flogi_xchg_t	fx;
-	uint32_t		fx_context;
+
 #ifdef FCT_IO_TRACE
 	emlxs_iotrace_t		*iotrace;
 	uint16_t		iotrace_cnt;

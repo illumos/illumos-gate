@@ -1902,20 +1902,42 @@ typedef struct
 } INIT_VPI_VAR;
 
 /* Structure for MB Command UNREG_VPI (0x97) */
-/* Good for SLI2/3 and SLI4 */
+/* Good for SLI2/3 */
+
+typedef struct
+{
+	uint32_t	rsvd1;
+	uint32_t	rsvd2;
+	uint32_t	rsvd3;
+	uint32_t	rsvd4;
+	uint32_t	rsvd5;
+#ifdef EMLXS_BIG_ENDIAN
+	uint16_t	rsvd6;
+	uint16_t	vpi;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+	uint16_t	vpi;
+	uint16_t	rsvd6;
+#endif
+} UNREG_VPI_VAR;
+
+/* Structure for MB Command UNREG_VPI (0x97) */
+/* Good for SLI4 */
 
 typedef struct
 {
 	uint32_t	rsvd1;
 #ifdef EMLXS_BIG_ENDIAN
-	uint16_t	rsvd2;
-	uint16_t	vpi;
+	uint8_t		ii:2;
+	uint16_t	rsvd2:14;
+	uint16_t	index;
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
-	uint16_t	vpi;
-	uint16_t	rsvd2;
+	uint16_t	index;
+	uint16_t	rsvd2:14;
+	uint8_t		ii:2;
 #endif
-} UNREG_VPI_VAR;
+} UNREG_VPI_VAR4;
 
 /* Structure for MB Command REG_VFI(0x9F) */
 /* Good for SLI4 only */
@@ -3450,7 +3472,7 @@ typedef union
 	REG_LOGIN_VAR		varRegLogin;	/* cmd = x93 (REG_RPI) */
 	UNREG_LOGIN_VAR		varUnregLogin;	/* cmd = x14 (UNREG_RPI) */
 	REG_VPI_VAR		varRegVPI4;	/* cmd = x96 (REG_VPI) */
-	UNREG_VPI_VAR		varUnRegVPI4;	/* cmd = x97 (UNREG_VPI) */
+	UNREG_VPI_VAR4		varUnRegVPI4;	/* cmd = x97 (UNREG_VPI) */
 	REG_VFI_VAR		varRegVFI4;	/* cmd = x9F (REG_VFI) */
 	UNREG_VFI_VAR		varUnRegVFI4;	/* cmd = xA1 (UNREG_VFI) */
 	REQUEST_FEATURES_VAR	varReqFeatures;	/* cmd = x9D (REQ_FEATURES) */

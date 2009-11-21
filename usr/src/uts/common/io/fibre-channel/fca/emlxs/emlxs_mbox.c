@@ -3649,6 +3649,7 @@ emlxs_mb_unreg_vpi(emlxs_port_t *port)
 	emlxs_hba_t	*hba = HBA;
 	MAILBOXQ	*mbq;
 	MAILBOX		*mb;
+	MAILBOX4	*mb4;
 	VFIobj_t	*vfip;
 	FCFIobj_t	*fcfp;
 	int		rval;
@@ -3669,15 +3670,20 @@ emlxs_mb_unreg_vpi(emlxs_port_t *port)
 
 	mutex_exit(&EMLXS_PORT_LOCK);
 
-	mb = (MAILBOX *)mbq->mbox;
-	bzero((void *)mb, MAILBOX_CMD_BSIZE);
-	mb->un.varUnregVpi.vpi = port->vpi + hba->vpi_base;
-	mb->mbxCommand = MBX_UNREG_VPI;
-	mb->mbxOwner = OWN_HOST;
-
 	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+		mb4 = (MAILBOX4 *)mbq->mbox;
+		bzero((void *)mb4, MAILBOX_CMD_SLI4_BSIZE);
+		mb4->un.varUnRegVPI4.ii = 0; /* index is a VPI */
+		mb4->un.varUnRegVPI4.index = port->vpi + hba->vpi_base;
+		mb4->mbxCommand = MBX_UNREG_VPI;
+		mb4->mbxOwner = OWN_HOST;
 		mbq->mbox_cmpl = emlxs_cmpl_unreg_vpi;
 	} else {
+		mb = (MAILBOX *)mbq->mbox;
+		bzero((void *)mb, MAILBOX_CMD_BSIZE);
+		mb->un.varUnregVpi.vpi = port->vpi + hba->vpi_base;
+		mb->mbxCommand = MBX_UNREG_VPI;
+		mb->mbxOwner = OWN_HOST;
 		mbq->mbox_cmpl = NULL; /* no cmpl needed */
 	}
 

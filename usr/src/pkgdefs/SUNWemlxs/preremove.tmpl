@@ -25,4 +25,8 @@
 
 include drv_utils
 
-pkg_drvrem emlxs || exit 1
+ret=0
+
+pkg_drvrem emlxs || ret=1
+
+exit $ret

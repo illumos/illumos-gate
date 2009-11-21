@@ -10588,9 +10588,8 @@ emlxs_dfc_set_be_dcbx(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	emlxs_port_t				*port = &PPORT;
 	MAILBOXQ				*mbq = NULL;
 	MAILBOX4				*mb;
-	IOCTL_COMMON_QUERY_FIRMWARE_CONFIG	*fw_config;
 	IOCTL_DCBX_SET_DCBX_MODE		*dcbx_mode;
-	uint32_t				port_num;
+	uint32_t				port_num = 0;
 	uint32_t				rval = 0;
 
 	mbq =
@@ -10601,35 +10600,6 @@ emlxs_dfc_set_be_dcbx(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	/*
 	 * Signifies an embedded command
 	 */
-	mb->un.varSLIConfig.be.embedded = 1;
-	mbq->mbox_cmpl = NULL;
-
-	mb->mbxCommand = MBX_SLI_CONFIG;
-	mb->mbxOwner = OWN_HOST;
-	mb->un.varSLIConfig.be.payload_length = IOCTL_HEADER_SZ;
-	mb->un.varSLIConfig.be.un_hdr.hdr_req.subsystem =
-	    IOCTL_SUBSYSTEM_COMMON;
-	mb->un.varSLIConfig.be.un_hdr.hdr_req.opcode =
-	    COMMON_OPCODE_QUERY_FIRMWARE_CONFIG;
-	mb->un.varSLIConfig.be.un_hdr.hdr_req.timeout = 0;
-	mb->un.varSLIConfig.be.un_hdr.hdr_req.req_length =
-	    sizeof (IOCTL_COMMON_QUERY_FIRMWARE_CONFIG);
-
-	rval = EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_WAIT, 0);
-	if (rval != MBX_SUCCESS) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: %s failed. mbxstatus=0x%x", emlxs_dfc_xlate(dfc->cmd),
-		    emlxs_mb_cmd_xlate(mb->mbxCommand), rval);
-
-		rval = DFC_DRV_ERROR;
-		goto done;
-	}
-
-	fw_config =
-	    (IOCTL_COMMON_QUERY_FIRMWARE_CONFIG *)&mb->un.varSLIConfig.payload;
-	port_num = fw_config->params.response.PhysicalPort;
-
-	bzero((void *)mb, sizeof (MAILBOX4));
 	mb->un.varSLIConfig.be.embedded = 1;
 	mbq->mbox_cmpl = NULL;
 
@@ -10672,9 +10642,8 @@ emlxs_dfc_get_be_dcbx(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	emlxs_port_t				*port = &PPORT;
 	MAILBOXQ				*mbq = NULL;
 	MAILBOX4				*mb;
-	IOCTL_COMMON_QUERY_FIRMWARE_CONFIG	*fw_config;
 	IOCTL_DCBX_GET_DCBX_MODE		*dcbx_mode;
-	uint32_t				port_num;
+	uint32_t				port_num = 0;
 	uint32_t				rval = 0;
 
 	mbq =
@@ -10685,35 +10654,6 @@ emlxs_dfc_get_be_dcbx(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	/*
 	 * Signifies an embedded command
 	 */
-	mb->un.varSLIConfig.be.embedded = 1;
-	mbq->mbox_cmpl = NULL;
-
-	mb->mbxCommand = MBX_SLI_CONFIG;
-	mb->mbxOwner = OWN_HOST;
-	mb->un.varSLIConfig.be.payload_length = IOCTL_HEADER_SZ;
-	mb->un.varSLIConfig.be.un_hdr.hdr_req.subsystem =
-	    IOCTL_SUBSYSTEM_COMMON;
-	mb->un.varSLIConfig.be.un_hdr.hdr_req.opcode =
-	    COMMON_OPCODE_QUERY_FIRMWARE_CONFIG;
-	mb->un.varSLIConfig.be.un_hdr.hdr_req.timeout = 0;
-	mb->un.varSLIConfig.be.un_hdr.hdr_req.req_length =
-	    sizeof (IOCTL_COMMON_QUERY_FIRMWARE_CONFIG);
-
-	rval = EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_WAIT, 0);
-	if (rval != MBX_SUCCESS) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: %s failed. mbxstatus=0x%x", emlxs_dfc_xlate(dfc->cmd),
-		    emlxs_mb_cmd_xlate(mb->mbxCommand), rval);
-
-		rval = DFC_DRV_ERROR;
-		goto done;
-	}
-
-	fw_config =
-	    (IOCTL_COMMON_QUERY_FIRMWARE_CONFIG *)&mb->un.varSLIConfig.payload;
-	port_num = fw_config->params.response.PhysicalPort;
-
-	bzero((void *)mb, sizeof (MAILBOX4));
 	mb->un.varSLIConfig.be.embedded = 1;
 	mbq->mbox_cmpl = NULL;
 

@@ -739,7 +739,7 @@ emlxs_get_dump(
 	}
 
 	if (size_cee) {
-		if (hba->model_info.chip == EMLXS_TIGERSHARK_CHIP) {
+		if (hba->model_info.chip == EMLXS_BE_CHIP) {
 			wptr[i++] = EMLXS_FAT_FILE_ID;
 		} else {
 			wptr[i++] = EMLXS_CEE_FILE_ID;
@@ -2342,7 +2342,7 @@ emlxs_dump_file_create(
 		*fpCeeFile = NULL;
 
 		if ((hba->model_info.device_id == PCI_DEVICE_ID_LP21000_M) ||
-		    (hba->model_info.chip == EMLXS_TIGERSHARK_CHIP)) {
+		    (hba->model_info.chip == EMLXS_BE_CHIP)) {
 			if ((*fpCeeFile =
 			    emlxs_fopen(hba, EMLXS_CEE_FILE)) == NULL) {
 				emlxs_fdelete(*fpTxtFile);
@@ -3805,7 +3805,7 @@ emlxs_dump_tigershark_log(
 	IOCTL_COMMON_MANAGE_FAT *fat;
 	mbox_req_hdr_t *hdr_req;
 
-	if (hba->model_info.chip != EMLXS_TIGERSHARK_CHIP) {
+	if (hba->model_info.chip != EMLXS_BE_CHIP) {
 		return (1);
 	}
 
@@ -4004,7 +4004,7 @@ emlxs_dump_user_event(
 		(void) emlxs_dump_saturn_log(hba, fpTxtFile, fpDmpFile);
 	}
 
-	if (hba->model_info.chip == EMLXS_TIGERSHARK_CHIP) {
+	if (hba->model_info.chip == EMLXS_BE_CHIP) {
 		(void) emlxs_dump_tigershark_log(hba, fpTxtFile, fpCeeFile);
 	}
 
@@ -4144,7 +4144,7 @@ emlxs_dump_drv_event(
 		(void) emlxs_dump_saturn_log(hba, fpTxtFile, fpDmpFile);
 	}
 
-	if (hba->model_info.chip == EMLXS_TIGERSHARK_CHIP) {
+	if (hba->model_info.chip == EMLXS_BE_CHIP) {
 		(void) emlxs_dump_tigershark_log(hba, fpTxtFile, fpCeeFile);
 	}
 

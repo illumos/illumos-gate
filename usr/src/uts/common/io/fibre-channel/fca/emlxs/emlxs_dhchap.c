@@ -2255,7 +2255,7 @@ emlxs_issue_dhchap_challenge(
 	if (hba->rdn_flag == 1) {
 		emlxs_get_random_bytes(ndlp, random_number, 20);
 	} else {
-		random_get_pseudo_bytes(random_number,
+		(void) random_get_pseudo_bytes(random_number,
 		    LE_SWAP32(chal->cnul.cval_len));
 	}
 
@@ -2329,7 +2329,7 @@ emlxs_issue_dhchap_challenge(
 		if (hba->rdn_flag == 1) {
 			emlxs_get_random_bytes(ndlp, random_number, 20);
 		} else {
-			random_get_pseudo_bytes(random_number,
+			(void) random_get_pseudo_bytes(random_number,
 			    LE_SWAP32(chal->cnul.cval_len));
 		}
 
@@ -3034,7 +3034,7 @@ uint32_t evt)
 		if (hba->rdn_flag == 1) {
 			emlxs_get_random_bytes(ndlp, random_number, 20);
 		} else {
-			random_get_pseudo_bytes(random_number, arg2len);
+			(void) random_get_pseudo_bytes(random_number, arg2len);
 		}
 
 		/* cache it for later verification usage */
@@ -5837,7 +5837,7 @@ emlxs_BIGNUM_get_pubkey(
 	if (hba->rdn_flag == 1) {
 		emlxs_get_random_bytes(ndlp, random_number, 20);
 	} else {
-		random_get_pseudo_bytes(random_number, hash_size);
+		(void) random_get_pseudo_bytes(random_number, hash_size);
 	}
 
 	/* e: y */

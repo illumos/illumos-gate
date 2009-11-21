@@ -25,6 +25,8 @@
 
 include drv_utils
 
+ret=0
+
 pkg_drvadd -i \
     '"pci10df,fc00"
     "pci10df,f800"
@@ -44,5 +46,8 @@ pkg_drvadd -i \
     "pciex10df,fe00"
     "pciex10df,fe05"
     "pciex19a2,704"
+    "pciex19a2,714"
     "lpfs"' \
-    -m '* 0666 root sys' -c "fibre-channel" emlxs || exit 1
+    -m '* 0666 root sys' -c "fibre-channel" emlxs || ret=1
+
+exit $ret

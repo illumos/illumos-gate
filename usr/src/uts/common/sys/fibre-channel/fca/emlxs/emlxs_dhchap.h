@@ -135,10 +135,6 @@ extern "C" {
 #define	SHA1_LEN		0x00000014	/* 20 bytes */
 #define	MD5_LEN			0x00000010	/* 16 bytes */
 
-/*
- * #define	AUTH_IKEV2		 0x04 #define	AUTH_IKEV2_AUTH	 0x05
- */
-
 #define	HBA_SECURITY			0x20
 
 /* AUTH_Reject Reason Codes */

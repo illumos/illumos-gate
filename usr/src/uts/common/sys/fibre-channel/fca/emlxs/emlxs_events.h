@@ -159,6 +159,46 @@ DEFINE_EVT(emlxs_sd_board_event, \
 	EVT_DESTROY_DEFAULT)
 #endif /* SAN_DIAG_SUPPORT */
 
+#define	MAX_LOG_INFO_LENGTH	96
+
+typedef struct emlxs_event_entry
+{
+	struct emlxs_event_entry	*next;
+	struct emlxs_event_entry	*prev;
+
+	uint32_t	id;
+	uint32_t	timestamp;
+	uint32_t	timer;
+
+	emlxs_event_t	*evt;
+
+	void *port;
+
+	void		*bp;			/* Context buffer */
+						/* pointer */
+	uint32_t	size;			/* Context buffer */
+						/* size */
+	uint32_t	flag;
+#define	EMLXS_DFC_EVENT_DONE	0x00000001
+#define	EMLXS_SD_EVENT_DONE	0x00000002
+
+} emlxs_event_entry_t;
+
+
+typedef struct emlxs_event_queue
+{
+	kmutex_t		lock;
+	kcondvar_t		lock_cv;
+
+	uint32_t		last_id[32]; /* per event */
+	uint32_t		next_id;
+	uint32_t		count;
+
+	emlxs_event_entry_t	*first;
+	emlxs_event_entry_t	*last;
+
+} emlxs_event_queue_t;
+
 #ifdef	__cplusplus
 }
 #endif

@@ -875,7 +875,7 @@ emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
 
 	bzero(fw_image, sizeof (emlxs_be_fw_image_t));
 
-	if (hba->model_info.chip != EMLXS_TIGERSHARK_CHIP) {
+	if (hba->model_info.chip != EMLXS_BE_CHIP) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_incompat_msg,
 		    "Invalid adapter model.");
 		return (EMLXS_IMAGE_INCOMPATIBLE);

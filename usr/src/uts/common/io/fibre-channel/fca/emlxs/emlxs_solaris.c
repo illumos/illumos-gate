@@ -8081,9 +8081,6 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 	cmd = *((uint32_t *)pkt->pkt_cmd);
 	cmd &= ELS_CMD_MASK;
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-	    "Send ELS cmd: %x", cmd);
-
 	/* Point of no return, except for ADISC & PLOGI */
 
 	/* Check node */
@@ -9867,6 +9864,10 @@ emlxs_swap_els_pkt(emlxs_buf_t *sbp)
 		if (rsp) {
 			emlxs_swap_service_params((SERV_PARM *) & rsp[1]);
 		}
+		break;
+
+	case ELS_CMD_LOGO:
+		cmd[1] = LE_SWAP32(cmd[1]);	/* N_Port ID */
 		break;
 
 	case ELS_CMD_RLS:

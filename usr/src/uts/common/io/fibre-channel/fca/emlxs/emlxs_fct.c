@@ -606,129 +606,136 @@ emlxs_fct_modclose()
 
 #endif /* MODSYM_SUPPORT */
 
-
-/* This routine is called to process a FLOGI ELS command that was recieved. */
+/*
+ * This routine is called to handle an unsol FLOGI exchange
+ *	fx	save
+ *	0	1	Process or save port->fx
+ *	0	0	Process or reject port->fx
+ *	1	1	Process port->fx, Process or save fx
+ *	1	0	Process or reject port->fx, Process or reject fx
+ */
 static void
-emlxs_fct_handle_rcvd_flogi(emlxs_port_t *port)
+emlxs_fct_handle_unsol_flogi(emlxs_port_t *port, fct_flogi_xchg_t *fx,
+    uint32_t save)
 {
+	emlxs_hba_t *hba = HBA;
 	fct_status_t status;
 	IOCBQ iocbq;
+	fct_flogi_xchg_t fxchg;
 
-	/*
-	 * If FCT has been notified of a Link Up event, process the
-	 * FLOGI now. Otherwise, defer processing till the Link Up happens.
-	 */
-	if (port->fct_flags & FCT_STATE_LINK_UP) {
-		/* Setup for call to emlxs_els_reply() */
+begin:
+	mutex_enter(&EMLXS_PORT_LOCK);
+
+	/* Check if there is an old saved FLOGI */
+	if (port->fx.fx_op) {
+		/* Get it now */
+		bcopy(&port->fx, &fxchg, sizeof (fct_flogi_xchg_t));
+
+		if (fx) {
+			/* Save new FLOGI */
+			bcopy(fx, &port->fx, sizeof (fct_flogi_xchg_t));
+
+			/* Reject old stale FLOGI */
+			fx = &fxchg;
+			goto reject_it;
+
+		} else {
+			bzero(&port->fx, sizeof (fct_flogi_xchg_t));
+			fx = &fxchg;
+		}
+
+	} else if (!fx) {
+		/* Nothing to do, just return */
+		mutex_exit(&EMLXS_PORT_LOCK);
+		return;
+	}
+
+	/* We have a valid FLOGI here */
+	/* There is no saved FLOGI at this point either */
+
+	/* Check if COMSTAR is ready to accept it */
+	if (port->fct_flags & FCT_STATE_LINK_UP_ACKED) {
+		mutex_exit(&EMLXS_PORT_LOCK);
+
 		bzero((uint8_t *)&iocbq, sizeof (IOCBQ));
-		iocbq.iocb.un.elsreq.remoteID = port->fx.fx_sid;
-		iocbq.iocb.un.elsreq.myID = port->fx.fx_did;
-		iocbq.iocb.ULPCONTEXT = port->fx_context;
+		iocbq.iocb.un.elsreq.remoteID = fx->fx_sid;
+		iocbq.iocb.un.elsreq.myID = fx->fx_did;
+		iocbq.iocb.ULPCONTEXT = (uint16_t)fx->rsvd2;
+		fx->rsvd2 = 0; /* Clear the reserved field now */
 
-		status =
-		    MODSYM(fct_handle_rcvd_flogi) (port->fct_port, &port->fx);
+		status = MODSYM(fct_handle_rcvd_flogi) (port->fct_port, fx);
 
 #ifdef FCT_API_TRACE
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_api_msg,
-		    "fct_handle_rcvd_flogi %p: x%x", port->fct_port, status);
+		    "fct_handle_rcvd_flogi %p: status=%x",
+		    port->fct_port, status);
 #endif /* FCT_API_TRACE */
 
 		if (status == FCT_SUCCESS) {
-			if (port->fx.fx_op == ELS_OP_ACC) {
+			if (fx->fx_op == ELS_OP_ACC) {
 				(void) emlxs_els_reply(port, &iocbq,
 				    ELS_CMD_ACC, ELS_CMD_FLOGI, 0, 0);
-			} else {	/* ELS_OP_LSRJT */
 
+			} else {	/* ELS_OP_LSRJT */
 				(void) emlxs_els_reply(port, &iocbq,
-				    ELS_CMD_LS_RJT,
-				    ELS_CMD_FLOGI, port->fx.fx_rjt_reason,
-				    port->fx.fx_rjt_expl);
+				    ELS_CMD_LS_RJT, ELS_CMD_FLOGI,
+				    fx->fx_rjt_reason, fx->fx_rjt_expl);
 			}
 		} else {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
-			    "FLOGI: sid=%x. fct_handle_rcvd_flogi failed. "
-			    "Rejecting.",
-			    port->fx.fx_sid);
+			    "FLOGI: sid=%x xid=%x. "
+			    "fct_handle_rcvd_flogi failed. Rejecting.",
+			    fx->fx_sid, iocbq.iocb.ULPCONTEXT);
 
-			(void) emlxs_els_reply(port, &iocbq, ELS_CMD_LS_RJT,
-			    ELS_CMD_FLOGI, LSRJT_UNABLE_TPC,
-			    LSEXP_NOTHING_MORE);
+			(void) emlxs_els_reply(port, &iocbq,
+			    ELS_CMD_LS_RJT, ELS_CMD_FLOGI,
+			    LSRJT_UNABLE_TPC, LSEXP_NOTHING_MORE);
 		}
 
-		port->fx.fx_op = 0;
-	}
-
-	return;
-
-} /* emlxs_fct_handle_rcvd_flogi() */
-
-
-/* cmd_sbp->fct_mtx must be held to enter */
-extern void
-emlxs_fct_unsol_callback(emlxs_port_t *port, fct_cmd_t *fct_cmd)
-{
-	emlxs_hba_t *hba = HBA;
-	emlxs_buf_t *cmd_sbp;
-
-	cmd_sbp = (emlxs_buf_t *)fct_cmd->cmd_fca_private;
-
-	/* Offline */
-	if (!(port->fct_flags & FCT_STATE_PORT_ONLINE)) {
-
-		emlxs_fct_cmd_post(port, fct_cmd, EMLXS_FCT_CMD_POSTED);
-		/* mutex_exit(&cmd_sbp->fct_mtx); */
-
-#ifdef FCT_API_TRACE
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_api_msg,
-		    "fct_post_rcvd_cmd:4 %p: portid x%x", fct_cmd,
-		    fct_cmd->cmd_lportid);
-#endif /* FCT_API_TRACE */
-
-		MODSYM(fct_post_rcvd_cmd) (fct_cmd, 0);
 		return;
 	}
 
-	/* Online & Link up */
-	if (port->fct_flags & FCT_STATE_LINK_UP) {
-
-		emlxs_fct_cmd_post(port, fct_cmd, EMLXS_FCT_CMD_POSTED);
-		/* mutex_exit(&cmd_sbp->fct_mtx); */
-
-#ifdef FCT_API_TRACE
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_api_msg,
-		    "fct_post_rcvd_cmd:1 %p: portid x%x", fct_cmd,
-		    fct_cmd->cmd_lportid);
-#endif /* FCT_API_TRACE */
-
-		MODSYM(fct_post_rcvd_cmd) (fct_cmd, 0);
+	if (save) {
+		/* Save FLOGI for later */
+		bcopy(fx, &port->fx, sizeof (fct_flogi_xchg_t));
+		mutex_exit(&EMLXS_PORT_LOCK);
 		return;
-
 	}
 
-	/* Online & Link down */
-	emlxs_fct_cmd_release(port, fct_cmd, EMLXS_FCT_CMD_WAITQ);
-	/* mutex_exit(&cmd_sbp->fct_mtx); */
-
-	/*
-	 * Defer processing of fct_cmd till later (after link up).
-	 * Add buffer to queue tail
-	 */
-	mutex_enter(&EMLXS_PORT_LOCK);
-
-	if (port->fct_wait_tail) {
-		port->fct_wait_tail->next = cmd_sbp;
-	}
-	port->fct_wait_tail = cmd_sbp;
-
-	if (!port->fct_wait_head) {
-		port->fct_wait_head = cmd_sbp;
-	}
+reject_it:
 
 	mutex_exit(&EMLXS_PORT_LOCK);
 
+	if (port->fct_flags & FCT_STATE_LINK_UP) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
+		    "FLOGI: sid=%x xid=%x. Stale. Rejecting.",
+		    fx->fx_sid, fx->rsvd2);
+
+		bzero((uint8_t *)&iocbq, sizeof (IOCBQ));
+		iocbq.iocb.un.elsreq.remoteID = fx->fx_sid;
+		iocbq.iocb.un.elsreq.myID = fx->fx_did;
+		iocbq.iocb.ULPCONTEXT = fx->rsvd2;
+
+		(void) emlxs_els_reply(port, &iocbq,
+		    ELS_CMD_LS_RJT, ELS_CMD_FLOGI,
+		    LSRJT_UNABLE_TPC, LSEXP_NOTHING_MORE);
+
+		/* If we have an FLOGI saved, try sending it now */
+		if (port->fx.fx_op) {
+			fx = NULL;
+			goto begin;
+		}
+
+	} else {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
+		    "FLOGI: sid=%x xid=%x. Link down. "
+		    "Dropping.",
+		    fx->fx_sid, fx->rsvd2);
+	}
+
 	return;
 
-} /* emlxs_fct_unsol_callback() */
+} /* emlxs_fct_handle_unsol_flogi() */
 
 
 /* This is called at port online and offline */
@@ -740,31 +747,21 @@ emlxs_fct_unsol_flush(emlxs_port_t *port)
 	emlxs_buf_t *next;
 	fct_cmd_t *fct_cmd;
 	fct_status_t rval;
+	uint32_t cmd_code;
 
 	if (!port->fct_port) {
 		return;
 	}
 
-	/* Return if nothing to do */
-	if (!port->fct_wait_head) {
-		return;
-	}
+	/* First handle any pending FLOGI */
+	emlxs_fct_handle_unsol_flogi(port, NULL, 0);
 
+	/* Wait queue */
 	mutex_enter(&EMLXS_PORT_LOCK);
 	cmd_sbp = port->fct_wait_head;
 	port->fct_wait_head = NULL;
 	port->fct_wait_tail = NULL;
 	mutex_exit(&EMLXS_PORT_LOCK);
-
-	/* First, see if there is an outstanding FLOGI to process */
-	if (port->fx.fx_op == ELS_OP_FLOGI) {
-		if (port->fct_flags & FCT_STATE_LINK_UP) {
-			/* Process Deferred FLOGI now */
-			emlxs_fct_handle_rcvd_flogi(port);
-		} else {
-			port->fx.fx_op = 0;	/* Flush delayed FLOGI */
-		}
-	}
 
 	/*
 	 * Next process any outstanding ELS commands. It doesn't
@@ -774,12 +771,16 @@ emlxs_fct_unsol_flush(emlxs_port_t *port)
 		next = cmd_sbp->next;
 		fct_cmd = cmd_sbp->fct_cmd;
 
+		cmd_code = (fct_cmd->cmd_oxid << ELS_CMD_SHIFT);
+
 		/* Reacquire ownership of the fct_cmd */
 		rval = emlxs_fct_cmd_acquire(port, fct_cmd, 0);
 		if (rval) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
-			    "emlxs_fct_unsol_flush: "
-			    "Unable to reacquire fct_cmd.");
+			    "emlxs_fct_unsol_flush: %s: sid=%x xid=%x "
+			    "Unable to reacquire fct_cmd.",
+			    emlxs_elscmd_xlate(cmd_code),
+			    fct_cmd->cmd_rxid, fct_cmd->cmd_rportid);
 
 			cmd_sbp = next;
 			continue;
@@ -787,7 +788,10 @@ emlxs_fct_unsol_flush(emlxs_port_t *port)
 		/* mutex_enter(&cmd_sbp->fct_mtx); */
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
-		    "Completing fct_cmd: %p", fct_cmd);
+		    "Completing %s: sid=%x xid=%x %p",
+		    emlxs_elscmd_xlate(cmd_code),
+		    fct_cmd->cmd_rportid, fct_cmd->cmd_rxid,
+		    fct_cmd);
 
 		emlxs_fct_cmd_post(port, fct_cmd, EMLXS_FCT_CMD_POSTED);
 		/* mutex_exit(&cmd_sbp->fct_mtx); */
@@ -1962,6 +1966,16 @@ emlxs_fct_flogi_xchg(struct fct_local_port *fct_port, struct fct_flogi_xchg *fx)
 		goto done;
 	}
 
+	/* Use this entyr point as the link up acknowlegment */
+	mutex_enter(&EMLXS_PORT_LOCK);
+	port->fct_flags |= FCT_STATE_LINK_UP_ACKED;
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
+	    "emlxs_fct_link_up acked.");
+	mutex_exit(&EMLXS_PORT_LOCK);
+
+	/* Now flush any pending unsolicited requests */
+	emlxs_fct_unsol_flush(port);
+
 	size = sizeof (SERV_PARM) + 4;
 
 	if (!(pkt = emlxs_pkt_alloc(port, size, size, 0, KM_NOSLEEP))) {
@@ -2109,7 +2123,6 @@ emlxs_fct_get_link_info(fct_local_port_t *fct_port, fct_link_info_t *link)
 	link->port_no_fct_flogi = 0;
 	link->port_fca_flogi_done = 0;
 	link->port_fct_flogi_done = 0;
-
 
 	mutex_exit(&EMLXS_PORT_LOCK);
 
@@ -3127,28 +3140,28 @@ emlxs_fct_handle_unsol_els(emlxs_port_t *port, CHANNEL *cp, IOCBQ *iocbq,
 	/* Process the request */
 	switch (cmd_code) {
 	case ELS_CMD_FLOGI:
-		rval =
-		    emlxs_fct_process_unsol_flogi(port, cp, iocbq, mp, size);
+		rval = emlxs_fct_process_unsol_flogi(port, cp, iocbq, mp, size);
 
 		if (!rval) {
 			ELS_PKT *els_pkt = (ELS_PKT *)bp;
+			fct_flogi_xchg_t fx;
+
+			bzero((uint8_t *)&fx, sizeof (fct_flogi_xchg_t));
 
 			/* Save the FLOGI exchange information */
-			bzero((uint8_t *)&port->fx,
-			    sizeof (fct_flogi_xchg_t));
-			port->fx_context = iocb->ULPCONTEXT;
+			fx.rsvd2 = iocb->ULPCONTEXT;
 			bcopy((caddr_t)&els_pkt->un.logi.nodeName,
-			    (caddr_t)port->fx.fx_nwwn, 8);
+			    (caddr_t)fx.fx_nwwn, 8);
 			bcopy((caddr_t)&els_pkt->un.logi.portName,
-			    (caddr_t)port->fx.fx_pwwn, 8);
-			port->fx.fx_sid = sid;
-			port->fx.fx_did = iocb->un.elsreq.myID;
-			port->fx.fx_fport = els_pkt->un.logi.cmn.fPort;
-			port->fx.fx_op = ELS_OP_FLOGI;
+			    (caddr_t)fx.fx_pwwn, 8);
+			fx.fx_sid = sid;
+			fx.fx_did = iocb->un.elsreq.myID;
+			fx.fx_fport = els_pkt->un.logi.cmn.fPort;
+			fx.fx_op = ELS_OP_FLOGI;
 
-			/* Try to handle the FLOGI now */
-			emlxs_fct_handle_rcvd_flogi(port);
+			emlxs_fct_handle_unsol_flogi(port, &fx, 1);
 		}
+
 		goto done;
 
 	case ELS_CMD_PLOGI:
@@ -3220,7 +3233,61 @@ emlxs_fct_handle_unsol_els(emlxs_port_t *port, CHANNEL *cp, IOCBQ *iocbq,
 	    GET_STRUCT_SIZE(emlxs_buf_t));
 	bcopy(bp, els->els_req_payload, size);
 
-	emlxs_fct_unsol_callback(port, fct_cmd);
+
+	/* Check if Offline */
+	if (!(port->fct_flags & FCT_STATE_PORT_ONLINE)) {
+
+		emlxs_fct_cmd_post(port, fct_cmd, EMLXS_FCT_CMD_POSTED);
+		/* mutex_exit(&cmd_sbp->fct_mtx); */
+
+#ifdef FCT_API_TRACE
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_api_msg,
+		    "fct_post_rcvd_cmd:4 %p: portid x%x", fct_cmd,
+		    fct_cmd->cmd_lportid);
+#endif /* FCT_API_TRACE */
+
+		MODSYM(fct_post_rcvd_cmd) (fct_cmd, 0);
+
+		goto done;
+	}
+
+	/* Online */
+	/* Check if Link up is acked */
+	if (port->fct_flags & FCT_STATE_LINK_UP_ACKED) {
+
+		emlxs_fct_cmd_post(port, fct_cmd, EMLXS_FCT_CMD_POSTED);
+		/* mutex_exit(&cmd_sbp->fct_mtx); */
+
+#ifdef FCT_API_TRACE
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_api_msg,
+		    "fct_post_rcvd_cmd:1 %p: portid x%x", fct_cmd,
+		    fct_cmd->cmd_lportid);
+#endif /* FCT_API_TRACE */
+
+		MODSYM(fct_post_rcvd_cmd) (fct_cmd, 0);
+
+		goto done;
+
+	}
+
+	/* Defer processing of fct_cmd till later (after link up ack). */
+
+	emlxs_fct_cmd_release(port, fct_cmd, EMLXS_FCT_CMD_WAITQ);
+	/* mutex_exit(&cmd_sbp->fct_mtx); */
+
+	/* Add cmd_sbp to queue tail */
+	mutex_enter(&EMLXS_PORT_LOCK);
+
+	if (port->fct_wait_tail) {
+		port->fct_wait_tail->next = cmd_sbp;
+	}
+	port->fct_wait_tail = cmd_sbp;
+
+	if (!port->fct_wait_head) {
+		port->fct_wait_head = cmd_sbp;
+	}
+
+	mutex_exit(&EMLXS_PORT_LOCK);
 
 done:
 
@@ -4536,6 +4603,7 @@ emlxs_fct_link_up(emlxs_port_t *port)
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
 		    "emlxs_fct_link_up event.");
 
+		port->fct_flags &= ~FCT_STATE_LINK_UP_ACKED;
 		port->fct_flags |= FCT_STATE_LINK_UP;
 		mutex_exit(&EMLXS_PORT_LOCK);
 
@@ -4546,7 +4614,6 @@ emlxs_fct_link_up(emlxs_port_t *port)
 		MODSYM(fct_handle_event) (port->fct_port, FCT_EVENT_LINK_UP,
 		    0, 0);
 
-		emlxs_fct_unsol_flush(port);
 	} else {
 		if (!hba->ini_mode &&
 		    !(port->fct_flags & FCT_STATE_PORT_ONLINE)) {
@@ -4577,6 +4644,7 @@ emlxs_fct_link_down(emlxs_port_t *port)
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
 		    "emlxs_fct_link_down event.");
 
+		port->fct_flags &= ~FCT_STATE_LINK_UP_ACKED;
 		port->fct_flags &= ~FCT_STATE_LINK_UP;
 		mutex_exit(&EMLXS_PORT_LOCK);
 

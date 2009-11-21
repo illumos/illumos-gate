@@ -36,7 +36,7 @@
 #include <emlxs_fw.h>
 #include <emlxs_adapters.h>
 #include <emlxs_msg.h>
-#include <emlxs_event.h>
+#include <emlxs_events.h>
 #include <emlxs_thread.h>
 #include <emlxs_config.h>
 #include <emlxs_dfclib.h>

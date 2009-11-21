@@ -369,7 +369,7 @@ emlxs_data_dump(hba, "RD_REV", (uint32_t *)mb, 18, 0);
 	emlxs_decode_label(vpd->opFwName, vpd->opFwName, 0);
 	emlxs_decode_label(vpd->postKernName, vpd->postKernName, 0);
 
-	if (hba->model_info.chip == EMLXS_TIGERSHARK_CHIP) {
+	if (hba->model_info.chip == EMLXS_BE_CHIP) {
 		(void) strcpy(vpd->sli4FwLabel, "be2.ufi");
 	} else {
 		(void) strcpy(vpd->sli4FwLabel, "sli4.fw");
@@ -537,7 +537,7 @@ emlxs_data_dump(hba, "RD_REV", (uint32_t *)mb, 18, 0);
 		if (fw) {
 
 			/* Obtain current firmware version info */
-			if (hba->model_info.chip == EMLXS_TIGERSHARK_CHIP) {
+			if (hba->model_info.chip == EMLXS_BE_CHIP) {
 				(void) emlxs_sli4_read_fw_version(hba, &hba_fw);
 			} else {
 				hba_fw.kern = vpd->postKernRev;
