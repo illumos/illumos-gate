@@ -20,12 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
- *  Copyright (c) 2002-2008 Neterion, Inc.
+ *  Copyright (c) 2002-2009 Neterion, Inc.
  *  All right Reserved.
  *
  *  FileName :    xgell.c
@@ -635,9 +635,9 @@ xgell_rx_hcksum_assoc(mblk_t *mp, char *vaddr, int pkt_length,
 		if (ext_info->proto & XGE_HAL_FRAME_PROTO_IPV4) {
 			struct ip *ip =
 			    (struct ip *)(vaddr + ip_off);
-			start = ip->ip_hl * 4 + ip_off;
+			start = ip->ip_hl * 4;
 		} else {
-			start = ip_off + 40;
+			start = 40;
 		}
 		cksum_flags |= HCK_PARTIALCKSUM;
 		(void) hcksum_assoc(mp, NULL, NULL, start, 0,

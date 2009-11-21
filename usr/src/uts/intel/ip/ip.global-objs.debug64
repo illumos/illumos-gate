@@ -312,5 +312,4 @@ udp_winit
 udpinfov4
 udpinfov6
 winit_arp
-eri_cksum_workaround
 nxge_cksum_workaround

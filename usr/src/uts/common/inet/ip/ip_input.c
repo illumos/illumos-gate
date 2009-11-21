@@ -1759,6 +1759,13 @@ ip_input_local_v4(ire_t *ire, mblk_t *mp, ipha_t *ipha, ip_recv_attr_t *ira)
 			/* Error has been sent and mp consumed */
 			return;
 		}
+		/*
+		 * Some old hardware does partial checksum by including the
+		 * whole IP header, so the partial checksum value might have
+		 * become invalid if any option in the packet have been
+		 * updated. Always clear partial checksum flag here.
+		 */
+		DB_CKSUMFLAGS(mp) &= ~HCK_PARTIALCKSUM;
 	}
 
 	/*
@@ -2139,9 +2146,6 @@ ip_input_sw_cksum_v4(mblk_t *mp, ipha_t *ipha, ip_recv_attr_t *ira)
 	return (B_FALSE);
 }
 
-/* There are drivers that can't do partial checksum with IP options */
-int eri_cksum_workaround = 1;
-
 /*
  * Verify the ULP checksums.
  * Returns B_TRUE if ok, or if the ULP doesn't have a well-defined checksum
@@ -2245,7 +2249,6 @@ ip_input_cksum_v4(iaflags_t iraflags, mblk_t *mp, ipha_t *ipha,
 	if ((hck_flags & HCK_PARTIALCKSUM) &&
 	    (mp1 == NULL || mp1->b_cont == NULL) &&
 	    ip_hdr_length >= DB_CKSUMSTART(mp) &&
-	    (!eri_cksum_workaround || ip_hdr_length == IP_SIMPLE_HDR_LENGTH) &&
 	    ((len = ip_hdr_length - DB_CKSUMSTART(mp)) & 1) == 0) {
 		uint32_t	adj;
 		uchar_t		*cksum_start;
