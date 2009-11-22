@@ -585,70 +585,6 @@ dump_dedup_ratio(const ddt_stat_t *dds)
 }
 
 static void
-dump_ddt_stat(const ddt_stat_t *dds, int h)
-{
-	char refcnt[6];
-	char blocks[6], lsize[6], psize[6], dsize[6];
-	char ref_blocks[6], ref_lsize[6], ref_psize[6], ref_dsize[6];
-
-	if (dds->dds_blocks == 0)
-		return;
-
-	if (h == -1)
-		(void) strcpy(refcnt, "Total");
-	else
-		nicenum(1ULL << h, refcnt);
-
-	nicenum(dds->dds_blocks, blocks);
-	nicenum(dds->dds_lsize, lsize);
-	nicenum(dds->dds_psize, psize);
-	nicenum(dds->dds_dsize, dsize);
-	nicenum(dds->dds_ref_blocks, ref_blocks);
-	nicenum(dds->dds_ref_lsize, ref_lsize);
-	nicenum(dds->dds_ref_psize, ref_psize);
-	nicenum(dds->dds_ref_dsize, ref_dsize);
-
-	(void) printf("%6s   %6s   %5s   %5s   %5s   %6s   %5s   %5s   %5s\n",
-	    refcnt,
-	    blocks, lsize, psize, dsize,
-	    ref_blocks, ref_lsize, ref_psize, ref_dsize);
-}
-
-static void
-dump_ddt_histogram(const ddt_histogram_t *ddh)
-{
-	ddt_stat_t dds_total = { 0 };
-
-	ddt_histogram_stat(&dds_total, ddh);
-
-	(void) printf("\n");
-
-	(void) printf("bucket   "
-	    "           allocated             "
-	    "          referenced          \n");
-	(void) printf("______   "
-	    "______________________________   "
-	    "______________________________\n");
-
-	(void) printf("%6s   %6s   %5s   %5s   %5s   %6s   %5s   %5s   %5s\n",
-	    "refcnt",
-	    "blocks", "LSIZE", "PSIZE", "DSIZE",
-	    "blocks", "LSIZE", "PSIZE", "DSIZE");
-
-	(void) printf("%6s   %6s   %5s   %5s   %5s   %6s   %5s   %5s   %5s\n",
-	    "------",
-	    "------", "-----", "-----", "-----",
-	    "------", "-----", "-----", "-----");
-
-	for (int h = 0; h < 64; h++)
-		dump_ddt_stat(&ddh->ddh_stat[h], h);
-
-	dump_ddt_stat(&dds_total, -1);
-
-	(void) printf("\n");
-}
-
-static void
 dump_ddt(ddt_t *ddt, enum ddt_type type, enum ddt_class class)
 {
 	char name[DDT_NAMELEN];
@@ -681,7 +617,7 @@ dump_ddt(ddt_t *ddt, enum ddt_type type, enum ddt_class class)
 	if (dump_opt['D'] < 3)
 		return;
 
-	dump_ddt_histogram(&ddt->ddt_histogram[type][class]);
+	zpool_dump_ddt(NULL, &ddt->ddt_histogram[type][class]);
 
 	if (dump_opt['D'] < 4)
 		return;
@@ -710,14 +646,12 @@ dump_all_ddts(spa_t *spa)
 		for (enum ddt_type type = 0; type < DDT_TYPES; type++) {
 			for (enum ddt_class class = 0; class < DDT_CLASSES;
 			    class++) {
-				ddt_histogram_add(&ddh_total,
-				    &ddt->ddt_histogram[type][class]);
 				dump_ddt(ddt, type, class);
 			}
 		}
 	}
 
-	ddt_histogram_stat(&dds_total, &ddh_total);
+	ddt_get_dedup_stats(spa, &dds_total);
 
 	if (dds_total.dds_blocks == 0) {
 		(void) printf("All DDTs are empty\n");
@@ -728,7 +662,8 @@ dump_all_ddts(spa_t *spa)
 
 	if (dump_opt['D'] > 1) {
 		(void) printf("DDT histogram (aggregated over all DDTs):\n");
-		dump_ddt_histogram(&ddh_total);
+		ddt_get_dedup_histogram(spa, &ddh_total);
+		zpool_dump_ddt(&dds_total, &ddh_total);
 	}
 
 	dump_dedup_ratio(&dds_total);
@@ -2245,7 +2180,7 @@ dump_simulated_ddt(spa_t *spa)
 
 	(void) printf("Simulated DDT histogram:\n");
 
-	dump_ddt_histogram(&ddh_total);
+	zpool_dump_ddt(&dds_total, &ddh_total);
 
 	dump_dedup_ratio(&dds_total);
 }

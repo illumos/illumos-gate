@@ -299,6 +299,7 @@ typedef enum {
 
 extern zpool_status_t zpool_get_status(zpool_handle_t *, char **);
 extern zpool_status_t zpool_import_status(nvlist_t *, char **);
+extern void zpool_dump_ddt(const ddt_stat_t *dds, const ddt_histogram_t *ddh);
 
 /*
  * Statistics and configuration functions.

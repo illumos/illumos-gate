@@ -451,6 +451,9 @@ typedef struct zpool_rewind_policy {
 #define	ZPOOL_CONFIG_HOLE_ARRAY		"hole_array"
 #define	ZPOOL_CONFIG_VDEV_CHILDREN	"vdev_children"
 #define	ZPOOL_CONFIG_IS_HOLE		"is_hole"
+#define	ZPOOL_CONFIG_DDT_HISTOGRAM	"ddt_histogram"
+#define	ZPOOL_CONFIG_DDT_OBJ_STATS	"ddt_object_stats"
+#define	ZPOOL_CONFIG_DDT_STATS		"ddt_stats"
 #define	ZPOOL_CONFIG_SUSPENDED		"suspended"	/* not stored on disk */
 #define	ZPOOL_CONFIG_TIMESTAMP		"timestamp"	/* not stored on disk */
 #define	ZPOOL_CONFIG_BOOTFS		"bootfs"	/* not stored on disk */
@@ -606,6 +609,31 @@ typedef struct vdev_stat {
 	uint64_t	vs_scrub_end;		/* UTC scrub end time	*/
 } vdev_stat_t;
 
+/*
+ * DDT statistics.  Note: all fields should be 64-bit because this
+ * is passed between kernel and userland as an nvlist uint64 array.
+ */
+typedef struct ddt_object {
+	uint64_t	ddo_count;	/* number of elments in ddt 	*/
+	uint64_t	ddo_dspace;	/* size of ddt on disk		*/
+	uint64_t	ddo_mspace;	/* size of ddt in-core		*/
+} ddt_object_t;
+
+typedef struct ddt_stat {
+	uint64_t	dds_blocks;	/* blocks			*/
+	uint64_t	dds_lsize;	/* logical size			*/
+	uint64_t	dds_psize;	/* physical size		*/
+	uint64_t	dds_dsize;	/* deflated allocated size	*/
+	uint64_t	dds_ref_blocks;	/* referenced blocks		*/
+	uint64_t	dds_ref_lsize;	/* referenced lsize * refcnt	*/
+	uint64_t	dds_ref_psize;	/* referenced psize * refcnt	*/
+	uint64_t	dds_ref_dsize;	/* referenced dsize * refcnt	*/
+} ddt_stat_t;
+
+typedef struct ddt_histogram {
+	ddt_stat_t	ddh_stat[64];	/* power-of-two histogram buckets */
+} ddt_histogram_t;
+
 #define	ZVOL_DRIVER	"zvol"
 #define	ZFS_DRIVER	"zfs"
 #define	ZFS_DEV		"/dev/zfs"
@@ -686,11 +714,12 @@ typedef enum zfs_ioc {
  * Internal SPA load state.  Used by FMA diagnosis engine.
  */
 typedef enum {
-	SPA_LOAD_NONE,		/* no load in progress */
-	SPA_LOAD_OPEN,		/* normal open */
-	SPA_LOAD_IMPORT,	/* import in progress */
+	SPA_LOAD_NONE,		/* no load in progress	*/
+	SPA_LOAD_OPEN,		/* normal open		*/
+	SPA_LOAD_IMPORT,	/* import in progress	*/
 	SPA_LOAD_TRYIMPORT,	/* tryimport in progress */
-	SPA_LOAD_RECOVER	/* recovery requested */
+	SPA_LOAD_RECOVER,	/* recovery requested	*/
+	SPA_LOAD_ERROR		/* load failed		*/
 } spa_load_state_t;
 
 /*

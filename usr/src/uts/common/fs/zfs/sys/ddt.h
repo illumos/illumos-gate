@@ -60,24 +60,6 @@ enum ddt_class {
 #define	DDT_COMPRESS_FUNCTION_MASK	0x7f
 
 /*
- * DDT statistics.
- */
-typedef struct ddt_stat {
-	uint64_t	dds_blocks;	/* blocks			*/
-	uint64_t	dds_lsize;	/* logical size			*/
-	uint64_t	dds_psize;	/* physical size		*/
-	uint64_t	dds_dsize;	/* deflated allocated size	*/
-	uint64_t	dds_ref_blocks;	/* referenced blocks		*/
-	uint64_t	dds_ref_lsize;	/* referenced lsize * refcnt	*/
-	uint64_t	dds_ref_psize;	/* referenced psize * refcnt	*/
-	uint64_t	dds_ref_dsize;	/* referenced dsize * refcnt	*/
-} ddt_stat_t;
-
-typedef struct ddt_histogram {
-	ddt_stat_t	ddh_stat[64];	/* power-of-two histogram buckets */
-} ddt_histogram_t;
-
-/*
  * On-disk ddt entry:  key (name) and physical storage (value).
  */
 typedef struct ddt_key {
@@ -215,6 +197,9 @@ extern void ddt_stat_add(ddt_stat_t *dst, const ddt_stat_t *src, uint64_t neg);
 extern void ddt_histogram_add(ddt_histogram_t *dst, const ddt_histogram_t *src);
 extern void ddt_histogram_stat(ddt_stat_t *dds, const ddt_histogram_t *ddh);
 extern boolean_t ddt_histogram_empty(const ddt_histogram_t *ddh);
+extern void ddt_get_dedup_object_stats(spa_t *spa, ddt_object_t *ddo);
+extern void ddt_get_dedup_histogram(spa_t *spa, ddt_histogram_t *ddh);
+extern void ddt_get_dedup_stats(spa_t *spa, ddt_stat_t *dds_total);
 
 extern uint64_t ddt_get_dedup_dspace(spa_t *spa);
 extern uint64_t ddt_get_pool_dedup_ratio(spa_t *spa);

@@ -1803,7 +1803,8 @@ out:
 	spa->spa_minref = refcount_count(&spa->spa_refcount);
 	if (error && error != EBADF)
 		zfs_ereport_post(ereport, spa, NULL, NULL, 0, 0);
-	spa->spa_load_state = SPA_LOAD_NONE;
+
+	spa->spa_load_state = error ? SPA_LOAD_ERROR : SPA_LOAD_NONE;
 	spa->spa_ena = 0;
 
 	return (error);

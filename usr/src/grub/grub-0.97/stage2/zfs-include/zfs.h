@@ -64,6 +64,9 @@
 #define	ZPOOL_CONFIG_HOLE_ARRAY		"hole_array"
 #define	ZPOOL_CONFIG_VDEV_CHILDREN	"vdev_children"
 #define	ZPOOL_CONFIG_IS_HOLE		"is_hole"
+#define	ZPOOL_CONFIG_DDT_HISTOGRAM	"ddt_histogram"
+#define	ZPOOL_CONFIG_DDT_OBJ_STATS	"ddt_object_stats"
+#define	ZPOOL_CONFIG_DDT_STATS		"ddt_stats"
 /*
  * The persistent vdev state is stored as separate values rather than a single
  * 'vdev_state' entry.  This is because a device can be in multiple states, such

@@ -2984,6 +2984,7 @@ typedef struct status_cbdata {
 	boolean_t	cb_verbose;
 	boolean_t	cb_explain;
 	boolean_t	cb_first;
+	boolean_t	cb_dedup_stats;
 } status_cbdata_t;
 
 /*
@@ -3121,6 +3122,36 @@ print_l2cache(zpool_handle_t *zhp, nvlist_t **l2cache, uint_t nl2cache,
 		    namewidth, 2, B_FALSE);
 		free(name);
 	}
+}
+
+static void
+print_dedup_stats(nvlist_t *config)
+{
+	ddt_histogram_t *ddh;
+	ddt_stat_t *dds;
+	ddt_object_t *ddo;
+	uint_t c;
+
+	/*
+	 * If the pool was faulted then we may not have been able to
+	 * obtain the config. Otherwise, if have anything in the dedup
+	 * table continue processing the stats.
+	 */
+	if (nvlist_lookup_uint64_array(config, ZPOOL_CONFIG_DDT_OBJ_STATS,
+	    (uint64_t **)&ddo, &c) != 0 || ddo->ddo_count == 0)
+		return;
+
+	(void) printf("\n");
+	(void) printf("DDT entries %llu, size %llu on disk, %llu in core\n",
+	    (u_longlong_t)ddo->ddo_count,
+	    (u_longlong_t)ddo->ddo_dspace,
+	    (u_longlong_t)ddo->ddo_mspace);
+
+	verify(nvlist_lookup_uint64_array(config, ZPOOL_CONFIG_DDT_STATS,
+	    (uint64_t **)&dds, &c) == 0);
+	verify(nvlist_lookup_uint64_array(config, ZPOOL_CONFIG_DDT_HISTOGRAM,
+	    (uint64_t **)&ddh, &c) == 0);
+	zpool_dump_ddt(dds, ddh);
 }
 
 /*
@@ -3405,6 +3436,9 @@ status_callback(zpool_handle_t *zhp, void *data)
 			else
 				print_error_log(zhp);
 		}
+
+		if (cbp->cb_dedup_stats)
+			print_dedup_stats(config);
 	} else {
 		(void) printf(gettext("config: The configuration cannot be "
 		    "determined.\n"));
@@ -3418,6 +3452,7 @@ status_callback(zpool_handle_t *zhp, void *data)
  *
  *	-v	Display complete error logs
  *	-x	Display only pools with potential problems
+ *	-D	Display dedup status (undocumented)
  *
  * Describes the health status of all pools or some subset.
  */
@@ -3429,13 +3464,16 @@ zpool_do_status(int argc, char **argv)
 	status_cbdata_t cb = { 0 };
 
 	/* check options */
-	while ((c = getopt(argc, argv, "vx")) != -1) {
+	while ((c = getopt(argc, argv, "vxD")) != -1) {
 		switch (c) {
 		case 'v':
 			cb.cb_verbose = B_TRUE;
 			break;
 		case 'x':
 			cb.cb_explain = B_TRUE;
+			break;
+		case 'D':
+			cb.cb_dedup_stats = B_TRUE;
 			break;
 		case '?':
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
