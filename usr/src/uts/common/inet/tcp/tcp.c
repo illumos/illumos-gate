@@ -2315,9 +2315,6 @@ tcp_accept_swap(tcp_t *listener, tcp_t *acceptor, tcp_t *eager)
 	/* Do the IPC initialization */
 	CONN_INC_REF(econnp);
 
-	econnp->conn_family = aconnp->conn_family;
-	econnp->conn_ipversion = aconnp->conn_ipversion;
-
 	/* Done with old IPC. Drop its ref on its connp */
 	CONN_DEC_REF(aconnp);
 }
@@ -8566,11 +8563,11 @@ tcp_build_hdrs(tcp_t *tcp)
 	if (buflen != 0) {
 		bcopy(buf, connp->conn_ht_ulp, buflen);
 	} else {
-		tcpha->tha_lport = connp->conn_lport;
-		tcpha->tha_fport = connp->conn_fport;
 		tcpha->tha_sum = 0;
 		tcpha->tha_offset_and_reserved = (5 << 4);
 	}
+	tcpha->tha_lport = connp->conn_lport;
+	tcpha->tha_fport = connp->conn_fport;
 
 	/*
 	 * IP wants our header length in the checksum field to
