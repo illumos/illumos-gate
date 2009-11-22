@@ -112,8 +112,8 @@ zfs_ereport_start(nvlist_t **ereport_out, nvlist_t **detector_out,
 	 * If we are doing a spa_tryimport() or in recovery mode,
 	 * ignore errors.
 	 */
-	if (spa->spa_load_state == SPA_LOAD_TRYIMPORT ||
-	    spa->spa_load_state == SPA_LOAD_RECOVER)
+	if (spa_load_state(spa) == SPA_LOAD_TRYIMPORT ||
+	    spa_load_state(spa) == SPA_LOAD_RECOVER)
 		return;
 
 	/*
@@ -121,7 +121,7 @@ zfs_ereport_start(nvlist_t **ereport_out, nvlist_t **detector_out,
 	 * failed, don't bother logging any new ereports - we're just going to
 	 * get the same diagnosis anyway.
 	 */
-	if (spa->spa_load_state != SPA_LOAD_NONE &&
+	if (spa_load_state(spa) != SPA_LOAD_NONE &&
 	    spa->spa_last_open_failed)
 		return;
 
@@ -202,7 +202,7 @@ zfs_ereport_start(nvlist_t **ereport_out, nvlist_t **detector_out,
 	 * state, use a SPA-wide ENA.  Otherwise, if we are in an I/O state, use
 	 * a root zio-wide ENA.  Otherwise, simply use a unique ENA.
 	 */
-	if (spa->spa_load_state != SPA_LOAD_NONE) {
+	if (spa_load_state(spa) != SPA_LOAD_NONE) {
 		if (spa->spa_ena == 0)
 			spa->spa_ena = fm_ena_generate(0, FM_ENA_FMT1);
 		ena = spa->spa_ena;
@@ -238,7 +238,7 @@ zfs_ereport_start(nvlist_t **ereport_out, nvlist_t **detector_out,
 	    DATA_TYPE_STRING, spa_name(spa), FM_EREPORT_PAYLOAD_ZFS_POOL_GUID,
 	    DATA_TYPE_UINT64, spa_guid(spa),
 	    FM_EREPORT_PAYLOAD_ZFS_POOL_CONTEXT, DATA_TYPE_INT32,
-	    spa->spa_load_state, NULL);
+	    spa_load_state(spa), NULL);
 
 	if (spa != NULL) {
 		fm_payload_set(ereport, FM_EREPORT_PAYLOAD_ZFS_POOL_FAILMODE,
@@ -805,7 +805,7 @@ zfs_post_common(spa_t *spa, vdev_t *vd, const char *name)
 	nvlist_t *resource;
 	char class[64];
 
-	if (spa->spa_load_state == SPA_LOAD_TRYIMPORT)
+	if (spa_load_state(spa) == SPA_LOAD_TRYIMPORT)
 		return;
 
 	if ((resource = fm_nvlist_create(NULL)) == NULL)

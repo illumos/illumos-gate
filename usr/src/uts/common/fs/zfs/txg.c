@@ -353,6 +353,7 @@ txg_dispatch_callbacks(dsl_pool_t *dp, uint64_t txg)
 static void
 txg_sync_thread(dsl_pool_t *dp)
 {
+	spa_t *spa = dp->dp_spa;
 	tx_state_t *tx = &dp->dp_tx;
 	callb_cpr_t cpr;
 	uint64_t start, delta;
@@ -371,7 +372,8 @@ txg_sync_thread(dsl_pool_t *dp)
 		 */
 		timer = (delta >= timeout ? 0 : timeout - delta);
 		while ((dp->dp_scrub_func == SCRUB_FUNC_NONE ||
-		    spa_shutting_down(dp->dp_spa)) &&
+		    spa_load_state(spa) != SPA_LOAD_NONE ||
+		    spa_shutting_down(spa)) &&
 		    !tx->tx_exiting && timer > 0 &&
 		    tx->tx_synced_txg >= tx->tx_sync_txg_waiting &&
 		    tx->tx_quiesced_txg == 0) {
@@ -411,7 +413,7 @@ txg_sync_thread(dsl_pool_t *dp)
 		mutex_exit(&tx->tx_sync_lock);
 
 		start = ddi_get_lbolt();
-		spa_sync(dp->dp_spa, txg);
+		spa_sync(spa, txg);
 		delta = ddi_get_lbolt() - start;
 
 		mutex_enter(&tx->tx_sync_lock);

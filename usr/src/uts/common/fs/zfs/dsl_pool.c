@@ -382,8 +382,12 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 		dsl_dir_sync(dd, tx);
 	write_time += gethrtime() - start;
 
-	if (spa_sync_pass(dp->dp_spa) == 1)
+	if (spa_sync_pass(dp->dp_spa) == 1) {
+		dp->dp_scrub_prefetch_zio_root = zio_root(dp->dp_spa, NULL,
+		    NULL, ZIO_FLAG_CANFAIL);
 		dsl_pool_scrub_sync(dp, tx);
+		(void) zio_wait(dp->dp_scrub_prefetch_zio_root);
+	}
 
 	start = gethrtime();
 	if (list_head(&mos->os_dirty_dnodes[txg & TXG_MASK]) != NULL ||

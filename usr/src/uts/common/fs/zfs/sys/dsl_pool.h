@@ -105,6 +105,7 @@ typedef struct dsl_pool {
 	boolean_t dp_scrub_isresilver;
 	boolean_t dp_scrub_restart;
 	kmutex_t dp_scrub_cancel_lock; /* protects dp_scrub_restart */
+	zio_t *dp_scrub_prefetch_zio_root;
 
 	/* Has its own locking */
 	tx_state_t dp_tx;

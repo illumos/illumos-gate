@@ -1236,6 +1236,12 @@ spa_state(spa_t *spa)
 	return (spa->spa_state);
 }
 
+spa_load_state_t
+spa_load_state(spa_t *spa)
+{
+	return (spa->spa_load_state);
+}
+
 uint64_t
 spa_freeze_txg(spa_t *spa)
 {

@@ -313,6 +313,8 @@ zfs_params(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		"zfs_vdev_max_pending",
 		"zfs_vdev_min_pending",
 		"zfs_scrub_limit",
+		"zfs_no_scrub_io",
+		"zfs_no_scrub_prefetch",
 		"zfs_vdev_time_shift",
 		"zfs_vdev_ramp_rate",
 		"zfs_vdev_aggregation_limit",

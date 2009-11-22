@@ -529,7 +529,7 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 		 * valid in the current context.  Local vdevs will
 		 * remain in the faulted state.
 		 */
-		if (spa->spa_load_state == SPA_LOAD_OPEN) {
+		if (spa_load_state(spa) == SPA_LOAD_OPEN) {
 			(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_FAULTED,
 			    &vd->vdev_faulted);
 			(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_DEGRADED,
@@ -1345,7 +1345,7 @@ vdev_validate(vdev_t *vd)
 		 * state of the pool.
 		 */
 		if (!spa->spa_load_verbatim &&
-		    spa->spa_load_state == SPA_LOAD_OPEN &&
+		    spa_load_state(spa) == SPA_LOAD_OPEN &&
 		    state != POOL_STATE_ACTIVE)
 			return (EBADF);
 
@@ -2900,7 +2900,7 @@ vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state, vdev_aux_t aux)
 		 * begin with.  Failure to open such a device is not considered
 		 * an error.
 		 */
-		if (spa->spa_load_state == SPA_LOAD_IMPORT &&
+		if (spa_load_state(spa) == SPA_LOAD_IMPORT &&
 		    vd->vdev_ops->vdev_op_leaf)
 			vd->vdev_not_present = 1;
 

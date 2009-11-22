@@ -1890,9 +1890,12 @@ zfs_prop_set_special(const char *dsname, zprop_source_t source,
 		zfsvfs_rele(zfsvfs, FTAG);
 
 		if (err == 0 && intval >= ZPL_VERSION_USERSPACE) {
-			zfs_cmd_t zc = { 0 };
-			(void) strcpy(zc.zc_name, dsname);
-			(void) zfs_ioc_userspace_upgrade(&zc);
+			zfs_cmd_t *zc;
+
+			zc = kmem_zalloc(sizeof (zfs_cmd_t), KM_SLEEP);
+			(void) strcpy(zc->zc_name, dsname);
+			(void) zfs_ioc_userspace_upgrade(zc);
+			kmem_free(zc, sizeof (zfs_cmd_t));
 		}
 		break;
 	}

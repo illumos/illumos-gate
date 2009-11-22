@@ -53,6 +53,7 @@ static void scrub_visitdnode(dsl_pool_t *dp, dnode_phys_t *dnp, arc_buf_t *buf,
 int zfs_scrub_min_time = 1000; /* (millisec) min time to scrub per txg */
 int zfs_resilver_min_time = 3000; /* (millisec) min time to resilver per txg */
 boolean_t zfs_no_scrub_io = B_FALSE; /* set to disable scrub i/o */
+boolean_t zfs_no_scrub_prefetch = B_FALSE; /* set to disable srub prefetching */
 enum ddt_class zfs_scrub_ddt_class_max = DDT_CLASS_DUPLICATE;
 
 extern int zfs_txg_timeout;
@@ -450,6 +451,27 @@ traverse_zil(dsl_pool_t *dp, zil_header_t *zh)
 }
 
 static void
+scrub_prefetch(dsl_pool_t *dp, arc_buf_t *buf, blkptr_t *bp, uint64_t objset,
+    uint64_t object, uint64_t blkid)
+{
+	zbookmark_t czb;
+	uint32_t flags = ARC_NOWAIT | ARC_PREFETCH;
+
+	if (zfs_no_scrub_prefetch)
+		return;
+
+	if (BP_IS_HOLE(bp) || bp->blk_birth <= dp->dp_scrub_min_txg ||
+	    (BP_GET_LEVEL(bp) == 0 && BP_GET_TYPE(bp) != DMU_OT_DNODE))
+		return;
+
+	SET_BOOKMARK(&czb, objset, object, BP_GET_LEVEL(bp), blkid);
+
+	(void) arc_read(dp->dp_scrub_prefetch_zio_root, dp->dp_spa, bp,
+	    buf, NULL, NULL, ZIO_PRIORITY_ASYNC_READ, ZIO_FLAG_CANFAIL,
+	    &flags, &czb);
+}
+
+static void
 scrub_visitbp(dsl_pool_t *dp, dnode_phys_t *dnp,
     arc_buf_t *pbuf, blkptr_t *bp, const zbookmark_t *zb)
 {
@@ -487,6 +509,13 @@ scrub_visitbp(dsl_pool_t *dp, dnode_phys_t *dnp,
 		}
 	}
 
+	/*
+	 * If dsl_pool_scrub_ddt() has aready scrubbed this block,
+	 * don't scrub it again.
+	 */
+	if (!ddt_class_contains(dp->dp_spa, dp->dp_scrub_ddt_class_max, bp))
+		(void) scrub_funcs[dp->dp_scrub_func](dp, bp, zb);
+
 	if (BP_GET_LEVEL(bp) > 0) {
 		uint32_t flags = ARC_WAIT;
 		int i;
@@ -502,9 +531,11 @@ scrub_visitbp(dsl_pool_t *dp, dnode_phys_t *dnp,
 			mutex_exit(&dp->dp_spa->spa_scrub_lock);
 			return;
 		}
-		cbp = buf->b_data;
-
-		for (i = 0; i < epb; i++, cbp++) {
+		for (i = 0, cbp = buf->b_data; i < epb; i++, cbp++) {
+			scrub_prefetch(dp, buf, cbp, zb->zb_objset,
+			    zb->zb_object, zb->zb_blkid * epb + i);
+		}
+		for (i = 0, cbp = buf->b_data; i < epb; i++, cbp++) {
 			zbookmark_t czb;
 
 			SET_BOOKMARK(&czb, zb->zb_objset, zb->zb_object,
@@ -514,8 +545,8 @@ scrub_visitbp(dsl_pool_t *dp, dnode_phys_t *dnp,
 		}
 	} else if (BP_GET_TYPE(bp) == DMU_OT_DNODE) {
 		uint32_t flags = ARC_WAIT;
-		dnode_phys_t *child_dnp;
-		int i;
+		dnode_phys_t *cdnp;
+		int i, j;
 		int epb = BP_GET_LSIZE(bp) >> DNODE_SHIFT;
 
 		err = arc_read(NULL, dp->dp_spa, bp, pbuf,
@@ -527,10 +558,15 @@ scrub_visitbp(dsl_pool_t *dp, dnode_phys_t *dnp,
 			mutex_exit(&dp->dp_spa->spa_scrub_lock);
 			return;
 		}
-		child_dnp = buf->b_data;
-
-		for (i = 0; i < epb; i++, child_dnp++) {
-			scrub_visitdnode(dp, child_dnp, buf, zb->zb_objset,
+		for (i = 0, cdnp = buf->b_data; i < epb; i++, cdnp++) {
+			for (j = 0; j < cdnp->dn_nblkptr; j++) {
+				blkptr_t *cbp = &cdnp->dn_blkptr[j];
+				scrub_prefetch(dp, buf, cbp, zb->zb_objset,
+				    zb->zb_blkid * epb + i, j);
+			}
+		}
+		for (i = 0, cdnp = buf->b_data; i < epb; i++, cdnp++) {
+			scrub_visitdnode(dp, cdnp, buf, zb->zb_objset,
 			    zb->zb_blkid * epb + i);
 		}
 	} else if (BP_GET_TYPE(bp) == DMU_OT_OBJSET) {
@@ -560,13 +596,6 @@ scrub_visitbp(dsl_pool_t *dp, dnode_phys_t *dnp,
 			    buf, zb->zb_objset, DMU_GROUPUSED_OBJECT);
 		}
 	}
-
-	/*
-	 * If dsl_pool_scrub_ddt() has aready scrubbed this block,
-	 * don't scrub it again.
-	 */
-	if (!ddt_class_contains(dp->dp_spa, dp->dp_scrub_ddt_class_max, bp))
-		(void) scrub_funcs[dp->dp_scrub_func](dp, bp, zb);
 
 	if (buf)
 		(void) arc_buf_remove_ref(buf, &buf);
@@ -887,7 +916,7 @@ dsl_pool_scrub_sync(dsl_pool_t *dp, dmu_tx_t *tx)
 	/*
 	 * If the pool is not loaded, or is trying to unload, leave it alone.
 	 */
-	if (spa->spa_load_state != SPA_LOAD_NONE || spa_shutting_down(spa))
+	if (spa_load_state(spa) != SPA_LOAD_NONE || spa_shutting_down(spa))
 		return;
 
 	if (dp->dp_scrub_restart) {
