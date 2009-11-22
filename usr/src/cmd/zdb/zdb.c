@@ -453,33 +453,37 @@ dump_metaslab_stats(metaslab_t *msp)
 static void
 dump_metaslab(metaslab_t *msp)
 {
-	char freebuf[5];
-	space_map_obj_t *smo = &msp->ms_smo;
 	vdev_t *vd = msp->ms_group->mg_vd;
 	spa_t *spa = vd->vdev_spa;
+	space_map_t *sm = &msp->ms_map;
+	space_map_obj_t *smo = &msp->ms_smo;
+	char freebuf[5];
 
-	nicenum(msp->ms_map.sm_size - smo->smo_alloc, freebuf);
+	nicenum(sm->sm_size - smo->smo_alloc, freebuf);
 
 	(void) printf(
 	    "\tmetaslab %6llu   offset %12llx   spacemap %6llu   free    %5s\n",
-	    (u_longlong_t)(msp->ms_map.sm_start / msp->ms_map.sm_size),
-	    (u_longlong_t)msp->ms_map.sm_start, (u_longlong_t)smo->smo_object,
-	    freebuf);
+	    (u_longlong_t)(sm->sm_start / sm->sm_size),
+	    (u_longlong_t)sm->sm_start, (u_longlong_t)smo->smo_object, freebuf);
 
 	if (dump_opt['m'] > 1 && !dump_opt['L']) {
 		mutex_enter(&msp->ms_lock);
-		VERIFY(space_map_load(&msp->ms_map, zfs_metaslab_ops,
-		    SM_FREE, &msp->ms_smo, spa->spa_meta_objset) == 0);
-		dump_metaslab_stats(msp);
-		space_map_unload(&msp->ms_map);
+		space_map_load_wait(sm);
+		if (!sm->sm_loaded &&
+		    (smo->smo_object != 0 || dump_opt['m'] > 2)) {
+			VERIFY(space_map_load(sm, zfs_metaslab_ops,
+			    SM_FREE, smo, spa->spa_meta_objset) == 0);
+			dump_metaslab_stats(msp);
+			space_map_unload(sm);
+		}
 		mutex_exit(&msp->ms_lock);
 	}
 
 	if (dump_opt['d'] > 5 || dump_opt['m'] > 2) {
-		ASSERT(msp->ms_map.sm_size == (1ULL << vd->vdev_ms_shift));
+		ASSERT(sm->sm_size == (1ULL << vd->vdev_ms_shift));
 
 		mutex_enter(&msp->ms_lock);
-		dump_spacemap(spa->spa_meta_objset, smo, &msp->ms_map);
+		dump_spacemap(spa->spa_meta_objset, smo, sm);
 		mutex_exit(&msp->ms_lock);
 	}
 }
@@ -2843,6 +2847,8 @@ main(int argc, char **argv)
 	error = 0;
 	target = argv[0];
 
+	VERIFY(nvlist_alloc(&policy, NV_UNIQUE_NAME, 0) == 0);
+
 	if (dump_opt['e']) {
 		nvlist_t *cfg = NULL;
 		char *name = find_zpool(&target, &cfg, nsearch, searchdirs);
@@ -2853,8 +2859,7 @@ main(int argc, char **argv)
 				(void) printf("\nConfiguration for import:\n");
 				dump_nvlist(cfg, 8);
 			}
-			if (nvlist_alloc(&policy, NV_UNIQUE_NAME, 0) != 0 ||
-			    nvlist_add_uint64(policy,
+			if (nvlist_add_uint64(policy,
 			    ZPOOL_REWIND_REQUEST_TXG, max_txg) != 0 ||
 			    nvlist_add_nvlist(cfg,
 			    ZPOOL_REWIND_POLICY, policy) != 0) {
@@ -2863,13 +2868,16 @@ main(int argc, char **argv)
 			}
 			if ((error = spa_import(name, cfg, NULL)) != 0)
 				error = spa_import_verbatim(name, cfg, NULL);
-			nvlist_free(policy);
 		}
+	} else {
+		VERIFY(nvlist_add_uint64(policy, ZPOOL_REWIND_META_THRESH,
+		    UINT64_MAX) == 0);
 	}
 
 	if (error == 0) {
 		if (strpbrk(target, "/@") == NULL || dump_opt['R']) {
-			error = spa_open(target, &spa, FTAG);
+			error = spa_open_rewind(target, &spa, FTAG, policy,
+			    NULL);
 			if (error) {
 				/*
 				 * If we're missing the log device then
@@ -2884,14 +2892,18 @@ main(int argc, char **argv)
 				}
 				mutex_exit(&spa_namespace_lock);
 
-				if (!error)
-					error = spa_open(target, &spa, FTAG);
+				if (!error) {
+					error = spa_open_rewind(target, &spa,
+					    FTAG, policy, NULL);
+				}
 			}
 		} else {
 			error = dmu_objset_own(target, DMU_OST_ANY,
 			    B_TRUE, FTAG, &os);
 		}
 	}
+	nvlist_free(policy);
+
 	if (error)
 		fatal("can't open '%s': %s", target, strerror(error));
 

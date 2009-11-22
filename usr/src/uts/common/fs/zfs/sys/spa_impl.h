@@ -80,7 +80,9 @@ typedef struct spa_config_dirent {
 
 enum zio_taskq_type {
 	ZIO_TASKQ_ISSUE = 0,
+	ZIO_TASKQ_ISSUE_HIGH,
 	ZIO_TASKQ_INTERRUPT,
+	ZIO_TASKQ_INTERRUPT_HIGH,
 	ZIO_TASKQ_TYPES
 };
 
