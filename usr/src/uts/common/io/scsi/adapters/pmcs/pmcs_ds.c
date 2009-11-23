@@ -215,6 +215,7 @@ pmcs_set_dev_state(pmcs_hw_t *pwp, pmcs_phy_t *phyp, pmcs_xscsi_t *xp,
 void
 pmcs_dev_state_recovery(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 {
+	boolean_t reschedule = B_FALSE;
 	uint8_t	ds, tgt_dev_state;
 	int rc;
 	pmcs_xscsi_t *tgt;
@@ -278,6 +279,9 @@ pmcs_dev_state_recovery(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 				    "%s: DS recovery on PHY %s "
 				    "re-invoked too soon. Skipping...",
 				    __func__, pptr->path);
+				if ((tgt) && (tgt->recover_wait)) {
+					reschedule = B_TRUE;
+				}
 				goto next_phy;
 			}
 		}
@@ -452,6 +456,10 @@ next_phy:
 		mutex_enter(&pwp->lock);
 		pwp->ds_err_recovering = 0;
 		mutex_exit(&pwp->lock);
+	}
+
+	if (reschedule) {
+		SCHEDULE_WORK(pwp, PMCS_WORK_DS_ERR_RECOVERY);
 	}
 }
 
