@@ -670,7 +670,7 @@ create_target(char *tgt, nvlist_t *proplist)
 	}
 
 	/* special case, don't set any TPGs */
-	if (tags && (strcmp("default", tags[0]) == 0)) {
+	if (tags && (count == 1) && (strcmp("default", tags[0]) == 0)) {
 		count = 0;
 	}
 
@@ -1113,7 +1113,7 @@ modify_target(char *tgt, char *newname, nvlist_t *proplist)
 	}
 
 	/* special case, remove all explicit TPGs, and don't add any */
-	if (tags && (strcmp("default", tags[0]) == 0)) {
+	if (tags && (count == 1) && (strcmp("default", tags[0]) == 0)) {
 		count = 0;
 	}
 
@@ -1603,7 +1603,7 @@ modify_initiator(char *ini, nvlist_t *proplist, boolean_t create)
 
 	inip = cfg->config_ini_list;
 	while (inip) {
-		if (strcmp(inip->ini_name, ini) == 0) {
+		if (strcasecmp(inip->ini_name, ini) == 0) {
 			break;
 		}
 
@@ -1716,7 +1716,7 @@ list_initiator(char *ini, boolean_t verbose, boolean_t script) /* ARGSUSED */
 		}
 
 		if (ini) {
-			if (strcmp(ini, ptr->ini_name) != 0) {
+			if (strcasecmp(ini, ptr->ini_name) != 0) {
 				continue;
 			} else {
 				found = B_TRUE;
@@ -1804,7 +1804,7 @@ delete_initiator(char *ini)
 
 	ptr = cfg->config_ini_list;
 	while (ptr) {
-		if (strcmp(ptr->ini_name, ini) == 0) {
+		if (strcasecmp(ptr->ini_name, ini) == 0) {
 			break;
 		}
 

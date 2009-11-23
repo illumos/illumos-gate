@@ -37,7 +37,7 @@
 extern "C" {
 #endif
 
-#define	MAX_TARGETS	32	/* maximum targets that may be created */
+#define	MAX_TARGETS 255 /* maximum targets that may be created */
 #define	MAX_TPGT	256
 #define	CFG_TPGTLIST	"tpgt-list"
 

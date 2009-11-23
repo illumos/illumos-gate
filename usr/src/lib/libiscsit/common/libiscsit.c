@@ -1302,7 +1302,7 @@ it_ini_create(it_config_t *cfg, it_ini_t **ini, char *ini_node_name)
 
 	ptr = cfg->config_ini_list;
 	while (ptr) {
-		if (strcmp(ptr->ini_name, ini_node_name) == 0) {
+		if (strcasecmp(ptr->ini_name, ini_node_name) == 0) {
 			break;
 		}
 		ptr = ptr->ini_next;
@@ -1449,7 +1449,7 @@ it_ini_delete(it_config_t *cfg, it_ini_t *ini)
 
 	ptr = cfg->config_ini_list;
 	while (ptr) {
-		if (strcmp(ptr->ini_name, ini->ini_name) == 0) {
+		if (strcasecmp(ptr->ini_name, ini->ini_name) == 0) {
 			break;
 		}
 		prev = ptr;
