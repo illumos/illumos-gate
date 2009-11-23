@@ -4174,10 +4174,10 @@ void
 time_help(void)
 {
 	mdb_printf("Prints the system time in nanoseconds.\n\n"
-	    "::time will return the timestamp at which we dropped into, if "
-	    "called from, kmdb(1); the core dump's high resolution time if "
-	    "inspecting one; or the running hires time if we're inspecting "
-	    "a live system.\n\n"
+	    "::time will return the timestamp at which we dropped into, \n"
+	    "if called from, kmdb(1); the core dump's high resolution \n"
+	    "time if inspecting one; or the running hires time if we're \n"
+	    "looking at a live system.\n\n"
 	    "Switches:\n"
 	    "  -l   prints the number of clock ticks since system boot\n");
 }

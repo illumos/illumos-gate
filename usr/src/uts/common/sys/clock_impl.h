@@ -40,7 +40,7 @@ extern "C" {
 /*
  * Default clock rate in Hz.
  */
-#define	HZ_DEFAULT		100
+#define	HZ_DEFAULT			(100)
 
 /*
  * Thresholds over which we switch between event and cyclic driven lbolt. The
@@ -62,7 +62,10 @@ typedef struct lbolt_cpu {
 } lbolt_cpu_t;
 
 typedef struct lbolt_info {
-	cyclic_id_t lbi_cyclic_id;	/* lbolt's cyclic id */
+	union {
+		cyclic_id_t lbi_cyclic_id;	/* lbolt's cyclic id */
+		int64_t lbi_id_pad;		/* 64bit padding */
+	} id;
 	int64_t lbi_internal;		/* lbolt source when on cyclic mode */
 	int64_t lbi_debug_time;		/* time spent in the debugger */
 	int64_t lbi_debug_ts;		/* last time we dropped into kmdb */

@@ -1016,7 +1016,7 @@ clock_init(void)
 
 	clock_cyclic = cyclic_add(&clk_hdlr, &clk_when);
 	ddi_timer_cyclic = cyclic_add(&timer_hdlr, &clk_when);
-	lb_info->lbi_cyclic_id = cyclic_add(&lbolt_hdlr, &lbolt_when);
+	lb_info->id.lbi_cyclic_id = cyclic_add(&lbolt_hdlr, &lbolt_when);
 
 	mutex_exit(&cpu_lock);
 }
@@ -2325,7 +2325,7 @@ lbolt_ev_to_cyclic(caddr_t arg1, caddr_t arg2)
 	exp = ts + nsec_per_tick - 1;
 	exp = (exp/nsec_per_tick) * nsec_per_tick;
 
-	ret = cyclic_reprogram(lb_info->lbi_cyclic_id, exp);
+	ret = cyclic_reprogram(lb_info->id.lbi_cyclic_id, exp);
 	ASSERT(ret);
 
 	lbolt_hybrid = lbolt_cyclic_driven;
@@ -2460,7 +2460,8 @@ lbolt_cyclic(void)
 				kpreempt_disable();
 
 				lbolt_hybrid = lbolt_event_driven;
-				ret = cyclic_reprogram(lb_info->lbi_cyclic_id,
+				ret = cyclic_reprogram(
+				    lb_info->id.lbi_cyclic_id,
 				    CY_INFINITY);
 				ASSERT(ret);
 
@@ -2498,12 +2499,23 @@ lbolt_debug_entry(void)
 	lb_info->lbi_debug_ts = gethrtime();
 }
 
+/*
+ * Calculate the time spent in the debugger and add it to the lbolt info
+ * structure. We also update the internal lbolt value in case we were in
+ * cyclic driven mode going in.
+ */
 void
 lbolt_debug_return(void)
 {
-	if (nsec_per_tick > 0)
+	hrtime_t ts;
+
+	if (nsec_per_tick > 0) {
+		ts = gethrtime();
+
+		lb_info->lbi_internal = (ts/nsec_per_tick);
 		lb_info->lbi_debug_time +=
-		    ((gethrtime() - lb_info->lbi_debug_ts)/nsec_per_tick);
+		    ((ts - lb_info->lbi_debug_ts)/nsec_per_tick);
+	}
 
 	lb_info->lbi_debug_ts = 0;
 }
