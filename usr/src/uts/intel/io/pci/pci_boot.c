@@ -2372,21 +2372,32 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	 * required size of the address space.  Restore the base
 	 * register contents.
 	 *
-	 * Do not disable I/O and memory access; this isn't necessary
-	 * since no driver is yet attached to this device, and disabling
-	 * I/O and memory access has the side-effect of disabling PCI-PCI
-	 * bridge mappings, which makes the bridge transparent to secondary-
-	 * bus activity (see sections 4.1-4.3 of the PCI-PCI Bridge
-	 * Spec V1.2).
+	 * Do not disable I/O and memory access for bridges; this
+	 * has the side-effect of making the bridge transparent to
+	 * secondary-bus activity (see sections 4.1-4.3 of the
+	 * PCI-PCI Bridge Spec V1.2).  For non-bridges, disable
+	 * I/O and memory access to avoid difficulty with USB
+	 * emulation (see OHCI spec1.0a appendix B
+	 * "Host Controller Mapping")
 	 */
 	end = PCI_CONF_BASE0 + max_basereg * sizeof (uint_t);
 	for (j = 0, offset = PCI_CONF_BASE0; offset < end;
 	    j++, offset += bar_sz) {
+		uint_t	command;
+
 		/* determine the size of the address space */
 		base = pci_getl(bus, dev, func, offset);
+		if (baseclass != PCI_CLASS_BRIDGE) {
+			command = (uint_t)pci_getw(bus, dev, func,
+			    PCI_CONF_COMM);
+			pci_putw(bus, dev, func, PCI_CONF_COMM,
+			    command & ~(PCI_COMM_MAE | PCI_COMM_IO));
+		}
 		pci_putl(bus, dev, func, offset, 0xffffffff);
 		value = pci_getl(bus, dev, func, offset);
 		pci_putl(bus, dev, func, offset, base);
+		if (baseclass != PCI_CLASS_BRIDGE)
+			pci_putw(bus, dev, func, PCI_CONF_COMM, command);
 
 		/* construct phys hi,med.lo, size hi, lo */
 		if ((pciide && j < 4) || (base & PCI_BASE_SPACE_IO)) {
