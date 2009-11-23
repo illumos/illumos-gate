@@ -709,7 +709,7 @@ zap_put_leaf_maybe_grow_ptrtbl(zap_name_t *zn, zap_leaf_t *l, dmu_tx_t *tx)
 static int
 fzap_checkname(zap_name_t *zn)
 {
-	if (zn->zn_key_orig_len > ZAP_MAXNAMELEN)
+	if (zn->zn_key_orig_numints * zn->zn_key_intlen > ZAP_MAXNAMELEN)
 		return (ENAMETOOLONG);
 	return (0);
 }
@@ -1132,7 +1132,7 @@ fzap_cursor_move_to_key(zap_cursor_t *zc, zap_name_t *zn)
 	zap_leaf_t *l;
 	zap_entry_handle_t zeh;
 
-	if (zn->zn_key_orig_len > ZAP_MAXNAMELEN)
+	if (zn->zn_key_orig_numints * zn->zn_key_intlen > ZAP_MAXNAMELEN)
 		return (ENAMETOOLONG);
 
 	err = zap_deref_leaf(zc->zc_zap, zn->zn_hash, NULL, RW_READER, &l);

@@ -75,26 +75,44 @@ zap_hash(zap_name_t *zn)
 		ASSERT(zap_getflags(zap) & ZAP_FLAG_UINT64_KEY);
 		h = *(uint64_t *)zn->zn_key_orig;
 	} else {
-		const uint8_t *cp = (const uint8_t *)zn->zn_key_norm;
-		int i, len;
-
 		h = zap->zap_salt;
 		ASSERT(h != 0);
 		ASSERT(zfs_crc64_table[128] == ZFS_CRC64_POLY);
-		len = zn->zn_key_norm_len;
 
-		/*
-		 * Because we previously stored the terminating null on
-		 * disk, but didn't hash it, we need to continue to not
-		 * hash it.  (The zn_key_*_len includes the terminating
-		 * null for non-binary keys.)
-		 */
-		if (!(zap_getflags(zap) & ZAP_FLAG_UINT64_KEY))
-			len--;
+		if (zap_getflags(zap) & ZAP_FLAG_UINT64_KEY) {
+			int i;
+			const uint64_t *wp = zn->zn_key_norm;
 
-		for (i = 0; i < len; cp++, i++)
-			h = (h >> 8) ^ zfs_crc64_table[(h ^ *cp) & 0xFF];
+			ASSERT(zn->zn_key_intlen == 8);
+			for (i = 0; i < zn->zn_key_norm_numints; wp++, i++) {
+				int j;
+				uint64_t word = *wp;
 
+				for (j = 0; j < zn->zn_key_intlen; j++) {
+					h = (h >> 8) ^
+					    zfs_crc64_table[(h ^ word) & 0xFF];
+					word >>= NBBY;
+				}
+			}
+		} else {
+			int i, len;
+			const uint8_t *cp = zn->zn_key_norm;
+
+			/*
+			 * We previously stored the terminating null on
+			 * disk, but didn't hash it, so we need to
+			 * continue to not hash it.  (The
+			 * zn_key_*_numints includes the terminating
+			 * null for non-binary keys.)
+			 */
+			len = zn->zn_key_norm_numints - 1;
+
+			ASSERT(zn->zn_key_intlen == 1);
+			for (i = 0; i < len; cp++, i++) {
+				h = (h >> 8) ^
+				    zfs_crc64_table[(h ^ *cp) & 0xFF];
+			}
+		}
 	}
 	/*
 	 * Don't use all 64 bits, since we need some in the cookie for
@@ -158,7 +176,7 @@ zap_name_alloc(zap_t *zap, const char *key, matchtype_t mt)
 	zn->zn_zap = zap;
 	zn->zn_key_intlen = sizeof (*key);
 	zn->zn_key_orig = key;
-	zn->zn_key_orig_len = strlen(zn->zn_key_orig) + 1;
+	zn->zn_key_orig_numints = strlen(zn->zn_key_orig) + 1;
 	zn->zn_matchtype = mt;
 	if (zap->zap_normflags) {
 		if (zap_normalize(zap, key, zn->zn_normbuf) != 0) {
@@ -166,14 +184,14 @@ zap_name_alloc(zap_t *zap, const char *key, matchtype_t mt)
 			return (NULL);
 		}
 		zn->zn_key_norm = zn->zn_normbuf;
-		zn->zn_key_norm_len = strlen(zn->zn_key_norm) + 1;
+		zn->zn_key_norm_numints = strlen(zn->zn_key_norm) + 1;
 	} else {
 		if (mt != MT_EXACT) {
 			zap_name_free(zn);
 			return (NULL);
 		}
 		zn->zn_key_norm = zn->zn_key_orig;
-		zn->zn_key_norm_len = zn->zn_key_orig_len;
+		zn->zn_key_norm_numints = zn->zn_key_orig_numints;
 	}
 
 	zn->zn_hash = zap_hash(zn);
@@ -189,7 +207,7 @@ zap_name_alloc_uint64(zap_t *zap, const uint64_t *key, int numints)
 	zn->zn_zap = zap;
 	zn->zn_key_intlen = sizeof (*key);
 	zn->zn_key_orig = zn->zn_key_norm = key;
-	zn->zn_key_orig_len = zn->zn_key_norm_len = numints;
+	zn->zn_key_orig_numints = zn->zn_key_norm_numints = numints;
 	zn->zn_matchtype = MT_EXACT;
 
 	zn->zn_hash = zap_hash(zn);

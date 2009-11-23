@@ -40,6 +40,7 @@
 #include <sys/zil.h>
 #include <sys/dmu_impl.h>
 #include <sys/zfs_ioctl.h>
+#include <sys/sunddi.h>
 
 spa_t *
 dmu_objset_spa(objset_t *os)
@@ -1382,12 +1383,9 @@ dmu_objset_find_spa(spa_t *spa, const char *name,
 			ASSERT(attr->za_integer_length == sizeof (uint64_t));
 			ASSERT(attr->za_num_integers == 1);
 
-			child = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-			(void) strcpy(child, name);
-			(void) strcat(child, "/");
-			(void) strcat(child, attr->za_name);
+			child = kmem_asprintf("%s/%s", name, attr->za_name);
 			err = dmu_objset_find_spa(spa, child, func, arg, flags);
-			kmem_free(child, MAXPATHLEN);
+			strfree(child);
 			if (err)
 				break;
 		}
@@ -1421,13 +1419,11 @@ dmu_objset_find_spa(spa_t *spa, const char *name,
 				    sizeof (uint64_t));
 				ASSERT(attr->za_num_integers == 1);
 
-				child = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-				(void) strcpy(child, name);
-				(void) strcat(child, "@");
-				(void) strcat(child, attr->za_name);
+				child = kmem_asprintf("%s@%s",
+				    name, attr->za_name);
 				err = func(spa, attr->za_first_integer,
 				    child, arg);
-				kmem_free(child, MAXPATHLEN);
+				strfree(child);
 				if (err)
 					break;
 			}

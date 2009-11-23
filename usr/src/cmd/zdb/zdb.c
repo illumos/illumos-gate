@@ -350,6 +350,14 @@ dump_zap(objset_t *os, uint64_t object, void *data, size_t size)
 
 /*ARGSUSED*/
 static void
+dump_ddt_zap(objset_t *os, uint64_t object, void *data, size_t size)
+{
+	dump_zap_stats(os, object);
+	/* contents are printed elsewhere, properly decoded */
+}
+
+/*ARGSUSED*/
+static void
 dump_zpldir(objset_t *os, uint64_t object, void *data, size_t size)
 {
 	zap_cursor_t zc;
@@ -1241,7 +1249,7 @@ static object_viewer_t *object_viewer[DMU_OT_NUMTYPES + 1] = {
 	dump_zap,		/* ZFS user/group used		*/
 	dump_zap,		/* ZFS user/group quota		*/
 	dump_zap,		/* snapshot refcount tags	*/
-	dump_none,		/* DDT ZAP object		*/
+	dump_ddt_zap,		/* DDT ZAP object		*/
 	dump_zap,		/* DDT statistics		*/
 	dump_unknown		/* Unknown type, must be last	*/
 };

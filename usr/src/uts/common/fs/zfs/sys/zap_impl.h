@@ -170,9 +170,9 @@ typedef struct zap_name {
 	zap_t *zn_zap;
 	int zn_key_intlen;
 	const void *zn_key_orig;
-	int zn_key_orig_len;
+	int zn_key_orig_numints;
 	const void *zn_key_norm;
-	int zn_key_norm_len;
+	int zn_key_norm_numints;
 	uint64_t zn_hash;
 	matchtype_t zn_matchtype;
 	char zn_normbuf[ZAP_MAXNAMELEN];
