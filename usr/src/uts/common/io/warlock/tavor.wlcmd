@@ -112,6 +112,7 @@ root	tavor_rsrc_srqhdl_destructor
 
 ### Tavor kstat callback
 root	tavor_kstat_cntr_update
+root	tavor_kstat_perfcntr64_update
 
 ### Tavor userland mapping callbacks and functions
 root	tavor_umap_umemlock_cb

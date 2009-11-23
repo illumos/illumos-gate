@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1960,6 +1960,86 @@ struct tavor_hw_mcg_qp_list_s {
 #endif
 #define	TAVOR_MCG_QPN_INVALID		0x0
 #define	TAVOR_MCG_QPN_VALID		0x1
+
+/*
+ * Structure for getting the peformance counters from the HCA
+ */
+
+#ifdef _LITTLE_ENDIAN
+struct tavor_hw_sm_perfcntr_s {
+	uint32_t	linkdown	:8;
+	uint32_t	linkerrrec	:8;
+	uint32_t	symerr		:16;
+
+	uint32_t	cntrsel		:16;
+	uint32_t	portsel		:8;
+	uint32_t			:8;
+
+	uint32_t	portxmdiscard	:16;
+	uint32_t	portrcvswrelay	:16;
+
+	uint32_t	portrcvrem	:16;
+	uint32_t	portrcv		:16;
+
+	uint32_t	vl15drop	:16;
+	uint32_t			:16;
+
+	uint32_t	xsbuffovrun	:4;
+	uint32_t	locallinkint	:4;
+	uint32_t			:8;
+	uint32_t	portrcconstr	:8;
+	uint32_t	portxmconstr	:8;
+
+	uint32_t	portrcdata;
+
+	uint32_t	portxmdata;
+
+	uint32_t	portrcpkts;
+
+	uint32_t	portxmpkts;
+
+	uint32_t	reserved;
+
+	uint32_t	portxmwait;
+};
+#else	/* BIG ENDIAN */
+struct tavor_hw_sm_perfcntr_s {
+	uint32_t			:8;
+	uint32_t	portsel		:8;
+	uint32_t	cntrsel		:16;
+
+	uint32_t	symerr		:16;
+	uint32_t	linkerrrec	:8;
+	uint32_t	linkdown	:8;
+
+	uint32_t	portrcv		:16;
+	uint32_t	portrcvrem	:16;
+
+	uint32_t	portrcvswrelay	:16;
+	uint32_t	portxmdiscard	:16;
+
+	uint32_t	portxmconstr	:8;
+	uint32_t	portrcconstr	:8;
+	uint32_t			:8;
+	uint32_t	locallinkint	:4;
+	uint32_t	xsbuffovrun	:4;
+
+	uint32_t			:16;
+	uint32_t	vl15drop	:16;
+
+	uint32_t	portxmdata;
+
+	uint32_t	portrcdata;
+
+	uint32_t	portxmpkts;
+
+	uint32_t	portrcpkts;
+
+	uint32_t	portxmwait;
+
+	uint32_t	reserved;
+};
+#endif
 
 
 /*

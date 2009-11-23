@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,6 +46,12 @@ static kstat_t *tavor_kstat_picN_create(tavor_state_t *state, int num_pic,
 static kstat_t *tavor_kstat_cntr_create(tavor_state_t *state, int num_pic,
     int (*update)(kstat_t *, int));
 static int tavor_kstat_cntr_update(kstat_t *ksp, int rw);
+
+void tavor_kstat_perfcntr64_create(tavor_state_t *state, uint_t port_num);
+static int tavor_kstat_perfcntr64_read(tavor_state_t *state, uint_t port,
+    int reset);
+static void tavor_kstat_perfcntr64_thread_exit(tavor_ks_info_t *ksi);
+static int tavor_kstat_perfcntr64_update(kstat_t *ksp, int rw);
 
 /*
  * Tavor IB Performance Events structure
@@ -88,6 +94,19 @@ tavor_ks_mask_t tavor_ib_perfcnt_list[TAVOR_CNTR_NUMENTRIES] = {
 	{"clear_pic", 0, 0, 0, 0}
 };
 
+/*
+ * Return the maximum of (x) and (y)
+ */
+#define	MAX(x, y)	(((x) > (y)) ? (x) : (y))
+
+/*
+ * Set (x) to the maximum of (x) and (y)
+ */
+#define	SET_TO_MAX(x, y)	\
+{				\
+	if ((x) < (y))		\
+		(x) = (y);	\
+}
 
 /*
  * tavor_kstat_init()
@@ -113,8 +132,9 @@ tavor_kstat_init(tavor_state_t *state)
 	state->ts_ks_info = ksi;
 
 	/*
-	 * Create as many "pic" kstats as we have IB ports.  Enable all
-	 * of the events specified in the "tavor_ib_perfcnt_list" structure.
+	 * Create as many "pic" and perfcntr64 kstats as we have IB ports.
+	 * Enable all of the events specified in the "tavor_ib_perfcnt_list"
+	 * structure.
 	 */
 	numports = state->ts_cfg_profile->cp_num_ports;
 	for (i = 0; i < numports; i++) {
@@ -123,6 +143,11 @@ tavor_kstat_init(tavor_state_t *state)
 		if (ksi->tki_picN_ksp[i] == NULL) {
 			TNF_PROBE_0(tavor_kstat_init_picN_fail,
 			    TAVOR_TNF_ERROR, "");
+			goto kstat_init_fail;
+		}
+
+		tavor_kstat_perfcntr64_create(state, i + 1);
+		if (ksi->tki_perfcntr64[i].tki64_ksp == NULL) {
 			goto kstat_init_fail;
 		}
 	}
@@ -148,6 +173,9 @@ tavor_kstat_init(tavor_state_t *state)
 		ksi->tki_ib_perfcnt[i] = tavor_ib_perfcnt_list[i];
 	}
 
+	mutex_init(&ksi->tki_perfcntr64_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&ksi->tki_perfcntr64_cv, NULL, CV_DRIVER, NULL);
+
 	TAVOR_TNF_EXIT(tavor_kstat_init);
 	return (DDI_SUCCESS);
 
@@ -161,6 +189,9 @@ kstat_init_fail:
 	for (i = 0; i < numports; i++) {
 		if (ksi->tki_picN_ksp[i] != NULL) {
 			kstat_delete(ksi->tki_picN_ksp[i]);
+		}
+		if (ksi->tki_perfcntr64[i].tki64_ksp != NULL) {
+			kstat_delete(ksi->tki_perfcntr64[i].tki64_ksp);
 		}
 	}
 
@@ -188,16 +219,30 @@ tavor_kstat_fini(tavor_state_t *state)
 	/* Get pointer to kstat info */
 	ksi = state->ts_ks_info;
 
-	/* Delete all the "pic" kstats (one per port) */
+	/*
+	 * Signal the perfcntr64_update_thread to exit and wait until the
+	 * thread exits.
+	 */
+	mutex_enter(&ksi->tki_perfcntr64_lock);
+	tavor_kstat_perfcntr64_thread_exit(ksi);
+	mutex_exit(&ksi->tki_perfcntr64_lock);
+
+	/* Delete all the "pic" and perfcntr64 kstats (one per port) */
 	numports = state->ts_cfg_profile->cp_num_ports;
 	for (i = 0; i < numports; i++) {
 		if (ksi->tki_picN_ksp[i] != NULL) {
 			kstat_delete(ksi->tki_picN_ksp[i]);
 		}
+		if (ksi->tki_perfcntr64[i].tki64_ksp != NULL) {
+			kstat_delete(ksi->tki_perfcntr64[i].tki64_ksp);
+		}
 	}
 
 	/* Delete the "counter" kstats (one per port) */
 	kstat_delete(ksi->tki_cntr_ksp);
+
+	cv_destroy(&ksi->tki_perfcntr64_cv);
+	mutex_destroy(&ksi->tki_perfcntr64_lock);
 
 	/* Free the kstat info structure */
 	kmem_free(ksi, sizeof (tavor_ks_info_t));
@@ -437,4 +482,368 @@ tavor_kstat_cntr_update(kstat_t *ksp, int rw)
 		TAVOR_TNF_EXIT(tavor_kstat_cntr_update);
 		return (0);
 	}
+}
+
+/*
+ * 64 bit kstats for performance counters:
+ *
+ * Since the hardware as of now does not support 64 bit performance counters,
+ * we maintain 64 bit performance counters in software using the 32 bit
+ * hardware counters.
+ *
+ * We create a thread that, every one second, reads the values of 32 bit
+ * hardware counters and adds them to the 64 bit software counters. Immediately
+ * after reading, it resets the 32 bit hardware counters to zero (so that they
+ * start counting from zero again). At any time the current value of a counter
+ * is going to be the sum of the 64 bit software counter and the 32 bit
+ * hardware counter.
+ *
+ * Since this work need not be done if there is no consumer, by default
+ * we do not maintain 64 bit software counters. To enable this the consumer
+ * needs to write a non-zero value to the "enable" component of the of
+ * perf_counters kstat. Writing zero to this component will disable this work.
+ *
+ * If performance monitor is enabled in subnet manager, the SM could
+ * periodically reset the hardware counters by sending perf-MADs. So only
+ * one of either our software 64 bit counters or the SM performance monitor
+ * could be enabled at the same time. However, if both of them are enabled at
+ * the same time we still do our best by keeping track of the values of the
+ * last read 32 bit hardware counters. If the current read of a 32 bit hardware
+ * counter is less than the last read of the counter, we ignore the current
+ * value and go with the last read value.
+ */
+
+/*
+ * tavor_kstat_perfcntr64_create()
+ *    Context: Only called from attach() path context
+ *
+ * Create "port#/perf_counters" kstat for the specified port number.
+ */
+void
+tavor_kstat_perfcntr64_create(tavor_state_t *state, uint_t port_num)
+{
+	tavor_ks_info_t		*ksi = state->ts_ks_info;
+	struct kstat		*cntr_ksp;
+	struct kstat_named	*cntr_named_data;
+	int			drv_instance;
+	char			*drv_name;
+	char			kname[32];
+
+	ASSERT(port_num != 0);
+
+	drv_name = (char *)ddi_driver_name(state->ts_dip);
+	drv_instance = ddi_get_instance(state->ts_dip);
+	(void) snprintf(kname, sizeof (kname), "port%u/perf_counters",
+	    port_num);
+	cntr_ksp = kstat_create(drv_name, drv_instance, kname, "ib",
+	    KSTAT_TYPE_NAMED, TAVOR_PERFCNTR64_NUM_COUNTERS,
+	    KSTAT_FLAG_WRITABLE);
+	if (cntr_ksp == NULL) {
+		return;
+	}
+	cntr_named_data = (struct kstat_named *)(cntr_ksp->ks_data);
+
+	kstat_named_init(&cntr_named_data[TAVOR_PERFCNTR64_ENABLE_IDX],
+	    "enable", KSTAT_DATA_UINT32);
+	kstat_named_init(&cntr_named_data[TAVOR_PERFCNTR64_XMIT_DATA_IDX],
+	    "xmit_data", KSTAT_DATA_UINT64);
+	kstat_named_init(&cntr_named_data[TAVOR_PERFCNTR64_RECV_DATA_IDX],
+	    "recv_data", KSTAT_DATA_UINT64);
+	kstat_named_init(&cntr_named_data[TAVOR_PERFCNTR64_XMIT_PKTS_IDX],
+	    "xmit_pkts", KSTAT_DATA_UINT64);
+	kstat_named_init(&cntr_named_data[TAVOR_PERFCNTR64_RECV_PKTS_IDX],
+	    "recv_pkts", KSTAT_DATA_UINT64);
+
+	ksi->tki_perfcntr64[port_num - 1].tki64_ksp = cntr_ksp;
+	ksi->tki_perfcntr64[port_num - 1].tki64_port_num = port_num;
+	ksi->tki_perfcntr64[port_num - 1].tki64_state = state;
+
+	cntr_ksp->ks_private = &ksi->tki_perfcntr64[port_num - 1];
+	cntr_ksp->ks_update  = tavor_kstat_perfcntr64_update;
+
+	/* Install the kstat */
+	kstat_install(cntr_ksp);
+}
+
+/*
+ * tavor_kstat_perfcntr64_read()
+ *
+ * Read the values of 32 bit hardware counters.
+ *
+ * If reset is true, reset the 32 bit hardware counters. Add the values of the
+ * 32 bit hardware counters to the 64 bit software counters.
+ *
+ * If reset is false, just save the values read from the 32 bit hardware
+ * counters in tki64_last_read[].
+ *
+ * See the general comment on the 64 bit performance counters
+ * regarding the use of last read 32 bit hardware counter values.
+ */
+static int
+tavor_kstat_perfcntr64_read(tavor_state_t *state, uint_t port, int reset)
+{
+	tavor_ks_info_t	*ksi = state->ts_ks_info;
+	tavor_perfcntr64_ks_info_t *ksi64 = &ksi->tki_perfcntr64[port - 1];
+	int			status, i;
+	uint32_t		tmp;
+	tavor_hw_sm_perfcntr_t	sm_perfcntr;
+
+	ASSERT(MUTEX_HELD(&ksi->tki_perfcntr64_lock));
+	ASSERT(port != 0);
+
+	/* read the 32 bit hardware counters */
+	status = tavor_getperfcntr_cmd_post(state, port,
+	    TAVOR_CMD_NOSLEEP_SPIN, &sm_perfcntr, 0);
+	if (status != TAVOR_CMD_SUCCESS) {
+		return (status);
+	}
+
+	if (reset) {
+		/* reset the hardware counters */
+		status = tavor_getperfcntr_cmd_post(state, port,
+		    TAVOR_CMD_NOSLEEP_SPIN, NULL, 1);
+		if (status != TAVOR_CMD_SUCCESS) {
+			return (status);
+		}
+
+		/*
+		 * Update 64 bit software counters
+		 */
+		tmp = MAX(sm_perfcntr.portxmdata,
+		    ksi64->tki64_last_read[TAVOR_PERFCNTR64_XMIT_DATA_IDX]);
+		ksi64->tki64_counters[TAVOR_PERFCNTR64_XMIT_DATA_IDX] += tmp;
+
+		tmp = MAX(sm_perfcntr.portrcdata,
+		    ksi64->tki64_last_read[TAVOR_PERFCNTR64_RECV_DATA_IDX]);
+		ksi64->tki64_counters[TAVOR_PERFCNTR64_RECV_DATA_IDX] += tmp;
+
+		tmp = MAX(sm_perfcntr.portxmpkts,
+		    ksi64->tki64_last_read[TAVOR_PERFCNTR64_XMIT_PKTS_IDX]);
+		ksi64->tki64_counters[TAVOR_PERFCNTR64_XMIT_PKTS_IDX] += tmp;
+
+		tmp = MAX(sm_perfcntr.portrcpkts,
+		    ksi64->tki64_last_read[TAVOR_PERFCNTR64_RECV_PKTS_IDX]);
+		ksi64->tki64_counters[TAVOR_PERFCNTR64_RECV_PKTS_IDX] += tmp;
+
+		for (i = 0; i < TAVOR_PERFCNTR64_NUM_COUNTERS; i++)
+			ksi64->tki64_last_read[i] = 0;
+
+	} else {
+		/*
+		 * Update ksi64->tki64_last_read[]
+		 */
+		SET_TO_MAX(
+		    ksi64->tki64_last_read[TAVOR_PERFCNTR64_XMIT_DATA_IDX],
+		    sm_perfcntr.portxmdata);
+
+		SET_TO_MAX(
+		    ksi64->tki64_last_read[TAVOR_PERFCNTR64_RECV_DATA_IDX],
+		    sm_perfcntr.portrcdata);
+
+		SET_TO_MAX(
+		    ksi64->tki64_last_read[TAVOR_PERFCNTR64_XMIT_PKTS_IDX],
+		    sm_perfcntr.portxmpkts);
+
+		SET_TO_MAX(
+		    ksi64->tki64_last_read[TAVOR_PERFCNTR64_RECV_PKTS_IDX],
+		    sm_perfcntr.portrcpkts);
+	}
+
+	return (TAVOR_CMD_SUCCESS);
+}
+
+/*
+ * tavor_kstat_perfcntr64_update_thread()
+ *    Context: Entry point for a kernel thread
+ *
+ * Maintain 64 bit performance counters in software using the 32 bit
+ * hardware counters.
+ */
+static void
+tavor_kstat_perfcntr64_update_thread(void *arg)
+{
+	tavor_state_t		*state = (tavor_state_t *)arg;
+	tavor_ks_info_t		*ksi = state->ts_ks_info;
+	uint_t			i;
+
+	mutex_enter(&ksi->tki_perfcntr64_lock);
+	/*
+	 * Every one second update the values 64 bit software counters
+	 * for all ports. Exit if TAVOR_PERFCNTR64_THREAD_EXIT flag is set.
+	 */
+	while (!(ksi->tki_perfcntr64_flags & TAVOR_PERFCNTR64_THREAD_EXIT)) {
+		for (i = 0; i < state->ts_cfg_profile->cp_num_ports; i++) {
+			if (ksi->tki_perfcntr64[i].tki64_enabled) {
+				(void) tavor_kstat_perfcntr64_read(state,
+				    i + 1, 1);
+			}
+		}
+		/* sleep for a second */
+		(void) cv_timedwait(&ksi->tki_perfcntr64_cv,
+		    &ksi->tki_perfcntr64_lock,
+		    ddi_get_lbolt() + drv_usectohz(1000000));
+	}
+	ksi->tki_perfcntr64_flags = 0;
+	mutex_exit(&ksi->tki_perfcntr64_lock);
+}
+
+/*
+ * tavor_kstat_perfcntr64_thread_create()
+ *    Context: Called from the kstat context
+ *
+ * Create a thread that maintains 64 bit performance counters in software.
+ */
+static void
+tavor_kstat_perfcntr64_thread_create(tavor_state_t *state)
+{
+	tavor_ks_info_t	*ksi = state->ts_ks_info;
+	kthread_t		*thr;
+
+	ASSERT(MUTEX_HELD(&ksi->tki_perfcntr64_lock));
+
+	/*
+	 * One thread per tavor instance. Don't create a thread if already
+	 * created.
+	 */
+	if (!(ksi->tki_perfcntr64_flags & TAVOR_PERFCNTR64_THREAD_CREATED)) {
+		thr = thread_create(NULL, 0,
+		    tavor_kstat_perfcntr64_update_thread,
+		    state, 0, &p0, TS_RUN, minclsyspri);
+		ksi->tki_perfcntr64_thread_id = thr->t_did;
+		ksi->tki_perfcntr64_flags |= TAVOR_PERFCNTR64_THREAD_CREATED;
+	}
+}
+
+/*
+ * tavor_kstat_perfcntr64_thread_exit()
+ *    Context: Called from attach, detach or kstat context
+ */
+static void
+tavor_kstat_perfcntr64_thread_exit(tavor_ks_info_t *ksi)
+{
+	kt_did_t	tid;
+
+	ASSERT(MUTEX_HELD(&ksi->tki_perfcntr64_lock));
+
+	if (ksi->tki_perfcntr64_flags & TAVOR_PERFCNTR64_THREAD_CREATED) {
+		/*
+		 * Signal the thread to exit and wait until the thread exits.
+		 */
+		ksi->tki_perfcntr64_flags |= TAVOR_PERFCNTR64_THREAD_EXIT;
+		tid = ksi->tki_perfcntr64_thread_id;
+		cv_signal(&ksi->tki_perfcntr64_cv);
+
+		mutex_exit(&ksi->tki_perfcntr64_lock);
+		thread_join(tid);
+		mutex_enter(&ksi->tki_perfcntr64_lock);
+	}
+}
+
+/*
+ * tavor_kstat_perfcntr64_update()
+ *    Context: Called from the kstat context
+ *
+ * See the general comment on 64 bit kstats for performance counters:
+ */
+static int
+tavor_kstat_perfcntr64_update(kstat_t *ksp, int rw)
+{
+	tavor_state_t			*state;
+	struct kstat_named		*data;
+	tavor_ks_info_t		*ksi;
+	tavor_perfcntr64_ks_info_t	*ksi64;
+	int				i, thr_exit;
+
+	ksi64	= ksp->ks_private;
+	state	= ksi64->tki64_state;
+	ksi	= state->ts_ks_info;
+	data	= (struct kstat_named *)(ksp->ks_data);
+
+	mutex_enter(&ksi->tki_perfcntr64_lock);
+
+	/*
+	 * 64 bit performance counters maintained by the software is not
+	 * enabled by default. Enable them upon a writing a non-zero value
+	 * to "enable" kstat. Disable them upon a writing zero to the
+	 * "enable" kstat.
+	 */
+	if (rw == KSTAT_WRITE) {
+		if (data[TAVOR_PERFCNTR64_ENABLE_IDX].value.ui32) {
+			if (ksi64->tki64_enabled == 0) {
+				/*
+				 * Reset the hardware counters to ensure that
+				 * the hardware counter doesn't max out
+				 * (and hence stop counting) before we get
+				 * a chance to reset the counter in
+				 * tavor_kstat_perfcntr64_update_thread.
+				 */
+				if (tavor_getperfcntr_cmd_post(state,
+				    ksi64->tki64_port_num,
+				    TAVOR_CMD_NOSLEEP_SPIN, NULL, 1) !=
+				    TAVOR_CMD_SUCCESS) {
+					mutex_exit(&ksi->tki_perfcntr64_lock);
+					return (EIO);
+				}
+
+				/* Enable 64 bit software counters */
+				ksi64->tki64_enabled = 1;
+				for (i = 0;
+				    i < TAVOR_PERFCNTR64_NUM_COUNTERS; i++) {
+					ksi64->tki64_counters[i] = 0;
+					ksi64->tki64_last_read[i] = 0;
+				}
+				tavor_kstat_perfcntr64_thread_create(state);
+			}
+
+		} else if (ksi64->tki64_enabled) {
+			/* Disable 64 bit software counters */
+			ksi64->tki64_enabled = 0;
+			thr_exit = 1;
+			for (i = 0; i < state->ts_cfg_profile->cp_num_ports;
+			    i++) {
+				if (ksi->tki_perfcntr64[i].tki64_enabled) {
+					thr_exit = 0;
+					break;
+				}
+			}
+			if (thr_exit)
+				tavor_kstat_perfcntr64_thread_exit(ksi);
+		}
+	} else if (ksi64->tki64_enabled) {
+		/*
+		 * Read the counters and update kstats.
+		 */
+		if (tavor_kstat_perfcntr64_read(state, ksi64->tki64_port_num,
+		    0) != TAVOR_CMD_SUCCESS) {
+			mutex_exit(&ksi->tki_perfcntr64_lock);
+			return (EIO);
+		}
+
+		data[TAVOR_PERFCNTR64_ENABLE_IDX].value.ui32 = 1;
+
+		data[TAVOR_PERFCNTR64_XMIT_DATA_IDX].value.ui64 =
+		    ksi64->tki64_counters[TAVOR_PERFCNTR64_XMIT_DATA_IDX] +
+		    ksi64->tki64_last_read[TAVOR_PERFCNTR64_XMIT_DATA_IDX];
+
+		data[TAVOR_PERFCNTR64_RECV_DATA_IDX].value.ui64 =
+		    ksi64->tki64_counters[TAVOR_PERFCNTR64_RECV_DATA_IDX] +
+		    ksi64->tki64_last_read[TAVOR_PERFCNTR64_RECV_DATA_IDX];
+
+		data[TAVOR_PERFCNTR64_XMIT_PKTS_IDX].value.ui64 =
+		    ksi64->tki64_counters[TAVOR_PERFCNTR64_XMIT_PKTS_IDX] +
+		    ksi64->tki64_last_read[TAVOR_PERFCNTR64_XMIT_PKTS_IDX];
+
+		data[TAVOR_PERFCNTR64_RECV_PKTS_IDX].value.ui64 =
+		    ksi64->tki64_counters[TAVOR_PERFCNTR64_RECV_PKTS_IDX] +
+		    ksi64->tki64_last_read[TAVOR_PERFCNTR64_RECV_PKTS_IDX];
+
+	} else {
+		/* return 0 in kstats if not enabled */
+		data[TAVOR_PERFCNTR64_ENABLE_IDX].value.ui32 = 0;
+		for (i = 1; i < TAVOR_PERFCNTR64_NUM_COUNTERS; i++)
+			data[i].value.ui64 = 0;
+	}
+
+	mutex_exit(&ksi->tki_perfcntr64_lock);
+	return (0);
 }

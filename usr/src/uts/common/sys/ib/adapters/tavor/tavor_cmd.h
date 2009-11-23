@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -260,6 +260,7 @@ extern "C" {
  */
 #define	TAVOR_CMD_MKEY_CHECK		0
 #define	TAVOR_CMD_MKEY_DONTCHECK	1
+#define	TAVOR_CMD_BKEY_DONTCHECK	2
 
 #define	TAVOR_CMD_MAD_IFC_SIZE		0x100
 #define	TAVOR_CMD_MADDATA_OFFSET	0x40
@@ -272,6 +273,11 @@ extern "C" {
 #define	TAVOR_CMD_NODEDESC		0x00100000
 #define	TAVOR_CMD_GUIDINFO		0x00140000
 #define	TAVOR_CMD_PKEYTBLE		0x00160000
+
+#define	TAVOR_CMD_PERF_GET		0x01040101
+#define	TAVOR_CMD_PERF_SET		0x01040102
+#define	TAVOR_CMD_PERFCNTRS		0x00120000
+#define	TAVOR_CMD_PERFATTR		0x00000000
 
 /*
  * The next few defines are used to indicate the size of the "reserved" area
@@ -684,6 +690,8 @@ int tavor_getguidinfo_cmd_post(tavor_state_t *state, uint_t port,
     uint_t guidblock, uint_t sleepflag, sm_guidinfo_t *guidinfo);
 int tavor_getpkeytable_cmd_post(tavor_state_t *state, uint_t port,
     uint_t pkeyblock, uint_t sleepflag, sm_pkey_table_t *pkeytable);
+int tavor_getperfcntr_cmd_post(tavor_state_t *state, uint_t port,
+    uint_t sleepflag, tavor_hw_sm_perfcntr_t *perfinfo, int reset);
 
 /*
  * WRITE_MTT - used for write MTT entries to the Tavor MTT table

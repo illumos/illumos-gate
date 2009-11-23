@@ -2960,3 +2960,101 @@ tavor_modify_mpt_cmd_post(tavor_state_t *state, tavor_hw_mpt_t *mpt,
 	TAVOR_TNF_EXIT(tavor_modify_mpt_cmd_post);
 	return (status);
 }
+
+/*
+ * tavor_getpefcntr_cmd_post()
+ *    Context: Can be called from interrupt or base context.
+ *
+ * If reset is zero, read the performance counters of the specified port and
+ * copy them into perfinfo.
+ * If reset is non-zero reset the performance counters of the specified port.
+ */
+int
+tavor_getperfcntr_cmd_post(tavor_state_t *state, uint_t port,
+    uint_t sleepflag, tavor_hw_sm_perfcntr_t *perfinfo, int reset)
+{
+	tavor_mbox_info_t	mbox_info;
+	tavor_cmd_post_t	cmd;
+	uint64_t		data;
+	uint32_t		*mbox;
+	uint_t			size;
+	int			status, i;
+
+	bzero((void *)&cmd, sizeof (tavor_cmd_post_t));
+
+	/* Get "In" and "Out" mailboxes for the command */
+	mbox_info.mbi_alloc_flags = TAVOR_ALLOC_INMBOX | TAVOR_ALLOC_OUTMBOX;
+	status = tavor_mbox_alloc(state, &mbox_info, sleepflag);
+	if (status != TAVOR_CMD_SUCCESS) {
+		return (status);
+	}
+
+	/* Build request MAD in the "In" mailbox */
+	size = TAVOR_CMD_MAD_IFC_SIZE;
+	mbox = (uint32_t *)mbox_info.mbi_in->mb_addr;
+
+	if (reset) {
+		ddi_put32(mbox_info.mbi_in->mb_acchdl, &mbox[0],
+		    TAVOR_CMD_PERF_SET);
+	} else {
+		ddi_put32(mbox_info.mbi_in->mb_acchdl, &mbox[0],
+		    TAVOR_CMD_PERF_GET);
+	}
+	ddi_put32(mbox_info.mbi_in->mb_acchdl, &mbox[1], TAVOR_CMD_MADHDR1);
+	ddi_put32(mbox_info.mbi_in->mb_acchdl, &mbox[2], TAVOR_CMD_MADHDR2);
+	ddi_put32(mbox_info.mbi_in->mb_acchdl, &mbox[3], TAVOR_CMD_MADHDR3);
+	ddi_put32(mbox_info.mbi_in->mb_acchdl, &mbox[4], TAVOR_CMD_PERFCNTRS);
+	ddi_put32(mbox_info.mbi_in->mb_acchdl, &mbox[5], TAVOR_CMD_PERFATTR);
+
+	if (reset) {
+		/* reset counters for XmitData, RcvData, XmitPkts, RcvPkts */
+		ddi_put32(mbox_info.mbi_in->mb_acchdl, &mbox[16],
+		    ((port << 16) | 0xf000));
+
+		ddi_put32(mbox_info.mbi_in->mb_acchdl, &mbox[22], 0);
+		ddi_put32(mbox_info.mbi_in->mb_acchdl, &mbox[23], 0);
+		ddi_put32(mbox_info.mbi_in->mb_acchdl, &mbox[24], 0);
+		ddi_put32(mbox_info.mbi_in->mb_acchdl, &mbox[25], 0);
+	} else
+		ddi_put32(mbox_info.mbi_in->mb_acchdl, &mbox[16], (port << 16));
+
+	/* Sync the mailbox for the device to read */
+	tavor_mbox_sync(mbox_info.mbi_in, 0, size, DDI_DMA_SYNC_FORDEV);
+
+	/* Setup the Hermon "MAD_IFC" command */
+	cmd.cp_inparm	= mbox_info.mbi_in->mb_mapaddr;
+	cmd.cp_outparm	= mbox_info.mbi_out->mb_mapaddr;
+	cmd.cp_inmod	= port;
+	cmd.cp_opcode	= MAD_IFC;
+	/* No MKey and BKey checking */
+	cmd.cp_opmod	= TAVOR_CMD_MKEY_DONTCHECK | TAVOR_CMD_BKEY_DONTCHECK;
+	cmd.cp_flags	= TAVOR_CMD_NOSLEEP_SPIN; /* NO SLEEP */
+	status = tavor_cmd_post(state, &cmd);
+	if (status != TAVOR_CMD_SUCCESS) {
+		goto getperfinfo_fail;
+	}
+
+	/* Sync the mailbox to read the results */
+	size = TAVOR_CMD_MAD_IFC_SIZE;
+	tavor_mbox_sync(mbox_info.mbi_out, 0, size, DDI_DMA_SYNC_FORCPU);
+
+	if (reset == 0) {
+		size = sizeof (tavor_hw_sm_perfcntr_t); /* for the copy */
+		/*
+		 * Copy Perfcounters into "perfinfo".  We can discard the MAD
+		 * header and the 8 Quadword reserved area of the PERM mgmt
+		 * class MAD
+		 */
+
+		for (i = 0; i < size >> 3; i++) {
+			data = ddi_get64(mbox_info.mbi_out->mb_acchdl,
+			    ((uint64_t *)mbox_info.mbi_out->mb_addr + i + 8));
+			((uint64_t *)(void *)perfinfo)[i] = data;
+		}
+	}
+
+getperfinfo_fail:
+	/* Free the mailbox */
+	tavor_mbox_free(state, &mbox_info);
+	return (status);
+}

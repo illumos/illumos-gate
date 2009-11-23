@@ -369,6 +369,31 @@ typedef struct tavor_ks_mask_s {
 } tavor_ks_mask_t;
 
 /*
+ * Index into the named data components of 64 bit "perf_counters" kstat.
+ */
+enum {
+	TAVOR_PERFCNTR64_ENABLE_IDX = 0,
+	TAVOR_PERFCNTR64_XMIT_DATA_IDX,
+	TAVOR_PERFCNTR64_RECV_DATA_IDX,
+	TAVOR_PERFCNTR64_XMIT_PKTS_IDX,
+	TAVOR_PERFCNTR64_RECV_PKTS_IDX,
+	TAVOR_PERFCNTR64_NUM_COUNTERS
+};
+
+/*
+ * Data associated with the 64 bit "perf_counters" kstat. One for each port.
+ */
+typedef struct tavor_perfcntr64_ks_info_s {
+	struct kstat	*tki64_ksp;
+	int		tki64_enabled;
+	uint64_t	tki64_counters[TAVOR_PERFCNTR64_NUM_COUNTERS];
+	uint32_t	tki64_last_read[TAVOR_PERFCNTR64_NUM_COUNTERS];
+	uint_t		tki64_port_num;
+	tavor_state_t	*tki64_state;
+} tavor_perfcntr64_ks_info_t;
+
+
+/*
  * The tavor_ks_info_t structure stores all the information necessary for
  * tracking the resources associated with each of the various kstats.  In
  * addition to containing pointers to each of the counter and pic kstats,
@@ -383,7 +408,16 @@ typedef struct tavor_ks_info_s {
 	uint64_t	tki_pic0;
 	uint64_t	tki_pic1;
 	tavor_ks_mask_t	tki_ib_perfcnt[TAVOR_CNTR_NUMENTRIES];
+	kt_did_t	tki_perfcntr64_thread_id;
+	kmutex_t	tki_perfcntr64_lock;
+	kcondvar_t	tki_perfcntr64_cv;
+	uint_t		tki_perfcntr64_flags;	/* see below */
+	tavor_perfcntr64_ks_info_t	tki_perfcntr64[TAVOR_NUM_PORTS];
 } tavor_ks_info_t;
+
+/* tki_perfcntr64_flags */
+#define	TAVOR_PERFCNTR64_THREAD_CREATED		0x0001
+#define	TAVOR_PERFCNTR64_THREAD_EXIT		0x0002
 
 /*
  * The tavor_ports_ioctl32_t, tavor_loopback_ioctl32_t, and
