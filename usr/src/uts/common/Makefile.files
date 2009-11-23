@@ -1444,6 +1444,8 @@ IDMAP_OBJS +=	idmap_mod.o	idmap_kapi.o	idmap_xdr.o	idmap_cache.o
 #
 #			scheduling class modules
 #
+SDC_OBJS +=		sysdc.o
+
 RT_OBJS +=		rt.o
 RT_DPTBL_OBJS +=	rt_dptbl.o
 

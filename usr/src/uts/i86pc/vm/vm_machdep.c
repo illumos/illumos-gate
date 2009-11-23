@@ -3720,16 +3720,6 @@ teardown_vaddr_for_ppcopy(struct cpu *cpup)
 }
 
 /*
- * Create the pageout scanner thread. The thread has to
- * start at procedure with process pp and priority pri.
- */
-void
-pageout_init(void (*procedure)(), proc_t *pp, pri_t pri)
-{
-	(void) thread_create(NULL, 0, procedure, NULL, 0, pp, TS_RUN, pri);
-}
-
-/*
  * Function for flushing D-cache when performing module relocations
  * to an alternate mapping.  Unnecessary on Intel / AMD platforms.
  */

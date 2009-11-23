@@ -1583,6 +1583,9 @@ startup_modules(void)
 	if (modloadonly("fs", "devfs") == -1)
 		halt("Can't load devfs");
 
+	if (modloadonly("fs", "procfs") == -1)
+		halt("Can't load procfs");
+
 	if (modloadonly("misc", "swapgeneric") == -1)
 		halt("Can't load swapgeneric");
 

@@ -314,13 +314,15 @@ cv_wait_sig(kcondvar_t *cvp, kmutex_t *mp)
 	ASSERT(!quiesce_active);
 
 	/*
-	 * The check for t_intr is to catch an interrupt thread
-	 * that has not yet unpinned the thread underneath.
+	 * Threads in system processes don't process signals.  This is
+	 * true both for standard threads of system processes and for
+	 * interrupt threads which have borrowed their pinned thread's LWP.
 	 */
-	if (lwp == NULL || t->t_intr) {
+	if (lwp == NULL || (p->p_flag & SSYS)) {
 		cv_wait(cvp, mp);
 		return (rval);
 	}
+	ASSERT(t->t_intr == NULL);
 
 	ASSERT(curthread->t_schedflag & TS_DONT_SWAP);
 	cancel_pending = schedctl_cancel_pending();
@@ -374,12 +376,13 @@ cv_timedwait_sig_hires(kcondvar_t *cvp, kmutex_t *mp, hrtime_t tim,
 	ASSERT(!quiesce_active);
 
 	/*
-	 * If there is no lwp, then we don't need to wait for a signal.
-	 * The check for t_intr is to catch an interrupt thread
-	 * that has not yet unpinned the thread underneath.
+	 * Threads in system processes don't process signals.  This is
+	 * true both for standard threads of system processes and for
+	 * interrupt threads which have borrowed their pinned thread's LWP.
 	 */
-	if (lwp == NULL || t->t_intr)
+	if (lwp == NULL || (p->p_flag & SSYS))
 		return (cv_timedwait_hires(cvp, mp, tim, res, flag));
+	ASSERT(t->t_intr == NULL);
 
 	/*
 	 * If tim is less than or equal to current hrtime, then the timeout
@@ -516,13 +519,15 @@ cv_wait_sig_swap_core(kcondvar_t *cvp, kmutex_t *mp, int *sigret)
 		return (rval);
 
 	/*
-	 * The check for t_intr is to catch an interrupt thread
-	 * that has not yet unpinned the thread underneath.
+	 * Threads in system processes don't process signals.  This is
+	 * true both for standard threads of system processes and for
+	 * interrupt threads which have borrowed their pinned thread's LWP.
 	 */
-	if (lwp == NULL || t->t_intr) {
+	if (lwp == NULL || (p->p_flag & SSYS)) {
 		cv_wait(cvp, mp);
 		return (rval);
 	}
+	ASSERT(t->t_intr == NULL);
 
 	cancel_pending = schedctl_cancel_pending();
 	lwp->lwp_asleep = 1;
@@ -640,14 +645,15 @@ cv_wait_stop(kcondvar_t *cvp, kmutex_t *mp, int wakeup_time)
 		return;
 
 	/*
-	 * If there is no lwp, then we don't need to eventually stop it
-	 * The check for t_intr is to catch an interrupt thread
-	 * that has not yet unpinned the thread underneath.
+	 * Threads in system processes don't process signals.  This is
+	 * true both for standard threads of system processes and for
+	 * interrupt threads which have borrowed their pinned thread's LWP.
 	 */
-	if (lwp == NULL || t->t_intr) {
+	if (lwp == NULL || (p->p_flag & SSYS)) {
 		cv_wait(cvp, mp);
 		return;
 	}
+	ASSERT(t->t_intr == NULL);
 
 	/*
 	 * Wakeup in wakeup_time milliseconds, i.e., human time.

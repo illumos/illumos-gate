@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -713,7 +711,7 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 
 		if (getcid(clname, &classid) != 0)
 			return (set_errno(EINVAL));
-		if (classid == syscid)
+		if (CLASS_KERNEL(classid))
 			return (set_errno(EINVAL));
 		defaultcid = classid;
 		ASSERT(defaultcid > 0 && defaultcid < loaded_classes);

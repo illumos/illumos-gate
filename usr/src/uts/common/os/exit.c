@@ -405,10 +405,12 @@ proc_exit(int why, int what)
 	 * Allocate a sigqueue now, before we grab locks.
 	 * It will be given to sigcld(), below.
 	 * Special case:  If we will be making the process disappear
-	 * without a trace (for the benefit of posix_spawn() in libc)
-	 * don't bother to allocate a useless sigqueue.
+	 * without a trace because it is either:
+	 *	* an exiting SSYS process, or
+	 *	* a posix_spawn() vfork child who requests it,
+	 * we don't bother to allocate a useless sigqueue.
 	 */
-	evaporate = ((p->p_flag & SVFORK) &&
+	evaporate = (p->p_flag & SSYS) || ((p->p_flag & SVFORK) &&
 	    why == CLD_EXITED && what == _EVAPORATE);
 	if (!evaporate)
 		sqp = kmem_zalloc(sizeof (sigqueue_t), KM_SLEEP);
@@ -747,6 +749,8 @@ proc_exit(int why, int what)
 	rdir = PTOU(p)->u_rdir;
 	cwd = PTOU(p)->u_cwd;
 
+	ASSERT(cdir != NULL || p->p_parent == &p0);
+
 	/*
 	 * Release resource controls, as they are no longer enforceable.
 	 */
@@ -840,7 +844,8 @@ proc_exit(int why, int what)
 	 * We don't release u_cdir and u_rdir until SZOMB is set.
 	 * This protects us against dofusers().
 	 */
-	VN_RELE(cdir);
+	if (cdir)
+		VN_RELE(cdir);
 	if (rdir)
 		VN_RELE(rdir);
 	if (cwd)

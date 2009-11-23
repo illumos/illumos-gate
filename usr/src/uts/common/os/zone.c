@@ -2203,7 +2203,7 @@ zone_set_sched_class(zone_t *zone, const char *new_class)
 	if ((err = copyinstr(new_class, sched_class, PC_CLNMSZ, NULL)) != 0)
 		return (err);	/* EFAULT or ENAMETOOLONG */
 
-	if (getcid(sched_class, &classid) != 0 || classid == syscid)
+	if (getcid(sched_class, &classid) != 0 || CLASS_KERNEL(classid))
 		return (set_errno(EINVAL));
 	zone->zone_defaultcid = classid;
 	ASSERT(zone->zone_defaultcid > 0 &&
@@ -3482,7 +3482,7 @@ zsched(void *arg)
 		 * will have to tear down the zone, and fail, or try again.
 		 */
 		if ((zone->zone_boot_err = newproc(zone_start_init, NULL, cid,
-		    minclsyspri - 1, &ct)) != 0) {
+		    minclsyspri - 1, &ct, 0)) != 0) {
 			mutex_enter(&zone_status_lock);
 			zone_status_set(zone, ZONE_IS_SHUTTING_DOWN);
 			mutex_exit(&zone_status_lock);
@@ -4023,7 +4023,8 @@ zone_create(const char *zone_name, const char *zone_root,
 	 * and initialize zsched appropriately.  I'm not sure that that
 	 * makes much of a difference, though.
 	 */
-	if (error = newproc(zsched, (void *)&zarg, syscid, minclsyspri, NULL)) {
+	error = newproc(zsched, (void *)&zarg, syscid, minclsyspri, NULL, 0);
+	if (error != 0) {
 		/*
 		 * We need to undo all globally visible state.
 		 */

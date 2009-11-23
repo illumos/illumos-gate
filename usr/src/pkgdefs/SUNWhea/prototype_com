@@ -1299,6 +1299,8 @@ f none usr/include/sys/syscall.h 644 root bin
 f none usr/include/sys/sysconf.h 644 root bin
 f none usr/include/sys/sysconfig.h 644 root bin
 f none usr/include/sys/sysconfig_impl.h 644 root bin
+f none usr/include/sys/sysdc.h 644 root bin
+f none usr/include/sys/sysdc_impl.h 644 root bin
 d none usr/include/sys/sysevent 755 root bin
 f none usr/include/sys/sysevent/ap_driver.h 644 root bin
 f none usr/include/sys/sysevent/domain.h 644 root bin

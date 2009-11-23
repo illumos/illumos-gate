@@ -28,12 +28,13 @@
 PROG= dispadmin
 MANIFEST= scheduler.xml
 SVCMETHOD= svc-scheduler
+SDC=  SDC$(PROG)
 RT=   RT$(PROG)
 TS=   TS$(PROG)
 IA=   IA$(PROG)
 FSS=  FSS$(PROG)
 FX=   FX$(PROG)
-PROGS= $(PROG) $(RT) $(TS) $(IA) $(FSS) $(FX)
+PROGS= $(PROG) $(RT) $(TS) $(IA) $(FSS) $(FX) $(SDC)
 
 include ../Makefile.cmd
 
@@ -41,38 +42,43 @@ CFLAGS +=	$(CCVERBOSE)
 
 ROOTDIR=	$(ROOT)/usr/lib/class
 ROOTDIRS=	$(ROOTDIR)	\
-		$(ROOTDIR)/RT	\
-		$(ROOTDIR)/TS	\
-		$(ROOTDIR)/IA	\
 		$(ROOTDIR)/FSS	\
-		$(ROOTDIR)/FX
+		$(ROOTDIR)/FX	\
+		$(ROOTDIR)/IA	\
+		$(ROOTDIR)/RT	\
+		$(ROOTDIR)/SDC	\
+		$(ROOTDIR)/TS
+
 ROOTPROG=	$(PROG:%=$(ROOTUSRSBIN)/%)
-ROOTRT=		$(RT:%=$(ROOTDIR)/RT/%)
-ROOTTS=		$(TS:%=$(ROOTDIR)/TS/%)
-ROOTIA=		$(IA:%=$(ROOTDIR)/IA/%)
 ROOTFSS=	$(FSS:%=$(ROOTDIR)/FSS/%)
 ROOTFX=		$(FX:%=$(ROOTDIR)/FX/%)
+ROOTIA=		$(IA:%=$(ROOTDIR)/IA/%)
+ROOTRT=		$(RT:%=$(ROOTDIR)/RT/%)
+ROOTSDC=	$(SDC:%=$(ROOTDIR)/SDC/%)
+ROOTTS=		$(TS:%=$(ROOTDIR)/TS/%)
 ROOTMANIFESTDIR=	$(ROOTSVCSYSTEM)
 
 # this would be simpler if we renamed rtdispadmin.c and tsdispadmin.c
 OBJECTS= $(PROG).o rt$(PROG).o ts$(PROG).o ia$(PROG).o \
-		fss$(PROG).o fx$(PROG).o subr.o
+		fss$(PROG).o fx$(PROG).o sdc$(PROG).o subr.o
 
 # conditional assignments, because of above names
 $(PROG):=	OBJ= $(PROG).o
-$(RT):=		OBJ= rt$(PROG).o
-$(TS):=		OBJ= ts$(PROG).o
-$(IA):=		OBJ= ia$(PROG).o
 $(FSS):=	OBJ= fss$(PROG).o
 $(FX):=		OBJ= fx$(PROG).o
+$(IA):=		OBJ= ia$(PROG).o
+$(RT):=		OBJ= rt$(PROG).o
+$(SDC):=	OBJ= sdc$(PROG).o
+$(TS):=		OBJ= ts$(PROG).o
 
 # install rules
 $(ROOTDIR)/% \
-$(ROOTDIR)/RT/% \
-$(ROOTDIR)/IA/% \
-$(ROOTDIR)/TS/% \
 $(ROOTDIR)/FSS/% \
-$(ROOTDIR)/FX/% : %
+$(ROOTDIR)/FX/% \
+$(ROOTDIR)/IA/% \
+$(ROOTDIR)/RT/% \
+$(ROOTDIR)/SDC/% \
+$(ROOTDIR)/TS/% : %
 	$(INS.file)
 
 .KEEP_STATE:
@@ -89,7 +95,7 @@ llib-lsubr.ln:	subr.c
 lint :=	LDLIBS += -L. -lsubr
 
 install: all $(ROOTPROG) $(ROOTRT) $(ROOTTS) $(ROOTIA) $(ROOTFSS) $(ROOTFX) \
-		$(ROOTMANIFEST) $(ROOTSVCMETHOD)
+		$(ROOTSDC) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
 # Don't re-install directories already installed by Targetdirs
 #$(ROOTDIRS):
@@ -102,10 +108,11 @@ clean:
  
 lint:	llib-lsubr.ln
 	$(LINT.c) dispadmin.c $(LDLIBS)
-	$(LINT.c) rtdispadmin.c $(LDLIBS)
-	$(LINT.c) tsdispadmin.c $(LDLIBS)
-	$(LINT.c) iadispadmin.c $(LDLIBS)
 	$(LINT.c) fssdispadmin.c $(LDLIBS)
 	$(LINT.c) fxdispadmin.c $(LDLIBS)
+	$(LINT.c) iadispadmin.c $(LDLIBS)
+	$(LINT.c) rtdispadmin.c $(LDLIBS)
+	$(LINT.c) sdcdispadmin.c $(LDLIBS)
+	$(LINT.c) tsdispadmin.c $(LDLIBS)
  
 include ../Makefile.targ

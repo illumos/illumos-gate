@@ -450,6 +450,12 @@ main(void)
 	(void) spl0();
 	interrupts_unleashed = 1;
 
+	/*
+	 * Create kmem cache for proc structures
+	 */
+	process_cache = kmem_cache_create("process_cache", sizeof (proc_t),
+	    0, NULL, NULL, NULL, NULL, NULL, 0);
+
 	vfs_mountroot();	/* Mount the root file system */
 	errorq_init();		/* after vfs_mountroot() so DDI root is ready */
 	cpu_kstat_init(CPU);	/* after vfs_mountroot() so TOD is valid */
@@ -498,12 +504,6 @@ main(void)
 	 * Set the scan rate and other parameters of the paging subsystem.
 	 */
 	setupclock(0);
-
-	/*
-	 * Create kmem cache for proc structures
-	 */
-	process_cache = kmem_cache_create("process_cache", sizeof (proc_t),
-	    0, NULL, NULL, NULL, NULL, NULL, 0);
 
 	/*
 	 * Initialize process 0's lwp directory and lwpid hash table.
@@ -576,24 +576,33 @@ main(void)
 
 	/*
 	 * Make init process; enter scheduling loop with system process.
+	 *
+	 * Note that we manually assign the pids for these processes, for
+	 * historical reasons.  If more pre-assigned pids are needed,
+	 * FAMOUS_PIDS will have to be updated.
 	 */
 
 	/* create init process */
-	if (newproc(start_init, NULL, defaultcid, 59, NULL))
+	if (newproc(start_init, NULL, defaultcid, 59, NULL,
+	    FAMOUS_PID_INIT))
 		panic("main: unable to fork init.");
 
 	/* create pageout daemon */
-	if (newproc(pageout, NULL, syscid, maxclsyspri - 1, NULL))
+	if (newproc(pageout, NULL, syscid, maxclsyspri - 1, NULL,
+	    FAMOUS_PID_PAGEOUT))
 		panic("main: unable to fork pageout()");
 
 	/* create fsflush daemon */
-	if (newproc(fsflush, NULL, syscid, minclsyspri, NULL))
+	if (newproc(fsflush, NULL, syscid, minclsyspri, NULL,
+	    FAMOUS_PID_FSFLUSH))
 		panic("main: unable to fork fsflush()");
 
 	/* create cluster process if we're a member of one */
 	if (cluster_bootflags & CLUSTER_BOOTED) {
-		if (newproc(cluster_wrapper, NULL, syscid, minclsyspri, NULL))
+		if (newproc(cluster_wrapper, NULL, syscid, minclsyspri,
+		    NULL, 0)) {
 			panic("main: unable to fork cluster()");
+		}
 	}
 
 	/*

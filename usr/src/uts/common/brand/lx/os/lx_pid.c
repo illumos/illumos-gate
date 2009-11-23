@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -119,7 +117,7 @@ lx_pid_assign(kthread_t *t)
 		/*
 		 * Allocate a pid for any thread other than the first
 		 */
-		if ((newpid = pid_allocate(p, 0)) < 0)
+		if ((newpid = pid_allocate(p, 0, 0)) < 0)
 			return (-1);
 
 		pidp = pid_find(newpid);

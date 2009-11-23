@@ -812,6 +812,7 @@ vfs_mountroot(void)
 	char		*path;
 	size_t		plen;
 	struct vfssw	*vswp;
+	proc_t		*p;
 
 	rw_init(&vfssw_lock, NULL, RW_DEFAULT, NULL);
 	rw_init(&vfslist, NULL, RW_DEFAULT, NULL);
@@ -835,9 +836,22 @@ vfs_mountroot(void)
 	vfs_setmntpoint(rootvfs, "/");
 	if (VFS_ROOT(rootvfs, &rootdir))
 		panic("vfs_mountroot: no root vnode");
-	PTOU(curproc)->u_cdir = rootdir;
-	VN_HOLD(PTOU(curproc)->u_cdir);
-	PTOU(curproc)->u_rdir = NULL;
+
+	/*
+	 * At this point, the process tree consists of p0 and possibly some
+	 * direct children of p0.  (i.e. there are no grandchildren)
+	 *
+	 * Walk through them all, setting their current directory.
+	 */
+	mutex_enter(&pidlock);
+	for (p = practive; p != NULL; p = p->p_next) {
+		ASSERT(p == &p0 || p->p_parent == &p0);
+
+		PTOU(p)->u_cdir = rootdir;
+		VN_HOLD(PTOU(p)->u_cdir);
+		PTOU(p)->u_rdir = NULL;
+	}
+	mutex_exit(&pidlock);
 
 	/*
 	 * Setup the global zone's rootvp, now that it exists.

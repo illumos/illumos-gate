@@ -114,7 +114,7 @@ CHKHDRS=			\
 	conf.h			\
 	consdev.h		\
 	console.h		\
-        consplat.h              \
+	consplat.h		\
 	vt.h			\
 	vtdaemon.h		\
 	kd.h			\
@@ -143,7 +143,7 @@ CHKHDRS=			\
 	cyclic_impl.h		\
 	dacf.h			\
 	dacf_impl.h		\
-	damap.h		\
+	damap.h			\
 	damap_impl.h		\
 	dc_ki.h			\
 	ddi.h			\
@@ -186,7 +186,7 @@ CHKHDRS=			\
 	dls.h			\
 	dls_mgmt.h		\
 	dls_impl.h		\
-	dma_i8237A.h            \
+	dma_i8237A.h		\
 	dnlc.h			\
 	door.h			\
 	door_data.h		\
@@ -196,9 +196,9 @@ CHKHDRS=			\
 	dumpadm.h		\
 	dumphdr.h		\
 	ecppsys.h		\
-	ecppio.h                \
-	ecppreg.h               \
-	ecppvar.h               \
+	ecppio.h		\
+	ecppreg.h		\
+	ecppvar.h		\
 	efi_partition.h		\
 	elf.h			\
 	elf_386.h		\
@@ -244,8 +244,8 @@ CHKHDRS=			\
 	fss.h			\
 	fsspriocntl.h		\
 	fsid.h			\
-	fssnap.h                \
-	fssnap_if.h             \
+	fssnap.h		\
+	fssnap_if.h		\
 	fstyp.h			\
 	ftrace.h		\
 	fx.h			\
@@ -391,7 +391,7 @@ CHKHDRS=			\
 	multidata_impl.h	\
 	mutex.h			\
 	nbmlock.h		\
-	ndifm.h		\
+	ndifm.h			\
 	ndi_impldefs.h		\
 	net80211.h		\
 	net80211_crypto.h	\
@@ -402,11 +402,11 @@ CHKHDRS=			\
 	netstack.h		\
 	nexusdefs.h		\
 	note.h			\
-	nvpair.h                \
-	nvpair_impl.h           \
+	nvpair.h		\
+	nvpair_impl.h		\
 	objfs.h			\
 	objfs_impl.h		\
-	ontrap.h                \
+	ontrap.h		\
 	open.h			\
 	openpromio.h		\
 	panic.h			\
@@ -440,7 +440,7 @@ CHKHDRS=			\
 	port_impl.h		\
 	port_kernel.h		\
 	portif.h		\
-	ppmio.h                 \
+	ppmio.h			\
 	pppt_ic_if.h		\
 	pppt_ioctl.h		\
 	priocntl.h		\
@@ -540,11 +540,13 @@ CHKHDRS=			\
 	suntty.h		\
 	swap.h			\
 	synch.h			\
+	sysdc.h			\
+	sysdc_impl.h		\
 	syscall.h		\
 	sysconf.h		\
 	sysconfig.h		\
 	sysevent.h		\
-	sysevent_impl.h         \
+	sysevent_impl.h		\
 	sysinfo.h		\
 	syslog.h		\
 	sysmacros.h		\
@@ -737,7 +739,7 @@ IDMHDRS=		\
 	idm_impl.h	\
 	idm_so.h	\
 	idm_text.h	\
-	idm_transport.h \
+	idm_transport.h	\
 	idm_conn_sm.h
 
 ISCSITHDRS=		\

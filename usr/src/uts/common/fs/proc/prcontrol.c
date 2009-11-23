@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/uio.h>
@@ -299,6 +297,12 @@ pr_control(long cmd, arg_t *argp, prnode_t *pnp, cred_t *cr)
 	p = pcp->prc_proc;
 	ASSERT(p != NULL);
 
+	/* System processes defy control. */
+	if (p->p_flag & SSYS) {
+		prunlock(pnp);
+		return (EBUSY);
+	}
+
 	switch (cmd) {
 
 	default:
@@ -315,7 +319,7 @@ pr_control(long cmd, arg_t *argp, prnode_t *pnp, cred_t *cr)
 			/*
 			 * Can't apply to a system process.
 			 */
-			if ((p->p_flag & SSYS) || p->p_as == &kas) {
+			if (p->p_as == &kas) {
 				error = EBUSY;
 				break;
 			}
@@ -723,6 +727,11 @@ pr_control32(int32_t cmd, arg32_t *argp, prnode_t *pnp, cred_t *cr)
 	p = pcp->prc_proc;
 	ASSERT(p != NULL);
 
+	if (p->p_flag & SSYS) {
+		prunlock(pnp);
+		return (EBUSY);
+	}
+
 	switch (cmd) {
 
 	default:
@@ -739,7 +748,7 @@ pr_control32(int32_t cmd, arg32_t *argp, prnode_t *pnp, cred_t *cr)
 			/*
 			 * Can't apply to a system process.
 			 */
-			if ((p->p_flag & SSYS) || p->p_as == &kas) {
+			if (p->p_as == &kas) {
 				error = EBUSY;
 				break;
 			}

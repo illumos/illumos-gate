@@ -20,15 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -94,7 +91,7 @@ struct plock	*proc_lock;	/* persistent array of p_lock's */
 static kmutex_t	pidlinklock;
 static struct pid **pidhash;
 static pid_t minpid;
-static pid_t mpid;
+static pid_t mpid = FAMOUS_PIDS;	/* one more than the last famous pid */
 static union procent *procdir;
 static union procent *procentfree;
 
@@ -132,7 +129,7 @@ pid_setmin(void)
 	if (jump_pid && jump_pid > mpid)
 		minpid = mpid = jump_pid;
 	else
-		minpid = mpid + 1;
+		minpid = mpid;
 }
 
 /*
@@ -171,7 +168,7 @@ pid_getlockslot(int prslot)
  * pid_allocate() returns the new pid on success, -1 on failure.
  */
 pid_t
-pid_allocate(proc_t *prp, int flags)
+pid_allocate(proc_t *prp, pid_t pid, int flags)
 {
 	struct pid *pidp;
 	union procent *pep;
@@ -187,17 +184,31 @@ pid_allocate(proc_t *prp, int flags)
 		goto failed;
 	}
 
-	/*
-	 * Allocate a pid
-	 */
-	startpid = mpid;
-	do  {
-		newpid = (++mpid == maxpid ? mpid = minpid : mpid);
-	} while (pid_lookup(newpid) && newpid != startpid);
+	if (pid != 0) {
+		VERIFY(minpid == 0);
+		VERIFY3P(pid, <, mpid);
+		VERIFY3P(pid_lookup(pid), ==, NULL);
+		newpid = pid;
+	} else {
+		/*
+		 * Allocate a pid
+		 */
+		ASSERT(minpid <= mpid && mpid <= maxpid);
 
-	if (newpid == startpid && pid_lookup(newpid)) {
-		/* couldn't find a free pid */
-		goto failed;
+		startpid = mpid;
+		for (;;) {
+			newpid = mpid;
+			if (mpid >= maxpid)
+				mpid = minpid;
+			else
+				mpid++;
+
+			if (pid_lookup(newpid) == NULL)
+				break;
+
+			if (mpid == startpid)
+				goto failed;
+		}
 	}
 
 	/*

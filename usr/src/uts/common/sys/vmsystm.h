@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,8 +38,6 @@
 
 #ifndef _SYS_VMSYSTM_H
 #define	_SYS_VMSYSTM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/proc.h>
 
@@ -154,7 +152,6 @@ extern	caddr_t	ppmapin(struct page *, uint_t, caddr_t);
 extern	void	ppmapout(caddr_t);
 
 extern	int pf_is_memory(pfn_t);
-extern	void	pageout_init(void (*proc)(), proc_t *pp, pri_t pri);
 
 extern	void	dcache_flushall(void);
 

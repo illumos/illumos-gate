@@ -683,7 +683,10 @@ pageout()
 		push_req[i].a_next = &push_req[i + 1];
 
 	pageout_pri = curthread->t_pri;
-	pageout_init(pageout_scanner, proc_pageout, pageout_pri - 1);
+
+	/* Create the pageout scanner thread. */
+	(void) lwp_kernel_create(proc_pageout, pageout_scanner, NULL, TS_RUN,
+	    pageout_pri - 1);
 
 	/*
 	 * kick off pageout scheduler.

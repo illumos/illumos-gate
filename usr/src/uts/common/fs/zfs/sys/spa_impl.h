@@ -86,6 +86,25 @@ enum zio_taskq_type {
 	ZIO_TASKQ_TYPES
 };
 
+/*
+ * State machine for the zpool-pooname process.  The states transitions
+ * are done as follows:
+ *
+ *	From		   To			Routine
+ *	PROC_NONE	-> PROC_CREATED		spa_activate()
+ *	PROC_CREATED	-> PROC_ACTIVE		spa_thread()
+ *	PROC_ACTIVE	-> PROC_DEACTIVATE	spa_deactivate()
+ *	PROC_DEACTIVATE	-> PROC_GONE		spa_thread()
+ *	PROC_GONE	-> PROC_NONE		spa_deactivate()
+ */
+typedef enum spa_proc_state {
+	SPA_PROC_NONE,		/* spa_proc = &p0, no process created */
+	SPA_PROC_CREATED,	/* spa_activate() has proc, is waiting */
+	SPA_PROC_ACTIVE,	/* taskqs created, spa_proc set */
+	SPA_PROC_DEACTIVATE,	/* spa_deactivate() requests process exit */
+	SPA_PROC_GONE		/* spa_thread() is exiting, spa_proc = &p0 */
+} spa_proc_state_t;
+
 struct spa {
 	/*
 	 * Fields protected by spa_namespace_lock.
@@ -186,6 +205,11 @@ struct spa {
 	uint64_t	spa_dedup_checksum;	/* default dedup checksum */
 	uint64_t	spa_dspace;		/* dspace in normal class */
 	kmutex_t	spa_vdev_top_lock;	/* dueling offline/remove */
+	kmutex_t	spa_proc_lock;		/* protects spa_proc* */
+	kcondvar_t	spa_proc_cv;		/* spa_proc_state transitions */
+	spa_proc_state_t spa_proc_state;	/* see definition */
+	struct proc	*spa_proc;		/* "zpool-poolname" process */
+	uint64_t	spa_did;		/* if procp != p0, did of t1 */
 	boolean_t	spa_autoreplace;	/* autoreplace set in open */
 	int		spa_vdev_locks;		/* locks grabbed */
 	/*

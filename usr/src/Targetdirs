@@ -216,6 +216,7 @@ DIRS= \
 	/usr/lib/class/FX \
 	/usr/lib/class/IA \
 	/usr/lib/class/RT \
+	/usr/lib/class/SDC \
 	/usr/lib/class/TS \
 	/usr/lib/crypto \
 	/usr/lib/drv \

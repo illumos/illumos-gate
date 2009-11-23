@@ -81,7 +81,10 @@
 #include <sys/fork.h>
 
 static int64_t cfork(int, int, int);
-static int getproc(proc_t **, int);
+static int getproc(proc_t **, pid_t, uint_t);
+#define	GETPROC_USER	0x0
+#define	GETPROC_KERNEL	0x1
+
 static void fork_fail(proc_t *);
 static void forklwp_fail(proc_t *);
 
@@ -224,7 +227,7 @@ cfork(int isvfork, int isfork1, int flags)
 	/*
 	 * Create a child proc struct. Place a VN_HOLD on appropriate vnodes.
 	 */
-	if (getproc(&cp, 0) < 0) {
+	if (getproc(&cp, 0, GETPROC_USER) < 0) {
 		mutex_enter(&p->p_lock);
 		pool_barrier_exit();
 		continuelwps(p);
@@ -779,20 +782,24 @@ extern struct as kas;
  * fork a kernel process.
  */
 int
-newproc(void (*pc)(), caddr_t arg, id_t cid, int pri, struct contract **ct)
+newproc(void (*pc)(), caddr_t arg, id_t cid, int pri, struct contract **ct,
+    pid_t pid)
 {
 	proc_t *p;
 	struct user *up;
-	klwp_t *lwp;
+	kthread_t *t;
 	cont_process_t *ctp = NULL;
 	rctl_entity_p_t e;
 
-	ASSERT(!(cid == syscid && ct != NULL));
-	if (cid == syscid) {
+	ASSERT(cid != sysdccid);
+	ASSERT(cid != syscid || ct == NULL);
+	if (CLASS_KERNEL(cid)) {
 		rctl_alloc_gp_t *init_gp;
 		rctl_set_t *init_set;
 
-		if (getproc(&p, 1) < 0)
+		ASSERT(pid != 1);
+
+		if (getproc(&p, pid, GETPROC_KERNEL) < 0)
 			return (EAGAIN);
 
 		/*
@@ -827,12 +834,17 @@ newproc(void (*pc)(), caddr_t arg, id_t cid, int pri, struct contract **ct)
 		mutex_exit(&p->p_lock);
 
 		rctl_prealloc_destroy(init_gp);
-	} else  {
+
+		t = lwp_kernel_create(p, pc, arg, TS_STOPPED, pri);
+	} else {
 		rctl_alloc_gp_t *init_gp, *default_gp;
 		rctl_set_t *init_set;
 		task_t *tk, *tk_old;
+		klwp_t *lwp;
 
-		if (getproc(&p, 0) < 0)
+		ASSERT(pid == 1);
+
+		if (getproc(&p, pid, GETPROC_USER) < 0)
 			return (EAGAIN);
 		/*
 		 * init creates a new task, distinct from the task
@@ -865,29 +877,26 @@ newproc(void (*pc)(), caddr_t arg, id_t cid, int pri, struct contract **ct)
 		task_rele(tk_old);
 		rctl_prealloc_destroy(default_gp);
 		rctl_prealloc_destroy(init_gp);
-	}
 
-	p->p_as = &kas;
+		if ((lwp = lwp_create(pc, arg, 0, p, TS_STOPPED, pri,
+		    &curthread->t_hold, cid, 1)) == NULL) {
+			task_t *tk;
+			fork_fail(p);
+			mutex_enter(&pidlock);
+			mutex_enter(&p->p_lock);
+			tk = p->p_task;
+			task_detach(p);
+			ASSERT(p->p_pool->pool_ref > 0);
+			atomic_add_32(&p->p_pool->pool_ref, -1);
+			mutex_exit(&p->p_lock);
+			pid_exit(p);
+			mutex_exit(&pidlock);
+			task_rele(tk);
 
-	if ((lwp = lwp_create(pc, arg, 0, p, TS_STOPPED, pri,
-	    &curthread->t_hold, cid, 1)) == NULL) {
-		task_t *tk;
-		fork_fail(p);
-		mutex_enter(&pidlock);
-		mutex_enter(&p->p_lock);
-		tk = p->p_task;
-		task_detach(p);
-		ASSERT(p->p_pool->pool_ref > 0);
-		atomic_add_32(&p->p_pool->pool_ref, -1);
-		mutex_exit(&p->p_lock);
-		pid_exit(p);
-		mutex_exit(&pidlock);
-		task_rele(tk);
+			return (EAGAIN);
+		}
+		t = lwptot(lwp);
 
-		return (EAGAIN);
-	}
-
-	if (cid != syscid) {
 		ctp = contract_process_fork(sys_process_tmpl, p, curproc,
 		    B_FALSE);
 		ASSERT(ctp != NULL);
@@ -895,13 +904,14 @@ newproc(void (*pc)(), caddr_t arg, id_t cid, int pri, struct contract **ct)
 			*ct = &ctp->conp_contract;
 	}
 
+	ASSERT3U(t->t_tid, ==, 1);
 	p->p_lwpid = 1;
 	mutex_enter(&pidlock);
-	pgjoin(p, curproc->p_pgidp);
+	pgjoin(p, p->p_parent->p_pgidp);
 	p->p_stat = SRUN;
 	mutex_enter(&p->p_lock);
-	lwptot(lwp)->t_proc_flag &= ~TP_HOLDLWP;
-	lwp_create_done(lwptot(lwp));
+	t->t_proc_flag &= ~TP_HOLDLWP;
+	lwp_create_done(t);
 	mutex_exit(&p->p_lock);
 	mutex_exit(&pidlock);
 	return (0);
@@ -911,7 +921,7 @@ newproc(void (*pc)(), caddr_t arg, id_t cid, int pri, struct contract **ct)
  * create a child proc struct.
  */
 static int
-getproc(proc_t **cpp, int kernel)
+getproc(proc_t **cpp, pid_t pid, uint_t flags)
 {
 	proc_t		*pp, *cp;
 	pid_t		newpid;
@@ -926,7 +936,7 @@ getproc(proc_t **cpp, int kernel)
 	if (zone_status_get(curproc->p_zone) >= ZONE_IS_SHUTTING_DOWN)
 		return (-1);	/* no point in starting new processes */
 
-	pp = curproc;
+	pp = (flags & GETPROC_KERNEL) ? &p0 : curproc;
 	cp = kmem_cache_alloc(process_cache, KM_SLEEP);
 	bzero(cp, sizeof (proc_t));
 
@@ -942,6 +952,7 @@ getproc(proc_t **cpp, int kernel)
 	mutex_init(&cp->p_maplock, NULL, MUTEX_DEFAULT, NULL);
 	cp->p_stat = SIDL;
 	cp->p_mstart = gethrtime();
+	cp->p_as = &kas;
 	/*
 	 * p_zone must be set before we call pid_allocate since the process
 	 * will be visible after that and code such as prfind_zone will
@@ -951,7 +962,7 @@ getproc(proc_t **cpp, int kernel)
 	cp->p_t1_lgrpid = LGRP_NONE;
 	cp->p_tr_lgrpid = LGRP_NONE;
 
-	if ((newpid = pid_allocate(cp, PID_ALLOC_PROC)) == -1) {
+	if ((newpid = pid_allocate(cp, pid, PID_ALLOC_PROC)) == -1) {
 		if (nproc == v.v_proc) {
 			CPU_STATS_ADDQ(CPU, sys, procovf, 1);
 			cmn_err(CE_WARN, "out of processes");
@@ -1060,7 +1071,7 @@ getproc(proc_t **cpp, int kernel)
 	 * always bound to the default pool.
 	 */
 	mutex_enter(&pp->p_lock);
-	if (kernel) {
+	if (flags & GETPROC_KERNEL) {
 		cp->p_pool = pool_default;
 		cp->p_flag |= SSYS;
 	} else {
@@ -1074,7 +1085,7 @@ getproc(proc_t **cpp, int kernel)
 	 * are always attached to task0.
 	 */
 	mutex_enter(&cp->p_lock);
-	if (kernel)
+	if (flags & GETPROC_KERNEL)
 		task_attach(task0p, cp);
 	else
 		task_attach(pp->p_task, cp);
@@ -1098,7 +1109,15 @@ getproc(proc_t **cpp, int kernel)
 	 */
 	fcnt_add(P_FINFO(pp), 1);
 
-	VN_HOLD(PTOU(pp)->u_cdir);
+	if (PTOU(pp)->u_cdir) {
+		VN_HOLD(PTOU(pp)->u_cdir);
+	} else {
+		ASSERT(pp == &p0);
+		/*
+		 * We must be at or before vfs_mountroot(); it will take care of
+		 * assigning our current directory.
+		 */
+	}
 	if (PTOU(pp)->u_rdir)
 		VN_HOLD(PTOU(pp)->u_rdir);
 	if (PTOU(pp)->u_cwd)

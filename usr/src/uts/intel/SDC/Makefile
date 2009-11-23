@@ -19,68 +19,41 @@
 # CDDL HEADER END
 #
 #
+# uts/intel/SDC/Makefile
+#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#	This makefile drives the production of the zfs file system
+#	This makefile drives the production of the SDC scheduling class
 #	kernel module.
+#
+#	intel architecture dependent
+#
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE	= ../..
 
-ARCHDIR:sh = cd ..; basename `pwd`
-
 #
 #	Define the module and object file sets.
 #
-MODULE		= zfs
-OBJECTS		= $(ZFS_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(ZFS_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-ROOTLINK	= $(ROOT_FS_DIR)/$(MODULE)
-CONF_SRCDIR	= $(UTSBASE)/common/fs/zfs
+MODULE		= SDC
+OBJECTS		= $(SDC_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(SDC_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_SCHED_DIR)/$(MODULE)
 
 #
 #	Include common rules.
 #
-include ../Makefile.$(ARCHDIR)
+include $(UTSBASE)/intel/Makefile.intel
 
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
+ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
-
-#
-#	Overrides and depends_on
-#
-#	We require sched/SDC because by the time vfs_mountroot() runs,
-#	we can no longer load modules through OBP.
-#
-MODSTUBS_DIR	 = $(OBJS_DIR)
-LDFLAGS		+= -dy -Nfs/specfs -Ncrypto/swrand -Nmisc/idmap -Nsched/SDC
-
-INC_PATH	+= -I$(UTSBASE)/common/fs/zfs
-INC_PATH	+= -I$(SRC)/common
-INC_PATH	+= -I$(COMMONBASE)/zfs
-
-C99MODE=	-xc99=%all
-C99LMODE=	-Xc99=%all
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
 #	Default build targets.
@@ -103,10 +76,7 @@ clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 
-$(ROOTLINK):	$(ROOT_FS_DIR) $(ROOTMODULE)
-	-$(RM) $@; ln $(ROOTMODULE) $@
-
 #
 #	Include common targets.
 #
-include ../Makefile.targ
+include $(UTSBASE)/intel/Makefile.targ

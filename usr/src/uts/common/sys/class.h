@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +29,6 @@
 
 #ifndef _SYS_CLASS_H
 #define	_SYS_CLASS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/t_lock.h>
 #include <sys/cred.h>
@@ -119,6 +117,8 @@ typedef struct sclass {
 
 #ifdef	_KERNEL
 
+#define	CLASS_KERNEL(cid)	((cid) == syscid || (cid) == sysdccid)
+
 extern int	nclass;		/* number of configured scheduling classes */
 extern char	*defaultclass;	/* default class for newproc'd processes */
 extern struct sclass sclass[];	/* the class table */
@@ -127,6 +127,7 @@ extern int	loaded_classes;	/* number of classes loaded */
 
 extern pri_t	minclsyspri;
 extern id_t	syscid;		/* system scheduling class ID */
+extern id_t	sysdccid;	/* system duty-cycle scheduling class ID */
 extern id_t	defaultcid;	/* "default" class id; see dispadmin(1M) */
 
 extern int	alloc_cid(char *, id_t *);

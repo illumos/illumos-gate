@@ -359,7 +359,7 @@ EXEC_KMODS	+= aoutexec elfexec intpexec shbinexec javaexec
 #
 #	Scheduling Class Modules (/kernel/sched):
 #
-SCHED_KMODS	+= RT TS RT_DPTBL TS_DPTBL IA FSS FX FX_DPTBL
+SCHED_KMODS	+= RT TS RT_DPTBL TS_DPTBL IA FSS FX FX_DPTBL SDC
 
 #
 #	File System Modules (/kernel/fs):

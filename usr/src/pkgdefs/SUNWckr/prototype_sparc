@@ -220,6 +220,7 @@ f none kernel/misc/sparcv9/swapgeneric 755 root sys
 f none kernel/misc/sparcv9/tlimod 755 root sys
 f none kernel/misc/sparcv9/tem 755 root sys
 d none kernel/sched/sparcv9 755 root sys
+f none kernel/sched/sparcv9/SDC 755 root sys
 f none kernel/sched/sparcv9/TS 755 root sys
 f none kernel/sched/sparcv9/TS_DPTBL 755 root sys
 d none kernel/strmod/sparcv9 755 root sys

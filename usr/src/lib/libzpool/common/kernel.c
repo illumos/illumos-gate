@@ -50,6 +50,9 @@ struct utsname utsname = {
 	"userland", "libzpool", "1", "1", "na"
 };
 
+/* this only exists to have its address taken */
+struct proc p0;
+
 /*
  * =========================================================================
  * threads

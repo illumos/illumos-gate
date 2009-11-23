@@ -239,6 +239,7 @@ l none kernel/misc/sha2=../../kernel/crypto/sha2
 f none kernel/misc/strplumb 755 root sys
 f none kernel/misc/tem 755 root sys
 f none kernel/misc/tlimod 755 root sys
+f none kernel/sched/SDC 755 root sys
 f none kernel/sched/TS 755 root sys
 f none kernel/sched/TS_DPTBL 755 root sys
 l none kernel/strmod/arp=../../kernel/drv/arp
@@ -459,6 +460,7 @@ f none kernel/misc/amd64/strplumb 755 root sys
 f none kernel/misc/amd64/tem 755 root sys
 f none kernel/misc/amd64/tlimod 755 root sys
 d none kernel/sched/amd64 755 root sys
+f none kernel/sched/amd64/SDC 755 root sys
 f none kernel/sched/amd64/TS 755 root sys
 f none kernel/sched/amd64/TS_DPTBL 755 root sys
 d none kernel/strmod/amd64 755 root sys

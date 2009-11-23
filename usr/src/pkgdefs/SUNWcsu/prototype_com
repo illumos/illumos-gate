@@ -355,6 +355,9 @@ f none usr/lib/class/IA/IApriocntl 555 root bin
 d none usr/lib/class/RT 755 root bin
 f none usr/lib/class/RT/RTdispadmin 555 root bin
 f none usr/lib/class/RT/RTpriocntl 555 root bin
+d none usr/lib/class/SDC 755 root bin
+f none usr/lib/class/SDC/SDCdispadmin 555 root bin
+f none usr/lib/class/SDC/SDCpriocntl 555 root bin
 d none usr/lib/class/TS 755 root bin
 f none usr/lib/class/TS/TSdispadmin 555 root bin
 f none usr/lib/class/TS/TSpriocntl 555 root bin

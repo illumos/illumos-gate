@@ -1509,6 +1509,9 @@ startup_modules(void)
 	if (modload("fs", "dev") == -1)
 		halt("Can't load dev");
 
+	if (modload("fs", "procfs") == -1)
+		halt("Can't load procfs");
+
 	(void) modloadonly("sys", "lbl_edition");
 
 	dispinit();

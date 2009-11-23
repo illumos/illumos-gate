@@ -27,7 +27,9 @@
 #define	_SYS_TASKQ_IMPL_H
 
 #include <sys/taskq.h>
+#include <sys/inttypes.h>
 #include <sys/vmem.h>
+#include <sys/list.h>
 #include <sys/kstat.h>
 
 #ifdef	__cplusplus
@@ -81,13 +83,16 @@ struct taskq_bucket {
 #define	TQBUCKET_CLOSE		0x01
 #define	TQBUCKET_SUSPEND	0x02
 
+#define	TASKQ_INTERFACE_FLAGS	0x0000ffff	/* defined in <sys/taskq.h> */
+
 /*
  * taskq implementation flags: bit range 16-31
  */
-#define	TASKQ_CHANGING		0x00010000
-#define	TASKQ_SUSPENDED		0x00020000
-#define	TASKQ_NOINSTANCE	0x00040000
-#define	TASKQ_THREAD_CREATED	0x00080000
+#define	TASKQ_CHANGING		0x00010000	/* nthreads != target */
+#define	TASKQ_SUSPENDED		0x00020000	/* taskq is suspended */
+#define	TASKQ_NOINSTANCE	0x00040000	/* no instance number */
+#define	TASKQ_THREAD_CREATED	0x00080000	/* a thread has been created */
+#define	TASKQ_DUTY_CYCLE	0x00100000	/* using the SDC class */
 
 struct taskq {
 	char		tq_name[TASKQ_NAMELEN + 1];
@@ -116,13 +121,19 @@ struct taskq {
 		kthread_t *_tq_thread;
 		kthread_t **_tq_threadlist;
 	}		tq_thr;
+
+	list_node_t	tq_cpupct_link;	/* linkage for taskq_cpupct_list */
+	struct proc	*tq_proc;	/* process for taskq threads */
+	int		tq_cpupart;	/* cpupart id bound to */
+	uint_t		tq_DC;		/* duty cycle for SDC */
+
 	/*
 	 * Statistics.
 	 */
 	kstat_t		*tq_kstat;	/* Exported statistics */
 	hrtime_t	tq_totaltime;	/* Time spent processing tasks */
-	int		tq_tasks;	/* Total # of tasks posted */
-	int		tq_executed;	/* Total # of tasks executed */
+	uint64_t	tq_tasks;	/* Total # of tasks posted */
+	uint64_t	tq_executed;	/* Total # of tasks executed */
 	int		tq_maxtasks;	/* Max number of tasks in the queue */
 	int		tq_tcreates;
 	int		tq_tdeaths;

@@ -68,6 +68,24 @@ extern void reapq_move_lq_to_tq(kthread_t *);
 extern void freectx_ctx(struct ctxop *);
 
 /*
+ * Create a kernel thread associated with a particular system process.  Give
+ * it an LWP so that microstate accounting will be available for it.
+ */
+kthread_t *
+lwp_kernel_create(proc_t *p, void (*proc)(), void *arg, int state, pri_t pri)
+{
+	klwp_t *lwp;
+
+	VERIFY((p->p_flag & SSYS) != 0);
+
+	lwp = lwp_create(proc, arg, 0, p, state, pri, &t0.t_hold, syscid, 0);
+
+	VERIFY(lwp != NULL);
+
+	return (lwptot(lwp));
+}
+
+/*
  * Create a thread that appears to be stopped at sys_rtt.
  */
 klwp_t *
@@ -84,7 +102,7 @@ lwp_create(void (*proc)(), caddr_t arg, size_t len, proc_t *p,
 	int err = 0;
 	kproject_t *oldkpj, *newkpj;
 	void *bufp = NULL;
-	klwp_t *curlwp = ttolwp(curthread);
+	klwp_t *curlwp;
 	lwpent_t *lep;
 	lwpdir_t *old_dir = NULL;
 	uint_t old_dirsz = 0;
@@ -96,12 +114,16 @@ lwp_create(void (*proc)(), caddr_t arg, size_t len, proc_t *p,
 	boolean_t branded = 0;
 	struct ctxop *ctx = NULL;
 
+	ASSERT(cid != sysdccid);	/* system threads must start in SYS */
+
+	ASSERT(p != &p0);		/* No new LWPs in p0. */
+
 	mutex_enter(&p->p_lock);
 	mutex_enter(&p->p_zone->zone_nlwps_lock);
 	/*
 	 * don't enforce rctl limits on system processes
 	 */
-	if (cid != syscid) {
+	if (!CLASS_KERNEL(cid)) {
 		if (p->p_task->tk_nlwps >= p->p_task->tk_nlwps_ctl)
 			if (rctl_test(rc_task_lwps, p->p_task->tk_rctls, p,
 			    1, 0) & RCT_DENY)
@@ -128,13 +150,26 @@ lwp_create(void (*proc)(), caddr_t arg, size_t len, proc_t *p,
 	mutex_exit(&p->p_zone->zone_nlwps_lock);
 	mutex_exit(&p->p_lock);
 
-	if (curlwp == NULL || (stksize = curlwp->lwp_childstksz) == 0)
+	if (CLASS_KERNEL(cid)) {
+		curlwp = NULL;		/* don't inherit from curlwp */
 		stksize = lwp_default_stksize;
+	} else {
+		curlwp = ttolwp(curthread);
+		if (curlwp == NULL || (stksize = curlwp->lwp_childstksz) == 0)
+			stksize = lwp_default_stksize;
+	}
 
 	/*
-	 * Try to reclaim a <lwp,stack> from 'deathrow'
+	 * For system threads, we sleep for our swap reservation, and the
+	 * thread stack can't be swapped.
+	 *
+	 * Otherwise, try to reclaim a <lwp,stack> from 'deathrow'
 	 */
-	if (stksize == lwp_default_stksize) {
+	if (CLASS_KERNEL(cid)) {
+		lwpdata = (caddr_t)segkp_get(segkp, stksize,
+		    (KPD_NO_ANON | KPD_HASREDZONE | KPD_LOCKED));
+
+	} else if (stksize == lwp_default_stksize) {
 		if (lwp_reapcnt > 0) {
 			mutex_enter(&reaplock);
 			if ((t = lwp_deathrow) != NULL) {
@@ -434,11 +469,15 @@ grow:
 	kpreempt_disable();	/* can't grab cpu_lock here */
 
 	/*
-	 * Inherit processor and processor set bindings from curthread,
-	 * unless we're creating a new kernel process, in which case
-	 * clear all bindings.
+	 * Inherit processor and processor set bindings from curthread.
+	 *
+	 * For kernel LWPs, we do not inherit processor set bindings at
+	 * process creation time (i.e. when p != curproc).  After the
+	 * kernel process is created, any subsequent LWPs must be created
+	 * by threads in the kernel process, at which point we *will*
+	 * inherit processor set bindings.
 	 */
-	if (cid == syscid) {
+	if (CLASS_KERNEL(cid) && p != curproc) {
 		t->t_bind_cpu = binding = PBIND_NONE;
 		t->t_cpupart = oldpart = &cp_default;
 		t->t_bind_pset = PS_NONE;
@@ -658,6 +697,13 @@ grow:
 
 error:
 	if (err) {
+		if (CLASS_KERNEL(cid)) {
+			/*
+			 * This should only happen if a system process runs
+			 * out of lwpids, which shouldn't occur.
+			 */
+			panic("Failed to create a system LWP");
+		}
 		/*
 		 * We have failed to create an lwp, so decrement the number
 		 * of lwps in the task and let the lgroup load averages know

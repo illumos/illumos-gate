@@ -1162,9 +1162,8 @@ void
 kcage_cageout_init()
 {
 	if (kcage_on) {
-
-		(void) thread_create(NULL, 0, kcage_cageout,
-		    NULL, 0, proc_pageout, TS_RUN, maxclsyspri - 1);
+		(void) lwp_kernel_create(proc_pageout, kcage_cageout, NULL,
+		    TS_RUN, maxclsyspri - 1);
 	}
 }
 

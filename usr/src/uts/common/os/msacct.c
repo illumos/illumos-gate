@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -244,6 +242,7 @@ mstate_thread_onproc_time(kthread_t *t)
 {
 	hrtime_t aggr_time;
 	hrtime_t now;
+	hrtime_t waitrq;
 	hrtime_t state_start;
 	struct mstate *ms;
 	klwp_t *lwp;
@@ -255,6 +254,7 @@ mstate_thread_onproc_time(kthread_t *t)
 		return (0);
 
 	mstate = t->t_mstate;
+	waitrq = t->t_waitrq;
 	ms = &lwp->lwp_mstate;
 	state_start = ms->ms_state_start;
 
@@ -267,13 +267,78 @@ mstate_thread_onproc_time(kthread_t *t)
 	 * NOTE: gethrtime_unscaled on X86 taken on different CPUs is
 	 * inconsistent, so it is possible that now < state_start.
 	 */
-	if ((mstate == LMS_USER || mstate == LMS_SYSTEM ||
-		mstate == LMS_TRAP) && (now > state_start)) {
-			aggr_time += now - state_start;
+	if (mstate == LMS_USER || mstate == LMS_SYSTEM || mstate == LMS_TRAP) {
+		/* if waitrq is zero, count all of the time. */
+		if (waitrq == 0) {
+			waitrq = now;
+		}
+
+		if (waitrq > state_start) {
+			aggr_time += waitrq - state_start;
+		}
 	}
 
 	scalehrtime(&aggr_time);
 	return (aggr_time);
+}
+
+/*
+ * Return the amount of onproc and runnable time this thread has experienced.
+ *
+ * Because the fields we read are not protected by locks when updated
+ * by the thread itself, this is an inherently racey interface.  In
+ * particular, the ASSERT(THREAD_LOCK_HELD(t)) doesn't guarantee as much
+ * as it might appear to.
+ *
+ * The implication for users of this interface is that onproc and runnable
+ * are *NOT* monotonically increasing; they may temporarily be larger than
+ * they should be.
+ */
+void
+mstate_systhread_times(kthread_t *t, hrtime_t *onproc, hrtime_t *runnable)
+{
+	struct mstate	*const	ms = &ttolwp(t)->lwp_mstate;
+
+	int		mstate;
+	hrtime_t	now;
+	hrtime_t	state_start;
+	hrtime_t	waitrq;
+	hrtime_t	aggr_onp;
+	hrtime_t	aggr_run;
+
+	ASSERT(THREAD_LOCK_HELD(t));
+	ASSERT(t->t_procp->p_flag & SSYS);
+	ASSERT(ttolwp(t) != NULL);
+
+	/* shouldn't be any non-SYSTEM on-CPU time */
+	ASSERT(ms->ms_acct[LMS_USER] == 0);
+	ASSERT(ms->ms_acct[LMS_TRAP] == 0);
+
+	mstate = t->t_mstate;
+	waitrq = t->t_waitrq;
+	state_start = ms->ms_state_start;
+
+	aggr_onp = ms->ms_acct[LMS_SYSTEM];
+	aggr_run = ms->ms_acct[LMS_WAIT_CPU];
+
+	now = gethrtime_unscaled();
+
+	/* if waitrq == 0, then there is no time to account to TS_RUN */
+	if (waitrq == 0)
+		waitrq = now;
+
+	/* If there is system time to accumulate, do so */
+	if (mstate == LMS_SYSTEM && state_start < waitrq)
+		aggr_onp += waitrq - state_start;
+
+	if (waitrq < now)
+		aggr_run += now - waitrq;
+
+	scalehrtime(&aggr_onp);
+	scalehrtime(&aggr_run);
+
+	*onproc = aggr_onp;
+	*runnable = aggr_run;
 }
 
 /*

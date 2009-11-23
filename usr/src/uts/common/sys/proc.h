@@ -564,6 +564,9 @@ extern struct pid pid0;		/* p0's pid */
 /* pseudo-flag to lwp_create() */
 #define	NOCLASS	(-1)
 
+/* unused scheduling class ID */
+#define	CLASS_UNUSED	(-2)
+
 /* LWP stats updated via lwp_stats_update() */
 typedef enum {
 	LWP_STAT_INBLK,
@@ -580,7 +583,7 @@ extern void profil_tick(uintptr_t);
 
 /* process management functions */
 
-extern int newproc(void (*)(), caddr_t, id_t, int, struct contract **);
+extern int newproc(void (*)(), caddr_t, id_t, int, struct contract **, pid_t);
 extern void vfwait(pid_t);
 extern void proc_detach(proc_t *);
 extern void freeproc(proc_t *);
@@ -620,7 +623,7 @@ extern int sigcheck(proc_t *, kthread_t *);
 extern void sigdefault(proc_t *);
 
 extern void pid_setmin(void);
-extern pid_t pid_allocate(proc_t *, int);
+extern pid_t pid_allocate(proc_t *, pid_t, int);
 extern struct pid *pid_find(pid_t);
 extern int pid_rele(struct pid *);
 extern void pid_exit(proc_t *);
@@ -658,6 +661,7 @@ extern	void	estimate_msacct(kthread_t *, hrtime_t);
 extern	void	disable_msacct(proc_t *);
 extern	hrtime_t mstate_aggr_state(proc_t *, int);
 extern	hrtime_t mstate_thread_onproc_time(kthread_t *);
+extern	void	mstate_systhread_times(kthread_t *, hrtime_t *, hrtime_t *);
 extern	void	syscall_mstate(int, int);
 
 extern	uint_t	cpu_update_pct(kthread_t *, hrtime_t);
@@ -718,6 +722,7 @@ extern	int	tsd_agent_set(kthread_t *, uint_t, void *);
 
 /* lwp function prototypes */
 
+extern kthread_t *lwp_kernel_create(proc_t *, void (*)(), void *, int, pri_t);
 extern	klwp_t 		*lwp_create(
 	void		(*proc)(),
 	caddr_t		arg,

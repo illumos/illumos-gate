@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -681,6 +681,11 @@ cpupart_movable_thread(kthread_id_t tp, cpupart_t *cp, int ignore)
 		if (boundcpu != NULL && boundcpu->cpu_part != cp)
 			return (EBUSY);
 	}
+
+	if (tp->t_cid == sysdccid) {
+		return (EINVAL);	/* For now, sysdc threads can't move */
+	}
+
 	return (0);
 }
 

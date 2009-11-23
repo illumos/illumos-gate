@@ -85,6 +85,8 @@ extern vmem_t *zio_alloc_arena;
  */
 #define	IO_IS_ALLOCATING(zio) ((zio)->io_orig_pipeline & ZIO_STAGE_DVA_ALLOCATE)
 
+boolean_t	zio_requeue_io_start_cut_in_line = B_TRUE;
+
 #ifdef ZFS_DEBUG
 int zio_buf_debug_limit = 16384;
 #else
@@ -1024,10 +1026,11 @@ zio_free_bp_init(zio_t *zio)
  */
 
 static void
-zio_taskq_dispatch(zio_t *zio, enum zio_taskq_type q)
+zio_taskq_dispatch(zio_t *zio, enum zio_taskq_type q, boolean_t cutinline)
 {
 	spa_t *spa = zio->io_spa;
 	zio_type_t t = zio->io_type;
+	int flags = TQ_SLEEP | (cutinline ? TQ_FRONT : 0);
 
 	/*
 	 * If we're a config writer or a probe, the normal issue and
@@ -1052,7 +1055,7 @@ zio_taskq_dispatch(zio_t *zio, enum zio_taskq_type q)
 
 	ASSERT3U(q, <, ZIO_TASKQ_TYPES);
 	(void) taskq_dispatch(spa->spa_zio_taskq[t][q],
-	    (task_func_t *)zio_execute, zio, TQ_SLEEP);
+	    (task_func_t *)zio_execute, zio, flags);
 }
 
 static boolean_t
@@ -1071,7 +1074,7 @@ zio_taskq_member(zio_t *zio, enum zio_taskq_type q)
 static int
 zio_issue_async(zio_t *zio)
 {
-	zio_taskq_dispatch(zio, ZIO_TASKQ_ISSUE);
+	zio_taskq_dispatch(zio, ZIO_TASKQ_ISSUE, B_FALSE);
 
 	return (ZIO_PIPELINE_STOP);
 }
@@ -1079,7 +1082,7 @@ zio_issue_async(zio_t *zio)
 void
 zio_interrupt(zio_t *zio)
 {
-	zio_taskq_dispatch(zio, ZIO_TASKQ_INTERRUPT);
+	zio_taskq_dispatch(zio, ZIO_TASKQ_INTERRUPT, B_FALSE);
 }
 
 /*
@@ -1122,10 +1125,15 @@ zio_execute(zio_t *zio)
 		 * will grab a config lock that is held across I/O,
 		 * or may wait for an I/O that needs an interrupt thread
 		 * to complete, issue async to avoid deadlock.
+		 *
+		 * For VDEV_IO_START, we cut in line so that the io will
+		 * be sent to disk promptly.
 		 */
 		if ((stage & ZIO_BLOCKING_STAGES) && zio->io_vd == NULL &&
 		    zio_taskq_member(zio, ZIO_TASKQ_INTERRUPT)) {
-			zio_taskq_dispatch(zio, ZIO_TASKQ_ISSUE);
+			boolean_t cut = (stage == ZIO_STAGE_VDEV_IO_START) ?
+			    zio_requeue_io_start_cut_in_line : B_FALSE;
+			zio_taskq_dispatch(zio, ZIO_TASKQ_ISSUE, cut);
 			return;
 		}
 
@@ -1790,7 +1798,7 @@ zio_ddt_read_done(zio_t *zio)
 		}
 		if (dde == NULL) {
 			zio->io_stage = ZIO_STAGE_DDT_READ_START >> 1;
-			zio_taskq_dispatch(zio, ZIO_TASKQ_ISSUE);
+			zio_taskq_dispatch(zio, ZIO_TASKQ_ISSUE, B_FALSE);
 			return (ZIO_PIPELINE_STOP);
 		}
 		if (dde->dde_repair_data != NULL) {
@@ -2365,6 +2373,9 @@ zio_vdev_io_assess(zio_t *zio)
 
 	/*
 	 * If the I/O failed, determine whether we should attempt to retry it.
+	 *
+	 * On retry, we cut in line in the issue queue, since we don't want
+	 * compression/checksumming/etc. work to prevent our (cheap) IO reissue.
 	 */
 	if (zio->io_error && vd == NULL &&
 	    !(zio->io_flags & (ZIO_FLAG_DONT_RETRY | ZIO_FLAG_IO_RETRY))) {
@@ -2374,7 +2385,8 @@ zio_vdev_io_assess(zio_t *zio)
 		zio->io_flags |= ZIO_FLAG_IO_RETRY |
 		    ZIO_FLAG_DONT_CACHE | ZIO_FLAG_DONT_AGGREGATE;
 		zio->io_stage = ZIO_STAGE_VDEV_IO_START >> 1;
-		zio_taskq_dispatch(zio, ZIO_TASKQ_ISSUE);
+		zio_taskq_dispatch(zio, ZIO_TASKQ_ISSUE,
+		    zio_requeue_io_start_cut_in_line);
 		return (ZIO_PIPELINE_STOP);
 	}
 

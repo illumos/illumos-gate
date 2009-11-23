@@ -98,7 +98,10 @@ thread_free_lock_t	*thread_free_lock;
 
 extern int nthread;
 
+/* System Scheduling classes. */
 id_t	syscid;				/* system scheduling class ID */
+id_t	sysdccid = CLASS_UNUSED;	/* reset when SDC loads */
+
 void	*segkp_thread;			/* cookie for segkp pool */
 
 int lwp_cache_sz = 32;

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * UNIX machine dependent virtual memory support.
@@ -1001,16 +999,6 @@ bp_color(struct buf *bp)
 		}
 	}
 	return (color < 0 ? 0 : ptob(color));
-}
-
-/*
- * Create & Initialise pageout scanner thread. The thread has to
- * start at procedure with process pp and priority pri.
- */
-void
-pageout_init(void (*procedure)(), proc_t *pp, pri_t pri)
-{
-	(void) thread_create(NULL, 0, procedure, NULL, 0, pp, TS_RUN, pri);
 }
 
 /*

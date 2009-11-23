@@ -764,6 +764,15 @@ fcnname/**/_info:							\
 #endif
 
 /*
+ * Stubs for sysdc
+ */
+#ifndef SDC_MODULE
+	MODULE(SDC,sched);
+	NO_UNLOAD_STUB(SDC, sysdc_thread_enter,		nomod_zero);
+	END_MODULE(SDC);
+#endif
+
+/*
  * Stubs for ts_dptbl
  */
 #ifndef TS_DPTBL_MODULE

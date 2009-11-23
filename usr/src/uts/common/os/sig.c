@@ -217,7 +217,8 @@ sigtoproc(proc_t *p, kthread_t *t, int sig)
 
 	ASSERT(MUTEX_HELD(&p->p_lock));
 
-	if (sig <= 0 || sig >= NSIG)
+	/* System processes don't get signals */
+	if (sig <= 0 || sig >= NSIG || (p->p_flag & SSYS))
 		return;
 
 	/*

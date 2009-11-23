@@ -1765,11 +1765,16 @@ disp_swapped_setrun(kthread_t *tp)
 	}
 }
 
-
 /*
  *	Make a thread give up its processor.  Find the processor on
  *	which this thread is executing, and have that processor
  *	preempt.
+ *
+ *	We allow System Duty Cycle (SDC) threads to be preempted even if
+ *	they are running at kernel priorities.  To implement this, we always
+ *	set cpu_kprunrun; this ensures preempt() will be called.  Since SDC
+ *	calls cpu_surrender() very often, we only preempt if there is anyone
+ *	competing with us.
  */
 void
 cpu_surrender(kthread_t *tp)
@@ -1789,9 +1794,16 @@ cpu_surrender(kthread_t *tp)
 	if (max_pri < max_run_pri)
 		max_pri = max_run_pri;
 
-	cpup->cpu_runrun = 1;
-	if (max_pri >= kpreemptpri && cpup->cpu_kprunrun == 0) {
-		cpup->cpu_kprunrun = 1;
+	if (tp->t_cid == sysdccid) {
+		uint_t t_pri = DISP_PRIO(tp);
+		if (t_pri > max_pri)
+			return;		/* we are not competing w/ anyone */
+		cpup->cpu_runrun = cpup->cpu_kprunrun = 1;
+	} else {
+		cpup->cpu_runrun = 1;
+		if (max_pri >= kpreemptpri && cpup->cpu_kprunrun == 0) {
+			cpup->cpu_kprunrun = 1;
+		}
 	}
 
 	/*
@@ -1815,7 +1827,6 @@ cpu_surrender(kthread_t *tp)
 	TRACE_2(TR_FAC_DISP, TR_CPU_SURRENDER,
 	    "cpu_surrender:tid %p cpu %p", tp, cpup);
 }
-
 
 /*
  * Commit to and ratify a scheduling decision
