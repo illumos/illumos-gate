@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -27,7 +27,8 @@ include ../Makefile.com
 DATAFILES += depend
 LICENSEFILES += \
 	../../uts/common/io/iwh/THIRDPARTYLICENSE \
-	../../uts/common/io/iwh/fw-iw/LICENSE
+	../../uts/common/io/iwh/fw-iw/fw_5000/LICENSE \
+	../../uts/common/io/iwh/fw-iw/fw_5150/LICENSE
 CDDL=
 
 .KEEP_STATE:

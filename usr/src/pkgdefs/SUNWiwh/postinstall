@@ -28,7 +28,8 @@
 # Driver info
 DRV=iwh
 DRVALIAS='"pciex8086,4232" "pciex8086,4235" "pciex8086,4236" 
-"pciex8086,4237" "pciex8086,423a" "pciex8086,4236.8086.1011"'
+"pciex8086,4237" "pciex8086,423a" "pciex8086,423b" "pciex8086,423c"
+"pciex8086,423d" "pciex8086,4236.8086.1011"'
 
 BASEDIR=${BASEDIR:-/}
 

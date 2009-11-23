@@ -103,8 +103,12 @@ static void	*iwh_soft_state_p = NULL;
 /*
  * ucode will be compiled into driver image
  */
-static uint8_t iwh_fw_bin [] = {
-#include "fw-iw/iwh.ucode"
+static uint8_t iwh_fw_5000_bin[] = {
+#include "fw-iw/fw_5000/iwh_5000.ucode"
+};
+
+static uint8_t iwh_fw_5150_bin[] = {
+#include "fw-iw/fw_5150/iwh_5150.ucode"
 };
 
 /*
@@ -238,7 +242,6 @@ static ddi_dma_attr_t fw_dma_attr = {
 	1,		/* granularity */
 	0,		/* flags (reserved) */
 };
-
 
 /*
  * regs access attributes
@@ -407,7 +410,7 @@ DDI_DEFINE_STREAM_OPS(iwh_devops, nulldev, nulldev, iwh_attach,
 
 static struct modldrv iwh_modldrv = {
 	&mod_driverops,
-	"Intel(R) ShirleyPeak driver(N)",
+	"Intel(R) ShirleyPeak/EchoPeak driver(N)",
 	&iwh_devops
 };
 
@@ -420,7 +423,7 @@ static struct modlinkage iwh_modlinkage = {
 int
 _init(void)
 {
-	int	status;
+	int status;
 
 	status = ddi_soft_state_init(&iwh_soft_state_p,
 	    sizeof (iwh_sc_t), 1);
@@ -498,16 +501,16 @@ iwh_dbg(uint32_t flags, const char *fmt, ...)
 int
 iwh_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
-	iwh_sc_t		*sc;
-	ieee80211com_t		*ic;
-	int			instance, i;
-	char			strbuf[32];
-	wifi_data_t		wd = { 0 };
-	mac_register_t		*macp;
-	int			intr_type;
-	int			intr_count;
-	int			intr_actual;
-	int			err = DDI_FAILURE;
+	iwh_sc_t *sc;
+	ieee80211com_t *ic;
+	int instance, i;
+	char strbuf[32];
+	wifi_data_t wd = { 0 };
+	mac_register_t *macp;
+	int intr_type;
+	int intr_count;
+	int intr_actual;
+	int err = DDI_FAILURE;
 
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -519,10 +522,11 @@ iwh_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    instance);
 		ASSERT(sc != NULL);
 
-		sc->sc_flags &= ~IWH_F_SUSPEND;
 		if (sc->sc_flags & IWH_F_RUNNING) {
 			(void) iwh_init(sc);
 		}
+
+		atomic_and_32(&sc->sc_flags, ~IWH_F_SUSPEND);
 
 		IWH_DBG((IWH_DEBUG_RESUME, "iwh_attach(): "
 		    "resume\n"));
@@ -562,7 +566,10 @@ iwh_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    (sc->sc_dev_id != 0x4235) &&
 	    (sc->sc_dev_id != 0x4236) &&
 	    (sc->sc_dev_id != 0x4237) &&
-	    (sc->sc_dev_id != 0x423a)) {
+	    (sc->sc_dev_id != 0x423a) &&
+	    (sc->sc_dev_id != 0x423b) &&
+	    (sc->sc_dev_id != 0x423c) &&
+	    (sc->sc_dev_id != 0x423d)) {
 		cmn_err(CE_WARN, "iwh_attach(): "
 		    "Do not support this device\n");
 		goto attach_fail3;
@@ -577,7 +584,8 @@ iwh_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/*
 	 * keep from disturbing C3 state of CPU
 	 */
-	ddi_put8(sc->sc_cfg_handle, (uint8_t *)(sc->sc_cfg_base + 0x41), 0);
+	ddi_put8(sc->sc_cfg_handle, (uint8_t *)(sc->sc_cfg_base +
+	    PCI_CFG_RETRY_TIMEOUT), 0);
 
 	/*
 	 * determine the size of buffer for frame and command to ucode
@@ -647,12 +655,8 @@ iwh_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    DDI_INTR_PRI(sc->sc_intr_pri));
 	mutex_init(&sc->sc_mt_lock, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(sc->sc_intr_pri));
-	mutex_init(&sc->sc_suspend_lock, NULL, MUTEX_DRIVER,
-	    DDI_INTR_PRI(sc->sc_intr_pri));
 
-	cv_init(&sc->sc_fw_cv, NULL, CV_DRIVER, NULL);
 	cv_init(&sc->sc_cmd_cv, NULL, CV_DRIVER, NULL);
-	cv_init(&sc->sc_tx_cv, "tx-ring", CV_DRIVER, NULL);
 	cv_init(&sc->sc_put_seg_cv, NULL, CV_DRIVER, NULL);
 	cv_init(&sc->sc_ucode_cv, NULL, CV_DRIVER, NULL);
 
@@ -732,7 +736,11 @@ iwh_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto attach_fail9;
 	}
 
-	sc->sc_hdr = (iwh_firmware_hdr_t *)iwh_fw_bin;
+	if ((0x423c == sc->sc_dev_id) || (0x423d == sc->sc_dev_id)) {
+		sc->sc_hdr = (iwh_firmware_hdr_t *)iwh_fw_5150_bin;
+	} else {
+		sc->sc_hdr = (iwh_firmware_hdr_t *)iwh_fw_5000_bin;
+	}
 
 	/*
 	 * copy ucode to dma buffer
@@ -919,7 +927,7 @@ iwh_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    iwh_thread, sc, 0, &p0, TS_RUN, minclsyspri);
 	}
 
-	sc->sc_flags |= IWH_F_ATTACHED;
+	atomic_or_32(&sc->sc_flags, IWH_F_ATTACHED);
 
 	return (DDI_SUCCESS);
 
@@ -974,7 +982,7 @@ int
 iwh_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	iwh_sc_t *sc;
-	ieee80211com_t	*ic;
+	ieee80211com_t *ic;
 	int err;
 
 	sc = ddi_get_soft_state(iwh_soft_state_p, ddi_get_instance(dip));
@@ -986,11 +994,15 @@ iwh_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		break;
 
 	case DDI_SUSPEND:
+		atomic_and_32(&sc->sc_flags, ~IWH_F_HW_ERR_RECOVER);
+		atomic_and_32(&sc->sc_flags, ~IWH_F_RATE_AUTO_CTL);
+
+		atomic_or_32(&sc->sc_flags, IWH_F_SUSPEND);
+
 		if (sc->sc_flags & IWH_F_RUNNING) {
 			ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
 			iwh_stop(sc);
 		}
-		sc->sc_flags |= IWH_F_SUSPEND;
 
 		IWH_DBG((IWH_DEBUG_RESUME, "iwh_detach(): "
 		    "suspend\n"));
@@ -1076,15 +1088,12 @@ static void
 iwh_destroy_locks(iwh_sc_t *sc)
 {
 	cv_destroy(&sc->sc_mt_cv);
-	cv_destroy(&sc->sc_tx_cv);
 	cv_destroy(&sc->sc_cmd_cv);
-	cv_destroy(&sc->sc_fw_cv);
 	cv_destroy(&sc->sc_put_seg_cv);
 	cv_destroy(&sc->sc_ucode_cv);
 	mutex_destroy(&sc->sc_mt_lock);
 	mutex_destroy(&sc->sc_tx_lock);
 	mutex_destroy(&sc->sc_glock);
-	mutex_destroy(&sc->sc_suspend_lock);
 }
 
 /*
@@ -1200,7 +1209,7 @@ iwh_alloc_fw_dma(iwh_sc_t *sc)
 	    dma_p->ncookies, dma_p->cookie.dmac_address,
 	    dma_p->cookie.dmac_size));
 
-	(void) memcpy(dma_p->mem_va, t, LE_32(sc->sc_hdr->textsz));
+	bcopy(t, dma_p->mem_va, LE_32(sc->sc_hdr->textsz));
 
 	/*
 	 * copy data and bak-data of runtime ucode
@@ -1223,7 +1232,7 @@ iwh_alloc_fw_dma(iwh_sc_t *sc)
 	    dma_p->ncookies, dma_p->cookie.dmac_address,
 	    dma_p->cookie.dmac_size));
 
-	(void) memcpy(dma_p->mem_va, t, LE_32(sc->sc_hdr->datasz));
+	bcopy(t, dma_p->mem_va, LE_32(sc->sc_hdr->datasz));
 
 	err = iwh_alloc_dma_mem(sc, LE_32(sc->sc_hdr->datasz),
 	    &fw_dma_attr, &iwh_dma_accattr,
@@ -1243,7 +1252,7 @@ iwh_alloc_fw_dma(iwh_sc_t *sc)
 	    dma_p->ncookies, dma_p->cookie.dmac_address,
 	    dma_p->cookie.dmac_size));
 
-	(void) memcpy(dma_p->mem_va, t, LE_32(sc->sc_hdr->datasz));
+	bcopy(t, dma_p->mem_va, LE_32(sc->sc_hdr->datasz));
 
 	/*
 	 * copy text of init ucode
@@ -1267,7 +1276,7 @@ iwh_alloc_fw_dma(iwh_sc_t *sc)
 	    dma_p->ncookies, dma_p->cookie.dmac_address,
 	    dma_p->cookie.dmac_size));
 
-	(void) memcpy(dma_p->mem_va, t, LE_32(sc->sc_hdr->init_textsz));
+	bcopy(t, dma_p->mem_va, LE_32(sc->sc_hdr->init_textsz));
 
 	/*
 	 * copy data of init ucode
@@ -1291,9 +1300,10 @@ iwh_alloc_fw_dma(iwh_sc_t *sc)
 	    dma_p->ncookies, dma_p->cookie.dmac_address,
 	    dma_p->cookie.dmac_size));
 
-	(void) memcpy(dma_p->mem_va, t, LE_32(sc->sc_hdr->init_datasz));
+	bcopy(t, dma_p->mem_va, LE_32(sc->sc_hdr->init_datasz));
 
 	sc->sc_boot = t + LE_32(sc->sc_hdr->init_datasz);
+
 fail:
 	return (err);
 }
@@ -1341,6 +1351,7 @@ iwh_alloc_shared(iwh_sc_t *sc)
 	    dma_p->cookie.dmac_size));
 
 	return (err);
+
 fail:
 	iwh_free_shared(sc);
 	return (err);
@@ -1383,6 +1394,7 @@ iwh_alloc_kw(iwh_sc_t *sc)
 	    dma_p->cookie.dmac_size));
 
 	return (err);
+
 fail:
 	iwh_free_kw(sc);
 	return (err);
@@ -1538,11 +1550,13 @@ iwh_alloc_tx_ring(iwh_sc_t *sc, iwh_tx_ring_t *ring,
 	iwh_dma_t *dma_p;
 #endif
 	int i, err = DDI_FAILURE;
+
 	ring->qid = qid;
 	ring->count = TFD_QUEUE_SIZE_MAX;
 	ring->window = slots;
 	ring->queued = 0;
 	ring->cur = 0;
+	ring->desc_cur = 0;
 
 	/*
 	 * allocate buffer for TX descriptor ring
@@ -1675,7 +1689,9 @@ iwh_reset_tx_ring(iwh_sc_t *sc, iwh_tx_ring_t *ring)
 
 	iwh_mac_access_exit(sc);
 
-	/* by pass, if it's quiesce */
+	/*
+	 * by pass, if it's quiesce
+	 */
 	if (!(sc->sc_flags & IWH_F_QUIESCED)) {
 		for (i = 0; i < ring->count; i++) {
 			data = &ring->data[i];
@@ -1685,6 +1701,7 @@ iwh_reset_tx_ring(iwh_sc_t *sc, iwh_tx_ring_t *ring)
 
 	ring->queued = 0;
 	ring->cur = 0;
+	ring->desc_cur = 0;
 }
 
 static void
@@ -1747,8 +1764,6 @@ iwh_ring_init(iwh_sc_t *sc)
 	if (err != DDI_SUCCESS) {
 		goto fail;
 	}
-
-	return (err);
 
 fail:
 	return (err);
@@ -1815,7 +1830,6 @@ iwh_node_free(ieee80211_node_t *in)
 	kmem_free(in, sizeof (iwh_amrr_t));
 }
 
-
 /*
  * change station's state. this function will be invoked by 80211 module
  * when need to change staton's state.
@@ -1844,7 +1858,7 @@ iwh_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 	case IEEE80211_S_SCAN:
 		switch (ostate) {
 		case IEEE80211_S_INIT:
-			sc->sc_flags |= IWH_F_SCANNING;
+			atomic_or_32(&sc->sc_flags, IWH_F_SCANNING);
 			iwh_set_led(sc, 2, 10, 2);
 
 			/*
@@ -1867,12 +1881,14 @@ iwh_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 			if (err != IWH_SUCCESS) {
 				cmn_err(CE_WARN, "iwh_newstate(): "
 				    "could not clear association\n");
-				sc->sc_flags &= ~IWH_F_SCANNING;
+				atomic_and_32(&sc->sc_flags, ~IWH_F_SCANNING);
 				mutex_exit(&sc->sc_glock);
 				return (err);
 			}
 
-			/* add broadcast node to send probe request */
+			/*
+			 * add broadcast node to send probe request
+			 */
 			(void) memset(&node, 0, sizeof (node));
 			(void) memset(&node.sta.addr, 0xff, IEEE80211_ADDR_LEN);
 			node.sta.sta_id = IWH_BROADCAST_ID;
@@ -1881,7 +1897,7 @@ iwh_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 			if (err != IWH_SUCCESS) {
 				cmn_err(CE_WARN, "iwh_newstate(): "
 				    "could not add broadcast node\n");
-				sc->sc_flags &= ~IWH_F_SCANNING;
+				atomic_and_32(&sc->sc_flags, ~IWH_F_SCANNING);
 				mutex_exit(&sc->sc_glock);
 				return (err);
 			}
@@ -1894,7 +1910,7 @@ iwh_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 			if ((err != 0) || ((err = iwh_scan(sc)) != 0)) {
 				cmn_err(CE_WARN, "iwh_newstate(): "
 				    "could not initiate scan\n");
-				sc->sc_flags &= ~IWH_F_SCANNING;
+				atomic_and_32(&sc->sc_flags, ~IWH_F_SCANNING);
 				ieee80211_cancel_scan(ic);
 			}
 			mutex_exit(&sc->sc_glock);
@@ -1907,7 +1923,7 @@ iwh_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 
 	case IEEE80211_S_AUTH:
 		if (ostate == IEEE80211_S_SCAN) {
-			sc->sc_flags &= ~IWH_F_SCANNING;
+			atomic_and_32(&sc->sc_flags, ~IWH_F_SCANNING);
 		}
 
 		/*
@@ -1931,11 +1947,13 @@ iwh_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 
 	case IEEE80211_S_RUN:
 		if (ostate == IEEE80211_S_SCAN) {
-			sc->sc_flags &= ~IWH_F_SCANNING;
+			atomic_and_32(&sc->sc_flags, ~IWH_F_SCANNING);
 		}
 
 		if (IEEE80211_M_MONITOR == ic->ic_opmode) {
-			/* let LED blink when monitoring */
+			/*
+			 * let LED blink when monitoring
+			 */
 			iwh_set_led(sc, 2, 10, 10);
 			break;
 		}
@@ -1968,13 +1986,15 @@ iwh_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 				    (sc->sc_ht_conf.tx_support_mcs[r/8] &
 				    (1 << (r%8)))) {
 					amrr->ht_mcs_idx = r;
-					sc->sc_flags |= IWH_F_RATE_AUTO_CTL;
+					atomic_or_32(&sc->sc_flags,
+					    IWH_F_RATE_AUTO_CTL);
 					break;
 				}
 			}
 		} else {
 			if (IEEE80211_FIXED_RATE_NONE == ic->ic_fixed_rate) {
-				sc->sc_flags |= IWH_F_RATE_AUTO_CTL;
+				atomic_or_32(&sc->sc_flags,
+				    IWH_F_RATE_AUTO_CTL);
 
 				/*
 				 * set rate to some reasonable initial value
@@ -1986,7 +2006,8 @@ iwh_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 				in->in_txrate = i;
 
 			} else {
-				sc->sc_flags &= ~IWH_F_RATE_AUTO_CTL;
+				atomic_and_32(&sc->sc_flags,
+				    ~IWH_F_RATE_AUTO_CTL);
 			}
 		}
 
@@ -1998,7 +2019,7 @@ iwh_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 
 	case IEEE80211_S_INIT:
 		if (ostate == IEEE80211_S_SCAN) {
-			sc->sc_flags &= ~IWH_F_SCANNING;
+			atomic_and_32(&sc->sc_flags, ~IWH_F_SCANNING);
 		}
 		/*
 		 * set LED off after init
@@ -2008,7 +2029,7 @@ iwh_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 
 	case IEEE80211_S_ASSOC:
 		if (ostate == IEEE80211_S_SCAN) {
-			sc->sc_flags &= ~IWH_F_SCANNING;
+			atomic_and_32(&sc->sc_flags, ~IWH_F_SCANNING);
 		}
 		break;
 	}
@@ -2031,7 +2052,9 @@ iwh_mac_access_enter(iwh_sc_t *sc)
 	IWH_WRITE(sc, CSR_GP_CNTRL,
 	    tmp | CSR_GP_CNTRL_REG_FLAG_MAC_ACCESS_REQ);
 
-	/* wait until we succeed */
+	/*
+	 * wait until we succeed
+	 */
 	for (n = 0; n < 1000; n++) {
 		if ((IWH_READ(sc, CSR_GP_CNTRL) &
 		    (CSR_GP_CNTRL_REG_FLAG_MAC_CLOCK_READY |
@@ -2112,10 +2135,10 @@ iwh_reg_write(iwh_sc_t *sc, uint32_t addr, uint32_t data)
 static int
 iwh_load_init_firmware(iwh_sc_t *sc)
 {
-	int	err = IWH_FAIL;
+	int err = IWH_FAIL;
 	clock_t	clk;
 
-	sc->sc_flags &= ~IWH_F_PUT_SEG;
+	atomic_and_32(&sc->sc_flags, ~IWH_F_PUT_SEG);
 
 	/*
 	 * load init_text section of uCode to hardware
@@ -2130,7 +2153,9 @@ iwh_load_init_firmware(iwh_sc_t *sc)
 
 	clk = ddi_get_lbolt() + drv_usectohz(1000000);
 
-	/* wait loading init_text until completed or timeout */
+	/*
+	 * wait loading init_text until completed or timeout
+	 */
 	while (!(sc->sc_flags & IWH_F_PUT_SEG)) {
 		if (cv_timedwait(&sc->sc_put_seg_cv, &sc->sc_glock, clk) < 0) {
 			break;
@@ -2143,7 +2168,7 @@ iwh_load_init_firmware(iwh_sc_t *sc)
 		return (IWH_FAIL);
 	}
 
-	sc->sc_flags &= ~IWH_F_PUT_SEG;
+	atomic_and_32(&sc->sc_flags, ~IWH_F_PUT_SEG);
 
 	/*
 	 * load init_data section of uCode to hardware
@@ -2173,7 +2198,7 @@ iwh_load_init_firmware(iwh_sc_t *sc)
 		return (IWH_FAIL);
 	}
 
-	sc->sc_flags &= ~IWH_F_PUT_SEG;
+	atomic_and_32(&sc->sc_flags, ~IWH_F_PUT_SEG);
 
 	return (err);
 }
@@ -2181,10 +2206,10 @@ iwh_load_init_firmware(iwh_sc_t *sc)
 static int
 iwh_load_run_firmware(iwh_sc_t *sc)
 {
-	int	err = IWH_FAIL;
+	int err = IWH_FAIL;
 	clock_t	clk;
 
-	sc->sc_flags &= ~IWH_F_PUT_SEG;
+	atomic_and_32(&sc->sc_flags, ~IWH_F_PUT_SEG);
 
 	/*
 	 * load init_text section of uCode to hardware
@@ -2199,7 +2224,9 @@ iwh_load_run_firmware(iwh_sc_t *sc)
 
 	clk = ddi_get_lbolt() + drv_usectohz(1000000);
 
-	/* wait loading run_text until completed or timeout */
+	/*
+	 * wait loading run_text until completed or timeout
+	 */
 	while (!(sc->sc_flags & IWH_F_PUT_SEG)) {
 		if (cv_timedwait(&sc->sc_put_seg_cv, &sc->sc_glock, clk) < 0) {
 			break;
@@ -2212,7 +2239,7 @@ iwh_load_run_firmware(iwh_sc_t *sc)
 		return (IWH_FAIL);
 	}
 
-	sc->sc_flags &= ~IWH_F_PUT_SEG;
+	atomic_and_32(&sc->sc_flags, ~IWH_F_PUT_SEG);
 
 	/*
 	 * load run_data section of uCode to hardware
@@ -2242,7 +2269,7 @@ iwh_load_run_firmware(iwh_sc_t *sc)
 		return (IWH_FAIL);
 	}
 
-	sc->sc_flags &= ~IWH_F_PUT_SEG;
+	atomic_and_32(&sc->sc_flags, ~IWH_F_PUT_SEG);
 
 	return (err);
 }
@@ -2257,7 +2284,7 @@ iwh_rx_phy_intr(iwh_sc_t *sc, iwh_rx_desc_t *desc)
 
 	sc->sc_rx_phy_res.flag = 1;
 
-	(void) memcpy(sc->sc_rx_phy_res.buf, (uint8_t *)(desc + 1),
+	bcopy((uint8_t *)(desc + 1), sc->sc_rx_phy_res.buf,
 	    sizeof (iwh_rx_phy_res_t));
 }
 
@@ -2268,21 +2295,20 @@ iwh_rx_phy_intr(iwh_sc_t *sc, iwh_rx_desc_t *desc)
 static void
 iwh_rx_mpdu_intr(iwh_sc_t *sc, iwh_rx_desc_t *desc)
 {
-	ieee80211com_t	*ic = &sc->sc_ic;
+	ieee80211com_t *ic = &sc->sc_ic;
 #ifdef	DEBUG
-	iwh_rx_ring_t	*ring = &sc->sc_rxq;
+	iwh_rx_ring_t *ring = &sc->sc_rxq;
 #endif
-	struct ieee80211_frame		*wh;
-	struct iwh_rx_non_cfg_phy	*phyinfo;
-	struct	iwh_rx_mpdu_body_size	*mpdu_size;
-
-	mblk_t			*mp;
-	int16_t			t;
-	uint16_t		len, rssi, agc;
-	uint32_t		temp, crc, *tail;
-	uint32_t		arssi, brssi, crssi, mrssi;
-	iwh_rx_phy_res_t	*stat;
-	ieee80211_node_t	*in;
+	struct ieee80211_frame *wh;
+	struct iwh_rx_non_cfg_phy *phyinfo;
+	struct iwh_rx_mpdu_body_size *mpdu_size;
+	mblk_t *mp;
+	int16_t t;
+	uint16_t len, rssi, agc;
+	uint32_t temp, crc, *tail;
+	uint32_t arssi, brssi, crssi, mrssi;
+	iwh_rx_phy_res_t *stat;
+	ieee80211_node_t *in;
 
 	/*
 	 * assuming not 11n here. cope with 11n in phase-II
@@ -2374,7 +2400,7 @@ iwh_rx_mpdu_intr(iwh_sc_t *sc, iwh_rx_desc_t *desc)
 	in = ieee80211_find_rxnode(ic, wh);
 	mp = allocb(len, BPRI_MED);
 	if (mp) {
-		(void) memcpy(mp->b_wptr, wh, len);
+		bcopy(wh, mp->b_wptr, len);
 		mp->b_wptr += len;
 
 		/*
@@ -2506,7 +2532,7 @@ iwh_ucode_alive(iwh_sc_t *sc, iwh_rx_desc_t *desc)
 		IWH_DBG((IWH_DEBUG_FW, "iwh_ucode_alive(): "
 		    "initialization alive received.\n"));
 
-		(void) memcpy(&sc->sc_card_alive_init, ar,
+		bcopy(ar, &sc->sc_card_alive_init,
 		    sizeof (struct iwh_init_alive_resp));
 
 		/*
@@ -2547,7 +2573,7 @@ iwh_ucode_alive(iwh_sc_t *sc, iwh_rx_desc_t *desc)
 		IWH_DBG((IWH_DEBUG_FW, "iwh_ucode_alive(): "
 		    "runtime alive received.\n"));
 
-		(void) memcpy(&sc->sc_card_alive_run, ar,
+		bcopy(ar, &sc->sc_card_alive_run,
 		    sizeof (struct iwh_alive_resp));
 
 		mutex_enter(&sc->sc_glock);
@@ -2615,7 +2641,43 @@ iwh_ucode_alive(iwh_sc_t *sc, iwh_rx_desc_t *desc)
 			DELAY(1000);
 		}
 
-		sc->sc_flags |= IWH_F_FW_INIT;
+		/*
+		 * send the result of DC calibration to uCode.
+		 */
+		if (res_p->dc_res != NULL) {
+			rv = iwh_cmd(sc, REPLY_PHY_CALIBRATION_CMD,
+			    res_p->dc_res,
+			    res_p->dc_res_len, 1);
+			if (rv != IWH_SUCCESS) {
+				cmn_err(CE_WARN, "iwh_ucode_alive(): "
+				    "failed to send DC"
+				    "calibration command.\n");
+				mutex_exit(&sc->sc_glock);
+				return;
+			}
+
+			DELAY(1000);
+		}
+
+		/*
+		 * send the result of BASE BAND calibration to uCode.
+		 */
+		if (res_p->base_band_res != NULL) {
+			rv = iwh_cmd(sc, REPLY_PHY_CALIBRATION_CMD,
+			    res_p->base_band_res,
+			    res_p->base_band_res_len, 1);
+			if (rv != IWH_SUCCESS) {
+				cmn_err(CE_WARN, "iwh_ucode_alive(): "
+				    "failed to send BASE BAND"
+				    "calibration command.\n");
+				mutex_exit(&sc->sc_glock);
+				return;
+			}
+
+			DELAY(1000);
+		}
+
+		atomic_or_32(&sc->sc_flags, IWH_F_FW_INIT);
 		cv_signal(&sc->sc_ucode_cv);
 
 		mutex_exit(&sc->sc_glock);
@@ -2705,8 +2767,8 @@ iwh_rx_softintr(caddr_t arg, caddr_t unused)
 				sc->sc_ostate = sc->sc_ic.ic_state;
 				ieee80211_new_state(&sc->sc_ic,
 				    IEEE80211_S_INIT, -1);
-				sc->sc_flags |=
-				    (IWH_F_HW_ERR_RECOVER | IWH_F_RADIO_OFF);
+				atomic_or_32(&sc->sc_flags,
+				    (IWH_F_HW_ERR_RECOVER | IWH_F_RADIO_OFF));
 			}
 
 			break;
@@ -2754,7 +2816,7 @@ iwh_rx_softintr(caddr_t arg, caddr_t unused)
 
 		case CALIBRATION_COMPLETE_NOTIFICATION:
 			mutex_enter(&sc->sc_glock);
-			sc->sc_flags |= IWH_F_FW_INIT;
+			atomic_or_32(&sc->sc_flags, IWH_F_FW_INIT);
 			cv_signal(&sc->sc_ucode_cv);
 			mutex_exit(&sc->sc_glock);
 			break;
@@ -2810,16 +2872,8 @@ iwh_intr(caddr_t arg, caddr_t unused)
 	}
 	sc = (iwh_sc_t *)arg;
 
-	mutex_enter(&sc->sc_suspend_lock);
-
-	if (sc->sc_flags & IWH_F_SUSPEND) {
-		mutex_exit(&sc->sc_suspend_lock);
-		return (DDI_INTR_UNCLAIMED);
-	}
-
 	r = IWH_READ(sc, CSR_INT);
 	if (0 == r || 0xffffffff == r) {
-		mutex_exit(&sc->sc_suspend_lock);
 		return (DDI_INTR_UNCLAIMED);
 	}
 
@@ -2845,16 +2899,17 @@ iwh_intr(caddr_t arg, caddr_t unused)
 	if (r & (BIT_INT_SWERROR | BIT_INT_ERR)) {
 		IWH_DBG((IWH_DEBUG_FW, "iwh_intr(): "
 		    "fatal firmware error\n"));
-		mutex_exit(&sc->sc_suspend_lock);
 		iwh_stop(sc);
 		sc->sc_ostate = sc->sc_ic.ic_state;
 
-		/* notify upper layer */
+		/*
+		 * notify upper layer
+		 */
 		if (!IWH_CHK_FAST_RECOVER(sc)) {
 			ieee80211_new_state(&sc->sc_ic, IEEE80211_S_INIT, -1);
 		}
 
-		sc->sc_flags |= IWH_F_HW_ERR_RECOVER;
+		atomic_or_32(&sc->sc_flags, IWH_F_HW_ERR_RECOVER);
 		return (DDI_INTR_CLAIMED);
 	}
 
@@ -2868,13 +2923,12 @@ iwh_intr(caddr_t arg, caddr_t unused)
 	if ((r & (BIT_INT_FH_RX | BIT_INT_SW_RX)) ||
 	    (rfh & FH_INT_RX_MASK)) {
 		(void) ddi_intr_trigger_softint(sc->sc_soft_hdl, NULL);
-		mutex_exit(&sc->sc_suspend_lock);
 		return (DDI_INTR_CLAIMED);
 	}
 
 	if (r & BIT_INT_FH_TX) {
 		mutex_enter(&sc->sc_glock);
-		sc->sc_flags |= IWH_F_PUT_SEG;
+		atomic_or_32(&sc->sc_flags, IWH_F_PUT_SEG);
 		cv_signal(&sc->sc_put_seg_cv);
 		mutex_exit(&sc->sc_glock);
 	}
@@ -2890,8 +2944,6 @@ iwh_intr(caddr_t arg, caddr_t unused)
 	 * re-enable interrupts
 	 */
 	IWH_WRITE(sc, CSR_INT_MASK, CSR_INI_SET_MASK);
-
-	mutex_exit(&sc->sc_suspend_lock);
 
 	return (DDI_INTR_CLAIMED);
 }
@@ -2970,15 +3022,20 @@ iwh_rate_to_plcp(int rate)
 static mblk_t *
 iwh_m_tx(void *arg, mblk_t *mp)
 {
-	iwh_sc_t	*sc;
-	ieee80211com_t	*ic;
-	mblk_t		*next;
+	iwh_sc_t *sc;
+	ieee80211com_t *ic;
+	mblk_t *next;
 
 	if (NULL == arg) {
 		return (NULL);
 	}
 	sc = (iwh_sc_t *)arg;
 	ic = &sc->sc_ic;
+
+	if (sc->sc_flags & IWH_F_SUSPEND) {
+		freemsgchain(mp);
+		return (NULL);
+	}
 
 	if (ic->ic_state != IEEE80211_S_RUN) {
 		freemsgchain(mp);
@@ -2992,13 +3049,6 @@ iwh_m_tx(void *arg, mblk_t *mp)
 		return (mp);
 	}
 
-	mutex_enter(&sc->sc_suspend_lock);
-	if (sc->sc_flags & IWH_F_SUSPEND) {
-		mutex_exit(&sc->sc_suspend_lock);
-		freemsgchain(mp);
-		return (NULL);
-	}
-
 	while (mp != NULL) {
 		next = mp->b_next;
 		mp->b_next = NULL;
@@ -3007,10 +3057,6 @@ iwh_m_tx(void *arg, mblk_t *mp)
 			break;
 		}
 		mp = next;
-	}
-
-	if (mutex_owned(&sc->sc_suspend_lock)) {
-		mutex_exit(&sc->sc_suspend_lock);
 	}
 
 	return (mp);
@@ -3026,10 +3072,11 @@ iwh_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	iwh_tx_ring_t *ring;
 	iwh_tx_desc_t *desc;
 	iwh_tx_data_t *data;
+	iwh_tx_data_t *desc_data;
 	iwh_cmd_t *cmd;
 	iwh_tx_cmd_t *tx;
 	ieee80211_node_t *in;
-	struct ieee80211_frame *wh;
+	struct ieee80211_frame *wh, *mp_wh;
 	struct ieee80211_key *k = NULL;
 	mblk_t *m, *m0;
 	int hdrlen, len, len0, mblen, off, err = IWH_SUCCESS;
@@ -3044,10 +3091,6 @@ iwh_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	}
 	sc = (iwh_sc_t *)ic;
 
-	if (!mutex_owned(&sc->sc_suspend_lock)) {
-		mutex_enter(&sc->sc_suspend_lock);
-	}
-
 	if (sc->sc_flags & IWH_F_SUSPEND) {
 		if ((type & IEEE80211_FC0_TYPE_MASK) !=
 		    IEEE80211_FC0_TYPE_DATA) {
@@ -3057,48 +3100,23 @@ iwh_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 		goto exit;
 	}
 
-	hdrlen = ieee80211_hdrspace(ic, mp->b_rptr);
-
-	m = allocb(msgdsize(mp) + 32, BPRI_MED);
-	if (NULL == m) { /* can not alloc buf, drop this package */
-		cmn_err(CE_WARN, "iwh_send(): "
-		    "failed to allocate msgbuf\n");
-		freemsg(mp);
-		err = IWH_SUCCESS;
-		goto exit;
+	if ((NULL == mp) || (MBLKL(mp) <= 0)) {
+		return (IWH_FAIL);
 	}
 
-	for (off = 0, m0 = mp; m0 != NULL; m0 = m0->b_cont) {
-		mblen = MBLKL(m0);
-		(void) memcpy(m->b_rptr + off, m0->b_rptr, mblen);
-		off += mblen;
-	}
-
-	m->b_wptr += off;
-
-	wh = (struct ieee80211_frame *)m->b_rptr;
+	mp_wh = (struct ieee80211_frame *)mp->b_rptr;
 
 	/*
-	 * determine send which AP or station in IBSS
+	 * Determine send which AP or station in IBSS
 	 */
-	in = ieee80211_find_txnode(ic, wh->i_addr1);
+	in = ieee80211_find_txnode(ic, mp_wh->i_addr1);
 	if (NULL == in) {
 		cmn_err(CE_WARN, "iwh_send(): "
 		    "failed to find tx node\n");
 		freemsg(mp);
-		freemsg(m);
 		sc->sc_tx_err++;
 		err = IWH_SUCCESS;
 		goto exit;
-	}
-
-	/*
-	 * Net80211 module encapsulate outbound data frames.
-	 * Add some feilds of 80211 frame.
-	 */
-	if ((type & IEEE80211_FC0_TYPE_MASK) ==
-	    IEEE80211_FC0_TYPE_DATA) {
-		(void) ieee80211_encap(ic, m, in);
 	}
 
 	/*
@@ -3110,15 +3128,14 @@ iwh_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 		if ((type & IEEE80211_FC0_TYPE_MASK) ==
 		    IEEE80211_FC0_TYPE_DATA) {
 
-			if (wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_QOS) {
-				qwh = (struct ieee80211_qosframe *)wh;
+			if (mp_wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_QOS) {
+				qwh = (struct ieee80211_qosframe *)mp_wh;
 
 				tid = qwh->i_qos[0] & IEEE80211_QOS_TID;
 				txq_id = iwh_wme_tid_to_txq(tid);
 
 				if (txq_id < TXQ_FOR_AC_MIN ||
 				    (txq_id > TXQ_FOR_AC_MAX)) {
-					freemsg(m);
 					freemsg(mp);
 					sc->sc_tx_err++;
 					err = IWH_SUCCESS;
@@ -3140,14 +3157,13 @@ iwh_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 		txq_id = NON_QOS_TXQ;
 	}
 
+	mutex_enter(&sc->sc_tx_lock);
 	ring = &sc->sc_txq[txq_id];
 	data = &ring->data[ring->cur];
-	desc = data->desc;
 	cmd = data->cmd;
-	bzero(desc, sizeof (*desc));
 	bzero(cmd, sizeof (*cmd));
 
-	mutex_enter(&sc->sc_tx_lock);
+	ring->cur = (ring->cur + 1) % ring->count;
 
 	/*
 	 * Need reschedule TX if TX buffer is full.
@@ -3159,7 +3175,6 @@ iwh_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 		sc->sc_need_reschedule = 1;
 		mutex_exit(&sc->sc_tx_lock);
 
-		freemsg(m);
 		if ((type & IEEE80211_FC0_TYPE_MASK) !=
 		    IEEE80211_FC0_TYPE_DATA) {
 			freemsg(mp);
@@ -3168,14 +3183,57 @@ iwh_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 		err = IWH_FAIL;
 		goto exit;
 	}
+
+	ring->queued++;
+
 	mutex_exit(&sc->sc_tx_lock);
+
+	hdrlen = ieee80211_hdrspace(ic, mp->b_rptr);
+
+	m = allocb(msgdsize(mp) + 32, BPRI_MED);
+	if (NULL == m) { /* can not alloc buf, drop this package */
+		cmn_err(CE_WARN, "iwh_send(): "
+		    "failed to allocate msgbuf\n");
+		freemsg(mp);
+
+		mutex_enter(&sc->sc_tx_lock);
+		ring->queued--;
+		if ((sc->sc_need_reschedule) && (ring->queued <= 0)) {
+			sc->sc_need_reschedule = 0;
+			mutex_exit(&sc->sc_tx_lock);
+			mac_tx_update(ic->ic_mach);
+			mutex_enter(&sc->sc_tx_lock);
+		}
+		mutex_exit(&sc->sc_tx_lock);
+
+		err = IWH_SUCCESS;
+		goto exit;
+	}
+
+	for (off = 0, m0 = mp; m0 != NULL; m0 = m0->b_cont) {
+		mblen = MBLKL(m0);
+		bcopy(m0->b_rptr, m->b_rptr + off, mblen);
+		off += mblen;
+	}
+
+	m->b_wptr += off;
+
+	wh = (struct ieee80211_frame *)m->b_rptr;
+
+	/*
+	 * Net80211 module encapsulate outbound data frames.
+	 * Add some feilds of 80211 frame.
+	 */
+	if ((type & IEEE80211_FC0_TYPE_MASK) ==
+	    IEEE80211_FC0_TYPE_DATA) {
+		(void) ieee80211_encap(ic, m, in);
+	}
 
 	freemsg(mp);
 
 	cmd->hdr.type = REPLY_TX;
 	cmd->hdr.flags = 0;
 	cmd->hdr.qid = ring->qid;
-	cmd->hdr.idx = ring->cur;
 
 	tx = (iwh_tx_cmd_t *)cmd->data;
 	tx->tx_flags = 0;
@@ -3191,11 +3249,24 @@ iwh_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 		if (NULL == k) {
 			freemsg(m);
 			sc->sc_tx_err++;
+
+			mutex_enter(&sc->sc_tx_lock);
+			ring->queued--;
+			if ((sc->sc_need_reschedule) && (ring->queued <= 0)) {
+				sc->sc_need_reschedule = 0;
+				mutex_exit(&sc->sc_tx_lock);
+				mac_tx_update(ic->ic_mach);
+				mutex_enter(&sc->sc_tx_lock);
+			}
+			mutex_exit(&sc->sc_tx_lock);
+
 			err = IWH_SUCCESS;
 			goto exit;
 		}
 
-		/* packet header may have moved, reset our local pointer */
+		/*
+		 * packet header may have moved, reset our local pointer
+		 */
 		wh = (struct ieee80211_frame *)m->b_rptr;
 	}
 
@@ -3340,9 +3411,9 @@ iwh_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	tx->driver_txop = 0;
 	tx->next_frame_len = 0;
 
-	(void) memcpy(tx + 1, m->b_rptr, hdrlen);
+	bcopy(m->b_rptr, tx + 1, hdrlen);
 	m->b_rptr += hdrlen;
-	(void) memcpy(data->dma_data.mem_va, m->b_rptr, len - hdrlen);
+	bcopy(m->b_rptr, data->dma_data.mem_va, (len - hdrlen));
 
 	IWH_DBG((IWH_DEBUG_TX, "iwh_send(): "
 	    "sending data: qid=%d idx=%d len=%d",
@@ -3352,6 +3423,12 @@ iwh_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	 * first segment includes the tx cmd plus the 802.11 header,
 	 * the second includes the remaining of the 802.11 frame.
 	 */
+
+	mutex_enter(&sc->sc_tx_lock);
+	cmd->hdr.idx = ring->desc_cur;
+	desc_data = &ring->data[ring->desc_cur];
+	desc = desc_data->desc;
+	bzero(desc, sizeof (*desc));
 	desc->val0 = 2 << 24;
 	desc->pa[0].tb1_addr = data->paddr_cmd;
 	desc->pa[0].val1 = ((len0 << 4) & 0xfff0) |
@@ -3365,29 +3442,27 @@ iwh_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	    data->paddr_cmd, data->dma_data.cookie.dmac_address,
 	    len0, len - hdrlen, desc->pa[0].val1, desc->pa[0].val2));
 
-	mutex_enter(&sc->sc_tx_lock);
-	ring->queued++;
-	mutex_exit(&sc->sc_tx_lock);
-
 	/*
 	 * kick ring
 	 */
 	s_id = tx->sta_id;
 
 	sc->sc_shared->queues_byte_cnt_tbls[ring->qid].
-	    tfd_offset[ring->cur].val =
+	    tfd_offset[ring->desc_cur].val =
 	    (8 + len) | (s_id << 12);
-	if (ring->cur < IWH_MAX_WIN_SIZE) {
+	if (ring->desc_cur < IWH_MAX_WIN_SIZE) {
 		sc->sc_shared->queues_byte_cnt_tbls[ring->qid].
-		    tfd_offset[IWH_QUEUE_SIZE + ring->cur].val =
+		    tfd_offset[IWH_QUEUE_SIZE + ring->desc_cur].val =
 		    (8 + len) | (s_id << 12);
 	}
 
 	IWH_DMA_SYNC(data->dma_data, DDI_DMA_SYNC_FORDEV);
 	IWH_DMA_SYNC(ring->dma_desc, DDI_DMA_SYNC_FORDEV);
 
-	ring->cur = (ring->cur + 1) % ring->count;
-	IWH_WRITE(sc, HBUS_TARG_WRPTR, ring->qid << 8 | ring->cur);
+	ring->desc_cur = (ring->desc_cur + 1) % ring->count;
+	IWH_WRITE(sc, HBUS_TARG_WRPTR, ring->qid << 8 | ring->desc_cur);
+
+	mutex_exit(&sc->sc_tx_lock);
 	freemsg(m);
 
 	/*
@@ -3405,10 +3480,6 @@ iwh_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	mutex_exit(&sc->sc_mt_lock);
 
 exit:
-	if (mutex_owned(&sc->sc_suspend_lock)) {
-		mutex_exit(&sc->sc_suspend_lock);
-	}
-
 	return (err);
 }
 
@@ -3418,9 +3489,9 @@ exit:
 static void
 iwh_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
 {
-	iwh_sc_t	*sc;
-	ieee80211com_t	*ic;
-	int		err = EINVAL;
+	iwh_sc_t *sc;
+	ieee80211com_t *ic;
+	int err = EINVAL;
 
 	if (NULL == arg) {
 		return;
@@ -3456,8 +3527,8 @@ static int
 iwh_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
     uint_t pr_flags, uint_t wldp_length, void *wldp_buf, uint_t *perm)
 {
-	iwh_sc_t	*sc;
-	int		err = EINVAL;
+	iwh_sc_t *sc;
+	int err = EINVAL;
 
 	if (NULL == arg) {
 		return (EINVAL);
@@ -3474,9 +3545,9 @@ static int
 iwh_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
     uint_t wldp_length, const void *wldp_buf)
 {
-	iwh_sc_t		*sc;
-	ieee80211com_t		*ic;
-	int			err = EINVAL;
+	iwh_sc_t *sc;
+	ieee80211com_t *ic;
+	int err = EINVAL;
 
 	if (NULL == arg) {
 		return (EINVAL);
@@ -3507,8 +3578,8 @@ iwh_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 static int
 iwh_m_stat(void *arg, uint_t stat, uint64_t *val)
 {
-	iwh_sc_t	*sc;
-	ieee80211com_t	*ic;
+	iwh_sc_t *sc;
+	ieee80211com_t *ic;
 	ieee80211_node_t *in;
 
 	if (NULL == arg) {
@@ -3585,7 +3656,6 @@ iwh_m_stat(void *arg, uint_t stat, uint64_t *val)
 	mutex_exit(&sc->sc_glock);
 
 	return (IWH_SUCCESS);
-
 }
 
 /*
@@ -3595,7 +3665,7 @@ static int
 iwh_m_start(void *arg)
 {
 	iwh_sc_t *sc;
-	ieee80211com_t	*ic;
+	ieee80211com_t *ic;
 	int err = IWH_FAIL;
 
 	if (NULL == arg) {
@@ -3611,13 +3681,13 @@ iwh_m_start(void *arg)
 		 * the 'plumb' succeed. The iwh_thread() tries to re-init
 		 * background.
 		 */
-		sc->sc_flags |= IWH_F_HW_ERR_RECOVER;
+		atomic_or_32(&sc->sc_flags, IWH_F_HW_ERR_RECOVER);
 		return (IWH_SUCCESS);
 	}
 
 	ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
 
-	sc->sc_flags |= IWH_F_RUNNING;
+	atomic_or_32(&sc->sc_flags, IWH_F_RUNNING);
 
 	return (IWH_SUCCESS);
 }
@@ -3629,7 +3699,7 @@ static void
 iwh_m_stop(void *arg)
 {
 	iwh_sc_t *sc;
-	ieee80211com_t	*ic;
+	ieee80211com_t *ic;
 
 	if (NULL == arg) {
 		return;
@@ -3646,11 +3716,11 @@ iwh_m_stop(void *arg)
 
 	ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
 
-	sc->sc_flags &= ~IWH_F_HW_ERR_RECOVER;
-	sc->sc_flags &= ~IWH_F_RATE_AUTO_CTL;
+	atomic_and_32(&sc->sc_flags, ~IWH_F_HW_ERR_RECOVER);
+	atomic_and_32(&sc->sc_flags, ~IWH_F_RATE_AUTO_CTL);
 
-	sc->sc_flags &= ~IWH_F_RUNNING;
-	sc->sc_flags &= ~IWH_F_SCANNING;
+	atomic_and_32(&sc->sc_flags, ~IWH_F_RUNNING);
+	atomic_and_32(&sc->sc_flags, ~IWH_F_SCANNING);
 }
 
 /*
@@ -3660,7 +3730,7 @@ static int
 iwh_m_unicst(void *arg, const uint8_t *macaddr)
 {
 	iwh_sc_t *sc;
-	ieee80211com_t	*ic;
+	ieee80211com_t *ic;
 	int err = IWH_SUCCESS;
 
 	if (NULL == arg) {
@@ -3680,8 +3750,6 @@ iwh_m_unicst(void *arg, const uint8_t *macaddr)
 			goto fail;
 		}
 	}
-
-	return (err);
 
 fail:
 	return (err);
@@ -3707,7 +3775,7 @@ iwh_m_promisc(void *arg, boolean_t on)
 static void
 iwh_thread(iwh_sc_t *sc)
 {
-	ieee80211com_t	*ic = &sc->sc_ic;
+	ieee80211com_t *ic = &sc->sc_ic;
 	clock_t clk;
 	int err, n = 0, timeout = 0;
 	uint32_t tmp;
@@ -3718,9 +3786,9 @@ iwh_thread(iwh_sc_t *sc)
 	while (sc->sc_mf_thread_switch) {
 		tmp = IWH_READ(sc, CSR_GP_CNTRL);
 		if (tmp & CSR_GP_CNTRL_REG_FLAG_HW_RF_KILL_SW) {
-			sc->sc_flags &= ~IWH_F_RADIO_OFF;
+			atomic_and_32(&sc->sc_flags, ~IWH_F_RADIO_OFF);
 		} else {
-			sc->sc_flags |= IWH_F_RADIO_OFF;
+			atomic_or_32(&sc->sc_flags, IWH_F_RADIO_OFF);
 		}
 
 		/*
@@ -3743,7 +3811,9 @@ iwh_thread(iwh_sc_t *sc)
 			iwh_stop(sc);
 
 			if (IWH_CHK_FAST_RECOVER(sc)) {
-				/* save runtime configuration */
+				/*
+				 * save runtime configuration
+				 */
 				bcopy(&sc->sc_config, &sc->sc_config_save,
 				    sizeof (sc->sc_config));
 			} else {
@@ -3761,13 +3831,14 @@ iwh_thread(iwh_sc_t *sc)
 
 			n = 0;
 			if (!err) {
-				sc->sc_flags |= IWH_F_RUNNING;
+				atomic_or_32(&sc->sc_flags, IWH_F_RUNNING);
 			}
 
 
 			if (!IWH_CHK_FAST_RECOVER(sc) ||
 			    iwh_fast_recover(sc) != IWH_SUCCESS) {
-				sc->sc_flags &= ~IWH_F_HW_ERR_RECOVER;
+				atomic_and_32(&sc->sc_flags,
+				    ~IWH_F_HW_ERR_RECOVER);
 
 				delay(drv_usectohz(2000000));
 				if (sc->sc_ostate != IEEE80211_S_INIT) {
@@ -3806,7 +3877,8 @@ iwh_thread(iwh_sc_t *sc)
 			if (10 == timeout) {
 				sc->sc_tx_timer--;
 				if (0 == sc->sc_tx_timer) {
-					sc->sc_flags |= IWH_F_HW_ERR_RECOVER;
+					atomic_or_32(&sc->sc_flags,
+					    IWH_F_HW_ERR_RECOVER);
 					sc->sc_ostate = IEEE80211_S_RUN;
 					IWH_DBG((IWH_DEBUG_FW, "iwh_thread(): "
 					    "try to recover from "
@@ -3823,7 +3895,6 @@ iwh_thread(iwh_sc_t *sc)
 	cv_signal(&sc->sc_mt_cv);
 	mutex_exit(&sc->sc_mt_lock);
 }
-
 
 /*
  * Send a command to the ucode.
@@ -3847,7 +3918,7 @@ iwh_cmd(iwh_sc_t *sc, int code, const void *buf, int size, int async)
 	cmd->hdr.flags = 0;
 	cmd->hdr.qid = ring->qid;
 	cmd->hdr.idx = ring->cur;
-	(void) memcpy(cmd->data, buf, size);
+	bcopy(buf, cmd->data, size);
 	(void) memset(desc, 0, sizeof (*desc));
 
 	desc->val0 = 1 << 24;
@@ -3980,9 +4051,12 @@ iwh_hw_set_before_auth(iwh_sc_t *sc)
 		return (err);
 	}
 
-	err = iwh_tx_power_table(sc, 1);
-	if (err != IWH_SUCCESS) {
-		return (err);
+	if ((sc->sc_dev_id != 0x423c) &&
+	    (sc->sc_dev_id != 0x423d)) {
+		err = iwh_tx_power_table(sc, 1);
+		if (err != IWH_SUCCESS) {
+			return (err);
+		}
 	}
 
 	/*
@@ -3993,12 +4067,15 @@ iwh_hw_set_before_auth(iwh_sc_t *sc)
 		return (err);
 	}
 
-	/*
-	 * set up retry rate table for AP node
-	 */
-	err = iwh_ap_lq(sc);
-	if (err != IWH_SUCCESS) {
-		return (err);
+	if ((sc->sc_dev_id != 0x423c) &&
+	    (sc->sc_dev_id != 0x423d)) {
+		/*
+		 * set up retry rate table for AP node
+		 */
+		err = iwh_ap_lq(sc);
+		if (err != IWH_SUCCESS) {
+			return (err);
+		}
 	}
 
 	return (err);
@@ -4098,7 +4175,7 @@ iwh_scan(iwh_sc_t *sc)
 	}
 	*frm++ = IEEE80211_ELEMID_SSID;
 	*frm++ = in->in_esslen;
-	(void) memcpy(frm, in->in_essid, in->in_esslen);
+	bcopy(in->in_essid, frm, in->in_esslen);
 	frm += in->in_esslen;
 
 	mode = ieee80211_chan2mode(ic, ic->ic_curchan);
@@ -4114,7 +4191,7 @@ iwh_scan(iwh_sc_t *sc)
 	}
 
 	*frm++ = (uint8_t)nrates;
-	(void) memcpy(frm, rs->ir_rates, nrates);
+	bcopy(rs->ir_rates, frm, nrates);
 	frm += nrates;
 
 	/*
@@ -4124,7 +4201,7 @@ iwh_scan(iwh_sc_t *sc)
 		nrates = rs->ir_nrates - IEEE80211_RATE_SIZE;
 		*frm++ = IEEE80211_ELEMID_XRATES;
 		*frm++ = (uint8_t)nrates;
-		(void) memcpy(frm, rs->ir_rates + IEEE80211_RATE_SIZE, nrates);
+		bcopy(rs->ir_rates + IEEE80211_RATE_SIZE, frm, nrates);
 		frm += nrates;
 	}
 
@@ -4132,7 +4209,7 @@ iwh_scan(iwh_sc_t *sc)
 	 * optionnal IE (usually for wpa)
 	 */
 	if (ic->ic_opt_ie != NULL) {
-		(void) memcpy(frm, ic->ic_opt_ie, ic->ic_opt_ie_len);
+		bcopy(ic->ic_opt_ie, frm, ic->ic_opt_ie_len);
 		frm += ic->ic_opt_ie_len;
 	}
 
@@ -4200,7 +4277,7 @@ iwh_config(iwh_sc_t *sc)
 	iwh_powertable_cmd_t powertable;
 	iwh_bt_cmd_t bt;
 	iwh_add_sta_t node;
-	iwh_rem_sta_t	rm_sta;
+	iwh_rem_sta_t rm_sta;
 	const uint8_t bcast[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 	iwh_link_quality_cmd_t link_quality;
 	int i, err = IWH_FAIL;
@@ -4325,7 +4402,7 @@ iwh_config(iwh_sc_t *sc)
 	 */
 	(void) memset(&rm_sta, 0, sizeof (rm_sta));
 	rm_sta.num_sta = 1;
-	(void) memcpy(rm_sta.addr, bcast, 6);
+	bcopy(bcast, rm_sta.addr, 6);
 
 	err = iwh_cmd(sc, REPLY_REMOVE_STA, &rm_sta, sizeof (iwh_rem_sta_t), 0);
 	if (err != IWH_SUCCESS) {
@@ -4334,12 +4411,15 @@ iwh_config(iwh_sc_t *sc)
 		return (err);
 	}
 
-	/*
-	 * configure TX power table
-	 */
-	err = iwh_tx_power_table(sc, 0);
-	if (err != IWH_SUCCESS) {
-		return (err);
+	if ((sc->sc_dev_id != 0x423c) &&
+	    (sc->sc_dev_id != 0x423d)) {
+		/*
+		 * configure TX power table
+		 */
+		err = iwh_tx_power_table(sc, 0);
+		if (err != IWH_SUCCESS) {
+			return (err);
+		}
 	}
 
 	/*
@@ -4358,29 +4438,32 @@ iwh_config(iwh_sc_t *sc)
 		return (err);
 	}
 
-	/*
-	 * TX_LINK_QUALITY cmd
-	 */
-	(void) memset(&link_quality, 0, sizeof (link_quality));
-	for (i = 0; i < LINK_QUAL_MAX_RETRY_NUM; i++) {
-		masks |= RATE_MCS_CCK_MSK;
-		masks |= RATE_MCS_ANT_B_MSK;
-		masks &= ~RATE_MCS_ANT_A_MSK;
-		link_quality.rate_n_flags[i] =
-		    LE_32(iwh_rate_to_plcp(2) | masks);
-	}
+	if ((sc->sc_dev_id != 0x423c) &&
+	    (sc->sc_dev_id != 0x423d)) {
+		/*
+		 * TX_LINK_QUALITY cmd
+		 */
+		(void) memset(&link_quality, 0, sizeof (link_quality));
+		for (i = 0; i < LINK_QUAL_MAX_RETRY_NUM; i++) {
+			masks |= RATE_MCS_CCK_MSK;
+			masks |= RATE_MCS_ANT_B_MSK;
+			masks &= ~RATE_MCS_ANT_A_MSK;
+			link_quality.rate_n_flags[i] =
+			    LE_32(iwh_rate_to_plcp(2) | masks);
+		}
 
-	link_quality.general_params.single_stream_ant_msk = 2;
-	link_quality.general_params.dual_stream_ant_msk = 3;
-	link_quality.agg_params.agg_dis_start_th = 3;
-	link_quality.agg_params.agg_time_limit = LE_16(4000);
-	link_quality.sta_id = IWH_BROADCAST_ID;
-	err = iwh_cmd(sc, REPLY_TX_LINK_QUALITY_CMD, &link_quality,
-	    sizeof (link_quality), 0);
-	if (err != IWH_SUCCESS) {
-		cmn_err(CE_WARN, "iwh_config(): "
-		    "failed to config link quality table\n");
-		return (err);
+		link_quality.general_params.single_stream_ant_msk = 2;
+		link_quality.general_params.dual_stream_ant_msk = 3;
+		link_quality.agg_params.agg_dis_start_th = 3;
+		link_quality.agg_params.agg_time_limit = LE_16(4000);
+		link_quality.sta_id = IWH_BROADCAST_ID;
+		err = iwh_cmd(sc, REPLY_TX_LINK_QUALITY_CMD, &link_quality,
+		    sizeof (link_quality), 0);
+		if (err != IWH_SUCCESS) {
+			cmn_err(CE_WARN, "iwh_config(): "
+			    "failed to config link quality table\n");
+			return (err);
+		}
 	}
 
 	return (err);
@@ -4405,7 +4488,9 @@ iwh_quiesce(dev_info_t *dip)
 	}
 
 #ifdef DEBUG
-	/* by pass any messages, if it's quiesce */
+	/*
+	 * by pass any messages, if it's quiesce
+	 */
 	iwh_dbg_flags = 0;
 #endif
 
@@ -4413,7 +4498,7 @@ iwh_quiesce(dev_info_t *dip)
 	 * No more blocking is allowed while we are in the
 	 * quiesce(9E) entry point.
 	 */
-	sc->sc_flags |= IWH_F_QUIESCED;
+	atomic_or_32(&sc->sc_flags, IWH_F_QUIESCED);
 
 	/*
 	 * Disable and mask all interrupts.
@@ -4476,10 +4561,10 @@ iwh_power_up(iwh_sc_t *sc)
 static int
 iwh_preinit(iwh_sc_t *sc)
 {
-	int		n;
-	uint8_t		vlink;
-	uint16_t	radio_cfg;
-	uint32_t	tmp;
+	int n;
+	uint8_t vlink;
+	uint16_t radio_cfg;
+	uint32_t tmp;
 
 	/*
 	 * clear any pending interrupts
@@ -4552,7 +4637,7 @@ iwh_preinit(iwh_sc_t *sc)
 	ddi_put8(sc->sc_cfg_handle, (uint8_t *)(sc->sc_cfg_base + 0xf0),
 	    vlink & ~2);
 
-	tmp = IWH_READ(sc, CSR_SW_VER);
+	tmp = IWH_READ(sc, CSR_HW_IF_CONFIG_REG);
 	tmp |= CSR_HW_IF_CONFIG_REG_BIT_RADIO_SI |
 	    CSR_HW_IF_CONFIG_REG_BIT_MAC_SI;
 	IWH_WRITE(sc, CSR_SW_VER, tmp);
@@ -4596,6 +4681,7 @@ iwh_eep_sem_down(iwh_sc_t *sc)
 			DELAY(10000);
 		}
 	}
+
 	return (IWH_FAIL);
 }
 
@@ -4699,7 +4785,7 @@ iwh_init(iwh_sc_t *sc)
 	iwh_release_calib_buffer(sc);
 
 	mutex_enter(&sc->sc_glock);
-	sc->sc_flags &= ~IWH_F_FW_INIT;
+	atomic_and_32(&sc->sc_flags, ~IWH_F_FW_INIT);
 
 	err = iwh_init_common(sc);
 	if (err != IWH_SUCCESS) {
@@ -4710,8 +4796,8 @@ iwh_init(iwh_sc_t *sc)
 	/*
 	 * backup ucode data part for future use.
 	 */
-	(void) memcpy(sc->sc_dma_fw_data_bak.mem_va,
-	    sc->sc_dma_fw_data.mem_va,
+	bcopy(sc->sc_dma_fw_data.mem_va,
+	    sc->sc_dma_fw_data_bak.mem_va,
 	    sc->sc_dma_fw_data.alength);
 
 	/* load firmware init segment into NIC */
@@ -4751,7 +4837,7 @@ iwh_init(iwh_sc_t *sc)
 	iwh_stop(sc);
 
 	mutex_enter(&sc->sc_glock);
-	sc->sc_flags &= ~IWH_F_FW_INIT;
+	atomic_and_32(&sc->sc_flags, ~IWH_F_FW_INIT);
 
 	err = iwh_init_common(sc);
 	if (err != IWH_SUCCESS) {
@@ -4795,7 +4881,7 @@ iwh_init(iwh_sc_t *sc)
 	DELAY(1000);
 
 	mutex_enter(&sc->sc_glock);
-	sc->sc_flags &= ~IWH_F_FW_INIT;
+	atomic_and_32(&sc->sc_flags, ~IWH_F_FW_INIT);
 
 	/*
 	 * at this point, the firmware is loaded OK, then config the hardware
@@ -4825,7 +4911,9 @@ iwh_stop(iwh_sc_t *sc)
 	uint32_t tmp;
 	int i;
 
-	/* by pass if it's quiesced */
+	/*
+	 * by pass if it's quiesced
+	 */
 	if (!(sc->sc_flags & IWH_F_QUIESCED)) {
 		mutex_enter(&sc->sc_glock);
 	}
@@ -4865,7 +4953,9 @@ iwh_stop(iwh_sc_t *sc)
 	tmp = IWH_READ(sc, CSR_RESET);
 	IWH_WRITE(sc, CSR_RESET, tmp | CSR_RESET_REG_FLAG_SW_RESET);
 
-	/* by pass if it's quiesced */
+	/*
+	 * by pass if it's quiesced
+	 */
 	if (!(sc->sc_flags & IWH_F_QUIESCED)) {
 		mutex_exit(&sc->sc_glock);
 	}
@@ -5100,8 +5190,8 @@ iwh_amrr_ratectl(void *arg, ieee80211_node_t *in)
 static uint8_t *
 iwh_eep_addr_trans(iwh_sc_t *sc, uint32_t indi_addr)
 {
-	uint32_t	di_addr;
-	uint16_t	temp;
+	uint32_t di_addr;
+	uint16_t temp;
 
 	if (!(indi_addr & INDIRECT_ADDRESS)) {
 		di_addr = indi_addr;
@@ -5185,11 +5275,11 @@ iwh_put_seg_fw(iwh_sc_t *sc, uint32_t addr_s, uint32_t addr_d, uint32_t len)
 static int
 iwh_alive_common(iwh_sc_t *sc)
 {
-	uint32_t	base;
-	uint32_t	i;
-	iwh_wimax_coex_cmd_t	w_cmd;
-	iwh_calibration_crystal_cmd_t	c_cmd;
-	uint32_t	rv = IWH_FAIL;
+	uint32_t base;
+	uint32_t i;
+	iwh_wimax_coex_cmd_t w_cmd;
+	iwh_calibration_crystal_cmd_t c_cmd;
+	uint32_t rv = IWH_FAIL;
 
 	/*
 	 * initialize SCD related registers to make TX work.
@@ -5284,24 +5374,29 @@ iwh_alive_common(iwh_sc_t *sc)
 		return (rv);
 	}
 
-	(void) memset(&c_cmd, 0, sizeof (c_cmd));
+	if ((sc->sc_dev_id != 0x423c) &&
+	    (sc->sc_dev_id != 0x423d)) {
+		(void) memset(&c_cmd, 0, sizeof (c_cmd));
 
-	c_cmd.opCode = PHY_CALIBRATE_CRYSTAL_FRQ_CMD;
-	c_cmd.data.cap_pin1 = LE_16(sc->sc_eep_calib->xtal_calib[0]);
-	c_cmd.data.cap_pin2 = LE_16(sc->sc_eep_calib->xtal_calib[1]);
+		c_cmd.opCode = PHY_CALIBRATE_CRYSTAL_FRQ_CMD;
+		c_cmd.data.cap_pin1 = LE_16(sc->sc_eep_calib->xtal_calib[0]);
+		c_cmd.data.cap_pin2 = LE_16(sc->sc_eep_calib->xtal_calib[1]);
 
-	rv = iwh_cmd(sc, REPLY_PHY_CALIBRATION_CMD, &c_cmd, sizeof (c_cmd), 1);
-	if (rv != IWH_SUCCESS) {
-		cmn_err(CE_WARN, "iwh_alive_common(): "
-		    "failed to send crystal frq calibration command.\n");
-		return (rv);
+		rv = iwh_cmd(sc, REPLY_PHY_CALIBRATION_CMD,
+		    &c_cmd, sizeof (c_cmd), 1);
+		if (rv != IWH_SUCCESS) {
+			cmn_err(CE_WARN, "iwh_alive_common(): "
+			    "failed to send crystal"
+			    "frq calibration command.\n");
+			return (rv);
+		}
+
+		/*
+		 * make sure crystal frequency calibration ready
+		 * before next operations.
+		 */
+		DELAY(1000);
 	}
-
-	/*
-	 * make sure crystal frequency calibration ready
-	 * before next operations.
-	 */
-	DELAY(1000);
 
 	return (IWH_SUCCESS);
 }
@@ -5334,7 +5429,7 @@ iwh_save_calib_result(iwh_sc_t *sc, iwh_rx_desc_t *desc)
 		}
 
 		res_p->lo_res_len = len;
-		(void) memcpy(res_p->lo_res, calib_hdr, len);
+		bcopy(calib_hdr, res_p->lo_res, len);
 		break;
 
 	case PHY_CALIBRATE_TX_IQ_CMD:
@@ -5349,7 +5444,7 @@ iwh_save_calib_result(iwh_sc_t *sc, iwh_rx_desc_t *desc)
 		}
 
 		res_p->tx_iq_res_len = len;
-		(void) memcpy(res_p->tx_iq_res, calib_hdr, len);
+		bcopy(calib_hdr, res_p->tx_iq_res, len);
 		break;
 
 	case PHY_CALIBRATE_TX_IQ_PERD_CMD:
@@ -5363,12 +5458,40 @@ iwh_save_calib_result(iwh_sc_t *sc, iwh_rx_desc_t *desc)
 		}
 
 		res_p->tx_iq_perd_res_len = len;
-		(void) memcpy(res_p->tx_iq_perd_res, calib_hdr, len);
+		bcopy(calib_hdr, res_p->tx_iq_perd_res, len);
+		break;
+
+	case PHY_CALIBRATE_DC_CMD:
+		if (NULL == res_p->dc_res) {
+			res_p->dc_res = kmem_alloc(len, KM_NOSLEEP);
+		}
+
+		if (NULL == res_p->dc_res) {
+			cmn_err(CE_WARN, "iwh_save_calib_result(): "
+			    "failed to allocate memory.\n");
+		}
+
+		res_p->dc_res_len = len;
+		bcopy(calib_hdr, res_p->dc_res, len);
+		break;
+
+	case PHY_CALIBRATE_BASE_BAND_CMD:
+		if (NULL == res_p->base_band_res) {
+			res_p->base_band_res = kmem_alloc(len, KM_NOSLEEP);
+		}
+
+		if (NULL == res_p->base_band_res) {
+			cmn_err(CE_WARN, "iwh_save_calib_result(): "
+			    "failed to allocate memory.\n");
+		}
+
+		res_p->base_band_res_len = len;
+		bcopy(calib_hdr, res_p->base_band_res, len);
 		break;
 
 	default:
 		cmn_err(CE_WARN, "iwh_save_calib_result(): "
-		    "incorrect calibration type.\n");
+		    "incorrect calibration type(%d).\n", calib_hdr->op_code);
 		break;
 	}
 
@@ -5440,6 +5563,17 @@ iwh_release_calib_buffer(iwh_sc_t *sc)
 		sc->sc_calib_results.tx_iq_perd_res = NULL;
 	}
 
+	if (sc->sc_calib_results.dc_res != NULL) {
+		kmem_free(sc->sc_calib_results.dc_res,
+		    sc->sc_calib_results.dc_res_len);
+		sc->sc_calib_results.dc_res = NULL;
+	}
+
+	if (sc->sc_calib_results.base_band_res != NULL) {
+		kmem_free(sc->sc_calib_results.base_band_res,
+		    sc->sc_calib_results.base_band_res_len);
+		sc->sc_calib_results.base_band_res = NULL;
+	}
 }
 
 /*
@@ -5537,7 +5671,9 @@ iwh_fast_recover(iwh_sc_t *sc)
 
 	mutex_enter(&sc->sc_glock);
 
-	/* restore runtime configuration */
+	/*
+	 * restore runtime configuration
+	 */
 	bcopy(&sc->sc_config_save, &sc->sc_config,
 	    sizeof (sc->sc_config));
 
@@ -5554,7 +5690,9 @@ iwh_fast_recover(iwh_sc_t *sc)
 	bcopy(&sc->sc_config_save, &sc->sc_config,
 	    sizeof (sc->sc_config));
 
-	/* update adapter's configuration */
+	/*
+	 * update adapter's configuration
+	 */
 	err = iwh_run_state_config(sc);
 	if (err != IWH_SUCCESS) {
 		cmn_err(CE_WARN, "iwh_fast_recover(): "
@@ -5562,14 +5700,19 @@ iwh_fast_recover(iwh_sc_t *sc)
 		mutex_exit(&sc->sc_glock);
 		return (err);
 	}
-	/* set LED on */
+
+	/*
+	 * set LED on
+	 */
 	iwh_set_led(sc, 2, 0, 1);
 
 	mutex_exit(&sc->sc_glock);
 
-	sc->sc_flags &= ~IWH_F_HW_ERR_RECOVER;
+	atomic_and_32(&sc->sc_flags, ~IWH_F_HW_ERR_RECOVER);
 
-	/* start queue */
+	/*
+	 * start queue
+	 */
 	IWH_DBG((IWH_DEBUG_FW, "iwh_fast_recover(): "
 	    "resume xmit\n"));
 	mac_tx_update(ic->ic_mach);
@@ -5649,12 +5792,15 @@ iwh_run_state_config(iwh_sc_t *sc)
 		return (err);
 	}
 
-	/*
-	 * send tx power table command
-	 */
-	err = iwh_tx_power_table(sc, 1);
-	if (err != IWH_SUCCESS) {
-		return (err);
+	if ((sc->sc_dev_id != 0x423c) &&
+	    (sc->sc_dev_id != 0x423d)) {
+		/*
+		 * send tx power table command
+		 */
+		err = iwh_tx_power_table(sc, 1);
+		if (err != IWH_SUCCESS) {
+			return (err);
+		}
 	}
 
 	/*

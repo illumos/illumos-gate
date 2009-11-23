@@ -72,6 +72,7 @@ typedef struct iwh_tx_ring {
 	int			window;
 	int			queued;
 	int			cur;
+	int			desc_cur;
 } iwh_tx_ring_t;
 
 typedef struct iwh_rx_data {

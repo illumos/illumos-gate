@@ -21,7 +21,7 @@
  * Copyright(c) 2005 - 2009 Intel Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
- * it under the terms of version 2 of the GNU Geeral Public License as
+ * it under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful, but
@@ -1205,6 +1205,7 @@ extern "C" {
 	ALM_FH_TSSR_TX_STATUS_REG_BIT_NO_PEND_REQ(_channel))
 #define	PCI_CFG_REV_ID_BIT_BASIC_SKU	(0x40)	/* bit 6 */
 #define	PCI_CFG_REV_ID_BIT_RTP		(0x80)	/* bit 7 */
+#define	PCI_CFG_RETRY_TIMEOUT		(0x41)
 
 #define	HBUS_TARG_MBX_C_REG_BIT_CMD_BLOCKED	(0x00000004)
 
@@ -2105,9 +2106,11 @@ typedef struct iwh_compressed_ba_resp {
 } iwh_compressed_ba_resp_t;
 
 #define	PHY_CALIBRATE_DIFF_GAIN_CMD	(7)
+#define	PHY_CALIBRATE_DC_CMD		(8)
 #define	PHY_CALIBRATE_LO_CMD		(9)
 #define	PHY_CALIBRATE_TX_IQ_CMD		(11)
 #define	PHY_CALIBRATE_CRYSTAL_FRQ_CMD	(15)
+#define	PHY_CALIBRATE_BASE_BAND_CMD	(16)
 #define	PHY_CALIBRATE_TX_IQ_PERD_CMD	(17)
 #define	HD_TABLE_SIZE	(11)
 
@@ -2158,6 +2161,10 @@ struct	iwh_calib_results {
 	uint32_t	tx_iq_perd_res_len;
 	void		*lo_res;
 	uint32_t	lo_res_len;
+	void		*dc_res;
+	uint32_t	dc_res_len;
+	void		*base_band_res;
+	uint32_t	base_band_res_len;
 };
 
 #define	IWH_CALIB_INIT_CFG_ALL	(0xFFFFFFFF)
