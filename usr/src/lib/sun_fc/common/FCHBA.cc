@@ -43,6 +43,8 @@
 #include <FCHBAPort.h>
 #include <HBAList.h>
 
+#define EXCPT_RETRY_COUNT    10
+
 using namespace std;
 const string FCHBA::FCSM_DRIVER_PATH = "/devices/pseudo/fcsm@0:fcsm";
 const string FCHBA::FCSM_DRIVER_PKG	= "SUNWfcsm";
@@ -128,6 +130,12 @@ FCHBA::FCHBA(string path) : HBA() {
 	    log.debug("About to add port %d (%s)", i, nextPath);
 	    addPort(new FCHBAPort(nextPath));
 	}
+    } catch (BusyException &e) {
+        throw e;
+    } catch (TryAgainException &e) {
+	throw e;
+    } catch (UnavailableException &e) {
+	throw e;
     } catch (HBAException &e) {
 	log.internalError(
 		"Unable to construct HBA.");
@@ -403,11 +411,35 @@ void FCHBA::loadAdapters(vector<HBA*> &list) {
 
     close(fd);
     log.debug("Detected %d adapters", pathList->numAdapters);
-    for (int i = 0; i < pathList->numAdapters; i++) {
+    for (int i = 0, times =0; i < pathList->numAdapters;) {
 	try {
 	    HBA *hba = new FCHBA(pathList->hbaPaths[i]);
 	    list.insert(list.begin(), hba);
-	} catch (...) {
+	    i++;
+	} catch (BusyException &e) {
+            sleep(1);
+            if (times++ > EXCPT_RETRY_COUNT) {
+                i++; 
+                times = 0;
+            }
+	    continue;
+	} catch (TryAgainException &e) {
+	    sleep(1);
+	    if (times++ > EXCPT_RETRY_COUNT) {
+		i++; 
+		times = 0;
+	    }  
+	    continue;
+	} catch (UnavailableException &e) {
+	    sleep(1);
+	    if (times++ > EXCPT_RETRY_COUNT) {
+		i++; 
+		times = 0;
+	    }  
+	    continue;
+	} catch (HBAException &e) {
+	    i++;
+	    times = 0;
 	    log.debug(
 		"Ignoring partial failure while loading an HBA");
 	}

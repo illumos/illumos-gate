@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -311,12 +311,12 @@ void HBA::_ioctl(int fd, int type, uchar_t *arg) {
 	int		    saved_errno = 0;
 	struct timespec	    ts;
 
-	errno = 0;
 	hrtime_t start = gethrtime();
 	hrtime_t end = start + BUSY_RETRY_TIMER;
 	ts.tv_sec = 0;
 	ts.tv_nsec = BUSY_SLEEP;
 	for (cur = start; cur < end; cur = gethrtime()) {
+		errno = 0;
 		if (ioctl(fd, type, arg) != 0) {
 			if (errno == EAGAIN) {
 				saved_errno = errno;

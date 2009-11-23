@@ -95,7 +95,7 @@ static struct dev_ops fp_ops = {
 	ddi_quiesce_not_needed 		/* quiesce */
 };
 
-#define	FP_VERSION		"20090729-1.100"
+#define	FP_VERSION		"20091123-1.101"
 #define	FP_NAME_VERSION		"SunFC Port v" FP_VERSION
 
 char *fp_version = FP_NAME_VERSION;
@@ -7223,6 +7223,8 @@ fp_fciocmd(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 		port->fp_flag |= FP_EXCL_BUSY;
 	}
 	mutex_exit(&port->fp_mutex);
+
+	fcio->fcio_errno = FC_SUCCESS;
 
 	switch (fcio->fcio_cmd) {
 	case FCIO_GET_HOST_PARAMS: {
