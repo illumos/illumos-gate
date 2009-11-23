@@ -686,7 +686,7 @@ setup_link:
 			break;
 		}
 
-		if (new_mtu < DEFAULT_MTU || new_mtu > MAX_MTU) {
+		if (new_mtu < DEFAULT_MTU || new_mtu > ixgbe->capab->max_mtu) {
 			err = EINVAL;
 			break;
 		}
@@ -837,7 +837,7 @@ ixgbe_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 		range.mpr_count = 1;
 		range.mpr_type = MAC_PROPVAL_UINT32;
 		range.range_uint32[0].mpur_min = DEFAULT_MTU;
-		range.range_uint32[0].mpur_max = MAX_MTU;
+		range.range_uint32[0].mpur_max = ixgbe->capab->max_mtu;
 		bcopy(&range, pr_val, sizeof (range));
 		break;
 	default:

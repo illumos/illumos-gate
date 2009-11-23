@@ -93,8 +93,9 @@ ixgbe_ring_tx(void *arg, mblk_t *mp)
 	link_list_t pending_list;
 	uint32_t len, hdr_frag_len, hdr_len;
 	uint32_t copy_thresh;
-	mblk_t *new_mp;
-	mblk_t *pre_mp;
+	mblk_t *hdr_new_mp = NULL;
+	mblk_t *hdr_pre_mp = NULL;
+	mblk_t *hdr_nmp = NULL;
 
 	ASSERT(mp->b_next == NULL);
 
@@ -172,13 +173,12 @@ ixgbe_ring_tx(void *arg, mblk_t *mp)
 		/* find the last fragment of the header */
 		len = MBLKL(mp);
 		ASSERT(len > 0);
-		nmp = mp;
-		pre_mp = NULL;
+		hdr_nmp = mp;
 		hdr_len = ctx->ip_hdr_len + ctx->mac_hdr_len + ctx->l4_hdr_len;
 		while (len < hdr_len) {
-			pre_mp = nmp;
-			nmp = nmp->b_cont;
-			len += MBLKL(nmp);
+			hdr_pre_mp = hdr_nmp;
+			hdr_nmp = hdr_nmp->b_cont;
+			len += MBLKL(hdr_nmp);
 		}
 		/*
 		 * If the header and the payload are in different mblks,
@@ -188,7 +188,7 @@ ixgbe_ring_tx(void *arg, mblk_t *mp)
 		if (len == hdr_len)
 			goto adjust_threshold;
 
-		hdr_frag_len = hdr_len - (len - MBLKL(nmp));
+		hdr_frag_len = hdr_len - (len - MBLKL(hdr_nmp));
 		/*
 		 * There are two cases we need to reallocate a mblk for the
 		 * last header fragment:
@@ -197,8 +197,8 @@ ixgbe_ring_tx(void *arg, mblk_t *mp)
 		 * 2. the header is in a single mblk shared with the payload
 		 * and the header is physical memory non-contiguous
 		 */
-		if ((nmp != mp) ||
-		    (P2NPHASE((uintptr_t)nmp->b_rptr, ixgbe->sys_page_size)
+		if ((hdr_nmp != mp) ||
+		    (P2NPHASE((uintptr_t)hdr_nmp->b_rptr, ixgbe->sys_page_size)
 		    < hdr_len)) {
 			IXGBE_DEBUG_STAT(tx_ring->stat_lso_header_fail);
 			/*
@@ -206,18 +206,19 @@ ixgbe_ring_tx(void *arg, mblk_t *mp)
 			 * expect to bcopy into pre-allocated page-aligned
 			 * buffer
 			 */
-			new_mp = allocb(hdr_frag_len, NULL);
-			if (!new_mp)
+			hdr_new_mp = allocb(hdr_frag_len, NULL);
+			if (!hdr_new_mp)
 				return (mp);
-			bcopy(nmp->b_rptr, new_mp->b_rptr, hdr_frag_len);
+			bcopy(hdr_nmp->b_rptr, hdr_new_mp->b_rptr,
+			    hdr_frag_len);
 			/* link the new header fragment with the other parts */
-			new_mp->b_wptr = new_mp->b_rptr + hdr_frag_len;
-			new_mp->b_cont = nmp;
-			if (pre_mp)
-				pre_mp->b_cont = new_mp;
-			nmp->b_rptr += hdr_frag_len;
-			if (hdr_frag_len == hdr_len)
-				mp = new_mp;
+			hdr_new_mp->b_wptr = hdr_new_mp->b_rptr + hdr_frag_len;
+			hdr_new_mp->b_cont = hdr_nmp;
+			if (hdr_pre_mp)
+				hdr_pre_mp->b_cont = hdr_new_mp;
+			else
+				mp = hdr_new_mp;
+			hdr_nmp->b_rptr += hdr_frag_len;
 		}
 adjust_threshold:
 		/*
@@ -402,6 +403,21 @@ adjust_threshold:
 		 */
 		if ((pull_mp = msgpullup(mp, -1)) == NULL) {
 			tx_ring->reschedule = B_TRUE;
+
+			/*
+			 * If new mblk has been allocted for the last header
+			 * fragment of a LSO packet, we should restore the
+			 * modified mp.
+			 */
+			if (hdr_new_mp) {
+				hdr_new_mp->b_cont = NULL;
+				freeb(hdr_new_mp);
+				hdr_nmp->b_rptr -= hdr_frag_len;
+				if (hdr_pre_mp)
+					hdr_pre_mp->b_cont = hdr_nmp;
+				else
+					mp = hdr_nmp;
+			}
 			return (mp);
 		}
 
@@ -499,6 +515,20 @@ tx_failure:
 		freemsg(pull_mp);
 	}
 
+	/*
+	 * If new mblk has been allocted for the last header
+	 * fragment of a LSO packet, we should restore the
+	 * modified mp.
+	 */
+	if (hdr_new_mp) {
+		hdr_new_mp->b_cont = NULL;
+		freeb(hdr_new_mp);
+		hdr_nmp->b_rptr -= hdr_frag_len;
+		if (hdr_pre_mp)
+			hdr_pre_mp->b_cont = hdr_nmp;
+		else
+			mp = hdr_nmp;
+	}
 	/*
 	 * Discard the mblk and free the used resources
 	 */

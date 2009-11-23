@@ -112,7 +112,6 @@ extern "C" {
 #define	MAX_TX_RING_SIZE		4096
 #define	MAX_RX_RING_SIZE		4096
 
-#define	MAX_MTU				16366
 #define	MAX_RX_LIMIT_PER_INTR		4096
 
 #define	MAX_RX_COPY_THRESHOLD		9216
@@ -249,7 +248,7 @@ typedef struct adapter_info {
 	uint32_t	max_tx_que_num;	/* maximum number of tx queues */
 	uint32_t	min_tx_que_num;	/* minimum number of tx queues */
 	uint32_t	def_tx_que_num;	/* default number of tx queues */
-
+	uint32_t	max_mtu;	/* maximum MTU size */
 	/*
 	 * Interrupt throttling is in unit of 256 nsec
 	 */
@@ -340,18 +339,6 @@ typedef struct link_list {
 #define	IXGBE_PROP_GET_INT(d, n)	ddi_prop_get_int(DDI_DEV_T_ANY, (d), \
 				    DDI_PROP_DONTPASS, (n), -1)
 
-
-/*
- * Named Data (ND) Parameter Management Structure
- */
-typedef struct {
-	struct ixgbe *private;
-	uint32_t info;
-	uint32_t min;
-	uint32_t max;
-	uint32_t val;
-	char *name;
-} nd_param_t;
 
 typedef union ixgbe_ether_addr {
 	struct {
@@ -707,7 +694,7 @@ typedef struct ixgbe {
 				param_lp_autoneg_cap:1,
 				param_lp_pause_cap:1,
 				param_lp_asym_pause_cap:1,
-				param_lp_rem_fault,
+				param_lp_rem_fault:1,
 				param_pad_to_32:12;
 } ixgbe_t;
 

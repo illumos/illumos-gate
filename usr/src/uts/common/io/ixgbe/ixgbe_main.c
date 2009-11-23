@@ -28,7 +28,7 @@
 #include "ixgbe_sw.h"
 
 static char ident[] = "Intel 10Gb Ethernet";
-static char ixgbe_version[] = "ixgbe 1.1.1";
+static char ixgbe_version[] = "ixgbe 1.1.2";
 
 /*
  * Local function protoypes
@@ -196,6 +196,10 @@ static lb_property_t lb_mac = {
 	internal, "MAC", IXGBE_LB_INTERNAL_MAC
 };
 
+static lb_property_t lb_external = {
+	external, "External", IXGBE_LB_EXTERNAL
+};
+
 #define	IXGBE_M_CALLBACK_FLAGS \
 	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
 
@@ -226,6 +230,7 @@ static adapter_info_t ixgbe_82598eb_cap = {
 	32,		/* maximum number of tx queues */
 	1,		/* minimum number of tx queues */
 	8,		/* default number of tx queues */
+	16366,		/* maximum MTU size */
 	0xFFFF,		/* maximum interrupt throttle rate */
 	0,		/* minimum interrupt throttle rate */
 	200,		/* default interrupt throttle rate */
@@ -245,6 +250,7 @@ static adapter_info_t ixgbe_82599eb_cap = {
 	128,		/* maximum number of tx queues */
 	1,		/* minimum number of tx queues */
 	8,		/* default number of tx queues */
+	15500,		/* maximum MTU size */
 	0xFF8,		/* maximum interrupt throttle rate */
 	0,		/* minimum interrupt throttle rate */
 	200,		/* default interrupt throttle rate */
@@ -2316,7 +2322,7 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 	 * frame check sequence.
 	 */
 	ixgbe->default_mtu = ixgbe_get_prop(ixgbe, PROP_DEFAULT_MTU,
-	    MIN_MTU, MAX_MTU, DEFAULT_MTU);
+	    MIN_MTU, ixgbe->capab->max_mtu, DEFAULT_MTU);
 
 	ixgbe->max_frame_size = ixgbe->default_mtu +
 	    sizeof (struct ether_vlan_header) + ETHERFCSL;
@@ -3021,6 +3027,7 @@ ixgbe_loopback_ioctl(ixgbe_t *ixgbe, struct iocblk *iocp, mblk_t *mp)
 
 		value = sizeof (lb_normal);
 		value += sizeof (lb_mac);
+		value += sizeof (lb_external);
 
 		lbsp = (lb_info_sz_t *)(uintptr_t)mp->b_cont->b_rptr;
 		*lbsp = value;
@@ -3029,6 +3036,7 @@ ixgbe_loopback_ioctl(ixgbe_t *ixgbe, struct iocblk *iocp, mblk_t *mp)
 	case LB_GET_INFO:
 		value = sizeof (lb_normal);
 		value += sizeof (lb_mac);
+		value += sizeof (lb_external);
 
 		size = value;
 		if (iocp->ioc_count != size)
@@ -3039,6 +3047,7 @@ ixgbe_loopback_ioctl(ixgbe_t *ixgbe, struct iocblk *iocp, mblk_t *mp)
 
 		lbpp[value++] = lb_normal;
 		lbpp[value++] = lb_mac;
+		lbpp[value++] = lb_external;
 		break;
 
 	case LB_GET_MODE:
@@ -3097,6 +3106,9 @@ ixgbe_set_loopback_mode(ixgbe_t *ixgbe, uint32_t mode)
 	default:
 		mutex_exit(&ixgbe->gen_lock);
 		return (B_FALSE);
+
+	case IXGBE_LB_EXTERNAL:
+		break;
 
 	case IXGBE_LB_INTERNAL_MAC:
 		ixgbe_set_internal_mac_loopback(ixgbe);
