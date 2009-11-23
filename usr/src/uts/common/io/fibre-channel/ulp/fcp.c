@@ -669,8 +669,6 @@ extern dev_info_t	*scsi_vhci_dip;
 
 #define	FCP_SVE_THROTTLE		0x28 /* Vicom */
 #define	MAX_INT_DMA			0x7fffffff
-#define	FCP_MAX_SENSE_LEN		252
-#define	FCP_MAX_RESPONSE_LEN		0xffffff
 /*
  * Property definitions
  */
@@ -732,7 +730,7 @@ extern dev_info_t	*scsi_vhci_dip;
 	(es)->es_add_code == 0x25 &&		\
 	(es)->es_qual_code == 0x0)
 
-#define	FCP_VERSION		"20090729-1.190"
+#define	FCP_VERSION		"20091109-1.191"
 #define	FCP_NAME_VERSION	"SunFC FCP v" FCP_VERSION
 
 #define	FCP_NUM_ELEMENTS(array)			\
@@ -2002,9 +2000,7 @@ fcp_setup_scsi_ioctl(struct fcp_scsi_cmd *u_fscsi,
 	 */
 	if ((k_fscsi.scsi_cdblen <= 0) ||
 	    (k_fscsi.scsi_buflen <= 0) ||
-	    (k_fscsi.scsi_buflen > FCP_MAX_RESPONSE_LEN) ||
-	    (k_fscsi.scsi_rqlen <= 0) ||
-	    (k_fscsi.scsi_rqlen > FCP_MAX_SENSE_LEN)) {
+	    (k_fscsi.scsi_rqlen <= 0)) {
 		return (EINVAL);
 	}
 
