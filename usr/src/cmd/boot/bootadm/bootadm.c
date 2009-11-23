@@ -4890,7 +4890,7 @@ get_partition(char *device)
 #ifdef i386
 	ext_part_t *epp;
 	uint32_t secnum, numsec;
-	int rval, pno;
+	int rval, pno, ext_partno = -1;
 #endif
 
 	/* form whole disk (p0) */
@@ -4943,15 +4943,6 @@ get_partition(char *device)
 				partno = i;
 				break;
 			}
-#ifdef i386
-		} else if (fdisk_is_dos_extended(part->systid)) {
-			rval = fdisk_get_solaris_part(epp, &pno, &secnum,
-			    &numsec);
-			if (rval == FDISK_SUCCESS) {
-				partno = pno - 1;
-				break;
-			}
-#endif
 		} else {	/* look for solaris partition, old and new */
 #ifdef i386
 			if ((part->systid == SUNIXOS &&
@@ -4964,9 +4955,21 @@ get_partition(char *device)
 				partno = i;
 				break;
 			}
+
+#ifdef i386
+			if (fdisk_is_dos_extended(part->systid))
+				ext_partno = i;
+#endif
 		}
 	}
 #ifdef i386
+	/* If no primary solaris partition, check extended partition */
+	if ((partno == -1) && (ext_partno != -1)) {
+		rval = fdisk_get_solaris_part(epp, &pno, &secnum, &numsec);
+		if (rval == FDISK_SUCCESS) {
+			partno = pno - 1;
+		}
+	}
 	libfdisk_fini(&epp);
 #endif
 	return (partno);
