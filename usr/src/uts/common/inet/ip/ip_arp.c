@@ -99,7 +99,7 @@ static arl_t *ill_to_arl(ill_t *);
 boolean_t arp_no_defense;
 
 struct module_info arp_mod_info = {
-	IP_MOD_ID, "arpip", 1, INFPSZ, 65536, 1024
+	IP_MOD_ID, "arp", 1, INFPSZ, 65536, 1024
 };
 static struct qinit rinit_arp = {
 	(pfi_t)arp_rput, NULL, arp_open, arp_close, NULL, &arp_mod_info
