@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/errno.h>
@@ -992,12 +990,8 @@ bcopy(const void *from, void *to, size_t count)
 	bz,pt	%ncc, .bc_sm_exit
 	  stb	%o3, [%o1 + 1]
 	ldub	[%o0 + 2], %o3		! move final byte
-	stb	%o3, [%o1 + 2]
-	membar	#Sync				! sync error barrier
-	andn	%o4, TRAMP_FLAG, %o4
-	stn	%o4, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
-	retl
-	  mov	%g0, %o0		! return 0
+	ba,pt   %ncc, .bc_sm_exit
+	  stb	%o3, [%o1 + 2]
 	.align	16
 	nop				! instruction alignment
 					! see discussion at start of file
@@ -1027,12 +1021,8 @@ bcopy(const void *from, void *to, size_t count)
 	  nop
 .bc_sm_byte:
 	ldub	[%o0], %o3
-	stb	%o3, [%o1]
-	membar	#Sync				! sync error barrier
-	andn	%o4, TRAMP_FLAG, %o4
-	stn	%o4, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
-	retl
-	  mov	%g0, %o0		! return 0
+	ba,pt   %ncc, .bc_sm_exit
+	  stb	%o3, [%o1]
 
 .bc_sm_word:
 	subcc	%o2, 4, %o2		! update count
@@ -1052,7 +1042,8 @@ bcopy(const void *from, void *to, size_t count)
 	ldub	[%o0 + 6], %o3		! load third byte
 	stb	%o3, [%o1 + 6]		! store third byte
 .bc_sm_exit:
-	brz,pt  %o4, .bc_sm_done
+	ldn     [THREAD_REG + T_LOFAULT], %o3
+	brz,pt  %o3, .bc_sm_done
 	  nop
 	membar	#Sync				! sync error barrier
 	andn	%o4, TRAMP_FLAG, %o4
