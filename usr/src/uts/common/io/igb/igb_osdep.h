@@ -69,7 +69,7 @@ extern "C" {
 #define	DEBUGOUT3(S, A, B, C)
 #endif
 
-#define	DEBUGFUNC(F)
+#define	DEBUGFUNC(f)
 
 #define	OS_DEP(hw)		((struct igb_osdep *)((hw)->back))
 

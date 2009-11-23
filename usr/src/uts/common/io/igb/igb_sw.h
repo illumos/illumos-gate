@@ -81,6 +81,7 @@ extern "C" {
 #define	IGB_INITIALIZED			0x01
 #define	IGB_STARTED			0x02
 #define	IGB_SUSPENDED			0x04
+#define	IGB_STALL			0x08
 
 #define	IGB_INTR_NONE			0
 #define	IGB_INTR_MSIX			1
@@ -114,10 +115,6 @@ extern "C" {
 
 #define	MAX_MTU				9000
 #define	MAX_RX_LIMIT_PER_INTR		4096
-#define	MAX_RX_INTR_DELAY		65535
-#define	MAX_RX_INTR_ABS_DELAY		65535
-#define	MAX_TX_INTR_DELAY		65535
-#define	MAX_TX_INTR_ABS_DELAY		65535
 
 #define	MAX_RX_COPY_THRESHOLD		9216
 #define	MAX_TX_COPY_THRESHOLD		9216
@@ -135,10 +132,7 @@ extern "C" {
 
 #define	MIN_MTU				ETHERMIN
 #define	MIN_RX_LIMIT_PER_INTR		16
-#define	MIN_RX_INTR_DELAY		0
-#define	MIN_RX_INTR_ABS_DELAY		0
-#define	MIN_TX_INTR_DELAY		0
-#define	MIN_TX_INTR_ABS_DELAY		0
+
 #define	MIN_RX_COPY_THRESHOLD		0
 #define	MIN_TX_COPY_THRESHOLD		0
 #define	MIN_TX_RECYCLE_THRESHOLD	MIN_NUM_TX_DESC
@@ -155,10 +149,7 @@ extern "C" {
 
 #define	DEFAULT_MTU			ETHERMTU
 #define	DEFAULT_RX_LIMIT_PER_INTR	256
-#define	DEFAULT_RX_INTR_DELAY		0
-#define	DEFAULT_RX_INTR_ABS_DELAY	0
-#define	DEFAULT_TX_INTR_DELAY		300
-#define	DEFAULT_TX_INTR_ABS_DELAY	0
+
 #define	DEFAULT_RX_COPY_THRESHOLD	128
 #define	DEFAULT_TX_COPY_THRESHOLD	512
 #define	DEFAULT_TX_RECYCLE_THRESHOLD	(MAX_COOKIE + 1)
@@ -834,8 +825,8 @@ void e1000_write_pci_cfg(struct e1000_hw *, uint32_t, uint16_t *);
 void e1000_read_pci_cfg(struct e1000_hw *, uint32_t, uint16_t *);
 int32_t e1000_read_pcie_cap_reg(struct e1000_hw *, uint32_t, uint16_t *);
 int32_t e1000_write_pcie_cap_reg(struct e1000_hw *, uint32_t, uint16_t *);
-void e1000_rar_clear(struct e1000_hw *hw, uint32_t);
-void e1000_rar_set_vmdq(struct e1000_hw *hw, const uint8_t *, uint32_t,
+void e1000_rar_clear(struct e1000_hw *, uint32_t);
+void e1000_rar_set_vmdq(struct e1000_hw *, const uint8_t *, uint32_t,
     uint32_t, uint8_t);
 
 /*

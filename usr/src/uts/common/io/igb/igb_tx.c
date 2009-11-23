@@ -957,7 +957,7 @@ igb_tx_fill_ring(igb_tx_ring_t *tx_ring, link_list_t *pending_list,
 		    (mbsize - ctx->mac_hdr_len - ctx->ip_hdr_len
 		    - ctx->l4_hdr_len) << E1000_ADVTXD_PAYLEN_SHIFT;
 	} else {
-		if (hw->mac.type == e1000_82576) {
+		if (hw->mac.type >= e1000_82576) {
 			first_tbd->read.olinfo_status |=
 			    (mbsize << E1000_ADVTXD_PAYLEN_SHIFT);
 		}

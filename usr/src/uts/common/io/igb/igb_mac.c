@@ -26,7 +26,7 @@
  * Use is subject to license terms of the CDDL.
  */
 
-/* IntelVersion: 1.104 v2-9-8_2009-6-12 */
+/* IntelVersion: 1.108 scm_100809_154340 */
 
 #include "igb_api.h"
 
@@ -346,6 +346,10 @@ e1000_check_alt_mac_addr_generic(struct e1000_hw *hw)
 
 	if (hw->bus.func == E1000_FUNC_1)
 		nvm_alt_mac_addr_offset += E1000_ALT_MAC_ADDRESS_OFFSET_LAN1;
+	if (hw->bus.func == E1000_FUNC_2)
+		nvm_alt_mac_addr_offset += E1000_ALT_MAC_ADDRESS_OFFSET_LAN2;
+	if (hw->bus.func == E1000_FUNC_3)
+		nvm_alt_mac_addr_offset += E1000_ALT_MAC_ADDRESS_OFFSET_LAN3;
 	for (i = 0; i < ETH_ADDR_LEN; i += 2) {
 		offset = nvm_alt_mac_addr_offset + (i >> 1);
 		ret_val = hw->nvm.ops.read(hw, offset, 1, &nvm_data);
@@ -2074,7 +2078,7 @@ e1000_update_adaptive_generic(struct e1000_hw *hw)
  * Verify that when not using auto-negotiation that MDI/MDIx is correctly
  * set, which is forced to MDI mode only.
  */
-s32
+static s32
 e1000_validate_mdi_setting_generic(struct e1000_hw *hw)
 {
 	s32 ret_val = E1000_SUCCESS;

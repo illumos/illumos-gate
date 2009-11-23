@@ -26,7 +26,7 @@
  * Use is subject to license terms of the CDDL.
  */
 
-/* IntelVersion: 1.18 v2-9-8_2009-6-12 */
+/* IntelVersion: 1.18 scm_100809_154340 */
 
 #ifndef _IGB_NVM_H
 #define	_IGB_NVM_H

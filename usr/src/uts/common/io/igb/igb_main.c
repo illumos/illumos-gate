@@ -29,7 +29,7 @@
 #include "igb_sw.h"
 
 static char ident[] = "Intel 1Gb Ethernet";
-static char igb_version[] = "igb 1.1.8";
+static char igb_version[] = "igb 1.1.9";
 
 /*
  * Local function protoypes
@@ -74,6 +74,7 @@ static void igb_stop_watchdog_timer(igb_t *);
 static void igb_disable_adapter_interrupts(igb_t *);
 static void igb_enable_adapter_interrupts_82575(igb_t *);
 static void igb_enable_adapter_interrupts_82576(igb_t *);
+static void igb_enable_adapter_interrupts_82580(igb_t *);
 static boolean_t is_valid_mac_addr(uint8_t *);
 static boolean_t igb_stall_check(igb_t *);
 static boolean_t igb_set_loopback_mode(igb_t *, uint32_t);
@@ -91,6 +92,7 @@ static int igb_enable_intrs(igb_t *);
 static int igb_disable_intrs(igb_t *);
 static void igb_setup_msix_82575(igb_t *);
 static void igb_setup_msix_82576(igb_t *);
+static void igb_setup_msix_82580(igb_t *);
 static uint_t igb_intr_legacy(void *, void *);
 static uint_t igb_intr_msi(void *, void *);
 static uint_t igb_intr_rx(void *, void *);
@@ -224,6 +226,30 @@ static adapter_info_t igb_82576_cap = {
 	/* function pointers */
 	igb_enable_adapter_interrupts_82576,
 	igb_setup_msix_82576,
+
+	/* capabilities */
+	(IGB_FLAG_HAS_DCA |	/* capability flags */
+	IGB_FLAG_VMDQ_POOL |
+	IGB_FLAG_NEED_CTX_IDX),
+
+	0xffe00000		/* mask for RXDCTL register */
+};
+
+static adapter_info_t igb_82580_cap = {
+	/* limits */
+	8,		/* maximum number of rx queues */
+	1,		/* minimum number of rx queues */
+	4,		/* default number of rx queues */
+	8,		/* maximum number of tx queues */
+	1,		/* minimum number of tx queues */
+	4,		/* default number of tx queues */
+	65535,		/* maximum interrupt throttle rate */
+	0,		/* minimum interrupt throttle rate */
+	200,		/* default interrupt throttle rate */
+
+	/* function pointers */
+	igb_enable_adapter_interrupts_82580,
+	igb_setup_msix_82580,
 
 	/* capabilities */
 	(IGB_FLAG_HAS_DCA |	/* capability flags */
@@ -812,6 +838,9 @@ igb_identify_hardware(igb_t *igb)
 	case e1000_82576:
 		igb->capab = &igb_82576_cap;
 		break;
+	case e1000_82580:
+		igb->capab = &igb_82580_cap;
+		break;
 	default:
 		return (IGB_FAILURE);
 	}
@@ -1257,7 +1286,7 @@ igb_init_adapter(igb_t *igb)
 	hw->fc.pause_time = E1000_FC_PAUSE_TIME;
 	hw->fc.send_xon = B_TRUE;
 
-	e1000_validate_mdi_setting(hw);
+	(void) e1000_validate_mdi_setting(hw);
 
 	/*
 	 * Reset the chipset hardware the second time to put PBA settings
@@ -1915,31 +1944,15 @@ igb_setup_rx(igb_t *igb)
 	 * wakeup but leave this here for completeness.
 	 */
 	rctl &= ~(3 << E1000_RCTL_MO_SHIFT);
+	rctl &= ~(E1000_RCTL_LBM_TCVR | E1000_RCTL_LBM_MAC);
 
-	switch (hw->mac.type) {
-	case e1000_82575:
-		rctl |= (E1000_RCTL_EN |	/* Enable Receive Unit */
-		    E1000_RCTL_BAM |		/* Accept Broadcast Packets */
-		    E1000_RCTL_LPE |		/* Large Packet Enable */
-						/* Multicast filter offset */
-		    (hw->mac.mc_filter_type << E1000_RCTL_MO_SHIFT) |
-		    E1000_RCTL_RDMTS_HALF |	/* rx descriptor threshold */
-		    E1000_RCTL_SECRC);		/* Strip Ethernet CRC */
-		break;
-
-	case e1000_82576:
-		rctl |= (E1000_RCTL_EN |	/* Enable Receive Unit */
-		    E1000_RCTL_BAM |		/* Accept Broadcast Packets */
-		    E1000_RCTL_LPE |		/* Large Packet Enable */
-						/* Multicast filter offset */
-		    (hw->mac.mc_filter_type << E1000_RCTL_MO_SHIFT) |
-		    E1000_RCTL_SECRC);		/* Strip Ethernet CRC */
-		break;
-
-	default:
-		igb_log(igb, "unsupported MAC type: %d", hw->mac.type);
-		return;	/* should never come here; this will cause rx failure */
-	}
+	rctl |= (E1000_RCTL_EN |	/* Enable Receive Unit */
+	    E1000_RCTL_BAM |		/* Accept Broadcast Packets */
+	    E1000_RCTL_LPE |		/* Large Packet Enable */
+					/* Multicast filter offset */
+	    (hw->mac.mc_filter_type << E1000_RCTL_MO_SHIFT) |
+	    E1000_RCTL_RDMTS_HALF |	/* rx descriptor threshold */
+	    E1000_RCTL_SECRC);		/* Strip Ethernet CRC */
 
 	for (i = 0; i < igb->num_rx_groups; i++) {
 		rx_group = &igb->rx_groups[i];
@@ -2175,7 +2188,7 @@ igb_setup_rss(igb_t *igb)
 
 	/* Setup the Redirection Table */
 	if (hw->mac.type == e1000_82576) {
-		shift = 0;
+		shift = 3;
 	} else if (hw->mac.type == e1000_82575) {
 		shift = 6;
 	}
@@ -2683,10 +2696,10 @@ igb_get_conf(igb_t *igb)
 	igb->num_rx_groups = igb_get_prop(igb, PROP_RX_GROUP_NUM,
 	    MIN_RX_GROUP_NUM, MAX_RX_GROUP_NUM, DEFAULT_RX_GROUP_NUM);
 	/*
-	 * Currently we do not support VMDq for 82576.
+	 * Currently we do not support VMDq for 82576 and 82580.
 	 * If it is e1000_82576, set num_rx_groups to 1.
 	 */
-	if (hw->mac.type == e1000_82576)
+	if (hw->mac.type >= e1000_82576)
 		igb->num_rx_groups = 1;
 
 	if (igb->mr_enable) {
@@ -2998,8 +3011,8 @@ igb_link_check(igb_t *igb)
 /*
  * igb_local_timer - driver watchdog function
  *
- * This function will handle the transmit stall check, link status check and
- * other routines.
+ * This function will handle the hardware stall check, link status
+ * check and other routines.
  */
 static void
 igb_local_timer(void *arg)
@@ -3007,10 +3020,14 @@ igb_local_timer(void *arg)
 	igb_t *igb = (igb_t *)arg;
 	boolean_t link_changed = B_FALSE;
 
-	if (igb_stall_check(igb)) {
+	if (igb_stall_check(igb))
+		igb->igb_state |= IGB_STALL;
+
+	if (igb->igb_state & IGB_STALL) {
 		igb_fm_ereport(igb, DDI_FM_DEVICE_STALL);
 		ddi_fm_service_impact(igb->dip, DDI_SERVICE_LOST);
 		igb->reset_count++;
+		igb->igb_state &= ~IGB_STALL;
 		if (igb_reset(igb) == IGB_SUCCESS)
 			ddi_fm_service_impact(igb->dip,
 			    DDI_SERVICE_RESTORED);
@@ -3045,6 +3062,7 @@ static boolean_t
 igb_stall_check(igb_t *igb)
 {
 	igb_tx_ring_t *tx_ring;
+	struct e1000_hw *hw = &igb->hw;
 	boolean_t result;
 	int i;
 
@@ -3065,6 +3083,10 @@ igb_stall_check(igb_t *igb)
 
 		if (tx_ring->stall_watchdog >= STALL_WATCHDOG_TIMEOUT) {
 			result = B_TRUE;
+			if (hw->mac.type == e1000_82580) {
+				hw->dev_spec._82575.global_device_reset
+				    = B_TRUE;
+			}
 			break;
 		}
 	}
@@ -3302,6 +3324,38 @@ igb_disable_adapter_interrupts(igb_t *igb)
 		E1000_WRITE_REG(hw, E1000_EIAC, 0);
 		E1000_WRITE_REG(hw, E1000_EIAM, 0);
 	}
+
+	E1000_WRITE_FLUSH(hw);
+}
+
+/*
+ * igb_enable_adapter_interrupts_82580 - Enable NIC interrupts for 82580
+ */
+static void
+igb_enable_adapter_interrupts_82580(igb_t *igb)
+{
+	struct e1000_hw *hw = &igb->hw;
+
+	/* Clear any pending interrupts */
+	(void) E1000_READ_REG(hw, E1000_ICR);
+	igb->ims_mask |= E1000_IMS_DRSTA;
+
+	if (igb->intr_type == DDI_INTR_TYPE_MSIX) {
+
+		/* Interrupt enabling for MSI-X */
+		E1000_WRITE_REG(hw, E1000_EIMS, igb->eims_mask);
+		E1000_WRITE_REG(hw, E1000_EIAC, igb->eims_mask);
+		igb->ims_mask = (E1000_IMS_LSC | E1000_IMS_DRSTA);
+		E1000_WRITE_REG(hw, E1000_IMS, igb->ims_mask);
+	} else { /* Interrupt enabling for MSI and legacy */
+		E1000_WRITE_REG(hw, E1000_IVAR0, E1000_IVAR_VALID);
+		igb->ims_mask = IMS_ENABLE_MASK | E1000_IMS_TXQE;
+		igb->ims_mask |= E1000_IMS_DRSTA;
+		E1000_WRITE_REG(hw, E1000_IMS, igb->ims_mask);
+	}
+
+	/* Disable auto-mask for ICR interrupt bits */
+	E1000_WRITE_REG(hw, E1000_IAM, 0);
 
 	E1000_WRITE_FLUSH(hw);
 }
@@ -3816,6 +3870,11 @@ igb_intr_legacy(void *arg1, void *arg2)
 			igb_get_phy_state(igb);
 		}
 
+		if (icr & E1000_ICR_DRSTA) {
+			/* 82580 Full Device Reset needed */
+			igb->igb_state |= IGB_STALL;
+		}
+
 		result = DDI_INTR_CLAIMED;
 	} else {
 		/*
@@ -3878,6 +3937,11 @@ igb_intr_msi(void *arg1, void *arg2)
 
 	if (icr & E1000_ICR_LSC) {
 		igb_intr_link_work(igb);
+	}
+
+	if (icr & E1000_ICR_DRSTA) {
+		/* 82580 Full Device Reset needed */
+		igb->igb_state |= IGB_STALL;
 	}
 
 	return (DDI_INTR_CLAIMED);
@@ -3959,6 +4023,11 @@ igb_intr_tx_other(void *arg1, void *arg2)
 	 */
 	if (icr & E1000_ICR_DOUTSYNC) {
 		IGB_STAT(igb->dout_sync);
+	}
+
+	if (icr & E1000_ICR_DRSTA) {
+		/* 82580 Full Device Reset needed */
+		igb->igb_state |= IGB_STALL;
 	}
 
 	return (DDI_INTR_CLAIMED);
@@ -4477,6 +4546,96 @@ igb_setup_msix_82576(igb_t *igb)
 		vector ++;
 	}
 
+	ASSERT(vector == igb->intr_cnt);
+}
+
+/*
+ * igb_setup_msix_82580 - setup 82580 adapter to use MSI-X interrupts
+ *
+ * 82580 uses same table approach at 82576 but has fewer entries.  Each
+ * queue has a single entry in the table to which we write a vector number
+ * along with a "valid" bit.  Vectors take a different position in the
+ * register depending on * whether * they are numbered above or below 4.
+ */
+static void
+igb_setup_msix_82580(igb_t *igb)
+{
+	struct e1000_hw *hw = &igb->hw;
+	uint32_t ivar, index, vector;
+	int i;
+
+	/* must enable msi-x capability before IVAR settings */
+	E1000_WRITE_REG(hw, E1000_GPIE, (E1000_GPIE_MSIX_MODE |
+	    E1000_GPIE_PBA | E1000_GPIE_NSICR | E1000_GPIE_EIAME));
+	/*
+	 * Set vector for tx ring 0 and other causes.
+	 * NOTE assumption that it is vector 0.
+	 * This is also interdependent with installation of interrupt service
+	 * routines in igb_add_intr_handlers().
+	 */
+
+	/* assign "other" causes to vector 0 */
+	vector = 0;
+	ivar = ((vector | E1000_IVAR_VALID) << 8);
+	E1000_WRITE_REG(hw, E1000_IVAR_MISC, ivar);
+
+	/* assign tx ring 0 to vector 0 */
+	ivar = ((vector | E1000_IVAR_VALID) << 8);
+	E1000_WRITE_REG(hw, E1000_IVAR0, ivar);
+
+	/* prepare to enable tx & other interrupt causes */
+	igb->eims_mask = (1 << vector);
+
+	vector ++;
+
+	for (i = 0; i < igb->num_rx_rings; i++) {
+		/*
+		 * Set vector for each rx ring
+		 */
+		index = (i >> 1);
+		ivar = E1000_READ_REG_ARRAY(hw, E1000_IVAR0, index);
+
+		if (i & 1) {
+			/* vector goes into third byte of register */
+			ivar = ivar & 0xFF00FFFF;
+			ivar |= ((vector | E1000_IVAR_VALID) << 16);
+		} else {
+			/* vector goes into low byte of register */
+			ivar = ivar & 0xFFFFFF00;
+			ivar |= (vector | E1000_IVAR_VALID);
+		}
+		E1000_WRITE_REG_ARRAY(hw, E1000_IVAR0, index, ivar);
+
+		/* Accumulate interrupt-cause bits to enable */
+		igb->eims_mask |= (1 << vector);
+
+		vector ++;
+	}
+
+	for (i = 1; i < igb->num_tx_rings; i++) {
+		/*
+		 * Set vector for each tx ring from 2nd tx ring.
+		 * Note assumption that tx vectors numericall follow rx vectors.
+		 */
+		index = (i >> 1);
+		ivar = E1000_READ_REG_ARRAY(hw, E1000_IVAR0, index);
+
+		if (i & 1) {
+			/* vector goes into high byte of register */
+			ivar = ivar & 0x00FFFFFF;
+			ivar |= ((vector | E1000_IVAR_VALID) << 24);
+		} else {
+			/* vector goes into second byte of register */
+			ivar = ivar & 0xFFFF00FF;
+			ivar |= (vector | E1000_IVAR_VALID) << 8;
+		}
+		E1000_WRITE_REG_ARRAY(hw, E1000_IVAR0, index, ivar);
+
+		/* Accumulate interrupt-cause bits to enable */
+		igb->eims_mask |= (1 << vector);
+
+		vector ++;
+	}
 	ASSERT(vector == igb->intr_cnt);
 }
 

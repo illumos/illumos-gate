@@ -26,7 +26,7 @@
  * Use is subject to license terms of the CDDL.
  */
 
-/* IntelVersion: 1.122 v2-9-8_2009-6-12 */
+/* IntelVersion: 1.128 scm_100809_154340 */
 
 #include "igb_api.h"
 
@@ -139,8 +139,16 @@ e1000_set_mac_type(struct e1000_hw *hw)
 	case E1000_DEV_ID_82576_SERDES:
 	case E1000_DEV_ID_82576_QUAD_COPPER:
 	case E1000_DEV_ID_82576_NS:
+	case E1000_DEV_ID_82576_NS_SERDES:
 	case E1000_DEV_ID_82576_SERDES_QUAD:
 		mac->type = e1000_82576;
+		break;
+	case E1000_DEV_ID_82580_COPPER:
+	case E1000_DEV_ID_82580_FIBER:
+	case E1000_DEV_ID_82580_SERDES:
+	case E1000_DEV_ID_82580_SGMII:
+	case E1000_DEV_ID_82580_COPPER_DUAL:
+		mac->type = e1000_82580;
 		break;
 	default:
 		/* Should never have loaded on this device */
@@ -197,6 +205,7 @@ e1000_setup_init_funcs(struct e1000_hw *hw, bool init_device)
 	switch (hw->mac.type) {
 	case e1000_82575:
 	case e1000_82576:
+	case e1000_82580:
 		e1000_init_function_pointers_82575(hw);
 		break;
 	default:

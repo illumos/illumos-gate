@@ -26,7 +26,7 @@
  * Use is subject to license terms of the CDDL.
  */
 
-/* IntelVersion: 1.77 v2-9-8_2009-6-12 */
+/* IntelVersion: 1.85 scm_100809_154340 */
 
 #ifndef _IGB_82575_H
 #define	_IGB_82575_H
@@ -52,10 +52,14 @@ extern "C" {
  */
 #define	E1000_RAR_ENTRIES_82575		16
 #define	E1000_RAR_ENTRIES_82576		24
+#define	E1000_RAR_ENTRIES_82580		24
+#define	E1000_SW_SYNCH_MB		0x00000100
+#define	E1000_STAT_DEV_RST_SET		0x00100000
+#define	E1000_CTRL_DEV_RST		0x20000000
 
 #ifdef E1000_BIT_FIELDS
 struct e1000_adv_data_desc {
-	u64 buffer_addr;	/* Address of the descriptor's data buffer */
+	__le64 buffer_addr;	/* Address of the descriptor's data buffer */
 	union {
 		u32 data;
 		struct {
@@ -129,6 +133,7 @@ struct e1000_adv_context_desc {
 #define	E1000_SRRCTL_DESCTYPE_HDR_REPLICATION		0x06000000
 #define	E1000_SRRCTL_DESCTYPE_HDR_REPLICATION_LARGE_PKT	0x08000000
 #define	E1000_SRRCTL_DESCTYPE_MASK			0x0E000000
+#define	E1000_SRRCTL_TIMESTAMP				0x40000000
 #define	E1000_SRRCTL_DROP_EN				0x80000000
 
 #define	E1000_SRRCTL_BSIZEPKT_MASK	0x0000007F
@@ -143,6 +148,7 @@ struct e1000_adv_context_desc {
 #define	E1000_MRQC_RSS_FIELD_IPV4_UDP		0x00400000
 #define	E1000_MRQC_RSS_FIELD_IPV6_UDP		0x00800000
 #define	E1000_MRQC_RSS_FIELD_IPV6_UDP_EX	0x01000000
+#define	E1000_MRQC_ENABLE_RSS_8Q		0x00000002
 
 #define	E1000_VMRCTL_MIRROR_PORT_SHIFT		8
 #define	E1000_VMRCTL_MIRROR_DSTPORT_MASK (7 << E1000_VMRCTL_MIRROR_PORT_SHIFT)
@@ -186,32 +192,32 @@ struct e1000_adv_context_desc {
 /* Receive Descriptor - Advanced */
 union e1000_adv_rx_desc {
 	struct {
-		u64 pkt_addr;	/* Packet buffer address */
-		u64 hdr_addr;	/* Header buffer address */
+		__le64 pkt_addr;	/* Packet buffer address */
+		__le64 hdr_addr;	/* Header buffer address */
 	} read;
 	struct {
 		struct {
 			union {
-				u32 data;
+				__le32 data;
 				struct {
 					/* RSS type, Packet type */
-					u16 pkt_info;
+					__le16 pkt_info;
 					/* Split Header, header buffer length */
-					u16 hdr_info;
+					__le16 hdr_info;
 				} hs_rss;
 			} lo_dword;
 			union {
-				u32 rss;	/* RSS Hash */
+				__le32 rss;	/* RSS Hash */
 				struct {
-					u16 ip_id;	/* IP id */
-					u16 csum;	/* Packet Checksum */
+					__le16 ip_id;	/* IP id */
+					__le16 csum;	/* Packet Checksum */
 				} csum_ip;
 			} hi_dword;
 		} lower;
 		struct {
-			u32 status_error;	/* ext status/error */
-			u16 length;		/* Packet length */
-			u16 vlan;		/* VLAN tag */
+			__le32 status_error;	/* ext status/error */
+			__le16 length;		/* Packet length */
+			__le16 vlan;		/* VLAN tag */
 		} upper;
 	} wb;		/* writeback */
 };
@@ -222,6 +228,8 @@ union e1000_adv_rx_desc {
 #define	E1000_RXDADV_HDRBUFLEN_SHIFT	5
 #define	E1000_RXDADV_SPLITHEADER_EN	0x00001000
 #define	E1000_RXDADV_SPH		0x8000
+#define	E1000_RXDADV_STAT_TS		0x10000 /* Pkt was time stamped */
+#define	E1000_RXDADV_STAT_TSIP		0x08000 /* timestamp in packet */
 #define	E1000_RXDADV_ERR_HBO		0x00800000
 
 /* RSS Hash results */
@@ -271,14 +279,14 @@ union e1000_adv_rx_desc {
 /* Transmit Descriptor - Advanced */
 union e1000_adv_tx_desc {
 	struct {
-		u64 buffer_addr;	/* Address of descriptor's data buf */
-		u32 cmd_type_len;
-		u32 olinfo_status;
+		__le64 buffer_addr;	/* Address of descriptor's data buf */
+		__le32 cmd_type_len;
+		__le32 olinfo_status;
 	} read;
 	struct {
-		u64 rsvd;	/* Reserved */
-		u32 nxtseq_seed;
-		u32 status;
+		__le64 rsvd;	/* Reserved */
+		__le32 nxtseq_seed;
+		__le32 status;
 	} wb;
 };
 
@@ -306,10 +314,10 @@ union e1000_adv_tx_desc {
 
 /* Context descriptors */
 struct e1000_adv_tx_context_desc {
-	u32 vlan_macip_lens;
-	u32 seqnum_seed;
-	u32 type_tucmd_mlhl;
-	u32 mss_l4len_idx;
+	__le32 vlan_macip_lens;
+	__le32 seqnum_seed;
+	__le32 type_tucmd_mlhl;
+	__le32 mss_l4len_idx;
 };
 
 #define	E1000_ADVTXD_MACLEN_SHIFT	9 /* Adv ctxt desc mac len shift */
@@ -386,6 +394,14 @@ struct e1000_adv_tx_context_desc {
  */
 #define	E1000_ETQF_FILTER_EAPOL		0
 
+#define	E1000_FTQF_VF_BP		0x00008000
+#define	E1000_FTQF_1588_TIME_STAMP	0x08000000
+#define	E1000_FTQF_MASK			0xF0000000
+#define	E1000_FTQF_MASK_PROTO_BP	0x10000000
+#define	E1000_FTQF_MASK_SOURCE_ADDR_BP	0x20000000
+#define	E1000_FTQF_MASK_DEST_ADDR_BP	0x40000000
+#define	E1000_FTQF_MASK_SOURCE_PORT_BP	0x80000000
+
 #define	E1000_NVM_APME_82575		0x0400
 #define	MAX_NUM_VFS			8
 
@@ -432,11 +448,21 @@ struct e1000_adv_tx_context_desc {
 #define	E1000_IOVCTL_REUSE_VFQ	0x00000001
 
 #define	E1000_RPLOLR_STRVLAN	0x40000000
+#define	E1000_RPLOLR_STRCRC	0x80000000
+
+#define	E1000_DTXCTL_8023LL	0x0004
+#define	E1000_DTXCTL_VLAN_ADDED	0x0008
+#define	E1000_DTXCTL_OOS_ENABLE	0x0010
+#define	E1000_DTXCTL_MDP_EN	0x0020
+#define	E1000_DTXCTL_SPOOF_INT	0x0040
 
 #define	ALL_QUEUES		0xFFFF
 
+/* RX packet buffer size defines */
+#define	E1000_RXPBS_SIZE_MASK_82576	0x0000007F
 void e1000_vmdq_set_loopback_pf(struct e1000_hw *hw, bool enable);
 void e1000_vmdq_set_replication_pf(struct e1000_hw *hw, bool enable);
+u16 e1000_rxpbs_adjust_82580(u32 data);
 
 #ifdef __cplusplus
 }
