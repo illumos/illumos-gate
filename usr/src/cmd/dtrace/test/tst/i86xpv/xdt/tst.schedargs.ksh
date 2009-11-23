@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -56,7 +54,7 @@ script()
 	xdt:sched::yield
 	{
 		/* print domid vcpu pcpu probename */
-		printf("%d %d %d %s\n", arg1, arg2, arg0, probename);
+		printf("%d %d %d %s\n", arg0, arg1, `xdt_curpcpu, probename);
 	}
 EOF
 }
