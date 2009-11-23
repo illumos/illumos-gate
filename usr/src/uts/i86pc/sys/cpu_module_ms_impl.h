@@ -45,9 +45,9 @@ typedef uint32_t cms_api_ver_t;
 	(((v) & 0xfff00000) == _CMS_API_VERSION_MAGIC)
 #define	CMS_API_VERSION_TOPRINT(v) ((v) & 0x000fffff)
 
-#define	CMS_API_VERSION_0	_CMS_API_VERSION(0)
+#define	CMS_API_VERSION_1	_CMS_API_VERSION(1)
 
-#define	CMS_API_VERSION		CMS_API_VERSION_0
+#define	CMS_API_VERSION		CMS_API_VERSION_1
 
 typedef struct cms_ops {
 	int (*cms_init)(cmi_hdl_t, void **);

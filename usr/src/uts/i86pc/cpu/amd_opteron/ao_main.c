@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The CPU module for the AMD Athlon64 and Opteron processors
@@ -118,7 +116,7 @@ ao_ms_post_mpstartup(cmi_hdl_t hdl)
 	(void) ddi_install_driver("mc-amd");
 }
 
-cms_api_ver_t _cms_api_version = CMS_API_VERSION_0;
+cms_api_ver_t _cms_api_version = CMS_API_VERSION_1;
 
 const cms_ops_t _cms_ops = {
 	ao_ms_init,			/* cms_init */

@@ -550,7 +550,7 @@ gintel_bankctl_skipinit(cmi_hdl_t hdl, int banknum)
 		return (0);
 }
 
-cms_api_ver_t _cms_api_version = CMS_API_VERSION_0;
+cms_api_ver_t _cms_api_version = CMS_API_VERSION_1;
 
 const cms_ops_t _cms_ops = {
 	gintel_init,		/* cms_init */

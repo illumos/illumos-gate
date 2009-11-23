@@ -838,7 +838,7 @@ msgstr "Processor is not off-lined, as the memory controller on the CPU chip is 
 msgid "INTEL-8001-LA.impact"
 msgstr "No impact to the system in the presence of this fault."
 msgid "INTEL-8001-LA.action"
-msgstr "Please refer to the 'Details' section of the knowledge article for additional info."
+msgstr "Please refer to the 'Details' section of the knowledge article for the latest service procedures and policies for resolving this issue."
 #
 # code: INTEL-8001-MH
 # keys: fault.cpu.intel.quickpath.mem_controller_ue
@@ -854,7 +854,7 @@ msgstr "Processor is not off-lined, as the memory controller on the CPU chip is 
 msgid "INTEL-8001-MH.impact"
 msgstr "System may panic or be reset by BIOS."
 msgid "INTEL-8001-MH.action"
-msgstr "Please refer to the 'Details' section of the knowledge article for additional info."
+msgstr "Please refer to the 'Details' section of the knowledge article for the latest service procedures and policies for resolving this issue."
 #
 # code: INTEL-8001-ND
 # keys: fault.cpu.intel.quickpath.mem_link_ce
@@ -870,7 +870,7 @@ msgstr "Processor is not off-lined, as the memory controller on the CPU chip is 
 msgid "INTEL-8001-ND.impact"
 msgstr "No impact to the system in the presence of this fault."
 msgid "INTEL-8001-ND.action"
-msgstr "Please refer to the 'Details' section of the knowledge article for additional info."
+msgstr "Please refer to the 'Details' section of the knowledge article for the latest service procedures and policies for resolving this issue."
 #
 # code: INTEL-8001-PY
 # keys: fault.cpu.intel.quickpath.mem_link_ue
@@ -886,7 +886,7 @@ msgstr "Processor is not off-lined, as the memory controller on the CPU chip is 
 msgid "INTEL-8001-PY.impact"
 msgstr "System may panic or be reset by BIOS."
 msgid "INTEL-8001-PY.action"
-msgstr "Please refer to the 'Details' section of the knowledge article for additional info."
+msgstr "Please refer to the 'Details' section of the knowledge article for the latest service procedures and policies for resolving this issue."
 #
 # code: INTEL-8001-Q3
 # keys: fault.cpu.intel.quickpath.mem_failover_mir
@@ -902,7 +902,7 @@ msgstr "None"
 msgid "INTEL-8001-Q3.impact"
 msgstr "System will continue to run, but a loss of memory mirror capability."
 msgid "INTEL-8001-Q3.action"
-msgstr "Please refer to the 'Details' section of the knowledge article for additional info"
+msgstr "Please refer to the 'Details' section of the knowledge article for the latest service procedures and policies for resolving this issue."
 #
 # code: INTEL-8001-RC
 # keys: fault.cpu.intel.quickpath.mem_scrubbing
@@ -918,7 +918,7 @@ msgstr "A pair of pages on two different DIMM's will be retired."
 msgid "INTEL-8001-RC.impact"
 msgstr "No impact to the system in the presence of this fault."
 msgid "INTEL-8001-RC.action"
-msgstr "Please refer to the 'Details' section of the knowledge article for additional info"
+msgstr "Please refer to the 'Details' section of the knowledge article for the latest service procedures and policies for resolving this issue."
 #
 # code: INTEL-8001-SQ
 # keys: fault.cpu.intel.quickpath.llc_ewb
@@ -928,13 +928,13 @@ msgstr "Fault"
 msgid "INTEL-8001-SQ.severity"
 msgstr "Minor"
 msgid "INTEL-8001-SQ.description"
-msgstr "An uncorreactable LLC explicit writeback error has occurred.  Refer to %s for more information."
+msgstr "An uncorrectable LLC explicit writeback error has occurred.  Refer to %s for more information."
 msgid "INTEL-8001-SQ.response"
 msgstr "Page is retired, however the page will be unretired upon next reboot."
 msgid "INTEL-8001-SQ.impact"
 msgstr "No impact to the system in the presence of this fault."
 msgid "INTEL-8001-SQ.action"
-msgstr "Please refer to the 'Details' section of the knowledge article for additional info"
+msgstr "Please refer to the 'Details' section of the knowledge article for the latest service procedures and policies for resolving this issue."
 #
 # code: INTEL-8001-T4
 # keys: fault.cpu.intel.quickpath.home_agent
@@ -950,7 +950,7 @@ msgstr "None"
 msgid "INTEL-8001-T4.impact"
 msgstr "System will be reset upon fatal event or may continue to run when an uncorrectable event."
 msgid "INTEL-8001-T4.action"
-msgstr "Please refer to the 'Details' section of the knowledge article for additional info"
+msgstr "Please refer to the 'Details' section of the knowledge article for the latest service procedures and policies for resolving this issue."
 #
 # code: INTEL-8001-UR
 # keys: fault.cpu.intel.quickpath.sys_cfg
@@ -966,7 +966,7 @@ msgstr "None"
 msgid "INTEL-8001-UR.impact"
 msgstr "System will be reset upon fatal event or may continue to run when an uncorrectable event."
 msgid "INTEL-8001-UR.action"
-msgstr "Please refer to the 'Details' section of the knowledge article for additional info"
+msgstr "Please refer to the 'Details' section of the knowledge article for the latest service procedures and policies for resolving this issue."
 #
 # code: INTEL-8001-V2
 # keys: fault.cpu.intel.quickpath.system_cache
@@ -982,7 +982,7 @@ msgstr "None"
 msgid "INTEL-8001-V2.impact"
 msgstr "System will be reset upon fatal event or may continue to run when an uncorrectable event."
 msgid "INTEL-8001-V2.action"
-msgstr "Please refer to the 'Details' section of the knowledge article for additional info"
+msgstr "Please refer to the 'Details' section of the knowledge article for the latest service procedures and policies for resolving this issue."
 #
 # code: INTEL-8001-WX
 # keys: fault.cpu.intel.quickpath.bus_interconnect
@@ -998,7 +998,7 @@ msgstr "None"
 msgid "INTEL-8001-WX.impact"
 msgstr "System may panic, maybe reset by the BIOS, or may continue to run."
 msgid "INTEL-8001-WX.action"
-msgstr "Please refer to the 'Details' section of the knowledge article for additional info"
+msgstr "Please refer to the 'Details' section of the knowledge article for the latest service procedures and policies for resolving this issue."
 #
 # code: INTEL-8001-XE
 # keys: fault.cpu.intel.has_poison
@@ -1014,7 +1014,7 @@ msgstr "None"
 msgid "INTEL-8001-XE.impact"
 msgstr "No impact to the system in the presence of this fault."
 msgid "INTEL-8001-XE.action"
-msgstr "Please refer to the 'Details' section of the knowledge article for additional info"
+msgstr "Please refer to the 'Details' section of the knowledge article for the latest service procedures and policies for resolving this issue."
 #
 # code: INTEL-8001-YJ
 # keys: fault.cpu.intel.discard_fatal
@@ -1030,4 +1030,4 @@ msgstr "None"
 msgid "INTEL-8001-YJ.impact"
 msgstr "No impact to the system in the presence of this fault."
 msgid "INTEL-8001-YJ.action"
-msgstr "Please refer to the 'Details' section of the knowledge article for additional info"
+msgstr "Please refer to the 'Details' section of the knowledge article for the latest service procedures and policies for resolving this issue."

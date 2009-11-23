@@ -1103,7 +1103,7 @@ authamd_msrinject(cmi_hdl_t hdl, uint_t msr, uint64_t val)
 	return (rv);
 }
 
-cms_api_ver_t _cms_api_version = CMS_API_VERSION_0;
+cms_api_ver_t _cms_api_version = CMS_API_VERSION_1;
 
 const cms_ops_t _cms_ops = {
 	authamd_init,			/* cms_init */
