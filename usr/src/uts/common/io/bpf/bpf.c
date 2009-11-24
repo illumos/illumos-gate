@@ -386,7 +386,7 @@ bpf_detachd(struct bpf_d *d)
 	 */
 	mutex_enter(&d->bd_lock);
 	*d->bd_ifname = '\0';
-	memset(&d->bd_mac, 0, sizeof (d->bd_mac));
+	(void) memset(&d->bd_mac, 0, sizeof (d->bd_mac));
 }
 
 
