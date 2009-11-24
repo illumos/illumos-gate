@@ -1037,24 +1037,36 @@ kmem_read_magazines(kmem_cache_t *cp, uintptr_t addr, int ncpus,
 	/*
 	 * Now whip through the CPUs, snagging the loaded magazines
 	 * and full spares.
+	 *
+	 * In order to prevent inconsistent dumps, rounds and prounds
+	 * are copied aside before dumping begins.
 	 */
 	for (cpu = 0; cpu < ncpus; cpu++) {
 		kmem_cpu_cache_t *ccp = &cp->cache_cpu[cpu];
+		short rounds, prounds;
+
+		if (KMEM_DUMPCC(ccp)) {
+			rounds = ccp->cc_dump_rounds;
+			prounds = ccp->cc_dump_prounds;
+		} else {
+			rounds = ccp->cc_rounds;
+			prounds = ccp->cc_prounds;
+		}
 
 		dprintf(("reading cpu cache %p\n",
 		    (uintptr_t)ccp - (uintptr_t)cp + addr));
 
-		if (ccp->cc_rounds > 0 &&
+		if (rounds > 0 &&
 		    (kmp = ccp->cc_loaded) != NULL) {
-			dprintf(("reading %d loaded rounds\n", ccp->cc_rounds));
-			READMAG_ROUNDS(ccp->cc_rounds);
+			dprintf(("reading %d loaded rounds\n", rounds));
+			READMAG_ROUNDS(rounds);
 		}
 
-		if (ccp->cc_prounds > 0 &&
+		if (prounds > 0 &&
 		    (kmp = ccp->cc_ploaded) != NULL) {
 			dprintf(("reading %d previously loaded rounds\n",
-			    ccp->cc_prounds));
-			READMAG_ROUNDS(ccp->cc_prounds);
+			    prounds));
+			READMAG_ROUNDS(prounds);
 		}
 	}
 

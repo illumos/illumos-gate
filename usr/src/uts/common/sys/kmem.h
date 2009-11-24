@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +29,6 @@
 
 #ifndef _SYS_KMEM_H
 #define	_SYS_KMEM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/vmem.h>
@@ -58,6 +56,9 @@ extern void *kmem_alloc(size_t size, int kmflags);
 extern void *kmem_zalloc(size_t size, int kmflags);
 extern void kmem_free(void *buf, size_t size);
 extern void *kmem_alloc_tryhard(size_t size, size_t *alloc_size, int kmflags);
+extern void kmem_dump_init(size_t);
+extern void kmem_dump_begin(void);
+extern size_t kmem_dump_finish(char *buf, size_t size);
 
 #endif	/* _KERNEL */
 

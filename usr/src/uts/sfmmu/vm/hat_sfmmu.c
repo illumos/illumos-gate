@@ -1322,7 +1322,8 @@ hat_init(void)
 	    hat_memload_arena, KMC_NOHASH);
 
 	hat_memload1_arena = vmem_create("hat_memload1", NULL, 0, PAGESIZE,
-	    segkmem_alloc_permanent, segkmem_free, heap_arena, 0, VM_SLEEP);
+	    segkmem_alloc_permanent, segkmem_free, heap_arena, 0,
+	    VMC_DUMPSAFE | VM_SLEEP);
 
 	sfmmu1_cache = kmem_cache_create("sfmmu1_cache", HME1BLK_SZ,
 	    HMEBLK_ALIGN, sfmmu_hblkcache_constructor,

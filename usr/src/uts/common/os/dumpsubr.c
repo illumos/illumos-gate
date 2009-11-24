@@ -130,6 +130,10 @@ int		dump_check_used;	/* enable check for used pages */
 uint_t dump_ncpu_low = 4;	/* minimum config for parallel lzjb */
 uint_t dump_bzip2_level = 1;	/* bzip2 level (1-9) */
 
+/* tunables for pre-reserved heap */
+uint_t dump_kmem_permap = 1024;
+uint_t dump_kmem_pages = 8;
+
 /* Define multiple buffers per helper to avoid stalling */
 #define	NCBUF_PER_HELPER	2
 #define	NCMAP_PER_HELPER	4
@@ -656,6 +660,15 @@ dump_update_clevel()
 		new->maxvm = vmem_xalloc(heap_arena, new->maxvmsize,
 		    CBUF_MAPSIZE, 0, 0, NULL, NULL, VM_SLEEP);
 	}
+
+	/*
+	 * Reserve memory for kmem allocation calls made during crash
+	 * dump.  The hat layer allocates memory for each mapping
+	 * created, and the I/O path allocates buffers and data structs.
+	 * Add a few pages for safety.
+	 */
+	kmem_dump_init((new->ncmap * dump_kmem_permap) +
+	    (dump_kmem_pages * PAGESIZE));
 
 	/* set new config pointers */
 	*old = *new;
@@ -1475,6 +1488,11 @@ dump_messages(void)
  * will not work.
  */
 
+/*
+ * Copy pages, trapping ECC errors. Also, for robustness, trap data
+ * access in case something goes wrong in the hat layer and the
+ * mapping is broken.
+ */
 static int
 dump_pagecopy(void *src, void *dst)
 {
@@ -1485,13 +1503,20 @@ dump_pagecopy(void *src, void *dst)
 	volatile int ueoff = -1;
 	on_trap_data_t otd;
 
-	if (on_trap(&otd, OT_DATA_EC)) {
+	if (on_trap(&otd, OT_DATA_EC | OT_DATA_ACCESS)) {
 		if (ueoff == -1)
 			ueoff = w * sizeof (long);
+		/* report "bad ECC" or "bad address" */
 #ifdef _LP64
-		wdst[w++] = 0xbadecc00badecc;
+		if (otd.ot_trap & OT_DATA_EC)
+			wdst[w++] = 0x00badecc00badecc;
+		else
+			wdst[w++] = 0x00badadd00badadd;
 #else
-		wdst[w++] = 0xbadecc;
+		if (otd.ot_trap & OT_DATA_EC)
+			wdst[w++] = 0x00badecc;
+		else
+			wdst[w++] = 0x00badadd;
 #endif
 	}
 	while (w < ncopies) {
@@ -1715,8 +1740,8 @@ dumpsys_copy_page(helper_t *hp, int offset)
 	if (ueoff != -1) {
 		uint64_t pa = ptob(cp->pfn) + offset + ueoff;
 
-		dumpsys_errmsg(hp, "memory error at PA 0x%08x.%08x\n",
-		    (uint32_t)(pa >> 32), (uint32_t)pa);
+		dumpsys_errmsg(hp, "cpu %d: memory error at PA 0x%08x.%08x\n",
+		    CPU->cpu_id, (uint32_t)(pa >> 32), (uint32_t)pa);
 	}
 
 	/*
@@ -2343,6 +2368,9 @@ dumpsys_main_task(void *arg)
 				} else {
 					uprintf("%s", cp->buf);
 				}
+				/* wait for console output */
+				drv_usecwait(200000);
+				dump_timeleft = dump_timeout;
 			}
 			CQ_PUT(freebufq, cp, CBUF_FREEBUF);
 			break;
@@ -2471,6 +2499,8 @@ dumpsys(void)
 	cbuf_t *cp;
 	pid_t npids, pidx;
 	char *content;
+	char *buf;
+	size_t size;
 	int save_dump_clevel;
 	dumpmlw_t mlw;
 	dumpcsize_t datatag;
@@ -2714,6 +2744,8 @@ dumpsys(void)
 		}
 
 	} else {
+		if (panicstr)
+			kmem_dump_begin();
 		dumpcfg.helpers_wanted = dumpcfg.clevel > 0;
 		dumpsys_spinunlock(&dumpcfg.helper_lock);
 	}
@@ -2747,8 +2779,21 @@ dumpsys(void)
 	datatag = 0;
 	dumpvp_write(&datatag, sizeof (datatag));
 
-	/* compression info in data header */
 	bzero(&datahdr, sizeof (datahdr));
+
+	/* buffer for metrics */
+	buf = dumpcfg.cbuf[0].buf;
+	size = MIN(dumpcfg.cbuf[0].size, DUMP_OFFSET - sizeof (dumphdr_t) -
+	    sizeof (dumpdatahdr_t));
+
+	/* finish the kmem intercepts, collect kmem verbose info */
+	if (panicstr) {
+		datahdr.dump_metrics = kmem_dump_finish(buf, size);
+		buf += datahdr.dump_metrics;
+		size -= datahdr.dump_metrics;
+	}
+
+	/* compression info in data header */
 	datahdr.dump_datahdr_magic = DUMP_DATAHDR_MAGIC;
 	datahdr.dump_datahdr_version = DUMP_DATAHDR_VERSION;
 	datahdr.dump_maxcsize = CBUF_SIZE;
@@ -2757,9 +2802,7 @@ dumpsys(void)
 	datahdr.dump_clevel = dumpcfg.clevel;
 #ifdef COLLECT_METRICS
 	if (dump_metrics_on)
-		datahdr.dump_metrics = dumpsys_metrics(ds, dumpcfg.cbuf[0].buf,
-		    MIN(dumpcfg.cbuf[0].size, DUMP_OFFSET - sizeof (dumphdr_t) -
-		    sizeof (dumpdatahdr_t)));
+		datahdr.dump_metrics += dumpsys_metrics(ds, buf, size);
 #endif
 	datahdr.dump_data_csize = dumpvp_flush() - dumphdr->dump_data;
 

@@ -67,6 +67,9 @@ extern "C" {
 #define	KMF_HASH	0x00000200	/* cache has hash table */
 #define	KMF_RANDOMIZE	0x00000400	/* randomize other kmem_flags */
 
+#define	KMF_DUMPDIVERT	0x00001000	/* use alternate memory at dump time */
+#define	KMF_DUMPUNSAFE	0x00002000	/* flag caches used at dump time */
+
 #define	KMF_BUFTAG	(KMF_DEADBEEF | KMF_REDZONE)
 #define	KMF_TOUCH	(KMF_BUFTAG | KMF_LITE | KMF_CONTENTS)
 #define	KMF_RANDOM	(KMF_TOUCH | KMF_AUDIT | KMF_NOMAGAZINE)
@@ -171,6 +174,12 @@ typedef struct kmem_buftag_lite {
 	((kmem_slab_t *)P2END((uintptr_t)(buf), (cp)->cache_slabsize) - 1)
 
 /*
+ * Test for using alternate memory at dump time.
+ */
+#define	KMEM_DUMP(cp)		((cp)->cache_flags & KMF_DUMPDIVERT)
+#define	KMEM_DUMPCC(ccp)	((ccp)->cc_flags & KMF_DUMPDIVERT)
+
+/*
  * The "CPU" macro loads a cpu_t that refers to the cpu that the current
  * thread is running on at the time the macro is executed.  A context switch
  * may occur immediately after loading this data structure, leaving this
@@ -189,7 +198,7 @@ typedef struct kmem_buftag_lite {
  */
 
 #define	KMEM_CPU_CACHE(cp)						\
-	(kmem_cpu_cache_t *)((char *)(&cp->cache_cpu) + CPU->cpu_cache_offset)
+	((kmem_cpu_cache_t *)((char *)(&cp->cache_cpu) + CPU->cpu_cache_offset))
 
 #define	KMEM_MAGAZINE_VALID(cp, mp)	\
 	(((kmem_slab_t *)P2END((uintptr_t)(mp), PAGESIZE) - 1)->slab_cache == \
@@ -238,7 +247,7 @@ typedef struct kmem_magazine {
  * The magazine types for fast per-cpu allocation
  */
 typedef struct kmem_magtype {
-	int		mt_magsize;	/* magazine size (number of rounds) */
+	short		mt_magsize;	/* magazine size (number of rounds) */
 	int		mt_align;	/* magazine alignment */
 	size_t		mt_minbuf;	/* all smaller buffers qualify */
 	size_t		mt_maxbuf;	/* no larger buffers qualify */
@@ -247,7 +256,8 @@ typedef struct kmem_magtype {
 
 #define	KMEM_CPU_CACHE_SIZE	64	/* must be power of 2 */
 #define	KMEM_CPU_PAD		(KMEM_CPU_CACHE_SIZE - sizeof (kmutex_t) - \
-	2 * sizeof (uint64_t) - 2 * sizeof (void *) - 4 * sizeof (int))
+	2 * sizeof (uint64_t) - 2 * sizeof (void *) - sizeof (int) - \
+	5 * sizeof (short))
 #define	KMEM_CACHE_SIZE(ncpus)	\
 	((size_t)(&((kmem_cache_t *)0)->cache_cpu[ncpus]))
 
@@ -262,10 +272,12 @@ typedef struct kmem_cpu_cache {
 	uint64_t	cc_free;	/* frees to this cpu */
 	kmem_magazine_t	*cc_loaded;	/* the currently loaded magazine */
 	kmem_magazine_t	*cc_ploaded;	/* the previously loaded magazine */
-	int		cc_rounds;	/* number of objects in loaded mag */
-	int		cc_prounds;	/* number of objects in previous mag */
-	int		cc_magsize;	/* number of rounds in a full mag */
 	int		cc_flags;	/* CPU-local copy of cache_flags */
+	short		cc_rounds;	/* number of objects in loaded mag */
+	short		cc_prounds;	/* number of objects in previous mag */
+	short		cc_magsize;	/* number of rounds in a full mag */
+	short		cc_dump_rounds;	/* dump time copy of cc_rounds */
+	short		cc_dump_prounds; /* dump time copy of cc_prounds */
 	char		cc_pad[KMEM_CPU_PAD]; /* for nice alignment */
 } kmem_cpu_cache_t;
 
@@ -387,6 +399,8 @@ struct kmem_cache {
 	kmem_magtype_t	*cache_magtype;		/* magazine type */
 	kmem_maglist_t	cache_full;		/* full magazines */
 	kmem_maglist_t	cache_empty;		/* empty magazines */
+	void		*cache_dumpfreelist;	/* heap during crash dump */
+	void		*cache_dumplog;		/* log entry during dump */
 
 	/*
 	 * Per-CPU layer

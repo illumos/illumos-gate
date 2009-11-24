@@ -2160,10 +2160,19 @@ static datafmt_t vmemfmt[] = {
 static int
 kmastat_cpu_avail(uintptr_t addr, const kmem_cpu_cache_t *ccp, int *avail)
 {
-	if (ccp->cc_rounds > 0)
-		*avail += ccp->cc_rounds;
-	if (ccp->cc_prounds > 0)
-		*avail += ccp->cc_prounds;
+	short rounds, prounds;
+
+	if (KMEM_DUMPCC(ccp)) {
+		rounds = ccp->cc_dump_rounds;
+		prounds = ccp->cc_dump_prounds;
+	} else {
+		rounds = ccp->cc_rounds;
+		prounds = ccp->cc_prounds;
+	}
+	if (rounds > 0)
+		*avail += rounds;
+	if (prounds > 0)
+		*avail += prounds;
 
 	return (WALK_NEXT);
 }

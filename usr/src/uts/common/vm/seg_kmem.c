@@ -337,7 +337,7 @@ kernelheap_init(
 	 */
 	hat_memload_arena = vmem_create("hat_memload", NULL, 0, PAGESIZE,
 	    hat_memload_alloc, segkmem_free, heap_arena, 0,
-	    VM_SLEEP | VMC_POPULATOR);
+	    VM_SLEEP | VMC_POPULATOR | VMC_DUMPSAFE);
 }
 
 void

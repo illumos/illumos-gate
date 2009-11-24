@@ -2186,6 +2186,284 @@ kmem_cpu_reload(kmem_cpu_cache_t *ccp, kmem_magazine_t *mp, int rounds)
 }
 
 /*
+ * Intercept kmem alloc/free calls during crash dump in order to avoid
+ * changing kmem state while memory is being saved to the dump device.
+ * Otherwise, ::kmem_verify will report "corrupt buffers".  Note that
+ * there are no locks because only one CPU calls kmem during a crash
+ * dump. To enable this feature, first create the associated vmem
+ * arena with VMC_DUMPSAFE.
+ */
+static void *kmem_dump_start;	/* start of pre-reserved heap */
+static void *kmem_dump_end;	/* end of heap area */
+static void *kmem_dump_curr;	/* current free heap pointer */
+static size_t kmem_dump_size;	/* size of heap area */
+
+/* append to each buf created in the pre-reserved heap */
+typedef struct kmem_dumpctl {
+	void	*kdc_next;	/* cache dump free list linkage */
+} kmem_dumpctl_t;
+
+#define	KMEM_DUMPCTL(cp, buf)	\
+	((kmem_dumpctl_t *)P2ROUNDUP((uintptr_t)(buf) + (cp)->cache_bufsize, \
+	    sizeof (void *)))
+
+/* Keep some simple stats. */
+#define	KMEM_DUMP_LOGS	(100)
+
+typedef struct kmem_dump_log {
+	kmem_cache_t	*kdl_cache;
+	uint_t		kdl_allocs;		/* # of dump allocations */
+	uint_t		kdl_frees;		/* # of dump frees */
+	uint_t		kdl_alloc_fails;	/* # of allocation failures */
+	uint_t		kdl_free_nondump;	/* # of non-dump frees */
+	uint_t		kdl_unsafe;		/* cache was used, but unsafe */
+} kmem_dump_log_t;
+
+static kmem_dump_log_t *kmem_dump_log;
+static int kmem_dump_log_idx;
+
+#define	KDI_LOG(cp, stat) {						\
+	kmem_dump_log_t *kdl;						\
+	if ((kdl = (kmem_dump_log_t *)((cp)->cache_dumplog)) != NULL) {	\
+		kdl->stat++;						\
+	} else if (kmem_dump_log_idx < KMEM_DUMP_LOGS) {		\
+		kdl = &kmem_dump_log[kmem_dump_log_idx++];		\
+		kdl->stat++;						\
+		kdl->kdl_cache = (cp);					\
+		(cp)->cache_dumplog = kdl;				\
+	}								\
+}
+
+/* set non zero for full report */
+uint_t kmem_dump_verbose = 0;
+
+/* stats for overize heap */
+uint_t kmem_dump_oversize_allocs = 0;
+uint_t kmem_dump_oversize_max = 0;
+
+static void
+kmem_dumppr(char **pp, char *e, const char *format, ...)
+{
+	char *p = *pp;
+
+	if (p < e) {
+		int n;
+		va_list ap;
+
+		va_start(ap, format);
+		n = vsnprintf(p, e - p, format, ap);
+		va_end(ap);
+		*pp = p + n;
+	}
+}
+
+/*
+ * Called when dumpadm(1M) configures dump parameters.
+ */
+void
+kmem_dump_init(size_t size)
+{
+	if (kmem_dump_start != NULL)
+		kmem_free(kmem_dump_start, kmem_dump_size);
+
+	if (kmem_dump_log == NULL)
+		kmem_dump_log = (kmem_dump_log_t *)kmem_zalloc(KMEM_DUMP_LOGS *
+		    sizeof (kmem_dump_log_t), KM_SLEEP);
+
+	kmem_dump_start = kmem_alloc(size, KM_SLEEP);
+
+	if (kmem_dump_start != NULL) {
+		kmem_dump_size = size;
+		kmem_dump_curr = kmem_dump_start;
+		kmem_dump_end = (void *)((char *)kmem_dump_start + size);
+		copy_pattern(KMEM_UNINITIALIZED_PATTERN, kmem_dump_start, size);
+	} else {
+		kmem_dump_size = 0;
+		kmem_dump_curr = NULL;
+		kmem_dump_end = NULL;
+	}
+}
+
+/*
+ * Set flag for each kmem_cache_t if is safe to use alternate dump
+ * memory. Called just before panic crash dump starts. Set the flag
+ * for the calling CPU.
+ */
+void
+kmem_dump_begin(void)
+{
+	ASSERT(panicstr != NULL);
+	if (kmem_dump_start != NULL) {
+		kmem_cache_t *cp;
+
+		for (cp = list_head(&kmem_caches); cp != NULL;
+		    cp = list_next(&kmem_caches, cp)) {
+			kmem_cpu_cache_t *ccp = KMEM_CPU_CACHE(cp);
+
+			if (cp->cache_arena->vm_cflags & VMC_DUMPSAFE) {
+				cp->cache_flags |= KMF_DUMPDIVERT;
+				ccp->cc_flags |= KMF_DUMPDIVERT;
+				ccp->cc_dump_rounds = ccp->cc_rounds;
+				ccp->cc_dump_prounds = ccp->cc_prounds;
+				ccp->cc_rounds = ccp->cc_prounds = -1;
+			} else {
+				cp->cache_flags |= KMF_DUMPUNSAFE;
+				ccp->cc_flags |= KMF_DUMPUNSAFE;
+			}
+		}
+	}
+}
+
+/*
+ * finished dump intercept
+ * print any warnings on the console
+ * return verbose information to dumpsys() in the given buffer
+ */
+size_t
+kmem_dump_finish(char *buf, size_t size)
+{
+	int kdi_idx;
+	int kdi_end = kmem_dump_log_idx;
+	int percent = 0;
+	int header = 0;
+	int warn = 0;
+	size_t used;
+	kmem_cache_t *cp;
+	kmem_dump_log_t *kdl;
+	char *e = buf + size;
+	char *p = buf;
+
+	if (kmem_dump_size == 0 || kmem_dump_verbose == 0)
+		return (0);
+
+	used = (char *)kmem_dump_curr - (char *)kmem_dump_start;
+	percent = (used * 100) / kmem_dump_size;
+
+	kmem_dumppr(&p, e, "%% heap used,%d\n", percent);
+	kmem_dumppr(&p, e, "used bytes,%ld\n", used);
+	kmem_dumppr(&p, e, "heap size,%ld\n", kmem_dump_size);
+	kmem_dumppr(&p, e, "Oversize allocs,%d\n",
+	    kmem_dump_oversize_allocs);
+	kmem_dumppr(&p, e, "Oversize max size,%ld\n",
+	    kmem_dump_oversize_max);
+
+	for (kdi_idx = 0; kdi_idx < kdi_end; kdi_idx++) {
+		kdl = &kmem_dump_log[kdi_idx];
+		cp = kdl->kdl_cache;
+		if (cp == NULL)
+			break;
+		if (kdl->kdl_alloc_fails)
+			++warn;
+		if (header == 0) {
+			kmem_dumppr(&p, e,
+			    "Cache Name,Allocs,Frees,Alloc Fails,"
+			    "Nondump Frees,Unsafe Allocs/Frees\n");
+			header = 1;
+		}
+		kmem_dumppr(&p, e, "%s,%d,%d,%d,%d,%d\n",
+		    cp->cache_name, kdl->kdl_allocs, kdl->kdl_frees,
+		    kdl->kdl_alloc_fails, kdl->kdl_free_nondump,
+		    kdl->kdl_unsafe);
+	}
+
+	/* return buffer size used */
+	if (p < e)
+		bzero(p, e - p);
+	return (p - buf);
+}
+
+/*
+ * Allocate a constructed object from alternate dump memory.
+ */
+void *
+kmem_cache_alloc_dump(kmem_cache_t *cp, int kmflag)
+{
+	void *buf;
+	void *curr;
+	char *bufend;
+
+	/* return a constructed object */
+	if ((buf = cp->cache_dumpfreelist) != NULL) {
+		cp->cache_dumpfreelist = KMEM_DUMPCTL(cp, buf)->kdc_next;
+		KDI_LOG(cp, kdl_allocs);
+		return (buf);
+	}
+
+	/* create a new constructed object */
+	curr = kmem_dump_curr;
+	buf = (void *)P2ROUNDUP((uintptr_t)curr, cp->cache_align);
+	bufend = (char *)KMEM_DUMPCTL(cp, buf) + sizeof (kmem_dumpctl_t);
+
+	/* hat layer objects cannot cross a page boundary */
+	if (cp->cache_align < PAGESIZE) {
+		char *page = (char *)P2ROUNDUP((uintptr_t)buf, PAGESIZE);
+		if (bufend > page) {
+			bufend += page - (char *)buf;
+			buf = (void *)page;
+		}
+	}
+
+	/* fall back to normal alloc if reserved area is used up */
+	if (bufend > (char *)kmem_dump_end) {
+		kmem_dump_curr = kmem_dump_end;
+		KDI_LOG(cp, kdl_alloc_fails);
+		return (NULL);
+	}
+
+	/*
+	 * Must advance curr pointer before calling a constructor that
+	 * may also allocate memory.
+	 */
+	kmem_dump_curr = bufend;
+
+	/* run constructor */
+	if (cp->cache_constructor != NULL &&
+	    cp->cache_constructor(buf, cp->cache_private, kmflag)
+	    != 0) {
+#ifdef DEBUG
+		printf("name='%s' cache=0x%p: kmem cache constructor failed\n",
+		    cp->cache_name, (void *)cp);
+#endif
+		/* reset curr pointer iff no allocs were done */
+		if (kmem_dump_curr == bufend)
+			kmem_dump_curr = curr;
+
+		/* fall back to normal alloc if the constructor fails */
+		KDI_LOG(cp, kdl_alloc_fails);
+		return (NULL);
+	}
+
+	KDI_LOG(cp, kdl_allocs);
+	return (buf);
+}
+
+/*
+ * Free a constructed object in alternate dump memory.
+ */
+int
+kmem_cache_free_dump(kmem_cache_t *cp, void *buf)
+{
+	/* save constructed buffers for next time */
+	if ((char *)buf >= (char *)kmem_dump_start &&
+	    (char *)buf < (char *)kmem_dump_end) {
+		KMEM_DUMPCTL(cp, buf)->kdc_next = cp->cache_dumpfreelist;
+		cp->cache_dumpfreelist = buf;
+		KDI_LOG(cp, kdl_frees);
+		return (0);
+	}
+
+	/* count all non-dump buf frees */
+	KDI_LOG(cp, kdl_free_nondump);
+
+	/* just drop buffers that were allocated before dump started */
+	if (kmem_dump_curr < kmem_dump_end)
+		return (0);
+
+	/* fall back to normal free if reserved area is used up */
+	return (1);
+}
+
+/*
  * Allocate a constructed object from cache cp.
  */
 void *
@@ -2205,13 +2483,20 @@ kmem_cache_alloc(kmem_cache_t *cp, int kmflag)
 			buf = ccp->cc_loaded->mag_round[--ccp->cc_rounds];
 			ccp->cc_alloc++;
 			mutex_exit(&ccp->cc_lock);
-			if ((ccp->cc_flags & KMF_BUFTAG) &&
-			    kmem_cache_alloc_debug(cp, buf, kmflag, 0,
-			    caller()) != 0) {
-				if (kmflag & KM_NOSLEEP)
-					return (NULL);
-				mutex_enter(&ccp->cc_lock);
-				continue;
+			if (ccp->cc_flags & (KMF_BUFTAG | KMF_DUMPUNSAFE)) {
+				if (ccp->cc_flags & KMF_DUMPUNSAFE) {
+					ASSERT(!(ccp->cc_flags &
+					    KMF_DUMPDIVERT));
+					KDI_LOG(cp, kdl_unsafe);
+				}
+				if ((ccp->cc_flags & KMF_BUFTAG) &&
+				    kmem_cache_alloc_debug(cp, buf, kmflag, 0,
+				    caller()) != 0) {
+					if (kmflag & KM_NOSLEEP)
+						return (NULL);
+					mutex_enter(&ccp->cc_lock);
+					continue;
+				}
 			}
 			return (buf);
 		}
@@ -2223,6 +2508,25 @@ kmem_cache_alloc(kmem_cache_t *cp, int kmflag)
 		if (ccp->cc_prounds > 0) {
 			kmem_cpu_reload(ccp, ccp->cc_ploaded, ccp->cc_prounds);
 			continue;
+		}
+
+		/*
+		 * Return an alternate buffer at dump time to preserve
+		 * the heap.
+		 */
+		if (ccp->cc_flags & (KMF_DUMPDIVERT | KMF_DUMPUNSAFE)) {
+			if (ccp->cc_flags & KMF_DUMPUNSAFE) {
+				ASSERT(!(ccp->cc_flags & KMF_DUMPDIVERT));
+				/* log it so that we can warn about it */
+				KDI_LOG(cp, kdl_unsafe);
+			} else {
+				if ((buf = kmem_cache_alloc_dump(cp, kmflag)) !=
+				    NULL) {
+					mutex_exit(&ccp->cc_lock);
+					return (buf);
+				}
+				break;		/* fall back to slab layer */
+			}
 		}
 
 		/*
@@ -2341,9 +2645,19 @@ kmem_cache_free(kmem_cache_t *cp, void *buf)
 	    (buf != cp->cache_defrag->kmd_from_buf &&
 	    buf != cp->cache_defrag->kmd_to_buf));
 
-	if (ccp->cc_flags & KMF_BUFTAG)
-		if (kmem_cache_free_debug(cp, buf, caller()) == -1)
+	if (ccp->cc_flags & (KMF_BUFTAG | KMF_DUMPDIVERT | KMF_DUMPUNSAFE)) {
+		if (ccp->cc_flags & KMF_DUMPUNSAFE) {
+			ASSERT(!(ccp->cc_flags & KMF_DUMPDIVERT));
+			/* log it so that we can warn about it */
+			KDI_LOG(cp, kdl_unsafe);
+		} else if (KMEM_DUMPCC(ccp) && !kmem_cache_free_dump(cp, buf)) {
 			return;
+		}
+		if (ccp->cc_flags & KMF_BUFTAG) {
+			if (kmem_cache_free_debug(cp, buf, caller()) == -1)
+				return;
+		}
+	}
 
 	mutex_enter(&ccp->cc_lock);
 	for (;;) {
@@ -2443,7 +2757,7 @@ kmem_zalloc(size_t size, int kmflag)
 		kmem_cache_t *cp = kmem_alloc_table[index];
 		buf = kmem_cache_alloc(cp, kmflag);
 		if (buf != NULL) {
-			if (cp->cache_flags & KMF_BUFTAG) {
+			if ((cp->cache_flags & KMF_BUFTAG) && !KMEM_DUMP(cp)) {
 				kmem_buftag_t *btp = KMEM_BUFTAG(cp, buf);
 				((uint8_t *)buf)[size] = KMEM_REDZONE_BYTE;
 				((uint32_t *)btp)[1] = KMEM_SIZE_ENCODE(size);
@@ -2488,11 +2802,17 @@ kmem_alloc(size_t size, int kmflag)
 		if (buf == NULL)
 			kmem_log_event(kmem_failure_log, NULL, NULL,
 			    (void *)size);
+		else if (KMEM_DUMP(kmem_slab_cache)) {
+			/* stats for dump intercept */
+			kmem_dump_oversize_allocs++;
+			if (size > kmem_dump_oversize_max)
+				kmem_dump_oversize_max = size;
+		}
 		return (buf);
 	}
 
 	buf = kmem_cache_alloc(cp, kmflag);
-	if ((cp->cache_flags & KMF_BUFTAG) && buf != NULL) {
+	if ((cp->cache_flags & KMF_BUFTAG) && !KMEM_DUMP(cp) && buf != NULL) {
 		kmem_buftag_t *btp = KMEM_BUFTAG(cp, buf);
 		((uint8_t *)buf)[size] = KMEM_REDZONE_BYTE;
 		((uint32_t *)btp)[1] = KMEM_SIZE_ENCODE(size);
@@ -2526,7 +2846,7 @@ kmem_free(void *buf, size_t size)
 		return;
 	}
 
-	if (cp->cache_flags & KMF_BUFTAG) {
+	if ((cp->cache_flags & KMF_BUFTAG) && !KMEM_DUMP(cp)) {
 		kmem_buftag_t *btp = KMEM_BUFTAG(cp, buf);
 		uint32_t *ip = (uint32_t *)btp;
 		if (ip[1] != KMEM_SIZE_ENCODE(size)) {
@@ -3788,12 +4108,12 @@ kmem_cache_init(int pass, int use_large_pages)
 			kmem_default_arena = vmem_xcreate("kmem_default",
 			    NULL, 0, PAGESIZE,
 			    segkmem_alloc_lp, segkmem_free_lp, kmem_va_arena,
-			    0, VM_SLEEP);
+			    0, VMC_DUMPSAFE | VM_SLEEP);
 		} else {
 			kmem_default_arena = vmem_create("kmem_default",
 			    NULL, 0, PAGESIZE,
 			    segkmem_alloc, segkmem_free, kmem_va_arena,
-			    0, VM_SLEEP);
+			    0, VMC_DUMPSAFE | VM_SLEEP);
 		}
 
 		/* Figure out what our maximum cache size is */
@@ -3886,7 +4206,7 @@ kmem_init(void)
 
 	kmem_msb_arena = vmem_create("kmem_msb", NULL, 0,
 	    PAGESIZE, segkmem_alloc, segkmem_free, kmem_metadata_arena, 0,
-	    VM_SLEEP);
+	    VMC_DUMPSAFE | VM_SLEEP);
 
 	kmem_cache_arena = vmem_create("kmem_cache", NULL, 0, KMEM_ALIGN,
 	    segkmem_alloc, segkmem_free, kmem_metadata_arena, 0, VM_SLEEP);
@@ -3903,7 +4223,8 @@ kmem_init(void)
 	    0, VM_SLEEP);
 
 	kmem_firewall_arena = vmem_create("kmem_firewall", NULL, 0, PAGESIZE,
-	    segkmem_alloc, segkmem_free, kmem_firewall_va_arena, 0, VM_SLEEP);
+	    segkmem_alloc, segkmem_free, kmem_firewall_va_arena, 0,
+	    VMC_DUMPSAFE | VM_SLEEP);
 
 	/* temporary oversize arena for mod_read_system_file */
 	kmem_oversize_arena = vmem_create("kmem_oversize", NULL, 0, PAGESIZE,
@@ -3968,12 +4289,13 @@ kmem_init(void)
 	    ((kmem_flags & KMF_LITE) || !(kmem_flags & KMF_DEBUG))) {
 		kmem_oversize_arena = vmem_xcreate("kmem_oversize", NULL, 0,
 		    PAGESIZE, segkmem_alloc_lp, segkmem_free_lp, heap_arena,
-		    0, VM_SLEEP);
+		    0, VMC_DUMPSAFE | VM_SLEEP);
 	} else {
 		kmem_oversize_arena = vmem_create("kmem_oversize",
 		    NULL, 0, PAGESIZE,
 		    segkmem_alloc, segkmem_free, kmem_minfirewall < ULONG_MAX?
-		    kmem_firewall_va_arena : heap_arena, 0, VM_SLEEP);
+		    kmem_firewall_va_arena : heap_arena, 0, VMC_DUMPSAFE |
+		    VM_SLEEP);
 	}
 
 	kmem_cache_init(2, use_large_pages);
