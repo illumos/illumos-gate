@@ -4707,7 +4707,7 @@ ibdm_ibnex_port_settle_wait(ib_guid_t hca_guid, int dft_wait)
 	mutex_enter(&ibdm.ibdm_hl_mutex);
 
 	while ((wait_time = ibdm_get_waittime(hca_guid, dft_wait)) > 0) {
-		delta = wait_time * drv_usectohz(wait_time * 1000000);
+		delta = drv_usectohz(wait_time * 1000000);
 		(void) cv_reltimedwait(&ibdm.ibdm_port_settle_cv,
 		    &ibdm.ibdm_hl_mutex, delta, TR_CLOCK_TICK);
 	}
