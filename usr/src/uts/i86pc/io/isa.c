@@ -641,8 +641,6 @@ is_pnpisa(dev_info_t *dip)
 	isa_regs_t *isa_regs;
 	int proplen, pnpisa;
 
-	if (ndi_dev_is_persistent_node(dip) == 0)
-		return (0);
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS, "reg",
 	    (caddr_t)&isa_regs, &proplen) != DDI_PROP_SUCCESS) {
 		return (0);
@@ -693,11 +691,13 @@ isa_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		return (DDI_SUCCESS);
 
 	case DDI_CTLOPS_SIDDEV:
+		if (ndi_dev_is_persistent_node(rdip))
+			return (DDI_SUCCESS);
 		/*
 		 * All ISA devices need to do confirming probes
 		 * unless they are PnP ISA.
 		 */
-		if (is_pnpisa(dip))
+		if (is_pnpisa(rdip))
 			return (DDI_SUCCESS);
 		else
 			return (DDI_FAILURE);
