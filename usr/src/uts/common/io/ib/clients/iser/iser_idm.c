@@ -1019,7 +1019,8 @@ iser_buf_tx_to_ini(idm_task_t *idt, idm_buf_t *idb)
 		ISER_LOG(CE_WARN, "iser_buf_tx_to_ini: failed "
 		    "iser_xfer_buf_to_ini: idt (0x%p) idb (0x%p)",
 		    (void *) idt, (void *) idb);
-		idm_status = IDM_STATUS_FAIL;
+		idm_buf_tx_to_ini_done(idt, idb, IDM_STATUS_ABORTED);
+		return (IDM_STATUS_FAIL);
 	}
 
 	/*
@@ -1049,10 +1050,11 @@ iser_buf_rx_from_ini(idm_task_t *idt, idm_buf_t *idb)
 	iser_status = iser_xfer_buf_from_ini(idt, idb);
 
 	if (iser_status != ISER_STATUS_SUCCESS) {
-		ISER_LOG(CE_WARN, "iser_buf_tx_from_ini: failed "
-		    "iser_xfer_buf_to_ini: idt (0x%p) idb (0x%p)",
+		ISER_LOG(CE_WARN, "iser_buf_rx_from_ini: failed "
+		    "iser_xfer_buf_from_ini: idt (0x%p) idb (0x%p)",
 		    (void *) idt, (void *) idb);
-		idm_status = IDM_STATUS_FAIL;
+		idm_buf_rx_from_ini_done(idt, idb, IDM_STATUS_ABORTED);
+		return (IDM_STATUS_FAIL);
 	}
 
 	/*
