@@ -60,14 +60,7 @@ apic_irq_t	*apic_find_irq(dev_info_t *, struct intrspec *, int);
 int	apic_support_msi = 0;
 
 /* Multiple vector support for MSI */
-#if !defined(__xpv)
 int	apic_multi_msi_enable = 1;
-#else
-/*
- * Xen hypervisor does not seem to properly support multi-MSI
- */
-int	apic_multi_msi_enable = 0;
-#endif	/* __xpv */
 
 /* Multiple vector support for MSI-X */
 int	apic_msix_enable = 1;

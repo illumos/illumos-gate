@@ -1122,6 +1122,7 @@ xpv_psm_get_msi_vector(dev_info_t *dip, int type, int entry)
 			msi_data = pci_config_get16(handle,
 			    cap_ptr + PCI_MSI_32BIT_DATA);
 		}
+		vector = (msi_data & 0xff) + entry;
 	} else if (type == DDI_INTR_TYPE_MSIX) {
 		uintptr_t	off;
 		ddi_intr_msix_t	*msix_p = i_ddi_get_msix(dip);
@@ -1132,8 +1133,8 @@ xpv_psm_get_msi_vector(dev_info_t *dip, int type, int entry)
 
 		msi_data = ddi_get32(msix_p->msix_tbl_hdl,
 		    (uint32_t *)(off + PCI_MSIX_DATA_OFFSET));
+		vector = msi_data & 0xff;
 	}
-	vector = msi_data & 0xff;
 	return (vector);
 }
 
@@ -1223,18 +1224,18 @@ apic_alloc_msi_vectors(dev_info_t *dip, int inum, int count, int pri,
 		 */
 		map_irq.domid = DOMID_SELF;
 		map_irq.type = MAP_PIRQ_TYPE_MSI;
-		map_irq.index = -1; /* hypervisor auto allocates vector */
+		map_irq.index = -rcount; /* hypervisor auto allocates vectors */
 		map_irq.pirq = -1;
 		map_irq.bus = busnum;
 		map_irq.devfn = devfn;
-		map_irq.entry_nr = 0;
+		map_irq.entry_nr = i;
 		map_irq.table_base = 0;
 		rc = HYPERVISOR_physdev_op(PHYSDEVOP_map_pirq, &map_irq);
 		irqno = map_irq.pirq;
 		if (rc < 0) {
 			mutex_exit(&airq_mutex);
 			cmn_err(CE_WARN, "map MSI irq failed err: %d", -rc);
-			return (0);
+			return (i);
 		}
 		if (irqno < 0) {
 			mutex_exit(&airq_mutex);
@@ -1243,14 +1244,16 @@ apic_alloc_msi_vectors(dev_info_t *dip, int inum, int count, int pri,
 			xen_support_msi = -1;
 			return (0);
 		}
-		if (msi_allocate_irq(irqno) < 0) {
-			mutex_exit(&airq_mutex);
-			return (0);
-		}
+
 		/*
 		 * Find out what vector the hypervisor assigned
 		 */
-		vector = xpv_psm_get_msi_vector(dip, DDI_INTR_TYPE_MSI, 0);
+		vector = xpv_psm_get_msi_vector(dip, DDI_INTR_TYPE_MSI, i);
+
+		if (msi_allocate_irq(irqno) < 0) {
+			mutex_exit(&airq_mutex);
+			return (i);
+		}
 		apic_max_device_irq = max(irqno, apic_max_device_irq);
 		apic_min_device_irq = min(irqno, apic_min_device_irq);
 		irqptr = apic_irq_table[irqno];
@@ -1359,7 +1362,7 @@ apic_alloc_msix_vectors(dev_info_t *dip, int inum, int count, int pri,
 		if (rc < 0) {
 			mutex_exit(&airq_mutex);
 			cmn_err(CE_WARN, "map MSI irq failed err: %d", -rc);
-			return (0);
+			return (i);
 		}
 		if (irqno < 0) {
 			mutex_exit(&airq_mutex);
@@ -1372,9 +1375,10 @@ apic_alloc_msix_vectors(dev_info_t *dip, int inum, int count, int pri,
 		 * Find out what vector the hypervisor assigned
 		 */
 		vector = xpv_psm_get_msi_vector(dip, DDI_INTR_TYPE_MSIX, i);
+
 		if (msi_allocate_irq(irqno) < 0) {
 			mutex_exit(&airq_mutex);
-			return (0);
+			return (i);
 		}
 		apic_vector_to_irq[vector] = (uchar_t)irqno;
 		msi_vector_to_pirq[vector] = (uchar_t)irqno;
