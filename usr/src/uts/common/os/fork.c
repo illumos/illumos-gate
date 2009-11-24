@@ -842,8 +842,6 @@ newproc(void (*pc)(), caddr_t arg, id_t cid, int pri, struct contract **ct,
 		task_t *tk, *tk_old;
 		klwp_t *lwp;
 
-		ASSERT(pid == 1);
-
 		if (getproc(&p, pid, GETPROC_USER) < 0)
 			return (EAGAIN);
 		/*
