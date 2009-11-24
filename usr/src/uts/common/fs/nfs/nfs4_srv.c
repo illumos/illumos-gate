@@ -6600,17 +6600,15 @@ rfs4_do_open(struct compound_state *cs, struct svc_req *req,
 	/* get the file struct and hold a lock on it during initial open */
 	fp = rfs4_findfile_withlock(cs->vp, &cs->fh, &fcreate);
 	if (fp == NULL) {
-		NFS4_DEBUG(rfs4_debug,
-		    (CE_NOTE, "rfs4_do_open: can't find file"));
-		resp->status = NFS4ERR_SERVERFAULT;
+		resp->status = NFS4ERR_RESOURCE;
+		DTRACE_PROBE1(nfss__e__do__open1, nfsstat4, resp->status);
 		return;
 	}
 
 	sp = rfs4_findstate_by_owner_file(oo, fp, &screate);
 	if (sp == NULL) {
-		NFS4_DEBUG(rfs4_debug,
-		    (CE_NOTE, "rfs4_do_open: can't find state"));
 		resp->status = NFS4ERR_RESOURCE;
+		DTRACE_PROBE1(nfss__e__do__open2, nfsstat4, resp->status);
 		/* No need to keep any reference */
 		rw_exit(&fp->rf_file_rwlock);
 		rfs4_file_rele(fp);
@@ -7002,17 +7000,15 @@ rfs4_do_opendelprev(struct compound_state *cs, struct svc_req *req,
 	/* get the file struct and hold a lock on it during initial open */
 	fp = rfs4_findfile_withlock(cs->vp, NULL, &create);
 	if (fp == NULL) {
-		NFS4_DEBUG(rfs4_debug,
-		    (CE_NOTE, "rfs4_do_opendelprev: can't find file"));
-		resp->status = NFS4ERR_SERVERFAULT;
+		resp->status = NFS4ERR_RESOURCE;
+		DTRACE_PROBE1(nfss__e__do_opendelprev1, nfsstat4, resp->status);
 		return;
 	}
 
 	sp = rfs4_findstate_by_owner_file(oo, fp, &create);
 	if (sp == NULL) {
-		NFS4_DEBUG(rfs4_debug,
-		    (CE_NOTE, "rfs4_do_opendelprev: can't find state"));
 		resp->status = NFS4ERR_SERVERFAULT;
+		DTRACE_PROBE1(nfss__e__do_opendelprev2, nfsstat4, resp->status);
 		rw_exit(&fp->rf_file_rwlock);
 		rfs4_file_rele(fp);
 		return;

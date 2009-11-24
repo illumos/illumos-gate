@@ -104,6 +104,9 @@ struct rfs4_table {
 	uint32_t	dbt_idxcnt;		/* # of indices in table */
 	uint32_t	dbt_maxcnt;		/* max # of indices */
 	uint32_t	dbt_ccnt;		/* # of creatable entries */
+	uint32_t	dbt_id_lwat;		/* lo wtrmrk; 50% ids in use */
+	uint32_t	dbt_id_hwat;		/* hi wtrmrk; 75% ids in use */
+	time_t		dbt_id_reap;		/* table's reap interval */
 	rfs4_index_t	*dbt_indices;		/* list of indices */
 	/* Given entry and data construct entry */
 	bool_t (*dbt_create)(rfs4_entry_t, void *data);
