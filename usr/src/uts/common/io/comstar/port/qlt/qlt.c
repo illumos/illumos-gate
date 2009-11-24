@@ -54,8 +54,10 @@
 
 static int qlt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static int qlt_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
-static fct_status_t qlt_reset_chip_and_download_fw(qlt_state_t *qlt,
-    int reset_only);
+static void qlt_enable_intr(qlt_state_t *);
+static void qlt_disable_intr(qlt_state_t *);
+static fct_status_t qlt_reset_chip(qlt_state_t *qlt);
+static fct_status_t qlt_download_fw(qlt_state_t *qlt);
 static fct_status_t qlt_load_risc_ram(qlt_state_t *qlt, uint32_t *host_addr,
     uint32_t word_count, uint32_t risc_addr);
 static fct_status_t qlt_raw_mailbox_command(qlt_state_t *qlt);
@@ -88,6 +90,7 @@ fct_status_t qlt_port_offline(qlt_state_t *qlt);
 static fct_status_t qlt_get_link_info(fct_local_port_t *port,
     fct_link_info_t *li);
 static void qlt_ctl(struct fct_local_port *port, int cmd, void *arg);
+static fct_status_t qlt_force_lip(qlt_state_t *);
 static fct_status_t qlt_do_flogi(struct fct_local_port *port,
 						fct_flogi_xchg_t *fx);
 void qlt_handle_atio_queue_update(qlt_state_t *qlt);
@@ -131,10 +134,8 @@ static int qlt_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 static int qlt_open(dev_t *devp, int flag, int otype, cred_t *credp);
 static int qlt_close(dev_t dev, int flag, int otype, cred_t *credp);
 
-#if defined(__sparc)
 static int qlt_setup_msi(qlt_state_t *qlt);
 static int qlt_setup_msix(qlt_state_t *qlt);
-#endif
 
 static int qlt_el_trace_desc_ctor(qlt_state_t *qlt);
 static int qlt_el_trace_desc_dtor(qlt_state_t *qlt);
@@ -145,15 +146,25 @@ static int qlt_read_int_prop(qlt_state_t *qlt, char *prop, int defval);
 static int qlt_read_string_prop(qlt_state_t *qlt, char *prop, char **prop_val);
 static int qlt_read_string_instance_prop(qlt_state_t *qlt, char *prop,
     char **prop_val);
+static int qlt_read_int_instance_prop(qlt_state_t *, char *, int);
 static int qlt_convert_string_to_ull(char *prop, int radix,
     u_longlong_t *result);
 static boolean_t qlt_wwn_overload_prop(qlt_state_t *qlt);
 static int qlt_quiesce(dev_info_t *dip);
+static fct_status_t qlt_raw_wrt_risc_ram_word(qlt_state_t *qlt, uint32_t,
+    uint32_t);
+static fct_status_t qlt_raw_rd_risc_ram_word(qlt_state_t *qlt, uint32_t,
+    uint32_t *);
+static void qlt_mps_reset(qlt_state_t *qlt);
+static void qlt_properties(qlt_state_t *qlt);
+
 
 #define	SETELSBIT(bmp, els)	(bmp)[((els) >> 3) & 0x1F] = \
 	(uint8_t)((bmp)[((els) >> 3) & 0x1F] | ((uint8_t)1) << ((els) & 7))
 
 int qlt_enable_msix = 0;
+int qlt_enable_msi = 1;
+
 
 string_table_t prop_status_tbl[] = DDI_PROP_STATUS();
 
@@ -321,7 +332,9 @@ qlt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    NULL) {
 		goto attach_fail_1;
 	}
+
 	qlt->instance = instance;
+
 	qlt->nvram = (qlt_nvram_t *)kmem_zalloc(sizeof (qlt_nvram_t), KM_SLEEP);
 	qlt->dip = dip;
 
@@ -330,7 +343,7 @@ qlt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto attach_fail_1;
 	}
 
-	EL(qlt, "instance=%d\n", instance);
+	EL(qlt, "instance=%d, ptr=%p\n", instance, (void *)qlt);
 
 	if (pci_config_setup(dip, &qlt->pcicfg_acc_handle) != DDI_SUCCESS) {
 		goto attach_fail_2;
@@ -379,9 +392,9 @@ qlt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    (unsigned long long)ret);
 		goto attach_fail_5;
 	}
-	if (qlt_wwn_overload_prop(qlt) == TRUE) {
-		EL(qlt, "wwnn overloaded.\n", instance);
-	}
+
+	qlt_properties(qlt);
+
 	if (ddi_dma_alloc_handle(dip, &qlt_queue_dma_attr, DDI_DMA_SLEEP,
 	    0, &qlt->queue_mem_dma_handle) != DDI_SUCCESS) {
 		goto attach_fail_5;
@@ -510,6 +523,8 @@ over_max_read_xfer_setting:;
 
 over_max_payload_setting:;
 
+	qlt_enable_intr(qlt);
+
 	if (qlt_port_start((caddr_t)qlt) != QLT_SUCCESS)
 		goto attach_fail_10;
 
@@ -566,8 +581,12 @@ qlt_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	    qlt->qlt_state_not_acked) {
 		return (DDI_FAILURE);
 	}
-	if (qlt_port_stop((caddr_t)qlt) != FCT_SUCCESS)
+	if (qlt_port_stop((caddr_t)qlt) != FCT_SUCCESS) {
 		return (DDI_FAILURE);
+	}
+
+	qlt_disable_intr(qlt);
+
 	ddi_remove_minor_node(dip, qlt->qlt_minor_name);
 	qlt_destroy_mutex(qlt);
 	qlt_release_intr(qlt);
@@ -601,19 +620,19 @@ qlt_quiesce(dev_info_t *dip)
 		return (DDI_SUCCESS);
 	}
 
-	REG_WR32(qlt, REG_HCCR, HCCR_CMD_CLEAR_HOST_TO_RISC_INTR);
+	REG_WR32(qlt, REG_HCCR, HCCR_CMD(CLEAR_HOST_TO_RISC_INTR));
 	REG_WR16(qlt, REG_MBOX0, MBC_STOP_FIRMWARE);
-	REG_WR32(qlt, REG_HCCR, HCCR_CMD_SET_HOST_TO_RISC_INTR);
+	REG_WR32(qlt, REG_HCCR, HCCR_CMD(SET_HOST_TO_RISC_INTR));
 	for (timer = 0; timer < 30000; timer++) {
 		stat = REG_RD32(qlt, REG_RISC_STATUS);
 		if (stat & RISC_HOST_INTR_REQUEST) {
 			if ((stat & FW_INTR_STATUS_MASK) < 0x12) {
 				REG_WR32(qlt, REG_HCCR,
-				    HCCR_CMD_CLEAR_RISC_PAUSE);
+				    HCCR_CMD(CLEAR_RISC_PAUSE));
 				break;
 			}
 			REG_WR32(qlt, REG_HCCR,
-			    HCCR_CMD_CLEAR_HOST_TO_RISC_INTR);
+			    HCCR_CMD(CLEAR_HOST_TO_RISC_INTR));
 		}
 		drv_usecwait(100);
 	}
@@ -621,6 +640,8 @@ qlt_quiesce(dev_info_t *dip)
 	REG_WR32(qlt, REG_CTRL_STATUS, CHIP_SOFT_RESET | DMA_SHUTDOWN_CTRL |
 	    PCI_X_XFER_CTRL);
 	drv_usecwait(100);
+
+	qlt_disable_intr(qlt);
 
 	return (DDI_SUCCESS);
 }
@@ -635,6 +656,7 @@ qlt_enable_intr(qlt_state_t *qlt)
 		for (i = 0; i < qlt->intr_cnt; i++)
 			(void) ddi_intr_enable(qlt->htable[i]);
 	}
+	qlt->qlt_intr_enabled = 1;
 }
 
 static void
@@ -647,6 +669,7 @@ qlt_disable_intr(qlt_state_t *qlt)
 		for (i = 0; i < qlt->intr_cnt; i++)
 			(void) ddi_intr_disable(qlt->htable[i]);
 	}
+	qlt->qlt_intr_enabled = 0;
 }
 
 static void
@@ -691,7 +714,6 @@ qlt_destroy_mutex(qlt_state_t *qlt)
 }
 
 
-#if defined(__sparc)
 static int
 qlt_setup_msix(qlt_state_t *qlt)
 {
@@ -847,7 +869,6 @@ free_mem:
 	qlt_release_intr(qlt);
 	return (ret);
 }
-#endif
 
 static int
 qlt_setup_fixed(qlt_state_t *qlt)
@@ -904,19 +925,17 @@ free_mem:
 	return (ret);
 }
 
-
 static int
 qlt_setup_interrupts(qlt_state_t *qlt)
 {
-#if defined(__sparc)
 	int itypes = 0;
-#endif
 
 /*
- * x86 has a bug in the ddi_intr_block_enable/disable area (6562198). So use
- * MSI for sparc only for now.
+ * x86 has a bug in the ddi_intr_block_enable/disable area (6562198).
  */
-#if defined(__sparc)
+#ifndef __sparc
+	if (qlt_enable_msi != 0) {
+#endif
 	if (ddi_intr_get_supported_types(qlt->dip, &itypes) != DDI_SUCCESS) {
 		itypes = DDI_INTR_TYPE_FIXED;
 	}
@@ -925,9 +944,12 @@ qlt_setup_interrupts(qlt_state_t *qlt)
 		if (qlt_setup_msix(qlt) == DDI_SUCCESS)
 			return (DDI_SUCCESS);
 	}
+
 	if (itypes & DDI_INTR_TYPE_MSI) {
 		if (qlt_setup_msi(qlt) == DDI_SUCCESS)
 			return (DDI_SUCCESS);
+	}
+#ifndef __sparc
 	}
 #endif
 	return (qlt_setup_fixed(qlt));
@@ -1029,7 +1051,7 @@ qlt_info(uint32_t cmd, fct_local_port_t *port,
 		}
 
 		/* GET LINK STATUS count */
-		mcp->to_fw[0] = 0x6d;
+		mcp->to_fw[0] = MBC_GET_STATUS_COUNTS;
 		mcp->to_fw[8] = 156/4;
 		mcp->to_fw_mask |= BIT_1 | BIT_8;
 		mcp->from_fw_mask |= BIT_1 | BIT_2;
@@ -1093,7 +1115,6 @@ qlt_port_start(caddr_t arg)
 	 * state struct.
 	 */
 	port->port_fca_private = qlt;
-	port->port_fca_version = FCT_FCA_MODREV_1;
 	port->port_fca_abort_timeout = 5 * 1000;	/* 5 seconds */
 	bcopy(qlt->nvram->node_name, port->port_nwwn, 8);
 	bcopy(qlt->nvram->port_name, port->port_pwwn, 8);
@@ -1119,6 +1140,7 @@ qlt_port_start(caddr_t arg)
 	port->port_flogi_xchg = qlt_do_flogi;
 	port->port_populate_hba_details = qlt_populate_hba_fru_details;
 	port->port_info = qlt_info;
+	port->port_fca_version = FCT_FCA_MODREV_1;
 
 	if ((ret = fct_register_local_port(port)) != FCT_SUCCESS) {
 		EL(qlt, "fct_register_local_port status=%llxh\n", ret);
@@ -1166,7 +1188,7 @@ fct_status_t
 qlt_port_online(qlt_state_t *qlt)
 {
 	uint64_t	da;
-	int		instance;
+	int		instance, i;
 	fct_status_t	ret;
 	uint16_t	rcount;
 	caddr_t		icb;
@@ -1177,7 +1199,7 @@ qlt_port_online(qlt_state_t *qlt)
 
 	/* XXX Make sure a sane state */
 
-	if ((ret = qlt_reset_chip_and_download_fw(qlt, 0)) != QLT_SUCCESS) {
+	if ((ret = qlt_download_fw(qlt)) != QLT_SUCCESS) {
 		cmn_err(CE_NOTE, "reset chip failed %llx", (long long)ret);
 		return (ret);
 	}
@@ -1185,22 +1207,22 @@ qlt_port_online(qlt_state_t *qlt)
 	bzero(qlt->queue_mem_ptr, TOTAL_DMA_MEM_SIZE);
 
 	/* Get resource count */
-	REG_WR16(qlt, REG_MBOX(0), 0x42);
+	REG_WR16(qlt, REG_MBOX(0), MBC_GET_RESOURCE_COUNTS);
 	ret = qlt_raw_mailbox_command(qlt);
 	rcount = REG_RD16(qlt, REG_MBOX(3));
-	REG_WR32(qlt, REG_HCCR, HCCR_CMD_CLEAR_RISC_TO_PCI_INTR);
+	REG_WR32(qlt, REG_HCCR, HCCR_CMD(CLEAR_RISC_TO_PCI_INTR));
 	if (ret != QLT_SUCCESS) {
 		EL(qlt, "qlt_raw_mailbox_command=42h status=%llxh\n", ret);
 		return (ret);
 	}
 
 	/* Enable PUREX */
-	REG_WR16(qlt, REG_MBOX(0), 0x38);
-	REG_WR16(qlt, REG_MBOX(1), 0x0400);
+	REG_WR16(qlt, REG_MBOX(0), MBC_SET_ADDITIONAL_FIRMWARE_OPT);
+	REG_WR16(qlt, REG_MBOX(1), OPT_PUREX_ENABLE);
 	REG_WR16(qlt, REG_MBOX(2), 0x0);
 	REG_WR16(qlt, REG_MBOX(3), 0x0);
 	ret = qlt_raw_mailbox_command(qlt);
-	REG_WR32(qlt, REG_HCCR, HCCR_CMD_CLEAR_RISC_TO_PCI_INTR);
+	REG_WR32(qlt, REG_HCCR, HCCR_CMD(CLEAR_RISC_TO_PCI_INTR));
 	if (ret != QLT_SUCCESS) {
 		EL(qlt, "qlt_raw_mailbox_command=38h status=%llxh\n", ret);
 		cmn_err(CE_NOTE, "Enable PUREX failed");
@@ -1208,19 +1230,16 @@ qlt_port_online(qlt_state_t *qlt)
 	}
 
 	/* Pass ELS bitmap to fw */
-	REG_WR16(qlt, REG_MBOX(0), 0x59);
-	REG_WR16(qlt, REG_MBOX(1), 0x0500);
+	REG_WR16(qlt, REG_MBOX(0), MBC_SET_PARAMETERS);
+	REG_WR16(qlt, REG_MBOX(1), PARAM_TYPE(PUREX_ELS_CMDS));
 	elsbmp = (uint8_t *)qlt->queue_mem_ptr + MBOX_DMA_MEM_OFFSET;
 	bzero(elsbmp, 32);
 	da = qlt->queue_mem_cookie.dmac_laddress;
 	da += MBOX_DMA_MEM_OFFSET;
-	REG_WR16(qlt, REG_MBOX(3), da & 0xffff);
-	da >>= 16;
-	REG_WR16(qlt, REG_MBOX(2), da & 0xffff);
-	da >>= 16;
-	REG_WR16(qlt, REG_MBOX(7), da & 0xffff);
-	da >>= 16;
-	REG_WR16(qlt, REG_MBOX(6), da & 0xffff);
+	REG_WR16(qlt, REG_MBOX(3), LSW(LSD(da)));
+	REG_WR16(qlt, REG_MBOX(2), MSW(LSD(da)));
+	REG_WR16(qlt, REG_MBOX(7), LSW(MSD(da)));
+	REG_WR16(qlt, REG_MBOX(6), MSW(MSD(da)));
 	SETELSBIT(elsbmp, ELS_OP_PLOGI);
 	SETELSBIT(elsbmp, ELS_OP_LOGO);
 	SETELSBIT(elsbmp, ELS_OP_ABTX);
@@ -1236,7 +1255,7 @@ qlt_port_online(qlt_state_t *qlt)
 	(void) ddi_dma_sync(qlt->queue_mem_dma_handle, MBOX_DMA_MEM_OFFSET, 32,
 	    DDI_DMA_SYNC_FORDEV);
 	ret = qlt_raw_mailbox_command(qlt);
-	REG_WR32(qlt, REG_HCCR, HCCR_CMD_CLEAR_RISC_TO_PCI_INTR);
+	REG_WR32(qlt, REG_HCCR, HCCR_CMD(CLEAR_RISC_TO_PCI_INTR));
 	if (ret != QLT_SUCCESS) {
 		EL(qlt, "qlt_raw_mailbox_command=59h status=llxh\n", ret);
 		cmn_err(CE_NOTE, "Set ELS Bitmap failed ret=%llx, "
@@ -1361,13 +1380,10 @@ qlt_port_online(qlt_state_t *qlt)
 		bctl = (qlt_dmem_bctl_t *)mcp->dbuf->db_port_private;
 		da = bctl->bctl_dev_addr + 0x80; /* base addr of eicb (phys) */
 
-		mcp->to_fw[11] = (uint16_t)(da & 0xffff);
-		da >>= 16;
-		mcp->to_fw[10] = (uint16_t)(da & 0xffff);
-		da >>= 16;
-		mcp->to_fw[13] = (uint16_t)(da & 0xffff);
-		da >>= 16;
-		mcp->to_fw[12] = (uint16_t)(da & 0xffff);
+		mcp->to_fw[11] = LSW(LSD(da));
+		mcp->to_fw[10] = MSW(LSD(da));
+		mcp->to_fw[13] = LSW(MSD(da));
+		mcp->to_fw[12] = MSW(MSD(da));
 		mcp->to_fw[14] = (uint16_t)(sizeof (qlt_ext_icb_81xx_t) &
 		    0xffff);
 
@@ -1378,15 +1394,13 @@ qlt_port_online(qlt_state_t *qlt)
 	}
 
 	qlt_dmem_dma_sync(mcp->dbuf, DDI_DMA_SYNC_FORDEV);
-	mcp->to_fw[0] = 0x60;
+	mcp->to_fw[0] = MBC_INITIALIZE_FIRMWARE;
 
 	/*
 	 * This is the 1st command after adapter initialize which will
 	 * use interrupts and regular mailbox interface.
 	 */
 	qlt->mbox_io_state = MBOX_STATE_READY;
-	qlt_enable_intr(qlt);
-	qlt->qlt_intr_enabled = 1;
 	REG_WR32(qlt, REG_INTR_CTRL, ENABLE_RISC_INTR);
 	/* Issue mailbox to firmware */
 	ret = qlt_mailbox_command(qlt, mcp);
@@ -1426,6 +1440,13 @@ qlt_port_online(qlt_state_t *qlt)
 	}
 
 	qlt_free_mailbox_command(qlt, mcp);
+
+	for (i = 0; i < 5; i++) {
+		qlt->qlt_bufref[i] = 0;
+		qlt->qlt_nullbufref[i] = 0;
+	}
+	qlt->qlt_bumpbucket = 0;
+
 	if (ret != QLT_SUCCESS)
 		return (ret);
 	return (FCT_SUCCESS);
@@ -1458,10 +1479,8 @@ qlt_port_offline(qlt_state_t *qlt)
 	mutex_exit(&qlt->mbox_lock);
 poff_mbox_done:;
 	qlt->intr_sneak_counter = 10;
-	qlt_disable_intr(qlt);
 	mutex_enter(&qlt->intr_lock);
-	qlt->qlt_intr_enabled = 0;
-	(void) qlt_reset_chip_and_download_fw(qlt, 1);
+	(void) qlt_reset_chip(qlt);
 	drv_usecwait(20);
 	qlt->intr_sneak_counter = 0;
 	mutex_exit(&qlt->intr_lock);
@@ -1481,7 +1500,7 @@ qlt_get_link_info(fct_local_port_t *port, fct_link_info_t *li)
 	et = ddi_get_lbolt() + drv_usectohz(5000000);
 	mcp = qlt_alloc_mailbox_command(qlt, 0);
 link_info_retry:
-	mcp->to_fw[0] = 0x20;
+	mcp->to_fw[0] = MBC_GET_ID;
 	mcp->to_fw[9] = 0;
 	mcp->to_fw_mask |= BIT_0 | BIT_9;
 	mcp->from_fw_mask |= BIT_0 | BIT_1 | BIT_2 | BIT_3 | BIT_6 | BIT_7;
@@ -1533,7 +1552,7 @@ link_info_retry:
 
 	if ((fc_ret == FCT_SUCCESS) && (li->port_fca_flogi_done)) {
 		mcp = qlt_alloc_mailbox_command(qlt, 64);
-		mcp->to_fw[0] = 0x64;
+		mcp->to_fw[0] = MBC_GET_PORT_DATABASE;
 		mcp->to_fw[1] = 0x7FE;
 		mcp->to_fw[9] = 0;
 		mcp->to_fw[10] = 0;
@@ -1916,6 +1935,31 @@ qlt_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 	return (ret);
 }
 
+static fct_status_t
+qlt_force_lip(qlt_state_t *qlt)
+{
+	mbox_cmd_t	*mcp;
+	fct_status_t	 rval;
+
+	mcp = qlt_alloc_mailbox_command(qlt, 0);
+	mcp->to_fw[0] = 0x0072;
+	mcp->to_fw[1] = BIT_4;
+	mcp->to_fw[3] = 1;
+	mcp->to_fw_mask |= BIT_1 | BIT_3;
+	rval = qlt_mailbox_command(qlt, mcp);
+	if (rval != FCT_SUCCESS) {
+		EL(qlt, "qlt force lip MB failed: rval=%x", rval);
+	} else {
+		if (mcp->from_fw[0] != 0x4000) {
+			QLT_LOG(qlt->qlt_port_alias, "qlt FLIP: fw[0]=%x",
+			    mcp->from_fw[0]);
+			rval = FCT_FAILURE;
+		}
+	}
+	qlt_free_mailbox_command(qlt, mcp);
+	return (rval);
+}
+
 static void
 qlt_ctl(struct fct_local_port *port, int cmd, void *arg)
 {
@@ -1926,6 +1970,7 @@ qlt_ctl(struct fct_local_port *port, int cmd, void *arg)
 
 	ASSERT((cmd == FCT_CMD_PORT_ONLINE) ||
 	    (cmd == FCT_CMD_PORT_OFFLINE) ||
+	    (cmd == FCT_CMD_FORCE_LIP) ||
 	    (cmd == FCT_ACK_PORT_ONLINE_COMPLETE) ||
 	    (cmd == FCT_ACK_PORT_OFFLINE_COMPLETE));
 
@@ -2003,6 +2048,20 @@ qlt_ctl(struct fct_local_port *port, int cmd, void *arg)
 				    qlt->qlt_port_alias);
 			}
 		}
+		break;
+
+	case FCT_CMD_FORCE_LIP:
+		if (qlt->qlt_81xx_chip) {
+			EL(qlt, "force lip is an unsupported command "
+			    "for this adapter type\n");
+		} else {
+			*((fct_status_t *)arg) = qlt_force_lip(qlt);
+			EL(qlt, "forcelip done\n");
+		}
+		break;
+
+	default:
+		EL(qlt, "unsupport cmd - 0x%02X", cmd);
 		break;
 	}
 }
@@ -2141,13 +2200,11 @@ qlt_submit_preq_entries(qlt_state_t *qlt, uint32_t n)
  * - Returns 0 on success.
  */
 static fct_status_t
-qlt_reset_chip_and_download_fw(qlt_state_t *qlt, int reset_only)
+qlt_reset_chip(qlt_state_t *qlt)
 {
 	int cntr;
-	uint32_t start_addr;
-	fct_status_t ret;
 
-	EL(qlt, "initiated, flags=%xh\n", reset_only);
+	EL(qlt, "initiated\n");
 
 	/* XXX: Switch off LEDs */
 
@@ -2186,8 +2243,35 @@ qlt_reset_chip_and_download_fw(qlt_state_t *qlt, int reset_only)
 	}
 	/* Disable Interrupts (Probably not needed) */
 	REG_WR32(qlt, REG_INTR_CTRL, 0);
-	if (reset_only)
-		return (QLT_SUCCESS);
+
+	return (QLT_SUCCESS);
+}
+/*
+ * - Should not be called from Interrupt.
+ * - A very hardware specific function. Does not touch driver state.
+ * - Assumes that interrupts are disabled or not there.
+ * - Expects that the caller makes sure that all activity has stopped
+ *   and its ok now to go ahead and reset the chip. Also the caller
+ *   takes care of post reset damage control.
+ * - called by initialize adapter() and dump_fw(for reset only).
+ * - During attach() nothing much is happening and during initialize_adapter()
+ *   the function (caller) does all the housekeeping so that this function
+ *   can execute in peace.
+ * - Returns 0 on success.
+ */
+static fct_status_t
+qlt_download_fw(qlt_state_t *qlt)
+{
+	uint32_t start_addr;
+	fct_status_t ret;
+
+	EL(qlt, "initiated\n");
+
+	(void) qlt_reset_chip(qlt);
+
+	if (qlt->qlt_81xx_chip) {
+		qlt_mps_reset(qlt);
+	}
 
 	/* Load the two segments */
 	if (qlt->fw_code01 != NULL) {
@@ -2229,31 +2313,31 @@ qlt_reset_chip_and_download_fw(qlt_state_t *qlt, int reset_only)
 	}
 
 	/* Verify Checksum */
-	REG_WR16(qlt, REG_MBOX(0), 7);
-	REG_WR16(qlt, REG_MBOX(1), (start_addr >> 16) & 0xffff);
-	REG_WR16(qlt, REG_MBOX(2),  start_addr & 0xffff);
+	REG_WR16(qlt, REG_MBOX(0), MBC_VERIFY_CHECKSUM);
+	REG_WR16(qlt, REG_MBOX(1), MSW(start_addr));
+	REG_WR16(qlt, REG_MBOX(2), LSW(start_addr));
 	ret = qlt_raw_mailbox_command(qlt);
-	REG_WR32(qlt, REG_HCCR, HCCR_CMD_CLEAR_RISC_TO_PCI_INTR);
+	REG_WR32(qlt, REG_HCCR, HCCR_CMD(CLEAR_RISC_TO_PCI_INTR));
 	if (ret != QLT_SUCCESS) {
 		EL(qlt, "qlt_raw_mailbox_command=7h status=%llxh\n", ret);
 		return (ret);
 	}
 
 	/* Execute firmware */
-	REG_WR16(qlt, REG_MBOX(0), 2);
-	REG_WR16(qlt, REG_MBOX(1), (start_addr >> 16) & 0xffff);
-	REG_WR16(qlt, REG_MBOX(2),  start_addr & 0xffff);
+	REG_WR16(qlt, REG_MBOX(0), MBC_EXECUTE_FIRMWARE);
+	REG_WR16(qlt, REG_MBOX(1), MSW(start_addr));
+	REG_WR16(qlt, REG_MBOX(2), LSW(start_addr));
 	REG_WR16(qlt, REG_MBOX(3), 0);
 	REG_WR16(qlt, REG_MBOX(4), 1);	/* 25xx enable additional credits */
 	ret = qlt_raw_mailbox_command(qlt);
-	REG_WR32(qlt, REG_HCCR, HCCR_CMD_CLEAR_RISC_TO_PCI_INTR);
+	REG_WR32(qlt, REG_HCCR, HCCR_CMD(CLEAR_RISC_TO_PCI_INTR));
 	if (ret != QLT_SUCCESS) {
 		EL(qlt, "qlt_raw_mailbox_command=2h status=%llxh\n", ret);
 		return (ret);
 	}
 
 	/* Get revisions (About Firmware) */
-	REG_WR16(qlt, REG_MBOX(0), 8);
+	REG_WR16(qlt, REG_MBOX(0), MBC_ABOUT_FIRMWARE);
 	ret = qlt_raw_mailbox_command(qlt);
 	qlt->fw_major = REG_RD16(qlt, REG_MBOX(1));
 	qlt->fw_minor = REG_RD16(qlt, REG_MBOX(2));
@@ -2261,7 +2345,7 @@ qlt_reset_chip_and_download_fw(qlt_state_t *qlt, int reset_only)
 	qlt->fw_endaddrlo = REG_RD16(qlt, REG_MBOX(4));
 	qlt->fw_endaddrhi = REG_RD16(qlt, REG_MBOX(5));
 	qlt->fw_attr = REG_RD16(qlt, REG_MBOX(6));
-	REG_WR32(qlt, REG_HCCR, HCCR_CMD_CLEAR_RISC_TO_PCI_INTR);
+	REG_WR32(qlt, REG_HCCR, HCCR_CMD(CLEAR_RISC_TO_PCI_INTR));
 	if (ret != QLT_SUCCESS) {
 		EL(qlt, "qlt_raw_mailbox_command=8h status=%llxh\n", ret);
 		return (ret);
@@ -2271,7 +2355,7 @@ qlt_reset_chip_and_download_fw(qlt_state_t *qlt, int reset_only)
 }
 
 /*
- * Used only from qlt_reset_chip_and_download_fw().
+ * Used only from qlt_download_fw().
  */
 static fct_status_t
 qlt_load_risc_ram(qlt_state_t *qlt, uint32_t *host_addr,
@@ -2295,20 +2379,17 @@ qlt_load_risc_ram(qlt_state_t *qlt, uint32_t *host_addr,
 		(void) ddi_dma_sync(qlt->queue_mem_dma_handle, 0,
 		    words_being_sent << 2, DDI_DMA_SYNC_FORDEV);
 		da = qlt->queue_mem_cookie.dmac_laddress;
-		REG_WR16(qlt, REG_MBOX(0), 0x0B);
-		REG_WR16(qlt, REG_MBOX(1), risc_addr & 0xffff);
-		REG_WR16(qlt, REG_MBOX(8), ((cur_risc_addr >> 16) & 0xffff));
-		REG_WR16(qlt, REG_MBOX(3), da & 0xffff);
-		da >>= 16;
-		REG_WR16(qlt, REG_MBOX(2), da & 0xffff);
-		da >>= 16;
-		REG_WR16(qlt, REG_MBOX(7), da & 0xffff);
-		da >>= 16;
-		REG_WR16(qlt, REG_MBOX(6), da & 0xffff);
-		REG_WR16(qlt, REG_MBOX(5), words_being_sent & 0xffff);
-		REG_WR16(qlt, REG_MBOX(4), (words_being_sent >> 16) & 0xffff);
+		REG_WR16(qlt, REG_MBOX(0), MBC_LOAD_RAM_EXTENDED);
+		REG_WR16(qlt, REG_MBOX(1), LSW(risc_addr));
+		REG_WR16(qlt, REG_MBOX(8), MSW(cur_risc_addr));
+		REG_WR16(qlt, REG_MBOX(3), LSW(LSD(da)));
+		REG_WR16(qlt, REG_MBOX(2), MSW(LSD(da)));
+		REG_WR16(qlt, REG_MBOX(7), LSW(MSD(da)));
+		REG_WR16(qlt, REG_MBOX(6), MSW(MSD(da)));
+		REG_WR16(qlt, REG_MBOX(5), LSW(words_being_sent));
+		REG_WR16(qlt, REG_MBOX(4), MSW(words_being_sent));
 		ret = qlt_raw_mailbox_command(qlt);
-		REG_WR32(qlt, REG_HCCR, HCCR_CMD_CLEAR_RISC_TO_PCI_INTR);
+		REG_WR32(qlt, REG_HCCR, HCCR_CMD(CLEAR_RISC_TO_PCI_INTR));
 		if (ret != QLT_SUCCESS) {
 			EL(qlt, "qlt_raw_mailbox_command=0Bh status=%llxh\n",
 			    ret);
@@ -2335,21 +2416,26 @@ qlt_raw_mailbox_command(qlt_state_t *qlt)
 	int cntr = 0;
 	uint32_t status;
 
-	REG_WR32(qlt, REG_HCCR, HCCR_CMD_SET_HOST_TO_RISC_INTR);
-	while ((REG_RD32(qlt, REG_INTR_STATUS) & RISC_INTR_REQUEST) == 0) {
+	REG_WR32(qlt, REG_HCCR, HCCR_CMD(SET_HOST_TO_RISC_INTR));
+	while ((REG_RD32(qlt, REG_INTR_STATUS) & RISC_PCI_INTR_REQUEST) == 0) {
 		cntr++;
-		if (cntr == 100)
+		if (cntr == 100) {
 			return (QLT_MAILBOX_STUCK);
+		}
 		delay(drv_usectohz(10000));
 	}
-	status = (REG_RD32(qlt, REG_RISC_STATUS) & 0xff);
-	if ((status == 1) || (status == 2) ||
-	    (status == 0x10) || (status == 0x11)) {
+	status = (REG_RD32(qlt, REG_RISC_STATUS) & FW_INTR_STATUS_MASK);
+
+	if ((status == ROM_MBX_CMD_SUCCESSFUL) ||
+	    (status == ROM_MBX_CMD_NOT_SUCCESSFUL) ||
+	    (status == MBX_CMD_SUCCESSFUL) ||
+	    (status == MBX_CMD_NOT_SUCCESSFUL)) {
 		uint16_t mbox0 = REG_RD16(qlt, REG_MBOX(0));
-		if (mbox0 == 0x4000)
+		if (mbox0 == QLT_MBX_CMD_SUCCESS) {
 			return (QLT_SUCCESS);
-		else
+		} else {
 			return (QLT_MBOX_FAILED | mbox0);
+		}
 	}
 	/* This is unexpected, dump a message */
 	cmn_err(CE_WARN, "qlt(%d): Unexpect intr status %llx",
@@ -2378,13 +2464,10 @@ qlt_alloc_mailbox_command(qlt_state_t *qlt, uint32_t dma_size)
 		bctl = (qlt_dmem_bctl_t *)mcp->dbuf->db_port_private;
 		da = bctl->bctl_dev_addr;
 		/* This is the most common initialization of dma ptrs */
-		mcp->to_fw[3] = (uint16_t)(da & 0xffff);
-		da >>= 16;
-		mcp->to_fw[2] = (uint16_t)(da & 0xffff);
-		da >>= 16;
-		mcp->to_fw[7] = (uint16_t)(da & 0xffff);
-		da >>= 16;
-		mcp->to_fw[6] = (uint16_t)(da & 0xffff);
+		mcp->to_fw[3] = LSW(LSD(da));
+		mcp->to_fw[2] = MSW(LSD(da));
+		mcp->to_fw[7] = LSW(MSD(da));
+		mcp->to_fw[6] = MSW(MSD(da));
 		mcp->to_fw_mask |= BIT_2 | BIT_3 | BIT_7 | BIT_6;
 	}
 	mcp->to_fw_mask |= BIT_0;
@@ -2442,12 +2525,12 @@ qlt_mailbox_command(qlt_state_t *qlt, mbox_cmd_t *mcp)
 		if (mcp->to_fw_mask & ((uint32_t)1 << i))
 			REG_WR16(qlt, REG_MBOX(i), mcp->to_fw[i]);
 	}
-	REG_WR32(qlt, REG_HCCR, HCCR_CMD_SET_HOST_TO_RISC_INTR);
+	REG_WR32(qlt, REG_HCCR, HCCR_CMD(SET_HOST_TO_RISC_INTR));
 
 qlt_mbox_wait_loop:;
 	/* Wait for mailbox command completion */
-	if (cv_reltimedwait(&qlt->mbox_cv, &qlt->mbox_lock,
-	    drv_usectohz(MBOX_TIMEOUT), TR_CLOCK_TICK) < 0) {
+	if (cv_timedwait(&qlt->mbox_cv, &qlt->mbox_lock, ddi_get_lbolt()
+	    + drv_usectohz(MBOX_TIMEOUT)) < 0) {
 		(void) snprintf(info, 80, "qlt_mailbox_command: qlt-%p, "
 		    "cmd-0x%02X timed out", (void *)qlt, qlt->mcp->to_fw[0]);
 		info[79] = 0;
@@ -2478,7 +2561,7 @@ qlt_mbox_wait_loop:;
 	/* Mailboxes are already loaded by interrupt routine */
 	qlt->mbox_io_state = MBOX_STATE_READY;
 	mutex_exit(&qlt->mbox_lock);
-	if (mcp->from_fw[0] != 0x4000)
+	if (mcp->from_fw[0] != QLT_MBX_CMD_SUCCESS)
 		return (QLT_MBOX_FAILED | mcp->from_fw[0]);
 
 	return (QLT_SUCCESS);
@@ -2562,16 +2645,16 @@ intr_again:;
 	if (intr_type == 0x1D) {
 		qlt->atio_ndx_from_fw = (uint16_t)
 		    REG_RD32(qlt, REG_ATIO_IN_PTR);
-		REG_WR32(qlt, REG_HCCR, HCCR_CMD_CLEAR_RISC_TO_PCI_INTR);
+		REG_WR32(qlt, REG_HCCR, HCCR_CMD(CLEAR_RISC_TO_PCI_INTR));
 		qlt->resp_ndx_from_fw = risc_status >> 16;
 		qlt_handle_atio_queue_update(qlt);
 		qlt_handle_resp_queue_update(qlt);
 	} else if (intr_type == 0x1C) {
-		REG_WR32(qlt, REG_HCCR, HCCR_CMD_CLEAR_RISC_TO_PCI_INTR);
+		REG_WR32(qlt, REG_HCCR, HCCR_CMD(CLEAR_RISC_TO_PCI_INTR));
 		qlt->atio_ndx_from_fw = (uint16_t)(risc_status >> 16);
 		qlt_handle_atio_queue_update(qlt);
 	} else if (intr_type == 0x13) {
-		REG_WR32(qlt, REG_HCCR, HCCR_CMD_CLEAR_RISC_TO_PCI_INTR);
+		REG_WR32(qlt, REG_HCCR, HCCR_CMD(CLEAR_RISC_TO_PCI_INTR));
 		qlt->resp_ndx_from_fw = risc_status >> 16;
 		qlt_handle_resp_queue_update(qlt);
 	} else if (intr_type == 0x12) {
@@ -2583,13 +2666,12 @@ intr_again:;
 		uint16_t mbox5 = REG_RD16(qlt, REG_MBOX(5));
 		uint16_t mbox6 = REG_RD16(qlt, REG_MBOX(6));
 
-		REG_WR32(qlt, REG_HCCR, HCCR_CMD_CLEAR_RISC_TO_PCI_INTR);
+		REG_WR32(qlt, REG_HCCR, HCCR_CMD(CLEAR_RISC_TO_PCI_INTR));
 		stmf_trace(qlt->qlt_port_alias, "Async event %x mb1=%x mb2=%x,"
 		    " mb3=%x, mb5=%x, mb6=%x", code, mbox1, mbox2, mbox3,
 		    mbox5, mbox6);
-		cmn_err(CE_NOTE, "!qlt(%d): Async event %x mb1=%x mb2=%x,"
-		    " mb3=%x, mb5=%x, mb6=%x", qlt->instance, code, mbox1,
-		    mbox2, mbox3, mbox5, mbox6);
+		EL(qlt, "Async event %x mb1=%x mb2=%x, mb3=%x, mb5=%x, mb6=%x",
+		    code, mbox1, mbox2, mbox3, mbox5, mbox6);
 
 		if ((code == 0x8030) || (code == 0x8010) || (code == 0x8013)) {
 			if (qlt->qlt_link_up) {
@@ -2688,13 +2770,13 @@ intr_again:;
 			}
 			qlt->mbox_io_state = MBOX_STATE_CMD_DONE;
 		}
-		REG_WR32(qlt, REG_HCCR, HCCR_CMD_CLEAR_RISC_TO_PCI_INTR);
+		REG_WR32(qlt, REG_HCCR, HCCR_CMD(CLEAR_RISC_TO_PCI_INTR));
 		cv_broadcast(&qlt->mbox_cv);
 		mutex_exit(&qlt->mbox_lock);
 	} else {
 		cmn_err(CE_WARN, "qlt(%d): Unknown intr type 0x%x",
 		    qlt->instance, intr_type);
-		REG_WR32(qlt, REG_HCCR, HCCR_CMD_CLEAR_RISC_TO_PCI_INTR);
+		REG_WR32(qlt, REG_HCCR, HCCR_CMD(CLEAR_RISC_TO_PCI_INTR));
 	}
 
 	(void) REG_RD32(qlt, REG_HCCR);	/* PCI Posting */
@@ -2765,7 +2847,7 @@ qlt_read_nvram(qlt_state_t *qlt)
 	mutex_enter(&qlt_global_lock);
 
 	/* Pause RISC. */
-	REG_WR32(qlt, REG_HCCR, HCCR_CMD_SET_RISC_PAUSE);
+	REG_WR32(qlt, REG_HCCR, HCCR_CMD(SET_RISC_PAUSE));
 	(void) REG_RD32(qlt, REG_HCCR);	/* PCI Posting. */
 
 	/* Get NVRAM data and calculate checksum. */
@@ -2784,7 +2866,7 @@ qlt_read_nvram(qlt_state_t *qlt)
 	}
 
 	/* Release RISC Pause */
-	REG_WR32(qlt, REG_HCCR, HCCR_CMD_CLEAR_RISC_PAUSE);
+	REG_WR32(qlt, REG_HCCR, HCCR_CMD(CLEAR_RISC_PAUSE));
 	(void) REG_RD32(qlt, REG_HCCR);	/* PCI Posting. */
 
 	mutex_exit(&qlt_global_lock);
@@ -2984,7 +3066,7 @@ qlt_portid_to_handle(qlt_state_t *qlt, uint32_t id, uint16_t cmd_handle,
 	if (mcp == NULL) {
 		return (STMF_ALLOC_FAILURE);
 	}
-	mcp->to_fw[0] = 0x7C;	/* GET ID LIST */
+	mcp->to_fw[0] = MBC_GET_ID_LIST;
 	mcp->to_fw[8] = 2048 * 8;
 	mcp->to_fw[9] = 0;
 	mcp->to_fw_mask |= BIT_9 | BIT_8;
@@ -3147,9 +3229,9 @@ qlt_deregister_remote_port(fct_local_port_t *port, fct_remote_port_t *rp)
 	qlt->rp_id_in_dereg = rp->rp_id;
 	qlt_submit_preq_entries(qlt, 1);
 
-	dereg_req_timer = drv_usectohz(DEREG_RP_TIMEOUT);
-	if (cv_reltimedwait(&qlt->rp_dereg_cv, &qlt->preq_lock,
-	    dereg_req_timer, TR_CLOCK_TICK) > 0) {
+	dereg_req_timer = ddi_get_lbolt() + drv_usectohz(DEREG_RP_TIMEOUT);
+	if (cv_timedwait(&qlt->rp_dereg_cv,
+	    &qlt->preq_lock, dereg_req_timer) > 0) {
 		ret = qlt->rp_dereg_status;
 	} else {
 		ret = FCT_BUSY;
@@ -4874,14 +4956,13 @@ qlt_firmware_dump(fct_local_port_t *port, stmf_state_change_info_t *ssci)
 	 */
 	mutex_enter(&qlt->mbox_lock);
 	if (qlt->mbox_io_state != MBOX_STATE_UNKNOWN) {
-		clock_t timeout = drv_usectohz(1000000);
 		/*
 		 * Wait to grab the mailboxes
 		 */
 		for (retries = 0; (qlt->mbox_io_state != MBOX_STATE_READY) &&
 		    (qlt->mbox_io_state != MBOX_STATE_UNKNOWN); retries++) {
-			(void) cv_reltimedwait(&qlt->mbox_cv, &qlt->mbox_lock,
-			    timeout, TR_CLOCK_TICK);
+			(void) cv_timedwait(&qlt->mbox_cv, &qlt->mbox_lock,
+			    ddi_get_lbolt() + drv_usectohz(1000000));
 			if (retries > 5) {
 				mutex_exit(&qlt->mbox_lock);
 				EL(qlt, "can't drain out mailbox commands\n");
@@ -4896,7 +4977,7 @@ qlt_firmware_dump(fct_local_port_t *port, stmf_state_change_info_t *ssci)
 	/*
 	 * Pause the RISC processor
 	 */
-	REG_WR32(qlt, REG_HCCR, HCCR_CMD_SET_RISC_PAUSE);
+	REG_WR32(qlt, REG_HCCR, HCCR_CMD(SET_RISC_PAUSE));
 
 	/*
 	 * Wait for the RISC processor to pause
@@ -5421,10 +5502,8 @@ over_aseq_regs:;
 	}
 
 	qlt->intr_sneak_counter = 10;
-	qlt_disable_intr(qlt);
 	mutex_enter(&qlt->intr_lock);
-	qlt->qlt_intr_enabled = 0;
-	(void) qlt_reset_chip_and_download_fw(qlt, 1);
+	(void) qlt_reset_chip(qlt);
 	drv_usecwait(20);
 	qlt->intr_sneak_counter = 0;
 	mutex_exit(&qlt->intr_lock);
@@ -5637,35 +5716,26 @@ qlt_read_risc_ram(qlt_state_t *qlt, uint32_t addr, uint32_t words)
 	uint64_t	da;
 	fct_status_t	ret;
 
-	REG_WR16(qlt, REG_MBOX(0), 0xc);
+	REG_WR16(qlt, REG_MBOX(0), MBC_DUMP_RAM_EXTENDED);
 	da = qlt->queue_mem_cookie.dmac_laddress;
 	da += MBOX_DMA_MEM_OFFSET;
 
-	/*
-	 * System destination address
-	 */
-	REG_WR16(qlt, REG_MBOX(3), da & 0xffff);
-	da >>= 16;
-	REG_WR16(qlt, REG_MBOX(2), da & 0xffff);
-	da >>= 16;
-	REG_WR16(qlt, REG_MBOX(7), da & 0xffff);
-	da >>= 16;
-	REG_WR16(qlt, REG_MBOX(6), da & 0xffff);
+	/* System destination address */
+	REG_WR16(qlt, REG_MBOX(3), LSW(LSD(da)));
+	REG_WR16(qlt, REG_MBOX(2), MSW(LSD(da)));
+	REG_WR16(qlt, REG_MBOX(7), LSW(MSD(da)));
+	REG_WR16(qlt, REG_MBOX(6), MSW(MSD(da)));
 
-	/*
-	 * Length
-	 */
-	REG_WR16(qlt, REG_MBOX(5), words & 0xffff);
-	REG_WR16(qlt, REG_MBOX(4), ((words >> 16) & 0xffff));
+	/* Length */
+	REG_WR16(qlt, REG_MBOX(5), LSW(words));
+	REG_WR16(qlt, REG_MBOX(4), MSW(words));
 
-	/*
-	 * RISC source address
-	 */
-	REG_WR16(qlt, REG_MBOX(1), addr & 0xffff);
-	REG_WR16(qlt, REG_MBOX(8), ((addr >> 16) & 0xffff));
+	/* RISC source address */
+	REG_WR16(qlt, REG_MBOX(1), LSW(addr));
+	REG_WR16(qlt, REG_MBOX(8), MSW(addr));
 
 	ret = qlt_raw_mailbox_command(qlt);
-	REG_WR32(qlt, REG_HCCR, 0xA0000000);
+	REG_WR32(qlt, REG_HCCR, HCCR_CMD(CLEAR_RISC_TO_PCI_INTR));
 	if (ret == QLT_SUCCESS) {
 		(void) ddi_dma_sync(qlt->queue_mem_dma_handle,
 		    MBOX_DMA_MEM_OFFSET, words << 2, DDI_DMA_SYNC_FORCPU);
@@ -5861,6 +5931,10 @@ qlt_el_msg(qlt_state_t *qlt, const char *fn, int ce, ...)
 		mutex_exit(&qlt->el_trace_desc->mutex);
 	}
 
+	if (enable_extended_logging) {
+		cmn_err(ce, fmt);
+	}
+
 	va_end(vl);
 }
 
@@ -5924,7 +5998,7 @@ qlt_dump_el_trace_buffer(qlt_state_t *qlt)
 
 /*
  * qlt_validate_trace_desc
- *	 Ensures the extended logging trace descriptor is good
+ *	 Ensures the extended logging trace descriptor is good.
  *
  * Input:
  *	qlt:	adapter state pointer.
@@ -6000,6 +6074,26 @@ qlt_read_string_prop(qlt_state_t *qlt, char *prop, char **prop_val)
 {
 	return (ddi_prop_lookup_string(DDI_DEV_T_ANY, qlt->dip,
 	    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP, prop, prop_val));
+}
+
+static int
+qlt_read_int_instance_prop(qlt_state_t *qlt, char *prop, int defval)
+{
+	char		inst_prop[256];
+	int		val;
+
+	/*
+	 * Get adapter instance specific parameters. If the instance
+	 * specific parameter isn't there, try the global parameter.
+	 */
+
+	(void) sprintf(inst_prop, "hba%d-%s", qlt->instance, prop);
+
+	if ((val = qlt_read_int_prop(qlt, inst_prop, defval)) == defval) {
+		val = qlt_read_int_prop(qlt, prop, defval);
+	}
+
+	return (val);
 }
 
 static int
@@ -6108,5 +6202,148 @@ qlt_chg_endian(uint8_t buf[], size_t size)
 		buf[cnt1] = buf[cnt];
 		buf[cnt] = byte;
 		cnt1--;
+	}
+}
+
+/*
+ * ql_mps_reset
+ *	Reset MPS for FCoE functions.
+ *
+ * Input:
+ *	ha = virtual adapter state pointer.
+ *
+ * Context:
+ *	Kernel context.
+ */
+static void
+qlt_mps_reset(qlt_state_t *qlt)
+{
+	uint32_t	data, dctl = 1000;
+
+	do {
+		if (dctl-- == 0 || qlt_raw_wrt_risc_ram_word(qlt, 0x7c00, 1) !=
+		    QLT_SUCCESS) {
+			return;
+		}
+		if (qlt_raw_rd_risc_ram_word(qlt, 0x7c00, &data) !=
+		    QLT_SUCCESS) {
+			qlt_raw_wrt_risc_ram_word(qlt, 0x7c00, 0);
+			return;
+		}
+	} while (!(data & BIT_0));
+
+	if (qlt_raw_rd_risc_ram_word(qlt, 0x7A15, &data) == QLT_SUCCESS) {
+		dctl = (uint16_t)PCICFG_RD16(qlt, 0x54);
+		if ((data & 0xe0) != (dctl & 0xe0)) {
+			data &= 0xff1f;
+			data |= dctl & 0xe0;
+			qlt_raw_wrt_risc_ram_word(qlt, 0x7A15, data);
+		}
+	}
+	qlt_raw_wrt_risc_ram_word(qlt, 0x7c00, 0);
+}
+
+/*
+ * qlt_raw_wrt_risc_ram_word
+ *	Write RISC RAM word.
+ *
+ * Input:	qlt:		adapter state pointer.
+ *		risc_address:	risc ram word address.
+ *		data:		data.
+ *
+ * Returns:	qlt local function return status code.
+ *
+ * Context:	Kernel context.
+ */
+static fct_status_t
+qlt_raw_wrt_risc_ram_word(qlt_state_t *qlt, uint32_t risc_address,
+    uint32_t data)
+{
+	fct_status_t	ret;
+
+	REG_WR16(qlt, REG_MBOX(0), MBC_WRITE_RAM_EXTENDED);
+	REG_WR16(qlt, REG_MBOX(1), LSW(risc_address));
+	REG_WR16(qlt, REG_MBOX(2), LSW(data));
+	REG_WR16(qlt, REG_MBOX(3), MSW(data));
+	REG_WR16(qlt, REG_MBOX(8), MSW(risc_address));
+	ret = qlt_raw_mailbox_command(qlt);
+	REG_WR32(qlt, REG_HCCR, HCCR_CMD(CLEAR_RISC_TO_PCI_INTR));
+	if (ret != QLT_SUCCESS) {
+		EL(qlt, "qlt_raw_mailbox_command=MBC_WRITE_RAM_EXTENDED status"
+		    "=%llxh\n", ret);
+	}
+	return (ret);
+}
+
+/*
+ * ql_raw_rd_risc_ram_word
+ *	Read RISC RAM word.
+ *
+ * Input:	qlt:		adapter state pointer.
+ *		risc_address:	risc ram word address.
+ *		data:		data pointer.
+ *
+ * Returns:	ql local function return status code.
+ *
+ * Context:	Kernel context.
+ */
+static fct_status_t
+qlt_raw_rd_risc_ram_word(qlt_state_t *qlt, uint32_t risc_address,
+    uint32_t *data)
+{
+	fct_status_t	ret;
+
+	REG_WR16(qlt, REG_MBOX(0), MBC_READ_RAM_EXTENDED);
+	REG_WR16(qlt, REG_MBOX(1), LSW(risc_address));
+	REG_WR16(qlt, REG_MBOX(2), MSW(risc_address));
+	ret = qlt_raw_mailbox_command(qlt);
+	*data = REG_RD16(qlt, REG_MBOX(2));
+	*data |= (REG_RD16(qlt, REG_MBOX(3)) << 16);
+	REG_WR32(qlt, REG_HCCR, HCCR_CMD(CLEAR_RISC_TO_PCI_INTR));
+	if (ret != QLT_SUCCESS) {
+		EL(qlt, "qlt_raw_mailbox_command=MBC_READ_RAM_EXTENDED status"
+		    "=%llxh\n", ret);
+	}
+	return (ret);
+}
+
+static void
+qlt_properties(qlt_state_t *qlt)
+{
+	int32_t		cnt = 0;
+	int32_t		defval = 0xffff;
+
+	if (qlt_wwn_overload_prop(qlt) == TRUE) {
+		EL(qlt, "wwnn overloaded.\n");
+	}
+
+	if ((cnt = qlt_read_int_instance_prop(qlt, "bucketcnt2k", defval)) !=
+	    defval) {
+		qlt->qlt_bucketcnt[0] = cnt;
+		EL(qlt, "2k bucket o/l=%d\n", cnt);
+	}
+
+	if ((cnt = qlt_read_int_instance_prop(qlt, "bucketcnt8k", defval)) !=
+	    defval) {
+		qlt->qlt_bucketcnt[1] = cnt;
+		EL(qlt, "8k bucket o/l=%d\n", cnt);
+	}
+
+	if ((cnt = qlt_read_int_instance_prop(qlt, "bucketcnt64k", defval)) !=
+	    defval) {
+		qlt->qlt_bucketcnt[2] = cnt;
+		EL(qlt, "64k bucket o/l=%d\n", cnt);
+	}
+
+	if ((cnt = qlt_read_int_instance_prop(qlt, "bucketcnt128k", defval)) !=
+	    defval) {
+		qlt->qlt_bucketcnt[3] = cnt;
+		EL(qlt, "128k bucket o/l=%d\n", cnt);
+	}
+
+	if ((cnt = qlt_read_int_instance_prop(qlt, "bucketcnt256", defval)) !=
+	    defval) {
+		qlt->qlt_bucketcnt[4] = cnt;
+		EL(qlt, "256k bucket o/l=%d\n", cnt);
 	}
 }

@@ -113,6 +113,108 @@ typedef enum {
 	MBOX_STATE_CMD_DONE
 } mbox_state_t;
 
+/*
+ * ISP mailbox commands
+ */
+#define	MBC_LOAD_RAM			0x01	/* Load RAM. */
+#define	MBC_EXECUTE_FIRMWARE		0x02	/* Execute firmware. */
+#define	MBC_DUMP_RAM			0x03	/* Dump RAM. */
+#define	MBC_WRITE_RAM_WORD		0x04	/* Write RAM word. */
+#define	MBC_READ_RAM_WORD		0x05	/* Read RAM word. */
+#define	MBC_MAILBOX_REGISTER_TEST	0x06	/* Wrap incoming mailboxes */
+#define	MBC_VERIFY_CHECKSUM		0x07	/* Verify checksum. */
+#define	MBC_ABOUT_FIRMWARE		0x08	/* About Firmware. */
+#define	MBC_DUMP_RISC_RAM		0x0a	/* Dump RISC RAM command. */
+#define	MBC_LOAD_RAM_EXTENDED		0x0b	/* Load RAM extended. */
+#define	MBC_DUMP_RAM_EXTENDED		0x0c	/* Dump RAM extended. */
+#define	MBC_WRITE_RAM_EXTENDED		0x0d	/* Write RAM word. */
+#define	MBC_READ_RAM_EXTENDED		0x0f	/* Read RAM extended. */
+#define	MBC_SERDES_TRANSMIT_PARAMETERS	0x10	/* Serdes Xmit Parameters */
+#define	MBC_2300_EXECUTE_IOCB		0x12	/* ISP2300 Execute IOCB cmd */
+#define	MBC_GET_IO_STATUS		0x12	/* ISP2422 Get I/O Status */
+#define	MBC_STOP_FIRMWARE		0x14	/* Stop firmware */
+#define	MBC_ABORT_COMMAND_IOCB		0x15	/* Abort IOCB command. */
+#define	MBC_ABORT_DEVICE		0x16	/* Abort device (ID/LUN). */
+#define	MBC_ABORT_TARGET		0x17	/* Abort target (ID). */
+#define	MBC_RESET			0x18	/* Target reset. */
+#define	MBC_XMIT_PARM			0x19	/* Change default xmit parms */
+#define	MBC_PORT_PARAM			0x1a	/* Get/set port speed parms */
+#define	MBC_GET_ID			0x20	/* Get loop id of ISP2200. */
+#define	MBC_GET_TIMEOUT_PARAMETERS	0x22	/* Get Timeout Parameters. */
+#define	MBC_TRACE_CONTROL		0x27	/* Trace control. */
+#define	MBC_GET_FIRMWARE_OPTIONS	0x28	/* Get firmware options */
+#define	MBC_READ_SFP			0x31	/* Read SFP. */
+
+#define	MBC_SET_ADDITIONAL_FIRMWARE_OPT	0x38	/* set firmware options */
+
+#define	OPT_PUREX_ENABLE			(BIT_10)
+
+#define	MBC_RESET_MENLO			0x3a	/* Reset Menlo. */
+#define	MBC_RESTART_MPI			0x3d	/* Restart MPI. */
+#define	MBC_FLASH_ACCESS		0x3e	/* Flash Access Control */
+#define	MBC_LOOP_PORT_BYPASS		0x40	/* Loop Port Bypass. */
+#define	MBC_LOOP_PORT_ENABLE		0x41	/* Loop Port Enable. */
+#define	MBC_GET_RESOURCE_COUNTS		0x42	/* Get Resource Counts. */
+#define	MBC_NON_PARTICIPATE		0x43	/* Non-Participating Mode. */
+#define	MBC_ECHO			0x44	/* ELS ECHO */
+#define	MBC_DIAGNOSTIC_LOOP_BACK	0x45	/* Diagnostic loop back. */
+#define	MBC_ONLINE_SELF_TEST		0x46	/* Online self-test. */
+#define	MBC_ENHANCED_GET_PORT_DATABASE	0x47	/* Get Port Database + login */
+#define	MBC_INITIALIZE_MULTI_ID_FW	0x48	/* Initialize multi-id fw */
+#define	MBC_GET_DCBX_PARAMS		0x51	/* Get DCBX parameters */
+#define	MBC_RESET_LINK_STATUS		0x52	/* Reset Link Error Status */
+#define	MBC_EXECUTE_IOCB		0x54	/* 64 Bit Execute IOCB cmd. */
+#define	MBC_SEND_RNID_ELS		0x57	/* Send RNID ELS request */
+
+#define	MBC_SET_PARAMETERS		0x59	/* Set parameters */
+
+#define	RNID_PARAMS_DF_FMT		0x00
+#define	RNID_PARAMS_E0_FMT		0x01
+#define	PUREX_ELS_CMDS			0x05
+#define	FLOGI_PARAMS			0x06
+
+#define	PARAM_TYPE_FIELD_MASK		0xff
+#define	PARAM_TYPE_FIELD_SHIFT		8
+#define	PARAM_TYPE(type)		((type & PARAM_TYPE_FIELD_MASK) << \
+					    PARAM_TYPE_FIELD_SHIFT)
+
+#define	MBC_GET_PARAMETERS		0x5a	/* Get RNID parameters */
+#define	MBC_DATA_RATE			0x5d	/* Data Rate */
+#define	MBC_INITIALIZE_FIRMWARE		0x60	/* Initialize firmware */
+#define	MBC_INITIATE_LIP		0x62	/* Initiate LIP */
+#define	MBC_GET_FC_AL_POSITION_MAP	0x63	/* Get FC_AL Position Map. */
+#define	MBC_GET_PORT_DATABASE		0x64	/* Get Port Database. */
+#define	MBC_CLEAR_ACA			0x65	/* Clear ACA. */
+#define	MBC_TARGET_RESET		0x66	/* Target Reset. */
+#define	MBC_CLEAR_TASK_SET		0x67	/* Clear Task Set. */
+#define	MBC_ABORT_TASK_SET		0x68	/* Abort Task Set. */
+#define	MBC_GET_FIRMWARE_STATE		0x69	/* Get firmware state. */
+#define	MBC_GET_PORT_NAME		0x6a	/* Get port name. */
+#define	MBC_GET_LINK_STATUS		0x6b	/* Get Link Status. */
+#define	MBC_LIP_RESET			0x6c	/* LIP reset. */
+#define	MBC_GET_STATUS_COUNTS		0x6d	/* Get Link Statistics and */
+						/* Private Data Counts */
+#define	MBC_SEND_SNS_COMMAND		0x6e	/* Send Simple Name Server */
+#define	MBC_LOGIN_FABRIC_PORT		0x6f	/* Login fabric port. */
+#define	MBC_SEND_CHANGE_REQUEST		0x70	/* Send Change Request. */
+#define	MBC_LOGOUT_FABRIC_PORT		0x71	/* Logout fabric port. */
+#define	MBC_LIP_FULL_LOGIN		0x72	/* Full login LIP. */
+#define	MBC_LOGIN_LOOP_PORT		0x74	/* Login Loop Port. */
+#define	MBC_PORT_NODE_NAME_LIST		0x75	/* Get port/node name list */
+#define	MBC_INITIALIZE_IP		0x77	/* Initialize IP */
+#define	MBC_SEND_FARP_REQ_COMMAND	0x78	/* FARP request. */
+#define	MBC_UNLOAD_IP			0x79	/* Unload IP */
+#define	MBC_GET_XGMAC_STATS		0x7a	/* Get XGMAC Statistics. */
+#define	MBC_GET_ID_LIST			0x7c	/* Get port ID list. */
+#define	MBC_SEND_LFA_COMMAND		0x7d	/* Send Loop Fabric Address */
+#define	MBC_LUN_RESET			0x7e	/* Send Task mgmt LUN reset */
+#define	MBC_IDC_REQUEST			0x100	/* IDC request */
+#define	MBC_IDC_ACK			0x101	/* IDC acknowledge */
+#define	MBC_IDC_TIME_EXTEND		0x102	/* IDC extend time */
+#define	MBC_PORT_RESET			0x120	/* Port Reset */
+#define	MBC_SET_PORT_CONFIG		0x122	/* Set port configuration */
+#define	MBC_GET_PORT_CONFIG		0x123	/* Get port configuration */
+
 #define	IOCB_SIZE		64
 
 /*
@@ -242,6 +344,13 @@ typedef struct qlt_state {
 	uint32_t	qlt_change_state_flags;	/* Cached for ACK handling */
 
 	qlt_el_trace_desc_t	*el_trace_desc;
+
+	/* temp ref & stat counters */
+	uint32_t	qlt_bucketcnt[5];	/* element 0 = 2k */
+	uint64_t	qlt_bufref[5];		/* element 0 = 2k */
+	uint64_t	qlt_nullbufref[5];	/* element 0 = 2k */
+	uint64_t	qlt_bumpbucket;		/* bigger buffer supplied */
+
 } qlt_state_t;
 
 /*
@@ -413,6 +522,13 @@ char *value2string(string_table_t *entry, int value, int delimiter);
 #define	BIG_ENDIAN_64(x)
 #define	BIG_ENDIAN(bp, bytes)
 #endif /* _BIG_ENDIAN */
+
+#define	LSB(x)		(uint8_t)(x)
+#define	MSB(x)		(uint8_t)((uint16_t)(x) >> 8)
+#define	MSW(x)		(uint16_t)((uint32_t)(x) >> 16)
+#define	LSW(x)		(uint16_t)(x)
+#define	LSD(x)		(uint32_t)(x)
+#define	MSD(x)		(uint32_t)((uint64_t)(x) >> 32)
 
 void	qlt_chg_endian(uint8_t *, size_t);
 

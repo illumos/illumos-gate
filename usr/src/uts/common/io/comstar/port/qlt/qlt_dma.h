@@ -18,10 +18,17 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2009 QLogic Corporation.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #ifndef	_QLT_DMA_H
 #define	_QLT_DMA_H
 
@@ -59,7 +66,7 @@ void qlt_dmem_fini(qlt_state_t *qlt);
 stmf_data_buf_t *qlt_dmem_alloc(fct_local_port_t *port, uint32_t size,
     uint32_t *pminsize, uint32_t flags);
 stmf_data_buf_t *qlt_i_dmem_alloc(qlt_state_t *qlt, uint32_t size,
-				uint32_t *pminsize, uint32_t flags);
+    uint32_t *pminsize, uint32_t flags);
 void qlt_dmem_free(fct_dbuf_store_t *fds, stmf_data_buf_t *dbuf);
 void qlt_i_dmem_free(qlt_state_t *qlt, stmf_data_buf_t *dbuf);
 void qlt_dmem_dma_sync(stmf_data_buf_t *dbuf, uint_t sync_type);
