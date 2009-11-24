@@ -37,6 +37,7 @@ extern "C" {
 #include <netinet/in.h>
 #include <net/if.h>
 #include <net/bpf.h>
+#include <net/bpfdesc.h>
 #include <sys/avl.h>
 #include <sys/neti.h>
 #include <sys/hook_event.h>
@@ -205,8 +206,6 @@ typedef struct ipnet_stack {
 	list_t		ips_str_list;
 	kstat_t		*ips_kstatp;
 	ipnet_kstats_t	ips_stats;
-	bpf_attach_fn_t	ips_bpfattach_fn;
-	bpf_detach_fn_t	ips_bpfdetach_fn;
 	avl_tree_t	ips_avl_by_shared;
 	hook_t		*ips_hook;
 } ipnet_stack_t;
@@ -244,6 +243,7 @@ typedef void ipnet_walkfunc_t(const char *, void *, dev_t);
 extern int	ipnet_client_open(ipnetif_t *, ipnetif_t **);
 extern void	ipnet_client_close(ipnetif_t *);
 extern void	ipnet_close_byhandle(ipnetif_t *);
+extern ipnet_stack_t *ipnet_find_by_zoneid(zoneid_t zoneid);
 extern int	ipnet_get_linkid_byname(const char *, datalink_id_t *,
     zoneid_t);
 extern dev_t	ipnet_if_getdev(char *, zoneid_t);
@@ -251,8 +251,8 @@ extern const char *ipnet_name(ipnetif_t *);
 extern int	ipnet_open_byname(const char *, ipnetif_t **, zoneid_t);
 extern int	ipnet_promisc_add(void *, uint_t, void *, uintptr_t *, int);
 extern void	ipnet_promisc_remove(void *);
-extern void	ipnet_set_bpfattach(bpf_attach_fn_t, bpf_detach_fn_t,
-    zoneid_t, bpf_itap_fn_t, bpf_provider_reg_fn_t);
+extern void	ipnet_rele(ipnet_stack_t *);
+extern void	ipnet_set_itap(bpf_itap_fn_t);
 extern void	ipnet_walk_if(ipnet_walkfunc_t *, void *, zoneid_t);
 
 extern bpf_provider_t	bpf_ipnet;

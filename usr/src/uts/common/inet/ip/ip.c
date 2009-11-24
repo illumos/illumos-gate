@@ -15367,7 +15367,7 @@ ipobs_hook(mblk_t *mp, int htype, zoneid_t zsrc, zoneid_t zdst,
 
 	hdr->hpo_version = 1;
 	hdr->hpo_htype = htype;
-	hdr->hpo_pktlen = htons((ushort_t)msgdsize(mp));
+	hdr->hpo_pktlen = htonl((ulong_t)msgdsize(mp));
 	hdr->hpo_ifindex = htonl(ill->ill_phyint->phyint_ifindex);
 	hdr->hpo_grifindex = htonl(grifindex);
 	hdr->hpo_zsrc = htonl(zsrc);

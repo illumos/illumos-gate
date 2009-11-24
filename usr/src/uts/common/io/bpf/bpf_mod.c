@@ -66,7 +66,7 @@ extern	void	bpfdetach(uintptr_t);
 extern	int	bpf_bufsize;
 extern	int	bpf_maxbufsize;
 
-static LIST_HEAD(, bpf_provider_list) bpf_providers;
+bpf_provider_head_t bpf_providers;
 
 static struct cb_ops bpf_cb_ops = {
 	bpfopen,
@@ -168,10 +168,9 @@ bpf_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (bpfilterattach() != 0)
 			goto attach_failed;
 
-		ASSERT(bpf_provider_add(&bpf_mac) == 0);
-		dls_set_bpfattach(bpfattach, bpfdetach);
-		ipnet_set_bpfattach(bpfattach, bpfdetach, GLOBAL_ZONEID,
-		    bpf_itap, bpf_provider_add);
+		ipnet_set_itap(bpf_itap);
+		VERIFY(bpf_provider_add(&bpf_ipnet) == 0);
+		VERIFY(bpf_provider_add(&bpf_mac) == 0);
 
 		/*
 		 * Set up to be notified about zones coming and going
@@ -220,23 +219,12 @@ bpf_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			return (DDI_FAILURE);
 		net_instance_free(bpf_inst);
 
-		ipnet_set_bpfattach(NULL, NULL, GLOBAL_ZONEID, NULL,
-		    bpf_provider_remove);
-		/*
-		 * Whilst we don't want to be notified about new devices that
-		 * are being detached, to set the bpf detach function to NULL
-		 * introduces a race condition between this kernel module
-		 * unloading and a network interface driver also unloading.
-		 */
-		dls_set_bpfattach(NULL, bpfdetach);
+		ipnet_set_itap(NULL);
 		error = bpfilterdetach();
 		if (error != 0)
 			return (DDI_FAILURE);
-		/*
-		 * Now everything is clean, set the detach to NULL too.
-		 */
-		dls_set_bpfattach(NULL, NULL);
-		ASSERT(bpf_provider_remove(&bpf_mac) == 0);
+		VERIFY(bpf_provider_remove(&bpf_ipnet) == 0);
+		VERIFY(bpf_provider_remove(&bpf_mac) == 0);
 
 		ASSERT(LIST_EMPTY(&bpf_providers));
 
@@ -414,30 +402,10 @@ bpf_create_inst(const netid_t netid)
 static void
 bpf_shutdown_inst(const netid_t netid, void *arg)
 {
-	zoneid_t zoneid;
-
-	zoneid = net_getzoneidbynetid(netid);
-	if (zoneid != GLOBAL_ZONEID) {
-		ipnet_set_bpfattach(NULL, NULL, zoneid, NULL, NULL);
-	}
 }
 
 /*ARGSUSED*/
 static void
 bpf_destroy_inst(const netid_t netid, void *arg)
 {
-}
-
-/*
- * This function is required, and is called from bpfopen, rather than
- * bpf_create_inst() for the simple reason that when bpf_create_inst()
- * is called, the zone is not fully initialised yet. This leads fo
- * functions that map the zoneid to pointers failing (when they should
- * not be failing) and thus the system panic'ing.
- */
-void
-bpf_open_zone(const zoneid_t zoneid)
-{
-	ipnet_set_bpfattach(bpfattach, bpfdetach,
-	    zoneid, bpf_itap, bpf_provider_add);
 }

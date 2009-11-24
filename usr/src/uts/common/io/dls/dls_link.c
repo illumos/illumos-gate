@@ -35,8 +35,6 @@
 #include	<sys/sdt.h>
 #include	<sys/atomic.h>
 
-static void		dls_bpf_newzone(dls_link_t *dlp, zoneid_t zid);
-
 static kmem_cache_t	*i_dls_link_cachep;
 mod_hash_t		*i_dls_link_hash;
 static uint_t		i_dls_link_count;
@@ -871,7 +869,6 @@ dls_link_setzid(const char *name, zoneid_t zid)
 		goto done;
 	}
 
-	dls_bpf_newzone(dlp, zid);
 	dlp->dl_zid = zid;
 
 	if (zid == GLOBAL_ZONEID) {
@@ -892,24 +889,6 @@ done:
 	if (err != 0 || old_zid != GLOBAL_ZONEID)
 		dls_link_rele(dlp);
 	return (err);
-}
-
-
-/*
- * When a NIC changes zone, that change needs to be communicated to BPF
- * so that it can correctly enforce access rights on it via BPF. In the
- * absence of a function from BPF to just change the zoneid, this is
- * done with a detach followed by an attach.
- */
-static void
-dls_bpf_newzone(dls_link_t *dlp, zoneid_t zid)
-{
-	if (dls_bpfdetach_fn != NULL)
-		dls_bpfdetach_fn((uintptr_t)dlp->dl_mh);
-
-	if (dls_bpfattach_fn != NULL)
-		dls_bpfattach_fn((uintptr_t)dlp->dl_mh, mac_type(dlp->dl_mh),
-		    zid, BPR_MAC);
 }
 
 int

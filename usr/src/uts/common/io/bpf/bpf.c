@@ -113,8 +113,7 @@ typedef void *(*cp_fn_t)(void *, const void *, size_t);
  */
 int bpf_bufsize = BPF_BUFSIZE;
 int bpf_maxbufsize = (16 * 1024 * 1024);
-int bpf_debug = 0;
-mod_hash_t *bpf_hash = NULL;
+static mod_hash_t *bpf_hash = NULL;
 
 /*
  * Use a mutex to avoid a race condition between gathering the stats/peers
@@ -134,23 +133,18 @@ static bpf_kstats_t bpf_kstats = {
 static kstat_t *bpf_ksp;
 
 /*
- *  bpf_iflist is the list of interfaces; each corresponds to an ifnet
- *  bpf_dtab holds the descriptors, indexed by minor device #
+ *  bpf_list is a list of the BPF descriptors currently open
  */
-TAILQ_HEAD(, bpf_if) bpf_iflist;
 LIST_HEAD(, bpf_d) bpf_list;
 
 static int	bpf_allocbufs(struct bpf_d *);
 static void	bpf_clear_timeout(struct bpf_d *);
-static void	bpf_debug_nic_action(char *, struct bpf_if *);
 static void	bpf_deliver(struct bpf_d *, cp_fn_t,
 		    void *, uint_t, uint_t, boolean_t);
-static struct bpf_if *
-		bpf_findif(struct bpf_d *, char *, int);
 static void	bpf_freed(struct bpf_d *);
 static int	bpf_ifname(struct bpf_d *d, char *, int);
 static void	*bpf_mcpy(void *, const void *, size_t);
-static void	bpf_attachd(struct bpf_d *, struct bpf_if *);
+static int	bpf_attachd(struct bpf_d *, const char *, int);
 static void	bpf_detachd(struct bpf_d *);
 static int	bpf_setif(struct bpf_d *, char *, int);
 static void	bpf_timed_out(void *);
@@ -243,32 +237,95 @@ bad:
 /*
  * Attach file to the bpf interface, i.e. make d listen on bp.
  */
-static void
-bpf_attachd(struct bpf_d *d, struct bpf_if *bp)
+static int
+bpf_attachd(struct bpf_d *d, const char *ifname, int dlt)
 {
-	uintptr_t mh = bp->bif_ifp;
+	bpf_provider_list_t *bp;
+	bpf_provider_t *bpr;
+	boolean_t zonematch;
+	zoneid_t niczone;
+	uintptr_t mcip;
+	zoneid_t zone;
+	uint_t nicdlt;
+	uintptr_t mh;
+	int hdrlen;
+	int error;
 
-	ASSERT(bp != NULL);
 	ASSERT(d->bd_bif == NULL);
-	/*
-	 * Point d at bp, and add d to the interface's list of listeners.
-	 * Finally, point the driver's bpf cookie at the interface so
-	 * it will divert packets to bpf.
-	 *
-	 * Note: Although this results in what looks like a lock order
-	 * reversal (bd_lock is held), the deadlock threat is not present
-	 * because the descriptor is not attached to any interface and
-	 * therefore there cannot be a packet waiting on bd_lock in
-	 * catchpacket.
-	 */
-	mutex_enter(&bp->bif_lock);
-	d->bd_bif = bp;
-	LIST_INSERT_HEAD(&bp->bif_dlist, d, bd_next);
-	mutex_exit(&bp->bif_lock);
+	ASSERT(d->bd_mcip == NULL);
+	zone = d->bd_zone;
+	zonematch = B_TRUE;
+again:
+	mh = 0;
+	mcip = 0;
+	LIST_FOREACH(bp, &bpf_providers, bpl_next) {
+		bpr = bp->bpl_what;
+		error = MBPF_OPEN(bpr, ifname, &mh, zone);
+		if (error != 0)
+			goto next;
+		error = MBPF_CLIENT_OPEN(bpr, mh, &mcip);
+		if (error != 0)
+			goto next;
+		error = MBPF_GET_DLT(bpr, mh, &nicdlt);
+		if (error != 0)
+			goto next;
 
-	if (MBPF_CLIENT_OPEN(&bp->bif_mac, mh, &d->bd_mcip) == 0)
-		(void) MBPF_PROMISC_ADD(&bp->bif_mac, d->bd_mcip, 0, d,
-		    &d->bd_promisc_handle, d->bd_promisc_flags);
+		nicdlt = bpf_dl_to_dlt(nicdlt);
+		if (dlt != -1 && dlt != nicdlt) {
+			error = ENOENT;
+			goto next;
+		}
+
+		error = MBPF_GET_ZONE(bpr, mh, &niczone);
+		if (error != 0)
+			goto next;
+
+		DTRACE_PROBE4(bpf__attach, struct bpf_provider_s *, bpr,
+		    uintptr_t, mh, int, nicdlt, zoneid_t, niczone);
+
+		if (zonematch && niczone != zone) {
+			error = ENOENT;
+			goto next;
+		}
+		break;
+next:
+		if (mcip != 0) {
+			MBPF_CLIENT_CLOSE(bpr, mcip);
+			mcip = 0;
+		}
+		if (mh != NULL) {
+			MBPF_CLOSE(bpr, mh);
+			mh = 0;
+		}
+	}
+	if (error != 0) {
+		if (zonematch && (zone == GLOBAL_ZONEID)) {
+			/*
+			 * If we failed to do an exact match for the global
+			 * zone using the global zoneid, try again in case
+			 * the network interface is owned by a local zone.
+			 */
+			zonematch = B_FALSE;
+			goto again;
+		}
+		return (error);
+	}
+
+	d->bd_mac = *bpr;
+	d->bd_mcip = mcip;
+	d->bd_bif = mh;
+	d->bd_dlt = nicdlt;
+	hdrlen = bpf_dl_hdrsize(nicdlt);
+	d->bd_hdrlen = BPF_WORDALIGN(hdrlen + SIZEOF_BPF_HDR) - hdrlen;
+
+	(void) strlcpy(d->bd_ifname, MBPF_CLIENT_NAME(&d->bd_mac, mcip),
+	    sizeof (d->bd_ifname));
+
+	(void) MBPF_GET_LINKID(&d->bd_mac, d->bd_ifname, &d->bd_linkid,
+	    zone);
+	(void) MBPF_PROMISC_ADD(&d->bd_mac, d->bd_mcip, 0, d,
+	    &d->bd_promisc_handle, d->bd_promisc_flags);
+	return (0);
 }
 
 /*
@@ -277,14 +334,15 @@ bpf_attachd(struct bpf_d *d, struct bpf_if *bp)
 static void
 bpf_detachd(struct bpf_d *d)
 {
-	struct bpf_if *bp;
 	uintptr_t mph;
 	uintptr_t mch;
+	uintptr_t mh;
 
+	ASSERT(d->bd_inuse == -1);
 	mch = d->bd_mcip;
 	d->bd_mcip = 0;
-	bp = d->bd_bif;
-	ASSERT(bp != NULL);
+	mh = d->bd_bif;
+	d->bd_bif = 0;
 
 	/*
 	 * Check if this descriptor had requested promiscuous mode.
@@ -314,32 +372,21 @@ bpf_detachd(struct bpf_d *d)
 	 */
 	mutex_exit(&d->bd_lock);
 	if (mph != 0)
-		MBPF_PROMISC_REMOVE(&bp->bif_mac, mph);
+		MBPF_PROMISC_REMOVE(&d->bd_mac, mph);
 
 	if (mch != 0)
-		MBPF_CLIENT_CLOSE(&bp->bif_mac, mch);
+		MBPF_CLIENT_CLOSE(&d->bd_mac, mch);
 
-	/*
-	 * bd_lock needs to stay not held by this function until after
-	 * it has finished with bif_lock, otherwise there's a lock order
-	 * reversal with bpf_deliver and the system can deadlock.
-	 *
-	 * Remove d from the interface's descriptor list.
-	 */
-	mutex_enter(&bp->bif_lock);
-	LIST_REMOVE(d, bd_next);
-	mutex_exit(&bp->bif_lock);
+	if (mh != 0)
+		MBPF_CLOSE(&d->bd_mac, mh);
 
 	/*
 	 * Because this function is called with bd_lock held, so it must
 	 * exit with it held.
 	 */
 	mutex_enter(&d->bd_lock);
-	/*
-	 * bd_bif cannot be cleared until after the promisc callback has been
-	 * removed.
-	 */
-	d->bd_bif = 0;
+	*d->bd_ifname = '\0';
+	memset(&d->bd_mac, 0, sizeof (d->bd_mac));
 }
 
 
@@ -373,7 +420,6 @@ bpfilterattach(void)
 	mutex_init(&bpf_mtx, NULL, MUTEX_DRIVER, NULL);
 
 	LIST_INIT(&bpf_list);
-	TAILQ_INIT(&bpf_iflist);
 
 	return (0);
 }
@@ -385,26 +431,11 @@ bpfilterattach(void)
 int
 bpfilterdetach(void)
 {
-	struct bpf_if *bp;
 
 	if (bpf_ksp != NULL) {
 		kstat_delete(bpf_ksp);
 		bpf_ksp = NULL;
 	}
-
-	/*
-	 * When no attach/detach callbacks can arrive from mac,
-	 * this is now safe without a lock.
-	 */
-	while ((bp = TAILQ_FIRST(&bpf_iflist)) != NULL)
-		bpfdetach(bp->bif_ifp);
-
-	mutex_enter(&bpf_mtx);
-	if (!LIST_EMPTY(&bpf_list)) {
-		mutex_exit(&bpf_mtx);
-		return (EBUSY);
-	}
-	mutex_exit(&bpf_mtx);
 
 	mod_hash_destroy_idhash(bpf_hash);
 	bpf_hash = NULL;
@@ -442,14 +473,6 @@ bpfopen(dev_t *devp, int flag, int mode, cred_t *cred)
 
 	if ((flag & (FWRITE|FREAD)) == 0)
 		return (ENXIO);
-
-	/*
-	 * If BPF is being opened from a non-global zone, trigger a call
-	 * back into the driver to see if it needs to initialise local
-	 * state in a zone.
-	 */
-	if (crgetzoneid(cred) != GLOBAL_ZONEID)
-		bpf_open_zone(crgetzoneid(cred));
 
 	/*
 	 * A structure is allocated per open file in BPF to store settings
@@ -504,6 +527,18 @@ bpfclose(dev_t dev, int flag, int otyp, cred_t *cred_p)
 	struct bpf_d *d = bpf_dev_get(getminor(dev));
 
 	mutex_enter(&d->bd_lock);
+
+	while (d->bd_inuse != 0) {
+		d->bd_waiting++;
+		if (cv_wait_sig(&d->bd_wait, &d->bd_lock) <= 0) {
+			d->bd_waiting--;
+			mutex_exit(&d->bd_lock);
+			return (EINTR);
+		}
+		d->bd_waiting--;
+	}
+
+	d->bd_inuse = -1;
 	if (d->bd_state == BPF_WAITING)
 		bpf_clear_timeout(d);
 	d->bd_state = BPF_IDLE;
@@ -669,9 +704,7 @@ int
 bpfwrite(dev_t dev, struct uio *uio, cred_t *cred)
 {
 	struct bpf_d *d = bpf_dev_get(getminor(dev));
-	struct bpf_if *bp;
 	uintptr_t mch;
-	uintptr_t ifp;
 	uint_t mtu;
 	mblk_t *m;
 	int error;
@@ -681,7 +714,7 @@ bpfwrite(dev_t dev, struct uio *uio, cred_t *cred)
 		return (EBADF);
 
 	mutex_enter(&d->bd_lock);
-	if (d->bd_bif == 0 || d->bd_mcip == 0 || d->bd_bif->bif_ifp == 0) {
+	if (d->bd_bif == 0 || d->bd_mcip == 0 || d->bd_bif == 0) {
 		mutex_exit(&d->bd_lock);
 		return (EINTR);
 	}
@@ -703,11 +736,9 @@ bpfwrite(dev_t dev, struct uio *uio, cred_t *cred)
 
 	mutex_exit(&d->bd_lock);
 
-	bp = d->bd_bif;
-	dlt = bp->bif_dlt;
+	dlt = d->bd_dlt;
 	mch = d->bd_mcip;
-	ifp = bp->bif_ifp;
-	MBPF_SDU_GET(&bp->bif_mac, ifp, &mtu);
+	MBPF_SDU_GET(&d->bd_mac, d->bd_bif, &mtu);
 	d->bd_inuse++;
 
 	m = NULL;
@@ -720,15 +751,15 @@ bpfwrite(dev_t dev, struct uio *uio, cred_t *cred)
 	if (error)
 		goto done;
 
-	DTRACE_PROBE5(bpf__tx, struct bpf_d *, d, struct bpf_if *, bp,
-	    int, dlt, uint_t, mtu, mblk_t *, m);
+	DTRACE_PROBE4(bpf__tx, struct bpf_d *, d, int, dlt,
+	    uint_t, mtu, mblk_t *, m);
 
 	if (M_LEN(m) > mtu) {
 		error = EMSGSIZE;
 		goto done;
 	}
 
-	error = MBPF_TX(&bp->bif_mac, mch, m);
+	error = MBPF_TX(&d->bd_mac, mch, m);
 	/*
 	 * The "tx" action here is required to consume the mblk_t.
 	 */
@@ -911,12 +942,12 @@ bpfioctl(dev_t dev, int cmd, intptr_t addr, int mode, cred_t *cred, int *rval)
 				d->bd_promisc_handle = 0;
 
 				mutex_exit(&d->bd_lock);
-				MBPF_PROMISC_REMOVE(&d->bd_bif->bif_mac, mph);
+				MBPF_PROMISC_REMOVE(&d->bd_mac, mph);
 				mutex_enter(&d->bd_lock);
 			}
 
 			d->bd_promisc_flags = MAC_PROMISC_FLAGS_NO_COPY;
-			error = MBPF_PROMISC_ADD(&d->bd_bif->bif_mac,
+			error = MBPF_PROMISC_ADD(&d->bd_mac,
 			    d->bd_mcip, MAC_CLIENT_PROMISC_ALL, d,
 			    &d->bd_promisc_handle, d->bd_promisc_flags);
 			if (error == 0)
@@ -932,8 +963,8 @@ bpfioctl(dev_t dev, int cmd, intptr_t addr, int mode, cred_t *cred, int *rval)
 		if (d->bd_bif == 0)
 			error = EINVAL;
 		else
-			error = copyout(&d->bd_bif->bif_dlt, (void *)addr,
-			    sizeof (d->bd_bif->bif_dlt));
+			error = copyout(&d->bd_dlt, (void *)addr,
+			    sizeof (d->bd_dlt));
 		break;
 
 	/*
@@ -1265,14 +1296,14 @@ bpf_setf(struct bpf_d *d, struct bpf_program *fp)
 
 /*
  * Detach a file from its current interface (if attached at all) and attach
- * to the interface indicated by the name stored in ifr.
+ * to the interface indicated by the name stored in ifname.
  * Return an errno or 0.
  */
 static int
 bpf_setif(struct bpf_d *d, char *ifname, int namesize)
 {
-	struct bpf_if *bp;
 	int unit_seen;
+	int error = 0;
 	char *cp;
 	int i;
 
@@ -1314,42 +1345,23 @@ bpf_setif(struct bpf_d *d, char *ifname, int namesize)
 	d->bd_inuse = -1;
 	mutex_exit(&d->bd_lock);
 
-	/*
-	 * Look through attached interfaces for the named one.
-	 *
-	 * The search is done twice - once
-	 */
-	mutex_enter(&bpf_mtx);
+	if (d->bd_sbuf == 0)
+		error = bpf_allocbufs(d);
 
-	bp = bpf_findif(d, ifname, -1);
-
-	if (bp != NULL) {
-		int error = 0;
-
-		if (d->bd_sbuf == 0)
-			error = bpf_allocbufs(d);
-
-		/*
-		 * We found the requested interface.
-		 * If we're already attached to requested interface,
-		 * just flush the buffer.
-		 */
+	if (error == 0) {
 		mutex_enter(&d->bd_lock);
-		if (error == 0 && bp != d->bd_bif) {
-			if (d->bd_bif)
-				/*
-				 * Detach if attached to something else.
-				 */
-				bpf_detachd(d);
+		if (d->bd_bif)
+			/*
+			 * Detach if attached to something else.
+			 */
+			bpf_detachd(d);
 
-			bpf_attachd(d, bp);
-		}
+		error = bpf_attachd(d, ifname, -1);
 		reset_d(d);
 		d->bd_inuse = 0;
 		if (d->bd_waiting != 0)
 			cv_signal(&d->bd_wait);
 		mutex_exit(&d->bd_lock);
-		mutex_exit(&bpf_mtx);
 		return (error);
 	}
 
@@ -1358,7 +1370,6 @@ bpf_setif(struct bpf_d *d, char *ifname, int namesize)
 	if (d->bd_waiting != 0)
 		cv_signal(&d->bd_wait);
 	mutex_exit(&d->bd_lock);
-	mutex_exit(&bpf_mtx);
 
 	/*
 	 * Try tickle the mac layer into attaching the device...
@@ -1372,16 +1383,14 @@ bpf_setif(struct bpf_d *d, char *ifname, int namesize)
 static int
 bpf_ifname(struct bpf_d *d, char *buffer, int bufsize)
 {
-	struct bpf_if *bp;
 
 	mutex_enter(&d->bd_lock);
-	bp = d->bd_bif;
-	if (bp == NULL) {
+	if (d->bd_bif == NULL) {
 		mutex_exit(&d->bd_lock);
 		return (EINVAL);
 	}
 
-	(void) strlcpy(buffer, bp->bif_ifname, bufsize);
+	(void) strlcpy(buffer, d->bd_ifname, bufsize);
 	mutex_exit(&d->bd_lock);
 
 	return (0);
@@ -1536,7 +1545,7 @@ bpf_itap(void *arg, mblk_t *m, boolean_t issent, uint_t length)
 	struct bpf_d *d = arg;
 
 	hdr = (hook_pkt_observe_t *)m->b_rptr;
-	if (ntohl(hdr->hpo_ifindex) != d->bd_bif->bif_linkid)
+	if (ntohl(hdr->hpo_ifindex) != d->bd_linkid)
 		return;
 	bpf_deliver(d, bpf_mcpy, m, length, 0, issent);
 
@@ -1556,7 +1565,7 @@ catchpacket(struct bpf_d *d, uchar_t *pkt, uint_t pktlen, uint_t snaplen,
 {
 	struct bpf_hdr *hp;
 	int totlen, curlen;
-	int hdrlen = d->bd_bif->bif_hdrlen;
+	int hdrlen = d->bd_hdrlen;
 	int do_wakeup = 0;
 
 	++d->bd_ccount;
@@ -1668,179 +1677,86 @@ bpf_freed(struct bpf_d *d)
 }
 
 /*
- * Attach additional dlt for a interface to bpf.
- * dlt is the link layer type.
- *
- * The zoneid is passed in explicitly to prevent the need to
- * do a lookup in dls using the linkid. Such a lookup would need
- * to use the same hash table that gets used for walking when
- * dls_set_bpfattach() is called.
- */
-void
-bpfattach(uintptr_t ifp, int dlt, zoneid_t zoneid, int provider)
-{
-	bpf_provider_t *bpr;
-	struct bpf_if *bp;
-	uintptr_t client;
-	int hdrlen;
-
-	bpr = bpf_find_provider_by_id(provider);
-	if (bpr == NULL) {
-		if (bpf_debug)
-			cmn_err(CE_WARN, "bpfattach: unknown provider %d",
-			    provider);
-		return;
-	}
-
-	bp = kmem_zalloc(sizeof (*bp), KM_NOSLEEP);
-	if (bp == NULL) {
-		if (bpf_debug)
-			cmn_err(CE_WARN, "bpfattach: no memory for bpf_if");
-		return;
-	}
-	bp->bif_mac = *bpr;
-
-	/*
-	 * To get the user-visible name, it is necessary to get the mac
-	 * client name of an interface and for this, we need to do the
-	 * mac_client_open. Leaving it open is undesirable because it
-	 * creates an open reference that is hard to see from outside
-	 * of bpf, potentially leading to data structures not being
-	 * cleaned up when they should.
-	 */
-	if (MBPF_CLIENT_OPEN(&bp->bif_mac, ifp, &client) != 0) {
-		if (bpf_debug)
-			cmn_err(CE_WARN,
-			    "bpfattach: mac_client_open fail for %s",
-			    MBPF_NAME(&bp->bif_mac, ifp));
-		kmem_free(bp, sizeof (*bp));
-		return;
-	}
-	(void) strlcpy(bp->bif_ifname, MBPF_CLIENT_NAME(&bp->bif_mac, client),
-	    sizeof (bp->bif_ifname));
-	MBPF_CLIENT_CLOSE(&bp->bif_mac, client);
-
-	bp->bif_ifp = ifp;
-	bp->bif_dlt = bpf_dl_to_dlt(dlt);
-	bp->bif_zoneid = zoneid;
-	LIST_INIT(&bp->bif_dlist);
-
-	/*
-	 * Compute the length of the bpf header.  This is not necessarily
-	 * equal to SIZEOF_BPF_HDR because we want to insert spacing such
-	 * that the network layer header begins on a longword boundary (for
-	 * performance reasons and to alleviate alignment restrictions).
-	 */
-	hdrlen = bpf_dl_hdrsize(dlt);
-	bp->bif_hdrlen = BPF_WORDALIGN(hdrlen + SIZEOF_BPF_HDR) - hdrlen;
-
-	if (MBPF_GET_LINKID(&bp->bif_mac, MBPF_NAME(&bp->bif_mac, ifp),
-	    &bp->bif_linkid, zoneid) != 0) {
-		if (bpf_debug) {
-			cmn_err(CE_WARN,
-			    "bpfattach: linkid resolution fail for %s/%s",
-			    MBPF_NAME(&bp->bif_mac, ifp), bp->bif_ifname);
-		}
-		kmem_free(bp, sizeof (*bp));
-		return;
-	}
-	mutex_init(&bp->bif_lock, NULL, MUTEX_DRIVER, NULL);
-
-	bpf_debug_nic_action("attached to", bp);
-
-	mutex_enter(&bpf_mtx);
-	TAILQ_INSERT_TAIL(&bpf_iflist, bp, bif_next);
-	mutex_exit(&bpf_mtx);
-}
-
-/*
- * Remove an interface from bpf.
- */
-void
-bpfdetach(uintptr_t ifp)
-{
-	struct bpf_if *bp;
-	struct bpf_d *d;
-	int removed = 0;
-
-	mutex_enter(&bpf_mtx);
-	/*
-	 * Loop through all of the known descriptors to find any that are
-	 * using the interface that wants to be detached.
-	 */
-	LIST_FOREACH(d, &bpf_list, bd_list) {
-		mutex_enter(&d->bd_lock);
-		bp = d->bd_bif;
-		if (bp != NULL && bp->bif_ifp == ifp) {
-			/*
-			 * Detach the descriptor from an interface now.
-			 * It will be free'ed later by close routine.
-			 */
-			bpf_detachd(d);
-		}
-		mutex_exit(&d->bd_lock);
-	}
-
-again:
-	TAILQ_FOREACH(bp, &bpf_iflist, bif_next) {
-		if (bp->bif_ifp == ifp) {
-			TAILQ_REMOVE(&bpf_iflist, bp, bif_next);
-			bpf_debug_nic_action("detached from", bp);
-			while (bp->bif_inuse != 0)
-				cv_wait(&bpf_dlt_waiter, &bpf_mtx);
-			kmem_free(bp, sizeof (*bp));
-			removed++;
-			goto again;
-		}
-	}
-	mutex_exit(&bpf_mtx);
-
-	ASSERT(removed > 0);
-}
-
-/*
  * Get a list of available data link type of the interface.
  */
 static int
 bpf_getdltlist(struct bpf_d *d, struct bpf_dltlist *listp)
 {
-	char ifname[LIFNAMSIZ+1];
-	struct bpf_if *bp;
-	uintptr_t ifp;
-	int n, error;
+	bpf_provider_list_t *bp;
+	bpf_provider_t *bpr;
+	zoneid_t zoneid;
+	uintptr_t mcip;
+	uint_t nicdlt;
+	uintptr_t mh;
+	int error;
+	int n;
 
-	mutex_enter(&bpf_mtx);
-	ifp = d->bd_bif->bif_ifp;
-	(void) strlcpy(ifname, MBPF_NAME(&d->bd_bif->bif_mac, ifp),
-	    sizeof (ifname));
 	n = 0;
+	mh = 0;
+	mcip = 0;
 	error = 0;
-	TAILQ_FOREACH(bp, &bpf_iflist, bif_next) {
-		if (strcmp(bp->bif_ifname, ifname) != 0)
-			continue;
+	mutex_enter(&d->bd_lock);
+	LIST_FOREACH(bp, &bpf_providers, bpl_next) {
+		bpr = bp->bpl_what;
+		error = MBPF_OPEN(bpr, d->bd_ifname, &mh, d->bd_zone);
+		if (error != 0)
+			goto next;
+		error = MBPF_CLIENT_OPEN(bpr, mh, &mcip);
+		if (error != 0)
+			goto next;
+		error = MBPF_GET_ZONE(bpr, mh, &zoneid);
+		if (error != 0)
+			goto next;
 		if (d->bd_zone != GLOBAL_ZONEID &&
-		    d->bd_zone != bp->bif_zoneid)
-			continue;
+		    d->bd_zone != zoneid)
+			goto next;
+		error = MBPF_GET_DLT(bpr, mh, &nicdlt);
+		if (error != 0)
+			goto next;
+		nicdlt = bpf_dl_to_dlt(nicdlt);
 		if (listp->bfl_list != NULL) {
-			if (n >= listp->bfl_len)
-				return (ENOMEM);
+			if (n >= listp->bfl_len) {
+				MBPF_CLIENT_CLOSE(bpr, mcip);
+				MBPF_CLOSE(bpr, mh);
+				break;
+			}
 			/*
-			 * Bumping of bif_inuse ensures the structure does not
+			 * Bumping of bd_inuse ensures the structure does not
 			 * disappear while the copyout runs and allows the for
 			 * loop to be continued.
 			 */
-			bp->bif_inuse++;
-			mutex_exit(&bpf_mtx);
-			if (copyout(&bp->bif_dlt,
+			d->bd_inuse++;
+			mutex_exit(&d->bd_lock);
+			if (copyout(&nicdlt,
 			    listp->bfl_list + n, sizeof (uint_t)) != 0)
 				error = EFAULT;
-			mutex_enter(&bpf_mtx);
-			bp->bif_inuse--;
+			mutex_enter(&d->bd_lock);
+			if (error != 0)
+				break;
+			d->bd_inuse--;
 		}
 		n++;
+next:
+		if (mcip != 0) {
+			MBPF_CLIENT_CLOSE(bpr, mcip);
+			mcip = 0;
+		}
+		if (mh != 0) {
+			MBPF_CLOSE(bpr, mh);
+			mh = 0;
+		}
 	}
-	cv_signal(&bpf_dlt_waiter);
-	mutex_exit(&bpf_mtx);
+	mutex_exit(&d->bd_lock);
+
+	/*
+	 * It is quite possible that one or more provider to BPF may not
+	 * know about a link name whlist others do. In that case, so long
+	 * as we have one success, do not declare an error unless it was
+	 * an EFAULT as this indicates a problem that needs to be reported.
+	 */
+	if ((error != EFAULT) && (n > 0))
+		error = 0;
+
 	listp->bfl_len = n;
 	return (error);
 }
@@ -1852,28 +1768,28 @@ static int
 bpf_setdlt(struct bpf_d *d, void *addr)
 {
 	char ifname[LIFNAMSIZ+1];
-	struct bpf_if *bp;
+	zoneid_t niczone;
 	int error;
 	int dlt;
 
 	if (copyin(addr, &dlt, sizeof (dlt)) != 0)
 		return (EFAULT);
-	/*
-	 * The established order is get bpf_mtx before bd_lock, even
-	 * though bpf_mtx is not needed until the loop...
-	 */
-	mutex_enter(&bpf_mtx);
+
 	mutex_enter(&d->bd_lock);
 
 	if (d->bd_bif == 0) {			/* Interface not set */
 		mutex_exit(&d->bd_lock);
-		mutex_exit(&bpf_mtx);
 		return (EINVAL);
 	}
-	if (d->bd_bif->bif_dlt == dlt) {	/* NULL-op */
+	if (d->bd_dlt == dlt) {	/* NULL-op */
 		mutex_exit(&d->bd_lock);
-		mutex_exit(&bpf_mtx);
 		return (0);
+	}
+
+	error = MBPF_GET_ZONE(&d->bd_mac, d->bd_bif, &niczone);
+	if (error != 0) {
+		mutex_exit(&d->bd_lock);
+		return (error);
 	}
 
 	/*
@@ -1881,34 +1797,17 @@ bpf_setdlt(struct bpf_d *d, void *addr)
 	 * enforced by this driver.
 	 */
 	if ((d->bd_zone != GLOBAL_ZONEID) && (dlt != DLT_IPNET) &&
-	    (d->bd_bif->bif_zoneid != d->bd_zone)) {
-		mutex_exit(&d->bd_lock);
-		mutex_exit(&bpf_mtx);
-		return (EINVAL);
-	}
-
-	(void) strlcpy(ifname,
-	    MBPF_NAME(&d->bd_bif->bif_mac, d->bd_bif->bif_ifp),
-	    sizeof (ifname));
-
-	bp = bpf_findif(d, ifname, dlt);
-
-	mutex_exit(&bpf_mtx);
-	/*
-	 * Now only bd_lock is held.
-	 *
-	 * If there was no matching interface that supports the requested
-	 * DLT, return an error and leave the current binding alone.
-	 */
-	if (bp == NULL) {
+	    (niczone != d->bd_zone)) {
 		mutex_exit(&d->bd_lock);
 		return (EINVAL);
 	}
 
-	error = 0;
+	(void) strlcpy(ifname, d->bd_ifname, sizeof (ifname));
+	d->bd_inuse = -1;
 	bpf_detachd(d);
-	bpf_attachd(d, bp);
+	error = bpf_attachd(d, ifname, dlt);
 	reset_d(d);
+	d->bd_inuse = 0;
 
 	mutex_exit(&d->bd_lock);
 	return (error);
@@ -1991,57 +1890,4 @@ bpf_dev_get(minor_t minor)
 	ASSERT(d != NULL);
 
 	return (d);
-}
-
-static void
-bpf_debug_nic_action(char *txt, struct bpf_if *bp)
-{
-	if (bpf_debug) {
-		cmn_err(CE_CONT, "%s %s %s/%d/%d/%d\n", bp->bif_ifname, txt,
-		    MBPF_NAME(&bp->bif_mac, bp->bif_ifp), bp->bif_linkid,
-		    bp->bif_zoneid, bp->bif_dlt);
-	}
-}
-
-/*
- * Finding a BPF network interface is a two pass job.
- * In the first pass, the best possible match is made on zone, DLT and
- * interface name.
- * In the second pass, we allow global zone snoopers to attach to interfaces
- * that are reserved for other zones.
- * This ensures that the global zone will always see its own interfaces first
- * before attaching to those that belong to a shared IP instance zone.
- */
-static struct bpf_if *
-bpf_findif(struct bpf_d *d, char *ifname, int dlt)
-{
-	struct bpf_if *bp;
-
-	TAILQ_FOREACH(bp, &bpf_iflist, bif_next) {
-		if ((bp->bif_ifp == 0) ||
-		    (strcmp(ifname, bp->bif_ifname) != 0))
-			continue;
-
-		if (bp->bif_zoneid != d->bd_zone)
-			continue;
-
-		if ((dlt != -1) && (dlt != bp->bif_dlt))
-			continue;
-
-		return (bp);
-	}
-
-	if (d->bd_zone == GLOBAL_ZONEID) {
-		TAILQ_FOREACH(bp, &bpf_iflist, bif_next) {
-			if ((bp->bif_ifp == 0) ||
-			    (strcmp(ifname, bp->bif_ifname) != 0))
-				continue;
-
-			if ((dlt != -1) && (dlt != bp->bif_dlt))
-				continue;
-			return (bp);
-		}
-	}
-
-	return (NULL);
 }

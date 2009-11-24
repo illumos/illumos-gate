@@ -34,8 +34,6 @@
 #include <sys/modhash.h>
 #include <sys/kstat.h>
 #include <net/if.h>
-#include <net/bpf.h>
-#include <net/bpfdesc.h>
 #include <sys/dlpi.h>
 
 #ifdef	__cplusplus
@@ -128,10 +126,6 @@ extern void		dls_mgmt_init(void);
 extern void		dls_mgmt_fini(void);
 
 extern int		dls_mgmt_get_phydev(datalink_id_t, dev_t *);
-
-extern bpf_attach_fn_t	dls_bpfattach_fn;
-extern bpf_detach_fn_t	dls_bpfdetach_fn;
-extern void		dls_set_bpfattach(bpf_attach_fn_t, bpf_detach_fn_t);
 
 #ifdef	__cplusplus
 }

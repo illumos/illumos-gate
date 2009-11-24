@@ -50,7 +50,9 @@ static void	mac_bpf_promisc_remove(uintptr_t);
 static int	mac_bpf_client_open(uintptr_t, uintptr_t *);
 static void	mac_bpf_client_close(uintptr_t);
 static const char *mac_bpf_client_name(uintptr_t);
+static int	mac_bpf_getdlt(uintptr_t, uint_t *);
 static int	mac_bpf_getlinkid(const char *, datalink_id_t *, zoneid_t);
+static int	mac_bpf_getzone(uintptr_t, zoneid_t *);
 
 bpf_provider_t bpf_mac = {
 	BPR_MAC,
@@ -65,14 +67,16 @@ bpf_provider_t bpf_mac = {
 	mac_bpf_getlinkid,
 	mac_bpf_client_close,
 	mac_bpf_client_name,
-	mac_bpf_client_open
+	mac_bpf_client_open,
+	mac_bpf_getzone,
+	mac_bpf_getdlt
 };
 
 /*ARGSUSED*/
 static int
 mac_bpf_open(const char *name, uintptr_t *mhandlep, zoneid_t zoneid)
 {
-	return (mac_open(name, (mac_handle_t *)mhandlep));
+	return (mac_open_by_linkname(name, (mac_handle_t *)mhandlep));
 }
 
 static void
@@ -162,4 +166,24 @@ mac_bpf_getlinkid(const char *name, datalink_id_t *idp, zoneid_t zoneid)
 		error = dls_devnet_macname2linkid(name, idp);
 
 	return (error);
+}
+
+static int
+mac_bpf_getzone(uintptr_t handle, zoneid_t *zip)
+{
+	mac_perim_handle_t mph;
+	int error;
+
+	mac_perim_enter_by_mh((mac_handle_t)handle, &mph);
+	error = dls_link_getzid(mac_name((mac_handle_t)handle), zip);
+	mac_perim_exit(mph);
+	return (error);
+}
+
+static int
+mac_bpf_getdlt(uintptr_t handle, uint_t *dltp)
+{
+	*dltp = mac_type((mac_handle_t)handle);
+
+	return (0);
 }

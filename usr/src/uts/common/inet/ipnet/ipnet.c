@@ -166,11 +166,7 @@ static void	*ipnet_stack_init(netstackid_t, netstack_t *);
 static void	ipnet_stack_fini(netstackid_t, void *);
 static void	ipnet_dispatch(void *);
 static int	ipobs_bounce_func(hook_event_token_t, hook_data_t, void *);
-static void	ipnet_bpfattach(ipnetif_t *);
-static void	ipnet_bpfdetach(ipnetif_t *);
 static int	ipnet_bpf_bounce(hook_event_token_t, hook_data_t, void *);
-static void	ipnet_bpf_probe_shared(ipnet_stack_t *);
-static void	ipnet_bpf_release_shared(ipnet_stack_t *);
 static ipnetif_t *ipnetif_clone_create(ipnetif_t *, zoneid_t);
 static void	ipnetif_clone_release(ipnetif_t *);
 
@@ -1317,11 +1313,6 @@ ipnetif_create(const char *name, uint64_t index, ipnet_stack_t *ips,
 	VERIFY(avl_find(&ips->ips_avl_by_name, (void *)name, &where) == NULL);
 	avl_insert(&ips->ips_avl_by_name, ipnetif, where);
 	mutex_exit(&ips->ips_avl_lock);
-	/*
-	 * Now that the interface can be found by lookups back into ipnet,
-	 * allowing for sanity checking, call the BPF attach.
-	 */
-	ipnet_bpfattach(ipnetif);
 
 	return (ipnetif);
 }
@@ -1343,10 +1334,6 @@ ipnetif_remove(ipnetif_t *ipnetif, ipnet_stack_t *ips)
 	avl_remove(&ips->ips_avl_by_index, ipnetif);
 	avl_remove(&ips->ips_avl_by_name, ipnetif);
 	mutex_exit(&ips->ips_avl_lock);
-	/*
-	 * Now that the interface can't be found, do a BPF detach
-	 */
-	ipnet_bpfdetach(ipnetif);
 	/*
 	 * Release the reference we implicitly held in ipnetif_create().
 	 */
@@ -2016,7 +2003,7 @@ ipobs_unregister_hook(netstack_t *ns, hook_t *hook)
 /*
  * Convenience function to make mapping a zoneid to an ipnet_stack_t easy.
  */
-static ipnet_stack_t *
+ipnet_stack_t *
 ipnet_find_by_zoneid(zoneid_t zoneid)
 {
 	netstack_t	*ns;
@@ -2026,111 +2013,25 @@ ipnet_find_by_zoneid(zoneid_t zoneid)
 }
 
 /*
- * Rather than weave the complexity of what needs to be done for a BPF
- * device attach or detach into the code paths of where they're used,
- * it is presented here in a couple of simple functions, along with
- * other similar code.
- *
- * The refrele/refhold here provide the means by which it is known
- * when the clone structures can be free'd.
+ * Functions, such as the above ipnet_find_by_zoneid(), will return a
+ * pointer to ipnet_stack_t by calling a netstack lookup function.
+ * The netstack_find_*() functions return a pointer after doing a "hold"
+ * on the data structure and thereby require a "release" when the caller
+ * is finished with it. We need to mirror that API here and thus a caller
+ * of ipnet_find_by_zoneid() is required to call ipnet_rele().
  */
-static void
-ipnet_bpfdetach(ipnetif_t *ifp)
+void
+ipnet_rele(ipnet_stack_t *ips)
 {
-	if (ifp->if_stackp->ips_bpfdetach_fn != NULL) {
-		ifp->if_stackp->ips_bpfdetach_fn((uintptr_t)ifp);
-		ipnetif_refrele(ifp);
-	}
-}
-
-static void
-ipnet_bpfattach(ipnetif_t *ifp)
-{
-	if (ifp->if_stackp->ips_bpfattach_fn != NULL) {
-		ipnetif_refhold(ifp);
-		ifp->if_stackp->ips_bpfattach_fn((uintptr_t)ifp, DL_IPNET,
-		    ifp->if_zoneid, BPR_IPNET);
-	}
+	netstack_rele(ips->ips_netstack);
 }
 
 /*
- * Set the functions to call back to when adding or removing an interface so
- * that BPF can keep its internal list of these up to date.
  */
 void
-ipnet_set_bpfattach(bpf_attach_fn_t attach, bpf_detach_fn_t detach,
-    zoneid_t zoneid, bpf_itap_fn_t tapfunc, bpf_provider_reg_fn_t provider)
+ipnet_set_itap(bpf_itap_fn_t tapfunc)
 {
-	ipnet_stack_t	*ips;
-	ipnetif_t	*ipnetif;
-	avl_tree_t	*tree;
-	ipnetif_t	*next;
-
-	if (zoneid == GLOBAL_ZONEID) {
-		ipnet_itap = tapfunc;
-	}
-
-	VERIFY((ips = ipnet_find_by_zoneid(zoneid)) != NULL);
-
-	/*
-	 * If we're setting a new attach function, call it for every
-	 * mac that has already been attached.
-	 */
-	if (attach != NULL && ips->ips_bpfattach_fn == NULL) {
-		ASSERT(detach != NULL);
-		if (provider != NULL) {
-			(void) provider(&bpf_ipnet);
-		}
-		/*
-		 * The call to ipnet_bpfattach() calls into bpf`bpfattach
-		 * which then wants to resolve the link name into a link id.
-		 * For ipnet, this results in a call back to
-		 * ipnet_get_linkid_byname which also needs to lock and walk
-		 * the AVL tree. Thus the call to ipnet_bpfattach needs to
-		 * be made without the avl_lock held.
-		 */
-		mutex_enter(&ips->ips_event_lock);
-		ips->ips_bpfattach_fn = attach;
-		ips->ips_bpfdetach_fn = detach;
-		mutex_enter(&ips->ips_avl_lock);
-		tree = &ips->ips_avl_by_index;
-		for (ipnetif = avl_first(tree); ipnetif != NULL;
-		    ipnetif = next) {
-			ipnetif_refhold(ipnetif);
-			mutex_exit(&ips->ips_avl_lock);
-			ipnet_bpfattach(ipnetif);
-			mutex_enter(&ips->ips_avl_lock);
-			next = avl_walk(tree, ipnetif, AVL_AFTER);
-			ipnetif_refrele(ipnetif);
-		}
-		mutex_exit(&ips->ips_avl_lock);
-		ipnet_bpf_probe_shared(ips);
-		mutex_exit(&ips->ips_event_lock);
-
-	} else if (attach == NULL && ips->ips_bpfattach_fn != NULL) {
-		ASSERT(ips->ips_bpfdetach_fn != NULL);
-		mutex_enter(&ips->ips_event_lock);
-		ips->ips_bpfattach_fn = NULL;
-		mutex_enter(&ips->ips_avl_lock);
-		tree = &ips->ips_avl_by_index;
-		for (ipnetif = avl_first(tree); ipnetif != NULL;
-		    ipnetif = next) {
-			ipnetif_refhold(ipnetif);
-			mutex_exit(&ips->ips_avl_lock);
-			ipnet_bpfdetach((ipnetif_t *)ipnetif);
-			mutex_enter(&ips->ips_avl_lock);
-			next = avl_walk(tree, ipnetif, AVL_AFTER);
-			ipnetif_refrele(ipnetif);
-		}
-		mutex_exit(&ips->ips_avl_lock);
-		ipnet_bpf_release_shared(ips);
-		ips->ips_bpfdetach_fn = NULL;
-		mutex_exit(&ips->ips_event_lock);
-
-		if (provider != NULL) {
-			(void) provider(&bpf_ipnet);
-		}
-	}
+	ipnet_itap = tapfunc;
 }
 
 /*
@@ -2148,13 +2049,23 @@ ipnet_open_byname(const char *name, ipnetif_t **ptr, zoneid_t zoneid)
 	VERIFY((ips = ipnet_find_by_zoneid(zoneid)) != NULL);
 
 	mutex_enter(&ips->ips_avl_lock);
-	ipnetif = avl_find(&ips->ips_avl_by_name, (char *)name, NULL);
-	if (ipnetif != NULL) {
-		ipnetif_refhold(ipnetif);
+
+	/*
+	 * Shared instance zone?
+	 */
+	if (netstackid_to_zoneid(zoneid_to_netstackid(zoneid)) != zoneid) {
+		uintptr_t key[2] = { zoneid, (uintptr_t)name };
+
+		ipnetif = avl_find(&ips->ips_avl_by_shared, (void *)key, NULL);
+	} else {
+		ipnetif = avl_find(&ips->ips_avl_by_name, (void *)name, NULL);
 	}
+	if (ipnetif != NULL)
+		ipnetif_refhold(ipnetif);
 	mutex_exit(&ips->ips_avl_lock);
 
 	*ptr = ipnetif;
+	ipnet_rele(ips);
 
 	if (ipnetif == NULL)
 		return (ESRCH);
@@ -2212,6 +2123,7 @@ ipnet_get_linkid_byname(const char *name, uint_t *idp, zoneid_t zoneid)
 	}
 
 	mutex_exit(&ips->ips_avl_lock);
+	ipnet_rele(ips);
 
 	if (ifp == NULL)
 		return (ESRCH);
@@ -2317,6 +2229,7 @@ ipnet_promisc_add(void *handle, uint_t how, void *data, uintptr_t *mhandle,
 	}
 
 	*mhandle = (uintptr_t)ipnet;
+	netstack_rele(ns);
 
 	return (0);
 
@@ -2324,6 +2237,7 @@ regfail:
 	cmn_err(CE_WARN, "net_hook_register failed: %d", error);
 	strfree(ipnet->ipnet_hook->h_name);
 	hook_free(ipnet->ipnet_hook);
+	netstack_rele(ns);
 	return (error);
 }
 
@@ -2397,7 +2311,7 @@ ipnet_bpf_bounce(hook_event_token_t token, hook_data_t info, void *arg)
 
 	ipnet_itap(ipnet->ipnet_data, mp,
 	    hdr->hpo_htype == IPOBS_HOOK_OUTBOUND,
-	    ntohs(hdr->hpo_pktlen) + (mp->b_wptr - mp->b_rptr));
+	    ntohl(hdr->hpo_pktlen) + MBLKL(mp));
 
 	return (0);
 }
@@ -2446,8 +2360,6 @@ ipnetif_clone_create(ipnetif_t *ifp, zoneid_t zoneid)
 	avl_insert(&ips->ips_avl_by_shared, newif, where);
 	mutex_exit(&ips->ips_avl_lock);
 
-	ipnet_bpfattach(newif);
-
 	return (newif);
 }
 
@@ -2470,57 +2382,9 @@ ipnetif_clone_release(ipnetif_t *ipnetif)
 		mutex_enter(&ips->ips_avl_lock);
 		avl_remove(&ips->ips_avl_by_shared, ipnetif);
 		mutex_exit(&ips->ips_avl_lock);
-		ipnet_bpfdetach(ipnetif);
 	}
 	if (dofree) {
 		ASSERT(ipnetif->if_sharecnt == 0);
 		ipnetif_free(ipnetif);
 	}
-}
-
-/*
- * Called when BPF loads, the goal is to tell BPF about all of the interfaces
- * in use by zones that have a shared IP stack. These interfaces are stored
- * in the ips_avl_by_shared tree. Note that if there are 1000 bge0's in use
- * as bge0:1 through to bge0:1000, then this would be represented by a single
- * bge0 on that AVL tree.
- */
-static void
-ipnet_bpf_probe_shared(ipnet_stack_t *ips)
-{
-	ipnetif_t	*next;
-	ipnetif_t	*ifp;
-
-	mutex_enter(&ips->ips_avl_lock);
-
-	for (ifp = avl_first(&ips->ips_avl_by_shared); ifp != NULL;
-	    ifp = next) {
-		ipnetif_refhold(ifp);
-		mutex_exit(&ips->ips_avl_lock);
-		ipnet_bpfattach(ifp);
-		mutex_enter(&ips->ips_avl_lock);
-		next = avl_walk(&ips->ips_avl_by_shared, ifp, AVL_AFTER);
-		ipnetif_refrele(ifp);
-	}
-	mutex_exit(&ips->ips_avl_lock);
-}
-
-static void
-ipnet_bpf_release_shared(ipnet_stack_t *ips)
-{
-	ipnetif_t	*next;
-	ipnetif_t	*ifp;
-
-	mutex_enter(&ips->ips_avl_lock);
-
-	for (ifp = avl_first(&ips->ips_avl_by_shared); ifp != NULL;
-	    ifp = next) {
-		ipnetif_refhold(ifp);
-		mutex_exit(&ips->ips_avl_lock);
-		ipnet_bpfdetach(ifp);
-		mutex_enter(&ips->ips_avl_lock);
-		next = avl_walk(&ips->ips_avl_by_shared, ifp, AVL_AFTER);
-		ipnetif_refrele(ifp);
-	}
-	mutex_exit(&ips->ips_avl_lock);
 }

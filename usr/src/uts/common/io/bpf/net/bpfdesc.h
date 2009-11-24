@@ -51,6 +51,64 @@
 #include <sys/queue.h>
 
 /*
+ * Access to "layer 2" networking is provided through each such provider
+ * delcaring a set of functions to use in the structure below. It has been
+ * modeled around what's required to use the mac layer. All of the functions
+ * below must be declared, even if only filled by a stub function.
+ */
+typedef struct bpf_provider_s {
+	int		bpr_unit;
+	int		(*bpr_open)(const char *, uintptr_t *, zoneid_t);
+	void		(*bpr_close)(uintptr_t);
+	const char 	*(*bpr_name)(uintptr_t);
+	int		(*bpr_type)(uintptr_t);
+	void		(*bpr_sdu_get)(uintptr_t, uint_t *);
+	int		(*bpr_tx)(uintptr_t, mblk_t *);
+	uintptr_t	(*bpr_promisc_add)(uintptr_t, int, void *, uintptr_t *,
+			    int);
+	void		(*bpr_promisc_remove)(uintptr_t);
+	int		(*bpr_getlinkid)(const char *, datalink_id_t *,
+			    zoneid_t);
+	void		(*bpr_client_close)(uintptr_t);
+	const char 	*(*bpr_client_name)(uintptr_t);
+	int		(*bpr_client_open)(uintptr_t, uintptr_t *);
+	int		(*bpr_getzone)(uintptr_t, zoneid_t *);
+	int		(*bpr_getdlt)(uintptr_t, uint_t *);
+} bpf_provider_t;
+
+typedef struct bpf_provider_list {
+	LIST_ENTRY(bpf_provider_list)	bpl_next;
+	bpf_provider_t			*bpl_what;
+} bpf_provider_list_t;
+
+/*
+ * The bpr_field from bpf_provider_t expects an integer that comes from
+ * the list of defines below.
+ */
+#define	BPR_MAC		1
+#define	BPR_IPNET	2
+
+#define	MBPF_OPEN(_m, _n, _p, _z)	(_m)->bpr_open(_n, (uintptr_t *)_p, _z)
+#define	MBPF_CLOSE(_m, _h)		(_m)->bpr_close(_h)
+#define	MBPF_NAME(_m, _h)		(_m)->bpr_name(_h)
+#define	MBPF_TYPE(_m, _h)		(_m)->bpr_type(_h)
+#define	MBPF_SDU_GET(_m, _h, _p)	(_m)->bpr_sdu_get(_h, _p)
+#define	MBPF_TX(_m, _h, _pkt)		(_m)->bpr_tx(_h, _pkt)
+#define	MBPF_PROMISC_ADD(_m, _h, _o, _d, _p, _f) \
+				(_m)->bpr_promisc_add(_h, _o, _d, _p, _f)
+#define	MBPF_PROMISC_REMOVE(_m, _h)	(_m)->bpr_promisc_remove(_h)
+#define	MBPF_GET_LINKID(_m, _n, _ip, _z) \
+					(_m)->bpr_getlinkid(_n, _ip, _z)
+#define	MBPF_CLIENT_CLOSE(_m, _h)	(_m)->bpr_client_close(_h)
+#define	MBPF_CLIENT_NAME(_m, _h)	(_m)->bpr_client_name(_h)
+#define	MBPF_CLIENT_OPEN(_m, _h, _p)	(_m)->bpr_client_open((uintptr_t)_h, \
+					    (uintptr_t *)_p)
+#define	MBPF_GET_ZONE(_m, _h, _zp)	(_m)->bpr_getzone(_h, _zp)
+#define	MBPF_GET_DLT(_m, _h, _dp)	(_m)->bpr_getdlt(_h, _dp);
+#define	MBPF_GET_HDRLEN(_m, _h, _dp)	(_m)->bpr_gethdrlen(_h, _dp);
+
+
+/*
  * Descriptor associated with each open bpf file.
  */
 struct bpf_d {
@@ -73,7 +131,7 @@ struct bpf_d {
 
 	int		bd_bufsize;	/* absolute length of buffers */
 
-	struct bpf_if 	*bd_bif;	/* interface descriptor */
+	uintptr_t 	bd_bif;		/* interface pointer */
 	ulong_t		bd_rtout;	/* Read timeout in 'ticks' */
 	struct bpf_insn *bd_filter; 	/* filter code */
 	size_t		bd_filter_size;
@@ -100,6 +158,7 @@ struct bpf_d {
 	 */
 	kmutex_t	bd_lock;
 	kcondvar_t	bd_wait;
+	uintptr_t	bd_mh;		/* where mac_handle gets put */
 	uintptr_t	bd_mcip;	/* Where mac_client_handle_t gets put */
 	uintptr_t	bd_promisc_handle;
 	minor_t		bd_dev;		/* device number for this handle */
@@ -107,6 +166,11 @@ struct bpf_d {
 	zoneid_t	bd_zone;	/* zoneid of the opening process */
 	int		bd_inuse;
 	int		bd_waiting;
+	char		bd_ifname[LIFNAMSIZ];
+	int		bd_dlt;
+	int		bd_hdrlen;
+	bpf_provider_t	bd_mac;
+	datalink_id_t	bd_linkid;
 	/*
 	 * bd_promisc_flags is used to store the promiscuous state of the
 	 * the interface in BPF so that the correct mode of operation can
@@ -139,78 +203,6 @@ struct bpf_d_ext {
 	char		bde_ifname[IFNAMSIZ];
 };
 
-/*
- * Access to "layer 2" networking is provided through each such provider
- * delcaring a set of functions to use in the structure below. It has been
- * modeled around what's required to use the mac layer. All of the functions
- * below must be declared, even if only filled by a stub function.
- */
-typedef struct bpf_provider_s {
-	int		bpr_unit;
-	int		(*bpr_open)(const char *, uintptr_t *, zoneid_t);
-	void		(*bpr_close)(uintptr_t);
-	const char 	*(*bpr_name)(uintptr_t);
-	int		(*bpr_type)(uintptr_t);
-	void		(*bpr_sdu_get)(uintptr_t, uint_t *);
-	int		(*bpr_tx)(uintptr_t, mblk_t *);
-	uintptr_t	(*bpr_promisc_add)(uintptr_t, int, void *, uintptr_t *,
-			    int);
-	void		(*bpr_promisc_remove)(uintptr_t);
-	int		(*bpr_getlinkid)(const char *, datalink_id_t *,
-			    zoneid_t);
-	void		(*bpr_client_close)(uintptr_t);
-	const char 	*(*bpr_client_name)(uintptr_t);
-	int		(*bpr_client_open)(uintptr_t, uintptr_t *);
-} bpf_provider_t;
-
-typedef struct bpf_provider_list {
-	LIST_ENTRY(bpf_provider_list)	bpl_next;
-	bpf_provider_t			*bpl_what;
-} bpf_provider_list_t;
-
-/*
- * The bpr_field from bpf_provider_t expects an integer that comes from
- * the list of defines below.
- */
-#define	BPR_MAC		1
-#define	BPR_IPNET	2
-
-#define	MBPF_OPEN(_m, _n, _p, _z)	(_m)->bpr_open(_n, (uintptr_t *)_p, _z)
-#define	MBPF_CLOSE(_m, _h)		(_m)->bpr_close(_h)
-#define	MBPF_NAME(_m, _h)		(_m)->bpr_name(_h)
-#define	MBPF_TYPE(_m, _h)		(_m)->bpr_type(_h)
-#define	MBPF_SDU_GET(_m, _h, _p)	(_m)->bpr_sdu_get(_h, _p)
-#define	MBPF_TX(_m, _h, _pkt)		(_m)->bpr_tx(_h, _pkt)
-#define	MBPF_PROMISC_ADD(_m, _h, _o, _d, _p, _f) \
-				(_m)->bpr_promisc_add(_h, _o, _d, _p, _f)
-#define	MBPF_PROMISC_REMOVE(_m, _h)	(_m)->bpr_promisc_remove(_h)
-#define	MBPF_GET_LINKID(_m, _n, _ip, _z) \
-					(_m)->bpr_getlinkid(_n, _ip, _z)
-#define	MBPF_CLIENT_CLOSE(_m, _h)	(_m)->bpr_client_close(_h)
-#define	MBPF_CLIENT_NAME(_m, _h)	(_m)->bpr_client_name(_h)
-#define	MBPF_CLIENT_OPEN(_m, _h, _p)	(_m)->bpr_client_open((uintptr_t)_h, \
-					    (uintptr_t *)_p)
-
-/*
- * Descriptor associated with each attached hardware interface.
- */
-struct bpf_if {
-	TAILQ_ENTRY(bpf_if) bif_next;	/* list of all interfaces */
-	LIST_HEAD(, bpf_d) bif_dlist;	/* list of all descriptors att'd */
-	uint_t		bif_dlt;	/* link layer type */
-	uint_t		bif_hdrlen;	/* length of header (with padding) */
-	/*
-	 * Solaris specific bits after this.
-	 */
-	uintptr_t	bif_ifp;	/* correspoding interface */
-	datalink_id_t	bif_linkid;
-	kmutex_t	bif_lock;
-	zoneid_t	bif_zoneid;	/* zone that the interface is in */
-	int		bif_inuse;
-	bpf_provider_t	bif_mac;
-	char		bif_ifname[LIFNAMSIZ+1];
-};
-
 #ifdef _KERNEL
 typedef struct bpf_kstats_s {
 	kstat_named_t	kp_read_wait;
@@ -227,9 +219,10 @@ int	 bpf_setf(struct bpf_d *, struct bpf_program *);
 typedef void	(*bpf_attach_fn_t)(uintptr_t, int, zoneid_t, int);
 typedef void	(*bpf_detach_fn_t)(uintptr_t);
 typedef int	(*bpf_provider_reg_fn_t)(bpf_provider_t *);
+typedef	LIST_HEAD(, bpf_provider_list) bpf_provider_head_t;
 
 extern bpf_provider_t	*bpf_find_provider_by_id(int);
-extern void		bpf_open_zone(const zoneid_t);
 extern int		bpf_provider_tickle(char *, zoneid_t);
+extern bpf_provider_head_t bpf_providers;
 
 #endif /* !_NET_BPFDESC_H_ */

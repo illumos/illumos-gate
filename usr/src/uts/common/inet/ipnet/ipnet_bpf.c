@@ -40,7 +40,9 @@ static void ipnet_bpf_client_close(uintptr_t);
 static const char *ipnet_bpf_client_name(uintptr_t);
 static int ipnet_bpf_client_open(uintptr_t, uintptr_t *);
 static void ipnet_bpf_close(uintptr_t);
+static int ipnet_bpf_getdlt(uintptr_t, uint_t *);
 static int ipnet_bpf_getlinkid(const char *, datalink_id_t *, zoneid_t);
+static int ipnet_bpf_getzone(uintptr_t, zoneid_t *);
 static int ipnet_bpf_open(const char *, uintptr_t *, zoneid_t);
 static uintptr_t ipnet_bpf_promisc_add(uintptr_t, int, void *,
     uintptr_t *, int);
@@ -62,13 +64,17 @@ bpf_provider_t bpf_ipnet = {
 	ipnet_bpf_getlinkid,
 	ipnet_bpf_client_close,
 	ipnet_bpf_client_name,
-	ipnet_bpf_client_open
+	ipnet_bpf_client_open,
+	ipnet_bpf_getzone,
+	ipnet_bpf_getdlt,
 };
 
 /*ARGSUSED*/
 static int
 ipnet_bpf_open(const char *name, uintptr_t *mhandlep, zoneid_t zoneid)
 {
+	if (zoneid == ALL_ZONES)
+		zoneid = GLOBAL_ZONEID;
 	return (ipnet_open_byname(name, (ipnetif_t **)mhandlep, zoneid));
 }
 
@@ -182,12 +188,36 @@ ipnet_bpf_client_name(uintptr_t chandle)
 static int
 ipnet_bpf_getlinkid(const char *name, datalink_id_t *idp, zoneid_t zoneid)
 {
-	uint_t	index;
-	int	error;
+	uint_t		index;
+	int		error;
+	ipnet_stack_t	*ips;
+
+	VERIFY((ips = ipnet_find_by_zoneid(zoneid)) != NULL);
 
 	index = 0;
+	mutex_enter(&ips->ips_event_lock);
 	error = ipnet_get_linkid_byname(name, &index, zoneid);
+	mutex_exit(&ips->ips_event_lock);
 	if (error == 0)
 		*idp = (datalink_id_t)index;
+	ipnet_rele(ips);
 	return (error);
+}
+
+static int
+ipnet_bpf_getzone(uintptr_t handle, zoneid_t *zip)
+{
+	ipnetif_t *ipnetif;
+
+	ipnetif = (ipnetif_t *)handle;
+	*zip = ipnetif->if_zoneid;
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+ipnet_bpf_getdlt(uintptr_t handle, uint_t *dlp)
+{
+	*dlp = DL_IPNET;
+	return (0);
 }

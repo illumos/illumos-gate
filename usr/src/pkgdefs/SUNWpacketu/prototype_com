@@ -35,6 +35,8 @@
 # packaging files
 i pkginfo
 i copyright
+i preremove
+i postinstall
 #
 # source locations relative to the prototype file
 #
