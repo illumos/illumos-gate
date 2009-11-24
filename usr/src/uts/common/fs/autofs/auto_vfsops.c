@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/errno.h>
@@ -360,7 +358,7 @@ auto_mount(vfs_t *vfsp, vnode_t *vp, struct mounta *uap, cred_t *cr)
 	char datalen = uap->datalen;
 	dev_t autofs_dev;
 	char strbuff[MAXPATHLEN + 1];
-	vnode_t *kvp;
+	vnode_t *kkvp;
 	struct autofs_globals *fngp;
 	zone_t *zone = curproc->p_zone;
 
@@ -622,15 +620,15 @@ auto_mount(vfs_t *vfsp, vnode_t *vp, struct mounta *uap, cred_t *cr)
 	 * happens when the daemon gets restarted?
 	 */
 	if ((error = lookupname("/dev/ticotsord", UIO_SYSSPACE, FOLLOW,
-	    NULLVPP, &kvp)) != 0) {
+	    NULLVPP, &kkvp)) != 0) {
 		cmn_err(CE_WARN, "autofs: lookupname: %d", error);
 		goto errout;
 	}
 
-	fnip->fi_knconf.knc_rdev = kvp->v_rdev;
+	fnip->fi_knconf.knc_rdev = kkvp->v_rdev;
 	fnip->fi_knconf.knc_protofmly = NC_LOOPBACK;
 	fnip->fi_knconf.knc_semantics = NC_TPI_COTS_ORD;
-	VN_RELE(kvp);
+	VN_RELE(kkvp);
 
 	/*
 	 * Make the root vnode
@@ -701,7 +699,7 @@ auto_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 
 	fnip = vfstofni(vfsp);
 	AUTOFS_DPRINT((4, "auto_unmount vfsp %p fnip %p\n", (void *)vfsp,
-			(void *)fnip));
+	    (void *)fnip));
 
 	if (secpolicy_fs_unmount(cr, vfsp) != 0)
 		return (EPERM);

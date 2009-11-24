@@ -284,16 +284,16 @@ ibcm_arp_get_ibd_insts(ibcm_arp_ibd_insts_t *ibds)
 static int
 ibcm_do_ip_ioctl(int cmd, int len, void *arg)
 {
-	vnode_t *kvp;
+	vnode_t *kkvp;
 	TIUSER  *tiptr;
 	struct  strioctl iocb;
 	int	err = 0;
 
-	if (lookupname("/dev/udp", UIO_SYSSPACE, FOLLOW, NULLVPP, &kvp) != 0)
+	if (lookupname("/dev/udp", UIO_SYSSPACE, FOLLOW, NULLVPP, &kkvp) != 0)
 		return (EPROTO);
 
-	if (t_kopen(NULL, kvp->v_rdev, FREAD|FWRITE, &tiptr, CRED()) != 0) {
-		VN_RELE(kvp);
+	if (t_kopen(NULL, kkvp->v_rdev, FREAD|FWRITE, &tiptr, CRED()) != 0) {
+		VN_RELE(kkvp);
 		return (EPROTO);
 	}
 
@@ -303,7 +303,7 @@ ibcm_do_ip_ioctl(int cmd, int len, void *arg)
 	iocb.ic_dp = (caddr_t)arg;
 	err = kstr_ioctl(tiptr->fp->f_vnode, I_STR, (intptr_t)&iocb);
 	(void) t_kclose(tiptr, 0);
-	VN_RELE(kvp);
+	VN_RELE(kkvp);
 	return (err);
 }
 

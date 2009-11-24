@@ -142,6 +142,7 @@
 #include <vm/vm_dep.h>
 #include <vm/as.h>
 #include <vm/hat.h>
+#include <vm/seg_kmem.h>
 
 /*
  * vnode for all pages which are retired from the VM system;
@@ -272,8 +273,6 @@ int page_retire_first_ue = 1;
  * setting things up. This is internal only and is not a tunable!
  */
 static int pr_enable = 0;
-
-extern struct vnode kvp;
 
 #ifdef	DEBUG
 struct page_retire_debug {

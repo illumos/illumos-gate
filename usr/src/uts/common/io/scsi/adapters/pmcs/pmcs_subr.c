@@ -6601,12 +6601,12 @@ pmcs_smp_function_result(pmcs_hw_t *pwp, smp_response_frame_t *srf)
  * acch: ddi_acc_handle_t to use for the mapping
  * dmah: ddi_dma_handle_t to use
  * length: Amount of memory for mapping
- * kvp: Pointer filled in with kernel virtual address on successful return
+ * kvap: Pointer filled in with kernel virtual address on successful return
  * dma_addr: Pointer filled in with DMA address on successful return
  */
 boolean_t
 pmcs_dma_setup(pmcs_hw_t *pwp, ddi_dma_attr_t *dma_attr, ddi_acc_handle_t *acch,
-    ddi_dma_handle_t *dmah, size_t length, caddr_t *kvp, uint64_t *dma_addr)
+    ddi_dma_handle_t *dmah, size_t length, caddr_t *kvap, uint64_t *dma_addr)
 {
 	dev_info_t		*dip = pwp->dip;
 	ddi_dma_cookie_t	cookie;
@@ -6632,7 +6632,7 @@ pmcs_dma_setup(pmcs_hw_t *pwp, ddi_dma_attr_t *dma_attr, ddi_acc_handle_t *acch,
 	}
 
 	if (ddi_dma_mem_alloc(*dmah, length, &mattr, ddma_flag, DDI_DMA_SLEEP,
-	    NULL, kvp, &real_length, acch) != DDI_SUCCESS) {
+	    NULL, kvap, &real_length, acch) != DDI_SUCCESS) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "Failed to allocate DMA mem");
 		ddi_dma_free_handle(dmah);
@@ -6640,7 +6640,7 @@ pmcs_dma_setup(pmcs_hw_t *pwp, ddi_dma_attr_t *dma_attr, ddi_acc_handle_t *acch,
 		return (B_FALSE);
 	}
 
-	if (ddi_dma_addr_bind_handle(*dmah, NULL, *kvp, real_length,
+	if (ddi_dma_addr_bind_handle(*dmah, NULL, *kvap, real_length,
 	    ddabh_flag, DDI_DMA_SLEEP, NULL, &cookie, &cookie_cnt)
 	    != DDI_DMA_MAPPED) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL, "Failed to bind DMA");

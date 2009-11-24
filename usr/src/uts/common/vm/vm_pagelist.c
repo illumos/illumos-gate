@@ -1117,13 +1117,12 @@ page_ctrs_adjust(int mnode)
 		/* update shared hpm_counters in other mnodes */
 		if (interleaved_mnodes) {
 			for (i = 0; i < max_mem_nodes; i++) {
-				if (i == mnode)
+				if ((i == mnode) ||
+				    (mem_node_config[i].exists == 0))
 					continue;
 				ASSERT(
 				    PAGE_COUNTERS_COUNTERS(i, r) == old_ctr ||
 				    PAGE_COUNTERS_COUNTERS(i, r) == NULL);
-				if (mem_node_config[i].exists == 0)
-					continue;
 				PAGE_COUNTERS_COUNTERS(i, r) = new_ctr;
 				PAGE_COUNTERS_ENTRIES(i, r) = pcsz;
 				PAGE_COUNTERS_BASE(i, r) = newbase;
@@ -1277,6 +1276,33 @@ cleanup:
 	return (rc);
 }
 
+/*
+ * Cleanup the hpm_counters field in the page counters
+ * array.
+ */
+void
+page_ctrs_cleanup(void)
+{
+	int r;	/* region size */
+	int i;	/* mnode index */
+
+	/*
+	 * Get the page counters write lock while we are
+	 * setting the page hpm_counters field to NULL
+	 * for non-existent mnodes.
+	 */
+	for (i = 0; i < max_mem_nodes; i++) {
+		PAGE_CTRS_WRITE_LOCK(i);
+		if (mem_node_config[i].exists) {
+			PAGE_CTRS_WRITE_UNLOCK(i);
+			continue;
+		}
+		for (r = 1; r < mmu_page_sizes; r++) {
+			PAGE_COUNTERS_COUNTERS(i, r) = NULL;
+		}
+		PAGE_CTRS_WRITE_UNLOCK(i);
+	}
+}
 
 #ifdef DEBUG
 
@@ -3449,7 +3475,17 @@ page_geti_contig_pages(int mnode, uint_t bin, uchar_t szc, int flags,
 			pfnhi = pfnlo + (slotlen * szcpgcnt) - 1;
 	}
 
-	memsegs_lock(0);
+	/*
+	 * This routine is can be called recursively so we shouldn't
+	 * acquire a reader lock if a write request is pending. This
+	 * could lead to a deadlock with the DR thread.
+	 *
+	 * Returning NULL informs the caller that we could not get
+	 * a contig page with the required characteristics.
+	 */
+
+	if (!memsegs_trylock(0))
+		return (NULL);
 
 	/*
 	 * loop through memsegs to look for contig page candidates

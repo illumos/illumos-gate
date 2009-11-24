@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * VM - page locking primitives
@@ -33,7 +32,6 @@
 #include <sys/vtrace.h>
 #include <sys/debug.h>
 #include <sys/cmn_err.h>
-#include <sys/vnode.h>
 #include <sys/bitmap.h>
 #include <sys/lockstat.h>
 #include <sys/sysmacros.h>
@@ -41,6 +39,7 @@
 #include <vm/page.h>
 #include <vm/seg_enum.h>
 #include <vm/vm_dep.h>
+#include <vm/seg_kmem.h>
 
 /*
  * This global mutex is for logical page locking.
@@ -144,8 +143,6 @@ static pad_mutex_t	pszc_mutex[PSZC_MTX_TABLE_SIZE];
 	    ((uintptr_t)(vp) >> 10) + \
 	    ((uintptr_t)(vp) >> 12)) \
 	    & (VPH_TABLE_SIZE - 1))
-
-extern	struct vnode	kvp;
 
 /*
  * Two slots after VPH_TABLE_SIZE are reserved in vph_mutex for kernel vnodes.
@@ -1024,6 +1021,12 @@ static krwlock_t memsegslock;
  * memlist (phys_install, phys_avail) locking.
  */
 static krwlock_t memlists_lock;
+
+int
+memsegs_trylock(int writer)
+{
+	return (rw_tryenter(&memsegslock, writer ? RW_WRITER : RW_READER));
+}
 
 void
 memsegs_lock(int writer)

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Platform specific implementation code
@@ -1505,7 +1503,6 @@ i_cpr_reusable_supported(void)
 static int
 i_cpr_find_ppages(void)
 {
-	extern struct vnode prom_ppages;
 	struct page *pp;
 	struct memlist *pmem;
 	pgcnt_t npages, pcnt, scnt, vcnt;
@@ -1539,15 +1536,15 @@ i_cpr_find_ppages(void)
 	scnt = cpr_count_seg_pages(mapflag, cpr_clrbit);
 
 	/*
-	 * set bits for phys pages referenced by the prom_ppages vnode;
+	 * set bits for phys pages referenced by the promvp vnode;
 	 * these pages are mostly comprised of forthdebug words
 	 */
 	vcnt = 0;
-	for (pp = prom_ppages.v_pages; pp; ) {
+	for (pp = promvp.v_pages; pp; ) {
 		if (cpr_setbit(pp->p_offset, mapflag) == 0)
 			vcnt++;
 		pp = pp->p_vpnext;
-		if (pp == prom_ppages.v_pages)
+		if (pp == promvp.v_pages)
 			break;
 	}
 

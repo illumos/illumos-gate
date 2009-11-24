@@ -2561,8 +2561,6 @@ memseg_find(pfn_t base, pfn_t *next)
 	return (NULL);
 }
 
-extern struct vnode prom_ppages;
-
 /*
  * Put page allocated by OBP on prom_ppages
  */
@@ -2604,7 +2602,7 @@ kphysm_erase(uint64_t addr, uint64_t len)
 			add_physmem_cb(pp, base);
 			if (page_trylock(pp, SE_EXCL) == 0)
 				cmn_err(CE_PANIC, "prom page locked");
-			(void) page_hashin(pp, &prom_ppages,
+			(void) page_hashin(pp, &promvp,
 			    (offset_t)base, NULL);
 			(void) page_pp_lock(pp, 0, 1);
 			pp++, base++, num--;
@@ -2700,7 +2698,7 @@ kphysm_add(uint64_t addr, uint64_t len, int reclaim)
 		 * unhash and unlock it
 		 */
 		while (rpp < lpp) {
-			ASSERT(PAGE_EXCL(rpp) && rpp->p_vnode == &prom_ppages);
+			ASSERT(PAGE_EXCL(rpp) && rpp->p_vnode == &promvp);
 			ASSERT(PP_ISNORELOC(rpp));
 			PP_CLRNORELOC(rpp);
 			page_pp_unlock(rpp, 0, 1);

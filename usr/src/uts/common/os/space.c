@@ -101,6 +101,11 @@ struct var v;
 #include <sys/bootconf.h>
 
 /*
+ * Data for segkmem pages that should be resident
+ */
+struct vnode kvps[KV_MAX];
+
+/*
  * Data from swapgeneric.c that must be resident.
  */
 struct vnode *rootvp;		/* vnode of the root device */

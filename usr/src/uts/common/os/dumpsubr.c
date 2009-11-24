@@ -817,13 +817,9 @@ static inline int
 dump_pfn_check(pfn_t pfn)
 {
 	page_t *pp = page_numtopp_nolock(pfn);
-#if defined(__sparc)
-	extern struct vnode prom_ppages;
-#endif
-
 	if (pp == NULL || pp->p_pagenum != pfn ||
 #if defined(__sparc)
-	    pp->p_vnode == &prom_ppages ||
+	    pp->p_vnode == &promvp ||
 #else
 	    PP_ISBOOTPAGES(pp) ||
 #endif

@@ -41,6 +41,7 @@
 
 #include <sys/sdt.h>		/* dtrace is S10 or later */
 
+#include <vm/seg_kmem.h>
 #include "sd_bcache.h"
 #include "sd_trace.h"
 #include "sd_io.h"
@@ -53,12 +54,6 @@
 #ifndef DS_DDICT
 extern uintptr_t kobj_getsymvalue(char *, int);	/* DDI violation */
 #endif
-
-/*
- * Shouldn't really use an extern here but no .h file provides this
- * so we have no choice (other than not using it)
- */
-extern struct vnode kvp;		/* the vnode for seg_kmem memory */
 
 #define	DO_PAGE_LIST	sdbc_do_page	/* enable pagelist code */
 

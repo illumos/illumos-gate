@@ -898,8 +898,7 @@ int	page_szc_user_filtered(size_t);
 #define	PP_ISAGED(pp)		(((pp)->p_state & P_FREE) && \
 					((pp)->p_vnode == NULL))
 #define	PP_ISNORELOC(pp)	((pp)->p_state & P_NORELOC)
-#define	PP_ISKAS(pp)		(((pp)->p_vnode == &kvp) || \
-					    ((pp)->p_vnode == &zvp))
+#define	PP_ISKAS(pp)		(VN_ISKAS((pp)->p_vnode))
 #define	PP_ISNORELOCKERNEL(pp)	(PP_ISNORELOC(pp) && PP_ISKAS(pp))
 #define	PP_ISMIGRATE(pp)	((pp)->p_state & P_MIGRATE)
 #define	PP_ISSWAP(pp)		((pp)->p_state & P_SWAP)
@@ -1177,6 +1176,7 @@ int page_trycapture(page_t *pp, uint_t szc, uint_t flags, void *datap);
 void page_unlock_capture(page_t *pp);
 int page_capture_unretire_pp(page_t *);
 
+extern int memsegs_trylock(int);
 extern void memsegs_lock(int);
 extern void memsegs_unlock(int);
 extern int memsegs_lock_held(void);

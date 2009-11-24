@@ -44,9 +44,6 @@ extern struct memseg *memseg_alloc();
 extern page_t *ppvm_base;
 extern pgcnt_t ppvm_size;
 
-static vnode_t pp_vn, rsv_vn;
-static pgcnt_t rsv_metapgs;
-static int meta_rsv_enable;
 static int sun4v_memseg_debug;
 
 extern struct memseg *memseg_reuse(pgcnt_t);
@@ -77,12 +74,11 @@ extern void remap_to_dummy(caddr_t, pgcnt_t);
 int
 memseg_alloc_meta(pfn_t base, pgcnt_t npgs, void **ptp, pgcnt_t *metap)
 {
-	page_t		*pp, *opp, *epp, *pgpp;
+	page_t		*pp, *opp, *epp;
 	pgcnt_t		metapgs;
-	int		i, rsv;
+	int		i;
 	struct seg	kseg;
 	caddr_t		vaddr;
-	u_offset_t	off;
 
 	/*
 	 * Verify incoming memory is within supported DR range.
@@ -95,7 +91,7 @@ memseg_alloc_meta(pfn_t base, pgcnt_t npgs, void **ptp, pgcnt_t *metap)
 	metapgs = btopr(npgs * sizeof (page_t));
 
 	if (!IS_P2ALIGNED((uint64_t)pp, PAGESIZE) &&
-	    page_find(&pp_vn, (u_offset_t)pp)) {
+	    page_find(&mpvp, (u_offset_t)pp)) {
 		/*
 		 * Another memseg has page_t's in the same
 		 * page which 'pp' resides.  This would happen
@@ -120,7 +116,7 @@ memseg_alloc_meta(pfn_t base, pgcnt_t npgs, void **ptp, pgcnt_t *metap)
 	}
 
 	if (!IS_P2ALIGNED((uint64_t)epp, PAGESIZE) &&
-	    page_find(&pp_vn, (u_offset_t)epp)) {
+	    page_find(&mpvp, (u_offset_t)epp)) {
 		/*
 		 * Another memseg has page_t's in the same
 		 * page which 'epp' resides.  This would happen
@@ -144,58 +140,19 @@ memseg_alloc_meta(pfn_t base, pgcnt_t npgs, void **ptp, pgcnt_t *metap)
 	vaddr = (caddr_t)pp;
 
 	for (i = 0; i < metapgs; i++)
-		if (page_find(&pp_vn, (u_offset_t)(vaddr + i * PAGESIZE)))
+		if (page_find(&mpvp, (u_offset_t)(vaddr + i * PAGESIZE)))
 			panic("page_find(0x%p, %p)\n",
-			    (void *)&pp_vn, (void *)(vaddr + i * PAGESIZE));
+			    (void *)&mpvp, (void *)(vaddr + i * PAGESIZE));
 
 	/*
 	 * Allocate the metadata pages; these are the pages that will
 	 * contain the page_t's for the incoming memory.
-	 *
-	 * If a normal allocation fails, use the reserved metapgs for
-	 * a small allocation; otherwise retry with PG_WAIT.
 	 */
-	rsv = off = 0;
-	if (metapgs <= rsv_metapgs) {
-		MEMSEG_DEBUG("memseg_get: use rsv 0x%lx metapgs", metapgs);
-		ASSERT(meta_rsv_enable);
-		rsv = 1;
-	} else if ((pgpp = page_create_va(&pp_vn, (u_offset_t)pp, ptob(metapgs),
+	if ((page_create_va(&mpvp, (u_offset_t)pp, ptob(metapgs),
 	    PG_NORELOC | PG_EXCL, &kseg, vaddr)) == NULL) {
-		cmn_err(CE_WARN, "memseg_get: can't get 0x%ld metapgs",
+		MEMSEG_DEBUG("memseg_alloc_meta: can't get 0x%ld metapgs",
 		    metapgs);
 		return (KPHYSM_ERESOURCE);
-	}
-	if (rsv) {
-		/*
-		 * The reseve pages must be hashed out of the reserve vnode
-		 * and rehashed by <pp_vn,vaddr>.  The resreved pages also
-		 * must be replenished immedidately at the end of the add
-		 * processing.
-		 */
-		for (i = 0; i < metapgs; i++) {
-			pgpp = page_find(&rsv_vn, off);
-			ASSERT(pgpp);
-			page_hashout(pgpp, 0);
-			hat_devload(kas.a_hat, vaddr, PAGESIZE,
-			    page_pptonum(pgpp), PROT_READ | PROT_WRITE,
-			    HAT_LOAD | HAT_LOAD_REMAP | HAT_LOAD_NOCONSIST);
-			ASSERT(!page_find(&pp_vn, (u_offset_t)vaddr));
-			if (!page_hashin(pgpp, &pp_vn, (u_offset_t)vaddr, 0))
-				panic("memseg_get: page_hashin(0x%p, 0x%p)",
-				    (void *)pgpp, (void *)vaddr);
-			off += PAGESIZE;
-			vaddr += PAGESIZE;
-			rsv_metapgs--;
-		}
-	} else {
-		for (i = 0; i < metapgs; i++) {
-			hat_devload(kas.a_hat, vaddr, PAGESIZE,
-			    page_pptonum(pgpp), PROT_READ | PROT_WRITE,
-			    HAT_LOAD | HAT_LOAD_REMAP | HAT_LOAD_NOCONSIST);
-			pgpp = pgpp->p_next;
-			vaddr += PAGESIZE;
-		}
 	}
 
 	ASSERT(ptp);
@@ -228,7 +185,7 @@ memseg_free_meta(void *ptp, pgcnt_t metapgs)
 	 * Free pages allocated during add.
 	 */
 	for (i = 0; i < metapgs; i++) {
-		pp = page_find(&pp_vn, off);
+		pp = page_find(&mpvp, off);
 		ASSERT(pp);
 		ASSERT(pp->p_szc == 0);
 		page_io_unlock(pp);
@@ -248,7 +205,7 @@ memseg_get_metapfn(void *ptp, pgcnt_t metapg)
 	ASSERT(off);
 	ASSERT(IS_P2ALIGNED((uint64_t)off, PAGESIZE));
 
-	pp = page_find(&pp_vn, off);
+	pp = page_find(&mpvp, off);
 	ASSERT(pp);
 	ASSERT(pp->p_szc == 0);
 	ASSERT(pp->p_pagenum != PFN_INVALID);
@@ -285,7 +242,7 @@ memseg_remap_meta(struct memseg *seg)
 	 */
 
 	if (!IS_P2ALIGNED((uint64_t)pp, PAGESIZE) &&
-	    page_find(&pp_vn, (u_offset_t)(pp - 1)) && !page_deleted(pp - 1)) {
+	    page_find(&mpvp, (u_offset_t)(pp - 1)) && !page_deleted(pp - 1)) {
 		/*
 		 * Another memseg has page_t's in the same
 		 * page which 'pp' resides.  This would happen
@@ -312,7 +269,7 @@ memseg_remap_meta(struct memseg *seg)
 	}
 
 	if (!IS_P2ALIGNED((uint64_t)epp, PAGESIZE) &&
-	    page_find(&pp_vn, (u_offset_t)epp) && !page_deleted(epp)) {
+	    page_find(&mpvp, (u_offset_t)epp) && !page_deleted(epp)) {
 		/*
 		 * Another memseg has page_t's in the same
 		 * page which 'epp' resides.  This would happen
@@ -333,78 +290,17 @@ memseg_remap_meta(struct memseg *seg)
 
 	off = (u_offset_t)pp;
 
-	MEMSEG_DEBUG("memseg_remap: off=0x%lx metapgs=0x%lx\n", (uint64_t)off,
-	    metapgs);
+	MEMSEG_DEBUG("memseg_remap_meta: off=0x%lx metapgs=0x%lx\n",
+	    (uint64_t)off, metapgs);
 	/*
 	 * Free pages allocated during add.
 	 */
 	for (i = 0; i < metapgs; i++) {
-		pp = page_find(&pp_vn, off);
+		pp = page_find(&mpvp, off);
 		ASSERT(pp);
 		ASSERT(pp->p_szc == 0);
 		page_io_unlock(pp);
 		page_destroy(pp, 0);
 		off += PAGESIZE;
 	}
-}
-
-static void
-rsv_alloc()
-{
-	int i;
-	page_t *pp;
-	pgcnt_t metapgs;
-	u_offset_t off;
-	struct seg kseg;
-
-	kseg.s_as = &kas;
-
-	/*
-	 * Reserve enough page_t pages for an add request of
-	 * RSV_SIZE bytes.
-	 */
-	metapgs = btopr(btop(RSV_SIZE) * sizeof (page_t)) - rsv_metapgs;
-
-	for (i = off = 0; i < metapgs; i++, off += PAGESIZE) {
-		(void) page_create_va(&rsv_vn, off, PAGESIZE,
-		    PG_NORELOC | PG_WAIT, &kseg, 0);
-		pp = page_find(&rsv_vn, off);
-		ASSERT(pp);
-		ASSERT(PAGE_EXCL(pp));
-		page_iolock_init(pp);
-		rsv_metapgs++;
-	}
-}
-
-void
-i_dr_mem_init(size_t *hint)
-{
-	if (meta_rsv_enable) {
-		rsv_alloc();
-		if (hint)
-			*hint = RSV_SIZE;
-	}
-}
-
-void
-i_dr_mem_fini()
-{
-	int i;
-	page_t *pp;
-	u_offset_t off;
-
-	for (i = off = 0; i < rsv_metapgs; i++, off += PAGESIZE) {
-		if (pp = page_find(&rsv_vn, off)) {
-			ASSERT(PAGE_EXCL(pp));
-			page_destroy(pp, 0);
-		}
-		ASSERT(!page_find(&rsv_vn, off));
-	}
-	rsv_metapgs = 0;
-}
-
-void
-i_dr_mem_update()
-{
-	rsv_alloc();
 }

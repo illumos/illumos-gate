@@ -35,10 +35,14 @@
 #include <sys/machsystm.h>
 #include <vm/seg_kpm.h>
 #include <vm/mach_kpm.h>
+#include <vm/faultcode.h>
+
+extern pfn_t memseg_get_start(struct memseg *);
 
 /*
  * Kernel Physical Mapping (kpm) facility
  */
+
 
 void
 mach_kpm_init()
@@ -226,7 +230,15 @@ hat_kpm_addmem_mseg_update(struct memseg *msp, pgcnt_t nkpmpgs,
 	 * if nkpmpgs needs to be used at some point.
 	 */
 
-	base = msp->pages_base;
+	/*
+	 * The meta (page_t) pages for dynamically added memory are allocated
+	 * either from the incoming memory itself or from existing memory.
+	 * In the former case the base of the incoming pages will be different
+	 * than the base of the dynamic segment so call memseg_get_start() to
+	 * get the actual base of the incoming memory for each case.
+	 */
+
+	base = memseg_get_start(msp);
 	end = msp->pages_end;
 
 	hat_devload(kas.a_hat, kpm_vbase + mmu_ptob(base),
@@ -259,7 +271,15 @@ hat_kpm_delmem_mseg_update(struct memseg *msp, struct memseg **mspp)
 {
 	pfn_t base, end;
 
-	base = msp->pages_base;
+	/*
+	 * The meta (page_t) pages for dynamically added memory are allocated
+	 * either from the incoming memory itself or from existing memory.
+	 * In the former case the base of the incoming pages will be different
+	 * than the base of the dynamic segment so call memseg_get_start() to
+	 * get the actual base of the incoming memory for each case.
+	 */
+
+	base = memseg_get_start(msp);
 	end = msp->pages_end;
 
 	hat_unload(kas.a_hat, kpm_vbase +  mmu_ptob(base), mmu_ptob(end - base),

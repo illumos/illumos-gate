@@ -36,6 +36,7 @@
 #include <sys/mdesc.h>
 #include <sys/mach_descrip.h>
 #include <sys/cpu_module.h>
+#include <vm/seg_kmem.h>
 
 #ifndef _KMDB
 #include <sys/pte.h>
@@ -50,7 +51,7 @@ int cif_cpu_mp_ready;
 int (*prom_cif_handler)(void *) = NULL;
 
 extern struct memlist *phys_avail;
-extern struct vnode prom_ppages;
+extern struct vnode promvp;
 extern void kdi_tlb_page_unlock(caddr_t, int);
 
 #define	COMBINE(hi, lo) (((uint64_t)(uint32_t)(hi) << 32) | (uint32_t)(lo))
@@ -309,7 +310,7 @@ unmap_prom_mappings(struct translation *transroot, size_t ntransroot)
 				ASSERT(PAGE_EXCL(pp));
 				ASSERT(PP_ISNORELOC(pp));
 				ASSERT(!PP_ISFREE(pp));
-				ASSERT(page_find(&prom_ppages, pfn));
+				ASSERT(page_find(&promvp, pfn));
 				ASSERT(page_get_pagecnt(pp->p_szc) == 1);
 
 				if (pp->p_mapping) {

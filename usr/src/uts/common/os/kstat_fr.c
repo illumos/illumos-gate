@@ -876,8 +876,6 @@ extern caddr_t	econtig32;
 extern caddr_t	econtig;
 #endif	/* __sparc */
 
-extern struct vnode kvp;
-
 /* ARGSUSED */
 static int
 system_pages_kstat_update(kstat_t *ksp, int rw)

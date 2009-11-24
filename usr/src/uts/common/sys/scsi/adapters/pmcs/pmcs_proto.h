@@ -291,7 +291,7 @@ int pmcs_sata_identify(pmcs_hw_t *, pmcs_phy_t *);
 void pmcs_sata_work(pmcs_hw_t *);
 boolean_t pmcs_dma_setup(pmcs_hw_t *pwp, ddi_dma_attr_t *dma_attr,
     ddi_acc_handle_t *acch, ddi_dma_handle_t *dmah, size_t length,
-    caddr_t *kvp, uint64_t *dma_addr);
+    caddr_t *kvap, uint64_t *dma_addr);
 void pmcs_fm_ereport(pmcs_hw_t *pwp, char *detail);
 int pmcs_check_dma_handle(ddi_dma_handle_t handle);
 int pmcs_check_acc_handle(ddi_acc_handle_t handle);

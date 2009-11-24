@@ -1318,10 +1318,22 @@ extern uint_t pvn_vmodsort_supported;
 	((VP1) && (VP2) && (vn_getops(VP1) == vn_getops(VP2)) ? \
 	VOP_CMP(VP1, VP2, NULL) : 0))
 
-extern struct vnode kvp;
-extern struct vnode zvp;
+/*
+ * Some well-known global vnodes used by the VM system to name pages.
+ */
+extern struct vnode kvps[];
 
-#define	VN_ISKAS(vp)		((vp) == &kvp || (vp) == &zvp)
+typedef enum {
+	KV_KVP,		/* vnode for all segkmem pages */
+	KV_ZVP,		/* vnode for all ZFS pages */
+#if defined(__sparc)
+	KV_MPVP,	/* vnode for all page_t meta-pages */
+	KV_PROMVP,	/* vnode for all PROM pages */
+#endif	/* __sparc */
+	KV_MAX		/* total number of vnodes in kvps[] */
+} kvps_index_t;
+
+#define	VN_ISKAS(vp)	((vp) >= &kvps[0] && (vp) < &kvps[KV_MAX])
 
 #endif	/* _KERNEL */
 
@@ -1367,7 +1379,6 @@ struct async_reqs {
  * be necessary to ensure the page was freed.
  */
 #define	VN_DISPOSE(pp, flag, dn, cr)	{ \
-	extern struct vnode kvp; \
 	if ((pp)->p_vnode != NULL && !VN_ISKAS((pp)->p_vnode)) \
 		VOP_DISPOSE((pp)->p_vnode, (pp), (flag), (dn), (cr), NULL); \
 	else if ((flag) == B_FREE) \

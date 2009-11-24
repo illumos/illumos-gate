@@ -5170,18 +5170,18 @@ rpcib_rdma_capable_interface(struct lifreq *lifrp)
 static int
 rpcib_do_ip_ioctl(int cmd, int len, void *arg)
 {
-	vnode_t *kvp, *vp;
+	vnode_t *kkvp, *vp;
 	TIUSER  *tiptr;
 	struct  strioctl iocb;
 	k_sigset_t smask;
 	int	err = 0;
 
-	if (lookupname("/dev/udp", UIO_SYSSPACE, FOLLOW, NULLVPP, &kvp) == 0) {
-		if (t_kopen(NULL, kvp->v_rdev, FREAD|FWRITE,
+	if (lookupname("/dev/udp", UIO_SYSSPACE, FOLLOW, NULLVPP, &kkvp) == 0) {
+		if (t_kopen(NULL, kkvp->v_rdev, FREAD|FWRITE,
 		    &tiptr, CRED()) == 0) {
 			vp = tiptr->fp->f_vnode;
 		} else {
-			VN_RELE(kvp);
+			VN_RELE(kkvp);
 			return (EPROTO);
 		}
 	} else {
@@ -5196,7 +5196,7 @@ rpcib_do_ip_ioctl(int cmd, int len, void *arg)
 	err = kstr_ioctl(vp, I_STR, (intptr_t)&iocb);
 	sigunintr(&smask);
 	(void) t_kclose(tiptr, 0);
-	VN_RELE(kvp);
+	VN_RELE(kkvp);
 	return (err);
 }
 

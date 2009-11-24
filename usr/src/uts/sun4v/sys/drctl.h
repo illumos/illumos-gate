@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,7 +46,8 @@ typedef enum {
 	DRCTL_IO_CONFIG_REQUEST,
 	DRCTL_IO_CONFIG_NOTIFY,
 	DRCTL_IO_UNCONFIG_REQUEST,
-	DRCTL_IO_UNCONFIG_NOTIFY
+	DRCTL_IO_UNCONFIG_NOTIFY,
+	DRCTL_DRC_BLOCK
 } drctl_cmds_t;
 
 /*
@@ -135,6 +136,8 @@ typedef void *drctl_cookie_t;
 extern int drctl_config_init(int, int,
     drctl_rsrc_t *, int, drctl_resp_t **, size_t *, drctl_cookie_t);
 extern int drctl_config_fini(drctl_cookie_t, drctl_rsrc_t *, int);
+extern void drctl_block(void);
+extern void drctl_unblock(void);
 
 /*
  * Values for the 2nd arg (flags) of drctl_config_init

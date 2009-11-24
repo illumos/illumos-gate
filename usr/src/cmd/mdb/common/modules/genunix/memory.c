@@ -29,6 +29,7 @@
 #include <sys/thread.h>
 #include <sys/swap.h>
 #include <sys/memlist.h>
+#include <sys/vnode.h>
 #if defined(__i386) || defined(__amd64)
 #include <sys/balloon_impl.h>
 #endif
@@ -490,6 +491,7 @@ memstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	memstat_t stats;
 	GElf_Sym sym;
 	vn_htable_t ht;
+	struct vnode *kvps;
 	uintptr_t vn_size = 0;
 #if defined(__i386) || defined(__amd64)
 	bln_stats_t bln_stats;
@@ -533,25 +535,19 @@ memstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	/* read kernel vnode pointer */
-	if (mdb_lookup_by_obj(MDB_OBJ_EXEC, "kvp",
+	/* read kernel vnode array pointer */
+	if (mdb_lookup_by_obj(MDB_OBJ_EXEC, "kvps",
 	    (GElf_Sym *)&sym) == -1) {
-		mdb_warn("unable to read kvp");
+		mdb_warn("unable to read kvps");
 		return (DCMD_ERR);
 	}
-
-	stats.ms_kvp = (struct vnode *)(uintptr_t)sym.st_value;
+	kvps = (struct vnode *)(uintptr_t)sym.st_value;
+	stats.ms_kvp =  &kvps[KV_KVP];
 
 	/*
-	 * Read the zio vnode pointer.  It may not exist on all kernels, so it
-	 * it isn't found, it's not a fatal error.
+	 * Read the zio vnode pointer.
 	 */
-	if (mdb_lookup_by_obj(MDB_OBJ_EXEC, "zvp",
-	    (GElf_Sym *)&sym) == -1) {
-		stats.ms_zvp = NULL;
-	} else {
-		stats.ms_zvp = (struct vnode *)(uintptr_t)sym.st_value;
-	}
+	stats.ms_zvp = &kvps[KV_ZVP];
 
 	/*
 	 * If physmem != total_pages, then the administrator has limited the

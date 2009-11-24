@@ -278,7 +278,6 @@ _init(void)
 	}
 
 	vlds_mdeg_init();
-	(void) vlds_mdeg_register();
 
 	return (s);
 }
@@ -292,8 +291,6 @@ _fini(void)
 		return (s);
 
 	ddi_soft_state_fini(&vlds_statep);
-
-	(void) vlds_mdeg_unregister();
 
 	return (s);
 }
@@ -338,6 +335,8 @@ vlds_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 	vlds_minor_init();
 
+	(void) vlds_mdeg_register();
+
 	return (DDI_SUCCESS);
 }
 
@@ -352,6 +351,7 @@ vlds_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 
 	vlds_minor_free(vlds_minor_bitmap);
 	ddi_remove_minor_node(devi, NULL);
+	(void) vlds_mdeg_unregister();
 	return (DDI_SUCCESS);
 }
 

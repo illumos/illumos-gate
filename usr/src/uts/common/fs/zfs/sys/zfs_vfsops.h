@@ -143,7 +143,7 @@ extern int zfs_set_userquota(zfsvfs_t *zfsvfs, zfs_userquota_prop_t type,
 extern boolean_t zfs_usergroup_overquota(zfsvfs_t *zfsvfs,
     boolean_t isgroup, uint64_t fuid);
 extern int zfs_set_version(zfsvfs_t *zfsvfs, uint64_t newvers);
-extern int zfsvfs_create(const char *name, zfsvfs_t **zvp);
+extern int zfsvfs_create(const char *name, zfsvfs_t **zfvp);
 extern void zfsvfs_free(zfsvfs_t *zfsvfs);
 extern int zfs_check_global_label(const char *dsname, const char *hexsl);
 

@@ -4365,10 +4365,6 @@ page_invalidate_pages()
 	pgcnt_t nbusypages;
 	int retry = 0;
 	const int MAXRETRIES = 4;
-#if defined(__sparc)
-	extern struct vnode prom_ppages;
-#endif /* __sparc */
-
 top:
 	/*
 	 * Flush dirty pages and destroy the clean ones.
@@ -4385,12 +4381,7 @@ top:
 		 * skip the page if it has no vnode or the page associated
 		 * with the kernel vnode or prom allocated kernel mem.
 		 */
-#if defined(__sparc)
-		if ((vp = pp->p_vnode) == NULL || VN_ISKAS(vp) ||
-		    vp == &prom_ppages)
-#else /* x86 doesn't have prom or prom_ppage */
 		if ((vp = pp->p_vnode) == NULL || VN_ISKAS(vp))
-#endif /* __sparc */
 			continue;
 
 		/*
@@ -6726,14 +6717,10 @@ cleanup:
 int
 page_capture_pre_checks(page_t *pp, uint_t flags)
 {
-#if defined(__sparc)
-	extern struct vnode prom_ppages;
-#endif /* __sparc */
-
 	ASSERT(pp != NULL);
 
 #if defined(__sparc)
-	if (pp->p_vnode == &prom_ppages) {
+	if (pp->p_vnode == &promvp) {
 		return (EPERM);
 	}
 

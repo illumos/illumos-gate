@@ -156,6 +156,7 @@ _init(void)
 
 	drctlp->drc_inst = -1;
 	mutex_init(&drctlp->drc_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&drctlp->drc_busy_cv, NULL, CV_DRIVER, NULL);
 
 	if ((rv = mod_install(&modlinkage)) != 0)
 		mutex_destroy(&drctlp->drc_lock);
@@ -171,7 +172,7 @@ _fini(void)
 
 	if ((rv = mod_remove(&modlinkage)) != 0)
 		return (rv);
-
+	cv_destroy(&drctlp->drc_busy_cv);
 	mutex_destroy(&drctlp->drc_lock);
 	return (0);
 }
@@ -376,7 +377,6 @@ verify_response(int cmd,
 	return (0);
 }
 
-
 static int
 drctl_config_common(int cmd, int flags, drctl_rsrc_t *res,
     int count, drctl_resp_t **rbuf, size_t *rsize, size_t *rq_size)
@@ -460,7 +460,6 @@ drctl_config_init(int cmd, int flags, drctl_rsrc_t *res,
 	}
 
 	mutex_enter(&drctlp->drc_lock);
-
 	if (drctlp->drc_busy != NULL) {
 		mutex_exit(&drctlp->drc_lock);
 		*rbuf = drctl_generate_err_resp(busy_msg, rsize);
@@ -488,6 +487,7 @@ drctl_config_init(int cmd, int flags, drctl_rsrc_t *res,
 			kmem_free(*rbuf, *rsize);
 			*rbuf = drctl_generate_err_resp(rsp_msg, rsize);
 			drctlp->drc_busy = NULL;
+			cv_broadcast(&drctlp->drc_busy_cv);
 		} else { /* message format is valid */
 			drctlp->drc_busy = ck;
 			drctlp->drc_cmd = cmd;
@@ -511,8 +511,8 @@ drctl_config_init(int cmd, int flags, drctl_rsrc_t *res,
 		drctlp->drc_cmd = -1;
 		drctlp->drc_flags = 0;
 		drctlp->drc_busy = NULL;
+		cv_broadcast(&drctlp->drc_busy_cv);
 	}
-
 	return (rv);
 }
 
@@ -528,12 +528,10 @@ drctl_config_fini(drctl_cookie_t ck, drctl_rsrc_t *res, int count)
 	size_t rq_size;
 
 	mutex_enter(&drctlp->drc_lock);
-
 	if (drctlp->drc_busy != ck) {
 		mutex_exit(&drctlp->drc_lock);
 		return (EBUSY);
 	}
-
 	mutex_exit(&drctlp->drc_lock);
 
 	flags = drctlp->drc_flags;
@@ -579,11 +577,11 @@ drctl_config_fini(drctl_cookie_t ck, drctl_rsrc_t *res, int count)
 	    flags, res, count, NULL, 0, &rq_size);
 
 done:
-	drctlp->drc_cmd = -1;
-	drctlp->drc_flags = 0;
-	drctlp->drc_busy = NULL;
-
-	return (rv);
+		drctlp->drc_cmd = -1;
+		drctlp->drc_flags = 0;
+		drctlp->drc_busy = NULL;
+		cv_broadcast(&drctlp->drc_busy_cv);
+		return (rv);
 }
 
 static int
@@ -696,4 +694,36 @@ pack_message(int cmd,
 	}
 
 	return (msgp);
+}
+
+/*
+ * Block DR operations
+ */
+void
+drctl_block(void)
+{
+	/* Wait for any in progress DR operation to complete */
+	mutex_enter(&drctlp->drc_lock);
+	while (drctlp->drc_busy != NULL)
+		(void) cv_wait_sig(&drctlp->drc_busy_cv, &drctlp->drc_lock);
+	/* Mark the link busy */
+	drctlp->drc_busy = (drctl_cookie_t)-1;
+	drctlp->drc_cmd = DRCTL_DRC_BLOCK;
+	drctlp->drc_flags = 0;
+	mutex_exit(&drctlp->drc_lock);
+}
+
+/*
+ * Unblock DR operations
+ */
+void
+drctl_unblock(void)
+{
+	/* Mark the link free */
+	mutex_enter(&drctlp->drc_lock);
+	drctlp->drc_cmd = -1;
+	drctlp->drc_flags = 0;
+	drctlp->drc_busy = NULL;
+	cv_broadcast(&drctlp->drc_busy_cv);
+	mutex_exit(&drctlp->drc_lock);
 }

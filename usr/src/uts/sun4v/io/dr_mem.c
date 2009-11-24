@@ -203,10 +203,6 @@ static mde_cookie_t dr_mem_find_node_md(dr_mem_blk_t *, md_t *, mde_cookie_t *);
 static int mem_add(pfn_t, pgcnt_t);
 static int mem_del(pfn_t, pgcnt_t);
 
-static size_t rsvaddsz;
-extern void i_dr_mem_init(uint64_t *);
-extern void i_dr_mem_fini();
-extern void i_dr_mem_update();
 extern int kphysm_add_memory_dynamic(pfn_t, pgcnt_t);
 
 int
@@ -261,8 +257,6 @@ dr_mem_init(void)
 		return (rv);
 	}
 
-	i_dr_mem_init(&rsvaddsz);
-
 	return (0);
 }
 
@@ -270,8 +264,6 @@ static int
 dr_mem_fini(void)
 {
 	int rv;
-
-	i_dr_mem_fini();
 
 	if ((rv = ds_cap_fini(&dr_mem_cap)) != 0) {
 		cmn_err(CE_NOTE, "dr_mem: ds_cap_fini failed: %d", rv);
@@ -720,6 +712,8 @@ dr_mem_list_query(dr_mem_hdr_t *req, dr_mem_hdr_t **resp, int *resp_len)
 	dr_mem_hdr_t	*rp;
 	dr_mem_query_t	*stat;
 
+	drctl_block();
+
 	/* the incoming array of req_mblks to configure */
 	req_mblks = DR_MEM_CMD_MBLKS(req);
 
@@ -763,6 +757,8 @@ dr_mem_list_query(dr_mem_hdr_t *req, dr_mem_hdr_t **resp, int *resp_len)
 
 	*resp = rp;
 	*resp_len = rlen;
+
+	drctl_unblock();
 
 	return (0);
 }
@@ -832,7 +828,7 @@ static int
 dr_mem_configure(dr_mem_blk_t *mbp, int *status)
 {
 	int rv;
-	uint64_t addr, size, addsz;
+	uint64_t addr, size;
 
 	rv = 0;
 	addr = mbp->addr;
@@ -854,64 +850,10 @@ dr_mem_configure(dr_mem_blk_t *mbp, int *status)
 			*status = DR_MEM_STAT_UNCONFIGURED;
 			rv = DR_MEM_RES_FAILURE;
 		}
-	} else if (rsvaddsz) {
-		addr += size;
-
-		/*
-		 * Add up to the first <rsvaddsz> portion of mblock
-		 * first since that portion has reserved meta pages.
-		 * This will likely guarantee an additional amount of
-		 * free pages from which we may have to allocate the
-		 * rest of the meta pages.
-		 *
-		 * Break up the request in descending order (if needed)
-		 * in order to ensure that cage grows from the high end
-		 * of the original request.
-		 */
-		for (addsz = MIN(size, rsvaddsz); addsz > 0; addsz = size) {
-			ASSERT(addr >= mbp->addr);
-			DR_DBG_MEM("addsz=0x%lx  size=0x%lx\n", addsz, size);
-			if (rv = mem_add(btop(addr - addsz), btop(addsz))) {
-				DR_DBG_MEM("failed to configure span"
-				    " 0x%lx.0x%lx (%d)\n", addr, addsz, rv);
-				break;
-			} else {
-				size -= addsz;
-				addr -= addsz;
-			}
-		}
-
-		/*
-		 * Mark the mblock configured if any span
-		 * in that mblock was successfully added.
-		 *
-		 * In case of partial success:
-		 *
-		 *	rv != DR_MEM_RES_OK
-		 *	status == DR_MEM_STAT_CONFIGURED
-		 *
-		 * mark span actually configured.
-		 */
-		if (size == mbp->size && rv != KPHYSM_ESPAN) {
-			*status = DR_MEM_STAT_UNCONFIGURED;
-		} else {
-			DR_DBG_MEM("failed (partial) to configure span"
-			    " 0x%lx.0x%lx (%d)\n", addr, addsz, rv);
-			*status = DR_MEM_STAT_CONFIGURED;
-			mbp->addr = addr;
-			mbp->size -= size;
-		}
-
-		rv = cvt_err(rv);
-		i_dr_mem_update();
 	} else {
-		/*
-		 * The reserved feature is disabled, add whole mblock.
-		 */
 		rv = mem_add(btop(addr), btop(size));
 		DR_DBG_MEM("addr=0x%lx size=0x%lx rv=%d\n", addr, size, rv);
 		if (rv) {
-			rv = cvt_err(rv);
 			*status = DR_MEM_STAT_UNCONFIGURED;
 		} else {
 			*status = DR_MEM_STAT_CONFIGURED;
@@ -934,7 +876,6 @@ dr_mem_unconfigure(dr_mem_blk_t *mbp, int *status)
 			*status = DR_MEM_STAT_CONFIGURED;
 			rv = DR_MEM_RES_EINVAL;
 	} else if (rv = mem_del(btop(mbp->addr), btop(mbp->size))) {
-		rv = cvt_err(rv);
 		*status = DR_MEM_STAT_CONFIGURED;
 	} else {
 		*status = DR_MEM_STAT_UNCONFIGURED;
@@ -1117,15 +1058,16 @@ mem_add(pfn_t base, pgcnt_t npgs)
 	DR_DBG_MEM("%s: begin base=0x%lx npgs=0x%lx\n", __func__, base, npgs);
 
 	if (npgs == 0)
-		return (0);
+		return (DR_MEM_RES_OK);
 
 	rv = kphysm_add_memory_dynamic(base, npgs);
 	DR_DBG_MEM("%s: kphysm_add(0x%lx, 0x%lx) = %d", __func__, base, npgs,
 	    rv);
-	if (!rv) {
+	if (rv == KPHYSM_OK) {
 		if (rc = kcage_range_add(base, npgs, KCAGE_DOWN))
 			cmn_err(CE_WARN, "kcage_range_add() = %d", rc);
 	}
+	rv = cvt_err(rv);
 	return (rv);
 }
 
@@ -1145,6 +1087,7 @@ static int
 mem_del(pfn_t base, pgcnt_t npgs)
 {
 	int rv, err, del_range = 0;
+	int convert = 1;
 	mem_sync_t ms;
 	memquery_t mq;
 	memhandle_t mh;
@@ -1154,10 +1097,11 @@ mem_del(pfn_t base, pgcnt_t npgs)
 	DR_DBG_MEM("%s: begin base=0x%lx npgs=0x%lx\n", __func__, base, npgs);
 
 	if (npgs == 0)
-		return (0);
+		return (DR_MEM_RES_OK);
 
 	if ((rv = kphysm_del_gethandle(&mh)) != KPHYSM_OK) {
 		cmn_err(CE_WARN, "%s: del_gethandle() = %d", __func__, rv);
+		rv = cvt_err(rv);
 		return (rv);
 	}
 	if ((rv = kphysm_del_span_query(base, npgs, &mq))
@@ -1168,10 +1112,19 @@ mem_del(pfn_t base, pgcnt_t npgs)
 	if (mq.nonrelocatable) {
 		DR_DBG_MEM("%s: non-reloc pages = %ld",
 		    __func__, mq.nonrelocatable);
-		rv = KPHYSM_ENONRELOC;
+		rv  = KPHYSM_ENONRELOC;
 		goto done;
 	}
 	if (rv = kcage_range_delete(base, npgs)) {
+		switch (rv) {
+		case EBUSY:
+			rv = DR_MEM_RES_ENOTVIABLE;
+			break;
+		default:
+			rv = DR_MEM_RES_FAILURE;
+			break;
+		}
+		convert = 0; /* conversion done */
 		cmn_err(CE_WARN, "%s: del_range() = %d", __func__, rv);
 		goto done;
 	} else {
@@ -1183,6 +1136,18 @@ mem_del(pfn_t base, pgcnt_t npgs)
 	}
 	if ((rv = memlist_add_span(ptob(base), ptob(npgs), &d_ml))
 	    != MEML_SPANOP_OK) {
+		switch (rv) {
+		case MEML_SPANOP_ESPAN:
+			rv = DR_MEM_RES_ESPAN;
+			break;
+		case MEML_SPANOP_EALLOC:
+			rv = DR_MEM_RES_ERESOURCE;
+			break;
+		default:
+			rv = DR_MEM_RES_FAILURE;
+			break;
+		}
+		convert = 0; /* conversion done */
 		cmn_err(CE_WARN, "%s: add_span() = %d", __func__, rv);
 		goto done;
 	}
@@ -1245,6 +1210,8 @@ done:
 
 	if ((err = kphysm_del_release(mh)) != KPHYSM_OK)
 		cmn_err(CE_WARN, "%s: del_release() = %d", __func__, err);
+	if (convert)
+		rv = cvt_err(rv);
 
 	DR_DBG_MEM("%s: rv=%d", __func__, rv);
 

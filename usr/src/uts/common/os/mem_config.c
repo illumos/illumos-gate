@@ -63,6 +63,7 @@ extern void mem_node_add(pfn_t, pfn_t);
 extern void mem_node_del(pfn_t, pfn_t);
 
 extern uint_t page_ctrs_adjust(int);
+void page_ctrs_cleanup(void);
 static void kphysm_setup_post_add(pgcnt_t);
 static int kphysm_setup_pre_del(pgcnt_t);
 static void kphysm_setup_post_del(pgcnt_t, int);
@@ -101,7 +102,7 @@ extern pfn_t memseg_get_metapfn(void *, pgcnt_t);
 extern void memseg_remap_meta(struct memseg *);
 static int memseg_is_dynamic(struct memseg *);
 static int memseg_includes_meta(struct memseg *);
-static pfn_t memseg_get_start(struct memseg *);
+pfn_t memseg_get_start(struct memseg *);
 static void memseg_cpu_vm_flush(void);
 
 int meta_alloc_enable;
@@ -353,6 +354,9 @@ mapalloc:
 	if (rv) {
 
 		mem_node_del_range(pt_base, pnum);
+
+		/* cleanup the  page counters */
+		page_ctrs_cleanup();
 
 		hat_unload(kas.a_hat, (caddr_t)pp, ptob(metapgs),
 		    HAT_UNLOAD_UNMAP|HAT_UNLOAD_UNLOCK);
@@ -2384,6 +2388,8 @@ refused:
 		mem_node_del_range(mdsp->mds_base,
 		    mdsp->mds_base + mdsp->mds_npgs - 1);
 	}
+	/* cleanup the page counters */
+	page_ctrs_cleanup();
 
 	comp_code = KPHYSM_OK;
 

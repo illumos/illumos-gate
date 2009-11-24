@@ -111,8 +111,6 @@ struct seg kvseg32;		/* 32-bit kernel heap segment */
 vmem_t *heap32_arena;		/* 32-bit kernel heap arena */
 vmem_t *heaptext_arena;		/* heaptext arena */
 struct as kas;			/* kernel address space */
-struct vnode kvp;		/* vnode for all segkmem pages */
-struct vnode zvp;		/* vnode for zfs pages */
 int segkmem_reloc;		/* enable/disable relocatable segkmem pages */
 vmem_t *static_arena;		/* arena for caches to import static memory */
 vmem_t *static_alloc_arena;	/* arena for allocating static memory */

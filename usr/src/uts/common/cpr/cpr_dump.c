@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Fill in and write out the cpr state file
@@ -811,15 +809,8 @@ cpr_count_upages(int mapflag, bitfunc_t bitfunc)
 	page0 = pp = page_first();
 
 	do {
-#if defined(__sparc)
-		extern struct vnode prom_ppages;
-		if (pp->p_vnode == NULL || PP_ISKAS(pp) ||
-		    pp->p_vnode == &prom_ppages ||
-		    PP_ISFREE(pp) && PP_ISAGED(pp))
-#else
 		if (pp->p_vnode == NULL || PP_ISKAS(pp) ||
 		    PP_ISFREE(pp) && PP_ISAGED(pp))
-#endif /* __sparc */
 			continue;
 
 		pfn = page_pptonum(pp);
@@ -835,7 +826,7 @@ cpr_count_upages(int mapflag, bitfunc_t bitfunc)
 	    dcnt, tcnt);
 	CPR_DEBUG(CPR_DEBUG7, "cpr_count_upages: %ld pages, 0x%lx bytes\n",
 	    dcnt, mmu_ptob(dcnt));
-
+	page0 = NULL; /* for Lint */
 	return (dcnt);
 }
 

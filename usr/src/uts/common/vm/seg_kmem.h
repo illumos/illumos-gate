@@ -19,14 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _VM_SEG_KMEM_H
 #define	_VM_SEG_KMEM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -59,13 +58,21 @@ extern struct seg kvseg32;	/* 32-bit kernel heap segment */
 extern vmem_t *heap32_arena;	/* 32-bit kernel heap arena */
 extern vmem_t *heaptext_arena;	/* kernel text arena, from heap */
 extern struct as kas;		/* kernel address space */
-extern struct vnode kvp;	/* vnode for all segkmem pages */
-extern struct vnode zvp;	/* vnode for all segkmem pages for zfs */
 extern int segkmem_reloc;	/* enable/disable segkmem relocatable pages */
 extern vmem_t *static_arena;	/* arena for caches to import static memory */
 extern vmem_t *static_alloc_arena;	/* arena for allocating static memory */
 extern vmem_t *zio_arena;	/* arena for zio caches */
 extern vmem_t *zio_alloc_arena;	/* arena for zio caches */
+extern struct vnode kvps[];
+/*
+ * segkmem page vnodes
+ */
+#define	kvp		(kvps[KV_KVP])
+#define	zvp		(kvps[KV_ZVP])
+#if defined(__sparc)
+#define	mpvp		(kvps[KV_MPVP])
+#define	promvp		(kvps[KV_PROMVP])
+#endif	/* __sparc */
 
 extern int segkmem_create(struct seg *);
 extern page_t *segkmem_page_create(void *, size_t, int, void *);

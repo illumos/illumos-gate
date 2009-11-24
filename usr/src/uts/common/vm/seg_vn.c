@@ -566,7 +566,6 @@ segvn_create(struct seg *seg, void *argsp)
 			    !IS_P2ALIGNED(seg->s_size, pgsz)) {
 				a->szc = 0;
 			} else if (a->vp != NULL) {
-				extern struct vnode kvp;
 				if (IS_SWAPFSVP(a->vp) || VN_ISKAS(a->vp)) {
 					/*
 					 * paranoid check.
@@ -6017,7 +6016,6 @@ segvn_setpagesize(struct seg *seg, caddr_t addr, size_t len, uint_t szc)
 	pgcnt_t pgcnt = page_get_pagecnt(szc);
 	int err;
 	u_offset_t off = svd->offset + (uintptr_t)(addr - seg->s_base);
-	extern struct vnode kvp;
 
 	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
 	ASSERT(addr >= seg->s_base && eaddr <= seg->s_base + seg->s_size);

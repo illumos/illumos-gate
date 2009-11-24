@@ -911,7 +911,6 @@ kcage_init(pgcnt_t preferred_size)
 	page_t *pp;
 	kstat_t *ksp;
 
-	extern struct vnode kvp;
 	extern void page_list_noreloc_startup(page_t *);
 
 	ASSERT(!kcage_on);
@@ -1618,10 +1617,8 @@ kcage_invalidate_page(page_t *pp, pgcnt_t *nfreedp)
 	int result;
 
 #if defined(__sparc)
-	extern struct vnode prom_ppages;
-	ASSERT(pp->p_vnode != &prom_ppages);
+	ASSERT(pp->p_vnode != &promvp);
 #endif /* __sparc */
-
 	ASSERT(!PP_ISFREE(pp));
 	ASSERT(PAGE_EXCL(pp));
 

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -177,9 +175,6 @@ get_max_phys_size(
 }
 
 
-
-struct vnode prom_ppages;
-
 static void
 more_pages(uint64_t base, uint64_t len)
 {
@@ -226,7 +221,7 @@ less_pages(uint64_t base, uint64_t len)
 			 * are page numbers (gack) for >32 bit
 			 * physical memory machines.
 			 */
-			(void) page_hashin(pp, &prom_ppages,
+			(void) page_hashin(pp, &promvp,
 			    (offset_t)pfnum, NULL);
 
 			if (kcage_on) {

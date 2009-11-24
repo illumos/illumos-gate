@@ -2211,7 +2211,7 @@ typedef struct kmastat_args {
 static int
 kmastat_cache(uintptr_t addr, const kmem_cache_t *cp, kmastat_args_t *kap)
 {
-	kmastat_vmem_t **kvp = kap->ka_kvpp;
+	kmastat_vmem_t **kvpp = kap->ka_kvpp;
 	kmastat_vmem_t *kv;
 	datafmt_t *dfp = kmemfmt;
 	int magsize;
@@ -2234,15 +2234,15 @@ kmastat_cache(uintptr_t addr, const kmem_cache_t *cp, kmastat_args_t *kap)
 	(void) mdb_pwalk("kmem_cpu_cache", cpu_avail, &avail, addr);
 	(void) mdb_pwalk("kmem_slab_partial", slab_avail, &avail, addr);
 
-	for (kv = *kvp; kv != NULL; kv = kv->kv_next) {
+	for (kv = *kvpp; kv != NULL; kv = kv->kv_next) {
 		if (kv->kv_addr == (uintptr_t)cp->cache_arena)
 			goto out;
 	}
 
 	kv = mdb_zalloc(sizeof (kmastat_vmem_t), UM_SLEEP | UM_GC);
-	kv->kv_next = *kvp;
+	kv->kv_next = *kvpp;
 	kv->kv_addr = (uintptr_t)cp->cache_arena;
-	*kvp = kv;
+	*kvpp = kv;
 out:
 	kv->kv_meminuse += meminuse;
 	kv->kv_alloc += alloc;
