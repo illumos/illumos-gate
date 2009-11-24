@@ -1924,7 +1924,6 @@ zfs_set_prop_nvlist(const char *dsname, zprop_source_t source, nvlist_t *nvl,
 {
 	nvpair_t *pair;
 	nvpair_t *propval;
-	int err = 0;
 	int rv = 0;
 	uint64_t intval;
 	char *strval;
@@ -1941,6 +1940,7 @@ retry:
 	while ((pair = nvlist_next_nvpair(nvl, pair)) != NULL) {
 		const char *propname = nvpair_name(pair);
 		zfs_prop_t prop = zfs_name_to_prop(propname);
+		int err = 0;
 
 		/* decode the property value */
 		propval = pair;
@@ -2031,6 +2031,7 @@ retry:
 		pair = NULL;
 		while ((pair = nvlist_next_nvpair(genericnvl, pair)) != NULL) {
 			const char *propname = nvpair_name(pair);
+			int err = 0;
 
 			propval = pair;
 			if (nvpair_type(pair) == DATA_TYPE_NVLIST) {
