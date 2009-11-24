@@ -2160,14 +2160,14 @@ ndmp_iter_zfs(ndmp_context_t *nctx, int (*np_restore_property)(nvlist_t *,
 {
 	tlm_commands_t *cmds;
 	ndmp_metadata_header_t *mhp;
+	ndmp_metadata_header_ext_t *mhpx;
 	ndmp_metadata_property_t *mpp;
+	ndmp_metadata_property_ext_t *mppx;
 	tlm_cmd_t *lcmd;
 	int actual_size;
 	nvlist_t *nvl;
-	nvlist_t *nvl_head;
 	nvlist_t *valp;
 	nvpair_t *nvp = NULL;
-	nvpair_t *nvph = NULL;
 	char plname[100];
 	char *mhbuf, *pp, *tp;
 	int rv, i;
@@ -2182,14 +2182,11 @@ ndmp_iter_zfs(ndmp_context_t *nctx, int (*np_restore_property)(nvlist_t *,
 	    lcmd->tc_buffers == NULL)
 		return (-1);
 
+	/* Default minimum bytes needed */
 	size = sizeof (ndmp_metadata_header_t) +
 	    ZFS_MAX_PROPS * sizeof (ndmp_metadata_property_t);
 	size += align;
 	size &= ~align;
-
-	/* For nvlist cleanup */
-	if (nvlist_alloc(&nvl_head, NV_UNIQUE_NAME, 0) != 0)
-		return (-1);
 
 	if ((mhbuf = malloc(size)) == NULL)
 		return (-1);
@@ -2200,11 +2197,27 @@ ndmp_iter_zfs(ndmp_context_t *nctx, int (*np_restore_property)(nvlist_t *,
 		pp = mhbuf;
 
 		if (strncmp(mhp->nh_magic, ZFS_META_MAGIC,
+		    sizeof (mhp->nh_magic)) != 0 &&
+		    strncmp(mhp->nh_magic, ZFS_META_MAGIC_EXT,
 		    sizeof (mhp->nh_magic)) != 0) {
 			/* No more metadata */
 			tlm_unget_read_buffer(lcmd->tc_buffers, actual_size);
-			nvlist_free(nvl_head);
+			free(mhbuf);
 			return (0);
+		}
+
+		if (strncmp(mhp->nh_magic, ZFS_META_MAGIC_EXT,
+		    sizeof (mhp->nh_magic)) == 0) {
+			mhpx = (ndmp_metadata_header_ext_t *)mhp;
+			if (mhpx->nh_total_bytes > size) {
+				if ((pp = realloc(mhbuf, mhpx->nh_total_bytes))
+				    == NULL) {
+					free(mhbuf);
+					return (-1);
+				}
+				mhbuf = pp;
+			}
+			size = mhpx->nh_total_bytes;
 		}
 
 		(void) memcpy(pp, (char *)mhp, (actual_size < size) ?
@@ -2215,55 +2228,116 @@ ndmp_iter_zfs(ndmp_context_t *nctx, int (*np_restore_property)(nvlist_t *,
 		while (sz < size &&
 		    ((tp = get_read_buffer(size - sz, &rv, &lsize,
 		    lcmd))) != NULL) {
-			(void) memcpy(pp, tp, size - sz);
+			(void) memcpy(pp, tp, lsize);
 			sz += lsize;
 			pp += lsize;
 		}
 		if (sz > size) {
 			tlm_unget_read_buffer(lcmd->tc_buffers, sz - size);
 		}
+
 		/* LINTED improper alignment */
 		mhp = (ndmp_metadata_header_t *)mhbuf;
 
-		nctx->nc_plversion = mhp->nh_plversion;
-		(void) strlcpy(plname, mhp->nh_plname, sizeof (plname));
+		nvl = NULL;
+		if (strncmp(mhp->nh_magic, ZFS_META_MAGIC_EXT,
+		    sizeof (mhp->nh_magic)) == 0) {
+			/* New metadata format */
+			/* LINTED improper alignment */
+			mhpx = (ndmp_metadata_header_ext_t *)mhbuf;
 
-		if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0)
-			goto nvlist_err;
+			if (mhpx->nh_major > META_HDR_MAJOR_VERSION) {
+				/* Major header mismatch */
+				NDMP_LOG(LOG_ERR, "metadata header mismatch",
+				    "M%d != M%d", mhpx->nh_major,
+				    META_HDR_MAJOR_VERSION);
+				free(mhbuf);
+				return (-1);
+			}
+			if (mhpx->nh_major == META_HDR_MAJOR_VERSION &&
+			    mhpx->nh_minor > META_HDR_MINOR_VERSION) {
+				/* Minor header mismatch */
+				NDMP_LOG(LOG_ERR, "Warning:"
+				    "metadata header mismatch m%d != m%d",
+				    mhpx->nh_minor,
+				    META_HDR_MINOR_VERSION);
+				continue;
+			}
 
-		mpp = &mhp->nh_property[0];
-		for (i = 0; i < mhp->nh_count && mpp; i++) {
-			if (nvlist_alloc(&valp, NV_UNIQUE_NAME, 0) != 0 ||
-			    nvlist_add_string(valp, "value",
-			    mpp->mp_value) != 0 ||
-			    nvlist_add_string(valp, "source",
-			    mpp->mp_source) != 0 ||
-			    nvlist_add_nvlist(nvl, mpp->mp_name, valp) != 0)
+			nctx->nc_plversion = mhpx->nh_plversion;
+			(void) strlcpy(plname, mhpx->nh_plname,
+			    sizeof (plname));
+
+			if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0)
 				goto nvlist_err;
-			mpp++;
+
+			mppx = &mhpx->nh_property[0];
+			for (i = 0; i < mhpx->nh_count && mppx; i++, mppx++) {
+				if (!*mppx->mp_name)
+					continue;
+				valp = NULL;
+				if (nvlist_alloc(&valp,
+				    NV_UNIQUE_NAME, 0) != 0 ||
+				    nvlist_add_string(valp, "value",
+				    mppx->mp_value) != 0 ||
+				    nvlist_add_string(valp, "source",
+				    mppx->mp_source) != 0 ||
+				    nvlist_add_nvlist(nvl, mppx->mp_name,
+				    valp) != 0) {
+					nvlist_free(valp);
+					goto nvlist_err;
+				}
+				nvlist_free(valp);
+			}
+		} else {
+			nctx->nc_plversion = mhp->nh_plversion;
+			(void) strlcpy(plname, mhp->nh_plname,
+			    sizeof (plname));
+
+			if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0)
+				goto nvlist_err;
+
+			mpp = &mhp->nh_property[0];
+			for (i = 0; i < mhp->nh_count && mpp; i++, mpp++) {
+				if (!*mpp->mp_name)
+					continue;
+				valp = NULL;
+				if (nvlist_alloc(&valp,
+				    NV_UNIQUE_NAME, 0) != 0 ||
+				    nvlist_add_string(valp, "value",
+				    mpp->mp_value) != 0 ||
+				    nvlist_add_string(valp, "source",
+				    mpp->mp_source) != 0 ||
+				    nvlist_add_nvlist(nvl, mpp->mp_name,
+				    valp) != 0) {
+					nvlist_free(valp);
+					goto nvlist_err;
+				}
+				nvlist_free(valp);
+			}
 		}
 
 		if (np_restore_property(nvl, ptr) != 0)
 			goto nvlist_err;
 
-		(void) nvlist_add_nvlist(nvl_head, "_", nvl);
-	}
-	free(mhbuf);
-
-	nvlist_free(nvl_head);
-	return (0);
-
-nvlist_err:
-	free(mhbuf);
-	while ((nvph = nvlist_next_nvpair(nvl_head, nvph)) != NULL &&
-	    nvpair_value_nvlist(nvph, &nvl) == 0) {
 		while ((nvp = nvlist_next_nvpair(nvl, nvp)) != NULL &&
 		    nvpair_value_nvlist(nvp, &valp) == 0) {
 			nvlist_free(valp);
 		}
 		nvlist_free(nvl);
 	}
-	nvlist_free(nvl_head);
+
+	free(mhbuf);
+	return (0);
+
+nvlist_err:
+	free(mhbuf);
+
+	while ((nvp = nvlist_next_nvpair(nvl, nvp)) != NULL &&
+	    nvpair_value_nvlist(nvp, &valp) == 0) {
+		nvlist_free(valp);
+	}
+	nvlist_free(nvl);
 	return (-1);
 }
 

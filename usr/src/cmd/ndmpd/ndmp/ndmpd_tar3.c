@@ -2453,9 +2453,10 @@ tar_backup_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 			nctx.nc_plversion = ndmp_pl->np_plversion;
 			nctx.nc_plname = ndmpd_get_prop(NDMP_PLUGIN_PATH);
 			nctx.nc_cmds = cmds;
+			nctx.nc_params = params;
 			if ((err = ndmp_pl->np_pre_backup(ndmp_pl, &nctx,
 			    nlp->nlp_backup_path)) != 0) {
-				NDMP_LOG(LOG_DEBUG, "Pre-backup plug-in: %m");
+				NDMP_LOG(LOG_ERR, "Pre-backup plug-in: %m");
 				goto backup_out;
 			}
 		}
@@ -3223,13 +3224,14 @@ ndmpd_dar_tar_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 		if (ndmp_pl != NULL &&
 		    ndmp_pl->np_pre_restore != NULL) {
 			nctx.nc_cmds = cmds;
+			nctx.nc_params = params;
 			ep = (mem_ndmp_name_v3_t *)MOD_GETNAME(params,
 			    dar_index - 1);
 
 			if ((err = ndmp_pl->np_pre_restore(ndmp_pl, &nctx,
 			    ep->nm3_opath, ep->nm3_dpath))
 			    != 0) {
-				NDMP_LOG(LOG_DEBUG, "Pre-restore plug-in: %m");
+				NDMP_LOG(LOG_ERR, "Pre-restore plug-in: %m");
 				cmds->tcs_command->tc_reader = TLM_STOP;
 				ndmp_stop_local_reader(session, cmds);
 				ndmp_wait_for_reader(cmds);
@@ -3443,6 +3445,28 @@ ndmp_plugin_pre_restore(ndmp_context_t *ctxp, ndmpd_module_params_t *params,
 	return (0);
 }
 
+/*
+ * Expands the format string and logs the resulting message to the
+ * remote DMA
+ */
+void
+ndmp_log_dma(ndmp_context_t *nctx, ndmp_log_dma_type_t lt, const char *fmt, ...)
+{
+	va_list ap;
+	char buf[256];
+	ndmpd_module_params_t *params;
+
+	if (nctx == NULL ||
+	    (params = (ndmpd_module_params_t *)nctx->nc_params) == NULL)
+		return;
+
+	va_start(ap, fmt);
+	(void) vsnprintf(buf, sizeof (buf), fmt, ap);
+	va_end(ap);
+
+	MOD_LOGV3(params, (ndmp_log_type)lt, "%s", buf);
+}
+
 
 /*
  * ndmpd_rs_sar_tar_v3
@@ -3525,10 +3549,11 @@ ndmpd_rs_sar_tar_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 		if (ndmp_pl != NULL &&
 		    ndmp_pl->np_pre_restore != NULL) {
 			nctx.nc_cmds = cmds;
+			nctx.nc_params = params;
 			if ((err = ndmp_plugin_pre_restore(&nctx, params,
 			    nlp->nlp_nfiles))
 			    != 0) {
-				NDMP_LOG(LOG_DEBUG, "Pre-restore plug-in: %m");
+				NDMP_LOG(LOG_ERR, "Pre-restore plug-in: %m");
 				cmds->tcs_command->tc_reader = TLM_STOP;
 				ndmp_stop_local_reader(session, cmds);
 				ndmp_wait_for_reader(cmds);

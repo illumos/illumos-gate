@@ -51,6 +51,8 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <sys/queue.h>
+#include <sys/fs/zfs.h>
+#include <libzfs.h>
 
 #define	IS_SET(f, m)	(((f) & (m)) != 0)
 
@@ -468,22 +470,76 @@ extern void *ndmp_malloc(size_t size);
  */
 #define	ZFS_MAX_PROPS		100
 #define	ZFS_META_MAGIC		"ZFSMETA"
+#define	ZFS_META_MAGIC_EXT	"ZFSMETA2"
 
+/* Add new major/minor for header changes */
+typedef enum {
+	META_HDR_MAJOR_0,	/* Original format */
+	META_HDR_MAJOR_1,	/* Extended format */
+} ndmp_metadata_header_major_t;
+
+#define	META_HDR_MAJOR_VERSION	META_HDR_MAJOR_1
+
+typedef enum {
+	META_HDR_MINOR_0,
+} ndmp_metadata_header_minor_t;
+
+#define	META_HDR_MINOR_VERSION	META_HDR_MINOR_0
+
+/* To support older backups */
 typedef struct ndmp_metadata_property {
 	char mp_name[NAME_MAX];
 	char mp_value[NAME_MAX];
 	char mp_source[NAME_MAX];
 } ndmp_metadata_property_t;
 
+typedef struct ndmp_metadata_property_ext {
+	char mp_name[ZFS_MAXNAMELEN];
+	char mp_value[ZFS_MAXPROPLEN];
+	char mp_source[ZFS_MAXPROPLEN];
+} ndmp_metadata_property_ext_t;
+
+typedef struct ndmp_metadata_top_header {
+	char th_plname[100];
+	uint_t th_plversion;
+	char th_magic[10];
+	void *th_reserved_1;
+	int th_count;
+} ndmp_metadata_top_header_t;
+
+/* Original metadata format */
 typedef struct ndmp_metadata_header {
-	char nh_plname[100];
-	uint_t nh_plversion;
-	char nh_magic[10];
-	void *nh_handle;
-	int nh_count;
+	ndmp_metadata_top_header_t nh_hdr;
 	char nh_dataset[NAME_MAX];
 	ndmp_metadata_property_t nh_property[1];
 } ndmp_metadata_header_t;
+
+/* Extended metadata format */
+typedef struct ndmp_metadata_header_ext {
+	ndmp_metadata_top_header_t nh_hdr;
+	char nh_dataset[ZFS_MAXNAMELEN];
+	int32_t nh_total_bytes;
+	int32_t nh_major;
+	int32_t nh_minor;
+	ndmp_metadata_property_ext_t nh_property[1];
+} ndmp_metadata_header_ext_t;
+
+#define	nh_plname	nh_hdr.th_plname
+#define	nh_plversion	nh_hdr.th_plversion
+#define	nh_magic	nh_hdr.th_magic
+#define	nh_count	nh_hdr.th_count
+
+typedef struct ndmp_metadata_handle {
+	void *ml_handle;
+	int32_t ml_quota_prop;
+	union {
+		ndmp_metadata_header_t *u_hdr;
+		ndmp_metadata_header_ext_t *u_xhdr;
+	} ml_hdr_u;
+} ndmp_metadata_handle_t;
+
+#define	ml_hdr	ml_hdr_u.u_hdr
+#define	ml_xhdr	ml_hdr_u.u_xhdr
 
 /*
  * Node in struct hardlink_q

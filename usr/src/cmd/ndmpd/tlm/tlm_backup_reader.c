@@ -72,7 +72,7 @@ static int output_xattr_header(char *fname,
     tlm_cmd_t *);
 
 extern  libzfs_handle_t *zlibh;
-extern  mutex_t zlib_mtx;
+extern	mutex_t zlib_mtx;
 
 
 /*
@@ -1180,29 +1180,40 @@ write_tar_eof(tlm_cmd_t *local_commands)
 static int
 zfs_put_prop_cb(int prop, void *pp)
 {
-	ndmp_metadata_header_t *mhp;
-	ndmp_metadata_property_t *mpp;
-	char buf[ZFS_MAXNAMELEN];
-	char sbuf[ZFS_MAXNAMELEN];
+	ndmp_metadata_handle_t *mhd;
+	ndmp_metadata_header_ext_t *mhp;
+	ndmp_metadata_property_ext_t *mpp;
+	char vbuf[ZFS_MAXPROPLEN];
+	char sbuf[ZFS_MAXPROPLEN];
 	zprop_source_t stype;
 	char *sourcestr;
 
 	if (pp == NULL)
 		return (ZPROP_INVAL);
 
-	mhp = (ndmp_metadata_header_t *)pp;
+	mhd = (ndmp_metadata_handle_t *)pp;
+	mhp = mhd->ml_xhdr;
+	mpp = &mhp->nh_property[mhp->nh_count];
 
-	if (zfs_prop_get(mhp->nh_handle, prop, buf, sizeof (buf),
-	    &stype, sbuf, sizeof (sbuf), B_TRUE) != 0)
+	if (mhp->nh_count * sizeof (ndmp_metadata_property_ext_t) +
+	    sizeof (ndmp_metadata_header_ext_t) > mhp->nh_total_bytes)
+		return (ZPROP_INVAL);
+
+	if (zfs_prop_get(mhd->ml_handle, prop, vbuf, sizeof (vbuf),
+	    &stype, sbuf, sizeof (sbuf), B_TRUE) != 0) {
+		mhp->nh_count++;
 		return (ZPROP_CONT);
+	}
 
-	mpp = &mhp->nh_property[mhp->nh_count++];
-	(void) strlcpy(mpp->mp_name, zfs_prop_to_name(prop), NAME_MAX);
-	(void) strlcpy(mpp->mp_value, buf, NAME_MAX);
+	(void) strlcpy(mpp->mp_name, zfs_prop_to_name(prop), ZFS_MAXNAMELEN);
+	(void) strlcpy(mpp->mp_value, vbuf, ZFS_MAXPROPLEN);
 
 	switch (stype) {
 	case ZPROP_SRC_NONE:
 		sourcestr = "none";
+		break;
+	case ZPROP_SRC_RECEIVED:
+		sourcestr = "received";
 		break;
 	case ZPROP_SRC_LOCAL:
 		sourcestr = mhp->nh_dataset;
@@ -1217,11 +1228,103 @@ zfs_put_prop_cb(int prop, void *pp)
 		sourcestr = sbuf;
 		break;
 	}
-	(void) strlcpy(mpp->mp_source, sourcestr, NAME_MAX);
+	(void) strlcpy(mpp->mp_source, sourcestr, ZFS_MAXPROPLEN);
 
+	mhp->nh_count++;
 	return (ZPROP_CONT);
 }
 
+/*
+ * Callback to backup each ZFS user/group quota
+ */
+static int
+zfs_put_quota_cb(void *pp, const char *domain, uid_t rid, uint64_t space)
+{
+	ndmp_metadata_handle_t *mhd;
+	ndmp_metadata_header_ext_t *mhp;
+	ndmp_metadata_property_ext_t *mpp;
+	char *typestr;
+
+	if (pp == NULL)
+		return (ZPROP_INVAL);
+
+	mhd = (ndmp_metadata_handle_t *)pp;
+	mhp = mhd->ml_xhdr;
+	mpp = &mhp->nh_property[mhp->nh_count];
+
+	if (mhp->nh_count * sizeof (ndmp_metadata_property_ext_t) +
+	    sizeof (ndmp_metadata_header_ext_t) > mhp->nh_total_bytes)
+		return (ZPROP_INVAL);
+
+	if (mhd->ml_quota_prop == ZFS_PROP_USERQUOTA)
+		typestr = "userquota";
+	else
+		typestr = "groupquota";
+
+	if (domain == NULL || *domain == '\0')
+		(void) snprintf(mpp->mp_name, ZFS_MAXNAMELEN, "%s@%llu",
+		    typestr, (longlong_t)rid);
+	else
+		(void) snprintf(mpp->mp_name, ZFS_MAXNAMELEN, "%s@%s-%llu",
+		    typestr, domain, (longlong_t)rid);
+	(void) snprintf(mpp->mp_value, ZFS_MAXPROPLEN, "%llu", space);
+	(void) strlcpy(mpp->mp_source, mhp->nh_dataset, ZFS_MAXPROPLEN);
+
+	mhp->nh_count++;
+	return (0);
+}
+
+/*
+ * Callback to count each ZFS property
+ */
+/*ARGSUSED*/
+static int
+zfs_count_prop_cb(int prop, void *pp)
+{
+	(*(int *)pp)++;
+	return (ZPROP_CONT);
+}
+
+/*
+ * Callback to count each ZFS user/group quota
+ */
+/*ARGSUSED*/
+static int
+zfs_count_quota_cb(void *pp, const char *domain, uid_t rid, uint64_t space)
+{
+	(*(int *)pp)++;
+	return (0);
+}
+
+/*
+ * Count the number of ZFS properties and user/group quotas
+ */
+int
+zfs_get_prop_counts(zfs_handle_t *zhp)
+{
+	int count = 0;
+	nvlist_t *uprops;
+	nvpair_t *elp;
+
+	if (zhp == NULL)
+		return (0);
+
+	(void) zprop_iter(zfs_count_prop_cb, &count, TRUE, TRUE,
+	    ZFS_TYPE_VOLUME | ZFS_TYPE_DATASET);
+
+	(void) zfs_userspace(zhp, ZFS_PROP_USERQUOTA, zfs_count_quota_cb,
+	    &count);
+	(void) zfs_userspace(zhp, ZFS_PROP_GROUPQUOTA, zfs_count_quota_cb,
+	    &count);
+
+	uprops = zfs_get_user_props(zhp);
+
+	elp = nvlist_next_nvpair(uprops, NULL);
+	for (; elp != NULL; elp = nvlist_next_nvpair(uprops, elp))
+		count++;
+
+	return (count);
+}
 
 /*
  * Notifies ndmpd that the metadata associated with the given ZFS dataset
@@ -1231,8 +1334,10 @@ int
 ndmp_include_zfs(ndmp_context_t *nctx, const char *dataset)
 {
 	tlm_commands_t *cmds;
-	ndmp_metadata_header_t *mhp;
-	ndmp_metadata_property_t *mpp;
+	ndmp_metadata_handle_t mhd;
+	ndmp_metadata_header_ext_t *mhp;
+	ndmp_metadata_property_ext_t *mpp;
+	zfs_handle_t *zhp;
 	tlm_cmd_t *lcmd;
 	long actual_size;
 	nvlist_t *uprops, *ulist;
@@ -1242,6 +1347,7 @@ ndmp_include_zfs(ndmp_context_t *nctx, const char *dataset)
 	char *wbuf, *pp, *tp;
 	long size, lsize, sz;
 	int align = RECORDSIZE - 1;
+	int pcount;
 
 	if (nctx == NULL || (cmds = (tlm_commands_t *)nctx->nc_cmds) == NULL)
 		return (-1);
@@ -1250,35 +1356,46 @@ ndmp_include_zfs(ndmp_context_t *nctx, const char *dataset)
 	    lcmd->tc_buffers == NULL)
 		return (-1);
 
-	size = sizeof (ndmp_metadata_header_t) +
-	    ZFS_MAX_PROPS * sizeof (ndmp_metadata_property_t);
+	(void) mutex_lock(&zlib_mtx);
+	if ((zhp = zfs_open(zlibh, dataset, ZFS_TYPE_DATASET)) == NULL) {
+		(void) mutex_unlock(&zlib_mtx);
+		return (-1);
+	}
+
+	pcount = zfs_get_prop_counts(zhp);
+	size = sizeof (ndmp_metadata_header_ext_t) +
+	    pcount * sizeof (ndmp_metadata_property_ext_t);
+
 	size += align;
 	size &= ~align;
 
-	if ((mhp = malloc(size)) == NULL)
-		return (-1);
-	(void) memset(mhp, 0, size);
-
-	mhp->nh_plversion = nctx->nc_plversion;
-	(void) strlcpy(mhp->nh_plname, nctx->nc_plname,
-	    sizeof (mhp->nh_plname));
-	(void) strlcpy(mhp->nh_magic, ZFS_META_MAGIC, sizeof (mhp->nh_magic));
-	(void) strlcpy(mhp->nh_dataset, dataset, sizeof (mhp->nh_dataset));
-
-	(void) mutex_lock(&zlib_mtx);
-	if ((mhp->nh_handle = zfs_open(zlibh, dataset,
-	    ZFS_TYPE_DATASET)) == NULL) {
+	if ((mhp = malloc(size)) == NULL) {
+		zfs_close(zhp);
 		(void) mutex_unlock(&zlib_mtx);
-		free(mhp);
-		return (ZPROP_INVAL);
+		return (-1);
 	}
 
+	(void) memset(mhp, 0, size);
+
+	mhd.ml_handle = zhp;
+	mhd.ml_xhdr = mhp;
+	mhp->nh_total_bytes = size;
+	mhp->nh_major = META_HDR_MAJOR_VERSION;
+	mhp->nh_minor = META_HDR_MINOR_VERSION;
+	mhp->nh_plversion = nctx->nc_plversion;
+
+	(void) strlcpy(mhp->nh_plname, nctx->nc_plname,
+	    sizeof (mhp->nh_plname));
+	(void) strlcpy(mhp->nh_magic, ZFS_META_MAGIC_EXT,
+	    sizeof (mhp->nh_magic));
+	(void) strlcpy(mhp->nh_dataset, dataset, sizeof (mhp->nh_dataset));
+
 	/* Get all the ZFS properties */
-	(void) zprop_iter(zfs_put_prop_cb, mhp, TRUE, TRUE,
+	(void) zprop_iter(zfs_put_prop_cb, &mhd, TRUE, TRUE,
 	    ZFS_TYPE_VOLUME | ZFS_TYPE_DATASET);
 
 	/* Get user properties */
-	uprops = zfs_get_user_props(mhp->nh_handle);
+	uprops = zfs_get_user_props(mhd.ml_handle);
 
 	elp = nvlist_next_nvpair(uprops, NULL);
 
@@ -1287,21 +1404,29 @@ ndmp_include_zfs(ndmp_context_t *nctx, const char *dataset)
 		if (nvpair_value_nvlist(elp, &ulist) != 0 ||
 		    nvlist_lookup_string(ulist, ZPROP_VALUE, &sval) != 0 ||
 		    nvlist_lookup_string(ulist, ZPROP_SOURCE, &ssrc) != 0) {
-			zfs_close(mhp->nh_handle);
+			zfs_close(mhd.ml_handle);
 			(void) mutex_unlock(&zlib_mtx);
 			free(mhp);
 			return (-1);
 		}
 		if ((pname = nvpair_name(elp)) != NULL)
-			(void) strlcpy(mpp->mp_name, pname, NAME_MAX);
+			(void) strlcpy(mpp->mp_name, pname, ZFS_MAXNAMELEN);
 
-		(void) strlcpy(mpp->mp_value, sval, NAME_MAX);
-		(void) strlcpy(mpp->mp_source, ssrc, NAME_MAX);
+		(void) strlcpy(mpp->mp_value, sval, ZFS_MAXPROPLEN);
+		(void) strlcpy(mpp->mp_source, ssrc, ZFS_MAXPROPLEN);
 		mhp->nh_count++;
 		elp = nvlist_next_nvpair(uprops, elp);
 	}
 
-	zfs_close(mhp->nh_handle);
+	mhd.ml_quota_prop = ZFS_PROP_USERQUOTA;
+	(void) zfs_userspace(mhd.ml_handle, ZFS_PROP_USERQUOTA,
+	    zfs_put_quota_cb, &mhd);
+	mhd.ml_quota_prop = ZFS_PROP_GROUPQUOTA;
+	(void) zfs_userspace(mhd.ml_handle, ZFS_PROP_GROUPQUOTA,
+	    zfs_put_quota_cb, &mhd);
+	mhp->nh_count = pcount;
+
+	zfs_close(mhd.ml_handle);
 	(void) mutex_unlock(&zlib_mtx);
 
 	if ((wbuf = get_write_buffer(size, &actual_size, TRUE,
@@ -1316,7 +1441,7 @@ ndmp_include_zfs(ndmp_context_t *nctx, const char *dataset)
 		while (sz < size &&
 		    ((tp = get_write_buffer(size - sz, &lsize,
 		    TRUE, lcmd))) != NULL) {
-			(void) memcpy(tp, pp, size - sz);
+			(void) memcpy(tp, pp, lsize);
 			sz += lsize;
 			pp += lsize;
 		}

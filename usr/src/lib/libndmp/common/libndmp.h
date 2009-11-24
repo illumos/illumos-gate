@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,6 +66,7 @@ typedef struct ndmp_context {
 	uint_t nc_plversion;
 	void *nc_pldata;
 	void *nc_cmds;
+	void *nc_params;
 } ndmp_context_t;
 
 typedef struct ndmp_plugin {
@@ -83,6 +84,13 @@ typedef struct ndmp_plugin {
 	int (*np_post_restore)(struct ndmp_plugin *, ndmp_context_t *,
 		int);
 } ndmp_plugin_t;
+
+typedef enum ndmp_log_dma_type {
+	NDMP_LOGD_NORMAL = 0,
+	NDMP_LOGD_DEBUG = 1,
+	NDMP_LOGD_ERROR = 2,
+	NDMP_LOGD_WARNING = 3
+} ndmp_log_dma_type_t;
 
 /* libndmp error codes */
 #define	ENDMP_BASE	2000
@@ -360,6 +368,7 @@ extern int ndmp_iter_zfs(ndmp_context_t *, int (*)(nvlist_t *, void *), void *);
 extern uint_t ndmp_context_get_version(ndmp_context_t *);
 extern void ndmp_context_set_specific(ndmp_context_t *, void *);
 extern void *ndmp_context_get_specific(ndmp_context_t *);
+void ndmp_log_dma(ndmp_context_t *, ndmp_log_dma_type_t, const char *, ...);
 
 #ifdef	__cplusplus
 }
