@@ -408,6 +408,8 @@ acpica_init()
 	if (ACPI_FAILURE(status = AcpiEnableSubsystem(acpi_init_level)))
 		goto error;
 
+	scan_d2a_map();
+
 	/* do after AcpiEnableSubsystem() so GPEs are initialized */
 	acpica_ec_init();	/* initialize EC if present */
 

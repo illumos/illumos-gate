@@ -2664,11 +2664,11 @@ impl_bus_initialprobe(void)
 
 	(void) modload("misc", "xpv_autoconfig");
 #else
-	(void) modload("misc", "acpidev");
-
 	if (modload("misc", "pci_autoconfig") < 0) {
 		panic("failed to load misc/pci_autoconfig");
 	}
+
+	(void) modload("misc", "acpidev");
 
 	if (modload("drv", "isa") < 0)
 		panic("failed to load drv/isa");

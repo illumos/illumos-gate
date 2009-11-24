@@ -56,9 +56,7 @@
 /* local functions */
 static int CompressEisaID(char *np);
 
-static void scan_d2a_map(void);
 static void scan_d2a_subtree(dev_info_t *dip, ACPI_HANDLE acpiobj, int bus);
-
 static int acpica_query_bbn_problem(void);
 static int acpica_find_pcibus(int busno, ACPI_HANDLE *rh);
 static int acpica_eval_hid(ACPI_HANDLE dev, char *method, int *rint);
@@ -1641,7 +1639,7 @@ acpica_probe_processor(ACPI_HANDLE obj, UINT32 level, void *ctx, void **rv)
 	return (AE_OK);
 }
 
-static void
+void
 scan_d2a_map(void)
 {
 	dev_info_t *dip, *cdip;
@@ -1650,7 +1648,7 @@ scan_d2a_map(void)
 	int bus;
 	static int map_error = 0;
 
-	if (map_error)
+	if (map_error || (d2a_done != 0))
 		return;
 
 	scanning_d2a_map = 1;
@@ -1808,8 +1806,7 @@ acpica_get_handle(dev_info_t *dip, ACPI_HANDLE *rh)
 	ACPI_STATUS status;
 	char *acpiname;
 
-	if (!d2a_done)
-		scan_d2a_map();
+	ASSERT(d2a_done != 0);
 
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "acpi-namespace", &acpiname) != DDI_PROP_SUCCESS) {

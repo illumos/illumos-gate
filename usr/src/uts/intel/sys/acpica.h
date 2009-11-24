@@ -195,6 +195,8 @@ extern uint64_t acpica_get_devcfg_feature(uint64_t);
 extern void acpica_set_devcfg_feature(uint64_t);
 extern void acpica_clear_devcfg_feature(uint64_t);
 
+void scan_d2a_map(void);
+
 #ifdef __cplusplus
 }
 #endif
