@@ -4983,7 +4983,19 @@ int
 zonecfg_default_brand(char *brand, size_t brandsize)
 {
 	zone_dochandle_t handle;
+	int myzoneid = getzoneid();
 	int ret;
+
+	/*
+	 * If we're running within a zone, then the default brand is the
+	 * current zone's brand.
+	 */
+	if (myzoneid != GLOBAL_ZONEID) {
+		ret = zone_getattr(myzoneid, ZONE_ATTR_BRAND, brand, brandsize);
+		if (ret < 0)
+			return ((errno == EFAULT) ? Z_TOO_BIG : Z_INVAL);
+		return (Z_OK);
+	}
 
 	if ((handle = zonecfg_init_handle()) == NULL)
 		return (Z_NOMEM);
