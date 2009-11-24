@@ -76,8 +76,6 @@ zfs_prop_init(void)
 		{ "sha256",	ZIO_CHECKSUM_SHA256 },
 		{ "sha256,verify",
 				ZIO_CHECKSUM_SHA256 | ZIO_CHECKSUM_VERIFY },
-		{ "fletcher4,verify",
-				ZIO_CHECKSUM_FLETCHER_4 | ZIO_CHECKSUM_VERIFY },
 		{ NULL }
 	};
 
@@ -192,7 +190,7 @@ zfs_prop_init(void)
 	    checksum_table);
 	register_index(ZFS_PROP_DEDUP, "dedup", ZIO_CHECKSUM_OFF,
 	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
-	    "on | off | verify | sha256[,verify] | fletcher4,verify", "DEDUP",
+	    "on | off | verify | sha256[,verify]", "DEDUP",
 	    dedup_table);
 	register_index(ZFS_PROP_COMPRESSION, "compression",
 	    ZIO_COMPRESS_DEFAULT, PROP_INHERIT,
