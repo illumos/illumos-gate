@@ -43,6 +43,8 @@ uint_t adj_shift;
 hrtime_t hrtime_base;
 int traptrace_use_stick;
 uint_t cpu_impl_dual_pgsz;
+uint64_t native_tick_offset;
+uint64_t native_stick_offset;
 
 void
 cpu_setup(void)

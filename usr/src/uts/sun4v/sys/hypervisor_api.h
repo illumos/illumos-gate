@@ -172,6 +172,10 @@ extern "C" {
 
 #define	HV_TM_ENABLE		0x180
 
+#define	GUEST_SUSPEND		0x181
+#define	TICK_SET_NPT		0x182
+#define	STICK_SET_NPT		0x183
+
 #define	HV_RA2PA		0x200
 #define	HV_HPRIV		0x201
 
@@ -441,6 +445,10 @@ extern uint64_t hvldc_intr_gettarget(uint64_t dev_hdl, uint32_t devino,
     uint32_t *cpuid);
 extern uint64_t hvldc_intr_settarget(uint64_t dev_hdl, uint32_t devino,
     uint32_t cpuid);
+
+extern uint64_t	hv_guest_suspend(void);
+extern uint64_t	hv_tick_set_npt(uint64_t npt);
+extern uint64_t	hv_stick_set_npt(uint64_t npt);
 
 #endif /* ! _ASM */
 

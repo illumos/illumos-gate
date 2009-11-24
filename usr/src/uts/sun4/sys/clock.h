@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_CLOCK_H
 #define	_SYS_CLOCK_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -269,116 +267,10 @@ typedef struct {
 	mov	-1, out;						\
 	srlx	out, NSEC_SHIFT, out
 
-
-/*
- * The following macros are only for use in the cpu module.
- */
-#if defined(CPU_MODULE)
-
 /*
  * NSEC_SHIFT and VTRACE_SHIFT constants are defined in
  * <sys/machclock.h> file.
  */
-
-
-/*
- * NOTE: the macros below assume that the various time-related variables
- * (hrestime, hrestime_adj, hres_last_tick, timedelta, nsec_scale, etc)
- * are all stored together on a 64-byte boundary.  The primary motivation
- * is cache performance, but we also take advantage of a convenient side
- * effect: these variables all have the same high 22 address bits, so only
- * one sethi is needed to access them all.
- */
-
-/*
- * GET_HRESTIME() returns the value of hrestime, hrestime_adj and the
- * number of nanoseconds since the last clock tick ('nslt').  It also
- * sets 'nano' to the value NANOSEC (one billion).
- *
- * This macro assumes that all registers are globals or outs so they can
- * safely contain 64-bit data, and that it's safe to use the label "5:".
- * Further, this macro calls the NATIVE_TIME_TO_NSEC_SCALE which in turn
- * uses the labels "6:" and "7:"; labels "5:", "6:" and "7:" must not
- * be used across invocations of this macro.
- */
-#define	GET_HRESTIME(hrestsec, hrestnsec, adj, nslt, nano, scr, hrlock, \
-    gnt1, gnt2) \
-5:	sethi	%hi(hres_lock), scr;					\
-	lduw	[scr + %lo(hres_lock)], hrlock;	/* load clock lock */	\
-	lduw	[scr + %lo(nsec_scale)], nano;	/* tick-to-ns factor */	\
-	andn	hrlock, 1, hrlock;  	/* see comments above! */	\
-	ldx	[scr + %lo(hres_last_tick)], nslt;			\
-	ldn	[scr + %lo(hrestime)], hrestsec; /* load hrestime.sec */\
-	add	scr, %lo(hrestime), hrestnsec;				\
-	ldn	[hrestnsec + CLONGSIZE], hrestnsec;			\
-	GET_NATIVE_TIME(adj, gnt1, gnt2);	/* get current %tick */	\
-	subcc	adj, nslt, nslt; /* nslt = ticks since last clockint */	\
-	movneg	%xcc, %g0, nslt; /* ignore neg delta from tick skew */	\
-	ldx	[scr + %lo(hrestime_adj)], adj; /* load hrestime_adj */	\
-	/* membar #LoadLoad; (see comment (2) above) */			\
-	lduw	[scr + %lo(hres_lock)], scr; /* load clock lock */	\
-	NATIVE_TIME_TO_NSEC_SCALE(nslt, nano, gnt1, NSEC_SHIFT);	\
-	sethi	%hi(NANOSEC), nano;					\
-	xor	hrlock, scr, scr;					\
-/* CSTYLED */ 								\
-	brnz,pn	scr, 5b;						\
-	or	nano, %lo(NANOSEC), nano;
-
-/*
- * Similar to above, but returns current gethrtime() value in 'base'.
- */
-#define	GET_HRTIME(base, now, nslt, scale, scr, hrlock, gnt1, gnt2)	\
-5:	sethi	%hi(hres_lock), scr;					\
-	lduw	[scr + %lo(hres_lock)], hrlock;	/* load clock lock */	\
-	lduw	[scr + %lo(nsec_scale)], scale;	/* tick-to-ns factor */	\
-	andn	hrlock, 1, hrlock;  	/* see comments above! */	\
-	ldx	[scr + %lo(hres_last_tick)], nslt;			\
-	ldx	[scr + %lo(hrtime_base)], base;	/* load hrtime_base */	\
-	GET_NATIVE_TIME(now, gnt1, gnt2);	/* get current %tick */	\
-	subcc	now, nslt, nslt; /* nslt = ticks since last clockint */	\
-	movneg	%xcc, %g0, nslt; /* ignore neg delta from tick skew */	\
-	/* membar #LoadLoad; (see comment (2) above) */			\
-	ld	[scr + %lo(hres_lock)], scr; /* load clock lock */	\
-	NATIVE_TIME_TO_NSEC_SCALE(nslt, scale, gnt1, NSEC_SHIFT);	\
-	xor	hrlock, scr, scr;					\
-/* CSTYLED */ 								\
-	brnz,pn	scr, 5b;						\
-	add	base, nslt, base;
-
-/*
- * Maximum-performance timestamp for kernel tracing.  We don't bother
- * clearing NPT because vtrace expresses everything in 32-bit deltas,
- * so only the low-order 32 bits matter.  We do shift down a few bits,
- * however, so that the trace framework doesn't emit a ridiculous number
- * of 32_bit_elapsed_time records (trace points are more expensive when
- * the time since the last trace point doesn't fit in a 16-bit delta).
- * We currently shift by 4 (divide by 16) on the grounds that (1) there's
- * no point making the timing finer-grained than the trace point latency,
- * which exceeds 16 cycles; and (2) the cost and probe effect of many
- * 32-bit time records far exceeds the cost of the 'srlx' instruction.
- */
-#define	GET_VTRACE_TIME(out, scr1, scr2)				\
-	GET_NATIVE_TIME(out, scr1, scr2);	/* get current %tick */	\
-	srlx	out, VTRACE_SHIFT, out;
-
-/*
- * Full 64-bit version for those truly rare occasions when you need it.
- * Currently this is only needed to generate the TR_START_TIME record.
- */
-#define	GET_VTRACE_TIME_64(out, scr1, scr2)				\
-	GET_NATIVE_TIME(out, scr1, scr2);	/* get current %tick */	\
-	add	out, out, out;						\
-	srlx	out, VTRACE_SHIFT + 1, out;
-
-/*
- * Return the rate at which the vtrace clock runs.
- */
-#define	GET_VTRACE_FREQUENCY(out, scr1, scr2)				\
-	sethi	%hi(sys_tick_freq), out;				\
-	ldx	[out + %lo(sys_tick_freq)], out;			\
-	srlx	out, VTRACE_SHIFT, out;
-
-#endif /* CPU_MODULE */
 
 #ifdef	__cplusplus
 }

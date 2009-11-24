@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * System call trap handler.
@@ -112,7 +109,7 @@ syscall_trap(struct regs *rp)	/* for tags only; not called from C */
 	andn	%l3, PSTATE_IE | PSTATE_AM, %g3
 	wrpr	%g0, %g3, %pstate		! disable interrupt
 	TRACE_PTR(%g3, %g2)			! get trace pointer
-	GET_TRACE_TICK(%g1)
+	GET_TRACE_TICK(%g1, %g2)
 	stxa	%g1, [%g3 + TRAP_ENT_TICK]%asi
 	ldx	[%l1 + G1_OFF], %g1		! get syscall code
 	TRACE_SAVE_TL_VAL(%g3, %g1)
@@ -195,7 +192,7 @@ syscall_trap(struct regs *rp)	/* for tags only; not called from C */
 	andn	%g5, PSTATE_IE | PSTATE_AM, %g4
 	wrpr	%g0, %g4, %pstate		! disable interrupt
 	TRACE_PTR(%g4, %g2)			! get trace pointer
-	GET_TRACE_TICK(%g2)
+	GET_TRACE_TICK(%g2, %g3)
 	stxa	%g2, [%g4 + TRAP_ENT_TICK]%asi
 	lduh	[THREAD_REG + T_SYSNUM], %g2
 	TRACE_SAVE_TL_VAL(%g4, %g2)
@@ -357,7 +354,7 @@ syscall_trap32(void)	/* for tags only - trap handler - not called from C */
 	andn	%l3, PSTATE_IE | PSTATE_AM, %g3
 	wrpr	%g0, %g3, %pstate		! disable interrupt
 	TRACE_PTR(%g3, %g2)			! get trace pointer
-	GET_TRACE_TICK(%g1)
+	GET_TRACE_TICK(%g1, %g2)
 	stxa	%g1, [%g3 + TRAP_ENT_TICK]%asi
 	ldx	[%l1 + G1_OFF], %g1		! get syscall code
 	TRACE_SAVE_TL_VAL(%g3, %g1)
@@ -453,7 +450,7 @@ syscall_trap32(void)	/* for tags only - trap handler - not called from C */
 	andn	%g5, PSTATE_IE | PSTATE_AM, %g4
 	wrpr	%g0, %g4, %pstate		! disable interrupt
 	TRACE_PTR(%g4, %g2)			! get trace pointer
-	GET_TRACE_TICK(%g2)
+	GET_TRACE_TICK(%g2, %g3)
 	stxa	%g2, [%g4 + TRAP_ENT_TICK]%asi
 	lduh	[THREAD_REG + T_SYSNUM], %g2
 	TRACE_SAVE_TL_VAL(%g4, %g2)

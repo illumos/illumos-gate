@@ -108,7 +108,7 @@ cpu_mondo(void)
 
 #ifdef TRAPTRACE
 	TRACE_PTR(%g4, %g6)
-	GET_TRACE_TICK(%g6)
+	GET_TRACE_TICK(%g6, %g3)
 	stxa	%g6, [%g4 + TRAP_ENT_TICK]%asi
 	TRACE_SAVE_TL_GL_REGS(%g4, %g6)
 	rdpr	%tt, %g6
@@ -311,7 +311,7 @@ dev_mondo(void)
 
 #ifdef TRAPTRACE
 	TRACE_PTR(%g4, %g6)
-	GET_TRACE_TICK(%g6)
+	GET_TRACE_TICK(%g6, %g3)
 	stxa	%g6, [%g4 + TRAP_ENT_TICK]%asi
 	TRACE_SAVE_TL_GL_REGS(%g4, %g6)
 	rdpr	%tt, %g6

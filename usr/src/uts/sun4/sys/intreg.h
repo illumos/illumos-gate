@@ -19,16 +19,18 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_INTREG_H
 #define	_SYS_INTREG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/machintreg.h>
+
+#ifndef	_ASM
+#include <sys/types.h>
+#endif
 
 #ifdef	__cplusplus
 extern "C" {

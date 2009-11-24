@@ -256,7 +256,7 @@ pg_cpu0_init(void)
 	 */
 	mutex_enter(&cpu_lock);
 
-	pg_cpu_init(CPU);
+	(void) pg_cpu_init(CPU, B_FALSE);
 	pg_cpupart_in(CPU, &cp_default);
 	pg_cpu_active(CPU);
 
@@ -276,9 +276,9 @@ pg_cpu0_reinit(void)
 	mutex_enter(&cpu_lock);
 	pg_cpu_inactive(CPU);
 	pg_cpupart_out(CPU, &cp_default);
-	pg_cpu_fini(CPU);
+	pg_cpu_fini(CPU, NULL);
 
-	pg_cpu_init(CPU);
+	(void) pg_cpu_init(CPU, B_FALSE);
 	pg_cpupart_in(CPU, &cp_default);
 	pg_cpu_active(CPU);
 	mutex_exit(&cpu_lock);
@@ -531,14 +531,22 @@ pg_cpu_data_free(cpu_pg_t *pgd)
 }
 
 /*
- * A new CPU is coming into the system, either via booting or DR.
- * Allocate it's PG data, and notify all registered classes about
+ * Called when either a new CPU is coming into the system (either
+ * via booting or DR) or when the CPU's PG data is being recalculated.
+ * Allocate its PG data, and notify all registered classes about
  * the new CPU.
+ *
+ * If "deferred_init" is B_TRUE, the CPU's PG data will be allocated
+ * and returned, but the "bootstrap" structure will be left in place.
+ * The deferred_init option is used when all CPUs in the system are
+ * using the bootstrap structure as part of the process of recalculating
+ * all PG data. The caller must replace the bootstrap structure with the
+ * allocated PG data before pg_cpu_active is called.
  *
  * This routine may block.
  */
-void
-pg_cpu_init(cpu_t *cp)
+cpu_pg_t *
+pg_cpu_init(cpu_t *cp, boolean_t deferred_init)
 {
 	pg_cid_t	i;
 	cpu_pg_t	*cpu_pg;
@@ -569,35 +577,48 @@ pg_cpu_init(cpu_t *cp)
 	/*
 	 * The CPU's PG data is now ready to use.
 	 */
-	cp->cpu_pg = cpu_pg;
+	if (deferred_init == B_FALSE)
+		cp->cpu_pg = cpu_pg;
+
+	return (cpu_pg);
 }
 
 /*
- * This CPU is being deleted from the system. Notify the classes
- * and free up the CPU's PG data.
+ * Either this CPU is being deleted from the system or its PG data is
+ * being recalculated. Notify the classes and free up the CPU's PG data.
+ *
+ * If "cpu_pg_deferred" is non-NULL, it points to the CPU's PG data and
+ * serves to indicate that this CPU is already using the bootstrap
+ * stucture. Used as part of the process to recalculate the PG data for
+ * all CPUs in the system.
  */
 void
-pg_cpu_fini(cpu_t *cp)
+pg_cpu_fini(cpu_t *cp, cpu_pg_t *cpu_pg_deferred)
 {
 	pg_cid_t	i;
 	cpu_pg_t	*cpu_pg;
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 
-	cpu_pg = cp->cpu_pg;
+	if (cpu_pg_deferred == NULL) {
+		cpu_pg = cp->cpu_pg;
 
-	/*
-	 * This can happen if the CPU coming into the system
-	 * failed to power on.
-	 */
-	if (cpu_pg == NULL || pg_cpu_is_bootstrapped(cp))
-		return;
+		/*
+		 * This can happen if the CPU coming into the system
+		 * failed to power on.
+		 */
+		if (cpu_pg == NULL || pg_cpu_is_bootstrapped(cp))
+			return;
 
-	/*
-	 * Have the CPU reference the bootstrap PG data to survive
-	 * the dispatcher should it block from here on out.
-	 */
-	pg_cpu_bootstrap(cp);
+		/*
+		 * Have the CPU reference the bootstrap PG data to survive
+		 * the dispatcher should it block from here on out.
+		 */
+		pg_cpu_bootstrap(cp);
+	} else {
+		ASSERT(pg_cpu_is_bootstrapped(cp));
+		cpu_pg = cpu_pg_deferred;
+	}
 
 	for (i = 0; i < pg_nclasses; i++)
 		PG_CPU_FINI(i, cp, cpu_pg);

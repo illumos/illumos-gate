@@ -55,6 +55,7 @@
 #include <sys/ldoms.h>
 #include <sys/kldc.h>
 #include <sys/clock_impl.h>
+#include <sys/suspend.h>
 #include <sys/dumphdr.h>
 
 /*
@@ -965,7 +966,9 @@ syncfpu(void)
 
 void
 sticksync_slave(void)
-{}
+{
+	suspend_sync_tick_stick_npt();
+}
 
 void
 sticksync_master(void)

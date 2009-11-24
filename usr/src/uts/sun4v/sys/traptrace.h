@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_TRAPTRACE_H
 #define	_SYS_TRAPTRACE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -180,6 +178,7 @@ extern void mach_htraptrace_cleanup(int);
 #else /* _ASM */
 
 #include <sys/machthread.h>
+#include <sys/machclock.h>
 
 /*
  * Offsets of words in trap_trace_ctl:
@@ -206,22 +205,22 @@ extern void mach_htraptrace_cleanup(int);
 /*
  * Use new %stick register for UltraSparc III and beyond for
  * sane debugging of mixed speed CPU systems. Use TRAPTRACE_FORCE_TICK
- * for finer granularity on same speed systems.
- *
- * Note the label-less branches used due to contraints of where
- * and when trap trace macros are used.
+ * for finer granularity on same speed systems. Note that traptrace
+ * %tick or %stick reads use the NO_SUSPEND_CHECK version of the
+ * register read macros. This requires fewer registers and a few less
+ * instructions to execute. As a result, if a suspend operation occurs
+ * while traptrace is executing GET_TRACE_TICK between the time that
+ * the counter offset variable is read and the hardware register is read,
+ * this traptrace entry in the log will have an incorrect %tick value
+ * since it is derived from a pre-suspend offset variable and a post-
+ * suspend hardware counter.
  */
 #ifdef	TRAPTRACE_FORCE_TICK
-#define	GET_TRACE_TICK(reg)				\
-	rdpr	%tick, reg;
+#define	GET_TRACE_TICK(reg, scr)				\
+	RD_TICK_NO_SUSPEND_CHECK(reg, scr);
 #else
-#define	GET_TRACE_TICK(reg)				\
-	sethi	%hi(traptrace_use_stick), reg;		\
-	lduw	[reg + %lo(traptrace_use_stick)], reg;	\
-	/* CSTYLED */					\
-        brz,a	reg, .+12;				\
-	rdpr	%tick, reg;				\
-	rd	%asr24, reg;
+#define	GET_TRACE_TICK(reg, scr)				\
+	RD_TICKSTICK_FLAG(reg, scr, traptrace_use_stick);
 #endif
 
 /*
@@ -321,7 +320,7 @@ extern void mach_htraptrace_cleanup(int);
 	andn	scr4, PSTATE_IE | PSTATE_AM, scr3;	\
 	wrpr	%g0, scr3, %pstate;			\
 	TRACE_PTR(scr1, scr2);				\
-	GET_TRACE_TICK(scr2);				\
+	GET_TRACE_TICK(scr2, scr3);			\
 	stxa	scr2, [scr1 + TRAP_ENT_TICK]%asi;	\
 	TRACE_SAVE_TL_GL_REGS(scr1, scr2);		\
 	set	code, scr2;				\
@@ -348,7 +347,7 @@ extern void mach_htraptrace_cleanup(int);
  */
 #define	TRACE_WIN_INFO(code, scr1, scr2, scr3)		\
 	TRACE_PTR(scr1, scr2);				\
-	GET_TRACE_TICK(scr2);				\
+	GET_TRACE_TICK(scr2, scr3);			\
 	stxa	scr2, [scr1 + TRAP_ENT_TICK]%asi;	\
 	TRACE_SAVE_TL_GL_REGS(scr1, scr2);		\
 	rdpr	%tt, scr2;				\
@@ -387,7 +386,7 @@ extern void mach_htraptrace_cleanup(int);
 
 #define	FAULT_WINTRACE(scr1, scr2, scr3, type)		\
 	TRACE_PTR(scr1, scr2);				\
-	GET_TRACE_TICK(scr2);				\
+	GET_TRACE_TICK(scr2, scr3);			\
 	stxa	scr2, [scr1 + TRAP_ENT_TICK]%asi;	\
 	TRACE_SAVE_TL_GL_REGS(scr1, scr2);		\
 	set	type, scr2;				\
@@ -409,7 +408,7 @@ extern void mach_htraptrace_cleanup(int);
 
 #define	SYSTRAP_TRACE(scr1, scr2, scr3)			\
 	TRACE_PTR(scr1, scr2);				\
-	GET_TRACE_TICK(scr2);				\
+	GET_TRACE_TICK(scr2, scr3);			\
 	stxa	scr2, [scr1 + TRAP_ENT_TICK]%asi;	\
 	TRACE_SAVE_TL_GL_REGS(scr1, scr2);		\
 	set	SYSTRAP_TT, scr3;			\

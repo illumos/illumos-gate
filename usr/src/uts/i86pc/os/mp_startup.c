@@ -1587,7 +1587,7 @@ mp_startup(void)
 	 */
 	mutex_enter(&cpu_lock);
 	pghw_physid_create(cp);
-	pg_cpu_init(cp);
+	(void) pg_cpu_init(cp, B_FALSE);
 	pg_cmt_cpu_startup(cp);
 	mutex_exit(&cpu_lock);
 

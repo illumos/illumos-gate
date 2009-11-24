@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_MACHCLOCK_H
 #define	_SYS_MACHCLOCK_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -41,6 +39,14 @@ extern "C" {
 	sethi	%hi(cpu_clearticknpt), %g1;	\
 	jmp	%g1 + %lo(cpu_clearticknpt);	\
 	rd	%pc, %g4
+
+#define	RD_TICK_NO_SUSPEND_CHECK(out, scr1)	\
+	rdpr	%tick, out;			\
+	sllx	out, 1, out;			\
+	srlx	out, 1, out;
+
+#define	RD_TICK(out, scr1, scr2, label)		\
+	RD_TICK_NO_SUSPEND_CHECK(out, scr1);
 
 #endif /* _ASM */
 
@@ -57,7 +63,6 @@ extern "C" {
  * At least 3.9MHz, for slower %stick-based systems.
  */
 #define	NSEC_SHIFT	8
-#define	VTRACE_SHIFT	8
 
 #elif defined(SPITFIRE)
 
@@ -70,6 +75,70 @@ extern "C" {
 #else
 #error "Compiling for CPU_MODULE but no CPU specified"
 #endif
+
+/*
+ * NOTE: the macros below assume that the various time-related variables
+ * (hrestime, hrestime_adj, hres_last_tick, timedelta, nsec_scale, etc)
+ * are all stored together on a 64-byte boundary.  The primary motivation
+ * is cache performance, but we also take advantage of a convenient side
+ * effect: these variables all have the same high 22 address bits, so only
+ * one sethi is needed to access them all.
+ */
+
+/*
+ * GET_HRESTIME() returns the value of hrestime, hrestime_adj and the
+ * number of nanoseconds since the last clock tick ('nslt').  It also
+ * sets 'nano' to the value NANOSEC (one billion).
+ *
+ * This macro assumes that all registers are globals or outs so they can
+ * safely contain 64-bit data, and that it's safe to use the label "5:".
+ * Further, this macro calls the NATIVE_TIME_TO_NSEC_SCALE which in turn
+ * uses the labels "6:" and "7:"; labels "5:", "6:" and "7:" must not
+ * be used across invocations of this macro.
+ */
+#define	GET_HRESTIME(hrestsec, hrestnsec, adj, nslt, nano, scr, hrlock, \
+    gnt1, gnt2) \
+5:	sethi	%hi(hres_lock), scr;					\
+	lduw	[scr + %lo(hres_lock)], hrlock;	/* load clock lock */	\
+	lduw	[scr + %lo(nsec_scale)], nano;	/* tick-to-ns factor */	\
+	andn	hrlock, 1, hrlock;  	/* see comments above! */	\
+	ldx	[scr + %lo(hres_last_tick)], nslt;			\
+	ldn	[scr + %lo(hrestime)], hrestsec; /* load hrestime.sec */\
+	add	scr, %lo(hrestime), hrestnsec;				\
+	ldn	[hrestnsec + CLONGSIZE], hrestnsec;			\
+	GET_NATIVE_TIME(adj, gnt1, gnt2);	/* get current %tick */	\
+	subcc	adj, nslt, nslt; /* nslt = ticks since last clockint */	\
+	movneg	%xcc, %g0, nslt; /* ignore neg delta from tick skew */	\
+	ldx	[scr + %lo(hrestime_adj)], adj; /* load hrestime_adj */	\
+	/* membar #LoadLoad; (see comment (2) above) */			\
+	lduw	[scr + %lo(hres_lock)], scr; /* load clock lock */	\
+	NATIVE_TIME_TO_NSEC_SCALE(nslt, nano, gnt1, NSEC_SHIFT);	\
+	sethi	%hi(NANOSEC), nano;					\
+	xor	hrlock, scr, scr;					\
+/* CSTYLED */ 								\
+	brnz,pn	scr, 5b;						\
+	or	nano, %lo(NANOSEC), nano;
+
+/*
+ * Similar to above, but returns current gethrtime() value in 'base'.
+ */
+#define	GET_HRTIME(base, now, nslt, scale, scr, hrlock, gnt1, gnt2)	\
+5:	sethi	%hi(hres_lock), scr;					\
+	lduw	[scr + %lo(hres_lock)], hrlock;	/* load clock lock */	\
+	lduw	[scr + %lo(nsec_scale)], scale;	/* tick-to-ns factor */	\
+	andn	hrlock, 1, hrlock;  	/* see comments above! */	\
+	ldx	[scr + %lo(hres_last_tick)], nslt;			\
+	ldx	[scr + %lo(hrtime_base)], base;	/* load hrtime_base */	\
+	GET_NATIVE_TIME(now, gnt1, gnt2);	/* get current %tick */	\
+	subcc	now, nslt, nslt; /* nslt = ticks since last clockint */	\
+	movneg	%xcc, %g0, nslt; /* ignore neg delta from tick skew */	\
+	/* membar #LoadLoad; (see comment (2) above) */			\
+	ld	[scr + %lo(hres_lock)], scr; /* load clock lock */	\
+	NATIVE_TIME_TO_NSEC_SCALE(nslt, scale, gnt1, NSEC_SHIFT);	\
+	xor	hrlock, scr, scr;					\
+/* CSTYLED */ 								\
+	brnz,pn	scr, 5b;						\
+	add	base, nslt, base;
 
 #endif /* CPU_MODULE */
 

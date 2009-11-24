@@ -1401,12 +1401,8 @@ save_cpu_state:
 	rd	SOFTINT, %g1
 	sta	%g1, [%g3 + PTL1_SOFTINT] %asi
 	wr	%g1, CLEAR_SOFTINT
-	sethi   %hi(traptrace_use_stick), %g1
-	ld      [%g1 + %lo(traptrace_use_stick)], %g1
-	brz,a,pn %g1, 2f
-	  rdpr	%tick, %g1
-	rd	STICK, %g1
-2:	stxa	%g1, [%g3 + PTL1_TICK] %asi
+	RD_TICKSTICK_FLAG(%g1, %g4, traptrace_use_stick)
+	stxa	%g1, [%g3 + PTL1_TICK] %asi
 
 	MMU_FAULT_STATUS_AREA(%g1)
 	ldx	[%g1 + MMFSA_D_TYPE], %g4

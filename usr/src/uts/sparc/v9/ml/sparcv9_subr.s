@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * General assembly language routines.
@@ -1275,6 +1273,13 @@ sulword_noerr(void *addr, ulong_t valuep)
 
 #endif	/* lint */
 
+/*
+ * We define rdtick here, but not for sun4v. On sun4v systems, the %tick
+ * and %stick should not be read directly without considering the tick
+ * and stick offset kernel variables introduced to support sun4v OS
+ * suspension.
+ */
+#if !defined (sun4v)
 
 #if defined (lint)
 
@@ -1282,12 +1287,16 @@ hrtime_t
 rdtick()
 { return (0); }
 
-#else
+#else /* lint */
+
 	ENTRY(rdtick)
 	retl
 	rd	%tick, %o0
         SET_SIZE(rdtick)
-#endif
+
+#endif /* lint */
+
+#endif /* !sun4v */
 
 /*
  * Set tba to given address, no side effects.

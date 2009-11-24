@@ -158,6 +158,9 @@ trap(struct regs *rp, caddr_t addr, uint32_t type, uint32_t mmu_fsr)
 	int watchpage;
 	extern faultcode_t pagefault(caddr_t, enum fault_type,
 	    enum seg_rw, int);
+#ifdef sun4v
+	extern boolean_t tick_stick_emulation_active;
+#endif	/* sun4v */
 
 	CPU_STATS_ADDQ(CPU, sys, trap, 1);
 
@@ -851,7 +854,27 @@ trap(struct regs *rp, caddr_t addr, uint32_t type, uint32_t mmu_fsr)
 	case T_PRIV_INSTR + T_USER:	/* privileged instruction fault */
 		if (tudebug)
 			showregs(type, rp, (caddr_t)0, 0);
+
 		bzero(&siginfo, sizeof (siginfo));
+#ifdef	sun4v
+		/*
+		 * If this instruction fault is a non-privileged %tick
+		 * or %stick trap, and %tick/%stick user emulation is
+		 * enabled as a result of an OS suspend, then simulate
+		 * the register read. We rely on simulate_rdtick to fail
+		 * if the instruction is not a %tick or %stick read,
+		 * causing us to fall through to the normal privileged
+		 * instruction handling.
+		 */
+		if (tick_stick_emulation_active &&
+		    (X_FAULT_TYPE(mmu_fsr) == FT_NEW_PRVACT) &&
+		    simulate_rdtick(rp) == SIMU_SUCCESS) {
+			/* skip the successfully simulated instruction */
+			rp->r_pc = rp->r_npc;
+			rp->r_npc += 4;
+			goto out;
+		}
+#endif
 		siginfo.si_signo = SIGILL;
 		siginfo.si_code = ILL_PRVOPC;
 		siginfo.si_addr = (caddr_t)rp->r_pc;

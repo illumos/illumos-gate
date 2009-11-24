@@ -1052,7 +1052,7 @@ table_name/**/_itlbmiss:						;\
 	sethi	%hi(FLUSH_ADDR), %g6					;\
 	flush	%g6							;\
 	TRACE_PTR(%g3, %g6)						;\
-	GET_TRACE_TICK(%g6)						;\
+	GET_TRACE_TICK(%g6, %g4)					;\
 	stxa	%g6, [%g3 + TRAP_ENT_TICK]%asi				;\
 	stna	%g2, [%g3 + TRAP_ENT_SP]%asi	/* tag access */	;\
 	stna	%g5, [%g3 + TRAP_ENT_F1]%asi	/* tsb data */		;\
@@ -2392,7 +2392,7 @@ done2:
 mmu_trap_tl1:
 #ifdef	TRAPTRACE
 	TRACE_PTR(%g5, %g6)
-	GET_TRACE_TICK(%g6)
+	GET_TRACE_TICK(%g6, %g7)
 	stxa	%g6, [%g5 + TRAP_ENT_TICK]%asi
 	TRACE_SAVE_TL_GL_REGS(%g5, %g6)
 	rdpr	%tt, %g6
@@ -2524,7 +2524,7 @@ obp_bpt:
 
 trace_dmmu:
 	TRACE_PTR(%g3, %g6)
-	GET_TRACE_TICK(%g6)
+	GET_TRACE_TICK(%g6, %g5)
 	stxa	%g6, [%g3 + TRAP_ENT_TICK]%asi
 	TRACE_SAVE_TL_GL_REGS(%g3, %g6)
 	rdpr	%tt, %g6
@@ -2549,7 +2549,7 @@ trace_dmmu:
 
 trace_immu:
 	TRACE_PTR(%g3, %g6)
-	GET_TRACE_TICK(%g6)
+	GET_TRACE_TICK(%g6, %g5)
 	stxa	%g6, [%g3 + TRAP_ENT_TICK]%asi
 	TRACE_SAVE_TL_GL_REGS(%g3, %g6)
 	rdpr	%tt, %g6
@@ -2574,7 +2574,7 @@ trace_immu:
 
 trace_gen:
 	TRACE_PTR(%g3, %g6)
-	GET_TRACE_TICK(%g6)
+	GET_TRACE_TICK(%g6, %g5)
 	stxa	%g6, [%g3 + TRAP_ENT_TICK]%asi
 	TRACE_SAVE_TL_GL_REGS(%g3, %g6)
 	rdpr	%tt, %g6
@@ -2633,10 +2633,10 @@ trace_tsbmiss:
 	sethi	%hi(FLUSH_ADDR), %g6
 	flush	%g6
 	TRACE_PTR(%g5, %g6)
-	GET_TRACE_TICK(%g6)
-	stxa	%g6, [%g5 + TRAP_ENT_TICK]%asi
 	stna	%g2, [%g5 + TRAP_ENT_SP]%asi		! tag access
 	stna	%g4, [%g5 + TRAP_ENT_F1]%asi		! XXX? tsb tag
+	GET_TRACE_TICK(%g6, %g4)
+	stxa	%g6, [%g5 + TRAP_ENT_TICK]%asi
 	rdpr	%tnpc, %g6
 	stna	%g6, [%g5 + TRAP_ENT_F2]%asi
 	stna	%g1, [%g5 + TRAP_ENT_F3]%asi		! tsb8k pointer
@@ -2674,7 +2674,7 @@ trace_dataprot:
 	sethi	%hi(FLUSH_ADDR), %g6
 	flush	%g6
 	TRACE_PTR(%g1, %g6)
-	GET_TRACE_TICK(%g6)
+	GET_TRACE_TICK(%g6, %g4)
 	stxa	%g6, [%g1 + TRAP_ENT_TICK]%asi
 	rdpr	%tpc, %g6
 	stna	%g6, [%g1 + TRAP_ENT_TPC]%asi

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if defined(lint)
 #include <sys/types.h>
@@ -130,7 +128,7 @@ vec_interrupt_resume:
 	ldxa	[%g2]ASI_INTR_RECEIVE, %g2
 #ifdef TRAPTRACE
 	TRACE_PTR(%g4, %g6)
-	GET_TRACE_TICK(%g6)
+	GET_TRACE_TICK(%g6, %g3)
 	stxa	%g6, [%g4 + TRAP_ENT_TICK]%asi
 	rdpr	%tl, %g6
 	stha	%g6, [%g4 + TRAP_ENT_TL]%asi
@@ -292,7 +290,7 @@ vec_intr_spurious(void)
 	ld	[%g2 + %lo(vec_spurious_cnt)], %g2
 #ifdef TRAPTRACE
 	TRACE_PTR(%g4, %g6)
-	GET_TRACE_TICK(%g6)
+	GET_TRACE_TICK(%g6, %g3)
 	stxa	%g6, [%g4 + TRAP_ENT_TICK]%asi
 	rdpr	%tl, %g6
 	stha	%g6, [%g4 + TRAP_ENT_TL]%asi

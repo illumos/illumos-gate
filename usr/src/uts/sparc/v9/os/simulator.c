@@ -51,6 +51,7 @@
 #include <sys/model.h>
 #include <vm/seg_vn.h>
 #include <sys/byteorder.h>
+#include <sys/time.h>
 
 #define	IS_IBIT_SET(x)	(x & 0x2000)
 #define	IS_VIS1(op, op3)(op == 2 && op3 == 0x36)
@@ -1135,6 +1136,46 @@ simulate_unimp(struct regs *rp, caddr_t *badaddr)
 	(void) as_fault(as->a_hat, as, (caddr_t)(rp->r_pc & PAGEMASK),
 	    PAGESIZE, F_SOFTUNLOCK, S_READ);
 	return (SIMU_RETRY);
+}
+
+/*
+ * Simulate a "rd %tick" or "rd %stick" (%asr24) instruction.
+ */
+int
+simulate_rdtick(struct regs *rp)
+{
+	uint_t	inst, op, op3, rd, rs1, i;
+	caddr_t badaddr;
+
+	inst = fetch_user_instr((caddr_t)rp->r_pc);
+	op   = (inst >> 30) & 0x3;
+	rd   = (inst >> 25) & 0x1F;
+	op3  = (inst >> 19) & 0x3F;
+	i    = (inst >> 13) & 0x1;
+
+	/*
+	 * Make sure this is either a %tick read (rs1 == 0x4) or
+	 * a %stick read (rs1 == 0x18) instruction.
+	 */
+	if (op == 2 && op3 == 0x28 && i == 0) {
+		rs1 = (inst >> 14) & 0x1F;
+
+		if (rs1 == 0x4) {
+			uint64_t tick;
+			(void) flush_user_windows_to_stack(NULL);
+			tick = gettick_counter();
+			if (putreg(&tick, rp, rd, &badaddr) == 0)
+				return (SIMU_SUCCESS);
+		} else if (rs1 == 0x18) {
+			uint64_t stick;
+			(void) flush_user_windows_to_stack(NULL);
+			stick = gethrtime_unscaled();
+			if (putreg(&stick, rp, rd, &badaddr) == 0)
+				return (SIMU_SUCCESS);
+		}
+	}
+
+	return (SIMU_FAULT);
 }
 
 /*

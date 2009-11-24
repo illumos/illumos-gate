@@ -1802,7 +1802,7 @@ cpu_del_unit(int cpuid)
 	 * Tear down the CPU's physical ID cache, and update any
 	 * processor groups
 	 */
-	pg_cpu_fini(cp);
+	pg_cpu_fini(cp, NULL);
 	pghw_physid_destroy(cp);
 
 	/*

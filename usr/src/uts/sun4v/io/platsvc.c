@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,10 @@
 #include <sys/uadmin.h>
 #include <sys/ds.h>
 #include <sys/platsvc.h>
+#include <sys/ddi.h>
+#include <sys/suspend.h>
+#include <sys/proc.h>
+#include <sys/disp.h>
 
 /*
  * Debugging routines
@@ -52,6 +56,7 @@ uint_t ps_debug = 0x0;
 #define	MS2NANO(x)	((x) * MICROSEC)
 #define	MS2SEC(x)	((x) / MILLISEC)
 #define	MS2MIN(x)	(MS2SEC(x) / 60)
+#define	SEC2HZ(x)	(drv_usectohz((x) * MICROSEC))
 
 /*
  * Domains Services interaction
@@ -59,6 +64,7 @@ uint_t ps_debug = 0x0;
 static ds_svc_hdl_t	ds_md_handle;
 static ds_svc_hdl_t	ds_shutdown_handle;
 static ds_svc_hdl_t	ds_panic_handle;
+static ds_svc_hdl_t	ds_suspend_handle;
 
 static ds_ver_t		ps_vers[] = {{ 1, 0 }};
 #define	PS_NVERS	(sizeof (ps_vers) / sizeof (ps_vers[0]))
@@ -81,12 +87,19 @@ static ds_capability_t ps_panic_cap = {
 	PS_NVERS		/* nvers */
 };
 
+static ds_capability_t ps_suspend_cap = {
+	"domain-suspend",	/* svc_id */
+	ps_vers,		/* vers */
+	PS_NVERS		/* nvers */
+};
+
 static void ps_reg_handler(ds_cb_arg_t arg, ds_ver_t *ver, ds_svc_hdl_t hdl);
 static void ps_unreg_handler(ds_cb_arg_t arg);
 
-static void ps_md_data_handler(ds_cb_arg_t arg, void * buf, size_t buflen);
+static void ps_md_data_handler(ds_cb_arg_t arg, void *buf, size_t buflen);
 static void ps_shutdown_data_handler(ds_cb_arg_t arg, void *buf, size_t buflen);
-static void ps_panic_data_handler(ds_cb_arg_t arg, void * buf, size_t buflen);
+static void ps_panic_data_handler(ds_cb_arg_t arg, void *buf, size_t buflen);
+static void ps_suspend_data_handler(ds_cb_arg_t arg, void *buf, size_t buflen);
 
 static ds_clnt_ops_t ps_md_ops = {
 	ps_reg_handler,			/* ds_reg_cb */
@@ -109,6 +122,13 @@ static ds_clnt_ops_t ps_panic_ops = {
 	&ds_panic_handle		/* cb_arg */
 };
 
+static ds_clnt_ops_t ps_suspend_ops = {
+	ps_reg_handler,			/* ds_reg_cb */
+	ps_unreg_handler,		/* ds_unreg_cb */
+	ps_suspend_data_handler,	/* ds_data_cb */
+	&ds_suspend_handle		/* cb_arg */
+};
+
 static int ps_init(void);
 static void ps_fini(void);
 
@@ -116,6 +136,43 @@ static void ps_fini(void);
  * Power down timeout value of 5 minutes.
  */
 #define	PLATSVC_POWERDOWN_DELAY		1200
+
+/*
+ * Set to true if OS suspend is supported. If OS suspend is not
+ * supported, the suspend service will not be started.
+ */
+static boolean_t ps_suspend_enabled = B_FALSE;
+
+/*
+ * Suspend service request handling
+ */
+typedef struct ps_suspend_data {
+	void		*buf;
+	size_t		buflen;
+} ps_suspend_data_t;
+
+static kmutex_t ps_suspend_mutex;
+static kcondvar_t ps_suspend_cv;
+
+static ps_suspend_data_t *ps_suspend_data = NULL;
+static boolean_t ps_suspend_thread_exit = B_FALSE;
+static kthread_t *ps_suspend_thread = NULL;
+
+static void ps_suspend_sequence(ps_suspend_data_t *data);
+static void ps_suspend_thread_func(void);
+
+/*
+ * The DELAY timeout is the time (in seconds) to wait for the
+ * suspend service to be re-registered after a suspend/resume
+ * operation. The INTVAL time is the time (in seconds) to wait
+ * between retry attempts when sending the post-suspend message
+ * after a suspend/resume operation.
+ */
+#define	PLATSVC_SUSPEND_REREG_DELAY	60
+#define	PLATSVC_SUSPEND_RETRY_INTVAL	1
+static int ps_suspend_rereg_delay = PLATSVC_SUSPEND_REREG_DELAY;
+static int ps_suspend_retry_intval = PLATSVC_SUSPEND_RETRY_INTVAL;
+
 
 static struct modlmisc modlmisc = {
 	&mod_miscops,
@@ -169,6 +226,7 @@ ps_init(void)
 {
 	int	rv;
 	extern int mdeg_init(void);
+	extern void mdeg_fini(void);
 
 	/* register with domain services framework */
 	rv = ds_cap_init(&ps_md_cap, &ps_md_ops);
@@ -177,9 +235,16 @@ ps_init(void)
 		return (rv);
 	}
 
+	rv = mdeg_init();
+	if (rv != 0) {
+		(void) ds_cap_fini(&ps_md_cap);
+		return (rv);
+	}
+
 	rv = ds_cap_init(&ps_shutdown_cap, &ps_shutdown_ops);
 	if (rv != 0) {
 		cmn_err(CE_WARN, "ds_cap_init domain-shutdown failed: %d", rv);
+		mdeg_fini();
 		(void) ds_cap_fini(&ps_md_cap);
 		return (rv);
 	}
@@ -188,13 +253,36 @@ ps_init(void)
 	if (rv != 0) {
 		cmn_err(CE_WARN, "ds_cap_init domain-panic failed: %d", rv);
 		(void) ds_cap_fini(&ps_md_cap);
+		mdeg_fini();
 		(void) ds_cap_fini(&ps_shutdown_cap);
 		return (rv);
 	}
 
-	rv = mdeg_init();
+	ps_suspend_enabled = suspend_supported();
 
-	return (rv);
+	if (ps_suspend_enabled) {
+		mutex_init(&ps_suspend_mutex, NULL, MUTEX_DEFAULT, NULL);
+		cv_init(&ps_suspend_cv, NULL, CV_DEFAULT, NULL);
+		ps_suspend_thread_exit = B_FALSE;
+
+		rv = ds_cap_init(&ps_suspend_cap, &ps_suspend_ops);
+		if (rv != 0) {
+			cmn_err(CE_WARN, "ds_cap_init domain-suspend failed: "
+			    "%d", rv);
+			(void) ds_cap_fini(&ps_md_cap);
+			mdeg_fini();
+			(void) ds_cap_fini(&ps_shutdown_cap);
+			(void) ds_cap_fini(&ps_panic_cap);
+			mutex_destroy(&ps_suspend_mutex);
+			cv_destroy(&ps_suspend_cv);
+			return (rv);
+		}
+
+		ps_suspend_thread = thread_create(NULL, 2 * DEFAULTSTKSZ,
+		    ps_suspend_thread_func, NULL, 0, &p0, TS_RUN, minclsyspri);
+	}
+
+	return (0);
 }
 
 static void
@@ -208,6 +296,22 @@ ps_fini(void)
 	(void) ds_cap_fini(&ps_md_cap);
 	(void) ds_cap_fini(&ps_shutdown_cap);
 	(void) ds_cap_fini(&ps_panic_cap);
+
+	if (ps_suspend_enabled) {
+		(void) ds_cap_fini(&ps_suspend_cap);
+		if (ps_suspend_thread != NULL) {
+			mutex_enter(&ps_suspend_mutex);
+			ps_suspend_thread_exit = B_TRUE;
+			cv_signal(&ps_suspend_cv);
+			mutex_exit(&ps_suspend_mutex);
+
+			thread_join(ps_suspend_thread->t_did);
+			ps_suspend_thread = NULL;
+
+			mutex_destroy(&ps_suspend_mutex);
+			cv_destroy(&ps_suspend_cv);
+		}
+	}
 
 	mdeg_fini();
 }
@@ -353,6 +457,233 @@ ps_panic_data_handler(ds_cb_arg_t arg, void *buf, size_t buflen)
 	_NOTE(NOTREACHED)
 }
 
+/*
+ * Send a suspend response message. If a timeout is specified, wait
+ * intval seconds between attempts to send the message. The timeout
+ * and intval arguments are in seconds.
+ */
+static void
+ps_suspend_send_response(ds_svc_hdl_t *ds_handle, uint64_t req_num,
+    uint32_t result, uint32_t rec_result, char *reason, int timeout,
+    int intval)
+{
+	platsvc_suspend_resp_t	*resp;
+	size_t			reason_length;
+	int			tries = 0;
+	int			rv = -1;
+	time_t			deadline;
+
+	if (reason == NULL) {
+		reason_length = 0;
+	} else {
+		/* Get number of non-NULL bytes */
+		reason_length = strnlen(reason, SUSPEND_MAX_REASON_SIZE - 1);
+		ASSERT(reason[reason_length] == '\0');
+		/* Account for NULL terminator */
+		reason_length++;
+	}
+
+	resp = (platsvc_suspend_resp_t *)
+	    kmem_zalloc(sizeof (platsvc_suspend_resp_t) + reason_length,
+	    KM_SLEEP);
+
+	resp->req_num = req_num;
+	resp->result = result;
+	resp->rec_result = rec_result;
+	if (reason_length > 0) {
+		bcopy(reason, &resp->reason, reason_length - 1);
+		/* Ensure NULL terminator is present */
+		resp->reason[reason_length] = '\0';
+	}
+
+	if (timeout == 0) {
+		tries++;
+		rv = ds_cap_send(*ds_handle, resp,
+		    sizeof (platsvc_suspend_resp_t) + reason_length);
+	} else {
+		deadline = gethrestime_sec() + timeout;
+		do {
+			ds_svc_hdl_t hdl;
+			/*
+			 * Copy the handle so we can ensure we never pass
+			 * an invalid handle to ds_cap_send. We don't want
+			 * to trigger warning messages just because the
+			 * service was temporarily unregistered.
+			 */
+			if ((hdl = *ds_handle) == DS_INVALID_HDL) {
+				delay(SEC2HZ(intval));
+			} else if ((rv = ds_cap_send(hdl, resp,
+			    sizeof (platsvc_suspend_resp_t) +
+			    reason_length)) != 0) {
+				tries++;
+				delay(SEC2HZ(intval));
+			}
+		} while ((rv != 0) && (gethrestime_sec() < deadline));
+	}
+
+	if (rv != 0) {
+		cmn_err(CE_NOTE, "suspend ds_cap_send resp failed (%d) "
+		    "sending message: %d, attempts: %d", rv, resp->result,
+		    tries);
+	}
+
+	kmem_free(resp, sizeof (platsvc_suspend_resp_t) + reason_length);
+}
+
+/*
+ * Handle data coming in for the suspend service. The suspend is
+ * sequenced by the ps_suspend_thread, but perform some checks here
+ * to make sure that the request is a valid request message and that
+ * a suspend operation is not already in progress.
+ */
+/*ARGSUSED*/
+static void
+ps_suspend_data_handler(ds_cb_arg_t arg, void *buf, size_t buflen)
+{
+	platsvc_suspend_req_t	*msg = buf;
+
+	if (arg == NULL)
+		return;
+
+	if (ds_suspend_handle == DS_INVALID_HDL) {
+		DBG("ps_suspend_data_handler: DS handle no longer valid\n");
+		return;
+	}
+
+	/* Handle invalid requests */
+	if (msg == NULL || buflen != sizeof (platsvc_suspend_req_t) ||
+	    msg->type != DOMAIN_SUSPEND_SUSPEND) {
+		ps_suspend_send_response(&ds_suspend_handle, msg->req_num,
+		    DOMAIN_SUSPEND_INVALID_MSG, DOMAIN_SUSPEND_REC_SUCCESS,
+		    NULL, 0, 0);
+		return;
+	}
+
+	/*
+	 * If ps_suspend_thread_exit is set, ds_cap_fini has been
+	 * called and we shouldn't be receving data. Handle this unexpected
+	 * case by returning without sending a response.
+	 */
+	if (ps_suspend_thread_exit) {
+		DBG("ps_suspend_data_handler: ps_suspend_thread is exiting\n");
+		return;
+	}
+
+	mutex_enter(&ps_suspend_mutex);
+
+	/* If a suspend operation is in progress, abort now */
+	if (ps_suspend_data != NULL) {
+		mutex_exit(&ps_suspend_mutex);
+		ps_suspend_send_response(&ds_suspend_handle, msg->req_num,
+		    DOMAIN_SUSPEND_INPROGRESS, DOMAIN_SUSPEND_REC_SUCCESS,
+		    NULL, 0, 0);
+		return;
+	}
+
+	ps_suspend_data = kmem_alloc(sizeof (ps_suspend_data_t), KM_SLEEP);
+	ps_suspend_data->buf = kmem_alloc(buflen, KM_SLEEP);
+	ps_suspend_data->buflen = buflen;
+	bcopy(buf, ps_suspend_data->buf, buflen);
+
+	cv_signal(&ps_suspend_cv);
+	mutex_exit(&ps_suspend_mutex);
+}
+
+/*
+ * Schedule the suspend operation by calling the pre-suspend, suspend,
+ * and post-suspend functions. When sending back response messages, we
+ * only use a timeout for the post-suspend response because after
+ * a resume, domain services will be re-registered and we may not
+ * be able to send the response immediately.
+ */
+static void
+ps_suspend_sequence(ps_suspend_data_t *data)
+{
+	platsvc_suspend_req_t	*msg;
+	uint32_t		rec_result;
+	char			*error_reason;
+	boolean_t		recovered = B_TRUE;
+	uint_t			rv;
+
+	ASSERT(data != NULL);
+
+	msg = data->buf;
+	error_reason = (char *)kmem_zalloc(SUSPEND_MAX_REASON_SIZE, KM_SLEEP);
+
+	/* Pre-suspend */
+	rv = suspend_pre(error_reason, SUSPEND_MAX_REASON_SIZE, &recovered);
+	if (rv != 0) {
+		rec_result = (recovered ? DOMAIN_SUSPEND_REC_SUCCESS :
+		    DOMAIN_SUSPEND_REC_FAILURE);
+
+		ps_suspend_send_response(&ds_suspend_handle, msg->req_num,
+		    DOMAIN_SUSPEND_PRE_FAILURE, rec_result, error_reason, 0, 0);
+
+		kmem_free(error_reason, SUSPEND_MAX_REASON_SIZE);
+		return;
+	}
+
+	ps_suspend_send_response(&ds_suspend_handle, msg->req_num,
+	    DOMAIN_SUSPEND_PRE_SUCCESS, 0, NULL, 0, 0);
+
+	/* Suspend */
+	rv = suspend_start(error_reason, SUSPEND_MAX_REASON_SIZE);
+	if (rv != 0) {
+		rec_result = (suspend_post(NULL, 0) == 0 ?
+		    DOMAIN_SUSPEND_REC_SUCCESS : DOMAIN_SUSPEND_REC_FAILURE);
+
+		ps_suspend_send_response(&ds_suspend_handle, msg->req_num,
+		    DOMAIN_SUSPEND_SUSPEND_FAILURE, rec_result, error_reason,
+		    0, 0);
+
+		kmem_free(error_reason, SUSPEND_MAX_REASON_SIZE);
+		return;
+	}
+
+	/* Post-suspend */
+	rv = suspend_post(error_reason, SUSPEND_MAX_REASON_SIZE);
+	if (rv != 0) {
+		ps_suspend_send_response(&ds_suspend_handle, msg->req_num,
+		    DOMAIN_SUSPEND_POST_FAILURE, 0, error_reason,
+		    ps_suspend_rereg_delay, ps_suspend_retry_intval);
+	} else {
+		ps_suspend_send_response(&ds_suspend_handle, msg->req_num,
+		    DOMAIN_SUSPEND_POST_SUCCESS, 0, error_reason,
+		    ps_suspend_rereg_delay, ps_suspend_retry_intval);
+	}
+
+	kmem_free(error_reason, SUSPEND_MAX_REASON_SIZE);
+}
+
+/*
+ * Wait for a suspend request or for ps_suspend_thread_exit to be set.
+ */
+static void
+ps_suspend_thread_func(void)
+{
+	mutex_enter(&ps_suspend_mutex);
+
+	while (ps_suspend_thread_exit == B_FALSE) {
+
+		if (ps_suspend_data == NULL) {
+			cv_wait(&ps_suspend_cv, &ps_suspend_mutex);
+			continue;
+		}
+
+		mutex_exit(&ps_suspend_mutex);
+		ps_suspend_sequence(ps_suspend_data);
+		mutex_enter(&ps_suspend_mutex);
+
+		kmem_free(ps_suspend_data->buf, ps_suspend_data->buflen);
+		kmem_free(ps_suspend_data, sizeof (ps_suspend_data_t));
+		ps_suspend_data = NULL;
+	}
+
+	mutex_exit(&ps_suspend_mutex);
+
+	thread_exit();
+}
+
 static void
 ps_reg_handler(ds_cb_arg_t arg, ds_ver_t *ver, ds_svc_hdl_t hdl)
 {
@@ -365,6 +696,8 @@ ps_reg_handler(ds_cb_arg_t arg, ds_ver_t *ver, ds_svc_hdl_t hdl)
 		ds_shutdown_handle = hdl;
 	if ((ds_svc_hdl_t *)arg == &ds_panic_handle)
 		ds_panic_handle = hdl;
+	if ((ds_svc_hdl_t *)arg == &ds_suspend_handle)
+		ds_suspend_handle = hdl;
 }
 
 static void
@@ -378,4 +711,6 @@ ps_unreg_handler(ds_cb_arg_t arg)
 		ds_shutdown_handle = DS_INVALID_HDL;
 	if ((ds_svc_hdl_t *)arg == &ds_panic_handle)
 		ds_panic_handle = DS_INVALID_HDL;
+	if ((ds_svc_hdl_t *)arg == &ds_suspend_handle)
+		ds_suspend_handle = DS_INVALID_HDL;
 }

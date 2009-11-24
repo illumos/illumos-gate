@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
  
@@ -38,6 +38,7 @@
 #include <sys/mmu.h>
 #include <sys/pcb.h>
 #include <sys/machthread.h>
+#include <sys/machclock.h>
 #include <sys/privregs.h>
 #include <sys/vtrace.h>
 #include <vm/hat_sfmmu.h>
@@ -433,9 +434,7 @@ resume(kthread_id_t t)
 	add	THREAD_REG, T_INTR_START, %o2
 1:	
 	ldx	[%o2], %o1
-	rdpr	%tick, %o0
-	sllx	%o0, 1, %o0
-	srlx	%o0, 1, %o0			! shift off NPT bit
+	RD_TICK(%o0,%o3,%g5,__LINE__)
 	casx	[%o2], %o1, %o0
 	cmp	%o0, %o1
 	be,pt	%xcc, 5b
@@ -595,9 +594,7 @@ resume_from_intr(kthread_id_t t)
 	add	THREAD_REG, T_INTR_START, %o2
 2:
 	ldx	[%o2], %o1
-	rdpr	%tick, %o0
-	sllx	%o0, 1, %o0
-	srlx	%o0, 1, %o0			! shift off NPT bit
+	RD_TICK(%o0,%o3,%l1,__LINE__)
 	casx	[%o2], %o1, %o0
 	cmp	%o0, %o1
 	bne,pn	%xcc, 2b

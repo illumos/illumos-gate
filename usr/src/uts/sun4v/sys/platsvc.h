@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _PLATSVC_H
 #define	_PLATSVC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,6 +35,7 @@ extern "C" {
 #include <sys/ds.h>
 
 #define	MAX_REASON_SIZE		1
+#define	SUSPEND_MAX_REASON_SIZE	256
 
 /*
  * PLATSVC STATUS
@@ -57,6 +56,28 @@ extern "C" {
 #define	DOMAIN_PANIC_FAILURE		PLATSVC_FAILURE
 #define	DOMAIN_PANIC_INVALID_MSG	PLATSVC_INVALID_MESG
 
+/*
+ * Suspend message types.
+ */
+#define	DOMAIN_SUSPEND_SUSPEND		0x0
+
+/*
+ * Suspend response result values.
+ */
+#define	DOMAIN_SUSPEND_PRE_SUCCESS	PLATSVC_SUCCESS
+#define	DOMAIN_SUSPEND_PRE_FAILURE	PLATSVC_FAILURE
+#define	DOMAIN_SUSPEND_INVALID_MSG	PLATSVC_INVALID_MESG
+#define	DOMAIN_SUSPEND_INPROGRESS	0x3
+#define	DOMAIN_SUSPEND_SUSPEND_FAILURE	0x4
+#define	DOMAIN_SUSPEND_POST_SUCCESS	0x5
+#define	DOMAIN_SUSPEND_POST_FAILURE	0x6
+
+/*
+ * Suspend recovery result values.
+ */
+#define	DOMAIN_SUSPEND_REC_SUCCESS	0x0
+#define	DOMAIN_SUSPEND_REC_FAILURE	0x1
+
 typedef struct platsvc_md_update_req {
 	uint64_t	req_num;
 } platsvc_md_update_req_t;
@@ -65,7 +86,6 @@ typedef struct platsvc_md_update_resp {
 	uint64_t	req_num;
 	uint32_t	result;
 } platsvc_md_update_resp_t;
-
 
 typedef struct platsvc_shutdown_req {
 	uint64_t	req_num;
@@ -87,6 +107,18 @@ typedef struct platsvc_panic_resp {
 	uint32_t	result;
 	char		reason[MAX_REASON_SIZE];
 } platsvc_panic_resp_t;
+
+typedef struct platsvc_suspend_req {
+	uint64_t	req_num;
+	uint64_t	type;
+} platsvc_suspend_req_t;
+
+typedef struct platsvc_suspend_resp {
+	uint64_t	req_num;
+	uint32_t	result;
+	uint32_t	rec_result;
+	char		reason[MAX_REASON_SIZE];
+} platsvc_suspend_resp_t;
 
 #ifdef __cplusplus
 }

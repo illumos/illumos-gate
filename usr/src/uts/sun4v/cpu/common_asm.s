@@ -42,25 +42,7 @@
 #define	FAST_TRAP_DONE	\
 	ba,a	fast_trap_done
 
-/*
- * Override GET_NATIVE_TIME for the cpu module code.  This is not
- * guaranteed to be exactly one instruction, be careful of using
- * the macro in delay slots.
- *
- * Do not use any instruction that modifies condition codes as the 
- * caller may depend on these to remain unchanged across the macro.
- */
-
-#define	GET_NATIVE_TIME(out, scr1, scr2) \
-	rd	STICK, out
-
-#define	RD_TICKCMPR(out, scr)		\
-	rd	STICK_COMPARE, out
-
-#define	WR_TICKCMPR(in,scr1,scr2,label)		\
-	wr	in, STICK_COMPARE
-
-
+#include <sys/machclock.h>
 #include <sys/clock.h>
 
 #if defined(lint)
@@ -111,9 +93,9 @@ tickcmpr_set(uint64_t clock_cycles)
 1:
 	WR_TICKCMPR(%o2,%o4,%o5,__LINE__)	! Write to TICK_CMPR
 
-	GET_NATIVE_TIME(%o0, %o4, %o5)	! Read %tick to confirm the
-	sllx	%o0, 1, %o0		!   value we wrote was in the future.
-	srlx	%o0, 1, %o0
+	GET_NATIVE_TIME(%o0,%o4,%o5,__LINE__)	! Read %tick to confirm the
+						! value we wrote was in the
+						! future.
 
 	cmp	%o2, %o0		! If the value we wrote was in the
 	bg,pt	%xcc, 2f		!   future, then blow out of here.
@@ -191,7 +173,7 @@ tickcmpr_disabled(void)
 #else   /* lint */
 
 	ENTRY_NP(tickcmpr_disabled)
-	RD_TICKCMPR(%g1, %o0)
+	RD_TICKCMPR(%g1,%o0,%o1,__LINE__)
 	retl
 	  srlx	%g1, TICKINT_DIS_SHFT, %o0
 	SET_SIZE(tickcmpr_disabled)
@@ -210,12 +192,28 @@ gettick(void)
 #else   /* lint */
 
 	ENTRY(gettick)
-	GET_NATIVE_TIME(%o0, %o2, %o3)
+	GET_NATIVE_TIME(%o0,%o2,%o3,__LINE__)
 	retl
 	  nop
 	SET_SIZE(gettick)
 
 #endif  /* lint */
+
+/*
+ * Get current tick. For trapstat use only.
+ */
+#if defined (lint)
+
+hrtime_t
+rdtick()
+{ return (0); }
+
+#else
+	ENTRY(rdtick)
+	retl
+	RD_TICK_PHYSICAL(%o0)
+	SET_SIZE(rdtick)
+#endif /* lint */
 
 
 /*
@@ -228,14 +226,33 @@ uint64_t
 gettick_counter(void)
 { return(0); }
 
+uint64_t
+gettick_npt(void)
+{ return(0); }
+
+uint64_t
+getstick_npt(void)
+{ return(0); }
+
 #else	/* lint */
 
 	ENTRY_NP(gettick_counter)
-	rdpr	%tick, %o0
-	sllx	%o0, 1, %o0
+	RD_TICK(%o0,%o1,%o2,__LINE__)
 	retl
-	  srlx	%o0, 1, %o0		! shake off npt bit
+	nop
 	SET_SIZE(gettick_counter)
+
+	ENTRY_NP(gettick_npt)
+	RD_TICK_PHYSICAL(%o0)
+	retl
+	srlx	%o0, 63, %o0
+	SET_SIZE(gettick_npt)
+
+	ENTRY_NP(getstick_npt)
+	RD_STICK_PHYSICAL(%o0)
+	retl
+	srlx	%o0, 63, %o0
+	SET_SIZE(getstick_npt)
 #endif	/* lint */
 
 /*
@@ -303,21 +320,21 @@ panic_hres_tick(void)
 #else	/* lint */
 
 	ENTRY_NP(gethrtime)
-	GET_HRTIME(%g1, %o0, %o1, %o2, %o3, %o4, %o5, %g2)
+	GET_HRTIME(%g1,%o0,%o1,%o2,%o3,%o4,%o5,%g2,__LINE__)
 							! %g1 = hrtime
 	retl
 	  mov	%g1, %o0
 	SET_SIZE(gethrtime)
 
 	ENTRY_NP(gethrtime_unscaled)
-	GET_NATIVE_TIME(%g1, %o2, %o3)			! %g1 = native time
+	GET_NATIVE_TIME(%g1,%o2,%o3,__LINE__)	! %g1 = native time
 	retl
 	  mov	%g1, %o0
 	SET_SIZE(gethrtime_unscaled)
 
 	ENTRY_NP(gethrtime_waitfree)
 	ALTENTRY(dtrace_gethrtime)
-	GET_NATIVE_TIME(%g1, %o2, %o3)			! %g1 = native time
+	GET_NATIVE_TIME(%g1,%o2,%o3,__LINE__)	! %g1 = native time
 	NATIVE_TIME_TO_NSEC(%g1, %o2, %o3)
 	retl
 	  mov	%g1, %o0
@@ -352,7 +369,8 @@ panic_hres_tick(void)
  */
 
 	ENTRY_NP(get_timestamp)
-	GET_HRTIME(%g1, %g2, %g3, %g4, %g5, %o0, %o1, %o2)	! %g1 = hrtime
+	GET_HRTIME(%g1,%g2,%g3,%g4,%g5,%o0,%o1,%o2,__LINE__)
+	! %g1 = hrtime
 	srlx	%g1, 32, %o0				! %o0 = hi32(%g1)
 	srl	%g1, 0, %o1				! %o1 = lo32(%g1)
 	FAST_TRAP_DONE
@@ -386,7 +404,7 @@ panic_hres_tick(void)
 4:
 
 	ENTRY_NP(gethrestime)
-	GET_HRESTIME(%o1, %o2, %o3, %o4, %o5, %g1, %g2, %g3, %g4)
+	GET_HRESTIME(%o1,%o2,%o3,%o4,%o5,%g1,%g2,%g3,%g4,__LINE__)
 	CONV_HRESTIME(%o1, %o2, %o3, %o4, %o5)
 	stn	%o1, [%o0]
 	retl
@@ -398,7 +416,7 @@ panic_hres_tick(void)
  * seconds.
  */
 	ENTRY_NP(gethrestime_sec)
-	GET_HRESTIME(%o0, %o2, %o3, %o4, %o5, %g1, %g2, %g3, %g4)
+	GET_HRESTIME(%o0,%o2,%o3,%o4,%o5,%g1,%g2,%g3,%g4,__LINE__)
 	CONV_HRESTIME(%o0, %o2, %o3, %o4, %o5)
 	retl					! %o0 current hrestime seconds
 	  nop
@@ -437,7 +455,7 @@ panic_hres_tick(void)
  */
 
 	ENTRY_NP(get_hrestime)
-	GET_HRESTIME(%o0, %o1, %g1, %g2, %g3, %g4, %g5, %o2, %o3)
+	GET_HRESTIME(%o0,%o1,%g1,%g2,%g3,%g4,%g5,%o2,%o3,__LINE__)
 	CONV_HRESTIME(%o0, %o1, %g1, %g2, %g3)
 	FAST_TRAP_DONE
 	SET_SIZE(get_hrestime)
@@ -457,7 +475,7 @@ panic_hres_tick(void)
  * 	%g5 = scratch
  */
 	ENTRY_NP(get_virtime)
-	GET_NATIVE_TIME(%g5, %g1, %g2)	! %g5 = native time in ticks
+	GET_NATIVE_TIME(%g5,%g1,%g2,__LINE__)	! %g5 = native time in ticks
 	CPU_ADDR(%g2, %g3)			! CPU struct ptr to %g2
 	ldn	[%g2 + CPU_THREAD], %g2		! thread pointer to %g2
 	ldn	[%g2 + T_LWP], %g3		! lwp pointer to %g3
@@ -510,7 +528,7 @@ hrtime_base_panic:
 	! update hres_last_tick.  %l5 has the scaling factor (nsec_scale).
 	!
 	ldx	[%l4 + %lo(hrtime_base)], %g1	! load current hrtime_base
-	GET_NATIVE_TIME(%l0, %l3, %l6)		! current native time
+	GET_NATIVE_TIME(%l0,%l3,%l6,__LINE__)	! current native time
 	stx	%l0, [%l4 + %lo(hres_last_tick)]! prev = current
 	! convert native time to nsecs
 	NATIVE_TIME_TO_NSEC_SCALE(%l0, %l5, %l2, NSEC_SHIFT)
@@ -631,38 +649,38 @@ QRETURN;								\
 
 	.align 16
 	ENTRY(kstat_waitq_enter)
-	GET_NATIVE_TIME(%g1, %g2, %g3)
+	GET_NATIVE_TIME(%g1,%g2,%g3,__LINE__)
 	KSTAT_Q_UPDATE(add, BRZPT, 1f, 1:retl, KSTAT_IO_W)
 	SET_SIZE(kstat_waitq_enter)
 
 	.align 16
 	ENTRY(kstat_waitq_exit)
-	GET_NATIVE_TIME(%g1, %g2, %g3)
+	GET_NATIVE_TIME(%g1,%g2,%g3,__LINE__)
 	KSTAT_Q_UPDATE(sub, BRZPN, kstat_q_panic, retl, KSTAT_IO_W)
 	SET_SIZE(kstat_waitq_exit)
 
 	.align 16
 	ENTRY(kstat_runq_enter)
-	GET_NATIVE_TIME(%g1, %g2, %g3)
+	GET_NATIVE_TIME(%g1,%g2,%g3,__LINE__)
 	KSTAT_Q_UPDATE(add, BRZPT, 1f, 1:retl, KSTAT_IO_R)
 	SET_SIZE(kstat_runq_enter)
 
 	.align 16
 	ENTRY(kstat_runq_exit)
-	GET_NATIVE_TIME(%g1, %g2, %g3)
+	GET_NATIVE_TIME(%g1,%g2,%g3,__LINE__)
 	KSTAT_Q_UPDATE(sub, BRZPN, kstat_q_panic, retl, KSTAT_IO_R)
 	SET_SIZE(kstat_runq_exit)
 
 	.align 16
 	ENTRY(kstat_waitq_to_runq)
-	GET_NATIVE_TIME(%g1, %g2, %g3)
+	GET_NATIVE_TIME(%g1,%g2,%g3,__LINE__)
 	KSTAT_Q_UPDATE(sub, BRZPN, kstat_q_panic, 1:, KSTAT_IO_W)
 	KSTAT_Q_UPDATE(add, BRZPT, 1f, 1:retl, KSTAT_IO_R)
 	SET_SIZE(kstat_waitq_to_runq)
 
 	.align 16
 	ENTRY(kstat_runq_back_to_waitq)
-	GET_NATIVE_TIME(%g1, %g2, %g3)
+	GET_NATIVE_TIME(%g1,%g2,%g3,__LINE__)
 	KSTAT_Q_UPDATE(sub, BRZPN, kstat_q_panic, 1:, KSTAT_IO_R)
 	KSTAT_Q_UPDATE(add, BRZPT, 1f, 1:retl, KSTAT_IO_W)
 	SET_SIZE(kstat_runq_back_to_waitq)
@@ -693,7 +711,7 @@ int traptrace_use_stick;
 	.seg	".data"
 	.global	timedelta, hres_last_tick, hrestime, hrestime_adj
 	.global	hres_lock, nsec_scale, hrtime_base, traptrace_use_stick
-	.global	nsec_shift, adj_shift
+	.global	nsec_shift, adj_shift, native_tick_offset, native_stick_offset
 
 	/* XXX - above comment claims 128-bytes is necessary */
 	.align	64
@@ -717,6 +735,12 @@ nsec_shift:
 	.word	NSEC_SHIFT
 adj_shift:
 	.word	ADJ_SHIFT
+	.align	8
+native_tick_offset:
+	.word	0, 0
+	.align	8
+native_stick_offset:
+	.word	0, 0
 
 #endif
 
@@ -756,11 +780,11 @@ usec_delay(int n)
 	lduw	[%o1 + %lo(sticks_per_usec)], %o1
 	mulx	%o1, %o0, %o1		! Scale usec to ticks
 	inc	%o1			! We don't start on a tick edge
-	GET_NATIVE_TIME(%o2, %o3, %o4)
+	GET_NATIVE_TIME(%o2,%o3,%o4,__LINE__)
 	add	%o1, %o2, %o1
 
 1:	cmp	%o1, %o2
-	GET_NATIVE_TIME(%o2, %o3, %o4)
+	GET_NATIVE_TIME(%o2,%o3,%o4,__LINE__)
 	bgeu,pt	%xcc, 1b
 	  nop
 	retl
@@ -810,7 +834,7 @@ pil14_interrupt(int level)
 	! Note that %o5 is live until after 1f.
 	! XXX - there is a subroutine call while %o5 is live!
 	!
-	RD_TICKCMPR(%o5, %g1)
+	RD_TICKCMPR(%o5,%g1,%g2,__LINE__)
 	srlx	%o5, TICKINT_DIS_SHFT, %g1
 	brnz,pt	%g1, 2f
 	  nop
@@ -839,9 +863,7 @@ pil14_interrupt(int level)
 	! that the value we programmed is still in the future.  If it isn't,
 	! we need to reprogram TICK_COMPARE to fire as soon as possible.
 	!
-	GET_NATIVE_TIME(%o0, %g1, %g2)		! %o0 = tick
-	sllx	%o0, 1, %o0			! Clear the DIS bit
-	srlx	%o0, 1, %o0
+	GET_NATIVE_TIME(%o0,%g1,%g2,__LINE__)	! %o0 = tick
 	cmp	%o5, %o0			! In the future?
 	bg,a,pt	%xcc, 2f			! Yes, drive on.
 	  wrpr	%g0, %g5, %pstate		!   delay: enable vec intr
@@ -854,9 +876,7 @@ pil14_interrupt(int level)
 	mov	8, %o4				! 8 = arbitrary inital step
 1:	add	%o0, %o4, %o5			! Add the step
 	WR_TICKCMPR(%o5,%g1,%g2,__LINE__)	! Write to TICK_CMPR
-	GET_NATIVE_TIME(%o0, %g1, %g2)		! %o0 = tick
-	sllx	%o0, 1, %o0			! Clear the DIS bit
-	srlx	%o0, 1, %o0
+	GET_NATIVE_TIME(%o0,%g1,%g2,__LINE__)	! %o0 = tick
 	cmp	%o5, %o0			! In the future?
 	bg,a,pt	%xcc, 2f			! Yes, drive on.
 	  wrpr	%g0, %g5, %pstate		!    delay: enable vec intr

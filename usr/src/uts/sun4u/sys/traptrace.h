@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_TRAPTRACE_H
 #define	_SYS_TRAPTRACE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -156,10 +154,10 @@ extern void mach_htraptrace_cleanup(int);
  * and when trap trace macros are used.
  */
 #ifdef	TRAPTRACE_FORCE_TICK
-#define	GET_TRACE_TICK(reg)				\
+#define	GET_TRACE_TICK(reg, scr)			\
 	rdpr	%tick, reg;
 #else
-#define	GET_TRACE_TICK(reg)				\
+#define	GET_TRACE_TICK(reg, scr)			\
 	sethi	%hi(traptrace_use_stick), reg;		\
 	lduw	[reg + %lo(traptrace_use_stick)], reg;	\
 	/* CSTYLED */					\
@@ -262,7 +260,7 @@ extern void mach_htraptrace_cleanup(int);
 	andn	scr4, PSTATE_IE | PSTATE_AM, scr3;	\
 	wrpr	%g0, scr3, %pstate;			\
 	TRACE_PTR(scr1, scr2);				\
-	GET_TRACE_TICK(scr2);				\
+	GET_TRACE_TICK(scr2, scr3);			\
 	stxa	scr2, [scr1 + TRAP_ENT_TICK]%asi;	\
 	rdpr	%tl, scr2;				\
 	stha	scr2, [scr1 + TRAP_ENT_TL]%asi;		\
@@ -292,7 +290,7 @@ extern void mach_htraptrace_cleanup(int);
  */
 #define	TRACE_WIN_INFO(code, scr1, scr2, scr3)		\
 	TRACE_PTR(scr1, scr2);				\
-	GET_TRACE_TICK(scr2);				\
+	GET_TRACE_TICK(scr2, scr3);			\
 	stxa	scr2, [scr1 + TRAP_ENT_TICK]%asi;	\
 	rdpr	%tl, scr2;				\
 	stha	scr2, [scr1 + TRAP_ENT_TL]%asi;		\
@@ -332,7 +330,7 @@ extern void mach_htraptrace_cleanup(int);
 
 #define	FAULT_WINTRACE(scr1, scr2, scr3, type)		\
 	TRACE_PTR(scr1, scr2);				\
-	GET_TRACE_TICK(scr2);				\
+	GET_TRACE_TICK(scr2, scr3);			\
 	stxa	scr2, [scr1 + TRAP_ENT_TICK]%asi;	\
 	rdpr	%tl, scr2;				\
 	stha	scr2, [scr1 + TRAP_ENT_TL]%asi;		\
@@ -355,7 +353,7 @@ extern void mach_htraptrace_cleanup(int);
 
 #define	SYSTRAP_TRACE(scr1, scr2, scr3)			\
 	TRACE_PTR(scr1, scr2);				\
-	GET_TRACE_TICK(scr2);				\
+	GET_TRACE_TICK(scr2, scr3);			\
 	stxa	scr2, [scr1 + TRAP_ENT_TICK]%asi;	\
 	rdpr	%tl, scr2;				\
 	stha	scr2, [scr1 + TRAP_ENT_TL]%asi;		\

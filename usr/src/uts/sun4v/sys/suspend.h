@@ -23,66 +23,22 @@
  * Use is subject to license terms.
  */
 
-/*
- * Routines for manipulating the UltraSPARC performance
- * counter registers (%pcr and %pic)
- */
+#ifndef _SYS_SUSPEND_H
+#define	_SYS_SUSPEND_H
 
-#include <sys/asm_linkage.h>
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
-#if defined(lint) || defined(__lint)
+int suspend_pre(char *error_reason, size_t max_reason_length,
+    boolean_t *recovered);
+int suspend_start(char *error_reason, size_t max_reason_length);
+int suspend_post(char *error_reason, size_t max_reason_length);
+void suspend_sync_tick_stick_npt(void);
+boolean_t suspend_supported(void);
 
-#include <sys/cpc_ultra.h>
+#ifdef	__cplusplus
+}
+#endif
 
-/*ARGSUSED*/
-void
-ultra_setpcr(uint64_t pcr)
-{}
-
-/*ARGSUSED*/
-uint64_t
-ultra_getpcr(void)
-{ return (0); }
-
-/*ARGSUSED*/
-void
-ultra_setpic(uint64_t pic)
-{}
-
-uint64_t
-ultra_getpic(void)
-{ return (0); }
-
-#else	/* lint || __lint */
-
-	ENTRY(ultra_setpcr)
-	retl
-	wr	%o0, %pcr
-	SET_SIZE(ultra_setpcr)
-
-	ENTRY(ultra_getpcr)
-	retl
-	rd	%pcr, %o0
-	SET_SIZE(ultra_getpcr)
-
-	ENTRY(ultra_setpic)
-#if defined(BB_ERRATA_1)	/* Writes to %pic may fail */
-	ba	1f
-	nop
-	.align	16
-1:	wr	%o0, %pic
-	rd	%pic, %g0
-	retl
-	nop
-#else
-	retl
-	wr	%o0, %pic
-#endif	/* BB_ERRATA_1 */
-	SET_SIZE(ultra_setpic)
-
-	ENTRY(ultra_getpic)
-	retl
-	rd	%pic, %o0
-	SET_SIZE(ultra_getpic)
-
-#endif	/* lint || __lint */
+#endif	/* !_SYS_SUSPEND_H */

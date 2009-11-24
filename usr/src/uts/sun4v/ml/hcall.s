@@ -349,6 +349,20 @@ uint64_t
 hv_soft_state_get(uint64_t string, uint64_t *state)
 { return (0); }
 
+uint64_t
+hv_guest_suspend(void)
+{ return (0); }
+
+/*ARGSUSED*/	
+uint64_t
+hv_set_tick_npt(uint64_t npt)
+{ return (0); }
+
+/*ARGSUSED*/	
+uint64_t
+hv_set_stick_npt(uint64_t npt)
+{ return (0); }
+
 #else	/* lint || __lint */
 
 	/*
@@ -1237,5 +1251,26 @@ hv_soft_state_get(uint64_t string, uint64_t *state)
 	retl
 	stx	%o1, [%o2]
 	SET_SIZE(hv_soft_state_get)
+
+	ENTRY(hv_guest_suspend)
+	mov	GUEST_SUSPEND, %o5
+	ta	FAST_TRAP
+	retl
+	nop
+	SET_SIZE(hv_guest_suspend)
+
+	ENTRY(hv_tick_set_npt)
+	mov	TICK_SET_NPT, %o5
+	ta	FAST_TRAP
+	retl
+	nop
+	SET_SIZE(hv_tick_set_npt)
+
+	ENTRY(hv_stick_set_npt)
+	mov	STICK_SET_NPT, %o5
+	ta	FAST_TRAP
+	retl
+	nop
+	SET_SIZE(hv_stick_set_npt)
 
 #endif	/* lint || __lint */

@@ -159,8 +159,8 @@ pg_cid_t	pg_class_register(char *, struct pg_ops *, pg_relation_t);
  * PG CPU reconfiguration hooks
  */
 void		pg_cpu0_init(void);
-void		pg_cpu_init(cpu_t *);
-void		pg_cpu_fini(cpu_t *);
+cpu_pg_t	*pg_cpu_init(cpu_t *, boolean_t deferred_init);
+void		pg_cpu_fini(cpu_t *, cpu_pg_t *cpu_pg_deferred);
 void		pg_cpu_active(cpu_t *);
 void		pg_cpu_inactive(cpu_t *);
 void		pg_cpu_startup(cpu_t *);

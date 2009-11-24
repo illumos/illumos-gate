@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * General machine architecture & implementation specific
@@ -39,11 +37,36 @@
 #include <sys/asm_linkage.h>
 #include <sys/machsystm.h>
 #include <sys/machthread.h>
+#include <sys/machclock.h>
 #include <sys/privregs.h>
 #include <sys/cmpregs.h>
 #include <sys/clock.h>
 #include <sys/fpras.h>
 #include <sys/soft_state.h>
+
+#if defined(lint)
+
+uint64_t
+ultra_gettick(void)
+{ return (0); }
+
+#else	/* lint */
+
+/*
+ * This isn't the routine you're looking for.
+ *
+ * The routine simply returns the value of %tick on the *current* processor.
+ * Most of the time, gettick() [which in turn maps to %stick on platforms
+ * that have different CPU %tick rates] is what you want.
+ */
+
+	ENTRY(ultra_gettick)
+	RD_TICK(%o0,%o1,%o2,__LINE__)
+	retl
+	nop
+	SET_SIZE(ultra_gettick)
+
+#endif	/* lint */
 
 #if defined(lint)
 /* ARGSUSED */

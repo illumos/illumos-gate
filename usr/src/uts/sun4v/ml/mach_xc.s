@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if defined(lint)
 #include <sys/types.h>
@@ -80,7 +77,7 @@ self_xcall(struct cpu *cpu, uint64_t arg1, uint64_t arg2, xcfunc_t *func)
 
 #ifdef TRAPTRACE
 	TRACE_PTR(%g4, %g6)
-	GET_TRACE_TICK(%g6)
+	GET_TRACE_TICK(%g6, %g3)
 	stxa	%g6, [%g4 + TRAP_ENT_TICK]%asi
 	rdpr	%tl, %g6
 	stha	%g6, [%g4 + TRAP_ENT_TL]%asi
@@ -124,7 +121,7 @@ xc_trace(u_int traptype, cpuset_t *cpu_set, xcfunc_t *func,
 	andn	%g1, PSTATE_IE | PSTATE_AM, %g2
 	wrpr	%g0, %g2, %pstate			/* disable interrupts */
 	TRACE_PTR(%g3, %g4)
-	GET_TRACE_TICK(%g6)
+	GET_TRACE_TICK(%g6, %g4)
 	stxa	%g6, [%g3 + TRAP_ENT_TICK]%asi
 	stha	%g0, [%g3 + TRAP_ENT_TL]%asi
 	set	TT_XCALL, %g2

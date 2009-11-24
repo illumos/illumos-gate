@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/dditypes.h>
@@ -665,7 +663,7 @@ typedef struct hsvc_info_unix_s {
 
 static hsvc_info_unix_t  hsvcinfo_unix[] = {
 	{{HSVC_REV_1, NULL,	HSVC_GROUP_SUN4V,	1,	0, NULL}, 1},
-	{{HSVC_REV_1, NULL,	HSVC_GROUP_CORE,	1,	1, NULL}, 1},
+	{{HSVC_REV_1, NULL,	HSVC_GROUP_CORE,	1,	2, NULL}, 1},
 	{{HSVC_REV_1, NULL,	HSVC_GROUP_DIAG,	1,	0, NULL}, 1},
 	{{HSVC_REV_1, NULL,	HSVC_GROUP_INTR,	1,	0, NULL}, 0},
 };

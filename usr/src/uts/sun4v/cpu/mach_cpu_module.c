@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/cpu_module.h>
 #include <vm/page.h>
@@ -699,3 +697,11 @@ atomic_clear_long_excl(volatile ulong_t *target, uint_t value)
 void
 fp_zero(void)
 {}
+
+uint64_t
+gettick_npt(void)
+{ return (0); }
+
+uint64_t
+getstick_npt(void)
+{ return (0); }
