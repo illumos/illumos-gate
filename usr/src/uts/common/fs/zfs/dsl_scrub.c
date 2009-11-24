@@ -50,8 +50,8 @@ static dsl_syncfunc_t dsl_pool_scrub_cancel_sync;
 static void scrub_visitdnode(dsl_pool_t *dp, dnode_phys_t *dnp, arc_buf_t *buf,
     uint64_t objset, uint64_t object);
 
-int zfs_scrub_min_time = 1000; /* (millisec) min time to scrub per txg */
-int zfs_resilver_min_time = 3000; /* (millisec) min time to resilver per txg */
+int zfs_scrub_min_time_ms = 1000; /* min millisecs to scrub per txg */
+int zfs_resilver_min_time_ms = 3000; /* min millisecs to resilver per txg */
 boolean_t zfs_no_scrub_io = B_FALSE; /* set to disable scrub i/o */
 boolean_t zfs_no_scrub_prefetch = B_FALSE; /* set to disable srub prefetching */
 enum ddt_class zfs_scrub_ddt_class_max = DDT_CLASS_DUPLICATE;
@@ -336,8 +336,8 @@ scrub_pause(dsl_pool_t *dp, const zbookmark_t *zb, const ddt_bookmark_t *ddb)
 	if (zb != NULL && zb->zb_level != 0)
 		return (B_FALSE);
 
-	mintime = dp->dp_scrub_isresilver ? zfs_resilver_min_time :
-	    zfs_scrub_min_time;
+	mintime = dp->dp_scrub_isresilver ? zfs_resilver_min_time_ms :
+	    zfs_scrub_min_time_ms;
 	elapsed_nanosecs = gethrtime() - dp->dp_scrub_start_time;
 	if (elapsed_nanosecs / NANOSEC > zfs_txg_timeout ||
 	    (elapsed_nanosecs / MICROSEC > mintime && txg_sync_waiting(dp))) {
