@@ -195,7 +195,6 @@ static void write_mii(struct dnetinstance *, uint32_t, int);
 static void mii_tristate(struct dnetinstance *);
 static void do_phy(struct dnetinstance *);
 static void dnet_mii_link_cb(dev_info_t *, int, enum mii_phy_state);
-static void dnet_mii_link_up(struct dnetinstance *);
 static void set_leaf(SROM_FORMAT *sr, LEAF_FORMAT *leaf);
 
 #ifdef DNETDEBUG
@@ -970,7 +969,6 @@ dnet_m_start(void *arg)
 	 */
 	if (!dnetp->suspended)
 		(void) dnet_start(dnetp);
-	dnet_mii_link_up(dnetp);
 	mutex_exit(&dnetp->intrlock);
 	return (0);
 }
@@ -986,17 +984,12 @@ dnet_m_stop(void *arg)
 	 */
 	mutex_enter(&dnetp->intrlock);
 	if (!dnetp->suspended) {
-		if (dnetp->mii_up) {
-			dnetp->mii_up = 0;
-			dnetp->mii_speed = 0;
-			dnetp->mii_duplex = 0;
-		}
-		mac_link_update(dnetp->mac_handle, LINK_STATE_UNKNOWN);
 		val = ddi_get32(dnetp->io_handle,
 		    REG32(dnetp->io_reg, OPN_MODE_REG));
 		ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG),
 		    val & ~(START_TRANSMIT | START_RECEIVE));
 	}
+	mac_link_update(dnetp->mac_handle, LINK_STATE_UNKNOWN);
 	dnetp->running = B_FALSE;
 	mutex_exit(&dnetp->intrlock);
 }
@@ -1197,8 +1190,12 @@ dnet_m_getstat(void *arg, uint_t stat, uint64_t *val)
 
 	switch (stat) {
 	case MAC_STAT_IFSPEED:
-		*val = (dnetp->mii_up ?
-		    dnetp->mii_speed : dnetp->speed) * 1000000;
+		if (!dnetp->running) {
+			*val = 0;
+		} else {
+			*val = (dnetp->mii_up ?
+			    dnetp->mii_speed : dnetp->speed) * 1000000;
+		}
 		break;
 
 	case MAC_STAT_NORCVBUF:
@@ -1232,10 +1229,8 @@ dnet_m_getstat(void *arg, uint_t stat, uint64_t *val)
 	case ETHER_STAT_LINK_DUPLEX:
 		if (!dnetp->running) {
 			*val = LINK_DUPLEX_UNKNOWN;
-			break;
-		}
 
-		if (dnetp->mii_up) {
+		} else if (dnetp->mii_up) {
 			*val = dnetp->mii_duplex ?
 			    LINK_DUPLEX_FULL : LINK_DUPLEX_HALF;
 		} else {
@@ -3971,27 +3966,10 @@ dnet_mii_link_cb(dev_info_t *dip, int phy, enum mii_phy_state state)
 			dnetp->selected_media_block = leaf->default_block;
 		setup_block(dnetp);
 	}
-	dnet_mii_link_up(dnetp);
-}
 
-static void
-dnet_mii_link_up(struct dnetinstance *dnetp)
-{
-	if (!dnetp->running) {
-		return;
-	}
-
-	if (dnetp->mii_up) {
-		(void) mii_getspeed(dnetp->mii, dnetp->phyaddr,
-		    &dnetp->mii_speed, &dnetp->mii_duplex);
-
-		mac_link_update(dnetp->mac_handle, LINK_STATE_UP);
-
-	} else {
-		dnetp->mii_speed = 0;
-		dnetp->mii_duplex = 0;
-
-		mac_link_update(dnetp->mac_handle, LINK_STATE_DOWN);
+	if (dnetp->running) {
+		mac_link_update(dnetp->mac_handle,
+		    (dnetp->mii_up ? LINK_STATE_UP : LINK_STATE_DOWN));
 	}
 }
 
