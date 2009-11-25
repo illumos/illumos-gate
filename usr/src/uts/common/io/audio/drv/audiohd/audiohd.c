@@ -215,6 +215,10 @@ audiohd_set_chipset_info(audiohd_state_t *statep)
 		name = "ATI HD Audio";
 		vers = "SB600";
 		break;
+	case 0x1002aa38:
+		name = "ATI HD Audio";
+		vers = "Radeon HD 4670";
+		break;
 	case 0x11063288:
 		name = "VIA HD Audio";
 		vers = "HDA";
@@ -410,7 +414,7 @@ audiohd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* High-level interrupt isn't supported by this driver */
 	if (ddi_intr_hilevel(dip, 0) != 0) {
-		cmn_err(CE_WARN,
+		audio_dev_warn(statep->adev,
 		    "unsupported high level interrupt");
 		return (DDI_FAILURE);
 	}
@@ -421,7 +425,7 @@ audiohd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* interrupt cookie and initialize mutex */
 	if (audiohd_init_state(statep, dip) != DDI_SUCCESS) {
-		cmn_err(CE_NOTE,
+		audio_dev_warn(statep->adev,
 		    "audiohd_init_state failed");
 		goto error;
 	}
@@ -2379,7 +2383,8 @@ audiohd_init_state(audiohd_state_t *statep, dev_info_t *dip)
 	statep->hda_dip = dip;
 
 	if ((adev = audio_dev_alloc(dip, 0)) == NULL) {
-		cmn_err(CE_WARN, "unable to allocate audio dev");
+		audio_dev_warn(statep->adev,
+		    "unable to allocate audio dev");
 		return (DDI_FAILURE);
 	}
 	statep->adev = adev;
@@ -2954,7 +2959,8 @@ audiohd_get_conns(hda_codec_t *codec, wid_t wid)
 	 */
 	if (prop.conn_len == 0) {
 		widget->nconns = 0;
-		cmn_err(CE_WARN, "node %d has 0 connections\n", wid);
+		audio_dev_warn(statep->adev,
+		    "node %d has 0 connections", wid);
 		return;
 	}
 
@@ -3220,6 +3226,9 @@ audiohd_set_codec_info(hda_codec_t *codec)
 	char buf[256];
 
 	switch (codec->vid) {
+	case 0x1002aa01:
+		(void) snprintf(buf, sizeof (buf), "ATI HD codec: R600 HDMI");
+		break;
 	case 0x10134206:
 		(void) snprintf(buf, sizeof (buf), "Cirrus HD codec: CS4206");
 		break;
@@ -3276,6 +3285,10 @@ audiohd_set_codec_info(hda_codec_t *codec)
 	case 0x434d4980:
 		(void) snprintf(buf, sizeof (buf), "CMedia HD codec: CMI19880");
 		break;
+	case 0x11d4194a:
+		(void) snprintf(buf, sizeof (buf),
+		    "Analog Devices HD codec: AD1984A");
+		break;
 	case 0x11d41981:
 		(void) snprintf(buf, sizeof (buf),
 		    "Analog Devices HD codec: AD1981");
@@ -3299,6 +3312,10 @@ audiohd_set_codec_info(hda_codec_t *codec)
 	case 0x11d4198b:
 		(void) snprintf(buf, sizeof (buf),
 		    "Analog Devices HD codec: AD1988B");
+		break;
+	case 0x14f15045:
+		(void) snprintf(buf, sizeof (buf),
+		    "Conexant HD codec: CX20549");
 		break;
 	case 0x14f15051:
 		(void) snprintf(buf, sizeof (buf),
@@ -3801,13 +3818,14 @@ audiohd_build_output_path(hda_codec_t *codec)
 
 	/*
 	 * Work around for laptops which have IDT or AD audio chipset, such as
-	 * HP mini 1000 laptop, Dell Lattitude 6400, Lenovo T60. We don't
-	 * allow mixer widget on such path, which leads to speaker
+	 * HP mini 1000 laptop, Dell Lattitude 6400, Lenovo T60, Lenove R61e.
+	 * We don't allow mixer widget on such path, which leads to speaker
 	 * loud hiss noise.
 	 */
 	if (codec->vid == AUDIOHD_CODEC_IDT7608 ||
 	    codec->vid == AUDIOHD_CODEC_IDT76B2 ||
-	    codec->vid == AUDIOHD_CODEC_AD1981)
+	    codec->vid == AUDIOHD_CODEC_AD1981 ||
+	    codec->vid == AUDIOHD_CODEC_CX20549)
 		mixer_allow = 0;
 	/* search an exclusive mixer widget path. This is preferred */
 	audiohd_do_build_output_path(codec, mixer_allow, &mnum, 1, 0);
