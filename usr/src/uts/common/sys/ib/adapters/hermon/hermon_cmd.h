@@ -306,6 +306,7 @@ extern "C" {
  */
 #define	HERMON_CMD_MKEY_CHECK		0
 #define	HERMON_CMD_MKEY_DONTCHECK	1
+#define	HERMON_CMD_BKEY_DONTCHECK	2
 
 #define	HERMON_CMD_MAD_IFC_SIZE		0x100
 #define	HERMON_CMD_MADDATA_OFFSET	0x40
@@ -322,8 +323,13 @@ extern "C" {
 
 #define	HERMON_CMD_PERF_GET		0x01040101
 #define	HERMON_CMD_PERF_SET		0x01040102
+#define	HERMON_CMD_CLASSPORTINFO	0x00010000
 #define	HERMON_CMD_PERFCNTRS		0x00120000
+#define	HERMON_CMD_EXTPERFCNTRS		0x001D0000
 #define	HERMON_CMD_PERFATTR		0x00000000
+
+#define	HERMON_IS_EXT_WIDTH_SUPPORTED		0x0000020000000000
+#define	HERMON_IS_EXT_WIDTH_SUPPORTED_NOIETF	0x0000040000000000
 
 
 /*
@@ -754,6 +760,10 @@ int hermon_getguidinfo_cmd_post(hermon_state_t *state, uint_t port,
     uint_t guidblock, uint_t sleepflag, sm_guidinfo_t *guidinfo);
 int hermon_getpkeytable_cmd_post(hermon_state_t *state, uint_t port,
     uint_t pkeyblock, uint_t sleepflag, sm_pkey_table_t *pkeytable);
+int hermon_is_ext_port_counters_supported(hermon_state_t *state, uint_t port,
+    uint_t sleepflag, int *ext_width_supported);
+int hermon_getextperfcntr_cmd_post(hermon_state_t *state, uint_t port,
+    uint_t sleepflag, hermon_hw_sm_extperfcntr_t *perfinfo);
 int hermon_getperfcntr_cmd_post(hermon_state_t *state, uint_t port,
     uint_t sleepflag, hermon_hw_sm_perfcntr_t *perfinfo, int reset);
 /*

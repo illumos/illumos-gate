@@ -448,6 +448,7 @@ enum {
  */
 typedef struct hermon_perfcntr64_ks_info_s {
 	struct kstat	*hki64_ksp;
+	int		hki64_ext_port_counters_supported;
 	int		hki64_enabled;
 	uint64_t	hki64_counters[HERMON_PERFCNTR64_NUM_COUNTERS];
 	uint32_t	hki64_last_read[HERMON_PERFCNTR64_NUM_COUNTERS];

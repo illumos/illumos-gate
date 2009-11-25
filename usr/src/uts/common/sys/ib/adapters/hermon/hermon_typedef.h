@@ -77,6 +77,7 @@ typedef struct hermon_hw_qpc_s		hermon_hw_qpc_t;
 typedef struct hermon_hw_mcg_s		hermon_hw_mcg_t;
 typedef struct hermon_hw_mcg_qp_list_s	hermon_hw_mcg_qp_list_t;
 typedef struct hermon_hw_sm_perfcntr_s	hermon_hw_sm_perfcntr_t;
+typedef struct hermon_hw_sm_extperfcntr_s hermon_hw_sm_extperfcntr_t;
 typedef struct hermon_hw_snd_wqe_ctrl_s hermon_hw_snd_wqe_ctrl_t;
 typedef struct hermon_hw_srq_wqe_next_s hermon_hw_srq_wqe_next_t;
 typedef struct hermon_hw_snd_wqe_ud_s	   hermon_hw_snd_wqe_ud_t;

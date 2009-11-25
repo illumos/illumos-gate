@@ -2052,6 +2052,152 @@ getportinfo_fail:
 }
 
 /*
+ * hermon_is_ext_port_counters_supported()
+ *
+ * Determine weather extended port counters are supported or not by sending
+ * ClassPortInfo perf mgmt class MAD.
+ */
+int
+hermon_is_ext_port_counters_supported(hermon_state_t *state, uint_t port,
+    uint_t sleepflag, int *ext_width_supported)
+{
+	hermon_mbox_info_t	mbox_info;
+	hermon_cmd_post_t	cmd;
+	uint64_t		data;
+	uint32_t		*mbox;
+	int			status;
+
+	bzero((void *)&cmd, sizeof (hermon_cmd_post_t));
+
+	/* Get "In" and "Out" mailboxes for the command */
+	mbox_info.mbi_alloc_flags = HERMON_ALLOC_INMBOX | HERMON_ALLOC_OUTMBOX;
+	status = hermon_mbox_alloc(state, &mbox_info, sleepflag);
+	if (status != HERMON_CMD_SUCCESS) {
+		return (status);
+	}
+
+	/* Build the ClassPortInfo request MAD in the "In" mailbox */
+	mbox = (uint32_t *)mbox_info.mbi_in->mb_addr;
+
+	ddi_put32(mbox_info.mbi_in->mb_acchdl, &mbox[0], HERMON_CMD_PERF_GET);
+	ddi_put32(mbox_info.mbi_in->mb_acchdl, &mbox[1], HERMON_CMD_MADHDR1);
+	ddi_put32(mbox_info.mbi_in->mb_acchdl, &mbox[2], HERMON_CMD_MADHDR2);
+	ddi_put32(mbox_info.mbi_in->mb_acchdl, &mbox[3], HERMON_CMD_MADHDR3);
+	ddi_put32(mbox_info.mbi_in->mb_acchdl, &mbox[4],
+	    HERMON_CMD_CLASSPORTINFO);
+	ddi_put32(mbox_info.mbi_in->mb_acchdl, &mbox[5], HERMON_CMD_PERFATTR);
+
+	/* Sync the mailbox for the device to read */
+	hermon_mbox_sync(mbox_info.mbi_in, 0, HERMON_CMD_MAD_IFC_SIZE,
+	    DDI_DMA_SYNC_FORDEV);
+
+	/* Setup the Hermon "MAD_IFC" command */
+	cmd.cp_inparm	= mbox_info.mbi_in->mb_mapaddr;
+	cmd.cp_outparm	= mbox_info.mbi_out->mb_mapaddr;
+	cmd.cp_inmod	= port;
+	cmd.cp_opcode	= MAD_IFC;
+	/* No MKey and BKey checking */
+	cmd.cp_opmod	= HERMON_CMD_MKEY_DONTCHECK | HERMON_CMD_BKEY_DONTCHECK;
+	cmd.cp_flags	= HERMON_CMD_NOSLEEP_SPIN; /* NO SLEEP */
+	status = hermon_cmd_post(state, &cmd);
+	if (status != HERMON_CMD_SUCCESS) {
+		goto fail;
+	}
+
+	/* Sync the mailbox to read the results */
+	hermon_mbox_sync(mbox_info.mbi_out, 0, HERMON_CMD_MAD_IFC_SIZE,
+	    DDI_DMA_SYNC_FORCPU);
+
+	/*
+	 * We can discard the MAD header and the reserved area of the
+	 * perf mgmt class MAD
+	 */
+	data = ddi_get64(mbox_info.mbi_out->mb_acchdl,
+	    ((uint64_t *)mbox_info.mbi_out->mb_addr + 8));
+	*ext_width_supported = (data & (HERMON_IS_EXT_WIDTH_SUPPORTED |
+	    HERMON_IS_EXT_WIDTH_SUPPORTED_NOIETF)) ? 1 : 0;
+
+fail:
+	/* Free the mailbox */
+	hermon_mbox_free(state, &mbox_info);
+	return (status);
+}
+
+/*
+ * hermon_getextpefcntr_cmd_post()
+ *
+ * Read the extended performance counters of the specified port and
+ * copy them into perfinfo.
+ */
+int
+hermon_getextperfcntr_cmd_post(hermon_state_t *state, uint_t port,
+    uint_t sleepflag, hermon_hw_sm_extperfcntr_t *perfinfo)
+{
+	hermon_mbox_info_t	mbox_info;
+	hermon_cmd_post_t	cmd;
+	uint64_t		data;
+	uint32_t		*mbox;
+	int			status, i;
+
+	bzero((void *)&cmd, sizeof (hermon_cmd_post_t));
+
+	/* Get "In" and "Out" mailboxes for the command */
+	mbox_info.mbi_alloc_flags = HERMON_ALLOC_INMBOX | HERMON_ALLOC_OUTMBOX;
+	status = hermon_mbox_alloc(state, &mbox_info, sleepflag);
+	if (status != HERMON_CMD_SUCCESS) {
+		return (status);
+	}
+
+	/* Build PortCountersExtended request MAD in the "In" mailbox */
+	mbox = (uint32_t *)mbox_info.mbi_in->mb_addr;
+
+	ddi_put32(mbox_info.mbi_in->mb_acchdl, &mbox[0], HERMON_CMD_PERF_GET);
+	ddi_put32(mbox_info.mbi_in->mb_acchdl, &mbox[1], HERMON_CMD_MADHDR1);
+	ddi_put32(mbox_info.mbi_in->mb_acchdl, &mbox[2], HERMON_CMD_MADHDR2);
+	ddi_put32(mbox_info.mbi_in->mb_acchdl, &mbox[3], HERMON_CMD_MADHDR3);
+	ddi_put32(mbox_info.mbi_in->mb_acchdl, &mbox[4],
+	    HERMON_CMD_EXTPERFCNTRS);
+	ddi_put32(mbox_info.mbi_in->mb_acchdl, &mbox[5], HERMON_CMD_PERFATTR);
+	ddi_put32(mbox_info.mbi_in->mb_acchdl, &mbox[16], (port << 16));
+
+	/* Sync the mailbox for the device to read */
+	hermon_mbox_sync(mbox_info.mbi_in, 0, HERMON_CMD_MAD_IFC_SIZE,
+	    DDI_DMA_SYNC_FORDEV);
+
+	/* Setup the Hermon "MAD_IFC" command */
+	cmd.cp_inparm	= mbox_info.mbi_in->mb_mapaddr;
+	cmd.cp_outparm	= mbox_info.mbi_out->mb_mapaddr;
+	cmd.cp_inmod	= port;
+	cmd.cp_opcode	= MAD_IFC;
+	/* No MKey and BKey checking */
+	cmd.cp_opmod	= HERMON_CMD_MKEY_DONTCHECK | HERMON_CMD_BKEY_DONTCHECK;
+	cmd.cp_flags	= HERMON_CMD_NOSLEEP_SPIN; /* NO SLEEP */
+	status = hermon_cmd_post(state, &cmd);
+	if (status != HERMON_CMD_SUCCESS) {
+		goto fail;
+	}
+
+	/* Sync the mailbox to read the results */
+	hermon_mbox_sync(mbox_info.mbi_out, 0, HERMON_CMD_MAD_IFC_SIZE,
+	    DDI_DMA_SYNC_FORCPU);
+
+	/*
+	 * Copy Perfcounters into "perfinfo". We can discard the MAD
+	 * header and the reserved area of the perf mgmt class MAD.
+	 */
+	for (i = 0; i < (sizeof (hermon_hw_sm_extperfcntr_t) >> 3); i++) {
+		data = ddi_get64(mbox_info.mbi_out->mb_acchdl,
+		    ((uint64_t *)mbox_info.mbi_out->mb_addr + i + 8));
+		((uint64_t *)(void *)perfinfo)[i] = data;
+	}
+
+fail:
+	/* Free the mailbox */
+	hermon_mbox_free(state, &mbox_info);
+	return (status);
+}
+
+/*
  * hermon_getpefcntr_cmd_post()
  *    Context: Can be called from interrupt or base context.
  *
@@ -2116,8 +2262,8 @@ hermon_getperfcntr_cmd_post(hermon_state_t *state, uint_t port,
 	cmd.cp_outparm	= mbox_info.mbi_out->mb_mapaddr;
 	cmd.cp_inmod	= port;
 	cmd.cp_opcode	= MAD_IFC;
-	cmd.cp_opmod	= HERMON_CMD_MKEY_DONTCHECK;  	/* No MKey checking */
-	cmd.cp_opmod	= 0x03;			/* temp, no bkey either */
+	/* No MKey and BKey checking */
+	cmd.cp_opmod	= HERMON_CMD_MKEY_DONTCHECK | HERMON_CMD_BKEY_DONTCHECK;
 	cmd.cp_flags	= HERMON_CMD_NOSLEEP_SPIN; /* NO SLEEP */
 	status = hermon_cmd_post(state, &cmd);
 	if (status != HERMON_CMD_SUCCESS) {

@@ -551,9 +551,14 @@ hermon_kstat_cntr_update(kstat_t *ksp, int rw)
 /*
  * 64 bit kstats for performance counters:
  *
- * Since the hardware as of now does not support 64 bit performance counters,
- * we maintain 64 bit performance counters in software using the 32 bit
- * hardware counters.
+ * Export 64 bit performance counters in kstats.
+ *
+ * If the HCA hardware supports 64 bit extended port counters, we use the
+ * hardware based counters. If the HCA hardware does not support extended port
+ * counters, we maintain 64 bit performance counters in software using the
+ * 32 bit hardware port counters.
+ *
+ * The software based counters are maintained as follows:
  *
  * We create a thread that, every one second, reads the values of 32 bit
  * hardware counters and adds them to the 64 bit software counters. Immediately
@@ -566,6 +571,8 @@ hermon_kstat_cntr_update(kstat_t *ksp, int rw)
  * we do not maintain 64 bit software counters. To enable this the consumer
  * needs to write a non-zero value to the "enable" component of the of
  * perf_counters kstat. Writing zero to this component will disable this work.
+ * NOTE: The enabling or disabling applies to software based counters only.
+ * Hardware based counters counters are always enabled.
  *
  * If performance monitor is enabled in subnet manager, the SM could
  * periodically reset the hardware counters by sending perf-MADs. So only
@@ -592,8 +599,16 @@ hermon_kstat_perfcntr64_create(hermon_state_t *state, uint_t port_num)
 	int			drv_instance;
 	char			*drv_name;
 	char			kname[32];
+	int			status, ext_width_supported;
 
 	ASSERT(port_num != 0);
+
+	status = hermon_is_ext_port_counters_supported(state, port_num,
+	    HERMON_CMD_NOSLEEP_SPIN, &ext_width_supported);
+	if (status == HERMON_CMD_SUCCESS) {
+		ksi->hki_perfcntr64[port_num - 1].
+		    hki64_ext_port_counters_supported = ext_width_supported;
+	}
 
 	drv_name = (char *)ddi_driver_name(state->hs_dip);
 	drv_instance = ddi_get_instance(state->hs_dip);
@@ -804,6 +819,52 @@ hermon_kstat_perfcntr64_thread_exit(hermon_ks_info_t *ksi)
 }
 
 /*
+ * hermon_kstat_perfcntr64_update_ext()
+ *    Context: Called from the kstat context
+ *
+ * Update perf_counters kstats with the values of the extended port counters
+ * from the hardware.
+ */
+static int
+hermon_kstat_perfcntr64_update_ext(hermon_perfcntr64_ks_info_t *ksi64, int rw,
+    struct kstat_named *data)
+{
+	hermon_hw_sm_extperfcntr_t	sm_extperfcntr;
+
+	/*
+	 * The "enable" component of the kstat is the only writable kstat.
+	 * It is a no-op when the hardware supports extended port counters.
+	 */
+	if (rw == KSTAT_WRITE)
+		return (0);
+
+	/*
+	 * Read the counters and update kstats.
+	 */
+	if (hermon_getextperfcntr_cmd_post(ksi64->hki64_state,
+	    ksi64->hki64_port_num, HERMON_CMD_NOSLEEP_SPIN, &sm_extperfcntr) !=
+	    HERMON_CMD_SUCCESS) {
+		return (EIO);
+	}
+
+	data[HERMON_PERFCNTR64_ENABLE_IDX].value.ui32 = 1;
+
+	data[HERMON_PERFCNTR64_XMIT_DATA_IDX].value.ui64 =
+	    sm_extperfcntr.portxmdata;
+
+	data[HERMON_PERFCNTR64_RECV_DATA_IDX].value.ui64 =
+	    sm_extperfcntr.portrcdata;
+
+	data[HERMON_PERFCNTR64_XMIT_PKTS_IDX].value.ui64 =
+	    sm_extperfcntr.portxmpkts;
+
+	data[HERMON_PERFCNTR64_RECV_PKTS_IDX].value.ui64 =
+	    sm_extperfcntr.portrcpkts;
+
+	return (0);
+}
+
+/*
  * hermon_kstat_perfcntr64_update()
  *    Context: Called from the kstat context
  *
@@ -817,6 +878,7 @@ hermon_kstat_perfcntr64_update(kstat_t *ksp, int rw)
 	hermon_ks_info_t		*ksi;
 	hermon_perfcntr64_ks_info_t	*ksi64;
 	int				i, thr_exit;
+	int				rv;
 
 	ksi64	= ksp->ks_private;
 	state	= ksi64->hki64_state;
@@ -824,6 +886,12 @@ hermon_kstat_perfcntr64_update(kstat_t *ksp, int rw)
 	data	= (struct kstat_named *)(ksp->ks_data);
 
 	mutex_enter(&ksi->hki_perfcntr64_lock);
+
+	if (ksi64->hki64_ext_port_counters_supported) {
+		rv = hermon_kstat_perfcntr64_update_ext(ksi64, rw, data);
+		mutex_exit(&ksi->hki_perfcntr64_lock);
+		return (rv);
+	}
 
 	/*
 	 * 64 bit performance counters maintained by the software is not

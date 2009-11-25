@@ -3139,6 +3139,58 @@ struct hermon_hw_sm_perfcntr_s {
 };
 #endif
 
+/*
+ * Structure for getting the extended peformance counters from the HCA
+ */
+
+#ifdef _LITTLE_ENDIAN
+struct hermon_hw_sm_extperfcntr_s {
+	uint32_t	rsvd;
+	uint32_t	cntrsel		:16;
+	uint32_t	portsel		:8;
+	uint32_t			:8;
+
+	uint64_t	portxmdata;
+
+	uint64_t	portrcdata;
+
+	uint64_t	portxmpkts;
+
+	uint64_t	portrcpkts;
+
+	uint64_t	portunicastxmpkts;
+
+	uint64_t	portunicastrcpkts;
+
+	uint64_t	portmulticastxmpkts;
+
+	uint64_t	portmulticastrcpkts;
+};
+#else	/* BIG ENDIAN */
+struct hermon_hw_sm_extperfcntr_s {
+	uint32_t			:8;
+	uint32_t	portsel		:8;
+	uint32_t	cntrsel		:16;
+	uint32_t	rsvd;
+
+	uint64_t	portxmdata;
+
+	uint64_t	portrcdata;
+
+	uint64_t	portxmpkts;
+
+	uint64_t	portrcpkts;
+
+	uint64_t	portunicastxmpkts;
+
+	uint64_t	portunicastrcpkts;
+
+	uint64_t	portmulticastxmpkts;
+
+	uint64_t	portmulticastrcpkts;
+};
+#endif
+
 
 /*
  * Hermon User Access Region (UAR)
