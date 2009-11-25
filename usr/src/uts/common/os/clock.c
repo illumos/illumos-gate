@@ -975,14 +975,6 @@ clock_init(void)
 
 	lbolt_when.cyt_interval = nsec_per_tick;
 
-	if (lbolt_cyc_only) {
-		lbolt_when.cyt_when = 0;
-		lbolt_hybrid = lbolt_cyclic_driven;
-	} else {
-		lbolt_when.cyt_when = CY_INFINITY;
-		lbolt_hybrid = lbolt_event_driven;
-	}
-
 	/*
 	 * Allocate cache line aligned space for the per CPU lbolt data and
 	 * lbolt info structures, and initialize them with their default
@@ -1008,6 +1000,14 @@ clock_init(void)
 		lb_cpu[i].lbc_counter = lb_info->lbi_thresh_calls;
 
 	lbolt_softint_add();
+
+	if (lbolt_cyc_only) {
+		lbolt_when.cyt_when = 0;
+		lbolt_hybrid = lbolt_cyclic_driven;
+	} else {
+		lbolt_when.cyt_when = CY_INFINITY;
+		lbolt_hybrid = lbolt_event_driven;
+	}
 
 	/*
 	 * Grab cpu_lock and install all three cyclics.
@@ -2496,7 +2496,10 @@ lbolt_cyclic(void)
 void
 lbolt_debug_entry(void)
 {
-	lb_info->lbi_debug_ts = gethrtime();
+	if (lbolt_hybrid != lbolt_bootstrap) {
+		ASSERT(lb_info != NULL);
+		lb_info->lbi_debug_ts = gethrtime();
+	}
 }
 
 /*
@@ -2509,13 +2512,15 @@ lbolt_debug_return(void)
 {
 	hrtime_t ts;
 
-	if (nsec_per_tick > 0) {
-		ts = gethrtime();
+	if (lbolt_hybrid != lbolt_bootstrap) {
+		ASSERT(lb_info != NULL);
+		ASSERT(nsec_per_tick > 0);
 
+		ts = gethrtime();
 		lb_info->lbi_internal = (ts/nsec_per_tick);
 		lb_info->lbi_debug_time +=
 		    ((ts - lb_info->lbi_debug_ts)/nsec_per_tick);
-	}
 
-	lb_info->lbi_debug_ts = 0;
+		lb_info->lbi_debug_ts = 0;
+	}
 }
