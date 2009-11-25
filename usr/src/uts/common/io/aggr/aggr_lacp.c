@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +45,7 @@
 #include <sys/byteorder.h>
 #include <sys/strsun.h>
 #include <sys/isa_defs.h>
+#include <sys/sdt.h>
 
 #include <sys/aggr.h>
 #include <sys/aggr_impl.h>
@@ -1438,11 +1439,14 @@ lacp_selection_logic(aggr_port_t *portp)
 		for (tpp = aggrp->lg_ports; tpp; tpp = tpp->lp_next) {
 			if (((tpp->lp_lacp.sm.mux_state == LACP_WAITING) ||
 			    tpp->lp_lacp.sm.begin) &&
-			    !pl->PartnerOperPortState.bit.sync) {
+			    !tpp->lp_lacp.PartnerOperPortState.bit.sync) {
 				/* Add up ports uninitialized or waiting */
 				ports_waiting++;
-				if (!tpp->lp_lacp.sm.ready_n)
+				if (!tpp->lp_lacp.sm.ready_n) {
+					DTRACE_PROBE1(port___not__ready,
+					    aggr_port_t *, tpp);
 					return;
+				}
 			}
 		}
 	}
