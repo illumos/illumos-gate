@@ -1,15 +1,12 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Sun elects to have this file available under and governed by the BSD license
+ * (see below for full license text).  However, the following notice
+ * accompanied the original version of this file:
  */
 
 /*
  * Copyright (c) 2009, Intel Corporation
  * All rights reserved.
- */
-
-/*
- * Sun elects to use this software under the BSD license.
  */
 
 /*
