@@ -100,10 +100,8 @@ d none platform/i86pc/kernel/misc 755 root sys
 d none platform/i86pc/kernel/misc/amd64 755 root sys
 f none platform/i86pc/kernel/misc/amd64/acpidev 755 root sys
 f none platform/i86pc/kernel/misc/amd64/gfx_private 755 root sys
-f none platform/i86pc/kernel/misc/amd64/pcie 755 root sys
 f none platform/i86pc/kernel/misc/acpidev 755 root sys
 f none platform/i86pc/kernel/misc/gfx_private 755 root sys
-f none platform/i86pc/kernel/misc/pcie 755 root sys
 f none platform/i86pc/kernel/unix 755 root sys
 f none platform/i86pc/multiboot 755 root sys
 d none platform/i86pc/ucode 755 root sys

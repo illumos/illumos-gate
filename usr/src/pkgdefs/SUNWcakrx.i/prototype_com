@@ -79,7 +79,6 @@ f none platform/i86xpv/kernel/mach/xpv_psm 755 root sys
 f none platform/i86xpv/kernel/mach/xpv_uppc 755 root sys
 d none platform/i86xpv/kernel/misc 755 root sys
 f none platform/i86xpv/kernel/misc/gfx_private 755 root sys
-f none platform/i86xpv/kernel/misc/pcie 755 root sys
 f none platform/i86xpv/kernel/misc/xpv_autoconfig 755 root sys
 d none platform/i86xpv/kernel/tod 755 root sys
 f none platform/i86xpv/kernel/tod/xpvtod 755 root sys
@@ -112,7 +111,6 @@ f none platform/i86xpv/kernel/mach/amd64/xpv_psm 755 root sys
 f none platform/i86xpv/kernel/mach/amd64/xpv_uppc 755 root sys
 d none platform/i86xpv/kernel/misc/amd64 755 root sys
 f none platform/i86xpv/kernel/misc/amd64/gfx_private 755 root sys
-f none platform/i86xpv/kernel/misc/amd64/pcie 755 root sys
 f none platform/i86xpv/kernel/misc/amd64/xnb 755 root sys
 f none platform/i86xpv/kernel/misc/amd64/xpv_autoconfig 755 root sys
 d none platform/i86xpv/kernel/tod/amd64 755 root sys

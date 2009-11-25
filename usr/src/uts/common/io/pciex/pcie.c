@@ -94,16 +94,10 @@ uint16_t pcie_devctl_default = PCIE_DEVCTL_RO_EN |
 				PCIE_ROOTCTL_SYS_ERR_ON_NFE_EN | \
 				PCIE_ROOTCTL_SYS_ERR_ON_FE_EN)
 
-#if defined(__xpv)
-ushort_t pcie_root_ctrl_default =
-    PCIE_ROOTCTL_SYS_ERR_ON_NFE_EN |
-    PCIE_ROOTCTL_SYS_ERR_ON_FE_EN;
-#else
 ushort_t pcie_root_ctrl_default =
     PCIE_ROOTCTL_SYS_ERR_ON_CE_EN |
     PCIE_ROOTCTL_SYS_ERR_ON_NFE_EN |
     PCIE_ROOTCTL_SYS_ERR_ON_FE_EN;
-#endif /* __xpv */
 
 /* PCI-Express Root Error Command Register */
 ushort_t pcie_root_error_cmd_default =
@@ -991,19 +985,9 @@ pcie_enable_errors(dev_info_t *dip)
 	    (reg16 = PCIE_CAP_GET(16, bus_p, PCIE_ROOTCTL)) !=
 	    PCI_CAP_EINVAL16) {
 
-#if defined(__xpv)
-		/*
-		 * When we're booted under the hypervisor we won't receive
-		 * MSI's, so to ensure that uncorrectable errors aren't ignored
-		 * we set the SERR_FAT and SERR_NONFAT bits in the Root Control
-		 * Register.
-		 */
-		tmp16 = pcie_root_ctrl_default;
-#else
 		tmp16 = pcie_serr_disable_flag ?
 		    (pcie_root_ctrl_default & ~PCIE_ROOT_SYS_ERR) :
 		    pcie_root_ctrl_default;
-#endif /* __xpv */
 		PCIE_CAP_PUT(16, bus_p, PCIE_ROOTCTL, tmp16);
 		PCIE_DBG_CAP(dip, bus_p, "ROOT DEVCTL", 16, PCIE_ROOTCTL,
 		    reg16);
@@ -1071,7 +1055,6 @@ root:
 	if (!PCIE_IS_ROOT(bus_p))
 		return;
 
-#if !defined(__xpv)
 	if ((reg16 = PCIE_AER_GET(16, bus_p, PCIE_AER_RE_CMD)) !=
 	    PCI_CAP_EINVAL16) {
 		PCIE_AER_PUT(16, bus_p, PCIE_AER_RE_CMD,
@@ -1079,7 +1062,6 @@ root:
 		PCIE_DBG_AER(dip, bus_p, "AER Root Err Cmd", 16,
 		    PCIE_AER_RE_CMD, reg16);
 	}
-#endif /* __xpv */
 }
 
 /*

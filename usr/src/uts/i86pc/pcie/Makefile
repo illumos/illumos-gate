@@ -44,7 +44,7 @@ OBJECTS		= $(PCIE_MISC_OBJS:%=$(OBJS_DIR)/%) \
 		  $(PCI_STRING_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(PCIE_MISC_OBJS:%.o=$(LINTS_DIR)/%.ln) \
 		  $(PCI_STRING_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
+ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 
 #
 #	Include common rules.
