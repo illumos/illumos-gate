@@ -1880,35 +1880,6 @@ st_known_tape_type(struct scsi_tape *un)
 		}
 	}
 
-	if (un->un_dp->type != ST_TYPE_INVALID) {
-		int result;
-
-		/* try and enable TLR */
-		un->un_tlr_flag = TLR_SAS_ONE_DEVICE;
-		result = st_set_target_TLR_mode(un, st_uscsi_cmd);
-		if (result == EACCES) {
-			/*
-			 * From attach command failed.
-			 * Set dp type so is run again on open.
-			 */
-			un->un_dp->type = ST_TYPE_INVALID;
-			un->un_tlr_flag = TLR_NOT_KNOWN;
-		} else if (result == 0) {
-			if (scsi_ifgetcap(&un->un_sd->sd_address,
-			    "tran-layer-retries", 1) == -1) {
-				un->un_tlr_flag = TLR_NOT_SUPPORTED;
-				(void) st_set_target_TLR_mode(un, st_uscsi_cmd);
-			} else {
-				un->un_tlr_flag = TLR_SAS_ONE_DEVICE;
-			}
-		} else {
-			un->un_tlr_flag = TLR_NOT_SUPPORTED;
-		}
-	}
-
-
-
-
 	/*
 	 * If we didn't just make up this configuration and
 	 * all the density codes are the same..
@@ -1938,6 +1909,33 @@ st_known_tape_type(struct scsi_tape *un)
 
 	/* setup operation time-outs based on options */
 	st_calculate_timeouts(un);
+
+	/* TLR support */
+	if (un->un_dp->type != ST_TYPE_INVALID) {
+		int result;
+
+		/* try and enable TLR */
+		un->un_tlr_flag = TLR_SAS_ONE_DEVICE;
+		result = st_set_target_TLR_mode(un, st_uscsi_cmd);
+		if (result == EACCES) {
+			/*
+			 * From attach command failed.
+			 * Set dp type so is run again on open.
+			 */
+			un->un_dp->type = ST_TYPE_INVALID;
+			un->un_tlr_flag = TLR_NOT_KNOWN;
+		} else if (result == 0) {
+			if (scsi_ifgetcap(&un->un_sd->sd_address,
+			    "tran-layer-retries", 1) == -1) {
+				un->un_tlr_flag = TLR_NOT_SUPPORTED;
+				(void) st_set_target_TLR_mode(un, st_uscsi_cmd);
+			} else {
+				un->un_tlr_flag = TLR_SAS_ONE_DEVICE;
+			}
+		} else {
+			un->un_tlr_flag = TLR_NOT_SUPPORTED;
+		}
+	}
 
 	/* make sure if we are supposed to be variable, make it variable */
 	if (dp->options & ST_VARIABLE) {
