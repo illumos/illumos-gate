@@ -1030,7 +1030,14 @@ xenbus_thread(void)
 {
 	int err;
 
-	for (; interrupts_unleashed != 0; ) {
+	/*
+	 * We have to wait for interrupts to be ready, so we don't clash
+	 * with the polled-IO code in read_reply().
+	 */
+	while (!interrupts_unleashed)
+		delay(10);
+
+	for (;;) {
 		err = process_msg();
 		if (err)
 			cmn_err(CE_WARN, "XENBUS error %d while reading "
