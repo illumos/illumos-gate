@@ -70,6 +70,7 @@ extern "C" {
 #define	MPTIOCTL_EVENT_REPORT		(MPTIOCTL | 7)
 #define	MPTIOCTL_GET_PCI_INFO		(MPTIOCTL | 8)
 #define	MPTIOCTL_DIAG_ACTION		(MPTIOCTL | 9)
+#define	MPTIOCTL_REG_ACCESS		(MPTIOCTL | 10)
 
 /*
  *  The following are our ioctl() return status values.  If everything went
@@ -196,7 +197,6 @@ typedef struct mptsas_diag_action
 	uint32_t	ReturnCode;
 } mptsas_diag_action_t;
 
-#define	MPTSAS_FW_DIAGNOSTIC_BUFFER_COUNT	(3)
 #define	MPTSAS_FW_DIAGNOSTIC_UID_NOT_FOUND	(0xFF)
 
 #define	MPTSAS_FW_DIAG_NEW			(0x806E6577)
@@ -221,7 +221,7 @@ typedef struct mptsas_diag_action
 
 typedef struct mptsas_fw_diag_register
 {
-	uint8_t		Reserved1;
+	uint8_t		ExtendedType;
 	uint8_t		BufferType;
 	uint16_t	ApplicationFlags;
 	uint32_t	DiagnosticFlags;
@@ -241,7 +241,7 @@ typedef struct mptsas_fw_diag_unregister
 
 typedef struct mptsas_fw_diag_query
 {
-	uint8_t		Reserved1;
+	uint8_t		ExtendedType;
 	uint8_t		BufferType;
 	uint16_t	ApplicationFlags;
 	uint32_t	DiagnosticFlags;
@@ -254,7 +254,7 @@ typedef struct mptsas_fw_diag_query
 typedef struct mptsas_fw_diag_release
 {
 	uint32_t	UniqueId;
-} mptsas_fw_diag_release;
+} mptsas_fw_diag_release_t;
 
 #define	MPTSAS_FW_DIAG_FLAG_REREGISTER		(0x0001)
 #define	MPTSAS_FW_DIAG_FLAG_FORCE_RELEASE	(0x0002)
@@ -269,6 +269,21 @@ typedef struct mptsas_diag_read_buffer
 	uint32_t	UniqueId;
 	uint32_t	DataBuffer[1];
 } mptsas_diag_read_buffer_t;
+
+/*
+ * Register Access
+ */
+#define	REG_IO_READ	1
+#define	REG_IO_WRITE	2
+#define	REG_MEM_READ	3
+#define	REG_MEM_WRITE	4
+
+typedef struct mptsas_reg_access
+{
+	uint32_t	Command;
+	uint32_t	RegOffset;
+	uint32_t	RegData;
+} mptsas_reg_access_t;
 
 #ifdef  __cplusplus
 }

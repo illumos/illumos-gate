@@ -72,6 +72,7 @@
 #include <sys/scsi/adapters/mpt_sas/mpi/mpi2_cnfg.h>
 #include <sys/scsi/adapters/mpt_sas/mpi/mpi2_init.h>
 #include <sys/scsi/adapters/mpt_sas/mpi/mpi2_ioc.h>
+#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_tool.h>
 #pragma pack()
 /*
  * private header files.
@@ -174,6 +175,7 @@ mptsas_ioc_do_get_facts_reply(mptsas_t *mpt, caddr_t memp, int var,
 	uint16_t		queueSize, queueDiff;
 	int			simple_sge_main;
 	int			simple_sge_next;
+	uint32_t		capabilities;
 
 	bzero(memp, sizeof (*factsreply));
 	factsreply = (void *)memp;
@@ -263,7 +265,7 @@ mptsas_ioc_do_get_facts_reply(mptsas_t *mpt, caddr_t memp, int var,
 	mpt->m_post_queue_depth = queueSize;
 
 	/*
-	 * Set up other stuff.
+	 * Set up max chain depth.
 	 */
 	mpt->m_max_chain_depth = ddi_get8(accessp,
 	    &factsreply->MaxChainDepth);
@@ -273,7 +275,6 @@ mptsas_ioc_do_get_facts_reply(mptsas_t *mpt, caddr_t memp, int var,
 	/*
 	 * Calculate max frames per request based on DMA S/G length.
 	 */
-
 	simple_sge_main = MPTSAS_MAX_FRAME_SGES64(mpt) - 1;
 	simple_sge_next = mpt->m_req_frame_size /
 	    sizeof (MPI2_SGE_SIMPLE64) - 1;
@@ -283,6 +284,39 @@ mptsas_ioc_do_get_facts_reply(mptsas_t *mpt, caddr_t memp, int var,
 	if (((MPTSAS_MAX_DMA_SEGS - simple_sge_main) %
 	    simple_sge_next) > 1) {
 		mpt->m_max_request_frames++;
+	}
+
+	/*
+	 * Check if controller supports FW diag buffers and set flag to enable
+	 * each type.
+	 */
+	capabilities = ddi_get32(accessp, &factsreply->IOCCapabilities);
+	if (capabilities & MPI2_IOCFACTS_CAPABILITY_DIAG_TRACE_BUFFER) {
+		mpt->m_fw_diag_buffer_list[MPI2_DIAG_BUF_TYPE_TRACE].enabled =
+		    TRUE;
+	}
+	if (capabilities & MPI2_IOCFACTS_CAPABILITY_SNAPSHOT_BUFFER) {
+		mpt->m_fw_diag_buffer_list[MPI2_DIAG_BUF_TYPE_SNAPSHOT].
+		    enabled = TRUE;
+	}
+	if (capabilities & MPI2_IOCFACTS_CAPABILITY_EXTENDED_BUFFER) {
+		mpt->m_fw_diag_buffer_list[MPI2_DIAG_BUF_TYPE_EXTENDED].
+		    enabled = TRUE;
+	}
+
+	/*
+	 * Check if controller supports replaying events when issuing Message
+	 * Unit Reset and set flag to enable MUR.
+	 */
+	if (capabilities & MPI2_IOCFACTS_CAPABILITY_EVENT_REPLAY) {
+		mpt->m_event_replay = TRUE;
+	}
+
+	/*
+	 * Check if controller supports IR.
+	 */
+	if (capabilities & MPI2_IOCFACTS_CAPABILITY_INTEGRATED_RAID) {
+		mpt->m_ir_capable = TRUE;
 	}
 
 	return (DDI_SUCCESS);
@@ -560,6 +594,8 @@ mptsas_do_ioc_init(mptsas_t *mpt, caddr_t memp, int var,
 
 	pMpi2IOCInitRequest_t	init;
 	int			numbytes;
+	timespec_t		time;
+	uint64_t		mSec;
 
 	bzero(memp, sizeof (*init));
 	init = (void *)memp;
@@ -593,6 +629,18 @@ mptsas_do_ioc_init(mptsas_t *mpt, caddr_t memp, int var,
 	    (uint32_t)(mpt->m_free_queue_dma_addr >> 32));
 	ddi_put32(accessp, &init->ReplyFreeQueueAddress.Low,
 	    (uint32_t)mpt->m_free_queue_dma_addr);
+
+	/*
+	 * Fill in the timestamp with the number of milliseconds since midnight
+	 * of January 1, 1970 UT (Greenwich Mean Time).  Time is returned in
+	 * seconds and nanoseconds.  Translate both to milliseconds and add
+	 * them together to get total milliseconds.
+	 */
+	gethrestime(&time);
+	mSec = time.tv_sec * MILLISEC;
+	mSec += (time.tv_nsec / MICROSEC);
+	ddi_put32(accessp, &init->TimeStamp.High, (uint32_t)(mSec >> 32));
+	ddi_put32(accessp, &init->TimeStamp.Low, (uint32_t)mSec);
 
 	numbytes = sizeof (*init);
 

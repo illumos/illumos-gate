@@ -305,6 +305,7 @@ typedef struct	mptsas_cmd {
 #define	CFLAG_TXQ		0x10000000 /* cmd queued in the tx_waitq */
 #define	CFLAG_FW_CMD		0x20000000 /* cmd is a fw up/down command */
 #define	CFLAG_CONFIG		0x40000000 /* cmd is for config header/page */
+#define	CFLAG_FW_DIAG		0x80000000 /* cmd is for FW diag buffers */
 
 #define	MPTSAS_SCSI_REPORTLUNS_ADDRESS_SIZE			8
 #define	MPTSAS_SCSI_REPORTLUNS_ADDRESS_MASK			0xC0
@@ -325,6 +326,15 @@ typedef struct	mptsas_cmd {
 
 #define	MPTSAS_HASH_FIRST	0xffff
 #define	MPTSAS_HASH_NEXT	0x0000
+
+typedef struct mptsas_dma_alloc_state
+{
+	ddi_dma_handle_t	handle;
+	caddr_t			memp;
+	size_t			size;
+	ddi_acc_handle_t	accessp;
+	ddi_dma_cookie_t	cookie;
+} mptsas_dma_alloc_state_t;
 
 /*
  * passthrough request structure
@@ -352,6 +362,27 @@ typedef struct mptsas_config_request {
 	uint8_t		ext_page_type;
 	uint16_t	ext_page_length;
 } mptsas_config_request_t;
+
+typedef struct mptsas_fw_diagnostic_buffer {
+	mptsas_dma_alloc_state_t	buffer_data;
+	uint8_t				extended_type;
+	uint8_t				buffer_type;
+	uint8_t				force_release;
+	uint32_t			product_specific[23];
+	uint8_t				immediate;
+	uint8_t				enabled;
+	uint8_t				valid_data;
+	uint8_t				owned_by_firmware;
+	uint32_t			unique_id;
+} mptsas_fw_diagnostic_buffer_t;
+
+/*
+ * FW diag request structure
+ */
+typedef struct mptsas_diag_request {
+	mptsas_fw_diagnostic_buffer_t	*pBuffer;
+	uint8_t				function;
+} mptsas_diag_request_t;
 
 typedef struct mptsas_hash_node {
 	void *data;
@@ -591,6 +622,7 @@ typedef struct mptsas {
 	kcondvar_t		m_passthru_cv;
 	kcondvar_t		m_fw_cv;
 	kcondvar_t		m_config_cv;
+	kcondvar_t		m_fw_diag_cv;
 	dev_info_t		*m_dip;
 
 	/*
@@ -785,6 +817,7 @@ typedef struct mptsas {
 	uint8_t			m_done_traverse_dev;
 	uint8_t			m_done_traverse_smp;
 	int			m_passthru_in_progress;
+	int			m_diag_action_in_progress;
 	uint16_t		m_dev_handle;
 	uint16_t		m_smp_devhdl;
 
@@ -795,6 +828,22 @@ typedef struct mptsas {
 	uint32_t		m_event_number;
 	uint32_t		m_event_mask[4];
 	mptsas_event_entry_t	m_events[MPTSAS_EVENT_QUEUE_SIZE];
+
+	/*
+	 * FW diag Buffer List
+	 */
+	mptsas_fw_diagnostic_buffer_t
+		m_fw_diag_buffer_list[MPI2_DIAG_BUF_TYPE_COUNT];
+
+	/*
+	 * Event Replay flag (MUR support)
+	 */
+	uint8_t			m_event_replay;
+
+	/*
+	 * IR Capable flag
+	 */
+	uint8_t			m_ir_capable;
 
 	/*
 	 * per instance cmd data structures for task management cmds
@@ -829,15 +878,6 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(mptsas::m_port_type))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(mptsas::m_mpxio_enable))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(mptsas::m_ntargets))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(mptsas::m_instance))
-
-typedef struct mptsas_dma_alloc_state
-{
-	ddi_dma_handle_t	handle;
-	caddr_t			memp;
-	size_t			size;
-	ddi_acc_handle_t	accessp;
-	ddi_dma_cookie_t	cookie;
-} mptsas_dma_alloc_state_t;
 
 /*
  * These should eventually migrate into the mpt header files
@@ -1165,9 +1205,8 @@ int mptsas_check_flash(mptsas_t *mpt, caddr_t origfile, uint32_t size,
 	uint8_t type, int mode);
 int mptsas_download_firmware();
 int mptsas_can_download_firmware();
-int mptsas_passthru_dma_alloc(mptsas_t *mpt,
-    mptsas_dma_alloc_state_t *dma_statep);
-void mptsas_passthru_dma_free(mptsas_dma_alloc_state_t *dma_statep);
+int mptsas_dma_alloc(mptsas_t *mpt, mptsas_dma_alloc_state_t *dma_statep);
+void mptsas_dma_free(mptsas_dma_alloc_state_t *dma_statep);
 uint8_t mptsas_physport_to_phymask(mptsas_t *mpt, uint8_t physport);
 uint8_t mptsas_phymask_to_physport(mptsas_t *mpt, uint8_t phymask);
 void mptsas_fma_check(mptsas_t *mpt, mptsas_cmd_t *cmd);
@@ -1246,6 +1285,7 @@ int mptsas_get_raid_info(mptsas_t *mpt);
 int mptsas_get_physdisk_settings(mptsas_t *mpt, mptsas_raidvol_t *raidvol,
     uint8_t physdisknum);
 int mptsas_delete_volume(mptsas_t *mpt, uint16_t volid);
+void mptsas_raid_action_system_shutdown(mptsas_t *mpt);
 
 #define	MPTSAS_IOCSTATUS(status) (status & MPI2_IOCSTATUS_MASK)
 /*

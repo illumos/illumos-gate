@@ -80,6 +80,8 @@
 #include <sys/scsi/adapters/mpt_sas/mpi/mpi2_init.h>
 #include <sys/scsi/adapters/mpt_sas/mpi/mpi2_ioc.h>
 #include <sys/scsi/adapters/mpt_sas/mpi/mpi2_sas.h>
+#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_tool.h>
+#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_raid.h>
 #pragma pack()
 
 /*
@@ -224,6 +226,31 @@ static int mptsas_do_passthru(mptsas_t *mpt, uint8_t *request, uint8_t *reply,
     uint32_t dataout_size, short timeout, int mode);
 static int mptsas_free_devhdl(mptsas_t *mpt, uint16_t devhdl);
 
+static uint8_t mptsas_get_fw_diag_buffer_number(mptsas_t *mpt,
+    uint32_t unique_id);
+static void mptsas_start_diag(mptsas_t *mpt, mptsas_cmd_t *cmd);
+static int mptsas_post_fw_diag_buffer(mptsas_t *mpt,
+    mptsas_fw_diagnostic_buffer_t *pBuffer, uint32_t *return_code);
+static int mptsas_release_fw_diag_buffer(mptsas_t *mpt,
+    mptsas_fw_diagnostic_buffer_t *pBuffer, uint32_t *return_code,
+    uint32_t diag_type);
+static int mptsas_diag_register(mptsas_t *mpt,
+    mptsas_fw_diag_register_t *diag_register, uint32_t *return_code);
+static int mptsas_diag_unregister(mptsas_t *mpt,
+    mptsas_fw_diag_unregister_t *diag_unregister, uint32_t *return_code);
+static int mptsas_diag_query(mptsas_t *mpt, mptsas_fw_diag_query_t *diag_query,
+    uint32_t *return_code);
+static int mptsas_diag_read_buffer(mptsas_t *mpt,
+    mptsas_diag_read_buffer_t *diag_read_buffer, uint8_t *ioctl_buf,
+    uint32_t *return_code, int ioctl_mode);
+static int mptsas_diag_release(mptsas_t *mpt,
+    mptsas_fw_diag_release_t *diag_release, uint32_t *return_code);
+static int mptsas_do_diag_action(mptsas_t *mpt, uint32_t action,
+    uint8_t *diag_action, uint32_t length, uint32_t *return_code,
+    int ioctl_mode);
+static int mptsas_diag_action(mptsas_t *mpt, mptsas_diag_action_t *data,
+    int mode);
+
 static int mptsas_pkt_alloc_extern(mptsas_t *mpt, mptsas_cmd_t *cmd,
     int cmdlen, int tgtlen, int statuslen, int kf);
 static void mptsas_pkt_destroy_extern(mptsas_t *mpt, mptsas_cmd_t *cmd);
@@ -344,6 +371,8 @@ static int mptsas_event_enable(mptsas_t *mpt, mptsas_event_enable_t *data,
 static int mptsas_event_report(mptsas_t *mpt, mptsas_event_report_t *data,
     int mode, int *rval);
 static void mptsas_record_event(void *args);
+static int mptsas_reg_access(mptsas_t *mpt, mptsas_reg_access_t *data,
+    int mode);
 
 static void mptsas_hash_init(mptsas_hash_table_t *hashtab);
 static void mptsas_hash_uninit(mptsas_hash_table_t *hashtab, size_t datalen);
@@ -489,7 +518,7 @@ static struct dev_ops mptsas_ops = {
 };
 
 
-#define	MPTSAS_MOD_STRING "MPTSAS HBA Driver 00.00.00.20"
+#define	MPTSAS_MOD_STRING "MPTSAS HBA Driver 00.00.00.21"
 
 static struct modldrv modldrv = {
 	&mod_driverops,	/* Type of module. This one is a driver */
@@ -1089,6 +1118,7 @@ intr_done:
 	cv_init(&mpt->m_passthru_cv, NULL, CV_DRIVER, NULL);
 	cv_init(&mpt->m_fw_cv, NULL, CV_DRIVER, NULL);
 	cv_init(&mpt->m_config_cv, NULL, CV_DRIVER, NULL);
+	cv_init(&mpt->m_fw_diag_cv, NULL, CV_DRIVER, NULL);
 	mutex_init_done++;
 
 	/*
@@ -1460,6 +1490,7 @@ fail:
 			cv_destroy(&mpt->m_passthru_cv);
 			cv_destroy(&mpt->m_fw_cv);
 			cv_destroy(&mpt->m_config_cv);
+			cv_destroy(&mpt->m_fw_diag_cv);
 		}
 		mptsas_free_handshake_msg(mpt);
 		mptsas_hba_fini(mpt);
@@ -1503,6 +1534,11 @@ mptsas_suspend(dev_info_t *devi)
 	}
 
 	mutex_enter(&mpt->m_mutex);
+
+	/*
+	 * Send RAID action system shutdown to sync IR
+	 */
+	mptsas_raid_action_system_shutdown(mpt);
 
 	if (mpt->m_suspended++) {
 		mutex_exit(&mpt->m_mutex);
@@ -1719,6 +1755,11 @@ mptsas_do_detach(dev_info_t *dip)
 	}
 
 	mutex_enter(&mpt->m_mutex);
+
+	/*
+	 * Send RAID action system shutdown to sync IR
+	 */
+	mptsas_raid_action_system_shutdown(mpt);
 	MPTSAS_DISABLE_INTR(mpt);
 	mutex_exit(&mpt->m_mutex);
 	mptsas_rem_intrs(mpt);
@@ -1877,6 +1918,7 @@ mptsas_do_detach(dev_info_t *dip)
 	cv_destroy(&mpt->m_passthru_cv);
 	cv_destroy(&mpt->m_fw_cv);
 	cv_destroy(&mpt->m_config_cv);
+	cv_destroy(&mpt->m_fw_diag_cv);
 
 	pci_config_teardown(&mpt->m_config_handle);
 	if (mpt->m_tran) {
@@ -2167,13 +2209,13 @@ mptsas_disable_bus_master(mptsas_t *mpt)
 }
 
 int
-mptsas_passthru_dma_alloc(mptsas_t *mpt, mptsas_dma_alloc_state_t *dma_statep)
+mptsas_dma_alloc(mptsas_t *mpt, mptsas_dma_alloc_state_t *dma_statep)
 {
 	ddi_dma_attr_t	attrs;
 	uint_t		ncookie;
 	size_t		alloc_len;
 
-	attrs = mpt->m_msg_dma_attr;
+	attrs = mpt->m_io_dma_attr;
 	attrs.dma_attr_sgllen = 1;
 
 	ASSERT(dma_statep != NULL);
@@ -2210,7 +2252,7 @@ mptsas_passthru_dma_alloc(mptsas_t *mpt, mptsas_dma_alloc_state_t *dma_statep)
 }
 
 void
-mptsas_passthru_dma_free(mptsas_dma_alloc_state_t *dma_statep)
+mptsas_dma_free(mptsas_dma_alloc_state_t *dma_statep)
 {
 	ASSERT(dma_statep != NULL);
 	if (dma_statep->handle != NULL) {
@@ -4515,8 +4557,8 @@ mptsas_wait_intr(mptsas_t *mpt, int polltime)
 	mpt->m_polled_intr = 1;
 
 	/*
-	 * Get the current interrupt mask.  When re-enabling ints, set mask to
-	 * saved value.
+	 * Get the current interrupt mask and disable interrupts.  When
+	 * re-enabling ints, set mask to saved value.
 	 */
 	int_mask = ddi_get32(mpt->m_datap, &mpt->m_reg->HostInterruptMask);
 	MPTSAS_DISABLE_INTR(mpt);
@@ -4538,6 +4580,7 @@ mptsas_wait_intr(mptsas_t *mpt, int polltime)
 			drv_usecwait(1000);
 			continue;
 		}
+
 		/*
 		 * The reply is valid, process it according to its
 		 * type.
@@ -4548,10 +4591,13 @@ mptsas_wait_intr(mptsas_t *mpt, int polltime)
 			mpt->m_post_index = 0;
 		}
 
+		/*
+		 * Update the global reply index
+		 */
 		ddi_put32(mpt->m_datap,
 		    &mpt->m_reg->ReplyPostHostIndex, mpt->m_post_index);
-
 		mpt->m_polled_intr = 0;
+
 		/*
 		 * Re-enable interrupts and quit.
 		 */
@@ -4645,11 +4691,12 @@ mptsas_handle_address_reply(mptsas_t *mpt,
 {
 	pMpi2AddressReplyDescriptor_t	address_reply;
 	pMPI2DefaultReply_t		reply;
+	mptsas_fw_diagnostic_buffer_t	*pBuffer;
 	uint32_t			reply_addr;
-	uint16_t			SMID;
+	uint16_t			SMID, iocstatus, action;
 	mptsas_slots_t			*slots = mpt->m_active;
 	mptsas_cmd_t			*cmd = NULL;
-	uint8_t				function;
+	uint8_t				function, buffer_type;
 	m_replyh_arg_t			*args;
 	int				reply_frame_no;
 
@@ -4685,7 +4732,24 @@ mptsas_handle_address_reply(mptsas_t *mpt,
 	 * don't get slot information and command for events since these values
 	 * don't exist
 	 */
-	if (function != MPI2_FUNCTION_EVENT_NOTIFICATION) {
+	if ((function != MPI2_FUNCTION_EVENT_NOTIFICATION) &&
+	    (function != MPI2_FUNCTION_DIAG_BUFFER_POST)) {
+		/*
+		 * If this is a raid action reply for system shutdown just exit
+		 * because the reply doesn't matter.  Signal that we got the
+		 * reply even though it's not really necessary since we're
+		 * shutting down.
+		 */
+		if (function == MPI2_FUNCTION_RAID_ACTION) {
+			action = ddi_get16(mpt->m_acc_reply_frame_hdl,
+			    &reply->FunctionDependent1);
+			if (action ==
+			    MPI2_RAID_ACTION_SYSTEM_SHUTDOWN_INITIATED) {
+				cv_broadcast(&mpt->m_fw_diag_cv);
+				return;
+			}
+		}
+
 		/*
 		 * This could be a TM reply, which use the last allocated SMID,
 		 * so allow for that.
@@ -4709,11 +4773,13 @@ mptsas_handle_address_reply(mptsas_t *mpt,
 			return;
 		}
 		if ((cmd->cmd_flags & CFLAG_PASSTHRU) ||
-		    (cmd->cmd_flags & CFLAG_CONFIG)) {
+		    (cmd->cmd_flags & CFLAG_CONFIG) ||
+		    (cmd->cmd_flags & CFLAG_FW_DIAG)) {
 			cmd->cmd_rfm = reply_addr;
 			cmd->cmd_flags |= CFLAG_FINISHED;
 			cv_broadcast(&mpt->m_passthru_cv);
 			cv_broadcast(&mpt->m_config_cv);
+			cv_broadcast(&mpt->m_fw_diag_cv);
 			return;
 		} else if (!(cmd->cmd_flags & CFLAG_FW_CMD)) {
 			mptsas_remove_cmd(mpt, cmd);
@@ -4779,6 +4845,43 @@ mptsas_handle_address_reply(mptsas_t *mpt,
 
 			ddi_put32(mpt->m_datap,
 			    &mpt->m_reg->ReplyFreeHostIndex, mpt->m_free_index);
+		}
+		return;
+	case MPI2_FUNCTION_DIAG_BUFFER_POST:
+		/*
+		 * If SMID is 0, this implies that the reply is due to a
+		 * release function with a status that the buffer has been
+		 * released.  Set the buffer flags accordingly.
+		 */
+		if (SMID == 0) {
+			iocstatus = ddi_get16(mpt->m_acc_reply_frame_hdl,
+			    &reply->IOCStatus);
+			buffer_type = ddi_get8(mpt->m_acc_reply_frame_hdl,
+			    &(((pMpi2DiagBufferPostReply_t)reply)->BufferType));
+			if (iocstatus == MPI2_IOCSTATUS_DIAGNOSTIC_RELEASED) {
+				pBuffer =
+				    &mpt->m_fw_diag_buffer_list[buffer_type];
+				pBuffer->valid_data = TRUE;
+				pBuffer->owned_by_firmware = FALSE;
+				pBuffer->immediate = FALSE;
+			}
+		} else {
+			/*
+			 * Normal handling of diag post reply with SMID.
+			 */
+			cmd = slots->m_slot[SMID];
+
+			/*
+			 * print warning and return if the slot is empty
+			 */
+			if (cmd == NULL) {
+				mptsas_log(mpt, CE_WARN, "?NULL command for "
+				    "address reply in slot %d", SMID);
+				return;
+			}
+			cmd->cmd_rfm = reply_addr;
+			cmd->cmd_flags |= CFLAG_FINISHED;
+			cv_broadcast(&mpt->m_fw_diag_cv);
 		}
 		return;
 	default:
@@ -5163,10 +5266,9 @@ mptsas_intr(caddr_t arg1, caddr_t arg2)
 	mutex_enter(&mpt->m_mutex);
 
 	/*
-	 * If interrupts are shared by two channels then
-	 * check whether this interrupt is genuinely for this
-	 * channel by making sure first the chip is in high
-	 * power state.
+	 * If interrupts are shared by two channels then check whether this
+	 * interrupt is genuinely for this channel by making sure first the
+	 * chip is in high power state.
 	 */
 	if ((mpt->m_options & MPTSAS_OPT_PM) &&
 	    (mpt->m_power_level != PM_LEVEL_D0)) {
@@ -5211,13 +5313,16 @@ mptsas_intr(caddr_t arg1, caddr_t arg2)
 
 			/*
 			 * The reply is valid, process it according to its
-			 * type.  Also, set a flag for updated the reply index
+			 * type.  Also, set a flag for updating the reply index
 			 * after they've all been processed.
 			 */
 			did_reply = TRUE;
 
 			mptsas_process_intr(mpt, reply_desc_union);
 
+			/*
+			 * Increment post index and roll over if needed.
+			 */
 			if (++mpt->m_post_index == mpt->m_post_queue_depth) {
 				mpt->m_post_index = 0;
 			}
@@ -5238,16 +5343,13 @@ mptsas_intr(caddr_t arg1, caddr_t arg2)
 	NDBG1(("mptsas_intr complete"));
 
 	/*
-	 * If no helper threads are created, process the doneq in ISR.
-	 * If helpers are created, use the doneq length as a metric to
-	 * measure the load on the interrupt CPU. If it is long enough,
-	 * which indicates the load is heavy, then we deliver the IO
-	 * completions to the helpers.
-	 * this measurement has some limitations although, it is simple
-	 * and straightforward and works well for most of the cases at
-	 * present.
+	 * If no helper threads are created, process the doneq in ISR. If
+	 * helpers are created, use the doneq length as a metric to measure the
+	 * load on the interrupt CPU. If it is long enough, which indicates the
+	 * load is heavy, then we deliver the IO completions to the helpers.
+	 * This measurement has some limitations, although it is simple and
+	 * straightforward and works well for most of the cases at present.
 	 */
-
 	if (!mpt->m_doneq_thread_n ||
 	    (mpt->m_doneq_len <= mpt->m_doneq_length_threshold)) {
 		mptsas_doneq_empty(mpt);
@@ -7400,6 +7502,19 @@ mptsas_restart_waitq(mptsas_t *mpt)
 			cmd = next_cmd;
 			continue;
 		}
+		if (cmd->cmd_flags & CFLAG_FW_DIAG) {
+			if (mptsas_save_cmd(mpt, cmd) == TRUE) {
+				/*
+				 * Send the FW Diag request and delete if from
+				 * the waitq.
+				 */
+				cmd->cmd_flags |= CFLAG_PREPARED;
+				mptsas_waitq_delete(mpt, cmd);
+				mptsas_start_diag(mpt, cmd);
+			}
+			cmd = next_cmd;
+			continue;
+		}
 
 		ptgt = cmd->cmd_tgt_addr;
 		if (ptgt && (ptgt->m_t_throttle == DRAIN_THROTTLE) &&
@@ -8294,8 +8409,27 @@ mptsas_flush_hba(mptsas_t *mpt)
 		if ((cmd = slots->m_slot[slot]) == NULL)
 			continue;
 
-		if (cmd->cmd_flags & CFLAG_CMDIOC)
+		if (cmd->cmd_flags & CFLAG_CMDIOC) {
+			/*
+			 * Need to make sure to tell everyone that might be
+			 * waiting on this command that it's going to fail.  If
+			 * we get here, this command will never timeout because
+			 * the active command table is going to be re-allocated,
+			 * so there will be nothing to check against a time out.
+			 * Instead, mark the command as failed due to reset.
+			 */
+			mptsas_set_pkt_reason(mpt, cmd, CMD_RESET,
+			    STAT_BUS_RESET);
+			if ((cmd->cmd_flags & CFLAG_PASSTHRU) ||
+			    (cmd->cmd_flags & CFLAG_CONFIG) ||
+			    (cmd->cmd_flags & CFLAG_FW_DIAG)) {
+				cmd->cmd_flags |= CFLAG_FINISHED;
+				cv_broadcast(&mpt->m_passthru_cv);
+				cv_broadcast(&mpt->m_config_cv);
+				cv_broadcast(&mpt->m_fw_diag_cv);
+			}
 			continue;
+		}
 
 		mptsas_log(mpt, CE_NOTE, "mptsas_flush_hba discovered non-NULL "
 		    "cmd in slot %d", slot);
@@ -8312,10 +8446,12 @@ mptsas_flush_hba(mptsas_t *mpt)
 	while ((cmd = mptsas_waitq_rm(mpt)) != NULL) {
 		mptsas_set_pkt_reason(mpt, cmd, CMD_RESET, STAT_BUS_RESET);
 		if ((cmd->cmd_flags & CFLAG_PASSTHRU) ||
-		    (cmd->cmd_flags & CFLAG_CONFIG)) {
+		    (cmd->cmd_flags & CFLAG_CONFIG) ||
+		    (cmd->cmd_flags & CFLAG_FW_DIAG)) {
 			cmd->cmd_flags |= CFLAG_FINISHED;
 			cv_broadcast(&mpt->m_passthru_cv);
 			cv_broadcast(&mpt->m_config_cv);
+			cv_broadcast(&mpt->m_fw_diag_cv);
 		} else {
 			mptsas_doneq_add(mpt, cmd);
 		}
@@ -8854,6 +8990,7 @@ mptsas_watch(void *arg)
 #endif
 
 	mptsas_t	*mpt;
+	uint32_t	doorbell;
 
 	NDBG30(("mptsas_watch"));
 
@@ -8870,6 +9007,20 @@ mptsas_watch(void *arg)
 			} else {
 				mutex_exit(&mpt->m_mutex);
 				continue;
+			}
+		}
+
+		/*
+		 * Check if controller is in a FAULT state. If so, reset it.
+		 */
+		doorbell = ddi_get32(mpt->m_datap, &mpt->m_reg->Doorbell);
+		if ((doorbell & MPI2_IOC_STATE_MASK) == MPI2_IOC_STATE_FAULT) {
+			doorbell &= MPI2_DOORBELL_DATA_MASK;
+			mptsas_log(mpt, CE_WARN, "MPT Firmware Fault, "
+			    "code: %04x", doorbell);
+			if ((mptsas_restart_ioc(mpt)) == DDI_FAILURE) {
+				mptsas_log(mpt, CE_WARN, "Reset failed"
+				    "after fault was detected");
 			}
 		}
 
@@ -8928,7 +9079,8 @@ mptsas_watchsubr(mptsas_t *mpt)
 				}
 			}
 			if ((cmd->cmd_flags & CFLAG_PASSTHRU) ||
-			    (cmd->cmd_flags & CFLAG_CONFIG)) {
+			    (cmd->cmd_flags & CFLAG_CONFIG) ||
+			    (cmd->cmd_flags & CFLAG_FW_DIAG)) {
 				cmd->cmd_active_timeout -=
 				    mptsas_scsi_watchdog_tick;
 				if (cmd->cmd_active_timeout <= 0) {
@@ -8939,6 +9091,7 @@ mptsas_watchsubr(mptsas_t *mpt)
 					    CFLAG_TIMEOUT);
 					cv_broadcast(&mpt->m_passthru_cv);
 					cv_broadcast(&mpt->m_config_cv);
+					cv_broadcast(&mpt->m_fw_diag_cv);
 				}
 			}
 		}
@@ -9379,8 +9532,7 @@ mptsas_do_passthru(mptsas_t *mpt, uint8_t *request, uint8_t *reply,
 
 	if (data_size != 0) {
 		data_dma_state.size = data_size;
-		if (mptsas_passthru_dma_alloc(mpt, &data_dma_state) !=
-		    DDI_SUCCESS) {
+		if (mptsas_dma_alloc(mpt, &data_dma_state) != DDI_SUCCESS) {
 			status = ENOMEM;
 			mptsas_log(mpt, CE_WARN, "failed to alloc DMA "
 			    "resource");
@@ -9405,8 +9557,7 @@ mptsas_do_passthru(mptsas_t *mpt, uint8_t *request, uint8_t *reply,
 
 	if (dataout_size != 0) {
 		dataout_dma_state.size = dataout_size;
-		if (mptsas_passthru_dma_alloc(mpt, &dataout_dma_state) !=
-		    DDI_SUCCESS) {
+		if (mptsas_dma_alloc(mpt, &dataout_dma_state) != DDI_SUCCESS) {
 			status = ENOMEM;
 			mptsas_log(mpt, CE_WARN, "failed to alloc DMA "
 			    "resource");
@@ -9607,7 +9758,7 @@ out:
 			    DDI_SERVICE_UNAFFECTED);
 			status = EFAULT;
 		}
-		mptsas_passthru_dma_free(&data_dma_state);
+		mptsas_dma_free(&data_dma_state);
 	}
 	if (pt_flags & MPTSAS_DATAOUT_ALLOCATED) {
 		if (mptsas_check_dma_handle(dataout_dma_state.handle) !=
@@ -9616,7 +9767,7 @@ out:
 			    DDI_SERVICE_UNAFFECTED);
 			status = EFAULT;
 		}
-		mptsas_passthru_dma_free(&dataout_dma_state);
+		mptsas_dma_free(&dataout_dma_state);
 	}
 	if (pt_flags & MPTSAS_CMD_TIMEOUT) {
 		if ((mptsas_restart_ioc(mpt)) == DDI_FAILURE) {
@@ -9665,6 +9816,928 @@ mptsas_pass_thru(mptsas_t *mpt, mptsas_pass_thru_t *data, int mode)
 	} else {
 		return (EINVAL);
 	}
+}
+
+static uint8_t
+mptsas_get_fw_diag_buffer_number(mptsas_t *mpt, uint32_t unique_id)
+{
+	uint8_t	index;
+
+	for (index = 0; index < MPI2_DIAG_BUF_TYPE_COUNT; index++) {
+		if (mpt->m_fw_diag_buffer_list[index].unique_id == unique_id) {
+			return (index);
+		}
+	}
+
+	return (MPTSAS_FW_DIAGNOSTIC_UID_NOT_FOUND);
+}
+
+static void
+mptsas_start_diag(mptsas_t *mpt, mptsas_cmd_t *cmd)
+{
+	pMpi2DiagBufferPostRequest_t	pDiag_post_msg;
+	pMpi2DiagReleaseRequest_t	pDiag_release_msg;
+	struct scsi_pkt			*pkt = cmd->cmd_pkt;
+	mptsas_diag_request_t		*diag = pkt->pkt_ha_private;
+	uint32_t			request_desc_low, i;
+
+	ASSERT(mutex_owned(&mpt->m_mutex));
+
+	/*
+	 * Form the diag message depending on the post or release function.
+	 */
+	if (diag->function == MPI2_FUNCTION_DIAG_BUFFER_POST) {
+		pDiag_post_msg = (pMpi2DiagBufferPostRequest_t)
+		    (mpt->m_req_frame + (mpt->m_req_frame_size *
+		    cmd->cmd_slot));
+		bzero(pDiag_post_msg, mpt->m_req_frame_size);
+		ddi_put8(mpt->m_acc_req_frame_hdl, &pDiag_post_msg->Function,
+		    diag->function);
+		ddi_put8(mpt->m_acc_req_frame_hdl, &pDiag_post_msg->BufferType,
+		    diag->pBuffer->buffer_type);
+		ddi_put8(mpt->m_acc_req_frame_hdl,
+		    &pDiag_post_msg->ExtendedType,
+		    diag->pBuffer->extended_type);
+		ddi_put32(mpt->m_acc_req_frame_hdl,
+		    &pDiag_post_msg->BufferLength,
+		    diag->pBuffer->buffer_data.size);
+		for (i = 0; i < (sizeof (pDiag_post_msg->ProductSpecific) / 4);
+		    i++) {
+			ddi_put32(mpt->m_acc_req_frame_hdl,
+			    &pDiag_post_msg->ProductSpecific[i],
+			    diag->pBuffer->product_specific[i]);
+		}
+		ddi_put32(mpt->m_acc_req_frame_hdl,
+		    &pDiag_post_msg->BufferAddress.Low,
+		    (uint32_t)(diag->pBuffer->buffer_data.cookie.dmac_laddress
+		    & 0xffffffffull));
+		ddi_put32(mpt->m_acc_req_frame_hdl,
+		    &pDiag_post_msg->BufferAddress.High,
+		    (uint32_t)(diag->pBuffer->buffer_data.cookie.dmac_laddress
+		    >> 32));
+	} else {
+		pDiag_release_msg = (pMpi2DiagReleaseRequest_t)
+		    (mpt->m_req_frame + (mpt->m_req_frame_size *
+		    cmd->cmd_slot));
+		bzero(pDiag_release_msg, mpt->m_req_frame_size);
+		ddi_put8(mpt->m_acc_req_frame_hdl,
+		    &pDiag_release_msg->Function, diag->function);
+		ddi_put8(mpt->m_acc_req_frame_hdl,
+		    &pDiag_release_msg->BufferType,
+		    diag->pBuffer->buffer_type);
+	}
+
+	/*
+	 * Send the message
+	 */
+	(void) ddi_dma_sync(mpt->m_dma_req_frame_hdl, 0, 0,
+	    DDI_DMA_SYNC_FORDEV);
+	request_desc_low = (cmd->cmd_slot << 16) +
+	    MPI2_REQ_DESCRIPT_FLAGS_DEFAULT_TYPE;
+	cmd->cmd_rfm = NULL;
+	MPTSAS_START_CMD(mpt, request_desc_low, 0);
+	if ((mptsas_check_dma_handle(mpt->m_dma_req_frame_hdl) !=
+	    DDI_SUCCESS) ||
+	    (mptsas_check_acc_handle(mpt->m_acc_req_frame_hdl) !=
+	    DDI_SUCCESS)) {
+		ddi_fm_service_impact(mpt->m_dip, DDI_SERVICE_UNAFFECTED);
+	}
+}
+
+static int
+mptsas_post_fw_diag_buffer(mptsas_t *mpt,
+    mptsas_fw_diagnostic_buffer_t *pBuffer, uint32_t *return_code)
+{
+	mptsas_diag_request_t		diag;
+	int				status, slot_num, post_flags = 0;
+	mptsas_cmd_t			*cmd = NULL;
+	struct scsi_pkt			*pkt;
+	pMpi2DiagBufferPostReply_t	reply;
+	uint16_t			iocstatus;
+	uint32_t			iocloginfo, transfer_length;
+
+	/*
+	 * If buffer is not enabled, just leave.
+	 */
+	*return_code = MPTSAS_FW_DIAG_ERROR_POST_FAILED;
+	if (!pBuffer->enabled) {
+		status = DDI_FAILURE;
+		goto out;
+	}
+
+	/*
+	 * Clear some flags initially.
+	 */
+	pBuffer->force_release = FALSE;
+	pBuffer->valid_data = FALSE;
+	pBuffer->owned_by_firmware = FALSE;
+
+	/*
+	 * Get a cmd buffer from the cmd buffer pool
+	 */
+	if ((slot_num = (mptsas_request_from_pool(mpt, &cmd, &pkt))) == -1) {
+		status = DDI_FAILURE;
+		mptsas_log(mpt, CE_NOTE, "command pool is full: Post FW Diag");
+		goto out;
+	}
+	post_flags |= MPTSAS_REQUEST_POOL_CMD;
+
+	bzero((caddr_t)cmd, sizeof (*cmd));
+	bzero((caddr_t)pkt, scsi_pkt_size());
+
+	cmd->ioc_cmd_slot = (uint32_t)(slot_num);
+
+	diag.pBuffer = pBuffer;
+	diag.function = MPI2_FUNCTION_DIAG_BUFFER_POST;
+
+	/*
+	 * Form a blank cmd/pkt to store the acknowledgement message
+	 */
+	pkt->pkt_ha_private	= (opaque_t)&diag;
+	pkt->pkt_flags		= FLAG_HEAD;
+	pkt->pkt_time		= 60;
+	cmd->cmd_pkt		= pkt;
+	cmd->cmd_flags		= CFLAG_CMDIOC | CFLAG_FW_DIAG;
+
+	/*
+	 * Save the command in a slot
+	 */
+	if (mptsas_save_cmd(mpt, cmd) == TRUE) {
+		/*
+		 * Once passthru command get slot, set cmd_flags
+		 * CFLAG_PREPARED.
+		 */
+		cmd->cmd_flags |= CFLAG_PREPARED;
+		mptsas_start_diag(mpt, cmd);
+	} else {
+		mptsas_waitq_add(mpt, cmd);
+	}
+
+	while ((cmd->cmd_flags & CFLAG_FINISHED) == 0) {
+		cv_wait(&mpt->m_fw_diag_cv, &mpt->m_mutex);
+	}
+
+	if (cmd->cmd_flags & CFLAG_TIMEOUT) {
+		status = DDI_FAILURE;
+		mptsas_log(mpt, CE_WARN, "Post FW Diag command timeout");
+		goto out;
+	}
+
+	/*
+	 * cmd_rfm points to the reply message if a reply was given.  Check the
+	 * IOCStatus to make sure everything went OK with the FW diag request
+	 * and set buffer flags.
+	 */
+	if (cmd->cmd_rfm) {
+		post_flags |= MPTSAS_ADDRESS_REPLY;
+		(void) ddi_dma_sync(mpt->m_dma_reply_frame_hdl, 0, 0,
+		    DDI_DMA_SYNC_FORCPU);
+		reply = (pMpi2DiagBufferPostReply_t)(mpt->m_reply_frame +
+		    (cmd->cmd_rfm - mpt->m_reply_frame_dma_addr));
+
+		/*
+		 * Get the reply message data
+		 */
+		iocstatus = ddi_get16(mpt->m_acc_reply_frame_hdl,
+		    &reply->IOCStatus);
+		iocloginfo = ddi_get32(mpt->m_acc_reply_frame_hdl,
+		    &reply->IOCLogInfo);
+		transfer_length = ddi_get32(mpt->m_acc_reply_frame_hdl,
+		    &reply->TransferLength);
+
+		/*
+		 * If post failed quit.
+		 */
+		if (iocstatus != MPI2_IOCSTATUS_SUCCESS) {
+			status = DDI_FAILURE;
+			NDBG13(("post FW Diag Buffer failed: IOCStatus=0x%x, "
+			    "IOCLogInfo=0x%x, TransferLength=0x%x", iocstatus,
+			    iocloginfo, transfer_length));
+			goto out;
+		}
+
+		/*
+		 * Post was successful.
+		 */
+		pBuffer->valid_data = TRUE;
+		pBuffer->owned_by_firmware = TRUE;
+		*return_code = MPTSAS_FW_DIAG_ERROR_SUCCESS;
+		status = DDI_SUCCESS;
+	}
+
+out:
+	/*
+	 * Put the reply frame back on the free queue, increment the free
+	 * index, and write the new index to the free index register.  But only
+	 * if this reply is an ADDRESS reply.
+	 */
+	if (post_flags & MPTSAS_ADDRESS_REPLY) {
+		ddi_put32(mpt->m_acc_free_queue_hdl,
+		    &((uint32_t *)(void *)mpt->m_free_queue)[mpt->m_free_index],
+		    cmd->cmd_rfm);
+		(void) ddi_dma_sync(mpt->m_dma_free_queue_hdl, 0, 0,
+		    DDI_DMA_SYNC_FORDEV);
+		if (++mpt->m_free_index == mpt->m_free_queue_depth) {
+			mpt->m_free_index = 0;
+		}
+		ddi_put32(mpt->m_datap, &mpt->m_reg->ReplyFreeHostIndex,
+		    mpt->m_free_index);
+	}
+	if (cmd && (cmd->cmd_flags & CFLAG_PREPARED)) {
+		mptsas_remove_cmd(mpt, cmd);
+		post_flags &= (~MPTSAS_REQUEST_POOL_CMD);
+	}
+	if (post_flags & MPTSAS_REQUEST_POOL_CMD) {
+		mptsas_return_to_pool(mpt, cmd);
+	}
+
+	return (status);
+}
+
+static int
+mptsas_release_fw_diag_buffer(mptsas_t *mpt,
+    mptsas_fw_diagnostic_buffer_t *pBuffer, uint32_t *return_code,
+    uint32_t diag_type)
+{
+	mptsas_diag_request_t	diag;
+	int			status, slot_num, rel_flags = 0;
+	mptsas_cmd_t		*cmd = NULL;
+	struct scsi_pkt		*pkt;
+	pMpi2DiagReleaseReply_t	reply;
+	uint16_t		iocstatus;
+	uint32_t		iocloginfo;
+
+	/*
+	 * If buffer is not enabled, just leave.
+	 */
+	*return_code = MPTSAS_FW_DIAG_ERROR_RELEASE_FAILED;
+	if (!pBuffer->enabled) {
+		mptsas_log(mpt, CE_NOTE, "This buffer type is not supported "
+		    "by the IOC");
+		status = DDI_FAILURE;
+		goto out;
+	}
+
+	/*
+	 * Clear some flags initially.
+	 */
+	pBuffer->force_release = FALSE;
+	pBuffer->valid_data = FALSE;
+	pBuffer->owned_by_firmware = FALSE;
+
+	/*
+	 * Get a cmd buffer from the cmd buffer pool
+	 */
+	if ((slot_num = (mptsas_request_from_pool(mpt, &cmd, &pkt))) == -1) {
+		status = DDI_FAILURE;
+		mptsas_log(mpt, CE_NOTE, "command pool is full: Release FW "
+		    "Diag");
+		goto out;
+	}
+	rel_flags |= MPTSAS_REQUEST_POOL_CMD;
+
+	bzero((caddr_t)cmd, sizeof (*cmd));
+	bzero((caddr_t)pkt, scsi_pkt_size());
+
+	cmd->ioc_cmd_slot = (uint32_t)(slot_num);
+
+	diag.pBuffer = pBuffer;
+	diag.function = MPI2_FUNCTION_DIAG_RELEASE;
+
+	/*
+	 * Form a blank cmd/pkt to store the acknowledgement message
+	 */
+	pkt->pkt_ha_private	= (opaque_t)&diag;
+	pkt->pkt_flags		= FLAG_HEAD;
+	pkt->pkt_time		= 60;
+	cmd->cmd_pkt		= pkt;
+	cmd->cmd_flags		= CFLAG_CMDIOC | CFLAG_FW_DIAG;
+
+	/*
+	 * Save the command in a slot
+	 */
+	if (mptsas_save_cmd(mpt, cmd) == TRUE) {
+		/*
+		 * Once passthru command get slot, set cmd_flags
+		 * CFLAG_PREPARED.
+		 */
+		cmd->cmd_flags |= CFLAG_PREPARED;
+		mptsas_start_diag(mpt, cmd);
+	} else {
+		mptsas_waitq_add(mpt, cmd);
+	}
+
+	while ((cmd->cmd_flags & CFLAG_FINISHED) == 0) {
+		cv_wait(&mpt->m_fw_diag_cv, &mpt->m_mutex);
+	}
+
+	if (cmd->cmd_flags & CFLAG_TIMEOUT) {
+		status = DDI_FAILURE;
+		mptsas_log(mpt, CE_WARN, "Release FW Diag command timeout");
+		goto out;
+	}
+
+	/*
+	 * cmd_rfm points to the reply message if a reply was given.  Check the
+	 * IOCStatus to make sure everything went OK with the FW diag request
+	 * and set buffer flags.
+	 */
+	if (cmd->cmd_rfm) {
+		rel_flags |= MPTSAS_ADDRESS_REPLY;
+		(void) ddi_dma_sync(mpt->m_dma_reply_frame_hdl, 0, 0,
+		    DDI_DMA_SYNC_FORCPU);
+		reply = (pMpi2DiagReleaseReply_t)(mpt->m_reply_frame +
+		    (cmd->cmd_rfm - mpt->m_reply_frame_dma_addr));
+
+		/*
+		 * Get the reply message data
+		 */
+		iocstatus = ddi_get16(mpt->m_acc_reply_frame_hdl,
+		    &reply->IOCStatus);
+		iocloginfo = ddi_get32(mpt->m_acc_reply_frame_hdl,
+		    &reply->IOCLogInfo);
+
+		/*
+		 * If release failed quit.
+		 */
+		if ((iocstatus != MPI2_IOCSTATUS_SUCCESS) ||
+		    pBuffer->owned_by_firmware) {
+			status = DDI_FAILURE;
+			NDBG13(("release FW Diag Buffer failed: "
+			    "IOCStatus=0x%x, IOCLogInfo=0x%x", iocstatus,
+			    iocloginfo));
+			goto out;
+		}
+
+		/*
+		 * Release was successful.
+		 */
+		*return_code = MPTSAS_FW_DIAG_ERROR_SUCCESS;
+		status = DDI_SUCCESS;
+
+		/*
+		 * If this was for an UNREGISTER diag type command, clear the
+		 * unique ID.
+		 */
+		if (diag_type == MPTSAS_FW_DIAG_TYPE_UNREGISTER) {
+			pBuffer->unique_id = MPTSAS_FW_DIAG_INVALID_UID;
+		}
+	}
+
+out:
+	/*
+	 * Put the reply frame back on the free queue, increment the free
+	 * index, and write the new index to the free index register.  But only
+	 * if this reply is an ADDRESS reply.
+	 */
+	if (rel_flags & MPTSAS_ADDRESS_REPLY) {
+		ddi_put32(mpt->m_acc_free_queue_hdl,
+		    &((uint32_t *)(void *)mpt->m_free_queue)[mpt->m_free_index],
+		    cmd->cmd_rfm);
+		(void) ddi_dma_sync(mpt->m_dma_free_queue_hdl, 0, 0,
+		    DDI_DMA_SYNC_FORDEV);
+		if (++mpt->m_free_index == mpt->m_free_queue_depth) {
+			mpt->m_free_index = 0;
+		}
+		ddi_put32(mpt->m_datap, &mpt->m_reg->ReplyFreeHostIndex,
+		    mpt->m_free_index);
+	}
+	if (cmd && (cmd->cmd_flags & CFLAG_PREPARED)) {
+		mptsas_remove_cmd(mpt, cmd);
+		rel_flags &= (~MPTSAS_REQUEST_POOL_CMD);
+	}
+	if (rel_flags & MPTSAS_REQUEST_POOL_CMD) {
+		mptsas_return_to_pool(mpt, cmd);
+	}
+
+	return (status);
+}
+
+static int
+mptsas_diag_register(mptsas_t *mpt, mptsas_fw_diag_register_t *diag_register,
+    uint32_t *return_code)
+{
+	mptsas_fw_diagnostic_buffer_t	*pBuffer;
+	uint8_t				extended_type, buffer_type, i;
+	uint32_t			buffer_size;
+	uint32_t			unique_id;
+	int				status;
+
+	ASSERT(mutex_owned(&mpt->m_mutex));
+
+	extended_type = diag_register->ExtendedType;
+	buffer_type = diag_register->BufferType;
+	buffer_size = diag_register->RequestedBufferSize;
+	unique_id = diag_register->UniqueId;
+
+	/*
+	 * Check for valid buffer type
+	 */
+	if (buffer_type >= MPI2_DIAG_BUF_TYPE_COUNT) {
+		*return_code = MPTSAS_FW_DIAG_ERROR_INVALID_PARAMETER;
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * Get the current buffer and look up the unique ID.  The unique ID
+	 * should not be found.  If it is, the ID is already in use.
+	 */
+	i = mptsas_get_fw_diag_buffer_number(mpt, unique_id);
+	pBuffer = &mpt->m_fw_diag_buffer_list[buffer_type];
+	if (i != MPTSAS_FW_DIAGNOSTIC_UID_NOT_FOUND) {
+		*return_code = MPTSAS_FW_DIAG_ERROR_INVALID_UID;
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * The buffer's unique ID should not be registered yet, and the given
+	 * unique ID cannot be 0.
+	 */
+	if ((pBuffer->unique_id != MPTSAS_FW_DIAG_INVALID_UID) ||
+	    (unique_id == MPTSAS_FW_DIAG_INVALID_UID)) {
+		*return_code = MPTSAS_FW_DIAG_ERROR_INVALID_UID;
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * If this buffer is already posted as immediate, just change owner.
+	 */
+	if (pBuffer->immediate && pBuffer->owned_by_firmware &&
+	    (pBuffer->unique_id == MPTSAS_FW_DIAG_INVALID_UID)) {
+		pBuffer->immediate = FALSE;
+		pBuffer->unique_id = unique_id;
+		return (DDI_SUCCESS);
+	}
+
+	/*
+	 * Post a new buffer after checking if it's enabled.  The DMA buffer
+	 * that is allocated will be contiguous (sgl_len = 1).
+	 */
+	if (!pBuffer->enabled) {
+		*return_code = MPTSAS_FW_DIAG_ERROR_NO_BUFFER;
+		return (DDI_FAILURE);
+	}
+	bzero(&pBuffer->buffer_data, sizeof (mptsas_dma_alloc_state_t));
+	pBuffer->buffer_data.size = buffer_size;
+	if (mptsas_dma_alloc(mpt, &pBuffer->buffer_data) != DDI_SUCCESS) {
+		mptsas_log(mpt, CE_WARN, "failed to alloc DMA resource for "
+		    "diag buffer: size = %d bytes", buffer_size);
+		*return_code = MPTSAS_FW_DIAG_ERROR_NO_BUFFER;
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * Copy the given info to the diag buffer and post the buffer.
+	 */
+	pBuffer->buffer_type = buffer_type;
+	pBuffer->immediate = FALSE;
+	if (buffer_type == MPI2_DIAG_BUF_TYPE_TRACE) {
+		for (i = 0; i < (sizeof (pBuffer->product_specific) / 4);
+		    i++) {
+			pBuffer->product_specific[i] =
+			    diag_register->ProductSpecific[i];
+		}
+	}
+	pBuffer->extended_type = extended_type;
+	pBuffer->unique_id = unique_id;
+	status = mptsas_post_fw_diag_buffer(mpt, pBuffer, return_code);
+
+	if (mptsas_check_dma_handle(pBuffer->buffer_data.handle) !=
+	    DDI_SUCCESS) {
+		mptsas_log(mpt, CE_WARN, "Check of DMA handle failed in "
+		    "mptsas_diag_register.");
+		ddi_fm_service_impact(mpt->m_dip, DDI_SERVICE_UNAFFECTED);
+			status = DDI_FAILURE;
+	}
+
+	/*
+	 * In case there was a failure, free the DMA buffer.
+	 */
+	if (status == DDI_FAILURE) {
+		mptsas_dma_free(&pBuffer->buffer_data);
+	}
+
+	return (status);
+}
+
+static int
+mptsas_diag_unregister(mptsas_t *mpt,
+    mptsas_fw_diag_unregister_t *diag_unregister, uint32_t *return_code)
+{
+	mptsas_fw_diagnostic_buffer_t	*pBuffer;
+	uint8_t				i;
+	uint32_t			unique_id;
+	int				status;
+
+	ASSERT(mutex_owned(&mpt->m_mutex));
+
+	unique_id = diag_unregister->UniqueId;
+
+	/*
+	 * Get the current buffer and look up the unique ID.  The unique ID
+	 * should be there.
+	 */
+	i = mptsas_get_fw_diag_buffer_number(mpt, unique_id);
+	if (i == MPTSAS_FW_DIAGNOSTIC_UID_NOT_FOUND) {
+		*return_code = MPTSAS_FW_DIAG_ERROR_INVALID_UID;
+		return (DDI_FAILURE);
+	}
+
+	pBuffer = &mpt->m_fw_diag_buffer_list[i];
+
+	/*
+	 * Try to release the buffer from FW before freeing it.  If release
+	 * fails, don't free the DMA buffer in case FW tries to access it
+	 * later.  If buffer is not owned by firmware, can't release it.
+	 */
+	if (!pBuffer->owned_by_firmware) {
+		status = DDI_SUCCESS;
+	} else {
+		status = mptsas_release_fw_diag_buffer(mpt, pBuffer,
+		    return_code, MPTSAS_FW_DIAG_TYPE_UNREGISTER);
+	}
+
+	/*
+	 * At this point, return the current status no matter what happens with
+	 * the DMA buffer.
+	 */
+	pBuffer->unique_id = MPTSAS_FW_DIAG_INVALID_UID;
+	if (status == DDI_SUCCESS) {
+		if (mptsas_check_dma_handle(pBuffer->buffer_data.handle) !=
+		    DDI_SUCCESS) {
+			mptsas_log(mpt, CE_WARN, "Check of DMA handle failed "
+			    "in mptsas_diag_unregister.");
+			ddi_fm_service_impact(mpt->m_dip,
+			    DDI_SERVICE_UNAFFECTED);
+		}
+		mptsas_dma_free(&pBuffer->buffer_data);
+	}
+
+	return (status);
+}
+
+static int
+mptsas_diag_query(mptsas_t *mpt, mptsas_fw_diag_query_t *diag_query,
+    uint32_t *return_code)
+{
+	mptsas_fw_diagnostic_buffer_t	*pBuffer;
+	uint8_t				i;
+	uint32_t			unique_id;
+
+	ASSERT(mutex_owned(&mpt->m_mutex));
+
+	unique_id = diag_query->UniqueId;
+
+	/*
+	 * If ID is valid, query on ID.
+	 * If ID is invalid, query on buffer type.
+	 */
+	if (unique_id == MPTSAS_FW_DIAG_INVALID_UID) {
+		i = diag_query->BufferType;
+		if (i >= MPI2_DIAG_BUF_TYPE_COUNT) {
+			*return_code = MPTSAS_FW_DIAG_ERROR_INVALID_UID;
+			return (DDI_FAILURE);
+		}
+	} else {
+		i = mptsas_get_fw_diag_buffer_number(mpt, unique_id);
+		if (i == MPTSAS_FW_DIAGNOSTIC_UID_NOT_FOUND) {
+			*return_code = MPTSAS_FW_DIAG_ERROR_INVALID_UID;
+			return (DDI_FAILURE);
+		}
+	}
+
+	/*
+	 * Fill query structure with the diag buffer info.
+	 */
+	pBuffer = &mpt->m_fw_diag_buffer_list[i];
+	diag_query->BufferType = pBuffer->buffer_type;
+	diag_query->ExtendedType = pBuffer->extended_type;
+	if (diag_query->BufferType == MPI2_DIAG_BUF_TYPE_TRACE) {
+		for (i = 0; i < (sizeof (diag_query->ProductSpecific) / 4);
+		    i++) {
+			diag_query->ProductSpecific[i] =
+			    pBuffer->product_specific[i];
+		}
+	}
+	diag_query->TotalBufferSize = pBuffer->buffer_data.size;
+	diag_query->DriverAddedBufferSize = 0;
+	diag_query->UniqueId = pBuffer->unique_id;
+	diag_query->ApplicationFlags = 0;
+	diag_query->DiagnosticFlags = 0;
+
+	/*
+	 * Set/Clear application flags
+	 */
+	if (pBuffer->immediate) {
+		diag_query->ApplicationFlags &= ~MPTSAS_FW_DIAG_FLAG_APP_OWNED;
+	} else {
+		diag_query->ApplicationFlags |= MPTSAS_FW_DIAG_FLAG_APP_OWNED;
+	}
+	if (pBuffer->valid_data || pBuffer->owned_by_firmware) {
+		diag_query->ApplicationFlags |=
+		    MPTSAS_FW_DIAG_FLAG_BUFFER_VALID;
+	} else {
+		diag_query->ApplicationFlags &=
+		    ~MPTSAS_FW_DIAG_FLAG_BUFFER_VALID;
+	}
+	if (pBuffer->owned_by_firmware) {
+		diag_query->ApplicationFlags |=
+		    MPTSAS_FW_DIAG_FLAG_FW_BUFFER_ACCESS;
+	} else {
+		diag_query->ApplicationFlags &=
+		    ~MPTSAS_FW_DIAG_FLAG_FW_BUFFER_ACCESS;
+	}
+
+	return (DDI_SUCCESS);
+}
+
+static int
+mptsas_diag_read_buffer(mptsas_t *mpt,
+    mptsas_diag_read_buffer_t *diag_read_buffer, uint8_t *ioctl_buf,
+    uint32_t *return_code, int ioctl_mode)
+{
+	mptsas_fw_diagnostic_buffer_t	*pBuffer;
+	uint8_t				i, *pData;
+	uint32_t			unique_id, byte;
+	int				status;
+
+	ASSERT(mutex_owned(&mpt->m_mutex));
+
+	unique_id = diag_read_buffer->UniqueId;
+
+	/*
+	 * Get the current buffer and look up the unique ID.  The unique ID
+	 * should be there.
+	 */
+	i = mptsas_get_fw_diag_buffer_number(mpt, unique_id);
+	if (i == MPTSAS_FW_DIAGNOSTIC_UID_NOT_FOUND) {
+		*return_code = MPTSAS_FW_DIAG_ERROR_INVALID_UID;
+		return (DDI_FAILURE);
+	}
+
+	pBuffer = &mpt->m_fw_diag_buffer_list[i];
+
+	/*
+	 * Make sure requested read is within limits
+	 */
+	if (diag_read_buffer->StartingOffset + diag_read_buffer->BytesToRead >
+	    pBuffer->buffer_data.size) {
+		*return_code = MPTSAS_FW_DIAG_ERROR_INVALID_PARAMETER;
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * Copy the requested data from DMA to the diag_read_buffer.  The DMA
+	 * buffer that was allocated is one contiguous buffer.
+	 */
+	pData = (uint8_t *)(pBuffer->buffer_data.memp +
+	    diag_read_buffer->StartingOffset);
+	(void) ddi_dma_sync(pBuffer->buffer_data.handle, 0, 0,
+	    DDI_DMA_SYNC_FORCPU);
+	for (byte = 0; byte < diag_read_buffer->BytesToRead; byte++) {
+		if (ddi_copyout(pData + byte, ioctl_buf + byte, 1, ioctl_mode)
+		    != 0) {
+			return (DDI_FAILURE);
+		}
+	}
+	diag_read_buffer->Status = 0;
+
+	/*
+	 * Set or clear the Force Release flag.
+	 */
+	if (pBuffer->force_release) {
+		diag_read_buffer->Flags |= MPTSAS_FW_DIAG_FLAG_FORCE_RELEASE;
+	} else {
+		diag_read_buffer->Flags &= ~MPTSAS_FW_DIAG_FLAG_FORCE_RELEASE;
+	}
+
+	/*
+	 * If buffer is to be reregistered, make sure it's not already owned by
+	 * firmware first.
+	 */
+	status = DDI_SUCCESS;
+	if (!pBuffer->owned_by_firmware) {
+		if (diag_read_buffer->Flags & MPTSAS_FW_DIAG_FLAG_REREGISTER) {
+			status = mptsas_post_fw_diag_buffer(mpt, pBuffer,
+			    return_code);
+		}
+	}
+
+	return (status);
+}
+
+static int
+mptsas_diag_release(mptsas_t *mpt, mptsas_fw_diag_release_t *diag_release,
+    uint32_t *return_code)
+{
+	mptsas_fw_diagnostic_buffer_t	*pBuffer;
+	uint8_t				i;
+	uint32_t			unique_id;
+	int				status;
+
+	ASSERT(mutex_owned(&mpt->m_mutex));
+
+	unique_id = diag_release->UniqueId;
+
+	/*
+	 * Get the current buffer and look up the unique ID.  The unique ID
+	 * should be there.
+	 */
+	i = mptsas_get_fw_diag_buffer_number(mpt, unique_id);
+	if (i == MPTSAS_FW_DIAGNOSTIC_UID_NOT_FOUND) {
+		*return_code = MPTSAS_FW_DIAG_ERROR_INVALID_UID;
+		return (DDI_FAILURE);
+	}
+
+	pBuffer = &mpt->m_fw_diag_buffer_list[i];
+
+	/*
+	 * If buffer is not owned by firmware, it's already been released.
+	 */
+	if (!pBuffer->owned_by_firmware) {
+		*return_code = MPTSAS_FW_DIAG_ERROR_ALREADY_RELEASED;
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * Release the buffer.
+	 */
+	status = mptsas_release_fw_diag_buffer(mpt, pBuffer, return_code,
+	    MPTSAS_FW_DIAG_TYPE_RELEASE);
+	return (status);
+}
+
+static int
+mptsas_do_diag_action(mptsas_t *mpt, uint32_t action, uint8_t *diag_action,
+    uint32_t length, uint32_t *return_code, int ioctl_mode)
+{
+	mptsas_fw_diag_register_t	diag_register;
+	mptsas_fw_diag_unregister_t	diag_unregister;
+	mptsas_fw_diag_query_t		diag_query;
+	mptsas_diag_read_buffer_t	diag_read_buffer;
+	mptsas_fw_diag_release_t	diag_release;
+	int				status = DDI_SUCCESS;
+	uint32_t			original_return_code, read_buf_len;
+
+	ASSERT(mutex_owned(&mpt->m_mutex));
+
+	original_return_code = *return_code;
+	*return_code = MPTSAS_FW_DIAG_ERROR_SUCCESS;
+
+	switch (action) {
+		case MPTSAS_FW_DIAG_TYPE_REGISTER:
+			if (!length) {
+				*return_code =
+				    MPTSAS_FW_DIAG_ERROR_INVALID_PARAMETER;
+				status = DDI_FAILURE;
+				break;
+			}
+			if (ddi_copyin(diag_action, &diag_register,
+			    sizeof (diag_register), ioctl_mode) != 0) {
+				return (DDI_FAILURE);
+			}
+			status = mptsas_diag_register(mpt, &diag_register,
+			    return_code);
+			break;
+
+		case MPTSAS_FW_DIAG_TYPE_UNREGISTER:
+			if (length < sizeof (diag_unregister)) {
+				*return_code =
+				    MPTSAS_FW_DIAG_ERROR_INVALID_PARAMETER;
+				status = DDI_FAILURE;
+				break;
+			}
+			if (ddi_copyin(diag_action, &diag_unregister,
+			    sizeof (diag_unregister), ioctl_mode) != 0) {
+				return (DDI_FAILURE);
+			}
+			status = mptsas_diag_unregister(mpt, &diag_unregister,
+			    return_code);
+			break;
+
+		case MPTSAS_FW_DIAG_TYPE_QUERY:
+			if (length < sizeof (diag_query)) {
+				*return_code =
+				    MPTSAS_FW_DIAG_ERROR_INVALID_PARAMETER;
+				status = DDI_FAILURE;
+				break;
+			}
+			if (ddi_copyin(diag_action, &diag_query,
+			    sizeof (diag_query), ioctl_mode) != 0) {
+				return (DDI_FAILURE);
+			}
+			status = mptsas_diag_query(mpt, &diag_query,
+			    return_code);
+			if (status == DDI_SUCCESS) {
+				if (ddi_copyout(&diag_query, diag_action,
+				    sizeof (diag_query), ioctl_mode) != 0) {
+					return (DDI_FAILURE);
+				}
+			}
+			break;
+
+		case MPTSAS_FW_DIAG_TYPE_READ_BUFFER:
+			if (ddi_copyin(diag_action, &diag_read_buffer,
+			    sizeof (diag_read_buffer) - 4, ioctl_mode) != 0) {
+				return (DDI_FAILURE);
+			}
+			read_buf_len = sizeof (diag_read_buffer) -
+			    sizeof (diag_read_buffer.DataBuffer) +
+			    diag_read_buffer.BytesToRead;
+			if (length < read_buf_len) {
+				*return_code =
+				    MPTSAS_FW_DIAG_ERROR_INVALID_PARAMETER;
+				status = DDI_FAILURE;
+				break;
+			}
+			status = mptsas_diag_read_buffer(mpt,
+			    &diag_read_buffer, diag_action +
+			    sizeof (diag_read_buffer) - 4, return_code,
+			    ioctl_mode);
+			if (status == DDI_SUCCESS) {
+				if (ddi_copyout(&diag_read_buffer, diag_action,
+				    sizeof (diag_read_buffer) - 4, ioctl_mode)
+				    != 0) {
+					return (DDI_FAILURE);
+				}
+			}
+			break;
+
+		case MPTSAS_FW_DIAG_TYPE_RELEASE:
+			if (length < sizeof (diag_release)) {
+				*return_code =
+				    MPTSAS_FW_DIAG_ERROR_INVALID_PARAMETER;
+				status = DDI_FAILURE;
+				break;
+			}
+			if (ddi_copyin(diag_action, &diag_release,
+			    sizeof (diag_release), ioctl_mode) != 0) {
+				return (DDI_FAILURE);
+			}
+			status = mptsas_diag_release(mpt, &diag_release,
+			    return_code);
+			break;
+
+		default:
+			*return_code = MPTSAS_FW_DIAG_ERROR_INVALID_PARAMETER;
+			status = DDI_FAILURE;
+			break;
+	}
+
+	if ((status == DDI_FAILURE) &&
+	    (original_return_code == MPTSAS_FW_DIAG_NEW) &&
+	    (*return_code != MPTSAS_FW_DIAG_ERROR_SUCCESS)) {
+		status = DDI_SUCCESS;
+	}
+
+	return (status);
+}
+
+static int
+mptsas_diag_action(mptsas_t *mpt, mptsas_diag_action_t *user_data, int mode)
+{
+	int			status;
+	mptsas_diag_action_t	driver_data;
+
+	ASSERT(mutex_owned(&mpt->m_mutex));
+
+	/*
+	 * Copy the user data to a driver data buffer.
+	 */
+	if (ddi_copyin(user_data, &driver_data, sizeof (mptsas_diag_action_t),
+	    mode) == 0) {
+		/*
+		 * Send diag action request if Action is valid
+		 */
+		if (driver_data.Action == MPTSAS_FW_DIAG_TYPE_REGISTER ||
+		    driver_data.Action == MPTSAS_FW_DIAG_TYPE_UNREGISTER ||
+		    driver_data.Action == MPTSAS_FW_DIAG_TYPE_QUERY ||
+		    driver_data.Action == MPTSAS_FW_DIAG_TYPE_READ_BUFFER ||
+		    driver_data.Action == MPTSAS_FW_DIAG_TYPE_RELEASE) {
+			status = mptsas_do_diag_action(mpt, driver_data.Action,
+			    (void *)(uintptr_t)driver_data.PtrDiagAction,
+			    driver_data.Length, &driver_data.ReturnCode,
+			    mode);
+			if (status == DDI_SUCCESS) {
+				if (ddi_copyout(&driver_data.ReturnCode,
+				    &user_data->ReturnCode,
+				    sizeof (user_data->ReturnCode), mode)
+				    != 0) {
+					status = EFAULT;
+				} else {
+					status = 0;
+				}
+			} else {
+				status = EIO;
+			}
+		} else {
+			status = EINVAL;
+		}
+	} else {
+		status = EFAULT;
+	}
+
+	return (status);
 }
 
 /*
@@ -9879,6 +10952,57 @@ mptsas_read_pci_info(mptsas_t *mpt, mptsas_pci_info_t *pci_info)
 }
 
 static int
+mptsas_reg_access(mptsas_t *mpt, mptsas_reg_access_t *data, int mode)
+{
+	int			status = 0;
+	mptsas_reg_access_t	driverdata;
+
+	mutex_enter(&mpt->m_mutex);
+	if (ddi_copyin(data, &driverdata, sizeof (driverdata), mode) == 0) {
+		switch (driverdata.Command) {
+			/*
+			 * IO access is not supported.
+			 */
+			case REG_IO_READ:
+			case REG_IO_WRITE:
+				mptsas_log(mpt, CE_WARN, "IO access is not "
+				    "supported.  Use memory access.");
+				status = EINVAL;
+				break;
+
+			case REG_MEM_READ:
+				driverdata.RegData = ddi_get32(mpt->m_datap,
+				    (uint32_t *)(void *)mpt->m_reg +
+				    driverdata.RegOffset);
+				if (ddi_copyout(&driverdata.RegData,
+				    &data->RegData,
+				    sizeof (driverdata.RegData), mode) != 0) {
+					mptsas_log(mpt, CE_WARN, "Register "
+					    "Read Failed");
+					status = EFAULT;
+				}
+				break;
+
+			case REG_MEM_WRITE:
+				ddi_put32(mpt->m_datap,
+				    (uint32_t *)(void *)mpt->m_reg +
+				    driverdata.RegOffset,
+				    driverdata.RegData);
+				break;
+
+			default:
+				status = EINVAL;
+				break;
+		}
+	} else {
+		status = EFAULT;
+	}
+
+	mutex_exit(&mpt->m_mutex);
+	return (status);
+}
+
+static int
 mptsas_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp,
     int *rval)
 {
@@ -10020,6 +11144,23 @@ mptsas_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp,
 			}
 			mutex_exit(&mpt->m_mutex);
 			break;
+		case MPTIOCTL_DIAG_ACTION:
+			/*
+			 * The user has done a diag buffer action.  Call our
+			 * routine which does this.  Only allow one diag action
+			 * at one time.
+			 */
+			mutex_enter(&mpt->m_mutex);
+			if (mpt->m_diag_action_in_progress) {
+				mutex_exit(&mpt->m_mutex);
+				return (EBUSY);
+			}
+			mpt->m_diag_action_in_progress = 1;
+			status = mptsas_diag_action(mpt,
+			    (mptsas_diag_action_t *)data, mode);
+			mpt->m_diag_action_in_progress = 0;
+			mutex_exit(&mpt->m_mutex);
+			break;
 		case MPTIOCTL_EVENT_QUERY:
 			/*
 			 * The user has done an event query. Call our routine
@@ -10043,6 +11184,14 @@ mptsas_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp,
 			 */
 			status = mptsas_event_report(mpt,
 			    (mptsas_event_report_t *)data, mode, rval);
+			break;
+		case MPTIOCTL_REG_ACCESS:
+			/*
+			 * The user has requested register access.  Call our
+			 * routine which does this.
+			 */
+			status = mptsas_reg_access(mpt,
+			    (mptsas_reg_access_t *)data, mode);
 			break;
 		default:
 			status = scsi_hba_ioctl(dev, cmd, data, mode, credp,
@@ -10157,6 +11306,23 @@ mptsas_init_chip(mptsas_t *mpt, int first_time)
 	uint32_t		i;
 	mptsas_slots_t		*new_active;
 
+	/*
+	 * Check to see if the firmware image is valid
+	 */
+	if (ddi_get32(mpt->m_datap, &mpt->m_reg->HostDiagnostic) &
+	    MPI2_DIAG_FLASH_BAD_SIG) {
+		mptsas_log(mpt, CE_WARN, "mptsas bad flash signature!");
+		goto fail;
+	}
+
+	/*
+	 * Reset the chip
+	 */
+	if (mptsas_ioc_reset(mpt) == MPTSAS_RESET_FAIL) {
+		mptsas_log(mpt, CE_WARN, "hard reset failed!");
+		goto fail;
+	}
+
 	if (first_time == FALSE) {
 		/*
 		 * De-allocate buffers before re-allocating them using the
@@ -10175,29 +11341,12 @@ mptsas_init_chip(mptsas_t *mpt, int first_time)
 	}
 
 	/*
-	 * Check to see if the firmware image is valid
-	 */
-	if (ddi_get32(mpt->m_datap, &mpt->m_reg->HostDiagnostic) &
-	    MPI2_DIAG_FLASH_BAD_SIG) {
-		mptsas_log(mpt, CE_WARN, "mptsas bad flash signature!");
-		goto fail;
-	}
-
-	/*
-	 * Reset the chip
-	 */
-	if (mptsas_ioc_reset(mpt) == MPTSAS_RESET_FAIL) {
-		mptsas_log(mpt, CE_WARN, "hard reset failed!");
-		goto fail;
-	}
-	/*
 	 * IOC facts can change after a diag reset so all buffers that are
 	 * based on these numbers must be de-allocated and re-allocated.  Get
 	 * new IOC facts each time chip is initialized.
 	 */
 	if (mptsas_ioc_get_facts(mpt) == DDI_FAILURE) {
-		mptsas_log(mpt, CE_WARN, "mptsas_ioc_get_facts "
-		    "failed");
+		mptsas_log(mpt, CE_WARN, "mptsas_ioc_get_facts failed");
 		goto fail;
 	}
 	/*
@@ -10230,35 +11379,23 @@ mptsas_init_chip(mptsas_t *mpt, int first_time)
 	}
 
 	/*
-	 * Allocate request message frames
+	 * Allocate request message frames, reply free queue, reply descriptor
+	 * post queue, and reply message frames using latest IOC facts.
 	 */
 	if (mptsas_alloc_request_frames(mpt) == DDI_FAILURE) {
-		mptsas_log(mpt, CE_WARN, "mptsas_alloc_request_frames "
-		    "failed");
+		mptsas_log(mpt, CE_WARN, "mptsas_alloc_request_frames failed");
 		goto fail;
 	}
-	/*
-	 * Allocate reply free queue
-	 */
 	if (mptsas_alloc_free_queue(mpt) == DDI_FAILURE) {
-		mptsas_log(mpt, CE_WARN, "mptsas_alloc_free_queue "
-		    "failed!");
+		mptsas_log(mpt, CE_WARN, "mptsas_alloc_free_queue failed!");
 		goto fail;
 	}
-	/*
-	 * Allocate reply descriptor post queue
-	 */
 	if (mptsas_alloc_post_queue(mpt) == DDI_FAILURE) {
-		mptsas_log(mpt, CE_WARN, "mptsas_alloc_post_queue "
-		    "failed!");
+		mptsas_log(mpt, CE_WARN, "mptsas_alloc_post_queue failed!");
 		goto fail;
 	}
-	/*
-	 * Allocate reply message frames
-	 */
 	if (mptsas_alloc_reply_frames(mpt) == DDI_FAILURE) {
-		mptsas_log(mpt, CE_WARN, "mptsas_alloc_reply_frames "
-		    "failed!");
+		mptsas_log(mpt, CE_WARN, "mptsas_alloc_reply_frames failed!");
 		goto fail;
 	}
 
@@ -10274,8 +11411,8 @@ mptsas_init_chip(mptsas_t *mpt, int first_time)
 	    mpt->m_max_replies, KM_SLEEP);
 
 	/*
-	 * Initialize reply post index and request index.  Reply free index is
-	 * initialized after the next loop.
+	 * Initialize reply post index.  Reply free index is initialized after
+	 * the next loop.
 	 */
 	mpt->m_post_index = 0;
 
@@ -10870,6 +12007,7 @@ out:
 	kmem_free(inq83, inq83_len);
 	return (sata_guid);
 }
+
 static int
 mptsas_inquiry(mptsas_t *mpt, mptsas_target_t *ptgt, int lun, uchar_t page,
     unsigned char *buf, int len, int *reallen, uchar_t evpd)
@@ -11182,7 +12320,7 @@ mptsas_probe_lun(dev_info_t *pdip, int lun, dev_info_t **dip,
 	} else {
 		rval = DDI_FAILURE;
 	}
-out:
+
 	kmem_free(sd_inq, SUN_INQSIZE);
 	return (rval);
 }
@@ -11473,7 +12611,6 @@ mptsas_config_raid(dev_info_t *pdip, uint16_t target, dev_info_t **dip)
 		rval = DDI_FAILURE;
 	}
 
-out:
 	kmem_free(sd_inq, SUN_INQSIZE);
 	return (rval);
 }

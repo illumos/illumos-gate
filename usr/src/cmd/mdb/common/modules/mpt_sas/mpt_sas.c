@@ -36,6 +36,8 @@
 #include <sys/scsi/adapters/mpt_sas/mpi/mpi2_init.h>
 #include <sys/scsi/adapters/mpt_sas/mpi/mpi2_ioc.h>
 #include <sys/scsi/adapters/mpt_sas/mpi/mpi2_sas.h>
+#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_raid.h>
+#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_tool.h>
 #pragma pack()
 
 #include <sys/scsi/adapters/mpt_sas/mptsas_var.h>

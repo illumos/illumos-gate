@@ -77,6 +77,8 @@
 #include <sys/scsi/adapters/mpt_sas/mpi/mpi2_cnfg.h>
 #include <sys/scsi/adapters/mpt_sas/mpi/mpi2_init.h>
 #include <sys/scsi/adapters/mpt_sas/mpi/mpi2_ioc.h>
+#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_raid.h>
+#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_tool.h>
 
 #pragma pack()
 
@@ -555,6 +557,114 @@ mptsas_get_physdisk_settings(mptsas_t *mpt, mptsas_raidvol_t *raidvol,
 	}
 
 	return (rval);
+}
+
+/*
+ * The only RAID Action needed throughout the driver is for System Shutdown.
+ * Since this is the only RAID Action and because this Action does not require
+ * waiting for a reply, make this a non-generic function.  If it turns out that
+ * other RAID Actions are required later, a generic function should be used.
+ */
+void
+mptsas_raid_action_system_shutdown(mptsas_t *mpt)
+{
+	pMpi2RaidActionRequest_t	action;
+	uint8_t				ir_active = FALSE;
+	mptsas_slots_t			*slots = mpt->m_active;
+	int				config, vol, action_flags = 0;
+	mptsas_cmd_t			*cmd;
+	struct scsi_pkt			*pkt;
+	uint32_t			request_desc_low;
+
+	ASSERT(mutex_owned(&mpt->m_mutex));
+
+	/*
+	 * Before doing the system shutdown RAID Action, make sure that the IOC
+	 * supports IR and make sure there is a valid volume for the request.
+	 */
+	if (mpt->m_ir_capable) {
+		for (config = 0; config < slots->m_num_raid_configs;
+		    config++) {
+			for (vol = 0; vol < MPTSAS_MAX_RAIDVOLS; vol++) {
+				if (slots->m_raidconfig[config].m_raidvol[vol].
+				    m_israid) {
+					ir_active = TRUE;
+					break;
+				}
+			}
+		}
+	}
+	if (!ir_active) {
+		return;
+	}
+
+	/*
+	 * Get a command from the pool.
+	 */
+	if (mptsas_request_from_pool(mpt, &cmd, &pkt) == -1) {
+		mptsas_log(mpt, CE_NOTE, "command pool is full for RAID "
+		    "action request");
+		return;
+	}
+	action_flags |= MPTSAS_REQUEST_POOL_CMD;
+
+	bzero((caddr_t)cmd, sizeof (*cmd));
+	bzero((caddr_t)pkt, scsi_pkt_size());
+
+	pkt->pkt_cdbp		= (opaque_t)&cmd->cmd_cdb[0];
+	pkt->pkt_scbp		= (opaque_t)&cmd->cmd_scb;
+	pkt->pkt_ha_private	= (opaque_t)cmd;
+	pkt->pkt_flags		= (FLAG_NOINTR | FLAG_HEAD);
+	pkt->pkt_time		= 5;
+	cmd->cmd_pkt		= pkt;
+	cmd->cmd_flags		= CFLAG_CMDIOC;
+
+	/*
+	 * Send RAID Action.  We don't care what the reply is so just exit
+	 * after sending the request.  This is just sent to the controller to
+	 * keep the volume from having to resync the next time it starts.  If
+	 * the request doesn't work for whatever reason, we're not going to
+	 * bother wondering why.
+	 */
+	if (mptsas_save_cmd(mpt, cmd) == TRUE) {
+		cmd->cmd_flags |= CFLAG_PREPARED;
+		/*
+		 * Form message for raid action
+		 */
+		action = (pMpi2RaidActionRequest_t)(mpt->m_req_frame +
+		    (mpt->m_req_frame_size * cmd->cmd_slot));
+		bzero(action, mpt->m_req_frame_size);
+		action->Function = MPI2_FUNCTION_RAID_ACTION;
+		action->Action = MPI2_RAID_ACTION_SYSTEM_SHUTDOWN_INITIATED;
+
+		/*
+		 * Send request
+		 */
+		(void) ddi_dma_sync(mpt->m_dma_req_frame_hdl, 0, 0,
+		    DDI_DMA_SYNC_FORDEV);
+		request_desc_low = (cmd->cmd_slot << 16) +
+		    MPI2_REQ_DESCRIPT_FLAGS_DEFAULT_TYPE;
+		MPTSAS_START_CMD(mpt, request_desc_low, 0);
+
+		/*
+		 * Even though reply does not matter, wait no more than 5
+		 * seconds here to get the reply just because we don't want to
+		 * leave it hanging if it's coming.  Use the FW diag cv.
+		 */
+		(void) cv_reltimedwait(&mpt->m_fw_diag_cv, &mpt->m_mutex,
+		    drv_usectohz(5 * MICROSEC), TR_CLOCK_TICK);
+	}
+
+	/*
+	 * Be sure to deallocate cmd before leaving.
+	 */
+	if (cmd && (cmd->cmd_flags & CFLAG_PREPARED)) {
+		mptsas_remove_cmd(mpt, cmd);
+		action_flags &= (~MPTSAS_REQUEST_POOL_CMD);
+	}
+	if (action_flags & MPTSAS_REQUEST_POOL_CMD)
+		mptsas_return_to_pool(mpt, cmd);
+
 }
 
 int

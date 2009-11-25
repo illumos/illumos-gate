@@ -74,6 +74,7 @@
 #include <sys/scsi/adapters/mpt_sas/mpi/mpi2_init.h>
 #include <sys/scsi/adapters/mpt_sas/mpi/mpi2_ioc.h>
 #include <sys/scsi/adapters/mpt_sas/mpi/mpi2_sas.h>
+#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_tool.h>
 #pragma pack()
 
 /*
@@ -871,11 +872,11 @@ mptsas_kick_start(mptsas_t *mpt)
 	saved_HCB_size = ddi_get32(mpt->m_datap, &mpt->m_reg->HCBSize);
 
 	/*
-	 * Set Reset Adapter bit and wait 30 mSeconds.
+	 * Set Reset Adapter bit and wait 50 mSeconds.
 	 */
 	diag_reg |= MPI2_DIAG_RESET_ADAPTER;
 	ddi_put32(mpt->m_datap, &mpt->m_reg->HostDiagnostic, diag_reg);
-	drv_usecwait(30000);
+	drv_usecwait(50000);
 
 	/*
 	 * Poll, waiting for Reset Adapter bit to clear.  300 Seconds max
@@ -931,9 +932,9 @@ mptsas_kick_start(mptsas_t *mpt)
 	    MPI2_WRSEQ_FLUSH_KEY_VALUE);
 
 	/*
-	 * Wait 20 seconds max for FW to come to ready state.
+	 * Wait 60 seconds max for FW to come to ready state.
 	 */
-	for (polls = 0; polls < 20000; polls++) {
+	for (polls = 0; polls < 60000; polls++) {
 		ioc_state = ddi_get32(mpt->m_datap, &mpt->m_reg->Doorbell);
 		if (ioc_state == 0xFFFFFFFF) {
 			mptsas_fm_ereport(mpt, DDI_FM_DEVICE_NO_RESPONSE);
@@ -946,7 +947,7 @@ mptsas_kick_start(mptsas_t *mpt)
 		}
 		drv_usecwait(1000);
 	}
-	if (polls == 20000) {
+	if (polls == 60000) {
 		mptsas_fm_ereport(mpt, DDI_FM_DEVICE_NO_RESPONSE);
 		ddi_fm_service_impact(mpt->m_dip, DDI_SERVICE_LOST);
 		return (DDI_FAILURE);
@@ -996,12 +997,12 @@ mptsas_ioc_reset(mptsas_t *mpt)
 		}
 
 		/*
-		 * Wait for chip to become ready
+		 * Wait no more than 60 seconds for chip to become ready.
 		 */
 		while ((ddi_get32(mpt->m_datap, &mpt->m_reg->Doorbell) &
 		    MPI2_IOC_STATE_READY) == 0x0) {
 			drv_usecwait(1000);
-			if (polls++ > 20000) {
+			if (polls++ > 60000) {
 				goto hard_reset;
 			}
 		}
