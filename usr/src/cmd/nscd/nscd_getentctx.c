@@ -404,28 +404,22 @@ _nscd_get_getent_ctx(
 	/*
 	 * If the context list is not empty, return the first one
 	 * on the list. Otherwise, create and return a new one if
-	 * limit is not reached. if reacehed, wait for the 'one is
-	 * available' signal.
+	 * limit is not reached. If limit is reached return an error
+	 * so that the client can perform the enumeration.
 	 */
 	tmp = (nscd_getent_ctx_base_t *)_nscd_mutex_lock(
 	    (nscd_acc_data_t *)base);
 	assert(base == tmp);
 	if (base->first == NULL) {
-		if (base->num_getent_ctx == base->max_getent_ctx) {
-			base->num_waiter++;
-			while (base->first == NULL) {
+		if (base->num_getent_ctx >= base->max_getent_ctx) {
+			/* run out of contexts */
 
-				_NSCD_LOG(NSCD_LOG_GETENT_CTX,
-				    NSCD_LOG_LEVEL_DEBUG)
-				(me, "waiting for signal\n");
+			_NSCD_LOG(NSCD_LOG_GETENT_CTX,
+			    NSCD_LOG_LEVEL_DEBUG)
+			(me, "run out of getent ctxs\n");
 
-				_nscd_cond_wait((nscd_acc_data_t *)base, NULL);
-
-				_NSCD_LOG(NSCD_LOG_GETENT_CTX,
-				    NSCD_LOG_LEVEL_DEBUG)
-				(me, "woke up\n");
-			}
-			base->num_waiter--;
+			_nscd_mutex_unlock((nscd_acc_data_t *)base);
+			return (NSCD_CREATE_GETENT_CTX_FAILED);
 		} else {
 			base->first = _nscd_create_getent_ctx(params);
 			if (base->first != NULL)
@@ -531,13 +525,6 @@ _nscd_put_getent_ctx(
 	_NSCD_LOG(NSCD_LOG_GETENT_CTX, NSCD_LOG_LEVEL_DEBUG)
 	(me, "ctx (%p, cookie # = %lld) removed from getent ctx DB\n",
 	    gnctx, gnctx->cookie_num);
-
-	if (base->num_waiter > 0) {
-		_NSCD_LOG(NSCD_LOG_GETENT_CTX, NSCD_LOG_LEVEL_DEBUG)
-		(me, "signaling (waiter = %d)\n", base->num_waiter);
-
-		_nscd_cond_signal((nscd_acc_data_t *)base);
-	}
 
 	gnctx->seq_num = 0;
 	gnctx->cookie_num = 0;

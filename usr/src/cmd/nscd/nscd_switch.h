@@ -127,7 +127,6 @@ typedef struct nscd_getent_ctx_base {
 	int			dbi;		/* which database? */
 	int			max_getent_ctx;
 	int			num_getent_ctx;
-	int			num_waiter;
 	struct nscd_getent_context *first;
 } nscd_getent_ctx_base_t;
 
