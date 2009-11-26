@@ -189,7 +189,6 @@ _auditsys(struct auditcalls *uap, rval_t *rvp)
 	case BSM_AUDITDOOR:
 		result = auditdoor((int)uap->a1);
 		break;
-	case BSM_AUDITON:
 	case BSM_AUDITCTL:
 		result = auditctl((int)uap->a1, (caddr_t)uap->a2, (int)uap->a3);
 		break;

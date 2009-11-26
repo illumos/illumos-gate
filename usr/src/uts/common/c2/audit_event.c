@@ -2849,9 +2849,7 @@ aui_auditsys(au_event_t e)
 	case BSM_AUDIT:
 		e = AUE_AUDIT;
 		break;
-	case BSM_AUDITON:
 	case BSM_AUDITCTL:
-
 		switch ((uint_t)uap->a1) {
 
 		case A_GETPOLICY:

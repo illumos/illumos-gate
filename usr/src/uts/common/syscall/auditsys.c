@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/systm.h>
 #include <sys/errno.h>
@@ -38,9 +36,9 @@ auditsys(struct auditcalls *uap, rval_t *rvp)
 	int err;
 
 	/*
-	 * this ugly hack is because auditsys returns 0 for
-	 * all cases except audit_active == 0 and
-	 * uap->code  == BSM_AUDITCTRL || BSM_AUDITON || default)
+	 * this ugly hack is because auditsys returns
+	 * 0 for all cases except audit_active == 0
+	 * and uap->code  == BSM_AUDITCTL || default)
 	 */
 
 	if (!audit_active)
@@ -54,7 +52,6 @@ auditsys(struct auditcalls *uap, rval_t *rvp)
 	case BSM_AUDIT:
 		return (0);
 	case BSM_AUDITCTL:
-	case BSM_AUDITON:
 		if ((int)uap->a1 == A_GETCOND)
 			err = secpolicy_audit_getattr(CRED());
 		else

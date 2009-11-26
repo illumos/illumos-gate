@@ -218,7 +218,7 @@ typedef au_id_t auid_t;
 #define	BSM_AUDIT		25
 /* 				26	OBSOLETE */
 /* 				27	EOL announced for Sol 10 */
-#define	BSM_AUDITON		28
+/*				28	OBSOLETE */
 #define	BSM_AUDITCTL		29
 /*				30	OBSOLETE */
 /*				31	OBSOLETE */
