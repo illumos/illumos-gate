@@ -19,7 +19,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * escparse.y -- parser for esc
@@ -40,8 +40,6 @@
  * only need to do that if you're debugging the grammar below.
  *
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <ctype.h>
@@ -362,6 +360,8 @@ parg	: pfunc
 		{ $$ = tree_pname($1); }
 	| QUOTE
 		{ $$ = tree_quote($1.s, $1.file, $1.line); }
+	| ID '(' exprlist ')'
+		{ $$ = tree_func($1.s, $3, $1.file, $1.line); }
 	;
 
 /*

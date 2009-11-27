@@ -220,39 +220,6 @@ fmd_case_hash_apply(fmd_case_hash_t *chp,
 }
 
 static void
-fmd_case_hash_apply_except_current(fmd_case_hash_t *chp,
-    void (*func)(fmd_case_t *, void *), void *arg, fmd_case_t *current)
-{
-	fmd_case_impl_t *cp, **cps, **cpp;
-	uint_t cpc, i;
-
-	(void) pthread_rwlock_rdlock(&chp->ch_lock);
-
-	cps = cpp = fmd_alloc(chp->ch_count * sizeof (fmd_case_t *), FMD_SLEEP);
-	cpc = chp->ch_count;
-
-	for (i = 0; i < chp->ch_hashlen; i++) {
-		for (cp = chp->ch_hash[i]; cp != NULL; cp = cp->ci_next)
-			if (cp != (fmd_case_impl_t *)current)
-				*cpp++ = fmd_case_tryhold(cp);
-			else
-				*cpp++ = cp;
-	}
-
-	ASSERT(cpp == cps + cpc);
-	(void) pthread_rwlock_unlock(&chp->ch_lock);
-
-	for (i = 0; i < cpc; i++) {
-		if (cps[i] != NULL && cps[i] != (fmd_case_impl_t *)current) {
-			func((fmd_case_t *)cps[i], arg);
-			fmd_case_rele((fmd_case_t *)cps[i]);
-		}
-	}
-
-	fmd_free(cps, cpc * sizeof (fmd_case_t *));
-}
-
-static void
 fmd_case_code_hash_insert(fmd_case_hash_t *chp, fmd_case_impl_t *cip)
 {
 	uint_t h = fmd_strhash(cip->ci_code) % chp->ch_hashlen;
@@ -951,12 +918,9 @@ fmd_case_convict(fmd_case_t *cp)
 	uint8_t *new_match_state;
 	int adjust_new = 0;
 	fccd_t fccd;
-
-	(void) pthread_mutex_lock(&cip->ci_lock);
-	if (cip->ci_code == NULL)
-		(void) fmd_case_mkcode(cp);
-	else if (cip->ci_precanned)
-		fmd_case_code_hash_insert(fmd.d_cases, cip);
+	fmd_case_impl_t *ncp, **cps, **cpp;
+	uint_t cpc;
+	fmd_case_hash_t *chp;
 
 	/*
 	 * First we must see if any matching cases already exist.
@@ -972,8 +936,38 @@ fmd_case_convict(fmd_case_t *cp)
 	fccd.fccd_new_susp_state = new_susp_state;
 	fccd.fccd_new_match_state = new_match_state;
 	fccd.fccd_discard_new = &discard_new;
-	fmd_case_hash_apply_except_current(fmd.d_cases, fmd_case_check_for_dups,
-	    &fccd, cp);
+
+	/*
+	 * Hold all cases
+	 */
+	chp = fmd.d_cases;
+	(void) pthread_rwlock_rdlock(&chp->ch_lock);
+	cps = cpp = fmd_alloc(chp->ch_count * sizeof (fmd_case_t *), FMD_SLEEP);
+	cpc = chp->ch_count;
+	for (i = 0; i < chp->ch_hashlen; i++)
+		for (ncp = chp->ch_hash[i]; ncp != NULL; ncp = ncp->ci_next)
+			*cpp++ = fmd_case_tryhold(ncp);
+	ASSERT(cpp == cps + cpc);
+	(void) pthread_rwlock_unlock(&chp->ch_lock);
+
+	/*
+	 * Run fmd_case_check_for_dups() on all cases except the current one.
+	 */
+	for (i = 0; i < cpc; i++) {
+		if (cps[i] != NULL) {
+			if (cps[i] != (fmd_case_impl_t *)cp)
+				fmd_case_check_for_dups((fmd_case_t *)cps[i],
+				    &fccd);
+			fmd_case_rele((fmd_case_t *)cps[i]);
+		}
+	}
+	fmd_free(cps, cpc * sizeof (fmd_case_t *));
+
+	(void) pthread_mutex_lock(&cip->ci_lock);
+	if (cip->ci_code == NULL)
+		(void) fmd_case_mkcode(cp);
+	else if (cip->ci_precanned)
+		fmd_case_code_hash_insert(fmd.d_cases, cip);
 
 	if (discard_new) {
 		/*

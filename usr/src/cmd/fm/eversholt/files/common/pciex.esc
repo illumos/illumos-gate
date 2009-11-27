@@ -858,6 +858,7 @@ event ereport.io.pci.rta@PCIEXFN{within(5s)};
 event ereport.io.pci.sta@PCIEXFN{within(5s)};
 event ereport.io.pciex.dl.dllp@PCIEXFN{within(5s)};
 event ereport.io.pciex.pl.te@PCIEXFN{within(5s)};
+event ereport.io.pciex.pl.sd@PCIEXFN{within(5s)};
 event ereport.io.pciex.tl.fcp@PCIEXFN{within(5s)};
 event ereport.io.pciex.tl.rof@PCIEXFN{within(5s)};
 event ereport.io.pciex.tl.mtlp@PCIEXFN{within(5s)};
@@ -869,6 +870,7 @@ event ereport.io.pciex.tl.uc@PCIEXFN{within(5s)};
 event ereport.io.pciex.tl.cto@PCIEXFN{within(5s)};
 event ereport.io.pciex.dl.dllp@pciexrc{within(5s)};
 event ereport.io.pciex.pl.te@pciexrc{within(5s)};
+event ereport.io.pciex.pl.sd@pciexrc{within(5s)};
 event ereport.io.pciex.tl.fcp@pciexrc{within(5s)};
 event ereport.io.pciex.tl.rof@pciexrc{within(5s)};
 event ereport.io.pciex.tl.mtlp@pciexrc{within(5s)};
@@ -951,12 +953,14 @@ prop error.io.pciex.fatlink@PCIEXFN/PCIEXFN { IS_SD(PCIEXFN) } (0)->
 prop error.io.pciex.fatlink@PCIEXFN/PCIEXFN { IS_SD(PCIEXFN) } (0)->
     ereport.io.pciex.dl.dllp@PCIEXFN,
     ereport.io.pciex.pl.te@PCIEXFN,
+    ereport.io.pciex.pl.sd@PCIEXFN,
     ereport.io.pciex.tl.fcp@PCIEXFN,
     ereport.io.pciex.tl.rof@PCIEXFN;
 
 prop error.io.pciex.fatlink@pciexrc/PCIEXFN (0)->
     ereport.io.pciex.dl.dllp@pciexrc,
     ereport.io.pciex.pl.te@pciexrc,
+    ereport.io.pciex.pl.sd@pciexrc,
     ereport.io.pciex.tl.fcp@pciexrc,
     ereport.io.pciex.tl.rof@pciexrc;
 
@@ -1799,10 +1803,8 @@ event ereport.io.pci.sec-ma@PCIEXFN{within(5s)};
  * is then represented as an unsupported request.
  */
 prop error.io.pci.ma-u@PCIEXFN/PCIFN (0)->
-    ereport.io.pciex.tl.ur@PCIEXFN;
-
-prop error.io.pci.ma-u@PCIEXFN/PCIFN { is_under(pciexrc, PCIEXFN/PCIFN) } (0)->
-    ereport.io.pci.sec-ma@pciexrc;
+    ereport.io.pciex.tl.ur@PCIEXFN,
+    error.io.pciex.ur-u@PCIEXFN;
 
 prop error.io.pci.ma-u@PCIEXFN/PCIFN (2)->
     ereport.io.pci.sec-ma@PCIEXFN,
@@ -1818,10 +1820,8 @@ prop error.io.pci.target-ma-d@PCIFN1 { IS_BG(PCIEXFN) && IS_PCI_LF(PCIFN1) &&
  */
 prop error.io.pci.ta-u@PCIEXFN/PCIFN (0)->
     ereport.io.pci.sta@PCIEXFN,
-    ereport.io.pciex.tl.ca@PCIEXFN;
-
-prop error.io.pci.ta-u@PCIEXFN/PCIFN { is_under(pciexrc, PCIEXFN/PCIFN) } (0)->
-    ereport.io.pci.sec-rta@pciexrc;
+    ereport.io.pciex.tl.ca@PCIEXFN,
+    error.io.pciex.ca-u@PCIEXFN;
 
 prop error.io.pci.ta-u@PCIEXFN/PCIFN (2)->
     ereport.io.pci.sec-rta@PCIEXFN,
@@ -1947,8 +1947,8 @@ prop error.io.pcix.uscmd@PCIEXFN (4)->
     ereport.io.pciex.tl.ca@PCIEXFN,
     ereport.io.pciex.bdg.uscmd@PCIEXFN;
 
-prop error.io.pcix.uscmd@PCIEXFN { is_under(pciexrc, PCIEXFN) } (0)->
-    ereport.io.pci.sec-rta@pciexrc;
+prop error.io.pcix.uscmd@PCIEXFN (0)->
+    error.io.pciex.ca-u@PCIEXFN;
 
 /*
  * Similarly a child device may have responded with a master abort or
@@ -1986,11 +1986,8 @@ prop error.io.pci.retry-to-u@PCIEXFN/PCIFN (2)->
 
 prop error.io.pci.retry-to-u@PCIEXFN/PCIFN (0)->
     ereport.io.pci.sta@PCIEXFN,
-    ereport.io.pci.dto@PCIEXFN;
-
-prop error.io.pci.retry-to-u@PCIEXFN/PCIFN {
-    is_under(pciexrc, PCIEXFN/PCIFN) } (0)->
-    ereport.io.pci.sec-rta@pciexrc;
+    ereport.io.pci.dto@PCIEXFN,
+    error.io.pciex.ca-u@PCIEXFN;
 
 /*
  * A bad dma request (eg with invalid address) propagates onto pci express
@@ -2000,13 +1997,13 @@ prop error.io.pci.retry-to-u@PCIEXFN/PCIFN {
 prop error.io.pci.badreq-pw-u@PCIEXFN/PCIFN (0)->
     ereport.io.pci.ma@PCIEXFN,
     ereport.io.pci.rta@PCIEXFN,
+    error.io.pciex.badreq-u@PCIEXFN,
     ereport.io.pci.sec-sta@PCIEXFN;
 
 prop error.io.pci.badreq-pw-u@PCIEXFN/PCIFN {
     is_under(pciexrc, PCIEXFN/PCIFN) } (0)->
     ereport.io.pciex.tl.ur@pciexrc,
-    ereport.io.pciex.tl.ca@pciexrc,
-    ereport.io.pci.sec-sta@pciexrc;
+    ereport.io.pciex.tl.ca@pciexrc;
 
 prop error.io.pci.badreq-pw-u@PCIEXFN/PCIFN { IS_SD(PCIEXFN1) &&
     is_under(PCIEXFN1, PCIEXFN/PCIFN) } (0)->
@@ -2018,13 +2015,13 @@ prop error.io.pci.badreq-pw-u@PCIEXFN/PCIFN { IS_SD(PCIEXFN1) &&
 prop error.io.pci.badreq-drw-u@PCIEXFN/PCIFN (0)->
     ereport.io.pci.ma@PCIEXFN,
     ereport.io.pci.rta@PCIEXFN,
+    error.io.pciex.badreq-u@PCIEXFN,
     ereport.io.pci.sec-sta@PCIEXFN;
 
 prop error.io.pci.badreq-drw-u@PCIEXFN/PCIFN {
     is_under(pciexrc, PCIEXFN/PCIFN) } (0)->
     ereport.io.pciex.tl.ur@pciexrc,
-    ereport.io.pciex.tl.ca@pciexrc,
-    ereport.io.pci.sec-sta@pciexrc;
+    ereport.io.pciex.tl.ca@pciexrc;
 
 prop error.io.pci.badreq-drw-u@PCIEXFN/PCIFN { IS_SD(PCIEXFN1) &&
     is_under(PCIEXFN1, PCIEXFN/PCIFN) } (0)->

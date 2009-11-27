@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * config.c -- system configuration cache module
@@ -284,6 +282,8 @@ config_cook(struct cfgdata *cdata)
 	ptr = stable("module");
 	Usedprops = lut_add(Usedprops, (void *)ptr, (void *)ptr, NULL);
 	ptr = stable("resource");
+	Usedprops = lut_add(Usedprops, (void *)ptr, (void *)ptr, NULL);
+	ptr = stable("serial");
 	Usedprops = lut_add(Usedprops, (void *)ptr, (void *)ptr, NULL);
 
 	out(O_ALTFP|O_VERB3, "Raw config data follows:");

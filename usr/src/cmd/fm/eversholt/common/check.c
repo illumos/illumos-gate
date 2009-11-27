@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * check.c -- routines for checking the prop tree
@@ -962,6 +962,17 @@ check_type_iterator(struct node *np)
 }
 
 void
+check_cat_list(struct node *np)
+{
+	if (np->t == T_FUNC)
+		check_func(np);
+	else if (np->t == T_LIST) {
+		check_cat_list(np->u.expr.left);
+		check_cat_list(np->u.expr.right);
+	}
+}
+
+void
 check_func(struct node *np)
 {
 	struct node *arglist = np->u.func.arglist;
@@ -1077,13 +1088,9 @@ check_func(struct node *np)
 	    np->u.func.s == L_is_under) {
 		if (arglist->t == T_LIST &&
 		    (arglist->u.expr.left->t == T_NAME ||
-		    (arglist->u.expr.left->t == T_FUNC &&
-		    (arglist->u.expr.left->u.func.s == L_fru ||
-		    arglist->u.expr.left->u.func.s == L_asru))) &&
+		    arglist->u.expr.left->t == T_FUNC) &&
 		    (arglist->u.expr.right->t == T_NAME ||
-		    (arglist->u.expr.right->t == T_FUNC &&
-		    (arglist->u.expr.right->u.func.s == L_fru ||
-		    arglist->u.expr.right->u.func.s == L_asru)))) {
+		    arglist->u.expr.right->t == T_FUNC)) {
 			if (arglist->u.expr.left->t == T_FUNC)
 				check_func(arglist->u.expr.left);
 			if (arglist->u.expr.right->t == T_FUNC)
@@ -1095,10 +1102,7 @@ check_func(struct node *np)
 			    np->u.func.s);
 		}
 	} else if (np->u.func.s == L_is_on) {
-		if (arglist->t == T_NAME ||
-		    (arglist->t == T_FUNC &&
-		    (arglist->u.func.s == L_fru ||
-		    arglist->u.func.s == L_asru))) {
+		if (arglist->t == T_NAME || arglist->t == T_FUNC) {
 			if (arglist->t == T_FUNC)
 				check_func(arglist);
 		} else {
@@ -1107,10 +1111,7 @@ check_func(struct node *np)
 			    "fru() or asru()");
 		}
 	} else if (np->u.func.s == L_is_present) {
-		if (arglist->t == T_NAME ||
-		    (arglist->t == T_FUNC &&
-		    (arglist->u.func.s == L_fru ||
-		    arglist->u.func.s == L_asru))) {
+		if (arglist->t == T_NAME || arglist->t == T_FUNC) {
 			if (arglist->t == T_FUNC)
 				check_func(arglist);
 		} else {
@@ -1121,9 +1122,7 @@ check_func(struct node *np)
 	} else if (np->u.func.s == L_has_fault) {
 		if (arglist->t == T_LIST &&
 		    (arglist->u.expr.left->t == T_NAME ||
-		    (arglist->u.expr.left->t == T_FUNC &&
-		    (arglist->u.expr.left->u.func.s == L_fru ||
-		    arglist->u.expr.left->u.func.s == L_asru))) &&
+		    arglist->u.expr.left->t == T_FUNC) &&
 		    arglist->u.expr.right->t == T_QUOTE) {
 			if (arglist->u.expr.left->t == T_FUNC)
 				check_func(arglist->u.expr.left);
@@ -1134,10 +1133,7 @@ check_func(struct node *np)
 			    "second argument must be a string", np->u.func.s);
 		}
 	} else if (np->u.func.s == L_is_type) {
-		if (arglist->t == T_NAME ||
-		    (arglist->t == T_FUNC &&
-		    (arglist->u.func.s == L_fru ||
-		    arglist->u.func.s == L_asru))) {
+		if (arglist->t == T_NAME || arglist->t == T_FUNC) {
 			if (arglist->t == T_FUNC)
 				check_func(arglist);
 		} else {
@@ -1156,9 +1152,7 @@ check_func(struct node *np)
 	    np->u.func.s == L_confprop_defined) {
 		if (arglist->t == T_LIST &&
 		    (arglist->u.expr.left->t == T_NAME ||
-		    (arglist->u.expr.left->t == T_FUNC &&
-		    (arglist->u.expr.left->u.func.s == L_fru ||
-		    arglist->u.expr.left->u.func.s == L_asru))) &&
+		    arglist->u.expr.left->t == T_FUNC) &&
 		    arglist->u.expr.right->t == T_QUOTE) {
 			if (arglist->u.expr.left->t == T_FUNC)
 				check_func(arglist->u.expr.left);
@@ -1210,6 +1204,8 @@ check_func(struct node *np)
 	    L_setserdincrement) {
 		if (arglist->t == T_FUNC)
 			check_func(arglist);
+	} else if (np->u.func.s == L_cat) {
+		check_cat_list(arglist);
 	} else if (np->u.func.s == L_envprop) {
 		if (arglist->t != T_QUOTE)
 			outfl(O_ERR, arglist->file, arglist->line,

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * literals.h -- public definitions for literals in string table
@@ -40,8 +40,6 @@
 
 #ifndef	_ESC_COMMON_LITERALS_H
 #define	_ESC_COMMON_LITERALS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -152,6 +150,7 @@ L_DECL(inhibit);
  */
 L_DECL(within);
 L_DECL(call);
+L_DECL(cat);
 L_DECL(confcall);
 L_DECL(confprop);
 L_DECL(confprop_defined);

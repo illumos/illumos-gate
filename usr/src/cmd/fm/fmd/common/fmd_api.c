@@ -1302,16 +1302,7 @@ fmd_case_add_suspect(fmd_hdl_t *hdl, fmd_case_t *cp, nvlist_t *nvl)
 	if (fru != NULL) {
 		(void) topo_fmri_serial(thp, fru, &serial, &err);
 		if (serial != NULL) {
-			if (rsrc != NULL)
-				(void) nvlist_add_string(rsrc, "serial",
-				    serial);
 			(void) nvlist_add_string(fru, "serial", serial);
-			topo_hdl_strfree(thp, serial);
-		}
-	} else if (rsrc != NULL) {
-		(void) topo_fmri_serial(thp, rsrc, &serial, &err);
-		if (serial != NULL) {
-			(void) nvlist_add_string(rsrc, "serial", serial);
 			topo_hdl_strfree(thp, serial);
 		}
 	}

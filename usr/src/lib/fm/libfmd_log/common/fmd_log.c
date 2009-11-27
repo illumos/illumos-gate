@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/fm/protocol.h>
 #include <sys/types.h>
@@ -286,6 +283,7 @@ fmd_log_load_xrdir(fmd_log_t *lp)
 	char dirbuf[PATH_MAX], path[PATH_MAX], *dirpath;
 	struct dirent *dp;
 	DIR *dirp;
+	struct stat statbuf;
 
 	lp->log_flags |= FMD_LF_XREFS;
 	(void) strlcpy(dirbuf, lp->log_path, sizeof (dirbuf));
@@ -302,6 +300,8 @@ fmd_log_load_xrdir(fmd_log_t *lp)
 		    "%s/%s", dirpath, dp->d_name);
 
 		if (strcmp(path, lp->log_path) != 0 &&
+		    stat(path, &statbuf) != -1 &&
+		    (statbuf.st_mode & S_IFMT) == S_IFREG &&
 		    (xlp = fmd_log_open(lp->log_abi, path, NULL)) != NULL) {
 			fmd_log_dprintf(lp, "%s loaded %s for xrefs\n",
 			    lp->log_path, xlp->log_path);

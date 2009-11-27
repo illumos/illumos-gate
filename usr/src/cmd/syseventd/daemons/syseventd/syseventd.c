@@ -226,7 +226,19 @@ flt_handler(int sig)
 			syseventd_exit(1);
 			/*NOTREACHED*/
 		case SIGCLD:
-			/* No need to abort on a SIGCLD */
+		case SIGPWR:
+		case SIGWINCH:
+		case SIGURG:
+		case SIGCONT:
+		case SIGWAITING:
+		case SIGLWP:
+		case SIGFREEZE:
+		case SIGTHAW:
+		case SIGCANCEL:
+		case SIGXRES:
+		case SIGJVM1:
+		case SIGJVM2:
+			/* No need to abort */
 			break;
 		default:
 			syseventd_err_print(FATAL_ERROR);

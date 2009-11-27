@@ -62,6 +62,8 @@ static int maybe_di_chars_copy(tnode_t *, did_t *,
     const char *, const char *, const char *);
 static int maybe_di_uint_to_str(tnode_t *, did_t *,
     const char *, const char *, const char *);
+static int maybe_di_uint_to_dec_str(tnode_t *, did_t *,
+    const char *, const char *, const char *);
 static int AADDR_set(tnode_t *, did_t *,
     const char *, const char *, const char *);
 
@@ -95,9 +97,49 @@ txprop_t Fn_common_props[] = {
 	{ NULL, &io_pgroup, TOPO_IO_DRIVER, DRIVERprop_set },
 	{ NULL, &io_pgroup, TOPO_IO_MODULE, MODULEprop_set },
 	{ "serd_io_device_nonfatal_n", &io_pgroup, "serd_io_device_nonfatal_n",
-	    maybe_di_uint_to_str },
+	    maybe_di_uint_to_dec_str },
 	{ "serd_io_device_nonfatal_t", &io_pgroup, "serd_io_device_nonfatal_t",
-	    maybe_di_uint_to_str },
+	    maybe_di_chars_copy },
+	{ "serd_io_device_nonfatal_btlp_n", &io_pgroup,
+	    "serd_io_device_nonfatal_btlp_n", maybe_di_uint_to_dec_str },
+	{ "serd_io_device_nonfatal_btlp_t", &io_pgroup,
+	    "serd_io_device_nonfatal_btlp_t", maybe_di_chars_copy },
+	{ "serd_io_device_nonfatal_bdllp_n", &io_pgroup,
+	    "serd_io_device_nonfatal_bdllp_n", maybe_di_uint_to_dec_str },
+	{ "serd_io_device_nonfatal_bdllp_t", &io_pgroup,
+	    "serd_io_device_nonfatal_bdllp_t", maybe_di_chars_copy },
+	{ "serd_io_device_nonfatal_re_n", &io_pgroup,
+	    "serd_io_device_nonfatal_re_n", maybe_di_uint_to_dec_str },
+	{ "serd_io_device_nonfatal_re_t", &io_pgroup,
+	    "serd_io_device_nonfatal_re_t", maybe_di_chars_copy },
+	{ "serd_io_device_nonfatal_rto_n", &io_pgroup,
+	    "serd_io_device_nonfatal_rto_n", maybe_di_uint_to_dec_str },
+	{ "serd_io_device_nonfatal_rto_t", &io_pgroup,
+	    "serd_io_device_nonfatal_rto_t", maybe_di_chars_copy },
+	{ "serd_io_device_nonfatal_rnr_n", &io_pgroup,
+	    "serd_io_device_nonfatal_rnr_n", maybe_di_uint_to_dec_str },
+	{ "serd_io_device_nonfatal_rnr_t", &io_pgroup,
+	    "serd_io_pciex_corrlink-bus_rnr_t", maybe_di_chars_copy },
+	{ "serd_io_pciex_corrlink-bus_btlp_n", &io_pgroup,
+	    "serd_io_pciex_corrlink-bus_btlp_n", maybe_di_uint_to_dec_str },
+	{ "serd_io_pciex_corrlink-bus_btlp_t", &io_pgroup,
+	    "serd_io_pciex_corrlink-bus_btlp_t", maybe_di_chars_copy },
+	{ "serd_io_pciex_corrlink-bus_bdllp_n", &io_pgroup,
+	    "serd_io_pciex_corrlink-bus_bdllp_n", maybe_di_uint_to_dec_str },
+	{ "serd_io_pciex_corrlink-bus_bdllp_t", &io_pgroup,
+	    "serd_io_pciex_corrlink-bus_bdllp_t", maybe_di_chars_copy },
+	{ "serd_io_pciex_corrlink-bus_re_n", &io_pgroup,
+	    "serd_io_pciex_corrlink-bus_re_n", maybe_di_uint_to_dec_str },
+	{ "serd_io_pciex_corrlink-bus_re_t", &io_pgroup,
+	    "serd_io_pciex_corrlink-bus_re_t", maybe_di_chars_copy },
+	{ "serd_io_pciex_corrlink-bus_rto_n", &io_pgroup,
+	    "serd_io_pciex_corrlink-bus_rto_n", maybe_di_uint_to_dec_str },
+	{ "serd_io_pciex_corrlink-bus_rto_t", &io_pgroup,
+	    "serd_io_pciex_corrlink-bus_rto_t", maybe_di_chars_copy },
+	{ "serd_io_pciex_corrlink-bus_rnr_n", &io_pgroup,
+	    "serd_io_pciex_corrlink-bus_rnr_n", maybe_di_uint_to_dec_str },
+	{ "serd_io_pciex_corrlink-bus_rnr_t", &io_pgroup,
+	    "serd_io_pciex_corrlink-bus_rnr_t", maybe_di_chars_copy },
 	{ NULL, &pci_pgroup, TOPO_PCI_EXCAP, EXCAP_set },
 	{ DI_CLASSPROP, &pci_pgroup, TOPO_PCI_CLASS, maybe_di_uint_to_str },
 	{ DI_VENDIDPROP, &pci_pgroup, TOPO_PCI_VENDID, maybe_di_uint_to_str },
@@ -800,6 +842,32 @@ maybe_di_uint_to_str(tnode_t *tn, did_t *pd,
 		return (0);
 
 	return (uint_to_strprop(did_mod(pd), v, tn, tpgrp, tpnm));
+}
+
+static int
+uint_to_dec_strprop(topo_mod_t *mp, uint_t v, tnode_t *tn,
+    const char *tpgrp, const char *tpnm)
+{
+	char str[21]; /* sizeof (UINT64_MAX) + '\0' */
+	int e;
+
+	(void) snprintf(str, 21, "%d", v);
+	if (topo_prop_set_string(tn,
+	    tpgrp, tpnm, TOPO_PROP_IMMUTABLE, str, &e) < 0)
+		return (topo_mod_seterrno(mp, e));
+	return (0);
+}
+
+static int
+maybe_di_uint_to_dec_str(tnode_t *tn, did_t *pd,
+    const char *dpnm, const char *tpgrp, const char *tpnm)
+{
+	uint_t v;
+
+	if (di_uintprop_get(did_mod(pd), did_dinode(pd), dpnm, &v) < 0)
+		return (0);
+
+	return (uint_to_dec_strprop(did_mod(pd), v, tn, tpgrp, tpnm));
 }
 
 static int

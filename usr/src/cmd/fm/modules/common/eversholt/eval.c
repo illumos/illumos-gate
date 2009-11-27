@@ -125,11 +125,27 @@ eval_getname(struct node *funcnp, struct lut *ex, struct node *events[],
 
 	if (np->t == T_NAME)
 		nodep = np;
-	else if (np->u.func.s == L_fru)
+	else if (np->t == T_FUNC && np->u.func.s == L_fru)
 		nodep = eval_fru(np->u.func.arglist);
-	else if (np->u.func.s == L_asru)
+	else if (np->t == T_FUNC && np->u.func.s == L_asru)
 		nodep = eval_asru(np->u.func.arglist);
-	else
+	else if (np->t == T_FUNC) {
+		if (eval_expr(np, ex, events, globals, croot, arrowp, try,
+		    &val) == 0)
+			/*
+			 * Can't evaluate yet. Return null so constraint is
+			 * deferred.
+			 */
+			return (NULL);
+		if (val.t == NODEPTR)
+			return ((struct node *)(uintptr_t)val.v);
+		else
+			/*
+			 * just return the T_FUNC - which the caller will
+			 * reject.
+			 */
+			return (np);
+	} else
 		out(O_DIE, "%s: unexpected type: %s",
 		    funcname, ptree_nodetype2str(np->t));
 	if (try) {
@@ -142,6 +158,46 @@ eval_getname(struct node *funcnp, struct lut *ex, struct node *events[],
 		}
 	}
 	return (nodep);
+}
+
+/*ARGSUSED*/
+static int
+eval_cat(struct node *np, struct lut *ex, struct node *events[],
+	struct lut **globals, struct config *croot, struct arrow *arrowp,
+	int try, struct evalue *valuep)
+{
+	if (np->t == T_LIST) {
+		struct evalue lval;
+		struct evalue rval;
+		int len;
+		char *s;
+
+		if (!eval_cat(np->u.expr.left, ex, events, globals, croot,
+		    arrowp, try, &lval))
+			return (0);
+		if (!eval_cat(np->u.expr.right, ex, events, globals, croot,
+		    arrowp, try, &rval))
+			return (0);
+		len = snprintf(NULL, 0, "%s%s", (char *)(uintptr_t)lval.v,
+		    (char *)(uintptr_t)rval.v);
+		s = MALLOC(len + 1);
+
+		(void) snprintf(s, len + 1, "%s%s", (char *)(uintptr_t)lval.v,
+		    (char *)(uintptr_t)rval.v);
+		outfl(O_ALTFP|O_VERB2, np->file, np->line,
+		    "eval_cat: %s %s returns %s", (char *)(uintptr_t)lval.v,
+		    (char *)(uintptr_t)rval.v, s);
+		valuep->t = STRING;
+		valuep->v = (uintptr_t)stable(s);
+		FREE(s);
+	} else {
+		if (!eval_expr(np, ex, events, globals, croot,
+		    arrowp, try, valuep))
+			return (0);
+		if (check_expr_args(valuep, NULL, STRING, np))
+			return (0);
+	}
+	return (1);
 }
 
 /*
@@ -174,6 +230,12 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 		    croot, arrowp, try, &duped_lhs);
 		rhs = eval_getname(funcnp, ex, events, np->u.expr.right,
 		    globals, croot, arrowp, try, &duped_rhs);
+		if (!rhs || !lhs)
+			return (0);
+		if (rhs->t != T_NAME || lhs->t != T_NAME) {
+			valuep->t = UNDEFINED;
+			return (1);
+		}
 
 		valuep->t = UINT64;
 		valuep->v = begins_with(lhs, rhs, ex);
@@ -196,6 +258,13 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 
 		nodep = eval_getname(funcnp, ex, events, np->u.expr.left,
 		    globals, croot, arrowp, try, &duped);
+		if (!nodep)
+			return (0);
+		if (nodep->t != T_NAME) {
+			valuep->t = UNDEFINED;
+			return (1);
+		}
+
 		if (nodep->u.name.last->u.name.cp != NULL) {
 			cp = nodep->u.name.last->u.name.cp;
 		} else {
@@ -272,6 +341,13 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 		    croot, arrowp, try, &duped_lhs);
 		rhs = eval_getname(funcnp, ex, events, np->u.expr.right,
 		    globals, croot, arrowp, try, &duped_rhs);
+		if (!rhs || !lhs)
+			return (0);
+		if (rhs->t != T_NAME || lhs->t != T_NAME) {
+			valuep->t = UNDEFINED;
+			return (1);
+		}
+
 		path = ipath2str(NULL, ipath(lhs));
 		matchthis[1] = stable(path);
 		if (lhs->u.name.last->u.name.cp != NULL)
@@ -333,6 +409,13 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 
 		nodep = eval_getname(funcnp, ex, events, np, globals,
 		    croot, arrowp, try, &duped);
+		if (!nodep)
+			return (0);
+		if (nodep->t != T_NAME) {
+			valuep->t = UNDEFINED;
+			return (1);
+		}
+
 		if (nodep->u.name.last->u.name.cp != NULL) {
 			cp = nodep->u.name.last->u.name.cp;
 		} else {
@@ -364,6 +447,13 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 
 		nodep = eval_getname(funcnp, ex, events, np, globals,
 		    croot, arrowp, try, &duped);
+		if (!nodep)
+			return (0);
+		if (nodep->t != T_NAME) {
+			valuep->t = UNDEFINED;
+			return (1);
+		}
+
 		if (nodep->u.name.last->u.name.cp != NULL) {
 			cp = nodep->u.name.last->u.name.cp;
 		} else {
@@ -394,6 +484,13 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 	} else if (funcname == L_is_present) {
 		nodep = eval_getname(funcnp, ex, events, np, globals,
 		    croot, arrowp, try, &duped);
+		if (!nodep)
+			return (0);
+		if (nodep->t != T_NAME) {
+			valuep->t = UNDEFINED;
+			return (1);
+		}
+
 		if (nodep->u.name.last->u.name.cp != NULL) {
 			cp = nodep->u.name.last->u.name.cp;
 		} else {
@@ -414,11 +511,18 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 
 		nodep = eval_getname(funcnp, ex, events, np->u.expr.left,
 		    globals, croot, arrowp, try, &duped);
+		if (!nodep)
+			return (0);
+		if (nodep->t != T_NAME) {
+			valuep->t = UNDEFINED;
+			return (1);
+		}
+
 		path = ipath2str(NULL, ipath(nodep));
 		platform_units_translate(0, croot, &asru, &fru, &rsrc, path);
 		outfl(O_ALTFP|O_VERB2|O_NONL, np->file, np->line, "has_fault(");
-		ptree_name_iter(O_ALTFP|O_VERB2|O_NONL, np->u.expr.left);
-		out(O_ALTFP|O_VERB2|O_NONL, ", \"%s\") ",
+		ptree_name_iter(O_ALTFP|O_VERB2|O_NONL, nodep);
+		out(O_ALTFP|O_VERB2|O_NONL, "(%s), \"%s\") ", path,
 		    np->u.expr.right->u.quote.s);
 		FREE((void *)path);
 		if (duped)
@@ -504,8 +608,20 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 			return (1);
 		} else {
 			switch (valuep->t) {
-			case UINT64:
 			case NODEPTR:
+				if (((struct node *)(uintptr_t)
+				    (valuep->v))->t == T_NAME) {
+					char *s = ipath2str(NULL,
+					    ipath((struct node *)
+					    (uintptr_t)valuep->v));
+					out(O_ALTFP|O_VERB2,
+					    "found: \"%s\"", s);
+					FREE(s);
+				} else
+					out(O_ALTFP|O_VERB2, "found: %llu",
+					    valuep->v);
+				break;
+			case UINT64:
 				out(O_ALTFP|O_VERB2, "found: %llu", valuep->v);
 				break;
 			case STRING:
@@ -580,6 +696,13 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 		valuep->t = UINT64;
 		valuep->v = 1;
 		return (1);
+	} else if (funcname == L_cat) {
+		int retval = eval_cat(np, ex, events, globals, croot,
+		    arrowp, try, valuep);
+
+		outfl(O_ALTFP|O_VERB2, np->file, np->line,
+		    "cat: returns %s", (char *)(uintptr_t)valuep->v);
+		return (retval);
 	} else if (funcname == L_setserdn || funcname == L_setserdt ||
 	    funcname == L_setserdsuffix || funcname == L_setserdincrement) {
 		struct evalue *serdvalp;
@@ -1186,6 +1309,28 @@ check_expr_args(struct evalue *lp, struct evalue *rp, enum datatype dtype,
 		FREE(s);
 		out(O_ALTFP|O_VERB2, "convert rhs path to \"%s\"",
 		    (char *)(uintptr_t)rp->v);
+	}
+
+	/* auto-convert numbers to strings */
+	if (dtype == STRING) {
+		if (lp->t == UINT64) {
+			int len = snprintf(NULL, 0, "%llx", lp->v);
+			char *s = MALLOC(len + 1);
+
+			(void) snprintf(s, len + 1, "%llx", lp->v);
+			lp->t = STRING;
+			lp->v = (uintptr_t)stable(s);
+			FREE(s);
+		}
+		if (rp != NULL && rp->t == UINT64) {
+			int len = snprintf(NULL, 0, "%llx", rp->v);
+			char *s = MALLOC(len + 1);
+
+			(void) snprintf(s, len + 1, "%llx", rp->v);
+			rp->t = STRING;
+			rp->v = (uintptr_t)stable(s);
+			FREE(s);
+		}
 	}
 
 	/* auto-convert strings to numbers */

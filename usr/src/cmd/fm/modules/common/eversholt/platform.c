@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * platform.c -- interfaces to the platform's configuration information
@@ -743,6 +743,7 @@ platform_units_translate(int isdefect, struct config *croot,
     nvlist_t **dfltasru, nvlist_t **dfltfru, nvlist_t **dfltrsrc, char *path)
 {
 	const char *fmristr;
+	char *serial;
 	nvlist_t *rsrc;
 	int err;
 
@@ -757,6 +758,19 @@ platform_units_translate(int isdefect, struct config *croot,
 		out(O_ALTFP, "Cannot rewrite resource for %s.", path);
 		return;
 	}
+
+	/*
+	 * If we don't have a serial number in the resource then check if it
+	 * is available as a separate property and if so then add it.
+	 */
+	if (nvlist_lookup_string(rsrc, FM_FMRI_HC_SERIAL_ID, &serial) != 0) {
+		serial = (char *)cfgstrprop_lookup(croot, path,
+		    FM_FMRI_HC_SERIAL_ID);
+		if (serial != NULL)
+			(void) nvlist_add_string(rsrc, FM_FMRI_HC_SERIAL_ID,
+			    serial);
+	}
+
 	*dfltrsrc = rsrc;
 }
 

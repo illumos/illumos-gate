@@ -741,6 +741,8 @@ fmd_asru_repair_if_aged(fmd_asru_link_t *alp, void *arg)
 		fmd_time_gettimeofday(&tv);
 		lp = fmd_log_open(alp->al_asru->asru_root, alp->al_uuid,
 		    FMD_LOG_ASRU);
+		if (lp == NULL)
+			return;
 		hrt = (hrtime_t)(tv.tv_sec - lp->log_stat.st_mtime);
 		fmd_log_rele(lp);
 		if (hrt * NANOSEC >= fmd.d_asrus->ah_lifetime) {
