@@ -193,15 +193,13 @@ pid_allocate(proc_t *prp, pid_t pid, int flags)
 		/*
 		 * Allocate a pid
 		 */
-		ASSERT(minpid <= mpid && mpid <= maxpid);
+		ASSERT(minpid <= mpid && mpid < maxpid);
 
 		startpid = mpid;
 		for (;;) {
 			newpid = mpid;
-			if (mpid >= maxpid)
+			if (++mpid == maxpid)
 				mpid = minpid;
-			else
-				mpid++;
 
 			if (pid_lookup(newpid) == NULL)
 				break;
