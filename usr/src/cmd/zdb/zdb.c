@@ -1607,7 +1607,7 @@ dump_label(const char *dev)
 
 /*ARGSUSED*/
 static int
-dump_one_dir(char *dsname, void *arg)
+dump_one_dir(const char *dsname, void *arg)
 {
 	int error;
 	objset_t *os;

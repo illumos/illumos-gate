@@ -178,7 +178,7 @@ int dmu_objset_snapshot(char *fsname, char *snapname, struct nvlist *props,
     boolean_t recursive);
 int dmu_objset_rename(const char *name, const char *newname,
     boolean_t recursive);
-int dmu_objset_find(char *name, int func(char *, void *), void *arg,
+int dmu_objset_find(char *name, int func(const char *, void *), void *arg,
     int flags);
 void dmu_objset_byteswap(void *buf, size_t size);
 

@@ -758,12 +758,12 @@ guid_compare(const void *arg1, const void *arg2)
  * guid of the dataset with the referenced data.
  */
 int
-find_ds_by_guid(char *name, void *arg)
+find_ds_by_guid(const char *name, void *arg)
 {
-	dsl_dataset_t *ds, *snapds;
 	avl_tree_t *guid_map = arg;
+	dsl_dataset_t *ds, *snapds;
 	guid_map_entry_t *gmep;
-	dsl_pool_t	*dp;
+	dsl_pool_t *dp;
 	int err;
 	uint64_t lastobj, firstobj;
 

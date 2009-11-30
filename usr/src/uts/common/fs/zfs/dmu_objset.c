@@ -779,7 +779,7 @@ snapshot_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 }
 
 static int
-dmu_objset_snapshot_one(char *name, void *arg)
+dmu_objset_snapshot_one(const char *name, void *arg)
 {
 	struct snaparg *sn = arg;
 	objset_t *os;
@@ -1315,7 +1315,7 @@ dmu_dir_list_next(objset_t *os, int namelen, char *name,
 }
 
 struct findarg {
-	int (*func)(char *, void *);
+	int (*func)(const char *, void *);
 	void *arg;
 };
 
@@ -1324,7 +1324,7 @@ static int
 findfunc(spa_t *spa, uint64_t dsobj, const char *dsname, void *arg)
 {
 	struct findarg *fa = arg;
-	return (fa->func((char *)dsname, fa->arg));
+	return (fa->func(dsname, fa->arg));
 }
 
 /*
@@ -1332,7 +1332,8 @@ findfunc(spa_t *spa, uint64_t dsobj, const char *dsname, void *arg)
  * Perhaps change all callers to use dmu_objset_find_spa()?
  */
 int
-dmu_objset_find(char *name, int func(char *, void *), void *arg, int flags)
+dmu_objset_find(char *name, int func(const char *, void *), void *arg,
+    int flags)
 {
 	struct findarg fa;
 	fa.func = func;
@@ -1446,7 +1447,7 @@ dmu_objset_find_spa(spa_t *spa, const char *name,
 
 /* ARGSUSED */
 int
-dmu_objset_prefetch(char *name, void *arg)
+dmu_objset_prefetch(const char *name, void *arg)
 {
 	dsl_dataset_t *ds;
 

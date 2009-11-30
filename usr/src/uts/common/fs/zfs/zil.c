@@ -529,7 +529,7 @@ zil_destroy(zilog_t *zilog, boolean_t keep_first)
 }
 
 int
-zil_claim(char *osname, void *txarg)
+zil_claim(const char *osname, void *txarg)
 {
 	dmu_tx_t *tx = txarg;
 	uint64_t first_txg = dmu_tx_get_txg(tx);
@@ -587,7 +587,7 @@ zil_claim(char *osname, void *txarg)
  * Any other error (no device or read failure) returns an error.
  */
 int
-zil_check_log_chain(char *osname, void *tx)
+zil_check_log_chain(const char *osname, void *tx)
 {
 	zilog_t *zilog;
 	objset_t *os;
@@ -1676,7 +1676,7 @@ zil_replaying(zilog_t *zilog, dmu_tx_t *tx)
 
 /* ARGSUSED */
 int
-zil_vdev_offline(char *osname, void *arg)
+zil_vdev_offline(const char *osname, void *arg)
 {
 	objset_t *os;
 	zilog_t *zilog;

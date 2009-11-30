@@ -240,7 +240,7 @@ void dsl_dataset_set_quota_sync(void *arg1, void *arg2, cred_t *cr,
 int dsl_dataset_set_reservation(const char *dsname, zprop_source_t source,
     uint64_t reservation);
 
-int dsl_destroy_inconsistent(char *dsname, void *arg);
+int dsl_destroy_inconsistent(const char *dsname, void *arg);
 
 #ifdef ZFS_DEBUG
 #define	dprintf_ds(ds, fmt, ...) do { \

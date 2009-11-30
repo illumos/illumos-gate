@@ -855,7 +855,7 @@ struct destroyarg {
 };
 
 static int
-dsl_snapshot_destroy_one(char *name, void *arg)
+dsl_snapshot_destroy_one(const char *name, void *arg)
 {
 	struct destroyarg *da = arg;
 	dsl_dataset_t *ds;
@@ -2191,47 +2191,42 @@ struct renamesnaparg {
 };
 
 static int
-dsl_snapshot_rename_one(char *name, void *arg)
+dsl_snapshot_rename_one(const char *name, void *arg)
 {
 	struct renamesnaparg *ra = arg;
 	dsl_dataset_t *ds = NULL;
-	char *cp;
+	char *snapname;
 	int err;
 
-	cp = name + strlen(name);
-	*cp = '@';
-	(void) strcpy(cp + 1, ra->oldsnap);
+	snapname = kmem_asprintf("%s@%s", name, ra->oldsnap);
+	(void) strlcpy(ra->failed, snapname, sizeof (ra->failed));
 
 	/*
 	 * For recursive snapshot renames the parent won't be changing
 	 * so we just pass name for both the to/from argument.
 	 */
-	err = zfs_secpolicy_rename_perms(name, name, CRED());
-	if (err == ENOENT) {
-		return (0);
-	} else if (err) {
-		(void) strcpy(ra->failed, name);
-		return (err);
+	err = zfs_secpolicy_rename_perms(snapname, snapname, CRED());
+	if (err != 0) {
+		strfree(snapname);
+		return (err == ENOENT ? 0 : err);
 	}
 
 #ifdef _KERNEL
 	/*
 	 * For all filesystems undergoing rename, we'll need to unmount it.
 	 */
-	(void) zfs_unmount_snap(name, NULL);
+	(void) zfs_unmount_snap(snapname, NULL);
 #endif
-	err = dsl_dataset_hold(name, ra->dstg, &ds);
-	*cp = '\0';
-	if (err == ENOENT) {
-		return (0);
-	} else if (err) {
-		(void) strcpy(ra->failed, name);
-		return (err);
+	err = dsl_dataset_hold(snapname, ra->dstg, &ds);
+	if (err != 0) {
+		strfree(snapname);
+		return (err == ENOENT ? 0 : err);
 	}
 
 	dsl_sync_task_create(ra->dstg, dsl_dataset_snapshot_rename_check,
 	    dsl_dataset_snapshot_rename_sync, ds, ra->newsnap, 0);
 
+	strfree(snapname);
 	return (0);
 }
 
@@ -2243,7 +2238,7 @@ dsl_recursive_rename(char *oldname, const char *newname)
 	dsl_sync_task_t *dst;
 	spa_t *spa;
 	char *cp, *fsname = spa_strdup(oldname);
-	int len = strlen(oldname);
+	int len = strlen(oldname) + 1;
 
 	/* truncate the snapshot name to get the fsname */
 	cp = strchr(fsname, '@');
@@ -2251,7 +2246,7 @@ dsl_recursive_rename(char *oldname, const char *newname)
 
 	err = spa_open(fsname, &spa, FTAG);
 	if (err) {
-		kmem_free(fsname, len + 1);
+		kmem_free(fsname, len);
 		return (err);
 	}
 	ra = kmem_alloc(sizeof (struct renamesnaparg), KM_SLEEP);
@@ -2263,7 +2258,7 @@ dsl_recursive_rename(char *oldname, const char *newname)
 
 	err = dmu_objset_find(fsname, dsl_snapshot_rename_one, ra,
 	    DS_FIND_CHILDREN);
-	kmem_free(fsname, len + 1);
+	kmem_free(fsname, len);
 
 	if (err == 0) {
 		err = dsl_sync_task_group_wait(ra->dstg);
@@ -2274,14 +2269,15 @@ dsl_recursive_rename(char *oldname, const char *newname)
 		dsl_dataset_t *ds = dst->dst_arg1;
 		if (dst->dst_err) {
 			dsl_dir_name(ds->ds_dir, ra->failed);
-			(void) strcat(ra->failed, "@");
-			(void) strcat(ra->failed, ra->newsnap);
+			(void) strlcat(ra->failed, "@", sizeof (ra->failed));
+			(void) strlcat(ra->failed, ra->newsnap,
+			    sizeof (ra->failed));
 		}
 		dsl_dataset_rele(ds, ra->dstg);
 	}
 
 	if (err)
-		(void) strcpy(oldname, ra->failed);
+		(void) strlcpy(oldname, ra->failed, sizeof (ra->failed));
 
 	dsl_sync_task_group_destroy(ra->dstg);
 	kmem_free(ra, sizeof (struct renamesnaparg));
@@ -2290,7 +2286,7 @@ dsl_recursive_rename(char *oldname, const char *newname)
 }
 
 static int
-dsl_valid_rename(char *oldname, void *arg)
+dsl_valid_rename(const char *oldname, void *arg)
 {
 	int delta = *(int *)arg;
 
@@ -3349,7 +3345,7 @@ dsl_dataset_user_hold_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 }
 
 static int
-dsl_dataset_user_hold_one(char *dsname, void *arg)
+dsl_dataset_user_hold_one(const char *dsname, void *arg)
 {
 	struct dsl_ds_holdarg *ha = arg;
 	dsl_dataset_t *ds;
@@ -3367,7 +3363,7 @@ dsl_dataset_user_hold_one(char *dsname, void *arg)
 	} else if (error == ENOENT && ha->recursive) {
 		error = 0;
 	} else {
-		(void) strcpy(ha->failed, dsname);
+		(void) strlcpy(ha->failed, dsname, sizeof (ha->failed));
 	}
 	return (error);
 }
@@ -3420,7 +3416,7 @@ dsl_dataset_user_hold(char *dsname, char *snapname, char *htag,
 		error = ENOENT;
 
 	if (error)
-		(void) strcpy(dsname, ha->failed);
+		(void) strlcpy(dsname, ha->failed, sizeof (ha->failed));
 
 	dsl_sync_task_group_destroy(ha->dstg);
 	kmem_free(ha, sizeof (struct dsl_ds_holdarg));
@@ -3545,7 +3541,7 @@ dsl_dataset_user_release_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 }
 
 static int
-dsl_dataset_user_release_one(char *dsname, void *arg)
+dsl_dataset_user_release_one(const char *dsname, void *arg)
 {
 	struct dsl_ds_holdarg *ha = arg;
 	struct dsl_ds_releasearg *ra;
@@ -3562,7 +3558,7 @@ dsl_dataset_user_release_one(char *dsname, void *arg)
 	strfree(name);
 	if (error == ENOENT && ha->recursive)
 		return (0);
-	(void) strcpy(ha->failed, dsname);
+	(void) strlcpy(ha->failed, dsname, sizeof (ha->failed));
 	if (error)
 		return (error);
 
@@ -3655,7 +3651,7 @@ dsl_dataset_user_release(char *dsname, char *snapname, char *htag,
 		error = ENOENT;
 
 	if (error)
-		(void) strcpy(dsname, ha->failed);
+		(void) strlcpy(dsname, ha->failed, sizeof (ha->failed));
 
 	dsl_sync_task_group_destroy(ha->dstg);
 	kmem_free(ha, sizeof (struct dsl_ds_holdarg));
@@ -3729,7 +3725,7 @@ dsl_dataset_get_holds(const char *dsname, nvlist_t **nvp)
  */
 /* ARGSUSED */
 int
-dsl_destroy_inconsistent(char *dsname, void *arg)
+dsl_destroy_inconsistent(const char *dsname, void *arg)
 {
 	dsl_dataset_t *ds;
 

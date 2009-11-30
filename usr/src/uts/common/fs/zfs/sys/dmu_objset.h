@@ -129,11 +129,11 @@ void dmu_objset_fast_stat(objset_t *os, dmu_objset_stats_t *stat);
 void dmu_objset_space(objset_t *os, uint64_t *refdbytesp, uint64_t *availbytesp,
     uint64_t *usedobjsp, uint64_t *availobjsp);
 uint64_t dmu_objset_fsid_guid(objset_t *os);
-int dmu_objset_find(char *name, int func(char *, void *), void *arg,
+int dmu_objset_find(char *name, int func(const char *, void *), void *arg,
     int flags);
 int dmu_objset_find_spa(spa_t *spa, const char *name,
     int func(spa_t *, uint64_t, const char *, void *), void *arg, int flags);
-int dmu_objset_prefetch(char *name, void *arg);
+int dmu_objset_prefetch(const char *name, void *arg);
 void dmu_objset_byteswap(void *buf, size_t size);
 int dmu_objset_evict_dbufs(objset_t *os);
 timestruc_t dmu_objset_snap_cmtime(objset_t *os);

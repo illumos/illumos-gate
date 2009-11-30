@@ -2714,7 +2714,7 @@ ztest_objset_create_cb(objset_t *os, void *arg, cred_t *cr, dmu_tx_t *tx)
 
 /* ARGSUSED */
 static int
-ztest_objset_destroy_cb(char *name, void *arg)
+ztest_objset_destroy_cb(const char *name, void *arg)
 {
 	objset_t *os;
 	dmu_object_info_t doi;
