@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,7 @@
  */
 
 /* If you modify this file, you must increment CW_VERSION */
-#define	CW_VERSION	"1.27"
+#define	CW_VERSION	"1.28"
 
 /*
  * -#		Verbose mode
@@ -1680,8 +1680,17 @@ reap(cw_ictx_t *ctx)
 	char buf[1024];
 	struct stat s;
 
+	/*
+	 * Only wait for one specific child.
+	 */
+	if (ctx->i_pid <= 0)
+		return (-1);
+
 	do {
-		(void) waitpid(ctx->i_pid, &status, 0);
+		if (waitpid(ctx->i_pid, &status, 0) < 0) {
+			cw_perror("cannot reap child");
+			return (-1);
+		}
 		if (status != 0) {
 			if (WIFSIGNALED(status)) {
 				ret = -WTERMSIG(status);

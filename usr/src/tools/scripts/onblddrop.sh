@@ -54,7 +54,7 @@ tarfile=$CODEMGR_WS/SUNWonbld.$isa.tar
 #
 # Generate the README from boilerplate and the contents of the
 # SUNWonbld tree.
-# usage: mkdireadme targetdir
+# usage: mkreadme targetdir
 #
 mkreadme() {
 	targetdir=$1

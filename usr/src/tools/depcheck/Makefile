@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -32,21 +31,21 @@ ETCFILES= \
 	SampleLinks \
 	SamplePkgLinks
 
-MAN1FILES= \
+SMAN1FILES= \
 	get_depend_info.1 \
 	make_pkg_db.1
 
 include ../Makefile.tools
 
 $(ROOTONBLDETCFILES) := FILEMODE=	644
-$(ROOTONBLDMAN1FILES) := FILEMODE=	644
+$(ROOTONBLDSMAN1FILES) := FILEMODE=	644
 
 .KEEP_STATE:
 
-all:	$(SHFILES) $(MAN1FILES)
+all:	$(SHFILES) $(SMAN1FILES)
 
 install: all .WAIT $(ROOTONBLDSHFILES) $(ROOTONBLDETCFILES) \
-	$(ROOTONBLDMAN1FILES)
+	$(ROOTONBLDSMAN1FILES)
 
 clean:
 	$(RM) $(CLEANFILES)
