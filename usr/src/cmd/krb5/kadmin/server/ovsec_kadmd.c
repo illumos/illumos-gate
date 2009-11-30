@@ -1296,9 +1296,28 @@ void kadm_svc_run(void)
 /*
  * Function: setup_signal_handlers
  *
- * Purpose: Setup signal handling functions with System V's signal().
+ * Purpose: Setup signal handling functions with either 
+ * System V's signal() or POSIX_SIGNALS.
  */
 void setup_signal_handlers(iprop_role iproprole) {
+#ifdef POSIX_SIGNALS
+	(void) sigemptyset(&s_action.sa_mask);
+	s_action.sa_handler = request_exit;
+	(void) sigaction(SIGINT, &s_action, (struct sigaction *) NULL);
+	(void) sigaction(SIGTERM, &s_action, (struct sigaction *) NULL);
+	(void) sigaction(SIGQUIT, &s_action, (struct sigaction *) NULL);
+	s_action.sa_handler = sig_pipe;
+	(void) sigaction(SIGPIPE, &s_action, (struct sigaction *) NULL);
+
+	/*
+	 * IProp will fork for a full-resync, we don't want to
+	 * wait on it and we don't want the living dead procs either.
+	 */
+	if (iproprole == IPROP_MASTER) {
+		s_action.sa_handler = SIG_IGN;
+		(void) sigaction(SIGCHLD, &s_action, (struct sigaction *) NULL);
+	}
+#else
      signal(SIGINT, request_exit);
      signal(SIGTERM, request_exit);
      signal(SIGQUIT, request_exit);
@@ -1311,6 +1330,7 @@ void setup_signal_handlers(iprop_role iproprole) {
 	if (iproprole == IPROP_MASTER)
 		(void) signal(SIGCHLD, SIG_IGN);
 
+#endif /* POSIX_SIGNALS */
 	return;
 }
 
@@ -1349,6 +1369,9 @@ void request_exit(int signum)
  */
 void sig_pipe(int unused)
 {
+#ifndef POSIX_SIGNALS
+     signal(SIGPIPE, sig_pipe);
+#endif /* POSIX_SIGNALS */
      krb5_klog_syslog(LOG_NOTICE, gettext("Warning: Received a SIGPIPE; "
 	    "probably a client aborted.  Continuing."));
      return;

@@ -1,10 +1,7 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <stdio.h>
 #include <stdlib.h> /* getenv, exit */
@@ -30,8 +27,6 @@
 #include <libintl.h>
 #include <kdb/kdb_log.h>
 #include "misc.h"
-
-
 
 extern int setup_gss_names(struct svc_req *, char **, char **);
 extern gss_name_t get_clnt_name(struct svc_req *);
@@ -61,6 +56,9 @@ static char *reply_unknown_str	= "<UNKNOWN_CODE>";
 #endif
 #define	DPRINT(i) if (nofork) printf i
 
+#ifdef POSIX_SIGNALS
+static struct sigaction s_action;
+#endif /* POSIX_SIGNALS */
 
 static void
 debprret(char *w, update_status_t ret, kdb_sno_t sno)
@@ -343,7 +341,13 @@ iprop_full_resync_1(
 
 	case 0: /* child */
 		DPRINT(("%s: run `%s' ...\n", whoami, ubuf));
+#ifdef POSIX_SIGNALS
+		(void) sigemptyset(&s_action.sa_mask);
+		s_action.sa_handler = SIG_DFL;
+		(void) sigaction(SIGCHLD, &s_action, (struct sigaction *) NULL);
+#else
 		(void) signal(SIGCHLD, SIG_DFL);
+#endif /* POSIX_SIGNALS */
 		/* run kdb5_util(1M) dump for IProp */
 		pret = pclose(popen(ubuf, "w"));
 		DPRINT(("%s: pclose=%d\n", whoami, pret));
