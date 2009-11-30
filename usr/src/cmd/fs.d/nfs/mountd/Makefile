@@ -35,11 +35,14 @@ LOCAL	  =	mountd.o netgroup.o rmtab.o nfsauth.o \
 OBJS	  = 	$(LOCAL) $(COMMON)
 SRCS	  =	$(LOCAL:%.o=%.c) $(FSLIBSRC) ../lib/nfs_sec.c \
 		../lib/sharetab.c ../lib/daemon.c
+DSRC	  =	mountd_dt.d
+DOBJ	  =	$(DSRC:%.d=%.o)
 LDLIBS	 +=	-lrpcsvc -lnsl -lbsm -lsocket -ltsnet -ltsol
 CPPFLAGS +=	-D_REENTRANT
 
 $(TYPEPROG):	$(OBJS)
-		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+		$(COMPILE.d) -s $(DSRC) -o $(DOBJ) $(OBJS)
+		$(LINK.c) -o $@ $(DOBJ) $(OBJS) $(LDLIBS)
 		$(POST_PROCESS)
 
 nfs_sec.o:	../lib/nfs_sec.c
@@ -55,4 +58,4 @@ lint:
 	$(LINT.c) $(SRCS) $(LDLIBS)
 
 clean:     
-	$(RM) $(OBJS)
+	$(RM) $(OBJS) $(DOBJ)

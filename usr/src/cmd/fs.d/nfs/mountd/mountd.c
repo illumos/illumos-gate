@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,6 +76,7 @@
 #include <tsol/label.h>
 #include <sys/tsol/label_macro.h>
 #include <libtsnet.h>
+#include <sys/sdt.h>
 
 extern int daemonize_init(void);
 extern void daemonize_fini(int fd);
@@ -85,20 +86,25 @@ struct sh_list *share_list;
 rwlock_t sharetab_lock;		/* lock to protect the cached sharetab */
 static mutex_t mnttab_lock;	/* prevent concurrent mnttab readers */
 
-static struct share *find_lofsentry(char *, int *);
+static mutex_t logging_queue_lock;
+static cond_t logging_queue_cv;
+
+static share_t *find_lofsentry(char *, int *);
+static void getclientsnames_lazy(char *, struct netbuf **,
+	struct nd_hostservlist **);
 static void getclientsnames(SVCXPRT *, struct netbuf **,
-					struct nd_hostservlist **);
-static int getclientsflavors_old(struct share *, struct netbuf *,
-	struct nd_hostservlist *, int *);
-static int getclientsflavors_new(struct share *, struct netbuf *,
-	struct nd_hostservlist *, int *);
-static int check_client_old(struct share *, struct netbuf *,
-    struct nd_hostservlist *, int);
-static int check_client_new(struct share *, struct netbuf *,
-	struct nd_hostservlist *, int);
+	struct nd_hostservlist **);
+static int getclientsflavors_old(share_t *, SVCXPRT *, struct netbuf **,
+	struct nd_hostservlist **, int *);
+static int getclientsflavors_new(share_t *, SVCXPRT *, struct netbuf **,
+	struct nd_hostservlist **, int *);
+static int check_client_old(share_t *, SVCXPRT *, struct netbuf **,
+	struct nd_hostservlist **, int);
+static int check_client_new(share_t *, SVCXPRT *, struct netbuf **,
+	struct nd_hostservlist **, int);
 static void mnt(struct svc_req *, SVCXPRT *);
 static void mnt_pathconf(struct svc_req *);
-static void mount(struct svc_req *r);
+static int mount(struct svc_req *r);
 static void sh_free(struct sh_list *);
 static void umount(struct svc_req *);
 static void umountall(struct svc_req *);
@@ -113,12 +119,27 @@ static int mount_vers_min = MOUNTVERS;
 static int mount_vers_max = MOUNTVERS3;
 
 /* Needs to be accessed by nfscmd.c */
-int  in_access_list(struct netbuf *, struct nd_hostservlist *, char *);
+int  in_access_list(SVCXPRT *, struct netbuf **,
+	struct nd_hostservlist **, char *);
 
 extern void nfscmd_func(void *, char *, size_t, door_desc_t *, uint_t);
 
 thread_t	nfsauth_thread;
 thread_t	cmd_thread;
+thread_t	logging_thread;
+
+typedef struct logging_data {
+	char			*ld_host;
+	char			*ld_path;
+	char			*ld_rpath;
+	int			ld_status;
+	char			*ld_netid;
+	struct netbuf		*ld_nb;
+	struct logging_data	*ld_next;
+} logging_data;
+
+static logging_data *logging_head = NULL;
+static logging_data *logging_tail = NULL;
 
 /* ARGSUSED */
 static void *
@@ -215,6 +236,117 @@ cmd_svc(void *arg)
 
 	/*NOTREACHED*/
 	syslog(LOG_ERR, gettext("Cmd door server exited"));
+	return (NULL);
+}
+
+static void
+free_logging_data(logging_data *lq)
+{
+	if (lq != NULL) {
+		free(lq->ld_host);
+		free(lq->ld_netid);
+
+		if (lq->ld_nb != NULL) {
+			free(lq->ld_nb->buf);
+			free(lq->ld_nb);
+		}
+
+		free(lq->ld_path);
+		free(lq->ld_rpath);
+
+		free(lq);
+	}
+}
+
+static logging_data *
+remove_head_of_queue(void)
+{
+	logging_data    *lq;
+
+	/*
+	 * Pull it off the queue.
+	 */
+	lq = logging_head;
+	if (lq) {
+		logging_head = lq->ld_next;
+
+		/*
+		 * Drained it.
+		 */
+		if (logging_head == NULL) {
+			logging_tail = NULL;
+		}
+	}
+
+	return (lq);
+}
+
+static void
+do_logging_queue(logging_data *lq)
+{
+	logging_data	*lq_clean = NULL;
+	int		cleared = 0;
+	char		*host;
+
+	struct nd_hostservlist	*clnames;
+
+	while (lq) {
+		if (lq->ld_host == NULL) {
+			DTRACE_PROBE(mountd, name_by_lazy);
+			getclientsnames_lazy(lq->ld_netid,
+			    &lq->ld_nb, &clnames);
+			if (clnames == NULL)
+				host = NULL;
+			else
+				host = clnames->h_hostservs[0].h_host;
+		} else
+			host = lq->ld_host;
+
+		audit_mountd_mount(host, lq->ld_path, lq->ld_status); /* BSM */
+
+		/* add entry to mount list */
+		if (lq->ld_rpath)
+			mntlist_new(host, lq->ld_rpath);
+
+		lq->ld_next = lq_clean;
+		lq_clean = lq;
+
+		(void) mutex_lock(&logging_queue_lock);
+		lq = remove_head_of_queue();
+		(void) mutex_unlock(&logging_queue_lock);
+	}
+
+	while (lq_clean) {
+		lq = lq_clean;
+		lq_clean = lq->ld_next;
+
+		free_logging_data(lq);
+		cleared++;
+	}
+
+	DTRACE_PROBE1(mountd, logging_cleared, cleared);
+}
+
+static void *
+logging_svc(void *arg)
+{
+	logging_data	*lq;
+
+	for (;;) {
+		(void) mutex_lock(&logging_queue_lock);
+		while (logging_head == NULL) {
+			(void) cond_wait(&logging_queue_cv,
+			    &logging_queue_lock);
+		}
+
+		lq = remove_head_of_queue();
+		(void) mutex_unlock(&logging_queue_lock);
+
+		do_logging_queue(lq);
+	}
+
+	/*NOTREACHED*/
+	syslog(LOG_ERR, gettext("Logging server exited"));
 	return (NULL);
 }
 
@@ -321,6 +453,9 @@ main(int argc, char *argv[])
 	(void) setlocale(LC_ALL, "");
 	(void) rwlock_init(&sharetab_lock, USYNC_THREAD, NULL);
 	(void) mutex_init(&mnttab_lock, USYNC_THREAD, NULL);
+	(void) mutex_init(&logging_queue_lock, USYNC_THREAD, NULL);
+	(void) cond_init(&logging_queue_cv, USYNC_THREAD, NULL);
+
 	netgroup_init();
 
 #if !defined(TEXT_DOMAIN)
@@ -426,6 +561,18 @@ main(int argc, char *argv[])
 	}
 
 	/*
+	 * Create an additional thread to service the rmtab and
+	 * audit_mountd_mount logging for mount requests. Use the same
+	 * signal disposition as the main thread. We create
+	 * a separate thread to allow the mount request threads to
+	 * clear as soon as possible.
+	 */
+	if (thr_create(NULL, 0, logging_svc, 0, thr_flags, &logging_thread)) {
+		syslog(LOG_ERR, gettext("Failed to create LOGGING svc thread"));
+		exit(2);
+	}
+
+	/*
 	 * Create datagram and connection oriented services
 	 */
 	if (mount_vers_max >= MOUNTVERS) {
@@ -440,6 +587,7 @@ main(int argc, char *argv[])
 			exit(1);
 		}
 	}
+
 	if (mount_vers_max >= MOUNTVERS_POSIX) {
 		if (svc_create(mnt, MOUNTPROG, MOUNTVERS_POSIX,
 		    "datagram_v") == 0) {
@@ -501,7 +649,7 @@ mnt(struct svc_req *rqstp, SVCXPRT *transp)
 		return;
 
 	case MOUNTPROC_MNT:
-		mount(rqstp);
+		(void) mount(rqstp);
 		return;
 
 	case MOUNTPROC_DUMP:
@@ -570,32 +718,12 @@ anon_client(char *host)
 	return (anon_hsl);
 }
 
-/*
- * Get the client's hostname from the transport handle
- * If the name is not available then return "(anon)".
- */
-void
-getclientsnames(SVCXPRT *transp, struct netbuf **nbuf,
+static void
+getclientsnames_common(struct netconfig *nconf, struct netbuf **nbuf,
     struct nd_hostservlist **serv)
 {
-	struct netconfig *nconf;
 	char tmp[MAXIPADDRLEN];
 	char *host = NULL;
-
-	nconf = getnetconfigent(transp->xp_netid);
-	if (nconf == NULL) {
-		syslog(LOG_ERR, "%s: getnetconfigent failed",
-		    transp->xp_netid);
-		*serv = anon_client(host);
-		return;
-	}
-
-	*nbuf = svc_getrpccaller(transp);
-	if (*nbuf == NULL) {
-		freenetconfigent(nconf);
-		*serv = anon_client(host);
-		return;
-	}
 
 	/*
 	 * Use the this API instead of the netdir_getbyaddr()
@@ -609,9 +737,6 @@ getclientsnames(SVCXPRT *transp, struct netbuf **nbuf,
 			/* LINTED pointer alignment */
 			sa = (struct sockaddr_in *)((*nbuf)->buf);
 			(void) inet_ntoa_r(sa->sin_addr, tmp);
-			*serv =	anon_client(host);
-			freenetconfigent(nconf);
-			return;
 		} else if (strcmp(nconf->nc_protofmly, NC_INET6) == 0) {
 			struct sockaddr_in6 *sa;
 
@@ -619,14 +744,60 @@ getclientsnames(SVCXPRT *transp, struct netbuf **nbuf,
 			sa = (struct sockaddr_in6 *)((*nbuf)->buf);
 			(void) inet_ntop(AF_INET6, sa->sin6_addr.s6_addr,
 			    tmp, INET6_ADDRSTRLEN);
-			*serv =	anon_client(host);
-			freenetconfigent(nconf);
-			return;
 		}
-		freenetconfigent(nconf);
+
 		*serv = anon_client(host);
+	}
+}
+
+/*
+ * Get the client's hostname from the copy of the
+ * relevant transport handle parts.
+ * If the name is not available then return "(anon)".
+ */
+static void
+getclientsnames_lazy(char *netid, struct netbuf **nbuf,
+    struct nd_hostservlist **serv)
+{
+	struct netconfig *nconf;
+
+	nconf = getnetconfigent(netid);
+	if (nconf == NULL) {
+		syslog(LOG_ERR, "%s: getnetconfigent failed", netid);
+		*serv = anon_client(NULL);
 		return;
 	}
+
+	getclientsnames_common(nconf, nbuf, serv);
+	freenetconfigent(nconf);
+}
+
+/*
+ * Get the client's hostname from the transport handle.
+ * If the name is not available then return "(anon)".
+ */
+void
+getclientsnames(SVCXPRT *transp, struct netbuf **nbuf,
+    struct nd_hostservlist **serv)
+{
+	struct netconfig *nconf;
+
+	nconf = getnetconfigent(transp->xp_netid);
+	if (nconf == NULL) {
+		syslog(LOG_ERR, "%s: getnetconfigent failed",
+		    transp->xp_netid);
+		*serv = anon_client(NULL);
+		return;
+	}
+
+	*nbuf = svc_getrpccaller(transp);
+	if (*nbuf == NULL) {
+		freenetconfigent(nconf);
+		*serv = anon_client(NULL);
+		return;
+	}
+
+	getclientsnames_common(nconf, nbuf, serv);
 	freenetconfigent(nconf);
 }
 
@@ -723,7 +894,7 @@ done:
  * subdirectories return EACCES.
  */
 static int
-checkrootmount(struct share *sh, char *rpath)
+checkrootmount(share_t *sh, char *rpath)
 {
 	char *val;
 
@@ -758,11 +929,11 @@ checkrootmount(struct share *sh, char *rpath)
  * otherwise EACCES.
  */
 static int
-mount_enoent_error(char *path, char *rpath, struct nd_hostservlist *clnames,
-    struct netbuf *nb, int *flavor_list)
+mount_enoent_error(SVCXPRT *transp, char *path, char *rpath,
+    struct nd_hostservlist **clnames, struct netbuf **nb, int *flavor_list)
 {
 	char *checkpath, *dp;
-	struct share *sh = NULL;
+	share_t *sh = NULL;
 	int realpath_error = ENOENT, reply_error = EACCES, lofs_tried = 0;
 	int flavor_count;
 
@@ -778,6 +949,7 @@ mount_enoent_error(char *path, char *rpath, struct nd_hostservlist *clnames,
 			sharefree(sh);
 			sh = NULL;
 		}
+
 		if ((sh = findentry(rpath)) == NULL &&
 		    (sh = find_lofsentry(rpath, &lofs_tried)) == NULL) {
 			/*
@@ -801,11 +973,11 @@ mount_enoent_error(char *path, char *rpath, struct nd_hostservlist *clnames,
 			 * Check permissions in mount table.
 			 */
 			if (newopts(sh->sh_opts))
-				flavor_count = getclientsflavors_new(sh, nb,
-				    clnames, flavor_list);
+				flavor_count = getclientsflavors_new(sh,
+				    transp, nb, clnames, flavor_list);
 			else
-				flavor_count = getclientsflavors_old(sh, nb,
-				    clnames, flavor_list);
+				flavor_count = getclientsflavors_old(sh,
+				    transp, nb, clnames, flavor_list);
 			if (flavor_count != 0) {
 				/*
 				 * Found entry in table and
@@ -815,6 +987,7 @@ mount_enoent_error(char *path, char *rpath, struct nd_hostservlist *clnames,
 				break;
 			}
 		}
+
 		/*
 		 * Check all parent directories.
 		 */
@@ -842,9 +1015,96 @@ mount_enoent_error(char *path, char *rpath, struct nd_hostservlist *clnames,
 }
 
 /*
+ * We need to inform the caller whether or not we were
+ * able to add a node to the queue. If we are not, then
+ * it is up to the caller to go ahead and log the data.
+ */
+static int
+enqueue_logging_data(char *host, SVCXPRT *transp, char *path,
+    char *rpath, int status, int error)
+{
+	logging_data	*lq;
+	struct netbuf	*nb;
+
+	lq = (logging_data *)calloc(1, sizeof (logging_data));
+	if (lq == NULL)
+		goto cleanup;
+
+	/*
+	 * We might not yet have the host...
+	 */
+	if (host) {
+		DTRACE_PROBE1(mountd, log_host, host);
+		lq->ld_host = strdup(host);
+		if (lq->ld_host == NULL)
+			goto cleanup;
+	} else {
+		DTRACE_PROBE(mountd, log_no_host);
+
+		lq->ld_netid = strdup(transp->xp_netid);
+		if (lq->ld_netid == NULL)
+			goto cleanup;
+
+		lq->ld_nb = calloc(1, sizeof (struct netbuf));
+		if (lq->ld_nb == NULL)
+			goto cleanup;
+
+		nb = svc_getrpccaller(transp);
+		if (nb == NULL) {
+			DTRACE_PROBE(mountd, e__nb__enqueue);
+			goto cleanup;
+		}
+
+		DTRACE_PROBE(mountd, nb_set_enqueue);
+
+		lq->ld_nb->maxlen = nb->maxlen;
+		lq->ld_nb->len = nb->len;
+
+		lq->ld_nb->buf = malloc(lq->ld_nb->len);
+		if (lq->ld_nb->buf == NULL)
+			goto cleanup;
+
+		bcopy(nb->buf, lq->ld_nb->buf, lq->ld_nb->len);
+	}
+
+	lq->ld_path = strdup(path);
+	if (lq->ld_path == NULL)
+		goto cleanup;
+
+	if (!error) {
+		lq->ld_rpath = strdup(rpath);
+		if (lq->ld_rpath == NULL)
+			goto cleanup;
+	}
+
+	lq->ld_status = status;
+
+	/*
+	 * Add to the tail of the logging queue.
+	 */
+	(void) mutex_lock(&logging_queue_lock);
+	if (logging_tail == NULL) {
+		logging_tail = logging_head = lq;
+	} else {
+		logging_tail->ld_next = lq;
+		logging_tail = lq;
+	}
+	(void) cond_signal(&logging_queue_cv);
+	(void) mutex_unlock(&logging_queue_lock);
+
+	return (TRUE);
+
+cleanup:
+
+	free_logging_data(lq);
+
+	return (FALSE);
+}
+
+/*
  * Check mount requests, add to mounted list if ok
  */
-static void
+static int
 mount(struct svc_req *rqstp)
 {
 	SVCXPRT *transp;
@@ -854,14 +1114,16 @@ mount(struct svc_req *rqstp)
 	char fh[FHSIZE3];
 	int len = FHSIZE3;
 	char *path, rpath[MAXPATHLEN];
-	struct share *sh = NULL;
+	share_t *sh = NULL;
 	struct nd_hostservlist *clnames = NULL;
 	char *host = NULL;
-	int error = 0, lofs_tried = 0;
+	int error = 0, lofs_tried = 0, enqueued;
 	int flavor_list[MAX_FLAVORS];
 	int flavor_count;
-	struct netbuf *nb;
+	struct netbuf *nb = NULL;
 	ucred_t	*uc = NULL;
+
+	int audit_status;
 
 	transp = rqstp->rq_xprt;
 	version = rqstp->rq_vers;
@@ -869,20 +1131,31 @@ mount(struct svc_req *rqstp)
 
 	if (!svc_getargs(transp, xdr_dirpath, (caddr_t)&path)) {
 		svcerr_decode(transp);
-		return;
+		return (EACCES);
 	}
 
-	getclientsnames(transp, &nb, &clnames);
-	if (clnames == NULL || nb == NULL) {
-		/*
-		 * We failed to get a name for the client, even 'anon',
-		 * probably because we ran out of memory. In this situation
-		 * it doesn't make sense to allow the mount to succeed.
-		 */
-		error = EACCES;
-		goto reply;
+	/*
+	 * Put off getting the name for the client until we
+	 * need it. This is a performance gain. If we are logging,
+	 * then we don't care about performance and might as well
+	 * get the host name now in case we need to spit out an
+	 * error message.
+	 */
+	if (verbose) {
+		DTRACE_PROBE(mountd, name_by_verbose);
+		getclientsnames(transp, &nb, &clnames);
+		if (clnames == NULL || nb == NULL) {
+			/*
+			 * We failed to get a name for the client, even
+			 * 'anon', probably because we ran out of memory.
+			 * In this situation it doesn't make sense to
+			 * allow the mount to succeed.
+			 */
+			error = EACCES;
+			goto reply;
+		}
+		host = clnames->h_hostservs[0].h_host;
 	}
-	host = clnames->h_hostservs[0].h_host;
 
 	/*
 	 * If the version being used is less than the minimum version,
@@ -922,8 +1195,8 @@ mount(struct svc_req *rqstp)
 			syslog(LOG_ERR,
 			    "mount request: realpath: %s: %m", path);
 		if (error == ENOENT)
-			error = mount_enoent_error(path, rpath, clnames, nb,
-			    flavor_list);
+			error = mount_enoent_error(transp, path, rpath,
+			    &clnames, &nb, flavor_list);
 		goto reply;
 	}
 
@@ -943,11 +1216,14 @@ mount(struct svc_req *rqstp)
 	}
 
 	if (newopts(sh->sh_opts))
-		flavor_count = getclientsflavors_new(sh, nb, clnames,
+		flavor_count = getclientsflavors_new(sh, transp, &nb, &clnames,
 		    flavor_list);
 	else
-		flavor_count = getclientsflavors_old(sh, nb, clnames,
+		flavor_count = getclientsflavors_old(sh, transp, &nb, &clnames,
 		    flavor_list);
+
+	if (clnames)
+		host = clnames->h_hostservs[0].h_host;
 
 	if (flavor_count == 0) {
 		error = EACCES;
@@ -1054,6 +1330,7 @@ mount(struct svc_req *rqstp)
 reply:
 	if (uc != NULL)
 		ucred_free(uc);
+
 	switch (version) {
 	case MOUNTVERS:
 	case MOUNTVERS_POSIX:
@@ -1063,9 +1340,11 @@ reply:
 			fhs.fhs_status = NFSERR_REMOTE;
 		else
 			fhs.fhs_status = error;
+
 		if (!svc_sendreply(transp, xdr_fhstatus, (char *)&fhs))
 			log_cant_reply(transp);
-		audit_mountd_mount(host, path, fhs.fhs_status); /* BSM */
+
+		audit_status = fhs.fhs_status;
 		break;
 
 	case MOUNTVERS3:
@@ -1081,8 +1360,8 @@ reply:
 		mountres3.fhs_status = error;
 		if (!svc_sendreply(transp, xdr_mountres3, (char *)&mountres3))
 			log_cant_reply(transp);
-		audit_mountd_mount(host, path, mountres3.fhs_status); /* BSM */
 
+		audit_status = mountres3.fhs_status;
 		break;
 	}
 
@@ -1091,21 +1370,41 @@ reply:
 		    (host == NULL) ? "unknown host" : host,
 		    error ? "denied" : "mounted", path);
 
+	/*
+	 * If we can not create a queue entry, go ahead and do it
+	 * in the context of this thread.
+	 */
+	enqueued = enqueue_logging_data(host, transp, path, rpath,
+	    audit_status, error);
+	if (enqueued == FALSE) {
+		if (host == NULL) {
+			DTRACE_PROBE(mountd, name_by_in_thread);
+			getclientsnames(transp, &nb, &clnames);
+			if (clnames != NULL)
+				host = clnames->h_hostservs[0].h_host;
+		}
+
+		DTRACE_PROBE(mountd, logged_in_thread);
+		audit_mountd_mount(host, path, audit_status); /* BSM */
+		if (!error)
+			mntlist_new(host, rpath); /* add entry to mount list */
+	}
+
 	if (path != NULL)
 		svc_freeargs(transp, xdr_dirpath, (caddr_t)&path);
 
-	if (!error)
-		mntlist_new(host, rpath); /* add entry to mount list */
 done:
 	if (sh)
 		sharefree(sh);
 	netdir_free(clnames, ND_HOSTSERVLIST);
+
+	return (error);
 }
 
-struct share *
+share_t *
 findentry(char *path)
 {
-	struct share *sh = NULL;
+	share_t *sh = NULL;
 	struct sh_list *shp;
 	register char *p1, *p2;
 	struct stat st1;
@@ -1145,6 +1444,7 @@ findentry(char *path)
 				shp = NULL;
 				goto done;
 			}
+
 			/*
 			 * Use stat64 on "path" since it might be larger
 			 * than 2 Gb and 32 bit stat would fail EOVERFLOW
@@ -1206,12 +1506,12 @@ is_substring(char **mntp, char **path)
  * concatenating the mnt_special and the remaining of rpath, call findentry()
  * to make sure the 'real path' is shared.
  */
-static struct share *
+static share_t *
 find_lofsentry(char *rpath, int *done_flag)
 {
 	struct stat r_stbuf;
 	mntlist_t *ml, *mntl, *mntpnt = NULL;
-	struct share *retcode = NULL;
+	share_t *retcode = NULL;
 	char tmp_path[MAXPATHLEN];
 	int mntpnt_len = 0, tmp;
 	char *p1, *p2;
@@ -1283,6 +1583,7 @@ find_lofsentry(char *rpath, int *done_flag)
 				goto done;
 			}
 		}
+
 		/*
 		 * The mount has been triggered, re-read mnttab to pick up
 		 * the changes made by autoFS.
@@ -1350,7 +1651,8 @@ done:
  * it's cheaper (just M*N strcmp()s), then try netgroups.
  */
 int
-in_access_list(struct netbuf *nb, struct nd_hostservlist *clnames,
+in_access_list(SVCXPRT *transp, struct netbuf **pnb,
+    struct nd_hostservlist **pclnames,
     char *access_list)	/* N.B. we clobber this "input" parameter */
 {
 	int nentries;
@@ -1362,11 +1664,27 @@ in_access_list(struct netbuf *nb, struct nd_hostservlist *clnames,
 	int netgroup_match;
 	int response;
 
+	bool_t lookup_names;
+	struct nd_hostservlist *clnames;
+
 	/*
 	 * If no access list - then it's unrestricted
 	 */
 	if (access_list == NULL || *access_list == '\0')
 		return (1);
+
+	/*
+	 * Just get the netbuf, avoiding the costly name
+	 * lookup. This will suffice for access based
+	 * soley on addresses.
+	 */
+	if (*pnb == NULL) {
+		lookup_names = TRUE;
+		*pnb = svc_getrpccaller(transp);
+		if (*pnb == NULL)
+			*pclnames = anon_client(NULL);
+	} else
+		lookup_names = FALSE;
 
 	nentries = 0;
 
@@ -1383,6 +1701,36 @@ in_access_list(struct netbuf *nb, struct nd_hostservlist *clnames,
 			gr++;
 		} else
 			response = 1;
+
+		/*
+		 * If the list name begins with an at
+		 * sign then do a network comparison.
+		 */
+		if (*gr == '@') {
+			if (netmatch(*pnb, gr + 1))
+				return (response);
+			continue;
+		}
+
+		/*
+		 * We need to get the host name if we haven't gotten
+		 * it by now!
+		 */
+		if (lookup_names) {
+			DTRACE_PROBE(mountd, name_by_addrlist);
+			getclientsnames(transp, pnb, pclnames);
+
+			/*
+			 * Do not grant access if we can't
+			 * get a name!
+			 */
+			if (*pclnames == NULL || *pnb == NULL)
+				return (0);
+
+			lookup_names = FALSE;
+		}
+
+		clnames = *pclnames;
 
 		/*
 		 * The following loops through all the
@@ -1411,15 +1759,6 @@ in_access_list(struct netbuf *nb, struct nd_hostservlist *clnames,
 			} else
 
 			/*
-			 * If the list name begins with an at
-			 * sign then do a network comparison.
-			 */
-			if (*gr == '@') {
-				if (netmatch(nb, gr + 1))
-					return (response);
-			} else
-
-			/*
 			 * Just do a hostname match
 			 */
 			if (strcasecmp(gr, host) == 0) {
@@ -1430,11 +1769,28 @@ in_access_list(struct netbuf *nb, struct nd_hostservlist *clnames,
 		nentries++;
 	}
 
-	netgroup_match = netgroup_check(clnames, access_list, nentries);
+	/*
+	 * We need to get the host name if we haven't gotten
+	 * it by now!
+	 */
+	if (lookup_names) {
+		DTRACE_PROBE(mountd, name_by_netgroup);
+		getclientsnames(transp, pnb, pclnames);
+
+		/*
+		 * Do not grant access if we can't
+		 * get a name!
+		 */
+		if (*pclnames == NULL || *pnb == NULL)
+			return (0);
+
+		lookup_names = FALSE;
+	}
+
+	netgroup_match = netgroup_check(*pclnames, access_list, nentries);
 
 	return (netgroup_match);
 }
-
 
 int
 netmatch(struct netbuf *nb, char *name)
@@ -1601,8 +1957,8 @@ newopts(char *opts)
  * default is that access is granted.
  */
 static int
-getclientsflavors_old(struct share *sh, struct netbuf *nb,
-    struct nd_hostservlist *clnames, int *flavors)
+getclientsflavors_old(share_t *sh, SVCXPRT *transp, struct netbuf **nb,
+    struct nd_hostservlist **clnames, int *flavors)
 {
 	char *opts, *p, *val;
 	boolean_t ok = B_FALSE;
@@ -1628,13 +1984,13 @@ getclientsflavors_old(struct share *sh, struct netbuf *nb,
 		case OPT_RO:
 		case OPT_RW:
 			defaultaccess = 0;
-			if (in_access_list(nb, clnames, val))
+			if (in_access_list(transp, nb, clnames, val))
 				ok++;
 			break;
 
 		case OPT_NONE:
 			defaultaccess = 0;
-			if (in_access_list(nb, clnames, val))
+			if (in_access_list(transp, nb, clnames, val))
 				reject = B_TRUE;
 		}
 	}
@@ -1666,8 +2022,8 @@ getclientsflavors_old(struct share *sh, struct netbuf *nb,
  * version 3 of the mount protocol.
  */
 static int
-getclientsflavors_new(struct share *sh, struct netbuf *nb,
-    struct nd_hostservlist *clnames, int *flavors)
+getclientsflavors_new(share_t *sh, SVCXPRT *transp, struct netbuf **nb,
+    struct nd_hostservlist **clnames, int *flavors)
 {
 	char *opts, *p, *val;
 	char *lasts;
@@ -1704,13 +2060,14 @@ getclientsflavors_new(struct share *sh, struct netbuf *nb,
 				flavors[c++] = map_flavor(f);
 				val = NULL;
 			}
+
 			/* for a new sec=xxx option, default is rw access */
 			access_ok = B_TRUE;
 			break;
 
 		case OPT_RO:
 		case OPT_RW:
-			if (in_access_list(nb, clnames, val)) {
+			if (in_access_list(transp, nb, clnames, val)) {
 				count = c;
 				access_ok = B_TRUE;
 			} else {
@@ -1719,7 +2076,7 @@ getclientsflavors_new(struct share *sh, struct netbuf *nb,
 			break;
 
 		case OPT_NONE:
-			if (in_access_list(nb, clnames, val))
+			if (in_access_list(transp, nb, clnames, val))
 				reject = B_TRUE; /* none overides rw/ro */
 			break;
 		}
@@ -1746,18 +2103,18 @@ getclientsflavors_new(struct share *sh, struct netbuf *nb,
  * flavor.  Other flavors are values of the new "sec=" option.
  */
 int
-check_client(struct share *sh, struct netbuf *nb,
+check_client(share_t *sh, struct netbuf *nb,
     struct nd_hostservlist *clnames, int flavor)
 {
 	if (newopts(sh->sh_opts))
-		return (check_client_new(sh, nb, clnames, flavor));
+		return (check_client_new(sh, NULL, &nb, &clnames, flavor));
 	else
-		return (check_client_old(sh, nb, clnames, flavor));
+		return (check_client_old(sh, NULL, &nb, &clnames, flavor));
 }
 
 static int
-check_client_old(struct share *sh, struct netbuf *nb,
-    struct nd_hostservlist *clnames, int flavor)
+check_client_old(share_t *sh, SVCXPRT *transp, struct netbuf **nb,
+    struct nd_hostservlist **clnames, int flavor)
 {
 	char *opts, *p, *val;
 	int match;	/* Set when a flavor is matched */
@@ -1786,14 +2143,14 @@ check_client_old(struct share *sh, struct netbuf *nb,
 		case OPT_RO:
 			list++;
 			if (val) ro_val++;
-			if (in_access_list(nb, clnames, val))
+			if (in_access_list(transp, nb, clnames, val))
 				perm |= NFSAUTH_RO;
 			break;
 
 		case OPT_RW:
 			list++;
 			if (val) rw_val++;
-			if (in_access_list(nb, clnames, val))
+			if (in_access_list(transp, nb, clnames, val))
 				perm |= NFSAUTH_RW;
 			break;
 
@@ -1809,7 +2166,7 @@ check_client_old(struct share *sh, struct netbuf *nb,
 			if (val == NULL || *val == '\0')
 				break;
 
-			if (in_access_list(nb, clnames, val))
+			if (in_access_list(transp, nb, clnames, val))
 				perm |= NFSAUTH_ROOT;
 			break;
 
@@ -1819,7 +2176,7 @@ check_client_old(struct share *sh, struct netbuf *nb,
 			 * to this share at all. This option behaves
 			 * more like "root" than either "rw" or "ro".
 			 */
-			if (in_access_list(nb, clnames, val))
+			if (in_access_list(transp, nb, clnames, val))
 				reject = B_TRUE;
 			break;
 		}
@@ -1875,14 +2232,15 @@ check_client_old(struct share *sh, struct netbuf *nb,
  * return TRUE to indicate that this "flavor" is a wrong sec.
  */
 static bool_t
-is_wrongsec(struct share *sh, struct netbuf *nb,
-		struct nd_hostservlist *clnames, int flavor)
+is_wrongsec(share_t *sh, SVCXPRT *transp, struct netbuf **nb,
+	struct nd_hostservlist **clnames, int flavor)
 {
 	int flavor_list[MAX_FLAVORS];
 	int flavor_count, i;
 
 	/* get the flavor list that the client has access with */
-	flavor_count = getclientsflavors_new(sh, nb, clnames, flavor_list);
+	flavor_count = getclientsflavors_new(sh, transp, nb,
+	    clnames, flavor_list);
 
 	if (flavor_count == 0)
 		return (FALSE);
@@ -1920,8 +2278,8 @@ is_wrongsec(struct share *sh, struct netbuf *nb,
  */
 
 static int
-check_client_new(struct share *sh, struct netbuf *nb,
-    struct nd_hostservlist *clnames, int flavor)
+check_client_new(share_t *sh, SVCXPRT *transp, struct netbuf **nb,
+    struct nd_hostservlist **clnames, int flavor)
 {
 	char *opts, *p, *val;
 	char *lasts;
@@ -1964,7 +2322,7 @@ check_client_new(struct share *sh, struct netbuf *nb,
 
 			list++;
 			if (val) ro_val++;
-			if (in_access_list(nb, clnames, val))
+			if (in_access_list(transp, nb, clnames, val))
 				perm |= NFSAUTH_RO;
 			break;
 
@@ -1974,7 +2332,7 @@ check_client_new(struct share *sh, struct netbuf *nb,
 
 			list++;
 			if (val) rw_val++;
-			if (in_access_list(nb, clnames, val))
+			if (in_access_list(transp, nb, clnames, val))
 				perm |= NFSAUTH_RW;
 			break;
 
@@ -1993,7 +2351,7 @@ check_client_new(struct share *sh, struct netbuf *nb,
 			if (val == NULL || *val == '\0')
 				break;
 
-			if (in_access_list(nb, clnames, val))
+			if (in_access_list(transp, nb, clnames, val))
 				perm |= NFSAUTH_ROOT;
 			break;
 
@@ -2003,7 +2361,7 @@ check_client_new(struct share *sh, struct netbuf *nb,
 			 * to this share at all. This option behaves
 			 * more like "root" than either "rw" or "ro".
 			 */
-			if (in_access_list(nb, clnames, val))
+			if (in_access_list(transp, nb, clnames, val))
 				perm |= NFSAUTH_DENIED;
 			break;
 		}
@@ -2024,7 +2382,7 @@ done:
 		 * If not, return NFSAUTH_DENIED.
 		 */
 		if ((perm & (NFSAUTH_RO | NFSAUTH_RW)) == 0) {
-			if (is_wrongsec(sh, nb, clnames, flavor))
+			if (is_wrongsec(sh, transp, nb, clnames, flavor))
 				perm |= NFSAUTH_WRONGSEC;
 			else
 				perm |= NFSAUTH_DENIED;
@@ -2069,14 +2427,13 @@ check_sharetab()
 	struct stat st;
 	static timestruc_t last_sharetab_time;
 	timestruc_t prev_sharetab_time;
-	struct share *sh;
+	share_t *sh;
 	struct sh_list *shp, *shp_prev;
 	int res, c = 0;
 
 	/*
 	 *  read in /etc/dfs/sharetab if it has changed
 	 */
-
 	if (stat(SHARETAB, &st) != 0) {
 		syslog(LOG_ERR, "Cannot stat %s: %m", SHARETAB);
 		return;
@@ -2146,6 +2503,7 @@ check_sharetab()
 		if (shp->shl_sh == NULL)
 			goto alloc_failed;
 	}
+
 	if (res < 0)
 		syslog(LOG_ERR, "%s: invalid at line %d\n",
 		    SHARETAB, c + 1);
@@ -2156,12 +2514,15 @@ check_sharetab()
 		(void) rw_unlock(&sharetab_lock);
 		return;
 	}
+
 	last_sharetab_time = st.st_mtim;
 	(void) fclose(f);
 	(void) rw_unlock(&sharetab_lock);
+
 	return;
 
 alloc_failed:
+
 	syslog(LOG_ERR, "check_sharetab: no memory");
 	sh_free(share_list);
 	share_list = NULL;

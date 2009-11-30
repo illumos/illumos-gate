@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -233,7 +231,7 @@ xdr_mntlistencode(XDR *xdrs, HASHSET *mntlist)
 			break;
 
 		if ((!xdr_name(xdrs, &m->m_host)) ||
-			(!xdr_dirpath(xdrs, &m->m_path))) {
+		    (!xdr_dirpath(xdrs, &m->m_path))) {
 			if (iterator != NULL)
 				free(iterator);
 			return (FALSE);
@@ -260,45 +258,42 @@ mntlist_send(SVCXPRT *transp)
 }
 
 /*
- * Compute a hash for an mntlist entry.
+ * Compute a 32 bit hash value for an mntlist entry.
  */
-#define	SPACE		(uchar_t)0x20
-#define	HASH_BITS	3	/* Num. of bits to shift the hash  */
-#define	HASH_MAXHOST	6	/* Max. number of characters from a hostname */
-#define	HASH_MAXPATH	3	/* Max. number of characters from a pathname */
 
 /*
- * Compute a 32 bit hash value for an mntlist entry.
- * We consider only first HASH_MAXHOST characters from the host part.
- * We skip the first character in the path part (usually /), and we
- * consider at most HASH_MAXPATH following characters.
- * We shift the hash value by HASH_BITS after each character.
+ * The string hashing algorithm is from the "Dragon Book" --
+ * "Compilers: Principles, Tools & Techniques", by Aho, Sethi, Ullman
+ *
+ * And is modified for this application from usr/src/uts/common/os/modhash.c
  */
+
+static uint_t
+mntentry_str_hash(char *s, uint_t hash)
+{
+	uint_t	g;
+
+	for (; *s != '\0'; s++) {
+		hash = (hash << 4) + *s;
+		if ((g = (hash & 0xf0000000)) != 0) {
+			hash ^= (g >> 24);
+			hash ^= g;
+		}
+	}
+
+	return (hash);
+}
 
 static uint32_t
 mntentry_hash(const void *p)
 {
 	struct mntentry *m = (struct mntentry *)p;
-	uchar_t *s;
-	uint_t i, sum = 0;
+	uint_t hash;
 
-	for (i = 0, s = (uchar_t *)m->m_host; *s && i < HASH_MAXHOST; i++) {
-		uchar_t ls = tolower(*s);
-		sum <<= HASH_BITS;
-		sum += ls - SPACE;
-		*s++;
-	}
+	hash = mntentry_str_hash(m->m_host, 0);
+	hash = mntentry_str_hash(m->m_path, hash);
 
-	/*
-	 * The first character is usually '/'.
-	 * Start with the next character.
-	 */
-	for (i = 0, s = (uchar_t *)m->m_path+1; *s && i < HASH_MAXPATH; i++) {
-		sum <<= HASH_BITS;
-		sum += *s++ - SPACE;
-	}
-
-	return (sum);
+	return (hash);
 }
 
 /*
@@ -313,7 +308,7 @@ mntentry_equal(const void *p1, const void *p2)
 	struct mntentry *m2 = (struct mntentry *)p2;
 
 	return ((strcasecmp(m1->m_host, m2->m_host) ||
-		strcmp(m1->m_path, m2->m_path)) ? 0 : 1);
+	    strcmp(m1->m_path, m2->m_path)) ? 0 : 1);
 }
 
 /*
@@ -455,8 +450,8 @@ rmtab_load()
 				for (i = 1; i < len; i++) {
 					if (buf[len-i] == '\n') {
 						buf[len-i] = '\0';
-						(void) fseek(fp, -i+1,
-							    SEEK_CUR);
+						(void) fseek(fp, -i + 1,
+						    SEEK_CUR);
 						goto parse;
 					}
 				}
