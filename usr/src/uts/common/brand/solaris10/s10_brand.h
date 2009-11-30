@@ -76,6 +76,7 @@ extern "C" {
  * "S10_FEATURE_ALTERED_MNTFS_IOCTL".
  */
 enum s10_emulated_features {
+	S10_FEATURE_ALTERED_MNTFS_IOCTL,
 	S10_NUM_EMUL_FEATURES		/* This must be the last entry! */
 };
 

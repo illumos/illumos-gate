@@ -363,7 +363,6 @@ set_zone_emul_bitmap(char *zonename)
 		 * Determine if the brand can emulate the feature specified
 		 * by bit_index.
 		 */
-		/*LINTED*/
 		if (bit_index >= S10_NUM_EMUL_FEATURES) {
 			/*
 			 * The zone requires emulation that the brand can't

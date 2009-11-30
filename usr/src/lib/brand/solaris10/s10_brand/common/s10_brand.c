@@ -386,7 +386,7 @@ s10_indir(sysret_t *rv, int code,
 }
 #endif /* __sparc && !__sparcv9 */
 
-/* Free the thread-local storage provided my mntfs_get_mntentbuf() */
+/* Free the thread-local storage provided by mntfs_get_mntentbuf(). */
 static void
 mntfs_free_mntentbuf(void *arg)
 {
@@ -402,7 +402,7 @@ mntfs_free_mntentbuf(void *arg)
 	free(embufp);
 }
 
-/* Provide the thread-local storage required by mntfs_ioctl() */
+/* Provide the thread-local storage required by mntfs_ioctl(). */
 static struct mntentbuf *
 mntfs_get_mntentbuf(size_t size)
 {
@@ -460,7 +460,9 @@ mntfs_get_mntentbuf(size_t size)
 }
 
 /*
- * The MNTIOC_GETMNTENT command in this release differs from that in Solaris 10.
+ * The MNTIOC_GETMNTENT command in this release differs from that in early
+ * versions of Solaris 10.
+ *
  * Previously, the command would copy a pointer to a struct extmnttab to an
  * address provided as an argument. The pointer would be somewhere within a
  * mapping already present within the user's address space. In addition, the
@@ -483,6 +485,12 @@ mntfs_ioctl(sysret_t *rval, int fdes, int cmd, intptr_t arg)
 	struct mntentbuf *embufp;
 	static size_t bufsize = MNT_LINE_MAX;
 
+
+	/* Do not emulate mntfs commands from up-to-date clients. */
+	if (S10_FEATURE_IS_PRESENT(S10_FEATURE_ALTERED_MNTFS_IOCTL))
+		return (__systemcall(rval, SYS_ioctl + 1024, fdes, cmd, arg));
+
+	/* Do not emulate mntfs commands directed at other file systems. */
 	if ((err = __systemcall(rval, SYS_fstat + 1024, fdes, &statbuf)) != 0)
 		return (err);
 	if (strcmp(statbuf.st_fstype, MNTTYPE_MNTFS) != 0)
