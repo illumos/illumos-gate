@@ -939,7 +939,7 @@ ipf_stack_t *ifs;
 		n->in_space = ~ntohl(n->in_outmsk);
 	else
 		n->in_space = 1;
-	if (n->in_flags & NAT_TCPUDPICMPQ) {
+	if ((n->in_flags & NAT_TCPUDPICMPQ) && (n->in_redir != NAT_REDIRECT)) {
 		if (ntohs(n->in_pmax) < ntohs(n->in_pmin))
 			return EINVAL;
 	}
