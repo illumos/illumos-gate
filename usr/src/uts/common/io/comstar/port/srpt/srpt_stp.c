@@ -359,6 +359,7 @@ srpt_stp_alloc_port(srpt_ioc_t *ioc, ib_guid_t guid)
 	lport->lport_send_status = &srpt_stp_send_status;
 	lport->lport_task_free	= &srpt_stp_task_free;
 	lport->lport_abort	= &srpt_stp_abort;
+	lport->lport_abort_timeout = 300;	/* 5 minutes */
 	lport->lport_task_poll	= &srpt_stp_task_poll;
 	lport->lport_ctl	= &srpt_stp_ctl;
 	lport->lport_info	= &srpt_stp_info;
@@ -962,17 +963,17 @@ srpt_stp_abort(struct stmf_local_port *lport, int abort_cmd,
 		SRPT_DPRINTF_L3("stp_abort, no outstanding I/O for %p",
 		    (void *)iu);
 		iu->iu_flags |= SRPT_IU_ABORTED;
-		mutex_exit(&iu->iu_lock);
 		/* Synchronous abort - STMF will call task_free */
 		status = STMF_ABORT_SUCCESS;
 	} else {
 		SRPT_DPRINTF_L3("stp_abort, %d outstanding I/O for %p",
 		    iu->iu_sq_posted_cnt, (void *)iu);
 		iu->iu_flags |= SRPT_IU_STMF_ABORTING;
-		mutex_exit(&iu->iu_lock);
-		status = STMF_SUCCESS;
+		/* Ask STMF to call us back later */
+		status = STMF_BUSY;
 	}
 
+	mutex_exit(&iu->iu_lock);
 	return (status);
 }
 
