@@ -74,7 +74,6 @@ kmfber_realloc(BerElement *ber, ber_len_t len)
 	Seqorset	*s;
 	size_t		off;
 	char		*oldbuf;
-	boolean_t	freeold = B_FALSE;
 
 	have_bytes = ber->ber_end - ber->ber_buf;
 	have = have_bytes / EXBUFSIZ;
@@ -94,19 +93,18 @@ kmfber_realloc(BerElement *ber, ber_len_t len)
 			/* transition to malloc'd buffer */
 			if ((ber->ber_buf = (char *)malloc(
 			    (size_t)total)) == NULL) {
-				free(oldbuf);
 				return (-1);
 			}
 			ber->ber_flags &= ~KMFBER_FLAG_NO_FREE_BUFFER;
+
 			/* copy existing data into new malloc'd buffer */
 			(void) memmove(ber->ber_buf, oldbuf, have_bytes);
-			freeold = B_TRUE;
 		} else {
 			if ((ber->ber_buf = (char *)realloc(
-			    ber->ber_buf, (size_t)total)) == NULL) {
+			    oldbuf, (size_t)total)) == NULL) {
+				free(oldbuf);
 				return (-1);
 			}
-			freeold = B_FALSE; /* it was just realloced */
 		}
 	}
 
@@ -128,8 +126,6 @@ kmfber_realloc(BerElement *ber, ber_len_t len)
 			s->sos_ptr = ber->ber_buf + off;
 		}
 	}
-	if (freeold && oldbuf != NULL)
-		free(oldbuf);
 
 	return (0);
 }
