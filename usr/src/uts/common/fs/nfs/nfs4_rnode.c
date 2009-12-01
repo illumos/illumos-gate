@@ -1408,7 +1408,7 @@ static int
 nfs4_active_data_reclaim(rnode4_t *rp)
 {
 	char *contents;
-	vnode_t *xattr;
+	vnode_t *xattr = NULL;
 	int size;
 	vsecattr_t *vsp;
 	int freed;
@@ -1427,8 +1427,16 @@ nfs4_active_data_reclaim(rnode4_t *rp)
 	rp->r_secattr = NULL;
 	if (rp->r_dir != NULL)
 		rdc = TRUE;
-	xattr = rp->r_xattr_dir;
-	rp->r_xattr_dir = NULL;
+	/*
+	 * To avoid a deadlock, do not free r_xattr_dir cache if it is hashed
+	 * on the same r_hashq queue. We are not mandated to free all caches.
+	 * VN_RELE(rp->r_xattr_dir) will be done sometime later - e.g. when the
+	 * rnode 'rp' is freed or put on the free list.
+	 */
+	if (rp->r_xattr_dir && VTOR4(rp->r_xattr_dir)->r_hashq != rp->r_hashq) {
+		xattr = rp->r_xattr_dir;
+		rp->r_xattr_dir = NULL;
+	}
 	mutex_exit(&rp->r_statelock);
 
 	/*
