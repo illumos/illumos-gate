@@ -1699,6 +1699,7 @@ audiohd_configure_output(audiohd_state_t *statep)
 
 	audiohd_set_output_gain(statep);
 }
+
 static void
 audiohd_configure_input(audiohd_state_t *statep)
 {
@@ -1708,19 +1709,18 @@ audiohd_configure_input(audiohd_state_t *statep)
 	audiohd_set_pin_volume(statep, DTYPE_CD);
 	audiohd_set_pin_volume(statep, DTYPE_MIC_IN);
 }
+
 static int
 audiohd_set_volume(void *arg, uint64_t val)
 {
 	audiohd_ctrl_t	*pc = arg;
 	audiohd_state_t	*statep = pc->statep;
 
-	val &= 0xff;
-	if (val > 100)
-		return (EINVAL);
+	AUDIOHD_CHECK_CHANNEL_VOLUME(val);
 
 	mutex_enter(&statep->hda_mutex);
 	pc->val = val;
-	audiohd_configure_output(statep);
+	audiohd_set_output_gain(statep);
 	mutex_exit(&statep->hda_mutex);
 
 	return (0);
@@ -1747,15 +1747,7 @@ audiohd_set_rear(void *arg, uint64_t val)
 {
 	audiohd_ctrl_t	*pc = arg;
 	audiohd_state_t	*statep = pc->statep;
-	uint8_t		l, r;
-
-	if (val & ~0xffff)
-		return (EINVAL);
-
-	l = (val & 0xff00) >> 8;
-	r = (val & 0xff);
-	if ((l > 100) || (r > 100))
-		return (EINVAL);
+	AUDIOHD_CHECK_2CHANNELS_VOLUME(val);
 
 	mutex_enter(&statep->hda_mutex);
 	pc->val = val;
@@ -1770,11 +1762,7 @@ audiohd_set_center(void *arg, uint64_t val)
 {
 	audiohd_ctrl_t	*pc = arg;
 	audiohd_state_t	*statep = pc->statep;
-
-	val &= 0xff;
-
-	if (val > 100)
-		return (EINVAL);
+	AUDIOHD_CHECK_CHANNEL_VOLUME(val);
 
 	mutex_enter(&statep->hda_mutex);
 	pc->val = val;
@@ -1789,15 +1777,7 @@ audiohd_set_surround(void *arg, uint64_t val)
 {
 	audiohd_ctrl_t	*pc = arg;
 	audiohd_state_t	*statep = pc->statep;
-	uint8_t		l, r;
-
-	if (val & ~0xffff)
-		return (EINVAL);
-
-	l = (val & 0xff00) >> 8;
-	r = (val & 0xff);
-	if ((l > 100) || (r > 100))
-		return (EINVAL);
+	AUDIOHD_CHECK_2CHANNELS_VOLUME(val);
 
 	mutex_enter(&statep->hda_mutex);
 	pc->val = val;
@@ -1812,11 +1792,7 @@ audiohd_set_lfe(void *arg, uint64_t val)
 {
 	audiohd_ctrl_t	*pc = arg;
 	audiohd_state_t	*statep = pc->statep;
-
-	val &= 0xff;
-
-	if (val > 100)
-		return (EINVAL);
+	AUDIOHD_CHECK_CHANNEL_VOLUME(val);
 
 	mutex_enter(&statep->hda_mutex);
 	pc->val = val;
@@ -1830,15 +1806,7 @@ audiohd_set_speaker(void *arg, uint64_t val)
 {
 	audiohd_ctrl_t	*pc = arg;
 	audiohd_state_t	*statep = pc->statep;
-	uint8_t		l, r;
-
-	if (val & ~0xffff)
-		return (EINVAL);
-
-	l = (val & 0xff00) >> 8;
-	r = (val & 0xff);
-	if ((l > 100) || (r > 100))
-		return (EINVAL);
+	AUDIOHD_CHECK_2CHANNELS_VOLUME(val);
 
 	mutex_enter(&statep->hda_mutex);
 	pc->val = val;
@@ -1852,15 +1820,7 @@ audiohd_set_front(void *arg, uint64_t val)
 {
 	audiohd_ctrl_t	*pc = arg;
 	audiohd_state_t	*statep = pc->statep;
-	uint8_t		l, r;
-
-	if (val & ~0xffff)
-		return (EINVAL);
-
-	l = (val & 0xff00) >> 8;
-	r = (val & 0xff);
-	if ((l > 100) || (r > 100))
-		return (EINVAL);
+	AUDIOHD_CHECK_2CHANNELS_VOLUME(val);
 
 	mutex_enter(&statep->hda_mutex);
 	pc->val = val;
@@ -1874,15 +1834,7 @@ audiohd_set_headphone(void *arg, uint64_t val)
 {
 	audiohd_ctrl_t	*pc = arg;
 	audiohd_state_t	*statep = pc->statep;
-	uint8_t		l, r;
-
-	if (val & ~0xffff)
-		return (EINVAL);
-
-	l = (val & 0xff00) >> 8;
-	r = (val & 0xff);
-	if ((l > 100) || (r > 100))
-		return (EINVAL);
+	AUDIOHD_CHECK_2CHANNELS_VOLUME(val);
 
 	mutex_enter(&statep->hda_mutex);
 	pc->val = val;
@@ -1896,15 +1848,7 @@ audiohd_set_linein(void *arg, uint64_t val)
 {
 	audiohd_ctrl_t	*pc = arg;
 	audiohd_state_t	*statep = pc->statep;
-	uint8_t		l, r;
-
-	if (val & ~0xffff)
-		return (EINVAL);
-
-	l = (val & 0xff00) >> 8;
-	r = (val & 0xff);
-	if ((l > 100) || (r > 100))
-		return (EINVAL);
+	AUDIOHD_CHECK_2CHANNELS_VOLUME(val);
 
 	mutex_enter(&statep->hda_mutex);
 	pc->val = val;
@@ -1919,15 +1863,7 @@ audiohd_set_mic(void *arg, uint64_t val)
 {
 	audiohd_ctrl_t	*pc = arg;
 	audiohd_state_t	*statep = pc->statep;
-	uint8_t		l, r;
-
-	if (val & ~0xffff)
-		return (EINVAL);
-
-	l = (val & 0xff00) >> 8;
-	r = (val & 0xff);
-	if ((l > 100) || (r > 100))
-		return (EINVAL);
+	AUDIOHD_CHECK_2CHANNELS_VOLUME(val);
 
 	mutex_enter(&statep->hda_mutex);
 	pc->val = val;
@@ -1942,15 +1878,7 @@ audiohd_set_cd(void *arg, uint64_t val)
 {
 	audiohd_ctrl_t	*pc = arg;
 	audiohd_state_t	*statep = pc->statep;
-	uint8_t		l, r;
-
-	if (val & ~0xffff)
-		return (EINVAL);
-
-	l = (val & 0xff00) >> 8;
-	r = (val & 0xff);
-	if ((l > 100) || (r > 100))
-		return (EINVAL);
+	AUDIOHD_CHECK_2CHANNELS_VOLUME(val);
 
 	mutex_enter(&statep->hda_mutex);
 	pc->val = val;
@@ -1965,15 +1893,7 @@ audiohd_set_mongain(void *arg, uint64_t val)
 {
 	audiohd_ctrl_t	*pc = arg;
 	audiohd_state_t	*statep = pc->statep;
-	uint8_t		l, r;
-
-	if (val & ~0xffff)
-		return (EINVAL);
-
-	l = (val & 0xff00) >> 8;
-	r = (val & 0xff);
-	if ((l > 100) || (r > 100))
-		return (EINVAL);
+	AUDIOHD_CHECK_2CHANNELS_VOLUME(val);
 
 	mutex_enter(&statep->hda_mutex);
 	pc->val = val;
@@ -1988,11 +1908,7 @@ audiohd_set_beep(void *arg, uint64_t val)
 {
 	audiohd_ctrl_t  *pc = arg;
 	audiohd_state_t *statep = pc->statep;
-
-	val &= 0xff;
-
-	if (val > 100)
-		return (EINVAL);
+	AUDIOHD_CHECK_CHANNEL_VOLUME(val);
 
 	mutex_enter(&statep->hda_mutex);
 	pc->val = val;
@@ -2378,9 +2294,10 @@ audiohd_beep_freq(void *arg, int freq)
 static int
 audiohd_init_state(audiohd_state_t *statep, dev_info_t *dip)
 {
-	audio_dev_t			*adev;
+	audio_dev_t	*adev;
 
 	statep->hda_dip = dip;
+	statep->hda_rirb_rp = 0;
 
 	if ((adev = audio_dev_alloc(dip, 0)) == NULL) {
 		audio_dev_warn(statep->adev,
@@ -2395,8 +2312,6 @@ audiohd_init_state(audiohd_state_t *statep, dev_info_t *dip)
 	/* set device information */
 	audio_dev_set_description(adev, AUDIOHD_DEV_CONFIG);
 	audio_dev_set_version(adev, AUDIOHD_DEV_VERSION);
-
-	statep->hda_rirb_rp = 0;
 
 	return (DDI_SUCCESS);
 }	/* audiohd_init_state() */
@@ -2415,17 +2330,17 @@ audiohd_init_pci(audiohd_state_t *statep, ddi_device_acc_attr_t *acc_attr)
 	uint16_t	vid;
 	uint8_t		cTmp;
 	dev_info_t	*dip = statep->hda_dip;
-	audio_dev_t	*ahandle = statep->adev;
+	audio_dev_t	*adev = statep->adev;
 
 	if (pci_config_setup(dip, &statep->hda_pci_handle) == DDI_FAILURE) {
-		audio_dev_warn(ahandle,
+		audio_dev_warn(adev,
 		    "pci config mapping failed");
 		return (DDI_FAILURE);
 	}
 
 	if (ddi_regs_map_setup(dip, 1, &statep->hda_reg_base, 0,
 	    0, acc_attr, &statep->hda_reg_handle) != DDI_SUCCESS) {
-		audio_dev_warn(ahandle,
+		audio_dev_warn(adev,
 		    "memory I/O mapping failed");
 		return (DDI_FAILURE);
 	}
@@ -2439,7 +2354,6 @@ audiohd_init_pci(audiohd_state_t *statep, ddi_device_acc_attr_t *acc_attr)
 
 	vid = pci_config_get16(statep->hda_pci_handle, PCI_CONF_VENID);
 	switch (vid) {
-
 	case AUDIOHD_VID_INTEL:
 		/*
 		 * Currently, Intel (G)MCH and ICHx chipsets support PCI
@@ -2459,7 +2373,6 @@ audiohd_init_pci(audiohd_state_t *statep, ddi_device_acc_attr_t *acc_attr)
 		pci_config_put8(statep->hda_pci_handle,
 		    AUDIOHD_INTEL_PCI_TCSEL, (cTmp & AUDIOHD_INTEL_TCS_MASK));
 		break;
-
 	case AUDIOHD_VID_ATI:
 		/*
 		 * Refer to ATI SB450 datesheet. We set snoop for SB450
@@ -2480,7 +2393,6 @@ audiohd_init_pci(audiohd_state_t *statep, ddi_device_acc_attr_t *acc_attr)
 		pci_config_put8(statep->hda_pci_handle, AUDIOHD_CORB_SIZE_OFF,
 		    cTmp | AUDIOHD_NVIDIA_SNOOP);
 		break;
-
 	default:
 		break;
 	}
@@ -2778,11 +2690,9 @@ audiohd_init_controller(audiohd_state_t *statep)
 	statep->hda_streams_nums = statep->hda_input_streams +
 	    statep->hda_output_streams;
 
-
 	statep->hda_record_regbase = AUDIOHD_REG_SD_BASE;
 	statep->hda_play_regbase = AUDIOHD_REG_SD_BASE + AUDIOHD_REG_SD_LEN *
 	    statep->hda_input_streams;
-
 
 	/* stop all dma before starting to reset controller */
 	audiohd_stop_dma(statep);
@@ -2823,8 +2733,7 @@ audiohd_init_controller(audiohd_state_t *statep)
 	/* Initialize RIRB */
 	addr = statep->hda_dma_rirb.ad_paddr;
 	AUDIOHD_REG_SET32(AUDIOHD_REG_RIRBLBASE, (uint32_t)addr);
-	AUDIOHD_REG_SET32(AUDIOHD_REG_RIRBUBASE,
-	    (uint32_t)(addr >> 32));
+	AUDIOHD_REG_SET32(AUDIOHD_REG_RIRBUBASE, (uint32_t)(addr >> 32));
 	AUDIOHD_REG_SET16(AUDIOHD_REG_RIRBWP, AUDIOHDR_RIRBWP_RESET);
 	AUDIOHD_REG_SET8(AUDIOHD_REG_RIRBSIZE, AUDIOHDR_RIRBSZ_256);
 	AUDIOHD_REG_SET8(AUDIOHD_REG_RIRBCTL, AUDIOHDR_RIRBCTL_DMARUN |
@@ -2834,8 +2743,7 @@ audiohd_init_controller(audiohd_state_t *statep)
 	addr = statep->hda_dma_corb.ad_paddr;
 	AUDIOHD_REG_SET16(AUDIOHD_REG_CORBRP, AUDIOHDR_CORBRP_RESET);
 	AUDIOHD_REG_SET32(AUDIOHD_REG_CORBLBASE, (uint32_t)addr);
-	AUDIOHD_REG_SET32(AUDIOHD_REG_CORBUBASE,
-	    (uint32_t)(addr >> 32));
+	AUDIOHD_REG_SET32(AUDIOHD_REG_CORBUBASE, (uint32_t)(addr >> 32));
 	AUDIOHD_REG_SET8(AUDIOHD_REG_CORBSIZE, AUDIOHDR_CORBSZ_256);
 	AUDIOHD_REG_SET16(AUDIOHD_REG_CORBWP, 0);
 	AUDIOHD_REG_SET16(AUDIOHD_REG_CORBRP, 0);

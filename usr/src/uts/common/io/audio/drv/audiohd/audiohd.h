@@ -796,13 +796,13 @@ struct audiohd_state {
 	uint32_t	hda_flags;
 
 	boolean_t	soft_volume;
-	boolean_t	intr_added;
 
-	caddr_t				hda_reg_base;
-	ddi_acc_handle_t		hda_pci_handle;
-	ddi_acc_handle_t		hda_reg_handle;
+	caddr_t			hda_reg_base;
+	ddi_acc_handle_t	hda_pci_handle;
+	ddi_acc_handle_t	hda_reg_handle;
 
 	ddi_intr_handle_t 	*htable; 	/* For array of interrupts */
+	boolean_t		intr_added;
 	int			intr_type;	/* What type of interrupt */
 	int			intr_rqst;	/* # of request intrs count */
 	int			intr_cnt;	/* # of intrs count returned */
@@ -983,6 +983,29 @@ struct audiohd_state {
 	    AUDIOHDC_AMP_SET_LR_OUTPUT | AUDIOHDC_GAIN_MAX) == \
 	    AUDIOHD_CODEC_FAILURE) \
 		return (DDI_FAILURE); \
+}
+
+/*
+ * check volume adjust value of 2 channels control
+ */
+#define	AUDIOHD_CHECK_2CHANNELS_VOLUME(value) \
+{ \
+	if ((value) & ~0xffff) \
+		return (EINVAL); \
+	if ((((value) & 0xff00) >> 8) > 100 || \
+	    ((value) & 0xff) > 100) \
+		return (EINVAL); \
+}
+
+/*
+ * check volume adjust value of mono channel control
+ */
+#define	AUDIOHD_CHECK_CHANNEL_VOLUME(value) \
+{ \
+	if ((value) & ~0xff) \
+		return (EINVAL); \
+	if (((value) & 0xff) > 100) \
+		return (EINVAL); \
 }
 
 #ifdef __cplusplus
