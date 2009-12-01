@@ -41,7 +41,6 @@ PROG=		\
 	mkdtab		\
 	nfs.server	\
 	nscd		\
-	pcmcia		\
 	sendmail	\
 	slpd		\
 	sysetup		\

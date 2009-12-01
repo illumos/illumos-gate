@@ -20,9 +20,7 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -134,49 +132,11 @@ do
 		    -e '/^type=ddi_pseudo;name=md;minor2=raw	/d' \
 		    -e '/^type=ddi_pseudo;name=tnf	/d' \
 		    -e '/^type=ddi_pseudo;name=pm	/d' \
-		    -e '/^type=ddi_pseudo;name=winlock	/d' \
-		    -e '/^type=ddi_pseudo;name=mm	/d' \
-		    -e '/^type=ddi_pseudo;name=conskbd	/d' \
-		    -e '/^type=ddi_pseudo;name=consms	/d' \
-		    -e '/^type=ddi_pseudo;name=wc	/d' \
-		    -e '/^type=ddi_pseudo;name=dump	/d' \
-		    -e '/^type=ddi_pseudo;name=cn	/d' \
-		    -e '/^type=ddi_pseudo;name=lo	/d' \
-		    -e '/^type=ddi_pseudo;name=ptm	/d' \
-		    -e '/^type=ddi_pseudo;name=ptc	/d' \
-		    -e '/^type=ddi_pseudo;name=pts	/d' \
-		    -e '/^type=ddi_pseudo;name=ptsl	/d' \
-		    -e '/^type=ddi_pseudo;name=log	/d' \
-		    -e '/^type=ddi_pseudo;name=sad	/d' \
-		    -e '/^type=ddi_pseudo;name=sy	/d' \
-		    -e '/^type=ddi_pseudo;name=clone	/d' \
-		    -e '/^type=ddi_network	/d' \
-		    -e '/^type=ddi_pseudo;name=openeepr	/d' \
-		    -e '/^type=ddi_pseudo;name=lockstat	/d' \
-		    -e '/^type=ddi_pseudo;name=kstat	/d' \
-		    -e '/^type=ddi_pseudo;name=ksyms	/d' \
-		    -e '/^type=ddi_display	/d' \
-		    -e '/^type=ddi_pseudo;name=clone;minor=icmp	/d' \
-		    -e '/^type=ddi_pseudo;name=SUNW,bpp	/d' \
-		    -e '/^type=ddi_pseudo;name=eeprom	/d' \
-		    -e '/^type=ddi_pseudo;name=clone;minor=ipdcm	/d' \
-		    -e '/^type=ddi_pseudo;name=vol	/d' \
-		    -e '/^type=ddi_pseudo;name=profile	/d' \
-		    -e '/^type=ddi_parallel;name=mcpp	/d' \
-		    -e '/^type=ddi_pseudo;name=zsh	/d' \
-		    -e '/^type=ddi_pseudo;name=clone;minor=zsh	/d' \
-		    -e '/^type=ddi_pseudo;name=SUNW,sx	/d' \
-		    -e '/^type=ddi_pseudo;name=sx_cmem	/d' \
-		    -e '/^type=ddi_parallel;name=SUNW,spif;minor=stclp	/d' \
-		    -e '/^type=ddi_pseudo;name=SUNW,spif;minor=stc	/d' \
-		    -e '/^type=ddi_pseudo;name=tl;minor=ticots	/d' \
-		    -e '/^type=ddi_pseudo;name=tl;minor=ticotsord	/d' \
-		    -e '/^type=ddi_pseudo;name=tl;minor=ticlts	/d' \
-		    -e '/^type=ddi_pseudo;name=md;minor=admin	/d' \
-		    -e '/^type=ddi_pseudo;name=md;minor2=blk	/d' \
-		    -e '/^type=ddi_pseudo;name=md;minor2=raw	/d' \
-		    -e '/^type=ddi_pseudo;name=tnf	/d' \
-		    -e '/^type=ddi_pseudo;name=pm	/d' \
+		    -e '/^type=ddi_nexus:devctl;minor=initpcmcia	/d' \
+		    -e '/^type=ddi_nexus:devctl;minor=probepcmcia	/d' \
+		    -e '/^type=ddi_ctl:devctl;minor=initpcmcia	/d' \
+		    -e '/^type=ddi_ctl:devctl;minor=probepcmcia	/d' \
+		    -e '/^type=pcmcia:event;name=pem	/d' \
 		$dest > /tmp/d.$$
 
 		if cmp -s /tmp/d.$$ $dest  > /dev/null 2>&1

@@ -8138,6 +8138,28 @@ mondo_loop() {
 	rm -rf $usr/ucb/vplot
 
 	#
+	# Remove legacy pcmcia bits
+	#
+	rm -f $root/kernel/drv/pcmem
+	rm -f $root/kernel/drv/pcram
+	rm -f $root/kernel/drv/pem
+	rm -f $root/kernel/drv/pem.conf
+	rm -f $root/kernel/drv/amd64/pcmem
+	rm -f $root/kernel/drv/amd64/pcram
+	rm -f $root/kernel/drv/amd64/pem
+	rm -f $root/kernel/drv/sparcv9/pcmem
+	rm -f $root/kernel/drv/sparcv9/pcram
+	rm -f $root/kernel/drv/sparcv9/pem
+	rm -f $root/etc/init.d/pcmcia
+	rm -f $usr/lib/pcmciad
+	rm -f $usr/lib/smedia/sm_pcmem.so.1
+	rm -f $usr/lib/smedia/amd64/sm_pcmem.so.1
+	rm -f $usr/lib/smedia/sparcv9/sm_pcmem.so.1
+	rm -f $usr/include/sys/pem.h
+	rm -f $usr/include/sys/pcmcia/pcramio.h
+	rm -f $usr/include/sys/pcmcia/pcramvar.h
+
+	#
 	# The pkg* commands should not be used after this point and before
 	# archive extraction as libcrypto/libssl may not be available.
 	#

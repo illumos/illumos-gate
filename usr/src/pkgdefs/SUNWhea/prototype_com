@@ -1113,8 +1113,6 @@ d none usr/include/sys/pcmcia 755 root bin
 f none usr/include/sys/pcmcia/pcata.h 644 root bin
 f none usr/include/sys/pcmcia/pcelx.h 644 root bin
 f none usr/include/sys/pcmcia/pcgld.h 644 root bin
-f none usr/include/sys/pcmcia/pcramio.h 644 root bin
-f none usr/include/sys/pcmcia/pcramvar.h 644 root bin
 f none usr/include/sys/pcmcia/pcser_conf.h 644 root bin
 f none usr/include/sys/pcmcia/pcser_io.h 644 root bin
 f none usr/include/sys/pcmcia/pcser_manuspec.h 644 root bin
@@ -1122,7 +1120,6 @@ f none usr/include/sys/pcmcia/pcser_reg.h 644 root bin
 f none usr/include/sys/pcmcia/pcser_var.h 644 root bin
 f none usr/include/sys/pcmcia.h 644 root bin
 f none usr/include/sys/pctypes.h 644 root bin
-f none usr/include/sys/pem.h 644 root bin
 f none usr/include/sys/physmem.h 644 root bin
 f none usr/include/sys/serializer.h 644 root bin
 f none usr/include/sys/pfmod.h 644 root bin

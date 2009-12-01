@@ -942,10 +942,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ppp/sppp/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/pcmcia/pem/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O) 
-
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ppp/spppasyn/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -2492,9 +2488,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/pcmcia/nexus/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/pcmcia/pcs/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/pcmcia/pem/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/rpc/%.c

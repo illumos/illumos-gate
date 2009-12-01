@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * fdformat program - formats floppy disks, and then adds a label to them
@@ -72,16 +69,6 @@
 #define	uppercase(c)	((c) >= 'a' && (c) <= 'z' ? (c) - 'a' + 'A' : (c))
 #define	min(a, b)	((a) < (b) ? (a) : (b))
 
-/*
- * These defines are from the PCMCIA memory driver driver
- *	header files (pcramio.h/pcramvar.h) and they are in
- *	the Platform Specific (PS) train.
- */
-#ifndef PCRAM_PROBESIZE
-#define	PCRAMIOC	('P' << 8)
-#define	PCRAM_PROBESIZE (PCRAMIOC|22)   /* Probe memory card size */
-#endif
-
 /* FORMAT PATTERNS */
 #define		PATTERN_1	0x55;
 #define		PATTERN_2	0xaa;
@@ -93,7 +80,6 @@ static 	struct fd_char 		fdchar;
 static 	struct dk_geom 		fdgeom;
 static 	struct dk_allmap 	allmap;
 static 	struct dk_cinfo 	dkinfo;
-static  struct dk_geom  	dkg;
 
 /* EXTERN */
 extern char	*optarg;
@@ -122,7 +108,6 @@ static 	int	x_flag = 0;	/* skip the format, only install SunOS label */
 				/* or DOS file system */
 static 	int	z_flag = 0;	/* debugging only, setting partial formatting */
 static 	int	interleave = 1;	/* interleave factor */
-static	int	pcmcia = 0;	/* 1 if media is a pcmcia card */
 
 static	uid_t	euid = 0;	/* stores effective user id */
 
@@ -160,8 +145,6 @@ static void	write_NEC_DOS_label(int, char *);
 static int	check_mount();
 static void	format_diskette(int, char *, struct vtoc *,
 				struct  bios_param_blk *,  int *);
-static void	format_pcmcia_card(int, char *, struct vtoc *,
-				    struct  bios_param_blk *, int *);
 static void	restore_default_chars(int fd,
 				    struct fd_char save_fdchar,
 				    struct dk_allmap save_allmap);
@@ -423,15 +406,10 @@ gettext("No such volume (or no media in specified device): %s\n"),
 			exit(3);
 	}
 
-	/* See if the device is a PCMCIA card */
-	if (dkinfo.dki_ctype == DKC_PCMCIA_MEM)
-		pcmcia = 1;
-
-
 	/*
 	 * The fd_vtoc, bpb, and rdirsec structures will be
-	 * partially filled in by format_pcmcia_card() or
-	 * format_diskette().  This was done so that write_DOS_label(),
+	 * partially filled in by format_diskette().
+	 * This was done so that write_DOS_label(),
 	 * write_SunOS_label(), and write_NEC_DOS_label() could be
 	 * device independent.  If a new device needs to be added to
 	 * fdformat, a new format function like format_diskette should
@@ -441,10 +419,7 @@ gettext("No such volume (or no media in specified device): %s\n"),
 	(void) memset((void *)&fd_vtoc, (char)0, sizeof (struct vtoc));
 	(void) memset((void *)&bpb, (char)0, sizeof (struct  bios_param_blk));
 
-	if (pcmcia)
-		format_pcmcia_card(fd, real_name, &fd_vtoc, &bpb, &rdirsec);
-	else
-		format_diskette(fd, real_name, &fd_vtoc, &bpb, &rdirsec);
+	format_diskette(fd, real_name, &fd_vtoc, &bpb, &rdirsec);
 
 	if (d_flag)
 		write_DOS_label(fd, altboot, altsize, altbootname,
@@ -1122,279 +1097,6 @@ restore_default_chars(int fd,
 	(void) ioctl(fd, FDDEFGEOCHAR, NULL);
 
 }
-
-/*
- * Inputs: file descriptor for the device and the device name.
- * Oututs: the fd_vtoc will be partially filled in with the
- * device specific information such as partition
- * information and ascillabel. The bpb structure and rdirsec will also be
- * partially filled in with device specific information.
- */
-void
-format_pcmcia_card(int fd, char *real_name, struct vtoc *fd_vtoc,
-				struct  bios_param_blk *bpb, int *rdirsec)
-{
-	int	sec_size;	/* sector size */
-	int	i, j;
-	char    wrpat;
-	char    wrbuf[512];
-	char    rdbuf[512];
-	enum dkio_state		state = DKIO_NONE;
-	int	card_size;	/* PCMCIA memory card size */
-	ulong_t	max_cyl;	/* max number of cylinders */
-	int	sec_fat;
-
-	/*
-	 * Using DKIOCSTATE ioctl()
-	 * to replace FDGETCHANGE ioctl()
-	 * start out with state=DKIO_NONE
-	 */
-	if (ioctl(fd, DKIOCSTATE, &state) < 0) {
-		(void) fprintf(stderr,
-			gettext("%s: DKIOCSTATE failed, "),
-			myname);
-		perror("");
-		exit(3);
-	}
-
-	if (state != DKIO_INSERTED) {
-			(void) fprintf(stderr,
-				gettext("%s: no media in %s\n"),
-				myname, real_name);
-		exit(4);
-	}
-
-
-	/* initialize the asciilabel */
-	(void) strcpy(fd_vtoc->v_asciilabel, "PCMCIA Memory Card");
-
-	/*  Get card cyl/head/secptrack info  */
-	if (ioctl(fd, DKIOCGGEOM, &dkg) == -1) {
-		/*
-		 * Card doesn't have a CIS. So, ask driver to probe
-		 * card size info
-		 */
-		if (ioctl(fd, PCRAM_PROBESIZE, &dkg) == -1) {
-			(void) fprintf(stderr,
-			gettext("%s: Unable to get card size information"),
-				myname);
-			perror("");
-			exit(3);
-		}
-	}
-
-	/* PCMCIA memory default sector size */
-	sec_size = DEV_BSIZE;
-
-	fdchar.fdc_sec_size	= sec_size;
-	fdchar.fdc_ncyl		= dkg.dkg_ncyl;
-	fdchar.fdc_nhead	= dkg.dkg_nhead;
-	fdchar.fdc_secptrack    = dkg.dkg_nsect;
-
-	max_cyl = fdchar.fdc_ncyl;
-
-	/* Initialize the vtoc information */
-	fd_vtoc->v_part[2].p_start = 0;
-	fd_vtoc->v_part[2].p_size =  max_cyl * fdchar.fdc_nhead
-						* fdchar.fdc_secptrack;
-	fd_vtoc->v_nparts = 1;
-
-	card_size = fdchar.fdc_ncyl * fdchar.fdc_nhead *
-		fdchar.fdc_secptrack * fdchar.fdc_sec_size;
-
-	/* Initialize the bios parameter block information */
-	bpb->b_nfat = 1;
-	if (card_size < 1048576) {
-		bpb->b_spcl = 2;
-		*rdirsec = 112;
-	} else {
-		bpb->b_spcl = 1;
-		*rdirsec = 224;
-	}
-	bpb->b_mediadescriptor = (char)0xf8;    /* fixed disk */
-
-	/*
-	 *	card_size	  sec_fat
-	 *  	524288			3
-	 * 	1048576			6
-	 *  	2097152			12
-	 */
-
-	sec_fat = (card_size * 3) / 524288;
-	bpb->b_fatsec[0] = sec_fat % 0x100;
-	bpb->b_fatsec[1] = sec_fat / 0x100;
-
-
-	(void) printf(gettext("Formatting %d bytes in %s\n"),
-			card_size, real_name);
-
-	if (!f_flag && !x_flag) {
-		(void) printf(gettext(
-		/*CSTYLED*/
-		"Press return to start formatting PCMCIA memory card."));
-		while (getchar() != '\n')
-			;
-		}
-
-
-	/*
-	 *  Skip the format, only install SunOS label or DOS file system.
-	 */
-	if (x_flag)
-		goto skipformat;
-
-	/*
-	 * First try to format only 512 bytes with four different
-	 * patterns.
-	 */
-	for (i = 0; i < 4; ++i) {
-		switch (i) {
-
-		case 0:
-			wrpat = (uchar_t)PATTERN_1;
-			break;
-		case 1:
-			wrpat = (uchar_t)PATTERN_2;
-			break;
-		case 2:
-			wrpat = (uchar_t)PATTERN_3;
-			break;
-		case 3:
-			wrpat = PATTERN_4;
-			break;
-		}
-
-		if (lseek(fd, (off_t)0, 0) != 0) {
-			(void) fprintf(stderr,
-				gettext("%s: seek to blk 0 failed, "),
-				myname);
-			perror("");
-			exit(3);
-		}
-
-		(void) memset(wrbuf, wrpat, 512);
-
-		if (write(fd, &wrbuf[0], 512) != 512) {
-			(void) fprintf(stderr,
-				/*CSTYLED*/
-				gettext("%s: Format Write failed, "), myname);
-			perror("");
-			exit(3);
-		}
-
-		if (lseek(fd, (off_t)0, 0) != 0) {
-			(void) fprintf(stderr,
-				gettext("%s: seek to blk 0 failed, "),
-				myname);
-			perror("");
-			exit(3);
-		}
-
-		if (read(fd, &rdbuf[0], 512) != 512) {
-			(void) fprintf(stderr,
-				/*CSTYLED*/
-				gettext("%s: Format Read failed, "), myname);
-			perror("");
-			exit(3);
-		}
-
-		if (memcmp(wrbuf, rdbuf, 512) != 0) {
-			(void) fprintf(stderr,
-				/*CSTYLED*/
-				gettext("%s: Format Compare Error, "), myname);
-			perror("");
-			exit(3);
-		}
-	}
-	/*
-	 * Then format the whole memory card with patterns
-	 * 0xff and 0x00 to erase the card.
-	 */
-	for (i = 0; i < 2; ++i) {
-
-		if (i == 0) {
-			wrpat = (uchar_t)PATTERN_3;
-		} else {
-			wrpat = PATTERN_4;
-		}
-
-		if (lseek(fd, (off_t)0, 0) != 0) {
-			(void) fprintf(stderr,
-				gettext("%s: seek to blk 0 failed, "),
-				myname);
-			perror("");
-			exit(3);
-		}
-
-		(void) memset(wrbuf, wrpat, 512);
-
-		for (j = 0; j < (card_size/512); ++j) {
-			if (write(fd, &wrbuf[0], 512) != 512) {
-				(void) fprintf(stderr,
-					/*CSTYLED*/
-				gettext("%s: Format Write failed, "), myname);
-				perror("");
-				exit(3);
-			}
-			/*
-			 * write some progress msg when each
-			 * 512KB block is done.
-			 */
-			if (((j%1024) == 0) && (!q_flag)) {
-				(void) printf(".");
-				(void) fflush(stdout);
-			}
-		}
-		/*
-		 * do a verify
-		 */
-
-		if (lseek(fd, (off_t)0, 0) != 0) {
-			(void) fprintf(stderr,
-				gettext("%s: seek to blk 0 failed, "),
-				myname);
-			perror("");
-			exit(3);
-		}
-
-		for (j = 0; j < (card_size/512); ++j) {
-			if (read(fd, &rdbuf[0], 512) != 512) {
-				(void) fprintf(stderr,
-					/*CSTYLED*/
-				gettext("%s: Format Read failed, "), myname);
-				perror("");
-				exit(3);
-			}
-			if (memcmp(wrbuf, rdbuf, 512) != 0) {
-				(void) fprintf(stderr,
-					/*CSTYLED*/
-				gettext("%s: Format Compare Error, "), myname);
-				perror("");
-				exit(3);
-			}
-		/*CSTYLED*/
-		/* write some progress msg when each 512KB block is done. */
-			if ((j%1024) == 0) {
-				if (!q_flag) {
-					(void) printf(".");
-					(void) fflush(stdout);
-				}
-			}
-		}
-	}
-	if (!q_flag)
-		(void) printf("\n");
-
-skipformat:
-	if (lseek(fd, (off_t)0, 0) != 0) {
-		(void) fprintf(stderr, gettext("%s: seek to blk 0 failed, "),
-			myname);
-		perror("");
-		exit(3);
-	}
-}
-
-
 
 /*
  * See if any partitions on the device are mounted.  Return 1 if a partition is

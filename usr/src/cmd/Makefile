@@ -294,7 +294,6 @@ COMMON_SUBDIRS=		\
 	pbind		\
 	pcidr		\
 	pcitool		\
-	pcmciad		\
 	pfexec		\
 	pgrep		\
 	picl		\

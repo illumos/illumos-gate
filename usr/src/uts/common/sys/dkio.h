@@ -82,7 +82,7 @@ struct dk_cinfo {
 #define	DKC_MD		16	/* meta-disk (virtual-disk) driver */
 #define	DKC_INTEL82077	19	/* 82077 floppy disk controller */
 #define	DKC_DIRECT	20	/* Intel direct attached device i.e. IDE */
-#define	DKC_PCMCIA_MEM	21	/* PCMCIA memory disk-like type */
+#define	DKC_PCMCIA_MEM	21	/* PCMCIA memory disk-like type (Obsolete) */
 #define	DKC_PCMCIA_ATA	22	/* PCMCIA AT Attached type */
 #define	DKC_VBD		23	/* virtual block device */
 

@@ -1639,13 +1639,9 @@ add_device_to_disklist(char *devname, char *devpath)
 		 * But not devices like Iomega Rev Drive which
 		 * identifies itself as a CDROM, but has a removable
 		 * disk.
-		 * Also skip PCMCIA memory card device since
-		 * it is used as a pseudo floppy disk drive
-		 * at the present time (BugID 1201473)
 		 */
-		if (((dkinfo.dki_ctype == DKC_CDROM) &&
-		    (mediainfo.dki_media_type != DK_REMOVABLE_DISK)) ||
-		    (dkinfo.dki_ctype == DKC_PCMCIA_MEM)) {
+		if ((dkinfo.dki_ctype == DKC_CDROM) &&
+		    (mediainfo.dki_media_type != DK_REMOVABLE_DISK)) {
 			(void) close(search_file);
 			return;
 		}

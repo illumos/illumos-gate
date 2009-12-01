@@ -45,15 +45,6 @@
 #include <priv_utils.h>
 #include <stdarg.h>
 #include "rmformat.h"
-/*
- * These defines are from the PCMCIA memory driver driver
- * header files (pcramio.h/pcramvar.h) and they are in
- * the Platform Specific (PS) train.
- */
-#ifndef PCRAM_PROBESIZE
-#define	PCRAMIOC	('P' << 8)
-#define	PCRAM_PROBESIZE (PCRAMIOC|22)	/* Probe memory card size */
-#endif
 
 /*
  * Definitions.
@@ -789,33 +780,6 @@ write_sunos_label(int32_t fd, int32_t media_type)
 		v_toc.v_part[2].p_start = 0;
 		v_toc.v_part[2].p_size = fdchar.fdc_ncyl * 2 *
 		    fdchar.fdc_secptrack * mult_factor;
-
-	} else if (media_type == SM_PCMCIA_MEM) {
-
-		static	struct dk_geom	dkg;
-
-		/*  Get card cyl/head/secptrack info  */
-		if (ioctl(fd, DKIOCGGEOM, &dkg) < 0) {
-			/*
-			 * Card doesn't have a CIS. So, ask driver
-			 * to probe card size info
-			 */
-			if (ioctl(fd, PCRAM_PROBESIZE, &dkg) < 0) {
-				(void) fprintf(stderr,
-				    gettext(
-				"Could not get card size information\n"));
-				(void) close(fd);
-				exit(3);
-			}
-		}
-
-
-		v_toc.v_part[2].p_start = 0;
-		v_toc.v_part[2].p_size =  dkg.dkg_ncyl * dkg.dkg_nhead *
-		    dkg.dkg_nsect;
-
-		/* v_nparts was 1 in fdformat. But write vtoc failes */
-		v_toc.v_nparts = 3;
 
 	} else if (media_type == SM_SCSI_FLOPPY) {
 

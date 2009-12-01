@@ -424,7 +424,6 @@ CHKHDRS=			\
 	pci_tools.h		\
 	pcmcia.h		\
 	pctypes.h		\
-	pem.h			\
 	pfmod.h			\
 	pg.h			\
 	pghw.h			\
@@ -849,8 +848,6 @@ FSHDRS=				\
 PCMCIAHDRS=		\
 	pcata.h		\
 	pcgld.h		\
-	pcramio.h	\
-	pcramvar.h	\
 	pcser_conf.h	\
 	pcser_io.h	\
 	pcser_reg.h	\

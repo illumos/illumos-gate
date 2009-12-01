@@ -82,6 +82,7 @@ do
 		add_driver wc
 		add_driver qcn
 		remove_driver chanmux
+		add_driver pcser
 	fi
 done
 

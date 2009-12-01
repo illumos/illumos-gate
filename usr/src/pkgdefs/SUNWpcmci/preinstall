@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,18 +20,12 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright (c) 1999,2001 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
 PATH="/usr/bin:/usr/sbin:${PATH}"
 export PATH
-
-DEVLINKTB=${BASEDIR}/etc/devlink.tab
-
-TMP=/tmp/$$
 
 #
 # remove_minor - removes minor node in /dev for passed driver
@@ -45,27 +38,6 @@ remove_minor()
 	DEVNODE="${BASEDIR}/dev/${DRIVER}"
 	rm -f $DEVNODE
 }
-
-#
-# rem_devlink - removes an entry from ${DEVLINKTB}
-#
-rem_devlink()
-{
-	PATTERN="$1"
-	LINK="$2"
-	PLINK="`echo $LINK | sed 's/[$*^|\]/\\\&/g'`"
-	grep -v "^$PATTERN      $PLINK$" ${DEVLINKTB} >$TMP.devlink
-	cp $TMP.devlink ${DEVLINKTB}
-	rm -f $TMP.devlink
-}
-
-
-#
-# Remove the existing ${BASEDIR}/devices/pcmcia directory since
-#	we will recreate the appropriate directories when the
-#	PCMCIA user daemon loads
-#
-rm -rf ${BASEDIR}/devices/pcmcia
 
 #
 # We remove any dangling /dev links in this order:
@@ -106,13 +78,5 @@ rem_drv -b ${BASEDIR} pcmcia
 [ ! -h ${BASEDIR}/dev/ra ]      && rm -f ${BASEDIR}/dev/ra
 [ ! -h ${BASEDIR}/dev/pcic ]    && rm -f ${BASEDIR}/dev/pcic
 [ ! -h ${BASEDIR}/dev/stp4020 ] && rm -f ${BASEDIR}/dev/stp4020
-
-#
-# remove devlinks
-#
-rem_devlink 'type=ddi_nexus;minor=initpcmcia' 'pcmcia/\N0'
-rem_devlink 'type=ddi_nexus;minor=probepcmcia' 'pcmcia/probe_\N0'
-rem_devlink 'type=ddi_ctl:devctl;minor=initpcmcia' 'pcmcia/\N0'
-rem_devlink 'type=ddi_ctl:devctl;minor=probepcmcia' 'pcmcia/probe_\N0'
 
 exit 0

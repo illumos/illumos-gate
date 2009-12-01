@@ -382,8 +382,6 @@ COMMON_SUBDIRS= \
 	SUNWpcan \
 	SUNWpcelx \
 	SUNWpcmci  \
-	SUNWpcmcu  \
-	SUNWpcmem \
 	SUNWpcser \
 	SUNWpcu	\
 	SUNWpcwl \

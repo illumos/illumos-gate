@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -363,8 +363,7 @@ pcfs_device_identify(
 			 *	  we retrieve the partition number.
 			 *	- [abAB] means a floppy drive, so we swallow
 			 *	  the "drive specifier" and test later
-			 *	  whether the physical device is a floppy or
-			 *	  PCMCIA pseudofloppy (sram card).
+			 *	  whether the physical device is a floppy.
 			 */
 			*c = tolower(*c);
 			if (*c == 'a' || *c == 'b') {
@@ -2284,7 +2283,6 @@ recheck:
  * Test whether the device is:
  *	- a floppy device from a known controller type via DKIOCINFO
  *	- a real floppy using the fd(7d) driver and capable of fdio(7I) ioctls
- *	- a PCMCIA sram memory card (pseudofloppy) using pcram(7d)
  *	- a USB floppy drive (identified by drive geometry)
  *
  * Detecting a floppy will make PCFS metadata updates on such media synchronous,
@@ -2387,17 +2385,15 @@ pcfs_device_getinfo(struct pcfs *fsp)
 		isfloppy = 1;
 
 	/*
-	 * some devices (PCMCIA pseudofloppies) we like to treat
-	 * as floppies, but they don't understand fdio(7I) requests.
+	 * some devices we like to treat as floppies, but they don't
+	 * understand fdio(7I) requests.
 	 */
 	if (!isfloppy &&
 	    !ldi_ioctl(lh, DKIOCINFO, argp, FKIOCTL, cr, NULL) &&
 	    (arg.ci.dki_ctype == DKC_WDC2880 ||
 	    arg.ci.dki_ctype == DKC_NCRFLOPPY ||
 	    arg.ci.dki_ctype == DKC_SMSFLOPPY ||
-	    arg.ci.dki_ctype == DKC_INTEL82077 ||
-	    (arg.ci.dki_ctype == DKC_PCMCIA_MEM &&
-	    arg.ci.dki_flags & DKI_PCMCIA_PFD)))
+	    arg.ci.dki_ctype == DKC_INTEL82077))
 		isfloppy = 1;
 
 	/*
@@ -2468,9 +2464,8 @@ pc_getfattype(struct pcfs *fsp)
 	/*
 	 * Detect the native block size of the medium, and attempt to
 	 * detect whether the medium is removeable.
-	 * We do treat removeable media (floppies, PCMCIA memory cards,
-	 * USB and FireWire disks) differently wrt. to the frequency
-	 * and synchronicity of FAT updates.
+	 * We do treat removable media (floppies, USB and FireWire disks)
+	 * differently wrt. to the frequency and synchronicity of FAT updates.
 	 * We need to know the media block size in order to be able to
 	 * parse the partition table.
 	 */

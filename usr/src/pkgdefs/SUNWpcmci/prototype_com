@@ -18,12 +18,8 @@
 #
 # CDDL HEADER END
 #
-
-#
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # This required package information file contains a list of package contents.
@@ -39,20 +35,14 @@
 i pkginfo
 i copyright
 i depend
-i checkinstall
 i postinstall
 i preremove
 i preinstall
-i i.initd
 #
 # source locations relative to the prototype file
 #
 # SUNWpcmci
 #
-d none etc 0755 root sys
-d none etc/init.d 0755 root sys
-e initd etc/init.d/pcmcia 0744 root sys
 d none kernel 0755 root sys
 d none kernel/drv 0755 root sys
 f none kernel/drv/pcic.conf 0644 root sys
-f none kernel/drv/pem.conf 0644 root sys

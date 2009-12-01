@@ -50,4 +50,3 @@ P SUNWcsd	Core Solaris Devices
 P SUNWcsl	Core Solaris Libraries
 P SUNWcslr	Core Solaris Libraries (Root)
 P SUNWpcmci	PCMCIA Card Services and kernel code
-P SUNWpcmcu	PCMCIA usr binaries

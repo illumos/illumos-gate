@@ -452,8 +452,7 @@ DRV_KMODS	+= iscsi
 #	PCMCIA specific module(s)
 #
 DRV_KMODS	+= pcs
-DRV_KMODS	+= pcata pcmem pcram
-DRV_KMODS	+= pem
+DRV_KMODS	+= pcata
 MISC_KMODS	+= cardbus
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= pcelx
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= pcser

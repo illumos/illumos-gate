@@ -18,9 +18,7 @@
 #
 # CDDL HEADER END
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -50,7 +48,6 @@
 #
 f none kernel/drv/stp4020.conf 0644 root sys
 d none kernel/drv/sparcv9 0755 root sys
-f none kernel/drv/sparcv9/pem 0755 root sys
 f none kernel/drv/sparcv9/pcs 0755 root sys
 f none kernel/drv/sparcv9/stp4020 0755 root sys
 f none kernel/drv/sparcv9/pcic 0755 root sys
