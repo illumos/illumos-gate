@@ -2236,8 +2236,10 @@ esp_submit_req_inbound(mblk_t *esp_mp, ip_recv_attr_t *ira,
 		return (NULL);
 	}
 
-	mp = ipsec_free_crypto_data(mp);
-	esp_mp = ip_recv_attr_free_mblk(mp);
+	if (force) {
+		mp = ipsec_free_crypto_data(mp);
+		esp_mp = ip_recv_attr_free_mblk(mp);
+	}
 	BUMP_MIB(ira->ira_ill->ill_ip_mib, ipIfStatsInDiscards);
 	esp_crypto_failed(esp_mp, B_TRUE, kef_rc, ira->ira_ill, espstack);
 	/* esp_mp was passed to ip_drop_packet */
