@@ -444,14 +444,12 @@ auimpl_output_callback_impl(audio_engine_t *eng)
 void
 auimpl_output_callback(audio_engine_t *eng)
 {
-	unsigned fragfr;
 	int64_t cnt;
 
-	fragfr = eng->e_fragfr;
 	cnt = eng->e_head - eng->e_tail;
 
 	/* stay a bit ahead */
-	while (cnt < ((fragfr * 3) / 2)) {
+	while (cnt < eng->e_playahead) {
 		auimpl_output_callback_impl(eng);
 		cnt = eng->e_head - eng->e_tail;
 	}

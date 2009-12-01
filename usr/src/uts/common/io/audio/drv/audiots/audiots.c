@@ -134,7 +134,6 @@ static int audiots_rate(void *);
 static void audiots_chinfo(void *, int, unsigned *, unsigned *);
 static uint64_t audiots_count(void *);
 static void audiots_sync(void *, unsigned);
-static size_t audiots_qlen(void *);
 
 static audio_engine_ops_t	audiots_engine_ops = {
 	AUDIO_ENGINE_VERSION,
@@ -147,8 +146,9 @@ static audio_engine_ops_t	audiots_engine_ops = {
 	audiots_channels,
 	audiots_rate,
 	audiots_sync,
-	audiots_qlen,
-	audiots_chinfo
+	NULL,
+	audiots_chinfo,
+	NULL,
 };
 
 /*
@@ -1733,25 +1733,6 @@ audiots_sync(void *arg, unsigned nframes)
 	_NOTE(ARGUNUSED(nframes));
 
 	(void) ddi_dma_sync(port->tp_dmah, 0, 0, port->tp_sync_dir);
-}
-
-/*
- * audiots_qlen()
- *
- * Description:
- *	This is called by the framework to determine on-device queue length.
- *
- * Arguments:
- *	void	*arg		The DMA engine to query
- *
- * Returns:
- *	hardware queue length not reported by count (0 for this device)
- */
-static size_t
-audiots_qlen(void *arg)
-{
-	_NOTE(ARGUNUSED(arg));
-	return (0);
 }
 
 /*

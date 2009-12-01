@@ -82,7 +82,7 @@ static int audiocs_channels(void *);
 static int audiocs_rate(void *);
 static uint64_t audiocs_count(void *);
 static void audiocs_sync(void *, unsigned);
-static size_t audiocs_qlen(void *);
+static unsigned audiocs_qlen(void *);
 
 /*
  * Control callbacks.
@@ -151,7 +151,9 @@ static audio_engine_ops_t audiocs_engine_ops = {
 	audiocs_channels,
 	audiocs_rate,
 	audiocs_sync,
-	audiocs_qlen
+	audiocs_qlen,
+	NULL,
+	NULL
 };
 
 #define	OUTPUT_SPEAKER		0
@@ -1945,7 +1947,7 @@ audiocs_sync(void *arg, unsigned nframes)
  * Returns:
  *	hardware queue length not reported by count (0 for this device)
  */
-static size_t
+static unsigned
 audiocs_qlen(void *arg)
 {
 	CS_engine_t	*eng = arg;

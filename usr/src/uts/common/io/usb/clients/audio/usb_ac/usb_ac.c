@@ -335,7 +335,7 @@ static int usb_engine_format(void *);
 static int usb_engine_channels(void *);
 static int usb_engine_rate(void *);
 static void usb_engine_sync(void *, unsigned);
-static size_t usb_engine_qlen(void *);
+static unsigned usb_engine_qlen(void *);
 
 /* engine buffer size in terms of fragments */
 
@@ -5666,7 +5666,7 @@ usb_engine_sync(void *arg, unsigned nframes)
 }
 
 
-static size_t
+static unsigned
 usb_engine_qlen(void *arg)
 {
 	usb_audio_eng_t *engp = (usb_audio_eng_t *)arg;

@@ -151,7 +151,6 @@ static int emu10k_channels(void *);
 static int emu10k_rate(void *);
 static uint64_t emu10k_count(void *);
 static void emu10k_sync(void *, unsigned);
-static size_t emu10k_qlen(void *);
 static void emu10k_chinfo(void *, int, unsigned *, unsigned *);
 
 static uint16_t emu10k_read_ac97(void *, uint8_t);
@@ -174,8 +173,9 @@ static audio_engine_ops_t emu10k_engine_ops = {
 	emu10k_channels,
 	emu10k_rate,
 	emu10k_sync,
-	emu10k_qlen,
-	emu10k_chinfo
+	NULL,
+	emu10k_chinfo,
+	NULL
 };
 
 static uint16_t
@@ -586,13 +586,6 @@ emu10k_sync(void *arg, unsigned nframes)
 	_NOTE(ARGUNUSED(nframes));
 
 	(void) ddi_dma_sync(portc->buf_dmah, 0, 0, portc->syncdir);
-}
-
-size_t
-emu10k_qlen(void *arg)
-{
-	_NOTE(ARGUNUSED (arg));
-	return (0);
 }
 
 uint64_t

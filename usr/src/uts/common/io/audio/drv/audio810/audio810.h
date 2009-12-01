@@ -36,9 +36,9 @@
 #define	I810_NAME			"audio810"
 #define	I810_MOD_NAME			"audio810 audio driver"
 
-#define	I810_INTS			(175)	/* default interrupt rate */
+#define	I810_INTS			(120)	/* default interrupt rate */
 #define	I810_MIN_INTS			(24)	/* minimum interrupt rate */
-#define	I810_MAX_INTS			(5000)	/* maximum interrupt rate */
+#define	I810_MAX_INTS			(500)	/* maximum interrupt rate */
 #define	I810_NFRAGS			(8)	/* default # fragments */
 
 /*

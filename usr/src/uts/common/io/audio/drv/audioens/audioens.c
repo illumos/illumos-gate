@@ -799,14 +799,6 @@ audioens_sync(void *arg, unsigned nframes)
 	}
 }
 
-static size_t
-audioens_qlen(void *arg)
-{
-	audioens_port_t *port = arg;
-
-	return (port->fragfr);
-}
-
 static void
 audioens_chinfo(void *arg, int chan, unsigned *offset, unsigned *incr)
 {
@@ -832,8 +824,9 @@ audio_engine_ops_t audioens_engine_ops = {
 	audioens_channels,
 	audioens_rate,
 	audioens_sync,
-	audioens_qlen,
-	audioens_chinfo
+	NULL,
+	audioens_chinfo,
+	NULL,
 };
 
 void

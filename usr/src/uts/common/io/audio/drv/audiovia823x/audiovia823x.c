@@ -106,7 +106,6 @@ static int auvia_channels(void *);
 static int auvia_rate(void *);
 static uint64_t auvia_count(void *);
 static void auvia_sync(void *, unsigned);
-static size_t auvia_qlen(void *);
 
 static uint16_t auvia_read_ac97(void *, uint8_t);
 static void auvia_write_ac97(void *, uint8_t, uint16_t);
@@ -132,7 +131,9 @@ static audio_engine_ops_t auvia_engine_ops = {
 	auvia_channels,
 	auvia_rate,
 	auvia_sync,
-	auvia_qlen
+	NULL,
+	NULL,
+	NULL,
 };
 
 static uint16_t
@@ -359,13 +360,6 @@ auvia_sync(void *arg, unsigned nframes)
 	_NOTE(ARGUNUSED(nframes));
 
 	(void) ddi_dma_sync(portc->buf_dmah, 0, 0, portc->syncdir);
-}
-
-size_t
-auvia_qlen(void *arg)
-{
-	_NOTE(ARGUNUSED(arg));
-	return (0);
 }
 
 uint64_t

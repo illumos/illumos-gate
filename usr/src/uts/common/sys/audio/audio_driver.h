@@ -43,7 +43,7 @@ extern "C" {
 
 struct audio_engine_ops {
 	int	audio_engine_version;
-#define	AUDIO_ENGINE_VERSION	0
+#define	AUDIO_ENGINE_VERSION	1
 
 	/*
 	 * Initialize engine, including buffer allocation.  Arguments
@@ -104,7 +104,7 @@ struct audio_engine_ops {
 	 * The framework may like to know how deep the device queues data.
 	 * This can be used to provide a more accurate latency calculation.
 	 */
-	size_t	(*audio_engine_qlen)(void *);
+	unsigned	(*audio_engine_qlen)(void *);
 
 	/*
 	 * If the driver doesn't use simple interleaving, then we need to
@@ -116,6 +116,14 @@ struct audio_engine_ops {
 	 */
 	void	(*audio_engine_chinfo)(void *, int chan, unsigned *offset,
 	    unsigned *incr);
+
+	/*
+	 * The following entry point is used to determine the play ahead
+	 * desired by the engine.  Engines with less consistent scheduling,
+	 * or with a need for deeper queuing, implement this.  If not
+	 * implemented, the framework assumes 1.5 * fragfr.
+	 */
+	unsigned	(*audio_engine_playahead)(void *);
 };
 
 void audio_init_ops(struct dev_ops *, const char *);

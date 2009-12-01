@@ -806,14 +806,6 @@ cmpci_sync(void *arg, unsigned nframes)
 	(void) ddi_dma_sync(port->dmah, 0, 0, port->sync_dir);
 }
 
-static size_t
-cmpci_qlen(void *unused)
-{
-	_NOTE(ARGUNUSED(unused));
-
-	return (0);
-}
-
 audio_engine_ops_t cmpci_engine_ops = {
 	AUDIO_ENGINE_VERSION,		/* version number */
 	cmpci_open,
@@ -825,8 +817,9 @@ audio_engine_ops_t cmpci_engine_ops = {
 	cmpci_channels,
 	cmpci_rate,
 	cmpci_sync,
-	cmpci_qlen,
+	NULL,		/* qlen */
 	cmpci_chinfo,
+	NULL,		/* playahead */
 };
 
 static int

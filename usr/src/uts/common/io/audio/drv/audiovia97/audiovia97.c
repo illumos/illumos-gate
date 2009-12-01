@@ -101,7 +101,6 @@ static int via97_channels(void *);
 static int via97_rate(void *);
 static uint64_t via97_count(void *);
 static void via97_sync(void *, unsigned);
-static size_t via97_qlen(void *);
 
 static uint16_t via97_read_ac97(void *, uint8_t);
 static void via97_write_ac97(void *, uint8_t, uint16_t);
@@ -126,7 +125,9 @@ static audio_engine_ops_t via97_engine_ops = {
 	via97_channels,
 	via97_rate,
 	via97_sync,
-	via97_qlen
+	NULL,
+	NULL,
+	NULL
 };
 
 static uint16_t
@@ -341,13 +342,6 @@ via97_sync(void *arg, unsigned nframes)
 	_NOTE(ARGUNUSED(nframes));
 
 	(void) ddi_dma_sync(portc->buf_dmah, 0, 0, portc->syncdir);
-}
-
-size_t
-via97_qlen(void *arg)
-{
-	_NOTE(ARGUNUSED(arg));
-	return (0);
 }
 
 uint64_t

@@ -79,7 +79,6 @@ static int audio1575_channels(void *);
 static int audio1575_rate(void *);
 static uint64_t audio1575_count(void *);
 static void audio1575_sync(void *, unsigned);
-static size_t audio1575_qlen(void *);
 
 static audio_engine_ops_t audio1575_engine_ops = {
 	AUDIO_ENGINE_VERSION,
@@ -92,7 +91,9 @@ static audio_engine_ops_t audio1575_engine_ops = {
 	audio1575_channels,
 	audio1575_rate,
 	audio1575_sync,
-	audio1575_qlen
+	NULL,
+	NULL,
+	NULL
 };
 
 /*
@@ -703,26 +704,6 @@ audio1575_sync(void *arg, unsigned nframes)
 
 	(void) ddi_dma_sync(port->samp_dmah, 0, 0, port->sync_dir);
 }
-
-/*
- * audio1575_qlen()
- *
- * Description:
- *	This is called by the framework to determine on-device queue length.
- *
- * Arguments:
- *	void	*arg		The DMA engine to query
- *
- * Returns:
- *	hardware queue length not reported by count (0 for this device)
- */
-static size_t
-audio1575_qlen(void *arg)
-{
-	_NOTE(ARGUNUSED(arg));
-	return (0);
-}
-
 
 /*
  * audio1575_start_port()

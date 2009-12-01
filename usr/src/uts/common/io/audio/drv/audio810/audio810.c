@@ -92,7 +92,7 @@ static int audio810_channels(void *);
 static int audio810_rate(void *);
 static uint64_t audio810_count(void *);
 static void audio810_sync(void *, unsigned);
-static size_t audio810_qlen(void *);
+static unsigned audio810_playahead(void *);
 
 static audio_engine_ops_t audio810_engine_ops = {
 	AUDIO_ENGINE_VERSION,
@@ -105,7 +105,9 @@ static audio_engine_ops_t audio810_engine_ops = {
 	audio810_channels,
 	audio810_rate,
 	audio810_sync,
-	audio810_qlen
+	NULL,
+	NULL,
+	audio810_playahead
 };
 
 /*
@@ -698,23 +700,29 @@ audio810_sync(void *arg, unsigned nframes)
 }
 
 /*
- * audio810_qlen()
+ * audio810_playahead()
  *
  * Description:
- *	This is called by the framework to determine on-device queue length.
+ *	This is called by the framework to determine how much data it
+ *	should queue up.  We desire a deeper playahead than most to
+ *	allow for virtualized devices which have less "regular"
+ *	interrupt scheduling.
  *
  * Arguments:
  *	void	*arg		The DMA engine to query
  *
  * Returns:
- *	hardware queue length not reported by count (0 for this device)
+ *	Play ahead in frames (4 fragments).
  */
-static size_t
-audio810_qlen(void *arg)
+static unsigned
+audio810_playahead(void *arg)
 {
-	_NOTE(ARGUNUSED(arg));
-	return (0);
+	audio810_port_t *port = arg;
+
+	return (4 * port->fragfr);
 }
+
+
 
 /* *********************** Local Routines *************************** */
 
@@ -1414,10 +1422,9 @@ audio810_alloc_port(audio810_state_t *statep, int num, uint8_t nchan)
 
 	/*
 	 * Note that fragments must divide evenly into I810_BD_NUMS (32).
+	 * We also insist that the value be larger than our "playahead".
 	 */
-	if (port->nfrag <= 4) {
-		port->nfrag = 4;
-	} else if (port->nfrag <= 8) {
+	if (port->nfrag <= 8) {
 		port->nfrag = 8;
 	} else if (port->nfrag <= 16) {
 		port->nfrag = 16;

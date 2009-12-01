@@ -525,7 +525,11 @@ auclnt_get_output_qlen(audio_client_t *c, unsigned *slen, unsigned *flen)
 
 	mutex_enter(&e->e_lock);
 	mutex_enter(&sp->s_lock);
-	el = ENG_QLEN(e) + (e->e_head - e->e_tail);
+	if (e->e_ops.audio_engine_qlen != NULL) {
+		el = ENG_QLEN(e) + (e->e_head - e->e_tail);
+	} else {
+		el = (e->e_head - e->e_tail);
+	}
 	er = e->e_rate;
 	sl = sp->s_cnv_cnt;
 	sr = sp->s_user_parms->p_rate;

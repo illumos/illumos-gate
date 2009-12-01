@@ -76,7 +76,6 @@ static int audioixp_channels(void *);
 static int audioixp_rate(void *);
 static uint64_t audioixp_count(void *);
 static void audioixp_sync(void *, unsigned);
-static size_t audioixp_qlen(void *);
 
 static audio_engine_ops_t audioixp_engine_ops = {
 	AUDIO_ENGINE_VERSION,
@@ -89,7 +88,9 @@ static audio_engine_ops_t audioixp_engine_ops = {
 	audioixp_channels,
 	audioixp_rate,
 	audioixp_sync,
-	audioixp_qlen
+	NULL,
+	NULL,
+	NULL
 };
 
 
@@ -740,26 +741,6 @@ audioixp_sync(void *arg, unsigned nframes)
 
 	(void) ddi_dma_sync(port->samp_dmah, 0, 0, port->sync_dir);
 }
-
-/*
- * audioixp_qlen()
- *
- * Description:
- *	This is called by the framework to determine on-device queue length.
- *
- * Arguments:
- *	void	*arg		The DMA engine to query
- *
- * Returns:
- *	hardware queue length not reported by count (0 for this device)
- */
-static size_t
-audioixp_qlen(void *arg)
-{
-	_NOTE(ARGUNUSED(arg));
-	return (0);
-}
-
 
 /* *********************** Local Routines *************************** */
 

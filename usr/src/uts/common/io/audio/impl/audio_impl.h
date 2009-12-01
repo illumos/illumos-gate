@@ -275,6 +275,8 @@ struct audio_engine {
 #define	e_hidx			e_buf.b_hidx
 #define	e_tidx			e_buf.b_tidx
 
+	unsigned		e_playahead;
+
 	int			e_intrs;
 	int			e_errors;
 	int			e_overruns;
@@ -474,6 +476,7 @@ void auimpl_dev_vwarn(audio_dev_t *, const char *, va_list);
 #define	ENG_STOP(e)		E_OP(e, stop)(E_PRV(e))
 #define	ENG_COUNT(e)		E_OP(e, count)(E_PRV(e))
 #define	ENG_QLEN(e)		E_OP(e, qlen)(E_PRV(e))
+#define	ENG_PLAYAHEAD(e)	E_OP(e, playahead)(E_PRV(e))
 #define	ENG_CLOSE(e)		E_OP(e, close)(E_PRV(e))
 #define	ENG_OPEN(e, s, nf, d) 	E_OP(e, open)(E_PRV(e), e->e_flags, s, nf, d)
 #define	ENG_CHINFO(e, c, o, i)	E_OP(e, chinfo(E_PRV(e), c, o, i))

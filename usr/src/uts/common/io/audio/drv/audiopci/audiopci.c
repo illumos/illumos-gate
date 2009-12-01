@@ -699,19 +699,6 @@ audiopci_sync(void *arg, unsigned nframes)
 	}
 }
 
-static size_t
-audiopci_qlen(void *arg)
-{
-	_NOTE(ARGUNUSED(arg));
-
-	/*
-	 * There is actually a small FIFO with 64 bytes -- 16 samples --
-	 * onboard, but it is probably not worth the effort to report it,
-	 * and the FIFO will not always be full.
-	 */
-	return (0);
-}
-
 audio_engine_ops_t audiopci_engine_ops = {
 	AUDIO_ENGINE_VERSION,		/* version number */
 	audiopci_open,
@@ -723,7 +710,8 @@ audio_engine_ops_t audiopci_engine_ops = {
 	audiopci_channels,
 	audiopci_rate,
 	audiopci_sync,
-	audiopci_qlen,
+	NULL,
+	NULL,
 	NULL,
 };
 

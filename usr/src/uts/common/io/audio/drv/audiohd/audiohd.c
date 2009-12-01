@@ -1147,14 +1147,6 @@ audiohd_engine_sync(void *arg, unsigned nframes)
 
 }
 
-static size_t
-audiohd_engine_qlen(void *arg)
-{
-	audiohd_port_t *port = arg;
-
-	return (port->fragfr);
-}
-
 audio_engine_ops_t audiohd_engine_ops = {
 	AUDIO_ENGINE_VERSION,		/* version number */
 	audiohd_engine_open,
@@ -1166,7 +1158,9 @@ audio_engine_ops_t audiohd_engine_ops = {
 	audiohd_engine_channels,
 	audiohd_engine_rate,
 	audiohd_engine_sync,
-	audiohd_engine_qlen,
+	NULL,
+	NULL,
+	NULL
 };
 
 static int

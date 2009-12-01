@@ -86,7 +86,6 @@ static int audigyls_channels(void *);
 static int audigyls_rate(void *);
 static uint64_t audigyls_count(void *);
 static void audigyls_sync(void *, unsigned);
-static size_t audigyls_qlen(void *);
 static void audigyls_chinfo(void *, int, unsigned *, unsigned *);
 
 
@@ -114,8 +113,9 @@ static audio_engine_ops_t audigyls_engine_ops = {
 	audigyls_channels,
 	audigyls_rate,
 	audigyls_sync,
-	audigyls_qlen,
-	audigyls_chinfo
+	NULL,
+	audigyls_chinfo,
+	NULL
 };
 
 /*
@@ -486,13 +486,6 @@ audigyls_sync(void *arg, unsigned nframes)
 	_NOTE(ARGUNUSED(nframes));
 
 	(void) ddi_dma_sync(port->buf_dmah, 0, 0, port->syncdir);
-}
-
-size_t
-audigyls_qlen(void *arg)
-{
-	_NOTE(ARGUNUSED(arg));
-	return (0);
 }
 
 uint64_t

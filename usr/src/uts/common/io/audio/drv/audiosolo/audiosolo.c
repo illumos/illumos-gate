@@ -934,13 +934,6 @@ solo_rate(void *arg)
 	return (SOLO_RATE);
 }
 
-static size_t
-solo_qlen(void *arg)
-{
-	_NOTE(ARGUNUSED(arg));
-	return (0);
-}
-
 static void
 solo_chinfo(void *arg, int chan, unsigned *offset, unsigned *incr)
 {
@@ -1060,8 +1053,9 @@ static audio_engine_ops_t solo_engine_ops = {
 	solo_channels,
 	solo_rate,
 	solo_sync,
-	solo_qlen,
+	NULL,
 	solo_chinfo,
+	NULL,
 };
 
 static void

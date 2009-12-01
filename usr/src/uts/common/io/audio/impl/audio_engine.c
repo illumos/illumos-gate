@@ -595,6 +595,26 @@ again:
 	e->e_limiter_state = 0x10000;
 	bzero(e->e_data, e->e_nbytes);
 
+	if (e->e_ops.audio_engine_playahead == NULL) {
+		e->e_playahead = (e->e_fragfr * 3) / 2;
+	} else {
+		e->e_playahead = ENG_PLAYAHEAD(e);
+		/*
+		 * Need to have at least a fragment plus some extra to
+		 * avoid underruns.
+		 */
+		if (e->e_playahead < ((e->e_fragfr * 3) / 2)) {
+			e->e_playahead = (e->e_fragfr * 3) / 2;
+		}
+
+		/*
+		 * Impossible to queue more frames than FIFO can hold.
+		 */
+		if (e->e_playahead > e->e_nframes) {
+			e->e_playahead = (e->e_fragfr * 3) / 2;
+		}
+	}
+
 	for (i = 0; i < e->e_nchan; i++) {
 		if (e->e_ops.audio_engine_chinfo == NULL) {
 			e->e_choffs[i] = i;

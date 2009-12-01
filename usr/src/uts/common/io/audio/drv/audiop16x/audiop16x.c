@@ -104,7 +104,6 @@ static int p16x_channels(void *);
 static int p16x_rate(void *);
 static uint64_t p16x_count(void *);
 static void p16x_sync(void *, unsigned);
-static size_t p16x_qlen(void *);
 static void p16x_chinfo(void *, int, unsigned *, unsigned *);
 
 static uint16_t p16x_read_ac97(void *, uint8_t);
@@ -129,8 +128,9 @@ static audio_engine_ops_t p16x_engine_ops = {
 	p16x_channels,
 	p16x_rate,
 	p16x_sync,
-	p16x_qlen,
+	NULL,
 	p16x_chinfo,
+	NULL
 };
 
 static unsigned int
@@ -366,13 +366,6 @@ p16x_sync(void *arg, unsigned nframes)
 	_NOTE(ARGUNUSED(nframes));
 
 	(void) ddi_dma_sync(port->buf_dmah, 0, 0, port->syncdir);
-}
-
-size_t
-p16x_qlen(void *arg)
-{
-	_NOTE(ARGUNUSED(arg));
-	return (0);
 }
 
 uint64_t
