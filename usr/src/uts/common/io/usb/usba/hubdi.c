@@ -1303,13 +1303,6 @@ hubd_config_one(hubd_t *hubd, int port)
 
 	ndi_hold_devi(hdip); /* so we don't race with detach */
 
-	mutex_enter(HUBD_MUTEX(hubd));
-
-	hubd_pm_busy_component(hubd, hubd->h_dip, 0);
-	hubd_stop_polling(hubd);
-
-	mutex_exit(HUBD_MUTEX(hubd));
-
 	/*
 	 * this ensures one config activity per system at a time.
 	 * we enter the parent PCI node to have this serialization.
@@ -1321,6 +1314,11 @@ hubd_config_one(hubd_t *hubd, int port)
 	/* exclude other threads */
 	ndi_devi_enter(hdip, &circ);
 	mutex_enter(HUBD_MUTEX(hubd));
+
+	hubd_pm_busy_component(hubd, hubd->h_dip, 0);
+	hubd_stop_polling(hubd);
+
+
 
 	if (!hubd->h_children_dips[port]) {
 
@@ -3713,11 +3711,6 @@ hubd_hotplug_thread(void *arg)
 		    "hubd_hotplug_thread: not root hub");
 	}
 
-	ASSERT(hubd->h_intr_pipe_state == HUBD_INTR_PIPE_ACTIVE);
-
-	nports = hubd->h_hub_descr.bNbrPorts;
-
-	hubd_stop_polling(hubd);
 	mutex_exit(HUBD_MUTEX(hubd));
 
 	/*
@@ -3732,6 +3725,12 @@ hubd_hotplug_thread(void *arg)
 	/* exclude other threads */
 	ndi_devi_enter(hdip, &circ);
 	mutex_enter(HUBD_MUTEX(hubd));
+
+	ASSERT(hubd->h_intr_pipe_state == HUBD_INTR_PIPE_ACTIVE);
+
+	nports = hubd->h_hub_descr.bNbrPorts;
+
+	hubd_stop_polling(hubd);
 
 	while ((hubd->h_dev_state == USB_DEV_ONLINE) &&
 	    (hubd->h_port_change)) {
@@ -7524,9 +7523,13 @@ usba_hubdi_ioctl(dev_info_t *self, dev_t dev, int cmd, intptr_t arg,
 		ndi_devi_exit(hubd->h_dip, circ);
 		ndi_devi_exit(rh_dip, rh_circ);
 		ndi_devi_exit(ddi_get_parent(rh_dip), prh_circ);
-		if ((child_dip == NULL) ||
-		    (ndi_devi_online(child_dip, 0) != NDI_SUCCESS)) {
+		if (child_dip == NULL) {
 			rv = EIO;
+		} else {
+			ndi_hold_devi(child_dip);
+			if (ndi_devi_online(child_dip, 0) != NDI_SUCCESS)
+				rv = EIO;
+			ndi_rele_devi(child_dip);
 		}
 		ndi_devi_enter(ddi_get_parent(rh_dip), &prh_circ);
 		ndi_devi_enter(rh_dip, &rh_circ);
