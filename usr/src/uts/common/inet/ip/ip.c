@@ -665,8 +665,6 @@ uint_t ip_max_frag_dups = 10;
 /* RFC 1122 Conformance */
 #define	IP_FORWARD_DEFAULT	IP_FORWARD_NEVER
 
-#define	ILL_MAX_NAMELEN			LIFNAMSIZ
-
 static int	ip_open(queue_t *q, dev_t *devp, int flag, int sflag,
 		    cred_t *credp, boolean_t isv6);
 static mblk_t	*ip_xmit_attach_llhdr(mblk_t *, nce_t *);

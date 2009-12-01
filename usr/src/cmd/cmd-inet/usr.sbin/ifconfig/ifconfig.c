@@ -4284,6 +4284,13 @@ Perror2(const char *cmd, const char *str)
 	case EEXIST:
 		(void) fprintf(stderr, "%s: already exists\n", str);
 		break;
+	case ENAMETOOLONG:
+		(void) fprintf(stderr, "%s: interface name too long\n", str);
+		break;
+	case ERANGE:
+		(void) fprintf(stderr, "%s: logical interface id is outside "
+		    "allowed range\n", str);
+		break;
 	default:
 		errno = error;
 		perror(str);

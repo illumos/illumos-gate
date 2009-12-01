@@ -144,7 +144,7 @@ static	int	ip_sioctl_token_tail(ipif_t *ipif, sin6_t *sin6, int addrlen,
 static void	ipsq_delete(ipsq_t *);
 
 static ipif_t	*ipif_allocate(ill_t *ill, int id, uint_t ire_type,
-    boolean_t initialize, boolean_t insert);
+    boolean_t initialize, boolean_t insert, int *errorp);
 static ire_t	**ipif_create_bcast_ires(ipif_t *ipif, ire_t **irep);
 static void	ipif_delete_bcast_ires(ipif_t *ipif);
 static int	ipif_add_ires_v4(ipif_t *, boolean_t);
@@ -3392,7 +3392,7 @@ ill_init(queue_t *q, ill_t *ill)
 	 * the device name.
 	 */
 	frag_ptr = (uchar_t *)mi_zalloc(ILL_FRAG_HASH_TBL_SIZE +
-	    2 * LIFNAMSIZ + 5 + strlen(ipv6_forward_suffix));
+	    2 * LIFNAMSIZ + strlen(ipv6_forward_suffix));
 	if (frag_ptr == NULL) {
 		freemsg(info_mp);
 		return (ENOMEM);
@@ -3751,7 +3751,7 @@ ill_lookup_on_name(char *name, boolean_t do_alloc, boolean_t isv6,
 	if (!ipsq_init(ill, B_FALSE))
 		goto done;
 
-	ipif = ipif_allocate(ill, 0L, IRE_LOOPBACK, B_TRUE, B_TRUE);
+	ipif = ipif_allocate(ill, 0L, IRE_LOOPBACK, B_TRUE, B_TRUE, NULL);
 	if (ipif == NULL)
 		goto done;
 
@@ -4215,7 +4215,7 @@ ip_ll_subnet_defaults(ill_t *ill, mblk_t *mp)
 		 * the wakeup.
 		 */
 		(void) ipif_allocate(ill, 0, IRE_LOCAL,
-		    dlia->dl_provider_style != DL_STYLE2, B_TRUE);
+		    dlia->dl_provider_style != DL_STYLE2, B_TRUE, NULL);
 		mutex_enter(&ill->ill_lock);
 		ASSERT(ill->ill_dlpi_style_set == 0);
 		ill->ill_dlpi_style_set = 1;
@@ -9191,8 +9191,7 @@ ip_sioctl_addif(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 	 * instead.
 	 */
 	if ((ipif = ipif_allocate(ill, found_sep ? id : -1, IRE_LOCAL,
-	    B_TRUE, B_TRUE)) == NULL) {
-		err = ENOBUFS;
+	    B_TRUE, B_TRUE, &err)) == NULL) {
 		goto done;
 	}
 
@@ -11518,6 +11517,22 @@ ipif_transfer(ipif_t *sipif, ipif_t *dipif, ipif_t *virgipif)
 }
 
 /*
+ * checks if:
+ *	- <ill_name>:<ipif_id> is at most LIFNAMSIZ - 1 and
+ *	- logical interface is within the allowed range
+ */
+static int
+is_lifname_valid(ill_t *ill, unsigned int ipif_id)
+{
+	if (snprintf(NULL, 0, "%s:%d", ill->ill_name, ipif_id) >= LIFNAMSIZ)
+		return (ENAMETOOLONG);
+
+	if (ipif_id >= ill->ill_ipst->ips_ip_addrs_per_if)
+		return (ERANGE);
+	return (0);
+}
+
+/*
  * Insert the ipif, so that the list of ipifs on the ill will be sorted
  * with respect to ipif_id. Note that an ipif with an ipif_id of -1 will
  * be inserted into the first space available in the list. The value of
@@ -11529,7 +11544,7 @@ ipif_insert(ipif_t *ipif, boolean_t acquire_g_lock)
 	ill_t *ill;
 	ipif_t *tipif;
 	ipif_t **tipifp;
-	int id;
+	int id, err;
 	ip_stack_t	*ipst;
 
 	ASSERT(ipif->ipif_ill->ill_net_type == IRE_LOOPBACK ||
@@ -11558,15 +11573,14 @@ ipif_insert(ipif_t *ipif, boolean_t acquire_g_lock)
 			id++;
 			tipifp = &(tipif->ipif_next);
 		}
-		/* limit number of logical interfaces */
-		if (id >= ipst->ips_ip_addrs_per_if) {
+		if ((err = is_lifname_valid(ill, id)) != 0) {
 			mutex_exit(&ill->ill_lock);
 			if (acquire_g_lock)
 				rw_exit(&ipst->ips_ill_g_lock);
-			return (-1);
+			return (err);
 		}
 		ipif->ipif_id = id; /* assign new id */
-	} else if (id < ipst->ips_ip_addrs_per_if) {
+	} else if ((err = is_lifname_valid(ill, id)) == 0) {
 		/* we have a real id; insert ipif in the right place */
 		while ((tipif = *tipifp) != NULL) {
 			ASSERT(tipif->ipif_id != id);
@@ -11578,7 +11592,7 @@ ipif_insert(ipif_t *ipif, boolean_t acquire_g_lock)
 		mutex_exit(&ill->ill_lock);
 		if (acquire_g_lock)
 			rw_exit(&ipst->ips_ill_g_lock);
-		return (-1);
+		return (err);
 	}
 
 	ASSERT(tipifp != &(ill->ill_ipif) || id == 0);
@@ -11628,8 +11642,9 @@ ipif_remove(ipif_t *ipif)
  */
 static ipif_t *
 ipif_allocate(ill_t *ill, int id, uint_t ire_type, boolean_t initialize,
-    boolean_t insert)
+    boolean_t insert, int *errorp)
 {
+	int err;
 	ipif_t	*ipif;
 	ip_stack_t *ipst = ill->ill_ipst;
 
@@ -11637,8 +11652,14 @@ ipif_allocate(ill_t *ill, int id, uint_t ire_type, boolean_t initialize,
 	    ill->ill_name, id, (void *)ill));
 	ASSERT(ire_type == IRE_LOOPBACK || IAM_WRITER_ILL(ill));
 
-	if ((ipif = (ipif_t *)mi_alloc(sizeof (ipif_t), BPRI_MED)) == NULL)
+	if (errorp != NULL)
+		*errorp = 0;
+
+	if ((ipif = mi_alloc(sizeof (ipif_t), BPRI_MED)) == NULL) {
+		if (errorp != NULL)
+			*errorp = ENOMEM;
 		return (NULL);
+	}
 	*ipif = ipif_zero;	/* start clean */
 
 	ipif->ipif_ill = ill;
@@ -11652,8 +11673,10 @@ ipif_allocate(ill_t *ill, int id, uint_t ire_type, boolean_t initialize,
 	ipif->ipif_refcnt = 0;
 
 	if (insert) {
-		if (ipif_insert(ipif, ire_type != IRE_LOOPBACK) != 0) {
+		if ((err = ipif_insert(ipif, ire_type != IRE_LOOPBACK)) != 0) {
 			mi_free(ipif);
+			if (errorp != NULL)
+				*errorp = err;
 			return (NULL);
 		}
 		/* -1 id should have been replaced by real id */
@@ -11678,6 +11701,8 @@ ipif_allocate(ill_t *ill, int id, uint_t ire_type, boolean_t initialize,
 				rw_exit(&ipst->ips_ill_g_lock);
 			}
 			mi_free(ipif);
+			if (errorp != NULL)
+				*errorp = ENOMEM;
 			return (NULL);
 		}
 	}
@@ -13377,7 +13402,7 @@ ipif_lookup_on_name(char *name, size_t namelen, boolean_t do_alloc,
 		ire_type = IRE_LOOPBACK;
 	else
 		ire_type = IRE_LOCAL;
-	ipif = ipif_allocate(ill, id, ire_type, B_TRUE, B_TRUE);
+	ipif = ipif_allocate(ill, id, ire_type, B_TRUE, B_TRUE, NULL);
 	if (ipif != NULL)
 		ipif_refhold_locked(ipif);
 	mutex_exit(&ill->ill_lock);
@@ -13838,14 +13863,14 @@ ipif_up(ipif_t *ipif, queue_t *q, mblk_t *mp)
 		 * to starting the move (and grabbing locks).
 		 */
 		if (ipif->ipif_id == 0) {
-			moveipif = ipif_allocate(ill, 0, IRE_LOCAL, B_TRUE,
-			    B_FALSE);
-			stubipif = ipif_allocate(ill, 0, IRE_LOCAL, B_TRUE,
-			    B_FALSE);
-			if (moveipif == NULL || stubipif == NULL) {
+			if ((moveipif = ipif_allocate(ill, 0, IRE_LOCAL, B_TRUE,
+			    B_FALSE, &err)) == NULL) {
+				return (err);
+			}
+			if ((stubipif = ipif_allocate(ill, 0, IRE_LOCAL, B_TRUE,
+			    B_FALSE, &err)) == NULL) {
 				mi_free(moveipif);
-				mi_free(stubipif);
-				return (ENOMEM);
+				return (err);
 			}
 		}
 
@@ -13875,7 +13900,7 @@ ipif_up(ipif_t *ipif, queue_t *q, mblk_t *mp)
 			ipif = ipmp_ill->ill_ipif;
 		} else {
 			ipif->ipif_id = -1;
-			if (ipif_insert(ipif, B_FALSE) != 0) {
+			if ((err = ipif_insert(ipif, B_FALSE)) != 0) {
 				/*
 				 * No more available ipif_id's -- put it back
 				 * on the original ill and fail the operation.
@@ -13891,7 +13916,7 @@ ipif_up(ipif_t *ipif, queue_t *q, mblk_t *mp)
 					VERIFY(ipif_insert(ipif, B_FALSE) == 0);
 				}
 				rw_exit(&ipst->ips_ill_g_lock);
-				return (ENOMEM);
+				return (err);
 			}
 		}
 		rw_exit(&ipst->ips_ill_g_lock);

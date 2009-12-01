@@ -2468,7 +2468,7 @@ nce_timer(void *arg)
 			}
 			if (ipif != NULL) {
 				if (ipif->ipif_was_dup) {
-					char ibuf[LIFNAMSIZ + 10];
+					char ibuf[LIFNAMSIZ];
 					char sbuf[INET6_ADDRSTRLEN];
 
 					ipif->ipif_was_dup = B_FALSE;

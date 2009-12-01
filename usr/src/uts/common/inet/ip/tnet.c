@@ -2050,8 +2050,7 @@ tsol_check_interface_address(const ipif_t *ipif)
 	zone_t *zone;
 	ts_label_t *plabel;
 	const bslabel_t *label;
-	char ifbuf[LIFNAMSIZ + 10];
-	const char *ifname;
+	char ifname[LIFNAMSIZ];
 	boolean_t retval;
 	tsol_rhent_t rhent;
 	netstack_t *ns = ipif->ipif_ill->ill_ipst->ips_netstack;
@@ -2107,12 +2106,7 @@ tsol_check_interface_address(const ipif_t *ipif)
 		return (B_TRUE);
 	}
 
-	ifname = ipif->ipif_ill->ill_name;
-	if (ipif->ipif_id != 0) {
-		(void) snprintf(ifbuf, sizeof (ifbuf), "%s:%u", ifname,
-		    ipif->ipif_id);
-		ifname = ifbuf;
-	}
+	ipif_get_name(ipif, ifname, sizeof (ifname));
 	(void) inet_ntop(af, addr, addrbuf, sizeof (addrbuf));
 
 	if (tp == NULL) {
