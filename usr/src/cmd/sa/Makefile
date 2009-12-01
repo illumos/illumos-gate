@@ -38,7 +38,6 @@ SADC= 		sadc
 SADP= 		sadp
 SAR= 		sar
 TIMEX=		timex
-SAG=		sag
 SA1=		sa1
 SA2=		sa2
 
@@ -46,7 +45,7 @@ sadc :=		LDLIBS += -lkstat
 
 # Executables produced
 BINPROG=	$(TIMEX)
-SBINPROG=	$(SAR) $(SAG)
+SBINPROG=	$(SAR)
 LIBPROG=	$(SADC)
 LIBSHELL=	$(SA1) $(SA2)
 INITSHELL=	$(PERF)
@@ -57,10 +56,9 @@ TXTS= 		$(SADP).c README
 ALL=		$(PROGS) $(SHELLS)
 
 # Source files
-SAG_OBJECTS=	$(SAG)a.o $(SAG)b.o
 SADC_OBJECTS=	$(SADC).o
 srcs=		$(TIMEX) $(SAR) $(SADC)
-SRCS=		$(srcs:%=%.c) $(SAG_OBJECTS:%.o=%.c)
+SRCS=		$(srcs:%=%.c)
 SHSRCS=		$(SHELLS:%=%.sh)
 
 # Set of target install directories
@@ -92,10 +90,6 @@ $(LIBSAD)/$(SADC) 	:= FILEMODE = 0555
 .KEEP_STATE:
 
 all: 		$(ALL) $(TXTS)
-
-$(SAG):		$(SAG_OBJECTS)
-	$(LINK.c) -o $@ $(SAG_OBJECTS) $(LDLIBS)
-	$(POST_PROCESS)
 
 $(SADC):	$(SADC_OBJECTS)
 	$(LINK.c) -o $@ $(SADC_OBJECTS) $(LDLIBS)
@@ -133,7 +127,7 @@ $(ETCINITD)/%: %
 check:	$(CHKMANIFEST)
 
 clean:
-	$(RM) $(SAG_OBJECTS) $(SADC_OBJECTS) $(PROGS) $(SHELLS) $(SADP)
+	$(RM) $(SADC_OBJECTS) $(PROGS) $(SHELLS) $(SADP)
 
 lint:	lint_SRCS
 
