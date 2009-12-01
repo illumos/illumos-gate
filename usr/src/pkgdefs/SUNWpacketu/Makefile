@@ -25,7 +25,6 @@
 
 include ../Makefile.com
 
-TMPLFILES += postinstall preremove
 LICENSEFILES += ../../uts/common/io/bpf/BPF.LICENCE
 CDDL=
 
