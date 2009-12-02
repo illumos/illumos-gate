@@ -1450,8 +1450,12 @@ ill_capability_dispatch(ill_t *ill, mblk_t *mp, dl_capability_sub_t *subp)
 	/*
 	 * If no ipif was brought up over this ill, this DL_CAPABILITY_REQ/ACK
 	 * is only to get the VRRP capability.
+	 *
+	 * Note that we cannot check ill_ipif_up_count here since
+	 * ill_ipif_up_count is only incremented when the resolver is setup.
+	 * That is done asynchronously, and can race with this function.
 	 */
-	if (ill->ill_ipif_up_count == 0) {
+	if (!ill->ill_dl_up) {
 		if (subp->dl_cap == DL_CAPAB_VRRP)
 			ill_capability_vrrp_ack(ill, mp, subp);
 		return;
