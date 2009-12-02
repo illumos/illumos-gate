@@ -47,7 +47,6 @@
 #include <sys/note.h>
 #include <sys/promif.h>
 
-#include <sys/acpi/acpi.h>
 #include <sys/acpi/accommon.h>
 #include <sys/acpica.h>
 
@@ -62,7 +61,7 @@ static int acpica_find_pcibus(int busno, ACPI_HANDLE *rh);
 static int acpica_eval_hid(ACPI_HANDLE dev, char *method, int *rint);
 static ACPI_STATUS acpica_set_devinfo(ACPI_HANDLE, dev_info_t *);
 static ACPI_STATUS acpica_unset_devinfo(ACPI_HANDLE);
-static void acpica_devinfo_handler(ACPI_HANDLE, UINT32, void *);
+static void acpica_devinfo_handler(ACPI_HANDLE, void *);
 
 /*
  * Event queue vars
@@ -1308,7 +1307,7 @@ acpica_find_pcibus(int busno, ACPI_HANDLE *rh)
 	if (ACPI_SUCCESS(AcpiGetHandle(NULL, "\\_SB", &sbobj))) {
 		busobj = NULL;
 		(void) AcpiWalkNamespace(ACPI_TYPE_DEVICE, sbobj, UINT32_MAX,
-		    acpica_find_pcibus_walker, (void *)(intptr_t)busno,
+		    acpica_find_pcibus_walker, NULL, (void *)(intptr_t)busno,
 		    (void **)&busobj);
 		if (busobj != NULL) {
 			*rh = busobj;
@@ -1374,7 +1373,7 @@ acpica_query_bbn_problem(void)
 	zerobbncnt = 0;
 	if (ACPI_SUCCESS(AcpiGetHandle(NULL, "\\_SB", &sbobj))) {
 		(void) AcpiWalkNamespace(ACPI_TYPE_DEVICE, sbobj, UINT32_MAX,
-		    acpica_query_bbn_walker, &zerobbncnt, &rv);
+		    acpica_query_bbn_walker, NULL, &zerobbncnt, &rv);
 	}
 
 	return (zerobbncnt > 1 ? 1 : 0);
@@ -1595,6 +1594,7 @@ acpica_probe_processor(ACPI_HANDLE obj, UINT32 level, void *ctx, void **rv)
 	ACPI_OBJECT_TYPE objtype;
 	unsigned long acpi_id;
 	ACPI_BUFFER rb;
+	ACPI_DEVICE_INFO *di;
 
 	if (AcpiGetType(obj, &objtype) != AE_OK)
 		return (AE_OK);
@@ -1613,26 +1613,21 @@ acpica_probe_processor(ACPI_HANDLE obj, UINT32 level, void *ctx, void **rv)
 		AcpiOsFree(rb.Pointer);
 	} else if (objtype == ACPI_TYPE_DEVICE) {
 		/* process a processor Device */
-		rb.Pointer = NULL;
-		rb.Length = ACPI_ALLOCATE_BUFFER;
-		status = AcpiGetObjectInfo(obj, &rb);
+		status = AcpiGetObjectInfo(obj, &di);
 		if (status != AE_OK) {
 			cmn_err(CE_WARN,
 			    "!acpica: error probing Processor Device\n");
 			return (status);
 		}
-		ASSERT(((ACPI_OBJECT *)rb.Pointer)->Type ==
-		    ACPI_TYPE_DEVICE);
 
-		if (ddi_strtoul(
-		    ((ACPI_DEVICE_INFO *)rb.Pointer)->UniqueId.Value,
-		    NULL, 10, &acpi_id) != 0) {
-			AcpiOsFree(rb.Pointer);
+		if (!(di->Valid & ACPI_VALID_UID) ||
+		    ddi_strtoul(di->UniqueId.String, NULL, 10, &acpi_id) != 0) {
+			ACPI_FREE(di);
 			cmn_err(CE_WARN,
 			    "!acpica: error probing Processor Device _UID\n");
 			return (AE_ERROR);
 		}
-		AcpiOsFree(rb.Pointer);
+		ACPI_FREE(di);
 	}
 	(void) acpica_add_processor_to_map(acpi_id, obj, UINT32_MAX);
 
@@ -1865,9 +1860,9 @@ acpica_unset_devinfo(ACPI_HANDLE obj)
  *
  */
 void
-acpica_devinfo_handler(ACPI_HANDLE obj, UINT32 func, void *data)
+acpica_devinfo_handler(ACPI_HANDLE obj, void *data)
 {
-	/* noop */
+	/* no-op */
 }
 
 ACPI_STATUS
@@ -1898,6 +1893,7 @@ acpica_build_processor_map(void)
 	    ACPI_ROOT_OBJECT,
 	    4,
 	    acpica_probe_processor,
+	    NULL,
 	    NULL,
 	    &rv);
 	ASSERT(status == AE_OK);

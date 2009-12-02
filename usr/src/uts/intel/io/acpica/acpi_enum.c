@@ -785,14 +785,11 @@ isa_acpi_callback(ACPI_HANDLE ObjHandle, uint32_t NestingLevel, void *a,
 	/*
 	 * Get device info object
 	 */
-	rb.Length = ACPI_ALLOCATE_BUFFER;
-	rb.Pointer = NULL;
-	if (AcpiGetObjectInfo(ObjHandle, &rb) != AE_OK) {
+	if (AcpiGetObjectInfo(ObjHandle, &info) != AE_OK) {
 		cmn_err(CE_WARN, "!acpi_enum: could not get device"
 		    " info for %s", path);
 		goto done;
 	}
-	info = (ACPI_DEVICE_INFO *)rb.Pointer;
 
 	/*
 	 * If device isn't present, we don't enumerate
@@ -820,7 +817,7 @@ isa_acpi_callback(ACPI_HANDLE ObjHandle, uint32_t NestingLevel, void *a,
 		/* No _HID, we skip this node */
 		goto done;
 	}
-	hidstr = info->HardwareId.Value;
+	hidstr = info->HardwareId.String;
 
 	/*
 	 * Attempt to get _CID value

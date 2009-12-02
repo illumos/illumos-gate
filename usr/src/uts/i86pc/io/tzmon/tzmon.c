@@ -564,7 +564,7 @@ tzmon_find_zones()
 	int retval;
 
 	status = AcpiWalkNamespace(ACPI_TYPE_THERMAL, ACPI_ROOT_OBJECT,
-	    8, tzmon_zone_callback, NULL, (void **)&retval);
+	    8, tzmon_zone_callback, NULL, NULL, (void **)&retval);
 
 	ASSERT(status == AE_OK);
 }

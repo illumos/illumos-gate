@@ -246,10 +246,10 @@ pcie_dump_acpi_obj(ACPI_HANDLE pcibus_obj)
 	/* dump all the methods for this bus node */
 	PCIE_DBG("  METHODS: \n");
 	status = AcpiWalkNamespace(ACPI_TYPE_METHOD, pcibus_obj, 1,
-	    pcie_print_acpi_name, "  ", NULL);
+	    pcie_print_acpi_name, NULL, "  ", NULL);
 	/* dump all the child devices */
 	status = AcpiWalkNamespace(ACPI_TYPE_DEVICE, pcibus_obj, 1,
-	    pcie_walk_obj_namespace, NULL, NULL);
+	    pcie_walk_obj_namespace, NULL, NULL, NULL);
 }
 
 /*ARGSUSED*/
@@ -276,7 +276,7 @@ pcie_walk_obj_namespace(ACPI_HANDLE hdl, uint32_t nl, void *context,
 	/* dump all the methods for this device */
 	PCIE_DBG("%s  METHODS: \n", buf);
 	status = AcpiWalkNamespace(ACPI_TYPE_METHOD, hdl, 1,
-	    pcie_print_acpi_name, (void *)buf, NULL);
+	    pcie_print_acpi_name, NULL, (void *)buf, NULL);
 	return (status);
 }
 

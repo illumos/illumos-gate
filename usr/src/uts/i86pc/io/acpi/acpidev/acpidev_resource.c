@@ -19,6 +19,10 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+/*
  * Copyright (c) 2009, Intel Corporation.
  * All rights reserved.
  */
@@ -973,7 +977,7 @@ acpidev_resource_walk(ACPI_HANDLE hdl, char *method,
 		ACPIDEV_DEBUG(CE_NOTE,
 		    "acpidev: method %s doesn't exist under %s",
 		    method, objname);
-		acpidev_free_object_name(hdl);
+		acpidev_free_object_name(objname);
 		return (AE_NOT_FOUND);
 	}
 
@@ -996,7 +1000,8 @@ acpidev_resource_walk(ACPI_HANDLE hdl, char *method,
 		ACPIDEV_DEBUG(CE_WARN,
 		    "acpidev: failed to walk resource from method %s under %s.",
 		    method, objname);
-		acpidev_free_object_name(hdl);
+		acpidev_free_object_name(objname);
+
 	}
 
 	return (rc);

@@ -122,8 +122,8 @@ acpidev_match_device_id(ACPI_DEVICE_INFO *infop, char **ids, int count)
 	/* Match _HID first. */
 	if (infop->Valid & ACPI_VALID_HID) {
 		for (i = 0; i < count; i++) {
-			if (strncmp(ids[i], infop->HardwareId.Value,
-			    sizeof (infop->HardwareId.Value)) == 0) {
+			if (strncmp(ids[i], infop->HardwareId.String,
+			    infop->HardwareId.Length) == 0) {
 				return (B_TRUE);
 			}
 		}
@@ -132,10 +132,11 @@ acpidev_match_device_id(ACPI_DEVICE_INFO *infop, char **ids, int count)
 	/* Match _CID next. */
 	if (infop->Valid & ACPI_VALID_CID) {
 		for (i = 0; i < count; i++) {
-			for (j = 0; j < infop->CompatibilityId.Count; j++) {
+			for (j = 0; j < infop->CompatibleIdList.Count; j++) {
 				if (strncmp(ids[i],
-				    infop->CompatibilityId.Id[j].Value,
-				    sizeof (ACPI_COMPATIBLE_ID)) == 0) {
+				    infop->CompatibleIdList.Ids[j].String,
+				    infop->CompatibleIdList.Ids[j].Length)
+				    == 0) {
 					return (B_TRUE);
 				}
 			}
@@ -158,7 +159,6 @@ acpidev_get_device_callback(ACPI_HANDLE hdl, UINT32 level, void *arg,
     void **retval)
 {
 	ACPI_STATUS rc;
-	ACPI_BUFFER buf;
 	ACPI_DEVICE_INFO *infop;
 	struct acpidev_get_device_arg *argp;
 
@@ -167,14 +167,12 @@ acpidev_get_device_callback(ACPI_HANDLE hdl, UINT32 level, void *arg,
 	ASSERT(hdl != NULL);
 
 	/* Query object information. */
-	buf.Length = ACPI_ALLOCATE_BUFFER;
-	rc = AcpiGetObjectInfo(hdl, &buf);
+	rc = AcpiGetObjectInfo(hdl, &infop);
 	if (ACPI_FAILURE(rc)) {
 		cmn_err(CE_WARN, "!acpidev: failed to get ACPI object info "
 		    "in acpidev_get_device_callback().");
 		return (AE_CTRL_DEPTH);
 	}
-	infop = buf.Pointer;
 
 	/*
 	 * Skip scanning of children if the device is neither PRESENT nor
@@ -220,7 +218,7 @@ acpidev_get_device_by_id(ACPI_HANDLE hdl, char **ids, int count,
 	arg.user_arg = userarg;
 	arg.user_func = userfunc;
 	rc = AcpiWalkNamespace(ACPI_TYPE_DEVICE, hdl, maxdepth,
-	    &acpidev_get_device_callback, &arg, retval);
+	    &acpidev_get_device_callback, NULL, &arg, retval);
 
 	return (rc);
 }
@@ -331,7 +329,6 @@ acpidev_walk_info_t *
 acpidev_alloc_walk_info(acpidev_op_type_t op_type, int lvl, ACPI_HANDLE hdl,
     acpidev_class_list_t **listpp, acpidev_walk_info_t *pinfop)
 {
-	ACPI_BUFFER buf;
 	acpidev_walk_info_t *infop = NULL;
 	acpidev_data_handle_t datap = NULL;
 
@@ -345,15 +342,13 @@ acpidev_alloc_walk_info(acpidev_op_type_t op_type, int lvl, ACPI_HANDLE hdl,
 	infop->awi_name = acpidev_get_object_name(hdl);
 
 	/* Cache ACPI device information. */
-	buf.Length = ACPI_ALLOCATE_BUFFER;
-	if (ACPI_FAILURE(AcpiGetObjectInfo(hdl, &buf))) {
+	if (ACPI_FAILURE(AcpiGetObjectInfo(hdl, &infop->awi_info))) {
 		cmn_err(CE_WARN, "!acpidev: failed to get object info for %s "
 		    "in acpidev_alloc_walk_info().", infop->awi_name);
 		acpidev_free_object_name(infop->awi_name);
 		kmem_free(infop, sizeof (*infop));
 		return (NULL);
 	}
-	infop->awi_info = buf.Pointer;
 
 	/*
 	 * Get or create an ACPI object data handle, which will be used to
@@ -423,7 +418,7 @@ acpidev_walk_info_get_pdip(acpidev_walk_info_t *infop)
  */
 /*ARGSUSED*/
 static void
-acpidev_get_object_handler(ACPI_HANDLE hdl, UINT32 func, void *data)
+acpidev_get_object_handler(ACPI_HANDLE hdl, void *data)
 {
 	acpidev_data_handle_t objhdl = data;
 
@@ -692,8 +687,8 @@ acpidev_set_unitaddr(acpidev_walk_info_t *infop, char **fmts, size_t nfmt,
 
 	if (infop->awi_info->Valid & ACPI_VALID_UID) {
 		if (ndi_prop_update_string(DDI_DEV_T_NONE, infop->awi_dip,
-		    ACPIDEV_PROP_NAME_ACPI_UID, infop->awi_info->UniqueId.Value)
-		    != NDI_SUCCESS) {
+		    ACPIDEV_PROP_NAME_ACPI_UID,
+		    infop->awi_info->UniqueId.String) != NDI_SUCCESS) {
 			cmn_err(CE_WARN,
 			    "!acpidev: failed to set UID property for %s.",
 			    infop->awi_name);
@@ -708,19 +703,19 @@ acpidev_set_unitaddr(acpidev_walk_info_t *infop, char **fmts, size_t nfmt,
 			nfmt = sizeof (acpidev_uid_formats) / sizeof (char *);
 		}
 		unitaddr = acpidev_generate_unitaddr(
-		    infop->awi_info->UniqueId.Value, fmts, nfmt,
+		    infop->awi_info->UniqueId.String, fmts, nfmt,
 		    unit, sizeof (unit));
 		/* Generate pseudo sequential unit address. */
 		if (unitaddr == NULL) {
 			unitaddr = acpidev_generate_pseudo_unitaddr(
-			    infop->awi_info->UniqueId.Value,
+			    infop->awi_info->UniqueId.String,
 			    infop->awi_class_curr->adc_class_id,
 			    unit, sizeof (unit));
 		}
 		if (unitaddr == NULL) {
 			cmn_err(CE_WARN, "!acpidev: failed to generate unit "
 			    "address from %s.",
-			    infop->awi_info->UniqueId.Value);
+			    infop->awi_info->UniqueId.String);
 			return (AE_ERROR);
 		}
 	}
@@ -775,18 +770,18 @@ acpidev_set_compatible(acpidev_walk_info_t *infop, char **compat, int acount)
 		count++;
 	}
 	if (di->Valid & ACPI_VALID_CID) {
-		count += di->CompatibilityId.Count;
+		count += di->CompatibleIdList.Count;
 	}
 	compatible = kmem_zalloc(sizeof (char *) * count, KM_SLEEP);
 
 	/* Generate string array. */
 	i = 0;
 	if (di->Valid & ACPI_VALID_HID) {
-		compatible[i++] = di->HardwareId.Value;
+		compatible[i++] = di->HardwareId.String;
 	}
 	if (di->Valid & ACPI_VALID_CID) {
-		for (j = 0; j < di->CompatibilityId.Count; j++) {
-			compatible[i++] = di->CompatibilityId.Id[j].Value;
+		for (j = 0; j < di->CompatibleIdList.Count; j++) {
+			compatible[i++] = di->CompatibleIdList.Ids[j].String;
 		}
 	}
 	for (j = 0; j < acount; j++) {

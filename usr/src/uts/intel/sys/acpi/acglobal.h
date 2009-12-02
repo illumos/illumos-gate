@@ -132,6 +132,10 @@
 #endif
 
 
+#ifdef DEFINE_ACPI_GLOBALS
+
+/* Public globals, available from outside ACPICA subsystem */
+
 /*****************************************************************************
  *
  * Runtime configuration (static defaults that can be overriden at runtime)
@@ -152,7 +156,7 @@
  * 5) Allow unresolved references (invalid target name) in package objects
  * 6) Enable warning messages for behavior that is not ACPI spec compliant
  */
-ACPI_EXTERN UINT8       ACPI_INIT_GLOBAL (AcpiGbl_EnableInterpreterSlack, FALSE);
+UINT8       ACPI_INIT_GLOBAL (AcpiGbl_EnableInterpreterSlack, FALSE);
 
 /*
  * Automatically serialize ALL control methods? Default is FALSE, meaning
@@ -160,28 +164,37 @@ ACPI_EXTERN UINT8       ACPI_INIT_GLOBAL (AcpiGbl_EnableInterpreterSlack, FALSE)
  * Only change this if the ASL code is poorly written and cannot handle
  * reentrancy even though methods are marked "NotSerialized".
  */
-ACPI_EXTERN UINT8       ACPI_INIT_GLOBAL (AcpiGbl_AllMethodsSerialized, FALSE);
+UINT8       ACPI_INIT_GLOBAL (AcpiGbl_AllMethodsSerialized, FALSE);
 
 /*
  * Create the predefined _OSI method in the namespace? Default is TRUE
  * because ACPI CA is fully compatible with other ACPI implementations.
  * Changing this will revert ACPI CA (and machine ASL) to pre-OSI behavior.
  */
-ACPI_EXTERN UINT8       ACPI_INIT_GLOBAL (AcpiGbl_CreateOsiMethod, TRUE);
+UINT8       ACPI_INIT_GLOBAL (AcpiGbl_CreateOsiMethod, TRUE);
 
 /*
  * Disable wakeup GPEs during runtime? Default is TRUE because WAKE and
  * RUNTIME GPEs should never be shared, and WAKE GPEs should typically only
  * be enabled just before going to sleep.
  */
-ACPI_EXTERN UINT8       ACPI_INIT_GLOBAL (AcpiGbl_LeaveWakeGpesDisabled, TRUE);
+UINT8       ACPI_INIT_GLOBAL (AcpiGbl_LeaveWakeGpesDisabled, TRUE);
 
 /*
  * Optionally use default values for the ACPI register widths. Set this to
  * TRUE to use the defaults, if an FADT contains incorrect widths/lengths.
  */
-ACPI_EXTERN UINT8       ACPI_INIT_GLOBAL (AcpiGbl_UseDefaultRegisterWidths, TRUE);
+UINT8       ACPI_INIT_GLOBAL (AcpiGbl_UseDefaultRegisterWidths, TRUE);
 
+
+/* AcpiGbl_FADT is a local copy of the FADT, converted to a common format. */
+
+ACPI_TABLE_FADT             AcpiGbl_FADT;
+UINT32                      AcpiCurrentGpeCount;
+UINT32                      AcpiGbl_TraceFlags;
+ACPI_NAME                   AcpiGbl_TraceMethodName;
+
+#endif
 
 /*****************************************************************************
  *
@@ -193,10 +206,8 @@ ACPI_EXTERN UINT8       ACPI_INIT_GLOBAL (AcpiGbl_UseDefaultRegisterWidths, TRUE
  * AcpiGbl_RootTableList is the master list of ACPI tables found in the
  * RSDT/XSDT.
  *
- * AcpiGbl_FADT is a local copy of the FADT, converted to a common format.
  */
 ACPI_EXTERN ACPI_INTERNAL_RSDT          AcpiGbl_RootTableList;
-ACPI_EXTERN ACPI_TABLE_FADT             AcpiGbl_FADT;
 ACPI_EXTERN ACPI_TABLE_FACS            *AcpiGbl_FACS;
 
 /* These addresses are calculated from the FADT Event Block addresses */
@@ -313,7 +324,8 @@ extern char const                       *AcpiGbl_ExceptionNames_Ctrl[];
 extern BOOLEAN                          AcpiGbl_Shutdown;
 extern UINT32                           AcpiGbl_StartupFlags;
 extern const char                      *AcpiGbl_SleepStateNames[ACPI_S_STATE_COUNT];
-extern const char                      *AcpiGbl_HighestDstateNames[4];
+extern const char                      *AcpiGbl_LowestDstateNames[ACPI_NUM_SxW_METHODS];
+extern const char                      *AcpiGbl_HighestDstateNames[ACPI_NUM_SxD_METHODS];
 extern const ACPI_OPCODE_INFO           AcpiGbl_AmlOpInfo[AML_NUM_OPCODES];
 extern const char                      *AcpiGbl_RegionTypes[ACPI_NUM_PREDEFINED_REGIONS];
 #endif
@@ -344,6 +356,8 @@ ACPI_EXTERN BOOLEAN                     AcpiGbl_DisplayFinalMemStats;
 ACPI_EXTERN ACPI_NAMESPACE_NODE         AcpiGbl_RootNodeStruct;
 ACPI_EXTERN ACPI_NAMESPACE_NODE        *AcpiGbl_RootNode;
 ACPI_EXTERN ACPI_NAMESPACE_NODE        *AcpiGbl_FadtGpeDevice;
+ACPI_EXTERN ACPI_OPERAND_OBJECT        *AcpiGbl_ModuleCodeList;
+
 
 extern const UINT8                      AcpiGbl_NsProperties [ACPI_NUM_NS_TYPES];
 extern const ACPI_PREDEFINED_NAMES      AcpiGbl_PreDefinedNames [NUM_PREDEFINED_NAMES];
@@ -393,7 +407,6 @@ extern      ACPI_FIXED_EVENT_INFO       AcpiGbl_FixedEventInfo[ACPI_NUM_FIXED_EV
 ACPI_EXTERN ACPI_FIXED_EVENT_HANDLER    AcpiGbl_FixedEventHandlers[ACPI_NUM_FIXED_EVENTS];
 ACPI_EXTERN ACPI_GPE_XRUPT_INFO        *AcpiGbl_GpeXruptListHead;
 ACPI_EXTERN ACPI_GPE_BLOCK_INFO        *AcpiGbl_GpeFadtBlocks[ACPI_MAX_GPE_BLOCKS];
-ACPI_EXTERN UINT32                      AcpiCurrentGpeCount;
 
 
 /*****************************************************************************
@@ -401,11 +414,6 @@ ACPI_EXTERN UINT32                      AcpiCurrentGpeCount;
  * Debug support
  *
  ****************************************************************************/
-
-/* Runtime configuration of debug print levels */
-
-extern      UINT32                      AcpiDbgLevel;
-extern      UINT32                      AcpiDbgLayer;
 
 /* Procedure nesting level for debug output */
 
@@ -422,10 +430,8 @@ ACPI_EXTERN UINT32                      AcpiFixedEventCount[ACPI_NUM_FIXED_EVENT
 
 ACPI_EXTERN UINT32                      AcpiGbl_OriginalDbgLevel;
 ACPI_EXTERN UINT32                      AcpiGbl_OriginalDbgLayer;
-ACPI_EXTERN ACPI_NAME                   AcpiGbl_TraceMethodName;
 ACPI_EXTERN UINT32                      AcpiGbl_TraceDbgLevel;
 ACPI_EXTERN UINT32                      AcpiGbl_TraceDbgLayer;
-ACPI_EXTERN UINT32                      AcpiGbl_TraceFlags;
 
 
 /*****************************************************************************
@@ -440,6 +446,7 @@ ACPI_EXTERN UINT8                       AcpiGbl_DbOutputFlags;
 
 ACPI_EXTERN BOOLEAN                     AcpiGbl_DbOpt_disasm;
 ACPI_EXTERN BOOLEAN                     AcpiGbl_DbOpt_verbose;
+ACPI_EXTERN ACPI_EXTERNAL_LIST         *AcpiGbl_ExternalList;
 #endif
 
 

@@ -19,6 +19,10 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+/*
  * Copyright (c) 2009, Intel Corporation.
  * All rights reserved.
  */
@@ -200,7 +204,7 @@ acpidev_container_filter_func(acpidev_walk_info_t *infop, ACPI_HANDLE hdl,
 
 	/* Search for ACPI Processor object. */
 	(void) AcpiWalkNamespace(ACPI_TYPE_PROCESSOR, hdl, 2,
-	    acpidev_container_search_dev, &proc_lvl, &retval);
+	    acpidev_container_search_dev, NULL, &proc_lvl, &retval);
 
 	/* Search for CPU Device object. */
 	(void) acpidev_get_device_by_id(hdl, ACPIDEV_ARRAY_PARAM(cpu_hids), 2,

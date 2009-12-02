@@ -647,18 +647,14 @@ pciehpc_acpi_power_off_slot(pcie_hp_ctrl_t *ctrl_p)
 static ACPI_STATUS
 pciehpc_acpi_get_dev_state(ACPI_HANDLE obj, int *statusp)
 {
-	ACPI_BUFFER	rb;
-	ACPI_DEVICE_INFO *info = NULL;
+	ACPI_DEVICE_INFO *info;
 	int ret = AE_OK;
 
 	/*
 	 * Get device info object
 	 */
-	rb.Length = ACPI_ALLOCATE_BUFFER;
-	rb.Pointer = NULL;
-	if ((ret = AcpiGetObjectInfo(obj, &rb)) != AE_OK)
+	if ((ret = AcpiGetObjectInfo(obj, &info)) != AE_OK)
 		return (ret);
-	info = (ACPI_DEVICE_INFO *)rb.Pointer;
 
 	if (info->Valid & ACPI_VALID_STA) {
 		*statusp = info->CurrentStatus;

@@ -28,7 +28,7 @@
 #
 # Set this to the fully-qualified path to the ACPI CA GIT directory
 #
-ACDIR=/export/home/myers/acpica/acpica-unix-20090521
+ACDIR=/tmp/acpica-unix-20091112
 
 ACSRC=$ACDIR
 ACINC=$ACDIR/include

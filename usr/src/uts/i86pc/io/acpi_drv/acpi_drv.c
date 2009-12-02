@@ -1541,7 +1541,6 @@ static int
 acpi_drv_obj_init(struct acpi_drv_dev *p)
 {
 	ACPI_DEVICE_INFO *info;
-	ACPI_BUFFER buf;
 	ACPI_NOTIFY_HANDLER ntf_handler = NULL;
 	ACPI_STATUS ret;
 
@@ -1550,21 +1549,19 @@ acpi_drv_obj_init(struct acpi_drv_dev *p)
 	p->valid = 0;
 
 	/* Info size is variable depending on existance of _CID */
-	buf.Length = ACPI_ALLOCATE_BUFFER;
-	ret = AcpiGetObjectInfo(p->hdl, &buf);
+	ret = AcpiGetObjectInfo(p->hdl, &info);
 	if (ACPI_FAILURE(ret)) {
 		ACPI_DRV_DBG(CE_WARN, NULL,
 		    "AcpiGetObjectInfo() fail: %d", (int32_t)ret);
 		return (ACPI_DRV_ERR);
 	}
 
-	info = buf.Pointer;
 	if ((info->Valid & ACPI_VALID_HID) == 0) {
 		ACPI_DRV_DBG(CE_WARN, NULL,
 		    "AcpiGetObjectInfo(): _HID not available");
 		(void) strncpy(p->hid, "\0", ID_LEN);
 	} else {
-		(void) strncpy(p->hid, info->HardwareId.Value, ID_LEN);
+		(void) strncpy(p->hid, info->HardwareId.String, ID_LEN);
 	}
 
 	/*
@@ -1577,9 +1574,10 @@ acpi_drv_obj_init(struct acpi_drv_dev *p)
 		/* Use 0 as the default _UID */
 		(void) strncpy(p->uid, "\0", ID_LEN);
 	} else {
-		(void) strncpy(p->uid, info->UniqueId.Value, ID_LEN);
+		(void) strncpy(p->uid, info->UniqueId.String, ID_LEN);
 	}
 
+	AcpiOsFree(info);
 	p->valid = 1;
 
 	if (strcmp(p->hid, ACPI_DEVNAME_CBAT) == 0) {
@@ -1639,7 +1637,6 @@ acpi_drv_obj_init(struct acpi_drv_dev *p)
 		}
 	}
 
-	AcpiOsFree(info);
 	return (ACPI_DRV_OK);
 }
 
@@ -2050,7 +2047,6 @@ int
 acpi_drv_dev_init(struct acpi_drv_dev *p)
 {
 	ACPI_DEVICE_INFO *info;
-	ACPI_BUFFER buf;
 	ACPI_STATUS ret;
 
 	ASSERT(p != NULL && p->hdl != NULL);
@@ -2058,21 +2054,19 @@ acpi_drv_dev_init(struct acpi_drv_dev *p)
 	p->valid = 0;
 
 	/* Info size is variable depending on existance of _CID */
-	buf.Length = ACPI_ALLOCATE_BUFFER;
-	ret = AcpiGetObjectInfo(p->hdl, &buf);
+	ret = AcpiGetObjectInfo(p->hdl, &info);
 	if (ACPI_FAILURE(ret)) {
 		ACPI_DRV_DBG(CE_WARN, NULL,
 		    "AcpiGetObjectInfo() fail: %d", (int32_t)ret);
 		return (ACPI_DRV_ERR);
 	}
 
-	info = buf.Pointer;
 	if ((info->Valid & ACPI_VALID_HID) == 0) {
 		ACPI_DRV_DBG(CE_WARN, NULL,
 		    "!AcpiGetObjectInfo(): _HID not available");
 		(void) strncpy(p->hid, "\0", ID_LEN);
 	} else {
-		(void) strncpy(p->hid, info->HardwareId.Value, ID_LEN);
+		(void) strncpy(p->hid, info->HardwareId.String, ID_LEN);
 	}
 
 	/*
@@ -2085,7 +2079,7 @@ acpi_drv_dev_init(struct acpi_drv_dev *p)
 		/* Use 0 as the default _UID */
 		(void) strncpy(p->uid, "\0", ID_LEN);
 	} else {
-		(void) strncpy(p->uid, info->UniqueId.Value, ID_LEN);
+		(void) strncpy(p->uid, info->UniqueId.String, ID_LEN);
 	}
 
 	if (info->Valid & ACPI_VALID_ADR) {

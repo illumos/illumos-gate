@@ -193,20 +193,17 @@ pci_process_acpi_device(ACPI_HANDLE hdl, UINT32 level, void *ctx, void **rv)
 	 * If not a PCI root-bus, ignore this device and continue
 	 * the walk
 	 */
-
-	rb.Length = ACPI_ALLOCATE_BUFFER;
-	if (ACPI_FAILURE(AcpiGetObjectInfo(hdl, &rb)))
+	if (ACPI_FAILURE(AcpiGetObjectInfo(hdl, &adi)))
 		return (AE_OK);
 
-	adi = rb.Pointer;
 	if (!(adi->Valid & ACPI_VALID_HID)) {
 		AcpiOsFree(adi);
 		return (AE_OK);
 	}
 
-	if (strncmp(adi->HardwareId.Value, PCI_ROOT_HID_STRING,
+	if (strncmp(adi->HardwareId.String, PCI_ROOT_HID_STRING,
 	    sizeof (PCI_ROOT_HID_STRING)) &&
-	    strncmp(adi->HardwareId.Value, PCI_EXPRESS_ROOT_HID_STRING,
+	    strncmp(adi->HardwareId.String, PCI_EXPRESS_ROOT_HID_STRING,
 	    sizeof (PCI_EXPRESS_ROOT_HID_STRING))) {
 		AcpiOsFree(adi);
 		return (AE_OK);

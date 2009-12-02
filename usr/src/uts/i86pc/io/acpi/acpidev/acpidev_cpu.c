@@ -592,7 +592,7 @@ acpidev_cpu_init(acpidev_walk_info_t *infop)
 	 * then use Processor Id if that fails.
 	 */
 	if ((infop->awi_info->Valid & ACPI_VALID_UID) == 0 ||
-	    acpidev_generate_unitaddr(infop->awi_info->UniqueId.Value,
+	    acpidev_generate_unitaddr(infop->awi_info->UniqueId.String,
 	    ACPIDEV_ARRAY_PARAM(acpidev_cpu_uid_formats),
 	    unitaddr, sizeof (unitaddr)) == NULL) {
 		(void) snprintf(unitaddr, sizeof (unitaddr), "%u",

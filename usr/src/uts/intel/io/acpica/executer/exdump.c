@@ -507,7 +507,7 @@ AcpiExDumpObject (
         case ACPI_EXD_REFERENCE:
 
             AcpiExOutString ("Class Name",
-                (char *) AcpiUtGetReferenceName (ObjDesc));
+                ACPI_CAST_PTR (char, AcpiUtGetReferenceName (ObjDesc)));
             AcpiExDumpReferenceObj (ObjDesc);
             break;
 
