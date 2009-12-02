@@ -483,6 +483,30 @@ typedef struct sata_pkt_txlate {
 _NOTE(SCHEME_PROTECTS_DATA("unshared data", sata_pkt_txlate))
 _NOTE(SCHEME_PROTECTS_DATA("unshared data", scsi_pkt))
 
+/* Length of largest sense buffer used by sata */
+#define	SATA_MAX_SENSE_LEN	MAX(sizeof (struct scsi_arq_status), \
+    sizeof (struct scsi_arq_status) - sizeof (struct scsi_extended_sense) + \
+    sizeof (struct scsi_descr_sense_hdr) + \
+    MAX(sizeof (struct scsi_cmd_specific_sense_descr), \
+    sizeof (struct scsi_ata_status_ret_sense_descr)))
+
+/*
+ * Sense Data structure for ATA Pass Through
+ * This is the entire sense data block passed back up to scsi.  It is
+ * effectively the scsi_arq_status structure for ATA Sense Return descriptor
+ * format sense data.
+ */
+struct sata_apt_sense_data {
+	struct scsi_status				apt_status;
+	struct scsi_status				apt_rqpkt_status;
+	uchar_t						apt_rqpkt_reason;
+	uchar_t						apt_rqpkt_resid;
+	uint_t						apt_rqpkt_state;
+	uint_t						apt_rqpkt_statistics;
+	struct scsi_descr_sense_hdr			apt_sd_hdr;
+	struct scsi_ata_status_ret_sense_descr		apt_sd_sense;
+};
+
 
 /*
  * Additional scsi sense code definitions.
@@ -490,18 +514,25 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", scsi_pkt))
  * usr/src/uts/common/sys/scsi/generic/sense.h
  */
 #define	SD_SCSI_ASC_NO_ADD_SENSE			0x00
+#define	SD_SCSI_ASC_ATP_INFO_AVAIL			0x00
 #define	SD_SCSI_ASC_LU_NOT_READY			0x04
+#define	SD_SCSI_ASC_LU_NOT_RESPONSE			0x05
 #define	SD_SCSI_ASC_WRITE_ERR				0x0c
 #define	SD_SCSI_ASC_UNREC_READ_ERR			0x11
 #define	SD_SCSI_ASC_INVALID_COMMAND_CODE		0x20
 #define	SD_SCSI_ASC_LBA_OUT_OF_RANGE			0x21
 #define	SD_SCSI_ASC_INVALID_FIELD_IN_CDB		0x24
 #define	SD_SCSI_ASC_INVALID_FIELD_IN_PARAMS_LIST	0x26
+#define	SD_SCSI_ASC_WRITE_PROTECTED			0x27
+#define	SD_SCSI_ASC_MEDIUM_MAY_HAVE_CHANGED		0x28
 #define	SD_SCSI_ASC_RESET				0x29
-#define	SD_SCSI_ASC_SAVING_PARAMS_NOT_SUPPORTED		0x39
 #define	SD_SCSI_ASC_CMD_SEQUENCE_ERR			0x2c
+#define	SD_SCSI_ASC_MEDIUM_NOT_PRESENT			0x3a
+#define	SD_SCSI_ASC_SAVING_PARAMS_NOT_SUPPORTED		0x39
+#define	SD_SCSI_ASC_INTERNAL_TARGET_FAILURE		0x44
+#define	SD_SCSI_ASC_INFO_UNIT_IUCRC_ERR			0x47
+#define	SD_SCSI_ASC_OP_MEDIUM_REM_REQ			0x5a
 #define	SD_SCSI_ASC_LOW_POWER_CONDITION_ON		0x5e
-#define	SD_SCSI_ASC_LU_NOT_RESPONSE			0x05
 
 
 /* SCSI defs missing from scsi headers */

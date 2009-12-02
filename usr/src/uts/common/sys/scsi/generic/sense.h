@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_SCSI_GENERIC_SENSE_H
 #define	_SYS_SCSI_GENERIC_SENSE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -345,6 +343,31 @@ struct scsi_block_cmd_sense_descr {
 #endif	/* _BIT_FIELDS_LTOH */
 };
 
+struct scsi_ata_status_ret_sense_descr {
+	uchar_t ars_descr_type;		/* Descriptor type (0x09)	*/
+	uchar_t ars_addl_length;	/* Additional byte count (0x0c)	*/
+#if defined(_BIT_FIELDS_LTOH)
+	uchar_t	ars_extend	: 1,
+		ars_reserved1	: 7;	/* reserved 			*/
+#elif defined(_BIT_FIELDS_HTOL)
+	uchar_t	ars_reserved1	: 7,	/* reserved 			*/
+		ars_extend	: 1;
+#else
+#error	One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined
+#endif	/* _BIT_FIELDS_LTOH */
+	uchar_t ars_error;
+	uchar_t ars_sec_count_msb;
+	uchar_t ars_sec_count_lsb;
+	uchar_t ars_lba_low_msb;
+	uchar_t ars_lba_low_lsb;
+	uchar_t ars_lba_mid_msb;
+	uchar_t ars_lba_mid_lsb;
+	uchar_t ars_lba_high_msb;
+	uchar_t ars_lba_high_lsb;
+	uchar_t ars_device;
+	uchar_t ars_status;
+};
+
 struct scsi_vendor_specific_sense_descr {
 	uchar_t vss_descr_type;		/* Descriptor type (0x80-0xFF)	*/
 	uchar_t vss_addl_length;	/* Additional byte count	*/
@@ -366,6 +389,7 @@ struct scsi_vendor_specific_sense_descr {
 #define	DESCR_OSD_OID			0x06
 #define	DESCR_OSD_RESP_INTEGRITY	0x07
 #define	DESCR_OSD_ATTR_ID		0x08
+#define	DESCR_ATA_STATUS_RETURN		0x09
 
 #ifdef	__cplusplus
 }
