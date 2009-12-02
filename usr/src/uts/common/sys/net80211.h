@@ -538,6 +538,7 @@ struct ieee80211com {
 	enum ieee80211_protmode	ic_htprotmode;	/* HT protection mode */
 	int			ic_lastnonerp;	/* last time nonERP sta noted */
 	int			ic_lastnonht;	/* last time non-HT sta noted */
+	int			ic_beaconmiss;	/* beacon miss counter */
 
 
 	/* callback functions */

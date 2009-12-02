@@ -836,6 +836,8 @@ ieee80211_recv_beacon(ieee80211com_t *ic, mblk_t *mp, struct ieee80211_node *in,
 	frm = (uint8_t *)&wh[1];
 	efrm = (uint8_t *)mp->b_wptr;
 
+	ic->ic_beaconmiss = 0;	/* clear beacon miss counter */
+
 	/*
 	 * We process beacon/probe response frames:
 	 *    o when scanning, or

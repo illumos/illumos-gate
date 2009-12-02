@@ -2822,21 +2822,8 @@ iwh_rx_softintr(caddr_t arg, caddr_t unused)
 			break;
 
 		case MISSED_BEACONS_NOTIFICATION:
-		{
-			struct iwh_beacon_missed *miss =
-			    (struct iwh_beacon_missed *)(desc + 1);
-
-			if ((ic->ic_state == IEEE80211_S_RUN) &&
-			    (LE_32(miss->consecutive) > 50)) {
-				cmn_err(CE_NOTE, "iwh: iwh_rx_softintr(): "
-				    "beacon missed %d/%d\n",
-				    LE_32(miss->consecutive),
-				    LE_32(miss->total));
-				(void) ieee80211_new_state(ic,
-				    IEEE80211_S_INIT, -1);
-			}
+			/* handle beacon miss by software mechanism */
 			break;
-		}
 		}
 
 		sc->sc_rxq.cur = (sc->sc_rxq.cur + 1) % RX_QUEUE_SIZE;
@@ -3867,6 +3854,13 @@ iwh_thread(iwh_sc_t *sc)
 			if (clk > sc->sc_clk + drv_usectohz(1000000)) {
 				iwh_amrr_timeout(sc);
 			}
+		}
+
+		if ((ic->ic_state == IEEE80211_S_RUN) &&
+		    (ic->ic_beaconmiss++ > 100)) {	/* 10 seconds */
+			cmn_err(CE_WARN, "iwh: beacon missed for 10 seconds\n");
+			(void) ieee80211_new_state(ic,
+			    IEEE80211_S_INIT, -1);
 		}
 
 		delay(drv_usectohz(100000));

@@ -3395,6 +3395,13 @@ iwk_thread(iwk_sc_t *sc)
 			}
 		}
 
+		if ((ic->ic_state == IEEE80211_S_RUN) &&
+		    (ic->ic_beaconmiss++ > 50)) {	/* 5 seconds */
+			cmn_err(CE_WARN, "iwk: beacon missed for 5 seconds\n");
+			(void) ieee80211_new_state(ic,
+			    IEEE80211_S_INIT, -1);
+		}
+
 		mutex_exit(&sc->sc_mt_lock);
 		delay(drv_usectohz(100000));
 		mutex_enter(&sc->sc_mt_lock);
