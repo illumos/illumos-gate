@@ -27,47 +27,110 @@
 #include	<stdio.h>
 #include	<stdlib.h>
 #include	<string.h>
+#include	<libgen.h>
 #include	<sys/param.h>
 #include	<sys/priocntl.h>
 #include	<sys/types.h>
 
 #include	"priocntl.h"
 
-static char usage[] = "usage:	priocntl -l\n";
+static char usage[] =
+"usage:	priocntl -l\n\
+	priocntl -d [-i idtype] [idlist]\n";
 
+/*
+ * A whole lot of to-do for a scheduling class that can't actually be
+ * configured or used by user processes.
+ */
 int
 main(int argc, char *argv[])
 {
-	int lflag = 0;
-	int c;
+	int	dflag, eflag, iflag, lflag, sflag;
+	int	c;
+	char	cmdpath[MAXPATHLEN];
+	char	basenm[BASENMSZ];
 
-	while ((c = getopt(argc, argv, "lc:")) != -1) {
+	(void) strlcpy(cmdpath, argv[0], MAXPATHLEN);
+	(void) strlcpy(basenm, basename(argv[0]), BASENMSZ);
+
+	dflag = eflag = iflag = lflag = sflag = 0;
+	while ((c = getopt(argc, argv, "c:dei:ls")) != -1) {
 		switch (c) {
-
-		case 'l':
-			lflag++;
-			break;
 
 		case 'c':
 			if (strcmp(optarg, "SDC") != 0)
 				fatalerr("error: %s executed for %s class, "
 				    "%s is actually sub-command for %s class\n",
-				    argv[0], optarg, argv[0], "SDC");
+				    cmdpath, optarg, cmdpath, "SDC");
+			break;
 
-			fatalerr("error: no scheduling-class specific options"
-			    " for SDC\n");
+		case 'd':
+			dflag++;
+			break;
+
+		case 'e':
+			eflag++;
+			break;
+
+		case 'i':
+			iflag++;	/* optarg is parsed, but ignored */
+			break;
+
+		case 'l':
+			lflag++;
+			break;
+
+		case 's':
+			sflag++;
 			break;
 
 		case '?':
 			fatalerr(usage);
+			/*NOTREACHED*/
+
 		default:
 			break;
 		}
 	}
 
-	if (!lflag)
+	if (sflag && eflag) {
 		fatalerr(usage);
+	}
+	if (sflag || eflag) {
+		fatalerr(
+		    "priocntl: \"-%c\" may not be used with the %s class\n",
+		    (sflag ? 's' : 'e'), "SDC");
+	}
 
-	(void) printf("SDC\t(System Duty-Cycle Class)\n");
+	if ((!dflag && !lflag) || (dflag && lflag)) {
+		fatalerr(usage);
+	}
+
+	if (dflag) {
+		pid_t *pidlist;
+		size_t numread, i;
+
+		/*
+		 * No scheduling-class-specific information to print,
+		 * but we read the pidlist to avoid generating a SIGPIPE
+		 * in the main priocntl process.  Once we've read it,
+		 * we might as well print it.
+		 */
+		if ((pidlist = read_pidlist(&numread, stdin)) == NULL) {
+			fatalerr("%s: Can't read pidlist.\n", basenm);
+		} else if (numread == 0) {
+			fatalerr("%s: No pids on input.\n", basenm);
+		} else {
+			(void) printf("SYSTEM DUTY-CYCLE PROCESSES:\n");
+			(void) printf("%7s\n", "PID");
+			for (i = 0; i < numread; i++) {
+				(void) printf("%7ld\n", pidlist[i]);
+			}
+		}
+		free_pidlist(pidlist);
+	} else {
+		(void) printf("SDC (System Duty-Cycle Class)\n");
+	}
+
 	return (0);
 }
