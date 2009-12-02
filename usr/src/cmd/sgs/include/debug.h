@@ -831,7 +831,7 @@ extern	void	Dbg_sec_discarded(Lm_list *, Is_desc *, Is_desc *);
 extern	void	Dbg_sec_genstr_compress(Lm_list *, const char *,
 		    Xword, Xword);
 extern	void	Dbg_sec_group(Lm_list *, Is_desc *, Group_desc *);
-extern	void	Dbg_sec_gnu_comdat(Lm_list *, Is_desc *, uint_t, uint_t);
+extern	void	Dbg_sec_gnu_comdat(Lm_list *, Is_desc *, Boolean, Boolean);
 extern	void	Dbg_sec_in(Lm_list *, Is_desc *);
 extern	void	Dbg_sec_order_error(Lm_list *, Ifl_desc *, Word, int);
 extern	void	Dbg_sec_order_list(Ofl_desc *, int);

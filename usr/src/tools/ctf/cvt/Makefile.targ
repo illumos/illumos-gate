@@ -29,11 +29,8 @@ ctfconvert: $(CVTOBJS)
 	$(LINK.c) -o $@ $(CVTOBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-# Remove this after build snv_126
-CTFMERGE_VERSION=-M../mapfile-vers
-
 ctfmerge: $(MRGOBJS)
-	$(LINK.c) $(CTFMERGE_VERSION) -o $@ $(MRGOBJS) $(LDLIBS)
+	$(LINK.c) -o $@ $(MRGOBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
 %.o: ../%.c

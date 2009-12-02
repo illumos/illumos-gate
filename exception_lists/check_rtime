@@ -1,4 +1,3 @@
-
 #
 # CDDL HEADER START
 #
@@ -108,9 +107,10 @@ UNUSED_RPATH	/usr/lib/picl/.*\ from\ .*/usr/platform
 UNUSED_RPATH	/usr/platform/.*\ from\ .*/usr/lib/picl
 
 # Unused runpaths in non-OSNET objects we can't change
-UNUSED_RPATH	/usr/lib/mps/secv1.*\ from\ .*libnss3\.so
 UNUSED_RPATH	/usr/lib/mps.*\ from\ .*libnss3\.so
-UNUSED_RPATH	/usr/lib/mps.*\ from\ .*libnssutil3.so
+UNUSED_RPATH	/usr/lib/mps.*\ from\ .*libnssutil3\.so
+UNUSED_RPATH	/usr/lib/mps.*\ from\ .*libsmime3\.so
+UNUSED_RPATH	/usr/lib/mps.*\ from\ .*libssl3\.so
 UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libdbus-1\.so\.3
 UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libdbus-glib-1\.so\.2
 UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libglib-2\.0\.so\.0
@@ -127,8 +127,6 @@ UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libnetsnmp\.so\.15
 UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libgcc_s\.so\.1
 UNUSED_RPATH	/usr/postgres/8.3/lib.*\ from\ .*libpq\.so\.5
 UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libpq\.so\.5
-UNUSED_RPATH	/usr/lib/mps.*\ from\ .*libsmime3\.so
-UNUSED_RPATH	/usr/lib/mps.*\ from\ .*libssl3\.so
 
 # Unused runpaths for reasons not captured above
 UNUSED_RPATH	/usr/lib/smbsrv.*\ from\ .*libsmb\.so\.1 	# future needs

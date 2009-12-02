@@ -1383,7 +1383,7 @@ Bugid   Risk Synopsis
 6642769 ld(1) -z combreloc should become default behavior (D)
 	PSARC/2008/006 make ld(1) -z combreloc become default behavior
 6634436 XFFLAG should be updated.  (link-editor components only)
-6492726 Merge SHF_MERGE|SHF_STRINGS input sections
+6492726 Merge SHF_MERGE|SHF_STRINGS input sections (D)
 4947191 OSNet should use direct bindings  (link-editor components only)
 6654381 lazy loading fall-back needs optimizing
 6658385 ld core dumps when building Xorg on nv_82
@@ -1502,25 +1502,25 @@ Bugid   Risk Synopsis
 6821646 xVM dom0 doesn't boot on daily.0324 and beyond
 6822828 librtld_db can return RD_ERR before RD_NOMAPS, which compromises dbx
 	expectations.
-6821619 Solaris linkers need systematic approach to ELF OSABI
+6821619 Solaris linkers need systematic approach to ELF OSABI (D)
 	PSARC/2009/196 ELF objects to set OSABI / elfdump -O option
 6827468 6801536 breaks 'ld -s' if there are weak/strong symbol pairs
 6715578 AOUT (BCP) symbol lookup can be compromised with lazy loading.
 6752883 ld.so.1 error message should be buffered (not sent to stderr).
 6577982 ld.so.1 calls getpid() before it should when any LD_* are set
 6826513 ldd gets confused by a crle(1) LD_PRELOAD setting
-6831285 linker LD_DEBUG support needs improvements
+6831285 linker LD_DEBUG support needs improvements (D)
 6806791 filter builds could be optimized (link-editor components only)
 6823371 calloc() uses suboptimal memset() causing 15% regression in SpecCPU2006
 	gcc code (link-editor components only)
 6831308 ld.so.1: symbol rescanning does a little too much work
 6837777 ld ordered section code uses too much memory and works too hard
 6841199 Undo 10 year old workaround and use 64-bit ld on 32-bit objects
-6784790 ld should examine archives to determine output object class/machine
+6784790 ld should examine archives to determine output object class/machine (D)
 	PSARC/2009/305 ld -32 option
 6849998 remove undocumented mapfile $SPECVERS and $NEED options
 6851224 elf_getshnum() and elf_getshstrndx() incompatible with 2002 ELF gABI
-	agreement
+	agreement (D)
 	PSARC/2009/363 replace elf_getphnum, elf_getshnum, and elf_getshstrndx
 6853809	ld.so.1: rescan fallback optimization is invalid
 6854158	ld.so.1: interposition can be skipped because of incorrect
@@ -1531,8 +1531,13 @@ Bugid   Risk Synopsis
 6834197 ld pukes when given an empty plate
 6516644 per-symbol filtering shouldn't be allowed in executables
 6878605 ld should accept '%' syntax when matching input SHT_PROGBITS sections
-6850768 ld option to autogenerate wrappers/interposers similar to GNU ld --wrap
+6850768 ld option to autogenerate wrappers/interposers similar to GNU ld
+	--wrap (D)
 	PSARC/2009/493 ld -z wrap option
 6888489 Null environment variables are not overriding crle(1) replaceable
 	environment variables.
 6885456 Need to implement GNU-ld behavior in construction of .init/.fini sections
+6900241 ld should track SHT_GROUP sections by symbol name, not section name
+6901773 Special handling of STT_SECTION group signature symbol for GNU objects
+6901895 Failing asserts in ld update_osym() trying to build gcc 4.5 develpment
+	head

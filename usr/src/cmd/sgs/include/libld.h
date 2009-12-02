@@ -368,6 +368,8 @@ struct ofl_desc {
 #define	FLG_OF_REDLSYM	0x004000000000	/* reduce local symbols */
 #define	FLG_OF_SECORDER	0x008000000000	/* section ordering is required */
 #define	FLG_OF_OSABI	0x010000000000	/* tag object as ELFOSABI_SOLARIS */
+#define	FLG_OF_ADJOSCNT	0x020000000000	/* ajust ofl_shdrcnt to accommodate */
+					/*	discarded sections */
 
 /*
  * In the flags1 arena, establish any options that are applicable to archive

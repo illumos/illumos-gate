@@ -162,6 +162,89 @@ ignore_sym(Ofl_desc *ofl, Ifl_desc *ifl, Sym_desc *sdp, int allow_ldynsym)
 }
 
 /*
+ * There are situations where we may count output sections (ofl_shdrcnt)
+ * that are subsequently eliminated from the output object. Whether or
+ * not this happens cannot be known until all input has been seen and
+ * section elimination code has run. However, the situations where this
+ * outcome is possible are known, and are flagged by setting FLG_OF_ADJOSCNT.
+ *
+ * If FLG_OF_ADJOSCNT is set, this routine makes a pass over the output
+ * sections. If an unused output section is encountered, we decrement
+ * ofl->ofl_shdrcnt and remove the section name from the .shstrtab string
+ * table (ofl->ofl_shdrsttab).
+ *
+ * This code must be kept in sync with the similar code
+ * found in outfile.c:ld_create_outfile().
+ */
+static void
+adjust_os_count(Ofl_desc *ofl)
+{
+	Sg_desc		*sgp;
+	Is_desc		*isp;
+	Os_desc		*osp;
+	Ifl_desc	*ifl;
+	Aliste		idx1;
+
+	if ((ofl->ofl_flags & FLG_OF_ADJOSCNT) == 0)
+		return;
+
+	/*
+	 * For each output section, look at the input sections to find at least
+	 * one input section that has not been eliminated. If none are found,
+	 * the -z ignore processing above has eliminated that output section.
+	 */
+	for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp)) {
+		Aliste	idx2;
+		Word	ptype = sgp->sg_phdr.p_type;
+
+		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx2, osp)) {
+			Aliste	idx3;
+			int	keep = 0, os_isdescs_idx;
+
+			OS_ISDESCS_TRAVERSE(os_isdescs_idx, osp, idx3, isp) {
+				ifl = isp->is_file;
+
+				/* Input section is tagged for discard? */
+				if (isp->is_flags & FLG_IS_DISCARD)
+					continue;
+
+				/*
+				 * If the file is discarded, it will take
+				 * the section with it.
+				 */
+				if (ifl &&
+				    (((ifl->ifl_flags & FLG_IF_FILEREF) == 0) ||
+				    ((ptype == PT_LOAD) &&
+				    ((isp->is_flags & FLG_IS_SECTREF) == 0) &&
+				    (isp->is_shdr->sh_size > 0))) &&
+				    (ifl->ifl_flags & FLG_IF_IGNORE))
+					continue;
+
+				/*
+				 * We have found a kept input section,
+				 * so the output section will be created.
+				 */
+				keep = 1;
+				break;
+			}
+			/*
+			 * If no section of this name was kept, decrement
+			 * the count and remove the name from .shstrtab.
+			 */
+			if (keep == 0) {
+				/* LINTED - only used for assert() */
+				int err;
+
+				ofl->ofl_shdrcnt--;
+				err = st_delstring(ofl->ofl_shdrsttab,
+				    osp->os_name);
+				assert(err != -1);
+			}
+		}
+	}
+}
+
+/*
  * If -zignore has been in effect, scan all input files to determine if the
  * file, or sections from the file, have been referenced.  If not, the file or
  * some of the files sections can be discarded. If sections are to be
@@ -305,67 +388,10 @@ ignore_section_processing(Ofl_desc *ofl)
 	}
 
 	/*
-	 * The number of output sections may have decreased. We must make a
-	 * pass over the output sections, and if we detect this situation,
-	 * decrement ofl->ofl_shdrcnt and remove the section name from the
-	 * .shstrtab string table (ofl->ofl_shdrsttab).
-	 *
-	 * This code must be kept in sync with the similar code
-	 * found in outfile.c:ld_create_outfile().
-	 *
-	 * For each output section, look at the input sections to find at least
-	 * one input section that has not been eliminated. If none are found,
-	 * the -z ignore processing above has eliminated that output section.
+	 * As a result of our work here, the number of output sections may
+	 * have decreased. Trigger a call to adjust_os_count().
 	 */
-	for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp)) {
-		Aliste	idx2;
-		Word	ptype = sgp->sg_phdr.p_type;
-
-		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx2, osp)) {
-			Aliste	idx3;
-			int	keep = 0, os_isdescs_idx;
-
-			OS_ISDESCS_TRAVERSE(os_isdescs_idx, osp, idx3, isp) {
-				ifl = isp->is_file;
-
-				/* Input section is tagged for discard? */
-				if (isp->is_flags & FLG_IS_DISCARD)
-					continue;
-
-				/*
-				 * If the file is discarded, it will take
-				 * the section with it.
-				 */
-				if (ifl &&
-				    (((ifl->ifl_flags & FLG_IF_FILEREF) == 0) ||
-				    ((ptype == PT_LOAD) &&
-				    ((isp->is_flags & FLG_IS_SECTREF) == 0) &&
-				    (isp->is_shdr->sh_size > 0))) &&
-				    (ifl->ifl_flags & FLG_IF_IGNORE))
-					continue;
-
-				/*
-				 * We have found a kept input section,
-				 * so the output section will be created.
-				 */
-				keep = 1;
-				break;
-			}
-			/*
-			 * If no section of this name was kept, decrement
-			 * the count and remove the name from .shstrtab.
-			 */
-			if (keep == 0) {
-				/* LINTED - only used for assert() */
-				int err;
-
-				ofl->ofl_shdrcnt--;
-				err = st_delstring(ofl->ofl_shdrsttab,
-				    osp->os_name);
-				assert(err != -1);
-			}
-		}
-	}
+	ofl->ofl_flags |= FLG_OF_ADJOSCNT;
 
 	return (1);
 }
@@ -2660,6 +2686,14 @@ ld_make_sections(Ofl_desc *ofl)
 		if (ignore_section_processing(ofl) == S_ERROR)
 			return (S_ERROR);
 	}
+
+	/*
+	 * If we have detected a situation in which previously placed
+	 * output sections may have been discarded, perform the necessary
+	 * readjustment.
+	 */
+	if (ofl->ofl_flags & FLG_OF_ADJOSCNT)
+		adjust_os_count(ofl);
 
 	/*
 	 * Do any of the output sections contain input sections that

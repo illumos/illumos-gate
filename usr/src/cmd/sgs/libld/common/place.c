@@ -249,8 +249,12 @@ add_comdat(Ofl_desc *ofl, Os_desc *osp, Is_desc *isp)
 		    SGSOFFSETOF(Isd_node, isd_avl));
 		osp->os_comdats = avlt;
 	}
-	isd.isd_hash = sgs_str_hash(isp->is_name);
-	isd.isd_isp = isp;
+
+	/*
+	 * A standard COMDAT section uses the section name as search key.
+	 */
+	isd.isd_name = isp->is_name;
+	isd.isd_hash = sgs_str_hash(isd.isd_name);
 
 	if ((isdp = avl_find(avlt, &isd, &where)) != NULL) {
 		isp->is_osdesc = osp;
@@ -283,6 +287,7 @@ add_comdat(Ofl_desc *ofl, Os_desc *osp, Is_desc *isp)
 	if ((isdp = libld_calloc(sizeof (Isd_node), 1)) == NULL)
 		return (S_ERROR);
 
+	isdp->isd_name = isd.isd_name;
 	isdp->isd_hash = isd.isd_hash;
 	isdp->isd_isp = isp;
 
@@ -643,14 +648,14 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident,
 
 		/*
 		 * Explicitly identify this section type as COMDAT.  Also,
-		 * enable lazy relocation processing, as this is typically a
-		 * requirement with .gnu.linkonce sections.
+		 * enable relaxed relocation processing, as this is typically
+		 * a requirement with .gnu.linkonce sections.
 		 */
 		isp->is_flags |= FLG_IS_COMDAT;
 		if ((ofl->ofl_flags1 & FLG_OF1_NRLXREL) == 0)
 			ofl->ofl_flags1 |= FLG_OF1_RLXREL;
-		Dbg_sec_gnu_comdat(ofl->ofl_lml, isp, 1,
-		    (ofl->ofl_flags1 & FLG_OF1_RLXREL));
+		Dbg_sec_gnu_comdat(ofl->ofl_lml, isp, TRUE,
+		    (ofl->ofl_flags1 & FLG_OF1_RLXREL) != 0);
 	}
 
 	/*
@@ -675,13 +680,12 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident,
 		DBG_CALL(Dbg_sec_redirected(ofl->ofl_lml, isp, oname));
 
 		/*
-		 * Enable lazy relocation processing, as this is typically a
-		 * requirement with GNU COMDAT sections.
+		 * Enable relaxed relocation processing, as this is
+		 * typically a requirement with GNU COMDAT sections.
 		 */
 		if ((ofl->ofl_flags1 & FLG_OF1_NRLXREL) == 0) {
 			ofl->ofl_flags1 |= FLG_OF1_RLXREL;
-			Dbg_sec_gnu_comdat(ofl->ofl_lml, isp, 0,
-			    (ofl->ofl_flags1 & FLG_OF1_RLXREL));
+			Dbg_sec_gnu_comdat(ofl->ofl_lml, isp, FALSE, TRUE);
 		}
 	}
 
@@ -838,7 +842,15 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident,
 	/*
 	 * We are adding a new output section.  Update the section header
 	 * count and associated string size.
+	 *
+	 * If the input section triggering this output section has been marked
+	 * for discard, and if no other non-discarded input section comes along
+	 * to join it, then we will over count. We cannot know if this will
+	 * happen or not until all input is seen. Set FLG_OF_AJDOSCNT to
+	 * trigger a final count readjustment.
 	 */
+	if (isp->is_flags & FLG_IS_DISCARD)
+		ofl->ofl_flags |= FLG_OF_ADJOSCNT;
 	ofl->ofl_shdrcnt++;
 	if (st_insert(ofl->ofl_shdrsttab, oname) == -1)
 		return ((Os_desc *)S_ERROR);

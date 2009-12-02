@@ -57,8 +57,14 @@ gpavl_loaded(Ofl_desc *ofl, Group_desc *gdp)
 		ofl->ofl_groups = avlt;
 	}
 
-	isd.isd_hash = sgs_str_hash(gdp->gd_isc->is_name);
-	isd.isd_isp = gdp->gd_isc;
+	/*
+	 * An SHT_GROUP section is identified by the name of its signature
+	 * symbol rather than section name. Although the section names are
+	 * often unique, this is not required, and some compilers set it to
+	 * a generic name like ".group".
+	 */
+	isd.isd_name = gdp->gd_name;
+	isd.isd_hash = sgs_str_hash(isd.isd_name);
 
 	if ((isdp = avl_find(avlt, &isd, &where)) != NULL) {
 		gdp->gd_oisc = isdp->isd_isp;
@@ -71,8 +77,9 @@ gpavl_loaded(Ofl_desc *ofl, Group_desc *gdp)
 	if ((isdp = libld_calloc(sizeof (Isd_node), 1)) == NULL)
 		return (S_ERROR);
 
+	isdp->isd_name = isd.isd_name;
 	isdp->isd_hash = isd.isd_hash;
-	isdp->isd_isp = isd.isd_isp;
+	isdp->isd_isp = gdp->gd_isc;
 
 	avl_insert(avlt, isdp, where);
 	return (0);
@@ -123,6 +130,7 @@ ld_group_process(Is_desc *gisc, Ofl_desc *ofl)
 	const char	*str;
 	Group_desc	gd;
 	size_t		ndx;
+	int		gnu_stt_section;
 
 	/*
 	 * Confirm that the sh_link points to a valid section.
@@ -171,6 +179,23 @@ ld_group_process(Is_desc *gisc, Ofl_desc *ofl)
 	str += sym->st_name;
 
 	/*
+	 * The GNU assembler can use section symbols as the signature symbol
+	 * as described by this comment in the gold linker (found via google):
+	 *
+	 *	It seems that some versions of gas will create a section group
+	 *	associated with a section symbol, and then fail to give a name
+	 *	to the section symbol.  In such a case, use the name of the
+	 *	section.
+	 *
+	 * In order to support such objects, we do the same.
+	 */
+	gnu_stt_section = ((sym->st_name == 0) || (*str == '\0')) &&
+	    (ELF_ST_TYPE(sym->st_info) == STT_SECTION);
+	if (gnu_stt_section)
+		str = gisc->is_name;
+
+
+	/*
 	 * Generate a group descriptor.
 	 */
 	gd.gd_isc = gisc;
@@ -182,7 +207,7 @@ ld_group_process(Is_desc *gisc, Ofl_desc *ofl)
 	/*
 	 * If this group is a COMDAT group, validate the signature symbol.
 	 */
-	if ((gd.gd_data[0] & GRP_COMDAT) &&
+	if ((gd.gd_data[0] & GRP_COMDAT) && !gnu_stt_section &&
 	    ((ELF_ST_BIND(sym->st_info) == STB_LOCAL) ||
 	    (sym->st_shndx == SHN_UNDEF))) {
 		/* If section symbol, construct a printable name for it */

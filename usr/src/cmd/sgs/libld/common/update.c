@@ -236,7 +236,7 @@ update_osym(Ofl_desc *ofl)
 	 * Initialize pointers to the symbol table entries and the symbol
 	 * table strings.  Skip the first symbol entry and the first string
 	 * table byte.  Note that if we are not generating any output symbol
-	 * tables we must still generate and update an internal copies so
+	 * tables we must still generate and update internal copies so
 	 * that the relocation phase has the correct information.
 	 */
 	if (!(flags & FLG_OF_STRIP) || (flags & FLG_OF_RELOBJ) ||
@@ -1827,11 +1827,9 @@ update_osym(Ofl_desc *ofl)
 		shdr->sh_info = symtab_gbl_bndx;
 		/* LINTED */
 		shdr->sh_link = (Word)elf_ndxscn(ofl->ofl_osstrtab->os_scn);
-		if (symshndx) {
-			shdr = ofl->ofl_ossymshndx->os_shdr;
-			shdr->sh_link =
+		if (symshndx)
+			ofl->ofl_ossymshndx->os_shdr->sh_link =
 			    (Word)elf_ndxscn(ofl->ofl_ossymtab->os_scn);
-		}
 
 		/*
 		 * Ensure that the expected number of symbols

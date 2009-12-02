@@ -469,7 +469,7 @@ Dbg_sec_redirected(Lm_list *lml, Is_desc *isp, const char *nname)
 }
 
 void
-Dbg_sec_gnu_comdat(Lm_list *lml, Is_desc *isp, uint_t comdat, uint_t relax)
+Dbg_sec_gnu_comdat(Lm_list *lml, Is_desc *isp, Boolean comdat, Boolean relax)
 {
 	dbg_isec_name_buf_t	buf;
 	char			*alloc_mem;

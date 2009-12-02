@@ -656,7 +656,7 @@ ld_getopt(Lm_list *lml, int ndx, int argc, char **argv)
 }
 
 /*
- * A compare routine for Isd_node AVLT trees.
+ * A compare routine for Isd_node AVL trees.
  */
 int
 isdavl_compare(const void *n1, const void *n2)
@@ -673,8 +673,8 @@ isdavl_compare(const void *n1, const void *n2)
 	if (hash1 < hash2)
 		return (-1);
 
-	st1 = ((Isd_node *)n1)->isd_isp->is_name;
-	st2 = ((Isd_node *)n2)->isd_isp->is_name;
+	st1 = ((Isd_node *)n1)->isd_name;
+	st2 = ((Isd_node *)n2)->isd_name;
 
 	rc = strcmp(st1, st2);
 	if (rc > 0)

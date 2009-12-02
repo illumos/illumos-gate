@@ -1091,15 +1091,30 @@ ld_sym_validate(Ofl_desc *ofl)
 	ofl_flag_t	oflags = ofl->ofl_flags;
 	ofl_flag_t	undef = 0, needed = 0, verdesc = 0;
 	Xword		bssalign = 0, tlsalign = 0;
+	Boolean		need_bss, need_tlsbss;
 	Xword		bsssize = 0, tlssize = 0;
 #if	defined(_ELF64)
 	Xword		lbssalign = 0, lbsssize = 0;
+	Boolean		need_lbss;
 #endif
 	int		ret;
 	int		allow_ldynsym;
 	uchar_t		type;
 
 	DBG_CALL(Dbg_basic_validate(ofl->ofl_lml));
+
+	/*
+	 * The need_XXX booleans are used to determine whether we need to
+	 * create each type of bss section. We used to create these sections
+	 * if the sum of the required sizes for each type were non-zero.
+	 * However, it is possible for a compiler to generate COMMON variables
+	 * of zero-length and this tricks that logic --- even zero-length
+	 * symbols need an output section.
+	 */
+	need_bss = need_tlsbss = FALSE;
+#if	defined(_ELF64)
+	need_lbss = FALSE;
+#endif
 
 	/*
 	 * If a symbol is undefined and this link-edit calls for no undefined
@@ -1431,19 +1446,19 @@ ld_sym_validate(Ofl_desc *ofl)
 		    (oflags & FLG_OF_PROCRED)))) {
 			if ((sdp->sd_move == NULL) ||
 			    ((sdp->sd_flags & FLG_SY_PAREXPN) == 0)) {
-				Xword * size, * align;
-
 				if (type != STT_TLS) {
-					size = &bsssize;
-					align = &bssalign;
+					need_bss = TRUE;
+					bsssize = (Xword)S_ROUND(bsssize,
+					    sym->st_value) + sym->st_size;
+					if (sym->st_value > bssalign)
+						bssalign = sym->st_value;
 				} else {
-					size = &tlssize;
-					align = &tlsalign;
+					need_tlsbss = TRUE;
+					tlssize = (Xword)S_ROUND(tlssize,
+					    sym->st_value) + sym->st_size;
+					if (sym->st_value > tlsalign)
+						tlsalign = sym->st_value;
 				}
-				*size = (Xword)S_ROUND(*size, sym->st_value) +
-				    sym->st_size;
-				if (sym->st_value > *align)
-					*align = sym->st_value;
 			}
 		}
 
@@ -1455,6 +1470,7 @@ ld_sym_validate(Ofl_desc *ofl)
 		 */
 		if ((ld_targ.t_m.m_mach == EM_AMD64) &&
 		    (sym->st_shndx == SHN_X86_64_LCOMMON)) {
+			need_lbss = TRUE;
 			lbsssize = (Xword)S_ROUND(lbsssize, sym->st_value) +
 			    sym->st_size;
 			if (sym->st_value > lbssalign)
@@ -1587,19 +1603,19 @@ ld_sym_validate(Ofl_desc *ofl)
 	/*
 	 * Generate the .bss section now that we know its size and alignment.
 	 */
-	if (bsssize) {
+	if (need_bss) {
 		if (ld_make_bss(ofl, bsssize, bssalign,
 		    ld_targ.t_id.id_bss) == S_ERROR)
 			return (S_ERROR);
 	}
-	if (tlssize) {
+	if (need_tlsbss) {
 		if (ld_make_bss(ofl, tlssize, tlsalign,
 		    ld_targ.t_id.id_tlsbss) == S_ERROR)
 			return (S_ERROR);
 	}
 #if	defined(_ELF64)
 	if ((ld_targ.t_m.m_mach == EM_AMD64) &&
-	    lbsssize && !(oflags & FLG_OF_RELOBJ)) {
+	    need_lbss && !(oflags & FLG_OF_RELOBJ)) {
 		if (ld_make_bss(ofl, lbsssize, lbssalign,
 		    ld_targ.t_id.id_lbss) == S_ERROR)
 			return (S_ERROR);

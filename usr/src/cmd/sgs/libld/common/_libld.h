@@ -511,12 +511,24 @@ typedef enum {
 	ld_swap_reloc_data(_ofl, _rel))
 
 /*
- * Define an AVL node for maintaining input section descriptors.  AVL trees of
+ * Define an AVL node for maintaining input section descriptors. AVL trees of
  * these descriptors are used to process group and COMDAT section.
+ *
+ * Pure COMDAT uses the input section name as the search key, while
+ * SHT_GROUP sections use the name of a special signature symbol. We
+ * support both by using the isd_name field to carry the name. An alternative
+ * design would be to use a separate type for each use, saving the cost
+ * of the unneeded pointer for pure COMDAT. We favor a single implementation
+ * because we believe that SHT_GROUP comdat will be more common going forward,
+ * particularly in the largest objects produced by C++ where SHT_GROUP is
+ * needed to manage the complex section relationships. In contrast, we think
+ * that pure COMDAT is both more rare, and used in smaller objects where the
+ * cost of an extra pointer per node is relatively unimportant.
  */
 typedef struct {
 	avl_node_t	isd_avl;	/* avl book-keeping (see SGSOFFSETOF) */
 	Is_desc		*isd_isp;	/* input section descriptor */
+	const char	*isd_name;	/* name used as search key */
 	uint_t		isd_hash;	/* input section name hash value */
 } Isd_node;
 

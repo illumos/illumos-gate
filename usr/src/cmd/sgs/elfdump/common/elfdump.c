@@ -3514,12 +3514,13 @@ group(Cache *cache, Word shnum, const char *file, uint_t flags)
 	Word	scnt;
 
 	for (scnt = 1; scnt < shnum; scnt++) {
-		Cache	*_cache = &cache[scnt];
-		Shdr	*shdr = _cache->c_shdr;
-		Word	*grpdata, gcnt, grpcnt, symnum, unknown;
-		Cache	*symsec, *strsec;
-		Sym	*syms, *sym;
-		char	flgstrbuf[MSG_GRP_COMDAT_SIZE + 10];
+		Cache		*_cache = &cache[scnt];
+		Shdr		*shdr = _cache->c_shdr;
+		Word		*grpdata, gcnt, grpcnt, symnum, unknown;
+		Cache		*symsec, *strsec;
+		Sym		*syms, *sym;
+		char		flgstrbuf[MSG_GRP_COMDAT_SIZE + 10];
+		const char	*grpnam;
 
 		if (shdr->sh_type != SHT_GROUP)
 			continue;
@@ -3568,9 +3569,25 @@ group(Cache *cache, Word shnum, const char *file, uint_t flags)
 		(void) strcat(flgstrbuf, MSG_ORIG(MSG_STR_CSQBRKT));
 		sym = (Sym *)(syms + shdr->sh_info);
 
+		/*
+		 * The GNU assembler can use section symbols as the signature
+		 * symbol as described by this comment in the gold linker
+		 * (found via google):
+		 *
+		 *	It seems that some versions of gas will create a
+		 *	section group associated with a section symbol, and
+		 *	then fail to give a name to the section symbol.  In
+		 *	such a case, use the name of the section.
+		 *
+		 * In order to support such objects, we do the same.
+		 */
+		grpnam = string(_cache, 0, strsec, file, sym->st_name);
+		if (((sym->st_name == 0) || (*grpnam == '\0')) &&
+		    (ELF_ST_TYPE(sym->st_info) == STT_SECTION))
+			grpnam = cache[sym->st_shndx].c_name;
+
 		dbg_print(0, MSG_INTL(MSG_GRP_SIGNATURE), flgstrbuf,
-		    demangle(string(_cache, 0, strsec, file, sym->st_name),
-		    flags));
+		    demangle(grpnam, flags));
 
 		for (gcnt = 1; gcnt < grpcnt; gcnt++) {
 			char		index[MAXNDXSIZE];
