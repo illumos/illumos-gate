@@ -483,20 +483,31 @@ my_ct_name(char *out, size_t len)
  * Set auxiliary_tty and auxiliary_fmri properties in restarter_actions pg to
  * communicate whether the action is requested from a tty and the fmri of the
  * responsible process.
+ *
+ * Returns 0, EPERM, or EROFS
  */
 static int
 restarter_setup(const char *fmri, const scf_instance_t *inst)
 {
 	boolean_t b = B_FALSE;
 	scf_propertygroup_t *pg = NULL;
+	int ret = 0;
 
 	if ((pg = scf_pg_create(h)) == NULL)
 		scfdie();
 
 	if (pg_get_or_add(inst, SCF_PG_RESTARTER_ACTIONS,
 	    SCF_PG_RESTARTER_ACTIONS_TYPE, SCF_PG_RESTARTER_ACTIONS_FLAGS,
-	    pg) != 0)
-		scfdie();
+	    pg) == EPERM) {
+		if (!verbose)
+			uu_warn(emsg_permission_denied, fmri);
+		else
+			uu_warn(emsg_create_pg_perm_denied, fmri,
+			    SCF_PG_RESTARTER_ACTIONS);
+
+		ret = EPERM;
+		goto out;
+	}
 
 	/* Set auxiliary_tty property */
 	if (isatty(STDIN_FILENO))
@@ -508,16 +519,28 @@ restarter_setup(const char *fmri, const scf_instance_t *inst)
 		break;
 
 	case EPERM:
-		uu_warn(gettext("Could not set %s/%s "
-		    "property of %s: permission denied.\n"),
-		    SCF_PG_RESTARTER_ACTIONS, SCF_PROPERTY_AUX_TTY, fmri);
-		break;
+		if (!verbose)
+			uu_warn(emsg_permission_denied, fmri);
+		else
+			uu_warn(emsg_prop_perm_denied, fmri,
+			    SCF_PG_RESTARTER_ACTIONS, SCF_PROPERTY_AUX_TTY);
+
+		ret = EPERM;
+		goto out;
+		/* NOTREACHED */
 
 	case EROFS:
-		uu_warn(gettext("%s: Could not set %s/%s "
-		    "(repository read-only).\n"), fmri,
-		    SCF_PG_RESTARTER_ACTIONS, SCF_PROPERTY_AUX_TTY);
-		break;
+		/* Shouldn't happen, but it can. */
+		if (!verbose)
+			uu_warn(gettext("%s: Repository read-only.\n"), fmri);
+		else
+			uu_warn(gettext("%s: Could not set %s/%s "
+			    "(repository read-only).\n"), fmri,
+			    SCF_PG_RESTARTER_ACTIONS, SCF_PROPERTY_AUX_TTY);
+
+		ret = EROFS;
+		goto out;
+		/* NOTREACHED */
 
 	default:
 		scfdie();
@@ -534,8 +557,9 @@ restarter_setup(const char *fmri, const scf_instance_t *inst)
 		    SCF_PG_RESTARTER_ACTIONS, SCF_PROPERTY_AUX_FMRI);
 	}
 
+out:
 	scf_pg_destroy(pg);
-	return (0);
+	return (ret);
 }
 
 /*
@@ -558,8 +582,7 @@ set_inst_enabled(const char *fmri, scf_instance_t *inst, boolean_t temp,
 		scfdie();
 
 	if (restarter_setup(fmri, inst))
-		uu_warn(gettext("Unable to record FMRI with request. svcs -l "
-		    "output may be incomplete.\n"));
+		goto out;
 
 	/*
 	 * An instance's configuration is incomplete if general/enabled
@@ -1311,8 +1334,7 @@ set_inst_action(const char *fmri, const scf_instance_t *inst,
 		scfdie();
 
 	if (restarter_setup(fmri, inst))
-		uu_warn(gettext("Failed to process %s: restarter_setup() "
-		    "failed\n"), fmri);
+		goto out;
 
 	if (scf_instance_get_pg(inst, scf_pg_restarter_actions, pg) == -1) {
 		if (scf_error() != SCF_ERROR_NOT_FOUND)

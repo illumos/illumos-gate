@@ -6753,6 +6753,14 @@ rc_node_setup_tx(rc_node_ptr_t *npp, rc_node_ptr_t *txp)
 	    strcmp(np->rn_type, AUTH_PG_GENERAL_OVR_TYPE) == 0))) {
 		rc_node_t *instn;
 
+		/* solaris.smf.modify can be used */
+		ret = perm_add_enabling(pcp, AUTH_MODIFY);
+		if (ret != REP_PROTOCOL_SUCCESS) {
+			pc_free(pcp);
+			rc_node_rele(np);
+			return (ret);
+		}
+
 		/* solaris.smf.manage can be used. */
 		ret = perm_add_enabling(pcp, AUTH_MANAGE);
 
@@ -7067,8 +7075,16 @@ rc_tx_commit(rc_node_ptr_t *txp, const void *cmds, size_t cmds_sz)
 			}
 
 			if (rc) {
-				/* Yes: only AUTH_MANAGE can be used. */
-				rc = perm_add_enabling(pcp, AUTH_MANAGE);
+				/*
+				 * Yes: only AUTH_MODIFY and AUTH_MANAGE
+				 * can be used.
+				 */
+				rc = perm_add_enabling(pcp, AUTH_MODIFY);
+
+				if (rc == REP_PROTOCOL_SUCCESS)
+					rc = perm_add_enabling(pcp,
+					    AUTH_MANAGE);
+
 				normal = 0;
 			} else {
 				rc = REP_PROTOCOL_SUCCESS;
