@@ -278,7 +278,7 @@ kcondvar_t lbolt_cv;
  * for the cyclic subsystem to be intialized.
  *
  */
-static int64_t lbolt_bootstrap(void);
+int64_t lbolt_bootstrap(void);
 int64_t lbolt_event_driven(void);
 int64_t lbolt_cyclic_driven(void);
 int64_t (*lbolt_hybrid)(void) = lbolt_bootstrap;
@@ -965,9 +965,9 @@ clock_init(void)
 	timer_hdlr.cyh_arg = NULL;
 
 	/*
-	 * Setup the necessary structures for the lbolt cyclic and add the
-	 * soft interrupt which will switch from event to cyclic mode when
-	 * under high pil.
+	 * The lbolt cyclic will be reprogramed to fire at a nsec_per_tick
+	 * interval to satisfy performance needs of the DDI lbolt consumers.
+	 * It is off by default.
 	 */
 	lbolt_hdlr.cyh_func = (cyc_func_t)lbolt_cyclic;
 	lbolt_hdlr.cyh_level = CY_LOCK_LEVEL;
@@ -999,8 +999,32 @@ clock_init(void)
 	for (i = 0; i < max_ncpus; i++)
 		lb_cpu[i].lbc_counter = lb_info->lbi_thresh_calls;
 
+	/*
+	 * Install the softint used to switch between event and cyclic driven
+	 * lbolt. We use a soft interrupt to make sure the context of the
+	 * cyclic reprogram call is safe.
+	 */
 	lbolt_softint_add();
 
+	/*
+	 * Since the hybrid lbolt implementation is based on a hardware counter
+	 * that is reset at every hardware reboot and that we'd like to have
+	 * the lbolt value starting at zero after both a hardware and a fast
+	 * reboot, we calculate the number of clock ticks the system's been up
+	 * and store it in the lbi_debug_time field of the lbolt info structure.
+	 * The value of this field will be subtracted from lbolt before
+	 * returning it.
+	 */
+	lb_info->lbi_internal = lb_info->lbi_debug_time =
+	    (gethrtime()/nsec_per_tick);
+
+	/*
+	 * lbolt_hybrid points at lbolt_bootstrap until now. The LBOLT_* macros
+	 * and lbolt_debug_{enter,return} use this value as an indication that
+	 * the initializaion above hasn't been completed. Setting lbolt_hybrid
+	 * to either lbolt_{cyclic,event}_driven here signals those code paths
+	 * that the lbolt related structures can be used.
+	 */
 	if (lbolt_cyc_only) {
 		lbolt_when.cyt_when = 0;
 		lbolt_hybrid = lbolt_cyclic_driven;
@@ -2299,7 +2323,7 @@ calcloadavg(int nrun, uint64_t *hp_ave)
  * nsec_per_tick. The lbolt cyclic will remain ON while at least one CPU is
  * causing enough activity to cross the thresholds.
  */
-static int64_t
+int64_t
 lbolt_bootstrap(void)
 {
 	return (0);
@@ -2429,7 +2453,7 @@ lbolt_cyclic_driven(void)
 }
 
 /*
- * The lbolt_cyclic() routine will fire at a nsec_per_tick rate to satisfy
+ * The lbolt_cyclic() routine will fire at a nsec_per_tick interval to satisfy
  * performance needs of ddi_get_lbolt() and ddi_get_lbolt64() consumers.
  * It is inactive by default, and will be activated when switching from event
  * to cyclic driven lbolt. The cyclic will turn itself off unless signaled

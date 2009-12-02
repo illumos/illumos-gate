@@ -1597,8 +1597,23 @@ hrtime_t
 mdb_gethrtime(void)
 {
 	uintptr_t ptr;
+	GElf_Sym sym;
 	lbolt_info_t lbi;
 	hrtime_t ts;
+
+	/*
+	 * We first check whether the lbolt info structure has been allocated
+	 * and initialized. If not, lbolt_hybrid will be pointing at
+	 * lbolt_bootstrap.
+	 */
+	if (mdb_lookup_by_name("lbolt_bootstrap", &sym) == -1)
+		return (0);
+
+	if (mdb_readvar(&ptr, "lbolt_hybrid") == -1)
+		return (0);
+
+	if (ptr == (uintptr_t)sym.st_value)
+		return (0);
 
 #ifdef _KMDB
 	if (mdb_readvar(&ptr, "lb_info") == -1)
@@ -1645,6 +1660,13 @@ mdb_get_lbolt(void)
 		return (pl);
 
 	/*
+	 * mdb_gethrtime() will return zero if the lbolt info structure hasn't
+	 * been allocated and initialized yet, or if it fails to read it.
+	 */
+	if ((ts = mdb_gethrtime()) <= 0)
+		return (0);
+
+	/*
 	 * Load the time spent in kmdb, if any.
 	 */
 	if (mdb_readvar(&ptr, "lb_info") == -1)
@@ -1652,9 +1674,6 @@ mdb_get_lbolt(void)
 
 	if (mdb_vread(&lbi, sizeof (lbolt_info_t), ptr) !=
 	    sizeof (lbolt_info_t))
-		return (0);
-
-	if ((ts = mdb_gethrtime()) <= 0)
 		return (0);
 
 	if (mdb_readvar(&nsec, "nsec_per_tick") == -1 || nsec == 0) {

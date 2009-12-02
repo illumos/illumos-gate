@@ -76,6 +76,7 @@ typedef struct lbolt_info {
 	int64_t lbi_cyc_deac_start;	/* deactivation interval */
 } lbolt_info_t;
 
+extern int64_t lbolt_bootstrap(void);
 extern int64_t lbolt_event_driven(void);
 extern int64_t lbolt_cyclic_driven(void);
 extern int64_t (*lbolt_hybrid)(void);
@@ -93,10 +94,11 @@ extern lbolt_info_t *lb_info;
  * LBOLT_WAITFREE{,64} provide a non-waiting version of lbolt.
  */
 #define	LBOLT_WAITFREE64						\
+	(lbolt_hybrid == lbolt_bootstrap ? 0 :				\
 	(lbolt_hybrid == lbolt_event_driven ?                           \
 	    ((gethrtime_waitfree()/nsec_per_tick) -			\
 	    lb_info->lbi_debug_time) :					\
-	    (lb_info->lbi_internal - lb_info->lbi_debug_time))
+	    (lb_info->lbi_internal - lb_info->lbi_debug_time)))
 
 #define	LBOLT_WAITFREE		(clock_t)LBOLT_WAITFREE64
 
@@ -106,8 +108,9 @@ extern lbolt_info_t *lb_info;
  * the TCP/IP code and will be removed once it's no longer required.
  */
 #define	LBOLT_FASTPATH64						\
-	(lbolt_hybrid == lbolt_event_driven ? ddi_get_lbolt64() :	\
-	    (lb_info->lbi_internal - lb_info->lbi_debug_time))
+	(lbolt_hybrid == lbolt_cyclic_driven ?				\
+	    (lb_info->lbi_internal - lb_info->lbi_debug_time) :		\
+	    ddi_get_lbolt64())
 
 #define	LBOLT_FASTPATH		(clock_t)LBOLT_FASTPATH64
 
@@ -119,9 +122,10 @@ extern lbolt_info_t *lb_info;
  * lbolt routines that could cause a mode switch.
  */
 #define	LBOLT_NO_ACCOUNT64						\
+	(lbolt_hybrid == lbolt_bootstrap ? 0 :				\
 	(lbolt_hybrid == lbolt_event_driven ?				\
 	    ((gethrtime()/nsec_per_tick) - lb_info->lbi_debug_time) :	\
-	    (lb_info->lbi_internal - lb_info->lbi_debug_time))
+	    (lb_info->lbi_internal - lb_info->lbi_debug_time)))
 
 #define	LBOLT_NO_ACCOUNT	(clock_t)LBOLT_NO_ACCOUNT64
 
