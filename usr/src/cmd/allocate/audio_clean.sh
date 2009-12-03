@@ -159,9 +159,9 @@ SAVEFILE="${SAVEDIR}/`basename ${DEVNM}`"
 
 if [ "${FLAG}" = "i" -a ! -r "${SAVEFILE}" ]
 then
-    /usr/sbin/mixerctl -d ${DEVNM} -f -s ${SAVEFILE} || fail_msg
+    /usr/bin/audioctl save-controls -d ${DEVNM} -f ${SAVEFILE} || fail_msg
 else
-    /usr/sbin/mixerctl -d ${DEVNM} -r ${SAVEFILE} || fail_msg
+    /usr/bin/audioctl load-controls -d ${DEVNM} ${SAVEFILE} || fail_msg
 fi
 
 exit 0

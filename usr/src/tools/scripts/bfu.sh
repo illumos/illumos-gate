@@ -7370,6 +7370,7 @@ mondo_loop() {
 	    rm -f $root/kernel/misc/sparcv9/audiosup
 	    rm -f $root/kernel/misc/sparcv9/mixer
 	fi
+	rm -f $usr/sbin/mixerctl
 
 	# Cleanup audio devlinks when bfu'ing back to legacy audio bits.
 	# We also cleanup devlinks the first time when upgrading from legacy

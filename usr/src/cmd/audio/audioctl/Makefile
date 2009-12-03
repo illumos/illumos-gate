@@ -22,9 +22,9 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Makefile for cmd/audio/mixerctl
+# Makefile for cmd/audio/audioctl
 
-PROG= mixerctl
+PROG= audioctl
 
 include ../../Makefile.cmd
 
@@ -34,7 +34,7 @@ CFLAGS += $(CCVERBOSE)
 
 all: $(PROG)
 
-install: all $(ROOTUSRSBINPROG)
+install: all $(ROOTPROG)
 
 clean:
 

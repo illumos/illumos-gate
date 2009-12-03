@@ -28,7 +28,7 @@
 include ../Makefile.cmd
 
 SUBDIRS =			\
-		mixerctl	\
+		audioctl	\
 		audiotest	\
 		utilities .WAIT \
 		audioplay	\

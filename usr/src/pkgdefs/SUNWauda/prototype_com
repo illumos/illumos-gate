@@ -46,6 +46,5 @@ d none usr/bin 755 root bin
 f none usr/bin/audioplay 555 root bin
 f none usr/bin/audiorecord 555 root bin
 f none usr/bin/audioconvert 555 root bin
+f none usr/bin/audioctl 555 root bin
 f none usr/bin/audiotest 555 root bin
-d none usr/sbin 755 root bin
-f none usr/sbin/mixerctl 555 root bin
