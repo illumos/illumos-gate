@@ -99,6 +99,12 @@ ixgbe_ring_tx(void *arg, mblk_t *mp)
 
 	ASSERT(mp->b_next == NULL);
 
+	if ((ixgbe->ixgbe_state & IXGBE_SUSPENDED) ||
+	    (ixgbe->ixgbe_state & IXGBE_ERROR) ||
+	    !(ixgbe->ixgbe_state & IXGBE_STARTED)) {
+		return (mp);
+	}
+
 	copy_thresh = ixgbe->tx_copy_thresh;
 
 	/* Get the mblk size */
@@ -1117,11 +1123,6 @@ ixgbe_tx_fill_ring(ixgbe_tx_ring_t *tx_ring, link_list_t *pending_list,
 	 */
 	DMA_SYNC(&tx_ring->tbd_area, DDI_DMA_SYNC_FORDEV);
 
-	if (ixgbe_check_dma_handle(tx_ring->tbd_area.dma_handle) != DDI_FM_OK) {
-		ddi_fm_service_impact(tx_ring->ixgbe->dip,
-		    DDI_SERVICE_DEGRADED);
-	}
-
 	/*
 	 * Update the number of the free tx descriptors.
 	 * The mutual exclusion between the transmission and the recycling
@@ -1148,6 +1149,7 @@ ixgbe_tx_fill_ring(ixgbe_tx_ring_t *tx_ring, link_list_t *pending_list,
 	    DDI_FM_OK) {
 		ddi_fm_service_impact(tx_ring->ixgbe->dip,
 		    DDI_SERVICE_DEGRADED);
+		atomic_or_32(&tx_ring->ixgbe->ixgbe_state, IXGBE_ERROR);
 	}
 
 	return (desc_num);
@@ -1215,6 +1217,8 @@ ixgbe_tx_recycle_legacy(ixgbe_tx_ring_t *tx_ring)
 
 	if (ixgbe_check_dma_handle(tx_ring->tbd_area.dma_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_DEGRADED);
+		atomic_or_32(&ixgbe->ixgbe_state, IXGBE_ERROR);
+		return (0);
 	}
 
 	LINK_LIST_INIT(&pending_list);
@@ -1385,6 +1389,8 @@ ixgbe_tx_recycle_head_wb(ixgbe_tx_ring_t *tx_ring)
 	if (ixgbe_check_dma_handle(tx_ring->tbd_area.dma_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(ixgbe->dip,
 		    DDI_SERVICE_DEGRADED);
+		atomic_or_32(&ixgbe->ixgbe_state, IXGBE_ERROR);
+		return (0);
 	}
 
 	LINK_LIST_INIT(&pending_list);

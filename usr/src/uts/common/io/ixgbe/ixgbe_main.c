@@ -28,7 +28,7 @@
 #include "ixgbe_sw.h"
 
 static char ident[] = "Intel 10Gb Ethernet";
-static char ixgbe_version[] = "ixgbe 1.1.2";
+static char ixgbe_version[] = "ixgbe 1.1.3";
 
 /*
  * Local function protoypes
@@ -65,8 +65,9 @@ static void ixgbe_get_hw_state(ixgbe_t *);
 static void ixgbe_get_conf(ixgbe_t *);
 static void ixgbe_init_params(ixgbe_t *);
 static int ixgbe_get_prop(ixgbe_t *, char *, int, int, int);
-static void ixgbe_driver_link_check(void *);
+static void ixgbe_driver_link_check(ixgbe_t *);
 static void ixgbe_sfp_check(void *);
+static void ixgbe_link_timer(void *);
 static void ixgbe_local_timer(void *);
 static void ixgbe_arm_watchdog_timer(ixgbe_t *);
 static void ixgbe_restart_watchdog_timer(ixgbe_t *);
@@ -442,15 +443,15 @@ ixgbe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	ixgbe->attach_progress |= ATTACH_PROGRESS_ADD_INTR;
 
 	/*
-	 * Create a taskq for link-status-change
+	 * Create a taskq for sfp-change
 	 */
 	(void) sprintf(taskqname, "ixgbe%d_taskq", instance);
-	if ((ixgbe->lsc_taskq = ddi_taskq_create(devinfo, taskqname,
+	if ((ixgbe->sfp_taskq = ddi_taskq_create(devinfo, taskqname,
 	    1, TASKQ_DEFAULTPRI, 0)) == NULL) {
 		ixgbe_error(ixgbe, "taskq_create failed");
 		goto attach_fail;
 	}
-	ixgbe->attach_progress |= ATTACH_PROGRESS_LSC_TASKQ;
+	ixgbe->attach_progress |= ATTACH_PROGRESS_SFP_TASKQ;
 
 	/*
 	 * Initialize driver parameters
@@ -476,6 +477,9 @@ ixgbe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		ixgbe_error(ixgbe, "Failed to initialize adapter");
 		goto attach_fail;
 	}
+	ixgbe->link_check_complete = B_FALSE;
+	ixgbe->link_check_hrtime = gethrtime() +
+	    (IXGBE_LINK_UP_TIME * 100000000ULL);
 	ixgbe->attach_progress |= ATTACH_PROGRESS_INIT;
 
 	if (ixgbe_check_acc_handle(ixgbe->osdep.cfg_handle) != DDI_FM_OK) {
@@ -502,6 +506,14 @@ ixgbe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	mac_link_update(ixgbe->mac_hdl, LINK_STATE_UNKNOWN);
 	ixgbe->attach_progress |= ATTACH_PROGRESS_MAC;
 
+	ixgbe->periodic_id = ddi_periodic_add(ixgbe_link_timer, ixgbe,
+	    IXGBE_CYCLIC_PERIOD, DDI_IPL_0);
+	if (ixgbe->periodic_id == 0) {
+		ixgbe_error(ixgbe, "Failed to add the link check timer");
+		goto attach_fail;
+	}
+	ixgbe->attach_progress |= ATTACH_PROGRESS_LINK_TIMER;
+
 	/*
 	 * Now that mutex locks are initialized, and the chip is also
 	 * initialized, enable interrupts.
@@ -513,7 +525,7 @@ ixgbe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	ixgbe->attach_progress |= ATTACH_PROGRESS_ENABLE_INTR;
 
 	ixgbe_log(ixgbe, "%s", ixgbe_version);
-	ixgbe->ixgbe_state |= IXGBE_INITIALIZED;
+	atomic_or_32(&ixgbe->ixgbe_state, IXGBE_INITIALIZED);
 
 	return (DDI_SUCCESS);
 
@@ -556,7 +568,6 @@ ixgbe_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 		break;
 	}
 
-
 	/*
 	 * Get the pointer to the driver private data structure
 	 */
@@ -565,29 +576,19 @@ ixgbe_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	/*
-	 * Unregister MAC. If failed, we have to fail the detach
-	 */
-	if (mac_unregister(ixgbe->mac_hdl) != 0) {
-		ixgbe_error(ixgbe, "Failed to unregister MAC");
-		return (DDI_FAILURE);
-	}
-	ixgbe->attach_progress &= ~ATTACH_PROGRESS_MAC;
-
-	/*
 	 * If the device is still running, it needs to be stopped first.
 	 * This check is necessary because under some specific circumstances,
 	 * the detach routine can be called without stopping the interface
 	 * first.
 	 */
-	mutex_enter(&ixgbe->gen_lock);
 	if (ixgbe->ixgbe_state & IXGBE_STARTED) {
-		ixgbe->ixgbe_state &= ~IXGBE_STARTED;
+		atomic_and_32(&ixgbe->ixgbe_state, ~IXGBE_STARTED);
+		mutex_enter(&ixgbe->gen_lock);
 		ixgbe_stop(ixgbe, B_TRUE);
 		mutex_exit(&ixgbe->gen_lock);
 		/* Disable and stop the watchdog timer */
 		ixgbe_disable_watchdog_timer(ixgbe);
-	} else
-		mutex_exit(&ixgbe->gen_lock);
+	}
 
 	/*
 	 * Check if there are still rx buffers held by the upper layer.
@@ -615,6 +616,16 @@ ixgbe_unconfigure(dev_info_t *devinfo, ixgbe_t *ixgbe)
 	}
 
 	/*
+	 * remove the link check timer
+	 */
+	if (ixgbe->attach_progress & ATTACH_PROGRESS_LINK_TIMER) {
+		if (ixgbe->periodic_id != NULL) {
+			ddi_periodic_delete(ixgbe->periodic_id);
+			ixgbe->periodic_id = NULL;
+		}
+	}
+
+	/*
 	 * Unregister MAC
 	 */
 	if (ixgbe->attach_progress & ATTACH_PROGRESS_MAC) {
@@ -636,10 +647,10 @@ ixgbe_unconfigure(dev_info_t *devinfo, ixgbe_t *ixgbe)
 	}
 
 	/*
-	 * Remove taskq for link-status-change
+	 * Remove taskq for sfp-status-change
 	 */
-	if (ixgbe->attach_progress & ATTACH_PROGRESS_LSC_TASKQ) {
-		ddi_taskq_destroy(ixgbe->lsc_taskq);
+	if (ixgbe->attach_progress & ATTACH_PROGRESS_SFP_TASKQ) {
+		ddi_taskq_destroy(ixgbe->sfp_taskq);
 	}
 
 	/*
@@ -1005,6 +1016,7 @@ static int
 ixgbe_resume(dev_info_t *devinfo)
 {
 	ixgbe_t *ixgbe;
+	int i;
 
 	ixgbe = (ixgbe_t *)ddi_get_driver_private(devinfo);
 	if (ixgbe == NULL)
@@ -1024,7 +1036,14 @@ ixgbe_resume(dev_info_t *devinfo)
 		ixgbe_enable_watchdog_timer(ixgbe);
 	}
 
-	ixgbe->ixgbe_state &= ~IXGBE_SUSPENDED;
+	atomic_and_32(&ixgbe->ixgbe_state, ~IXGBE_SUSPENDED);
+
+	if (ixgbe->ixgbe_state & IXGBE_STARTED) {
+		for (i = 0; i < ixgbe->num_tx_rings; i++) {
+			mac_tx_ring_update(ixgbe->mac_hdl,
+			    ixgbe->tx_rings[i].ring_handle);
+		}
+	}
 
 	mutex_exit(&ixgbe->gen_lock);
 
@@ -1042,7 +1061,7 @@ ixgbe_suspend(dev_info_t *devinfo)
 
 	mutex_enter(&ixgbe->gen_lock);
 
-	ixgbe->ixgbe_state |= IXGBE_SUSPENDED;
+	atomic_or_32(&ixgbe->ixgbe_state, IXGBE_SUSPENDED);
 	if (!(ixgbe->ixgbe_state & IXGBE_STARTED)) {
 		mutex_exit(&ixgbe->gen_lock);
 		return (DDI_SUCCESS);
@@ -1128,9 +1147,6 @@ ixgbe_init(ixgbe_t *ixgbe)
 		goto init_fail;
 	}
 
-	if (ixgbe_check_acc_handle(ixgbe->osdep.cfg_handle) != DDI_FM_OK) {
-		goto init_fail;
-	}
 	if (ixgbe_check_acc_handle(ixgbe->osdep.reg_handle) != DDI_FM_OK) {
 		goto init_fail;
 	}
@@ -1264,6 +1280,8 @@ ixgbe_chip_stop(ixgbe_t *ixgbe)
 static int
 ixgbe_reset(ixgbe_t *ixgbe)
 {
+	int i;
+
 	/*
 	 * Disable and stop the watchdog timer
 	 */
@@ -1272,7 +1290,7 @@ ixgbe_reset(ixgbe_t *ixgbe)
 	mutex_enter(&ixgbe->gen_lock);
 
 	ASSERT(ixgbe->ixgbe_state & IXGBE_STARTED);
-	ixgbe->ixgbe_state &= ~IXGBE_STARTED;
+	atomic_and_32(&ixgbe->ixgbe_state, ~IXGBE_STARTED);
 
 	ixgbe_stop(ixgbe, B_FALSE);
 
@@ -1281,7 +1299,22 @@ ixgbe_reset(ixgbe_t *ixgbe)
 		return (IXGBE_FAILURE);
 	}
 
-	ixgbe->ixgbe_state |= IXGBE_STARTED;
+	/*
+	 * After resetting, need to recheck the link status.
+	 */
+	ixgbe->link_check_complete = B_FALSE;
+	ixgbe->link_check_hrtime = gethrtime() +
+	    (IXGBE_LINK_UP_TIME * 100000000ULL);
+
+	atomic_or_32(&ixgbe->ixgbe_state, IXGBE_STARTED);
+
+	if (!(ixgbe->ixgbe_state & IXGBE_SUSPENDED)) {
+		for (i = 0; i < ixgbe->num_tx_rings; i++) {
+			mac_tx_ring_update(ixgbe->mac_hdl,
+			    ixgbe->tx_rings[i].ring_handle);
+		}
+	}
+
 	mutex_exit(&ixgbe->gen_lock);
 
 	/*
@@ -1480,6 +1513,13 @@ ixgbe_start(ixgbe_t *ixgbe, boolean_t alloc_buffer)
 	 * Setup the rx/tx rings
 	 */
 	ixgbe_setup_rings(ixgbe);
+
+	/*
+	 * ixgbe_start() will be called when resetting, however if reset
+	 * happens, we need to clear the ERROR and STALL flags before
+	 * enabling the interrupts.
+	 */
+	atomic_and_32(&ixgbe->ixgbe_state, ~(IXGBE_ERROR | IXGBE_STALL));
 
 	/*
 	 * Enable adapter interrupts
@@ -2543,22 +2583,24 @@ ixgbe_driver_setup_link(ixgbe_t *ixgbe, boolean_t setup_hw)
 }
 
 /*
- * ixgbe_driver_link_check - Link status processing done in taskq.
+ * ixgbe_driver_link_check - Link status processing.
+ *
+ * This function can be called in both kernel context and interrupt context
  */
 static void
-ixgbe_driver_link_check(void *arg)
+ixgbe_driver_link_check(ixgbe_t *ixgbe)
 {
-	ixgbe_t *ixgbe = (ixgbe_t *)arg;
 	struct ixgbe_hw *hw = &ixgbe->hw;
 	ixgbe_link_speed speed = IXGBE_LINK_SPEED_UNKNOWN;
 	boolean_t link_up = B_FALSE;
 	boolean_t link_changed = B_FALSE;
 
-	mutex_enter(&ixgbe->gen_lock);
+	ASSERT(mutex_owned(&ixgbe->gen_lock));
 
-	/* check for link, wait the full time */
-	(void) ixgbe_check_link(hw, &speed, &link_up, true);
+	(void) ixgbe_check_link(hw, &speed, &link_up, false);
 	if (link_up) {
+		ixgbe->link_check_complete = B_TRUE;
+
 		/* Link is up, enable flow control settings */
 		(void) ixgbe_fc_enable(hw, 0);
 
@@ -2582,20 +2624,30 @@ ixgbe_driver_link_check(void *arg)
 			link_changed = B_TRUE;
 		}
 	} else {
-		if (ixgbe->link_state != LINK_STATE_DOWN) {
-			ixgbe->link_speed = 0;
-			ixgbe->link_duplex = 0;
-			ixgbe->link_state = LINK_STATE_DOWN;
-			link_changed = B_TRUE;
-		}
+		if (ixgbe->link_check_complete == B_TRUE ||
+		    (ixgbe->link_check_complete == B_FALSE &&
+		    gethrtime() >= ixgbe->link_check_hrtime)) {
+			/*
+			 * The link is really down
+			 */
+			ixgbe->link_check_complete = B_TRUE;
 
-		if (ixgbe->ixgbe_state & IXGBE_STARTED) {
-			if (ixgbe->link_down_timeout < MAX_LINK_DOWN_TIMEOUT) {
-				ixgbe->link_down_timeout++;
-			} else if (ixgbe->link_down_timeout ==
-			    MAX_LINK_DOWN_TIMEOUT) {
-				ixgbe_tx_clean(ixgbe);
-				ixgbe->link_down_timeout++;
+			if (ixgbe->link_state != LINK_STATE_DOWN) {
+				ixgbe->link_speed = 0;
+				ixgbe->link_duplex = LINK_DUPLEX_UNKNOWN;
+				ixgbe->link_state = LINK_STATE_DOWN;
+				link_changed = B_TRUE;
+			}
+
+			if (ixgbe->ixgbe_state & IXGBE_STARTED) {
+				if (ixgbe->link_down_timeout <
+				    MAX_LINK_DOWN_TIMEOUT) {
+					ixgbe->link_down_timeout++;
+				} else if (ixgbe->link_down_timeout ==
+				    MAX_LINK_DOWN_TIMEOUT) {
+					ixgbe_tx_clean(ixgbe);
+					ixgbe->link_down_timeout++;
+				}
 			}
 		}
 	}
@@ -2606,13 +2658,15 @@ ixgbe_driver_link_check(void *arg)
 	 */
 	ixgbe_get_hw_state(ixgbe);
 
-	/* re-enable the interrupt, which was automasked */
-	ixgbe->eims |= IXGBE_EICR_LSC;
-	IXGBE_WRITE_REG(hw, IXGBE_EIMS, ixgbe->eims);
+	/*
+	 * If we are in an interrupt context, need to re-enable the
+	 * interrupt, which was automasked
+	 */
+	if (servicing_interrupt() != 0) {
+		ixgbe->eims |= IXGBE_EICR_LSC;
+		IXGBE_WRITE_REG(hw, IXGBE_EIMS, ixgbe->eims);
+	}
 
-	mutex_exit(&ixgbe->gen_lock);
-
-	/* outside the gen_lock */
 	if (link_changed) {
 		mac_link_update(ixgbe->mac_hdl, ixgbe->link_state);
 	}
@@ -2628,6 +2682,7 @@ ixgbe_sfp_check(void *arg)
 	uint32_t eicr = ixgbe->eicr;
 	struct ixgbe_hw *hw = &ixgbe->hw;
 
+	mutex_enter(&ixgbe->gen_lock);
 	if (eicr & IXGBE_EICR_GPI_SDP1) {
 		/* clear the interrupt */
 		IXGBE_WRITE_REG(hw, IXGBE_EICR, IXGBE_EICR_GPI_SDP1);
@@ -2648,27 +2703,49 @@ ixgbe_sfp_check(void *arg)
 		    B_TRUE, B_TRUE);
 		ixgbe_driver_link_check(ixgbe);
 	}
+	mutex_exit(&ixgbe->gen_lock);
+}
+
+/*
+ * ixgbe_link_timer - timer for link status detection
+ */
+static void
+ixgbe_link_timer(void *arg)
+{
+	ixgbe_t *ixgbe = (ixgbe_t *)arg;
+
+	mutex_enter(&ixgbe->gen_lock);
+	ixgbe_driver_link_check(ixgbe);
+	mutex_exit(&ixgbe->gen_lock);
 }
 
 /*
  * ixgbe_local_timer - Driver watchdog function.
  *
- * This function will handle the transmit stall check, link status check and
- * other routines.
+ * This function will handle the transmit stall check and other routines.
  */
 static void
 ixgbe_local_timer(void *arg)
 {
 	ixgbe_t *ixgbe = (ixgbe_t *)arg;
 
-	if (ixgbe_stall_check(ixgbe)) {
-		ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_DEGRADED);
+	if (ixgbe->ixgbe_state & IXGBE_ERROR) {
 		ixgbe->reset_count++;
 		if (ixgbe_reset(ixgbe) == IXGBE_SUCCESS)
 			ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_RESTORED);
+		ixgbe_restart_watchdog_timer(ixgbe);
+		return;
 	}
 
-	ixgbe_restart_watchdog_timer(ixgbe);
+	if (ixgbe_stall_check(ixgbe)) {
+		atomic_or_32(&ixgbe->ixgbe_state, IXGBE_STALL);
+		ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_DEGRADED);
+
+		ixgbe->reset_count++;
+		if (ixgbe_reset(ixgbe) == IXGBE_SUCCESS)
+			ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_RESTORED);
+		ixgbe_restart_watchdog_timer(ixgbe);
+	}
 }
 
 /*
@@ -3226,15 +3303,14 @@ static void
 ixgbe_intr_other_work(ixgbe_t *ixgbe, uint32_t eicr)
 {
 	struct ixgbe_hw *hw = &ixgbe->hw;
+
+	ASSERT(mutex_owned(&ixgbe->gen_lock));
+
 	/*
-	 * dispatch taskq to handle link status change
+	 * handle link status change
 	 */
 	if (eicr & IXGBE_EICR_LSC) {
-		if ((ddi_taskq_dispatch(ixgbe->lsc_taskq,
-		    ixgbe_driver_link_check, (void *)ixgbe, DDI_NOSLEEP))
-		    != DDI_SUCCESS) {
-			ixgbe_log(ixgbe, "Fail to dispatch taskq");
-		}
+		ixgbe_driver_link_check(ixgbe);
 	}
 
 	/*
@@ -3255,12 +3331,19 @@ ixgbe_intr_other_work(ixgbe_t *ixgbe, uint32_t eicr)
 	 * Do SFP check for 82599
 	 */
 	if (hw->mac.type == ixgbe_mac_82599EB) {
-		if ((ddi_taskq_dispatch(ixgbe->lsc_taskq,
+		if ((ddi_taskq_dispatch(ixgbe->sfp_taskq,
 		    ixgbe_sfp_check, (void *)ixgbe,
 		    DDI_NOSLEEP)) != DDI_SUCCESS) {
 			ixgbe_log(ixgbe, "No memory available to dispatch "
 			    "taskq for SFP check");
 		}
+
+		/*
+		 * We need to fully re-check the link later.
+		 */
+		ixgbe->link_check_complete = B_FALSE;
+		ixgbe->link_check_hrtime = gethrtime() +
+		    (IXGBE_LINK_UP_TIME * 100000000ULL);
 	}
 }
 
@@ -3294,6 +3377,13 @@ ixgbe_intr_legacy(void *arg1, void *arg2)
 	 * Any bit set in eicr: claim this interrupt
 	 */
 	eicr = IXGBE_READ_REG(hw, IXGBE_EICR);
+
+	if (ixgbe_check_acc_handle(ixgbe->osdep.reg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_DEGRADED);
+		atomic_or_32(&ixgbe->ixgbe_state, IXGBE_ERROR);
+		return (DDI_INTR_CLAIMED);
+	}
+
 	if (eicr) {
 		/*
 		 * For legacy interrupt, we have only one interrupt,
@@ -3392,6 +3482,12 @@ ixgbe_intr_msi(void *arg1, void *arg2)
 
 	eicr = IXGBE_READ_REG(hw, IXGBE_EICR);
 
+	if (ixgbe_check_acc_handle(ixgbe->osdep.reg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_DEGRADED);
+		atomic_or_32(&ixgbe->ixgbe_state, IXGBE_ERROR);
+		return (DDI_INTR_CLAIMED);
+	}
+
 	/*
 	 * For MSI interrupt, we have only one vector,
 	 * so we have only one rx ring and one tx ring enabled.
@@ -3474,6 +3570,14 @@ ixgbe_intr_msix(void *arg1, void *arg2)
 	 */
 	if (BT_TEST(vect->other_map, 0) == 1) {
 		eicr = IXGBE_READ_REG(hw, IXGBE_EICR);
+
+		if (ixgbe_check_acc_handle(ixgbe->osdep.reg_handle) !=
+		    DDI_FM_OK) {
+			ddi_fm_service_impact(ixgbe->dip,
+			    DDI_SERVICE_DEGRADED);
+			atomic_or_32(&ixgbe->ixgbe_state, IXGBE_ERROR);
+			return (DDI_INTR_CLAIMED);
+		}
 
 		/*
 		 * Need check cause bits and only other causes will

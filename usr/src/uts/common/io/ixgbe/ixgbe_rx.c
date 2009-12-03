@@ -148,6 +148,8 @@ ixgbe_rx_copy(ixgbe_rx_data_t *rx_data, uint32_t index, uint32_t pkt_len)
 	if (ixgbe_check_dma_handle(current_rcb->rx_buf.dma_handle) !=
 	    DDI_FM_OK) {
 		ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_DEGRADED);
+		atomic_or_32(&ixgbe->ixgbe_state, IXGBE_ERROR);
+		return (NULL);
 	}
 
 	/*
@@ -220,6 +222,9 @@ ixgbe_rx_bind(ixgbe_rx_data_t *rx_data, uint32_t index, uint32_t pkt_len)
 	if (ixgbe_check_dma_handle(current_rcb->rx_buf.dma_handle) !=
 	    DDI_FM_OK) {
 		ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_DEGRADED);
+		atomic_inc_32(&rx_data->rcb_free);
+		atomic_or_32(&ixgbe->ixgbe_state, IXGBE_ERROR);
+		return (NULL);
 	}
 
 	mp = current_rcb->mp;
@@ -300,6 +305,11 @@ ixgbe_ring_rx(ixgbe_rx_ring_t *rx_ring, int poll_bytes)
 	ixgbe_t *ixgbe = rx_ring->ixgbe;
 	ixgbe_rx_data_t *rx_data = rx_ring->rx_data;
 
+	if ((ixgbe->ixgbe_state & IXGBE_SUSPENDED) ||
+	    (ixgbe->ixgbe_state & IXGBE_ERROR) ||
+	    !(ixgbe->ixgbe_state & IXGBE_STARTED))
+		return (NULL);
+
 	mblk_head = NULL;
 	mblk_tail = &mblk_head;
 
@@ -310,6 +320,8 @@ ixgbe_ring_rx(ixgbe_rx_ring_t *rx_ring, int poll_bytes)
 
 	if (ixgbe_check_dma_handle(rx_data->rbd_area.dma_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_DEGRADED);
+		atomic_or_32(&ixgbe->ixgbe_state, IXGBE_ERROR);
+		return (NULL);
 	}
 
 	/*
@@ -410,6 +422,7 @@ rx_discard:
 
 	if (ixgbe_check_acc_handle(ixgbe->osdep.reg_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_DEGRADED);
+		atomic_or_32(&ixgbe->ixgbe_state, IXGBE_ERROR);
 	}
 
 	return (mblk_head);
@@ -424,7 +437,7 @@ ixgbe_ring_rx_poll(void *arg, int n_bytes)
 	ASSERT(n_bytes >= 0);
 
 	if (n_bytes == 0)
-		return (mp);
+		return (NULL);
 
 	mutex_enter(&rx_ring->rx_lock);
 	mp = ixgbe_ring_rx(rx_ring, n_bytes);

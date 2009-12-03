@@ -280,7 +280,7 @@ ixgbe_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case ETHER_STAT_LINK_DUPLEX:
-		*val = LINK_DUPLEX_FULL;
+		*val = ixgbe->link_duplex;
 		break;
 
 	case ETHER_STAT_TOOSHORT_ERRORS:
@@ -314,8 +314,10 @@ ixgbe_m_stat(void *arg, uint_t stat, uint64_t *val)
 
 	mutex_exit(&ixgbe->gen_lock);
 
-	if (ixgbe_check_acc_handle(ixgbe->osdep.reg_handle) != DDI_FM_OK)
-		ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_UNAFFECTED);
+	if (ixgbe_check_acc_handle(ixgbe->osdep.reg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_DEGRADED);
+		return (EIO);
+	}
 
 	return (0);
 }
@@ -341,7 +343,7 @@ ixgbe_m_start(void *arg)
 		return (EIO);
 	}
 
-	ixgbe->ixgbe_state |= IXGBE_STARTED;
+	atomic_or_32(&ixgbe->ixgbe_state, IXGBE_STARTED);
 
 	mutex_exit(&ixgbe->gen_lock);
 
@@ -369,7 +371,7 @@ ixgbe_m_stop(void *arg)
 		return;
 	}
 
-	ixgbe->ixgbe_state &= ~IXGBE_STARTED;
+	atomic_and_32(&ixgbe->ixgbe_state, ~IXGBE_STARTED);
 
 	ixgbe_stop(ixgbe, B_TRUE);
 

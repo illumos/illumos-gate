@@ -67,6 +67,7 @@ extern "C" {
 #include <sys/ddifm.h>
 #include <sys/fm/protocol.h>
 #include <sys/fm/util.h>
+#include <sys/disp.h>
 #include <sys/fm/io/ddi.h>
 #include "ixgbe_api.h"
 
@@ -78,6 +79,8 @@ extern "C" {
 #define	IXGBE_INITIALIZED		0x01
 #define	IXGBE_STARTED			0x02
 #define	IXGBE_SUSPENDED			0x04
+#define	IXGBE_STALL			0x08
+#define	IXGBE_ERROR			0x80
 
 #define	MAX_NUM_UNICAST_ADDRESSES 	0x10
 #define	MAX_NUM_MULTICAST_ADDRESSES 	0x1000
@@ -167,6 +170,8 @@ extern "C" {
 #define	STALL_WATCHDOG_TIMEOUT		8	/* 8 seconds */
 #define	MAX_LINK_DOWN_TIMEOUT		8	/* 8 seconds */
 
+#define	IXGBE_CYCLIC_PERIOD		(1000000000)	/* 1s */
+
 /*
  * Extra register bit masks for 82598
  */
@@ -194,7 +199,8 @@ extern "C" {
 #define	ATTACH_PROGRESS_MAC		0x0800	/* MAC registered */
 #define	ATTACH_PROGRESS_ENABLE_INTR	0x1000	/* DDI interrupts enabled */
 #define	ATTACH_PROGRESS_FM_INIT		0x2000	/* FMA initialized */
-#define	ATTACH_PROGRESS_LSC_TASKQ	0x4000	/* LSC taskq created */
+#define	ATTACH_PROGRESS_SFP_TASKQ	0x4000	/* SFP taskq created */
+#define	ATTACH_PROGRESS_LINK_TIMER	0x8000	/* link check timer */
 
 #define	PROP_DEFAULT_MTU		"default_mtu"
 #define	PROP_FLOW_CONTROL		"flow_control"
@@ -583,7 +589,7 @@ typedef struct ixgbe {
 	struct ixgbe_osdep	osdep;
 
 	adapter_info_t		*capab;	/* adapter hardware capabilities */
-	ddi_taskq_t		*lsc_taskq;	/* link-status-change taskq */
+	ddi_taskq_t		*sfp_taskq;	/* sfp-change taskq */
 	uint32_t		eims;		/* interrupt mask setting */
 	uint32_t		eimc;		/* interrupt mask clear */
 	uint32_t		eicr;		/* interrupt cause reg */
@@ -669,6 +675,10 @@ typedef struct ixgbe {
 	struct ether_addr	mcast_table[MAX_NUM_MULTICAST_ADDRESSES];
 
 	ulong_t			sys_page_size;
+
+	boolean_t		link_check_complete;
+	hrtime_t		link_check_hrtime;
+	ddi_periodic_t		periodic_id; /* for link check timer func */
 
 	/*
 	 * Kstat definitions
