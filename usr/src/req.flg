@@ -34,8 +34,6 @@ echo_file usr/src/Makefile.psm
 echo_file usr/src/Makefile.psm.targ
 echo_file usr/src/xmod/xmod_files
 echo_file usr/closed/cmd/cmd-crypto/etc/certs/SUNWosnetCF
-echo_file usr/closed/cmd/cmd-crypto/etc/certs/SUNWosnetCFLimited
 echo_file usr/closed/cmd/cmd-crypto/etc/certs/SUNWosnetSE
 echo_file usr/closed/cmd/cmd-crypto/etc/keys/SUNWosnetCF
-echo_file usr/closed/cmd/cmd-crypto/etc/keys/SUNWosnetCFLimited
 echo_file usr/closed/cmd/cmd-crypto/etc/keys/SUNWosnetSE

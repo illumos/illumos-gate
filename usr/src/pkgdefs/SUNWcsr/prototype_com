@@ -112,7 +112,6 @@ d none etc/crypto/certs 755 root sys
 f none etc/crypto/certs/CA 644 root sys
 l none etc/crypto/certs/SUNWObjectCA=../../../etc/certs/SUNWObjectCA
 f none etc/crypto/certs/SUNW_SunOS_5.10 644 root sys
-f none etc/crypto/certs/SUNW_SunOS_5.11_Limited 644 root sys
 d none etc/crypto/crls 755 root sys
 f none etc/datemsk 444 root sys
 s none etc/dcopy=../usr/sbin/dcopy

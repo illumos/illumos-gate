@@ -4145,6 +4145,11 @@ crypto_cleanup()
 	# care of them
 	rm -f $rootprefix/platform/sun4v/kernel/drv/sparcv9/n2cp.esa
 
+	# Remove old limited use certificates
+	rm -f $rootprefix/etc/crypto/certs/SUNW_SunOS_5.11_Limited
+	rm -f $rootprefix/etc/crypto/certs/SUNWosnetCFLimited
+	rm -f $rootprefix/etc/crypto/certs/SUNWosnetLimited
+
 	print "\n"
 }
 

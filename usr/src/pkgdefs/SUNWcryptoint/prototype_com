@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -49,9 +49,7 @@ f none etc/certs/SUNWosnetSE 644 root sys
 d none etc/crypto 755 root sys
 d none etc/crypto/certs 755 root sys
 f none etc/crypto/certs/SUNWosnet 644 root sys
-f none etc/crypto/certs/SUNWosnetLimited 644 root sys
 f none etc/crypto/certs/SUNWosnetCF 644 root sys
-f none etc/crypto/certs/SUNWosnetCFLimited 644 root sys
 # CRYPT DELETE END
 d none kernel 755 root sys
 d none kernel/crypto 755 root sys
