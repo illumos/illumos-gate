@@ -460,6 +460,14 @@ install_flar()
 		fi
 	done
 
+	# Check for an archive made from a ZFS root pool.
+	egrep -s "^rootpool=" identification
+        if (( $? == 0 )); then
+		/usr/bin/rm -f identification
+                log "$bad_zfs_flar"
+                return 1
+        fi
+
 	# Get the information needed to unpack the archive.
 	archiver=$(get_archiver identification)
 	if [[ $archiver == "pax" ]]; then
@@ -627,12 +635,13 @@ install_cpio()
 
 	vlog "cd \"$ARCHIVE_BASE\" && $stage1 \"$archive\" | cpio $cpioopts"
 
+	# Ignore errors from cpio since we expect some errors depending on
+	# how the archive was made.
 	( cd "$ARCHIVE_BASE" && $stage1 "$archive" | cpio $cpioopts )
-	result=$?
 
 	post_unpack
 
-	return $result
+	return 0
 }
 
 #
@@ -650,12 +659,13 @@ install_pax()
 
 	vlog "cd \"$ARCHIVE_BASE\" && pax -r -f \"$archive\" $filtopt"
 
+	# Ignore errors from pax since we expect some errors depending on
+	# how the archive was made.
 	( cd "$ARCHIVE_BASE" && pax -r -f "$archive" $filtopt )
-	result=$?
 
 	post_unpack
 
-	return $result
+	return 0
 }
 
 #
@@ -712,13 +722,14 @@ install_dir()
 	vlog "cd \"$source_dir\" && find $flist $findopts | "
 	vlog "cpio $cpioopts \"$ZONEROOT\""
 
+	# Ignore errors from cpio since we expect some errors depending on
+	# how the archive was made.
 	( cd "$source_dir" && find $flist $findopts | \
 	    cpio $cpioopts "$ZONEROOT" )
-	result=$?
 
 	post_unpack
 
-	return $result
+	return 0
 }
 
 #
@@ -938,8 +949,10 @@ install_image()
 
 	elif [[ "$filetype" = "tar" ]]; then
 		vlog "cd \"$ZONEROOT\" && tar -xf \"$insrc\""
+		# Ignore errors from tar since we expect some errors depending
+		# on how the archive was made.
 		( cd "$ZONEROOT" && tar -xf "$insrc" )
-		unpack_result=$?
+		unpack_result=0
 		post_unpack
 
 	elif [[ "$filetype" == "ufsdump" ]]; then
@@ -970,13 +983,13 @@ install_image()
 		unpack_result=$?
 	fi
 
-	vlog "$unpack_done" $unpack_result
-
 	# Clean up any fs mounts used during unpacking.
 	umnt_fs
 	rm -f $fstmpfile $ipdcpiofile $ipdpaxfile
 
 	chmod 700 $zonepath
+
+	(( $unpack_result != 0 )) && fatal "$f_unpack_failed"
 
 	# Verify this is a valid image.
 	sanity_check $ZONEROOT
@@ -1010,6 +1023,8 @@ m_analyse_archive=$(gettext "Analysing the archive")
 not_readable=$(gettext "Cannot read file '%s'")
 not_flar=$(gettext "Input is not a flash archive")
 bad_flar=$(gettext "Flash archive is a corrupt")
+bad_zfs_flar=$(gettext "Flash archive contains a ZFS send stream.\n\tRecreate the flar using the -L option with cpio or pax.")
+f_unpack_failed=$(gettext "Unpacking the archive failed")
 unknown_archiver=$(gettext "Archiver %s is not supported")
 cmd_not_exec=$(gettext "Required command '%s' not executable!")
 

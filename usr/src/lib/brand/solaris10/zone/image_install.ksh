@@ -42,8 +42,6 @@ install_log=$(gettext   "      Log File: %s")
 
 install_good=$(gettext  "        Result: Installation completed successfully.")
 
-unpack_done=$(gettext   " Unpack result: %d")
-
 sanity_ok=$(gettext     "  Sanity Check: Passed.  Looks like a Solaris 10 system.")
 sanity_fail=$(gettext   "  Sanity Check: FAILED (see log for details).")
 
