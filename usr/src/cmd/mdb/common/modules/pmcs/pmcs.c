@@ -2197,7 +2197,6 @@ pmcs_help()
 	    "    -h: Print more detailed hardware information\n"
 	    "    -i: Print interrupt coalescing information\n"
 	    "    -I: Print information about each iport\n"
-	    "    -l: Dump the trace log (cannot be used with other options)\n"
 	    "    -p: Print information about each attached PHY\n"
 	    "    -q: Dump inbound queues\n"
 	    "    -Q: Dump outbound queues\n"

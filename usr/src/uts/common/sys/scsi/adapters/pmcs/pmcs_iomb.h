@@ -466,6 +466,45 @@ typedef struct {
 #define	PMCOUT_STATUS_IO_ABORT_IN_PROGRESS				0x40
 
 /*
+ * IOMB formats
+ *
+ * NOTE: All IOMBs are little-endian with exceptions to certain parts of
+ * some IOMBs.  For example, the SSP_RESPONSE_IU in the SSP_COMPLETION
+ * outbound IOMB is big-endian (SAS).
+ */
+
+/* Common IOMB header */
+
+typedef struct pmcs_iomb_header {
+	uint8_t		opcode_lo;
+	DECL_BITFIELD2(opcode_hi: 4,
+	    cat			: 4);
+	DECL_BITFIELD2(obid	: 6,
+	    rsvd1		: 2);
+	DECL_BITFIELD4(buf_count: 5,
+	    rsvd2		: 1,
+	    h_bit		: 1,
+	    v_bit		: 1);
+} pmcs_iomb_header_t;
+
+/* PMCOUT_SSP_COMPLETION */
+
+typedef struct pmcout_ssp_comp {
+	pmcs_iomb_header_t	header;
+	uint32_t		htag;
+	uint32_t		status;
+	uint32_t		param;
+	uint16_t		ssp_tag;
+	DECL_BITFIELD3(resc_v	: 1,
+	    resc_pad	: 2,
+	    rsvd1	: 5);
+	uint8_t			rsvd2;
+	/* SSP_RESPONSE_IU (if it exists) */
+	/* Residual count (if resc_v is set) */
+} pmcout_ssp_comp_t;
+
+
+/*
  * Device State definitions
  */
 #define	PMCS_DEVICE_STATE_NOT_AVAILABLE		0x0	/* Unconfigured tgt */

@@ -1989,11 +1989,43 @@ pmcs_SAS_done(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *msg)
 				pmcs_latch_status(pwp, sp, rptr->status, xd,
 				    slen, pptr->path);
 			} else if (rptr->datapres == SAS_RSP_DATAPRES_NO_DATA) {
+				pmcout_ssp_comp_t *sspcp;
+				sspcp = (pmcout_ssp_comp_t *)msg;
+				uint32_t *residp;
 				/*
 				 * This is the case for a plain SCSI status.
+				 * Note: If RESC_V is set and we're here, there
+				 * is a residual.  We need to find it and update
+				 * the packet accordingly.
 				 */
 				pmcs_latch_status(pwp, sp, rptr->status, NULL,
 				    0, pptr->path);
+
+				if (sspcp->resc_v) {
+					/*
+					 * Point residual to the SSP_RESP_IU
+					 */
+					residp = (uint32_t *)(sspcp + 1);
+					/*
+					 * param contains the number of bytes
+					 * between where the SSP_RESP_IU may
+					 * or may not be and the residual.
+					 * Increment residp by the appropriate
+					 * number of words: (param+resc_pad)/4).
+					 */
+					residp += (LE_32(sspcp->param) +
+					    sspcp->resc_pad) /
+					    sizeof (uint32_t);
+					pmcs_prt(pwp, PMCS_PRT_DEBUG_UNDERFLOW,
+					    pptr, xp, "%s: tgt 0x%p "
+					    "residual %d for pkt 0x%p",
+					    __func__, (void *) xp, *residp,
+					    (void *) pkt);
+					ASSERT(LE_32(*residp) <=
+					    pkt->pkt_dma_len);
+					(void) pmcs_set_resid(pkt,
+					    pkt->pkt_dma_len, LE_32(*residp));
+				}
 			} else {
 				pmcs_print_entry(pwp, PMCS_PRT_DEBUG,
 				    "illegal SAS response", msg);

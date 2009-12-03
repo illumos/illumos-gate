@@ -49,6 +49,7 @@ extern "C" {
 #include <sys/scsi/generic/smp_frames.h>
 #include <sys/atomic.h>
 #include <sys/byteorder.h>
+#include <sys/sysmacros.h>
 #include <sys/bitmap.h>
 #include <sys/queue.h>
 #include <sys/sdt.h>
