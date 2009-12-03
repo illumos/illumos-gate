@@ -146,14 +146,6 @@ emlxs_timer_checks(emlxs_hba_t *hba)
 		return;
 	}
 
-	/* DEBUG - re-examine this path for SLI4 later */
-	if (hba->model_info.sli_mask & EMLXS_SLI4_MASK) {
-		/* Check for linkup timeout */
-		emlxs_timer_check_linkup(hba);
-
-		return;
-	}
-
 	bzero((void *)flag, sizeof (flag));
 
 	/* Check SLI level timeouts */
@@ -884,7 +876,7 @@ emlxs_timer_check_discovery(emlxs_port_t *port)
 	mutex_exit(&EMLXS_PORT_LOCK);
 
 	/* Try to send clear link attention, if needed */
-	if ((send_clear_la == 1) &&
+	if ((hba->sli_mode < EMLXS_HBA_SLI4_MODE) && (send_clear_la == 1) &&
 	    (mbox = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))) {
 		mutex_enter(&EMLXS_PORT_LOCK);
 

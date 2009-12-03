@@ -82,7 +82,7 @@ emlxs_node_close(emlxs_port_t *port, NODELIST *ndlp, uint32_t channelno,
 			mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_closed_msg,
-			    "node=%p did=%06x channel=%d. offline=%d set.",
+			    "node=%p did=%06x channel=%d. offline=%d update.",
 			    ndlp, ndlp->nlp_DID, channelno, timeout);
 
 		} else if (timeout) {
@@ -90,7 +90,7 @@ emlxs_node_close(emlxs_port_t *port, NODELIST *ndlp, uint32_t channelno,
 			mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_closed_msg,
-			    "node=%p did=%06x channel=%d. timeout=%d set.",
+			    "node=%p did=%06x channel=%d. timeout=%d update.",
 			    ndlp, ndlp->nlp_DID, channelno, timeout);
 		} else {
 			mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
@@ -106,8 +106,20 @@ emlxs_node_close(emlxs_port_t *port, NODELIST *ndlp, uint32_t channelno,
 		ndlp->nlp_tics[channelno] = hba->timer_tics + timeout;
 		ndlp->nlp_flag[channelno] |= NLP_OFFLINE;
 
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_closed_msg,
+		    "node=%p did=%06x channel=%d. offline=%d set.",
+		    ndlp, ndlp->nlp_DID, channelno, timeout);
+
 	} else if (timeout) {
 		ndlp->nlp_tics[channelno] = hba->timer_tics + timeout;
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_closed_msg,
+		    "node=%p did=%06x channel=%d. timeout=%d set.",
+		    ndlp, ndlp->nlp_DID, channelno, timeout);
+	} else {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_closed_msg,
+		    "node=%p did=%06x channel=%d.",
+		    ndlp, ndlp->nlp_DID, channelno);
 	}
 
 

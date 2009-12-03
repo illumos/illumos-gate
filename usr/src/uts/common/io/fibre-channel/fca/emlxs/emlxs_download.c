@@ -4593,6 +4593,10 @@ emlxs_boot_code_disable(emlxs_hba_t *hba)
 
 	vpd = &VPD;
 
+	if (hba->model_info.chip == EMLXS_BE_CHIP) {
+		return (EMLXS_OP_NOT_SUP);
+	}
+
 	if (emlxs_read_wakeup_parms(hba, &hba->wakeup_parms, 0)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 		    "emlxs_boot_code_disable: Unable to read wake up parms.");
@@ -4643,6 +4647,10 @@ emlxs_boot_code_enable(emlxs_hba_t *hba)
 	uint32_t i;
 
 	vpd = &VPD;
+
+	if (hba->model_info.chip == EMLXS_BE_CHIP) {
+		return (FC_SUCCESS);
+	}
 
 	/* Read the wakeup parms */
 	if (emlxs_read_wakeup_parms(hba, &hba->wakeup_parms, 0)) {
@@ -4708,6 +4716,10 @@ extern int32_t
 emlxs_boot_code_state(emlxs_hba_t *hba)
 {
 	emlxs_port_t *port = &PPORT;
+
+	if (hba->model_info.chip == EMLXS_BE_CHIP) {
+		return (FC_SUCCESS);
+	}
 
 	/* Read the wakeup parms */
 	if (emlxs_read_wakeup_parms(hba, &hba->wakeup_parms, 1)) {

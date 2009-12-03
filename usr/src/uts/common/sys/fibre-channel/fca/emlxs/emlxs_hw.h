@@ -690,6 +690,8 @@ typedef SliCtRequest_t SLI_CT_REQUEST;
 /* PCI Config Register offsets */
 #define	PCICFG_UE_STATUS_LO_OFFSET	0xA0	/* Error Indication - low */
 #define	PCICFG_UE_STATUS_HI_OFFSET	0xA4	/* Error Indication - high */
+#define	PCICFG_UE_MASK_LO_OFFSET	0xA8	/* Error mask - low */
+#define	PCICFG_UE_MASK_HI_OFFSET	0xAC	/* Error mask - high */
 #define	PCICFG_UE_STATUS_ONLINE1	0xB0	/* Error status1 */
 #define	PCICFG_UE_STATUS_ONLINE2	0xB4	/* Error status2 */
 

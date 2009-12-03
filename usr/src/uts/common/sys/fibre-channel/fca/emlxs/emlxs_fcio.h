@@ -91,7 +91,9 @@ extern "C" {
 								/* offline */
 #define	EMLXS_NO_BOOT_CODE		(EMLXS_ERRNO_START + 5)	/* No boot */
 								/* code image */
-#define	EMLXS_ERRNO_END			(EMLXS_ERRNO_START + 5)
+#define	EMLXS_OP_NOT_SUP		(EMLXS_ERRNO_START + 6)	/* Operation */
+								/* not supp */
+#define	EMLXS_ERRNO_END			(EMLXS_ERRNO_START + 6)
 
 
 typedef struct emlxs_parm

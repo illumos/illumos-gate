@@ -196,6 +196,7 @@ typedef struct ulp_bde64
 #define	MBX_READ_LA64		0x95
 #define	MBX_FLASH_WR_ULA	0x98
 #define	MBX_SET_DEBUG		0x99
+#define	MBX_SLI_CONFIG		0x9B
 #define	MBX_LOAD_EXP_ROM	0x9C
 #define	MBX_REQUEST_FEATURES	0x9D
 #define	MBX_RESUME_RPI		0x9E
@@ -377,6 +378,131 @@ typedef struct update_cfg
 	uint32_t	byte_len;
 	uint32_t	cfg_data;
 } update_cfg_var_t;
+
+
+
+typedef struct
+{
+	union {
+		struct {
+#ifdef EMLXS_BIG_ENDIAN
+			uint8_t domain;
+			uint8_t port_number;
+			uint8_t subsystem;
+			uint8_t opcode;
+#else
+			uint8_t opcode;
+			uint8_t subsystem;
+			uint8_t port_number;
+			uint8_t domain;
+#endif
+			uint32_t timeout;
+			uint32_t request_length;
+			uint32_t rsvd0;
+		}req;
+
+		struct {
+#ifdef EMLXS_BIG_ENDIAN
+			/* dw 0 */
+			uint8_t domain;
+			uint8_t rsvd0;
+			uint8_t subsystem;
+			uint8_t opcode;
+
+			/* dw 1 */
+			uint16_t rsvd1;
+			uint8_t additional_status;
+			uint8_t status;
+#else
+			/* dw 0 */
+			uint8_t opcode;
+			uint8_t subsystem;
+			uint8_t rsvd0;
+			uint8_t domain;
+
+			/* dw 1 */
+			uint8_t status;
+			uint8_t additional_status;
+			uint16_t rsvd1;
+#endif
+
+			uint32_t rsp_length;
+			uint32_t actual_rsp_length;
+		}rsp;
+		uint32_t dw[4];
+	}u0;
+} common_hdr_t;
+
+typedef struct get_oem_attrs
+{
+	common_hdr_t hdr;
+	union {
+		struct {
+			uint32_t rsvd0;
+		}req;
+
+		struct {
+			uint8_t emulex_serial_number[12];
+			uint8_t oem_serial_number[24];
+			uint32_t oem_personality_mgmt_word;
+#ifdef EMLXS_BIG_ENDIAN
+			uint8_t rsvd[3];
+			uint8_t oem_current_personality;
+#else
+			uint8_t oem_current_personality;
+			uint8_t rsvd[3];
+#endif
+
+		}rsp;
+	}params;
+
+} get_oem_attrs_t;
+
+
+typedef struct read_write_flashrom {
+	common_hdr_t hdr;
+	uint32_t	flash_op_code;
+	uint32_t	flash_op_type;
+	uint32_t	data_buffer_size;
+	uint32_t	data_offset;
+	uint8_t		data_buffer[4];
+} read_write_flashrom_t;
+
+
+typedef struct
+{
+#ifdef EMLXS_BIG_ENDIAN
+	uint32_t	special:8;		/* word 1 */
+	uint32_t	reserved2:16;		/* word 1 */
+	uint32_t	sge_cnt:5;		/* word 1 */
+	uint32_t	reserved1:2;		/* word 1 */
+	uint32_t	embedded:1;		/* word 1 */
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+	uint32_t	embedded:1;		/* word 1 */
+	uint32_t	reserved1:2;		/* word 1 */
+	uint32_t	sge_cnt:5;		/* word 1 */
+	uint32_t	reserved2:16;		/* word 1 */
+	uint32_t	special:8;		/* word 1 */
+#endif
+	uint32_t	payload_length;		/* word 2 */
+	uint32_t	tag_low;		/* word 3 */
+	uint32_t	tag_hi;			/* word 4 */
+	uint32_t	reserved3;		/* word 5 */
+
+} be_req_header_t;
+
+typedef struct
+{
+	be_req_header_t	be;
+
+	union
+	{
+		get_oem_attrs_t		varOemAttrs;
+		read_write_flashrom_t	varFlashRom;
+	} un;
+
+} sli_config_var_t;
 
 
 typedef struct read_cfg_var
@@ -573,8 +699,11 @@ typedef struct dfc_mailbox4
 		uint32_t		varWords[63];
 		dump4_var_t		varDmp;
 		update_cfg_var_t	varUpdateCfg;
+		sli_config_var_t	varSLIConfig;
 	} un;
 } dfc_mailbox4_t;
+
+
 
 
 /* Config Region 23 Records */

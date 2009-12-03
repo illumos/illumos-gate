@@ -1412,6 +1412,44 @@ emlxs_port_init(emlxs_port_t *port)
 } /* emlxs_port_init() */
 
 
+void
+emlxs_disable_pcie_ce_err(emlxs_hba_t *hba)
+{
+#define	NXT_PTR_OFF		PCI_BYTE
+#define	PCIE_DEVCTL_OFF		0x8
+#define	PCIE_CAP_ID		0x10
+
+	uint8_t	cap_ptr;
+	uint8_t	cap_id;
+	uint16_t  tmp16;
+
+	cap_ptr = ddi_get8(hba->pci_acc_handle,
+	    (uint8_t *)(hba->pci_addr + PCI_CAP_POINTER));
+
+	while (cap_ptr) {
+		cap_id = ddi_get8(hba->pci_acc_handle,
+		    (uint8_t *)(hba->pci_addr + cap_ptr));
+
+		if (cap_id == PCIE_CAP_ID) {
+			break;
+		}
+		cap_ptr = ddi_get8(hba->pci_acc_handle,
+		    (uint8_t *)(hba->pci_addr + cap_ptr + NXT_PTR_OFF));
+	}
+
+	/* PCI Express Capability Register Set */
+	/* Turn off the Correctable Error Reporting */
+	/* (the Device Control Register, bit 0). */
+
+	if (cap_id == PCIE_CAP_ID) {
+		tmp16 = ddi_get16(hba->pci_acc_handle,
+		    (uint16_t *)(hba->pci_addr + cap_ptr + PCIE_DEVCTL_OFF));
+		tmp16 &= ~1;
+		(void) ddi_put16(hba->pci_acc_handle,
+		    (uint16_t *)(hba->pci_addr + cap_ptr + PCIE_DEVCTL_OFF),
+		    tmp16);
+	}
+}
 
 /*
  * emlxs_bind_port
@@ -1630,6 +1668,12 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 		}
 		port = vport;
 
+	}
+
+	/* PCIE Correctable Error Reporting workaround */
+	if ((hba->model_info.chip == EMLXS_BE_CHIP) &&
+	    (bind_info->port_num == 0)) {
+		emlxs_disable_pcie_ce_err(hba);
 	}
 
 	/* Save initial state */

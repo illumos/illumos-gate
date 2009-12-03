@@ -10289,6 +10289,13 @@ emlxs_dfc_get_fcflist(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		return (DFC_FCOE_NOTSUPPORTED);
 	}
 
+	if (hba->state != FC_READY) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+		    "%s: HBA not ready.", emlxs_dfc_xlate(dfc->cmd));
+
+		return (DFC_DRV_ERROR);
+	}
+
 	size = sizeof (DFC_FCoEFCFList_t) +
 	    hba->sli.sli4.FCFICount * sizeof (DFC_FCoEFCFInfo_t);
 	fcflist = (DFC_FCoEFCFList_t *)kmem_zalloc(size, KM_SLEEP);

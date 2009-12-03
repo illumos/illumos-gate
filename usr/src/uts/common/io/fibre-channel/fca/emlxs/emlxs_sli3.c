@@ -947,6 +947,12 @@ reset:
 		}
 	}
 
+	/* Free the buffers since we were polling */
+	(void) emlxs_mem_put(hba, MEM_BUF, (uint8_t *)mp);
+	mp = NULL;
+	(void) emlxs_mem_put(hba, MEM_BUF, (uint8_t *)mp1);
+	mp1 = NULL;
+
 	hba->channel_fcp = FC_FCP_RING;
 	hba->channel_els = FC_ELS_RING;
 	hba->channel_ip = FC_IP_RING;
@@ -1048,10 +1054,6 @@ reset:
 		}
 	}
 #endif /* MAX_RRDY_SUPPORT */
-
-	/* Free the buffer since we were polling */
-	(void) emlxs_mem_put(hba, MEM_BUF, (uint8_t *)mp);
-	mp = NULL;
 
 	/* Reuse mbq from previous mbox */
 	bzero(mbq, sizeof (MAILBOXQ));
@@ -1470,6 +1472,7 @@ msi_configured:
 	 * The leadvile driver will now handle the FLOGI at the driver level
 	 */
 
+	(void) kmem_free((uint8_t *)mbq, sizeof (MAILBOXQ));
 	return (0);
 
 failed:

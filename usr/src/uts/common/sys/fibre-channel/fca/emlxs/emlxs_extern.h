@@ -682,7 +682,10 @@ extern IOCBQ			*emlxs_create_close_xri_cx(emlxs_port_t *port,
 					CHANNEL *cp);
 extern void			emlxs_abort_ct_exchange(emlxs_hba_t *hba,
 					emlxs_port_t *port, uint32_t rxid);
-
+extern void			emlxs_abort_els_exchange(emlxs_hba_t *hba,
+					emlxs_port_t *port, uint32_t rxid);
+extern void			emlxs_abort_fct_exchange(emlxs_hba_t *hba,
+					emlxs_port_t *port, uint32_t rxid);
 extern emlxs_buf_t		*emlxs_chipq_get(CHANNEL *cp, uint16_t iotag);
 extern void			emlxs_chipq_put(CHANNEL *cp, emlxs_buf_t *sbp);
 extern uint32_t			emlxs_chipq_node_flush(emlxs_port_t *port,

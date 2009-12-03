@@ -1658,6 +1658,8 @@ typedef struct emlxs_sli4
 
 	RXQ_DESC_t	rxq[EMLXS_MAX_RXQS];
 
+	uint32_t	ue_mask_lo;
+	uint32_t	ue_mask_hi;
 } emlxs_sli4_t;
 
 

@@ -92,7 +92,8 @@ static uint32_t emlxs_fct_process_unsol_flogi(emlxs_port_t *port,
     CHANNEL *cp, IOCBQ *iocbq, MATCHMAP *mp, uint32_t size);
 static uint32_t emlxs_fct_process_unsol_plogi(emlxs_port_t *port,
     CHANNEL *cp, IOCBQ *iocbq, MATCHMAP *mp, uint32_t size);
-static fct_status_t emlxs_fct_pkt_abort(emlxs_port_t *port, emlxs_buf_t *sbp);
+static uint32_t emlxs_fct_pkt_abort_txq(emlxs_port_t *port,
+    emlxs_buf_t *cmd_sbp);
 static fct_status_t emlxs_fct_send_qfull_reply(emlxs_port_t *port,
     emlxs_node_t *ndlp, uint16_t xid, uint32_t class, emlxs_fcp_cmd_t *fcp_cmd);
 static void emlxs_fct_dbuf_dma_sync(stmf_data_buf_t *dbuf, uint_t sync_type);
@@ -1919,7 +1920,7 @@ emlxs_fct_send_cmd_rsp(fct_cmd_t *fct_cmd, uint32_t ioflags)
 		    "emlxs_fct_send_cmd_rsp: Invalid cmd type found. type=%x",
 		    fct_cmd->cmd_type);
 
-		emlxs_fct_cmd_post(port, fct_cmd, EMLXS_FCT_OWNED);
+		emlxs_fct_cmd_post(port, fct_cmd, EMLXS_FCT_CMD_POSTED);
 		/* mutex_exit(&cmd_sbp->fct_mtx); */
 
 		return (FCT_FAILURE);
@@ -1932,7 +1933,7 @@ failure:
 	    "Unable to handle FCT_IOF_FORCE_FCA_DONE. type=%x",
 	    fct_cmd->cmd_type);
 
-	emlxs_fct_cmd_post(port, fct_cmd, EMLXS_FCT_OWNED);
+	emlxs_fct_cmd_post(port, fct_cmd, EMLXS_FCT_CMD_POSTED);
 	/* mutex_exit(&cmd_sbp->fct_mtx); */
 
 	return (FCT_FAILURE);
@@ -2273,7 +2274,7 @@ done:
 
 		remote_port->rp_handle = ndlp->nlp_Rpi;
 
-		emlxs_fct_cmd_post(port, fct_cmd, EMLXS_FCT_OWNED);
+		emlxs_fct_cmd_post(port, fct_cmd, EMLXS_FCT_CMD_POSTED);
 		/* mutex_exit(&cmd_sbp->fct_mtx); */
 
 		TGTPORTSTAT.FctPortRegister++;
@@ -2287,7 +2288,7 @@ done:
 
 		remote_port->rp_handle = FCT_HANDLE_NONE;
 
-		emlxs_fct_cmd_post(port, fct_cmd, EMLXS_FCT_OWNED);
+		emlxs_fct_cmd_post(port, fct_cmd, EMLXS_FCT_CMD_POSTED);
 		/* mutex_exit(&cmd_sbp->fct_mtx); */
 
 		TGTPORTSTAT.FctFailedPortRegister++;
@@ -2574,7 +2575,7 @@ emlxs_fct_send_fcp_data(fct_cmd_t *fct_cmd, stmf_data_buf_t *dbuf,
 
 	if (EMLXS_SLI_PREP_FCT_IOCB(port, cmd_sbp, channel) != IOERR_SUCCESS) {
 
-		emlxs_fct_cmd_post(port, fct_cmd, EMLXS_FCT_OWNED);
+		emlxs_fct_cmd_post(port, fct_cmd, EMLXS_FCT_CMD_POSTED);
 		/* mutex_exit(&cmd_sbp->fct_mtx); */
 
 		return (FCT_BUSY);
@@ -2644,7 +2645,7 @@ emlxs_fct_send_fcp_status(fct_cmd_t *fct_cmd)
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_error_msg,
 		    "emlxs_fct_send_fcp_status: Unable to allocate packet.");
 
-		emlxs_fct_cmd_post(port, fct_cmd, EMLXS_FCT_OWNED);
+		emlxs_fct_cmd_post(port, fct_cmd, EMLXS_FCT_CMD_POSTED);
 		/* mutex_exit(&cmd_sbp->fct_mtx); */
 
 		return (FCT_BUSY);
@@ -2740,7 +2741,7 @@ emlxs_fct_send_fcp_status(fct_cmd_t *fct_cmd)
 		}
 		/* mutex_enter(&cmd_sbp->fct_mtx); */
 
-		emlxs_fct_cmd_post(port, fct_cmd, EMLXS_FCT_OWNED);
+		emlxs_fct_cmd_post(port, fct_cmd, EMLXS_FCT_CMD_POSTED);
 		/* mutex_exit(&cmd_sbp->fct_mtx); */
 
 		return (FCT_BUSY);
@@ -2970,7 +2971,7 @@ emlxs_fct_handle_fcp_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 
 		cmd_sbp->fct_flags &= ~EMLXS_FCT_SEND_STATUS;
 
-		emlxs_fct_cmd_post(port, fct_cmd, EMLXS_FCT_OWNED);
+		emlxs_fct_cmd_post(port, fct_cmd, EMLXS_FCT_CMD_POSTED);
 		/* mutex_exit(&cmd_sbp->fct_mtx); */
 
 #ifdef FCT_API_TRACE
@@ -3313,8 +3314,9 @@ emlxs_fct_process_unsol_flogi(emlxs_port_t *port, CHANNEL *cp, IOCBQ *iocbq,
 		return (1);
 	}
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg, "FLOGI: sid=0x%x %s",
-	    iocb->un.elsreq.remoteID, buffer);
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
+	    "FLOGI: sid=0x%x xid=%x %s",
+	    iocb->un.elsreq.remoteID, iocb->ULPIOTAG, buffer);
 
 	return (0);
 
@@ -3338,8 +3340,9 @@ emlxs_fct_process_unsol_plogi(emlxs_port_t *port, CHANNEL *cp, IOCBQ *iocbq,
 		return (1);
 	}
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg, "PLOGI: sid=0x%x %s",
-	    iocb->un.elsreq.remoteID, buffer);
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
+	    "PLOGI: sid=0x%x xid=%x %s",
+	    iocb->un.elsreq.remoteID, iocb->ULPIOTAG, buffer);
 
 	return (0);
 
@@ -4003,7 +4006,7 @@ emlxs_fct_send_els_rsp(fct_cmd_t *fct_cmd)
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_error_msg,
 		    "emlxs_fct_send_els_rsp: Unable to allocate packet.");
 
-		emlxs_fct_cmd_post(port, fct_cmd, EMLXS_FCT_OWNED);
+		emlxs_fct_cmd_post(port, fct_cmd, EMLXS_FCT_CMD_POSTED);
 		/* mutex_exit(&cmd_sbp->fct_mtx); */
 
 		return (FCT_FAILURE);
@@ -4058,7 +4061,7 @@ emlxs_fct_send_els_rsp(fct_cmd_t *fct_cmd)
 		}
 		/* mutex_enter(&cmd_sbp->fct_mtx); */
 
-		emlxs_fct_cmd_post(port, fct_cmd, EMLXS_FCT_OWNED);
+		emlxs_fct_cmd_post(port, fct_cmd, EMLXS_FCT_CMD_POSTED);
 		/* mutex_exit(&cmd_sbp->fct_mtx); */
 
 		return (FCT_FAILURE);
@@ -4156,7 +4159,7 @@ emlxs_fct_send_ct_cmd(fct_cmd_t *fct_cmd)
 
 
 /* cmd_sbp->fct_mtx must be held to enter */
-uint32_t
+static uint32_t
 emlxs_fct_pkt_abort_txq(emlxs_port_t *port, emlxs_buf_t *cmd_sbp)
 {
 	emlxs_hba_t *hba = HBA;
@@ -4397,10 +4400,10 @@ top:
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
-	    "emlxs_fct_abort: HbaLink %d. "
-	    "xid=%x. cmd_sbp=%p state=%d flags=%x,%x,%x",
-	    hba->state, fct_cmd->cmd_rxid, cmd_sbp, cmd_sbp->fct_state, flags,
-	    cmd_sbp->fct_flags, cmd_sbp->pkt_flags);
+	    "emlxs_fct_abort: hbastate=%x. "
+	    "xid=%x,%x cmd_sbp=%p fctstate=%d flags=%x,%x,%x",
+	    hba->state, fct_cmd->cmd_oxid, fct_cmd->cmd_rxid, cmd_sbp,
+	    cmd_sbp->fct_state, flags, cmd_sbp->fct_flags, cmd_sbp->pkt_flags);
 
 	if (cmd_sbp->fct_flags & EMLXS_FCT_ABORT_INP) {
 		EMLXS_SLI_ISSUE_IOCB_CMD(hba, cmd_sbp->channel, 0);
@@ -4420,9 +4423,9 @@ top:
 	switch (cmd_sbp->fct_state) {
 	/* These are currently owned by COMSTAR. */
 	/* They were last processed by emlxs_fct_cmd_post() */
-	case EMLXS_FCT_CMD_POSTED:
+	/* We have NO exchange resources associated with this IO. */
 	case EMLXS_FCT_OWNED:
-		goto abort_it_now;
+		goto abort_done;
 
 	/* These are on the unsol waitQ in the driver */
 	case EMLXS_FCT_CMD_WAITQ:
@@ -4453,7 +4456,24 @@ top:
 		}
 		mutex_exit(&EMLXS_PORT_LOCK);
 
-		goto abort_it_now;
+		/*FALLTHROUGH*/
+
+	/* These are currently owned by COMSTAR. */
+	/* They were last processed by emlxs_fct_cmd_post() */
+	/* We have residual exchange resources associated with this IO */
+	case EMLXS_FCT_CMD_POSTED:
+		switch (fct_cmd->cmd_type) {
+		case FCT_CMD_FCP_XCHG: /* Unsol */
+			TGTPORTSTAT.FctOutstandingIO--;
+			emlxs_abort_fct_exchange(hba, port, fct_cmd->cmd_rxid);
+			break;
+
+		case FCT_CMD_RCVD_ELS: /* Unsol */
+			emlxs_abort_els_exchange(hba, port, fct_cmd->cmd_rxid);
+			break;
+		}
+
+		goto abort_done;
 
 	/* These are active in the driver */
 	/* They were last processed by emlxs_fct_cmd_release() */
@@ -4470,7 +4490,7 @@ top:
 				TGTPORTSTAT.FctOutstandingIO--;
 			}
 
-			goto abort_it_now;
+			goto abort_done;
 		}
 
 		/* If we're not online, then all IO will be flushed anyway */
@@ -4579,7 +4599,7 @@ top:
 
 	return (FCT_SUCCESS);
 
-abort_it_now:
+abort_done:
 
 	emlxs_fct_cmd_done(port, fct_cmd,
 	    EMLXS_FCT_ABORT_DONE);
@@ -4613,7 +4633,6 @@ emlxs_fct_link_up(emlxs_port_t *port)
 #endif /* FCT_API_TRACE */
 		MODSYM(fct_handle_event) (port->fct_port, FCT_EVENT_LINK_UP,
 		    0, 0);
-
 	} else {
 		if (!hba->ini_mode &&
 		    !(port->fct_flags & FCT_STATE_PORT_ONLINE)) {

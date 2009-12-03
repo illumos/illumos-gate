@@ -623,7 +623,8 @@ emlxs_data_dump(hba, "RD_REV", (uint32_t *)mb, 18, 0);
 		    "FCOE info dumped. rsp_cnt=%d status=%x",
 		    mb->un.varDmp4.rsp_cnt, mb->mbxStatus);
 		(void) emlxs_parse_fcoe(hba,
-		    (uint8_t *)hba->sli.sli4.dump_region.virt, 0);
+		    (uint8_t *)hba->sli.sli4.dump_region.virt,
+		    mb->un.varDmp4.rsp_cnt);
 	}
 
 	/* Reuse mbq from previous mbox */
@@ -1453,6 +1454,12 @@ emlxs_sli4_hba_init(emlxs_hba_t *hba)
 	hba->sli.sli4.cfgFCOE.FCMap[0] = FCOE_FCF_MAP0;
 	hba->sli.sli4.cfgFCOE.FCMap[1] = FCOE_FCF_MAP1;
 	hba->sli.sli4.cfgFCOE.FCMap[2] = FCOE_FCF_MAP2;
+
+	/* Cache the UE MASK registers value for UE error detection */
+	hba->sli.sli4.ue_mask_lo = ddi_get32(hba->pci_acc_handle,
+	    (uint32_t *)(hba->pci_addr + PCICFG_UE_MASK_LO_OFFSET));
+	hba->sli.sli4.ue_mask_hi = ddi_get32(hba->pci_acc_handle,
+	    (uint32_t *)(hba->pci_addr + PCICFG_UE_MASK_HI_OFFSET));
 
 	return (0);
 
@@ -3370,7 +3377,7 @@ emlxs_sli4_process_async_event(emlxs_hba_t *hba, CQE_ASYNC_t *cqe)
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
 			    "FCOE Async Event VLINK CLEAR %d: received ",
 			    fcoe->ref_index);
-			if (fcoe->ref_index == 0) {
+			if (fcoe->ref_index == hba->vpi_base) {
 				/*
 				 * Bounce the link to force rediscovery for
 				 * VPI 0.  We are ignoring this event for
@@ -4348,10 +4355,12 @@ emlxs_sli4_process_unsol_rcv(emlxs_hba_t *hba, CQ_DESC_t *cq,
 		iocbq->flag |= (IOCB_PRIORITY | IOCB_SPECIAL);
 
 		/* Set up an iotag using special Abort iotags */
+		mutex_enter(&EMLXS_FCTAB_LOCK);
 		if ((hba->fc_oor_iotag >= EMLXS_MAX_ABORT_TAG)) {
 			hba->fc_oor_iotag = hba->max_iotag;
 		}
 		iotag = hba->fc_oor_iotag++;
+		mutex_exit(&EMLXS_FCTAB_LOCK);
 
 		/* BLS ACC Response */
 		wqe = &iocbq->wqe;
@@ -6893,29 +6902,25 @@ emlxs_sli4_poll_erratt(emlxs_hba_t *hba)
 	emlxs_port_t *port = &PPORT;
 	uint32_t ue_h;
 	uint32_t ue_l;
-	uint32_t on1;
-	uint32_t on2;
 
 	if (hba->flag & FC_HARDWARE_ERROR) {
 		return;
 	}
 
-	on1 = ddi_get32(hba->pci_acc_handle,
-	    (uint32_t *)(hba->pci_addr + PCICFG_UE_STATUS_ONLINE1));
-	on2 = ddi_get32(hba->pci_acc_handle,
-	    (uint32_t *)(hba->pci_addr + PCICFG_UE_STATUS_ONLINE2));
+	ue_l = ddi_get32(hba->pci_acc_handle,
+	    (uint32_t *)(hba->pci_addr + PCICFG_UE_STATUS_LO_OFFSET));
+	ue_h = ddi_get32(hba->pci_acc_handle,
+	    (uint32_t *)(hba->pci_addr + PCICFG_UE_STATUS_HI_OFFSET));
 
-	if (on1 != 0xffffffff || on2 != 0xffffffff) {
-		ue_l = ddi_get32(hba->pci_acc_handle,
-		    (uint32_t *)(hba->pci_addr + PCICFG_UE_STATUS_LO_OFFSET));
-		ue_h = ddi_get32(hba->pci_acc_handle,
-		    (uint32_t *)(hba->pci_addr + PCICFG_UE_STATUS_HI_OFFSET));
-
+	if ((~hba->sli.sli4.ue_mask_lo & ue_l) ||
+	    (~hba->sli.sli4.ue_mask_hi & ue_h)) {
 		/* Unrecoverable error detected */
 		/* Shut the HBA down */
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_hardware_error_msg,
-		    "Host Error: ueLow:%08x ueHigh:%08x on1:%08x on2:%08x",
-		    ue_l, ue_h, on1, on2);
+		    "Host Error: ueLow:%08x ueHigh:%08x maskLow:%08x "
+		    "maskHigh:%08x",
+		    ue_l, ue_h, hba->sli.sli4.ue_mask_lo,
+		    hba->sli.sli4.ue_mask_hi);
 
 		EMLXS_STATE_CHANGE(hba, FC_ERROR);
 
@@ -6923,21 +6928,6 @@ emlxs_sli4_poll_erratt(emlxs_hba_t *hba)
 
 		emlxs_thread_spawn(hba, emlxs_shutdown_thread, NULL, NULL);
 	}
-
-#ifdef FMA_SUPPORT
-	/* The PCI(e) driver generates PCI error when PCI read returns */
-	/* 0xFFFFFFFF value. Since PCICFG_UE_STATUS_ONLINE0 and */
-	/* PCICFG_UE_STATUS_ONLINE1 registers return 0xFFFFFFFF to */
-	/* indicate that no internal component has an unrecoverable */
-	/* error on HBA, no access handle check and just call below */
-	/* function to clear the access handle error here. */
-
-	/* Some S10 versions do not define the ddi_fm_acc_err_clear function */
-	if ((void *)&ddi_fm_acc_err_clear != NULL) {
-		(void) ddi_fm_acc_err_clear(hba->pci_acc_handle,
-		    DDI_FME_VERSION);
-	}
-#endif  /* FMA_SUPPORT */
 
 } /* emlxs_sli4_poll_erratt() */
 

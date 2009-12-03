@@ -3743,7 +3743,7 @@ emlxs_chipq_lun_flush(emlxs_port_t *port, NODELIST *ndlp,
 
 /*
  * Issue an ABORT_XRI_CN iocb command to abort an FCP command already issued.
- * This must be called while holding the EMLXS_FCCTAB_LOCK
+ * This must be called while holding the EMLXS_FCTAB_LOCK
  */
 extern IOCBQ *
 emlxs_create_abort_xri_cn(emlxs_port_t *port, NODELIST *ndlp,
@@ -3809,6 +3809,7 @@ emlxs_create_abort_xri_cn(emlxs_port_t *port, NODELIST *ndlp,
 } /* emlxs_create_abort_xri_cn() */
 
 
+/* This must be called while holding the EMLXS_FCTAB_LOCK */
 extern IOCBQ *
 emlxs_create_abort_xri_cx(emlxs_port_t *port, NODELIST *ndlp, uint16_t xid,
     CHANNEL *cp, uint8_t class, int32_t flag)
@@ -3863,7 +3864,7 @@ emlxs_create_abort_xri_cx(emlxs_port_t *port, NODELIST *ndlp, uint16_t xid,
 
 
 
-/* This must be called while holding the EMLXS_FCCTAB_LOCK */
+/* This must be called while holding the EMLXS_FCTAB_LOCK */
 extern IOCBQ *
 emlxs_create_close_xri_cn(emlxs_port_t *port, NODELIST *ndlp,
     uint16_t iotag, CHANNEL *cp)
@@ -3927,7 +3928,7 @@ emlxs_create_close_xri_cn(emlxs_port_t *port, NODELIST *ndlp,
 } /* emlxs_create_close_xri_cn() */
 
 
-/* This must be called while holding the EMLXS_FCCTAB_LOCK */
+/* This must be called while holding the EMLXS_FCTAB_LOCK */
 extern IOCBQ *
 emlxs_create_close_xri_cx(emlxs_port_t *port, NODELIST *ndlp, uint16_t xid,
     CHANNEL *cp)
@@ -3980,16 +3981,122 @@ emlxs_create_close_xri_cx(emlxs_port_t *port, NODELIST *ndlp, uint16_t xid,
 } /* emlxs_create_close_xri_cx() */
 
 
+#ifdef SFCT_SUPPORT
+void
+emlxs_abort_fct_exchange(emlxs_hba_t *hba, emlxs_port_t *port, uint32_t rxid)
+{
+	CHANNEL *cp;
+	IOCBQ *iocbq;
+	IOCB *iocb;
+
+	if (rxid == 0 || rxid == 0xFFFF) {
+		return;
+	}
+
+	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
+		    "Aborting FCT exchange: xid=%x", rxid);
+
+		if (emlxs_sli4_unreserve_xri(hba, rxid) == 0) {
+			/* We have no way to abort unsolicited exchanges */
+			/* that we have not responded to at this time */
+			/* So we will return for now */
+			return;
+		}
+	}
+
+	cp = &hba->chan[hba->channel_fcp];
+
+	mutex_enter(&EMLXS_FCTAB_LOCK);
+
+	/* Create the abort IOCB */
+	if (hba->state >= FC_LINK_UP) {
+		iocbq = emlxs_create_abort_xri_cx(port, NULL, rxid, cp,
+		    CLASS3, ABORT_TYPE_ABTS);
+	} else {
+		iocbq = emlxs_create_close_xri_cx(port, NULL, rxid, cp);
+	}
+
+	mutex_exit(&EMLXS_FCTAB_LOCK);
+
+	if (iocbq) {
+		iocb = &iocbq->iocb;
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
+		    "Aborting FCT exchange: xid=%x iotag=%x", rxid,
+		    iocb->ULPIOTAG);
+
+		EMLXS_SLI_ISSUE_IOCB_CMD(hba, cp, iocbq);
+	}
+
+} /* emlxs_abort_fct_exchange() */
+#endif /* SFCT_SUPPORT */
+
+
+void
+emlxs_abort_els_exchange(emlxs_hba_t *hba, emlxs_port_t *port, uint32_t rxid)
+{
+	CHANNEL *cp;
+	IOCBQ *iocbq;
+	IOCB *iocb;
+
+	if (rxid == 0 || rxid == 0xFFFF) {
+		return;
+	}
+
+	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
+		    "Aborting ELS exchange: xid=%x", rxid);
+
+		if (emlxs_sli4_unreserve_xri(hba, rxid) == 0) {
+			/* We have no way to abort unsolicited exchanges */
+			/* that we have not responded to at this time */
+			/* So we will return for now */
+			return;
+		}
+	}
+
+	cp = &hba->chan[hba->channel_els];
+
+	mutex_enter(&EMLXS_FCTAB_LOCK);
+
+	/* Create the abort IOCB */
+	if (hba->state >= FC_LINK_UP) {
+		iocbq = emlxs_create_abort_xri_cx(port, NULL, rxid, cp,
+		    CLASS3, ABORT_TYPE_ABTS);
+	} else {
+		iocbq = emlxs_create_close_xri_cx(port, NULL, rxid, cp);
+	}
+
+	mutex_exit(&EMLXS_FCTAB_LOCK);
+
+	if (iocbq) {
+		iocb = &iocbq->iocb;
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
+		    "Aborting ELS exchange: xid=%x iotag=%x", rxid,
+		    iocb->ULPIOTAG);
+
+		EMLXS_SLI_ISSUE_IOCB_CMD(hba, cp, iocbq);
+	}
+
+} /* emlxs_abort_els_exchange() */
+
+
 void
 emlxs_abort_ct_exchange(emlxs_hba_t *hba, emlxs_port_t *port, uint32_t rxid)
 {
 	CHANNEL *cp;
 	IOCBQ *iocbq;
+	IOCB *iocb;
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_ct_msg,
-	    "Aborting CT exchange: xid=%x", rxid);
+	if (rxid == 0 || rxid == 0xFFFF) {
+		return;
+	}
 
 	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_ct_msg,
+		    "Aborting CT exchange: xid=%x", rxid);
+
 		if (emlxs_sli4_unreserve_xri(hba, rxid) == 0) {
 			/* We have no way to abort unsolicited exchanges */
 			/* that we have not responded to at this time */
@@ -4000,23 +4107,31 @@ emlxs_abort_ct_exchange(emlxs_hba_t *hba, emlxs_port_t *port, uint32_t rxid)
 
 	cp = &hba->chan[hba->channel_ct];
 
+	mutex_enter(&EMLXS_FCTAB_LOCK);
+
 	/* Create the abort IOCB */
 	if (hba->state >= FC_LINK_UP) {
-		iocbq =
-		    emlxs_create_abort_xri_cx(port, NULL, rxid, cp, CLASS3,
-		    ABORT_TYPE_ABTS);
+		iocbq = emlxs_create_abort_xri_cx(port, NULL, rxid, cp,
+		    CLASS3, ABORT_TYPE_ABTS);
 	} else {
 		iocbq = emlxs_create_close_xri_cx(port, NULL, rxid, cp);
 	}
 
+	mutex_exit(&EMLXS_FCTAB_LOCK);
+
 	if (iocbq) {
+		iocb = &iocbq->iocb;
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
+		    "Aborting CT exchange: xid=%x iotag=%x", rxid,
+		    iocb->ULPIOTAG);
+
 		EMLXS_SLI_ISSUE_IOCB_CMD(hba, cp, iocbq);
 	}
 
 } /* emlxs_abort_ct_exchange() */
 
 
-/* This must be called while holding the EMLXS_FCCTAB_LOCK */
+/* This must be called while holding the EMLXS_FCTAB_LOCK */
 static void
 emlxs_sbp_abort_add(emlxs_port_t *port, emlxs_buf_t *sbp, Q *abort,
     uint8_t *flag, emlxs_buf_t *fpkt)
