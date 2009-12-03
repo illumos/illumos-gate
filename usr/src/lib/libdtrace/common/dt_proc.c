@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * DTrace Process Control
@@ -712,9 +710,12 @@ dt_proc_destroy(dtrace_hdl_t *dtp, struct ps_prochandle *P)
 	if (!(Pstatus(dpr->dpr_proc)->pr_flags & (PR_KLC | PR_RLC))) {
 		dt_dprintf("abandoning pid %d\n", (int)dpr->dpr_pid);
 		rflag = PRELEASE_HANG;
+	} else if (Pstatus(dpr->dpr_proc)->pr_flags & PR_KLC) {
+		dt_dprintf("killing pid %d\n", (int)dpr->dpr_pid);
+		rflag = PRELEASE_KILL; /* apply kill-on-last-close */
 	} else {
 		dt_dprintf("releasing pid %d\n", (int)dpr->dpr_pid);
-		rflag = 0; /* apply kill or run-on-last-close */
+		rflag = 0; /* apply run-on-last-close */
 	}
 
 	if (dpr->dpr_tid) {

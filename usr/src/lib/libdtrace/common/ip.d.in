@@ -19,75 +19,73 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #pragma D depends_on module ip
 #pragma D depends_on provider ip
 
 inline int IPH_DF = @IPH_DF@;
-#pragma D binding "1.0" IPH_DF
+#pragma D binding "1.5" IPH_DF
 inline int IPH_MF = @IPH_MF@;
-#pragma D binding "1.0" IPH_MF
+#pragma D binding "1.5" IPH_MF
 
-#pragma D binding "1.0" IPPROTO_IP
+#pragma D binding "1.5" IPPROTO_IP
 inline int IPPROTO_IP = @IPPROTO_IP@;
-#pragma D binding "1.0" IPPROTO_HOPOPTS
+#pragma D binding "1.5" IPPROTO_HOPOPTS
 inline int IPPROTO_HOPOPTS = @IPPROTO_HOPOPTS@;
-#pragma D binding "1.0" IPPROTO_ICMP
+#pragma D binding "1.5" IPPROTO_ICMP
 inline int IPPROTO_ICMP = @IPPROTO_ICMP@;
-#pragma D binding "1.0" IPPROTO_IGMP
+#pragma D binding "1.5" IPPROTO_IGMP
 inline int IPPROTO_IGMP = @IPPROTO_IGMP@;
-#pragma D binding "1.0" IPPROTO_GGP
+#pragma D binding "1.5" IPPROTO_GGP
 inline int IPPROTO_GGP = @IPPROTO_GGP@;
-#pragma D binding "1.0" IPPROTO_ENCAP
+#pragma D binding "1.5" IPPROTO_ENCAP
 inline int IPPROTO_ENCAP = @IPPROTO_ENCAP@;
-#pragma D binding "1.0" IPPROTO_TCP
+#pragma D binding "1.5" IPPROTO_TCP
 inline int IPPROTO_TCP = @IPPROTO_TCP@;
-#pragma D binding "1.0" IPPROTO_EGP
+#pragma D binding "1.5" IPPROTO_EGP
 inline int IPPROTO_EGP = @IPPROTO_EGP@;
-#pragma D binding "1.0" IPPROTO_PUP
+#pragma D binding "1.5" IPPROTO_PUP
 inline int IPPROTO_PUP = @IPPROTO_PUP@;
-#pragma D binding "1.0" IPPROTO_UDP
+#pragma D binding "1.5" IPPROTO_UDP
 inline int IPPROTO_UDP = @IPPROTO_UDP@;
-#pragma D binding "1.0" IPPROTO_IDP
+#pragma D binding "1.5" IPPROTO_IDP
 inline int IPPROTO_IDP = @IPPROTO_IDP@;
-#pragma D binding "1.0" IPPROTO_IPV6
+#pragma D binding "1.5" IPPROTO_IPV6
 inline int IPPROTO_IPV6 = @IPPROTO_IPV6@;
-#pragma D binding "1.0" IPPROTO_ROUTING
+#pragma D binding "1.5" IPPROTO_ROUTING
 inline int IPPROTO_ROUTING = @IPPROTO_ROUTING@;
-#pragma D binding "1.0" IPPROTO_FRAGMENT
+#pragma D binding "1.5" IPPROTO_FRAGMENT
 inline int IPPROTO_FRAGMENT = @IPPROTO_FRAGMENT@;
-#pragma D binding "1.0" IPPROTO_RSVP
+#pragma D binding "1.5" IPPROTO_RSVP
 inline int IPPROTO_RSVP = @IPPROTO_RSVP@;
-#pragma D binding "1.0" IPPROTO_ESP
+#pragma D binding "1.5" IPPROTO_ESP
 inline int IPPROTO_ESP = @IPPROTO_ESP@;
-#pragma D binding "1.0" IPPROTO_AH
+#pragma D binding "1.5" IPPROTO_AH
 inline int IPPROTO_AH = @IPPROTO_AH@;
-#pragma D binding "1.0" IPPROTO_ICMPV6
+#pragma D binding "1.5" IPPROTO_ICMPV6
 inline int IPPROTO_ICMPV6 = @IPPROTO_ICMPV6@;
-#pragma D binding "1.0" IPPROTO_NONE
+#pragma D binding "1.5" IPPROTO_NONE
 inline int IPPROTO_NONE = @IPPROTO_NONE@;
-#pragma D binding "1.0" IPPROTO_DSTOPTS
+#pragma D binding "1.5" IPPROTO_DSTOPTS
 inline int IPPROTO_DSTOPTS = @IPPROTO_DSTOPTS@;
-#pragma D binding "1.0" IPPROTO_HELLO
+#pragma D binding "1.5" IPPROTO_HELLO
 inline int IPPROTO_HELLO = @IPPROTO_HELLO@;
-#pragma D binding "1.0" IPPROTO_ND
+#pragma D binding "1.5" IPPROTO_ND
 inline int IPPROTO_ND = @IPPROTO_ND@;
-#pragma D binding "1.0" IPPROTO_EON
+#pragma D binding "1.5" IPPROTO_EON
 inline int IPPROTO_EON = @IPPROTO_EON@;
-#pragma D binding "1.0" IPPROTO_OSPF
+#pragma D binding "1.5" IPPROTO_OSPF
 inline int IPPROTO_OSPF = @IPPROTO_OSPF@;
-#pragma D binding "1.0" IPPROTO_PIM
+#pragma D binding "1.5" IPPROTO_PIM
 inline int IPPROTO_PIM = @IPPROTO_PIM@;
-#pragma D binding "1.0" IPPROTO_SCTP
+#pragma D binding "1.5" IPPROTO_SCTP
 inline int IPPROTO_SCTP = @IPPROTO_SCTP@;
-#pragma D binding "1.0" IPPROTO_RAW
+#pragma D binding "1.5" IPPROTO_RAW
 inline int IPPROTO_RAW = @IPPROTO_RAW@;
-#pragma D binding "1.0" IPPROTO_MAX
+#pragma D binding "1.5" IPPROTO_MAX
 inline int IPPROTO_MAX = @IPPROTO_MAX@;
 
 /*
@@ -183,17 +181,17 @@ typedef uintptr_t void_ip_t;
  */
 typedef ill_t __dtrace_ipsr_ill_t;
 
-#pragma D binding "1.0" translator
+#pragma D binding "1.5" translator
 translator pktinfo_t < mblk_t *M > {
 	pkt_addr = NULL;
 };
 
-#pragma D binding "1.0" translator
+#pragma D binding "1.5" translator
 translator csinfo_t < conn_t *C > {
 	cs_addr = NULL;
 };
 
-#pragma D binding "1.0" translator
+#pragma D binding "1.5" translator
 translator ipinfo_t < ipha_t *I > {
 	ip_ver = I->ipha_version_and_hdr_length >> 4;
 	ip_plength = ntohs(I->ipha_length) -
@@ -202,7 +200,7 @@ translator ipinfo_t < ipha_t *I > {
 	ip_daddr = inet_ntoa(&I->ipha_dst);
 };
 
-#pragma D binding "1.0" translator
+#pragma D binding "1.5" translator
 translator ipinfo_t < ip6_t *I > {
 	ip_ver = *(uint8_t *)I >> 4;
 	ip_plength = ntohs(I->ip6_ctlun.ip6_un1.ip6_un1_plen);
@@ -210,7 +208,7 @@ translator ipinfo_t < ip6_t *I > {
 	ip_daddr = inet_ntoa6(&I->ip6_dst);
 };
 
-#pragma D binding "1.0" translator
+#pragma D binding "1.5" translator
 translator ipinfo_t < void_ip_t *I > {
 	ip_ver = I != NULL ? *(uint8_t *)I >> 4 : 0;
 	ip_plength = I != NULL ? (*(uint8_t *)I >> 4 == 4 ?
@@ -226,7 +224,7 @@ translator ipinfo_t < void_ip_t *I > {
 	    inet_ntoa6(&((ip6_t *)I)->ip6_dst) : "<unknown>") : "<unknown>";
 };
 
-#pragma D binding "1.0" translator
+#pragma D binding "1.5" translator
 translator ifinfo_t < __dtrace_ipsr_ill_t *I > {
 	if_name = I != NULL ? stringof(I->ill_name) : "<null>";
 	if_ipstack = I != NULL ? I->ill_ipst->ips_netstack->netstack_stackid
@@ -235,7 +233,7 @@ translator ifinfo_t < __dtrace_ipsr_ill_t *I > {
 	if_addr = (uintptr_t)I;
 };
 
-#pragma D binding "1.0" translator
+#pragma D binding "1.5" translator
 translator ipv4info_t < ipha_t *I > {
 	ipv4_ver = I != NULL ? I->ipha_version_and_hdr_length >> 4 : 0;
 	ipv4_ihl = I != NULL ? (I->ipha_version_and_hdr_length & 0xf) << 2 : 0;
@@ -272,7 +270,7 @@ translator ipv4info_t < ipha_t *I > {
 	ipv4_hdr = I;
 };
 
-#pragma D binding "1.0" translator
+#pragma D binding "1.5" translator
 translator ipv6info_t < ip6_t *I > {
 	ipv6_ver = I != NULL ? I->ip6_ctlun.ip6_un2_vfc >> 4 : 0;
 	ipv6_tclass = I != NULL ? ((I->ip6_ctlun.ip6_un1.ip6_un1_flow &&

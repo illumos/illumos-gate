@@ -650,6 +650,8 @@ f none SUNWdtrt/tst/common/misc/tst.dynopt.d.out 0444 root bin
 f none SUNWdtrt/tst/common/misc/tst.enablerace.ksh 0444 root bin
 f none SUNWdtrt/tst/common/misc/tst.haslam.d 0444 root bin
 f none SUNWdtrt/tst/common/misc/tst.include.ksh 0444 root bin
+f none SUNWdtrt/tst/common/misc/tst.macroglob.ksh 0444 root bin
+f none SUNWdtrt/tst/common/misc/tst.macroglob.ksh.out 0444 root bin
 f none SUNWdtrt/tst/common/misc/tst.roch.d 0444 root bin
 f none SUNWdtrt/tst/common/misc/tst.schrock.ksh 0444 root bin
 d none SUNWdtrt/tst/common/multiaggs 0755 root bin
@@ -725,6 +727,7 @@ f none SUNWdtrt/tst/common/pid/tst.fork.d 0444 root bin
 f none SUNWdtrt/tst/common/pid/tst.fork.exe 0555 root bin
 f none SUNWdtrt/tst/common/pid/tst.gcc.d 0444 root bin
 f none SUNWdtrt/tst/common/pid/tst.gcc.exe 0555 root bin
+f none SUNWdtrt/tst/common/pid/tst.killonerror.ksh 0444 root bin
 f none SUNWdtrt/tst/common/pid/tst.main.ksh 0444 root bin
 f none SUNWdtrt/tst/common/pid/tst.manypids.ksh 0444 root bin
 f none SUNWdtrt/tst/common/pid/tst.newprobes.ksh 0444 root bin
