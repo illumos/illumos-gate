@@ -98,6 +98,7 @@ add_hba_port_info(di_node_t portNode, struct sun_sas_hba *hba_ptr, int protocol)
 	uint64_t		    tmpAddr;
 	char			    *charptr, cntlLink[MAXPATHLEN] = {'\0'};
 	int			    rval;
+	di_node_t		    branchNode;
 	uint_t			    state = HBA_PORTSTATE_UNKNOWN;
 
 	if (hba_ptr == NULL) {
@@ -122,6 +123,26 @@ add_hba_port_info(di_node_t portNode, struct sun_sas_hba *hba_ptr, int protocol)
 	if ((portDevpath = di_devfs_path(portNode)) == NULL) {
 		log(LOG_DEBUG, ROUTINE,
 		    "Unable to get device path from HBA Port Node.");
+		S_FREE(port_ptr->port_attributes.PortSpecificAttribute.SASPort);
+		S_FREE(port_ptr);
+		return (HBA_STATUS_ERROR);
+	}
+
+	/*
+	 * Let's take a branch snap shot for pulling attributes.
+	 * The attribute change doesn't invalidate devinfo cache snapshot.
+	 * Phy info prop and num-phys can be obsolate when the same hba
+	 * connected to the same expander(SIM) thus phy numbers are increased.
+	 * Also the phy number may get decreased when a connection is removed
+	 * while the iport still exist through another connection.
+	 */
+	branchNode = di_init(portDevpath, DINFOPROP);
+	if (branchNode == DI_NODE_NIL) {
+		/* something is wrong here. */
+		di_fini(branchNode);
+		log(LOG_DEBUG, ROUTINE,
+		    "Unable to take devinfoi branch snapshot on HBA port \"%s\""
+		    " due to %s", portDevpath, strerror(errno));
 		S_FREE(port_ptr->port_attributes.PortSpecificAttribute.SASPort);
 		S_FREE(port_ptr);
 		return (HBA_STATUS_ERROR);
@@ -165,12 +186,13 @@ add_hba_port_info(di_node_t portNode, struct sun_sas_hba *hba_ptr, int protocol)
 	port_ptr->port_attributes.PortSpecificAttribute.
 	    SASPort->PortProtocol = protocol;
 
-	rval = di_prop_lookup_strings(DDI_DEV_T_ANY, portNode,
+	rval = di_prop_lookup_strings(DDI_DEV_T_ANY, branchNode,
 	    "initiator-port", &propStringData);
 	if (rval < 0) {
 		log(LOG_DEBUG, ROUTINE,
 		    "Unable to get initiator-port from HBA port node %s.",
 		    port_ptr->port_attributes.OSDeviceName);
+		di_fini(branchNode);
 		S_FREE(port_ptr->port_attributes.PortSpecificAttribute.SASPort);
 		S_FREE(port_ptr);
 		return (HBA_STATUS_ERROR);
@@ -192,12 +214,13 @@ add_hba_port_info(di_node_t portNode, struct sun_sas_hba *hba_ptr, int protocol)
 		}
 	}
 
-	rval = di_prop_lookup_strings(DDI_DEV_T_ANY, portNode,
+	rval = di_prop_lookup_strings(DDI_DEV_T_ANY, branchNode,
 	    "attached-port", &propStringData);
 	if (rval < 0) {
 		log(LOG_DEBUG, ROUTINE,
 		    "Unable to get attached-port from HBA port node %s.",
 		    port_ptr->port_attributes.OSDeviceName);
+		di_fini(branchNode);
 		S_FREE(port_ptr->port_attributes.PortSpecificAttribute.SASPort);
 		S_FREE(port_ptr);
 		return (HBA_STATUS_ERROR);
@@ -223,12 +246,13 @@ add_hba_port_info(di_node_t portNode, struct sun_sas_hba *hba_ptr, int protocol)
 		}
 	}
 
-	rval = di_prop_lookup_ints(DDI_DEV_T_ANY, portNode,
+	rval = di_prop_lookup_ints(DDI_DEV_T_ANY, branchNode,
 	    "num-phys", &propIntData);
 	if (rval < 0) {
 		log(LOG_DEBUG, ROUTINE,
 		    "Unable to get NumberofPhys from HBA port %s.",
 		    port_ptr->port_attributes.OSDeviceName);
+		di_fini(branchNode);
 		S_FREE(port_ptr->port_attributes.PortSpecificAttribute.SASPort);
 		S_FREE(port_ptr);
 		return (HBA_STATUS_ERROR);
@@ -239,23 +263,29 @@ add_hba_port_info(di_node_t portNode, struct sun_sas_hba *hba_ptr, int protocol)
 
 	if (port_ptr->port_attributes.PortSpecificAttribute.\
 	    SASPort->NumberofPhys > 0) {
-		if (get_phy_info(portNode, port_ptr) != HBA_STATUS_OK) {
+		if (get_phy_info(branchNode, port_ptr) != HBA_STATUS_OK) {
 			log(LOG_DEBUG, ROUTINE,
 			    "Failed to get phy info on HBA port %s.",
 			    port_ptr->port_attributes.OSDeviceName);
+			di_fini(branchNode);
 			S_FREE(port_ptr->port_attributes.
 			    PortSpecificAttribute.SASPort);
 			S_FREE(port_ptr);
+			return (HBA_STATUS_ERROR);
 		}
 	}
 
-	/* devtree_attached_devices(portSubtreenode, port_ptr); */
+	/* now done with prop checking. remove branchNode. */
+	di_fini(branchNode);
+
+	/* Construct discovered target port. */
 	if (devtree_attached_devices(portNode, port_ptr) != HBA_STATUS_OK) {
 		log(LOG_DEBUG, ROUTINE,
 		    "Failed to get attached device info HBA port %s.",
 		    port_ptr->port_attributes.OSDeviceName);
 		S_FREE(port_ptr->port_attributes.PortSpecificAttribute.SASPort);
 		S_FREE(port_ptr);
+		return (HBA_STATUS_ERROR);
 	}
 
 	fillDomainPortWWN(port_ptr);

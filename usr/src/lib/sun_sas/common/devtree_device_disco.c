@@ -78,44 +78,6 @@ get_minor(char *devpath, char *minor)
 }
 
 /*
- * Get the LUID through libdevid.
- *
- * devpath: /devices path for the devices.
- * luidi: devid string.
- */
-static void
-get_luid(char *devpath, char *luid)
-{
-	const char	ROUTINE[] = "get_luid";
-	int 		fd;
-	ddi_devid_t 	devid = NULL;
-	char 		*devidstr;
-
-	/* reset errno. */
-	errno = 0;
-	if ((fd = open(devpath,  O_RDONLY|O_NDELAY)) >= 0) {
-		if (devid_get(fd, &devid) == 0) {
-			if ((devidstr = devid_to_guid(devid)) != NULL) {
-				(void) strlcpy(luid, devidstr, 256);
-				devid_free_guid(devidstr);
-			} else {
-				log(LOG_DEBUG, ROUTINE,
-				    "failed to get devid guid on (%s) : %s",
-				    devpath, strerror(errno));
-			}
-			devid_free(devid);
-		} else {
-			log(LOG_DEBUG, ROUTINE,
-			    "failed to get devid on (%s)", devpath);
-		}
-		(void) close(fd);
-	} else {
-		log(LOG_DEBUG, ROUTINE, "open failed on (%s) error: %s",
-		    devpath, strerror(errno));
-	}
-}
-
-/*
  * Free the attached port allocation.
  */
 static void
@@ -257,8 +219,9 @@ get_attached_devices_info(di_node_t node, struct sun_sas_port *port_ptr)
 	char			    *propStringData = NULL;
 	int			    *propIntData = NULL;
 	int64_t			    *propInt64Data = NULL;
-	uchar_t			    *propByteData = NULL;
 	scsi_lun_t		    samLun;
+	ddi_devid_t		    devid;
+	char			    *guidStr;
 	char			    *unit_address;
 	char			    *charptr;
 	char			    *devpath, link[MAXNAMELEN];
@@ -268,7 +231,7 @@ get_attached_devices_info(di_node_t node, struct sun_sas_port *port_ptr)
 	HBA_WWN			    SASAddress, AttachedSASAddress;
 	struct sun_sas_port	    *disco_port_ptr;
 	uint_t			    state = 0;
-	int			    portfound, rval, size, count, i;
+	int			    portfound, rval, size;
 	int			    port_state = HBA_PORTSTATE_ONLINE;
 	uint64_t		    tmpAddr;
 
@@ -616,17 +579,41 @@ get_attached_devices_info(di_node_t node, struct sun_sas_port *port_ptr)
 	    sizeof (mapping_ptr->entry.ScsiId.OSDeviceName),
 	    "%s%s%s", DEVICES_DIR, devpath, minorname);
 
-	count = di_prop_lookup_bytes(DDI_DEV_T_ANY, node, "inquiry-page-83",
-	    (uchar_t **)&propByteData);
-	if (count < 0) {
-		get_luid(mapping_ptr->entry.ScsiId.OSDeviceName,
-		    mapping_ptr->entry.LUID.buffer);
-	} else {
-		for (i = 0, charptr = mapping_ptr->entry.LUID.buffer; i < count;
-		    i++, charptr += 2) {
-			(void) sprintf(charptr, "%02x", propByteData[i]);
+	/* reset errno to 0 */
+	errno = 0;
+	if (di_prop_lookup_strings(DDI_DEV_T_ANY, node, "devid",
+	    &propStringData) != -1) {
+		if (devid_str_decode(propStringData, &devid, NULL) != -1) {
+			guidStr = devid_to_guid(devid);
+			if (guidStr != NULL) {
+				(void) strlcpy(mapping_ptr->entry.LUID.buffer,
+				    guidStr, 256);
+				devid_free_guid(guidStr);
+			} else {
+				/*
+				 * Note:
+				 * if logical unit associated page 83 id
+				 * descriptor is not avaialble for the device
+				 * devid_to_guid returns NULl with errno 0.
+				 */
+				log(LOG_DEBUG, ROUTINE,
+				    "failed to get devid guid on (%s) : %s",
+				    devpath, strerror(errno));
+			}
+		} else {
+			/*
+			 * device may not support proper page 83 id descriptor.
+			 * leave LUID attribute to NULL and continue.
+			 */
+			log(LOG_DEBUG, ROUTINE,
+			    "failed to decode devid prop on (%s) : %s",
+			    devpath, strerror(errno));
 		}
-		*charptr = '\0';
+	} else {
+		/* leave LUID attribute to NULL and continue. */
+		log(LOG_DEBUG, ROUTINE,
+		    "failed to get devid prop on (%s) : %s",
+		    devpath, strerror(errno));
 	}
 
 	if (disco_port_ptr->scsiInfo == NULL) {
@@ -652,6 +639,8 @@ get_attached_paths_info(di_path_t path, struct sun_sas_port *port_ptr)
 	int			    *propIntData = NULL;
 	int64_t			    *propInt64Data = NULL;
 	scsi_lun_t		    samLun;
+	ddi_devid_t		    devid;
+	char			    *guidStr;
 	char			    *unit_address;
 	char			    *charptr;
 	char			    *clientdevpath = NULL;
@@ -1001,18 +990,50 @@ get_attached_paths_info(di_path_t path, struct sun_sas_port *port_ptr)
 	    "%s%s%s", DEVICES_DIR, clientdevpath, minorname);
 
 	/* get luid. */
-	if (di_prop_lookup_strings(DDI_DEV_T_ANY, clientnode,
-	    "client-guid", &propStringData) != -1) {
-		(void) strlcpy(mapping_ptr->entry.LUID.buffer, propStringData,
-		    sizeof (mapping_ptr->entry.LUID.buffer));
+	errno = 0; /* reset errno to 0 */
+	if (di_prop_lookup_strings(DDI_DEV_T_ANY, clientnode, "devid",
+	    &propStringData) != -1) {
+		if (devid_str_decode(propStringData, &devid, NULL) != -1) {
+			guidStr = devid_to_guid(devid);
+			if (guidStr != NULL) {
+				(void) strlcpy(mapping_ptr->entry.LUID.buffer,
+				    guidStr,
+				    sizeof (mapping_ptr->entry.LUID.buffer));
+				devid_free_guid(guidStr);
+			} else {
+				/*
+				 * Note:
+				 * if logical unit associated page 83 id
+				 * descriptor is not avaialble for the device
+				 * devid_to_guid returns NULl with errno 0.
+				 */
+				log(LOG_DEBUG, ROUTINE,
+				    "failed to get devid guid on (%s)",
+				    " associated with path(%s) : %s",
+				    clientdevpath,
+				    pathdevpath ?  pathdevpath :
+				    "(missing device path)",
+				    strerror(errno));
+			}
+		} else {
+			/*
+			 * device may not support proper page 83 id descriptor.
+			 * leave LUID attribute to NULL and continue.
+			 */
+			log(LOG_DEBUG, ROUTINE,
+			    "failed to decode devid prop on (%s)",
+			    " associated with path(%s) : %s",
+			    clientdevpath,
+			    pathdevpath ?  pathdevpath :
+			    "(missing device path)",
+			    strerror(errno));
+		}
 	} else {
-		log(LOG_DEBUG, ROUTINE, "No client-guid prop found on path(%s)",
-		    pathdevpath ?  pathdevpath :
-		    "(missing device path)");
-		if (pathdevpath) di_devfs_path_free(pathdevpath);
-		di_devfs_path_free(clientdevpath);
-		free_attached_port(port_ptr);
-		return (HBA_STATUS_ERROR);
+		/* leave LUID attribute to NULL and continue. */
+		log(LOG_DEBUG, ROUTINE, "Failed to get devid on %s"
+		    " associated with path(%s) : %s", clientdevpath,
+		    pathdevpath ?  pathdevpath : "(missing device path)",
+		    strerror(errno));
 	}
 
 	if (disco_port_ptr->scsiInfo == NULL) {

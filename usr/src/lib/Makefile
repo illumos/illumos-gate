@@ -648,6 +648,9 @@ libvrrpadm:	libsocket libdladm
 libvscan:	libscf
 scsi:		libnvpair
 mpapi:		libpthread libdevinfo libsysevent libnvpair
+sun_fc:		libdevinfo libsysevent libnvpair
+libsun_ima:	libdevinfo libsysevent libnsl
+sun_sas:	libdevinfo libsysevent libnvpair libkstat libdevid
 libgrubmgmt:	libdevinfo libzfs libfstyp
 pyzfs:		libnvpair libsec libidmap libzfs
 libreparse:	libnvpair
