@@ -826,7 +826,7 @@ srpt_ioc_svc_bind(srpt_target_port_t *tgt, uint_t portnum)
 
 	/*
 	 * If previously bound and the port GID has changed,
-	 * rebind to the new GID.
+	 * unbind the old GID.
 	 */
 	if (port->hwp_bind_hdl != NULL) {
 		if (new_gid.gid_guid != port->hwp_gid.gid_guid ||
@@ -836,25 +836,35 @@ srpt_ioc_svc_bind(srpt_target_port_t *tgt, uint_t portnum)
 			(void) ibt_unbind_service(tgt->tp_ibt_svc_hdl,
 			    port->hwp_bind_hdl);
 			port->hwp_bind_hdl = NULL;
+		} else {
+			SRPT_DPRINTF_L2("ioc_svc_bind, port %d already bound",
+			    portnum);
 		}
 	}
-	SRPT_DPRINTF_L2("ioc_svc_bind, bind service, %016llx:%016llx",
-	    (u_longlong_t)new_gid.gid_prefix,
-	    (u_longlong_t)new_gid.gid_guid);
 
-	/*
-	 * Pass SCSI Target Port as CM private data, the target will always
-	 * exist while this service is bound.
-	 */
-	status = ibt_bind_service(tgt->tp_ibt_svc_hdl, new_gid, NULL, tgt,
-	    &port->hwp_bind_hdl);
-	if (status != IBT_SUCCESS && status != IBT_CM_SERVICE_EXISTS) {
-		SRPT_DPRINTF_L1("ioc_svc_bind, bind error (%d)", status);
-		return (status);
+	/* bind the new port GID */
+	if (port->hwp_bind_hdl == NULL) {
+		SRPT_DPRINTF_L2("ioc_svc_bind, bind service, %016llx:%016llx",
+		    (u_longlong_t)new_gid.gid_prefix,
+		    (u_longlong_t)new_gid.gid_guid);
+
+		/*
+		 * Pass SCSI Target Port as CM private data, the target will
+		 * always exist while this service is bound.
+		 */
+		status = ibt_bind_service(tgt->tp_ibt_svc_hdl, new_gid, NULL,
+		    tgt, &port->hwp_bind_hdl);
+		if (status != IBT_SUCCESS && status != IBT_CM_SERVICE_EXISTS) {
+			SRPT_DPRINTF_L1("ioc_svc_bind, bind error (%d)",
+			    status);
+			return (status);
+		}
+		port->hwp_gid.gid_prefix = new_gid.gid_prefix;
+		port->hwp_gid.gid_guid = new_gid.gid_guid;
 	}
+
+	/* port is now active */
 	tgt->tp_num_active_ports++;
-	port->hwp_gid.gid_prefix = new_gid.gid_prefix;
-	port->hwp_gid.gid_guid = new_gid.gid_guid;
 
 	/* setting up a transient structure for the dtrace probe. */
 	bzero(&sess, sizeof (srpt_session_t));
