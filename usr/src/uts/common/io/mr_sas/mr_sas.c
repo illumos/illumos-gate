@@ -164,9 +164,10 @@ static struct modlinkage modlinkage = {
 };
 
 static struct ddi_device_acc_attr endian_attr = {
-	DDI_DEVICE_ATTR_V0,
+	DDI_DEVICE_ATTR_V1,
 	DDI_STRUCTURE_LE_ACC,
-	DDI_STRICTORDER_ACC
+	DDI_STRICTORDER_ACC,
+	DDI_DEFAULT_ACC
 };
 
 
@@ -2981,6 +2982,7 @@ mrsas_alloc_dma_obj(struct mrsas_instance *instance, dma_obj_t *obj,
 
 	tmp_endian_attr = endian_attr;
 	tmp_endian_attr.devacc_attr_endian_flags = endian_flags;
+	tmp_endian_attr.devacc_attr_access = DDI_DEFAULT_ACC;
 
 	i = ddi_dma_alloc_handle(instance->dip, &obj->dma_attr,
 	    DDI_DMA_SLEEP, NULL, &obj->dma_handle);

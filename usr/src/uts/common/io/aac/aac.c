@@ -610,9 +610,10 @@ static struct aac_interface aac_rkt_interface = {
 };
 
 ddi_device_acc_attr_t aac_acc_attr = {
-	DDI_DEVICE_ATTR_V0,
+	DDI_DEVICE_ATTR_V1,
 	DDI_STRUCTURE_LE_ACC,
-	DDI_STRICTORDER_ACC
+	DDI_STRICTORDER_ACC,
+	DDI_DEFAULT_ACC
 };
 
 static struct {
@@ -785,6 +786,7 @@ aac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	softs->buf_dma_attr = softs->addr_dma_attr = aac_dma_attr;
 	softs->addr_dma_attr.dma_attr_granular = 1;
 	softs->acc_attr = aac_acc_attr;
+	softs->reg_attr = aac_acc_attr;
 	softs->card = AAC_UNKNOWN_CARD;
 #ifdef DEBUG
 	softs->debug_flags = aac_debug_flags;
@@ -805,7 +807,7 @@ aac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* Map PCI mem space */
 	if (ddi_regs_map_setup(dip, 1,
 	    (caddr_t *)&softs->pci_mem_base_vaddr, 0,
-	    softs->map_size_min, &softs->acc_attr,
+	    softs->map_size_min, &softs->reg_attr,
 	    &softs->pci_mem_handle) != DDI_SUCCESS)
 		goto error;
 
@@ -2289,7 +2291,7 @@ aac_check_firmware(struct aac_softstate *softs)
 		/* read out and save PCI MBR */
 		if ((atu_size > softs->map_size) &&
 		    (ddi_regs_map_setup(softs->devinfo_p, 1,
-		    (caddr_t *)&data, 0, atu_size, &softs->acc_attr,
+		    (caddr_t *)&data, 0, atu_size, &softs->reg_attr,
 		    &pci_handle) == DDI_SUCCESS)) {
 			ddi_regs_map_free(&softs->pci_mem_handle);
 			softs->pci_mem_handle = pci_handle;
@@ -6461,7 +6463,7 @@ aac_fm_init(struct aac_softstate *softs)
 	/* Only register with IO Fault Services if we have some capability */
 	if (softs->fm_capabilities) {
 		/* Adjust access and dma attributes for FMA */
-		softs->acc_attr.devacc_attr_access |= DDI_FLAGERR_ACC;
+		softs->reg_attr.devacc_attr_access = DDI_FLAGERR_ACC;
 		softs->addr_dma_attr.dma_attr_flags |= DDI_DMA_FLAGERR;
 		softs->buf_dma_attr.dma_attr_flags |= DDI_DMA_FLAGERR;
 
@@ -6519,7 +6521,7 @@ aac_fm_fini(struct aac_softstate *softs)
 		ddi_fm_fini(softs->devinfo_p);
 
 		/* Adjust access and dma attributes for FMA */
-		softs->acc_attr.devacc_attr_access &= ~DDI_FLAGERR_ACC;
+		softs->reg_attr.devacc_attr_access = DDI_DEFAULT_ACC;
 		softs->addr_dma_attr.dma_attr_flags &= ~DDI_DMA_FLAGERR;
 		softs->buf_dma_attr.dma_attr_flags &= ~DDI_DMA_FLAGERR;
 	}

@@ -1044,7 +1044,7 @@ void e1000_enable_pciex_master(struct e1000_hw *hw);
 int e1000g_check_acc_handle(ddi_acc_handle_t handle);
 int e1000g_check_dma_handle(ddi_dma_handle_t handle);
 void e1000g_fm_ereport(struct e1000g *Adapter, char *detail);
-void e1000g_set_fma_flags(struct e1000g *Adapter, int acc_flag, int dma_flag);
+void e1000g_set_fma_flags(int dma_flag);
 int e1000g_reset_link(struct e1000g *Adapter);
 
 /*

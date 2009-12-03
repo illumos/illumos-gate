@@ -472,9 +472,10 @@ ddi_dma_attr_t mptsas_dma_attrs64 = {
 };
 
 ddi_device_acc_attr_t mptsas_dev_attr = {
-	DDI_DEVICE_ATTR_V0,
+	DDI_DEVICE_ATTR_V1,
 	DDI_STRUCTURE_LE_ACC,
-	DDI_STRICTORDER_ACC
+	DDI_STRICTORDER_ACC,
+	DDI_DEFAULT_ACC
 };
 
 static struct cb_ops mptsas_cb_ops = {
@@ -962,6 +963,7 @@ mptsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* Make a per-instance copy of the structures */
 	mpt->m_io_dma_attr = mptsas_dma_attrs64;
 	mpt->m_msg_dma_attr = mptsas_dma_attrs;
+	mpt->m_reg_acc_attr = mptsas_dev_attr;
 	mpt->m_dev_acc_attr = mptsas_dev_attr;
 
 	/*
@@ -1006,7 +1008,7 @@ mptsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	if (ddi_regs_map_setup(dip, mem_bar, (caddr_t *)&mpt->m_reg,
-	    0, 0, &mpt->m_dev_acc_attr, &mpt->m_datap) != DDI_SUCCESS) {
+	    0, 0, &mpt->m_reg_acc_attr, &mpt->m_datap) != DDI_SUCCESS) {
 		mptsas_log(mpt, CE_WARN, "map setup failed");
 		goto fail;
 	}
@@ -11771,7 +11773,7 @@ mptsas_fm_init(mptsas_t *mpt)
 	/* Only register with IO Fault Services if we have some capability */
 	if (mpt->m_fm_capabilities) {
 		/* Adjust access and dma attributes for FMA */
-		mpt->m_dev_acc_attr.devacc_attr_access |= DDI_FLAGERR_ACC;
+		mpt->m_reg_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
 		mpt->m_msg_dma_attr.dma_attr_flags |= DDI_DMA_FLAGERR;
 		mpt->m_io_dma_attr.dma_attr_flags |= DDI_DMA_FLAGERR;
 
@@ -11833,7 +11835,7 @@ mptsas_fm_fini(mptsas_t *mpt)
 		ddi_fm_fini(mpt->m_dip);
 
 		/* Adjust access and dma attributes for FMA */
-		mpt->m_dev_acc_attr.devacc_attr_access &= ~DDI_FLAGERR_ACC;
+		mpt->m_reg_acc_attr.devacc_attr_access = DDI_DEFAULT_ACC;
 		mpt->m_msg_dma_attr.dma_attr_flags &= ~DDI_DMA_FLAGERR;
 		mpt->m_io_dma_attr.dma_attr_flags &= ~DDI_DMA_FLAGERR;
 

@@ -104,8 +104,7 @@ static ddi_dma_attr_t ixgbe_tx_dma_attr = {
 static ddi_device_acc_attr_t ixgbe_desc_acc_attr = {
 	DDI_DEVICE_ATTR_V0,
 	DDI_STRUCTURE_LE_ACC,
-	DDI_STRICTORDER_ACC,
-	DDI_FLAGERR_ACC
+	DDI_STRICTORDER_ACC
 };
 
 /*
@@ -922,14 +921,8 @@ ixgbe_free_rcb_lists(ixgbe_rx_data_t *rx_data)
  * ixgbe_set_fma_flags - Set the attribute for fma support.
  */
 void
-ixgbe_set_fma_flags(int acc_flag, int dma_flag)
+ixgbe_set_fma_flags(int dma_flag)
 {
-	if (acc_flag) {
-		ixgbe_desc_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
-	} else {
-		ixgbe_desc_acc_attr.devacc_attr_access = DDI_DEFAULT_ACC;
-	}
-
 	if (dma_flag) {
 		ixgbe_tx_dma_attr.dma_attr_flags = DDI_DMA_FLAGERR;
 		ixgbe_buf_dma_attr.dma_attr_flags = DDI_DMA_FLAGERR;

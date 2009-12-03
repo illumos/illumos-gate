@@ -1403,6 +1403,8 @@ impl_acc_err_init(ddi_acc_hdl_t *handlep)
 		handlep->ah_acc.devacc_attr_access = DDI_DEFAULT_ACC;
 	} else if (DDI_FM_ACC_ERR_CAP(fmcap)) {
 		if (handlep->ah_acc.devacc_attr_access == DDI_DEFAULT_ACC) {
+			if (handlep->ah_xfermodes)
+				return;
 			i_ddi_drv_ereport_post(handlep->ah_dip, DVR_EFMCAP,
 			    NULL, DDI_NOSLEEP);
 		} else {

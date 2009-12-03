@@ -164,7 +164,7 @@ static struct modlinkage igb_modlinkage = {
 
 /* Access attributes for register mapping */
 ddi_device_acc_attr_t igb_regs_acc_attr = {
-	DDI_DEVICE_ATTR_V0,
+	DDI_DEVICE_ATTR_V1,
 	DDI_STRUCTURE_LE_ACC,
 	DDI_STRICTORDER_ACC,
 	DDI_FLAGERR_ACC
@@ -4930,15 +4930,13 @@ static void
 igb_fm_init(igb_t *igb)
 {
 	ddi_iblock_cookie_t iblk;
-	int fma_acc_flag, fma_dma_flag;
+	int fma_dma_flag;
 
 	/* Only register with IO Fault Services if we have some capability */
 	if (igb->fm_capabilities & DDI_FM_ACCCHK_CAPABLE) {
 		igb_regs_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
-		fma_acc_flag = 1;
 	} else {
 		igb_regs_acc_attr.devacc_attr_access = DDI_DEFAULT_ACC;
-		fma_acc_flag = 0;
 	}
 
 	if (igb->fm_capabilities & DDI_FM_DMACHK_CAPABLE) {
@@ -4947,7 +4945,7 @@ igb_fm_init(igb_t *igb)
 		fma_dma_flag = 0;
 	}
 
-	(void) igb_set_fma_flags(fma_acc_flag, fma_dma_flag);
+	(void) igb_set_fma_flags(fma_dma_flag);
 
 	if (igb->fm_capabilities) {
 

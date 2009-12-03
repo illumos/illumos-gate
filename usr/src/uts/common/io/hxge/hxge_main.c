@@ -217,7 +217,7 @@ extern hxge_status_t hxge_ldgv_init();
 extern hxge_status_t hxge_ldgv_uninit();
 extern hxge_status_t hxge_intr_ldgv_init();
 extern void hxge_fm_init(p_hxge_t hxgep, ddi_device_acc_attr_t *reg_attr,
-    ddi_device_acc_attr_t *desc_attr, ddi_dma_attr_t *dma_attr);
+    ddi_dma_attr_t *dma_attr);
 extern void hxge_fm_fini(p_hxge_t hxgep);
 
 /*
@@ -230,9 +230,10 @@ uint32_t hxge_mblks_pending = 0;
  * Device register access attributes for PIO.
  */
 static ddi_device_acc_attr_t hxge_dev_reg_acc_attr = {
-	DDI_DEVICE_ATTR_V0,
+	DDI_DEVICE_ATTR_V1,
 	DDI_STRUCTURE_LE_ACC,
 	DDI_STRICTORDER_ACC,
+	DDI_DEFAULT_ACC
 };
 
 /*
@@ -468,8 +469,7 @@ hxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		hxgep->mmac.addrs[i].primary = B_FALSE;
 	}
 
-	hxge_fm_init(hxgep, &hxge_dev_reg_acc_attr, &hxge_dev_desc_dma_acc_attr,
-	    &hxge_rx_dma_attr);
+	hxge_fm_init(hxgep, &hxge_dev_reg_acc_attr, &hxge_rx_dma_attr);
 
 	status = hxge_map_regs(hxgep);
 	if (status != HXGE_OK) {

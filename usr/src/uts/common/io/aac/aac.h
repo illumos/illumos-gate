@@ -296,6 +296,7 @@ struct aac_softstate {
 
 	/* PCI spaces */
 	ddi_device_acc_attr_t acc_attr;
+	ddi_device_acc_attr_t reg_attr;
 	ddi_acc_handle_t pci_mem_handle;
 	uint8_t *pci_mem_base_vaddr;
 	uint32_t pci_mem_base_paddr;

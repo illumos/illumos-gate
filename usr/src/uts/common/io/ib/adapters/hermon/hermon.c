@@ -1465,7 +1465,7 @@ hermon_hw_init(hermon_state_t *state)
 	cleanup = HERMON_DRV_CLEANUP_LEVEL0;
 
 	/* Setup device access attributes */
-	state->hs_reg_accattr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
+	state->hs_reg_accattr.devacc_attr_version = DDI_DEVICE_ATTR_V1;
 	state->hs_reg_accattr.devacc_attr_endian_flags = DDI_STRUCTURE_BE_ACC;
 	state->hs_reg_accattr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
 	state->hs_reg_accattr.devacc_attr_access = DDI_DEFAULT_ACC;

@@ -224,7 +224,7 @@ static struct modlinkage modlinkage = {
 
 /* Access attributes for register mapping */
 static ddi_device_acc_attr_t e1000g_regs_acc_attr = {
-	DDI_DEVICE_ATTR_V0,
+	DDI_DEVICE_ATTR_V1,
 	DDI_STRUCTURE_LE_ACC,
 	DDI_STRICTORDER_ACC,
 	DDI_FLAGERR_ACC
@@ -5975,15 +5975,13 @@ static void
 e1000g_fm_init(struct e1000g *Adapter)
 {
 	ddi_iblock_cookie_t iblk;
-	int fma_acc_flag, fma_dma_flag;
+	int fma_dma_flag;
 
 	/* Only register with IO Fault Services if we have some capability */
 	if (Adapter->fm_capabilities & DDI_FM_ACCCHK_CAPABLE) {
 		e1000g_regs_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
-		fma_acc_flag = 1;
 	} else {
 		e1000g_regs_acc_attr.devacc_attr_access = DDI_DEFAULT_ACC;
-		fma_acc_flag = 0;
 	}
 
 	if (Adapter->fm_capabilities & DDI_FM_DMACHK_CAPABLE) {
@@ -5992,7 +5990,7 @@ e1000g_fm_init(struct e1000g *Adapter)
 		fma_dma_flag = 0;
 	}
 
-	(void) e1000g_set_fma_flags(Adapter, fma_acc_flag, fma_dma_flag);
+	(void) e1000g_set_fma_flags(fma_dma_flag);
 
 	if (Adapter->fm_capabilities) {
 

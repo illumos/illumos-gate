@@ -56,6 +56,12 @@ pcieb_plat_peekpoke(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 
 /*ARGSUSED*/
 void
+pcieb_set_prot_scan(dev_info_t *dip, ddi_acc_impl_t *hdlp)
+{
+}
+
+/*ARGSUSED*/
+void
 pcieb_plat_attach_workaround(dev_info_t *dip)
 {
 }

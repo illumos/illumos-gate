@@ -852,7 +852,7 @@ int igb_atomic_reserve(uint32_t *, uint32_t);
 int igb_check_acc_handle(ddi_acc_handle_t);
 int igb_check_dma_handle(ddi_dma_handle_t);
 void igb_fm_ereport(igb_t *, char *);
-void igb_set_fma_flags(int, int);
+void igb_set_fma_flags(int);
 
 /*
  * Function prototypes in igb_gld.c

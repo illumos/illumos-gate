@@ -81,7 +81,7 @@ static ddi_dma_attr_t dma_attr = {
  * PIO access attributes for registers
  */
 static ddi_device_acc_attr_t bge_reg_accattr = {
-	DDI_DEVICE_ATTR_V0,
+	DDI_DEVICE_ATTR_V1,
 	DDI_NEVERSWAP_ACC,
 	DDI_STRICTORDER_ACC,
 	DDI_FLAGERR_ACC
@@ -93,8 +93,7 @@ static ddi_device_acc_attr_t bge_reg_accattr = {
 static ddi_device_acc_attr_t bge_desc_accattr = {
 	DDI_DEVICE_ATTR_V0,
 	DDI_NEVERSWAP_ACC,
-	DDI_STRICTORDER_ACC,
-	DDI_FLAGERR_ACC
+	DDI_STRICTORDER_ACC
 };
 
 /*
@@ -2926,7 +2925,6 @@ bge_fm_init(bge_t *bgep)
 	/* Only register with IO Fault Services if we have some capability */
 	if (bgep->fm_capabilities) {
 		bge_reg_accattr.devacc_attr_access = DDI_FLAGERR_ACC;
-		bge_desc_accattr.devacc_attr_access = DDI_FLAGERR_ACC;
 		dma_attr.dma_attr_flags = DDI_DMA_FLAGERR;
 
 		/* Register capabilities with IO Fault Services */
@@ -2951,7 +2949,6 @@ bge_fm_init(bge_t *bgep)
 		 * FMA capabilities at runtime.
 		 */
 		bge_reg_accattr.devacc_attr_access = DDI_DEFAULT_ACC;
-		bge_desc_accattr.devacc_attr_access = DDI_DEFAULT_ACC;
 		dma_attr.dma_attr_flags = 0;
 	}
 }

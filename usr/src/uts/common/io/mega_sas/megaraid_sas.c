@@ -157,9 +157,10 @@ static struct modlinkage modlinkage = {
 };
 
 static struct ddi_device_acc_attr endian_attr = {
-	DDI_DEVICE_ATTR_V0,
+	DDI_DEVICE_ATTR_V1,
 	DDI_STRUCTURE_LE_ACC,
-	DDI_STRICTORDER_ACC
+	DDI_STRICTORDER_ACC,
+	DDI_DEFAULT_ACC
 };
 
 
@@ -2994,7 +2995,10 @@ mega_alloc_dma_obj(struct megasas_instance *instance, dma_obj_t *obj)
 	int	i;
 	size_t	alen = 0;
 	uint_t	cookie_cnt;
+	struct ddi_device_acc_attr	tmp_endian_attr;
 
+	tmp_endian_attr = endian_attr;
+	tmp_endian_attr.devacc_attr_access = DDI_DEFAULT_ACC;
 	i = ddi_dma_alloc_handle(instance->dip, &obj->dma_attr,
 	    DDI_DMA_SLEEP, NULL, &obj->dma_handle);
 	if (i != DDI_SUCCESS) {
@@ -3017,7 +3021,7 @@ mega_alloc_dma_obj(struct megasas_instance *instance, dma_obj_t *obj)
 		return (-1);
 	}
 
-	if ((ddi_dma_mem_alloc(obj->dma_handle, obj->size, &endian_attr,
+	if ((ddi_dma_mem_alloc(obj->dma_handle, obj->size, &tmp_endian_attr,
 	    DDI_DMA_RDWR | DDI_DMA_STREAMING, DDI_DMA_SLEEP, NULL,
 	    &obj->buffer, &alen, &obj->acc_handle) != DDI_SUCCESS) ||
 	    alen < obj->size) {

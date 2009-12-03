@@ -453,7 +453,7 @@ static dca_device_t dca_devices[] = {
  * Device attributes.
  */
 static struct ddi_device_acc_attr dca_regsattr = {
-	DDI_DEVICE_ATTR_V0,
+	DDI_DEVICE_ATTR_V1,
 	DDI_STRUCTURE_LE_ACC,
 	DDI_STRICTORDER_ACC,
 	DDI_FLAGERR_ACC
@@ -462,16 +462,14 @@ static struct ddi_device_acc_attr dca_regsattr = {
 static struct ddi_device_acc_attr dca_devattr = {
 	DDI_DEVICE_ATTR_V0,
 	DDI_STRUCTURE_LE_ACC,
-	DDI_STRICTORDER_ACC,
-	DDI_FLAGERR_ACC
+	DDI_STRICTORDER_ACC
 };
 
 #if !defined(i386) && !defined(__i386)
 static struct ddi_device_acc_attr dca_bufattr = {
 	DDI_DEVICE_ATTR_V0,
 	DDI_NEVERSWAP_ACC,
-	DDI_STRICTORDER_ACC,
-	DDI_FLAGERR_ACC
+	DDI_STRICTORDER_ACC
 };
 #endif
 
@@ -4893,7 +4891,6 @@ dca_fma_init(dca_t *dca)
 	/* Only register with IO Fault Services if we have some capability */
 	if (dca->fm_capabilities) {
 		dca_regsattr.devacc_attr_access = DDI_FLAGERR_ACC;
-		dca_devattr.devacc_attr_access = DDI_FLAGERR_ACC;
 		dca_dmaattr.dma_attr_flags = DDI_DMA_FLAGERR;
 
 		/* Register capabilities with IO Fault Services */
@@ -4922,7 +4919,6 @@ dca_fma_init(dca_t *dca)
 		 * FMA capabilities at runtime.
 		 */
 		dca_regsattr.devacc_attr_access = DDI_DEFAULT_ACC;
-		dca_devattr.devacc_attr_access = DDI_DEFAULT_ACC;
 		dca_dmaattr.dma_attr_flags = 0;
 	}
 }

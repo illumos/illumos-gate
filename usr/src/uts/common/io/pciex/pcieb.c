@@ -460,6 +460,12 @@ pcieb_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 {
 	dev_info_t *pdip;
 
+	if (PCIE_IS_RP(PCIE_DIP2BUS(dip))) {
+		ddi_acc_impl_t *hdlp =
+		    (ddi_acc_impl_t *)(mp->map_handlep)->ah_platform_private;
+
+		pcieb_set_prot_scan(dip, hdlp);
+	}
 	pdip = (dev_info_t *)DEVI(dip)->devi_parent;
 	return ((DEVI(pdip)->devi_ops->devo_bus_ops->bus_map)(pdip, rdip, mp,
 	    offset, len, vaddrp));

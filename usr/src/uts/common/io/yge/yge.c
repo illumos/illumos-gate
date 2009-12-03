@@ -119,8 +119,7 @@
 static struct ddi_device_acc_attr yge_regs_attr = {
 	DDI_DEVICE_ATTR_V0,
 	DDI_STRUCTURE_LE_ACC,
-	DDI_STRICTORDER_ACC,
-	DDI_FLAGERR_ACC
+	DDI_STRICTORDER_ACC
 };
 
 static struct ddi_device_acc_attr yge_ring_attr = {

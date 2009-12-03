@@ -10937,10 +10937,8 @@ emlxs_fm_init(emlxs_hba_t *hba)
 
 	if (DDI_FM_ACC_ERR_CAP(hba->fm_caps)) {
 		emlxs_dev_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
-		emlxs_data_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
 	} else {
 		emlxs_dev_acc_attr.devacc_attr_access = DDI_DEFAULT_ACC;
-		emlxs_data_acc_attr.devacc_attr_access = DDI_DEFAULT_ACC;
 	}
 
 	if (DDI_FM_DMA_ERR_CAP(hba->fm_caps)) {

@@ -332,16 +332,24 @@ pci_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	struct regspec reg;
 	ddi_map_req_t mr;
 	ddi_acc_hdl_t *hp;
+	ddi_acc_impl_t *hdlp;
 	pci_regspec_t pci_reg;
 	pci_regspec_t *pci_rp;
 	int 	rnumber;
 	int	length;
 	pci_acc_cfblk_t *cfp;
 	int	space;
-
+	pci_state_t *pcip;
 
 	mr = *mp; /* Get private copy of request */
 	mp = &mr;
+
+	pcip = ddi_get_soft_state(pci_statep, ddi_get_instance(dip));
+	hdlp = (ddi_acc_impl_t *)(mp->map_handlep)->ah_platform_private;
+	hdlp->ahi_err_mutexp = &pcip->pci_err_mutex;
+	hdlp->ahi_peekpoke_mutexp = &pcip->pci_peek_poke_mutex;
+	hdlp->ahi_scan_dip = dip;
+	hdlp->ahi_scan = pci_peekpoke_cb;
 
 	/*
 	 * check for register number

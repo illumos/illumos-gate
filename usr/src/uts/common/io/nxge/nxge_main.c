@@ -396,7 +396,6 @@ extern nxge_status_t	nxge_ldgv_uninit(p_nxge_t);
 extern nxge_status_t	nxge_intr_ldgv_init(p_nxge_t);
 extern void		nxge_fm_init(p_nxge_t,
 					ddi_device_acc_attr_t *,
-					ddi_device_acc_attr_t *,
 					ddi_dma_attr_t *);
 extern void		nxge_fm_fini(p_nxge_t);
 extern npi_status_t	npi_mac_altaddr_disable(npi_handle_t, uint8_t, uint8_t);
@@ -411,9 +410,10 @@ uint32_t nxge_mblks_pending = 0;
  * Device register access attributes for PIO.
  */
 static ddi_device_acc_attr_t nxge_dev_reg_acc_attr = {
-	DDI_DEVICE_ATTR_V0,
+	DDI_DEVICE_ATTR_V1,
 	DDI_STRUCTURE_LE_ACC,
 	DDI_STRICTORDER_ACC,
+	DDI_DEFAULT_ACC
 };
 
 /*
@@ -610,9 +610,7 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto nxge_attach_fail3;
 	}
 
-	nxge_fm_init(nxgep, &nxge_dev_reg_acc_attr,
-	    &nxge_dev_desc_dma_acc_attr,
-	    &nxge_rx_dma_attr);
+	nxge_fm_init(nxgep, &nxge_dev_reg_acc_attr, &nxge_rx_dma_attr);
 
 	/* Create & initialize the per-Neptune data structure */
 	/* (even if we're a guest). */

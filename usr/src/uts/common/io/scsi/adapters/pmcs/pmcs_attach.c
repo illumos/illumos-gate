@@ -164,7 +164,7 @@ const ddi_dma_attr_t pmcs_dattr = {
 };
 
 static ddi_device_acc_attr_t rattr = {
-	DDI_DEVICE_ATTR_V0,
+	DDI_DEVICE_ATTR_V1,
 	DDI_STRUCTURE_LE_ACC,
 	DDI_STRICTORDER_ACC,
 	DDI_DEFAULT_ACC
@@ -2947,8 +2947,7 @@ pmcs_fm_init(pmcs_hw_t *pwp)
 	/* Only register with IO Fault Services if we have some capability */
 	if (pwp->fm_capabilities) {
 		/* Adjust access and dma attributes for FMA */
-		pwp->reg_acc_attr.devacc_attr_access |= DDI_FLAGERR_ACC;
-		pwp->dev_acc_attr.devacc_attr_access |= DDI_FLAGERR_ACC;
+		pwp->reg_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
 		pwp->iqp_dma_attr.dma_attr_flags |= DDI_DMA_FLAGERR;
 		pwp->oqp_dma_attr.dma_attr_flags |= DDI_DMA_FLAGERR;
 		pwp->cip_dma_attr.dma_attr_flags |= DDI_DMA_FLAGERR;
@@ -3002,8 +3001,7 @@ pmcs_fm_fini(pmcs_hw_t *pwp)
 		ddi_fm_fini(pwp->dip);
 
 		/* Adjust access and dma attributes for FMA */
-		pwp->reg_acc_attr.devacc_attr_access &= ~DDI_FLAGERR_ACC;
-		pwp->dev_acc_attr.devacc_attr_access &= ~DDI_FLAGERR_ACC;
+		pwp->reg_acc_attr.devacc_attr_access = DDI_DEFAULT_ACC;
 		pwp->iqp_dma_attr.dma_attr_flags &= ~DDI_DMA_FLAGERR;
 		pwp->oqp_dma_attr.dma_attr_flags &= ~DDI_DMA_FLAGERR;
 		pwp->cip_dma_attr.dma_attr_flags &= ~DDI_DMA_FLAGERR;

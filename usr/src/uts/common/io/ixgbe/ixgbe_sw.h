@@ -776,7 +776,7 @@ typedef struct ixgbe_stat {
  */
 int ixgbe_alloc_dma(ixgbe_t *);
 void ixgbe_free_dma(ixgbe_t *);
-void ixgbe_set_fma_flags(int, int);
+void ixgbe_set_fma_flags(int);
 void ixgbe_free_dma_buffer(dma_buffer_t *);
 int ixgbe_alloc_rx_ring_data(ixgbe_rx_ring_t *rx_ring);
 void ixgbe_free_rx_ring_data(ixgbe_rx_data_t *rx_data);

@@ -722,6 +722,7 @@ typedef struct mptsas {
 	ddi_dma_attr_t		m_io_dma_attr;	/* Used for data I/O */
 	ddi_dma_attr_t		m_msg_dma_attr; /* Used for message frames */
 	ddi_device_acc_attr_t	m_dev_acc_attr;
+	ddi_device_acc_attr_t	m_reg_acc_attr;
 
 	/*
 	 * request/reply variables

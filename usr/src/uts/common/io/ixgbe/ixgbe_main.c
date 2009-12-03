@@ -180,7 +180,7 @@ static struct modlinkage ixgbe_modlinkage = {
  * Access attributes for register mapping
  */
 ddi_device_acc_attr_t ixgbe_regs_acc_attr = {
-	DDI_DEVICE_ATTR_V0,
+	DDI_DEVICE_ATTR_V1,
 	DDI_STRUCTURE_LE_ACC,
 	DDI_STRICTORDER_ACC,
 	DDI_FLAGERR_ACC
@@ -4500,17 +4500,15 @@ static void
 ixgbe_fm_init(ixgbe_t *ixgbe)
 {
 	ddi_iblock_cookie_t iblk;
-	int fma_acc_flag, fma_dma_flag;
+	int fma_dma_flag;
 
 	/*
 	 * Only register with IO Fault Services if we have some capability
 	 */
 	if (ixgbe->fm_capabilities & DDI_FM_ACCCHK_CAPABLE) {
 		ixgbe_regs_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
-		fma_acc_flag = 1;
 	} else {
 		ixgbe_regs_acc_attr.devacc_attr_access = DDI_DEFAULT_ACC;
-		fma_acc_flag = 0;
 	}
 
 	if (ixgbe->fm_capabilities & DDI_FM_DMACHK_CAPABLE) {
@@ -4519,7 +4517,7 @@ ixgbe_fm_init(ixgbe_t *ixgbe)
 		fma_dma_flag = 0;
 	}
 
-	ixgbe_set_fma_flags(fma_acc_flag, fma_dma_flag);
+	ixgbe_set_fma_flags(fma_dma_flag);
 
 	if (ixgbe->fm_capabilities) {
 

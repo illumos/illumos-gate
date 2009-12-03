@@ -20,7 +20,7 @@
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDLv1.
+ * Use is subject to license terms.
  */
 
 /*
@@ -79,8 +79,7 @@ static p_rx_sw_packet_t e1000g_alloc_rx_sw_packet(e1000g_rx_data_t *,
 static ddi_device_acc_attr_t e1000g_desc_acc_attr = {
 	DDI_DEVICE_ATTR_V0,
 	DDI_STRUCTURE_LE_ACC,
-	DDI_STRICTORDER_ACC,
-	DDI_FLAGERR_ACC
+	DDI_STRICTORDER_ACC
 };
 
 /* DMA access attributes for DMA buffers */
@@ -1504,14 +1503,8 @@ e1000g_release_dma_resources(struct e1000g *Adapter)
 
 /* ARGSUSED */
 void
-e1000g_set_fma_flags(struct e1000g *Adapter, int acc_flag, int dma_flag)
+e1000g_set_fma_flags(int dma_flag)
 {
-	if (acc_flag) {
-		e1000g_desc_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
-	} else {
-		e1000g_desc_acc_attr.devacc_attr_access = DDI_DEFAULT_ACC;
-	}
-
 	if (dma_flag) {
 		e1000g_tx_dma_attr.dma_attr_flags = DDI_DMA_FLAGERR;
 		e1000g_buf_dma_attr.dma_attr_flags = DDI_DMA_FLAGERR;

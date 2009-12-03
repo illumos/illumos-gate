@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <hxge_impl.h>
 #include <sys/ddifm.h>
@@ -173,7 +171,7 @@ hxge_fm_ereport_attr_t hxge_fm_ereport_sw[] = {
 
 void
 hxge_fm_init(p_hxge_t hxgep, ddi_device_acc_attr_t *reg_attr,
-	ddi_device_acc_attr_t *desc_attr, ddi_dma_attr_t *dma_attr)
+	ddi_dma_attr_t *dma_attr)
 {
 	ddi_iblock_cookie_t iblk;
 
@@ -218,10 +216,8 @@ hxge_fm_init(p_hxge_t hxgep, ddi_device_acc_attr_t *reg_attr,
 	 */
 	if (DDI_FM_ACC_ERR_CAP(hxgep->fm_capabilities)) {
 		reg_attr->devacc_attr_access  = DDI_FLAGERR_ACC;
-		desc_attr->devacc_attr_access = DDI_FLAGERR_ACC;
 	} else {
 		reg_attr->devacc_attr_access  = DDI_DEFAULT_ACC;
-		desc_attr->devacc_attr_access = DDI_DEFAULT_ACC;
 	}
 
 	/*

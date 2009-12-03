@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -361,6 +361,21 @@ bge_poll_ring(void *arg, int bytes_to_pickup)
 	 * before accepting the packets they describe
 	 */
 	DMA_SYNC(rrp->desc, DDI_DMA_SYNC_FORKERNEL);
+	if (*rrp->prod_index_p >= rrp->desc.nslots) {
+		bgep->bge_chip_state = BGE_CHIP_ERROR;
+		bge_fm_ereport(bgep, DDI_FM_DEVICE_INVAL_STATE);
+		mutex_exit(rrp->rx_lock);
+		return (NULL);
+	}
+	if (bge_check_dma_handle(bgep, rrp->desc.dma_hdl) != DDI_FM_OK) {
+		rrp->rx_next = *rrp->prod_index_p;
+		bge_mbx_put(bgep, rrp->chip_mbx_reg, rrp->rx_next);
+		bgep->bge_dma_error = B_TRUE;
+		bgep->bge_chip_state = BGE_CHIP_ERROR;
+		mutex_exit(rrp->rx_lock);
+		return (NULL);
+	}
+
 	hw_rbd_p = DMA_VPTR(rrp->desc);
 	head = NULL;
 	tail = &head;
@@ -377,6 +392,8 @@ bge_poll_ring(void *arg, int bytes_to_pickup)
 	}
 
 	bge_mbx_put(bgep, rrp->chip_mbx_reg, rrp->rx_next);
+	if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK)
+		bgep->bge_chip_state = BGE_CHIP_ERROR;
 	mutex_exit(rrp->rx_lock);
 	return (head);
 }

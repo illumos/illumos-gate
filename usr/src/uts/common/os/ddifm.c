@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -860,6 +860,16 @@ ddi_fm_capable(dev_info_t *dip)
  *
  * These routines may be called from user, kernel, and interrupt contexts.
  */
+
+static void
+ddi_fm_acc_err_get_fail(ddi_acc_handle_t handle)
+{
+	ddi_acc_hdl_t *hp = impl_acc_hdl_get(handle);
+
+	i_ddi_drv_ereport_post(hp->ah_dip, DVR_EVER, NULL, DDI_NOSLEEP);
+	cmn_err(CE_PANIC, "ddi_fm_acc_err_get: Invalid driver version\n");
+}
+
 void
 ddi_fm_acc_err_get(ddi_acc_handle_t handle, ddi_fm_error_t *de, int version)
 {
@@ -869,18 +879,28 @@ ddi_fm_acc_err_get(ddi_acc_handle_t handle, ddi_fm_error_t *de, int version)
 		return;
 
 	if (version != DDI_FME_VER0 && version != DDI_FME_VER1) {
-		ddi_acc_hdl_t *hp = impl_acc_hdl_get(handle);
-
-		i_ddi_drv_ereport_post(hp->ah_dip, DVR_EVER, NULL, DDI_NOSLEEP);
-		cmn_err(CE_PANIC, "ddi_fm_acc_err_get: "
-		    "Invalid driver version\n");
+		ddi_fm_acc_err_get_fail(handle);
+		return;
 	}
 
 	errp = ((ddi_acc_impl_t *)handle)->ahi_err;
+	if (errp->err_status == DDI_FM_OK) {
+		if (de->fme_status != DDI_FM_OK)
+			de->fme_status = DDI_FM_OK;
+		return;
+	}
 	de->fme_status = errp->err_status;
 	de->fme_ena = errp->err_ena;
 	de->fme_flag = errp->err_expected;
 	de->fme_acc_handle = handle;
+}
+
+void
+ddi_fm_dma_err_get_fail(ddi_dma_handle_t handle)
+{
+	i_ddi_drv_ereport_post(((ddi_dma_impl_t *)handle)->dmai_rdip,
+	    DVR_EVER, NULL, DDI_NOSLEEP);
+	cmn_err(CE_PANIC, "ddi_fm_dma_err_get: Invalid driver version\n");
 }
 
 void
@@ -892,18 +912,30 @@ ddi_fm_dma_err_get(ddi_dma_handle_t handle, ddi_fm_error_t *de, int version)
 		return;
 
 	if (version != DDI_FME_VER0 && version != DDI_FME_VER1) {
-		i_ddi_drv_ereport_post(((ddi_dma_impl_t *)handle)->dmai_rdip,
-		    DVR_EVER, NULL, DDI_NOSLEEP);
-		cmn_err(CE_PANIC, "ddi_fm_dma_err_get: "
-		    "Invalid driver version\n");
+		ddi_fm_dma_err_get_fail(handle);
+		return;
 	}
 
 	errp = &((ddi_dma_impl_t *)handle)->dmai_error;
 
+	if (errp->err_status == DDI_FM_OK) {
+		if (de->fme_status != DDI_FM_OK)
+			de->fme_status = DDI_FM_OK;
+		return;
+	}
 	de->fme_status = errp->err_status;
 	de->fme_ena = errp->err_ena;
 	de->fme_flag = errp->err_expected;
 	de->fme_dma_handle = handle;
+}
+
+void
+ddi_fm_acc_err_clear_fail(ddi_acc_handle_t handle)
+{
+	ddi_acc_hdl_t *hp = impl_acc_hdl_get(handle);
+
+	i_ddi_drv_ereport_post(hp->ah_dip, DVR_EVER, NULL, DDI_NOSLEEP);
+	cmn_err(CE_PANIC, "ddi_fm_acc_err_clear: Invalid driver version\n");
 }
 
 void
@@ -915,17 +947,22 @@ ddi_fm_acc_err_clear(ddi_acc_handle_t handle, int version)
 		return;
 
 	if (version != DDI_FME_VER0 && version != DDI_FME_VER1) {
-		ddi_acc_hdl_t *hp = impl_acc_hdl_get(handle);
-
-		i_ddi_drv_ereport_post(hp->ah_dip, DVR_EVER, NULL, DDI_NOSLEEP);
-		cmn_err(CE_PANIC, "ddi_fm_acc_err_clear: "
-		    "Invalid driver version\n");
+		ddi_fm_acc_err_clear_fail(handle);
+		return;
 	}
 
 	errp = ((ddi_acc_impl_t *)handle)->ahi_err;
 	errp->err_status = DDI_FM_OK;
 	errp->err_ena = 0;
 	errp->err_expected = DDI_FM_ERR_UNEXPECTED;
+}
+
+void
+ddi_fm_dma_err_clear_fail(ddi_dma_handle_t handle)
+{
+	i_ddi_drv_ereport_post(((ddi_dma_impl_t *)handle)->dmai_rdip,
+	    DVR_EVER, NULL, DDI_NOSLEEP);
+	cmn_err(CE_PANIC, "ddi_fm_dma_err_clear: Invalid driver version\n");
 }
 
 void
@@ -937,10 +974,8 @@ ddi_fm_dma_err_clear(ddi_dma_handle_t handle, int version)
 		return;
 
 	if (version != DDI_FME_VER0 && version != DDI_FME_VER1) {
-		i_ddi_drv_ereport_post(((ddi_dma_impl_t *)handle)->dmai_rdip,
-		    DVR_EVER, NULL, DDI_NOSLEEP);
-		cmn_err(CE_PANIC, "ddi_fm_dma_err_clear: "
-		    "Invalid driver version\n");
+		ddi_fm_dma_err_clear_fail(handle);
+		return;
 	}
 
 	errp = &((ddi_dma_impl_t *)handle)->dmai_error;

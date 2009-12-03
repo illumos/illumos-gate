@@ -448,7 +448,17 @@ ppb_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	off_t offset, off_t len, caddr_t *vaddrp)
 {
 	dev_info_t *pdip;
+	ppb_devstate_t *ppb = ddi_get_soft_state(ppb_state,
+	    ddi_get_instance(dip));
 
+	if (strcmp(ddi_driver_name(ddi_get_parent(dip)), "npe") == 0) {
+		ddi_acc_impl_t *hdlp =
+		    (ddi_acc_impl_t *)(mp->map_handlep)->ah_platform_private;
+		hdlp->ahi_err_mutexp = &ppb->ppb_err_mutex;
+		hdlp->ahi_peekpoke_mutexp = &ppb->ppb_peek_poke_mutex;
+		hdlp->ahi_scan_dip = dip;
+		hdlp->ahi_scan = ppb_peekpoke_cb;
+	}
 	pdip = (dev_info_t *)DEVI(dip)->devi_parent;
 	return ((DEVI(pdip)->devi_ops->devo_bus_ops->bus_map)(pdip,
 	    rdip, mp, offset, len, vaddrp));

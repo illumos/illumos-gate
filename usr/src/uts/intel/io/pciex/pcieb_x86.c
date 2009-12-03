@@ -47,6 +47,18 @@ pcieb_peekpoke_cb(dev_info_t *dip, ddi_fm_error_t *derr) {
 	(void) pf_scan_fabric(dip, derr, NULL);
 }
 
+void
+pcieb_set_prot_scan(dev_info_t *dip, ddi_acc_impl_t *hdlp)
+{
+	pcieb_devstate_t *pcieb = ddi_get_soft_state(pcieb_state,
+	    ddi_get_instance(dip));
+
+	hdlp->ahi_err_mutexp = &pcieb->pcieb_err_mutex;
+	hdlp->ahi_peekpoke_mutexp = &pcieb->pcieb_peek_poke_mutex;
+	hdlp->ahi_scan_dip = dip;
+	hdlp->ahi_scan = pcieb_peekpoke_cb;
+}
+
 int
 pcieb_plat_peekpoke(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
     void *arg, void *result)

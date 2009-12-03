@@ -1370,11 +1370,6 @@ audio1575_map_regs(audio1575_state_t *statep)
 {
 	dev_info_t		*dip = statep->dip;
 
-	/* Check for fault management capabilities */
-	if (DDI_FM_ACC_ERR_CAP(ddi_fm_capable(dip))) {
-		dev_attr.devacc_attr_access = DDI_FLAGERR_ACC;
-	}
-
 	/* map the M1575 Audio PCI Cfg Space */
 	if (pci_config_setup(dip, &statep->pcih) != DDI_SUCCESS) {
 		audio_dev_warn(statep->adev, "PCI config map failure");

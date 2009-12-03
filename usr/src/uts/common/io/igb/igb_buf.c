@@ -23,7 +23,7 @@
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Use is subject to license terms.
  */
 
 #include "igb_sw.h"
@@ -105,8 +105,7 @@ static ddi_dma_attr_t igb_tx_dma_attr = {
 static ddi_device_acc_attr_t igb_desc_acc_attr = {
 	DDI_DEVICE_ATTR_V0,
 	DDI_STRUCTURE_LE_ACC,
-	DDI_STRICTORDER_ACC,
-	DDI_FLAGERR_ACC
+	DDI_STRICTORDER_ACC
 };
 
 /*
@@ -865,14 +864,8 @@ igb_free_rcb_lists(igb_rx_ring_t *rx_ring)
 }
 
 void
-igb_set_fma_flags(int acc_flag, int dma_flag)
+igb_set_fma_flags(int dma_flag)
 {
-	if (acc_flag) {
-		igb_desc_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
-	} else {
-		igb_desc_acc_attr.devacc_attr_access = DDI_DEFAULT_ACC;
-	}
-
 	if (dma_flag) {
 		igb_tx_dma_attr.dma_attr_flags = DDI_DMA_FLAGERR;
 		igb_buf_dma_attr.dma_attr_flags = DDI_DMA_FLAGERR;
