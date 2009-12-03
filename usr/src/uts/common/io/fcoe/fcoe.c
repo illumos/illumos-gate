@@ -123,6 +123,7 @@ static void fcoe_worker_init();
 static int fcoe_worker_fini();
 static void fcoe_worker_frame();
 static int fcoe_get_port_list(fcoe_port_instance_t *ports, int count);
+static boolean_t fcoe_mac_existed(fcoe_mac_t *pmac);
 
 /*
  * Driver identificaton stuff
@@ -195,7 +196,7 @@ static struct dev_ops fcoe_ops = {
 	ddi_quiesce_not_needed
 };
 
-#define	FCOE_VERSION	"20090729-1.01"
+#define	FCOE_VERSION	"20091123-1.02"
 #define	FCOE_NAME	"FCoE Transport v" FCOE_VERSION
 #define	TASKQ_NAME_LEN	32
 
@@ -748,8 +749,10 @@ fcoe_iocmd(fcoe_soft_state_t *ss, intptr_t data, int mode)
 			    fcoe_mac,
 			    (param->fcp_port_type == FCOE_CLIENT_TARGET));
 			if (ret != 0) {
-				(void) fcoe_close_mac(fcoe_mac);
-				fcoe_destroy_mac(fcoe_mac);
+				if (fcoe_mac_existed(fcoe_mac) == B_TRUE) {
+					(void) fcoe_close_mac(fcoe_mac);
+					fcoe_destroy_mac(fcoe_mac);
+				}
 				fcoeio->fcoeio_status = FCOEIOE_CREATE_PORT;
 				ret = EIO;
 			}
@@ -948,6 +951,24 @@ fcoe_lookup_mac_by_id(datalink_id_t linkid)
 		return (mac);
 	}
 	return (NULL);
+}
+
+/*
+ * Return B_TRUE if mac exists, or else return B_FALSE
+ */
+static boolean_t
+fcoe_mac_existed(fcoe_mac_t *pmac)
+{
+	fcoe_mac_t	*mac = NULL;
+
+	ASSERT(MUTEX_HELD(&fcoe_global_ss->ss_ioctl_mutex));
+	for (mac = list_head(&fcoe_global_ss->ss_mac_list); mac;
+	    mac = list_next(&fcoe_global_ss->ss_mac_list, mac)) {
+		if (mac == pmac) {
+			return (B_TRUE);
+		}
+	}
+	return (B_FALSE);
 }
 
 /*

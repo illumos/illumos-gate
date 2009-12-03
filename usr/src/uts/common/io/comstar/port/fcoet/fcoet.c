@@ -548,6 +548,7 @@ fcoet_attach_init(fcoet_soft_state_t *ss)
 	 * port_fct_private and port_lport have been initialized by fct_alloc
 	 */
 	port->port_fca_private = ss;
+	port->port_fca_version = FCT_FCA_MODREV_1;
 	bcopy(ss->ss_eport->eport_nodewwn, port->port_nwwn, 8);
 	bcopy(ss->ss_eport->eport_portwwn, port->port_pwwn, 8);
 	port->port_default_alias = ss->ss_alias;
