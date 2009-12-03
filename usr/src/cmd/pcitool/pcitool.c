@@ -1705,8 +1705,8 @@ do_interrupts(int fd, pcitool_uiargs_t *input_args_p)
 {
 	if (input_args_p->flags & READ_FLAG) {
 
-		int gic_rval;
-		int gi_rval;
+		int gic_rval = SUCCESS;
+		int gi_rval = SUCCESS;
 
 		if (input_args_p->flags &  SHOWCTLR_FLAG) {
 			gic_rval = get_interrupt_ctlr(fd, input_args_p);
