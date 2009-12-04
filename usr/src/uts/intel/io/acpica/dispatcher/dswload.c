@@ -1154,33 +1154,40 @@ AcpiDsLoad2EndOp (
             }
 
             /*
-             * If we are executing a method, initialize the region
+             * The OpRegion is not fully parsed at this time. The only valid
+             * argument is the SpaceId. (We must save the address of the
+             * AML of the address and length operands)
+             *
+             * If we have a valid region, initialize it. The Namespace is NOT
+             * locked at this point.
+             *
+             * Need to unlock interpreter if it is locked (if we are running
+             * a control method), in order to allow _REG methods to be run
+             * during AcpiEvInitializeRegion.
              */
             if (WalkState->MethodNode)
             {
+                /*
+                 * Executing a method: initialize the region and unlock
+                 * the interpreter
+                 */
                 Status = AcpiExCreateRegion (Op->Named.Data, Op->Named.Length,
                             RegionSpace, WalkState);
                 if (ACPI_FAILURE (Status))
                 {
                     return (Status);
                 }
+
+                AcpiExExitInterpreter ();
             }
 
-            /*
-             * The OpRegion is not fully parsed at this time. Only valid
-             * argument is the SpaceId. (We must save the address of the
-             * AML of the address and length operands)
-             */
-
-            /*
-             * If we have a valid region, initialize it
-             * Namespace is NOT locked at this point.
-             *
-             * TBD: need to unlock interpreter if it is locked, in order
-             * to allow _REG methods to be run.
-             */
             Status = AcpiEvInitializeRegion (AcpiNsGetAttachedObject (Node),
                         FALSE);
+            if (WalkState->MethodNode)
+            {
+                AcpiExEnterInterpreter ();
+            }
+
             if (ACPI_FAILURE (Status))
             {
                 /*
