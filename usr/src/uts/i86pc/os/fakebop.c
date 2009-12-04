@@ -61,6 +61,7 @@
 #include <sys/dmar_acpi.h>
 #include <sys/kobj.h>
 #include <sys/kobj_lex.h>
+#include <sys/pci_cfgspace_impl.h>
 #include "acpi_fw.h"
 
 static int have_console = 0;	/* set once primitive console is initialized */
@@ -230,7 +231,7 @@ do_bop_phys_alloc(uint64_t size, uint64_t align)
 	/*NOTREACHED*/
 }
 
-static uintptr_t
+uintptr_t
 alloc_vaddr(size_t size, paddr_t align)
 {
 	uintptr_t rv;
@@ -1861,7 +1862,6 @@ bop_no_more_mem(void)
 }
 
 
-#ifndef __xpv
 /*
  * Set ACPI firmware properties
  */
@@ -1873,6 +1873,9 @@ vmap_phys(size_t length, paddr_t pa)
 	caddr_t	va;
 	size_t	len, page;
 
+#ifdef __xpv
+	pa = pfn_to_pa(xen_assign_pfn(mmu_btop(pa))) | (pa & MMU_PAGEOFFSET);
+#endif
 	start = P2ALIGN(pa, MMU_PAGESIZE);
 	end = P2ROUNDUP(pa + length, MMU_PAGESIZE);
 	len = end - start;
@@ -2046,6 +2049,30 @@ find_fw_table(char *signature)
 	return (NULL);
 }
 
+static void
+process_mcfg(struct mcfg *tp)
+{
+	struct cfg_base_addr_alloc *cfg_baap;
+	char *cfg_baa_endp;
+	int64_t ecfginfo[4];
+
+	cfg_baap = tp->CfgBaseAddrAllocList;
+	cfg_baa_endp = ((char *)tp) + tp->Length;
+	while ((char *)cfg_baap < cfg_baa_endp) {
+		if (cfg_baap->base_addr != 0 && cfg_baap->segment == 0) {
+			ecfginfo[0] = cfg_baap->base_addr;
+			ecfginfo[1] = cfg_baap->segment;
+			ecfginfo[2] = cfg_baap->start_bno;
+			ecfginfo[3] = cfg_baap->end_bno;
+			bsetprop(MCFG_PROPNAME, strlen(MCFG_PROPNAME),
+			    ecfginfo, sizeof (ecfginfo));
+			break;
+		}
+		cfg_baap++;
+	}
+}
+
+#ifndef __xpv
 static void
 process_madt(struct madt *tp)
 {
@@ -2235,9 +2262,9 @@ enumerate_xen_cpus()
 static void
 build_firmware_properties(void)
 {
-#ifndef __xpv
-	struct table_header *tp;
+	struct table_header *tp = NULL;
 
+#ifndef __xpv
 	if ((tp = find_fw_table("APIC")) != NULL)
 		process_madt((struct madt *)tp);
 
@@ -2249,9 +2276,14 @@ build_firmware_properties(void)
 
 	if (tp = find_fw_table("DMAR"))
 		process_dmar((struct dmar *)tp);
+	tp = find_fw_table("MCFG");
 #else /* __xpv */
 	enumerate_xen_cpus();
+	if (DOMAIN_IS_INITDOMAIN(xen_info))
+		tp = find_fw_table("MCFG");
 #endif /* __xpv */
+	if (tp != NULL)
+		process_mcfg((struct mcfg *)tp);
 }
 
 /*

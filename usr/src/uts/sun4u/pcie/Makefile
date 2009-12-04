@@ -19,14 +19,16 @@
 # CDDL HEADER END
 #
 #
-# uts/intel/pci_autoconfig/Makefile
+# uts/sun4u/pcie/Makefile
+#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#	This makefile drives the production of the PCI autoconfiguration
-#	kernel module.
 #
-#	intel platform dependent
+#	This makefile drives the production of the sun4u/kernel/misc/sparcv9/pcie module
+#	for PCI-E Error handling support in PCI-E nexus drivers.
+#
+#	sun4u implementation architecture dependent
 #
 
 #
@@ -37,16 +39,17 @@ UTSBASE	= ../..
 #
 #	Define the module and object file sets.
 #
-MODULE		= pci_autoconfig
-OBJECTS		= $(PCI_AUTOCONFIG_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(PCI_AUTOCONFIG_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
-INC_PATH	+= -I$(UTSBASE)/i86pc
+MODULE		= pcie
+OBJECTS		= $(PCIE_MISC_OBJS:%=$(OBJS_DIR)/%) \
+		  $(PCI_STRING_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(PCIE_MISC_OBJS:%.o=$(LINTS_DIR)/%.ln) \
+		  $(PCI_STRING_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
 
 #
 #	Include common rules.
 #
-include $(UTSBASE)/intel/Makefile.intel
+include $(UTSBASE)/sun4u/Makefile.sun4u
 
 #
 #	Define targets
@@ -56,17 +59,9 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-# Depends on acpica ACPI CA interpreter and PCI-E framework
+#     Dependency
 #
-LDFLAGS		+= -dy -Nmisc/acpica -Nmisc/pcie
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+LDFLAGS += -dy -Nmisc/busra
 
 #
 #	Default build targets.
@@ -92,4 +87,4 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/intel/Makefile.targ
+include $(UTSBASE)/sun4u/Makefile.targ

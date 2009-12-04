@@ -190,10 +190,6 @@ extern int px_err_add_intr(px_fault_t *px_fault_p);
 extern void px_err_rem_intr(px_fault_t *px_fault_p);
 extern int px_cb_add_intr(px_fault_t *);
 extern void px_cb_rem_intr(px_fault_t *);
-extern uint32_t px_fab_get(px_t *px_p, pcie_req_id_t bdf,
-    uint16_t offset);
-extern void px_fab_set(px_t *px_p, pcie_req_id_t bdf, uint16_t offset,
-    uint32_t val);
 
 /*
  * CPR callback
@@ -213,6 +209,11 @@ extern pcie_req_id_t px_lib_get_bdf(px_t *px_p);
 
 extern int px_lib_get_root_complex_mps(px_t *px_p, dev_info_t *dip, int *mps);
 extern int px_lib_set_root_complex_mps(px_t *px_p,  dev_info_t *dip, int mps);
+
+/*
+ * Config space access
+ */
+extern uint64_t px_lib_get_cfgacc_base(dev_info_t *dip);
 
 #ifdef	__cplusplus
 }

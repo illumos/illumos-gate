@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,16 +32,18 @@
 #include <sys/pci.h>
 #include <sys/sunndi.h>
 #include <sys/pcie.h>
+#include <sys/pcie_impl.h>
 #include <sys/pci_cfgspace.h>
 #include <io/pciex/pcie_nvidia.h>
 
 /*
  * PCI Configuration (Nvidia chipsets, PCIe) related library functions
  */
-static boolean_t	look_for_any_pciex_device(uchar_t);
 
 /* Globals */
 extern int pci_boot_debug;
+
+extern uint64_t mcfg_mem_base;
 
 boolean_t
 check_if_device_is_pciex(dev_info_t *cdip, uchar_t bus, uchar_t dev,
@@ -125,7 +127,7 @@ check_if_device_is_pciex(dev_info_t *cdip, uchar_t bus, uchar_t dev,
  * PCI-Express device in the system.
  * If found, return B_TRUE else B_FALSE
  */
-static boolean_t
+boolean_t
 look_for_any_pciex_device(uchar_t bus)
 {
 	uchar_t dev, func;
@@ -170,10 +172,11 @@ look_for_any_pciex_device(uchar_t bus)
 	return (B_FALSE);
 }
 
-
 boolean_t
 create_pcie_root_bus(uchar_t bus, dev_info_t *dip)
 {
+	pcie_bus_t *bus_p;
+
 	/*
 	 * Currently this is being hard-coded.
 	 * We need to figure out if the root bus does indeed
@@ -191,6 +194,12 @@ create_pcie_root_bus(uchar_t bus, dev_info_t *dip)
 	    "device_type", "pciex");
 	(void) ndi_prop_update_string(DDI_DEV_T_NONE, dip,
 	    "compatible", "pciex_root_complex");
+
+	pcie_rc_init_bus(dip);
+
+	/* save base addr in bus_t for pci_cfgacc_xxx() */
+	bus_p = PCIE_DIP2BUS(dip);
+	bus_p->bus_cfgacc_base = mcfg_mem_base;
 
 	return (B_TRUE);
 }

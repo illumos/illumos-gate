@@ -280,10 +280,6 @@ typedef	struct eq_rec {
 /* TLU Control register bits */
 #define	TLU_REMAIN_DETECT_QUIET		8
 
-/* PX BDF Shift in a Phyiscal Address - used FMA Fabric only */
-#define	PX_PA_BDF_SHIFT			12
-#define	PX_BDF_TO_CFGADDR(bdf, offset) (((bdf) << PX_PA_BDF_SHIFT) + (offset))
-
 /*
  * Fire hardware specific version definitions.
  * All Fire versions > 2.0 will be numerically greater than FIRE_MOD_REV_20

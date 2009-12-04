@@ -1,0 +1,89 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+
+/*
+ * Assembly language support for pci config space access on sun4v
+ */
+
+#include <sys/asm_linkage.h>
+#include <sys/hypervisor_api.h>
+#include <sys/dditypes.h>
+#include <sys/pci_cfgacc.h>
+#include <io/px/px_ioapi.h>
+#include <io/px/px_lib4v.h>
+
+#if defined(lint) || defined(__lint)
+
+/*ARGSUSED*/
+uint64_t
+hvio_config_get(devhandle_t dev_hdl, pci_device_t bdf, pci_config_offset_t off, 
+    pci_config_size_t size, pci_cfg_data_t *data_p)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hvio_config_put(devhandle_t dev_hdl, pci_device_t bdf, pci_config_offset_t off, 
+    pci_config_size_t size, pci_cfg_data_t data)
+{ return (0); }
+
+#else	/* lint || __lint */
+
+	/*
+	 * arg0 - devhandle
+	 * arg1 - pci_device
+	 * arg2 - pci_config_offset
+	 * arg3 - pci_config_size (1, 2 or 4 byte)
+	 *
+	 * ret0 - status
+	 * ret1 - error_flag
+	 * ret2 - pci_cfg_data
+	 */
+	ENTRY(hvio_config_get)
+	mov	HVIO_CONFIG_GET, %o5
+	ta	FAST_TRAP
+	movrnz	%o1, -1, %o2
+	stx	%o2, [%o4]
+	retl
+	nop
+	SET_SIZE(hvio_config_get)
+
+	/*
+	 * arg0 - devhandle
+	 * arg1 - pci_device
+	 * arg2 - pci_config_offset
+	 * arg3 - pci_config_size (1, 2 or 4 byte)
+	 * arg4 - pci_cfg_data
+	 *
+	 * ret0 - status
+	 * ret1 - error_flag
+	 */
+	ENTRY(hvio_config_put)
+	mov	HVIO_CONFIG_PUT, %o5
+	ta	FAST_TRAP
+	retl
+	nop
+	SET_SIZE(hvio_config_put)
+#endif

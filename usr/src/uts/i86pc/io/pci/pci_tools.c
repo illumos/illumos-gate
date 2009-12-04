@@ -42,6 +42,7 @@
 #include <sys/promif.h>
 #include <sys/x86_archext.h>
 #include <sys/cpuvar.h>
+#include <sys/pci_cfgacc.h>
 
 #ifdef __xpv
 #include <sys/hypervisor.h>
@@ -54,6 +55,7 @@
 
 #define	SUCCESS	0
 
+extern uint64_t mcfg_mem_base;
 int pcitool_debug = 0;
 
 /*
@@ -75,14 +77,11 @@ static uint8_t pci_bars[] = {
 static uint64_t max_cfg_size = PCI_CONF_HDR_SIZE;
 
 static uint64_t pcitool_swap_endian(uint64_t data, int size);
-static int pcitool_pciex_cfg_access(dev_info_t *dip, pcitool_reg_t *prg,
+static int pcitool_cfg_access(pcitool_reg_t *prg, boolean_t write_flag,
+    boolean_t io_access);
+static int pcitool_io_access(pcitool_reg_t *prg, boolean_t write_flag);
+static int pcitool_mem_access(pcitool_reg_t *prg, uint64_t virt_addr,
     boolean_t write_flag);
-static int pcitool_cfg_access(dev_info_t *dip, pcitool_reg_t *prg,
-    boolean_t write_flag);
-static int pcitool_io_access(dev_info_t *dip, pcitool_reg_t *prg,
-    boolean_t write_flag);
-static int pcitool_mem_access(dev_info_t *dip, pcitool_reg_t *prg,
-    uint64_t virt_addr, boolean_t write_flag);
 static uint64_t pcitool_map(uint64_t phys_addr, size_t size, size_t *num_pages);
 static void pcitool_unmap(uint64_t virt_addr, size_t num_pages);
 
@@ -243,8 +242,6 @@ pcitool_get_intr_dev_info(dev_info_t *dip, pcitool_intr_dev_t *devs)
 	devs->dev_inst = ddi_get_instance(dip);
 }
 
-
-/*ARGSUSED*/
 static int
 pcitool_get_intr(dev_info_t *dip, void *arg, int mode)
 {
@@ -438,7 +435,6 @@ pcitool_intr_info(dev_info_t *dip, void *arg, int mode)
  * Main function for handling interrupt CPU binding requests and queries.
  * Need to implement later
  */
-/*ARGSUSED*/
 int
 pcitool_intr_admn(dev_info_t *dip, void *arg, int cmd, int mode)
 {
@@ -465,16 +461,6 @@ pcitool_intr_admn(dev_info_t *dip, void *arg, int cmd, int mode)
 
 	return (rval);
 }
-
-
-/*
- * A note about ontrap handling:
- *
- * X86 systems on which this module was tested return FFs instead of bus errors
- * when accessing devices with invalid addresses.  Ontrap handling, which
- * gracefully handles kernel bus errors, is installed anyway, in case future
- * X86 platforms require it.
- */
 
 /*
  * Perform register accesses on the nexus device itself.
@@ -511,158 +497,97 @@ pcitool_swap_endian(uint64_t data, int size)
 	return (returned_data.data64);
 }
 
-
 /*
- * Access device.  prg is modified.
+ * A note about ontrap handling:
  *
- * Extended config space is available only through memory-mapped access.
- * Standard config space on pci express devices is available either way,
- * so do it memory-mapped here too, for simplicity, if allowed by MCFG.
- * If anything fails, return EINVAL so caller can try I/O access.
+ * X86 systems on which this module was tested return FFs instead of bus errors
+ * when accessing devices with invalid addresses.  Ontrap handling, which
+ * gracefully handles kernel bus errors, is installed anyway for I/O and mem
+ * space accessing (not for pci config space), in case future X86 platforms
+ * require it.
  */
-/*ARGSUSED*/
-static int
-pcitool_pciex_cfg_access(dev_info_t *dip, pcitool_reg_t *prg,
-    boolean_t write_flag)
-{
-	int rval = SUCCESS;
-	uint64_t virt_addr;
-	size_t	num_virt_pages;
-	int first_bus, last_bus;
-	int64_t *ecfginfo;
-	uint_t nelem;
-
-	prg->status = PCITOOL_SUCCESS;
-
-	if (ddi_prop_lookup_int64_array(DDI_DEV_T_ANY, dip, 0,
-	    "ecfg", &ecfginfo, &nelem) == DDI_PROP_SUCCESS) {
-
-		/*
-		 * We must have a four-element property; base addr [0] must
-		 * be nonzero.  Also, segment [1] must be 0 for now; we don't
-		 * handle nonzero segments (or create a property containing
-		 * them)
-		 */
-		if ((nelem != 4) || (ecfginfo[0] == 0) || (ecfginfo[1] != 0)) {
-			ddi_prop_free(ecfginfo);
-			return (EINVAL);
-		}
-
-		prg->phys_addr = ecfginfo[0];
-		first_bus = ecfginfo[2];
-		last_bus = ecfginfo[3];
-
-		ddi_prop_free(ecfginfo);
-
-		if (prg->bus_no < first_bus || prg->bus_no > last_bus)
-			return (EINVAL);
-	} else {
-		return (EINVAL);
-	}
-
-	prg->phys_addr += prg->offset +
-	    ((prg->bus_no << PCIEX_REG_BUS_SHIFT) |
-	    (prg->dev_no << PCIEX_REG_DEV_SHIFT) |
-	    (prg->func_no << PCIEX_REG_FUNC_SHIFT));
-
-	virt_addr = pcitool_map(prg->phys_addr,
-	    PCITOOL_ACC_ATTR_SIZE(prg->acc_attr), &num_virt_pages);
-
-	if (virt_addr == NULL)
-		return (EINVAL);
-
-	rval = pcitool_mem_access(dip, prg, virt_addr, write_flag);
-	pcitool_unmap(virt_addr, num_virt_pages);
-	return (rval);
-}
 
 /* Access device.  prg is modified. */
-/*ARGSUSED*/
 static int
-pcitool_cfg_access(dev_info_t *dip, pcitool_reg_t *prg, boolean_t write_flag)
+pcitool_cfg_access(pcitool_reg_t *prg, boolean_t write_flag,
+    boolean_t io_access)
 {
 	int size = PCITOOL_ACC_ATTR_SIZE(prg->acc_attr);
 	boolean_t big_endian = PCITOOL_ACC_IS_BIG_ENDIAN(prg->acc_attr);
 	int rval = SUCCESS;
 	uint64_t local_data;
+	pci_cfgacc_req_t req;
+	uint32_t max_offset;
+
+	if ((size <= 0) || (size > 8) || ((size & (size - 1)) != 0)) {
+		prg->status = PCITOOL_INVALID_SIZE;
+		return (ENOTSUP);
+	}
 
 	/*
 	 * NOTE: there is no way to verify whether or not the address is
 	 * valid other than that it is within the maximum offset.  The
-	 * put functions return void and the get functions return ff on
-	 * error.
+	 * put functions return void and the get functions return -1 on error.
 	 */
 
-	if (prg->offset + size - 1 > 0xFF) {
+	if (io_access)
+		max_offset = 0xFF;
+	else
+		max_offset = 0xFFF;
+	if (prg->offset + size - 1 > max_offset) {
 		prg->status = PCITOOL_INVALID_ADDRESS;
 		return (ENOTSUP);
 	}
 
 	prg->status = PCITOOL_SUCCESS;
 
+	req.rcdip = NULL;
+	req.bdf = PCI_GETBDF(prg->bus_no, prg->dev_no, prg->func_no);
+	req.offset = prg->offset;
+	req.size = size;
+	req.write = write_flag;
+	req.ioacc = io_access;
 	if (write_flag) {
-
 		if (big_endian) {
 			local_data = pcitool_swap_endian(prg->data, size);
 		} else {
 			local_data = prg->data;
 		}
-
-		switch (size) {
-		case 1:
-			(*pci_putb_func)(prg->bus_no, prg->dev_no,
-			    prg->func_no, prg->offset, local_data);
-			break;
-		case 2:
-			(*pci_putw_func)(prg->bus_no, prg->dev_no,
-			    prg->func_no, prg->offset, local_data);
-			break;
-		case 4:
-			(*pci_putl_func)(prg->bus_no, prg->dev_no,
-			    prg->func_no, prg->offset, local_data);
-			break;
-		default:
-			rval = ENOTSUP;
-			prg->status = PCITOOL_INVALID_SIZE;
-			break;
-		}
+		VAL64(&req) = local_data;
+		pci_cfgacc_acc(&req);
 	} else {
-		switch (size) {
-		case 1:
-			local_data = (*pci_getb_func)(prg->bus_no, prg->dev_no,
-			    prg->func_no, prg->offset);
-			break;
-		case 2:
-			local_data = (*pci_getw_func)(prg->bus_no, prg->dev_no,
-			    prg->func_no, prg->offset);
-			break;
-		case 4:
-			local_data = (*pci_getl_func)(prg->bus_no, prg->dev_no,
-			    prg->func_no, prg->offset);
-			break;
-		default:
-			rval = ENOTSUP;
-			prg->status = PCITOOL_INVALID_SIZE;
-			break;
-		}
-
-		if (rval == SUCCESS) {
-			if (big_endian) {
-				prg->data =
-				    pcitool_swap_endian(local_data, size);
-			} else {
-				prg->data = local_data;
-			}
+		pci_cfgacc_acc(&req);
+		local_data = VAL64(&req);
+		if (big_endian) {
+			prg->data =
+			    pcitool_swap_endian(local_data, size);
+		} else {
+			prg->data = local_data;
 		}
 	}
-	prg->phys_addr = 0;	/* Config space is not memory mapped on X86. */
+	/*
+	 * Check if legacy IO config access is used, in which case
+	 * only first 256 bytes are valid.
+	 */
+	if (req.ioacc && (prg->offset + size - 1 > 0xFF)) {
+		prg->status = PCITOOL_INVALID_ADDRESS;
+		return (ENOTSUP);
+	}
+
+	/* Set phys_addr only if MMIO is used */
+	prg->phys_addr = 0;
+	if (!req.ioacc && mcfg_mem_base != 0) {
+		prg->phys_addr = mcfg_mem_base + prg->offset +
+		    ((prg->bus_no << PCIEX_REG_BUS_SHIFT) |
+		    (prg->dev_no << PCIEX_REG_DEV_SHIFT) |
+		    (prg->func_no << PCIEX_REG_FUNC_SHIFT));
+	}
+
 	return (rval);
 }
 
-
-/*ARGSUSED*/
 static int
-pcitool_io_access(dev_info_t *dip, pcitool_reg_t *prg, boolean_t write_flag)
+pcitool_io_access(pcitool_reg_t *prg, boolean_t write_flag)
 {
 	int port = (int)prg->phys_addr;
 	size_t size = PCITOOL_ACC_ATTR_SIZE(prg->acc_attr);
@@ -750,10 +675,8 @@ pcitool_io_access(dev_info_t *dip, pcitool_reg_t *prg, boolean_t write_flag)
 	return (rval);
 }
 
-/*ARGSUSED*/
 static int
-pcitool_mem_access(dev_info_t *dip, pcitool_reg_t *prg, uint64_t virt_addr,
-	boolean_t write_flag)
+pcitool_mem_access(pcitool_reg_t *prg, uint64_t virt_addr, boolean_t write_flag)
 {
 	size_t size = PCITOOL_ACC_ATTR_SIZE(prg->acc_attr);
 	boolean_t big_endian = PCITOOL_ACC_IS_BIG_ENDIAN(prg->acc_attr);
@@ -922,10 +845,12 @@ pcitool_unmap(uint64_t virt_addr, size_t num_pages)
 
 
 /* Perform register accesses on PCI leaf devices. */
+/*ARGSUSED*/
 int
 pcitool_dev_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 {
 	boolean_t	write_flag = B_FALSE;
+	boolean_t	io_access = B_TRUE;
 	int		rval = 0;
 	pcitool_reg_t	prg;
 	uint8_t		size;
@@ -989,36 +914,10 @@ pcitool_dev_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 				rval = EINVAL;
 				goto done_reg;
 			}
+			if (max_cfg_size == PCIE_CONF_HDR_SIZE)
+				io_access = B_FALSE;
 
-			/*
-			 * Access device.  prg is modified.
-			 * First, check for AMD K8 northbridges for I/O access
-			 * (This fix will move in future to pcitool user-land)
-			 * Next, check for PCIe devices and do
-			 * memory-mapped access
-			 * Lastly, check for PCI devices and do I/O access
-			 */
-			if ((prg.bus_no == 0) &&
-			    (prg.dev_no >= 0x18) &&
-			    (prg.dev_no <
-			    (0x18 + ncpus/cpuid_get_ncpu_per_chip(CPU))) &&
-			    (cpuid_getvendor(CPU) == X86_VENDOR_AMD) &&
-			    (cpuid_getfamily(CPU) == 0xf)) {
-				rval = pcitool_cfg_access(dip, &prg,
-				    write_flag);
-			} else if (max_cfg_size == PCIE_CONF_HDR_SIZE) {
-				rval = pcitool_pciex_cfg_access(dip, &prg,
-				    write_flag);
-				if (rval == EINVAL) {
-					/* Not valid for MMIO; try IO */
-					rval = pcitool_cfg_access(dip, &prg,
-					    write_flag);
-				}
-			} else {
-				rval = pcitool_cfg_access(dip, &prg,
-				    write_flag);
-			}
-
+			rval = pcitool_cfg_access(&prg, write_flag, io_access);
 			if (pcitool_debug)
 				prom_printf(
 				    "config access: data:0x%" PRIx64 "\n",
@@ -1047,7 +946,7 @@ pcitool_dev_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 			 * prg2.offset is the offset into config space of the
 			 * BAR desired.  prg.status is modified on error.
 			 */
-			rval = pcitool_cfg_access(dip, &prg2, B_FALSE);
+			rval = pcitool_cfg_access(&prg2, B_FALSE, B_TRUE);
 			if (rval != SUCCESS) {
 				if (pcitool_debug)
 					prom_printf("BAR access failed\n");
@@ -1091,7 +990,7 @@ pcitool_dev_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 				prg2.data &= PCI_BASE_IO_ADDR_M;
 				prg.phys_addr = prg2.data + prg.offset;
 
-				rval = pcitool_io_access(dip, &prg, write_flag);
+				rval = pcitool_io_access(&prg, write_flag);
 				if ((rval != SUCCESS) && (pcitool_debug))
 					prom_printf("IO access failed\n");
 
@@ -1129,7 +1028,8 @@ pcitool_dev_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 				 * prg2.status is modified on error.
 				 */
 				prg2.offset += 4;
-				rval = pcitool_cfg_access(dip, &prg2, B_FALSE);
+				rval = pcitool_cfg_access(&prg2,
+				    B_FALSE, B_TRUE);
 				if (rval != SUCCESS) {
 					prg.status = prg2.status;
 					goto done_reg;
@@ -1199,8 +1099,7 @@ pcitool_dev_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 				goto done_reg;
 			}
 
-			rval = pcitool_mem_access(dip, &prg, virt_addr,
-			    write_flag);
+			rval = pcitool_mem_access(&prg, virt_addr, write_flag);
 			pcitool_unmap(virt_addr, num_virt_pages);
 		}
 done_reg:

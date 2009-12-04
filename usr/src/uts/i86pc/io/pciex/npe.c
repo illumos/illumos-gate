@@ -308,8 +308,6 @@ npe_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	pcip->pci_dip = devi;
 	pcip->pci_soft_state = PCI_SOFT_STATE_CLOSED;
 
-	pcie_rc_init_bus(devi);
-
 	if (pcie_init(devi, NULL) != DDI_SUCCESS)
 		goto fail1;
 
@@ -330,6 +328,7 @@ npe_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 	npe_query_acpi_mcfg(devi);
 	ddi_report_dev(devi);
+	pcie_fab_init_bus(devi, PCIE_BUS_FINAL);
 
 	return (DDI_SUCCESS);
 
@@ -353,6 +352,7 @@ npe_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 
 	switch (cmd) {
 	case DDI_DETACH:
+		pcie_fab_fini_bus(devi, PCIE_BUS_INITIAL);
 
 		/* Uninitialize pcitool support. */
 		pcitool_uninit(devi);
@@ -363,7 +363,6 @@ npe_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		if (pcip->pci_fmcap & DDI_FM_ERRCB_CAPABLE)
 			ddi_fm_handler_unregister(devi);
 
-		pcie_rc_fini_bus(devi);
 		pcie_rc_fini_pfd(PCIE_DIP2PFD(devi));
 		kmem_free(PCIE_DIP2PFD(devi), sizeof (pf_data_t));
 
@@ -939,7 +938,7 @@ npe_initchild(dev_info_t *child)
 		pci_config_teardown(&cfg_hdl);
 	}
 
-	bus_p = pcie_init_bus(child);
+	bus_p = PCIE_DIP2BUS(child);
 	if (bus_p) {
 		uint16_t device_id = (uint16_t)(bus_p->bus_dev_ven_id >> 16);
 		uint16_t vendor_id = (uint16_t)(bus_p->bus_dev_ven_id & 0xFFFF);

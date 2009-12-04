@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_PCIEX_PCI_NVIDIA_H
 #define	_PCIEX_PCI_NVIDIA_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -36,6 +34,7 @@ extern "C" {
 /*
  * PCI Configuration (Nvidia, PCIe) related library functions
  */
+boolean_t	look_for_any_pciex_device(uchar_t);
 boolean_t	check_if_device_is_pciex(dev_info_t *, uchar_t, uchar_t,
 		    uchar_t, ushort_t *, ushort_t *);
 boolean_t	create_pcie_root_bus(uchar_t, dev_info_t *);

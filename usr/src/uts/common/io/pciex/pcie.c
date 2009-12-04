@@ -41,6 +41,7 @@
 #include <sys/pcie_impl.h>
 #include <sys/hotplug/pci/pcie_hp.h>
 #include <sys/hotplug/pci/pcicfg.h>
+#include <sys/pci_cfgacc.h>
 
 /* Local functions prototypes */
 static void pcie_init_pfd(dev_info_t *);
@@ -143,6 +144,8 @@ static int pcie_get_max_supported(dev_info_t *dip, void *arg);
 static int pcie_map_phys(dev_info_t *dip, pci_regspec_t *phys_spec,
     caddr_t *addrp, ddi_acc_handle_t *handlep);
 static void pcie_unmap_phys(ddi_acc_handle_t *handlep,	pci_regspec_t *ph);
+
+dev_info_t *pcie_get_rc_dip(dev_info_t *dip);
 
 /*
  * modload support
@@ -389,6 +392,35 @@ skip:
 	return (ddi_prop_op(dev, dip, prop_op, flags, name, valuep, lengthp));
 }
 
+int
+pcie_init_cfghdl(dev_info_t *cdip)
+{
+	pcie_bus_t		*bus_p;
+	ddi_acc_handle_t	eh = NULL;
+
+	bus_p = PCIE_DIP2BUS(cdip);
+	if (bus_p == NULL)
+		return (DDI_FAILURE);
+
+	/* Create an config access special to error handling */
+	if (pci_config_setup(cdip, &eh) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "Cannot setup config access"
+		    " for BDF 0x%x\n", bus_p->bus_bdf);
+		return (DDI_FAILURE);
+	}
+
+	bus_p->bus_cfg_hdl = eh;
+	return (DDI_SUCCESS);
+}
+
+void
+pcie_fini_cfghdl(dev_info_t *cdip)
+{
+	pcie_bus_t	*bus_p = PCIE_DIP2BUS(cdip);
+
+	pci_config_teardown(&bus_p->bus_cfg_hdl);
+}
+
 /*
  * PCI-Express child device initialization.
  * This function enables generic pci-express interrupts and error
@@ -412,6 +444,9 @@ pcie_initchild(dev_info_t *cdip)
 
 		return (DDI_FAILURE);
 	}
+
+	if (pcie_init_cfghdl(cdip) != DDI_SUCCESS)
+		return (DDI_FAILURE);
 
 	/* Clear the device's status register */
 	reg16 = PCIE_GET(16, bus_p, PCI_CONF_STAT);
@@ -509,8 +544,10 @@ pcie_initchild(dev_info_t *cdip)
 		bus_p->bus_ari = B_TRUE;
 	}
 
-	if (pcie_initchild_mps(cdip) == DDI_FAILURE)
+	if (pcie_initchild_mps(cdip) == DDI_FAILURE) {
+		pcie_fini_cfghdl(cdip);
 		return (DDI_FAILURE);
+	}
 
 	return (DDI_SUCCESS);
 }
@@ -702,6 +739,37 @@ pcie_rc_fini_pfd(pf_data_t *pfd_p)
 	kmem_free(PCIE_ROOT_FAULT(pfd_p), sizeof (pf_root_fault_t));
 }
 
+/*
+ * init pcie_bus_t for root complex
+ *
+ * Only a few of the fields in bus_t is valid for root complex.
+ * The fields that are bracketed are initialized in this routine:
+ *
+ * dev_info_t *		<bus_dip>
+ * dev_info_t *		bus_rp_dip
+ * ddi_acc_handle_t	bus_cfg_hdl
+ * uint_t		<bus_fm_flags>
+ * pcie_req_id_t	bus_bdf
+ * pcie_req_id_t	bus_rp_bdf
+ * uint32_t		bus_dev_ven_id
+ * uint8_t		bus_rev_id
+ * uint8_t		<bus_hdr_type>
+ * uint16_t		<bus_dev_type>
+ * uint8_t		bus_bdg_secbus
+ * uint16_t		bus_pcie_off
+ * uint16_t		<bus_aer_off>
+ * uint16_t		bus_pcix_off
+ * uint16_t		bus_ecc_ver
+ * pci_bus_range_t	bus_bus_range
+ * ppb_ranges_t	*	bus_addr_ranges
+ * int			bus_addr_entries
+ * pci_regspec_t *	bus_assigned_addr
+ * int			bus_assigned_entries
+ * pf_data_t *		bus_pfd
+ * int			bus_mps
+ * uint64_t		bus_cfgacc_base
+ * void	*		bus_plat_private
+ */
 void
 pcie_rc_init_bus(dev_info_t *dip)
 {
@@ -724,138 +792,226 @@ pcie_rc_init_bus(dev_info_t *dip)
 void
 pcie_rc_fini_bus(dev_info_t *dip)
 {
-	pcie_bus_t *bus_p = (pcie_bus_t *)ndi_get_bus_private(dip, B_FALSE);
-
+	pcie_bus_t *bus_p = PCIE_DIP2DOWNBUS(dip);
 	ndi_set_bus_private(dip, B_FALSE, NULL, NULL);
 	kmem_free(bus_p, sizeof (pcie_bus_t));
 }
 
 /*
- * Initialize PCIe Bus Private Data
+ * partially init pcie_bus_t for device (dip,bdf) for accessing pci
+ * config space
  *
- * PCIe Bus Private Data contains commonly used PCI/PCIe information and offsets
- * to key registers.
+ * This routine is invoked during boot, either after creating a devinfo node
+ * (x86 case) or during px driver attach (sparc case); it is also invoked
+ * in hotplug context after a devinfo node is created.
+ *
+ * The fields that are bracketed are initialized if flag PCIE_BUS_INITIAL
+ * is set:
+ *
+ * dev_info_t *		<bus_dip>
+ * dev_info_t *		<bus_rp_dip>
+ * ddi_acc_handle_t	bus_cfg_hdl
+ * uint_t		bus_fm_flags
+ * pcie_req_id_t	<bus_bdf>
+ * pcie_req_id_t	<bus_rp_bdf>
+ * uint32_t		<bus_dev_ven_id>
+ * uint8_t		<bus_rev_id>
+ * uint8_t		<bus_hdr_type>
+ * uint16_t		<bus_dev_type>
+ * uint8_t		<bus_bdg_secbus
+ * uint16_t		<bus_pcie_off>
+ * uint16_t		<bus_aer_off>
+ * uint16_t		<bus_pcix_off>
+ * uint16_t		<bus_ecc_ver>
+ * pci_bus_range_t	bus_bus_range
+ * ppb_ranges_t	*	bus_addr_ranges
+ * int			bus_addr_entries
+ * pci_regspec_t *	bus_assigned_addr
+ * int			bus_assigned_entries
+ * pf_data_t *		bus_pfd
+ * int			bus_mps
+ * uint64_t		bus_cfgacc_base
+ * void	*		bus_plat_private
+ *
+ * The fields that are bracketed are initialized if flag PCIE_BUS_FINAL
+ * is set:
+ *
+ * dev_info_t *		bus_dip
+ * dev_info_t *		bus_rp_dip
+ * ddi_acc_handle_t	bus_cfg_hdl
+ * uint_t		bus_fm_flags
+ * pcie_req_id_t	bus_bdf
+ * pcie_req_id_t	bus_rp_bdf
+ * uint32_t		bus_dev_ven_id
+ * uint8_t		bus_rev_id
+ * uint8_t		bus_hdr_type
+ * uint16_t		bus_dev_type
+ * uint8_t		<bus_bdg_secbus>
+ * uint16_t		bus_pcie_off
+ * uint16_t		bus_aer_off
+ * uint16_t		bus_pcix_off
+ * uint16_t		bus_ecc_ver
+ * pci_bus_range_t	<bus_bus_range>
+ * ppb_ranges_t	*	<bus_addr_ranges>
+ * int			<bus_addr_entries>
+ * pci_regspec_t *	<bus_assigned_addr>
+ * int			<bus_assigned_entries>
+ * pf_data_t *		<bus_pfd>
+ * int			bus_mps
+ * uint64_t		bus_cfgacc_base
+ * void	*		<bus_plat_private>
  */
+
 pcie_bus_t *
-pcie_init_bus(dev_info_t *cdip)
+pcie_init_bus(dev_info_t *dip, pcie_req_id_t bdf, uint8_t flags)
 {
-	pcie_bus_t		*bus_p = 0;
-	ddi_acc_handle_t	eh = NULL;
-	int			range_size;
-	dev_info_t		*pdip;
-	const char		*errstr = NULL;
+	uint16_t	status, base, baseptr, num_cap;
+	uint32_t	capid;
+	int		range_size;
+	pcie_bus_t	*bus_p;
+	dev_info_t	*rcdip;
+	dev_info_t	*pdip;
+	const char	*errstr = NULL;
 
-	ASSERT(PCIE_DIP2UPBUS(cdip) == NULL);
+	if (!(flags & PCIE_BUS_INITIAL))
+		goto initial_done;
 
-	/* allocate memory for pcie bus data */
 	bus_p = kmem_zalloc(sizeof (pcie_bus_t), KM_SLEEP);
 
-	/* Set back pointer to dip */
-	bus_p->bus_dip = cdip;
+	bus_p->bus_dip = dip;
+	bus_p->bus_bdf = bdf;
 
-	/* Create an config access special to error handling */
-	if (pci_config_setup(cdip, &eh) != DDI_SUCCESS) {
-		errstr = "Cannot setup config access";
-		goto fail;
-	}
+	rcdip = pcie_get_rc_dip(dip);
+	ASSERT(rcdip != NULL);
 
-	bus_p->bus_cfg_hdl = eh;
-	bus_p->bus_fm_flags = 0;
-	bus_p->bus_soft_state = PCI_SOFT_STATE_CLOSED;
-
-	/* get device's bus/dev/function number */
-	if (pcie_get_bdf_from_dip(cdip, &bus_p->bus_bdf) != DDI_SUCCESS) {
-		errstr = "Cannot get device BDF";
-		goto fail;
-	}
-
-	/* Save the Vendor Id Device Id */
-	bus_p->bus_dev_ven_id = PCIE_GET(32, bus_p, PCI_CONF_VENID);
-	bus_p->bus_rev_id = PCIE_GET(8, bus_p, PCI_CONF_REVID);
-
+	/* Save the Vendor ID, Device ID and revision ID */
+	bus_p->bus_dev_ven_id = pci_cfgacc_get32(rcdip, bdf, PCI_CONF_VENID);
+	bus_p->bus_rev_id = pci_cfgacc_get8(rcdip, bdf, PCI_CONF_REVID);
 	/* Save the Header Type */
-	bus_p->bus_hdr_type = PCIE_GET(8, bus_p, PCI_CONF_HEADER);
+	bus_p->bus_hdr_type = pci_cfgacc_get8(rcdip, bdf, PCI_CONF_HEADER);
 	bus_p->bus_hdr_type &= PCI_HEADER_TYPE_M;
 
-	/* Figure out the device type and all the relavant capability offsets */
-	if ((PCI_CAP_LOCATE(eh, PCI_CAP_ID_PCI_E, &bus_p->bus_pcie_off))
-	    != DDI_FAILURE) {
-		bus_p->bus_dev_type = PCI_CAP_GET16(eh, NULL,
-		    bus_p->bus_pcie_off, PCIE_PCIECAP) &
-		    PCIE_PCIECAP_DEV_TYPE_MASK;
+	/*
+	 * Figure out the device type and all the relavant capability offsets
+	 */
+	/* set default value */
+	bus_p->bus_dev_type = PCIE_PCIECAP_DEV_TYPE_PCI_PSEUDO;
 
-		if (PCI_CAP_LOCATE(eh, PCI_CAP_XCFG_SPC(PCIE_EXT_CAP_ID_AER),
-		    &bus_p->bus_aer_off) != DDI_SUCCESS)
-			bus_p->bus_aer_off = NULL;
+	status = pci_cfgacc_get16(rcdip, bdf, PCI_CONF_STAT);
+	if (status == PCI_CAP_EINVAL16 || !(status & PCI_STAT_CAP))
+		goto caps_done; /* capability not supported */
 
-		/* Check and save PCIe hotplug capability information */
-		if ((PCIE_IS_RP(bus_p) || PCIE_IS_SWD(bus_p)) &&
-		    (PCI_CAP_GET16(eh, NULL, bus_p->bus_pcie_off, PCIE_PCIECAP)
-		    & PCIE_PCIECAP_SLOT_IMPL) &&
-		    (PCI_CAP_GET32(eh, NULL, bus_p->bus_pcie_off, PCIE_SLOTCAP)
-		    & PCIE_SLOTCAP_HP_CAPABLE))
-			bus_p->bus_hp_sup_modes |= PCIE_NATIVE_HP_MODE;
-	} else {
-		bus_p->bus_pcie_off = NULL;
-		bus_p->bus_dev_type = PCIE_PCIECAP_DEV_TYPE_PCI_PSEUDO;
+	/* Relevant conventional capabilities first */
+
+	/* Conventional caps: PCI_CAP_ID_PCI_E, PCI_CAP_ID_PCIX */
+	num_cap = 2;
+
+	switch (bus_p->bus_hdr_type) {
+	case PCI_HEADER_ZERO:
+		baseptr = PCI_CONF_CAP_PTR;
+		break;
+	case PCI_HEADER_PPB:
+		baseptr = PCI_BCNF_CAP_PTR;
+		break;
+	case PCI_HEADER_CARDBUS:
+		baseptr = PCI_CBUS_CAP_PTR;
+		break;
+	default:
+		cmn_err(CE_WARN, "%s: unexpected pci header type:%x",
+		    __func__, bus_p->bus_hdr_type);
+		goto caps_done;
 	}
 
-	if ((PCI_CAP_LOCATE(eh, PCI_CAP_ID_PCIX, &bus_p->bus_pcix_off))
-	    != DDI_FAILURE) {
-		if (PCIE_IS_BDG(bus_p))
-			bus_p->bus_ecc_ver = PCIX_CAP_GET(16, bus_p,
-			    PCI_PCIX_SEC_STATUS) & PCI_PCIX_VER_MASK;
-		else
-			bus_p->bus_ecc_ver = PCIX_CAP_GET(16, bus_p,
-			    PCI_PCIX_COMMAND) & PCI_PCIX_VER_MASK;
-	} else {
-		bus_p->bus_pcix_off = NULL;
-		bus_p->bus_ecc_ver = NULL;
-	}
+	base = baseptr;
+	for (base = pci_cfgacc_get8(rcdip, bdf, base); base && num_cap;
+	    base = pci_cfgacc_get8(rcdip, bdf, base + PCI_CAP_NEXT_PTR)) {
+		capid = pci_cfgacc_get8(rcdip, bdf, base);
+		switch (capid) {
+		case PCI_CAP_ID_PCI_E:
+			bus_p->bus_pcie_off = base;
+			bus_p->bus_dev_type = pci_cfgacc_get16(rcdip, bdf,
+			    base + PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
 
-	/* Save the Range information if device is a switch/bridge */
-	if (PCIE_IS_BDG(bus_p)) {
-		/* Check and save PCI hotplug (SHPC) capability information */
-		if ((PCI_CAP_LOCATE(eh, PCI_CAP_ID_PCI_HOTPLUG,
-		    &bus_p->bus_pci_hp_off)) == DDI_SUCCESS)
-			bus_p->bus_hp_sup_modes |= PCIE_PCI_HP_MODE;
+			/* Check and save PCIe hotplug capability information */
+			if ((PCIE_IS_RP(bus_p) || PCIE_IS_SWD(bus_p)) &&
+			    (pci_cfgacc_get16(rcdip, bdf, base + PCIE_PCIECAP)
+			    & PCIE_PCIECAP_SLOT_IMPL) &&
+			    (pci_cfgacc_get32(rcdip, bdf, base + PCIE_SLOTCAP)
+			    & PCIE_SLOTCAP_HP_CAPABLE))
+				bus_p->bus_hp_sup_modes |= PCIE_NATIVE_HP_MODE;
 
-		/* get "bus_range" property */
-		range_size = sizeof (pci_bus_range_t);
-		if (ddi_getlongprop_buf(DDI_DEV_T_ANY, cdip, DDI_PROP_DONTPASS,
-		    "bus-range", (caddr_t)&bus_p->bus_bus_range, &range_size)
-		    != DDI_PROP_SUCCESS) {
-			errstr = "Cannot find \"bus-range\" property";
-			goto fail;
+			num_cap--;
+			break;
+		case PCI_CAP_ID_PCIX:
+			bus_p->bus_pcix_off = base;
+			if (PCIE_IS_BDG(bus_p))
+				bus_p->bus_ecc_ver =
+				    pci_cfgacc_get16(rcdip, bdf, base +
+				    PCI_PCIX_SEC_STATUS) & PCI_PCIX_VER_MASK;
+			else
+				bus_p->bus_ecc_ver =
+				    pci_cfgacc_get16(rcdip, bdf, base +
+				    PCI_PCIX_COMMAND) & PCI_PCIX_VER_MASK;
+			num_cap--;
+			break;
+		default:
+			break;
 		}
-
-		/* get secondary bus number */
-		bus_p->bus_bdg_secbus = PCIE_GET(8, bus_p, PCI_BCNF_SECBUS);
-
-		/* Get "ranges" property */
-		if (ddi_getlongprop(DDI_DEV_T_ANY, cdip, DDI_PROP_DONTPASS,
-		    "ranges", (caddr_t)&bus_p->bus_addr_ranges,
-		    &bus_p->bus_addr_entries) != DDI_PROP_SUCCESS)
-			bus_p->bus_addr_entries = 0;
-		bus_p->bus_addr_entries /= sizeof (ppb_ranges_t);
 	}
 
-	/* save "assigned-addresses" property array, ignore failues */
-	if (ddi_getlongprop(DDI_DEV_T_ANY, cdip, DDI_PROP_DONTPASS,
-	    "assigned-addresses", (caddr_t)&bus_p->bus_assigned_addr,
-	    &bus_p->bus_assigned_entries) == DDI_PROP_SUCCESS)
-		bus_p->bus_assigned_entries /= sizeof (pci_regspec_t);
-	else
-		bus_p->bus_assigned_entries = 0;
+	/* Check and save PCI hotplug (SHPC) capability information */
+	if (PCIE_IS_BDG(bus_p)) {
+		base = baseptr;
+		for (base = pci_cfgacc_get8(rcdip, bdf, base);
+		    base; base = pci_cfgacc_get8(rcdip, bdf,
+		    base + PCI_CAP_NEXT_PTR)) {
+			capid = pci_cfgacc_get8(rcdip, bdf, base);
+			if (capid == PCI_CAP_ID_PCI_HOTPLUG) {
+				bus_p->bus_pci_hp_off = base;
+				bus_p->bus_hp_sup_modes |= PCIE_PCI_HP_MODE;
+				break;
+			}
+		}
+	}
 
+	/* Then, relevant extended capabilities */
+
+	if (!PCIE_IS_PCIE(bus_p))
+		goto caps_done;
+
+	/* Extended caps: PCIE_EXT_CAP_ID_AER */
+	for (base = PCIE_EXT_CAP; base; base = (capid >>
+	    PCIE_EXT_CAP_NEXT_PTR_SHIFT) & PCIE_EXT_CAP_NEXT_PTR_MASK) {
+		capid = pci_cfgacc_get32(rcdip, bdf, base);
+		if (capid == PCI_CAP_EINVAL32)
+			break;
+		if (((capid >> PCIE_EXT_CAP_ID_SHIFT) & PCIE_EXT_CAP_ID_MASK)
+		    == PCIE_EXT_CAP_ID_AER) {
+			bus_p->bus_aer_off = base;
+			break;
+		}
+	}
+
+caps_done:
 	/* save RP dip and RP bdf */
 	if (PCIE_IS_RP(bus_p)) {
-		bus_p->bus_rp_dip = cdip;
+		bus_p->bus_rp_dip = dip;
 		bus_p->bus_rp_bdf = bus_p->bus_bdf;
 	} else {
-		for (pdip = ddi_get_parent(cdip); pdip;
+		for (pdip = ddi_get_parent(dip); pdip;
 		    pdip = ddi_get_parent(pdip)) {
 			pcie_bus_t *parent_bus_p = PCIE_DIP2BUS(pdip);
+
+			/*
+			 * If RP dip and RP bdf in parent's bus_t have
+			 * been initialized, simply use these instead of
+			 * continuing up to the RC.
+			 */
+			if (parent_bus_p->bus_rp_dip != NULL) {
+				bus_p->bus_rp_dip = parent_bus_p->bus_rp_dip;
+				bus_p->bus_rp_bdf = parent_bus_p->bus_rp_bdf;
+				break;
+			}
 
 			/*
 			 * When debugging be aware that some NVIDIA x86
@@ -871,33 +1027,110 @@ pcie_init_bus(dev_info_t *cdip)
 		}
 	}
 
-	ndi_set_bus_private(cdip, B_TRUE, DEVI_PORT_TYPE_PCI, (void *)bus_p);
-
-	if (PCIE_IS_HOTPLUG_CAPABLE(cdip))
-		(void) ndi_prop_create_boolean(DDI_DEV_T_NONE, cdip,
-		    "hotplug-capable");
-
-	pcie_init_pfd(cdip);
-
+	bus_p->bus_soft_state = PCI_SOFT_STATE_CLOSED;
+	bus_p->bus_fm_flags = 0;
 	bus_p->bus_mps = 0;
 
-	pcie_init_plat(cdip);
+	ndi_set_bus_private(dip, B_TRUE, DEVI_PORT_TYPE_PCI, (void *)bus_p);
+
+	if (PCIE_IS_HOTPLUG_CAPABLE(dip))
+		(void) ndi_prop_create_boolean(DDI_DEV_T_NONE, dip,
+		    "hotplug-capable");
+
+initial_done:
+	if (!(flags & PCIE_BUS_FINAL))
+		goto final_done;
+
+	/* already initialized? */
+	bus_p = PCIE_DIP2BUS(dip);
+
+	/* Save the Range information if device is a switch/bridge */
+	if (PCIE_IS_BDG(bus_p)) {
+		/* get "bus_range" property */
+		range_size = sizeof (pci_bus_range_t);
+		if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+		    "bus-range", (caddr_t)&bus_p->bus_bus_range, &range_size)
+		    != DDI_PROP_SUCCESS) {
+			errstr = "Cannot find \"bus-range\" property";
+			cmn_err(CE_WARN,
+			    "PCIE init err info failed BDF 0x%x:%s\n",
+			    bus_p->bus_bdf, errstr);
+		}
+
+		/* get secondary bus number */
+		rcdip = pcie_get_rc_dip(dip);
+		ASSERT(rcdip != NULL);
+
+		bus_p->bus_bdg_secbus = pci_cfgacc_get8(rcdip,
+		    bus_p->bus_bdf, PCI_BCNF_SECBUS);
+
+		/* Get "ranges" property */
+		if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+		    "ranges", (caddr_t)&bus_p->bus_addr_ranges,
+		    &bus_p->bus_addr_entries) != DDI_PROP_SUCCESS)
+			bus_p->bus_addr_entries = 0;
+		bus_p->bus_addr_entries /= sizeof (ppb_ranges_t);
+	}
+
+	/* save "assigned-addresses" property array, ignore failues */
+	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "assigned-addresses", (caddr_t)&bus_p->bus_assigned_addr,
+	    &bus_p->bus_assigned_entries) == DDI_PROP_SUCCESS)
+		bus_p->bus_assigned_entries /= sizeof (pci_regspec_t);
+	else
+		bus_p->bus_assigned_entries = 0;
+
+	pcie_init_pfd(dip);
+
+	pcie_init_plat(dip);
+
+final_done:
 
 	PCIE_DBG("Add %s(dip 0x%p, bdf 0x%x, secbus 0x%x)\n",
-	    ddi_driver_name(cdip), (void *)cdip, bus_p->bus_bdf,
+	    ddi_driver_name(dip), (void *)dip, bus_p->bus_bdf,
 	    bus_p->bus_bdg_secbus);
 #ifdef DEBUG
 	pcie_print_bus(bus_p);
 #endif
 
 	return (bus_p);
-fail:
-	cmn_err(CE_WARN, "PCIE init err info failed BDF 0x%x:%s\n",
-	    bus_p->bus_bdf, errstr);
-	if (eh)
-		pci_config_teardown(&eh);
-	kmem_free(bus_p, sizeof (pcie_bus_t));
-	return (NULL);
+}
+
+/*
+ * Invoked before destroying devinfo node, mostly during hotplug
+ * operation to free pcie_bus_t data structure
+ */
+/* ARGSUSED */
+void
+pcie_fini_bus(dev_info_t *dip, uint8_t flags)
+{
+	pcie_bus_t *bus_p = PCIE_DIP2UPBUS(dip);
+	ASSERT(bus_p);
+
+	if (flags & PCIE_BUS_INITIAL) {
+		pcie_fini_plat(dip);
+		pcie_fini_pfd(dip);
+
+		kmem_free(bus_p->bus_assigned_addr,
+		    (sizeof (pci_regspec_t) * bus_p->bus_assigned_entries));
+		kmem_free(bus_p->bus_addr_ranges,
+		    (sizeof (ppb_ranges_t) * bus_p->bus_addr_entries));
+		/* zero out the fields that have been destroyed */
+		bus_p->bus_assigned_addr = NULL;
+		bus_p->bus_addr_ranges = NULL;
+		bus_p->bus_assigned_entries = 0;
+		bus_p->bus_addr_entries = 0;
+	}
+
+	if (flags & PCIE_BUS_FINAL) {
+		if (PCIE_IS_HOTPLUG_CAPABLE(dip)) {
+			(void) ndi_prop_remove(DDI_DEV_T_NONE, dip,
+			    "hotplug-capable");
+		}
+
+		ndi_set_bus_private(dip, B_TRUE, NULL, NULL);
+		kmem_free(bus_p, sizeof (pcie_bus_t));
+	}
 }
 
 int
@@ -920,31 +1153,109 @@ void
 pcie_uninitchild(dev_info_t *cdip)
 {
 	pcie_disable_errors(cdip);
-	pcie_fini_bus(cdip);
+	pcie_fini_cfghdl(cdip);
+}
+
+/*
+ * find the root complex dip
+ */
+dev_info_t *
+pcie_get_rc_dip(dev_info_t *dip)
+{
+	dev_info_t *rcdip;
+	pcie_bus_t *rc_bus_p;
+
+	for (rcdip = ddi_get_parent(dip); rcdip;
+	    rcdip = ddi_get_parent(rcdip)) {
+		rc_bus_p = PCIE_DIP2BUS(rcdip);
+		if (rc_bus_p && PCIE_IS_RC(rc_bus_p))
+			break;
+	}
+
+	return (rcdip);
+}
+
+static boolean_t
+pcie_is_pci_device(dev_info_t *dip)
+{
+	dev_info_t	*pdip;
+	char		*device_type;
+
+	pdip = ddi_get_parent(dip);
+	ASSERT(pdip);
+
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, pdip, DDI_PROP_DONTPASS,
+	    "device_type", &device_type) != DDI_PROP_SUCCESS)
+		return (B_FALSE);
+
+	if (strcmp(device_type, "pciex") != 0 &&
+	    strcmp(device_type, "pci") != 0) {
+		ddi_prop_free(device_type);
+		return (B_FALSE);
+	}
+
+	ddi_prop_free(device_type);
+	return (B_TRUE);
+}
+
+typedef struct {
+	boolean_t	init;
+	uint8_t		flags;
+} pcie_bus_arg_t;
+
+/*ARGSUSED*/
+static int
+pcie_fab_do_init_fini(dev_info_t *dip, void *arg)
+{
+	pcie_req_id_t	bdf;
+	pcie_bus_arg_t	*bus_arg = (pcie_bus_arg_t *)arg;
+
+	if (!pcie_is_pci_device(dip))
+		goto out;
+
+	if (bus_arg->init) {
+		if (pcie_get_bdf_from_dip(dip, &bdf) != DDI_SUCCESS)
+			goto out;
+
+		(void) pcie_init_bus(dip, bdf, bus_arg->flags);
+	} else {
+		(void) pcie_fini_bus(dip, bus_arg->flags);
+	}
+
+	return (DDI_WALK_CONTINUE);
+
+out:
+	return (DDI_WALK_PRUNECHILD);
 }
 
 void
-pcie_fini_bus(dev_info_t *cdip)
+pcie_fab_init_bus(dev_info_t *rcdip, uint8_t flags)
 {
-	pcie_bus_t	*bus_p;
+	int		circular_count;
+	dev_info_t	*dip = ddi_get_child(rcdip);
+	pcie_bus_arg_t	arg;
 
-	pcie_fini_plat(cdip);
-	pcie_fini_pfd(cdip);
+	arg.init = B_TRUE;
+	arg.flags = flags;
 
-	bus_p = PCIE_DIP2UPBUS(cdip);
-	ASSERT(bus_p);
+	ndi_devi_enter(rcdip, &circular_count);
+	ddi_walk_devs(dip, pcie_fab_do_init_fini, &arg);
+	ndi_devi_exit(rcdip, circular_count);
+}
 
-	if (PCIE_IS_HOTPLUG_CAPABLE(cdip))
-		(void) ndi_prop_remove(DDI_DEV_T_NONE, cdip, "hotplug-capable");
+void
+pcie_fab_fini_bus(dev_info_t *rcdip, uint8_t flags)
+{
+	int		circular_count;
+	dev_info_t	*dip = ddi_get_child(rcdip);
+	pcie_bus_arg_t	arg;
 
-	pci_config_teardown(&bus_p->bus_cfg_hdl);
-	ndi_set_bus_private(cdip, B_TRUE, NULL, NULL);
-	kmem_free(bus_p->bus_assigned_addr,
-	    (sizeof (pci_regspec_t) * bus_p->bus_assigned_entries));
-	kmem_free(bus_p->bus_addr_ranges,
-	    (sizeof (ppb_ranges_t) * bus_p->bus_addr_entries));
+	arg.init = B_FALSE;
+	arg.flags = flags;
 
-	kmem_free(bus_p, sizeof (pcie_bus_t));
+	ndi_devi_enter(rcdip, &circular_count);
+	ddi_walk_devs(dip, pcie_fab_do_init_fini, &arg);
+	ndi_devi_exit(rcdip, circular_count);
 }
 
 void
@@ -1980,4 +2291,5 @@ pcie_check_io_mem_range(ddi_acc_handle_t cfg_hdl, boolean_t *empty_io_range,
 			*empty_mem_range = B_TRUE;
 	}
 }
+
 #endif /* defined(__i386) || defined(__amd64) */

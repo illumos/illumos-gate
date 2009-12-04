@@ -35,12 +35,14 @@
 #include <sys/pci_impl.h>
 #include <sys/pci_cfgspace.h>
 #include <sys/pci_cfgspace_impl.h>
+#include <sys/pci_cfgacc.h>
 #if defined(__xpv)
 #include <sys/hypervisor.h>
-int pci_max_nbus = 0xFE;
 #endif
 
-
+#if defined(__xpv)
+int pci_max_nbus = 0xFE;
+#endif
 int pci_bios_cfg_type = PCI_MECHANISM_UNKNOWN;
 int pci_bios_maxbus;
 int pci_bios_mech;
@@ -54,10 +56,21 @@ int	PCI_CFG_TYPE = 0;
 int	PCI_PROBE_TYPE = 0;
 
 /*
+ * No valid mcfg_mem_base by default, and accessing pci config space
+ * in mem-mapped way is disabled.
+ */
+uint64_t mcfg_mem_base = 0;
+uint8_t mcfg_bus_start = 0;
+uint8_t mcfg_bus_end = 0xff;
+
+/*
  * These function pointers lead to the actual implementation routines
  * for configuration space access.  Normally they lead to either the
  * pci_mech1_* or pci_mech2_* routines, but they can also lead to
  * routines that work around chipset bugs.
+ * These functions are accessing pci config space via I/O way.
+ * Pci_cfgacc_get/put functions shoul be used as more common interfaces,
+ * which also provide accessing pci config space via mem-mapped way.
  */
 uint8_t (*pci_getb_func)(int bus, int dev, int func, int reg);
 uint16_t (*pci_getw_func)(int bus, int dev, int func, int reg);
@@ -65,6 +78,8 @@ uint32_t (*pci_getl_func)(int bus, int dev, int func, int reg);
 void (*pci_putb_func)(int bus, int dev, int func, int reg, uint8_t val);
 void (*pci_putw_func)(int bus, int dev, int func, int reg, uint16_t val);
 void (*pci_putl_func)(int bus, int dev, int func, int reg, uint32_t val);
+
+extern void (*pci_cfgacc_acc_p)(pci_cfgacc_req_t *req);
 
 /*
  * Internal routines
@@ -96,13 +111,14 @@ pci_cfgspace_init(void)
 }
 
 /*
- * This code determines if this system supports PCI and which
+ * This code determines if this system supports PCI/PCIE and which
  * type of configuration access method is used
  */
-
 static int
 pci_check(void)
 {
+	uint64_t ecfginfo[4];
+
 	/*
 	 * Only do this once.  NB:  If this is not a PCI system, and we
 	 * get called twice, we can't detect it and will probably die
@@ -135,8 +151,6 @@ pci_check(void)
 		 */
 		pci_bios_maxbus = pci_max_nbus;
 	}
-
-	return (TRUE);
 #else /* !__xpv */
 
 	pci_bios_cfg_type = pci_check_bios();
@@ -192,9 +206,24 @@ pci_check(void)
 	default:
 		return (FALSE);
 	}
+#endif /* __xpv */
+
+	/*
+	 * Try to get a valid mcfg_mem_base in early boot
+	 * If failed, leave mem-mapped pci config space accessing disabled
+	 * until pci boot code (pci_autoconfig) makes sure this is a PCIE
+	 * platform.
+	 */
+	if (do_bsys_getprop(NULL, MCFG_PROPNAME, ecfginfo) != -1) {
+		mcfg_mem_base = ecfginfo[0];
+		mcfg_bus_start = ecfginfo[2];
+		mcfg_bus_end = ecfginfo[3];
+	}
+
+	/* See pci_cfgacc.c */
+	pci_cfgacc_acc_p = pci_cfgacc_acc;
 
 	return (TRUE);
-#endif /* __xpv */
 }
 
 #if !defined(__xpv)

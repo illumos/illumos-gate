@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_PCI_CFGSPACE_IMPL_H
 #define	_SYS_PCI_CFGSPACE_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Routines to support particular PCI chipsets
@@ -98,10 +96,13 @@ extern void pci_orion_putl(int bus, int dev, int func, int reg, uint32_t val);
 #define	PCI_MECH1_SPEC_CYCLE_DEV	0x1f	/* dev to request spec cyc */
 #define	PCI_MECH1_SPEC_CYCLE_FUNC	0x07	/* func to request spec cyc */
 
+extern uint64_t mcfg_mem_base;
+extern uint8_t mcfg_bus_start;
+extern uint8_t mcfg_bus_end;
+
 /*
  * Mutex for all pci config space routines to share
  */
-
 extern kmutex_t pcicfg_mutex;
 
 /*
@@ -130,6 +131,8 @@ extern kmutex_t pcicfg_chipset_mutex;
 
 #define	N_PCI_IRQ_ROUTES	32
 #define	N_PCI_IRQ_ROUTES_MAX	255
+
+#define	MCFG_PROPNAME		"ecfg"
 
 #define	FP_OFF(fp)	(((uintptr_t)(fp)) & 0xFFFF)
 #define	FP_SEG(fp)	((((uintptr_t)(fp)) >> 16) & 0xFFFF)

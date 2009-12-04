@@ -36,6 +36,8 @@
 #include <sys/errno.h>
 #include <sys/hypervisor_api.h>
 #include <sys/hsvc.h>
+#include <sys/pci_cfgacc.h>
+#include <sys/pci_cfgacc_4v.h>
 #include <px_obj.h>
 #include <sys/machsystm.h>
 #include "px_lib4v.h"

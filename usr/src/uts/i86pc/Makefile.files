@@ -94,6 +94,8 @@ CORE_OBJS +=			\
 	mpcore.o		\
 	notes.o			\
 	pci_bios.o		\
+	pci_cfgacc.o		\
+	pci_cfgacc_x86.o	\
 	pci_cfgspace.o		\
 	pci_mech1.o		\
 	pci_mech2.o		\

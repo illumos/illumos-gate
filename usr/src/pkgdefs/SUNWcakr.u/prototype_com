@@ -488,6 +488,7 @@ f none platform/sun4u/kernel/misc/sparcv9/i2c_svc 755 root sys
 l none platform/sun4u/kernel/misc/sparcv9/md5=../../../kernel/crypto/sparcv9/md5
 f none platform/sun4u/kernel/misc/sparcv9/obpsym 755 root sys
 f none platform/sun4u/kernel/misc/sparcv9/opl_cfg 755 root sys
+f none platform/sun4u/kernel/misc/sparcv9/pcie 755 root sys
 f none platform/sun4u/kernel/misc/sparcv9/platmod 755 root sys
 f none platform/sun4u/kernel/misc/sparcv9/sbd 755 root sys
 l none platform/sun4u/kernel/misc/sparcv9/sha1=../../../kernel/crypto/sparcv9/sha1

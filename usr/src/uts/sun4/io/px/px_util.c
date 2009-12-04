@@ -525,8 +525,7 @@ px_init_child(px_t *px_p, dev_info_t *child)
 	    ddi_node_name(child), ddi_get_name_addr(child));
 
 	ddi_set_parent_data(child, (void *)ppd);
-	if (pcie_init_bus(child))
-		(void) pcie_initchild(child);
+	(void) pcie_initchild(child);
 
 	/*
 	 * Handle chip specific init-child tasks.

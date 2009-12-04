@@ -39,6 +39,7 @@
 #include <sys/x86_archext.h>
 #include <io/pciex/pcie_nvidia.h>
 #include <io/pciex/pcie_nb5000.h>
+#include <sys/pci_cfgacc_x86.h>
 
 /*
  * Prototype declaration
@@ -56,43 +57,6 @@ boolean_t npe_is_child_pci(dev_info_t *dip);
 int64_t npe_default_ecfga_base = 0xE0000000;
 
 extern uint32_t npe_aer_uce_mask;
-
-/* AMD's northbridges vendor-id and device-ids */
-#define	AMD_NTBRDIGE_VID		0x1022	/* AMD vendor-id */
-#define	AMD_HT_NTBRIDGE_DID		0x1100	/* HT Configuration */
-#define	AMD_AM_NTBRIDGE_DID		0x1101	/* Address Map */
-#define	AMD_DC_NTBRIDGE_DID		0x1102	/* DRAM Controller */
-#define	AMD_MC_NTBRIDGE_DID		0x1103	/* Misc Controller */
-#define	AMD_K10_NTBRIDGE_DID_0		0x1200
-#define	AMD_K10_NTBRIDGE_DID_1		0x1201
-#define	AMD_K10_NTBRIDGE_DID_2		0x1202
-#define	AMD_K10_NTBRIDGE_DID_3		0x1203
-#define	AMD_K10_NTBRIDGE_DID_4		0x1204
-
-/*
- * Check if the given device is an AMD northbridge
- */
-#define	IS_BAD_AMD_NTBRIDGE(vid, did) \
-	    (((vid) == AMD_NTBRDIGE_VID) && \
-	    (((did) == AMD_HT_NTBRIDGE_DID) || \
-	    ((did) == AMD_AM_NTBRIDGE_DID) || \
-	    ((did) == AMD_DC_NTBRIDGE_DID) || \
-	    ((did) == AMD_MC_NTBRIDGE_DID)))
-
-#define	IS_K10_AMD_NTBRIDGE(vid, did) \
-	    (((vid) == AMD_NTBRDIGE_VID) && \
-	    (((did) == AMD_K10_NTBRIDGE_DID_0) || \
-	    ((did) == AMD_K10_NTBRIDGE_DID_1) || \
-	    ((did) == AMD_K10_NTBRIDGE_DID_2) || \
-	    ((did) == AMD_K10_NTBRIDGE_DID_3) || \
-	    ((did) == AMD_K10_NTBRIDGE_DID_4)))
-
-#define	MSR_AMD_NB_MMIO_CFG_BADDR	0xc0010058
-#define	AMD_MMIO_CFG_BADDR_ADDR_MASK	0xFFFFFFF00000ULL
-#define	AMD_MMIO_CFG_BADDR_ENA_MASK	0x000000000001ULL
-#define	AMD_MMIO_CFG_BADDR_ENA_ON	0x000000000001ULL
-#define	AMD_MMIO_CFG_BADDR_ENA_OFF	0x000000000000ULL
-
 
 /*
  * Query the MCFG table using ACPI.  If MCFG is found, setup the

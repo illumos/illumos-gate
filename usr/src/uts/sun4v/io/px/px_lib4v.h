@@ -79,9 +79,6 @@ extern "C" {
  */
 #define	DEVHDLE_MASK	0xFFFFFFF
 
-/* PX BDF Shift in a Phyiscal Address - used FMA Fabric only */
-#define	PX_RA_BDF_SHIFT			8
-
 #define	PX_ADDR2PFN(addr, index, flags, i) \
 	((flags & MMU_MAP_PFN) ? \
 	PX_GET_MP_PFN((ddi_dma_impl_t *)(addr), (index + i)) : \
@@ -98,11 +95,6 @@ extern "C" {
 #define	PX_VPCI_MINOR_VER_0	0x0ull
 #define	PX_VPCI_MINOR_VER_1	0x1ull
 #define	PX_VPCI_MINOR_VER	PX_VPCI_MINOR_VER_1
-
-extern uint64_t hvio_config_get(devhandle_t dev_hdl, pci_device_t bdf,
-    pci_config_offset_t off, pci_config_size_t size, pci_cfg_data_t *data_p);
-extern uint64_t hvio_config_put(devhandle_t dev_hdl, pci_device_t bdf,
-    pci_config_offset_t off, pci_config_size_t size, pci_cfg_data_t data);
 
 extern uint64_t hvio_iommu_map(devhandle_t dev_hdl, tsbid_t tsbid,
     pages_t pages, io_attributes_t attr, io_page_list_t *io_page_list_p,

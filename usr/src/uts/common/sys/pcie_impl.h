@@ -59,6 +59,9 @@ extern "C" {
 #define	PCIE_BUS2DIP(bus_p) bus_p->bus_dip
 #define	PCIE_BUS2PFD(bus_p) PCIE_DIP2PFD(PCIE_BUS2DIP(bus_p))
 
+/*
+ * These macros depend on initialization of type related data in bus_p.
+ */
 #define	PCIE_IS_PCIE(bus_p) (bus_p->bus_pcie_off)
 #define	PCIE_IS_PCIX(bus_p) (bus_p->bus_pcix_off)
 #define	PCIE_IS_PCI(bus_p) (!PCIE_IS_PCIE(bus_p))
@@ -256,6 +259,16 @@ typedef struct pf_root_fault {
 
 typedef struct pf_data pf_data_t;
 
+/*
+ * For hot plugged device, these data are init'ed during during probe
+ * For non-hotplugged device, these data are init'ed in pci_autoconfig (on x86),
+ * or in px_attach()(on sparc).
+ *
+ * For root complex the fields are initialized in pcie_rc_init_bus();
+ * for others part of the fields are initialized in pcie_init_bus(),
+ * and part of fields initialized in pcie_post_init_bus(). See comments
+ * on top of respective functions for details.
+ */
 typedef struct pcie_bus {
 	/* Needed for PCI/PCIe fabric error handling */
 	dev_info_t	*bus_dip;
@@ -294,6 +307,8 @@ typedef struct pcie_bus {
 	pcie_hp_mode_t	bus_hp_curr_mode;	/* HP mode used */
 	void		*bus_hp_ctrl;		/* HP bus ctrl data */
 	int		bus_ari;		/* ARI device */
+
+	uint64_t	bus_cfgacc_base;	/* config space base address */
 } pcie_bus_t;
 
 struct pf_data {
@@ -399,6 +414,13 @@ typedef struct {
 		pcie_disable_errors(dip);	\
 	}
 
+/*
+ * pcie_init_buspcie_fini_bus specific flags
+ */
+#define	PCIE_BUS_INITIAL	0x0001
+#define	PCIE_BUS_FINAL		0x0002
+#define	PCIE_BUS_ALL		(PCIE_BUS_INITIAL | PCIE_BUS_FINAL)
+
 #ifdef	DEBUG
 #define	PCIE_DBG pcie_dbg
 /* Common Debugging shortcuts */
@@ -441,6 +463,8 @@ extern int pcie_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
 extern void pcie_init_root_port_mps(dev_info_t *dip);
 extern int pcie_initchild(dev_info_t *dip);
 extern void pcie_uninitchild(dev_info_t *dip);
+extern int pcie_init_cfghdl(dev_info_t *dip);
+extern void pcie_fini_cfghdl(dev_info_t *dip);
 extern void pcie_clear_errors(dev_info_t *dip);
 extern int pcie_postattach_child(dev_info_t *dip);
 extern void pcie_enable_errors(dev_info_t *dip);
@@ -448,8 +472,11 @@ extern void pcie_disable_errors(dev_info_t *dip);
 extern int pcie_enable_ce(dev_info_t *dip);
 extern boolean_t pcie_bridge_is_link_disabled(dev_info_t *);
 
-extern pcie_bus_t *pcie_init_bus(dev_info_t *cdip);
-extern void pcie_fini_bus(dev_info_t *cdip);
+extern pcie_bus_t *pcie_init_bus(dev_info_t *dip, pcie_req_id_t bdf,
+    uint8_t flags);
+extern void pcie_fini_bus(dev_info_t *dip, uint8_t flags);
+extern void pcie_fab_init_bus(dev_info_t *dip, uint8_t flags);
+extern void pcie_fab_fini_bus(dev_info_t *dip, uint8_t flags);
 extern void pcie_rc_init_bus(dev_info_t *dip);
 extern void pcie_rc_fini_bus(dev_info_t *dip);
 extern void pcie_rc_init_pfd(dev_info_t *dip, pf_data_t *pfd);

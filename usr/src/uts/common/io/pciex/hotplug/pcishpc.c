@@ -950,11 +950,13 @@ pcishpc_destroy_controller(dev_info_t *dip)
 	/*
 	 * Deallocate the slot state structures for this controller.
 	 */
+	PCIE_SET_HP_CTRL(dip, NULL);
+	bus_p->bus_hp_curr_mode = PCIE_NONE_HP_MODE;
+
 	(void) pcishpc_destroy_slots(ctrl_p);
 	cv_destroy(&ctrl_p->hc_cmd_comp_cv);
 	mutex_destroy(&ctrl_p->hc_mutex);
 	kmem_free(ctrl_p, sizeof (pcie_hp_ctrl_t));
-	bus_p->bus_hp_curr_mode = PCIE_NONE_HP_MODE;
 
 	PCIE_DBG("pcishpc_destroy_controller() success\n");
 	return (DDI_SUCCESS);

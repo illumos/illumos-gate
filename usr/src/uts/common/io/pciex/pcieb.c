@@ -780,7 +780,7 @@ pcieb_initchild(dev_info_t *child)
 	    "INITCHILD: config regs setup for %s@%s\n",
 	    ddi_node_name(child), ddi_get_name_addr(child));
 
-	if (!pcie_init_bus(child) || pcie_initchild(child) != DDI_SUCCESS) {
+	if (pcie_initchild(child) != DDI_SUCCESS) {
 		result = DDI_FAILURE;
 		goto cleanup;
 	}

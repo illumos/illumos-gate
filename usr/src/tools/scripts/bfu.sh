@@ -7242,6 +7242,16 @@ mondo_loop() {
 	rm -f $usr/sbin/hotplug
 
 	#
+	# Remove old pcie misc module. Also remove new pcie modules for
+	# backward bfu.
+	#
+	if [ $target_isa = sparc ]; then 
+		rm -f $root/kernel/misc/sparcv9/pcie
+		rm -f $root/platform/sun4u/kernel/misc/sparcv9/pcie
+		rm -f $root/platform/sun4v/kernel/misc/sparcv9/pcie
+	fi
+
+	#
         # Remove the IPsec encryption and authentication modules.
         # IPsec now uses the Kernel Crypto Framework for crypto.
         #

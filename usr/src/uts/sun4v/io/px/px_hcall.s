@@ -38,18 +38,6 @@
 
 /*ARGSUSED*/
 uint64_t
-hvio_config_get(devhandle_t dev_hdl, pci_device_t bdf, pci_config_offset_t off, 
-    pci_config_size_t size, pci_cfg_data_t *data_p)
-{ return (0); }
-
-/*ARGSUSED*/
-uint64_t
-hvio_config_put(devhandle_t dev_hdl, pci_device_t bdf, pci_config_offset_t off, 
-    pci_config_size_t size, pci_cfg_data_t data)
-{ return (0); }
-
-/*ARGSUSED*/
-uint64_t
 hvio_iommu_map(devhandle_t dev_hdl, tsbid_t tsbid, pages_t pages,
     io_attributes_t attr, io_page_list_t *io_page_list_p,
     pages_t *pages_mapped)
@@ -215,42 +203,6 @@ px_phys_acc_4v(uint64_t dummy, uint64_t from_addr, uint64_t to_addr)
 { return (0); }
 
 #else	/* lint || __lint */
-
-	/*
-	 * arg0 - devhandle
-	 * arg1 - pci_device
-	 * arg2 - pci_config_offset
-	 * arg3 - pci_config_size
-	 *
-	 * ret0 - status
-	 * ret1 - error_flag
-	 * ret2 - pci_cfg_data
-	 */
-	ENTRY(hvio_config_get)
-	mov	HVIO_CONFIG_GET, %o5
-	ta	FAST_TRAP
-	movrnz	%o1, -1, %o2
-	stx	%o2, [%o4]
-	retl
-	nop
-	SET_SIZE(hvio_config_get)
-
-	/*
-	 * arg0 - devhandle
-	 * arg1 - pci_device
-	 * arg2 - pci_config_offset
-	 * arg3 - pci_config_size
-	 * arg4 - pci_cfg_data
-	 *
-	 * ret0 - status
-	 * ret1 - error_flag
-	 */
-	ENTRY(hvio_config_put)
-	mov	HVIO_CONFIG_PUT, %o5
-	ta	FAST_TRAP
-	retl
-	nop
-	SET_SIZE(hvio_config_put)
 
 	/*
 	 * arg0 - devhandle

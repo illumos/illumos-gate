@@ -42,6 +42,7 @@
 #include <sys/pci_tools.h>
 #include "px_tools_ext.h"
 #include <sys/pcie_pwr.h>
+#include <sys/pci_cfgacc.h>
 
 /*LINTLIBRARY*/
 
@@ -56,11 +57,11 @@ static int px_cb_attach(px_t *);
 static void px_cb_detach(px_t *);
 static int px_pwr_setup(dev_info_t *dip);
 static void px_pwr_teardown(dev_info_t *dip);
-
 static void px_set_mps(px_t *px_p);
 
+extern void pci_cfgacc_acc(pci_cfgacc_req_t *);
 extern int pcie_max_mps;
-
+extern void (*pci_cfgacc_acc_p)(pci_cfgacc_req_t *);
 /*
  * bus ops and dev ops structures:
  */
@@ -224,10 +225,14 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	int		ret = DDI_SUCCESS;
 	devhandle_t	dev_hdl = NULL;
 	pcie_hp_regops_t regops;
+	pcie_bus_t	*bus_p;
 
 	switch (cmd) {
 	case DDI_ATTACH:
 		DBG(DBG_ATTACH, dip, "DDI_ATTACH\n");
+
+		/* See pci_cfgacc.c */
+		pci_cfgacc_acc_p = pci_cfgacc_acc;
 
 		/*
 		 * Allocate and get the per-px soft state structure.
@@ -341,6 +346,25 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		ddi_report_dev(dip);
 
 		px_p->px_state = PX_ATTACHED;
+
+		/*
+		 * save base addr in bus_t for pci_cfgacc_xxx(), this
+		 * depends of px structure being properly initialized.
+		 */
+		bus_p = PCIE_DIP2BUS(dip);
+		bus_p->bus_cfgacc_base = px_lib_get_cfgacc_base(dip);
+
+		/*
+		 * Partially populate bus_t for all devices in this fabric
+		 * for device type macros to work.
+		 */
+		/*
+		 * Populate bus_t for all devices in this fabric, after FMA
+		 * is initializated, so that config access errors could
+		 * trigger panic.
+		 */
+		pcie_fab_init_bus(dip, PCIE_BUS_ALL);
+
 		DBG(DBG_ATTACH, dip, "attach success\n");
 		break;
 
@@ -448,6 +472,9 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			mutex_exit(&px_p->px_mutex);
 			return (DDI_FAILURE);
 		}
+
+		/* Destroy bus_t for the whole fabric */
+		pcie_fab_fini_bus(dip, PCIE_BUS_ALL);
 
 		/*
 		 * things which used to be done in obj_destroy

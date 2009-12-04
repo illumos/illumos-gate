@@ -40,6 +40,9 @@
 #include <sys/machsystm.h>
 #include "px_lib4v.h"
 #include "px_err.h"
+#include <sys/pci_cfgacc.h>
+#include <sys/pci_cfgacc_4v.h>
+
 
 /* mask for the ranges property in calculating the real PFN range */
 uint_t px_ranges_phi_mask = ((1 << 28) -1);
@@ -1929,28 +1932,16 @@ px_pmeq_intr(caddr_t arg)
 }
 
 /*
- * Unprotected raw reads/writes of fabric device's config space.
- * Only used for temporary PCI-E Fabric Error Handling.
+ * fetch the config space base addr of the root complex
+ * note this depends on px structure being initialized
  */
-uint32_t
-px_fab_get(px_t *px_p, pcie_req_id_t bdf, uint16_t offset) {
-	uint64_t 	data = 0;
+uint64_t
+px_lib_get_cfgacc_base(dev_info_t *dip)
+{
+	int		instance = DIP_TO_INST(dip);
+	px_t		*px_p = INST_TO_STATE(instance);
 
-	(void) hvio_config_get(px_p->px_dev_hdl,
-	    (bdf << PX_RA_BDF_SHIFT), offset, 4,
-	    (pci_cfg_data_t *)&data);
-
-	return ((uint32_t)data);
-}
-
-void
-px_fab_set(px_t *px_p, pcie_req_id_t bdf, uint16_t offset,
-    uint32_t val) {
-	pci_cfg_data_t	wdata = { 0 };
-
-	wdata.qw = (uint32_t)val;
-	(void) hvio_config_put(px_p->px_dev_hdl,
-	    (bdf << PX_RA_BDF_SHIFT), offset, 4, wdata);
+	return (px_p->px_dev_hdl);
 }
 
 /*ARGSUSED*/

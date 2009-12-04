@@ -434,6 +434,7 @@ MISC_KMODS	+= sbd
 MISC_KMODS	+= opl_cfg
 MISC_KMODS	+= zuluvm
 MISC_KMODS	+= gptwo_cpu gptwocfg
+MISC_KMODS	+= pcie
 
 #
 #	Brand modules

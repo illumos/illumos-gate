@@ -2344,45 +2344,6 @@ px_fill_rc_status(px_fault_t *px_fault_p, pciex_rc_error_regs_t *rc_status)
 #endif /* FMA */
 
 /*
- * Unprotected raw reads/writes of fabric device's config space.
- * Only used for temporary PCI-E Fabric Error Handling.
- */
-uint32_t
-px_fab_get(px_t *px_p, pcie_req_id_t bdf, uint16_t offset)
-{
-	pci_ranges_t	*rp = px_p->px_ranges_p;
-	uint64_t	range_prop, base_addr;
-	int		bank = PCI_REG_ADDR_G(PCI_ADDR_CONFIG);
-	uint32_t	val;
-
-	/* Get Fire's Physical Base Address */
-	range_prop = px_get_range_prop(px_p, rp, bank);
-
-	/* Get config space first. */
-	base_addr = range_prop + PX_BDF_TO_CFGADDR(bdf, offset);
-
-	val = ldphysio(base_addr);
-
-	return (LE_32(val));
-}
-
-void
-px_fab_set(px_t *px_p, pcie_req_id_t bdf, uint16_t offset,
-    uint32_t val) {
-	pci_ranges_t	*rp = px_p->px_ranges_p;
-	uint64_t	range_prop, base_addr;
-	int		bank = PCI_REG_ADDR_G(PCI_ADDR_CONFIG);
-
-	/* Get Fire's Physical Base Address */
-	range_prop = px_get_range_prop(px_p, rp, bank);
-
-	/* Get config space first. */
-	base_addr = range_prop + PX_BDF_TO_CFGADDR(bdf, offset);
-
-	stphysio(base_addr, LE_32(val));
-}
-
-/*
  * cpr callback
  *
  * disable fabric error msg interrupt prior to suspending
@@ -2518,6 +2479,22 @@ px_get_range_prop(px_t *px_p, pci_ranges_t *rp, int bank)
 	    rp[bank].parent_low;
 
 	return (range_prop);
+}
+
+/*
+ * fetch the config space base addr of the root complex
+ * note this depends on px structure being initialized
+ */
+uint64_t
+px_lib_get_cfgacc_base(dev_info_t *dip)
+{
+	int		instance = DIP_TO_INST(dip);
+	px_t		*px_p = INST_TO_STATE(instance);
+	pci_ranges_t	*rp = px_p->px_ranges_p;
+	int		bank = PCI_REG_ADDR_G(PCI_ADDR_CONFIG);
+
+	/* Get Fire's Physical Base Address */
+	return (px_get_range_prop(px_p, rp, bank));
 }
 
 /*

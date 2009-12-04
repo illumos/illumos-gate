@@ -963,7 +963,7 @@ ppb_initchild(dev_info_t *child)
 	 * errors.
 	 */
 	if (ppb->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV) {
-		if (pcie_init_bus(child) == NULL) {
+		if (pcie_init_cfghdl(child) != DDI_SUCCESS) {
 			pci_config_teardown(&config_handle);
 			return (DDI_FAILURE);
 		}
@@ -997,7 +997,7 @@ ppb_uninitchild(dev_info_t *child)
 	 * SG OPL FMA specific
 	 */
 	if (ppb->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV)
-		pcie_fini_bus(child);
+		pcie_fini_cfghdl(child);
 
 	ppb_removechild(child);
 }

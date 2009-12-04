@@ -29,10 +29,11 @@
 #include <sys/sunndi.h>
 #include <sys/pci.h>
 #include <sys/pci_impl.h>
-#include <sys/pci_cfgspace.h>
+#include <sys/pcie_impl.h>
 #include <sys/memlist.h>
 #include <sys/bootconf.h>
 #include <io/pci/mps_table.h>
+#include <sys/pci_cfgacc.h>
 #include <sys/pci_cfgspace.h>
 #include <sys/pci_cfgspace_impl.h>
 #include <sys/psw.h>
@@ -45,6 +46,7 @@
 #include <sys/intel_iommu.h>
 #include <sys/iommulib.h>
 #include <sys/devcache.h>
+#include <sys/pci_cfgacc_x86.h>
 
 #define	pci_getb	(*pci_getb_func)
 #define	pci_getw	(*pci_getw_func)
@@ -107,6 +109,9 @@ extern struct memlist *find_bus_res(int, int);
 static struct pci_fixundo *undolist = NULL;
 static int num_root_bus = 0;	/* count of root buses */
 extern volatile int acpi_resource_discovery;
+extern uint64_t mcfg_mem_base;
+extern void pci_cfgacc_add_workaround(uint16_t, uchar_t, uchar_t);
+extern dev_info_t *pcie_get_rc_dip(dev_info_t *);
 
 /*
  * Module prototypes
@@ -134,6 +139,8 @@ static void pciex_slot_names_prop(dev_info_t *, ushort_t);
 static void populate_bus_res(uchar_t bus);
 static void memlist_remove_list(struct memlist **list,
     struct memlist *remove_list);
+static boolean_t is_pcie_platform(void);
+static void ck804_fix_aer_ptr(dev_info_t *, pcie_req_id_t);
 
 static void pci_scan_bbn(void);
 static int pci_unitaddr_cache_valid(void);
@@ -452,6 +459,13 @@ void
 pci_setup_tree(void)
 {
 	uint_t i, root_bus_addr = 0;
+
+	/*
+	 * enable mem-mapped pci config space accessing,
+	 * if failed to do so during early boot
+	 */
+	if ((mcfg_mem_base == NULL) && is_pcie_platform())
+		mcfg_mem_base = 0xE0000000;
 
 	alloc_res_array();
 	for (i = 0; i <= pci_bios_maxbus; i++) {
@@ -1864,6 +1878,7 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 	ushort_t is_pci_bridge = 0;
 	struct pci_devfunc *devlist = NULL, *entry = NULL;
 	gfx_entry_t *gfxp;
+	pcie_req_id_t bdf;
 
 	ushort_t deviceid = pci_getw(bus, dev, func, PCI_CONF_DEVID);
 
@@ -1924,6 +1939,28 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 	if (check_if_device_is_pciex(dip, bus, dev, func, &slot_num,
 	    &is_pci_bridge) == B_TRUE)
 		pciex = 1;
+
+	bdf = PCI_GETBDF(bus, dev, func);
+	/*
+	 * Record BAD AMD bridges which don't support MMIO config access.
+	 */
+	if (IS_BAD_AMD_NTBRIDGE(vendorid, deviceid) ||
+	    IS_AMD_8132_CHIP(vendorid, deviceid)) {
+		uchar_t secbus = 0;
+		uchar_t subbus = 0;
+
+		if ((basecl == PCI_CLASS_BRIDGE) &&
+		    (subcl == PCI_BRIDGE_PCI)) {
+			secbus = pci_getb(bus, dev, func, PCI_BCNF_SECBUS);
+			subbus = pci_getb(bus, dev, func, PCI_BCNF_SUBBUS);
+		}
+		pci_cfgacc_add_workaround(bdf, secbus, subbus);
+	}
+
+	if (mcfg_mem_base != NULL) {
+		ck804_fix_aer_ptr(dip, bdf);
+		(void) pcie_init_bus(dip, bdf, PCIE_BUS_INITIAL);
+	}
 
 	/* add properties */
 	(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip, "device-id", deviceid);
@@ -3288,4 +3325,52 @@ pciex_slot_names_prop(dev_info_t *dip, ushort_t slot_num)
 	len += len % 4;
 	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip, "slot-names",
 	    (int *)slotprop, len / sizeof (int));
+}
+
+/*
+ * This is currently a hack, a better way is needed to determine if it
+ * is a PCIE platform.
+ */
+static boolean_t
+is_pcie_platform()
+{
+	uint8_t bus;
+
+	for (bus = 0; bus < pci_bios_maxbus; bus++) {
+		if (look_for_any_pciex_device(bus))
+			return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
+/*
+ * Enable reporting of AER capability next pointer.
+ * This needs to be done only for CK8-04 devices
+ * by setting NV_XVR_VEND_CYA1 (offset 0xf40) bit 13
+ * NOTE: BIOS is disabling this, it needs to be enabled temporarily
+ *
+ * This function is adapted from npe_ck804_fix_aer_ptr(), and is
+ * called from pci_boot.c.
+ */
+static void
+ck804_fix_aer_ptr(dev_info_t *dip, pcie_req_id_t bdf)
+{
+	dev_info_t *rcdip;
+	ushort_t cya1;
+
+	rcdip = pcie_get_rc_dip(dip);
+	ASSERT(rcdip != NULL);
+
+	if ((pci_cfgacc_get16(rcdip, bdf, PCI_CONF_VENID) ==
+	    NVIDIA_VENDOR_ID) &&
+	    (pci_cfgacc_get16(rcdip, bdf, PCI_CONF_DEVID) ==
+	    NVIDIA_CK804_DEVICE_ID) &&
+	    (pci_cfgacc_get8(rcdip, bdf, PCI_CONF_REVID) >=
+	    NVIDIA_CK804_AER_VALID_REVID)) {
+		cya1 = pci_cfgacc_get16(rcdip, bdf, NVIDIA_CK804_VEND_CYA1_OFF);
+		if (!(cya1 & ~NVIDIA_CK804_VEND_CYA1_ERPT_MASK))
+			(void) pci_cfgacc_put16(rcdip, bdf,
+			    NVIDIA_CK804_VEND_CYA1_OFF,
+			    cya1 | NVIDIA_CK804_VEND_CYA1_ERPT_VAL);
+	}
 }

@@ -31,6 +31,7 @@
 #include <sys/hsvc.h>
 #include <px_obj.h>
 #include <sys/pci_tools.h>
+#include <sys/pci_cfgacc.h>
 #include <px_tools_var.h>
 #include "px_lib4v.h"
 #include <px_tools_ext.h>
@@ -215,7 +216,6 @@ pxtool_phys_access(px_t *px_p, uintptr_t dev_addr,
  * prg_p->phys_addr isn't used.
  */
 
-/*ARGSUSED*/
 int
 pxtool_pcicfg_access(px_t *px_p, pcitool_reg_t *prg_p,
     uint64_t *data_p, boolean_t is_write)
@@ -224,9 +224,15 @@ pxtool_pcicfg_access(px_t *px_p, pcitool_reg_t *prg_p,
 	on_trap_data_t otd;
 	dev_info_t *dip = px_p->px_dip;
 	px_pec_t *pec_p = px_p->px_pec_p;
-	pci_device_t bdf = PX_GET_BDF(prg_p);
 	size_t size = PCITOOL_ACC_ATTR_SIZE(prg_p->acc_attr);
 	int rval = 0;
+	pci_cfgacc_req_t req;
+
+	if ((size <= 0) || (size > 8)) {
+		DBG(DBG_TOOLS, dip, "not supported size.\n");
+		prg_p->status = PCITOOL_INVALID_SIZE;
+		return (ENOTSUP);
+	}
 
 	/* Alignment checking. */
 	if (!IS_P2ALIGNED(prg_p->offset, size)) {
@@ -238,6 +244,11 @@ pxtool_pcicfg_access(px_t *px_p, pcitool_reg_t *prg_p,
 	mutex_enter(&pec_p->pec_pokefault_mutex);
 	pec_p->pec_ontrap_data = &otd;
 
+	req.rcdip = dip;
+	req.bdf = PCI_GETBDF(prg_p->bus_no, prg_p->dev_no, prg_p->func_no);
+	req.offset = prg_p->offset;
+	req.size = size;
+	req.write = is_write;
 	if (is_write) {
 
 		if (PCITOOL_ACC_IS_BIG_ENDIAN(prg_p->acc_attr))
@@ -259,16 +270,17 @@ pxtool_pcicfg_access(px_t *px_p, pcitool_reg_t *prg_p,
 				break;
 		}
 
-		DBG(DBG_TOOLS, dip, "put: bdf:0x%x, off:0x%" PRIx64 ", size:"
-		    "0x%" PRIx64 ", data:0x%" PRIx64 "\n",
-		    bdf, prg_p->offset, size, data.qw);
+		DBG(DBG_TOOLS, dip, "put: bdf:%d,%d,%d, off:0x%"PRIx64", size:"
+		    "0x%"PRIx64", data:0x%"PRIx64"\n",
+		    prg_p->bus_no, prg_p->dev_no, prg_p->func_no,
+		    prg_p->offset, size, data.qw);
 
 		pec_p->pec_safeacc_type = DDI_FM_ERR_POKE;
 
 		if (!on_trap(&otd, OT_DATA_ACCESS)) {
 			otd.ot_trampoline = (uintptr_t)&poke_fault;
-			rval = hvio_config_put(px_p->px_dev_hdl, bdf,
-			    prg_p->offset, size, data);
+			VAL64(&req) = data.qw;
+			pci_cfgacc_acc(&req);
 		} else
 			rval = H_EIO;
 
@@ -283,14 +295,29 @@ pxtool_pcicfg_access(px_t *px_p, pcitool_reg_t *prg_p,
 
 		if (!on_trap(&otd, OT_DATA_ACCESS)) {
 			otd.ot_trampoline = (uintptr_t)&peek_fault;
-			rval = hvio_config_get(px_p->px_dev_hdl, bdf,
-			    prg_p->offset, size, &data);
+			pci_cfgacc_acc(&req);
+			data.qw = VAL64(&req);
 		} else
 			rval = H_EIO;
 
-		DBG(DBG_TOOLS, dip, "get: bdf:0x%x, off:0x%" PRIx64 ", size:"
-		    "0x%" PRIx64 ", data:0x%" PRIx64 "\n",
-		    bdf, prg_p->offset, size, data.qw);
+		switch (size) {
+			case sizeof (uint8_t):
+				data.qw = (uint64_t)data.b;
+				break;
+			case sizeof (uint16_t):
+				data.qw = (uint64_t)data.w;
+				break;
+			case sizeof (uint32_t):
+				data.qw = (uint64_t)data.dw;
+				break;
+			case sizeof (uint64_t):
+				break;
+		}
+
+		DBG(DBG_TOOLS, dip, "get: bdf:%d,%d,%d, off:0x%"PRIx64", size:"
+		    "0x%"PRIx64", data:0x%"PRIx64"\n",
+		    prg_p->bus_no, prg_p->dev_no, prg_p->func_no,
+		    prg_p->offset, size, data.qw);
 		*data_p = data.qw;
 
 		if (PCITOOL_ACC_IS_BIG_ENDIAN(prg_p->acc_attr))

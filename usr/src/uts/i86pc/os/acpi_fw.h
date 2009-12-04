@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,6 +160,28 @@ struct slit {
  * Pointer to System Locality Information Table (SLIT)
  */
 extern struct slit	*slit_ptr;
+
+struct cfg_base_addr_alloc {
+	uint64_t	base_addr;
+	uint16_t	segment;
+	uint8_t		start_bno;
+	uint8_t		end_bno;
+	uint32_t	reserved;
+};
+
+struct mcfg {
+	char		Signature[4];
+	uint32_t	Length;
+	uint8_t		Revision;
+	uint8_t		Checksum;
+	char		OemId[6];
+	char		OemTableId[8];
+	uint32_t	OemRevision;
+	char		CreatorId[4];
+	uint32_t	CreatorRevision;
+	uint8_t		Reserved[8];
+	struct cfg_base_addr_alloc	CfgBaseAddrAllocList[1];
+};
 
 struct dmar {
 	struct table_header hdr;

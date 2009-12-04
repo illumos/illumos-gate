@@ -169,6 +169,7 @@ DS_OBJS		= ds_common.o ds_drv.o
 FAULT_ISO_OBJS	= fault_iso.o
 OBPSYM_OBJS	+= obpsym.o obpsym_1275.o
 PLATSVC_OBJS	= platsvc.o mdeg.o
+PCIE_MISC_OBJS += pci_cfgacc_4v.o pci_cfgacc_asm.o pci_cfgacc.o
 
 #
 #			Brand modules

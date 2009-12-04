@@ -182,6 +182,8 @@ CPR_IMPL_OBJS	= cpr_impl.o
 
 SBD_OBJS	+= sbd.o sbd_cpu.o sbd_mem.o sbd_io.o
 
+PCIE_MISC_OBJS += pci_cfgacc_4u.o pci_cfgacc.o
+
 #
 #			Brand modules
 #

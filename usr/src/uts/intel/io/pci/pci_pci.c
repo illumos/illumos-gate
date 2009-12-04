@@ -684,7 +684,7 @@ ppb_initchild(dev_info_t *child)
 	 * errors.
 	 */
 	if (ppb->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV) {
-		if (pcie_init_bus(child) == NULL)
+		if (pcie_init_cfghdl(child) != DDI_SUCCESS)
 			return (DDI_FAILURE);
 	}
 
@@ -726,7 +726,7 @@ ppb_removechild(dev_info_t *dip)
 	    ddi_get_instance(ddi_get_parent(dip)));
 
 	if (ppb->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV)
-		pcie_fini_bus(dip);
+		pcie_fini_cfghdl(dip);
 	else if ((pdptr = ddi_get_parent_data(dip)) != NULL) {
 		kmem_free(pdptr, (sizeof (*pdptr) + sizeof (struct intrspec)));
 		ddi_set_parent_data(dip, NULL);

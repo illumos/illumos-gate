@@ -232,19 +232,6 @@ typedef enum io_sync_direction {
 	IO_SYNC_CPU		= (uint32_t)0x02
 } io_sync_direction_t;
 
-typedef enum pci_config_size {
-	PCI_CFG_SIZE_BYTE = 0,
-	PCI_CFG_SIZE_WORD,
-	PCI_CFG_SIZE_DWORD
-} pci_config_size_t;
-
-typedef union pci_cfg_data {
-	uint8_t b;
-	uint16_t w;
-	uint32_t dw;
-	uint64_t qw;
-} pci_cfg_data_t;
-
 /*
  *	MSI Definitions
  *

@@ -396,6 +396,7 @@ MISC_KMODS	+= obpsym
 MISC_KMODS	+= platmod
 MISC_KMODS	+= platsvc
 MISC_KMODS	+= vis
+MISC_KMODS	+= pcie
 
 #	md5 optimized for Niagara
 #

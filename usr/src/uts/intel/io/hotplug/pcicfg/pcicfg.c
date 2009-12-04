@@ -41,6 +41,8 @@
 #include <sys/sunndi.h>
 #include <sys/hotplug/pci/pcicfg.h>
 #include <sys/ndi_impldefs.h>
+#include <sys/pci_cfgacc.h>
+#include <sys/pcie_impl.h>
 
 /*
  * ************************************************************************
@@ -219,7 +221,7 @@ static void debug(char *, uintptr_t, uintptr_t,
 static int pcicfg_add_config_reg(dev_info_t *,
     uint_t, uint_t, uint_t);
 static int pcicfg_probe_children(dev_info_t *, uint_t, uint_t, uint_t,
-    uint_t *, pcicfg_flags_t);
+    uint_t *, pcicfg_flags_t, boolean_t);
 static int pcicfg_match_dev(dev_info_t *, void *);
 static dev_info_t *pcicfg_devi_find(dev_info_t *, uint_t, uint_t);
 static pcicfg_phdl_t *pcicfg_find_phdl(dev_info_t *);
@@ -238,7 +240,7 @@ static void pcicfg_device_off(ddi_acc_handle_t);
 static int pcicfg_set_busnode_props(dev_info_t *, uint8_t);
 static int pcicfg_free_bridge_resources(dev_info_t *);
 static int pcicfg_free_device_resources(dev_info_t *);
-static int pcicfg_teardown_device(dev_info_t *, pcicfg_flags_t);
+static int pcicfg_teardown_device(dev_info_t *, pcicfg_flags_t, boolean_t);
 static void pcicfg_reparent_node(dev_info_t *, dev_info_t *);
 static int pcicfg_config_setup(dev_info_t *, ddi_acc_handle_t *);
 static void pcicfg_config_teardown(ddi_acc_handle_t *);
@@ -266,8 +268,9 @@ static int pcicfg_pcie_dev(dev_info_t *, ddi_acc_handle_t);
 static int pcicfg_pcie_device_type(dev_info_t *, ddi_acc_handle_t);
 static int pcicfg_pcie_port_type(dev_info_t *, ddi_acc_handle_t);
 static int pcicfg_probe_bridge(dev_info_t *, ddi_acc_handle_t, uint_t,
-    uint_t *);
+	uint_t *, boolean_t);
 static int pcicfg_find_resource_end(dev_info_t *, void *);
+static boolean_t is_pcie_fabric(dev_info_t *);
 
 static int pcicfg_populate_reg_props(dev_info_t *, ddi_acc_handle_t);
 static int pcicfg_populate_props_from_bar(dev_info_t *, ddi_acc_handle_t);
@@ -560,6 +563,7 @@ pcicfg_configure(dev_info_t *devi, uint_t device, uint_t function,
 	int max_function = PCI_MAX_FUNCTIONS;
 	int trans_device;
 	dev_info_t *new_device;
+	boolean_t is_pcie;
 
 	if (flags == PCICFG_FLAG_ENABLE_ARI)
 		return (pcicfg_ari_configure(devi));
@@ -579,6 +583,8 @@ pcicfg_configure(dev_info_t *devi, uint_t device, uint_t function,
 
 	attach_point = devi;
 
+	is_pcie = is_pcie_fabric(devi);
+
 	ndi_devi_enter(devi, &circ);
 	for (func = 0; func < max_function; ) {
 
@@ -591,7 +597,8 @@ pcicfg_configure(dev_info_t *devi, uint_t device, uint_t function,
 			trans_device = device;
 
 		switch (rv = pcicfg_probe_children(attach_point,
-		    bus, trans_device, func & 7, &highest_bus, flags)) {
+		    bus, trans_device, func & 7, &highest_bus,
+		    flags, is_pcie)) {
 			case PCICFG_NORESRC:
 			case PCICFG_FAILURE:
 				DEBUG2("configure failed: bus [0x%x] device "
@@ -725,6 +732,15 @@ cleanup:
 		 * probe handle - if not, no harm in calling this.
 		 */
 		(void) pcicfg_destroy_phdl(new_device);
+		if (is_pcie) {
+			/*
+			 * free pcie_bus_t for the sub-tree
+			 */
+			if (ddi_get_child(new_device) != NULL)
+				pcie_fab_fini_bus(new_device, PCIE_BUS_ALL);
+
+			pcie_fini_bus(new_device, PCIE_BUS_ALL);
+		}
 		/*
 		 * This will free up the node
 		 */
@@ -1433,6 +1449,8 @@ pcicfg_unconfigure(dev_info_t *devi, uint_t device, uint_t function,
 	int func;
 	int i;
 	int max_function, trans_device;
+	int circ;
+	boolean_t is_pcie;
 
 	if (pcie_ari_is_enabled(devi) == PCIE_ARI_FORW_ENABLED)
 		max_function = PCICFG_MAX_ARI_FUNCTION;
@@ -1443,6 +1461,9 @@ pcicfg_unconfigure(dev_info_t *devi, uint_t device, uint_t function,
 	 * Cycle through devices to make sure none are busy.
 	 * If a single device is busy fail the whole unconfigure.
 	 */
+	is_pcie = is_pcie_fabric(devi);
+
+	ndi_devi_enter(devi, &circ);
 	for (func = 0; func < max_function; func++) {
 		if ((function != PCICFG_ALL_FUNC) && (function != func))
 			continue;
@@ -1489,10 +1510,10 @@ pcicfg_unconfigure(dev_info_t *devi, uint_t device, uint_t function,
 			if (ndi_devi_online(child_dip, NDI_CONFIG)
 			    != NDI_SUCCESS) {
 				DEBUG0("Failed to put back devices state\n");
-				return (PCICFG_FAILURE);
+				goto fail;
 			}
 		}
-		return (PCICFG_FAILURE);
+		goto fail;
 	}
 
 	/*
@@ -1521,14 +1542,14 @@ pcicfg_unconfigure(dev_info_t *devi, uint_t device, uint_t function,
 			    PCICFG_SUCCESS) {
 				cmn_err(CE_WARN,
 				    "ntbridge: unconfigure failed\n");
-				return (PCICFG_FAILURE);
+				goto fail;
 			}
 
-		if (pcicfg_teardown_device(child_dip, flags)
+		if (pcicfg_teardown_device(child_dip, flags, is_pcie)
 		    != PCICFG_SUCCESS) {
 			DEBUG2("Failed to tear down device [0x%x]"
 			    "function [0x%x]\n", trans_device, func & 7);
-			return (PCICFG_FAILURE);
+			goto fail;
 		}
 	}
 
@@ -1537,11 +1558,16 @@ pcicfg_unconfigure(dev_info_t *devi, uint_t device, uint_t function,
 		(void) pcie_ari_disable(devi);
 	}
 
+	ndi_devi_exit(devi, circ);
 	return (PCICFG_SUCCESS);
+
+fail:
+	ndi_devi_exit(devi, circ);
+	return (PCICFG_FAILURE);
 }
 
 static int
-pcicfg_teardown_device(dev_info_t *dip, pcicfg_flags_t flags)
+pcicfg_teardown_device(dev_info_t *dip, pcicfg_flags_t flags, boolean_t is_pcie)
 {
 	ddi_acc_handle_t	handle;
 
@@ -1560,6 +1586,16 @@ pcicfg_teardown_device(dev_info_t *dip, pcicfg_flags_t flags)
 		return (PCICFG_FAILURE);
 	pcicfg_device_off(handle);
 	pcicfg_config_teardown(&handle);
+
+	if (is_pcie) {
+		/*
+		 * free pcie_bus_t for the sub-tree
+		 */
+		if (ddi_get_child(dip) != NULL)
+			pcie_fab_fini_bus(dip, PCIE_BUS_ALL);
+
+		pcie_fini_bus(dip, PCIE_BUS_ALL);
+	}
 
 	/*
 	 * The framework provides this routine which can
@@ -3622,7 +3658,7 @@ pcicfg_update_bridge(pcicfg_phdl_t *entry,
 
 static int
 pcicfg_probe_children(dev_info_t *parent, uint_t bus, uint_t device,
-    uint_t func, uint_t *highest_bus, pcicfg_flags_t flags)
+    uint_t func, uint_t *highest_bus, pcicfg_flags_t flags, boolean_t is_pcie)
 {
 	dev_info_t		*new_child;
 	ddi_acc_handle_t	config_handle;
@@ -3654,6 +3690,10 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus, uint_t device,
 		"Failed to setup config space\n");
 		goto failedconfig;
 	}
+
+	if (is_pcie)
+		(void) pcie_init_bus(new_child, PCI_GETBDF(bus, device, func),
+		    PCIE_BUS_INITIAL);
 
 	/*
 	 * As soon as we have access to config space,
@@ -3692,9 +3732,8 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus, uint_t device,
 	 */
 	if ((!(header_type & PCI_HEADER_MULTI)) && (func != 0)) {
 
-		(void) pcicfg_config_teardown(&config_handle);
-		(void) ndi_devi_free(new_child);
-		return (PCICFG_NODEVICE);
+		ret = PCICFG_NODEVICE;
+		goto failedchild;
 	}
 
 	/*
@@ -3712,7 +3751,7 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus, uint_t device,
 			goto failedchild;
 
 		ret = pcicfg_probe_bridge(new_child, config_handle, bus,
-		    highest_bus);
+		    highest_bus, is_pcie);
 		if (ret != PCICFG_SUCCESS) {
 			(void) pcicfg_free_bridge_resources(new_child);
 			goto failedchild;
@@ -3765,6 +3804,13 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus, uint_t device,
 
 	(void) pcicfg_config_teardown(&config_handle);
 
+	/*
+	 * Properties have been setted up, so initialize the remaining
+	 * bus_t fields
+	 */
+	if (is_pcie)
+		pcie_init_bus(new_child, 0, PCIE_BUS_FINAL);
+
 	return (PCICFG_SUCCESS);
 
 failedchild:
@@ -3772,6 +3818,9 @@ failedchild:
 	 * XXX check if it should be taken offline (if online)
 	 */
 	(void) pcicfg_config_teardown(&config_handle);
+
+	if (is_pcie)
+		pcie_fini_bus(new_child, PCIE_BUS_FINAL);
 
 failedconfig:
 
@@ -3972,7 +4021,7 @@ failedchild:
 
 static int
 pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
-    uint_t *highest_bus)
+    uint_t *highest_bus, boolean_t is_pcie)
 {
 	uint64_t next_bus;
 	uint_t new_bus, num_slots;
@@ -4415,6 +4464,8 @@ pf_setup_end:
 
 	(void) pcicfg_device_on(h);
 
+	if (is_pcie)
+		pcie_init_bus(new_child, 0, PCIE_BUS_FINAL);
 	if (ndi_devi_online(new_child, NDI_NO_EVENT|NDI_CONFIG)
 	    != NDI_SUCCESS) {
 		DEBUG0("Unable to online bridge\n");
@@ -4445,8 +4496,8 @@ pf_setup_end:
 				trans_device = i;
 
 			if ((rval = pcicfg_probe_children(new_child,
-			    new_bus, trans_device, j & 7, highest_bus, 0))
-			    != PCICFG_SUCCESS) {
+			    new_bus, trans_device, j & 7, highest_bus,
+			    0, is_pcie)) != PCICFG_SUCCESS) {
 				if (rval == PCICFG_NODEVICE) {
 					DEBUG3("No Device at bus [0x%x]"
 					    "device [0x%x] "
@@ -4526,6 +4577,8 @@ next:
 	 */
 	VERIFY(ndi_devi_offline(new_child, NDI_NO_EVENT|NDI_UNCONFIG)
 	    == NDI_SUCCESS);
+	if (is_pcie)
+		pcie_fini_bus(new_child, PCIE_BUS_INITIAL);
 
 	phdl.dip = new_child;
 	phdl.memory_base = mem_answer;
@@ -5122,4 +5175,34 @@ pcicfg_pcie_port_type(dev_info_t *dip, ddi_acc_handle_t handle)
 		    cap_loc + PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
 
 	return (port_type);
+}
+
+/*
+ * Return true if the devinfo node is in a PCI Express hierarchy.
+ */
+static boolean_t
+is_pcie_fabric(dev_info_t *dip)
+{
+	dev_info_t *root = ddi_root_node();
+	dev_info_t *pdip;
+	boolean_t found = B_FALSE;
+	char *bus;
+
+	/*
+	 * Does this device reside in a pcie fabric ?
+	 */
+	for (pdip = dip; pdip && (pdip != root) && !found;
+	    pdip = ddi_get_parent(pdip)) {
+		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, pdip,
+		    DDI_PROP_DONTPASS, "device_type", &bus) !=
+		    DDI_PROP_SUCCESS)
+			break;
+
+		if (strcmp(bus, "pciex") == 0)
+			found = B_TRUE;
+
+		ddi_prop_free(bus);
+	}
+
+	return (found);
 }
