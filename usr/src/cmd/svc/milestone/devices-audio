@@ -32,8 +32,8 @@ smf_is_globalzone || exit $SMF_EXIT_OK
 # In order to populate the initial startup mapping of devfs links to
 # the audio subsystem (necessary to properly report numbers in
 # /dev/sndstat and in the OSS sysinfo ioctls -- thank you Linux!) we
-# need to run some code at boot.  We key this off of the handler in
-# devfsadm for the audio node(s).
+# need to initialize each audio device and plumb it into the system.
 #
-/usr/sbin/devfsadm -i audio
+/usr/bin/audioctl init-devices
+
 exit $SMF_EXIT_OK

@@ -40,6 +40,7 @@
 #include <ctype.h>
 #include <sys/param.h>
 #include <sys/soundcard.h>
+#include <libdevinfo.h>
 
 #if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
 #define	TEXT_DOMAIN "SYS_TEST"	/* Use this only if it weren't */
@@ -309,6 +310,11 @@ load_devices(void)
 	int i;
 	oss_sysinfo si;
 	device_t *d;
+
+	if (devices != NULL) {
+		/* already loaded */
+		return (0);
+	}
 
 	if ((fd = open("/dev/mixer", O_RDWR)) < 0) {
 		rv = errno;
@@ -735,6 +741,10 @@ find_device(char *name)
 	 * We can canonicalize these by looking at the dev_t though.
 	 */
 
+	if (load_devices() != 0) {
+		return (NULL);
+	}
+
 	if (name == NULL)
 		name = getenv("AUDIODEV");
 
@@ -789,6 +799,10 @@ do_list_devices(int argc, char **argv)
 	argv += optind;
 	if (argc != 0) {
 		help();
+		return (-1);
+	}
+
+	if (load_devices() != 0) {
 		return (-1);
 	}
 
@@ -1145,6 +1159,93 @@ do_load_controls(int argc, char **argv)
 }
 
 int
+mixer_walker(di_devlink_t dlink, void *arg)
+{
+	const char	*link;
+	int		num;
+	int		fd;
+	int		verbose = *(int *)arg;
+	int		num_offset;
+
+	num_offset = sizeof ("/dev/mixer") - 1;
+
+	link = di_devlink_path(dlink);
+
+	if ((link == NULL) ||
+	    (strncmp(link, "/dev/mixer", num_offset) != 0) ||
+	    (!isdigit(link[num_offset]))) {
+		return (DI_WALK_CONTINUE);
+	}
+
+	num = atoi(link + num_offset);
+	if ((fd = open(link, O_RDWR)) < 0) {
+		if (verbose) {
+			if (errno == ENOENT) {
+				msg(_("Device %s not present.\n"), link);
+			} else {
+				msg(_("Unable to open device %s: %s\n"),
+				    link, strerror(errno));
+			}
+		}
+		return (DI_WALK_CONTINUE);
+	}
+
+	if (verbose) {
+		msg(_("Initializing link %s: "), link);
+	}
+	if (ioctl(fd, SNDCTL_SUN_SEND_NUMBER, &num) != 0) {
+		if (verbose) {
+			msg(_("failed: %s\n"), strerror(errno));
+		}
+	} else {
+		if (verbose) {
+			msg(_("done.\n"));
+		}
+	}
+	(void) close(fd);
+	return (DI_WALK_CONTINUE);
+}
+
+int
+do_init_devices(int argc, char **argv)
+{
+	int			optc;
+	di_devlink_handle_t	dlh;
+	int			verbose = 0;
+
+	while ((optc = getopt(argc, argv, "v")) != EOF) {
+		switch (optc) {
+		case 'v':
+			verbose = 1;
+			break;
+		default:
+			help();
+			return (-1);
+		}
+	}
+	argc -= optind;
+	argv += optind;
+
+	if (argc != 0) {
+		help();
+		return (-1);
+	}
+
+	dlh = di_devlink_init(NULL, 0);
+	if (dlh == NULL) {
+		perror(_("Unable to initialize devlink handle"));
+		return (-1);
+	}
+
+	if (di_devlink_walk(dlh, "^mixer", NULL, 0, &verbose,
+	    mixer_walker) != 0) {
+		perror(_("Unable to walk devlinks"));
+		return (-1);
+	}
+	return (0);
+}
+
+int
 main(int argc, char **argv)
 {
 	int rv = 0;
@@ -1172,11 +1273,6 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	rv = load_devices();
-	if (rv != 0) {
-		goto OUT;
-	}
-
 	if (argc < 1) {
 		help();
 		rv = EINVAL;
@@ -1195,6 +1291,8 @@ main(int argc, char **argv)
 		rv = do_load_controls(argc, argv);
 	} else if (strcmp(argv[0], "save-controls") == 0) {
 		rv = do_save_controls(argc, argv);
+	} else if (strcmp(argv[0], "init-devices") == 0) {
+		rv = do_init_devices(argc, argv);
 	} else {
 		help();
 		rv = EINVAL;

@@ -138,38 +138,6 @@ send_number(long num)
 	}
 }
 
-static void
-send_all(void)
-{
-	/*
-	 * This module traverses /dev/sound to look for nodes that
-	 * have been previously created.
-	 */
-	finddevhdl_t	fh;
-	const char	*path;
-
-	/*
-	 * This is not safe with -r.
-	 */
-	if ((strcmp(devfsadm_root_path(), "/") == 0) &&
-	    (finddev_readdir("/dev", &fh) == 0)) {
-		static int	doneit = 0;
-
-		while ((!doneit) && ((path = finddev_next(fh)) != NULL)) {
-			long num;
-			char *ep;
-			if ((strncmp(path, "mixer", 5) != 0) ||
-			    (!isdigit(path[5]))) {
-				continue;
-			}
-			num = strtol(path + 5, &ep, 10);
-			send_number(num);
-		}
-		finddev_close(fh);
-		doneit = 1;
-	}
-}
-
 static int
 sndstat_process(di_minor_t minor, di_node_t node)
 {
@@ -183,7 +151,6 @@ sndstat_process(di_minor_t minor, di_node_t node)
 	if (strcmp(mn, "sound,sndstat0") == 0) {
 		(void) devfsadm_mklink("sndstat", node, minor, 0);
 		(void) devfsadm_secondary_link("mixer", "sndstat", 0);
-		send_all();
 	}
 
 	return (DEVFSADM_CONTINUE);
@@ -206,6 +173,13 @@ audio_process(di_minor_t minor, di_node_t node)
 	char *ep;
 	char re_string[RE_SIZE+1];
 	devfsadm_enumerate_t rules[1] = {NULL};
+	char base[PATH_MAX + 1];
+	char linksrc[PATH_MAX + 1];
+	char linkdst[PATH_MAX + 1];
+	long num;
+	long inst;
+	int i;
+	char *driver;
 
 	if (system_labeled)
 		flags = DA_ADD|DA_AUDIO;
@@ -218,135 +192,110 @@ audio_process(di_minor_t minor, di_node_t node)
 	(void) snprintf(devpath, sizeof (devpath), "%s:%s", tmp, mn);
 	di_devfs_path_free(tmp);
 
+	if (strncmp(mn, "sound,", sizeof ("sound,") - 1) != 0) {
+		devfsadm_errprint("SUNW_audio_link: "
+		    "can't find match for'%s'\n", mn);
+		return (DEVFSADM_CONTINUE);
+	}
+
+	/* strlen("sound,") */
+	(void) strlcpy(base, mn + 6, sizeof (base));
+	mn = base;
+
+	driver = di_driver_name(node);
+
+	/* if driver name override in minor name */
+	if ((tmp = strchr(mn, ',')) != NULL) {
+		driver = mn;
+		*tmp = '\0';
+		mn = tmp + 1;
+	}
+
+	/* skip past "audio" portion of the minor name */
+	if (strncmp(mn, "audio", sizeof ("audio") - 1) == 0) {
+		mn += sizeof ("audio") - 1;
+	}
+
+	/* parse the instance number */
+	for (i = strlen(mn); i; i--) {
+		if (!isdigit(mn[i - 1]))
+			break;
+	}
+	inst = strtol(mn + i, &ep, 10);
+	mn[i] = 0;	/* lop off the instance number */
+
 	/*
-	 * "Special" handling for /dev/sndstat and /dev/mixer.
+	 * First we create a node with the driver under /dev/sound.
+	 * Note that "instance numbers" used by the audio framework
+	 * are guaranteed to be unique for each driver.
 	 */
-	if (strcmp(mn, "sound,sndstat0") == 0) {
-		(void) strlcpy(newpath, "sound/sndstat", sizeof (newpath));
+	(void) snprintf(newpath, sizeof (newpath), "sound/%s:%d%s",
+	    driver, inst, mn);
+	(void) devfsadm_mklink(newpath, node, minor, flags);
 
-		(void) devfsadm_mklink(newpath, node, minor, flags);
-		(void) devfsadm_secondary_link("sndstat", newpath, flags);
-		(void) devfsadm_secondary_link("mixer", newpath, flags);
-		send_all();
+	/*
+	 * The rest of this logic is a gross simplification that is
+	 * made possible by the fact that each audio node will have
+	 * several different minors associated with it.  Rather than
+	 * processing each node separately, we just create the links
+	 * all at once.
+	 *
+	 * This reduces the chances of the various links being out of
+	 * sync with each other.
+	 */
+	if (strcmp(mn, "mixer") != 0) {
 		return (DEVFSADM_CONTINUE);
 	}
 
-	if (strncmp(mn, "sound,", 6) == 0) {
-		char base[PATH_MAX + 1];
-		char linksrc[PATH_MAX + 1];
-		char linkdst[PATH_MAX + 1];
-		long num;
-		long inst;
-		int i;
-		char *driver;
+	/*
+	 * Its the control node, so create the various
+	 * secondary links.
+	 */
 
-		/* strlen("sound,") */
-		(void) strlcpy(base, mn + 6, sizeof (base));
-		mn = base;
+	/*
+	 * We want a match against the physical path
+	 * without the minor name component.
+	 */
+	(void) snprintf(re_string, RE_SIZE, "%s", "^mixer([0-9]+)");
+	rules[0].re = re_string;
+	rules[0].subexp = 1;
+	rules[0].flags = MATCH_ALL;
 
-		driver = di_driver_name(node);
-
-		/* if driver name override in minor name */
-		if ((tmp = strchr(mn, ',')) != NULL) {
-			driver = mn;
-			*tmp = '\0';
-			mn = tmp + 1;
-		}
-
-		/* skip past "audio" portion of the minor name */
-		if (strncmp(mn, "audio", 5) == 0) {
-			mn += 5;
-		}
-
-		/* parse the instance number */
-		for (i = strlen(mn); i; i--) {
-			if (!isdigit(mn[i - 1]))
-				break;
-		}
-		inst = strtol(mn + i, &ep, 10);
-		mn[i] = 0;	/* lop off the instance number */
-
-		/*
-		 * First we create a node with the driver under /dev/sound.
-		 * Note that "instance numbers" used by the audio framework
-		 * are guaranteed to be unique for each driver.
-		 */
-		(void) snprintf(newpath, sizeof (newpath), "sound/%s:%d%s",
-		    driver, inst, mn);
-		(void) devfsadm_mklink(newpath, node, minor, flags);
-
-		/*
-		 * The rest of this logic is a gross simplification that
-		 * is made possible by the fact that each audio node will
-		 * have several different minors associated with it.  Rather
-		 * processing each node separately, we just create the links
-		 * all at once.
-		 *
-		 * This reduces the chances of the various links being out
-		 * of sync with each other.
-		 */
-		if (strcmp(mn, "mixer") != 0) {
-			return (DEVFSADM_CONTINUE);
-		}
-
-		/*
-		 * Its the control node, so create the various
-		 * secondary links.
-		 */
-
-		/*
-		 * We want a match against the physical path
-		 * without the minor name component.
-		 */
-		(void) snprintf(re_string, RE_SIZE, "%s", "^mixer([0-9]+)");
-		rules[0].re = re_string;
-		rules[0].subexp = 1;
-		rules[0].flags = MATCH_ALL;
-
-		/*
-		 * enumerate finds the logical audio id, and stuffs
-		 * it in buf
-		 */
-		(void) strlcpy(devpath, newpath, sizeof (devpath));
-		if (devfsadm_enumerate_int(devpath, 0, &buf, rules, 1)) {
-			return (DEVFSADM_CONTINUE);
-		}
-		num = strtol(buf, &ep, 10);
-		free(buf);
-
-		/* /dev/sound/0 */
-		(void) snprintf(linksrc, sizeof (linksrc), "sound/%s:%ld",
-		    driver, inst);
-		(void) snprintf(linkdst, sizeof (linkdst), "sound/%ld", num);
-		(void) devfsadm_secondary_link(linkdst, linksrc, flags);
-
-		(void) snprintf(linksrc, sizeof (linksrc), "sound/%s:%ldctl",
-		    driver, inst);
-		(void) snprintf(linkdst, sizeof (linkdst), "sound/%ldctl", num);
-		(void) devfsadm_secondary_link(linkdst, linksrc, flags);
-
-		(void) snprintf(linksrc, sizeof (linksrc), "sound/%s:%lddsp",
-		    driver, inst);
-		(void) snprintf(linkdst, sizeof (linkdst), "dsp%ld", num);
-		(void) devfsadm_secondary_link(linkdst, linksrc, flags);
-
-		(void) snprintf(linksrc, sizeof (linksrc), "sound/%s:%ldmixer",
-		    driver, inst);
-		(void) snprintf(linkdst, sizeof (linkdst), "mixer%ld", num);
-		(void) devfsadm_secondary_link(linkdst, linksrc, flags);
-
-		/* Send control number */
-		send_number(num);
-
+	/*
+	 * enumerate finds the logical audio id, and stuffs
+	 * it in buf
+	 */
+	(void) strlcpy(devpath, newpath, sizeof (devpath));
+	if (devfsadm_enumerate_int(devpath, 0, &buf, rules, 1)) {
 		return (DEVFSADM_CONTINUE);
 	}
+	num = strtol(buf, &ep, 10);
+	free(buf);
 
-	if (strncmp(mn, "internal,", 9) == 0) {
-		/* we don't set up internal nodes in /dev */
-		return (DEVFSADM_CONTINUE);
-	}
+	/* /dev/sound/0 */
+	(void) snprintf(linksrc, sizeof (linksrc), "sound/%s:%ld",
+	    driver, inst);
+	(void) snprintf(linkdst, sizeof (linkdst), "sound/%ld", num);
+	(void) devfsadm_secondary_link(linkdst, linksrc, flags);
 
-	devfsadm_errprint("SUNW_audio_link: can't find match for'%s'\n", mn);
+	(void) snprintf(linksrc, sizeof (linksrc), "sound/%s:%ldctl",
+	    driver, inst);
+	(void) snprintf(linkdst, sizeof (linkdst), "sound/%ldctl", num);
+	(void) devfsadm_secondary_link(linkdst, linksrc, flags);
+
+	(void) snprintf(linksrc, sizeof (linksrc), "sound/%s:%lddsp",
+	    driver, inst);
+	(void) snprintf(linkdst, sizeof (linkdst), "dsp%ld", num);
+	(void) devfsadm_secondary_link(linkdst, linksrc, flags);
+
+	(void) snprintf(linksrc, sizeof (linksrc), "sound/%s:%ldmixer",
+	    driver, inst);
+	(void) snprintf(linkdst, sizeof (linkdst), "mixer%ld", num);
+	(void) devfsadm_secondary_link(linkdst, linksrc, flags);
+
+	/* Send control number */
+	send_number(num);
+
 	return (DEVFSADM_CONTINUE);
 }
 

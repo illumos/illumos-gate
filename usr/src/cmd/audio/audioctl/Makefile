@@ -28,6 +28,7 @@ PROG= audioctl
 
 include ../../Makefile.cmd
 
+LDLIBS += -ldevinfo
 CFLAGS += $(CCVERBOSE)
 
 .KEEP_STATE:
