@@ -1849,7 +1849,7 @@ zfs_acl_ids_create(znode_t *dzp, int flag, vattr_t *vap, cred_t *cr,
 	/*
 	 * Determine uid and gid.
 	 */
-	if ((flag & (IS_ROOT_NODE | IS_REPLAY)) ||
+	if ((flag & IS_ROOT_NODE) || zfsvfs->z_replay ||
 	    ((flag & IS_XATTR) && (vap->va_type == VDIR))) {
 		acl_ids->z_fuid = zfs_fuid_create(zfsvfs,
 		    (uint64_t)vap->va_uid, cr,

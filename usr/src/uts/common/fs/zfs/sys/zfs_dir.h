@@ -46,7 +46,6 @@ extern "C" {
 /* mknode flags */
 #define	IS_ROOT_NODE	0x01		/* create a root node */
 #define	IS_XATTR	0x02		/* create an extended attribute node */
-#define	IS_REPLAY	0x04		/* we are replaying intent log */
 
 extern int zfs_dirent_lock(zfs_dirlock_t **, znode_t *, char *, znode_t **,
     int, int *, pathname_t *);
