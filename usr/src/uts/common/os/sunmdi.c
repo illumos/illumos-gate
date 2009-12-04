@@ -9297,46 +9297,49 @@ mdi_read_devices_files(void)
 static void
 clean_vhcache(mdi_vhci_config_t *vhc)
 {
-	mdi_vhci_cache_t *vhcache = &vhc->vhc_vhcache;
-	mdi_vhcache_phci_t *cphci, *cphci_head, *cphci_next;
-	mdi_vhcache_client_t *cct, *cct_head, *cct_next;
-	mdi_vhcache_pathinfo_t *cpi, *cpi_head, *cpi_next;
+	mdi_vhci_cache_t	*vhcache = &vhc->vhc_vhcache;
+	mdi_vhcache_phci_t	*phci, *nxt_phci;
+	mdi_vhcache_client_t	*client, *nxt_client;
+	mdi_vhcache_pathinfo_t	*path, *nxt_path;
 
 	rw_enter(&vhcache->vhcache_lock, RW_WRITER);
 
-	cct_head = vhcache->vhcache_client_head;
+	client = vhcache->vhcache_client_head;
 	vhcache->vhcache_client_head = vhcache->vhcache_client_tail = NULL;
-	for (cct = cct_head; cct != NULL; cct = cct_next) {
-		cct_next = cct->cct_next;
+	for ( ; client != NULL; client = nxt_client) {
+		nxt_client = client->cct_next;
 
-		cpi_head = cct->cct_cpi_head;
-		cct->cct_cpi_head = cct->cct_cpi_tail = NULL;
-		for (cpi = cpi_head; cpi != NULL; cpi = cpi_next) {
-			cpi_next = cpi->cpi_next;
-			if (cpi->cpi_pip != NULL) {
-				ASSERT(cpi->cpi_cphci->cphci_phci != NULL);
-				enqueue_tail_vhcache_pathinfo(cct, cpi);
-			} else
-				free_vhcache_pathinfo(cpi);
+		path = client->cct_cpi_head;
+		client->cct_cpi_head = client->cct_cpi_tail = NULL;
+		for ( ; path != NULL; path = nxt_path) {
+			nxt_path = path->cpi_next;
+			if ((path->cpi_cphci->cphci_phci != NULL) &&
+			    (path->cpi_pip != NULL)) {
+				enqueue_tail_vhcache_pathinfo(client, path);
+			} else if (path->cpi_pip != NULL) {
+				/* Not valid to have a path without a phci. */
+				free_vhcache_pathinfo(path);
+			}
 		}
 
-		if (cct->cct_cpi_head != NULL)
-			enqueue_vhcache_client(vhcache, cct);
+		if (client->cct_cpi_head != NULL)
+			enqueue_vhcache_client(vhcache, client);
 		else {
 			(void) mod_hash_destroy(vhcache->vhcache_client_hash,
-			    (mod_hash_key_t)cct->cct_name_addr);
-			free_vhcache_client(cct);
+			    (mod_hash_key_t)client->cct_name_addr);
+			free_vhcache_client(client);
 		}
 	}
 
-	cphci_head = vhcache->vhcache_phci_head;
+	phci = vhcache->vhcache_phci_head;
 	vhcache->vhcache_phci_head = vhcache->vhcache_phci_tail = NULL;
-	for (cphci = cphci_head; cphci != NULL; cphci = cphci_next) {
-		cphci_next = cphci->cphci_next;
-		if (cphci->cphci_phci != NULL)
-			enqueue_vhcache_phci(vhcache, cphci);
+	for ( ; phci != NULL; phci = nxt_phci) {
+
+		nxt_phci = phci->cphci_next;
+		if (phci->cphci_phci != NULL)
+			enqueue_vhcache_phci(vhcache, phci);
 		else
-			free_vhcache_phci(cphci);
+			free_vhcache_phci(phci);
 	}
 
 	vhcache->vhcache_clean_time = ddi_get_lbolt64();
