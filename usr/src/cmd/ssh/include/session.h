@@ -22,14 +22,12 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SESSION_H
 #define	_SESSION_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -82,6 +80,8 @@ Session	*session_by_tty(char *);
 void	 session_close(Session *);
 void	 do_setusercontext(struct passwd *);
 void	 child_set_env(char ***envp, u_int *envsizep, const char *name,
+		       const char *value);
+void	 child_set_env_silent(char ***envp, u_int *envsizep, const char *name,
 		       const char *value);
 
 

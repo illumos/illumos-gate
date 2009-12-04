@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -164,6 +164,7 @@ input_userauth_request(int type, u_int32_t seq, void *ctxt)
 	Authctxt *authctxt = ctxt;
 	Authmethod *m = NULL;
 	char *user, *service, *method, *style = NULL;
+	int valid_attempt;
 
 	if (authctxt == NULL)
 		fatal("input_userauth_request: no authctxt");
@@ -186,13 +187,22 @@ input_userauth_request(int type, u_int32_t seq, void *ctxt)
 	if (m != NULL && m->is_initial)
 		authctxt->init_attempt++;
 
+	if (options.pre_userauth_hook != NULL &&
+	    run_auth_hook(options.pre_userauth_hook, user, m->name) != 0) {
+		valid_attempt = 0;
+	} else {
+		valid_attempt = 1;
+	}
+
 	if (authctxt->attempt == 1) {
 		/* setup auth context */
 		authctxt->pw = getpwnamallow(user);
 		/* May want to abstract SSHv2 services someday */
 		if (authctxt->pw && strcmp(service, "ssh-connection")==0) {
 			/* enforced in userauth_finish() below */
-			authctxt->valid = 1;
+			if (valid_attempt) {
+				authctxt->valid = 1;
+			}
 			debug2("input_userauth_request: setting up authctxt for %s", user);
 		} else {
 			log("input_userauth_request: illegal user %s", user);
@@ -323,7 +333,9 @@ userauth_finish(Authctxt *authctxt, char *method)
 done_checking:
 	if (!authctxt->valid && authenticated) {
 		/*
-		 * Should never happen -- if it does PAM's at fault
+		 * We get here if the PreUserauthHook fails but the
+		 * user is otherwise valid.
+		 * An error in the PAM handling could also get us here
 		 * but we need not panic, just treat as a failure.
 		 */
 		authctxt->method->authenticated = 0;

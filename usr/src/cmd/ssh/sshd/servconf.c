@@ -154,6 +154,7 @@ initialize_server_options(ServerOptions *options)
 	options->lookup_client_hostnames = -1;
 	options->use_openssl_engine = -1;
 	options->chroot_directory = NULL;
+	options->pre_userauth_hook = NULL;
 }
 
 #ifdef HAVE_DEFOPEN
@@ -420,7 +421,7 @@ typedef enum {
 	sClientAliveCountMax, sAuthorizedKeysFile, sAuthorizedKeysFile2,
 	sMaxAuthTries, sMaxAuthTriesLog, sUsePrivilegeSeparation,
 	sLookupClientHostnames, sUseOpenSSLEngine, sChrootDirectory,
-	sMatch,
+	sPreUserauthHook, sMatch,
 	sDeprecated
 } ServerOpCodes;
 
@@ -522,6 +523,7 @@ static struct {
 	{ "lookupclienthostnames", sLookupClientHostnames, SSHCFG_GLOBAL },
 	{ "useopensslengine", sUseOpenSSLEngine, SSHCFG_GLOBAL },
 	{ "chrootdirectory", sChrootDirectory, SSHCFG_ALL },
+	{ "preuserauthhook", sPreUserauthHook, SSHCFG_ALL},
 	{ "match", sMatch, SSHCFG_ALL },
 
 	{ NULL, sBadOption, 0 }
@@ -1297,6 +1299,10 @@ parse_flag:
 		if (*activep && *charptr == NULL)
 			*charptr = xstrdup(arg);
 		break;
+
+	case sPreUserauthHook:
+		charptr = &options->pre_userauth_hook;
+		goto parse_filename;
 
 	case sMatch:
 		if (cmdline)

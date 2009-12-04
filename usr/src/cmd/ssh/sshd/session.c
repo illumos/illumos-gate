@@ -799,10 +799,18 @@ void
 child_set_env(char ***envp, u_int *envsizep, const char *name,
 	const char *value)
 {
+	debug3("child_set_env(%s, %s)", name, value);
+	child_set_env_silent(envp, envsizep, name, value);
+}
+
+
+void
+child_set_env_silent(char ***envp, u_int *envsizep, const char *name,
+	const char *value)
+{
 	u_int i, namelen;
 	char **env;
 
-	debug3("child_set_env(%s, %s)", name, value);
 	/*
 	 * Find the slot where the value should be stored.  If the variable
 	 * already exists, we reuse the slot; otherwise we append a new slot

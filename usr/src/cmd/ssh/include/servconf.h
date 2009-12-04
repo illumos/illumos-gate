@@ -163,6 +163,7 @@ typedef struct {
 	int	lookup_client_hostnames;
 	int	use_openssl_engine;
 	char   *chroot_directory;
+	char   *pre_userauth_hook;
 
 }       ServerOptions;
 

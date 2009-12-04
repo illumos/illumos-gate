@@ -55,6 +55,8 @@ RCSID("$OpenBSD: auth.c,v 1.45 2002/09/20 18:41:29 stevesk Exp $");
 #include "misc.h"
 #include "bufaux.h"
 #include "packet.h"
+#include "channels.h"
+#include "session.h"
 
 #ifdef HAVE_BSM
 #include "bsmaudit.h"
@@ -611,6 +613,144 @@ getpwnamallow(const char *user)
 	if (pw != NULL)
 		return (pwcopy(pw));
 	return (NULL);
+}
+
+
+/*
+ * The fatal_cleanup method to kill the hook. Since hook has been put into
+ * new process group all descendants will be killed as well.
+ */
+static void
+kill_hook(void *arg)
+{
+	pid_t pid;
+
+        pid = *(pid_t*)arg;
+	debug("killing hook and all it's children, process group: %ld", pid);
+	xfree(arg);
+	(void)killpg(pid, SIGTERM);
+}
+
+/*
+ * Runs the PreUserauthHook.
+ * Returns -1 on execution error or the exit code of the hook if execution is
+ * successful.
+ */
+int
+run_auth_hook(const char *path, const char *user, const char *method)
+{
+	struct stat st;
+	int i, status, ret = 1;
+	u_int envsize, argsize;
+	char buf[256];
+	char **env, **args;
+        pid_t pid, *ppid;
+
+	if (path == NULL || user == NULL || method == NULL) {
+		return (-1);
+	}
+
+	/* Initialize the environment/arguments for the hook. */
+	envsize = 4; /* 3 env vars + EndOfList marker */
+	argsize = 4; /* 2 args + exe name + EndOfList marker */
+	env = xmalloc(envsize * sizeof (char *));
+	args = xmalloc(argsize * sizeof (char *));
+	env[0] = NULL;
+
+	/* we use the SSH env handling scheme */
+	child_set_env_silent(&env, &envsize, "PATH", "/usr/bin:/bin");
+	child_set_env_silent(&env, &envsize, "IFS", " \t\n");
+
+	(void) snprintf(buf, sizeof (buf), "%.50s %d %.50s %d",
+	    get_remote_ipaddr(), get_remote_port(),
+	    get_local_ipaddr(packet_get_connection_in()), get_local_port());
+	child_set_env_silent(&env, &envsize, "SSH_CONNECTION", buf);
+
+	args[0] = xstrdup(path);
+	args[1] = xstrdup(method);
+	args[2] = xstrdup(user);
+	args[3] = NULL;
+
+	/*
+	 * sanity checks
+	 * note: the checks do not make sure that the file checked is actually
+	 * the same which is executed. However, in this case it shouldn't be a
+	 * major issue since the hook is rather static and the worst case would
+	 * be an uncorrect message in the log or a hook is run even though the
+	 * permissions are not right.
+	 */
+
+	/* check if script does exist */
+	if (stat(path, &st) < 0) {
+		log("Error executing PreUserauthHook \"%s\": %s", path,
+		    strerror(errno));
+		goto cleanup;
+	}
+
+	/* Check correct permissions for script (uid of SSHD, mode 500) */
+	if (st.st_uid != getuid() || ((st.st_mode & 0777) != 0500)) {
+		log("PreUserauthHook has invalid permissions (should be 500, is"
+		    " %o) or ownership (should be %d, is %d)",
+		(uint) st.st_mode & 0777, getuid(), st.st_uid);
+		goto cleanup;
+	}
+
+	if ((pid = fork()) == 0) {
+		/* 
+		 * We put the hook and all its (possible) descendants into
+		 * a new process group so that in case of a hanging hook
+		 * we can wipe out the whole "family".
+		 */
+            	if (setpgid(0, 0) != 0) {
+			log("setpgid: %s", strerror(errno));
+			_exit(255);
+                }
+		(void) execve(path, args, env);
+		/* child is gone so we shouldn't get here */
+		log("Error executing PreUserauthHook \"%s\": %s", path,
+		    strerror(errno));
+		_exit(255);
+	} else if (pid == -1) {
+		log("Error executing PreUserauthHook \"%s\": %s", path,
+		    strerror(errno));
+		goto cleanup;
+	}
+
+	/* make preparations to kill hook if it is hanging */
+	ppid = xmalloc(sizeof (pid_t));
+	*ppid = pid;
+	fatal_add_cleanup((void (*)(void *))kill_hook, (void *) ppid);
+
+	if (waitpid(pid, &status, 0) == -1) {
+		log("Error executing PreUserauthHook \"%s\": %s", path,
+		    strerror(errno));
+		goto cleanup;
+	}
+
+	ret = WEXITSTATUS(status);
+
+	if (ret == 255) {
+		ret = -1; /* execve() failed, error msg already logged */
+	} else if (ret != 0) {
+		log("PreUserauthHook \"%s\" failed with exit code %d",
+		    path, ret);
+	} else {
+		debug("PreUserauthHook \"%s\" finished successfully", path);
+	}
+
+cleanup:
+	for (i = 0; args[i] != NULL; i++) {
+		xfree(args[i]);
+	}
+	for (i = 0; env[i] != NULL; i++) {
+		xfree(env[i]);
+	}
+	xfree(args);
+	xfree(env);
+
+	fatal_remove_cleanup((void (*)(void *))kill_hook, (void *) ppid);
+
+	return (ret);
 }
 
 void
