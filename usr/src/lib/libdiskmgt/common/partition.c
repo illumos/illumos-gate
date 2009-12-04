@@ -652,9 +652,15 @@ get_parts(disk_t *disk, struct ipart *iparts, char *opath, int opath_len)
 				case FDISK_EBADLOGDRIVE:
 				case FDISK_ENOLOGDRIVE:
 					free(device);
+					libfdisk_fini(&epp);
 					continue;
+				case FDISK_EBADMAGIC:
+					free(device);
+					libfdisk_fini(&epp);
+					return (ENOTTY);
 				default:
 					free(device);
+					libfdisk_fini(&epp);
 					return (ENODEV);
 			}
 		}

@@ -1181,31 +1181,37 @@ main(int argc, char *argv[])
 	    != FDISK_SUCCESS) {
 		switch (rval) {
 			/*
-			 * FDISK_EBADLOGDRIVE and FDISK_ENOLOGDRIVE can
-			 * be considered as soft errors and hence
-			 * we do not exit
+			 * FDISK_EBADLOGDRIVE, FDISK_ENOLOGDRIVE and
+			 * FDISK_EBADMAGIC can be considered as
+			 * soft errors and hence we do not exit
 			 */
 			case FDISK_EBADLOGDRIVE:
 				break;
 			case FDISK_ENOLOGDRIVE:
 				break;
+			case FDISK_EBADMAGIC:
+				break;
 			case FDISK_ENOVGEOM:
 				fprintf(stderr, "Could not get virtual"
 				    " geometry for this device\n");
+				libfdisk_fini(&epp);
 				exit(1);
 				break;
 			case FDISK_ENOPGEOM:
 				fprintf(stderr, "Could not get physical"
 				    " geometry for this device\n");
+				libfdisk_fini(&epp);
 				exit(1);
 				break;
 			case FDISK_ENOLGEOM:
 				fprintf(stderr, "Could not get label"
 				    " geometry for this device\n");
+				libfdisk_fini(&epp);
 				exit(1);
 				break;
 			default:
 				perror("Failed to initialise libfdisk.\n");
+				libfdisk_fini(&epp);
 				exit(1);
 				break;
 		}

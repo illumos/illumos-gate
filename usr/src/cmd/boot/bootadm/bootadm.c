@@ -4924,8 +4924,11 @@ get_partition(char *device)
 				break;
 			case FDISK_ENOLOGDRIVE:
 				break;
+			case FDISK_EBADMAGIC:
+				/*FALLTHROUGH*/
 			default:
 				free(wholedisk);
+				libfdisk_fini(&epp);
 				return (partno);
 				break;
 		}

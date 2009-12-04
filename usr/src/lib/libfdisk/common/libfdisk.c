@@ -155,6 +155,7 @@ libfdisk_init(ext_part_t **epp, char *devstr, struct ipart *parttab, int opflag)
 	ext_part_t *temp;
 	struct stat sbuf;
 	int rval = FDISK_SUCCESS;
+	int found_bad_magic = 0;
 
 	if ((temp = calloc(1, sizeof (ext_part_t))) == NULL) {
 		return (ENOMEM);
@@ -206,7 +207,15 @@ libfdisk_init(ext_part_t **epp, char *devstr, struct ipart *parttab, int opflag)
 	if ((temp->mtable = parttab) == NULL) {
 		if ((rval = fdisk_init_master_part_table(temp)) !=
 		    FDISK_SUCCESS) {
-			return (rval);
+			/*
+			 * When we have no fdisk magic 0xAA55 on the disk,
+			 * we return FDISK_EBADMAGIC after successfully
+			 * obtaining the disk geometry.
+			 */
+			if (rval != FDISK_EBADMAGIC)
+				return (rval);
+			else
+				found_bad_magic = 1;
 		}
 	}
 
@@ -217,6 +226,10 @@ libfdisk_init(ext_part_t **epp, char *devstr, struct ipart *parttab, int opflag)
 	}
 
 	*epp = temp;
+
+	if (found_bad_magic != 0) {
+		return (FDISK_EBADMAGIC);
+	}
 
 	if (opflag & FDISK_READ_DISK) {
 		rval = fdisk_read_extpart(*epp);
@@ -591,7 +604,7 @@ fdisk_validate_logical_drive(ext_part_t *epp, uint32_t begsec,
  * Procedure to walk through the extended partitions and build a Singly
  * Linked List out of the data.
  */
-int
+static int
 fdisk_read_extpart(ext_part_t *epp)
 {
 	struct ipart *fdp, *ext_fdp;
@@ -754,12 +767,14 @@ fdisk_read_master_part_table(ext_part_t *epp)
 	if (read(epp->dev_fd, buf, sectsize) < sectsize) {
 		return (EIO);
 	}
-	bcopy(&buf[FDISK_PART_TABLE_START], epp->mtable, cpcnt);
 
 	/*LINTED*/
 	if (LE_16((*(uint16_t *)&buf[510])) != MBB_MAGIC) {
+		bzero(epp->mtable, cpcnt);
 		return (FDISK_EBADMAGIC);
 	}
+
+	bcopy(&buf[FDISK_PART_TABLE_START], epp->mtable, cpcnt);
 
 	return (FDISK_SUCCESS);
 }

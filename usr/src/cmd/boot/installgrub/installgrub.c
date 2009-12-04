@@ -311,13 +311,15 @@ get_start_sector(int fd)
 	 */
 	if ((rval = libfdisk_init(&epp, device_p0, NULL, FDISK_READ_DISK))
 	    != FDISK_SUCCESS) {
+		libfdisk_fini(&epp);
 		switch (rval) {
 			/*
-			 * The first 2 cases are not an error per-se, just that
+			 * The first 3 cases are not an error per-se, just that
 			 * there is no Solaris logical partition
 			 */
 			case FDISK_EBADLOGDRIVE:
 			case FDISK_ENOLOGDRIVE:
+			case FDISK_EBADMAGIC:
 				(void) fprintf(stderr, NOSOLPAR);
 				exit(-1);
 				/*NOTREACHED*/
@@ -341,12 +343,12 @@ get_start_sector(int fd)
 	}
 
 	rval = fdisk_get_solaris_part(epp, &pno, &secnum, &numsec);
+	libfdisk_fini(&epp);
 	if (rval != FDISK_SUCCESS) {
 		/* No solaris logical partition */
 		(void) fprintf(stderr, NOSOLPAR);
 		exit(-1);
 	}
-	libfdisk_fini(&epp);
 
 	start_sect = secnum;
 	partition = pno - 1;

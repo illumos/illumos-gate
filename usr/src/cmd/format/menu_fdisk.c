@@ -952,31 +952,37 @@ extpart_init(ext_part_t **epp)
 	    FDISK_SUCCESS) {
 		switch (rval) {
 			/*
-			 * FDISK_EBADLOGDRIVE and FDISK_ENOLOGDRIVE can
-			 * be considered as soft errors and hence
-			 * we do not exit
+			 * FDISK_EBADLOGDRIVE, FDISK_ENOLOGDRIVE
+			 * and FDISK_EBADMAGIC can be considered
+			 * as soft errors and hence we do not exit.
 			 */
 			case FDISK_EBADLOGDRIVE:
 				break;
 			case FDISK_ENOLOGDRIVE:
 				break;
+			case FDISK_EBADMAGIC:
+				break;
 			case FDISK_ENOVGEOM:
 				err_print("Could not get virtual geometry for"
 				    " this device\n");
+				libfdisk_fini(epp);
 				fullabort();
 				break;
 			case FDISK_ENOPGEOM:
 				err_print("Could not get physical geometry for"
 				    " this device\n");
+				libfdisk_fini(epp);
 				fullabort();
 				break;
 			case FDISK_ENOLGEOM:
 				err_print("Could not get label geometry for "
 				    " this device\n");
+				libfdisk_fini(epp);
 				fullabort();
 				break;
 			default:
 				err_print("Failed to initialise libfdisk.\n");
+				libfdisk_fini(epp);
 				fullabort();
 				break;
 		}
