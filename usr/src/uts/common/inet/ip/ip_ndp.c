@@ -363,7 +363,7 @@ nce_lookup_then_add_v6(ill_t *ill, uchar_t *hw_addr, uint_t hw_addr_len,
 	if (err == 0)
 		err = nce_add_v6_postprocess(nce);
 	if (in_ill != ill && nce != NULL) {
-		nce_t *under_nce;
+		nce_t *under_nce = NULL;
 
 		/*
 		 * in_ill was the under_ill. Try to create the under_nce.
@@ -3597,7 +3597,7 @@ nce_lookup_then_add_v4(ill_t *ill, uchar_t *hw_addr, uint_t hw_addr_len,
 		err = nce_add_v4_postprocess(nce);
 
 	if (in_ill != ill && nce != NULL) {
-		nce_t *under_nce;
+		nce_t *under_nce = NULL;
 
 		/*
 		 * in_ill was the under_ill. Try to create the under_nce.
