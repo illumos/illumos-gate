@@ -43,12 +43,6 @@
 
 #include <sys/ib/adapters/tavor/tavor.h>
 
-/*
- * Used by tavor_cq_numcalc() below to fill in the "unconstrained" portion
- * of Tavor completion queue number
- */
-static uint_t tavor_debug_cqnum_cnt = 0x00000000;
-
 static void tavor_cq_doorbell(tavor_state_t *state, uint32_t cq_cmd,
     uint32_t cqn, uint32_t cq_param);
 #pragma inline(tavor_cq_doorbell)
@@ -60,8 +54,6 @@ static void tavor_cqe_sync(tavor_cqhdl_t cq, tavor_hw_cqe_t *cqe,
     uint_t flag);
 static void tavor_cq_resize_helper(tavor_cqhdl_t cq, tavor_hw_cqe_t *new_cqbuf,
     uint32_t old_cons_indx, uint32_t num_newcqe);
-static void tavor_cq_numcalc(tavor_state_t *state, uint32_t indx,
-    uint32_t *key);
 
 /*
  * tavor_cq_alloc()
@@ -147,14 +139,8 @@ tavor_cq_alloc(tavor_state_t *state, ibt_cq_hdl_t ibt_cqhdl,
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*cq))
 	cq->cq_is_umap = cq_is_umap;
 
-	/*
-	 * Calculate the CQ number from CQC index.  In much the same way
-	 * as we create keys for memory regions (see tavor_mr.c), this CQ
-	 * number is constructed from a "constrained" portion (which depends
-	 * on the CQC index) and an "unconstrained" portion (which is
-	 * arbitrarily chosen).
-	 */
-	tavor_cq_numcalc(state, cqc->tr_indx, &cq->cq_cqnum);
+	/* Use the index as CQ number */
+	cq->cq_cqnum = cqc->tr_indx;
 
 	/*
 	 * If this will be a user-mappable CQ, then allocate an entry for
@@ -1736,33 +1722,6 @@ tavor_cq_resize_helper(tavor_cqhdl_t cq, tavor_hw_cqe_t *new_cqbuf,
 	}
 
 	TAVOR_TNF_EXIT(tavor_cq_resize_helper);
-}
-
-
-/*
- * tavor_cq_numcalc()
- *    Context: Can be called from interrupt or base context.
- */
-static void
-tavor_cq_numcalc(tavor_state_t *state, uint32_t indx, uint32_t *key)
-{
-	uint32_t	tmp, log_num_cq;
-
-	/*
-	 * Generate a simple key from counter.  Note:  We increment this
-	 * static variable _intentionally_ without any kind of mutex around
-	 * it.  First, single-threading all operations through a single lock
-	 * would be a bad idea (from a performance point-of-view).  Second,
-	 * the upper "unconstrained" bits don't really have to be unique
-	 * because the lower bits are guaranteed to be (although we do make a
-	 * best effort to ensure that they are).  Third, the window for the
-	 * race (where both threads read and update the counter at the same
-	 * time) is incredibly small.
-	 */
-	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(tavor_debug_cqnum_cnt))
-	log_num_cq = state->ts_cfg_profile->cp_log_num_cq;
-	tmp = (tavor_debug_cqnum_cnt++) << log_num_cq;
-	*key = (tmp | indx) & TAVOR_CQ_MAXNUMBER_MSK;
 }
 
 /*

@@ -1883,6 +1883,7 @@ mrcommon_fail7:
 mrcommon_fail6:
 	tavor_rsrc_free(state, &mtt);
 	tavor_mr_mem_unbind(state, bh);
+	bind->bi_type = bh->bi_type;
 mrcommon_fail5:
 	if (mr_is_umem) {
 		tavor_umap_db_free(umapdb);

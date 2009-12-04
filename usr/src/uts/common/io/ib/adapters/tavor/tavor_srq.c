@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,13 +41,6 @@
 
 #include <sys/ib/adapters/tavor/tavor.h>
 
-/*
- * Used by tavor_srq_numcalc() below to fill in the "unconstrained" portion of
- * Tavor shared receive queue number
- */
-static uint_t tavor_debug_srqnum_cnt = 0x00000000;
-static void tavor_srq_numcalc(tavor_state_t *state, uint32_t indx,
-    uint32_t *key);
 static void tavor_srq_sgl_to_logwqesz(tavor_state_t *state, uint_t num_sgl,
     tavor_qp_wq_type_t wq_type, uint_t *logwqesz, uint_t *max_sgl);
 
@@ -151,8 +144,7 @@ tavor_srq_alloc(tavor_state_t *state, tavor_srq_info_t *srqinfo,
 	srq = (tavor_srqhdl_t)rsrc->tr_addr;
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*srq))
 
-	/* Calculate the SRQ number */
-	tavor_srq_numcalc(state, srqc->tr_indx, &srq->srq_srqnum);
+	srq->srq_srqnum = srqc->tr_indx;	/* just use index */
 
 	/*
 	 * If this will be a user-mappable SRQ, then allocate an entry for
@@ -1022,33 +1014,6 @@ srqmodify_fail:
 	    tnf_string, msg, errormsg);
 	TAVOR_TNF_EXIT(tavor_srq_modify);
 	return (status);
-}
-
-
-/*
- * tavor_srq_numcalc()
- *    Context: Can be called from interrupt or base context.
- */
-static void
-tavor_srq_numcalc(tavor_state_t *state, uint32_t indx, uint32_t *key)
-{
-	uint32_t	tmp, log_num_srq;
-
-	/*
-	 * Generate a simple key from counter.  Note:  We increment this
-	 * static variable _intentionally_ without any kind of mutex around
-	 * it.  First, single-threading all operations through a single lock
-	 * would be a bad idea (from a performance point-of-view).  Second,
-	 * the upper "unconstrained" bits don't really have to be unique
-	 * because the lower bits are guaranteed to be (although we do make a
-	 * best effort to ensure that they are).  Third, the window for the
-	 * race (where both threads read and update the counter at the same
-	 * time) is incredibly small.
-	 */
-	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(tavor_debug_srqnum_cnt))
-	log_num_srq = state->ts_cfg_profile->cp_log_num_srq;
-	tmp = (tavor_debug_srqnum_cnt++) << log_num_srq;
-	*key = (tmp | indx) & TAVOR_CQ_MAXNUMBER_MSK;
 }
 
 

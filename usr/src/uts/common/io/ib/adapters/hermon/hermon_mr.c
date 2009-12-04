@@ -1790,6 +1790,7 @@ mrcommon_fail7:
 	hermon_rsrc_free(state, &mtt_refcnt);
 mrcommon_fail6:
 	hermon_mr_mem_unbind(state, bh);
+	bind->bi_type = bh->bi_type;
 mrcommon_fail5:
 	if (mr_is_umem) {
 		hermon_umap_db_free(umapdb);
