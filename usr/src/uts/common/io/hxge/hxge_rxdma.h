@@ -60,6 +60,7 @@ extern "C" {
 #define	RCR_PKTBUFSZ_1			0x01
 #define	RCR_PKTBUFSZ_2			0x02
 #define	RCR_SINGLE_BLOCK		0x03
+#define	N_PKTSIZE_TYPES			0x04
 
 #define	RCR_NO_ERROR			0x0
 #define	RCR_CTRL_FIFO_DED		0x1
@@ -362,7 +363,7 @@ typedef struct _rxbuf_index_info_t {
 /* Buffer index information */
 
 typedef struct _rxring_info_t {
-	uint32_t		hint[3];
+	uint32_t		hint[N_PKTSIZE_TYPES];
 	uint32_t		block_size_mask;
 	uint16_t		max_iterations;
 	rxbuf_index_info_t	buffer[HXGE_DMA_BLOCK];

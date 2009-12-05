@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,37 +51,48 @@ extern "C" {
 #endif
 
 #define	HXGE_RBR_RBB_MIN	128
-#define	HXGE_RBR_RBB_MAX	(64 * 128 -1)
+#define	HXGE_RBR_RBB_MAX	((64 * 128) - 1)
+#if defined(__sparc)
+#define	HXGE_RBR_RBB_DEFAULT	1536		/* Number of RBR Blocks */
+#else
 #define	HXGE_RBR_RBB_DEFAULT	2048		/* Number of RBR Blocks */
+#endif
 #define	HXGE_RCR_MIN		(HXGE_RBR_RBB_MIN * 2)
 #define	HXGE_RCR_MAX		65504			/* 2^16 - 32 */
 
-/* 4096/256 for x86 and 8192/512 for Sparc */
+/*
+ * 4096/256 for x86 and 8192 / 256 for Sparc
+ *	NOTE: RCR Ring Size should *not* enable bit 19 of the address.
+ */
+#if defined(__sparc)
+#define	HXGE_RCR_DEFAULT	(HXGE_RBR_RBB_DEFAULT * 32)
+#else
 #define	HXGE_RCR_DEFAULT	(HXGE_RBR_RBB_DEFAULT * 16)
+#endif
 
 #define	HXGE_TX_RING_DEFAULT	2048
-#define	HXGE_TX_RING_MAX	(64 * 128 - 1)
+#define	HXGE_TX_RING_MAX	((64 * 128) - 1)
 
-#define	RBR_BKSIZE_4K			0
-#define	RBR_BKSIZE_8K			1
-#define	RBR_BKSIZE_4K_BYTES		(4 * 1024)
+#define	RBR_BKSIZE_4K		0
+#define	RBR_BKSIZE_8K		1
+#define	RBR_BKSIZE_4K_BYTES	(4 * 1024)
 
-#define	RBR_BUFSZ2_2K			0
-#define	RBR_BUFSZ2_4K			1
-#define	RBR_BUFSZ2_2K_BYTES		(2 * 1024)
-#define	RBR_BUFSZ2_4K_BYTES		(4 * 1024)
+#define	RBR_BUFSZ2_2K		0
+#define	RBR_BUFSZ2_4K		1
+#define	RBR_BUFSZ2_2K_BYTES	(2 * 1024)
+#define	RBR_BUFSZ2_4K_BYTES	(4 * 1024)
 
-#define	RBR_BUFSZ1_1K			0
-#define	RBR_BUFSZ1_2K			1
-#define	RBR_BUFSZ1_1K_BYTES		1024
-#define	RBR_BUFSZ1_2K_BYTES		(2 * 1024)
+#define	RBR_BUFSZ1_1K		0
+#define	RBR_BUFSZ1_2K		1
+#define	RBR_BUFSZ1_1K_BYTES	1024
+#define	RBR_BUFSZ1_2K_BYTES	(2 * 1024)
 
-#define	RBR_BUFSZ0_256B			0
-#define	RBR_BUFSZ0_512B			1
-#define	RBR_BUFSZ0_1K			2
-#define	RBR_BUFSZ0_256_BYTES		256
-#define	RBR_BUFSZ0_512_BYTES		512
-#define	RBR_BUFSZ0_1K_BYTES		1024
+#define	RBR_BUFSZ0_256B		0
+#define	RBR_BUFSZ0_512B		1
+#define	RBR_BUFSZ0_1K		2
+#define	RBR_BUFSZ0_256_BYTES	256
+#define	RBR_BUFSZ0_512_BYTES	512
+#define	RBR_BUFSZ0_1K_BYTES	1024
 
 /*
  * VLAN table configuration

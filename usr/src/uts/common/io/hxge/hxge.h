@@ -401,11 +401,6 @@ struct _hxge_t {
 	kmutex_t		vmac_lock;
 	kmutex_t		pio_lock;
 	hxge_timeout		timeout;
-
-	int			msix_count;
-	int			msix_index;
-	uint32_t		msix_table[32][3];
-	uint32_t		msix_table_check[1][3];
 };
 
 /*

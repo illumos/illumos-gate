@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -148,8 +149,8 @@ hxge_rx_vmac_init(p_hxge_t hxgep)
 	if (hxgep->statsp->port_stats.lb_mode != hxge_lb_normal)
 		xconfig |= CFG_VMAC_RX_LOOP_BACK;
 
-	if (hpi_vmac_rx_config(handle, INIT, xconfig, max_frame_length)
-	    != HPI_SUCCESS)
+	if (hpi_vmac_rx_config(handle, INIT, xconfig,
+	    max_frame_length) != HPI_SUCCESS)
 		return (HXGE_ERROR);
 
 	hxgep->vmac.rx_config = xconfig;
@@ -221,16 +222,26 @@ hxge_rx_vmac_enable(p_hxge_t hxgep)
 	 * vmac.  Max framesize is programed here in
 	 * hxge_rx_vmac_init().
 	 */
-	rv = hxge_rx_vmac_init(hxgep);
-	if (rv != HXGE_OK)
-		return (rv);
+	rv = hpi_vmac_rx_set_framesize(HXGE_DEV_HPI_HANDLE(hxgep),
+	    (uint16_t)hxgep->vmac.maxframesize);
+	if (rv != HPI_SUCCESS) {
+		HXGE_DEBUG_MSG((hxgep, MAC_CTL, "<== hxge_rx_vmac_enable"));
+		return (HXGE_ERROR);
+	}
 
+	/*
+	 * Wait for a period of time.
+	 */
+	HXGE_DELAY(10);
+
+	/*
+	 * Enable the vmac.
+	 */
 	rv = hpi_vmac_rx_config(handle, ENABLE, CFG_VMAC_RX_EN, 0);
 
 	status = (rv == HPI_SUCCESS) ? HXGE_OK : HXGE_ERROR;
 
 	HXGE_DEBUG_MSG((hxgep, MAC_CTL, "<== hxge_rx_vmac_enable"));
-
 	return (status);
 }
 
@@ -254,12 +265,16 @@ hxge_rx_vmac_disable(p_hxge_t hxgep)
 	(void) hpi_vmac_rx_set_framesize(HXGE_DEV_HPI_HANDLE(hxgep),
 	    (uint16_t)0);
 
+	/*
+	 * Wait for 10us before doing disable.
+	 */
+	HXGE_DELAY(10);
+
 	rv = hpi_vmac_rx_config(handle, DISABLE, CFG_VMAC_RX_EN, 0);
 
 	status = (rv == HPI_SUCCESS) ? HXGE_OK : HXGE_ERROR;
 
 	HXGE_DEBUG_MSG((hxgep, MAC_CTL, "<== hxge_rx_vmac_disable"));
-
 	return (status);
 }
 
@@ -281,6 +296,14 @@ hxge_status_t
 hxge_rx_vmac_reset(p_hxge_t hxgep)
 {
 	hpi_handle_t	handle = hxgep->hpi_handle;
+
+	(void) hpi_vmac_rx_set_framesize(HXGE_DEV_HPI_HANDLE(hxgep),
+	    (uint16_t)0);
+
+	/*
+	 * Wait for 10us  before doing reset.
+	 */
+	HXGE_DELAY(10);
 
 	(void) hpi_rx_vmac_reset(handle);
 
