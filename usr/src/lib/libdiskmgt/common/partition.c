@@ -624,16 +624,14 @@ get_parts(disk_t *disk, struct ipart *iparts, char *opath, int opath_len)
 		if (!fdisk_is_dos_extended(iparts[i].systid))
 			continue;
 
-		len = strlen(disk->aliases->alias) + strlen("/dev/rdsk/") + 1;
+		len = strlen(disk->aliases->alias) + 1;
 		if ((device = malloc(len)) == NULL) {
 			if (device)
 				free(device);
 			continue;
 		}
 
-		/* Check the above fix w Jean */
-		(void) snprintf(device, len, "/dev/rdsk/%s",
-		    disk->aliases->alias);
+		(void) snprintf(device, len, "%s", disk->aliases->alias);
 
 		if ((ret = libfdisk_init(&epp, device, &iparts[i],
 		    FDISK_READ_DISK)) != FDISK_SUCCESS) {
