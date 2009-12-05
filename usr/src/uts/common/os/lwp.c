@@ -502,6 +502,12 @@ grow:
 		t->t_bound_cpu = cpu[binding];
 		if (t->t_lpl != t->t_bound_cpu->cpu_lpl)
 			lgrp_move_thread(t, t->t_bound_cpu->cpu_lpl, 1);
+	} else if (CLASS_KERNEL(cid)) {
+		/*
+		 * For kernel threads, assign ourselves to the root lgrp.
+		 */
+		lgrp_move_thread(t,
+		    &curthread->t_cpupart->cp_lgrploads[LGRP_ROOTID], 1);
 	} else {
 		lgrp_move_thread(t, lgrp_choose(t, t->t_cpupart), 1);
 	}
