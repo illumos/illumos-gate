@@ -1,12 +1,10 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_AGPTARGET_IO_H
 #define	_SYS_AGPTARGET_IO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -27,6 +25,9 @@ extern "C" {
 #define	AGP_TARGET_FLUSH_GTLB	_IO(AGPTARGETIOC_BASE, 35)
 #define	AGP_TARGET_CONFIGURE	_IO(AGPTARGETIOC_BASE, 36)
 #define	AGP_TARGET_UNCONFIG	_IO(AGPTARGETIOC_BASE, 37)
+#define	INTEL_CHIPSET_FLUSH_SETUP	_IO(AGPTARGETIOC_BASE, 38)
+#define	INTEL_CHIPSET_FLUSH	_IO(AGPTARGETIOC_BASE, 39)
+#define	INTEL_CHIPSET_FLUSH_FREE	_IO(AGPTARGETIOC_BASE, 40)
 
 /* Internal agp info struct */
 typedef struct _i_agp_info {

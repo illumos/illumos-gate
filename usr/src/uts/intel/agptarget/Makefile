@@ -1,11 +1,9 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/intel/agptarget/Makefile
 #
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the framework of agp protocol
 #	(agptarget) kernel module.
@@ -22,6 +20,11 @@ MODULE		= agptarget
 OBJECTS		= $(AGPTARGET_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(AGPTARGET_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
+
+#
+#       dependency
+#
+LDFLAGS += -dy -Nmisc/busra
 
 #
 #	Include common rules.

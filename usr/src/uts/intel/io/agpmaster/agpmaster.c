@@ -20,6 +20,11 @@
  */
 
 /*
+ * Copyright (c) 2009, Intel Corporation.
+ * All Rights Reserved.
+ */
+
+/*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -86,35 +91,6 @@ int agpm_debug = 0;
  */
 #define	IS_IGD(agpmaster) ((agpmaster->agpm_dev_type == DEVICE_IS_I810) || \
 	(agpmaster->agpm_dev_type == DEVICE_IS_I830))
-
-
-/* Intel 915 and 945 series */
-#define	IS_INTEL_915(agpmaster) ((agpmaster->agpm_id == INTEL_IGD_915) || \
-	(agpmaster->agpm_id == INTEL_IGD_915GM) || \
-	(agpmaster->agpm_id == INTEL_IGD_945) || \
-	(agpmaster->agpm_id == INTEL_IGD_945GM) || \
-	(agpmaster->agpm_id == INTEL_IGD_945GME))
-
-/* Intel 965 series */
-#define	IS_INTEL_965(agpmaster) ((agpmaster->agpm_id == INTEL_IGD_946GZ) || \
-	(agpmaster->agpm_id == INTEL_IGD_965G1) || \
-	(agpmaster->agpm_id == INTEL_IGD_965Q) || \
-	(agpmaster->agpm_id == INTEL_IGD_965G2) || \
-	(agpmaster->agpm_id == INTEL_IGD_965GM) || \
-	(agpmaster->agpm_id == INTEL_IGD_965GME) || \
-	(agpmaster->agpm_id == INTEL_IGD_GM45) || \
-	IS_INTEL_G4X(agpmaster))
-
-/* Intel G33 series */
-#define	IS_INTEL_X33(agpmaster) ((agpmaster->agpm_id == INTEL_IGD_Q35) || \
-	(agpmaster->agpm_id == INTEL_IGD_G33) || \
-	(agpmaster->agpm_id == INTEL_IGD_Q33))
-
-/* Intel G4X series */
-#define	IS_INTEL_G4X(agpmaster) ((agpmaster->agpm_id == INTEL_IGD_EL) || \
-	(agpmaster->agpm_id == INTEL_IGD_Q45) || \
-	(agpmaster->agpm_id == INTEL_IGD_G45) || \
-	(agpmaster->agpm_id == INTEL_IGD_G41))
 
 static struct modlmisc modlmisc = {
 	&mod_miscops, "AGP master interfaces"
@@ -288,7 +264,7 @@ set_gtt_mmio(dev_info_t *devi, agp_master_softc_t *agpmaster,
 	off_t gmadr_off;  /* GMADR offset in PCI config space */
 	int status;
 
-	if (IS_INTEL_X33(agpmaster)) {
+	if (IS_INTEL_X33(agpmaster->agpm_id)) {
 		/* Intel 3 series are similar with 915/945 series */
 		status = ddi_regs_map_setup(devi, I915_GTTADDR,
 		    &GTT_ADDR(agpmaster), 0, 0, &i8xx_dev_access,
@@ -303,13 +279,13 @@ set_gtt_mmio(dev_info_t *devi, agp_master_softc_t *agpmaster,
 		gmadr_off = I915_CONF_GMADR;
 		/* Different computing method used in getting aperture size. */
 		apersize = i3XX_apersize(pci_acc_hdl);
-	} else if (IS_INTEL_965(agpmaster)) {
+	} else if (IS_INTEL_965(agpmaster->agpm_id)) {
 		status = ddi_regs_map_setup(devi, I965_GTTMMADR,
 		    &MMIO_BASE(agpmaster), 0, 0, &i8xx_dev_access,
 		    &MMIO_HANDLE(agpmaster));
 		CHECK_STATUS(status);
 		if ((agpmaster->agpm_id == INTEL_IGD_GM45) ||
-		    IS_INTEL_G4X(agpmaster))
+		    IS_INTEL_G4X(agpmaster->agpm_id))
 			GTT_ADDR(agpmaster) =
 			    MMIO_BASE(agpmaster) + GM45_GTT_OFFSET;
 		else
@@ -319,7 +295,7 @@ set_gtt_mmio(dev_info_t *devi, agp_master_softc_t *agpmaster,
 
 		gmadr_off = I915_CONF_GMADR;
 		apersize = i965_apersize(agpmaster);
-	} else if (IS_INTEL_915(agpmaster)) {
+	} else if (IS_INTEL_915(agpmaster->agpm_id)) {
 		/* I915/945 series */
 		status = ddi_regs_map_setup(devi, I915_GTTADDR,
 		    &GTT_ADDR(agpmaster), 0, 0, &i8xx_dev_access,
@@ -650,6 +626,7 @@ detect_i8xx_device(agp_master_softc_t *master_softc)
 	case INTEL_IGD_Q45:
 	case INTEL_IGD_G45:
 	case INTEL_IGD_G41:
+	case INTEL_IGD_B43:
 		master_softc->agpm_dev_type = DEVICE_IS_I830;
 		break;
 	default:		/* unknown id */

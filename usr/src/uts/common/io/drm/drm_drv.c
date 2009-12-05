@@ -5,6 +5,7 @@
 /*
  * Copyright 1999, 2000 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
+ * Copyright (c) 2009, Intel Corporation.
  * All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -61,6 +62,14 @@ drm_ioctl_desc_t drm_ioctls[DRIVER_IOCTL_COUNT] = {
 	    {drm_getstats, 0},
 	[DRM_IOCTL_NR(DRM_IOCTL_SET_VERSION)] =
 	    {drm_setversion, DRM_MASTER|DRM_ROOT_ONLY},
+	[DRM_IOCTL_NR(DRM_IOCTL_MODESET_CTL)] =
+	    {drm_modeset_ctl, 0},
+	[DRM_IOCTL_NR(DRM_IOCTL_GEM_CLOSE)] =
+	    {drm_gem_close_ioctl, 0},
+	[DRM_IOCTL_NR(DRM_IOCTL_GEM_FLINK)] =
+	    {drm_gem_flink_ioctl, DRM_AUTH},
+	[DRM_IOCTL_NR(DRM_IOCTL_GEM_OPEN)] =
+	    {drm_gem_open_ioctl, DRM_AUTH},
 	[DRM_IOCTL_NR(DRM_IOCTL_SET_UNIQUE)] =
 	    {drm_setunique, DRM_AUTH|DRM_MASTER|DRM_ROOT_ONLY},
 	[DRM_IOCTL_NR(DRM_IOCTL_BLOCK)] =
@@ -140,6 +149,8 @@ drm_ioctl_desc_t drm_ioctls[DRIVER_IOCTL_COUNT] = {
 	[DRM_IOCTL_NR(DRM_IOCTL_UPDATE_DRAW)] =
 	    {drm_update_draw, DRM_AUTH|DRM_MASTER|DRM_ROOT_ONLY},
 };
+
+extern void idr_list_free(struct idr_list *head);
 
 const char *
 drm_find_description(int vendor, int device, drm_pci_id_list_t *idlist)
@@ -263,7 +274,7 @@ drm_lastclose(drm_device_t *dev)
 			if (entry->bound)
 				(void) drm_agp_unbind_memory(
 				    (unsigned long)entry->handle, dev);
-			(void) drm_agp_free_memory(entry->handle);
+			(void) drm_agp_free_memory(entry->handle, dev);
 			drm_free(entry, sizeof (*entry), DRM_MEM_AGPLISTS);
 		}
 		dev->agp->memory = NULL;
@@ -337,6 +348,15 @@ drm_load(drm_device_t *dev)
 		goto error;
 	}
 
+	if (dev->driver->use_gem == 1) {
+		retcode = drm_gem_init(dev);
+		if (retcode) {
+			DRM_ERROR("Cannot initialize graphics execution "
+			    "manager (GEM)\n");
+			goto error;
+		}
+	}
+
 	if (drm_init_kstats(dev)) {
 		DRM_ERROR("drm_attach => drm_load: init kstats error");
 		retcode = EFAULT;
@@ -375,6 +395,11 @@ drm_unload(drm_device_t *dev)
 
 	drm_ctxbitmap_cleanup(dev);
 
+	if (dev->driver->use_gem == 1) {
+		idr_list_free(&dev->object_name_idr);
+		mutex_destroy(&dev->object_name_lock);
+	}
+
 	DRM_LOCK();
 	(void) drm_lastclose(dev);
 	DRM_UNLOCK();
@@ -393,6 +418,10 @@ drm_unload(drm_device_t *dev)
 	mutex_destroy(&dev->dev_lock);
 	mutex_destroy(&dev->drw_lock);
 	mutex_destroy(&dev->tasklet_lock);
+
+	dev->gtt_total = 0;
+	atomic_set(&dev->pin_memory, 0);
+	DRM_ERROR("drm_unload");
 }
 
 
@@ -464,12 +493,17 @@ drm_close(drm_device_t *dev, int minor, int flag, int otyp,
 		    "retake lock not implemented yet");
 	}
 
-	if (dev->driver->use_dma)
+	if (dev->driver->use_dma) {
 		drm_reclaim_buffers(dev, fpriv);
+	}
 
+	if (dev->driver->use_gem == 1) {
+		drm_gem_release(dev, fpriv);
+	}
 
-	if (dev->driver->postclose != NULL)
+	if (dev->driver->postclose != NULL) {
 		dev->driver->postclose(dev, fpriv);
+	}
 	TAILQ_REMOVE(&dev->files, fpriv, link);
 	drm_free(fpriv, sizeof (*fpriv), DRM_MEM_FILES);
 

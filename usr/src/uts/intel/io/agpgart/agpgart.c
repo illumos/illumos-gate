@@ -1,5 +1,10 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright (c) 2009, Intel Corporation.
+ * All Rights Reserved.
+ */
+
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -59,8 +64,55 @@ static void *agpgart_glob_soft_handle;
 #define	IS_TRUE_AGP(type)	(((type) == ARC_INTELAGP) || \
 	((type) == ARC_AMD64AGP))
 
+#define	AGP_HASH_NODE	1024
+
+static void
+list_head_init(struct list_head  *head) {
+	struct	list_head	*entry,	*tmp;
+	/* HASH for accelerate */
+	entry = kmem_zalloc(AGP_HASH_NODE *
+		sizeof (struct list_head), KM_NOSLEEP);
+	head->next = entry;
+	for (int i = 0; i < AGP_HASH_NODE; i++) {
+	tmp = &entry[i];
+	tmp->next = tmp;
+	tmp->prev = tmp;
+	tmp->gttseg = NULL;
+	}
+}
+
+static void
+list_head_add_new(struct list_head	*head,
+		igd_gtt_seg_t	*gttseg)
+{
+	struct list_head  *entry, *tmp;
+	int key;
+	entry = kmem_zalloc(sizeof (*entry), KM_NOSLEEP);
+	key = gttseg->igs_pgstart % AGP_HASH_NODE;
+	tmp = &head->next[key];
+	tmp->next->prev = entry;
+	entry->next = tmp->next;
+	entry->prev = tmp;
+	tmp->next = entry;
+	entry->gttseg = gttseg;
+}
+
+static void
+list_head_del(struct list_head	*entry) {
+	(entry)->next->prev = (entry)->prev;      \
+	(entry)->prev->next = (entry)->next;      \
+	(entry)->gttseg = NULL; \
+}
+
+#define	list_head_for_each_safe(entry,	temp,	head)	\
+	for (int key = 0; key < AGP_HASH_NODE; key++)	\
+	for (entry = (&(head)->next[key])->next, temp = (entry)->next;	\
+		entry != &(head)->next[key];	\
+		entry = temp, temp = temp->next)
+
+
 #define	agpinfo_default_to_32(v, v32)	\
-	{				\
+	{	\
 		(v32).agpi32_version = (v).agpi_version;	\
 		(v32).agpi32_devid = (v).agpi_devid;	\
 		(v32).agpi32_mode = (v).agpi_mode;	\
@@ -1134,7 +1186,7 @@ lyr_flush_gart_cache(agp_registered_dev_t *agp_regdev)
  *	based on the ammount of physical pages.
  * 	The algorithm is: compare the aperture size with 1/4 of total
  *	physical pages, and use the smaller one to for the max available
- * 	pages.
+ * 	pages. But the minimum video memory should be 192M.
  *
  * Arguments:
  * 	aper_size	system agp aperture size (in MB)
@@ -1145,14 +1197,18 @@ lyr_flush_gart_cache(agp_registered_dev_t *agp_regdev)
 static uint32_t
 get_max_pages(uint32_t aper_size)
 {
-	uint32_t i, j;
+	uint32_t i, j, size;
 
 	ASSERT(aper_size <= MAXAPERMEGAS);
 
 	i = AGP_MB2PAGES(aper_size);
 	j = (physmem >> 2);
 
-	return ((i < j) ? i : j);
+	size = ((i < j) ? i : j);
+
+	if (size < AGP_MB2PAGES(MINAPERMEGAS))
+		size = AGP_MB2PAGES(MINAPERMEGAS);
+	return (size);
 }
 
 /*
@@ -2438,6 +2494,8 @@ agpgart_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    AGP_MAXKEYS * (sizeof (keytable_ent_t)),
 	    KM_SLEEP);
 
+	list_head_init(&softstate->mapped_list);
+
 	return (DDI_SUCCESS);
 err4:
 	agp_fini_kstats(softstate);
@@ -2483,6 +2541,21 @@ agpgart_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		    AGP_MAXKEYS * (sizeof (keytable_ent_t)));
 		st->asoft_table = 0;
 	}
+
+	struct list_head	*entry,	*temp,	*head;
+	igd_gtt_seg_t	*gttseg;
+	list_head_for_each_safe(entry, temp, &st->mapped_list) {
+		gttseg = entry->gttseg;
+		list_head_del(entry);
+		kmem_free(entry, sizeof (*entry));
+		kmem_free(gttseg->igs_phyaddr,
+		    sizeof (uint32_t) * gttseg->igs_npage);
+		kmem_free(gttseg, sizeof (igd_gtt_seg_t));
+	}
+	head = &st->mapped_list;
+	kmem_free(head->next,
+	    AGP_HASH_NODE * sizeof (struct list_head));
+	head->next = NULL;
 
 	ddi_remove_minor_node(dip, AGPGART_DEVNODE);
 	agp_fini_kstats(st);
@@ -2557,6 +2630,7 @@ agpgart_open(dev_t *dev, int openflags, int otyp, cred_t *credp)
 	int instance = AGP_DEV2INST(*dev);
 	agpgart_softstate_t *softstate;
 	int rc = 0;
+	uint32_t devid;
 
 	if (secpolicy_gart_access(credp)) {
 		AGPDB_PRINT2((CE_WARN, "agpgart_open: permission denied"));
@@ -2610,6 +2684,21 @@ agpgart_open(dev_t *dev, int openflags, int otyp, cred_t *credp)
 			lyr_end(&softstate->asoft_devreg);
 			mutex_exit(&softstate->asoft_instmutex);
 
+			return (EIO);
+		}
+		devid = softstate->asoft_info.agpki_mdevid;
+		if (IS_INTEL_915(devid) ||
+		    IS_INTEL_965(devid) ||
+		    IS_INTEL_X33(devid) ||
+		    IS_INTEL_G4X(devid)) {
+			rc = ldi_ioctl(softstate->asoft_devreg.agprd_targethdl,
+			    INTEL_CHIPSET_FLUSH_SETUP, 0, FKIOCTL, kcred, 0);
+		}
+		if (rc) {
+			AGPDB_PRINT2((CE_WARN,
+			    "agpgart_open: Intel chipset flush setup error"));
+			lyr_end(&softstate->asoft_devreg);
+			mutex_exit(&softstate->asoft_instmutex);
 			return (EIO);
 		}
 		mutex_exit(&softstate->asoft_instmutex);
@@ -2698,6 +2787,8 @@ agpgart_close(dev_t dev, int flag, int otyp, cred_t *credp)
 {
 	int instance = AGP_DEV2INST(dev);
 	agpgart_softstate_t *softstate;
+	int rc = 0;
+	uint32_t devid;
 
 	softstate = ddi_get_soft_state(agpgart_glob_soft_handle, instance);
 	if (softstate == NULL) {
@@ -2719,6 +2810,19 @@ agpgart_close(dev_t dev, int flag, int otyp, cred_t *credp)
 		AGPDB_PRINT2((CE_WARN,
 		    "agpgart_close: auto release control over driver"));
 		release_control(softstate);
+	}
+
+	devid = softstate->asoft_info.agpki_mdevid;
+	if (IS_INTEL_915(devid) ||
+	    IS_INTEL_965(devid) ||
+	    IS_INTEL_X33(devid) ||
+	    IS_INTEL_G4X(devid)) {
+		rc = ldi_ioctl(softstate->asoft_devreg.agprd_targethdl,
+		    INTEL_CHIPSET_FLUSH_FREE, 0, FKIOCTL, kcred, 0);
+	}
+	if (rc) {
+		AGPDB_PRINT2((CE_WARN,
+		    "agpgart_open: Intel chipset flush free error"));
 	}
 
 	if (lyr_unconfig_devices(&softstate->asoft_devreg)) {
@@ -3020,6 +3124,144 @@ ioctl_agpgart_unbind(agpgart_softstate_t  *st, void  *arg, int flags)
 	return (0);
 }
 
+static int
+ioctl_agpgart_flush_chipset(agpgart_softstate_t *st)
+{
+	ldi_handle_t	hdl;
+	uint32_t devid;
+	int rc = 0;
+	devid = st->asoft_info.agpki_mdevid;
+	hdl = st->asoft_devreg.agprd_targethdl;
+	if (IS_INTEL_915(devid) ||
+	    IS_INTEL_965(devid) ||
+	    IS_INTEL_X33(devid) ||
+	    IS_INTEL_G4X(devid)) {
+		rc = ldi_ioctl(hdl, INTEL_CHIPSET_FLUSH, 0, FKIOCTL, kcred, 0);
+	}
+	return	(rc);
+}
+
+static int
+ioctl_agpgart_pages_bind(agpgart_softstate_t  *st, void  *arg, int flags)
+{
+	agp_bind_pages_t 	bind_info;
+	uint32_t	pg_offset;
+	int err = 0;
+	ldi_handle_t hdl;
+	uint32_t npages;
+	igd_gtt_seg_t *gttseg;
+	uint32_t i;
+	int rval;
+	if (ddi_copyin(arg, &bind_info,
+	    sizeof (agp_bind_pages_t), flags) != 0) {
+		return (EFAULT);
+	}
+
+	gttseg = (igd_gtt_seg_t *)kmem_zalloc(sizeof (igd_gtt_seg_t),
+	    KM_SLEEP);
+
+	pg_offset = bind_info.agpb_pgstart;
+
+	gttseg->igs_pgstart =  pg_offset;
+	npages = (uint32_t)bind_info.agpb_pgcount;
+	gttseg->igs_npage = npages;
+
+	gttseg->igs_type = AGP_NORMAL;
+	gttseg->igs_phyaddr = (uint32_t *)kmem_zalloc
+	    (sizeof (uint32_t) * gttseg->igs_npage, KM_SLEEP);
+
+	for (i = 0; i < npages; i++) {
+		gttseg->igs_phyaddr[i] = bind_info.agpb_pages[i] <<
+		    GTT_PAGE_SHIFT;
+	}
+
+	hdl = st->asoft_devreg.agprd_masterhdl;
+	if (ldi_ioctl(hdl, I8XX_ADD2GTT, (intptr_t)gttseg, FKIOCTL,
+	    kcred, &rval)) {
+		AGPDB_PRINT2((CE_WARN, "ioctl_agpgart_pages_bind: start0x%x",
+		    gttseg->igs_pgstart));
+		AGPDB_PRINT2((CE_WARN, "ioctl_agpgart_pages_bind: pages=0x%x",
+		    gttseg->igs_npage));
+		AGPDB_PRINT2((CE_WARN, "ioctl_agpgart_pages_bind: type=0x%x",
+		    gttseg->igs_type));
+		err = -1;
+	}
+
+	list_head_add_new(&st->mapped_list, gttseg);
+	return (err);
+}
+
+static int
+ioctl_agpgart_pages_unbind(agpgart_softstate_t  *st, void  *arg, int flags)
+{
+	agp_unbind_pages_t unbind_info;
+	int	rval;
+	ldi_handle_t	hdl;
+	igd_gtt_seg_t	*gttseg;
+
+	if (ddi_copyin(arg, &unbind_info, sizeof (unbind_info), flags) != 0) {
+		return (EFAULT);
+	}
+
+	struct list_head  *entry, *temp;
+	list_head_for_each_safe(entry, temp, &st->mapped_list) {
+		if (entry->gttseg->igs_pgstart == unbind_info.agpb_pgstart) {
+			gttseg = entry->gttseg;
+			/* not unbind if VT switch */
+			if (unbind_info.agpb_type) {
+				list_head_del(entry);
+				kmem_free(entry, sizeof (*entry));
+			}
+			break;
+		}
+	}
+	ASSERT(gttseg != NULL);
+	gttseg->igs_pgstart =  unbind_info.agpb_pgstart;
+	ASSERT(gttseg->igs_npage == unbind_info.agpb_pgcount);
+
+	hdl = st->asoft_devreg.agprd_masterhdl;
+	if (ldi_ioctl(hdl, I8XX_REM_GTT, (intptr_t)gttseg, FKIOCTL,
+	    kcred, &rval))
+		return (-1);
+
+	if (unbind_info.agpb_type) {
+		kmem_free(gttseg->igs_phyaddr, sizeof (uint32_t) *
+		    gttseg->igs_npage);
+		kmem_free(gttseg, sizeof (igd_gtt_seg_t));
+	}
+
+	return (0);
+}
+
+static int
+ioctl_agpgart_pages_rebind(agpgart_softstate_t  *st)
+{
+	int	rval;
+	ldi_handle_t	hdl;
+	igd_gtt_seg_t	*gttseg;
+	int err = 0;
+
+	hdl = st->asoft_devreg.agprd_masterhdl;
+	struct list_head  *entry, *temp;
+	list_head_for_each_safe(entry, temp, &st->mapped_list) {
+		gttseg = entry->gttseg;
+		list_head_del(entry);
+		kmem_free(entry, sizeof (*entry));
+		if (ldi_ioctl(hdl, I8XX_ADD2GTT, (intptr_t)gttseg, FKIOCTL,
+		    kcred, &rval)) {
+			AGPDB_PRINT2((CE_WARN, "agpgart_pages_rebind errori"));
+			err = -1;
+			break;
+		}
+		kmem_free(gttseg->igs_phyaddr, sizeof (uint32_t) *
+		    gttseg->igs_npage);
+		kmem_free(gttseg, sizeof (igd_gtt_seg_t));
+
+	}
+	return (err);
+
+}
+
 /*ARGSUSED*/
 static int
 agpgart_ioctl(dev_t dev, int cmd, intptr_t intarg, int flags,
@@ -3064,6 +3306,18 @@ agpgart_ioctl(dev_t dev, int cmd, intptr_t intarg, int flags,
 		break;
 	case AGPIOC_UNBIND:
 		retval = ioctl_agpgart_unbind(softstate, arg, flags);
+		break;
+	case AGPIOC_FLUSHCHIPSET:
+		retval = ioctl_agpgart_flush_chipset(softstate);
+		break;
+	case AGPIOC_PAGES_BIND:
+		retval = ioctl_agpgart_pages_bind(softstate, arg, flags);
+		break;
+	case AGPIOC_PAGES_UNBIND:
+		retval = ioctl_agpgart_pages_unbind(softstate, arg, flags);
+		break;
+	case AGPIOC_PAGES_REBIND:
+		retval = ioctl_agpgart_pages_rebind(softstate);
 		break;
 	default:
 		AGPDB_PRINT2((CE_WARN, "agpgart_ioctl: wrong argument"));

@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2004 Eric Anholt
+ * Copyright (c) 2009, Intel Corporation.
  * All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -57,7 +58,7 @@ typedef uint32_t	atomic_t;
 #define	atomic_inc(p)		atomic_add_int(p, 1)
 #define	atomic_dec(p)		atomic_dec_uint(p)
 #define	atomic_add(n, p)	atomic_add_int(p, n)
-#define	atomic_sub(n, p)	atomic_dec_uint(p, n)
+#define	atomic_sub(n, p)	atomic_add_int(p, -n)
 #define	atomic_set_int(p, bits)	atomic_or_uint(p, bits)
 #define	atomic_clear_int(p, bits)	atomic_and_uint(p, ~(bits))
 #define	atomic_cmpset_int(p, c, n) \

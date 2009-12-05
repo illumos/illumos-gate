@@ -7,6 +7,7 @@
 
 /*
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
+ * Copyright (c) 2009, Intel Corporation.
  * All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -431,23 +432,120 @@ i915_restore_vga(struct drm_device *dev)
 		vga_reg_put8(&regmap, VGA_DACDATA, s3_priv->saveDACDATA[i]);
 }
 
-static int
-i915_resume(struct drm_device *dev)
+/**
+ * i915_save_display - save display & mode info
+ * @dev: DRM device
+ *
+ * Save mode timings and display info.
+ */
+void i915_save_display(struct drm_device *dev)
 {
-	ddi_acc_handle_t conf_hdl;
 	struct s3_i915_private *s3_priv = dev->s3_private;
-	int i;
 
-	if (pci_config_setup(dev->dip, &conf_hdl) != DDI_SUCCESS) {
-		DRM_ERROR(("i915_resume: pci_config_setup fail"));
-		return (DDI_FAILURE);
-	}
+	/* Display arbitration control */
+	s3_priv->saveDSPARB = S3_READ(DSPARB);
+
 	/*
-	 * Nexus driver will resume pci config space and set the power state
-	 * for its children. So we needn't resume them explicitly here.
-	 * see pci_pre_resume for detail.
+	 * Pipe & plane A info.
 	 */
-	pci_config_put8(conf_hdl, LBB, s3_priv->saveLBB);
+	s3_priv->savePIPEACONF = S3_READ(PIPEACONF);
+	s3_priv->savePIPEASRC = S3_READ(PIPEASRC);
+	s3_priv->saveFPA0 = S3_READ(FPA0);
+	s3_priv->saveFPA1 = S3_READ(FPA1);
+	s3_priv->saveDPLL_A = S3_READ(DPLL_A);
+	if (IS_I965G(dev))
+		s3_priv->saveDPLL_A_MD = S3_READ(DPLL_A_MD);
+	s3_priv->saveHTOTAL_A = S3_READ(HTOTAL_A);
+	s3_priv->saveHBLANK_A = S3_READ(HBLANK_A);
+	s3_priv->saveHSYNC_A = S3_READ(HSYNC_A);
+	s3_priv->saveVTOTAL_A = S3_READ(VTOTAL_A);
+	s3_priv->saveVBLANK_A = S3_READ(VBLANK_A);
+	s3_priv->saveVSYNC_A = S3_READ(VSYNC_A);
+	s3_priv->saveBCLRPAT_A = S3_READ(BCLRPAT_A);
+
+	s3_priv->saveDSPACNTR = S3_READ(DSPACNTR);
+	s3_priv->saveDSPASTRIDE = S3_READ(DSPASTRIDE);
+	s3_priv->saveDSPASIZE = S3_READ(DSPASIZE);
+	s3_priv->saveDSPAPOS = S3_READ(DSPAPOS);
+	s3_priv->saveDSPABASE = S3_READ(DSPABASE);
+	if (IS_I965G(dev)) {
+		s3_priv->saveDSPASURF = S3_READ(DSPASURF);
+		s3_priv->saveDSPATILEOFF = S3_READ(DSPATILEOFF);
+	}
+	i915_save_palette(dev, PIPE_A);
+	s3_priv->savePIPEASTAT = S3_READ(PIPEASTAT);
+
+	/*
+	 * Pipe & plane B info
+	 */
+	s3_priv->savePIPEBCONF = S3_READ(PIPEBCONF);
+	s3_priv->savePIPEBSRC = S3_READ(PIPEBSRC);
+	s3_priv->saveFPB0 = S3_READ(FPB0);
+	s3_priv->saveFPB1 = S3_READ(FPB1);
+	s3_priv->saveDPLL_B = S3_READ(DPLL_B);
+	if (IS_I965G(dev))
+		s3_priv->saveDPLL_B_MD = S3_READ(DPLL_B_MD);
+	s3_priv->saveHTOTAL_B = S3_READ(HTOTAL_B);
+	s3_priv->saveHBLANK_B = S3_READ(HBLANK_B);
+	s3_priv->saveHSYNC_B = S3_READ(HSYNC_B);
+	s3_priv->saveVTOTAL_B = S3_READ(VTOTAL_B);
+	s3_priv->saveVBLANK_B = S3_READ(VBLANK_B);
+	s3_priv->saveVSYNC_B = S3_READ(VSYNC_B);
+	s3_priv->saveBCLRPAT_A = S3_READ(BCLRPAT_A);
+
+	s3_priv->saveDSPBCNTR = S3_READ(DSPBCNTR);
+	s3_priv->saveDSPBSTRIDE = S3_READ(DSPBSTRIDE);
+	s3_priv->saveDSPBSIZE = S3_READ(DSPBSIZE);
+	s3_priv->saveDSPBPOS = S3_READ(DSPBPOS);
+	s3_priv->saveDSPBBASE = S3_READ(DSPBBASE);
+	if (IS_I965GM(dev) || IS_GM45(dev)) {
+		s3_priv->saveDSPBSURF = S3_READ(DSPBSURF);
+		s3_priv->saveDSPBTILEOFF = S3_READ(DSPBTILEOFF);
+	}
+	i915_save_palette(dev, PIPE_B);
+	s3_priv->savePIPEBSTAT = S3_READ(PIPEBSTAT);
+
+	/*
+	 * CRT state
+	 */
+	s3_priv->saveADPA = S3_READ(ADPA);
+
+	/*
+	 * LVDS state
+	 */
+	s3_priv->savePP_CONTROL = S3_READ(PP_CONTROL);
+	s3_priv->savePFIT_PGM_RATIOS = S3_READ(PFIT_PGM_RATIOS);
+	s3_priv->saveBLC_PWM_CTL = S3_READ(BLC_PWM_CTL);
+	if (IS_I965G(dev))
+		s3_priv->saveBLC_PWM_CTL2 = S3_READ(BLC_PWM_CTL2);
+	if (IS_MOBILE(dev) && !IS_I830(dev))
+		s3_priv->saveLVDS = S3_READ(LVDS);
+	if (!IS_I830(dev) && !IS_845G(dev))
+		s3_priv->savePFIT_CONTROL = S3_READ(PFIT_CONTROL);
+	s3_priv->saveLVDSPP_ON = S3_READ(LVDSPP_ON);
+	s3_priv->saveLVDSPP_OFF = S3_READ(LVDSPP_OFF);
+	s3_priv->savePP_CYCLE = S3_READ(PP_CYCLE);
+
+	/* FIXME: save TV & SDVO state */
+
+	/* FBC state */
+	s3_priv->saveFBC_CFB_BASE = S3_READ(FBC_CFB_BASE);
+	s3_priv->saveFBC_LL_BASE = S3_READ(FBC_LL_BASE);
+	s3_priv->saveFBC_CONTROL2 = S3_READ(FBC_CONTROL2);
+	s3_priv->saveFBC_CONTROL = S3_READ(FBC_CONTROL);
+
+	/* VGA state */
+	s3_priv->saveVCLK_DIVISOR_VGA0 = S3_READ(VCLK_DIVISOR_VGA0);
+	s3_priv->saveVCLK_DIVISOR_VGA1 = S3_READ(VCLK_DIVISOR_VGA1);
+	s3_priv->saveVCLK_POST_DIV = S3_READ(VCLK_POST_DIV);
+	s3_priv->saveVGACNTRL = S3_READ(VGACNTRL);
+
+	i915_save_vga(dev);
+}
+
+void i915_restore_display(struct drm_device *dev)
+{
+        struct s3_i915_private *s3_priv = dev->s3_private;
 
 	S3_WRITE(DSPARB, s3_priv->saveDSPARB);
 
@@ -566,6 +664,37 @@ i915_resume(struct drm_device *dev)
 	S3_WRITE(VCLK_DIVISOR_VGA1, s3_priv->saveVCLK_DIVISOR_VGA1);
 	S3_WRITE(VCLK_POST_DIV, s3_priv->saveVCLK_POST_DIV);
 	drv_usecwait(150);
+	
+	i915_restore_vga(dev);
+}
+static int
+i915_resume(struct drm_device *dev)
+{
+	ddi_acc_handle_t conf_hdl;
+	struct s3_i915_private *s3_priv = dev->s3_private;
+	int i;
+
+	if (pci_config_setup(dev->dip, &conf_hdl) != DDI_SUCCESS) {
+		DRM_ERROR(("i915_resume: pci_config_setup fail"));
+		return (DDI_FAILURE);
+	}
+	/*
+	 * Nexus driver will resume pci config space and set the power state
+	 * for its children. So we needn't resume them explicitly here.
+	 * see pci_pre_resume for detail.
+	 */
+	pci_config_put8(conf_hdl, LBB, s3_priv->saveLBB);
+
+	if (IS_I965G(dev) && IS_MOBILE(dev))
+		S3_WRITE(MCHBAR_RENDER_STANDBY, s3_priv->saveRENDERSTANDBY);
+	if (IS_I965GM(dev))
+		(void) S3_READ(MCHBAR_RENDER_STANDBY);
+
+	S3_WRITE(HWS_PGA, s3_priv->saveHWS);
+	if (IS_I965GM(dev))
+		(void) S3_READ(HWS_PGA);
+
+	i915_restore_display(dev);
 
 	 /* Clock gating state */
 	S3_WRITE (D_STATE, s3_priv->saveD_STATE);
@@ -584,21 +713,24 @@ i915_resume(struct drm_device *dev)
 	for (i = 0; i < 3; i++)
 		S3_WRITE(SWF30 + (i << 2), s3_priv->saveSWF2[i]);
 
-	i915_restore_vga(dev);
+	if (IS_I965GM(dev)) {
+		S3_WRITE(I915REG_PGTBL_CTRL, s3_priv->pgtbl_ctl);
+		(void) S3_READ(I915REG_PGTBL_CTRL);
+	}
 
-	S3_WRITE(I915REG_PGTBL_CTRL, s3_priv->pgtbl_ctl);
-	
 	(void) pci_config_teardown(&conf_hdl);
+
+	drm_agp_rebind(dev);
 
 	return (DDI_SUCCESS);
 }
+
 static int
 i915_suspend(struct drm_device *dev)
 {
 	ddi_acc_handle_t conf_hdl;
 	struct s3_i915_private *s3_priv = dev->s3_private;
 	int i;
-
 
 	if (pci_config_setup(dev->dip, &conf_hdl) != DDI_SUCCESS) {
 		DRM_ERROR(("i915_suspend: pci_config_setup fail"));
@@ -611,108 +743,18 @@ i915_suspend(struct drm_device *dev)
 	 */
 	s3_priv->saveLBB = pci_config_get8(conf_hdl, LBB);
 
-	/* Display arbitration control */
-	s3_priv->saveDSPARB = S3_READ(DSPARB);
+	if (IS_I965G(dev) && IS_MOBILE(dev))
+		s3_priv->saveRENDERSTANDBY = S3_READ(MCHBAR_RENDER_STANDBY);
 
-	/*
-	 * Pipe & plane A info.
-	 */
-	s3_priv->savePIPEACONF = S3_READ(PIPEACONF);
-	s3_priv->savePIPEASRC = S3_READ(PIPEASRC);
-	s3_priv->saveFPA0 = S3_READ(FPA0);
-	s3_priv->saveFPA1 = S3_READ(FPA1);
-	s3_priv->saveDPLL_A = S3_READ(DPLL_A);
-	if (IS_I965G(dev))
-		s3_priv->saveDPLL_A_MD = S3_READ(DPLL_A_MD);
-	s3_priv->saveHTOTAL_A = S3_READ(HTOTAL_A);
-	s3_priv->saveHBLANK_A = S3_READ(HBLANK_A);
-	s3_priv->saveHSYNC_A = S3_READ(HSYNC_A);
-	s3_priv->saveVTOTAL_A = S3_READ(VTOTAL_A);
-	s3_priv->saveVBLANK_A = S3_READ(VBLANK_A);
-	s3_priv->saveVSYNC_A = S3_READ(VSYNC_A);
-	s3_priv->saveBCLRPAT_A = S3_READ(BCLRPAT_A);
+	/* Hardware status page */
+	s3_priv->saveHWS = S3_READ(HWS_PGA);
 
-	s3_priv->saveDSPACNTR = S3_READ(DSPACNTR);
-	s3_priv->saveDSPASTRIDE = S3_READ(DSPASTRIDE);
-	s3_priv->saveDSPASIZE = S3_READ(DSPASIZE);
-	s3_priv->saveDSPAPOS = S3_READ(DSPAPOS);
-	s3_priv->saveDSPABASE = S3_READ(DSPABASE);
-	if (IS_I965G(dev)) {
-		s3_priv->saveDSPASURF = S3_READ(DSPASURF);
-		s3_priv->saveDSPATILEOFF = S3_READ(DSPATILEOFF);
-	}
-	i915_save_palette(dev, PIPE_A);
-	s3_priv->savePIPEASTAT = S3_READ(PIPEASTAT);
-
-	/*
-	 * Pipe & plane B info
-	 */
-	s3_priv->savePIPEBCONF = S3_READ(PIPEBCONF);
-	s3_priv->savePIPEBSRC = S3_READ(PIPEBSRC);
-	s3_priv->saveFPB0 = S3_READ(FPB0);
-	s3_priv->saveFPB1 = S3_READ(FPB1);
-	s3_priv->saveDPLL_B = S3_READ(DPLL_B);
-	if (IS_I965G(dev))
-		s3_priv->saveDPLL_B_MD = S3_READ(DPLL_B_MD);
-	s3_priv->saveHTOTAL_B = S3_READ(HTOTAL_B);
-	s3_priv->saveHBLANK_B = S3_READ(HBLANK_B);
-	s3_priv->saveHSYNC_B = S3_READ(HSYNC_B);
-	s3_priv->saveVTOTAL_B = S3_READ(VTOTAL_B);
-	s3_priv->saveVBLANK_B = S3_READ(VBLANK_B);
-	s3_priv->saveVSYNC_B = S3_READ(VSYNC_B);
-	s3_priv->saveBCLRPAT_A = S3_READ(BCLRPAT_A);
-
-	s3_priv->saveDSPBCNTR = S3_READ(DSPBCNTR);
-	s3_priv->saveDSPBSTRIDE = S3_READ(DSPBSTRIDE);
-	s3_priv->saveDSPBSIZE = S3_READ(DSPBSIZE);
-	s3_priv->saveDSPBPOS = S3_READ(DSPBPOS);
-	s3_priv->saveDSPBBASE = S3_READ(DSPBBASE);
-	if (IS_I965GM(dev) || IS_GM45(dev)) {
-		s3_priv->saveDSPBSURF = S3_READ(DSPBSURF);
-		s3_priv->saveDSPBTILEOFF = S3_READ(DSPBTILEOFF);
-	}
-	i915_save_palette(dev, PIPE_B);
-	s3_priv->savePIPEBSTAT = S3_READ(PIPEBSTAT);
-
-	/*
-	 * CRT state
-	 */
-	s3_priv->saveADPA = S3_READ(ADPA);
-
-	/*
-	 * LVDS state
-	 */
-	s3_priv->savePP_CONTROL = S3_READ(PP_CONTROL);
-	s3_priv->savePFIT_PGM_RATIOS = S3_READ(PFIT_PGM_RATIOS);
-	s3_priv->saveBLC_PWM_CTL = S3_READ(BLC_PWM_CTL);
-	if (IS_I965G(dev))
-		s3_priv->saveBLC_PWM_CTL2 = S3_READ(BLC_PWM_CTL2);
-	if (IS_MOBILE(dev) && !IS_I830(dev))
-		s3_priv->saveLVDS = S3_READ(LVDS);
-	if (!IS_I830(dev) && !IS_845G(dev))
-		s3_priv->savePFIT_CONTROL = S3_READ(PFIT_CONTROL);
-	s3_priv->saveLVDSPP_ON = S3_READ(LVDSPP_ON);
-	s3_priv->saveLVDSPP_OFF = S3_READ(LVDSPP_OFF);
-	s3_priv->savePP_CYCLE = S3_READ(PP_CYCLE);
-
-	/* FIXME: save TV & SDVO state */
-
-	/* FBC state */
-	s3_priv->saveFBC_CFB_BASE = S3_READ(FBC_CFB_BASE);
-	s3_priv->saveFBC_LL_BASE = S3_READ(FBC_LL_BASE);
-	s3_priv->saveFBC_CONTROL2 = S3_READ(FBC_CONTROL2);
-	s3_priv->saveFBC_CONTROL = S3_READ(FBC_CONTROL);
+	i915_save_display(dev);
 
 	/* Interrupt state */
 	s3_priv->saveIIR = S3_READ(IIR);
 	s3_priv->saveIER = S3_READ(IER);
 	s3_priv->saveIMR = S3_READ(IMR);
-
-	/* VGA state */
-	s3_priv->saveVCLK_DIVISOR_VGA0 = S3_READ(VCLK_DIVISOR_VGA0);
-	s3_priv->saveVCLK_DIVISOR_VGA1 = S3_READ(VCLK_DIVISOR_VGA1);
-	s3_priv->saveVCLK_POST_DIV = S3_READ(VCLK_POST_DIV);
-	s3_priv->saveVGACNTRL = S3_READ(VGACNTRL);
 
 	/* Clock gating state */
 	s3_priv->saveD_STATE = S3_READ(D_STATE);
@@ -732,12 +774,11 @@ i915_suspend(struct drm_device *dev)
 	for (i = 0; i < 3; i++)
 		s3_priv->saveSWF2[i] = S3_READ(SWF30 + (i << 2));
 
-	
-	i915_save_vga(dev);
 	/*
 	 * Save page table control register
 	 */
-	s3_priv->pgtbl_ctl = S3_READ(I915REG_PGTBL_CTRL);
+	if (IS_I965GM(dev))
+		s3_priv->pgtbl_ctl = S3_READ(I915REG_PGTBL_CTRL);
 
 	(void) pci_config_teardown(&conf_hdl);
 
@@ -960,16 +1001,20 @@ static void i915_configure(drm_driver_t *driver)
 	driver->buf_priv_size	=	1;	/* No dev_priv */
 	driver->load	=	i915_driver_load;
 	driver->unload	=	i915_driver_unload;
+	driver->open	=	i915_driver_open;
 	driver->preclose	=	i915_driver_preclose;
+	driver->postclose	=	i915_driver_postclose;
 	driver->lastclose	=	i915_driver_lastclose;
 	driver->device_is_agp	=	i915_driver_device_is_agp;
-	driver->get_vblank_counter	= i915_get_vblank_counter;
 	driver->enable_vblank	= 	i915_enable_vblank;
 	driver->disable_vblank	= 	i915_disable_vblank;
 	driver->irq_preinstall	=	i915_driver_irq_preinstall;
 	driver->irq_postinstall	=	i915_driver_irq_postinstall;
 	driver->irq_uninstall	=	i915_driver_irq_uninstall;
-	driver->irq_handler 		=	i915_driver_irq_handler;
+	driver->irq_handler 	=	i915_driver_irq_handler;
+
+	driver->gem_init_object = 	i915_gem_init_object;
+	driver->gem_free_object = 	i915_gem_free_object;
 
 	driver->driver_ioctls	=	i915_ioctls;
 	driver->max_driver_ioctl	=	i915_max_ioctl;

@@ -1,12 +1,15 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright (c) 2009, Intel Corporation.
+ * All Rights Reserved.
+ */
+
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_AGPGART_IMPL_H
 #define	_SYS_AGPGART_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -123,6 +126,12 @@ typedef struct _agp_info32 {
 } agp_info32_t;
 #endif /* _MULTI_DATAMODEL */
 
+struct list_head {
+	struct list_head *next, *prev;
+	struct igd_gtt_seg  *gttseg;
+};
+
+
 typedef struct	agpgart_softstate {
 	dev_info_t	*asoft_dip;
 	kmutex_t	asoft_instmutex;
@@ -147,6 +156,7 @@ typedef struct	agpgart_softstate {
 	/* all registered agp device in here */
 	agp_registered_dev_t	asoft_devreg;
 	kstat_t			*asoft_ksp;
+	struct		list_head	mapped_list;
 } agpgart_softstate_t;
 
 typedef struct agpgart_ctx {

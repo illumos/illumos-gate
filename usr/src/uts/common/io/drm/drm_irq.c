@@ -4,6 +4,7 @@
  */
 /*
  * Copyright 2003 Eric Anholt
+ * Copyright (c) 2009, Intel Corporation.
  * All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -119,6 +120,8 @@ drm_vblank_cleanup(struct drm_device *dev)
 	    dev->num_crtcs, DRM_MEM_DRIVER);
 	drm_free(dev->last_vblank, sizeof (u32) * dev->num_crtcs,
 	    DRM_MEM_DRIVER);
+	drm_free(dev->vblank_inmodeset, sizeof (*dev->vblank_inmodeset) *
+	    dev->num_crtcs, DRM_MEM_DRIVER);
 	dev->num_crtcs = 0;
 }
 
@@ -159,6 +162,12 @@ drm_vblank_init(struct drm_device *dev, int num_crtcs)
 	dev->last_vblank = drm_alloc(num_crtcs * sizeof (u32), DRM_MEM_DRIVER);
 	if (!dev->last_vblank)
 		goto err;
+
+	dev->vblank_inmodeset = drm_alloc(num_crtcs * sizeof (int),
+	    DRM_MEM_DRIVER);
+	if (!dev->vblank_inmodeset)
+		goto err;
+
 	/* Zero per-crtc vblank stuff */
 	for (i = 0; i < num_crtcs; i++) {
 		DRM_INIT_WAITQUEUE(&dev->vbl_queues[i], DRM_INTR_PRI(dev));
@@ -380,6 +389,70 @@ drm_vblank_put(struct drm_device *dev, int crtc)
 	DRM_SPINUNLOCK(&dev->vbl_lock);
 }
 
+/*
+ * drm_modeset_ctl - handle vblank event counter changes across mode switch
+ * @DRM_IOCTL_ARGS: standard ioctl arguments
+ *
+ * Applications should call the %_DRM_PRE_MODESET and %_DRM_POST_MODESET
+ * ioctls around modesetting so that any lost vblank events are accounted for.
+ *
+ * Generally the counter will reset across mode sets.  If interrupts are
+ * enabled around this call, we don't have to do anything since the counter
+ * will have already been incremented.
+ */
+/*ARGSUSED*/
+int
+drm_modeset_ctl(DRM_IOCTL_ARGS)
+{
+	DRM_DEVICE;
+	struct drm_modeset_ctl modeset;
+	int crtc, ret = 0;
+
+	/* If drm_vblank_init() hasn't been called yet, just no-op */
+	if (!dev->num_crtcs)
+		goto out;
+
+	DRM_COPYFROM_WITH_RETURN(&modeset, (void *)data,
+	    sizeof (modeset));
+
+	crtc = modeset.crtc;
+	if (crtc >= dev->num_crtcs) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	/*
+	 * To avoid all the problems that might happen if interrupts
+	 * were enabled/disabled around or between these calls, we just
+	 * have the kernel take a reference on the CRTC (just once though
+	 * to avoid corrupting the count if multiple, mismatch calls occur),
+	 * so that interrupts remain enabled in the interim.
+	 */
+	switch (modeset.cmd) {
+	case _DRM_PRE_MODESET:
+		if (!dev->vblank_inmodeset[crtc]) {
+			dev->vblank_inmodeset[crtc] = 1;
+			ret = drm_vblank_get(dev, crtc);
+		}
+		break;
+	case _DRM_POST_MODESET:
+		if (dev->vblank_inmodeset[crtc]) {
+			DRM_SPINLOCK(&dev->vbl_lock);
+			dev->vblank_disable_allowed = 1;
+			dev->vblank_inmodeset[crtc] = 0;
+			DRM_SPINUNLOCK(&dev->vbl_lock);
+			drm_vblank_put(dev, crtc);
+		}
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+
+out:
+	return (ret);
+}
+
 /*ARGSUSED*/
 int
 drm_wait_vblank(DRM_IOCTL_ARGS)
@@ -390,7 +463,7 @@ drm_wait_vblank(DRM_IOCTL_ARGS)
 	unsigned int	sequence;
 
 	if (!dev->irq_enabled) {
-		DRM_DEBUG("wait vblank, EINVAL");
+		DRM_ERROR("wait vblank, EINVAL");
 		return (EINVAL);
 	}
 #ifdef _MULTI_DATAMODEL
@@ -411,19 +484,20 @@ drm_wait_vblank(DRM_IOCTL_ARGS)
 
 	if (vblwait.request.type &
 	    ~(_DRM_VBLANK_TYPES_MASK | _DRM_VBLANK_FLAGS_MASK)) {
-		cmn_err(CE_WARN, "drm_wait_vblank: wrong request type 0x%x",
+		DRM_ERROR("drm_wait_vblank: wrong request type 0x%x",
 		    vblwait.request.type);
 		return (EINVAL);
 	}
 
 	flags = vblwait.request.type & _DRM_VBLANK_FLAGS_MASK;
 	crtc = flags & _DRM_VBLANK_SECONDARY ? 1 : 0;
-	if (crtc >= dev->num_crtcs)
+	if (crtc >= dev->num_crtcs) {
+		DRM_ERROR("wait vblank operation not support");
 		return (ENOTSUP);
-
+	}
 	ret = drm_vblank_get(dev, crtc);
 	if (ret) {
-		DRM_DEBUG("can't get drm vblank");
+		DRM_ERROR("can't get drm vblank %d", ret);
 		return (ret);
 	}
 	sequence = drm_vblank_count(dev, crtc);
@@ -449,7 +523,7 @@ drm_wait_vblank(DRM_IOCTL_ARGS)
 		/*
 		 * Don't block process, send signal when vblank interrupt
 		 */
-		DRM_DEBUG("NOT SUPPORT YET, SHOULD BE ADDED");
+		DRM_ERROR("NOT SUPPORT YET, SHOULD BE ADDED");
 		cmn_err(CE_WARN, "NOT SUPPORT YET, SHOULD BE ADDED");
 		ret = EINVAL;
 		goto done;
@@ -457,8 +531,9 @@ drm_wait_vblank(DRM_IOCTL_ARGS)
 		/* block until vblank interupt */
 		/* shared code returns -errno */
 		DRM_WAIT_ON(ret, &dev->vbl_queues[crtc], 3 * DRM_HZ,
-		    ((drm_vblank_count(dev, crtc)
-		    - vblwait.request.sequence) <= (1 << 23)));
+		    (((drm_vblank_count(dev, crtc)
+		    - vblwait.request.sequence) <= (1 << 23)) ||
+		    !dev->irq_enabled));
 		if (ret != EINTR) {
 			struct timeval now;
 			(void) uniqtime(&now);
@@ -503,33 +578,4 @@ drm_handle_vblank(struct drm_device *dev, int crtc)
 {
 	atomic_inc(&dev->_vblank_count[crtc]);
 	DRM_WAKEUP(&dev->vbl_queues[crtc]);
-	drm_vbl_send_signals(dev);
-}
-
-/*
- * Schedule a tasklet to call back a driver hook with the HW lock held.
- *
- * \param dev DRM device.
- * \param func Driver callback.
- *
- * This is intended for triggering actions that require the HW lock from an
- * interrupt handler. The lock will be grabbed ASAP after the interrupt handler
- * completes. Note that the callback may be called from interrupt or process
- * context, it must not make any assumptions about this. Also, the HW lock will
- * be held with the kernel context or any client context.
- */
-
-void
-drm_locked_tasklet(drm_device_t *dev, void (*func)(drm_device_t *))
-{
-	mutex_enter(&dev->tasklet_lock);
-
-	if (dev->locked_tasklet_func) {
-		mutex_exit(&dev->tasklet_lock);
-		return;
-	}
-
-	dev->locked_tasklet_func = func;
-
-	mutex_exit(&dev->tasklet_lock);
 }

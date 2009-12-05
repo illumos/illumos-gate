@@ -20,14 +20,17 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright (c) 2009, Intel Corporation.
+ * All Rights Reserved.
+ */
+
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_AGPMASTER_IO_H
 #define	_SYS_AGPMASTER_IO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {

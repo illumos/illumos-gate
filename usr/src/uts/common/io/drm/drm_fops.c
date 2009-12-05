@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -11,6 +11,7 @@
 /*-
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
+ * Copyright (c) 2009, Intel Corporation.
  * All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -40,8 +41,6 @@
  */
 
 /* END CSTYLED */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "drmP.h"
 
@@ -109,6 +108,9 @@ drm_open_helper(drm_device_t *dev, drm_cminor_t *mp, int flags,
 
 		/* for compatibility root is always authenticated */
 		priv->authenticated	= DRM_SUSER(credp);
+
+		if (dev->driver->use_gem == 1)
+			drm_gem_open(priv);
 
 		if (dev->driver->open) {
 			retcode = dev->driver->open(dev, priv);

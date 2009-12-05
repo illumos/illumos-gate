@@ -1,10 +1,11 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
  * Copyright (c) 2000 Doug Rabson
+ * Copyright (c) 2009, Intel Corporation.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,8 +33,6 @@
 
 #ifndef	_SYS_AGPGART_H
 #define	_SYS_AGPGART_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -69,6 +68,18 @@ typedef struct _agp_allocate {
 	uint32_t	agpa_physical;	/* for i810 only, private */
 } agp_allocate_t;
 
+typedef struct _agp_bind_pages {
+	uint32_t	agpb_pgstart;
+	pfn_t		*agpb_pages;
+	unsigned long 	agpb_pgcount;
+} agp_bind_pages_t;
+
+typedef struct _agp_unbind_pages {
+	uint32_t	agpb_pgstart;
+	unsigned long	agpb_pgcount;
+	uint32_t	agpb_type;
+} agp_unbind_pages_t;
+
 typedef struct _agp_bind {
 	int32_t		agpb_key;
 	uint32_t	agpb_pgstart;
@@ -92,6 +103,10 @@ typedef struct _agp_unbind {
 #define	AGPIOC_IOREMAP_FREE	_IO(AGPIOC_BASE, 9)
 #define	AGPIOC_READ		_IO(AGPIOC_BASE, 10)
 #define	AGPIOC_WRITE		_IO(AGPIOC_BASE, 11)
+#define	AGPIOC_FLUSHCHIPSET	_IO(AGPIOC_BASE, 12)
+#define	AGPIOC_PAGES_BIND	_IOW(AGPIOC_BASE, 13, agp_bind_pages_t)
+#define	AGPIOC_PAGES_UNBIND	_IOW(AGPIOC_BASE, 14, agp_unbind_pages_t)
+#define	AGPIOC_PAGES_REBIND	_IO(AGPIOC_BASE, 15)
 
 /* AGP status register bits definition */
 #define	AGPSTAT_RQ_MASK		0xff000000	/* target only */

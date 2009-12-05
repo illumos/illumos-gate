@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -10,6 +10,7 @@
 /*
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
+ * Copyright (c) 2009, Intel Corporation.
  * All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -36,8 +37,6 @@
  *    Gareth Hughes <gareth@valinux.com>
  *
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "drmP.h"
 
@@ -135,6 +134,7 @@ drm_get_pci_index_reg(dev_info_t *devi, uint_t physical, uint_t size,
 			break;
 		}
 	}
+
 	kmem_free(regs, (size_t)length);
 	return (regnum);
 error:
@@ -204,8 +204,8 @@ drm_ioremap(drm_device_t *softstate, drm_local_map_t *map)
 	map->dev_addr = iomap.drm_base;
 
 	DRM_DEBUG(
-	    "map->handle is %p map->dev_addr is %lx",
-	    (void *)map->handle, (unsigned long)map->dev_addr);
+	    "map->handle is %p map->dev_addr is %lx map->size %x",
+	    (void *)map->handle, (unsigned long)map->dev_addr, map->size);
 
 	return (0);
 }

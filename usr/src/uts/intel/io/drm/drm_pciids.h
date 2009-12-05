@@ -207,6 +207,7 @@ extern "C" {
 	{0x8086, 0x2E12, CHIP_I9XX|CHIP_I965, "Intel Q45"}, \
 	{0x8086, 0x2E22, CHIP_I9XX|CHIP_I965, "Intel G45"}, \
 	{0x8086, 0x2E32, CHIP_I9XX|CHIP_I965, "Intel G41"}, \
+	{0x8086, 0x2E42, CHIP_I9XX|CHIP_I965, "Intel B43"}, \
 	{0, 0, 0, NULL}
 
 #ifdef	__cplusplus

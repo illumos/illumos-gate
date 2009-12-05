@@ -13,6 +13,7 @@
 /*
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
+ * Copyright (c) 2009, Intel Corporation.
  * All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -665,6 +666,19 @@ typedef union drm_wait_vblank {
 	struct drm_wait_vblank_reply reply;
 } drm_wait_vblank_t;
 
+#define _DRM_PRE_MODESET 1
+#define _DRM_POST_MODESET 2
+
+/**
+ * DRM_IOCTL_MODESET_CTL ioctl argument type
+ *
+ * \sa drmModesetCtl().
+ */
+typedef struct drm_modeset_ctl {
+	uint32_t crtc;
+	uint32_t cmd;
+} drm_modeset_ctl_t;
+
 /**
  * DRM_IOCTL_AGP_ENABLE ioctl argument type.
  *
@@ -737,6 +751,34 @@ typedef struct drm_set_version {
 	int drm_dd_minor;
 } drm_set_version_t;
 
+/** DRM_IOCTL_GEM_CLOSE ioctl argument type */
+typedef struct drm_gem_close {
+	/** Handle of the object to be closed. */
+	uint32_t handle;
+	uint32_t pad;
+} drm_gem_close_t;
+
+/** DRM_IOCTL_GEM_FLINK ioctl argument type */
+typedef struct drm_gem_flink {
+	/** Handle for the object being named */
+	uint32_t handle;
+
+	/** Returned global name */
+	uint32_t name;
+} drm_gem_flink_t;
+
+/** DRM_IOCTL_GEM_OPEN ioctl argument type */
+typedef struct drm_gem_open {
+	/** Name of object being opened */
+	uint32_t name;
+
+	/** Returned handle for the object */
+	uint32_t handle;
+
+	/** Returned size of the object */
+	uint64_t size;
+} drm_gem_open_t;
+
 /**
  * \name Ioctls Definitions
  */
@@ -756,6 +798,10 @@ typedef struct drm_set_version {
 #define DRM_IOCTL_GET_CLIENT            DRM_IOWR(0x05, drm_client_t)
 #define DRM_IOCTL_GET_STATS             DRM_IOR( 0x06, drm_stats_t)
 #define DRM_IOCTL_SET_VERSION		DRM_IOWR(0x07, drm_set_version_t)
+#define DRM_IOCTL_MODESET_CTL           DRM_IOW(0x08,	drm_modeset_ctl_t)
+#define DRM_IOCTL_GEM_CLOSE		DRM_IOW (0x09, drm_gem_close_t)
+#define DRM_IOCTL_GEM_FLINK		DRM_IOWR(0x0a, drm_gem_flink_t)
+#define DRM_IOCTL_GEM_OPEN		DRM_IOWR(0x0b, drm_gem_open_t)
 
 #define DRM_IOCTL_SET_UNIQUE		DRM_IOW( 0x10, drm_unique_t)
 #define DRM_IOCTL_AUTH_MAGIC		DRM_IOW( 0x11, drm_auth_t)

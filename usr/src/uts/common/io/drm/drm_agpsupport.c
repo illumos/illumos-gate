@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -10,6 +10,7 @@
 /*
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
+ * Copyright (c) 2009, Intel Corporation.
  * All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -36,8 +37,6 @@
  *    Gareth Hughes <gareth@valinux.com>
  *
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "drm.h"
 #include "drmP.h"
@@ -193,6 +192,7 @@ drm_agp_enable(DRM_IOCTL_ARGS)
 	dev->agp->mode = modes.mode;
 	setup.agps_mode = (uint32_t)modes.mode;
 
+
 	DRM_DEBUG("drm_agp_enable: dev->agp->mode=%lx", modes.mode);
 
 	ret = ldi_ioctl(dev->agp->agpgart_lh, AGPIOC_SETUP,
@@ -205,6 +205,7 @@ drm_agp_enable(DRM_IOCTL_ARGS)
 	dev->agp->base = dev->agp->agp_info.agpi_aperbase;
 	dev->agp->enabled = 1;
 
+	DRM_DEBUG("drm_agp_enable: dev->agp->base=0x%lx", dev->agp->base);
 	return (0);
 }
 
@@ -246,6 +247,8 @@ drm_agp_alloc(DRM_IOCTL_ARGS)
 	if (dev->agp->memory)
 		dev->agp->memory->prev = entry;
 	dev->agp->memory = entry;
+
+	DRM_DEBUG("entry->phys_addr %lx", entry->phys_addr);
 
 	/* physical is used only by i810 driver */
 	request.physical = alloc.agpa_physical;
@@ -383,7 +386,6 @@ drm_agp_init(drm_device_t *dev)
 	drm_agp_head_t *agp   = NULL;
 	int	retval, rval;
 
-	DRM_DEBUG("drm_agp_init\n");
 	agp = kmem_zalloc(sizeof (drm_agp_head_t), KM_SLEEP);
 
 	retval = ldi_ident_from_dip(dev->dip, &agp->agpgart_li);
@@ -437,14 +439,14 @@ drm_agp_fini(drm_device_t *dev)
 
 /*ARGSUSED*/
 void *
-drm_agp_allocate_memory(size_t pages, uint32_t type)
+drm_agp_allocate_memory(size_t pages, uint32_t type, drm_device_t *dev)
 {
 	return (NULL);
 }
 
 /*ARGSUSED*/
 int
-drm_agp_free_memory(void *handle)
+drm_agp_free_memory(agp_allocate_t *handle, drm_device_t *dev)
 {
 	return (1);
 }
@@ -493,4 +495,93 @@ drm_agp_unbind_memory(unsigned long handle, drm_device_t *dev)
 	}
 	entry->bound = 0;
 	return (0);
+}
+
+/*
+ * Binds a collection of pages into AGP memory at the given offset, returning
+ * the AGP memory structure containing them.
+ *
+ * No reference is held on the pages during this time -- it is up to the
+ * caller to handle that.
+ */
+int
+drm_agp_bind_pages(drm_device_t *dev,
+		    pfn_t *pages,
+		    unsigned long num_pages,
+		    uint32_t gtt_offset)
+{
+
+	agp_bind_pages_t bind;
+	int	ret, rval;
+
+	bind.agpb_pgstart = gtt_offset / AGP_PAGE_SIZE;
+	bind.agpb_pgcount = num_pages;
+	bind.agpb_pages = pages;
+	ret = ldi_ioctl(dev->agp->agpgart_lh, AGPIOC_PAGES_BIND,
+	    (intptr_t)&bind, FKIOCTL, kcred, &rval);
+	if (ret) {
+		DRM_ERROR("AGPIOC_PAGES_BIND failed ret %d", ret);
+		return (ret);
+	}
+	return (0);
+}
+
+int
+drm_agp_unbind_pages(drm_device_t *dev,
+		    unsigned long num_pages,
+		    uint32_t gtt_offset,
+		    uint32_t type)
+{
+
+	agp_unbind_pages_t unbind;
+	int	ret, rval;
+
+	unbind.agpb_pgstart = gtt_offset / AGP_PAGE_SIZE;
+	unbind.agpb_pgcount = num_pages;
+	unbind.agpb_type = type;
+	ret = ldi_ioctl(dev->agp->agpgart_lh, AGPIOC_PAGES_UNBIND,
+	    (intptr_t)&unbind, FKIOCTL, kcred, &rval);
+	if (ret) {
+		DRM_DEBUG("drm_agp_unbind_pages AGPIOC_PAGES_UNBIND failed");
+		return (ret);
+	}
+	return (0);
+}
+
+/*
+ * Certain Intel chipsets contains a global write buffer, and this can require
+ * flushing from the drm or X.org to make sure all data has hit RAM before
+ * initiating a GPU transfer, due to a lack of coherency with the integrated
+ * graphics device and this buffer.
+ */
+void
+drm_agp_chipset_flush(struct drm_device *dev)
+{
+	int ret, rval;
+
+	DRM_DEBUG("agp_chipset_flush");
+	ret = ldi_ioctl(dev->agp->agpgart_lh, AGPIOC_FLUSHCHIPSET,
+	    (intptr_t)0, FKIOCTL, kcred, &rval);
+	if (ret != 0) {
+		DRM_ERROR("Failed to drm_agp_chipset_flush ret %d", ret);
+	}
+}
+
+/*
+ * The pages are evict on suspend, so re-bind it at resume time
+ */
+void
+drm_agp_rebind(struct drm_device *dev)
+{
+	int ret, rval;
+
+	if (!dev->agp) {
+		return;
+	}
+
+	ret = ldi_ioctl(dev->agp->agpgart_lh, AGPIOC_PAGES_REBIND,
+	    (intptr_t)0, FKIOCTL, kcred, &rval);
+	if (ret != 0) {
+		DRM_ERROR("rebind failed %d", ret);
+	}
 }

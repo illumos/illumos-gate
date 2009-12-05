@@ -5,6 +5,7 @@
 /*
  * -
  * Copyright 2003 Eric Anholt
+ * Copyright (c) 2009, Intel Corporation.
  * All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -31,33 +32,48 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #ifndef _DRM_LINUX_LIST_H_
 #define	_DRM_LINUX_LIST_H_
 
 struct list_head {
 	struct list_head *next, *prev;
+	caddr_t contain_ptr;
 };
 
 /* Cheat, assume the list_head is at the start of the struct */
-#define	list_entry(entry, type, member)	(type *)(entry)
+#define	list_entry(entry, type, member)	(type *)(uintptr_t)(entry->contain_ptr)
 
 #define	INIT_LIST_HEAD(head) { \
 	(head)->next = head;   \
 	(head)->prev = head;   \
+	(head)->contain_ptr = (caddr_t)head;	\
 }
 
-#define	list_add_tail(entry, head) {  \
+#define	list_add(entry, head, con_ptr) {	\
+	(head)->next->prev = entry;	\
+	(entry)->next = (head)->next;	\
+	(entry)->prev = head;	\
+	(head)->next = entry;	\
+	(entry)->contain_ptr = con_ptr;	\
+}
+
+#define	list_add_tail(entry, head, con_ptr) {  \
 	(entry)->prev = (head)->prev; \
 	(entry)->next = head;         \
 	(head)->prev->next = entry;   \
 	(head)->prev = entry;         \
+	(entry)->contain_ptr = con_ptr;	\
 }
 
 #define	list_del(entry) {                         \
 	(entry)->next->prev = (entry)->prev;      \
 	(entry)->prev->next = (entry)->next;      \
+	(entry)->contain_ptr = NULL;	\
 }
 
 #define	list_for_each(entry, head)				\
@@ -65,7 +81,19 @@ struct list_head {
 
 #define	list_for_each_safe(entry, temp, head)			\
     for (entry = (head)->next, temp = (entry)->next;		\
-	temp != head; 						\
+	entry != head; 						\
 	entry = temp, temp = temp->next)
+
+#define	list_del_init(entry) {				\
+	list_del(entry);				\
+	INIT_LIST_HEAD(entry);		\
+}
+
+#define	list_move_tail(entry, head, con_ptr) {				\
+	list_del(entry);					\
+	list_add_tail(entry, head, con_ptr);		\
+}
+
+#define	list_empty(head)	((head)->next == head)
 
 #endif /* _DRM_LINUX_LIST_H_ */

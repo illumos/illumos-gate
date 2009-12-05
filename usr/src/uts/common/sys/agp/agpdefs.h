@@ -20,6 +20,11 @@
  */
 
 /*
+ * Copyright (c) 2009, Intel Corporation.
+ * All Rights Reserved.
+ */
+
+/*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -103,6 +108,7 @@ extern "C" {
 #define	INTEL_BR_Q45			0x2e108086
 #define	INTEL_BR_G45			0x2e208086
 #define	INTEL_BR_G41			0x2e308086
+#define	INTEL_BR_B43			0x2e408086
 
 /* AGP common register offset in pci configuration space */
 #define	AGP_CONF_MISC			0x51 /* one byte */
@@ -172,6 +178,36 @@ extern "C" {
 #define	INTEL_IGD_Q45			0x2e128086
 #define	INTEL_IGD_G45			0x2e228086
 #define	INTEL_IGD_G41			0x2e328086
+#define	INTEL_IGD_B43			0x2e428086
+
+/* Intel 915 and 945 series */
+#define	IS_INTEL_915(device) ((device == INTEL_IGD_915) ||	\
+	(device == INTEL_IGD_915GM) ||	\
+	(device == INTEL_IGD_945) ||	\
+	(device == INTEL_IGD_945GM) ||	\
+	(device == INTEL_IGD_945GME))
+
+/* Intel 965 series */
+#define	IS_INTEL_965(device) ((device == INTEL_IGD_946GZ) ||	\
+	(device == INTEL_IGD_965G1) ||	\
+	(device == INTEL_IGD_965Q) ||	\
+	(device == INTEL_IGD_965G2) ||	\
+	(device == INTEL_IGD_965GM) ||	\
+	(device == INTEL_IGD_965GME) ||	\
+	(device == INTEL_IGD_GM45) ||	\
+	IS_INTEL_G4X(device))
+
+/* Intel G33 series */
+#define	IS_INTEL_X33(device) ((device == INTEL_IGD_Q35) ||	\
+	(device == INTEL_IGD_G33) ||	\
+	(device == INTEL_IGD_Q33))
+
+/* Intel G4X series */
+#define	IS_INTEL_G4X(device) ((device == INTEL_IGD_EL) ||	\
+	(device == INTEL_IGD_Q45) ||	\
+	(device == INTEL_IGD_G45) ||	\
+	(device == INTEL_IGD_G41) ||	\
+	(device == INTEL_IGD_B43))
 
 /* register offsets in PCI config space */
 #define	I8XX_CONF_GMADR			0x10 /* GMADR of i8xx series */
@@ -296,6 +332,7 @@ extern "C" {
 #define	GIGA_MASK		0xC0000000
 #define	UI32_MASK		0xffffffffU
 #define	MAXAPERMEGAS		0x1000 /* Aper size no more than 4G */
+#define	MINAPERMEGAS		192
 
 #endif /* _KERNEL */
 

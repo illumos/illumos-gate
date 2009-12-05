@@ -444,7 +444,7 @@ ndi_ra_free(dev_info_t *dip, uint64_t base, uint64_t len, char *type,
 	 * Update dip's "available" property, adding this piece of
 	 * resource to the pool.
 	 */
-	(void) pci_put_available_prop(dip, base, len, type);
+	(void) pci_put_available_prop(dipmap->ra_dip, base, len, type);
 done:
 	return (NDI_SUCCESS);
 
@@ -732,7 +732,8 @@ ndi_ra_alloc(dev_info_t *dip, ndi_ra_request_t *req, uint64_t *retbasep,
 	 * resource from the pool.
 	 */
 	if ((rval == NDI_SUCCESS) || (rval == NDI_RA_PARTIAL_REQ))
-		(void) pci_get_available_prop(dip, *retbasep, *retlenp, type);
+		(void) pci_get_available_prop(dipmap->ra_dip,
+		    *retbasep, *retlenp, type);
 
 	return (rval);
 }

@@ -5,6 +5,7 @@
 /*
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
+ * Copyright (c) 2009, Intel Corporation.
  * All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -151,8 +152,9 @@
 #define	DRM_LOCK_OWNED()	ASSERT(mutex_owned(&dev->dev_lock))
 #define	spin_lock_irqsave(l, flag)		mutex_enter(l)
 #define	spin_unlock_irqrestore(u, flag) mutex_exit(u)
-#define	spin_lock(l)		mutex_enter(l)
-#define	spin_unlock(u)		mutex_exit(u)
+#define	spin_lock(l)	mutex_enter(l)
+#define	spin_unlock(u)	mutex_exit(u)
+
 
 #define	DRM_UDELAY(sec)  delay(drv_usectohz(sec *1000))
 #define	DRM_MEMORYBARRIER()
@@ -166,12 +168,16 @@ typedef struct drm_driver_info drm_driver_t;
 	drm_device_t *dev1, intptr_t data, drm_file_t *fpriv, int mode
 
 #define	DRM_COPYFROM_WITH_RETURN(dest, src, size)	\
-	if (ddi_copyin(src, dest, size, 0)) \
-		return (EFAULT)
+	if (ddi_copyin((src), (dest), (size), 0)) {	\
+		DRM_ERROR("%s: copy from user failed", __func__);	\
+		return (EFAULT);	\
+	}
 
 #define	DRM_COPYTO_WITH_RETURN(dest, src, size)	\
-	if (ddi_copyout((src), (dest), (size), 0)) \
-		return (EFAULT)
+	if (ddi_copyout((src), (dest), (size), 0)) {	\
+		DRM_ERROR("%s: copy to user failed", __func__);	\
+		return (EFAULT);	\
+	}
 
 #define	DRM_COPY_FROM_USER(dest, src, size) \
 	ddi_copyin((src), (dest), (size), 0) /* flag for src */
@@ -222,6 +228,8 @@ typedef struct drm_wait_queue {
 	mutex_exit(&(q)->lock);	\
 }
 
+#define	jiffies	ddi_get_lbolt()
+
 #define	DRM_WAIT_ON(ret, q, timeout, condition)  			\
 	mutex_enter(&(q)->lock);					\
 	while (!(condition)) {						\
@@ -239,6 +247,21 @@ typedef struct drm_wait_queue {
 	} 								\
 	mutex_exit(&(q)->lock);
 
+#define	DRM_WAIT(ret, q, condition)  \
+mutex_enter(&(q)->lock);	\
+if (!(condition)) {	\
+	ret = cv_timedwait_sig(&(q)->cv, &(q)->lock, jiffies + 30 * DRM_HZ); \
+	if (ret == -1) {				\
+		/* gfx maybe hang */	\
+		if (!(condition)) 	\
+			ret = -2;	\
+	} else {	\
+		ret = 0;	\
+	}	\
+} \
+mutex_exit(&(q)->lock);
+
+
 #define	DRM_GETSAREA()  					\
 {                                				\
 	drm_local_map_t *map;					\
@@ -255,8 +278,8 @@ typedef struct drm_wait_queue {
 #define	LOCK_TEST_WITH_RETURN(dev, fpriv)				\
 	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock) ||		\
 	    dev->lock.filp != fpriv) {					\
-		DRM_ERROR("called without lock held");	\
-		return (EINVAL);					\
+		DRM_DEBUG("%s called without lock held", __func__);	\
+		return (EINVAL);	\
 	}
 
 #define	DRM_IRQ_ARGS	caddr_t arg
@@ -280,6 +303,11 @@ enum {
 
 #define	PAGE_ALIGN(addr)	(((addr) + DRM_PAGE_SIZE - 1) & DRM_PAGE_MASK)
 #define	DRM_SUSER(p)		(crgetsgid(p) == 0 || crgetsuid(p) == 0)
+
+#define	DRM_GEM_OBJIDR_HASHNODE	1024
+#define	idr_list_for_each(entry, head) \
+	for (int key = 0; key < DRM_GEM_OBJIDR_HASHNODE; key++) \
+		list_for_each(entry, &(head)->next[key])
 
 /*
  * wait for 400 milliseconds
@@ -378,6 +406,88 @@ typedef struct drm_buf_entry {
 } drm_buf_entry_t;
 
 typedef TAILQ_HEAD(drm_file_list, drm_file) drm_file_list_t;
+
+/* BEGIN CSTYLED */
+typedef struct drm_local_map {
+	unsigned long	offset;  /*  Physical address (0 for SAREA)	*/
+	unsigned long	size;	 /* Physical size (bytes)		*/
+	drm_map_type_t	type;	 /* Type of memory mapped		*/
+	drm_map_flags_t flags;	 /* Flags				*/
+	void		*handle; /* User-space: "Handle" to pass to mmap */
+				 /* Kernel-space: kernel-virtual address */
+	int		mtrr;	 /* Boolean: MTRR used 			*/
+				 /* Private data			*/
+	int		rid;	 /* PCI resource ID for bus_space 	*/
+	int		kernel_owned; /* Boolean: 1= initmapped, 0= addmapped */
+	caddr_t		dev_addr;	  /* base device address 	*/
+	ddi_acc_handle_t  dev_handle;	  /* The data access handle 	*/
+	ddi_umem_cookie_t drm_umem_cookie; /* For SAREA alloc and free  */
+	TAILQ_ENTRY(drm_local_map) link;
+} drm_local_map_t;
+/* END CSTYLED */
+
+/*
+ * This structure defines the drm_mm memory object, which will be used by the
+ * DRM for its buffer objects.
+ */
+struct drm_gem_object {
+	/* Reference count of this object */
+	atomic_t refcount;
+
+	/* Handle count of this object. Each handle also holds a reference */
+	atomic_t handlecount;
+
+	/* Related drm device */
+	struct drm_device *dev;
+
+	int flink;
+	/*
+	 * Size of the object, in bytes.  Immutable over the object's
+	 * lifetime.
+	 */
+	size_t size;
+
+	/*
+	 * Global name for this object, starts at 1. 0 means unnamed.
+	 * Access is covered by the object_name_lock in the related drm_device
+	 */
+	int name;
+
+	/*
+	 * Memory domains. These monitor which caches contain read/write data
+	 * related to the object. When transitioning from one set of domains
+	 * to another, the driver is called to ensure that caches are suitably
+	 * flushed and invalidated
+	 */
+	uint32_t read_domains;
+	uint32_t write_domain;
+
+	/*
+	 * While validating an exec operation, the
+	 * new read/write domain values are computed here.
+	 * They will be transferred to the above values
+	 * at the point that any cache flushing occurs
+	 */
+	uint32_t pending_read_domains;
+	uint32_t pending_write_domain;
+
+	void *driver_private;
+
+	drm_local_map_t *map;
+	ddi_dma_handle_t dma_hdl;
+	ddi_acc_handle_t acc_hdl;
+	caddr_t kaddr;
+	size_t real_size;	/* real size of memory */
+	pfn_t *pfnarray;
+};
+
+struct idr_list {
+	struct idr_list *next, *prev;
+	struct drm_gem_object *obj;
+	uint32_t	handle;
+	caddr_t	contain_ptr;
+};
+
 struct drm_file {
 	TAILQ_ENTRY(drm_file) link;
 	int		  authenticated;
@@ -389,6 +499,13 @@ struct drm_file {
 	drm_magic_t	  magic;
 	unsigned long	  ioctl_count;
 	void		 *driver_priv;
+	/* Mapping of mm object handles to object pointers. */
+	struct idr_list object_idr;
+	/* Lock for synchronization of access to object_idr. */
+	kmutex_t table_lock;
+
+	dev_t dev;
+	cred_t *credp;
 };
 
 typedef struct drm_lock_data {
@@ -467,26 +584,26 @@ typedef struct drm_sg_mem {
 	drm_dma_handle_t	*dmah_gart; /* Handle to PCI memory */
 } drm_sg_mem_t;
 
-typedef TAILQ_HEAD(drm_map_list, drm_local_map) drm_map_list_t;
+/*
+ * Generic memory manager structs
+ */
 
-/* BEGIN CSTYLED */
-typedef struct drm_local_map {
-	unsigned long	offset;  /*  Physical address (0 for SAREA)	*/
-	unsigned long	size;	 /* Physical size (bytes)		*/
-	drm_map_type_t	type;	 /* Type of memory mapped		*/
-	drm_map_flags_t flags;	 /* Flags				*/
-	void		*handle; /* User-space: "Handle" to pass to mmap */
-				 /* Kernel-space: kernel-virtual address */
-	int		mtrr;	 /* Boolean: MTRR used 			*/
-				 /* Private data			*/
-	int		rid;	 /* PCI resource ID for bus_space 	*/
-	int		kernel_owned; /* Boolean: 1= initmapped, 0= addmapped */
-	caddr_t		dev_addr;	  /* base device address 	*/
-	ddi_acc_handle_t  dev_handle;	  /* The data access handle 	*/
-	ddi_umem_cookie_t drm_umem_cookie; /* For SAREA alloc and free  */
-	TAILQ_ENTRY(drm_local_map) link;
-} drm_local_map_t;
-/* END CSTYLED */
+struct drm_mm_node {
+	struct list_head fl_entry;
+	struct list_head ml_entry;
+	int free;
+	unsigned long start;
+	unsigned long size;
+	struct drm_mm *mm;
+	void *private;
+};
+
+struct drm_mm {
+	struct list_head fl_entry;
+	struct list_head ml_entry;
+};
+
+typedef TAILQ_HEAD(drm_map_list, drm_local_map) drm_map_list_t;
 
 typedef TAILQ_HEAD(drm_vbl_sig_list, drm_vbl_sig) drm_vbl_sig_list_t;
 typedef struct drm_vbl_sig {
@@ -556,6 +673,16 @@ struct drm_driver_info {
 	int (*enable_vblank)(struct drm_device *dev, int crtc);
 	void (*disable_vblank)(struct drm_device *dev, int crtc);
 
+	/*
+	 * Driver-specific constructor for drm_gem_objects, to set up
+	 * obj->driver_private.
+	 *
+	 * Returns 0 on success.
+	 */
+	int (*gem_init_object) (struct drm_gem_object *obj);
+	void (*gem_free_object) (struct drm_gem_object *obj);
+
+
 	drm_ioctl_desc_t *driver_ioctls;
 	int	max_driver_ioctl;
 
@@ -577,6 +704,7 @@ struct drm_driver_info {
 	unsigned use_vbl_irq :1;
 	unsigned use_vbl_irq2 :1;
 	unsigned use_mtrr :1;
+	unsigned use_gem;
 };
 
 /*
@@ -607,11 +735,12 @@ struct drm_device {
 	int		flags;	/* Flags to open(2)		   */
 
 	/* Locks */
-	kmutex_t	  vbl_lock;	/* protects vblank operations */
-	kmutex_t	  dma_lock;	/* protects dev->dma */
-	kmutex_t	  irq_lock;	/* protects irq condition checks */
-	kmutex_t	  dev_lock;	/* protects everything else */
+	kmutex_t	vbl_lock;	/* protects vblank operations */
+	kmutex_t	dma_lock;	/* protects dev->dma */
+	kmutex_t	irq_lock;	/* protects irq condition checks */
+	kmutex_t	dev_lock;	/* protects everything else */
 	drm_lock_data_t   lock;		/* Information on hardware lock    */
+	kmutex_t	struct_mutex;	/* < For others	*/
 
 	/* Usage Counters */
 	int		  open_count;	/* Outstanding files open	   */
@@ -651,7 +780,12 @@ struct drm_device {
 
 	drm_vbl_sig_list_t vbl_sig_list;
 	drm_vbl_sig_list_t vbl_sig_list2;
-
+	/*
+	 * At load time, disabling the vblank interrupt won't be allowed since
+	 * old clients may not call the modeset ioctl and therefore misbehave.
+	 * Once the modeset ioctl *has* been called though, we can safely
+	 * disable them when unused.
+	 */
 	int vblank_disable_allowed;
 
 	wait_queue_head_t	vbl_queue;	/* vbl wait channel */
@@ -672,13 +806,13 @@ struct drm_device {
 	u32		  *last_vblank;
 	/* so we don't call enable more than */
 	atomic_t	  *vblank_enabled;
-	/* for compensation of spurious wraparounds */
-	u32		  *vblank_premodeset;
+	/* Display driver is setting mode */
+	int		*vblank_inmodeset;
 	/* Don't wait while crtc is likely disabled */
-	int		  *vblank_suspend;
+	int		*vblank_suspend;
 	/* size of vblank counter register */
-	u32		  max_vblank_count;
-	int		  num_crtcs;
+	u32		max_vblank_count;
+	int		num_crtcs;
 	kmutex_t	tasklet_lock;
 	void (*locked_tasklet_func)(struct drm_device *dev);
 
@@ -698,6 +832,22 @@ struct drm_device {
 	u32 *drw_bitfield;
 	unsigned int drw_info_length;
 	drm_drawable_info_t **drw_info;
+
+	/* \name GEM information */
+	/* @{ */
+	kmutex_t object_name_lock;
+	struct idr_list	object_name_idr;
+	atomic_t object_count;
+	atomic_t object_memory;
+	atomic_t pin_count;
+	atomic_t pin_memory;
+	atomic_t gtt_count;
+	atomic_t gtt_memory;
+	uint32_t gtt_total;
+	uint32_t invalidate_domains;	/* domains pending invalidation */
+	uint32_t flush_domains;	/* domains pending flush */
+	/* @} */
+
 	/*
 	 * Saving S3 context
 	 */
@@ -767,8 +917,8 @@ u32	drm_vblank_count(struct drm_device *dev, int crtc);
 int	drm_vblank_get(struct drm_device *dev, int crtc);
 void	drm_vblank_put(struct drm_device *dev, int crtc);
 int	drm_vblank_init(struct drm_device *dev, int num_crtcs);
-void    drm_locked_tasklet(drm_device_t *, void(*func)(drm_device_t *));
 void	drm_vblank_cleanup(struct drm_device *dev);
+int    drm_modeset_ctl(DRM_IOCTL_ARGS);
 
 /* AGP/GART support (drm_agpsupport.c) */
 int	drm_device_is_agp(drm_device_t *);
@@ -776,10 +926,21 @@ int 	drm_device_is_pcie(drm_device_t *);
 drm_agp_head_t *drm_agp_init(drm_device_t *);
 void	drm_agp_fini(drm_device_t *);
 int 	drm_agp_do_release(drm_device_t *);
-void	*drm_agp_allocate_memory(size_t, uint32_t);
-int	drm_agp_free_memory(void *);
+void	*drm_agp_allocate_memory(size_t pages,
+	    uint32_t type, drm_device_t *dev);
+int	drm_agp_free_memory(agp_allocate_t *handle, drm_device_t *dev);
 int	drm_agp_bind_memory(unsigned int, uint32_t, drm_device_t *);
 int	drm_agp_unbind_memory(unsigned long, drm_device_t *);
+int	drm_agp_bind_pages(drm_device_t *dev,
+		    pfn_t *pages,
+		    unsigned long num_pages,
+		    uint32_t gtt_offset);
+int	drm_agp_unbind_pages(drm_device_t *dev,
+		    unsigned long num_pages,
+		    uint32_t gtt_offset,
+		    uint32_t type);
+void drm_agp_chipset_flush(struct drm_device *dev);
+void drm_agp_rebind(struct drm_device *dev);
 
 /* kstat support (drm_kstats.c) */
 int	drm_init_kstats(drm_device_t *);
@@ -797,6 +958,8 @@ int	drm_lock(DRM_IOCTL_ARGS);
 int	drm_unlock(DRM_IOCTL_ARGS);
 int	drm_version(DRM_IOCTL_ARGS);
 int	drm_setversion(DRM_IOCTL_ARGS);
+/* Cache management (drm_cache.c) */
+void drm_clflush_pages(caddr_t *pages, unsigned long num_pages);
 
 /* Misc. IOCTL support (drm_ioctl.c) */
 int	drm_irq_by_busid(DRM_IOCTL_ARGS);
@@ -858,8 +1021,15 @@ int	drm_agp_bind(DRM_IOCTL_ARGS);
 int	drm_sg_alloc(DRM_IOCTL_ARGS);
 int	drm_sg_free(DRM_IOCTL_ARGS);
 
-extern int drm_debug_flag;
+/*	drm_mm.c	*/
+struct drm_mm_node *drm_mm_get_block(struct drm_mm_node *parent,
+				    unsigned long size, unsigned alignment);
+struct drm_mm_node *drm_mm_search_free(const struct drm_mm *mm,
+				    unsigned long size,
+				    unsigned alignment, int best_match);
 
+extern void drm_mm_clean_ml(const struct drm_mm *mm);
+extern int drm_debug_flag;
 
 /* We add function to support DRM_DEBUG,DRM_ERROR,DRM_INFO */
 extern void drm_debug(const char *fmt, ...);
@@ -904,5 +1074,31 @@ extern drm_file_t *drm_find_file_by_proc(drm_device_t *, cred_t *);
 extern drm_cminor_t *drm_find_file_by_minor(drm_device_t *, int);
 extern int drm_open_helper(drm_device_t *, drm_cminor_t *, int, int,
     cred_t *);
+
+/* Graphics Execution Manager library functions (drm_gem.c) */
+int drm_gem_init(struct drm_device *dev);
+void drm_gem_object_free(struct drm_gem_object *obj);
+struct drm_gem_object *drm_gem_object_alloc(struct drm_device *dev,
+					    size_t size);
+void drm_gem_object_handle_free(struct drm_gem_object *obj);
+
+void drm_gem_object_reference(struct drm_gem_object *obj);
+void drm_gem_object_unreference(struct drm_gem_object *obj);
+
+int drm_gem_handle_create(struct drm_file *file_priv,
+			    struct drm_gem_object *obj,
+			    int *handlep);
+void drm_gem_object_handle_reference(struct drm_gem_object *obj);
+
+void drm_gem_object_handle_unreference(struct drm_gem_object *obj);
+
+struct drm_gem_object *drm_gem_object_lookup(struct drm_file *filp,
+					    int handle);
+int drm_gem_close_ioctl(DRM_IOCTL_ARGS);
+int drm_gem_flink_ioctl(DRM_IOCTL_ARGS);
+int drm_gem_open_ioctl(DRM_IOCTL_ARGS);
+void drm_gem_open(struct drm_file *file_private);
+void drm_gem_release(struct drm_device *dev, struct drm_file *file_private);
+
 
 #endif	/* _DRMP_H */

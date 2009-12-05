@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -97,7 +97,6 @@ struct cb_ops drm_cb_ops = {
 	0,					/* cb_stream */
 	D_NEW | D_MTSAFE |D_DEVMAP	/* cb_flag */
 };
-
 
 int
 _init(void)
@@ -499,6 +498,9 @@ drm_sun_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	    ((ioctl->flags & DRM_MASTER) && !fpriv->master))
 		return (EACCES);
 
+	fpriv->dev = dev;
+	fpriv->credp = credp;
+
 	retval = func(dp, arg, fpriv, mode);
 
 	return (retval);
@@ -514,7 +516,7 @@ drm_sun_devmap(dev_t dev, devmap_cookie_t dhp, offset_t offset,
 	drm_inst_state_t	*mstate;
 	drm_device_t		*dp;
 	ddi_umem_cookie_t	cookie;
-	drm_local_map_t		*map;
+	drm_local_map_t		*map = NULL;
 	unsigned long	aperbase;
 	u_offset_t		handle;
 	offset_t		koff;
@@ -527,6 +529,11 @@ drm_sun_devmap(dev_t dev, devmap_cookie_t dhp, offset_t offset,
 		DDI_DEVICE_ATTR_V0,
 		DDI_NEVERSWAP_ACC,
 		DDI_STRICTORDER_ACC,
+	};
+	static ddi_device_acc_attr_t gem_dev_attr = {
+		DDI_DEVICE_ATTR_V0,
+		DDI_NEVERSWAP_ACC,
+		DDI_MERGING_OK_ACC
 	};
 
 	mstate = drm_sup_devt_to_state(dev);
@@ -560,28 +567,54 @@ drm_sun_devmap(dev_t dev, devmap_cookie_t dhp, offset_t offset,
 		return (EINVAL);
 	}
 
-	/*
-	 * We will solve 32-bit application on 64-bit kernel
-	 * issue later, now, we just use low 32-bit
-	 */
-	handle = (u_offset_t)offset;
-	handle &= 0xffffffff;
 	mutex_enter(&dp->dev_lock);
-	TAILQ_FOREACH(map, &dp->maplist, link) {
-		if (handle ==
-		    ((u_offset_t)((uintptr_t)map->handle) & 0xffffffff))
-			break;
+
+	if (dp->driver->use_gem == 1) {
+		struct idr_list *entry;
+		drm_cminor_t *mp;
+
+		mp = drm_find_file_by_minor(dp, minor);
+		if (!mp) {
+			mutex_exit(&dp->dev_lock);
+			DRM_ERROR("drm_sun_devmap: can't find authenticator");
+			return (EACCES);
+		}
+
+		spin_lock(&dp->struct_mutex);
+		idr_list_for_each(entry, &(mp->fpriv->object_idr)) {
+			if ((uintptr_t)entry->obj == (u_offset_t)offset) {
+				map = entry->obj->map;
+				goto goon;
+			}
+		}
+goon:
+		spin_unlock(&dp->struct_mutex);
 	}
 
-	/*
-	 * Temporarily, because offset is phys_addr for register
-	 * and framebuffer, is kernel virtual_addr for others
-	 * Maybe we will use hash table to solve this issue later.
-	 */
 	if (map == NULL) {
+		/*
+		 * We will solve 32-bit application on 64-bit kernel
+		 * issue later, now, we just use low 32-bit
+		 */
+		handle = (u_offset_t)offset;
+		handle &= 0xffffffff;
+
 		TAILQ_FOREACH(map, &dp->maplist, link) {
-			if (handle == (map->offset & 0xffffffff))
+			if (handle ==
+			    ((u_offset_t)((uintptr_t)map->handle) & 0xffffffff))
 				break;
+		}
+
+		/*
+		 * Temporarily, because offset is phys_addr for register
+		 * and framebuffer, is kernel virtual_addr for others
+		 * Maybe we will use hash table to solve this issue later.
+		 */
+		if (map == NULL) {
+			TAILQ_FOREACH(map, &dp->maplist, link) {
+				if (handle == (map->offset & 0xffffffff))
+					break;
+			}
 		}
 	}
 
@@ -703,6 +736,20 @@ drm_sun_devmap(dev_t dev, devmap_cookie_t dhp, offset_t offset,
 		}
 		*maplen = length;
 		break;
+
+	case _DRM_TTM:
+		if (map->drm_umem_cookie == NULL)
+			return (EINVAL);
+
+		if (gfxp_devmap_umem_setup(dhp, dp->dip,
+		    NULL, map->drm_umem_cookie, 0, map->size, PROT_ALL,
+		    IOMEM_DATA_UC_WR_COMBINE | DEVMAP_ALLOW_REMAP,
+		    &gem_dev_attr)) {
+			cmn_err(CE_WARN, "devmap:failed, retval=%d", ret);
+			return (DDI_FAILURE);
+		}
+		*maplen = map->size;
+		return (DDI_SUCCESS);
 
 	default:
 		return (DDI_FAILURE);

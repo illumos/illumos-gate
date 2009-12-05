@@ -5,6 +5,7 @@
 /*
  * Copyright 1999, 2000 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
+ * Copyright (c) 2009, Intel Corporation.
  * All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -170,7 +171,7 @@ int drm_addmap(drm_device_t *dev, unsigned long offset,
 		break;
 
 	case _DRM_CONSISTENT:
-		cmn_err(CE_WARN, "%d DRM_AGP_CONSISTENT", __LINE__);
+		DRM_ERROR("%d DRM_AGP_CONSISTENT", __LINE__);
 		return (ENOTSUP);
 	case _DRM_AGP:
 		map->offset += dev->agp->base;

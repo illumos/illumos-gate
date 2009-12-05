@@ -20,6 +20,11 @@
  */
 
 /*
+ * Copyright (c) 2009, Intel Corporation.
+ * All Rights Reserved.
+ */
+
+/*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -32,6 +37,7 @@
 #include <sys/stat.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/sunndi.h>
 #include <sys/modctl.h>
 #include <sys/sunldi.h>
 #include <sys/pci.h>
@@ -43,6 +49,37 @@ int agptarget_debug_var = 0;
 #define	TARGETDB_PRINT2(fmt)	if (agptarget_debug_var >= 1) cmn_err fmt
 #define	INST2NODENUM(inst)	(inst)
 #define	DEV2INST(dev)		(getminor(dev))
+
+static ddi_device_acc_attr_t dev_attr = {
+	DDI_DEVICE_ATTR_V0,
+	DDI_NEVERSWAP_ACC,
+	DDI_STRICTORDER_ACC,
+};
+
+static struct _i9xx_private_compat {
+	uint64_t	physical;	/* physical address */
+	uint_t	size;	/* size of mapping */
+	uint_t	regnum;	/* register number */
+	caddr_t	flush_page;	/* kernel virtual address */
+	ddi_acc_handle_t	handle; /* data access handle */
+} i9xx_private;
+
+#define	I915_IFPADDR	0x60
+#define	I965_IFPADDR	0x70
+
+#define	HIADDR(n)	((uint32_t)(((uint64_t)(n) & \
+			0xFFFFFFFF00000000ULL) >> 32))
+#define	LOADDR(n)	((uint32_t)((uint64_t)(n) & 0x00000000FFFFFFFF))
+
+/*
+ * Using for GEM to flush the chipset global
+ * write buffers on certain intel chipset
+ */
+
+static void
+intel_chipset_flush_setup(dev_info_t *dip,
+		    ddi_acc_handle_t pci_acc_hdl,
+		    int gms_off);
 
 typedef struct agp_target_softstate {
 	dev_info_t		*tsoft_dip;
@@ -376,6 +413,8 @@ static gms_mode_t gms_modes[] = {
 	{INTEL_BR_G45, I8XX_CONF_GC, I8XX_GC_MODE_MASK,
 		GMS_SIZE(gms_G4X), gms_G4X},
 	{INTEL_BR_G41, I8XX_CONF_GC, I8XX_GC_MODE_MASK,
+		GMS_SIZE(gms_G4X), gms_G4X},
+	{INTEL_BR_B43, I8XX_CONF_GC, I8XX_GC_MODE_MASK,
 		GMS_SIZE(gms_G4X), gms_G4X}
 };
 static int
@@ -487,6 +526,145 @@ intel_br_suspend(agp_target_softstate_t *softstate)
 	    gms_modes[gms_off].gm_regoff);
 
 	return (DDI_SUCCESS);
+}
+
+static void
+intel_chipset_flush_setup(dev_info_t *dip,
+		    ddi_acc_handle_t pci_acc_hdl, int gms_off)
+{
+	uint32_t temp_hi, temp_lo;
+	ndi_ra_request_t	request;
+	uint64_t	answer;
+	uint64_t	alen;
+	pci_regspec_t	*regs, *regs2;
+	int	n_reg, length;
+	uint32_t	i, regnum, ret;
+	ddi_acc_handle_t	conf_hdl = pci_acc_hdl;
+	uint32_t phys_hi_mask = 0;
+
+	bzero((caddr_t)&request, sizeof (ndi_ra_request_t));
+	request.ra_flags  |= NDI_RA_ALIGN_SIZE | NDI_RA_ALLOC_BOUNDED;
+	request.ra_boundbase = 0;
+	request.ra_boundlen = 0xffffffff;
+	request.ra_len = AGP_PAGE_SIZE;
+
+	/* IS_I965 || IS_G33 || IS_G4X */
+	if (gms_off > 11) {
+		temp_hi = pci_config_get32(conf_hdl, I965_IFPADDR + 4);
+		temp_lo = pci_config_get32(conf_hdl, I965_IFPADDR);
+		phys_hi_mask |= PCI_ADDR_MEM64 | I965_IFPADDR;
+	} else {
+		temp_lo = pci_config_get32(conf_hdl, I915_IFPADDR);
+		phys_hi_mask |= PCI_ADDR_MEM32 | I915_IFPADDR;
+	}
+
+	if (!(temp_lo & 0x1)) {
+		/* allocate space from the allocator */
+		if (ndi_ra_alloc(ddi_get_parent(dip),
+		    &request, &answer, &alen,
+		    NDI_RA_TYPE_MEM, NDI_RA_PASS)
+		    != NDI_SUCCESS) {
+			return;
+		}
+		TARGETDB_PRINT2((CE_WARN, "addr = 0x%x.0x%x len [0x%x]\n",
+		    HIADDR(answer),
+		    LOADDR(answer),
+		    (uint32_t)alen));
+
+		if (gms_off > 11) {
+			pci_config_put32(conf_hdl, I965_IFPADDR + 4,
+			    HIADDR(answer));
+			pci_config_put32(conf_hdl, I965_IFPADDR,
+			    LOADDR(answer) | 0x1);
+		} else {
+			pci_config_put32(conf_hdl, I915_IFPADDR,
+			    LOADDR(answer) | 0x1);
+		}
+	}
+	else
+	{
+		temp_lo &= ~0x1;
+		answer = ((uint64_t)temp_hi << 32) | temp_lo;
+	}
+
+	temp_hi = pci_config_get32(conf_hdl, I965_IFPADDR + 4);
+	temp_lo = pci_config_get32(conf_hdl, I965_IFPADDR);
+
+	/* set pci props */
+	if (ddi_dev_nregs(dip, &n_reg) == DDI_FAILURE) {
+		TARGETDB_PRINT2((CE_WARN, "init_chipset_flush failed"));
+		n_reg = 0;
+		return;
+	}
+
+	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "reg", (caddr_t)&regs, &length) !=
+	    DDI_PROP_SUCCESS) {
+		TARGETDB_PRINT2((CE_WARN, "init_chipset_flush failed!"));
+		return;
+	}
+
+	regnum = length / sizeof (pci_regspec_t);
+
+	TARGETDB_PRINT2((CE_WARN, "reg regnum %d", regnum));
+
+	regs2 = kmem_alloc((regnum + 1) * sizeof (pci_regspec_t), KM_SLEEP);
+	if (regs2 == NULL) {
+
+		TARGETDB_PRINT2((CE_WARN, "init_chipset_flush failed"));
+		goto error;
+	}
+	if (memcpy(regs2, regs, (size_t)length) == NULL) {
+		TARGETDB_PRINT2((CE_WARN, "init_chipset_flush failed"));
+		kmem_free(regs2, (regnum + 1) * sizeof (pci_regspec_t));
+		goto error;
+	}
+
+	/* Bus=0, Dev=0, Func=0 0x82001000 */
+	regs2[regnum].pci_phys_hi = PCI_REG_REL_M | phys_hi_mask;
+	regs2[regnum].pci_phys_mid = HIADDR(answer);
+	regs2[regnum].pci_phys_low = LOADDR(answer);
+	regs2[regnum].pci_size_hi = 0x00000000;
+	regs2[regnum].pci_size_low = AGP_PAGE_SIZE;
+	kmem_free(regs, (size_t)length);
+	regs = regs2;
+
+	i = ndi_prop_update_int_array(DDI_DEV_T_NONE,
+	    dip,  "reg",  (int *)regs, (uint_t)5 * (regnum + 1));
+	if (i != DDI_PROP_SUCCESS) {
+		TARGETDB_PRINT2((CE_WARN, "Failed to update reg %d", i));
+		kmem_free(regs2, (regnum + 1) * sizeof (pci_regspec_t));
+		return;
+	}
+	kmem_free(regs2, (regnum + 1) * sizeof (pci_regspec_t));
+	regs = NULL;
+
+	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "reg", (caddr_t)&regs, &length) !=
+	    DDI_PROP_SUCCESS) {
+		TARGETDB_PRINT2((CE_WARN, "init_chipset_flush: failed1!"));
+		goto error;
+	}
+	regnum = length / sizeof (pci_regspec_t);
+	kmem_free(regs, (size_t)length);
+
+	i9xx_private.physical = answer;
+	i9xx_private.size = AGP_PAGE_SIZE;
+	i9xx_private.regnum = regnum - 1;
+	ret = ddi_regs_map_setup(dip, i9xx_private.regnum,
+	    (caddr_t *)&(i9xx_private.flush_page), 0,
+	    i9xx_private.size, &dev_attr,
+	    (ddi_acc_handle_t *)&i9xx_private.handle);
+
+	if (ret != DDI_SUCCESS) {
+		TARGETDB_PRINT2((CE_WARN, "chipset_flush do_ioremap failed "));
+		i9xx_private.handle = NULL;
+		return;
+	}
+	return;
+error:
+	if (regs)
+		kmem_free(regs, (size_t)length);
 }
 
 static int
@@ -795,6 +973,29 @@ agp_target_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 		break;
 	}
 
+	case INTEL_CHIPSET_FLUSH_SETUP:
+	{
+		intel_chipset_flush_setup(st->tsoft_dip,
+		    st->tsoft_pcihdl, st->tsoft_gms_off);
+		break;
+	}
+	case INTEL_CHIPSET_FLUSH:
+	{
+		if (i9xx_private.handle != NULL)
+			ddi_put32(i9xx_private.handle,
+			    (uint32_t *)(uintptr_t)i9xx_private.flush_page, 1);
+
+		break;
+	}
+	case INTEL_CHIPSET_FLUSH_FREE:
+	{
+		if (i9xx_private.handle != NULL) {
+			ddi_regs_map_free(
+			    (ddi_acc_handle_t *)&i9xx_private.handle);
+			i9xx_private.handle = NULL;
+		}
+		break;
+	}
 	default:
 		mutex_exit(&st->tsoft_lock);
 		return (ENXIO);
