@@ -24,6 +24,47 @@
  */
 
 /*
+ * This file contains preset event names from the Performance Application
+ * Programming Interface v3.5 which included the following notice:
+ *
+ *                             Copyright (c) 2005,6
+ *                           Innovative Computing Labs
+ *                         Computer Science Department,
+ *                            University of Tennessee,
+ *                                 Knoxville, TN.
+ *                              All Rights Reserved.
+ *
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ *    * Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *    * Redistributions in binary form must reproduce the above copyright
+ *      notice, this list of conditions and the following disclaimer in the
+ *      documentation and/or other materials provided with the distribution.
+ *    * Neither the name of the University of Tennessee nor the names of its
+ *      contributors may be used to endorse or promote products derived from
+ *      this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ *
+ * This open source software license conforms to the BSD License template.
+ */
+
+
+/*
  * Performance Counter Back-End for Intel processors supporting Architectural
  * Performance Monitoring.
  */
@@ -174,6 +215,46 @@ struct nametable_core_uarch {
  */
 #define	ALL_CORES	(1ULL << 15)
 #define	ALL_AGENTS	(1ULL << 13)
+
+struct generic_events {
+	const char	*name;
+	uint8_t		event_num;
+	uint8_t		umask;
+};
+
+static const struct generic_events cmn_generic_events[] = {
+	{ "PAPI_tot_cyc", 0x3c, 0x00 }, /* cpu_clk_unhalted.thread_p/core */
+	{ "PAPI_tot_ins", 0xc0, 0x00 }, /* inst_retired.any_p		  */
+	{ "PAPI_br_ins",  0xc4, 0x0c }, /* br_inst_retired.taken	  */
+	{ "PAPI_br_msp",  0xc5, 0x00 }, /* br_inst_retired.mispred	  */
+	{ "PAPI_br_ntk",  0xc4, 0x03 },
+				/* br_inst_retired.pred_not_taken|pred_taken */
+	{ "PAPI_br_prc",  0xc4, 0x05 },
+				/* br_inst_retired.pred_not_taken|pred_taken */
+	{ "PAPI_hw_int",  0xc8, 0x00 }, /* hw_int_rvc			  */
+	{ "PAPI_tot_iis", 0xaa, 0x01 }, /* macro_insts.decoded		  */
+	{ "PAPI_l1_dca",  0x43, 0x01 }, /* l1d_all_ref			  */
+	{ "PAPI_l1_icm",  0x81, 0x00 }, /* l1i_misses			  */
+	{ "PAPI_l1_icr",  0x80, 0x00 }, /* l1i_reads			  */
+	{ "PAPI_l1_tcw",  0x41, 0x0f }, /* l1d_cache_st.mesi		  */
+	{ "PAPI_l2_stm",  0x2a, 0x41 }, /* l2_st.self.i_state		  */
+	{ "PAPI_l2_tca",  0x2e, 0x4f }, /* l2_rqsts.self.demand.mesi	  */
+	{ "PAPI_l2_tch",  0x2e, 0x4e }, /* l2_rqsts.mes			  */
+	{ "PAPI_l2_tcm",  0x2e, 0x41 }, /* l2_rqsts.self.demand.i_state   */
+	{ "PAPI_l2_tcw",  0x2a, 0x4f }, /* l2_st.self.mesi		  */
+	{ "PAPI_ld_ins",  0xc0, 0x01 }, /* inst_retired.loads		  */
+	{ "PAPI_lst_ins", 0xc0, 0x03 }, /* inst_retired.loads|stores	  */
+	{ "PAPI_sr_ins",  0xc0, 0x02 }, /* inst_retired.stores		  */
+	{ "PAPI_tlb_dm",  0x08, 0x01 }, /* dtlb_misses.any		  */
+	{ "PAPI_tlb_im",  0x82, 0x12 }, /* itlb.small_miss|large_miss	  */
+	{ "PAPI_tlb_tl",  0x0c, 0x03 }, /* page_walks			  */
+	{ "",		  NT_END, 0  }
+};
+
+static const struct generic_events generic_events_pic0[] = {
+	{ "PAPI_l1_dcm",  0xcb, 0x01 }, /* mem_load_retired.l1d_miss */
+	{ "",		  NT_END, 0  }
+};
 
 /*
  * The events listed in the following table can be counted on all
@@ -361,22 +442,29 @@ static const struct nametable_core_uarch pic1_events[] = {
 };
 
 /* FFC entries must be in order */
-char *ffc_names_non_htt[] = {
+static char *ffc_names_non_htt[] = {
 	"instr_retired.any",
 	"cpu_clk_unhalted.core",
 	"cpu_clk_unhalted.ref",
 	NULL
 };
 
-char *ffc_names_htt[] = {
+static char *ffc_names_htt[] = {
 	"instr_retired.any",
 	"cpu_clk_unhalted.thread",
 	"cpu_clk_unhalted.ref",
 	NULL
 };
 
-char **ffc_names = NULL;
+static char *ffc_genericnames[] = {
+	"PAPI_tot_ins",
+	"PAPI_tot_cyc",
+	"",
+	NULL
+};
 
+static char	**ffc_names = NULL;
+static char	**ffc_allnames = NULL;
 static char	**gpc_names = NULL;
 static uint32_t	versionid;
 static uint64_t	num_gpc;
@@ -423,19 +511,64 @@ struct events_table_t {
 	{ 0xc4, 0x00, C_ALL, "br_inst_retired.all_branches" },	\
 	{ 0xc5, 0x00, C_ALL, "br_misp_retired.all_branches" }
 
-const struct events_table_t arch_events_table_non_htt[] = {
+static const struct events_table_t arch_events_table_non_htt[] = {
 	{ 0x3c, 0x00, C_ALL, "cpu_clk_unhalted.core" },
 	ARCH_EVENTS_COMMON
 };
 
-const struct events_table_t arch_events_table_htt[] = {
+static const struct events_table_t arch_events_table_htt[] = {
 	{ 0x3c, 0x00, C_ALL, "cpu_clk_unhalted.thread_p" },
 	ARCH_EVENTS_COMMON
 };
 
-const struct events_table_t *arch_events_table = NULL;
+static char *arch_genevents_table[] = {
+	"PAPI_tot_cyc", /* cpu_clk_unhalted.thread_p/core */
+	"PAPI_tot_ins", /* inst_retired.any_p		  */
+	"",		/* cpu_clk_unhalted.ref_p	  */
+	"",		/* longest_lat_cache.reference	  */
+	"",		/* longest_lat_cache.miss	  */
+	"",		/* br_inst_retired.all_branches	  */
+	"",		/* br_misp_retired.all_branches	  */
+};
+
+static const struct events_table_t *arch_events_table = NULL;
 static uint64_t known_arch_events;
 static uint64_t known_ffc_num;
+
+#define	GENERICEVENTS_FAM6_MOD26					       \
+{ 0xc4, 0x01, C0|C1|C2|C3, "PAPI_br_cn" },   /* br_inst_retired.conditional */ \
+{ 0x1d, 0x01, C0|C1|C2|C3, "PAPI_hw_int" },  /* hw_int.rcx		    */ \
+{ 0x17, 0x01, C0|C1|C2|C3, "PAPI_tot_iis" }, /* inst_queue_writes	    */ \
+{ 0x43, 0x01, C0|C1,	   "PAPI_l1_dca" },  /* l1d_all_ref.any		    */ \
+{ 0x24, 0x03, C0|C1|C2|C3, "PAPI_l1_dcm" },  /* l2_rqsts. loads and rfos    */ \
+{ 0x40, 0x0f, C0|C1|C2|C3, "PAPI_l1_dcr" },  /* l1d_cache_ld.mesi	    */ \
+{ 0x41, 0x0f, C0|C1|C2|C3, "PAPI_l1_dcw" },  /* l1d_cache_st.mesi	    */ \
+{ 0x80, 0x03, C0|C1|C2|C3, "PAPI_l1_ica" },  /* l1i.reads		    */ \
+{ 0x80, 0x01, C0|C1|C2|C3, "PAPI_l1_ich" },  /* l1i.hits		    */ \
+{ 0x80, 0x02, C0|C1|C2|C3, "PAPI_l1_icm" },  /* l1i.misses		    */ \
+{ 0x80, 0x03, C0|C1|C2|C3, "PAPI_l1_icr" },  /* l1i.reads		    */ \
+{ 0x24, 0x33, C0|C1|C2|C3, "PAPI_l1_ldm" },  /* l2_rqsts. loads and ifetches */\
+{ 0x24, 0xff, C0|C1|C2|C3, "PAPI_l1_tcm" },  /* l2_rqsts.references	    */ \
+{ 0x24, 0x02, C0|C1|C2|C3, "PAPI_l2_ldm" },  /* l2_rqsts.ld_miss	    */ \
+{ 0x24, 0x08, C0|C1|C2|C3, "PAPI_l2_stm" },  /* l2_rqsts.rfo_miss	    */ \
+{ 0x24, 0x3f, C0|C1|C2|C3, "PAPI_l2_tca" },				       \
+				/* l2_rqsts. loads, rfos and ifetches */       \
+{ 0x24, 0x15, C0|C1|C2|C3, "PAPI_l2_tch" },				       \
+				/* l2_rqsts. ld_hit, rfo_hit and ifetch_hit */ \
+{ 0x24, 0x2a, C0|C1|C2|C3, "PAPI_l2_tcm" },				       \
+			/* l2_rqsts. ld_miss, rfo_miss and ifetch_miss */      \
+{ 0x24, 0x33, C0|C1|C2|C3, "PAPI_l2_tcr" },  /* l2_rqsts. loads and ifetches */\
+{ 0x24, 0x0c, C0|C1|C2|C3, "PAPI_l2_tcw" },  /* l2_rqsts.rfos		    */ \
+{ 0x2e, 0x4f, C0|C1|C2|C3, "PAPI_l3_tca" },  /* l3_lat_cache.reference	    */ \
+{ 0x2e, 0x41, C0|C1|C2|C3, "PAPI_l3_tcm" },  /* l3_lat_cache.misses	    */ \
+{ 0x0b, 0x01, C0|C1|C2|C3, "PAPI_ld_ins" },  /* mem_inst_retired.loads	    */ \
+{ 0x0b, 0x03, C0|C1|C2|C3, "PAPI_lst_ins" },				       \
+				/* mem_inst_retired.loads and stores	    */ \
+{ 0x26, 0xf0, C0|C1|C2|C3, "PAPI_prf_dm" },  /* l2_data_rqsts.prefetch.mesi */ \
+{ 0x0b, 0x02, C0|C1|C2|C3, "PAPI_sr_ins" },  /* mem_inst_retired.stores	    */ \
+{ 0x49, 0x01, C0|C1|C2|C3, "PAPI_tlb_dm" },  /* dtlb_misses.any		    */ \
+{ 0x85, 0x01, C0|C1|C2|C3, "PAPI_tlb_im" }   /* itlb_misses.any		    */
+
 
 #define	EVENTS_FAM6_MOD26						\
 									\
@@ -743,6 +876,25 @@ static uint64_t known_ffc_num;
 { 0xCC, 0x02, C0|C1|C2|C3, "fp_mmx_trans.to_mmx" },			\
 { 0xC3, 0x04, C0|C1|C2|C3, "machine_clears.smc" }
 
+#define	GENERICEVENTS_FAM6_MOD28					       \
+{ 0xc4, 0x00, C0|C1, "PAPI_br_ins" },	/* br_inst_retired.any */	       \
+{ 0xc5, 0x00, C0|C1, "PAPI_br_msp" },	/* br_inst_retired.mispred */	       \
+{ 0xc4, 0x03, C0|C1, "PAPI_br_ntk" },					       \
+			/* br_inst_retired.pred_not_taken|mispred_not_taken */ \
+{ 0xc4, 0x05, C0|C1, "PAPI_br_prc" },					       \
+			/* br_inst_retired.pred_not_taken|pred_taken */	       \
+{ 0xc8, 0x00, C0|C1, "PAPI_hw_int" },	/* hw_int_rcv */	      	       \
+{ 0xaa, 0x03, C0|C1, "PAPI_tot_iis" },	/* macro_insts.all_decoded */	       \
+{ 0x40, 0x23, C0|C1, "PAPI_l1_dca" },	/* l1d_cache.l1|st */	      	       \
+{ 0x2a, 0x41, C0|C1, "PAPI_l2_stm" },	/* l2_st.self.i_state */	       \
+{ 0x2e, 0x4f, C0|C1, "PAPI_l2_tca" },	/* longest_lat_cache.reference */      \
+{ 0x2e, 0x4e, C0|C1, "PAPI_l2_tch" },   /* l2_rqsts.mes */		       \
+{ 0x2e, 0x41, C0|C1, "PAPI_l2_tcm" },	/* longest_lat_cache.miss */	       \
+{ 0x2a, 0x4f, C0|C1, "PAPI_l2_tcw" },	/* l2_st.self.mesi */		       \
+{ 0x08, 0x07, C0|C1, "PAPI_tlb_dm" },	/* data_tlb_misses.dtlb.miss */	       \
+{ 0x82, 0x02, C0|C1, "PAPI_tlb_im" }	/* itlb.misses */
+
+
 #define	EVENTS_FAM6_MOD28						\
 	{ 0x2,  0x81, C0|C1, "store_forwards.good" },                   \
 	{ 0x6,  0x0,  C0|C1, "segment_reg_loads.any" },                 \
@@ -867,11 +1019,13 @@ static uint64_t known_ffc_num;
 static const struct events_table_t *events_table = NULL;
 
 const struct events_table_t events_fam6_mod26[] = {
+	GENERICEVENTS_FAM6_MOD26,
 	EVENTS_FAM6_MOD26,
 	{ NT_END, 0, 0, "" }
 };
 
 const struct events_table_t events_fam6_mod28[] = {
+	GENERICEVENTS_FAM6_MOD28,
 	EVENTS_FAM6_MOD28,
 	{ NT_END, 0, 0, "" }
 };
@@ -884,7 +1038,9 @@ static void
 pcbe_init_core_uarch()
 {
 	const struct nametable_core_uarch	*n;
+	const struct generic_events		*k;
 	const struct nametable_core_uarch	*picspecific_events;
+	const struct generic_events		*picspecific_genericevents;
 	size_t			common_size;
 	size_t			size;
 	uint64_t		i;
@@ -897,11 +1053,18 @@ pcbe_init_core_uarch()
 		common_size += strlen(n->name) + 1;
 	}
 
+	for (k = cmn_generic_events; k->event_num != NT_END; k++) {
+		common_size += strlen(k->name) + 1;
+	}
+
 	for (i = 0; i < num_gpc; i++) {
 		size = 0;
+		picspecific_genericevents = NULL;
+
 		switch (i) {
 			case 0:
 				picspecific_events = pic0_events;
+				picspecific_genericevents = generic_events_pic0;
 				break;
 			case 1:
 				picspecific_events = pic1_events;
@@ -917,6 +1080,12 @@ pcbe_init_core_uarch()
 				size += strlen(n->name) + 1;
 			}
 		}
+		if (picspecific_genericevents != NULL) {
+			for (k = picspecific_genericevents;
+			    k->event_num != NT_END; k++) {
+				size += strlen(k->name) + 1;
+			}
+		}
 
 		gpc_names[i] =
 		    kmem_alloc(size + common_size + 1, KM_SLEEP);
@@ -924,9 +1093,15 @@ pcbe_init_core_uarch()
 		gpc_names[i][0] = '\0';
 		if (picspecific_events != NULL) {
 			for (n = picspecific_events;
-			    n->event_num != NT_END;
-			    n++) {
+			    n->event_num != NT_END; n++) {
 				(void) strcat(gpc_names[i], n->name);
+				(void) strcat(gpc_names[i], ",");
+			}
+		}
+		if (picspecific_genericevents != NULL) {
+			for (k = picspecific_genericevents;
+			    k->event_num != NT_END; k++) {
+				(void) strcat(gpc_names[i], k->name);
 				(void) strcat(gpc_names[i], ",");
 			}
 		}
@@ -935,6 +1110,11 @@ pcbe_init_core_uarch()
 			(void) strcat(gpc_names[i], n->name);
 			(void) strcat(gpc_names[i], ",");
 		}
+		for (k = cmn_generic_events; k->event_num != NT_END; k++) {
+			(void) strcat(gpc_names[i], k->name);
+			(void) strcat(gpc_names[i], ",");
+		}
+
 		/*
 		 * Remove trailing comma.
 		 */
@@ -1065,7 +1245,24 @@ core_pcbe_init(void)
 		return (-1);
 	}
 
-	/* GPC events for Family 6 Models 15 & 23 only */
+	/* FFC names */
+	ffc_allnames = kmem_alloc(num_ffc * sizeof (char *), KM_SLEEP);
+	for (i = 0; i < num_ffc; i++) {
+		ffc_allnames[i] = kmem_alloc(
+		    strlen(ffc_names[i]) + strlen(ffc_genericnames[i]) + 2,
+		    KM_SLEEP);
+
+		ffc_allnames[i][0] = '\0';
+		(void) strcat(ffc_allnames[i], ffc_names[i]);
+
+		/* Check if this ffc has a generic name */
+		if (strcmp(ffc_genericnames[i], "") != 0) {
+			(void) strcat(ffc_allnames[i], ",");
+			(void) strcat(ffc_allnames[i], ffc_genericnames[i]);
+		}
+	}
+
+	/* GPC events for Family 6 Models 15, 23 and 29 only */
 	if ((cpuid_getfamily(CPU) == 6) &&
 	    ((cpuid_getmodel(CPU) == 15) || (cpuid_getmodel(CPU) == 23) ||
 	    (cpuid_getmodel(CPU) == 29))) {
@@ -1112,6 +1309,10 @@ core_pcbe_init(void)
 			if (((1U << i) & arch_events_vector) == 0) {
 				arch_events_string_length +=
 				    strlen(arch_events_table[i].name) + 1;
+				if (strcmp(arch_genevents_table[i], "") != 0) {
+					arch_events_string_length +=
+					    strlen(arch_genevents_table[i]) + 1;
+				}
 			}
 		}
 
@@ -1154,6 +1355,14 @@ core_pcbe_init(void)
 					(void) strcat(gpc_names[i],
 					    arch_events_table[j].name);
 					(void) strcat(gpc_names[i], ",");
+					if (strcmp(
+					    arch_genevents_table[j], "")
+					    != 0) {
+						(void) strcat(gpc_names[i],
+						    arch_genevents_table[j]);
+						(void) strcat(gpc_names[i],
+						    ",");
+					}
 				}
 			}
 
@@ -1171,10 +1380,7 @@ core_pcbe_init(void)
 			gpc_names[i][size - 1] = '\0';
 		}
 	}
-	/*
-	 * Fixed-function Counters (FFC) are already listed individually in
-	 * ffc_names[]
-	 */
+
 	return (0);
 }
 
@@ -1200,7 +1406,7 @@ static char *core_pcbe_list_events(uint_t picnum)
 	if (picnum < num_gpc) {
 		return (gpc_names[picnum]);
 	} else {
-		return (ffc_names[picnum - num_gpc]);
+		return (ffc_allnames[picnum - num_gpc]);
 	}
 }
 
@@ -1234,6 +1440,20 @@ find_gpcevent_core_uarch(char *name,
 	return (NULL);
 }
 
+static const struct generic_events *
+find_generic_events(char *name, const struct generic_events *table)
+{
+	const struct generic_events *n;
+
+	for (n = table; n->event_num != NT_END; n++) {
+		if (strcmp(name, n->name) == 0) {
+			return (n);
+		};
+	}
+
+	return (NULL);
+}
+
 static const struct events_table_t *
 find_gpcevent(char *name)
 {
@@ -1241,7 +1461,8 @@ find_gpcevent(char *name)
 
 	/* Search architectural events */
 	for (i = 0; i < known_arch_events; i++) {
-		if (strcmp(name, arch_events_table[i].name) == 0) {
+		if (strcmp(name, arch_events_table[i].name) == 0 ||
+		    strcmp(name, arch_genevents_table[i]) == 0) {
 			if (((1U << i) & arch_events_vector) == 0) {
 				return (&arch_events_table[i]);
 			}
@@ -1259,6 +1480,7 @@ find_gpcevent(char *name)
 
 	return (NULL);
 }
+
 static uint64_t
 core_pcbe_event_coverage(char *event)
 {
@@ -1277,8 +1499,12 @@ core_pcbe_event_coverage(char *event)
 			    BITMASK_XBITS(num_gpc));
 		}
 	} else {
-		if (find_gpcevent_core_uarch(event, cmn_gpc_events_core_uarch)
-		    != NULL) {
+		if (find_generic_events(event, cmn_generic_events) != NULL) {
+			bitmap |= BITMASK_XBITS(num_gpc);
+		} if (find_generic_events(event, generic_events_pic0) != NULL) {
+			bitmap |= 1ULL;
+		} else if (find_gpcevent_core_uarch(event,
+		    cmn_gpc_events_core_uarch) != NULL) {
 			bitmap |= BITMASK_XBITS(num_gpc);
 		} else if (find_gpcevent_core_uarch(event, pic0_events) !=
 		    NULL) {
@@ -1294,6 +1520,8 @@ core_pcbe_event_coverage(char *event)
 		bitmask = 1ULL << num_gpc;
 		for (i = 0; i < num_ffc; i++) {
 			if (strcmp(event, ffc_names[i]) == 0) {
+				bitmap |= bitmask;
+			} else if (strcmp(event, ffc_genericnames[i]) == 0) {
 				bitmap |= bitmask;
 			}
 			bitmask = bitmask << 1;
@@ -1344,6 +1572,7 @@ configure_gpc(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 {
 	core_pcbe_config_t	conf;
 	const struct nametable_core_uarch	*n;
+	const struct generic_events *k = NULL;
 	const struct nametable_core_uarch	*m;
 	const struct nametable_core_uarch	*picspecific_events;
 	struct nametable_core_uarch	nt_raw = { "", 0x0, 0x0 };
@@ -1369,6 +1598,10 @@ configure_gpc(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 			if ((C(picnum) & eventcode->supported_counters) == 0) {
 				return (CPC_PIC_NOT_CAPABLE);
 			}
+			if (nattrs > 0 &&
+			    (strncmp("PAPI_", event, 5) == 0)) {
+				return (CPC_ATTRIBUTE_OUT_OF_RANGE);
+			}
 			conf.core_ctl = eventcode->eventselect;
 			conf.core_ctl |= eventcode->unitmask <<
 			    CORE_UMASK_SHIFT;
@@ -1380,58 +1613,78 @@ configure_gpc(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 			conf.core_ctl = event_num & 0xFF;
 		}
 	} else {
-		n = find_gpcevent_core_uarch(event, cmn_gpc_events_core_uarch);
-		if (n == NULL) {
-			switch (picnum) {
-				case 0:
-					picspecific_events = pic0_events;
-					break;
-				case 1:
-					picspecific_events = pic1_events;
-					break;
-				default:
-					picspecific_events = NULL;
-					break;
+		if ((k = find_generic_events(event, cmn_generic_events)) !=
+		    NULL ||
+		    (picnum == 0 &&
+		    (k = find_generic_events(event, generic_events_pic0)) !=
+		    NULL)) {
+			if (nattrs > 0) {
+				return (CPC_ATTRIBUTE_OUT_OF_RANGE);
 			}
-			if (picspecific_events != NULL) {
-				n = find_gpcevent_core_uarch(event,
-				    picspecific_events);
-			}
-		}
-		if (n == NULL) {
-			/*
-			 * Check if this is a case where the event was
-			 * specified directly by its event number instead of
-			 * its name string.
-			 */
-			if (ddi_strtol(event, NULL, 0, &event_num) != 0) {
-				return (CPC_INVALID_EVENT);
-			}
+			conf.core_ctl = k->event_num;
+			conf.core_ctl |= k->umask << CORE_UMASK_SHIFT;
+		} else {
+			/* Not a generic event */
 
-			event_num = event_num & 0xFF;
-
-			/*
-			 * Search the event table to find out if the event
-			 * specified has an privilege requirements.  Currently
-			 * none of the pic-specific counters have any privilege
-			 * requirements.  Hence only the table
-			 * cmn_gpc_events_core_uarch is searched.
-			 */
-			for (m = cmn_gpc_events_core_uarch;
-			    m->event_num != NT_END;
-			    m++) {
-				if (event_num == m->event_num) {
-					break;
+			n = find_gpcevent_core_uarch(event,
+			    cmn_gpc_events_core_uarch);
+			if (n == NULL) {
+				switch (picnum) {
+					case 0:
+						picspecific_events =
+						    pic0_events;
+						break;
+					case 1:
+						picspecific_events =
+						    pic1_events;
+						break;
+					default:
+						picspecific_events = NULL;
+						break;
+				}
+				if (picspecific_events != NULL) {
+					n = find_gpcevent_core_uarch(event,
+					    picspecific_events);
 				}
 			}
-			if (m->event_num == NT_END) {
-				nt_raw.event_num = (uint8_t)event_num;
-				n = &nt_raw;
-			} else {
-				n = m;
+			if (n == NULL) {
+
+				/*
+				 * Check if this is a case where the event was
+				 * specified directly by its event number
+				 * instead of its name string.
+				 */
+				if (ddi_strtol(event, NULL, 0, &event_num) !=
+				    0) {
+					return (CPC_INVALID_EVENT);
+				}
+
+				event_num = event_num & 0xFF;
+
+				/*
+				 * Search the event table to find out if the
+				 * event specified has an privilege
+				 * requirements.  Currently none of the
+				 * pic-specific counters have any privilege
+				 * requirements.  Hence only the table
+				 * cmn_gpc_events_core_uarch is searched.
+				 */
+				for (m = cmn_gpc_events_core_uarch;
+				    m->event_num != NT_END;
+				    m++) {
+					if (event_num == m->event_num) {
+						break;
+					}
+				}
+				if (m->event_num == NT_END) {
+					nt_raw.event_num = (uint8_t)event_num;
+					n = &nt_raw;
+				} else {
+					n = m;
+				}
 			}
+			conf.core_ctl = n->event_num; /* Event Select */
 		}
-		conf.core_ctl = n->event_num; /* Event Select */
 	}
 
 
@@ -1489,7 +1742,7 @@ configure_gpc(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 		conf.core_ctl |= CORE_INT;
 	conf.core_ctl |= CORE_EN;
 
-	if (versionid < 3) {
+	if (versionid < 3 && k == NULL) {
 		if (check_cpc_securitypolicy(&conf, n) != 0) {
 			return (CPC_ATTR_REQUIRES_PRIVILEGE);
 		}
@@ -1512,7 +1765,8 @@ configure_ffc(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 		return (CPC_INVALID_PICNUM);
 	}
 
-	if (strcmp(ffc_names[picnum-num_gpc], event) != 0) {
+	if ((strcmp(ffc_names[picnum-num_gpc], event) != 0) &&
+	    (strcmp(ffc_genericnames[picnum-num_gpc], event) != 0)) {
 		return (CPC_INVALID_EVENT);
 	}
 
