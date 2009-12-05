@@ -1142,7 +1142,7 @@ static boolean_t
 ipnet_loaccept(ipnet_t *ipnet, hook_pkt_observe_t *hdr, ipnet_addrp_t *src,
     ipnet_addrp_t *dst)
 {
-	if (hdr->hpo_htype != IPOBS_HOOK_LOCAL) {
+	if (hdr->hpo_htype != htons(IPOBS_HOOK_LOCAL)) {
 		/*
 		 * ipnet_if is only NULL for IPNET_MINOR_LO devices.
 		 */
@@ -2310,7 +2310,7 @@ ipnet_bpf_bounce(hook_event_token_t token, hook_data_t info, void *arg)
 	IPSK_BUMP(ips, ik_acceptOk);
 
 	ipnet_itap(ipnet->ipnet_data, mp,
-	    hdr->hpo_htype == IPOBS_HOOK_OUTBOUND,
+	    hdr->hpo_htype == htons(IPOBS_HOOK_OUTBOUND),
 	    ntohl(hdr->hpo_pktlen) + MBLKL(mp));
 
 	return (0);
