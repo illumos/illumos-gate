@@ -53,6 +53,12 @@ pmcs_get_dev_state(pmcs_hw_t *pwp, pmcs_phy_t *phyp, pmcs_xscsi_t *xp,
 	if (xp != NULL) {
 		ASSERT(mutex_owned(&xp->statlock));
 	}
+
+	if (phyp == NULL) {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, NULL, xp,
+		    "%s: PHY is NULL", __func__);
+		return (-1);
+	}
 	ASSERT(mutex_owned(&phyp->phy_lock));
 
 	pwrk = pmcs_gwork(pwp, PMCS_TAG_TYPE_WAIT, phyp);
