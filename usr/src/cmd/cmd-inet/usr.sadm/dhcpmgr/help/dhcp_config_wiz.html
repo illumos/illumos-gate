@@ -1,12 +1,10 @@
 <!--
-  -- ident	"%W%	%E% SMI"
   --
     CDDL HEADER START
 
     The contents of this file are subject to the terms of the
-    Common Development and Distribution License, Version 1.0 only
-    (the "License").  You may not use this file except in compliance
-    with the License.
+    Common Development and Distribution License (the "License").
+    You may not use this file except in compliance with the License.
 
     You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
     or http://www.opensolaris.org/os/licensing.
@@ -21,8 +19,8 @@
 
     CDDL HEADER END
 
- -- Copyright (c) 2000-2001 by Sun Microsystems, Inc.
-  -- All rights reserved.
+ -- Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ -- Use is subject to license terms.
   -->
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
 <html>
@@ -68,7 +66,6 @@
 	&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#net"><EM>Network</EM></A><BR>
 	&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#router"><EM>Router</EM></A><BR>
 	&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#nis"><EM>NIS</EM></A><BR>
-	&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#nisplus"><EM>NIS+</EM></A><BR>
 	&nbsp;&nbsp;<A HREF="dhcp_relay_config.html">Relay Config</A><BR>
 	&nbsp;&nbsp;<A HREF="dhcp_net_wiz.html">Network Config</A><BR>
 	&nbsp;&nbsp;<A HREF="dhcp_server_serv.html">DHCP Services</A><BR>
@@ -134,10 +131,6 @@ The DHCP Configuration Wizard, asks you to supply the following information.
 		<td valign="top">Data is stored in clear text ASCII files. Suitable for small number of clients, up to 10,000. Data can be shared through NFS among several DHCP servers.</td>
 		</tr>
 <tr>
-		<td width=90 valign="top"><em>NIS+</em></td>
-		<td valign="top">Data is stored in NIS+ tables. Suitable for medium to large numbers of clients, up to 40,000. Data can be shared among several DHCP servers.  If the server is not already configured as a NIS+ client, you cannot select the NIS+ option.  To use NIS+ as a data store, cancel the wizard, configure the server as a NIS+ client, and run DHCP Manager again.</td>
-		</tr>
-<tr>
 		<td width=90 valign="top"><em>Binary files</em></td>
 		<td valign="top">Data is stored in binary text files. Suitable for large numbers of clients up to 100,000. Data can <em>not</em> be shared among several DHCP servers. </td>
 		</tr>
@@ -150,7 +143,7 @@ The DHCP Configuration Wizard, asks you to supply the following information.
 </td>
 <td>If you chose text files or binary files as your data store, enter the path to the 
 	data (default=<tt>/var/dhcp</tt>).<p>
-	If you chose NIS+, enter the domain of the NIS+ server (default=this server's domain). <P> </td></tr>
+	<P> </td></tr>
 
 	
 <tr>
@@ -165,10 +158,6 @@ The DHCP Configuration Wizard, asks you to supply the following information.
 <tr>
 		<td width=90 valign="top"><em>/etc/hosts</em></td>
 		<td valign="top">The DHCP server will add host name entries to the servers /etc/hosts table. </td>
-		</tr>
-<tr>
-		<td width=90 valign="top"><em>NIS+</em></td>
-		<td valign="top">The DHCP server will add host name entries to NIS+.  The DHCP server system must be a NIS+ client. You must supply the NIS+ domain name. </td>
 		</tr>
 <tr>
 		<td width=90 valign="top"><em>DNS</em></td>
@@ -276,19 +265,6 @@ the DHCP server is configured, you can add additional networks using the Network
 	which the servers are queried.
 	</td> 
 	</tr>
-
-	<tr>
-	<td width=125 valign="top"><A NAME="nisplus"><STRONG>NIS+ Domain Name</STRONG></A><br>
-	<STRONG>NIS+ Server Address</STRONG></td>
-	<td valign="top">If the server is configured to use NIS+ name service, 
-	the NIS+ server information will be filled in.  If not, you can enter 
-	the domain name and IP address of one or more NIS+ name servers.<P>
-	The order in which the address appears in the list determines the order in
-	which the servers are queried.
-	</td>  		
-
-	</tr>
-	
 
 </table>
 &nbsp;&nbsp;&nbsp;<A HREF="#top"><small>return to top</small></A>

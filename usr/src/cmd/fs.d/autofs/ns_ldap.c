@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,11 +21,9 @@
 /*
  *	ns_ldap.c
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -205,9 +202,9 @@ init_ldap(char **stack, char ***stkptr)
 	rc = __ns_ldap_getParam(NS_LDAP_FILE_VERSION_P, &paramVal, &errorp);
 	if (rc != NS_LDAP_SUCCESS || !paramVal || !*paramVal) {
 		syslog(LOG_ERR, "Can not determine version of LDAP profile"
-			" that is used (%d, %s).  Using version 2 profile"
-			" defaults", rc, (errorp && errorp->message ?
-			errorp->message : ""));
+		    " that is used (%d, %s).  Using version 2 profile"
+		    " defaults", rc, (errorp && errorp->message ?
+		    errorp->message : ""));
 		(void) __ns_ldap_freeError(&errorp);
 	} else {
 		if (strcasecmp(*paramVal, NS_LDAP_VERSION_1) == 0)
@@ -375,9 +372,9 @@ ldap_match(char *map, char *key, char **ldap_line, int *ldap_len)
 			if (verbose) {
 				char errstr[MAXERROR];
 				(void) sprintf(errstr,
-					gettext("ldap server can't list map,"
-					" '%s': '%s' - '%d'."),
-					map, errp->message, errp->status);
+				    gettext("ldap server can't list map,"
+				    " '%s': '%s' - '%d'."),
+				    map, errp->message, errp->status);
 				syslog(LOG_ERR, errstr);
 			}
 			__ns_ldap_freeError(&errp);
@@ -496,22 +493,22 @@ loadmaster_ldap(char *mapname, char *defopts, char **stack, char ***stkptr)
 		    searchfilter, mapname);
 
 	res = __ns_ldap_list(mapname, searchfilter, NULL, NULL, NULL,
-		0, &result, &errp, mastermap_callback_ldap,
-		(void *) &master_cbdata);
+	    0, &result, &errp, mastermap_callback_ldap,
+	    (void *) &master_cbdata);
 
 	if (trace > 1)
 		trace_prt(1,
-			"loadmaster_ldap: __ns_ldap_list just returned: %d\n",
-			res);
+		    "loadmaster_ldap: __ns_ldap_list just returned: %d\n",
+		    res);
 
 	if (res != NS_LDAP_SUCCESS) {
 		if (errp) {
 			char errstr[MAXERROR];
 			if (verbose) {
 				(void) sprintf(errstr, gettext(
-					"ldap server can't list map,"
-					"'%s': '%s' - '%d'."),
-					mapname, errp->message, errp->status);
+				    "ldap server can't list map,"
+				    "'%s': '%s' - '%d'."),
+				    mapname, errp->message, errp->status);
 				syslog(LOG_ERR, errstr);
 			}
 			__ns_ldap_freeError(&errp);
@@ -529,13 +526,13 @@ loadmaster_ldap(char *mapname, char *defopts, char **stack, char ***stkptr)
 
 	if (trace > 1)
 		trace_prt(1,
-			"loadmaster_ldap: calling __ns_ldap_freeResult...\n");
+		    "loadmaster_ldap: calling __ns_ldap_freeResult...\n");
 
 	__ns_ldap_freeResult(&result);
 
 	if (trace > 1)
 		trace_prt(1,
-			"loadmaster_ldap: about to return __NSW_SUCCESS...\n");
+		    "loadmaster_ldap: about to return __NSW_SUCCESS...\n");
 
 	return (__NSW_SUCCESS);
 }
@@ -576,9 +573,9 @@ char **stack, char ***stkptr)
 			char errstr[MAXERROR];
 			if (verbose) {
 				(void) sprintf(errstr,
-					gettext("ldap server can't list map,"
-					" '%s': '%s' - '%d'."),
-					nsmap, errp->message, errp->status);
+				    gettext("ldap server can't list map,"
+				    " '%s': '%s' - '%d'."),
+				    nsmap, errp->message, errp->status);
 				syslog(LOG_ERR, errstr);
 			}
 			__ns_ldap_freeError(&errp);
@@ -649,8 +646,7 @@ mastermap_callback_ldap(ns_ldap_entry_t *entry, void *udata)
 	 * nisMapEntry=contents).
 	 * We skip the description.  Even though LDAP allows for multiple
 	 * values per attribute, we take only the 1st value for each
-	 * attribute because the automount data is organized as such
-	 * (same as NIS+).
+	 * attribute because the automount data is organized as such.
 	 */
 	key_len = 0;
 	contents_len = 0;
@@ -668,31 +664,33 @@ mastermap_callback_ldap(ns_ldap_entry_t *entry, void *udata)
 		if (strcasecmp(attr->attrname, automountInformation) == 0) {
 			if (encode)
 				(void) strncpy(cont_temp,
-					tounix_str(attr->attrvalue[0]), LINESZ);
+				    tounix_str(attr->attrvalue[0]), LINESZ);
 			else
 				(void) strncpy(cont_temp, attr->attrvalue[0],
-					LINESZ);
+				    LINESZ);
 			contents = cont_temp;
 			contents_len = strlen(contents);
 			if (trace > 1) {
 				trace_prt(1,
-	"mastermap_callback_ldap: contents=[ %s ], contents_len=[ %d ]\n",
-				contents, contents_len);
+				    "mastermap_callback_ldap: contents=[ %s ],"
+				    " contents_len=[ %d ]\n",
+				    contents, contents_len);
 			}
 		}
 		if (strcasecmp(attr->attrname, automountKey) == 0) {
 			if (encode)
 				(void) strncpy(key_temp,
-					tounix_str(attr->attrvalue[0]), LINESZ);
+				    tounix_str(attr->attrvalue[0]), LINESZ);
 			else
 				(void) strncpy(key_temp, attr->attrvalue[0],
-					LINESZ);
+				    LINESZ);
 			key = key_temp;
 			key_len = strlen(key);
 			if (trace > 1) {
 				trace_prt(1,
-			"mastermap_callback_ldap: key=[ %s ], key_len=[ %d ]\n",
-				key, key_len);
+				    "mastermap_callback_ldap: key=[ %s ],"
+				    " key_len=[ %d ]\n",
+				    key, key_len);
 			}
 		}
 	}
@@ -764,13 +762,14 @@ mastermap_callback_ldap(ns_ldap_entry_t *entry, void *udata)
 
 			attr = entry->attr_pair[i];
 			if (strcasecmp(attr->attrname, "dn")
-								== 0) {
+			    == 0) {
 				dn = attr->attrvalue[0];
 				break;
 			}
 		}
 		pr_msg(
-	"Warning: invalid entry for %s in ldap server dn: %s ignored.\n",
+		    "Warning: invalid entry for %s in ldap server"
+		    " dn: %s ignored.\n",
 		    dir, dn);
 	}
 	if (trace > 1)
@@ -855,11 +854,11 @@ int *cache_time, char **stack, char ***stkptr)
 		    searchfilter, nsmap);
 
 	res = __ns_ldap_list(nsmap, searchfilter, NULL, NULL, NULL, 0,
-		&result, &errp, readdir_callback, (void *) &readdir_cbdata);
+	    &result, &errp, readdir_callback, (void *) &readdir_cbdata);
 
 	if (trace > 1)
 		trace_prt(1, "  getmapkeys_ldap: __ns_ldap_list returned %d\n",
-			res);
+		    res);
 
 	if (readdir_cbdata.error)
 		*error = readdir_cbdata.error;
@@ -869,9 +868,9 @@ int *cache_time, char **stack, char ***stkptr)
 			if (verbose) {
 				char errstr[MAXERROR];
 				(void) sprintf(errstr, gettext(
-					"ldap server can't list map,"
-					" '%s': '%s' - '%d'."),
-					nsmap, errp->message, errp->status);
+				    "ldap server can't list map,"
+				    " '%s': '%s' - '%d'."),
+				    nsmap, errp->message, errp->status);
 				syslog(LOG_ERR, errstr);
 			}
 			__ns_ldap_freeError(&errp);

@@ -35,7 +35,6 @@
 # suffixed with .txt so we don't have to list them.
 #
 ./usr/src/cmd/oawk/EXPLAIN
-./usr/src/cmd/rpcsvc/nis/rpc.nisd/resolv_server/DNS_FWD
 ./usr/src/cmd/vi/port/ex.news
 ./usr/src/cmd/ssh/doc
 

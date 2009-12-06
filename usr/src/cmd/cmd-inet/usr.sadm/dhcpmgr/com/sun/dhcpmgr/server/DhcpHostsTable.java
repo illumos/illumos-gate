@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 package com.sun.dhcpmgr.server;
 
@@ -43,7 +40,7 @@ public class DhcpHostsTable {
      * Access to this handle is synchronized.
      */
     private static DhcpHostsTable cfgHostsTable = null;
-    
+
     private DirectoryTable hostsTable;
     private int addrColumn = 0;
     private int cnameColumn = 0;
@@ -52,7 +49,7 @@ public class DhcpHostsTable {
 
     /**
      * Create a new DhcpHostsTable of type resource in the specified domain
-     * @param resource the host resource(eg., files, dns, nisplus)
+     * @param resource the host resource(eg., files, dns)
      * @param domain the domain (if any) for the host resource
      */
     public DhcpHostsTable(String resource, String domain)
@@ -216,7 +213,6 @@ public class DhcpHostsTable {
     public synchronized void createHostsRecord(String addr, String name,
 	String comment) throws BridgeException {
 
-	
 	if (getHostName(addr) != null) {
 	    throw new HostExistsException(addr);
 	}
@@ -224,7 +220,7 @@ public class DhcpHostsTable {
 	if (getHostAddress(name) != null) {
 	    throw new HostExistsException(name);
 	}
-	
+
 	try {
 	    DirectoryRow record = hostsTable.getRowInstance();
 
@@ -297,7 +293,7 @@ public class DhcpHostsTable {
     /**
      * Determines the whether or not the hosts table under a given
      * name service can be managed.
-     * @param resource name service resource (files, dns, nisplus)
+     * @param resource name service resource (files, dns)
      * @param domain the name service domain (ignored for files)
      * @return true if the user can manage the table
      */
@@ -325,7 +321,7 @@ public class DhcpHostsTable {
 
 	if (cfgHostsTable == null) {
 	    try {
-		DhcpdOptions options = bridge.readDefaults();	
+		DhcpdOptions options = bridge.readDefaults();
 		String resource = options.getHostsResource();
 		if (resource != null) {
 		    String domain = options.getHostsDomain();
@@ -340,4 +336,3 @@ public class DhcpHostsTable {
     } // getCfgHostsTable
 
 } // DhcpHostsTable
-

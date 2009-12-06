@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <strings.h>
 #include <string.h>
@@ -42,7 +40,6 @@
 #include "ldap_op.h"
 #include "ldap_nisdbquery.h"
 #include "ldap_attr.h"
-#include "ldap_nisplus.h"
 #include "ldap_xdr.h"
 
 
@@ -230,7 +227,6 @@ createQuery(int num, char **index, __nis_table_mapping_t *t,
 	int			i, j, n, a, nv, niv, stat, sinum;
 	__nis_rule_value_t	*rvq;
 	__nis_buffer_t		b = {0, 0};
-	nis_result		*res = 0;
 	char			*table = 0;
 	char			*myself = "createQuery";
 
@@ -257,22 +253,6 @@ createQuery(int num, char **index, __nis_table_mapping_t *t,
 			freeRuleValue(rvq, 1);
 			return (0);
 		}
-
-		stat = getNisPlusObj(table, myself, &res);
-		if (stat == LDAP_SUCCESS) {
-			if (res->objects.objects_val->zo_data.zo_type !=
-					NIS_TABLE_OBJ) {
-				logmsg(MSG_NOTIMECHECK, LOG_WARNING,
-					"%s: \"%s\" isn't a table object",
-					myself, NIL(table));
-				nis_freeresult(res);
-				res = 0;
-			}
-		} else {
-			logmsg(MSG_NOTIMECHECK, LOG_INFO,
-				"%s: Unable to retrieve \"%s\" object: %s",
-				myself, NIL(table), ldap_err2string(stat));
-		}
 	}
 
 	/* Create a rule-value from the col=val pairs */
@@ -298,8 +278,6 @@ createQuery(int num, char **index, __nis_table_mapping_t *t,
 				if (addSCol2RuleValue(index[n], value, rvq)) {
 					freeRuleValue(rvq, 1);
 					sfree(table);
-					if (res != 0)
-						nis_freeresult(res);
 					return (0);
 				}
 
@@ -322,159 +300,7 @@ createQuery(int num, char **index, __nis_table_mapping_t *t,
 			niv *= rvq->colVal[n].numVals;
 	}
 
-	/*
-	 * Generate a NIS+ query, provided that the following conditions
-	 * are satisfied:
-	 *
-	 *	We were able to get information about the table, and
-	 *
-	 *	The col=val pairs include at least one searchable
-	 *	column, and
-	 *
-	 *	At most one value was supplied for each searchable
-	 *	column.
-	 */
-	if (res != 0 && rvq->numColumns > 0) {
-		bp2buf(myself, &b, "[");
-
-		for (n = 0, sinum = 0; n < rvq->numColumns; n++) {
-			table_obj	*to = &(NIS_RES_OBJECT(res)->TA_data);
-			table_col	*tc;
-			int		si = -1;
-
-			for (i = 0; i < to->ta_cols.ta_cols_len; i++) {
-				tc = &to->ta_cols.ta_cols_val[i];
-				if (strcmp(rvq->colName[n], tc->tc_name) == 0 &&
-					(tc->tc_flags & TA_SEARCHABLE) != 0) {
-					si = i;
-					break;
-				}
-			}
-
-			if (si >= 0) {
-				if (rvq->colVal[n].numVals < 0)
-					continue;
-				if (rvq->colVal[n].numVals > 1) {
-					logmsg(MSG_NOTIMECHECK, LOG_WARNING,
-		"%s: Multi-valued column \"%s\" excluded from NIS+ search",
-						myself, rvq->colName[n]);
-					continue;
-				}
-				if (sinum == 0)
-					bp2buf(myself, &b, "%s=%s",
-						rvq->colName[n],
-						rvq->colVal[n].val[0].value);
-				else
-					bp2buf(myself, &b, ",%s=%s",
-						rvq->colName[n],
-						rvq->colVal[n].val[0].value);
-				sinum++;
-			} else {
-				logmsg(MSG_NOTIMECHECK, LOG_INFO,
-			"%s: \"%s\" not searchable; not included in NIS+ query",
-					myself, index[n]);
-			}
-		}
-		bp2buf(myself, &b, "]");
-
-		if (strcmp(b.buf, "[]") == 0) {
-			logmsg(MSG_NOTIMECHECK, LOG_WARNING,
-		"%s: No searchable column specified; skipping NIS+ query",
-				myself);
-			nis_freeresult(res);
-			res = 0;
-		}
-	} else if (res != 0) {
-		nis_freeresult(res);
-		res = 0;
-	}
-
-	/* Query NIS+ */
-	if (res != 0) {
-		__nis_rule_value_t	*rv;
-
-		bp2buf(myself, &b, "%s", table);
-
-		logmsg(MSG_NOTIMECHECK, LOG_INFO,
-			"%s: NIS+ query: %s", myself, NIL(b.buf));
-
-		rv = getNisPlusEntrySimple(b.buf, numVals);
-
-		/*
-		 * Add values from the NIS+ entry to the ones passed in by
-		 * our caller (in the form of col=value pairs).
-		 */
-		if (rv != 0 && *numVals > 1 && niv > 1) {
-			/*
-			 * Since we have both multi-valued columns in the
-			 * 'index' array, _and_ multiple NIS+ matches, we
-			 * don't know how to combine the two in a meaningful
-			 * fashion. Ignore the NIS+ values, and use the
-			 * 'index' array only.
-			 */
-			logmsg(MSG_NOTIMECHECK, LOG_WARNING,
-	"%s: At least one multi-valued input column, and multiple NIS+ matches",
-				myself);
-			logmsg(MSG_NOTIMECHECK, LOG_WARNING,
-				"%s: Ignoring NIS+ lookup results", myself);
-			freeRuleValue(rv, *numVals);
-			rv = 0;
-			*numVals = 1;
-		} else if (rv != 0 && *numVals > 0) {
-			/*
-			 * Since passed-in values override those from the
-			 * NIS+ entries, we first need to delete the passed-in
-			 * columns from the NIS+ data, and then add the
-			 * passed-in columns/values.
-			 */
-			for (i = 0; i < rvq->numColumns; i++) {
-				for (n = 0; n < *numVals; n++) {
-					delColFromRuleValue(&rv[n],
-						rvq->colName[i]);
-					for (j = 0; j < rvq->colVal[i].numVals;
-							j++) {
-						if (addCol2RuleValue(
-							rvq->colVal[i].type,
-							rvq->colName[i],
-							rvq->colVal[i].val[j].
-								value,
-							rvq->colVal[i].val[j].
-								length,
-							&rv[n])) {
-							freeRuleValue(rv,
-								*numVals);
-							freeRuleValue(rvq, 1);
-							sfree(b.buf);
-							sfree(table);
-							nis_freeresult(res);
-							return (0);
-						}
-					}
-				}
-			}
-			freeRuleValue(rvq, 1);
-			rvq = rv;
-		} else {
-			if (rv != 0) {
-				/*
-				 * Since we got here, '*numVals' <= 0,
-				 * so it's unclear if it's safe to call
-				 * freeRuleValue().
-				 */
-				logmsg(MSG_NOTIMECHECK, LOG_WARNING,
-		"%s: getNisPlusEntrySimple() => non-NULL, but %d elements",
-					myself, *numVals);
-			} else
-				logmsg(MSG_NOTIMECHECK, LOG_INFO,
-					"%s: No NIS+ data for \"%s\"",
-					myself, b.buf);
-			*numVals = 1;
-		}
-		nis_freeresult(res);
-		res = 0;
-	} else {
-		*numVals = 1;
-	}
+	*numVals = 1;
 
 	sfree(b.buf);
 	sfree(table);
@@ -911,27 +737,7 @@ createNisPlusEntry(__nis_table_mapping_t *t, __nis_rule_value_t *rv,
 			 * get a string representation of the LHS in case
 			 * we need to report an error.)
 			 */
-			if (litem[i].type == mit_nisplus &&
-				litem[i].searchSpec.obj.index.numIndexes > 0) {
-				int	err;
-
-				err = storeNisPlus(&litem[i], i, numItems,
-							rv, t->objName, rval);
-				if (err != NIS_SUCCESS) {
-					char	*iname = "<unknown>";
-
-					if (tmpval != 0 &&
-							tmpval->numVals == 1)
-						iname = tmpval->val[0].value;
-					logmsg(MSG_NOTIMECHECK, LOG_ERR,
-						"%s: NIS+ store \"%s\": %s",
-						myself, iname,
-						nis_sperrno(err));
-				}
-
-				freeValue(tmpval, 1);
-				continue;
-			} else if (litem[i].type == mit_ldap) {
+			if (litem[i].type == mit_ldap) {
 				int	stat;
 
 				if (dn == 0)

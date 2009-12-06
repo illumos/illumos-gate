@@ -53,19 +53,17 @@
 #include <sys/resource.h>
 #include <netdir.h>
 #include <rpcsvc/nis.h>
-#include <rpcsvc/nispasswd.h>
 
 #define	MAXMAPNAMELEN	256
 #define	MAXPASSWD	256	/* max significant characters in password */
 
 #define	PK_FILES	1
 #define	PK_YP		2
-#define	PK_NISPLUS	3
 #define	PK_LDAP		4
+#define	DESCREDPASSLEN	sizeof (des_block)
 
 extern	int optind;
 extern	char *optarg;
-extern	char *get_nisplus_principal();
 extern	int __getnetnamebyuid();
 extern  int self_check(char *name);
 
@@ -101,7 +99,6 @@ main(int argc, char *argv[])
 	bool_t	validhost;
 	uid_t	uid;
 	int	c;
-	char	*nprinc = NULL;  /* nisplus principal name */
 	char	host_pname[NIS_MAXNAMELEN];
 
 	program_name = argv[0];
@@ -156,18 +153,14 @@ main(int argc, char *argv[])
 				    program_name, username);
 				usage();
 			}
-			if (pk_database == PK_NISPLUS)
-				target_host = nis_local_host();
-			else {
-				if (gethostname(host_pname, NIS_MAXNAMELEN)
-				    < 0) {
-					(void) fprintf(stderr,
-				"%s: could not get the hostname for %s\n",
-					    program_name, username);
-					usage();
-				}
-				target_host = host_pname;
+			if (gethostname(host_pname, NIS_MAXNAMELEN)
+			    < 0) {
+				(void) fprintf(stderr,
+			"%s: could not get the hostname for %s\n",
+				    program_name, username);
+				usage();
 			}
+			target_host = host_pname;
 		}
 		if (__getnetnamebyuid(name, uid) == 0) {
 			(void) fprintf(stderr,
@@ -175,9 +168,6 @@ main(int argc, char *argv[])
 			    program_name, username);
 			usage();
 		}
-		if (pk_database == PK_NISPLUS)
-			nprinc = get_nisplus_principal(nis_local_directory(),
-			    uid);
 	} else {
 		/* -h hostname option */
 		service.h_host = target_host;
@@ -208,14 +198,6 @@ main(int argc, char *argv[])
 			exit(1);
 		}
 		(void) host2netname(name, target_host, (char *)NULL);
-		if (pk_database == PK_NISPLUS) {
-			if (target_host[strlen(target_host) - 1] != '.') {
-				sprintf(host_pname, "%s.%s",
-				    target_host, nis_local_directory());
-				nprinc = host_pname;
-			} else
-				nprinc = target_host;
-		}
 		uid = 0;
 	}
 
@@ -234,7 +216,7 @@ main(int argc, char *argv[])
 	xencrypt(crypt1, short_pass);
 
 	if (status = setpublicmap(name, public, crypt1, pk_database,
-	    nprinc, short_pass)) {
+	    short_pass)) {
 		switch (pk_database) {
 		case PK_YP:
 			(void) fprintf(stderr,
@@ -245,11 +227,6 @@ main(int argc, char *argv[])
 		case PK_FILES:
 			(void) fprintf(stderr,
 			    "%s: hence, unable to update publickey database\n",
-			    program_name);
-			break;
-		case PK_NISPLUS:
-			(void) fprintf(stderr,
-			    "%s: unable to update nisplus database\n",
 			    program_name);
 			break;
 		default:
@@ -266,12 +243,11 @@ main(int argc, char *argv[])
  * Set the entry in the public key file
  */
 int
-setpublicmap(name, public, secret, database, nis_princ, pw)
+setpublicmap(name, public, secret, database, pw)
 	int database;
 	char *name;
 	char *public;
 	char *secret;
-	nis_name nis_princ;
 	char *pw;
 {
 	char pkent[HEXKEYBYTES + HEXKEYBYTES + KEYCHECKSUMSIZE + 2];
@@ -312,8 +288,6 @@ setpublicmap(name, public, secret, database, nis_princ, pw)
 		return (mapupdate(name, PKMAP, YPOP_STORE, pkent));
 	case PK_FILES:
 		return (localupdate(name, PKFILE, YPOP_STORE, pkent));
-	case PK_NISPLUS:
-		return (nisplus_update(name, public, secret, nis_princ));
 	case PK_LDAP:
 		return (ldap_update("dh192-0", name, public, secret, pw));
 	default:
@@ -326,10 +300,10 @@ void
 usage(void)
 {
 	(void) fprintf(stderr,
-	    "usage:\t%s -u username [-s ldap | nisplus | nis | files]\n",
+	    "usage:\t%s -u username [-s ldap | nis | files]\n",
 	    program_name);
 	(void) fprintf(stderr,
-	    "\t%s -h hostname [-s ldap | nisplus | nis | files]\n",
+	    "\t%s -h hostname [-s ldap | nis | files]\n",
 	    program_name);
 	exit(1);
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
- * Copyright (c) 1998-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 package com.sun.dhcpmgr.server;
 
@@ -39,7 +36,7 @@ import com.sun.dhcpmgr.data.*;
 
 public class DhcptabMgrImpl implements DhcptabMgr {
     private Bridge bridge;
-    
+
     /**
      * Create a new DhcptabMgr using the provided native bridge.
      * @param bridge the native bridge class which actually does the work.
@@ -47,7 +44,7 @@ public class DhcptabMgrImpl implements DhcptabMgr {
     public DhcptabMgrImpl(Bridge bridge) {
 	this.bridge = bridge;
     }
-    
+
     /**
      * Create an option.
      * @param name the name of the option.
@@ -66,7 +63,7 @@ public class DhcptabMgrImpl implements DhcptabMgr {
     public Option [] getOptions() throws BridgeException {
 	return getOptions(null);
     }
-    
+
     /**
      * Retrieve all options currently defined in the dhcptab.
      * @param datastore user-supplied datastore attributes
@@ -76,7 +73,7 @@ public class DhcptabMgrImpl implements DhcptabMgr {
 	throws BridgeException {
 	return bridge.getOptions(datastore);
     }
-    
+
     /**
      * Retrieve all the macros currently defined in the dhcptab.
      * @return an array of Macros
@@ -84,7 +81,7 @@ public class DhcptabMgrImpl implements DhcptabMgr {
     public Macro [] getMacros() throws BridgeException {
 	return getMacros(null);
     }
-    
+
     /**
      * Retrieve all the macros currently defined in the dhcptab.
      * @param datastore user-supplied datastore attributes
@@ -101,7 +98,7 @@ public class DhcptabMgrImpl implements DhcptabMgr {
 	optionsTable.add(bridge.getOptions(datastore));
 	return bridge.getMacros(datastore);
     }
-    
+
     /**
      * Create a given record in the dhcptab, and signal the server to
      * reload the dhcptab if so requested.
@@ -112,7 +109,7 @@ public class DhcptabMgrImpl implements DhcptabMgr {
 	    throws BridgeException {
 	createRecord(rec, signalServer, null);
     }
-    
+
     /**
      * Create a given record in the dhcptab, and signal the server to
      * reload the dhcptab if so requested.
@@ -127,7 +124,7 @@ public class DhcptabMgrImpl implements DhcptabMgr {
 	    bridge.reload();
 	}
     }
-    
+
     /**
      * Modify a given record in the dhcptab, and signal the server to reload
      * the dhcptab if so requested
@@ -139,7 +136,7 @@ public class DhcptabMgrImpl implements DhcptabMgr {
 	    boolean signalServer) throws BridgeException {
 	modifyRecord(oldRec, newRec, signalServer, null);
     }
-    
+
     /**
      * Modify a given record in the dhcptab, and signal the server to reload
      * the dhcptab if so requested
@@ -156,7 +153,7 @@ public class DhcptabMgrImpl implements DhcptabMgr {
 	    bridge.reload();
 	}
     }
-    
+
     /**
      * Delete a given record from the dhcptab, and signal the server to reload
      * the dhcptab if so requested
@@ -167,7 +164,7 @@ public class DhcptabMgrImpl implements DhcptabMgr {
 	    throws BridgeException {
 	deleteRecord(rec, signalServer, null);
     }
-    
+
     /**
      * Delete a given record from the dhcptab, and signal the server to reload
      * the dhcptab if so requested
@@ -182,7 +179,7 @@ public class DhcptabMgrImpl implements DhcptabMgr {
 	    bridge.reload();
 	}
     }
-    
+
     /**
      * Delete a record by name and type
      * @param key The key for the record
@@ -226,7 +223,7 @@ public class DhcptabMgrImpl implements DhcptabMgr {
 	}
 	return deleteRecords(recs);
     }
-	    
+
     /**
      * Delete all macros
      * @return An array of ActionError, one error for each macro not deleted
@@ -334,7 +331,7 @@ public class DhcptabMgrImpl implements DhcptabMgr {
 	throws BridgeException {
 	bridge.cvtDhcptab(datastore);
     }
-    
+
     /**
      * Create a new empty dhcptab in the server's data store, which must
      * already be configured.
@@ -342,7 +339,7 @@ public class DhcptabMgrImpl implements DhcptabMgr {
     public void createDhcptab() throws BridgeException {
 	createDhcptab(null);
     }
-    
+
     /**
      * Create a new empty dhcptab in the server's data store, which must
      * already be configured.
@@ -352,7 +349,7 @@ public class DhcptabMgrImpl implements DhcptabMgr {
 	throws BridgeException {
 	bridge.createDhcptab(datastore);
     }
-    
+
     /**
      * Delete the server's dhcptab in the current data store.
      */
@@ -424,19 +421,17 @@ public class DhcptabMgrImpl implements DhcptabMgr {
 	createRecord(macro, false);
     }
 
-    public synchronized void createNetworkMacro(Network network, 
-	IPAddress [] routers, boolean isLan, String nisDomain, Vector nisServs,
-	String nisplusDomain, Vector nisplusServs)
+    public synchronized void createNetworkMacro(Network network,
+	IPAddress [] routers, boolean isLan, String nisDomain, Vector nisServs)
 	throws BridgeException, ValidationException {
 
 	createNetworkMacro(network, routers, isLan, nisDomain, nisServs,
-	    nisplusDomain, nisplusServs, null);
+	    null);
     }
 
-    public void createNetworkMacro(Network network, 
+    public void createNetworkMacro(Network network,
 	IPAddress [] routers, boolean isLan, String nisDomain, Vector nisServs,
-	String nisplusDomain, Vector nisplusServs, DhcpDatastore datastore)
-	throws BridgeException, ValidationException {
+	DhcpDatastore datastore) throws BridgeException, ValidationException {
 
 	Macro macro = new Macro();
 	macro.setKey(network.toString());
@@ -453,21 +448,12 @@ public class DhcptabMgrImpl implements DhcptabMgr {
 	    macro.storeOption(StandardOptions.CD_BROADCASTADDR,
 		network.getBroadcastAddress());
 	}
-	    
+
 	// NIS config
 	if (nisDomain != null && nisDomain.length() != 0 &&
 	    nisServs != null && nisServs.size() != 0) {
 	    macro.storeOption(StandardOptions.CD_NIS_DOMAIN, nisDomain);
 	    macro.storeOption(StandardOptions.CD_NIS_SERV, nisServs);
-	}
-	    
-	// NIS+ config
-	if (nisplusDomain != null && nisplusDomain.length() != 0 &&
-	    nisplusServs != null && nisplusServs.size() != 0) {
-	    macro.storeOption(StandardOptions.CD_NISPLUS_DMAIN,
-		nisplusDomain);
-	    macro.storeOption(StandardOptions.CD_NISPLUS_SERVS,
-		nisplusServs);
 	}
 
 	createRecord(macro, false);

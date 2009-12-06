@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY= libnisdb.a
@@ -51,9 +50,9 @@ OBJECTS = \
 	db_dictxdr.o db_dictlog.o db_dictlog_c_xdr.o \
 	nis_db.o \
 	nisdb_mt.o nisdb_rw.o \
-	nis_hashitem.o nis_servlist.o \
+	nis_hashitem.o \
 	ldap_attr.o ldap_cto.o ldap_glob.o ldap_ldap.o \
-	ldap_map.o ldap_nisdbquery.o ldap_nisplus.o \
+	ldap_map.o ldap_nisdbquery.o \
 	ldap_op.o ldap_parse.o ldap_print.o ldap_ruleval.o \
 	ldap_util.o ldap_val.o ldap_xdr.o ldap_scheme.o \
 	nis_ldap.o \

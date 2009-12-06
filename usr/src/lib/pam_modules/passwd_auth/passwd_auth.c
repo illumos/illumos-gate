@@ -232,14 +232,12 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	repository_name = al[7].data.val_s;
 
 	/*
-	 * if repository isn't files|nis|nisplus, and
-	 * user wants to follow server policy,
-	 * return PAM_IGNORE
+	 * if repository isn't files|nis, and user wants to follow server
+	 * policy, return PAM_IGNORE
 	 */
 	if (server_policy &&
 	    strcmp(repository_name, "files") != 0 &&
-	    strcmp(repository_name, "nis") != 0 &&
-	    strcmp(repository_name, "nisplus") != 0) {
+	    strcmp(repository_name, "nis") != 0) {
 		retval = PAM_IGNORE;
 		goto out;
 	}

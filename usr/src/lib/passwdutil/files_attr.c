@@ -49,8 +49,7 @@ int files_getattr(char *name, attrlist *item, pwu_repository_t *rep);
 int files_getpwnam(char *name, attrlist *items, pwu_repository_t *rep,
     void **buf);
 int files_update(attrlist *items, pwu_repository_t *rep, void *buf);
-int files_putpwnam(char *name, char *oldpw, char *dummy,
-	pwu_repository_t *rep, void *buf);
+int files_putpwnam(char *name, char *oldpw, pwu_repository_t *rep, void *buf);
 int files_user_to_authenticate(char *name, pwu_repository_t *rep,
 	char **auth_user, int *privileged);
 
@@ -1086,16 +1085,14 @@ passwd_exit:
 }
 
 /*
- * files_putpwnam(name, oldpw, dummy, rep, buf)
+ * files_putpwnam(name, oldpw, rep, buf)
  *
  * store the password attributes contained in "buf" in /etc/passwd and
- * /etc/shadow. The dummy parameter is a placeholder for NIS+
- * updates where the "oldrpc" password is passed.
+ * /etc/shadow.
  */
 /*ARGSUSED*/
 int
-files_putpwnam(char *name, char *oldpw, char *dummy,
-    pwu_repository_t *rep, void *buf)
+files_putpwnam(char *name, char *oldpw, pwu_repository_t *rep, void *buf)
 {
 	struct pwbuf *pwbuf = (struct pwbuf *)buf;
 	int result = PWU_SUCCESS;

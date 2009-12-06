@@ -21,7 +21,7 @@
 /*
  *	getgrent.c
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * lib/nsswitch/compat/getgrent.c -- name-service-switch backend for getgrnam()
@@ -29,7 +29,7 @@
  *   group entries there that begin with "+" or "-", it consults other
  *   services.  By default it uses NIS (YP), but the user can override this
  *   with a "group_compat" entry in /etc/nsswitch.conf, e.g.
- *			group_compat: nisplus
+ *			group_compat: ldap
  *
  * This code tries to produce the same results as the 4.x code, even when
  *   the latter seems ill thought-out.  Bug-compatible, in other words.

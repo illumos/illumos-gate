@@ -78,7 +78,6 @@ SUNWprivate_2.1 {
 
 		files_put_printer;		# required for ns_put_printer()
 		nis_put_printer;
-		nisplus_put_printer;
 		ldap_put_printer;
 
 	local:

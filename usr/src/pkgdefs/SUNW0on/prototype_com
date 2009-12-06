@@ -175,8 +175,6 @@ d none usr/share/lib/locale/com/sun/dhcpmgr/client/SUNWfiles 755 root bin
 f none usr/share/lib/locale/com/sun/dhcpmgr/client/SUNWfiles/ResourceBundle.properties 644 root bin
 d none usr/share/lib/locale/com/sun/dhcpmgr/client/SUNWbinfiles 755 root bin
 f none usr/share/lib/locale/com/sun/dhcpmgr/client/SUNWbinfiles/ResourceBundle.properties 644 root bin
-d none usr/share/lib/locale/com/sun/dhcpmgr/client/SUNWnisplus 755 root bin
-f none usr/share/lib/locale/com/sun/dhcpmgr/client/SUNWnisplus/ResourceBundle.properties 644 root bin
 d none usr/share/lib/locale/com/sun/dhcpmgr/data 755 root bin
 f none usr/share/lib/locale/com/sun/dhcpmgr/data/ResourceBundle.properties 644 root bin
 d none usr/share/lib/locale/com/sun/dhcpmgr/ui 755 root bin

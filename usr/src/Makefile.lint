@@ -214,7 +214,6 @@ COMMON_SUBDIRS = \
 	cmd/newgrp \
 	cmd/newtask \
 	cmd/nice \
-	cmd/nispasswd \
 	cmd/nl \
 	cmd/nohup \
 	cmd/nscd \

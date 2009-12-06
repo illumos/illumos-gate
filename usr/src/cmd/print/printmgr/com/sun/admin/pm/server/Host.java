@@ -19,9 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Host class
@@ -318,30 +316,9 @@ public class Host
 		syscmd = null;
 		if (exitvalue == 0) {
 			Debug.warning(
-			    "SVR: Discovered NIS+ server in yp compat mode.");
-			Debug.warning(
 			    "SVR: Unable to update this configuration.");
 			throw new pmNSNotConfiguredException();
 		}
-	} else if (ns.equals("nisplus")) {
-		cmd = "/usr/bin/grep printers: /etc/nsswitch.conf";
-		syscmd = new SysCommand();
-		syscmd.exec(cmd);
-		if (syscmd.getExitValue() != 0) {
-			syscmd = null;
-			Debug.message(
-			    "SVR: nisplus is not supported for this system");
-			throw new pmNSNotConfiguredException();
-		}
-		cmd = "/usr/bin/nisls";
-		syscmd = new SysCommand();
-		syscmd.exec(cmd);
-		if (syscmd.getExitValue() != 0) {
-			err = syscmd.getError();
-			syscmd = null;
-			throw new pmNSNotConfiguredException(err);
-		}
-		syscmd = null;
 	} else if (ns.equals("ldap")) {
 		/*
 		 * Check if the ldap-client is configured by first checking

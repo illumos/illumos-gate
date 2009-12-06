@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,11 +21,9 @@
 /*
  *	db_mindex.cc
  *
- *  Copyright 1988-2002 Sun Microsystems, Inc.  All rights reserved.
+ *  Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  *  Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 
@@ -46,7 +43,6 @@
 #include "ldap_scheme.h"
 #include "ldap_parse.h"
 #include "nis_hashitem.h"
-#include "ldap_nisplus.h"
 
 /*
  *  Constructor:  Create new table using scheme defintion supplied.
@@ -250,8 +246,6 @@ db_mindex::satisfy_query(db_query *q, long *count, bool_t *valid,
 		ret = satisfy_query_dbonly(q, count, TRUE, valid);
 		if (ret == NULL) {
 			ret = satisfy_query_dbonly(q, count, FALSE, valid);
-			if (ret != NULL)
-				setMappingStatus(NIS_CACHEEXPIRED, queryRes);
 		}
 	} else {
 		/*
@@ -259,8 +253,6 @@ db_mindex::satisfy_query(db_query *q, long *count, bool_t *valid,
 		 * it with an appropriate status.
 		 */
 		ret = satisfy_query_dbonly(q, count, FALSE, valid);
-		setMappingStatus(ret ? NIS_CACHEEXPIRED : NIS_SUCCESS,
-				queryRes);
 	}
 
 	READUNLOCK(this, NULL, "ru db_mindex::satisfy_query");
@@ -791,7 +783,6 @@ db_mindex::remove_aux(entryp recloc)
 				o = unmakePseudoEntryObj(e, 0);
 			queryRes = removeLDAP(cq, o);
 			if (queryRes != LDAP_SUCCESS) {
-				setMappingStatus(NIS_SUCCESS, queryRes);
 				if (table->mapping.storeErrorDisp == abandon)
 					res = DB_INTERNAL_ERROR;
 			}

@@ -175,7 +175,6 @@ f none lib/nss_compat.so.1 755 root bin
 f none lib/nss_dns.so.1 755 root bin
 f none lib/nss_files.so.1 755 root bin
 f none lib/nss_nis.so.1 755 root bin
-f none lib/nss_nisplus.so.1 755 root bin
 f none lib/nss_user.so.1 755 root bin
 d none lib/mpxio 755 root bin
 f none lib/mpxio/stmsboot_util 555 root bin

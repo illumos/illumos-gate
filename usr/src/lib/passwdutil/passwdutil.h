@@ -100,47 +100,39 @@ typedef struct {
 #define	REP_NOREP	0		/* Can't find suitable repository */
 #define	REP_FILES	0x0001		/* /etc/passwd, /etc/shadow */
 #define	REP_NIS		0x0002
-#define	REP_NISPLUS	0x0004
-#define	REP_LDAP	0x0008
-#define	REP_NSS		0x0010
+#define	REP_LDAP	0x0004
+#define	REP_NSS		0x0008
 #define	REP_LAST	REP_NSS
 #define	REP_ERANGE	0x8000		/* Unknown repository specified */
 
 #define	REP_COMPAT_NIS		0x1000
-#define	REP_COMPAT_NISPLUS	0x2000
-#define	REP_COMPAT_LDAP		0x4000
+#define	REP_COMPAT_LDAP		0x2000
 
 /* For the time being, these are also defined in pam_*.h */
-#undef	IS_NISPLUS
 #undef	IS_FILES
 #undef	IS_NIS
 #undef	IS_LDAP
 
 #define	IS_FILES(r)	(r.type != NULL && strcmp(r.type, "files") == 0)
 #define	IS_NIS(r)	(r.type != NULL && strcmp(r.type, "nis") == 0)
-#define	IS_NISPLUS(r)	(r.type != NULL && strcmp(r.type, "nisplus") == 0)
 #define	IS_LDAP(r)	(r.type != NULL && strcmp(r.type, "ldap") == 0)
 
 #define	MINWEEKS	-1
 #define	MAXWEEKS	-1
 #define	WARNWEEKS	-1
 
-#define	NISPLUS_LOOKUP	0
-#define	NISPLUS_UPDATE	1
-
 typedef struct repops {
 	int (*checkhistory)(char *, char *, pwu_repository_t *);
 	int (*getattr)(char *, attrlist *, pwu_repository_t *);
 	int (*getpwnam)(char *, attrlist *, pwu_repository_t *, void **);
 	int (*update)(attrlist *, pwu_repository_t *, void *);
-	int (*putpwnam)(char *, char *, char *, pwu_repository_t *, void *);
+	int (*putpwnam)(char *, char *, pwu_repository_t *, void *);
 	int (*user_to_authenticate)(char *, pwu_repository_t *, char **, int *);
 	int (*lock)(void);
 	int (*unlock)(void);
 } repops_t;
 
-extern repops_t files_repops, nis_repops,
-	nisplus_repops, ldap_repops, nss_repops;
+extern repops_t files_repops, nis_repops, ldap_repops, nss_repops;
 
 extern repops_t *rops[];
 
@@ -171,8 +163,7 @@ int name_to_int(char *);
 /*
  * __set_authtok_attr.c
  */
-int __set_authtoken_attr(char *, char *, char *, pwu_repository_t *,
-    attrlist *, int *);
+int __set_authtoken_attr(char *, char *, pwu_repository_t *, attrlist *, int *);
 /*
  * __get_authtokenn_attr.c
  */
@@ -182,11 +173,6 @@ int __get_authtoken_attr(char *, pwu_repository_t *, attrlist *);
  * __user_to_authenticate.c
  */
 int __user_to_authenticate(char *, pwu_repository_t *, char **, int *);
-
-/*
- * __verify_rpc_passwd.c
- */
-int __verify_rpc_passwd(char *, char *, pwu_repository_t *);
 
 /*
  *	Password history definitions
@@ -221,25 +207,14 @@ int __rst_failed_count(char *, char *);
 #define	PWU_REPOSITORY_ERROR	-13	/* Unknown repository specified */
 #define	PWU_AGING_DISABLED	-14	/* Modifying min/warn while max==-1 */
 
-/* NISPLUS specific errors */
+/* More errors */
 
-#define	PWU_RECOVERY_ERR	-15	/* can't recover old auth token */
-#define	PWU_CRED_UPDATE_ERR	-16	/* failed to update credentials */
-#define	PWU_ATTR_UPDATE_ERR	-17	/* failed to update attributes */
-#define	PWU_CRED_ERROR		-18	/* failed to obtain user credentials */
-#define	PWU_PARTIAL_SUCCESS	-19	/* passwd is updated, creds are not */
-#define	PWU_BAD_CREDPASS	-20	/* password doesn't decrypt creds */
-#define	PWU_NO_PRIV_CRED_UPDATE	-21	/* priv. user can't update creds */
-#define	PWU_UPDATED_SOME_CREDS	-22	/* some, not all, creds were updated */
-
-/* More errors, not NISPLUS specific */
-
-#define	PWU_PWD_TOO_SHORT	-23	/* new passwd too short */
-#define	PWU_PWD_INVALID		-24	/* new passwd has invalid syntax */
-#define	PWU_PWD_IN_HISTORY	-25	/* new passwd in history list */
-#define	PWU_CHANGE_NOT_ALLOWED	-26	/* change not allowed */
-#define	PWU_WITHIN_MIN_AGE	-27	/* change not allowed, within min age */
-#define	PWU_ACCOUNT_LOCKED	-28	/* account successfully locked */
+#define	PWU_PWD_TOO_SHORT	-15	/* new passwd too short */
+#define	PWU_PWD_INVALID		-16	/* new passwd has invalid syntax */
+#define	PWU_PWD_IN_HISTORY	-17	/* new passwd in history list */
+#define	PWU_CHANGE_NOT_ALLOWED	-18	/* change not allowed */
+#define	PWU_WITHIN_MIN_AGE	-19	/* change not allowed, within min age */
+#define	PWU_ACCOUNT_LOCKED	-20	/* account successfully locked */
 
 #ifdef __cplusplus
 }

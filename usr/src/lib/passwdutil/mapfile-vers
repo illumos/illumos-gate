@@ -45,7 +45,6 @@ SUNWprivate_1.1 {
 	__rst_failed_count;
 	__set_authtoken_attr;
 	__user_to_authenticate;
-	__verify_rpc_passwd;
     local:
 	*;
 };

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -89,16 +89,11 @@ yp_rsvd.o \
 yppasswd_xdr.o
 
 NIS_GEN=  \
-nislib.o          nis_callback.o   nis_xdr.o      nis_subr.o     nis_names.o  \
-nis_cback_xdr.o   print_obj.o      nis_perror.o   nis_groups.o   nis_tags.o   \
-nis_misc.o        nis_lookup.o     nis_rpc.o      nis_clnt.o	 nis_cast.o   \
-nis_hash.o	  nis_misc_proc.o  nis_sec_mechs.o npd_lib.o
+nis_xdr.o      nis_subr.o       nis_misc.o         \
+nis_misc_proc.o  nis_sec_mechs.o
 
-NIS_CACHE=  cache.o cache_api.o cold_start.o local_cache.o \
-	mapped_cache.o client_cache.o mgr_cache.o \
-	nis_cache_clnt.o nis_cache_xdr.o
 
-NIS= $(NIS_GEN) $(NIS_CACHE)
+NIS= $(NIS_GEN)
 
 KEY= publickey.o xcrypt.o gen_dhkeys.o
 
@@ -158,12 +153,8 @@ pics/%.o: ../nis/gen/%.c ../nis/gen/nis_clnt.h
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-pics/%.o: ../nis/cache/%.c ../nis/cache/nis_clnt.h
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
 
-pics/%.o: ../nis/cache/%.cc ../nis/gen/nis_clnt.h \
-	../nis/cache/nis_clnt.h ../nis/cache/nis_cache.h
+pics/%.o: ../nis/gen/nis_clnt.h
 	$(COMPILE.cc) -o $@ $<
 	$(POST_PROCESS_O)
 

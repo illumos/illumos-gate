@@ -74,8 +74,7 @@ int ldap_getattr(char *name, attrlist *item, pwu_repository_t *rep);
 int ldap_getpwnam(char *name, attrlist *items, pwu_repository_t *rep,
     void **buf);
 int ldap_update(attrlist *items, pwu_repository_t *rep, void *buf);
-int ldap_putpwnam(char *name, char *oldpw, char *dummy,
-	pwu_repository_t *rep, void *buf);
+int ldap_putpwnam(char *name, char *oldpw, pwu_repository_t *rep, void *buf);
 int ldap_user_to_authenticate(char *name, pwu_repository_t *rep,
 	char **auth_user, int *privileged);
 
@@ -1130,16 +1129,13 @@ out:
 
 
 /*
- * ldap_putpwnam(name, oldpw, dummy, rep, buf)
+ * ldap_putpwnam(name, oldpw, rep, buf)
  *
  * update the LDAP server with the attributes contained in 'buf'.
- * The dummy parameter is a placeholder for NIS+ where the old
- * RPC password is passwd.
  */
 /*ARGSUSED*/
 int
-ldap_putpwnam(char *name, char *oldpw, char *dummy,
-	pwu_repository_t *rep, void *buf)
+ldap_putpwnam(char *name, char *oldpw, pwu_repository_t *rep, void *buf)
 {
 	int res;
 	char *dn;	/* dn of user whose attributes we are changing */

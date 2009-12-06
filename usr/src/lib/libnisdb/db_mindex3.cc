@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <time.h>
@@ -40,7 +37,6 @@
 #include "nisdb_mt.h"
 #include "ldap_map.h"
 #include "ldap_glob.h"
-#include "ldap_nisplus.h"
 #include "ldap_util.h"
 
 
@@ -83,6 +79,8 @@ entryFlagsFromTable(uint_t tf) {
 	return (ef);
 }
 #endif	/* SET_ENTRY_FLAGS */
+
+static void                    setOid(nis_object *obj);
 
 /*
  * Retrieve container entries from LDAP per 't' and 'qin'/'q'.
@@ -924,4 +922,16 @@ entriesFromLDAPreal(__entries_from_ldap_arg_t *arg) {
 			"%s: Error %d unlocking db", myself, lstat);
 
 	return (stat);
+}
+/*
+ * Sets the oid (i.e., the creation and modification times) for the
+ * specified object. In order to avoid retrieving the old incarnation
+ * (if any) from the DB first, we're punting and setting both mtime
+ * and ctime to the current time.
+ */
+static void
+setOid(nis_object *obj) {
+        if (obj != 0) {
+                obj->zo_oid.ctime = obj->zo_oid.mtime = time(0);
+        }
 }

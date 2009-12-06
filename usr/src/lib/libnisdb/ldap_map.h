@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef	_LDAP_MAP_H
 #define	_LDAP_MAP_H
@@ -65,8 +63,6 @@ __nis_table_mapping_t	**selectTableMapping(__nis_table_mapping_t *t,
 				db_query *q, int wantWrite, int wantObj,
 				char *dbId, int *numMatches);
 int			haveIndexedMapping(__nis_table_mapping_t *t);
-int			getNisPlusObj(char *objName, char *msg,
-					nis_result **outRes);
 int			objToLDAP(__nis_table_mapping_t *t, nis_object *o,
 				entry_obj **ea, int numEa);
 int			objFromLDAP(__nis_table_mapping_t *t, nis_object **o,
@@ -87,6 +83,6 @@ __nis_rule_value_t	*addObjAttr2RuleValue(nis_object *obj,
 
 #ifdef	__cplusplus
 }
-#endif	/* __cplusplus */
+#endif
 
 #endif	/* _LDAP_MAP_H */

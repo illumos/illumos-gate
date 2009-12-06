@@ -132,9 +132,9 @@ display_warning(pam_handle_t *pamh, int failures, char *homedir)
  * PAM_AUTHTOK item is indeed the password that belongs to the user
  * as stored in PAM_USER.
  *
- * This routine will not establish Secure RPC Credentials. If these
- * credentials are needed to obtain the password from the NIS+ service,
- * the pam_dhkeys module should be stacked before us!
+ * This routine will not establish Secure RPC Credentials, the pam_dhkeys
+ * module should be stacked before us if Secure RPC Credentials are needed
+ * to obtain passwords.
  */
 int
 pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
@@ -142,7 +142,6 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	int	i;
 	int	debug = 0;
 	int	nowarn = (flags & PAM_SILENT) != 0;
-	char	messages[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE];
 	char	*user;
 	char	*passwd;
 	char	*rep_passwd;
@@ -279,39 +278,9 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		goto out;
 	}
 
-	/*
-	 * "rep_passwd" holds the encrypted password.
-	 * If, however, we detect that the password equals NOPWDRTR,
-	 * while we've obtained it from NIS+, it
-	 * means that the permissions on the NIS+ table are too tight
-	 * for us to get the password without having Secure RPC
-	 * Credentials. In that case, we log an error stating that
-	 * the Secure RPC credential Module should be on the PAM stack
-	 * before the unix_auth module. We also tell the user to go
-	 * and inform the administrator of this error.
-	 */
-	if (strcmp(repository_name, "nisplus") == 0 &&
-	    strcmp(rep_passwd, NOPWDRTR) == 0) {
-		__pam_log(LOG_AUTH | LOG_ERR,
-		    "pam_unix_auth: NIS+ permissions require that"
-		    "the pam_dhkeys module is on the PAM stack before "
-		    "pam_unix_auth");
-		if (nowarn == 0) {
-			(void) snprintf(messages[0], sizeof (messages[0]),
-			    dgettext(TEXT_DOMAIN,
-			    "NIS+ permissions are too tight. "
-			    "Please inform your administrator."));
-			(void) __pam_display_msg(pamh, PAM_ERROR_MSG, 1,
-			    messages, NULL);
-		}
-		result = PAM_USER_UNKNOWN;
-		goto out;
-	}
-
 	if (server_policy &&
 	    strcmp(repository_name, "files") != 0 &&
-	    strcmp(repository_name, "nis") != 0 &&
-	    strcmp(repository_name, "nisplus") != 0) {
+	    strcmp(repository_name, "nis") != 0) {
 		result = PAM_IGNORE;
 		goto out;
 	}

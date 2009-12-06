@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,13 +19,11 @@
  * CDDL HEADER END
  */
 /*
- *	ns_fnmount.c
+ * ns_fnmount.c
  *
- *	Copyright (c) 1996 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,13 +45,6 @@
 #define	KEYNAMESZ	(size_t)(AUTOFS_MAXCOMPONENTLEN + 1)
 #define	COMPNAMESZ	(size_t)(MAPNAMESZ - FNPREFIXLEN + KEYNAMESZ - 2)
 #define	DESCSZ		(size_t)512
-
-
-/*
- * Number of the home directory field in NIS+ password tables.
- */
-#define	NIS_HOME	5
-
 
 typedef struct mapent	mapent;
 typedef struct mapline	mapline;
@@ -144,13 +134,6 @@ addr_from_ref(const FN_ref_t *ref, const char *cname, addrtype_t *typep,
 static int
 str_from_addr(const char *cname, const FN_ref_addr_t *addr, char str[],
     size_t strsz);
-
-/*
- * Perform a NIS+ query to find a home directory.  The result is a
- * newly-allocated string, or NULL on error.
- */
-static char *
-nisplus_homedir(const char *nisname);
 
 /*
  * Given a map name and its current length, append "/name".  Return
@@ -351,14 +334,14 @@ process_ref(const FN_ref_t *ref, const char *cname, char *map, char *key,
 				    ml.lineqbuf, LINESZ)) {
 					syslog(LOG_ERR,
 					"%s/%s: opts too long (max %d chars)",
-					FNPREFIX, cname, LINESZ - 1);
+					    FNPREFIX, cname, LINESZ - 1);
 					return (NULL);
 				}
 				opts = ml.linebuf + 1;	/* skip '-' */
 				goto indirect;
 			}
 			mapents = parse_entry(key, map, opts, &ml, NULL, 0,
-						TRUE);
+			    TRUE);
 			if (mapents == NULL || !safe_mapent(mapents)) {
 				free_mapent(mapents);
 				return (NULL);
@@ -397,7 +380,7 @@ process_ref(const FN_ref_t *ref, const char *cname, char *map, char *key,
 				}
 			}
 			mapents = new_mapent(root, strdup(""), strdup("nfs"),
-					safe_opts(opts), nfshost, nfsdir);
+			    safe_opts(opts), nfshost, nfsdir);
 			if (self && !shallow) {
 				return (mapents);
 			}
@@ -407,14 +390,7 @@ process_ref(const FN_ref_t *ref, const char *cname, char *map, char *key,
 			homedir = strdup(addrdata);
 			homedir[strcspn(homedir, " \t\r\n")] = '\0';
 			mapents = new_mapent(root, strdup(""), strdup("lofs"),
-					strdup(opts), strdup(""), homedir);
-			break;
-		case ADDR_USER_NISPLUS:
-			homedir = nisplus_homedir(addrdata);
-			mapents = (homedir == NULL)
-				? NULL
-				: new_mapent(root, strdup(""), strdup("lofs"),
-					strdup(opts), strdup(""), homedir);
+			    strdup(opts), strdup(""), homedir);
 			break;
 		}
 
@@ -432,7 +408,7 @@ process_ref(const FN_ref_t *ref, const char *cname, char *map, char *key,
 			return (mapents);
 		}
 		return (frontier(mapents, ref, map, maplen, map + maplen,
-				opts, status));
+		    opts, status));
 	}
 
 	/* Ref type wasn't recognized. */
@@ -440,7 +416,7 @@ process_ref(const FN_ref_t *ref, const char *cname, char *map, char *key,
 indirect:
 	/* Install an indirect autofs mount point. */
 	return (new_mapent(root, strdup(""), strdup("autofs"), strdup(opts),
-				strdup(""), concat(map, '/', key)));
+	    strdup(""), concat(map, '/', key)));
 }
 
 
@@ -480,18 +456,18 @@ frontier(mapent *mapents, const FN_ref_t *ref, char *map, size_t maplen,
 	}
 
 	while ((child_s = fn_bindinglist_next(bindings, &child_ref, status))
-			!= NULL) {
+	    != NULL) {
 		child = (const char *)fn_string_str(child_s, &statcode);
 		if (child == NULL) {
 			if (verbose) {
 				syslog(LOG_ERR,
-					"FNS string error listing %s", map);
+				    "FNS string error listing %s", map);
 			}
 			fn_string_destroy(child_s);
 			goto err_return;
 		}
 		mapents = frontier_aux(mapents, child_ref, map, maplen,
-					mntpnt, child, opts, status);
+		    mntpnt, child, opts, status);
 		fn_string_destroy(child_s);
 		fn_ref_destroy(child_ref);
 		if (mapents == NULL) {
@@ -573,10 +549,10 @@ frontier_aux(mapent *mapents, const FN_ref_t *ref, char *map, size_t maplen,
 	 */
 	if (at_frontier) {
 		opts = (opts[0] != '\0')
-			? concat(opts, ',', "direct")
-			: strdup("direct");
+		    ? concat(opts, ',', "direct")
+		    : strdup("direct");
 		me = new_mapent(noroot, strdup(mntpnt), strdup("autofs"), opts,
-				strdup(""), strdup(map));
+		    strdup(""), strdup(map));
 		if (me != NULL) {
 			/* Link new mapent into list (not at the head). */
 			me->map_next = mapents->map_next;
@@ -639,8 +615,8 @@ addr_from_ref(const FN_ref_t *ref, const char *cname, addrtype_t *typep,
 		*typep = addrtype(addr);
 		if (*typep < NUM_ADDRTYPES) {
 			return ((data != NULL)
-				? str_from_addr(cname, addr, data, datasz)
-				: 0);
+			    ? str_from_addr(cname, addr, data, datasz)
+			    : 0);
 		}
 		addr = fn_ref_next(ref, &iter_pos);
 	}
@@ -656,11 +632,11 @@ str_from_addr(const char *cname, const FN_ref_addr_t *addr, char str[],
 	int	res;
 
 	xdrmem_create(&xdr, (caddr_t)fn_ref_addr_data(addr),
-			fn_ref_addr_length(addr), XDR_DECODE);
+	    fn_ref_addr_length(addr), XDR_DECODE);
 	if (!xdr_string(&xdr, &str, strsz)) {
 		if (verbose) {
 			syslog(LOG_ERR,
-				"Could not decode FNS address for %s", cname);
+			    "Could not decode FNS address for %s", cname);
 		}
 		res = -1;
 	} else {
@@ -670,55 +646,6 @@ str_from_addr(const char *cname, const FN_ref_addr_t *addr, char str[],
 	return (res);
 }
 
-
-static char *
-nisplus_homedir(const char *nisname)
-{
-	nis_result	*res;
-	void		*val;
-	size_t		len;
-	char		*homedir = NULL;
-
-	/* NIS+ query to find passwd table entry */
-	res = nis_list((nis_name)nisname,
-			FOLLOW_LINKS | FOLLOW_PATH | USE_DGRAM, NULL, NULL);
-	if (res == NULL) {
-		if (verbose) {
-			syslog(LOG_ERR,
-				"FNS home dir query failed: %s", nisname);
-		}
-		return (NULL);
-	}
-	if (res->status != NIS_SUCCESS && res->status != NIS_S_SUCCESS) {
-		if ((res->status != NIS_NOTFOUND) && verbose) {
-			syslog(LOG_ERR,
-				"FNS home dir query failed: %s", nisname);
-		}
-		goto done;
-	}
-	val = ENTRY_VAL(NIS_RES_OBJECT(res), NIS_HOME);
-	len = ENTRY_LEN(NIS_RES_OBJECT(res), NIS_HOME);
-
-	if (len < 1) {
-		if (verbose) {
-			syslog(LOG_ERR, "FNS home dir not found: %s", nisname);
-		}
-		goto done;
-	}
-	homedir = malloc(len + 1);
-	if (homedir == NULL) {
-		log_mem_failure();
-		goto done;
-	}
-
-	strncpy(homedir, (char *)val, len);
-	homedir[len] = '\0';
-done:
-	nis_freeresult(res);
-	return (homedir);
-}
-
-
 static size_t
 append_mapname(char *map, size_t maplen, const char *name)
 {
@@ -727,7 +654,7 @@ append_mapname(char *map, size_t maplen, const char *name)
 	if (maplen + 1 + namelen >= MAPNAMESZ) {
 		if (verbose) {
 			syslog(LOG_ERR, "FNS name %s/%s too long",
-				map + FNPREFIXLEN + 1, name);
+			    map + FNPREFIXLEN + 1, name);
 		}
 		return (0);
 	}

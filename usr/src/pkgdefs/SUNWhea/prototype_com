@@ -549,15 +549,8 @@ f none usr/include/rpcsvc/nfs_prot.h 644 root bin
 f none usr/include/rpcsvc/nfs_prot.x 644 root bin
 f none usr/include/rpcsvc/nis.h 644 root bin
 f none usr/include/rpcsvc/nis.x 644 root bin
-f none usr/include/rpcsvc/nispasswd.h 644 root bin
-f none usr/include/rpcsvc/nispasswd.x 644 root bin
-f none usr/include/rpcsvc/nis_cache.h 644 root bin
-f none usr/include/rpcsvc/nis_cache.x 644 root bin
-f none usr/include/rpcsvc/nis_callback.h 644 root bin
-f none usr/include/rpcsvc/nis_callback.x 644 root bin
 f none usr/include/rpcsvc/nis_db.h 644 root bin
 f none usr/include/rpcsvc/nis_object.x 644 root bin
-f none usr/include/rpcsvc/nis_tags.h 644 root bin
 f none usr/include/rpcsvc/nislib.h 644 root bin
 f none usr/include/rpcsvc/nlm_prot.h 644 root bin
 f none usr/include/rpcsvc/nlm_prot.x 644 root bin

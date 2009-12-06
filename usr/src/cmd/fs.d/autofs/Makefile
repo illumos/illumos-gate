@@ -60,7 +60,7 @@ $(MAPINSTALL)	:= FILEMODE= 0644
 $(MFSTINSTALL)	:= FILEMODE = 0444
 
 REAL_COMMON=	debug_alloc.o
-COMMON=		ns_generic.o ns_files.o ns_nisplus.o ns_nis.o \
+COMMON=		ns_generic.o ns_files.o ns_nis.o \
 		ns_ldap.o auto_mnttab.o auto_subr.o $(REAL_COMMON)
 
 AUTOOBJS=	automount.o $(COMMON) $(FSLIB)

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <lber.h>
 #include <ldap.h>
@@ -38,7 +36,6 @@
 #include "ldap_ruleval.h"
 #include "ldap_attr.h"
 #include "ldap_val.h"
-#include "ldap_nisplus.h"
 #include "ldap_ldap.h"
 
 extern int yp2ldap;
@@ -650,10 +647,7 @@ getMappingItemVal(__nis_mapping_item_t *item, __nis_mapping_item_type_t native,
 
 	/* Do a direct lookup ? */
 	if (val == 0 && (check == rvThenLookup || check == lookupOnly)) {
-		if (item->type == mit_nisplus) {
-			val = lookupNisPlus(&item->searchSpec.obj, item->name,
-						rv);
-		} else if (item->type == mit_ldap) {
+		if (item->type == mit_ldap) {
 			int	err = 0;
 			__nis_search_triple_t	triple;
 			char			*baseDN;

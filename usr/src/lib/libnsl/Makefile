@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROTOCOL_DIR= $(ROOTHDRDIR)/rpcsvc
@@ -38,29 +37,19 @@ $(BUILD64)SUBDIRS += $(MACH64)
 RPC_DERIVED_FILES=
 
 GEN_DERIVED_FILES= \
-	nis/gen/nis_clnt.h      \
-	nis/gen/nis_clnt.c
+	nis/gen/nis_clnt.h
 
-CACHE_DERIVED_FILES= \
-	nis/cache/nis_clnt.h	\
-	nis/cache/nis_cache.h	\
-	nis/cache/nis_cache_clnt.cc \
-	nis/cache/nis_cache_xdr.cc
 
 PROTOCOL_FILES= \
 	$(PROTOCOL_DIR)/daemon_utils.h	\
 	$(PROTOCOL_DIR)/nis.x		\
 	$(PROTOCOL_DIR)/nis.h		\
-	$(PROTOCOL_DIR)/nis_object.x	\
-	$(PROTOCOL_DIR)/nis_callback.x	\
-	$(PROTOCOL_DIR)/nis_callback.h	\
-	$(PROTOCOL_DIR)/nis_cache.x	\
-	$(PROTOCOL_DIR)/nis_cache.h
+	$(PROTOCOL_DIR)/nis_object.x
 
 PROTOCOL_FILES_UTS= \
 	$(PROTOCOL_DIR)/key_prot.x
 
-DERIVED_FILES= $(GEN_DERIVED_FILES) $(CACHE_DERIVED_FILES) $(RPC_DERIVED_FILES)
+DERIVED_FILES= $(GEN_DERIVED_FILES) $(RPC_DERIVED_FILES)
 
 #
 # Make sure they get cleaned when necessary
@@ -118,18 +107,6 @@ $(PROTOCOL_DIR)/nis.h:	$(PROTOCOL_SRCDIR)/nis.x $(PROTOCOL_SRCDIR)/nis_object.x
 	$(INS) -s -m $(FILEMODE) -f $(@D) nis.h
 	$(RM) nis.h nis-tmp.h
 
-$(PROTOCOL_DIR)/nis_callback.h:	$(PROTOCOL_SRCDIR)/nis_callback.x
-	$(RPCGEN) -C -h $(PROTOCOL_SRCDIR)/nis_callback.x -o nis_callback.h
-	$(RM) $@
-	$(INS) -s -m $(FILEMODE) -f $(@D) nis_callback.h
-	$(RM) nis_callback.h
-
-$(PROTOCOL_DIR)/nis_cache.h:	$(PROTOCOL_SRCDIR)/nis_cache.x
-	$(RPCGEN) -C -h $(PROTOCOL_SRCDIR)/nis_cache.x -o nis_cache.h
-	$(RM) $@
-	$(INS) -s -m $(FILEMODE) -f $(@D) nis_cache.h
-	$(RM) nis_cache.h
-
 $(PROTOCOL_DIR)/%.x:	$(PROTOCOL_SRCDIR)/%.x
 	$(INS.file)
 
@@ -148,38 +125,9 @@ nis/gen/nis_clnt.h: $(PROTOCOL_DIR)/nis.x $(PROTOCOL_DIR)/nis_object.x
 	$(SED) -e 's/_3/_clnt/' > $@
 	$(RM) nis_clnt-gen.h
 
-nis/cache/nis_clnt.h: $(PROTOCOL_DIR)/nis.x $(PROTOCOL_DIR)/nis_object.x 
-	$(RPCGEN) -C -h $(PROTOCOL_DIR)/nis.x > nis_clnt-cache.h
-	$(SED) -n -e '/EDIT_START/,$$ p' < nis_clnt-cache.h |\
-	$(SED) -e 's/_3_svc/_svc/' |\
-	$(SED) -e 's/_3/_clnt/' > $@
-	$(RM) nis_clnt-cache.h
-
 #
 # Derived source files
 #
-nis/gen/nis_clnt.c: $(PROTOCOL_DIR)/nis.x $(PROTOCOL_DIR)/nis_object.x 
-	$(RPCGEN) -C -l $(PROTOCOL_DIR)/nis.x > nis_clnt-tmp.c
-	$(SED) -e 's!\"$(PROTOCOL_DIR)/nis.h\"!\<rpcsvc/nis.h\>!' \
-	    < nis_clnt-tmp.c |\
-	$(SED) -e '/#include <memory.h>/i\
-#include "mt.h"' |\
-	$(SED) -e 's/_3/_clnt/' > $@
-	$(RM) nis_clnt-tmp.c
-
-nis/cache/nis_cache_xdr.cc: $(PROTOCOL_DIR)/nis_cache.x
-	$(RPCGEN) -C -c $(PROTOCOL_DIR)/nis_cache.x |\
-        $(SED) -e 's!\"$(PROTOCOL_DIR)/nis_cache.h\"!"nis_cache.h"!' > $@
-
-nis/cache/nis_cache_clnt.cc: $(PROTOCOL_DIR)/nis_cache.x
-	$(RPCGEN) -C -l $(PROTOCOL_DIR)/nis_cache.x |\
-	$(SED) -e '/#include <memory.h>/i\
-#include "mt.h"' |\
-        $(SED) -e 's!\"$(PROTOCOL_DIR)/nis_cache.h\"!"nis_cache.h"!' > $@
-
-nis/cache/nis_cache.h: $(PROTOCOL_DIR)/nis_cache.x
-	$(RPCGEN) -C -h $(PROTOCOL_DIR)/nis_cache.x |\
-        $(SED) -e 's!\"$(PROTOCOL_DIR)/nis_cache.h\"!"nis_cache.h"!' > $@
 
 # include library targets
 include ../Makefile.targ

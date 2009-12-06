@@ -69,7 +69,7 @@ __incr_failed_count(char *username, char *repname, int max_failures)
 		if ((ret = ops->update(items, NULL, buf)) != PWU_SUCCESS)
 			goto out;
 	}
-	if (((ret = ops->putpwnam(username, NULL, NULL, NULL, buf)) ==
+	if (((ret = ops->putpwnam(username, NULL, NULL, buf)) ==
 	    PWU_SUCCESS) &&
 	    (items[0].type == ATTR_LOCK_ACCOUNT))
 		ret = PWU_ACCOUNT_LOCKED;
@@ -113,7 +113,7 @@ __rst_failed_count(char *username, char *repname)
 		goto out;
 	if ((ret = ops->update(items, NULL, buf)) != PWU_SUCCESS)
 		goto out;
-	ret = ops->putpwnam(username, NULL, NULL, NULL, buf);
+	ret = ops->putpwnam(username, NULL, NULL, buf);
 out:
 	if (ops->unlock != NULL) {
 		ops->unlock();

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Dynamic Host Configuration Protocol version 6, for IPv6.  Supports
@@ -277,12 +275,8 @@ option_to_str(uint8_t mtype)
 		return ("IA_PD Prefix");
 	case DHCPV6_OPT_NIS_SERVERS:
 		return ("Network Information Service Servers");
-	case DHCPV6_OPT_NISP_SERVERS:
-		return ("Network Information Service V2 Servers");
 	case DHCPV6_OPT_NIS_DOMAIN:
 		return ("Network Information Service Domain Name");
-	case DHCPV6_OPT_NISP_DOMAIN:
-		return ("Network Information Service V2 Domain Name");
 	case DHCPV6_OPT_SNTP_SERVERS:
 		return ("Simple Network Time Protocol Servers");
 	case DHCPV6_OPT_INFO_REFTIME:
@@ -910,7 +904,6 @@ show_options(const uint8_t *data, int len)
 		case DHCPV6_OPT_SIP_NAMES:
 		case DHCPV6_OPT_DNS_SEARCH:
 		case DHCPV6_OPT_NIS_DOMAIN:
-		case DHCPV6_OPT_NISP_DOMAIN:
 		case DHCPV6_OPT_BCMCS_SRV_D: {
 			dhcp_symbol_t *symp;
 			char *sp2;
@@ -939,7 +932,6 @@ show_options(const uint8_t *data, int len)
 		case DHCPV6_OPT_SIP_ADDR:
 		case DHCPV6_OPT_DNS_ADDR:
 		case DHCPV6_OPT_NIS_SERVERS:
-		case DHCPV6_OPT_NISP_SERVERS:
 		case DHCPV6_OPT_SNTP_SERVERS:
 		case DHCPV6_OPT_BCMCS_SRV_A:
 			while (olen >= sizeof (in6_addr_t)) {

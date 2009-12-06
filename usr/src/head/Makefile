@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # head/Makefile
@@ -246,7 +246,6 @@ RPCSVC_SRC_HDRS =	\
 	daemon_utils.h	\
 	dbm.h		\
 	nis_db.h	\
-	nis_tags.h	\
 	nislib.h	\
 	svc_dg_priv.h	\
 	yp_prot.h	\
@@ -262,8 +261,6 @@ RPCSVC_GEN_HDRS = \
 	nfs_prot.h	\
 	nfs4_prot.h	\
 	nis.h		\
-	nis_cache.h	\
-	nis_callback.h	\
 	nlm_prot.h	\
 	rex.h		\
 	rquota.h	\
@@ -271,7 +268,6 @@ RPCSVC_GEN_HDRS = \
 	rusers.h	\
 	rwall.h		\
 	spray.h		\
-	nispasswd.h	\
 	ufs_prot.h	\
 	nfs_acl.h
 
@@ -284,7 +280,6 @@ SYMHDRFLOAT = $(ROOT)/usr/include/iso/float_iso.h
 SYMHDRISO646 = $(ROOT)/usr/include/iso/iso646_iso.h
 
 RPCGENFLAGS = -C -h
-rpcsvc/nispasswd.h :=	RPCGENFLAGS += -M
 rpcsvc/rwall.h :=	RPCGENFLAGS += -M
 meta_basic.h :=	RPCGENFLAGS += -M
 metad.h := RPCGENFLAGS += -M

@@ -124,17 +124,6 @@ extern "C" {
 /* account module functions */
 #define	PAM_SM_ACCT_MGMT		"pam_sm_acct_mgmt"
 
-/*
- * Definitions shared by passwd.c and the UNIX module
- */
-
-#define	PAM_REP_DEFAULT	0x0
-#define	PAM_REP_FILES	0x01
-#define	PAM_REP_NIS	0x02
-#define	PAM_REP_NISPLUS	0x04
-#define	PAM_REP_LDAP	0x10
-#define	PAM_OPWCMD	0x08	/* for nispasswd, yppasswd */
-
 /* max # of authentication token attributes */
 #define	PAM_MAX_NUM_ATTR	10
 

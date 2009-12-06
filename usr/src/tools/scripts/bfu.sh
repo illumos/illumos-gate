@@ -2099,15 +2099,11 @@ smf_apply_conf () {
 
 	grep ldap $rootprefix/etc/nsswitch.conf >/dev/null 2>&1
 	is_ldap=$?
-	grep nisplus $rootprefix/etc/nsswitch.conf >/dev/null 2>&1
-	is_nisplus=$?
 	grep nis $rootprefix/etc/nsswitch.conf >/dev/null 2>&1
 	is_nis=$?
 
 	if [ $is_ldap  = 0 ]; then
 		ns_profile=ns_ldap.xml
-	elif [ $is_nisplus = 0  ]; then
-		ns_profile=ns_nisplus.xml
 	elif [ $is_nis = 0 ]; then
 		ns_profile=ns_nis.xml
 	else
@@ -4042,6 +4038,78 @@ rbac_cleanup()
 	print "\n"
 }
 
+# Remove EOF NIS+ 
+
+remove_eof_nisplus()
+{
+	# We don't attempt to remove packages like SUNWnisu, SUNWnisr as they contain
+	# the binaries and libraries required for NIS and LDAP.
+	# We do it manually.
+
+	print "Removing NIS+ from Solaris... \n"
+
+	# directories.
+	rm -rf $usr/usr/lib/nis
+	rm -rf $usr/usr/share/lib/locale/com/sun/dhcpmgr/client/SUNWnisplus
+	rm -rf $root/var/nis
+
+	# files and symlinks.
+	rm -f $root/etc/default/rpc.nisd
+	rm -f $root/etc/nsswitch.nisplus
+	rm -f $root/lib/nss_nisplus.so.1
+	rm -f $root/lib/svc/method/nisplus
+	rm -f $root/lib/sparcv9/nss_nisplus.so.1
+	rm -f $root/lib/amd64/nss_nisplus.so.1
+	rm -f $root/var/svc/profile/ns_nisplus.xml
+	rm -f $root/var/svc/manifest/network/rpc/nisplus.xml
+	rm -f $usr/bin/nisaddcred
+	rm -f $usr/bin/niscat
+	rm -f $usr/bin/nischgrp
+	rm -f $usr/bin/nischmod
+	rm -f $usr/bin/nischown
+	rm -f $usr/bin/nischttl
+	rm -f $usr/bin/nisdefaults
+	rm -f $usr/bin/niserror
+	rm -f $usr/bin/nisgrep
+	rm -f $usr/bin/nisgrpadm
+	rm -f $usr/bin/nisln
+	rm -f $usr/bin/nisls
+	rm -f $usr/bin/nismatch
+	rm -f $usr/bin/nismkdir
+	rm -f $usr/bin/nispasswd
+	rm -f $usr/bin/nispath
+	rm -f $usr/bin/nisprefadm
+	rm -f $usr/bin/nisrm
+	rm -f $usr/bin/nisrmdir
+	rm -f $usr/bin/nistbladm
+	rm -f $usr/bin/nistest
+	rm -f $usr/include/rpcsvc/nis_tags.h
+	rm -f $usr/include/rpcsvc/nis_cache.h
+	rm -f $usr/include/rpcsvc/nis_cache.x
+	rm -f $usr/include/rpcsvc/nispasswd.h
+	rm -f $usr/include/rpcsvc/nispasswd.x
+	rm -f $usr/include/rpcsvc/nis_callback.h
+	rm -f $usr/include/rpcsvc/nis_callback.x
+	rm -f $usr/lib/amd64/nss_nisplus.so.1
+	rm -f $usr/lib/inet/dhcp/svc/ds_SUNWnisplus.so.0
+	rm -f $usr/lib/inet/dhcp/svc/ds_SUNWnisplus.so.1
+	rm -f $usr/lib/inet/dhcp/svc/ds_SUNWnisplus.so
+	rm -f $usr/lib/nscd_nischeck
+	rm -f $usr/lib/nss_nisplus.so.1
+	rm -f $usr/lib/sparcv9/nss_nisplus.so.1
+	rm -f $usr/sadm/admin/dhcpmgr/SUNWnisplus.jar
+	rm -f $usr/sbin/nis_cachemgr
+	rm -f $usr/sbin/nisbackup
+	rm -f $usr/sbin/nisinit
+	rm -f $usr/sbin/nisldapmaptest
+	rm -f $usr/sbin/nislog
+	rm -f $usr/sbin/nisrestore
+	rm -f $usr/sbin/rpc.nisd
+	rm -f $usr/sbin/rpc.nisd_resolv
+	rm -f $usr/sbin/rpc.nispasswdd
+	rm -f $usr/share/lib/locale/com/sun/dhcpmgr/client/SUNWnisplus/ResourceBundle.properties
+
+}
 crypto_cleanup()
 {
 	# This function will remove no longer needed cryptography
@@ -8429,6 +8497,14 @@ mondo_loop() {
 	if [[ $zone = global && -f $rootprefix/etc/datalink.conf ]]; then
 		rm -f $rootprefix/etc/datalink.conf
 	fi
+
+        # Remove EOF NIS+ 
+        if [ -d $rootprefix/var/nis -o \
+             -d $usr/lib/nis ]; then
+		print "Disabling NIS+ ..."
+	     	svcadm disable network/rpc/nisplus
+                remove_eof_nisplus
+        fi
 
 	#
 	# Force xVM privilege fixups to occur on next boot.

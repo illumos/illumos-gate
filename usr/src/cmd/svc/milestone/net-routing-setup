@@ -64,7 +64,7 @@ fi
 # configuration file.  The file can contain the hostnames or IP
 # addresses of one or more default routers.  If hostnames are used,
 # each hostname must also be listed in the local "/etc/hosts" file
-# because NIS and NIS+ are not running at the time that this script is
+# because NIS is not running at the time that this script is
 # run.  Each router name or address is listed on a single line by
 # itself in the file.  Anything else on that line after the router's
 # name or address is ignored.  Lines that begin with "#" are

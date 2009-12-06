@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,9 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
- * Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * DoPrinterNS class
@@ -578,26 +575,6 @@ public class DoPrinterNS
 			    "SVR: User does not have NIS update access.");
 			throw new pmAuthException(getstderr());
 		}
-	} else if (nsname.equals("nisplus")) {
-		String cmd = null;
-		SysCommand syscmd = new SysCommand();
-
-		cmd = "/usr/bin/lpset -n " + nsname;
-		cmd = cmd.concat(" -a testauth=true _pmTestAuthToken");
-		syscmd.exec(cmd);
-		int ret = syscmd.getExitValue();
-		String err = syscmd.getError();
-		syscmd = null;
-		if (ret != 0) {
-			Debug.error(
-			    "SVR: User does not have NIS+ update priveleges.");
-			syscmd = null;
-			throw new pmAuthException(err);
-		}
-		syscmd = new SysCommand();
-		cmd = "/usr/bin/lpset -n " + nsname + " -x _pmTestAuthToken";
-		syscmd.exec(cmd);
-		syscmd = null;
 	} else if (nsname.equals("ldap")) {
 		int ret = updateldap("add", host, user, passwd,
 		    "_pmTestAuthToken", null, null, null, "false");

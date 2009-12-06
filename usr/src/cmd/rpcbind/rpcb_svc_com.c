@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -34,7 +34,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * rpcb_svc_com.c
  * The commom server procedure for the rpcbind.
@@ -70,7 +69,6 @@
 #include <rpcsvc/mount.h>
 #include <nfs/nfs_acl.h>
 #include <rpc/key_prot.h>
-#include <rpcsvc/nispasswd.h>
 #include <rpcsvc/yp_prot.h>
 #include <rpcsvc/rquota.h>
 #include <rpcsvc/yppasswd.h>
@@ -1374,7 +1372,7 @@ my_svc_run()
 			memset(pollfds, 0, sizeof (pollfds));
 			p = pollfds;
 			for (in = svc_pollfd, n = 0; n < svc_max_pollfd;
-					n++, in++) {
+			    n++, in++) {
 				if ((in->fd >= 0) && active_fd(in->fd)) {
 					p->fd = in->fd;
 					p->events = MASKVAL;
@@ -1840,8 +1838,8 @@ del_pmaplist(RPCB *arg)
 	}
 	for (prevpml = NULL, pml = list_pml; pml; /* cstyle */) {
 		if ((pml->pml_map.pm_prog != arg->r_prog) ||
-			(pml->pml_map.pm_vers != arg->r_vers) ||
-			(prot && (pml->pml_map.pm_prot != prot))) {
+		    (pml->pml_map.pm_vers != arg->r_vers) ||
+		    (prot && (pml->pml_map.pm_prot != prot))) {
 			/* both pml & prevpml move forwards */
 			prevpml = pml;
 			pml = pml->pml_next;

@@ -162,35 +162,10 @@ MMS Administrator:solaris:cmd:::/usr/bin/mmsinit:uid=0
 MMS Administrator:solaris:cmd:::/usr/bin/mmsadm:uid=0
 MMS Operator:solaris:cmd:::/usr/bin/mmsadm:uid=0;privs=file_dac_read
 MMS User:solaris:cmd:::/usr/bin/mmsmnt:uid=0;privs=file_dac_read
-Name Service Management:suser:cmd:::/usr/bin/nischttl:euid=0
-Name Service Management:suser:cmd:::/usr/bin/nisln:euid=0
-Name Service Management:suser:cmd:::/usr/lib/nis/nisctl:euid=0
-Name Service Management:suser:cmd:::/usr/lib/nis/nisping:euid=0
-Name Service Management:suser:cmd:::/usr/lib/nis/nisshowcache:euid=0
-Name Service Management:suser:cmd:::/usr/lib/nis/nisstat:euid=0
 Name Service Management:suser:cmd:::/usr/sbin/nscd:euid=0
 Name Service Security:suser:cmd:::/usr/bin/chkey:euid=0
-Name Service Security:suser:cmd:::/usr/bin/nisaddcred:euid=0
-Name Service Security:suser:cmd:::/usr/bin/nischgrp:euid=0
-Name Service Security:suser:cmd:::/usr/bin/nischmod:euid=0
-Name Service Security:suser:cmd:::/usr/bin/nischown:euid=0
-Name Service Security:suser:cmd:::/usr/bin/nisgrpadm:euid=0
-Name Service Security:suser:cmd:::/usr/bin/nismkdir:euid=0
-Name Service Security:suser:cmd:::/usr/bin/nispasswd:euid=0
-Name Service Security:suser:cmd:::/usr/bin/nisrm:euid=0
-Name Service Security:suser:cmd:::/usr/bin/nisrmdir:euid=0
-Name Service Security:suser:cmd:::/usr/bin/nistbladm:euid=0
-Name Service Security:suser:cmd:::/usr/lib/nis/nisaddent:euid=0
-Name Service Security:suser:cmd:::/usr/lib/nis/nisclient:uid=0
-Name Service Security:suser:cmd:::/usr/lib/nis/nispopulate:euid=0
-Name Service Security:suser:cmd:::/usr/lib/nis/nisserver:uid=0
-Name Service Security:suser:cmd:::/usr/lib/nis/nissetup:euid=0
-Name Service Security:suser:cmd:::/usr/lib/nis/nisupdkeys:euid=0
 Name Service Security:suser:cmd:::/usr/sbin/ldapclient:uid=0
 Name Service Security:suser:cmd:::/usr/sbin/newkey:euid=0
-Name Service Security:suser:cmd:::/usr/sbin/nisinit:euid=0
-Name Service Security:suser:cmd:::/usr/sbin/nislog:euid=0
-Name Service Security:suser:cmd:::/usr/sbin/rpc.nisd:uid=0;gid=0
 Network Management:solaris:cmd:::/sbin/ifconfig:uid=0
 Network Management:solaris:cmd:::/sbin/route:privs=sys_ip_config
 Network Management:solaris:cmd:::/sbin/routeadm:euid=0;\

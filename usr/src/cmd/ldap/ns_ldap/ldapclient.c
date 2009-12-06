@@ -162,11 +162,6 @@
 #define	NSSWITCH_BACK		LDAP_RESTORE_DIR "/" NSSWITCH_FILE
 #define	NSSWITCH_LDAP		"/etc/nsswitch.ldap"
 
-#define	NIS_COLDSTART_DIR	"/var/nis"
-#define	NIS_COLDSTART_FILE	"NIS_COLD_START"
-#define	NIS_COLDSTART		NIS_COLDSTART_DIR "/" NIS_COLDSTART_FILE
-#define	NIS_COLDSTART_BACK	LDAP_RESTORE_DIR "/" NIS_COLDSTART_FILE
-
 #define	YP_BIND_DIR		"/var/yp/binding"
 
 /* Define the service FMRIs */
@@ -174,7 +169,6 @@
 #define	NSCD_FMRI		"system/name-service-cache:default"
 #define	AUTOFS_FMRI		"system/filesystem/autofs:default"
 #define	LDAP_FMRI		"network/ldap/client:default"
-#define	NISD_FMRI		"network/rpc/nisplus:default"
 #define	YP_FMRI			"network/nis/client:default"
 #define	NS_MILESTONE_FMRI	"milestone/name-services:default"
 
@@ -193,9 +187,6 @@
 #define	TO_DEV_NULL		" >/dev/null 2>&1"
 
 /* Files that need to be just removed */
-#define	NIS_PRIVATE_CACHE	"/var/nis/.NIS_PRIVATE_DIRCACHE"
-#define	NIS_SHARED_CACHE	"/var/nis/NIS_SHARED_DIRCACHE"
-#define	NIS_CLIENT_INFO		"/var/nis/client_info"
 #define	LDAP_CACHE_LOG		"/var/ldap/cachemgr.log"
 
 /* Output defines to supress if quiet mode set */
@@ -244,7 +235,6 @@ static int gen = 0;
 
 static int gStartLdap = 0;
 static int gStartYp = 0;
-static int gStartNisd = 0;
 
 static int enableFlag = 0;
 
@@ -2062,21 +2052,6 @@ stop_services(int saveState)
 			    stderr);
 	}
 
-	if (!is_service(NISD_FMRI, SCF_STATE_STRING_DISABLED)) {
-		if (mode_verbose)
-			CLIENT_FPUTS(gettext("Stopping nisd\n"), stderr);
-		ret = disable_service(NISD_FMRI, B_TRUE);
-		if (ret != CLIENT_SUCCESS) {
-			CLIENT_FPRINTF(stderr, gettext("Stopping nisd "
-			    "failed with (%d)\n"), ret);
-			return (CLIENT_ERR_FAIL);
-		}
-	} else {
-		if (mode_verbose)
-			CLIENT_FPUTS(gettext("nisd not running\n"),
-			    stderr);
-	}
-
 	if (!is_service(YP_FMRI, SCF_STATE_STRING_DISABLED)) {
 		if (saveState)
 			gStartYp = START_RESET;
@@ -2158,7 +2133,7 @@ start_services(int flag)
 
 	/*
 	 * We can be starting services after an init in which case
-	 * we want to start ldap and not start yp or nis+.
+	 * we want to start ldap and not start yp.
 	 */
 	if (flag == START_INIT) {
 		sysret = system(cmd_domain_start);
@@ -2210,7 +2185,7 @@ start_services(int flag)
 				retcode = CLIENT_ERR_FAIL;
 
 		}
-		/* No YP or NIS+ after init */
+		/* No YP after init */
 	/*
 	 * Or we can be starting services after an uninit or error
 	 * recovery.  We want to start whatever services were running
@@ -2249,12 +2224,6 @@ start_services(int flag)
 			if (!(is_service(YP_FMRI, SCF_STATE_STRING_ONLINE)))
 				(void) start_service(YP_FMRI, B_TRUE);
 		}
-
-		if (gStartNisd == flag) {
-			if (!(is_service(NISD_FMRI, SCF_STATE_STRING_ONLINE)))
-				(void) start_service(NISD_FMRI, B_TRUE);
-		}
-
 	}
 	if ((enableFlag & AUTOFS_ON) &&
 	    !(is_service(AUTOFS_FMRI, SCF_STATE_STRING_ONLINE)))
@@ -2740,27 +2709,6 @@ recover(int saveState)
 			    ldap_cred_back, NSCREDFILE);
 	}
 
-	/* Check for recovery of NIS+ */
-	stat_ret = stat(NIS_COLDSTART_BACK, &buf);
-	if (mode_verbose)
-		CLIENT_FPRINTF(stderr,
-		    gettext("recover: stat(%s)=%d\n"),
-		    NIS_COLDSTART_BACK, stat_ret);
-	if (stat_ret == 0) {
-		if (saveState) {
-			gStartNisd = START_UNINIT;
-		}
-		if (mode_verbose)
-			CLIENT_FPRINTF(stderr,
-			    gettext("recover: file_move(%s, %s)\n"),
-			    NIS_COLDSTART_BACK, NIS_COLDSTART);
-		retcode = file_move(NIS_COLDSTART_BACK, NIS_COLDSTART);
-		if (retcode != 0)
-			CLIENT_FPRINTF(stderr,
-			    gettext("recover: file_move(%s, %s) failed!\n"),
-			    NIS_COLDSTART_BACK, NIS_COLDSTART);
-	}
-
 	/* Check for recovery of NIS(YP) if we have a domainname */
 	if (domain) {
 		/* "name" would have to be huge for this, but just in case */
@@ -2856,7 +2804,7 @@ file_backup(void)
 {
 	struct stat buf;
 	int domain_stat, conf_stat, ldap_stat;
-	int nis_stat, yp_stat, restore_stat;
+	int yp_stat, restore_stat;
 	int retcode, namelen, ret;
 	char yp_dir[BUFSIZ], yp_dir_back[BUFSIZ];
 	char name[BUFSIZ];
@@ -2952,31 +2900,6 @@ file_backup(void)
 				    "file.\n"),
 				    DOMAINNAME);
 			}
-	}
-
-	nis_stat = stat(NIS_COLDSTART, &buf);
-	if (mode_verbose)
-		CLIENT_FPRINTF(stderr,
-		    gettext("file_backup: stat(%s)=%d\n"),
-		    NIS_COLDSTART, nis_stat);
-	if (nis_stat == 0) {
-		if (mode_verbose)
-			CLIENT_FPRINTF(stderr,
-			    gettext("file_backup: (%s -> %s)\n"),
-			    NIS_COLDSTART, NIS_COLDSTART_BACK);
-		retcode = file_move(NIS_COLDSTART, NIS_COLDSTART_BACK);
-		if (retcode != 0) {
-			CLIENT_FPRINTF(stderr,
-			    gettext("file_backup: file_move(%s, %s) failed "
-			    "with %d\n"),
-			    NIS_COLDSTART, NIS_COLDSTART_BACK, retcode);
-			ret = CLIENT_ERR_RENAME;
-		}
-	} else {
-		if (mode_verbose)
-			CLIENT_FPRINTF(stderr,
-			    gettext("file_backup: No %s file.\n"),
-			    NIS_COLDSTART);
 	}
 
 	namelen = BUFSIZ;

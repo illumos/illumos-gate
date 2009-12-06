@@ -90,7 +90,6 @@ public class pmTop extends JPanel {
     NameService ns = null;
     NameService nisns = null;
     NameService systemns = null;
-    NameService nisplusns = null;
     NameService ldapns = null;
 
     pmAccess accessView = null;
@@ -133,11 +132,6 @@ public class pmTop extends JPanel {
 		nisns = new NameService("nis");
 	} catch (Exception e) {
 		Debug.message("CLNT:  nis:Nameservice exception " + e);
-	}
-	try {
-		nisplusns = new NameService("nisplus");
-	} catch (Exception e) {
-		Debug.message("CLNT:  nisplus:Nameservice exception " + e);
 	}
 	try {
 		ldapns = new NameService("ldap");
@@ -891,9 +885,6 @@ public class pmTop extends JPanel {
 	} else if (newNS.equals("NIS")) {
 		serverNS = new String("nis");
 		useLocalhost.setState(false);
-	} else if (newNS.equals("NIS+")) {
-		serverNS = new String("nisplus");
-		useLocalhost.setState(false);
 	} else if (newNS.equals("LDAP")) {
 		serverNS = new String("ldap");
 		useLocalhost.setState(false);
@@ -914,9 +905,6 @@ public class pmTop extends JPanel {
 		} else if (newNS.equals("NIS")) {
 			useLocalhost.setState(false);
 			ns = nisns;
-		} else if (newNS.equals("NIS+")) {
-			useLocalhost.setState(false);
-			ns = nisplusns;
 		} else if (newNS.equals("LDAP")) {
 			useLocalhost.setState(false);
 			ns = ldapns;
@@ -964,7 +952,7 @@ public class pmTop extends JPanel {
 				m.setVisible(true);
                 	} catch (Exception e) {
                             Debug.message(
-                                "CLNT:pmTop:login nis/nis+/ldap failed: " + e);
+                                "CLNT:pmTop:login nis/ldap failed: " + e);
 			    runningAuth = false;
 			    pmMessageDialog m = new pmMessageDialog(
 				    loadView.frame,

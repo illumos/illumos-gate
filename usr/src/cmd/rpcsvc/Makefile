@@ -37,14 +37,12 @@ TPROG= rpc.rstatd
 PROG= $(BINPROG) $(SBINPROG) $(RPROG) $(SPROG) $(WPROG) $(TPROG)
 
 MANIFEST= \
-	nisplus.xml \
 	rusers.xml \
 	spray.xml \
 	wall.xml \
 	rstat.xml
 
-SVCMETHOD= \
-	nisplus
+SVCMETHOD=
 
 SCLNTOBJS= spray.o spray_clnt.o
 SSVCOBJS= spray_subr.o spray_svc.o
@@ -70,8 +68,7 @@ $(TPROG) :=	LDLIBS += -lrpcsvc
 spray :=	LDLIBS += -lrpcsvc
 
 
-SUBDIRS= rpc.bootparamd nis/utils nis/bin nis/cachemgr nis/rpc.nisd \
-	 nis/rpc.nispasswdd
+SUBDIRS= rpc.bootparamd
 OBJS= $(SCLNTOBJS) $(SSVCOBJS) $(WCLNTOBJS) $(WSVCOBJS) $(TSVCOBJS)
 SRCS= $(OBJS:%.o=%.c) rusers.c rpc.rusersd.c rup.c
 
@@ -85,7 +82,6 @@ RWALL= $(NETSVC)/rwall
 RUSERS= $(NETSVC)/rusers
 SPRAY= $(NETSVC)/spray
 RSTAT= $(NETSVC)/rstat
-ROOTVAR_NIS= $(ROOT)/var/nis
 
 ROOTDIRS= \
 		$(NETSVC) \
@@ -93,8 +89,7 @@ ROOTDIRS= \
 		$(RWALL) \
 		$(RUSERS) \
 		$(SPRAY) \
-		$(RSTAT) \
-		$(ROOTVAR_NIS)
+		$(RSTAT)
 
 IBINPROG=		$(BINPROG:%=$(ROOTBIN)/%)
 ISBINPROG=		$(SBINPROG:%=$(ROOTUSRSBIN)/%)

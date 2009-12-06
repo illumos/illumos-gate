@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <errno.h>
@@ -48,8 +45,7 @@ int nis_getattr(char *name, attrlist *item, pwu_repository_t *rep);
 int nis_getpwnam(char *name, attrlist *items, pwu_repository_t *rep,
     void **buf);
 int nis_update(attrlist *items, pwu_repository_t *rep, void *buf);
-int nis_putpwnam(char *name, char *oldpw, char *dummy,
-	pwu_repository_t *rep, void *buf);
+int nis_putpwnam(char *name, char *oldpw, pwu_repository_t *rep, void *buf);
 int nis_user_to_authenticate(char *user, pwu_repository_t *rep,
 	char **auth_user, int *privileged);
 
@@ -317,7 +313,7 @@ nis_getpwnam(char *name, attrlist *items, pwu_repository_t *rep,
 
 	if (yp_master(nisbuf->domain, "passwd.byname", &nisbuf->master) != 0) {
 		syslog(LOG_ERR,
-			"passwdutil.so: can't get master for passwd map");
+		    "passwdutil.so: can't get master for passwd map");
 		if (nisbuf->master)
 			free(nisbuf->master);
 		free(nisbuf->pwd);
@@ -326,8 +322,8 @@ nis_getpwnam(char *name, attrlist *items, pwu_repository_t *rep,
 	}
 
 	nisresult = yp_match(nisbuf->domain, "passwd.byname", name,
-				strlen(name), &(nisbuf->scratch),
-				&(nisbuf->scratchlen));
+	    strlen(name), &(nisbuf->scratch),
+	    &(nisbuf->scratchlen));
 	if (nisresult != 0) {
 		(void) free(nisbuf->pwd);
 		if (nisbuf->scratch)
@@ -357,8 +353,8 @@ nis_getpwnam(char *name, attrlist *items, pwu_repository_t *rep,
 		keylen = strlen(key);
 
 		nisresult = yp_match(nisbuf->domain, "passwd.adjunct.byname",
-				key, keylen, &(nisbuf->c2scratch),
-				&(nisbuf->c2scratchlen));
+		    key, keylen, &(nisbuf->c2scratch),
+		    &(nisbuf->c2scratchlen));
 
 		if (nisresult == 0 && nisbuf->c2scratch != NULL) {
 			/* Skip username (first field), and pick up password */
@@ -450,16 +446,14 @@ nis_update(attrlist *items, pwu_repository_t *rep, void *buf)
 }
 
 /*
- * nis_putpwnam(name, oldpw, dummy, rep, buf)
+ * nis_putpwnam(name, oldpw, rep, buf)
  *
  * Update the NIS server. The passwd structure in buf will be sent to
  * the server for user "name" authenticating with password "oldpw".
- * The dummy parameter is a placeholder where for NIS+ where the
- * old RPC password is passwd.
  */
 /*ARGSUSED*/
 int
-nis_putpwnam(char *name, char *oldpw, char *dummy, pwu_repository_t *rep,
+nis_putpwnam(char *name, char *oldpw, pwu_repository_t *rep,
 	void *buf)
 {
 	nisbuf_t *nisbuf = (nisbuf_t *)buf;
@@ -484,24 +478,24 @@ nis_putpwnam(char *name, char *oldpw, char *dummy, pwu_repository_t *rep,
 		nconf = getnetconfigent("ticlts");
 		if (!nconf) {
 			syslog(LOG_ERR,
-				"passwdutil.so: Couldn't get netconfig entry");
+			    "passwdutil.so: Couldn't get netconfig entry");
 			return (PWU_SYSTEM_ERROR);
 		}
 		client = clnt_tp_create(nisbuf->master, YPPASSWDPROG,
-					YPPASSWDVERS, nconf);
+		    YPPASSWDVERS, nconf);
 		freenetconfigent(nconf);
 	} else {
 		/* Try IPv6 first */
 		client = clnt_create(nisbuf->master, YPPASSWDPROG,
-					YPPASSWDVERS, "udp6");
+		    YPPASSWDVERS, "udp6");
 		if (client == NULL)
 			client = clnt_create(nisbuf->master, YPPASSWDPROG,
-						YPPASSWDVERS, "udp");
+			    YPPASSWDVERS, "udp");
 	}
 
 	if (client == NULL) {
 		syslog(LOG_ERR,
-			"passwdutil.so: couldn't create client to YP master");
+		    "passwdutil.so: couldn't create client to YP master");
 		return (PWU_SERVER_ERROR);
 	}
 
@@ -509,7 +503,7 @@ nis_putpwnam(char *name, char *oldpw, char *dummy, pwu_repository_t *rep,
 	timeout.tv_sec = 55;	/* ndp uses 55 seconds */
 
 	ans = CLNT_CALL(client, YPPASSWDPROC_UPDATE, xdr_yppasswd,
-		(char *)&yppasswd, xdr_int, (char *)&ok, timeout);
+	    (char *)&yppasswd, xdr_int, (char *)&ok, timeout);
 
 	if (nisbuf->pwd)
 		(void) free(nisbuf->pwd);

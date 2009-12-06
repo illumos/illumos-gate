@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 1995-2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -46,30 +43,8 @@ i depend
 #
 d none usr 755 root sys
 d none usr/bin 755 root bin
-f none usr/bin/aliasadm 555 root bin
 f none usr/bin/chkey 4555 root sys
 f none usr/bin/ldaplist 555 root bin
-f none usr/bin/nisaddcred 555 root bin
-f none usr/bin/niscat 555 root bin
-f none usr/bin/nischgrp 555 root bin
-l none usr/bin/nischmod=../../usr/bin/nischgrp
-l none usr/bin/nischown=../../usr/bin/nischgrp
-l none usr/bin/nischttl=../../usr/bin/nischgrp
-f none usr/bin/nisdefaults 555 root bin
-f none usr/bin/niserror 555 root bin
-f none usr/bin/nisgrep 555 root bin
-f none usr/bin/nisgrpadm 555 root bin
-f none usr/bin/nisln 555 root bin
-f none usr/bin/nisls 555 root bin
-f none usr/bin/nismatch 555 root bin
-f none usr/bin/nismkdir 555 root bin
-f none usr/bin/nispasswd 555 root bin
-f none usr/bin/nispath 555 root bin
-f none usr/bin/nisrm 555 root bin
-f none usr/bin/nisrmdir 555 root bin
-f none usr/bin/nistbladm 555 root bin
-f none usr/bin/nisprefadm 555 root bin
-f none usr/bin/nistest 555 root bin
 f none usr/bin/ypcat 555 root other
 f none usr/bin/ypmatch 555 root other
 f none usr/bin/ypwhich 555 root other
@@ -87,34 +62,12 @@ f none usr/lib/netsvc/yp/ypbind 555 root bin
 f none usr/lib/netsvc/yp/ypxfr 555 root bin
 f none usr/lib/netsvc/yp/ypstart 555 root bin
 f none usr/lib/netsvc/yp/ypstop 555 root bin
-d none usr/lib/nis 755 root bin
-f none usr/lib/nis/nisaddent 555 root bin
-f none usr/lib/nis/nisauthconf 555 root bin
-f none usr/lib/nis/nisctl 555 root bin
-f none usr/lib/nis/nisclient 755 root bin
-f none usr/lib/nis/nisopaccess 755 root bin
-f none usr/lib/nis/nisping 555 root bin
-f none usr/lib/nis/nispopulate 755 root bin
-f none usr/lib/nis/nisserver 755 root bin
-f none usr/lib/nis/nissetup 755 root bin
-f none usr/lib/nis/nisshowcache 555 root bin
-f none usr/lib/nis/nisstat 555 root bin
-f none usr/lib/nis/nisupdkeys 555 root bin
 d none usr/sbin 755 root bin
 f none usr/sbin/gettable 555 root bin
 f none usr/sbin/htable 555 root bin
 f none usr/sbin/ldapclient 555 root bin
 f none usr/sbin/ldapaddent 555 root bin
 f none usr/sbin/newkey 555 root sys
-f none usr/sbin/nis_cachemgr 555 root bin
-f none usr/sbin/nisbackup 555 root bin
-f none usr/sbin/nisinit 555 root bin
-f none usr/sbin/nisldapmaptest 555 root bin
-f none usr/sbin/nislog 555 root bin
-f none usr/sbin/nisrestore 555 root bin
-f none usr/sbin/rpc.nisd 555 root bin
-f none usr/sbin/rpc.nisd_resolv 555 root bin
-f none usr/sbin/rpc.nispasswdd 555 root bin
 f none usr/sbin/rpc.rexd 555 root bin
 f none usr/sbin/ypalias 555 root bin
 f none usr/sbin/ypinit 555 root bin

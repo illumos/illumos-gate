@@ -20,15 +20,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # This is third phase of TCP/IP startup/configuration.  This script
-# runs after the NIS/NIS+ startup script.  We run things here that may
-# depend on NIS/NIS+ maps.
+# runs after the NIS startup script.  We run things here that may
+# depend on NIS maps.
 #
 
 . /lib/svc/share/smf_include.sh

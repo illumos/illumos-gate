@@ -211,8 +211,6 @@ extern void interpret_nfs4_cb(int, int, int, int, int, char *, int);
 extern void interpret_nfs_acl(int, int, int, int, int, char *, int);
 extern void interpret_nis(int, int, int, int, int, char *, int);
 extern void interpret_nisbind(int, int, int, int, int, char *, int);
-extern void interpret_nisp_cb(int, int, int, int, int, char *, int);
-extern void interpret_nisplus(int, int, int, int, int, char *, int);
 extern void interpret_nlm(int, int, int, int, int, char *, int);
 extern void interpret_pmap(int, int, int, int, int, char *, int);
 extern int interpret_reserved(int, int, in_port_t, in_port_t, char *, int);

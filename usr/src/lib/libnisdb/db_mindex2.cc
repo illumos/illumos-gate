@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright (c) 2001 by Sun Microsystems, Inc.
- *	All Rights Reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 
@@ -46,8 +43,6 @@
 #include "ldap_scheme.h"
 #include "ldap_parse.h"
 #include "nis_hashitem.h"
-#include "nis_servlist.h"
-#include "ldap_nisplus.h"
 #include "nis_db.h"
 #include "ldap_glob.h"
 
@@ -147,6 +142,8 @@ db_mindex::getTable(void) {
 	return (table);
 }
 
+static void                    setOid(nis_object *obj);
+
 extern void	db_free_result(db_result *);
 
 zotypes
@@ -201,11 +198,7 @@ updateMappingObj(__nis_table_mapping_t *t, char **objNameP,
 				if (!setMappingObjTypeEtc(t, o))
 					nis_destroy_object(o);
 
-				if (isMasterP != 0)
-					*isMasterP = t->isMaster;
 			} else {
-				if (isMasterP != 0)
-					*isMasterP = isMaster(o);
 				nis_destroy_object(o);
 			}
 		} else if (lstat != LDAP_SUCCESS) {
@@ -294,8 +287,6 @@ selectMapping(db_table *table, nis_object *obj, db_query *qin,
 		 * If caller wants a mapping suitable for writing,
 		 * check that we're the master for this object.
 		 */
-		if (wantWrite && !t->isMaster)
-			return (0);
 
 		return (t);
 	}
@@ -1687,4 +1678,16 @@ db_mindex::storeLDAP(db_query *qin, entry_object *obj, nis_object *o,
 	}
 
 	return (stat);
+}
+/*
+ * Sets the oid (i.e., the creation and modification times) for the
+ * specified object. In order to avoid retrieving the old incarnation
+ * (if any) from the DB first, we're punting and setting both mtime
+ * and ctime to the current time.
+ */
+static void
+setOid(nis_object *obj) {
+        if (obj != 0) {
+                obj->zo_oid.ctime = obj->zo_oid.mtime = time(0);
+        }
 }

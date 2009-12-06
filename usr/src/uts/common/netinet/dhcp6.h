@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _DHCP6_H
 #define	_DHCP6_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This header file describes constants and on-the-wire data structures used
@@ -112,9 +110,7 @@ extern "C" {
 #define	DHCPV6_OPT_IA_PD	25	/* Delegate dhcpv6_ia_na (RFC3633) */
 #define	DHCPV6_OPT_IAPREFIX	26	/* Prefix dhcpv6_iaprefix (RFC3633) */
 #define	DHCPV6_OPT_NIS_SERVERS	27	/* NIS in6_addr_t array (RFC3898) */
-#define	DHCPV6_OPT_NISP_SERVERS	28	/* NIS+ in6_addr_t array (RFC3898) */
 #define	DHCPV6_OPT_NIS_DOMAIN	29	/* NIS Domain string (RFC3898) */
-#define	DHCPV6_OPT_NISP_DOMAIN	30	/* NIS+ Domain string (RFC3898) */
 #define	DHCPV6_OPT_SNTP_SERVERS	31	/* SNTP in6_addr_t array (RFC4075) */
 #define	DHCPV6_OPT_INFO_REFTIME	32	/* Info refresh uint32_t (RFC4242) */
 #define	DHCPV6_OPT_BCMCS_SRV_D	33	/* NUL-term string list (RFC4280) */

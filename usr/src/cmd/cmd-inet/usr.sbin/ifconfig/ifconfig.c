@@ -4542,7 +4542,7 @@ print_config_flags(int af, uint64_t flags)
 }
 
 /*
- * Use the configured directory lookup mechanism (e.g. files/NIS/NIS+/...)
+ * Use the configured directory lookup mechanism (e.g. files/NIS/...)
  * to find the network mask.  Returns true if we found one to set.
  *
  * The parameter addr_set controls whether we should get the address of

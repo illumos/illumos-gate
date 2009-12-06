@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 
@@ -51,16 +49,13 @@ normalize_ns_name(char *ns)
 	if (ns == NULL)
 		return (NULL);
 	else if ((strcasecmp(ns, "files") == 0) ||
-			(strcasecmp(ns, "system") == 0) ||
-			(strcasecmp(ns, "etc") == 0))
+	    (strcasecmp(ns, "system") == 0) ||
+	    (strcasecmp(ns, "etc") == 0))
 		return ("files");
 	else if (strcasecmp(ns, "nis") == 0)
 		return ("nis");
 	else if (strcasecmp(ns, "ldap") == 0)
 		return ("ldap");
-	else if ((strcasecmp(ns, "nisplus") == 0) ||
-			(strcasecmp(ns, "nis+") == 0))
-		return ("nisplus");
 	else
 		return (ns);
 }
@@ -86,7 +81,7 @@ ns_printer_destroy(ns_printer_t *printer)
 			extern void ns_kvp_destroy(ns_kvp_t *);
 
 			list_iterate((void **)printer->attributes,
-				(VFUNC_T)ns_kvp_destroy);
+			    (VFUNC_T)ns_kvp_destroy);
 			free(printer->attributes);
 		}
 		if (printer->aliases != NULL) {		/* aliases */
@@ -120,11 +115,11 @@ ns_printer_get_list(const char *ns)
 	ns = normalize_ns_name((char *)ns);
 	while (getprinterentry(buf, sizeof (buf), (char *)ns) == 0) {
 		ns_printer_t *printer =
-			(ns_printer_t *)_cvt_nss_entry_to_printer(buf, NULL);
+		    (ns_printer_t *)_cvt_nss_entry_to_printer(buf, NULL);
 
 		printer_list = (ns_printer_t **)list_append(
-					(void **)printer_list,
-					(void *)printer);
+		    (void **)printer_list,
+		    (void *)printer);
 	}
 
 	(void) endprinterentry();
@@ -180,7 +175,7 @@ ns_printer_put(const ns_printer_t *printer)
 		return (-1);
 
 	if (snprintf(func, sizeof (func), "%s_put_printer",
-		normalize_ns_name(printer->source)) >= sizeof (func)) {
+	    normalize_ns_name(printer->source)) >= sizeof (func)) {
 			syslog(LOG_ERR, "ns_printer_put: buffer overflow");
 			return (-1);
 	}

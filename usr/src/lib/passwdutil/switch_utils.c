@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,9 +41,6 @@
 
 #include "passwdutil.h"
 
-static struct passwd *nisplus_getpw_from_master(const char *, char *);
-static struct spwd *nisplus_getsp_from_master(const char *, char *);
-
 /*
  * name_to_int(rep)
  *
@@ -59,8 +56,6 @@ name_to_int(char *rep_name)
 		result = REP_FILES;
 	else if (strcmp(rep_name, "nis") == 0)
 		result = REP_NIS;
-	else if (strcmp(rep_name, "nisplus") == 0)
-		result = REP_NISPLUS;
 	else if (strcmp(rep_name, "ldap") == 0)
 		result = REP_LDAP;
 	else if (strcmp(rep_name, "compat") == 0) {
@@ -71,10 +66,7 @@ name_to_int(char *rep_name)
 		if (cfg == NULL) {
 			result = REP_FILES | REP_NIS;
 		} else {
-			if (strcmp(cfg->lookups->service_name, "nisplus") == 0)
-				result = REP_FILES | REP_NISPLUS;
-			else if (strcmp(cfg->lookups->service_name, "ldap") ==
-			    0)
+			if (strcmp(cfg->lookups->service_name, "ldap") == 0)
 				result = REP_FILES | REP_LDAP;
 			else
 				result = REP_ERANGE;
@@ -96,9 +88,7 @@ get_compat_mode(void)
 	int result = REP_COMPAT_NIS;
 
 	if ((cfg = __nsw_getconfig("passwd_compat", &pserr)) != NULL) {
-		if (strcmp(cfg->lookups->service_name, "nisplus") == 0)
-			result = REP_COMPAT_NISPLUS;
-		else if (strcmp(cfg->lookups->service_name, "ldap") == 0)
+		if (strcmp(cfg->lookups->service_name, "ldap") == 0)
 			result = REP_COMPAT_LDAP;
 	}
 	__nsw_freeconfig(cfg);
@@ -121,7 +111,7 @@ get_compat_mode(void)
  * on WRITE access.
  *
  * If we detect read-access in compat mode, we augment the result
- * with one of REP_COMPAT_{NIS,NISPLUS,LDAP}. We need this in order to
+ * with one of REP_COMPAT_{NIS,LDAP}. We need this in order to
  * implement ATTR_REP_NAME in nss_getpwnam.
  *
  * A return value of REP_NOREP indicates an error.
@@ -188,8 +178,6 @@ get_ns(pwu_repository_t *rep, int accesstype)
 				result |= REP_LDAP;
 			else if (strcmp(lkp2->service_name, "nis") == 0)
 				result |= REP_NIS;
-			else if (strcmp(lkp2->service_name, "nisplus") == 0)
-				result |= REP_NISPLUS;
 			else if (strcmp(lkp2->service_name, "ad") != 0)
 				result = REP_NSS;
 			/* AD is ignored */
@@ -199,8 +187,8 @@ get_ns(pwu_repository_t *rep, int accesstype)
 	} else if (conf->num_lookups == 3) {
 		/*
 		 * Valid configurations with 3 repositories are:
-		 *   files ad [nis | ldap | nisplus] OR
-		 *   files [nis | ldap | nisplus] ad
+		 *   files ad [nis | ldap ] OR
+		 *   files [nis | ldap ] ad
 		 */
 		lkp2 = lkp->next;
 		lkp3 = lkp2->next;
@@ -217,8 +205,6 @@ get_ns(pwu_repository_t *rep, int accesstype)
 				result |= REP_LDAP;
 			else if (strcmp(lkpn->service_name, "nis") == 0)
 				result |= REP_NIS;
-			else if (strcmp(lkpn->service_name, "nisplus") == 0)
-				result |= REP_NISPLUS;
 			else
 				result = REP_NSS;
 		} else {
@@ -272,27 +258,6 @@ nss_nis_shadow(p)
 	p->default_config = "nis";
 }
 #endif /* PAM_NIS */
-
-
-static void
-nss_nisplus_passwd(p)
-	nss_db_params_t	*p;
-{
-	p->name = NSS_DBNAM_PASSWD;
-	p->flags |= NSS_USE_DEFAULT_CONFIG;
-	p->default_config = "nisplus";
-}
-
-static void
-nss_nisplus_shadow(p)
-	nss_db_params_t	*p;
-{
-	p->name = NSS_DBNAM_SHADOW;
-	p->config_name    = NSS_DBNAM_PASSWD;	/* Use config for "passwd" */
-	p->flags |= NSS_USE_DEFAULT_CONFIG;
-	p->default_config = "nisplus";
-}
-
 
 static char *
 gettok(nextpp)
@@ -643,6 +608,7 @@ endutilpwent(void)
 	nss_delete(&db_root);
 }
 
+/*ARGSUSED*/
 struct passwd *
 getpwnam_from(const char *name, pwu_repository_t *rep, int reptype)
 {
@@ -658,13 +624,6 @@ getpwnam_from(const char *name, pwu_repository_t *rep, int reptype)
 	switch (reptype) {
 	case REP_LDAP:
 		(void) nss_search(&db_root, nss_ldap_passwd,
-		    NSS_DBOP_PASSWD_BYNAME, &arg);
-		break;
-	case REP_NISPLUS:
-		if (rep && rep->scope)
-			return (nisplus_getpw_from_master(name, rep->scope));
-
-		(void) nss_search(&db_root, nss_nisplus_passwd,
 		    NSS_DBOP_PASSWD_BYNAME, &arg);
 		break;
 #ifdef PAM_NIS
@@ -698,10 +657,6 @@ getpwuid_from(uid_t uid, pwu_repository_t *rep, int reptype)
 		(void) nss_search(&db_root, nss_ldap_passwd,
 		    NSS_DBOP_PASSWD_BYUID, &arg);
 		break;
-	case REP_NISPLUS:
-		(void) nss_search(&db_root, nss_nisplus_passwd,
-		    NSS_DBOP_PASSWD_BYUID, &arg);
-		break;
 #ifdef PAM_NIS
 	case REP_NIS:
 		(void) nss_search(&db_root, nss_nis_passwd,
@@ -730,6 +685,7 @@ endutilspent(void)
 	nss_delete(&spdb_root);
 }
 
+/*ARGSUSED*/
 struct spwd *
 getspnam_from(const char *name, pwu_repository_t *rep, int reptype)
 {
@@ -746,13 +702,6 @@ getspnam_from(const char *name, pwu_repository_t *rep, int reptype)
 		(void) nss_search(&spdb_root, nss_ldap_shadow,
 		    NSS_DBOP_SHADOW_BYNAME, &arg);
 		break;
-	case REP_NISPLUS:
-		if (rep && rep->scope)
-			return (nisplus_getsp_from_master(name, rep->scope));
-
-		(void) nss_search(&spdb_root, nss_nisplus_shadow,
-		    NSS_DBOP_SHADOW_BYNAME, &arg);
-		break;
 #ifdef PAM_NIS
 	case REP_NIS:
 		(void) nss_search(&spdb_root, nss_nis_shadow,
@@ -763,266 +712,4 @@ getspnam_from(const char *name, pwu_repository_t *rep, int reptype)
 		return (NULL);
 	}
 	return (struct spwd *)NSS_XbyY_FINI(&arg);
-}
-
-
-static nis_result *
-nisplus_match(const char *name, char *domain, char *buf, int len)
-{
-	int n;
-	int flags;
-	nis_result *res;
-	nis_object *object;
-
-	n = snprintf(buf, len, "[name=%s],passwd.org_dir.%s", name, domain);
-	if (n >= len) {
-		syslog(LOG_ERR, "nisplus_match: name too long");
-		return (NULL);
-	}
-	if (buf[n-1] != '.') {
-		if (n == len-1) {
-			syslog(LOG_ERR, "nisplus_match: name too long");
-			return (NULL);
-		}
-		buf[n++] = '.';
-		buf[n] = '\0';
-	}
-
-	flags = USE_DGRAM | FOLLOW_LINKS | FOLLOW_PATH | MASTER_ONLY;
-
-	res = nis_list(buf, flags, NULL, NULL);
-
-	if (res == NULL) {
-		syslog(LOG_ERR, "nisplus_match: nis_list returned NULL");
-		return (NULL);
-	}
-
-	if (NIS_RES_STATUS(res) != NIS_SUCCESS || NIS_RES_NUMOBJ(res) != 1) {
-		syslog(LOG_ERR, "nisplus_match: match failed: %s",
-		    nis_sperrno(NIS_RES_STATUS(res)));
-		nis_freeresult(res);
-		return (NULL);
-	}
-
-	object = NIS_RES_OBJECT(res);
-
-	if (object->EN_data.en_cols.en_cols_len < 8) {
-		syslog(LOG_ERR, "nisplus_match: "
-		    "not a valid passwd table entry for user %s", name);
-		nis_freeresult(res);
-		return (NULL);
-	}
-
-	return (res);
-}
-
-#define	SAFE_STRDUP(dst, idx) \
-	if ((idx) <= 3 && ENTRY_VAL(nret, (idx)) == NULL) { \
-		syslog(LOG_ERR, \
-		    "passwdutil: missing field from password entry"); \
-		goto error; \
-	} \
-	len = ENTRY_LEN(nret, (idx)); \
-	(dst) = malloc(len+1); \
-	if ((dst) == NULL) { \
-		syslog(LOG_ERR, "passwdutil: out of memory"); \
-		goto error; \
-	} \
-	(dst)[len] = '\0'; \
-	(void) strncpy((dst), \
-	    ENTRY_VAL(nret, (idx)) ? ENTRY_VAL(nret, (idx)) : "", \
-	    len);
-
-
-
-static struct passwd *
-nisplus_getpw_from_master(const char *name, char *domain)
-{
-	char lookup[NIS_MAXNAMELEN+1];
-	nis_result *res;
-	nis_object *nret;
-	int len;
-	char *p;
-	struct passwd *pw;
-
-	if ((pw = calloc(1, sizeof (*pw))) == NULL)
-		return (NULL);
-
-	res = nisplus_match(name, domain, lookup, sizeof (lookup));
-
-	if (res == NULL)
-		return (NULL);
-
-	nret = NIS_RES_OBJECT(res);
-
-	SAFE_STRDUP(pw->pw_name, 0);
-
-	if ((pw->pw_passwd = strdup("x")) == NULL) {
-		syslog(LOG_ERR, "passwdutil: out of memory");
-		goto error;
-	}
-
-	SAFE_STRDUP(p, 2);
-	pw->pw_uid = atoi(p);
-	free(p);
-
-	SAFE_STRDUP(p, 3);
-	pw->pw_gid = atoi(p);
-	free(p);
-
-	pw->pw_age = NULL;
-	pw->pw_comment = NULL;
-
-/*CONSTANTCONDITION*/
-	SAFE_STRDUP(pw->pw_gecos, 4);
-
-/*CONSTANTCONDITION*/
-	SAFE_STRDUP(pw->pw_dir, 5);
-
-/*CONSTANTCONDITION*/
-	SAFE_STRDUP(pw->pw_shell, 6);
-
-	nis_freeresult(res);
-
-	return (pw);
-
-error:
-	nis_freeresult(res);
-	if (pw->pw_name)
-		free(pw->pw_name);
-	if (pw->pw_passwd)
-		free(pw->pw_passwd);
-	if (pw->pw_gecos)
-		free(pw->pw_gecos);
-	if (pw->pw_dir)
-		free(pw->pw_dir);
-	if (pw->pw_shell)
-		free(pw->pw_shell);
-	free(pw);
-
-	return (NULL);
-}
-
-/*
- * struct spwd * nisplus_getsp_from_master()
- *
- * Get the shadow structure from a NIS+ master.
- * This routine normally runs with EUID==0. This can cause trouble
- * if the NIS+ tables are locked down so that only the owner can
- * access the encrypted password. If we detect that scenario, we switch
- * EUID to the owner of the record and refetch it.
- */
-static struct spwd *
-nisplus_getsp_from_master(const char *name, char *domain)
-{
-	char lookup[NIS_MAXNAMELEN+1];
-	nis_result *res = NULL;
-	nis_object *nret = NULL;
-	int len;
-	struct spwd *spw;
-	char *shadow = NULL;
-	const char *p = NULL;
-	const char *limit;
-
-	res = nisplus_match(name, domain, lookup, sizeof (lookup));
-	if (res == NULL)
-		return (NULL);
-
-	nret = NIS_RES_OBJECT(res);
-
-	/*CONSTANTCONDITION*/
-	SAFE_STRDUP(shadow, 7);
-
-	/*
-	 * If we got NOPWDRTR as password, try again with EUID set
-	 * to the UID of the record-owner.
-	 */
-	if (strncmp(shadow, NOPWDRTR, 4) == 0) {
-		char *p;
-		uid_t owner_uid;
-		uid_t euid = geteuid();
-
-		SAFE_STRDUP(p, 2);	/* record-owner field */
-		owner_uid = atoi(p);
-		free(p);
-
-		if (owner_uid != euid) {
-			/* re-obtain entry using owners EUID */
-			free(shadow);
-			nis_freeresult(res);
-
-			(void) seteuid(owner_uid);
-			res = nisplus_match(name, domain, lookup,
-			    sizeof (lookup));
-			(void) seteuid(euid);
-
-			if (res == NULL)
-				return (NULL);
-			nret = NIS_RES_OBJECT(res);
-
-			/*CONSTANTCONDITION*/
-			SAFE_STRDUP(shadow, 7);
-		}
-	}
-
-	if ((spw = calloc(1, sizeof (*spw))) == NULL) {
-		nis_freeresult(res);
-		return (NULL);
-	}
-
-	SAFE_STRDUP(spw->sp_namp, 0);
-	SAFE_STRDUP(spw->sp_pwdp, 1);
-
-	nis_freeresult(res);
-
-	limit = shadow + strlen(shadow) + 1;
-	p = shadow;
-
-	spw->sp_lstchg = -1;
-	spw->sp_min	= -1;
-	spw->sp_max	= -1;
-	spw->sp_warn	= -1;
-	spw->sp_inact = -1;
-	spw->sp_expire = -1;
-	spw->sp_flag	= 0;
-
-	if (!getfield(&p, limit, 0, &spw->sp_lstchg))
-		goto out;
-
-	if (!getfield(&p, limit, 0, &spw->sp_min))
-		goto out;
-
-	if (!getfield(&p, limit, 0, &spw->sp_max))
-		goto out;
-
-	if (!getfield(&p, limit, 0, &spw->sp_warn))
-		goto out;
-
-	if (!getfield(&p, limit, 0, &spw->sp_inact))
-		goto out;
-
-	if (!getfield(&p, limit, 0, &spw->sp_expire))
-		goto out;
-
-	if (!getfield(&p, limit, 1, &spw->sp_flag))
-		goto out;
-
-	if (p != limit) {
-		syslog(LOG_ERR, "passwdutil: garbage at end of record");
-		goto error;
-	}
-
-out:
-	free(shadow);
-	return (spw);
-
-error:
-	if (spw->sp_namp)
-		free(spw->sp_namp);
-	if (spw->sp_pwdp)
-		free(spw->sp_pwdp);
-	free(spw);
-	if (shadow)
-		free(shadow);
-	return (NULL);
 }

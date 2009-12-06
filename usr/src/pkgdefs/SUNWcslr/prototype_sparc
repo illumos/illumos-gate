@@ -172,5 +172,4 @@ f none lib/sparcv9/nss_compat.so.1 755 root bin
 f none lib/sparcv9/nss_dns.so.1 755 root bin
 f none lib/sparcv9/nss_files.so.1 755 root bin
 f none lib/sparcv9/nss_nis.so.1 755 root bin
-f none lib/sparcv9/nss_nisplus.so.1 755 root bin
 f none lib/sparcv9/nss_user.so.1 755 root bin

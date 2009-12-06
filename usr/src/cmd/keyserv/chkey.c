@@ -49,17 +49,16 @@
 #include <rpc/rpc.h>
 #include <rpc/key_prot.h>
 #include <rpcsvc/nis.h>
-#include <rpcsvc/nispasswd.h>
 #include <rpcsvc/nis_dhext.h>
 #include <rpcsvc/ypclnt.h>
 #include <nsswitch.h>
 
 #define	PK_FILES	1
 #define	PK_YP		2
-#define	PK_NISPLUS	3
 #define	PK_LDAP		4
 
 #define	CURMECH		mechs[mcount]
+#define	DESCREDPASSLEN	sizeof (des_block)
 
 static char	CRED_TABLE[] = "cred.org_dir";
 static char	PKMAP[] = "publickey.byname";
@@ -101,9 +100,7 @@ char		short_login_pw[DESCREDPASSLEN + 1];
 /* Short S-RPC password, which has first 8 chars of login_pw */
 
 static int add_cred_obj(nis_object *, char *);
-static nis_error auth_exists(char *, char *, char *, char *);
 static void cmp_passwd();
-static nis_error cred_exists(const char *, const char *, const char *);
 static void encryptkeys();
 static void error_msg();
 static char *fgets_ignorenul();
@@ -115,13 +112,10 @@ static void keylogin(keylen_t, algtype_t);
 static void keylogin_des();
 static void makenewkeys();
 static int modify_cred_obj(nis_object *, char *);
-static int nisplus_update(nis_name, char *, char *, char *);
-static int sanity_checks(char *, char *, char *);
 static void storekeys();
 static void usage();
 static void write_rootkey();
 
-extern char *get_nisplus_principal(char *, uid_t);
 extern nis_object *init_entry();
 extern int get_pk_source(char *);
 extern int localupdate(char *, char *, uint_t, char *);
@@ -143,10 +137,7 @@ error_msg()
 	    strcasecmp(sec_domain, local_domain)) {
 		fprintf(stderr,
 "The system default domain '%s' is different from the Secure RPC\n\
-domain %s where the key is stored.  The Secure RPC domainname is\n\
-defined by the directory object stored in the /var/nis/NIS_COLD_START file.\n\
-If you need to change this Secure RPC domainname, please use the nisinit(1M)\n\
-command with the `-k` option.\n", local_domain, sec_domain);
+domain %s where the key is stored. \n", local_domain, sec_domain);
 		exit(1);
 	}
 }
@@ -155,7 +146,7 @@ command with the `-k` option.\n", local_domain, sec_domain);
 static void
 usage()
 {
-	fprintf(stderr, "usage: %s [-p] [-s ldap | nisplus | nis | files] \n",
+	fprintf(stderr, "usage: %s [-p] [-s ldap | nis | files] \n",
 	    program_name);
 	exit(1);
 }
@@ -370,7 +361,7 @@ cmp_passwd()
 	char	baseprompt[] = "Please enter the login password for";
 	char	prompt[BUFSIZ];
 	char	*en_login_pw = spw->sp_pwdp;
-	char    short_en_login_pw[DESCREDPASSLEN + 1];
+	char	short_en_login_pw[DESCREDPASSLEN + 1];
 	char	*try_en_login_pw;
 	bool_t	pwmatch = FALSE;
 	int	done = 0, tries = 0, pcount;
@@ -845,95 +836,6 @@ rootkey_err:
 	    flavor);
 }
 
-
-/* Returns 0 if check fails; 1 if successful. */
-static int
-sanity_checks(char *nis_princ, char *domain, char *authtype)
-{
-	char	netdomainaux[MAXHOSTNAMELEN+1];
-	char	*princdomain, *netdomain;
-	int	len;
-
-	/* Sanity check 0. Do we have a nis+ principal name to work with? */
-	if (nis_princ == NULL) {
-		(void) fprintf(stderr,
-		"%s: you must create a \"LOCAL\" credential for '%s' first.\n",
-		    program_name, netname);
-		(void) fprintf(stderr, "\tSee nisaddcred(1).\n");
-		return (0);
-	}
-
-	/* Sanity check 0.5.  NIS+ principal names must be dotted. */
-	len = strlen(nis_princ);
-	if (nis_princ[len-1] != '.') {
-		(void) fprintf(stderr,
-		"%s: invalid principal name: '%s' (forgot ending dot?).\n",
-		    program_name, nis_princ);
-		return (0);
-	}
-
-	/* Sanity check 1.  We only deal with one type of netnames. */
-	if (strncmp(netname, "unix", 4) != 0) {
-		(void) fprintf(stderr,
-		"%s: unrecognized netname type: '%s'.\n",
-		    program_name, netname);
-		return (0);
-	}
-
-	/* Sanity check 2.  Should only add DES cred in home domain. */
-	princdomain = nis_domain_of(nis_princ);
-	if (strcasecmp(princdomain, domain) != 0) {
-		(void) fprintf(stderr,
-"%s: domain of principal '%s' does not match destination domain '%s'.\n",
-		    program_name, nis_princ, domain);
-		(void) fprintf(stderr,
-	"Should only add DES credential of principal in its home domain\n");
-		return (0);
-	}
-
-	/*
-	 * Sanity check 3:  Make sure netname's domain same as principal's
-	 * and don't have extraneous dot at the end.
-	 */
-	netdomain = (char *)strchr(netname, '@');
-	if (! netdomain || netname[strlen(netname)-1] == '.') {
-		(void) fprintf(stderr, "%s: invalid netname: '%s'. \n",
-		    program_name, netname);
-		return (0);
-	}
-	netdomain++; /* skip '@' */
-
-	if (strlcpy(netdomainaux, netdomain, sizeof (netdomainaux)) >=
-	    sizeof (netdomainaux)) {
-		(void) fprintf(stderr, "%s: net domain name %s is too long\n",
-		    program_name, netdomain);
-		return (0);
-	}
-
-	if (netdomainaux[strlen(netdomainaux) - 1] != '.') {
-		if (strlcat(netdomainaux, ".", sizeof (netdomainaux)) >=
-		    sizeof (netdomainaux)) {
-			(void) fprintf(stderr,
-			    "%s: net domain name %s is too long\n",
-			    program_name, netdomainaux);
-			return (0);
-		}
-	}
-
-	if (strcasecmp(princdomain, netdomainaux) != 0) {
-		(void) fprintf(stderr,
-	"%s: domain of netname %s should be same as that of principal %s\n",
-		    program_name, netname, nis_princ);
-		return (0);
-	}
-
-	/* Another principal owns same credentials? (exits if that happens) */
-	(void) auth_exists(nis_princ, netname, authtype, domain);
-
-	return (1); /* all passed */
-}
-
-
 /* Store new key information in the specified name service */
 static void
 storekeys()
@@ -946,10 +848,6 @@ storekeys()
 	/* Setup */
 	switch (dest_service) {
 	case PK_LDAP:
-		break;
-	case PK_NISPLUS:
-		nis_princ = get_nisplus_principal(nis_local_directory(),
-		    geteuid());
 		break;
 	case PK_YP:
 		yp_get_default_domain(&ypdomain);
@@ -1009,18 +907,6 @@ storekeys()
 					ucount++;
 				break;
 
-			case PK_NISPLUS:
-				if (nisplus_update(nis_princ,
-				    authtype,
-				    plist[mcount],
-				    clist[mcount]))
-					fprintf(stderr,
-			"%s: unable to update %s key in nisplus database\n",
-					    program_name, authtype);
-				else
-					ucount++;
-				break;
-
 			case PK_YP:
 				/* Should never get here. */
 				break;
@@ -1045,19 +931,6 @@ storekeys()
 			"%s: unable to update %s key in LDAP database\n",
 				    program_name);
 				exit(1);
-			}
-			break;
-
-		case PK_NISPLUS:
-			assert(plist[0] && clist[0]);
-			if (nisplus_update(nis_princ,
-			    AUTH_DES_AUTH_TYPE,
-			    plist[0],
-			    clist[0])) {
-				fprintf(stderr,
-			"%s: unable to update nisplus database\n",
-				    program_name);
-					exit(1);
 			}
 			break;
 
@@ -1095,261 +968,6 @@ storekeys()
 		exit(1);
 	}
 }
-
-/* Check that someone else don't have the same auth information already */
-static
-nis_error
-auth_exists(char *princname, char *auth_name, char *auth_type, char *domain)
-{
-	char sname[NIS_MAXNAMELEN+1];
-	nis_result	*res;
-	nis_error status;
-	char *foundprinc;
-
-	(void) sprintf(sname, "[auth_name=%s,auth_type=%s],%s.%s",
-	    auth_name, auth_type, CRED_TABLE, domain);
-	if (sname[strlen(sname)-1] != '.')
-		strcat(sname, ".");
-	/* Don't want FOLLOW_PATH here */
-	res = nis_list(sname,
-	    MASTER_ONLY+USE_DGRAM+NO_AUTHINFO+FOLLOW_LINKS,
-	    NULL, NULL);
-
-	status = res->status;
-	switch (res->status) {
-	case NIS_NOTFOUND:
-		break;
-	case NIS_TRYAGAIN:
-		(void) fprintf(stderr,
-		"%s: NIS+ server busy, try again later.\n",
-		    program_name);
-		exit(1);
-		break;
-	case NIS_PERMISSION:
-		(void) fprintf(stderr,
-		"%s: insufficient permission to look up old credentials.\n",
-		    program_name);
-		exit(1);
-		break;
-	case NIS_SUCCESS:
-		foundprinc = ENTRY_VAL(res->objects.objects_val, 0);
-		if (nis_dir_cmp(foundprinc, princname) != SAME_NAME) {
-			(void) fprintf(stderr,
-	"%s: %s credentials with auth_name '%s' already belong to '%s'.\n",
-			    program_name, auth_type, auth_name, foundprinc);
-			exit(1);
-		}
-		break;
-	default:
-		(void) fprintf(stderr,
-		"%s: error looking at cred table, NIS+ error: %s\n",
-		    program_name, nis_sperrno(res->status));
-		exit(1);
-	}
-	nis_freeresult(res);
-	return (status);
-}
-
-
-/* Check whether this principal already has this type of credentials */
-static nis_error
-cred_exists(const char *nisprinc, const char *flavor, const char *domain)
-{
-	char sname[NIS_MAXNAMELEN+1];
-	nis_result	*res;
-	nis_error status;
-
-	snprintf(sname, NIS_MAXNAMELEN,
-	    "[cname=\"%s\",auth_type=%s],%s.%s",
-	    nisprinc, flavor, CRED_TABLE, domain);
-	if (sname[strlen(sname)-1] != '.')
-		strcat(sname, ".");
-
-	/* Don't want FOLLOW_PATH here */
-	res = nis_list(sname,
-	    MASTER_ONLY+USE_DGRAM+NO_AUTHINFO+FOLLOW_LINKS,
-	    NULL, NULL);
-
-	status = res->status;
-	switch (status) {
-	case NIS_NOTFOUND:
-		break;
-	case NIS_TRYAGAIN:
-		fprintf(stderr,
-		"%s: NIS+ server busy, try again later.\n",
-		    program_name);
-		exit(1);
-		break;
-	case NIS_PERMISSION:
-		(void) fprintf(stderr,
-		"%s: insufficient permission to look at credentials table\n",
-		    program_name);
-		exit(1);
-		break;
-	case NIS_SUCCESS:
-	case NIS_S_SUCCESS:
-		break;
-	default:
-		(void) fprintf(stderr,
-		"%s: error looking at cred table, NIS+ error: %s\n",
-		    program_name, nis_sperrno(res->status));
-		exit(1);
-	}
-	nis_freeresult(res);
-	return (status);
-}
-
-
-static int
-modify_cred_obj(nis_object *obj, char *domain)
-{
-	int status = 0;
-	char sname[NIS_MAXNAMELEN+1];
-	nis_result	*res;
-
-	(void) sprintf(sname, "%s.%s", CRED_TABLE, domain);
-	res = nis_modify_entry(sname, obj, 0);
-	switch (res->status) {
-	case NIS_TRYAGAIN:
-		(void) fprintf(stderr,
-		"%s: NIS+ server busy, try again later.\n",
-		    program_name);
-		exit(1);
-		break;
-	case NIS_PERMISSION:
-		(void) fprintf(stderr,
-		"%s: insufficient permission to update credentials.\n",
-		    program_name);
-		exit(1);
-		break;
-	case NIS_SUCCESS:
-		status = 1;
-		break;
-	default:
-		(void) fprintf(stderr,
-		"%s: error modifying credential, NIS+ error: %s.\n",
-		    program_name, nis_sperrno(res->status));
-		exit(1);
-	}
-	nis_freeresult(res);
-	return (status);
-}
-
-
-static int
-add_cred_obj(nis_object *obj, char *domain)
-{
-	int status = 0;
-	char sname[NIS_MAXNAMELEN+1];
-	nis_result	*res;
-
-	/* Assume check for cred_exists performed already */
-
-	(void) sprintf(sname, "%s.%s", CRED_TABLE, domain);
-	res = nis_add_entry(sname, obj, 0);
-	switch (res->status) {
-	case NIS_TRYAGAIN:
-		(void) fprintf(stderr,
-		"%s: NIS+ server busy, try again later.\n",
-		    program_name);
-		exit(1);
-		break;
-	case NIS_PERMISSION:
-		(void) fprintf(stderr,
-		"%s: insufficient permission to update credentials.\n",
-		    program_name);
-		exit(1);
-		break;
-	case NIS_SUCCESS:
-		status = 1;
-		break;
-	default:
-		(void) fprintf(stderr,
-		"%s: error creating credential, NIS+ error: %s.\n",
-		    program_name, nis_sperrno(res->status));
-		exit(1);
-	}
-	nis_freeresult(res);
-	return (status);
-}
-
-
-/* Update NIS+ table with new key information */
-static int
-nisplus_update(nis_name nis_princ, char *authtype, char *public, char *crypt)
-{
-	nis_object	*obj = init_entry();
-	int		status;
-	bool_t		addition;
-	char		cmpdomain[MAXHOSTNAMELEN + 1];
-	char		*userdomain, *domain;
-
-	if (!(userdomain = strchr(netname, '@'))) {
-		fprintf(stderr, "%s: invalid netname: '%s'.\n",
-		    program_name, netname);
-		exit(1);
-	}
-	userdomain++;
-
-	if (strlcpy(cmpdomain, userdomain, sizeof (cmpdomain)) >=
-	    sizeof (cmpdomain)) {
-		(void) fprintf(stderr,
-		"%s: net domain name %s is too long\n",
-		    program_name, cmpdomain);
-			exit(1);
-	}
-
-	if (cmpdomain[strlen(cmpdomain) - 1] != '.') {
-		if (strlcat(cmpdomain, ".", sizeof (cmpdomain)) >=
-		    sizeof (cmpdomain)) {
-			(void) fprintf(stderr,
-			"%s: net domain name %s is too long\n",
-			    program_name, cmpdomain);
-			exit(1);
-		}
-	}
-
-	domain = nis_domain_of(nis_princ);
-	if (strcasecmp(domain, cmpdomain) != 0)
-		domain = nis_local_directory();
-
-	if (!sanity_checks(nis_princ, domain, authtype))
-		exit(1);
-
-	addition = (cred_exists(nis_princ, authtype, domain) == NIS_NOTFOUND);
-
-	ENTRY_VAL(obj, 0) = nis_princ;
-	ENTRY_LEN(obj, 0) = strlen(nis_princ) + 1;
-
-	ENTRY_VAL(obj, 1) = authtype;
-	ENTRY_LEN(obj, 1) = strlen(authtype) + 1;
-
-	ENTRY_VAL(obj, 2) = netname;
-	ENTRY_LEN(obj, 2) = strlen(netname) + 1;
-
-	ENTRY_VAL(obj, 3) = public;
-	ENTRY_LEN(obj, 3) = strlen(public) + 1;
-
-	ENTRY_VAL(obj, 4) = crypt;
-	ENTRY_LEN(obj, 4) = strlen(crypt) + 1;
-
-	if (addition) {
-		obj->zo_owner = nis_princ;
-		obj->zo_group = nis_local_group();
-		obj->zo_domain = domain;
-		/* owner: r, group: rmcd */
-		obj->zo_access = ((NIS_READ_ACC<<16)|
-		    (NIS_READ_ACC|NIS_MODIFY_ACC|NIS_CREATE_ACC|
-		    NIS_DESTROY_ACC)<<8);
-		status = add_cred_obj(obj, domain);
-	} else {
-		obj->EN_data.en_cols.en_cols_val[3].ec_flags |= EN_MODIFIED;
-		obj->EN_data.en_cols.en_cols_val[4].ec_flags |= EN_MODIFIED;
-		status = modify_cred_obj(obj, domain);
-	}
-	return (status == 1 ? 0 : 1);
-}
-
 
 void
 addmechtolist(char *mechtype)
@@ -1546,10 +1164,6 @@ main(int argc, char **argv)
 	 *
 	 *	files/compat:	read /etc/shadow
 	 *
-	 *	nisplus:	try to read the encrypted pw as the root
-	 *			principal and if that fails, and if the
-	 *			user's secret key is set, seteuid(user)
-	 *			and retry the read.
 	 */
 	if ((spw = getspnam(pw->pw_name)) == 0) {
 

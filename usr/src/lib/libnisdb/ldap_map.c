@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -39,7 +36,6 @@
 #include "ldap_ruleval.h"
 #include "ldap_op.h"
 #include "ldap_map.h"
-#include "ldap_nisplus.h"
 #include "ldap_glob.h"
 #include "ldap_xdr.h"
 #include "ldap_val.h"
@@ -54,7 +50,7 @@ extern	int yp2ldap;
 
 int
 setColumnNames(__nis_table_mapping_t *t) {
-	int	i, j, nic, noc, stat;
+	int	i, j, nic, noc;
 	char	**col;
 	zotypes	type;
 	char	*myself = "setColumnNames";
@@ -68,32 +64,6 @@ setColumnNames(__nis_table_mapping_t *t) {
 
 	t->objType = NIS_BOGUS_OBJ;
 	t->obj = 0;
-
-	stat = initializeColumnNames(t->objName, &t->column, &t->numColumns,
-					&t->objType, &t->obj);
-	if (stat == LDAP_OBJECT_CLASS_VIOLATION) {
-		/* Not a table object; that's OK */
-		sfree(col);
-		return (0);
-	} else if (justTesting && stat != LDAP_SUCCESS) {
-		/*
-		 * Restore the parser initialization. This will only work
-		 * correctly if the config file is consistent in the ordering
-		 * of column names, and either no NIS+ lookups are needed,
-		 * or the ordering is the same as in NIS+.
-		 */
-		t->column = col;
-		t->numColumns = nic;
-		/* Make a guess at the object type, based on the name */
-		if (strstr(t->objName, ".org_dir") != 0)
-			t->objType = NIS_TABLE_OBJ;
-		else if (strncmp(t->objName, "admin.groups_dir",
-				sizeof ("admin.groups_dir")) != 0)
-			t->objType = NIS_GROUP_OBJ;
-		else
-			t->objType = NIS_DIRECTORY_OBJ;
-		return (0);
-	}
 
 	/*
 	 * If it's a table object, but there are no translation rules,
@@ -793,12 +763,8 @@ map1qToLDAP(__nis_table_mapping_t *t, db_query *old, db_query *new,
  * locking, and we remove the locking overhead by using the libnsl
  * hash functions.
  */
-#undef	NIS_HASH_ITEM
-#undef	NIS_HASH_TABLE
-#undef	nis_insert_item
-#undef	nis_find_item
-#undef	nis_pop_item
-#undef	nis_remove_item
+#undef  NIS_HASH_ITEM
+#undef  NIS_HASH_TABLE
 
 typedef struct {
 	NIS_HASH_ITEM	item;
@@ -856,7 +822,6 @@ mapToLDAP(__nis_table_mapping_t *tm, int nq, db_query **old, db_query **new,
 	__nis_ldap_search_t	*ls;
 	char			**dn = 0, **odn = 0;
 	__nis_rule_value_t	**rv;
-	NIS_HASH_TABLE		dntab;
 	__dn_item_t		*dni;
 	char			*myself = "mapToLDAP";
 
@@ -914,8 +879,6 @@ mapToLDAP(__nis_table_mapping_t *tm, int nq, db_query **old, db_query **new,
 #endif	/* NISDB_LDAP_DEBUG */
 		"%s: %s: %d * %d potential updates",
 		myself, NIL(tm->objName), nq, maxMatches);
-
-	(void) memset(&dntab, 0, sizeof (dntab));
 
 	/*
 	 * Create DNs, column and attribute values, and merge duplicate DNs.
@@ -996,51 +959,7 @@ mapToLDAP(__nis_table_mapping_t *tm, int nq, db_query **old, db_query **new,
 			 * about, merge the rule-values.
 			 */
 
-			dni = (__dn_item_t *)nis_find_item(dnt, &dntab);
-			if (dni != 0) {
-				i = dni->index;
-
-				if (i >= (firstOnly ? ((idx < maxMatches) ?
-						idx : maxMatches) : idx)) {
-					goto update_cleanup;
-				}
-
-				if (odnt != 0 && (dni->oldDn == 0 ||
-						strcasecmp(odnt, dni->oldDn) !=
-							0)) {
-					logmsg(MSG_NOTIMECHECK, LOG_WARNING,
-			"%s: DN mismatch while merging updates: %s: %s != %s",
-						myself, NIL(tpa[i]->dbId),
-						NIL(odnt), NIL(dni->oldDn));
-					goto update_cleanup;
-				}
-
-				if (mergeRuleValue(rv[i], rvt)) {
-					logmsg(MSG_NOTIMECHECK, LOG_WARNING,
-				"%s: Error merging updates for %s:dn=%s",
-						myself, NIL(tpa[i]->dbId),
-						dn[i]);
-					if ((dni = (__dn_item_t *)
-						nis_remove_item(dnt, &dntab)) !=
-							0) {
-						i = dni->index;
-						sfree(dn[i]);
-						dn[i] = 0;
-						tpa[i] = 0;
-						freeRuleValue(rv[i], 1);
-						rv[i] = 0;
-						sfree(dni);
-					}
-					goto update_cleanup;
-				}
-update_cleanup:
-				sfree(dnt);
-				dnt = 0;
-				sfree(odnt);
-				odnt = 0;
-				freeRuleValue(rvt, 1);
-				rvt = 0;
-			} else if ((iq == 0 || !firstOnly) && dnt != 0) {
+			if ((iq == 0 || !firstOnly) && dnt != 0) {
 				dni = am(myself, sizeof (*dni));
 				if (dni != 0) {
 					dni->item.name = dnt;
@@ -1052,17 +971,6 @@ update_cleanup:
 						myself, dnt);
 					sfree(dnt);
 					dnt = 0;
-				}
-				if (dni != 0 &&
-					nis_insert_item((NIS_HASH_ITEM *)dni,
-							&dntab) != 1) {
-					logmsg(MSG_NOTIMECHECK, LOG_ERR,
-					"%s: Unable to memorize dn=\"%s\"",
-						myself, dnt);
-					sfree(dnt);
-					dnt = 0;
-					sfree(odnt);
-					odnt = 0;
 				}
 				if (dnt != 0) {
 					dn[idx+n] = dnt;
@@ -1080,11 +988,6 @@ update_cleanup:
 			}
 		}
 		sfree(tp);
-	}
-
-	/* Done with the dntab */
-	while ((dni = (__dn_item_t *)nis_pop_item(&dntab)) != 0) {
-		sfree(dni);
 	}
 
 	logmsg(MSG_NOTIMECHECK,
@@ -1517,7 +1420,6 @@ int
 objToLDAP(__nis_table_mapping_t *t, nis_object *o, entry_obj **ea, int numEa) {
 	__nis_table_mapping_t	**tp;
 	XDR			xdr;
-	nis_result		*res = 0;
 	char			*objName;
 	int			stat, osize, n, numMatches = 0;
 	void			*buf;
@@ -1556,34 +1458,11 @@ objToLDAP(__nis_table_mapping_t *t, nis_object *o, entry_obj **ea, int numEa) {
 		t = tp[n];
 
 		if (o == 0) {
-			stat = getNisPlusObj(t->objName, myself, &res);
-			if (stat != LDAP_SUCCESS) {
-				sfree(tp);
-				return (stat);
-			}
-
-			/*
-			 * getNisPlusObj() only returns success when res != 0,
-			 * and res->objects.objects_len > 0, so no need to
-			 * check for those conditons.
-			 */
-
-			o = res->objects.objects_val;
-			if (o == 0) {
-				sfree(tp);
-				nis_freeresult(res);
-				return (LDAP_OPERATIONS_ERROR);
-			}
-			if (o->zo_data.zo_type == NIS_DIRECTORY_OBJ) {
-				/* XXX??? get dir list, set 'ea' and 'numEa' */
-			}
+			sfree(tp);
+			return (LDAP_OPERATIONS_ERROR);
 		}
 
 		buf = (char *)xdrNisObject(o, ea, numEa, &osize);
-		if (res != 0) {
-			nis_freeresult(res);
-			res = 0;
-		}
 		if (buf == 0) {
 			sfree(tp);
 			return (LDAP_OPERATIONS_ERROR);

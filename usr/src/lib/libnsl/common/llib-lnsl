@@ -51,9 +51,7 @@
 #include <rpcsvc/yppasswd.h>
 #include <rpcsvc/ypupd.h>
 #include <rpcsvc/nis.h>
-#include <rpcsvc/nis_callback.h>
 #include <rpcsvc/nislib.h>
-#include <rpcsvc/nispasswd.h>
 #include <sys/stream.h>
 #include <sys/stropts.h>
 #include <sys/tihdr.h>
@@ -178,177 +176,10 @@ char *nc_sperror(void);
 void nc_perror(const char *string);
 
 /*
- * usr/src/lib/libnsl/nis/cache routines
- */
-
-/* cache.cc */
-
-/* cache_api.cc */
-#ifdef notdef
-/* XXX lacking appropriate public header files */
-nis_error __nis_CacheInit(NisCache **cache);
-#endif
-nis_error __nis_CacheBind(char *dname, directory_obj *dobj);
-bool_t __nis_CacheRemoveEntry(directory_obj *dobj);
-nis_error __nis_CacheSearch(char *dname, directory_obj *dobj);
-void __nis_CacheRestart(void);
-void __nis_CachePrint(void);
-bool_t __nis_CacheAddEntry(fd_result *, directory_obj *);
-uint32_t __nis_CacheLocalLoadPref(void);
-nis_error __nis_CacheLocalInit(uint32_t *exp_time);
-nis_error __nis_CacheMgrInit(void);
-void __nis_CacheMgrCleanup(void);
-nis_error __nis_CacheMgrBindReplica(char *dname);
-nis_error __nis_CacheMgrBindMaster(char *dname);
-nis_error __nis_CacheMgrBindServer(nis_server *srv, int nsrv);
-int __nis_CacheMgrRefreshBinding(nis_bound_directory *binding);
-int __nis_CacheMgrRefreshAddress(nis_bound_endpoint *bep);
-int __nis_CacheMgrRefreshCallback(nis_bound_endpoint *bep);
-int __nis_CacheMgrUpdateUaddr(char *uaddr);
-void __nis_CacheMgrMarkUp(void);
-uint32_t __nis_CacheMgrTimers(void);
-uint32_t __nis_CacheMgrRefreshCache(void);
-uint32_t __nis_serverRefreshCache(void);
-
-/* client_cache.cc */
-
-/* cold_start.cc */
-bool_t writeColdStartFile(directory_obj *dobj);
-
-/* local_cache.cc */
-
-/* mapped_cache.cc */
-
-/* mgr_cache.cc */
-
-/* nis_cache_clnt.cc */
-
-/* nis_cache_xdr.cc */
-
-/*
  * usr/src/lib/libnsl/nis/gen routines
  */
 
-/* nis_callback.c */
-int __nis_destroy_callback(void);
-nis_server *__nis_init_callback(CLIENT *svc_clnt, int (*cbfunc)(),
-								void *userdata);
-int __nis_run_callback(netobj *srvid, rpcproc_t srvproc,
-				struct timeval *timeout, CLIENT *myserv);
-
-/* nis_cast.c */
-enum clnt_stat __nis_cast_proc(nis_bound_directory *binding, int base,
-				int nbep, rpcproc_t procnum,
-				xdrproc_t xdr_inproc, void *in,
-				xdrproc_t xdr_outproc, void *out,
-				int *fastest, int mytimeout);
-
-/* nis_cback_xdr.c */
-bool_t xdr_obj_p(XDR *xdrs, obj_p *objp);
-bool_t xdr_cback_data(XDR *xdrs, cback_data *objp);
-
-/* nis_clnt.c */
-
-/* nis_groups.c */
-typedef nis_result *(*nis_lookup_func)(nis_name, u_int);
-int __nis_group_cache_stats(int *grpcachecall, int *grpcachehits,
-					int *grpcachemisses);
-bool_t nis_ismember(nis_name princp, nis_name group);
-bool_t __do_ismember(nis_name princp, nis_object *obj, nis_lookup_func lookup);
-void nis_print_group_entry(nis_name group);
-void nis_flushgroups(void);
-void __nis_flush_group_exp_name(nis_name groupname);
-nis_name __nis_map_group_r(const nis_name name, char *buf, size_t bufsize);
-nis_error nis_addmember(nis_name princp, nis_name group);
-nis_error nis_removemember(nis_name princp, nis_name group);
-nis_error nis_verifygroup(nis_name group);
-nis_error __nis_creategroup_obj(nis_name name, uint_t flags, nis_object *obj);
-nis_error nis_creategroup(nis_name name, uint_t flags);
-nis_error nis_destroygroup(nis_name name);
-
-/* nis_hash.c */
-int nis_in_table(nis_name name, NIS_HASH_TABLE *table, int *key);
-int nis_insert_item(NIS_HASH_ITEM *item, NIS_HASH_TABLE *table);
-NIS_HASH_ITEM *nis_find_item(nis_name name, NIS_HASH_TABLE *table);
-NIS_HASH_ITEM *nis_pop_item(NIS_HASH_TABLE *table);
-NIS_HASH_ITEM *nis_remove_item(nis_name name, NIS_HASH_TABLE *table);
-void nis_insert_name(nis_name name, NIS_HASH_TABLE *table);
-void nis_remove_name(nis_name name, NIS_HASH_TABLE *table);
-
-/* nis_lookup.c */
-nis_result *__nis_remote_lookup(ib_request *req, u_int flags, int list_op,
-				void *cbdata, int (*cback)());
-nis_result *__nis_core_lookup(ib_request *req, u_int flags, int list_op,
-				void *cbdata, int (*cback)());
-fd_result *__nis_finddirectory_remote(nis_bound_directory **binding,
-				char *dname);
-fd_result *__nis_finddirectory(nis_bound_directory **binding, char *dname);
-fd_result *nis_finddirectory(directory_obj *dobj, nis_name name);
-
-/* nis_misc.c */
-void __nis_pingproc(nis_server *srv, nis_name name, uint32_t mtime);
-void nis_ping(nis_name name, uint32_t mtime, nis_object *obj);
-log_result *nis_dumplog(nis_server *host, nis_name name, uint32_t dtime);
-log_result *nis_dump(nis_server *host, nis_name name, int (*cback)());
-void nis_free_binding(nis_bound_directory *binding);
-void __nis_path_free(char **names, int len);
-nis_error __nis_path(char *from, char *to, int *path_length, char ***namesp);
-int __nis_host_is_server(nis_server *, int);
-void __nis_print_result(nis_result *);
-struct netconfig *__nis_get_netconfig(endpoint *);
-nis_server *__nis_server_dup(nis_server *, nis_server *);
-
-/* nis_misc_proc.c */
-void __nis_auth2princ(char *name, int flavor, caddr_t auth, bool_t refresh,
-			int verbose);
-bool_t __nis_ck_perms(u_int right, u_int mask, nis_object *obj,
-				nis_name pr, int level);
-bool_t __nis_ismaster(char *host, char *domain);
-bool_t __nis_isadmin(char *princ, char *table, char *domain);
-nis_server * __nis_host2nis_server(char *host, bool_t addpubkey, int *errcode);
-
-/* nis_names.c */
-int __nis_parse_path(char *path, nis_name *list, int max);
-nis_name *nis_getnames(nis_name name);
-void nis_freenames(nis_name *namelist);
-
-/* nis_perror.c */
-char *nis_sperrno(nis_error stat);
-void nis_perror(nis_error stat, char *str);
-char *nis_sperror_r(nis_error stat, char *str, char buf[], int len);
-char *nis_sperror(nis_error stat, char *str);
-void nis_lerror(nis_error stat, char *str);
-
-/* nis_rpc.c */
-typedef struct {
-	nis_server *srv;
-	int nsrv;
-	char *name;
-	int parent_first;
-	u_int flags;
-	struct timeval timeout;
-	nis_error niserror;
-	uint32_t aticks;
-	int state;
-	nis_bound_directory *binding;
-	int base;
-	int end;
-	int count;
-	int start;
-	int cur;
-	int bound_to;
-	int refresh_count;
-} nis_call_state;
-
-void __nis_reset_state(void);
-void __nis_bad_auth_server(CLIENT *c);
-void __nis_release_server(nis_call_state *state, CLIENT *c,
-					enum clnt_stat status);
-CLIENT *__nis_get_server(nis_call_state *state);
-
 /* nis_subr.c */
-int __start_clock(int clk);
-unsigned int __stop_clock(int clk);
 name_pos nis_dir_cmp(nis_name n1, nis_name n2);
 nis_name nis_local_group(void);
 nis_name nis_domain_of(char *s);
@@ -356,36 +187,16 @@ nis_name nis_leaf_of_r(const nis_name  s, char *buf, size_t bufsize);
 nis_name nis_leaf_of(char *s);
 nis_name nis_name_of(char *s);
 nis_name nis_local_directory(void);
-int __nis_principal(char *principal_name, uid_t uid, char *directory);
-nis_name nis_local_principal(void);
 nis_name nis_local_host(void);
 void nis_destroy_object(nis_object *obj);
 nis_object *nis_clone_object(nis_object *obj, nis_object *dest);
-char **__break_name(nis_name name, int *levels);
-int __name_distance(char **targ, char **test);
-nis_result *nis_make_error(nis_error err, uint32_t aticks, uint32_t cticks,
-				uint32_t dticks, uint32_t zticks);
-nis_attr *__cvt2attr(int *na, char **attrs);
-void nis_free_request(ib_request *req);
-nis_error nis_get_request(nis_name name, nis_object *obj, netobj *cookie,
-				ib_request *reqreq);
 nis_object *nis_read_obj(char *f);
 int nis_write_obj(char *f, nis_object *o);
-CLIENT *nis_make_rpchandle(nis_server *srv, int cback, rpcprog_t prog,
-			rpcvers_t ver, u_int flags, int inbuf, int outbuf);
 void *nis_get_static_storage(struct nis_sdata *bs, u_int el, u_int nel);
-char *nis_old_data(char *s);
-char *nis_data(char *s);
-nis_name __nis_local_root(void);
-
-/* nis_tags.c */
-void nis_freeservlist(nis_server **servers);
-nis_server **nis_getservlist(nis_name name);
-nis_error nis_stats(nis_server *srv, nis_tag *tags, int ntags,
-							nis_tag **result);
-nis_error nis_servstate(nis_server *srv, nis_tag *tags, int ntags,
-							nis_tag **result);
-void nis_freetags(nis_tag *tags, int ntags);
+/*
+ * char *nis_old_data(char *s);
+ * char *nis_data(char *s);
+ */
 
 /* nis_xdr.c */
 bool_t xdr_nis_attr(XDR *xdrs, nis_attr *objp);
@@ -399,65 +210,12 @@ bool_t xdr_objdata(XDR *xdrs, objdata *objp);
 bool_t xdr_nis_oid(XDR *xdrs, nis_oid *objp);
 bool_t xdr_nis_object(XDR *xdrs, nis_object *objp);
 bool_t xdr_nis_object(XDR *xdrs, nis_object *objp);
-bool_t xdr_nis_error(XDR *xdrs, nis_error *objp);
-bool_t xdr_nis_result(XDR *xdrs, nis_result *objp);
-bool_t xdr_ns_request(XDR *xdrs, ns_request *objp);
-bool_t xdr_ib_request(XDR *xdrs, ib_request *objp);
-bool_t xdr_ping_args(XDR *xdrs, ping_args *objp);
 bool_t xdr_log_entry_t(XDR *xdrs, log_entry_t *objp);
 bool_t xdr_log_entry(XDR *xdrs, log_entry *objp);
-bool_t xdr_log_result(XDR *xdrs, log_result *objp);
-bool_t xdr_cp_result(XDR *xdrs, cp_result *objp);
 bool_t xdr_nis_tag(XDR *xdrs, nis_tag *objp);
-bool_t xdr_nis_taglist(XDR *xdrs, nis_taglist *objp);
-bool_t xdr_dump_args(XDR *xdrs, dump_args *objp);
-bool_t xdr_fd_args(XDR *xdrs, fd_args *objp);
-bool_t xdr_fd_result(XDR *xdrs, fd_result *objp);
 bool_t xdr_nis_bound_endpoint(XDR *xdrs, nis_bound_endpoint *objp);
 bool_t xdr_nis_bound_directory(XDR *xdrs, nis_bound_directory *objp);
 bool_t xdr_nis_active_endpoint(XDR *xdrs, nis_active_endpoint *objp);
-
-/* nislib.c */
-void nis_freeresult(nis_result *res);
-void __nis_freelogresult(log_result *lres);
-nis_error nis_bind_dir(char *dname, int parent_first,
-				nis_bound_directory **binding, u_int flags);
-nis_result *nis_lookup(nis_name name, uint_t flags);
-nis_result *nis_list(nis_name name, uint_t flags, int (*cback)(),
-				void *cbdata);
-nis_result *nis_add(nis_name name, nis_object *obj);
-nis_result *nis_remove(nis_name name, nis_object *obj);
-nis_result *nis_modify(nis_name name, nis_object *obj);
-nis_result *nis_add_entry(nis_name name, nis_object *obj, uint_t flags);
-nis_result *nis_remove_entry(nis_name name, nis_object *obj, uint_t flags);
-nis_result *nis_modify_entry(nis_name name, nis_object *obj, uint_t flags);
-nis_result *nis_first_entry(nis_name table);
-nis_result *nis_next_entry(nis_name table, netobj *cookie);
-nis_result *nis_checkpoint(nis_name name);
-nis_error nis_mkdir(nis_name name, nis_server *srv);
-nis_error nis_rmdir(nis_name name, nis_server *srv);
-nis_error __nis_send_msg(nis_server *srv, int proc, xdrproc_t out, char *msg);
-nis_result *__nis_list_localcb(nis_name name, u_int flags,
-				int (*cback)(), void *cbdata);
-
-/* npd_lib.c */
-bool_t __npd_ecb_crypt(uint32_t *val1, uint32_t *val2, des_block *buf,
-			uint_t bufsize, uint_t mode, des_block *deskey);
-bool_t __npd_cbc_crypt(uint32_t *val, char *str, uint_t strsize,
-			npd_newpass *buf, uint_t bufsize, uint_t mode,
-			des_block *deskey);
-bool_t __npd2_cbc_crypt(uint32_t *val, char *str, uint_t strsize,
-			npd_newpass2 *buf, uint_t bufsize, uint_t mode,
-			des_block *deskey);
-
-/* print_obj.c */
-void nis_print_rights(u_int r);
-void nis_print_directory(directory_obj *r);
-void nis_print_group(group_obj *g);
-void nis_print_table(table_obj *t);
-void nis_print_link(link_obj *l);
-void nis_print_entry(entry_obj *edata);
-void nis_print_object(nis_object *o);
 
 /* thr_misc.c */
 

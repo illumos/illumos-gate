@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 BASEPREFIX=`echo $BASEDIR | sed "s/\//_/g"`
@@ -208,15 +208,11 @@ elif [ ! -r $BASEDIR/var/svc/profile/name_service.xml ] || \
 	#
 	grep ldap $BASEDIR/etc/nsswitch.conf >/dev/null 2>&1
 	is_ldap=$?
-	grep nisplus $BASEDIR/etc/nsswitch.conf >/dev/null 2>&1
-	is_nisplus=$?
 	grep nis $BASEDIR/etc/nsswitch.conf >/dev/null 2>&1
 	is_nis=$?
 
 	if [ $is_ldap = 0 ]; then
 		ns_profile=ns_ldap.xml
-	elif [ $is_nisplus = 0  ]; then
-		ns_profile=ns_nisplus.xml
 	elif [ $is_nis = 0 ]; then
 		ns_profile=ns_nis.xml
 	else

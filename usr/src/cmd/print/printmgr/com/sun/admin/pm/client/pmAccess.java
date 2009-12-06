@@ -20,9 +20,7 @@
  */
 /*
  *
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Comment which describes the contents of this file.
@@ -272,11 +270,11 @@ public class pmAccess extends pmButtonScreen {
 				"User.cancelled.login."));
 		} catch (pmGuiException e) {
 			Debug.message(
-			    "CLNT:pmAccess:login nis/nis+/ldap failed: " + e);
+			    "CLNT:pmAccess:login nis/ldap failed: " + e);
                		throw new pmLoginFailedException();
 		} catch (Exception e) {
 			Debug.message(
-			    "CLNT:pmAccess:login nis/nis+/ldap failed: " + e);
+			    "CLNT:pmAccess:login nis/ldap failed: " + e);
                		throw new pmLoginFailedException();
 		}
 	}

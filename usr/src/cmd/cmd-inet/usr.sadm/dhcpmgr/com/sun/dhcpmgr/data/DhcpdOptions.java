@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,9 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 package com.sun.dhcpmgr.data;
@@ -245,7 +242,7 @@ public class DhcpdOptions implements DhcpConfigOpts, Serializable {
     /**
      * Set the DhcpDatastore attributes.
      * @param datastore a datastore object whose attributes
-     *        are the desired attributes.
+     * are the desired attributes.
      */
     public void setDhcpDatastore(DhcpDatastore datastore) {
 	setResource(datastore.getResource());
@@ -789,7 +786,6 @@ public class DhcpdOptions implements DhcpConfigOpts, Serializable {
 		    new QualifierImpl(DSVC_CK_HOSTS_DOMAIN, true, false,
 			    new QualifierStringEnum(
 				new String[] {
-				    DSVC_CV_NISPLUS,
 				    DSVC_CV_DNS
 				}));
 	} else if (key.equals(DSVC_CK_HOSTS_RESOURCE)) {
@@ -797,7 +793,6 @@ public class DhcpdOptions implements DhcpConfigOpts, Serializable {
 		    new QualifierImpl(DSVC_CK_HOSTS_RESOURCE, true, false,
 			    new QualifierStringEnum(
 				new String[] {
-				    DSVC_CV_NISPLUS,
 				    DSVC_CV_DNS,
 				    DSVC_CV_FILES
 				}));

@@ -100,7 +100,6 @@ MINIROOT_DESCRIPTIONS= \
 	../../ypcmd/client.xml \
 	../../ypcmd/server.xml \
 	../../keyserv/keyserv.xml \
-	../../rpcsvc/nisplus.xml \
 	../../cmd-crypto/scripts/cryptosvc.xml \
 	../../nscd/name-service-cache.xml \
 	../../syslogd/system-log.xml

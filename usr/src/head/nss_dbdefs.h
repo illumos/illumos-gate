@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Database-specific definitions for the getXXXbyYYY routines
@@ -37,8 +37,6 @@
 
 #ifndef _NSS_DBDEFS_H
 #define	_NSS_DBDEFS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <unistd.h>
@@ -116,7 +114,7 @@ extern "C" {
 #define	NSS_DEFCONF_NETMASKS	NSS_NS_FALLBACK
 #define	NSS_DEFCONF_NETWORKS	NSS_NS_FALLBACK
 #define	NSS_DEFCONF_PASSWD	NSS_FILES_NS
-#define	NSS_DEFCONF_PRINTERS	"user files nis nisplus"
+#define	NSS_DEFCONF_PRINTERS	"user files nis"
 #define	NSS_DEFCONF_PROJECT	NSS_FILES_NS
 #define	NSS_DEFCONF_PROTOCOLS	NSS_NS_FALLBACK
 #define	NSS_DEFCONF_PUBLICKEY	NSS_FILES_NS

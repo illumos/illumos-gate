@@ -166,7 +166,6 @@ f none lib/amd64/nss_compat.so.1 755 root bin
 f none lib/amd64/nss_dns.so.1 755 root bin
 f none lib/amd64/nss_files.so.1 755 root bin
 f none lib/amd64/nss_nis.so.1 755 root bin
-f none lib/amd64/nss_nisplus.so.1 755 root bin
 f none lib/amd64/nss_user.so.1 755 root bin
 s none lib/amd64/libfdisk.so=libfdisk.so.1
 f none lib/amd64/libfdisk.so.1 755 root bin

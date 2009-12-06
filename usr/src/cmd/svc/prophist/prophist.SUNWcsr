@@ -20,11 +20,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-
 # prophist.SUNWcsr - historical property corrections for ON
 #
 # For builds prior to S10 final product release, certain manifests were
@@ -475,12 +473,6 @@ instance_refresh svc:/network/rpc/metamed:default
 prophist_addprop svc:/network/rpc/metamh inetd framework proto astring: tcp
 prophist_override network/rpc/metamh inetd proto tcp
 instance_refresh svc:/network/rpc/metamh:default
-
-prophist_addprop svc:/network/rpc/nisplus:default application application \
-    stability astring: Unstable
-prophist_addprop svc:/network/rpc/nisplus:default application application \
-    emulate_yp boolean: false
-instance_refresh svc:/network/rpc/nisplus:default
 
 prophist_upgrade network/security/kadmin start timeout_seconds 60 30
 prophist_upgrade network/security/kadmin stop timeout_seconds 60 30

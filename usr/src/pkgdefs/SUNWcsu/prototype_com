@@ -698,7 +698,6 @@ f none usr/lib/makekey 555 root bin
 f none usr/lib/more.help 644 root bin
 d none usr/lib/netsvc 755 root sys
 f none usr/lib/newsyslog 555 root sys
-f none usr/lib/nscd_nischeck 555 root bin
 d none usr/lib/pci 755 root bin
 f none usr/lib/pci/pcidr 555 root bin
 f none usr/lib/pci/pcidr_plugin.so 755 root bin

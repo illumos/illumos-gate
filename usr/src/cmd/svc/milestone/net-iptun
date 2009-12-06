@@ -40,7 +40,7 @@
 #
 # Also, if names are used in the /etc/hostname*.* files, those names have to
 # be in either DNS (and DNS is used) or in /etc/hosts, because this file is
-# executed before NIS or NIS+ is started.
+# executed before NIS is started.
 #
 
 #

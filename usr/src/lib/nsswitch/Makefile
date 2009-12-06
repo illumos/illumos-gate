@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # lib/nsswitch/Makefile
@@ -27,7 +27,7 @@
 
 include $(SRC)/Makefile.master
 
-SUBDIRS= files nis nisplus compat dns ldap user mdns ad
+SUBDIRS= files nis compat dns ldap user mdns ad
 
 all:=		TARGET= all
 clean:=		TARGET= clean

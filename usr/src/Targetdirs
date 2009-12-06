@@ -1023,7 +1023,6 @@ $(ROOT)/usr/lib/nss_compat.so.1:=	REALPATH=../../lib/nss_compat.so.1
 $(ROOT)/usr/lib/nss_dns.so.1:=		REALPATH=../../lib/nss_dns.so.1
 $(ROOT)/usr/lib/nss_files.so.1:=	REALPATH=../../lib/nss_files.so.1
 $(ROOT)/usr/lib/nss_nis.so.1:=		REALPATH=../../lib/nss_nis.so.1
-$(ROOT)/usr/lib/nss_nisplus.so.1:=	REALPATH=../../lib/nss_nisplus.so.1
 $(ROOT)/usr/lib/nss_user.so.1:=		REALPATH=../../lib/nss_user.so.1
 
 $(ROOT)/lib/$(MACH64)/libposix4.so.1:= \
@@ -1378,8 +1377,6 @@ $(ROOT)/usr/lib/$(MACH64)/nss_files.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/nss_files.so.1
 $(ROOT)/usr/lib/$(MACH64)/nss_nis.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/nss_nis.so.1
-$(ROOT)/usr/lib/$(MACH64)/nss_nisplus.so.1:= \
-	REALPATH=../../../lib/$(MACH64)/nss_nisplus.so.1
 $(ROOT)/usr/lib/$(MACH64)/nss_user.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/nss_user.so.1
 
@@ -1626,7 +1623,6 @@ SYM.USRLIB= \
 	/usr/lib/nss_dns.so.1 \
 	/usr/lib/nss_files.so.1 \
 	/usr/lib/nss_nis.so.1 \
-	/usr/lib/nss_nisplus.so.1 \
 	/usr/lib/nss_user.so.1
 
 sparcv9_SYM.USRLIB64= 
@@ -1812,7 +1808,6 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/nss_dns.so.1 \
 	/usr/lib/$(MACH64)/nss_files.so.1 \
 	/usr/lib/$(MACH64)/nss_nis.so.1 \
-	/usr/lib/$(MACH64)/nss_nisplus.so.1 \
 	/usr/lib/$(MACH64)/nss_user.so.1
 
 #

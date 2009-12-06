@@ -133,7 +133,6 @@ SUNWprivate_2.1 {
 	__nis_init_hash_table;
 	__nis_insert_item_mt;
 	__nis_insert_name_mt;
-	nis_isserving;
 	__nis_item_access;
 	__nis_lock_db_table;
 	__nis_lock_hash_table;
@@ -142,7 +141,6 @@ SUNWprivate_2.1 {
 	__nis_remove_item_mt;
 	__nis_retry_sleep;
 	__nis_scan_table_mt;
-	nis_server_control;
 	__nis_ulock_db_table;
 	__nis_ulock_hash_table;
 	nogecos;

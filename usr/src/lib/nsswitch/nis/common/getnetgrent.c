@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,8 +40,6 @@
  *	setnetgrent() should still check for the top-level netgroup name
  *	and return NSS_SUCCESS / NSS_NOTFOUND).
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "nis_common.h"
 #include <ctype.h>
@@ -224,7 +222,7 @@ struct nis_netgr_be {
  * A netgrtab structure contains the hash-chain heads and the head/tail
  * pointers for the expansion list.
  *
- * Most of this code is common to at least the NIS and NIS+ backends;  it
+ * Most of this code is common to at least the NIS backend;  it
  * should be generalized and, presumably, moved into the frontend.
  * ==> Not any longer...
  */
@@ -370,7 +368,7 @@ top_down(struct nis_netgr_be *be, const char **groups, int ngroups,
 		int		yperr;
 
 		result = _nss_nis_ypmatch(be->domain, "netgroup", group,
-					&val, &vallen, &yperr);
+		    &val, &vallen, &yperr);
 		if (result != NSS_SUCCESS) {
 			/*LINTED E_NOP_IF_STMT*/
 			if (result == NSS_NOTFOUND) {

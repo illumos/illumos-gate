@@ -34,7 +34,7 @@ OBJS=	nfs4_xdr.o snoop.o snoop_aarp.o snoop_adsp.o snoop_aecho.o \
 	snoop_ipaddr.o snoop_ipsec.o snoop_isis.o \
 	snoop_ldap.o snoop_mip.o snoop_mount.o \
 	snoop_nbp.o snoop_netbios.o snoop_nfs.o snoop_nfs3.o snoop_nfs4.o \
-	snoop_nfs_acl.o snoop_nis.o snoop_nisplus.o snoop_nlm.o snoop_ntp.o \
+	snoop_nfs_acl.o snoop_nis.o snoop_nlm.o snoop_ntp.o \
 	snoop_pf.o snoop_ospf.o snoop_ospf6.o snoop_pmap.o snoop_ppp.o \
 	snoop_pppoe.o snoop_rip.o snoop_rip6.o snoop_rpc.o snoop_rpcprint.o \
 	snoop_rpcsec.o snoop_rport.o snoop_rquota.o snoop_rstat.o snoop_rtmp.o \

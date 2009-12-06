@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,11 +21,10 @@
 /*
  *	nis_db.cc
  *
- *	Copyright (c) 1988-2001 by Sun Microsystems, Inc.
- *	All Rights Reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <strings.h>
@@ -43,9 +41,7 @@
 #include "ldap_parse.h"
 #include "ldap_glob.h"
 #include "ldap_xdr.h"
-#include "nis_servlist.h"
 #include "ldap_glob.h"
-#include "ldap_nisplus.h"
 
 db_dictionary	curdict;
 db_dictionary	tempdict; /* a temporary one */
@@ -689,32 +685,6 @@ findObj(char *name, db_status *statP, int *lstatP) {
 	return (o);
 }
 
-bool_t
-isMaster(nis_object *o) {
-	db_status	stat;
-	int		lstat;
-	nis_object	*dir;
-	bool_t		res;
-	char		*myself = "isMaster";
-
-	if (o == 0)
-		return (FALSE);
-
-	if (o->zo_data.zo_type == NIS_DIRECTORY_OBJ)
-		return (nis_isserving(o) == 1);
-
-	dir = findObj(o->zo_domain, &stat, &lstat);
-
-	if (dir != 0) {
-		res = nis_isserving(dir) == 1;
-		nis_destroy_object(dir);
-	} else {
-		res = FALSE;
-	}
-
-	return (res);
-}
-
 /*
  * Delete the specified object from the local DB.
  */
@@ -757,12 +727,6 @@ dbDeleteObj(char *objName) {
 	 * removed), we only allow object deletion if we're the
 	 * master for it.
 	 */
-	if (isMaster(o)) {
-		logmsg(MSG_NOTIMECHECK, LOG_INFO,
-			"%s: Master for \"%s\", will not remove",
-			myself, objName);
-		return (DB_SUCCESS);
-	}
 
 	nod = (nisdb_obj_del_t *)am(myself, sizeof (*nod));
 	if (nod == 0) {
@@ -1172,12 +1136,6 @@ dbRefreshObj(char *name, nis_object *o) {
 			} else {
 				stat = dbCreateTable(objTable, o);
 			}
-			if (stat == DB_SUCCESS && isDir) {
-				int	st = nis_server_control(SERVING_LIST,
-							DIR_ADD, objName);
-				if (!st)
-					stat = DB_INTERNAL_ERROR;
-			}
 		}
 		sfree(objTable);
 	}
@@ -1219,7 +1177,7 @@ replaceMappingObj(__nis_table_mapping_t *t, nis_object *n) {
 }
 
 /*
- * Set object type, isMaster, column info, and obj for the specified
+ * Set object type, column info, and obj for the specified
  * mapping 't' from the object 'o'. Returns zero if 'o' was unused,
  * and should be freed by the caller, larger than zero otherwise.
  */
@@ -1227,16 +1185,15 @@ int
 setMappingObjTypeEtc(__nis_table_mapping_t *t, nis_object *o) {
 	__nis_table_mapping_t	*x;
 	int			ls, ret;
+	int	                i;
 
 	if (t == 0 || o == 0)
 		return (0);
 
 	t->objType = o->zo_data.zo_type;
-	t->isMaster = isMaster(o);
 	for (x = t; x != 0; x = (__nis_table_mapping_t *)x->next) {
 		if (x != t) {
 			x->objType = t->objType;
-			x->isMaster = t->isMaster;
 		}
 		if (x->objType == NIS_TABLE_OBJ) {
 			/*
@@ -1244,18 +1201,12 @@ setMappingObjTypeEtc(__nis_table_mapping_t *t, nis_object *o) {
 			 * and we need the column names. Otherwise, remove the
 			 * column names (if any).
 			 */
-			if (x->numRulesFromLDAP > 0 || x->numRulesToLDAP > 0)
-				ls = copyColumnNames(o, &x->column,
-							&x->numColumns);
-			else {
-				int	i;
 
-				for (i = 0; i < x->numColumns; i++)
-					sfree(x->column[i]);
-				sfree(x->column);
-				x->column = 0;
-				x->numColumns = 0;
-			}
+                        for (i = 0; i < x->numColumns; i++)
+			sfree(x->column[i]);
+		        sfree(x->column);
+			x->column = 0;
+			x->numColumns = 0;
 		}
 	}
 	ret = replaceMappingObj(t, o);

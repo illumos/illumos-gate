@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
- * Copyright (c) 1998-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 package com.sun.dhcpmgr.data;
 
@@ -50,8 +47,6 @@ public class StandardOptions implements Serializable {
     public static final String CD_NIS_DOMAIN = "NISdmain";
     public static final String CD_NIS_SERV = "NISservs";
     public static final String CD_LEASE_TIME = "LeaseTim";
-    public static final String CD_NISPLUS_DMAIN = "NIS+dom";
-    public static final String CD_NISPLUS_SERVS = "NIS+serv";
     public static final String CD_BOOL_LEASENEG = "LeaseNeg";
 
     /*
@@ -67,7 +62,7 @@ public class StandardOptions implements Serializable {
     public static int size() {
 	return (options == null) ? 0 :options.length;
     }
-    
+
     /**
      * Enumerate the options defined here.
      * @return an Enumeration of the standard options.
@@ -75,11 +70,11 @@ public class StandardOptions implements Serializable {
     public Enumeration enumOptions() {
 	return new Enumeration() {
 	    int cursor = 0;
-	    
+
 	    public boolean hasMoreElements() {
 		return (cursor < size());
 	    }
-	    
+
 	    public Object nextElement() throws NoSuchElementException {
 		if (cursor >= size()) {
 		    throw new NoSuchElementException();
@@ -88,7 +83,7 @@ public class StandardOptions implements Serializable {
 	    }
 	};
     }
-    
+
     /**
      * Return all options as an array
      * @return the array of options defined here
@@ -96,7 +91,7 @@ public class StandardOptions implements Serializable {
     public static Option [] getAllOptions() {
 	return options;
     }
-    
+
     /**
      * Set all options as an array
      * @param options array of STANDARD options
@@ -104,12 +99,12 @@ public class StandardOptions implements Serializable {
     public static void setAllOptions(Option [] ops) {
 	options = ops;
     }
-    
+
     /**
      * Find the option name for a given code.  This could be
      * much faster but not clear that it needs to be yet.
      * @return the name of the option, or null if that code is unknown.
-     */ 
+     */
     public static String nameForCode(int code) {
 	for (int i = 0; i < options.length; ++i) {
 	    if (options[i].getCode() == code) {

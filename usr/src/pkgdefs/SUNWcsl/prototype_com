@@ -294,7 +294,6 @@ s none usr/lib/nss_files.so.1=../../lib/nss_files.so.1
 f none usr/lib/nss_ldap.so.1 755 root bin
 f none usr/lib/nss_ad.so.1 755 root bin
 s none usr/lib/nss_nis.so.1=../../lib/nss_nis.so.1
-s none usr/lib/nss_nisplus.so.1=../../lib/nss_nisplus.so.1
 s none usr/lib/nss_user.so.1=../../lib/nss_user.so.1
 f none usr/lib/passwdutil.so.1 755 root bin
 d none usr/lib/raidcfg 755 root bin

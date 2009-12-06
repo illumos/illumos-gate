@@ -361,7 +361,6 @@ s none usr/lib/amd64/nss_files.so.1=../../../lib/amd64/nss_files.so.1
 f none usr/lib/amd64/nss_ldap.so.1 755 root bin
 f none usr/lib/amd64/nss_ad.so.1 755 root bin
 s none usr/lib/amd64/nss_nis.so.1=../../../lib/amd64/nss_nis.so.1
-s none usr/lib/amd64/nss_nisplus.so.1=../../../lib/amd64/nss_nisplus.so.1
 s none usr/lib/amd64/nss_user.so.1=../../../lib/amd64/nss_user.so.1
 f none usr/lib/amd64/passwdutil.so.1 755 root bin
 f none usr/lib/amd64/straddr.so.2 755 root bin

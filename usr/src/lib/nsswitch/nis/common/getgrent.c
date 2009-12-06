@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -130,7 +130,7 @@ getbymember(be, a)
 	if (strcmp(argp->username, "root") == 0) {
 		/*
 		 * Assume that "root" can only sensibly be in /etc/group,
-		 *   not in NIS or NIS+
+		 *   not in NIS
 		 * If we don't do this, a hung name-service may cause
 		 *   a root login or su to hang.
 		 */

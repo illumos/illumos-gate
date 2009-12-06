@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -93,7 +91,7 @@ static int
 _file_put_printer(const char *file, const ns_printer_t *printer)
 {
 	FILE	*ifp,
-		*ofp;
+	    *ofp;
 	char *tmpfile;
 	int fd;
 	int exit_status = 0;
@@ -152,19 +150,19 @@ _file_put_printer(const char *file, const ns_printer_t *printer)
 	 */
 
 		if (!((strcmp(printer->name, "all") == 0) &&
-				(printer->attributes == NULL))) {
+		    (printer->attributes == NULL))) {
 			char *t, *entry, *pentry;
 
 			(void) _cvt_printer_to_entry((ns_printer_t *)printer,
-							buf, sizeof (buf));
+			    buf, sizeof (buf));
 			t = pentry = strdup(buf);
 
 			while (freadline(ifp, buf, sizeof (buf)) != NULL) {
 				ns_printer_t *tmp = (ns_printer_t *)
-					_cvt_nss_entry_to_printer(buf, "");
+				    _cvt_nss_entry_to_printer(buf, "");
 
 				if (ns_printer_match_name(tmp, printer->name)
-						== 0) {
+				    == 0) {
 					entry = pentry;
 					pentry = NULL;
 				} else
@@ -204,7 +202,6 @@ files_put_printer(const ns_printer_t *printer)
 	return (_file_put_printer(file, printer));
 }
 
-
 /*
  * Support for writing a printer into the NIS printers.conf.byname
  * map.
@@ -227,7 +224,7 @@ remote_command(char *command, char *host)
 		int fd;
 
 		if ((fd = rcmd_af(&host, htons(514), pw->pw_name, "root",
-				command, NULL, AF_INET6)) < 0)
+		    command, NULL, AF_INET6)) < 0)
 			return (-1);
 		(void) close(fd);
 		return (0);
@@ -264,12 +261,12 @@ nis_put_printer(const ns_printer_t *printer)
 		return (-1);
 
 	if (snprintf(lfile, sizeof (lfile), "/tmp/%s", map) >=
-			sizeof (lfile)) {
+	    sizeof (lfile)) {
 		syslog(LOG_ERR, "nis_put_printer:lfile buffer overflow");
 		return (-1);
 	}
 	if (snprintf(rfile, sizeof (rfile), "root@%s:/etc/%s", host, map) >=
-			sizeof (rfile)) {
+	    sizeof (rfile)) {
 		syslog(LOG_ERR, "nis_put_printer:rfile buffer overflow");
 		return (-1);
 	}
@@ -280,10 +277,10 @@ nis_put_printer(const ns_printer_t *printer)
 
 	/* copy it local */
 	if (snprintf(cmd, sizeof (cmd), "rcp %s %s >/dev/null 2>&1",
-		rfile, lfile) >= sizeof (cmd)) {
-		    syslog(LOG_ERR,
-			    "nis_put_printer:buffer overflow building cmd");
-		    return (-1);
+	    rfile, lfile) >= sizeof (cmd)) {
+		syslog(LOG_ERR,
+		    "nis_put_printer:buffer overflow building cmd");
+		return (-1);
 	}
 	(void) system(cmd);	/* could fail because it doesn't exist */
 
@@ -294,20 +291,20 @@ nis_put_printer(const ns_printer_t *printer)
 
 	/* copy it back */
 	if (snprintf(cmd, sizeof (cmd), "rcp %s %s >/dev/null 2>&1",
-		lfile, rfile) >= sizeof (cmd)) {
-		    syslog(LOG_ERR,
-			    "nis_put_printer:buffer overflow building cmd");
-		    return (-1);
+	    lfile, rfile) >= sizeof (cmd)) {
+		syslog(LOG_ERR,
+		    "nis_put_printer:buffer overflow building cmd");
+		return (-1);
 	}
 	if (system(cmd) != 0)
 		return (-1);
 
 	/* copy the Makefile excerpt */
 	if (snprintf(cmd, sizeof (cmd),
-			"rcp %s root@%s:%s.print >/dev/null 2>&1",
-			MAKE_EXCERPT, host, NIS_MAKEFILE) >= sizeof (cmd)) {
+	    "rcp %s root@%s:%s.print >/dev/null 2>&1",
+	    MAKE_EXCERPT, host, NIS_MAKEFILE) >= sizeof (cmd)) {
 		syslog(LOG_ERR,
-			"nis_put_printer:buffer overflow building cmd");
+		    "nis_put_printer:buffer overflow building cmd");
 		return (-1);
 	}
 
@@ -316,86 +313,13 @@ nis_put_printer(const ns_printer_t *printer)
 
 	/* run the make */
 	if (snprintf(cmd, sizeof (cmd),
-			"/bin/sh -c 'PATH=/usr/ccs/bin:/bin:/usr/bin:$PATH "
-			"make -f %s -f %s.print printers.conf >/dev/null 2>&1'",
-			NIS_MAKEFILE, NIS_MAKEFILE) >= sizeof (cmd)) {
+	    "/bin/sh -c 'PATH=/usr/ccs/bin:/bin:/usr/bin:$PATH "
+	    "make -f %s -f %s.print printers.conf >/dev/null 2>&1'",
+	    NIS_MAKEFILE, NIS_MAKEFILE) >= sizeof (cmd)) {
 		syslog(LOG_ERR,
-			"nis_put_printer:buffer overflow on make");
+		    "nis_put_printer:buffer overflow on make");
 		return (-1);
 	}
 
 	return (remote_command(cmd, host));
-}
-
-/*
- * Support for writing a printer into the NISPLUS org_dir.printers table
- * begins here.  This support uses the nisplus(5) commands rather than the
- * nisplus API.  This was done to remove the dependency in libprint on the
- * API, which is used for lookup in a configuration dependent manner.
- */
-#define	NISPLUS_CREATE	"/usr/bin/nistest -t T printers.org_dir || "\
-			"( /usr/bin/nistbladm "\
-			"-D access=og=rmcd,nw=r:group=admin."\
-				"`/usr/bin/nisdefaults -d` "\
-			"-c printers_tbl key=S,nogw= datum=,nogw= "\
-			"printers.org_dir.`/usr/bin/nisdefaults -d` )"
-
-#define	NISPLUS_REMOVE	"/usr/bin/nistbladm  -R key=%s printers.org_dir"
-#define	NISPLUS_UPDATE	"/usr/bin/nistbladm  -A key=%s datum="
-
-int
-nisplus_put_printer(const ns_printer_t *printer)
-{
-	int rc = 0;
-	char cmd[BUFSIZ];
-
-	if (printer == NULL)
-		return (rc);
-
-	/* create the table if it doesn't exist */
-	(void) system(NISPLUS_CREATE);
-
-	if (printer->attributes != NULL) {
-		int		len;
-		ns_kvp_t	**kvp;
-
-		if (snprintf(cmd, sizeof (cmd), NISPLUS_UPDATE,
-				printer->name) >= sizeof (cmd)) {
-		    syslog(LOG_ERR,
-		    "nisplus_put_printer:NISPLUS_UPDATE:buffer overflow");
-		    return (-1);
-		}
-
-		len = strlen(cmd);
-
-		/* Append key/value pairs */
-		for (kvp = printer->attributes; *kvp != NULL; kvp++)
-			if (((*kvp)->key != NULL) && ((*kvp)->value != NULL)) {
-			(void) strlcat(cmd, ":", sizeof (cmd));
-			(void) strncat_escaped(cmd, (*kvp)->key, sizeof (cmd),
-			    ESCAPE_CHARS);
-			(void) strlcat(cmd, "=", sizeof (cmd));
-			(void) strncat_escaped(cmd, (*kvp)->value,
-			    sizeof (cmd), ESCAPE_CHARS);
-	}
-
-		if (len != strlen(cmd))
-			(void) strlcat(cmd, " printers.org_dir", sizeof (cmd));
-		else
-			(void) snprintf(cmd, sizeof (cmd), NISPLUS_REMOVE,
-						printer->name);
-
-	} else
-		(void) snprintf(cmd, sizeof (cmd), NISPLUS_REMOVE,
-		    printer->name);
-
-	if (strlcat(cmd, " >/dev/null 2>&1", sizeof (cmd)) >= sizeof (cmd)) {
-		syslog(LOG_ERR, "nisplus_put_printer: buffer overflow");
-		return (-1);
-	}
-
-	/* add/modify/delete the entry */
-	rc = system(cmd);
-
-	return (rc);
 }

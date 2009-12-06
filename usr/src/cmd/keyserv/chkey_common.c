@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,7 +50,6 @@ static const char *CRED_TABLE = "cred.org_dir";
 
 #define	PK_FILES	1
 #define	PK_YP		2
-#define	PK_NISPLUS	3
 #define	PK_LDAP		4
 
 #define	LDAP_BINDDN_DEFAULT	"cn=Directory Manager"
@@ -236,9 +232,9 @@ int
 is_switch_policy(struct __nsw_switchconfig *conf, char *target)
 {
 	return (conf &&
-		conf->lookups &&
-		strcmp(conf->lookups->service_name, target) == 0 &&
-		conf->lookups->next == NULL);
+	    conf->lookups &&
+	    strcmp(conf->lookups->service_name, target) == 0 &&
+	    conf->lookups->next == NULL);
 }
 
 char *
@@ -268,15 +264,15 @@ first_and_only_switch_policy(char *policy,
 		if (use_default) {
 			(void) fprintf(stderr,
 			"\n%s\n There is no publickey entry in %s.\n",
-				head_msg, __NSW_CONFIG_FILE);
+			    head_msg, __NSW_CONFIG_FILE);
 			(void) fprintf(stderr,
 			"The default publickey policy is \"publickey: %s\".\n",
-			switch_policy_str(default_conf));
+			    switch_policy_str(default_conf));
 		} else
 			(void) fprintf(stderr,
 		"\n%s\nThe publickey entry in %s is \"publickey: %s\".\n",
-			head_msg, __NSW_CONFIG_FILE,
-			switch_policy_str(conf));
+			    head_msg, __NSW_CONFIG_FILE,
+			    switch_policy_str(conf));
 	}
 
 	if (policy_correct == 0)
@@ -309,25 +305,25 @@ check_switch_policy(char *policy, char *target_service,
 	if (no_switch_policy(conf)) {
 		if (!is_switch_policy(default_conf, target_service)) {
 			(void) fprintf(stderr,
-				"\n%s\nThere is no publickey entry in %s.\n",
-				head_msg, __NSW_CONFIG_FILE);
+			    "\n%s\nThere is no publickey entry in %s.\n",
+			    head_msg, __NSW_CONFIG_FILE);
 			(void) fprintf(stderr,
 			"The default publickey policy is \"publickey: %s\".\n",
-			switch_policy_str(default_conf));
+			    switch_policy_str(default_conf));
 			policy_correct = 0;
 		}
 	} else if (!is_switch_policy(conf, target_service)) {
 		(void) fprintf(stderr,
 		"\n%s\nThe publickey entry in %s is \"publickey: %s\".\n",
-			head_msg, __NSW_CONFIG_FILE,
-			switch_policy_str(conf));
+		    head_msg, __NSW_CONFIG_FILE,
+		    switch_policy_str(conf));
 		policy_correct = 0;
 	}
 	/* should we exit ? */
 	if (policy_correct == 0)
 		(void) fprintf(stderr,
 		"It should be \"publickey: %s\"%s\n\n",
-			target_service, tail_msg);
+		    target_service, tail_msg);
 	if (conf)
 		__nsw_freeconfig(conf);
 
@@ -342,19 +338,17 @@ get_pk_source(char *pk_service)
 	/* No service specified, try to figure out from switch */
 	if (pk_service == 0) {
 		pk_service = first_and_only_switch_policy("publickey", 0,
-				"ERROR:");
+		    "ERROR:");
 		if (pk_service == 0)
 			return (0);
 		(void) fprintf(stdout,
-			"Updating %s publickey database.\n",
-			pk_service);
+		    "Updating %s publickey database.\n",
+		    pk_service);
 		got_from_switch = 1;
 	}
 
 	if (strcmp(pk_service, "ldap") == 0)
 		db = PK_LDAP;
-	else if (strcmp(pk_service, "nisplus") == 0)
-		db = PK_NISPLUS;
 	else if (strcmp(pk_service, "nis") == 0)
 		db = PK_YP;
 	else if (strcmp(pk_service, "files") == 0)
@@ -367,8 +361,8 @@ get_pk_source(char *pk_service)
 	 */
 	if (got_from_switch == 0)
 		check_switch_policy("publickey", pk_service, 0, "WARNING:",
-				    db == PK_FILES ? "" :
-			    "; add 'files' if you want the 'nobody' key.");
+		    db == PK_FILES ? "" :
+		    "; add 'files' if you want the 'nobody' key.");
 
 
 	return (db); /* all passed */
@@ -398,387 +392,12 @@ keylogin(char *netname, char *secret)
 	/* do actual key login */
 	if (key_setnet(&netst) < 0) {
 		(void) fprintf(stderr,
-			"Could not set %s's secret key\n", netname);
+		    "Could not set %s's secret key\n", netname);
 		(void) fprintf(stderr, "May be the keyserv is down?\n");
 		return (0);
 	}
 
 	return (1);
-}
-
-/*
- * XXX unused routine.
- * Can not locate any routine that is using this write_rootkey()
- * function. There are 2 other write_rootkey() routines defined in chkey.c
- * and in cmd/rpcsvc/nis/utils/nisaddcred/makedhextcred.c.
- *
- * write unencrypted secret key into root key file
- */
-void
-write_rootkey(char *secret)
-{
-	char sbuf[HEXKEYBYTES+2];
-	int fd, len;
-
-	strcpy(sbuf, secret);
-	strcat(sbuf, "\n");
-	len = strlen(sbuf);
-	sbuf[len] = '\0';
-	unlink(ROOTKEY_FILE);
-	if ((fd = open(ROOTKEY_FILE, O_WRONLY+O_CREAT, 0600)) != -1) {
-		write(fd, sbuf, len+1);
-		close(fd);
-		(void) fprintf(stdout, "Wrote secret key into %s\n",
-			ROOTKEY_FILE);
-	} else {
-		(void) fprintf(stderr, "Could not open %s for update\n",
-			ROOTKEY_FILE);
-		perror(ROOTKEY_FILE);
-	}
-}
-
-/* ****************************** nisplus stuff ************************* */
-/* most of it gotten from nisaddcred */
-
-
-/* Check that someone else don't have the same auth information already */
-static
-nis_error
-auth_exists(char *princname, char *auth_name, char *auth_type, char *domain)
-{
-	char sname[NIS_MAXNAMELEN+MAXHOSTNAMELEN+64];
-	nis_result	*res;
-	nis_error status;
-	char *foundprinc;
-
-	(void) sprintf(sname, "[auth_name=%s,auth_type=%s],%s.%s",
-		auth_name, auth_type, CRED_TABLE, domain);
-	if (sname[strlen(sname)-1] != '.')
-		strcat(sname, ".");
-	/* Don't want FOLLOW_PATH here */
-	res = nis_list(sname,
-		MASTER_ONLY+USE_DGRAM+NO_AUTHINFO+FOLLOW_LINKS,
-		NULL, NULL);
-
-	status = res->status;
-	switch (res->status) {
-	case NIS_NOTFOUND:
-		break;
-	case NIS_TRYAGAIN :
-		(void) fprintf(stderr,
-			"%s: NIS+ server busy, try again later.\n",
-			program_name);
-		exit(1);
-	case NIS_PERMISSION :
-		(void) fprintf(stderr,
-		"%s: insufficient permission to look up old credentials.\n",
-			program_name);
-		exit(1);
-	case NIS_SUCCESS:
-		foundprinc = ENTRY_VAL(res->objects.objects_val, 0);
-		if (nis_dir_cmp(foundprinc, princname) != SAME_NAME) {
-			(void) fprintf(stderr,
-	"%s: %s credentials with auth_name '%s' already belong to '%s'.\n",
-			program_name, auth_type, auth_name, foundprinc);
-			exit(1);
-		}
-		break;
-	default:
-		(void) fprintf(stderr,
-			"%s: error looking at cred table, NIS+ error: %s\n",
-			program_name, nis_sperrno(res->status));
-		exit(1);
-	}
-	nis_freeresult(res);
-	return (status);
-}
-
-/* Returns 0 if check fails; 1 if successful. */
-static int
-sanity_checks(nis_princ, netname, domain)
-char	*nis_princ,
-	*netname,
-	*domain;
-{
-	char	netdomainaux[MAXHOSTNAMELEN+1];
-	char	*princdomain, *netdomain;
-	int	len;
-
-	/* Sanity check 0. Do we have a nis+ principal name to work with? */
-	if (nis_princ == NULL) {
-		(void) fprintf(stderr,
-		"%s: you must create a \"LOCAL\" credential for '%s' first.\n",
-			program_name, netname);
-		(void) fprintf(stderr, "\tSee nisaddcred(1).\n");
-		return (0);
-	}
-
-	/* Sanity check 0.5.  NIS+ principal names must be dotted. */
-	len = strlen(nis_princ);
-	if (nis_princ[len-1] != '.') {
-		(void) fprintf(stderr,
-		"%s: invalid principal name: '%s' (forgot ending dot?).\n",
-			program_name, nis_princ);
-		return (0);
-	}
-
-	/* Sanity check 1.  We only deal with one type of netnames. */
-	if (strncmp(netname, "unix", 4) != 0) {
-		(void) fprintf(stderr,
-			"%s: unrecognized netname type: '%s'.\n",
-			program_name, netname);
-		return (0);
-	}
-
-	/* Sanity check 2.  Should only add DES cred in home domain. */
-	princdomain = nis_domain_of(nis_princ);
-	if (strcasecmp(princdomain, domain) != 0) {
-		(void) fprintf(stderr,
-"%s: domain of principal '%s' does not match destination domain '%s'.\n",
-			program_name, nis_princ, domain);
-		(void) fprintf(stderr,
-	"Should only add DES credential of principal in its home domain\n");
-		return (0);
-	}
-
-	/*
-	 * Sanity check 3:  Make sure netname's domain same as principal's
-	 * and don't have extraneous dot at the end.
-	 */
-	netdomain = (char *)strchr(netname, '@');
-	if (! netdomain || netname[strlen(netname)-1] == '.') {
-		(void) fprintf(stderr, "%s: invalid netname: '%s'. \n",
-			program_name, netname);
-		return (0);
-	}
-	netdomain++; /* skip '@' */
-	/* make sure we don't run into buffer overflow */
-	if (strlen(netdomain) > sizeof (netdomainaux))
-		return (0);
-	strcpy(netdomainaux, netdomain);
-	if (netdomainaux[strlen(netdomainaux)-1] != '.')
-		strcat(netdomainaux, ".");
-
-	if (strcasecmp(princdomain, netdomainaux) != 0) {
-		(void) fprintf(stderr,
-	"%s: domain of netname %s should be same as that of principal %s\n",
-			program_name, netname, nis_princ);
-		return (0);
-	}
-
-	/* Another principal owns same credentials? (exits if that happens) */
-	(void) auth_exists(nis_princ, netname, "DES", domain);
-
-	return (1); /* all passed */
-}
-
-
-/*
- * Similar to nis_local_principal in "nis_subr.c" except
- * this gets the results from the MASTER_ONLY and no FOLLOW_PATH.
- * We only want the master because we'll be making updates there,
- * and also the replicas may not have seen the 'nisaddacred local'
- * that may have just occurred.
- * Returns NULL if not found.
- */
-char *
-get_nisplus_principal(directory, uid)
-char	*directory;
-uid_t	uid;
-{
-	nis_result	*res;
-	char		buf[NIS_MAXNAMELEN + 1];
-	int		status;
-	static	char	principal_name[NIS_MAXNAMELEN + 1];
-
-	if (uid == 0)
-		return (nis_local_host());
-
-	/* buf is enough to hold the string, no buffer overflow */
-	(void) sprintf(buf, "[auth_name=%d,auth_type=LOCAL],%s.%s",
-		uid, CRED_TABLE, directory);
-
-	if (buf[strlen(buf)-1] != '.')
-		strcat(buf, ".");
-
-	res = nis_list(buf,
-		MASTER_ONLY+USE_DGRAM+NO_AUTHINFO+FOLLOW_LINKS,
-		NULL, NULL);
-
-	if (res == NULL) {
-		(void) fprintf(stderr,
-			"%s: unable to get result from NIS+ server.",
-			program_name);
-		exit(1);
-	}
-	switch (res->status) {
-	case NIS_SUCCESS:
-		if (res->objects.objects_len > 1) {
-			/*
-			 * More than one principal with same uid?
-			 * something wrong with cred table. Should be unique
-			 * Warn user and continue.
-			 */
-			(void) fprintf(stderr,
-			"%s: LOCAL entry for %d in directory %s not unique",
-				program_name, uid, directory);
-		}
-		/* make sure we don't run into buffer overflow */
-		if (strlen(ENTRY_VAL(res->objects.objects_val, 0)) >
-			sizeof (principal_name))
-			return (NULL);
-		strcpy(principal_name,
-			ENTRY_VAL(res->objects.objects_val, 0));
-		nis_freeresult(res);
-		return (principal_name);
-
-	case NIS_NOTFOUND:
-		nis_freeresult(res);
-		return (NULL);
-
-	case NIS_TRYAGAIN :
-		(void) fprintf(stderr,
-			"%s: NIS+ server busy, try again later.\n",
-			program_name);
-		exit(1);
-
-	case NIS_PERMISSION :
-		(void) fprintf(stderr,
-			"%s: insufficient permission to update credentials.\n",
-			program_name);
-		exit(1);
-
-	default:
-		(void) fprintf(stderr,
-			"%s: error talking to server, NIS+ error: %s.\n",
-			program_name, nis_sperrno(res->status));
-		exit(1);
-	}
-	return (NULL);
-}
-
-
-
-/* Check whether this principal already has this type of credentials */
-static nis_error
-cred_exists(char *nisprinc, char *flavor, char *domain)
-{
-	char sname[NIS_MAXNAMELEN+MAXHOSTNAMELEN+64];
-	nis_result	*res;
-	nis_error status;
-
-	(void) sprintf(sname, "[cname=\"%s\",auth_type=%s],%s.%s",
-		nisprinc, flavor, CRED_TABLE, domain);
-	if (sname[strlen(sname)-1] != '.')
-		strcat(sname, ".");
-
-	/* Don't want FOLLOW_PATH here */
-	res = nis_list(sname,
-		MASTER_ONLY+USE_DGRAM+NO_AUTHINFO+FOLLOW_LINKS,
-		NULL, NULL);
-
-	status = res->status;
-	switch (status) {
-	case NIS_NOTFOUND:
-		break;
-	case NIS_TRYAGAIN:
-		(void) fprintf(stderr,
-			"%s: NIS+ server busy, try again later.\n",
-			program_name);
-		exit(1);
-	case NIS_PERMISSION:
-		(void) fprintf(stderr,
-		"%s: insufficient permission to look at credentials table\n",
-			program_name);
-		exit(1);
-	case NIS_SUCCESS:
-	case NIS_S_SUCCESS:
-		break;
-	default:
-		(void) fprintf(stderr,
-			"%s: error looking at cred table, NIS+ error: %s\n",
-			program_name, nis_sperrno(res->status));
-		exit(1);
-	}
-	nis_freeresult(res);
-	return (status);
-}
-
-
-/* Returns 0 if operation fails; 1 if successful. */
-static
-int
-modify_cred_obj(obj, domain)
-	char *domain;
-	nis_object *obj;
-{
-	int status = 0;
-	char sname[NIS_MAXNAMELEN+1];
-	nis_result	*res;
-
-	(void) sprintf(sname, "%s.%s", CRED_TABLE, domain);
-	res = nis_modify_entry(sname, obj, 0);
-	switch (res->status) {
-	case NIS_TRYAGAIN :
-		(void) fprintf(stderr,
-			"%s: NIS+ server busy, try again later.\n",
-			program_name);
-		exit(1);
-	case NIS_PERMISSION :
-		(void) fprintf(stderr,
-			"%s: insufficient permission to update credentials.\n",
-			program_name);
-		exit(1);
-	case NIS_SUCCESS :
-		status = 1;
-		break;
-	default:
-		(void) fprintf(stderr,
-			"%s: error modifying credential, NIS+ error: %s.\n",
-			program_name, nis_sperrno(res->status));
-		exit(1);
-	}
-	nis_freeresult(res);
-	return (status);
-}
-
-
-static
-int
-add_cred_obj(obj, domain)
-	char *domain;
-	nis_object *obj;
-{
-	int status = 0;
-	char sname[NIS_MAXNAMELEN+1];
-	nis_result	*res;
-
-	/* Assume check for cred_exists performed already */
-
-	(void) sprintf(sname, "%s.%s", CRED_TABLE, domain);
-	res = nis_add_entry(sname, obj, 0);
-	switch (res->status) {
-	case NIS_TRYAGAIN :
-		(void) fprintf(stderr,
-			"%s: NIS+ server busy, try again later.\n",
-			program_name);
-		exit(1);
-	case NIS_PERMISSION :
-		(void) fprintf(stderr,
-			"%s: insufficient permission to update credentials.\n",
-			program_name);
-		exit(1);
-	case NIS_SUCCESS :
-		status = 1;
-		break;
-	default:
-		(void) fprintf(stderr,
-			"%s: error creating credential, NIS+ error: %s.\n",
-			program_name, nis_sperrno(res->status));
-		exit(1);
-	}
-	nis_freeresult(res);
-	return (status);
 }
 
 nis_object *
@@ -890,7 +509,7 @@ ldap_attr_mod(ns_ldap_entry_t *entry,
 				for (j = 0; j < attr->value_count; j++) {
 					char	*val = attr->attrvalue[j];
 					if (strncasecmp(val, mechfilter,
-							mechfilterlen) == 0) {
+					    mechfilterlen) == 0) {
 						/* Replace entry */
 						rep++;
 						alist[q][j] = keys[q];
@@ -921,7 +540,7 @@ ldap_attr_mod(ns_ldap_entry_t *entry,
 		}
 	}
 	if ((attrs = (ns_ldap_attr_t *)calloc(1,
-			sizeof (ns_ldap_attr_t))) == NULL)
+	    sizeof (ns_ldap_attr_t))) == NULL)
 		return (0);
 	attrs->attrname = "nisPublicKey";
 	attrs->attrvalue = alist[0];
@@ -929,7 +548,7 @@ ldap_attr_mod(ns_ldap_entry_t *entry,
 	*pkeyattrs = attrs;
 
 	if ((attrs = (ns_ldap_attr_t *)calloc(1,
-			sizeof (ns_ldap_attr_t))) == NULL)
+	    sizeof (ns_ldap_attr_t))) == NULL)
 		return (0);
 	attrs->attrname = "nisSecretKey";
 	attrs->attrvalue = alist[1];
@@ -1013,7 +632,7 @@ update_ldap_attr(const char *dn,
 
 	/* get host certificate path, if one is configured */
 	if (__ns_ldap_getParam(NS_LDAP_HOST_CERTPATH_P,
-		(void ***)&certpath, &errorp) != NS_LDAP_SUCCESS)
+	    (void ***)&certpath, &errorp) != NS_LDAP_SUCCESS)
 		goto out;
 
 	if (certpath && *certpath)
@@ -1021,7 +640,7 @@ update_ldap_attr(const char *dn,
 
 	/* Load the service specific authentication method */
 	if (__ns_ldap_getServiceAuthMethods("keyserv", &authpp, &errorp) !=
-		NS_LDAP_SUCCESS)
+	    NS_LDAP_SUCCESS)
 		goto out;
 
 	/*
@@ -1030,7 +649,7 @@ update_ldap_attr(const char *dn,
 	 */
 	if (authpp == NULL) {
 		if (__ns_ldap_getParam(NS_LDAP_AUTH_P, (void ***)&authpp,
-			&errorp) != NS_LDAP_SUCCESS)
+		    &errorp) != NS_LDAP_SUCCESS)
 			goto out;
 	}
 
@@ -1040,7 +659,7 @@ update_ldap_attr(const char *dn,
 	 */
 	if (authpp == NULL) {
 		fprintf(stderr, "No LDAP authentication method configured.\n"
-			" configured.\n");
+		    " configured.\n");
 		goto out;
 	}
 
@@ -1061,12 +680,12 @@ update_ldap_attr(const char *dn,
 
 		if (add == TRUE)
 			ldaprc = __ns_ldap_addAttr("publickey", dn,
-				(const ns_ldap_attr_t * const *)attrs,
-				credp, NULL, &errorp);
+			    (const ns_ldap_attr_t * const *)attrs,
+			    credp, NULL, &errorp);
 		else
 			ldaprc = __ns_ldap_repAttr("publickey", dn,
-				(const ns_ldap_attr_t * const *)attrs,
-				credp, NULL, &errorp);
+			    (const ns_ldap_attr_t * const *)attrs,
+			    credp, NULL, &errorp);
 		if (ldaprc == NS_LDAP_SUCCESS) {
 			/* clean up ns_cred_t structure in memory */
 			if (credp != NULL)
@@ -1076,8 +695,8 @@ update_ldap_attr(const char *dn,
 
 		/* XXX add checking for cases of authentication errors */
 		if ((ldaprc == NS_LDAP_INTERNAL) &&
-			((errorp->status == LDAP_INAPPROPRIATE_AUTH) ||
-			(errorp->status == LDAP_INVALID_CREDENTIALS))) {
+		    ((errorp->status == LDAP_INAPPROPRIATE_AUTH) ||
+		    (errorp->status == LDAP_INVALID_CREDENTIALS))) {
 			fprintf(stderr, "LDAP authentication failed.\n");
 			goto out;
 		}
@@ -1159,7 +778,7 @@ ldap_update(char *mechname,
 		if (dn == NULL) {
 			fprintf(stderr, "Could not obtain LDAP dn\n");
 			fprintf(stderr, "%s: key-pair(s) unchanged.\n",
-				program_name);
+			    program_name);
 			exit(1);
 		}
 		db = "passwd";
@@ -1169,7 +788,7 @@ ldap_update(char *mechname,
 		else {
 			fprintf(stderr, "Can not allocate filter buffer.\n");
 			fprintf(stderr, "%s: key-pair(s) unchanged.\n",
-				program_name);
+			    program_name);
 			exit(1);
 		}
 	} else {
@@ -1180,7 +799,7 @@ ldap_update(char *mechname,
 		if (dn == NULL) {
 			fprintf(stderr, "Could not obtain LDAP dn\n");
 			fprintf(stderr, "%s: key-pair(s) unchanged.\n",
-				program_name);
+			    program_name);
 			exit(1);
 		}
 
@@ -1191,7 +810,7 @@ ldap_update(char *mechname,
 		else {
 			fprintf(stderr, "Can not allocate filter buffer.\n");
 			fprintf(stderr, "%s: key-pair(s) unchanged.\n",
-				program_name);
+			    program_name);
 			exit(1);
 		}
 
@@ -1201,9 +820,9 @@ ldap_update(char *mechname,
 		if (status != PROMPTGET_SUCCESS) {
 			FREE_CREDINFO(bindDN);
 			fprintf(stderr,
-				"Failed to get a valid LDAP bind DN.\n"
-				"%s: key-pair(s) unchanged.\n",
-				program_name);
+			    "Failed to get a valid LDAP bind DN.\n"
+			    "%s: key-pair(s) unchanged.\n",
+			    program_name);
 			exit(1);
 		}
 
@@ -1215,9 +834,9 @@ ldap_update(char *mechname,
 			FREE_CREDINFO(bindDN);
 
 			fprintf(stderr,
-				"Failed to get a valid LDAP bind password."
-				"\n%s: key-pair(s) unchanged.\n",
-				program_name);
+			    "Failed to get a valid LDAP bind password."
+			    "\n%s: key-pair(s) unchanged.\n",
+			    program_name);
 			exit(1);
 		}
 	}
@@ -1245,8 +864,8 @@ ldap_update(char *mechname,
 
 	/* Does entry exist? */
 	if ((__ns_ldap_list(db, filter, NULL, (const char **)attrFilter,
-			    NULL, 0, &res, &errorp,
-			    NULL, NULL) == NS_LDAP_SUCCESS) && res == NULL) {
+	    NULL, 0, &res, &errorp,
+	    NULL, NULL) == NS_LDAP_SUCCESS) && res == NULL) {
 		FREE_CREDINFO(ckeyatval);
 		FREE_CREDINFO(pkeyatval);
 		FREE_CREDINFO(bindPasswd);
@@ -1269,14 +888,14 @@ ldap_update(char *mechname,
 		newattr[0] = "NisKeyObject";
 		newattr[1] = NULL;
 		if ((attrs[0] = (ns_ldap_attr_t *)calloc(1,
-				sizeof (ns_ldap_attr_t))) == NULL) {
+		    sizeof (ns_ldap_attr_t))) == NULL) {
 			FREE_CREDINFO(ckeyatval);
 			FREE_CREDINFO(pkeyatval);
 			FREE_CREDINFO(bindPasswd);
 			FREE_CREDINFO(bindDN);
 			fprintf(stderr, "Memory allocation failed\n");
 			fprintf(stderr, "%s: key-pair(s) unchanged.\n",
-				program_name);
+			    program_name);
 			exit(1);
 		}
 		attrs[0]->attrname = "objectClass";
@@ -1288,14 +907,14 @@ ldap_update(char *mechname,
 		newattr[0] = pkeyatval;
 		newattr[1] = NULL;
 		if ((attrs[1] = (ns_ldap_attr_t *)calloc(1,
-				sizeof (ns_ldap_attr_t))) == NULL) {
+		    sizeof (ns_ldap_attr_t))) == NULL) {
 			FREE_CREDINFO(ckeyatval);
 			FREE_CREDINFO(pkeyatval);
 			FREE_CREDINFO(bindPasswd);
 			FREE_CREDINFO(bindDN);
 			fprintf(stderr, "Memory allocation failed\n");
 			fprintf(stderr, "%s: key-pair(s) unchanged.\n",
-				program_name);
+			    program_name);
 			exit(1);
 		}
 		attrs[1]->attrname = "nisPublicKey";
@@ -1307,14 +926,14 @@ ldap_update(char *mechname,
 		newattr[0] = ckeyatval;
 		newattr[1] = NULL;
 		if ((attrs[2] = (ns_ldap_attr_t *)calloc(1,
-				sizeof (ns_ldap_attr_t))) == NULL) {
+		    sizeof (ns_ldap_attr_t))) == NULL) {
 			FREE_CREDINFO(ckeyatval);
 			FREE_CREDINFO(pkeyatval);
 			FREE_CREDINFO(bindPasswd);
 			FREE_CREDINFO(bindDN);
 			fprintf(stderr, "Memory allocation failed\n");
 			fprintf(stderr, "%s: key-pair(s) unchanged.\n",
-				program_name);
+			    program_name);
 			exit(1);
 		}
 		attrs[2]->attrname = "nisSecretKey";
@@ -1325,22 +944,22 @@ ldap_update(char *mechname,
 		attrs[3] = NULL;
 
 		update_ldap_attr(dn, attrs, passwd, TRUE, update4host,
-				bindDN, bindPasswd);
+		    bindDN, bindPasswd);
 	} else {
 		/* object class already exists, replace keys */
 		ns_ldap_attr_t	*attrs[4]; /* objectclass, pk, sk, NULL */
 
 		if (!ldap_attr_mod(&res->entry[0], mechname,
-				pkeyatval, &pattrs,
-				ckeyatval, &cattrs)) {
+		    pkeyatval, &pattrs,
+		    ckeyatval, &cattrs)) {
 			FREE_CREDINFO(ckeyatval);
 			FREE_CREDINFO(pkeyatval);
 			FREE_CREDINFO(bindPasswd);
 			FREE_CREDINFO(bindDN);
 			fprintf(stderr,
-				"Could not generate LDAP attribute list.\n");
+			    "Could not generate LDAP attribute list.\n");
 			fprintf(stderr,
-				"%s: key-pair(s) unchanged.\n", program_name);
+			    "%s: key-pair(s) unchanged.\n", program_name);
 			exit(1);
 		}
 
@@ -1349,7 +968,7 @@ ldap_update(char *mechname,
 		attrs[2] = NULL;
 
 		update_ldap_attr(dn, attrs, passwd, FALSE, update4host,
-				bindDN, bindPasswd);
+		    bindDN, bindPasswd);
 	}
 
 	FREE_CREDINFO(ckeyatval);
@@ -1358,77 +977,4 @@ ldap_update(char *mechname,
 	FREE_CREDINFO(bindDN);
 
 	return (0);
-}
-
-
-/* Returns 0 if successful; -1 if failure. (expected by setpublicmap). */
-
-int
-nisplus_update(char *netname, char *public, char *secret, nis_name nis_princ)
-{
-	nis_object	*obj = init_entry();
-	char	*domain, *netdomain;
-	char	netdomainaux[MAXHOSTNAMELEN + 1];
-	int status, addition;
-
-	/*
-	 * we take the domain given in the netname & the principal
-	 * name if they match otherwise the local domain.
-	 */
-
-	netdomain = (char *)strchr(netname, '@');
-	if (! netdomain) {
-		(void) fprintf(stderr, "%s: invalid netname: '%s'. \n",
-			program_name, netname);
-		return (0);
-	}
-	netdomain++; /* skip '@' */
-	/* make sure we don't run into buffer overflow */
-	if (strlen(netdomain) > sizeof (netdomainaux))
-		return (0);
-	strcpy(netdomainaux, netdomain);
-	if (netdomainaux[strlen(netdomainaux) - 1] != '.')
-		strcat(netdomainaux, ".");
-
-	domain = nis_domain_of(nis_princ);
-	if (strcasecmp(domain, netdomainaux) != 0)
-		domain = nis_local_directory();
-
-	if (sanity_checks(nis_princ, netname, domain) == 0)
-		return (-1);
-
-	addition = (cred_exists(nis_princ, "DES", domain) == NIS_NOTFOUND);
-
-	/* Now we have a key pair, build up the cred entry */
-	ENTRY_VAL(obj, 0) = nis_princ;
-	ENTRY_LEN(obj, 0) = strlen(nis_princ) + 1;
-
-	ENTRY_VAL(obj, 1) = "DES";
-	ENTRY_LEN(obj, 1) = 4;
-
-	ENTRY_VAL(obj, 2) = netname;
-	ENTRY_LEN(obj, 2) = strlen(netname) + 1;
-
-	ENTRY_VAL(obj, 3) = public;
-	ENTRY_LEN(obj, 3) = strlen(public) + 1;
-
-	ENTRY_VAL(obj, 4) = secret;
-	ENTRY_LEN(obj, 4) = strlen(secret) + 1;
-
-	if (addition) {
-		obj->zo_owner = nis_princ;
-		obj->zo_group = nis_local_group();
-		obj->zo_domain = domain;
-		/* owner: r, group: rmcd */
-		obj->zo_access = ((NIS_READ_ACC<<16)|
-				(NIS_READ_ACC|NIS_MODIFY_ACC|NIS_CREATE_ACC|
-					NIS_DESTROY_ACC)<<8);
-		status = add_cred_obj(obj, domain);
-	} else {
-		obj->EN_data.en_cols.en_cols_val[3].ec_flags |= EN_MODIFIED;
-		obj->EN_data.en_cols.en_cols_val[4].ec_flags |= EN_MODIFIED;
-		status = modify_cred_obj(obj, domain);
-	}
-
-	return (status == 1 ? 0 : -1);
 }

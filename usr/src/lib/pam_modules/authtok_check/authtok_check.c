@@ -252,7 +252,7 @@ get_passwd_defaults(pam_handle_t *pamh, char *user, struct pwdefaults *p)
 	 * and which password-crypt-algorithm is to be used (based on the
 	 * old password, or the system default).
 	 *
-	 * If the user comes from a repository other than FILES/NIS/NIS+,
+	 * If the user comes from a repository other than FILES/NIS
 	 * the module-flag "server_policy" means that we don't perform
 	 * any checks on the user, but let the repository decide instead.
 	 */
@@ -284,8 +284,7 @@ get_passwd_defaults(pam_handle_t *pamh, char *user, struct pwdefaults *p)
 		char *oldpw = attr[0].data.val_s;
 		char *repository = attr[1].data.val_s;
 		if ((strcmp(repository, "files") == 0 ||
-		    strcmp(repository, "nis") == 0 ||
-		    strcmp(repository, "nisplus") == 0) ||
+		    strcmp(repository, "nis") == 0) ||
 		    p->server_policy == B_FALSE) {
 			char *salt;
 			/*
@@ -306,7 +305,7 @@ get_passwd_defaults(pam_handle_t *pamh, char *user, struct pwdefaults *p)
 
 			p->server_policy = B_FALSE; /* we perform checks */
 		} else {
-			/* not files, nis or nisplus AND server_policy is set */
+			/* not files or nis AND server_policy is set */
 			p->maxlength = _PASS_MAX;
 		}
 		free(attr[0].data.val_s);

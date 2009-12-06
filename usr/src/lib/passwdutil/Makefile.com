@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -29,21 +29,16 @@ OBJ=		__check_history.o \
 		__set_authtoken_attr.o \
 		__get_authtoken_attr.o \
 		__user_to_authenticate.o \
-		__verify_rpc_passwd.o \
 		__failed_count.o \
 		files_attr.o	\
 		nis_attr.o	\
-		npd_clnt.o	\
-		nisplus_attr.o	\
 		ldap_attr.o	\
 		nss_attr.o	\
 		switch_utils.o	\
 		utils.o		\
 		debug.o
 
-DERIVED_OBJ=	nispasswd_xdr.o
-
-OBJECTS=	$(OBJ) $(DERIVED_OBJ)
+OBJECTS=	$(OBJ)
 
 include	../../Makefile.lib
 
@@ -61,25 +56,11 @@ CPPFLAGS	+= -DENABLE_SUNOS_AGING -D_REENTRANT \
 		   -I$(SRC)/lib/libsldap/common -I$(SRC)/lib/libnsl/include
 CFLAGS		+= $(CCVERBOSE)
 
-#
-# We depend upon a rpcgen file. Specify some additional macros
-# to correctly build and get rid of the derived file
-#
-PROTOCOL_DIR=	../../../head/rpcsvc
-DERIVED_FILES=	../nispasswd_xdr.c
-CLOBBERFILES += $(DERIVED_FILES)
-
-#
-# Don't lint derived files
-#
 lint	:=	SRCS= $(OBJ:%.o=$(SRCDIR)/%.c)
 
 .KEEP_STATE:
 
 all:	$(LIBS)
-
-../nispasswd_xdr.c: $(PROTOCOL_DIR)/nispasswd.x
-	$(RPCGEN) -c -C -M $(PROTOCOL_DIR)/nispasswd.x > ../nispasswd_xdr.c
 
 lint:	lintcheck
 

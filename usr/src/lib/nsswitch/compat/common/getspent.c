@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -30,7 +30,7 @@
  *   with "+" or "-", it consults other services.  By default it uses NIS (YP),
  *   but the user can override this with a "passwd_compat" entry in
  *   /etc/nsswitch.conf, e.g.
- *			passwd_compat: nisplus
+ *			passwd_compat: ldap
  * The main criterion for this code is that it behave in the same way as
  * the code for getpwnam() and friends (in getpwent.c).  Note that it uses
  * the same nsswitch.conf entry, not a separate entry for "shadow_compat".
@@ -45,8 +45,6 @@
  *	differ, everything should work fine, but the semantics will be pretty
  *	confusing.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <shadow.h>
 #include <string.h>

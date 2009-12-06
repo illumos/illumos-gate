@@ -20,9 +20,7 @@
  */
 /*
  *
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
- * Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * pmLoad.java
@@ -47,8 +45,7 @@ public class pmLoad extends JPanel {
 	final static int HELP =  5;
 
 	final static int NIS =  6;
-	final static int NISPLUS =  7;
-	final static int NONE =  8;
+	final static int NONE =  7;
 
 	pmFrame frame = new pmFrame(
 		pmUtility.getResource("SPM:Select.Naming.Service"));
@@ -100,9 +97,6 @@ public class pmLoad extends JPanel {
 	if (mytop.nisns != null)
 		nameserviceCombo.addItem("NIS");
 
-	if (mytop.nisplusns != null)
-		nameserviceCombo.addItem("NIS+");
-
 	if (mytop.ldapns != null)
 		nameserviceCombo.addItem("LDAP");
 
@@ -126,8 +120,6 @@ public class pmLoad extends JPanel {
 			Debug.message("CLNT:pmLoad:0: NONE");
 		} else if (mytop.actionindex == 1) {
 			Debug.message("CLNT:pmLoad:1: NIS");
-		} else if (mytop.actionindex == 3) {
-			Debug.message("CLNT:pmLoad:2: NISPLUS");
 		} else if (mytop.actionindex == 4) {
 			Debug.message("CLNT:pmLoad:2: LDAP");
 		}

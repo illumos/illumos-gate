@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,12 +63,6 @@
 
 #include "key_call_uid.h"
 #include <shadow.h>
-
-/* to keep track of codepath */
-#define	CODEPATH_PAM_SM_AUTHENTICATE	0
-#define	CODEPATH_PAM_SM_SETCRED		1
-
-#define	SUNW_OLDRPCPASS	"SUNW-OLD-RPC-PASSWORD"
 
 extern	int	_nfssys(int, void *);
 
@@ -175,32 +169,23 @@ get_and_set_seckey(
  * stack so we should only return failures or PAM_IGNORE. Returning PAM_SUCCESS
  * may short circuit the stack and circumvent later critical checks.
  *
- * Because this routine is used for both pam_authenticate *and*
- * pam_setcred, we have to be somewhat careful:
+ * we are called from pam_sm_setcred:
+ *	1. if we are root (uid == 0), we do nothing and return
+ *	   PAM_IGNORE.
+ *	2. else, we try to establish credentials.
  *
- *      - if called from pam_sm_authenticate:
- *		1. if no NIS+, we don't set credentials and return PAM_IGNORE.
- *              2. else, we try to establish credentials;
+ * We return framework errors as appropriate such as PAM_USER_UNKNOWN,
+ * PAM_BUF_ERR, PAM_PERM_DENIED.
  *
- *	- if called from pam_sm_setcred:
- *		1. if we are root (uid == 0), we do nothing and return
- *		   PAM_IGNORE.
- *		2. else, we try to establish credentials.
+ * If we succeed in establishing credentials we return PAM_IGNORE.
  *
- *      We return framework errors as appropriate such as PAM_USER_UNKNOWN,
- *      PAM_BUF_ERR, PAM_PERM_DENIED.
- *
- *	If we succeed in establishing credentials we return PAM_IGNORE.
- *
- *	If we fail to establish credentials then we return:
- *	- PAM_IGNORE if we are called from pam_sm_authenticate and we
- *	  don't need credentials;
- *	- PAM_SERVICE_ERR (credentials needed) or PAM_SYSTEM_ERR
- *	  (credentials not needed) if netname could not be created;
- *	- PAM_AUTH_ERR (credentials needed) or PAM_IGNORE (credentials
- *	  not needed) if no credentials were retrieved;
- *	- PAM_AUTH_ERR if the password didn't decrypt the cred;
- *	- PAM_SYSTEM_ERR if the cred's could not be stored.
+ * If we fail to establish credentials then we return:
+ *    - PAM_SERVICE_ERR (credentials needed) or PAM_SYSTEM_ERR
+ *      (credentials not needed) if netname could not be created;
+ *    - PAM_AUTH_ERR (credentials needed) or PAM_IGNORE (credentials
+ *      not needed) if no credentials were retrieved;
+ *    - PAM_AUTH_ERR if the password didn't decrypt the cred;
+ *    - PAM_SYSTEM_ERR if the cred's could not be stored.
  *
  * This routine returns the user's netname in "netname".
  *
@@ -210,8 +195,7 @@ get_and_set_seckey(
  * Therefore, we use a local variable "short_pass" to hold those 8 char's.
  */
 static int
-establish_key(pam_handle_t *pamh, int flags, int codepath, int debug,
-	char *netname)
+establish_key(pam_handle_t *pamh, int flags, int debug, char *netname)
 {
 	char	*user;
 	char	*passwd;
@@ -224,24 +208,6 @@ establish_key(pam_handle_t *pamh, int flags, int codepath, int debug,
 	struct passwd pw;	/* Needed to obtain uid */
 	char	*scratch;
 	int	scratchlen;
-
-	/*
-	 * Default is that credentials are needed until we explicitly
-	 * check they are. This means all failure codes are returned
-	 * until then.
-	 */
-	int	need_cred = -1;
-	int	auth_cred_flags;
-				/*
-				 * no_warn if creds not needed and
-				 * authenticating
-				 */
-	int	auth_path = (codepath == CODEPATH_PAM_SM_AUTHENTICATE);
-	char *repository_name = NULL;	/* which repository are we using */
-	char *repository_pass = NULL;	/* user's password from that rep */
-	pwu_repository_t *pwu_rep;
-	struct pam_repository *auth_rep;
-	attrlist attr_pw[2];
 
 	mechanism_t	**mechs;
 	mechanism_t	**mpp;
@@ -274,83 +240,17 @@ establish_key(pam_handle_t *pamh, int flags, int codepath, int debug,
 
 	/*
 	 * We don't set credentials when root logs in.
-	 * We do, however, need to set the credentials if the NIS+ permissions
-	 * require so. Thus, we only bail out if we're root and we're
-	 * called from pam_setcred.
 	 */
-	if (uid == 0 && codepath == CODEPATH_PAM_SM_SETCRED) {
+	if (uid == 0) {
 		result = PAM_IGNORE;
 		goto out;
 	}
 
-	/*
-	 * Check to see if we REALLY need to set the credentials, i.e.
-	 * whether not being able to do so is an error or whether we
-	 * can ignore it.
-	 * We need to get the password from the repository that we're
-	 * currently authenticating against. If this is the auth_path
-	 * and the repository isn't NIS+ we can skip establishing credentials.
-	 * Otherwise, we will try to establish credentials but it's only
-	 * critical iff the password is "*NP*" and the repository is NIS+.
-	 */
-	(void) pam_get_item(pamh, PAM_REPOSITORY, (void **)&auth_rep);
-	if (auth_rep != NULL) {
-		if ((pwu_rep = calloc(1, sizeof (*pwu_rep))) == NULL)
-			return (PAM_BUF_ERR);
-		pwu_rep->type = auth_rep->type;
-		pwu_rep->scope = auth_rep->scope;
-		pwu_rep->scope_len = auth_rep->scope_len;
-	} else
-		pwu_rep = PWU_DEFAULT_REP;
-
-	attr_pw[0].type = ATTR_PASSWD; attr_pw[0].next = &attr_pw[1];
-	attr_pw[1].type = ATTR_REP_NAME; attr_pw[1].next = NULL;
-	result = __get_authtoken_attr(user, pwu_rep, attr_pw);
-
-	if (pwu_rep != PWU_DEFAULT_REP)
-		free(pwu_rep);
-
-	if (result == PWU_NOT_FOUND) {
-		if (debug)
-			syslog(LOG_DEBUG, "pam_dhkeys: user %s not found",
-			    user);
-		result = PAM_USER_UNKNOWN;
-		goto out;
-	} else if (result != PWU_SUCCESS) {
-		result = PAM_PERM_DENIED;
-		goto out;
-	}
-
-	repository_name = attr_pw[1].data.val_s;
-	repository_pass = attr_pw[0].data.val_s;
-
-	if (auth_path && (strcmp(repository_name, "nisplus") != 0)) {
-		result = PAM_IGNORE;
-		goto out;
-	}
-
-	need_cred = (strcmp(repository_name, "nisplus") == 0 &&
-	    strcmp(repository_pass, NOPWDRTR) == 0);
-	if (auth_path) {
-		auth_cred_flags =
-		    (need_cred ? flags : flags | PAM_SILENT);
-	} else {
-		auth_cred_flags = flags;
-	}
-
-	if (uid == 0)		/* "root", need to create a host-netname */
-		err = host2netname(netname, NULL, NULL);
-	else
-		err = user2netname(netname, uid, NULL);
+	err = user2netname(netname, uid, NULL);
 
 	if (err != 1) {
 		if (debug)
 			syslog(LOG_DEBUG, "pam_dhkeys: user2netname failed");
-		if (need_cred) {
-			syslog(LOG_ALERT, "pam_dhkeys: user %s needs "
-			    "Secure RPC Credentials to login.", user);
-			result = PAM_SERVICE_ERR;
-		} else
 			result = PAM_SYSTEM_ERR;
 		goto out;
 	}
@@ -381,7 +281,7 @@ establish_key(pam_handle_t *pamh, int flags, int codepath, int debug,
 			if (!get_and_set_seckey(pamh, netname, mp->keylen,
 			    mp->algtype, short_passp, uid, gid,
 			    &get_seckey_cnt, &good_pw_cnt, &set_seckey_cnt,
-			    auth_cred_flags, debug)) {
+			    flags, debug)) {
 				result = PAM_BUF_ERR;
 				goto out;
 			}
@@ -390,7 +290,7 @@ establish_key(pam_handle_t *pamh, int flags, int codepath, int debug,
 		/* fall through to AUTH_DES below */
 	} else {
 		/*
-		 * No usable mechs found in NIS+ security cf thus
+		 * No usable mechs found in security congifuration file thus
 		 * fallback to AUTH_DES compat.
 		 */
 		if (debug)
@@ -399,13 +299,12 @@ establish_key(pam_handle_t *pamh, int flags, int codepath, int debug,
 	}
 
 	/*
-	 * We always perform AUTH_DES for the benefit of non-NIS+
-	 * services (e.g. NFS) that may depend on the classic des
-	 * 192bit key being set.
+	 * We always perform AUTH_DES for the benefit of services like NFS
+	 * that may depend on the classic des 192bit key being set.
 	 */
 	if (!get_and_set_seckey(pamh, netname, AUTH_DES_KEYLEN,
 	    AUTH_DES_ALGTYPE, short_passp, uid, gid, &get_seckey_cnt,
-	    &good_pw_cnt, &set_seckey_cnt, auth_cred_flags, debug)) {
+	    &good_pw_cnt, &set_seckey_cnt, flags, debug)) {
 		result = PAM_BUF_ERR;
 		goto out;
 	}
@@ -423,7 +322,7 @@ establish_key(pam_handle_t *pamh, int flags, int codepath, int debug,
 	}
 
 	if (get_seckey_cnt == 0) {		/* No credentials */
-		result = need_cred ? PAM_AUTH_ERR : PAM_IGNORE;
+		result = PAM_IGNORE;
 		goto out;
 	}
 
@@ -436,7 +335,7 @@ establish_key(pam_handle_t *pamh, int flags, int codepath, int debug,
 		result = PAM_SYSTEM_ERR;
 		goto out;
 	}
-	/* Credentials have been successfully establish, return PAM_IGNORE. */
+	/* Credentials have been successfully established, return PAM_IGNORE */
 	result = PAM_IGNORE;
 out:
 	/*
@@ -445,13 +344,6 @@ out:
 	 * definitely needed them. Thus always return PAM_IGNORE
 	 * if we are authenticating and credentials were not needed.
 	 */
-	if (auth_path && !need_cred)
-		result = PAM_IGNORE;
-	if (repository_name)
-		free(repository_name);
-	if (repository_pass)
-		free(repository_pass);
-
 	free(scratch);
 
 	(void) memset(short_pass, '\0', sizeof (short_pass));
@@ -459,25 +351,11 @@ out:
 	return (result);
 }
 
+/*ARGSUSED*/
 int
 pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
-	int	i;
-	int	debug = 0;
-	int	result;
-	char	netname[MAXNETNAMELEN + 1];
-
-	for (i = 0; i < argc; i++) {
-		if (strcmp(argv[i], "debug") == 0)
-			debug = 1;
-		else if (strcmp(argv[i], "nowarn") == 0)
-			flags |= PAM_SILENT;
-	}
-
-	result = establish_key(pamh, flags, CODEPATH_PAM_SM_AUTHENTICATE, debug,
-	    netname);
-
-	return (result);
+	return (PAM_IGNORE);
 }
 
 
@@ -647,8 +525,7 @@ pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 			syslog(LOG_DEBUG, "pam_dhkeys: removing creds\n");
 		result = remove_key(pamh, flags, debug);
 	} else {
-		result = establish_key(pamh, flags, CODEPATH_PAM_SM_SETCRED,
-		    debug, netname);
+		result = establish_key(pamh, flags, debug, netname);
 		/* Some diagnostics */
 		if ((flags & PAM_SILENT) == 0) {
 			if (result == PAM_AUTH_ERR)
@@ -678,182 +555,9 @@ rpc_cleanup(pam_handle_t *pamh, void *data, int pam_status)
 	}
 }
 
+/*ARGSUSED*/
 int
 pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
-	int i;
-	int debug = 0;
-	int res;
-	pam_repository_t *pam_rep;
-	pwu_repository_t *pwu_rep;
-	char *oldpw;
-	char *user;
-	int tries;
-	int oldpw_ok;
-	char *oldrpcpw;
-	char *oldrpcpass;
-	char *data;
-	/* password truncated at 8 chars, see comment at establish_key() */
-	char short_pass[sizeof (des_block)+1], *short_passp;
-
-	for (i = 0; i < argc; i++)
-		if (strcmp(argv[i], "debug") == 0)
-			debug = 1;
-
-	if (debug)
-		syslog(LOG_DEBUG, "pam_dhkeys: entered pam_sm_chauthtok()");
-
-	if ((flags & PAM_PRELIM_CHECK) == 0)
-		return (PAM_IGNORE);
-
-	/*
-	 * See if the old secure-rpc password has already been set
-	 */
-	res = pam_get_data(pamh, SUNW_OLDRPCPASS, (const void **)&oldrpcpass);
-	if (res == PAM_SUCCESS) {
-		if (debug)
-			syslog(LOG_DEBUG,
-			    "pam_dhkeys: OLDRPCPASS already set");
-		return (PAM_IGNORE);
-	}
-
-	(void) pam_get_item(pamh, PAM_REPOSITORY, (void **)&pam_rep);
-
-	(void) pam_get_item(pamh, PAM_USER, (void **)&user);
-
-	(void) pam_get_item(pamh, PAM_AUTHTOK, (void **)&oldpw);
-
-	if (user == NULL || *user == '\0') {
-		if (debug)
-			syslog(LOG_DEBUG, "pam_dhkeys: user NULL or empty");
-		return (PAM_USER_UNKNOWN);
-	}
-
-	/* oldpw can be NULL (eg. root changing someone's passwd) */
-	if (oldpw) {
-		(void) strlcpy(short_pass, oldpw, sizeof (short_pass));
-		short_passp = short_pass;
-	} else
-		short_passp = NULL;
-
-	/*
-	 * For NIS+ we need to check whether the old password equals
-	 * the RPC password. If it doesn't, we won't be able to update
-	 * the secure RPC credentials later on in the process.
-	 */
-
-	if (pam_rep == NULL)
-		pwu_rep = PWU_DEFAULT_REP;
-	else {
-		if ((pwu_rep = calloc(1, sizeof (*pwu_rep))) == NULL)
-			return (PAM_BUF_ERR);
-		pwu_rep->type = pam_rep->type;
-		pwu_rep->scope = pam_rep->scope;
-		pwu_rep->scope_len = pam_rep->scope_len;
-	}
-
-	switch (__verify_rpc_passwd(user, short_passp, pwu_rep)) {
-	case PWU_SUCCESS:
-		/* oldpw matches RPC password, or no RPC password needed */
-
-		if (pwu_rep != PWU_DEFAULT_REP)
-			free(pwu_rep);
-
-		if (short_passp) {
-			if ((data = strdup(short_pass)) == NULL) {
-				(void) memset(short_pass, '\0',
-				    sizeof (short_pass));
-				return (PAM_BUF_ERR);
-			}
-		} else
-			data = NULL;
-
-		(void) pam_set_data(pamh, SUNW_OLDRPCPASS, data, rpc_cleanup);
-		return (PAM_IGNORE);
-
-	case PWU_NOT_FOUND:
-		if (pwu_rep != PWU_DEFAULT_REP)
-			free(pwu_rep);
-		(void) memset(short_pass, '\0', sizeof (short_pass));
-		return (PAM_USER_UNKNOWN);
-	case PWU_BAD_CREDPASS:
-		/* The old password does not decrypt any credentials */
-		break;
-	case PWU_CRED_ERROR:
-		/*
-		 * Indicates that the user's credentials could not be
-		 * retrieved or removed.  This could occur when a NIS+
-		 * user is in transition to another account authority.
-		 */
-		if (pwu_rep != PWU_DEFAULT_REP)
-			free(pwu_rep);
-		(void) memset(short_pass, '\0', sizeof (short_pass));
-		return (PAM_AUTHTOK_ERR);
-	default:
-		if (pwu_rep != PWU_DEFAULT_REP)
-			free(pwu_rep);
-		(void) memset(short_pass, '\0', sizeof (short_pass));
-		return (PAM_SYSTEM_ERR);
-	}
-
-	/*
-	 * We got here because the OLDAUTHTOK doesn't match the Secure RPC
-	 * password. In compliance with the old behavior, we give the
-	 * user two chances to get the password right. If that succeeds
-	 * all is well; if it doesn't, we'll return an error.
-	 */
-
-	(void) msg(pamh, dgettext(TEXT_DOMAIN,
-	    "This password differs from your secure RPC password."));
-
-	tries = 0;
-	oldpw_ok = 0;
-
-	while (oldpw_ok == 0 && ++tries < 3) {
-		if (tries > 1)
-			(void) msg(pamh, dgettext(TEXT_DOMAIN,
-			    "This password does not decrypt your "
-			    "secure RPC password."));
-		res = __pam_get_authtok(pamh, PAM_PROMPT, 0,
-		    dgettext(TEXT_DOMAIN,
-		    "Please enter your old Secure RPC password: "), &oldpw);
-		if (res != PAM_SUCCESS) {
-			if (pwu_rep != PWU_DEFAULT_REP)
-				free(pwu_rep);
-			return (res);
-		}
-		(void) strlcpy(short_pass, oldpw, sizeof (short_pass));
-		(void) memset(oldpw, 0, strlen(oldpw));
-		free(oldpw);
-		oldpw = NULL;
-		if (__verify_rpc_passwd(user, short_pass, pwu_rep) ==
-		    PWU_SUCCESS)
-			oldpw_ok = 1;
-	}
-
-	if (pwu_rep != PWU_DEFAULT_REP)
-		free(pwu_rep);
-
-	if (oldpw_ok == 0) {
-		(void) memset(short_pass, '\0', sizeof (short_pass));
-		return (PAM_AUTHTOK_ERR);
-	}
-
-	/*
-	 * Since the PAM framework only provides space for two different
-	 * password (one old and one current), there is officially no
-	 * place to put additional passwords (like our old rpc password).
-	 * We have no choice but to stuff it in a data item, and hope it
-	 * will be picked up by the password-update routines.
-	 */
-
-	oldrpcpw = strdup(short_pass);
-	(void) memset(short_pass, '\0', sizeof (short_pass));
-
-	if (oldrpcpw == NULL)
-		return (PAM_BUF_ERR);
-
-	res = pam_set_data(pamh, SUNW_OLDRPCPASS, oldrpcpw, rpc_cleanup);
-
-	return (res);
+	return (PAM_IGNORE);
 }

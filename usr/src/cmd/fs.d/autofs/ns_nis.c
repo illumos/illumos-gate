@@ -21,11 +21,9 @@
 /*
  *	ns_nis.c
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -70,7 +68,6 @@ init_nis(char **stack, char ***stkptr)
 #endif /* lint */
 
 	(void) sysinfo(SI_SRPC_DOMAIN, nis_mydomain, sizeof (nis_mydomain));
-	(void) __nis_reset_state();	/* XXX temporary hack for csh bug */
 }
 
 /*ARGSUSED*/

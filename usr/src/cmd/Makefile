@@ -278,7 +278,6 @@ COMMON_SUBDIRS=		\
 	news		\
 	newtask		\
 	nice		\
-	nispasswd	\
 	nl		\
 	nlsadmin	\
 	nohup		\
@@ -635,7 +634,6 @@ MSGSUBDIRS=		\
 	newgrp		\
 	newtask		\
 	nice		\
-	nispasswd	\
 	nohup		\
 	oawk		\
 	pack		\

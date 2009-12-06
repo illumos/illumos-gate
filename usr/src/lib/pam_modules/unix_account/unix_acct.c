@@ -368,14 +368,12 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	}
 
 	/*
-	 * if repository is not files|nis|nisplus, and
-	 * user wants server_policy, we don't care
-	 * about aging and hence return PAM_IGNORE
+	 * if repository is not files|nis, and user wants server_policy,
+	 * we don't care about aging and hence return PAM_IGNORE
 	 */
 	if (server_policy &&
 	    strcmp(repository_name, "files") != 0 &&
-	    strcmp(repository_name, "nis") != 0 &&
-	    strcmp(repository_name, "nisplus") != 0) {
+	    strcmp(repository_name, "nis") != 0) {
 		error = PAM_IGNORE;
 		goto out;
 	}

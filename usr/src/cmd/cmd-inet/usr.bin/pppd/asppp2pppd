@@ -10,14 +10,13 @@
 # whether the translation is appropriate for your operating
 # environment.
 
-# Copyright (c) 2000 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 # Steps in translation:
 #	- parse /etc/asppp.cf
-#	- check for aspppls in /etc/passwd (or NIS or NIS+)
+#	- check for aspppls in /etc/passwd (or NIS) 
 #	- read in current /etc/ppp/options configuration file
 #	- read list of configured serial ports from pmadm
 #	- read in UUCP configuration files
@@ -513,7 +512,7 @@ sub readaspppcf
     ( \%ifconfig, \%paths );
 }
 
-# Read /etc/passwd (or NIS or NIS+) and return hash of users for whom
+# Read /etc/passwd (or NIS) and return hash of users for whom
 # the default shell is aspppls.  Each hash entry contains the user's
 # home directory path.
 sub readpasswd
@@ -828,30 +827,7 @@ sub rewrite_passwd
 	fcntl PWDLCK, F_SETLK, $lockstr;
 	close PWDLCK;
     }
-    if (system("/usr/lib/nis/nisping -u 2>/dev/null") == 0) {
-	print "Updating NIS+ user home directories.\n" if $opt_v;
-	system("/usr/bin/sed 's/\$/p/' <$sedpasswd >${sedpasswd}n");
-	if (open NISUSERS, "/usr/lib/nis/nisaddent -d passwd | " .
-	    "/usr/bin/sed -n -f ${sedpasswd}n |") {
-	    local (@updatedusers) = <NISUSERS>;
-	    close NISUSERS;
-	    if (@updatedusers) {
-		if (open NISUSERS, "| /usr/lib/nis/nisaddent passwd") {
-		    foreach $user (@updatedusers) {
-			print NISUSERS $user;
-		    }
-		    close NISUSERS || warn "NIS+ update failure.\n";
-		} else {
-		    warn "NIS+ update failure.\n";
-		}
-	    } else {
-		print "No NIS+ users need to be updated.\n" if $opt_v;
-	    }
-	} else {
-	    warn "Unable to read NIS+ users.\n";
-	}
-	unlink $sedpasswd . "n";
-    } elsif (($ypmaster = `/usr/bin/ypwhich 2>/dev/null`) && $? == 0) {
+    if (($ypmaster = `/usr/bin/ypwhich 2>/dev/null`) && $? == 0) {
 	$ypmaster =~ /(.*)\n/;
 	($ypmaster) = gethostbyname($1);
 	($thishost) = gethostbyname(hostname);

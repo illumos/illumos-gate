@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
- * Copyright (c) 1998-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 package com.sun.dhcpmgr.server;
 
@@ -41,7 +38,7 @@ import com.sun.dhcpmgr.data.*;
  */
 public class DhcpServiceMgrImpl implements DhcpServiceMgr {
     private Bridge bridge;
-    
+
     private String serverName;
     private String shortServerName;
     private InetAddress serverAddress;
@@ -63,7 +60,7 @@ public class DhcpServiceMgrImpl implements DhcpServiceMgr {
 	    serverName = shortServerName = "";
 	}
     }
-    
+
     public String getServerName() {
 	return serverName;
     }
@@ -92,7 +89,7 @@ public class DhcpServiceMgrImpl implements DhcpServiceMgr {
     public DhcpDatastore [] getDataStores() throws BridgeException {
 	return bridge.getDataStores();
     }
-    
+
     /**
      * Retrieve a list of options from the DHCP inittab.
      * @return an array of options
@@ -100,7 +97,7 @@ public class DhcpServiceMgrImpl implements DhcpServiceMgr {
     public Option [] getInittabOptions(byte context) throws BridgeException {
 	return bridge.getInittabOptions(context);
     }
-    
+
     public String getDataStoreClassname(String dataStoreName)
 	throws BridgeException {
 
@@ -137,7 +134,7 @@ public class DhcpServiceMgrImpl implements DhcpServiceMgr {
     public DhcpdOptions readDefaults() throws BridgeException {
 	return bridge.readDefaults();
     }
-    
+
     /**
      * Write new settings to the DHCP config file.
      * @param cfgs the new config settings
@@ -145,35 +142,35 @@ public class DhcpServiceMgrImpl implements DhcpServiceMgr {
     public void writeDefaults(DhcpdOptions cfgs) throws BridgeException {
 	bridge.writeDefaults(cfgs);
     }
-    
+
     /**
      * Remove the DHCP config file.
      */
     public void removeDefaults() throws BridgeException {
 	bridge.removeDefaults();
     }
-    
+
     /**
      * Start the server
      */
     public void startup() throws BridgeException {
 	bridge.startup();
     }
-    
+
     /**
      * Stop the server
      */
     public void shutdown() throws BridgeException {
 	bridge.shutdown();
     }
-    
+
     /**
      * Send the server a SIGHUP to re-read the dhcptab
      */
     public void reload() throws BridgeException {
 	bridge.reload();
     }
-    
+
     /**
      * Get the list of possible interfaces for the server to monitor
      * @return an array of interfaces
@@ -181,7 +178,7 @@ public class DhcpServiceMgrImpl implements DhcpServiceMgr {
     public IPInterface [] getInterfaces() throws BridgeException {
 	return bridge.getInterfaces();
     }
-    
+
     /**
      * Break up a line into a list of arguments
      * @param input line
@@ -190,7 +187,7 @@ public class DhcpServiceMgrImpl implements DhcpServiceMgr {
     public String [] getArguments(String line) throws BridgeException {
 	return bridge.getArguments(line);
     }
-    
+
     /**
      * Get the default value for an option which would take a string
      * @param optionName name of the option
@@ -201,7 +198,7 @@ public class DhcpServiceMgrImpl implements DhcpServiceMgr {
 	Option option = OptionsTable.getTable().get(optionName);
 	return bridge.getStringOption(option.getCode(), arg);
     }
-    
+
     /**
      * Get the default value for an option which would take one or more IP addrs
      * @param optionName name of the option
@@ -212,7 +209,7 @@ public class DhcpServiceMgrImpl implements DhcpServiceMgr {
 	Option option = OptionsTable.getTable().get(optionName);
 	return bridge.getIPOption(option.getCode(), arg);
     }
-    
+
     /**
      * Get the default value for an option which would take one or more numbers
      * @param optionName name of the option
@@ -223,7 +220,7 @@ public class DhcpServiceMgrImpl implements DhcpServiceMgr {
 	Option option = OptionsTable.getTable().get(optionName);
 	return bridge.getNumberOption(option.getCode(), arg);
     }
-    
+
     /**
      * Check if the datastore version is current.
      * @return true if the datastore version if current.
@@ -231,7 +228,7 @@ public class DhcpServiceMgrImpl implements DhcpServiceMgr {
     public boolean isVersionCurrent() throws BridgeException {
 	return bridge.isVersionCurrent();
     }
-    
+
     /**
      * Check if the server is currently running
      * @return true if the server process is started
@@ -243,7 +240,7 @@ public class DhcpServiceMgrImpl implements DhcpServiceMgr {
     /**
      * Determines the whether or not the hosts table under a given
      * name service can be managed.
-     * @param resource name service resource (files, dns, nisplus)
+     * @param resource name service resource (files, dns)
      * @param domain the name service domain (ignored for files)
      * @return true if the user can manage the table
      */

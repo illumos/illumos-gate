@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -615,116 +613,6 @@ get_nis_servers(const char *arg)
 	return (opt);
 }
 
-/*ARGSUSED*/
-static struct dhcp_option *
-get_nisplus_domain(const char *arg)
-{
-	struct dhcp_option *opt;
-
-	opt = newopt(ASCII_OPTION, 1);
-	if (opt != NULL) {
-		opt->u.ret.data.strings[0] = strdup(nis_local_directory());
-		if (opt->u.ret.data.strings[0] == NULL) {
-			dd_freeopt(opt);
-			return (malloc_failure());
-		}
-	}
-	return (opt);
-}
-
-/*ARGSUSED*/
-static struct dhcp_option *
-get_nisplus_servers(const char *arg)
-{
-	struct dhcp_option *opt;
-	nis_result *nres;
-	nis_object *nobj;
-	int i;
-	struct netconfig *nc;
-	struct netbuf *nb;
-	int cnt = 0;
-	struct sockaddr_in *sin;
-	struct in_addr **tmpaddrs;
-
-	nres = nis_lookup(nis_local_directory(), FOLLOW_LINKS);
-	if ((NIS_RES_STATUS(nres) != NIS_SUCCESS) &&
-	    (NIS_RES_STATUS(nres) != NIS_S_SUCCESS)) {
-		opt = newopt(ERROR_OPTION, 0);
-		if (opt != NULL) {
-			opt->error_code = NIS_RES_STATUS(nres);
-			opt->u.msg = nis_sperrno(NIS_RES_STATUS(nres));
-		}
-		nis_freeresult(nres);
-		return (opt);
-	}
-	nobj = NIS_RES_OBJECT(nres);
-	if (nobj->zo_data.zo_type != NIS_DIRECTORY_OBJ) {
-		opt = newopt(ERROR_OPTION, 0);
-		if (opt != NULL) {
-			opt->error_code = 1;
-			opt->u.msg = gettext("Not a directory object");
-		}
-		nis_freeresult(nres);
-		return (opt);
-	}
-	opt = newopt(IP_OPTION, nobj->DI_data.do_servers.do_servers_len);
-	if (opt == NULL) {
-		nis_freeresult(nres);
-		return (malloc_failure());
-	}
-	for (i = 0; i < nobj->DI_data.do_servers.do_servers_len; ++i) {
-		/* Make sure it's an internet-type address */
-		if (strcmp("inet",
-		    nobj->DI_data.do_servers.do_servers_val[i].
-		    ep.ep_val[0].family) == 0) {
-			/* Find a translation service */
-			nc = getnetconfigent(nobj->DI_data.do_servers.
-			    do_servers_val[i].ep.ep_val[0].proto);
-			if (nc == NULL) {
-				continue;
-			}
-			/* Translate address to normal in_addr structure */
-			nb = uaddr2taddr(nc, nobj->DI_data.do_servers.
-			    do_servers_val[i].ep.ep_val[0].uaddr);
-			freenetconfigent(nc);
-			if (nb == NULL) {
-				continue;
-			}
-			opt->u.ret.data.addrs[cnt] = malloc(
-			    sizeof (struct in_addr));
-			if (opt->u.ret.data.addrs[cnt] == NULL) {
-				dd_freeopt(opt);
-				nis_freeresult(nres);
-				netdir_free(nb, ND_ADDR);
-				return (malloc_failure());
-			}
-			/*LINTED - alignment*/
-			sin = (struct sockaddr_in *)nb->buf;
-			*opt->u.ret.data.addrs[cnt] = sin->sin_addr;
-			++cnt;
-			netdir_free(nb, ND_ADDR);
-		}
-	}
-
-	nis_freeresult(nres);
-	/*
-	 * Adjust size of returned block to the actual data size, as
-	 * the above loop may not have filled in all of the elements
-	 * which were allocated.
-	 */
-	if (cnt != opt->u.ret.count) {
-		tmpaddrs = realloc(opt->u.ret.data.addrs,
-		    cnt * sizeof (struct in_addr *));
-		if (tmpaddrs == NULL) {
-			dd_freeopt(opt);
-			return (malloc_failure());
-		}
-		opt->u.ret.data.addrs = tmpaddrs;
-		opt->u.ret.count = cnt;
-	}
-	return (opt);
-}
-
 /*
  * Retrieve the default value for a specified DHCP option.  Option code is
  * from the lst in dhcp.h, arg is an option-specific string argument, and
@@ -757,10 +645,6 @@ dd_getopt(ushort_t code, const char *arg, const char *context)
 		return (get_nis_domain(arg));
 	case CD_NIS_SERV:
 		return (get_nis_servers(arg));
-	case CD_NISPLUS_DMAIN:
-		return (get_nisplus_domain(arg));
-	case CD_NISPLUS_SERVS:
-		return (get_nisplus_servers(arg));
 	default:
 		opt = newopt(ERROR_OPTION, 0);
 		if (opt != NULL) {

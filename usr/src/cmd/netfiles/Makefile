@@ -28,7 +28,7 @@ DEFAULTFILES= nss.dfl
 include ../Makefile.cmd
 
 FILES= hosts services
-ETCFILES= netconfig nsswitch.conf nsswitch.files nsswitch.nis nsswitch.nisplus \
+ETCFILES= netconfig nsswitch.conf nsswitch.files nsswitch.nis \
 		nsswitch.dns nsswitch.ldap nsswitch.ad
 
 ROOTNET=    $(ROOTETC)/net

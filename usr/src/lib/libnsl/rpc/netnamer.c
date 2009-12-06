@@ -68,8 +68,6 @@
 static const char    OPSYS[]	= "unix";
 static const char    NETIDFILE[] = "/etc/netid";
 static const char    NETID[]	= "netid.byname";
-static const char    PKTABLE[]  = "cred.org_dir";
-#define	PKTABLE_LEN 12
 #define	OPSYS_LEN 4
 
 extern int _getgroupsbymember(const char *, gid_t[], int, int);
@@ -111,7 +109,7 @@ parse_uid(char *s, struct netid_userdata *argp)
 
 	if (!s || !isdigit(*s)) {
 		syslog(LOG_ERR,
-			"netname2user: expecting uid '%s'", s);
+		    "netname2user: expecting uid '%s'", s);
 		return (__NSW_NOTFOUND); /* xxx need a better error */
 	}
 
@@ -136,8 +134,8 @@ parse_gidlist(char *p, struct netid_userdata *argp)
 
 	if (!p || (!isdigit(*p))) {
 		syslog(LOG_ERR,
-			"netname2user: missing group id list in '%s'.",
-			p);
+		    "netname2user: missing group id list in '%s'.",
+		    p);
 		return (__NSW_NOTFOUND);
 	}
 
@@ -176,28 +174,13 @@ parse_netid_str(char *s, struct netid_userdata *argp)
 	p = strchr(s, ':');
 	if (!p) {
 		syslog(LOG_ERR,
-			"netname2user: missing group id list in '%s'", s);
+		    "netname2user: missing group id list in '%s'", s);
 		return (__NSW_NOTFOUND);
 	}
 	++p;			/* skip ':' */
 	err = parse_gidlist(p, argp);
 	return (err);
 }
-
-static int
-parse_uid_gidlist(char *ustr, char *gstr, struct netid_userdata *argp)
-{
-	int	err;
-
-	/* get uid */
-	err = parse_uid(ustr, argp);
-	if (err != __NSW_SUCCESS)
-		return (err);
-
-	/* Now get the group list */
-	return (parse_gidlist(gstr, argp));
-}
-
 
 /*
  * netname2user_files()
@@ -244,8 +227,8 @@ netname2user_files(int *err, char *netname, struct netid_userdata *argp)
 			value++;
 		if (*value == '\0') {
 			syslog(LOG_WARNING,
-				"netname2user: badly formatted line in %s.",
-				NETIDFILE);
+			    "netname2user: badly formatted line in %s.",
+			    NETIDFILE);
 			continue;
 		}
 		*value++ = '\0'; /* nul terminate the name */
@@ -286,7 +269,7 @@ netname2user_nis(int *err, char *netname, struct netid_userdata *argp)
 	domain++;
 	lookup = NULL;
 	yperr = yp_match(domain, (char *)NETID, netname, strlen(netname),
-			&lookup, &len);
+	    &lookup, &len);
 	switch (yperr) {
 		case 0:
 			break; /* the successful case */
@@ -307,179 +290,6 @@ netname2user_nis(int *err, char *netname, struct netid_userdata *argp)
 	}
 	*err = __NSW_NOTFOUND;
 	return (0);
-}
-
-/*
- * Obtain user information (uid, gidlist) from nisplus.
- * What we're trying to do here is to map a netname into
- * local unix information (uid, gids), relevant in
- * the *local* domain.
- *
- *	 cname   auth_type auth_name public  private
- * ----------------------------------------------------------
- *	nisname   DES     netname   pubkey  prikey
- *	nisname   LOCAL   uid       gidlist
- *
- * 1.  Find out which 'home' domain to look for user's DES entry.
- *	This is gotten from the domain part of the netname.
- * 2.  Get the nisplus principal name from the DES entry in the cred
- *	table of user's home domain.
- * 3.  Use the nisplus principal name and search in the cred table of
- *	the *local* directory for the LOCAL entry.
- *
- * Note that we need this translation of netname to <uid,gidlist> to be
- * secure, so we *must* use authenticated connections.
- */
-static int
-netname2user_nisplus(int *err, char *netname, struct netid_userdata *argp)
-{
-	char *domain;
-	nis_result *res;
-	char	sname[NIS_MAXNAMELEN+1]; /*  search criteria + table name */
-	char	principal[NIS_MAXNAMELEN+1];
-	int len;
-
-	/* 1.  Get home domain of user. */
-	domain = strchr(netname, '@');
-	if (!domain) {
-		*err = __NSW_UNAVAIL;
-		return (0);
-	}
-	domain++;  /* skip '@' */
-
-
-	/* 2.  Get user's nisplus principal name.  */
-	if ((strlen(netname)+strlen(domain)+PKTABLE_LEN+32) >
-		(size_t)NIS_MAXNAMELEN) {
-		*err = __NSW_UNAVAIL;
-		return (0);
-	}
-	(void) snprintf(sname, sizeof (sname),
-		"[auth_name=\"%s\",auth_type=DES],%s.%s",
-		netname, PKTABLE, domain);
-	if (sname[strlen(sname) - 1] != '.')
-		(void) strcat(sname, ".");
-
-	/* must use authenticated call here */
-	/* XXX but we cant, for now. XXX */
-	res = nis_list(sname, USE_DGRAM+NO_AUTHINFO+FOLLOW_LINKS+FOLLOW_PATH,
-	    NULL, NULL);
-	switch (res->status) {
-	case NIS_SUCCESS:
-	case NIS_S_SUCCESS:
-		break;   /* go and do something useful */
-	case NIS_NOTFOUND:
-	case NIS_PARTIAL:
-	case NIS_NOSUCHNAME:
-	case NIS_NOSUCHTABLE:
-		*err = __NSW_NOTFOUND;
-		nis_freeresult(res);
-		return (0);
-	case NIS_S_NOTFOUND:
-	case NIS_TRYAGAIN:
-		*err = __NSW_TRYAGAIN;
-		syslog(LOG_ERR,
-			"netname2user: (nis+ lookup): %s\n",
-			nis_sperrno(res->status));
-		nis_freeresult(res);
-		return (0);
-	default:
-		*err = __NSW_UNAVAIL;
-		syslog(LOG_ERR, "netname2user: (nis+ lookup): %s\n",
-			nis_sperrno(res->status));
-		nis_freeresult(res);
-		return (0);
-	}
-
-	if (res->objects.objects_len > 1) {
-		/*
-		 * A netname belonging to more than one principal?
-		 * Something wrong with cred table. should be unique.
-		 * Warn user and continue.
-		 */
-		syslog(LOG_ALERT,
-			"netname2user: DES entry for %s in \
-			directory %s not unique",
-			netname, domain);
-	}
-
-	len = ENTRY_LEN(res->objects.objects_val, 0);
-	(void) strncpy(principal, ENTRY_VAL(res->objects.objects_val, 0), len);
-	principal[len] = '\0';
-	nis_freeresult(res);
-
-	if (principal[0] == '\0') {
-		*err = __NSW_UNAVAIL;
-		return (0);
-	}
-
-	/*
-	 *	3.  Use principal name to look up uid/gid information in
-	 *	LOCAL entry in **local** cred table.
-	 */
-	domain = nis_local_directory();
-	if ((strlen(principal)+strlen(domain)+PKTABLE_LEN+30) >
-		(size_t)NIS_MAXNAMELEN) {
-		*err = __NSW_UNAVAIL;
-		syslog(LOG_ERR, "netname2user: principal name '%s' too long",
-			principal);
-		return (0);
-	}
-	(void) snprintf(sname, sizeof (sname),
-		"[cname=\"%s\",auth_type=LOCAL],%s.%s",
-		principal, PKTABLE, domain);
-	if (sname[strlen(sname) - 1] != '.')
-		(void) strcat(sname, ".");
-
-	/* must use authenticated call here */
-	/* XXX but we cant, for now. XXX */
-	res = nis_list(sname, USE_DGRAM+NO_AUTHINFO+FOLLOW_LINKS+FOLLOW_PATH,
-	    NULL, NULL);
-	switch (res->status) {
-	case NIS_NOTFOUND:
-	case NIS_PARTIAL:
-	case NIS_NOSUCHNAME:
-	case NIS_NOSUCHTABLE:
-		*err = __NSW_NOTFOUND;
-		nis_freeresult(res);
-		return (0);
-	case NIS_S_NOTFOUND:
-	case NIS_TRYAGAIN:
-		*err = __NSW_TRYAGAIN;
-		syslog(LOG_ERR,
-			"netname2user: (nis+ lookup): %s\n",
-			nis_sperrno(res->status));
-		nis_freeresult(res);
-		return (0);
-	case NIS_SUCCESS:
-	case NIS_S_SUCCESS:
-		break;   /* go and do something useful */
-	default:
-		*err = __NSW_UNAVAIL;
-		syslog(LOG_ERR, "netname2user: (nis+ lookup): %s\n",
-			nis_sperrno(res->status));
-		nis_freeresult(res);
-		return (0);
-	}
-
-	if (res->objects.objects_len > 1) {
-		/*
-		 * A principal can have more than one LOCAL entry?
-		 * Something wrong with cred table.
-		 * Warn user and continue.
-		 */
-		syslog(LOG_ALERT,
-			"netname2user: LOCAL entry for %s in\
-				directory %s not unique",
-			netname, domain);
-	}
-	/* nisname	LOCAL	uid 	grp,grp,grp */
-	*err = parse_uid_gidlist(ENTRY_VAL(res->objects.objects_val, 2),
-					/* uid */
-			ENTRY_VAL(res->objects.objects_val, 3), /* gids */
-			argp);
-	nis_freeresult(res);
-	return (*err == __NSW_SUCCESS);
 }
 
 /*
@@ -537,7 +347,7 @@ netname2user_ldap(int *err, char *netname, struct netid_userdata *argp)
 	groups[0] = pw.pw_gid;
 
 	ngroups = _getgroupsbymember(pw.pw_name, groups, maxgrp,
-				(pw.pw_gid <= MAXUID) ? 1 : 0);
+	    (pw.pw_gid <= MAXUID) ? 1 : 0);
 
 	if (ngroups < 0) {
 		*err = __NSW_UNAVAIL;
@@ -608,10 +418,7 @@ netname2user(const char netname[MAXNETNAMELEN + 1], uid_t *uidp, gid_t *gidp,
 		needfree = 1; /* free the config structure */
 
 	for (look = conf->lookups; look; look = look->next) {
-		if (strcmp(look->service_name, "nisplus") == 0)
-			res = netname2user_nisplus(&err,
-						(char *)netname, &argp);
-		else if (strcmp(look->service_name, "nis") == 0)
+		if (strcmp(look->service_name, "nis") == 0)
 			res = netname2user_nis(&err, (char *)netname, &argp);
 		else if (strcmp(look->service_name, "files") == 0)
 			res = netname2user_files(&err, (char *)netname, &argp);
@@ -619,8 +426,8 @@ netname2user(const char netname[MAXNETNAMELEN + 1], uid_t *uidp, gid_t *gidp,
 			res = netname2user_ldap(&err, (char *)netname, &argp);
 		else {
 			syslog(LOG_INFO,
-		"netname2user: unknown nameservice for publickey info '%s'\n",
-						look->service_name);
+			    "netname2user: unknown nameservice for publickey"
+			    "info '%s'\n", look->service_name);
 			err = __NSW_UNAVAIL;
 		}
 		switch (look->actions[err]) {
@@ -633,8 +440,8 @@ netname2user(const char netname[MAXNETNAMELEN + 1], uid_t *uidp, gid_t *gidp,
 				return (res);
 			default :
 				syslog(LOG_ERR,
-			"netname2user: Unknown action for nameservice '%s'",
-							look->service_name);
+				    "netname2user: Unknown action for "
+				    "nameservice '%s'", look->service_name);
 		}
 	}
 	if (needfree)
@@ -683,7 +490,7 @@ netname2host(const char netname[MAXNETNAMELEN + 1], char *hostname,
 
 	if (hostlen < len) {
 		syslog(LOG_ERR,
-			"netname2host: insufficient space for hostname");
+		    "netname2host: insufficient space for hostname");
 		goto bad_exit;
 	}
 
@@ -699,7 +506,7 @@ netname2host(const char netname[MAXNETNAMELEN + 1], char *hostname,
 	dlen = strlen(domainname);
 	if (hostlen < (len + dlen + 2)) {
 		syslog(LOG_ERR,
-			"netname2host: insufficient space for hostname");
+		    "netname2host: insufficient space for hostname");
 		goto bad_exit;
 	}
 

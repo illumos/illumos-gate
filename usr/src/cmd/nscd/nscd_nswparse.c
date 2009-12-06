@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <limits.h>
@@ -56,7 +54,7 @@ static int alldigits(char *);
 
 /*
  *
- * With the "lookup control" feature, the default criteria for NIS, NIS+,
+ * With the "lookup control" feature, the default criteria for NIS
  * and any new services (e.g. ldap) will be:
  *     [SUCCESS=return  NOTFOUND=continue UNAVAIL=continue TRYAGAIN=forever]
  *
@@ -88,7 +86,7 @@ set_dns_default_lkp(struct __nsw_lookup_v1 *lkp)
 {
 	if (strcasecmp(lkp->service_name, "dns") == 0) {
 		lkp->actions[__NSW_TRYAGAIN] =
-			__NSW_TRYAGAIN_NTIMES;
+		    __NSW_TRYAGAIN_NTIMES;
 		lkp->max_retries = dns_tryagain_retry;
 	}
 }

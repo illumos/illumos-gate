@@ -26,7 +26,6 @@
 #
 
 PROG=		nscd
-NISPROG=	nscd_nischeck
 MANIFEST=	name-service-cache.xml
 SVCMETHOD=	svc-nscd
 
@@ -48,13 +47,9 @@ OBJS=	server.o getpw.o getgr.o gethost.o getnode.o \
 	nscd_frontend.o nscd_admin.o nscd_door.o \
 	gettnrhtp.o gettnrhdb.o
 
-NISOBJS=	nscd_nischeck.o
-
-CLOBBERFILES=	nscd nscd_nischeck
+CLOBBERFILES=	nscd
 
 SRCS=	${OBJS:%.o=%.c}
-
-NISSRC=	${NISOBJS:%.o=%.c}
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -DSUN_THREADS \
@@ -74,12 +69,10 @@ LDFLAGS +=	$(ZINTERPOSE)
 # DEBUG_FLAG=	-g
 
 PROGLIBS=	$(LDLIBS) -lresolv -lnsl -lsocket -lumem -lscf -lavl
-NISPROGLIBS=	$(LDLIBS) -lnsl
 
 # install macros and rule
 #
 ROOTPROG=	${ROOTUSRSBIN}/nscd
-ROOTNISPROG=	${ROOTLIB}/nscd_nischeck
 
 .KEEP_STATE:
 
@@ -89,23 +82,18 @@ ${PROG}: ${OBJS}
 	${LINK.c} ${OPT} -o $@ ${OBJS} ${PROGLIBS}
 	${POST_PROCESS}
 
-${NISPROG}: ${NISOBJS}
-	${LINK.c} ${OPT} -o $@ ${NISOBJS} ${NISPROGLIBS}
-	${POST_PROCESS}
-
 lint:
 	$(LINT.c) ${SRCS} ${PROGLIBS}
-	$(LINT.c) ${NISSRC} ${NISPROGLIBS}
 
 cstyle:
-	${CSTYLE} ${SRCS} ${NISSRC}
+	${CSTYLE} ${SRCS} 
 
-install: all $(ROOTPROG) $(ROOTNISPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
+install: all $(ROOTPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
 check:	$(CHKMANIFEST)
 
 clean:
-	${RM} ${OBJS} ${NISOBJS}
+	${RM} ${OBJS}
 
 ${ROOTUSRSBIN}/%: %
 	${INS.file}

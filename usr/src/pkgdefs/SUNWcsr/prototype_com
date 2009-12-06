@@ -578,7 +578,6 @@ f none var/svc/profile/ns_files.xml 0444 root sys
 f none var/svc/profile/ns_dns.xml 0444 root sys
 f none var/svc/profile/ns_ldap.xml 0444 root sys
 f none var/svc/profile/ns_nis.xml 0444 root sys
-f none var/svc/profile/ns_nisplus.xml 0444 root sys
 f none var/svc/profile/ns_none.xml 0444 root sys
 f none var/svc/profile/platform_none.xml 0444 root sys
 f none var/svc/profile/prophist.SUNWcsr 0444 root sys

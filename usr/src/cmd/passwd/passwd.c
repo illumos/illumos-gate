@@ -191,7 +191,6 @@ static pwu_repository_t	__REPFILES = { "files", NULL, 0 };
 /*
  * Function Declarations
  */
-extern	nis_name	nis_local_directory(void);
 
 extern	void		setusershell(void);
 extern	char		*getusershell(void);
@@ -475,7 +474,7 @@ main(int argc, char *argv[])
 		if (attributes != NULL) {
 			retval = __set_authtoken_attr(usrname,
 			    pamh->ps_item[PAM_AUTHTOK].pi_addr,
-			    NULL, &repository, attributes, &updated_reps);
+			    &repository, attributes, &updated_reps);
 			switch (retval) {
 			case PWU_SUCCESS:
 				for (i = 1; i <= REP_LAST; i <<= 1) {
@@ -691,7 +690,7 @@ ckarg(int argc, char **argv, attrlist **attributes)
 
 	flag = 0;
 
-	while ((opt = getopt(argc, argv, "r:aldefghsux:n:w:D:N")) != EOF) {
+	while ((opt = getopt(argc, argv, "r:aldefghsux:n:w:N")) != EOF) {
 		switch (opt) {
 
 		case 'r': /* Repository Specified */
@@ -704,14 +703,7 @@ ckarg(int argc, char **argv, attrlist **attributes)
 				retval = BADSYN;
 				return (FAIL);
 			}
-			if (strcmp(optarg, "nisplus") == 0) {
-				repository.type = optarg;
-				repository.scope = nis_local_directory();
-				if (repository.scope != NULL) {
-					repository.scope_len =
-					    strlen(repository.scope)+ 1;
-				}
-			} else if (strcmp(optarg, "nis") == 0) {
+			if (strcmp(optarg, "nis") == 0) {
 				repository.type = optarg;
 			} else if (strcmp(optarg, "ldap") == 0) {
 				repository.type = optarg;
@@ -766,11 +758,10 @@ ckarg(int argc, char **argv, attrlist **attributes)
 				repository = __REPFILES;
 
 			if (IS_FILES(repository) == FALSE &&
-			    IS_LDAP(repository) == FALSE &&
-			    IS_NISPLUS(repository) == FALSE) {
+			    IS_LDAP(repository) == FALSE) {
 				(void) fprintf(stderr, gettext(
-				    "-N only applies to files, ldap or  "
-				    "nisplus repository\n"));
+				    "-N only applies to files or ldap "
+				    "repository\n"));
 				rusage();	/* exit */
 				retval = BADOPT;
 				return (FAIL);
@@ -799,11 +790,10 @@ ckarg(int argc, char **argv, attrlist **attributes)
 				repository = __REPFILES;
 
 			if (IS_FILES(repository) == FALSE &&
-			    IS_LDAP(repository) == FALSE &&
-			    IS_NISPLUS(repository) == FALSE) {
+			    IS_LDAP(repository) == FALSE) {
 				(void) fprintf(stderr, gettext(
-				    "-l only applies to files, ldap or "
-				    "nisplus repository\n"));
+				    "-l only applies to files or ldap "
+				    "repository\n"));
 				rusage();	/* exit */
 				retval = BADOPT;
 				return (FAIL);
@@ -832,11 +822,10 @@ ckarg(int argc, char **argv, attrlist **attributes)
 				repository = __REPFILES;
 
 			if (IS_FILES(repository) == FALSE &&
-			    IS_LDAP(repository) == FALSE &&
-			    IS_NISPLUS(repository) == FALSE) {
+			    IS_LDAP(repository) == FALSE) {
 				(void) fprintf(stderr, gettext(
-				    "-u only applies to files, ldap or "
-				    "nisplus repository\n"));
+				    "-u only applies to files or ldap "
+				    "repository\n"));
 				rusage();	/* exit */
 				retval = BADOPT;
 				return (FAIL);
@@ -866,11 +855,10 @@ ckarg(int argc, char **argv, attrlist **attributes)
 				repository = __REPFILES;
 
 			if (IS_FILES(repository) == FALSE &&
-			    IS_LDAP(repository) == FALSE &&
-			    IS_NISPLUS(repository) == FALSE) {
+			    IS_LDAP(repository) == FALSE) {
 				(void) fprintf(stderr, gettext(
-				    "-x only applies to files, ldap or "
-				    "nisplus repository\n"));
+				    "-x only applies to files or ldap "
+				    "repository\n"));
 				rusage();	/* exit */
 				retval = BADSYN;
 				return (FAIL);
@@ -908,11 +896,10 @@ ckarg(int argc, char **argv, attrlist **attributes)
 				repository = __REPFILES;
 
 			if (IS_FILES(repository) == FALSE &&
-			    IS_LDAP(repository) == FALSE &&
-			    IS_NISPLUS(repository) == FALSE) {
+			    IS_LDAP(repository) == FALSE) {
 				(void) fprintf(stderr, gettext(
-				    "-n only applies to files, ldap or "
-				    "nisplus repository\n"));
+				    "-n only applies to files or ldap "
+				    "repository\n"));
 				rusage();	/* exit */
 				retval = BADSYN;
 				return (FAIL);
@@ -948,11 +935,10 @@ ckarg(int argc, char **argv, attrlist **attributes)
 				repository = __REPFILES;
 
 			if (IS_FILES(repository) == FALSE &&
-			    IS_LDAP(repository) == FALSE &&
-			    IS_NISPLUS(repository) == FALSE) {
+			    IS_LDAP(repository) == FALSE) {
 				(void) fprintf(stderr, gettext(
-				    "-w only applies to files, ldap or "
-				    "nisplus repository\n"));
+				    "-w only applies to files or ldap "
+				    "repository\n"));
 				rusage();	/* exit */
 				retval = BADSYN;
 				return (FAIL);
@@ -992,11 +978,10 @@ ckarg(int argc, char **argv, attrlist **attributes)
 
 			/* display password attributes */
 			if (IS_FILES(repository) == FALSE &&
-			    IS_LDAP(repository) == FALSE &&
-			    IS_NISPLUS(repository) == FALSE) {
+			    IS_LDAP(repository) == FALSE) {
 				(void) fprintf(stderr, gettext(
-				    "-s only applies to files, ldap or "
-				    "nisplus repository\n"));
+				    "-s only applies to files or ldap "
+				    "repository\n"));
 				rusage();	/* exit */
 				retval = BADSYN;
 				return (FAIL);
@@ -1023,11 +1008,10 @@ ckarg(int argc, char **argv, attrlist **attributes)
 				repository = __REPFILES;
 
 			if (IS_FILES(repository) == FALSE &&
-			    IS_LDAP(repository) == FALSE &&
-			    IS_NISPLUS(repository) == FALSE) {
+			    IS_LDAP(repository) == FALSE) {
 				(void) fprintf(stderr, gettext(
-				    "-a only applies to files, ldap or "
-				    "nisplus repository\n"));
+				    "-a only applies to files or ldap "
+				    "repository\n"));
 				rusage();	/* exit */
 				retval = BADSYN;
 				return (FAIL);
@@ -1054,11 +1038,10 @@ ckarg(int argc, char **argv, attrlist **attributes)
 				repository = __REPFILES;
 
 			if (IS_FILES(repository) == FALSE &&
-			    IS_LDAP(repository) == FALSE &&
-			    IS_NISPLUS(repository) == FALSE) {
+			    IS_LDAP(repository) == FALSE) {
 				(void) fprintf(stderr, gettext(
-				    "-f only applies to files, ldap or "
-				    "nisplus repository\n"));
+				    "-f only applies to files or ldap "
+				    "repository\n"));
 				rusage();	/* exit */
 				retval = BADSYN;
 				return (FAIL);
@@ -1077,30 +1060,6 @@ ckarg(int argc, char **argv, attrlist **attributes)
 			}
 			flag |= FFLAG;
 			attrlist_add(attributes, ATTR_EXPIRE_PASSWORD, NULL);
-			break;
-
-		case 'D': /* domain name specified */
-			if (IS_NISPLUS(repository) == FALSE) {
-				(void) fprintf(stderr, gettext(
-				    "-D only applies to nisplus repository\n"));
-				rusage();	/* exit */
-				retval = BADSYN;
-				return (FAIL);
-			}
-
-			if (flag & AFLAG) {
-				retval = BADOPT;
-				return (FAIL);
-			}
-			/* It is cleaner not to set this flag */
-			/* flag |= OFLAG; */
-
-			/* get domain from optarg */
-			repository.scope = optarg;
-			if (repository.scope != NULL) {
-				repository.scope_len =
-				    strlen(repository.scope)+1;
-			}
 			break;
 
 		case 'e': /* change login shell */
@@ -1425,11 +1384,10 @@ get_namelist_files(char ***namelist_p, int *num_user)
 
 /*
  * Our private version of the switch frontend for getspent.  We want
- * to search just the nisplus or ldap sp file, so we want to bypass
+ * to search just the ldap sp file, so we want to bypass
  * normal nsswitch.conf based processing.  This implementation
  * compatible with version 2 of the name service switch.
  */
-#define	NSS_NISPLUS_ONLY	"nisplus"
 #define	NSS_LDAP_ONLY		"ldap"
 
 extern int str2spwd(const char *, int, void *, char *, int);
@@ -1443,7 +1401,7 @@ _lc_nss_initf_shadow(nss_db_params_t *p)
 {
 	p->name	= NSS_DBNAM_SHADOW;
 	p->config_name    = NSS_DBNAM_PASSWD;	/* Use config for "passwd" */
-	p->default_config = local_config;   	/* Use ldap or nisplus only */
+	p->default_config = local_config;   	/* Use ldap only */
 	p->flags = NSS_USE_DEFAULT_CONFIG;
 }
 
@@ -1533,9 +1491,6 @@ get_namelist(pwu_repository_t repository, char ***namelist, int *num_user)
 {
 	if (IS_LDAP(repository)) {
 		local_config = NSS_LDAP_ONLY;
-		return (get_namelist_local(namelist, num_user));
-	} else if (IS_NISPLUS(repository)) {
-		local_config = NSS_NISPLUS_ONLY;
 		return (get_namelist_local(namelist, num_user));
 	} else if (IS_FILES(repository))
 		return (get_namelist_files(namelist, num_user));
@@ -1804,18 +1759,13 @@ rusage(void)
 #define	MSG(a) (void) fprintf(stderr, gettext((a)));
 
 	MSG("usage:\n");
-	MSG("\tpasswd [-r files | -r nis | -r nisplus | -r ldap] [name]\n");
+	MSG("\tpasswd [-r files | -r nis | -r ldap] [name]\n");
 	MSG("\tpasswd [-r files] [-egh] [name]\n");
 	MSG("\tpasswd [-r files] -sa\n");
 	MSG("\tpasswd [-r files] -s [name]\n");
 	MSG("\tpasswd [-r files] [-d|-l|-N|-u] [-f] [-n min] [-w warn] "
 	    "[-x max] name\n");
 	MSG("\tpasswd -r nis [-eg] [name]\n");
-	MSG("\tpasswd -r nisplus [-egh] [-D domainname] [name]\n");
-	MSG("\tpasswd -r nisplus -sa\n");
-	MSG("\tpasswd -r nisplus [-D domainname] -s [name]\n");
-	MSG("\tpasswd -r nisplus [-D domainname] [-l|-N|-u] [-f] [-n min] "
-	    "[-w warn]\n");
 	MSG("\t\t[-x max] name\n");
 	MSG("\tpasswd -r ldap [-egh] [name]\n");
 	MSG("\tpasswd -r ldap -sa\n");

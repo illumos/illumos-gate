@@ -18,18 +18,16 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # cmd/sendmail/aux/Makefile
 #
 include		../../Makefile.cmd
 include		../Makefile.cmd
 
-PROG= 		mailstats mconnect vacation mailcompat aliasadm praliases mailq
+PROG= 		mailstats mconnect vacation mailcompat praliases mailq
 
 LIBPROG=	mail.local smrsh
 
@@ -38,13 +36,12 @@ USRSBINPROG=	etrn makemap editmap
 # $(PROG) by default
 CLOBBERFILES=	$(LIBPROG) $(USRSBINPROG)
 
-OBJS= 		$(PROG:%=%.o) nisplus.o nisedit.o
+OBJS= 		$(PROG:%=%.o)
 
 .PARALLEL:	$(OBJS) $(PROG) $(LIBPROG) $(USRSBINPROG)
 
-SRCS= 		$(PROG:%=%.c) nisplus.c nisedit.c
+SRCS= 		$(PROG:%=%.c)
 
-aliasadm :=	LDLIBS += -lnsl
 editmap :=	LDLIBS += -lldap
 mail.local :=	LDLIBS += -lsocket -lnsl -lmail -lldap
 mailq :=	LDLIBS += -lsecdb
@@ -79,10 +76,6 @@ convtime.o:	../src/convtime.c
 vacation:	vacation.o convtime.o rfc2047.o ../libsm/libsm.a
 	$(LINK.c) vacation.o convtime.o rfc2047.o -o $@ $(LDLIBS) \
 		../libsm/libsm.a
-	$(POST_PROCESS)
-
-aliasadm:	aliasadm.o nisplus.o nisedit.o
-	$(LINK.c) aliasadm.o nisplus.o nisedit.o -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 mail.local:	mail.local.o ../libsmutil/libsmutil.a ../libsm/libsm.a

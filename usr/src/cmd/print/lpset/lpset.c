@@ -85,10 +85,10 @@ static void
 Usage(char *name)
 {
 	(void) fprintf(stderr,
-		gettext("Usage: %s [-n files | nisplus | ldap] [-x] "
-			"[-h ldaphost] [-D binddn] [-w passwd] "
-			"[-a key=value] [-d key] (printer)\n"),
-		name);
+	    gettext("Usage: %s [-n files | ldap] [-x] "
+	    "[-h ldaphost] [-D binddn] [-w passwd] "
+	    "[-a key=value] [-d key] (printer)\n"),
+	    name);
 	exit(1);
 }
 
@@ -105,12 +105,12 @@ main(int ac, char *av[])
 	int delete_printer = 0;
 	int c;
 	char	*program = NULL,
-		*printer = NULL,
-		*host = NULL,
-		*binddn = NULL,
-		*passwd = NULL,
-		*ins = NULL,
-		*ons = "files";
+	    *printer = NULL,
+	    *host = NULL,
+	    *binddn = NULL,
+	    *passwd = NULL,
+	    *ins = NULL,
+	    *ons = "files";
 	char	**changes = NULL;
 	ns_cred_t	*cred = NULL;
 	ns_printer_t 	*printer_obj = NULL;
@@ -140,7 +140,7 @@ main(int ac, char *av[])
 			/* FALLTHRU */
 		case 'a':
 			changes = (char **)list_append((void**)changes,
-						(void *)strdup(optarg));
+			    (void *)strdup(optarg));
 			break;
 		case 'D':
 			binddn = optarg;
@@ -178,8 +178,8 @@ main(int ac, char *av[])
 
 	if (strchr(printer, ':') != NULL) {
 		(void) fprintf(stderr, gettext(
-			"POSIX-Style names are not valid destinations (%s)\n"),
-			printer);
+		    "POSIX-Style names are not valid destinations (%s)\n"),
+		    printer);
 		return (1);
 	}
 
@@ -195,16 +195,14 @@ main(int ac, char *av[])
 	} else if (strcasecmp("files", ons) == 0) {
 		if (authorized() == 0) {
 			(void) fprintf(stderr, gettext(
-				"Permission denied: not authorized\n"));
+			    "Permission denied: not authorized\n"));
 			return (1);
 		}
 		ons = "files";
-	} else if (strcasecmp("nisplus", ons) == 0) {
-		ons = "nisplus";
 	} else if (strcasecmp("ldap", ons) == 0) {
 		if ((cred = calloc(1, sizeof (*cred))) == NULL) {
 			(void) fprintf(stderr,
-				gettext("could not initialize credential\n"));
+			    gettext("could not initialize credential\n"));
 			return (1);
 		}
 
@@ -237,8 +235,8 @@ main(int ac, char *av[])
 		(void) setuid(getuid());
 	} else {
 		(void) fprintf(stderr,
-			gettext("%s is not a supported name service.\n"),
-			ons);
+		    gettext("%s is not a supported name service.\n"),
+		    ons);
 		return (1);
 	}
 
@@ -247,67 +245,68 @@ main(int ac, char *av[])
 	    /* Naming Service is not LDAP */
 
 	    /* get the printer object */
-	    if ((printer_obj = ns_printer_get_name(printer, ins)) == NULL) {
-		if (delete_printer != 0) {
-			(void) fprintf(stderr, gettext("%s: unknown printer\n"),
-				printer);
+		if ((printer_obj = ns_printer_get_name(printer, ins)) == NULL) {
+			if (delete_printer != 0) {
+				(void) fprintf(stderr, gettext
+				    ("%s: unknown printer\n"), printer);
 			return (1);
+			}
+			if ((printer_obj = calloc(1, sizeof (*printer_obj)))
+			    == NULL) {
+				(void) fprintf(stderr, gettext(
+				    "could not initialize printer object\n"));
+				return (1);
+			}
+			printer_obj->name = strdup(printer);
 		}
-		if ((printer_obj = calloc(1, sizeof (*printer_obj))) == NULL) {
-			(void) fprintf(stderr, gettext(
-				"could not initialize printer object\n"));
-			return (1);
+
+		printer_obj->source = ons;
+
+		if (cred != NULL) {
+			printer_obj->cred = cred;
 		}
-		printer_obj->name = strdup(printer);
-	    }
-
-	    printer_obj->source = ons;
-
-	    if (cred != NULL) {
-		printer_obj->cred = cred;
-	    }
 
 	    /* make the changes to it */
-	    while (changes != NULL && *changes != NULL) {
-		int has_equals = (strchr(*changes, '=') != NULL);
-		char *p, *key = NULL, *value = NULL;
+		while (changes != NULL && *changes != NULL) {
+			int has_equals = (strchr(*changes, '=') != NULL);
+			char *p, *key = NULL, *value = NULL;
 
-		key = *(changes++);
+			key = *(changes++);
 
-		for (p = key; ((p != NULL) && (*p != NULL)); p++)
-			if (*p == '=') {
-				*p = NULL;
-				value = ++p;
-				break;
-			} else if (*p == '\\')
-				p++;
+			for (p = key; ((p != NULL) && (*p != NULL)); p++)
+				if (*p == '=') {
+					*p = NULL;
+					value = ++p;
+					break;
+				} else if (*p == '\\')
+					p++;
 
-		if ((value != NULL) && (*value == NULL))
-			value = NULL;
+			if ((value != NULL) && (*value == NULL))
+				value = NULL;
 
-		if ((key != NULL) && (key[0] != NULL)) {
-			if ((value == NULL) &&
-			    (ns_get_value(key, printer_obj) == NULL) &&
-			    (has_equals == 0)) {
-				fprintf(stderr,
-					gettext("%s: unknown attribute\n"),
-					key);
-				result = 1;
-			} else
-			(void) ns_set_value_from_string(key, value,
-				printer_obj);
+			if ((key != NULL) && (key[0] != NULL)) {
+				if ((value == NULL) &&
+				    (ns_get_value(key, printer_obj) == NULL) &&
+				    (has_equals == 0)) {
+					fprintf(stderr,
+					    gettext("%s: unknown attribute\n"),
+					    key);
+					result = 1;
+				} else
+				(void) ns_set_value_from_string(key, value,
+				    printer_obj);
+			}
 		}
-	    }
-	    if (delete_printer != 0)
-		printer_obj->attributes = NULL;
+		if (delete_printer != 0)
+			printer_obj->attributes = NULL;
 
-	    /* write it back */
-	    if (ns_printer_put(printer_obj) != 0) {
-		(void) fprintf(stderr,
-				gettext("Failed to write into %s database\n"),
-				ons);
-		result = 1;
-	    }
+		/* write it back */
+		if (ns_printer_put(printer_obj) != 0) {
+			(void) fprintf(stderr,
+			    gettext("Failed to write into %s database\n"),
+			    ons);
+			result = 1;
+		}
 	}
 
 	else {
@@ -320,7 +319,7 @@ main(int ac, char *av[])
 
 		if ((printer_obj = calloc(1, sizeof (*printer_obj))) == NULL) {
 			(void) fprintf(stderr, gettext(
-				"could not initialize printer object\n"));
+			    "could not initialize printer object\n"));
 			return (1);
 		}
 
@@ -339,12 +338,13 @@ main(int ac, char *av[])
 				if (delete_printer != 0) {
 					/* Delete the printer object */
 					((NS_LDAPDATA *)
-					(printer_obj->nsdata))->attrList = NULL;
+					    (printer_obj->nsdata))->attrList
+					    = NULL;
 				} else {
 					/* Add or modify the printer object */
 					((NS_LDAPDATA *)
-					(printer_obj->nsdata))->attrList =
-									changes;
+					    (printer_obj->nsdata))->attrList =
+					    changes;
 				}
 
 				result = ns_printer_put(printer_obj);
@@ -369,7 +369,7 @@ main(int ac, char *av[])
 		else {
 			result = 1;
 			(void) fprintf(stderr,
-				gettext("Error - no LDAP credentials\n"));
+			    gettext("Error - no LDAP credentials\n"));
 		}
 
 		if (printer_obj != NULL) {

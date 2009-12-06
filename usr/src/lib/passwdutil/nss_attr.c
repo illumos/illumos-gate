@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <errno.h>
@@ -190,8 +188,6 @@ nss_getpwnam(char *name, attrlist *items, pwu_repository_t *rep, void **buf)
 		if (private_getpwnam_r(name, &pwd, pwd_scratch,
 		    PWD_SCRATCH_SIZE) != NULL)
 			pwbuf->rep_name = "files";
-		else if (repositories & REP_COMPAT_NISPLUS)
-			pwbuf->rep_name = "nisplus";
 		else if (repositories & REP_COMPAT_LDAP)
 			pwbuf->rep_name = "ldap";
 		else if (repositories & REP_COMPAT_NIS)

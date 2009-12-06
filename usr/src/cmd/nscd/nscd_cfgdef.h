@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,27 +119,25 @@ nscd_cfg_id_t _nscd_cfg_nsw_src[] = {
 	{	0,	"files"			},
 	{	1,	"ldap"			},
 	{	2,	"nis"			},
-	{	3,	"nisplus"		},
-	{	4,	"mdns"			},
-	{	5,	"dns"			},
-	{	6,	"compat"		},
-	{	7,	"user"			},
-	{	8,	"ad"			},
+	{	3,	"mdns"			},
+	{	4,	"dns"			},
+	{	5,	"compat"		},
+	{	6,	"user"			},
+	{	7,	"ad"			},
 	{	-1,	NULL			}
 };
 
 /*
  * name service related smf service table
  * (the order of the services should match the order of the source
- *  listed above, 0: files, 1: ldap, 2: nis, 3: nisplus, 4: mdns.
+ *  listed above, 0: files, 1: ldap, 2: nis, 3: mdns.
  *  dns is not needed)
  */
 nscd_cfg_id_t _nscd_cfg_smf_services[] = {
 	{	0,	"svc:/system/name-service-cache:default"},
 	{	1,	"svc:/network/ldap/client:default"	},
 	{	2,	"svc:/network/nis/client:default"	},
-	{	3,	"svc:/network/rpc/bind:default"		},
-	{	4,	"svc:/network/dns/multicast:default"	},
+	{	3,	"svc:/network/dns/multicast:default"	},
 	{	-1,	NULL					}
 };
 

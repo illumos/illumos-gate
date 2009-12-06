@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,9 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 package com.sun.dhcpmgr.client;
@@ -62,22 +59,20 @@ public class ConfigWizard extends DSWizard {
     private IPAddress router = null;
     private String nisDomain;
     private Vector nisServs;
-    private String nisplusDomain;
-    private Vector nisplusServs;
     private static final String [] unitChoices = {
 	ResourceStrings.getString("cfg_wiz_hours"),
 	ResourceStrings.getString("cfg_wiz_days"),
 	ResourceStrings.getString("cfg_wiz_weeks") };
     private static final int [] unitMultiples = { 60*60, 24*60*60, 7*24*60*60 };
     private HostResource hostResource = null;
-    
+
     /**
      * This class defines a host resource component.
      */
     private class HostResource extends Box {
 
 	/**
-	 * The host resource(eg., files, nisplus, dns).
+	 * The host resource(eg., files, dns).
 	 */
 	private String resource = null;
 
@@ -269,12 +264,12 @@ public class ConfigWizard extends DSWizard {
 	 * The component provided to the wizard.
 	 */
 	private Box stepBox;
-	
+
 	/**
 	 * The basic constructor for the wizard step.
 	 */
 	public HostDataStep() {
-	
+
 	    stepBox = Box.createVerticalBox();
 
 	    // Explanatory step text
@@ -321,7 +316,7 @@ public class ConfigWizard extends DSWizard {
 
 	    // The "files" option.
 	    //
-	    hostDescription = 
+	    hostDescription =
 		ResourceStrings.getString("cfg_wiz_files");
 	    hostResource = new HostResource(DhcpConfigOpts.DSVC_CV_FILES,
 		hostDescription, null, null, true);
@@ -331,36 +326,13 @@ public class ConfigWizard extends DSWizard {
 	    buttonGroup.add(hostResource.getHostButton());
 	    boxPanel.add(hostResource);
 
-	    // The "nisplus" option. Only enabled if it can be managed
+	    // The "dns" option. Only enabled if it can be managed
 	    // from the selected server.
 	    //
 	    String domainDefault = null;
 	    boolean enabled = false;
-	    try {
-		// If we can obtain a server list, then nisplus is enabled.
-		server.getIPOption(StandardOptions.CD_NISPLUS_SERVS, "");
-		enabled = true;
-		domainDefault = server.getStringOption(
-		    StandardOptions.CD_NISPLUS_DMAIN, "");
-	    } catch (Throwable e) {
-		domainDefault = new String();
-	    }
-
-	    hostDescription = 
-		ResourceStrings.getString("cfg_wiz_nisplus");
 	    String domainDescription =
 		ResourceStrings.getString("cfg_wiz_domain") + " ";
-	    hostResource = new HostResource(DhcpConfigOpts.DSVC_CV_NISPLUS,
-		hostDescription, domainDefault, domainDescription, enabled);
-	    HostButton hbNISPlus = hostResource.getHostButton();
-            hbNISPlus.setToolTipText(hostDescription);
-	    hostResource.getHostButton().addChangeListener(buttonListener);
-	    buttonGroup.add(hostResource.getHostButton());
-	    boxPanel.add(hostResource);
-
-	    // The "dns" option. Only enabled if it can be managed
-	    // from the selected server.
-	    //
 	    try {
 		domainDefault =
 		    server.getStringOption(StandardOptions.CD_DNSDOMAIN, "");
@@ -375,9 +347,9 @@ public class ConfigWizard extends DSWizard {
 		enabled = false;
 	    }
 
-	    hostDescription = 
+	    hostDescription =
 		ResourceStrings.getString("cfg_wiz_dns");
-	    
+
 	    hostResource = new HostResource(DhcpConfigOpts.DSVC_CV_DNS,
 		hostDescription, domainDefault, domainDescription, enabled);
 	    HostButton hbDNS = hostResource.getHostButton();
@@ -393,19 +365,19 @@ public class ConfigWizard extends DSWizard {
 	    stepBox.add(Box.createVerticalGlue());
 
 	} // constructor
-	
+
 	public String getDescription() {
 	    return ResourceStrings.getString("cfg_wiz_hostdata_desc");
 	} // getDescription
-	
+
 	public Component getComponent() {
 	    return stepBox;
 	} // getComponent
-	
+
 	public void setActive(int direction) {
 	    setForwardEnabled(true);
 	} // setActive
-	
+
 	public boolean setInactive(int direction) {
 
 	    // If moving forward, validate that the host resource/domain
@@ -433,21 +405,21 @@ public class ConfigWizard extends DSWizard {
 	} // setInactive
 
     } // HostDataStep
-    
+
     // This step specifies lease length and renewal policies for the server
     class LeaseStep implements WizardStep {
 	private IntegerField length;
 	private JComboBox units;
 	private JCheckBox negotiable;
 	private Box stepBox;
-	    
+
 	public LeaseStep() {
 	    stepBox = Box.createVerticalBox();
-	    
+
 	    // Explanatory text
 	    stepBox.add(Wizard.createTextArea(
 		ResourceStrings.getString("cfg_wiz_lease_explain"), 3, 45));
-	    
+
 	    // Need to input a number together with units
 	    JPanel flowPanel = new JPanel();
 
@@ -478,24 +450,24 @@ public class ConfigWizard extends DSWizard {
 	    stepBox.add(Wizard.createTextArea(
 		ResourceStrings.getString("cfg_wiz_negotiable_explain"), 6,
 		45));
-	    
+
 	    negotiable = new JCheckBox(
 		ResourceStrings.getString("cfg_wiz_negotiable"), true);
 	    negotiable.setToolTipText(
-	        ResourceStrings.getString("cfg_wiz_negotiable"));
+		ResourceStrings.getString("cfg_wiz_negotiable"));
 	    negotiable.setAlignmentX(Component.CENTER_ALIGNMENT);
 	    stepBox.add(negotiable);
 	    stepBox.add(Box.createVerticalGlue());
 	}
-	
+
 	public String getDescription() {
 	    return ResourceStrings.getString("cfg_wiz_lease_desc");
 	}
-	
+
 	public Component getComponent() {
 	    return stepBox;
 	}
-	
+
 	public void setActive(int direction) {
 	    setForwardEnabled(true);
 	    // Set the units field to the maximum unit this value expresses
@@ -514,9 +486,9 @@ public class ConfigWizard extends DSWizard {
 	    }
 	    units.setSelectedIndex(i);
 	    length.setValue(lengthVal);
-	    negotiable.setSelected(leaseNegotiable);			
+	    negotiable.setSelected(leaseNegotiable);
 	}
-	
+
 	public boolean setInactive(int direction) {
 	    // Leases cannot be zero length
 	    long lease = (long)length.getValue();
@@ -533,7 +505,7 @@ public class ConfigWizard extends DSWizard {
 		// Value is too large
 		MessageFormat form = new MessageFormat(
 		    ResourceStrings.getString("cfg_wiz_lease_overflow"));
-		Object args = new Object[] { 
+		Object args = new Object[] {
 		    new Integer(Integer.MAX_VALUE / multiplier),
 		    units.getSelectedItem()
 		};
@@ -547,22 +519,22 @@ public class ConfigWizard extends DSWizard {
 	    return true;
 	}
     }
-    
+
     // Step to configure DNS
     class DnsStep implements WizardStep {
 	private NoSpaceField domain;
 	private IPAddressList serverList;
 	private Box stepBox;
 	private boolean firstActive = true;
-	
+
 	public DnsStep() {
 	    stepBox = Box.createVerticalBox();
-	    
+
 	    // Explanatory text
 	    stepBox.add(Wizard.createTextArea(
 		ResourceStrings.getString("cfg_wiz_dns_explain"), 5, 45));
 	    stepBox.add(Box.createVerticalStrut(10));
-	    
+
 	    // Domain first
 	    JPanel fieldPanel = new JPanel(new FieldLayout());
 
@@ -577,7 +549,7 @@ public class ConfigWizard extends DSWizard {
 	    jlDNSDomain.setDisplayedMnemonic(mnDNS.getMnemonic());
 	    fieldPanel.add(FieldLayout.FIELD, domain);
 	    stepBox.add(fieldPanel);
-	    
+
 	    serverList = new IPAddressList();
 	    Border tb = BorderFactory.createTitledBorder(
 		BorderFactory.createLineBorder(Color.black),
@@ -586,15 +558,15 @@ public class ConfigWizard extends DSWizard {
 		BorderFactory.createEmptyBorder(5, 5, 5, 5)));
 	    stepBox.add(serverList);
 	}
-	
+
 	public String getDescription() {
 	    return ResourceStrings.getString("cfg_wiz_dns_desc");
 	}
-	
+
 	public Component getComponent() {
 	    return stepBox;
 	}
-	
+
 	public void setActive(int direction) {
 	    setForwardEnabled(true);
 
@@ -612,7 +584,7 @@ public class ConfigWizard extends DSWizard {
 		}
 	    }
 	}
-	
+
 	public boolean setInactive(int direction) {
 	    if (direction == FORWARD) {
 		/*
@@ -633,7 +605,7 @@ public class ConfigWizard extends DSWizard {
 	    return true;
 	}
     }
-    
+
     // Select the network to configure
     class NetworkStep implements WizardStep {
 	private JComboBox networkBox;
@@ -642,13 +614,13 @@ public class ConfigWizard extends DSWizard {
 	private Box stepBox;
 	private boolean firstActive = true;
 	private Hashtable maskTable;
-	
+
 	// Model for the list of networks
 	class NetworkListModel extends AbstractListModel
 		implements ComboBoxModel {
 	    private Object currentValue;
 	    private String [] data = null;
-	    
+
 	    public int getSize() {
 		if (data == null) {
 		    return 0;
@@ -656,7 +628,7 @@ public class ConfigWizard extends DSWizard {
 		    return data.length;
 		}
 	    }
-	    
+
 	    public Object getElementAt(int index) {
 		if (data == null) {
 		    return null;
@@ -664,23 +636,23 @@ public class ConfigWizard extends DSWizard {
 		    return data[index];
 		}
 	    }
-	    
+
 	    public void setSelectedItem(Object anItem) {
 		currentValue = anItem;
 		fireContentsChanged(this, -1, -1);
 	    }
-	    
+
 	    public Object getSelectedItem() {
 		return currentValue;
 	    }
-	    
+
 	    public void setData(Vector addrs) {
 		data = new String[addrs.size()];
 		addrs.copyInto(data);
 		fireContentsChanged(this, 0, data.length);
 	    }
 	}
-	
+
 	/*
 	 * Editor for the Network combo box, ensures that a valid IP address
 	 * is entered. This implementation cribbed from Swing's
@@ -688,16 +660,16 @@ public class ConfigWizard extends DSWizard {
 	 */
 	class NetworkComboBoxEditor implements ComboBoxEditor, FocusListener {
 	    private IPAddressField editor;
-	    
+
 	    public NetworkComboBoxEditor() {
 		editor = new IPAddressField();
 		editor.addFocusListener(this);
 	    }
-	    
+
 	    public Component getEditorComponent() {
 		return editor;
 	    }
-	    
+
 	    public void setItem(Object obj) {
 		if (obj != null) {
 		    editor.setText((String)obj);
@@ -705,31 +677,31 @@ public class ConfigWizard extends DSWizard {
 		    editor.setText("");
 		}
 	    }
-	    
+
 	    public Object getItem() {
 		return editor.getText();
 	    }
-	    
+
 	    public void selectAll() {
 		editor.selectAll();
 		editor.requestFocus();
 	    }
-	    
+
 	    public void focusGained(FocusEvent e) {
 	    }
-	    
+
 	    public void focusLost(FocusEvent e) {
 	    }
-	    
+
 	    public void addActionListener(ActionListener l) {
 		editor.addActionListener(l);
 	    }
-	    
+
 	    public void removeActionListener(ActionListener l) {
 		editor.removeActionListener(l);
 	    }
 	}
-		
+
 	public NetworkStep() {
 	    stepBox = Box.createVerticalBox();
 
@@ -771,16 +743,16 @@ public class ConfigWizard extends DSWizard {
 
 	    panel.add(FieldLayout.FIELD, mask);
 	    stepBox.add(panel);
-	    
+
 	    stepBox.add(Box.createVerticalStrut(10));
-	    
+
 	    if (fullConfig) {
 		stepBox.add(Wizard.createTextArea(
 		    ResourceStrings.getString("cfg_wiz_network_explainmore"), 4,
 		    45));
 	    }
 	    stepBox.add(Box.createVerticalGlue());
-	    
+
 	    /*
 	     * Listen to selection changes on the network box and change the
 	     * netmask accordingly.
@@ -798,15 +770,15 @@ public class ConfigWizard extends DSWizard {
 		}
 	    });
 	}
-	
+
 	public String getDescription() {
 	    return ResourceStrings.getString("cfg_wiz_network_desc");
 	}
-	
+
 	public Component getComponent() {
 	    return stepBox;
 	}
-	
+
 	public void setActive(int direction) {
 	    setForwardEnabled(true);
 	    if (firstActive) {
@@ -821,7 +793,7 @@ public class ConfigWizard extends DSWizard {
 		    try {
 			ifs = server.getInterfaces();
 		    } catch (BridgeException e) {
-		        // we're not configured yet, apparently
+			// we're not configured yet, apparently
 			ifs = null;
 		    }
 		    Vector addrs = new Vector();
@@ -866,7 +838,7 @@ public class ConfigWizard extends DSWizard {
 		}
 	    }
 	}
-	
+
 	public boolean setInactive(int direction) {
 	    if (direction == FORWARD) {
 		try {
@@ -891,7 +863,7 @@ public class ConfigWizard extends DSWizard {
 		    } else {
 			network.setMask(mask.getValue());
 		    }
-		    
+
 		    // Check for network already configured, error if so
 		    Network [] nets = new Network[0];
 		    try {
@@ -935,7 +907,7 @@ public class ConfigWizard extends DSWizard {
 	    return true;
 	}
     }
-    
+
     // Get the type of network and routing policy
     class NetTypeStep implements WizardStep {
 	private JRadioButton lan, ptp;
@@ -944,15 +916,15 @@ public class ConfigWizard extends DSWizard {
 	private IPAddressField address;
 	private Box stepBox;
 	private boolean firstTime = true;
-	
+
 	public NetTypeStep() {
 	    stepBox = Box.createVerticalBox();
-	    
+
 	    // Explanatory text at the top
 	    stepBox.add(Wizard.createTextArea(
 		ResourceStrings.getString("cfg_wiz_nettype_explain"), 2, 45));
 	    stepBox.add(Box.createVerticalStrut(10));
-	    
+
 	    // Label and radio buttons for type of network
 	    JPanel panel = new JPanel(new GridLayout(2, 1));
 	    /*
@@ -981,18 +953,18 @@ public class ConfigWizard extends DSWizard {
             panel.add(ptp);
             stepBox.add(panel);
             stepBox.add(Box.createVerticalStrut(20));
-	    
+
 	    // Routing policy
 	    panel = new JPanel(new GridLayout(2, 1));
 	    tb = BorderFactory.createTitledBorder(b,
 		ResourceStrings.getString("cfg_wiz_routing_label"));
 	    panel.setBorder(BorderFactory.createCompoundBorder(tb,
 		BorderFactory.createEmptyBorder(0, 5, 0, 5)));
-	    
+
 	    discover = new JRadioButton(
 		ResourceStrings.getString("cfg_wiz_router_discovery"), true);
 	    discover.setToolTipText(ResourceStrings.getString(
-	        "cfg_wiz_router_discovery"));
+		"cfg_wiz_router_discovery"));
 	    routingGroup = new ButtonGroup();
 	    routingGroup.add(discover);
 	    panel.add(discover);
@@ -1001,7 +973,7 @@ public class ConfigWizard extends DSWizard {
 	    specify = new JRadioButton(
 		ResourceStrings.getString("cfg_wiz_router_specify"), false);
 	    specify.setToolTipText(ResourceStrings.getString(
-	        "cfg_wiz_router_specify"));
+		"cfg_wiz_router_specify"));
 	    routingGroup.add(specify);
 	    routerBox.add(specify);
 	    routerBox.add(Box.createHorizontalStrut(2));
@@ -1015,10 +987,10 @@ public class ConfigWizard extends DSWizard {
 	    routerBox.add(address);
 	    panel.add(routerBox);
 	    stepBox.add(panel);
-	    
+
 	    stepBox.add(Box.createVerticalStrut(10));
 	    stepBox.add(Box.createVerticalGlue());
-	    
+
 	    /*
 	     * Enable forward if router discovery, or if specifying router and
 	     * address is not empty.
@@ -1030,7 +1002,7 @@ public class ConfigWizard extends DSWizard {
 			|| (address.getText().length() != 0));
 		}
 	    });
-	    
+
 	    // Enable forward when address is not empty.
 	    address.getDocument().addDocumentListener(new DocumentListener() {
 		public void insertUpdate(DocumentEvent e) {
@@ -1044,22 +1016,22 @@ public class ConfigWizard extends DSWizard {
 		}
 	    });
 	}
-	
+
 	public String getDescription() {
 	    return ResourceStrings.getString("cfg_wiz_nettype_desc");
 	}
-	
+
 	public Component getComponent() {
 	    return stepBox;
 	}
-	
+
 	public void setActive(int direction) {
 	    setForwardEnabled(true);
 	    lan.setSelected(isLan);
 	    discover.setSelected(routerDiscovery);
 	    address.setValue(router);
 	}
-	
+
 	public boolean setInactive(int direction) {
 	    isLan = lan.isSelected();
 	    if (direction == FORWARD) {
@@ -1107,27 +1079,27 @@ public class ConfigWizard extends DSWizard {
 	private JButton add, delete, moveUp, moveDown;
 	private IPAddressList serverList;
 	boolean firstActive = true;
-	
+
 	public NisStep() {
 	    stepBox = Box.createVerticalBox();
 
 	    stepBox.add(Wizard.createTextArea(
 		ResourceStrings.getString("cfg_wiz_nis_explain"), 6, 45));
 	    stepBox.add(Box.createVerticalStrut(10));
-	   
+
             JPanel fieldPanel = new JPanel(new FieldLayout());
 	    Mnemonic mnNis =
-	        new Mnemonic(ResourceStrings.getString("cfg_wiz_nis_domain"));
-            JLabel jlNISDomain = 
-	        new JLabel(mnNis.getString());
-	    fieldPanel.add(FieldLayout.LABEL, jlNISDomain); 
+		new Mnemonic(ResourceStrings.getString("cfg_wiz_nis_domain"));
+            JLabel jlNISDomain =
+		new JLabel(mnNis.getString());
+	    fieldPanel.add(FieldLayout.LABEL, jlNISDomain);
 	    domain = new NoSpaceField();
 	    jlNISDomain.setLabelFor(domain);
 	    jlNISDomain.setToolTipText(mnNis.getString());
 	    jlNISDomain.setDisplayedMnemonic(mnNis.getMnemonic());
-     	    fieldPanel.add(FieldLayout.FIELD, domain);
+	    fieldPanel.add(FieldLayout.FIELD, domain);
             stepBox.add(fieldPanel);
-	    
+
 	    serverList = new IPAddressList();
 	    Border tb = BorderFactory.createTitledBorder(
 		BorderFactory.createLineBorder(Color.black),
@@ -1136,15 +1108,15 @@ public class ConfigWizard extends DSWizard {
 		BorderFactory.createEmptyBorder(5, 5, 5, 5)));
 	    stepBox.add(serverList);
 	}
-	
+
 	public String getDescription() {
 	    return ResourceStrings.getString("cfg_wiz_nis_desc");
 	}
-	
+
 	public Component getComponent() {
 	    return stepBox;
 	}
-	
+
 	public void setActive(int direction) {
 	    setForwardEnabled(true);
 	    if (firstActive) {
@@ -1165,7 +1137,7 @@ public class ConfigWizard extends DSWizard {
 		}
 	    }
 	}
-	
+
 	public boolean setInactive(int direction) {
 	    if (direction == FORWARD) {
 		/*
@@ -1186,94 +1158,7 @@ public class ConfigWizard extends DSWizard {
 	    return true;
 	}
     }
-    
-    // Get the NIS+ configuration
-    class NisplusStep implements WizardStep {
-	private NoSpaceField domain;
-	private IPAddressList serverList;
-	private Box stepBox;
-	boolean firstActive = true;
-	
-	public NisplusStep() {
-	    stepBox = Box.createVerticalBox();
-	    
-	    stepBox.add(Wizard.createTextArea(
-		ResourceStrings.getString("cfg_wiz_nisplus_explain"), 6, 45));
-	    stepBox.add(Box.createVerticalStrut(10));
-	   
-	    JPanel fieldPanel = new JPanel(new FieldLayout());
-            Mnemonic mnNisPlus =
-                new Mnemonic(ResourceStrings.getString(
-		"cfg_wiz_nisplus_domain"));
-	    JLabel lblNisPlus = new JLabel(mnNisPlus.getString()); 
-	    fieldPanel.add(FieldLayout.LABEL, lblNisPlus);
-	    domain = new NoSpaceField();
-	    fieldPanel.add(FieldLayout.FIELD, domain);
-            stepBox.add(fieldPanel);
-            lblNisPlus.setLabelFor(domain);
-            lblNisPlus.setToolTipText(mnNisPlus.getString());
-	    lblNisPlus.setDisplayedMnemonic(mnNisPlus.getMnemonic());
- 
-	    serverList = new IPAddressList();
-	    Border tb = BorderFactory.createTitledBorder(
-		BorderFactory.createLineBorder(Color.black),
-		ResourceStrings.getString("cfg_wiz_nisplus_servers"));
-	    serverList.setBorder(BorderFactory.createCompoundBorder(tb,
-		BorderFactory.createEmptyBorder(5, 5, 5, 5)));
-	    stepBox.add(serverList);
-	}
-	
-	public String getDescription() {
-	    return ResourceStrings.getString("cfg_wiz_nisplus_desc");
-	}
-	
-	public Component getComponent() {
-	    return stepBox;
-	}
-	
-	public void setActive(int direction) {
-	    setForwardEnabled(true);
-	    if (firstActive) {
-		firstActive = false;
-		try {
-		    /*
-		     * Order is important; the domain will always be returned
-		     * even if NIS+ is not configured, so try finding a server
-		     * first and if that fails we will end up with both fields
-		     * empty.
-		     */
-		    serverList.setAddressList(
-			server.getIPOption(StandardOptions.CD_NISPLUS_SERVS,
-			""));
-		    domain.setText(server.getStringOption(
-			StandardOptions.CD_NISPLUS_DMAIN, ""));
-		} catch (Throwable e) {
-		    // Do nothing, just setting defaults
-		}
-	    }
-	}
-	 
-	public boolean setInactive(int direction) {
-	    if (direction == FORWARD) {
-		/*
-		 * Either must supply both a domain and a list of servers,
-		 * or neither
-		 */
-		if ((domain.getText().length() == 0)
-			!= (serverList.getListSize() == 0)) {
-		    JOptionPane.showMessageDialog(ConfigWizard.this,
-			ResourceStrings.getString("cfg_wiz_nisplus_both"),
-			ResourceStrings.getString("input_error"),
-			JOptionPane.ERROR_MESSAGE);
-		    return false;
-		}
-	    }
-	    nisplusDomain = domain.getText();
-	    nisplusServs = serverList.getAddressList();
-	    return true;
-	}
-    }
-    
+
     class ReviewStep implements WizardStep {
 	private JLabel storeLabel;
 	private JLabel hostLabel;
@@ -1286,11 +1171,9 @@ public class ConfigWizard extends DSWizard {
 	private JLabel dnsServLabel;
 	private JLabel nisLabel;
 	private JLabel nisServLabel;
-	private JLabel nisplusLabel;
-	private JLabel nisplusServLabel;
 	private JPanel panel;
 	private JScrollPane scrollPane;
-	
+
 	public ReviewStep() {
 	    Box stepBox = Box.createVerticalBox();
 	    if (fullConfig) {
@@ -1302,7 +1185,7 @@ public class ConfigWizard extends DSWizard {
 		    ResourceStrings.getString("net_wiz_review_explain"), 3,
 		    45));
 	    }
-	    
+
 	    panel = new JPanel(new FieldLayout());
 	    JLabel jlTmp;
 
@@ -1322,36 +1205,29 @@ public class ConfigWizard extends DSWizard {
 		addLabel("cfg_wiz_dns_servers");
 		dnsServLabel = addField("109.151.1.15, 109.148.144.2");
 	    }
-	    
+
 	    jlTmp = addLabelMnemonic("cfg_wiz_network");
 	    networkLabel = addField("109.148.21.0");
 	    jlTmp.setLabelFor(networkLabel);
- 
+
 	    jlTmp = addLabelMnemonic("cfg_wiz_mask");
 	    netmaskLabel = addField("255.255.255.0");
-	    jlTmp.setLabelFor(netmaskLabel);	   
- 
+	    jlTmp.setLabelFor(netmaskLabel);
+
 	    addLabel("cfg_wiz_nettype");
 	    netTypeLabel = addField(ResourceStrings.getString("cfg_wiz_lan"));
-	    
+
 	    addLabel("cfg_wiz_router");
 	    routerLabel = addField(
 		ResourceStrings.getString("cfg_wiz_router_discovery"));
-	    
+
 	    jlTmp = addLabelMnemonic("cfg_wiz_nis_domain");
 	    nisLabel = addField("Foo.Bar.Sun.COM");
-	    jlTmp.setLabelFor(nisLabel);	   
- 
+	    jlTmp.setLabelFor(nisLabel);
+
 	    addLabel("cfg_wiz_nis_servers");
 	    nisServLabel = addField("109.148.21.21, 109.148.21.44");
-	    
-	    jlTmp = addLabelMnemonic("cfg_wiz_nisplus_domain");
-	    nisplusLabel = addField("spg.Foo.Bar.Sun.COM");
-	    jlTmp.setLabelFor(nisplusLabel);
- 
-	    addLabel("cfg_wiz_nisplus_servers");
-	    nisplusServLabel = addField("109.148.21.1");
-	    
+
 	    stepBox.add(panel);
 	    stepBox.add(Box.createVerticalGlue());
 
@@ -1372,12 +1248,12 @@ public class ConfigWizard extends DSWizard {
 	    JLabel jl;
 	    Mnemonic mnStr =
                 new Mnemonic(ResourceStrings.getString(s));
-	    jl = new JLabel(mnStr.getString()); 
+	    jl = new JLabel(mnStr.getString());
 	    panel.add(FieldLayout.LABEL, jl);
             jl.setToolTipText(mnStr.getString());
 	    return jl;
         }
-	
+
 	private JLabel addField(String s) {
 	    JLabel l = new JLabel(s);
 	    l.setForeground(Color.black);
@@ -1386,15 +1262,15 @@ public class ConfigWizard extends DSWizard {
 	    l.setToolTipText(s);
 	    return l;
 	}
-	
+
 	public String getDescription() {
 	    return ResourceStrings.getString("cfg_wiz_review_desc");
 	}
-	
+
 	public Component getComponent() {
 	    return scrollPane;
 	}
-	
+
 	public void setActive(int direction) {
 	    StringBuffer b = new StringBuffer();
 	    setFinishEnabled(true);
@@ -1425,7 +1301,7 @@ public class ConfigWizard extends DSWizard {
 		}
 		leaseLabel.setText(MessageFormat.format(
 		    ResourceStrings.getString("cfg_wiz_lease_fmt"), objs));
-		
+
 		// Set DNS info
 		dnsLabel.setText(dnsDomain);
 		b.setLength(0);
@@ -1439,12 +1315,12 @@ public class ConfigWizard extends DSWizard {
 		}
 		dnsServLabel.setText(b.toString());
 	    }
-	    
+
 	    // Set network address
 	    networkLabel.setText(network.toString());
 	    // Set subnet mask
 	    netmaskLabel.setText(network.getMask().getHostAddress());
-	    
+
 	    // Set network type
 	    if (isLan) {
 		netTypeLabel.setText(ResourceStrings.getString("cfg_wiz_lan"));
@@ -1452,7 +1328,7 @@ public class ConfigWizard extends DSWizard {
 		netTypeLabel.setText(
 		    ResourceStrings.getString("cfg_wiz_point"));
 	    }
-	    
+
 	    // Set router
 	    if (routerDiscovery) {
 		routerLabel.setText(
@@ -1460,7 +1336,7 @@ public class ConfigWizard extends DSWizard {
 	    } else {
 		routerLabel.setText(router.getHostAddress());
 	    }
-	    
+
 	    // Set NIS info
 	    nisLabel.setText(nisDomain);
 	    b.setLength(0);
@@ -1473,29 +1349,16 @@ public class ConfigWizard extends DSWizard {
 		b.append(a.getHostAddress());
 	    }
 	    nisServLabel.setText(b.toString());
-	    
-	    // Set NIS+ info
-	    nisplusLabel.setText(nisplusDomain);
-	    b.setLength(0);
-	    en = nisplusServs.elements();
-	    while (en.hasMoreElements()) {
-		IPAddress a = (IPAddress)en.nextElement();
-		if (b.length() != 0) {
-		    b.append(", ");
-		}
-		b.append(a.getHostAddress());
-	    }
-	    nisplusServLabel.setText(b.toString());
 	}
-	
+
 	public boolean setInactive(int direction) {
 	    return true;
 	}
     }
-    
+
     public ConfigWizard(Frame owner, String title, boolean fullConfig) {
 	super(owner, title);
-	
+
 	try {
 	    server = DataManager.get().getDhcpServiceMgr();
 	    if (fullConfig) {
@@ -1508,7 +1371,7 @@ public class ConfigWizard extends DSWizard {
 	}
 
 	this.fullConfig = fullConfig;
-	
+
 	// If running as Config Wizard, put in the initial steps.
 	if (fullConfig) {
 	    addStep(new DatastoreStep(
@@ -1523,11 +1386,10 @@ public class ConfigWizard extends DSWizard {
 	addStep(new NetworkStep());
 	addStep(new NetTypeStep());
 	addStep(new NisStep());
-	addStep(new NisplusStep());
 	addStep(new ReviewStep());
 	showFirstStep();
     }
-    
+
     public void doFinish() {
 	/*
 	 * To activate the server, we have to do the following items:
@@ -1537,7 +1399,7 @@ public class ConfigWizard extends DSWizard {
 	 *    (as in NIS+ case)
 	 * 4. Create the Locale macro; ignore the error if it already exists
 	 * 5. Create the server macro; if it exists we just overwrite it
-	 * 6. Create the network macro; 
+	 * 6. Create the network macro;
 	 * 7. Create the network table
 	 * 8. Start the service
 	 */
@@ -1578,7 +1440,7 @@ public class ConfigWizard extends DSWizard {
 		e.printStackTrace();
 		return;
 	    }
-	    
+
 	    // Create the dhcptab
 	    try {
 		DataManager.get().getDhcptabMgr().createDhcptab();
@@ -1586,7 +1448,7 @@ public class ConfigWizard extends DSWizard {
 		// Not an error; some data stores are shared by multiple servers
 	    }
 	}
-	
+
 	if (fullConfig) {
 	    try {
 		DataManager.get().getDhcptabMgr().createLocaleMacro();
@@ -1596,7 +1458,7 @@ public class ConfigWizard extends DSWizard {
 		 * it's correct
 		 */
 	    }
-		
+
 	    // Create the Server macro
 	    try {
 		String svrName =
@@ -1619,7 +1481,7 @@ public class ConfigWizard extends DSWizard {
 		return;
 	    }
 	}
-	    
+
 	// Create the network macro
 	IPAddress [] routers = null;
 	if (router != null) {
@@ -1627,8 +1489,7 @@ public class ConfigWizard extends DSWizard {
 	}
 	try {
 	    DataManager.get().getDhcptabMgr().createNetworkMacro(network,
-		routers, isLan, nisDomain, nisServs, nisplusDomain,
-		nisplusServs);
+		routers, isLan, nisDomain, nisServs);
 	} catch (Throwable e) {
 	    // Ignore this error? dhcpconfig gives a merge option
 	}
@@ -1649,7 +1510,7 @@ public class ConfigWizard extends DSWizard {
 		JOptionPane.ERROR_MESSAGE);
 	    return;
 	}
-	
+
 	// Start the server in the initial configuration case
 	if (fullConfig) {
 	    try {
@@ -1665,10 +1526,10 @@ public class ConfigWizard extends DSWizard {
 		    JOptionPane.WARNING_MESSAGE);
 	    }
 	}
-	
+
 	super.doFinish();
     }
-    
+
     public void doHelp() {
 	if (fullConfig) {
 	    DhcpmgrApplet.showHelp("config_wizard");

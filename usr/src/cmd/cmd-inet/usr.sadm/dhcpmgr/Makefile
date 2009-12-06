@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,9 +19,7 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/cmd-inet/usr.sadm/dhcpmgr/Makefile
@@ -73,16 +70,11 @@ SUNWBINFILES_JARFILES= 	com/sun/dhcpmgr/client/SUNWbinfiles/*.class \
 			com/sun/dhcpmgr/client/SUNWbinfiles/*.properties
 SUNWBINFILES_MANIFEST=	SUNWbinfiles.manifest
 
-SUNWNISPLUS_JAR=	SUNWnisplus.jar
-SUNWNISPLUS_JARFILES=	com/sun/dhcpmgr/client/SUNWnisplus/*.class \
-			com/sun/dhcpmgr/client/SUNWnisplus/*.properties
-SUNWNISPLUS_MANIFEST=	SUNWnisplus.manifest
-
 CLI_JARS=${CLI_JAR} ${SERVER_JAR} ${COMMON_JAR}
-GUI_JARS=$(GUI_JAR) ${SUNWFILES_JAR} ${SUNWBINFILES_JAR} ${SUNWNISPLUS_JAR}
+GUI_JARS=$(GUI_JAR) ${SUNWFILES_JAR} ${SUNWBINFILES_JAR}
 ALL_JARS= ${GUI_JARS} ${CLI_JARS}
 
-MANIFEST_FILES= $(SUNWFILES_MANIFEST) $(SUNWBINFILES_MANIFEST) $(SUNWNISPLUS_MANIFEST)
+MANIFEST_FILES= $(SUNWFILES_MANIFEST) $(SUNWBINFILES_MANIFEST)
 
 ROOTGUIDIR = $(ROOT)/usr/sadm/admin/dhcpmgr
 ROOTCLIDIR = $(ROOT)/usr/lib/inet/dhcp/svcadm
@@ -150,19 +142,12 @@ $(SUNWFILES_JAR): $(SUNWFILES_MANIFEST) FRC
 $(SUNWBINFILES_JAR): $(SUNWBINFILES_MANIFEST) FRC
 	$(JAR) cmf $(SUNWBINFILES_MANIFEST) $@ $(SUNWBINFILES_JARFILES)
 
-$(SUNWNISPLUS_JAR): $(SUNWNISPLUS_MANIFEST) FRC
-	$(JAR) cmf $(SUNWNISPLUS_MANIFEST) $@ $(SUNWNISPLUS_JARFILES)
-
 $(SUNWFILES_MANIFEST):
 	@$(ECHO) "Name: com/sun/dhcpmgr/client/SUNWfiles/SUNWfiles.class" > $@;
 	@$(ECHO) "Java-Bean: True" >> $@;
 
 $(SUNWBINFILES_MANIFEST):
 	@$(ECHO) "Name: com/sun/dhcpmgr/client/SUNWbinfiles/SUNWbinfiles.class" > $@;
-	@$(ECHO) "Java-Bean: True" >> $@;
-
-$(SUNWNISPLUS_MANIFEST):
-	@$(ECHO) "Name: com/sun/dhcpmgr/client/SUNWnisplus/SUNWnisplus.class" > $@;
 	@$(ECHO) "Java-Bean: True" >> $@;
 
 $(ROOTCLIDIR)/%:	%

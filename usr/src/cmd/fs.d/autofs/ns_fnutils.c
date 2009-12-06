@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,11 +21,9 @@
 /*
  * ns_fnutils.c
  *
- * Copyright (c) 1995, 1996, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,7 +48,6 @@ const char *addrtypes[] = {
 	"onc_fn_fs_mount",
 	"onc_fn_fs_host",
 	"onc_fn_fs_user",
-	"onc_fn_fs_user_nisplus",
 };
 
 
@@ -148,8 +144,8 @@ bool_t
 ident_equal(const FN_identifier_t *id1, const FN_identifier_t *id2)
 {
 	return ((id1->format == id2->format) &&
-		(id1->length == id2->length) &&
-		(memcmp(id1->contents, id2->contents, id1->length) == 0));
+	    (id1->length == id2->length) &&
+	    (memcmp(id1->contents, id2->contents, id1->length) == 0));
 }
 
 
@@ -157,8 +153,8 @@ bool_t
 ident_str_equal(const FN_identifier_t *id, const char *str)
 {
 	return ((id->format == FN_ID_STRING) &&
-		(id->length == strlen(str)) &&
-		(strncmp(str, id->contents, id->length) == 0));
+	    (id->length == strlen(str)) &&
+	    (strncmp(str, id->contents, id->length) == 0));
 }
 
 
@@ -177,7 +173,7 @@ logstat(const FN_status_t *status, const char *msg1, const char *msg2)
 			desc = "(no status description)";
 		}
 		syslog(LOG_ERR, "FNS %s %s: %s (%u)",
-				msg1, msg2, desc, fn_status_code(status));
+		    msg1, msg2, desc, fn_status_code(status));
 		fn_string_destroy(desc_string);
 	}
 }

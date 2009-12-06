@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -25,11 +24,9 @@
 #
 # See http://www.sendmail.org/sun-specific/migration.html#FQHN for details.
 #
-# Copyright (c) 1997-2000 by Sun Microsystems, Inc.
-# All Rights Reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
-# %W% (Sun) %G%
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 PATH=/bin:/usr/sbin
 
@@ -86,18 +83,6 @@ check_nis() {
 	done
 }
 
-# Check the `nismatch $1 hosts` output.  Its output is different from ypmatch
-# and the hosts file.  Field 1 is a cname (i.e., alias), field 2 is the
-# proper name, field 3 is the IP address and field 4 is comment.
-
-check_nisplus() {
-	for hst in `nismatch $1 hosts.org_dir | \
-		awk '{for (f=1; f <= 2; f++) print $f}'`
-	do
-		accept_if_fully_qualified $hst
-	done
-}
-
 # Recommend how to reconfigure to get $1.$2 as the FQHN.
 # $3 is the first entry for hosts in /etc/nsswitch.conf . 
 
@@ -129,9 +114,9 @@ suggest_fix_and_exit() {
 	exit 0
 }
 
-# Fall back to the NIS[+] domain, minus the first label.  If it is non-null,
+# Fall back to the NIS domain, minus the first label.  If it is non-null,
 # use it but recommend against it.  $2 is just informative, indicating whether
-# we're checking the NIS or NIS+ domain.  $3 is to pass on.
+# we're checking the NIS domain.  $3 is to pass on.
 
 check_nis_domain() {
 	nisdomain=`domainname`
@@ -154,8 +139,7 @@ check_nis_domain() {
 #       * files (parse /etc/hosts directly)
 #       * dns (parse nslookup output)
 #       * nis (parse ypmatch output)
-#       * nisplus (parse nismatch output)
-#    3. fall back to the NIS[+] domain name.
+#    3. fall back to the NIS domain name.
 # If none of the above succeed, give up.  Recommend:
 #    a. the domain entry in /etc/resolv.conf, if one exists
 #    b. "pick.some.domain"
@@ -181,10 +165,6 @@ do
 		check_nis $myhostname
 		nis_domains="$nis_domains nis"
 		;;
-	nisplus)
-		check_nisplus $myhostname
-		nis_domains="$nis_domains nisplus"
-		;;
 	esac
 done
 
@@ -193,9 +173,6 @@ do
 	case $entry in
 	nis)
 		check_nis_domain $myhostname "" $first_hosts_entry
-		;;
-	nisplus)
-		check_nis_domain $myhostname "+" $first_hosts_entry
 		;;
 	esac
 done

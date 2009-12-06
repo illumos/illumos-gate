@@ -112,8 +112,6 @@ static char *option_types[] = {
 "Client Identifier =",			/* 61 */
 "Netware IP Domain =",			/* 62 */
 "Netware IP Options =",			/* 63 */
-"NISPLUS Domainname",			/* 64 */
-"NISPLUS Servers",			/* 65 */
 "TFTP Server Name",			/* 66 */
 "Option BootFile Name",			/* 67 */
 "Mobile IP Agents",			/* 68 */
@@ -321,7 +319,6 @@ show_options(unsigned char  *cp, int len)
 		case CD_NETBIOS_DIST_SERV:
 		case CD_XWIN_FONT_SERV:
 		case CD_XWIN_DISP_SERV:
-		case CD_NISPLUS_SERVS:
 		case CD_MOBILE_IP_AGENT:
 		case CD_SMTP_SERVS:
 		case CD_POP3_SERVS:
@@ -350,7 +347,6 @@ show_options(unsigned char  *cp, int len)
 		case CD_NIS_DOMAIN:
 		case CD_NETBIOS_SCOPE:
 		case CD_MESSAGE:
-		case CD_NISPLUS_DMAIN:
 		case CD_OPT_BOOTFILE_NAME:
 		case CD_USER_CLASS_ID:
 			/* Ascii strings */

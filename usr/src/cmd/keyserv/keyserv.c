@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +36,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * keyserv - server for storing private encryption keys
@@ -123,9 +121,9 @@ static char *defaults_file = "/etc/default/keyserv";
 static int use_nobody_keys = TRUE;
 
 /*
- * Hack to allow the keyserver to use AUTH_DES (for authenticated
- * NIS+ calls, for example).  The only functions that get called
- * are key_encryptsession_pk, key_decryptsession_pk, and key_gendes.
+ * Hack to allow the keyserver to use AUTH_DES. The only functions
+ * that get called are key_encryptsession_pk, key_decryptsession_pk,
+ * and key_gendes.
  *
  * The approach is to have the keyserver fill in pointers to local
  * implementations of these functions, and to call those in key_call().
@@ -210,8 +208,8 @@ main(int argc, char *argv[])
 	 */
 	if (getdomainname(domainname, MAXNETNAMELEN+1) ||
 	    (domainname[0] == '\0')) {
-	    syslog(LOG_ERR, "could not get a valid domainname.\n");
-	    exit(SMF_EXIT_ERR_CONFIG);
+		syslog(LOG_ERR, "could not get a valid domainname.\n");
+		exit(SMF_EXIT_ERR_CONFIG);
 	}
 
 	/*
@@ -262,7 +260,8 @@ main(int argc, char *argv[])
 				 * -s <size>
 				 */
 				if (s1flag) {
-				    fprintf(stderr, "duplicate [-s <size>]\n");
+					fprintf(stderr, "duplicate"
+					    " [-s <size>]\n");
 					usage();
 				}
 				s1flag++;
@@ -282,8 +281,8 @@ main(int argc, char *argv[])
 				}
 				if (value == NULL) {
 					fprintf(stderr,
-					"missing cache size for mechtype %s\n",
-					cache_options[d]);
+					    "missing cache size for "
+					    "mechtype %s\n", cache_options[d]);
 					usage();
 				}
 				cache_size[d] = get_cache_size(value);
@@ -321,7 +320,7 @@ main(int argc, char *argv[])
 			(void) fprintf(stderr, "default disk cache size: ");
 			if (default_cache < 0) {
 				(void) fprintf(stderr, "%d entries\n",
-					abs(default_cache));
+				    abs(default_cache));
 			} else {
 				(void) fprintf(stderr, "%dMB\n", default_cache);
 			}
@@ -333,7 +332,7 @@ main(int argc, char *argv[])
 				(void) fprintf(stderr, "\t%s\t\t", *cpp++);
 				if (*ip < 0) {
 					(void) fprintf(stderr, "%d entries\n",
-						abs(*ip));
+					    abs(*ip));
 				} else {
 					(void) fprintf(stderr, "%dMB\n", *ip);
 				}
@@ -341,7 +340,7 @@ main(int argc, char *argv[])
 			}
 		} else {
 			(void) fprintf(stderr,
-				"common key disk caching disabled\n");
+			    "common key disk caching disabled\n");
 		}
 	}
 	/*
@@ -354,7 +353,7 @@ main(int argc, char *argv[])
 			    (mechs[i]->keylen < 0) || (mechs[i]->algtype < 0))
 				continue;
 			create_cache_file(mechs[i]->keylen, mechs[i]->algtype,
-				cache_size[i] ? cache_size[i] : default_cache);
+			    cache_size[i] ? cache_size[i] : default_cache);
 		}
 	}
 	getrootkey(&masterkey, nflag);
@@ -376,26 +375,26 @@ main(int argc, char *argv[])
 	}
 
 	if (svc_create_local_service(keyprogram, KEY_PROG, KEY_VERS,
-		"netpath", "keyserv") == 0) {
+	    "netpath", "keyserv") == 0) {
 		syslog(LOG_ERR,
-			"%s: unable to create service for version %d\n",
-			argv[0], KEY_VERS);
+		    "%s: unable to create service for version %d\n",
+		    argv[0], KEY_VERS);
 		exit(1);
 	}
 
 	if (svc_create_local_service(keyprogram, KEY_PROG, KEY_VERS2,
-		"netpath", "keyserv") == 0) {
+	    "netpath", "keyserv") == 0) {
 		syslog(LOG_ERR,
-			"%s: unable to create service for version %d\n",
-			argv[0], KEY_VERS2);
+		    "%s: unable to create service for version %d\n",
+		    argv[0], KEY_VERS2);
 		exit(1);
 	}
 
 	if (svc_create_local_service(keyprogram, KEY_PROG, KEY_VERS3,
-		"netpath", "keyserv") == 0) {
+	    "netpath", "keyserv") == 0) {
 		syslog(LOG_ERR,
-			"%s: unable to create service for version %d\n",
-			argv[0], KEY_VERS3);
+		    "%s: unable to create service for version %d\n",
+		    argv[0], KEY_VERS3);
 		exit(1);
 	}
 
@@ -405,22 +404,22 @@ main(int argc, char *argv[])
 
 	if (svc_create(keyprogram, KEY_PROG, KEY_VERS, "door") == 0) {
 		syslog(LOG_ERR,
-		"%s: unable to create service over doors for version %d\n",
-			argv[0], KEY_VERS);
+		    "%s: unable to create service over doors for version %d\n",
+		    argv[0], KEY_VERS);
 		exit(1);
 	}
 
 	if (svc_create(keyprogram, KEY_PROG, KEY_VERS2, "door") == 0) {
 		syslog(LOG_ERR,
-		"%s: unable to create service over doors for version %d\n",
-			argv[0], KEY_VERS2);
+		    "%s: unable to create service over doors for version %d\n",
+		    argv[0], KEY_VERS2);
 		exit(1);
 	}
 
 	if (svc_create(keyprogram, KEY_PROG, KEY_VERS3, "door") == 0) {
 		syslog(LOG_ERR,
-		"%s: unable to create service over doors for version %d\n",
-			argv[0], KEY_VERS3);
+		    "%s: unable to create service over doors for version %d\n",
+		    argv[0], KEY_VERS3);
 		exit(1);
 	}
 
@@ -901,7 +900,7 @@ static bool_t
 __key_set_3_svc(uid_t uid, setkeyarg3 *arg, keystatus *status)
 {
 	debug(KEYSERV_DEBUG, ("__key_set_3_svc(%d, %d, %d)",
-		uid, arg->algtype, arg->keylen));
+	    uid, arg->algtype, arg->keylen));
 	*status = pk_setkey3(uid, arg);
 	debug(KEYSERV_DEBUG, ("__key_set_3_svc %s", strstatus(*status)));
 	return (TRUE);
@@ -914,13 +913,13 @@ __key_encrypt_3_svc(uid_t uid, cryptkeyarg3 *arg, cryptkeyres3 *res)
 	des_block *dp;
 
 	debug(KEYSERV_DEBUG, ("encrypt_3(%d %d %s)", uid,
-		arg->deskey.deskeyarray_len, arg->remotename));
+	    arg->deskey.deskeyarray_len, arg->remotename));
 	res->status = pk_encrypt3(uid, arg, &res->cryptkeyres3_u.deskey);
 	len = res->cryptkeyres3_u.deskey.deskeyarray_len;
 	dp = res->cryptkeyres3_u.deskey.deskeyarray_val;
 	for (i = 0; i < len; i++) {
 		debug(KEYSERV_DEBUG0, ("encrypt_3 retval[%d] == (%x,%x)",
-			i, dp->key.high, dp->key.low));
+		    i, dp->key.high, dp->key.low));
 		dp++;
 	}
 	debug(KEYSERV_DEBUG, ("encrypt_3 returned %s", strstatus(res->status)));
@@ -934,13 +933,13 @@ __key_decrypt_3_svc(uid_t uid, cryptkeyarg3 *arg, cryptkeyres3 *res)
 	des_block *dp;
 
 	debug(KEYSERV_DEBUG, ("decrypt_3(%d, %d, %s)", uid,
-		arg->deskey.deskeyarray_len, arg->remotename));
+	    arg->deskey.deskeyarray_len, arg->remotename));
 	res->status = pk_decrypt3(uid, arg, &res->cryptkeyres3_u.deskey);
 	len = res->cryptkeyres3_u.deskey.deskeyarray_len;
 	dp = res->cryptkeyres3_u.deskey.deskeyarray_val;
 	for (i = 0; i < len; i++) {
 		debug(KEYSERV_DEBUG0, ("decrypt_3 retval[%d] == (%x,%x)",
-			i, dp->key.high, dp->key.low));
+		    i, dp->key.high, dp->key.low));
 		dp++;
 	}
 	debug(KEYSERV_DEBUG, ("decrypt_3 returned %s", strstatus(res->status)));
@@ -961,11 +960,11 @@ __key_gen_3_svc(void *v, keynum_t *kp, deskeyarray *res)
 	}
 	for (i = 0; i < keynum; i++) {
 		debug(KEYSERV_DEBUG, ("gen_3 calling gen_1 %x",
-			res->deskeyarray_val+i));
+		    res->deskeyarray_val+i));
 		__key_gen_1_svc((void *) NULL, (struct svc_req *)NULL,
-			res->deskeyarray_val+i);
+		    res->deskeyarray_val+i);
 		debug(KEYSERV_DEBUG, ("gen_3 val %d %x",
-			i, *(int *)(res->deskeyarray_val+i)));
+		    i, *(int *)(res->deskeyarray_val+i)));
 	}
 	return (TRUE);
 }
@@ -1030,9 +1029,9 @@ __key_net_get_3_svc(uid_t uid, mechtype *arg, key_netstres3 *keynetname)
 {
 	debug(KEYSERV_DEBUG, ("net_get_3 (%d, %x)", uid, arg));
 	keynetname->status = pk_netget3(uid,
-		arg, &keynetname->key_netstres3_u.knet);
+	    arg, &keynetname->key_netstres3_u.knet);
 	debug(KEYSERV_DEBUG,
-		("net_get_3 ret %s", strstatus(keynetname->status)));
+	    ("net_get_3 ret %s", strstatus(keynetname->status)));
 	return (TRUE);
 }
 
@@ -1052,7 +1051,7 @@ __key_get_conv_3_svc(uid_t uid, deskeyarg3 *arg, cryptkeyres3 *res)
 	debug(KEYSERV_DEBUG, ("get_conv_3(%d %x %x)", uid, arg, res));
 	res->status = pk_get_conv_key3(uid, arg, res);
 	debug(KEYSERV_DEBUG,
-		("get_conv_3 ret %s", strstatus(res->status)));
+	    ("get_conv_3 ret %s", strstatus(res->status)));
 	return (TRUE);
 }
 

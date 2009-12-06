@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_AUTOMOUNT_H
 #define	_AUTOMOUNT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fslib.h>		/* needed for mntlist_t declaration */
 #include <thread.h>
@@ -352,14 +350,6 @@ extern int loaddirect_files(char *, char *, char *, char **, char ***);
 extern int getmapkeys_files(char *, struct dir_entry **, int *, int *,
 	char **, char ***);
 extern int stack_op(int, char *, char **, char ***);
-
-extern void init_nisplus(char **, char ***);
-extern int getmapent_nisplus(char *, char *, struct mapline *, char **,
-				char ***, bool_t *, bool_t);
-extern int loadmaster_nisplus(char *, char *, char **, char ***);
-extern int loaddirect_nisplus(char *, char *, char *, char **, char ***);
-extern int getmapkeys_nisplus(char *, struct dir_entry **, int *, int *,
-	char **, char ***);
 
 extern void init_nis(char **, char ***);
 extern int getmapent_nis(char *, char *, struct mapline *, char **, char ***,

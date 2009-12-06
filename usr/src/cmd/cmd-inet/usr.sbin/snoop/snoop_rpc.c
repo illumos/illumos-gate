@@ -526,8 +526,6 @@ struct rpcnames {
 100180, "NA.MIPROUTES",		/* SNM multicast routing table agent */
 100201, "MVSNFSSTAT",		/* MVS/NFS Memory usage statistic server */
 100227, "NFS_ACL",		/* NFS ACL support */
-100300, "NIS+",			/* NIS+ name service */
-100302, "NIS+ CB",		/* NIS+ callbacks */
 101002, "NSELINKTOOL",		/* NSE link daemon */
 101003, "NSELINKAPP",		/* NSE link application */
 110001, "GOLABEL",		/* SunOS MLS  */
