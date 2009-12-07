@@ -500,7 +500,7 @@ typedef emlxs_fcip_nethdr_t NETHDR;
 
 /* A SGL entry is 16 bytes. Subtract 2 for command and response buffers */
 #define	SGL_TO_SGLLEN(_sgl)   ((_sgl/16)-2)
-#define	MEM_SGL_SIZE		1024  /* Default size */
+#define	MEM_SGL_SIZE		4096  /* Default size */
 
 #ifdef EMLXS_I386
 #define	EMLXS_SGLLEN		BPL_TO_SGLLEN(MEM_BPL_SIZE)
@@ -1700,6 +1700,12 @@ typedef struct emlxs_hba
 	int32_t		fm_caps;	/* FMA capabilities */
 #endif	/* FMA_SUPPORT */
 	fc_fca_tran_t	*fca_tran;
+
+	/* DMA attributes */
+	ddi_dma_attr_t	dma_attr;
+	ddi_dma_attr_t	dma_attr_ro;
+	ddi_dma_attr_t	dma_attr_1sg;
+	ddi_dma_attr_t	dma_attr_fcip_rsp;
 
 	/* HBA Info */
 	emlxs_model_t	model_info;

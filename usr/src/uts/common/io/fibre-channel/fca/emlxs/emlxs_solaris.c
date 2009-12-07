@@ -6209,6 +6209,28 @@ emlxs_hba_attach(dev_info_t *dip)
 	bcopy((caddr_t)&emlxs_fca_tran, (caddr_t)hba->fca_tran,
 	    sizeof (fc_fca_tran_t));
 
+	/*
+	 * Copy the global ddi_dma_attr to the local hba fields
+	 */
+	bcopy((caddr_t)&emlxs_dma_attr, (caddr_t)&hba->dma_attr,
+	    sizeof (ddi_dma_attr_t));
+	bcopy((caddr_t)&emlxs_dma_attr_ro, (caddr_t)&hba->dma_attr_ro,
+	    sizeof (ddi_dma_attr_t));
+	bcopy((caddr_t)&emlxs_dma_attr_1sg, (caddr_t)&hba->dma_attr_1sg,
+	    sizeof (ddi_dma_attr_t));
+	bcopy((caddr_t)&emlxs_dma_attr_fcip_rsp,
+	    (caddr_t)&hba->dma_attr_fcip_rsp, sizeof (ddi_dma_attr_t));
+
+	/* Reset the fca_tran dma_attr fields to the per-hba copies */
+	hba->fca_tran->fca_dma_attr = &hba->dma_attr;
+	hba->fca_tran->fca_dma_fcp_cmd_attr = &hba->dma_attr_1sg;
+	hba->fca_tran->fca_dma_fcp_rsp_attr = &hba->dma_attr_1sg;
+	hba->fca_tran->fca_dma_fcp_data_attr = &hba->dma_attr_ro;
+	hba->fca_tran->fca_dma_fcip_cmd_attr = &hba->dma_attr_1sg;
+	hba->fca_tran->fca_dma_fcip_rsp_attr = &hba->dma_attr_fcip_rsp;
+	hba->fca_tran->fca_dma_fcsm_cmd_attr = &hba->dma_attr_1sg;
+	hba->fca_tran->fca_dma_fcsm_rsp_attr = &hba->dma_attr;
+
 	/* Set the transport structure pointer in our dip */
 	/* SFS may panic if we are in target only mode    */
 	/* We will update the transport structure later   */
@@ -6316,13 +6338,20 @@ emlxs_hba_attach(dev_info_t *dip)
 	if (hba->model_info.sli_mask & EMLXS_SLI4_MASK) {
 		hba->sli.sli4.mem_sgl_size = MEM_SGL_SIZE;
 #ifdef EMLXS_I386
+		/*
+		 * TigerShark has 64K limit for SG element size
+		 * Do this for x86 alone. For SPARC, the driver
+		 * breaks up the single SGE later on.
+		 */
+		hba->dma_attr_ro.dma_attr_count_max = 0xffff;
+
 		i = cfg[CFG_MAX_XFER_SIZE].current;
 		/* Update SGL size based on max_xfer_size */
-		if (i > 516096) {
-			/* 516096 = (((2048 / 16) - 2) * 4096) */
+		if (i > 688128) {
+			/* 688128 = (((2048 / 12) - 2) * 4096) */
 			hba->sli.sli4.mem_sgl_size = 4096;
-		} else if (i > 253953) {
-			/* 253953 = (((1024 / 16) - 2) * 4096) */
+		} else if (i > 339968) {
+			/* 339968 = (((1024 / 12) - 2) * 4096) */
 			hba->sli.sli4.mem_sgl_size = 2048;
 		} else {
 			hba->sli.sli4.mem_sgl_size = 1024;
@@ -6349,9 +6378,9 @@ emlxs_hba_attach(dev_info_t *dip)
 
 #ifdef EMLXS_I386
 	/* Update dma_attr_sgllen based on BPL size */
-	emlxs_dma_attr.dma_attr_sgllen = i;
-	emlxs_dma_attr_ro.dma_attr_sgllen = i;
-	emlxs_dma_attr_fcip_rsp.dma_attr_sgllen = i;
+	hba->dma_attr.dma_attr_sgllen = i;
+	hba->dma_attr_ro.dma_attr_sgllen = i;
+	hba->dma_attr_fcip_rsp.dma_attr_sgllen = i;
 #endif /* EMLXS_I386 */
 
 	if (EMLXS_SLI_MAP_HDW(hba)) {
@@ -7220,7 +7249,7 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 	uint_t			dma_flag;
 	int			status;
 
-	dma_attr = emlxs_dma_attr_1sg;
+	dma_attr = hba->dma_attr_1sg;
 	dev_attr = emlxs_data_acc_attr;
 
 	if (buf_info->flags & FC_MBUF_SNGLSG) {
@@ -10981,20 +11010,22 @@ emlxs_fm_init(emlxs_hba_t *hba)
 
 	if (DDI_FM_ACC_ERR_CAP(hba->fm_caps)) {
 		emlxs_dev_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
+		emlxs_data_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
 	} else {
 		emlxs_dev_acc_attr.devacc_attr_access = DDI_DEFAULT_ACC;
+		emlxs_data_acc_attr.devacc_attr_access = DDI_DEFAULT_ACC;
 	}
 
 	if (DDI_FM_DMA_ERR_CAP(hba->fm_caps)) {
-		emlxs_dma_attr.dma_attr_flags |= DDI_DMA_FLAGERR;
-		emlxs_dma_attr_ro.dma_attr_flags |= DDI_DMA_FLAGERR;
-		emlxs_dma_attr_1sg.dma_attr_flags |= DDI_DMA_FLAGERR;
-		emlxs_dma_attr_fcip_rsp.dma_attr_flags |= DDI_DMA_FLAGERR;
+		hba->dma_attr.dma_attr_flags |= DDI_DMA_FLAGERR;
+		hba->dma_attr_ro.dma_attr_flags |= DDI_DMA_FLAGERR;
+		hba->dma_attr_1sg.dma_attr_flags |= DDI_DMA_FLAGERR;
+		hba->dma_attr_fcip_rsp.dma_attr_flags |= DDI_DMA_FLAGERR;
 	} else {
-		emlxs_dma_attr.dma_attr_flags &= ~DDI_DMA_FLAGERR;
-		emlxs_dma_attr_ro.dma_attr_flags &= ~DDI_DMA_FLAGERR;
-		emlxs_dma_attr_1sg.dma_attr_flags &= ~DDI_DMA_FLAGERR;
-		emlxs_dma_attr_fcip_rsp.dma_attr_flags &= ~DDI_DMA_FLAGERR;
+		hba->dma_attr.dma_attr_flags &= ~DDI_DMA_FLAGERR;
+		hba->dma_attr_ro.dma_attr_flags &= ~DDI_DMA_FLAGERR;
+		hba->dma_attr_1sg.dma_attr_flags &= ~DDI_DMA_FLAGERR;
+		hba->dma_attr_fcip_rsp.dma_attr_flags &= ~DDI_DMA_FLAGERR;
 	}
 
 	ddi_fm_init(hba->dip, &hba->fm_caps, &iblk);

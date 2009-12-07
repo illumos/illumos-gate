@@ -198,7 +198,7 @@ emlxs_pkt_alloc(emlxs_port_t *port, uint32_t cmdlen, uint32_t rsplen,
 
 	if (cmdlen) {
 		/* Allocate the cmd buf */
-		if (ddi_dma_alloc_handle(hba->dip, &emlxs_dma_attr_1sg, cb,
+		if (ddi_dma_alloc_handle(hba->dip, &hba->dma_attr_1sg, cb,
 		    NULL, &pkt->pkt_cmd_dma) != DDI_SUCCESS) {
 			cmdlen = 0;
 			rsplen = 0;
@@ -265,7 +265,7 @@ emlxs_pkt_alloc(emlxs_port_t *port, uint32_t cmdlen, uint32_t rsplen,
 
 	if (rsplen) {
 		/* Allocate the rsp buf */
-		if (ddi_dma_alloc_handle(hba->dip, &emlxs_dma_attr_1sg, cb,
+		if (ddi_dma_alloc_handle(hba->dip, &hba->dma_attr_1sg, cb,
 		    NULL, &pkt->pkt_resp_dma) != DDI_SUCCESS) {
 			rsplen = 0;
 			datalen = 0;
@@ -329,7 +329,7 @@ emlxs_pkt_alloc(emlxs_port_t *port, uint32_t cmdlen, uint32_t rsplen,
 	/* Allocate the data buf */
 	if (datalen) {
 		/* Allocate the rsp buf */
-		if (ddi_dma_alloc_handle(hba->dip, &emlxs_dma_attr_1sg, cb,
+		if (ddi_dma_alloc_handle(hba->dip, &hba->dma_attr_1sg, cb,
 		    NULL, &pkt->pkt_data_dma) != DDI_SUCCESS) {
 			datalen = 0;
 			goto failed;

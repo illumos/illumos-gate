@@ -3103,7 +3103,7 @@ emlxs_sli4_prep_ct_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 		wqe->un.XmitSeq.Rctl  = pkt->pkt_cmd_fhdr.r_ctl;
 		wqe->un.XmitSeq.Type  = pkt->pkt_cmd_fhdr.type;
 		wqe->OXId = xp->rx_id;
-		wqe->XC = 1;
+		wqe->XC = 0; /* xri_tag is a new exchange */
 		wqe->CmdSpecific[0] = wqe->un.GenReq.Payload.tus.f.bdeSize;
 
 	} else {

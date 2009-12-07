@@ -4728,7 +4728,7 @@ emlxs_fct_dmem_init(emlxs_port_t *port)
 
 		p->dmem_bctls_mem = bctl;
 
-		if (ddi_dma_alloc_handle(hba->dip, &emlxs_dma_attr_1sg,
+		if (ddi_dma_alloc_handle(hba->dip, &hba->dma_attr_1sg,
 		    DDI_DMA_SLEEP, 0, &p->dmem_dma_handle) != DDI_SUCCESS) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
 			    "emlxs_fct_dmem_init: Unable to allocate handle.");
