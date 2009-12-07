@@ -70,7 +70,7 @@ static boolean_t pmcs_phy_target_match(pmcs_phy_t *);
  */
 const char pmcs_nowrk[] = "%s: unable to get work structure";
 const char pmcs_nomsg[] = "%s: unable to get Inbound Message entry";
-const char pmcs_timeo[] = "!%s: command timed out";
+const char pmcs_timeo[] = "%s: command timed out";
 
 extern const ddi_dma_attr_t pmcs_dattr;
 
@@ -660,7 +660,7 @@ pmcs_start_phy(pmcs_hw_t *pwp, int phynum, int linkmode, int speed)
 	pmcs_pwork(pwp, pwrk);
 
 	if (result) {
-		pmcs_prt(pwp, PMCS_PRT_ERR, pptr, NULL, pmcs_timeo, __func__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL, pmcs_timeo, __func__);
 	} else {
 		mutex_enter(&pwp->lock);
 		pwp->phys_started |= (1 << phynum);
@@ -790,6 +790,10 @@ pmcs_reset_phy(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint8_t type)
 	}
 	COPY_MESSAGE(msg, iomb, amt);
 	htag = pwrk->htag;
+
+	/* SMP serialization */
+	pmcs_smp_acquire(pptr->iport);
+
 	pwrk->state = PMCS_WORK_STATE_ONCHIP;
 	INC_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
 
@@ -798,8 +802,11 @@ pmcs_reset_phy(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint8_t type)
 	pmcs_pwork(pwp, pwrk);
 	pmcs_lock_phy(pptr);
 
+	/* SMP serialization */
+	pmcs_smp_release(pptr->iport);
+
 	if (result) {
-		pmcs_prt(pwp, PMCS_PRT_ERR, pptr, NULL, pmcs_timeo, __func__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL, pmcs_timeo, __func__);
 
 		if (pmcs_abort(pwp, pptr, htag, 0, 0)) {
 			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
@@ -882,7 +889,7 @@ pmcs_stop_phy(pmcs_hw_t *pwp, int phynum)
 
 		pmcs_pwork(pwp, pwrk);
 		if (result) {
-			pmcs_prt(pwp, PMCS_PRT_ERR,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG,
 			    pptr, NULL, pmcs_timeo, __func__);
 		}
 
@@ -1235,7 +1242,7 @@ pmcs_register_device(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 	pmcs_pwork(pwp, pwrk);
 
 	if (result) {
-		pmcs_prt(pwp, PMCS_PRT_ERR, pptr, NULL, pmcs_timeo, __func__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL, pmcs_timeo, __func__);
 		result = ETIMEDOUT;
 		goto out;
 	}
@@ -1318,7 +1325,7 @@ pmcs_deregister_device(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 	pmcs_lock_phy(pptr);
 
 	if (result) {
-		pmcs_prt(pwp, PMCS_PRT_ERR, pptr, NULL, pmcs_timeo, __func__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL, pmcs_timeo, __func__);
 		return;
 	}
 	status = LE_32(iomb[2]);
@@ -2071,46 +2078,43 @@ pmcs_get_iport_by_phy(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 }
 
 /*
- * Promote the next phy on this iport to primary, and return it.
+ * Promote the next phy on this port to primary, and return it.
  * Called when the primary PHY on a port is going down, but the port
  * remains up (see pmcs_intr.c).
  */
 pmcs_phy_t *
 pmcs_promote_next_phy(pmcs_phy_t *prev_primary)
 {
-	pmcs_iport_t *iport;
-	pmcs_phy_t *pptr, *next_pptr, *child;
+	pmcs_hw_t	*pwp;
+	pmcs_iport_t	*iport;
+	pmcs_phy_t	*pptr, *child;
+	int		portid;
 
-	mutex_enter(&prev_primary->phy_lock);
-	iport = prev_primary->iport;
-	mutex_exit(&prev_primary->phy_lock);
-	ASSERT(iport);
+	pmcs_lock_phy(prev_primary);
+	portid = prev_primary->portid;
+	iport  = prev_primary->iport;
+	pwp    = prev_primary->pwp;
 
-	mutex_enter(&iport->lock);
-	for (pptr = list_head(&iport->phys); pptr != NULL; pptr = next_pptr) {
-		next_pptr = list_next(&iport->phys, pptr);
-
-		/* Use the first PHY in the list that is not the primary */
-		if (pptr != prev_primary) {
+	/* Use the first available phy in this port */
+	for (pptr = pwp->root_phys; pptr; pptr = pptr->sibling) {
+		if ((pptr->portid == portid) && (pptr != prev_primary)) {
+			mutex_enter(&pptr->phy_lock);
 			break;
 		}
 	}
-	iport->pptr = pptr;
-	mutex_exit(&iport->lock);
 
 	if (pptr == NULL) {
-		pmcs_prt(iport->pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
-		    "%s: unable to promote to new primary phy on iport [0x%p]",
-		    __func__, (void *)iport);
+		pmcs_unlock_phy(prev_primary);
 		return (NULL);
 	}
 
+	if (iport) {
+		mutex_enter(&iport->lock);
+		iport->pptr = pptr;
+		mutex_exit(&iport->lock);
+	}
+
 	/* Update the phy handle with the data from the previous primary */
-	mutex_enter(&pptr->phy_lock);
-	pmcs_lock_phy(prev_primary);
-
-	ASSERT(pptr->subsidiary);
-
 	pptr->children		= prev_primary->children;
 	child = pptr->children;
 	while (child) {
@@ -2128,10 +2132,14 @@ pmcs_promote_next_phy(pmcs_phy_t *prev_primary)
 	pptr->configured	= prev_primary->configured;
 	pptr->iport		= prev_primary->iport;
 	pptr->target		= prev_primary->target;
+	if (pptr->target) {
+		pptr->target->phy = pptr;
+	}
 	pptr->subsidiary = 0;
 
 	prev_primary->subsidiary = 1;
 	prev_primary->children = NULL;
+	prev_primary->target = NULL;
 	pmcs_unlock_phy(prev_primary);
 
 	/*
@@ -3238,6 +3246,7 @@ pmcs_configure_expander(pmcs_hw_t *pwp, pmcs_phy_t *pptr, pmcs_iport_t *iport)
 	 * is the primary PHY, make sure subsidiary is cleared.
 	 */
 	pptr->subsidiary = 0;
+	pptr->iport = iport;
 	if (pmcs_get_device_handle(pwp, pptr)) {
 		goto out;
 	}
@@ -3936,6 +3945,10 @@ again:
 	msg[15] = 0;
 
 	COPY_MESSAGE(ptr, msg, PMCS_MSG_SIZE);
+
+	/* SMP serialization */
+	pmcs_smp_acquire(pptr->iport);
+
 	pwrk->state = PMCS_WORK_STATE_ONCHIP;
 	htag = pwrk->htag;
 	INC_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
@@ -3943,6 +3956,10 @@ again:
 	pmcs_unlock_phy(pptr);
 	WAIT_FOR(pwrk, 1000, result);
 	pmcs_lock_phy(pptr);
+
+	/* SMP serialization */
+	pmcs_smp_release(pptr->iport);
+
 	pmcs_pwork(pwp, pwrk);
 
 	mutex_enter(&pwp->config_lock);
@@ -4025,18 +4042,18 @@ again:
 			    __func__, pptr->path);
 
 			if (xp == NULL) {
-				pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, pptr,
-				    xp, "%s: No target to do DS recovery for "
-				    "PHY %p (%s), attempting PHY hard reset",
-				    __func__, (void *)pptr, pptr->path);
-				(void) pmcs_reset_phy(pwp, pptr,
-				    PMCS_PHYOP_HARD_RESET);
-				break;
+				/*
+				 * Kick off recovery right now.
+				 */
+				SCHEDULE_WORK(pwp, PMCS_WORK_DS_ERR_RECOVERY);
+				(void) ddi_taskq_dispatch(pwp->tq, pmcs_worker,
+				    pwp, DDI_NOSLEEP);
+			} else {
+				mutex_enter(&xp->statlock);
+				pmcs_start_dev_state_recovery(xp, pptr);
+				mutex_exit(&xp->statlock);
 			}
 
-			mutex_enter(&xp->statlock);
-			pmcs_start_dev_state_recovery(xp, pptr);
-			mutex_exit(&xp->statlock);
 			break;
 		}
 
@@ -4155,6 +4172,10 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
 	}
 
 	COPY_MESSAGE(ptr, msg, PMCS_MSG_SIZE);
+
+	/* SMP serialization */
+	pmcs_smp_acquire(expander->iport);
+
 	pwrk->state = PMCS_WORK_STATE_ONCHIP;
 	htag = pwrk->htag;
 	INC_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
@@ -4166,6 +4187,10 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
 	pmcs_unlock_phy(expander);
 	WAIT_FOR(pwrk, 1000, result);
 	pmcs_lock_phy(expander);
+
+	/* SMP serialization */
+	pmcs_smp_release(expander->iport);
+
 	pmcs_pwork(pwp, pwrk);
 
 	mutex_enter(&pwp->config_lock);
@@ -4178,7 +4203,7 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
 	mutex_exit(&pwp->config_lock);
 
 	if (result) {
-		pmcs_prt(pwp, PMCS_PRT_WARN, pptr, NULL, pmcs_timeo, __func__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL, pmcs_timeo, __func__);
 		if (pmcs_abort(pwp, expander, htag, 0, 0)) {
 			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
 			    "%s: Unable to issue SMP ABORT for htag 0x%08x",
@@ -4973,7 +4998,7 @@ pmcs_sata_abort_ncq(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 
 	tgt = pptr->target;
 	if (result) {
-		pmcs_prt(pwp, PMCS_PRT_INFO, pptr, tgt, pmcs_timeo, __func__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, tgt, pmcs_timeo, __func__);
 		return (EIO);
 	}
 	status = LE_32(msg[2]);
@@ -7589,4 +7614,65 @@ pmcs_phy_target_match(pmcs_phy_t *phyp)
 	}
 
 	return (rval);
+}
+/*
+ * Commands used to serialize SMP requests.
+ *
+ * The SPC only allows 2 SMP commands per SMP target: 1 cmd pending and 1 cmd
+ * queued for the same SMP target. If a third SMP cmd is sent to the SPC for an
+ * SMP target that already has a SMP cmd pending and one queued, then the
+ * SPC responds with the ERROR_INTERNAL_SMP_RESOURCE response.
+ *
+ * Additionally, the SPC has an 8 entry deep cmd queue and the number of SMP
+ * cmds that can be queued is controlled by the PORT_CONTROL IOMB. The
+ * SPC default is 1 SMP command/port (iport).  These 2 queued SMP cmds would
+ * have to be for different SMP targets.  The INTERNAL_SMP_RESOURCE error will
+ * also be returned if a 2nd SMP cmd is sent to the controller when there is
+ * already 1 SMP cmd queued for that port or if a 3rd SMP cmd is sent to the
+ * queue if there are already 2 queued SMP cmds.
+ */
+void
+pmcs_smp_acquire(pmcs_iport_t *iport)
+{
+	ASSERT(iport);
+
+	if (iport == NULL) {
+		pmcs_prt(iport->pwp, PMCS_PRT_DEBUG_IPORT, NULL, NULL,
+		    "%s: iport is NULL...", __func__);
+		return;
+	}
+
+	mutex_enter(&iport->smp_lock);
+	while (iport->smp_active) {
+		pmcs_prt(iport->pwp, PMCS_PRT_DEBUG_IPORT, NULL, NULL,
+		    "%s: SMP is active on thread 0x%p, waiting", __func__,
+		    (void *)iport->smp_active_thread);
+		cv_wait(&iport->smp_cv, &iport->smp_lock);
+	}
+	iport->smp_active = B_TRUE;
+	iport->smp_active_thread = curthread;
+	pmcs_prt(iport->pwp, PMCS_PRT_DEBUG_IPORT, NULL, NULL,
+	    "%s: SMP acquired by thread 0x%p", __func__,
+	    (void *)iport->smp_active_thread);
+	mutex_exit(&iport->smp_lock);
+}
+
+void
+pmcs_smp_release(pmcs_iport_t *iport)
+{
+	ASSERT(iport);
+
+	if (iport == NULL) {
+		pmcs_prt(iport->pwp, PMCS_PRT_DEBUG_IPORT, NULL, NULL,
+		    "%s: iport is NULL...", __func__);
+		return;
+	}
+
+	mutex_enter(&iport->smp_lock);
+	pmcs_prt(iport->pwp, PMCS_PRT_DEBUG_IPORT, NULL, NULL,
+	    "%s: SMP released by thread 0x%p", __func__, (void *)curthread);
+	iport->smp_active = B_FALSE;
+	iport->smp_active_thread = NULL;
+	cv_signal(&iport->smp_cv);
+	mutex_exit(&iport->smp_lock);
 }

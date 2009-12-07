@@ -250,6 +250,11 @@ struct pmcs_iport {
 	int		nphy;		/* number of phys in this port */
 	scsi_hba_tgtmap_t	*iss_tgtmap;	/* tgtmap */
 	ddi_soft_state_bystr	*tgt_sstate;	/* tgt softstate */
+	/* SMP serialization */
+	kmutex_t	smp_lock;
+	kcondvar_t	smp_cv;
+	boolean_t	smp_active;
+	kthread_t	*smp_active_thread;
 };
 
 struct pmcs_chunk {

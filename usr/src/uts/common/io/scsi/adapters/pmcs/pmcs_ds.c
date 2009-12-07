@@ -32,6 +32,7 @@
 /*
  * SAS Topology Configuration
  */
+static void pmcs_ds_operational(pmcs_phy_t *pptr, pmcs_xscsi_t *tgt);
 static void pmcs_handle_ds_recovery_error(pmcs_phy_t *phyp,
     pmcs_xscsi_t *tgt, pmcs_hw_t *pwp, const char *func_name, int line,
     char *reason_string);
@@ -218,6 +219,41 @@ pmcs_set_dev_state(pmcs_hw_t *pwp, pmcs_phy_t *phyp, pmcs_xscsi_t *xp,
 	}
 }
 
+static void
+pmcs_ds_operational(pmcs_phy_t *pptr, pmcs_xscsi_t *tgt)
+{
+	pmcs_hw_t	*pwp;
+
+	ASSERT(pptr);
+	pwp = pptr->pwp;
+
+	if (tgt != NULL) {
+		tgt->recover_wait = 0;
+	}
+	pptr->ds_recovery_retries = 0;
+
+	if ((pptr->ds_prev_good_recoveries == 0) ||
+	    (ddi_get_lbolt() - pptr->last_good_recovery >
+	    drv_usectohz(PMCS_MAX_DS_RECOVERY_TIME))) {
+		pptr->last_good_recovery = ddi_get_lbolt();
+		pptr->ds_prev_good_recoveries = 1;
+	} else if (ddi_get_lbolt() < pptr->last_good_recovery +
+	    drv_usectohz(PMCS_MAX_DS_RECOVERY_TIME)) {
+		pptr->ds_prev_good_recoveries++;
+	} else {
+		pmcs_handle_ds_recovery_error(pptr, tgt, pwp,
+		    __func__, __LINE__, "Max recovery"
+		    "attempts reached. Declaring PHY dead");
+	}
+
+	/* Don't bother to run the work queues if the PHY is dead */
+	if (!pptr->dead) {
+		SCHEDULE_WORK(pwp, PMCS_WORK_RUN_QUEUES);
+		(void) ddi_taskq_dispatch(pwp->tq, pmcs_worker,
+		    pwp, DDI_NOSLEEP);
+	}
+}
+
 void
 pmcs_dev_state_recovery(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 {
@@ -309,6 +345,12 @@ pmcs_dev_state_recovery(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 			goto next_phy;
 		}
 
+		/* If the chip says it's operational, we're done */
+		if (ds == PMCS_DEVICE_STATE_OPERATIONAL) {
+			pmcs_ds_operational(pptr, tgt);
+			goto next_phy;
+		}
+
 		if ((tgt_dev_state == ds) &&
 		    (ds == PMCS_DEVICE_STATE_IN_RECOVERY)) {
 			pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, pptr, tgt,
@@ -341,30 +383,37 @@ pmcs_dev_state_recovery(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 		}
 
 		/*
-		 * Step 2: Perform a hard reset on the PHY
+		 * Step 2: Perform a hard reset on the PHY.
+		 * Note we do not reset HBA PHYs.
 		 */
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, pptr, tgt,
-		    "%s: Issue HARD_RESET to PHY %s", __func__, pptr->path);
-		/*
-		 * Must release statlock here because pmcs_reset_phy will
-		 * drop and reacquire the PHY lock.
-		 */
-		if (tgt != NULL) {
-			mutex_exit(&tgt->statlock);
-		}
-		rc = pmcs_reset_phy(pwp, pptr, PMCS_PHYOP_HARD_RESET);
-		if (tgt != NULL) {
-			mutex_enter(&tgt->statlock);
-		}
-		if (rc) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, tgt,
-			    "%s: HARD_RESET to PHY %s failed (rc=%d)",
-			    __func__, pptr->path, rc);
+		if (pptr->level > 0) {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, pptr, tgt,
+			    "%s: Issue HARD_RESET to PHY %s", __func__,
+			    pptr->path);
+			/*
+			 * Must release statlock here because pmcs_reset_phy
+			 * will drop and reacquire the PHY lock.
+			 */
+			if (tgt != NULL) {
+				mutex_exit(&tgt->statlock);
+			}
+			rc = pmcs_reset_phy(pwp, pptr, PMCS_PHYOP_HARD_RESET);
+			if (tgt != NULL) {
+				mutex_enter(&tgt->statlock);
+			}
+			if (rc) {
+				pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, tgt,
+				    "%s: HARD_RESET to PHY %s failed (rc=%d)",
+				    __func__, pptr->path, rc);
 
-			pmcs_handle_ds_recovery_error(pptr, tgt, pwp,
-			    __func__, __LINE__, "HARD_RESET");
+				pmcs_handle_ds_recovery_error(pptr, tgt, pwp,
+				    __func__, __LINE__, "HARD_RESET");
 
-			goto next_phy;
+				goto next_phy;
+			}
+		} else {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, pptr, tgt,
+			    "%s: Not resetting HBA PHY...", __func__);
 		}
 
 		/*
@@ -407,34 +456,7 @@ pmcs_dev_state_recovery(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 		rc = pmcs_set_dev_state(pwp, pptr, tgt,
 		    PMCS_DEVICE_STATE_OPERATIONAL);
 		if (rc == 0) {
-			if (tgt != NULL) {
-				tgt->recover_wait = 0;
-			}
-			pptr->ds_recovery_retries = 0;
-
-			if ((pptr->ds_prev_good_recoveries == 0) ||
-			    (ddi_get_lbolt() - pptr->last_good_recovery >
-			    drv_usectohz(PMCS_MAX_DS_RECOVERY_TIME))) {
-				pptr->last_good_recovery = ddi_get_lbolt();
-				pptr->ds_prev_good_recoveries = 1;
-			} else if (ddi_get_lbolt() < pptr->last_good_recovery +
-			    drv_usectohz(PMCS_MAX_DS_RECOVERY_TIME)) {
-				pptr->ds_prev_good_recoveries++;
-			} else {
-				pmcs_handle_ds_recovery_error(pptr, tgt, pwp,
-				    __func__, __LINE__, "Max recovery"
-				    "attempts reached. Declaring PHY dead");
-			}
-
-			/*
-			 * Don't bother to run the work queues if the PHY
-			 * is dead.
-			 */
-			if (tgt && tgt->phy && !tgt->phy->dead) {
-				SCHEDULE_WORK(pwp, PMCS_WORK_RUN_QUEUES);
-				(void) ddi_taskq_dispatch(pwp->tq, pmcs_worker,
-				    pwp, DDI_NOSLEEP);
-			}
+			pmcs_ds_operational(pptr, tgt);
 		} else {
 			pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, pptr, tgt,
 			    "%s: Failed to SET tgt 0x%p to OPERATIONAL state",

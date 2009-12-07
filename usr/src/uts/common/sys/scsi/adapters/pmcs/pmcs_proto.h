@@ -348,6 +348,12 @@ void pmcs_fatal_handler(pmcs_hw_t *);
  */
 void pmcs_start_dev_state_recovery(pmcs_xscsi_t *, pmcs_phy_t *);
 
+/*
+ * Functions to serialize SMP requests
+ */
+void pmcs_smp_acquire(pmcs_iport_t *iport);
+void pmcs_smp_release(pmcs_iport_t *iport);
+
 #ifdef	__cplusplus
 }
 #endif

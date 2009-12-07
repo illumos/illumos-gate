@@ -1025,6 +1025,10 @@ pmcs_smp_start(struct smp_pkt *smp_pkt)
 	msg[15] = 0;
 
 	COPY_MESSAGE(ptr, msg, PMCS_MSG_SIZE);
+
+	/* SMP serialization */
+	pmcs_smp_acquire(pptr->iport);
+
 	pwrk->state = PMCS_WORK_STATE_ONCHIP;
 	htag = pwrk->htag;
 	INC_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
@@ -1033,6 +1037,9 @@ pmcs_smp_start(struct smp_pkt *smp_pkt)
 	WAIT_FOR(pwrk, smp_pkt->smp_pkt_timeout * 1000, result);
 	pmcs_pwork(pwp, pwrk);
 	pmcs_lock_phy(pptr);
+
+	/* SMP serialization */
+	pmcs_smp_release(pptr->iport);
 
 	if (result) {
 		pmcs_timed_out(pwp, htag, __func__);

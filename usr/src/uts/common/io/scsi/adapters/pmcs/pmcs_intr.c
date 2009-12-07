@@ -403,7 +403,6 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 			iport = pmcs_get_iport_by_phy(pwp, pptr);
 			pmcs_unlock_phy(pptr);
 			if (iport) {
-				pptr->iport = iport;
 				primary = !pptr->subsidiary;
 
 				mutex_enter(&iport->lock);
@@ -412,6 +411,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 				}
 				if (iport->ua_state == UA_ACTIVE) {
 					pmcs_add_phy_to_iport(iport, pptr);
+					pptr->iport = iport;
 				}
 				mutex_exit(&iport->lock);
 				pmcs_rele_iport(iport);
@@ -509,7 +509,6 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		iport = pmcs_get_iport_by_phy(pwp, pptr);
 		pmcs_unlock_phy(pptr);
 		if (iport) {
-			pptr->iport = iport;
 			primary = !pptr->subsidiary;
 
 			mutex_enter(&iport->lock);
@@ -518,6 +517,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 			}
 			if (iport->ua_state == UA_ACTIVE) {
 				pmcs_add_phy_to_iport(iport, pptr);
+				pptr->iport = iport;
 			}
 			mutex_exit(&iport->lock);
 			pmcs_rele_iport(iport);
@@ -604,12 +604,11 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		iport = pmcs_get_iport_by_phy(pwp, pptr);
 		pmcs_unlock_phy(pptr);
 		if (iport) {
-			pptr->iport = iport;
-
 			mutex_enter(&iport->lock);
 			iport->pptr = pptr;
 			if (iport->ua_state == UA_ACTIVE) {
 				pmcs_add_phy_to_iport(iport, pptr);
+				pptr->iport = iport;
 				ASSERT(iport->nphy == 1);
 				iport->nphy = 1;
 			}
@@ -716,7 +715,6 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 					    "promoted to primary", portid,
 					    pptr->phynum);
 				} else {
-					/* This should not happen */
 					pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr,
 					    NULL, "PortID 0x%x: PHY 0x%x: "
 					    "unable to promote phy", portid,
@@ -744,7 +742,10 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 			 */
 			if (iport) {
 				mutex_enter(&iport->lock);
-				pmcs_remove_phy_from_iport(iport, subphy);
+				if (iport->ua_state == UA_ACTIVE) {
+					pmcs_remove_phy_from_iport(iport,
+					    subphy);
+				}
 				mutex_exit(&iport->lock);
 			}
 
@@ -819,9 +820,11 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		 */
 		if (iport) {
 			mutex_enter(&iport->lock);
-			pmcs_remove_phy_from_iport(iport, subphy);
-			iport->pptr = NULL;
-			iport->ua_state = UA_PEND_DEACTIVATE;
+			if (iport->ua_state == UA_ACTIVE) {
+				pmcs_remove_phy_from_iport(iport, subphy);
+				iport->pptr = NULL;
+				iport->ua_state = UA_PEND_DEACTIVATE;
+			}
 			mutex_exit(&iport->lock);
 		}
 

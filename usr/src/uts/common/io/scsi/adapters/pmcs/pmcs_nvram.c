@@ -346,7 +346,7 @@ pmcs_flash_chunk(pmcs_hw_t *pwp, uint8_t *chunk)
 		WAIT_FOR(pwrk, 5000, result);
 		pmcs_pwork(pwp, pwrk);
 		if (result) {
-			pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    pmcs_timeo, __func__);
 			return (EIO);
 		}

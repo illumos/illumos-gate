@@ -296,7 +296,10 @@ pmcs_iport_attach(dev_info_t *dip)
 	mutex_init(&iport->lock, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(pwp->intr_pri));
 	cv_init(&iport->refcnt_cv, NULL, CV_DEFAULT, NULL);
+	cv_init(&iport->smp_cv, NULL, CV_DEFAULT, NULL);
 	mutex_init(&iport->refcnt_lock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(pwp->intr_pri));
+	mutex_init(&iport->smp_lock, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(pwp->intr_pri));
 
 	/* Set some data on the iport handle */
@@ -398,7 +401,9 @@ iport_attach_fail2:
 	list_destroy(&iport->phys);
 	strfree(iport->ua);
 	mutex_destroy(&iport->refcnt_lock);
+	mutex_destroy(&iport->smp_lock);
 	cv_destroy(&iport->refcnt_cv);
+	cv_destroy(&iport->smp_cv);
 	mutex_destroy(&iport->lock);
 iport_attach_fail1:
 	ddi_soft_state_free(pmcs_iport_softstate, inst);
@@ -1228,8 +1233,10 @@ pmcs_iport_unattach(pmcs_iport_t *iport)
 
 	/* Finish teardown and free the softstate */
 	mutex_destroy(&iport->refcnt_lock);
+	mutex_destroy(&iport->smp_lock);
 	ASSERT(iport->refcnt == 0);
 	cv_destroy(&iport->refcnt_cv);
+	cv_destroy(&iport->smp_cv);
 	mutex_destroy(&iport->lock);
 	ddi_soft_state_free(pmcs_iport_softstate, ddi_get_instance(iport->dip));
 
@@ -3018,19 +3025,19 @@ pmcs_fabricate_wwid(pmcs_hw_t *pwp)
 
 	cp = &c;
 	(void) ddi_strtoul(hw_serial, &cp, 10, (unsigned long *)&adr);
+
 	if (adr == 0) {
-		static const char foo[] = __DATE__ __TIME__;
-		/* Oh, dear, we're toast */
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: No serial number available to fabricate WWN",
 		    __func__);
-		for (i = 0; foo[i]; i++) {
-			adr += foo[i];
-		}
+
+		adr = (uint64_t)gethrtime();
 	}
+
 	adr <<= 8;
 	adr |= ((uint64_t)ddi_get_instance(pwp->dip) << 52);
 	adr |= (5ULL << 60);
+
 	for (i = 0; i < PMCS_MAX_PORTS; i++) {
 		pwp->sas_wwns[i] = adr + i;
 	}
