@@ -34,6 +34,8 @@ extern "C" {
 #endif
 
 #define	FM_IOC_MAXBUFSZ		32768
+#define	FM_IOC_OUT_BUFSZ	32768
+#define	FM_IOC_OUT_MAXBUFSZ	524288
 #define	FM_DRV_VERSION		1
 
 #define	FM_VERSIONS_VERSION	"fm-versions-version"

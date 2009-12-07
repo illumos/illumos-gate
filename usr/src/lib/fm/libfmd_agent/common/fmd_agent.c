@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,25 +110,45 @@ fmd_agent_nvl_ioctl(fmd_agent_hdl_t *hdl, int cmd, uint32_t ver,
 	}
 
 	if (outnvlp != NULL) {
-		outsz = FM_IOC_MAXBUFSZ;
-		if ((outbuf = umem_alloc(outsz, UMEM_DEFAULT)) == NULL) {
-			err = errno;
-			if (inbuf != NULL)
-				umem_free(inbuf, insz);
-			return (err);
+		outsz = FM_IOC_OUT_BUFSZ;
+	}
+	for (;;) {
+		if (outnvlp != NULL) {
+			outbuf = umem_alloc(outsz, UMEM_DEFAULT);
+			if (outbuf == NULL) {
+				err = errno;
+				break;
+			}
+		}
+
+		fid.fid_version = ver;
+		fid.fid_insz = insz;
+		fid.fid_inbuf = inbuf;
+		fid.fid_outsz = outsz;
+		fid.fid_outbuf = outbuf;
+
+		if (ioctl(hdl->agent_devfd, cmd, &fid) < 0) {
+			if (errno == ENAMETOOLONG && outsz != 0 &&
+			    outsz < (FM_IOC_OUT_MAXBUFSZ / 2)) {
+				umem_free(outbuf, outsz);
+				outsz *= 2;
+				outbuf = umem_alloc(outsz, UMEM_DEFAULT);
+				if (outbuf == NULL) {
+					err = errno;
+					break;
+				}
+			} else {
+				err = errno;
+				break;
+			}
+		} else if (outnvlp != NULL) {
+			err = nvlist_unpack(fid.fid_outbuf, fid.fid_outsz,
+			    outnvlp, 0);
+			break;
+		} else {
+			break;
 		}
 	}
-
-	fid.fid_version = ver;
-	fid.fid_insz = insz;
-	fid.fid_inbuf = inbuf;
-	fid.fid_outsz = outsz;
-	fid.fid_outbuf = outbuf;
-
-	if (ioctl(hdl->agent_devfd, cmd, &fid) < 0)
-		err = errno;
-	else if (outnvlp != NULL)
-		err = nvlist_unpack(fid.fid_outbuf, fid.fid_outsz, outnvlp, 0);
 
 	if (inbuf != NULL)
 		umem_free(inbuf, insz);

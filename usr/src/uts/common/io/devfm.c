@@ -278,7 +278,7 @@ fm_ioctl(dev_t dev, int cmd, intptr_t data, int flag, cred_t *cred, int *rvalp)
 
 	if (fid.fid_insz > FM_IOC_MAXBUFSZ)
 		return (ENAMETOOLONG);
-	if (fid.fid_outsz > FM_IOC_MAXBUFSZ)
+	if (fid.fid_outsz > FM_IOC_OUT_MAXBUFSZ)
 		return (EINVAL);
 
 	/*

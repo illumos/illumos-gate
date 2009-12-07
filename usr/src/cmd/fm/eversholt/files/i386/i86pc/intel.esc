@@ -938,7 +938,7 @@ prop fault.cpu.intel.discard_fatal@motherboard
       payloadprop_defined("bank_number") && 5 == payloadprop("bank_number") &&
       payloadprop_defined("processor_context_corrupt") &&
       1 == payloadprop("processor_context_corrupt") } (0)->
-    ereport.cpu.intel.internal_unclassified@chip<>/core<>/strand<>;
+    ereport.cpu.intel.internal_unclassified@chip<>/core<>/strand<> {within(10s)};
 
 prop fault.cpu.intel.internal@chip/core/strand
     { (count(stat.has_poison@motherboard[0]) <= count(stat.discard_fatal@motherboard[0]) ||
