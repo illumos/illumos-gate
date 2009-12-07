@@ -247,7 +247,7 @@ cstate_wakeup(cpu_t *cp, int bound)
 	 * alternate cpu.
 	 */
 	if (cpu_found != CPU->cpu_seqid) {
-		mcpu_mwait = cpu[cpu_found]->cpu_m.mcpu_mwait;
+		mcpu_mwait = cpu_seq[cpu_found]->cpu_m.mcpu_mwait;
 		if ((mcpu_mwait != NULL) && (*mcpu_mwait == MWAIT_HALTED))
 			MWAIT_WAKEUP(cpu_seq[cpu_found]);
 		else
