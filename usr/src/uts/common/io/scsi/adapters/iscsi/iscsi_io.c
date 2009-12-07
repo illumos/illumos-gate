@@ -754,10 +754,13 @@ iscsi_rx_process_cmd_rsp(idm_conn_t *ic, idm_pdu_t *pdu)
 		/* success */
 		iscsi_cmd_rsp_chk(icmdp, issrhp);
 		flush = iscsi_cmd_rsp_cmd_status(icmdp, issrhp, data);
+
+		ASSERT(icmdp->cmd_lun == NULL || icmdp->cmd_lun->lun_num ==
+		    (icmdp->cmd_un.scsi.lun & ISCSI_LUN_MASK));
+
 		if (flush == B_TRUE) {
 			cmd_sn = icmdp->cmd_sn;
-			ASSERT(icmdp->cmd_lun != NULL);
-			lun_num = icmdp->cmd_lun->lun_num;
+			lun_num = icmdp->cmd_un.scsi.lun & ISCSI_LUN_MASK;
 		}
 	}
 
@@ -3552,8 +3555,8 @@ iscsi_nop_timeout_checks(iscsi_cmd_t *icmdp)
 /*
  * iscsi_flush_cmd_after_reset - flush commands after reset
  *
- * Here we will flush all the commands in the same connection whose cmdsn is
- * less than the one received with the Unit Attention.
+ * Here we will flush all the commands for a specified LUN whose cmdsn is less
+ * than the one received with the Unit Attention.
  */
 static void
 iscsi_flush_cmd_after_reset(uint32_t cmd_sn, uint16_t lun_num,
@@ -3578,8 +3581,16 @@ iscsi_flush_cmd_after_reset(uint32_t cmd_sn, uint16_t lun_num,
 		    ((cmd_sn > t_icmdp->cmd_sn) ||
 		    ((t_icmdp->cmd_sn - cmd_sn) >
 		    ISCSI_CMD_SN_WRAP))) {
-			if (t_icmdp->cmd_lun != NULL &&
-			    t_icmdp->cmd_lun->lun_num == lun_num) {
+			/*
+			 * Internally generated SCSI commands do not have
+			 * t_icmdp->cmd_lun set, but the LUN can be retrieved
+			 * from t_icmdp->cmd_un.scsi.lun.
+			 */
+			if ((t_icmdp->cmd_lun != NULL &&
+			    t_icmdp->cmd_lun->lun_num == lun_num) ||
+			    (t_icmdp->cmd_type == ISCSI_CMD_TYPE_SCSI &&
+			    (t_icmdp->cmd_un.scsi.lun & ISCSI_LUN_MASK) ==
+			    lun_num)) {
 				t_icmdp->cmd_misc_flags |=
 				    ISCSI_CMD_MISCFLAG_FLUSH;
 				if (t_icmdp->cmd_type == ISCSI_CMD_TYPE_SCSI) {

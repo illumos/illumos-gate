@@ -137,6 +137,7 @@ extern boolean_t iscsi_sess_logging;
 
 #define	ISCSI_LUN_MASK_MSB	0x00003f00
 #define	ISCSI_LUN_MASK_LSB	0x000000ff
+#define	ISCSI_LUN_MASK		(ISCSI_LUN_MASK_MSB | ISCSI_LUN_MASK_LSB)
 #define	ISCSI_LUN_BYTE_COPY(lun, report_lun_data) \
 	lun[0] = (report_lun_data & ISCSI_LUN_MASK_MSB) >> 8; \
 	lun[1] = (report_lun_data & ISCSI_LUN_MASK_LSB);
