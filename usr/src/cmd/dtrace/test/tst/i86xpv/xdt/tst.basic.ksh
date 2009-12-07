@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -48,13 +46,13 @@ script()
 {
 	$dtrace -qs /dev/stdin <<EOF
 	xdt:sched::on-cpu
-	/arg1 == 0/
+	/arg0 == 0/
 	{
 		self->on++;
 	}
 
 	xdt:sched::off-cpu
-	/arg1 == 0 && self->on/
+	/arg0 == 0 && self->on/
 	{
 		self->off++;
 	}

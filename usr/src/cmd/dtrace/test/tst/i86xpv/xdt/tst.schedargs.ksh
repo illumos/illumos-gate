@@ -54,7 +54,7 @@ script()
 	xdt:sched::yield
 	{
 		/* print domid vcpu pcpu probename */
-		printf("%d %d %d %s\n", arg0, arg1, `xdt_curpcpu, probename);
+		printf("%d %d %d %s\n", arg0, arg1, \`xdt_curpcpu, probename);
 	}
 EOF
 }
