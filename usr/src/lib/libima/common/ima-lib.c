@@ -5141,8 +5141,8 @@ IMA_API IMA_STATUS IMA_LuInquiry(
 
 	if (pOutputBuffer == NULL || pOutputBufferLength == NULL ||
 	    *pOutputBufferLength == 0 ||
-	    pSenseBuffer == NULL || pSenseBufferLength == NULL ||
-	    *pSenseBufferLength == 0)
+	    (pSenseBuffer == NULL && pSenseBufferLength != NULL &&
+	    *pSenseBufferLength != 0))
 		return (IMA_ERROR_INVALID_PARAMETER);
 
 	if ((evpd != IMA_TRUE && evpd != IMA_FALSE) ||

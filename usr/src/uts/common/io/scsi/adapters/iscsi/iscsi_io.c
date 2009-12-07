@@ -57,6 +57,10 @@ boolean_t iscsi_io_logging = B_FALSE;
 		}						\
 	}
 
+/* Size of structure scsi_arq_status without sense data. */
+#define	ISCSI_ARQ_STATUS_NOSENSE_LEN	(sizeof (struct scsi_arq_status) - \
+    sizeof (struct scsi_extended_sense))
+
 /* generic io helpers */
 static uint32_t n2h24(uchar_t *ptr);
 static int iscsi_sna_lt(uint32_t n1, uint32_t n2);
@@ -433,13 +437,14 @@ static boolean_t
 iscsi_cmd_rsp_cmd_status(iscsi_cmd_t *icmdp, iscsi_scsi_rsp_hdr_t *issrhp,
     uint8_t *data)
 {
-	int32_t			dlength		= 0;
-	struct scsi_arq_status	*arqstat	= NULL;
-	size_t			senselen	= 0;
-	int32_t			statuslen	= 0;
-	int32_t			senselen_to	= 0;
+	int32_t			dlength;
+	struct scsi_arq_status	*arqstat;
+	size_t			senselen;
+	int32_t			statuslen;
+	int32_t			sensebuf_len;
 	struct scsi_pkt		*pkt;
-	boolean_t		affect		= B_FALSE;
+	boolean_t		affect = B_FALSE;
+	int32_t			senselen_to_copy;
 
 	pkt = icmdp->cmd_un.scsi.pkt;
 	dlength = n2h24(issrhp->dlength);
@@ -539,19 +544,28 @@ iscsi_cmd_rsp_cmd_status(iscsi_cmd_t *icmdp, iscsi_scsi_rsp_hdr_t *issrhp,
 				pkt->pkt_state |= STATE_XARQ_DONE;
 			}
 
-			senselen_to =  pkt->pkt_scblen -
-			    sizeof (struct scsi_arq_status) +
-			    sizeof (struct scsi_extended_sense);
+			/*
+			 * Calculate size of space reserved for sense data in
+			 * pkt->pkt_scbp.
+			 */
+			sensebuf_len = statuslen - ISCSI_ARQ_STATUS_NOSENSE_LEN;
 
 			/* copy auto request sense */
-			dlength = min(senselen, senselen_to);
-			if (dlength > 0) {
+			senselen_to_copy = min(senselen, sensebuf_len);
+			if (senselen_to_copy > 0) {
 				bcopy(&data[2], (uchar_t *)&arqstat->
-				    sts_sensedata, dlength);
+				    sts_sensedata, senselen_to_copy);
 
 				affect = iscsi_decode_sense(
 				    (uint8_t *)&arqstat->sts_sensedata);
 			}
+			arqstat->sts_rqpkt_resid = sensebuf_len -
+			    senselen_to_copy;
+			ISCSI_IO_LOG(CE_NOTE, "DEBUG: iscsi_cmd_rsp_cmd_status:"
+			    " sts_rqpkt_resid: %d pkt_scblen: %d senselen: %lu"
+			    " sensebuf_len: %d senselen_to_copy: %d affect: %d",
+			    arqstat->sts_rqpkt_resid, pkt->pkt_scblen, senselen,
+			    sensebuf_len, senselen_to_copy, affect);
 			break;
 		}
 		/* FALLTHRU */
@@ -818,8 +832,9 @@ iscsi_data_rsp_pkt(iscsi_cmd_t *icmdp, iscsi_data_rsp_hdr_t *idrhp)
 		*((uchar_t *)&arqstat->sts_status) =
 		    idrhp->cmd_status;
 
-		arqstat->sts_rqpkt_resid =
-		    sizeof (struct scsi_extended_sense);
+		/* sense residual is set to whole size of sense buffer */
+		arqstat->sts_rqpkt_resid = icmdp->cmd_un.scsi.statuslen -
+		    ISCSI_ARQ_STATUS_NOSENSE_LEN;
 		ISCSI_IO_LOG(CE_NOTE, "DEBUG: iscsi_data_rsp_pkt: "
 		    "exception status: itt: %d resid: %d",
 		    idrhp->itt, arqstat->sts_rqpkt_resid);
@@ -2919,22 +2934,26 @@ long_text_response:
 iscsi_status_t
 iscsi_handle_passthru(iscsi_sess_t *isp, uint16_t lun, struct uscsi_cmd *ucmdp)
 {
-	iscsi_status_t		rval		= ISCSI_STATUS_SUCCESS;
-	iscsi_cmd_t		*icmdp		= NULL;
-	struct scsi_pkt		*pkt		= NULL;
-	struct buf		*bp		= NULL;
-	struct scsi_arq_status  *arqstat	= NULL;
-	int			rqlen		= SENSE_LENGTH;
+	iscsi_status_t		rval;
+	iscsi_cmd_t		*icmdp;
+	struct scsi_pkt		*pkt;
+	struct buf		*bp;
+	struct scsi_arq_status  *arqstat;
+	int			statuslen;
 
 	ASSERT(isp != NULL);
 	ASSERT(ucmdp != NULL);
 
-	/*
-	 * If the caller didn't provide a sense buffer we need
-	 * to allocation one to get the scsi status.
-	 */
 	if (ucmdp->uscsi_rqlen > SENSE_LENGTH) {
-		rqlen = ucmdp->uscsi_rqlen;
+		/*
+		 * The caller provided sense buffer large enough for additional
+		 * sense bytes. We need to allocate pkt_scbp to fit them there
+		 * too.
+		 */
+		statuslen = ucmdp->uscsi_rqlen + ISCSI_ARQ_STATUS_NOSENSE_LEN;
+	} else {
+		/* The default size of pkt_scbp */
+		statuslen = sizeof (struct scsi_arq_status);
 	}
 
 	/*
@@ -2954,7 +2973,7 @@ iscsi_handle_passthru(iscsi_sess_t *isp, uint16_t lun, struct uscsi_cmd *ucmdp)
 
 	/* setup scsi_pkt structure */
 	pkt->pkt_ha_private	= icmdp;
-	pkt->pkt_scbp		= kmem_zalloc(rqlen, KM_SLEEP);
+	pkt->pkt_scbp		= kmem_zalloc(statuslen, KM_SLEEP);
 	pkt->pkt_cdbp		= kmem_zalloc(ucmdp->uscsi_cdblen, KM_SLEEP);
 	/* callback routine for passthru, will wake cv_wait */
 	pkt->pkt_comp		= iscsi_handle_passthru_callback;
@@ -2968,7 +2987,7 @@ iscsi_handle_passthru(iscsi_sess_t *isp, uint16_t lun, struct uscsi_cmd *ucmdp)
 	icmdp->cmd_un.scsi.bp		= bp;
 	bcopy(ucmdp->uscsi_cdb, pkt->pkt_cdbp, ucmdp->uscsi_cdblen);
 	icmdp->cmd_un.scsi.cmdlen	= ucmdp->uscsi_cdblen;
-	icmdp->cmd_un.scsi.statuslen	= rqlen;
+	icmdp->cmd_un.scsi.statuslen	= statuslen;
 	icmdp->cmd_crc_error_seen	= B_FALSE;
 	icmdp->cmd_completed		= B_FALSE;
 	icmdp->cmd_result		= ISCSI_STATUS_SUCCESS;
@@ -2983,7 +3002,7 @@ iscsi_handle_passthru(iscsi_sess_t *isp, uint16_t lun, struct uscsi_cmd *ucmdp)
 
 		iscsi_cmd_free(icmdp);
 		kmem_free(pkt->pkt_cdbp, ucmdp->uscsi_cdblen);
-		kmem_free(pkt->pkt_scbp, rqlen);
+		kmem_free(pkt->pkt_scbp, statuslen);
 		kmem_free(pkt, sizeof (struct scsi_pkt));
 		kmem_free(bp, sizeof (struct buf));
 
@@ -3016,14 +3035,16 @@ iscsi_handle_passthru(iscsi_sess_t *isp, uint16_t lun, struct uscsi_cmd *ucmdp)
 	/* copy request sense buffers if caller gave space */
 	if ((ucmdp->uscsi_rqlen > 0) &&
 	    (ucmdp->uscsi_rqbuf != NULL)) {
-		bcopy(arqstat, ucmdp->uscsi_rqbuf,
-		    MIN(sizeof (struct scsi_arq_status), rqlen));
+		ASSERT(ucmdp->uscsi_rqlen >= arqstat->sts_rqpkt_resid);
+		ucmdp->uscsi_rqresid = arqstat->sts_rqpkt_resid;
+		bcopy(&arqstat->sts_sensedata, ucmdp->uscsi_rqbuf,
+		    ucmdp->uscsi_rqlen - arqstat->sts_rqpkt_resid);
 	}
 
 	/* clean up */
 	iscsi_cmd_free(icmdp);
 	kmem_free(pkt->pkt_cdbp, ucmdp->uscsi_cdblen);
-	kmem_free(pkt->pkt_scbp, rqlen);
+	kmem_free(pkt->pkt_scbp, statuslen);
 	kmem_free(pkt, sizeof (struct scsi_pkt));
 	kmem_free(bp, sizeof (struct buf));
 

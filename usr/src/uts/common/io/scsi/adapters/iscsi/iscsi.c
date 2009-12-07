@@ -3957,7 +3957,8 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		if (iu.iu_ucmd.uscsi_rqlen > 0) {
 			if (ddi_copyout(iu.iu_ucmd.uscsi_rqbuf,
 			    iu_caller.iu_ucmd.uscsi_rqbuf,
-			    iu.iu_ucmd.uscsi_rqlen, mode) != 0) {
+			    iu.iu_ucmd.uscsi_rqlen - iu.iu_ucmd.uscsi_rqresid,
+			    mode) != 0) {
 				rtn = EFAULT;
 			}
 			kmem_free(iu.iu_ucmd.uscsi_rqbuf,
@@ -3965,30 +3966,36 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		}
 
 #ifdef _MULTI_DATAMODEL
-		if (iu.iu_ucmd.uscsi_status != 0) {
-			switch (model = ddi_model_convert_from(
-			    mode & FMODELS)) {
-			case DDI_MODEL_ILP32:
+		switch (model = ddi_model_convert_from(mode & FMODELS)) {
+		case DDI_MODEL_ILP32:
+			if (iu.iu_ucmd.uscsi_status != 0) {
 				iu32_caller.iu_ucmd.uscsi_status =
 				    iu.iu_ucmd.uscsi_status;
-				if (ddi_copyout((void *)&iu32_caller,
-				    (caddr_t)arg, sizeof (iscsi_uscsi32_t),
-				    mode) != 0) {
-					rtn = EFAULT;
-				}
-				break;
-			case DDI_MODEL_NONE:
+				iu32_caller.iu_ucmd.uscsi_rqresid =
+				    iu.iu_ucmd.uscsi_rqresid;
+			}
+			iu32_caller.iu_ucmd.uscsi_resid =
+			    iu.iu_ucmd.uscsi_resid;
+			if (ddi_copyout((void *)&iu32_caller, (caddr_t)arg,
+			    sizeof (iscsi_uscsi32_t), mode) != 0) {
+				rtn = EFAULT;
+			}
+			break;
+		case DDI_MODEL_NONE:
+			if (iu.iu_ucmd.uscsi_status != 0) {
 				iu_caller.iu_ucmd.uscsi_status =
 				    iu.iu_ucmd.uscsi_status;
-				if (ddi_copyout((void *)&iu_caller,
-				    (caddr_t)arg, sizeof (iscsi_uscsi_t),
-				    mode) != 0) {
-					rtn = EFAULT;
-				}
-				break;
-			default:
-				ASSERT(FALSE);
+				iu_caller.iu_ucmd.uscsi_rqresid =
+				    iu.iu_ucmd.uscsi_rqresid;
 			}
+			iu_caller.iu_ucmd.uscsi_resid = iu.iu_ucmd.uscsi_resid;
+			if (ddi_copyout((void *)&iu_caller, (caddr_t)arg,
+			    sizeof (iscsi_uscsi_t), mode) != 0) {
+				rtn = EFAULT;
+			}
+			break;
+		default:
+			ASSERT(FALSE);
 		}
 #endif /* _MULTI_DATAMODEL */
 		rw_exit(&ihp->hba_sess_list_rwlock);

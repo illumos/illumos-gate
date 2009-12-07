@@ -41,6 +41,8 @@
 #include <stdio.h>
 #include <time.h>
 #include <libdevinfo.h>
+#include <sys/scsi/generic/commands.h>
+#include <sys/scsi/generic/status.h>
 #include <sys/scsi/adapters/iscsi_if.h>
 #include <sys/iscsi_protocol.h>
 #include <ima.h>
@@ -52,10 +54,6 @@
 #define	LIBRARY_FILE_NAME			L"libsun_ima.so"
 
 #define	OS_DEVICE_NAME_LEN		256
-#define	INQUIRY_CMD			0x12
-#define	GETCAPACITY_CMD  		0x25
-#define	INQUIRY_CMDLEN			6
-#define	INQUIRY_REPLY_LEN		96
 #define	USCSI_TIMEOUT_IN_SEC		10
 #define	MAX_AUTHMETHODS			10
 #define	NUM_SUPPORTED_AUTH_METHODS	2
@@ -64,6 +62,9 @@
 #define	SUN_IMA_IP_PORT_LEN		64
 #define	SUN_IMA_MAX_RADIUS_SECRET_LEN	128
 #define	MAX_LONG_LONG_STRING_LEN	10
+#define	MAX_INQUIRY_BUFFER_LEN		0xffff
+#define	MAX_REPORT_LUNS_BUFFER_LEN	0xffffffff
+#define	MAX_READ_CAPACITY16_BUFFER_LEN	0xffffffff
 
 /* Forward declaration */
 #define	BOOL_PARAM			1
@@ -1732,7 +1733,6 @@ IMA_API	IMA_STATUS IMA_GetDeviceStatistics(
 	return (IMA_ERROR_NOT_SUPPORTED);
 }
 
-/*ARGSUSED*/
 IMA_API	IMA_STATUS IMA_LuInquiry(
 	IMA_OID deviceId,
 	IMA_BOOL evpd,
@@ -1746,20 +1746,28 @@ IMA_API	IMA_STATUS IMA_LuInquiry(
 {
 	IMA_LU_PROPERTIES luProps;
 	IMA_STATUS status;
-
-	char cmdblk [ INQUIRY_CMDLEN ] =
-	    { INQUIRY_CMD,   /* command */
-			0,   /* lun/reserved */
-			0,   /* page code */
-			0,   /* reserved */
-	INQUIRY_REPLY_LEN,   /* allocation length */
-			0 }; /* reserved/flag/link */
-
-
+	unsigned char cmdblk[CDB_GROUP0];
+	IMA_UINT buflen;
 	int fd;
 	iscsi_uscsi_t uscsi;
 
+	(void) memset(&cmdblk[0], 0, CDB_GROUP0);
+	cmdblk[0] = SCMD_INQUIRY;
+
+	if (evpd == IMA_TRUE)
+		cmdblk[1] |= 0x01;
+	if (cmddt == IMA_TRUE)
+		cmdblk[1] |= 0x02;
+
 	cmdblk[2] = pageCode;
+
+	if (*pOutputBufferLength > MAX_INQUIRY_BUFFER_LEN) {
+		buflen = MAX_INQUIRY_BUFFER_LEN;
+	} else {
+		buflen = *pOutputBufferLength;
+	}
+	cmdblk[3] = (buflen & 0xff00) >> 8;
+	cmdblk[4] = (buflen & 0x00ff);
 
 	(void) memset(&uscsi, 0, sizeof (iscsi_uscsi_t));
 	uscsi.iu_vers 	= ISCSI_INTERFACE_VERSION;
@@ -1785,11 +1793,12 @@ IMA_API	IMA_STATUS IMA_LuInquiry(
 	uscsi.iu_ucmd.uscsi_flags = USCSI_READ;
 	uscsi.iu_ucmd.uscsi_timeout = USCSI_TIMEOUT_IN_SEC;
 	uscsi.iu_ucmd.uscsi_bufaddr = (char *)pOutputBuffer;
-	uscsi.iu_ucmd.uscsi_buflen = *pOutputBufferLength;
+	uscsi.iu_ucmd.uscsi_buflen = buflen;
 	uscsi.iu_ucmd.uscsi_rqbuf = (char *)pSenseBuffer;
-	uscsi.iu_ucmd.uscsi_rqlen = *pSenseBufferLength;
-	uscsi.iu_ucmd.uscsi_cdb = &cmdblk[0];
-	uscsi.iu_ucmd.uscsi_cdblen = INQUIRY_CMDLEN;
+	uscsi.iu_ucmd.uscsi_rqlen = (pSenseBufferLength != NULL) ?
+	    *pSenseBufferLength : 0;
+	uscsi.iu_ucmd.uscsi_cdb = (char *)&cmdblk[0];
+	uscsi.iu_ucmd.uscsi_cdblen = CDB_GROUP0;
 
 	if ((fd = open(ISCSI_DRIVER_DEVCTL, O_RDONLY)) == -1) {
 		syslog(LOG_USER|LOG_DEBUG, "Cannot open %s (%d)",
@@ -1804,10 +1813,17 @@ IMA_API	IMA_STATUS IMA_LuInquiry(
 		return (IMA_ERROR_UNEXPECTED_OS_ERROR);
 	}
 
+	if (uscsi.iu_ucmd.uscsi_status == STATUS_CHECK) {
+		if (pSenseBufferLength != NULL) {
+			*pSenseBufferLength -= uscsi.iu_ucmd.uscsi_rqresid;
+		}
+		return (IMA_ERROR_SCSI_STATUS_CHECK_CONDITION);
+	}
+
+	*pOutputBufferLength = buflen - uscsi.iu_ucmd.uscsi_resid;
 	return (IMA_STATUS_SUCCESS);
 }
 
-/*ARGSUSED*/
 IMA_API	IMA_STATUS IMA_LuReadCapacity(
 		IMA_OID deviceId,
 		IMA_UINT cdbLength,
@@ -1820,18 +1836,40 @@ IMA_API	IMA_STATUS IMA_LuReadCapacity(
 {
 	IMA_LU_PROPERTIES luProps;
 	IMA_STATUS status;
+	/* CDB_GROUP4 size is safe for both 10 and 16 byte CDBs */
+	unsigned char cmdblk[CDB_GROUP4];
+	IMA_UINT buflen;
 	int fd;
 	iscsi_uscsi_t uscsi;
 
-	char cmdblk [ INQUIRY_CMDLEN ] =
-		{ GETCAPACITY_CMD,   /* command */
-				0,   /* lun/reserved */
-				0,   /* page code */
-				0,   /* reserved */
-		INQUIRY_REPLY_LEN,   /* allocation length */
-				0 }; /* reserved/flag/link */
+	(void) memset(&cmdblk[0], 0, CDB_GROUP4);
 
+	if (cdbLength == CDB_GROUP1) {
+		/* Read Capacity (10) command. */
+		cmdblk[0] = SCMD_READ_CAPACITY;
+		buflen = *pOutputBufferLength;
+	} else if (cdbLength == CDB_GROUP4) {
+		/*
+		 * Read Capacity (16) is a Service Action In command. One
+		 * command byte (0x9E) is overloaded for multiple operations,
+		 * with the second CDB byte specifying the desired operation.
+		 */
+		cmdblk[0] = SCMD_SVC_ACTION_IN_G4;
+		cmdblk[1] = SSVC_ACTION_READ_CAPACITY_G4;
 
+		if (*pOutputBufferLength > MAX_READ_CAPACITY16_BUFFER_LEN) {
+			buflen = MAX_READ_CAPACITY16_BUFFER_LEN;
+		} else {
+			buflen = *pOutputBufferLength;
+		}
+		cmdblk[10] = (buflen & 0xff000000) >> 24;
+		cmdblk[11] = (buflen & 0x00ff0000) >> 16;
+		cmdblk[12] = (buflen & 0x0000ff00) >> 8;
+		cmdblk[13] = (buflen & 0x000000ff);
+	} else {
+		/* only 10 and 16 byte CDB are supported */
+		return (IMA_ERROR_NOT_SUPPORTED);
+	}
 
 	(void) memset(&uscsi, 0, sizeof (iscsi_uscsi_t));
 	uscsi.iu_vers 	= ISCSI_INTERFACE_VERSION;
@@ -1855,13 +1893,14 @@ IMA_API	IMA_STATUS IMA_LuReadCapacity(
 	}
 
 	uscsi.iu_ucmd.uscsi_flags = USCSI_READ;
-	uscsi.iu_ucmd.uscsi_timeout = 10;
+	uscsi.iu_ucmd.uscsi_timeout = USCSI_TIMEOUT_IN_SEC;
 	uscsi.iu_ucmd.uscsi_bufaddr = (char *)pOutputBuffer;
-	uscsi.iu_ucmd.uscsi_buflen = *pOutputBufferLength;
+	uscsi.iu_ucmd.uscsi_buflen = buflen;
 	uscsi.iu_ucmd.uscsi_rqbuf = (char *)pSenseBuffer;
-	uscsi.iu_ucmd.uscsi_rqlen = *pSenseBufferLength;
-	uscsi.iu_ucmd.uscsi_cdb = &cmdblk[0];
-	uscsi.iu_ucmd.uscsi_cdblen = INQUIRY_CMDLEN;
+	uscsi.iu_ucmd.uscsi_rqlen = (pSenseBufferLength != NULL) ?
+	    *pSenseBufferLength : 0;
+	uscsi.iu_ucmd.uscsi_cdb = (char *)&cmdblk[0];
+	uscsi.iu_ucmd.uscsi_cdblen = cdbLength;
 
 	if ((fd = open(ISCSI_DRIVER_DEVCTL, O_RDONLY)) == -1) {
 		syslog(LOG_USER|LOG_DEBUG, "Cannot open %s (%d)",
@@ -1876,10 +1915,17 @@ IMA_API	IMA_STATUS IMA_LuReadCapacity(
 		return (IMA_ERROR_UNEXPECTED_OS_ERROR);
 	}
 
+	if (uscsi.iu_ucmd.uscsi_status == STATUS_CHECK) {
+		if (pSenseBufferLength != NULL) {
+			*pSenseBufferLength -= uscsi.iu_ucmd.uscsi_rqresid;
+		}
+		return (IMA_ERROR_SCSI_STATUS_CHECK_CONDITION);
+	}
+
+	*pOutputBufferLength = buflen - uscsi.iu_ucmd.uscsi_resid;
 	return (IMA_STATUS_SUCCESS);
 }
 
-/*ARGSUSED*/
 IMA_API	IMA_STATUS IMA_LuReportLuns(
 		IMA_OID deviceId,
 		IMA_BOOL sendToWellKnownLun,
@@ -1894,22 +1940,34 @@ IMA_API	IMA_STATUS IMA_LuReportLuns(
 {
 	IMA_LU_PROPERTIES luProps;
 	IMA_STATUS status;
+	unsigned char cmdblk[CDB_GROUP5];
+	IMA_UINT buflen;
 	int fd;
 	iscsi_uscsi_t uscsi;
 
-	char cmdblk [ INQUIRY_CMDLEN ] =
-	    { INQUIRY_CMD,   /* command */
-			0,   /* lun/reserved */
-			0,   /* page code */
-			0,   /* reserved */
-	INQUIRY_REPLY_LEN,   /* allocation length */
-			0 }; /* reserved/flag/link */
+	(void) memset(&cmdblk[0], 0, CDB_GROUP5);
+	cmdblk[0] = SCMD_REPORT_LUNS;
+	cmdblk[2] = selectReport;
+
+	if (*pOutputBufferLength > MAX_REPORT_LUNS_BUFFER_LEN) {
+		buflen = MAX_REPORT_LUNS_BUFFER_LEN;
+	} else {
+		buflen = *pOutputBufferLength;
+	}
+	cmdblk[6] = (buflen & 0xff000000) >> 24;
+	cmdblk[7] = (buflen & 0x00ff0000) >> 16;
+	cmdblk[8] = (buflen & 0x0000ff00) >> 8;
+	cmdblk[9] = (buflen & 0x000000ff);
 
 	(void) memset(&uscsi, 0, sizeof (iscsi_uscsi_t));
 	uscsi.iu_vers 	= ISCSI_INTERFACE_VERSION;
 
 	/* iu_oid is a session oid in the driver */
 	if (deviceId.objectType == IMA_OBJECT_TYPE_TARGET) {
+		if (sendToWellKnownLun == IMA_TRUE) {
+			/* this optional feature is not supported now */
+			return (IMA_ERROR_NOT_SUPPORTED);
+		}
 		uscsi.iu_oid	= deviceId.objectSequenceNumber;
 		uscsi.iu_lun	= 0;
 	} else {
@@ -1927,13 +1985,14 @@ IMA_API	IMA_STATUS IMA_LuReportLuns(
 	}
 
 	uscsi.iu_ucmd.uscsi_flags = USCSI_READ;
-	uscsi.iu_ucmd.uscsi_timeout = 10;
+	uscsi.iu_ucmd.uscsi_timeout = USCSI_TIMEOUT_IN_SEC;
 	uscsi.iu_ucmd.uscsi_bufaddr = (char *)pOutputBuffer;
-	uscsi.iu_ucmd.uscsi_buflen = *pOutputBufferLength;
+	uscsi.iu_ucmd.uscsi_buflen = buflen;
 	uscsi.iu_ucmd.uscsi_rqbuf = (char *)pSenseBuffer;
-	uscsi.iu_ucmd.uscsi_rqlen = *pSenseBufferLength;
-	uscsi.iu_ucmd.uscsi_cdb = &cmdblk[0];
-	uscsi.iu_ucmd.uscsi_cdblen = INQUIRY_CMDLEN;
+	uscsi.iu_ucmd.uscsi_rqlen = (pSenseBufferLength != NULL) ?
+	    *pSenseBufferLength : 0;
+	uscsi.iu_ucmd.uscsi_cdb = (char *)&cmdblk[0];
+	uscsi.iu_ucmd.uscsi_cdblen = CDB_GROUP5;
 
 	if ((fd = open(ISCSI_DRIVER_DEVCTL, O_RDONLY)) == -1) {
 		syslog(LOG_USER|LOG_DEBUG, "Cannot open %s (%d)",
@@ -1948,6 +2007,14 @@ IMA_API	IMA_STATUS IMA_LuReportLuns(
 		return (IMA_ERROR_UNEXPECTED_OS_ERROR);
 	}
 
+	if (uscsi.iu_ucmd.uscsi_status == STATUS_CHECK) {
+		if (pSenseBufferLength != NULL) {
+			*pSenseBufferLength -= uscsi.iu_ucmd.uscsi_rqresid;
+		}
+		return (IMA_ERROR_SCSI_STATUS_CHECK_CONDITION);
+	}
+
+	*pOutputBufferLength = buflen - uscsi.iu_ucmd.uscsi_resid;
 	return (IMA_STATUS_SUCCESS);
 }
 
