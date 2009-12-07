@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-
 #include <stdlib.h>
 #include <syslog.h>
 #include <errno.h>
@@ -40,7 +39,6 @@
 #include <synch.h>
 
 #include <rpcsvc/nis.h>
-#include <rpcsvc/nispasswd.h>
 #include <rpcsvc/yppasswd.h>
 #include <rpcsvc/ypclnt.h>
 #include <rpc/key_prot.h>
@@ -407,7 +405,7 @@ remove_key(pam_handle_t *pamh, int flags, int debug)
 	uid_t uid;
 	gid_t gid;
 	argres_t argres;
-	thread_t tid;
+	pthread_t tid;
 
 	(void) pam_get_item(pamh, PAM_USER, (void **)&uname);
 	if (uname == NULL || *uname == NULL) {
