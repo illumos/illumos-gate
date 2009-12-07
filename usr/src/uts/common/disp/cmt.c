@@ -339,6 +339,7 @@ cmt_hier_promote(pg_cmt_t *pg, cpu_pg_t *pgdata)
 	pg_cpu_itr_t	cpu_iter;
 	int		r;
 	int		err;
+	int		nchildren;
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 
@@ -387,7 +388,8 @@ cmt_hier_promote(pg_cmt_t *pg, cpu_pg_t *pgdata)
 	 * We assume (and therefore assert) that the PG being promoted is an
 	 * only child of it's parent. Update the parent's children set
 	 * replacing PG's entry with the parent (since the parent is becoming
-	 * the child). Then have PG and the parent swap children sets.
+	 * the child). Then have PG and the parent swap children sets and
+	 * children counts.
 	 */
 	ASSERT(GROUP_SIZE(parent->cmt_children) <= 1);
 	if (group_remove(parent->cmt_children, pg, GRP_NORESIZE) != -1) {
@@ -398,6 +400,10 @@ cmt_hier_promote(pg_cmt_t *pg, cpu_pg_t *pgdata)
 	children = pg->cmt_children;
 	pg->cmt_children = parent->cmt_children;
 	parent->cmt_children = children;
+
+	nchildren = pg->cmt_nchildren;
+	pg->cmt_nchildren = parent->cmt_nchildren;
+	parent->cmt_nchildren = nchildren;
 
 	/*
 	 * Update the sibling references for PG and it's parent
@@ -411,6 +417,7 @@ cmt_hier_promote(pg_cmt_t *pg, cpu_pg_t *pgdata)
 	PG_CPU_ITR_INIT(pg, cpu_iter);
 	while ((cpu = pg_cpu_next(&cpu_iter)) != NULL) {
 		int		idx;
+		int		sz;
 		pg_cmt_t	*cpu_pg;
 		cpu_pg_t	*pgd;	/* CPU's PG data */
 
@@ -447,8 +454,8 @@ cmt_hier_promote(pg_cmt_t *pg, cpu_pg_t *pgdata)
 			continue;
 		}
 
-		ASSERT(GROUP_ACCESS(&pgd->cmt_pgs, idx - 1) == parent);
 		ASSERT(idx > 0);
+		ASSERT(GROUP_ACCESS(&pgd->cmt_pgs, idx - 1) == parent);
 
 		/*
 		 * Have the child and the parent swap places in the CPU's
@@ -460,6 +467,14 @@ cmt_hier_promote(pg_cmt_t *pg, cpu_pg_t *pgdata)
 		ASSERT(err == 0);
 		err = group_add_at(&pgd->cmt_pgs, pg, idx - 1);
 		ASSERT(err == 0);
+
+		/*
+		 * Ensure cmt_lineage references CPU's leaf PG.
+		 * Since cmt_pgs is top-down ordered, the bottom is the last
+		 * element.
+		 */
+		if ((sz = GROUP_SIZE(&pgd->cmt_pgs)) > 0)
+			pgd->cmt_lineage = GROUP_ACCESS(&pgd->cmt_pgs, sz - 1);
 	}
 
 	/*
@@ -1665,9 +1680,9 @@ pg_cmt_disable(void)
  * would result in a violation of this invariant. If a violation is found,
  * and the PG is of a grouping type who's definition is known to originate from
  * suspect sources (BIOS), then pg_cmt_prune() will be invoked to prune the
- * PG (and all other instances PG's sharing relationship type) from the
+ * PG (and all other instances PG's sharing relationship type) from the CMT
  * hierarchy. Further, future instances of that sharing relationship type won't
- * be instantiated. If the grouping definition doesn't originate from suspect
+ * be added. If the grouping definition doesn't originate from suspect
  * sources, then pg_cmt_disable() will be invoked to log an error, and disable
  * CMT scheduling altogether.
  *
@@ -1694,7 +1709,6 @@ pg_cmt_disable(void)
  * Otherwise, this routine will return a value indicating which error it
  * was unable to recover from (and set cmt_lineage_status along the way).
  *
- *
  * This routine operates on the CPU specific processor group data (for the CPU
  * whose lineage is being validated), which is under-construction.
  * "pgdata" is a reference to the CPU's under-construction PG data.
@@ -1704,7 +1718,7 @@ static cmt_lineage_validation_t
 pg_cmt_lineage_validate(pg_cmt_t **lineage, int *sz, cpu_pg_t *pgdata)
 {
 	int		i, j, size;
-	pg_cmt_t	*pg, *pg_next, *pg_bad, *pg_tmp;
+	pg_cmt_t	*pg, *pg_next, *pg_bad, *pg_tmp, *parent;
 	cpu_t		*cp;
 	pg_cpu_itr_t	cpu_iter;
 	lgrp_handle_t	lgrp;
@@ -1731,45 +1745,61 @@ revalidate:
 		    (PG_NUM_CPUS((pg_t *)pg) <= PG_NUM_CPUS((pg_t *)pg_next)));
 
 		/*
-		 * Check to make sure that the existing parent of PG (if any)
-		 * is either in the PG's lineage, or the PG has more CPUs than
-		 * its existing parent and can and should be promoted above its
-		 * parent.
+		 * The CPUs PG lineage was passed as the first argument to
+		 * this routine and contains the sorted list of the CPU's
+		 * PGs. Ultimately, the ordering of the PGs in that list, and
+		 * the ordering as traversed by the cmt_parent list must be
+		 * the same. PG promotion will be used as the mechanism to
+		 * achieve this, but first we need to look for cases where
+		 * promotion will be necessary, and validate that will be
+		 * possible without violating the subset invarient described
+		 * above.
 		 *
 		 * Since the PG topology is in the middle of being changed, we
 		 * need to check whether the PG's existing parent (if any) is
-		 * part of its lineage (and therefore should contain the new
-		 * CPU). If not, it means that the addition of the new CPU
-		 * should have made this PG have more CPUs than its parent, and
-		 * this PG should be promoted to be above its existing parent
-		 * now. We need to verify all of this to defend against a buggy
+		 * part of this CPU's lineage (and therefore should contain
+		 * the new CPU). If not, it means that the addition of the
+		 * new CPU should have made this PG have more CPUs than its
+		 * parent (and other ancestors not in the same lineage) and
+		 * will need to be promoted into place.
+		 *
+		 * We need to verify all of this to defend against a buggy
 		 * BIOS giving bad power domain CPU groupings. Sigh.
 		 */
-		if (pg->cmt_parent) {
+		parent = pg->cmt_parent;
+		while (parent != NULL) {
 			/*
-			 * Determine if cmt_parent is in this lineage
+			 * Determine if the parent/ancestor is in this lineage
 			 */
-			for (j = 0; j < size; j++) {
+			pg_tmp = NULL;
+			for (j = 0; (j < size) && (pg_tmp != parent); j++) {
 				pg_tmp = lineage[j];
-				if (pg_tmp == pg->cmt_parent)
-					break;
 			}
-			if (pg_tmp != pg->cmt_parent) {
+			if (pg_tmp == parent) {
 				/*
-				 * cmt_parent is not in the lineage, verify
-				 * it is a proper subset of PG.
+				 * It's in the lineage. The concentricity
+				 * checks will handle the rest.
 				 */
-				if (PG_NUM_CPUS((pg_t *)pg->cmt_parent) >=
-				    PG_NUM_CPUS((pg_t *)pg)) {
-					/*
-					 * Not a proper subset if pg has less
-					 * CPUs than cmt_parent...
-					 */
-					cmt_lineage_status =
-					    CMT_LINEAGE_NON_PROMOTABLE;
-					goto handle_error;
-				}
+				break;
 			}
+			/*
+			 * If it is not in the lineage, PG will eventually
+			 * need to be promoted above it. Verify the ancestor
+			 * is a proper subset. There is still an error if
+			 * the ancestor has the same number of CPUs as PG,
+			 * since that would imply it should be in the lineage,
+			 * and we already know it isn't.
+			 */
+			if (PG_NUM_CPUS((pg_t *)parent) >=
+			    PG_NUM_CPUS((pg_t *)pg)) {
+				/*
+				 * Not a proper subset if the parent/ancestor
+				 * has the same or more CPUs than PG.
+				 */
+				cmt_lineage_status = CMT_LINEAGE_NON_PROMOTABLE;
+				goto handle_error;
+			}
+			parent = parent->cmt_parent;
 		}
 
 		/*
