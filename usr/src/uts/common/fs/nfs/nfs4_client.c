@@ -1126,10 +1126,9 @@ nfs4_async_manager(vfs_t *vfsp)
 	 * part of the zone/mount going away.
 	 *
 	 * We want to be able to create at least one thread to handle
-	 * asyncrhonous inactive calls.
+	 * asynchronous inactive calls.
 	 */
 	max_threads = MAX(mi->mi_max_threads, 1);
-	mutex_enter(&mi->mi_lock);
 	/*
 	 * We don't want to wait for mi_max_threads to go to zero, since that
 	 * happens as part of a failed unmount, but this thread should only
@@ -1146,12 +1145,7 @@ nfs4_async_manager(vfs_t *vfsp)
 	 * doesn't violate the protocol, as all threads will exit as soon as
 	 * they're done processing the remaining requests.
 	 */
-	while (!(mi->mi_flags & MI4_ASYNC_MGR_STOP) ||
-	    mi->mi_async_req_count > 0) {
-		mutex_exit(&mi->mi_lock);
-		CALLB_CPR_SAFE_BEGIN(&cprinfo);
-		cv_wait(&mi->mi_async_reqs_cv, &mi->mi_async_lock);
-		CALLB_CPR_SAFE_END(&cprinfo, &mi->mi_async_lock);
+	for (;;) {
 		while (mi->mi_async_req_count > 0) {
 			/*
 			 * Paranoia: If the mount started out having
@@ -1185,9 +1179,18 @@ nfs4_async_manager(vfs_t *vfsp)
 			ASSERT(mi->mi_async_req_count != 0);
 			mi->mi_async_req_count--;
 		}
+
 		mutex_enter(&mi->mi_lock);
+		if (mi->mi_flags & MI4_ASYNC_MGR_STOP) {
+			mutex_exit(&mi->mi_lock);
+			break;
+		}
+		mutex_exit(&mi->mi_lock);
+
+		CALLB_CPR_SAFE_BEGIN(&cprinfo);
+		cv_wait(&mi->mi_async_reqs_cv, &mi->mi_async_lock);
+		CALLB_CPR_SAFE_END(&cprinfo, &mi->mi_async_lock);
 	}
-	mutex_exit(&mi->mi_lock);
 
 	NFS4_DEBUG(nfs4_client_zone_debug, (CE_NOTE,
 	    "nfs4_async_manager exiting for vfs %p\n", (void *)mi->mi_vfsp));
