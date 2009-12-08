@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
-	Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+	Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 	Use is subject to license terms.
 
  CDDL HEADER START
@@ -22,8 +22,6 @@
  information: Portions Copyright [yyyy] [name of copyright owner]
 
  CDDL HEADER END
-
-	ident	"%Z%%M%	%I%	%E% SMI"
 
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
@@ -85,7 +83,7 @@
 	<exec_method
 		type='method'
 		name='refresh'
-		exec='/usr/sbin/ipsecconf -q -a %{config/config_file}'
+		exec='/usr/sbin/ipsecconf -q -F -a %{config/config_file}'
 		timeout_seconds='60'
 	/>
 

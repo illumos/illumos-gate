@@ -102,7 +102,7 @@ static char spdsock_diag_buf[SPDSOCK_DIAG_BUF_LEN];
  */
 
 enum ipsec_cmds {IPSEC_CONF_ADD = 1, IPSEC_CONF_DEL, IPSEC_CONF_VIEW,
-    IPSEC_CONF_FLUSH, IPSEC_CONF_LIST, IPSEC_CONF_SUB};
+    IPSEC_CONF_FLUSH, IPSEC_CONF_LIST, IPSEC_CONF_SUB, IPSEC_CONF_REPLACE};
 
 static const char policy_conf_file[] = "/var/run/ipsecpolicy.conf";
 static const char lock_file[] = "/var/run/ipsecconf.lock";
@@ -325,7 +325,7 @@ static int	parse_index(const char *, char *);
 static int	attach_tunname(spd_if_t *);
 static void	usage(void);
 static int	ipsec_conf_del(int, boolean_t);
-static int	ipsec_conf_add(boolean_t, boolean_t);
+static int	ipsec_conf_add(boolean_t, boolean_t, boolean_t);
 static int	ipsec_conf_sub(void);
 static int	ipsec_conf_flush(int);
 static int	ipsec_conf_view(void);
@@ -1326,6 +1326,7 @@ main(int argc, char *argv[])
 	int index;
 	boolean_t smf_managed;
 	boolean_t just_check = B_FALSE;
+	boolean_t replace_policy = B_FALSE;
 
 	char *smf_warning = gettext(
 	    "\n\tIPsec policy should be managed using smf(5). Modifying\n"
@@ -1334,6 +1335,7 @@ main(int argc, char *argv[])
 	    "\tsecurity policy.\n\n");
 
 	flushret = 0;
+	cmd = 0;
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)
@@ -1369,7 +1371,15 @@ main(int argc, char *argv[])
 			interface_name = &all_polheads;
 			/* FALLTHRU */
 		case 'f':
-			/* Only one command at a time */
+			/*
+			 * The policy flush command can be specified with -a
+			 * to perform an atomic policy replace. It can't be
+			 * specified with any other flags.
+			 */
+			if (cmd == IPSEC_CONF_ADD) {
+				cmd = IPSEC_CONF_REPLACE;
+				break;
+			}
 			if (cmd != 0) {
 				USAGE();
 				EXIT_FATAL("Multiple commands specified");
@@ -1397,6 +1407,11 @@ main(int argc, char *argv[])
 			ipsecconf_qflag++;
 			/* FALLTHRU */
 		case 'a':
+			if (cmd == IPSEC_CONF_FLUSH) {
+				cmd = IPSEC_CONF_REPLACE;
+				filename = optarg;
+				break;
+			}
 			/* Only one command at a time, and no interface name */
 			if (cmd != 0 || interface_name != NULL) {
 				USAGE();
@@ -1502,6 +1517,9 @@ done:
 		(void) restore_all_signals();
 		flushret = ipsec_conf_flush(SPD_STANDBY);
 		break;
+	case IPSEC_CONF_REPLACE:
+		replace_policy = B_TRUE;
+		/* FALLTHRU */
 	case IPSEC_CONF_ADD:
 		/*
 		 * The IPsec kernel modules should only be loaded
@@ -1514,7 +1532,7 @@ done:
 		}
 		if (!smf_managed && !ipsecconf_qflag)
 			(void) fprintf(stdout, "%s", smf_warning);
-		ret = ipsec_conf_add(just_check, smf_managed);
+		ret = ipsec_conf_add(just_check, smf_managed, replace_policy);
 		(void) restore_all_signals();
 		break;
 	case IPSEC_CONF_SUB:
@@ -5177,7 +5195,7 @@ dump_conf(ips_conf_t *conf)
 
 
 static int
-ipsec_conf_add(boolean_t just_check, boolean_t smf_managed)
+ipsec_conf_add(boolean_t just_check, boolean_t smf_managed, boolean_t replace)
 {
 	act_prop_t *act_props = malloc(sizeof (act_prop_t));
 	ips_conf_t conf;
@@ -5285,6 +5303,23 @@ ipsec_conf_add(boolean_t just_check, boolean_t smf_managed)
 			first_time = B_FALSE;
 			fetch_algorithms();
 			ipsec_conf_admin(SPD_CLONE);
+
+			/*
+			 * The default behaviour for IPSEC_CONF_ADD is to append
+			 * the new rules to the existing policy. If a new rule
+			 * collides with an existing rule, the new rule won't be
+			 * added.
+			 *
+			 * To perform an atomic policy replace, we really don't
+			 * care what the existing policy was, just replace it
+			 * with the new one. Remove all rules from the SPD_CLONE
+			 * policy before checking the new rules.
+			 */
+			if (replace) {
+				flushret = ipsec_conf_flush(SPD_STANDBY);
+				if (flushret != 0)
+					return (flushret);
+			}
 		}
 
 		/*
