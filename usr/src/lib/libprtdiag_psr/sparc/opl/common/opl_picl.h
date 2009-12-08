@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Opl Platform header file.
@@ -30,8 +30,6 @@
 
 #ifndef	_OPL_PICL_H
 #define	_OPL_PICL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -80,6 +78,7 @@ extern "C" {
 #define	PCI_LINK_MASK		0x1f		/* Link Mask */
 
 #define	PCI_LINK_SHIFT		4		/* Link shift Bits */
+#define	PCI_FREQ_33		33		/* legacy PCI default freq */
 #define	PCI_FREQ_66		66		/* PCI default freq */
 #define	PCI_FREQ_100		100
 

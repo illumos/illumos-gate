@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Opl platform specific PICL functions.
@@ -27,8 +27,6 @@
  * 	called when :
  *	machine_type == MTYPE_OPL
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -71,7 +69,7 @@ static picl_errno_t opl_pci_callback(picl_nodehdl_t pcih, void *args);
 static int opl_get_first_compatible_value(picl_nodehdl_t nodeh,
     char **outbuf);
 static int picldiag_get_clock_freq(picl_nodehdl_t modh,
-    uint32_t *freq);
+    uint32_t *freq, uint32_t *freq_max);
 static uint64_t picldiag_get_uint_propval(picl_nodehdl_t modh,
     char *prop_name, int *ret);
 static uint32_t	read_long(int fd, int bus, int dev, int func,
@@ -80,7 +78,6 @@ static uint8_t read_byte(int fd, int bus, int dev, int func, int offset,
     int *ret);
 static uint16_t read_word(int fd, int bus, int dev, int func, int offset,
     int *ret);
-
 
 /*
  * Collect I/O nodes information.
@@ -338,7 +335,8 @@ opl_pci_callback(picl_nodehdl_t pcih, void *args)
 		} else if (bus_type == PCIX) {
 			PRINT_FREQ_FMT(freq_at, freq_max);
 		} else if (bus_type == PCI) {
-			err = picldiag_get_clock_freq(nodeh, &freq_at);
+			err = picldiag_get_clock_freq(nodeh, &freq_at,
+			    &freq_max);
 			PRINT_FREQ_FMT(freq_at, freq_max);
 		} else
 			log_printf(" -- , --   ");
@@ -786,15 +784,32 @@ get_lane_width
 	return (PICL_SUCCESS);
 }
 
+static int
+is_66mhz_capable(picl_nodehdl_t nodeh)
+{
+	picl_errno_t	err;
+	picl_prophdl_t	proph;
+	picl_propinfo_t	pinfo;
+
+	err = picl_get_propinfo_by_name(nodeh, OBP_PROP_66MHZ_CAPABLE,
+	    &pinfo, &proph);
+	if (err == PICL_SUCCESS)
+		return (1);
+	return (0);
+}
+
 /*
  * get the clock frequency
  */
 static int
-picldiag_get_clock_freq(picl_nodehdl_t modh, uint32_t *freq)
+picldiag_get_clock_freq(picl_nodehdl_t modh, uint32_t *freq, uint32_t *freq_max)
 {
 	int		err;
 	uint64_t	clk_freq;
 
+	*freq_max = PCI_FREQ_33;
+	if (is_66mhz_capable(modh))
+		*freq_max = PCI_FREQ_66;
 	clk_freq = picldiag_get_uint_propval(modh, OBP_PROP_CLOCK_FREQ, &err);
 	if (err != PICL_SUCCESS)
 		return (err);
