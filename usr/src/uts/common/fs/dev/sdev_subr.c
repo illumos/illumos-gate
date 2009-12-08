@@ -251,21 +251,43 @@ sdev_set_nodestate(struct sdev_node *dv, sdev_node_state_t state)
 }
 
 static void
-sdev_attrinit(struct sdev_node *dv, vattr_t *vap)
+sdev_attr_update(struct sdev_node *dv, vattr_t *vap)
 {
-	timestruc_t now;
+	timestruc_t	now;
+	struct vattr	*attrp;
+	uint_t		mask;
 
+	ASSERT(dv->sdev_attr);
 	ASSERT(vap);
 
-	dv->sdev_attr = kmem_zalloc(sizeof (struct vattr), KM_SLEEP);
-	*dv->sdev_attr = *vap;
-
-	dv->sdev_attr->va_mode = MAKEIMODE(vap->va_type, vap->va_mode);
+	attrp = dv->sdev_attr;
+	mask = vap->va_mask;
+	if (mask & AT_TYPE)
+		attrp->va_type = vap->va_type;
+	if (mask & AT_MODE)
+		attrp->va_mode = vap->va_mode;
+	if (mask & AT_UID)
+		attrp->va_uid = vap->va_uid;
+	if (mask & AT_GID)
+		attrp->va_gid = vap->va_gid;
+	if (mask & AT_RDEV)
+		attrp->va_rdev = vap->va_rdev;
 
 	gethrestime(&now);
-	dv->sdev_attr->va_atime = now;
-	dv->sdev_attr->va_mtime = now;
-	dv->sdev_attr->va_ctime = now;
+	attrp->va_atime = (mask & AT_ATIME) ? vap->va_atime : now;
+	attrp->va_mtime = (mask & AT_MTIME) ? vap->va_mtime : now;
+	attrp->va_ctime = (mask & AT_CTIME) ? vap->va_ctime : now;
+}
+
+static void
+sdev_attr_alloc(struct sdev_node *dv, vattr_t *vap)
+{
+	ASSERT(dv->sdev_attr == NULL);
+	ASSERT(vap->va_mask & AT_TYPE);
+	ASSERT(vap->va_mask & AT_MODE);
+
+	dv->sdev_attr = kmem_zalloc(sizeof (struct vattr), KM_SLEEP);
+	sdev_attr_update(dv, vap);
 }
 
 /* alloc and initialize a sdev_node */
@@ -313,7 +335,7 @@ sdev_nodeinit(struct sdev_node *ddv, char *nm, struct sdev_node **newdv,
 	dv->sdev_dotdot = NULL;
 	dv->sdev_attrvp = NULL;
 	if (vap) {
-		sdev_attrinit(dv, vap);
+		sdev_attr_alloc(dv, vap);
 	} else {
 		dv->sdev_attr = NULL;
 	}
@@ -397,10 +419,11 @@ sdev_nodeready(struct sdev_node *dv, struct vattr *vap, struct vnode *avp,
 	if (avp) {
 		dv->sdev_attrvp = avp;
 	} else {
-		if (dv->sdev_attr == NULL)
-			sdev_attrinit(dv, vap);
-		else
-			*dv->sdev_attr = *vap;
+		if (dv->sdev_attr == NULL) {
+			sdev_attr_alloc(dv, vap);
+		} else {
+			sdev_attr_update(dv, vap);
+		}
 
 		if ((dv->sdev_attrvp == NULL) && SDEV_IS_PERSIST(dv))
 			error = sdev_shadow_node(dv, cred);
@@ -1095,7 +1118,7 @@ sdev_rnmnode(struct sdev_node *oddv, struct sdev_node *odv,
 	struct sdev_node *ndv = NULL;
 	timestruc_t now;
 
-	vattr.va_mask = AT_MODE|AT_UID|AT_GID;
+	vattr.va_mask = AT_TYPE|AT_MODE|AT_UID|AT_GID;
 	error = VOP_GETATTR(ovp, &vattr, 0, cred, NULL);
 	if (error)
 		return (error);
@@ -1445,7 +1468,7 @@ sdev_filldir_from_store(struct sdev_node *ddv, int dlen, struct cred *cred)
 			if (error)
 				continue;
 
-			vattr.va_mask = AT_MODE|AT_UID|AT_GID;
+			vattr.va_mask = AT_TYPE|AT_MODE|AT_UID|AT_GID;
 			error = VOP_GETATTR(vp, &vattr, 0, cred, NULL);
 			if (error)
 				continue;
@@ -1493,14 +1516,15 @@ sdev_filldir_dynamic(struct sdev_node *ddv)
 {
 	int error;
 	int i;
-	struct vattr *vap;
+	struct vattr vattr;
+	struct vattr *vap = &vattr;
 	char *nm = NULL;
 	struct sdev_node *dv = NULL;
 
 	ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
 	ASSERT((ddv->sdev_flags & SDEV_BUILD));
 
-	vap = sdev_getdefault_attr(VDIR);
+	*vap = *sdev_getdefault_attr(VDIR);	/* note structure copy here */
 	gethrestime(&vap->va_atime);
 	vap->va_mtime = vap->va_atime;
 	vap->va_ctime = vap->va_atime;
@@ -1731,7 +1755,7 @@ sdev_call_dircallback(struct sdev_node *ddv, struct sdev_node **dvp, char *nm,
 	int rv = 0;
 	char *physpath = NULL;
 	struct vattr vattr;
-	struct vattr *vap;
+	struct vattr *vap = &vattr;
 	struct sdev_node *dv = NULL;
 
 	ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
@@ -1744,7 +1768,7 @@ sdev_call_dircallback(struct sdev_node *ddv, struct sdev_node **dvp, char *nm,
 			return (-1);
 		}
 
-		vap = sdev_getdefault_attr(VLNK);
+		*vap = *sdev_getdefault_attr(VLNK);	/* structure copy */
 		vap->va_size = strlen(physpath);
 		gethrestime(&vap->va_atime);
 		vap->va_mtime = vap->va_atime;
@@ -1953,7 +1977,7 @@ tryagain:
 
 		if (!error) {
 
-			vattr.va_mask = AT_MODE|AT_UID|AT_GID;
+			vattr.va_mask = AT_TYPE|AT_MODE|AT_UID|AT_GID;
 			error = VOP_GETATTR(rvp, &vattr, 0, cred, NULL);
 			if (error) {
 				rw_exit(&ddv->sdev_contents);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -214,7 +214,8 @@ devvt_create_snode(struct sdev_node *ddv, char *nm, struct cred *cred, int type)
 {
 	int error;
 	struct sdev_node *sdv = NULL;
-	struct vattr *vap = NULL;
+	struct vattr vattr;
+	struct vattr *vap = &vattr;
 	major_t maj;
 	minor_t min;
 
@@ -235,7 +236,7 @@ devvt_create_snode(struct sdev_node *ddv, char *nm, struct cred *cred, int type)
 	mutex_exit(&sdv->sdev_lookup_lock);
 
 	if (type & SDEV_VATTR) {
-		vap = &devvt_vattr;
+		*vap = devvt_vattr;
 		vap->va_rdev = makedevice(maj, min);
 		error = sdev_mknode(ddv, nm, &sdv, vap, NULL,
 		    NULL, cred, SDEV_READY);
@@ -243,7 +244,7 @@ devvt_create_snode(struct sdev_node *ddv, char *nm, struct cred *cred, int type)
 		char *link = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
 
 		(void) vt_getactive(link, MAXPATHLEN);
-		vap = &sdev_vattr_lnk;
+		*vap = sdev_vattr_lnk;
 		vap->va_size = strlen(link);
 		error = sdev_mknode(ddv, nm, &sdv, vap, NULL,
 		    (void *)link, cred, SDEV_READY);
