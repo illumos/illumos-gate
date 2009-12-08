@@ -3064,7 +3064,7 @@ scsa2usb_check_bulkonly_blacklist_attrs(scsa2usb_state_t *scsa2usbp,
 
 		return (SCSA2USB_JUST_ACCEPT);
 
-	case SCMD_START_STOP:
+	case SCMD_START_STOP:	/* SCMD_LOAD for sequential devices */
 		/*
 		 * these devices don't have mechanics that spin the
 		 * media up and down. So, it doesn't make much sense
@@ -3076,6 +3076,13 @@ scsa2usb_check_bulkonly_blacklist_attrs(scsa2usb_state_t *scsa2usbp,
 		if (!(scsa2usbp->scsa2usb_attrs & SCSA2USB_ATTRS_START_STOP)) {
 
 			return (SCSA2USB_JUST_ACCEPT);
+
+		} else if (inq->inq_dtype == DTYPE_SEQUENTIAL) {
+			/*
+			 * In case of USB tape device, we need to send the
+			 * command to the device to unload the media.
+			 */
+			break;
 
 		} else if (cmd->cmd_pkt->pkt_cdbp[4] & LOEJECT) {
 			/*
