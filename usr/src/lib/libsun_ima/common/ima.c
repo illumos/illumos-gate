@@ -3309,9 +3309,9 @@ IMA_API IMA_STATUS SUN_IMA_GetTunableProperties(
 			return (IMA_STATUS_SUCCESS);
 		}
 		value = (long long)pg.t_value.v_integer;
-		ptr = lltostr(value, tmp);
+		ptr = lltostr(value, &tmp[MAX_LONG_LONG_STRING_LEN -1]);
 		if ((ptr != NULL) && (ptr != tmp)) {
-			*(tmp + 1) = '\0';
+			tmp[MAX_LONG_LONG_STRING_LEN - 1] = '\0';
 		} else {
 			(void) close(fd);
 			return (IMA_ERROR_UNEXPECTED_OS_ERROR);
@@ -3319,15 +3319,15 @@ IMA_API IMA_STATUS SUN_IMA_GetTunableProperties(
 		switch (param->tunable_objectType) {
 			case ISCSI_RX_TIMEOUT_VALUE:
 				(void) strlcpy(param->tunable_objectValue,
-				    ptr, strlen(ptr));
+				    ptr, strlen(ptr) + 1);
 				break;
 			case ISCSI_CONN_DEFAULT_LOGIN_MAX:
 				(void) strlcpy(param->tunable_objectValue,
-				    ptr, strlen(ptr));
+				    ptr, strlen(ptr) + 1);
 				break;
 			case ISCSI_LOGIN_POLLING_DELAY:
 				(void) strlcpy(param->tunable_objectValue,
-				    ptr, strlen(ptr));
+				    ptr, strlen(ptr) + 1);
 				break;
 			default:
 				break;
