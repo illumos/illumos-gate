@@ -1801,7 +1801,11 @@ acpica_get_handle(dev_info_t *dip, ACPI_HANDLE *rh)
 	ACPI_STATUS status;
 	char *acpiname;
 
-	ASSERT(d2a_done != 0);
+#ifdef	DEBUG
+	if (d2a_done == 0)
+		cmn_err(CE_WARN, "!acpica_get_handle:"
+		    " no ACPI mapping for %s", ddi_node_name(dip));
+#endif
 
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "acpi-namespace", &acpiname) != DDI_PROP_SUCCESS) {
