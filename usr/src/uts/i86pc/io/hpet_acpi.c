@@ -1077,7 +1077,7 @@ hpet_expire_all(void)
 {
 	processorid_t	id;
 
-	for (id = 0; id < ncpus; ++id) {
+	for (id = 0; id < max_ncpus; ++id) {
 		if (hpet_proxy_users[id] != HPET_INFINITY) {
 			hpet_proxy_users[id] = HPET_INFINITY;
 			if (id != CPU->cpu_id)
@@ -1118,7 +1118,7 @@ hpet_guaranteed_schedule(hrtime_t required_wakeup_time)
 		now = gethrtime();
 		next_proxy_time = HPET_INFINITY;
 		next_proxy_id = CPU->cpu_id;
-		for (id = 0; id < ncpus; ++id) {
+		for (id = 0; id < max_ncpus; ++id) {
 			if (hpet_proxy_users[id] < now) {
 				hpet_proxy_users[id] = HPET_INFINITY;
 				if (id != CPU->cpu_id)
@@ -1308,7 +1308,7 @@ hpet_use_hpet_timer(hrtime_t *lapic_expire)
 	 * expire time before us.  The next HPET interrupt has been programmed
 	 * to fire before our expire time.
 	 */
-	for (id = 0; id < ncpus; ++id) {
+	for (id = 0; id < max_ncpus; ++id) {
 		if ((hpet_proxy_users[id] <= expire) && (id != cpu_id)) {
 			mutex_exit(&hpet_proxy_lock);
 			return (B_TRUE);
@@ -1370,15 +1370,14 @@ hpet_init_proxy_data(void)
 	processorid_t	id;
 
 	/*
-	 * Use apic_nproc because we are in boot before max_ncpus has been
-	 * initialized.
+	 * Use max_ncpus for hot plug compliance.
 	 */
-	hpet_proxy_users = kmem_zalloc(apic_nproc * sizeof (*hpet_proxy_users),
+	hpet_proxy_users = kmem_zalloc(max_ncpus * sizeof (*hpet_proxy_users),
 	    KM_SLEEP);
 
 	/*
 	 * Unused entries always contain HPET_INFINITY.
 	 */
-	for (id = 0; id < apic_nproc; ++id)
+	for (id = 0; id < max_ncpus; ++id)
 		hpet_proxy_users[id] = HPET_INFINITY;
 }
