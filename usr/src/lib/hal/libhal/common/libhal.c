@@ -3223,8 +3223,8 @@ libhal_ctx_shutdown (LibHalContext *ctx, DBusError *error)
 				       "interface='org.freedesktop.Hal.Manager',"
 				       "sender='org.freedesktop.Hal',"
 				       "path='/org/freedesktop/Hal/Manager'", &myerror);
-		if (dbus_error_is_set (&myerror)) {
-			dbus_move_error (&myerror, error);
+		dbus_move_error(&myerror, error);
+		if (error != NULL && dbus_error_is_set(error)) {
 			fprintf (stderr, "%s %d : Error unsubscribing to signals, error=%s\n", 
 				 __FILE__, __LINE__, error->message);
 			/** @todo  clean up */
