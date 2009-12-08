@@ -293,6 +293,8 @@ show_files(struct ps_prochandle *Pr)
 			(void) printf(" rdev:0x%.8lX\n", (long)rdev);
 
 		if (!nflag) {
+			off_t offset;
+
 			dofcntl(Pr, fd,
 			    (statb.st_mode & (S_IFMT|S_ENFMT|S_IXGRP))
 			    == (S_IFREG|S_ENFMT),
@@ -329,6 +331,12 @@ show_files(struct ps_prochandle *Pr)
 				}
 			}
 			(void) printf("      %s\n", fname);
+
+			offset = pr_lseek(Pr, fd, 0, SEEK_CUR);
+			if (offset != -1) {
+				(void) printf("      offset:%ld\n", offset);
+			}
+
 		}
 	}
 	(void) closedir(dirp);
