@@ -3772,8 +3772,8 @@ remove_mlps(zlog_t *zlogp, zoneid_t zoneid)
 }
 
 int
-prtmount(const char *fs, void *x) {
-	zerror((zlog_t *)x, B_FALSE, "  %s", fs);
+prtmount(const struct mnttab *fs, void *x) {
+	zerror((zlog_t *)x, B_FALSE, "  %s", fs->mnt_mountp);
 	return (0);
 }
 

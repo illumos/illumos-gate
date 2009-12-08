@@ -3488,9 +3488,9 @@ copy_zone(char *src, char *dst)
 }
 
 /* ARGSUSED */
-static int
-zfm_print(const char *p, void *r) {
-	zerror("  %s\n", p);
+int
+zfm_print(const struct mnttab *p, void *r) {
+	zerror("  %s\n", p->mnt_mountp);
 	return (0);
 }
 
@@ -3951,12 +3951,14 @@ move_func(int argc, char *argv[])
 	zone_dochandle_t handle;
 	boolean_t fast;
 	boolean_t is_zfs = B_FALSE;
+	boolean_t root_fs_mounted = B_FALSE;
 	struct dirent *dp;
 	DIR *dirp;
 	boolean_t empty = B_TRUE;
 	boolean_t revert;
 	struct stat zonepath_buf;
 	struct stat new_zonepath_buf;
+	zone_mounts_t mounts;
 
 	if (zonecfg_in_alt_root()) {
 		zerror(gettext("cannot move zone in alternate root"));
@@ -4033,13 +4035,20 @@ move_func(int argc, char *argv[])
 		return (Z_ERR);
 	}
 
-	/* Don't move the zone if anything is still mounted there */
-	if (zonecfg_find_mounts(zonepath, NULL, NULL)) {
-		zerror(gettext("These file systems are mounted on "
-		    "subdirectories of %s.\n"), zonepath);
-		(void) zonecfg_find_mounts(zonepath, zfm_print, NULL);
+	/*
+	 * Collect information about mounts within the zone's zonepath.
+	 * Overlay mounts on the zone's root directory are erroneous.
+	 * Bail if we encounter any unexpected mounts.
+	 */
+	if (zone_mounts_init(&mounts, zonepath) != 0)
 		return (Z_ERR);
+	if (mounts.num_root_overlay_mounts != 0) {
+		zerror(gettext("%d overlay mount(s) detected on %s/root."),
+		    mounts.num_root_overlay_mounts, zonepath);
+		goto err_and_mounts_destroy;
 	}
+	if (mounts.num_unexpected_mounts != 0)
+		goto err_and_mounts_destroy;
 
 	/*
 	 * Check if we are moving in the same file system and can do a fast
@@ -4049,22 +4058,27 @@ move_func(int argc, char *argv[])
 
 	if ((handle = zonecfg_init_handle()) == NULL) {
 		zperror(cmd_to_str(CMD_MOVE), B_TRUE);
-		return (Z_ERR);
+		goto err_and_mounts_destroy;
 	}
 
 	if ((err = zonecfg_get_handle(target_zone, handle)) != Z_OK) {
 		errno = err;
 		zperror(cmd_to_str(CMD_MOVE), B_TRUE);
-		zonecfg_fini_handle(handle);
-		return (Z_ERR);
+		goto err_and_fini_handle;
 	}
 
 	if (zonecfg_grab_lock_file(target_zone, &lockfd) != Z_OK) {
 		zerror(gettext("another %s may have an operation in progress."),
 		    "zoneadm");
-		zonecfg_fini_handle(handle);
-		return (Z_ERR);
+		goto err_and_fini_handle;
 	}
+
+	/*
+	 * Unmount the zone's root filesystem before we move the zone's
+	 * zonepath.
+	 */
+	if (zone_unmount_rootfs(&mounts, zonepath, B_FALSE) != 0)
+		goto err_and_rele_lockfile;
 
 	/*
 	 * We're making some file system changes now so we have to clean up
@@ -4088,9 +4102,8 @@ move_func(int argc, char *argv[])
 		if (rmdir(new_zonepath) != 0) {
 			zperror(gettext("could not rmdir new zone path"),
 			    B_FALSE);
-			zonecfg_fini_handle(handle);
-			zonecfg_release_lock_file(target_zone, lockfd);
-			return (Z_ERR);
+			(void) zone_mount_rootfs(&mounts, zonepath);
+			goto err_and_rele_lockfile;
 		}
 
 		if (rename(zonepath, new_zonepath) != 0) {
@@ -4100,9 +4113,8 @@ move_func(int argc, char *argv[])
 			 * so just return from this error.
 			 */
 			zperror(gettext("could not move zone"), B_FALSE);
-			zonecfg_fini_handle(handle);
-			zonecfg_release_lock_file(target_zone, lockfd);
-			return (Z_ERR);
+			(void) zone_mount_rootfs(&mounts, zonepath);
+			goto err_and_rele_lockfile;
 		}
 
 	} else {
@@ -4124,6 +4136,16 @@ move_func(int argc, char *argv[])
 		if (err != Z_OK)
 			goto done;
 	}
+
+	/*
+	 * Mount the zone's root filesystem in the new zonepath if there was
+	 * a root mount prior to the move.
+	 */
+	if (zone_mount_rootfs(&mounts, new_zonepath) != 0) {
+		err = Z_ERR;
+		goto done;
+	}
+	root_fs_mounted = B_TRUE;
 
 	if ((err = zonecfg_set_zonepath(handle, new_zonepath)) != Z_OK) {
 		errno = err;
@@ -4149,6 +4171,24 @@ done:
 	 * or we clean up the old zonepath if everything is ok.
 	 */
 	if (revert) {
+		/*
+		 * Check for the unlikely scenario in which the zone's
+		 * zonepath and its root file system moved but libzonecfg
+		 * couldn't save the new zonepath to the zone's configuration
+		 * file.  The mounted root filesystem must be unmounted before
+		 * zoneadm restores the zone's zonepath.
+		 */
+		if (root_fs_mounted && zone_unmount_rootfs(&mounts,
+		    new_zonepath, B_TRUE) != 0) {
+			/*
+			 * We can't forcibly unmount the zone's root file system
+			 * from the new zonepath.  Bail!
+			 */
+			zerror(gettext("fatal error: cannot unmount %s/root\n"),
+			    new_zonepath);
+			goto err_and_mounts_destroy;
+		}
+
 		/* The zonecfg update failed, cleanup the new zonepath. */
 		if (is_zfs) {
 			if (move_zfs(new_zonepath, zonepath) == Z_ERR) {
@@ -4158,8 +4198,9 @@ done:
 				/*
 				 * err is already != Z_OK since we're reverting
 				 */
+			} else {
+				(void) zone_mount_rootfs(&mounts, zonepath);
 			}
-
 		} else if (fast) {
 			if (rename(new_zonepath, zonepath) != 0) {
 				zperror(gettext("could not restore zonepath"),
@@ -4167,6 +4208,8 @@ done:
 				/*
 				 * err is already != Z_OK since we're reverting
 				 */
+			} else {
+				(void) zone_mount_rootfs(&mounts, zonepath);
 			}
 		} else {
 			(void) printf(gettext("Cleaning up zonepath %s..."),
@@ -4187,8 +4230,9 @@ done:
 				 */
 				err = Z_ERR;
 			}
-		}
 
+			(void) zone_mount_rootfs(&mounts, zonepath);
+		}
 	} else {
 		/* The move was successful, cleanup the old zonepath. */
 		if (!is_zfs && !fast) {
@@ -4206,7 +4250,16 @@ done:
 		}
 	}
 
+	zone_mounts_destroy(&mounts);
 	return ((err == Z_OK) ? Z_OK : Z_ERR);
+
+err_and_rele_lockfile:
+	zonecfg_release_lock_file(target_zone, lockfd);
+err_and_fini_handle:
+	zonecfg_fini_handle(handle);
+err_and_mounts_destroy:
+	zone_mounts_destroy(&mounts);
+	return (Z_ERR);
 }
 
 /* ARGSUSED */

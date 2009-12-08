@@ -49,6 +49,7 @@ extern "C" {
 #include <libbrand.h>
 #include <sys/uuid.h>
 #include <libuutil.h>
+#include <sys/mnttab.h>
 
 #define	ZONE_ID_UNDEFINED	-1
 
@@ -328,8 +329,8 @@ extern	int	zonecfg_lookup_ipd(zone_dochandle_t, struct zone_fstab *);
 extern	int	zonecfg_add_fs_option(struct zone_fstab *, char *);
 extern	int	zonecfg_remove_fs_option(struct zone_fstab *, char *);
 extern	void	zonecfg_free_fs_option_list(zone_fsopt_t *);
-extern	int 	zonecfg_find_mounts(char *, int(*)(const char *, void *),
-    void *);
+extern	int 	zonecfg_find_mounts(char *, int(*)(const struct mnttab *,
+    void *), void *);
 
 /*
  * Network interface configuration.

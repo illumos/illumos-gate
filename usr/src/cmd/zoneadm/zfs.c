@@ -44,6 +44,8 @@
 #include <libzfs.h>
 #include <sys/mntent.h>
 #include <values.h>
+#include <strings.h>
+#include <assert.h>
 
 #include "zoneadm.h"
 
@@ -1298,6 +1300,395 @@ verify_fs_zfs(struct zone_fstab *fstab)
 
 	zfs_close(zhp);
 	return (Z_OK);
+}
+
+/*
+ * Destroy the specified mnttab structure that was created by mnttab_dup().
+ * NOTE: The structure's mnt_time field isn't freed.
+ */
+static void
+mnttab_destroy(struct mnttab *tabp)
+{
+	assert(tabp != NULL);
+
+	free(tabp->mnt_mountp);
+	free(tabp->mnt_special);
+	free(tabp->mnt_fstype);
+	free(tabp->mnt_mntopts);
+	free(tabp);
+}
+
+/*
+ * Duplicate the specified mnttab structure.  The mnt_mountp and mnt_time
+ * fields aren't duplicated.  This function returns a pointer to the new mnttab
+ * structure or NULL if an error occurred.  If an error occurs, then this
+ * function sets errno to reflect the error.  mnttab structures created by
+ * this function should be destroyed via mnttab_destroy().
+ */
+static struct mnttab *
+mnttab_dup(const struct mnttab *srcp)
+{
+	struct mnttab *retval;
+
+	assert(srcp != NULL);
+
+	retval = (struct mnttab *)calloc(1, sizeof (*retval));
+	if (retval == NULL) {
+		errno = ENOMEM;
+		return (NULL);
+	}
+	if (srcp->mnt_special != NULL) {
+		retval->mnt_special = strdup(srcp->mnt_special);
+		if (retval->mnt_special == NULL)
+			goto err;
+	}
+	if (srcp->mnt_fstype != NULL) {
+		retval->mnt_fstype = strdup(srcp->mnt_fstype);
+		if (retval->mnt_fstype == NULL)
+			goto err;
+	}
+	retval->mnt_mntopts = (char *)malloc(MAX_MNTOPT_STR * sizeof (char));
+	if (retval->mnt_mntopts == NULL)
+		goto err;
+	if (srcp->mnt_mntopts != NULL) {
+		if (strlcpy(retval->mnt_mntopts, srcp->mnt_mntopts,
+		    MAX_MNTOPT_STR * sizeof (char)) >= MAX_MNTOPT_STR *
+		    sizeof (char)) {
+			mnttab_destroy(retval);
+			errno = EOVERFLOW; /* similar to mount(2) behavior */
+			return (NULL);
+		}
+	} else {
+		retval->mnt_mntopts[0] = '\0';
+	}
+	return (retval);
+
+err:
+	mnttab_destroy(retval);
+	errno = ENOMEM;
+	return (NULL);
+}
+
+/*
+ * Determine whether the specified ZFS dataset's mountpoint property is set
+ * to "legacy".  If the specified dataset does not have a legacy mountpoint,
+ * then the string pointer to which the mountpoint argument points is assigned
+ * a dynamically-allocated string containing the dataset's mountpoint
+ * property.  If the dataset's mountpoint property is "legacy" or a libzfs
+ * error occurs, then the string pointer to which the mountpoint argument
+ * points isn't modified.
+ *
+ * This function returns B_TRUE if it doesn't encounter any fatal errors.
+ * It returns B_FALSE if it encounters a fatal error and sets errno to the
+ * appropriate error code.
+ */
+static boolean_t
+get_zfs_non_legacy_mountpoint(const char *dataset_name, char **mountpoint)
+{
+	zfs_handle_t *zhp;
+	char propbuf[ZFS_MAXPROPLEN];
+
+	assert(dataset_name != NULL);
+	assert(mountpoint != NULL);
+
+	if ((zhp = zfs_open(g_zfs, dataset_name, ZFS_TYPE_DATASET)) == NULL) {
+		errno = EINVAL;
+		return (B_FALSE);
+	}
+	if (zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT, propbuf, sizeof (propbuf),
+	    NULL, NULL, 0, 0) != 0) {
+		zfs_close(zhp);
+		errno = EINVAL;
+		return (B_FALSE);
+	}
+	zfs_close(zhp);
+	if (strcmp(propbuf, "legacy") != 0) {
+		if ((*mountpoint = strdup(propbuf)) == NULL) {
+			errno = ENOMEM;
+			return (B_FALSE);
+		}
+	}
+	return (B_TRUE);
+}
+
+
+/*
+ * This zonecfg_find_mounts() callback records information about mounts of
+ * interest in a zonepath.  It also tallies the number of zone
+ * root overlay mounts and the number of unexpected mounts found.
+ * This function outputs errors using zerror() if it finds unexpected
+ * mounts.  cookiep should point to an initialized zone_mounts_t structure.
+ *
+ * This function returns zero on success and a nonzero value on failure.
+ */
+static int
+zone_mounts_cb(const struct mnttab *mountp, void *cookiep)
+{
+	zone_mounts_t *mounts;
+	const char *zone_mount_dir;
+
+	assert(mountp != NULL);
+	assert(cookiep != NULL);
+
+	mounts = (zone_mounts_t *)cookiep;
+	zone_mount_dir = mountp->mnt_mountp + mounts->zonepath_len;
+	if (strcmp(zone_mount_dir, "/root") == 0) {
+		/*
+		 * Check for an overlay mount.  If we already detected a /root
+		 * mount, then the current mount must be an overlay mount.
+		 */
+		if (mounts->root_mnttab != NULL) {
+			mounts->num_root_overlay_mounts++;
+			return (0);
+		}
+
+		/*
+		 * Store the root mount's mnttab information in the
+		 * zone_mounts_t structure for future use.
+		 */
+		if ((mounts->root_mnttab = mnttab_dup(mountp)) == NULL) {
+			zperror(cmd_to_str(CMD_MOVE), B_FALSE);
+			return (-1);
+		}
+
+		/*
+		 * Determine if the filesystem is a ZFS filesystem with a
+		 * non-legacy mountpoint.  If it is, then set the root
+		 * filesystem's mnttab's mnt_mountp field to a non-NULL
+		 * value, which will serve as a flag to indicate this special
+		 * condition.
+		 */
+		if (strcmp(mountp->mnt_fstype, MNTTYPE_ZFS) == 0 &&
+		    get_zfs_non_legacy_mountpoint(mountp->mnt_special,
+		    &mounts->root_mnttab->mnt_mountp) != B_TRUE) {
+			zperror(cmd_to_str(CMD_MOVE), B_FALSE);
+			return (-1);
+		}
+	} else {
+		/*
+		 * An unexpected mount was found.  Notify the user.
+		 */
+		if (mounts->num_unexpected_mounts == 0)
+			zerror(gettext("These file systems are mounted on "
+			    "subdirectories of %s.\n"), mounts->zonepath);
+		mounts->num_unexpected_mounts++;
+		(void) zfm_print(mountp, NULL);
+	}
+	return (0);
+}
+
+/*
+ * Initialize the specified zone_mounts_t structure for the given zonepath.
+ * If this function succeeds, it returns zero and the specified zone_mounts_t
+ * structure contains information about mounts in the specified zonepath.
+ * The function returns a nonzero value if it fails.  The zone_mounts_t
+ * structure doesn't need be destroyed via zone_mounts_destroy() if this
+ * function fails.
+ */
+int
+zone_mounts_init(zone_mounts_t *mounts, const char *zonepath)
+{
+	assert(mounts != NULL);
+	assert(zonepath != NULL);
+
+	bzero(mounts, sizeof (*mounts));
+	if ((mounts->zonepath = strdup(zonepath)) == NULL) {
+		zerror(gettext("the process ran out of memory while checking "
+		    "for mounts in zonepath %s."), zonepath);
+		return (-1);
+	}
+	mounts->zonepath_len = strlen(zonepath);
+	if (zonecfg_find_mounts((char *)zonepath, zone_mounts_cb, mounts) ==
+	    -1) {
+		zerror(gettext("an error occurred while checking for mounts "
+		    "in zonepath %s."), zonepath);
+		zone_mounts_destroy(mounts);
+		return (-1);
+	}
+	return (0);
+}
+
+/*
+ * Destroy the memory used by the specified zone_mounts_t structure's fields.
+ * This function doesn't free the memory occupied by the structure itself
+ * (i.e., it doesn't free the parameter).
+ */
+void
+zone_mounts_destroy(zone_mounts_t *mounts)
+{
+	assert(mounts != NULL);
+
+	free(mounts->zonepath);
+	if (mounts->root_mnttab != NULL)
+		mnttab_destroy(mounts->root_mnttab);
+}
+
+/*
+ * Mount a moving zone's root filesystem (if it had a root filesystem mount
+ * prior to the move) using the specified zonepath.  mounts should refer to
+ * the zone_mounts_t structure describing the zone's mount information.
+ *
+ * This function returns zero if the mount succeeds and a nonzero value
+ * if it doesn't.
+ */
+int
+zone_mount_rootfs(zone_mounts_t *mounts, const char *zonepath)
+{
+	char zoneroot[MAXPATHLEN];
+	struct mnttab *mtab;
+	int flags;
+
+	assert(mounts != NULL);
+	assert(zonepath != NULL);
+
+	/*
+	 * If there isn't a root filesystem, then don't do anything.
+	 */
+	mtab = mounts->root_mnttab;
+	if (mtab == NULL)
+		return (0);
+
+	/*
+	 * Determine the root filesystem's new mountpoint.
+	 */
+	if (snprintf(zoneroot, sizeof (zoneroot), "%s/root", zonepath) >=
+	    sizeof (zoneroot)) {
+		zerror(gettext("Zonepath %s is too long.\n"), zonepath);
+		return (-1);
+	}
+
+	/*
+	 * If the root filesystem is a non-legacy ZFS filesystem (i.e., if it's
+	 * mnt_mountp field is non-NULL), then make the filesystem's new
+	 * mount point its mountpoint property and mount the filesystem.
+	 */
+	if (mtab->mnt_mountp != NULL) {
+		zfs_handle_t *zhp;
+
+		if ((zhp = zfs_open(g_zfs, mtab->mnt_special,
+		    ZFS_TYPE_DATASET)) == NULL) {
+			zerror(gettext("could not get ZFS handle for the zone's"
+			    " root filesystem"));
+			return (-1);
+		}
+		if (zfs_prop_set(zhp, zfs_prop_to_name(ZFS_PROP_MOUNTPOINT),
+		    zoneroot) != 0) {
+			zerror(gettext("could not modify zone's root "
+			    "filesystem's mountpoint property"));
+			zfs_close(zhp);
+			return (-1);
+		}
+		if (zfs_mount(zhp, mtab->mnt_mntopts, 0) != 0) {
+			zerror(gettext("unable to mount zone root %s: %s"),
+			    zoneroot, libzfs_error_description(g_zfs));
+			if (zfs_prop_set(zhp,
+			    zfs_prop_to_name(ZFS_PROP_MOUNTPOINT),
+			    mtab->mnt_mountp) != 0)
+				zerror(gettext("unable to restore zone's root "
+				    "filesystem's mountpoint property"));
+			zfs_close(zhp);
+			return (-1);
+		}
+		zfs_close(zhp);
+		return (0);
+	}
+
+	/*
+	 * The root filesystem is either a legacy-mounted ZFS filesystem or
+	 * a non-ZFS filesystem.  Use mount(2) to mount the root filesystem.
+	 */
+	if (mtab->mnt_mntopts != NULL)
+		flags = MS_OPTIONSTR;
+	else
+		flags = 0;
+	if (mount(mtab->mnt_special, zoneroot, flags, mtab->mnt_fstype, NULL, 0,
+	    mtab->mnt_mntopts, MAX_MNTOPT_STR * sizeof (char)) != 0) {
+		flags = errno;
+		zerror(gettext("unable to mount zone root %s: %s"), zoneroot,
+		    strerror(flags));
+		return (-1);
+	}
+	return (0);
+}
+
+/*
+ * Unmount a moving zone's root filesystem (if such a mount exists) using the
+ * specified zonepath.  mounts should refer to the zone_mounts_t structure
+ * describing the zone's mount information.  If force is B_TRUE, then if the
+ * unmount fails, then the function will try to forcibly unmount the zone's root
+ * filesystem.
+ *
+ * This function returns zero if the unmount (forced or otherwise) succeeds;
+ * otherwise, it returns a nonzero value.
+ */
+int
+zone_unmount_rootfs(zone_mounts_t *mounts, const char *zonepath,
+    boolean_t force)
+{
+	char zoneroot[MAXPATHLEN];
+	struct mnttab *mtab;
+	int err;
+
+	assert(mounts != NULL);
+	assert(zonepath != NULL);
+
+	/*
+	 * If there isn't a root filesystem, then don't do anything.
+	 */
+	mtab = mounts->root_mnttab;
+	if (mtab == NULL)
+		return (0);
+
+	/*
+	 * Determine the root filesystem's mountpoint.
+	 */
+	if (snprintf(zoneroot, sizeof (zoneroot), "%s/root", zonepath) >=
+	    sizeof (zoneroot)) {
+		zerror(gettext("Zonepath %s is too long.\n"), zonepath);
+		return (-1);
+	}
+
+	/*
+	 * If the root filesystem is a non-legacy ZFS fileystem, then unmount
+	 * the filesystem via libzfs.
+	 */
+	if (mtab->mnt_mountp != NULL) {
+		zfs_handle_t *zhp;
+
+		if ((zhp = zfs_open(g_zfs, mtab->mnt_special,
+		    ZFS_TYPE_DATASET)) == NULL) {
+			zerror(gettext("could not get ZFS handle for the zone's"
+			    " root filesystem"));
+			return (-1);
+		}
+		if (zfs_unmount(zhp, zoneroot, 0) != 0) {
+			if (force && zfs_unmount(zhp, zoneroot, MS_FORCE) ==
+			    0) {
+				zfs_close(zhp);
+				return (0);
+			}
+			zerror(gettext("unable to unmount zone root %s: %s"),
+			    zoneroot, libzfs_error_description(g_zfs));
+			zfs_close(zhp);
+			return (-1);
+		}
+		zfs_close(zhp);
+		return (0);
+	}
+
+	/*
+	 * Use umount(2) to unmount the root filesystem.  If this fails, then
+	 * forcibly unmount it if the force flag is set.
+	 */
+	if (umount(zoneroot) != 0) {
+		if (force && umount2(zoneroot, MS_FORCE) == 0)
+			return (0);
+		err = errno;
+		zerror(gettext("unable to unmount zone root %s: %s"), zoneroot,
+		    strerror(err));
+		return (-1);
+	}
+	return (0);
 }
 
 int

@@ -27,6 +27,8 @@
 #ifndef _ZONEADM_H
 #define	_ZONEADM_H
 
+#include <sys/types.h>
+
 #define	CMD_HELP	0
 #define	CMD_BOOT	1
 #define	CMD_HALT	2
@@ -62,10 +64,46 @@
 #define	SW_CMP_SILENT	0x02
 
 /*
+ * This structure stores information about mounts of interest within an
+ * installed zone.
+ */
+typedef struct zone_mounts {
+	/* The zone's zonepath */
+	char		*zonepath;
+
+	/* The length of zonepath */
+	int		zonepath_len;
+
+	/*
+	 * This indicates the number of unexpected mounts that were encountered
+	 * in the zone.
+	 */
+	int		num_unexpected_mounts;
+
+	/*
+	 * This is the number of overlay mounts detected on the zone's root
+	 * directory.
+	 */
+	int		num_root_overlay_mounts;
+
+	/*
+	 * This is used to track important zone root mount information.  The
+	 * mnt_time field isn't used.  If root_mnttab is NULL, then the
+	 * associated zone doesn't have a mounted root filesystem.
+	 *
+	 * NOTE: mnt_mountp is non-NULL iff the zone's root filesystem is a
+	 * ZFS filesystem with a non-legacy mountpoint.  In this case, it
+	 * refers to a string containing the dataset's mountpoint.
+	 */
+	struct mnttab	*root_mnttab;
+} zone_mounts_t;
+
+/*
  * zoneadm.c
  */
 extern char *target_zone;
 
+extern int zfm_print(const struct mnttab *mntp, void *unused);
 extern int clone_copy(char *source_zonepath, char *zonepath);
 extern char *cmd_to_str(int cmd_num);
 extern int do_subproc(char *cmdbuf);
@@ -88,6 +126,11 @@ extern boolean_t is_zonepath_zfs(char *zonepath);
 extern int move_zfs(char *zonepath, char *new_zonepath);
 extern int verify_datasets(zone_dochandle_t handle);
 extern int verify_fs_zfs(struct zone_fstab *fstab);
+extern int zone_mounts_init(zone_mounts_t *mounts, const char *zonepath);
+extern void zone_mounts_destroy(zone_mounts_t *mounts);
+extern int zone_mount_rootfs(zone_mounts_t *mounts, const char *zonepath);
+extern int zone_unmount_rootfs(zone_mounts_t *mounts, const char *zonepath,
+    boolean_t force);
 extern int init_zfs(void);
 
 #endif	/* _ZONEADM_H */

@@ -1582,8 +1582,8 @@ get_detach_info(zone_dochandle_t handle, boolean_t detaching)
 
 /* ARGSUSED */
 static int
-zfm_print(const char *p, void *r) {
-	(void) fprintf(stderr, "  %s\n", p);
+zfm_print(const struct mnttab *p, void *r) {
+	(void) fprintf(stderr, "  %s\n", p->mnt_mountp);
 	return (0);
 }
 

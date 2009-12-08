@@ -2760,14 +2760,14 @@ zonecfg_devperms_apply(zone_dochandle_t hdl, const char *inpath, uid_t owner,
  * This function finds everything mounted under a zone's rootpath.
  * This returns the number of mounts under rootpath, or -1 on error.
  * callback is called once per mount found with the first argument
- * pointing to the  mount point.
+ * pointing to a mnttab structure containing the mount's information.
  *
  * If the callback function returns non-zero zonecfg_find_mounts
  * aborts with an error.
  */
 int
-zonecfg_find_mounts(char *rootpath, int (*callback)(const char *, void *),
-    void *priv) {
+zonecfg_find_mounts(char *rootpath, int (*callback)(const struct mnttab *,
+    void *), void *priv) {
 	FILE *mnttab;
 	struct mnttab m;
 	size_t l;
@@ -2800,7 +2800,7 @@ zonecfg_find_mounts(char *rootpath, int (*callback)(const char *, void *),
 			rv++;
 			if (callback == NULL)
 				continue;
-			if (callback(m.mnt_mountp, priv)) {
+			if (callback(&m, priv)) {
 				rv = -1;
 				goto out;
 
