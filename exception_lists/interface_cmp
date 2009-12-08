@@ -107,42 +107,115 @@ EMPTY_TOPVERSION	^SUNW_1\.10$	^MACH(lib)/libnsl\.so\.1$
 #	6874309 Remove NIS+ from Solaris
 #	PSARC 2009/530 Removal of NIS+
 #
-DELSYM	^nis_add$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_add_entry$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_addmember$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_checkpoint$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_creategroup$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_destroygroup$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_first_entry$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_freenames$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_freeresult$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_freeservlist$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_freetags$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_getnames$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_getservlist$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_ismember$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_lerror$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_list$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_local_principal$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_lookup$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_mkdir$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_modify$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_modify_entry$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_next_entry$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_perror$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_ping$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_print_group_entry$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_print_object$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_remove$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_remove_entry$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_removemember$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_rmdir$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_servstate$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_sperrno$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_sperror$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_sperror_r$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_stats$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
-DELSYM	^nis_verifygroup$	^SUNW_0\.7\.1$	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_add$       \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_add_entry$ \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_addmember$ \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_checkpoint$        \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_creategroup$       \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_destroygroup$      \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_first_entry$       \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_freenames$ \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_freeresult$        \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_freeservlist$      \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_freetags$  \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_getnames$  \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_getservlist$       \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_ismember$  \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_lerror$    \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_list$      \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_local_principal$   \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_lookup$    \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_mkdir$     \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_modify$    \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_modify_entry$      \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_next_entry$        \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_perror$    \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_ping$      \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_print_group_entry$ \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_print_object$      \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_remove$    \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_remove_entry$      \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_removemember$      \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_rmdir$     \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_servstate$ \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_sperrno$   \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_sperror$   \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_sperror_r$ \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_stats$	\
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+DELSYM  ^nis_verifygroup$       \
+	^SUNW_(0\.[7-9])|(1\.[1-9](\.1)?)$      \
+	^MACH(lib)/libnsl\.so\.1$
+
 
 ## libpapi
 #
