@@ -44,8 +44,8 @@
 
 #define	BUF_COUNT_2K		2048
 #define	BUF_COUNT_8K		512
-#define	BUF_COUNT_64K		128
-#define	BUF_COUNT_128K		64
+#define	BUF_COUNT_64K		256
+#define	BUF_COUNT_128K		1024
 #define	BUF_COUNT_256K		8
 
 #define	QLT_DMEM_MAX_BUF_SIZE	(4 * 65536)
@@ -257,47 +257,84 @@ qlt_i_dmem_alloc(qlt_state_t *qlt, uint32_t size, uint32_t *pminsize,
 					uint32_t flags)
 {
 	qlt_dmem_bucket_t	*p;
-	qlt_dmem_bctl_t		*bctl;
+	qlt_dmem_bctl_t 	*bctl;
 	int			i;
+	uint32_t		size_possible = 0;
 
-	if ((size <= QLT_DMEM_MAX_BUF_SIZE) && (size > 0)) {
+	if (size > QLT_DMEM_MAX_BUF_SIZE) {
+		goto qlt_try_partial_alloc;
+	}
 
-		for (i = 0; (p = qlt->dmem_buckets[i]) != NULL; i++) {
-			if (p->dmem_buf_size >= size) {
-				if (p->dmem_nbufs_free) {
-					mutex_enter(&p->dmem_lock);
-					bctl = p->dmem_bctl_free_list;
-					if (bctl == NULL) {
-						mutex_exit(&p->dmem_lock);
-						continue;
-					}
-					p->dmem_bctl_free_list =
-					    bctl->bctl_next;
-					p->dmem_nbufs_free--;
-					qlt->qlt_bufref[i]++;
+	/* 1st try to do a full allocation */
+	for (i = 0; (p = qlt->dmem_buckets[i]) != NULL; i++) {
+		if (p->dmem_buf_size >= size) {
+			if (p->dmem_nbufs_free) {
+				mutex_enter(&p->dmem_lock);
+				bctl = p->dmem_bctl_free_list;
+				if (bctl == NULL) {
 					mutex_exit(&p->dmem_lock);
-					bctl->bctl_buf->db_data_size = size;
-					return (bctl->bctl_buf);
-				} else {
-					qlt->qlt_bumpbucket++;
+					continue;
 				}
+				p->dmem_bctl_free_list =
+				    bctl->bctl_next;
+				p->dmem_nbufs_free--;
+				qlt->qlt_bufref[i]++;
+				mutex_exit(&p->dmem_lock);
+				bctl->bctl_buf->db_data_size = size;
+				return (bctl->bctl_buf);
+			} else {
+				qlt->qlt_bumpbucket++;
 			}
 		}
 	}
 
-	*pminsize = QLT_DMEM_MAX_BUF_SIZE;
+qlt_try_partial_alloc:
 
-	if (size <= 0x800) {
-		qlt->qlt_nullbufref[0]++;
-	} else if (size <= 0x2000) {
-		qlt->qlt_nullbufref[1]++;
-	} else if (size <= 0x10000) {
-		qlt->qlt_nullbufref[2]++;
-	} else if (size <= 0x20000) {
-		qlt->qlt_nullbufref[3]++;
-	} else {
-		qlt->qlt_nullbufref[4]++;
+	qlt->qlt_pmintry++;
+
+	/* Now go from high to low */
+	for (i = QLT_DMEM_NBUCKETS - 1; i >= 0; i--) {
+		p = qlt->dmem_buckets[i];
+		if (p->dmem_nbufs_free == 0)
+			continue;
+		if (!size_possible) {
+			size_possible = p->dmem_buf_size;
+		}
+		if (*pminsize > p->dmem_buf_size) {
+			/* At this point we know the request is failing. */
+			if (size_possible) {
+				/*
+				 * This caller is asking too much. We already
+				 * know what we can give, so get out.
+				 */
+				break;
+			} else {
+				/*
+				 * Lets continue to find out and tell what
+				 * we can give.
+				 */
+				continue;
+			}
+		}
+		mutex_enter(&p->dmem_lock);
+		if (*pminsize <= p->dmem_buf_size) {
+			bctl = p->dmem_bctl_free_list;
+			if (bctl == NULL) {
+				/* Someone took it. */
+				size_possible = 0;
+				mutex_exit(&p->dmem_lock);
+				continue;
+			}
+			p->dmem_bctl_free_list = bctl->bctl_next;
+			p->dmem_nbufs_free--;
+			mutex_exit(&p->dmem_lock);
+			bctl->bctl_buf->db_data_size = p->dmem_buf_size;
+			qlt->qlt_pmin_ok++;
+			return (bctl->bctl_buf);
+		}
 	}
+
+	*pminsize = size_possible;
 
 	return (NULL);
 }

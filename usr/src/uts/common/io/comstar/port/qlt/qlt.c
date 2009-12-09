@@ -1443,9 +1443,10 @@ qlt_port_online(qlt_state_t *qlt)
 
 	for (i = 0; i < 5; i++) {
 		qlt->qlt_bufref[i] = 0;
-		qlt->qlt_nullbufref[i] = 0;
 	}
 	qlt->qlt_bumpbucket = 0;
+	qlt->qlt_pmintry = 0;
+	qlt->qlt_pmin_ok = 0;
 
 	if (ret != QLT_SUCCESS)
 		return (ret);

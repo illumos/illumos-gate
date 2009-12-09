@@ -348,8 +348,9 @@ typedef struct qlt_state {
 	/* temp ref & stat counters */
 	uint32_t	qlt_bucketcnt[5];	/* element 0 = 2k */
 	uint64_t	qlt_bufref[5];		/* element 0 = 2k */
-	uint64_t	qlt_nullbufref[5];	/* element 0 = 2k */
 	uint64_t	qlt_bumpbucket;		/* bigger buffer supplied */
+	uint64_t	qlt_pmintry;
+	uint64_t	qlt_pmin_ok;
 
 } qlt_state_t;
 
