@@ -117,9 +117,10 @@ static int count;		/* number of iterations the stat is printed */
 
 /*
  * MI4_MIRRORMOUNT is canonically defined in nfs4_clnt.h, but we cannot
- * include that file here.
+ * include that file here.  Same with MI4_REFERRAL.
  */
 #define	MI4_MIRRORMOUNT 0x4000
+#define	MI4_REFERRAL	0x8000
 #define	NFS_V4		4
 
 static int req_width(kstat_t *, int);
@@ -1241,6 +1242,8 @@ mi_print(void)
 		if (mik.mik_vers >= NFS_V4) {
 			if (mik.mik_flags & MI4_MIRRORMOUNT)
 				printf(",mirrormount");
+			if (mik.mik_flags & MI4_REFERRAL)
+				printf(",referral");
 		}
 
 		printf(",rsize=%d,wsize=%d,retrans=%d,timeo=%d",

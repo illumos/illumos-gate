@@ -1493,7 +1493,8 @@ nfs4_do_delegreturn(rnode4_t *rp, int flags, cred_t *cr,
 			(void) nfs4_start_recovery(&e, mi, vp,
 			    NULL, &rp->r_deleg_stateid,
 			    lost_rqst.lr_op == OP_DELEGRETURN ?
-			    &lost_rqst : NULL, OP_DELEGRETURN, NULL);
+			    &lost_rqst : NULL, OP_DELEGRETURN, NULL,
+			    NULL, NULL);
 			nfs4_end_op(mi, vp, NULL, &recov_state, needrecov);
 			break;
 		}
@@ -1517,7 +1518,8 @@ nfs4_do_delegreturn(rnode4_t *rp, int flags, cred_t *cr,
 			(void) nfs4_start_recovery(&e, mi, vp,
 			    NULL, &rp->r_deleg_stateid,
 			    lost_rqst.lr_op == OP_DELEGRETURN ?
-			    &lost_rqst : NULL, OP_DELEGRETURN, NULL);
+			    &lost_rqst : NULL, OP_DELEGRETURN, NULL,
+			    NULL, NULL);
 		} else {
 			nfs4delegreturn_cleanup_impl(rp, NULL, ncg);
 			done = TRUE;
@@ -1956,7 +1958,7 @@ retry:
 			 * thread will take it from here.
 			 */
 			(void) nfs4_start_recovery(&e, mi, vp, NULL, NULL,
-			    NULL, OP_OPEN, NULL);
+			    NULL, OP_OPEN, NULL, NULL, NULL);
 			open_stream_rele(osp, rp);
 			*recovp = TRUE;
 			break;

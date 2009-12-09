@@ -74,9 +74,9 @@
 #include "replica.h"
 #include "nfs_subr.h"
 #include "webnfs.h"
+#include "nfs_resolve.h"
 #include <sys/sockio.h>
 #include <net/if.h>
-#include <assert.h>
 #include <rpcsvc/daemon_utils.h>
 #include <pwd.h>
 #include <strings.h>
@@ -90,11 +90,6 @@ extern AUTH *nfs_create_ah();
 extern enum snego_stat nfs_sec_nego();
 
 #define	MAXHOSTS	512
-
-/* number of transports to try */
-#define	MNT_PREF_LISTLEN	2
-#define	FIRST_TRY		1
-#define	SECOND_TRY		2
 
 #define	MNTTYPE_CACHEFS "cachefs"
 
@@ -134,9 +129,7 @@ static enum nfsstat nfsmount(struct mapfs *, char *, char *, int, int, uid_t,
 	action_list *);
 static int is_nfs_port(char *);
 
-void netbuf_free(struct netbuf *);
-struct knetconfig *get_knconf(struct netconfig *);
-void free_knconf(struct knetconfig *);
+static void netbuf_free(struct netbuf *);
 static int get_pathconf(CLIENT *, char *, char *, struct pathcnf **, int);
 static struct mapfs *enum_servers(struct mapent *, char *);
 static struct mapfs *get_mysubnet_servers(struct mapfs *);
@@ -156,12 +149,18 @@ enum type_of_stuff {
 	SERVER_FH = 2
 };
 
-void *get_server_stuff(enum type_of_stuff, char *, rpcprog_t,
+static void *get_server_netinfo(enum type_of_stuff, char *, rpcprog_t,
 	rpcvers_t, mfs_snego_t *, struct netconfig **, char *, ushort_t,
 	struct t_info *, caddr_t *, bool_t, char *, enum clnt_stat *);
-
-void *get_the_stuff(enum type_of_stuff, char *, rpcprog_t,
-	rpcvers_t, mfs_snego_t *, struct netconfig *, ushort_t, struct t_info *,
+static void *get_netconfig_info(enum type_of_stuff, char *, rpcprog_t,
+	rpcvers_t, struct netconfig *, ushort_t, struct t_info *,
+	struct t_bind *, caddr_t *, bool_t, char *, enum clnt_stat *,
+	mfs_snego_t *);
+static void *get_server_addrorping(char *, rpcprog_t, rpcvers_t,
+	struct netconfig *, ushort_t, struct t_info *, struct t_bind *,
+	caddr_t *, bool_t, char *, enum clnt_stat *, int);
+static void *get_server_fh(char *, rpcprog_t, rpcvers_t, mfs_snego_t *,
+	struct netconfig *, ushort_t, struct t_info *, struct t_bind *,
 	caddr_t *, bool_t, char *, enum clnt_stat *);
 
 struct mapfs *add_mfs(struct mapfs *, int, struct mapfs **, struct mapfs **);
@@ -1877,13 +1876,14 @@ try_mnt_slash:
 
 			/*
 			 * For NFSv4, we want to avoid rpcbind, so call
-			 * get_server_stuff() directly to tell it that
+			 * get_server_netinfo() directly to tell it that
 			 * we want to go "direct_to_server".  Otherwise,
 			 * do what has always been done.
 			 */
 			if (nfsvers == NFS_V4) {
 				enum clnt_stat cstat;
-				argp->addr = get_server_stuff(SERVER_ADDR,
+
+				argp->addr = get_server_netinfo(SERVER_ADDR,
 				    host, NFS_PROGRAM, nfsvers, NULL,
 				    &nconf, nfs_proto, thisport, NULL,
 				    NULL, TRUE, NULL, &cstat);
@@ -2010,7 +2010,7 @@ try_mnt_slash:
 		 *
 		 * Eventurally, we want to move this code to nfs_clnt_secdata()
 		 * when autod_nfs.c and mount.c can share the same
-		 * get_the_addr/get_the_stuff routine.
+		 * get_the_addr/get_netconfig_info routine.
 		 */
 		secflags = 0;
 		syncaddr = NULL;
@@ -2024,9 +2024,10 @@ try_mnt_slash:
 		 */
 			if ((mfs->mfs_flags & MFS_FH_VIA_WEBNFS) == 0 &&
 			    nfsvers != NFS_V4) {
-			syncaddr = get_the_stuff(SERVER_ADDR, host, RPCBPROG,
-			    RPCBVERS, NULL, nconf, 0, NULL, NULL, FALSE,
-			    NULL, NULL);
+				enum clnt_stat cstat;
+				syncaddr = get_server_netinfo(SERVER_ADDR,
+				    host, RPCBPROG, RPCBVERS, NULL, &nconf,
+				    NULL, 0, NULL, NULL, FALSE, NULL, &cstat);
 			}
 
 			if (syncaddr != NULL) {
@@ -2527,50 +2528,6 @@ get_pathconf(CLIENT *cl, char *path, char *fsname, struct pathcnf **pcnf,
 	return (RET_OK);
 }
 
-struct knetconfig *
-get_knconf(nconf)
-	struct netconfig *nconf;
-{
-	struct stat stbuf;
-	struct knetconfig *k;
-
-	if (stat(nconf->nc_device, &stbuf) < 0) {
-		syslog(LOG_ERR, "get_knconf: stat %s: %m", nconf->nc_device);
-		return (NULL);
-	}
-	k = (struct knetconfig *)malloc(sizeof (*k));
-	if (k == NULL)
-		goto nomem;
-	k->knc_semantics = nconf->nc_semantics;
-	k->knc_protofmly = strdup(nconf->nc_protofmly);
-	if (k->knc_protofmly == NULL)
-		goto nomem;
-	k->knc_proto = strdup(nconf->nc_proto);
-	if (k->knc_proto == NULL)
-		goto nomem;
-	k->knc_rdev = stbuf.st_rdev;
-
-	return (k);
-
-nomem:
-	syslog(LOG_ERR, "get_knconf: no memory");
-	free_knconf(k);
-	return (NULL);
-}
-
-void
-free_knconf(k)
-	struct knetconfig *k;
-{
-	if (k == NULL)
-		return;
-	if (k->knc_protofmly)
-		free(k->knc_protofmly);
-	if (k->knc_proto)
-		free(k->knc_proto);
-	free(k);
-}
-
 void
 netbuf_free(nb)
 	struct netbuf *nb;
@@ -2833,393 +2790,6 @@ get_cached_srv_addr(char *hostname, rpcprog_t prog, rpcvers_t vers,
 }
 
 /*
- * Get the network address on "hostname" for program "prog"
- * with version "vers" by using the nconf configuration data
- * passed in.
- *
- * If the address of a netconfig pointer is null then
- * information is not sufficient and no netbuf will be returned.
- *
- * tinfo argument is for matching the get_the_addr() defined in
- * ../nfs/mount/mount.c
- */
-void *
-get_the_stuff(
-	enum type_of_stuff type_of_stuff,
-	char *hostname,
-	rpcprog_t prog,
-	rpcprog_t vers,
-	mfs_snego_t *mfssnego,
-	struct netconfig *nconf,
-	ushort_t port,
-	struct t_info *tinfo,
-	caddr_t *fhp,
-	bool_t direct_to_server,
-	char *fspath,
-	enum clnt_stat *cstat)
-
-{
-	struct netbuf *nb = NULL;
-	struct t_bind *tbind = NULL;
-	int fd = -1;
-	enum clnt_stat cs = RPC_TIMEDOUT;
-	CLIENT *cl = NULL;
-	struct timeval tv;
-	AUTH *ah = NULL;
-	AUTH *new_ah = NULL;
-	struct snego_t snego;
-
-	if (nconf == NULL) {
-		goto done;
-	}
-
-	if (prog == NFS_PROGRAM && vers == NFS_V4)
-		if (strncasecmp(nconf->nc_proto, NC_UDP, strlen(NC_UDP)) == 0)
-			goto done;
-
-	if ((fd = t_open(nconf->nc_device, O_RDWR, tinfo)) < 0) {
-		goto done;
-	}
-
-	/* LINTED pointer alignment */
-	if ((tbind = (struct t_bind *)t_alloc(fd, T_BIND, T_ADDR))
-		    == NULL) {
-			goto done;
-	}
-
-	if (direct_to_server == TRUE) {
-		struct nd_hostserv hs;
-		struct nd_addrlist *retaddrs;
-		hs.h_host = hostname;
-
-		if (trace > 1)
-			trace_prt(1, "	get_the_stuff: %s call "
-				"direct to server %s\n",
-				type_of_stuff == SERVER_FH ? "pub fh" :
-				type_of_stuff == SERVER_ADDR ? "get address" :
-				type_of_stuff == SERVER_PING ? "ping" :
-				"unknown", hostname);
-		if (port == 0)
-			hs.h_serv = "nfs";
-		else
-			hs.h_serv = NULL;
-
-		if (netdir_getbyname(nconf, &hs, &retaddrs) != ND_OK) {
-			goto done;
-		}
-		memcpy(tbind->addr.buf, retaddrs->n_addrs->buf,
-			retaddrs->n_addrs->len);
-		tbind->addr.len = retaddrs->n_addrs->len;
-		netdir_free((void *)retaddrs, ND_ADDRLIST);
-		if (port) {
-			/* LINTED pointer alignment */
-
-			if (strcmp(nconf->nc_protofmly, NC_INET) == NULL)
-				((struct sockaddr_in *)
-				tbind->addr.buf)->sin_port =
-					htons((ushort_t)port);
-			else if (strcmp(nconf->nc_protofmly, NC_INET6) == NULL)
-				((struct sockaddr_in6 *)
-				tbind->addr.buf)->sin6_port =
-					htons((ushort_t)port);
-		}
-
-		if (type_of_stuff == SERVER_FH) {
-			if (netdir_options(nconf, ND_SET_RESERVEDPORT, fd,
-				NULL) == -1)
-				if (trace > 1)
-					trace_prt(1, "\tget_the_stuff: "
-						"ND_SET_RESERVEDPORT(%s) "
-						"failed\n", hostname);
-		}
-
-		cl = clnt_tli_create(fd, nconf, &tbind->addr, prog,
-			vers, 0, 0);
-
-		if (trace > 1)
-			trace_prt(1, "	get_the_stuff: clnt_tli_create(%s) "
-				"returned %p\n", hostname, cl);
-		if (cl == NULL)
-			goto done;
-#ifdef MALLOC_DEBUG
-		add_alloc("CLNT_HANDLE", cl, 0, __FILE__, __LINE__);
-		add_alloc("AUTH_HANDLE", cl->cl_auth, 0,
-			__FILE__, __LINE__);
-#endif
-
-		switch (type_of_stuff) {
-		case SERVER_FH:
-		    {
-		    enum snego_stat sec;
-
-		    ah = authsys_create_default();
-		    if (ah != NULL) {
-#ifdef MALLOC_DEBUG
-			drop_alloc("AUTH_HANDLE", cl->cl_auth,
-				__FILE__, __LINE__);
-#endif
-			AUTH_DESTROY(cl->cl_auth);
-			cl->cl_auth = ah;
-#ifdef MALLOC_DEBUG
-			add_alloc("AUTH_HANDLE", cl->cl_auth, 0,
-				__FILE__, __LINE__);
-#endif
-		    }
-
-		    if (!mfssnego->snego_done && vers != NFS_V4) {
-			/*
-			 * negotiate sec flavor.
-			 */
-			snego.cnt = 0;
-			if ((sec = nfs_sec_nego(vers, cl, fspath, &snego)) ==
-				SNEGO_SUCCESS) {
-			    int jj;
-
-			/*
-			 * check if server supports the one
-			 * specified in the sec= option.
-			 */
-			    if (mfssnego->sec_opt) {
-				for (jj = 0; jj < snego.cnt; jj++) {
-				    if (snego.array[jj] ==
-					mfssnego->nfs_sec.sc_nfsnum) {
-					mfssnego->snego_done = TRUE;
-					break;
-				    }
-				}
-			    }
-
-			/*
-			 * find a common sec flavor
-			 */
-			    if (!mfssnego->snego_done) {
-				for (jj = 0; jj < snego.cnt; jj++) {
-				    if (!nfs_getseconfig_bynumber(
-					snego.array[jj], &mfssnego->nfs_sec)) {
-					mfssnego->snego_done = TRUE;
-					break;
-				    }
-				}
-			    }
-			    if (!mfssnego->snego_done)
-				return (NULL);
-
-			/*
-			 * Now that the flavor has been
-			 * negotiated, get the fh.
-			 *
-			 * First, create an auth handle using the negotiated
-			 * sec flavor in the next lookup to
-			 * fetch the filehandle.
-			 */
-			    new_ah = nfs_create_ah(cl, hostname,
-					&mfssnego->nfs_sec);
-			    if (new_ah == NULL)
-				goto done;
-#ifdef MALLOC_DEBUG
-			    drop_alloc("AUTH_HANDLE", cl->cl_auth,
-				__FILE__, __LINE__);
-#endif
-			    AUTH_DESTROY(cl->cl_auth);
-			    cl->cl_auth = new_ah;
-#ifdef MALLOC_DEBUG
-			    add_alloc("AUTH_HANDLE", cl->cl_auth, 0,
-				__FILE__, __LINE__);
-#endif
-			} else if (sec == SNEGO_ARRAY_TOO_SMALL ||
-			    sec == SNEGO_FAILURE) {
-			    goto done;
-			}
-			/*
-			 * Note that if sec == SNEGO_DEF_VALID
-			 * the default sec flavor is acceptable.
-			 * Use it to get the filehandle.
-			 */
-		    }
-		    }
-
-		    switch (vers) {
-		    case NFS_VERSION:
-			    {
-			    wnl_diropargs arg;
-			    wnl_diropres res;
-
-			    memset((char *)&arg.dir, 0, sizeof (wnl_fh));
-			    memset((char *)&res, 0, sizeof (wnl_diropres));
-			    arg.name = fspath;
-			    if (wnlproc_lookup_2(&arg, &res, cl) !=
-				RPC_SUCCESS || res.status != NFS_OK)
-				    goto done;
-			    *fhp = malloc(sizeof (wnl_fh));
-
-			    if (*fhp == NULL) {
-				    syslog(LOG_ERR, "no memory\n");
-				    goto done;
-			    }
-
-			    memcpy((char *)*fhp,
-			    (char *)&res.wnl_diropres_u.wnl_diropres.file,
-				sizeof (wnl_fh));
-			    cs = RPC_SUCCESS;
-			    }
-			    break;
-		    case NFS_V3:
-			    {
-			    WNL_LOOKUP3args arg;
-			    WNL_LOOKUP3res res;
-			    nfs_fh3 *fh3p;
-
-			    memset((char *)&arg.what.dir, 0, sizeof (wnl_fh3));
-			    memset((char *)&res, 0, sizeof (WNL_LOOKUP3res));
-			    arg.what.name = fspath;
-			    if (wnlproc3_lookup_3(&arg, &res, cl) !=
-				RPC_SUCCESS || res.status != NFS3_OK)
-				    goto done;
-
-			    fh3p = (nfs_fh3 *)malloc(sizeof (*fh3p));
-
-			    if (fh3p == NULL) {
-				    syslog(LOG_ERR, "no memory\n");
-				    goto done;
-			    }
-
-			    fh3p->fh3_length = res.
-				WNL_LOOKUP3res_u.res_ok.object.data.data_len;
-			    memcpy(fh3p->fh3_u.data, res.
-				WNL_LOOKUP3res_u.res_ok.object.data.data_val,
-				fh3p->fh3_length);
-
-			    *fhp = (caddr_t)fh3p;
-
-			    cs = RPC_SUCCESS;
-			    }
-			    break;
-		    case NFS_V4:
-			    tv.tv_sec = 10;
-			    tv.tv_usec = 0;
-			    cs = clnt_call(cl, NULLPROC, xdr_void, 0,
-				xdr_void, 0, tv);
-			    if (cs != RPC_SUCCESS)
-				    goto done;
-			    *fhp = strdup(fspath);
-			    break;
-		    }
-		    break;
-		case SERVER_ADDR:
-		case SERVER_PING:
-			tv.tv_sec = 10;
-			tv.tv_usec = 0;
-			cs = clnt_call(cl, NULLPROC, xdr_void, 0,
-				xdr_void, 0, tv);
-			if (trace > 1)
-				trace_prt(1,
-					"get_the_stuff: clnt_call(%s) "
-					"returned %s\n",
-				hostname,
-					cs == RPC_SUCCESS ? "success" :
-					"failure");
-
-			if (cs != RPC_SUCCESS)
-				goto done;
-			break;
-		}
-
-	} else if (type_of_stuff != SERVER_FH) {
-
-		if (type_of_stuff == SERVER_ADDR) {
-			if (get_cached_srv_addr(hostname, prog, vers, nconf,
-			    &tbind->addr) == 0)
-				goto done;
-		}
-
-		if (port) {
-			/* LINTED pointer alignment */
-			if (strcmp(nconf->nc_protofmly, NC_INET) == NULL)
-				((struct sockaddr_in *)
-				tbind->addr.buf)->sin_port =
-					htons((ushort_t)port);
-			else if (strcmp(nconf->nc_protofmly, NC_INET6) == NULL)
-				((struct sockaddr_in6 *)
-				tbind->addr.buf)->sin6_port =
-					htons((ushort_t)port);
-			cl = clnt_tli_create(fd, nconf, &tbind->addr,
-				prog, vers, 0, 0);
-			if (cl == NULL)
-				goto done;
-#ifdef MALLOC_DEBUG
-			add_alloc("CLNT_HANDLE", cl, 0, __FILE__, __LINE__);
-			add_alloc("AUTH_HANDLE", cl->cl_auth, 0,
-				__FILE__, __LINE__);
-#endif
-			tv.tv_sec = 10;
-			tv.tv_usec = 0;
-			cs = clnt_call(cl, NULLPROC, xdr_void, 0, xdr_void,
-				0, tv);
-			if (cs != RPC_SUCCESS)
-				goto done;
-		}
-
-	} else {
-		/* can't happen */
-		goto done;
-	}
-
-	if (type_of_stuff != SERVER_PING) {
-
-		cs = RPC_SYSTEMERROR;
-
-		/*
-		 * Make a copy of the netbuf to return
-		 */
-		nb = (struct netbuf *)malloc(sizeof (struct netbuf));
-		if (nb == NULL) {
-			syslog(LOG_ERR, "no memory\n");
-			goto done;
-		}
-		*nb = tbind->addr;
-		nb->buf = (char *)malloc(nb->maxlen);
-		if (nb->buf == NULL) {
-			syslog(LOG_ERR, "no memory\n");
-			free(nb);
-			nb = NULL;
-			goto done;
-		}
-		(void) memcpy(nb->buf, tbind->addr.buf, tbind->addr.len);
-
-		cs = RPC_SUCCESS;
-	}
-
-done:
-	if (cl != NULL) {
-		if (ah != NULL) {
-#ifdef MALLOC_DEBUG
-			drop_alloc("AUTH_HANDLE", cl->cl_auth,
-				__FILE__, __LINE__);
-#endif
-			AUTH_DESTROY(cl->cl_auth);
-			cl->cl_auth = NULL;
-		}
-#ifdef MALLOC_DEBUG
-		drop_alloc("CLNT_HANDLE", cl, __FILE__, __LINE__);
-#endif
-		clnt_destroy(cl);
-	}
-
-	if (tbind) {
-		t_free((char *)tbind, T_BIND);
-		tbind = NULL;
-	}
-
-	if (fd >= 0)
-		(void) t_close(fd);
-
-	if (cstat != NULL)
-		*cstat = cs;
-
-	return (nb);
-}
-
-/*
  * Get a network address on "hostname" for program "prog"
  * with version "vers".  If the port number is specified (non zero)
  * then try for a TCP/UDP transport and set the port number of the
@@ -3242,7 +2812,7 @@ get_addr(char *hostname, rpcprog_t prog, rpcvers_t vers,
 {
 	enum clnt_stat cstat;
 
-	return (get_server_stuff(SERVER_ADDR, hostname, prog, vers, NULL,
+	return (get_server_netinfo(SERVER_ADDR, hostname, prog, vers, NULL,
 		nconfp, proto, port, tinfo, NULL, FALSE, NULL, &cstat));
 }
 
@@ -3253,7 +2823,7 @@ get_pubfh(char *hostname, rpcvers_t vers, mfs_snego_t *mfssnego,
 {
 	enum clnt_stat cstat;
 
-	return (get_server_stuff(SERVER_FH, hostname, NFS_PROGRAM, vers,
+	return (get_server_netinfo(SERVER_FH, hostname, NFS_PROGRAM, vers,
 	    mfssnego, nconfp, proto, port, tinfo, fhp, get_pubfh, fspath,
 	    &cstat));
 }
@@ -3264,14 +2834,15 @@ get_ping(char *hostname, rpcprog_t prog, rpcvers_t vers,
 {
 	enum clnt_stat cstat;
 
-	(void) get_server_stuff(SERVER_PING, hostname, prog, vers, NULL, nconfp,
-	    NULL, port, NULL, NULL, direct_to_server, NULL, &cstat);
+	(void) get_server_netinfo(SERVER_PING, hostname, prog,
+	    vers, NULL, nconfp, NULL, port, NULL, NULL,
+	    direct_to_server, NULL, &cstat);
 
 	return (cstat);
 }
 
 void *
-get_server_stuff(
+get_server_netinfo(
 	enum type_of_stuff type_of_stuff,
 	char *hostname,
 	rpcprog_t prog,
@@ -3289,13 +2860,16 @@ get_server_stuff(
 	struct netbuf *nb = NULL;
 	struct netconfig *nconf = NULL;
 	NCONF_HANDLE *nc = NULL;
+	int error = 0;
+	int fd = 0;
+	struct t_bind *tbind = NULL;
 	int nthtry = FIRST_TRY;
 
-	if (nconfp && *nconfp)
-		return (get_the_stuff(type_of_stuff, hostname, prog, vers,
-		    mfssnego, *nconfp, port, tinfo, fhp, direct_to_server,
-		    fspath, cstatp));
-
+	if (nconfp && *nconfp) {
+		return (get_netconfig_info(type_of_stuff, hostname,
+		    prog, vers, nconf, port, tinfo, tbind, fhp,
+		    direct_to_server, fspath, cstatp, mfssnego));
+	}
 
 	/*
 	 * No nconf passed in.
@@ -3314,8 +2888,7 @@ get_server_stuff(
 	 * otherwise try COTS first, if failed, then try CLTS.
 	 */
 	if (proto) {
-
-		while (nconf = getnetpath(nc)) {
+		while ((nconf = getnetpath(nc)) != NULL) {
 			if (strcmp(nconf->nc_proto, proto))
 				continue;
 			/*
@@ -3329,24 +2902,20 @@ get_server_stuff(
 				    strcmp(nconf->nc_proto, NC_UDP)))
 					continue;
 			}
-
-			nb = get_the_stuff(type_of_stuff, hostname, prog, vers,
-			    mfssnego, nconf, port, tinfo, fhp,
-			    direct_to_server, fspath, cstatp);
-
+			nb = get_netconfig_info(type_of_stuff, hostname,
+			    prog, vers, nconf, port, tinfo, tbind, fhp,
+			    direct_to_server, fspath, cstatp, mfssnego);
 			if (*cstatp == RPC_SUCCESS)
 				break;
 
 			assert(nb == NULL);
 
-		} /* end of while */
-
+		}
 		if (nconf == NULL)
 			goto done;
-
 	} else {
 retry:
-		while (nconf = getnetpath(nc)) {
+		while ((nconf = getnetpath(nc)) != NULL) {
 			if (nconf->nc_flag & NC_VISIBLE) {
 				if (nthtry == FIRST_TRY) {
 					if ((nconf->nc_semantics ==
@@ -3379,7 +2948,8 @@ retry:
 					}
 				}
 			}
-		} /* while */
+		}
+
 		if (nconf == NULL) {
 			if (++nthtry <= MNT_PREF_LISTLEN) {
 				endnetpath(nc);
@@ -3389,9 +2959,9 @@ retry:
 			} else
 				goto done;
 		} else {
-			nb = get_the_stuff(type_of_stuff, hostname, prog, vers,
-			    mfssnego, nconf, port, tinfo, fhp, direct_to_server,
-			    fspath, cstatp);
+			nb = get_netconfig_info(type_of_stuff, hostname,
+			    prog, vers, nconf, port, tinfo, tbind, fhp,
+			    direct_to_server, fspath, cstatp, mfssnego);
 			if (*cstatp != RPC_SUCCESS)
 				/*
 				 * Continue the same search path in the
@@ -3400,17 +2970,20 @@ retry:
 				 */
 				goto retry;
 		}
-	} /* if !proto */
+	}
 
 	/*
 	 * Got nconf and nb.  Now dup the netconfig structure (nconf)
 	 * and return it thru nconfp.
 	 */
-	*nconfp = getnetconfigent(nconf->nc_netid);
-	if (*nconfp == NULL) {
-		syslog(LOG_ERR, "no memory\n");
-		free(nb);
-		nb = NULL;
+	if (nconf != NULL) {
+		if ((*nconfp = getnetconfigent(nconf->nc_netid)) == NULL) {
+			syslog(LOG_ERR, "no memory\n");
+			free(nb);
+			nb = NULL;
+		}
+	} else {
+		*nconfp = NULL;
 	}
 done:
 	if (nc)
@@ -3418,6 +2991,221 @@ done:
 	return (nb);
 }
 
+void *
+get_server_fh(char *hostname, rpcprog_t	prog, rpcvers_t	vers,
+	mfs_snego_t *mfssnego, struct netconfig *nconf, ushort_t port,
+	struct t_info *tinfo, struct t_bind *tbind, caddr_t *fhp,
+	bool_t direct_to_server, char *fspath, enum clnt_stat *cstat)
+{
+	AUTH *ah = NULL;
+	AUTH *new_ah = NULL;
+	struct snego_t	snego;
+	enum clnt_stat cs = RPC_TIMEDOUT;
+	struct timeval tv;
+	bool_t file_handle = 1;
+	enum snego_stat sec;
+	CLIENT *cl = NULL;
+	int fd = -1;
+	struct netbuf *nb = NULL;
+
+	if (direct_to_server != TRUE)
+		return (NULL);
+
+	if (prog == NFS_PROGRAM && vers == NFS_V4)
+		if (strncasecmp(nconf->nc_proto, NC_UDP, strlen(NC_UDP)) == 0)
+			goto done;
+
+	if ((fd = t_open(nconf->nc_device, O_RDWR, tinfo)) < 0)
+		goto done;
+
+	/* LINTED pointer alignment */
+	if ((tbind = (struct t_bind *)t_alloc(fd, T_BIND, T_ADDR)) == NULL)
+		goto done;
+
+	if (setup_nb_parms(nconf, tbind, tinfo, hostname, fd,
+	    direct_to_server, port, prog, vers, file_handle) < 0) {
+		goto done;
+	}
+
+	cl = clnt_tli_create(fd, nconf, &tbind->addr, prog, vers, 0, 0);
+	if (cl == NULL)
+		goto done;
+
+	ah = authsys_create_default();
+	if (ah != NULL) {
+#ifdef MALLOC_DEBUG
+		drop_alloc("AUTH_HANDLE", cl->cl_auth,
+		    __FILE__, __LINE__);
+#endif
+		AUTH_DESTROY(cl->cl_auth);
+		cl->cl_auth = ah;
+#ifdef MALLOC_DEBUG
+		add_alloc("AUTH_HANDLE", cl->cl_auth, 0,
+		    __FILE__, __LINE__);
+#endif
+	}
+
+	if (!mfssnego->snego_done && vers != NFS_V4) {
+		/*
+		 * negotiate sec flavor.
+		 */
+		snego.cnt = 0;
+		if ((sec = nfs_sec_nego(vers, cl, fspath, &snego)) ==
+		    SNEGO_SUCCESS) {
+			int jj;
+
+			/*
+			 * check if server supports the one
+			 * specified in the sec= option.
+			 */
+			if (mfssnego->sec_opt) {
+				for (jj = 0; jj < snego.cnt; jj++) {
+					if (snego.array[jj] ==
+					    mfssnego->nfs_sec.sc_nfsnum) {
+						mfssnego->snego_done = TRUE;
+						break;
+					}
+				}
+			}
+
+			/*
+			 * find a common sec flavor
+			 */
+			if (!mfssnego->snego_done) {
+				for (jj = 0; jj < snego.cnt; jj++) {
+					if (!nfs_getseconfig_bynumber(
+					    snego.array[jj],
+					    &mfssnego->nfs_sec)) {
+						mfssnego->snego_done = TRUE;
+						break;
+					}
+				}
+			}
+			if (!mfssnego->snego_done)
+				goto done;
+			/*
+			 * Now that the flavor has been
+			 * negotiated, get the fh.
+			 *
+			 * First, create an auth handle using the negotiated
+			 * sec flavor in the next lookup to
+			 * fetch the filehandle.
+			 */
+			new_ah = nfs_create_ah(cl, hostname,
+			    &mfssnego->nfs_sec);
+			if (new_ah  == NULL)
+				goto done;
+#ifdef MALLOC_DEBUG
+			drop_alloc("AUTH_HANDLE", cl->cl_auth,
+			    __FILE__, __LINE__);
+#endif
+			AUTH_DESTROY(cl->cl_auth);
+			cl->cl_auth = new_ah;
+#ifdef MALLOC_DEBUG
+			add_alloc("AUTH_HANDLE", cl->cl_auth, 0,
+			    __FILE__, __LINE__);
+#endif
+		} else if (sec == SNEGO_ARRAY_TOO_SMALL ||
+		    sec == SNEGO_FAILURE) {
+			goto done;
+		}
+	}
+
+	switch (vers) {
+	case NFS_VERSION:
+		{
+		wnl_diropargs arg;
+		wnl_diropres res;
+
+		memset((char *)&arg.dir, 0, sizeof (wnl_fh));
+		memset((char *)&res, 0, sizeof (wnl_diropres));
+		arg.name = fspath;
+		if (wnlproc_lookup_2(&arg, &res, cl) !=
+		    RPC_SUCCESS || res.status != NFS_OK)
+			goto done;
+		*fhp = malloc(sizeof (wnl_fh));
+
+		if (*fhp == NULL) {
+			syslog(LOG_ERR, "no memory\n");
+			goto done;
+		}
+
+		memcpy((char *)*fhp,
+		    (char *)&res.wnl_diropres_u.wnl_diropres.file,
+		    sizeof (wnl_fh));
+		cs = RPC_SUCCESS;
+		}
+		break;
+	case NFS_V3:
+		{
+		WNL_LOOKUP3args arg;
+		WNL_LOOKUP3res res;
+		nfs_fh3 *fh3p;
+
+		memset((char *)&arg.what.dir, 0, sizeof (wnl_fh3));
+		memset((char *)&res, 0, sizeof (WNL_LOOKUP3res));
+		arg.what.name = fspath;
+		if (wnlproc3_lookup_3(&arg, &res, cl) !=
+		    RPC_SUCCESS || res.status != NFS3_OK)
+			goto done;
+
+		fh3p = (nfs_fh3 *)malloc(sizeof (*fh3p));
+
+		if (fh3p == NULL) {
+			syslog(LOG_ERR, "no memory\n");
+			goto done;
+		}
+
+		fh3p->fh3_length =
+		    res.WNL_LOOKUP3res_u.res_ok.object.data.data_len;
+		memcpy(fh3p->fh3_u.data,
+		    res.WNL_LOOKUP3res_u.res_ok.object.data.data_val,
+		    fh3p->fh3_length);
+
+		*fhp = (caddr_t)fh3p;
+
+		cs = RPC_SUCCESS;
+		}
+		break;
+	case NFS_V4:
+		tv.tv_sec = 10;
+		tv.tv_usec = 0;
+		cs = clnt_call(cl, NULLPROC, xdr_void, 0,
+		    xdr_void, 0, tv);
+		if (cs != RPC_SUCCESS)
+			goto done;
+
+		*fhp = strdup(fspath);
+		if (fhp == NULL) {
+			cs = RPC_SYSTEMERROR;
+			goto done;
+		}
+		break;
+	}
+	nb = (struct netbuf *)malloc(sizeof (struct netbuf));
+	if (nb == NULL) {
+		syslog(LOG_ERR, "no memory\n");
+		cs = RPC_SYSTEMERROR;
+		goto done;
+	}
+	nb->buf = (char *)malloc(tbind->addr.maxlen);
+	if (nb->buf == NULL) {
+		syslog(LOG_ERR, "no memory\n");
+		free(nb);
+		nb = NULL;
+		cs = RPC_SYSTEMERROR;
+		goto done;
+	}
+	(void) memcpy(nb->buf, tbind->addr.buf, tbind->addr.len);
+	nb->len = tbind->addr.len;
+	nb->maxlen = tbind->addr.maxlen;
+done:
+	if (cstat != NULL)
+		*cstat = cs;
+	destroy_auth_client_handle(cl);
+	cleanup_tli_parms(tbind, fd);
+	return (nb);
+}
 
 /*
  * Sends a null call to the remote host's (NFS program, versp). versp
@@ -4534,4 +4322,122 @@ free_nfs_args(struct nfs_args *argp)
 			argp = NULL;
 		free(oldp);
 	}
+}
+
+void *
+get_netconfig_info(enum type_of_stuff type_of_stuff, char *hostname,
+	rpcprog_t prog, rpcvers_t vers, struct netconfig *nconf,
+	ushort_t port, struct t_info *tinfo, struct t_bind *tbind,
+	caddr_t *fhp, bool_t direct_to_server, char *fspath,
+	enum clnt_stat *cstat, mfs_snego_t *mfssnego)
+{
+	struct netconfig *nb = NULL;
+	int ping_server = 0;
+
+
+	if (nconf == NULL)
+		return (NULL);
+
+	switch (type_of_stuff) {
+	case SERVER_FH:
+		nb = get_server_fh(hostname, prog, vers, mfssnego,
+		    nconf, port, tinfo, tbind, fhp, direct_to_server,
+		    fspath, cstat);
+		break;
+	case SERVER_PING:
+		ping_server = 1;
+	case SERVER_ADDR:
+		nb = get_server_addrorping(hostname, prog, vers,
+		    nconf, port, tinfo, tbind, fhp, direct_to_server,
+		    fspath, cstat, ping_server);
+		break;
+	default:
+		assert(nb != NULL);
+	}
+	return (nb);
+}
+
+/*
+ * Get the server address or can we ping it or not.
+ * Check the portmap cache first for server address.
+ * If no entries there, ping the server with a NULLPROC rpc.
+ */
+void *
+get_server_addrorping(char *hostname, rpcprog_t prog, rpcvers_t vers,
+	struct netconfig *nconf, ushort_t port, struct t_info *tinfo,
+	struct t_bind *tbind, caddr_t *fhp, bool_t direct_to_server,
+	char *fspath, enum clnt_stat *cstat, int ping_server)
+{
+	struct timeval tv;
+	enum clnt_stat cs = RPC_TIMEDOUT;
+	struct netbuf *nb = NULL;
+	CLIENT *cl = NULL;
+	int fd = -1;
+
+	if (prog == NFS_PROGRAM && vers == NFS_V4)
+		if (strncasecmp(nconf->nc_proto, NC_UDP, strlen(NC_UDP)) == 0)
+			goto done;
+
+	if ((fd = t_open(nconf->nc_device, O_RDWR, tinfo)) < 0) {
+		goto done;
+	}
+
+	/* LINTED pointer alignment */
+	if ((tbind = (struct t_bind *)t_alloc(fd, T_BIND, T_ADDR))
+	    == NULL) {
+		goto done;
+	}
+
+	if (direct_to_server != TRUE) {
+		if (!ping_server) {
+			if (get_cached_srv_addr(hostname, prog, vers,
+			    nconf, &tbind->addr) == 0)
+				goto done;
+		} else {
+			if (port == 0)
+				goto done;
+		}
+	}
+	if (setup_nb_parms(nconf, tbind, tinfo, hostname,
+	    fd, direct_to_server, port, prog, vers, 0) < 0)
+		goto done;
+
+	if (port || (direct_to_server == TRUE)) {
+		tv.tv_sec = 10;
+		tv.tv_usec = 0;
+		cl = clnt_tli_create(fd, nconf, &tbind->addr,
+		    prog, vers, 0, 0);
+		if (cl == NULL)
+			goto done;
+
+		cs = clnt_call(cl, NULLPROC, xdr_void, 0,
+		    xdr_void, 0, tv);
+		if (cs != RPC_SUCCESS) {
+			syslog(LOG_ERR, "error is %d", cs);
+			goto done;
+		}
+	}
+	if (!ping_server) {
+		nb = (struct netbuf *)malloc(sizeof (struct netbuf));
+		if (nb == NULL) {
+			syslog(LOG_ERR, "no memory\n");
+			goto done;
+		}
+		nb->buf = (char *)malloc(tbind->addr.maxlen);
+		if (nb->buf == NULL) {
+			syslog(LOG_ERR, "no memory\n");
+			free(nb);
+			nb = NULL;
+			goto done;
+		}
+		(void) memcpy(nb->buf, tbind->addr.buf, tbind->addr.len);
+		nb->len = tbind->addr.len;
+		nb->maxlen = tbind->addr.maxlen;
+		cs = RPC_SUCCESS;
+	}
+done:
+	destroy_auth_client_handle(cl);
+	cleanup_tli_parms(tbind, fd);
+	*cstat = cs;
+	return (nb);
 }

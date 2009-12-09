@@ -42,7 +42,16 @@
 #include <nfs/nfs4.h>
 #include <nfs/nfs4_clnt.h>
 #include <sys/sdt.h>
+#include <sys/mkdev.h>
 #include <rpc/rpc_rdma.h>
+#include <rpc/xdr.h>
+
+#define	xdr_dev_t xdr_u_int
+
+extern bool_t xdr_netbuf(XDR *, struct netbuf *);
+extern bool_t xdr_vector(XDR *, char *, const uint_t, const uint_t,
+	const xdrproc_t);
+bool_t xdr_knetconfig(XDR *, struct knetconfig *);
 
 bool_t
 xdr_bitmap4(XDR *xdrs, bitmap4 *objp)
@@ -142,6 +151,143 @@ xdr_utf8string(XDR *xdrs, utf8string *objp)
 		kmem_free(objp->utf8string_val, objp->utf8string_len);
 		objp->utf8string_val = NULL;
 	}
+	return (TRUE);
+}
+
+/*
+ * used by NFSv4 referrals to get info needed for NFSv4 referral mount.
+ */
+bool_t
+xdr_nfs_fsl_info(XDR *xdrs, struct nfs_fsl_info *objp)
+{
+
+	if (!xdr_u_int(xdrs, &objp->netbuf_len))
+		return (FALSE);
+	if (!xdr_u_int(xdrs, &objp->netnm_len))
+		return (FALSE);
+	if (!xdr_u_int(xdrs, &objp->knconf_len))
+		return (FALSE);
+
+#if defined(_LP64)
+	/*
+	 * The object can come from a 32-bit binary; nfsmapid.
+	 * To be safe we double the size of the knetconfig to
+	 * allow some buffering for decoding.
+	 */
+	if (xdrs->x_op == XDR_DECODE)
+		objp->knconf_len += sizeof (struct knetconfig);
+#endif
+
+	if (!xdr_string(xdrs, &objp->netname, ~0))
+		return (FALSE);
+	if (!xdr_pointer(xdrs, (char **)&objp->addr, objp->netbuf_len,
+	    (xdrproc_t)xdr_netbuf))
+		return (FALSE);
+	if (!xdr_pointer(xdrs, (char **)&objp->knconf,
+	    objp->knconf_len, (xdrproc_t)xdr_knetconfig))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_knetconfig(XDR *xdrs, struct knetconfig *objp)
+{
+	rpc_inline_t *buf;
+	u_longlong_t dev64;
+#if !defined(_LP64)
+	uint32_t major, minor;
+#endif
+	int i;
+
+	if (!xdr_u_int(xdrs, &objp->knc_semantics))
+		return (FALSE);
+	if (xdrs->x_op == XDR_DECODE) {
+		objp->knc_protofmly = (((char *)objp) +
+		    sizeof (struct knetconfig));
+		objp->knc_proto = objp->knc_protofmly + KNC_STRSIZE;
+	}
+	if (!xdr_opaque(xdrs, objp->knc_protofmly, KNC_STRSIZE))
+		return (FALSE);
+	if (!xdr_opaque(xdrs, objp->knc_proto, KNC_STRSIZE))
+		return (FALSE);
+
+	/*
+	 * For interoperability between 32-bit daemon and 64-bit kernel,
+	 * we always treat dev_t as 64-bit number and do the expanding
+	 * or compression of dev_t as needed.
+	 * We have to hand craft the conversion since there is no available
+	 * function in ddi.c. Besides ddi.c is available only in the kernel
+	 * and we want to keep both user and kernel of xdr_knetconfig() the
+	 * same for consistency.
+	 */
+	if (xdrs->x_op == XDR_ENCODE) {
+#if defined(_LP64)
+		dev64 = objp->knc_rdev;
+#else
+		major = (objp->knc_rdev >> NBITSMINOR32) & MAXMAJ32;
+		minor = objp->knc_rdev & MAXMIN32;
+		dev64 = (((unsigned long long)major) << NBITSMINOR64) | minor;
+#endif
+		if (!xdr_u_longlong_t(xdrs, &dev64))
+			return (FALSE);
+	}
+	if (xdrs->x_op == XDR_DECODE) {
+#if defined(_LP64)
+		if (!xdr_u_longlong_t(xdrs, (u_longlong_t *)&objp->knc_rdev))
+			return (FALSE);
+#else
+		if (!xdr_u_longlong_t(xdrs, &dev64))
+			return (FALSE);
+
+		major = (dev64 >> NBITSMINOR64) & L_MAXMAJ32;
+		minor = dev64 & L_MAXMIN32;
+		objp->knc_rdev = (major << L_BITSMINOR32) | minor;
+#endif
+	}
+
+	if (xdrs->x_op == XDR_ENCODE) {
+		buf = XDR_INLINE(xdrs, (8) * BYTES_PER_XDR_UNIT);
+		if (buf == NULL) {
+			if (!xdr_vector(xdrs, (char *)objp->knc_unused, 8,
+			    sizeof (uint_t), (xdrproc_t)xdr_u_int))
+				return (FALSE);
+		} else {
+			uint_t *genp;
+
+			for (i = 0, genp = objp->knc_unused;
+			    i < 8; i++) {
+#if defined(_LP64) || defined(_KERNEL)
+				IXDR_PUT_U_INT32(buf, *genp++);
+#else
+				IXDR_PUT_U_LONG(buf, *genp++);
+#endif
+			}
+		}
+		return (TRUE);
+	} else if (xdrs->x_op == XDR_DECODE) {
+		buf = XDR_INLINE(xdrs, (8) * BYTES_PER_XDR_UNIT);
+		if (buf == NULL) {
+			if (!xdr_vector(xdrs, (char *)objp->knc_unused, 8,
+			    sizeof (uint_t), (xdrproc_t)xdr_u_int))
+				return (FALSE);
+		} else {
+			uint_t *genp;
+
+			for (i = 0, genp = objp->knc_unused;
+			    i < 8; i++) {
+#if defined(_LP64) || defined(_KERNEL)
+					*genp++ = IXDR_GET_U_INT32(buf);
+#else
+					*genp++ = IXDR_GET_U_LONG(buf);
+#endif
+			}
+		}
+		return (TRUE);
+	}
+
+	if (!xdr_vector(xdrs, (char *)objp->knc_unused, 8,
+	    sizeof (uint_t), (xdrproc_t)xdr_u_int))
+		return (FALSE);
 	return (TRUE);
 }
 
@@ -492,8 +638,12 @@ xdr_nfs_fh4(XDR *xdrs, nfs_fh4 *objp)
 static bool_t
 xdr_fs_location4(XDR *xdrs, fs_location4 *objp)
 {
+	if (xdrs->x_op == XDR_DECODE) {
+		objp->server_val = NULL;
+		objp->rootpath.pathname4_val = NULL;
+	}
 	if (!xdr_array(xdrs, (char **)&objp->server_val,
-	    (uint_t *)&objp->server_len, NFS4_FS_LOCATIONS_LIMIT,
+	    (uint_t *)&objp->server_len, NFS4_MAX_UTF8STRING,
 	    sizeof (utf8string), (xdrproc_t)xdr_utf8string))
 		return (FALSE);
 	return (xdr_array(xdrs, (char **)&objp->rootpath.pathname4_val,
@@ -560,6 +710,11 @@ xdr_fattr4_acl(XDR *xdrs, fattr4_acl *objp)
 bool_t
 xdr_fattr4_fs_locations(XDR *xdrs, fattr4_fs_locations *objp)
 {
+	if (xdrs->x_op == XDR_DECODE) {
+		objp->fs_root.pathname4_len = 0;
+		objp->fs_root.pathname4_val = NULL;
+		objp->locations_val = NULL;
+	}
 	if (!xdr_array(xdrs, (char **)&objp->fs_root.pathname4_val,
 	    (uint_t *)&objp->fs_root.pathname4_len,
 	    NFS4_MAX_PATHNAME4,
@@ -930,7 +1085,9 @@ xdr_ga_fattr_res(XDR *xdrs, struct nfs4_ga_res *garp, bitmap4 resbmap,
 	    FATTR4_HOMOGENEOUS_MASK)) {
 
 		if (resbmap & FATTR4_FS_LOCATIONS_MASK) {
-			ASSERT(0);
+			if (!xdr_fattr4_fs_locations(xdrs,
+			    &gesp->n4g_fslocations))
+				return (FALSE);
 		}
 		if (resbmap & FATTR4_HIDDEN_MASK) {
 			ASSERT(0);
@@ -2253,7 +2410,9 @@ noentries:
 static bool_t
 xdr_ga_res(XDR *xdrs, GETATTR4res *objp, GETATTR4args *aobjp)
 {
+#ifdef INLINE
 	uint32_t *ptr;
+#endif
 	bitmap4 resbmap;
 	uint32_t attrlen;
 
@@ -2307,11 +2466,13 @@ xdr_ga_res(XDR *xdrs, GETATTR4res *objp, GETATTR4args *aobjp)
 	}
 
 	/* Check to see if the attrs can be inlined and go for it if so */
+#ifdef INLINE
 	if (!(resbmap & FATTR4_ACL_MASK) &&
 	    (ptr = (uint32_t *)XDR_INLINE(xdrs, attrlen)) != NULL)
 		return (xdr_ga_fattr_res_inline(ptr, &objp->ga_res,
 		    resbmap, aobjp->attr_request, aobjp->mi, NULL));
 	else
+#endif
 		return (xdr_ga_fattr_res(xdrs, &objp->ga_res,
 		    resbmap, aobjp->attr_request, aobjp->mi, NULL));
 }
@@ -4300,6 +4461,7 @@ xdr_nfs_resop4_free(XDR *xdrs, nfs_resop4 **arrayp, int len, int decode_len)
 {
 	int i;
 	nfs_resop4 *array = *arrayp;
+	nfs4_ga_res_t *gr;
 
 	/*
 	 * Optimized XDR_FREE only results array
@@ -4319,10 +4481,15 @@ xdr_nfs_resop4_free(XDR *xdrs, nfs_resop4 **arrayp, int len, int decode_len)
 		case OP_GETATTR:
 			if (array[i].nfs_resop4_u.opgetattr.status != NFS4_OK)
 				continue;
-			if (array[i].nfs_resop4_u.opgetattr.ga_res.n4g_ext_res)
-				kmem_free(array[i].nfs_resop4_u.opgetattr.
-				    ga_res.n4g_ext_res,
+
+			gr = &array[i].nfs_resop4_u.opgetattr.ga_res;
+			if (gr->n4g_ext_res) {
+				if (gr->n4g_resbmap & FATTR4_FS_LOCATIONS_MASK)
+					(void) xdr_fattr4_fs_locations(xdrs,
+					    &gr->n4g_ext_res->n4g_fslocations);
+				kmem_free(gr->n4g_ext_res,
 				    sizeof (struct nfs4_ga_ext_res));
+			}
 			continue;
 		case OP_GETFH:
 			if (array[i].nfs_resop4_u.opgetfh.status != NFS4_OK)

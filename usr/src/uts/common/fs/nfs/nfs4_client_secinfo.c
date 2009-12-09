@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * NFS Version 4 client side SECINFO code.
@@ -749,7 +747,7 @@ retry:
 		    "nfs4secinfo_otw: recovery in a recovery thread\n"));
 
 		abort = nfs4_start_recovery(&e, mi, NULL,
-		    NULL, NULL, NULL, OP_SECINFO, NULL);
+		    NULL, NULL, NULL, OP_SECINFO, NULL, NULL, NULL);
 		if (!e.error) {
 			e.error = geterrno4(res.status);
 			(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);

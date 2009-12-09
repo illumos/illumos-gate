@@ -295,6 +295,7 @@ struct charset_cache {
 /* Forward declarations */
 struct exportinfo;
 struct exp_visible;
+struct svc_req;
 
 /*
  * Treenodes are used to build tree representing every node which is part
@@ -409,6 +410,7 @@ struct exportinfo {
 	struct exp_visible	*exi_visible;
 	struct charset_cache	*exi_charset;
 	unsigned		exi_volatile_dev:1;
+	unsigned		exi_moved:1;
 #ifdef VOLATILE_FH_TEST
 	uint32_t		exi_volatile_id;
 	struct ex_vol_rename	*exi_vol_rename;
@@ -512,6 +514,9 @@ extern void	export_link(struct exportinfo *);
 extern int	export_unlink(fsid_t *, fid_t *, vnode_t *,
 			struct exportinfo **);
 extern vnode_t *untraverse(vnode_t *);
+extern int	vn_is_nfs_reparse(vnode_t *, cred_t *);
+extern int	client_is_downrev(struct svc_req *);
+extern char    *build_symlink(vnode_t *, cred_t *, size_t *);
 
 /*
  * Functions that handle the NFSv4 server namespace

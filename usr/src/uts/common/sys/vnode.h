@@ -1239,6 +1239,7 @@ vnode_t *specvp(struct vnode *vp, dev_t dev, vtype_t type, struct cred *cr);
 vnode_t *makespecvp(dev_t dev, vtype_t type);
 vn_vfslocks_entry_t *vn_vfslocks_getlock(void *);
 void	vn_vfslocks_rele(vn_vfslocks_entry_t *);
+boolean_t vn_is_reparse(vnode_t *, cred_t *, caller_context_t *);
 
 void vn_copypath(struct vnode *src, struct vnode *dst);
 void vn_setpath_str(struct vnode *vp, const char *str, size_t len);

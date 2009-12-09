@@ -19,12 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <ctype.h>
 #include <string.h>
@@ -578,7 +575,7 @@ static void showxdr_utf8string(char *);
 static char *utf8localize(utf8string *);
 static void utf8free(void);
 static void sum_pathname4(char *, size_t, pathname4 *);
-static void detail_pathname4(pathname4 *pathp);
+static void detail_pathname4(pathname4 *pathp, char *);
 static void sum_compname4(char *buf, size_t buflen, component4 *comp);
 static void detail_compname4(component4 *comp);
 
@@ -696,8 +693,8 @@ interpret_nfs4_cb(int flags, int type, int xid, int vers, int proc,
 
 		if (type == CALL) {
 			(void) sprintf(line, "NFS C %s",
-				    proc == CB_COMPOUND ? "CB4" :
-					    cb_procnames_short[proc]);
+			    proc == CB_COMPOUND ? "CB4" :
+			    cb_procnames_short[proc]);
 			line += strlen(line);
 
 			if (proc == CB_COMPOUND) {
@@ -706,15 +703,15 @@ interpret_nfs4_cb(int flags, int type, int xid, int vers, int proc,
 				if (!xdr_utf8string(&xdrm, &tag))
 					longjmp(xdr_err, 1);
 				sprintf(line, " (%.20s) %s",
-					utf8localize(&tag),
-					sum_cb_compound4args());
+				    utf8localize(&tag),
+				    sum_cb_compound4args());
 				xdr_free(xdr_utf8string, (char *)&tag);
 			}
 			check_retransmit(line, xid);
 		} else {
 			(void) sprintf(line, "NFS R %s ",
-				    proc == CB_COMPOUND ? "CB4" :
-					    cb_procnames_short[proc]);
+			    proc == CB_COMPOUND ? "CB4" :
+			    cb_procnames_short[proc]);
 			line += strlen(line);
 			if (proc == CB_COMPOUND)
 				sum_comp4res(line, sum_cb_compound4res);
@@ -725,7 +722,7 @@ interpret_nfs4_cb(int flags, int type, int xid, int vers, int proc,
 		show_header("NFS:  ", "Sun NFS4 CallBack", len);
 		show_space();
 		(void) sprintf(get_line(0, 0), "Proc = %d (%s)",
-			proc, cb_procnames_long[proc]);
+		    proc, cb_procnames_long[proc]);
 		if (proc == CB_COMPOUND) {
 			if (type == CALL) {
 				showxdr_utf8string("Tag = %s");
@@ -736,7 +733,7 @@ interpret_nfs4_cb(int flags, int type, int xid, int vers, int proc,
 				status = getxdr_long();
 				showxdr_utf8string("Tag = %s");
 				sprintf(get_line(0, 0), "Status = %d (%s)",
-					status, status_name(status));
+				    status, status_name(status));
 				detail_cb_resop4();
 			}
 		}
@@ -766,8 +763,8 @@ interpret_nfs4(int flags, int type, int xid, int vers, int proc,
 
 		if (type == CALL) {
 			(void) sprintf(line, "NFS C %s",
-				    proc == NFSPROC4_COMPOUND ? "4" :
-					    procnames_short[proc]);
+			    proc == NFSPROC4_COMPOUND ? "4" :
+			    procnames_short[proc]);
 			line += strlen(line);
 
 			if (proc == NFSPROC4_COMPOUND) {
@@ -776,15 +773,15 @@ interpret_nfs4(int flags, int type, int xid, int vers, int proc,
 				if (!xdr_utf8string(&xdrm, &tag))
 					longjmp(xdr_err, 1);
 				sprintf(line, " (%.20s) %s",
-					utf8localize(&tag),
-					sum_compound4args());
+				    utf8localize(&tag),
+				    sum_compound4args());
 				xdr_free(xdr_utf8string, (char *)&tag);
 			}
 			check_retransmit(line, xid);
 		} else {
 			(void) sprintf(line, "NFS R %s ",
-				    proc == NFSPROC4_COMPOUND ? "4" :
-					    procnames_short[proc]);
+			    proc == NFSPROC4_COMPOUND ? "4" :
+			    procnames_short[proc]);
 			line += strlen(line);
 
 			if (proc == NFSPROC4_COMPOUND)
@@ -796,7 +793,7 @@ interpret_nfs4(int flags, int type, int xid, int vers, int proc,
 		show_header("NFS:  ", "Sun NFS", len);
 		show_space();
 		(void) sprintf(get_line(0, 0), "Proc = %d (%s)",
-			proc, procnames_long[proc]);
+		    proc, procnames_long[proc]);
 		if (proc == NFSPROC4_COMPOUND) {
 			if (type == CALL) {
 				showxdr_utf8string("Tag = %s");
@@ -807,7 +804,7 @@ interpret_nfs4(int flags, int type, int xid, int vers, int proc,
 				status = getxdr_long();
 				showxdr_utf8string("Tag = %s");
 				sprintf(get_line(0, 0), "Status = %d (%s)",
-					status, status_name(status));
+				    status, status_name(status));
 				detail_nfs_resop4();
 			}
 		}
@@ -840,7 +837,7 @@ sum_compound4args(void)
 	if (setjmp(xdr_err)) {
 		bp = buf + strlen(buf);
 		snprintf(bp, buflen - (bp - buf),
-			nfs4_fragged_rpc ? nfs4err_fragrpc : nfs4err_xdrfrag);
+		    nfs4_fragged_rpc ? nfs4err_fragrpc : nfs4err_xdrfrag);
 		return (buf);
 	}
 
@@ -863,7 +860,7 @@ sum_compound4args(void)
 			longjmp(xdr_err, 1);
 		}
 		snprintf(bp, buflen - (bp - buf), "%s ",
-			opcode_name(one_op.argop));
+		    opcode_name(one_op.argop));
 		bp += strlen(bp);
 
 		operand = sum_operand(&one_op);
@@ -952,7 +949,7 @@ sum_cb_compound4args(void)
 	if (setjmp(xdr_err)) {
 		bp = buf + strlen(buf);
 		snprintf(bp, buflen - (bp - buf), "<XDR Error or Fragmented"
-			" RPC>");
+		    " RPC>");
 		return (buf);
 	}
 
@@ -981,7 +978,7 @@ sum_cb_compound4args(void)
 		}
 
 		snprintf(bp, buflen - (bp - buf), "%s ",
-			cb_opcode_name(one_op.argop));
+		    cb_opcode_name(one_op.argop));
 		bp += strlen(bp);
 		operand = sum_cb_operand(&one_op);
 		if (strlen(operand) > 0) {
@@ -1058,11 +1055,11 @@ detail_nfs_argop4(void)
 		longjmp(xdr_err, 1);
 
 	(void) sprintf(get_line(0, 0), "Minor version = %u",
-		minor_version);
+	    minor_version);
 
 	numops = getxdr_long();
 	(void) sprintf(get_line(0, 0), "Number of operations = %d",
-		    numops);
+	    numops);
 
 	while (numops-- > 0) {
 		bzero(&one_op, sizeof (one_op));
@@ -1074,7 +1071,7 @@ detail_nfs_argop4(void)
 
 		get_line(0, 0);		/* blank line to separate ops */
 		sprintf(get_line(0, 0), "Op = %d (%s)",
-			one_op.argop, opcode_name(one_op.argop));
+		    one_op.argop, opcode_name(one_op.argop));
 		if (one_op.argop < num_opcodes) {
 			fmtproc = opcode_info[one_op.argop].dtlarg;
 			if (fmtproc != NULL)
@@ -1104,16 +1101,16 @@ detail_cb_argop4(void)
 	if (!xdr_uint32_t(&xdrm, &minor_version))
 		longjmp(xdr_err, 1);
 	(void) sprintf(get_line(0, 0), "Minor version = %u",
-		minor_version);
+	    minor_version);
 
 	if (!xdr_uint32_t(&xdrm, &callback_ident))
 		longjmp(xdr_err, 1);
 	(void) sprintf(get_line(0, 0), "Callback Ident = %u",
-		callback_ident);
+	    callback_ident);
 
 	numops = getxdr_long();
 	(void) sprintf(get_line(0, 0), "Number of operations = %d",
-		    numops);
+	    numops);
 
 	while (numops-- > 0) {
 		bzero(&one_op, sizeof (one_op));
@@ -1124,7 +1121,7 @@ detail_cb_argop4(void)
 
 		get_line(0, 0);		/* blank line to separate ops */
 		sprintf(get_line(0, 0), "Op = %d (%s)",
-			one_op.argop, cb_opcode_name(one_op.argop));
+		    one_op.argop, cb_opcode_name(one_op.argop));
 		if (one_op.argop < cb_num_opcodes) {
 			fmtproc = cb_opcode_info[one_op.argop].dtlarg;
 			if (fmtproc != NULL)
@@ -1268,10 +1265,10 @@ _sum_stateid(stateid4 *stateid, char *prefix)
 
 	if ((spec = special_stateid(stateid)) < 0)
 		snprintf(buf, sizeof (buf), "%s%04X:%u", prefix,
-			stateid_hash(stateid), stateid->seqid);
+		    stateid_hash(stateid), stateid->seqid);
 	else
 		snprintf(buf, sizeof (buf), "%s%s", prefix,
-			spec == 0 ? "SPC0" : (spec == 1 ? "SPC1" : "SPC?"));
+		    spec == 0 ? "SPC0" : (spec == 1 ? "SPC1" : "SPC?"));
 	return (buf);
 }
 
@@ -1285,15 +1282,15 @@ _detail_stateid(stateid4 *stateid, char *prefix)
 
 	if (spec < 0)
 		sprintf(get_line(0, 0), "%sState ID hash = %04X",
-			prefix, stateid_hash(stateid));
+		    prefix, stateid_hash(stateid));
 	else
 		sprintf(get_line(0, 0), "%sState ID hash = %s",	prefix,
-			spec == 0 ? "SPECIAL_0" :
-				(spec == 1 ? "SPECIAL_1" : "SPECIAL_?"));
+		    spec == 0 ? "SPECIAL_0" :
+		    (spec == 1 ? "SPECIAL_1" : "SPECIAL_?"));
 
 	sprintf(get_line(0, 0), "    len = %u    val = %s",
-		sizeof (stateid->other),
-		tohex(stateid->other, sizeof (stateid->other)));
+	    sizeof (stateid->other),
+	    tohex(stateid->other, sizeof (stateid->other)));
 
 	/*
 	 * If spec 0/1 stateid, print seqid in hex; otherwise,
@@ -1307,7 +1304,7 @@ _detail_stateid(stateid4 *stateid, char *prefix)
 		sprintf(seqstr, "%08X", stateid->seqid);
 
 	sprintf(get_line(0, 0), "    %sState ID Sequence ID = %s",
-		prefix, seqstr);
+	    prefix, seqstr);
 }
 
 
@@ -1317,9 +1314,9 @@ sum_lock_denied(LOCK4denied *denied)
 	static char buf[64];
 
 	sprintf(buf, "%s %llu %llu LO=%04X",
-		sum_lock_type_name(denied->locktype),
-		denied->offset, denied->length,
-		owner_hash(&denied->owner.owner));
+	    sum_lock_type_name(denied->locktype),
+	    denied->offset, denied->length,
+	    owner_hash(&denied->owner.owner));
 
 	return (buf);
 }
@@ -1368,7 +1365,7 @@ static void
 detail_createhow4(createhow4 *crtp)
 {
 	sprintf(get_line(0, 0), "Method = %s",
-		createhow4_name(crtp));
+	    createhow4_name(crtp));
 
 	switch (crtp->mode) {
 	case UNCHECKED4:
@@ -1377,8 +1374,8 @@ detail_createhow4(createhow4 *crtp)
 		break;
 	case EXCLUSIVE4:
 		sprintf(get_line(0, 0), "  Verifier = %s",
-			tohex(crtp->createhow4_u.createverf,
-				NFS4_VERIFIER_SIZE));
+		    tohex(crtp->createhow4_u.createverf,
+		    NFS4_VERIFIER_SIZE));
 		break;
 	}
 }
@@ -1387,17 +1384,17 @@ static void
 detail_createtype4(createtype4 *crtp)
 {
 	sprintf(get_line(0, 0), "Type = %s",
-		detail_type_name(crtp->type));
+	    detail_type_name(crtp->type));
 	switch (crtp->type) {
 	case NF4LNK:
 		sprintf(get_line(0, 0), "Linkdata = %s",
-			utf8localize(&crtp->createtype4_u.linkdata));
+		    utf8localize(&crtp->createtype4_u.linkdata));
 		break;
 	case NF4BLK:
 	case NF4CHR:
 		sprintf(get_line(0, 0), "Specdata1 = %04x Specdata2 = %04x",
-			crtp->createtype4_u.devdata.specdata1,
-			crtp->createtype4_u.devdata.specdata2);
+		    crtp->createtype4_u.devdata.specdata1,
+		    crtp->createtype4_u.devdata.specdata2);
 		break;
 	default:
 		break;
@@ -1426,7 +1423,7 @@ sumarg_close(char *buf, size_t buflen, void *obj)
 	CLOSE4args *args = (CLOSE4args *)obj;
 
 	snprintf(buf, buflen, "SQ=%u %s",
-		args->seqid, sum_open_stateid(&args->open_stateid));
+	    args->seqid, sum_open_stateid(&args->open_stateid));
 }
 
 static void
@@ -1444,7 +1441,7 @@ sumarg_commit(char *buf, size_t buflen, void *obj)
 	COMMIT4args *args = (COMMIT4args *)obj;
 
 	snprintf(buf, buflen, "at %llu for %u ", args->offset,
-		args->count);
+	    args->count);
 }
 
 static void
@@ -1478,7 +1475,7 @@ sumarg_create(char *buf, size_t buflen, void *obj)
 	CREATE4args *args = (CREATE4args *)obj;
 
 	snprintf(buf, buflen, "%s %s ", component_name(&args->objname),
-		sum_type_name(args->objtype.type));
+	    sum_type_name(args->objtype.type));
 }
 
 static void
@@ -1566,7 +1563,7 @@ sumarg_cb_recall(char *buf, size_t buflen, void *obj)
 	char *bp = buf;
 
 	snprintf(bp, buflen, "%s %s TR=%s", sum_fh4(&args->fh),
-		sum_stateid(&args->stateid), args->truncate ? "T" : "F");
+	    sum_stateid(&args->stateid), args->truncate ? "T" : "F");
 }
 
 static void
@@ -1577,7 +1574,7 @@ dtlarg_cb_recall(void *obj)
 	detail_fh4(&args->fh);
 	detail_stateid(&args->stateid);
 	sprintf(get_line(0, 0), "Truncate = %s",
-		args->truncate ? "True" : "False");
+	    args->truncate ? "True" : "False");
 }
 
 
@@ -1608,9 +1605,9 @@ sumarg_open(char *buf, size_t buflen, void *obj)
 	blen -= len;
 
 	snprintf(bp, blen, " AC=%s DN=%s OO=%04X",
-		sum_open_share_access(args->share_access),
-		sum_open_share_deny(args->share_deny),
-				owner_hash(&args->owner.owner));
+	    sum_open_share_access(args->share_access),
+	    sum_open_share_deny(args->share_deny),
+	    owner_hash(&args->owner.owner));
 }
 
 static void
@@ -1623,9 +1620,9 @@ dtlarg_open(void *obj)
 	detail_open_owner(&args->owner);
 	sprintf(get_line(0, 0), "Sequence ID = %u", args->seqid);
 	sprintf(get_line(0, 0), "Access = 0x%x (%s)",
-		args->share_access, sum_open_share_access(args->share_access));
+	    args->share_access, sum_open_share_access(args->share_access));
 	sprintf(get_line(0, 0), "Deny   = 0x%x (%s)",
-		args->share_deny, sum_open_share_access(args->share_deny));
+	    args->share_deny, sum_open_share_access(args->share_deny));
 }
 
 static void
@@ -1634,7 +1631,7 @@ sumarg_openattr(char *buf, size_t buflen, void *obj)
 	OPENATTR4args *args = (OPENATTR4args *)obj;
 
 	snprintf(buf, buflen, "CD=%s",
-		args->createdir ? "T" : "F");
+	    args->createdir ? "T" : "F");
 }
 
 static void
@@ -1643,7 +1640,7 @@ dtlarg_openattr(void *obj)
 	OPENATTR4args *args = (OPENATTR4args *)obj;
 
 	sprintf(get_line(0, 0), "CreateDir = %s",
-		args->createdir ? "True" : "False");
+	    args->createdir ? "True" : "False");
 }
 
 static void
@@ -1653,7 +1650,7 @@ sumarg_open_confirm(char *buf, size_t buflen, void *obj)
 	OPEN_CONFIRM4args *args = (OPEN_CONFIRM4args *)obj;
 
 	snprintf(bp, buflen, "SQ=%u %s", args->seqid,
-		sum_open_stateid(&args->open_stateid));
+	    sum_open_stateid(&args->open_stateid));
 }
 
 static void
@@ -1671,9 +1668,9 @@ sumarg_open_downgrd(char *buf, size_t buflen, void *obj)
 	OPEN_DOWNGRADE4args *args = (OPEN_DOWNGRADE4args *)obj;
 
 	snprintf(buf, buflen, "SQ=%u %s AC=%s DN=%s",
-		args->seqid, sum_open_stateid(&args->open_stateid),
-		sum_open_share_access(args->share_access),
-		sum_open_share_deny(args->share_deny));
+	    args->seqid, sum_open_stateid(&args->open_stateid),
+	    sum_open_share_access(args->share_access),
+	    sum_open_share_deny(args->share_deny));
 }
 
 static void
@@ -1684,9 +1681,9 @@ dtlarg_open_downgrd(void *obj)
 	sprintf(get_line(0, 0), "Open Sequence ID = %u", args->seqid);
 	detail_open_stateid(&args->open_stateid);
 	sprintf(get_line(0, 0), "Access = 0x%x (%s)",
-		args->share_access, sum_open_share_access(args->share_access));
+	    args->share_access, sum_open_share_access(args->share_access));
 	sprintf(get_line(0, 0), "Deny   = 0x%x (%s)",
-		args->share_deny, sum_open_share_access(args->share_deny));
+	    args->share_deny, sum_open_share_access(args->share_deny));
 }
 
 static void
@@ -1719,22 +1716,22 @@ dtlarg_link(void *obj)
 	LINK4args *args = (LINK4args *)obj;
 
 	sprintf(get_line(0, 0), "New name = %s",
-		component_name(&args->newname));
+	    component_name(&args->newname));
 }
 
 static void
 sum_open_to_lock_owner(char *buf, int buflen, open_to_lock_owner4 *own)
 {
 	snprintf(buf, buflen, " OSQ=%u %s LSQ=%u LO=%04X", own->open_seqid,
-		sum_open_stateid(&own->open_stateid), own->lock_seqid,
-		owner_hash(&own->lock_owner.owner));
+	    sum_open_stateid(&own->open_stateid), own->lock_seqid,
+	    owner_hash(&own->lock_owner.owner));
 }
 
 static void
 sum_exist_lock_owner(char *buf, int buflen, exist_lock_owner4 *own)
 {
 	snprintf(buf, buflen, " LSQ=%u %s", own->lock_seqid,
-		sum_lock_stateid(&own->lock_stateid));
+	    sum_lock_stateid(&own->lock_stateid));
 }
 
 static void
@@ -1779,9 +1776,9 @@ sumarg_lock(char *buf, size_t buflen, void *obj)
 	char *bp = buf;
 
 	snprintf(buf, buflen, "%s%s%llu:%llu",
-		sum_lock_type_name(args->locktype),
-		args->reclaim ? " reclaim " : " ",
-		args->offset, args->length);
+	    sum_lock_type_name(args->locktype),
+	    args->reclaim ? " reclaim " : " ",
+	    args->offset, args->length);
 
 	bp += strlen(buf);
 	sum_locker(bp, buflen - (bp - buf), &args->locker);
@@ -1819,7 +1816,7 @@ dtlarg_lock(void *obj)
 
 	sprintf(get_line(0, 0), "Type = %s", lock_type_name(args->locktype));
 	sprintf(get_line(0, 0), "Reclaim = %s",
-		args->reclaim ? "TRUE" : "FALSE");
+	    args->reclaim ? "TRUE" : "FALSE");
 	sprintf(get_line(0, 0), "Offset = %llu", args->offset);
 	sprintf(get_line(0, 0), "Length = %llu", args->length);
 	detail_locker(&args->locker);
@@ -1831,7 +1828,7 @@ sumarg_lockt(char *buf, size_t buflen, void *obj)
 	LOCKT4args *args = (LOCKT4args *)obj;
 
 	snprintf(buf, buflen, "R=%llu:%llu",
-		args->offset, args->length);
+	    args->offset, args->length);
 }
 
 static void
@@ -1851,8 +1848,8 @@ sumarg_locku(char *buf, size_t buflen, void *obj)
 	LOCKU4args *args = (LOCKU4args *)obj;
 
 	snprintf(buf, buflen, "R=%llu:%llu LSQ=%u %s",
-		args->offset, args->length, args->seqid,
-		sum_lock_stateid(&args->lock_stateid));
+	    args->offset, args->length, args->seqid,
+	    sum_lock_stateid(&args->lock_stateid));
 }
 
 
@@ -1890,7 +1887,7 @@ sumarg_read(char *buf, size_t buflen, void *obj)
 	READ4args *args = (READ4args *)obj;
 
 	snprintf(buf, buflen, "%s at %llu for %u",
-		sum_stateid(&args->stateid), args->offset, args->count);
+	    sum_stateid(&args->stateid), args->offset, args->count);
 }
 
 static void
@@ -1909,8 +1906,8 @@ sumarg_readdir(char *buf, size_t buflen, void *obj)
 	READDIR4args *args = (READDIR4args *)obj;
 
 	snprintf(buf, buflen, "Cookie=%llu (%s) for %u/%u",
-		args->cookie, tohex(args->cookieverf, NFS4_VERIFIER_SIZE),
-		args->dircount, args->maxcount);
+	    args->cookie, tohex(args->cookieverf, NFS4_VERIFIER_SIZE),
+	    args->dircount, args->maxcount);
 }
 
 static void
@@ -1920,7 +1917,7 @@ dtlarg_readdir(void *obj)
 
 	sprintf(get_line(0, 0), "Cookie = %llu", args->cookie);
 	sprintf(get_line(0, 0), "Verifier = %s",
-		tohex(args->cookieverf, NFS4_VERIFIER_SIZE));
+	    tohex(args->cookieverf, NFS4_VERIFIER_SIZE));
 	sprintf(get_line(0, 0), "Dircount = %u", args->dircount);
 	sprintf(get_line(0, 0), "Maxcount = %u", args->maxcount);
 	detail_attr_bitmap("", &args->attr_request, NULL);
@@ -1949,8 +1946,8 @@ sumarg_rename(char *buf, size_t buflen, void *obj)
 	RENAME4args *args = (RENAME4args *)obj;
 
 	snprintf(buf, buflen, "%s to %s",
-		component_name(&args->oldname),
-		component_name(&args->newname));
+	    component_name(&args->oldname),
+	    component_name(&args->newname));
 }
 
 static void
@@ -1959,9 +1956,9 @@ dtlarg_rename(void *obj)
 	RENAME4args *args = (RENAME4args *)obj;
 
 	sprintf(get_line(0, 0), "Old name = %s",
-		component_name(&args->oldname));
+	    component_name(&args->oldname));
 	sprintf(get_line(0, 0), "New name = %s",
-		component_name(&args->newname));
+	    component_name(&args->newname));
 }
 
 static void
@@ -1985,7 +1982,7 @@ sumarg_secinfo(char *buf, size_t buflen, void *obj)
 	SECINFO4args *args = (SECINFO4args *)obj;
 
 	snprintf(buf, buflen, "%s",
-		component_name(&args->name));
+	    component_name(&args->name));
 }
 
 static void
@@ -1994,7 +1991,7 @@ dtlarg_secinfo(void *obj)
 	SECINFO4args *args = (SECINFO4args *)obj;
 
 	sprintf(get_line(0, 0), "Name = %s",
-		component_name(&args->name));
+	    component_name(&args->name));
 }
 
 static void
@@ -2020,9 +2017,9 @@ sumarg_setclid(char *buf, size_t buflen, void *obj)
 	SETCLIENTID4args *args = (SETCLIENTID4args *)obj;
 
 	snprintf(buf, buflen, "Prog=%u ID=%s Addr=%s CBID=%u",
-		args->callback.cb_program,
-		args->callback.cb_location.r_netid,
-		args->callback.cb_location.r_addr, args->callback_ident);
+	    args->callback.cb_program,
+	    args->callback.cb_location.r_netid,
+	    args->callback.cb_location.r_addr, args->callback_ident);
 }
 
 static void
@@ -2031,17 +2028,17 @@ dtlarg_setclid(void *obj)
 	SETCLIENTID4args *args = (SETCLIENTID4args *)obj;
 
 	sprintf(get_line(0, 0), "Verifier=%s",
-		tohex(args->client.verifier, NFS4_VERIFIER_SIZE));
+	    tohex(args->client.verifier, NFS4_VERIFIER_SIZE));
 	sprintf(get_line(0, 0), "ID = (%d) %s",
-		args->client.id.id_len,
-		tohex(args->client.id.id_val, args->client.id.id_len));
+	    args->client.id.id_len,
+	    tohex(args->client.id.id_val, args->client.id.id_len));
 
 	sprintf(get_line(0, 0), "Callback Program = %u",
-		args->callback.cb_program);
+	    args->callback.cb_program);
 	sprintf(get_line(0, 0), "Callback Net ID = %s",
-		args->callback.cb_location.r_netid);
+	    args->callback.cb_location.r_netid);
 	sprintf(get_line(0, 0), "Callback Addr = %s",
-		args->callback.cb_location.r_addr);
+	    args->callback.cb_location.r_addr);
 	sprintf(get_line(0, 0), "Callback Ident = %u", args->callback_ident);
 }
 
@@ -2051,7 +2048,7 @@ sumarg_setclid_cfm(char *buf, size_t buflen, void *obj)
 	SETCLIENTID_CONFIRM4args *args = (SETCLIENTID_CONFIRM4args *)obj;
 
 	snprintf(buf, buflen, "%s CFV=%s", sum_clientid(args->clientid),
-		tohex(args->setclientid_confirm, NFS4_VERIFIER_SIZE));
+	    tohex(args->setclientid_confirm, NFS4_VERIFIER_SIZE));
 }
 
 static void
@@ -2061,7 +2058,7 @@ dtlarg_setclid_cfm(void *obj)
 
 	detail_clientid(args->clientid);
 	sprintf(get_line(0, 0), "Set Client ID Confirm Verifier = %s",
-		tohex(args->setclientid_confirm, NFS4_VERIFIER_SIZE));
+	    tohex(args->setclientid_confirm, NFS4_VERIFIER_SIZE));
 }
 
 
@@ -2079,7 +2076,7 @@ sumarg_write(char *buf, size_t buflen, void *obj)
 	WRITE4args *args = (WRITE4args *)obj;
 
 	snprintf(buf, buflen, "%s at %llu for %u",
-		sum_stateid(&args->stateid), args->offset, args->data.data_len);
+	    sum_stateid(&args->stateid), args->offset, args->data.data_len);
 }
 
 static void
@@ -2134,7 +2131,7 @@ detail_fattr4(fattr4 *attrp)
 	jmp_buf old_errbuf;
 
 	xdrmem_create(&attrxdr, attrp->attr_vals.attrlist4_val,
-		    attrp->attr_vals.attrlist4_len, XDR_DECODE);
+	    attrp->attr_vals.attrlist4_len, XDR_DECODE);
 
 	bcopy(xdr_err, old_errbuf, sizeof (old_errbuf));
 	if (setjmp(xdr_err)) {
@@ -2171,8 +2168,8 @@ sum_attr_bitmap(char *buf, size_t buflen, bitmap4 *mapp)
 		bp = buf + curlen;
 		remaining = buflen - curlen;
 		snprintf(bp, remaining,
-			num_words == 0 ? "%x" : " %x",
-			mapp->bitmap4_val[num_words]);
+		    num_words == 0 ? "%x" : " %x",
+		    mapp->bitmap4_val[num_words]);
 	}
 }
 
@@ -2216,7 +2213,7 @@ detail_attr_bitmap(char *prefix, bitmap4 *bitp, unpkd_attrmap_t *unpacked)
 					    attr_name(attrnum + bit));
 					if (unpacked != NULL)
 						unpacked->map[attrnum + bit] =
-							1;
+						    1;
 				}
 			}
 		}
@@ -2238,7 +2235,7 @@ sum_comp4res(char *line, char *(*sumres_fn)(void))
 		longjmp(xdr_err, 1);
 
 	sprintf(line, "(%.20s) %s %s", utf8localize(&tag),
-		status_name(status), sumres_fn());
+	    status_name(status), sumres_fn());
 
 	xdr_free(xdr_utf8string, (char *)&tag);
 }
@@ -2263,7 +2260,7 @@ sum_compound4res(void)
 	if (setjmp(xdr_err)) {
 		bp = buf + strlen(buf);
 		snprintf(bp, buflen - (bp - buf),
-			nfs4_fragged_rpc ? nfs4err_fragrpc : nfs4err_xdrfrag);
+		    nfs4_fragged_rpc ? nfs4err_fragrpc : nfs4err_xdrfrag);
 		return (buf);
 	}
 
@@ -2280,7 +2277,7 @@ sum_compound4res(void)
 		}
 
 		snprintf(bp, buflen - (bp - buf), "%s ",
-			opcode_name(one_res.resop));
+		    opcode_name(one_res.resop));
 		bp += strlen(bp);
 
 		result = sum_result(&one_res);
@@ -2325,7 +2322,7 @@ sum_cb_compound4res(void)
 	if (setjmp(xdr_err)) {
 		bp = buf + strlen(buf);
 		snprintf(bp, buflen - (bp - buf), "<XDR Error or Fragmented"
-			" RPC>");
+		    " RPC>");
 		return (buf);
 	}
 
@@ -2338,8 +2335,8 @@ sum_cb_compound4res(void)
 			longjmp(xdr_err, 1);
 		}
 		snprintf(bp, buflen - (bp - buf), "%s %s ",
-					cb_opcode_name(one_res.resop),
-					sum_cb_result(&one_res));
+		    cb_opcode_name(one_res.resop),
+		    sum_cb_result(&one_res));
 		bp += strlen(bp);
 
 		xdr_free(xdr_nfs_cb_resop4, (char *)&one_res);
@@ -2410,7 +2407,7 @@ dtl_change_info(char *msg, change_info4 *infop)
 {
 	sprintf(get_line(0, 0), "%s:", msg);
 	sprintf(get_line(0, 0), "  Atomic = %s",
-		infop->atomic ? "TRUE" : "FALSE");
+	    infop->atomic ? "TRUE" : "FALSE");
 	detail_fattr4_change("  Before", infop->before);
 	detail_fattr4_change("  After", infop->after);
 }
@@ -2436,7 +2433,7 @@ dtl_nfsstat4(void *obj)
 	nfsstat4 status = *(nfsstat4 *)obj;
 
 	sprintf(get_line(0, 0), "Status = %d (%s)", status,
-		status_name(status));
+	    status_name(status));
 }
 
 static void
@@ -2475,9 +2472,9 @@ dtlres_access(void *obj)
 	dtl_nfsstat4(obj);
 	if (res->status == NFS4_OK) {
 		detail_access4("Supported Attributes",
-			    res->ACCESS4res_u.resok4.supported);
+		    res->ACCESS4res_u.resok4.supported);
 		detail_access4("Allowed Attributes",
-			    res->ACCESS4res_u.resok4.access);
+		    res->ACCESS4res_u.resok4.access);
 	}
 }
 
@@ -2488,7 +2485,7 @@ sumres_close(char *buf, size_t buflen, void *obj)
 
 	if (res->status == NFS4_OK)
 		snprintf(buf, buflen, "%s",
-			sum_open_stateid(&res->CLOSE4res_u.open_stateid));
+		    sum_open_stateid(&res->CLOSE4res_u.open_stateid));
 }
 
 static void
@@ -2509,8 +2506,8 @@ sumres_commit(char *buf, size_t buflen, void *obj)
 
 	if (res->status == NFS4_OK)
 		snprintf(buf, buflen, "Verf=%s",
-			tohex(res->COMMIT4res_u.resok4.writeverf,
-				NFS4_VERIFIER_SIZE));
+		    tohex(res->COMMIT4res_u.resok4.writeverf,
+		    NFS4_VERIFIER_SIZE));
 }
 
 static void
@@ -2521,8 +2518,8 @@ dtlres_commit(void *obj)
 	dtl_nfsstat4(obj);
 	if (res->status == NFS4_OK) {
 		sprintf(get_line(0, 0), "Verifier = %s",
-			tohex(res->COMMIT4res_u.resok4.writeverf,
-				NFS4_VERIFIER_SIZE));
+		    tohex(res->COMMIT4res_u.resok4.writeverf,
+		    NFS4_VERIFIER_SIZE));
 	}
 }
 
@@ -2534,9 +2531,9 @@ dtlres_create(void *obj)
 	dtl_nfsstat4(obj);
 	if (res->status == NFS4_OK) {
 		dtl_change_info("Change Information",
-				&res->CREATE4res_u.resok4.cinfo);
+		    &res->CREATE4res_u.resok4.cinfo);
 		detail_attr_bitmap("", &res->CREATE4res_u.resok4.attrset,
-				NULL);
+		    NULL);
 	}
 }
 
@@ -2589,7 +2586,7 @@ sumres_getfh(char *buf, size_t buflen, void *obj)
 	if (res->status == NFS4_OK) {
 		bp = buf + strlen(buf);
 		snprintf(bp, buflen - (bp - buf), " %s",
-			sum_fh4(&res->GETFH4res_u.resok4.object));
+		    sum_fh4(&res->GETFH4res_u.resok4.object));
 	}
 }
 
@@ -2612,7 +2609,7 @@ dtlres_link(void *obj)
 	dtl_nfsstat4(obj);
 	if (res->status == NFS4_OK) {
 		dtl_change_info("Change Information",
-				&res->LINK4res_u.resok4.cinfo);
+		    &res->LINK4res_u.resok4.cinfo);
 	}
 }
 
@@ -2626,12 +2623,12 @@ sumres_lock(char *buf, size_t buflen, void *obj)
 	if (res->status == NFS4_OK) {
 		bp = buf + strlen(buf);
 		snprintf(bp, buflen - (bp - buf), " %s",
-			sum_lock_stateid(&res->LOCK4res_u.resok4.lock_stateid));
+		    sum_lock_stateid(&res->LOCK4res_u.resok4.lock_stateid));
 	}
 	if (res->status == NFS4ERR_DENIED) {
 		bp = buf + strlen(buf);
 		snprintf(bp, buflen - (bp - buf), " %s",
-			sum_lock_denied(&res->LOCK4res_u.denied));
+		    sum_lock_denied(&res->LOCK4res_u.denied));
 	}
 }
 
@@ -2659,7 +2656,7 @@ sumres_lockt(char *buf, size_t buflen, void *obj)
 	if (res->status == NFS4ERR_DENIED) {
 		bp = buf + strlen(buf);
 		snprintf(bp, buflen - (bp - buf), " %s",
-			sum_lock_denied(&res->LOCKT4res_u.denied));
+		    sum_lock_denied(&res->LOCKT4res_u.denied));
 	}
 }
 
@@ -2684,7 +2681,7 @@ sumres_locku(char *buf, size_t buflen, void *obj)
 	bp = buf + strlen(buf);
 	if (res->status == NFS4_OK)
 		snprintf(bp, buflen - (bp - buf), " %s",
-			sum_lock_stateid(&res->LOCKU4res_u.lock_stateid));
+		    sum_lock_stateid(&res->LOCKU4res_u.lock_stateid));
 }
 
 static void
@@ -2712,7 +2709,7 @@ sumres_open(char *buf, size_t buflen, void *obj)
 		blen -= len;
 
 		snprintf(bp, blen, " %s",
-			sum_stateid(&res->OPEN4res_u.resok4.stateid));
+		    sum_stateid(&res->OPEN4res_u.resok4.stateid));
 		bp += (len = strlen(bp));
 		blen -= len;
 
@@ -2735,12 +2732,12 @@ dtlres_open(void *obj)
 	if (res->status == NFS4_OK) {
 		detail_stateid(&res->OPEN4res_u.resok4.stateid);
 		dtl_change_info("Change Information",
-			&res->OPEN4res_u.resok4.cinfo);
+		    &res->OPEN4res_u.resok4.cinfo);
 		sprintf(get_line(0, 0), "Flags = 0x%x (%s)",
-			res->OPEN4res_u.resok4.rflags,
-			detail_open_rflags(res->OPEN4res_u.resok4.rflags));
+		    res->OPEN4res_u.resok4.rflags,
+		    detail_open_rflags(res->OPEN4res_u.resok4.rflags));
 		detail_attr_bitmap("", &res->OPEN4res_u.resok4.attrset,
-				NULL);
+		    NULL);
 		detail_delegation(&res->OPEN4res_u.resok4.delegation);
 	}
 }
@@ -2755,8 +2752,8 @@ sumres_open_confirm(char *buf, size_t buflen, void *obj)
 	if (res->status == NFS4_OK) {
 		bp = buf + strlen(buf);
 		snprintf(bp, buflen - (bp - buf), " %s",
-			sum_open_stateid(&res->OPEN_CONFIRM4res_u.resok4.
-					open_stateid));
+		    sum_open_stateid(&res->OPEN_CONFIRM4res_u.resok4.
+		    open_stateid));
 	}
 }
 
@@ -2768,7 +2765,7 @@ dtlres_open_confirm(void *obj)
 	dtl_nfsstat4(obj);
 	if (res->status == NFS4_OK) {
 		detail_open_stateid(&res->OPEN_CONFIRM4res_u.resok4.
-				    open_stateid);
+		    open_stateid);
 	}
 }
 
@@ -2782,8 +2779,8 @@ sumres_open_downgrd(char *buf, size_t buflen, void *obj)
 	if (res->status == NFS4_OK) {
 		bp = buf + strlen(buf);
 		snprintf(bp, buflen - (bp - buf), " %s",
-			sum_open_stateid(&res->OPEN_DOWNGRADE4res_u.resok4.
-					open_stateid));
+		    sum_open_stateid(&res->OPEN_DOWNGRADE4res_u.resok4.
+		    open_stateid));
 	}
 }
 
@@ -2795,7 +2792,7 @@ dtlres_open_downgrd(void *obj)
 	dtl_nfsstat4(obj);
 	if (res->status == NFS4_OK) {
 		detail_open_stateid(&res->OPEN_DOWNGRADE4res_u.resok4.
-				    open_stateid);
+		    open_stateid);
 	}
 }
 
@@ -2809,8 +2806,8 @@ sumres_read(char *buf, size_t buflen, void *obj)
 	if (res->status == NFS4_OK) {
 		bp = buf + strlen(buf);
 		snprintf(bp, buflen - (bp - buf), " (%u bytes) %s",
-			res->READ4res_u.resok4.data.data_len,
-			res->READ4res_u.resok4.eof ? "EOF" : "");
+		    res->READ4res_u.resok4.data.data_len,
+		    res->READ4res_u.resok4.eof ? "EOF" : "");
 	}
 }
 
@@ -2822,9 +2819,9 @@ dtlres_read(void *obj)
 	dtl_nfsstat4(obj);
 	if (res->status == NFS4_OK) {
 		sprintf(get_line(0, 0), "Count = %u bytes read",
-			res->READ4res_u.resok4.data.data_len);
+		    res->READ4res_u.resok4.data.data_len);
 		sprintf(get_line(0, 0), "End of file = %s",
-			res->READ4res_u.resok4.eof ? "TRUE" : "FALSE");
+		    res->READ4res_u.resok4.eof ? "TRUE" : "FALSE");
 	}
 }
 
@@ -2844,9 +2841,9 @@ sumres_readdir(char *buf, size_t buflen, void *obj)
 			num_entries++;
 		bp = buf + strlen(buf);
 		snprintf(bp, buflen - (bp - buf), " %d entries (%s)",
-			num_entries,
-			res->READDIR4res_u.resok4.reply.eof
-			? "No more" : "More");
+		    num_entries,
+		    res->READDIR4res_u.resok4.reply.eof
+		    ? "No more" : "More");
 	}
 }
 
@@ -2864,12 +2861,12 @@ dtlres_readdir(void *obj)
 		    ep = ep->nextentry) {
 			num_entries++;
 			sprintf(get_line(0, 0),
-				"------------------ entry #%d",
-				num_entries);
+			    "------------------ entry #%d",
+			    num_entries);
 			sprintf(get_line(0, 0), "Cookie = %llu",
-				ep->cookie);
+			    ep->cookie);
 			sprintf(get_line(0, 0), "Name = %s",
-				component_name(&ep->name));
+			    component_name(&ep->name));
 			detail_fattr4(&ep->attrs);
 		}
 		if (num_entries == 0)
@@ -2877,8 +2874,8 @@ dtlres_readdir(void *obj)
 		sprintf(get_line(0, 0), "EOF = %s",
 		    res->READDIR4res_u.resok4.reply.eof ? "TRUE" : "FALSE");
 		sprintf(get_line(0, 0), "Verifer = %s",
-			tohex(res->READDIR4res_u.resok4.cookieverf,
-				NFS4_VERIFIER_SIZE));
+		    tohex(res->READDIR4res_u.resok4.cookieverf,
+		    NFS4_VERIFIER_SIZE));
 	}
 }
 
@@ -2892,7 +2889,7 @@ sumres_readlnk(char *buf, size_t buflen, void *obj)
 	if (res->status == NFS4_OK) {
 		bp = buf + strlen(buf);
 		snprintf(bp, buflen - (bp - buf), " %s",
-			linktext_name(&res->READLINK4res_u.resok4.link));
+		    linktext_name(&res->READLINK4res_u.resok4.link));
 	}
 }
 
@@ -2904,7 +2901,7 @@ dtlres_readlnk(void *obj)
 	dtl_nfsstat4(obj);
 	if (res->status == NFS4_OK) {
 		sprintf(get_line(0, 0), "Link = %s",
-			linktext_name(&res->READLINK4res_u.resok4.link));
+		    linktext_name(&res->READLINK4res_u.resok4.link));
 	}
 }
 
@@ -2916,7 +2913,7 @@ dtlres_remove(void *obj)
 	dtl_nfsstat4(obj);
 	if (res->status == NFS4_OK) {
 		dtl_change_info("Change Information",
-				&res->REMOVE4res_u.resok4.cinfo);
+		    &res->REMOVE4res_u.resok4.cinfo);
 	}
 }
 
@@ -2928,9 +2925,9 @@ dtlres_rename(void *obj)
 	dtl_nfsstat4(obj);
 	if (res->status == NFS4_OK) {
 		dtl_change_info("Source Change Information",
-				&res->RENAME4res_u.resok4.source_cinfo);
+		    &res->RENAME4res_u.resok4.source_cinfo);
 		dtl_change_info("Target Change Information",
-				&res->RENAME4res_u.resok4.target_cinfo);
+		    &res->RENAME4res_u.resok4.target_cinfo);
 	}
 }
 
@@ -2950,7 +2947,7 @@ sumres_secinfo(char *buf, size_t buflen, void *obj)
 		    numinfo != 0;
 		    infop++, numinfo--) {
 			snprintf(bp, buflen - (bp - buf), " %s",
-				flavor_name(infop->flavor));
+			    flavor_name(infop->flavor));
 			bp += strlen(bp);
 		}
 	}
@@ -2964,7 +2961,7 @@ dtlres_secinfo(void *obj)
 	dtl_nfsstat4(obj);
 	if (res->status == NFS4_OK) {
 		uint_t numinfo =
-			res->SECINFO4res_u.resok4.SECINFO4resok_len;
+		    res->SECINFO4res_u.resok4.SECINFO4resok_len;
 		secinfo4 *infop;
 
 		for (infop = res->SECINFO4res_u.resok4.SECINFO4resok_val;
@@ -3004,15 +3001,15 @@ sumres_setclid(char *buf, size_t buflen, void *obj)
 	case NFS_OK:
 		bp = buf + strlen(buf);
 		snprintf(bp, buflen - (bp - buf), " %s CFV=%s",
-			sum_clientid(res->SETCLIENTID4res_u.resok4.clientid),
-			tohex(res->SETCLIENTID4res_u.resok4.setclientid_confirm,
-				NFS4_VERIFIER_SIZE));
+		    sum_clientid(res->SETCLIENTID4res_u.resok4.clientid),
+		    tohex(res->SETCLIENTID4res_u.resok4.setclientid_confirm,
+		    NFS4_VERIFIER_SIZE));
 		break;
 	case NFS4ERR_CLID_INUSE:
 		bp = buf + strlen(buf);
 		snprintf(bp, buflen - (bp - buf), " ID=%s Addr=%s",
-			res->SETCLIENTID4res_u.client_using.r_netid,
-			res->SETCLIENTID4res_u.client_using.r_addr);
+		    res->SETCLIENTID4res_u.client_using.r_netid,
+		    res->SETCLIENTID4res_u.client_using.r_addr);
 		break;
 	}
 }
@@ -3027,14 +3024,14 @@ dtlres_setclid(void *obj)
 	case NFS_OK:
 		detail_clientid(res->SETCLIENTID4res_u.resok4.clientid);
 		sprintf(get_line(0, 0), "Set Client ID Confirm Verifier = %s",
-			tohex(res->SETCLIENTID4res_u.resok4.setclientid_confirm,
-				NFS4_VERIFIER_SIZE));
+		    tohex(res->SETCLIENTID4res_u.resok4.setclientid_confirm,
+		    NFS4_VERIFIER_SIZE));
 		break;
 	case NFS4ERR_CLID_INUSE:
 		sprintf(get_line(0, 0), "Used by Net ID = %s",
-			res->SETCLIENTID4res_u.client_using.r_netid);
+		    res->SETCLIENTID4res_u.client_using.r_netid);
 		sprintf(get_line(0, 0), "Used by Addr = %s",
-			res->SETCLIENTID4res_u.client_using.r_addr);
+		    res->SETCLIENTID4res_u.client_using.r_addr);
 		break;
 	}
 }
@@ -3049,8 +3046,8 @@ sumres_write(char *buf, size_t buflen, void *obj)
 	if (res->status == NFS4_OK) {
 		bp = buf + strlen(buf);
 		snprintf(bp, buflen - (bp - buf), " %u (%s)",
-			res->WRITE4res_u.resok4.count,
-			stable_how4_name(res->WRITE4res_u.resok4.committed));
+		    res->WRITE4res_u.resok4.count,
+		    stable_how4_name(res->WRITE4res_u.resok4.committed));
 	}
 }
 
@@ -3062,12 +3059,12 @@ dtlres_write(void *obj)
 	dtl_nfsstat4(obj);
 	if (res->status == NFS4_OK) {
 		sprintf(get_line(0, 0), "Count = %u bytes written",
-			res->WRITE4res_u.resok4.count);
+		    res->WRITE4res_u.resok4.count);
 		sprintf(get_line(0, 0), "Stable = %s",
-			stable_how4_name(res->WRITE4res_u.resok4.committed));
+		    stable_how4_name(res->WRITE4res_u.resok4.committed));
 		sprintf(get_line(0, 0), "Verifier = %s",
-			tohex(res->WRITE4res_u.resok4.writeverf,
-				NFS4_VERIFIER_SIZE));
+		    tohex(res->WRITE4res_u.resok4.writeverf,
+		    NFS4_VERIFIER_SIZE));
 	}
 }
 
@@ -3084,7 +3081,7 @@ detail_nfs_resop4(void)
 
 	numres = getxdr_long();
 	(void) sprintf(get_line(0, 0), "Number of results = %d",
-		    numres);
+	    numres);
 
 	while (numres-- > 0) {
 		bzero(&one_res, sizeof (one_res));
@@ -3096,7 +3093,7 @@ detail_nfs_resop4(void)
 
 		get_line(0, 0);		/* blank line to separate ops */
 		sprintf(get_line(0, 0), "Op = %d (%s)",
-			one_res.resop, opcode_name(one_res.resop));
+		    one_res.resop, opcode_name(one_res.resop));
 		if (one_res.resop < num_opcodes)
 			fmtproc = opcode_info[one_res.resop].dtlres;
 		else if (one_res.resop == OP_ILLEGAL)
@@ -3129,7 +3126,7 @@ detail_cb_resop4(void)
 
 	numres = getxdr_long();
 	(void) sprintf(get_line(0, 0), "Number of results = %d",
-		    numres);
+	    numres);
 
 	while (numres-- > 0) {
 		bzero(&one_res, sizeof (one_res));
@@ -3138,7 +3135,7 @@ detail_cb_resop4(void)
 
 		get_line(0, 0);		/* blank line to separate ops */
 		sprintf(get_line(0, 0), "Op = %d (%s)",
-			one_res.resop, cb_opcode_name(one_res.resop));
+		    one_res.resop, cb_opcode_name(one_res.resop));
 		if (one_res.resop < cb_num_opcodes)
 			fmtproc = cb_opcode_info[one_res.resop].dtlres;
 		else if (one_res.resop == OP_CB_ILLEGAL)
@@ -3256,17 +3253,17 @@ detail_access4(char *descrip, uint32_t bits)
 	sprintf(get_line(0, 0), "%s = 0x%08x", descrip, bits);
 
 	(void) sprintf(get_line(0, 0), "	%s",
-		getflag(bits, ACCESS4_READ, "Read", "(no read)"));
+	    getflag(bits, ACCESS4_READ, "Read", "(no read)"));
 	(void) sprintf(get_line(0, 0), "	%s",
-		getflag(bits, ACCESS4_LOOKUP, "Lookup", "(no lookup)"));
+	    getflag(bits, ACCESS4_LOOKUP, "Lookup", "(no lookup)"));
 	(void) sprintf(get_line(0, 0), "	%s",
-		getflag(bits, ACCESS4_MODIFY, "Modify", "(no modify)"));
+	    getflag(bits, ACCESS4_MODIFY, "Modify", "(no modify)"));
 	(void) sprintf(get_line(0, 0), "	%s",
-		getflag(bits, ACCESS4_EXTEND, "Extend", "(no extend)"));
+	    getflag(bits, ACCESS4_EXTEND, "Extend", "(no extend)"));
 	(void) sprintf(get_line(0, 0), "	%s",
-		getflag(bits, ACCESS4_DELETE, "Delete", "(no delete)"));
+	    getflag(bits, ACCESS4_DELETE, "Delete", "(no delete)"));
 	(void) sprintf(get_line(0, 0), "	%s",
-		getflag(bits, ACCESS4_EXECUTE, "Execute", "(no execute)"));
+	    getflag(bits, ACCESS4_EXECUTE, "Execute", "(no execute)"));
 }
 
 
@@ -3281,19 +3278,19 @@ sum_name(char *buf, size_t buflen, open_claim4 *claim)
 	switch (claim->claim) {
 	case CLAIM_NULL:
 		snprintf(bp, buflen, "%s ",
-			component_name(&claim->open_claim4_u.file));
+		    component_name(&claim->open_claim4_u.file));
 		break;
 	case CLAIM_PREVIOUS:
 		break;
 	case CLAIM_DELEGATE_CUR:
 		snprintf(bp, buflen, "%s ",
-			component_name(&claim->open_claim4_u.
-					delegate_cur_info.file));
+		    component_name(&claim->open_claim4_u.
+		    delegate_cur_info.file));
 		break;
 	case CLAIM_DELEGATE_PREV:
 		snprintf(bp, buflen, "%s ",
-			component_name(&claim->open_claim4_u.
-					file_delegate_prev));
+		    component_name(&claim->open_claim4_u.
+		    file_delegate_prev));
 		break;
 	}
 }
@@ -3312,12 +3309,12 @@ sum_claim(char *buf, size_t buflen, open_claim4 *claim)
 		break;
 	case CLAIM_PREVIOUS:
 		snprintf(bp, buflen, " CT=P DT=%s",
-			get_deleg_typestr(claim->open_claim4_u.delegate_type));
+		    get_deleg_typestr(claim->open_claim4_u.delegate_type));
 		break;
 	case CLAIM_DELEGATE_CUR:
 		snprintf(bp, buflen, " CT=DC %s",
-			sum_deleg_stateid(&claim->open_claim4_u.
-				delegate_cur_info.delegate_stateid));
+		    sum_deleg_stateid(&claim->open_claim4_u.
+		    delegate_cur_info.delegate_stateid));
 		break;
 	case CLAIM_DELEGATE_PREV:
 		snprintf(bp, buflen, " CT=DP");
@@ -3358,7 +3355,7 @@ static void
 detail_claim(open_claim4 *claim)
 {
 	sprintf(get_line(0, 0), "Claim Type = %d (%s)",
-		claim->claim, claim_name(claim->claim));
+	    claim->claim, claim_name(claim->claim));
 
 	switch (claim->claim) {
 	case CLAIM_NULL:
@@ -3366,13 +3363,13 @@ detail_claim(open_claim4 *claim)
 		break;
 	case CLAIM_PREVIOUS:
 		sprintf(get_line(0, 0), "Delegate Type = %s (val = %d)",
-			get_deleg_typestr(claim->open_claim4_u.delegate_type),
-			claim->open_claim4_u.delegate_type);
+		    get_deleg_typestr(claim->open_claim4_u.delegate_type),
+		    claim->open_claim4_u.delegate_type);
 		break;
 	case CLAIM_DELEGATE_CUR:
 		detail_compname4(&claim->open_claim4_u.delegate_cur_info.file);
 		detail_deleg_stateid(&claim->open_claim4_u.delegate_cur_info.
-				    delegate_stateid);
+		    delegate_stateid);
 		break;
 	case CLAIM_DELEGATE_PREV:
 		detail_compname4(&claim->open_claim4_u.file_delegate_prev);
@@ -3415,15 +3412,15 @@ sum_delegation(char *buf, size_t buflen, open_delegation4 *delp)
 		break;
 	case OPEN_DELEGATE_READ:
 		snprintf(buf, buflen, " DT=R %s",
-			sum_deleg_stateid(&delp->open_delegation4_u.write.
-					stateid));
+		    sum_deleg_stateid(&delp->open_delegation4_u.write.
+		    stateid));
 		break;
 	case OPEN_DELEGATE_WRITE:
 		snprintf(buf, buflen, " DT=W %s %s",
-			sum_deleg_stateid(&delp->open_delegation4_u.write.
-					stateid),
-			sum_space_limit(&delp->open_delegation4_u.write.
-					space_limit));
+		    sum_deleg_stateid(&delp->open_delegation4_u.write.
+		    stateid),
+		    sum_space_limit(&delp->open_delegation4_u.write.
+		    space_limit));
 		break;
 	default:
 		snprintf(buf, buflen, " DT=?");
@@ -3435,8 +3432,8 @@ static void
 detail_delegation(open_delegation4 *delp)
 {
 	sprintf(get_line(0, 0), "Delegation Type = %d (%s)",
-		delp->delegation_type,
-		delegation_type_name(delp->delegation_type));
+	    delp->delegation_type,
+	    delegation_type_name(delp->delegation_type));
 
 	switch (delp->delegation_type) {
 	case OPEN_DELEGATE_NONE:
@@ -3445,17 +3442,17 @@ detail_delegation(open_delegation4 *delp)
 	case OPEN_DELEGATE_READ:
 		detail_deleg_stateid(&delp->open_delegation4_u.read.stateid);
 		sprintf(get_line(0, 0), "Recall = %s",
-			delp->open_delegation4_u.read.recall ?
-			"TRUE" : "FALSE");
+		    delp->open_delegation4_u.read.recall ?
+		    "TRUE" : "FALSE");
 		sprintf(get_line(0, 0), "[nfsacl4]");
 		break;
 	case OPEN_DELEGATE_WRITE:
 		detail_deleg_stateid(&delp->open_delegation4_u.write.stateid);
 		sprintf(get_line(0, 0), "Recall = %s",
-			delp->open_delegation4_u.write.recall ?
-			"TRUE" : "FALSE");
+		    delp->open_delegation4_u.write.recall ?
+		    "TRUE" : "FALSE");
 		detail_space_limit(&delp->open_delegation4_u.write.
-				space_limit);
+		    space_limit);
 		sprintf(get_line(0, 0), "[nfsacl4]");
 		break;
 	}
@@ -3466,10 +3463,10 @@ static void
 detail_open_owner(open_owner4 *owner)
 {
 	sprintf(get_line(0, 0), "Open Owner hash = [%04X] ",
-		owner_hash(&owner->owner));
+	    owner_hash(&owner->owner));
 	sprintf(get_line(0, 0), "    len = %u   val = %s ",
-		owner->owner.owner_len,
-		tohex(owner->owner.owner_val, owner->owner.owner_len));
+	    owner->owner.owner_len,
+	    tohex(owner->owner.owner_val, owner->owner.owner_len));
 	detail_clientid(owner->clientid);
 }
 
@@ -3477,10 +3474,10 @@ static void
 detail_lock_owner(lock_owner4 *owner)
 {
 	sprintf(get_line(0, 0), "Lock Owner hash = [%04X] ",
-		owner_hash(&owner->owner));
+	    owner_hash(&owner->owner));
 	sprintf(get_line(0, 0), "    len = %u   val = %s ",
-		owner->owner.owner_len,
-		tohex(owner->owner.owner_val, owner->owner.owner_len));
+	    owner->owner.owner_len,
+	    tohex(owner->owner.owner_val, owner->owner.owner_len));
 	detail_clientid(owner->clientid);
 }
 
@@ -3500,7 +3497,7 @@ sum_openflag(char *bufp, int buflen, openflag4 *flagp)
 			break;
 		default:
 			snprintf(bufp, buflen, "OT=CR(?:%d)",
-				flagp->openflag4_u.how.mode);
+			    flagp->openflag4_u.how.mode);
 			break;
 		}
 	} else
@@ -3511,7 +3508,7 @@ static void
 detail_openflag(openflag4 *flagp)
 {
 	sprintf(get_line(0, 0), "Open Type = %s",
-		flagp->opentype == OPEN4_CREATE ? "CREATE" : "NOCREATE");
+	    flagp->opentype == OPEN4_CREATE ? "CREATE" : "NOCREATE");
 	if (flagp->opentype == OPEN4_CREATE)
 		detail_createhow4(&flagp->openflag4_u.how);
 }
@@ -3528,8 +3525,8 @@ sum_pathname4(char *buf, size_t buflen, pathname4 *pathp)
 	for (component = 0; component < pathp->pathname4_len;
 	    component++) {
 		snprintf(bp, buflen - (bp - buf),
-			component == 0 ? "%s" : "/%s",
-			component_name(&pathp->pathname4_val[component]));
+		    component == 0 ? "%s" : "/%s",
+		    component_name(&pathp->pathname4_val[component]));
 		bp += strlen(bp);
 	}
 }
@@ -3547,17 +3544,17 @@ detail_compname4(component4 *comp)
 }
 
 static void
-detail_pathname4(pathname4 *pathp)
+detail_pathname4(pathname4 *pathp, char *what)
 {
 	char *bp = get_line(0, 0);
 	uint_t component;
 
-	sprintf(bp, "File name = ");
+	sprintf(bp, what);
 	bp += strlen(bp);
 
 	for (component = 0; component < pathp->pathname4_len; component++) {
 		sprintf(bp, component == 0 ? "%s" : "/%s",
-			component_name(&pathp->pathname4_val[component]));
+		    component_name(&pathp->pathname4_val[component]));
 		bp += strlen(bp);
 	}
 }
@@ -3571,10 +3568,10 @@ static void
 detail_rpcsec_gss(rpcsec_gss_info *info)
 {
 	sprintf(get_line(0, 0), "OID = %s",
-		tohex(info->oid.sec_oid4_val, info->oid.sec_oid4_len));
+	    tohex(info->oid.sec_oid4_val, info->oid.sec_oid4_len));
 	sprintf(get_line(0, 0), "QOP = %u", info->qop);
 	sprintf(get_line(0, 0), "Service = %d (%s)",
-		info->service, gss_svc_name(info->service));
+	    info->service, gss_svc_name(info->service));
 }
 
 /*
@@ -3585,7 +3582,7 @@ static void
 detail_secinfo4(secinfo4 *infop)
 {
 	sprintf(get_line(0, 0), "Flavor = %d (%s)",
-		infop->flavor, flavor_name(infop->flavor));
+	    infop->flavor, flavor_name(infop->flavor));
 	switch (infop->flavor) {
 	case RPCSEC_GSS:
 		detail_rpcsec_gss(&infop->secinfo4_u.flavor_info);
@@ -3608,12 +3605,12 @@ sum_space_limit(nfs_space_limit4 *limitp)
 	switch (limitp->limitby) {
 	case NFS_LIMIT_SIZE:
 		snprintf(buf, buflen, "LB=SZ(%llu)",
-			limitp->nfs_space_limit4_u.filesize);
+		    limitp->nfs_space_limit4_u.filesize);
 		break;
 	case NFS_LIMIT_BLOCKS:
 		snprintf(buf, buflen, "LB=BL(%u*%u)",
-			limitp->nfs_space_limit4_u.mod_blocks.num_blocks,
-			limitp->nfs_space_limit4_u.mod_blocks.bytes_per_block);
+		    limitp->nfs_space_limit4_u.mod_blocks.num_blocks,
+		    limitp->nfs_space_limit4_u.mod_blocks.bytes_per_block);
 		break;
 	default:
 		snprintf(buf, buflen, "LB=?(%d)", limitp->limitby);
@@ -3631,19 +3628,19 @@ static void
 detail_space_limit(nfs_space_limit4 *limitp)
 {
 	sprintf(get_line(0, 0), "LimitBy = %d (%s)",
-		limitp->limitby,
-		limitby_name(limitp->limitby));
+	    limitp->limitby,
+	    limitby_name(limitp->limitby));
 
 	switch (limitp->limitby) {
 	case NFS_LIMIT_SIZE:
 		sprintf(get_line(0, 0), "Bytes = %llu",
-			limitp->nfs_space_limit4_u.filesize);
+		    limitp->nfs_space_limit4_u.filesize);
 		break;
 	case NFS_LIMIT_BLOCKS:
 		sprintf(get_line(0, 0), "Blocks = %u",
-			limitp->nfs_space_limit4_u.mod_blocks.num_blocks);
+		    limitp->nfs_space_limit4_u.mod_blocks.num_blocks);
 		sprintf(get_line(0, 0), "Bytes Per Block = %u",
-			limitp->nfs_space_limit4_u.mod_blocks.bytes_per_block);
+		    limitp->nfs_space_limit4_u.mod_blocks.bytes_per_block);
 		break;
 	}
 }
@@ -3927,8 +3924,8 @@ status_name(int status)
 	case NFS4ERR_RESOURCE:	p = "NFS4ERR_RESOURCE"; break;
 	case NFS4ERR_MOVED:	p = "NFS4ERR_MOVED"; break;
 	case NFS4ERR_NOFILEHANDLE: p = "NFS4ERR_NOFILEHANDLE"; break;
-	case NFS4ERR_MINOR_VERS_MISMATCH: p =
-				"NFS4ERR_MINOR_VERS_MISMATCH"; break;
+	case NFS4ERR_MINOR_VERS_MISMATCH: p = "NFS4ERR_MINOR_VERS_MISMATCH";
+	break;
 	case NFS4ERR_STALE_CLIENTID: p = "NFS4ERR_STALE_CLIENTID"; break;
 	case NFS4ERR_STALE_STATEID: p = "NFS4ERR_STALE_STATEID"; break;
 	case NFS4ERR_OLD_STATEID: p = "NFS4ERR_OLD_STATEID"; break;
@@ -4007,7 +4004,7 @@ prt_fh_expire_type(XDR *xdr)
 
 	sprintf(buf, "Filehandle expire type = ");
 	if ((val & (FH4_NOEXPIRE_WITH_OPEN | FH4_VOLATILE_ANY |
-			FH4_VOL_MIGRATION | FH4_VOL_RENAME)) == 0) {
+	    FH4_VOL_MIGRATION | FH4_VOL_RENAME)) == 0) {
 		strcat(buf, "Persistent");
 		return;
 	}
@@ -4067,7 +4064,7 @@ prt_link_support(XDR *xdr)
 	if (!xdr_bool(xdr, &val))
 		longjmp(xdr_err, 1);
 	sprintf(get_line(0, 0), "Link Support = %s",
-		val ? "TRUE" : "FALSE");
+	    val ? "TRUE" : "FALSE");
 }
 
 static void
@@ -4078,7 +4075,7 @@ prt_symlink_support(XDR *xdr)
 	if (!xdr_bool(xdr, &val))
 		longjmp(xdr_err, 1);
 	sprintf(get_line(0, 0), "Symlink Support = %s",
-		val ? "TRUE" : "FALSE");
+	    val ? "TRUE" : "FALSE");
 }
 
 static void
@@ -4089,7 +4086,7 @@ prt_named_attr(XDR *xdr)
 	if (!xdr_bool(xdr, &val))
 		longjmp(xdr_err, 1);
 	sprintf(get_line(0, 0), "Has Named Attributes = %s",
-		val ? "TRUE" : "FALSE");
+	    val ? "TRUE" : "FALSE");
 }
 
 static void
@@ -4100,7 +4097,7 @@ prt_fsid(XDR *xdr)
 	if (!xdr_fsid4(xdr, &val))
 		longjmp(xdr_err, 1);
 	sprintf(get_line(0, 0), "FS ID: Major = %llx, Minor = %llx",
-		val.major, val.minor);
+	    val.major, val.minor);
 }
 
 static void
@@ -4111,7 +4108,7 @@ prt_unique_handles(XDR *xdr)
 	if (!xdr_bool(xdr, &val))
 		longjmp(xdr_err, 1);
 	sprintf(get_line(0, 0), "Unique Handles = %s",
-		val ? "TRUE" : "FALSE");
+	    val ? "TRUE" : "FALSE");
 }
 
 static void
@@ -4132,7 +4129,7 @@ prt_rdattr_error(XDR *xdr)
 	if (!xdr_nfsstat4(xdr, &val))
 		longjmp(xdr_err, 1);
 	sprintf(get_line(0, 0), "Rdattr Error = %u (%s)",
-		val, status_name(val));
+	    val, status_name(val));
 }
 
 static void
@@ -4253,7 +4250,7 @@ prt_archive(XDR *xdr)
 	if (!xdr_bool(xdr, &val))
 		longjmp(xdr_err, 1);
 	sprintf(get_line(0, 0), "Archived = %s",
-		val ? "TRUE" : "FALSE");
+	    val ? "TRUE" : "FALSE");
 }
 
 static void
@@ -4264,7 +4261,7 @@ prt_cansettime(XDR *xdr)
 	if (!xdr_bool(xdr, &val))
 		longjmp(xdr_err, 1);
 	sprintf(get_line(0, 0), "Server Can Set Time = %s",
-		val ? "TRUE" : "FALSE");
+	    val ? "TRUE" : "FALSE");
 }
 
 static void
@@ -4275,7 +4272,7 @@ prt_case_insensitive(XDR *xdr)
 	if (!xdr_bool(xdr, &val))
 		longjmp(xdr_err, 1);
 	sprintf(get_line(0, 0), "Case Insensitive Lookups = %s",
-		val ? "TRUE" : "FALSE");
+	    val ? "TRUE" : "FALSE");
 }
 
 static void
@@ -4286,7 +4283,7 @@ prt_case_preserving(XDR *xdr)
 	if (!xdr_bool(xdr, &val))
 		longjmp(xdr_err, 1);
 	sprintf(get_line(0, 0), "Case Preserving = %s",
-		val ? "TRUE" : "FALSE");
+	    val ? "TRUE" : "FALSE");
 }
 
 static void
@@ -4297,7 +4294,7 @@ prt_chown_restricted(XDR *xdr)
 	if (!xdr_bool(xdr, &val))
 		longjmp(xdr_err, 1);
 	sprintf(get_line(0, 0), "Chown Is Restricted = %s",
-		val ? "TRUE" : "FALSE");
+	    val ? "TRUE" : "FALSE");
 }
 
 static void
@@ -4362,14 +4359,29 @@ prt_files_total(XDR *xdr)
 }
 
 static void
+prt_fs_location(fs_location4 *fsl)
+{
+	int i;
+
+	for (i = 0; i < fsl->server.server_len; i++)
+		sprintf(get_line(0, 0), "server: %s",
+		    utf8localize(&fsl->server.server_val[i]));
+
+	detail_pathname4(&fsl->rootpath, "rootpath: ");
+}
+
+static void
 prt_fs_locations(XDR *xdr)
 {
 	static fs_locations4 val;
+	int i;
 
 	if (!xdr_fs_locations4(xdr, &val))
 		longjmp(xdr_err, 1);
-	sprintf(get_line(0, 0), "[fs_locations]"); /* XXX */
-	detail_pathname4(&val.fs_root);
+	sprintf(get_line(0, 0), "[fs_locations]");
+	detail_pathname4(&val.fs_root, "fs_root: ");
+	for (i = 0; i < val.locations.locations_len; i++)
+		prt_fs_location(&val.locations.locations_val[i]);
 	xdr_free(xdr_fs_locations4, (char *)&val);
 }
 
@@ -4381,7 +4393,7 @@ prt_hidden(XDR *xdr)
 	if (!xdr_bool(xdr, &val))
 		longjmp(xdr_err, 1);
 	sprintf(get_line(0, 0), "Hidden = %s",
-		val ? "TRUE" : "FALSE");
+	    val ? "TRUE" : "FALSE");
 }
 
 static void
@@ -4392,7 +4404,7 @@ prt_homogeneous(XDR *xdr)
 	if (!xdr_bool(xdr, &val))
 		longjmp(xdr_err, 1);
 	sprintf(get_line(0, 0), "FS Is Homogeneous = %s",
-		val ? "TRUE" : "FALSE");
+	    val ? "TRUE" : "FALSE");
 }
 
 static void
@@ -4475,7 +4487,7 @@ prt_no_trunc(XDR *xdr)
 	if (!xdr_bool(xdr, &val))
 		longjmp(xdr_err, 1);
 	sprintf(get_line(0, 0), "Long Names Are Error (no_trunc) = %s",
-		val ? "TRUE" : "FALSE");
+	    val ? "TRUE" : "FALSE");
 }
 
 static void
@@ -4548,7 +4560,7 @@ prt_rawdev(XDR *xdr)
 	if (!xdr_specdata4(xdr, &val))
 		longjmp(xdr_err, 1);
 	sprintf(get_line(0, 0), "Raw Device ID = %u, %u",
-		val.specdata1, val.specdata2);
+	    val.specdata1, val.specdata2);
 }
 
 static void
@@ -4599,7 +4611,7 @@ prt_system(XDR *xdr)
 	if (!xdr_bool(xdr, &val))
 		longjmp(xdr_err, 1);
 	sprintf(get_line(0, 0), "System File = %s",
-		val ? "TRUE" : "FALSE");
+	    val ? "TRUE" : "FALSE");
 }
 
 static void
@@ -4610,7 +4622,7 @@ prt_time_access(XDR *xdr)
 	if (!xdr_nfstime4(xdr, &val))
 		longjmp(xdr_err, 1);
 	sprintf(get_line(0, 0), "Last Access Time = %s",
-		format_time(val.seconds, val.nseconds));
+	    format_time(val.seconds, val.nseconds));
 }
 
 static void
@@ -4622,8 +4634,8 @@ prt_time_access_set(XDR *xdr)
 		longjmp(xdr_err, 1);
 	if (val.set_it == SET_TO_CLIENT_TIME4) {
 		sprintf(get_line(0, 0), "Access Time = %s (set to client time)",
-			format_time(val.settime4_u.time.seconds,
-			val.settime4_u.time.nseconds));
+		    format_time(val.settime4_u.time.seconds,
+		    val.settime4_u.time.nseconds));
 	} else if (val.set_it == SET_TO_SERVER_TIME4) {
 		sprintf(get_line(0, 0), "Access Time (set to server time)");
 	} else
@@ -4638,7 +4650,7 @@ prt_time_backup(XDR *xdr)
 	if (!xdr_nfstime4(xdr, &val))
 		longjmp(xdr_err, 1);
 	sprintf(get_line(0, 0), "Last Backup Time = %s",
-		format_time(val.seconds, val.nseconds));
+	    format_time(val.seconds, val.nseconds));
 }
 
 static void
@@ -4649,7 +4661,7 @@ prt_time_create(XDR *xdr)
 	if (!xdr_nfstime4(xdr, &val))
 		longjmp(xdr_err, 1);
 	sprintf(get_line(0, 0), "Creation Time = %s",
-		format_time(val.seconds, val.nseconds));
+	    format_time(val.seconds, val.nseconds));
 }
 
 static void
@@ -4660,7 +4672,7 @@ prt_time_delta(XDR *xdr)
 	if (!xdr_nfstime4(xdr, &val))
 		longjmp(xdr_err, 1);
 	sprintf(get_line(0, 0), "Server Time Granularity = %lld.%09d sec",
-		val.seconds, val.nseconds);
+	    val.seconds, val.nseconds);
 }
 
 static void
@@ -4671,7 +4683,7 @@ prt_time_metadata(XDR *xdr)
 	if (!xdr_nfstime4(xdr, &val))
 		longjmp(xdr_err, 1);
 	sprintf(get_line(0, 0), "Last Metadata Change Time = %s",
-		format_time(val.seconds, val.nseconds));
+	    format_time(val.seconds, val.nseconds));
 }
 
 static void
@@ -4682,7 +4694,7 @@ prt_time_modify(XDR *xdr)
 	if (!xdr_nfstime4(xdr, &val))
 		longjmp(xdr_err, 1);
 	sprintf(get_line(0, 0), "Last Modification Time = %s",
-		format_time(val.seconds, val.nseconds));
+	    format_time(val.seconds, val.nseconds));
 }
 
 static void
@@ -4694,12 +4706,12 @@ prt_time_modify_set(XDR *xdr)
 		longjmp(xdr_err, 1);
 	if (val.set_it == SET_TO_CLIENT_TIME4) {
 		sprintf(get_line(0, 0),
-			"Modification Time = %s (set to client time)",
-			format_time(val.settime4_u.time.seconds,
-			val.settime4_u.time.nseconds));
+		    "Modification Time = %s (set to client time)",
+		    format_time(val.settime4_u.time.seconds,
+		    val.settime4_u.time.nseconds));
 	} else if (val.set_it == SET_TO_SERVER_TIME4) {
 		sprintf(get_line(0, 0),
-			"Modification Time (set to server time)");
+		    "Modification Time (set to server time)");
 	} else
 		longjmp(xdr_err, 1);
 }
@@ -4760,7 +4772,7 @@ utf8localize(utf8string *utf8str)
 	}
 	if (newsize != oldsize) {
 		utf_buf[cur_utf_buf] = realloc(utf_buf[cur_utf_buf],
-					    newsize);
+		    newsize);
 		if (utf_buf[cur_utf_buf] == NULL) {
 			pr_err("out of memory\n");
 			utf_buflen[cur_utf_buf] = 0;

@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * There are well defined policies for mapping uid and gid values to and
@@ -134,7 +133,7 @@
 /*
  * Truly global modular globals
  */
-static zone_key_t		nfsidmap_zone_key;
+zone_key_t			nfsidmap_zone_key;
 static list_t			nfsidmap_globals_list;
 static kmutex_t			nfsidmap_globals_lock;
 static kmem_cache_t		*nfsidmap_cache;

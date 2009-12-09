@@ -56,6 +56,8 @@
 #include <sys/ddi.h>
 #include <sys/zone.h>
 
+#include <fs/fs_reparse.h>
+
 #include <rpc/types.h>
 #include <rpc/auth.h>
 #include <rpc/rpcsec_gss.h>
@@ -82,7 +84,6 @@ static int rfs4_maxlock_tries = RFS4_MAXLOCK_TRIES;
 #define	RFS4_LOCK_DELAY 10	/* Milliseconds */
 static clock_t  rfs4_lock_delay = RFS4_LOCK_DELAY;
 extern struct svc_ops rdma_svc_ops;
-/* End of Tunables */
 
 static int rdma_setup_read_data4(READ4args *, READ4res *);
 
@@ -243,7 +244,7 @@ static void	rfs4_op_secinfo_free(nfs_resop4 *);
 static nfsstat4 check_open_access(uint32_t,
 				struct compound_state *, struct svc_req *);
 nfsstat4 rfs4_client_sysid(rfs4_client_t *, sysid_t *);
-void rfs4_ss_clid(rfs4_client_t *, struct svc_req *);
+void rfs4_ss_clid(rfs4_client_t *);
 
 /*
  * translation table for attrs
@@ -464,6 +465,8 @@ static char    *rfs4_op_string[] = {
 void	rfs4_ss_chkclid(rfs4_client_t *);
 
 extern size_t   strlcpy(char *dst, const char *src, size_t dstsize);
+
+extern void	rfs4_free_fs_locations4(fs_locations4 *);
 
 #ifdef	nextdp
 #undef nextdp
@@ -1609,6 +1612,7 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	resp->attrset = 0;
 
 	sarg.sbp = &sb;
+	sarg.is_referral = B_FALSE;
 	nfs4_ntov_table_init(&ntov);
 
 	status = do_rfs4_set_attrs(&resp->attrset,
@@ -2314,13 +2318,26 @@ rfs4_op_getattr(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 	sarg.sbp = &sb;
 	sarg.cs = cs;
+	sarg.is_referral = B_FALSE;
 
 	status = bitmap4_to_attrmask(args->attr_request, &sarg);
 	if (status == NFS4_OK) {
+
 		status = bitmap4_get_sysattrs(&sarg);
-		if (status == NFS4_OK)
+		if (status == NFS4_OK) {
+
+			/* Is this a referral? */
+			if (vn_is_nfs_reparse(cs->vp, cs->cr)) {
+				/* Older V4 Solaris client sees a link */
+				if (client_is_downrev(req))
+					sarg.vap->va_type = VLNK;
+				else
+					sarg.is_referral = B_TRUE;
+			}
+
 			status = do_rfs4_op_getattr(args->attr_request,
 			    &resp->obj_attributes, &sarg);
+		}
 	}
 	*cs->statusp = resp->status = status;
 out:
@@ -2352,6 +2369,25 @@ rfs4_op_getfh(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	if (cs->access == CS_ACCESS_DENIED) {
 		*cs->statusp = resp->status = NFS4ERR_ACCESS;
 		goto out;
+	}
+
+	/* check for reparse point at the share point */
+	if (cs->exi->exi_moved || vn_is_nfs_reparse(cs->exi->exi_vp, cs->cr)) {
+		/* it's all bad */
+		cs->exi->exi_moved = 1;
+		*cs->statusp = resp->status = NFS4ERR_MOVED;
+		DTRACE_PROBE2(nfs4serv__func__referral__shared__moved,
+		    vnode_t *, cs->vp, char *, "rfs4_op_getfh");
+		return;
+	}
+
+	/* check for reparse point at vp */
+	if (vn_is_nfs_reparse(cs->vp, cs->cr) && !client_is_downrev(req)) {
+		/* it's not all bad */
+		*cs->statusp = resp->status = NFS4ERR_MOVED;
+		DTRACE_PROBE2(nfs4serv__func__referral__moved,
+		    vnode_t *, cs->vp, char *, "rfs4_op_getfh");
+		return;
 	}
 
 	resp->object.nfs_fh4_val =
@@ -3688,6 +3724,7 @@ rfs4_op_readlink(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	char *data;
 	struct sockaddr *ca;
 	char *name = NULL;
+	int is_referral;
 
 	DTRACE_NFSV4_1(op__readlink__start, struct compound_state *, cs);
 
@@ -3703,14 +3740,25 @@ rfs4_op_readlink(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		goto out;
 	}
 
-	if (vp->v_type == VDIR) {
-		*cs->statusp = resp->status = NFS4ERR_ISDIR;
-		goto out;
-	}
+	/* Is it a referral? */
+	if (vn_is_nfs_reparse(vp, cs->cr) && client_is_downrev(req)) {
 
-	if (vp->v_type != VLNK) {
-		*cs->statusp = resp->status = NFS4ERR_INVAL;
-		goto out;
+		is_referral = 1;
+
+	} else {
+
+		is_referral = 0;
+
+		if (vp->v_type == VDIR) {
+			*cs->statusp = resp->status = NFS4ERR_ISDIR;
+			goto out;
+		}
+
+		if (vp->v_type != VLNK) {
+			*cs->statusp = resp->status = NFS4ERR_INVAL;
+			goto out;
+		}
+
 	}
 
 	va.va_mask = AT_MODE;
@@ -3727,24 +3775,45 @@ rfs4_op_readlink(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 	data = kmem_alloc(MAXPATHLEN + 1, KM_SLEEP);
 
-	iov.iov_base = data;
-	iov.iov_len = MAXPATHLEN;
-	uio.uio_iov = &iov;
-	uio.uio_iovcnt = 1;
-	uio.uio_segflg = UIO_SYSSPACE;
-	uio.uio_extflg = UIO_COPY_CACHED;
-	uio.uio_loffset = 0;
-	uio.uio_resid = MAXPATHLEN;
+	if (is_referral) {
+		char *s;
+		size_t strsz;
 
-	error = VOP_READLINK(vp, &uio, cs->cr, NULL);
+		/* Get an artificial symlink based on a referral */
+		s = build_symlink(vp, cs->cr, &strsz);
+		global_svstat_ptr[4][NFS_REFERLINKS].value.ui64++;
+		DTRACE_PROBE2(nfs4serv__func__referral__reflink,
+		    vnode_t *, vp, char *, s);
+		if (s == NULL)
+			error = EINVAL;
+		else {
+			error = 0;
+			(void) strlcpy(data, s, MAXPATHLEN + 1);
+			kmem_free(s, strsz);
+		}
+
+	} else {
+
+		iov.iov_base = data;
+		iov.iov_len = MAXPATHLEN;
+		uio.uio_iov = &iov;
+		uio.uio_iovcnt = 1;
+		uio.uio_segflg = UIO_SYSSPACE;
+		uio.uio_extflg = UIO_COPY_CACHED;
+		uio.uio_loffset = 0;
+		uio.uio_resid = MAXPATHLEN;
+
+		error = VOP_READLINK(vp, &uio, cs->cr, NULL);
+
+		if (!error)
+			*(data + MAXPATHLEN - uio.uio_resid) = '\0';
+	}
 
 	if (error) {
 		kmem_free((caddr_t)data, (uint_t)MAXPATHLEN + 1);
 		*cs->statusp = resp->status = puterrno4(error);
 		goto out;
 	}
-
-	*(data + MAXPATHLEN - uio.uio_resid) = '\0';
 
 	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
 	name = nfscmd_convname(ca, cs->exi, data, NFSCMD_CONV_OUTBOUND,
@@ -5053,6 +5122,7 @@ do_rfs4_op_setattr(bitmap4 *resp, fattr4 *fattrp, struct compound_state *cs,
 
 	*resp = 0;
 	sarg.sbp = &sb;
+	sarg.is_referral = B_FALSE;
 	nfs4_ntov_table_init(&ntov);
 	status = do_rfs4_set_attrs(resp, fattrp, cs, &sarg, &ntov,
 	    NFS4ATTR_SETIT);
@@ -5347,6 +5417,7 @@ rfs4_op_verify(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	}
 
 	sarg.sbp = &sb;
+	sarg.is_referral = B_FALSE;
 	nfs4_ntov_table_init(&ntov);
 	resp->status = do_rfs4_set_attrs(NULL, &args->obj_attributes, cs,
 	    &sarg, &ntov, NFS4ATTR_VERIT);
@@ -5408,6 +5479,7 @@ rfs4_op_nverify(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		return;
 	}
 	sarg.sbp = &sb;
+	sarg.is_referral = B_FALSE;
 	nfs4_ntov_table_init(&ntov);
 	resp->status = do_rfs4_set_attrs(NULL, &args->obj_attributes, cs,
 	    &sarg, &ntov, NFS4ATTR_VERIT);
@@ -6212,6 +6284,7 @@ rfs4_createfile(OPEN4args *args, struct svc_req *req, struct compound_state *cs,
 	char *name = NULL;
 
 	sarg.sbp = &sb;
+	sarg.is_referral = B_FALSE;
 
 	dvp = cs->vp;
 
@@ -7806,7 +7879,8 @@ rfs4_op_setclientid(nfs_argop4 *argop, nfs_resop4 *resop,
 	SETCLIENTID4args *args = &argop->nfs_argop4_u.opsetclientid;
 	SETCLIENTID4res *res = &resop->nfs_resop4_u.opsetclientid;
 	rfs4_client_t *cp, *newcp, *cp_confirmed, *cp_unconfirmed;
-	bool_t create = TRUE;
+	rfs4_clntip_t *ci;
+	bool_t create;
 	char *addr, *netid;
 	int len;
 
@@ -7814,6 +7888,27 @@ rfs4_op_setclientid(nfs_argop4 *argop, nfs_resop4 *resop,
 	    SETCLIENTID4args *, args);
 retry:
 	newcp = cp_confirmed = cp_unconfirmed = NULL;
+
+	/*
+	 * Save the caller's IP address
+	 */
+	args->client.cl_addr =
+	    (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
+
+	/*
+	 * Record if it is a Solaris client that cannot handle referrals.
+	 */
+	if (strstr(args->client.id_val, "Solaris") &&
+	    !strstr(args->client.id_val, "+referrals")) {
+		/* Add a "yes, it's downrev" record */
+		create = TRUE;
+		ci = rfs4_find_clntip(args->client.cl_addr, &create);
+		ASSERT(ci != NULL);
+		rfs4_dbe_rele(ci->ri_dbe);
+	} else {
+		/* Remove any previous record */
+		rfs4_invalidate_clntip(args->client.cl_addr);
+	}
 
 	/*
 	 * In search of an EXISTING client matching the incoming
@@ -8063,7 +8158,7 @@ rfs4_op_setclientid_confirm(nfs_argop4 *argop, nfs_resop4 *resop,
 	 * Record clientid in stable storage.
 	 * Must be done after server instance has been assigned.
 	 */
-	rfs4_ss_clid(cp, req);
+	rfs4_ss_clid(cp);
 
 	rfs4_dbe_unlock(cp->rc_dbe);
 
@@ -9362,4 +9457,284 @@ rdma_setup_read_data4(READ4args *args, READ4res *rok)
 	rok->wlist_len = wlist_len;
 	rok->wlist = wcl;
 	return (TRUE);
+}
+
+/* tunable to disable server referrals */
+int rfs4_no_referrals = 0;
+
+/*
+ * Find an NFS record in reparse point data.
+ * Returns 0 for success and <0 or an errno value on failure.
+ */
+int
+vn_find_nfs_record(vnode_t *vp, nvlist_t **nvlp, char **svcp, char **datap)
+{
+	int err;
+	char *stype, *val;
+	nvlist_t *nvl;
+	nvpair_t *curr;
+
+	if ((nvl = reparse_init()) == NULL)
+		return (-1);
+
+	if ((err = reparse_vnode_parse(vp, nvl)) != 0) {
+		reparse_free(nvl);
+		return (err);
+	}
+
+	curr = NULL;
+	while ((curr = nvlist_next_nvpair(nvl, curr)) != NULL) {
+		if ((stype = nvpair_name(curr)) == NULL) {
+			reparse_free(nvl);
+			return (-2);
+		}
+		if (strncasecmp(stype, "NFS", 3) == 0)
+			break;
+	}
+
+	if ((curr == NULL) ||
+	    (nvpair_value_string(curr, &val))) {
+		reparse_free(nvl);
+		return (-3);
+	}
+	*nvlp = nvl;
+	*svcp = stype;
+	*datap = val;
+	return (0);
+}
+
+int
+vn_is_nfs_reparse(vnode_t *vp, cred_t *cr)
+{
+	nvlist_t *nvl;
+	char *s, *d;
+
+	if (rfs4_no_referrals != 0)
+		return (B_FALSE);
+
+	if (vn_is_reparse(vp, cr, NULL) == B_FALSE)
+		return (B_FALSE);
+
+	if (vn_find_nfs_record(vp, &nvl, &s, &d) != 0)
+		return (B_FALSE);
+
+	reparse_free(nvl);
+
+	return (B_TRUE);
+}
+
+/*
+ * There is a user-level copy of this routine in ref_subr.c.
+ * Changes should be kept in sync.
+ */
+static int
+nfs4_create_components(char *path, component4 *comp4)
+{
+	int slen, plen, ncomp;
+	char *ori_path, *nxtc, buf[MAXNAMELEN];
+
+	if (path == NULL)
+		return (0);
+
+	plen = strlen(path) + 1;	/* include the terminator */
+	ori_path = path;
+	ncomp = 0;
+
+	/* count number of components in the path */
+	for (nxtc = path; nxtc < ori_path + plen; nxtc++) {
+		if (*nxtc == '/' || *nxtc == '\0' || *nxtc == '\n') {
+			if ((slen = nxtc - path) == 0) {
+				path = nxtc + 1;
+				continue;
+			}
+
+			if (comp4 != NULL) {
+				bcopy(path, buf, slen);
+				buf[slen] = '\0';
+				str_to_utf8(buf, &comp4[ncomp]);
+			}
+
+			ncomp++;	/* 1 valid component */
+			path = nxtc + 1;
+		}
+		if (*nxtc == '\0' || *nxtc == '\n')
+			break;
+	}
+
+	return (ncomp);
+}
+
+/*
+ * There is a user-level copy of this routine in ref_subr.c.
+ * Changes should be kept in sync.
+ */
+static int
+make_pathname4(char *path, pathname4 *pathname)
+{
+	int ncomp;
+	component4 *comp4;
+
+	if (pathname == NULL)
+		return (0);
+
+	if (path == NULL) {
+		pathname->pathname4_val = NULL;
+		pathname->pathname4_len = 0;
+		return (0);
+	}
+
+	/* count number of components to alloc buffer */
+	if ((ncomp = nfs4_create_components(path, NULL)) == 0) {
+		pathname->pathname4_val = NULL;
+		pathname->pathname4_len = 0;
+		return (0);
+	}
+	comp4 = kmem_zalloc(ncomp * sizeof (component4), KM_SLEEP);
+
+	/* copy components into allocated buffer */
+	ncomp = nfs4_create_components(path, comp4);
+
+	pathname->pathname4_val = comp4;
+	pathname->pathname4_len = ncomp;
+
+	return (ncomp);
+}
+
+#define	xdr_fs_locations4 xdr_fattr4_fs_locations
+
+fs_locations4 *
+fetch_referral(vnode_t *vp, cred_t *cr)
+{
+	nvlist_t *nvl;
+	char *stype, *sdata;
+	fs_locations4 *result;
+	char buf[1024];
+	size_t bufsize;
+	XDR xdr;
+	int err;
+
+	/*
+	 * Check attrs to ensure it's a reparse point
+	 */
+	if (vn_is_reparse(vp, cr, NULL) == B_FALSE)
+		return (NULL);
+
+	/*
+	 * Look for an NFS record and get the type and data
+	 */
+	if (vn_find_nfs_record(vp, &nvl, &stype, &sdata) != 0)
+		return (NULL);
+
+	/*
+	 * With the type and data, upcall to get the referral
+	 */
+	bufsize = sizeof (buf);
+	bzero(buf, sizeof (buf));
+	err = reparse_kderef((const char *)stype, (const char *)sdata,
+	    buf, &bufsize);
+	reparse_free(nvl);
+
+	DTRACE_PROBE4(nfs4serv__func__referral__upcall,
+	    char *, stype, char *, sdata, char *, buf, int, err);
+	if (err) {
+		cmn_err(CE_NOTE,
+		    "reparsed daemon not running: unable to get referral (%d)",
+		    err);
+		return (NULL);
+	}
+
+	/*
+	 * We get an XDR'ed record back from the kderef call
+	 */
+	xdrmem_create(&xdr, buf, bufsize, XDR_DECODE);
+	result = kmem_alloc(sizeof (fs_locations4), KM_SLEEP);
+	err = xdr_fs_locations4(&xdr, result);
+	XDR_DESTROY(&xdr);
+	if (err != TRUE) {
+		DTRACE_PROBE1(nfs4serv__func__referral__upcall__xdrfail,
+		    int, err);
+		return (NULL);
+	}
+
+	/*
+	 * Look at path to recover fs_root, ignoring the leading '/'
+	 */
+	(void) make_pathname4(vp->v_path, &result->fs_root);
+
+	return (result);
+}
+
+char *
+build_symlink(vnode_t *vp, cred_t *cr, size_t *strsz)
+{
+	fs_locations4 *fsl;
+	fs_location4 *fs;
+	char *server, *path, *symbuf;
+	static char *prefix = "/net/";
+	int i, size, npaths;
+	uint_t len;
+
+	/* Get the referral */
+	if ((fsl = fetch_referral(vp, cr)) == NULL)
+		return (NULL);
+
+	/* Deal with only the first location and first server */
+	fs = &fsl->locations_val[0];
+	server = utf8_to_str(&fs->server_val[0], &len, NULL);
+	if (server == NULL) {
+		rfs4_free_fs_locations4(fsl);
+		kmem_free(fsl, sizeof (fs_locations4));
+		return (NULL);
+	}
+
+	/* Figure out size for "/net/" + host + /path/path/path + NULL */
+	size = strlen(prefix) + len;
+	for (i = 0; i < fs->rootpath.pathname4_len; i++)
+		size += fs->rootpath.pathname4_val[i].utf8string_len + 1;
+
+	/* Allocate the symlink buffer and fill it */
+	symbuf = kmem_zalloc(size, KM_SLEEP);
+	(void) strcat(symbuf, prefix);
+	(void) strcat(symbuf, server);
+	kmem_free(server, len);
+
+	npaths = 0;
+	for (i = 0; i < fs->rootpath.pathname4_len; i++) {
+		path = utf8_to_str(&fs->rootpath.pathname4_val[i], &len, NULL);
+		if (path == NULL)
+			continue;
+		(void) strcat(symbuf, "/");
+		(void) strcat(symbuf, path);
+		npaths++;
+		kmem_free(path, len);
+	}
+
+	rfs4_free_fs_locations4(fsl);
+	kmem_free(fsl, sizeof (fs_locations4));
+
+	if (strsz != NULL)
+		*strsz = size;
+	return (symbuf);
+}
+
+/*
+ * Check to see if we have a downrev Solaris client, so that we
+ * can send it a symlink instead of a referral.
+ */
+int
+client_is_downrev(struct svc_req *req)
+{
+	struct sockaddr *ca;
+	rfs4_clntip_t *ci;
+	bool_t create = FALSE;
+	int is_downrev;
+
+	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
+	ASSERT(ca);
+	ci = rfs4_find_clntip(ca, &create);
+	if (ci == NULL)
+		return (0);
+	is_downrev = ci->ri_no_referrals;
+	rfs4_dbe_rele(ci->ri_dbe);
+	return (is_downrev);
 }

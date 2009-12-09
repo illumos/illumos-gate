@@ -46,6 +46,7 @@
 #include <sys/avl.h>
 #include <sys/list.h>
 #include <rpc/auth.h>
+#include <sys/door.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -161,6 +162,8 @@ typedef struct nfs4_delmap_args {
 struct clstat4 {
 	kstat_named_t	calls;			/* client requests */
 	kstat_named_t	badcalls;		/* rpc failures */
+	kstat_named_t	referrals;		/* referrals */
+	kstat_named_t	referlinks;		/* referrals as symlinks */
 	kstat_named_t	clgets;			/* client handle gets */
 	kstat_named_t	cltoomany;		/* client handle cache misses */
 #ifdef DEBUG
@@ -302,6 +305,7 @@ typedef enum nfs4_tag_type {
 	TAG_FSINFO,
 	TAG_GET_SYMLINK,
 	TAG_GETATTR,
+	TAG_GETATTR_FSLOCATION,
 	TAG_INACTIVE,
 	TAG_LINK,
 	TAG_LOCK,
@@ -374,6 +378,8 @@ typedef enum nfs4_tag_type {
 			{0x67657420, 0x736c6e6b, 0x20747874}},	\
 		{TAG_GETATTR,		"getattr",		\
 			{0x67657461, 0x74747220, 0x20202020}},	\
+		{TAG_GETATTR_FSLOCATION, "getattr fslocation",	\
+			{0x67657461, 0x74747220, 0x66736c6f}},	\
 		{TAG_INACTIVE,		"inactive",		\
 			{0x696e6163, 0x74697665, 0x20202020}},	\
 		{TAG_LINK,		"link",			\
@@ -553,7 +559,8 @@ typedef struct nfs4_open_owner {
 
 /*
  * Static server information.
- * These fields are read-only once they are initialized:
+ * These fields are read-only once they are initialized; sv_lock
+ * should be held as writer if they are changed during mount:
  *	sv_addr
  *	sv_dhsec
  *	sv_hostname
@@ -699,7 +706,8 @@ typedef enum {
 	NR_DELAY,
 	NR_LOST_LOCK,
 	NR_LOST_STATE_RQST,
-	NR_STALE
+	NR_STALE,
+	NR_MOVED
 } nfs4_recov_t;
 
 /*
@@ -708,6 +716,8 @@ typedef enum {
 
 #define	NFS4_MSG_MAX	100
 extern int nfs4_msg_max;
+
+#define	NFS4_REFERRAL_LOOP_MAX	20
 
 typedef enum {
 	RE_BAD_SEQID,
@@ -729,7 +739,8 @@ typedef enum {
 	RE_UNEXPECTED_ERRNO,
 	RE_UNEXPECTED_STATUS,
 	RE_WRONGSEC,
-	RE_LOST_STATE_BAD_OP
+	RE_LOST_STATE_BAD_OP,
+	RE_REFERRAL
 } nfs4_event_type_t;
 
 typedef enum {
@@ -1033,6 +1044,10 @@ typedef struct mntinfo4 {
 
 	uint_t mi_srvset_cnt; /* increment when changing the nfs4_server_t */
 	struct nfs4_server *mi_srv; /* backpointer to nfs4_server_t */
+	/*
+	 * Referral related info.
+	 */
+	int		mi_vfs_referral_loop_cnt;
 } mntinfo4_t;
 
 /*
@@ -1085,7 +1100,7 @@ typedef struct mntinfo4 {
 #define	MI4_ACL			 0x2000
 /* MI4_MIRRORMOUNT is also defined in nfsstat.c */
 #define	MI4_MIRRORMOUNT		 0x4000
-/* 0x8000 is available */
+#define	MI4_REFERRAL		 0x8000
 /* 0x10000 is available */
 #define	MI4_NOPRINT		 0x20000
 #define	MI4_DIRECTIO		 0x40000
@@ -1103,11 +1118,7 @@ typedef struct mntinfo4 {
 #define	MI4_ASYNC_MGR_STOP	 0x40000000
 #define	MI4_TIMEDOUT		 0x80000000
 
-/*
- * Note that when we add referrals, then MI4_EPHEMERAL
- * will be MI4_MIRRORMOUNT | MI4_REFERRAL.
- */
-#define	MI4_EPHEMERAL		MI4_MIRRORMOUNT
+#define	MI4_EPHEMERAL		(MI4_MIRRORMOUNT | MI4_REFERRAL)
 
 #define	INTR4(vp)	(VTOMI4(vp)->mi_flags & MI4_INT)
 
@@ -1128,6 +1139,7 @@ typedef struct mntinfo4 {
 #define	MI4R_SRV_REBOOT		0x20	/* server has rebooted */
 #define	MI4R_LOST_STATE		0x40
 #define	MI4R_BAD_SEQID		0x80
+#define	MI4R_MOVED		0x100
 
 #define	MI4_HOLD(mi) {		\
 	mi_hold(mi);		\
@@ -1492,6 +1504,7 @@ extern void	nfs4_write_error(vnode_t *, int, cred_t *);
 extern void	nfs4_lockcompletion(vnode_t *, int);
 extern bool_t	nfs4_map_lost_lock_conflict(vnode_t *);
 extern int	vtodv(vnode_t *, vnode_t **, cred_t *, bool_t);
+extern int	vtoname(vnode_t *, char *, ssize_t);
 extern void	nfs4open_confirm(vnode_t *, seqid4*, stateid4 *, cred_t *,
 		    bool_t, bool_t *, nfs4_open_owner_t *, bool_t,
 		    nfs4_error_t *, int *);
@@ -1501,6 +1514,9 @@ extern void	nfs4_free_args(struct nfs_args *);
 
 extern void 	mi_hold(mntinfo4_t *);
 extern void	mi_rele(mntinfo4_t *);
+
+extern vnode_t	*find_referral_stubvp(vnode_t *, char *, cred_t *);
+extern int	 nfs4_setup_referral(vnode_t *, char *, vnode_t **, cred_t *);
 
 extern sec_data_t	*copy_sec_data(sec_data_t *);
 extern gss_clntdata_t	*copy_sec_data_gss(gss_clntdata_t *);
@@ -1969,7 +1985,8 @@ extern int	nfs4_needs_recovery(nfs4_error_t *, bool_t, vfs_t *);
 extern int	nfs4_recov_marks_dead(nfsstat4);
 extern bool_t	nfs4_start_recovery(nfs4_error_t *, struct mntinfo4 *,
 			vnode_t *, vnode_t *, stateid4 *,
-			nfs4_lost_rqst_t *, nfs_opnum4, nfs4_bseqid_entry_t *);
+			nfs4_lost_rqst_t *, nfs_opnum4, nfs4_bseqid_entry_t *,
+			vnode_t *, char *);
 extern int	nfs4_start_op(struct mntinfo4 *, vnode_t *, vnode_t *,
 			nfs4_recov_state_t *);
 extern void	nfs4_end_op(struct mntinfo4 *, vnode_t *, vnode_t *,
@@ -1991,13 +2008,17 @@ extern char	*nfs4_recov_action_to_str(nfs4_recov_t);
  * of whether or not the code in _unlock is to be ran.
  */
 extern void	nfs4_ephemeral_umount_activate(mntinfo4_t *,
-    bool_t *, bool_t *, nfs4_ephemeral_tree_t **);
+    bool_t *, nfs4_ephemeral_tree_t **);
 extern int	nfs4_ephemeral_umount(mntinfo4_t *, int, cred_t *,
-    bool_t *, bool_t *, nfs4_ephemeral_tree_t **);
-extern void	nfs4_ephemeral_umount_unlock(bool_t *, bool_t *,
+    bool_t *, nfs4_ephemeral_tree_t **);
+extern void	nfs4_ephemeral_umount_unlock(bool_t *,
     nfs4_ephemeral_tree_t **);
 
 extern int	nfs4_record_ephemeral_mount(mntinfo4_t *mi, vnode_t *mvp);
+
+extern int	nfs4_callmapid(utf8string *, struct nfs_fsl_info *);
+extern int	nfs4_fetch_locations(mntinfo4_t *, struct nfs4_sharedfh *,
+    char *, cred_t *, nfs4_ga_res_t *, COMPOUND4res_clnt *, bool_t);
 
 extern int	wait_for_recall(vnode_t *, vnode_t *, nfs4_op_hint_t,
 			nfs4_recov_state_t *);
@@ -2137,6 +2158,10 @@ extern char *fn_name(nfs4_fname_t *);
 extern char *fn_path(nfs4_fname_t *);
 extern void fn_move(nfs4_fname_t *, nfs4_fname_t *, char *);
 extern nfs4_fname_t *fn_parent(nfs4_fname_t *);
+
+/* Referral Support */
+extern int nfs4_process_referral(mntinfo4_t *, nfs4_sharedfh_t *, char *,
+    cred_t *, nfs4_ga_res_t *, COMPOUND4res_clnt *, struct nfs_fsl_info *);
 
 #endif
 

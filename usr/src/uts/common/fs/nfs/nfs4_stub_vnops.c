@@ -65,6 +65,7 @@
 #include <sys/list.h>
 #include <sys/stat.h>
 #include <sys/mntent.h>
+#include <sys/priv.h>
 
 #include <rpc/types.h>
 #include <rpc/auth.h>
@@ -78,6 +79,8 @@
 #include <nfs/nfs4_kprot.h>
 #include <nfs/rnode4.h>
 #include <nfs/nfs4_clnt.h>
+#include <nfs/nfsid_map.h>
+#include <nfs/nfs4_idmap_impl.h>
 
 #include <vm/hat.h>
 #include <vm/as.h>
@@ -96,6 +99,9 @@
 #include <sys/sunddi.h>
 
 #include <sys/priv_names.h>
+
+extern zone_key_t	nfs4clnt_zone_key;
+extern zone_key_t	nfsidmap_zone_key;
 
 /*
  * The automatic unmounter thread stuff!
@@ -202,13 +208,16 @@ extern int	nfs4_realvp(vnode_t *, vnode_t **, caller_context_t *);
 static int	nfs4_trigger_mount(vnode_t *, cred_t *, vnode_t **);
 static int	nfs4_trigger_domount(vnode_t *, domount_args_t *, vfs_t **,
     cred_t *, vnode_t **);
-static domount_args_t  *nfs4_trigger_domount_args_create(vnode_t *);
+static domount_args_t  *nfs4_trigger_domount_args_create(vnode_t *, cred_t *);
 static void	nfs4_trigger_domount_args_destroy(domount_args_t *dma,
     vnode_t *vp);
-static ephemeral_servinfo_t *nfs4_trigger_esi_create(vnode_t *, servinfo4_t *);
+static ephemeral_servinfo_t *nfs4_trigger_esi_create(vnode_t *, servinfo4_t *,
+    cred_t *);
 static void	nfs4_trigger_esi_destroy(ephemeral_servinfo_t *, vnode_t *);
 static ephemeral_servinfo_t *nfs4_trigger_esi_create_mirrormount(vnode_t *,
     servinfo4_t *);
+static ephemeral_servinfo_t *nfs4_trigger_esi_create_referral(vnode_t *,
+    cred_t *);
 static struct nfs_args 	*nfs4_trigger_nargs_create(mntinfo4_t *, servinfo4_t *,
     ephemeral_servinfo_t *);
 static void	nfs4_trigger_nargs_destroy(struct nfs_args *);
@@ -216,9 +225,10 @@ static char	*nfs4_trigger_create_mntopts(vfs_t *);
 static void	nfs4_trigger_destroy_mntopts(char *);
 static int 	nfs4_trigger_add_mntopt(char *, char *, vfs_t *);
 static enum clnt_stat nfs4_trigger_ping_server(servinfo4_t *, int);
+static enum clnt_stat nfs4_ping_server_common(struct knetconfig *,
+    struct netbuf *, int);
 
 extern int	umount2_engine(vfs_t *, int, cred_t *, int);
-
 
 vnodeops_t *nfs4_trigger_vnodeops;
 
@@ -372,12 +382,46 @@ nfs4_trigger_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 	return (VOP_OPEN(vpp, flag, cr, ct));
 }
 
+void
+nfs4_fake_attrs(vnode_t *vp, struct vattr *vap)
+{
+	uint_t mask;
+	timespec_t now;
+
+	/*
+	 * Set some attributes here for referrals.
+	 */
+	mask = vap->va_mask;
+	bzero(vap, sizeof (struct vattr));
+	vap->va_mask	= mask;
+	vap->va_uid	= 0;
+	vap->va_gid	= 0;
+	vap->va_nlink	= 1;
+	vap->va_size	= 1;
+	gethrestime(&now);
+	vap->va_atime	= now;
+	vap->va_mtime	= now;
+	vap->va_ctime	= now;
+	vap->va_type	= VDIR;
+	vap->va_mode	= 0555;
+	vap->va_fsid	= vp->v_vfsp->vfs_dev;
+	vap->va_rdev	= 0;
+	vap->va_blksize	= MAXBSIZE;
+	vap->va_nblocks	= 1;
+	vap->va_seq	= 0;
+}
+
 /*
  * For the majority of cases, nfs4_trigger_getattr() will not trigger
  * a mount. However, if ATTR_TRIGGER is set, we are being informed
  * that we need to force the mount before we attempt to determine
  * the attributes. The intent is an atomic operation for security
  * testing.
+ *
+ * If we're not triggering a mount, we can still inquire about the
+ * actual attributes from the server in the mirror mount case,
+ * and will return manufactured attributes for a referral (see
+ * the 'create' branch of find_referral_stubvp()).
  */
 static int
 nfs4_trigger_getattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
@@ -394,8 +438,15 @@ nfs4_trigger_getattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
 
 		error = VOP_GETATTR(newvp, vap, flags, cr, ct);
 		VN_RELE(newvp);
-	} else {
+
+	} else if (RP_ISSTUB_MIRRORMOUNT(VTOR4(vp))) {
+
 		error = nfs4_getattr(vp, vap, flags, cr, ct);
+
+	} else if (RP_ISSTUB_REFERRAL(VTOR4(vp))) {
+
+		nfs4_fake_attrs(vp, vap);
+		error = 0;
 	}
 
 	return (error);
@@ -446,17 +497,19 @@ nfs4_trigger_lookup(vnode_t *dvp, char *nm, vnode_t **vpp,
 
 	ASSERT(RP_ISSTUB(drp));
 
-	/* for now, we only support mirror-mounts */
-	ASSERT(RP_ISSTUB_MIRRORMOUNT(drp));
-
 	/*
 	 * It's not legal to lookup ".." for an fs root, so we mustn't pass
 	 * that up. Instead, pass onto the regular op, regardless of whether
 	 * we've triggered a mount.
 	 */
 	if (strcmp(nm, "..") == 0)
-		return (nfs4_lookup(dvp, nm, vpp, pnp, flags, rdir, cr,
-		    ct, deflags, rpnp));
+		if (RP_ISSTUB_MIRRORMOUNT(drp)) {
+			return (nfs4_lookup(dvp, nm, vpp, pnp, flags, rdir, cr,
+			    ct, deflags, rpnp));
+		} else if (RP_ISSTUB_REFERRAL(drp)) {
+			/* Return the parent vnode */
+			return (vtodv(dvp, vpp, cr, TRUE));
+		}
 
 	error = nfs4_trigger_mount(dvp, cr, &newdvp);
 	if (error)
@@ -672,7 +725,7 @@ nfs4_trigger_mounted_already(vnode_t *vp, vnode_t **newvpp,
 }
 
 /*
- * Mount upon a trigger vnode; for mirror-mounts, etc.
+ * Mount upon a trigger vnode; for mirror-mounts, referrals, etc.
  *
  * The mount may have already occurred, via another thread. If not,
  * assemble the location information - which may require fetching - and
@@ -705,9 +758,6 @@ nfs4_trigger_mount(vnode_t *vp, cred_t *cr, vnode_t **newvpp)
 	zone_t			*zone = curproc->p_zone;
 
 	ASSERT(RP_ISSTUB(rp));
-
-	/* for now, we only support mirror-mounts */
-	ASSERT(RP_ISSTUB_MIRRORMOUNT(rp));
 
 	*newvpp = NULL;
 
@@ -782,7 +832,7 @@ nfs4_trigger_mount(vnode_t *vp, cred_t *cr, vnode_t **newvpp)
 
 	must_unlock = TRUE;
 
-	dma = nfs4_trigger_domount_args_create(vp);
+	dma = nfs4_trigger_domount_args_create(vp, cr);
 	if (dma == NULL) {
 		error = EINVAL;
 		goto done;
@@ -801,9 +851,14 @@ nfs4_trigger_mount(vnode_t *vp, cred_t *cr, vnode_t **newvpp)
 	}
 
 	crset_zone_privall(mcred);
+	if (is_system_labeled())
+		(void) setpflags(NET_MAC_AWARE, 1, mcred);
 
 	error = nfs4_trigger_domount(vp, dma, &vfsp, mcred, newvpp);
 	nfs4_trigger_domount_args_destroy(dma, vp);
+
+	DTRACE_PROBE2(nfs4clnt__func__referral__mount,
+	    vnode_t *, vp, int, error);
 
 	crfree(mcred);
 
@@ -812,9 +867,20 @@ done:
 	if (must_unlock) {
 		mutex_enter(&net->net_cnt_lock);
 		net->net_status &= ~NFS4_EPHEMERAL_TREE_MOUNTING;
+
+		/*
+		 * REFCNT: If we are the root of the tree, then we need
+		 * to keep a reference because we malloced the tree and
+		 * this is where we tied it to our mntinfo.
+		 *
+		 * If we are not the root of the tree, then our tie to
+		 * the mntinfo occured elsewhere and we need to
+		 * decrement the reference to the tree.
+		 */
 		if (is_building)
 			net->net_status &= ~NFS4_EPHEMERAL_TREE_BUILDING;
-		nfs4_ephemeral_tree_decr(net);
+		else
+			nfs4_ephemeral_tree_decr(net);
 		mutex_exit(&net->net_cnt_lock);
 
 		mutex_exit(&net->net_tree_lock);
@@ -830,7 +896,7 @@ done:
  * Collect together both the generic & mount-type specific args.
  */
 static domount_args_t *
-nfs4_trigger_domount_args_create(vnode_t *vp)
+nfs4_trigger_domount_args_create(vnode_t *vp, cred_t *cr)
 {
 	int nointr;
 	char *hostlist;
@@ -848,7 +914,7 @@ nfs4_trigger_domount_args_create(vnode_t *vp)
 	/* check if the current server is responding */
 	status = nfs4_trigger_ping_server(svp, nointr);
 	if (status == RPC_SUCCESS) {
-		esi_first = nfs4_trigger_esi_create(vp, svp);
+		esi_first = nfs4_trigger_esi_create(vp, svp, cr);
 		if (esi_first == NULL) {
 			kmem_free(hostlist, MAXPATHLEN);
 			return (NULL);
@@ -924,7 +990,7 @@ nfs4_trigger_domount_args_create(vnode_t *vp)
 			if (status != RPC_SUCCESS)
 				continue;
 
-			esi = nfs4_trigger_esi_create(vp, svp);
+			esi = nfs4_trigger_esi_create(vp, svp, cr);
 			if (esi == NULL)
 				continue;
 
@@ -1006,7 +1072,7 @@ nfs4_trigger_domount_args_destroy(domount_args_t *dma, vnode_t *vp)
  * types of ephemeral mount, the way we gather its contents differs.
  */
 static ephemeral_servinfo_t *
-nfs4_trigger_esi_create(vnode_t *vp, servinfo4_t *svp)
+nfs4_trigger_esi_create(vnode_t *vp, servinfo4_t *svp, cred_t *cr)
 {
 	ephemeral_servinfo_t *esi;
 	rnode4_t *rp = VTOR4(vp);
@@ -1016,12 +1082,10 @@ nfs4_trigger_esi_create(vnode_t *vp, servinfo4_t *svp)
 	/* Call the ephemeral type-specific routine */
 	if (RP_ISSTUB_MIRRORMOUNT(rp))
 		esi = nfs4_trigger_esi_create_mirrormount(vp, svp);
+	else if (RP_ISSTUB_REFERRAL(rp))
+		esi = nfs4_trigger_esi_create_referral(vp, cr);
 	else
 		esi = NULL;
-
-	/* for now, we only support mirror-mounts */
-	ASSERT(esi != NULL);
-
 	return (esi);
 }
 
@@ -1031,9 +1095,6 @@ nfs4_trigger_esi_destroy(ephemeral_servinfo_t *esi, vnode_t *vp)
 	rnode4_t *rp = VTOR4(vp);
 
 	ASSERT(RP_ISSTUB(rp));
-
-	/* for now, we only support mirror-mounts */
-	ASSERT(RP_ISSTUB_MIRRORMOUNT(rp));
 
 	/* Currently, no need for an ephemeral type-specific routine */
 
@@ -1050,6 +1111,10 @@ nfs4_trigger_esi_destroy(ephemeral_servinfo_t *esi, vnode_t *vp)
  * Some of this may turn out to be common with other ephemeral types,
  * in which case it should be moved to nfs4_trigger_esi_create(), or a
  * common function called.
+ */
+
+/*
+ * Mirror mounts case - should have all data available
  */
 static ephemeral_servinfo_t *
 nfs4_trigger_esi_create_mirrormount(vnode_t *vp, servinfo4_t *svp)
@@ -1149,9 +1214,12 @@ nfs4_trigger_esi_create_mirrormount(vnode_t *vp, servinfo4_t *svp)
 	stubpath += 1;
 
 	/* for nfs_args->fh */
-	esi->esi_path_len = strlen(svp->sv_path) + strlen(stubpath) + 1;
+	esi->esi_path_len = strlen(stubpath) + 1;
+	if (strcmp(svp->sv_path, "/") != 0)
+		esi->esi_path_len += strlen(svp->sv_path);
 	esi->esi_path = kmem_zalloc(esi->esi_path_len, KM_SLEEP);
-	(void) strcat(esi->esi_path, svp->sv_path);
+	if (strcmp(svp->sv_path, "/") != 0)
+		(void) strcat(esi->esi_path, svp->sv_path);
 	(void) strcat(esi->esi_path, stubpath);
 
 	stubpath -= 1;
@@ -1161,6 +1229,592 @@ nfs4_trigger_esi_create_mirrormount(vnode_t *vp, servinfo4_t *svp)
 	nfs_rw_exit(&svp->sv_lock);
 
 	return (esi);
+}
+
+/*
+ * Makes an upcall to NFSMAPID daemon to resolve hostname of NFS server to
+ * get network information required to do the mount call.
+ */
+int
+nfs4_callmapid(utf8string *server, struct nfs_fsl_info *resp)
+{
+	door_arg_t	door_args;
+	door_handle_t	dh;
+	XDR		xdr;
+	refd_door_args_t *xdr_argsp;
+	refd_door_res_t  *orig_resp;
+	k_sigset_t	smask;
+	int		xdr_len = 0;
+	int 		res_len = 16; /* length of an ip adress */
+	int		orig_reslen = res_len;
+	int		error = 0;
+	struct nfsidmap_globals *nig;
+
+	if (zone_status_get(curproc->p_zone) >= ZONE_IS_SHUTTING_DOWN)
+		return (ECONNREFUSED);
+
+	nig = zone_getspecific(nfsidmap_zone_key, nfs_zone());
+	ASSERT(nig != NULL);
+
+	mutex_enter(&nig->nfsidmap_daemon_lock);
+	dh = nig->nfsidmap_daemon_dh;
+	if (dh == NULL) {
+		mutex_exit(&nig->nfsidmap_daemon_lock);
+		cmn_err(CE_NOTE,
+		    "nfs4_callmapid: nfsmapid daemon not " \
+		    "running unable to resolve host name\n");
+		return (EINVAL);
+	}
+	door_ki_hold(dh);
+	mutex_exit(&nig->nfsidmap_daemon_lock);
+
+	xdr_len = xdr_sizeof(&(xdr_utf8string), server);
+
+	xdr_argsp = kmem_zalloc(xdr_len + sizeof (*xdr_argsp), KM_SLEEP);
+	xdr_argsp->xdr_len = xdr_len;
+	xdr_argsp->cmd = NFSMAPID_SRV_NETINFO;
+
+	xdrmem_create(&xdr, (char *)&xdr_argsp->xdr_arg,
+	    xdr_len, XDR_ENCODE);
+
+	if (!xdr_utf8string(&xdr, server)) {
+		kmem_free(xdr_argsp, xdr_len + sizeof (*xdr_argsp));
+		door_ki_rele(dh);
+		return (1);
+	}
+
+	if (orig_reslen)
+		orig_resp = kmem_alloc(orig_reslen, KM_SLEEP);
+
+	door_args.data_ptr = (char *)xdr_argsp;
+	door_args.data_size = sizeof (*xdr_argsp) + xdr_argsp->xdr_len;
+	door_args.desc_ptr = NULL;
+	door_args.desc_num = 0;
+	door_args.rbuf = orig_resp ? (char *)orig_resp : NULL;
+	door_args.rsize = res_len;
+
+	sigintr(&smask, 1);
+	error = door_ki_upcall(dh, &door_args);
+	sigunintr(&smask);
+
+	door_ki_rele(dh);
+
+	kmem_free(xdr_argsp, xdr_len + sizeof (*xdr_argsp));
+	if (error) {
+		kmem_free(orig_resp, orig_reslen);
+		/*
+		 * There is no door to connect to. The referral daemon
+		 * must not be running yet.
+		 */
+		cmn_err(CE_WARN,
+		    "nfsmapid not running cannot resolve host name");
+		goto out;
+	}
+
+	/*
+	 * If the results buffer passed back are not the same as
+	 * what was sent free the old buffer and use the new one.
+	 */
+	if (orig_resp && orig_reslen) {
+		refd_door_res_t *door_resp;
+
+		door_resp = (refd_door_res_t *)door_args.rbuf;
+		if ((void *)door_args.rbuf != orig_resp)
+			kmem_free(orig_resp, orig_reslen);
+		if (door_resp->res_status == 0) {
+			xdrmem_create(&xdr, (char *)&door_resp->xdr_res,
+			    door_resp->xdr_len, XDR_DECODE);
+			bzero(resp, sizeof (struct nfs_fsl_info));
+			if (!xdr_nfs_fsl_info(&xdr, resp)) {
+				DTRACE_PROBE2(
+				    nfs4clnt__debug__referral__upcall__xdrfail,
+				    struct nfs_fsl_info *, resp,
+				    char *, "nfs4_callmapid");
+				error = EINVAL;
+			}
+		} else {
+			DTRACE_PROBE2(
+			    nfs4clnt__debug__referral__upcall__badstatus,
+			    int, door_resp->res_status,
+			    char *, "nfs4_callmapid");
+			error = door_resp->res_status;
+		}
+		kmem_free(door_args.rbuf, door_args.rsize);
+	}
+out:
+	DTRACE_PROBE2(nfs4clnt__func__referral__upcall,
+	    char *, server, int, error);
+	return (error);
+}
+
+/*
+ * Fetches the fs_locations attribute. Typically called
+ * from a Replication/Migration/Referrals/Mirror-mount context
+ *
+ * Fills in the attributes in garp. The caller is assumed
+ * to have allocated memory for garp.
+ *
+ * lock: if set do not lock s_recovlock and mi_recovlock mutex,
+ *	 it's already done by caller. Otherwise lock these mutexes
+ *	 before doing the rfs4call().
+ *
+ * Returns
+ * 	1	 for success
+ * 	0	 for failure
+ */
+int
+nfs4_fetch_locations(mntinfo4_t *mi, nfs4_sharedfh_t *sfh, char *nm,
+    cred_t *cr, nfs4_ga_res_t *garp, COMPOUND4res_clnt *callres, bool_t lock)
+{
+	COMPOUND4args_clnt args;
+	COMPOUND4res_clnt res;
+	nfs_argop4 *argop;
+	int argoplist_size = 3 * sizeof (nfs_argop4);
+	nfs4_server_t *sp = NULL;
+	int doqueue = 1;
+	nfs4_error_t e = { 0, NFS4_OK, RPC_SUCCESS };
+	int retval = 1;
+	struct nfs4_clnt *nfscl;
+
+	if (lock == TRUE)
+		(void) nfs_rw_enter_sig(&mi->mi_recovlock, RW_READER, 0);
+	else
+		ASSERT(nfs_rw_lock_held(&mi->mi_recovlock, RW_READER) ||
+		    nfs_rw_lock_held(&mi->mi_recovlock, RW_WRITER));
+
+	sp = find_nfs4_server(mi);
+	if (lock == TRUE)
+		nfs_rw_exit(&mi->mi_recovlock);
+
+	if (sp != NULL)
+		mutex_exit(&sp->s_lock);
+
+	if (lock == TRUE) {
+		if (sp != NULL)
+			(void) nfs_rw_enter_sig(&sp->s_recovlock,
+			    RW_WRITER, 0);
+		(void) nfs_rw_enter_sig(&mi->mi_recovlock, RW_WRITER, 0);
+	} else {
+		if (sp != NULL) {
+			ASSERT(nfs_rw_lock_held(&sp->s_recovlock, RW_READER) ||
+			    nfs_rw_lock_held(&sp->s_recovlock, RW_WRITER));
+		}
+	}
+
+	/*
+	 * Do we want to do the setup for recovery here?
+	 *
+	 * We know that the server responded to a null ping a very
+	 * short time ago, and we know that we intend to do a
+	 * single stateless operation - we want to fetch attributes,
+	 * so we know we can't encounter errors about state.  If
+	 * something goes wrong with the GETATTR, like not being
+	 * able to get a response from the server or getting any
+	 * kind of FH error, we should fail the mount.
+	 *
+	 * We may want to re-visited this at a later time.
+	 */
+	argop = kmem_alloc(argoplist_size, KM_SLEEP);
+
+	args.ctag = TAG_GETATTR_FSLOCATION;
+	/* PUTFH LOOKUP GETATTR */
+	args.array_len = 3;
+	args.array = argop;
+
+	/* 0. putfh file */
+	argop[0].argop = OP_CPUTFH;
+	argop[0].nfs_argop4_u.opcputfh.sfh = sfh;
+
+	/* 1. lookup name, can't be dotdot */
+	argop[1].argop = OP_CLOOKUP;
+	argop[1].nfs_argop4_u.opclookup.cname = nm;
+
+	/* 2. file attrs */
+	argop[2].argop = OP_GETATTR;
+	argop[2].nfs_argop4_u.opgetattr.attr_request =
+	    FATTR4_FSID_MASK | FATTR4_FS_LOCATIONS_MASK |
+	    FATTR4_MOUNTED_ON_FILEID_MASK;
+	argop[2].nfs_argop4_u.opgetattr.mi = mi;
+
+	rfs4call(mi, &args, &res, cr, &doqueue, 0, &e);
+
+	if (lock == TRUE) {
+		nfs_rw_exit(&mi->mi_recovlock);
+		if (sp != NULL)
+			nfs_rw_exit(&sp->s_recovlock);
+	}
+
+	nfscl = zone_getspecific(nfs4clnt_zone_key, nfs_zone());
+	nfscl->nfscl_stat.referrals.value.ui64++;
+	DTRACE_PROBE3(nfs4clnt__func__referral__fsloc,
+	    nfs4_sharedfh_t *, sfh, char *, nm, nfs4_error_t *, &e);
+
+	if (e.error != 0) {
+		if (sp != NULL)
+			nfs4_server_rele(sp);
+		kmem_free(argop, argoplist_size);
+		return (0);
+	}
+
+	/*
+	 * Check for all possible error conditions.
+	 * For valid replies without an ops array or for illegal
+	 * replies, return a failure.
+	 */
+	if (res.status != NFS4_OK || res.array_len < 3 ||
+	    res.array[2].nfs_resop4_u.opgetattr.status != NFS4_OK) {
+		retval = 0;
+		goto exit;
+	}
+
+	/*
+	 * There isn't much value in putting the attributes
+	 * in the attr cache since fs_locations4 aren't
+	 * encountered very frequently, so just make them
+	 * available to the caller.
+	 */
+	*garp = res.array[2].nfs_resop4_u.opgetattr.ga_res;
+
+	DTRACE_PROBE2(nfs4clnt__debug__referral__fsloc,
+	    nfs4_ga_res_t *, garp, char *, "nfs4_fetch_locations");
+
+	/* No fs_locations? -- return a failure */
+	if (garp->n4g_ext_res == NULL ||
+	    garp->n4g_ext_res->n4g_fslocations.locations_val == NULL) {
+		retval = 0;
+		goto exit;
+	}
+
+	if (!garp->n4g_fsid_valid)
+		retval = 0;
+
+exit:
+	if (retval == 0) {
+		/* the call was ok but failed validating the call results */
+		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
+	} else {
+		ASSERT(callres != NULL);
+		*callres = res;
+	}
+
+	if (sp != NULL)
+		nfs4_server_rele(sp);
+	kmem_free(argop, argoplist_size);
+	return (retval);
+}
+
+/* tunable to disable referral mounts */
+int nfs4_no_referrals = 0;
+
+/*
+ * Returns NULL if the vnode cannot be created or found.
+ */
+vnode_t *
+find_referral_stubvp(vnode_t *dvp, char *nm, cred_t *cr)
+{
+	nfs_fh4 *stub_fh, *dfh;
+	nfs4_sharedfh_t *sfhp;
+	char *newfhval;
+	vnode_t *vp = NULL;
+	fattr4_mounted_on_fileid mnt_on_fileid;
+	nfs4_ga_res_t garp;
+	mntinfo4_t *mi;
+	COMPOUND4res_clnt callres;
+	hrtime_t t;
+
+	if (nfs4_no_referrals)
+		return (NULL);
+
+	/*
+	 * Get the mounted_on_fileid, unique on that server::fsid
+	 */
+	mi = VTOMI4(dvp);
+	if (nfs4_fetch_locations(mi, VTOR4(dvp)->r_fh, nm, cr,
+	    &garp, &callres, FALSE) == 0)
+		return (NULL);
+	mnt_on_fileid = garp.n4g_mon_fid;
+	(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&callres);
+
+	/*
+	 * Build a fake filehandle from the dir FH and the mounted_on_fileid
+	 */
+	dfh = &VTOR4(dvp)->r_fh->sfh_fh;
+	stub_fh = kmem_alloc(sizeof (nfs_fh4), KM_SLEEP);
+	stub_fh->nfs_fh4_val = kmem_alloc(dfh->nfs_fh4_len +
+	    sizeof (fattr4_mounted_on_fileid), KM_SLEEP);
+	newfhval = stub_fh->nfs_fh4_val;
+
+	/* copy directory's file handle */
+	bcopy(dfh->nfs_fh4_val, newfhval, dfh->nfs_fh4_len);
+	stub_fh->nfs_fh4_len = dfh->nfs_fh4_len;
+	newfhval = newfhval + dfh->nfs_fh4_len;
+
+	/* Add mounted_on_fileid. Use bcopy to avoid alignment problem */
+	bcopy((char *)&mnt_on_fileid, newfhval,
+	    sizeof (fattr4_mounted_on_fileid));
+	stub_fh->nfs_fh4_len += sizeof (fattr4_mounted_on_fileid);
+
+	sfhp = sfh4_put(stub_fh, VTOMI4(dvp), NULL);
+	kmem_free(stub_fh->nfs_fh4_val, dfh->nfs_fh4_len +
+	    sizeof (fattr4_mounted_on_fileid));
+	kmem_free(stub_fh, sizeof (nfs_fh4));
+	if (sfhp == NULL)
+		return (NULL);
+
+	t = gethrtime();
+	garp.n4g_va.va_type = VDIR;
+	vp = makenfs4node(sfhp, NULL, dvp->v_vfsp, t,
+	    cr, dvp, fn_get(VTOSV(dvp)->sv_name, nm, sfhp));
+
+	if (vp != NULL)
+		vp->v_type = VDIR;
+
+	sfh4_rele(&sfhp);
+	return (vp);
+}
+
+int
+nfs4_setup_referral(vnode_t *dvp, char *nm, vnode_t **vpp, cred_t *cr)
+{
+	vnode_t *nvp;
+	rnode4_t *rp;
+
+	if ((nvp = find_referral_stubvp(dvp, nm, cr)) == NULL)
+		return (EINVAL);
+
+	rp = VTOR4(nvp);
+	mutex_enter(&rp->r_statelock);
+	r4_stub_referral(rp);
+	mutex_exit(&rp->r_statelock);
+	dnlc_enter(dvp, nm, nvp);
+
+	if (*vpp != NULL)
+		VN_RELE(*vpp);	/* no longer need this vnode */
+
+	*vpp = nvp;
+
+	return (0);
+}
+
+/*
+ * Fetch the location information and resolve the new server.
+ * Caller needs to free up the XDR data which is returned.
+ * Input: mount info, shared filehandle, nodename
+ * Return: Index to the result or Error(-1)
+ * Output: FsLocations Info, Resolved Server Info.
+ */
+int
+nfs4_process_referral(mntinfo4_t *mi, nfs4_sharedfh_t *sfh,
+    char *nm, cred_t *cr, nfs4_ga_res_t *grp, COMPOUND4res_clnt *res,
+    struct nfs_fsl_info *fsloc)
+{
+	fs_location4 *fsp;
+	struct nfs_fsl_info nfsfsloc;
+	int ret, i, error;
+	nfs4_ga_res_t garp;
+	COMPOUND4res_clnt callres;
+	struct knetconfig *knc;
+
+	ret = nfs4_fetch_locations(mi, sfh, nm, cr, &garp, &callres, TRUE);
+	if (ret == 0)
+		return (-1);
+
+	/*
+	 * As a lame attempt to figuring out if we're
+	 * handling a migration event or a referral,
+	 * look for rnodes with this fsid in the rnode
+	 * cache.
+	 *
+	 * If we can find one or more such rnodes, it
+	 * means we're handling a migration event and
+	 * we want to bail out in that case.
+	 */
+	if (r4find_by_fsid(mi, &garp.n4g_fsid)) {
+		DTRACE_PROBE3(nfs4clnt__debug__referral__migration,
+		    mntinfo4_t *, mi, nfs4_ga_res_t *, &garp,
+		    char *, "nfs4_process_referral");
+		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&callres);
+		return (-1);
+	}
+
+	/*
+	 * Find the first responsive server to mount.  When we find
+	 * one, fsp will point to it.
+	 */
+	for (i = 0; i < garp.n4g_ext_res->n4g_fslocations.locations_len; i++) {
+
+		fsp = &garp.n4g_ext_res->n4g_fslocations.locations_val[i];
+		if (fsp->server_len == 0 || fsp->server_val == NULL)
+			continue;
+
+		error = nfs4_callmapid(fsp->server_val, &nfsfsloc);
+		if (error != 0)
+			continue;
+
+		error = nfs4_ping_server_common(nfsfsloc.knconf,
+		    nfsfsloc.addr, !(mi->mi_flags & MI4_INT));
+		if (error == RPC_SUCCESS)
+			break;
+
+		DTRACE_PROBE2(nfs4clnt__debug__referral__srvaddr,
+		    sockaddr_in *, (struct sockaddr_in *)nfsfsloc.addr->buf,
+		    char *, "nfs4_process_referral");
+
+		(void) xdr_free(xdr_nfs_fsl_info, (char *)&nfsfsloc);
+	}
+	knc = nfsfsloc.knconf;
+	if ((i >= garp.n4g_ext_res->n4g_fslocations.locations_len) ||
+	    (knc->knc_protofmly == NULL) || (knc->knc_proto == NULL)) {
+		DTRACE_PROBE2(nfs4clnt__debug__referral__nofsloc,
+		    nfs4_ga_res_t *, &garp, char *, "nfs4_process_referral");
+		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&callres);
+		return (-1);
+	}
+
+	/* Send the results back */
+	*fsloc = nfsfsloc;
+	*grp = garp;
+	*res = callres;
+	return (i);
+}
+
+/*
+ * Referrals case - need to fetch referral data and then upcall to
+ * user-level to get complete mount data.
+ */
+static ephemeral_servinfo_t *
+nfs4_trigger_esi_create_referral(vnode_t *vp, cred_t *cr)
+{
+	struct knetconfig	*sikncp, *svkncp;
+	struct netbuf		*bufp;
+	ephemeral_servinfo_t	*esi;
+	vnode_t			*dvp;
+	rnode4_t		*drp;
+	fs_location4		*fsp;
+	struct nfs_fsl_info	nfsfsloc;
+	nfs4_ga_res_t		garp;
+	char			*p;
+	char			fn[MAXNAMELEN];
+	int			i, index = -1;
+	mntinfo4_t		*mi;
+	COMPOUND4res_clnt	callres;
+
+	/*
+	 * If we're passed in a stub vnode that
+	 * isn't a "referral" stub, bail out
+	 * and return a failure
+	 */
+	if (!RP_ISSTUB_REFERRAL(VTOR4(vp)))
+		return (NULL);
+
+	if (vtodv(vp, &dvp, CRED(), TRUE) != 0)
+		return (NULL);
+
+	drp = VTOR4(dvp);
+	if (nfs_rw_enter_sig(&drp->r_rwlock, RW_READER, INTR4(dvp))) {
+		VN_RELE(dvp);
+		return (NULL);
+	}
+
+	if (vtoname(vp, fn, MAXNAMELEN) != 0) {
+		nfs_rw_exit(&drp->r_rwlock);
+		VN_RELE(dvp);
+		return (NULL);
+	}
+
+	mi = VTOMI4(dvp);
+	index = nfs4_process_referral(mi, drp->r_fh, fn, cr,
+	    &garp, &callres, &nfsfsloc);
+	nfs_rw_exit(&drp->r_rwlock);
+	VN_RELE(dvp);
+	if (index < 0)
+		return (NULL);
+
+	fsp = &garp.n4g_ext_res->n4g_fslocations.locations_val[index];
+	esi = kmem_zalloc(sizeof (ephemeral_servinfo_t), KM_SLEEP);
+
+	/* initially set to be our type of ephemeral mount; may be added to */
+	esi->esi_mount_flags = NFSMNT_REFERRAL;
+
+	esi->esi_hostname =
+	    kmem_zalloc(fsp->server_val->utf8string_len + 1, KM_SLEEP);
+	bcopy(fsp->server_val->utf8string_val, esi->esi_hostname,
+	    fsp->server_val->utf8string_len);
+	esi->esi_hostname[fsp->server_val->utf8string_len] = '\0';
+
+	bufp = kmem_alloc(sizeof (struct netbuf), KM_SLEEP);
+	bufp->len = nfsfsloc.addr->len;
+	bufp->maxlen = nfsfsloc.addr->maxlen;
+	bufp->buf = kmem_zalloc(bufp->len, KM_SLEEP);
+	bcopy(nfsfsloc.addr->buf, bufp->buf, bufp->len);
+	esi->esi_addr = bufp;
+
+	esi->esi_knconf = kmem_zalloc(sizeof (*esi->esi_knconf), KM_SLEEP);
+	sikncp = esi->esi_knconf;
+
+	DTRACE_PROBE2(nfs4clnt__debug__referral__nfsfsloc,
+	    struct nfs_fsl_info *, &nfsfsloc,
+	    char *, "nfs4_trigger_esi_create_referral");
+
+	svkncp = nfsfsloc.knconf;
+	sikncp->knc_semantics = svkncp->knc_semantics;
+	sikncp->knc_protofmly = (caddr_t)kmem_zalloc(KNC_STRSIZE, KM_SLEEP);
+	(void) strlcat((char *)sikncp->knc_protofmly,
+	    (char *)svkncp->knc_protofmly, KNC_STRSIZE);
+	sikncp->knc_proto = (caddr_t)kmem_zalloc(KNC_STRSIZE, KM_SLEEP);
+	(void) strlcat((char *)sikncp->knc_proto, (char *)svkncp->knc_proto,
+	    KNC_STRSIZE);
+	sikncp->knc_rdev = svkncp->knc_rdev;
+
+	DTRACE_PROBE2(nfs4clnt__debug__referral__knetconf,
+	    struct knetconfig *, sikncp,
+	    char *, "nfs4_trigger_esi_create_referral");
+
+	esi->esi_netname = kmem_zalloc(nfsfsloc.netnm_len, KM_SLEEP);
+	bcopy(nfsfsloc.netname, esi->esi_netname, nfsfsloc.netnm_len);
+	esi->esi_syncaddr = NULL;
+
+	esi->esi_path = p = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+	esi->esi_path_len = MAXPATHLEN;
+	*p++ = '/';
+	for (i = 0; i < fsp->rootpath.pathname4_len; i++) {
+		component4 *comp;
+
+		comp = &fsp->rootpath.pathname4_val[i];
+		/* If no space, null the string and bail */
+		if ((p - esi->esi_path) + comp->utf8string_len + 1 > MAXPATHLEN)
+			goto err;
+		bcopy(comp->utf8string_val, p, comp->utf8string_len);
+		p += comp->utf8string_len;
+		*p++ = '/';
+	}
+	if (fsp->rootpath.pathname4_len != 0)
+		*(p - 1) = '\0';
+	else
+		*p = '\0';
+	p = esi->esi_path;
+	esi->esi_path = strdup(p);
+	esi->esi_path_len = strlen(p) + 1;
+	kmem_free(p, MAXPATHLEN);
+
+	/* Allocated in nfs4_process_referral() */
+	(void) xdr_free(xdr_nfs_fsl_info, (char *)&nfsfsloc);
+	(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&callres);
+
+	return (esi);
+err:
+	kmem_free(esi->esi_path, esi->esi_path_len);
+	kmem_free(esi->esi_hostname, fsp->server_val->utf8string_len + 1);
+	kmem_free(esi->esi_addr->buf, esi->esi_addr->len);
+	kmem_free(esi->esi_addr, sizeof (struct netbuf));
+	kmem_free(esi->esi_knconf->knc_protofmly, KNC_STRSIZE);
+	kmem_free(esi->esi_knconf->knc_proto, KNC_STRSIZE);
+	kmem_free(esi->esi_knconf, sizeof (*esi->esi_knconf));
+	kmem_free(esi->esi_netname, nfsfsloc.netnm_len);
+	kmem_free(esi, sizeof (ephemeral_servinfo_t));
+	(void) xdr_free(xdr_nfs_fsl_info, (char *)&nfsfsloc);
+	(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&callres);
+	return (NULL);
 }
 
 /*
@@ -1357,6 +2011,9 @@ nfs4_trigger_nargs_create(mntinfo4_t *mi, servinfo4_t *svp,
 	nargs->acdirmin = HR2SEC(mi->mi_acdirmin);
 	nargs->acdirmax = HR2SEC(mi->mi_acdirmax);
 
+	/* add any specific flags for this type of ephemeral mount */
+	nargs->flags |= esi->esi_mount_flags;
+
 	if (mi->mi_flags & MI4_NOCTO)
 		nargs->flags |= NFSMNT_NOCTO;
 	if (mi->mi_flags & MI4_GRPID)
@@ -1367,19 +2024,28 @@ nfs4_trigger_nargs_create(mntinfo4_t *mi, servinfo4_t *svp,
 		nargs->flags |= NFSMNT_NOPRINT;
 	if (mi->mi_flags & MI4_DIRECTIO)
 		nargs->flags |= NFSMNT_DIRECTIO;
-	if (mi->mi_flags & MI4_PUBLIC)
+	if (mi->mi_flags & MI4_PUBLIC && nargs->flags & NFSMNT_MIRRORMOUNT)
 		nargs->flags |= NFSMNT_PUBLIC;
 
-	mutex_exit(&mi->mi_lock);
+	/* Do some referral-specific option tweaking */
+	if (nargs->flags & NFSMNT_REFERRAL) {
+		nargs->flags &= ~NFSMNT_DORDMA;
+		nargs->flags |= NFSMNT_TRYRDMA;
+	}
 
-	/* add any specific flags for this type of ephemeral mount */
-	nargs->flags |= esi->esi_mount_flags;
+	mutex_exit(&mi->mi_lock);
 
 	/*
 	 * Security data & negotiation policy.
 	 *
-	 * We need to preserve the parent mount's preference for security
-	 * negotiation, translating SV4_TRYSECDEFAULT -> NFSMNT_SECDEFAULT.
+	 * For mirror mounts, we need to preserve the parent mount's
+	 * preference for security negotiation, translating SV4_TRYSECDEFAULT
+	 * to NFSMNT_SECDEFAULT if present.
+	 *
+	 * For referrals, we always want security negotiation and will
+	 * set NFSMNT_SECDEFAULT and we will not copy current secdata.
+	 * The reason is that we can't negotiate down from a parent's
+	 * Kerberos flavor to AUTH_SYS.
 	 *
 	 * If SV4_TRYSECDEFAULT is not set, that indicates that a specific
 	 * security flavour was requested, with data in sv_secdata, and that
@@ -1395,8 +2061,16 @@ nfs4_trigger_nargs_create(mntinfo4_t *mi, servinfo4_t *svp,
 	 * we will copy sv_currsec. Otherwise, copy sv_secdata. Regardless,
 	 * we will set NFSMNT_SECDEFAULT, to enable negotiation.
 	 */
-	if (svp->sv_flags & SV4_TRYSECDEFAULT) {
-		/* enable negotiation for ephemeral mount */
+	if (nargs->flags & NFSMNT_REFERRAL) {
+		/* enable negotiation for referral mount */
+		nargs->flags |= NFSMNT_SECDEFAULT;
+		secdata = kmem_alloc(sizeof (sec_data_t), KM_SLEEP);
+		secdata->secmod = secdata->rpcflavor = AUTH_SYS;
+		secdata->data = NULL;
+	}
+
+	else if (svp->sv_flags & SV4_TRYSECDEFAULT) {
+		/* enable negotiation for mirror mount */
 		nargs->flags |= NFSMNT_SECDEFAULT;
 
 		/*
@@ -1499,6 +2173,11 @@ nfs4_record_ephemeral_mount(mntinfo4_t *mi, vnode_t *mvp)
 		return (EBUSY);
 	}
 
+	/*
+	 * We've just tied the mntinfo to the tree, so
+	 * now we bump the refcnt and hold it there until
+	 * this mntinfo is removed from the tree.
+	 */
 	nfs4_ephemeral_tree_hold(net);
 
 	/*
@@ -1515,7 +2194,6 @@ nfs4_record_ephemeral_mount(mntinfo4_t *mi, vnode_t *mvp)
 	 */
 	eph->ne_mount_to = ntg->ntg_mount_to;
 
-	mi->mi_flags |= MI4_EPHEMERAL;
 	mi->mi_ephemeral = eph;
 
 	/*
@@ -1542,6 +2220,7 @@ nfs4_record_ephemeral_mount(mntinfo4_t *mi, vnode_t *mvp)
 			mi->mi_flags &= ~MI4_EPHEMERAL;
 			mi->mi_ephemeral = NULL;
 			kmem_free(eph, sizeof (*eph));
+			nfs4_ephemeral_tree_rele(net);
 			rc = EBUSY;
 		} else {
 			if (prior->ne_child == NULL) {
@@ -1580,8 +2259,6 @@ nfs4_record_ephemeral_mount(mntinfo4_t *mi, vnode_t *mvp)
 
 		eph->ne_prior = NULL;
 	}
-
-	nfs4_ephemeral_tree_rele(net);
 
 	mutex_exit(&mi->mi_lock);
 	mutex_exit(&mi_parent->mi_lock);
@@ -1758,15 +2435,13 @@ nfs4_ephemeral_unmount_engine(nfs4_ephemeral_t *eph,
  */
 void
 nfs4_ephemeral_umount_unlock(bool_t *pmust_unlock,
-    bool_t *pmust_rele, nfs4_ephemeral_tree_t **pnet)
+    nfs4_ephemeral_tree_t **pnet)
 {
 	nfs4_ephemeral_tree_t	*net = *pnet;
 
 	if (*pmust_unlock) {
 		mutex_enter(&net->net_cnt_lock);
 		net->net_status &= ~NFS4_EPHEMERAL_TREE_UMOUNTING;
-		if (*pmust_rele)
-			nfs4_ephemeral_tree_decr(net);
 		mutex_exit(&net->net_cnt_lock);
 
 		mutex_exit(&net->net_tree_lock);
@@ -1783,7 +2458,7 @@ nfs4_ephemeral_umount_unlock(bool_t *pmust_unlock,
  */
 void
 nfs4_ephemeral_umount_activate(mntinfo4_t *mi, bool_t *pmust_unlock,
-    bool_t *pmust_rele, nfs4_ephemeral_tree_t **pnet)
+    nfs4_ephemeral_tree_t **pnet)
 {
 	/*
 	 * Now we need to get rid of the ephemeral data if it exists.
@@ -1798,6 +2473,7 @@ nfs4_ephemeral_umount_activate(mntinfo4_t *mi, bool_t *pmust_unlock,
 		if (!(mi->mi_flags & MI4_EPHEMERAL_RECURSED))
 			nfs4_ephemeral_umount_cleanup(mi->mi_ephemeral);
 
+		nfs4_ephemeral_tree_rele(*pnet);
 		ASSERT(mi->mi_ephemeral != NULL);
 
 		kmem_free(mi->mi_ephemeral, sizeof (*mi->mi_ephemeral));
@@ -1805,15 +2481,19 @@ nfs4_ephemeral_umount_activate(mntinfo4_t *mi, bool_t *pmust_unlock,
 	}
 	mutex_exit(&mi->mi_lock);
 
-	nfs4_ephemeral_umount_unlock(pmust_unlock, pmust_rele, pnet);
+	nfs4_ephemeral_umount_unlock(pmust_unlock, pnet);
 }
 
 /*
  * Unmount an ephemeral node.
+ *
+ * Note that if this code fails, then it must unlock.
+ *
+ * If it succeeds, then the caller must be prepared to do so.
  */
 int
 nfs4_ephemeral_umount(mntinfo4_t *mi, int flag, cred_t *cr,
-    bool_t *pmust_unlock, bool_t *pmust_rele, nfs4_ephemeral_tree_t **pnet)
+    bool_t *pmust_unlock, nfs4_ephemeral_tree_t **pnet)
 {
 	int			error = 0;
 	nfs4_ephemeral_t	*eph;
@@ -1826,7 +2506,7 @@ nfs4_ephemeral_umount(mntinfo4_t *mi, int flag, cred_t *cr,
 	 * Make sure to set the default state for cleaning
 	 * up the tree in the caller (and on the way out).
 	 */
-	*pmust_unlock = *pmust_rele = FALSE;
+	*pmust_unlock = FALSE;
 
 	/*
 	 * The active vnodes on this file system may be ephemeral
@@ -1865,16 +2545,18 @@ nfs4_ephemeral_umount(mntinfo4_t *mi, int flag, cred_t *cr,
 	is_recursed = mi->mi_flags & MI4_EPHEMERAL_RECURSED;
 	is_derooting = (eph == NULL);
 
+	mutex_enter(&net->net_cnt_lock);
+
 	/*
 	 * If this is not recursion, then we need to
-	 * grab a ref count.
+	 * check to see if a harvester thread has
+	 * already grabbed the lock.
 	 *
-	 * But wait, we also do not want to do that
-	 * if a harvester thread has already grabbed
-	 * the lock.
+	 * After we exit this branch, we may not
+	 * blindly return, we need to jump to
+	 * is_busy!
 	 */
 	if (!is_recursed) {
-		mutex_enter(&net->net_cnt_lock);
 		if (net->net_status &
 		    NFS4_EPHEMERAL_TREE_LOCKED) {
 			/*
@@ -1902,13 +2584,10 @@ nfs4_ephemeral_umount(mntinfo4_t *mi, int flag, cred_t *cr,
 			}
 
 			was_locked = TRUE;
-		} else {
-			nfs4_ephemeral_tree_incr(net);
-			*pmust_rele = TRUE;
 		}
-
-		mutex_exit(&net->net_cnt_lock);
 	}
+
+	mutex_exit(&net->net_cnt_lock);
 	mutex_exit(&mi->mi_lock);
 
 	/*
@@ -1936,9 +2615,7 @@ nfs4_ephemeral_umount(mntinfo4_t *mi, int flag, cred_t *cr,
 				if (net->net_status &
 				    (NFS4_EPHEMERAL_TREE_DEROOTING
 				    | NFS4_EPHEMERAL_TREE_INVALID)) {
-					nfs4_ephemeral_tree_decr(net);
 					mutex_exit(&net->net_cnt_lock);
-					*pmust_rele = FALSE;
 					goto is_busy;
 				}
 				mutex_exit(&net->net_cnt_lock);
@@ -1974,10 +2651,8 @@ nfs4_ephemeral_umount(mntinfo4_t *mi, int flag, cred_t *cr,
 				if (net->net_status &
 				    NFS4_EPHEMERAL_TREE_INVALID ||
 				    (!is_derooting && eph == NULL)) {
-					nfs4_ephemeral_tree_decr(net);
 					mutex_exit(&net->net_cnt_lock);
 					mutex_exit(&net->net_tree_lock);
-					*pmust_rele = FALSE;
 					goto is_busy;
 				}
 				mutex_exit(&net->net_cnt_lock);
@@ -2048,8 +2723,14 @@ nfs4_ephemeral_umount(mntinfo4_t *mi, int flag, cred_t *cr,
 		mutex_enter(&net->net_cnt_lock);
 		net->net_status &= ~NFS4_EPHEMERAL_TREE_DEROOTING;
 		net->net_status |= NFS4_EPHEMERAL_TREE_INVALID;
-		if (was_locked == FALSE)
-			nfs4_ephemeral_tree_decr(net);
+		DTRACE_NFSV4_1(nfs4clnt__dbg__ephemeral__tree__derooting,
+		    uint_t, net->net_refcnt);
+
+		/*
+		 * We will not finalize this node, so safe to
+		 * release it.
+		 */
+		nfs4_ephemeral_tree_decr(net);
 		mutex_exit(&net->net_cnt_lock);
 
 		if (was_locked == FALSE)
@@ -2057,8 +2738,8 @@ nfs4_ephemeral_umount(mntinfo4_t *mi, int flag, cred_t *cr,
 
 		/*
 		 * We have just blown away any notation of this
-		 * tree being locked. We can't let the caller
-		 * try to clean things up.
+		 * tree being locked or having a refcnt.
+		 * We can't let the caller try to clean things up.
 		 */
 		*pmust_unlock = FALSE;
 
@@ -2077,8 +2758,7 @@ nfs4_ephemeral_umount(mntinfo4_t *mi, int flag, cred_t *cr,
 
 is_busy:
 
-	nfs4_ephemeral_umount_unlock(pmust_unlock, pmust_rele,
-	    pnet);
+	nfs4_ephemeral_umount_unlock(pmust_unlock, pnet);
 
 	return (error);
 }
@@ -2314,19 +2994,18 @@ check_done:
 		/*
 		 * At this point we are done processing this tree.
 		 *
-		 * If the tree is invalid and we are the only reference
+		 * If the tree is invalid and we were the only reference
 		 * to it, then we push it on the local linked list
 		 * to remove it at the end. We avoid that action now
 		 * to keep the tree processing going along at a fair clip.
 		 *
-		 * Else, even if we are the only reference, we drop
-		 * our hold on the current tree and allow it to be
-		 * reused as needed.
+		 * Else, even if we were the only reference, we
+		 * allow it to be reused as needed.
 		 */
 		mutex_enter(&net->net_cnt_lock);
-		if (net->net_refcnt == 1 &&
+		nfs4_ephemeral_tree_decr(net);
+		if (net->net_refcnt == 0 &&
 		    net->net_status & NFS4_EPHEMERAL_TREE_INVALID) {
-			nfs4_ephemeral_tree_decr(net);
 			net->net_status &= ~NFS4_EPHEMERAL_TREE_LOCKED;
 			mutex_exit(&net->net_cnt_lock);
 			mutex_exit(&net->net_tree_lock);
@@ -2341,7 +3020,6 @@ check_done:
 			continue;
 		}
 
-		nfs4_ephemeral_tree_decr(net);
 		net->net_status &= ~NFS4_EPHEMERAL_TREE_LOCKED;
 		mutex_exit(&net->net_cnt_lock);
 		mutex_exit(&net->net_tree_lock);
@@ -2620,9 +3298,9 @@ nfs4_trigger_add_mntopt(char *mntopts, char *optname, vfs_t *vfsp)
 }
 
 static enum clnt_stat
-nfs4_trigger_ping_server(servinfo4_t *svp, int nointr)
+nfs4_ping_server_common(struct knetconfig *knc, struct netbuf *addr, int nointr)
 {
-	int retries, error;
+	int retries;
 	uint_t max_msgsize;
 	enum clnt_stat status;
 	CLIENT *cl;
@@ -2634,9 +3312,8 @@ nfs4_trigger_ping_server(servinfo4_t *svp, int nointr)
 	timeout.tv_sec = 2;
 	timeout.tv_usec = 0;
 
-	error = clnt_tli_kcreate(svp->sv_knconf, &svp->sv_addr, NFS_PROGRAM,
-	    NFS_V4, max_msgsize, retries, CRED(), &cl);
-	if (error)
+	if (clnt_tli_kcreate(knc, addr, NFS_PROGRAM, NFS_V4,
+	    max_msgsize, retries, CRED(), &cl) != 0)
 		return (RPC_FAILED);
 
 	if (nointr)
@@ -2650,4 +3327,10 @@ nfs4_trigger_ping_server(servinfo4_t *svp, int nointr)
 	CLNT_DESTROY(cl);
 
 	return (status);
+}
+
+static enum clnt_stat
+nfs4_trigger_ping_server(servinfo4_t *svp, int nointr)
+{
+	return (nfs4_ping_server_common(svp->sv_knconf, &svp->sv_addr, nointr));
 }

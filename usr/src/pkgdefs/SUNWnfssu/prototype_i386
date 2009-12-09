@@ -18,10 +18,8 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -47,3 +45,6 @@
 #
 d none usr/lib/fs/nfs/amd64 755 root sys
 f none usr/lib/fs/nfs/amd64/libshare_nfs.so.1 755 root bin
+d none usr/lib/reparse/amd64 755 root sys
+f none usr/lib/reparse/amd64/libnfs_basic.so.1 755 root bin
+s none usr/lib/reparse/amd64/libnfs_basic.so=./libnfs_basic.so.1

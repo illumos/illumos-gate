@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/kstat.h>
@@ -87,6 +85,8 @@ nfsstat_zone_fini_common(zoneid_t zoneid, const char *module, int vers,
 static const kstat_named_t svstat_tmpl[] = {
 	{ "calls",	KSTAT_DATA_UINT64 },
 	{ "badcalls",	KSTAT_DATA_UINT64 },
+	{ "referrals",	KSTAT_DATA_UINT64 },
+	{ "referlinks",	KSTAT_DATA_UINT64 },
 };
 
 /* Points to the global zone server kstat data for all nfs versions */
@@ -108,7 +108,7 @@ nfsstat_zone_init_server(zoneid_t zoneid, kstat_named_t *svstatp[])
 
 	for (vers = NFS_VERSION; vers <= NFS_V4; vers++) {
 		svstatp[vers] = nfsstat_zone_init_common(zoneid, "nfs", vers,
-			    "nfs_server", svstat_tmpl, sizeof (svstat_tmpl));
+		    "nfs_server", svstat_tmpl, sizeof (svstat_tmpl));
 		if (zoneid == GLOBAL_ZONEID)
 			global_svstat_ptr[vers] = svstatp[vers];
 	}

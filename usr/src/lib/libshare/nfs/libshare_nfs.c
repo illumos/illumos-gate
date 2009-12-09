@@ -114,9 +114,10 @@ struct sa_plugin_ops sa_plugin_ops = {
  */
 
 static char *service_list_default[] =
-	{ STATD, LOCKD, MOUNTD, NFSD, NFSMAPID, RQUOTAD, NULL };
+	{ STATD, LOCKD, MOUNTD, NFSD, NFSMAPID, RQUOTAD, REPARSED, NULL };
 static char *service_list_logging[] =
-	{ STATD, LOCKD, MOUNTD, NFSD, NFSMAPID, RQUOTAD, NFSLOGD, NULL };
+	{ STATD, LOCKD, MOUNTD, NFSD, NFSMAPID, RQUOTAD, NFSLOGD, REPARSED,
+	    NULL };
 
 /*
  * option definitions.  Make sure to keep the #define for the option
@@ -2929,6 +2930,9 @@ restart_service(uint32_t svcs)
 			break;
 		case SVC_NFSLOGD:
 			service = NFSLOGD;
+			break;
+		case SVC_REPARSED:
+			service = REPARSED;
 			break;
 		default:
 			continue;

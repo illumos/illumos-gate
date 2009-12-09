@@ -29,6 +29,9 @@
 #include <nfs/export.h>
 #include <nfs/nfs4.h>
 #include <sys/ddi.h>
+#include <sys/door.h>
+#include <sys/sdt.h>
+#include <nfs/nfssys.h>
 
 void	rfs4_init_compound_state(struct compound_state *);
 
@@ -141,6 +144,7 @@ rfs4_attr_init()
 	sarg.flag = 0;
 	sarg.rdattr_error = NFS4_OK;
 	sarg.rdattr_error_req = FALSE;
+	sarg.is_referral = B_FALSE;
 
 	rfs4_ntov_init();
 
@@ -634,7 +638,10 @@ rfs4_fattr4_fsid(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 			error = EINVAL;
 		break;		/* this attr is supported */
 	case NFS4ATTR_GETIT:
-		if (sarg->cs->exi->exi_volatile_dev) {
+		if (sarg->is_referral) {
+			na->fsid.major = 1;
+			na->fsid.minor = 0;
+		} else if (sarg->cs->exi->exi_volatile_dev) {
 			pmaj[0] = sarg->cs->exi->exi_fsid.val[0];
 			pmaj[1] = sarg->cs->exi->exi_fsid.val[1];
 			na->fsid.minor = 0;
@@ -647,7 +654,11 @@ rfs4_fattr4_fsid(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		error = EINVAL;
 		break;
 	case NFS4ATTR_VERIT:
-		if (sarg->cs->exi->exi_volatile_dev) {
+		if (sarg->is_referral) {
+			if (na->fsid.major != 1 ||
+			    na->fsid.minor != 0)
+				error = -1;
+		} else if (sarg->cs->exi->exi_volatile_dev) {
 			if (pmaj[0] != sarg->cs->exi->exi_fsid.val[0] ||
 			    pmaj[1] != sarg->cs->exi->exi_fsid.val[1] ||
 			    na->fsid.minor != 0)
@@ -1495,12 +1506,109 @@ rfs4_fattr4_files_total(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 	return (error);
 }
 
+static void
+rfs4_free_pathname4(pathname4 *pn4)
+{
+	int i, len;
+	utf8string *utf8s;
+
+	if (pn4 == NULL || (len = pn4->pathname4_len) == 0 ||
+	    (utf8s = pn4->pathname4_val) == NULL)
+		return;
+
+	for (i = 0; i < len; i++, utf8s++) {
+		if (utf8s->utf8string_val == NULL ||
+		    utf8s->utf8string_len == 0)
+			continue;
+
+		kmem_free(utf8s->utf8string_val, utf8s->utf8string_len);
+		utf8s->utf8string_val = NULL;
+	}
+
+	kmem_free(pn4->pathname4_val,
+	    sizeof (utf8string) * pn4->pathname4_len);
+	pn4->pathname4_val = 0;
+}
+
+static void
+rfs4_free_fs_location4(fs_location4 *fsl4)
+{
+	if (fsl4 == NULL)
+		return;
+
+	rfs4_free_pathname4((pathname4 *)&fsl4->server_len);
+	rfs4_free_pathname4(&fsl4->rootpath);
+}
+
+void
+rfs4_free_fs_locations4(fs_locations4 *fsls4)
+{
+	int i, len;
+	fs_location4 *fsl4;
+
+	if (fsls4 == NULL)
+		return;
+
+	/* free fs_root */
+	rfs4_free_pathname4(&fsls4->fs_root);
+
+	if ((len = fsls4->locations_len) == 0 ||
+	    (fsl4 = fsls4->locations_val) == NULL)
+		return;
+
+	/* free fs_location4 */
+	for (i = 0; i < len; i++) {
+		rfs4_free_fs_location4(fsl4);
+		fsl4++;
+	}
+
+	kmem_free(fsls4->locations_val, sizeof (fs_location4) * len);
+	fsls4->locations_val = NULL;
+}
+
 /* ARGSUSED */
 static int
 rfs4_fattr4_fs_locations(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 	union nfs4_attr_u *na)
 {
-	return (ENOTSUP);
+	int error = 0;
+	fs_locations4 *fsl;
+
+	if (RFS4_MANDATTR_ONLY)
+		return (ENOTSUP);
+
+	switch (cmd) {
+	case NFS4ATTR_SUPPORTED:
+		if (sarg->op == NFS4ATTR_SETIT || sarg->op == NFS4ATTR_VERIT)
+			error = EINVAL;
+		break;  /* this attr is supported */
+
+	case NFS4ATTR_GETIT:
+		fsl = fetch_referral(sarg->cs->vp, sarg->cs->cr);
+		if (fsl == NULL)
+			error = EINVAL;
+		else {
+			na->fs_locations = *fsl;
+			kmem_free(fsl, sizeof (fs_locations4));
+		}
+		global_svstat_ptr[4][NFS_REFERRALS].value.ui64++;
+		break;
+
+	case NFS4ATTR_FREEIT:
+		if (sarg->op == NFS4ATTR_SETIT || sarg->op == NFS4ATTR_VERIT)
+			error = EINVAL;
+		rfs4_free_fs_locations4(&na->fs_locations);
+		break;
+
+	case NFS4ATTR_SETIT:
+	case NFS4ATTR_VERIT:
+		/*
+		 * read-only attr
+		 */
+		error = EINVAL;
+		break;
+	}
+	return (error);
 }
 
 /* ARGSUSED */

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,6 +53,9 @@
 #include <sys/sdt.h>
 #include <sys/idmap.h>
 #include <idmap.h>
+#include <sys/fs/autofs.h>
+#include <sys/mkdev.h>
+#include "nfs_resolve.h"
 
 #define		UID_MAX_STR_LEN		11	/* Digits in UID_MAX + 1 */
 #define		DIAG_FILE		"/var/run/nfs4_domain"
@@ -585,6 +588,97 @@ done:
 	}
 }
 
+void
+nfsmapid_server_netinfo(refd_door_args_t *referral_args, size_t arg_size)
+{
+	char *res;
+	int res_size;
+	int error;
+	int srsz = 0;
+	char host[MAXHOSTNAMELEN];
+	utf8string	*nfsfsloc_args;
+	refd_door_res_t	*door_res;
+	refd_door_res_t	failed_res;
+	struct nfs_fsl_info *nfs_fsloc_res;
+
+	if (arg_size < sizeof (refd_door_args_t)) {
+		failed_res.res_status = EINVAL;
+		res = (char *)&failed_res;
+		res_size = sizeof (refd_door_res_t);
+		syslog(LOG_ERR,
+		    "nfsmapid_server_netinfo failed: Invalid data\n");
+		goto send_response;
+	}
+
+	if (decode_args(xdr_utf8string, (refd_door_args_t *)referral_args,
+	    (caddr_t *)&nfsfsloc_args, sizeof (utf8string))) {
+		syslog(LOG_ERR, "cannot allocate memory");
+		failed_res.res_status = ENOMEM;
+		failed_res.xdr_len = 0;
+		res = (caddr_t)&failed_res;
+		res_size = sizeof (refd_door_res_t);
+		goto send_response;
+	}
+
+	if (nfsfsloc_args->utf8string_len >= MAXHOSTNAMELEN) {
+		syslog(LOG_ERR, "argument too large");
+		failed_res.res_status = EOVERFLOW;
+		failed_res.xdr_len = 0;
+		res = (caddr_t)&failed_res;
+		res_size = sizeof (refd_door_res_t);
+		goto send_response;
+	}
+
+	snprintf(host, nfsfsloc_args->utf8string_len + 1,
+	    "%s", nfsfsloc_args->utf8string_val);
+
+	nfs_fsloc_res =
+	    get_nfs4ref_info(host, NFS_PORT, NFS_V4);
+
+	xdr_free(xdr_utf8string, (char *)&nfsfsloc_args);
+
+	if (nfs_fsloc_res) {
+		error = 0;
+		error = encode_res(xdr_nfs_fsl_info, &door_res,
+		    (caddr_t)nfs_fsloc_res, &res_size);
+		free_nfs4ref_info(nfs_fsloc_res);
+		if (error != 0) {
+			syslog(LOG_ERR,
+			    "error allocating fs_locations "
+			    "results buffer");
+			failed_res.res_status = error;
+			failed_res.xdr_len = srsz;
+			res = (caddr_t)&failed_res;
+			res_size = sizeof (refd_door_res_t);
+		} else {
+			door_res->res_status = 0;
+			res = (caddr_t)door_res;
+		}
+	} else {
+		failed_res.res_status = EINVAL;
+		failed_res.xdr_len = 0;
+		res = (caddr_t)&failed_res;
+		res_size = sizeof (refd_door_res_t);
+	}
+
+send_response:
+	srsz = res_size;
+	errno = 0;
+
+	error = door_return(res, res_size, NULL, 0);
+	if (errno == E2BIG) {
+		failed_res.res_status = EOVERFLOW;
+		failed_res.xdr_len = srsz;
+		res = (caddr_t)&failed_res;
+		res_size = sizeof (refd_door_res_t);
+	} else {
+		res = NULL;
+		res_size = 0;
+	}
+
+	door_return(res, res_size, NULL, 0);
+}
+
 /* ARGSUSED */
 void
 nfsmapid_func(void *cookie, char *argp, size_t arg_size,
@@ -592,6 +686,7 @@ nfsmapid_func(void *cookie, char *argp, size_t arg_size,
 {
 	struct mapid_arg	*mapargp;
 	struct mapid_res	mapres;
+	refd_door_args_t	*referral_args;
 
 	/*
 	 * Make sure we have a valid argument
@@ -606,6 +701,7 @@ nfsmapid_func(void *cookie, char *argp, size_t arg_size,
 
 	/* LINTED pointer cast */
 	mapargp = (struct mapid_arg *)argp;
+	referral_args = (refd_door_args_t *)argp;
 	switch (mapargp->cmd) {
 	case NFSMAPID_STR_UID:
 		nfsmapid_str_uid(mapargp, arg_size);
@@ -619,6 +715,8 @@ nfsmapid_func(void *cookie, char *argp, size_t arg_size,
 	case NFSMAPID_GID_STR:
 		nfsmapid_gid_str(mapargp, arg_size);
 		return;
+	case NFSMAPID_SRV_NETINFO:
+		nfsmapid_server_netinfo(referral_args, arg_size);
 	default:
 		break;
 	}
@@ -795,4 +893,191 @@ cb_update_domain(void *arg)
 	idmap_kcall(FLUSH_KCACHES_ONLY);
 
 	return (NULL);
+}
+
+bool_t
+xdr_utf8string(XDR *xdrs, utf8string *objp)
+{
+	if (xdrs->x_op != XDR_FREE)
+		return (xdr_bytes(xdrs, (char **)&objp->utf8string_val,
+		    (uint_t *)&objp->utf8string_len, NFS4_MAX_UTF8STRING));
+	return (TRUE);
+}
+
+
+int
+decode_args(xdrproc_t xdrfunc, refd_door_args_t *argp, caddr_t *xdrargs,
+    int size)
+{
+	XDR xdrs;
+
+	caddr_t tmpargs = (caddr_t)&((refd_door_args_t *)argp)->xdr_arg;
+	size_t arg_size = ((refd_door_args_t *)argp)->xdr_len;
+
+	xdrmem_create(&xdrs, tmpargs, arg_size, XDR_DECODE);
+
+	*xdrargs = calloc(1, size);
+	if (*xdrargs == NULL) {
+		syslog(LOG_ERR, "error allocating arguments buffer");
+		return (ENOMEM);
+	}
+
+	if (!(*xdrfunc)(&xdrs, *xdrargs)) {
+		free(*xdrargs);
+		*xdrargs = NULL;
+		syslog(LOG_ERR, "error decoding arguments");
+		return (EINVAL);
+	}
+
+	return (0);
+}
+
+int
+encode_res(
+	xdrproc_t xdrfunc,
+	refd_door_res_t **results,
+	caddr_t resp,
+	int *size)
+{
+	XDR xdrs;
+
+	*size = xdr_sizeof((*xdrfunc), resp);
+	*results = malloc(sizeof (refd_door_res_t) + *size);
+	if (*results == NULL) {
+		return (ENOMEM);
+	}
+	(*results)->xdr_len = *size;
+	*size = sizeof (refd_door_res_t) + (*results)->xdr_len;
+	xdrmem_create(&xdrs, (caddr_t)((*results)->xdr_res),
+	    (*results)->xdr_len, XDR_ENCODE);
+	if (!(*xdrfunc)(&xdrs, resp)) {
+		(*results)->res_status = EINVAL;
+		syslog(LOG_ERR, "error encoding results");
+		return ((*results)->res_status);
+	}
+	(*results)->res_status = 0;
+	return ((*results)->res_status);
+}
+
+
+bool_t
+xdr_knetconfig(XDR *xdrs, struct knetconfig *objp)
+{
+	rpc_inline_t *buf;
+	int i;
+	u_longlong_t dev64;
+#if !defined(_LP64)
+	uint32_t major, minor;
+#endif
+
+	if (!xdr_u_int(xdrs, &objp->knc_semantics))
+		return (FALSE);
+	if (!xdr_opaque(xdrs, objp->knc_protofmly, KNC_STRSIZE))
+		return (FALSE);
+	if (!xdr_opaque(xdrs, objp->knc_proto, KNC_STRSIZE))
+		return (FALSE);
+
+	/*
+	 * For interoperability between 32-bit daemon and 64-bit kernel,
+	 * we always treat dev_t as 64-bit number and do the expanding
+	 * or compression of dev_t as needed.
+	 * We have to hand craft the conversion since there is no available
+	 * function in ddi.c. Besides ddi.c is available only in the kernel
+	 * and we want to keep both user and kernel of xdr_knetconfig() the
+	 * same for consistency.
+	 */
+
+	if (xdrs->x_op == XDR_ENCODE) {
+#if defined(_LP64)
+		dev64 = objp->knc_rdev;
+#else
+		major = (objp->knc_rdev >> NBITSMINOR32) & MAXMAJ32;
+		minor = objp->knc_rdev & MAXMIN32;
+		dev64 = (((unsigned long long)major) << NBITSMINOR64) | minor;
+#endif
+		if (!xdr_u_longlong_t(xdrs, &dev64))
+			return (FALSE);
+	}
+	if (xdrs->x_op == XDR_DECODE) {
+#if defined(_LP64)
+		if (!xdr_u_longlong_t(xdrs, (u_longlong_t *)&objp->knc_rdev))
+			return (FALSE);
+#else
+		if (!xdr_u_longlong_t(xdrs, &dev64))
+			return (FALSE);
+
+		major = (dev64 >> NBITSMINOR64) & L_MAXMAJ32;
+		minor = dev64 & L_MAXMIN32;
+		objp->knc_rdev = (major << L_BITSMINOR32) | minor;
+#endif
+	}
+
+	if (xdrs->x_op == XDR_ENCODE) {
+		buf = XDR_INLINE(xdrs, (8) * BYTES_PER_XDR_UNIT);
+		if (buf == NULL) {
+			if (!xdr_vector(xdrs, (char *)objp->knc_unused, 8,
+			    sizeof (uint_t), (xdrproc_t)xdr_u_int))
+				return (FALSE);
+		} else {
+			uint_t *genp;
+
+			for (i = 0, genp = objp->knc_unused;
+			    i < 8; i++) {
+#if defined(_LP64) || defined(_KERNEL)
+				IXDR_PUT_U_INT32(buf, *genp++);
+#else
+				IXDR_PUT_U_LONG(buf, *genp++);
+#endif
+			}
+		}
+		return (TRUE);
+	} else if (xdrs->x_op == XDR_DECODE) {
+		buf = XDR_INLINE(xdrs, (8) * BYTES_PER_XDR_UNIT);
+		if (buf == NULL) {
+			if (!xdr_vector(xdrs, (char *)objp->knc_unused, 8,
+			    sizeof (uint_t), (xdrproc_t)xdr_u_int))
+				return (FALSE);
+		} else {
+			uint_t *genp;
+
+			for (i = 0, genp = objp->knc_unused;
+			    i < 8; i++) {
+#if defined(_LP64) || defined(_KERNEL)
+				*genp++ = IXDR_GET_U_INT32(buf);
+#else
+				*genp++ = IXDR_GET_U_LONG(buf);
+#endif
+			}
+		}
+		return (TRUE);
+	}
+
+	if (!xdr_vector(xdrs, (char *)objp->knc_unused, 8,
+	    sizeof (uint_t), (xdrproc_t)xdr_u_int))
+		return (FALSE);
+	return (TRUE);
+}
+
+/*
+ * used by NFSv4 referrals to get info needed for NFSv4 referral mount.
+ */
+bool_t
+xdr_nfs_fsl_info(XDR *xdrs, struct nfs_fsl_info *objp)
+{
+
+	if (!xdr_u_int(xdrs, &objp->netbuf_len))
+		return (FALSE);
+	if (!xdr_u_int(xdrs, &objp->netnm_len))
+		return (FALSE);
+	if (!xdr_u_int(xdrs, &objp->knconf_len))
+		return (FALSE);
+	if (!xdr_string(xdrs, &objp->netname, ~0))
+		return (FALSE);
+	if (!xdr_pointer(xdrs, (char **)&objp->addr, objp->netbuf_len,
+	    (xdrproc_t)xdr_netbuf))
+		return (FALSE);
+	if (!xdr_pointer(xdrs, (char **)&objp->knconf,
+	    objp->knconf_len, (xdrproc_t)xdr_knetconfig))
+		return (FALSE);
+	return (TRUE);
 }

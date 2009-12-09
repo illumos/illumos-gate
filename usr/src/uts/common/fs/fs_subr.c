@@ -938,7 +938,7 @@ int
 reparse_kderef(const char *svc_type, const char *svc_data, char *buf,
     size_t *bufsize)
 {
-	int err, retries, need_free;
+	int err, retries, need_free, retried_doorhd;
 	size_t dlen, res_len;
 	char *darg;
 	door_arg_t door_args;
@@ -975,6 +975,7 @@ reparse_kderef(const char *svc_type, const char *svc_data, char *buf,
 	door_args.rsize = *bufsize;
 
 	/* do the door_call */
+	retried_doorhd = 0;
 	retries = 0;
 	door_ki_hold(rp_door);
 	while ((err = door_ki_upcall_limited(rp_door, &door_args,
@@ -987,10 +988,23 @@ reparse_kderef(const char *svc_type, const char *svc_data, char *buf,
 		} else if (err == EBADF) {
 			/* door server goes away... */
 			reparse_door_reset_handle();
+
+			if (retried_doorhd == 0) {
+				door_ki_rele(rp_door);
+				retried_doorhd++;
+				rp_door = reparse_door_get_handle();
+				if (rp_door != NULL) {
+					door_ki_hold(rp_door);
+					continue;
+				}
+			}
 		}
 		break;
 	}
-	door_ki_rele(rp_door);
+
+	if (rp_door)
+		door_ki_rele(rp_door);
+
 	if (need_free)
 		kmem_free(darg, dlen);		/* done with args buffer */
 

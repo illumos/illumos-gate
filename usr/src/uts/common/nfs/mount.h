@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,8 +30,6 @@
 
 #ifndef	_NFS_MOUNT_H
 #define	_NFS_MOUNT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -157,11 +155,9 @@ struct nfs_args32 {
 #define	NFSMNT_TRYRDMA		0x8000000 /* Try RDMA mount,no proto advised */
 #define	NFSMNT_DORDMA		0x10000000 /* Do an RDMA mount, regardless */
 #define	NFSMNT_MIRRORMOUNT	0x20000000 /* Is a mirrormount */
+#define	NFSMNT_REFERRAL		0x40000000 /* Is a referral */
 
-/*
- * This will have to change when we do referrals.
- */
-#define	NFSMNT_EPHEMERAL	NFSMNT_MIRRORMOUNT
+#define	NFSMNT_EPHEMERAL	(NFSMNT_MIRRORMOUNT | NFSMNT_REFERRAL)
 
 #ifdef	__cplusplus
 }

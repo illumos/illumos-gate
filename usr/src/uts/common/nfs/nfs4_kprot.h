@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -226,6 +226,15 @@ struct fs_locations4 {
 	fs_location4 *locations_val;
 };
 typedef struct fs_locations4 fs_locations4;
+
+struct nfs_fsl_info {
+	uint_t netbuf_len;
+	uint_t netnm_len;
+	uint_t knconf_len;
+	char *netname;
+	struct netbuf *addr;
+	struct knetconfig *knconf;
+};
 
 /*
  * ACL support
@@ -590,6 +599,7 @@ struct nfs_client_id4 {
 	verifier4 verifier;
 	uint_t id_len;
 	char *id_val;
+	struct sockaddr *cl_addr;
 };
 typedef struct nfs_client_id4 nfs_client_id4;
 
@@ -1635,6 +1645,12 @@ extern  bool_t xdr_COMPOUND4res_srv(XDR *, COMPOUND4res *);
 extern  bool_t xdr_CB_COMPOUND4args_clnt(XDR *, CB_COMPOUND4args *);
 extern  bool_t xdr_CB_COMPOUND4args_srv(XDR *, CB_COMPOUND4args *);
 extern  bool_t xdr_CB_COMPOUND4res(XDR *, CB_COMPOUND4res *);
+
+/*
+ * xdr for referrrals upcall
+ */
+extern	bool_t xdr_knetconfig(XDR *, struct knetconfig *);
+extern	bool_t xdr_nfs_fsl_info(XDR *, struct nfs_fsl_info *);
 
 
 #ifdef __cplusplus

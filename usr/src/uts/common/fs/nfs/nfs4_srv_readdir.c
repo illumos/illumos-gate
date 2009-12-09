@@ -97,7 +97,6 @@ static nfs_ftype4 vt_to_nf4[] = {
 	0, NF4REG, NF4DIR, NF4BLK, NF4CHR, NF4LNK, NF4FIFO, 0, 0, NF4SOCK, 0
 };
 
-
 int
 nfs4_readdir_getvp(vnode_t *dvp, char *d_name, vnode_t **vpp,
 		struct exportinfo **exi, struct svc_req *req,
@@ -117,8 +116,20 @@ nfs4_readdir_getvp(vnode_t *dvp, char *d_name, vnode_t **vpp,
 	    NULL, NULL, NULL))
 		return (error);
 
+	/*
+	 * If the directory is a referral point, don't return the
+	 * attrs, instead set rdattr_error to MOVED.
+	 */
+	if (vn_is_nfs_reparse(vp, cs->cr) && !client_is_downrev(req)) {
+		VN_RELE(vp);
+		DTRACE_PROBE2(nfs4serv__func__referral__moved,
+		    vnode_t *, vp, char *, "nfs4_readdir_getvp");
+		return (NFS4ERR_MOVED);
+	}
+
 	/* Is this object mounted upon? */
 	ismntpt = vn_ismntpt(vp);
+
 	/*
 	 * Nothing more to do if object is not a mount point or
 	 * a possible LOFS shadow of an LOFS mount (which won't
@@ -140,6 +151,13 @@ nfs4_readdir_getvp(vnode_t *dvp, char *d_name, vnode_t **vpp,
 		if ((error = traverse(&vp)) != 0) {
 			VN_RELE(pre_tvp);
 			return (error);
+		}
+		if (vn_is_nfs_reparse(vp, cs->cr)) {
+			VN_RELE(vp);
+			VN_RELE(pre_tvp);
+			DTRACE_PROBE2(nfs4serv__func__referral__moved,
+			    vnode_t *, vp, char *, "nfs4_readdir_getvp");
+			return (NFS4ERR_MOVED);
 		}
 	}
 
@@ -818,9 +836,18 @@ reencode_attrs:
 				va.va_mask = AT_ALL;
 				rddirattr_error =
 				    VOP_GETATTR(vp, &va, 0, cs->cr, NULL);
-				if (rddirattr_error)
+				if (rddirattr_error) {
 					ae = ar & (FATTR4_RDATTR_ERROR_MASK |
 					    FATTR4_MOUNTED_ON_FILEID_MASK);
+				} else {
+					/*
+					 * We may lie about the object
+					 * type for a referral
+					 */
+					if (vn_is_nfs_reparse(vp, cs->cr) &&
+					    client_is_downrev(req))
+						va.va_type = VLNK;
+				}
 			}
 		}
 

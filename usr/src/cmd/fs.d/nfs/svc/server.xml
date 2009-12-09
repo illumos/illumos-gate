@@ -94,6 +94,13 @@
 		<service_fmri value='svc:/network/shares/group' />
 	</dependency>
 
+	<dependency name='reparse'
+	    grouping='optional_all'
+	    restart_on='none'
+	    type='service'>
+		<service_fmri value='svc:/system/filesystem/reparse' />
+	</dependency>
+
 	<!-- Must have all local filesystems mounted before we share them -->
 	<dependency name='filesystem-local'
 	    grouping='require_all'

@@ -4441,3 +4441,32 @@ fs_reparse_mark(char *target, vattr_t *vap, xvattr_t *xvattr)
 
 	return (0);
 }
+
+/*
+ * Function to check whether a symlink is a reparse point.
+ * Return B_TRUE if it is a reparse point, else return B_FALSE
+ */
+boolean_t
+vn_is_reparse(vnode_t *vp, cred_t *cr, caller_context_t *ct)
+{
+	xvattr_t xvattr;
+	xoptattr_t *xoap;
+
+	if ((vp->v_type != VLNK) ||
+	    !(vfs_has_feature(vp->v_vfsp, VFSFT_XVATTR)))
+		return (B_FALSE);
+
+	xva_init(&xvattr);
+	xoap = xva_getxoptattr(&xvattr);
+	ASSERT(xoap);
+	XVA_SET_REQ(&xvattr, XAT_REPARSE);
+
+	if (VOP_GETATTR(vp, &xvattr.xva_vattr, 0, cr, ct))
+		return (B_FALSE);
+
+	if ((!(xvattr.xva_vattr.va_mask & AT_XVATTR)) ||
+	    (!(XVA_ISSET_RTN(&xvattr, XAT_REPARSE))))
+		return (B_FALSE);
+
+	return (xoap->xoa_reparse ? B_TRUE : B_FALSE);
+}

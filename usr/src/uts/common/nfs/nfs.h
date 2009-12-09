@@ -884,7 +884,8 @@ extern void rfs_srvrfini(void);
 #define	NATIVEPATH	0x02	/* Native path, i.e., via mount protocol */
 #define	SECURITY_QUERY	0x04	/* Security query */
 
-enum nfs_svccounts {NFS_CALLS, NFS_BADCALLS}; /* index for svstat_ptr */
+/* index for svstat_ptr */
+enum nfs_svccounts {NFS_CALLS, NFS_BADCALLS, NFS_REFERRALS, NFS_REFERLINKS};
 
 /*	function defs for NFS kernel */
 extern int	nfs_waitfor_purge_complete(vnode_t *);

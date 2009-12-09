@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _NFS4_ATTR_H
 #define	_NFS4_ATTR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -436,6 +433,7 @@ typedef struct nfs4_ga_ext_res {
 	 * ACL4_SUPPORT_ALARM_ACL
 	 */
 	fattr4_aclsupport		n4g_aclsupport;
+	fattr4_fs_locations		n4g_fslocations;
 } nfs4_ga_ext_res_t;
 
 extern bitmap4 rfs4_supported_attrs;

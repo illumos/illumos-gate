@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -27,8 +26,6 @@
 /*
  *	nfs4_prot.x
  */
-
-%#pragma ident	"@(#)nfs4_prot.x	1.122"
 
 /*
  * Basic typedefs for RFC 1832 data type definitions
@@ -210,6 +207,16 @@ struct fs_locations4 {
 	pathname4	fs_root;
 	fs_location4	locations<>;
 };
+
+struct nfs_fsl_info {
+	uint_t			netbuf_len;
+	uint_t			netnm_len;
+	uint_t			knconf_len;
+	string			netname<MAXNETNAMELEN>;
+	struct netbuf		*addr;
+	struct knetconfig	*knconf;
+};
+
 
 /*
  * Various Access Control Entry definitions

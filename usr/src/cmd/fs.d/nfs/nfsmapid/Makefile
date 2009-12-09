@@ -32,11 +32,13 @@ include		../../Makefile.fstype
 
 LDLIBS   +=	-L$(ROOT)/usr/lib/nfs -R/usr/lib/nfs
 LDLIBS   +=	-lnsl -lmapid -ldtrace -lidmap
-SRCS	  =	nfsmapid.c nfsmapid_server.c
+COMMON    =	nfs_resolve.o
+SRCS	  =	nfsmapid.c ../lib/nfs_resolve.c nfsmapid_server.c
 DSRC	  =	nfsmapid_dt.d
 DOBJ	  =	$(DSRC:%.d=%.o)
-OBJS	  =	$(SRCS:%.c=%.o)
+OBJS	  =	nfsmapid.o nfsmapid_server.o $(COMMON)
 CPPFLAGS +=	-I../lib -D_POSIX_PTHREAD_SEMANTICS
+
 
 all:		$(TYPEPROG) $(TESTPROG)
 
@@ -44,6 +46,9 @@ $(TYPEPROG):	$(OBJS) $(DSRC)
 		$(COMPILE.d) -s $(DSRC) -o $(DOBJ) $(OBJS)
 		$(LINK.c) $(ZIGNORE) -o $@ $(DOBJ) $(OBJS) $(LDLIBS)
 		$(POST_PROCESS)
+
+nfs_resolve.o:	../lib/nfs_resolve.c
+		$(COMPILE.c) ../lib/nfs_resolve.c
 
 TESTSRCS  =	nfsmapid_test.c
 TESTOBJS  =	$(TESTSRCS:%.c=%.o)

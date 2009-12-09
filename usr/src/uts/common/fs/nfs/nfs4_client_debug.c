@@ -303,6 +303,17 @@ set_event(nfs4_event_type_t id, nfs4_revent_t *ep, mntinfo4_t *mi,
 		if (rp2 != NULL && rp2->r_svnode.sv_name != NULL)
 			ep->re_char2 = fn_path(rp2->r_svnode.sv_name);
 		break;
+	case RE_REFERRAL:
+		/* server we're being referred to */
+		if (server1 != NULL) {
+			len = strlen(server1);
+			ep->re_char1 = kmem_alloc(len + 1, KM_SLEEP);
+			bcopy(server1, ep->re_char1, len);
+			ep->re_char1[len] = '\0';
+		} else {
+			ep->re_char1 = NULL;
+		}
+		break;
 	default:
 		break;
 	}
@@ -391,6 +402,8 @@ successful_comm(nfs4_debug_msg_t *msgp)
 		case RE_SIGLOST:
 		case RE_SIGLOST_NO_DUMP:
 		case RE_LOST_STATE_BAD_OP:
+		case RE_REFERRAL:
+			/* placeholder */
 			return (0);
 		default:
 			return (0);
@@ -1039,6 +1052,18 @@ queue_print_event(nfs4_debug_msg_t *msg, mntinfo4_t *mi, int dump)
 		    ep->re_char1, (void *)ep->re_rp1, ep->re_char2,
 		    (void *)ep->re_rp2);
 		break;
+	case RE_REFERRAL:
+		if (ep->re_char1)
+			zcmn_err(zoneid, CE_NOTE,
+			    "![NFS4][Server: %s][Mntpt: %s]"
+			    "being referred from %s to %s", msg->msg_srv,
+			    msg->msg_mntpt, msg->msg_srv, ep->re_char1);
+		else
+			zcmn_err(zoneid, CE_NOTE,
+			    "![NFS4][Server: %s][Mntpt: %s]"
+			    "NFS4: being referred from %s to unknown server",
+			    msg->msg_srv, msg->msg_mntpt, msg->msg_srv);
+		break;
 	default:
 		zcmn_err(zoneid, CE_WARN,
 		    "!queue_print_event: illegal event %d", ep->re_type);
@@ -1186,6 +1211,7 @@ id_to_dump_solo_event(nfs4_event_type_t id)
 	case RE_UNEXPECTED_ERRNO:
 	case RE_UNEXPECTED_STATUS:
 	case RE_LOST_STATE_BAD_OP:
+	case RE_REFERRAL:
 		return (1);
 	default:
 		return (0);

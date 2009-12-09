@@ -112,6 +112,10 @@ rfs3_getattr(GETATTR3args *args, GETATTR3res *resp, struct exportinfo *exi,
 	error = rfs4_delegated_getattr(vp, &va, 0, cr);
 
 	if (!error) {
+		/* Lie about the object type for a referral */
+		if (vn_is_nfs_reparse(vp, cr))
+			va.va_type = VLNK;
+
 		/* overflow error if time or size is out of range */
 		error = vattr_to_fattr3(&va, &resp->resok.obj_attributes);
 		if (error)
@@ -792,6 +796,7 @@ rfs3_readlink(READLINK3args *args, READLINK3res *resp, struct exportinfo *exi,
 	char *data;
 	struct sockaddr *ca;
 	char *name = NULL;
+	int is_referral = 0;
 
 	vap = NULL;
 
@@ -817,7 +822,11 @@ rfs3_readlink(READLINK3args *args, READLINK3res *resp, struct exportinfo *exi,
 	vap = &va;
 #endif
 
-	if (vp->v_type != VLNK) {
+	/* We lied about the object type for a referral */
+	if (vn_is_nfs_reparse(vp, cr))
+		is_referral = 1;
+
+	if (vp->v_type != VLNK && !is_referral) {
 		resp->status = NFS3ERR_INVAL;
 		goto out1;
 	}
@@ -845,16 +854,39 @@ rfs3_readlink(READLINK3args *args, READLINK3res *resp, struct exportinfo *exi,
 
 	data = kmem_alloc(MAXPATHLEN + 1, KM_SLEEP);
 
-	iov.iov_base = data;
-	iov.iov_len = MAXPATHLEN;
-	uio.uio_iov = &iov;
-	uio.uio_iovcnt = 1;
-	uio.uio_segflg = UIO_SYSSPACE;
-	uio.uio_extflg = UIO_COPY_CACHED;
-	uio.uio_loffset = 0;
-	uio.uio_resid = MAXPATHLEN;
+	if (is_referral) {
+		char *s;
+		size_t strsz;
 
-	error = VOP_READLINK(vp, &uio, cr, NULL);
+		/* Get an artificial symlink based on a referral */
+		s = build_symlink(vp, cr, &strsz);
+		global_svstat_ptr[3][NFS_REFERLINKS].value.ui64++;
+		DTRACE_PROBE2(nfs3serv__func__referral__reflink,
+		    vnode_t *, vp, char *, s);
+		if (s == NULL)
+			error = EINVAL;
+		else {
+			error = 0;
+			(void) strlcpy(data, s, MAXPATHLEN + 1);
+			kmem_free(s, strsz);
+		}
+
+	} else {
+
+		iov.iov_base = data;
+		iov.iov_len = MAXPATHLEN;
+		uio.uio_iov = &iov;
+		uio.uio_iovcnt = 1;
+		uio.uio_segflg = UIO_SYSSPACE;
+		uio.uio_extflg = UIO_COPY_CACHED;
+		uio.uio_loffset = 0;
+		uio.uio_resid = MAXPATHLEN;
+
+		error = VOP_READLINK(vp, &uio, cr, NULL);
+
+		if (!error)
+			*(data + MAXPATHLEN - uio.uio_resid) = '\0';
+	}
 
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
@@ -866,6 +898,9 @@ rfs3_readlink(READLINK3args *args, READLINK3res *resp, struct exportinfo *exi,
 	va.va_mask = AT_ALL;
 	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 #endif
+	/* Lie about object type again just to be consistent */
+	if (is_referral && vap != NULL)
+		vap->va_type = VLNK;
 
 #if 0 /* notyet */
 	/*
@@ -883,8 +918,6 @@ rfs3_readlink(READLINK3args *args, READLINK3res *resp, struct exportinfo *exi,
 		kmem_free(data, MAXPATHLEN + 1);
 		goto out;
 	}
-
-	*(data + MAXPATHLEN - uio.uio_resid) = '\0';
 
 	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
 	name = nfscmd_convname(ca, exi, data, NFSCMD_CONV_OUTBOUND,
@@ -3863,6 +3896,10 @@ good:
 		nva.va_mask = AT_ALL;
 		nvap = rfs4_delegated_getattr(nvp, &nva, 0, cr) ? NULL : &nva;
 #endif
+		/* Lie about the object type for a referral */
+		if (vn_is_nfs_reparse(nvp, cr))
+			nvap->va_type = VLNK;
+
 		vattr_to_post_op_attr(nvap, &infop[i].attr);
 
 #ifdef DEBUG

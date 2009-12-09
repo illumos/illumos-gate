@@ -59,6 +59,8 @@
 static const struct clstat4 clstat4_tmpl = {
 	{ "calls",	KSTAT_DATA_UINT64 },
 	{ "badcalls",	KSTAT_DATA_UINT64 },
+	{ "referrals",	KSTAT_DATA_UINT64 },
+	{ "referlinks",	KSTAT_DATA_UINT64 },
 	{ "clgets",	KSTAT_DATA_UINT64 },
 	{ "cltoomany",	KSTAT_DATA_UINT64 },
 #ifdef DEBUG
@@ -90,7 +92,7 @@ struct clstat4_debug clstat4_debug = {
  */
 static list_t nfs4_clnt_list;
 static kmutex_t nfs4_clnt_list_lock;
-static zone_key_t nfs4clnt_zone_key;
+zone_key_t nfs4clnt_zone_key;
 
 static struct kmem_cache *chtab4_cache;
 
@@ -1943,6 +1945,9 @@ again:
 	 * crossed an underlying server fs boundary.
 	 *
 	 * This stub will be for a mirror-mount.
+	 * A referral would look like a boundary crossing
+	 * as well, but would not be the same type of object,
+	 * so we would expect to mark the object dead.
 	 *
 	 * See comment in r4_do_attrcache() for more details.
 	 */
@@ -2109,7 +2114,8 @@ recov_retry:
 			bool_t abort;
 
 			abort = nfs4_start_recovery(&e, mi,
-			    rootvp, NULL, NULL, NULL, OP_LOOKUP, NULL);
+			    rootvp, NULL, NULL, NULL, OP_LOOKUP, NULL, NULL,
+			    NULL);
 			if (abort) {
 				nfs4_end_fop(mi, rootvp, NULL, OH_LOOKUP,
 				    &recov_state, FALSE);
@@ -2169,7 +2175,7 @@ recov_retry:
 
 					abort = nfs4_start_recovery(&e, mi,
 					    rootvp, NULL, NULL, NULL,
-					    OP_LOOKUP, NULL);
+					    OP_LOOKUP, NULL, NULL, NULL);
 					if (abort) {
 						nfs4_end_fop(mi, rootvp, NULL,
 						    OH_LOOKUP, &recov_state,
@@ -2757,6 +2763,7 @@ clinit4_zone(zoneid_t zoneid)
 	mutex_enter(&nfs4_clnt_list_lock);
 	list_insert_head(&nfs4_clnt_list, nfscl);
 	mutex_exit(&nfs4_clnt_list_lock);
+
 	return (nfscl);
 }
 

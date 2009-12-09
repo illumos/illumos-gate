@@ -288,6 +288,8 @@ rfs4_table_t *rfs4_client_tab;
 
 static rfs4_index_t *rfs4_clientid_idx;
 static rfs4_index_t *rfs4_nfsclnt_idx;
+static rfs4_table_t *rfs4_clntip_tab;
+static rfs4_index_t *rfs4_clntip_idx;
 static rfs4_table_t *rfs4_openowner_tab;
 static rfs4_index_t *rfs4_openowner_idx;
 static rfs4_table_t *rfs4_state_tab;
@@ -330,6 +332,7 @@ static rfs4_index_t *rfs4_deleg_state_idx;
 
 
 static time_t rfs4_client_cache_time = 0;
+static time_t rfs4_clntip_cache_time = 0;
 static time_t rfs4_openowner_cache_time = 0;
 static time_t rfs4_state_cache_time = 0;
 static time_t rfs4_lo_state_cache_time = 0;
@@ -348,6 +351,12 @@ static void *clientid_mkkey(rfs4_entry_t);
 static uint32_t nfsclnt_hash(void *);
 static bool_t nfsclnt_compare(rfs4_entry_t, void *);
 static void *nfsclnt_mkkey(rfs4_entry_t);
+static bool_t rfs4_clntip_expiry(rfs4_entry_t);
+static void rfs4_clntip_destroy(rfs4_entry_t);
+static bool_t rfs4_clntip_create(rfs4_entry_t, void *);
+static uint32_t clntip_hash(void *);
+static bool_t clntip_compare(rfs4_entry_t, void *);
+static void *clntip_mkkey(rfs4_entry_t);
 static bool_t rfs4_openowner_create(rfs4_entry_t, void *);
 static void rfs4_openowner_destroy(rfs4_entry_t);
 static bool_t rfs4_openowner_expiry(rfs4_entry_t);
@@ -883,7 +892,7 @@ rfs4_ss_chkclid_sip(rfs4_client_t *cp, rfs4_servinst_t *sip)
  * the server-generated short-hand clientid.
  */
 void
-rfs4_ss_clid(rfs4_client_t *cp, struct svc_req *req)
+rfs4_ss_clid(rfs4_client_t *cp)
 {
 	const char *kinet_ntop6(uchar_t *, char *, size_t);
 	char leaf[MAXNAMELEN], buf[INET6_ADDRSTRLEN];
@@ -896,19 +905,12 @@ rfs4_ss_clid(rfs4_client_t *cp, struct svc_req *req)
 
 	buf[0] = 0;
 
-
-	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
-	if (ca == NULL) {
-		return;
-	}
+	ca = (struct sockaddr *)&cp->rc_addr;
 
 	/*
 	 * Convert the caller's IP address to a dotted string
 	 */
 	if (ca->sa_family == AF_INET) {
-
-		bcopy(svc_getrpccaller(req->rq_xprt)->buf, &cp->rc_addr,
-		    sizeof (struct sockaddr_in));
 		b = (uchar_t *)&((struct sockaddr_in *)ca)->sin_addr;
 		(void) sprintf(buf, "%03d.%03d.%03d.%03d", b[0] & 0xFF,
 		    b[1] & 0xFF, b[2] & 0xFF, b[3] & 0xFF);
@@ -916,8 +918,6 @@ rfs4_ss_clid(rfs4_client_t *cp, struct svc_req *req)
 		struct sockaddr_in6 *sin6;
 
 		sin6 = (struct sockaddr_in6 *)ca;
-		bcopy(svc_getrpccaller(req->rq_xprt)->buf, &cp->rc_addr,
-		    sizeof (struct sockaddr_in6));
 		(void) kinet_ntop6((uchar_t *)&sin6->sin6_addr,
 		    buf, INET6_ADDRSTRLEN);
 	}
@@ -1256,6 +1256,22 @@ rfs4_state_init()
 	    "client_id", clientid_hash,
 	    clientid_compare, clientid_mkkey,
 	    FALSE);
+
+	rfs4_clntip_cache_time = 86400 * 365;	/* about a year */
+	rfs4_clntip_tab = rfs4_table_create(rfs4_server_state,
+	    "ClntIP",
+	    rfs4_clntip_cache_time,
+	    1,
+	    rfs4_clntip_create,
+	    rfs4_clntip_destroy,
+	    rfs4_clntip_expiry,
+	    sizeof (rfs4_clntip_t),
+	    TABSIZE,
+	    MAXTABSZ, 100);
+	rfs4_clntip_idx = rfs4_index_create(rfs4_clntip_tab,
+	    "client_ip", clntip_hash,
+	    clntip_compare, clntip_mkkey,
+	    TRUE);
 
 	rfs4_openowner_cache_time *= rfs4_lease_time;
 	rfs4_openowner_tab = rfs4_table_create(rfs4_server_state,
@@ -1649,6 +1665,7 @@ rfs4_client_create(rfs4_entry_t u_entry, void *arg)
 {
 	rfs4_client_t *cp = (rfs4_client_t *)u_entry;
 	nfs_client_id4 *client = (nfs_client_id4 *)arg;
+	struct sockaddr *ca;
 	cid *cidp;
 	scid_confirm_verf *scvp;
 
@@ -1666,6 +1683,14 @@ rfs4_client_create(rfs4_entry_t u_entry, void *arg)
 	cp->rc_nfs_client.id_len = client->id_len;
 	bcopy(client->id_val, cp->rc_nfs_client.id_val, client->id_len);
 	cp->rc_nfs_client.verifier = client->verifier;
+
+	/* Copy client's IP address */
+	ca = client->cl_addr;
+	if (ca->sa_family == AF_INET)
+		bcopy(ca, &cp->rc_addr, sizeof (struct sockaddr_in));
+	else if (ca->sa_family == AF_INET6)
+		bcopy(ca, &cp->rc_addr, sizeof (struct sockaddr_in6));
+	cp->rc_nfs_client.cl_addr = (struct sockaddr *)&cp->rc_addr;
 
 	/* Init the value for the SETCLIENTID_CONFIRM verifier */
 	scvp = (scid_confirm_verf *)&cp->rc_confirm_verf;
@@ -1779,6 +1804,119 @@ rfs4_findclient_by_id(clientid4 clientid, bool_t find_unconfirmed)
 	} else {
 		return (cp);
 	}
+}
+
+static uint32_t
+clntip_hash(void *key)
+{
+	struct sockaddr *addr = key;
+	int i, len = 0;
+	uint32_t hash = 0;
+
+	if (addr->sa_family == AF_INET)
+		len = sizeof (struct sockaddr_in);
+	else if (addr->sa_family == AF_INET6)
+		len = sizeof (struct sockaddr_in6);
+
+	for (i = 0; i < len; i++) {
+		hash <<= 1;
+		hash += (uint_t)(((char *)addr)[i]);
+	}
+	return (hash);
+}
+
+static bool_t
+clntip_compare(rfs4_entry_t entry, void *key)
+{
+	rfs4_clntip_t *cp = (rfs4_clntip_t *)entry;
+	struct sockaddr *addr = key;
+	int len = 0;
+
+	if (addr->sa_family == AF_INET)
+		len = sizeof (struct sockaddr_in);
+	else if (addr->sa_family == AF_INET6)
+		len = sizeof (struct sockaddr_in6);
+	else
+		return (0);
+
+	return (bcmp(&cp->ri_addr, addr, len) == 0);
+}
+
+static void *
+clntip_mkkey(rfs4_entry_t entry)
+{
+	rfs4_clntip_t *cp = (rfs4_clntip_t *)entry;
+
+	return (&cp->ri_addr);
+}
+
+static bool_t
+rfs4_clntip_expiry(rfs4_entry_t u_entry)
+{
+	rfs4_clntip_t *cp = (rfs4_clntip_t *)u_entry;
+
+	if (rfs4_dbe_is_invalid(cp->ri_dbe))
+		return (TRUE);
+	return (FALSE);
+}
+
+/* ARGSUSED */
+static void
+rfs4_clntip_destroy(rfs4_entry_t u_entry)
+{
+}
+
+static bool_t
+rfs4_clntip_create(rfs4_entry_t u_entry, void *arg)
+{
+	rfs4_clntip_t *cp = (rfs4_clntip_t *)u_entry;
+	struct sockaddr *ca = (struct sockaddr *)arg;
+
+	/* Copy client's IP address */
+	if (ca->sa_family == AF_INET)
+		bcopy(ca, &cp->ri_addr, sizeof (struct sockaddr_in));
+	else if (ca->sa_family == AF_INET6)
+		bcopy(ca, &cp->ri_addr, sizeof (struct sockaddr_in6));
+	else
+		return (FALSE);
+	cp->ri_no_referrals = 1;
+
+	return (TRUE);
+}
+
+rfs4_clntip_t *
+rfs4_find_clntip(struct sockaddr *addr, bool_t *create)
+{
+	rfs4_clntip_t *cp;
+
+	rw_enter(&rfs4_findclient_lock, RW_READER);
+
+	cp = (rfs4_clntip_t *)rfs4_dbsearch(rfs4_clntip_idx, addr,
+	    create, addr, RFS4_DBS_VALID);
+
+	rw_exit(&rfs4_findclient_lock);
+
+	return (cp);
+}
+
+void
+rfs4_invalidate_clntip(struct sockaddr *addr)
+{
+	rfs4_clntip_t *cp;
+	bool_t create = FALSE;
+
+	rw_enter(&rfs4_findclient_lock, RW_READER);
+
+	cp = (rfs4_clntip_t *)rfs4_dbsearch(rfs4_clntip_idx, addr,
+	    &create, NULL, RFS4_DBS_VALID);
+	if (cp == NULL) {
+		rw_exit(&rfs4_findclient_lock);
+		return;
+	}
+	rfs4_dbe_invalidate(cp->ri_dbe);
+	rfs4_dbe_rele(cp->ri_dbe);
+
+	rw_exit(&rfs4_findclient_lock);
 }
 
 bool_t

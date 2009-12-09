@@ -837,7 +837,7 @@ recov_retry:
 
 	if (nfs4_needs_recovery(&e, FALSE, vp->v_vfsp)) {
 		if (nfs4_start_recovery(&e, VTOMI4(vp), vp, NULL, NULL,
-		    NULL, OP_GETATTR, NULL) == FALSE)  {
+		    NULL, OP_GETATTR, NULL, NULL, NULL) == FALSE)  {
 			nfs4_end_fop(VTOMI4(vp), vp, NULL, OH_GETATTR,
 			    &recov_state, 1);
 			goto recov_retry;
@@ -1027,7 +1027,7 @@ recov_retry:
 		    "nfs4_attr_otw: initiating recovery\n"));
 
 		abort = nfs4_start_recovery(&e, VTOMI4(vp), vp, NULL, NULL,
-		    NULL, OP_GETATTR, NULL);
+		    NULL, OP_GETATTR, NULL, NULL, NULL);
 		nfs4_end_fop(VTOMI4(vp), vp, NULL, OH_GETATTR, &recov_state,
 		    needrecov);
 		if (!e.error) {
@@ -3492,7 +3492,7 @@ recov_retry:
 		    "nfs4renew: initiating recovery\n"));
 
 		if (nfs4_start_recovery(&e, mi, NULL, NULL, NULL, NULL,
-		    OP_RENEW, NULL) == FALSE) {
+		    OP_RENEW, NULL, NULL, NULL) == FALSE) {
 			nfs4_end_op(mi, NULL, NULL, &recov_state, needrecov);
 			VFS_RELE(mi->mi_vfsp);
 			if (!e.error)

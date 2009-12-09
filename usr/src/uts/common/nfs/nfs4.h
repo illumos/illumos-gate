@@ -460,6 +460,7 @@ nvlist_t *rfs4_dss_paths, *rfs4_dss_oldpaths;
  * ss_remove - indicates that the rfs4_client_destroy function should
  * 		clean up stable storage file.
  * forced_expire - set if the sysadmin has used clear_locks for this client.
+ * no_referrals - set if the client is Solaris and pre-dates referrals
  * deleg_revoked - how many delegations have been revoked for this client?
  *
  * cp_confirmed - this refers to a confirmed client struct that has
@@ -497,6 +498,17 @@ typedef struct rfs4_client {
 	struct sockaddr_storage rc_addr;
 	rfs4_servinst_t		*rc_server_instance;
 } rfs4_client_t;
+
+/*
+ * ClntIP struct - holds the diagnosis about whether the client
+ * cannot support referrals.  Set to true for old Solaris clients.
+ */
+
+typedef struct rfs4_clntip {
+	rfs4_dbe_t		*ri_dbe;
+	struct sockaddr_storage ri_addr;
+	unsigned		ri_no_referrals:1;
+} rfs4_clntip_t;
 
 /*
  * The openowner contains the client supplied open_owner4 as well as
@@ -775,6 +787,7 @@ extern	void		rfs4_copy_reply(nfs_resop4 *, nfs_resop4 *);
 extern	rfs4_client_t	*rfs4_findclient(nfs_client_id4 *,
 					bool_t *, rfs4_client_t *);
 extern	rfs4_client_t	*rfs4_findclient_by_id(clientid4, bool_t);
+extern	rfs4_client_t	*rfs4_findclient_by_addr(struct sockaddr *);
 extern	void		rfs4_client_rele(rfs4_client_t *);
 extern	void		rfs4_client_close(rfs4_client_t *);
 extern	void		rfs4_client_state_remove(rfs4_client_t *);
@@ -782,6 +795,10 @@ extern	void		rfs4_client_scv_next(rfs4_client_t *);
 extern	void		rfs4_update_lease(rfs4_client_t *);
 extern	bool_t		rfs4_lease_expired(rfs4_client_t *);
 extern	nfsstat4	rfs4_check_clientid(clientid4 *, int);
+
+/* rfs4_clntip_t handling */
+extern	rfs4_clntip_t	*rfs4_find_clntip(struct sockaddr *, bool_t *);
+extern	void		rfs4_invalidate_clntip(struct sockaddr *);
 
 /* rfs4_openowner_t handling */
 extern	rfs4_openowner_t *rfs4_findopenowner(open_owner4 *, bool_t *, seqid4);
@@ -1095,6 +1112,7 @@ struct nfs4_svgetit_arg {
 						/* rdattr_error */
 	nfsstat4	rdattr_error;	/* used for per-entry status */
 					/* (if rdattr_err) */
+	bool_t		is_referral;	/* because sometimes we tell lies */
 	bool_t		mntdfid_set;
 	fattr4_mounted_on_fileid
 			mounted_on_fileid;
@@ -1301,6 +1319,11 @@ extern int	vs_acet_to_ace4(vsecattr_t *, vsecattr_t *, int);
 extern void	vs_acet_destroy(vsecattr_t *);
 extern void	vs_ace4_destroy(vsecattr_t *);
 extern void	vs_aent_destroy(vsecattr_t *);
+
+extern int	vn_find_nfs_record(vnode_t *, nvlist_t **, char **, char **);
+extern int	vn_is_nfs_reparse(vnode_t *, cred_t *);
+extern fs_locations4 *fetch_referral(vnode_t *, cred_t *);
+extern char	*build_symlink(vnode_t *, cred_t *, size_t *);
 
 extern int	stateid4_cmp(stateid4 *, stateid4 *);
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.
- * All rights reserved.  Use is subject to license terms.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/time.h>
 #include <sys/systm.h>
@@ -107,7 +104,7 @@ nfs4_ver_fattr4_attr(vattr_t *vap, struct nfs4_ntov_map *ntovp,
 	case AT_ATIME:
 		if ((ntovp->nval != FATTR4_TIME_ACCESS) ||
 		    (*errorp = nfs4_time_vton(&vap->va_ctime,
-					&nap->time_access))) {
+		    &nap->time_access))) {
 			/*
 			 * either asked for FATTR4_TIME_ACCESS_SET -
 			 *	not used for setattr
@@ -119,7 +116,7 @@ nfs4_ver_fattr4_attr(vattr_t *vap, struct nfs4_ntov_map *ntovp,
 	case AT_MTIME:
 		if ((ntovp->nval != FATTR4_TIME_MODIFY) ||
 		    (*errorp = nfs4_time_vton(&vap->va_mtime,
-					&nap->time_modify))) {
+		    &nap->time_modify))) {
 			/*
 			 * either asked for FATTR4_TIME_MODIFY_SET -
 			 *	not used for setattr
@@ -130,7 +127,7 @@ nfs4_ver_fattr4_attr(vattr_t *vap, struct nfs4_ntov_map *ntovp,
 		break;
 	case AT_CTIME:
 		if (*errorp = nfs4_time_vton(&vap->va_ctime,
-					&nap->time_metadata)) {
+		    &nap->time_metadata)) {
 			/*
 			 * system time invalid for otw transfers
 			 */
@@ -196,7 +193,7 @@ nfs4_set_fattr4_attr(vattr_t *vap, vsecattr_t *vsap,
 	case AT_ATIME:
 		if ((ntovp->nval != FATTR4_TIME_ACCESS_SET) ||
 		    (*errorp = timestruc_to_settime4(&vap->va_atime,
-				&nap->time_access_set, flags))) {
+		    &nap->time_access_set, flags))) {
 			/* FATTR4_TIME_ACCESS - not used for verify */
 			retval = FALSE;
 		}
@@ -204,7 +201,7 @@ nfs4_set_fattr4_attr(vattr_t *vap, vsecattr_t *vsap,
 	case AT_MTIME:
 		if ((ntovp->nval != FATTR4_TIME_MODIFY_SET) ||
 		    (*errorp = timestruc_to_settime4(&vap->va_mtime,
-				&nap->time_modify_set, flags))) {
+		    &nap->time_modify_set, flags))) {
 			/* FATTR4_TIME_MODIFY - not used for verify */
 			retval = FALSE;
 		}
@@ -260,7 +257,7 @@ vattr_to_fattr4(vattr_t *vap, vsecattr_t *vsap, fattr4 *fattrp, int flags,
 	fattrp->attrlist4_len = 0;
 	fattrp->attrlist4 = NULL;
 	na = kmem_zalloc(sizeof (union nfs4_attr_u) * nfs4_ntov_map_size,
-			KM_SLEEP);
+	    KM_SLEEP);
 
 	if (op == OP_SETATTR || op == OP_CREATE || op == OP_OPEN) {
 		/*
@@ -341,8 +338,8 @@ vattr_to_fattr4(vattr_t *vap, vsecattr_t *vsap, fattr4 *fattrp, int flags,
 			xdr_size += nfs4_ntov_map[i].xdr_size;
 			if ((nfs4_ntov_map[i].nval == FATTR4_TIME_ACCESS_SET ||
 			    nfs4_ntov_map[i].nval == FATTR4_TIME_MODIFY_SET) &&
-				attrfunc == nfs4_set_fattr4_attr &&
-				!(flags & ATTR_UTIME)) {
+			    attrfunc == nfs4_set_fattr4_attr &&
+			    !(flags & ATTR_UTIME)) {
 				xdr_size -= 3 * BYTES_PER_XDR_UNIT;
 			}
 		} else {
@@ -351,19 +348,19 @@ vattr_to_fattr4(vattr_t *vap, vsecattr_t *vsap, fattr4 *fattrp, int flags,
 			 * are AT_UID, AT_GID and FATTR4_ACL_MASK
 			 */
 			ASSERT(nfs4_ntov_map[i].vbit == AT_UID ||
-				nfs4_ntov_map[i].vbit == AT_GID ||
-				nfs4_ntov_map[i].fbit == FATTR4_ACL_MASK);
+			    nfs4_ntov_map[i].vbit == AT_GID ||
+			    nfs4_ntov_map[i].fbit == FATTR4_ACL_MASK);
 			if (nfs4_ntov_map[i].vbit == AT_UID) {
 				uid_attr = attrcnt;
 				xdr_size += BYTES_PER_XDR_UNIT;	/* length */
 				xdr_size +=
-					RNDUP(na[attrcnt].owner.utf8string_len);
+				    RNDUP(na[attrcnt].owner.utf8string_len);
 			} else if (nfs4_ntov_map[i].vbit == AT_GID) {
 				gid_attr = attrcnt;
 				xdr_size += BYTES_PER_XDR_UNIT;	/* length */
 				xdr_size +=
 				    RNDUP(
-					na[attrcnt].owner_group.utf8string_len);
+				    na[attrcnt].owner_group.utf8string_len);
 			} else if (nfs4_ntov_map[i].fbit == FATTR4_ACL_MASK) {
 				nfsace4 *tmpacl = (nfsace4 *)vsap->vsa_aclentp;
 
@@ -411,7 +408,7 @@ vattr_to_fattr4(vattr_t *vap, vsecattr_t *vsap, fattr4 *fattrp, int flags,
 	for (i = 0; i < attrcnt; i++) {
 		if ((*nfs4_ntov_map[amap[i]].xfunc)(&xdr, &na[i]) == FALSE) {
 			cmn_err(CE_WARN, "vattr_to_fattr4: xdr encode of "
-				"attribute failed\n");
+			    "attribute failed\n");
 			error = EINVAL;
 			break;
 		}
@@ -422,11 +419,11 @@ done:
 	 */
 	if (uid_attr != -1 && na[uid_attr].owner.utf8string_val != NULL) {
 		kmem_free(na[uid_attr].owner.utf8string_val,
-				na[uid_attr].owner.utf8string_len);
+		    na[uid_attr].owner.utf8string_len);
 	}
 	if (gid_attr != -1 && na[gid_attr].owner_group.utf8string_val != NULL) {
 		kmem_free(na[gid_attr].owner_group.utf8string_val,
-				na[gid_attr].owner_group.utf8string_len);
+		    na[gid_attr].owner_group.utf8string_len);
 	}
 
 	/* xdrmem_destroy(&xdrs); */	/* NO-OP */
@@ -770,7 +767,7 @@ struct nfs4_ntov_map nfs4_ntov_map[] = {
 		FATTR4_TIME_MODIFY_SET, 4 * BYTES_PER_XDR_UNIT, xdr_settime4,
 		NULL, "fattr4_time_modify_set" },
 
-	{ FATTR4_MOUNTED_ON_FILEID_MASK, 0, FALSE, FALSE,
+	{ FATTR4_MOUNTED_ON_FILEID_MASK, AT_NODEID, FALSE, FALSE,
 		FATTR4_MOUNTED_ON_FILEID, 2 * BYTES_PER_XDR_UNIT,
 		xdr_u_longlong_t,
 		NULL, "fattr4_mounted_on_fileid" },

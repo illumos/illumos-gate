@@ -76,6 +76,8 @@
 #include <nfs/nfs4_clnt.h>
 #include <sys/fs/autofs.h>
 
+#include <sys/sdt.h>
+
 
 /*
  * Arguments passed to thread to free data structures from forced unmount.
@@ -159,6 +161,14 @@ static void	remove_mi(nfs4_server_t *, mntinfo4_t *);
 
 extern void nfs4_ephemeral_init(void);
 extern void nfs4_ephemeral_fini(void);
+
+/* referral related routines */
+static servinfo4_t *copy_svp(servinfo4_t *);
+static void free_knconf_contents(struct knetconfig *k);
+static char *extract_referral_point(const char *, int);
+static void setup_newsvpath(servinfo4_t *, int);
+static void update_servinfo4(servinfo4_t *, fs_location4 *,
+		struct nfs_fsl_info *, char *, int);
 
 /*
  * Initialize the vfs structure
@@ -1270,7 +1280,7 @@ recov_retry:
 		    "getlinktext_otw: initiating recovery\n"));
 
 		if (nfs4_start_recovery(&e, mi, NULL, NULL, NULL, NULL,
-		    OP_READLINK, NULL) == FALSE) {
+		    OP_READLINK, NULL, NULL, NULL) == FALSE) {
 			nfs4_end_op(mi, NULL, NULL, &recov_state, needrecov);
 			if (!e.error)
 				(void) xdr_free(xdr_COMPOUND4res_clnt,
@@ -1457,6 +1467,198 @@ out:
 }
 
 /*
+ * This routine updates servinfo4 structure with the new referred server
+ * info.
+ * nfsfsloc has the location related information
+ * fsp has the hostname and pathname info.
+ * new path = pathname from referral + part of orig pathname(based on nth).
+ */
+static void
+update_servinfo4(servinfo4_t *svp, fs_location4 *fsp,
+    struct nfs_fsl_info *nfsfsloc, char *orig_path, int nth)
+{
+	struct knetconfig *knconf, *svknconf;
+	struct netbuf *saddr;
+	sec_data_t	*secdata;
+	utf8string *host;
+	int i = 0, num_slashes = 0;
+	char *p, *spath, *op, *new_path;
+
+	/* Update knconf */
+	knconf = svp->sv_knconf;
+	free_knconf_contents(knconf);
+	bzero(knconf, sizeof (struct knetconfig));
+	svknconf = nfsfsloc->knconf;
+	knconf->knc_semantics = svknconf->knc_semantics;
+	knconf->knc_protofmly = kmem_zalloc(KNC_STRSIZE, KM_SLEEP);
+	knconf->knc_proto = kmem_zalloc(KNC_STRSIZE, KM_SLEEP);
+	knconf->knc_rdev = svknconf->knc_rdev;
+	bcopy(svknconf->knc_protofmly, knconf->knc_protofmly, KNC_STRSIZE);
+	bcopy(svknconf->knc_proto, knconf->knc_proto, KNC_STRSIZE);
+
+	/* Update server address */
+	saddr = &svp->sv_addr;
+	if (saddr->buf != NULL)
+		kmem_free(saddr->buf, saddr->maxlen);
+	saddr->buf  = kmem_alloc(nfsfsloc->addr->maxlen, KM_SLEEP);
+	saddr->len = nfsfsloc->addr->len;
+	saddr->maxlen = nfsfsloc->addr->maxlen;
+	bcopy(nfsfsloc->addr->buf, saddr->buf, nfsfsloc->addr->len);
+
+	/* Update server name */
+	host = fsp->server_val;
+	kmem_free(svp->sv_hostname, svp->sv_hostnamelen);
+	svp->sv_hostname = kmem_zalloc(host->utf8string_len + 1, KM_SLEEP);
+	bcopy(host->utf8string_val, svp->sv_hostname, host->utf8string_len);
+	svp->sv_hostname[host->utf8string_len] = '\0';
+	svp->sv_hostnamelen = host->utf8string_len + 1;
+
+	/*
+	 * Update server path.
+	 * We need to setup proper path here.
+	 * For ex., If we got a path name serv1:/rp/aaa/bbb
+	 * where aaa is a referral and points to serv2:/rpool/aa
+	 * we need to set the path to serv2:/rpool/aa/bbb
+	 * The first part of this below code generates /rpool/aa
+	 * and the second part appends /bbb to the server path.
+	 */
+	spath = p = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+	*p++ = '/';
+	for (i = 0; i < fsp->rootpath.pathname4_len; i++) {
+		component4 *comp;
+
+		comp = &fsp->rootpath.pathname4_val[i];
+		/* If no space, null the string and bail */
+		if ((p - spath) + comp->utf8string_len + 1 > MAXPATHLEN) {
+			p = spath + MAXPATHLEN - 1;
+			spath[0] = '\0';
+			break;
+		}
+		bcopy(comp->utf8string_val, p, comp->utf8string_len);
+		p += comp->utf8string_len;
+		*p++ = '/';
+	}
+	if (fsp->rootpath.pathname4_len != 0)
+		*(p - 1) = '\0';
+	else
+		*p = '\0';
+	p = spath;
+
+	new_path = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+	(void) strlcpy(new_path, p, MAXPATHLEN);
+	kmem_free(p, MAXPATHLEN);
+	i = strlen(new_path);
+
+	for (op = orig_path; *op; op++) {
+		if (*op == '/')
+			num_slashes++;
+		if (num_slashes == nth + 2) {
+			while (*op != '\0') {
+				new_path[i] = *op;
+				i++;
+				op++;
+			}
+			break;
+		}
+	}
+	new_path[i] = '\0';
+
+	kmem_free(svp->sv_path, svp->sv_pathlen);
+	svp->sv_pathlen = strlen(new_path) + 1;
+	svp->sv_path = kmem_alloc(svp->sv_pathlen, KM_SLEEP);
+	bcopy(new_path, svp->sv_path, svp->sv_pathlen);
+	kmem_free(new_path, MAXPATHLEN);
+
+	/*
+	 * All the security data is specific to old server.
+	 * Clean it up except secdata which deals with mount options.
+	 * We need to inherit that data. Copy secdata into our new servinfo4.
+	 */
+	if (svp->sv_dhsec) {
+		sec_clnt_freeinfo(svp->sv_dhsec);
+		svp->sv_dhsec = NULL;
+	}
+	if (svp->sv_save_secinfo &&
+	    svp->sv_save_secinfo != svp->sv_secinfo) {
+		secinfo_free(svp->sv_save_secinfo);
+		svp->sv_save_secinfo = NULL;
+	}
+	if (svp->sv_secinfo) {
+		secinfo_free(svp->sv_secinfo);
+		svp->sv_secinfo = NULL;
+	}
+	svp->sv_currsec = NULL;
+
+	secdata = kmem_alloc(sizeof (*secdata), KM_SLEEP);
+	*secdata = *svp->sv_secdata;
+	secdata->data = NULL;
+	if (svp->sv_secdata) {
+		sec_clnt_freeinfo(svp->sv_secdata);
+		svp->sv_secdata = NULL;
+	}
+	svp->sv_secdata = secdata;
+}
+
+/*
+ * Resolve a referral. The referral is in the n+1th component of
+ * svp->sv_path and has a parent nfs4 file handle "fh".
+ * Upon return, the sv_path will point to the new path that has referral
+ * component resolved to its referred path and part of original path.
+ * Hostname and other address information is also updated.
+ */
+int
+resolve_referral(mntinfo4_t *mi, servinfo4_t *svp, cred_t *cr, int nth,
+    nfs_fh4 *fh)
+{
+	nfs4_sharedfh_t	*sfh;
+	struct nfs_fsl_info nfsfsloc;
+	nfs4_ga_res_t garp;
+	COMPOUND4res_clnt callres;
+	fs_location4	*fsp;
+	char *nm, *orig_path;
+	int orig_pathlen = 0, ret = -1, index;
+
+	if (svp->sv_pathlen <= 0)
+		return (ret);
+
+	(void) nfs_rw_enter_sig(&svp->sv_lock, RW_WRITER, 0);
+	orig_pathlen = svp->sv_pathlen;
+	orig_path = kmem_alloc(orig_pathlen, KM_SLEEP);
+	bcopy(svp->sv_path, orig_path, orig_pathlen);
+	nm = extract_referral_point(svp->sv_path, nth);
+	setup_newsvpath(svp, nth);
+	nfs_rw_exit(&svp->sv_lock);
+
+	sfh = sfh4_get(fh, mi);
+	index = nfs4_process_referral(mi, sfh, nm, cr,
+	    &garp, &callres, &nfsfsloc);
+	sfh4_rele(&sfh);
+	kmem_free(nm, MAXPATHLEN);
+	if (index < 0) {
+		kmem_free(orig_path, orig_pathlen);
+		return (index);
+	}
+
+	fsp =  &garp.n4g_ext_res->n4g_fslocations.locations_val[index];
+	(void) nfs_rw_enter_sig(&svp->sv_lock, RW_WRITER, 0);
+	update_servinfo4(svp, fsp, &nfsfsloc, orig_path, nth);
+	nfs_rw_exit(&svp->sv_lock);
+
+	mutex_enter(&mi->mi_lock);
+	mi->mi_vfs_referral_loop_cnt++;
+	mutex_exit(&mi->mi_lock);
+
+	ret = 0;
+bad:
+	/* Free up XDR memory allocated in nfs4_process_referral() */
+	xdr_free(xdr_nfs_fsl_info, (char *)&nfsfsloc);
+	xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&callres);
+	kmem_free(orig_path, orig_pathlen);
+
+	return (ret);
+}
+
+/*
  * Get the root filehandle for the given filesystem and server, and update
  * svp.
  *
@@ -1466,7 +1668,6 @@ out:
  *
  * Errors are returned by the nfs4_error_t parameter.
  */
-
 static void
 nfs4getfh_otw(struct mntinfo4 *mi, servinfo4_t *svp, vtype_t *vtp,
     int flags, cred_t *cr, nfs4_error_t *ep)
@@ -1498,7 +1699,14 @@ nfs4getfh_otw(struct mntinfo4 *mi, servinfo4_t *svp, vtype_t *vtp,
 
 	recov_state.rs_flags = 0;
 	recov_state.rs_num_retry_despite_err = 0;
+
 recov_retry:
+	if (mi->mi_vfs_referral_loop_cnt >= NFS4_REFERRAL_LOOP_MAX) {
+		DTRACE_PROBE3(nfs4clnt__debug__referral__loop, mntinfo4 *,
+		    mi, servinfo4_t *, svp, char *, "nfs4getfh_otw");
+		nfs4_error_init(ep, EINVAL);
+		return;
+	}
 	nfs4_error_zinit(ep);
 
 	if (!recovery) {
@@ -1599,7 +1807,7 @@ recov_retry:
 		    (CE_NOTE, "nfs4getfh_otw: initiating recovery\n"));
 
 		abort = nfs4_start_recovery(ep, mi, NULL,
-		    NULL, NULL, NULL, OP_GETFH, NULL);
+		    NULL, NULL, NULL, OP_GETFH, NULL, NULL, NULL);
 		if (!ep->error) {
 			ep->error = geterrno4(res.status);
 			(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
@@ -1628,7 +1836,8 @@ recov_retry:
 is_link_err:
 
 	/* for non-recovery errors */
-	if (res.status && res.status != NFS4ERR_SYMLINK) {
+	if (res.status && res.status != NFS4ERR_SYMLINK &&
+	    res.status != NFS4ERR_MOVED) {
 		if (!recovery) {
 			nfs4_end_fop(mi, NULL, NULL, OH_MOUNT, &recov_state,
 			    needrecov);
@@ -1643,8 +1852,16 @@ is_link_err:
 	 * If any intermediate component in the path is a symbolic link,
 	 * resolve the symlink, then try mount again using the new path.
 	 */
-	if (res.status == NFS4ERR_SYMLINK) {
+	if (res.status == NFS4ERR_SYMLINK || res.status == NFS4ERR_MOVED) {
 		int where;
+
+		/*
+		 * Need to call nfs4_end_op before resolve_sympath to avoid
+		 * potential nfs4_start_op deadlock.
+		 */
+		if (!recovery)
+			nfs4_end_fop(mi, NULL, NULL, OH_MOUNT, &recov_state,
+			    needrecov);
 
 		/*
 		 * This must be from OP_LOOKUP failure. The (cfh) for this
@@ -1661,21 +1878,24 @@ is_link_err:
 		where = res.array_len - 2;
 		ASSERT(where > 0);
 
-		resop = &res.array[where - 1];
-		ASSERT(resop->resop == OP_GETFH);
-		tmpfhp = &resop->nfs_resop4_u.opgetfh.object;
-		nthcomp = res.array_len/3 - 1;
+		if (res.status == NFS4ERR_SYMLINK) {
 
-		/*
-		 * Need to call nfs4_end_op before resolve_sympath to avoid
-		 * potential nfs4_start_op deadlock.
-		 */
-		if (!recovery)
-			nfs4_end_fop(mi, NULL, NULL, OH_MOUNT, &recov_state,
-			    needrecov);
+			resop = &res.array[where - 1];
+			ASSERT(resop->resop == OP_GETFH);
+			tmpfhp = &resop->nfs_resop4_u.opgetfh.object;
+			nthcomp = res.array_len/3 - 1;
+			ep->error = resolve_sympath(mi, svp, nthcomp,
+			    tmpfhp, cr, flags);
 
-		ep->error = resolve_sympath(mi, svp, nthcomp, tmpfhp, cr,
-		    flags);
+		} else if (res.status == NFS4ERR_MOVED) {
+
+			resop = &res.array[where - 2];
+			ASSERT(resop->resop == OP_GETFH);
+			tmpfhp = &resop->nfs_resop4_u.opgetfh.object;
+			nthcomp = res.array_len/3 - 1;
+			ep->error = resolve_referral(mi, svp, cr, nthcomp,
+			    tmpfhp);
+		}
 
 		nfs4args_lookup_free(argop, num_argops);
 		kmem_free(argop, lookuparg.arglen * sizeof (nfs_argop4));
@@ -1809,12 +2029,133 @@ is_link_err:
 	    garp->n4g_ext_res->n4g_suppattrs | FATTR4_MANDATTR_MASK;
 
 	nfs_rw_exit(&svp->sv_lock);
-
 	nfs4args_lookup_free(argop, num_argops);
 	kmem_free(argop, lookuparg.arglen * sizeof (nfs_argop4));
 	(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 	if (!recovery)
 		nfs4_end_fop(mi, NULL, NULL, OH_MOUNT, &recov_state, needrecov);
+}
+
+/*
+ * Save a copy of Servinfo4_t structure.
+ * We might need when there is a failure in getting file handle
+ * in case of a referral to replace servinfo4 struct and try again.
+ */
+static struct servinfo4 *
+copy_svp(servinfo4_t *nsvp)
+{
+	servinfo4_t *svp = NULL;
+	struct knetconfig *sknconf, *tknconf;
+	struct netbuf *saddr, *taddr;
+
+	svp = kmem_zalloc(sizeof (*svp), KM_SLEEP);
+	nfs_rw_init(&svp->sv_lock, NULL, RW_DEFAULT, NULL);
+	svp->sv_flags = nsvp->sv_flags;
+	svp->sv_fsid = nsvp->sv_fsid;
+	svp->sv_hostnamelen = nsvp->sv_hostnamelen;
+	svp->sv_pathlen = nsvp->sv_pathlen;
+	svp->sv_supp_attrs = nsvp->sv_supp_attrs;
+
+	svp->sv_path = kmem_alloc(svp->sv_pathlen, KM_SLEEP);
+	svp->sv_hostname = kmem_alloc(svp->sv_hostnamelen, KM_SLEEP);
+	bcopy(nsvp->sv_hostname, svp->sv_hostname, svp->sv_hostnamelen);
+	bcopy(nsvp->sv_path, svp->sv_path, svp->sv_pathlen);
+
+	saddr = &nsvp->sv_addr;
+	taddr = &svp->sv_addr;
+	taddr->maxlen = saddr->maxlen;
+	taddr->len = saddr->len;
+	if (saddr->len > 0) {
+		taddr->buf = kmem_zalloc(saddr->maxlen, KM_SLEEP);
+		bcopy(saddr->buf, taddr->buf, saddr->len);
+	}
+
+	svp->sv_knconf = kmem_zalloc(sizeof (struct knetconfig), KM_SLEEP);
+	sknconf = nsvp->sv_knconf;
+	tknconf = svp->sv_knconf;
+	tknconf->knc_semantics = sknconf->knc_semantics;
+	tknconf->knc_rdev = sknconf->knc_rdev;
+	if (sknconf->knc_proto != NULL) {
+		tknconf->knc_proto = kmem_zalloc(KNC_STRSIZE, KM_SLEEP);
+		bcopy(sknconf->knc_proto, (char *)tknconf->knc_proto,
+		    KNC_STRSIZE);
+	}
+	if (sknconf->knc_protofmly != NULL) {
+		tknconf->knc_protofmly = kmem_zalloc(KNC_STRSIZE, KM_SLEEP);
+		bcopy(sknconf->knc_protofmly, (char *)tknconf->knc_protofmly,
+		    KNC_STRSIZE);
+	}
+
+	if (nsvp->sv_origknconf != NULL) {
+		svp->sv_origknconf = kmem_zalloc(sizeof (struct knetconfig),
+		    KM_SLEEP);
+		sknconf = nsvp->sv_origknconf;
+		tknconf = svp->sv_origknconf;
+		tknconf->knc_semantics = sknconf->knc_semantics;
+		tknconf->knc_rdev = sknconf->knc_rdev;
+		if (sknconf->knc_proto != NULL) {
+			tknconf->knc_proto = kmem_zalloc(KNC_STRSIZE, KM_SLEEP);
+			bcopy(sknconf->knc_proto, (char *)tknconf->knc_proto,
+			    KNC_STRSIZE);
+		}
+		if (sknconf->knc_protofmly != NULL) {
+			tknconf->knc_protofmly = kmem_zalloc(KNC_STRSIZE,
+			    KM_SLEEP);
+			bcopy(sknconf->knc_protofmly,
+			    (char *)tknconf->knc_protofmly, KNC_STRSIZE);
+		}
+	}
+
+	svp->sv_secdata = copy_sec_data(nsvp->sv_secdata);
+	svp->sv_dhsec = copy_sec_data(svp->sv_dhsec);
+	/*
+	 * Rest of the security information is not copied as they are built
+	 * with the information available from secdata and dhsec.
+	 */
+	svp->sv_next = NULL;
+
+	return (svp);
+}
+
+servinfo4_t *
+restore_svp(mntinfo4_t *mi, servinfo4_t *svp, servinfo4_t *origsvp)
+{
+	servinfo4_t *srvnext, *tmpsrv;
+
+	if (strcmp(svp->sv_hostname, origsvp->sv_hostname) != 0) {
+		/*
+		 * Since the hostname changed, we must be dealing
+		 * with a referral, and the lookup failed.  We will
+		 * restore the whole servinfo4_t to what it was before.
+		 */
+		srvnext = svp->sv_next;
+		svp->sv_next = NULL;
+		tmpsrv = copy_svp(origsvp);
+		sv4_free(svp);
+		svp = tmpsrv;
+		svp->sv_next = srvnext;
+		mutex_enter(&mi->mi_lock);
+		mi->mi_servers = svp;
+		mi->mi_curr_serv = svp;
+		mutex_exit(&mi->mi_lock);
+
+	} else if (origsvp->sv_pathlen != svp->sv_pathlen) {
+
+		/*
+		 * For symlink case: restore original path because
+		 * it might have contained symlinks that were
+		 * expanded by nfsgetfh_otw before the failure occurred.
+		 */
+		nfs_rw_enter_sig(&svp->sv_lock, RW_READER, 0);
+		kmem_free(svp->sv_path, svp->sv_pathlen);
+		svp->sv_path =
+		    kmem_alloc(origsvp->sv_pathlen, KM_SLEEP);
+		svp->sv_pathlen = origsvp->sv_pathlen;
+		bcopy(origsvp->sv_path, svp->sv_path,
+		    origsvp->sv_pathlen);
+		nfs_rw_exit(&svp->sv_lock);
+	}
+	return (svp);
 }
 
 static ushort_t nfs4_max_threads = 8;	/* max number of active async threads */
@@ -1830,12 +2171,11 @@ static uint_t nfs4_cots_timeo = NFS_COTS_TIMEO;
 void
 nfs4_remap_root(mntinfo4_t *mi, nfs4_error_t *ep, int flags)
 {
-	struct servinfo4 *svp;
+	struct servinfo4 *svp, *origsvp;
 	vtype_t vtype;
 	nfs_fh4 rootfh;
 	int getfh_flags;
-	char *orig_sv_path;
-	int orig_sv_pathlen, num_retry;
+	int num_retry;
 
 	mutex_enter(&mi->mi_lock);
 
@@ -1861,9 +2201,7 @@ remap_retry:
 	 * to re-lookup everything and recover.
 	 */
 	(void) nfs_rw_enter_sig(&svp->sv_lock, RW_READER, 0);
-	orig_sv_pathlen = svp->sv_pathlen;
-	orig_sv_path = kmem_alloc(orig_sv_pathlen, KM_SLEEP);
-	bcopy(svp->sv_path, orig_sv_path, orig_sv_pathlen);
+	origsvp = copy_svp(svp);
 	nfs_rw_exit(&svp->sv_lock);
 
 	num_retry = nfs4_max_mount_retry;
@@ -1882,24 +2220,13 @@ remap_retry:
 
 		/*
 		 * For some reason, the mount compound failed.  Before
-		 * retrying, we need to restore the original sv_path
-		 * because it might have contained symlinks that were
-		 * expanded by nfsgetfh_otw before the failure occurred.
-		 * replace current sv_path with orig sv_path -- just in case
-		 * it changed due to embedded symlinks.
+		 * retrying, we need to restore original conditions.
 		 */
-		(void) nfs_rw_enter_sig(&svp->sv_lock, RW_READER, 0);
-		if (orig_sv_pathlen != svp->sv_pathlen) {
-			kmem_free(svp->sv_path, svp->sv_pathlen);
-			svp->sv_path = kmem_alloc(orig_sv_pathlen, KM_SLEEP);
-			svp->sv_pathlen = orig_sv_pathlen;
-		}
-		bcopy(orig_sv_path, svp->sv_path, orig_sv_pathlen);
-		nfs_rw_exit(&svp->sv_lock);
+		svp = restore_svp(mi, svp, origsvp);
 
 	} while (num_retry-- > 0);
 
-	kmem_free(orig_sv_path, orig_sv_pathlen);
+	sv4_free(origsvp);
 
 	if (ep->error != 0 || ep->stat != 0) {
 		return;
@@ -1940,7 +2267,7 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 	dev_t nfs_dev;
 	int error = 0;
 	rnode4_t *rp;
-	int i;
+	int i, len;
 	struct vattr va;
 	vtype_t vtype = VNON;
 	vtype_t tmp_vtype = VNON;
@@ -1951,9 +2278,10 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 	struct nfs_stats *nfsstatsp;
 	nfs4_fname_t *mfname;
 	nfs4_error_t e;
-	char *orig_sv_path;
-	int orig_sv_pathlen, num_retry, removed;
+	int num_retry, removed;
 	cred_t *lcr = NULL, *tcr = cr;
+	struct servinfo4 *origsvp;
+	char *resource;
 
 	nfsstatsp = zone_getspecific(nfsstat_zone_key, nfs_zone());
 	ASSERT(nfsstatsp != NULL);
@@ -1980,6 +2308,8 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 		mi->mi_flags |= MI4_PUBLIC;
 	if (flags & NFSMNT_MIRRORMOUNT)
 		mi->mi_flags |= MI4_MIRRORMOUNT;
+	if (flags & NFSMNT_REFERRAL)
+		mi->mi_flags |= MI4_REFERRAL;
 	mi->mi_retrans = NFS_RETRIES;
 	if (svp->sv_knconf->knc_semantics == NC_TPI_COTS_ORD ||
 	    svp->sv_knconf->knc_semantics == NC_TPI_COTS)
@@ -2100,9 +2430,7 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 	 * Save server path we're attempting to mount.
 	 */
 	(void) nfs_rw_enter_sig(&svp->sv_lock, RW_WRITER, 0);
-	orig_sv_pathlen = svp_head->sv_pathlen;
-	orig_sv_path = kmem_alloc(svp_head->sv_pathlen, KM_SLEEP);
-	bcopy(svp_head->sv_path, orig_sv_path, svp_head->sv_pathlen);
+	origsvp = copy_svp(svp);
 	nfs_rw_exit(&svp->sv_lock);
 
 	/*
@@ -2162,21 +2490,13 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 				break;
 
 			/*
-			 * replace current sv_path with orig sv_path -- just in
-			 * case it changed due to embedded symlinks.
+			 * For some reason, the mount compound failed.  Before
+			 * retrying, we need to restore original conditions.
 			 */
-			(void) nfs_rw_enter_sig(&svp->sv_lock, RW_READER, 0);
-			if (orig_sv_pathlen != svp->sv_pathlen) {
-				kmem_free(svp->sv_path, svp->sv_pathlen);
-				svp->sv_path = kmem_alloc(orig_sv_pathlen,
-				    KM_SLEEP);
-				svp->sv_pathlen = orig_sv_pathlen;
-			}
-			bcopy(orig_sv_path, svp->sv_path, orig_sv_pathlen);
-			nfs_rw_exit(&svp->sv_lock);
+			svp = restore_svp(mi, svp, origsvp);
+			svp_head = svp;
 
 		} while (num_retry-- > 0);
-
 		error = e.error ? e.error : geterrno4(e.stat);
 		if (error) {
 			nfs_cmn_err(error, CE_WARN,
@@ -2214,8 +2534,6 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 		if (firstsvp == NULL)
 			firstsvp = svp;
 	}
-
-	kmem_free(orig_sv_path, orig_sv_pathlen);
 
 	if (firstsvp == NULL) {
 		if (error == 0)
@@ -2286,6 +2604,19 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 	mi->mi_flags &= ~MI4_MOUNTING;
 	mutex_exit(&mi->mi_lock);
 
+	/* Update VFS with new server and path info */
+	if ((strcmp(svp->sv_hostname, origsvp->sv_hostname) != 0) ||
+	    (strcmp(svp->sv_path, origsvp->sv_path) != 0)) {
+		len = svp->sv_hostnamelen + svp->sv_pathlen;
+		resource = kmem_zalloc(len, KM_SLEEP);
+		(void) strcat(resource, svp->sv_hostname);
+		(void) strcat(resource, ":");
+		(void) strcat(resource, svp->sv_path);
+		vfs_setresource(vfsp, resource);
+		kmem_free(resource, len);
+	}
+
+	sv4_free(origsvp);
 	*rtvpp = rtvp;
 	if (lcr != NULL)
 		crfree(lcr);
@@ -2321,6 +2652,9 @@ bad:
 	 */
 	MI4_RELE(mi);
 
+	if (origsvp != NULL)
+		sv4_free(origsvp);
+
 	*rtvpp = NULL;
 	return (error);
 }
@@ -2336,7 +2670,6 @@ nfs4_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 	int			removed;
 
 	bool_t			must_unlock;
-	bool_t			must_rele;
 
 	nfs4_ephemeral_tree_t	*eph_tree;
 
@@ -2388,7 +2721,7 @@ nfs4_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 	 * again when needed.
 	 */
 	if (nfs4_ephemeral_umount(mi, flag, cr,
-	    &must_unlock, &must_rele, &eph_tree)) {
+	    &must_unlock, &eph_tree)) {
 		ASSERT(must_unlock == FALSE);
 		mutex_enter(&mi->mi_async_lock);
 		mi->mi_max_threads = omax;
@@ -2402,8 +2735,7 @@ nfs4_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 	 * then the file system is busy and can't be unmounted.
 	 */
 	if (check_rtable4(vfsp)) {
-		nfs4_ephemeral_umount_unlock(&must_unlock, &must_rele,
-		    &eph_tree);
+		nfs4_ephemeral_umount_unlock(&must_unlock, &eph_tree);
 
 		mutex_enter(&mi->mi_async_lock);
 		mi->mi_max_threads = omax;
@@ -2416,8 +2748,7 @@ nfs4_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 	 * The unmount can't fail from now on, so record any
 	 * ephemeral changes.
 	 */
-	nfs4_ephemeral_umount_activate(mi, &must_unlock,
-	    &must_rele, &eph_tree);
+	nfs4_ephemeral_umount_activate(mi, &must_unlock, &eph_tree);
 
 	/*
 	 * There are no active files that could require over-the-wire
@@ -2982,7 +3313,7 @@ recov_retry:
 		 */
 		if (FAILOVER_MOUNT4(mi) && nfs4_try_failover(n4ep)) {
 			(void) nfs4_start_recovery(n4ep, mi, NULL,
-			    NULL, NULL, NULL, OP_SETCLIENTID, NULL);
+			    NULL, NULL, NULL, OP_SETCLIENTID, NULL, NULL, NULL);
 			/*
 			 * Don't retry here, just return and let
 			 * recovery take over.
@@ -3534,7 +3865,12 @@ new_nfs4_server(struct servinfo4 *svp, cred_t *cr)
 		} un_curtime;
 		verifier4	un_verifier;
 	} nfs4clientid_verifier;
-	char id_val[] = "Solaris: %s, NFSv4 kernel client";
+	/*
+	 * We change this ID string carefully and with the Solaris
+	 * NFS server behaviour in mind.  "+referrals" indicates
+	 * a client that can handle an NFSv4 referral.
+	 */
+	char id_val[] = "Solaris: %s, NFSv4 kernel client +referrals";
 	int len;
 
 	np = kmem_zalloc(sizeof (struct nfs4_server), KM_SLEEP);
@@ -3946,7 +4282,6 @@ nfs4_free_mount(vfs_t *vfsp, int flag, cred_t *cr)
 	int			removed;
 
 	bool_t			must_unlock;
-	bool_t			must_rele;
 	nfs4_ephemeral_tree_t	*eph_tree;
 
 	/*
@@ -4020,9 +4355,9 @@ nfs4_free_mount(vfs_t *vfsp, int flag, cred_t *cr)
 	 * directory tree, we are okay.
 	 */
 	if (!nfs4_ephemeral_umount(mi, flag, cr,
-	    &must_unlock, &must_rele, &eph_tree))
+	    &must_unlock, &eph_tree))
 		nfs4_ephemeral_umount_activate(mi, &must_unlock,
-		    &must_rele, &eph_tree);
+		    &eph_tree);
 
 	/*
 	 * The original purge of the dnlc via 'dounmount'
@@ -4057,4 +4392,82 @@ nfs4_free_mount(vfs_t *vfsp, int flag, cred_t *cr)
 	removed = nfs4_mi_zonelist_remove(mi);
 	if (removed)
 		zone_rele(mi->mi_zone);
+}
+
+/* Referral related sub-routines */
+
+/* Freeup knetconfig */
+static void
+free_knconf_contents(struct knetconfig *k)
+{
+	if (k == NULL)
+		return;
+	if (k->knc_protofmly)
+		kmem_free(k->knc_protofmly, KNC_STRSIZE);
+	if (k->knc_proto)
+		kmem_free(k->knc_proto, KNC_STRSIZE);
+}
+
+/*
+ * This updates newpath variable with exact name component from the
+ * path which gave us a NFS4ERR_MOVED error.
+ * If the path is /rp/aaa/bbb and nth value is 1, aaa is returned.
+ */
+static char *
+extract_referral_point(const char *svp, int nth)
+{
+	int num_slashes = 0;
+	const char *p;
+	char *newpath = NULL;
+	int i = 0;
+
+	newpath = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+	for (p = svp; *p; p++) {
+		if (*p == '/')
+			num_slashes++;
+		if (num_slashes == nth + 1) {
+			p++;
+			while (*p != '/') {
+				if (*p == '\0')
+					break;
+				newpath[i] = *p;
+				i++;
+				p++;
+			}
+			newpath[i++] = '\0';
+			break;
+		}
+	}
+	return (newpath);
+}
+
+/*
+ * This sets up a new path in sv_path to do a lookup of the referral point.
+ * If the path is /rp/aaa/bbb and the referral point is aaa,
+ * this updates /rp/aaa. This path will be used to get referral
+ * location.
+ */
+static void
+setup_newsvpath(servinfo4_t *svp, int nth)
+{
+	int num_slashes = 0, pathlen, i = 0;
+	char *newpath, *p;
+
+	newpath = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+	for (p = svp->sv_path; *p; p++) {
+		newpath[i] =  *p;
+		if (*p == '/')
+			num_slashes++;
+		if (num_slashes == nth + 1) {
+			newpath[i] = '\0';
+			pathlen = strlen(newpath) + 1;
+			kmem_free(svp->sv_path, svp->sv_pathlen);
+			svp->sv_path = kmem_alloc(pathlen, KM_SLEEP);
+			svp->sv_pathlen = pathlen;
+			bcopy(newpath, svp->sv_path, pathlen);
+			break;
+		}
+		i++;
+	}
+	kmem_free(newpath, MAXPATHLEN);
 }

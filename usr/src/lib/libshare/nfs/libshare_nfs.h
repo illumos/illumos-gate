@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -97,6 +97,7 @@ struct option_defs {
 #define	SVC_NFSMAPID	0x0020
 #define	SVC_RQUOTAD	0x0040
 #define	SVC_NFSLOGD	0x0080
+#define	SVC_REPARSED	0x0100
 
 /*
  * place holder for future service -- will move to daemon_utils.h when

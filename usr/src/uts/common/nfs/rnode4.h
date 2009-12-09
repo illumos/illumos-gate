@@ -41,7 +41,8 @@ extern "C" {
 
 typedef enum nfs4_stub_type {
 	NFS4_STUB_NONE,
-	NFS4_STUB_MIRRORMOUNT
+	NFS4_STUB_MIRRORMOUNT,
+	NFS4_STUB_REFERRAL
 } nfs4_stub_type_t;
 
 typedef enum nfs4_access_type {
@@ -333,7 +334,7 @@ typedef struct rnode4 {
 					/* sv_fsid (servinfo4_t) to see why */
 					/* stub type was set		    */
 	nfs4_stub_type_t	r_stub_type;
-					/* e.g. mirror-mount */
+					/* e.g. mirror-mount or referral */
 	uint_t		r_inmap;	/* to serialize read/write and mmap */
 } rnode4_t;
 
@@ -371,6 +372,7 @@ typedef struct rnode4 {
 
 #define	RP_ISSTUB(rp)	(((rp)->r_stub_type != NFS4_STUB_NONE))
 #define	RP_ISSTUB_MIRRORMOUNT(rp) ((rp)->r_stub_type == NFS4_STUB_MIRRORMOUNT)
+#define	RP_ISSTUB_REFERRAL(rp)	((rp)->r_stub_type == NFS4_STUB_REFERRAL)
 
 /*
  * Open file instances.
@@ -415,6 +417,7 @@ extern vnode_t *makenfs4node_by_fh(nfs4_sharedfh_t *, nfs4_sharedfh_t *,
 
 extern nfs4_opinst_t *r4mkopenlist(struct mntinfo4 *);
 extern void	r4releopenlist(nfs4_opinst_t *);
+extern int	r4find_by_fsid(mntinfo4_t *, fattr4_fsid *);
 
 /* Access cache calls */
 extern nfs4_access_type_t nfs4_access_check(rnode4_t *, uint32_t, cred_t *);
@@ -499,6 +502,7 @@ extern rddir4_cache *rddir4_cache_lookup(rnode4_t *, offset_t, int);
 extern void	rddir4_cache_rele(rnode4_t *, rddir4_cache *);
 
 extern void	r4_stub_mirrormount(rnode4_t *);
+extern void	r4_stub_referral(rnode4_t *);
 extern void	r4_stub_none(rnode4_t *);
 
 #ifdef DEBUG

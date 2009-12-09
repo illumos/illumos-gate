@@ -117,6 +117,10 @@ rfs_getattr(fhandle_t *fhp, struct nfsattrstat *ns, struct exportinfo *exi,
 
 	/* check for overflows */
 	if (!error) {
+		/* Lie about the object type for a referral */
+		if (vn_is_nfs_reparse(vp, cr))
+			va.va_type = VLNK;
+
 		acl_perm(vp, exi, &va, cr);
 		error = vattr_to_nattr(&va, &ns->ns_attr);
 	}
@@ -489,6 +493,7 @@ rfs_readlink(fhandle_t *fhp, struct nfsrdlnres *rl, struct exportinfo *exi,
 	struct vattr va;
 	struct sockaddr *ca;
 	char *name = NULL;
+	int is_referral = 0;
 
 	vp = nfs_fhtovp(fhp, exi);
 	if (vp == NULL) {
@@ -515,11 +520,15 @@ rfs_readlink(fhandle_t *fhp, struct nfsrdlnres *rl, struct exportinfo *exi,
 		return;
 	}
 
+	/* We lied about the object type for a referral */
+	if (vn_is_nfs_reparse(vp, cr))
+		is_referral = 1;
+
 	/*
 	 * XNFS and RFC1094 require us to return ENXIO if argument
 	 * is not a link. BUGID 1138002.
 	 */
-	if (vp->v_type != VLNK) {
+	if (vp->v_type != VLNK && !is_referral) {
 		VN_RELE(vp);
 		rl->rl_data = NULL;
 		rl->rl_status = NFSERR_NXIO;
@@ -531,27 +540,52 @@ rfs_readlink(fhandle_t *fhp, struct nfsrdlnres *rl, struct exportinfo *exi,
 	 */
 	rl->rl_data = kmem_alloc(NFS_MAXPATHLEN, KM_SLEEP);
 
-	/*
-	 * Set up io vector to read sym link data
-	 */
-	iov.iov_base = rl->rl_data;
-	iov.iov_len = NFS_MAXPATHLEN;
-	uio.uio_iov = &iov;
-	uio.uio_iovcnt = 1;
-	uio.uio_segflg = UIO_SYSSPACE;
-	uio.uio_extflg = UIO_COPY_CACHED;
-	uio.uio_loffset = (offset_t)0;
-	uio.uio_resid = NFS_MAXPATHLEN;
+	if (is_referral) {
+		char *s;
+		size_t strsz;
 
-	/*
-	 * Do the readlink.
-	 */
-	error = VOP_READLINK(vp, &uio, cr, NULL);
+		/* Get an artificial symlink based on a referral */
+		s = build_symlink(vp, cr, &strsz);
+		global_svstat_ptr[2][NFS_REFERLINKS].value.ui64++;
+		DTRACE_PROBE2(nfs2serv__func__referral__reflink,
+		    vnode_t *, vp, char *, s);
+		if (s == NULL)
+			error = EINVAL;
+		else {
+			error = 0;
+			(void) strlcpy(rl->rl_data, s, NFS_MAXPATHLEN);
+			rl->rl_count = (uint32_t)MIN(strsz, NFS_MAXPATHLEN);
+			kmem_free(s, strsz);
+		}
+
+	} else {
+
+		/*
+		 * Set up io vector to read sym link data
+		 */
+		iov.iov_base = rl->rl_data;
+		iov.iov_len = NFS_MAXPATHLEN;
+		uio.uio_iov = &iov;
+		uio.uio_iovcnt = 1;
+		uio.uio_segflg = UIO_SYSSPACE;
+		uio.uio_extflg = UIO_COPY_CACHED;
+		uio.uio_loffset = (offset_t)0;
+		uio.uio_resid = NFS_MAXPATHLEN;
+
+		/*
+		 * Do the readlink.
+		 */
+		error = VOP_READLINK(vp, &uio, cr, NULL);
+
+		rl->rl_count = (uint32_t)(NFS_MAXPATHLEN - uio.uio_resid);
+
+		if (!error)
+			rl->rl_data[rl->rl_count] = '\0';
+
+	}
+
 
 	VN_RELE(vp);
-
-	rl->rl_count = (uint32_t)(NFS_MAXPATHLEN - uio.uio_resid);
-	rl->rl_data[rl->rl_count] = '\0';
 
 	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
 	name = nfscmd_convname(ca, exi, rl->rl_data,

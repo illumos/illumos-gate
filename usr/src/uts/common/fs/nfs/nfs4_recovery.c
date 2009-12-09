@@ -39,6 +39,11 @@
 #include <sys/disp.h>
 #include <sys/list.h>
 #include <sys/sdt.h>
+#include <sys/mount.h>
+#include <sys/door.h>
+#include <nfs/nfssys.h>
+#include <nfs/nfsid_map.h>
+#include <nfs/nfs4_idmap_impl.h>
 
 extern r4hashq_t *rtable4;
 
@@ -69,6 +74,8 @@ typedef struct {
 	nfs4_error_t rc_orig_errors;	/* original errors causing recovery */
 	int rc_error;
 	nfs4_bseqid_entry_t *rc_bseqid_rqst;
+	vnode_t *rc_moved_vp;
+	char *rc_moved_nm;
 } recov_info_t;
 
 /*
@@ -135,6 +142,8 @@ int nfs4_srvmnt_fail_cnt = 0;
 int nfs4_srvmnt_debug = 0;
 #endif
 
+extern zone_key_t	nfs4clnt_zone_key;
+
 /* forward references, in alphabetic order */
 static void close_after_open_resend(vnode_t *, cred_t *, uint32_t,
 	nfs4_error_t *);
@@ -169,7 +178,7 @@ static void resend_one_op(nfs4_lost_rqst_t *, nfs4_error_t *, mntinfo4_t *,
 	nfs4_server_t *);
 static void save_bseqid_rqst(nfs4_bseqid_entry_t *, recov_info_t *);
 static void start_recovery(recov_info_t *, mntinfo4_t *, vnode_t *, vnode_t *,
-	nfs4_server_t *);
+	nfs4_server_t *, vnode_t *, char *);
 static void start_recovery_action(nfs4_recov_t, bool_t, mntinfo4_t *, vnode_t *,
 	vnode_t *);
 static int wait_for_recovery(mntinfo4_t *, nfs4_op_hint_t);
@@ -330,7 +339,7 @@ enqueue_bseqid_rqst(recov_info_t *recovp, mntinfo4_t *mi)
 bool_t
 nfs4_start_recovery(nfs4_error_t *ep, mntinfo4_t *mi, vnode_t *vp1,
     vnode_t *vp2, stateid4 *sid, nfs4_lost_rqst_t *lost_rqstp, nfs_opnum4 op,
-    nfs4_bseqid_entry_t *bsep)
+    nfs4_bseqid_entry_t *bsep, vnode_t *moved_vp, char *moved_nm)
 {
 	recov_info_t *recovp;
 	nfs4_server_t *sp;
@@ -371,7 +380,7 @@ nfs4_start_recovery(nfs4_error_t *ep, mntinfo4_t *mi, vnode_t *vp1,
 	errs_to_action(recovp, sp, mi, sid, lost_rqstp, gone, op, bsep);
 	if (sp != NULL)
 		mutex_exit(&sp->s_lock);
-	start_recovery(recovp, mi, vp1, vp2, sp);
+	start_recovery(recovp, mi, vp1, vp2, sp, moved_vp, moved_nm);
 	if (sp != NULL)
 		nfs4_server_rele(sp);
 	return (FALSE);
@@ -397,12 +406,13 @@ start_recovery_action(nfs4_recov_t what, bool_t reboot, mntinfo4_t *mi,
 	recovp->rc_action = what;
 	recovp->rc_srv_reboot = reboot;
 	recovp->rc_error = EIO;
-	start_recovery(recovp, mi, vp1, vp2, NULL);
+	start_recovery(recovp, mi, vp1, vp2, NULL, NULL, NULL);
 }
 
 static void
 start_recovery(recov_info_t *recovp, mntinfo4_t *mi,
-    vnode_t *vp1, vnode_t *vp2, nfs4_server_t *sp)
+    vnode_t *vp1, vnode_t *vp2, nfs4_server_t *sp,
+    vnode_t *moved_vp, char *moved_nm)
 {
 	NFS4_DEBUG(nfs4_client_recov_debug, (CE_NOTE,
 	    "start_recovery: mi %p, what %s", (void*)mi,
@@ -563,7 +573,6 @@ again:
 	case NR_LOST_LOCK:
 		nfs4_enqueue_lost_rqst(recovp, mi);
 		break;
-
 	default:
 		nfs4_queue_event(RE_UNEXPECTED_ACTION, mi, NULL,
 		    recovp->rc_action, NULL, NULL, 0, NULL, 0, TAG_NONE,
@@ -607,6 +616,8 @@ again:
 		ASSERT(VTOMI4(vp2) == mi);
 		VN_HOLD(recovp->rc_vp2);
 	}
+	recovp->rc_moved_vp = moved_vp;
+	recovp->rc_moved_nm = moved_nm;
 
 	(void) zthread_create(NULL, 0, nfs4_recov_thread, recovp, 0,
 	    minclsyspri);
@@ -1937,7 +1948,7 @@ recov_filehandle(nfs4_recov_t action, mntinfo4_t *mi, vnode_t *vp)
 		needrecov = FALSE;
 	if (needrecov) {
 		(void) nfs4_start_recovery(&e, mi, vp,
-		    NULL, NULL, NULL, OP_LOOKUP, NULL);
+		    NULL, NULL, NULL, OP_LOOKUP, NULL, NULL, NULL);
 	} else if (e.error != EINTR &&
 	    !NFS4_FRC_UNMT_ERR(e.error, mi->mi_vfsp) &&
 	    (e.error != 0 || e.stat != NFS4_OK)) {
@@ -2012,7 +2023,7 @@ recov_stale(mntinfo4_t *mi, vnode_t *vp)
 	needrecov = nfs4_needs_recovery(&e, FALSE, vp->v_vfsp);
 	if (needrecov && (e.error != 0 || e.stat != NFS4ERR_STALE)) {
 		(void) nfs4_start_recovery(&e, mi, vp,
-		    NULL, NULL, NULL, OP_GETATTR, NULL);
+		    NULL, NULL, NULL, OP_GETATTR, NULL, NULL, NULL);
 		NFS4_DEBUG(nfs4_client_recov_debug, (CE_NOTE,
 		    "recov_stale: error=%d, stat=%d seen on rp %s",
 		    e.error, e.stat, rnode4info(rp)));
@@ -2062,7 +2073,7 @@ recov_stale(mntinfo4_t *mi, vnode_t *vp)
 			if (needrecov) {
 				(void) nfs4_start_recovery(&e,
 				    mi, rootvp, NULL, NULL, NULL,
-				    OP_GETATTR, NULL);
+				    OP_GETATTR, NULL, NULL, NULL);
 				NFS4_DEBUG(nfs4_client_recov_debug, (CE_NOTE,
 				    "recov_stale: error=%d, stat=%d seen "
 				    "on rp %s", e.error, e.stat,
@@ -2491,7 +2502,7 @@ recov_openfiles(recov_info_t *recovp, nfs4_server_t *sp)
 		nfs4_remap_root(mi, &e, 0);
 		if (nfs4_needs_recovery(&e, FALSE, mi->mi_vfsp)) {
 			(void) nfs4_start_recovery(&e, mi, NULL,
-			    NULL, NULL, NULL, OP_LOOKUP, NULL);
+			    NULL, NULL, NULL, OP_LOOKUP, NULL, NULL, NULL);
 		}
 	}
 
@@ -2561,7 +2572,7 @@ recov_openfiles(recov_info_t *recovp, nfs4_server_t *sp)
 				    mi->mi_vfsp)) {
 					(void) nfs4_start_recovery(&e, mi,
 					    rep->re_vp, NULL, NULL, NULL,
-					    OP_OPEN, NULL);
+					    OP_OPEN, NULL, NULL, NULL);
 					break;
 				}
 			}
@@ -2575,7 +2586,7 @@ recov_openfiles(recov_info_t *recovp, nfs4_server_t *sp)
 			if (nfs4_needs_recovery(&e, TRUE, mi->mi_vfsp))
 				(void) nfs4_start_recovery(&e, mi,
 				    rep->re_vp, NULL, NULL, NULL, OP_LOCK,
-				    NULL);
+				    NULL, NULL, NULL);
 			if (e.error != 0 || e.stat != NFS4_OK)
 				break;
 		}
@@ -2664,7 +2675,7 @@ nfs4_resend_lost_rqsts(recov_info_t *recovp, nfs4_server_t *sp)
 			} else {
 				(void) nfs4_start_recovery(&n4e,
 				    mi, lrp->lr_dvp, lrp->lr_vp, NULL, NULL,
-				    lrp->lr_op, NULL);
+				    lrp->lr_op, NULL, NULL, NULL);
 			}
 			return;
 		}
@@ -3122,10 +3133,10 @@ errs_to_action(recov_info_t *recovp,
 		case NFS4ERR_LEASE_MOVED:
 			action = xxx;
 			break;
-		case NFS4ERR_MOVED:
-			action = xxx;
-			break;
 #endif
+		case NFS4ERR_MOVED:
+			action = NR_MOVED;
+			break;
 		case NFS4ERR_BADHANDLE:
 			action = NR_BADHANDLE;
 			break;

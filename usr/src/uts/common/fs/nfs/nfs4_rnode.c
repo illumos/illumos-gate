@@ -381,10 +381,11 @@ r4_do_attrcache(vnode_t *vp, nfs4_ga_res_t *garp, int newnode,
 			 * creation time and it never changes for life
 			 * of the rnode.
 			 *
+			 * This stub will be for a mirror-mount, rather than
+			 * a referral (the latter also sets R4SRVSTUB).
+			 *
 			 * The stub type is also set during RO failover,
 			 * nfs4_remap_file().
-			 *
-			 * This stub will be for a mirror-mount.
 			 *
 			 * We don't bother with taking r_state_lock to
 			 * set the stub type because this is a new rnode
@@ -1769,6 +1770,52 @@ r4mkopenlist(mntinfo4_t *mi)
 }
 
 /*
+ * Given a filesystem id, check to see if any rnodes
+ * within this fsid reside in the rnode cache, other
+ * than one we know about.
+ *
+ * Return 1 if an rnode is found, 0 otherwise
+ */
+int
+r4find_by_fsid(mntinfo4_t *mi, fattr4_fsid *moved_fsid)
+{
+	rnode4_t *rp;
+	vnode_t *vp;
+	vfs_t *vfsp = mi->mi_vfsp;
+	fattr4_fsid *fsid;
+	int index, found = 0;
+
+	for (index = 0; index < rtable4size; index++) {
+		rw_enter(&rtable4[index].r_lock, RW_READER);
+		for (rp = rtable4[index].r_hashf;
+		    rp != (rnode4_t *)(&rtable4[index]);
+		    rp = rp->r_hashf) {
+
+			vp = RTOV4(rp);
+			if (vp->v_vfsp != vfsp)
+				continue;
+
+			/*
+			 * XXX there might be a case where a
+			 * replicated fs may have the same fsid
+			 * across two different servers. This
+			 * check isn't good enough in that case
+			 */
+			fsid = &rp->r_srv_fsid;
+			if (FATTR4_FSID_EQ(moved_fsid, fsid)) {
+				found = 1;
+				break;
+			}
+		}
+		rw_exit(&rtable4[index].r_lock);
+
+		if (found)
+			break;
+	}
+	return (found);
+}
+
+/*
  * Release the list of open instance references.
  */
 
@@ -1895,6 +1942,14 @@ void
 r4_stub_mirrormount(rnode4_t *rp)
 {
 	r4_stub_set(rp, NFS4_STUB_MIRRORMOUNT);
+}
+
+void
+r4_stub_referral(rnode4_t *rp)
+{
+	DTRACE_PROBE1(nfs4clnt__func__referral__moved,
+	    vnode_t *, RTOV4(rp));
+	r4_stub_set(rp, NFS4_STUB_REFERRAL);
 }
 
 void

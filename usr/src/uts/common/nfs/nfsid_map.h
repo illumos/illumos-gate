@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _NFSID_MAP_H
 #define	_NFSID_MAP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef _KERNEL
 #include <stddef.h>
@@ -59,6 +56,7 @@ extern "C" {
 #define	NFSMAPID_UID_STR	2
 #define	NFSMAPID_STR_GID	3
 #define	NFSMAPID_GID_STR	4
+#define	NFSMAPID_SRV_NETINFO	5
 
 /*
  * We are passing in arguments in a variable length struct
@@ -144,6 +142,35 @@ typedef struct mapid_res mapid_res_t;
  */
 #define	MAPID_RES_LEN(str_length)	\
 	((offsetof(mapid_res_t, str[0]) + 1 + (str_length) + 7) & ~ 7)
+
+/*
+ * Support for referral name resolution by the NFS client
+ */
+typedef struct refd_door_args {
+	int		cmd;		/* NFS4_FS_LOCATIONS/NFS4_SRV_NETINFO */
+	int		xdr_len;	/* Length of xdr Buffer */
+	char		xdr_arg[1];	/* Buffer holding xdr encoded data */
+} refd_door_args_t;
+
+typedef struct refd_door_res {
+	int		res_status;
+	int		xdr_len;
+	char		xdr_res[1];
+} refd_door_res_t;
+
+#ifdef _SYSCALL32
+typedef struct refd_door_args32 {
+	int32_t		cmd;
+	int32_t		xdr_len;
+	char		xdr_arg[1];
+} refd_door_args32_t;
+
+typedef struct 	refd_door_res32 {
+	int32_t		res_status;
+	int32_t		xdr_len;
+	char		xdr_res[1];
+} refd_door_res32_t;
+#endif
 
 #ifdef	__cplusplus
 }

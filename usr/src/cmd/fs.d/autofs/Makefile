@@ -71,8 +71,8 @@ LOCAL=		autod_main.o \
 		autod_parse.o autod_mount.o autod_nfs.o nfs_cast.o \
 		autod_autofs.o autod_xdr.o autod_readdir.o autod_lookup.o
 
-TYPEOBJS=	$(LOCAL) $(COMMON) replica.o nfs_sec.o nfs_subr.o $(FSLIB) \
-		webnfs_xdr.o webnfs_client.o selfcheck.o
+TYPEOBJS=	$(LOCAL) $(COMMON) replica.o nfs_sec.o nfs_resolve.o nfs_subr.o \
+		$(FSLIB) webnfs_xdr.o webnfs_client.o selfcheck.o
 
 SHAREOBJS=	$(SHARESRCS:%.c=%.o)
 
@@ -87,7 +87,7 @@ $(MOUNT):=	LDLIBS += -lnsl
 $(TYPEPROG) :=	LDLIBS += -lrpcsvc -lsocket -lnsl -lsldap -lkstat
 
 CFLAGS +=	$(CCVERBOSE) -D_FILE_OFFSET_BITS=64
-CPPFLAGS=	-I. -I.. -I../nfs/lib $(CPPFLAGS.master) -D_REENTRANT \
+CPPFLAGS=	-I. -I.. -I../nfs/lib $(CPPFLAGS.master) -D_REENTRANT  \
 			$(MALLOC_DEBUG)
 OBJS=		$(AUTOOBJS) $(MOUNTOBJS) $(TYPEOBJS) \
 		$(SHAREOBJS) $(UNSHAREOBJS)
@@ -96,7 +96,8 @@ AUTOSRCS=	automount.c $(COMMON:%.o=%.c) $(FSLIBSRC)
 MOUNTSRCS=	mount.c $(FSLIBSRC)
 TYPESRCS=	$(LOCAL:%.o=%.c) $(COMMON:%.o=%.c) \
 		../nfs/lib/replica.c ../nfs/lib/nfs_sec.c \
-		../nfs/lib/nfs_subr.c $(FSLIBSRC) ../nfs/lib/selfcheck.c
+		../nfs/lib/nfs_subr.c $(FSLIBSRC) ../nfs/lib/selfcheck.c \
+		../nfs/lib/nfs_resolve.c
 SHARESRCS=	$(SHARE:%=%.c)
 UNSHARESRCS=	$(UNSHARE:%=%.c)
 DFSHARESSRCS=	$(DFSHARES:%=%.sh)
@@ -168,6 +169,8 @@ nfs_subr.o:	../nfs/lib/nfs_subr.c
 selfcheck.o:	../nfs/lib/selfcheck.c
 		$(COMPILE.c) ../nfs/lib/selfcheck.c
 
+nfs_resolve.o:	../nfs/lib/nfs_resolve.c
+		$(COMPILE.c) ../nfs/lib/nfs_resolve.c
 
 webnfs_xdr.c:	webnfs.x
 	$(RPCGEN) -M -C -c -o $@ webnfs.x
