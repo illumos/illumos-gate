@@ -50,25 +50,15 @@ extern "C" {
 
 #if defined(__i386) || defined(__amd_64) || defined(__x86_64)
 
-#define	INTEL_CPU_FEATURE_SSE42	0x0100000
-
-static INLINE unsigned int
 #ifdef _KERNEL
-/*LINTED:E_FUNC_ARG_UNUSED*/
-cpuid_ecx(unsigned int op)
+#include <sys/x86_archext.h>	/* x86_feature, X86_AES */
+
 #else
-cpuid_ecx(unsigned int op)
-#endif /* _KERNEL */
-{
-	/*LINTED:E_FUNC_VAR_UNUSED*/
-	unsigned int eax, ecx;
-	__asm__ __volatile__("cpuid"
-	    : "=a" (eax), "=c" (ecx)
-	    : "0" (op)
-	    : "bx", "dx");
-	/*LINTED:E_VAR_USED_BEFORE_SET*/
-	return (ecx);
-}
+
+#include <sys/auxv.h>		/* getisax() */
+#include <sys/auxv_386.h>	/* AV_386_AES bit */
+
+#endif
 
 static INLINE uint32_t
 #ifdef _KERNEL
@@ -257,15 +247,29 @@ hd_crc32_avail(uint32_t *crc32_table)
 		0xBE2DA0A5, 0x4C4623A6, 0x5F16D052, 0xAD7D5351
 	};
 
-	if ((cpuid_ecx(1) & INTEL_CPU_FEATURE_SSE42) != 0) {
+#ifdef _KERNEL
+	if (!(x86_feature & X86_SSE4_2)) {
+		return (B_FALSE);
+	} else {
+#else
+	{
+		uint_t	ui = 0;
+
+		(void) getisax(&ui, 1);
+
+		if (!(ui & AV_386_SSE4_2)) {
+			return (B_FALSE);
+		}
+#endif /* _KERNEL */
 		for (i = 0; i < 256; i++) {
 			if (crc32_table[i] != _intel_crc32_hd_table[i])
 				return (B_FALSE);
 		}
 		return (B_TRUE);
 	}
-#endif
+#else
 	return (B_FALSE);
+#endif
 }
 
 #ifdef __cplusplus

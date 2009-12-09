@@ -594,7 +594,6 @@ discover_isns_server(uint8_t *lhba_handle,
 		} else {
 			kmem_free(*isns_server_addrs, list_space);
 			*isns_server_addrs = NULL;
-			(*isns_server_addrs)->al_out_cnt = 0;
 			return (ISNS_BAD_SVR_ADDR);
 		}
 		i++;
