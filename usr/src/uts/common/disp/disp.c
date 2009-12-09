@@ -927,6 +927,22 @@ swtch()
 		} else {
 			if (t->t_flag & T_INTR_THREAD)
 				cpu_intr_swtch_exit(t);
+			/*
+			 * Threads that enqueue themselves on a run queue defer
+			 * setting t_waitrq. It is then either set in swtch()
+			 * when the CPU is actually yielded, or not at all if it
+			 * is remaining on the CPU.
+			 * There is however a window between where the thread
+			 * placed itself on a run queue, and where it selects
+			 * itself in disp(), where a third party (eg. clock()
+			 * doing tick processing) may have re-enqueued this
+			 * thread, setting t_waitrq in the process. We detect
+			 * this race by noticing that despite switching to
+			 * ourself, our t_waitrq has been set, and should be
+			 * cleared.
+			 */
+			if (t->t_waitrq != 0)
+				t->t_waitrq = 0;
 
 			pg_ev_thread_remain(cp, t);
 
