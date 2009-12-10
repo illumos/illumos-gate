@@ -1,4 +1,4 @@
-#!/usr/sfw/bin/python
+#!/usr/bin/python2.4
 #
 # CDDL HEADER START
 #
@@ -19,10 +19,9 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # wsdiff(1) is a tool that can be used to determine which compiled objects
@@ -114,7 +113,7 @@ def info(msg) :
 
 # Error message to be printed to the screen, and the log file
 def error(msg) :
-	
+
 	print >> sys.stderr, "ERROR:", msg
 	sys.stderr.flush()
 	if logging :
@@ -127,7 +126,7 @@ def v_info(msg) :
 	if logging :
 		print >> log, msg
 		log.flush()
-	
+
 #
 # Flag a detected file difference
 # Display the fileName to stdout, and log the difference
@@ -151,7 +150,7 @@ def log_difference(f, dtype, diffs) :
 		print >> log, "NOTE:", dtype, "difference detected."
 
 		difflen = len(diffs)
-		if difflen > 0 :				
+		if difflen > 0 :
 			print >> log
 
 			if not vdiffs and difflen > diffs_sz_thresh :
@@ -179,12 +178,12 @@ def diffFileData(tmpf1, tmpf2) :
 	if isBinary(tmpf1) or isBinary(tmpf2) :
 		tmp_od1 = tmpf1 + ".od"
 		tmp_od2 = tmpf2 + ".od"
-		
+
 		cmd = od_cmd + " -c -t x4" + " " + tmpf1 + " > " + tmp_od1
 		os.system(cmd)
 		cmd = od_cmd + " -c -t x4" + " " + tmpf2 + " > " + tmp_od2
 		os.system(cmd)
-		
+
 		tmpf1 = tmp_od1
 		tmpf2 = tmp_od2
 
@@ -231,10 +230,10 @@ def str_prefix_trunc(s, prefix) :
 # Prune off leading proto path goo (if there is one) to yield
 # the deliverable's eventual path relative to root
 # e.g. proto.base/root_sparc/usr/src/cmd/prstat => usr/src/cmd/prstat
-# 
+#
 def fnFormat(fn) :
 	root_arch_str = "root_" + arch
-	
+
 	pos = fn.find(root_arch_str)
 	if pos == -1 :
 		return fn
@@ -346,7 +345,7 @@ def getTheFileType(f) :
 		       'ln'	:	'Lint Library',
 		       'esa'	:	'Elfsign Activation',
 		       'db'	:	'Sqlite Database' }
-	
+
 	try:
 		if os.stat(f)[ST_SIZE] == 0 :
 			return 'ASCII'
@@ -385,7 +384,7 @@ def isELF(f) :
 #
 # Return non-zero is "f" is binary.
 # Consider the file to be binary if it contains any null characters
-# 
+#
 def isBinary(f) :
 	try:
 		fd = open(f)
@@ -402,7 +401,7 @@ def isBinary(f) :
 
 #####
 # Directory traversal and file finding
-# 
+#
 
 #
 # Return a sorted list of files found under the specified directory
@@ -426,10 +425,10 @@ def protoCatalog(base, ptch) :
 
 	newFiles = []		# New files detected
 	deletedFiles = []	# Deleted files
-	
+
 	baseFilesList = list(findFiles(base))
 	baseStringLength = len(base)
-	
+
 	ptchFilesList = list(findFiles(ptch))
 	ptchStringLength = len(ptch)
 
@@ -480,7 +479,7 @@ def flistCatalog(base, ptch, flist) :
 	compFiles = []		# List of files in both proto areas
 	newFiles = []		# New files detected
 	deletedFiles = []	# Deleted files
-	
+
 	try:
 		fd = open(flist, "r")
 	except:
@@ -489,11 +488,11 @@ def flistCatalog(base, ptch, flist) :
 
 	files = []
 	files = fd.readlines()
-	
+
 	for f in files :
 		ptch_present = True
 		base_present = True
-		
+
 		if f == '\n' :
 			continue
 
@@ -538,7 +537,7 @@ def flistCatalog(base, ptch, flist) :
 			if os.path.islink(base + fn) and os.path.islink(ptch + fn) :
 				continue
 			error(f + " in file list, but not in either tree. Skipping...")
-		
+
 	return compFiles, newFiles, deletedFiles
 
 
@@ -563,10 +562,10 @@ def find_tool(tool) :
 		location = pdir + "/" + arch + "/" + tool
 		if os.path.exists(location) :
 			return location + " "
-		
+
 	error("Could not find path to: " + tool);
 	sys.exit(1);
-	
+
 
 #####
 # ELF file comparison helper routines
@@ -574,7 +573,7 @@ def find_tool(tool) :
 
 #
 # Return a dictionary of ELF section types keyed by section name
-# 
+#
 def get_elfheader(f) :
 
 	header = {}
@@ -673,7 +672,7 @@ def diff_elf_section(f1, f2, section, sh_type) :
 	os.system(cmd2)
 
 	data = diffFileData(tmpFile1, tmpFile2)
-	
+
 	return (data)
 
 #
@@ -744,11 +743,11 @@ def compareElfs(base, ptch, quiet) :
 		      base + " but not in " + ptch)
 		v_info("\n" + slist)
 		return 1
-			
+
 	if len(e2_only_sections) > 0 :
 		if quiet :
 			return 1
-		
+
 		info(fileName);
 		if not logging :
 			return 1
@@ -792,12 +791,12 @@ def compareElfs(base, ptch, quiet) :
 					log_difference(fileName, "ELF " + sect, data)
 				else :
 					difference(fileName, "ELF " + sect, data)
-				
+
 			if not reportAllSects :
 				return 1
 			first_section = False
 	return 0
-	
+
 #####
 # Archive object comparison
 #
@@ -897,7 +896,7 @@ def compareArchives(base, ptch, fileType) :
 # (Basic) file comparison
 #
 # There's some special case code here for Javadoc HTML files
-# 
+#
 # Returns 1 if difference detected
 #         0 if no difference detected
 #        -1 on error
@@ -976,7 +975,7 @@ def compareByDumping(base, ptch, quiet, fileType) :
 			  tmpFile1
 		ptchCmd = "echo .dump | " + sqlite_cmd + ptch + " > " + \
 			  tmpFile2
-	
+
 	os.system(baseCmd)
 	os.system(ptchCmd)
 
@@ -1033,7 +1032,7 @@ def compareActivation(base, ptch, quiet, fileType) :
 # Compare two objects. Detect type changes.
 # Vector off to the appropriate type specific
 # compare routine based on the type.
-# 
+#
 def compareOneFile(base, ptch, quiet) :
 
 	# Verify the file types.
@@ -1085,10 +1084,10 @@ def cleanup(ret) :
 
 		os.system(baseCmd)
 		os.system(ptchCmd)
-		
+
 	if logging :
 		log.close()
-		
+
 	sys.exit(ret)
 
 def main() :
@@ -1140,7 +1139,7 @@ def main() :
 		v_info("# This file was produced by wsdiff")
 		v_info(dateTimeStr)
 
-	# 
+	#
 	# Build paths to the tools required tools
 	#
 	# Try to look for tools in $SRC/tools if the "-t" option
@@ -1189,7 +1188,7 @@ def main() :
 	v_info("New proto area: " + ptchRoot)
 	v_info("Results file: " + results + "\n")
 
-	# 
+	#
 	# Set up the temporary directories / files
 	# Could use python's tmpdir routines, but these should
 	# be easier to identify / keep around for debugging
@@ -1242,7 +1241,7 @@ def main() :
 	for fn in changedFiles :
 		base = baseRoot + fn
 		ptch = ptchRoot + fn
-		
+
 		compareOneFile(base, ptch, False)
 
 	# We're done, cleanup.

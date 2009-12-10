@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python2.4
 #
 # CDDL HEADER START
 #
@@ -76,7 +76,7 @@ class ExceptionList(object):
 
 	def __contains__(self, elt):
 		return self.match(elt)
-	
+
 def usage():
 	progname = os.path.split(sys.argv[0])[1]
 	sys.stderr.write('''Usage: %s [-v] [-x exceptions] paths...
@@ -107,7 +107,7 @@ def walker(opts, dirname, fnames):
 		else:
 			if path in opts['exclude']:
 				fnames.remove(f)
-				
+
 def walkpath(path, opts):
 	if os.path.isdir(path):
 		os.path.walk(path, walker, opts)
@@ -133,7 +133,7 @@ def main(args):
 			options['verbose'] = True
 		elif opt == '-x':
 			options['exclude'].load(arg)
-		
+
 	for path in args:
 		walkpath(path, options)
 
