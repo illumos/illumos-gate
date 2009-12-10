@@ -7386,6 +7386,7 @@ getdeldev(
 	uint_t		set_status;
 	md_dev64_t	dev;
 	int		flags = MDDB_MUSTEXIST;
+	mddb_ri_t	*rip;
 
 	cp->c_dbmax = MDDB_NLB;
 
@@ -7515,8 +7516,14 @@ getdeldev(
 		lbp->lb_commitcnt = commitcnt;
 	}
 
-	if (s->s_mbiarray[li])
+	if (s->s_mbiarray[li]) {
+		/* A freed mbi pointer still exists in the mddb_ri_t */
+		for (rip = s->s_rip; rip != NULL; rip = rip->ri_next) {
+			if (rip->ri_mbip == s->s_mbiarray[li])
+				rip->ri_mbip = NULL;
+		}
 		free_mbipp(&s->s_mbiarray[li]);
+	}
 
 	if (! (locators[li].l_flags & MDDB_F_EMASTER)) {
 		dev = md_expldev(locators[li].l_dev);
@@ -8279,6 +8286,10 @@ newdev(
 	int		flags;
 	int		mn_set = 0;
 	int		index;
+	mddb_ri_t	*rip;
+	int		locator_deleted = 0;
+	dev32_t		locator_deleted_dev;
+	int		sz = 0;
 
 
 	/* Currently don't allow addition of new replica during upgrade */
@@ -8417,8 +8428,11 @@ newdev(
 	/* Look for a deleted slot */
 	for (li = 0; li < lbp->lb_loccnt; li++) {
 		lp = &lbp->lb_locators[li];
-		if (lp->l_flags & MDDB_F_DELETED)
+		if (lp->l_flags & MDDB_F_DELETED) {
+			locator_deleted = 1;
+			locator_deleted_dev = lp->l_dev;
 			break;
+		}
 	}
 
 	/* If no deleted slots, add a new one */
@@ -8507,6 +8521,33 @@ newdev(
 		single_thread_end(s);
 		mddb_setexit(s);
 		return (mdmddberror(ep, MDE_DB_TOOSMALL, NODEV32, setno));
+	}
+
+	/*
+	 * Hijack a deleted rip master record and correct the contents
+	 */
+	if (locator_deleted) {
+		for (rip = s->s_rip; rip != NULL; rip = rip->ri_next) {
+			if (rip->ri_lbp != NULL &&
+			    rip->ri_mbip == 0 &&
+			    (rip->ri_dev == md_expldev(locator_deleted_dev))) {
+				rip->ri_dev = md_expldev(clp->l_dev);
+				rip->ri_mbip = mbip;
+
+				if (use_devid && clp->l_devid != 0) {
+					sz = (int)ddi_devid_sizeof(
+					    (ddi_devid_t)(uintptr_t)
+					    clp->l_devid);
+					rip->ri_devid =
+					    (ddi_devid_t)kmem_zalloc(sz,
+					    KM_SLEEP);
+					bcopy((void *)(uintptr_t)clp->l_devid,
+					    (char *)rip->ri_devid, sz);
+				}
+
+				break;
+			}
+		}
 	}
 
 	if (use_devid)
