@@ -1001,7 +1001,7 @@ segkp_fault(
 		 * Make sure the addr is LOCKED and it has anon backing
 		 * before unlocking
 		 */
-		if ((kpd->kp_flags & (KPD_LOCKED|KPD_NO_ANON)) == KPD_NO_ANON) {
+		if ((kpd->kp_flags & (KPD_LOCKED|KPD_NO_ANON)) != KPD_LOCKED) {
 			panic("segkp_fault: bad unlock");
 			/*NOTREACHED*/
 		}

@@ -413,10 +413,6 @@ thread_create(
 		stkinfo_begin(t);
 	}
 
-	/* set default stack flag */
-	if (stksize == lwp_default_stksize)
-		t->t_flag |= T_DFLTSTK;
-
 	t->t_ts = ts;
 
 	/*
@@ -727,6 +723,10 @@ thread_free_barrier(kthread_t *t)
 void
 thread_free(kthread_t *t)
 {
+	boolean_t allocstk = (t->t_flag & T_TALLOCSTK);
+	klwp_t *lwp = t->t_lwp;
+	caddr_t swap = t->t_swap;
+
 	ASSERT(t != &t0 && t->t_state == TS_FREE);
 	ASSERT(t->t_door == NULL);
 	ASSERT(t->t_schedctl == NULL);
@@ -759,13 +759,13 @@ thread_free(kthread_t *t)
 		t->t_rprof = NULL;
 	}
 	t->t_lockp = NULL;	/* nothing should try to lock this thread now */
-	if (t->t_lwp)
-		lwp_freeregs(t->t_lwp, 0);
+	if (lwp)
+		lwp_freeregs(lwp, 0);
 	if (t->t_ctx)
 		freectx(t, 0);
 	t->t_stk = NULL;
-	if (t->t_lwp)
-		lwp_stk_fini(t->t_lwp);
+	if (lwp)
+		lwp_stk_fini(lwp);
 	lock_clear(&t->t_lock);
 
 	if (t->t_ts->ts_waiters > 0)
@@ -787,27 +787,24 @@ thread_free(kthread_t *t)
 
 	lgrp_affinity_free(&t->t_lgrp_affinity);
 
+	mutex_enter(&pidlock);
+	nthread--;
+	mutex_exit(&pidlock);
+
 	/*
-	 * Free thread struct and its stack.
+	 * Free thread, lwp and stack.  This needs to be done carefully, since
+	 * if T_TALLOCSTK is set, the thread is part of the stack.
 	 */
-	if (t->t_flag & T_TALLOCSTK) {
-		/* thread struct is embedded in stack */
-		segkp_release(segkp, t->t_swap);
-		mutex_enter(&pidlock);
-		nthread--;
-		mutex_exit(&pidlock);
-	} else {
-		if (t->t_swap) {
-			segkp_release(segkp, t->t_swap);
-			t->t_swap = NULL;
-		}
-		if (t->t_lwp) {
-			kmem_cache_free(lwp_cache, t->t_lwp);
-			t->t_lwp = NULL;
-		}
-		mutex_enter(&pidlock);
-		nthread--;
-		mutex_exit(&pidlock);
+	t->t_lwp = NULL;
+	t->t_swap = NULL;
+
+	if (swap) {
+		segkp_release(segkp, swap);
+	}
+	if (lwp) {
+		kmem_cache_free(lwp_cache, lwp);
+	}
+	if (!allocstk) {
 		kmem_cache_free(thread_cache, t);
 	}
 }
@@ -983,11 +980,15 @@ reapq_add(kthread_t *t)
 	mutex_enter(&reaplock);
 
 	/*
-	 * lwp_deathrow contains only threads with lwp linkage
-	 * that are of the default stacksize. Anything else goes
-	 * on thread_deathrow.
+	 * lwp_deathrow contains threads with lwp linkage and
+	 * swappable thread stacks which have the default stacksize.
+	 * These threads' lwps and stacks may be reused by lwp_create().
+	 *
+	 * Anything else goes on thread_deathrow(), where it will eventually
+	 * be thread_free()d.
 	 */
-	if (ttolwp(t) && (t->t_flag & T_DFLTSTK)) {
+	if (t->t_flag & T_LWPREUSE) {
+		ASSERT(ttolwp(t) != NULL);
 		t->t_forw = lwp_deathrow;
 		lwp_deathrow = t;
 		lwp_reapcnt++;

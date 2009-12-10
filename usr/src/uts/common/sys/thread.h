@@ -138,7 +138,7 @@ typedef struct _kthread {
 	uintptr_t t_lofault;	/* ret pc for failed page faults */
 	label_t	*t_onfault;	/* on_fault() setjmp buf */
 	struct on_trap_data *t_ontrap;	/* on_trap() protection data */
-	caddr_t t_swap;		/* swappable thread storage */
+	caddr_t t_swap;		/* the bottom of the stack, if from segkp */
 	lock_t	t_lock;		/* used to resume() a thread */
 	uint8_t	t_lockstat;	/* set while thread is in lockstat code */
 	uint8_t	t_pil;		/* interrupt thread PIL */
@@ -369,7 +369,7 @@ typedef struct _kthread {
 #define	T_WAITCVSEM	0x0200	/* waiting for a lwp_cv or lwp_sema on sleepq */
 #define	T_WATCHPT	0x0400	/* thread undergoing a watchpoint emulation */
 #define	T_PANIC		0x0800	/* thread initiated a system panic */
-#define	T_DFLTSTK	0x1000	/* stack is default size */
+#define	T_LWPREUSE	0x1000	/* stack and LWP can be reused */
 #define	T_CAPTURING	0x2000	/* thread is in page capture logic */
 #define	T_VFPARENT	0x4000	/* thread is vfork parent, must call vfwait */
 #define	T_DONTDTRACE	0x8000  /* disable DTrace probes */

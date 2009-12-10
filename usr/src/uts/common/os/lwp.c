@@ -150,26 +150,25 @@ lwp_create(void (*proc)(), caddr_t arg, size_t len, proc_t *p,
 	mutex_exit(&p->p_zone->zone_nlwps_lock);
 	mutex_exit(&p->p_lock);
 
-	if (CLASS_KERNEL(cid)) {
-		curlwp = NULL;		/* don't inherit from curlwp */
+	curlwp = ttolwp(curthread);
+	if (curlwp == NULL || (stksize = curlwp->lwp_childstksz) == 0)
 		stksize = lwp_default_stksize;
-	} else {
-		curlwp = ttolwp(curthread);
-		if (curlwp == NULL || (stksize = curlwp->lwp_childstksz) == 0)
-			stksize = lwp_default_stksize;
-	}
 
-	/*
-	 * For system threads, we sleep for our swap reservation, and the
-	 * thread stack can't be swapped.
-	 *
-	 * Otherwise, try to reclaim a <lwp,stack> from 'deathrow'
-	 */
 	if (CLASS_KERNEL(cid)) {
-		lwpdata = (caddr_t)segkp_get(segkp, stksize,
-		    (KPD_NO_ANON | KPD_HASREDZONE | KPD_LOCKED));
+		/*
+		 * Since we are creating an LWP in an SSYS process, we do not
+		 * inherit anything from the current thread's LWP.  We set
+		 * stksize and lwpdata to 0 in order to let thread_create()
+		 * allocate a regular kernel thread stack for this thread.
+		 */
+		curlwp = NULL;
+		stksize = 0;
+		lwpdata = NULL;
 
 	} else if (stksize == lwp_default_stksize) {
+		/*
+		 * Try to reuse an <lwp,stack> from the LWP deathrow.
+		 */
 		if (lwp_reapcnt > 0) {
 			mutex_enter(&reaplock);
 			if ((t = lwp_deathrow) != NULL) {
@@ -223,7 +222,31 @@ lwp_create(void (*proc)(), caddr_t arg, size_t len, proc_t *p,
 	 */
 	t = thread_create(lwpdata, stksize, NULL, NULL, 0, p, TS_STOPPED, pri);
 
-	t->t_swap = lwpdata;	/* Start of page-able data */
+	/*
+	 * If a non-NULL stack base is passed in, thread_create() assumes
+	 * that the stack might be statically allocated (as opposed to being
+	 * allocated from segkp), and so it does not set t_swap.  Since
+	 * the lwpdata was allocated from segkp, we must set t_swap to point
+	 * to it ourselves.
+	 *
+	 * This would be less confusing if t_swap had a better name; it really
+	 * indicates that the stack is allocated from segkp, regardless of
+	 * whether or not it is swappable.
+	 */
+	if (lwpdata != NULL) {
+		ASSERT(!CLASS_KERNEL(cid));
+		ASSERT(t->t_swap == NULL);
+		t->t_swap = lwpdata;	/* Start of page-able data */
+	}
+
+	/*
+	 * If the stack and lwp can be reused, mark the thread as such.
+	 * When we get to reapq_add() from resume_from_zombie(), these
+	 * threads will go onto lwp_deathrow instead of thread_deathrow.
+	 */
+	if (!CLASS_KERNEL(cid) && stksize == lwp_default_stksize)
+		t->t_flag |= T_LWPREUSE;
+
 	if (lwp == NULL)
 		lwp = kmem_cache_alloc(lwp_cache, KM_SLEEP);
 	bzero(lwp, sizeof (*lwp));
