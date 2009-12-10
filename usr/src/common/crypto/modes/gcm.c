@@ -40,10 +40,10 @@
 #include <sys/byteorder.h>
 
 #ifdef __amd64
-#include <sys/x86_archext.h>	/* x86_feature, X86_*, CPUID_* */
 
-#ifndef _KERNEL
+#ifdef _KERNEL
 #include <sys/cpuvar.h>		/* cpu_t, CPU */
+#include <sys/x86_archext.h>	/* x86_feature, X86_*, CPUID_* */
 #include <sys/disp.h>		/* kpreempt_disable(), kpreempt_enable */
 /* Workaround for no XMM kernel thread save/restore */
 #define	KPREEMPT_DISABLE	kpreempt_disable()
