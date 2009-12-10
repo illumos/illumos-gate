@@ -2146,7 +2146,7 @@ restore_svp(mntinfo4_t *mi, servinfo4_t *svp, servinfo4_t *origsvp)
 		 * it might have contained symlinks that were
 		 * expanded by nfsgetfh_otw before the failure occurred.
 		 */
-		nfs_rw_enter_sig(&svp->sv_lock, RW_READER, 0);
+		(void) nfs_rw_enter_sig(&svp->sv_lock, RW_READER, 0);
 		kmem_free(svp->sv_path, svp->sv_pathlen);
 		svp->sv_path =
 		    kmem_alloc(origsvp->sv_pathlen, KM_SLEEP);
