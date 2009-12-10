@@ -56,7 +56,7 @@
 
 	<dependent
 		name='devices_audio_multi-user'
-		grouping='require_all'
+		grouping='optional_all'
 		restart_on='none'>
 		<service_fmri value='svc:/milestone/multi-user' />
 	</dependent>
