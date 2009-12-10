@@ -39,7 +39,8 @@ typedef struct {
 	uint32_t		svr_registered:1,
 				svr_reset_needed:1,
 				svr_delete_needed:1,
-				svr_targets_changed:1;
+				svr_targets_changed:1,
+				svr_monitor_hold:1;
 	uint32_t		svr_last_target_index;
 	uint32_t		svr_esi_interval;
 	avl_tree_t		svr_target_list;

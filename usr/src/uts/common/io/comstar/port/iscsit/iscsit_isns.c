@@ -201,8 +201,8 @@ uint32_t	isns_message_buf_size = ISNSP_MAX_PDU_SIZE;
 int	isns_initial_delay = ISNS_INITIAL_DELAY;
 
 /*
- * Because of a bug in the isns server, we cannot send a modify
- * operation that changes the target's TPGTs. So just replace all.
+ * Because of a bug in the Solaris isns server (c 2009), we cannot send a
+ * modify operation that changes the target's TPGTs. So just replace all.
  * If the iSNS server does not have this bug, clear this flag.
  * Changes take effect on each modify_target operation
  */
@@ -309,7 +309,10 @@ static int isnst_keepalive(iscsit_isns_svr_t *svr);
 static size_t
 isnst_make_keepalive_pdu(iscsit_isns_svr_t *svr, isns_pdu_t **pdu);
 
-static isns_target_t *isnst_get_registered_source(iscsit_isns_svr_t *srv);
+static isns_target_t *
+isnst_get_registered_source(iscsit_isns_svr_t *srv);
+static isns_target_t *
+isnst_get_registered_source_locked(iscsit_isns_svr_t *srv);
 
 static int
 isnst_verify_rsp(iscsit_isns_svr_t *svr, isns_pdu_t *pdu,
@@ -848,7 +851,7 @@ iscsit_isns_target_update(iscsit_tgt_t *target)
 		 * completely registered when it comes online.
 		 */
 		mutex_exit(&iscsit_isns_mutex);
-		/* Remove the old target_info struct */
+		/* Remove the target_info struct -- not needed */
 		isnst_clear_target_info_cb(ti);
 		return;
 	}
@@ -1004,8 +1007,13 @@ isnst_monitor_all_servers()
 
 	enabled = iscsit_global.global_isns_cfg.isns_state;
 	for (svr = list_head(svr_list); svr != NULL; svr = next_svr) {
-		next_svr = list_next(svr_list, svr);
 
+		svr->svr_monitor_hold = B_TRUE;
+		/*
+		 * isnst_monitor_one_server can release ISNS_GLOBAL_LOCK
+		 * internally.  This allows isnst_config_merge to run
+		 * even when messages to iSNS servers are pending.
+		 */
 		rc = isnst_monitor_one_server(svr, enabled);
 		if (rc != 0) {
 			svr->svr_retry_count++;
@@ -1030,6 +1038,8 @@ isnst_monitor_all_servers()
 		 * If we have finished unregistering this server,
 		 * it is now OK to delete it.
 		 */
+		svr->svr_monitor_hold = B_FALSE;
+		next_svr = list_next(svr_list, svr);
 		if (svr->svr_delete_needed == B_TRUE &&
 		    svr->svr_registered == B_FALSE) {
 			isnst_finish_delete_isns(svr);
@@ -1317,7 +1327,9 @@ retry_replace_all:
 		if (ddi_get_lbolt() >= (svr->svr_last_msg +
 		    drv_usectohz(isns_registration_period * (1000000/3)))) {
 			/* Send a self-query as a keepalive. */
+			ISNS_GLOBAL_UNLOCK();
 			rc = isnst_keepalive(svr);
+			ISNS_GLOBAL_LOCK();
 			if (rc != 0 && isnst_retry_registration(rc)) {
 				/* Retryable code => try replace-all */
 				svr->svr_reset_needed = B_TRUE;
@@ -1521,11 +1533,20 @@ isnst_copy_global_status_changes(void)
 	mutex_exit(&iscsit_isns_mutex);
 }
 
+/*
+ * isnst_update_one_server releases ISNS_GLOBAL_LOCK internally and
+ * acquires it again as needed.  This allows isnst_config_merge and
+ * isnst_esi_thread to run even while waiting for a response from the
+ * iSNS server (or a dead iSNS server).
+ */
 static int
 isnst_update_one_server(iscsit_isns_svr_t *svr, isns_target_t *itarget,
     isns_reg_type_t reg)
 {
 	int rc = 0;
+
+	ASSERT(ISNS_GLOBAL_LOCK_HELD());
+	ISNS_GLOBAL_UNLOCK();
 
 	switch (reg) {
 	case ISNS_DEREGISTER_TARGET:
@@ -1550,6 +1571,7 @@ isnst_update_one_server(iscsit_isns_svr_t *svr, isns_target_t *itarget,
 		/* NOTREACHED */
 	}
 
+	ISNS_GLOBAL_LOCK();
 	return (rc);
 }
 
@@ -1654,8 +1676,20 @@ isnst_make_reg_pdu(isns_pdu_t **pdu, isns_target_t *itarget,
 	boolean_t		reg_all = B_FALSE;
 	uint16_t		flags = 0;
 
-	ASSERT(ISNS_GLOBAL_LOCK_HELD());
-
+	ISNS_GLOBAL_LOCK();
+	ASSERT(svr->svr_monitor_hold);
+	/*
+	 * svr could have an empty target list if svr was added
+	 * by isnst_config_merge sometime after the last call to
+	 * copy_global_status_changes.  Just skip this chance
+	 * to reregister.  The next call to copy_global_status_changes
+	 * will sort things out.
+	 */
+	if (avl_numnodes(&svr->svr_target_list) == 0) {
+		/* If no targets, nothing to register */
+		ISNS_GLOBAL_UNLOCK();
+		return (0);
+	}
 	/*
 	 * Find a source attribute for this registration.
 	 *
@@ -1664,11 +1698,10 @@ isnst_make_reg_pdu(isns_pdu_t **pdu, isns_target_t *itarget,
 	 * If already registered, use a registered target
 	 * Otherwise, use the first target we are going to register.
 	 */
-	ASSERT(avl_numnodes(&svr->svr_target_list) != 0);
 	if (itarget != NULL && ! svr->svr_registered) {
 		src = itarget;
 	} else if (svr->svr_registered) {
-		src = isnst_get_registered_source(svr);
+		src = isnst_get_registered_source_locked(svr);
 	} else {
 		/*
 		 * When registering to a server, and we don't know which
@@ -1710,6 +1743,7 @@ isnst_make_reg_pdu(isns_pdu_t **pdu, isns_target_t *itarget,
 
 	pdu_size = isnst_create_pdu_header(ISNS_DEV_ATTR_REG, pdu, flags);
 	if (pdu_size == 0) {
+		ISNS_GLOBAL_UNLOCK();
 		return (0);
 	}
 
@@ -1829,6 +1863,7 @@ isnst_make_reg_pdu(isns_pdu_t **pdu, isns_target_t *itarget,
 
 	} while (itarget != NULL);
 
+	ISNS_GLOBAL_UNLOCK();
 	return (pdu_size);
 
 pdu_error:
@@ -1850,6 +1885,7 @@ pdu_error:
 	kmem_free(*pdu, pdu_size);
 	*pdu = NULL;
 
+	ISNS_GLOBAL_UNLOCK();
 	return (0);
 }
 
@@ -2345,6 +2381,19 @@ isnst_get_registered_source(iscsit_isns_svr_t *svr)
 	 * If svr is registered, then there must be at least one
 	 * target that is registered to that svr.
 	 */
+	ISNS_GLOBAL_LOCK();
+	ASSERT(svr->svr_monitor_hold);
+	itarget = isnst_get_registered_source_locked(svr);
+	ISNS_GLOBAL_UNLOCK();
+	return (itarget);
+}
+
+static isns_target_t *
+isnst_get_registered_source_locked(iscsit_isns_svr_t *svr)
+{
+	isns_target_t	*itarget;
+
+	ASSERT(ISNS_GLOBAL_LOCK_HELD());
 	ASSERT(svr->svr_registered);
 	ASSERT((avl_numnodes(&svr->svr_target_list) != 0));
 
@@ -2437,14 +2486,17 @@ isnst_verify_rsp(iscsit_isns_svr_t *svr, isns_pdu_t *pdu,
 				if (attr_len != 4 ||
 				    attr_len > rsp_payload_len - 8) {
 					/* Mal-formed packet */
-					break;
+					return (-1);
 				}
 				esi_interval =
 				    ntohl(*((uint32_t *)
 				    ((void *)(&attr->attr_value))));
 
+				ISNS_GLOBAL_LOCK();
+				ASSERT(svr->svr_monitor_hold);
 				if (esi_interval > svr->svr_esi_interval)
 					svr->svr_esi_interval = esi_interval;
+				ISNS_GLOBAL_UNLOCK();
 
 				break;
 			}
@@ -2521,7 +2573,10 @@ isnst_verify_rsp(iscsit_isns_svr_t *svr, isns_pdu_t *pdu,
 
 	/* Update the last time we heard from this server */
 	if (status == 0) {
+		ISNS_GLOBAL_LOCK();
+		ASSERT(svr->svr_monitor_hold);
 		svr->svr_last_msg = ddi_get_lbolt();
+		ISNS_GLOBAL_UNLOCK();
 	}
 
 
@@ -2714,6 +2769,8 @@ isnst_send_pdu(void *so, isns_pdu_t *pdu)
 	iovec_t		iov[2];
 	int		rc;
 
+	ASSERT(! ISNS_GLOBAL_LOCK_HELD());
+
 	/* update pdu flags */
 	flags  = ntohs(pdu->flags);
 	flags |= ISNS_FLAG_CLIENT;
@@ -2788,6 +2845,8 @@ isnst_rcv_pdu(void *so, isns_pdu_t **pdu)
 	timeout_id_t	rcv_timer;
 	uint16_t	flags;
 	uint16_t	seq;
+
+	ASSERT(! ISNS_GLOBAL_LOCK_HELD());
 
 	*pdu = NULL;
 	total_pdu_len = total_payload_len = 0;
@@ -2881,7 +2940,9 @@ isnst_open_so(struct sockaddr_storage *sa)
 	int sa_sz;
 	ksocket_t so;
 
-	/* determin local IP address */
+	ASSERT(! ISNS_GLOBAL_LOCK_HELD());
+
+	/* determine local IP address */
 	if (sa->ss_family == AF_INET) {
 		/* IPv4 */
 		sa_sz = sizeof (struct sockaddr_in);
@@ -2961,6 +3022,8 @@ isnst_esi_start(void)
 static void
 isnst_esi_stop()
 {
+	boolean_t	need_offline = B_FALSE;
+
 	ISNST_LOG(CE_NOTE, "isnst_esi_stop");
 
 	/* Shutdown ESI listening socket, wait for thread to terminate */
@@ -2968,10 +3031,13 @@ isnst_esi_stop()
 	if (esi.esi_enabled) {
 		esi.esi_enabled = B_FALSE;
 		if (esi.esi_valid) {
+			need_offline = B_TRUE;
+		}
+		mutex_exit(&esi.esi_mutex);
+		if (need_offline) {
 			idm_soshutdown(esi.esi_so);
 			idm_sodestroy(esi.esi_so);
 		}
-		mutex_exit(&esi.esi_mutex);
 		thread_join(esi.esi_thread_did);
 	} else {
 		mutex_exit(&esi.esi_mutex);
@@ -3084,7 +3150,6 @@ isnst_esi_thread(void *arg)
 				ISNST_LOG(CE_WARN, "isnst_esi_thread: "
 				    "accept failure (0x%x)", rc);
 
-				delay(drv_usectohz(100000));
 				if (rc == EINTR) {
 					continue;
 				} else {
@@ -3099,7 +3164,8 @@ isnst_esi_thread(void *arg)
 			if (pl_size == 0) {
 				ISNST_LOG(CE_WARN, "isnst_esi_thread: "
 				    "rcv_pdu failure");
-				(void) ksocket_close(newso, CRED());
+				idm_soshutdown(newso);
+				idm_sodestroy(newso);
 
 				mutex_enter(&esi.esi_mutex);
 				continue;
@@ -3107,7 +3173,8 @@ isnst_esi_thread(void *arg)
 
 			isnst_handle_esi_req(newso, pdu, pl_size);
 
-			(void) ksocket_close(newso, CRED());
+			idm_soshutdown(newso);
+			idm_sodestroy(newso);
 
 			mutex_enter(&esi.esi_mutex);
 		}
