@@ -624,6 +624,20 @@ do_exec_pty(Session *s, const char *command)
 		 */
 		close(pipe_fds[1]);
 
+		/*
+		 * do_motd() was called originally in do_login(). However,
+		 * when the /etc/motd file is large, a deadlock would happen,
+		 * because
+		 * - The child is blocked at fputs() to pty, when pty buffer
+		 *   is full.
+		 * - The parent can not consume the pty buffer, because it is
+		 *   still blocked at read(pipe_fds[0]).
+		 *
+		 * To resolve the deadlock issue, we defer do_motd() after
+		 * close(pipe_fds[1]).
+		 */
+		do_motd();
+
 		/* Do common processing for the child, such as execing the command. */
 		do_child(s, command);
 		/* NOTREACHED */
@@ -739,7 +753,6 @@ do_login(Session *s, const char *command)
 	}
 #endif /* NO_SSH_LASTLOG */
 
-	do_motd();
 }
 
 /*
