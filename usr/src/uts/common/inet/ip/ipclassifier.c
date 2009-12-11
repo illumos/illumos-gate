@@ -354,7 +354,7 @@ ipcl_g_init(void)
 	tcp_conn_cache = kmem_cache_create("tcp_conn_cache",
 	    sizeof (itc_t) + sizeof (tcp_t), CACHE_ALIGN_SIZE,
 	    tcp_conn_constructor, tcp_conn_destructor,
-	    NULL, NULL, NULL, 0);
+	    tcp_conn_reclaim, NULL, NULL, 0);
 
 	udp_conn_cache = kmem_cache_create("udp_conn_cache",
 	    sizeof (itc_t) + sizeof (udp_t), CACHE_ALIGN_SIZE,

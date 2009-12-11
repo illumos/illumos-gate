@@ -799,6 +799,7 @@ size_t
 tcp_fuse_set_rcv_hiwat(tcp_t *tcp, size_t rwnd)
 {
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	uint32_t	max_win;
 
 	ASSERT(tcp->tcp_fused);
 
@@ -810,6 +811,12 @@ tcp_fuse_set_rcv_hiwat(tcp_t *tcp, size_t rwnd)
 	 * after SO_SNDBUF; the latter is also similarly rounded up.
 	 */
 	rwnd = P2ROUNDUP_TYPED(rwnd, PAGESIZE, size_t);
+	max_win = TCP_MAXWIN << tcp->tcp_rcv_ws;
+	if (rwnd > max_win) {
+		rwnd = max_win - (max_win % tcp->tcp_mss);
+		if (rwnd < tcp->tcp_mss)
+			rwnd = max_win;
+	}
 
 	/*
 	 * Record high water mark, this is used for flow-control

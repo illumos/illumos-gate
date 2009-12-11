@@ -253,6 +253,7 @@ tcp_acceptor_winit
 tcp_conn_cache
 tcp_conn_hash_size
 tcp_drop_ack_unsent_cnt
+tcp_early_abort
 tcp_fallback_sock_winit
 tcp_free_list_max_cnt
 tcp_g_kstat
@@ -260,7 +261,9 @@ tcp_g_statistics
 tcp_g_t_info_ack
 tcp_g_t_info_ack_v6
 tcp_icmp_source_quench
+tcp_init_wnd_shft
 tcp_max_optsize
+tcp_min_conn_listener
 tcp_opt_arr
 tcp_opt_obj
 tcp_outbound_squeue_switch

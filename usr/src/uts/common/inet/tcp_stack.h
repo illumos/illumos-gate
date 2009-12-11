@@ -103,6 +103,10 @@ typedef struct tcp_stat {
 	kstat_named_t	tcp_lso_disabled;
 	kstat_named_t	tcp_lso_times;
 	kstat_named_t	tcp_lso_pkt_out;
+	kstat_named_t	tcp_listen_cnt_drop;
+	kstat_named_t	tcp_listen_mem_drop;
+	kstat_named_t	tcp_zwin_ack_syn;
+	kstat_named_t	tcp_rst_unsent;
 } tcp_stat_t;
 
 #define	TCP_STAT(tcps, x)	((tcps)->tcps_statistics.x.value.ui64++)
@@ -179,16 +183,25 @@ struct tcp_stack {
 	 * TCP to sent out tcp_rst_sent_rate (ndd param) number of RSTs in
 	 * each 1 second interval.  This is to protect TCP against DoS attack.
 	 */
-	clock_t		tcps_last_rst_intrvl;
+	int64_t		tcps_last_rst_intrvl;
 	uint32_t	tcps_rst_cnt;
-	/* The number of RST not sent because of the rate limit. */
-	uint32_t	tcps_rst_unsent;
+
 	ldi_ident_t	tcps_ldi_ident;
 
 	/* Used to synchronize access when reclaiming memory */
 	mblk_t		*tcps_ixa_cleanup_mp;
 	kmutex_t	tcps_ixa_cleanup_lock;
 	kcondvar_t	tcps_ixa_cleanup_cv;
+
+	/* Variables for handling kmem reclaim call back. */
+	kmutex_t	tcps_reclaim_lock;
+	boolean_t	tcps_reclaim;
+	timeout_id_t	tcps_reclaim_tid;
+	uint32_t	tcps_reclaim_period;
+
+	/* Listener connection limit configuration. */
+	kmutex_t	tcps_listener_conf_lock;
+	list_t		tcps_listener_conf;
 };
 typedef struct tcp_stack tcp_stack_t;
 

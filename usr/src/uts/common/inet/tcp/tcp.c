@@ -542,23 +542,86 @@ uint_t tcp_free_list_max_cnt = 0;
  */
 #define	TCP_BIND_FANOUT_SIZE	512
 #define	TCP_BIND_HASH(lport) (ntohs(lport) & (TCP_BIND_FANOUT_SIZE - 1))
+
 /*
- * Size of listen and acceptor hash list.  It has to be a power of 2 for
- * hashing.
+ * Size of acceptor hash list.  It has to be a power of 2 for hashing.
  */
-#define	TCP_FANOUT_SIZE		256
+#define	TCP_ACCEPTOR_FANOUT_SIZE		256
 
 #ifdef	_ILP32
 #define	TCP_ACCEPTOR_HASH(accid)					\
-		(((uint_t)(accid) >> 8) & (TCP_FANOUT_SIZE - 1))
+		(((uint_t)(accid) >> 8) & (TCP_ACCEPTOR_FANOUT_SIZE - 1))
 #else
 #define	TCP_ACCEPTOR_HASH(accid)					\
-		((uint_t)(accid) & (TCP_FANOUT_SIZE - 1))
+		((uint_t)(accid) & (TCP_ACCEPTOR_FANOUT_SIZE - 1))
 #endif	/* _ILP32 */
 
 #define	IP_ADDR_CACHE_SIZE	2048
 #define	IP_ADDR_CACHE_HASH(faddr)					\
 	(ntohl(faddr) & (IP_ADDR_CACHE_SIZE -1))
+
+/*
+ * If there is a limit set on the number of connections allowed per each
+ * listener, the following struct is used to store that counter.  This needs
+ * to be separated from the listener since the listener can go away before
+ * all the connections are gone.  When the struct is allocated, tlc_cnt is set
+ * to 1.  When the listener goes away, tlc_cnt is decremented  by one.  And
+ * the last connection (or the listener) which decrements tlc_cnt to zero
+ * frees the struct.
+ *
+ * tlc_max is the threshold value tcps_conn_listen_port.  It is set when the
+ * tcp_listen_cnt_t is allocated.
+ *
+ * tlc_report_time stores the time when cmn_err() is called to report that the
+ * max has been exceeeded.  Report is done at most once every
+ * TCP_TLC_REPORT_INTERVAL mins for a listener.
+ *
+ * tlc_drop stores the number of connection attempt dropped because the
+ * limit has reached.
+ */
+typedef struct tcp_listen_cnt_s {
+	uint32_t	tlc_max;
+	uint32_t	tlc_cnt;
+	int64_t		tlc_report_time;
+	uint32_t	tlc_drop;
+} tcp_listen_cnt_t;
+
+#define	TCP_TLC_REPORT_INTERVAL	(1 * MINUTES)
+
+#define	TCP_DECR_LISTEN_CNT(tcp)					\
+{									\
+	ASSERT((tcp)->tcp_listen_cnt->tlc_cnt > 0);			\
+	if (atomic_add_32_nv(&(tcp)->tcp_listen_cnt->tlc_cnt, -1) == 0) \
+		kmem_free((tcp)->tcp_listen_cnt, sizeof (tcp_listen_cnt_t)); \
+	(tcp)->tcp_listen_cnt = NULL;					\
+}
+
+/* Minimum number of connections per listener. */
+uint32_t tcp_min_conn_listener = 2;
+
+/*
+ * Linked list struct to store listener connection limit configuration per
+ * IP stack.
+ */
+typedef struct tcp_listener_s {
+	in_port_t	tl_port;
+	uint32_t	tl_ratio;
+	list_node_t	tl_link;
+} tcp_listener_t;
+
+/*
+ * The shift factor applied to tcp_mss to decide if the peer sends us a
+ * valid initial receive window.  By default, if the peer receive window
+ * is smaller than 1 MSS (shift factor is 0), it is considered as invalid.
+ */
+uint32_t tcp_init_wnd_shft = 0;
+
+/*
+ * When the system is under memory pressure, stack variable tcps_reclaim is
+ * true, we shorten the connection timeout abort interval to tcp_early_abort
+ * seconds.
+ */
+uint32_t tcp_early_abort = 30;
 
 /*
  * TCP options struct returned from tcp_parse_options.
@@ -737,6 +800,7 @@ static int	tcp_1948_phrase_set(queue_t *q, mblk_t *mp, char *value,
 static void	tcp_process_shrunk_swnd(tcp_t *tcp, uint32_t shrunk_cnt);
 static void	tcp_update_xmit_tail(tcp_t *tcp, uint32_t snxt);
 static mblk_t	*tcp_reass(tcp_t *tcp, mblk_t *mp, uint32_t start);
+static void	tcp_reass_timer(void *arg);
 static void	tcp_reass_elim_overlap(tcp_t *tcp, mblk_t *mp);
 static void	tcp_reinit(tcp_t *tcp);
 static void	tcp_reinit_values(tcp_t *tcp);
@@ -783,6 +847,7 @@ static void	tcp_icmp_error_ipv6(tcp_t *, mblk_t *, ip_recv_attr_t *);
 static boolean_t tcp_verifyicmp(conn_t *, void *, icmph_t *, icmp6_t *,
     ip_recv_attr_t *);
 static int	tcp_build_hdrs(tcp_t *);
+static void	tcp_time_wait_append(tcp_t *tcp);
 static void	tcp_time_wait_processing(tcp_t *tcp, mblk_t *mp,
     uint32_t seg_seq, uint32_t seg_ack, int seg_len, tcpha_t *tcpha,
     ip_recv_attr_t *ira);
@@ -846,6 +911,14 @@ static int tcp_bind_check(conn_t *, struct sockaddr *, socklen_t, cred_t *,
     boolean_t);
 
 static void tcp_ulp_newconn(conn_t *, conn_t *, mblk_t *);
+
+static uint32_t tcp_find_listener_conf(tcp_stack_t *, in_port_t);
+static int tcp_listener_conf_get(queue_t *, mblk_t *, caddr_t, cred_t *);
+static int tcp_listener_conf_add(queue_t *, mblk_t *, char *, caddr_t,
+    cred_t *);
+static int tcp_listener_conf_del(queue_t *, mblk_t *, char *, caddr_t,
+    cred_t *);
+static void tcp_listener_conf_cleanup(tcp_stack_t *);
 
 /*
  * Routines related to the TCP_IOC_ABORT_CONN ioctl command.
@@ -1000,6 +1073,8 @@ static struct T_info_ack tcp_g_t_info_ack_v6 = {
 static tcpparam_t lcl_tcp_wroff_xtra_param = { 0, 256, 32, "tcp_wroff_xtra" };
 #define	tcps_wroff_xtra	tcps_wroff_xtra_param->tcp_param_val
 
+#define	MB	(1024 * 1024)
+
 /*
  * All of these are alterable, within the min/max values given, at run time.
  * Note that the default value of "tcp_time_wait_interval" is four minutes,
@@ -1013,12 +1088,12 @@ static tcpparam_t	lcl_tcp_param_arr[] = {
  { 0,		PARAM_MAX,	1024,		"tcp_conn_req_max_q0" },
  { 1,		1024,		1,		"tcp_conn_req_min" },
  { 0*MS,	20*SECONDS,	0*MS,		"tcp_conn_grace_period" },
- { 128,		(1<<30),	1024*1024,	"tcp_cwnd_max" },
+ { 128,		(1<<30),	1*MB,		"tcp_cwnd_max" },
  { 0,		10,		0,		"tcp_debug" },
  { 1024,	(32*1024),	1024,		"tcp_smallest_nonpriv_port"},
  { 1*SECONDS,	PARAM_MAX,	3*MINUTES,	"tcp_ip_abort_cinterval"},
  { 1*SECONDS,	PARAM_MAX,	3*MINUTES,	"tcp_ip_abort_linterval"},
- { 500*MS,	PARAM_MAX,	8*MINUTES,	"tcp_ip_abort_interval"},
+ { 500*MS,	PARAM_MAX,	5*MINUTES,	"tcp_ip_abort_interval"},
  { 1*SECONDS,	PARAM_MAX,	10*SECONDS,	"tcp_ip_notify_cinterval"},
  { 500*MS,	PARAM_MAX,	10*SECONDS,	"tcp_ip_notify_interval"},
  { 1,		255,		64,		"tcp_ipv4_ttl"},
@@ -1028,13 +1103,11 @@ static tcpparam_t	lcl_tcp_param_arr[] = {
  { 1,		TCP_MSS_MAX_IPV4, TCP_MSS_MAX_IPV4, "tcp_mss_max_ipv4"},
  { 1,		TCP_MSS_MAX,	108,		"tcp_mss_min"},
  { 1,		(64*1024)-1,	(4*1024)-1,	"tcp_naglim_def"},
- { 1*MS,	20*SECONDS,	3*SECONDS,	"tcp_rexmit_interval_initial"},
+ { 1*MS,	20*SECONDS,	1*SECONDS,	"tcp_rexmit_interval_initial"},
  { 1*MS,	2*HOURS,	60*SECONDS,	"tcp_rexmit_interval_max"},
  { 1*MS,	2*HOURS,	400*MS,		"tcp_rexmit_interval_min"},
  { 1*MS,	1*MINUTES,	100*MS,		"tcp_deferred_ack_interval" },
  { 0,		16,		0,		"tcp_snd_lowat_fraction" },
- { 0,		128000,		0,		"tcp_sth_rcv_hiwat" },
- { 0,		128000,		0,		"tcp_sth_rcv_lowat" },
  { 1,		10000,		3,		"tcp_dupack_fast_retransmit" },
  { 0,		1,		0,		"tcp_ignore_path_mtu" },
  { 1024,	TCP_MAX_PORT,	32*1024,	"tcp_smallest_anon_port"},
@@ -1044,7 +1117,7 @@ static tcpparam_t	lcl_tcp_param_arr[] = {
  { TCP_RECV_LOWATER, (1<<30), TCP_RECV_HIWATER,"tcp_recv_hiwat"},
  { 1,		65536,		4,		"tcp_recv_hiwat_minmss"},
  { 1*SECONDS,	PARAM_MAX,	675*SECONDS,	"tcp_fin_wait_2_flush_interval"},
- { 8192,	(1<<30),	1024*1024,	"tcp_max_buf"},
+ { 8192,	(1<<30),	1*MB,		"tcp_max_buf"},
 /*
  * Question:  What default value should I set for tcp_strong_iss?
  */
@@ -1058,7 +1131,6 @@ static tcpparam_t	lcl_tcp_param_arr[] = {
  { 1,		16384,		4,		"tcp_slow_start_after_idle"},
  { 1,		4,		4,		"tcp_slow_start_initial"},
  { 0,		2,		2,		"tcp_sack_permitted"},
- { 0,		1,		1,		"tcp_compression_enabled"},
  { 0,		IPV6_MAX_HOPS,	IPV6_DEFAULT_HOPS,	"tcp_ipv6_hoplimit"},
  { 1,		TCP_MSS_MAX_IPV6, 1220,		"tcp_mss_def_ipv6"},
  { 1,		TCP_MSS_MAX_IPV6, TCP_MSS_MAX_IPV6, "tcp_mss_max_ipv6"},
@@ -1072,6 +1144,7 @@ static tcpparam_t	lcl_tcp_param_arr[] = {
  { 0,		1,		0,		"tcp_use_smss_as_mss_opt"},
  { 0,		PARAM_MAX,	8*MINUTES,	"tcp_keepalive_abort_interval"},
  { 0,		1,		0,		"tcp_dev_flow_ctl"},
+ { 0,		PARAM_MAX,	100*SECONDS,	"tcp_reass_timeout"}
 };
 /* END CSTYLED */
 
@@ -1256,6 +1329,41 @@ void (*cl_inet_disconnect)(netstackid_t stack_id, uint8_t protocol,
 			}						\
 		}							\
 	}								\
+}
+
+/*
+ * Steps to do when a tcp_t moves to TIME-WAIT state.
+ *
+ * This connection is done, we don't need to account for it.  Decrement
+ * the listener connection counter if needed.
+ *
+ * Unconditionally clear the exclusive binding bit so this TIME-WAIT
+ * connection won't interfere with new ones.
+ *
+ * Start the TIME-WAIT timer.  If upper layer has not closed the connection,
+ * the timer is handled within the context of this tcp_t.  When the timer
+ * fires, tcp_clean_death() is called.  If upper layer closes the connection
+ * during this period, tcp_time_wait_append() will be called to add this
+ * tcp_t to the global TIME-WAIT list.  Note that this means that the
+ * actual wait time in TIME-WAIT state will be longer than the
+ * tcps_time_wait_interval since the period before upper layer closes the
+ * connection is not accounted for when tcp_time_wait_append() is called.
+ *
+ * If uppser layer has closed the connection, call tcp_time_wait_append()
+ * directly.
+ */
+#define	SET_TIME_WAIT(tcps, tcp, connp)				\
+{								\
+	(tcp)->tcp_state = TCPS_TIME_WAIT;			\
+	if ((tcp)->tcp_listen_cnt != NULL)			\
+		TCP_DECR_LISTEN_CNT(tcp);			\
+	(connp)->conn_exclbind = 0;				\
+	if (!TCP_IS_DETACHED(tcp)) {				\
+		TCP_TIMER_RESTART(tcp, (tcps)->tcps_time_wait_interval); \
+	} else {						\
+		tcp_time_wait_append(tcp);			\
+		TCP_DBGSTAT(tcps, tcp_rput_time_wait);		\
+	}							\
 }
 
 /*
@@ -3047,6 +3155,13 @@ tcp_clean_death(tcp_t *tcp, int err, uint8_t tag)
 
 	TCP_STAT(tcps, tcp_clean_death_nondetached);
 
+	/*
+	 * The connection is dead.  Decrement listener connection counter if
+	 * necessary.
+	 */
+	if (tcp->tcp_listen_cnt != NULL)
+		TCP_DECR_LISTEN_CNT(tcp);
+
 	q = connp->conn_rq;
 
 	/* Trash all inbound data */
@@ -3636,6 +3751,10 @@ tcp_timers_stop(tcp_t *tcp)
 		(void) TCP_TIMER_CANCEL(tcp, tcp->tcp_push_tid);
 		tcp->tcp_push_tid = 0;
 	}
+	if (tcp->tcp_reass_tid != 0) {
+		(void) TCP_TIMER_CANCEL(tcp, tcp->tcp_reass_tid);
+		tcp->tcp_reass_tid = 0;
+	}
 }
 
 /*
@@ -3704,6 +3823,11 @@ tcp_closei_local(tcp_t *tcp)
 			tcp->tcp_ip_addr_cache = NULL;
 		}
 	}
+
+	/* Decrement listerner connection counter if necessary. */
+	if (tcp->tcp_listen_cnt != NULL)
+		TCP_DECR_LISTEN_CNT(tcp);
+
 	mutex_enter(&tcp->tcp_non_sq_lock);
 	if (tcp->tcp_flow_stopped)
 		tcp_clrqfull(tcp);
@@ -4384,6 +4508,7 @@ tcp_input_listener(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 	uint_t		flags;
 	mblk_t		*tpi_mp;
 	uint_t		ifindex = ira->ira_ruifindex;
+	boolean_t	tlc_set = B_FALSE;
 
 	ip_hdr_len = ira->ira_ip_hdr_length;
 	tcpha = (tcpha_t *)&mp->b_rptr[ip_hdr_len];
@@ -4410,6 +4535,22 @@ tcp_input_listener(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 	ASSERT(IPCL_IS_BOUND(lconnp));
 
 	mutex_enter(&listener->tcp_eager_lock);
+
+	/*
+	 * The system is under memory pressure, so we need to do our part
+	 * to relieve the pressure.  So we only accept new request if there
+	 * is nothing waiting to be accepted or waiting to complete the 3-way
+	 * handshake.  This means that busy listener will not get too many
+	 * new requests which they cannot handle in time while non-busy
+	 * listener is still functioning properly.
+	 */
+	if (tcps->tcps_reclaim && (listener->tcp_conn_req_cnt_q > 0 ||
+	    listener->tcp_conn_req_cnt_q0 > 0)) {
+		mutex_exit(&listener->tcp_eager_lock);
+		TCP_STAT(tcps, tcp_listen_mem_drop);
+		goto error2;
+	}
+
 	if (listener->tcp_conn_req_cnt_q >= listener->tcp_conn_req_max) {
 		mutex_exit(&listener->tcp_eager_lock);
 		TCP_STAT(tcps, tcp_listendrop);
@@ -4452,6 +4593,36 @@ tcp_input_listener(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 			goto error2;
 		}
 	}
+
+	/*
+	 * Enforce the limit set on the number of connections per listener.
+	 * Note that tlc_cnt starts with 1.  So need to add 1 to tlc_max
+	 * for comparison.
+	 */
+	if (listener->tcp_listen_cnt != NULL) {
+		tcp_listen_cnt_t *tlc = listener->tcp_listen_cnt;
+		int64_t now;
+
+		if (atomic_add_32_nv(&tlc->tlc_cnt, 1) > tlc->tlc_max + 1) {
+			mutex_exit(&listener->tcp_eager_lock);
+			now = ddi_get_lbolt64();
+			atomic_add_32(&tlc->tlc_cnt, -1);
+			TCP_STAT(tcps, tcp_listen_cnt_drop);
+			tlc->tlc_drop++;
+			if (now - tlc->tlc_report_time >
+			    MSEC_TO_TICK(TCP_TLC_REPORT_INTERVAL)) {
+				zcmn_err(lconnp->conn_zoneid, CE_WARN,
+				    "Listener (port %d) connection max (%u) "
+				    "reached: %u attempts dropped total\n",
+				    ntohs(listener->tcp_connp->conn_lport),
+				    tlc->tlc_max, tlc->tlc_drop);
+				tlc->tlc_report_time = now;
+			}
+			goto error2;
+		}
+		tlc_set = B_TRUE;
+	}
+
 	mutex_exit(&listener->tcp_eager_lock);
 
 	/*
@@ -4742,6 +4913,12 @@ tcp_input_listener(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 	eager->tcp_saved_listener = listener;
 
 	/*
+	 * Set tcp_listen_cnt so that when the connection is done, the counter
+	 * is decremented.
+	 */
+	eager->tcp_listen_cnt = listener->tcp_listen_cnt;
+
+	/*
 	 * Tag this detached tcp vector for later retrieval
 	 * by our listener client in tcp_accept().
 	 */
@@ -4881,6 +5058,8 @@ error3:
 	CONN_DEC_REF(econnp);
 error2:
 	freemsg(mp);
+	if (tlc_set)
+		atomic_add_32(&listener->tcp_listen_cnt->tlc_cnt, -1);
 }
 
 /*
@@ -5471,6 +5650,16 @@ tcp_disconnect_common(tcp_t *tcp, t_scalar_t seqnum)
 		} else if (old_state > TCPS_BOUND) {
 			tcp->tcp_conn_req_max = 0;
 			tcp->tcp_state = TCPS_BOUND;
+
+			/*
+			 * If this end point is not going to become a listener,
+			 * decrement the listener connection count if
+			 * necessary.  Note that we do not do this if it is
+			 * going to be a listner (the above if case) since
+			 * then it may remove the counter struct.
+			 */
+			if (tcp->tcp_listen_cnt != NULL)
+				TCP_DECR_LISTEN_CNT(tcp);
 		}
 		if (lconnp != NULL)
 			CONN_DEC_REF(lconnp);
@@ -5793,8 +5982,8 @@ tcp_eager_unlink(tcp_t *tcp)
 {
 	tcp_t	*listener = tcp->tcp_listener;
 
-	ASSERT(MUTEX_HELD(&listener->tcp_eager_lock));
 	ASSERT(listener != NULL);
+	ASSERT(MUTEX_HELD(&listener->tcp_eager_lock));
 	if (tcp->tcp_eager_next_q0 != NULL) {
 		ASSERT(tcp->tcp_eager_prev_q0 != NULL);
 
@@ -6645,6 +6834,8 @@ tcp_reinit_values(tcp)
 
 	PRESERVE(tcp->tcp_connid);
 
+	ASSERT(tcp->tcp_listen_cnt == NULL);
+	ASSERT(tcp->tcp_reass_tid == 0);
 
 #undef	DONTCARE
 #undef	PRESERVE
@@ -8653,6 +8844,24 @@ tcp_param_register(IDP *ndp, tcpparam_t *tcppa, int cnt, tcp_stack_t *tcps)
 		nd_free(ndp);
 		return (B_FALSE);
 	}
+
+
+	if (!nd_load(ndp, "tcp_listener_limit_conf",
+	    tcp_listener_conf_get, NULL, NULL)) {
+		nd_free(ndp);
+		return (B_FALSE);
+	}
+	if (!nd_load(ndp, "tcp_listener_limit_conf_add",
+	    NULL, tcp_listener_conf_add, NULL)) {
+		nd_free(ndp);
+		return (B_FALSE);
+	}
+	if (!nd_load(ndp, "tcp_listener_limit_conf_del",
+	    NULL, tcp_listener_conf_del, NULL)) {
+		nd_free(ndp);
+		return (B_FALSE);
+	}
+
 	/*
 	 * Dummy ndd variables - only to convey obsolescence information
 	 * through printing of their name (no get or set routines)
@@ -8708,6 +8917,22 @@ tcp_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp, cred_t *cr)
 	}
 	tcppa->tcp_param_val = new_value;
 	return (0);
+}
+
+static void
+tcp_reass_timer(void *arg)
+{
+	conn_t *connp = (conn_t *)arg;
+	tcp_t *tcp = connp->conn_tcp;
+
+	tcp->tcp_reass_tid = 0;
+	if (tcp->tcp_reass_head == NULL)
+		return;
+	ASSERT(tcp->tcp_reass_tail != NULL);
+	tcp_sack_remove(tcp->tcp_sack_list, TCP_REASS_END(tcp->tcp_reass_tail),
+	    &tcp->tcp_num_sack_blk);
+	tcp_close_mpp(&tcp->tcp_reass_head);
+	tcp->tcp_reass_tail = NULL;
 }
 
 /*
@@ -10234,6 +10459,20 @@ tcp_input_data(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 				    tcp, seg_ack, 0, TH_RST);
 				return;
 			}
+			/*
+			 * No sane TCP stack will send such a small window
+			 * without receiving any data.  Just drop this invalid
+			 * ACK.  We also shorten the abort timeout in case
+			 * this is an attack.
+			 */
+			if (ntohs(tcpha->tha_win) <
+			    (tcp->tcp_mss >> tcp_init_wnd_shft)) {
+				freemsg(mp);
+				TCP_STAT(tcps, tcp_zwin_ack_syn);
+				tcp->tcp_second_ctimer_threshold =
+				    tcp_early_abort * SECONDS;
+				return;
+			}
 		}
 		break;
 	case TCPS_LISTEN:
@@ -10697,6 +10936,22 @@ ok:;
 					tcp->tcp_valid_bits &=
 					    ~TCP_OFO_FIN_VALID;
 				}
+				if (tcp->tcp_reass_tid != 0) {
+					(void) TCP_TIMER_CANCEL(tcp,
+					    tcp->tcp_reass_tid);
+					/*
+					 * Restart the timer if there is still
+					 * data in the reassembly queue.
+					 */
+					if (tcp->tcp_reass_head != NULL) {
+						tcp->tcp_reass_tid = TCP_TIMER(
+						    tcp, tcp_reass_timer,
+						    MSEC_TO_TICK(
+						    tcps->tcps_reass_timeout));
+					} else {
+						tcp->tcp_reass_tid = 0;
+					}
+				}
 			} else {
 				/*
 				 * Keep going even with NULL mp.
@@ -10710,6 +10965,13 @@ ok:;
 				 */
 				seg_len = 0;
 				ofo_seg = B_TRUE;
+
+				if (tcps->tcps_reass_timeout != 0 &&
+				    tcp->tcp_reass_tid == 0) {
+					tcp->tcp_reass_tid = TCP_TIMER(tcp,
+					    tcp_reass_timer, MSEC_TO_TICK(
+					    tcps->tcps_reass_timeout));
+				}
 			}
 		}
 	} else if (seg_len > 0) {
@@ -10835,7 +11097,7 @@ ok:;
 				 * if we are at the mark.
 				 *
 				 * If there are allocation failures (e.g. in
-				 * dupmsg below) the next time tcp_rput_data
+				 * dupmsg below) the next time tcp_input_data
 				 * sees the urgent segment it will send up the
 				 * MSGMARKNEXT message.
 				 */
@@ -11492,12 +11754,17 @@ process_ack:
 			 * don't send back any ACK.  This prevents TCP from
 			 * getting into an ACK storm if somehow an attacker
 			 * successfully spoofs an acceptable segment to our
-			 * peer.
+			 * peer.  If this continues (count > 2 X threshold),
+			 * we should abort this connection.
 			 */
 			if (tcp_drop_ack_unsent_cnt > 0 &&
 			    ++tcp->tcp_in_ack_unsent >
 			    tcp_drop_ack_unsent_cnt) {
 				TCP_STAT(tcps, tcp_in_ack_unsent_drop);
+				if (tcp->tcp_in_ack_unsent > 2 *
+				    tcp_drop_ack_unsent_cnt) {
+					(void) tcp_clean_death(tcp, EPROTO, 20);
+				}
 				return;
 			}
 			mp = tcp_ack_mp(tcp);
@@ -11889,22 +12156,8 @@ est:
 			}
 			goto xmit_check;
 		case TCPS_CLOSING:
-			if (tcp->tcp_fin_acked) {
-				tcp->tcp_state = TCPS_TIME_WAIT;
-				/*
-				 * Unconditionally clear the exclusive binding
-				 * bit so this TIME-WAIT connection won't
-				 * interfere with new ones.
-				 */
-				connp->conn_exclbind = 0;
-				if (!TCP_IS_DETACHED(tcp)) {
-					TCP_TIMER_RESTART(tcp,
-					    tcps->tcps_time_wait_interval);
-				} else {
-					tcp_time_wait_append(tcp);
-					TCP_DBGSTAT(tcps, tcp_rput_time_wait);
-				}
-			}
+			if (tcp->tcp_fin_acked)
+				SET_TIME_WAIT(tcps, tcp, connp);
 			/*FALLTHRU*/
 		case TCPS_CLOSE_WAIT:
 			freemsg(mp);
@@ -11945,20 +12198,7 @@ est:
 				}
 				/* FALLTHRU */
 			case TCPS_FIN_WAIT_2:
-				tcp->tcp_state = TCPS_TIME_WAIT;
-				/*
-				 * Unconditionally clear the exclusive binding
-				 * bit so this TIME-WAIT connection won't
-				 * interfere with new ones.
-				 */
-				connp->conn_exclbind = 0;
-				if (!TCP_IS_DETACHED(tcp)) {
-					TCP_TIMER_RESTART(tcp,
-					    tcps->tcps_time_wait_interval);
-				} else {
-					tcp_time_wait_append(tcp);
-					TCP_DBGSTAT(tcps, tcp_rput_time_wait);
-				}
+				SET_TIME_WAIT(tcps, tcp, connp);
 				if (seg_len) {
 					/*
 					 * implies data piggybacked on FIN.
@@ -13534,6 +13774,16 @@ tcp_timer(void *arg)
 		return;
 	}
 
+	/*
+	 * If the system is under memory pressure or the max number of
+	 * connections have been established for the listener, be more
+	 * aggressive in aborting connections.
+	 */
+	if (tcps->tcps_reclaim || (tcp->tcp_listen_cnt != NULL &&
+	    tcp->tcp_listen_cnt->tlc_cnt > tcp->tcp_listen_cnt->tlc_max)) {
+		second_threshold = tcp_early_abort * SECONDS;
+	}
+
 	if ((ms = tcp->tcp_ms_we_have_waited) > second_threshold) {
 		/*
 		 * Should not hold the zero-copy messages for too long.
@@ -13567,6 +13817,16 @@ tcp_timer(void *arg)
 			    tcp->tcp_client_errno : ETIMEDOUT, 25);
 			return;
 		} else {
+			/*
+			 * If the system is under memory pressure, we also
+			 * abort connection in zero window probing.
+			 */
+			if (tcps->tcps_reclaim) {
+				(void) tcp_clean_death(tcp,
+				    tcp->tcp_client_errno ?
+				    tcp->tcp_client_errno : ETIMEDOUT, 25);
+				return;
+			}
 			/*
 			 * Set tcp_ms_we_have_waited to second_threshold
 			 * so that in next timeout, we will do the above
@@ -13707,6 +13967,9 @@ tcp_do_unbind(conn_t *connp)
 	}
 	mutex_exit(&tcp->tcp_eager_lock);
 
+	/* Clean up the listener connection counter if necessary. */
+	if (tcp->tcp_listen_cnt != NULL)
+		TCP_DECR_LISTEN_CNT(tcp);
 	connp->conn_laddr_v6 = ipv6_all_zeros;
 	connp->conn_saddr_v6 = ipv6_all_zeros;
 	tcp_bind_hash_remove(tcp);
@@ -14291,31 +14554,6 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 	}
 
 	/*
-	 * Set max window size (conn_rcvbuf) of the acceptor.
-	 */
-	if (tcp->tcp_rcv_list == NULL) {
-		/*
-		 * Recv queue is empty, tcp_rwnd should not have changed.
-		 * That means it should be equal to the listener's tcp_rwnd.
-		 */
-		connp->conn_rcvbuf = tcp->tcp_rwnd;
-	} else {
-#ifdef DEBUG
-		mblk_t *tmp;
-		mblk_t	*mp1;
-		uint_t	cnt = 0;
-
-		mp1 = tcp->tcp_rcv_list;
-		while ((tmp = mp1) != NULL) {
-			mp1 = tmp->b_next;
-			cnt += msgdsize(tmp);
-		}
-		ASSERT(cnt != 0 && tcp->tcp_rcv_cnt == cnt);
-#endif
-		/* There is some data, add them back to get the max. */
-		connp->conn_rcvbuf = tcp->tcp_rwnd + tcp->tcp_rcv_cnt;
-	}
-	/*
 	 * This is the first time we run on the correct
 	 * queue after tcp_accept. So fix all the q parameters
 	 * here.
@@ -14691,7 +14929,7 @@ no_more_eagers:
 	/*
 	 * At this point, the eager is detached from the listener
 	 * but we still have an extra refs on eager (apart from the
-	 * usual tcp references). The ref was placed in tcp_rput_data
+	 * usual tcp references). The ref was placed in tcp_input_data
 	 * before sending the conn_ind in tcp_send_conn_ind.
 	 * The ref will be dropped in tcp_accept_finish().
 	 */
@@ -16844,7 +17082,7 @@ tcp_xmit_ctl(char *str, tcp_t *tcp, uint32_t seq, uint32_t ack, int ctl)
 static boolean_t
 tcp_send_rst_chk(tcp_stack_t *tcps)
 {
-	clock_t	now;
+	int64_t	now;
 
 	/*
 	 * TCP needs to protect itself from generating too many RSTs.
@@ -16857,11 +17095,9 @@ tcp_send_rst_chk(tcp_stack_t *tcps)
 	 * limited.
 	 */
 	if (tcps->tcps_rst_sent_rate_enabled != 0) {
-		now = ddi_get_lbolt();
-		/* lbolt can wrap around. */
-		if ((tcps->tcps_last_rst_intrvl > now) ||
-		    (TICK_TO_MSEC(now - tcps->tcps_last_rst_intrvl) >
-		    1*SECONDS)) {
+		now = ddi_get_lbolt64();
+		if (TICK_TO_MSEC(now - tcps->tcps_last_rst_intrvl) >
+		    1*SECONDS) {
 			tcps->tcps_last_rst_intrvl = now;
 			tcps->tcps_rst_cnt = 1;
 		} else if (++tcps->tcps_rst_cnt > tcps->tcps_rst_sent_rate) {
@@ -16900,7 +17136,7 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq, uint32_t ack, int ctl,
 	ushort_t	port;
 
 	if (!tcp_send_rst_chk(tcps)) {
-		tcps->tcps_rst_unsent++;
+		TCP_STAT(tcps, tcp_rst_unsent);
 		freemsg(mp);
 		return;
 	}
@@ -16918,7 +17154,7 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq, uint32_t ack, int ctl,
 
 		ixa = conn_get_ixa_exclusive(connp);
 		if (ixa == NULL) {
-			tcps->tcps_rst_unsent++;
+			TCP_STAT(tcps, tcp_rst_unsent);
 			freemsg(mp);
 			return;
 		}
@@ -17289,7 +17525,7 @@ tcp_xmit_listeners_reset(mblk_t *mp, ip_recv_attr_t *ira, ip_stack_t *ipst,
 			 * floor.
 			 */
 			freemsg(mp);
-			tcps->tcps_rst_unsent++;
+			TCP_STAT(tcps, tcp_rst_unsent);
 			return;
 		}
 
@@ -18491,14 +18727,14 @@ tcp_stack_init(netstackid_t stackid, netstack_t *ns)
 	tcps->tcps_bind_fanout = kmem_zalloc(sizeof (tf_t) *
 	    TCP_BIND_FANOUT_SIZE, KM_SLEEP);
 	tcps->tcps_acceptor_fanout = kmem_zalloc(sizeof (tf_t) *
-	    TCP_FANOUT_SIZE, KM_SLEEP);
+	    TCP_ACCEPTOR_FANOUT_SIZE, KM_SLEEP);
 
 	for (i = 0; i < TCP_BIND_FANOUT_SIZE; i++) {
 		mutex_init(&tcps->tcps_bind_fanout[i].tf_lock, NULL,
 		    MUTEX_DEFAULT, NULL);
 	}
 
-	for (i = 0; i < TCP_FANOUT_SIZE; i++) {
+	for (i = 0; i < TCP_ACCEPTOR_FANOUT_SIZE; i++) {
 		mutex_init(&tcps->tcps_acceptor_fanout[i].tf_lock, NULL,
 		    MUTEX_DEFAULT, NULL);
 	}
@@ -18545,6 +18781,15 @@ tcp_stack_init(netstackid_t stackid, netstack_t *ns)
 	cv_init(&tcps->tcps_ixa_cleanup_cv, NULL, CV_DEFAULT, NULL);
 	mutex_init(&tcps->tcps_ixa_cleanup_lock, NULL, MUTEX_DEFAULT, NULL);
 
+	mutex_init(&tcps->tcps_reclaim_lock, NULL, MUTEX_DEFAULT, NULL);
+	tcps->tcps_reclaim = B_FALSE;
+	tcps->tcps_reclaim_tid = 0;
+	tcps->tcps_reclaim_period = tcps->tcps_rexmit_interval_max * 3;
+
+	mutex_init(&tcps->tcps_listener_conf_lock, NULL, MUTEX_DEFAULT, NULL);
+	list_create(&tcps->tcps_listener_conf, sizeof (tcp_listener_t),
+	    offsetof(tcp_listener_t, tl_link));
+
 	return (tcps);
 }
 
@@ -18580,6 +18825,12 @@ tcp_stack_fini(netstackid_t stackid, void *arg)
 	cv_destroy(&tcps->tcps_ixa_cleanup_cv);
 	mutex_destroy(&tcps->tcps_ixa_cleanup_lock);
 
+	if (tcps->tcps_reclaim_tid != 0)
+		(void) untimeout(tcps->tcps_reclaim_tid);
+	mutex_destroy(&tcps->tcps_reclaim_lock);
+
+	tcp_listener_conf_cleanup(tcps);
+
 	nd_free(&tcps->tcps_g_nd);
 	kmem_free(tcps->tcps_params, sizeof (lcl_tcp_param_arr));
 	tcps->tcps_params = NULL;
@@ -18591,7 +18842,7 @@ tcp_stack_fini(netstackid_t stackid, void *arg)
 		mutex_destroy(&tcps->tcps_bind_fanout[i].tf_lock);
 	}
 
-	for (i = 0; i < TCP_FANOUT_SIZE; i++) {
+	for (i = 0; i < TCP_ACCEPTOR_FANOUT_SIZE; i++) {
 		ASSERT(tcps->tcps_acceptor_fanout[i].tf_tcp == NULL);
 		mutex_destroy(&tcps->tcps_acceptor_fanout[i].tf_lock);
 	}
@@ -18599,7 +18850,8 @@ tcp_stack_fini(netstackid_t stackid, void *arg)
 	kmem_free(tcps->tcps_bind_fanout, sizeof (tf_t) * TCP_BIND_FANOUT_SIZE);
 	tcps->tcps_bind_fanout = NULL;
 
-	kmem_free(tcps->tcps_acceptor_fanout, sizeof (tf_t) * TCP_FANOUT_SIZE);
+	kmem_free(tcps->tcps_acceptor_fanout, sizeof (tf_t) *
+	    TCP_ACCEPTOR_FANOUT_SIZE);
 	tcps->tcps_acceptor_fanout = NULL;
 
 	mutex_destroy(&tcps->tcps_iss_key_lock);
@@ -19766,6 +20018,10 @@ tcp_kstat2_init(netstackid_t stackid, tcp_stat_t *tcps_statisticsp)
 		{ "tcp_lso_disabled",		KSTAT_DATA_UINT64 },
 		{ "tcp_lso_times",		KSTAT_DATA_UINT64 },
 		{ "tcp_lso_pkt_out",		KSTAT_DATA_UINT64 },
+		{ "tcp_listen_cnt_drop",	KSTAT_DATA_UINT64 },
+		{ "tcp_listen_mem_drop",	KSTAT_DATA_UINT64 },
+		{ "tcp_zwin_ack_syn",		KSTAT_DATA_UINT64 },
+		{ "tcp_rst_unsent",		KSTAT_DATA_UINT64 }
 	};
 
 	ksp = kstat_create_netstack(TCP_MOD_NAME, 0, "tcpstat", "net",
@@ -21447,6 +21703,51 @@ do_listen:
 
 		tcp_bind_hash_remove(tcp);
 		return (error);
+	} else {
+		/*
+		 * If there is a connection limit, allocate and initialize
+		 * the counter struct.  Note that since listen can be called
+		 * multiple times, the struct may have been allready allocated.
+		 */
+		if (!list_is_empty(&tcps->tcps_listener_conf) &&
+		    tcp->tcp_listen_cnt == NULL) {
+			tcp_listen_cnt_t *tlc;
+			uint32_t ratio;
+
+			ratio = tcp_find_listener_conf(tcps,
+			    ntohs(connp->conn_lport));
+			if (ratio != 0) {
+				uint32_t mem_ratio, tot_buf;
+
+				tlc = kmem_alloc(sizeof (tcp_listen_cnt_t),
+				    KM_SLEEP);
+				/*
+				 * Calculate the connection limit based on
+				 * the configured ratio and maxusers.  Maxusers
+				 * are calculated based on memory size,
+				 * ~ 1 user per MB.  Note that the conn_rcvbuf
+				 * and conn_sndbuf may change after a
+				 * connection is accepted.  So what we have
+				 * is only an approximation.
+				 */
+				if ((tot_buf = connp->conn_rcvbuf +
+				    connp->conn_sndbuf) < MB) {
+					mem_ratio = MB / tot_buf;
+					tlc->tlc_max = maxusers / ratio *
+					    mem_ratio;
+				} else {
+					mem_ratio = tot_buf / MB;
+					tlc->tlc_max = maxusers / ratio /
+					    mem_ratio;
+				}
+				/* At least we should allow two connections! */
+				if (tlc->tlc_max <= tcp_min_conn_listener)
+					tlc->tlc_max = tcp_min_conn_listener;
+				tlc->tlc_cnt = 1;
+				tlc->tlc_drop = 0;
+				tcp->tcp_listen_cnt = tlc;
+			}
+		}
 	}
 	return (error);
 }
@@ -21574,3 +21875,191 @@ sock_downcalls_t sock_tcp_downcalls = {
 	tcp_ioctl,
 	tcp_close,
 };
+
+/*
+ * Timeout function to reset the TCP stack variable tcps_reclaim to false.
+ */
+static void
+tcp_reclaim_timer(void *arg)
+{
+	tcp_stack_t *tcps = (tcp_stack_t *)arg;
+
+	mutex_enter(&tcps->tcps_reclaim_lock);
+	tcps->tcps_reclaim = B_FALSE;
+	tcps->tcps_reclaim_tid = 0;
+	mutex_exit(&tcps->tcps_reclaim_lock);
+	/* Only need to print this once. */
+	if (tcps->tcps_netstack->netstack_stackid == GLOBAL_ZONEID)
+		cmn_err(CE_WARN, "TCP defensive mode off\n");
+}
+
+/*
+ * Kmem reclaim call back function.  When the system is under memory
+ * pressure, we set the TCP stack variable tcps_reclaim to true.  This
+ * variable is reset to false after tcps_reclaim_period msecs.  During this
+ * period, TCP will be more aggressive in aborting connections not making
+ * progress, meaning retransmitting for some time (tcp_early_abort seconds).
+ * TCP will also not accept new connection request for those listeners whose
+ * q or q0 is not empty.
+ */
+/* ARGSUSED */
+void
+tcp_conn_reclaim(void *arg)
+{
+	netstack_handle_t nh;
+	netstack_t *ns;
+	tcp_stack_t *tcps;
+	boolean_t new = B_FALSE;
+
+	netstack_next_init(&nh);
+	while ((ns = netstack_next(&nh)) != NULL) {
+		tcps = ns->netstack_tcp;
+		mutex_enter(&tcps->tcps_reclaim_lock);
+		if (!tcps->tcps_reclaim) {
+			tcps->tcps_reclaim = B_TRUE;
+			tcps->tcps_reclaim_tid = timeout(tcp_reclaim_timer,
+			    tcps, MSEC_TO_TICK(tcps->tcps_reclaim_period));
+			new = B_TRUE;
+		}
+		mutex_exit(&tcps->tcps_reclaim_lock);
+		netstack_rele(ns);
+	}
+	netstack_next_fini(&nh);
+	if (new)
+		cmn_err(CE_WARN, "Memory pressure: TCP defensive mode on\n");
+}
+
+/*
+ * Given a tcp_stack_t and a port (in host byte order), find a listener
+ * configuration for that port and return the ratio.
+ */
+static uint32_t
+tcp_find_listener_conf(tcp_stack_t *tcps, in_port_t port)
+{
+	tcp_listener_t	*tl;
+	uint32_t ratio = 0;
+
+	mutex_enter(&tcps->tcps_listener_conf_lock);
+	for (tl = list_head(&tcps->tcps_listener_conf); tl != NULL;
+	    tl = list_next(&tcps->tcps_listener_conf, tl)) {
+		if (tl->tl_port == port) {
+			ratio = tl->tl_ratio;
+			break;
+		}
+	}
+	mutex_exit(&tcps->tcps_listener_conf_lock);
+	return (ratio);
+}
+
+/*
+ * Ndd param helper routine to return the current list of listener limit
+ * configuration.
+ */
+/* ARGSUSED */
+static int
+tcp_listener_conf_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
+{
+	tcp_stack_t	*tcps = Q_TO_TCP(q)->tcp_tcps;
+	tcp_listener_t	*tl;
+
+	mutex_enter(&tcps->tcps_listener_conf_lock);
+	for (tl = list_head(&tcps->tcps_listener_conf); tl != NULL;
+	    tl = list_next(&tcps->tcps_listener_conf, tl)) {
+		(void) mi_mpprintf(mp, "%d:%d ", tl->tl_port, tl->tl_ratio);
+	}
+	mutex_exit(&tcps->tcps_listener_conf_lock);
+	return (0);
+}
+
+/*
+ * Ndd param helper routine to add a new listener limit configuration.
+ */
+/* ARGSUSED */
+static int
+tcp_listener_conf_add(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
+    cred_t *cr)
+{
+	tcp_listener_t	*new_tl;
+	tcp_listener_t	*tl;
+	long		lport;
+	long		ratio;
+	char		*colon;
+	tcp_stack_t	*tcps = Q_TO_TCP(q)->tcp_tcps;
+
+	if (ddi_strtol(value, &colon, 10, &lport) != 0 || lport <= 0 ||
+	    lport > USHRT_MAX || *colon != ':') {
+		return (EINVAL);
+	}
+	if (ddi_strtol(colon + 1, NULL, 10, &ratio) != 0 || ratio <= 0)
+		return (EINVAL);
+
+	mutex_enter(&tcps->tcps_listener_conf_lock);
+	for (tl = list_head(&tcps->tcps_listener_conf); tl != NULL;
+	    tl = list_next(&tcps->tcps_listener_conf, tl)) {
+		/* There is an existing entry, so update its ratio value. */
+		if (tl->tl_port == lport) {
+			tl->tl_ratio = ratio;
+			mutex_exit(&tcps->tcps_listener_conf_lock);
+			return (0);
+		}
+	}
+
+	if ((new_tl = kmem_alloc(sizeof (tcp_listener_t), KM_NOSLEEP)) ==
+	    NULL) {
+		mutex_exit(&tcps->tcps_listener_conf_lock);
+		return (ENOMEM);
+	}
+
+	new_tl->tl_port = lport;
+	new_tl->tl_ratio = ratio;
+	list_insert_tail(&tcps->tcps_listener_conf, new_tl);
+	mutex_exit(&tcps->tcps_listener_conf_lock);
+	return (0);
+}
+
+/*
+ * Ndd param helper routine to remove a listener limit configuration.
+ */
+/* ARGSUSED */
+static int
+tcp_listener_conf_del(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
+    cred_t *cr)
+{
+	tcp_listener_t	*tl;
+	long		lport;
+	tcp_stack_t	*tcps = Q_TO_TCP(q)->tcp_tcps;
+
+	if (ddi_strtol(value, NULL, 10, &lport) != 0 || lport <= 0 ||
+	    lport > USHRT_MAX) {
+		return (EINVAL);
+	}
+	mutex_enter(&tcps->tcps_listener_conf_lock);
+	for (tl = list_head(&tcps->tcps_listener_conf); tl != NULL;
+	    tl = list_next(&tcps->tcps_listener_conf, tl)) {
+		if (tl->tl_port == lport) {
+			list_remove(&tcps->tcps_listener_conf, tl);
+			mutex_exit(&tcps->tcps_listener_conf_lock);
+			kmem_free(tl, sizeof (tcp_listener_t));
+			return (0);
+		}
+	}
+	mutex_exit(&tcps->tcps_listener_conf_lock);
+	return (ESRCH);
+}
+
+/*
+ * To remove all listener limit configuration in a tcp_stack_t.
+ */
+static void
+tcp_listener_conf_cleanup(tcp_stack_t *tcps)
+{
+	tcp_listener_t	*tl;
+
+	mutex_enter(&tcps->tcps_listener_conf_lock);
+	while ((tl = list_head(&tcps->tcps_listener_conf)) != NULL) {
+		list_remove(&tcps->tcps_listener_conf, tl);
+		kmem_free(tl, sizeof (tcp_listener_t));
+	}
+	mutex_destroy(&tcps->tcps_listener_conf_lock);
+	list_destroy(&tcps->tcps_listener_conf);
+}

@@ -132,6 +132,7 @@ typedef	struct tcphdra_s {
 } tcpha_t;
 
 struct conn_s;
+struct tcp_listen_cnt_s;
 
 /*
  * Control structure for each open TCP stream,
@@ -248,7 +249,7 @@ typedef struct tcp_s {
 		tcp_tconnind_started : 1, /* conn_ind message is being sent */
 
 		tcp_lso :1,		/* Lower layer is capable of LSO */
-		tcp_is_wnd_shrnk : 1, /* Window has shrunk */
+		tcp_is_wnd_shrnk : 1,	/* Window has shrunk */
 
 		tcp_pad_to_bit_31 : 18;
 
@@ -472,6 +473,12 @@ typedef struct tcp_s {
 	/* Mutex for accessing tcp_rsrv_mp */
 	kmutex_t	tcp_rsrv_mp_lock;
 
+	/* For connection counting. */
+	struct tcp_listen_cnt_s	*tcp_listen_cnt;
+
+	/* Segment reassembly timer. */
+	timeout_id_t		tcp_reass_tid;
+
 #ifdef DEBUG
 	pc_t			tcmp_stk[15];
 #endif
@@ -484,6 +491,7 @@ typedef struct tcp_s {
 #define	TCP_DEBUG_GETPCSTACK(buffer, depth)
 #endif
 
+extern void	tcp_conn_reclaim(void *);
 extern void 	tcp_free(tcp_t *tcp);
 extern void	tcp_ddi_g_init(void);
 extern void	tcp_ddi_g_destroy(void);
