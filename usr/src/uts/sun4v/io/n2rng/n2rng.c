@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -221,6 +221,12 @@ n2rng_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 * Victoria Falls
 		 */
 		n2rng->n_binding = N2RNG_CPU_VF;
+	} else if (strncmp(n2rng->n_binding_name, N2RNG_BINDNAME_KT,
+	    strlen(N2RNG_BINDNAME_KT)) == 0) {
+		/*
+		 * Rainbow Falls
+		 */
+		n2rng->n_binding = N2RNG_CPU_KT;
 	} else {
 		n2rng_diperror(dip,
 		    "unable to determine n2rng (cpu) binding (%s)",

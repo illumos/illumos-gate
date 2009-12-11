@@ -19,12 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <npi_fflp.h>
 #include <nxge_common.h>
@@ -71,6 +68,8 @@
 	((class == TCAM_CLASS_ETYPE_1) || (class == TCAM_CLASS_ETYPE_2))
 #define	TCAM_L3_CLASS_VALID(class) \
 	((class >= TCAM_CLASS_IP_USER_4) && (class <= TCAM_CLASS_SCTP_IPV6))
+#define	TCAM_L3_CLASS_VALID_RFNL(class) \
+	((TCAM_L3_CLASS_VALID(class)) || class == TCAM_CLASS_IPV6_FRAG)
 #define	TCAM_CLASS_VALID(class) \
 	((class >= TCAM_CLASS_ETYPE_1) && (class <= TCAM_CLASS_RARP))
 
@@ -1973,6 +1972,111 @@ npi_fflp_cfg_ip_usr_cls_set(npi_handle_t handle, tcam_class_t class,
 }
 
 /*
+ * npi_fflp_cfg_ip_usr_cls_set_iptun()
+ * Configures the TCAM user configurable IP classes. This function sets the
+ * new fields that were added for IP tunneling support
+ *
+ * Input
+ *      handle:		opaque handle interpreted by the underlying OS
+ *      class:       IP Class  class
+ *		     (TCAM_CLASS_IP_USER_4 <= class <= TCAM_CLASS_IP_USER_7)
+ *	l4b0_val	value of the first L4 byte to be compared
+ *	l4b0_msk	mask to apply to compare byte 0 of L4
+ *	l4b23_val	values of L4 bytes 2 and 3 to compare
+ *	l4b23_sel	set to 1 to compare L4 bytes 2 and 3.
+ * by default, the class is disabled until explicitly enabled
+ *
+ * Return
+ * NPI success/failure status code
+ */
+npi_status_t
+npi_fflp_cfg_ip_usr_cls_set_iptun(npi_handle_t handle, tcam_class_t class,
+			    uint8_t l4b0_val, uint8_t l4b0_msk,
+			    uint16_t l4b23_val, uint8_t l4b23_sel)
+{
+	uint64_t offset, val;
+	tcam_class_prg_ip_t ip_cls_cfg;
+
+	ASSERT(TCAM_L3_USR_CLASS_VALID(class));
+	if (!TCAM_L3_USR_CLASS_VALID(class)) {
+		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
+		    " npi_fflp_cfg_ip_usr_cls_set:"
+		    " Invalid class %d \n",
+		    class));
+		return (NPI_FFLP_TCAM_CLASS_INVALID);
+	}
+
+	offset = GET_TCAM_CLASS_OFFSET(class);
+	REG_PIO_READ64(handle, offset, &ip_cls_cfg.value);
+
+	val = 1;
+	ip_cls_cfg.value |= (val << L3_UCLS_L4_MODE_SH);
+	val = l4b0_val;
+	ip_cls_cfg.value |= (val << L3_UCLS_L4B0_VAL_SH);
+	val = l4b0_msk;
+	ip_cls_cfg.value |= (val << L3_UCLS_L4B0_MASK_SH);
+	val = l4b23_sel;
+	ip_cls_cfg.value |= (val << L3_UCLS_L4B23_SEL_SH);
+	val = l4b23_val;
+	ip_cls_cfg.value |= (val << L3_UCLS_L4B23_VAL_SH);
+
+	ip_cls_cfg.bits.ldw.valid = 0;
+	REG_PIO_WRITE64(handle, offset, ip_cls_cfg.value);
+	return (NPI_SUCCESS);
+}
+
+/*
+ * npi_fflp_cfg_ip_usr_cls_get_iptun()
+ * Retrieves the IP tunneling related settings for the given TCAM user
+ * configurable IP classe.
+ *
+ * Input
+ *      handle:		opaque handle interpreted by the underlying OS
+ *      class:       IP Class  class
+ *		     (TCAM_CLASS_IP_USER_4 <= class <= TCAM_CLASS_IP_USER_7)
+ *	l4b0_val	value of the first L4 byte to be compared
+ *	l4b0_msk	mask to apply to compare byte 0 of L4
+ *	l4b23_val	values of L4 bytes 2 and 3 to compare
+ *	l4b23_sel	set to 1 to compare L4 bytes 2 and 3.
+ * by default, the class is disabled until explicitly enabled
+ *
+ * Return
+ * NPI success/failure status code
+ */
+npi_status_t
+npi_fflp_cfg_ip_usr_cls_get_iptun(npi_handle_t handle, tcam_class_t class,
+			    uint8_t *l4b0_val, uint8_t *l4b0_msk,
+			    uint16_t *l4b23_val, uint8_t *l4b23_sel)
+{
+	uint64_t offset;
+	tcam_class_prg_ip_t ip_cls_cfg;
+
+	ASSERT(TCAM_L3_USR_CLASS_VALID(class));
+	if (!TCAM_L3_USR_CLASS_VALID(class)) {
+		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
+		    " npi_fflp_cfg_ip_usr_cls_set:"
+		    " Invalid class %d \n",
+		    class));
+		return (NPI_FFLP_TCAM_CLASS_INVALID);
+	}
+
+	offset = GET_TCAM_CLASS_OFFSET(class);
+	REG_PIO_READ64(handle, offset, &ip_cls_cfg.value);
+
+	*l4b0_val = (ip_cls_cfg.value >> L3_UCLS_L4B0_VAL_SH) &
+	    L3_UCLS_L4B0_VAL_MSK;
+	*l4b0_msk = (ip_cls_cfg.value >> L3_UCLS_L4B0_MASK_SH) &
+	    L3_UCLS_L4B0_MASK_MSK;
+	*l4b23_sel = (ip_cls_cfg.value >> L3_UCLS_L4B23_SEL_SH) &
+	    L3_UCLS_L4B23_SEL_MSK;
+	*l4b23_val = (ip_cls_cfg.value >> L3_UCLS_L4B23_VAL_SH) &
+	    L3_UCLS_L4B23_VAL_MSK;
+
+	return (NPI_SUCCESS);
+
+}
+
+/*
  * npi_fflp_cfg_ip_usr_cls_enable()
  * Enable previously configured TCAM user configurable IP classes.
  *
@@ -2280,6 +2384,241 @@ npi_fflp_cfg_ip_cls_flow_key_get(npi_handle_t handle,
 
 }
 
+/*
+ * npi_fflp_cfg_ip_cls_flow_key_rfnl ()
+ *
+ * Configures the flow key generation for the IP classes
+ * Flow key is used to generate the H1 hash function value
+ * The fields used for the generation are configured using this
+ * NPI function.
+ *
+ * Input
+ *      handle:	opaque handle interpreted by the underlying OS
+ *      l3_class:        IP class to configure flow key generation
+ *      cfg:             Configuration bits:
+ *		     l4_xor_sel:    bit field to select the L4 payload
+ *				    bytes for X-OR to get hash key.
+ *		     use_l4_md:	    Set to 1 for enabling L4-mode.
+ *		     use_sym:	    Set to 1 to use symmetric mode.
+ *                   use_proto:     Use IP proto field
+ *                   use_dport:     use l4 destination port
+ *                   use_sport:     use l4 source port
+ *                   ip_opts_exist: IP Options Present
+ *                   use_daddr:     use ip dest address
+ *                   use_saddr:     use ip source address
+ *                   use_vlan:      use VLAN ID
+ *                   use_l2da:      use L2 Dest MAC Address
+ *                   use_portnum:   use L2 virtual port number
+ *
+ *
+ * Return
+ * NPI success/failure status code
+ */
+npi_status_t
+npi_fflp_cfg_ip_cls_flow_key_rfnl(npi_handle_t handle, tcam_class_t l3_class,
+		flow_key_cfg_t *cfg)
+{
+	uint64_t offset;
+	flow_class_key_ip_t flow_cfg_reg;
+
+	ASSERT(TCAM_L3_CLASS_VALID_RFNL(l3_class));
+	if (!(TCAM_L3_CLASS_VALID_RFNL(l3_class))) {
+		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
+		    " npi_fflp_cfg_ip_cls_flow_key_rfnl:"
+		    " Invalid class %d \n",
+		    l3_class));
+		return (NPI_FFLP_TCAM_CLASS_INVALID);
+	}
+
+	if (l3_class == TCAM_CLASS_IPV6_FRAG) {
+		offset = FFLP_FLOW_KEY_IP6_FRAG_REG;
+	} else {
+		offset = GET_FLOW_KEY_OFFSET(l3_class);
+	}
+
+	flow_cfg_reg.value = 0;
+
+	flow_cfg_reg.bits.ldw.l4_xor = cfg->l4_xor_sel;
+
+	if (cfg->use_l4_md)
+		flow_cfg_reg.bits.ldw.l4_mode = 1;
+
+	if (cfg->use_sym)
+		flow_cfg_reg.bits.ldw.sym = 1;
+
+	if (cfg->use_proto) {
+		flow_cfg_reg.bits.ldw.proto = 1;
+	}
+
+	if (cfg->use_dport) {
+		flow_cfg_reg.bits.ldw.l4_1 = 2;
+		if (cfg->ip_opts_exist)
+			flow_cfg_reg.bits.ldw.l4_1 = 3;
+	}
+
+	if (cfg->use_sport) {
+		flow_cfg_reg.bits.ldw.l4_0 = 2;
+		if (cfg->ip_opts_exist)
+			flow_cfg_reg.bits.ldw.l4_0 = 3;
+	}
+
+	if (cfg->use_daddr) {
+		flow_cfg_reg.bits.ldw.ipda = BIT_ENABLE;
+	}
+
+	if (cfg->use_saddr) {
+		flow_cfg_reg.bits.ldw.ipsa = BIT_ENABLE;
+	}
+
+	if (cfg->use_vlan) {
+		flow_cfg_reg.bits.ldw.vlan = BIT_ENABLE;
+	}
+
+	if (cfg->use_l2da) {
+		flow_cfg_reg.bits.ldw.l2da = BIT_ENABLE;
+	}
+
+	if (cfg->use_portnum) {
+		flow_cfg_reg.bits.ldw.port = BIT_ENABLE;
+	}
+
+	REG_PIO_WRITE64(handle, offset, flow_cfg_reg.value);
+	return (NPI_SUCCESS);
+
+}
+
+npi_status_t
+npi_fflp_cfg_sym_ip_cls_flow_key(npi_handle_t handle, tcam_class_t l3_class,
+		boolean_t enable)
+{
+	uint64_t offset;
+	flow_class_key_ip_t flow_cfg_reg;
+
+	ASSERT(TCAM_L3_CLASS_VALID_RFNL(l3_class));
+	if (!(TCAM_L3_CLASS_VALID_RFNL(l3_class))) {
+		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
+		    " npi_fflp_cfg_sym_ip_cls_flow_key:"
+		    " Invalid class %d \n",
+		    l3_class));
+		return (NPI_FFLP_TCAM_CLASS_INVALID);
+	}
+
+	if (l3_class == TCAM_CLASS_IPV6_FRAG) {
+		offset = FFLP_FLOW_KEY_IP6_FRAG_REG;
+	} else {
+		offset = GET_FLOW_KEY_OFFSET(l3_class);
+	}
+
+	REG_PIO_READ64(handle, offset, &flow_cfg_reg.value);
+
+	if (enable && flow_cfg_reg.bits.ldw.sym == 0) {
+		flow_cfg_reg.bits.ldw.sym = 1;
+		REG_PIO_WRITE64(handle, offset, flow_cfg_reg.value);
+	} else if (!enable && flow_cfg_reg.bits.ldw.sym == 1) {
+		flow_cfg_reg.bits.ldw.sym = 0;
+		REG_PIO_WRITE64(handle, offset, flow_cfg_reg.value);
+	}
+
+	return (NPI_SUCCESS);
+
+}
+
+npi_status_t
+npi_fflp_cfg_ip_cls_flow_key_get_rfnl(npi_handle_t handle,
+				    tcam_class_t l3_class,
+				    flow_key_cfg_t *cfg)
+{
+	uint64_t offset;
+	flow_class_key_ip_t flow_cfg_reg;
+
+	ASSERT(TCAM_L3_CLASS_VALID_RFNL(l3_class));
+	if (!(TCAM_L3_CLASS_VALID_RFNL(l3_class))) {
+		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
+		    " npi_fflp_cfg_ip_cls_flow_key_get_rfnl:"
+		    " Invalid class %d \n",
+		    l3_class));
+		return (NPI_FFLP_TCAM_CLASS_INVALID);
+	}
+
+	if (l3_class == TCAM_CLASS_IPV6_FRAG) {
+		offset = FFLP_FLOW_KEY_IP6_FRAG_REG;
+	} else {
+		offset = GET_FLOW_KEY_OFFSET(l3_class);
+	}
+
+	cfg->l4_xor_sel = 0;
+	cfg->use_l4_md = 0;
+	cfg->use_sym = 0;
+	cfg->use_proto = 0;
+	cfg->use_dport = 0;
+	cfg->use_sport = 0;
+	cfg->ip_opts_exist = 0;
+	cfg->use_daddr = 0;
+	cfg->use_saddr = 0;
+	cfg->use_vlan = 0;
+	cfg->use_l2da = 0;
+	cfg->use_portnum  = 0;
+
+	REG_PIO_READ64(handle, offset, &flow_cfg_reg.value);
+
+	cfg->l4_xor_sel = flow_cfg_reg.bits.ldw.l4_xor;
+
+	if (flow_cfg_reg.bits.ldw.l4_mode)
+		cfg->use_l4_md = 1;
+
+	if (flow_cfg_reg.bits.ldw.sym)
+		cfg->use_sym = 1;
+
+	if (flow_cfg_reg.bits.ldw.proto) {
+		cfg->use_proto = 1;
+	}
+
+	if (flow_cfg_reg.bits.ldw.l4_1 == 2) {
+		cfg->use_dport = 1;
+	}
+
+	if (flow_cfg_reg.bits.ldw.l4_1 == 3) {
+		cfg->use_dport = 1;
+		cfg->ip_opts_exist = 1;
+	}
+
+	if (flow_cfg_reg.bits.ldw.l4_0 == 2) {
+		cfg->use_sport = 1;
+	}
+
+	if (flow_cfg_reg.bits.ldw.l4_0 == 3) {
+		cfg->use_sport = 1;
+		cfg->ip_opts_exist = 1;
+	}
+
+	if (flow_cfg_reg.bits.ldw.ipda) {
+		cfg->use_daddr = 1;
+	}
+
+	if (flow_cfg_reg.bits.ldw.ipsa) {
+		cfg->use_saddr = 1;
+	}
+
+	if (flow_cfg_reg.bits.ldw.vlan) {
+		cfg->use_vlan = 1;
+	}
+
+	if (flow_cfg_reg.bits.ldw.l2da) {
+		cfg->use_l2da = 1;
+	}
+
+	if (flow_cfg_reg.bits.ldw.port) {
+		cfg->use_portnum = 1;
+	}
+
+	NPI_DEBUG_MSG((handle.function, NPI_FFLP_CTL,
+	    " npi_fflp_cfg_ip_cls_flow_get %llx \n",
+	    flow_cfg_reg.value));
+
+	return (NPI_SUCCESS);
+
+}
+
 npi_status_t
 npi_fflp_cfg_ip_cls_tcam_key_get(npi_handle_t handle,
 			    tcam_class_t l3_class, tcam_key_cfg_t *cfg)
@@ -2315,7 +2654,7 @@ npi_fflp_cfg_ip_cls_tcam_key_get(npi_handle_t handle,
 	}
 
 	if (tcam_cls_cfg.bits.ldw.tsel) {
-		cfg->lookup_enable	= 1;
+		cfg->lookup_enable = 1;
 	}
 
 	NPI_DEBUG_MSG((handle.function, NPI_CTL,

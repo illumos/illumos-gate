@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,15 +72,16 @@ typedef struct niumx_ih {
 	struct niumx_ih	*ih_next;	/* next in the chain */
 } niumx_ih_t;
 
+#define	NIUMX_MAX_INTRS	64
+
 typedef struct niumx_devstate {
 	dev_info_t *dip;
 	devhandle_t	niumx_dev_hdl;	/* device handle */
 	kmutex_t niumx_mutex;
 	int niumx_fm_cap;
 	ddi_iblock_cookie_t niumx_fm_ibc;
+	niumx_ih_t niumx_ihtable[NIUMX_MAX_INTRS];
 } niumx_devstate_t;
-
-#define	NIUMX_MAX_INTRS	64
 
 /*
  * flags for overloading dmai_inuse field of the dma request structure:

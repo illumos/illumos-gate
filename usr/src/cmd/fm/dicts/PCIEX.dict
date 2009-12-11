@@ -50,3 +50,7 @@ fault.io.pciex.device-interr-unaf=20
 fault.io.pciex.device-interr-deg=21
 fault.io.pciex.fw_corrupt=22
 fault.io.pciex.fw_mismatch=23
+fault.io.pciex.rc.generic-ce=24
+fault.io.pciex.rc.generic-ue=25
+fault.io.pciex.rc.generic-sw=26
+fault.io.pciex.rc.generic-fw=27

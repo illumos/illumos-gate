@@ -133,7 +133,7 @@ typedef struct _ni_generic_events {
 	char *event;
 } ni_generic_event_t;
 
-#define	ULTRA_PCR_PRIVPIC	(UINT64_C(1) << CPC_NIAGARA_PCR_PRIVPIC)
+#define	ULTRA_PCR_PRIVPIC	(UINT64_C(1) << CPC_PCR_PRIVPIC)
 #define	NT_END 0xFF
 #define	GEN_EVT_END { NULL, NULL }
 
@@ -206,8 +206,8 @@ ni_pcbe_init(void)
 
 	events = Niagara_names;
 	generic_events = Niagara_generic_names;
-	pcr_pic0_mask = CPC_NIAGARA_PCR_PIC0_MASK;
-	pcr_pic1_mask = CPC_NIAGARA_PCR_PIC1_MASK;
+	pcr_pic0_mask = CPC_PCR_PIC0_MASK;
+	pcr_pic1_mask = CPC_PCR_PIC1_MASK;
 
 	/*
 	 * Initialize the list of events for each PIC.
@@ -324,15 +324,15 @@ ni_pcbe_overflow_bitmap(void)
 
 	pcr = ultra_getpcr();
 	DTRACE_PROBE1(niagara__getpcr, uint64_t, pcr);
-	overflow =  (pcr & CPC_NIAGARA_PCR_OVF_MASK) >>
-	    CPC_NIAGARA_PCR_OVF_SHIFT;
+	overflow =  (pcr & CPC_PCR_OVF_MASK) >>
+	    CPC_PCR_OVF_SHIFT;
 #if 0
 	/*
 	 * Not needed if the CPC framework is responsible to stop counters
 	 * and that action ends up clearing overflow flags.
 	 */
 	if (overflow)
-		ultra_setpcr(pcr & ~CPC_NIAGARA_PCR_OVF_MASK);
+		ultra_setpcr(pcr & ~CPC_PCR_OVF_MASK);
 #endif
 	return (overflow);
 }
@@ -439,13 +439,13 @@ ni_pcbe_program(void *token)
 	ultra_setpic(((uint64_t)pic1->pcbe_pic << PIC1_SHIFT) |
 	    (uint64_t)pic0->pcbe_pic);
 
-	pcr = (pic0->pcbe_bits & pcr_pic0_mask) << CPC_NIAGARA_PCR_PIC0_SHIFT;
-	pcr |= (pic1->pcbe_bits & pcr_pic1_mask) << CPC_NIAGARA_PCR_PIC1_SHIFT;
+	pcr = (pic0->pcbe_bits & pcr_pic0_mask) << CPC_PCR_PIC0_SHIFT;
+	pcr |= (pic1->pcbe_bits & pcr_pic1_mask) << CPC_PCR_PIC1_SHIFT;
 
 	if (pic0->pcbe_flags & CPC_COUNT_USER)
-		pcr |= (1ull << CPC_NIAGARA_PCR_USR);
+		pcr |= (1ull << CPC_PCR_USR);
 	if (pic0->pcbe_flags & CPC_COUNT_SYSTEM)
-		pcr |= (1ull << CPC_NIAGARA_PCR_SYS);
+		pcr |= (1ull << CPC_PCR_SYS);
 
 	DTRACE_PROBE1(niagara__setpcr, uint64_t, pcr);
 	ultra_setpcr(pcr);

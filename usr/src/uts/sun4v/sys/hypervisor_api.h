@@ -167,6 +167,9 @@ extern "C" {
 #define	MMU_STAT_AREA		0xfc
 #endif /* SET_MMU_STATS */
 
+#define	HV_MACH_PRI		0x170
+#define	HV_REBOOT_DATA_SET	0x172
+
 #define	HV_TPM_GET		0x176
 #define	HV_TPM_PUT		0x177
 
@@ -445,6 +448,8 @@ extern uint64_t hvldc_intr_gettarget(uint64_t dev_hdl, uint32_t devino,
     uint32_t *cpuid);
 extern uint64_t hvldc_intr_settarget(uint64_t dev_hdl, uint32_t devino,
     uint32_t cpuid);
+extern uint64_t hv_mach_pri(uint64_t buffer_ra, uint64_t *buffer_sizep);
+extern uint64_t hv_reboot_data_set(uint64_t buffer_ra, uint64_t buffer_len);
 
 extern uint64_t	hv_guest_suspend(void);
 extern uint64_t	hv_tick_set_npt(uint64_t npt);

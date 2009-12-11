@@ -240,11 +240,6 @@ pcie_init(dev_info_t *dip, caddr_t arg)
 #endif /* defined(__sparc) */
 	}
 
-	if ((pcie_ari_supported(dip) == PCIE_ARI_FORW_SUPPORTED) &&
-	    (pcie_ari_is_enabled(dip) == PCIE_ARI_FORW_DISABLED))
-		(void) pcicfg_configure(dip, 0, PCICFG_ALL_FUNC,
-		    PCICFG_FLAG_ENABLE_ARI);
-
 	return (DDI_SUCCESS);
 }
 

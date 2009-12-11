@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,6 +74,19 @@
 #define	N2NIU_VRTX_PARAM_GET	0x15a
 #define	N2NIU_VRTX_PARAM_SET	0x15b
 
+/*
+ * The new set of HV APIs to provide the ability
+ * of a domain to manage multiple NIU resources at once to
+ * support the KT familty chip having up to 4 NIUs
+ * per system. The trap # will be the same as those defined
+ * before 2.0
+ */
+#define	N2NIU_CFGH_RX_LP_SET	0x142
+#define	N2NIU_CFGH_TX_LP_SET	0x143
+#define	N2NIU_CFGH_RX_LP_GET	0x144
+#define	N2NIU_CFGH_TX_LP_GET	0x145
+#define	N2NIU_CFGH_VR_ASSIGN	0x146
+
 #if defined(lint) || defined(__lint)
 
 /*ARGSUSED*/
@@ -103,6 +116,38 @@ hv_niu_tx_logical_page_info(uint64_t chidx, uint64_t pgidx,
 /*ARGSUSED*/
 uint64_t
 hv_niu_vr_assign(uint64_t vridx, uint64_t ldc_id, uint32_t *cookie)
+{ return (0); }
+
+/*
+ * KT: Interfaces functions which require the configuration handle
+ */
+/*ARGSUSED*/
+uint64_t
+hv_niu_cfgh_rx_logical_page_conf(uint64_t cfgh, uint64_t chidx, uint64_t pgidx,
+	uint64_t raddr, uint64_t size)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hv_niu_cfgh_rx_logical_page_info(uint64_t cfgh, uint64_t chidx, uint64_t pgidx,
+	uint64_t *raddr, uint64_t *size)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hv_niu_cfgh_tx_logical_page_conf(uint64_t cfgh, uint64_t chidx, uint64_t pgidx,
+	uint64_t raddr, uint64_t size)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hv_niu_cfgh_tx_logical_page_info(uint64_t cfgh, uint64_t chidx, uint64_t pgidx,
+	uint64_t *raddr, uint64_t *size)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hv_niu_cfgh_vr_assign(uint64_t cfgh, uint64_t vridx, uint64_t ldc_id, uint32_t *cookie)
 { return (0); }
 
 /*ARGSUSED*/
@@ -516,6 +561,71 @@ hv_niu_vrrx_set_ino(uint32_t cookie, uint64_t vridx, uint32_t ino)
 	retl
 	nop
 	SET_SIZE(hv_niu_vrtx_param_set)
+
+	/*
+	 * Interfaces functions which require the configuration handle.
+	 */
+	/*
+	 * hv_niu__cfgh_rx_logical_page_conf(uint64_t cfgh, uint64_t chidx,
+	 *    uint64_t pgidx, uint64_t raddr, uint64_t size)
+	 */
+	ENTRY(hv_niu_cfgh_rx_logical_page_conf)
+	mov	N2NIU_RX_LP_CONF, %o5
+	ta	FAST_TRAP
+	retl
+	nop
+	SET_SIZE(hv_niu_cfgh_rx_logical_page_conf)
+
+	/*
+	 * hv_niu__cfgh_rx_logical_page_info(uint64_t cfgh, uint64_t chidx,
+	 *    uint64_t pgidx, uint64_t *raddr, uint64_t *size)
+	 */
+	ENTRY(hv_niu_cfgh_rx_logical_page_info)
+	mov	%o3, %g1
+	mov	%o4, %g2
+	mov	N2NIU_RX_LP_INFO, %o5
+	ta	FAST_TRAP
+	stx	%o1, [%g1]
+	retl
+	stx	%o2, [%g2]
+	SET_SIZE(hv_niu_cfgh_rx_logical_page_info)
+
+	/*
+	 * hv_niu_cfgh_tx_logical_page_conf(uint64_t cfgh, uint64_t chidx,
+	 *    uint64_t pgidx, uint64_t raddr, uint64_t size)
+	 */
+	ENTRY(hv_niu_cfgh_tx_logical_page_conf)
+	mov	N2NIU_TX_LP_CONF, %o5
+	ta	FAST_TRAP
+	retl
+	nop
+	SET_SIZE(hv_niu_cfgh_tx_logical_page_conf)
+
+	/*
+	 * hv_niu_cfgh_tx_logical_page_info(uint64_t cfgh, uint64_t chidx,
+	 *    uint64_t pgidx, uint64_t *raddr, uint64_t *size)
+	 */
+	ENTRY(hv_niu_cfgh_tx_logical_page_info)
+	mov	%o3, %g1
+	mov	%o4, %g2
+	mov	N2NIU_TX_LP_INFO, %o5
+	ta	FAST_TRAP
+	stx	%o1, [%g1]
+	retl
+	stx	%o2, [%g2]
+	SET_SIZE(hv_niu_cfgh_tx_logical_page_info)
+
+	/*
+	 * hv_niu_cfgh_vr_assign(uint64_t cfgh, uint64_t vridx, uint64_t ldc_id,
+	 *     uint32_t *cookie)
+	 */
+	ENTRY(hv_niu_cfgh_vr_assign)
+	mov	%o3, %g1
+	mov	N2NIU_VR_ASSIGN, %o5
+	ta	FAST_TRAP
+	retl
+	stw	%o1, [%g1]
+	SET_SIZE(hv_niu_cfgh_vr_assign)
 
 #endif	/* lint || __lint */
 

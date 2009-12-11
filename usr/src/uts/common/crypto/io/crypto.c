@@ -800,18 +800,28 @@ crypto_build_function_list(crypto_function_list_t *fl, kcf_provider_desc_t *pd)
 			fl->fl_set_pin = B_TRUE;
 	}
 
-	fl->prov_is_limited = pd->pd_flags & CRYPTO_HASH_NO_UPDATE;
-	if (fl->prov_is_limited) {
-		/*
-		 * XXX - The threshold should ideally be per hash
-		 * mechanism. For now, we use the same value for all
-		 * hash mechanisms. Empirical evidence suggests this
-		 * is fine.
-		 */
-		fl->prov_hash_threshold = kcf_md5_threshold;
+	fl->prov_is_hash_limited = pd->pd_flags & CRYPTO_HASH_NO_UPDATE;
+	if (fl->prov_is_hash_limited) {
 		fl->prov_hash_limit = min(pd->pd_hash_limit,
 		    min(CRYPTO_MAX_BUFFER_LEN,
 		    curproc->p_task->tk_proj->kpj_data.kpd_crypto_mem_ctl));
+	}
+
+	fl->prov_is_hmac_limited = pd->pd_flags & CRYPTO_HMAC_NO_UPDATE;
+	if (fl->prov_is_hmac_limited) {
+		fl->prov_hmac_limit = min(pd->pd_hmac_limit,
+		    min(CRYPTO_MAX_BUFFER_LEN,
+		    curproc->p_task->tk_proj->kpj_data.kpd_crypto_mem_ctl));
+	}
+
+	if (fl->prov_is_hash_limited || fl->prov_is_hmac_limited) {
+		/*
+		 * XXX - The threshold should ideally be per hash/HMAC
+		 * mechanism. For now, we use the same value for all
+		 * hash/HMAC mechanisms. Empirical evidence suggests this
+		 * is fine.
+		 */
+		fl->prov_hash_threshold = kcf_md5_threshold;
 	}
 
 	fl->total_threshold_count = MAX_NUM_THRESHOLD;

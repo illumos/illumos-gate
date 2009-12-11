@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -66,6 +64,8 @@ uint_t root_phys_addr_lo_mask = 0xffffffffU;
 char cpu_module_name[] = "SUNW,UltraSPARC-T2";
 #elif defined(VFALLS_IMPL)
 char cpu_module_name[] = "SUNW,UltraSPARC-T2+";
+#elif defined(KT_IMPL)
+char cpu_module_name[] = "SUNW,UltraSPARC-KT";
 #endif
 
 /*
@@ -83,6 +83,11 @@ static hsvc_info_t cpu_hsvc = {
 static hsvc_info_t cpu_hsvc = {
 	HSVC_REV_1, NULL, HSVC_GROUP_VFALLS_CPU, VFALLS_HSVC_MAJOR,
 	VFALLS_HSVC_MINOR, cpu_module_name
+};
+#elif defined(KT_IMPL)
+static hsvc_info_t cpu_hsvc = {
+	HSVC_REV_1, NULL, HSVC_GROUP_KT_CPU, KT_HSVC_MAJOR,
+	KT_HSVC_MINOR, cpu_module_name
 };
 #endif
 
@@ -113,6 +118,24 @@ cpu_setup(void)
 	 */
 	cpu_setup_common(NULL);
 
+	/*
+	 * Initialize the cpu_hwcap_flags for N2 and VF if it is not already
+	 * set in cpu_setup_common() by the hwcap MD info. Note that this MD
+	 * info may not be available for N2/VF.
+	 */
+	if (cpu_hwcap_flags == 0) {
+#ifdef KT_IMPL
+		/*
+		 * This should not happen since hwcap MD info is always
+		 * available for KT platforms.
+		 */
+		ASSERT(cpu_hwcap_flags != 0);	/* panic in DEBUG mode */
+		cpu_hwcap_flags |= AV_SPARC_VIS3 | AV_SPARC_HPC | AV_SPARC_FMAF;
+#endif /* KT_IMPL */
+		cpu_hwcap_flags |= AV_SPARC_VIS | AV_SPARC_VIS2 |
+		    AV_SPARC_ASI_BLK_INIT | AV_SPARC_POPC;
+	}
+
 	cache |= (CACHE_PTAG | CACHE_IOCOHERENT);
 
 	if ((mmu_exported_pagesize_mask &
@@ -122,9 +145,6 @@ cpu_setup(void)
 		    " does not have required sun4v page sizes"
 		    " 8K, 64K and 4M: MD mask is 0x%x",
 		    mmu_exported_pagesize_mask);
-
-	cpu_hwcap_flags = AV_SPARC_VIS | AV_SPARC_VIS2 |
-	    AV_SPARC_ASI_BLK_INIT | AV_SPARC_POPC;
 
 	/*
 	 * Niagara2 supports a 48-bit subset of the full 64-bit virtual
@@ -494,13 +514,11 @@ page_next_pfn_for_color_cpu(pfn_t pfn, uchar_t szc, uint_t color,
 
 	/* restart here when we switch memblocks */
 next_mem_block:
-	if (szc <= TTE64K) {
-		pfnmn = PAPFN_2_MNODE(pfn);
-	}
-	if (((page_papfn_2_color_cpu(pfn, szc) ^ color) & ceq_mask) == 0 &&
-	    (szc > TTE64K || pfnmn == it->mi_mnode)) {
+	pfnmn = PAPFN_2_MNODE(pfn);
+	if ((((page_papfn_2_color_cpu(pfn, szc) ^ color) & ceq_mask) == 0) &&
+	    (pfnmn == it->mi_mnode)) {
 
-		/* we start from the page with correct color */
+		/* we start from the page with correct color and mnode */
 		if (szc >= TTE512K) {
 			if (szc >= TTE4M) {
 				/* page color is PA[32:28] */
@@ -510,6 +528,11 @@ next_mem_block:
 				pfn_ceq_mask = ((ceq_mask & 1) << 6) |
 				    ((ceq_mask >> 1) << 15);
 			}
+			/*
+			 * Preserve mnode bits in case they are not part of the
+			 * color mask (eg., 8GB interleave, mnode bits 34:33).
+			 */
+			pfn_ceq_mask |= it->mi_mnode_pfn_mask;
 			npfn = ADD_MASKED(pfn, pstep, pfn_ceq_mask, mask);
 			goto done;
 		} else {
@@ -554,8 +577,9 @@ next_mem_block:
 		} else {
 			/* try get the right color by changing bit PA[19:19] */
 			npfn = pfn + pstep;
-			if (((page_papfn_2_color_cpu(npfn, szc) ^ color) &
-			    ceq_mask) == 0)
+			pfnmn = PAPFN_2_MNODE(npfn);
+			if ((((page_papfn_2_color_cpu(npfn, szc) ^ color) &
+			    ceq_mask) == 0) && (pfnmn == it->mi_mnode))
 				goto done;
 
 			/* page color is PA[32:28].PA[19:19] */
@@ -565,6 +589,16 @@ next_mem_block:
 			npfn = ((pfn >> 20) << 20) | pfn_color;
 		}
 
+		/* Fix mnode if necessary */
+		if ((pfnmn = PAPFN_2_MNODE(npfn)) != it->mi_mnode)
+			npfn += ((it->mi_mnode - pfnmn) & it->mi_mnode_mask) <<
+			    it->mi_mnode_pfn_shift;
+
+		/*
+		 * Preserve mnode bits in case they are not part of the color
+		 * mask eg 8GB interleave, mnode bits 34:33).
+		 */
+		pfn_ceq_mask |= it->mi_mnode_pfn_mask;
 		while (npfn <= pfn) {
 			npfn = ADD_MASKED(npfn, pstep, pfn_ceq_mask, mask);
 		}

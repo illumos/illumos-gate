@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _NPI_RXDMA_H
 #define	_NPI_RXDMA_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -102,6 +100,16 @@ extern "C" {
 	((offset == SW_OFFSET_NO_OFFSET) || \
 	    (offset == SW_OFFSET_64) || \
 	    (offset == SW_OFFSET_128))
+
+#define	RXDMA_RF_BUFF_OFFSET_VALID(offset) \
+	((offset == SW_OFFSET_NO_OFFSET) || \
+	    (offset == SW_OFFSET_64) || \
+	    (offset == SW_OFFSET_128) || \
+	    (offset == SW_OFFSET_192) || \
+	    (offset == SW_OFFSET_256) || \
+	    (offset == SW_OFFSET_320) || \
+	    (offset == SW_OFFSET_384) || \
+	    (offset == SW_OFFSET_448))
 
 
 #define	RXDMA_RCR_TO_VALID(tov) ((tov) && (tov < 64))
@@ -548,7 +556,7 @@ typedef struct _rdc_desc_cfg_t {
 
 
 npi_status_t npi_rxdma_cfg_rdc_ring(npi_handle_t, uint8_t,
-				    rdc_desc_cfg_t *);
+				    rdc_desc_cfg_t *, boolean_t);
 
 
 

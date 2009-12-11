@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -167,6 +167,29 @@ typedef union _tcam_class_prg_ip_t {
 #endif
 	} bits;
 } tcam_class_prg_ip_t, *p_tcam_class_prg_ip_t;
+
+/*
+ * New fields added to the L3 programmable class register for RF-NIU
+ * and Neptune-L.
+ */
+#define	L3_UCLS_TOS_SH		0
+#define	L3_UCLS_TOS_MSK		0xff
+#define	L3_UCLS_TOSM_SH		8
+#define	L3_UCLS_TOSM_MSK	0xff
+#define	L3_UCLS_PID_SH		16
+#define	L3_UCLS_PID_MSK		0xff
+#define	L3_UCLS_VALID_SH	25
+#define	L3_UCLS_VALID_MSK	0x01
+#define	L3_UCLS_L4B23_SEL_SH	26
+#define	L3_UCLS_L4B23_SEL_MSK	0x01
+#define	L3_UCLS_L4B23_VAL_SH	27
+#define	L3_UCLS_L4B23_VAL_MSK	0xffff
+#define	L3_UCLS_L4B0_MASK_SH	43
+#define	L3_UCLS_L4B0_MASK_MSK	0xff
+#define	L3_UCLS_L4B0_VAL_SH	51
+#define	L3_UCLS_L4B0_VAL_MSK	0xff
+#define	L3_UCLS_L4_MODE_SH	59
+#define	L3_UCLS_L4_MODE_MSK	0x01
 /* define the classes which use the above structure */
 
 typedef enum fflp_tcam_class {
@@ -192,8 +215,10 @@ typedef enum fflp_tcam_class {
     TCAM_CLASS_DUMMY_13,
     TCAM_CLASS_DUMMY_14,
     TCAM_CLASS_DUMMY_15,
-    TCAM_CLASS_MAX
+    TCAM_CLASS_IPV6_FRAG = 0x1F
 } tcam_class_t;
+
+#define	TCAM_CLASS_MAX	TCAM_CLASS_IPV6_FRAG
 
 /*
  * Specify how to build TCAM key for L3
@@ -867,6 +892,13 @@ typedef union _fcram_phy_rd_lat_t {
 #define		FFLP_FLOW_KEY_IP6_UDP_REG		(FZC_FFLP + 0x40048)
 #define		FFLP_FLOW_KEY_IP6_AH_ESP_REG	(FZC_FFLP + 0x40050)
 #define		FFLP_FLOW_KEY_IP6_SCTP_REG		(FZC_FFLP + 0x40058)
+/*
+ * New FLOW KEY register added for IPV6 Fragments for RF-NIU
+ * and Neptune-L.
+ */
+#define		FFLP_FLOW_KEY_IP6_FRAG_REG		(FZC_FFLP + 0x400B0)
+
+#define	FL_KEY_USR_L4XOR_MSK	0x03ff
 
 typedef union _flow_class_key_ip_t {
     uint64_t value;
@@ -876,7 +908,12 @@ typedef union _flow_class_key_ip_t {
 #endif
 		struct {
 #ifdef _BIT_FIELDS_HTOL
-			uint32_t rsrvd2:22;
+			uint32_t rsrvd2:10;
+/* These bits added for L3 programmable classes in RF-NIU and Neptune-L */
+			uint32_t l4_xor:10;
+			uint32_t l4_mode:1;
+/* This bit added for SNORT support in RF-NIU and Neptune-L */
+			uint32_t sym:1;
 			uint32_t port:1;
 			uint32_t l2da:1;
 			uint32_t vlan:1;
@@ -894,7 +931,10 @@ typedef union _flow_class_key_ip_t {
 			uint32_t vlan:1;
 			uint32_t l2da:1;
 			uint32_t port:1;
-			uint32_t rsrvd2:22;
+			uint32_t sym:1;
+			uint32_t l4_mode:1;
+			uint32_t l4_xor:10;
+			uint32_t rsrvd2:10;
 #endif
 		} ldw;
 #ifndef _BIG_ENDIAN
@@ -902,7 +942,6 @@ typedef union _flow_class_key_ip_t {
 #endif
 	} bits;
 } flow_class_key_ip_t, *p_flow_class_key_ip_t;
-
 
 #define		FFLP_H1POLY_REG		(FZC_FFLP + 0x40060)
 
@@ -1379,7 +1418,11 @@ typedef union flow_template {
 
 
 typedef struct _flow_key_cfg_t {
-    uint32_t rsrvd:23;
+    uint32_t rsrvd:11;
+/* The following 3 bit fields added for RF-NIU and Neptune-L */
+    uint32_t l4_xor_sel:10;
+    uint32_t use_l4_md:1;
+    uint32_t use_sym:1;
     uint32_t use_portnum:1;
     uint32_t use_l2da:1;
     uint32_t use_vlan:1;

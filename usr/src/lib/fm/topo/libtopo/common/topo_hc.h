@@ -79,6 +79,7 @@ extern "C" {
 #define	RISER		"riser"
 #define	SHELF		"shelf"
 #define	SES_ENCLOSURE	"ses-enclosure"
+#define	SP		"sp"
 #define	SUBCHASSIS	"subchassis"
 #define	SYSTEMBOARD	"systemboard"
 #define	XAUI		"xaui"

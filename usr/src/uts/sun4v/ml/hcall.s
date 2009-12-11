@@ -347,9 +347,7 @@ hv_soft_state_set(uint64_t state, uint64_t string)
 /*ARGSUSED*/	
 uint64_t
 hv_soft_state_get(uint64_t string, uint64_t *state)
-{ return (0); }
-
-uint64_t
+{ return (0); }uint64_t
 hv_guest_suspend(void)
 { return (0); }
 
@@ -361,6 +359,11 @@ hv_set_tick_npt(uint64_t npt)
 /*ARGSUSED*/	
 uint64_t
 hv_set_stick_npt(uint64_t npt)
+{ return (0); }
+
+/*ARGSUSED*/	
+uint64_t
+hv_reboot_data_set(uint64_t buffer_ra, uint64_t buffer_len)
 { return (0); }
 
 #else	/* lint || __lint */
@@ -1272,5 +1275,18 @@ hv_set_stick_npt(uint64_t npt)
 	retl
 	nop
 	SET_SIZE(hv_stick_set_npt)
+
+	/*
+	 * REBOOT_DATA_SET
+	 * arg0 buffer real address
+	 * arg1 buffer length
+	 * ret0 status
+	 */
+	ENTRY(hv_reboot_data_set)
+	mov	HV_REBOOT_DATA_SET, %o5
+	ta	FAST_TRAP
+	retl
+	nop
+	SET_SIZE(hv_reboot_data_set)
 
 #endif	/* lint || __lint */

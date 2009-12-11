@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-
 /*
  * sun4v domain services PRI driver
  */
@@ -44,7 +43,11 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/ds.h>
-
+#include <sys/hypervisor_api.h>
+#include <sys/machsystm.h>
+#include <sys/sysmacros.h>
+#include <sys/hsvc.h>
+#include <sys/bitmap.h>
 #include <sys/ds_pri.h>
 
 static uint_t ds_pri_debug = 0;
@@ -85,8 +88,10 @@ typedef	struct {
 	uint8_t		data[1];
 } ds_pri_msg_t;
 
-	/* The following are bit field flags */
-	/* No service implies no PRI and no outstanding request */
+/*
+ * The following are bit field flags. No service implies no DS PRI and
+ * no outstanding request.
+ */
 typedef enum {
 	DS_PRI_NO_SERVICE = 0x0,
 	DS_PRI_HAS_SERVICE = 0x1,
@@ -117,6 +122,7 @@ typedef struct ds_pri_state ds_pri_state_t;
 static void *ds_pri_statep;
 
 static void request_pri(ds_pri_state_t *sp);
+static uint64_t ds_get_hv_pri(ds_pri_state_t *sp);
 
 static int ds_pri_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static int ds_pri_attach(dev_info_t *, ddi_attach_cmd_t);
@@ -206,11 +212,26 @@ static struct modlinkage modlinkage = {
 	NULL
 };
 
+static boolean_t hsvc_pboot_available = B_FALSE;
+static hsvc_info_t pboot_hsvc = {
+	HSVC_REV_1, NULL, HSVC_GROUP_PBOOT, 1, 0, NULL
+};
 
 int
 _init(void)
 {
 	int retval;
+	uint64_t	hsvc_pboot_minor;
+	uint64_t	status;
+
+	status = hsvc_register(&pboot_hsvc, &hsvc_pboot_minor);
+	if (status == H_EOK) {
+		hsvc_pboot_available = B_TRUE;
+	} else {
+		DS_PRI_DBG("hypervisor services not negotiated "
+		    "for group number: 0x%lx errorno: 0x%lx\n",
+		    pboot_hsvc.hsvc_group, status);
+	}
 
 	retval = ddi_soft_state_init(&ds_pri_statep,
 	    sizeof (ds_pri_state_t), 0);
@@ -243,6 +264,8 @@ _fini(void)
 		return (retval);
 
 	ddi_soft_state_fini(&ds_pri_statep);
+
+	(void) hsvc_unregister(&pboot_hsvc);
 
 	return (retval);
 }
@@ -286,6 +309,7 @@ ds_pri_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	int instance;
 	ds_pri_state_t *sp;
 	int rv;
+	uint64_t status;
 
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -332,6 +356,16 @@ ds_pri_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	sp->req_id = 0;
 	sp->num_opens = 0;
 
+	/*
+	 * See if we can get the static hv pri data. Static pri data
+	 * is only available for privileged domains.
+	 */
+	if (hsvc_pboot_available == B_TRUE) {
+		if ((status = ds_get_hv_pri(sp)) != 0) {
+			cmn_err(CE_NOTE, "ds_get_hv_pri failed: 0x%lx", status);
+		}
+	}
+
 	if ((rv = ds_cap_init(&ds_pri_cap, &ds_pri_ops)) != 0) {
 		cmn_err(CE_NOTE, "ds_cap_init failed: %d", rv);
 		goto fail;
@@ -342,6 +376,8 @@ ds_pri_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	return (DDI_SUCCESS);
 
 fail:
+	if (sp->ds_pri)
+		kmem_free(sp->ds_pri, sp->ds_pri_len);
 	ddi_remove_minor_node(dip, NULL);
 	cv_destroy(&sp->cv);
 	mutex_destroy(&sp->lock);
@@ -410,27 +446,26 @@ ds_pri_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	mutex_enter(&sp->lock);
 
 	/*
-	 * If we're here and the state is DS_PRI_NO_SERVICE then this
-	 * means that ds hasn't yet called the registration callback.
+	 * Proceed if we have PRI data (possibly obtained from
+	 * static HV PRI or last pushed DS PRI data update).
+	 * If no PRI data and we have no DS PRI service then this
+	 * means that PRI DS has never called the registration callback.
 	 * A while loop is necessary as we might have been woken up
 	 * prematurely, e.g., due to a debugger or "pstack" etc.
 	 * Wait here and the callback will signal us when it has completed
 	 * its work.
 	 */
-	while (sp->state == DS_PRI_NO_SERVICE) {
-		if (cv_wait_sig(&sp->cv, &sp->lock) == 0) {
-			mutex_exit(&sp->lock);
-			return (EINTR);
+	if (!(sp->state & DS_PRI_HAS_PRI)) {
+		while (!(sp->state & DS_PRI_HAS_SERVICE)) {
+			if (cv_wait_sig(&sp->cv, &sp->lock) == 0) {
+				mutex_exit(&sp->lock);
+				return (EINTR);
+			}
 		}
 	}
 
 	sp->num_opens++;
 	mutex_exit(&sp->lock);
-
-	/*
-	 * On open we dont fetch the PRI even if we have a valid service
-	 * handle. PRI fetch is essentially lazy and on-demand.
-	 */
 
 	DS_PRI_DBG("ds_pri_open: state = 0x%x\n", sp->state);
 
@@ -465,19 +500,6 @@ ds_pri_close(dev_t dev, int flag, int otyp, cred_t *credp)
 		return (0);
 	}
 
-	/* If we have an old PRI - remove it */
-	if (sp->state & DS_PRI_HAS_PRI) {
-		if (sp->ds_pri != NULL && sp->ds_pri_len > 0) {
-			/*
-			 * remove the old data if we have an
-			 * outstanding request
-			 */
-			kmem_free(sp->ds_pri, sp->ds_pri_len);
-			sp->ds_pri_len = 0;
-			sp->ds_pri = NULL;
-		}
-		sp->state &= ~DS_PRI_HAS_PRI;
-	}
 	sp->state &= ~DS_PRI_REQUESTED;
 	mutex_exit(&sp->lock);
 	return (0);
@@ -715,22 +737,19 @@ ds_pri_reg_handler(ds_cb_arg_t arg, ds_ver_t *ver, ds_svc_hdl_t hdl)
 	DS_PRI_DBG("ds_pri_reg_handler: registering handle 0x%lx for version "
 	    "0x%x:0x%x\n", (uint64_t)hdl, ver->major, ver->minor);
 
-	/* When the domain service comes up automatically req the pri */
+	/* When the domain service comes up automatically update the state */
 	mutex_enter(&sp->lock);
 
 	ASSERT(sp->ds_pri_handle == DS_INVALID_HDL);
 	sp->ds_pri_handle = hdl;
 
-	ASSERT(sp->state == DS_PRI_NO_SERVICE);
-	ASSERT(sp->ds_pri == NULL);
-	ASSERT(sp->ds_pri_len == 0);
-
-	/* have service, but no PRI */
+	ASSERT(!(sp->state & DS_PRI_HAS_SERVICE));
 	sp->state |= DS_PRI_HAS_SERVICE;
 
 	/*
 	 * Cannot request a PRI here, because the reg handler cannot
 	 * do a DS send operation - we take care of this later.
+	 * Static hv pri data might be available.
 	 */
 
 	/* Wake up anyone waiting in open() */
@@ -755,14 +774,16 @@ ds_pri_unreg_handler(ds_cb_arg_t arg)
 
 	mutex_enter(&sp->lock);
 
-	/* Once the service goes - if we have a PRI at hand free it up */
-	if (sp->ds_pri_len != 0) {
-		kmem_free(sp->ds_pri, sp->ds_pri_len);
-		sp->ds_pri_len = 0;
-		sp->ds_pri = NULL;
-	}
+	/*
+	 * Note that if the service goes offline, we don't
+	 * free up the current PRI data at hand. It is assumed
+	 * that PRI DS service will only push new update when
+	 * it comes online. We mark the state to indicate no
+	 * DS PRI service is available. The current PRI data if
+	 * available is provided to the consumers.
+	 */
 	sp->ds_pri_handle = DS_INVALID_HDL;
-	sp->state = DS_PRI_NO_SERVICE;
+	sp->state &= ~DS_PRI_HAS_SERVICE;
 
 	mutex_exit(&sp->lock);
 }
@@ -830,6 +851,10 @@ ds_pri_data_handler(ds_cb_arg_t arg, void *buf, size_t buflen)
 	}
 
 	pri_size = buflen - sizeof (msgp->hdr);
+	if (pri_size == 0) {
+		cmn_err(CE_WARN, "Received DS pri data of size 0");
+		goto done;
+	}
 	data = kmem_alloc(pri_size, KM_SLEEP);
 	sp->ds_pri = data;
 	sp->ds_pri_len = pri_size;
@@ -842,4 +867,65 @@ ds_pri_data_handler(ds_cb_arg_t arg, void *buf, size_t buflen)
 
 done:;
 	mutex_exit(&sp->lock);
+}
+
+/*
+ * Routine to get static PRI data from the Hypervisor.
+ * If successful, this PRI data is the last known PRI
+ * data generated since the last poweron reset.
+ */
+static uint64_t
+ds_get_hv_pri(ds_pri_state_t *sp)
+{
+	uint64_t	status;
+	uint64_t	pri_size;
+	uint64_t	buf_size;
+	uint64_t	buf_pa;
+	caddr_t		buf_va = NULL;
+	caddr_t		pri_data;
+
+	/*
+	 * Get pri buffer size by calling hcall with buffer size 0.
+	 */
+	pri_size = 0LL;
+	status = hv_mach_pri((uint64_t)0, &pri_size);
+	DS_PRI_DBG("ds_get_hv_pri: hv_mach_pri pri size: 0x%lx\n", pri_size);
+	if (pri_size == 0)
+		return (1);
+
+	if (status == H_ENOTSUPPORTED || status == H_ENOACCESS) {
+		DS_PRI_DBG("ds_get_hv_pri: hv_mach_pri service is not "
+		    "available. errorno: 0x%lx\n", status);
+		return (status);
+	}
+
+	/*
+	 * contig_mem_alloc requires size to be a power of 2.
+	 * Increase size to next power of 2 if necessary.
+	 */
+	if ((pri_size & (pri_size - 1)) != 0)
+		buf_size = 1 << highbit(pri_size);
+	DS_PRI_DBG("ds_get_hv_pri: buf_size = 0x%lx\n", buf_size);
+
+	buf_va = contig_mem_alloc(buf_size);
+	if (buf_va == NULL)
+		return (1);
+
+	buf_pa = va_to_pa(buf_va);
+	DS_PRI_DBG("ds_get_hv_pri: buf_pa 0x%lx\n", buf_pa);
+	status = hv_mach_pri(buf_pa, &pri_size);
+	DS_PRI_DBG("ds_get_hv_pri: hv_mach_pri status = 0x%lx\n", status);
+
+	if (status == H_EOK) {
+		pri_data = kmem_alloc(pri_size, KM_SLEEP);
+		sp->ds_pri = pri_data;
+		sp->ds_pri_len = pri_size;
+		bcopy(buf_va, pri_data, sp->ds_pri_len);
+		sp->state |= DS_PRI_HAS_PRI;
+		sp->gencount++;
+	}
+
+	contig_mem_free(buf_va, buf_size);
+
+	return (status);
 }

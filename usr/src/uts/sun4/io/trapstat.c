@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -266,23 +266,24 @@
  * be added via a hybrid scheme, where the same 4M virtual address is used
  * on different MMUs.
  *
- * On sun4v architecture, we currently don't use hybrid scheme as it imposes
- * additional restriction on live migration and transparent CPU replacement.
- * Instead, we increase the number of supported CPUs by reducing the virtual
- * address space requirements per CPU via shared interposing trap table as
- * follows:
+ * On sun4v architecture, we cannot use the hybrid scheme as the architecture
+ * imposes additional restriction on the number of permanent mappings per
+ * guest and it is illegal to use the same virtual address to map different
+ * TTEs on different MMUs. Instead, we increase the number of supported CPUs
+ * by reducing the virtual address space requirements per CPU via shared
+ * interposing trap table as follows:
  *
  *                                          Offset (within 4MB page)
  *       +------------------------------------+- 0x400000
- *       |  CPU 507 trap statistics (8KB)     |   .
- *       |- - - - - - - - - - - - - - - - - - +- 0x3fe000
+ *       |  CPU 1015 trap statistics (4KB)    |   .
+ *       |- - - - - - - - - - - - - - - - - - +- 0x3ff000
  *       |                                    |
  *       |   ...                              |
  *       |                                    |
- *       |- - - - - - - - - - - - - - - - - - +- 0x00c000
- *       |  CPU 1 trap statistics (8KB)       |   .
  *       |- - - - - - - - - - - - - - - - - - +- 0x00a000
- *       |  CPU 0 trap statistics (8KB)       |   .
+ *       |  CPU 1 trap statistics (4KB)       |   .
+ *       |- - - - - - - - - - - - - - - - - - +- 0x009000
+ *       |  CPU 0 trap statistics (4KB)       |   .
  *       |- - - - - - - - - - - - - - - - - - +- 0x008000
  *       |  Shared trap handler continuation  |   .
  *       |- - - - - - - - - - - - - - - - - - +- 0x006000
@@ -293,13 +294,19 @@
  *       |  Non-trap instruction, TL=0        |   .
  *       +------------------------------------+- 0x000000
  *
- * Note that each CPU has its own 8K space for its trap statistics but
+ * Note that each CPU has its own 4K space for its trap statistics but
  * shares the same interposing trap handlers.  Interposing trap handlers
  * use the CPU ID to determine the location of per CPU trap statistics
  * area dynamically. This increases the interposing trap handler overhead,
- * but is acceptable as it allows us to support up to 508 CPUs with one
+ * but is acceptable as it allows us to support up to 1016 CPUs with one
  * 4MB page on sun4v architecture. Support for additional CPUs can be
- * added via hybrid scheme as mentioned earlier.
+ * added with another 4MB page to 2040 cpus (or 3064 cpus with 2 additional
+ * 4MB pages). With additional 4MB pages, we cannot use displacement branch
+ * (ba instruction) and we have to use jmp instruction instead. Note that
+ * with sun4v, globals are nested (not per-trap type as in sun4u), so it is
+ * ok to use additional global reg to do jmp. This option is not available in
+ * sun4u which mandates the usage of displacement branches since no global reg
+ * is available at TL>1
  *
  * TLB Statistics
  *
@@ -546,10 +553,13 @@ static size_t		tstat_total_size;  /* tstat data size + instr size */
 
 #else /* sun4v */
 
-static caddr_t		tstat_va;	/* VA of memory reserved for TBA */
-static pfn_t		tstat_pfn;	/* PFN of memory reserved for TBA */
+static caddr_t		tstat_va[TSTAT_NUM4M_LIMIT]; /* VAs of 4MB pages */
+static pfn_t		tstat_pfn[TSTAT_NUM4M_LIMIT]; /* PFNs of 4MB pages */
 static boolean_t	tstat_fast_tlbstat = B_FALSE;
 static int		tstat_traptab_initialized;
+static int		tstat_perm_mapping_failed;
+static int		tstat_hv_nopanic;
+static int		tstat_num4m_mapping;
 
 #endif /* sun4v */
 
@@ -597,9 +607,8 @@ tstat_tsbmiss_patch_entry_t tstat_tsbmiss_patch_table[] = {
 static void
 trapstat_load_tlb(void)
 {
-#ifndef sun4v
 	int i;
-#else
+#ifdef sun4v
 	uint64_t ret;
 #endif
 	tte_t tte;
@@ -625,16 +634,43 @@ trapstat_load_tlb(void)
 		}
 	}
 #else /* sun4v */
-	tte.tte_inthi = TTE_VALID_INT | TTE_PFN_INTHI(tstat_pfn);
-	tte.tte_intlo = TTE_PFN_INTLO(tstat_pfn) | TTE_CP_INT |
-	    TTE_CV_INT | TTE_PRIV_INT | TTE_HWWR_INT |
-	    TTE_SZ_INTLO(TTE4M);
-	ret = hv_mmu_map_perm_addr(va, KCONTEXT, *(uint64_t *)&tte,
-	    MAP_ITLB | MAP_DTLB);
+	for (i = 0; i < tstat_num4m_mapping; i++) {
+		tte.tte_inthi = TTE_VALID_INT | TTE_PFN_INTHI(tstat_pfn[i]);
+		tte.tte_intlo = TTE_PFN_INTLO(tstat_pfn[i]) | TTE_CP_INT |
+		    TTE_CV_INT | TTE_PRIV_INT | TTE_HWWR_INT |
+		    TTE_SZ_INTLO(TTE4M);
+		ret = hv_mmu_map_perm_addr(va, KCONTEXT, *(uint64_t *)&tte,
+		    MAP_ITLB | MAP_DTLB);
 
-	if (ret != H_EOK)
-		cmn_err(CE_PANIC, "trapstat: cannot map new TBA "
-		    "for cpu %d  (error: 0x%lx)", CPU->cpu_id, ret);
+		if (ret != H_EOK) {
+			if (tstat_hv_nopanic) {
+				int j;
+				/*
+				 * The first attempt to create perm mapping
+				 * failed. The guest might have exhausted its
+				 * perm mapping limit. We don't panic on first
+				 * try.
+				 */
+				tstat_perm_mapping_failed = 1;
+				va = tcpu->tcpu_vabase;
+				for (j = 0; j < i; j++) {
+					(void) hv_mmu_unmap_perm_addr(va,
+					    KCONTEXT, MAP_ITLB | MAP_DTLB);
+					va += MMU_PAGESIZE4M;
+				}
+				break;
+			}
+			/*
+			 * We failed on subsequent cpus trying to
+			 * create the same perm mappings. This
+			 * should not happen. Panic here.
+			 */
+			cmn_err(CE_PANIC, "trapstat: cannot create "
+			    "perm mappings for cpu %d "
+			    "(error: 0x%lx)", CPU->cpu_id, ret);
+		}
+		va += MMU_PAGESIZE4M;
+	}
 #endif /* sun4v */
 }
 
@@ -765,7 +801,11 @@ trapstat_probe()
 	 * interposing trap table.  We can safely use tstat_buffer because
 	 * the caller of the trapstat_probe() cross call is holding tstat_lock.
 	 */
+#ifdef sun4v
+	bcopy(tcpu->tcpu_data, tstat_buffer, TSTAT_DATA_SIZE);
+#else
 	bcopy(tcpu->tcpu_data, tstat_buffer, tstat_data_t_size);
+#endif
 
 	tstat_probe_time = gethrtime();
 
@@ -777,8 +817,13 @@ trapstat_probe()
 
 	tstat_probe_time = gethrtime() - tstat_probe_time;
 
+#ifdef sun4v
+	bcopy(tstat_buffer, tcpu->tcpu_data, TSTAT_DATA_SIZE);
+	tcpu->tcpu_tdata_peffect = (after - before) / TSTAT_PROBE_NPAGES;
+#else
 	bcopy(tstat_buffer, tcpu->tcpu_data, tstat_data_t_size);
 	tcpu->tcpu_data->tdata_peffect = (after - before) / TSTAT_PROBE_NPAGES;
+#endif
 }
 
 static void
@@ -970,18 +1015,47 @@ trapstat_snapshot()
 	ASSERT(tcpu->tcpu_flags & TSTAT_CPU_ALLOCATED);
 	ASSERT(tcpu->tcpu_flags & TSTAT_CPU_ENABLED);
 
+#ifndef sun4v
 	data->tdata_snapts = gethrtime();
 	data->tdata_snaptick = rdtick();
 	bcopy(data, tstat_buffer, tstat_data_t_size);
-#ifdef sun4v
+#else
 	/*
-	 * Invoke processor specific interface to collect TSB hit
-	 * statistics on each processor.
+	 * For sun4v, in order to conserve space in the limited
+	 * per-cpu 4K buffer, we derive certain info somewhere else and
+	 * copy them directly into the tstat_buffer output.
+	 * Note that we either are collecting tlb stats or
+	 * regular trapstats but never both.
 	 */
-	if ((tstat_options & TSTAT_OPT_TLBDATA) && tstat_fast_tlbstat)
-		cpu_trapstat_data((void *) tstat_buffer->tdata_pgsz,
-		    tstat_pgszs);
-#endif
+	tstat_buffer->tdata_cpuid = CPU->cpu_id;
+	tstat_buffer->tdata_peffect = tcpu->tcpu_tdata_peffect;
+	tstat_buffer->tdata_snapts = gethrtime();
+	tstat_buffer->tdata_snaptick = rdtick();
+
+	if (tstat_options & TSTAT_OPT_TLBDATA) {
+		/* Copy tlb/tsb stats collected in the per-cpu trapdata */
+		tstat_tdata_t *tdata = (tstat_tdata_t *)data;
+		bcopy(&tdata->tdata_pgsz[0],
+		    &tstat_buffer->tdata_pgsz[0],
+		    tstat_pgszs * sizeof (tstat_pgszdata_t));
+
+		/*
+		 * Invoke processor specific interface to collect TLB stats
+		 * on each processor if enabled.
+		 */
+		if (tstat_fast_tlbstat) {
+			cpu_trapstat_data((void *) tstat_buffer->tdata_pgsz,
+			    tstat_pgszs);
+		}
+	} else {
+		/*
+		 * Normal trapstat collection.
+		 * Copy all the 4K data area into tstat_buffer tdata_trap
+		 * area.
+		 */
+		bcopy(data, &tstat_buffer->tdata_traps[0], TSTAT_DATA_SIZE);
+	}
+#endif /* sun4v */
 }
 
 /*
@@ -1023,7 +1097,7 @@ trapstat_tlbretent(tstat_percpu_t *tcpu, tstat_tlbretent_t *ret,
 #ifndef sun4v
 	uintptr_t tmptick = TSTAT_DATA_OFFS(tcpu, tdata_tmptick);
 #else
-	uintptr_t tmptick = TSTAT_CPU0_DATA_OFFS(tcpu, tdata_tmptick);
+	uintptr_t tmptick = TSTAT_CPU0_TLBDATA_OFFS(tcpu, tdata_tmptick);
 #endif
 
 	/*
@@ -1162,15 +1236,17 @@ trapstat_tlbretent(tstat_percpu_t *tcpu, tstat_tlbretent_t *ret,
 #define	TSTAT_TLBENT_TPCLO_KERN	28
 #define	TSTAT_TLBENT_TSHI	32
 #define	TSTAT_TLBENT_TSLO	35
-#define	TSTAT_TLBENT_BA		36
+#define	TSTAT_TLBENT_ADDRHI	36
+#define	TSTAT_TLBENT_ADDRLO	37
 #endif /* sun4v */
 
 static void
 trapstat_tlbent(tstat_percpu_t *tcpu, int entno)
 {
 	uint32_t *ent;
-	uintptr_t orig, va, baoffs;
+	uintptr_t orig, va;
 #ifndef sun4v
+	uintptr_t baoffs;
 	int itlb = entno == TSTAT_ENT_ITLBMISS;
 	uint32_t asi = itlb ? ASI(ASI_IMMU) : ASI(ASI_DMMU);
 #else
@@ -1185,9 +1261,15 @@ trapstat_tlbent(tstat_percpu_t *tcpu, int entno)
 #endif
 	int entoffs = entno << TSTAT_ENT_SHIFT;
 	uintptr_t tmptick, stat, tpc, utpc;
-	tstat_pgszdata_t *data = &tcpu->tcpu_data->tdata_pgsz[0];
+	tstat_pgszdata_t *data;
 	tstat_tlbdata_t *udata, *kdata;
 	tstat_tlbret_t *ret;
+
+#ifdef sun4v
+	data = &((tstat_tdata_t *)tcpu->tcpu_data)->tdata_pgsz[0];
+#else
+	data = &tcpu->tcpu_data->tdata_pgsz[0];
+#endif /* sun4v */
 
 	/*
 	 * When trapstat is run with TLB statistics, this is the entry for
@@ -1276,7 +1358,10 @@ trapstat_tlbent(tstat_percpu_t *tcpu, int entno)
 	    0x82004004,			/* add %g1, %g4, %g1		*/
 	    0x85410000,			/* rd    %tick, %g2		*/
 	    0xc4706000,			/* stx   %g2, [%g1 + %lo(tmptick)] */
-	    0x30800000			/* ba,a  addr			*/
+	    0x05000000,			/* sethi %hi(addr), %g2		*/
+	    0x8410a000,			/* or %g2, %lo(addr), %g2	*/
+	    0x81c08000,			/* jmp %g2			*/
+	    NOP,
 #endif /* sun4v */
 	};
 
@@ -1290,8 +1375,8 @@ trapstat_tlbent(tstat_percpu_t *tcpu, int entno)
 	ASSERT(entno == TSTAT_ENT_ITLBMISS || entno == TSTAT_ENT_DTLBMISS ||
 	    entno == TSTAT_ENT_IMMUMISS || entno == TSTAT_ENT_DMMUMISS);
 
-	stat = TSTAT_CPU0_DATA_OFFS(tcpu, tdata_traps) + entoffs;
-	tmptick = TSTAT_CPU0_DATA_OFFS(tcpu, tdata_tmptick);
+	stat = TSTAT_CPU0_TLBDATA_OFFS(tcpu, tdata_traps[entno]);
+	tmptick = TSTAT_CPU0_TLBDATA_OFFS(tcpu, tdata_tmptick);
 #endif /* sun4v */
 
 	if (itlb) {
@@ -1314,7 +1399,6 @@ trapstat_tlbent(tstat_percpu_t *tcpu, int entno)
 	ent = (uint32_t *)((uintptr_t)tcpu->tcpu_instr + entoffs);
 	orig = KERNELBASE + entoffs;
 	va = (uintptr_t)tcpu->tcpu_ibase + entoffs;
-	baoffs = TSTAT_TLBENT_BA * sizeof (uint32_t);
 
 #ifdef sun4v
 	/*
@@ -1358,7 +1442,13 @@ trapstat_tlbent(tstat_percpu_t *tcpu, int entno)
 	ent[TSTAT_TLBENT_TPCLO_KERN] |= LO10(tpc);
 	ent[TSTAT_TLBENT_TSHI] |= HI22(tmptick);
 	ent[TSTAT_TLBENT_TSLO] |= LO10(tmptick);
+#ifndef	sun4v
+	baoffs = TSTAT_TLBENT_BA * sizeof (uint32_t);
 	ent[TSTAT_TLBENT_BA] |= DISP22(va + baoffs, orig);
+#else
+	ent[TSTAT_TLBENT_ADDRHI] |= HI22(orig);
+	ent[TSTAT_TLBENT_ADDRLO] |= LO10(orig);
+#endif /* sun4v */
 
 	/*
 	 * And now set up the TLB return entries.
@@ -1478,14 +1568,15 @@ trapstat_make_traptab(tstat_percpu_t *tcpu)
 #define	TSTAT_ENABLED_ADDRLO	3
 #define	TSTAT_ENABLED_CONTBA	6
 #define	TSTAT_ENABLED_TDATASHFT	7
-#define	TSTAT_DISABLED_BA	0
+#define	TSTAT_DISABLED_ADDRHI	0
+#define	TSTAT_DISABLED_ADDRLO	1
 
 static void
 trapstat_make_traptab(tstat_percpu_t *tcpu)
 {
 	uint32_t *ent;
 	uint64_t *stat;
-	uintptr_t orig, va, en_baoffs, dis_baoffs;
+	uintptr_t orig, va, en_baoffs;
 	uintptr_t tstat_cont_va;
 	int nent;
 
@@ -1546,15 +1637,17 @@ trapstat_make_traptab(tstat_percpu_t *tcpu)
 
 	/*
 	 * This is the entry in the interposing trap table for disabled trap
-	 * table entries.  It simply branches to the actual, underlying trap
+	 * table entries.  It simply "jmp" to the actual, underlying trap
 	 * table entry.  As explained in the "Implementation Details" section
 	 * of the block comment, all TL>0 traps _must_ use the disabled entry;
 	 * additional entries may be explicitly disabled through the use
 	 * of TSTATIOC_ENTRY/TSTATIOC_NOENTRY.
 	 */
 	static const uint32_t disabled[TSTAT_ENT_NINSTR] = {
-	    0x30800000,			/* ba,a addr			*/
-	    NOP, NOP, NOP, NOP, NOP, NOP, NOP,
+	    0x05000000,			/* sethi %hi(addr), %g2		*/
+	    0x8410a000,			/* or %g2, %lo(addr), %g2	*/
+	    0x81c08000,			/* jmp %g2			*/
+	    NOP, NOP, NOP, NOP, NOP,
 	};
 
 	ASSERT(MUTEX_HELD(&tstat_lock));
@@ -1563,11 +1656,18 @@ trapstat_make_traptab(tstat_percpu_t *tcpu)
 	orig = KERNELBASE;
 	va = (uintptr_t)tcpu->tcpu_ibase;
 	en_baoffs = TSTAT_ENABLED_CONTBA * sizeof (uint32_t);
-	dis_baoffs = TSTAT_DISABLED_BA * sizeof (uint32_t);
 	tstat_cont_va = TSTAT_INSTR_OFFS(tcpu, tinst_trapcnt);
 
 	for (nent = 0; nent < TSTAT_TOTAL_NENT; nent++) {
-		if (tstat_enabled[nent]) {
+		/*
+		 * If TSTAT_OPT_TLBDATA option is enabled (-t or -T option)
+		 * we make sure only TSTAT_TLB_NENT traps can be enabled.
+		 * Note that this logic is somewhat moot since trapstat
+		 * cmd actually use TSTATIOC_NOENTRY ioctl to disable all
+		 * traps when performing Tlb stats collection.
+		 */
+		if ((!(tstat_options & TSTAT_OPT_TLBDATA) ||
+		    nent < TSTAT_TLB_NENT) && tstat_enabled[nent]) {
 			bcopy(enabled, ent, sizeof (enabled));
 			ent[TSTAT_ENABLED_STATHI] |= HI22((uintptr_t)stat);
 			ent[TSTAT_ENABLED_STATLO] |= LO10((uintptr_t)stat);
@@ -1579,7 +1679,8 @@ trapstat_make_traptab(tstat_percpu_t *tcpu)
 			    LO10((uintptr_t)TSTAT_DATA_SHIFT);
 		} else {
 			bcopy(disabled, ent, sizeof (disabled));
-			ent[TSTAT_DISABLED_BA] |= DISP22(va + dis_baoffs, orig);
+			ent[TSTAT_DISABLED_ADDRHI] |= HI22((uintptr_t)orig);
+			ent[TSTAT_DISABLED_ADDRLO] |= LO10((uintptr_t)orig);
 		}
 
 		stat++;
@@ -1620,6 +1721,8 @@ trapstat_setup(processorid_t cpu)
 	cpu_t *cp;
 	uint_t strand_idx;
 	size_t tstat_offset;
+#else
+	uint64_t offset;
 #endif
 
 	ASSERT(tcpu->tcpu_pfn == NULL);
@@ -1709,17 +1812,19 @@ trapstat_setup(processorid_t cpu)
 	 * The lower fifteen bits of the %tba are always read as zero; hence
 	 * it must be aligned at least on 512K boundary.
 	 */
-	tcpu->tcpu_vabase = (caddr_t)(KERNELBASE - MMU_PAGESIZE4M);
+	tcpu->tcpu_vabase = (caddr_t)(KERNELBASE -
+	    MMU_PAGESIZE4M * tstat_num4m_mapping);
 	tcpu->tcpu_ibase = tcpu->tcpu_vabase;
 	tcpu->tcpu_dbase = tcpu->tcpu_ibase + TSTAT_INSTR_SIZE +
 	    cpu * TSTAT_DATA_SIZE;
 
-	tcpu->tcpu_pfn = &tstat_pfn;
-	tcpu->tcpu_instr = (tstat_instr_t *)tstat_va;
-	tcpu->tcpu_data = (tstat_data_t *)(tstat_va + TSTAT_INSTR_SIZE +
-	    cpu * TSTAT_DATA_SIZE);
+	tcpu->tcpu_pfn = &tstat_pfn[0];
+	tcpu->tcpu_instr = (tstat_instr_t *)tstat_va[0];
+
+	offset = TSTAT_INSTR_SIZE + cpu * TSTAT_DATA_SIZE;
+	tcpu->tcpu_data = (tstat_data_t *)(tstat_va[offset >> MMU_PAGESHIFT4M] +
+	    (offset & MMU_PAGEOFFSET4M));
 	bzero(tcpu->tcpu_data, TSTAT_DATA_SIZE);
-	tcpu->tcpu_data->tdata_cpuid = cpu;
 
 	/*
 	 * Now that we have all of the instruction and data pages allocated,
@@ -1759,9 +1864,7 @@ static void
 trapstat_teardown(processorid_t cpu)
 {
 	tstat_percpu_t *tcpu = &tstat_percpu[cpu];
-#ifndef sun4v
 	int i;
-#endif
 	caddr_t va = tcpu->tcpu_vabase;
 
 	ASSERT(tcpu->tcpu_pfn != NULL);
@@ -1783,7 +1886,10 @@ trapstat_teardown(processorid_t cpu)
 		    (uint64_t)ksfmmup);
 	}
 #else
-	xt_one(cpu, vtag_unmap_perm_tl1, (uint64_t)va, KCONTEXT);
+	for (i = 0; i < tstat_num4m_mapping; i++) {
+		xt_one(cpu, vtag_unmap_perm_tl1, (uint64_t)va, KCONTEXT);
+		va += MMU_PAGESIZE4M;
+	}
 #endif
 
 	tcpu->tcpu_pfn = NULL;
@@ -1796,6 +1902,9 @@ static int
 trapstat_go()
 {
 	cpu_t *cp;
+#ifdef sun4v
+	int i;
+#endif /* sun4v */
 
 	mutex_enter(&cpu_lock);
 	mutex_enter(&tstat_lock);
@@ -1808,15 +1917,32 @@ trapstat_go()
 
 #ifdef sun4v
 	/*
-	 * Allocate large page to hold interposing tables.
+	 * Compute the actual number of 4MB mappings
+	 * we need based on the guest's ncpu_guest_max value.
+	 * Note that earlier at compiled time, we did establish
+	 * and check against the sun4v solaris arch limit
+	 * (TSTAT_NUM4M_LIMIT) which is based on NCPU.
 	 */
-	tstat_va = contig_mem_alloc(MMU_PAGESIZE4M);
-	tstat_pfn = va_to_pfn(tstat_va);
-	if (tstat_pfn == PFN_INVALID) {
-		mutex_exit(&tstat_lock);
-		mutex_exit(&cpu_lock);
-		return (EAGAIN);
+	tstat_num4m_mapping = TSTAT_NUM4M_MACRO(ncpu_guest_max);
+	ASSERT(tstat_num4m_mapping <= TSTAT_NUM4M_LIMIT);
+
+	/*
+	 * Allocate large pages to hold interposing tables.
+	 */
+	for (i = 0; i < tstat_num4m_mapping; i++) {
+		tstat_va[i] = contig_mem_alloc(MMU_PAGESIZE4M);
+		tstat_pfn[i] = va_to_pfn(tstat_va[i]);
+		if (tstat_pfn[i] == PFN_INVALID) {
+			int j;
+			for (j = 0; j < i; j++) {
+				contig_mem_free(tstat_va[j], MMU_PAGESIZE4M);
+			}
+			mutex_exit(&tstat_lock);
+			mutex_exit(&cpu_lock);
+			return (EAGAIN);
+		}
 	}
+
 
 	/*
 	 * For detailed TLB statistics, invoke CPU specific interface
@@ -1832,12 +1958,17 @@ trapstat_go()
 		if (error == 0)
 			tstat_fast_tlbstat = B_TRUE;
 		else if (error != ENOTSUP) {
-			contig_mem_free(tstat_va, MMU_PAGESIZE4M);
+			for (i = 0; i < tstat_num4m_mapping; i++) {
+				contig_mem_free(tstat_va[i], MMU_PAGESIZE4M);
+			}
 			mutex_exit(&tstat_lock);
 			mutex_exit(&cpu_lock);
 			return (error);
 		}
 	}
+
+	tstat_hv_nopanic = 1;
+	tstat_perm_mapping_failed = 0;
 #endif /* sun4v */
 
 	/*
@@ -1849,7 +1980,6 @@ trapstat_go()
 	 * Allocate the resources we'll need to measure probe effect.
 	 */
 	trapstat_probe_alloc();
-
 
 	cp = cpu_list;
 	do {
@@ -1864,6 +1994,41 @@ trapstat_go()
 		 * of in parallel with an xc_all().
 		 */
 		xc_one(cp->cpu_id, (xcfunc_t *)trapstat_probe, 0, 0);
+
+#ifdef sun4v
+		/*
+		 * Check to see if the first cpu's attempt to create
+		 * the perm mappings failed. This might happen if the
+		 * guest somehow exhausted all its limited perm mappings.
+		 * Note that we only check this once for the first
+		 * attempt since it shouldn't fail for subsequent cpus
+		 * mapping the same TTEs if the first attempt was successful.
+		 */
+		if (tstat_hv_nopanic && tstat_perm_mapping_failed) {
+			tstat_percpu_t *tcpu = &tstat_percpu[cp->cpu_id];
+			for (i = 0; i < tstat_num4m_mapping; i++) {
+				contig_mem_free(tstat_va[i], MMU_PAGESIZE4M);
+			}
+
+			/*
+			 * Do clean up before returning.
+			 * Cleanup is manageable since we
+			 * only need to do it for the first cpu
+			 * iteration that failed.
+			 */
+			trapstat_probe_free();
+			trapstat_hotpatch();
+			tcpu->tcpu_pfn = NULL;
+			tcpu->tcpu_instr = NULL;
+			tcpu->tcpu_data = NULL;
+			tcpu->tcpu_flags &= ~TSTAT_CPU_ALLOCATED;
+			mutex_exit(&tstat_lock);
+			mutex_exit(&cpu_lock);
+			return (EAGAIN);
+		}
+		tstat_hv_nopanic = 0;
+#endif /* sun4v */
+
 	} while ((cp = cp->cpu_next) != cpu_list);
 
 	xc_all((xcfunc_t *)trapstat_enable, 0, 0);
@@ -1900,7 +2065,8 @@ trapstat_stop()
 	tstat_traptab_initialized = 0;
 	if (tstat_options & TSTAT_OPT_TLBDATA)
 		cpu_trapstat_conf(CPU_TSTATCONF_FINI);
-	contig_mem_free(tstat_va, MMU_PAGESIZE4M);
+	for (i = 0; i < tstat_num4m_mapping; i++)
+		contig_mem_free(tstat_va[i], MMU_PAGESIZE4M);
 #endif
 	trapstat_hotpatch();
 	tstat_running = 0;
@@ -2016,7 +2182,11 @@ trapstat_cpr(void *arg, int code)
 		 * Preserve this CPU's data in tstat_buffer and rip down its
 		 * interposing trap table.
 		 */
+#ifdef sun4v
+		bcopy(tcpu->tcpu_data, tstat_buffer, TSTAT_DATA_SIZE);
+#else
 		bcopy(tcpu->tcpu_data, tstat_buffer, tstat_data_t_size);
+#endif /* sun4v */
 		trapstat_teardown(cp->cpu_id);
 		ASSERT(!(tcpu->tcpu_flags & TSTAT_CPU_ALLOCATED));
 
@@ -2026,7 +2196,11 @@ trapstat_cpr(void *arg, int code)
 		 */
 		trapstat_setup(cp->cpu_id);
 		ASSERT(tcpu->tcpu_flags & TSTAT_CPU_ALLOCATED);
+#ifdef sun4v
+		bcopy(tstat_buffer, tcpu->tcpu_data, TSTAT_DATA_SIZE);
+#else
 		bcopy(tstat_buffer, tcpu->tcpu_data, tstat_data_t_size);
+#endif /* sun4v */
 
 		xc_one(cp->cpu_id, (xcfunc_t *)trapstat_enable, 0, 0);
 	} while ((cp = cp->cpu_next) != cpu_list);
@@ -2360,7 +2534,15 @@ trapstat_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	tstat_data_size = tstat_data_pages * MMU_PAGESIZE;
 	tstat_total_size = TSTAT_INSTR_SIZE + tstat_data_size;
 #else
-	ASSERT(tstat_data_t_size <= TSTAT_DATA_SIZE);
+	/*
+	 * For sun4v, the tstat_data_t_size reflect the tstat_buffer
+	 * output size based on tstat_data_t structure. For tlbstats
+	 * collection, we use the internal tstat_tdata_t structure
+	 * to collect the tlbstats for the pages. Therefore we
+	 * need to adjust the size for the assertion.
+	 */
+	ASSERT((tstat_data_t_size - sizeof (tstat_data_t) +
+	    sizeof (tstat_tdata_t)) <= TSTAT_DATA_SIZE);
 #endif
 
 	tstat_percpu = kmem_zalloc((max_cpuid + 1) *
@@ -2461,7 +2643,7 @@ static struct dev_ops trapstat_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"Trap Statistics",	/* name of module */
+	"Trap Statistics 1.1",	/* name of module */
 	&trapstat_ops,		/* driver ops */
 };
 

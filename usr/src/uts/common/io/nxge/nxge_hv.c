@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,13 @@
 
 #include <sys/nxge/nxge_impl.h>
 #include <sys/nxge/nxge_hio.h>
+
+/*
+ * The HV VR functions are set up based on the
+ * the version number of the NIU API group.
+ * For version 2.0 and above, the NIU will be
+ * be referenced from the cfg-handle.
+ */
 
 #if defined(sun4v)
 
@@ -49,7 +56,11 @@ nxge_hio_hv_init(nxge_t *nxge)
 	/* First, the HV VR functions. */
 	vr = &nhd->hio.vr;
 
+	/* HV Major 1 interfaces */
 	vr->assign = &hv_niu_vr_assign;
+	/* HV Major 2 interfaces */
+	vr->cfgh_assign = &hv_niu_cfgh_vr_assign;
+
 	vr->unassign = &hv_niu_vr_unassign;
 	vr->getinfo = &hv_niu_vr_getinfo;
 
@@ -61,12 +72,15 @@ nxge_hio_hv_init(nxge_t *nxge)
 	tx->unassign = &hv_niu_tx_dma_unassign;
 	tx->get_map = &hv_niu_vr_get_txmap;
 
+	/* HV Major 1 interfaces */
 	tx->lp_conf = &hv_niu_tx_logical_page_conf;
 	tx->lp_info = &hv_niu_tx_logical_page_info;
+	/* HV Major 2 interfaces */
+	tx->lp_cfgh_conf = &hv_niu_cfgh_tx_logical_page_conf;
+	tx->lp_cfgh_info = &hv_niu_cfgh_tx_logical_page_info;
 
 	tx->getinfo = &hv_niu_vrtx_getinfo;
 
-	// -------------------------------------------------------------
 	/* Now find the Receive functions. */
 	rx = &nhd->hio.rx;
 
@@ -74,8 +88,12 @@ nxge_hio_hv_init(nxge_t *nxge)
 	rx->unassign = &hv_niu_rx_dma_unassign;
 	rx->get_map = &hv_niu_vr_get_rxmap;
 
+	/* HV Major 1 interfaces */
 	rx->lp_conf = &hv_niu_rx_logical_page_conf;
 	rx->lp_info = &hv_niu_rx_logical_page_info;
+	/* HV Major 2 interfaces */
+	rx->lp_cfgh_conf = &hv_niu_cfgh_rx_logical_page_conf;
+	rx->lp_cfgh_info = &hv_niu_cfgh_rx_logical_page_info;
 
 	rx->getinfo = &hv_niu_vrrx_getinfo;
 }

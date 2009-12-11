@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_KERNEL_SLOT_H
 #define	_KERNEL_SLOT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -44,10 +42,15 @@ typedef struct cipher_mechs_threshold {
 
 /*
  * This slot has limited hash support. It can not do multi-part
- * hashing (updates) and it can not hash input data of size
- * greater than sl_max_inlen.
+ * hashing (updates).
  */
 #define	CRYPTO_LIMITED_HASH_SUPPORT	0x00000001
+
+/*
+ * This slot has limited hmac support. It can not do multi-part
+ * hmac (updates).
+ */
+#define	CRYPTO_LIMITED_HMAC_SUPPORT	0x00000002
 
 typedef struct kernel_slot {
 	CK_SLOT_ID		sl_provider_id;	/* kernel provider ID */
@@ -65,12 +68,18 @@ typedef struct kernel_slot {
 	 * The maximum input data that can be digested by this slot.
 	 * Used only if CRYPTO_LIMITED_HASH_SUPPORT is set in sl_flags.
 	 */
-	int			sl_max_inlen;
+	int			sl_hash_max_inlen;
+
+	/*
+	 * The maximum input data that can be hmac'ed by this slot.
+	 * Used only if CRYPTO_LIMITED_HMAC_SUPPORT is set in sl_flags.
+	 */
+	int			sl_hmac_max_inlen;
 
 	/*
 	 * The threshold for input data size. We use this slot
 	 * only if data size is at or above this value. Used only if
-	 * CRYPTO_LIMITED_HASH_SUPPORT is set.
+	 * CRYPTO_LIMITED_HASH_SUPPORT or CRYPTO_LIMITED_HMAC_SUPPORT is set.
 	 */
 	int			sl_threshold;
 

@@ -154,11 +154,22 @@ debug_printf(const char *fname, void *arg,  const char *fmt, ...)
 #endif
 
 /*
- * Hypervisor N2/NIU services information.
+ * Hypervisor N2/NIU services information:
+ *
+ * The list of HV versions that support NIU HybridIO. Note,
+ * the order is higher version to a lower version, as the
+ * registration is attempted in this order.
  */
-static hsvc_info_t niu_hsvc = {
-	HSVC_REV_1, NULL, HSVC_GROUP_NIU, 1, 1, "vnet_dds"
+static hsvc_info_t niu_hsvc[] = {
+	{HSVC_REV_1, NULL, HSVC_GROUP_NIU, 2, 0, "vnet_dds"},
+	{HSVC_REV_1, NULL, HSVC_GROUP_NIU, 1, 1, "vnet_dds"}
 };
+
+/*
+ * Index that points to the successful HV version that
+ * is registered.
+ */
+static int niu_hsvc_index = -1;
 
 /*
  * Lock to serialize the NIU device node related operations.
@@ -173,18 +184,29 @@ boolean_t vdds_hv_hio_capable = B_FALSE;
 void
 vdds_mod_init(void)
 {
+	int i;
 	int rv;
-	uint64_t minor;
+	uint64_t minor = 0;
 
-	rv = hsvc_register(&niu_hsvc, &minor);
 	/*
-	 * Only HV version 1.1 is capable of NIU Hybrid IO.
+	 * Try register one by one from niu_hsvc.
 	 */
-	if ((rv == 0) && (minor == 1)) {
-		vdds_hv_hio_capable = B_TRUE;
+	for (i = 0; i < (sizeof (niu_hsvc) / sizeof (hsvc_info_t)); i++) {
+		rv = hsvc_register(&niu_hsvc[i], &minor);
+		if (rv == 0) {
+			if (minor == niu_hsvc[i].hsvc_minor) {
+				vdds_hv_hio_capable = B_TRUE;
+				niu_hsvc_index = i;
+				break;
+			} else {
+				(void) hsvc_unregister(&niu_hsvc[i]);
+			}
+		}
 	}
 	mutex_init(&vdds_dev_lock, NULL, MUTEX_DRIVER, NULL);
-	DBG1(NULL, "HV HIO capable");
+	DBG2(NULL, "HV HIO capable=%d ver(%ld.%ld)", vdds_hv_hio_capable,
+	    (niu_hsvc_index == -1) ? 0 : niu_hsvc[niu_hsvc_index].hsvc_major,
+	    minor);
 }
 
 /*
@@ -193,7 +215,9 @@ vdds_mod_init(void)
 void
 vdds_mod_fini(void)
 {
-	(void) hsvc_unregister(&niu_hsvc);
+	if (niu_hsvc_index != -1) {
+		(void) hsvc_unregister(&niu_hsvc[niu_hsvc_index]);
+	}
 	mutex_destroy(&vdds_dev_lock);
 }
 

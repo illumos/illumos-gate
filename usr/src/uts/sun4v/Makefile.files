@@ -121,6 +121,7 @@ PX_OBJS		+= px_lib4v.o px_err.o px_tools_4v.o px_hcall.o px_libhv.o
 FPC_OBJS	+= fpc-impl-4v.o fpc-asm-4v.o
 N2PIUPC_OBJS	+= n2piupc.o n2piupc_tables.o n2piupc_kstats.o \
 			n2piupc_biterr.o n2piupc_asm.o
+IOSPC_OBJS	+= iospc.o rfios_iospc.o rfios_tables.o rfios_asm.o
 TRAPSTAT_OBJS	+= trapstat.o
 NIUMX_OBJS	+= niumx.o
 N2RNG_OBJS	+= n2rng.o n2rng_debug.o n2rng_hcall.o n2rng_kcf.o \
@@ -153,7 +154,7 @@ VNET_OBJS	= vnet.o vnet_gen.o vnet_dds.o vnet_dds_hcall.o
 VSW_OBJS	= vsw.o vsw_ldc.o vsw_phys.o vsw_switching.o vsw_hio.o
 VDC_OBJS	= vdc.o
 VDS_OBJS	= vds.o
-DS_PRI_OBJS	= ds_pri.o
+DS_PRI_OBJS	= ds_pri.o ds_pri_hcall.o
 DS_SNMP_OBJS	= ds_snmp.o
 VLDS_OBJS	= vlds.o
 

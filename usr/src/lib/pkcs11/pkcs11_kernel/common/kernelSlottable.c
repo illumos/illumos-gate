@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 #include <security/cryptoki.h>
@@ -190,10 +188,18 @@ kernel_get_func_list(kernel_slot_t *pslot)
 	pslot->sl_func_list.fl_set_pin = fl.fl_list.fl_set_pin;
 
 	pslot->sl_flags = 0;
-	if (fl.fl_list.prov_is_limited) {
-		pslot->sl_flags = CRYPTO_LIMITED_HASH_SUPPORT;
+	if (fl.fl_list.prov_is_hash_limited) {
+		pslot->sl_flags |= CRYPTO_LIMITED_HASH_SUPPORT;
+		pslot->sl_hash_max_inlen = fl.fl_list.prov_hash_limit;
+	}
+
+	if (fl.fl_list.prov_is_hmac_limited) {
+		pslot->sl_flags |= CRYPTO_LIMITED_HMAC_SUPPORT;
+		pslot->sl_hmac_max_inlen = fl.fl_list.prov_hmac_limit;
+	}
+
+	if (fl.fl_list.prov_is_hash_limited | fl.fl_list.prov_is_hmac_limited) {
 		pslot->sl_threshold = fl.fl_list.prov_hash_threshold;
-		pslot->sl_max_inlen = fl.fl_list.prov_hash_limit;
 	}
 
 	pslot->total_threshold_count = fl.fl_list.total_threshold_count;

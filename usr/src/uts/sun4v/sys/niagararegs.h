@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_NIAGARAREGS_H
 #define	_SYS_NIAGARAREGS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,30 +41,30 @@ extern "C" {
  * Niagara SPARC Performance Control Register
  */
 
-#define	CPC_NIAGARA_PCR_PRIVPIC		0
-#define	CPC_NIAGARA_PCR_SYS		1
-#define	CPC_NIAGARA_PCR_USR		2
+#define	CPC_PCR_PRIVPIC		0
+#define	CPC_PCR_SYS		1
+#define	CPC_PCR_USR		2
 
-#define	CPC_NIAGARA_PCR_PIC0_SHIFT	4
-#define	CPC_NIAGARA_PCR_PIC1_SHIFT	0
-#define	CPC_NIAGARA_PCR_PIC0_MASK	UINT64_C(0x7)
-#define	CPC_NIAGARA_PCR_PIC1_MASK	UINT64_C(0)
+#define	CPC_PCR_PIC0_SHIFT	4
+#define	CPC_PCR_PIC1_SHIFT	0
+#define	CPC_PCR_PIC0_MASK	UINT64_C(0x7)
+#define	CPC_PCR_PIC1_MASK	UINT64_C(0)
 
-#define	CPC_NIAGARA_PCR_OVF_MASK	UINT64_C(0x300)
-#define	CPC_NIAGARA_PCR_OVF_SHIFT	8
+#define	CPC_PCR_OVF_MASK	UINT64_C(0x300)
+#define	CPC_PCR_OVF_SHIFT	8
 
 /*
  * Niagara DRAM performance counters
  */
-#define	NIAGARA_DRAM_BANKS		0x4
+#define	DRAM_BANKS		0x4
 
-#define	NIAGARA_DRAM_PIC0_SEL_SHIFT	0x4
-#define	NIAGARA_DRAM_PIC1_SEL_SHIFT	0x0
+#define	DRAM_PIC0_SEL_SHIFT	0x4
+#define	DRAM_PIC1_SEL_SHIFT	0x0
 
-#define	NIAGARA_DRAM_PIC0_SHIFT		0x20
-#define	NIAGARA_DRAM_PIC0_MASK		0x7fffffff
-#define	NIAGARA_DRAM_PIC1_SHIFT		0x0
-#define	NIAGARA_DRAM_PIC1_MASK		0x7fffffff
+#define	DRAM_PIC0_SHIFT		0x20
+#define	DRAM_PIC0_MASK		0x7fffffff
+#define	DRAM_PIC1_SHIFT		0x0
+#define	DRAM_PIC1_MASK		0x7fffffff
 
 /*
  * Niagara JBUS performance counters
@@ -99,14 +97,14 @@ extern "C" {
  */
 #define	HV_NIAGARA_JBUS_CTL		0x0
 #define	HV_NIAGARA_JBUS_COUNT		0x1
-#define	HV_NIAGARA_DRAM_CTL0		0x2
-#define	HV_NIAGARA_DRAM_COUNT0		0x3
-#define	HV_NIAGARA_DRAM_CTL1		0x4
-#define	HV_NIAGARA_DRAM_COUNT1		0x5
-#define	HV_NIAGARA_DRAM_CTL2		0x6
-#define	HV_NIAGARA_DRAM_COUNT2		0x7
-#define	HV_NIAGARA_DRAM_CTL3		0x8
-#define	HV_NIAGARA_DRAM_COUNT3		0x9
+#define	HV_DRAM_CTL0		0x2
+#define	HV_DRAM_COUNT0		0x3
+#define	HV_DRAM_CTL1		0x4
+#define	HV_DRAM_COUNT1		0x5
+#define	HV_DRAM_CTL2		0x6
+#define	HV_DRAM_COUNT2		0x7
+#define	HV_DRAM_CTL3		0x8
+#define	HV_DRAM_COUNT3		0x9
 
 #ifndef _ASM
 

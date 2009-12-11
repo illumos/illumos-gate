@@ -63,6 +63,7 @@ f none usr/lib/fm/eft/neptune_xaui.eft 444 root bin
 f none usr/lib/fm/eft/neptune_xfp.eft 444 root bin
 f none usr/lib/fm/eft/pci.eft 444 root bin
 f none usr/lib/fm/eft/pciex.eft 444 root bin
+f none usr/lib/fm/eft/pciexrc.eft 444 root bin
 f none usr/lib/fm/eft/sensor.eft 444 root bin
 d none usr/lib/fm/fmd 755 root bin
 f none usr/lib/fm/fmd/fmd 555 root bin

@@ -21,10 +21,8 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
  
 PATH="/usr/bin:/usr/sbin:${PATH}"
@@ -47,6 +45,11 @@ fi
 if installed n2piupc
 then
 	rem_drv -b ${BASEDIR} n2piupc || EXIT=1
+fi
+
+if installed iospc
+then
+	rem_drv -b ${BASEDIR} iospc || EXIT=1
 fi
 
 exit $EXIT

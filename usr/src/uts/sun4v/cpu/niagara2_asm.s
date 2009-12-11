@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if !defined(lint)
 #include "assym.h"
@@ -64,6 +62,8 @@ hv_niagara_setperf(uint64_t perfreg, uint64_t data)
 	mov     HV_NIAGARA2_GETPERF, %o5
 #elif defined(VFALLS_IMPL)
 	mov	HV_VFALLS_GETPERF, %o5
+#elif defined(KT_IMPL)
+	mov	HV_KT_GETPERF, %o5
 #endif
 	ta      FAST_TRAP
 	brz,a   %o0, 1f
@@ -81,6 +81,8 @@ hv_niagara_setperf(uint64_t perfreg, uint64_t data)
 	mov     HV_NIAGARA2_SETPERF, %o5
 #elif defined(VFALLS_IMPL)
 	mov     HV_VFALLS_SETPERF, %o5
+#elif defined(KT_IMPL)
+	mov     HV_KT_SETPERF, %o5
 #endif
 	ta      FAST_TRAP
 	retl

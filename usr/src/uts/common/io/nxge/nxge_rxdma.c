@@ -46,6 +46,7 @@
 extern uint32_t nxge_rbr_size;
 extern uint32_t nxge_rcr_size;
 extern uint32_t	nxge_rbr_spare_size;
+extern uint16_t	nxge_rdc_buf_offset;
 
 extern uint32_t nxge_mblks_pending;
 
@@ -598,7 +599,12 @@ nxge_enable_rxdma_channel(p_nxge_t nxgep, uint16_t channel,
 	    rbr_p->npi_pkt_buf_size0, rbr_p->npi_pkt_buf_size1,
 	    rbr_p->npi_pkt_buf_size2));
 
-	rs = npi_rxdma_cfg_rdc_ring(handle, rbr_p->rdc, &rdc_desc);
+	if (nxgep->niu_hw_type == NIU_HW_TYPE_RF)
+		rs = npi_rxdma_cfg_rdc_ring(handle, rbr_p->rdc,
+		    &rdc_desc, B_TRUE);
+	else
+		rs = npi_rxdma_cfg_rdc_ring(handle, rbr_p->rdc,
+		    &rdc_desc, B_FALSE);
 	if (rs != NPI_SUCCESS) {
 		return (NXGE_ERROR | rs);
 	}
@@ -2375,6 +2381,36 @@ nxge_receive_packet(p_nxge_t nxgep,
 		return;
 	}
 
+	switch (nxge_rdc_buf_offset) {
+	case SW_OFFSET_NO_OFFSET:
+		sw_offset_bytes = 0;
+		break;
+	case SW_OFFSET_64:
+		sw_offset_bytes = 64;
+		break;
+	case SW_OFFSET_128:
+		sw_offset_bytes = 128;
+		break;
+	case SW_OFFSET_192:
+		sw_offset_bytes = 192;
+		break;
+	case SW_OFFSET_256:
+		sw_offset_bytes = 256;
+		break;
+	case SW_OFFSET_320:
+		sw_offset_bytes = 320;
+		break;
+	case SW_OFFSET_384:
+		sw_offset_bytes = 384;
+		break;
+	case SW_OFFSET_448:
+		sw_offset_bytes = 448;
+		break;
+	default:
+		sw_offset_bytes = 0;
+		break;
+	}
+
 	DMA_COMMON_SYNC_OFFSET(rx_msg_p->buf_dma,
 	    (buf_offset + sw_offset_bytes),
 	    (hdr_size + l2_len),
@@ -3602,7 +3638,9 @@ nxge_map_rxdma_channel_cfg_ring(p_nxge_t nxgep, uint16_t dma_channel,
 	    nxgep->intr_threshold;
 
 	rcrp->full_hdr_flag = B_FALSE;
-	rcrp->sw_priv_hdr_len = 0;
+
+	rcrp->sw_priv_hdr_len = nxge_rdc_buf_offset;
+
 
 	cfga_p = &(rcrp->rcr_cfga);
 	cfgb_p = &(rcrp->rcr_cfgb);
@@ -3660,7 +3698,31 @@ nxge_map_rxdma_channel_cfg_ring(p_nxge_t nxgep, uint16_t dma_channel,
 	    cfig1_p->value, cfig2_p->value));
 
 	cfig2_p->bits.ldw.full_hdr = rcrp->full_hdr_flag;
-	cfig2_p->bits.ldw.offset = rcrp->sw_priv_hdr_len;
+	if (nxgep->niu_hw_type == NIU_HW_TYPE_RF) {
+		switch (rcrp->sw_priv_hdr_len) {
+			case SW_OFFSET_NO_OFFSET:
+			case SW_OFFSET_64:
+			case SW_OFFSET_128:
+			case SW_OFFSET_192:
+				cfig2_p->bits.ldw.offset =
+				    rcrp->sw_priv_hdr_len;
+				cfig2_p->bits.ldw.offset256 = 0;
+				break;
+			case SW_OFFSET_256:
+			case SW_OFFSET_320:
+			case SW_OFFSET_384:
+			case SW_OFFSET_448:
+				cfig2_p->bits.ldw.offset =
+				    rcrp->sw_priv_hdr_len & 0x3;
+				cfig2_p->bits.ldw.offset256 = 1;
+				break;
+			default:
+				cfig2_p->bits.ldw.offset = SW_OFFSET_NO_OFFSET;
+				cfig2_p->bits.ldw.offset256 = 0;
+			}
+	} else {
+		cfig2_p->bits.ldw.offset = rcrp->sw_priv_hdr_len;
+	}
 
 	rbrp->rx_rcr_p = rcrp;
 	rcrp->rx_rbr_p = rbrp;

@@ -184,13 +184,17 @@ prop upset.memory.memlink@MEM_CTRL
     ereport.cpu.generic-sparc.membuf-crc@MEM_CTRL;
 
 /*
- * membuf-crc-uc will fault the detector FRU and sender FRU
+ * membuf-crc-uc, membuf-other-uc will fault the detector FRU and sender FRU
  * if detector is CHIP or MEM_CTRL, the sender is MEM_BUFF.
  * if detector is MEM_BUFF, the sender is CHIP or MEM_CTRL
  */
 event ereport.cpu.generic-sparc.membuf-crc-uc@CHIP { within(1s) };
 event ereport.cpu.generic-sparc.membuf-crc-uc@MEM_BUFF { within(1s) };
 event ereport.cpu.generic-sparc.membuf-crc-uc@MEM_CTRL { within(1s) };
+
+event ereport.cpu.generic-sparc.membuf-other-uc@CHIP { within(1s) };
+event ereport.cpu.generic-sparc.membuf-other-uc@MEM_BUFF { within(1s) };
+event ereport.cpu.generic-sparc.membuf-other-uc@MEM_CTRL { within(1s) };
 
 event fault.memory.memlink-uc@CHIP;
 event fault.memory.memlink-uc@MEM_BUFF;
@@ -201,55 +205,66 @@ event fault.memory.memlink-uc@MEM_CTRL;
  */
 prop fault.memory.memlink-uc@CHIP
     { DIAGNOSE_ERPT } (0) ->
-    ereport.cpu.generic-sparc.membuf-crc-uc@CHIP;
+    ereport.cpu.generic-sparc.membuf-crc-uc@CHIP,
+    ereport.cpu.generic-sparc.membuf-other-uc@CHIP;
 
 prop fault.memory.memlink-uc@MEM_BUFF
     { DIAGNOSE_ERPT && CONTAINS_MEMBUFF } (0) ->
-    ereport.cpu.generic-sparc.membuf-crc-uc@CHIP<>;
+    ereport.cpu.generic-sparc.membuf-crc-uc@CHIP<>,
+    ereport.cpu.generic-sparc.membuf-other-uc@CHIP<>;
 
 event upset.memory.memlink-uc@CHIP;
 
 prop upset.memory.memlink-uc@CHIP
     { !DIAGNOSE_ERPT } (0)->
-    ereport.cpu.generic-sparc.membuf-crc-uc@CHIP;
+    ereport.cpu.generic-sparc.membuf-crc-uc@CHIP,
+    ereport.cpu.generic-sparc.membuf-other-uc@CHIP;
 
 /*
  * memory-buffer is detector
  */
 prop fault.memory.memlink-uc@MEM_BUFF
     { DIAGNOSE_ERPT } (0) ->
-    ereport.cpu.generic-sparc.membuf-crc-uc@MEM_BUFF;
+    ereport.cpu.generic-sparc.membuf-crc-uc@MEM_BUFF,
+    ereport.cpu.generic-sparc.membuf-other-uc@MEM_BUFF;
 
 prop fault.memory.memlink-uc@CHIP
     { DIAGNOSE_ERPT && CONTAINS_CHIP } (0) ->
-    ereport.cpu.generic-sparc.membuf-crc-uc@MEM_BUFF<>;
+    ereport.cpu.generic-sparc.membuf-crc-uc@MEM_BUFF<>,
+    ereport.cpu.generic-sparc.membuf-other-uc@MEM_BUFF<>;
 
 prop fault.memory.memlink-uc@MEM_CTRL
     { DIAGNOSE_ERPT && CONTAINS_MEMCTRL } (0) ->
-    ereport.cpu.generic-sparc.membuf-crc-uc@MEM_BUFF<>;
+    ereport.cpu.generic-sparc.membuf-crc-uc@MEM_BUFF<>,
+    ereport.cpu.generic-sparc.membuf-other-uc@MEM_BUFF<>;
 
 event upset.memory.memlink-uc@MEM_BUFF;
 
 prop upset.memory.memlink-uc@MEM_BUFF
     { !DIAGNOSE_ERPT } (0)->
-    ereport.cpu.generic-sparc.membuf-crc-uc@MEM_BUFF;
+    ereport.cpu.generic-sparc.membuf-crc-uc@MEM_BUFF,
+    ereport.cpu.generic-sparc.membuf-other-uc@MEM_BUFF;
 
 /*
  * memory-controller is detector
  */
 prop fault.memory.memlink-uc@MEM_CTRL
     { DIAGNOSE_ERPT } (0) ->
-    ereport.cpu.generic-sparc.membuf-crc-uc@MEM_CTRL;
+    ereport.cpu.generic-sparc.membuf-crc-uc@MEM_CTRL,
+    ereport.cpu.generic-sparc.membuf-other-uc@MEM_CTRL;
 
 prop fault.memory.memlink-uc@MEM_BUFF
     { DIAGNOSE_ERPT && CONTAINS_MEMBUFF } (0) ->
-    ereport.cpu.generic-sparc.membuf-crc-uc@MEM_CTRL<>;
+    ereport.cpu.generic-sparc.membuf-crc-uc@MEM_CTRL<>,
+    ereport.cpu.generic-sparc.membuf-other-uc@MEM_CTRL<>;
 
 event upset.memory.memlink-uc@MEM_CTRL;
 
 prop upset.memory.memlink-uc@MEM_CTRL
     { !DIAGNOSE_ERPT } (0)->
-    ereport.cpu.generic-sparc.membuf-crc-uc@MEM_CTRL;
+    ereport.cpu.generic-sparc.membuf-crc-uc@MEM_CTRL,
+    ereport.cpu.generic-sparc.membuf-other-uc@MEM_CTRL;
+
 /*
  * membuf-crc-failover will fault the detector FRU and sender FRU
  * if detector is chip or memory-controller, the sender is memory-buffer.

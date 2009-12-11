@@ -617,7 +617,7 @@ typedef struct s10_crypto_function_list {
 	boolean_t fl_init_pin;
 	boolean_t fl_set_pin;
 
-	boolean_t prov_is_limited;
+	boolean_t prov_is_hash_limited;
 	uint32_t prov_hash_threshold;
 	uint32_t prov_hash_limit;
 } s10_crypto_function_list_t;
@@ -742,7 +742,7 @@ crypto_ioctl(sysret_t *rval, int fdes, int cmd, intptr_t arg)
 	struct_assign(s10_param, native_param, fl_list.fl_init_pin);
 	struct_assign(s10_param, native_param, fl_list.fl_set_pin);
 
-	struct_assign(s10_param, native_param, fl_list.prov_is_limited);
+	struct_assign(s10_param, native_param, fl_list.prov_is_hash_limited);
 	struct_assign(s10_param, native_param, fl_list.prov_hash_threshold);
 	struct_assign(s10_param, native_param, fl_list.prov_hash_limit);
 

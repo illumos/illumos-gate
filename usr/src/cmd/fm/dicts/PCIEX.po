@@ -390,7 +390,7 @@ msgstr "One or more device instances may be disabled.\n"
 msgid "PCIEX-8000-PY.impact"
 msgstr "Degraded services provided by the device instances associated with this fault.\n"
 msgid "PCIEX-8000-PY.action"
-msgstr "Use fmadm faulty to identify the device and then update the firmware to the latest version or schedule a repair procedure to replace the affected device. Contact Sun support for further information.\n"
+msgstr "Use 'fmadm faulty' to identify the device and then update the firmware to the latest version or schedule a repair procedure to replace the affected device. Contact Sun support for further information.\n"
 #
 # code: PCIEX-8000-Q3
 # keys: fault.io.pciex.fw_mismatch
@@ -406,4 +406,68 @@ msgstr "One or more device instances may be disabled.\n"
 msgid "PCIEX-8000-Q3.impact"
 msgstr "Degraded services provided by the device instances associated with this fault.\n"
 msgid "PCIEX-8000-Q3.action"
-msgstr "Use fmadm faulty to identify the device and then update the firmware to the latest version. Contact Sun support for further information.\n"
+msgstr "Use 'fmadm faulty' to identify the device and then update the firmware to the latest version. Contact Sun support for further information.\n"
+#
+# code: PCIEX-8000-RC
+# keys: fault.io.pciex.rc.generic-ce
+#
+msgid "PCIEX-8000-RC.type"
+msgstr "Fault"
+msgid "PCIEX-8000-RC.severity"
+msgstr "Critical"
+msgid "PCIEX-8000-RC.description"
+msgstr "The number of correctable errors detected in the PCIe Root Complex has crossed the allowed threshold.\n"
+msgid "PCIEX-8000-RC.response"
+msgstr "One or more device instances may be disabled\n"
+msgid "PCIEX-8000-RC.impact"
+msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
+msgid "PCIEX-8000-RC.action"
+msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact Sun for support.\n"
+#
+# code: PCIEX-8000-SQ
+# keys: fault.io.pciex.rc.generic-ue
+#
+msgid "PCIEX-8000-SQ.type"
+msgstr "Fault"
+msgid "PCIEX-8000-SQ.severity"
+msgstr "Critical"
+msgid "PCIEX-8000-SQ.description"
+msgstr "An uncorrectable error was detected in the PCIe Root Complex.\n  Refer to %s for more information."
+msgid "PCIEX-8000-SQ.response"
+msgstr "One or more device instances may be disabled\n"
+msgid "PCIEX-8000-SQ.impact"
+msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
+msgid "PCIEX-8000-SQ.action"
+msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact Sun for support.\n"
+#
+# code: PCIEX-8000-T4
+# keys: fault.io.pciex.rc.generic-sw
+#
+msgid "PCIEX-8000-T4.type"
+msgstr "Fault"
+msgid "PCIEX-8000-T4.severity"
+msgstr "Critical"
+msgid "PCIEX-8000-T4.description"
+msgstr "A defect in the PCIe Root Complex or Root Port code has been detected.\n  Refer to %s for more information."
+msgid "PCIEX-8000-T4.response"
+msgstr "One or more device instances may be disabled\n"
+msgid "PCIEX-8000-T4.impact"
+msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
+msgid "PCIEX-8000-T4.action"
+msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact Sun for support.\n"
+#
+# code: PCIEX-8000-UR
+# keys: fault.io.pciex.rc.generic-fw
+#
+msgid "PCIEX-8000-UR.type"
+msgstr "Fault"
+msgid "PCIEX-8000-UR.severity"
+msgstr "Critical"
+msgid "PCIEX-8000-UR.description"
+msgstr "A defective firmware associated with the PCIe Root Complex has been detected.\n  Refer to %s for more information."
+msgid "PCIEX-8000-UR.response"
+msgstr "One or more device instances may be disabled\n"
+msgid "PCIEX-8000-UR.impact"
+msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
+msgid "PCIEX-8000-UR.action"
+msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact Sun for support.\n"

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -133,7 +133,6 @@ static struct modlinkage modlinkage = {
 };
 
 static void *niumx_state;
-static niumx_ih_t niumx_ihtable[NIUMX_MAX_INTRS];
 
 /*
  * forward function declarations:
@@ -189,9 +188,10 @@ hrtime_t niumx_intr_timeout = 2ull * NANOSEC; /* 2 seconds in nanoseconds */
 void
 niumx_intr_dist(void *arg)
 {
-	kmutex_t 	*lock_p = (kmutex_t *)arg;
+	niumx_devstate_t	*niumxds_p = (niumx_devstate_t *)arg;
+	kmutex_t 	*lock_p = &niumxds_p->niumx_mutex;
 	int		i;
-	niumx_ih_t	*ih_p = niumx_ihtable;
+	niumx_ih_t	*ih_p = niumxds_p->niumx_ihtable;
 
 	DBG(DBG_A_INTX, NULL, "niumx_intr_dist entered\n");
 	mutex_enter(lock_p);
@@ -270,7 +270,7 @@ niumx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    NIUMX_DEVHDLE_MASK);
 
 		/* add interrupt redistribution callback */
-		intr_dist_add(niumx_intr_dist, &niumxds_p->niumx_mutex);
+		intr_dist_add(niumx_intr_dist, niumxds_p);
 
 		niumxds_p->niumx_fm_cap = DDI_FM_EREPORT_CAPABLE;
 
@@ -305,7 +305,7 @@ niumx_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		niumxds_p = (niumx_devstate_t *)
 		    ddi_get_soft_state(niumx_state, ddi_get_instance(dip));
 
-		intr_dist_rem(niumx_intr_dist, &niumxds_p->niumx_mutex);
+		intr_dist_rem(niumx_intr_dist, niumxds_p);
 		ddi_fm_fini(dip);
 		mutex_destroy(&niumxds_p->niumx_mutex);
 		ddi_soft_state_free(niumx_state, ddi_get_instance(dip));
@@ -864,6 +864,11 @@ niumx_set_intr(dev_info_t *dip, dev_info_t *rdip,
 	devino_t	*inos_p;
 	int		inoslen, ret = DDI_SUCCESS;
 	uint64_t	hvret;
+	niumx_devstate_t	*niumxds_p;	/* devstate pointer */
+	int 		instance = ddi_get_instance(dip);
+
+	niumxds_p = (niumx_devstate_t *)ddi_get_soft_state(niumx_state,
+	    instance);
 
 	ASSERT(hdlp->ih_inum < NIUMX_MAX_INTRS);
 
@@ -873,7 +878,8 @@ niumx_set_intr(dev_info_t *dip, dev_info_t *rdip,
 		ret = DDI_FAILURE;
 		goto fail;
 	}
-	ih_p = niumx_ihtable + inos_p[hdlp->ih_inum];
+
+	ih_p = niumxds_p->niumx_ihtable + inos_p[hdlp->ih_inum];
 	DBG(DBG_A_INTX, dip, "niumx_set_intr: rdip=%s%d, valid=%d %s (%x,%x)\n",
 	    NAMEINST(rdip), valid, valid ? "enabling" : "disabling",
 	    ih_p->ih_inum, ih_p->ih_sysino);
@@ -907,6 +913,11 @@ niumx_add_intr(dev_info_t *dip, dev_info_t *rdip,
 	uint64_t	hvret;
 	devino_t	*inos_p, ino; /* INO numbers, from "interrupts" prop */
 	sysino_t	sysino;
+	niumx_devstate_t	*niumxds_p;	/* devstate pointer */
+	int		instance = ddi_get_instance(dip);
+
+	niumxds_p = (niumx_devstate_t *)ddi_get_soft_state(niumx_state,
+	    instance);
 
 	/* get new ino */
 	if (hdlp->ih_inum >= NIUMX_MAX_INTRS) {
@@ -920,7 +931,7 @@ niumx_add_intr(dev_info_t *dip, dev_info_t *rdip,
 		ret = DDI_FAILURE;
 		goto done;
 	}
-	ih_p = niumx_ihtable + inos_p[hdlp->ih_inum];
+	ih_p = niumxds_p->niumx_ihtable + inos_p[hdlp->ih_inum];
 	ino = inos_p[hdlp->ih_inum];
 	kmem_free(inos_p, inoslen);
 	if ((hvret = hvio_intr_devino_to_sysino(DIP_TO_HANDLE(dip), ino,
@@ -994,6 +1005,11 @@ niumx_rem_intr(dev_info_t *dip, dev_info_t *rdip,
 	int		inoslen, ret = DDI_SUCCESS, state;
 	hrtime_t	start;
 	sysino_t 	sysino;
+	niumx_devstate_t	*niumxds_p;	/* devstate pointer */
+	int		instance = ddi_get_instance(dip);
+
+	niumxds_p = (niumx_devstate_t *)ddi_get_soft_state(niumx_state,
+	    instance);
 
 	ASSERT(hdlp->ih_inum < NIUMX_MAX_INTRS);
 
@@ -1003,7 +1019,7 @@ niumx_rem_intr(dev_info_t *dip, dev_info_t *rdip,
 		ret = DDI_FAILURE;
 		goto fail1;
 	}
-	ih_p = niumx_ihtable + inos_p[hdlp->ih_inum];
+	ih_p = niumxds_p->niumx_ihtable + inos_p[hdlp->ih_inum];
 	sysino = ih_p->ih_sysino;
 	DBG(DBG_R_INTX, dip, "removing (%x,%x)\n", ih_p->ih_inum, sysino);
 

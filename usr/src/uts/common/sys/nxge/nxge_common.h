@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -499,6 +499,14 @@ typedef struct nxge_part_cfg {
 #define	FZC_READ_ONLY			0x04
 } nxge_part_cfg_t, *p_nxge_part_cfg_t;
 
+typedef struct nxge_usr_l3_cls {
+	uint64_t		cls;
+	uint16_t		tcam_ref_cnt;
+	uint8_t			pid;
+	uint8_t			flow_pkt_type;
+	uint8_t			valid;
+} nxge_usr_l3_cls_t, *p_nxge_usr_l3_cls_t;
+
 typedef struct nxge_hw_list {
 	struct nxge_hw_list 	*next;
 	nxge_os_mutex_t 	nxge_cfg_lock;
@@ -536,6 +544,10 @@ typedef struct nxge_hw_list {
 	uint32_t		platform_type;
 	uint8_t			xcvr_addr[NXGE_MAX_PORTS];
 	uintptr_t		hio;
+	void			*tcam;
+	uint32_t 		tcam_size;
+	uint64_t		tcam_l2_prog_cls[NXGE_L2_PROG_CLS];
+	nxge_usr_l3_cls_t	tcam_l3_prog_cls[NXGE_L3_PROG_CLS];
 } nxge_hw_list_t, *p_nxge_hw_list_t;
 
 #ifdef	__cplusplus

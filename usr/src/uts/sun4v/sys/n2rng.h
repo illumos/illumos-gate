@@ -62,6 +62,7 @@ extern "C" {
 
 #define	N2RNG_BINDNAME_N2	"SUNW,n2-rng"
 #define	N2RNG_BINDNAME_VF	"SUNW,vf-rng"
+#define	N2RNG_BINDNAME_KT	"SUNW,kt-rng"
 
 #define	N2RNG_MAX_RNGS		4
 #define	N2RNG_INVALID_ID	(-1)
@@ -71,7 +72,8 @@ extern "C" {
 typedef enum {
 	N2RNG_CPU_UNKNOWN,
 	N2RNG_CPU_N2,
-	N2RNG_CPU_VF
+	N2RNG_CPU_VF,
+	N2RNG_CPU_KT
 } n2rng_binding_t;
 
 typedef union n2rngctl {

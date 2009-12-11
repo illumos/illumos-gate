@@ -207,6 +207,7 @@ typedef uint32_t crypto_keysize_unit_t;
 #define	SUN_CKM_AES_CCM			"CKM_AES_CCM"
 #define	SUN_CKM_AES_GCM			"CKM_AES_GCM"
 #define	SUN_CKM_AES_GMAC		"CKM_AES_GMAC"
+#define	SUN_CKM_AES_CFB128		"CKM_AES_CFB128"
 #define	SUN_CKM_RC4			"CKM_RC4"
 #define	SUN_CKM_RSA_PKCS		"CKM_RSA_PKCS"
 #define	SUN_CKM_RSA_X_509		"CKM_RSA_X_509"
@@ -454,6 +455,8 @@ typedef struct crypto_provider_ext_info {
 	crypto_version_t	ei_hardware_version;
 	crypto_version_t	ei_firmware_version;
 	uchar_t			ei_time[CRYPTO_EXT_SIZE_TIME];
+	int			ei_hash_max_input_len;
+	int			ei_hmac_max_input_len;
 } crypto_provider_ext_info_t;
 
 typedef uint_t		crypto_session_id_t;

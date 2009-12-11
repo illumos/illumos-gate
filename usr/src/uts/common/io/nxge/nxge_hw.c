@@ -53,6 +53,7 @@ static nxge_status_t nxge_check_xaui_xfp(p_nxge_t nxgep);
 
 extern uint32_t nxge_rx_mode;
 extern uint32_t nxge_jumbo_mtu;
+extern uint16_t	nxge_rdc_buf_offset;
 
 static void
 nxge_rtrace_ioctl(p_nxge_t, queue_t *, mblk_t *, struct iocblk *);
@@ -143,6 +144,41 @@ nxge_hw_init_niu_common(p_nxge_t nxgep)
 
 	/* per neptune common block init */
 	(void) nxge_fflp_hw_reset(nxgep);
+
+	if (nxgep->niu_hw_type != NIU_HW_TYPE_RF) {
+		switch (nxge_rdc_buf_offset) {
+		case SW_OFFSET_NO_OFFSET:
+		case SW_OFFSET_64:
+		case SW_OFFSET_128:
+			break;
+		default:
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "nxge_hw_init_niu_common: Unsupported RDC buffer"
+			    " offset code %d, setting to %d",
+			    nxge_rdc_buf_offset, SW_OFFSET_NO_OFFSET));
+			nxge_rdc_buf_offset = SW_OFFSET_NO_OFFSET;
+			break;
+		}
+	} else {
+		switch (nxge_rdc_buf_offset) {
+		case SW_OFFSET_NO_OFFSET:
+		case SW_OFFSET_64:
+		case SW_OFFSET_128:
+		case SW_OFFSET_192:
+		case SW_OFFSET_256:
+		case SW_OFFSET_320:
+		case SW_OFFSET_384:
+		case SW_OFFSET_448:
+			break;
+		default:
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "nxge_hw_init_niu_common: Unsupported RDC buffer"
+			    " offset code %d, setting to %d",
+			    nxge_rdc_buf_offset, SW_OFFSET_NO_OFFSET));
+			nxge_rdc_buf_offset = SW_OFFSET_NO_OFFSET;
+			break;
+		}
+	}
 
 	hw_p->flags = COMMON_INIT_DONE;
 	MUTEX_EXIT(&hw_p->nxge_cfg_lock);

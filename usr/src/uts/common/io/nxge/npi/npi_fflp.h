@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _NPI_FFLP_H
 #define	_NPI_FFLP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -765,6 +763,12 @@ npi_status_t npi_fflp_cfg_ip_usr_cls_set(npi_handle_t,
 					uint8_t, uint8_t,
 					uint8_t, uint8_t);
 
+npi_status_t npi_fflp_cfg_ip_usr_cls_set_iptun(npi_handle_t,
+		tcam_class_t, uint8_t, uint8_t, uint16_t, uint8_t);
+
+npi_status_t npi_fflp_cfg_ip_usr_cls_get_iptun(npi_handle_t,
+		tcam_class_t, uint8_t *, uint8_t *, uint16_t *, uint8_t *);
+
 /*
  * npi_fflp_cfg_ip_usr_cls_enable()
  * Enable previously configured TCAM user configurable IP classes.
@@ -860,15 +864,21 @@ npi_status_t npi_fflp_cfg_ip_cls_tcam_key(npi_handle_t,
 npi_status_t npi_fflp_cfg_ip_cls_flow_key(npi_handle_t,
 			    tcam_class_t, flow_key_cfg_t *);
 
-
-
 npi_status_t npi_fflp_cfg_ip_cls_flow_key_get(npi_handle_t,
 				    tcam_class_t,
 				    flow_key_cfg_t *);
 
+npi_status_t npi_fflp_cfg_ip_cls_flow_key_rfnl(npi_handle_t,
+		tcam_class_t, flow_key_cfg_t *);
+
+npi_status_t npi_fflp_cfg_sym_ip_cls_flow_key(npi_handle_t, tcam_class_t,
+					boolean_t);
+
+npi_status_t npi_fflp_cfg_ip_cls_flow_key_get_rfnl(npi_handle_t,
+			tcam_class_t, flow_key_cfg_t *);
 
 npi_status_t npi_fflp_cfg_ip_cls_tcam_key_get(npi_handle_t,
-				    tcam_class_t, tcam_key_cfg_t *);
+			tcam_class_t, tcam_key_cfg_t *);
 /*
  * npi_fflp_cfg_hash_h1poly()
  * Initializes the H1 hash generation logic.

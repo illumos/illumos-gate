@@ -131,9 +131,12 @@ typedef struct crypto_function_list {
 	boolean_t fl_init_pin;
 	boolean_t fl_set_pin;
 
-	boolean_t prov_is_limited;
+	boolean_t prov_is_hash_limited;
 	uint32_t prov_hash_threshold;
 	uint32_t prov_hash_limit;
+
+	boolean_t prov_is_hmac_limited;
+	uint32_t prov_hmac_limit;
 
 	int total_threshold_count;
 	fl_mechs_threshold_t	fl_threshold[MAX_NUM_THRESHOLD];

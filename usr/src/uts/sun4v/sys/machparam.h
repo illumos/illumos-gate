@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_MACHPARAM_H
 #define	_SYS_MACHPARAM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -60,7 +58,7 @@ extern "C" {
  * makefile.
  */
 #ifndef NCPU
-#define	NCPU	256
+#define	NCPU	512
 #endif
 
 /*

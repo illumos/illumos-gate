@@ -65,6 +65,9 @@ extern "C" {
 #define	NXGE_PUT_TCAM		(NXGE_IOC|30)
 #define	NXGE_INJECT_ERR		(NXGE_IOC|40)
 
+#define	NXGE_RX_CLASS		(NXGE_IOC|41)
+#define	NXGE_RX_HASH		(NXGE_IOC|42)
+
 #define	NXGE_OK			0
 #define	NXGE_ERROR		0x40000000
 #define	NXGE_DDI_FAILED		0x20000000
@@ -92,6 +95,9 @@ extern "C" {
 #define	INIT_BUCKET_SIZE	16	/* Initial Hash Bucket Size */
 
 #define	NXGE_CHECK_TIMER	(5000)
+
+/* KT/NIU OBP creates a compatible property for KT */
+#define	KT_NIU_COMPATIBLE	"SUNW,niusl-kt"
 
 typedef enum {
 	param_instance,
@@ -794,6 +800,15 @@ struct _nxge_t {
 	nxge_ring_group_t	rx_hio_groups[NXGE_MAX_RDC_GROUPS];
 
 	nxge_share_handle_t	shares[NXGE_MAX_VRS];
+
+	/*
+	 * KT-NIU:
+	 *	KT family will have up to 4 NIUs per system.
+	 *	Differences between N2/NIU and KT/NIU:
+	 *		SerDes, Hypervisor interfaces,
+	 *		additional NIU classification features.
+	 */
+	niu_hw_type_t		niu_hw_type;
 };
 
 /*

@@ -666,6 +666,7 @@ static hsvc_info_unix_t  hsvcinfo_unix[] = {
 	{{HSVC_REV_1, NULL,	HSVC_GROUP_CORE,	1,	2, NULL}, 1},
 	{{HSVC_REV_1, NULL,	HSVC_GROUP_DIAG,	1,	0, NULL}, 1},
 	{{HSVC_REV_1, NULL,	HSVC_GROUP_INTR,	1,	0, NULL}, 0},
+	{{HSVC_REV_1, NULL,	HSVC_GROUP_REBOOT_DATA,	1,	0, NULL}, 0},
 };
 
 #define	HSVCINFO_UNIX_CNT	(sizeof (hsvcinfo_unix) / sizeof (hsvc_info_t))

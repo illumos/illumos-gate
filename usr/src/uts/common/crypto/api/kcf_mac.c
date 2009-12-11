@@ -180,8 +180,8 @@ retry:
 		KCF_PROV_INCRSTATS(pd, error);
 	} else {
 		if (pd->pd_prov_type == CRYPTO_HW_PROVIDER &&
-		    (pd->pd_flags & CRYPTO_HASH_NO_UPDATE) &&
-		    (data->cd_length > pd->pd_hash_limit)) {
+		    (pd->pd_flags & CRYPTO_HMAC_NO_UPDATE) &&
+		    (data->cd_length > pd->pd_hmac_limit)) {
 			/*
 			 * XXX - We need a check to see if this is indeed
 			 * a HMAC. So far, all kernel clients use
@@ -305,8 +305,8 @@ retry:
 		KCF_PROV_INCRSTATS(pd, error);
 	} else {
 		if (pd->pd_prov_type == CRYPTO_HW_PROVIDER &&
-		    (pd->pd_flags & CRYPTO_HASH_NO_UPDATE) &&
-		    (data->cd_length > pd->pd_hash_limit)) {
+		    (pd->pd_flags & CRYPTO_HMAC_NO_UPDATE) &&
+		    (data->cd_length > pd->pd_hmac_limit)) {
 			/* see comments in crypto_mac() */
 			error = CRYPTO_BUFFER_TOO_BIG;
 		} else {
@@ -475,7 +475,7 @@ retry:
 	}
 
 	if (pd->pd_prov_type == CRYPTO_HW_PROVIDER &&
-	    (pd->pd_flags & CRYPTO_HASH_NO_UPDATE)) {
+	    (pd->pd_flags & CRYPTO_HMAC_NO_UPDATE)) {
 		/*
 		 * The hardware provider has limited HMAC support.
 		 * So, we fallback early here to using a software provider.

@@ -1,5 +1,5 @@
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -116,3 +116,4 @@ fault.memory.memlink-uc=87
 defect.fw.generic-sparc.addr-oob=88
 defect.fw.generic-sparc.erpt-gen=89
 fault.cpu.generic-sparc.bootbus=90
+fault.sp.failed=91

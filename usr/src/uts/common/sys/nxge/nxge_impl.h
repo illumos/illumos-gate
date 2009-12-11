@@ -32,9 +32,17 @@ extern "C" {
 
 /*
  * NIU HV API version definitions.
+ *
+ * If additional major (HV API) is to be supported,
+ * please increment NIU_MAJOR_HI.
+ * If additional minor # is to be supported,
+ * please increment NIU_MINOR_HI.
  */
+#define	NIU_MAJOR_HI		2
+#define	NIU_MINOR_HI		1
 #define	NIU_MAJOR_VER		1
 #define	NIU_MINOR_VER		1
+#define	NIU_MAJOR_VER_2		2
 
 #if defined(sun4v)
 
@@ -428,6 +436,17 @@ typedef enum {
 	    (NXGE_PORT_RSVD << 12))
 
 } niu_type_t;
+
+/*
+ * The niu_hw_type is for non-PHY related functions
+ * designed on various versions of NIU chips (i.e. RF/NIU has
+ * additional classification features and communicates with
+ * a different SerDes than N2/NIU).
+ */
+typedef enum {
+	NIU_HW_TYPE_DEFAULT = 0,	/* N2/NIU */
+	NIU_HW_TYPE_RF = 1,		/* RF/NIU */
+} niu_hw_type_t;
 
 /*
  * P_NEPTUNE_GENERIC:
@@ -849,6 +868,9 @@ nxge_status_t nxge_fflp_set_hash2(p_nxge_t, uint16_t);
 nxge_status_t nxge_fflp_init_hostinfo(p_nxge_t);
 
 void nxge_handle_tcam_fragment_bug(p_nxge_t);
+int nxge_rxclass_ioctl(p_nxge_t, queue_t *, mblk_t *);
+int nxge_rxhash_ioctl(p_nxge_t, queue_t *, mblk_t *);
+
 nxge_status_t nxge_fflp_hw_reset(p_nxge_t);
 nxge_status_t nxge_fflp_handle_sys_errors(p_nxge_t);
 nxge_status_t nxge_zcp_handle_sys_errors(p_nxge_t);
@@ -1124,6 +1146,26 @@ uint64_t hv_niu_vrtx_logical_page_conf(uint32_t cookie, uint64_t chidx,
 uint64_t hv_niu_vrtx_logical_page_info(uint32_t cookie, uint64_t chidx,
     uint64_t pgidx, uint64_t *raddr, uint64_t *size);
 #pragma weak	hv_niu_vrtx_logical_page_info
+
+uint64_t hv_niu_cfgh_rx_logical_page_conf(uint64_t, uint64_t, uint64_t,
+	uint64_t, uint64_t);
+#pragma weak	hv_niu_rx_logical_page_conf
+
+uint64_t hv_niu_cfgh_rx_logical_page_info(uint64_t, uint64_t, uint64_t,
+	uint64_t *, uint64_t *);
+#pragma weak	hv_niu_rx_logical_page_info
+
+uint64_t hv_niu_cfgh_tx_logical_page_conf(uint64_t, uint64_t, uint64_t,
+	uint64_t, uint64_t);
+#pragma weak	hv_niu_tx_logical_page_conf
+
+uint64_t hv_niu_cfgh_tx_logical_page_info(uint64_t, uint64_t, uint64_t,
+	uint64_t *, uint64_t *);
+#pragma weak	hv_niu_tx_logical_page_info
+
+uint64_t hv_niu_cfgh_vr_assign(uint64_t, uint64_t vridx, uint64_t ldc_id,
+	uint32_t *cookie);
+#pragma weak	hv_niu_vr_assign
 
 //
 // NIU-specific interrupt API

@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_NXGE_NXGE_FFLP_H
 #define	_SYS_NXGE_NXGE_FFLP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -131,6 +129,7 @@ typedef struct _tcam_flow_spec {
 	tcam_entry_t tce;
 	uint64_t flags;
 	uint64_t user_info;
+	uint8_t valid;
 } tcam_flow_spec_t, *p_tcam_flow_spec_t;
 
 
@@ -204,6 +203,7 @@ typedef struct _nxge_classify {
 	nxge_os_mutex_t		fcram_lock;
 	nxge_os_mutex_t		hash_lock[MAX_PARTITION];
 	uint32_t 		tcam_size;
+	uint32_t		tcam_entry_cnt;
 	uint32_t 		state;
 #define	NXGE_FFLP_HW_RESET	0x1
 #define	NXGE_FFLP_HW_INIT	0x2
@@ -211,8 +211,15 @@ typedef struct _nxge_classify {
 #define	NXGE_FFLP_FCRAM_PART	0x80000000
 	p_nxge_fflp_stats_t	fflp_stats;
 
-	tcam_flow_spec_t    *tcam_entries;
-	uint8_t		    tcam_location;
+	tcam_flow_spec_t    	*tcam_entries;
+	uint8_t			tcam_top;
+	uint8_t			tcam_location;
+	uint64_t		tcam_l2_prog_cls[NXGE_L2_PROG_CLS];
+	uint64_t		tcam_l3_prog_cls[NXGE_L3_PROG_CLS];
+	uint64_t		tcam_key[12];
+	uint64_t		flow_key[12];
+	uint16_t		tcam_l3_prog_cls_refcnt[NXGE_L3_PROG_CLS];
+	uint8_t			tcam_l3_prog_cls_pid[NXGE_L3_PROG_CLS];
 #define	NXGE_FLOW_NO_SUPPORT  0x0
 #define	NXGE_FLOW_USE_TCAM    0x1
 #define	NXGE_FLOW_USE_FCRAM   0x2

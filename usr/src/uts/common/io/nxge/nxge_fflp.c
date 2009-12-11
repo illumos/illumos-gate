@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <npi_fflp.h>
 #include <npi_mac.h>
@@ -53,9 +51,14 @@ static void nxge_fill_tcam_entry_udp_ipv6(p_nxge_t, flow_spec_t *,
 	tcam_entry_t *);
 static void nxge_fill_tcam_entry_sctp_ipv6(p_nxge_t, flow_spec_t *,
 	tcam_entry_t *);
-static uint8_t nxge_get_rdc_offset(p_nxge_t, uint8_t, intptr_t);
-static uint8_t nxge_get_rdc_group(p_nxge_t, uint8_t, intptr_t);
-static tcam_location_t nxge_get_tcam_location(p_nxge_t, uint8_t);
+static uint8_t nxge_get_rdc_offset(p_nxge_t, uint8_t, uint64_t);
+static uint8_t nxge_get_rdc_group(p_nxge_t, uint8_t, uint64_t);
+static uint16_t nxge_tcam_get_index(p_nxge_t, uint16_t);
+static uint32_t nxge_tcam_cls_to_flow(uint32_t);
+static uint8_t nxge_iptun_pkt_type_to_pid(uint8_t);
+static npi_status_t nxge_set_iptun_usr_cls_reg(p_nxge_t, uint64_t,
+					iptun_cfg_t *);
+static boolean_t nxge_is_iptun_cls_present(p_nxge_t, uint8_t, int *);
 
 /*
  * functions used outside this file
@@ -68,6 +71,17 @@ nxge_status_t nxge_add_tcam_entry(p_nxge_t, flow_resource_t *);
 nxge_status_t nxge_add_fcram_entry(p_nxge_t, flow_resource_t *);
 nxge_status_t nxge_flow_get_hash(p_nxge_t, flow_resource_t *,
 	uint32_t *, uint16_t *);
+int nxge_get_valid_tcam_cnt(p_nxge_t);
+void nxge_get_tcam_entry_all(p_nxge_t, rx_class_cfg_t *);
+void nxge_get_tcam_entry(p_nxge_t, flow_resource_t *);
+void nxge_del_tcam_entry(p_nxge_t, uint32_t);
+void nxge_add_iptun_class(p_nxge_t, iptun_cfg_t *, uint8_t *);
+void nxge_cfg_iptun_hash(p_nxge_t, iptun_cfg_t *, uint8_t);
+void nxge_del_iptun_class(p_nxge_t, uint8_t);
+void nxge_get_iptun_class(p_nxge_t, iptun_cfg_t *, uint8_t);
+void nxge_set_ip_cls_sym(p_nxge_t, uint8_t, uint8_t);
+void nxge_get_ip_cls_sym(p_nxge_t, uint8_t, uint8_t *);
+
 
 nxge_status_t
 nxge_tcam_dump_entry(p_nxge_t nxgep, uint32_t location)
@@ -812,7 +826,6 @@ nxge_fflp_set_hash2(p_nxge_t nxgep, uint16_t h2)
 nxge_status_t
 nxge_classify_init_sw(p_nxge_t nxgep)
 {
-	int alloc_size;
 	nxge_classify_t *classify_ptr;
 
 	NXGE_DEBUG_MSG((nxgep, FFLP_CTL, "==> nxge_classify_init_sw"));
@@ -823,19 +836,10 @@ nxge_classify_init_sw(p_nxge_t nxgep)
 		    "nxge_classify_init_sw already init"));
 		return (NXGE_OK);
 	}
-	/* Init SW structures */
-	classify_ptr->tcam_size = TCAM_NIU_TCAM_MAX_ENTRY;
 
-	/* init data structures, based on HW type */
-	if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep)) {
-		classify_ptr->tcam_size = TCAM_NXGE_TCAM_MAX_ENTRY;
-		/*
-		 * check if fcram based classification is required and init the
-		 * flow storage
-		 */
-	}
-	alloc_size = sizeof (tcam_flow_spec_t) * classify_ptr->tcam_size;
-	classify_ptr->tcam_entries = KMEM_ZALLOC(alloc_size, NULL);
+	classify_ptr->tcam_size = nxgep->nxge_hw_p->tcam_size / nxgep->nports;
+	classify_ptr->tcam_entries = (tcam_flow_spec_t *)nxgep->nxge_hw_p->tcam;
+	classify_ptr->tcam_top = nxgep->function_num;
 
 	/* Init defaults */
 	/*
@@ -855,49 +859,10 @@ nxge_classify_init_sw(p_nxge_t nxgep)
 nxge_status_t
 nxge_classify_exit_sw(p_nxge_t nxgep)
 {
-	int alloc_size;
-	nxge_classify_t *classify_ptr;
-	int fsize;
-
 	NXGE_DEBUG_MSG((nxgep, FFLP_CTL, "==> nxge_classify_exit_sw"));
-	classify_ptr = &nxgep->classifier;
-
-	fsize = sizeof (tcam_flow_spec_t);
-	if (classify_ptr->tcam_entries) {
-		alloc_size = fsize * classify_ptr->tcam_size;
-		KMEM_FREE((void *) classify_ptr->tcam_entries, alloc_size);
-	}
 	nxgep->classifier.state = NULL;
-
 	NXGE_DEBUG_MSG((nxgep, FFLP_CTL, "<== nxge_classify_exit_sw"));
 	return (NXGE_OK);
-}
-
-/*
- * Figures out the location where the TCAM entry is
- * to be inserted.
- *
- * The current implementation is just a place holder and it
- * returns the next tcam location.
- * The real location determining algorithm would consider
- * the priority, partition etc ... before deciding which
- * location to insert.
- *
- */
-
-/* ARGSUSED */
-static tcam_location_t
-nxge_get_tcam_location(p_nxge_t nxgep, uint8_t class)
-{
-	tcam_location_t location;
-
-	location = nxgep->classifier.tcam_location;
-	nxgep->classifier.tcam_location = (location + nxgep->nports) %
-	    nxgep->classifier.tcam_size;
-	NXGE_DEBUG_MSG((nxgep, FFLP_CTL,
-	    "nxge_get_tcam_location: location %d next %d \n",
-	    location, nxgep->classifier.tcam_location));
-	return (location);
 }
 
 /*
@@ -912,7 +877,7 @@ nxge_get_tcam_location(p_nxge_t nxgep, uint8_t class)
 
 /* ARGSUSED */
 static uint8_t
-nxge_get_rdc_group(p_nxge_t nxgep, uint8_t class, intptr_t cookie)
+nxge_get_rdc_group(p_nxge_t nxgep, uint8_t class, uint64_t cookie)
 {
 	int use_port_rdc_grp = 0;
 	uint8_t rdc_grp = 0;
@@ -933,7 +898,7 @@ nxge_get_rdc_group(p_nxge_t nxgep, uint8_t class, intptr_t cookie)
 
 /* ARGSUSED */
 static uint8_t
-nxge_get_rdc_offset(p_nxge_t nxgep, uint8_t class, intptr_t cookie)
+nxge_get_rdc_offset(p_nxge_t nxgep, uint8_t class, uint64_t cookie)
 {
 	return ((uint8_t)cookie);
 }
@@ -962,6 +927,8 @@ nxge_fill_tcam_entry_udp(p_nxge_t nxgep, flow_spec_t *flow_spec,
 	TCAM_IP_PROTO(tcam_ptr->ip4_proto_key,
 	    tcam_ptr->ip4_proto_mask,
 	    IPPROTO_UDP);
+	tcam_ptr->ip4_tos_key = fspec_key->tos;
+	tcam_ptr->ip4_tos_mask = fspec_mask->tos;
 }
 
 static void
@@ -992,6 +959,8 @@ nxge_fill_tcam_entry_udp_ipv6(p_nxge_t nxgep, flow_spec_t *flow_spec,
 	    fspec_key->pdst, fspec_key->psrc);
 	TCAM_IP_PORTS(tcam_ptr->ip6_port_mask,
 	    fspec_mask->pdst, fspec_mask->psrc);
+	tcam_ptr->ip6_tos_key = fspec_key->tos;
+	tcam_ptr->ip6_tos_mask = fspec_mask->tos;
 }
 
 /* ARGSUSED */
@@ -1017,6 +986,8 @@ nxge_fill_tcam_entry_tcp(p_nxge_t nxgep, flow_spec_t *flow_spec,
 	    tcam_ptr->ip4_class_mask, TCAM_CLASS_TCP_IPV4);
 	TCAM_IP_PROTO(tcam_ptr->ip4_proto_key,
 	    tcam_ptr->ip4_proto_mask, IPPROTO_TCP);
+	tcam_ptr->ip4_tos_key = fspec_key->tos;
+	tcam_ptr->ip4_tos_mask = fspec_mask->tos;
 }
 
 /* ARGSUSED */
@@ -1042,6 +1013,8 @@ nxge_fill_tcam_entry_sctp(p_nxge_t nxgep, flow_spec_t *flow_spec,
 	    fspec_key->pdst, fspec_key->psrc);
 	TCAM_IP_PORTS(tcam_ptr->ip4_port_mask,
 	    fspec_mask->pdst, fspec_mask->psrc);
+	tcam_ptr->ip4_tos_key = fspec_key->tos;
+	tcam_ptr->ip4_tos_mask = fspec_mask->tos;
 }
 
 static void
@@ -1073,6 +1046,8 @@ nxge_fill_tcam_entry_tcp_ipv6(p_nxge_t nxgep, flow_spec_t *flow_spec,
 	    fspec_key->pdst, fspec_key->psrc);
 	TCAM_IP_PORTS(tcam_ptr->ip6_port_mask,
 	    fspec_mask->pdst, fspec_mask->psrc);
+	tcam_ptr->ip6_tos_key = fspec_key->tos;
+	tcam_ptr->ip6_tos_mask = fspec_mask->tos;
 }
 
 static void
@@ -1104,7 +1079,112 @@ nxge_fill_tcam_entry_sctp_ipv6(p_nxge_t nxgep, flow_spec_t *flow_spec,
 	    fspec_key->pdst, fspec_key->psrc);
 	TCAM_IP_PORTS(tcam_ptr->ip6_port_mask,
 	    fspec_mask->pdst, fspec_mask->psrc);
+	tcam_ptr->ip6_tos_key = fspec_key->tos;
+	tcam_ptr->ip6_tos_mask = fspec_mask->tos;
 }
+
+/* ARGSUSED */
+static void
+nxge_fill_tcam_entry_ah_esp(p_nxge_t nxgep, flow_spec_t *flow_spec,
+	tcam_entry_t *tcam_ptr)
+{
+	ahip4_spec_t *fspec_key;
+	ahip4_spec_t *fspec_mask;
+
+	fspec_key = (ahip4_spec_t *)&flow_spec->uh.ahip4spec;
+	fspec_mask = (ahip4_spec_t *)&flow_spec->um.ahip4spec;
+
+	TCAM_IPV4_ADDR(tcam_ptr->ip4_dest_key, fspec_key->ip4dst);
+	TCAM_IPV4_ADDR(tcam_ptr->ip4_dest_mask, fspec_mask->ip4dst);
+	TCAM_IPV4_ADDR(tcam_ptr->ip4_src_key, fspec_key->ip4src);
+	TCAM_IPV4_ADDR(tcam_ptr->ip4_src_mask, fspec_mask->ip4src);
+
+	tcam_ptr->ip4_port_key = fspec_key->spi;
+	tcam_ptr->ip4_port_mask = fspec_mask->spi;
+
+	TCAM_IP_CLASS(tcam_ptr->ip4_class_key,
+	    tcam_ptr->ip4_class_mask,
+	    TCAM_CLASS_AH_ESP_IPV4);
+
+	if (flow_spec->flow_type == FSPEC_AHIP4) {
+		TCAM_IP_PROTO(tcam_ptr->ip4_proto_key,
+		    tcam_ptr->ip4_proto_mask, IPPROTO_AH);
+	} else {
+		TCAM_IP_PROTO(tcam_ptr->ip4_proto_key,
+		    tcam_ptr->ip4_proto_mask, IPPROTO_ESP);
+	}
+	tcam_ptr->ip4_tos_key = fspec_key->tos;
+	tcam_ptr->ip4_tos_mask = fspec_mask->tos;
+}
+
+static void
+nxge_fill_tcam_entry_ah_esp_ipv6(p_nxge_t nxgep, flow_spec_t *flow_spec,
+	tcam_entry_t *tcam_ptr)
+{
+	ahip6_spec_t *fspec_key;
+	ahip6_spec_t *fspec_mask;
+	p_nxge_class_pt_cfg_t p_class_cfgp;
+
+	fspec_key = (ahip6_spec_t *)&flow_spec->uh.ahip6spec;
+	fspec_mask = (ahip6_spec_t *)&flow_spec->um.ahip6spec;
+
+	p_class_cfgp = (p_nxge_class_pt_cfg_t)&nxgep->class_config;
+	if (p_class_cfgp->class_cfg[TCAM_CLASS_AH_ESP_IPV6] &
+	    NXGE_CLASS_TCAM_USE_SRC_ADDR) {
+		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_key, fspec_key->ip6src);
+		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_mask, fspec_mask->ip6src);
+	} else {
+		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_key, fspec_key->ip6dst);
+		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_mask, fspec_mask->ip6dst);
+	}
+
+	TCAM_IP_CLASS(tcam_ptr->ip6_class_key,
+	    tcam_ptr->ip6_class_mask, TCAM_CLASS_AH_ESP_IPV6);
+
+	if (flow_spec->flow_type == FSPEC_AHIP6) {
+		TCAM_IP_PROTO(tcam_ptr->ip6_nxt_hdr_key,
+		    tcam_ptr->ip6_nxt_hdr_mask, IPPROTO_AH);
+	} else {
+		TCAM_IP_PROTO(tcam_ptr->ip6_nxt_hdr_key,
+		    tcam_ptr->ip6_nxt_hdr_mask, IPPROTO_ESP);
+	}
+	tcam_ptr->ip6_port_key = fspec_key->spi;
+	tcam_ptr->ip6_port_mask = fspec_mask->spi;
+	tcam_ptr->ip6_tos_key = fspec_key->tos;
+	tcam_ptr->ip6_tos_mask = fspec_mask->tos;
+}
+
+/* ARGSUSED */
+static void
+nxge_fill_tcam_entry_ip_usr(p_nxge_t nxgep, flow_spec_t *flow_spec,
+	tcam_entry_t *tcam_ptr, tcam_class_t class)
+{
+	ip_user_spec_t *fspec_key;
+	ip_user_spec_t *fspec_mask;
+
+	fspec_key = (ip_user_spec_t *)&flow_spec->uh.ip_usr_spec;
+	fspec_mask = (ip_user_spec_t *)&flow_spec->um.ip_usr_spec;
+
+	if (fspec_key->ip_ver == FSPEC_IP4) {
+		TCAM_IPV4_ADDR(tcam_ptr->ip4_dest_key, fspec_key->ip4dst);
+		TCAM_IPV4_ADDR(tcam_ptr->ip4_dest_mask, fspec_mask->ip4dst);
+		TCAM_IPV4_ADDR(tcam_ptr->ip4_src_key, fspec_key->ip4src);
+		TCAM_IPV4_ADDR(tcam_ptr->ip4_src_mask, fspec_mask->ip4src);
+
+		tcam_ptr->ip4_port_key = fspec_key->l4_4_bytes;
+		tcam_ptr->ip4_port_mask = fspec_mask->l4_4_bytes;
+
+		TCAM_IP_CLASS(tcam_ptr->ip4_class_key,
+		    tcam_ptr->ip4_class_mask, class);
+
+		tcam_ptr->ip4_proto_key = fspec_key->proto;
+		tcam_ptr->ip4_proto_mask = fspec_mask->proto;
+
+		tcam_ptr->ip4_tos_key = fspec_key->tos;
+		tcam_ptr->ip4_tos_mask = fspec_mask->tos;
+	}
+}
+
 
 nxge_status_t
 nxge_flow_get_hash(p_nxge_t nxgep, flow_resource_t *flow_res,
@@ -1192,14 +1272,15 @@ nxge_status_t
 nxge_add_tcam_entry(p_nxge_t nxgep, flow_resource_t *flow_res)
 {
 	npi_handle_t handle;
-	intptr_t channel_cookie;
-	intptr_t flow_cookie;
+	uint64_t channel_cookie;
+	uint64_t flow_cookie;
 	flow_spec_t *flow_spec;
 	npi_status_t rs = NPI_SUCCESS;
 	tcam_entry_t tcam_ptr;
-	tcam_location_t location = 0;
+	tcam_location_t location;
 	uint8_t offset, rdc_grp;
 	p_nxge_hw_list_t hw_p;
+	uint64_t class;
 
 	NXGE_DEBUG_MSG((nxgep, FFLP_CTL, "==> nxge_add_tcam_entry"));
 	handle = nxgep->npi_reg_handle;
@@ -1208,12 +1289,110 @@ nxge_add_tcam_entry(p_nxge_t nxgep, flow_resource_t *flow_res)
 	flow_spec = (flow_spec_t *)&flow_res->flow_spec;
 	flow_cookie = flow_res->flow_cookie;
 	channel_cookie = flow_res->channel_cookie;
+	location = (tcam_location_t)nxge_tcam_get_index(nxgep,
+	    (uint16_t)flow_res->location);
+
+	if ((hw_p = nxgep->nxge_hw_p) == NULL) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    " nxge_add_tcam_entry: common hardware not set",
+		    nxgep->niu_type));
+		return (NXGE_ERROR);
+	}
+
+	if (flow_spec->flow_type == FSPEC_IP_USR) {
+		int i;
+		int add_usr_cls = 0;
+		int ipv6 = 0;
+		ip_user_spec_t *uspec = &flow_spec->uh.ip_usr_spec;
+		ip_user_spec_t *umask = &flow_spec->um.ip_usr_spec;
+		nxge_usr_l3_cls_t *l3_ucls_p;
+
+		MUTEX_ENTER(&hw_p->nxge_tcam_lock);
+
+		for (i = 0; i < NXGE_L3_PROG_CLS; i++) {
+			l3_ucls_p = &hw_p->tcam_l3_prog_cls[i];
+			if (l3_ucls_p->valid && l3_ucls_p->tcam_ref_cnt) {
+				if (uspec->proto == l3_ucls_p->pid) {
+					class = l3_ucls_p->cls;
+					l3_ucls_p->tcam_ref_cnt++;
+					add_usr_cls = 1;
+					break;
+				}
+			} else if (l3_ucls_p->valid == 0) {
+				/* Program new user IP class */
+				switch (i) {
+				case 0:
+					class = TCAM_CLASS_IP_USER_4;
+					break;
+				case 1:
+					class = TCAM_CLASS_IP_USER_5;
+					break;
+				case 2:
+					class = TCAM_CLASS_IP_USER_6;
+					break;
+				case 3:
+					class = TCAM_CLASS_IP_USER_7;
+					break;
+				default:
+					break;
+				}
+				if (uspec->ip_ver == FSPEC_IP6)
+					ipv6 = 1;
+				rs = npi_fflp_cfg_ip_usr_cls_set(handle,
+				    (tcam_class_t)class, uspec->tos,
+				    umask->tos, uspec->proto, ipv6);
+				if (rs != NPI_SUCCESS)
+					goto fail;
+
+				rs = npi_fflp_cfg_ip_usr_cls_enable(handle,
+				    (tcam_class_t)class);
+				if (rs != NPI_SUCCESS)
+					goto fail;
+
+				l3_ucls_p->cls = class;
+				l3_ucls_p->pid = uspec->proto;
+				l3_ucls_p->tcam_ref_cnt++;
+				l3_ucls_p->valid = 1;
+				add_usr_cls = 1;
+				break;
+			} else if (l3_ucls_p->tcam_ref_cnt == 0 &&
+			    uspec->proto == l3_ucls_p->pid) {
+				/*
+				 * The class has already been programmed,
+				 * probably for flow hash
+				 */
+				class = l3_ucls_p->cls;
+				if (uspec->ip_ver == FSPEC_IP6)
+					ipv6 = 1;
+				rs = npi_fflp_cfg_ip_usr_cls_set(handle,
+				    (tcam_class_t)class, uspec->tos,
+				    umask->tos, uspec->proto, ipv6);
+				if (rs != NPI_SUCCESS)
+					goto fail;
+
+				rs = npi_fflp_cfg_ip_usr_cls_enable(handle,
+				    (tcam_class_t)class);
+				if (rs != NPI_SUCCESS)
+					goto fail;
+
+				l3_ucls_p->pid = uspec->proto;
+				l3_ucls_p->tcam_ref_cnt++;
+				add_usr_cls = 1;
+				break;
+			}
+		}
+		if (!add_usr_cls) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "nxge_add_tcam_entry: Could not find/insert class"
+			    "for pid %d", uspec->proto));
+			goto fail;
+		}
+		MUTEX_EXIT(&hw_p->nxge_tcam_lock);
+	}
 
 	switch (flow_spec->flow_type) {
 	case FSPEC_TCPIP4:
 		nxge_fill_tcam_entry_tcp(nxgep, flow_spec, &tcam_ptr);
-		location = nxge_get_tcam_location(nxgep,
-		    TCAM_CLASS_TCP_IPV4);
 		rdc_grp = nxge_get_rdc_group(nxgep, TCAM_CLASS_TCP_IPV4,
 		    flow_cookie);
 		offset = nxge_get_rdc_offset(nxgep, TCAM_CLASS_TCP_IPV4,
@@ -1222,8 +1401,6 @@ nxge_add_tcam_entry(p_nxge_t nxgep, flow_resource_t *flow_res)
 
 	case FSPEC_UDPIP4:
 		nxge_fill_tcam_entry_udp(nxgep, flow_spec, &tcam_ptr);
-		location = nxge_get_tcam_location(nxgep,
-		    TCAM_CLASS_UDP_IPV4);
 		rdc_grp = nxge_get_rdc_group(nxgep,
 		    TCAM_CLASS_UDP_IPV4,
 		    flow_cookie);
@@ -1235,8 +1412,6 @@ nxge_add_tcam_entry(p_nxge_t nxgep, flow_resource_t *flow_res)
 	case FSPEC_TCPIP6:
 		nxge_fill_tcam_entry_tcp_ipv6(nxgep,
 		    flow_spec, &tcam_ptr);
-		location = nxge_get_tcam_location(nxgep,
-		    TCAM_CLASS_TCP_IPV6);
 		rdc_grp = nxge_get_rdc_group(nxgep, TCAM_CLASS_TCP_IPV6,
 		    flow_cookie);
 		offset = nxge_get_rdc_offset(nxgep, TCAM_CLASS_TCP_IPV6,
@@ -1246,65 +1421,85 @@ nxge_add_tcam_entry(p_nxge_t nxgep, flow_resource_t *flow_res)
 	case FSPEC_UDPIP6:
 		nxge_fill_tcam_entry_udp_ipv6(nxgep,
 		    flow_spec, &tcam_ptr);
-		location = nxge_get_tcam_location(nxgep,
-		    TCAM_CLASS_UDP_IPV6);
 		rdc_grp = nxge_get_rdc_group(nxgep,
 		    TCAM_CLASS_UDP_IPV6,
-		    channel_cookie);
+		    flow_cookie);
 		offset = nxge_get_rdc_offset(nxgep,
 		    TCAM_CLASS_UDP_IPV6,
-		    flow_cookie);
+		    channel_cookie);
 		break;
 
 	case FSPEC_SCTPIP4:
 		nxge_fill_tcam_entry_sctp(nxgep, flow_spec, &tcam_ptr);
-		location = nxge_get_tcam_location(nxgep,
-		    TCAM_CLASS_SCTP_IPV4);
 		rdc_grp = nxge_get_rdc_group(nxgep,
 		    TCAM_CLASS_SCTP_IPV4,
-		    channel_cookie);
+		    flow_cookie);
 		offset = nxge_get_rdc_offset(nxgep,
 		    TCAM_CLASS_SCTP_IPV4,
-		    flow_cookie);
+		    channel_cookie);
 		break;
 
 	case FSPEC_SCTPIP6:
 		nxge_fill_tcam_entry_sctp_ipv6(nxgep,
 		    flow_spec, &tcam_ptr);
-		location = nxge_get_tcam_location(nxgep,
-		    TCAM_CLASS_SCTP_IPV4);
 		rdc_grp = nxge_get_rdc_group(nxgep,
 		    TCAM_CLASS_SCTP_IPV6,
-		    channel_cookie);
+		    flow_cookie);
 		offset = nxge_get_rdc_offset(nxgep,
 		    TCAM_CLASS_SCTP_IPV6,
-		    flow_cookie);
+		    channel_cookie);
 		break;
 
+	case FSPEC_AHIP4:
+	case FSPEC_ESPIP4:
+		nxge_fill_tcam_entry_ah_esp(nxgep, flow_spec, &tcam_ptr);
+		rdc_grp = nxge_get_rdc_group(nxgep,
+		    TCAM_CLASS_AH_ESP_IPV4,
+		    flow_cookie);
+		offset = nxge_get_rdc_offset(nxgep,
+		    TCAM_CLASS_AH_ESP_IPV4,
+		    channel_cookie);
+		break;
+
+	case FSPEC_AHIP6:
+	case FSPEC_ESPIP6:
+		nxge_fill_tcam_entry_ah_esp_ipv6(nxgep,
+		    flow_spec, &tcam_ptr);
+		rdc_grp = nxge_get_rdc_group(nxgep,
+		    TCAM_CLASS_AH_ESP_IPV6,
+		    flow_cookie);
+		offset = nxge_get_rdc_offset(nxgep,
+		    TCAM_CLASS_AH_ESP_IPV6,
+		    channel_cookie);
+		break;
+
+	case FSPEC_IP_USR:
+		nxge_fill_tcam_entry_ip_usr(nxgep, flow_spec, &tcam_ptr,
+		    (tcam_class_t)class);
+		rdc_grp = nxge_get_rdc_group(nxgep,
+		    (tcam_class_t)class, flow_cookie);
+		offset = nxge_get_rdc_offset(nxgep,
+		    (tcam_class_t)class, channel_cookie);
+		break;
 	default:
-		return (NXGE_OK);
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "nxge_add_tcam_entry: Unknown flow spec 0x%x",
+		    flow_spec->flow_type));
+		return (NXGE_ERROR);
 	}
 
 	NXGE_DEBUG_MSG((nxgep, FFLP_CTL,
 	    " nxge_add_tcam_entry write"
 	    " for location %d offset %d", location, offset));
 
-	if ((hw_p = nxgep->nxge_hw_p) == NULL) {
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-		    " nxge_add_tcam_entry: common hardware not set",
-		    nxgep->niu_type));
-		return (NXGE_ERROR);
-	}
-
 	MUTEX_ENTER(&hw_p->nxge_tcam_lock);
 	rs = npi_fflp_tcam_entry_write(handle, location, &tcam_ptr);
 
 	if (rs & NPI_FFLP_ERROR) {
-		MUTEX_EXIT(&hw_p->nxge_tcam_lock);
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    " nxge_add_tcam_entry write"
 		    " failed for location %d", location));
-		return (NXGE_ERROR | rs);
+		goto fail;
 	}
 
 	tcam_ptr.match_action.value = 0;
@@ -1312,24 +1507,29 @@ nxge_add_tcam_entry(p_nxge_t nxgep, flow_resource_t *flow_res)
 	tcam_ptr.match_action.bits.ldw.offset = offset;
 	tcam_ptr.match_action.bits.ldw.tres =
 	    TRES_TERM_OVRD_L2RDC;
-	if (channel_cookie == -1)
+	if (channel_cookie == NXGE_PKT_DISCARD)
 		tcam_ptr.match_action.bits.ldw.disc = 1;
 	rs = npi_fflp_tcam_asc_ram_entry_write(handle,
 	    location, tcam_ptr.match_action.value);
 	if (rs & NPI_FFLP_ERROR) {
-		MUTEX_EXIT(&hw_p->nxge_tcam_lock);
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    " nxge_add_tcam_entry write"
 		    " failed for ASC RAM location %d", location));
-		return (NXGE_ERROR | rs);
+		goto fail;
 	}
 	bcopy((void *) &tcam_ptr,
 	    (void *) &nxgep->classifier.tcam_entries[location].tce,
 	    sizeof (tcam_entry_t));
+	nxgep->classifier.tcam_entry_cnt++;
+	nxgep->classifier.tcam_entries[location].valid = 1;
 
 	MUTEX_EXIT(&hw_p->nxge_tcam_lock);
 	NXGE_DEBUG_MSG((nxgep, FFLP_CTL, "<== nxge_add_tcam_entry"));
 	return (NXGE_OK);
+fail:
+	MUTEX_EXIT(&hw_p->nxge_tcam_lock);
+	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_add_tcam_entry FAILED"));
+	return (NXGE_ERROR);
 }
 
 static nxge_status_t
@@ -1389,6 +1589,8 @@ nxge_tcam_handle_ip_fragment(p_nxge_t nxgep)
 	bcopy((void *) &tcam_ptr,
 	    (void *) &nxgep->classifier.tcam_entries[location].tce,
 	    sizeof (tcam_entry_t));
+	nxgep->classifier.tcam_entry_cnt++;
+	nxgep->classifier.tcam_entries[location].valid = 1;
 	for (class = TCAM_CLASS_TCP_IPV4;
 	    class <= TCAM_CLASS_SCTP_IPV6; class++) {
 		class_config = nxgep->class_config.class_cfg[class];
@@ -1922,11 +2124,13 @@ nxge_classify_init_hw(p_nxge_t nxgep)
 		return (NXGE_ERROR);
 	}
 
-	status = nxge_tcam_handle_ip_fragment(nxgep);
-	if (status != NXGE_OK) {
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-		    "nxge_tcam_handle_ip_fragment failed"));
-		return (NXGE_ERROR);
+	if (nxgep->classifier.fragment_bug == 1) {
+		status = nxge_tcam_handle_ip_fragment(nxgep);
+		if (status != NXGE_OK) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "nxge_tcam_handle_ip_fragment failed"));
+			return (NXGE_ERROR);
+		}
 	}
 
 	nxgep->classifier.state |= NXGE_FFLP_HW_INIT;
@@ -2059,4 +2263,689 @@ nxge_fflp_handle_sys_errors(p_nxge_t nxgep)
 	statsp->errlog.hash_lookup1 = (uint32_t)fcram1_err.value;
 	statsp->errlog.hash_lookup2 = (uint32_t)fcram2_err.value;
 	return (NXGE_OK);
+}
+
+int
+nxge_get_valid_tcam_cnt(p_nxge_t nxgep) {
+	return ((nxgep->classifier.fragment_bug == 1) ?
+		nxgep->classifier.tcam_entry_cnt - 1 :
+		nxgep->classifier.tcam_entry_cnt);
+}
+
+int
+nxge_rxdma_channel_cnt(p_nxge_t nxgep)
+{
+	p_nxge_dma_pt_cfg_t p_dma_cfgp;
+	p_nxge_hw_pt_cfg_t p_cfgp;
+
+	p_dma_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
+	p_cfgp = (p_nxge_hw_pt_cfg_t)&p_dma_cfgp->hw_config;
+	return (p_cfgp->max_rdcs);
+}
+
+/* ARGSUSED */
+int
+nxge_rxclass_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp)
+{
+	uint32_t cmd;
+	rx_class_cfg_t *cfg_info = (rx_class_cfg_t *)mp->b_rptr;
+
+	if (nxgep == NULL) {
+		return (-1);
+	}
+	cmd = cfg_info->cmd;
+	switch (cmd) {
+	default:
+		return (-1);
+
+	case NXGE_RX_CLASS_GCHAN:
+		cfg_info->data = nxge_rxdma_channel_cnt(nxgep);
+		break;
+	case NXGE_RX_CLASS_GRULE_CNT:
+		MUTEX_ENTER(&nxgep->nxge_hw_p->nxge_tcam_lock);
+		cfg_info->rule_cnt = nxge_get_valid_tcam_cnt(nxgep);
+		MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_tcam_lock);
+		break;
+	case NXGE_RX_CLASS_GRULE:
+		nxge_get_tcam_entry(nxgep, &cfg_info->fs);
+		break;
+	case NXGE_RX_CLASS_GRULE_ALL:
+		nxge_get_tcam_entry_all(nxgep, cfg_info);
+		break;
+	case NXGE_RX_CLASS_RULE_DEL:
+		nxge_del_tcam_entry(nxgep, cfg_info->fs.location);
+		break;
+	case NXGE_RX_CLASS_RULE_INS:
+		(void) nxge_add_tcam_entry(nxgep, &cfg_info->fs);
+		break;
+	}
+	return (0);
+}
+/* ARGSUSED */
+int
+nxge_rxhash_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp)
+{
+	uint32_t cmd;
+	cfg_cmd_t	*cfg_info = (cfg_cmd_t *)mp->b_rptr;
+
+	if (nxgep == NULL) {
+		return (-1);
+	}
+	cmd = cfg_info->cmd;
+
+	switch (cmd) {
+	default:
+		return (-1);
+	case NXGE_IPTUN_CFG_ADD_CLS:
+		nxge_add_iptun_class(nxgep, &cfg_info->iptun_cfg,
+		    &cfg_info->class_id);
+		break;
+	case NXGE_IPTUN_CFG_SET_HASH:
+		nxge_cfg_iptun_hash(nxgep, &cfg_info->iptun_cfg,
+		    cfg_info->class_id);
+		break;
+	case NXGE_IPTUN_CFG_DEL_CLS:
+		nxge_del_iptun_class(nxgep, cfg_info->class_id);
+		break;
+	case NXGE_IPTUN_CFG_GET_CLS:
+		nxge_get_iptun_class(nxgep, &cfg_info->iptun_cfg,
+		    cfg_info->class_id);
+		break;
+	case NXGE_CLS_CFG_SET_SYM:
+		nxge_set_ip_cls_sym(nxgep, cfg_info->class_id, cfg_info->sym);
+		break;
+	case NXGE_CLS_CFG_GET_SYM:
+		nxge_get_ip_cls_sym(nxgep, cfg_info->class_id, &cfg_info->sym);
+		break;
+	}
+	return (0);
+}
+
+void
+nxge_get_tcam_entry_all(p_nxge_t nxgep, rx_class_cfg_t *cfgp)
+{
+	nxge_classify_t *clasp = &nxgep->classifier;
+	uint16_t	n_entries;
+	int		i, j, k;
+	tcam_flow_spec_t	*tcam_entryp;
+
+	cfgp->data = clasp->tcam_size;
+	MUTEX_ENTER(&nxgep->nxge_hw_p->nxge_tcam_lock);
+	n_entries = cfgp->rule_cnt;
+
+	for (i = 0, j = 0; j < cfgp->data; j++) {
+		k = nxge_tcam_get_index(nxgep, j);
+		tcam_entryp = &clasp->tcam_entries[k];
+		if (tcam_entryp->valid != 1)
+			continue;
+		cfgp->rule_locs[i] = j;
+		i++;
+	};
+	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_tcam_lock);
+
+	if (n_entries != i) {
+		/* print warning, this should not happen */
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_get_tcam_entry_all"
+		    "n_entries[%d] != i[%d]!!!", n_entries, i));
+	}
+}
+
+
+/* Entries for the ports are interleaved in the TCAM */
+static uint16_t
+nxge_tcam_get_index(p_nxge_t nxgep, uint16_t index)
+{
+	/* One entry reserved for IP fragment rule */
+	if (index >= (nxgep->classifier.tcam_size - 1))
+		index = 0;
+	if (nxgep->classifier.fragment_bug == 1)
+		index++;
+	return (nxgep->classifier.tcam_top + (index * nxgep->nports));
+}
+
+static uint32_t
+nxge_tcam_cls_to_flow(uint32_t class_code) {
+	switch (class_code) {
+	case TCAM_CLASS_TCP_IPV4:
+		return (FSPEC_TCPIP4);
+	case TCAM_CLASS_UDP_IPV4:
+		return (FSPEC_UDPIP4);
+	case TCAM_CLASS_AH_ESP_IPV4:
+		return (FSPEC_AHIP4);
+	case TCAM_CLASS_SCTP_IPV4:
+		return (FSPEC_SCTPIP4);
+	case  TCAM_CLASS_TCP_IPV6:
+		return (FSPEC_TCPIP6);
+	case TCAM_CLASS_UDP_IPV6:
+		return (FSPEC_UDPIP6);
+	case TCAM_CLASS_AH_ESP_IPV6:
+		return (FSPEC_AHIP6);
+	case TCAM_CLASS_SCTP_IPV6:
+		return (FSPEC_SCTPIP6);
+	case TCAM_CLASS_IP_USER_4:
+	case TCAM_CLASS_IP_USER_5:
+	case TCAM_CLASS_IP_USER_6:
+	case TCAM_CLASS_IP_USER_7:
+		return (FSPEC_IP_USR);
+	default:
+		NXGE_ERROR_MSG((NULL, NXGE_ERR_CTL, "nxge_tcam_cls_to_flow"
+		    ": Unknown class code [0x%x]", class_code));
+		break;
+	}
+	return (0);
+}
+
+void
+nxge_get_tcam_entry(p_nxge_t nxgep, flow_resource_t *fs)
+{
+	uint16_t 	index;
+	tcam_flow_spec_t *tcam_ep;
+	tcam_entry_t	*tp;
+	flow_spec_t	*fspec;
+	tcpip4_spec_t 	*fspec_key;
+	tcpip4_spec_t 	*fspec_mask;
+
+	index = nxge_tcam_get_index(nxgep, (uint16_t)fs->location);
+	tcam_ep = &nxgep->classifier.tcam_entries[index];
+	if (tcam_ep->valid != 1) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_get_tcam_entry: :"
+		    "Entry [%d] invalid for index [%d]", fs->location, index));
+		return;
+	}
+
+	/* Fill the flow spec entry */
+	tp = &tcam_ep->tce;
+	fspec = &fs->flow_spec;
+	fspec->flow_type = nxge_tcam_cls_to_flow(tp->ip4_class_key);
+
+	/* TODO - look at proto field to differentiate between AH and ESP */
+	if (fspec->flow_type == FSPEC_AHIP4) {
+		if (tp->ip4_proto_key == IPPROTO_ESP)
+			fspec->flow_type = FSPEC_ESPIP4;
+	}
+
+	switch (tp->ip4_class_key) {
+	case TCAM_CLASS_TCP_IPV4:
+	case TCAM_CLASS_UDP_IPV4:
+	case TCAM_CLASS_AH_ESP_IPV4:
+	case TCAM_CLASS_SCTP_IPV4:
+		fspec_key = (tcpip4_spec_t *)&fspec->uh.tcpip4spec;
+		fspec_mask = (tcpip4_spec_t *)&fspec->um.tcpip4spec;
+		FSPEC_IPV4_ADDR(fspec_key->ip4dst, tp->ip4_dest_key);
+		FSPEC_IPV4_ADDR(fspec_mask->ip4dst, tp->ip4_dest_mask);
+		FSPEC_IPV4_ADDR(fspec_key->ip4src, tp->ip4_src_key);
+		FSPEC_IPV4_ADDR(fspec_mask->ip4src, tp->ip4_src_mask);
+		fspec_key->tos = tp->ip4_tos_key;
+		fspec_mask->tos = tp->ip4_tos_mask;
+		break;
+	default:
+		break;
+	}
+
+	switch (tp->ip4_class_key) {
+	case TCAM_CLASS_TCP_IPV4:
+	case TCAM_CLASS_UDP_IPV4:
+	case TCAM_CLASS_SCTP_IPV4:
+		FSPEC_IP_PORTS(fspec_key->pdst, fspec_key->psrc,
+		    tp->ip4_port_key);
+		FSPEC_IP_PORTS(fspec_mask->pdst, fspec_mask->psrc,
+		    tp->ip4_port_mask);
+		break;
+	case TCAM_CLASS_AH_ESP_IPV4:
+		fspec->uh.ahip4spec.spi = tp->ip4_port_key;
+		fspec->um.ahip4spec.spi = tp->ip4_port_mask;
+		break;
+	case TCAM_CLASS_IP_USER_4:
+	case TCAM_CLASS_IP_USER_5:
+	case TCAM_CLASS_IP_USER_6:
+	case TCAM_CLASS_IP_USER_7:
+		fspec->uh.ip_usr_spec.l4_4_bytes = tp->ip4_port_key;
+		fspec->um.ip_usr_spec.l4_4_bytes = tp->ip4_port_mask;
+		fspec->uh.ip_usr_spec.ip_ver = FSPEC_IP4;
+		fspec->uh.ip_usr_spec.proto = tp->ip4_proto_key;
+		fspec->um.ip_usr_spec.proto = tp->ip4_proto_mask;
+		break;
+	default:
+		break;
+	}
+
+	if (tp->match_action.bits.ldw.disc == 1) {
+		fs->channel_cookie = NXGE_PKT_DISCARD;
+	} else {
+		fs->channel_cookie = tp->match_action.bits.ldw.offset;
+	}
+}
+
+void
+nxge_del_tcam_entry(p_nxge_t nxgep, uint32_t location)
+{
+	npi_status_t rs = NPI_SUCCESS;
+	uint16_t 	index;
+	tcam_flow_spec_t *tcam_ep;
+	tcam_entry_t	*tp;
+	tcam_class_t	class;
+
+	MUTEX_ENTER(&nxgep->nxge_hw_p->nxge_tcam_lock);
+	index = nxge_tcam_get_index(nxgep, (uint16_t)location);
+	tcam_ep = &nxgep->classifier.tcam_entries[index];
+	if (tcam_ep->valid != 1) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_del_tcam_entry: :"
+		    "Entry [%d] invalid for index [%d]", location, index));
+		goto fail;
+	}
+
+	/* Fill the flow spec entry */
+	tp = &tcam_ep->tce;
+	class = tp->ip4_class_key;
+	if (class >= TCAM_CLASS_IP_USER_4 && class <= TCAM_CLASS_IP_USER_7) {
+		int i;
+		nxge_usr_l3_cls_t *l3_ucls_p;
+		p_nxge_hw_list_t hw_p = nxgep->nxge_hw_p;
+
+		for (i = 0; i < NXGE_L3_PROG_CLS; i++) {
+			l3_ucls_p = &hw_p->tcam_l3_prog_cls[i];
+			if (l3_ucls_p->valid) {
+				if (l3_ucls_p->cls == class &&
+				    l3_ucls_p->tcam_ref_cnt) {
+					l3_ucls_p->tcam_ref_cnt--;
+					if (l3_ucls_p->tcam_ref_cnt > 0)
+						continue;
+					/* disable class */
+					rs = npi_fflp_cfg_ip_usr_cls_disable(
+					    nxgep->npi_reg_handle,
+					    (tcam_class_t)class);
+					if (rs != NPI_SUCCESS)
+						goto fail;
+					l3_ucls_p->cls = 0;
+					l3_ucls_p->pid = 0;
+					l3_ucls_p->valid = 0;
+					break;
+				}
+			}
+		}
+		if (i == NXGE_L3_PROG_CLS) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "nxge_del_tcam_entry: Usr class "
+			    "0x%llx not found", (unsigned long long) class));
+			goto fail;
+		}
+	}
+
+	rs = npi_fflp_tcam_entry_invalidate(nxgep->npi_reg_handle, index);
+	if (rs != NPI_SUCCESS) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "nxge_del_tcam_entry: TCAM invalidate failed "
+		    "at loc %d ", location));
+		goto fail;
+	}
+
+	nxgep->classifier.tcam_entries[index].valid = 0;
+	nxgep->classifier.tcam_entry_cnt--;
+
+	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_tcam_lock);
+	NXGE_DEBUG_MSG((nxgep, FFLP_CTL, "<== nxge_del_tcam_entry"));
+	return;
+fail:
+	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_tcam_lock);
+	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+	    "<== nxge_del_tcam_entry FAILED"));
+}
+
+static uint8_t
+nxge_iptun_pkt_type_to_pid(uint8_t pkt_type)
+{
+	uint8_t pid = 0;
+
+	switch (pkt_type) {
+	case IPTUN_PKT_IPV4:
+		pid = 4;
+		break;
+	case IPTUN_PKT_IPV6:
+		pid = 41;
+		break;
+	case IPTUN_PKT_GRE:
+		pid = 47;
+		break;
+	case IPTUN_PKT_GTP:
+		pid = 17;
+		break;
+	default:
+		NXGE_ERROR_MSG((NULL, NXGE_ERR_CTL,
+		    "nxge_iptun_pkt_type_to_pid: Unknown pkt type 0x%x",
+		    pkt_type));
+		break;
+	}
+
+	return (pid);
+}
+
+static npi_status_t
+nxge_set_iptun_usr_cls_reg(p_nxge_t nxgep, uint64_t class,
+		iptun_cfg_t *iptunp)
+{
+	npi_handle_t handle = nxgep->npi_reg_handle;
+	npi_status_t rs = NPI_SUCCESS;
+
+	switch (iptunp->in_pkt_type) {
+	case IPTUN_PKT_IPV4:
+	case IPTUN_PKT_IPV6:
+		rs = npi_fflp_cfg_ip_usr_cls_set_iptun(handle,
+		    (tcam_class_t)class, 0, 0, 0, 0);
+		break;
+	case IPTUN_PKT_GRE:
+		rs = npi_fflp_cfg_ip_usr_cls_set_iptun(handle,
+		    (tcam_class_t)class, iptunp->l4b0_val,
+		    iptunp->l4b0_mask, 0, 0);
+		break;
+	case IPTUN_PKT_GTP:
+		rs = npi_fflp_cfg_ip_usr_cls_set_iptun(handle,
+		    (tcam_class_t)class, 0, 0, iptunp->l4b23_val,
+		    (iptunp->l4b23_sel & 0x01));
+		break;
+	default:
+		rs = NPI_FFLP_TCAM_CLASS_INVALID;
+		break;
+	}
+	return (rs);
+}
+
+void
+nxge_add_iptun_class(p_nxge_t nxgep, iptun_cfg_t *iptunp,
+		uint8_t *cls_idp)
+{
+	int i, add_cls;
+	uint8_t pid;
+	uint64_t class;
+	p_nxge_hw_list_t hw_p = nxgep->nxge_hw_p;
+	npi_handle_t handle = nxgep->npi_reg_handle;
+	npi_status_t rs = NPI_SUCCESS;
+
+	pid = nxge_iptun_pkt_type_to_pid(iptunp->in_pkt_type);
+	if (pid == 0)
+		return;
+
+	add_cls = 0;
+	MUTEX_ENTER(&hw_p->nxge_tcam_lock);
+
+	/* Get an user programmable class ID */
+	for (i = 0; i < NXGE_L3_PROG_CLS; i++) {
+		if (hw_p->tcam_l3_prog_cls[i].valid == 0) {
+			/* todo add new usr class reg */
+			switch (i) {
+			case 0:
+				class = TCAM_CLASS_IP_USER_4;
+				break;
+			case 1:
+				class = TCAM_CLASS_IP_USER_5;
+				break;
+			case 2:
+				class = TCAM_CLASS_IP_USER_6;
+				break;
+			case 3:
+				class = TCAM_CLASS_IP_USER_7;
+				break;
+			default:
+				break;
+			}
+			rs = npi_fflp_cfg_ip_usr_cls_set(handle,
+			    (tcam_class_t)class, 0, 0, pid, 0);
+			if (rs != NPI_SUCCESS)
+				goto fail;
+
+			rs = nxge_set_iptun_usr_cls_reg(nxgep, class, iptunp);
+
+			if (rs != NPI_SUCCESS)
+				goto fail;
+
+			rs = npi_fflp_cfg_ip_usr_cls_enable(handle,
+			    (tcam_class_t)class);
+			if (rs != NPI_SUCCESS)
+				goto fail;
+
+			hw_p->tcam_l3_prog_cls[i].cls = class;
+			hw_p->tcam_l3_prog_cls[i].pid = pid;
+			hw_p->tcam_l3_prog_cls[i].flow_pkt_type =
+			    iptunp->in_pkt_type;
+			hw_p->tcam_l3_prog_cls[i].valid = 1;
+			*cls_idp = (uint8_t)class;
+			add_cls = 1;
+			break;
+		} else if (hw_p->tcam_l3_prog_cls[i].pid == pid) {
+			if (hw_p->tcam_l3_prog_cls[i].flow_pkt_type == 0) {
+				/* there is no flow key */
+				/* todo program the existing usr class reg */
+
+				rs = nxge_set_iptun_usr_cls_reg(nxgep, class,
+				    iptunp);
+				if (rs != NPI_SUCCESS)
+					goto fail;
+
+				rs = npi_fflp_cfg_ip_usr_cls_enable(handle,
+				    (tcam_class_t)class);
+				if (rs != NPI_SUCCESS)
+					goto fail;
+
+				hw_p->tcam_l3_prog_cls[i].flow_pkt_type =
+				    iptunp->in_pkt_type;
+				*cls_idp = (uint8_t)class;
+				add_cls = 1;
+			} else {
+				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				    "nxge_add_iptun_class: L3 usr "
+				    "programmable class with pid %d "
+				    "already exists", pid));
+			}
+			break;
+		}
+	}
+	MUTEX_EXIT(&hw_p->nxge_tcam_lock);
+
+	if (add_cls != 1) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "nxge_add_iptun_class: Could not add IP tunneling class"));
+	}
+	return;
+fail:
+	MUTEX_EXIT(&hw_p->nxge_tcam_lock);
+	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_add_iptun_class: FAILED"));
+}
+
+static boolean_t
+nxge_is_iptun_cls_present(p_nxge_t nxgep, uint8_t cls_id, int *idx)
+{
+	int i;
+	p_nxge_hw_list_t hw_p = nxgep->nxge_hw_p;
+
+	MUTEX_ENTER(&hw_p->nxge_tcam_lock);
+	for (i = 0; i < NXGE_L3_PROG_CLS; i++) {
+		if (hw_p->tcam_l3_prog_cls[i].valid &&
+		    hw_p->tcam_l3_prog_cls[i].flow_pkt_type != 0) {
+			if (hw_p->tcam_l3_prog_cls[i].cls == cls_id)
+				break;
+		}
+	}
+	MUTEX_EXIT(&hw_p->nxge_tcam_lock);
+
+	if (i == NXGE_L3_PROG_CLS) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "nxge_is_iptun_cls_present: Invalid class %d", cls_id));
+		return (B_FALSE);
+	} else {
+		*idx = i;
+		return (B_TRUE);
+	}
+}
+
+void
+nxge_cfg_iptun_hash(p_nxge_t nxgep, iptun_cfg_t *iptunp, uint8_t cls_id)
+{
+	int idx;
+	npi_handle_t handle = nxgep->npi_reg_handle;
+	flow_key_cfg_t cfg;
+
+	/* check to see that this is a valid class ID */
+	if (!nxge_is_iptun_cls_present(nxgep, cls_id, &idx)) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "nxge_cfg_iptun_hash: nxge_is_iptun_cls_present "
+		    "failed for cls_id %d", cls_id));
+		return;
+	}
+
+	bzero((void *)&cfg, sizeof (flow_key_cfg_t));
+
+	/*
+	 * This ensures that all 4 bytes of the XOR value are loaded to the
+	 * hash key.
+	 */
+	cfg.use_dport = cfg.use_sport = cfg.ip_opts_exist = 1;
+
+	cfg.l4_xor_sel = (iptunp->l4xor_sel & FL_KEY_USR_L4XOR_MSK);
+	cfg.use_l4_md = 1;
+
+	if (iptunp->hash_flags & HASH_L3PROTO)
+		cfg.use_proto = 1;
+	else if (iptunp->hash_flags & HASH_IPDA)
+		cfg.use_daddr = 1;
+	else if (iptunp->hash_flags & HASH_IPSA)
+		cfg.use_saddr = 1;
+	else if (iptunp->hash_flags & HASH_VLAN)
+		cfg.use_vlan = 1;
+	else if (iptunp->hash_flags & HASH_L2DA)
+		cfg.use_l2da = 1;
+	else if (iptunp->hash_flags & HASH_IFPORT)
+		cfg.use_portnum = 1;
+
+	(void) npi_fflp_cfg_ip_cls_flow_key_rfnl(handle, (tcam_class_t)cls_id,
+	    &cfg);
+}
+
+void
+nxge_del_iptun_class(p_nxge_t nxgep, uint8_t cls_id)
+{
+	int i;
+	npi_handle_t handle = nxgep->npi_reg_handle;
+	npi_status_t rs = NPI_SUCCESS;
+
+
+	/* check to see that this is a valid class ID */
+	if (!nxge_is_iptun_cls_present(nxgep, cls_id, &i)) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "nxge_del_iptun_class: Invalid class ID 0x%x", cls_id));
+		return;
+	}
+
+	MUTEX_ENTER(&nxgep->nxge_hw_p->nxge_tcam_lock);
+	rs = npi_fflp_cfg_ip_usr_cls_disable(handle, (tcam_class_t)cls_id);
+	if (rs != NPI_SUCCESS)
+		goto fail;
+	nxgep->nxge_hw_p->tcam_l3_prog_cls[i].flow_pkt_type = 0;
+	if (nxgep->nxge_hw_p->tcam_l3_prog_cls[i].tcam_ref_cnt == 0)
+		nxgep->nxge_hw_p->tcam_l3_prog_cls[i].valid = 0;
+
+	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_tcam_lock);
+	return;
+fail:
+	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_tcam_lock);
+	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_del_iptun_class: FAILED"));
+}
+
+void
+nxge_get_iptun_class(p_nxge_t nxgep, iptun_cfg_t *iptunp, uint8_t cls_id)
+{
+	int i;
+	uint8_t pid;
+	npi_handle_t handle = nxgep->npi_reg_handle;
+	npi_status_t rs = NPI_SUCCESS;
+	flow_key_cfg_t cfg;
+
+
+	/* check to see that this is a valid class ID */
+	if (!nxge_is_iptun_cls_present(nxgep, cls_id, &i))
+		return;
+
+	bzero((void *)iptunp, sizeof (iptun_cfg_t));
+
+	pid = nxgep->nxge_hw_p->tcam_l3_prog_cls[i].pid;
+
+	rs = npi_fflp_cfg_ip_usr_cls_get_iptun(handle, (tcam_class_t)cls_id,
+	    &iptunp->l4b0_val, &iptunp->l4b0_mask, &iptunp->l4b23_val,
+	    &iptunp->l4b23_sel);
+	if (rs != NPI_SUCCESS)
+		goto fail;
+
+	rs = npi_fflp_cfg_ip_cls_flow_key_get_rfnl(handle,
+	    (tcam_class_t)cls_id, &cfg);
+	if (rs != NPI_SUCCESS)
+		goto fail;
+
+	iptunp->l4xor_sel = cfg.l4_xor_sel;
+	if (cfg.use_proto)
+		iptunp->hash_flags |= HASH_L3PROTO;
+	else if (cfg.use_daddr)
+		iptunp->hash_flags |= HASH_IPDA;
+	else if (cfg.use_saddr)
+		iptunp->hash_flags |= HASH_IPSA;
+	else if (cfg.use_vlan)
+		iptunp->hash_flags |= HASH_VLAN;
+	else if (cfg.use_l2da)
+		iptunp->hash_flags |= HASH_L2DA;
+	else if (cfg.use_portnum)
+		iptunp->hash_flags |= HASH_IFPORT;
+
+	switch (pid) {
+	case 4:
+		iptunp->in_pkt_type = IPTUN_PKT_IPV4;
+		break;
+	case 41:
+		iptunp->in_pkt_type = IPTUN_PKT_IPV6;
+		break;
+	case 47:
+		iptunp->in_pkt_type = IPTUN_PKT_GRE;
+		break;
+	case 17:
+		iptunp->in_pkt_type = IPTUN_PKT_GTP;
+		break;
+	default:
+		iptunp->in_pkt_type = 0;
+		break;
+	}
+
+	return;
+fail:
+	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_get_iptun_class: FAILED"));
+}
+
+void
+nxge_set_ip_cls_sym(p_nxge_t nxgep, uint8_t cls_id, uint8_t sym)
+{
+	npi_handle_t handle = nxgep->npi_reg_handle;
+	npi_status_t rs = NPI_SUCCESS;
+	boolean_t sym_en = (sym == 1) ? B_TRUE : B_FALSE;
+
+	rs = npi_fflp_cfg_sym_ip_cls_flow_key(handle, (tcam_class_t)cls_id,
+	    sym_en);
+	if (rs != NPI_SUCCESS)
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "nxge_set_ip_cls_sym: FAILED"));
+}
+
+void
+nxge_get_ip_cls_sym(p_nxge_t nxgep, uint8_t cls_id, uint8_t *sym)
+{
+	npi_handle_t handle = nxgep->npi_reg_handle;
+	npi_status_t rs = NPI_SUCCESS;
+	flow_key_cfg_t cfg;
+
+	rs = npi_fflp_cfg_ip_cls_flow_key_get_rfnl(handle,
+	    (tcam_class_t)cls_id, &cfg);
+	if (rs != NPI_SUCCESS)
+		goto fail;
+
+	if (cfg.use_sym)
+		*sym = 1;
+	else
+		*sym = 0;
+	return;
+fail:
+	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_get_ip_cls_sym: FAILED"));
 }

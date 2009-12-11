@@ -137,7 +137,7 @@ C_SignInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 		rv = crypto2pkcs11_error_number(sign_init.si_return_value);
 	}
 
-	if (rv == CKR_OK && SLOT_HAS_LIMITED_HASH(session_p) &&
+	if (rv == CKR_OK && SLOT_HAS_LIMITED_HMAC(session_p) &&
 	    is_hmac(pMechanism->mechanism)) {
 		if (key_p->is_lib_obj && key_p->class == CKO_SECRET_KEY) {
 			(void) pthread_mutex_lock(&session_p->session_mutex);
@@ -221,7 +221,7 @@ C_Sign(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 
 	if (session_p->sign.flags & CRYPTO_EMULATE) {
 		if ((ulDataLen < SLOT_THRESHOLD(session_p)) ||
-		    (ulDataLen > SLOT_MAX_INDATA_LEN(session_p))) {
+		    (ulDataLen > SLOT_HMAC_MAX_INDATA_LEN(session_p))) {
 			session_p->sign.flags |= CRYPTO_EMULATE_USING_SW;
 			(void) pthread_mutex_unlock(&session_p->session_mutex);
 			ses_lock_held = B_FALSE;

@@ -1792,21 +1792,9 @@ dprov_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    DDI_PROP_DONTPASS, "max_digest_sz", INT_MAX);
 	if (dprov_max_digestsz != INT_MAX && dprov_max_digestsz != 0 &&
 	    dprov_max_digestsz != DDI_PROP_NOT_FOUND) {
-		int i, nmechs;
-
 		dprov_no_multipart = B_TRUE;
-		dprov_prov_info.pi_flags |= CRYPTO_HASH_NO_UPDATE;
-
-		/* Set cm_max_input_length for all hash mechs */
-		nmechs = sizeof (dprov_mech_info_tab) /
-		    sizeof (crypto_mech_info_t);
-		for (i = 0; i < nmechs; i++) {
-			if (dprov_mech_info_tab[i].cm_func_group_mask &
-			    CRYPTO_FG_DIGEST) {
-				dprov_mech_info_tab[i].cm_max_input_length =
-				    dprov_max_digestsz;
-			}
-		}
+		dprov_prov_info.pi_flags |=
+		    (CRYPTO_HASH_NO_UPDATE | CRYPTO_HMAC_NO_UPDATE);
 	}
 
 	/* create taskq */
@@ -8557,6 +8545,8 @@ dprov_mgmt_task(dprov_req_t *taskq_req)
 		if (softc->ds_token_initialized)
 			ext_info->ei_flags |= CRYPTO_EXTF_TOKEN_INITIALIZED;
 
+		ext_info->ei_hash_max_input_len = dprov_max_digestsz;
+		ext_info->ei_hmac_max_input_len = dprov_max_digestsz;
 		error = CRYPTO_SUCCESS;
 		break;
 	}

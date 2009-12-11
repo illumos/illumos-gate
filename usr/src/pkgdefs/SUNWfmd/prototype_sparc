@@ -131,6 +131,7 @@ f none usr/platform/sun4v/lib/fm/eft/vfncx.eft 444 root bin
 f none usr/platform/sun4v/lib/fm/eft/zambezi.eft 444 root bin
 f none usr/platform/sun4v/lib/fm/eft/gcpu.eft 444 root bin
 f none usr/platform/sun4v/lib/fm/eft/gmem.eft 444 root bin
+f none usr/platform/sun4v/lib/fm/eft/sp.eft 444 root bin
 d none usr/platform/sun4v/lib/fm/fmd 755 root bin
 d none usr/platform/sun4v/lib/fm/fmd/plugins 755 root bin
 f none usr/platform/sun4v/lib/fm/fmd/plugins/cpumem-diagnosis.so 555 root bin

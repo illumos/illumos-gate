@@ -1463,3 +1463,19 @@ msgid "SUN4V-8002-T5.impact"
 msgstr "The system's integrity is seriously compromised.  Processor chip(s)\nmay be unavailable.\n"
 msgid "SUN4V-8002-T5.action"
 msgstr "Schedule a repair procedure to replace the affected resource, the identity of which can be determined using 'fmadm faulty'.\n"
+#
+# code: SUN4V-8002-US
+# keys: fault.sp.failed
+#
+msgid "SUN4V-8002-US.type"
+msgstr "Fault"
+msgid "SUN4V-8002-US.severity"
+msgstr "Critical"
+msgid "SUN4V-8002-US.description"
+msgstr "The Service Processor failed.\n  Refer to %s for more information."
+msgid "SUN4V-8002-US.response"
+msgstr "No automated response.\n"
+msgid "SUN4V-8002-US.impact"
+msgstr "Some services such as Fault Diagnosis may be degraded as a result.\n"
+msgid "SUN4V-8002-US.action"
+msgstr "Schedule a repair procedure for the Service Processor, or contact Sun for support.\n"

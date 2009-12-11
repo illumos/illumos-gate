@@ -1613,6 +1613,9 @@ nxge_get_config_properties(p_nxge_t nxgep)
 {
 	nxge_status_t status = NXGE_OK;
 	p_nxge_hw_list_t hw_p;
+	char **prop_val;
+	uint_t prop_len;
+	uint_t i;
 
 	NXGE_DEBUG_MSG((nxgep, VPD_CTL, " ==> nxge_get_config_properties"));
 
@@ -1716,6 +1719,30 @@ nxge_get_config_properties(p_nxge_t nxgep)
 	NXGE_DEBUG_MSG((nxgep, VPD_CTL,
 	    "nxge_get_config_properties: software lso %d\n",
 	    nxgep->soft_lso_enable));
+
+	nxgep->niu_hw_type = NIU_HW_TYPE_DEFAULT;
+	if (nxgep->niu_type == N2_NIU) {
+		/*
+		 * For NIU, the next generation KT has
+		 * a few differences in features that the
+		 * driver needs to handle them
+		 * accordingly.
+		 */
+		if (ddi_prop_lookup_string_array(DDI_DEV_T_ANY, nxgep->dip, 0,
+		    "compatible", &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
+			for (i = 0; i < prop_len; i++) {
+				if ((strcmp((caddr_t)prop_val[i],
+				    KT_NIU_COMPATIBLE) == 0)) {
+					nxgep->niu_hw_type = NIU_HW_TYPE_RF;
+					NXGE_DEBUG_MSG((nxgep, VPD_CTL,
+					    "NIU type %d", nxgep->niu_hw_type));
+					break;
+				}
+			}
+		}
+
+		ddi_prop_free(prop_val);
+	}
 
 	NXGE_DEBUG_MSG((nxgep, VPD_CTL, " <== nxge_get_config_properties"));
 	return (status);

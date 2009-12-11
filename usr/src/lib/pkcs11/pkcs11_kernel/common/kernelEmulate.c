@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -152,14 +152,23 @@ emulate_update(kernel_session_t *session_p, CK_BYTE_PTR pPart,
     CK_ULONG ulPartLen, int opflag)
 {
 	CK_RV rv;
+	int maxlen;
 	digest_buf_t *bufp;
 	boolean_t use_soft = B_FALSE;
 	crypto_active_op_t *opp;
 
-	opp = (opflag & OP_DIGEST) ? &(session_p->digest) : \
-	    ((opflag & OP_SIGN) ? &(session_p->sign) : &(session_p->verify));
-
-	if (!SLOT_HAS_LIMITED_HASH(session_p))
+	if (opflag & OP_DIGEST) {
+		opp = &(session_p->digest);
+		if (!SLOT_HAS_LIMITED_HASH(session_p))
+			return (CKR_ARGUMENTS_BAD);
+		maxlen =  SLOT_HASH_MAX_INDATA_LEN(session_p);
+	} else if (opflag & (OP_SIGN | OP_VERIFY)) {
+		opp = (opflag & OP_SIGN) ?
+		    &(session_p->sign) : &(session_p->verify);
+		if (!SLOT_HAS_LIMITED_HMAC(session_p))
+			return (CKR_ARGUMENTS_BAD);
+		maxlen =  SLOT_HMAC_MAX_INDATA_LEN(session_p);
+	} else
 		return (CKR_ARGUMENTS_BAD);
 
 	if (opp->flags & CRYPTO_EMULATE_USING_SW) {
@@ -175,7 +184,7 @@ emulate_update(kernel_session_t *session_p, CK_BYTE_PTR pPart,
 	}
 
 	/* Did we exceed the maximum allowed? */
-	if (bufp->indata_len + ulPartLen > SLOT_MAX_INDATA_LEN(session_p)) {
+	if (bufp->indata_len + ulPartLen > maxlen) {
 		use_soft = B_TRUE;
 	} else if (ulPartLen > (bufp->buf_len - bufp->indata_len))  {
 		int siz = ulPartLen < bufp->buf_len ?

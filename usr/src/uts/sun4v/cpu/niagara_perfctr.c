@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,7 @@
 #include <sys/kstat.h>
 #if defined(NIAGARA_IMPL)
 #include <sys/niagararegs.h>
-#elif defined(NIAGARA2_IMPL) || defined(VFALLS_IMPL)
+#elif defined(NIAGARA2_IMPL) || defined(VFALLS_IMPL) || defined(KT_IMPL)
 #include <sys/niagara2regs.h>
 #endif
 
@@ -58,6 +58,7 @@ typedef struct ni_kev_mask {
  * counters.
  */
 #define	NUM_OF_PICS	2
+#define	NUM_OF_PIC_REGS	1
 
 typedef struct ni_ksinfo {
 	uint8_t		pic_no_evs;			/* number of events */
@@ -66,13 +67,13 @@ typedef struct ni_ksinfo {
 	uint64_t	pic_mask[NUM_OF_PICS];
 	kstat_t		*pic_name_ksp[NUM_OF_PICS];
 	kstat_t		*cntr_ksp;
-	uint32_t	pic_reg[NUM_OF_PICS];
+	uint32_t	pic_reg[NUM_OF_PIC_REGS];
 	uint32_t	pcr_reg;
 	uint32_t	pic_overflow[NUM_OF_PICS];	/* overflow count */
 	uint32_t	pic_last_val[NUM_OF_PICS];	/* last PIC value */
 } ni_ksinfo_t;
 
-static ni_ksinfo_t	*ni_dram_kstats[NIAGARA_DRAM_BANKS];
+static ni_ksinfo_t	*ni_dram_kstats[DRAM_BANKS];
 
 #if defined(NIAGARA_IMPL)
 static ni_ksinfo_t	*ni_jbus_kstat;
@@ -80,19 +81,24 @@ static ni_ksinfo_t	*ni_jbus_kstat;
 
 typedef struct ni_perf_regs {
 	uint32_t	pcr_reg;
-	uint32_t	pic_reg;
+	uint32_t	pic_reg[NUM_OF_PIC_REGS];
 } ni_perf_regs_t;
 
 static ni_perf_regs_t dram_perf_regs[] = {
-	{HV_NIAGARA_DRAM_CTL0, HV_NIAGARA_DRAM_COUNT0},
-	{HV_NIAGARA_DRAM_CTL1, HV_NIAGARA_DRAM_COUNT1},
-	{HV_NIAGARA_DRAM_CTL2, HV_NIAGARA_DRAM_COUNT2},
-	{HV_NIAGARA_DRAM_CTL3, HV_NIAGARA_DRAM_COUNT3},
-#ifdef VFALLS_IMPL
-	{HV_NIAGARA_DRAM_CTL4, HV_NIAGARA_DRAM_COUNT4},
-	{HV_NIAGARA_DRAM_CTL5, HV_NIAGARA_DRAM_COUNT5},
-	{HV_NIAGARA_DRAM_CTL6, HV_NIAGARA_DRAM_COUNT6},
-	{HV_NIAGARA_DRAM_CTL7, HV_NIAGARA_DRAM_COUNT7}
+#if defined(NIAGARA_IMPL) || defined(NIAGARA2_IMPL)
+	{HV_DRAM_CTL0, HV_DRAM_COUNT0},
+	{HV_DRAM_CTL1, HV_DRAM_COUNT1},
+	{HV_DRAM_CTL2, HV_DRAM_COUNT2},
+	{HV_DRAM_CTL3, HV_DRAM_COUNT3},
+#elif defined(VFALLS_IMPL) || defined(KT_IMPL)
+	{HV_DRAM_CTL0, HV_DRAM_COUNT0},
+	{HV_DRAM_CTL1, HV_DRAM_COUNT1},
+	{HV_DRAM_CTL2, HV_DRAM_COUNT2},
+	{HV_DRAM_CTL3, HV_DRAM_COUNT3},
+	{HV_DRAM_CTL4, HV_DRAM_COUNT4},
+	{HV_DRAM_CTL5, HV_DRAM_COUNT5},
+	{HV_DRAM_CTL6, HV_DRAM_COUNT6},
+	{HV_DRAM_CTL7, HV_DRAM_COUNT7}
 #endif
 };
 
@@ -169,16 +175,31 @@ static int	ni_perf_debug;
  */
 static ni_kev_mask_t
 niagara_dram_events[] = {
+#if defined(NIAGARA_IMPL) || defined(NIAGARA2_IMPL) || defined(VFALLS_IMPL)
 	{"mem_reads",		0x0},
 	{"mem_writes",		0x1},
 	{"mem_read_write",	0x2},
-#if defined(NIAGARA_IMPL)
+#elif defined(KT_IMPL)
+	{"remote_reads",	0x0},
+	{"remote_writes",	0x1},
+	{"remote_read_write",	0x2},
+#endif
+#if defined(NIAGARA_IMPL) || defined(KT_IMPL)
 	{"bank_busy_stalls",	0x3},
 #endif
 	{"rd_queue_latency",	0x4},
 	{"wr_queue_latency",	0x5},
 	{"rw_queue_latency",	0x6},
+#if defined(NIAGARA_IMPL) || defined(NIAGARA2_IMPL) || defined(VFALLS_IMPL)
 	{"wb_buf_hits",		0x7},
+#elif defined(KT_IMPL)
+	{"write_queue_drain",	0x7},
+	{"read_all_channels",	0x8},
+	{"write_starved",	0x9},
+	{"write_all_channels",	0xa},
+	{"read_write_channel0",	0xb},
+	{"read_write_channel1",	0xc},
+#endif
 	{"clear_pic",		0xf}
 };
 
@@ -281,7 +302,7 @@ niagara_kstat_init()
 {
 	int i;
 	ni_ksinfo_t *ksinfop;
-#ifdef VFALLS_IMPL
+#if defined(VFALLS_IMPL) || defined(KT_IMPL)
 	uint64_t stat, pcr;
 #endif
 
@@ -293,8 +314,8 @@ niagara_kstat_init()
 	/*
 	 * Create DRAM perf events kstat
 	 */
-	for (i = 0; i < NIAGARA_DRAM_BANKS; i++) {
-#ifdef VFALLS_IMPL
+	for (i = 0; i < DRAM_BANKS; i++) {
+#if defined(VFALLS_IMPL) || defined(KT_IMPL)
 		/* check if this dram instance is enabled in the HW */
 		stat = hv_niagara_getperf(dram_perf_regs[i].pcr_reg, &pcr);
 		if ((stat != H_EINVAL) && (stat != H_ENOTSUPPORTED)) {
@@ -311,13 +332,13 @@ niagara_kstat_init()
 			ksinfop->pic_no_evs =
 			    sizeof (niagara_dram_events) /
 			    sizeof (ni_kev_mask_t);
-			ksinfop->pic_sel_shift[0] = NIAGARA_DRAM_PIC0_SEL_SHIFT;
-			ksinfop->pic_shift[0] = NIAGARA_DRAM_PIC0_SHIFT;
-			ksinfop->pic_mask[0] = NIAGARA_DRAM_PIC0_MASK;
-			ksinfop->pic_sel_shift[1] = NIAGARA_DRAM_PIC1_SEL_SHIFT;
-			ksinfop->pic_shift[1] = NIAGARA_DRAM_PIC1_SHIFT;
-			ksinfop->pic_mask[1] = NIAGARA_DRAM_PIC1_MASK;
-			ksinfop->pic_reg[0] = dram_perf_regs[i].pic_reg;
+			ksinfop->pic_sel_shift[0] = DRAM_PIC0_SEL_SHIFT;
+			ksinfop->pic_shift[0] = DRAM_PIC0_SHIFT;
+			ksinfop->pic_mask[0] = DRAM_PIC0_MASK;
+			ksinfop->pic_sel_shift[1] = DRAM_PIC1_SEL_SHIFT;
+			ksinfop->pic_shift[1] = DRAM_PIC1_SHIFT;
+			ksinfop->pic_mask[1] = DRAM_PIC1_MASK;
+			ksinfop->pic_reg[0] = dram_perf_regs[i].pic_reg[0];
 			ksinfop->pcr_reg = dram_perf_regs[i].pcr_reg;
 			ni_dram_kstats[i] = ksinfop;
 
@@ -329,7 +350,7 @@ niagara_kstat_init()
 			/* create counter kstats */
 			ni_dram_kstats[i]->cntr_ksp = ni_create_cntr_kstat(
 			    "dram", i, ni_cntr_kstat_update, ksinfop);
-#ifdef VFALLS_IMPL
+#if defined(VFALLS_IMPL) || defined(KT_IMPL)
 		}
 #endif
 	}
@@ -484,7 +505,7 @@ niagara_kstat_fini()
 		printf("ni_kstat_fini called\n");
 #endif
 
-	for (i = 0; i < NIAGARA_DRAM_BANKS; i++) {
+	for (i = 0; i < DRAM_BANKS; i++) {
 		if (ni_dram_kstats[i] != NULL) {
 			ni_delete_name_kstat(ni_dram_kstats[i]);
 			if (ni_dram_kstats[i]->cntr_ksp != NULL)
@@ -773,7 +794,6 @@ ni_cntr_kstat_update(kstat_t *ksp, int rw)
 		    hv_niagara_getperf(ksinfop->pcr_reg, &pcr) != 0)
 			stat = EACCES;
 		else {
-
 			data_p[0].value.ui64 = pcr;
 
 			/*

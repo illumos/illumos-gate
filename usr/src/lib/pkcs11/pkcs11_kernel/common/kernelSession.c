@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <pthread.h>
 #include <errno.h>
@@ -244,8 +242,8 @@ kernel_get_operationstate(kernel_session_t *session_p, CK_STATE ses_state,
 
 	/*
 	 * XXX Need to support this case in future.
-	 * This is the case where we exceeded SLOT_MAX_INDATA_LEN and
-	 * hence started using libmd. SLOT_MAX_INDATA_LEN is at least
+	 * This is the case where we exceeded SLOT_HASH_MAX_INDATA_LEN and
+	 * hence started using libmd. SLOT_HASH_MAX_INDATA_LEN is at least
 	 * 64K for current crypto framework providers and web servers
 	 * do not need to clone digests that big for SSL operations.
 	 */
@@ -369,7 +367,7 @@ kernel_set_operationstate(kernel_session_t *session_p, CK_STATE ses_state,
 	/* compute the data buffer length */
 	indata_len = expected_len - sizeof (int) -
 	    sizeof (CK_STATE) - sizeof (crypto_active_op_t);
-	if (indata_len > SLOT_MAX_INDATA_LEN(session_p))
+	if (indata_len > SLOT_HASH_MAX_INDATA_LEN(session_p))
 		return (CKR_SAVED_STATE_INVALID);
 	src += sizeof (int);
 

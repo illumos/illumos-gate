@@ -1,0 +1,218 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma dictionary "PCIEX"
+
+#include <px_err.h>
+
+/*
+ * generic root complex/root port diagnosis rules
+ */
+
+#define	PCIEXFN		pciexbus/pciexdev/pciexfn
+#define	PCIEXFNHZ	pciexbus<>/pciexdev<>/pciexfn<>
+
+#define RC_N    5
+#define RC_T    72h
+
+#define SW_FIT    5000
+#define FW_FIT    5000
+#define HB_FIT    400
+
+#define EPKT_DESC       (payloadprop("desc") >> 12)
+#define EPKT_B_BIT      (payloadprop("desc") & (1 << 7))
+#define EPKT_C_BIT      (payloadprop("desc") & (1 << 5))
+#define EPKT_H_BIT      (payloadprop("desc") & (1 << 4))
+
+#define MATCHES_DESC(b, o, p, c, d) \
+    (EPKT_DESC == (b << 16 | o << 12 | p << 8 | c << 4 | d))
+
+#define IS_CE (EPKT_C_BIT != 0 && setserdsuffix(EPKT_DESC))
+#define IS_UE (EPKT_C_BIT == 0)
+#define IS_BLOCKED (EPKT_B_BIT != 0)
+
+#define EPKT(b, o, p, c, d) \
+    ereport.io.pciex.rc.epkt@hostbridge { MATCHES_DESC(b, o, p, c, d) }
+
+/* Ereport Events */
+event ereport.io.pciex.rc.epkt@hostbridge {within(5s)};
+
+/* Internal Events */
+event error.io.pciex.rc.stall@hostbridge;
+event error.io.pciex.rc.poiscomp@hostbridge;
+event error.io.pciex.nr-d@hostbridge/pciexrc/PCIEXFN;
+event error.io.pciex.badreq-u@hostbridge/pciexrc/PCIEXFN;
+event error.io.pciex.poiscomp-d@hostbridge/pciexrc/PCIEXFN;
+event error.io.pciex.noimpact-d@hostbridge/pciexrc/PCIEXFN;
+event error.io.pciex.lost-d@hostbridge/pciexrc/PCIEXFN;
+event error.io.pciex.degraded-d@hostbridge/pciexrc/PCIEXFN;
+
+/* Upset event */
+event upset.io.pciex.rc.discard@hostbridge;
+
+/*
+ * Fault Events
+ * Do no retire and FRUs for SW/FW faults
+ */
+event fault.io.pciex.rc.generic-ue@hostbridge,
+    FITrate=HB_FIT, retire=0, response=0;
+event fault.io.pciex.rc.generic-sw@hostbridge,
+    FITrate=SW_FIT, retire=0, response=0;
+event fault.io.pciex.rc.generic-fw@hostbridge,
+    FITrate=FW_FIT, retire=0, response=0;
+
+/* Serd engine for CE errors */
+engine serd.io.pciex.rc.generic-ce@hostbridge, N=RC_N, T=RC_T;
+event fault.io.pciex.rc.generic-ce@hostbridge, FITrate=HB_FIT,
+    engine=serd.io.pciex.rc.generic-ce@hostbridge;
+
+/* Fire faults */
+event fault.io.fire.pciex.device@PCIEXFN, FITrate=1000;
+event fault.io.fire.pci.device@pcibus/pcidev/pcifn, FITrate=1000;
+
+/* Generic Root Complex Software faults */
+prop fault.io.pciex.rc.generic-sw@hostbridge ->
+    ereport.io.pciex.rc.epkt@hostbridge {
+	MATCHES_DESC(BLOCK_INTR,OP_FIXED,PH_UNKNOWN,CND_ILL,DIR_INGRESS)  ||
+	MATCHES_DESC(BLOCK_INTR,OP_MSI32,PH_UNKNOWN,CND_ILL,DIR_IRR)  ||
+	MATCHES_DESC(BLOCK_INTR,OP_PCIEMSG,PH_UNKNOWN,CND_ILL,DIR_INGRESS)
+    };
+
+/* Generic Root Complex Firmware faults */
+prop fault.io.pciex.rc.generic-fw@hostbridge ->
+    ereport.io.pciex.rc.epkt@hostbridge {
+	MATCHES_DESC(BLOCK_HOSTBUS,OP_PIO,PH_ADDR,CND_UNMAP,DIR_WRITE)
+    };
+
+/* Generic Root Complex CE faults */
+prop fault.io.pciex.rc.generic-ce@hostbridge { IS_CE } -> 
+    ereport.io.pciex.rc.epkt@hostbridge;
+
+/* Generic Root Complex UE faults from propagations */
+event error.io.pciex.rc.generic-ue1@hostbridge;
+event error.io.pciex.rc.generic-ue2@hostbridge;
+
+prop fault.io.pciex.rc.generic-ue@hostbridge -> 
+    error.io.pciex.rc.generic-ue1@hostbridge,
+    error.io.pciex.rc.generic-ue2@hostbridge,
+    error.io.pciex.rc.stall@hostbridge,
+    error.io.pciex.rc.poiscomp@hostbridge;
+
+/* Generic Root Complex UE propagations */
+prop error.io.pciex.rc.generic-ue1@hostbridge { IS_UE && !IS_BLOCKED } ->
+    ereport.io.pciex.rc.epkt@hostbridge {
+	MATCHES_DESC(BLOCK_HOSTBUS,OP_DMA,PH_DATA,CND_INT,DIR_READ) ||
+	MATCHES_DESC(BLOCK_HOSTBUS,OP_DMA,PH_DATA,CND_INT,DIR_UNKNOWN) ||
+	MATCHES_DESC(BLOCK_HOSTBUS,OP_DMA,PH_DATA,CND_INT,DIR_WRITE) ||
+	MATCHES_DESC(BLOCK_HOSTBUS,OP_DMA,PH_DATA,CND_TO,DIR_READ) ||
+	MATCHES_DESC(BLOCK_HOSTBUS,OP_DMA,PH_DATA,CND_TO,DIR_WRITE) ||
+	MATCHES_DESC(BLOCK_HOSTBUS,OP_PIO,PH_DATA,CND_INT,DIR_UNKNOWN) ||
+	MATCHES_DESC(BLOCK_HOSTBUS,OP_UNKNOWN,PH_DATA,CND_INT,DIR_UNKNOWN) ||
+	MATCHES_DESC(BLOCK_HOSTBUS,OP_UNKNOWN,PH_DATA,CND_INT,DIR_UNKNOWN) ||
+	MATCHES_DESC(BLOCK_INTR,OP_MSI32,PH_DATA,CND_INT,DIR_UNKNOWN) ||
+	MATCHES_DESC(BLOCK_INTR,OP_MSIQ,PH_DATA,CND_INT,DIR_UNKNOWN)
+    };
+
+prop error.io.pciex.rc.generic-ue2@hostbridge { IS_UE && !IS_BLOCKED } ->
+    ereport.io.pciex.rc.epkt@hostbridge {
+	MATCHES_DESC(BLOCK_MMU,OP_TBW,PH_ADDR,CND_UNKNOWN,DIR_UNKNOWN) ||
+	MATCHES_DESC(BLOCK_MMU,OP_TBW,PH_ADDR,CND_UNMAP,DIR_UNKNOWN) ||
+	MATCHES_DESC(BLOCK_MMU,OP_TBW,PH_DATA,CND_INT,DIR_IRR) ||
+	MATCHES_DESC(BLOCK_MMU,OP_TBW,PH_UNKNOWN,CND_UNKNOWN,DIR_UNKNOWN) ||
+	MATCHES_DESC(BLOCK_MMU,OP_XLAT,PH_DATA,CND_INT,DIR_UNKNOWN) ||
+	MATCHES_DESC(BLOCK_PORT,OP_DMA,PH_DATA,CND_INT,DIR_READ) ||
+	MATCHES_DESC(BLOCK_PORT,OP_PIO,PH_DATA,CND_INT,DIR_READ) ||
+	MATCHES_DESC(BLOCK_PORT,OP_PIO,PH_DATA,CND_INT,DIR_UNKNOWN) ||
+	MATCHES_DESC(BLOCK_PORT,OP_UNKNOWN,PH_DATA,CND_INT,DIR_UNKNOWN) ||
+	MATCHES_DESC(BLOCK_PORT,OP_UNKNOWN,PH_DATA,CND_INT,DIR_UNKNOWN)
+    };
+
+/* Errors that will cause a pipe stall and thus a CTO in the fabric */
+prop error.io.pciex.rc.stall@hostbridge (0) -> 
+    error.io.pciex.nr-d@hostbridge/pciexrc<>/PCIEXFNHZ;
+
+prop error.io.pciex.rc.stall@hostbridge { IS_UE && IS_BLOCKED } -> 
+    ereport.io.pciex.rc.epkt@hostbridge;
+
+/*
+ * Errors that will send a poisoned data to the fabric
+ * Also the poiscomp-d could represent a fault that a hardened driver
+ * handled and reported a service impact.
+ */
+prop error.io.pciex.rc.poiscomp@hostbridge (0) ->
+    error.io.pciex.poiscomp-d@hostbridge/pciexrc<>/PCIEXFNHZ,
+    error.io.pciex.noimpact-d@hostbridge/pciexrc<>/PCIEXFNHZ,
+    error.io.pciex.lost-d@hostbridge/pciexrc<>/PCIEXFNHZ,
+    error.io.pciex.degraded-d@hostbridge/pciexrc<>/PCIEXFNHZ;
+
+prop error.io.pciex.rc.poiscomp@hostbridge { IS_UE && !IS_BLOCKED } -> 
+    ereport.io.pciex.rc.epkt@hostbridge {
+	MATCHES_DESC(BLOCK_HOSTBUS,OP_DMA,PH_DATA,CND_INT,DIR_READ)
+    };
+
+prop error.io.pciex.badreq-u@hostbridge/pciexrc/PCIEXFN { IS_UE && !IS_BLOCKED } (0) -> 
+    ereport.io.pciex.rc.epkt@hostbridge {
+	MATCHES_DESC(BLOCK_MMU,OP_XLAT,PH_ADDR,CND_UNMAP,DIR_RDWR) ||
+	MATCHES_DESC(BLOCK_MMU,OP_XLAT,PH_DATA,CND_INV,DIR_RDWR) ||
+	MATCHES_DESC(BLOCK_MMU,OP_XLAT,PH_DATA,CND_PROT,DIR_RDWR)
+    };
+
+prop upset.io.pciex.rc.discard@hostbridge -> 
+    ereport.io.pciex.rc.epkt@hostbridge {
+	MATCHES_DESC(BLOCK_INTR,OP_MSI32,PH_DATA,CND_ILL,DIR_IRR) ||
+	MATCHES_DESC(BLOCK_PORT,OP_LINK,PH_FC,CND_TO,DIR_IRR) ||
+	MATCHES_DESC(BLOCK_PORT,OP_PIO,PH_IRR,CND_INV,DIR_RDWR) ||
+	MATCHES_DESC(BLOCK_PORT,OP_PIO,PH_IRR,CND_RCA,DIR_WRITE) ||
+	MATCHES_DESC(BLOCK_PORT,OP_PIO,PH_IRR,CND_RUR,DIR_WRITE) ||
+	MATCHES_DESC(BLOCK_PORT,OP_PIO,PH_IRR,CND_TO,DIR_READ) ||
+	MATCHES_DESC(BLOCK_PORT,OP_PIO,PH_IRR,CND_TO,DIR_WRITE) ||
+	MATCHES_DESC(BLOCK_PORT,OP_PIO,PH_IRR,CND_UC,DIR_IRR)
+    };
+
+/* Event queue overflow */
+#define PROP_PLAT_FRU "FRU"
+#define GET_HB_FRU (confprop(asru(hostbridge), PROP_PLAT_FRU))
+#define GET_PCIE_FRU (confprop(asru(pciexbus[b]/pciexdev[d]/pciexfn[0]), PROP_PLAT_FRU))
+#define GET_PCI_FRU (confprop(asru(pcibus[b]/pcidev[d]/pcifn[0]), PROP_PLAT_FRU))
+
+prop fault.io.fire.pciex.device@pciexbus[b]/pciexdev[d]/pciexfn[0]
+    {  
+        /*
+         * Indict PCI-E FRU(s) under this root complex excluding the 
+         * one that the Fire ASIC resides on. 
+         */
+        is_under(hostbridge, pciexbus[b]/pciexdev[d]/pciexfn[0]) &&
+	(GET_HB_FRU != GET_PCIE_FRU)
+    } (0) -> EPKT(BLOCK_INTR,OP_MSIQ,PH_UNKNOWN,CND_OV,DIR_IRR);
+
+prop fault.io.fire.pci.device@pcibus[b]/pcidev[d]/pcifn[0]
+    {  
+        /*
+         * Indict PCI FRU(s) under this root complex excluding the 
+         * one that the Fire ASIC resides on. 
+         */
+        is_under(hostbridge, pcibus[b]/pcidev[d]/pcifn[0]) &&
+	    (GET_HB_FRU != GET_PCI_FRU)
+    } (0) -> EPKT(BLOCK_INTR,OP_MSIQ,PH_UNKNOWN,CND_OV,DIR_IRR);

@@ -336,6 +336,7 @@ DRV_KMODS	+= niumx
 DRV_KMODS	+= ntwdt
 DRV_KMODS	+= nxge
 DRV_KMODS	+= n2piupc
+DRV_KMODS	+= iospc
 DRV_KMODS	+= n2rng
 DRV_KMODS	+= px
 DRV_KMODS	+= qcn
@@ -432,7 +433,7 @@ XMODS		+=
 #
 #	cpu modules
 #
-CPU_KMODS	+= generic niagara niagara2 vfalls
+CPU_KMODS	+= generic niagara niagara2 vfalls kt
 
 LINT_CPU_KMODS	+= generic
 
@@ -442,3 +443,4 @@ LINT_CPU_KMODS	+= generic
 PCBE_KMODS	+= niagara_pcbe
 PCBE_KMODS	+= niagara2_pcbe
 PCBE_KMODS	+= vfalls_pcbe
+PCBE_KMODS	+= kt_pcbe

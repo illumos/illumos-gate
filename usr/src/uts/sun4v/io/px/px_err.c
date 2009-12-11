@@ -53,9 +53,13 @@ static int px_mmu_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr,
     px_rc_err_t *epkt);
 static int px_intr_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr,
     px_rc_err_t *epkt);
+static int px_port_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr,
+    px_rc_err_t *epkt);
 static int px_pcie_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr,
     px_rc_err_t *epkt);
 static int px_intr_handle_errors(dev_info_t *dip, ddi_fm_error_t *derr,
+    px_rc_err_t *epkt);
+static int px_port_handle_errors(dev_info_t *dip, ddi_fm_error_t *derr,
     px_rc_err_t *epkt);
 static void px_fix_legacy_epkt(dev_info_t *dip, ddi_fm_error_t *derr,
     px_rc_err_t *epkt);
@@ -320,6 +324,9 @@ px_err_epkt_severity(px_t *px_p, ddi_fm_error_t *derr, px_rc_err_t *epkt,
 	case BLOCK_INTR:
 		err = px_intr_epkt_severity(dip, derr, epkt);
 		break;
+	case BLOCK_PORT:
+		err = px_port_epkt_severity(dip, derr, epkt);
+		break;
 	case BLOCK_PCIE:
 		is_block_pci = B_TRUE;
 		err = px_pcie_epkt_severity(dip, derr, epkt);
@@ -404,6 +411,11 @@ px_err_send_epkt_erpt(dev_info_t *dip, px_rc_err_t *epkt,
 		    is_valid_epkt ? pec->ehdl : 0,
 		    EPKT_STICK, DATA_TYPE_UINT64,
 		    is_valid_epkt ? pec->stick : 0,
+		    EPKT_DW0, DATA_TYPE_UINT64, ((uint64_t *)pec)[3],
+		    EPKT_DW1, DATA_TYPE_UINT64, ((uint64_t *)pec)[4],
+		    EPKT_DW2, DATA_TYPE_UINT64, ((uint64_t *)pec)[5],
+		    EPKT_DW3, DATA_TYPE_UINT64, ((uint64_t *)pec)[6],
+		    EPKT_DW4, DATA_TYPE_UINT64, ((uint64_t *)pec)[7],
 		    EPKT_PEC_DESCR, DATA_TYPE_STRING, descr_buf);
 	} else {
 		(void) snprintf(descr_buf, sizeof (descr_buf),
@@ -431,6 +443,11 @@ px_err_send_epkt_erpt(dev_info_t *dip, px_rc_err_t *epkt,
 		    is_valid_epkt ? epkt->ehdl : 0,
 		    EPKT_STICK, DATA_TYPE_UINT64,
 		    is_valid_epkt ? epkt->stick : 0,
+		    EPKT_DW0, DATA_TYPE_UINT64, ((uint64_t *)epkt)[3],
+		    EPKT_DW1, DATA_TYPE_UINT64, ((uint64_t *)epkt)[4],
+		    EPKT_DW2, DATA_TYPE_UINT64, ((uint64_t *)epkt)[5],
+		    EPKT_DW3, DATA_TYPE_UINT64, ((uint64_t *)epkt)[6],
+		    EPKT_DW4, DATA_TYPE_UINT64, ((uint64_t *)epkt)[7],
 		    EPKT_RC_DESCR, DATA_TYPE_STRING, descr_buf);
 	}
 }
@@ -578,6 +595,73 @@ static int
 px_intr_handle_errors(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt)
 {
 	return (px_err_check_eq(dip));
+}
+
+/* ARGSUSED */
+static int
+px_port_handle_errors(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt)
+{
+	pf_pcie_adv_err_regs_t	adv_reg;
+	uint16_t		s_status;
+	int			sts = PX_PANIC;
+
+	/*
+	 * Check for failed non-posted writes, which are errors that are not
+	 * defined in the PCIe spec.  If not return panic.
+	 */
+	if (!((epkt->rc_descr.op == OP_PIO) &&
+	    (epkt->rc_descr.phase == PH_IRR))) {
+		sts = (PX_PANIC);
+		goto done;
+	}
+
+	/*
+	 * Gather the error logs, if they do not exist just return with no panic
+	 * and let the fabric message take care of the error.
+	 */
+	if (!epkt->rc_descr.H) {
+		sts = (PX_NO_PANIC);
+		goto done;
+	}
+
+	adv_reg.pcie_ue_hdr[0] = (uint32_t)(epkt->hdr[0]);
+	adv_reg.pcie_ue_hdr[1] = (uint32_t)(epkt->hdr[0] >> 32);
+	adv_reg.pcie_ue_hdr[2] = (uint32_t)(epkt->hdr[1]);
+	adv_reg.pcie_ue_hdr[3] = (uint32_t)(epkt->hdr[1] >> 32);
+
+	sts = pf_tlp_decode(PCIE_DIP2BUS(dip), &adv_reg);
+
+	if (epkt->rc_descr.M)
+		adv_reg.pcie_ue_tgt_addr = epkt->addr;
+
+	if (!((sts == DDI_SUCCESS) || (epkt->rc_descr.M))) {
+		/* Let the fabric message take care of error */
+		sts = PX_NO_PANIC;
+		goto done;
+	}
+
+	/* See if the failed transaction belonged to a hardened driver */
+	if (pf_hdl_lookup(dip, derr->fme_ena,
+	    adv_reg.pcie_ue_tgt_trans, adv_reg.pcie_ue_tgt_addr,
+	    adv_reg.pcie_ue_tgt_bdf) == PF_HDL_FOUND)
+		sts = (PX_NO_PANIC);
+	else
+		sts = (PX_PANIC);
+
+	/* Add pfd to cause a fabric scan */
+	switch (epkt->rc_descr.cond) {
+	case CND_RCA:
+		s_status = PCI_STAT_R_TARG_AB;
+		break;
+	case CND_RUR:
+		s_status = PCI_STAT_R_MAST_AB;
+		break;
+	}
+	px_rp_en_q(DIP_TO_STATE(dip), adv_reg.pcie_ue_tgt_bdf,
+	    adv_reg.pcie_ue_tgt_addr, s_status);
+
+done:
+	return (sts);
 }
 
 /* ARGSUSED */

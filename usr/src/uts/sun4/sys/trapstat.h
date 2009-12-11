@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_TRAPSTAT_H
 #define	_SYS_TRAPSTAT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef _ASM
 #include <sys/processor.h>
@@ -77,6 +75,29 @@ typedef struct tstat_pgszdata {
 	tstat_modedata_t	tpgsz_user;
 	tstat_modedata_t	tpgsz_kernel;
 } tstat_pgszdata_t;
+
+#ifdef sun4v
+/*
+ * For sun4v, we optimized by using a smaller 4K data area
+ * per-cpu. We use separate structures for data collection,
+ * one for normal trapstat collection and one for collecting
+ * TLB stats. Note that we either collect normal trapstats
+ * or TLB stats, never both. For TLB stats, we are only
+ * interested in the MMU/TLB miss traps (which are trap #s
+ * 0x9, 0x32, 0x64 & 0x68)
+ */
+#define	TSTAT_TLB_NENT	200 /* max trap entries for tlb stats */
+
+typedef struct tstat_ndata {
+	uint64_t	tdata_traps[TSTAT_NENT];
+} tstat_ndata_t;
+
+typedef struct tstat_tdata {
+	uint64_t	tdata_traps[TSTAT_TLB_NENT];
+	hrtime_t	tdata_tmptick;
+	tstat_pgszdata_t tdata_pgsz[1];
+} tstat_tdata_t;
+#endif /* sun4v */
 
 typedef struct tstat_data {
 	processorid_t	tdata_cpuid;
@@ -153,20 +174,52 @@ typedef struct tstat_tsbmiss_patch_entry {
 
 #ifdef sun4v
 
-#if (NCPU > 508)
-#error "sun4v trapstat supports up to 508 cpus"
-#endif
-
 #define	TSTAT_TLB_STATS		0x1		/* cpu_tstat_flags */
 #define	TSTAT_INSTR_SIZE	\
 	((sizeof (tstat_instr_t) + MMU_PAGESIZE - 1) & ~(MMU_PAGESIZE - 1))
-#define	TSTAT_DATA_SHIFT	13
-#define	TSTAT_DATA_SIZE		(1 << TSTAT_DATA_SHIFT)	/* 8K per CPU */
+#define	TSTAT_DATA_SHIFT	12
+#define	TSTAT_DATA_SIZE		(1 << TSTAT_DATA_SHIFT)	/* 4K per CPU */
 #define	TSTAT_TBA_MASK		~((1 << 15) - 1)	/* 32K boundary */
 
 #define	TSTAT_CPU0_DATA_OFFS(tcpu, mem)	\
 	((uintptr_t)(tcpu)->tcpu_ibase + TSTAT_INSTR_SIZE + \
-	    offsetof(tstat_data_t, mem))
+	    offsetof(tstat_ndata_t, mem))
+
+#define	TSTAT_CPU0_TLBDATA_OFFS(tcpu, mem) \
+	((uintptr_t)(tcpu)->tcpu_ibase + TSTAT_INSTR_SIZE + \
+	    offsetof(tstat_tdata_t, mem))
+
+/*
+ * Sun4v trapstat can use up to 3 4MB pages to support
+ * 3064 cpus. Each cpu needs 4K of data page for stats collection.
+ * The first 32K (TSTAT_TRAPTBLE_SIZE) in the first 4 MB page is
+ * use for the traptable leaving 4MB - 32K = 4064K for cpu data
+ * which work out to be 4064/4K = 1016 cpus. Each additional
+ * 4MB page (2nd and 3rd ones) can support 4096/4 = 1024 cpus.
+ * This works out to be a total of 1016 + 1024 + 1024 = 3064 cpus.
+ */
+#define	ROUNDUP(a, n)	(((a) + ((n) - 1)) & ~((n) - 1))
+#define	TSTAT_MAXNUM4M_MAPPING	3
+#define	TSTAT_TRAPTBL_SIZE	(32 * 1024)
+#define	TSTAT_NUM4M_LIMIT \
+	(ROUNDUP((NCPU * TSTAT_DATA_SIZE) + TSTAT_TRAPTBL_SIZE, \
+	    MMU_PAGESIZE4M) >> MMU_PAGESHIFT4M)
+
+#if (TSTAT_NUM4M_LIMIT > TSTAT_MAXNUM4M_MAPPING)
+#error "NCPU is too large for trapstat"
+#endif
+
+/*
+ * Note that the macro below is almost identical to the
+ * one for TSTAT_NUM4M_LIMIT with one difference. Instead of
+ * using TSTAT_TRAPTBL_SIZE constant, it uses TSTAT_INSTR_SIZE which
+ * has a runtime sizeof() expression. The result should be
+ * the same. This macro is used at runtime as an extra
+ * validation for correctness.
+ */
+#define	TSTAT_NUM4M_MACRO(ncpu) \
+	(ROUNDUP(((ncpu) * TSTAT_DATA_SIZE) + TSTAT_INSTR_SIZE, \
+	    MMU_PAGESIZE4M) >> MMU_PAGESHIFT4M)
 
 #else /* sun4v */
 
@@ -204,6 +257,9 @@ typedef struct tstat_percpu {
 	pfn_t		*tcpu_pfn;
 	tstat_instr_t	*tcpu_instr;
 	tstat_data_t	*tcpu_data;
+#ifdef sun4v
+	hrtime_t	tcpu_tdata_peffect;
+#endif /* sun4v */
 } tstat_percpu_t;
 
 #endif

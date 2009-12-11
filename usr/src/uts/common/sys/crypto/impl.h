@@ -204,6 +204,8 @@ typedef enum {
  *			and other internal flags defined above.
  * pd_hash_limit:	Maximum data size that hash mechanisms of this provider
  * 			can support.
+ * pd_hmac_limit:	Maximum data size that HMAC mechanisms of this provider
+ * 			can support.
  * pd_kcf_prov_handle:	KCF-private handle assigned by KCF
  * pd_prov_id:		Identification # assigned by KCF to provider
  * pd_kstat:		kstat associated with the provider
@@ -232,6 +234,7 @@ typedef struct kcf_provider_desc {
 	char				*pd_description;
 	uint_t				pd_flags;
 	uint_t				pd_hash_limit;
+	uint_t				pd_hmac_limit;
 	crypto_kcf_provider_handle_t	pd_kcf_prov_handle;
 	crypto_provider_id_t		pd_prov_id;
 	kstat_t				*pd_kstat;
@@ -590,6 +593,7 @@ extern rctl_hndl_t rc_project_crypto_mem;
 #define	KCF_PROV_NOSTORE_KEY_OPS(pd)	\
 	((pd)->pd_ops_vector->co_nostore_key_ops)
 #define	KCF_PROV_FIPS140_OPS(pd)	((pd)->pd_ops_vector->co_fips140_ops)
+#define	KCF_PROV_PROVMGMT_OPS(pd)	((pd)->pd_ops_vector->co_provider_ops)
 
 /*
  * Wrappers for crypto_control_ops(9S) entry points.

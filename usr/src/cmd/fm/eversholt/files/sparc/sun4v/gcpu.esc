@@ -437,10 +437,11 @@ prop upset.fw.generic-sparc.erpt-gen@chassis
     { !DIAGNOSE_ERPT } (0) ->
     ereport.cpu.generic-sparc.inconsistent@chassis;
 /*
- * bootbus-to and bootbus-par errors. Fault the detector.
+ * bootbus-prot, bootbus-to and bootbus-par errors. Fault the detector.
  */
 event ereport.cpu.generic-sparc.bootbus-to@chip;
 event ereport.cpu.generic-sparc.bootbus-par@chip;
+event ereport.cpu.generic-sparc.bootbus-prot@chip;
 event upset.cpu.generic-sparc.bootbus@chip;
 
 event fault.cpu.generic-sparc.bootbus@chip, retire=0;
@@ -453,10 +454,15 @@ prop fault.cpu.generic-sparc.bootbus@chip
     { DIAGNOSE_ERPT } (0) ->
     ereport.cpu.generic-sparc.bootbus-par@chip;
 
+prop fault.cpu.generic-sparc.bootbus@chip
+    { DIAGNOSE_ERPT } (0) ->
+    ereport.cpu.generic-sparc.bootbus-prot@chip;
+
 prop upset.cpu.generic-sparc.bootbus@chip
     { !DIAGNOSE_ERPT } (0) ->
     ereport.cpu.generic-sparc.bootbus-to@chip,
-    ereport.cpu.generic-sparc.bootbus-par@chip;
+    ereport.cpu.generic-sparc.bootbus-par@chip,
+    ereport.cpu.generic-sparc.bootbus-prot@chip;
 
 /*
  * ignore the pio-read error.

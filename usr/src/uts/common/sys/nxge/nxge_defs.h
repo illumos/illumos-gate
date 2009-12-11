@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -225,7 +225,12 @@ extern "C" {
 #define	SW_OFFSET_NO_OFFSET		0
 #define	SW_OFFSET_64			1	/* 64 bytes */
 #define	SW_OFFSET_128			2	/* 128 bytes */
-#define	SW_OFFSET_INVALID		3
+/* The following additional offsets are defined for Neptune-L and RF-NIU */
+#define	SW_OFFSET_192			3
+#define	SW_OFFSET_256			4
+#define	SW_OFFSET_320			5
+#define	SW_OFFSET_384			6
+#define	SW_OFFSET_448			7
 
 #define	TDC_DEFAULT_MAX		8192
 /*
@@ -336,8 +341,11 @@ extern "C" {
 
 #define	TCAM_FLOW_KEY_MAX_CLASS		12
 #define	TCAM_L3_MAX_USER_CLASS		4
+#define	TCAM_MAX_ENTRY			256
 #define	TCAM_NIU_TCAM_MAX_ENTRY		128
 #define	TCAM_NXGE_TCAM_MAX_ENTRY	256
+#define	NXGE_L2_PROG_CLS		2
+#define	NXGE_L3_PROG_CLS		4
 
 
 

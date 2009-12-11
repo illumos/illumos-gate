@@ -96,6 +96,7 @@ uint32_t	nxge_cksum_offload = 0;
 uint32_t 	nxge_rbr_size = NXGE_RBR_RBB_DEFAULT;
 uint32_t 	nxge_rbr_spare_size = 0;
 uint32_t 	nxge_rcr_size = NXGE_RCR_DEFAULT;
+uint16_t	nxge_rdc_buf_offset = SW_OFFSET_NO_OFFSET;
 uint32_t 	nxge_tx_ring_size = NXGE_TX_RING_DEFAULT;
 boolean_t 	nxge_no_msg = B_TRUE;		/* control message display */
 uint32_t 	nxge_no_link_notify = 0;	/* control DL_NOTIFY */
@@ -170,6 +171,16 @@ uint32_t	nxge_tx_serial_maxsleep = 1;
 #if	defined(sun4v)
 /*
  * Hypervisor N2/NIU services information.
+ */
+/*
+ * The following is the default API supported:
+ * major 1 and minor 1.
+ *
+ * Please update the MAX_NIU_MAJORS,
+ * MAX_NIU_MINORS, and minor number supported
+ * when the newer Hypervior API interfaces
+ * are added. Also, please update nxge_hsvc_register()
+ * if needed.
  */
 static hsvc_info_t niu_hsvc = {
 	HSVC_REV_1, NULL, HSVC_GROUP_NIU, NIU_MAJOR_VER,
@@ -1073,27 +1084,89 @@ int
 nxge_hsvc_register(nxge_t *nxgep)
 {
 	nxge_status_t status;
+	int i, j;
 
-	if (nxgep->niu_type == N2_NIU) {
-		nxgep->niu_hsvc_available = B_FALSE;
-		bcopy(&niu_hsvc, &nxgep->niu_hsvc, sizeof (hsvc_info_t));
-		if ((status = hsvc_register(&nxgep->niu_hsvc,
-		    &nxgep->niu_min_ver)) != 0) {
-			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			    "nxge_attach: %s: cannot negotiate "
-			    "hypervisor services revision %d group: 0x%lx "
-			    "major: 0x%lx minor: 0x%lx errno: %d",
-			    niu_hsvc.hsvc_modname, niu_hsvc.hsvc_rev,
-			    niu_hsvc.hsvc_group, niu_hsvc.hsvc_major,
-			    niu_hsvc.hsvc_minor, status));
-			return (DDI_FAILURE);
-		}
-		nxgep->niu_hsvc_available = B_TRUE;
-		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-		    "NIU Hypervisor service enabled"));
+	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_hsvc_register"));
+	if (nxgep->niu_type != N2_NIU) {
+		NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_hsvc_register"));
+		return (DDI_SUCCESS);
 	}
 
-	return (DDI_SUCCESS);
+	/*
+	 * Currently, the NIU Hypervisor API supports two major versions:
+	 * version 1 and 2.
+	 * If Hypervisor introduces a higher major or minor version,
+	 * please update NIU_MAJOR_HI and NIU_MINOR_HI accordingly.
+	 */
+	nxgep->niu_hsvc_available = B_FALSE;
+	bcopy(&niu_hsvc, &nxgep->niu_hsvc,
+	    sizeof (hsvc_info_t));
+
+	for (i = NIU_MAJOR_HI; i > 0; i--) {
+		nxgep->niu_hsvc.hsvc_major = i;
+		for (j = NIU_MINOR_HI; j >= 0; j--) {
+			nxgep->niu_hsvc.hsvc_minor = j;
+			NXGE_DEBUG_MSG((nxgep, DDI_CTL,
+			    "nxge_hsvc_register: %s: negotiating "
+			    "hypervisor services revision %d "
+			    "group: 0x%lx major: 0x%lx "
+			    "minor: 0x%lx",
+			    nxgep->niu_hsvc.hsvc_modname,
+			    nxgep->niu_hsvc.hsvc_rev,
+			    nxgep->niu_hsvc.hsvc_group,
+			    nxgep->niu_hsvc.hsvc_major,
+			    nxgep->niu_hsvc.hsvc_minor,
+			    nxgep->niu_min_ver));
+
+			if ((status = hsvc_register(&nxgep->niu_hsvc,
+			    &nxgep->niu_min_ver)) == 0) {
+				/* Use the supported minor */
+				nxgep->niu_hsvc.hsvc_minor = nxgep->niu_min_ver;
+				NXGE_DEBUG_MSG((nxgep, DDI_CTL,
+				    "nxge_hsvc_register: %s: negotiated "
+				    "hypervisor services revision %d "
+				    "group: 0x%lx major: 0x%lx "
+				    "minor: 0x%lx (niu_min_ver 0x%lx)",
+				    nxgep->niu_hsvc.hsvc_modname,
+				    nxgep->niu_hsvc.hsvc_rev,
+				    nxgep->niu_hsvc.hsvc_group,
+				    nxgep->niu_hsvc.hsvc_major,
+				    nxgep->niu_hsvc.hsvc_minor,
+				    nxgep->niu_min_ver));
+
+				nxgep->niu_hsvc_available = B_TRUE;
+				NXGE_DEBUG_MSG((nxgep, DDI_CTL,
+				    "<== nxge_hsvc_register: "
+				    "NIU Hypervisor service enabled"));
+				return (DDI_SUCCESS);
+			}
+
+			NXGE_DEBUG_MSG((nxgep, DDI_CTL,
+			    "nxge_hsvc_register: %s: negotiated failed - "
+			    "try lower major number "
+			    "hypervisor services revision %d "
+			    "group: 0x%lx major: 0x%lx minor: 0x%lx "
+			    "errno: %d",
+			    nxgep->niu_hsvc.hsvc_modname,
+			    nxgep->niu_hsvc.hsvc_rev,
+			    nxgep->niu_hsvc.hsvc_group,
+			    nxgep->niu_hsvc.hsvc_major,
+			    nxgep->niu_hsvc.hsvc_minor, status));
+		}
+	}
+
+	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+	    "nxge_hsvc_register: %s: cannot negotiate "
+	    "hypervisor services revision %d group: 0x%lx "
+	    "major: 0x%lx minor: 0x%lx errno: %d",
+	    niu_hsvc.hsvc_modname, niu_hsvc.hsvc_rev,
+	    niu_hsvc.hsvc_group, niu_hsvc.hsvc_major,
+	    niu_hsvc.hsvc_minor, status));
+
+	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
+	    "<== nxge_hsvc_register: Register to NIU Hypervisor failed"));
+
+	return (DDI_FAILURE);
 }
 #endif
 
@@ -1144,7 +1217,10 @@ nxge_map_regs(p_nxge_t nxgep)
 		nxgep->niu_type = N2_NIU;
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
 		    "nxge_map_regs: N2/NIU devname %s", devname));
-		/* get function number */
+		/*
+		 * Get function number:
+		 *  - N2/NIU: "/niu@80/network@0" and "/niu@80/network@1"
+		 */
 		nxgep->function_num =
 		    (devname[strlen(devname) -1] == '1' ? 1 : 0);
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
@@ -3949,6 +4025,8 @@ nxge_m_ioctl(void *arg,  queue_t *wq, mblk_t *mp)
 	case NXGE_GET_TCAM:
 	case NXGE_RTRACE:
 	case NXGE_RDUMP:
+	case NXGE_RX_CLASS:
+	case NXGE_RX_HASH:
 
 		need_privilege = B_FALSE;
 		break;
@@ -3996,6 +4074,19 @@ nxge_m_ioctl(void *arg,  queue_t *wq, mblk_t *mp)
 		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
 		    "==> nxge_m_ioctl: cmd 0x%x", cmd));
 		nxge_hw_ioctl(nxgep, wq, mp, iocp);
+		break;
+	case NXGE_RX_CLASS:
+		if (nxge_rxclass_ioctl(nxgep, wq, mp->b_cont) < 0)
+			miocnak(wq, mp, 0, EINVAL);
+		else
+			miocack(wq, mp, sizeof (rx_class_cfg_t), 0);
+		break;
+	case NXGE_RX_HASH:
+
+		if (nxge_rxhash_ioctl(nxgep, wq, mp->b_cont) < 0)
+			miocnak(wq, mp, 0, EINVAL);
+		else
+			miocack(wq, mp, sizeof (cfg_cmd_t), 0);
 		break;
 	}
 
@@ -6587,10 +6678,15 @@ nxge_init_common_dev(p_nxge_t nxgep)
 		if (nxgep->niu_type == N2_NIU) {
 			hw_p->niu_type = N2_NIU;
 			hw_p->platform_type = P_NEPTUNE_NIU;
+			hw_p->tcam_size = TCAM_NIU_TCAM_MAX_ENTRY;
 		} else {
 			hw_p->niu_type = NIU_TYPE_NONE;
 			hw_p->platform_type = P_NEPTUNE_NONE;
+			hw_p->tcam_size = TCAM_NXGE_TCAM_MAX_ENTRY;
 		}
+
+		hw_p->tcam = KMEM_ZALLOC(sizeof (tcam_flow_spec_t) *
+		    hw_p->tcam_size, KM_SLEEP);
 
 		MUTEX_INIT(&hw_p->nxge_cfg_lock, NULL, MUTEX_DRIVER, NULL);
 		MUTEX_INIT(&hw_p->nxge_tcam_lock, NULL, MUTEX_DRIVER, NULL);
@@ -6697,6 +6793,9 @@ nxge_uninit_common_dev(p_nxge_t nxgep)
 			}
 			hw_p->nxge_p[nxgep->function_num] = NULL;
 			if (!hw_p->ndevs) {
+				KMEM_FREE(hw_p->tcam,
+				    sizeof (tcam_flow_spec_t) *
+				    hw_p->tcam_size);
 				MUTEX_DESTROY(&hw_p->nxge_vlan_lock);
 				MUTEX_DESTROY(&hw_p->nxge_tcam_lock);
 				MUTEX_DESTROY(&hw_p->nxge_cfg_lock);

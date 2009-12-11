@@ -276,7 +276,7 @@ crypto_register_provider(crypto_provider_info_t *info,
 	else
 		prov_desc->pd_taskq = NULL;
 
-	/* no kernel session to logical providers */
+	/* no kernel session to logical providers and no pd_flags  */
 	if (prov_desc->pd_prov_type != CRYPTO_LOGICAL_PROVIDER) {
 		/*
 		 * Open a session for session-oriented providers. This session
@@ -293,11 +293,38 @@ crypto_register_provider(crypto_provider_info_t *info,
 			    CRYPTO_USER, NULL, 0, prov_desc);
 			ret = kcf_submit_request(prov_desc, NULL, NULL, &params,
 			    B_FALSE);
+			if (ret != CRYPTO_SUCCESS)
+				goto undo_then_bail;
+		}
 
-			if (ret != CRYPTO_SUCCESS) {
-				undo_register_provider(prov_desc, B_TRUE);
-				ret = CRYPTO_FAILED;
-				goto bail;
+		/*
+		 * Get the value for the maximum input length allowed if
+		 * CRYPTO_HASH_NO_UPDATE or CRYPTO_HASH_NO_UPDATE is specified.
+		 */
+		if (prov_desc->pd_flags &
+		    (CRYPTO_HASH_NO_UPDATE | CRYPTO_HMAC_NO_UPDATE)) {
+			kcf_req_params_t params;
+			crypto_provider_ext_info_t ext_info;
+
+			if (KCF_PROV_PROVMGMT_OPS(prov_desc) == NULL)
+				goto undo_then_bail;
+
+			bzero(&ext_info, sizeof (ext_info));
+			KCF_WRAP_PROVMGMT_OPS_PARAMS(&params,
+			    KCF_OP_MGMT_EXTINFO,
+			    0, NULL, 0, NULL, 0, NULL, &ext_info, prov_desc);
+			ret = kcf_submit_request(prov_desc, NULL, NULL,
+			    &params, B_FALSE);
+			if (ret != CRYPTO_SUCCESS)
+				goto undo_then_bail;
+
+			if (prov_desc->pd_flags & CRYPTO_HASH_NO_UPDATE) {
+				prov_desc->pd_hash_limit =
+				    ext_info.ei_hash_max_input_len;
+			}
+			if (prov_desc->pd_flags & CRYPTO_HMAC_NO_UPDATE) {
+				prov_desc->pd_hmac_limit =
+				    ext_info.ei_hmac_max_input_len;
 			}
 		}
 	}
@@ -380,8 +407,12 @@ crypto_register_provider(crypto_provider_info_t *info,
 
 exit:
 	*handle = prov_desc->pd_kcf_prov_handle;
-	ret = CRYPTO_SUCCESS;
+	KCF_PROV_REFRELE(prov_desc);
+	return (CRYPTO_SUCCESS);
 
+undo_then_bail:
+	undo_register_provider(prov_desc, B_TRUE);
+	ret = CRYPTO_FAILED;
 bail:
 	KCF_PROV_REFRELE(prov_desc);
 	return (ret);
@@ -744,24 +775,6 @@ init_prov_mechs(crypto_provider_info_t *info, kcf_provider_desc_t *desc)
 		    (mi->cm_mech_flags & CRYPTO_KEYSIZE_UNIT_IN_BYTES)) {
 			err = CRYPTO_ARGUMENTS_BAD;
 			break;
-		}
-
-		if (desc->pd_flags & CRYPTO_HASH_NO_UPDATE &&
-		    mi->cm_func_group_mask & CRYPTO_FG_DIGEST) {
-			/*
-			 * We ask the provider to specify the limit
-			 * per hash mechanism. But, in practice, a
-			 * hardware limitation means all hash mechanisms
-			 * will have the same maximum size allowed for
-			 * input data. So, we make it a per provider
-			 * limit to keep it simple.
-			 */
-			if (mi->cm_max_input_length == 0) {
-				err = CRYPTO_ARGUMENTS_BAD;
-				break;
-			} else {
-				desc->pd_hash_limit = mi->cm_max_input_length;
-			}
 		}
 
 		if ((err = kcf_add_mech_provider(mech_idx, desc, &pmd)) !=

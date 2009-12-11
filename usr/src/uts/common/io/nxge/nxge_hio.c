@@ -353,6 +353,9 @@ nxge_grp_remove(
 	nxge_grp_set_t *set;
 	vpc_type_t type;
 
+	if (group == NULL)
+		return;
+
 	MUTEX_ENTER(&nxge->group_lock);
 	switch (group->type) {
 	case NXGE_TRANSMIT_GROUP:
@@ -987,13 +990,20 @@ nxge_hio_init(nxge_t *nxge)
 	    (nxge->niu_type == N2_NIU)) {
 		if (nxge->niu_hsvc_available == B_TRUE) {
 			hsvc_info_t *niu_hsvc = &nxge->niu_hsvc;
-			if (niu_hsvc->hsvc_major == 1 &&
-			    niu_hsvc->hsvc_minor == 1)
+			/*
+			 * Versions supported now are:
+			 *  - major number >= 1 (NIU_MAJOR_VER).
+			 */
+			if ((niu_hsvc->hsvc_major >= NIU_MAJOR_VER) ||
+			    (niu_hsvc->hsvc_major == 1 &&
+			    niu_hsvc->hsvc_minor == 1)) {
 				nxge->environs = SOLARIS_SERVICE_DOMAIN;
-			NXGE_DEBUG_MSG((nxge, HIO_CTL,
-			    "nxge_hio_init: hypervisor services "
-			    "version %d.%d",
-			    niu_hsvc->hsvc_major, niu_hsvc->hsvc_minor));
+				NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
+				    "nxge_hio_init: hypervisor services "
+				    "version %d.%d",
+				    niu_hsvc->hsvc_major,
+				    niu_hsvc->hsvc_minor));
+			}
 		}
 	}
 
@@ -1390,21 +1400,45 @@ nxge_hio_share_assign(
 	nxge_hio_dc_t *dc;
 	nxhv_vr_fp_t *fp;
 	int i;
+	uint64_t major;
 
 	/*
 	 * Ask the Hypervisor to set up the VR for us
 	 */
 	fp = &nhd->hio.vr;
-	if ((hv_rv = (*fp->assign)(vr->region, cookie, &vr->cookie))) {
-		NXGE_ERROR_MSG((nxge, HIO_CTL,
-		    "nxge_hio_share_assign: "
-		    "vr->assign() returned %d", hv_rv));
-		return (-EIO);
+	major = nxge->niu_hsvc.hsvc_major;
+	switch (major) {
+	case NIU_MAJOR_VER: /* 1 */
+		if ((hv_rv = (*fp->assign)(vr->region, cookie, &vr->cookie))) {
+			NXGE_ERROR_MSG((nxge, HIO_CTL,
+			    "nxge_hio_share_assign: major %d "
+			    "vr->assign() returned %d", major, hv_rv));
+			nxge_hio_unshare(vr);
+			return (-EIO);
+		}
+
+		break;
+
+	case NIU_MAJOR_VER_2: /* 2 */
+	default:
+		if ((hv_rv = (*fp->cfgh_assign)
+		    (nxge->niu_cfg_hdl, vr->region, cookie, &vr->cookie))) {
+			NXGE_ERROR_MSG((nxge, HIO_CTL,
+			    "nxge_hio_share_assign: major %d "
+			    "vr->assign() returned %d", major, hv_rv));
+			nxge_hio_unshare(vr);
+			return (-EIO);
+		}
+
+		break;
 	}
+
+	NXGE_DEBUG_MSG((nxge, HIO_CTL,
+	    "nxge_hio_share_assign: major %d "
+	    "vr->assign() success", major));
 
 	/*
 	 * For each shared TDC, ask the HV to find us an empty slot.
-	 * -----------------------------------------------------
 	 */
 	dc = vr->tx_group.dc;
 	for (i = 0; i < NXGE_MAX_TDCS; i++) {
@@ -1432,7 +1466,6 @@ nxge_hio_share_assign(
 
 	/*
 	 * For each shared RDC, ask the HV to find us an empty slot.
-	 * -----------------------------------------------------
 	 */
 	dc = vr->rx_group.dc;
 	for (i = 0; i < NXGE_MAX_RDCS; i++) {

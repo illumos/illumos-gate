@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_NXGE_NXGE_N2_ESR_HW_H
 #define	_SYS_NXGE_NXGE_N2_ESR_HW_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -355,6 +353,324 @@ typedef	union _esr_ti_testcfg {
 #define	TESTCFG_PAD_LOOPBACK		0x1
 #define	TESTCFG_INNER_CML_DIS_LOOPBACK	0x2
 #define	TESTCFG_INNER_CML_EN_LOOOPBACK	0x3
+
+/*
+ * Definitions for TI WIZ7c2xxn5x1 Macro Family (KT/NIU).
+ */
+
+/* PLL_CFG: PLL Configuration Low 16-bit word */
+typedef	union _k_esr_ti_cfgpll_l {
+	uint16_t value;
+
+	struct {
+#if defined(_BIT_FIELDS_HTOL)
+		uint16_t res2		: 1;
+		uint16_t clkbyp		: 2;
+		uint16_t lb		: 2;
+		uint16_t res1		: 1;
+		uint16_t vrange		: 1;
+		uint16_t divclken	: 1;
+		uint16_t mpy		: 7;
+		uint16_t enpll		: 1;
+#elif defined(_BIT_FIELDS_LTOH)
+		uint16_t enpll		: 1;
+		uint16_t mpy		: 7;
+		uint16_t divclken	: 1;
+		uint16_t vrange		: 1;
+		uint16_t res1		: 1;
+		uint16_t lb		: 2;
+		uint16_t clkbyp		: 2;
+		uint16_t res2		: 1;
+#endif
+	} bits;
+} k_esr_ti_cfgpll_l_t;
+
+/* PLL Configurations */
+#define	K_CFGPLL_ENABLE_PLL		1
+#define	K_CFGPLL_MPY_4X			0x10
+#define	K_CFGPLL_MPY_5X			0x14
+#define	K_CFGPLL_MPY_6X			0x18
+#define	K_CFGPLL_MPY_8X			0x20
+#define	K_CFGPLL_MPY_8P25X		0x21
+#define	K_CFGPLL_MPY_10X		0x28
+#define	K_CFGPLL_MPY_12X		0x30
+#define	K_CFGPLL_MPY_12P5X		0x32
+#define	K_CFGPLL_MPY_15X		0x3c
+#define	K_CFGPLL_MPY_16X		0x40
+#define	K_CFGPLL_MPY_16P5X		0x42
+#define	K_CFGPLL_MPY_20X		0x50
+#define	K_CFGPLL_MPY_22X		0x58
+#define	K_CFGPLL_MPY_25X		0x64
+#define	K_CFGPLL_ENABLE_DIVCLKEN	0x100
+
+/* PLL_STS */
+typedef	union _k_esr_ti_pll_sts {
+	uint16_t value;
+
+	struct {
+#if defined(_BIT_FIELDS_HTOL)
+		uint16_t res2		: 12;
+		uint16_t res1		: 2;
+		uint16_t divclk		: 1;
+		uint16_t lock		: 1;
+#elif defined(_BIT_FIELDS_LTOH)
+		uint16_t lock		: 1;
+		uint16_t divclk		: 1;
+		uint16_t res1		: 2;
+		uint16_t res2		: 12;
+#endif
+	} bits;
+} k_esr_ti_pll_sts_t;
+
+/* TEST_CFT */
+typedef	union _kt_esr_ti_testcfg {
+	uint16_t value;
+
+	struct {
+#if defined(_BIT_FIELDS_HTOL)
+		uint16_t res		: 7;
+		uint16_t testpatt2	: 3;
+		uint16_t testpatt1	: 3;
+		uint16_t enbspt		: 1;
+		uint16_t enbsrx		: 1;
+		uint16_t enbstx		: 1;
+#elif defined(_BIT_FIELDS_LTOH)
+		uint16_t enbstx		: 1;
+		uint16_t enbsrx		: 1;
+		uint16_t enbspt		: 1;
+		uint16_t testpatt1	: 3;
+		uint16_t testpatt2	: 3;
+		uint16_t res		: 7;
+#endif
+	} bits;
+} k_esr_ti_testcfg_t;
+
+#define	K_TESTCFG_ENBSTX		0x1
+#define	K_TESTCFG_ENBSRX		0x2
+#define	K_TESTCFG_ENBSPT		0x4
+
+/* TX_CFG: Tx Configuration Low 16-bit word */
+
+typedef	union _k_esr_ti_cfgtx_l {
+	uint16_t value;
+
+	struct {
+#if defined(_BIT_FIELDS_HTOL)
+		uint16_t de		: 3;
+		uint16_t swing		: 4;
+		uint16_t cm		: 1;
+		uint16_t invpair	: 1;
+		uint16_t rate		: 2;
+		uint16_t buswwidth	: 4;
+		uint16_t entx		: 1;
+#elif defined(_BIT_FIELDS_LTOH)
+		uint16_t entx		: 1;
+		uint16_t buswwidth	: 4;
+		uint16_t rate		: 2;
+		uint16_t invpair	: 1;
+		uint16_t cm		: 1;
+		uint16_t swing		: 4;
+		uint16_t de		: 3;
+#endif
+	} bits;
+} k_esr_ti_cfgtx_l_t;
+
+/* Tx Configuration High 16-bit word */
+
+typedef	union _k_esr_ti_cfgtx_h {
+	uint16_t value;
+
+	struct {
+#if defined(_BIT_FIELDS_HTOL)
+		uint16_t res3		: 1;
+		uint16_t bstx		: 1;
+		uint16_t res2		: 1;
+		uint16_t loopback	: 2;
+		uint16_t rdtct		: 2;
+		uint16_t enidl		: 1;
+		uint16_t rsync		: 1;
+		uint16_t msync		: 1;
+		uint16_t res1		: 4;
+		uint16_t de		: 2;
+#elif defined(_BIT_FIELDS_LTOH)
+		uint16_t de		: 2;
+		uint16_t res1		: 4;
+		uint16_t msync		: 1;
+		uint16_t rsync		: 1;
+		uint16_t enidl		: 1;
+		uint16_t rdtct		: 2;
+		uint16_t loopback	: 2;
+		uint16_t res2		: 1;
+		uint16_t bstx		: 1;
+		uint16_t res3		: 1;
+#endif
+	} bits;
+} k_esr_ti_cfgtx_h_t;
+
+/* Transmit Configurations (TBD) */
+#define	K_CFGTX_ENABLE_TX		0x1
+#define	K_CFGTX_ENABLE_MSYNC		0x1
+
+#define	K_CFGTX_BUSWIDTH_10BIT		0
+#define	K_CFGTX_BUSWIDTH_8BIT		1
+#define	K_CFGTX_RATE_FULL		0
+#define	K_CFGTX_RATE_HALF		0x1
+#define	K_CFGTX_RATE_QUAD		2
+#define	K_CFGTX_SWING_125MV		0
+#define	K_CFGTX_SWING_250MV		1
+#define	K_CFGTX_SWING_500MV		2
+#define	K_CFGTX_SWING_625MV		3
+#define	K_CFGTX_SWING_750MV		4
+#define	K_CFGTX_SWING_1000MV		5
+#define	K_CFGTX_SWING_1250MV		6
+#define	K_CFGTX_SWING_1375MV		7
+#define	K_CFGTX_SWING_2000MV		0xf
+#define	K_CFGTX_DE_0			0
+#define	K_CFGTX_DE_4P76			1
+#define	K_CFGTX_DE_9P52			2
+#define	K_CFGTX_DE_14P28		3
+#define	K_CFGTX_DE_19P04		4
+#define	K_CFGTX_DE_23P8			5
+#define	K_CFGTX_DE_28P56		6
+#define	K_CFGTX_DE_33P32		7
+#define	K_CFGTX_DIS_LOOPBACK		0x0
+#define	K_CFGTX_BUMP_PAD_LOOPBACK	0x1
+#define	K_CFGTX_INNER_CML_DIS_LOOPBACK	0x2
+#define	K_CFGTX_INNER_CML_ENA_LOOPBACK	0x3
+
+/* TX_STS */
+typedef	union _k_esr_ti_tx_sts {
+	uint16_t value;
+
+	struct {
+#if defined(_BIT_FIELDS_HTOL)
+		uint16_t res1		: 14;
+		uint16_t rdtctip	: 1;
+		uint16_t testfail	: 1;
+#elif defined(_BIT_FIELDS_LTOH)
+		uint16_t testfail	: 1;
+		uint16_t rdtctip	: 1;
+		uint16_t res1		: 14;
+#endif
+	} bits;
+} k_esr_ti_tx_sts_t;
+
+/* Rx Configuration Low 16-bit word */
+
+typedef	union _k_esr_ti_cfgrx_l {
+	uint16_t value;
+
+	struct {
+#if defined(_BIT_FIELDS_HTOL)
+		uint16_t los		: 3;
+		uint16_t align		: 2;
+		uint16_t term		: 3;
+		uint16_t invpair	: 1;
+		uint16_t rate		: 2;
+		uint16_t buswidth	: 4;
+		uint16_t enrx		: 1;
+#elif defined(_BIT_FIELDS_LTOH)
+		uint16_t enrx		: 1;
+		uint16_t buswidth	: 4;
+		uint16_t rate		: 2;
+		uint16_t invpair	: 1;
+		uint16_t term		: 3;
+		uint16_t align		: 2;
+		uint16_t los		: 3;
+#endif
+	} bits;
+} k_esr_ti_cfgrx_l_t;
+
+/* Rx Configuration High 16-bit word */
+
+typedef	union _k_esr_ti_cfgrx_h {
+	uint16_t value;
+
+	struct {
+#if defined(_BIT_FIELDS_HTOL)
+		uint16_t res2		: 1;
+		uint16_t bsinrxn	: 1;
+		uint16_t bsinrxp	: 1;
+		uint16_t loopback	: 2;
+		uint16_t res1		: 3;
+		uint16_t enoc		: 1;
+		uint16_t eq		: 4;
+		uint16_t cdr		: 3;
+#elif defined(_BIT_FIELDS_LTOH)
+		uint16_t cdr		: 3;
+		uint16_t eq		: 4;
+		uint16_t enoc		: 1;
+		uint16_t res1		: 3;
+		uint16_t loopback	: 2;
+		uint16_t bsinrxp	: 1;
+		uint16_t bsinrxn	: 1;
+		uint16_t res2		: 1;
+#endif
+	} bits;
+} k_esr_ti_cfgrx_h_t;
+
+/* Receive Configurations (TBD) */
+#define	K_CFGRX_ENABLE_RX			0x1
+
+#define	K_CFGRX_BUSWIDTH_10BIT			0
+#define	K_CFGRX_BUSWIDTH_8BIT			1
+#define	K_CFGRX_RATE_FULL			0
+#define	K_CFGRX_RATE_HALF			1
+#define	K_CFGRX_RATE_QUAD			2
+#define	K_CFGRX_TERM_VDDT			0
+#define	K_CFGRX_TERM_0P8VDDT			1
+#define	K_CFGRX_TERM_FLOAT			3
+#define	K_CFGRX_ALIGN_DIS			0x0
+#define	K_CFGRX_ALIGN_EN			0x1
+#define	K_CFGRX_ALIGN_JOG			0x2
+#define	K_CFGRX_LOS_DIS				0x0
+#define	K_CFGRX_LOS_ENABLE			0x2
+#define	K_CFGRX_CDR_1ST_ORDER			0
+#define	K_CFGRX_CDR_2ND_ORDER_HP		1
+#define	K_CFGRX_CDR_2ND_ORDER_MP		2
+#define	K_CFGRX_CDR_2ND_ORDER_LP		3
+#define	K_CFGRX_CDR_1ST_ORDER_FAST_LOCK		4
+#define	K_CFGRX_CDR_2ND_ORDER_HP_FAST_LOCK	5
+#define	K_CFGRX_CDR_2ND_ORDER_MP_FAST_LOCK	6
+#define	K_CFGRX_CDR_2ND_ORDER_LP_FAST_LOCK	7
+#define	K_CFGRX_EQ_MAX_LF_ZF			0
+#define	K_CFGRX_EQ_ADAPTIVE			0x1
+#define	K_CFGRX_EQ_ADAPTIVE_LF_365MHZ_ZF	0x8
+#define	K_CFGRX_EQ_ADAPTIVE_LF_275MHZ_ZF	0x9
+#define	K_CFGRX_EQ_ADAPTIVE_LP_195MHZ_ZF	0xa
+#define	K_CFGRX_EQ_ADAPTIVE_LP_140MHZ_ZF	0xb
+#define	K_CFGRX_EQ_ADAPTIVE_LP_105MHZ_ZF	0xc
+#define	K_CFGRX_EQ_ADAPTIVE_LP_75MHZ_ZF		0xd
+#define	K_CFGRX_EQ_ADAPTIVE_LP_55MHZ_ZF		0xe
+#define	K_CFGRX_EQ_ADAPTIVE_LP_50HZ_ZF		0xf
+
+/* Rx Status Low 16-bit word */
+
+typedef	union _k_esr_ti_stsrx_l {
+	uint16_t value;
+
+	struct {
+#if defined(_BIT_FIELDS_HTOL)
+		uint16_t res2		: 10;
+		uint16_t bsrxn		: 1;
+		uint16_t bsrxp		: 1;
+		uint16_t losdtct	: 1;
+		uint16_t res1		: 1;
+		uint16_t sync		: 1;
+		uint16_t testfail	: 1;
+#elif defined(_BIT_FIELDS_LTOH)
+		uint16_t testfail	: 1;
+		uint16_t sync		: 1;
+		uint16_t res1		: 1;
+		uint16_t losdtct	: 1;
+		uint16_t bsrxp		: 1;
+		uint16_t bsrxn		: 1;
+		uint16_t res		: 10;
+#endif
+	} bits;
+} k_esr_ti_stsrx_l_t;
+
+#define	K_TESTCFG_INNER_CML_EN_LOOOPBACK	0x3
 
 #ifdef	__cplusplus
 }

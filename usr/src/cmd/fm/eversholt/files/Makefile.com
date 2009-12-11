@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 .SUFFIXES: .eft .esc
 
@@ -54,8 +53,11 @@ clean clobber:
 	$(RM) $(EFT_PLAT_FILES) $(EFT_COMMON_FILES) \
 	$(USR_PLAT_EFT_FILES) $(ROOT_COMMON_EFT_FILES)
 
+ESCFLAGS= -D_ESC -I$(ROOT)/usr/include
+pciexrc.eft := ESCFLAGS += -I$(SRC)/uts/sun4v/io/px
+
 %.eft: ../common/%.esc
-	$(ESC) -I$(ROOT)/usr/include  -o $@ $<
+	$(ESC) $(ESCFLAGS) -o $@ $<
 
 %.eft: %.esc
-	$(ESC) -o $@ $<
+	$(ESC) $(ESCFLAGS) -o $@ $<

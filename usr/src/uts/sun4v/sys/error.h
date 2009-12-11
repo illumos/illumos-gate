@@ -53,6 +53,7 @@ extern "C" {
 #define	ERRH_DESC_DEF_NRE	3	/* Deferred non-resumalbe error */
 #define	ERRH_DESC_WARN_RE	4	/* Power-off for vBSC HostShutdown() */
 #define	ERRH_DESC_USER_DCORE	5	/* User initiated panic */
+#define	ERRH_DESC_SP		6	/* SP state change */
 
 /*
  * Sun4v Error Report Error Attributes specifies the attributes of the error
@@ -70,13 +71,21 @@ extern "C" {
 #define	ERRH_ATTR_RQF		0x80000000	/* Resumablee Queue Full */
 
 /*
- * For Excution mode
+ * For Execution mode
  */
 #define	ERRH_MODE_MASK		0x03000000
 #define	ERRH_MODE_SHIFT		24
 #define	ERRH_MODE_UNKNOWN	0
 #define	ERRH_MODE_USER		1
 #define	ERRH_MODE_PRIV		2
+
+/*
+ * For SP (Service Processor) state change
+ */
+#define	ERRH_SP_MASK		0x00000200
+#define	ERRH_SP_SHIFT		9
+#define	ERRH_SP_UNAVAILABLE	0
+#define	ERRH_SP_AVAILABLE	1
 
 /*
  * ASR register number

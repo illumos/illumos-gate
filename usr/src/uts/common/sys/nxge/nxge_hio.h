@@ -58,12 +58,19 @@ typedef hv_rv_t (*vr_assign)(uint64_t, uint64_t, uint32_t *);
 typedef hv_rv_t (*vr_unassign)(uint32_t);
 typedef hv_rv_t (*vr_getinfo)(uint32_t, uint64_t *, uint64_t *);
 
+/* HV 2.0 API group functions */
+typedef hv_rv_t (*vr_cfgh_assign)(uint64_t, uint64_t, uint64_t, uint32_t *);
+typedef hv_rv_t (*vrlp_cfgh_conf)(uint64_t, uint64_t, uint64_t, uint64_t,
+    uint64_t);
+typedef hv_rv_t (*vrlp_cfgh_info)(uint64_t, uint64_t, uint64_t, uint64_t *,
+    uint64_t *);
+
 
 typedef struct {
-	vr_assign	assign;
+	vr_assign	assign;		/* HV Major 1 interface */
+	vr_cfgh_assign	cfgh_assign;	/* HV Major 2 interface */
 	vr_unassign	unassign;
 	vr_getinfo	getinfo;
-
 } nxhv_vr_fp_t;
 
 typedef hv_rv_t (*vrlp_conf)(uint64_t, uint64_t, uint64_t, uint64_t);
@@ -82,9 +89,10 @@ typedef struct {
 	dc_getstate	getstate;
 	dc_get_map	get_map;
 
-	vrlp_conf	lp_conf;
-	vrlp_info	lp_info;
-
+	vrlp_conf	lp_conf;	/* HV Major 1 interface */
+	vrlp_info	lp_info;	/* HV Major 1 interface */
+	vrlp_cfgh_conf	lp_cfgh_conf;	/* HV Major 2 interface */
+	vrlp_cfgh_info	lp_cfgh_info;	/* HV Major 2 interface */
 	dc_getinfo	getinfo;
 } nxhv_dc_fp_t;
 

@@ -30,6 +30,7 @@ EFT_COMMON_FILES=		\
 	neptune_xfp.eft		\
 	pci.eft			\
 	pciex.eft		\
+	pciexrc.eft		\
 	sca500.eft		\
 	sca1000.eft 		\
 	sensor.eft

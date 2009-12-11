@@ -668,13 +668,6 @@ typedef struct crypto_mech_info {
 #define	cm_keysize_unit	cm_mech_flags
 
 /*
- * The following is used by a provider that sets
- * CRYPTO_HASH_NO_UPDATE. It needs to specify the maximum
- * input data size it can digest in this field.
- */
-#define	cm_max_input_length	cm_max_key_length
-
-/*
  * crypto_kcf_provider_handle_t is a handle allocated by the kernel.
  * It is returned after the provider registers with
  * crypto_register_provider(), and must be specified by the provider
@@ -730,9 +723,18 @@ typedef struct crypto_provider_info {
 #define	CRYPTO_HIDE_PROVIDER		0x00000001
 /*
  * provider can not do multi-part digest (updates) and has a limit
- * on maximum input data that it can digest.
+ * on maximum input data that it can digest. The provider sets
+ * this value in crypto_provider_ext_info_t by implementing
+ * the ext_info entry point in the co_provider_ops vector.
  */
 #define	CRYPTO_HASH_NO_UPDATE		0x00000002
+/*
+ * provider can not do multi-part HMAC (updates) and has a limit
+ * on maximum input data that it can hmac. The provider sets
+ * this value in crypto_provider_ext_info_t by implementing
+ * the ext_info entry point in the co_provider_ops vector.
+ */
+#define	CRYPTO_HMAC_NO_UPDATE		0x00000008
 
 /* provider can handle the request without returning a CRYPTO_QUEUED */
 #define	CRYPTO_SYNCHRONOUS		0x00000004

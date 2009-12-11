@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_KERNEL_EMULATE_H
 #define	_KERNEL_EMULATE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,9 +39,14 @@ extern "C" {
 #include "kernelSoftCommon.h"
 
 #define	SLOT_THRESHOLD(sp) (slot_table[sp->ses_slotid]->sl_threshold)
-#define	SLOT_MAX_INDATA_LEN(sp)	(slot_table[sp->ses_slotid]->sl_max_inlen)
+#define	SLOT_HASH_MAX_INDATA_LEN(sp) \
+	(slot_table[sp->ses_slotid]->sl_hash_max_inlen)
+#define	SLOT_HMAC_MAX_INDATA_LEN(sp) \
+	(slot_table[sp->ses_slotid]->sl_hmac_max_inlen)
 #define	SLOT_HAS_LIMITED_HASH(sp) (slot_table[sp->ses_slotid]->sl_flags & \
 	CRYPTO_LIMITED_HASH_SUPPORT)
+#define	SLOT_HAS_LIMITED_HMAC(sp) (slot_table[sp->ses_slotid]->sl_flags & \
+	CRYPTO_LIMITED_HMAC_SUPPORT)
 #define	get_sp(opp)	(((digest_buf_t *)((opp)->context))->soft_sp)
 #define	get_spp(opp)	(&(((digest_buf_t *)((opp)->context))->soft_sp))
 

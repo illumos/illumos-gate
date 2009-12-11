@@ -403,6 +403,7 @@ typedef union _rxdma_cfig1_t {
 #define	RXDMA_CFIG2_MBADDR_L_SHIFT	6			/* bit 31:6 */
 #define	RXDMA_CFIG2_MBADDR_L_MASK	0x00000000ffffffc0ULL
 
+/* NOTE: offset256 valid only for Neptune-L and RF-NIU */
 typedef union _rxdma_cfig2_t {
 	uint64_t value;
 	struct {
@@ -412,14 +413,16 @@ typedef union _rxdma_cfig2_t {
 		struct {
 #if defined(_BIT_FIELDS_HTOL)
 			uint32_t mbaddr:26;
-			uint32_t res2:3;
+			uint32_t res2:2;
+			uint32_t offset256:1;
 			uint32_t offset:2;
 			uint32_t full_hdr:1;
 
 #elif defined(_BIT_FIELDS_LTOH)
 			uint32_t full_hdr:1;
 			uint32_t offset:2;
-			uint32_t res2:3;
+			uint32_t offset256:1;
+			uint32_t res2:2;
 			uint32_t mbaddr:26;
 #endif
 		} ldw;

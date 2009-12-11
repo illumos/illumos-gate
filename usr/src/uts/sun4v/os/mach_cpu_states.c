@@ -109,7 +109,7 @@ extern uint64_t get_cpuaddr(uint64_t, uint64_t);
  * the next boot.
  */
 static void
-store_boot_cmd(char *args, boolean_t add_boot_str)
+store_boot_cmd(char *args, boolean_t add_boot_str, boolean_t invoke_cb)
 {
 	static char	cmd_buf[BOOT_CMD_MAX_LEN];
 	size_t		len = 1;
@@ -117,6 +117,22 @@ store_boot_cmd(char *args, boolean_t add_boot_str)
 	size_t		base_len = 0;
 	size_t		args_len;
 	size_t		args_max;
+	uint64_t	majornum;
+	uint64_t	minornum;
+	uint64_t	buf_pa;
+	uint64_t	status;
+
+	status = hsvc_version(HSVC_GROUP_REBOOT_DATA, &majornum, &minornum);
+
+	/*
+	 * invoke_cb is set to true when we are in a normal shutdown sequence
+	 * (interrupts are not blocked, the system is not panicking or being
+	 * suspended). In that case, we can use any method to store the boot
+	 * command. Otherwise storing the boot command can not be done using
+	 * a domain service because it can not be safely used in that context.
+	 */
+	if ((status != H_EOK) && (invoke_cb == B_FALSE))
+		return;
 
 	if (add_boot_str) {
 		(void) strcpy(cmd_buf, BOOT_CMD_BASE);
@@ -140,11 +156,25 @@ store_boot_cmd(char *args, boolean_t add_boot_str)
 		(void) strncpy(&cmd_buf[base_len], args, args_len);
 	}
 
-	node = prom_optionsnode();
-	if ((node == OBP_NONODE) || (node == OBP_BADNODE) ||
-	    prom_setprop(node, "reboot-command", cmd_buf, len) == -1)
-		cmn_err(CE_WARN, "Unable to store boot command for "
-		    "use on reboot");
+	/*
+	 * Save the reboot-command with HV, if reboot data group is
+	 * negotiated. Else save the reboot-command via vars-config domain
+	 * services on the SP.
+	 */
+	if (status == H_EOK) {
+		buf_pa = va_to_pa(cmd_buf);
+		status = hv_reboot_data_set(buf_pa, len);
+		if (status != H_EOK) {
+			cmn_err(CE_WARN, "Unable to store boot command for "
+			    "use on reboot with HV: error = 0x%lx", status);
+		}
+	} else {
+		node = prom_optionsnode();
+		if ((node == OBP_NONODE) || (node == OBP_BADNODE) ||
+		    prom_setprop(node, "reboot-command", cmd_buf, len) == -1)
+			cmn_err(CE_WARN, "Unable to store boot command for "
+			    "use on reboot");
+	}
 }
 
 
@@ -182,8 +212,8 @@ mdboot(int cmd, int fcn, char *bootstr, boolean_t invoke_cb)
 		 * it completes the reset.  This causes the system
 		 * to stop at the ok prompt.
 		 */
-		if (domaining_enabled() && invoke_cb)
-			store_boot_cmd("noop", B_FALSE);
+		if (domaining_enabled())
+			store_boot_cmd("noop", B_FALSE, invoke_cb);
 		break;
 
 	case AD_POWEROFF:
@@ -221,8 +251,8 @@ mdboot(int cmd, int fcn, char *bootstr, boolean_t invoke_cb)
 		 * before we enter restricted mode.  This is possible
 		 * only if we are not being called from panic.
 		 */
-		if (domaining_enabled() && invoke_cb)
-			store_boot_cmd(bootstr, B_TRUE);
+		if (domaining_enabled())
+			store_boot_cmd(bootstr, B_TRUE, invoke_cb);
 	}
 
 	/*

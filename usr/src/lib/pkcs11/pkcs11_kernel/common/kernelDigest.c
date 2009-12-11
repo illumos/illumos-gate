@@ -209,7 +209,7 @@ C_Digest(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 		pMechanism = &(opp->mech);
 
 		if ((ulDataLen < SLOT_THRESHOLD(session_p)) ||
-		    (ulDataLen > SLOT_MAX_INDATA_LEN(session_p))) {
+		    (ulDataLen > SLOT_HASH_MAX_INDATA_LEN(session_p))) {
 			session_p->digest.flags |= CRYPTO_EMULATE_USING_SW;
 			(void) pthread_mutex_unlock(&session_p->session_mutex);
 			ses_lock_held = B_FALSE;

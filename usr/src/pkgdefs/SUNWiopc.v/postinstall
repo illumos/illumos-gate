@@ -21,10 +21,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
  
 PATH="/usr/bin:/usr/sbin:${PATH}"
@@ -43,5 +41,8 @@ installed fpc || add_drv -b ${BASEDIR} -m '* 0666 root sys' fpc || EXIT=1
 
 installed n2piupc || add_drv -b ${BASEDIR} -m '* 0666 root sys' \
 	-i '"SUNW,n2piu-pr" "SUNW,vfpiu-pr"' n2piupc || EXIT=1
+
+installed iospc || add_drv -b ${BASEDIR} -m '* 0666 root sys' \
+	-i '"SUNW,ktios-pr" "SUNW,rfios-pr"' iospc || EXIT=1
 
 exit $EXIT

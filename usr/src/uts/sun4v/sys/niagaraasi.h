@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_NIAGARAASI_H
 #define	_SYS_NIAGARAASI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * alternate address space identifiers
@@ -40,17 +38,11 @@
 extern "C" {
 #endif
 
-#if defined(NIAGARA_IMPL) || defined(NIAGARA2_IMPL) || defined(VFALLS_IMPL)
-
 /*
- * NIAGARA, NIAGARA2 and Victoria Falls specific ASIs
+ * NIAGARA, NIAGARA2, Victoria Falls and KT specific ASIs
  */
 #define	ASI_BLK_INIT_QUAD_LDD_AIUS	0x23	/* block as if user secondary */
 #define	ASI_BLK_INIT_ST_QUAD_LDD_P	0xE2	/* block initializing primary */
-
-#else
-#error	"This file has ASIs specific to Niagara, Niagara2 and VFalls CPUs"
-#endif	/* NIAGARA_IMPL */
 
 #ifdef __cplusplus
 }

@@ -100,6 +100,8 @@ static void ue_drain(void *, struct async_flt *, errorq_elem_t *);
 static void ce_drain(void *, struct async_flt *, errorq_elem_t *);
 static void errh_handle_attr(errh_async_flt_t *);
 static void errh_handle_asr(errh_async_flt_t *);
+static void errh_handle_sp(errh_async_flt_t *);
+static void sp_ereport_post(uint8_t);
 
 /*ARGSUSED*/
 void
@@ -151,6 +153,13 @@ process_resumable_error(struct regs *rp, uint32_t head_offset,
 				setsoftint(err_shutdown_inum);
 				++err_shutdown_triggered;
 			}
+			continue;
+
+		case ERRH_DESC_SP:
+			/*
+			 * The state of the SP has changed.
+			 */
+			errh_handle_sp(&errh_flt);
 			continue;
 
 		default:
@@ -868,6 +877,27 @@ errh_handle_asr(errh_async_flt_t *errh_fltp)
 }
 
 /*
+ * Handle a SP state change.
+ */
+static void
+errh_handle_sp(errh_async_flt_t *errh_fltp)
+{
+	uint8_t		sp_state;
+
+	sp_state = (errh_fltp->errh_er.attr & ERRH_SP_MASK) >> ERRH_SP_SHIFT;
+
+	/*
+	 * Only the SP is unavailable state change is currently valid.
+	 */
+	if (sp_state == ERRH_SP_UNAVAILABLE) {
+		sp_ereport_post(sp_state);
+	} else {
+		cmn_err(CE_WARN, "Invalid SP state 0x%x in SP state change "
+		    "handler.\n", sp_state);
+	}
+}
+
+/*
  * Dump the error packet
  */
 /*ARGSUSED*/
@@ -906,4 +936,33 @@ errh_er_print(errh_er_t *errh_erp, const char *queue)
 		    p->s[0], p->s[1], p->s[2], p->s[3]);
 	}
 	mutex_exit(&errh_print_lock);
+}
+
+static void
+sp_ereport_post(uint8_t sp_state)
+{
+	nvlist_t	*ereport, *detector;
+
+	/*
+	 * Currently an ereport is only sent when the state of the SP
+	 * changes to unavailable.
+	 */
+	ASSERT(sp_state == ERRH_SP_UNAVAILABLE);
+
+	ereport = fm_nvlist_create(NULL);
+	detector = fm_nvlist_create(NULL);
+
+	/*
+	 * Create an HC-scheme detector FMRI.
+	 */
+	fm_fmri_hc_set(detector, FM_HC_SCHEME_VERSION, NULL, NULL, 1,
+	    "chassis", 0);
+
+	fm_ereport_set(ereport, FM_EREPORT_VERSION, "chassis.sp.unavailable",
+	    fm_ena_generate(0, FM_ENA_FMT1), detector, NULL);
+
+	(void) fm_ereport_post(ereport, EVCH_TRYHARD);
+
+	fm_nvlist_destroy(ereport, FM_NVA_FREE);
+	fm_nvlist_destroy(detector, FM_NVA_FREE);
 }

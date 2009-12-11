@@ -90,6 +90,7 @@ static uint32_t nxge_get_cl22_phy_id(p_nxge_t, int);
 static boolean_t nxge_is_supported_phy(uint32_t, uint8_t);
 static boolean_t nxge_is_phy_present(p_nxge_t, int, uint32_t, uint32_t);
 static nxge_status_t nxge_n2_serdes_init(p_nxge_t);
+static nxge_status_t nxge_n2_kt_serdes_init(p_nxge_t);
 static nxge_status_t nxge_neptune_10G_serdes_init(p_nxge_t);
 static nxge_status_t nxge_1G_serdes_init(p_nxge_t);
 static nxge_status_t nxge_10G_link_intr_stop(p_nxge_t);
@@ -1476,6 +1477,11 @@ nxge_n2_serdes_init(p_nxge_t nxgep)
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_n2_serdes_init port<%d>",
 	    portn));
+	if (nxgep->niu_hw_type == NIU_HW_TYPE_RF) {
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "==> nxge_n2_serdes_init port<%d>: KT-NIU", portn));
+		return (nxge_n2_kt_serdes_init(nxgep));
+	}
 
 	tx_cfg_l.value = 0;
 	tx_cfg_h.value = 0;
@@ -1662,6 +1668,280 @@ nxge_n2_serdes_init(p_nxge_t nxgep)
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_n2_serdes_init port<%d>",
 	    portn));
+
+	return (NXGE_OK);
+fail:
+	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+	    "nxge_n2_serdes_init: Failed to initialize N2 serdes for port<%d>",
+	    portn));
+
+	return (status);
+
+}
+
+/* Initialize the TI Hedwig Internal Serdes (N2-KT-NIU only) */
+
+static nxge_status_t
+nxge_n2_kt_serdes_init(p_nxge_t nxgep)
+{
+	uint8_t portn;
+	int chan;
+	k_esr_ti_cfgpll_l_t pll_cfg_l;
+	k_esr_ti_cfgrx_l_t rx_cfg_l;
+	k_esr_ti_cfgrx_h_t rx_cfg_h;
+	k_esr_ti_cfgtx_l_t tx_cfg_l;
+	k_esr_ti_cfgtx_h_t tx_cfg_h;
+#ifdef NXGE_DEBUG
+	k_esr_ti_testcfg_t cfg;
+#endif
+	k_esr_ti_testcfg_t test_cfg;
+	nxge_status_t status = NXGE_OK;
+	boolean_t mode_1g = B_FALSE;
+
+	portn = nxgep->mac.portnum;
+
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+	    "==> nxge_n2_kt_serdes_init port<%d>", portn));
+
+	tx_cfg_l.value = 0;
+	tx_cfg_h.value = 0;
+	rx_cfg_l.value = 0;
+	rx_cfg_h.value = 0;
+	pll_cfg_l.value = 0;
+	test_cfg.value = 0;
+
+	/*
+	 * The following setting assumes the reference clock frquency
+	 * is 156.25 MHz.
+	 */
+	/*
+	 * If the nxge driver has been plumbed without a link, then it will
+	 * detect a link up when a cable connecting to an anto-negotiation
+	 * partner is plugged into the port. Because the TN1010 PHY supports
+	 * both 1G and 10G speeds, the driver must re-configure the
+	 * Neptune/NIU according to the negotiated speed.  nxge_n2_serdes_init
+	 * is called at the post-link-up reconfiguration time. Here it calls
+	 * nxge_set_tn1010_param to set portmode before re-initializing
+	 * the serdes.
+	 */
+	if (nxgep->mac.portmode == PORT_1G_TN1010 ||
+	    nxgep->mac.portmode == PORT_10G_TN1010) {
+		if (nxge_set_tn1010_param(nxgep) != NXGE_OK) {
+			goto fail;
+		}
+	}
+	if (nxgep->mac.portmode == PORT_10G_FIBER ||
+	    nxgep->mac.portmode == PORT_10G_TN1010 ||
+	    nxgep->mac.portmode == PORT_10G_SERDES) {
+		tx_cfg_l.bits.entx = K_CFGTX_ENABLE_TX;
+		/* 0x1e21 */
+		tx_cfg_l.bits.swing = K_CFGTX_SWING_2000MV;
+		tx_cfg_l.bits.rate = K_CFGTX_RATE_HALF;
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "==> nxge_n2_kt_serdes_init port<%d> tx_cfg_l 0x%x",
+		    portn, tx_cfg_l.value));
+
+		/* channel 0: enable syn. master */
+		/* 0x40 */
+		tx_cfg_h.bits.msync = K_CFGTX_ENABLE_MSYNC;
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "==> nxge_n2_kt_serdes_init port<%d> tx_cfg_h 0x%x",
+		    portn, tx_cfg_h.value));
+		/* 0x4821 */
+		rx_cfg_l.bits.enrx = K_CFGRX_ENABLE_RX;
+		rx_cfg_l.bits.rate = K_CFGRX_RATE_HALF;
+		rx_cfg_l.bits.align = K_CFGRX_ALIGN_EN;
+		rx_cfg_l.bits.los = K_CFGRX_LOS_ENABLE;
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "==> nxge_n2_kt_serdes_init port<%d> rx_cfg_l 0x%x",
+		    portn, rx_cfg_l.value));
+
+		/* 0x0008 */
+		rx_cfg_h.bits.eq = K_CFGRX_EQ_ADAPTIVE;
+
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "==> nxge_n2_kt_serdes_init port<%d> rx_cfg_h 0x%x",
+		    portn, rx_cfg_h.value));
+
+		/* Set loopback mode if necessary */
+		if (nxgep->statsp->port_stats.lb_mode == nxge_lb_serdes10g) {
+			tx_cfg_h.bits.loopback = K_CFGTX_INNER_CML_ENA_LOOPBACK;
+			rx_cfg_h.bits.loopback = K_CFGTX_INNER_CML_ENA_LOOPBACK;
+			rx_cfg_l.bits.los = 0;
+
+			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+			    "==> nxge_n2_kt_serdes_init port<%d>: "
+			    "loopback 0x%x", portn, tx_cfg_h.value));
+		}
+		/* 0xa1: Initialize PLL for 10G */
+		pll_cfg_l.bits.mpy = K_CFGPLL_MPY_20X;
+		pll_cfg_l.bits.enpll = K_CFGPLL_ENABLE_PLL;
+
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "==> nxge_n2_kt_serdes_init port<%d> pll_cfg_l 0x%x",
+		    portn, pll_cfg_l.value));
+
+		if ((status = nxge_mdio_write(nxgep, portn, ESR_N2_DEV_ADDR,
+		    ESR_N2_PLL_CFG_L_REG, pll_cfg_l.value)) != NXGE_OK)
+			goto fail;
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "==> nxge_n2_kt_serdes_init port<%d> pll_cfg_l 0x%x",
+		    portn, pll_cfg_l.value));
+#ifdef  NXGE_DEBUG
+		nxge_mdio_read(nxgep, portn, ESR_N2_DEV_ADDR,
+		    ESR_N2_PLL_CFG_L_REG, &cfg.value);
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "==> nxge_n2_kt_serdes_init port<%d>: "
+		    "PLL cfg.l 0x%x (0x%x)",
+		    portn, pll_cfg_l.value, cfg.value));
+
+		nxge_mdio_read(nxgep, portn, ESR_N2_DEV_ADDR,
+		    ESR_N2_PLL_STS_L_REG, &cfg.value);
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "==> nxge_n2_kt_serdes_init port<%d>: (0x%x)",
+		    portn, cfg.value));
+#endif
+	} else if (nxgep->mac.portmode == PORT_1G_FIBER ||
+	    nxgep->mac.portmode == PORT_1G_TN1010 ||
+	    nxgep->mac.portmode == PORT_1G_SERDES) {
+		mode_1g = B_TRUE;
+		/* 0x1e41 */
+		tx_cfg_l.bits.entx = 1;
+		tx_cfg_l.bits.rate = K_CFGTX_RATE_HALF;
+		tx_cfg_l.bits.swing = K_CFGTX_SWING_2000MV;
+
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "==> nxge_n2_kt_serdes_init port<%d> tx_cfg_l 0x%x",
+		    portn, tx_cfg_l.value));
+
+
+		/* channel 0: enable syn. master */
+		tx_cfg_h.bits.msync = K_CFGTX_ENABLE_MSYNC;
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "==> nxge_n2_kt_serdes_init port<%d> tx_cfg_h 0x%x",
+		    portn, tx_cfg_h.value));
+
+
+		/* 0x4841 */
+		rx_cfg_l.bits.enrx = 1;
+		rx_cfg_l.bits.rate = K_CFGRX_RATE_HALF;
+		rx_cfg_l.bits.align = K_CFGRX_ALIGN_EN;
+		rx_cfg_l.bits.los = K_CFGRX_LOS_ENABLE;
+
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "==> nxge_n2_kt_serdes_init port<%d> rx_cfg_l 0x%x",
+		    portn, rx_cfg_l.value));
+
+		/* 0x0008 */
+		rx_cfg_h.bits.eq = K_CFGRX_EQ_ADAPTIVE_LF_365MHZ_ZF;
+
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "==> nxge_n2_kt_serdes_init port<%d> tx_cfg_h 0x%x",
+		    portn, rx_cfg_h.value));
+
+		/* 0xa1: Initialize PLL for 1G */
+		pll_cfg_l.bits.mpy = K_CFGPLL_MPY_20X;
+		pll_cfg_l.bits.enpll = K_CFGPLL_ENABLE_PLL;
+
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "==> nxge_n2_kt_serdes_init port<%d> pll_cfg_l 0x%x",
+		    portn, pll_cfg_l.value));
+
+		if ((status = nxge_mdio_write(nxgep, portn, ESR_N2_DEV_ADDR,
+		    ESR_N2_PLL_CFG_L_REG, pll_cfg_l.value))
+		    != NXGE_OK)
+			goto fail;
+
+
+#ifdef  NXGE_DEBUG
+		nxge_mdio_read(nxgep, portn, ESR_N2_DEV_ADDR,
+		    ESR_N2_PLL_CFG_L_REG, &cfg.value);
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "==> nxge_n2_serdes_init port<%d>: PLL cfg.l 0x%x (0x%x)",
+		    portn, pll_cfg_l.value, cfg.value));
+
+		nxge_mdio_read(nxgep, portn, ESR_N2_DEV_ADDR,
+		    ESR_N2_PLL_STS_L_REG, &cfg.value);
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "==> nxge_n2_kt_serdes_init port<%d>: (0x%x)",
+		    portn, cfg.value));
+#endif
+
+		/* Set loopback mode if necessary */
+		if (nxgep->statsp->port_stats.lb_mode == nxge_lb_serdes1000) {
+			tx_cfg_h.bits.loopback = TESTCFG_INNER_CML_DIS_LOOPBACK;
+
+			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+			    "==> nxge_n2_kt_serdes_init port<%d>: "
+			    "loopback 0x%x", portn, test_cfg.value));
+			if ((status = nxge_mdio_write(nxgep, portn,
+			    ESR_N2_DEV_ADDR,
+			    ESR_N2_TX_CFG_L_REG_ADDR(0),
+			    tx_cfg_h.value)) != NXGE_OK) {
+				goto fail;
+			}
+		}
+	} else {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "nxge_n2_kt_serdes_init:port<%d> - "
+		    "unsupported port mode %d",
+		    portn, nxgep->mac.portmode));
+		goto fail;
+	}
+
+	NXGE_DELAY(20);
+	/* Clear the test register (offset 0x8004) */
+	if ((status = nxge_mdio_write(nxgep, portn, ESR_N2_DEV_ADDR,
+	    ESR_N2_TEST_CFG_REG, test_cfg.value)) != NXGE_OK) {
+		goto fail;
+	}
+	NXGE_DELAY(20);
+
+	/* init TX channels */
+	for (chan = 0; chan < 4; chan++) {
+		if (mode_1g)
+			tx_cfg_l.value = 0;
+		if ((status = nxge_mdio_write(nxgep, portn, ESR_N2_DEV_ADDR,
+		    ESR_N2_TX_CFG_L_REG_ADDR(chan), tx_cfg_l.value)) != NXGE_OK)
+			goto fail;
+
+		if ((status = nxge_mdio_write(nxgep, portn, ESR_N2_DEV_ADDR,
+		    ESR_N2_TX_CFG_H_REG_ADDR(chan), tx_cfg_h.value)) != NXGE_OK)
+			goto fail;
+
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "==> nxge_n2_kt_serdes_init port<%d>: "
+		    "chan %d tx_cfg_l 0x%x", portn, chan, tx_cfg_l.value));
+
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "==> nxge_n2_kt_serdes_init port<%d>: "
+		    "chan %d tx_cfg_h 0x%x", portn, chan, tx_cfg_h.value));
+	}
+
+	/* init RX channels */
+	/* 1G mode only write to the first channel */
+	for (chan = 0; chan < 4; chan++) {
+		if ((status = nxge_mdio_write(nxgep, portn, ESR_N2_DEV_ADDR,
+		    ESR_N2_RX_CFG_L_REG_ADDR(chan), rx_cfg_l.value))
+		    != NXGE_OK)
+			goto fail;
+
+		if ((status = nxge_mdio_write(nxgep, portn, ESR_N2_DEV_ADDR,
+		    ESR_N2_RX_CFG_H_REG_ADDR(chan), rx_cfg_h.value))
+		    != NXGE_OK)
+			goto fail;
+
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "==> nxge_n2_kt_serdes_init port<%d>: "
+		    "chan %d rx_cfg_l 0x%x", portn, chan, rx_cfg_l.value));
+
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "==> nxge_n2_kt_serdes_init port<%d>: "
+		    "chan %d rx_cfg_h 0x%x", portn, chan, rx_cfg_h.value));
+	}
+
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+	    "<== nxge_n2_kt_serdes_init port<%d>", portn));
 
 	return (NXGE_OK);
 fail:
@@ -5938,7 +6218,7 @@ nxge_check_bcm8704_link(p_nxge_t nxgep, boolean_t *link_up)
 	uint16_t	val1, val2, val3;
 #ifdef	NXGE_DEBUG_SYMBOL_ERR
 	uint16_t	val_debug;
-	uint16_t	val;
+	uint32_t	val;
 #endif
 
 	phy_port_addr = nxgep->statsp->mac_stats.xcvr_portn;
@@ -6009,7 +6289,6 @@ nxge_check_bcm8704_link(p_nxge_t nxgep, boolean_t *link_up)
 		    "Unknown chip ID [0x%x]", nxgep->chip_id));
 		goto fail;
 	}
-
 
 #ifdef	NXGE_DEBUG_ALIGN_ERR
 	/* Temp workaround for link down issue */

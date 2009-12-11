@@ -31,6 +31,8 @@
 
 #if	defined(sun4v) && defined(NIU_LP_WORKAROUND)
 static int	nxge_herr2kerr(uint64_t);
+static uint64_t nxge_init_hv_fzc_lp_op(p_nxge_t, uint64_t,
+    uint64_t, uint64_t, uint64_t, uint64_t);
 #endif
 
 static nxge_status_t nxge_init_fzc_rdc_pages(p_nxge_t,
@@ -1265,8 +1267,8 @@ nxge_init_hv_fzc_txdma_channel_pages(p_nxge_t nxgep, uint16_t channel,
 	/*
 	 * Initialize logical page 1 for data buffers.
 	 */
-	hverr = hv_niu_tx_logical_page_conf((uint64_t)channel,
-	    (uint64_t)0,
+	hverr = nxge_init_hv_fzc_lp_op(nxgep, (uint64_t)channel,
+	    (uint64_t)0, N2NIU_TX_LP_CONF,
 	    tx_ring_p->hv_tx_buf_base_ioaddr_pp,
 	    tx_ring_p->hv_tx_buf_ioaddr_size);
 
@@ -1288,10 +1290,9 @@ nxge_init_hv_fzc_txdma_channel_pages(p_nxge_t nxgep, uint16_t channel,
 
 #ifdef	DEBUG
 	ra = size = 0;
-	hverr = hv_niu_tx_logical_page_info((uint64_t)channel,
-	    (uint64_t)0,
-	    &ra,
-	    &size);
+	hverr = nxge_init_hv_fzc_lp_op(nxgep, (uint64_t)channel,
+	    (uint64_t)0, N2NIU_TX_LP_INFO,
+	    (uint64_t)&ra, (uint64_t)&size);
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
 	    "==> nxge_init_hv_fzc_txdma_channel_pages: channel %d "
@@ -1323,8 +1324,8 @@ nxge_init_hv_fzc_txdma_channel_pages(p_nxge_t nxgep, uint16_t channel,
 	/*
 	 * Initialize logical page 2 for control buffers.
 	 */
-	hverr = hv_niu_tx_logical_page_conf((uint64_t)channel,
-	    (uint64_t)1,
+	hverr = nxge_init_hv_fzc_lp_op(nxgep, (uint64_t)channel,
+	    (uint64_t)1, N2NIU_TX_LP_CONF,
 	    tx_ring_p->hv_tx_cntl_base_ioaddr_pp,
 	    tx_ring_p->hv_tx_cntl_ioaddr_size);
 
@@ -1359,10 +1360,9 @@ nxge_init_hv_fzc_txdma_channel_pages(p_nxge_t nxgep, uint16_t channel,
 
 #ifdef	DEBUG
 	ra = size = 0;
-	hverr = hv_niu_tx_logical_page_info((uint64_t)channel,
-	    (uint64_t)1,
-	    &ra,
-	    &size);
+	hverr = nxge_init_hv_fzc_lp_op(nxgep, (uint64_t)channel,
+	    (uint64_t)1, N2NIU_TX_LP_INFO,
+	    (uint64_t)&ra, (uint64_t)&size);
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
 	    "==> nxge_init_hv_fzc_txdma_channel_pages: channel %d "
@@ -1406,10 +1406,11 @@ nxge_init_hv_fzc_rxdma_channel_pages(p_nxge_t nxgep,
 	}
 
 	/* Initialize data buffers for page 0 */
-	hverr = hv_niu_rx_logical_page_conf((uint64_t)channel,
-	    (uint64_t)0,
+	hverr = nxge_init_hv_fzc_lp_op(nxgep, (uint64_t)channel,
+	    (uint64_t)0, N2NIU_RX_LP_CONF,
 	    rbrp->hv_rx_buf_base_ioaddr_pp,
 	    rbrp->hv_rx_buf_ioaddr_size);
+
 	err = (nxge_status_t)nxge_herr2kerr(hverr);
 	if (err != 0) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
@@ -1429,10 +1430,9 @@ nxge_init_hv_fzc_rxdma_channel_pages(p_nxge_t nxgep,
 
 #ifdef	DEBUG
 	ra = size = 0;
-	(void) hv_niu_rx_logical_page_info((uint64_t)channel,
-	    (uint64_t)0,
-	    &ra,
-	    &size);
+	hverr = nxge_init_hv_fzc_lp_op(nxgep, (uint64_t)channel,
+	    (uint64_t)0, N2NIU_RX_LP_INFO,
+	    (uint64_t)&ra, (uint64_t)&size);
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL,
 	    "==> nxge_init_hv_fzc_rxdma_channel_pages: channel %d "
@@ -1452,8 +1452,8 @@ nxge_init_hv_fzc_rxdma_channel_pages(p_nxge_t nxgep,
 #endif
 
 	/* Initialize control buffers for logical page 1.  */
-	hverr = hv_niu_rx_logical_page_conf((uint64_t)channel,
-	    (uint64_t)1,
+	hverr = nxge_init_hv_fzc_lp_op(nxgep, (uint64_t)channel,
+	    (uint64_t)1, N2NIU_RX_LP_CONF,
 	    rbrp->hv_rx_cntl_base_ioaddr_pp,
 	    rbrp->hv_rx_cntl_ioaddr_size);
 
@@ -1476,11 +1476,9 @@ nxge_init_hv_fzc_rxdma_channel_pages(p_nxge_t nxgep,
 
 #ifdef	DEBUG
 	ra = size = 0;
-	(void) hv_niu_rx_logical_page_info((uint64_t)channel,
-	    (uint64_t)1,
-	    &ra,
-	    &size);
-
+	hverr = nxge_init_hv_fzc_lp_op(nxgep, (uint64_t)channel,
+	    (uint64_t)1, N2NIU_RX_LP_INFO,
+	    (uint64_t)&ra, (uint64_t)&size);
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL,
 	    "==> nxge_init_hv_fzc_rxdma_channel_pages: channel %d "
@@ -1530,6 +1528,146 @@ nxge_herr2kerr(uint64_t hv_errcode)
 		break;
 	}
 	return (s_errcode);
+}
+
+uint64_t
+nxge_init_hv_fzc_lp_op(p_nxge_t nxgep, uint64_t channel,
+    uint64_t page_no, uint64_t op_type,
+    uint64_t ioaddr_pp, uint64_t ioaddr_size)
+{
+	uint64_t		hverr;
+	uint64_t		major;
+	nxge_hio_data_t *nhd = (nxge_hio_data_t *)nxgep->nxge_hw_p->hio;
+	nxhv_dc_fp_t		*io_fp;
+
+	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
+	    "==> nxge_init_hv_fzc_lp_op"));
+
+	major = nxgep->niu_hsvc.hsvc_major;
+	NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
+	    "==> nxge_init_hv_fzc_lp_op (major %d): channel %d op_type 0x%x "
+	    "page_no %d ioaddr_pp $%p ioaddr_size 0x%llx",
+	    major, channel, op_type, page_no, ioaddr_pp, ioaddr_size));
+
+	/* Call the transmit conf function. */
+	switch (major) {
+	case NIU_MAJOR_VER: /* 1 */
+		switch (op_type) {
+		case N2NIU_TX_LP_CONF:
+			io_fp = &nhd->hio.tx;
+			hverr = (*io_fp->lp_conf)((uint64_t)channel,
+			    (uint64_t)page_no,
+			    (uint64_t)ioaddr_pp,
+			    (uint64_t)ioaddr_size);
+			NXGE_DEBUG_MSG((nxgep, DMA_CTL,
+			    "==> nxge_init_hv_fzc_lp_op(tx_conf): major %d "
+			    "op 0x%x hverr 0x%x", major, op_type, hverr));
+			break;
+
+		case N2NIU_TX_LP_INFO:
+			io_fp = &nhd->hio.tx;
+			hverr = (*io_fp->lp_info)((uint64_t)channel,
+			    (uint64_t)page_no,
+			    (uint64_t *)ioaddr_pp,
+			    (uint64_t *)ioaddr_size);
+			break;
+
+		case N2NIU_RX_LP_CONF:
+			io_fp = &nhd->hio.rx;
+			hverr = (*io_fp->lp_conf)((uint64_t)channel,
+			    (uint64_t)page_no,
+			    (uint64_t)ioaddr_pp,
+			    (uint64_t)ioaddr_size);
+			break;
+
+		case N2NIU_RX_LP_INFO:
+			io_fp = &nhd->hio.rx;
+			hverr = (*io_fp->lp_info)((uint64_t)channel,
+			    (uint64_t)page_no,
+			    (uint64_t *)ioaddr_pp,
+			    (uint64_t *)ioaddr_size);
+			NXGE_DEBUG_MSG((nxgep, DMA_CTL,
+			    "==> nxge_init_hv_fzc_lp_op(rx_conf): major %d "
+			    "op 0x%x hverr 0x%x", major, op_type, hverr));
+			break;
+
+		default:
+			hverr = EINVAL;
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "==> nxge_init_hv_fzc_lp_op(rx_conf): major %d "
+			    "invalid op 0x%x hverr 0x%x", major,
+			    op_type, hverr));
+			break;
+		}
+
+		break;
+
+	case NIU_MAJOR_VER_2: /* 2 */
+		switch (op_type) {
+		case N2NIU_TX_LP_CONF:
+			io_fp = &nhd->hio.tx;
+			hverr = (*io_fp->lp_cfgh_conf)(nxgep->niu_cfg_hdl,
+			    (uint64_t)channel,
+			    (uint64_t)page_no, ioaddr_pp, ioaddr_size);
+
+			NXGE_DEBUG_MSG((nxgep, DMA_CTL,
+			    "==> nxge_init_hv_fzc_lp_op(tx_conf): major %d "
+			    "op 0x%x hverr 0x%x", major, op_type, hverr));
+			break;
+
+		case N2NIU_TX_LP_INFO:
+			io_fp = &nhd->hio.tx;
+			hverr = (*io_fp->lp_cfgh_info)(nxgep->niu_cfg_hdl,
+			    (uint64_t)channel,
+			    (uint64_t)page_no,
+			    (uint64_t *)ioaddr_pp,
+			    (uint64_t *)ioaddr_size);
+			break;
+
+		case N2NIU_RX_LP_CONF:
+			io_fp = &nhd->hio.rx;
+			hverr = (*io_fp->lp_cfgh_conf)(nxgep->niu_cfg_hdl,
+			    (uint64_t)channel,
+			    (uint64_t)page_no,
+			    (uint64_t)ioaddr_pp,
+			    (uint64_t)ioaddr_size);
+			NXGE_DEBUG_MSG((nxgep, DMA_CTL,
+			    "==> nxge_init_hv_fzc_lp_op(rx_conf): major %d "
+			    "hverr 0x%x", major, hverr));
+			break;
+
+		case N2NIU_RX_LP_INFO:
+			io_fp = &nhd->hio.rx;
+			hverr = (*io_fp->lp_cfgh_info)(nxgep->niu_cfg_hdl,
+			    (uint64_t)channel,
+			    (uint64_t)page_no,
+			    (uint64_t *)ioaddr_pp,
+			    (uint64_t *)ioaddr_size);
+			break;
+
+		default:
+			hverr = EINVAL;
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "==> nxge_init_hv_fzc_lp_op(rx_conf): major %d "
+			    "invalid op 0x%x hverr 0x%x", major,
+			    op_type, hverr));
+			break;
+		}
+
+		break;
+
+	default:
+		hverr = EINVAL;
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "==> nxge_init_hv_fzc_lp_op(rx_conf): invalid major %d "
+		    "op 0x%x hverr 0x%x", major, op_type, hverr));
+		break;
+	}
+
+	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
+	    "<== nxge_init_hv_fzc_lp_op: 0x%x", hverr));
+
+	return (hverr);
 }
 
 #endif	/* sun4v and NIU_LP_WORKAROUND */

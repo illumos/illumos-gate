@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <npi_rxdma.h>
 #include <npi_rx_rd64.h>
@@ -594,7 +592,7 @@ npi_rxdma_cfg_rdc_rcr_timeout(npi_handle_t handle, uint8_t rdc,
  */
 npi_status_t
 npi_rxdma_cfg_rdc_ring(npi_handle_t handle, uint8_t rdc,
-			    rdc_desc_cfg_t *rdc_desc_cfg)
+			    rdc_desc_cfg_t *rdc_desc_cfg, boolean_t new_off)
 {
 	rbr_cfig_a_t cfga;
 	rbr_cfig_b_t cfgb;
@@ -640,10 +638,38 @@ npi_rxdma_cfg_rdc_ring(npi_handle_t handle, uint8_t rdc,
 	if (rdc_desc_cfg->full_hdr == 1)
 		cfg2.bits.ldw.full_hdr = 1;
 
-	if (RXDMA_BUFF_OFFSET_VALID(rdc_desc_cfg->offset)) {
-		cfg2.bits.ldw.offset = rdc_desc_cfg->offset;
+	if (new_off) {
+		if (RXDMA_RF_BUFF_OFFSET_VALID(rdc_desc_cfg->offset)) {
+			switch (rdc_desc_cfg->offset) {
+			case SW_OFFSET_NO_OFFSET:
+			case SW_OFFSET_64:
+			case SW_OFFSET_128:
+			case SW_OFFSET_192:
+				cfg2.bits.ldw.offset = rdc_desc_cfg->offset;
+				cfg2.bits.ldw.offset256 = 0;
+				break;
+			case SW_OFFSET_256:
+			case SW_OFFSET_320:
+			case SW_OFFSET_384:
+			case SW_OFFSET_448:
+				cfg2.bits.ldw.offset =
+				    rdc_desc_cfg->offset & 0x3;
+				cfg2.bits.ldw.offset256 = 1;
+				break;
+			default:
+				cfg2.bits.ldw.offset = SW_OFFSET_NO_OFFSET;
+				cfg2.bits.ldw.offset256 = 0;
+			}
+		} else {
+			cfg2.bits.ldw.offset = SW_OFFSET_NO_OFFSET;
+			cfg2.bits.ldw.offset256 = 0;
+		}
 	} else {
-		cfg2.bits.ldw.offset = SW_OFFSET_NO_OFFSET;
+		if (RXDMA_BUFF_OFFSET_VALID(rdc_desc_cfg->offset)) {
+			cfg2.bits.ldw.offset = rdc_desc_cfg->offset;
+		} else {
+			cfg2.bits.ldw.offset = SW_OFFSET_NO_OFFSET;
+		}
 	}
 
 		/* rbr config */
