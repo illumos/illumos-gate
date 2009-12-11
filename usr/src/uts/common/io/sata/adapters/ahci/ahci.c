@@ -3711,6 +3711,11 @@ ahci_config_space_init(ahci_ctl_t *ahci_ctlp)
 	 * list for non-queued commands because the previous register content
 	 * of PxCI can be re-written in the register write, so a flag will be
 	 * set to record this defect - AHCI_CAP_NO_MCMDLIST_NONQUEUE.
+	 *
+	 * For VT8251, software reset also has the same defect as the below
+	 * AMD/ATI chipset. That is, software reset will get failed if 0xf
+	 * is filled in pmport field. Therefore, another software reset need
+	 * to be done with 0 filled in pmport field.
 	 */
 	if (ahci_ctlp->ahcictl_venid == VIA_VENID) {
 		revision = pci_config_get8(ahci_ctlp->ahcictl_pci_conf_handle,
@@ -3723,10 +3728,12 @@ ahci_config_space_init(ahci_ctl_t *ahci_ctlp)
 			    "change ddi_attr_align to 0x4", NULL);
 		}
 
-		ahci_ctlp->ahcictl_cap = AHCI_CAP_NO_MCMDLIST_NONQUEUE;
+		ahci_ctlp->ahcictl_cap |= AHCI_CAP_NO_MCMDLIST_NONQUEUE;
 		AHCIDBG(AHCIDBG_INIT, ahci_ctlp,
 		    "VT8251 cannot use multiple command lists for "
 		    "non-queued commands", NULL);
+
+		ahci_ctlp->ahcictl_cap |= AHCI_CAP_SRST_NO_HOSTPORT;
 	}
 
 	/*
