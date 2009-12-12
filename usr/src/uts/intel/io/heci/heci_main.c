@@ -1415,63 +1415,21 @@ static int
 heci_quiesce(dev_info_t *dip)
 {
 	struct iamt_heci_device	*dev;
-	int err;
 
 	dev = ddi_get_soft_state(heci_soft_state_p, ddi_get_instance(dip));
 	ASSERT(dev != NULL);
 
-	if (dev->wd_timer)
-		(void) untimeout(dev->wd_timer);
-
-	mutex_enter(&dev->device_lock);
 	if (dev->wd_file_ext.state == HECI_FILE_CONNECTED &&
 	    dev->wd_timeout) {
 		dev->wd_timeout = 0;
 		dev->wd_due_counter = 0;
 		(void) memcpy(dev->wd_data, stop_wd_params,
 		    HECI_WD_PARAMS_SIZE);
-		dev->stop = 1;
-		if (dev->host_buffer_is_empty &&
-		    flow_ctrl_creds(dev, &dev->wd_file_ext)) {
-			dev->host_buffer_is_empty = 0;
-
-			if (!heci_send_wd(dev)) {
-				DBG("send stop WD failed\n");
-			} else
-				flow_ctrl_reduce(dev, &dev->wd_file_ext);
-
-			dev->wd_pending = 0;
-		} else
-			dev->wd_pending = 1;
-		dev->wd_stoped = 0;
-
-		err = 0;
-		while (!dev->wd_stoped && err != -1) {
-			err = cv_reltimedwait(&dev->wait_stop_wd,
-			    &dev->device_lock, 10*HZ, TR_CLOCK_TICK);
-		}
-
-		if (!dev->wd_stoped) {
-			DBG("stop wd failed to complete.\n");
-		} else {
-			DBG("stop wd complete.\n");
+		if (!heci_send_wd(dev)) {
+			DBG("send stop WD failed\n");
 		}
 
 	}
-
-	mutex_exit(&dev->device_lock);
-
-	if (dev->iamthif_file_ext.state == HECI_FILE_CONNECTED) {
-		dev->iamthif_file_ext.state = HECI_FILE_DISCONNECTING;
-		(void) heci_disconnect_host_client(dev,
-		    &dev->iamthif_file_ext);
-	}
-	if (dev->wd_file_ext.state == HECI_FILE_CONNECTED) {
-		dev->wd_file_ext.state = HECI_FILE_DISCONNECTING;
-		(void) heci_disconnect_host_client(dev,
-		    &dev->wd_file_ext);
-	}
-
 
 	/* disable interrupts */
 	heci_csr_disable_interrupts(dev);
