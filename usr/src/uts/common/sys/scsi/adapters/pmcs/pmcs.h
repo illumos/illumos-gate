@@ -129,6 +129,8 @@ struct pmcs_xscsi {
 	kcondvar_t			abort_cv;
 	char				*ua;
 	pmcs_dtype_t			dtype;
+	struct scsi_device		*sd;		/* Ptr to scsi_device */
+	struct smp_device		*smpd;		/* Ptr to smp_device */
 };
 
 /*

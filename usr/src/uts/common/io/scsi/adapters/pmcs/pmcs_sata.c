@@ -623,7 +623,7 @@ pmcs_run_sata_cmd(pmcs_hw_t *pwp, pmcs_phy_t *pptr, fis_t fis, uint32_t mode,
 {
 	struct pmcwork *pwrk;
 	uint32_t *ptr, msg[PMCS_MSG_SIZE];
-	uint32_t iq, htag;
+	uint32_t iq, htag, status;
 	int i, result = 0;
 
 	pwrk = pmcs_gwork(pwp, PMCS_TAG_TYPE_WAIT, pptr);
@@ -687,9 +687,21 @@ pmcs_run_sata_cmd(pmcs_hw_t *pwp, pmcs_phy_t *pptr, fis_t fis, uint32_t mode,
 		return (ETIMEDOUT);
 	}
 
-	if (LE_32(msg[2]) != PMCOUT_STATUS_OK) {
+	status = LE_32(msg[2]);
+
+	if (status != PMCOUT_STATUS_OK) {
+		if (status == PMCOUT_STATUS_OPEN_CNX_ERROR_STP_RESOURCES_BUSY) {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, pptr->target,
+			    "%s: Potential affiliation active on 0x%" PRIx64,
+			    __func__, pmcs_barray2wwn(pptr->sas_address));
+		} else {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG2, pptr, pptr->target,
+			    "%s: SATA I/O returned with IOMB status 0x%x",
+			    __func__, status);
+		}
 		return (EIO);
 	}
+
 	if (LE_32(ptr[3]) != 0) {
 		size_t j, amt = LE_32(ptr[3]);
 		if (amt > sizeof (fis_t)) {

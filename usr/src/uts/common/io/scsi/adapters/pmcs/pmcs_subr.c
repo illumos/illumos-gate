@@ -2135,6 +2135,21 @@ pmcs_promote_next_phy(pmcs_phy_t *prev_primary)
 	if (pptr->target) {
 		pptr->target->phy = pptr;
 	}
+
+	/* Update the phy mask properties for the affected PHYs */
+	/* Clear the current values... */
+	pmcs_update_phy_pm_props(pptr, pptr->att_port_pm_tmp,
+	    pptr->tgt_port_pm_tmp, B_FALSE);
+	/* ...replace with the values from prev_primary... */
+	pmcs_update_phy_pm_props(pptr, prev_primary->att_port_pm_tmp,
+	    prev_primary->tgt_port_pm_tmp, B_TRUE);
+	/* ...then clear prev_primary's PHY values from the new primary */
+	pmcs_update_phy_pm_props(pptr, prev_primary->att_port_pm,
+	    prev_primary->tgt_port_pm, B_FALSE);
+	/* Clear the prev_primary's values */
+	pmcs_update_phy_pm_props(prev_primary, prev_primary->att_port_pm_tmp,
+	    prev_primary->tgt_port_pm_tmp, B_FALSE);
+
 	pptr->subsidiary = 0;
 
 	prev_primary->subsidiary = 1;
@@ -2648,7 +2663,7 @@ pmcs_report_observations(pmcs_hw_t *pwp)
 			pmcs_unlock_phy(pptr);
 		}
 		if (ndi_prop_update_string(DDI_DEV_T_NONE, iport->dip,
-		    SCSI_ADDR_PROP_ATTACHED_PORT,  ap) != DDI_SUCCESS) {
+		    SCSI_ADDR_PROP_ATTACHED_PORT, ap) != DDI_SUCCESS) {
 			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL, "%s: Failed "
 			    "to set prop ("SCSI_ADDR_PROP_ATTACHED_PORT")",
 			    __func__);
@@ -3223,6 +3238,16 @@ pmcs_configure_expander(pmcs_hw_t *pwp, pmcs_phy_t *pptr, pmcs_iport_t *iport)
 			if (widephy) {
 				ctmp->width++;
 				pptr->subsidiary = 1;
+
+				/*
+				 * Update the primary PHY's attached-port-pm
+				 * and target-port-pm information with the info
+				 * from this subsidiary
+				 */
+				pmcs_update_phy_pm_props(ctmp,
+				    pptr->att_port_pm_tmp,
+				    pptr->tgt_port_pm_tmp, B_TRUE);
+
 				pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
 				    "%s: PHY %s part of wide PHY %s "
 				    "(now %d wide)", __func__, pptr->path,
@@ -4321,6 +4346,9 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
 			    "%s: %s has tgt support=%x init support=(%x)",
 			    __func__, pptr->path, tgt_support, ini_support);
 		}
+		pmcs_update_phy_pm_props(pptr, (1ULL <<
+		    sdr->sdr_attached_phy_identifier), (1ULL << pptr->phynum),
+		    B_TRUE);
 		break;
 	case SAS_IF_DTYPE_EDGE:
 	case SAS_IF_DTYPE_FANOUT:
@@ -4358,6 +4386,9 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
 			    pptr->path, tgt_support, ini_support);
 			pptr->dtype = EXPANDER;
 		}
+		pmcs_update_phy_pm_props(pptr, (1ULL <<
+		    sdr->sdr_attached_phy_identifier), (1ULL << pptr->phynum),
+		    B_TRUE);
 		break;
 	default:
 		pptr->dtype = NOTHING;
@@ -6543,7 +6574,8 @@ pmcs_clear_xp(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 	 * but this device is going away anyway, so no matter.
 	 */
 	xp->dip = NULL;
-
+	xp->sd = NULL;
+	xp->smpd = NULL;
 	xp->special_running = 0;
 	xp->recovering = 0;
 	xp->recover_wait = 0;
@@ -7581,6 +7613,8 @@ pmcs_remove_phy_from_iport(pmcs_iport_t *iport, pmcs_phy_t *phyp)
 	ASSERT(list_link_active(&phyp->list_node));
 	iport->nphy--;
 	list_remove(&iport->phys, phyp);
+	pmcs_update_phy_pm_props(phyp, phyp->att_port_pm_tmp,
+	    phyp->tgt_port_pm_tmp, B_FALSE);
 	pmcs_smhba_add_iport_prop(iport, DATA_TYPE_INT32, PMCS_NUM_PHYS,
 	    &iport->nphy);
 	pmcs_rele_iport(iport);
@@ -7675,4 +7709,84 @@ pmcs_smp_release(pmcs_iport_t *iport)
 	iport->smp_active_thread = NULL;
 	cv_signal(&iport->smp_cv);
 	mutex_exit(&iport->smp_lock);
+}
+
+/*
+ * Update a PHY's attached-port-pm and target-port-pm properties
+ *
+ * phyp: PHY whose properties are to be updated
+ *
+ * att_bv: Bit value of the attached-port-pm property to be updated in the
+ * 64-bit holding area for the PHY.
+ *
+ * tgt_bv: Bit value of the target-port-pm property to update in the 64-bit
+ * holding area for the PHY.
+ *
+ * prop_add_val: If TRUE, we're adding bits into the property value.
+ * Otherwise, we're taking them out.  Either way, the properties for this
+ * PHY will be updated.
+ *
+ * NOTE: The devinfo tree view of attached port and target port is reversed
+ * from SAS.  Thus, the attached port phymask corresponds to the target port
+ * phymask and vice-versa.
+ */
+void
+pmcs_update_phy_pm_props(pmcs_phy_t *phyp, uint64_t att_bv, uint64_t tgt_bv,
+    boolean_t prop_add_val)
+{
+	if (prop_add_val) {
+		/*
+		 * If the values are currently 0, then we're setting the
+		 * phymask for just this PHY as well.
+		 */
+		if (phyp->att_port_pm_tmp == 0) {
+			phyp->att_port_pm = tgt_bv;
+			phyp->tgt_port_pm = att_bv;
+		}
+		phyp->att_port_pm_tmp |= tgt_bv;
+		phyp->tgt_port_pm_tmp |= att_bv;
+		(void) snprintf(phyp->att_port_pm_str, PMCS_PM_MAX_NAMELEN,
+		    "%"PRIx64, phyp->att_port_pm_tmp);
+		(void) snprintf(phyp->tgt_port_pm_str, PMCS_PM_MAX_NAMELEN,
+		    "%"PRIx64, phyp->tgt_port_pm_tmp);
+	} else {
+		phyp->att_port_pm_tmp &= ~tgt_bv;
+		phyp->tgt_port_pm_tmp &= ~att_bv;
+		if (phyp->att_port_pm_tmp) {
+			(void) snprintf(phyp->att_port_pm_str,
+			    PMCS_PM_MAX_NAMELEN, "%"PRIx64,
+			    phyp->att_port_pm_tmp);
+		} else {
+			phyp->att_port_pm_str[0] = '\0';
+			phyp->att_port_pm = 0;
+		}
+		if (phyp->tgt_port_pm_tmp) {
+			(void) snprintf(phyp->tgt_port_pm_str,
+			    PMCS_PM_MAX_NAMELEN, "%"PRIx64,
+			    phyp->tgt_port_pm_tmp);
+		} else {
+			phyp->tgt_port_pm_str[0] = '\0';
+			phyp->tgt_port_pm = 0;
+		}
+	}
+
+	if (phyp->target == NULL) {
+		return;
+	}
+
+	if (phyp->target->sd) {
+		(void) scsi_device_prop_update_string(phyp->target->sd,
+		    SCSI_DEVICE_PROP_PATH, SCSI_ADDR_PROP_ATTACHED_PORT_PM,
+		    phyp->att_port_pm_str);
+		(void) scsi_device_prop_update_string(phyp->target->sd,
+		    SCSI_DEVICE_PROP_PATH, SCSI_ADDR_PROP_TARGET_PORT_PM,
+		    phyp->tgt_port_pm_str);
+	} else if (phyp->target->smpd) {
+		(void) smp_device_prop_update_string(phyp->target->smpd,
+		    SCSI_ADDR_PROP_ATTACHED_PORT_PM,
+		    phyp->att_port_pm_str);
+		(void) smp_device_prop_update_string(phyp->target->smpd,
+		    SCSI_ADDR_PROP_TARGET_PORT_PM,
+		    phyp->tgt_port_pm_str);
+	}
 }

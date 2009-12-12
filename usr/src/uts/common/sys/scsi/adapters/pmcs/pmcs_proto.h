@@ -354,6 +354,11 @@ void pmcs_start_dev_state_recovery(pmcs_xscsi_t *, pmcs_phy_t *);
 void pmcs_smp_acquire(pmcs_iport_t *iport);
 void pmcs_smp_release(pmcs_iport_t *iport);
 
+/*
+ * Update attached-port-pm and target-port-pm properties on a PHY
+ */
+void pmcs_update_phy_pm_props(pmcs_phy_t *, uint64_t, uint64_t, boolean_t);
+
 #ifdef	__cplusplus
 }
 #endif

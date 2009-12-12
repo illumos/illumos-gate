@@ -99,6 +99,48 @@ extern void		smp_hba_tran_free(smp_hba_tran_t *smp);
 extern int		smp_probe(struct smp_device *smp_devp);
 extern int		smp_transport(struct smp_pkt *pkt);
 
+/* ==== The following interfaces are private (currently) ==== */
+
+/*
+ * smp_device_prop_*() property interfaces: flags
+ *
+ *   SMP_DEVICE_PROP_DEVICE: property of device.
+ *	The property is always associated with the smp_sd_dev devinfo
+ *	node.  Implementation uses ndi_prop_*() interfaces applied
+ *	dev_info_t (smp_sd_dev) nodes.
+ */
+#define	SMP_DEVICE_PROP_DEVICE		0x2	/* type is property-of-device */
+#define	SMP_DEVICE_PROP_TYPE_MSK	0xF
+
+int	smp_device_prop_get_int(struct smp_device *smp_sd, char *name,
+	    int defvalue);
+int64_t	smp_device_prop_get_int64(struct smp_device *, char *name,
+	    int64_t defvalue);
+
+int	smp_device_prop_lookup_byte_array(struct smp_device *smp_sd, char *name,
+	    uchar_t **, uint_t *);
+int	smp_device_prop_lookup_int_array(struct smp_device *smp_sd, char *name,
+	    int **, uint_t *);
+int	smp_device_prop_lookup_string(struct smp_device *smp_sd, char *name,
+	    char **);
+int	smp_device_prop_lookup_string_array(struct smp_device *smp_sd,
+	    char *name, char ***, uint_t *);
+
+int	smp_device_prop_update_byte_array(struct smp_device *smp_sd, char *name,
+	    uchar_t *, uint_t);
+int	smp_device_prop_update_int(struct smp_device *smp_sd, char *name, int);
+int	smp_device_prop_update_int64(struct smp_device *smp_sd, char *name,
+	    int64_t);
+int	smp_device_prop_update_int_array(struct smp_device *smp_sd, char *name,
+	    int *, uint_t);
+int	smp_device_prop_update_string(struct smp_device *smp_sd, char *name,
+	    char *);
+int	smp_device_prop_update_string_array(struct smp_device *smp_sd,
+	    char *name, char **, uint_t);
+
+int	smp_device_prop_remove(struct smp_device *smp_sd, char *name);
+void	smp_device_prop_free(struct smp_device *smp_sd, void *data);
+
 #endif /* defined(_KERNEL) */
 
 #ifdef	__cplusplus

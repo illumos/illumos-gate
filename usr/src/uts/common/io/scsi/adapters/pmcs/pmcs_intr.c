@@ -330,6 +330,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		};
 		pmcs_phy_t *rp;
 		sas_identify_af_t af;
+		uint64_t phy_id;
 
 		/*
 		 * If we're not at running state, don't do anything
@@ -356,6 +357,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 
 		/* Copy the remote address into our phy handle */
 		(void) memcpy(pptr->sas_address, af.sas_address, 8);
+		phy_id = (uint64_t)af.phy_identifier;
 
 		/*
 		 * Check to see if there is a PortID already active.
@@ -398,8 +400,13 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 				    pmcs_barray2wwn(pptr->sas_address));
 			}
 
-			/* Get our iport, if attached, and set it up */
+			/*
+			 * Get our iport, if attached, and set it up.  Update
+			 * the PHY's phymask props while we're locked.
+			 */
 			pmcs_lock_phy(pptr);
+			pmcs_update_phy_pm_props(pptr, (1ULL << phy_id),
+			    (1ULL << phynum), B_TRUE);
 			iport = pmcs_get_iport_by_phy(pwp, pptr);
 			pmcs_unlock_phy(pptr);
 			if (iport) {
@@ -417,6 +424,8 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 				pmcs_rele_iport(iport);
 			}
 
+			pmcs_update_phy_pm_props(rp, (1ULL << phy_id),
+			    (1ULL << phynum), B_TRUE);
 			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
 			    "PortID 0x%x: PHY 0x%x SAS LINK UP WIDENS PORT "
 			    "TO %d PHYS", portid, phynum, rp->width);
@@ -524,6 +533,8 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		}
 
 		pmcs_lock_phy(pptr);
+		pmcs_update_phy_pm_props(pptr, (1ULL << phy_id),
+		    (1ULL << phynum), B_TRUE);
 		pmcs_smhba_log_sysevent(pwp, ESC_SAS_PHY_EVENT,
 		    SAS_PHY_ONLINE, pptr);
 		pmcs_unlock_phy(pptr);
@@ -617,6 +628,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		}
 
 		pmcs_lock_phy(pptr);
+		pmcs_update_phy_pm_props(pptr, 1ULL, (1ULL << phynum), B_TRUE);
 		pmcs_smhba_log_sysevent(pwp, ESC_SAS_PHY_EVENT,
 		    SAS_PHY_ONLINE, pptr);
 		pmcs_unlock_phy(pptr);
@@ -677,6 +689,9 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 			    portid, phynum);
 			/* Entire port is down due to a host-initiated reset */
 			mutex_enter(&pptr->phy_lock);
+			/* Clear the phymask props in pptr */
+			pmcs_update_phy_pm_props(pptr, pptr->att_port_pm_tmp,
+			    pptr->tgt_port_pm_tmp, B_FALSE);
 			iport = pptr->iport;
 			mutex_exit(&pptr->phy_lock);
 			if (iport) {
@@ -727,6 +742,8 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 			 * No need to lock the entire tree for this
 			 */
 			mutex_enter(&pptr->phy_lock);
+			pmcs_update_phy_pm_props(pptr, subphy->att_port_pm_tmp,
+			    subphy->tgt_port_pm_tmp, B_FALSE);
 			pptr->width = IOP_EVENT_NPIP(w3);
 			mutex_exit(&pptr->phy_lock);
 
@@ -795,13 +812,18 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 
 		/*
 		 * Last PHY on the port.
-		 * Assumption: pptr and subphy are both "valid"
+		 * Assumption: pptr and subphy are both "valid".  In fact,
+		 * they should be one and the same.
 		 *
 		 * Drop port width on the primary phy handle
-		 * Report the event while we've got the lock
+		 * Report the event and clear its PHY pm props while we've
+		 * got the lock
 		 */
+		ASSERT(pptr == subphy);
 		mutex_enter(&pptr->phy_lock);
 		pptr->width = 0;
+		pmcs_update_phy_pm_props(pptr, pptr->att_port_pm_tmp,
+		    pptr->tgt_port_pm_tmp, B_FALSE);
 		pmcs_smhba_log_sysevent(pwp, ESC_SAS_PHY_EVENT,
 		    SAS_PHY_OFFLINE, pptr);
 		mutex_exit(&pptr->phy_lock);

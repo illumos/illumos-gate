@@ -317,6 +317,7 @@ pmcs_scsa_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	}
 
 	tgt->dip = sd->sd_dev;
+	tgt->sd = sd;
 
 	if (!pmcs_assign_device(pwp, tgt)) {
 		pmcs_release_scratch(pwp);
@@ -351,6 +352,12 @@ pmcs_scsa_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 
 	/* SM-HBA */
 	(void) pmcs_smhba_set_scsi_device_props(pwp, phyp, sd);
+	/*
+	 * Make sure attached port and target port pm props are updated
+	 * By passing in 0s, we're not actually updating any values, but
+	 * the properties should now get updated on the node.
+	 */
+	pmcs_update_phy_pm_props(phyp, 0, 0, B_TRUE);
 
 	mutex_exit(&tgt->statlock);
 	pmcs_unlock_phy(phyp);
@@ -1025,7 +1032,6 @@ pmcs_smp_start(struct smp_pkt *smp_pkt)
 	msg[15] = 0;
 
 	COPY_MESSAGE(ptr, msg, PMCS_MSG_SIZE);
-
 	/* SMP serialization */
 	pmcs_smp_acquire(pptr->iport);
 
@@ -1191,7 +1197,6 @@ pmcs_smp_init(dev_info_t *self, dev_info_t *child,
 		 * Now that we've increased the ref count on phy, it's OK
 		 * to drop the lock so we can acquire the parent's lock.
 		 */
-
 		pphy = phy->parent;
 		pmcs_unlock_phy(phy);
 		pmcs_lock_phy(pphy);
@@ -1232,6 +1237,12 @@ pmcs_smp_init(dev_info_t *self, dev_info_t *child,
 		goto smp_init_fail;
 	}
 
+	/*
+	 * Update the attached port and target port pm properties
+	 */
+	tgt->smpd = smp_sd;
+	pmcs_update_phy_pm_props(phy, 0, 0, B_TRUE);
+
 	pmcs_unlock_phy(phy);
 	mutex_exit(&pwp->lock);
 
@@ -1239,9 +1250,8 @@ pmcs_smp_init(dev_info_t *self, dev_info_t *child,
 	tgt->dtype = phy->dtype;
 
 	addr = scsi_wwn_to_wwnstr(wwn, ua_form, NULL);
-	/* XXX: Update smp devinfo node using ndi_xxx */
-	if (ndi_prop_update_string(DDI_DEV_T_NONE, child,
-	    SCSI_ADDR_PROP_ATTACHED_PORT, addr) != DDI_SUCCESS) {
+	if (smp_device_prop_update_string(smp_sd, SCSI_ADDR_PROP_ATTACHED_PORT,
+	    addr) != DDI_SUCCESS) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL, "%s: Failed to set "
 		    "prop ("SCSI_ADDR_PROP_ATTACHED_PORT")", __func__);
 	}
@@ -2792,6 +2802,9 @@ pmcs_ioerror(pmcs_hw_t *pwp, pmcs_dtype_t t, pmcwork_t *pwrk, uint32_t *w)
 
 	case PMCOUT_STATUS_OPEN_CNX_ERROR_STP_RESOURCES_BUSY:
 		/* synthesize a RESERVATION CONFLICT */
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, phyp, phyp->target,
+		    "%s: Potential affiliation active on 0x%" PRIx64, __func__,
+		    pmcs_barray2wwn(phyp->sas_address));
 		pmcs_latch_status(pwp, sp, STATUS_RESERVATION_CONFLICT, NULL,
 		    0, phyp->path);
 		break;

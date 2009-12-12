@@ -59,6 +59,8 @@ typedef enum {
 
 #define	PMCS_INVALID_DEVICE_ID	0xffffffff
 
+#define	PMCS_PM_MAX_NAMELEN	16
+
 struct pmcs_phy {
 	pmcs_phy_t	*sibling;	/* sibling phy */
 	pmcs_phy_t 	*parent;	/* parent phy */
@@ -112,6 +114,16 @@ struct pmcs_phy {
 	pmcs_iport_t	*iport;		/* back ptr to the iport handle */
 	pmcs_xscsi_t	*target;	/* back ptr to current target */
 	kstat_t		*phy_stats;	/* kstats for this phy */
+	/*
+	 * Attached port phy mask and target port phymask.  With 16 bytes
+	 * we can represent a phymask for anything with up to 64 ports
+	 */
+	uint64_t	att_port_pm;		/* att port pm for this PHY */
+	uint64_t	att_port_pm_tmp;	/* Temp area for wide-ports */
+	char		att_port_pm_str[PMCS_PM_MAX_NAMELEN + 1];
+	uint64_t	tgt_port_pm;		/* tgt port pm for this PHY */
+	uint64_t	tgt_port_pm_tmp;	/* Temp area for wide-ports */
+	char		tgt_port_pm_str[PMCS_PM_MAX_NAMELEN + 1];
 };
 
 /* maximum number of ds recovery retries (ds_recovery_retries) */

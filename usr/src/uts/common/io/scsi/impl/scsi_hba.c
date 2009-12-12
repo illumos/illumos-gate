@@ -4479,6 +4479,212 @@ scsi_device_prop_free(struct scsi_device *sd, uint_t flags, void *data)
 		ddi_prop_free(data);
 }
 
+/* SMP device property interfaces */
+int
+smp_device_prop_get_int(struct smp_device *smp_sd, char *name, int defval)
+{
+	int		v = defval;
+
+	ASSERT(smp_sd && name && smp_sd->smp_sd_dev);
+	if ((smp_sd == NULL) || (name == NULL) || (smp_sd->smp_sd_dev == NULL))
+		return (v);
+
+	v = ddi_prop_get_int(DDI_DEV_T_ANY, smp_sd->smp_sd_dev,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, name, v);
+	return (v);
+}
+
+
+int64_t
+smp_device_prop_get_int64(struct smp_device *smp_sd, char *name, int64_t defval)
+{
+	int64_t		v = defval;
+
+	ASSERT(smp_sd && name && smp_sd->smp_sd_dev);
+	if ((smp_sd == NULL) || (name == NULL) || (smp_sd->smp_sd_dev == NULL))
+		return (v);
+
+	v = ddi_prop_get_int64(DDI_DEV_T_ANY, smp_sd->smp_sd_dev,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, name, v);
+	return (v);
+}
+
+int
+smp_device_prop_lookup_byte_array(struct smp_device *smp_sd, char *name,
+    uchar_t **data, uint_t *nelements)
+{
+	int		rv;
+
+	ASSERT(smp_sd && name && smp_sd->smp_sd_dev);
+	if ((smp_sd == NULL) || (name == NULL) || (smp_sd->smp_sd_dev == NULL))
+		return (DDI_PROP_INVAL_ARG);
+
+	rv = ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, smp_sd->smp_sd_dev,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+	    name, data, nelements);
+	return (rv);
+}
+
+int
+smp_device_prop_lookup_int_array(struct smp_device *smp_sd, char *name,
+    int **data, uint_t *nelements)
+{
+	int		rv;
+
+	ASSERT(smp_sd && name && smp_sd->smp_sd_dev);
+	if ((smp_sd == NULL) || (name == NULL) || (smp_sd->smp_sd_dev == NULL))
+		return (DDI_PROP_INVAL_ARG);
+
+	rv = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, smp_sd->smp_sd_dev,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+	    name, data, nelements);
+	return (rv);
+}
+
+
+int
+smp_device_prop_lookup_string(struct smp_device *smp_sd, char *name,
+    char **data)
+{
+	int		rv;
+
+	ASSERT(smp_sd && name && smp_sd->smp_sd_dev);
+	if ((smp_sd == NULL) || (name == NULL) || (smp_sd->smp_sd_dev == NULL))
+		return (DDI_PROP_INVAL_ARG);
+
+	rv = ddi_prop_lookup_string(DDI_DEV_T_ANY, smp_sd->smp_sd_dev,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+	    name, data);
+	return (rv);
+}
+
+int
+smp_device_prop_lookup_string_array(struct smp_device *smp_sd, char *name,
+    char ***data, uint_t *nelements)
+{
+	int		rv;
+
+	ASSERT(smp_sd && name && smp_sd->smp_sd_dev);
+	if ((smp_sd == NULL) || (name == NULL) || (smp_sd->smp_sd_dev == NULL))
+		return (DDI_PROP_INVAL_ARG);
+
+	rv = ddi_prop_lookup_string_array(DDI_DEV_T_ANY, smp_sd->smp_sd_dev,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+	    name, data, nelements);
+	return (rv);
+}
+
+int
+smp_device_prop_update_byte_array(struct smp_device *smp_sd, char *name,
+    uchar_t *data, uint_t nelements)
+{
+	int		rv;
+
+	ASSERT(smp_sd && name && smp_sd->smp_sd_dev);
+	if ((smp_sd == NULL) || (name == NULL) || (smp_sd->smp_sd_dev == NULL))
+		return (DDI_PROP_INVAL_ARG);
+
+	rv = ndi_prop_update_byte_array(DDI_DEV_T_NONE, smp_sd->smp_sd_dev,
+	    name, data, nelements);
+	return (rv);
+}
+
+int
+smp_device_prop_update_int(struct smp_device *smp_sd, char *name, int data)
+{
+	int		rv;
+
+	ASSERT(smp_sd && name && smp_sd->smp_sd_dev);
+	if ((smp_sd == NULL) || (name == NULL) || (smp_sd->smp_sd_dev == NULL))
+		return (DDI_PROP_INVAL_ARG);
+
+	rv = ndi_prop_update_int(DDI_DEV_T_NONE, smp_sd->smp_sd_dev,
+	    name, data);
+	return (rv);
+}
+
+int
+smp_device_prop_update_int64(struct smp_device *smp_sd, char *name,
+    int64_t data)
+{
+	int		rv;
+
+	ASSERT(smp_sd && name && smp_sd->smp_sd_dev);
+	if ((smp_sd == NULL) || (name == NULL) || (smp_sd->smp_sd_dev == NULL))
+		return (DDI_PROP_INVAL_ARG);
+
+	rv = ndi_prop_update_int64(DDI_DEV_T_NONE, smp_sd->smp_sd_dev,
+	    name, data);
+	return (rv);
+}
+
+int
+smp_device_prop_update_int_array(struct smp_device *smp_sd, char *name,
+    int *data, uint_t nelements)
+{
+	int		rv;
+
+	ASSERT(smp_sd && name && smp_sd->smp_sd_dev);
+	if ((smp_sd == NULL) || (name == NULL) || (smp_sd->smp_sd_dev == NULL))
+		return (DDI_PROP_INVAL_ARG);
+
+	rv = ndi_prop_update_int_array(DDI_DEV_T_NONE, smp_sd->smp_sd_dev,
+	    name, data, nelements);
+	return (rv);
+}
+
+int
+smp_device_prop_update_string(struct smp_device *smp_sd, char *name, char *data)
+{
+	int		rv;
+
+	ASSERT(smp_sd && name && smp_sd->smp_sd_dev);
+	if ((smp_sd == NULL) || (name == NULL) || (smp_sd->smp_sd_dev == NULL))
+		return (DDI_PROP_INVAL_ARG);
+
+	rv = ndi_prop_update_string(DDI_DEV_T_NONE, smp_sd->smp_sd_dev,
+	    name, data);
+	return (rv);
+}
+
+int
+smp_device_prop_update_string_array(struct smp_device *smp_sd, char *name,
+    char **data, uint_t nelements)
+{
+	int		rv;
+
+	ASSERT(smp_sd && name && smp_sd->smp_sd_dev);
+	if ((smp_sd == NULL) || (name == NULL) || (smp_sd->smp_sd_dev == NULL))
+		return (DDI_PROP_INVAL_ARG);
+
+	rv = ndi_prop_update_string_array(DDI_DEV_T_NONE, smp_sd->smp_sd_dev,
+	    name, data, nelements);
+	return (rv);
+}
+
+int
+smp_device_prop_remove(struct smp_device *smp_sd, char *name)
+{
+	int		rv;
+
+	ASSERT(smp_sd && name && smp_sd->smp_sd_dev);
+	if ((smp_sd == NULL) || (name == NULL) || (smp_sd->smp_sd_dev == NULL))
+		return (DDI_PROP_INVAL_ARG);
+
+	rv = ndi_prop_remove(DDI_DEV_T_NONE, smp_sd->smp_sd_dev, name);
+	return (rv);
+}
+
+void
+smp_device_prop_free(struct smp_device *smp_sd, void *data)
+{
+	ASSERT(smp_sd && data && smp_sd->smp_sd_dev);
+	if ((smp_sd == NULL) || (data == NULL) || (smp_sd->smp_sd_dev == NULL))
+		return;
+
+	ddi_prop_free(data);
+}
+
 /*
  * scsi_hba_ua_set: given "unit-address" string, set properties.
  *

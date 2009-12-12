@@ -193,6 +193,13 @@ typedef struct sas_phy_stats {
 
 
 /*
+ * Phy-mask property names for the target port and attached port
+ */
+#define	SCSI_ADDR_PROP_TARGET_PORT_PM	"target-port-pm"
+#define	SCSI_ADDR_PROP_ATTACHED_PORT_PM	"attached-port-pm"
+
+
+/*
  * Event definitions
  */
 /* Event Class */
