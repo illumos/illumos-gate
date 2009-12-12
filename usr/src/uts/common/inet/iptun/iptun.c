@@ -3382,6 +3382,9 @@ iptun_output_common(iptun_t *iptun, ip_xmit_attr_t *ixa, mblk_t *mp)
 		return;
 	}
 
+	/* Save IXAF_DONTFRAG value */
+	iaflags_t dontfrag = ixa->ixa_flags & IXAF_DONTFRAG;
+
 	/* Perform header processing. */
 	if (outer4 != NULL) {
 		mp = iptun_out_process_ipv4(iptun, mp, outer4, inner4, inner6,
@@ -3432,18 +3435,36 @@ iptun_output_common(iptun_t *iptun, ip_xmit_attr_t *ixa, mblk_t *mp)
 		 * instructions for outbound IPsec processing.
 		 */
 		for (newmp = mp; newmp != NULL; newmp = mp) {
+			size_t minmtu = iptun->iptun_typeinfo->iti_minmtu;
+
 			atomic_inc_64(&iptun->iptun_opackets);
 			atomic_add_64(&iptun->iptun_obytes, ixa->ixa_pktlen);
 			mp = mp->b_next;
 			newmp->b_next = NULL;
 
-			if (update_pktlen)
-				ixa->ixa_pktlen = msgdsize(mp);
+			/*
+			 * The IXAF_DONTFRAG flag is global, but there is
+			 * a chain here.  Check if we're really already
+			 * smaller than the minimum allowed MTU and reset here
+			 * appropriately.  Otherwise one small packet can kill
+			 * the whole chain's path mtu discovery.
+			 * In addition, update the pktlen to the length of
+			 * the actual packet being processed.
+			 */
+			if (update_pktlen) {
+				ixa->ixa_pktlen = msgdsize(newmp);
+				if (ixa->ixa_pktlen <= minmtu)
+					ixa->ixa_flags &= ~IXAF_DONTFRAG;
+			}
 
 			atomic_inc_64(&iptun->iptun_opackets);
 			atomic_add_64(&iptun->iptun_obytes, ixa->ixa_pktlen);
 
 			error = conn_ip_output(newmp, ixa);
+
+			/* Restore IXAF_DONTFRAG value */
+			ixa->ixa_flags |= dontfrag;
+
 			if (error == EMSGSIZE) {
 				/* IPsec policy might have changed */
 				(void) iptun_update_mtu(iptun, ixa, 0);

@@ -94,6 +94,7 @@ struct ip_dropstats {
 	kstat_named_t ipds_spd_overlap_frag;
 	kstat_named_t ipds_spd_evil_frag;
 	kstat_named_t ipds_spd_max_frags;
+	kstat_named_t ipds_spd_expired_frags;
 
 	/* ESP-specific drop statistics. */
 	kstat_named_t ipds_esp_nomem;

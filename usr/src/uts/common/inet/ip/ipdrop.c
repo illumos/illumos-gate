@@ -139,6 +139,8 @@ ip_drop_init(ipsec_stack_t *ipss)
 	    "spd_evil_frag", KSTAT_DATA_UINT64);
 	kstat_named_init(&ipss->ipsec_ip_drop_types->ipds_spd_max_frags,
 	    "spd_max_frags", KSTAT_DATA_UINT64);
+	kstat_named_init(&ipss->ipsec_ip_drop_types->ipds_spd_expired_frags,
+	    "spd_expired_frags", KSTAT_DATA_UINT64);
 
 	/* ESP-specific drop statistics. */
 

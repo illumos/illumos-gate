@@ -2715,7 +2715,6 @@ ipsec_init_inbound_sel(ipsec_selector_t *sel, mblk_t *mp, ipha_t *ipha,
 		sel->ips_remote_addr_v6 = ip6h->ip6_src;
 
 		bzero(&ipp, sizeof (ipp));
-		(void) ip_find_hdr_v6(mp, ip6h, B_FALSE, &ipp, NULL);
 
 		switch (nexthdr) {
 		case IPPROTO_HOPOPTS:
@@ -2735,14 +2734,18 @@ ipsec_init_inbound_sel(ipsec_selector_t *sel, mblk_t *mp, ipha_t *ipha,
 				ipsec_freemsg_chain(spare_mp);
 				return (SELRET_BADPKT);
 			}
+			/* Repopulate now that we have the whole packet */
+			ip6h = (ip6_t *)(spare_mp->b_rptr + outer_hdr_len);
+			(void) ip_find_hdr_v6(spare_mp, ip6h, B_FALSE, &ipp,
+			    NULL);
 			nexthdr = *nexthdrp;
 			/* We can just extract based on hdr_len now. */
 			break;
 		default:
+			(void) ip_find_hdr_v6(mp, ip6h, B_FALSE, &ipp, NULL);
 			hdr_len = IPV6_HDR_LEN;
 			break;
 		}
-
 		if (port_policy_present && IS_V6_FRAGMENT(ipp) && !is_icmp) {
 			/* IPv6 Fragment */
 			ipsec_freemsg_chain(spare_mp);
@@ -5608,6 +5611,41 @@ ipsec_tun_inbound(ip_recv_attr_t *ira, mblk_t *data_mp, ipsec_tun_pol_t *itp,
 				    &ipss->ipsec_spd_dropper);
 				return (NULL);
 			}
+
+			/*
+			 * Inner and outer headers may not be contiguous.
+			 * Pullup the data_mp now to satisfy assumptions of
+			 * ipsec_fragcache_add()
+			 */
+			if (data_mp->b_cont != NULL) {
+				mblk_t *nmp;
+
+				nmp = msgpullup(data_mp, -1);
+				if (nmp == NULL) {
+					ip_drop_packet(data_mp, B_TRUE, NULL,
+					    DROPPER(ipss, ipds_spd_nomem),
+					    &ipss->ipsec_spd_dropper);
+					return (NULL);
+				}
+				freemsg(data_mp);
+				data_mp = nmp;
+				if (outer_ipv4 != NULL)
+					outer_ipv4 =
+					    (ipha_t *)data_mp->b_rptr;
+				else
+					outer_ipv6 =
+					    (ip6_t *)data_mp->b_rptr;
+				if (inner_ipv4 != NULL) {
+					inner_ipv4 =
+					    (ipha_t *)(data_mp->b_rptr +
+					    outer_hdr_len);
+				} else {
+					inner_ipv6 =
+					    (ip6_t *)(data_mp->b_rptr +
+					    outer_hdr_len);
+				}
+			}
+
 			/*
 			 * If we need to queue the packet. First we
 			 * get an mblk with the attributes. ipsec_fragcache_add
@@ -5622,6 +5660,7 @@ ipsec_tun_inbound(ip_recv_attr_t *ira, mblk_t *data_mp, ipsec_tun_pol_t *itp,
 				    &ipss->ipsec_spd_dropper);
 				return (NULL);
 			}
+
 			mp = ipsec_fragcache_add(&itp->itp_fragcache,
 			    mp, data_mp, outer_hdr_len, ipss);
 
@@ -6227,6 +6266,9 @@ ipsec_fragcache_add(ipsec_fragcache_t *frag, mblk_t *iramp, mblk_t *mp,
 	int last;
 	boolean_t inbound = (iramp != NULL);
 
+#ifdef FRAGCACHE_DEBUG
+	cmn_err(CE_WARN, "Fragcache: %s\n", inbound ? "INBOUND" : "OUTBOUND");
+#endif
 	/*
 	 * You're on the slow path, so insure that every packet in the
 	 * cache is a single-mblk one.
@@ -6341,8 +6383,8 @@ ipsec_fragcache_add(ipsec_fragcache_t *frag, mblk_t *iramp, mblk_t *mp,
 		last = (V4_MORE_FRAGS(iph) == 0);
 #ifdef FRAGCACHE_DEBUG
 		cmn_err(CE_WARN, "V4 fragcache: firstbyte = %d, lastbyte = %d, "
-		    "last = %d, id = %d\n", firstbyte, lastbyte, last,
-		    iph->ipha_ident);
+		    "is_last_frag = %d, id = %d, mp = %p\n", firstbyte,
+		    lastbyte, last, iph->ipha_ident, mp);
 #endif
 	} else {
 		firstbyte = ntohs(fraghdr->ip6f_offlg & IP6F_OFF_MASK);
@@ -6351,9 +6393,9 @@ ipsec_fragcache_add(ipsec_fragcache_t *frag, mblk_t *iramp, mblk_t *mp,
 		last = (fraghdr->ip6f_offlg & IP6F_MORE_FRAG) == 0;
 #ifdef FRAGCACHE_DEBUG
 		cmn_err(CE_WARN, "V6 fragcache: firstbyte = %d, lastbyte = %d, "
-		    "last = %d, id = %d, fraghdr = %p, mp = %p\n",
-		    firstbyte, lastbyte, last, fraghdr->ip6f_ident,
-		    fraghdr, mp);
+		    "is_last_frag = %d, id = %d, fraghdr = %p, mp = %p\n",
+		    firstbyte, lastbyte, last, fraghdr->ip6f_ident, fraghdr,
+		    mp);
 #endif
 	}
 
@@ -6643,15 +6685,10 @@ ipsec_fragcache_add(ipsec_fragcache_t *frag, mblk_t *iramp, mblk_t *mp,
 	if (!fep->itpfe_last) {
 		mutex_exit(&frag->itpf_lock);
 #ifdef FRAGCACHE_DEBUG
-		cmn_err(CE_WARN, "Fragment cached, not last.\n");
+		cmn_err(CE_WARN, "Fragment cached, last not yet seen.\n");
 #endif
 		return (NULL);
 	}
-
-#ifdef FRAGCACHE_DEBUG
-	cmn_err(CE_WARN, "Last fragment cached.\n");
-	cmn_err(CE_WARN, "mp = %p\n", mp);
-#endif
 
 	offset = 0;
 	for (mp = fep->itpfe_fraglist; mp; mp = mp->b_next) {
@@ -6725,6 +6762,11 @@ ipsec_fragcache_add(ipsec_fragcache_t *frag, mblk_t *iramp, mblk_t *mp,
 #endif
 			return (NULL);
 		}
+#ifdef FRAGCACHE_DEBUG
+		cmn_err(CE_WARN, "Frag offsets : "
+		    "firstbyte = %d, offset = %d, mp = %p\n",
+		    firstbyte, offset, mp);
+#endif
 
 		/*
 		 * If we are at the last fragment, we have the complete
@@ -6826,7 +6868,8 @@ fragcache_delentry(int slot, ipsec_fragcache_entry_t *fep,
 	if (fep->itpfe_fraglist != NULL) {
 		ip_drop_packet_chain(fep->itpfe_fraglist,
 		    ip_recv_attr_is_mblk(fep->itpfe_fraglist), NULL,
-		    DROPPER(ipss, ipds_spd_nomem), &ipss->ipsec_spd_dropper);
+		    DROPPER(ipss, ipds_spd_expired_frags),
+		    &ipss->ipsec_spd_dropper);
 	}
 	fep->itpfe_fraglist = NULL;
 
