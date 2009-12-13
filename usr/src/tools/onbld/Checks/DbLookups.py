@@ -132,40 +132,64 @@ class BugDB(object):
 		Dictionary, mapping CR=>dictionary, where the nested dictionary
 		is a mapping of field=>value
 		"""
-		
-		#
-		# We request synopsis last, and split on only
-		# the number of separators that we expect to
-		# see such that a | in the synopsis doesn't
-		# throw us out of whack.
-		#
-		monacoFields = [ "cr_number", "category", "sub_category",
-			"area", "release", "build", "responsible_manager",
-			"responsible_engineer", "priority", "status", "sub_status",
-			"submitted_by", "date_submitted", "synopsis" ]
-		cmd = []
-		cmd.append("set What = cr." + ', cr.'.join(monacoFields))
-		cmd.append("")
-		cmd.append("set Which = cr.cr_number in (" + ','.join(crs) +")")
-		cmd.append("")
-		cmd.append("set FinalClauses = order by cr.cr_number")
-		cmd.append("")
-		cmd.append("doMeta genQuery cr")
-		url = "http://hestia.sfbay.sun.com/cgi-bin/expert?format="
-		url += "Pipe-delimited+text;Go=2;no_header=on;cmds="
-		url += urllib.quote_plus("\n".join(cmd))
-		results = {}
-		try:
-			data = urllib2.urlopen(url).readlines()
-		except urllib2.HTTPError, e:
-			print "ERROR: HTTP error at " + url + \
-				" got error: " + str(e.code)
-			raise e
 
-		except urllib2.URLError, e:
-			print "ERROR: could not connect to " + url + \
-				' got error: "' + e.reason[1] + '"'
-			raise e
+		#
+		# See if 'maxcrs' for maximal batch query size is defined
+		# if not, default to 200. 
+		# This clears the 2499 chars query limit
+		#
+		try:
+			maxcrs
+		except NameError:
+			maxcrs = 200
+		
+		i = 0
+		results = {}
+		data = []
+
+		while i < len(crs):
+			if len(crs) < ( i + maxcrs ):
+				j = len(crs)
+			else:
+				j = i + maxcrs
+
+			crstmp=crs[i:j]
+
+			#
+			# We request synopsis last, and split on only
+			# the number of separators that we expect to
+			# see such that a | in the synopsis doesn't
+			# throw us out of whack.
+			#
+			monacoFields = [ "cr_number", "category", "sub_category",
+				"area", "release", "build", "responsible_manager",
+				"responsible_engineer", "priority", "status", "sub_status",
+				"submitted_by", "date_submitted", "synopsis" ]
+			cmd = []
+			cmd.append("set What = cr." + ', cr.'.join(monacoFields))
+			cmd.append("")
+			cmd.append("set Which = cr.cr_number in (" + ','.join(crstmp) +")")
+			cmd.append("")
+			cmd.append("set FinalClauses = order by cr.cr_number")
+			cmd.append("")
+			cmd.append("doMeta genQuery cr")
+			url = "http://hestia.sfbay.sun.com/cgi-bin/expert?format="
+			url += "Pipe-delimited+text;Go=2;no_header=on;cmds="
+			url += urllib.quote_plus("\n".join(cmd))
+			try:
+				data += urllib2.urlopen(url).readlines()
+			except urllib2.HTTPError, e:
+				print "ERROR: HTTP error at " + url + \
+					" got error: " + str(e.code)
+				raise e
+	
+			except urllib2.URLError, e:
+				print "ERROR: could not connect to " + url + \
+					' got error: "' + e.reason[1] + '"'
+				raise e
+
+			i += maxcrs
+
 		for line in data:
 			line = line.rstrip('\n')
 			values = line.split('|', len(monacoFields) - 1)
@@ -175,6 +199,8 @@ class BugDB(object):
 			for field in monacoFields:
 				results[cr][field] = values[v]
 				v += 1
+
+
 		return results
 
 	def lookup(self, crs):
