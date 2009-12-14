@@ -1812,15 +1812,22 @@ clntip_hash(void *key)
 	struct sockaddr *addr = key;
 	int i, len = 0;
 	uint32_t hash = 0;
+	char *ptr;
 
-	if (addr->sa_family == AF_INET)
-		len = sizeof (struct sockaddr_in);
-	else if (addr->sa_family == AF_INET6)
-		len = sizeof (struct sockaddr_in6);
+	if (addr->sa_family == AF_INET) {
+		struct sockaddr_in *a = (struct sockaddr_in *)addr;
+		len = sizeof (struct in_addr);
+		ptr = (char *)&a->sin_addr;
+	} else if (addr->sa_family == AF_INET6) {
+		struct sockaddr_in6 *a = (struct sockaddr_in6 *)addr;
+		len = sizeof (struct in6_addr);
+		ptr = (char *)&a->sin6_addr;
+	} else
+		return (0);
 
 	for (i = 0; i < len; i++) {
 		hash <<= 1;
-		hash += (uint_t)(((char *)addr)[i]);
+		hash += (uint_t)ptr[i];
 	}
 	return (hash);
 }
@@ -1831,15 +1838,24 @@ clntip_compare(rfs4_entry_t entry, void *key)
 	rfs4_clntip_t *cp = (rfs4_clntip_t *)entry;
 	struct sockaddr *addr = key;
 	int len = 0;
+	char *p1, *p2;
 
-	if (addr->sa_family == AF_INET)
-		len = sizeof (struct sockaddr_in);
-	else if (addr->sa_family == AF_INET6)
-		len = sizeof (struct sockaddr_in6);
-	else
+	if (addr->sa_family == AF_INET) {
+		struct sockaddr_in *a1 = (struct sockaddr_in *)&cp->ri_addr;
+		struct sockaddr_in *a2 = (struct sockaddr_in *)addr;
+		len = sizeof (struct in_addr);
+		p1 = (char *)&a1->sin_addr;
+		p2 = (char *)&a2->sin_addr;
+	} else if (addr->sa_family == AF_INET6) {
+		struct sockaddr_in6 *a1 = (struct sockaddr_in6 *)&cp->ri_addr;
+		struct sockaddr_in6 *a2 = (struct sockaddr_in6 *)addr;
+		len = sizeof (struct in6_addr);
+		p1 = (char *)&a1->sin6_addr;
+		p2 = (char *)&a2->sin6_addr;
+	} else
 		return (0);
 
-	return (bcmp(&cp->ri_addr, addr, len) == 0);
+	return (bcmp(p1, p2, len) == 0);
 }
 
 static void *
