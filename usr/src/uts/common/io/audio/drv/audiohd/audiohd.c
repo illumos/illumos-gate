@@ -155,25 +155,17 @@ audiohd_set_chipset_info(audiohd_state_t *statep)
 	vers = AUDIOHD_DEV_VERSION;
 
 	switch (devid) {
-	case 0x80862668:
-		name = "Intel HD Audio";
-		vers = "ICH6";
+	case 0x1002437b:
+		name = "ATI HD Audio";
+		vers = "SB450";
 		break;
-	case 0x808627d8:
-		name = "Intel HD Audio";
-		vers = "ICH7";
+	case 0x10024383:
+		name = "ATI HD Audio";
+		vers = "SB600";
 		break;
-	case 0x8086284b:
-		name = "Intel HD Audio";
-		vers = "ICH8";
-		break;
-	case 0x8086293e:
-		name = "Intel HD Audio";
-		vers = "ICH9";
-		break;
-	case 0x80863a3e:
-		name = "Intel HD Audio";
-		vers = "ICH10";
+	case 0x1002aa38:
+		name = "ATI HD Audio";
+		vers = "Radeon HD 4670";
 		break;
 	case 0x10de026c:
 		name = "NVIDIA HD Audio";
@@ -207,21 +199,29 @@ audiohd_set_chipset_info(audiohd_state_t *statep)
 		name = "NVIDIA HD Audio";
 		vers = "MCP79";
 		break;
-	case 0x1002437b:
-		name = "ATI HD Audio";
-		vers = "SB450";
-		break;
-	case 0x10024383:
-		name = "ATI HD Audio";
-		vers = "SB600";
-		break;
-	case 0x1002aa38:
-		name = "ATI HD Audio";
-		vers = "Radeon HD 4670";
-		break;
 	case 0x11063288:
 		name = "VIA HD Audio";
 		vers = "HDA";
+		break;
+	case 0x80862668:
+		name = "Intel HD Audio";
+		vers = "ICH6";
+		break;
+	case 0x808627d8:
+		name = "Intel HD Audio";
+		vers = "ICH7";
+		break;
+	case 0x8086284b:
+		name = "Intel HD Audio";
+		vers = "ICH8";
+		break;
+	case 0x8086293e:
+		name = "Intel HD Audio";
+		vers = "ICH9";
+		break;
+	case 0x80863a3e:
+		name = "Intel HD Audio";
+		vers = "ICH10";
 		break;
 	}
 	/* set device information */
@@ -414,7 +414,7 @@ audiohd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* High-level interrupt isn't supported by this driver */
 	if (ddi_intr_hilevel(dip, 0) != 0) {
-		audio_dev_warn(statep->adev,
+		cmn_err(CE_WARN,
 		    "unsupported high level interrupt");
 		return (DDI_FAILURE);
 	}
@@ -425,7 +425,7 @@ audiohd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* interrupt cookie and initialize mutex */
 	if (audiohd_init_state(statep, dip) != DDI_SUCCESS) {
-		audio_dev_warn(statep->adev,
+		cmn_err(CE_WARN,
 		    "audiohd_init_state failed");
 		goto error;
 	}
@@ -682,10 +682,8 @@ audiohd_free_path(audiohd_state_t *statep)
 static void
 audiohd_destroy(audiohd_state_t *statep)
 {
-	mutex_enter(&statep->hda_mutex);
 	audiohd_stop_dma(statep);
 	audiohd_disable_intr(statep);
-	mutex_exit(&statep->hda_mutex);
 	if (statep->intr_added) {
 		audiohd_rem_intrs(statep);
 	}
@@ -2294,7 +2292,7 @@ audiohd_init_state(audiohd_state_t *statep, dev_info_t *dip)
 	statep->hda_rirb_rp = 0;
 
 	if ((adev = audio_dev_alloc(dip, 0)) == NULL) {
-		audio_dev_warn(statep->adev,
+		cmn_err(CE_WARN,
 		    "unable to allocate audio dev");
 		return (DDI_FAILURE);
 	}
@@ -2764,7 +2762,6 @@ audiohd_init_controller(audiohd_state_t *statep)
 static void
 audiohd_fini_controller(audiohd_state_t *statep)
 {
-	audiohd_stop_dma(statep);
 	audiohd_release_dma_mem(&statep->hda_dma_rirb);
 	audiohd_release_dma_mem(&statep->hda_dma_corb);
 
@@ -3134,6 +3131,14 @@ audiohd_set_codec_info(hda_codec_t *codec)
 	case 0x10134206:
 		(void) snprintf(buf, sizeof (buf), "Cirrus HD codec: CS4206");
 		break;
+	case 0x10de0002:
+		(void) snprintf(buf, sizeof (buf),
+		    "nVidia HD codec: MCP78 HDMI");
+		break;
+	case 0x10de0007:
+		(void) snprintf(buf, sizeof (buf),
+		    "nVidia HD codec: MCP7A HDMI");
+		break;
 	case 0x10ec0260:
 		(void) snprintf(buf, sizeof (buf), "Realtek HD codec: ALC260");
 		break;
@@ -3152,7 +3157,7 @@ audiohd_set_codec_info(hda_codec_t *codec)
 	case 0x10ec0663:
 		(void) snprintf(buf, sizeof (buf), "Realtek HD codec: ALC663");
 		break;
-	case 0x10ec861:
+	case 0x10ec0861:
 		(void) snprintf(buf, sizeof (buf), "Realtek HD codec: ALC861");
 		break;
 	case 0x10ec0862:
@@ -3173,19 +3178,9 @@ audiohd_set_codec_info(hda_codec_t *codec)
 	case 0x10ec0888:
 		(void) snprintf(buf, sizeof (buf), "Realtek HD codec: ALC888");
 		break;
-	case 0x10de0002:
+	case 0x111d76b2:
 		(void) snprintf(buf, sizeof (buf),
-		    "nVidia HD codec: MCP78 HDMI");
-		break;
-	case 0x10de0007:
-		(void) snprintf(buf, sizeof (buf),
-		    "nVidia HD codec: MCP7A HDMI");
-		break;
-	case 0x13f69880:
-		(void) snprintf(buf, sizeof (buf), "CMedia HD codec: CMI19880");
-		break;
-	case 0x434d4980:
-		(void) snprintf(buf, sizeof (buf), "CMedia HD codec: CMI19880");
+		    "Integrated Devices HD codec: 92HD71B7");
 		break;
 	case 0x11d4194a:
 		(void) snprintf(buf, sizeof (buf),
@@ -3215,6 +3210,9 @@ audiohd_set_codec_info(hda_codec_t *codec)
 		(void) snprintf(buf, sizeof (buf),
 		    "Analog Devices HD codec: AD1988B");
 		break;
+	case 0x13f69880:
+		(void) snprintf(buf, sizeof (buf), "CMedia HD codec: CMI19880");
+		break;
 	case 0x14f15045:
 		(void) snprintf(buf, sizeof (buf),
 		    "Conexant HD codec: CX20549");
@@ -3223,52 +3221,11 @@ audiohd_set_codec_info(hda_codec_t *codec)
 		(void) snprintf(buf, sizeof (buf),
 		    "Conexant HD codec: CX20561");
 		break;
+	case 0x434d4980:
+		(void) snprintf(buf, sizeof (buf), "CMedia HD codec: CMI19880");
+		break;
 	case 0x80862802:
 		(void) snprintf(buf, sizeof (buf), "Intel HD codec: HDMI");
-		break;
-	case 0x83847690:
-		(void) snprintf(buf, sizeof (buf),
-		    "Sigmatel HD codec: STAC9200");
-		break;
-	case 0x838476a0:
-		(void) snprintf(buf, sizeof (buf),
-		    "Sigmatel HD codec: STAC9205");
-		break;
-	case 0x838476a1:
-		(void) snprintf(buf, sizeof (buf),
-		    "Sigmatel HD codec: STAC9205D");
-		break;
-	case 0x838476a2:
-		(void) snprintf(buf, sizeof (buf),
-		    "Sigmatel HD codec: STAC9204");
-		break;
-	case 0x838476a3:
-		(void) snprintf(buf, sizeof (buf),
-		    "Sigmatel HD codec: STAC9204D");
-		break;
-	case 0x83847880:
-		(void) snprintf(buf, sizeof (buf),
-		    "Sigmatel HD codec: STAC9220 A1");
-		break;
-	case 0x83847882:
-		(void) snprintf(buf, sizeof (buf),
-		    "Sigmatel HD codec: STAC9220 A2");
-		break;
-	case 0x83847680:
-		(void) snprintf(buf, sizeof (buf),
-		    "Sigmatel HD codec: STAC9221 A1");
-		break;
-	case 0x83847681:
-		(void) snprintf(buf, sizeof (buf),
-		    "Sigmatel HD codec: STAC9220 D");
-		break;
-	case 0x83847682:
-		(void) snprintf(buf, sizeof (buf),
-		    "Sigmatel HD codec: STAC9221");
-		break;
-	case 0x83847683:
-		(void) snprintf(buf, sizeof (buf),
-		    "Sigmatel HD codec: STAC9221D");
 		break;
 	case 0x83847610:
 		(void) snprintf(buf, sizeof (buf),
@@ -3309,22 +3266,6 @@ audiohd_set_codec_info(hda_codec_t *codec)
 	case 0x83847619:
 		(void) snprintf(buf, sizeof (buf),
 		    "Sigmatel HD codec: STAC9227D");
-		break;
-	case 0x838476a4:
-		(void) snprintf(buf, sizeof (buf),
-		    "Sigmatel HD codec: STAC9255");
-		break;
-	case 0x838476a5:
-		(void) snprintf(buf, sizeof (buf),
-		    "Sigmatel HD codec: STAC9255D");
-		break;
-	case 0x838476a6:
-		(void) snprintf(buf, sizeof (buf),
-		    "Sigmatel HD codec: STAC9254");
-		break;
-	case 0x838476a7:
-		(void) snprintf(buf, sizeof (buf),
-		    "Sigmatel HD codec: STAC9254D");
 		break;
 	case 0x83847620:
 		(void) snprintf(buf, sizeof (buf),
@@ -3374,6 +3315,66 @@ audiohd_set_codec_info(hda_codec_t *codec)
 		(void) snprintf(buf, sizeof (buf),
 		    "Sigmatel HD codec: STAC9872K");
 		break;
+	case 0x83847680:
+		(void) snprintf(buf, sizeof (buf),
+		    "Sigmatel HD codec: STAC9221 A1");
+		break;
+	case 0x83847681:
+		(void) snprintf(buf, sizeof (buf),
+		    "Sigmatel HD codec: STAC9220 D");
+		break;
+	case 0x83847682:
+		(void) snprintf(buf, sizeof (buf),
+		    "Sigmatel HD codec: STAC9221");
+		break;
+	case 0x83847683:
+		(void) snprintf(buf, sizeof (buf),
+		    "Sigmatel HD codec: STAC9221D");
+		break;
+	case 0x83847690:
+		(void) snprintf(buf, sizeof (buf),
+		    "Sigmatel HD codec: STAC9200");
+		break;
+	case 0x838476a0:
+		(void) snprintf(buf, sizeof (buf),
+		    "Sigmatel HD codec: STAC9205");
+		break;
+	case 0x838476a1:
+		(void) snprintf(buf, sizeof (buf),
+		    "Sigmatel HD codec: STAC9205D");
+		break;
+	case 0x838476a2:
+		(void) snprintf(buf, sizeof (buf),
+		    "Sigmatel HD codec: STAC9204");
+		break;
+	case 0x838476a3:
+		(void) snprintf(buf, sizeof (buf),
+		    "Sigmatel HD codec: STAC9204D");
+		break;
+	case 0x838476a4:
+		(void) snprintf(buf, sizeof (buf),
+		    "Sigmatel HD codec: STAC9255");
+		break;
+	case 0x838476a5:
+		(void) snprintf(buf, sizeof (buf),
+		    "Sigmatel HD codec: STAC9255D");
+		break;
+	case 0x838476a6:
+		(void) snprintf(buf, sizeof (buf),
+		    "Sigmatel HD codec: STAC9254");
+		break;
+	case 0x838476a7:
+		(void) snprintf(buf, sizeof (buf),
+		    "Sigmatel HD codec: STAC9254D");
+		break;
+	case 0x83847880:
+		(void) snprintf(buf, sizeof (buf),
+		    "Sigmatel HD codec: STAC9220 A1");
+		break;
+	case 0x83847882:
+		(void) snprintf(buf, sizeof (buf),
+		    "Sigmatel HD codec: STAC9220 A2");
+		break;
 	default:
 		(void) snprintf(buf, sizeof (buf),
 		    "Unknown HD codec: 0x%x", codec->vid);
@@ -3410,8 +3411,10 @@ audiohd_create_codec(audiohd_state_t *statep)
 		codec->vid = audioha_codec_verb_get(statep, i,
 		    AUDIOHDC_NODE_ROOT, AUDIOHDC_VERB_GET_PARAM,
 		    AUDIOHDC_PAR_VENDOR_ID);
-		if (codec->vid == (uint32_t)(-1))
+		if (codec->vid == (uint32_t)(-1)) {
+			kmem_free(codec, sizeof (hda_codec_t));
 			continue;
+		}
 
 		codec->revid =
 		    audioha_codec_verb_get(statep, i,
@@ -5457,9 +5460,6 @@ audiohd_free_port(audiohd_state_t *statep)
 	int			i;
 	audiohd_port_t		*port;
 
-	if (statep == NULL) {
-		return;
-	}
 	for (i = 0; i < PORT_MAX; i++) {
 		port = statep->port[i];
 		if (port == NULL)

@@ -32,14 +32,15 @@ extern "C" {
 /*
  * vendor IDs of PCI audio controllers
  */
-#define	AUDIOHD_VID_INTEL	0x8086
 #define	AUDIOHD_VID_ATI		0x1002
 #define	AUDIOHD_VID_CIRRUS	0x1013
 #define	AUDIOHD_VID_NVIDIA	0x10de
 #define	AUDIOHD_VID_REALTEK	0x10ec
+#define	AUDIOHD_VID_IDT		0x111d
 #define	AUDIOHD_VID_ANALOG	0x11d4
 #define	AUDIOHD_VID_CONEXANT	0x14f1
 #define	AUDIOHD_VID_SIGMATEL	0x8384
+#define	AUDIOHD_VID_INTEL	0x8086
 
 /*
  * specific audiohd controller device id
