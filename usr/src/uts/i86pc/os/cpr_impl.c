@@ -1018,7 +1018,18 @@ i_cpr_alloc_cpus(void)
 void
 i_cpr_free_cpus(void)
 {
+	int index;
+	wc_cpu_t *wc_cpu;
+
 	if (wc_other_cpus != NULL) {
+		for (index = 0; index < ncpus; index++) {
+			wc_cpu = wc_other_cpus + index;
+			if (wc_cpu->wc_saved_stack != NULL) {
+				kmem_free(wc_cpu->wc_saved_stack,
+				    wc_cpu->wc_saved_stack_size);
+			}
+		}
+
 		kmem_free((void *) wc_other_cpus, ncpus * sizeof (wc_cpu_t));
 		wc_other_cpus = NULL;
 	}
