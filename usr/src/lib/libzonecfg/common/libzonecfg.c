@@ -290,7 +290,7 @@ zonecfg_init_handle(void)
 	}
 
 	/* generic libxml initialization */
-	xmlLineNumbersDefault(1);
+	(void) xmlLineNumbersDefault(1);
 	xmlLoadExtDtdDefaultValue |= XML_DETECT_IDS;
 	xmlDoValidityCheckingDefaultValue = 1;
 	(void) xmlKeepBlanksDefault(0);
