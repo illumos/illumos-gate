@@ -730,7 +730,7 @@ extern dev_info_t	*scsi_vhci_dip;
 	(es)->es_add_code == 0x25 &&		\
 	(es)->es_qual_code == 0x0)
 
-#define	FCP_VERSION		"20091109-1.191"
+#define	FCP_VERSION		"20091208-1.192"
 #define	FCP_NAME_VERSION	"SunFC FCP v" FCP_VERSION
 
 #define	FCP_NUM_ELEMENTS(array)			\
@@ -13414,8 +13414,14 @@ fcp_remove_child(struct fcp_lun *plun)
 			mutex_exit(&plun->lun_mutex);
 			mutex_exit(&plun->lun_tgt->tgt_mutex);
 			mutex_exit(&plun->lun_tgt->tgt_port->port_mutex);
+
 			mdi_devi_enter(
 			    plun->lun_tgt->tgt_port->port_dip, &circ);
+
+			/*
+			 * Exit phci to avoid deadlock with power management
+			 * code during mdi_pi_offline
+			 */
 			mdi_hold_path(PIP(plun->lun_cip));
 			mdi_devi_exit_phci(
 			    plun->lun_tgt->tgt_port->port_dip, circ);
@@ -13424,14 +13430,17 @@ fcp_remove_child(struct fcp_lun *plun)
 			mdi_devi_enter_phci(
 			    plun->lun_tgt->tgt_port->port_dip, &circ);
 			mdi_rele_path(PIP(plun->lun_cip));
-			mdi_devi_exit_phci(
+
+			mdi_devi_exit(
 			    plun->lun_tgt->tgt_port->port_dip, circ);
+
 			FCP_TRACE(fcp_logq,
 			    plun->lun_tgt->tgt_port->port_instbuf,
 			    fcp_trace, FCP_BUF_LEVEL_3, 0,
 			    "lun=%p pip freed %p", plun, plun->lun_cip);
 			(void) mdi_prop_remove(PIP(plun->lun_cip), NULL);
 			(void) mdi_pi_free(PIP(plun->lun_cip), 0);
+
 			mutex_enter(&plun->lun_tgt->tgt_port->port_mutex);
 			mutex_enter(&plun->lun_tgt->tgt_mutex);
 			mutex_enter(&plun->lun_mutex);
