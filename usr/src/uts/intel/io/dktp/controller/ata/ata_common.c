@@ -1678,13 +1678,17 @@ ata_id_common(
 		}
 		/*
 		 * Give the drive another second to assert DRQ. Some older
-		 * drives de-assert BSY before asserting DRQ.
+		 * drives de-assert BSY before asserting DRQ. Bail out
+		 * immediately if the status becomes 0x7f, which is invalid
+		 * value. It can happen when no drive is present.
 		 */
-		if (!ata_wait(io_hdl2, ioaddr2, ATS_DRQ, ATS_BSY, 1000000)) {
-		ADBG_WARN(("ata_id_common: !DRQ status 0x%x error 0x%x\n",
-		    ddi_get8(io_hdl2, (uchar_t *)ioaddr2 +AT_ALTSTATUS),
-		    ddi_get8(io_hdl1, (uchar_t *)ioaddr1 + AT_ERROR)));
-		return (FALSE);
+		if (!ata_wait3(io_hdl2, ioaddr2, ATS_DRQ, ATS_BSY, 0x7f,
+		    ATS_BSY, 0x7f, ATS_BSY, 1000000)) {
+			ADBG_WARN(("ata_id_common: "
+			    "!DRQ status 0x%x error 0x%x\n",
+			    ddi_get8(io_hdl2, (uchar_t *)ioaddr2 +AT_ALTSTATUS),
+			    ddi_get8(io_hdl1, (uchar_t *)ioaddr1 + AT_ERROR)));
+			return (FALSE);
 		}
 	}
 
@@ -1701,16 +1705,19 @@ ata_id_common(
 	/*
 	 * Wait for the drive to recognize I've read all the data.
 	 * Some drives have been observed to take as much as 3msec to
-	 * deassert DRQ after reading the data; allow 10 msec just in case.
+	 * deassert DRQ after reading the data; allow 1 sec just in case.
 	 *
 	 * Note: some non-compliant ATAPI drives (e.g., NEC Multispin 6V,
 	 * CDR-1350A) don't assert DRDY. If we've made it this far we can
 	 * safely ignore the DRDY bit since the ATAPI Packet command
 	 * actually doesn't require it to ever be asserted.
 	 *
+	 * Bail out immediately if the status becomes 0x7f, which is invalid
+	 * value. It can happen when no drive is present.
+	 *
 	 */
-	if (!ata_wait(io_hdl2, ioaddr2, (uchar_t)(expect_drdy ? ATS_DRDY : 0),
-	    (ATS_BSY | ATS_DRQ), 1000000)) {
+	if (!ata_wait3(io_hdl2, ioaddr2, (uchar_t)(expect_drdy ? ATS_DRDY : 0),
+	    (ATS_BSY | ATS_DRQ), 0x7f, ATS_BSY, 0x7f, ATS_BSY, 1000000)) {
 		ADBG_WARN(("ata_id_common: bad status 0x%x error 0x%x\n",
 		    ddi_get8(io_hdl2, (uchar_t *)ioaddr2 + AT_ALTSTATUS),
 		    ddi_get8(io_hdl1, (uchar_t *)ioaddr1 + AT_ERROR)));
