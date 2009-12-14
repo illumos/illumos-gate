@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,8 +30,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/isa_defs.h>
@@ -65,8 +63,6 @@
  * we don't expect any major performance impact due to the extra kmem_alloc's
  * and copying done in this routine.
  */
-
-#define	MAXGETDENTS_SIZE	(64 * 1024)
 
 /*
  * Native 32-bit system call for non-large-file applications.

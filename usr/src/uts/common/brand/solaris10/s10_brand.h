@@ -64,6 +64,7 @@ extern "C" {
 #define	B_S10_TRUSS_POINT	129
 #define	B_S10_NATIVE		130
 #define	B_S10_FSREGCORRECTION	131
+#define	B_S10_ISFDXATTRDIR	132
 
 /*
  * Versioning flags

@@ -25,6 +25,8 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <dirent.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -52,6 +54,7 @@
 #include <sys/ucontext.h>
 #include <sys/mntio.h>
 #include <sys/mnttab.h>
+#include <sys/attr.h>
 #include <atomic.h>
 
 #include <s10_brand.h>
@@ -988,6 +991,188 @@ s10_pwrite64(sysret_t *rval, int fd, const void *bufferp, size32_t num_bytes,
 }
 #endif	/* !_LP64 */
 
+/*
+ * These are convenience macros that s10_getdents_common() uses.  Both treat
+ * their arguments, which should be character pointers, as dirent pointers or
+ * dirent64 pointers and yield their d_name and d_reclen fields.  These
+ * macros shouldn't be used outside of s10_getdents_common().
+ */
+#define	dirent_name(charptr)	((charptr) + name_offset)
+#define	dirent_reclen(charptr)	\
+	(*(unsigned short *)(uintptr_t)((charptr) + reclen_offset))
+
+/*
+ * This function contains code that is common to both s10_getdents() and
+ * s10_getdents64().  See the comment above s10_getdents() for details.
+ *
+ * rval, fd, buf, and nbyte should be passed unmodified from s10_getdents()
+ * and s10_getdents64().  getdents_syscall_id should be either SYS_getdents
+ * or SYS_getdents64.  name_offset should be the the byte offset of
+ * the d_name field in the dirent structures passed to the kernel via the
+ * syscall represented by getdents_syscall_id.  reclen_offset should be
+ * the byte offset of the d_reclen field in the aforementioned dirent
+ * structures.
+ */
+static int
+s10_getdents_common(sysret_t *rval, int fd, char *buf, size_t nbyte,
+    int getdents_syscall_id, size_t name_offset, size_t reclen_offset)
+{
+	int err;
+	size_t buf_size;
+	char *local_buf;
+	char *buf_current;
+
+	/*
+	 * Use a special brand operation, B_S10_ISFDXATTRDIR, to determine
+	 * whether the specified file descriptor refers to an extended file
+	 * attribute directory.  If it doesn't, then SYS_getdents won't
+	 * reveal extended file attributes, in which case we can simply
+	 * hand the syscall to the native kernel.
+	 */
+	if ((err = __systemcall(rval, SYS_brand + 1024, B_S10_ISFDXATTRDIR,
+	    fd)) != 0)
+		return (err);
+	if (rval->sys_rval1 == 0)
+		return (__systemcall(rval, getdents_syscall_id + 1024, fd, buf,
+		    nbyte));
+
+	/*
+	 * The file descriptor refers to an extended file attributes directory.
+	 * We need to create a dirent buffer that's as large as buf into which
+	 * the native SYS_getdents will store the special extended file
+	 * attribute directory's entries.  We can't dereference buf because
+	 * it might be an invalid pointer!
+	 */
+	if (nbyte > MAXGETDENTS_SIZE)
+		nbyte = MAXGETDENTS_SIZE;
+	local_buf = (char *)malloc(nbyte);
+	if (local_buf == NULL) {
+		/*
+		 * getdents(2) doesn't return an error code indicating a memory
+		 * allocation error and it doesn't make sense to return any of
+		 * its documented error codes for a malloc(3C) failure.  We'll
+		 * use ENOMEM even though getdents(2) doesn't use it because it
+		 * best describes the failure.
+		 */
+		(void) S10_TRUSS_POINT_3(rval, getdents_syscall_id, ENOMEM, fd,
+		    buf, nbyte);
+		rval->sys_rval1 = -1;
+		rval->sys_rval2 = 0;
+		return (EIO);
+	}
+
+	/*
+	 * Issue a native SYS_getdents syscall but use our local dirent buffer
+	 * instead of buf.  This will allow us to examine the returned dirent
+	 * structures immediately and copy them to buf later.  That way the
+	 * calling process won't be able to see the dirent structures until
+	 * we finish examining them.
+	 */
+	if ((err = __systemcall(rval, getdents_syscall_id + 1024, fd, local_buf,
+	    nbyte)) != 0) {
+		free(local_buf);
+		return (err);
+	}
+	buf_size = rval->sys_rval1;
+	if (buf_size == 0) {
+		free(local_buf);
+		return (0);
+	}
+
+	/*
+	 * Look for SUNWattr_ro (VIEW_READONLY) and SUNWattr_rw
+	 * (VIEW_READWRITE) in the directory entries and remove them
+	 * from the dirent buffer.
+	 */
+	for (buf_current = local_buf;
+	    (size_t)(buf_current - local_buf) < buf_size; /* cstyle */) {
+		if (strcmp(dirent_name(buf_current), VIEW_READONLY) != 0 &&
+		    strcmp(dirent_name(buf_current), VIEW_READWRITE) != 0) {
+			/*
+			 * The dirent refers to an attribute that should
+			 * be visible to Solaris 10 processes.  Keep it
+			 * and examine the next entry in the buffer.
+			 */
+			buf_current += dirent_reclen(buf_current);
+		} else {
+			/*
+			 * We found either SUNWattr_ro (VIEW_READONLY)
+			 * or SUNWattr_rw (VIEW_READWRITE).  Remove it
+			 * from the dirent buffer by decrementing
+			 * buf_size by the size of the entry and
+			 * overwriting the entry with the remaining
+			 * entries.
+			 */
+			buf_size -= dirent_reclen(buf_current);
+			(void) memmove(buf_current, buf_current +
+			    dirent_reclen(buf_current), buf_size -
+			    (size_t)(buf_current - local_buf));
+		}
+	}
+
+	/*
+	 * Copy local_buf into buf so that the calling process can see
+	 * the results.
+	 */
+	if ((err = s10_uucopy(local_buf, buf, buf_size)) != 0) {
+		free(local_buf);
+		rval->sys_rval1 = -1;
+		rval->sys_rval2 = 0;
+		return (err);
+	}
+	rval->sys_rval1 = buf_size;
+	free(local_buf);
+	return (0);
+}
+
+/*
+ * Solaris Next added two special extended file attributes, SUNWattr_ro and
+ * SUNWattr_rw, which are called "extended system attributes".  They have
+ * special semantics (e.g., a process cannot unlink SUNWattr_ro) and should
+ * not appear in solaris10-branded zones because no Solaris 10 applications,
+ * including system commands such as tar(1), are coded to correctly handle these
+ * special attributes.
+ *
+ * This emulation function solves the aforementioned problem by emulating
+ * the getdents(2) syscall and filtering both system attributes out of resulting
+ * directory entry lists.  The emulation function only filters results when
+ * the given file descriptor refers to an extended file attribute directory.
+ * Filtering getdents(2) results is expensive because it requires dynamic
+ * memory allocation; however, the performance cost is tolerable because
+ * we don't expect Solaris 10 processes to frequently examine extended file
+ * attribute directories.
+ *
+ * The brand's emulation library needs two getdents(2) emulation functions
+ * because getdents(2) comes in two flavors: non-largefile-aware getdents(2)
+ * and largefile-aware getdents64(2).  s10_getdents() handles the non-largefile-
+ * aware case for 32-bit processes and all getdents(2) syscalls for 64-bit
+ * processes (64-bit processes use largefile-aware interfaces by default).
+ * See s10_getdents64() below for the largefile-aware getdents64(2) emulation
+ * function for 32-bit processes.
+ */
+static int
+s10_getdents(sysret_t *rval, int fd, struct dirent *buf, size_t nbyte)
+{
+	return (s10_getdents_common(rval, fd, (char *)buf, nbyte, SYS_getdents,
+	    offsetof(struct dirent, d_name),
+	    offsetof(struct dirent, d_reclen)));
+}
+
+#ifndef	_LP64
+/*
+ * This is the largefile-aware version of getdents(2) for 32-bit processes.
+ * This exists for the same reason that s10_getdents() exists.  See the comment
+ * above s10_getdents().
+ */
+static int
+s10_getdents64(sysret_t *rval, int fd, struct dirent64 *buf, size_t nbyte)
+{
+	return (s10_getdents_common(rval, fd, (char *)buf, nbyte,
+	    SYS_getdents64, offsetof(struct dirent64, d_name),
+	    offsetof(struct dirent64, d_reclen)));
+}
+#endif	/* !_LP64 */
+
 #define	S10_AC_PROC		(0x1 << 28)
 #define	S10_AC_TASK		(0x2 << 28)
 #define	S10_AC_FLOW		(0x4 << 28)
@@ -1855,7 +2040,7 @@ s10_sysent_table_t s10_sysent_table[] = {
 	NOSYS,					/*  78 */
 	NOSYS,					/*  79 */
 	NOSYS,					/*  80 */
-	NOSYS,					/*  81 */
+	EMULATE(s10_getdents, 3 | RV_DEFAULT),	/*  81 */
 	NOSYS,					/*  82 */
 	NOSYS,					/*  83 */
 	NOSYS,					/*  84 */
@@ -1995,7 +2180,11 @@ s10_sysent_table_t s10_sysent_table[] = {
 	EMULATE(s10_lwp_mutex_timedlock, 2 | RV_DEFAULT),	/* 210 */
 	NOSYS,					/* 211 */
 	NOSYS,					/* 212 */
+#ifdef	_LP64
 	NOSYS,					/* 213 */
+#else	/* !_LP64 */
+	EMULATE(s10_getdents64, 3 | RV_DEFAULT), /* 213 */
+#endif	/* !_LP64 */
 	NOSYS,					/* 214 */
 	NOSYS,					/* 215 */
 	NOSYS,					/* 216 */

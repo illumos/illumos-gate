@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,14 +23,12 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_DIRENT_H
 #define	_SYS_DIRENT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 11.11 */
 
 #include <sys/feature_tests.h>
 
@@ -87,6 +84,12 @@ typedef struct dirent64 {
 #define	DIRENT32_NAMELEN(reclen)	\
 	((reclen) - (offsetof(dirent32_t, d_name[0])))
 #endif
+
+/*
+ * This is the maximum number of bytes that getdents(2) will store in
+ * user-supplied dirent buffers.
+ */
+#define	MAXGETDENTS_SIZE	(64 * 1024)
 
 #if !defined(_KERNEL)
 

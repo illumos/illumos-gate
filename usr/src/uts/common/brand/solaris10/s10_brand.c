@@ -25,6 +25,7 @@
 
 #include <sys/errno.h>
 #include <sys/exec.h>
+#include <sys/file.h>
 #include <sys/kmem.h>
 #include <sys/modctl.h>
 #include <sys/model.h>
@@ -376,6 +377,24 @@ s10_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		 *    arg2: errno
 		 */
 		return ((arg2 == 0) ? 0 : set_errno((uint_t)arg2));
+
+	case B_S10_ISFDXATTRDIR: {
+		/*
+		 * This subcommand enables the userland brand emulation library
+		 * to determine whether a file descriptor refers to an extended
+		 * file attributes directory.  There is no standard syscall or
+		 * libc function that can make such a determination.
+		 */
+		file_t *dir_filep;
+
+		dir_filep = getf((int)arg1);
+		if (dir_filep == NULL)
+			return (EBADF);
+		ASSERT(dir_filep->f_vnode != NULL);
+		*rval = IS_XATTRDIR(dir_filep->f_vnode);
+		releasef((int)arg1);
+		return (0);
+	}
 
 #ifdef	__amd64
 	case B_S10_FSREGCORRECTION:
@@ -934,6 +953,7 @@ _init(void)
 	s10_emulation_table[SYS_execve] = 1;			/*  59 */
 	s10_emulation_table[SYS_acctctl] = 1;			/*  71 */
 	s10_emulation_table[S10_SYS_issetugid] = 1;		/*  75 */
+	s10_emulation_table[SYS_getdents] = 1;			/*  81 */
 	s10_emulation_table[SYS_uname] = 1;			/* 135 */
 	s10_emulation_table[SYS_systeminfo] = 1;		/* 139 */
 #ifdef	__amd64
@@ -944,6 +964,7 @@ _init(void)
 	s10_emulation_table[SYS_auditsys] = 1;			/* 186 */
 	s10_emulation_table[SYS_sigqueue] = 1;			/* 190 */
 	s10_emulation_table[SYS_lwp_mutex_timedlock] = 1;	/* 210 */
+	s10_emulation_table[SYS_getdents64] = 1;		/* 213 */
 	s10_emulation_table[SYS_pwrite64] = 1;			/* 223 */
 	s10_emulation_table[SYS_zone] = 1;			/* 227 */
 	s10_emulation_table[SYS_lwp_mutex_trylock] = 1;		/* 251 */
