@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -581,7 +581,7 @@ ntwdt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	cyc_handler_t		*hdlr = NULL;
 
 	NTWDT_DBG(WDT_DBG_ENTRY, ("attach: dip/cmd: 0x%p/%d",
-	    dip, cmd));
+	    (void *)dip, cmd));
 
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -599,7 +599,7 @@ ntwdt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	/* (unsolicitedly) send SWDT state to ScApp via mailbox */
-	ntwdt_set_swdt_state();
+	(void) ntwdt_set_swdt_state();
 
 	instance = ddi_get_instance(dip);
 	ASSERT(instance == 0);
@@ -690,7 +690,7 @@ err4:
 	ntwdt_remove_callbacks();
 	ddi_remove_softintr(ntwdt_cyclic_softint_id);
 err3:
-	ntwdt_remove_mbox_handlers();
+	(void) ntwdt_remove_mbox_handlers();
 err2:
 	mutex_destroy(&wdog_state->ntwdt_event_lock);
 	mutex_destroy(&wdog_state->ntwdt_wdog_mutex);
@@ -793,7 +793,7 @@ ntwdt_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	ntwdt_state_t	*ntwdt_ptr = NULL;
 
 	NTWDT_DBG(WDT_DBG_ENTRY, ("detach: dip/cmd: 0x%p/%d",
-	    dip, cmd));
+	    (void *)dip, cmd));
 
 	ntwdt_ptr = ddi_get_soft_state(ntwdt_statep, instance);
 	if (ntwdt_ptr == NULL) {
@@ -813,11 +813,11 @@ ntwdt_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 		ntwdt_stop_timer_lock((void *)ntwdt_ptr);
 
-		ntwdt_remove_callbacks(ntwdt_ptr);
+		ntwdt_remove_callbacks();
 
 		ddi_remove_softintr(ntwdt_cyclic_softint_id);
 
-		ntwdt_remove_mbox_handlers();
+		(void) ntwdt_remove_mbox_handlers();
 
 		mutex_destroy(&ntwdt_ptr->ntwdt_wdog_state->ntwdt_event_lock);
 		mutex_destroy(&ntwdt_ptr->ntwdt_wdog_state->ntwdt_wdog_mutex);
@@ -976,7 +976,7 @@ ntwdt_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	ntwdt_state_t	*ntwdt_ptr = getstate(inst);
 
 	NTWDT_DBG(WDT_DBG_ENTRY, ("open: inst/soft: %d/0x%p",
-	    inst, ntwdt_ptr));
+	    inst, (void *)ntwdt_ptr));
 
 	/* ensure caller is a privileged process */
 	if (drv_priv(credp) != 0)
@@ -1022,7 +1022,7 @@ ntwdt_close(dev_t dev, int flag, int otyp, cred_t *credp)
 	ntwdt_state_t	*ntwdt_ptr = getstate(inst);
 
 	NTWDT_DBG(WDT_DBG_ENTRY, ("close: inst/soft: %d/0x%p",
-	    inst, ntwdt_ptr));
+	    inst, (void *)ntwdt_ptr));
 
 	if (ntwdt_ptr == NULL)
 		return (ENXIO);
@@ -1175,14 +1175,14 @@ ntwdt_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 			ntwdt_swdt_to_awdt(wdog_state);
 
 			/* Tell ScApp we're in AWDT mode */
-			ntwdt_set_cfgvar(LW8_WDT_PROP_MODE,
+			(void) ntwdt_set_cfgvar(LW8_WDT_PROP_MODE,
 			    LW8_PROP_MODE_AWDT);
 		}
 
 		/* Inform ScApp of the choices made by the app */
-		ntwdt_set_cfgvar(LW8_WDT_PROP_WDT,
+		(void) ntwdt_set_cfgvar(LW8_WDT_PROP_WDT,
 		    wdog_state->ntwdt_wdog_enabled);
-		ntwdt_set_cfgvar(LW8_WDT_PROP_RECOV,
+		(void) ntwdt_set_cfgvar(LW8_WDT_PROP_RECOV,
 		    wdog_state->ntwdt_reset_enabled);
 
 		if (wdog_state->ntwdt_wdog_enabled != 0 &&
@@ -1197,7 +1197,7 @@ ntwdt_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 			 * while Solaris is running, as ScApp will read
 			 * a zero and not assume SWDT is running.
 			 */
-			ntwdt_set_hw_timeout(0);
+			(void) ntwdt_set_hw_timeout(0);
 
 			/* "the first watchdog-enable has been seen" */
 			wdog_state->ntwdt_is_initial_enable = 1;
@@ -1243,7 +1243,7 @@ ntwdt_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		}
 
 		/* Tell ScApp of the specified timeout */
-		ntwdt_set_cfgvar(LW8_WDT_PROP_TO, lom_dogtime);
+		(void) ntwdt_set_cfgvar(LW8_WDT_PROP_TO, lom_dogtime);
 
 		mutex_exit(&wdog_state->ntwdt_wdog_mutex);
 		break;
@@ -1506,7 +1506,7 @@ ntwdt_cyclic_softint(char *arg)
 		}
 
 		/* Schedule Callout to stop this Cyclic */
-		timeout(ntwdt_stop_timer_lock, ntwdt_ptr, 0);
+		(void) timeout(ntwdt_stop_timer_lock, ntwdt_ptr, 0);
 
 	} else {
 		_NOTE(EMPTY)
@@ -1543,7 +1543,7 @@ ntwdt_reprogram_wd(ntwdt_state_t *ntwdt_ptr)
 	    wdog_state->ntwdt_reset_enabled != 0 &&
 	    wdog_state->ntwdt_timer_running != 0) {
 		if (ddi_in_panic() != 0)
-			ntwdt_set_cfgvar_noreply(LW8_WDT_PROP_TO,
+			(void) ntwdt_set_cfgvar_noreply(LW8_WDT_PROP_TO,
 			    wdog_state->ntwdt_boot_timeout);
 		else
 			(void) ntwdt_set_cfgvar(LW8_WDT_PROP_TO,
@@ -1661,7 +1661,7 @@ ntwdt_add_callbacks(ntwdt_state_t *ntwdt_ptr)
 static void
 ntwdt_remove_callbacks()
 {
-	callb_delete(ntwdt_callback_ids.ntwdt_panic_cb);
+	(void) callb_delete(ntwdt_callback_ids.ntwdt_panic_cb);
 }
 
 /*
@@ -1743,7 +1743,7 @@ ntwdt_set_swdt_state()
 	 * note that ScApp only needs this one
 	 * variable when system is in SWDT mode.
 	 */
-	ntwdt_set_cfgvar(LW8_WDT_PROP_MODE,
+	(void) ntwdt_set_cfgvar(LW8_WDT_PROP_MODE,
 	    LW8_PROP_MODE_SWDT);
 
 	return (0);
@@ -1764,13 +1764,13 @@ static int
 ntwdt_set_awdt_state(ntwdt_wdog_t *rstatep)
 {
 	/* ScApp expects values in this order: */
-	ntwdt_set_cfgvar(LW8_WDT_PROP_MODE,
+	(void) ntwdt_set_cfgvar(LW8_WDT_PROP_MODE,
 	    ntwdt_watchdog_activated != 0);
-	ntwdt_set_cfgvar(LW8_WDT_PROP_TO,
+	(void) ntwdt_set_cfgvar(LW8_WDT_PROP_TO,
 	    rstatep->ntwdt_wdog_timeout);
-	ntwdt_set_cfgvar(LW8_WDT_PROP_RECOV,
+	(void) ntwdt_set_cfgvar(LW8_WDT_PROP_RECOV,
 	    rstatep->ntwdt_reset_enabled);
-	ntwdt_set_cfgvar(LW8_WDT_PROP_WDT,
+	(void) ntwdt_set_cfgvar(LW8_WDT_PROP_WDT,
 	    rstatep->ntwdt_wdog_enabled);
 
 	return (NTWDT_SUCCESS);
@@ -1852,7 +1852,7 @@ ntwdt_set_cfgvar(int var, int val)
 static void
 ntwdt_set_cfgvar_noreply(int var, int val)
 {
-	ntwdt_set_cfgvar(var, val);
+	(void) ntwdt_set_cfgvar(var, val);
 }
 
 #ifdef DEBUG
@@ -1996,7 +1996,7 @@ ntwdt_mbox_softint(char *arg)
 	mutex_enter(&wdog_state->ntwdt_wdog_mutex);
 
 	/* tell ScApp state of AWDT */
-	ntwdt_set_awdt_state(wdog_state);
+	(void) ntwdt_set_awdt_state(wdog_state);
 
 	mutex_exit(&wdog_state->ntwdt_wdog_mutex);
 

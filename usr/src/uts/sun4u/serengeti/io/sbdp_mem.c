@@ -326,7 +326,7 @@ sbdp_move_memory(sbdp_handle_t *hp, int t_bd)
 	 */
 	mempage = kmem_alloc(PAGESIZE, KM_SLEEP);
 
-	SBDP_DBG_MEM("mempage = 0x%p\n", mempage);
+	SBDP_DBG_MEM("mempage = 0x%p\n", (void *)mempage);
 
 	/*
 	 * Copy the code for the copy-rename routine into
@@ -339,7 +339,8 @@ sbdp_move_memory(sbdp_handle_t *hp, int t_bd)
 
 	funcp = (int (*)())mempage;
 
-	SBDP_DBG_MEM("copy-rename funcp = 0x%p (len = 0x%x)\n", funcp, funclen);
+	SBDP_DBG_MEM("copy-rename funcp = 0x%p (len = 0x%x)\n", (void *)funcp,
+	    funclen);
 
 	/*
 	 * Prepare data page that will contain script of
@@ -422,7 +423,7 @@ sbdp_move_memory(sbdp_handle_t *hp, int t_bd)
 		goto cleanup;
 	}
 
-	SBDP_DBG_MEM("copy-rename index area = 0x%p\n", indexp);
+	SBDP_DBG_MEM("copy-rename index area = 0x%p\n", (void *)indexp);
 
 	SBDP_DBG_MEM("cpu %d\n", CPU->cpu_id);
 
@@ -441,10 +442,10 @@ sbdp_move_memory(sbdp_handle_t *hp, int t_bd)
 		SBDP_DBG_MEM("Didn't find memory list\n");
 	}
 	SBDP_DBG_MEM("src\n\tbd\t%d\n\tnode\t%d\n\tbpa 0x%lx\n\tnodes\t%p\n",
-	    s_bdp->bd, s_bdp->wnode, s_bdp->bpa, s_bdp->nodes);
+	    s_bdp->bd, s_bdp->wnode, s_bdp->bpa, (void *)s_bdp->nodes);
 	sbdp_memlist_dump(s_bdp->ml);
 	SBDP_DBG_MEM("tgt\n\tbd\t%d\n\tnode\t%d\n\tbpa 0x%lx\n\tnodes\t%p\n",
-	    t_bdp->bd, t_bdp->wnode, t_bdp->bpa, t_bdp->nodes);
+	    t_bdp->bd, t_bdp->wnode, t_bdp->bpa, (void *)t_bdp->nodes);
 	sbdp_memlist_dump(t_bdp->ml);
 
 	/*
@@ -456,7 +457,7 @@ sbdp_move_memory(sbdp_handle_t *hp, int t_bd)
 		sep = &srhp->sep;
 		sbdp_set_err(hp->h_err, sep->e_code, sep->e_rsc);
 		sbdp_release_sr_handle(srhp);
-		sbdp_del_memlist(hp, mlist);
+		(void) sbdp_del_memlist(hp, mlist);
 		err = 1;
 		goto cleanup;
 	}
@@ -513,7 +514,7 @@ sbdp_move_memory(sbdp_handle_t *hp, int t_bd)
 	copytime = ddi_get_lbolt() - copytime;
 
 	sbdp_release_sr_handle(srhp);
-	sbdp_del_memlist(hp, mlist);
+	(void) sbdp_del_memlist(hp, mlist);
 
 	SBDP_DBG_MEM("copy-rename elapsed time = %ld ticks (%ld secs)\n",
 	    copytime, copytime / hz);

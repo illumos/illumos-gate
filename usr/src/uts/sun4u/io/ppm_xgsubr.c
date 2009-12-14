@@ -18,13 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 /*
  * common code for ppm drivers
@@ -112,7 +110,7 @@ ppm_open(dev_t *devp, int flag, int otyp, cred_t *cred_p)
 	if (otyp != OTYP_CHR)
 		return (EINVAL);
 	DPRINTF(D_OPEN, ("ppm_open: \"%s\", devp 0x%p, flag 0x%x, otyp %d\n",
-	    ppm_prefix, devp, flag, otyp));
+	    ppm_prefix, (void *)devp, flag, otyp));
 	return (0);
 }
 
@@ -351,7 +349,7 @@ ppm_add_dev(dev_info_t *dip, ppm_domain_t *domp)
 		domp->devlist = new;
 		DPRINTF(D_ADDDEV,
 		    ("ppm_add_dev: \"%s\", \"%s\", ppm_dev 0x%p\n",
-		    new->path, domp->name, new));
+		    new->path, domp->name, (void *)new));
 	}
 
 	ASSERT(new != NULL);
@@ -409,7 +407,7 @@ ppm_rem_dev(dev_info_t *dip)
 		}
 
 		DPRINTF(D_REMDEV, ("ppm_rem_dev: path \"%s\", ppm_dev 0x%p\n",
-		    pdp->path, pdp));
+		    pdp->path, (void *)pdp));
 
 		PPM_SET_PRIVATE(dip, NULL);
 		*devpp = pdp->next;

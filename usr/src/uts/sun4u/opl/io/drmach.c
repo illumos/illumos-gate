@@ -18,13 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <sys/debug.h>
 #include <sys/types.h>
@@ -1051,7 +1049,7 @@ drmach_board_new(int bnum, int boot_board)
 	if (boot_board)
 		drmach_setup_core_info(bp);
 
-	drmach_array_set(drmach_boards, bnum, bp);
+	(void) drmach_array_set(drmach_boards, bnum, bp);
 	return (bp);
 }
 
@@ -1088,7 +1086,7 @@ drmach_board_status(drmachid_t id, drmach_status_t *stat)
 	stat->configured = 0;		/* assume not configured */
 	stat->empty = 0;
 	stat->cond = bp->cond = SBD_COND_OK;
-	strncpy(stat->type, "System Brd", sizeof (stat->type));
+	(void) strncpy(stat->type, "System Brd", sizeof (stat->type));
 	stat->info[0] = '\0';
 
 	if (bp->devices) {
@@ -1173,7 +1171,8 @@ drmach_init(void)
 
 		if (drmach_array_get(drmach_boards, bnum, &id) == -1) {
 			cmn_err(CE_WARN, "Device node 0x%p has invalid "
-			    "property value, %s=%d", rdip, OBP_BOARDNUM, bnum);
+			    "property value, %s=%d", (void *)rdip,
+			    OBP_BOARDNUM, bnum);
 			goto error;
 		} else if (id == NULL) {
 			(void) drmach_board_new(bnum, 1);
@@ -1271,7 +1270,7 @@ drmach_io_new(drmach_device_t *proto, drmachid_t *idp)
 	ip->channel = (portid >> 1) & 0x7;
 	ip->leaf = (portid & 0x1);
 
-	snprintf(ip->dev.cm.name, sizeof (ip->dev.cm.name), "%s%d",
+	(void) snprintf(ip->dev.cm.name, sizeof (ip->dev.cm.name), "%s%d",
 	    ip->dev.type, ip->dev.unum);
 
 	*idp = (drmachid_t)ip;
@@ -1489,7 +1488,7 @@ drmach_board_disconnect(drmachid_t id, drmach_opts_t *opts)
 	rv = opl_unprobe_sb(obj->bnum);
 
 	if (rv == 0) {
-		prom_detach_notice(obj->bnum);
+		(void) prom_detach_notice(obj->bnum);
 		obj->connected = 0;
 
 	} else
@@ -1711,7 +1710,7 @@ drmach_board_lookup(int bnum, drmachid_t *id)
 sbd_error_t *
 drmach_board_name(int bnum, char *buf, int buflen)
 {
-	snprintf(buf, buflen, "SB%d", bnum);
+	(void) snprintf(buf, buflen, "SB%d", bnum);
 	return (NULL);
 }
 
@@ -1837,7 +1836,7 @@ drmach_cpu_new(drmach_device_t *proto, drmachid_t *idp)
 	cp->dev.cm.release = drmach_cpu_release;
 	cp->dev.cm.status = drmach_cpu_status;
 
-	snprintf(cp->dev.cm.name, sizeof (cp->dev.cm.name), "%s%d",
+	(void) snprintf(cp->dev.cm.name, sizeof (cp->dev.cm.name), "%s%d",
 	    cp->dev.type, cp->dev.unum);
 
 /*
@@ -1897,7 +1896,7 @@ drmach_cpu_start(struct cpu *cp)
 	 */
 	DRMACH_PR("COLD START for cpu (%d)\n", cpuid);
 
-	restart_other_cpu(cpuid);
+	(void) restart_other_cpu(cpuid);
 
 	return (0);
 }
@@ -1927,7 +1926,7 @@ drmach_cpu_status(drmachid_t id, drmach_status_t *stat)
 	stat->configured = (cpu_get(cp->cpuid) != NULL);
 	mutex_exit(&cpu_lock);
 	stat->busy = dp->busy;
-	strncpy(stat->type, dp->type, sizeof (stat->type));
+	(void) strncpy(stat->type, dp->type, sizeof (stat->type));
 	stat->info[0] = '\0';
 
 	return (NULL);
@@ -2200,7 +2199,7 @@ drmach_io_status(drmachid_t id, drmach_status_t *stat)
 	stat->powered = dp->bp->powered;
 	stat->configured = (configured != 0);
 	stat->busy = dp->busy;
-	strncpy(stat->type, dp->type, sizeof (stat->type));
+	(void) strncpy(stat->type, dp->type, sizeof (stat->type));
 	stat->info[0] = '\0';
 
 	return (NULL);
@@ -2235,7 +2234,8 @@ drmach_mem_new(drmach_device_t *proto, drmachid_t *idp)
 	mp->dev.cm.release = drmach_mem_release;
 	mp->dev.cm.status = drmach_mem_status;
 
-	snprintf(mp->dev.cm.name, sizeof (mp->dev.cm.name), "%s", mp->dev.type);
+	(void) snprintf(mp->dev.cm.name, sizeof (mp->dev.cm.name), "%s",
+	    mp->dev.type);
 
 	dip = mp->dev.node->n_getdip(mp->dev.node);
 	if (drmach_setup_mc_info(dip, mp) != 0) {
@@ -2287,8 +2287,8 @@ drmach_mem_add_span(drmachid_t id, uint64_t basepa, uint64_t size)
 
 	rv = kcage_range_add(basepfn, npages, KCAGE_DOWN);
 	if (rv == ENOMEM) {
-		cmn_err(CE_WARN, "%ld megabytes not available to kernel cage",
-		    (size == 0 ? 0 : size / MBYTE));
+		cmn_err(CE_WARN, "%lu megabytes not available to kernel cage",
+		    (ulong_t)(size == 0 ? 0 : size / MBYTE));
 	} else if (rv != 0) {
 		/* catch this in debug kernels */
 		ASSERT(0);
@@ -2485,7 +2485,7 @@ drmach_mem_status(drmachid_t id, drmach_status_t *stat)
 	stat->powered = dp->dev.bp->powered;
 	stat->configured = (ml != NULL);
 	stat->busy = dp->dev.busy;
-	strncpy(stat->type, dp->dev.type, sizeof (stat->type));
+	(void) strncpy(stat->type, dp->dev.type, sizeof (stat->type));
 	stat->info[0] = '\0';
 
 	return (NULL);

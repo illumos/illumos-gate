@@ -611,7 +611,7 @@ hpc3130_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		if (unitp->slots_are == HPC3130_SLOT_TYPE_SBD) {
 			DAK_GET_SBD_APID(ev.name, sizeof (ev.name), port);
 		} else {
-			snprintf(ev.name, HPC3130_NAME_MAX,
+			(void) snprintf(ev.name, HPC3130_NAME_MAX,
 			    "/devices%s:", ste->nexus);
 			ASSERT(strlen(ev.name) < HPC3130_NAME_MAX - 1);
 			DAK_GET_PCI_APID(ev.name + strlen(ev.name),
@@ -891,7 +891,7 @@ hpc3130_do_attach(dev_info_t *dip)
 
 		ste = &hpc3130_p->hpc3130_slot_table[j];
 
-		strcpy(ste->nexus, nexus);
+		(void) strcpy(ste->nexus, nexus);
 
 		if (strncmp(ste->nexus, "/pci", 4) == 0) {
 
@@ -966,7 +966,7 @@ hpc3130_do_attach(dev_info_t *dip)
 		    &hpc3130_p->hpc3130_slot_table[i];
 		hpc3130_p->power[i] = B_TRUE;
 		if (ste->callback_info.handle != NULL) {
-			hpc_slot_register(dip, ste->nexus,
+			(void) hpc_slot_register(dip, ste->nexus,
 			    &ste->hpc3130_slot_info,
 			    &ste->hpc3130_slot_handle,
 			    hpc3130_p->hpc3130_slot_ops,
@@ -1043,7 +1043,7 @@ hpc3130_do_detach(dev_info_t *dip)
 	cv_destroy(&hpc3130_p->hpc3130_cond);
 
 	for (i = 0; i < hpc3130_p->hpc3130_slot_table_length; i++) {
-		hpc_slot_unregister(
+		(void) hpc_slot_unregister(
 		    &hpc3130_p->hpc3130_slot_table[i].hpc3130_slot_handle);
 	}
 
@@ -1637,7 +1637,7 @@ hpc3130_slot_connect(caddr_t ops_arg, hpc_slot_t slot_hdl,
 		}
 	}
 
-	hpc_slot_event_notify(ste->hpc3130_slot_handle,
+	(void) hpc_slot_event_notify(ste->hpc3130_slot_handle,
 	    HPC_EVENT_SLOT_POWER_ON, 0);
 
 	/* Flash the "fault" indicator */
@@ -1760,7 +1760,7 @@ hpc3130_slot_disconnect(caddr_t ops_arg, hpc_slot_t slot_hdl,
 		goto out;
 	}
 
-	hpc_slot_event_notify(ste->hpc3130_slot_handle,
+	(void) hpc_slot_event_notify(ste->hpc3130_slot_handle,
 	    HPC_EVENT_SLOT_POWER_OFF, 0);
 
 	if (hpc3130_p->present[offset] == B_TRUE) {
@@ -1861,7 +1861,7 @@ hpc3130_verify_slot_power(hpc3130_unit_t *hpc3130_p, i2c_client_hdl_t handle,
 		}
 		(void) hpc3130_set_led(hpc3130_p, offset, HPC3130_LED_FAULT,
 		    HPC3130_ATTN_ON);
-		hpc_slot_event_notify(ste->hpc3130_slot_handle,
+		(void) hpc_slot_event_notify(ste->hpc3130_slot_handle,
 		    HPC_EVENT_SLOT_NOT_HEALTHY, 0);
 	}
 
@@ -2007,24 +2007,24 @@ hpc3130_slot_control(caddr_t ops_arg, hpc_slot_t slot_hdl,
 		break;
 		case HPC_CTRL_DEV_CONFIG_START:
 		case HPC_CTRL_DEV_UNCONFIG_START:
-			hpc3130_set_led(hpc3130_p, offset, HPC3130_LED_FAULT,
-			    HPC3130_ATTN_SLO);
+			(void) hpc3130_set_led(hpc3130_p, offset,
+			    HPC3130_LED_FAULT, HPC3130_ATTN_SLO);
 		break;
 		case HPC_CTRL_DEV_CONFIG_FAILURE:
-			hpc3130_set_led(hpc3130_p, offset, HPC3130_LED_FAULT,
-			    HPC3130_ATTN_ON);
+			(void) hpc3130_set_led(hpc3130_p, offset,
+			    HPC3130_LED_FAULT, HPC3130_ATTN_ON);
 		break;
 		case HPC_CTRL_DEV_CONFIGURED:
-			hpc3130_set_led(hpc3130_p, offset, HPC3130_LED_FAULT,
-			    HPC3130_ATTN_OFF);
+			(void) hpc3130_set_led(hpc3130_p, offset,
+			    HPC3130_LED_FAULT, HPC3130_ATTN_OFF);
 			hpc3130_p->present[offset] = B_TRUE;
 		break;
 		case HPC_CTRL_DEV_UNCONFIGURED:
 			if (hpc3130_p->power[offset] == B_TRUE) {
-				hpc3130_set_led(hpc3130_p, offset,
+				(void) hpc3130_set_led(hpc3130_p, offset,
 				    HPC3130_LED_FAULT, HPC3130_ATTN_SLO);
 			} else {
-				hpc3130_set_led(hpc3130_p, offset,
+				(void) hpc3130_set_led(hpc3130_p, offset,
 				    HPC3130_LED_FAULT, HPC3130_ATTN_OFF);
 			}
 		break;

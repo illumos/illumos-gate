@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * safari system board DR module.
@@ -623,7 +622,7 @@ sbd_setup_instance(int instance, dev_info_t *root, int max_boards, int wnode,
 		cmn_err(CE_WARN,
 			"sbd:%s:%d: failed to alloc soft-state",
 			f, instance);
-		sbdp_teardown_instance(sbdp_arg);
+		(void) sbdp_teardown_instance(sbdp_arg);
 		sbd_instances--;
 		return (DDI_FAILURE);
 	}

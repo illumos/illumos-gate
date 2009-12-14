@@ -215,14 +215,14 @@ _init(void)
 	    sckm_mbox_callback)) != 0) {
 		cmn_err(CE_WARN, "failed initializing incoming mailbox "
 		    "(%d)\n", ret);
-		mboxsc_fini(KEY_KDSC);
+		(void) mboxsc_fini(KEY_KDSC);
 		return (ret);
 	}
 
 	if ((ret = mboxsc_ctrl(KEY_SCKD, MBOXSC_CMD_GETMSG_TIMEOUT_RANGE,
 	    (void *)&timeout_range)) != 0) {
-		mboxsc_fini(KEY_SCKD);
-		mboxsc_fini(KEY_KDSC);
+		(void) mboxsc_fini(KEY_SCKD);
+		(void) mboxsc_fini(KEY_KDSC);
 		return (ret);
 	}
 
@@ -239,8 +239,8 @@ _init(void)
 	}
 
 	if ((ret = mod_install(&modlinkage)) != 0) {
-		mboxsc_fini(KEY_KDSC);
-		mboxsc_fini(KEY_SCKD);
+		(void) mboxsc_fini(KEY_KDSC);
+		(void) mboxsc_fini(KEY_SCKD);
 		return (ret);
 	}
 
@@ -269,9 +269,9 @@ _init(void)
 		rep_data = NULL;
 
 		/* uninitialize mailboxes, remove module, and return error */
-		mboxsc_fini(KEY_KDSC);
-		mboxsc_fini(KEY_SCKD);
-		mod_remove(&modlinkage);
+		(void) mboxsc_fini(KEY_KDSC);
+		(void) mboxsc_fini(KEY_SCKD);
+		(void) mod_remove(&modlinkage);
 		return (-1);
 	}
 
@@ -316,8 +316,8 @@ _fini(void)
 	/*
 	 * Terminate incoming and outgoing IOSRAM mailboxes
 	 */
-	mboxsc_fini(KEY_KDSC);
-	mboxsc_fini(KEY_SCKD);
+	(void) mboxsc_fini(KEY_KDSC);
+	(void) mboxsc_fini(KEY_SCKD);
 
 	/*
 	 * Destroy module synchronization objects and free memory

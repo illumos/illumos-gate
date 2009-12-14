@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -274,7 +272,7 @@ plat_add_mem_unum_label(char *unum, int mcid, int bank, int dimm)
 	int printed;
 	int buflen = UNUM_NAMLEN;
 
-	strcpy(old_unum, unum);
+	(void) strcpy(old_unum, unum);
 	printed = snprintf(unum, buflen, "MB/C%d/P0/B%d", mcid, bank);
 	buflen -= printed;
 	unum += printed;
@@ -285,7 +283,7 @@ plat_add_mem_unum_label(char *unum, int mcid, int bank, int dimm)
 		unum += printed;
 	}
 
-	snprintf(unum, buflen, ": %s", old_unum);
+	(void) snprintf(unum, buflen, ": %s", old_unum);
 }
 
 /*ARGSUSED*/

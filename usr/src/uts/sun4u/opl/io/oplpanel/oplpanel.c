@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -243,7 +243,7 @@ panel_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	/* setup the interrupt handler */
-	ddi_get_iblock_cookie(dip, 0, &statep->iblock_cookie);
+	(void) ddi_get_iblock_cookie(dip, 0, &statep->iblock_cookie);
 	if (ddi_add_intr(dip, 0, &statep->iblock_cookie, 0, &panel_intr,
 	    (caddr_t)statep) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "%s%d: cannot add interrupt handler.",
@@ -372,7 +372,7 @@ panel_intr(caddr_t arg)
 	 */
 	panel_ddi_put8(statep->panel_regs_handle, statep->panelregs,
 	    statep->panelregs_state | PNLINT_MASK);
-	ddi_get8(statep->panel_regs_handle, statep->panelregs);
+	(void) ddi_get8(statep->panel_regs_handle, statep->panelregs);
 
 	if (panel_enable) {
 		uint_t pstate_save;

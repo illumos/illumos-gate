@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -323,7 +323,7 @@ gptwo_configure_pci(dev_info_t *ap, spcd_t *pcd, uint_t id)
 			    DDI_SUCCESS) {
 				cmn_err(CE_WARN, "gptwo_pci: Unable to bind"
 				    " new pci child at dip=0x%p\n",
-				    new_child);
+				    (void *)new_child);
 			}
 
 			/*

@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * memory support routines for sbd.
@@ -335,7 +334,7 @@ sbd_post_attach_mem(sbd_handle_t *hp, sbd_devlist_t devlist[], int devnum)
 		memlist_read_unlock();
 
 		for (ml = mlist; ml != NULL; ml = ml->next) {
-			sbdp_mem_add_span(hdp, ml->address, ml->size);
+			(void) sbdp_mem_add_span(hdp, ml->address, ml->size);
 		}
 
 		memlist_delete(mlist);

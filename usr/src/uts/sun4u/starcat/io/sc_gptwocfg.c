@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -442,11 +442,12 @@ sc_free_common_pcd(spcd_t *pcd)
 {
 	int i;
 
-	SC_DEBUG(1, (CE_WARN, "sc_free_common_pcd pcd=%p\n", pcd));
+	SC_DEBUG(1, (CE_WARN, "sc_free_common_pcd pcd=%p\n", (void *)pcd));
 
 	if (pcd->memory_layout && pcd->memory_layout_size) {
 		SC_DEBUG(1, (CE_WARN, "sc_free_common_pcd: memory_layout %p "
-		    "size=%x", pcd->memory_layout, pcd->memory_layout_size));
+		    "size=%x", (void *)pcd->memory_layout,
+		    pcd->memory_layout_size));
 		kmem_free(pcd->memory_layout, pcd->memory_layout_size);
 	}
 
@@ -670,7 +671,7 @@ sc_configure(uint_t board, int create_nodes)
 	}
 
 	SC_DEBUG(1, (CE_WARN, "sc_configure: Returning 0x%p\n",
-	    board_config));
+	    (void *)board_config));
 
 	return (board_config);
 }
@@ -730,7 +731,7 @@ sc_unprobe_board(uint_t board)
 
 		SC_DEBUG(1, (CE_WARN, "sc_unprobe_board: "
 		    "calling gptwocfg_unconfigure(ap=0x%p portid=0x%x)\n",
-		    ddi_root_node(), board_config->portid));
+		    (void *)ddi_root_node(), board_config->portid));
 
 		port_cookie = gptwocfg_unconfigure(ddi_root_node(),
 		    board_config->portid);
@@ -792,7 +793,8 @@ sc_next_node(sc_gptwocfg_cookie_t c, dev_info_t *previous, dev_info_t **next)
 	sc_gptwocfg_config_t *cookie;
 
 	SC_DEBUG(1, (CE_WARN, "sccfg: sccfg_next_node"
-	    "(c=0x%p, previous=0x%p, next=0x%p)\n", c, previous, next));
+	    "(c=0x%p, previous=0x%p, next=0x%p)\n", (void *)c,
+	    (void *)previous, (void *)next));
 
 	cookie = (sc_gptwocfg_config_t *)c;
 
@@ -856,7 +858,7 @@ sc_find_axq_node(uint_t axq_id)
 	while (dip != NULL) {
 
 		SC_DEBUG(1, (CE_CONT, "Searching dip=0x%p for our AXQ\n",
-		    dip));
+		    (void *)dip));
 
 		if (ddi_getlongprop(DDI_DEV_T_ANY, dip,
 		    DDI_PROP_DONTPASS, "name", (caddr_t)&name, &size)
@@ -866,13 +868,13 @@ sc_find_axq_node(uint_t axq_id)
 			 * This node does not have a name property.
 			 */
 			SC_DEBUG(1, (CE_CONT, "dip=0x%p does not have a "
-			    "'name' property\n", dip));
+			    "'name' property\n", (void *)dip));
 
 			dip = ddi_get_next_sibling(dip);
 			continue;
 		}
 
-		SC_DEBUG(1, (CE_CONT, "dip=0x%p name=%s\n", dip, name));
+		SC_DEBUG(1, (CE_CONT, "dip=0x%p name=%s\n", (void *)dip, name));
 
 		if (strcmp(name, "address-extender-queue")) {
 
@@ -880,7 +882,7 @@ sc_find_axq_node(uint_t axq_id)
 			 * This node is not a AXQ node.
 			 */
 			SC_DEBUG(1, (CE_CONT, "dip=0x%p is not an AXQ "
-			    "node\n", dip));
+			    "node\n", (void *)dip));
 			kmem_free(name, size);
 			dip = ddi_get_next_sibling(dip);
 			continue;
@@ -895,7 +897,7 @@ sc_find_axq_node(uint_t axq_id)
 			 * This AXQ node does not have a reg property.
 			 */
 			SC_DEBUG(1, (CE_CONT, "dip=0x%p (AXQ Node) does "
-			    "have a 'reg' property\n", dip));
+			    "have a 'reg' property\n", (void *)dip));
 			dip = ddi_get_next_sibling(dip);
 			continue;
 		}
@@ -911,7 +913,7 @@ sc_find_axq_node(uint_t axq_id)
 			 * This is the wrong AXQ node.
 			 */
 			SC_DEBUG(1, (CE_CONT, "dip=0x%p Wrong node id=0x%x\n",
-			    dip, id));
+			    (void *)dip, id));
 
 			dip = ddi_get_next_sibling(dip);
 			continue;
@@ -921,13 +923,15 @@ sc_find_axq_node(uint_t axq_id)
 		/*
 		 * The correct AXQ node was found.
 		 */
-		SC_DEBUG(1, (CE_CONT, "dip=0x%p Found AXQ Node\n", dip));
+		SC_DEBUG(1, (CE_CONT, "dip=0x%p Found AXQ Node\n",
+		    (void *)dip));
 		ndi_hold_devi(dip);
 		break;
 	}
 	ndi_devi_exit(ddi_root_node(), circ);
 
-	SC_DEBUG(1, (CE_CONT, "sc_find_axq_node: Returning 0x%p\n", dip));
+	SC_DEBUG(1, (CE_CONT, "sc_find_axq_node: Returning 0x%p\n",
+	    (void *)dip));
 
 	return (dip);
 }
@@ -1036,7 +1040,7 @@ sc_gptwocfg_configure_axq(dev_info_t *ap, uint_t id, int create_nodes)
 		}
 
 		SC_DEBUG(1, (CE_CONT, "gptwocfg_configure_axq: "
-		    "Returning 0x%p\n", new_nodes));
+		    "Returning 0x%p\n", (void *)new_nodes));
 
 		return (new_nodes);
 	}
@@ -1170,7 +1174,7 @@ sc_get_agent_id(spcd_t *pcd, uint_t expander, uint_t slot, uint_t prd_slot)
 	agent_id |= (expander << 5);
 
 	SC_DEBUG(1, (CE_CONT, "sc_get_agent_id(pcd=0x%p, expander=0x%x, "
-	    "prd_slot=0x%x) Returning agent_id=0x%x\n", pcd, expander,
+	    "prd_slot=0x%x) Returning agent_id=0x%x\n", (void *)pcd, expander,
 	    prd_slot, agent_id));
 
 	return (agent_id);
@@ -1181,17 +1185,17 @@ dump_config(sc_gptwocfg_config_t *board_config)
 {
 	gptwocfg_config_t *port;
 
-	SC_DEBUG(1, (CE_CONT, "dump_config 0x%p", board_config));
+	SC_DEBUG(1, (CE_CONT, "dump_config 0x%p", (void *)board_config));
 	while (board_config != NULL) {
 		SC_DEBUG(1, (CE_CONT, "************* 0x%p ************\n",
-		    board_config));
+		    (void *)board_config));
 		SC_DEBUG(1, (CE_CONT, "port_cookie - 0x%p\n",
-		    board_config->port_cookie));
+		    (void *)board_config->port_cookie));
 
 		port = board_config->port_cookie;
 		if (port) {
 			SC_DEBUG(1, (CE_CONT, "     ap     - 0x%p\n",
-			    port->gptwo_ap));
+			    (void *)port->gptwo_ap));
 			SC_DEBUG(1, (CE_CONT, "     portid - 0x%x\n",
 			    port->gptwo_portid));
 		}
@@ -1200,9 +1204,9 @@ dump_config(sc_gptwocfg_config_t *board_config)
 		SC_DEBUG(1, (CE_CONT, "board      - 0x%x\n",
 		    board_config->board));
 		SC_DEBUG(1, (CE_CONT, "link        - 0x%p\n",
-		    board_config->link));
+		    (void *)board_config->link));
 		SC_DEBUG(1, (CE_CONT, "next        - 0x%p\n",
-		    board_config->next));
+		    (void *)board_config->next));
 		board_config = board_config->link;
 	}
 }
@@ -1212,7 +1216,7 @@ dump_pcd(spcd_t *pcd)
 {
 	int i;
 
-	SC_DEBUG(1, (CE_CONT, "dump_pcd 0x%p", pcd));
+	SC_DEBUG(1, (CE_CONT, "dump_pcd 0x%p", (void *)pcd));
 	SC_DEBUG(1, (CE_CONT, "     magic   - 0x%x\n", pcd->spcd_magic));
 	SC_DEBUG(1, (CE_CONT, "     version - 0x%x\n", pcd->spcd_version));
 	SC_DEBUG(1, (CE_CONT, "     ver.reg - 0x%lx\n", pcd->spcd_ver_reg));

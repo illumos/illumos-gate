@@ -544,7 +544,7 @@ retry:
 
 		/* check version of the message received */
 		if (reqp->krq_version != OKM_PROTOCOL_VERSION) {
-			okm_send_reply(okmsp, reqp->krq_transid,
+			(void) okm_send_reply(okmsp, reqp->krq_transid,
 			    OKM_ERR_VERSION, 0, 0);
 			kmem_free(msgbuf, len);
 			mutex_exit(&okmsp->km_lock);
@@ -588,7 +588,7 @@ okm_process_req(okms_t *okmsp, okm_req_hdr_t *reqp, uint32_t len,
 	case OKM_MSG_SADB:
 		/* sanity check request */
 		if (sadb_msglen <= 0) {
-			okm_send_reply(okmsp, reqp->krq_transid,
+			(void) okm_send_reply(okmsp, reqp->krq_transid,
 			    OKM_ERR_SADB_MSG, 0, 0);
 			DPRINTF(DBG_WARN, ("okm_process_req: bad message\n"));
 			return (EBADMSG);
@@ -627,7 +627,8 @@ okm_process_req(okms_t *okmsp, okm_req_hdr_t *reqp, uint32_t len,
 		 * Received an unknown command, send corresponding
 		 * error message.
 		 */
-		okm_send_reply(okmsp, reqp->krq_transid, OKM_ERR_BAD_CMD, 0, 0);
+		(void) okm_send_reply(okmsp, reqp->krq_transid,
+		    OKM_ERR_BAD_CMD, 0, 0);
 		return (EBADMSG);
 	}
 	DPRINTF(DBG_DRV, ("okm_process_req: ret=0\n"));
@@ -1094,7 +1095,7 @@ okm_print_req(okm_req_hdr_t *reqp, uint32_t len)
 	    ((reqp->krq_cmd == OKM_MSG_SADB) ? "MSG_SADB" : "UNKNOWN"));
 	for (i = 0; i < msglen; ) {
 		for (j = 0; (j < BYTES_PER_LINE) && (i < msglen); j++, i++) {
-			sprintf(&bytestr[j * 3], "%02X ", datap[i]);
+			(void) sprintf(&bytestr[j * 3], "%02X ", datap[i]);
 		}
 		if (j != 0) {
 			printf("\t%s\n", bytestr);

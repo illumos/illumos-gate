@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -735,7 +736,7 @@ smr_buf_free(int domid, caddr_t bufp, uint_t len)
 	    (IDN_ADDR2OFFSET(bufp) % IDN_SMR_BUFSIZE)) {
 		cmn_err(CE_WARN,
 		    "IDN: 304: buffer (0x%p) from domain %d not on a "
-		    "%d boundary", bufp, domid, IDN_SMR_BUFSIZE);
+		    "%d boundary", (void *)bufp, domid, IDN_SMR_BUFSIZE);
 		goto bfdone;
 	}
 	if (!lockheld && (len > IDN_DATA_SIZE)) {
@@ -780,7 +781,7 @@ bfdone:
 	} else {
 		cmn_err(CE_WARN,
 		    "IDN: 306: unknown buffer (0x%p) from domain %d",
-		    bufp, domid);
+		    (void *)bufp, domid);
 		ATOMIC_INC(idn_domain[domid].dioerr);
 	}
 
@@ -1258,7 +1259,7 @@ smr_slaballoc_wait(int domid, smr_slab_t **spp)
 	mutex_enter(&wp->w_mutex);
 
 	PR_SMR("%s: domain = %d, nwaiters = %d, wsp = 0x%p\n",
-	    proc, domid, wp->w_nwaiters, wp->w_sp);
+	    proc, domid, wp->w_nwaiters, (void *)wp->w_sp);
 
 	if (wp->w_nwaiters <= 0) {
 		/*
@@ -1349,8 +1350,8 @@ smr_slaballoc_put(int domid, smr_slab_t *sp, int forceflag, int serrno)
 
 	PR_SMR("%s: domain = %d, bufp = 0x%p, ebufp = 0x%p, "
 	    "(f = %d, se = %d)\n", proc, domid,
-	    (sp ? sp->sl_start : 0),
-	    (sp ? sp->sl_end : 0), forceflag, serrno);
+	    (sp ? (void *)sp->sl_start : 0),
+	    (sp ? (void *)sp->sl_end : 0), forceflag, serrno);
 
 	if (wp->w_nwaiters <= 0) {
 		/*
@@ -1491,7 +1492,7 @@ smr_slaballoc_get(int domid, caddr_t bufp, caddr_t ebufp)
 	procname_t	proc = "smr_slaballoc_get";
 
 	PR_SMR("%s: getting slab for domain %d [bufp=0x%p, ebufp=0x%p]\n",
-	    proc, domid, bufp, ebufp);
+	    proc, domid, (void *)bufp, (void *)ebufp);
 
 	dp = &idn_domain[domid];
 
@@ -1538,8 +1539,9 @@ smr_slaballoc_get(int domid, caddr_t bufp, caddr_t ebufp)
 
 		if (bufp && (ebufp > sp->sl_end)) {
 			PR_SMR("%s: bufp/ebufp (0x%p/0x%p) "
-			    "expected (0x%p/0x%p)\n", proc, bufp, ebufp,
-			    sp->sl_start, sp->sl_end);
+			    "expected (0x%p/0x%p)\n", proc, (void *)bufp,
+			    (void *)ebufp, (void *)sp->sl_start,
+			    (void *)sp->sl_end);
 			ASSERT(0);
 		}
 		/*
@@ -1867,7 +1869,7 @@ smr_slab_reserve(int domid)
 		}
 
 		PR_SMR("%s: allocated slab 0x%p (start=0x%p, size=%lu) for "
-		    "domain %d\n", proc, spa, spa->sl_start,
+		    "domain %d\n", proc, (void *)spa, (void *)spa->sl_start,
 		    spa->sl_end - spa->sl_start, domid);
 	} else {
 		PR_SMR("%s: FAILED to allocate for domain %d\n",
@@ -1925,7 +1927,7 @@ smr_slab_unreserve(int domid, smr_slab_t *sp)
 		ATOMIC_INC(idn.slabpool->pool[p].nfree);
 
 		PR_SMR("%s: freed (bufp=0x%p) for domain %d\n",
-		    proc, bufp, domid);
+		    proc, (void *)bufp, domid);
 
 		if (domid == idn.localid) {
 			/*
@@ -1949,7 +1951,7 @@ smr_slab_unreserve(int domid, smr_slab_t *sp)
 		 * Couldn't find slab entry for given buf!
 		 */
 		PR_SMR("%s: FAILED to free (bufp=0x%p) for domain %d\n",
-		    proc, bufp, domid);
+		    proc, (void *)bufp, domid);
 	}
 }
 
@@ -2135,7 +2137,7 @@ smr_remap(struct as *as, register caddr_t vaddr,
 
 	if (va_to_pfn(vaddr) == new_pfn) {
 		PR_REMAP("%s: vaddr (0x%p) already mapped to pfn (0x%lx)\n",
-		    proc, vaddr, new_pfn);
+		    proc, (void *)vaddr, new_pfn);
 		return;
 	}
 
@@ -2144,7 +2146,7 @@ smr_remap(struct as *as, register caddr_t vaddr,
 	ASSERT(npgs != 0);
 
 	PR_REMAP("%s: va = 0x%p, pfn = 0x%lx, npgs = %ld, mb = %d MB (%ld)\n",
-	    proc, vaddr, new_pfn, npgs, mblen, blen);
+	    proc, (void *)vaddr, new_pfn, npgs, mblen, blen);
 
 	/*
 	 * Unmap the SMR virtual address from it's current

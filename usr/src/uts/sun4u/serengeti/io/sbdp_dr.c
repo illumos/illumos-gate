@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/cmn_err.h>
@@ -97,7 +95,7 @@ sbdp_walk_prom_tree(pnode_t node, int(*f)(pnode_t, void *, uint_t), void *arg)
 	arg_block.node = node;
 	arg_block.f = f;
 	arg_block.arg = arg;
-	prom_tree_access(sbdp_walk_prom_tree_start, &arg_block, NULL);
+	(void) prom_tree_access(sbdp_walk_prom_tree_start, &arg_block, NULL);
 }
 
 static void
@@ -144,7 +142,7 @@ sbdp_attach_branch(dev_info_t *pdip, pnode_t node, void *arg)
 	SBDP_DBG_STATE("attaching %s\n", name);
 	err = ndi_devi_online(dip, NDI_DEVI_BIND);
 	if (err != NDI_SUCCESS) {
-		ndi_devi_free(dip);
+		(void) ndi_devi_free(dip);
 		return;
 	}
 	child = prom_childnode(node);
@@ -255,7 +253,7 @@ sbdp_select_top_nodes(pnode_t node, void *arg, uint_t flags)
 					return (DDI_WALK_TERMINATE);
 
 				(void) prom_getprop(node, "implementation#",
-						    (caddr_t)&impl);
+				    (caddr_t)&impl);
 				/*
 				 * If it is a CPU under CMP, don't save
 				 * the node as we will be saving the CMP

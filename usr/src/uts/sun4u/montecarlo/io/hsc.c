@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * MonteCarlo HotSwap Controller functionality
@@ -538,7 +536,7 @@ hsc_set_config_state(hsc_slot_t *hsp, int cmd)
 		hsp->hs_board_configuring = B_FALSE;
 		if ((hsc->state & HSC_ATTACHED) == HSC_ATTACHED &&
 			hsp->hs_flags & HSC_ALARM_CARD_PRES)
-			scsb_hsc_ac_op(hsp->hs_hpchandle,
+			(void) scsb_hsc_ac_op(hsp->hs_hpchandle,
 				hsp->hs_slot_number, SCSB_HSC_AC_CONFIGURED);
 		/* LED must be OFF on the occupant. */
 		(void) hpc_slot_event_notify(hsp->hs_slot_handle,
@@ -559,7 +557,7 @@ hsc_set_config_state(hsc_slot_t *hsp, int cmd)
 		hsp->hs_board_unconfiguring = B_FALSE;
 		hsp->hs_flags &= ~HSC_SLOT_BAD_STATE;
 		if (hsp->hs_flags & HSC_ALARM_CARD_PRES)
-			scsb_hsc_ac_op(hsp->hs_hpchandle,
+			(void) scsb_hsc_ac_op(hsp->hs_hpchandle,
 				hsp->hs_slot_number, SCSB_HSC_AC_UNCONFIGURED);
 		hsc_led_op(hsp, HPC_CTRL_SET_LED_STATE, HPC_ACTIVE_LED,
 							HPC_LED_BLINK);
@@ -655,19 +653,20 @@ hsc_autoconfig(hsc_slot_t *hsp, int cmd)
 	hsc_state_t *hsc;
 
 	DEBUG1("hsc_autoconfig: slot %d", hsp->hs_slot_number);
-	sprintf(slotautocfg_prop, "slot%d-autoconfig", hsp->hs_slot_number);
+	(void) sprintf(slotautocfg_prop, "slot%d-autoconfig",
+	    hsp->hs_slot_number);
 
 	if (cmd == HPC_CTRL_ENABLE_AUTOCFG) {
 		hsp->hs_flags |= HSC_AUTOCFG;
-		ddi_prop_update_string(DDI_DEV_T_NONE, hsp->hsc->dip,
+		(void) ddi_prop_update_string(DDI_DEV_T_NONE, hsp->hsc->dip,
 				slotautocfg_prop, "enabled");
 		if ((res = scsb_enable_enum(hsp->hsc)) == DDI_SUCCESS) {
 			(void) hpc_slot_event_notify(hsp->hs_slot_handle,
 					HPC_EVENT_ENABLE_ENUM, 0);
 		}
 	} else {
-		ddi_prop_update_string(DDI_DEV_T_NONE, hsp->hsc->dip,
-				slotautocfg_prop, "disabled");
+		(void) ddi_prop_update_string(DDI_DEV_T_NONE, hsp->hsc->dip,
+		    slotautocfg_prop, "disabled");
 		hsp->hs_flags &= ~HSC_AUTOCFG;
 		hsc = hsp->hsc;
 		if (hsc->state & HSC_ATTACHED) {
@@ -693,7 +692,8 @@ hsc_autoconfig(hsc_slot_t *hsp, int cmd)
 				}
 			}
 			if (enum_disable == B_TRUE)
-				scsb_disable_enum(hsc, SCSB_HSC_FORCE_REMOVE);
+				(void) scsb_disable_enum(hsc,
+				    SCSB_HSC_FORCE_REMOVE);
 		}
 	}
 	return (res);
@@ -812,15 +812,15 @@ scsb_hsc_disable_slot(hsc_slot_t *hsp)
 	char slot_disable_prop[18];
 
 	DEBUG1("hsc_disable_slot: slot %d", hsp->hs_slot_number);
-	sprintf(slot_disable_prop, "slot%d-status", hsp->hs_slot_number);
+	(void) sprintf(slot_disable_prop, "slot%d-status", hsp->hs_slot_number);
 
 	rc = scsb_reset_slot(hsp->hs_hpchandle, hsp->hs_slot_number,
 					SCSB_RESET_SLOT);
 	if (rc == DDI_SUCCESS) {
-		hsc_autoconfig(hsp, HPC_CTRL_DISABLE_AUTOCFG);
+		(void) hsc_autoconfig(hsp, HPC_CTRL_DISABLE_AUTOCFG);
 		hsp->hs_flags &= ~HSC_SLOT_ENABLED;
-		ddi_prop_update_string(DDI_DEV_T_NONE, hsp->hsc->dip,
-				slot_disable_prop, "disabled");
+		(void) ddi_prop_update_string(DDI_DEV_T_NONE, hsp->hsc->dip,
+		    slot_disable_prop, "disabled");
 	} else
 		rc = DDI_FAILURE;
 	return (rc);
@@ -833,15 +833,15 @@ scsb_hsc_enable_slot(hsc_slot_t *hsp)
 	char slot_disable_prop[18];
 
 	DEBUG1("hsc_disable_slot: slot %d", hsp->hs_slot_number);
-	sprintf(slot_disable_prop, "slot%d-status", hsp->hs_slot_number);
+	(void) sprintf(slot_disable_prop, "slot%d-status", hsp->hs_slot_number);
 
 	rc = scsb_reset_slot(hsp->hs_hpchandle, hsp->hs_slot_number,
 					SCSB_UNRESET_SLOT);
 	if (rc == DDI_SUCCESS) {
-		hsc_autoconfig(hsp, HPC_CTRL_ENABLE_AUTOCFG);
+		(void) hsc_autoconfig(hsp, HPC_CTRL_ENABLE_AUTOCFG);
 		hsp->hs_flags |= HSC_SLOT_ENABLED;
-		ddi_prop_remove(DDI_DEV_T_NONE, hsp->hsc->dip,
-						slot_disable_prop);
+		(void) ddi_prop_remove(DDI_DEV_T_NONE, hsp->hsc->dip,
+		    slot_disable_prop);
 	} else
 		rc = HPC_ERR_FAILED;
 	return (rc);
@@ -879,7 +879,7 @@ hsc_alloc_slot(
 	 * Note: the name *must* be 'pci' so that the correct cfgadm plug-in
 	 *	 library is selected
 	 */
-	sprintf(hsip->pci_slot_name, "cpci_slot%d", slot_number);
+	(void) sprintf(hsip->pci_slot_name, "cpci_slot%d", slot_number);
 
 	/*
 	 * We assume that the following LED settings reflect
@@ -1012,7 +1012,7 @@ hsc_slot_unregister(int slot_number)
 	mutex_exit(&hsc_mutex);
 
 	if (hsp != NULL) {
-		hpc_slot_unregister(&hsp->hs_slot_handle);
+		(void) hpc_slot_unregister(&hsp->hs_slot_handle);
 		if ((hsp->hsc->state & HSC_ATTACHED) != HSC_ATTACHED &&
 				hsp->hs_slot_state != HPC_SLOT_EMPTY) {
 			hsp->hsc->n_registered_occupants--;
@@ -1047,12 +1047,12 @@ scsb_hsc_init_slot_state(hsc_state_t *hsc, hsc_slot_t *hsp)
 			 */
 			hsp->hs_slot_state = HPC_SLOT_EMPTY;
 			/* slot empty. */
-			scsb_reset_slot(hsc->scsb_handle, slot_number,
-					SCSB_RESET_SLOT);
+			(void) scsb_reset_slot(hsc->scsb_handle, slot_number,
+			    SCSB_RESET_SLOT);
 			hsc_led_op(hsp, HPC_CTRL_SET_LED_STATE, HPC_ACTIVE_LED,
-								HPC_LED_OFF);
+			    HPC_LED_OFF);
 			hsc_led_op(hsp, HPC_CTRL_SET_LED_STATE, HPC_FAULT_LED,
-							HPC_LED_OFF);
+			    HPC_LED_OFF);
 			break;
 		case HPC_SLOT_DISCONNECTED:
 			/*
@@ -1066,8 +1066,8 @@ scsb_hsc_init_slot_state(hsc_state_t *hsc, hsc_slot_t *hsp)
 				 * Force a disconnect just in case there are
 				 * differences between healthy and reset states.
 				 */
-				scsb_reset_slot(hsc->scsb_handle, slot_number,
-					SCSB_RESET_SLOT);
+				(void) scsb_reset_slot(hsc->scsb_handle,
+				    slot_number, SCSB_RESET_SLOT);
 				/*
 				 * Slot in reset. OBP has not probed this
 				 * device. Hence it is ok to remove this board.
@@ -1232,7 +1232,7 @@ hsc_slot_occupancy(int slot_number, boolean_t occupied, int flags, int healthy)
 					ddi_driver_name(hsp->hsc->dip),
 					ddi_get_instance(hsp->hsc->dip));
 			/* Slot in reset and disabled */
-			scsb_hsc_disable_slot(hsp);
+			(void) scsb_hsc_disable_slot(hsp);
 			hsp->hs_flags |= HSC_SLOT_BAD_STATE;
 			/* the following works for P1.0 only. */
 			hsc_led_op(hsp, HPC_CTRL_SET_LED_STATE, HPC_FAULT_LED,
@@ -1428,8 +1428,8 @@ scsb_enable_enum(hsc_state_t *hsc)
 			"Full Hotswap Mode\n", ddi_driver_name(hsc->dip),
 			ddi_get_instance(hsc->dip));
 	hsc->state |= HSC_ENUM_ENABLED;
-	ddi_prop_update_string(DDI_DEV_T_NONE, hsc->dip, HOTSWAP_MODE_PROP,
-					"full");
+	(void) ddi_prop_update_string(DDI_DEV_T_NONE, hsc->dip,
+	    HOTSWAP_MODE_PROP, "full");
 	return (DDI_SUCCESS);
 
 }
@@ -1460,8 +1460,8 @@ scsb_disable_enum(hsc_state_t *hsc, int op)
 				ddi_driver_name(hsc->dip),
 				ddi_get_instance(hsc->dip));
 		}
-		ddi_prop_update_string(DDI_DEV_T_NONE, hsc->dip,
-				HOTSWAP_MODE_PROP, "basic");
+		(void) ddi_prop_update_string(DDI_DEV_T_NONE, hsc->dip,
+		    HOTSWAP_MODE_PROP, "basic");
 		return (DDI_SUCCESS);
 	} else
 		/* No programming interface for disabling ENUM# on MC/Tonga */
@@ -1661,7 +1661,7 @@ scsb_hsc_attach(dev_info_t *dip, void *scsb_handle, int instance)
 			hsc->slot_table_prop[i].pslotnum = atoi(phys_slotname);
 			hsc->slot_table_prop[i].ga = atoi(ga);
 			hsc->slot_table_prop[i].pci_devno = atoi(pcidev);
-			strcpy(hsc->slot_table_prop[i].nexus, nexus);
+			(void) strcpy(hsc->slot_table_prop[i].nexus, nexus);
 		}
 	} else {
 		hpstp = (hsc_prom_slot_table_t *)hpc_slot_table_data;
@@ -1759,8 +1759,8 @@ scsb_hsc_attach(dev_info_t *dip, void *scsb_handle, int instance)
 	hsc->hsp_last = NULL;
 	hsc->hsc_intr_counter = 0;
 	kmem_free(hpc_slot_table_data, hpc_slot_table_size);
-	ddi_prop_update_string(DDI_DEV_T_NONE, hsc->dip, HOTSWAP_MODE_PROP,
-								"basic");
+	(void) ddi_prop_update_string(DDI_DEV_T_NONE, hsc->dip,
+	    HOTSWAP_MODE_PROP, "basic");
 	hsc->state |= (HSC_ATTACHED|HSC_SCB_CONNECTED);
 
 	/*
@@ -1822,9 +1822,10 @@ scsb_hsc_detach(dev_info_t *dip, void *scsb_handle, int instance)
 			(void) hsc_led_state(hsp, HPC_CTRL_SET_LED_STATE,
 							&fledinfo);
 		}
-		sprintf(slotautocfg_prop, "slot%d-autoconfig",
-						hsp->hs_slot_number);
-		ddi_prop_remove(DDI_DEV_T_NONE, hsc->dip, slotautocfg_prop);
+		(void) sprintf(slotautocfg_prop, "slot%d-autoconfig",
+		    hsp->hs_slot_number);
+		(void) ddi_prop_remove(DDI_DEV_T_NONE, hsc->dip,
+		    slotautocfg_prop);
 		if (hsc_slot_unregister(hsc->slot_table_prop[i].pslotnum)
 						!= 0) {
 			cmn_err(CE_NOTE, "%s#%d: failed to unregister"
@@ -1841,7 +1842,7 @@ scsb_hsc_detach(dev_info_t *dip, void *scsb_handle, int instance)
 		hsc->state &= ~HSC_ENUM_ENABLED;
 	}
 	mutex_destroy(&hsc->hsc_mutex);
-	ddi_prop_remove(DDI_DEV_T_NONE, hsc->dip, HOTSWAP_MODE_PROP);
+	(void) ddi_prop_remove(DDI_DEV_T_NONE, hsc->dip, HOTSWAP_MODE_PROP);
 	hsc->state &= ~(HSC_ATTACHED|HSC_SCB_CONNECTED);
 	ddi_soft_state_free(hsc_state, instance);
 	return (DDI_SUCCESS);
@@ -2008,8 +2009,9 @@ hsc_ac_op(int instance, int pslotnum, int op, void *arg)
 			 * this slot, just send a event.
 			 */
 			if (hsc->state & HSC_ENUM_ENABLED)
-				hpc_slot_event_notify(hsp->hs_slot_handle,
-					HPC_EVENT_PROCESS_ENUM, 0);
+				(void) hpc_slot_event_notify(
+				    hsp->hs_slot_handle,
+				    HPC_EVENT_PROCESS_ENUM, 0);
 			break;
 		case SCSB_HSC_AC_GET_SLOT_INFO :
 			*(hsc_slot_t **)arg = hsp;
@@ -2123,7 +2125,8 @@ hsc_enum_intr(caddr_t iarg)
 			(hsp->hs_slot_state == HPC_SLOT_DISCONNECTED))
 		return (DDI_INTR_CLAIMED);
 
-	hpc_slot_event_notify(hsp->hs_slot_handle, HPC_EVENT_PROCESS_ENUM, 0);
+	(void) hpc_slot_event_notify(hsp->hs_slot_handle,
+	    HPC_EVENT_PROCESS_ENUM, 0);
 	return (DDI_INTR_CLAIMED);
 }
 /*

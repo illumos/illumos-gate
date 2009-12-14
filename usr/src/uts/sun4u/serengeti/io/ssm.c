@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #include <sys/types.h>
@@ -285,7 +285,7 @@ _fini(void)
 	/*
 	 * Unregister the event handler
 	 */
-	sbbc_mbox_unreg_intr(MBOX_EVENT_GENERIC, ssm_dr_event_handler);
+	(void) sbbc_mbox_unreg_intr(MBOX_EVENT_GENERIC, ssm_dr_event_handler);
 	mutex_destroy(&ssm_event_lock);
 
 	/* Free the soft state info. */
@@ -360,7 +360,7 @@ ssm_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	mutex_init(&softsp->ssm_sft_lock, NULL, MUTEX_DRIVER, NULL);
 
 	DPRINTF(SSM_ATTACH_DEBUG, ("ssm-%d: devi= 0x%p, softsp=0x%p\n",
-	    instance, devi, softsp));
+	    instance, (void *)devi, (void *)softsp));
 
 	if ((softsp->ssm_nodeid = (int)ddi_getprop(DDI_DEV_T_ANY, softsp->dip,
 	    DDI_PROP_DONTPASS, "nodeid", -1)) == -1) {
@@ -888,7 +888,8 @@ ssm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			}
 
 			slot = (getminor(dev) & SSM_BOARD_MASK);
-			ssm_generate_event(softsp->ssm_nodeid, slot, hint);
+			(void) ssm_generate_event(softsp->ssm_nodeid, slot,
+			    hint);
 		}
 		break;
 	}
@@ -1040,7 +1041,7 @@ ssm_dr_event_handler(char *arg)
 
 	}
 
-	ssm_generate_event(fdp->node, fdp->slot, hint);
+	(void) ssm_generate_event(fdp->node, fdp->slot, hint);
 
 	return (DDI_INTR_CLAIMED);
 }

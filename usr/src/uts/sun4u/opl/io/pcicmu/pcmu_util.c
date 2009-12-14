@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * CMU-CH nexus utility routines:
@@ -317,10 +316,10 @@ name_child(dev_info_t *child, char *name, int namelen)
 		func = PCI_REG_FUNC_G(pcmu_rp[0].pci_phys_hi);
 		if (func != 0) {
 			(void) snprintf(name, namelen, "%x,%x",
-				PCI_REG_DEV_G(pcmu_rp[0].pci_phys_hi), func);
+			    PCI_REG_DEV_G(pcmu_rp[0].pci_phys_hi), func);
 		} else {
 			(void) snprintf(name, namelen, "%x",
-				PCI_REG_DEV_G(pcmu_rp[0].pci_phys_hi));
+			    PCI_REG_DEV_G(pcmu_rp[0].pci_phys_hi));
 		}
 		ddi_prop_free(pcmu_rp);
 		return (DDI_SUCCESS);
@@ -450,7 +449,7 @@ pcmu_get_reg_set_size(dev_info_t *child, int rnumber)
 	}
 
 	size = pcmu_rp[rnumber].pci_size_low |
-		((uint64_t)pcmu_rp[rnumber].pci_size_hi << 32);
+	    ((uint64_t)pcmu_rp[rnumber].pci_size_hi << 32);
 	kmem_free(pcmu_rp, i);
 	return (size);
 }
@@ -539,8 +538,8 @@ pcmu_cfg_report(dev_info_t *dip, ddi_fm_error_t *derr,
 			    (pcmu_p->pcmu_pcbm_p)->pcbm_nameinst_str,
 			    (pcmu_p->pcmu_pcbm_p)->pcbm_nameaddr_str,
 			    "PCI config space:", aux_msg);
-			cmn_err(CE_WARN, "%s %s=0x%p", buf,
-			    "pbm-csr", (pcmu_p->pcmu_pcbm_p)->pcbm_ctrl_reg);
+			cmn_err(CE_WARN, "%s %s=0x%p", buf, "pbm-csr",
+			    (void *)(pcmu_p->pcmu_pcbm_p)->pcbm_ctrl_reg);
 		}
 	}
 

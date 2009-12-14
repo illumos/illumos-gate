@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * CMU-CH Interrupt Block
@@ -274,7 +273,7 @@ pcmu_ib_intr_dist(pcmu_ib_t *pib_p, pcmu_ib_ino_info_t *ino_p)
 			    "%s:%s: pcmu_ib_intr_dist(%p,%x) timeout",
 			    pcbm_p->pcbm_nameinst_str,
 			    pcbm_p->pcbm_nameaddr_str,
-			    imr_p, PCMU_IB_INO_TO_MONDO(pib_p, ino));
+			    (void *)imr_p, PCMU_IB_INO_TO_MONDO(pib_p, ino));
 			break;
 		}
 	}

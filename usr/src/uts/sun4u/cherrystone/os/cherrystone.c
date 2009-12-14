@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -236,7 +235,7 @@ keyswitch_poll(void *arg)
 	}
 
 	key_locked_bit = (boolean_t)((port_byte & 0x1));
-	timeout(keyswitch_poll, (caddr_t)dip, keypoll_timeout_hz);
+	(void) timeout(keyswitch_poll, (caddr_t)dip, keypoll_timeout_hz);
 }
 
 static void
@@ -567,8 +566,8 @@ plat_add_mem_unum_label(char *unum, int mcid, int bank, int dimm)
 	char board = CHERRYSTONE_GETSLOT_LABEL(mcid);
 	char old_unum[UNUM_NAMLEN];
 
-	strcpy(old_unum, unum);
-	snprintf(unum, UNUM_NAMLEN, "Slot %c: %s", board, old_unum);
+	(void) strcpy(old_unum, unum);
+	(void) snprintf(unum, UNUM_NAMLEN, "Slot %c: %s", board, old_unum);
 }
 
 int

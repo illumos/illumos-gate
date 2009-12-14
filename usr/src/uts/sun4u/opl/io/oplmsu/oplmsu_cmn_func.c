@@ -22,8 +22,6 @@
  * All Rights Reserved, Copyright (c) FUJITSU LIMITED 2006
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/errno.h>
 #include <sys/modctl.h>
 #include <sys/stat.h>
@@ -572,13 +570,13 @@ oplmsu_cmn_put_xoffxon(queue_t *queue, int data)
 	/* Send M_START */
 	if ((mp = allocb(0, BPRI_LO)) != NULL) {
 		mp->b_datap->db_type = M_START;
-		putq(queue, mp);
+		(void) putq(queue, mp);
 
 		/* Send M_DATA(XOFF, XON) */
 		if ((mp = allocb(sizeof (int), BPRI_LO)) != NULL) {
 			*(uint_t *)mp->b_rptr = data;
 			mp->b_wptr = mp->b_rptr + sizeof (int);
-			putq(queue, mp);
+			(void) putq(queue, mp);
 		} else {
 			rval = FAILURE;
 		}
@@ -730,7 +728,7 @@ oplmsu_cmn_bufcall(queue_t *q, mblk_t *mp, size_t size, int rw_flag)
 	if (rw_flag == MSU_WRITE_SIDE) {
 		ctrl_t	*ctrl;
 
-		putbq(q, mp);
+		(void) putbq(q, mp);
 
 		mutex_enter(&oplmsu_uinst->c_lock);
 		ctrl = (ctrl_t *)q->q_ptr;
@@ -772,7 +770,7 @@ oplmsu_cmn_bufcall(queue_t *q, mblk_t *mp, size_t size, int rw_flag)
 			mp->b_prev = NULL;
 			lpath->first_lpri_hi = mp;
 		} else {
-			putbq(q, mp);
+			(void) putbq(q, mp);
 		}
 
 		if (lpath->rbuf_id != 0) {
@@ -1235,7 +1233,7 @@ oplmsu_wcmn_flush_hndl(queue_t *q, mblk_t *mp, krw_t rw)
 			freemsg(mp);
 		}
 	} else {
-		putq(WR(dst_queue), mp);
+		(void) putq(WR(dst_queue), mp);
 	}
 }
 
@@ -1290,10 +1288,10 @@ oplmsu_wcmn_through_hndl(queue_t *q, mblk_t *mp, int pri_flag, krw_t rw)
 
 	if ((usr_queue == WR(q)) || (usr_queue == RD(q))) {
 		if (pri_flag == MSU_HIGH) {
-			putq(dst_queue, mp);
+			(void) putq(dst_queue, mp);
 		} else {
 			if (canput(dst_queue)) {
-				putq(dst_queue, mp);
+				(void) putq(dst_queue, mp);
 			} else {
 				oplmsu_wcmn_norm_putbq(WR(q), mp, dst_queue);
 				return (FAILURE);
@@ -1371,7 +1369,7 @@ oplmsu_wcmn_norm_putbq(queue_t *uwq, mblk_t *mp, queue_t *dq)
 	lpath->uwq_flag = 1;
 	lpath->uwq_queue = uwq;
 	mutex_exit(&oplmsu_uinst->l_lock);
-	putbq(uwq, mp);
+	(void) putbq(uwq, mp);
 }
 
 /*
@@ -1441,7 +1439,7 @@ oplmsu_rcmn_flush_hndl(queue_t *q, mblk_t *mp)
 		mutex_exit(&oplmsu_uinst->c_lock);
 
 		if (dst_queue != NULL) {
-			putq(dst_queue, mp);
+			(void) putq(dst_queue, mp);
 		} else {
 			if (*mp->b_rptr & FLUSHW) {
 				flushq(WR(q), FLUSHDATA);
@@ -1511,10 +1509,10 @@ oplmsu_rcmn_through_hndl(queue_t *q, mblk_t *mp, int pri_flag)
 	}
 
 	if (pri_flag == MSU_HIGH) {
-		putq(dst_queue, mp);
+		(void) putq(dst_queue, mp);
 	} else {
 		if (canput(dst_queue)) {
-			putq(dst_queue, mp);
+			(void) putq(dst_queue, mp);
 		} else {
 			/*
 			 * Place a normal priority message at the head of
@@ -1525,7 +1523,7 @@ oplmsu_rcmn_through_hndl(queue_t *q, mblk_t *mp, int pri_flag)
 			ctrl->lrq_flag = 1;
 			ctrl->lrq_queue = q;
 			mutex_exit(&oplmsu_uinst->c_lock);
-			putbq(q, mp);
+			(void) putbq(q, mp);
 			return (FAILURE);
 		}
 	}
@@ -1653,7 +1651,7 @@ oplmsu_cmn_trace(queue_t *q, mblk_t *mp, int op)
 	}
 
 	/* Trace current counter */
-	drv_getparm(LBOLT, (void *)&oplmsu_ltrc_ccnt);
+	(void) drv_getparm(LBOLT, (void *)&oplmsu_ltrc_ccnt);
 
 	if (oplmsu_ltrc_cur == oplmsu_ltrc_tail) {
 		oplmsu_ltrc_cur = oplmsu_ltrc_top;
@@ -1810,7 +1808,7 @@ oplmsu_cmn_msglog(mblk_t *mp, int direction)
 					*bufp = ' ';
 					bufp++;
 				}
-				sprintf(bufp, "%02x", *cur);
+				(void) sprintf(bufp, "%02x", *cur);
 				bufp += 2;
 				cur++;
 				count++;
@@ -1835,9 +1833,10 @@ oplmsu_cmn_prt_pathname(dev_info_t *dip)
 	char	pathname[128];
 	char	wrkbuf[128];
 
-	ddi_pathname(dip, wrkbuf);
+	(void) ddi_pathname(dip, wrkbuf);
 	*(wrkbuf + strlen(wrkbuf)) = '\0';
-	sprintf(pathname, "/devices%s:%c", wrkbuf, 'a'+ ddi_get_instance(dip));
+	(void) sprintf(pathname, "/devices%s:%c", wrkbuf,
+	    'a'+ ddi_get_instance(dip));
 
 	DBG_PRINT((CE_NOTE, "oplmsu: debug-info: "
 	    "Active path change to path => %s", pathname));

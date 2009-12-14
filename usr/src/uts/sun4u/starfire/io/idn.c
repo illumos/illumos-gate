@@ -782,7 +782,7 @@ idnattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 * on bootup.
 		 */
 		if (sgnblk_poll_reference(idn_sigb_setup, NULL) != 0) {
-			sgnblk_poll_unregister(idn_sigbhandler);
+			(void) sgnblk_poll_unregister(idn_sigbhandler);
 			mutex_enter(&idn.sigbintr.sb_mutex);
 			idn_sigbhandler_kill();
 			idn.sigbintr.sb_cpuid = (uchar_t)-1;
@@ -919,7 +919,7 @@ idndetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		/*
 		 * Remove our sigblock SSP interrupt handler.
 		 */
-		sgnblk_poll_unregister(idn_sigbhandler);
+		(void) sgnblk_poll_unregister(idn_sigbhandler);
 		mutex_enter(&idn.sigbintr.sb_mutex);
 		idn_sigbhandler_kill();
 		idn.sigbintr.sb_cpuid = (uchar_t)-1;
@@ -1157,7 +1157,7 @@ idn_init_smr()
 	idn.smr.rempfn = idn.smr.rempfnlim = PFN_INVALID;
 	IDN_SMR_SIZE = smr_size;
 
-	PR_PROTO("%s: smr vaddr = %p\n", proc, idn.smr.vaddr);
+	PR_PROTO("%s: smr vaddr = %p\n", proc, (void *)idn.smr.vaddr);
 
 	smr_remap(&kas, idn.smr.vaddr, idn.smr.locpfn, IDN_SMR_SIZE);
 
@@ -1195,7 +1195,7 @@ idn_sigb_setup(cpu_sgnblk_t *sigbp, void *arg)
 {
 	procname_t	proc = "idn_sigb_setup";
 
-	PR_PROTO("%s: Setting sigb to %p\n", proc, sigbp);
+	PR_PROTO("%s: Setting sigb to %p\n", proc, (void *)sigbp);
 
 	mutex_enter(&idn.idnsb_mutex);
 	if (sigbp == NULL) {
@@ -1226,7 +1226,7 @@ idn_init(dev_info_t *dip)
 
 	if (idn.dip != NULL) {
 		PR_DRV("%s: already initialized (dip = 0x%p)\n",
-		    proc, idn.dip);
+		    proc, (void *)idn.dip);
 		return (0);
 	}
 
@@ -1665,7 +1665,7 @@ idnwput(register queue_t *wq, register mblk_t *mp)
 
 		} else {
 			PR_DLPI("%s: idndl_start(sip=0x%p)\n",
-			    proc, sip);
+			    proc, (void *)sip);
 			rw_enter(&stp->ss_rwlock, RW_READER);
 			(void) idndl_start(wq, mp, sip);
 			rw_exit(&stp->ss_rwlock);
@@ -1729,7 +1729,7 @@ idnwsrv(queue_t *wq)
 		case M_DATA:
 			if (sip) {
 				PR_DLPI("%s: idndl_start(sip=0x%p)\n",
-				    proc, sip);
+				    proc, (void *)sip);
 				rw_enter(&stp->ss_rwlock, RW_READER);
 				err = idndl_start(wq, mp, sip);
 				rw_exit(&stp->ss_rwlock);
@@ -1775,7 +1775,7 @@ idnrput(register queue_t *rq, register mblk_t *mp)
 		 */
 		cmn_err(CE_WARN,
 		    "IDN: 123: unexpected M_DATA packets for "
-		    "q_stream 0x%p", rq->q_stream);
+		    "q_stream 0x%p", (void *)rq->q_stream);
 		freemsg(mp);
 		err = ENXIO;
 		break;
@@ -1928,7 +1928,7 @@ idn_sigbhandler_thread(struct sigbintr **sbpp)
 	sbp = *sbpp;
 
 	PR_PROTO("%s: KICKED OFF (sigbintr pointer = 0x%p)\n",
-	    proc, sbp);
+	    proc, (void *)sbp);
 
 	ASSERT(sbp == &idn.sigbintr);
 
@@ -2212,7 +2212,7 @@ idn_sigbhandler_create()
 	if (idn.sigb_threadp) {
 		cmn_err(CE_WARN,
 		    "IDN: 126: sigbhandler thread already "
-		    "exists (0x%p)", idn.sigb_threadp);
+		    "exists (0x%p)", (void *)idn.sigb_threadp);
 		return;
 	}
 	cv_init(&idn.sigbintr.sb_cv, NULL, CV_DEFAULT, NULL);
@@ -2661,7 +2661,7 @@ idn_get_net_binding(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 	if (idn.nchannels == 0)
 		return (0);
 
-	mi_mpprintf(mp, "Net    Cpu");
+	(void) mi_mpprintf(mp, "Net    Cpu");
 
 	for (c = 0; c < IDN_MAX_NETS; c++) {
 		int		bc;
@@ -2676,9 +2676,9 @@ idn_get_net_binding(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 			bc = csp->ch_bound_cpuid_pending;
 
 		if (c < 10)
-			mi_mpprintf(mp, " %d      %d", c, bc);
+			(void) mi_mpprintf(mp, " %d      %d", c, bc);
 		else
-			mi_mpprintf(mp, " %d     %d", c, bc);
+			(void) mi_mpprintf(mp, " %d     %d", c, bc);
 	}
 
 	return (0);
@@ -3464,7 +3464,7 @@ idn_domains_init(struct hwconfig *local_hw)
 
 	ldp = &idn_domain[idn.localid];
 
-	strncpy(ldp->dname, utsname.nodename, MAXDNAME - 1);
+	(void) strncpy(ldp->dname, utsname.nodename, MAXDNAME - 1);
 	ldp->dname[MAXDNAME-1] = '\0';
 	bcopy(local_hw, &ldp->dhw, sizeof (ldp->dhw));
 	ASSERT(idn.ndomains == 1);
@@ -4068,7 +4068,7 @@ _hexspace(uint64_t v, int sz, int width, int padding)
 	_get_spaces((w), (s), 1))
 
 #define	MBXINFO(mtp) \
-	&mtp->mt_header, \
+	(void *)&mtp->mt_header, \
 		HEXSPACE(&mtp->mt_header, &mtp->mt_header, 16, 2), \
 	mtp->mt_header.mh_svr_ready_ptr, \
 		HEXSPACE(mtp->mt_header.mh_svr_ready_ptr, \
@@ -4087,7 +4087,7 @@ _hexspace(uint64_t v, int sz, int width, int padding)
 	mtp->mt_header.mh_cookie, \
 		HEXSPACE(mtp->mt_header.mh_cookie, \
 			mtp->mt_header.mh_cookie, 8, 2), \
-	&mtp->mt_queue[0], \
+	(void *)&mtp->mt_queue[0], \
 		HEXSPACE(&mtp->mt_queue[0], &mtp->mt_queue[0], 16, 2)
 
 /*ARGSUSED*/
@@ -4116,7 +4116,7 @@ idn_mboxtbl_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 
 	if (map) {
 		(void) mi_mpprintf(mp, "Mailbox Area starts @ 0x%p",
-		    map);
+		    (void *)map);
 	} else {
 		(void) mi_mpprintf(mp, "Mailbox Area not found.");
 		goto repdone;
@@ -4245,13 +4245,13 @@ idn_mainmbox_domain_report(queue_t *wq, mblk_t *mp, int domid,
 		    mm_count, DECSPACE(mm_count, 8, 2),
 		    mmp->mm_dropped,
 		    DECSPACE(mmp->mm_dropped, 8, 2),
-		    mmp->mm_smr_mboxp,
+		    (void *)mmp->mm_smr_mboxp,
 		    HEXSPACE(mmp->mm_smr_mboxp,
 		    mmp->mm_smr_mboxp, 16, 2),
-		    mmp->mm_smr_readyp,
+		    (void *)mmp->mm_smr_readyp,
 		    HEXSPACE(mmp->mm_smr_readyp,
 		    mmp->mm_smr_readyp, 16, 2),
-		    mmp->mm_smr_activep,
+		    (void *)mmp->mm_smr_activep,
 		    HEXSPACE(mmp->mm_smr_activep,
 		    mmp->mm_smr_activep, 16, 2),
 		    mmp->mm_qiget, mmp->mm_qiput);
@@ -4350,7 +4350,7 @@ idn_global_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 
 	(void) mi_mpprintf(mp, "SMR");
 	(void) mi_mpprintf(mp, "    vaddr                ");
-	(void) mi_mpprintf(mp, "    0x%p", idn.smr.vaddr);
+	(void) mi_mpprintf(mp, "    0x%p", (void *)idn.smr.vaddr);
 
 	(void) mi_mpprintf(mp, "    paddr-local     paddr-remote");
 	masterid = IDN_GET_MASTERID();
@@ -4452,7 +4452,7 @@ idn_global_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 		    "    Master Domain (id:name/brds - state):");
 
 		if (strlen(mdp->dname) > 0)
-			strcpy(dbp, mdp->dname);
+			(void) strcpy(dbp, mdp->dname);
 		else
 			boardset2str(mdp->dhw.dh_boardset, dbp);
 		if (masterid < 10)
@@ -4478,7 +4478,7 @@ idn_global_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 				continue;
 
 			if (strlen(dp->dname) > 0)
-				strcpy(dbp, dp->dname);
+				(void) strcpy(dbp, dp->dname);
 			else
 				boardset2str(dp->dhw.dh_boardset, dbp);
 			if (d < 10)
@@ -4506,7 +4506,7 @@ idn_global_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 				continue;
 
 			if (strlen(dp->dname) > 0)
-				strcpy(dbp, dp->dname);
+				(void) strcpy(dbp, dp->dname);
 			else
 				boardset2str(dp->dhw.dh_boardset, dbp);
 			if (d < 10)
@@ -4621,11 +4621,11 @@ idn_domain_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 			if (d < 10)
 				(void) mi_mpprintf(mp,
 				    "Domain %d   (0x%p) busy...",
-				    d, dp);
+				    d, (void *)dp);
 			else
 				(void) mi_mpprintf(mp,
 				    "Domain %d  (0x%p) busy...",
-				    d, dp);
+				    d, (void *)dp);
 			continue;
 		}
 		if (dp->dcpu == IDN_NIL_DCPU) {
@@ -4635,11 +4635,11 @@ idn_domain_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 		if (d < 10)
 			(void) mi_mpprintf(mp, "%sDomain %d   (0x%p)",
 			    (d && (idn.ndomains > 1)) ? "\n" : "",
-			    d, dp);
+			    d, (void *)dp);
 		else
 			(void) mi_mpprintf(mp, "%sDomain %d  (0x%p)",
 			    (d && (idn.ndomains > 1)) ? "\n" : "",
-			    d, dp);
+			    d, (void *)dp);
 
 		if (d == idn.localid)
 			(void) mi_mpprintf(mp, "  (local)  State = %s (%d)",
@@ -4796,7 +4796,7 @@ idn_init_handler()
 	idn.intr.dmv_data_len = len;
 	idn.intr.dmv_data = kmem_zalloc(len, KM_SLEEP);
 
-	PR_PROTO("%s: DMV data area = %p\n", proc, idn.intr.dmv_data);
+	PR_PROTO("%s: DMV data area = %p\n", proc, (void *)idn.intr.dmv_data);
 
 	idn_dmv_data = (idn_dmv_data_t *)idn.intr.dmv_data;
 	basep = (idn_dmv_msg_t *)roundup((size_t)idn.intr.dmv_data +
@@ -4913,8 +4913,8 @@ idn_handler(caddr_t unused, caddr_t unused2)
 			INUM2STR(mtype, mstr);
 			if ((mtype & IDNP_MSGTYPE_MASK) == 0) {
 				INUM2STR(atype, astr);
-				strcat(mstr, "/");
-				strcat(mstr, astr);
+				(void) strcat(mstr, "/");
+				(void) strcat(mstr, astr);
 			}
 
 			count++;
@@ -5321,22 +5321,22 @@ inum2str(uint_t inum, char str[])
 	inum &= ~IDNP_ACKNACK_MASK;
 
 	if (!inum && !acknack) {
-		strcpy(str, idnm_str[0]);
+		(void) strcpy(str, idnm_str[0]);
 		return;
 	}
 
 	if (inum == 0) {
-		strcpy(str, (acknack & IDNP_ACK) ? "ack" : "nack");
+		(void) strcpy(str, (acknack & IDNP_ACK) ? "ack" : "nack");
 	} else {
 		if (inum < IDN_NUM_MSGTYPES)
-			strcpy(str, idnm_str[inum]);
+			(void) strcpy(str, idnm_str[inum]);
 		else
-			sprintf(str, "0x%x?", inum);
+			(void) sprintf(str, "0x%x?", inum);
 		if (acknack) {
 			if (acknack & IDNP_ACK)
-				strcat(str, "+ack");
+				(void) strcat(str, "+ack");
 			else
-				strcat(str, "+nack");
+				(void) strcat(str, "+nack");
 		}
 	}
 }
@@ -5444,9 +5444,9 @@ idnxdc(int domid, idn_msgtype_t *mtp,
 		INUM2STR(mtp->mt_mtype, mstr);
 		if ((mtp->mt_mtype & IDNP_MSGTYPE_MASK) == 0) {
 			INUM2STR(arg1, astr);
-			sprintf(str, "%s/%s", mstr, astr);
+			(void) sprintf(str, "%s/%s", mstr, astr);
 		} else {
-			strcpy(str, mstr);
+			(void) strcpy(str, mstr);
 		}
 		if (dp->dcpu == IDN_NIL_DCPU)
 			bd = -1;
@@ -5729,9 +5729,9 @@ debug_idnxdc(char *f, int domid, idn_msgtype_t *mtp,
 	INUM2STR(mtp->mt_mtype, mstr);
 	if ((mtp->mt_mtype & IDNP_MSGTYPE_MASK) == 0) {
 		INUM2STR(a1, astr);
-		sprintf(str, "%s/%s", mstr, astr);
+		(void) sprintf(str, "%s/%s", mstr, astr);
 	} else {
-		strcpy(str, mstr);
+		(void) strcpy(str, mstr);
 	}
 
 	if ((cpuid = dp->dcpu) == IDN_NIL_DCPU)
@@ -5766,7 +5766,7 @@ _idn_getstruct(char *structname, int size)
 	ptr = kmem_zalloc(size, KM_SLEEP);
 
 	PR_ALLOC("%s: ptr 0x%p, struct(%s), size = %d\n",
-	    proc, ptr, structname, size);
+	    proc, (void *)ptr, structname, size);
 
 	return (ptr);
 }
@@ -5777,7 +5777,7 @@ _idn_freestruct(caddr_t ptr, char *structname, int size)
 	procname_t	proc = "FREESTRUCT";
 
 	PR_ALLOC("%s: ptr 0x%p, struct(%s), size = %d\n",
-	    proc, ptr, structname, size);
+	    proc, (void *)ptr, structname, size);
 
 	ASSERT(ptr != NULL);
 	kmem_free(ptr, size);

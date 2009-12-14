@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -364,15 +364,15 @@ sgcn_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *credp)
 	mutex_exit(&sgcn_state->sgcn_lock);
 
 	/* initialize interrupt handler */
-	iosram_reg_intr(SBBC_CONSOLE_IN,
+	(void) iosram_reg_intr(SBBC_CONSOLE_IN,
 	    (sbbc_intrfunc_t)sgcn_data_in_handler, NULL,
 	    &sgcn_state->sgcn_sbbc_in_state,
 	    &sgcn_state->sgcn_sbbc_in_lock);
-	iosram_reg_intr(SBBC_CONSOLE_SPACE_OUT,
+	(void) iosram_reg_intr(SBBC_CONSOLE_SPACE_OUT,
 	    (sbbc_intrfunc_t)sgcn_space_2_out_handler, NULL,
 	    &sgcn_state->sgcn_sbbc_outspace_state,
 	    &sgcn_state->sgcn_sbbc_outspace_lock);
-	iosram_reg_intr(SBBC_CONSOLE_BRK,
+	(void) iosram_reg_intr(SBBC_CONSOLE_BRK,
 	    (sbbc_intrfunc_t)sgcn_break_handler, NULL,
 	    &sgcn_state->sgcn_sbbc_brk_state,
 	    &sgcn_state->sgcn_sbbc_brk_lock);
@@ -458,7 +458,7 @@ sgcn_wput(queue_t *q, mblk_t *mp)
 			 * with the output before it. Poke the start
 			 * routine, just in case.
 			 */
-			putq(q, mp);
+			(void) putq(q, mp);
 			sgcn_start();
 			break;
 		default:
@@ -695,7 +695,7 @@ sgcn_transmit(queue_t *q, mblk_t *mp)
 		buf = (caddr_t)bp->b_rptr;
 		len = CONSOLE_WRITE(buf, len);
 		if (len > 0)
-			iosram_send_intr(SBBC_CONSOLE_OUT);
+			(void) iosram_send_intr(SBBC_CONSOLE_OUT);
 		if (len >= 0 && len < oldlen) {
 			/* IOSRAM is full, we are not done with mp yet */
 			bp->b_rptr += len;
@@ -791,7 +791,7 @@ sgcn_data_in_handler(caddr_t arg)
 
 		}
 
-		iosram_send_intr(SBBC_CONSOLE_SPACE_IN);
+		(void) iosram_send_intr(SBBC_CONSOLE_SPACE_IN);
 
 		if (abort_enable == KIOCABORTALTERNATE) {
 			for (i = 0; i < len; i ++) {
@@ -890,7 +890,7 @@ sgcn_log_error(int when, int what)
 
 	if (error_counter > SGCN_MAX_ERROR) {
 		error_counter = 0;
-		strcpy(error_msg, "!Too many sgcn errors");
+		(void) strcpy(error_msg, "!Too many sgcn errors");
 	} else {
 		(void) sprintf(error_code, "Error %d", what);
 
@@ -1196,7 +1196,7 @@ sgcn_rsrv(queue_t *q)
 		if (canputnext(q)) {
 			putnext(q, mp);
 		} else if (mp->b_datap->db_type >= QPCTL) {
-			putbq(q, mp);
+			(void) putbq(q, mp);
 		}
 	}
 

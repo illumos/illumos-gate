@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1298,7 +1298,8 @@ fhc_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 		tmp_mondo_vec |= IMR_VALID;
 
 	DPRINTF(FHC_INTERRUPT_DEBUG,
-	    ("Mondo 0x%x mapping reg: 0x%p", hdlp->ih_vector, mondo_vec_reg));
+	    ("Mondo 0x%x mapping reg: 0x%p", hdlp->ih_vector,
+	    (void *)mondo_vec_reg));
 
 	/* Store it in the hardware reg. */
 	*mondo_vec_reg = tmp_mondo_vec;

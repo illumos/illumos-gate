@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -221,7 +221,7 @@ static void
 todds1307_cyclic(void *arg)
 {
 
-	todds1307_read_rtc((struct rtc_t *)arg);
+	(void) todds1307_read_rtc((struct rtc_t *)arg);
 
 }
 
@@ -377,7 +377,7 @@ todds1307_get(void)
 	ASSERT(MUTEX_HELD(&tod_lock));
 
 	if (sync_clock_once) {
-		todds1307_read_rtc(&soft_rtc);
+		(void) todds1307_read_rtc(&soft_rtc);
 		sync_clock_once = 0;
 	} else {
 		tod_fault_reset();
@@ -439,7 +439,7 @@ todds1307_set(timestruc_t ts)
 	rtc.rtc_min	= int2bcd(tod.tod_min);
 	rtc.rtc_sec	= int2bcd(tod.tod_sec);
 
-	todds1307_write_rtc(&rtc);
+	(void) todds1307_write_rtc(&rtc);
 }
 
 /* ARGSUSED */

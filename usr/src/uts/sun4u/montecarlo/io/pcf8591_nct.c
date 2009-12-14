@@ -19,13 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-
-
-
 
 /*
  * I2C leaf driver for the PCF8591
@@ -548,7 +544,7 @@ pcf8591_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		 * Read the status byte from pcf8591 chip. The value will
 		 * be already converted to Celcius by translate_cputemp.
 		 */
-		pcf8591_read_chip(unitp, channel, 1);
+		(void) pcf8591_read_chip(unitp, channel, 1);
 		if (ddi_copyout(unitp->i2c_tran->i2c_rbuf,
 		    (caddr_t)arg, sizeof (uint8_t), mode) != DDI_SUCCESS) {
 			err = EFAULT;
@@ -794,8 +790,7 @@ pcf8591_do_attach(dev_info_t *dip)
 	unitp->attach_flag = PCF8591_SOFT_STATE_ALLOC;
 
 	if (pcf8591_read_props(unitp) != DDI_PROP_SUCCESS) {
-		pcf8591_do_detach(dip);
-
+		(void) pcf8591_do_detach(dip);
 		return (DDI_FAILURE);
 	}
 
@@ -806,7 +801,7 @@ pcf8591_do_attach(dev_info_t *dip)
 	 */
 	unitp->current_mode = ENVCTRL_NORMAL_MODE; /* normal mode */
 
-	snprintf(unitp->pcf8591_name, PCF8591_NAMELEN,
+	(void) snprintf(unitp->pcf8591_name, PCF8591_NAMELEN,
 	    "%s%d", ddi_driver_name(dip), instance);
 
 	/*
@@ -822,8 +817,7 @@ pcf8591_do_attach(dev_info_t *dip)
 	if (ddi_create_minor_node(dip, name, S_IFCHR, minor,
 	    PCF8591_NODE_TYPE, NULL) == DDI_FAILURE) {
 			ddi_remove_minor_node(dip, NULL);
-			pcf8591_do_detach(dip);
-
+			(void) pcf8591_do_detach(dip);
 			return (DDI_FAILURE);
 		}
 	}
@@ -832,8 +826,7 @@ pcf8591_do_attach(dev_info_t *dip)
 
 	if (i2c_client_register(dip, &unitp->pcf8591_hdl)
 	    != I2C_SUCCESS) {
-		pcf8591_do_detach(dip);
-
+		(void) pcf8591_do_detach(dip);
 		return (DDI_FAILURE);
 	}
 
@@ -845,8 +838,7 @@ pcf8591_do_attach(dev_info_t *dip)
 	 */
 	if (i2c_transfer_alloc(unitp->pcf8591_hdl, &unitp->i2c_tran,
 	    MAX_WLEN, MAX_RLEN, KM_SLEEP) != I2C_SUCCESS) {
-		pcf8591_do_detach(dip);
-
+		(void) pcf8591_do_detach(dip);
 		return (DDI_FAILURE);
 	}
 
@@ -884,8 +876,7 @@ pcf8591_do_attach(dev_info_t *dip)
 	unitp->attach_flag |= PCF8591_LOCK_INIT;
 
 	if (pcf8591_add_kstats(unitp) != DDI_SUCCESS) {
-		pcf8591_do_detach(dip);
-
+		(void) pcf8591_do_detach(dip);
 		return (DDI_FAILURE);
 	}
 
@@ -962,7 +953,7 @@ pcf8591_add_kstats(struct pcf8591_unit *unitp)
 	unitp->tempksp->ks_update = pcf8591_temp_kstat_update;
 	unitp->tempksp->ks_private = (void *)unitp;
 
-	strcpy(unitp->temp_kstats.label,
+	(void) strcpy(unitp->temp_kstats.label,
 	    unitp->props.channels_description[0]);
 	unitp->temp_kstats.type = ENVC_NETRACT_CPU_SENSOR;
 
@@ -1031,8 +1022,7 @@ pcf8591_temp_kstat_update(kstat_t *ksp, int rw)
 		unitp->temp_kstats.shutdown_threshold = shutdown_temp;
 
 	} else {
-
-		pcf8591_read_chip(unitp, channel, 1);
+		(void) pcf8591_read_chip(unitp, channel, 1);
 		unitp->temp_kstats.value =
 		    unitp->i2c_tran->i2c_rbuf[0];
 		bcopy((caddr_t)&unitp->temp_kstats, kstatp,
@@ -1155,7 +1145,7 @@ pcf8591_read_props(struct pcf8591_unit *unitp)
 		    unitp->props.slave_address);
 #endif /* DEBUG */
 	}
-	ddi_getproplen(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	(void) ddi_getproplen(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "channels-in-use", &prop_len);
 	retval = ddi_prop_lookup_byte_array(DDI_DEV_T_ANY,
 	    dip, DDI_PROP_DONTPASS,

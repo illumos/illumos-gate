@@ -2590,7 +2590,7 @@ vnet_hio_mac_cleanup(vnet_t *vnetp)
 	}
 
 	if (vnetp->hio_muh != NULL) {
-		mac_unicast_remove(vnetp->hio_mch, vnetp->hio_muh);
+		(void) mac_unicast_remove(vnetp->hio_mch, vnetp->hio_muh);
 		vnetp->hio_muh = NULL;
 	}
 

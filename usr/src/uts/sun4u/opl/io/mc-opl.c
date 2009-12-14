@@ -446,7 +446,7 @@ mc_polling_thread()
 	mc_pollthr_running = 1;
 	while (!(mc_poll_cmd & MC_POLL_EXIT)) {
 		mc_polling();
-		cv_reltimedwait(&mc_polling_cv, &mc_polling_lock,
+		(void) cv_reltimedwait(&mc_polling_cv, &mc_polling_lock,
 		    mc_timeout_period, TR_CLOCK_TICK);
 	}
 	mc_pollthr_running = 0;
@@ -871,12 +871,12 @@ mc_set_mem_unum(char *buf, int buflen, int sb, int bank,
 		    mf_type == FLT_TYPE_PERMANENT_CE) {
 			i = BD_BK_SLOT_TO_INDEX(0, bank, d_slot);
 			dimmnm = mc_dc_dimm_unum_table[i];
-			snprintf(buf, buflen, "/%s%02d/MEM%s",
+			(void) snprintf(buf, buflen, "/%s%02d/MEM%s",
 			    model_names[plat_model].unit_name, sb, dimmnm);
 		} else {
 			i = BD_BK_SLOT_TO_INDEX(0, bank, 0);
 			j = (cs == 0) ?  i : i + 2;
-			snprintf(buf, buflen, "/%s%02d/MEM%s MEM%s",
+			(void) snprintf(buf, buflen, "/%s%02d/MEM%s MEM%s",
 			    model_names[plat_model].unit_name, sb,
 			    mc_dc_dimm_unum_table[j],
 			    mc_dc_dimm_unum_table[j + 1]);
@@ -889,7 +889,7 @@ mc_set_mem_unum(char *buf, int buflen, int sb, int bank,
 			i = BD_BK_SLOT_TO_INDEX(sb, bank, d_slot);
 			dimmnm = mc_ff_dimm_unum_table[i];
 			memb_num = dimmnm[0];
-			snprintf(buf, buflen, "/%s/%s%c/MEM%s",
+			(void) snprintf(buf, buflen, "/%s/%s%c/MEM%s",
 			    model_names[plat_model].unit_name,
 			    model_names[plat_model].mem_name,
 			    memb_num, &dimmnm[1]);
@@ -897,7 +897,7 @@ mc_set_mem_unum(char *buf, int buflen, int sb, int bank,
 			i = BD_BK_SLOT_TO_INDEX(sb, bank, 0);
 			j = (cs == 0) ?  i : i + 2;
 			memb_num = mc_ff_dimm_unum_table[i][0],
-			    snprintf(buf, buflen, "/%s/%s%c/MEM%s MEM%s",
+			    (void) snprintf(buf, buflen, "/%s/%s%c/MEM%s MEM%s",
 			    model_names[plat_model].unit_name,
 			    model_names[plat_model].mem_name, memb_num,
 			    &mc_ff_dimm_unum_table[j][1],
@@ -909,13 +909,13 @@ mc_set_mem_unum(char *buf, int buflen, int sb, int bank,
 		    mf_type == FLT_TYPE_PERMANENT_CE) {
 			i = BD_BK_SLOT_TO_INDEX(sb, bank, d_slot);
 			dimmnm = mc_ff_dimm_unum_table[i];
-			snprintf(buf, buflen, "/%s/MEM%s",
+			(void) snprintf(buf, buflen, "/%s/MEM%s",
 			    model_names[plat_model].unit_name, &dimmnm[1]);
 		} else {
 			i = BD_BK_SLOT_TO_INDEX(sb, bank, 0);
 			j = (cs == 0) ?  i : i + 2;
 			memb_num = mc_ff_dimm_unum_table[i][0],
-			    snprintf(buf, buflen, "/%s/MEM%s MEM%s",
+			    (void) snprintf(buf, buflen, "/%s/MEM%s MEM%s",
 			    model_names[plat_model].unit_name,
 			    &mc_ff_dimm_unum_table[j][1],
 			    &mc_ff_dimm_unum_table[j + 1][1]);
@@ -1077,7 +1077,7 @@ mc_ereport_post(mc_aflt_t *mc_aflt)
 		blen = MAXPATHLEN - n;
 		p = &device_path[n];
 		if (i < (nflts - 1)) {
-			snprintf(p, blen, " ");
+			(void) snprintf(p, blen, " ");
 			blen--;
 			p++;
 		}
@@ -2309,7 +2309,7 @@ mc_check_errors_func(mc_opl_t *mcp)
 				}
 
 				error_count++;
-				restart_patrol(mcp, i, &rsaddr_info);
+				(void) restart_patrol(mcp, i, &rsaddr_info);
 			} else {
 				/*
 				 * HW patrol scan has apparently stopped
@@ -2321,7 +2321,7 @@ mc_check_errors_func(mc_opl_t *mcp)
 				 * bank in this case.
 				 */
 				if (!IS_MIRROR(mcp, i) || (i & 0x1))
-					restart_patrol(mcp, i, NULL);
+					(void) restart_patrol(mcp, i, NULL);
 			}
 		}
 	}
@@ -2779,7 +2779,7 @@ mc_board_add(mc_opl_t *mcp)
 			get_ptrl_start_address(mcp, bk, &rsaddr.mi_restartaddr);
 			rsaddr.mi_valid = 0;
 			rsaddr.mi_injectrestart = 0;
-			restart_patrol(mcp, bk, &rsaddr);
+			(void) restart_patrol(mcp, bk, &rsaddr);
 		} else {
 			MC_LOG("Not starting up /LSB%d/B%d\n",
 			    mcp->mc_board_num, bk);
@@ -3021,7 +3021,7 @@ mc_get_mem_unum(int synd_code, uint64_t flt_addr, char *buf, int buflen,
 	case MODEL_DC:
 		i = BD_BK_SLOT_TO_INDEX(0, bank, 0);
 		j = (cs == 0) ? i : i + 2;
-		snprintf(buf, buflen, "/%s%02d/MEM%s MEM%s",
+		(void) snprintf(buf, buflen, "/%s%02d/MEM%s MEM%s",
 		    model_names[plat_model].unit_name, sb,
 		    mc_dc_dimm_unum_table[j],
 		    mc_dc_dimm_unum_table[j + 1]);
@@ -3031,7 +3031,7 @@ mc_get_mem_unum(int synd_code, uint64_t flt_addr, char *buf, int buflen,
 		i = BD_BK_SLOT_TO_INDEX(sb, bank, 0);
 		j = (cs == 0) ? i : i + 2;
 		memb_num = mc_ff_dimm_unum_table[i][0];
-		snprintf(buf, buflen, "/%s/%s%c/MEM%s MEM%s",
+		(void) snprintf(buf, buflen, "/%s/%s%c/MEM%s MEM%s",
 		    model_names[plat_model].unit_name,
 		    model_names[plat_model].mem_name, memb_num,
 		    &mc_ff_dimm_unum_table[j][1],
@@ -3040,7 +3040,7 @@ mc_get_mem_unum(int synd_code, uint64_t flt_addr, char *buf, int buflen,
 	case MODEL_IKKAKU:
 		i = BD_BK_SLOT_TO_INDEX(sb, bank, 0);
 		j = (cs == 0) ? i : i + 2;
-		snprintf(buf, buflen, "/%s/MEM%s MEM%s",
+		(void) snprintf(buf, buflen, "/%s/MEM%s MEM%s",
 		    model_names[plat_model].unit_name,
 		    &mc_ff_dimm_unum_table[j][1],
 		    &mc_ff_dimm_unum_table[j + 1][1]);
@@ -3065,7 +3065,7 @@ opl_mc_suspend(void)
 	for (i = 0; i < OPL_MAX_BOARDS; i++) {
 		if ((mcp = mc_instances[i]) == NULL)
 			continue;
-		mc_suspend(mcp, MC_SOFT_SUSPENDED);
+		(void) mc_suspend(mcp, MC_SOFT_SUSPENDED);
 	}
 	mutex_exit(&mcmutex);
 
@@ -3082,7 +3082,7 @@ opl_mc_resume(void)
 	for (i = 0; i < OPL_MAX_BOARDS; i++) {
 		if ((mcp = mc_instances[i]) == NULL)
 			continue;
-		mc_resume(mcp, MC_SOFT_SUSPENDED);
+		(void) mc_resume(mcp, MC_SOFT_SUSPENDED);
 	}
 	mutex_exit(&mcmutex);
 
@@ -3362,7 +3362,7 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 		rsaddr.mi_restartaddr.ma_dimm_addr = dimm_addr;
 		rsaddr.mi_valid = 1;
 		rsaddr.mi_injectrestart = 1;
-		restart_patrol(mcp, bank, &rsaddr);
+		(void) restart_patrol(mcp, bank, &rsaddr);
 	}
 
 	if (flags & MC_INJECT_FLAG_POLL) {
@@ -3389,7 +3389,7 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 				mc_error_handler(mcp, bank, &rsaddr);
 			}
 
-			restart_patrol(mcp, bank, &rsaddr);
+			(void) restart_patrol(mcp, bank, &rsaddr);
 		} else {
 			/*
 			 * We are expecting to report injected
@@ -3398,7 +3398,7 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 			 */
 			mcp->mc_speedup_period[ebank] = 2;
 			MAC_CMD(mcp, bank, 0);
-			restart_patrol(mcp, bank, NULL);
+			(void) restart_patrol(mcp, bank, NULL);
 		}
 	}
 
@@ -3533,7 +3533,7 @@ mc_get_mem_sid_dimm(mc_opl_t *mcp, char *dname, char *buf,
 			    "buflen is smaller than %d\n", *lenp);
 			ret = ENOSPC;
 		} else {
-			snprintf(buf, buflen, "%s:%s",
+			(void) snprintf(buf, buflen, "%s:%s",
 			    d->md_serial, d->md_partnum);
 			ret = 0;
 		}
@@ -3819,7 +3819,7 @@ mc_get_dimm_list(mc_opl_t *mcp)
 		}
 	}
 	kmem_free(bd_dimmp, maxbufsz);
-	MC_LOG("mc_get_dimm_list: dimmlist=0x%p\n", dimm_list);
+	MC_LOG("mc_get_dimm_list: dimmlist=0x%p\n", (void *)dimm_list);
 	return (dimm_list);
 }
 
@@ -4057,28 +4057,28 @@ mc_ioctl_debug(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 	switch (cmd) {
 	case MCI_CE:
-		mc_inject_error(MC_INJECT_INTERMITTENT_CE, pa, flags);
+		(void) mc_inject_error(MC_INJECT_INTERMITTENT_CE, pa, flags);
 		break;
 	case MCI_PERM_CE:
-		mc_inject_error(MC_INJECT_PERMANENT_CE, pa, flags);
+		(void) mc_inject_error(MC_INJECT_PERMANENT_CE, pa, flags);
 		break;
 	case MCI_UE:
-		mc_inject_error(MC_INJECT_UE, pa, flags);
+		(void) mc_inject_error(MC_INJECT_UE, pa, flags);
 		break;
 	case MCI_M_CE:
-		mc_inject_error(MC_INJECT_INTERMITTENT_MCE, pa, flags);
+		(void) mc_inject_error(MC_INJECT_INTERMITTENT_MCE, pa, flags);
 		break;
 	case MCI_M_PCE:
-		mc_inject_error(MC_INJECT_PERMANENT_MCE, pa, flags);
+		(void) mc_inject_error(MC_INJECT_PERMANENT_MCE, pa, flags);
 		break;
 	case MCI_M_UE:
-		mc_inject_error(MC_INJECT_MUE, pa, flags);
+		(void) mc_inject_error(MC_INJECT_MUE, pa, flags);
 		break;
 	case MCI_CMP:
-		mc_inject_error(MC_INJECT_CMPE, pa, flags);
+		(void) mc_inject_error(MC_INJECT_CMPE, pa, flags);
 		break;
 	case MCI_NOP:
-		mc_inject_error(MC_INJECT_NOP, pa, flags); break;
+		(void) mc_inject_error(MC_INJECT_NOP, pa, flags); break;
 	case MCI_SHOW_ALL:
 		mc_debug_show_all = 1;
 		break;

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Driver for handling Serengeti I/O SRAM
@@ -116,13 +114,13 @@ sgsbbc_iosram_is_chosen(sbbc_softstate_t *softsp)
 
 	(void) ddi_pathname(softsp->dip, pn);
 	SGSBBC_DBG_ALL("sgsbbc_iosram(%d): ddi_pathname(%p) is '%s'\n",
-			softsp->sbbc_instance, softsp->dip, pn);
+	    softsp->sbbc_instance, (void *)softsp->dip, pn);
 
 	chosen = (strcmp(chosen_iosram, pn) == 0) ? 1 : 0;
 	SGSBBC_DBG_ALL("sgsbbc_iosram(%d): ... %s\n", softsp->sbbc_instance,
-			chosen? "MASTER" : "SLAVE");
+	    chosen? "MASTER" : "SLAVE");
 	SGSBBC_DBG_ALL("sgsbbc_iosram(%d): ... %s\n", softsp->sbbc_instance,
-			(chosen ? "MASTER" : "SLAVE"));
+	    (chosen ? "MASTER" : "SLAVE"));
 
 	return (chosen);
 }
@@ -255,7 +253,8 @@ tunnel_init(sbbc_softstate_t *softsp, tunnel_t *new_tunnel)
 			    "registers", ddi_get_instance(softsp->dip));
 			return (DDI_FAILURE);
 	}
-	SGSBBC_DBG_ALL("dip=%p mapped TOC %p\n", softsp->dip, toc);
+	SGSBBC_DBG_ALL("dip=%p mapped TOC %p\n", (void *)softsp->dip,
+	    (void *)toc);
 
 	check_iosram_ver(toc->iosram_version);
 
@@ -281,10 +280,10 @@ tunnel_init(sbbc_softstate_t *softsp, tunnel_t *new_tunnel)
 				return (DDI_FAILURE);
 			}
 			SGSBBC_DBG_ALL("%d: key %s size %d offset %x addr %p\n",
-				i, toc->iosram_keys[i].key,
-				toc->iosram_keys[i].size,
-				toc->iosram_keys[i].offset,
-				tunnel->base);
+			    i, toc->iosram_keys[i].key,
+			    toc->iosram_keys[i].size,
+			    toc->iosram_keys[i].offset,
+			    (void *)tunnel->base);
 
 		}
 	}
@@ -995,7 +994,7 @@ iosram_switch_tunnel(int instance)
 	 * Call the interrupt handler directly in case
 	 * we have missed an interrupt
 	 */
-	(void) sbbc_intr_handler(master_iosram->iosram_sbbc);
+	(void) sbbc_intr_handler((caddr_t)master_iosram->iosram_sbbc);
 
 	if (rc != DDI_SUCCESS) {
 		/*

@@ -1014,11 +1014,11 @@ plat_add_mem_unum_label(char *unum, int mcid, int bank, int dimm)
 		SG_SET_FRU_NAME_BANK(new_unum, bank);
 		SG_SET_FRU_NAME_DIMM(new_unum, dimm);
 
-		strcat(new_unum, " ");
-		strcat(new_unum, unum);
+		(void) strcat(new_unum, " ");
+		(void) strcat(new_unum, unum);
 	}
 
-	strcpy(unum, new_unum);
+	(void) strcpy(unum, new_unum);
 }
 
 int
@@ -1468,13 +1468,13 @@ sg_system_release(void)
 static void
 sg_console_claim(void)
 {
-	prom_serengeti_set_console_input(SGCN_OBP_STR);
+	(void) prom_serengeti_set_console_input(SGCN_OBP_STR);
 }
 
 static void
 sg_console_release(void)
 {
-	prom_serengeti_set_console_input(SGCN_CLNT_STR);
+	(void) prom_serengeti_set_console_input(SGCN_CLNT_STR);
 }
 
 void

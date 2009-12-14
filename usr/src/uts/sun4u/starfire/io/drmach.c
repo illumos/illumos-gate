@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -806,7 +807,7 @@ drmach_board_new(int bnum)
 	bp->assigned = !drmach_initialized;
 	bp->powered = !drmach_initialized;
 
-	drmach_array_set(drmach_boards, bnum, bp);
+	(void) drmach_array_set(drmach_boards, bnum, bp);
 	return (bp);
 }
 
@@ -843,7 +844,7 @@ drmach_board_status(drmachid_t id, drmach_status_t *stat)
 	stat->configured = 0;		/* assume not configured */
 	stat->empty = 0;
 	stat->cond = bp->cond = SBD_COND_OK;
-	strncpy(stat->type, "System Brd", sizeof (stat->type));
+	(void) strncpy(stat->type, "System Brd", sizeof (stat->type));
 	stat->info[0] = '\0';
 
 	if (bp->devices) {
@@ -1394,9 +1395,9 @@ drmach_prep_rename_script(drmach_device_t *s_mem, drmach_device_t *t_mem,
 		DRMACH_PR("mc idle register address list:");
 		isp = (drmach_mc_idle_script_t *)buf;
 		DRMACH_PR("source mc idle addr 0x%lx, mem id %p",
-			isp[0].idle_addr, isp[0].mem);
+			isp[0].idle_addr, (void *)isp[0].mem);
 		DRMACH_PR("target mc idle addr 0x%lx, mem id %p",
-			isp[1].idle_addr, isp[1].mem);
+			isp[1].idle_addr, (void *)isp[1].mem);
 		ASSERT(isp[2].idle_addr == 0);
 
 		DRMACH_PR("copy-rename script:");
@@ -1654,7 +1655,7 @@ drmach_copy_rename_init(drmachid_t t_id, uint64_t t_slice_offset,
 
 	/* allocate space for copy rename struct */
 	len = sizeof (drmach_copy_rename_program_t);
-	DRMACH_PR("prog = 0x%p, header len %d\n", wp, len);
+	DRMACH_PR("prog = 0x%p, header len %d\n", (void *)wp, len);
 	prog = (drmach_copy_rename_program_t *)wp;
 	wp += (len + ecache_alignsize - 1) & ~ (ecache_alignsize - 1);
 
@@ -1670,7 +1671,7 @@ drmach_copy_rename_init(drmachid_t t_id, uint64_t t_slice_offset,
 	ASSERT(wp + len < bp + PAGESIZE);
 	bcopy((caddr_t)drmach_copy_rename_prog__relocatable, wp, len);
 
-	DRMACH_PR("copy-rename function 0x%p, len %d\n", wp, len);
+	DRMACH_PR("copy-rename function 0x%p, len %d\n", (void *)wp, len);
 	prog->run = (void (*)())wp;
 	wp += (len + ecache_alignsize - 1) & ~ (ecache_alignsize - 1);
 
@@ -1686,7 +1687,7 @@ drmach_copy_rename_init(drmachid_t t_id, uint64_t t_slice_offset,
 		return (err);
 	}
 
-	DRMACH_PR("copy-rename script 0x%p, len %d\n", wp, len);
+	DRMACH_PR("copy-rename script 0x%p, len %d\n", (void *)wp, len);
 	prog->data = wp;
 	wp += (len + ecache_alignsize - 1) & ~ (ecache_alignsize - 1);
 
@@ -1742,7 +1743,8 @@ drmach_io_new(drmach_device_t *dp)
 	dp->cm.release = drmach_io_release;
 	dp->cm.status = drmach_io_status;
 
-	snprintf(dp->cm.name, sizeof (dp->cm.name), "%s%d", dp->type, dp->unum);
+	(void) snprintf(dp->cm.name, sizeof (dp->cm.name), "%s%d", dp->type,
+	    dp->unum);
 
 	return (err);
 }
@@ -2259,7 +2261,7 @@ drmach_board_lookup(int bnum, drmachid_t *id)
 sbd_error_t *
 drmach_board_name(int bnum, char *buf, int buflen)
 {
-	snprintf(buf, buflen, "SB%d", bnum);
+	(void) snprintf(buf, buflen, "SB%d", bnum);
 	return (NULL);
 }
 
@@ -2359,7 +2361,8 @@ drmach_cpu_new(drmach_device_t *dp)
 	dp->cm.release = drmach_cpu_release;
 	dp->cm.status = drmach_cpu_status;
 
-	snprintf(dp->cm.name, sizeof (dp->cm.name), "%s%d", dp->type, dp->unum);
+	(void) snprintf(dp->cm.name, sizeof (dp->cm.name), "%s%d", dp->type,
+	    dp->unum);
 
 	return (err);
 }
@@ -2706,7 +2709,7 @@ drmach_cpu_status(drmachid_t id, drmach_status_t *stat)
 	stat->configured = (cpu_get(drmach_cpu_calc_id(dp)) != NULL);
 	mutex_exit(&cpu_lock);
 	stat->busy = dp->busy;
-	strncpy(stat->type, dp->type, sizeof (stat->type));
+	(void) strncpy(stat->type, dp->type, sizeof (stat->type));
 	stat->info[0] = '\0';
 
 	return (NULL);
@@ -2915,7 +2918,7 @@ drmach_io_status(drmachid_t id, drmach_status_t *stat)
 	stat->powered = dp->bp->powered;
 	stat->configured = (configured != 0);
 	stat->busy = dp->busy;
-	strncpy(stat->type, dp->type, sizeof (stat->type));
+	(void) strncpy(stat->type, dp->type, sizeof (stat->type));
 	stat->info[0] = '\0';
 
 	return (NULL);
@@ -2932,7 +2935,7 @@ drmach_mem_new(drmach_device_t *dp)
 	dp->cm.release = drmach_mem_release;
 	dp->cm.status = drmach_mem_status;
 
-	snprintf(dp->cm.name, sizeof (dp->cm.name), "%s", dp->type);
+	(void) snprintf(dp->cm.name, sizeof (dp->cm.name), "%s", dp->type);
 
 	return (NULL);
 }
@@ -2952,8 +2955,8 @@ drmach_mem_add_span(drmachid_t id, uint64_t basepa, uint64_t size)
 
 	rv = kcage_range_add(basepfn, npages, KCAGE_DOWN);
 	if (rv == ENOMEM) {
-		cmn_err(CE_WARN, "%ld megabytes not available to kernel cage",
-			(size == 0 ? 0 : size / MBYTE));
+		cmn_err(CE_WARN, "%lu megabytes not available to kernel cage",
+			(ulong_t)(size == 0 ? 0 : size / MBYTE));
 	} else if (rv != 0) {
 		/* catch this in debug kernels */
 		ASSERT(0);
@@ -3380,7 +3383,7 @@ drmach_mem_status(drmachid_t id, drmach_status_t *stat)
 	stat->powered = dp->bp->powered;
 	stat->configured = (ml != NULL);
 	stat->busy = dp->busy;
-	strncpy(stat->type, dp->type, sizeof (stat->type));
+	(void) strncpy(stat->type, dp->type, sizeof (stat->type));
 	stat->info[0] = '\0';
 
 	return (NULL);

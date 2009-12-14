@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -556,7 +556,7 @@ schpc_connect(caddr_t ops_arg, hpc_slot_t slot_hdl, void *data, uint_t flags)
 	int		slot;
 
 	SCHPC_DEBUG2(D_IOC_CONNECT, "schpc_connect( ops_arg=%p slot_hdl=%p)",
-	    ops_arg, slot_hdl);
+	    (void *)ops_arg, (void *)slot_hdl);
 
 	mutex_enter(&schpc_p->schpc_mutex);
 
@@ -877,7 +877,7 @@ schpc_connect(caddr_t ops_arg, hpc_slot_t slot_hdl, void *data, uint_t flags)
 				freq = schpc_slot_freq(&getslot);
 				SCHPC_DEBUG2(D_FREQCHG,
 				    "schpc_connect: updating dip=%p freq=%dHZ",
-				    find_dev.dip, freq);
+				    (void *)find_dev.dip, freq);
 				if (ndi_prop_update_int(DDI_DEV_T_NONE,
 				    find_dev.dip, "clock-frequency", freq)
 				    != DDI_SUCCESS) {
@@ -969,7 +969,8 @@ schpc_disconnect(caddr_t ops_arg, hpc_slot_t slot_hdl, void *data,
 	pci_setslot_t	setslot;
 
 	SCHPC_DEBUG2(D_IOC_CONNECT,
-	    "schpc_disconnect( ops_arg=%p slot_hdl=%p)", ops_arg, slot_hdl);
+	    "schpc_disconnect( ops_arg=%p slot_hdl=%p)", (void *)ops_arg,
+	    slot_hdl);
 
 	mutex_enter(&schpc_p->schpc_mutex);
 
@@ -1120,7 +1121,7 @@ schpc_cpci_control(caddr_t ops_arg, hpc_slot_t slot_hdl, int request,
 
 	SCHPC_DEBUG3(D_IOC_CONTROL,
 	    "schpc_cpci_control(op_args=%p slot_hdl=%p request=%x)",
-	    ops_arg, slot_hdl, request);
+	    (void *)ops_arg, (void *)slot_hdl, request);
 
 	mutex_enter(&schpc_p->schpc_mutex);
 
@@ -1277,7 +1278,8 @@ schpc_cpci_control(caddr_t ops_arg, hpc_slot_t slot_hdl, int request,
 		hpc_led_info = (hpc_led_info_t *)arg;
 
 		SCHPC_DEBUG1(D_IOC_CONTROL, "schpc_cpci_control() - "
-		    "HPC_CTRL_SET_LED_STATE hpc_led_info=%p", hpc_led_info);
+		    "HPC_CTRL_SET_LED_STATE hpc_led_info=%p",
+		    (void *)hpc_led_info);
 
 		switch (hpc_led_info->led) {
 		case HPC_FAULT_LED:
@@ -1383,7 +1385,7 @@ schpc_cpci_control(caddr_t ops_arg, hpc_slot_t slot_hdl, int request,
 
 		SCHPC_DEBUG1(D_IOC_CONTROL, "schpc_cpci_control() - "
 		    "HPC_CTRL_GET_SLOT_STATE hpc_slot_state=%p",
-		    hpc_slot_state);
+		    (void *)hpc_slot_state);
 
 		rval = schpc_getslotstatus(expander, board, slot, &slotstatus);
 
@@ -1588,7 +1590,7 @@ schpc_pci_control(caddr_t ops_arg, hpc_slot_t slot_hdl, int request,
 
 	SCHPC_DEBUG3(D_IOC_CONTROL,
 	    "schpc_pci_control(op_args=%p slot_hdl=%p request=%x)",
-	    ops_arg, slot_hdl, request);
+	    (void *)ops_arg, (void *)slot_hdl, request);
 
 	mutex_enter(&schpc_p->schpc_mutex);
 
@@ -1669,7 +1671,7 @@ schpc_pci_control(caddr_t ops_arg, hpc_slot_t slot_hdl, int request,
 
 		SCHPC_DEBUG1(D_IOC_CONTROL, "schpc_pci_control() - "
 		    "HPC_CTRL_GET_SLOT_STATE hpc_slot_state=%p",
-		    hpc_slot_state);
+		    (void *)hpc_slot_state);
 
 		rval = schpc_getslotstatus(expander, board, slot, &slotstatus);
 
@@ -1841,7 +1843,8 @@ schpc_pci_control(caddr_t ops_arg, hpc_slot_t slot_hdl, int request,
 		hpc_led_info = (hpc_led_info_t *)arg;
 
 		SCHPC_DEBUG1(D_IOC_CONTROL, "schpc_pci_control() - "
-		    "HPC_CTRL_SET_LED_STATE hpc_led_info=%p", hpc_led_info);
+		    "HPC_CTRL_SET_LED_STATE hpc_led_info=%p",
+		    (void *)hpc_led_info);
 
 		switch (hpc_led_info->led) {
 		case HPC_FAULT_LED:
@@ -1998,7 +2001,7 @@ schpc_test(caddr_t ops_arg, int slot, void *data, uint_t flags)
 	int		retry = 1;
 
 	SCHPC_DEBUG2(D_IOC_TEST, "schpc_test(op_args=%p slot=%x)",
-	    ops_arg, SCHPC_SLOT_NUM(slot));
+	    (void *)ops_arg, SCHPC_SLOT_NUM(slot));
 
 	SCHPC_DEBUG3(D_IOC_TEST,
 	    "    schpc_test() Expander=%d Board=%d Slot=%d",
@@ -2392,14 +2395,14 @@ schpc_event_handler(void *arg)
 			schpc_p->schpc_slot[slot].state |=
 			    SCHPC_SLOTSTATE_CONNECTED;
 
-			hpc_slot_event_notify(
+			(void) hpc_slot_event_notify(
 			    schpc_p->schpc_slot[slot].slot_handle,
 			    HPC_EVENT_SLOT_POWER_ON, 0);
 		} else {
 			schpc_p->schpc_slot[slot].state &=
 			    ~SCHPC_SLOTSTATE_CONNECTED;
 
-			hpc_slot_event_notify(
+			(void) hpc_slot_event_notify(
 			    schpc_p->schpc_slot[slot].slot_handle,
 			    HPC_EVENT_SLOT_POWER_OFF, 0);
 		}
@@ -2452,7 +2455,7 @@ schpc_event_handler(void *arg)
 			schpc_p->schpc_slot[slot].state &=
 			    ~SCHPC_SLOTSTATE_PRESENT;
 
-			hpc_slot_event_notify(
+			(void) hpc_slot_event_notify(
 			    schpc_p->schpc_slot[slot].slot_handle,
 			    HPC_EVENT_SLOT_REMOVAL, 0);
 		} else {
@@ -2487,7 +2490,7 @@ schpc_event_handler(void *arg)
 			schpc_p->schpc_slot[slot].state &=
 			    ~SCHPC_SLOTSTATE_CONNECTED;
 
-			hpc_slot_event_notify(
+			(void) hpc_slot_event_notify(
 			    schpc_p->schpc_slot[slot].slot_handle,
 			    HPC_EVENT_SLOT_INSERTION, 0);
 
@@ -2531,7 +2534,7 @@ schpc_event_handler(void *arg)
 
 				mutex_exit(&schpc_p->schpc_mutex);
 
-				hpc_slot_event_notify(
+				(void) hpc_slot_event_notify(
 				    schpc_p->schpc_slot[slot].slot_handle,
 				    HPC_EVENT_SLOT_CONFIGURE, 0);
 			} else {
@@ -2555,7 +2558,7 @@ schpc_event_handler(void *arg)
 
 		schpc_p->schpc_slot[slot].state |= SCHPC_SLOTSTATE_ENUM;
 
-		hpc_slot_event_notify(
+		(void) hpc_slot_event_notify(
 		    schpc_p->schpc_slot[slot].slot_handle,
 		    HPC_EVENT_SLOT_ENUM, 0);
 	}
@@ -2571,7 +2574,7 @@ schpc_event_handler(void *arg)
 			schpc_p->schpc_slot[slot].state &=
 			    ~SCHPC_SLOTSTATE_OCC_GOOD;
 
-			hpc_slot_event_notify(
+			(void) hpc_slot_event_notify(
 			    schpc_p->schpc_slot[slot].slot_handle,
 			    HPC_EVENT_SLOT_NOT_HEALTHY, 0);
 
@@ -2582,7 +2585,7 @@ schpc_event_handler(void *arg)
 			schpc_p->schpc_slot[slot].state |=
 			    SCHPC_SLOTSTATE_OCC_GOOD;
 
-			hpc_slot_event_notify(
+			(void) hpc_slot_event_notify(
 			    schpc_p->schpc_slot[slot].slot_handle,
 			    HPC_EVENT_SLOT_HEALTHY_OK, 0);
 
@@ -2602,7 +2605,7 @@ schpc_event_handler(void *arg)
 			schpc_p->schpc_slot[slot].state |=
 			    SCHPC_SLOTSTATE_OCC_GOOD;
 
-			hpc_slot_event_notify(
+			(void) hpc_slot_event_notify(
 			    schpc_p->schpc_slot[slot].slot_handle,
 			    HPC_EVENT_SLOT_HEALTHY_OK, 0);
 
@@ -2621,7 +2624,7 @@ schpc_event_handler(void *arg)
 				schpc_p->schpc_slot[slot].state &=
 				    ~SCHPC_SLOTSTATE_OCC_GOOD;
 
-				hpc_slot_event_notify(
+				(void) hpc_slot_event_notify(
 				    schpc_p->schpc_slot[slot].slot_handle,
 				    HPC_EVENT_SLOT_NOT_HEALTHY, 0);
 
@@ -2642,7 +2645,7 @@ schpc_event_handler(void *arg)
 			schpc_p->schpc_slot[slot].state &=
 			    ~SCHPC_SLOTSTATE_OCC_GOOD;
 
-			hpc_slot_event_notify(
+			(void) hpc_slot_event_notify(
 			    schpc_p->schpc_slot[slot].slot_handle,
 			    HPC_EVENT_SLOT_NOT_HEALTHY, 0);
 
@@ -2654,7 +2657,7 @@ schpc_event_handler(void *arg)
 			schpc_p->schpc_slot[slot].state |=
 			    SCHPC_SLOTSTATE_OCC_GOOD;
 
-			hpc_slot_event_notify(
+			(void) hpc_slot_event_notify(
 			    schpc_p->schpc_slot[slot].slot_handle,
 			    HPC_EVENT_SLOT_HEALTHY_OK, 0);
 
@@ -3093,7 +3096,7 @@ schpc_getslotstatus(uint32_t expander, uint32_t board, uint32_t slot,
 	SCHPC_DEBUG4(D_GETSLOTSTATUS,
 	    "schpc_getslotstatus(expander=%d board=%d "
 	    "slot=%d slotstatus=0x%p", expander, board,
-	    SCHPC_SLOT_NUM(slot), slotstatus);
+	    SCHPC_SLOT_NUM(slot), (void *)slotstatus);
 
 	if (schpc_p == NULL) {
 		return (1);
@@ -3185,7 +3188,7 @@ schpc_setslotstatus(uint32_t expander, uint32_t board, uint32_t slot,
 	SCHPC_DEBUG4(D_SETSLOTSTATUS,
 	    "schpc_setslotstatus(expander=%d board=%d "
 	    "slot=%d slotstatus=0x%p", expander, board,
-	    SCHPC_SLOT_NUM(slot), slotstatus);
+	    SCHPC_SLOT_NUM(slot), (void *)slotstatus);
 
 	bzero(&request, sizeof (pcimsg_t));
 
@@ -3413,7 +3416,7 @@ schpc_register_all_slots(schpc_t *schpc_p)
 	int		leaf, schizo, expander, portid, offset;
 
 	SCHPC_DEBUG1(D_ATTACH,
-	    "schpc_register_all_slots(schpc_p=%p)", schpc_p);
+	    "schpc_register_all_slots(schpc_p=%p)", (void *)schpc_p);
 
 	/*
 	 * Allow the event_handler to start processing unsolicited
@@ -3468,7 +3471,7 @@ schpc_register_all_slots(schpc_t *schpc_p)
 
 		SCHPC_DEBUG2(D_ATTACH,
 		    "schpc_register_all_slots: pci@%s FOUND dip=0x%p",
-		    caddr, pci_dip);
+		    caddr, (void *)pci_dip);
 
 		(void) schpc_add_pci(pci_dip);
 
@@ -3501,7 +3504,7 @@ schpc_add_pci(dev_info_t *bdip)
 	hpc_slot_ops_t	*slot_ops;
 	dev_info_t 	*sdip = bdip;
 
-	SCHPC_DEBUG1(D_ATTACH, "schpc_add_pci(dip=0x%p)", sdip);
+	SCHPC_DEBUG1(D_ATTACH, "schpc_add_pci(dip=0x%p)", (void *)sdip);
 
 	if (schpc_p == NULL) {
 		/*
@@ -3511,7 +3514,8 @@ schpc_add_pci(dev_info_t *bdip)
 	}
 
 	if ((portid = ddi_getprop(DDI_DEV_T_ANY, sdip, 0, "portid", -1)) < 0) {
-		cmn_err(CE_WARN, "schpc_add_pci(dip=0x%p) - no portid\n", sdip);
+		cmn_err(CE_WARN, "schpc_add_pci(dip=0x%p) - no portid\n",
+		    (void *)sdip);
 		return (DDI_FAILURE);
 	}
 
@@ -3528,14 +3532,14 @@ schpc_add_pci(dev_info_t *bdip)
 		break;
 	default:
 		cmn_err(CE_WARN, "schpc_add_pci(dip=0x%p) - "
-		    "Invalid pci portid 0x%x\n", sdip, portid);
+		    "Invalid pci portid 0x%x\n", (void *)sdip, portid);
 		return (DDI_FAILURE);
 	}
 
 	naddr = ddi_get_name_addr(sdip);
 	if (naddr == NULL) {
 		SCHPC_DEBUG1(D_ATTACH, "schpc_add_pci: ddi_get_name_addr"
-		    "(0x%p) returns null", sdip);
+		    "(0x%p) returns null", (void *)sdip);
 		return (DDI_FAILURE);
 	}
 
@@ -3565,7 +3569,7 @@ schpc_add_pci(dev_info_t *bdip)
 					cmn_err(CE_WARN,
 					    "schpc_add_pci(dip=0x%p) - "
 					    "Invalid pci name addr %s\n",
-					    sdip, naddr);
+					    (void *)sdip, naddr);
 					ndi_devi_exit(sdip, circ);
 					return (DDI_FAILURE);
 				}
@@ -3574,7 +3578,7 @@ schpc_add_pci(dev_info_t *bdip)
 			}
 		} else {
 			cmn_err(CE_WARN, "schpc_add_pci(dip=0x%p) - "
-			    "Invalid pci name addr %s\n", sdip, naddr);
+			    "Invalid pci name addr %s\n", (void *)sdip, naddr);
 			return (DDI_FAILURE);
 		}
 	}
@@ -3584,7 +3588,7 @@ schpc_add_pci(dev_info_t *bdip)
 
 	if (schpc_p->schpc_slot[slot].devi) {
 		cmn_err(CE_WARN, "schpc_add_pci(dip=0x%p) - "
-		    "pci node already registered\n", sdip);
+		    "pci node already registered\n", (void *)sdip);
 		return (DDI_FAILURE);
 	}
 
@@ -3683,7 +3687,7 @@ schpc_add_pci(dev_info_t *bdip)
 			slot_info.slot_flags = HPC_SLOT_NO_AUTO_ENABLE |
 			    HPC_SLOT_CREATE_DEVLINK;
 
-		strcpy(slot_info.slot.pci.slot_logical_name,
+		(void) strcpy(slot_info.slot.pci.slot_logical_name,
 		    schpc_p->schpc_slot[slot].ap_id);
 
 		/*
@@ -3710,7 +3714,7 @@ schpc_add_pci(dev_info_t *bdip)
 		SCHPC_DEBUG5(D_ATTACH, "schpc_add_pci: Registering HPC "
 		    "- nexus =%s schpc_p=%p slot=%d pci number=%d ap_id=%s",
 		    schpc_p->schpc_slot[slot].nexus_path,
-		    schpc_p, SCHPC_SLOT_NUM(slot),
+		    (void *)schpc_p, SCHPC_SLOT_NUM(slot),
 		    slot_info.slot.pci.device_number,
 		    slot_info.slot.pci.slot_logical_name);
 
@@ -3754,7 +3758,7 @@ schpc_remove_pci(dev_info_t *dip)
 {
 	int slot;
 
-	SCHPC_DEBUG1(D_DETACH, "schpc_remove_pci(dip=0x%p)", dip);
+	SCHPC_DEBUG1(D_DETACH, "schpc_remove_pci(dip=0x%p)", (void *)dip);
 
 	if (schpc_p == NULL) {
 		/*
@@ -3772,7 +3776,7 @@ schpc_remove_pci(dev_info_t *dip)
 					cmn_err(CE_WARN,
 					    "schpc_remove_pci(dip=0x%p) - "
 					    "unable to unregister pci slots\n",
-					    dip);
+					    (void *)dip);
 					return (DDI_FAILURE);
 				} else {
 					hpc_free_slot_ops(
@@ -3794,7 +3798,7 @@ schpc_remove_pci(dev_info_t *dip)
 	}
 
 	cmn_err(CE_WARN, "schpc_remove_pci(dip=0x%p) "
-	    "dip not found\n", dip);
+	    "dip not found\n", (void *)dip);
 
 	return (DDI_SUCCESS);
 }
@@ -3826,7 +3830,7 @@ schpc_match_dip(dev_info_t *dip, void *arg)
 
 		SCHPC_DEBUG2(D_ATTACH,
 		    "schpc_match_dip: pci@%s FOUND dip=0x%p",
-		    find_dev->caddr, find_dev->dip);
+		    find_dev->caddr, (void *)find_dev->dip);
 
 		return (DDI_WALK_TERMINATE);
 	}
@@ -3855,7 +3859,7 @@ schpc_buildapid(dev_info_t *dip, int slot, char *ap_id)
 	if (schpc_use_legacy_apid) {
 		SCHPC_DEBUG1(D_APID, "Slot %d - Using Legacy ap-id", slot);
 
-		sprintf(ap_id, "e%02db%dslot%d", schpc_getexpander(dip),
+		(void) sprintf(ap_id, "e%02db%dslot%d", schpc_getexpander(dip),
 		    schpc_getboard(dip), slot_num);
 
 		SCHPC_DEBUG2(D_APID, "Slot %d - ap-id=%s", slot, ap_id);
@@ -3931,7 +3935,8 @@ schpc_buildapid(dev_info_t *dip, int slot, char *ap_id)
 			 * We should be at our string.
 			 */
 
-			sprintf(ap_id, "IO%d_%s", schpc_getexpander(dip), s);
+			(void) sprintf(ap_id, "IO%d_%s",
+			    schpc_getexpander(dip), s);
 
 			SCHPC_DEBUG2(D_APID, "Slot %d - ap-id=%s",
 			    slot, ap_id);
@@ -3951,7 +3956,7 @@ schpc_buildapid(dev_info_t *dip, int slot, char *ap_id)
 	/*
 	 * Build the ap-id using the legacy naming scheme.
 	 */
-	sprintf(ap_id, "e%02db%dslot%d", schpc_getexpander(dip),
+	(void) sprintf(ap_id, "e%02db%dslot%d", schpc_getexpander(dip),
 	    schpc_getboard(dip), slot_num);
 
 	SCHPC_DEBUG2(D_APID, "Slot %d - ap-id=%s", slot, ap_id);

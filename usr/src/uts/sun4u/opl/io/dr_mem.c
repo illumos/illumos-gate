@@ -733,7 +733,7 @@ dr_mem_status(dr_handle_t *hp, dr_devset_t devset, sbd_dev_stat_t *dsp)
 		msp = &dsp->d_mem;
 		bzero((caddr_t)msp, sizeof (*msp));
 
-		strncpy(msp->ms_cm.c_id.c_name, pstat.type,
+		(void) strncpy(msp->ms_cm.c_id.c_name, pstat.type,
 		    sizeof (msp->ms_cm.c_id.c_name));
 		msp->ms_cm.c_id.c_type = mp->sbm_cm.sbdev_type;
 		msp->ms_cm.c_id.c_unit = SBD_NULL_UNIT;
@@ -767,7 +767,7 @@ dr_mem_status(dr_handle_t *hp, dr_devset_t devset, sbd_dev_stat_t *dsp)
 			(void) ddi_pathname(bp->b_dip, path);
 			minor = strchr(p_mp->sbm_cm.sbdev_path, ':');
 
-			snprintf(msp->ms_peer_ap_id,
+			(void) snprintf(msp->ms_peer_ap_id,
 			    sizeof (msp->ms_peer_ap_id), "%s%s",
 			    path, (minor == NULL) ? "" : minor);
 

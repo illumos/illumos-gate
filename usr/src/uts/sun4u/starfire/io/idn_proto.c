@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -532,7 +533,7 @@ idn_link(int domid, int cpuid, int pri, int waittime, idnsb_error_t *sep)
 	if (waittime > 0)
 		opcookie = idn_init_op(IDNOP_CONNECTED, DOMAINSET(domid), sep);
 
-	idn_connect(domid);
+	(void) idn_connect(domid);
 
 	IDN_DUNLOCK(domid);
 	IDN_SYNC_UNLOCK();
@@ -805,7 +806,7 @@ idn_unlink_domainset(domainset_t domset, idn_fin_t fintype,
 				    idnset);
 			}
 		}
-		idn_disconnect(d, ftype, finarg, IDNDS_SYNC_TYPE(dp));
+		(void) idn_disconnect(d, ftype, finarg, IDNDS_SYNC_TYPE(dp));
 		IDN_DUNLOCK(d);
 	}
 }
@@ -844,7 +845,7 @@ idn_connect(int domid)
 	dp->dxp = &xphase_nego;
 	IDN_XSTATE_TRANSITION(dp, IDNXS_PEND);
 
-	idn_xphase_transition(domid, NULL, xargs);
+	(void) idn_xphase_transition(domid, NULL, xargs);
 
 	return (0);
 }
@@ -934,7 +935,7 @@ idn_disconnect(int domid, idn_fin_t fintype, idn_finarg_t finarg,
 	finmaster = MAKE_FIN_MASTER(new_masterid, new_cpuid);
 	SET_XARGS_FIN_MASTER(xargs, finmaster);
 
-	idn_xphase_transition(domid, NULL, xargs);
+	(void) idn_xphase_transition(domid, NULL, xargs);
 
 	return (0);
 }
@@ -1183,7 +1184,7 @@ idn_select_master(int domid, int rmasterid, int rcpuid)
 			    proc, domid, rmasterid);
 			rv = idn_open_domain(rmasterid, rcpuid, 0);
 			if (rv == 0) {
-				idn_connect(rmasterid);
+				(void) idn_connect(rmasterid);
 			} else if (rv < 0) {
 				cmn_err(CE_WARN,
 				    "IDN: 205: (%s) failed to "
@@ -1343,10 +1344,12 @@ idn_retry_query(uint_t token, void *arg)
 		IDN_SYNC_QUERY_UPDATE(domid, d);
 
 		if (rtype == IDNRETRY_CONQ)
-			idn_send_con(d, NULL, IDNCON_QUERY, my_ready_set);
+			(void) idn_send_con(d, NULL, IDNCON_QUERY,
+			    my_ready_set);
 		else
-			idn_send_fin(d, NULL, IDNFIN_QUERY, IDNFIN_ARG_NONE,
-			    IDNFIN_OPT_NONE, my_ready_set, NIL_FIN_MASTER);
+			(void) idn_send_fin(d, NULL, IDNFIN_QUERY,
+			    IDNFIN_ARG_NONE, IDNFIN_OPT_NONE, my_ready_set,
+			    NIL_FIN_MASTER);
 		if (d != domid)
 			IDN_DUNLOCK(d);
 	}
@@ -1536,7 +1539,7 @@ idn_recv_nego(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs,
 				DOMAINSET_ADD(idn.domset.ds_relink, domid);
 				IDN_HISTORY_LOG(IDNH_RELINK, domid,
 				    dp->dstate, idn.domset.ds_relink);
-				idn_disconnect(domid, IDNFIN_NORMAL,
+				(void) idn_disconnect(domid, IDNFIN_NORMAL,
 				    IDNFIN_ARG_NONE, IDNFIN_SYNC_YES);
 			} else {
 				mt.mt_mtype = IDNP_NACK;
@@ -1576,7 +1579,7 @@ idn_recv_nego(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs,
 		return (0);
 	}
 
-	idn_xphase_transition(domid, mtp, xargs);
+	(void) idn_xphase_transition(domid, mtp, xargs);
 
 	return (0);
 }
@@ -1659,7 +1662,7 @@ idn_retry_nego(uint_t token, void *arg)
 	}
 	IDN_GUNLOCK();
 
-	idn_xphase_transition(domid, NULL, xargs);
+	(void) idn_xphase_transition(domid, NULL, xargs);
 
 	IDN_DUNLOCK(domid);
 	IDN_SYNC_UNLOCK();
@@ -2000,7 +2003,7 @@ idn_check_nego(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 			continue;
 		}
 
-		idn_connect(d);
+		(void) idn_connect(d);
 
 		IDN_DUNLOCK(d);
 	}
@@ -2023,12 +2026,12 @@ idn_action_nego_pend(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 	con_set &= ~idn.domset.ds_trans_off;
 
 	if (!msg) {
-		idn_send_nego(domid, NULL, con_set);
+		(void) idn_send_nego(domid, NULL, con_set);
 	} else {
 		mt.mt_mtype = IDNP_NEGO | IDNP_ACK;
 		mt.mt_atype = 0;
 		mt.mt_cookie = mtp->mt_cookie;
-		idn_send_nego(domid, &mt, con_set);
+		(void) idn_send_nego(domid, &mt, con_set);
 	}
 }
 
@@ -2096,7 +2099,7 @@ idn_error_nego(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 	} else {
 		DOMAINSET_DEL(idn.domset.ds_relink, domid);
 		IDN_RESET_COOKIES(domid);
-		idn_disconnect(domid, IDNFIN_NORMAL, IDNFIN_ARG_NONE,
+		(void) idn_disconnect(domid, IDNFIN_NORMAL, IDNFIN_ARG_NONE,
 		    IDNDS_SYNC_TYPE(&idn_domain[domid]));
 	}
 }
@@ -2123,7 +2126,7 @@ idn_action_nego_sent(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		 */
 		mt.mt_mtype = IDNP_NEGO | IDNP_ACK;
 		mt.mt_atype = 0;
-		idn_send_nego(domid, &mt, conset);
+		(void) idn_send_nego(domid, &mt, conset);
 	} else if (msg & IDNP_MSGTYPE_MASK) {
 		int		d;
 		idn_xdcargs_t	nargs;
@@ -2199,7 +2202,8 @@ idn_action_nego_sent(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		} else {
 			DOMAINSET_DEL(idn.domset.ds_relink, domid);
 			IDN_RESET_COOKIES(domid);
-			idn_disconnect(domid, IDNFIN_NORMAL, IDNFIN_ARG_NONE,
+			(void) idn_disconnect(domid, IDNFIN_NORMAL,
+			    IDNFIN_ARG_NONE,
 			    IDNDS_SYNC_TYPE(&idn_domain[domid]));
 		}
 	}
@@ -2252,7 +2256,8 @@ idn_action_nego_rcvd(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		} else {
 			DOMAINSET_DEL(idn.domset.ds_relink, domid);
 			IDN_RESET_COOKIES(domid);
-			idn_disconnect(domid, IDNFIN_NORMAL, IDNFIN_ARG_NONE,
+			(void) idn_disconnect(domid, IDNFIN_NORMAL,
+			    IDNFIN_ARG_NONE,
 			    IDNDS_SYNC_TYPE(&idn_domain[domid]));
 		}
 	}
@@ -2317,7 +2322,8 @@ idn_exit_nego(int domid, uint_t msgtype)
 	 * possible we may not have exchanged appropriate cookies.
 	 */
 	IDN_RESET_COOKIES(domid);
-	idn_disconnect(domid, fintype, IDNFIN_ARG_NONE, IDNDS_SYNC_TYPE(dp));
+	(void) idn_disconnect(domid, fintype, IDNFIN_ARG_NONE,
+	    IDNDS_SYNC_TYPE(dp));
 }
 
 static void
@@ -2594,7 +2600,7 @@ idn_recv_con(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		return (-1);
 	}
 
-	idn_xphase_transition(domid, mtp, xargs);
+	(void) idn_xphase_transition(domid, mtp, xargs);
 
 	return (0);
 }
@@ -2641,7 +2647,7 @@ idn_retry_con(uint_t token, void *arg)
 		return;
 	}
 
-	idn_xphase_transition(domid, NULL, xargs);
+	(void) idn_xphase_transition(domid, NULL, xargs);
 
 	IDN_DUNLOCK(domid);
 	IDN_SYNC_UNLOCK();
@@ -2712,7 +2718,8 @@ idn_check_con(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 
 			IDN_SYNC_QUERY_UPDATE(domid, d);
 
-			idn_send_con(d, NULL, IDNCON_QUERY, my_ready_set);
+			(void) idn_send_con(d, NULL, IDNCON_QUERY,
+			    my_ready_set);
 			IDN_DUNLOCK(d);
 		}
 	}
@@ -2765,12 +2772,12 @@ idn_action_con_pend(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 	DOMAINSET_ADD(my_ready_set, idn.localid);
 
 	if (!msg) {
-		idn_send_con(domid, NULL, IDNCON_NORMAL, my_ready_set);
+		(void) idn_send_con(domid, NULL, IDNCON_NORMAL, my_ready_set);
 	} else {
 		mt.mt_mtype = IDNP_CON | IDNP_ACK;
 		mt.mt_atype = 0;
 		mt.mt_cookie = mtp->mt_cookie;
-		idn_send_con(domid, &mt, IDNCON_NORMAL, my_ready_set);
+		(void) idn_send_con(domid, &mt, IDNCON_NORMAL, my_ready_set);
 	}
 }
 
@@ -2801,7 +2808,7 @@ idn_action_con_sent(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		 */
 		mt.mt_mtype = IDNP_CON | IDNP_ACK;
 		mt.mt_atype = 0;
-		idn_send_con(domid, &mt, contype, my_ready_set);
+		(void) idn_send_con(domid, &mt, contype, my_ready_set);
 	} else if (msg & IDNP_MSGTYPE_MASK) {
 		idn_xdcargs_t	cargs;
 
@@ -2907,7 +2914,7 @@ idn_final_con(int domid)
 		 * shutdown connection with respective domain
 		 * which is the effect we really want anyway.
 		 */
-		idn_disconnect(domid, IDNFIN_NORMAL, IDNFIN_ARG_SMRBAD,
+		(void) idn_disconnect(domid, IDNFIN_NORMAL, IDNFIN_ARG_SMRBAD,
 		    IDNFIN_SYNC_YES);
 
 		return;
@@ -2979,7 +2986,8 @@ idn_exit_con(int domid, uint_t msgtype)
 	}
 	IDN_GUNLOCK();
 
-	idn_disconnect(domid, fintype, IDNFIN_ARG_NONE, IDNDS_SYNC_TYPE(dp));
+	(void) idn_disconnect(domid, fintype, IDNFIN_ARG_NONE,
+	    IDNDS_SYNC_TYPE(dp));
 }
 
 static int
@@ -3214,7 +3222,7 @@ idn_recv_fin(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		SET_XARGS_FIN_MASTER(xargs, NIL_FIN_MASTER);
 	}
 
-	idn_xphase_transition(domid, mtp, xargs);
+	(void) idn_xphase_transition(domid, mtp, xargs);
 
 	return (0);
 }
@@ -3238,7 +3246,7 @@ idn_retry_fin(uint_t token, void *arg)
 
 	if (dp->dxp != &xphase_fin) {
 		PR_PROTO("%s:%d: dxp(0x%p) != xstate_fin(0x%p)...bailing\n",
-		    proc, domid, dp->dxp, &xphase_fin);
+		    proc, domid, (void *)dp->dxp, (void *)&xphase_fin);
 		IDN_DUNLOCK(domid);
 		IDN_SYNC_UNLOCK();
 		return;
@@ -3270,7 +3278,7 @@ idn_retry_fin(uint_t token, void *arg)
 	finmaster = MAKE_FIN_MASTER(new_masterid, new_cpuid);
 	SET_XARGS_FIN_MASTER(xargs, finmaster);
 
-	idn_xphase_transition(domid, NULL, xargs);
+	(void) idn_xphase_transition(domid, NULL, xargs);
 
 	IDN_DUNLOCK(domid);
 	IDN_SYNC_UNLOCK();
@@ -3663,8 +3671,9 @@ idn_check_fin_pend(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 
 			IDN_SYNC_QUERY_UPDATE(domid, d);
 
-			idn_send_fin(d, NULL, IDNFIN_QUERY, IDNFIN_ARG_NONE,
-			    IDNFIN_OPT_NONE, my_ready_set, NIL_FIN_MASTER);
+			(void) idn_send_fin(d, NULL, IDNFIN_QUERY,
+			    IDNFIN_ARG_NONE, IDNFIN_OPT_NONE, my_ready_set,
+			    NIL_FIN_MASTER);
 			IDN_DUNLOCK(d);
 		}
 	}
@@ -3747,18 +3756,18 @@ idn_action_fin_pend(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 			mt.mt_mtype = IDNP_ACK;
 			mt.mt_atype = IDNP_FIN | IDNP_ACK;
 		}
-		idn_xphase_transition(domid, &mt, xargs);
+		(void) idn_xphase_transition(domid, &mt, xargs);
 	} else if (!msg) {
-		idn_send_fin(domid, NULL, dp->dfin, finarg, finopt,
-		    my_ready_set, finmaster);
+		(void) idn_send_fin(domid, NULL, dp->dfin, finarg,
+		    finopt, my_ready_set, finmaster);
 	} else if ((msg & IDNP_ACKNACK_MASK) == 0) {
 		/*
 		 * fin
 		 */
 		mt.mt_mtype = IDNP_FIN | IDNP_ACK;
 		mt.mt_atype = 0;
-		idn_send_fin(domid, &mt, dp->dfin, finarg, finopt,
-		    my_ready_set, finmaster);
+		(void) idn_send_fin(domid, &mt, dp->dfin, finarg,
+		    finopt, my_ready_set, finmaster);
 	} else {
 		uint_t	token;
 		/*
@@ -3889,8 +3898,9 @@ idn_check_fin_sent(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 
 			IDN_SYNC_QUERY_UPDATE(domid, d);
 
-			idn_send_fin(d, NULL, IDNFIN_QUERY, IDNFIN_ARG_NONE,
-			    IDNFIN_OPT_NONE, my_ready_set, NIL_FIN_MASTER);
+			(void) idn_send_fin(d, NULL, IDNFIN_QUERY,
+			    IDNFIN_ARG_NONE, IDNFIN_OPT_NONE, my_ready_set,
+			    NIL_FIN_MASTER);
 			IDN_DUNLOCK(d);
 		}
 	}
@@ -3969,12 +3979,12 @@ idn_action_fin_sent(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 		if (dp->dfin == IDNFIN_FORCE_HARD) {
 			mt.mt_mtype = IDNP_ACK;
 			mt.mt_atype = IDNP_FIN | IDNP_ACK;
-			idn_xphase_transition(domid, &mt, xargs);
+			(void) idn_xphase_transition(domid, &mt, xargs);
 		} else {
 			mt.mt_mtype = IDNP_FIN | IDNP_ACK;
 			mt.mt_atype = 0;
-			idn_send_fin(domid, &mt, dp->dfin, finarg, finopt,
-			    my_ready_set, finmaster);
+			(void) idn_send_fin(domid, &mt, dp->dfin, finarg,
+			    finopt, my_ready_set, finmaster);
 		}
 	} else if (msg & IDNP_MSGTYPE_MASK) {
 		/*
@@ -5354,7 +5364,7 @@ retry:
 			PR_DATA("%s:%d: offset ALIGNMENT (%lu -> %u) "
 			    "(data_rptr = %p)\n",
 			    proc, dst_domid, sizeof (smr_pkthdr_t),
-			    bufoffset, data_rptr);
+			    bufoffset, (void *)data_rptr);
 
 		n_xfersize = MIN(xfersize, (IDN_SMR_BUFSIZE - bufoffset));
 		if (xfersize != n_xfersize) {
@@ -5393,7 +5403,7 @@ retry:
 			PR_DATA("%s:%d: DATA XFER to chan %d FAILED "
 			    "(ret=%d)\n",
 			    proc, dst_domid, channel, xrv);
-			smr_buf_free(dst_domid, iobufp, xfersize);
+			(void) smr_buf_free(dst_domid, iobufp, xfersize);
 
 			PR_DATA("%s:%d: (line %d) dec(dio) -> %d\n",
 			    proc, dst_domid, __LINE__, dp->dio);
@@ -5713,7 +5723,7 @@ idn_recv_proto(idn_protomsg_t *hp)
 
 	switch (mtype) {
 	case IDNP_NEGO:
-		idn_recv_nego(domid, &mt, hp->m_xargs, dcookie);
+		(void) idn_recv_nego(domid, &mt, hp->m_xargs, dcookie);
 		break;
 
 	case IDNP_CFG:
@@ -5721,11 +5731,11 @@ idn_recv_proto(idn_protomsg_t *hp)
 		break;
 
 	case IDNP_CON:
-		idn_recv_con(domid, &mt, hp->m_xargs);
+		(void) idn_recv_con(domid, &mt, hp->m_xargs);
 		break;
 
 	case IDNP_FIN:
-		idn_recv_fin(domid, &mt, hp->m_xargs);
+		(void) idn_recv_fin(domid, &mt, hp->m_xargs);
 		break;
 
 	case IDNP_CMD:
@@ -5742,7 +5752,7 @@ idn_recv_proto(idn_protomsg_t *hp)
 		 * the fast track, we do all the processing here
 		 * in the protocol server.
 		 */
-		idn_recv_data(domid, &mt, hp->m_xargs);
+		(void) idn_recv_data(domid, &mt, hp->m_xargs);
 		break;
 
 	default:
@@ -5961,7 +5971,8 @@ idn_send_master_config(int domid, int phase)
 
 	case 1:
 		mbox_table = mbox_domain = IDN_NIL_SMROFFSET;
-		idn_get_mbox_config(domid, NULL, &mbox_table, &mbox_domain);
+		(void) idn_get_mbox_config(domid, NULL, &mbox_table,
+		    &mbox_domain);
 		/*
 		 * ----------------------------------------------------
 		 * Send: SLABSIZE, DATAMBOX.DOMAIN, DATAMBOX.TABLE
@@ -6186,7 +6197,8 @@ idn_send_slave_config(int domid, int phase)
 	case 1:
 		mbox_index = IDN_NIL_DOMID;
 		mbox_domain = IDN_NIL_SMROFFSET;
-		idn_get_mbox_config(domid, &mbox_index, NULL, &mbox_domain);
+		(void) idn_get_mbox_config(domid, &mbox_index, NULL,
+		    &mbox_domain);
 		/*
 		 * ----------------------------------------------------
 		 * Send: DATAMBOX.DOMAIN or DATAMBOX.INDEX,
@@ -6435,8 +6447,8 @@ idn_recv_config(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 					IDN_XSTATE_TRANSITION(dp, IDNXS_PEND);
 					bzero(xargs, sizeof (xargs));
 
-					idn_xphase_transition(domid, NULL,
-					    xargs);
+					(void) idn_xphase_transition(domid,
+					    NULL, xargs);
 				}
 				IDN_SYNC_UNLOCK();
 			}
@@ -6830,7 +6842,7 @@ idn_recv_config(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 			DOMAINSET_ADD(idn.domset.ds_relink, domid);
 			IDN_HISTORY_LOG(IDNH_RELINK, domid, dp->dstate,
 			    idn.domset.ds_relink);
-			idn_disconnect(domid, IDNFIN_NORMAL,
+			(void) idn_disconnect(domid, IDNFIN_NORMAL,
 			    IDNFIN_ARG_CFGERR_FATAL,
 			    IDNFIN_SYNC_NO);
 		}
@@ -6913,7 +6925,7 @@ idn_recv_config(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 			idn_update_op(IDNOP_ERROR, DOMAINSET(domid), &idnerr);
 
 			DOMAINSET_DEL(idn.domset.ds_relink, domid);
-			idn_disconnect(domid, IDNFIN_NORMAL,
+			(void) idn_disconnect(domid, IDNFIN_NORMAL,
 			    CFGERR2FINARG(rv), IDNFIN_SYNC_NO);
 			IDN_SYNC_UNLOCK();
 		}
@@ -7337,7 +7349,7 @@ idn_recv_config_done(int domid)
 		SET_IDNKERR_PARAM0(&idnerr, domid);
 		idn_update_op(IDNOP_ERROR, DOMAINSET(domid), &idnerr);
 
-		idn_disconnect(domid, IDNFIN_FORCE_HARD,
+		(void) idn_disconnect(domid, IDNFIN_FORCE_HARD,
 		    IDNFIN_ARG_CFGERR_FATAL, IDNFIN_SYNC_NO);
 		IDN_SYNC_UNLOCK();
 
@@ -7380,7 +7392,7 @@ idn_recv_config_done(int domid)
 		SET_IDNKERR_PARAM0(&idnerr, domid);
 		idn_update_op(IDNOP_ERROR, DOMAINSET(domid), &idnerr);
 
-		idn_disconnect(domid, IDNFIN_FORCE_HARD,
+		(void) idn_disconnect(domid, IDNFIN_FORCE_HARD,
 		    IDNFIN_ARG_CPUCFG, IDNFIN_SYNC_NO);
 		IDN_SYNC_UNLOCK();
 
@@ -7494,7 +7506,7 @@ idn_recv_config_done(int domid)
 			IDN_XSTATE_TRANSITION(dp, IDNXS_PEND);
 			bzero(xargs, sizeof (xargs));
 
-			idn_xphase_transition(domid, NULL, xargs);
+			(void) idn_xphase_transition(domid, NULL, xargs);
 		}
 		IDN_SYNC_UNLOCK();
 	}
@@ -8966,7 +8978,7 @@ idn_recv_nodename_req(int domid, idn_msgtype_t *mtp, smr_offset_t bufoffset)
 			    IDNNACK_RETRY);
 			return;
 		}
-		strncpy(ldp->dname, utsname.nodename, MAXDNAME - 1);
+		(void) strncpy(ldp->dname, utsname.nodename, MAXDNAME - 1);
 	}
 	IDN_DLOCK_DOWNGRADE(idn.localid);
 
@@ -8989,7 +9001,7 @@ idn_recv_nodename_req(int domid, idn_msgtype_t *mtp, smr_offset_t bufoffset)
 		return;
 	}
 
-	strncpy(b_bufp, ldp->dname, MAXDNAME);
+	(void) strncpy(b_bufp, ldp->dname, MAXDNAME);
 	b_bufp[MAXDNAME-1] = 0;
 	IDN_DUNLOCK(idn.localid);
 
@@ -9016,7 +9028,7 @@ idn_recv_nodename_resp(int domid, smr_offset_t bufoffset, int serrno)
 		b_bufp[MAXDNAME-1] = 0;
 
 		if (strlen(b_bufp) > 0) {
-			strncpy(dp->dname, b_bufp, MAXDNAME);
+			(void) strncpy(dp->dname, b_bufp, MAXDNAME);
 			PR_PROTO("%s:%d: received nodename(%s)\n",
 			    proc, domid, dp->dname);
 		}
@@ -9220,7 +9232,7 @@ idn_timer_expired(void *arg)
 	domid = tp->t_domid;
 
 	dp = &idn_domain[domid];
-	strcpy(dname, dp->dname);
+	(void) strcpy(dname, dp->dname);
 	dcpu = dp->dcpu;
 
 	IDN_TIMER_EXEC(tp);
@@ -9384,7 +9396,7 @@ idn_timer_expired(void *arg)
 		DOMAINSET_ADD(idn.domset.ds_relink, domid);
 		IDN_HISTORY_LOG(IDNH_RELINK, domid, dp->dstate,
 		    idn.domset.ds_relink);
-		idn_disconnect(domid, IDNFIN_FORCE_SOFT,
+		(void) idn_disconnect(domid, IDNFIN_FORCE_SOFT,
 		    IDNFIN_ARG_NONE, IDNFIN_SYNC_NO);
 		IDN_DUNLOCK(domid);
 		IDN_SYNC_UNLOCK();
@@ -9795,7 +9807,8 @@ idn_protocol_server(int *id)
 
 	ASSERT(pq->q_id == *id);
 
-	PR_PROTO("%s: id %d starting up (pq = 0x%p)\n", proc, pq->q_id, pq);
+	PR_PROTO("%s: id %d starting up (pq = 0x%p)\n",
+	    proc, pq->q_id, (void *)pq);
 
 	/*CONSTCOND*/
 	while (1) {
@@ -9948,7 +9961,8 @@ idn_mboxarea_init(idn_mboxtbl_t *mtp, register int ntbls)
 
 	ASSERT(mtp && (ntbls > 0));
 
-	PR_PROTO("%s: init mboxtbl (0x%p) ntbls = %d\n", proc, mtp, ntbls);
+	PR_PROTO("%s: init mboxtbl (0x%p) ntbls = %d\n",
+	    proc, (void *)mtp, ntbls);
 
 	for (d = 0; d < ntbls; d++) {
 		register int	pd, sd;
@@ -10545,7 +10559,7 @@ idn_chan_server_syncheader(int channel)
 	}
 	IDN_DUNLOCK(idn.localid);
 
-	PR_CHAN("%s: channel(%d) mainhp = 0x%p\n", proc, channel, mhp);
+	PR_CHAN("%s: channel(%d) mainhp = 0x%p\n", proc, channel, (void *)mhp);
 
 	return (mhp);
 }
@@ -10889,7 +10903,7 @@ cc_die:
 			PR_CHAN("%s: (channel %d) TERMINATING\n",
 			    proc, channel);
 			PR_CHAN("%s: (channel %d) ch_morguep = %p\n",
-			    proc, channel, csp->ch_recv_morguep);
+			    proc, channel, (void *)csp->ch_recv_morguep);
 
 			csp->ch_recv_threadp = NULL;
 #ifdef DEBUG
@@ -12397,7 +12411,7 @@ idn_activate_channel(idn_chanset_t chanset, idn_chanop_t chanop)
 		if (IDN_CHANNEL_IS_ENABLED(csp) &&
 		    ((mainhp = idn_chan_server_syncheader(c)) != NULL)) {
 			PR_CHAN("%s: marking chansvr (mhp=0x%p) %d READY\n",
-			    proc, mainhp, c);
+			    proc, (void *)mainhp, c);
 			mainhp->mh_svr_ready = 1;
 		}
 
@@ -12649,7 +12663,7 @@ idn_deactivate_channel_services(int channel, idn_chanop_t chanop)
 
 		PR_CHAN("%s: pointing chansvr %d to morgue (0x%p)\n",
 		    proc, c, central_morguep ? central_morguep
-		    : csp->ch_recv_morguep);
+		    : (void *)(csp->ch_recv_morguep));
 
 		if (central_morguep == NULL) {
 			central_morguep = csp->ch_recv_morguep;
@@ -12682,7 +12696,7 @@ idn_deactivate_channel_services(int channel, idn_chanop_t chanop)
 
 	PR_CHAN("%s: waiting for %d (chnset=0x%x) chan svrs to term\n",
 	    proc, cs_count, chanset);
-	PR_CHAN("%s: morguep = 0x%p\n", proc, central_morguep);
+	PR_CHAN("%s: morguep = 0x%p\n", proc, (void *)central_morguep);
 
 	ASSERT((cs_count > 0) ? (central_morguep != NULL) : 1);
 	while (cs_count-- > 0)

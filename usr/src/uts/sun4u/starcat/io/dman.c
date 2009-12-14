@@ -756,7 +756,7 @@ _init(void)
 	if (status != 0) {
 		cmn_err(CE_WARN, "man_init: ddi_soft_state_init failed"
 		    " error = %d", status);
-		mod_remove(&modlinkage);
+		(void) mod_remove(&modlinkage);
 		return (status);
 	}
 
@@ -1846,7 +1846,7 @@ man_start_lower(man_dest_t *mdp, mblk_t *mp, queue_t *flow_wq, int caller)
 					 * flow control situation to the
 					 * caller.
 					 */
-					putbq(flow_wq, mp);
+					(void) putbq(flow_wq, mp);
 					qenable(flow_wq);
 					status = 1;
 					goto exit;
@@ -1960,7 +1960,8 @@ man_ioctl(register queue_t *wq, register mblk_t *mp)
 	{
 		char			ioc_cmd[30];
 
-		sprintf(ioc_cmd, "not handled IOCTL 0x%x", iocp->ioc_cmd);
+		(void) sprintf(ioc_cmd, "not handled IOCTL 0x%x",
+		    iocp->ioc_cmd);
 		MAN_DBG((MAN_SWITCH | MAN_PATH | MAN_DLPI),
 		    ("man_ioctl: wq(0x%p) mp(0x%p) cmd(%s)\n",
 		    (void *)wq, (void *)mp,
@@ -3688,7 +3689,7 @@ man_lwsrv(queue_t *wq)
 			 * infinite loop mentioned in putbq(9F)
 			 */
 			noenable(wq);
-			putbq(wq, mp);
+			(void) putbq(wq, mp);
 			enableok(wq);
 
 			break;
@@ -3778,7 +3779,7 @@ man_lrput(queue_t *rq, mblk_t *mp)
 		/*
 		 * Handle in man_lrsrv with exclusive inner perimeter lock.
 		 */
-		putq(rq, mp);
+		(void) putq(rq, mp);
 	}
 
 	return (0);
@@ -3848,7 +3849,7 @@ man_lrsrv(queue_t *rq)
 #if defined(DEBUG)
 		iocp = (struct iocblk *)mp->b_rptr;
 
-		sprintf(ioc_cmd, "0x%x", iocp->ioc_cmd);
+		(void) sprintf(ioc_cmd, "0x%x", iocp->ioc_cmd);
 		MAN_DBG(MAN_LRSRV, ("man_lrsrv: M_IOCNAK err %d for cmd(%s)\n",
 		    iocp->ioc_error,
 		    (iocp->ioc_cmd == DL_IOC_HDR_INFO) ? "DL_IOC_HDR_INFO" :
@@ -7358,61 +7359,61 @@ man_get_hostinfo(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 		return (status);
 	}
 
-	mi_mpprintf(mp, "manc_magic = 0x%x", manc.manc_magic);
-	mi_mpprintf(mp, "manc_version = 0%d", manc.manc_version);
-	mi_mpprintf(mp, "manc_csum = 0x%x", manc.manc_csum);
+	(void) mi_mpprintf(mp, "manc_magic = 0x%x", manc.manc_magic);
+	(void) mi_mpprintf(mp, "manc_version = 0%d", manc.manc_version);
+	(void) mi_mpprintf(mp, "manc_csum = 0x%x", manc.manc_csum);
 
 	if (manc.manc_ip_type == AF_INET) {
 		in_addr_t	netnum;
 
-		mi_mpprintf(mp, "manc_ip_type = AF_INET");
+		(void) mi_mpprintf(mp, "manc_ip_type = AF_INET");
 
 		ipaddr = man_inet_ntoa(manc.manc_dom_ipaddr);
-		mi_mpprintf(mp, "manc_dom_ipaddr = %s", ipaddr);
+		(void) mi_mpprintf(mp, "manc_dom_ipaddr = %s", ipaddr);
 
 		ipaddr = man_inet_ntoa(manc.manc_dom_ip_netmask);
-		mi_mpprintf(mp, "manc_dom_ip_netmask = %s", ipaddr);
+		(void) mi_mpprintf(mp, "manc_dom_ip_netmask = %s", ipaddr);
 
 		netnum = manc.manc_dom_ipaddr & manc.manc_dom_ip_netmask;
 		ipaddr = man_inet_ntoa(netnum);
-		mi_mpprintf(mp, "manc_dom_ip_netnum = %s", ipaddr);
+		(void) mi_mpprintf(mp, "manc_dom_ip_netnum = %s", ipaddr);
 
 		ipaddr = man_inet_ntoa(manc.manc_sc_ipaddr);
-		mi_mpprintf(mp, "manc_sc_ipaddr = %s", ipaddr);
+		(void) mi_mpprintf(mp, "manc_sc_ipaddr = %s", ipaddr);
 
 	} else if (manc.manc_ip_type == AF_INET6) {
 
-		mi_mpprintf(mp, "manc_ip_type = AF_INET6");
+		(void) mi_mpprintf(mp, "manc_ip_type = AF_INET6");
 
 		(void) inet_ntop(AF_INET6, (void *)&manc.manc_dom_ipv6addr,
 		    ipv6addr, INET6_ADDRSTRLEN);
-		mi_mpprintf(mp, "manc_dom_ipv6addr = %s", ipv6addr);
+		(void) mi_mpprintf(mp, "manc_dom_ipv6addr = %s", ipv6addr);
 
-		mi_mpprintf(mp, "manc_dom_ipv6_netmask = %d",
+		(void) mi_mpprintf(mp, "manc_dom_ipv6_netmask = %d",
 		    manc.manc_dom_ipv6_netmask.s6_addr[0]);
 
 		(void) inet_ntop(AF_INET6, (void *)&manc.manc_sc_ipv6addr,
 		    ipv6addr, INET6_ADDRSTRLEN);
-		mi_mpprintf(mp, "manc_sc_ipv6addr = %s", ipv6addr);
+		(void) mi_mpprintf(mp, "manc_sc_ipv6addr = %s", ipv6addr);
 
 	} else {
 
-		mi_mpprintf(mp, "manc_ip_type = NONE");
+		(void) mi_mpprintf(mp, "manc_ip_type = NONE");
 	}
 
-	mi_mpprintf(mp, "manc_dom_eaddr = %s",
+	(void) mi_mpprintf(mp, "manc_dom_eaddr = %s",
 	    ether_sprintf(&manc.manc_dom_eaddr));
-	mi_mpprintf(mp, "manc_sc_eaddr = %s",
+	(void) mi_mpprintf(mp, "manc_sc_eaddr = %s",
 	    ether_sprintf(&manc.manc_sc_eaddr));
 
-	mi_mpprintf(mp, "manc_iob_bitmap = 0x%x\tio boards = ",
+	(void) mi_mpprintf(mp, "manc_iob_bitmap = 0x%x\tio boards = ",
 	    manc.manc_iob_bitmap);
 	for (i = 0; i < MAN_MAX_EXPANDERS; i++) {
 		if ((manc.manc_iob_bitmap >> i) & 0x1) {
-			mi_mpprintf_nr(mp, "%d.1, ", i);
+			(void) mi_mpprintf_nr(mp, "%d.1, ", i);
 		}
 	}
-	mi_mpprintf(mp, "manc_golden_iob = %d", manc.manc_golden_iob);
+	(void) mi_mpprintf(mp, "manc_golden_iob = %d", manc.manc_golden_iob);
 
 	return (0);
 }
@@ -8024,8 +8025,8 @@ man_print_msp(manstr_t *msp)
 	flags = msp->ms_flags;
 	for (i = 0; i < A_CNT(_ms_flags); i++) {
 		if ((flags >> i) & 0x1) {
-			sprintf(buf, " %s |", _ms_flags[i+1]);
-			strcat(prbuf, buf);
+			(void) sprintf(buf, " %s |", _ms_flags[i+1]);
+			(void) strcat(prbuf, buf);
 		}
 	}
 	prbuf[strlen(prbuf) - 1] = '\0';
@@ -8081,13 +8082,13 @@ man_print_mdp(man_dest_t *mdp)
 	state = mdp->md_state;
 
 	if (state == 0) {
-		strcat(prbuf, _md_state[0]);
+		(void) strcat(prbuf, _md_state[0]);
 	} else {
 
 		for (i = 0; i < A_CNT(_md_state); i++) {
 			if ((state >> i) & 0x1)  {
-				sprintf(buf, " %s |", _md_state[i+1]);
-				strcat(prbuf, buf);
+				(void) sprintf(buf, " %s |", _md_state[i+1]);
+				(void) strcat(prbuf, buf);
 			}
 		}
 		prbuf[strlen(prbuf) -1] = '\0';
@@ -8112,12 +8113,12 @@ man_print_man(man_t *manp)
 		return;
 
 	if (ddi_major_to_name(manp->man_meta_major)) {
-		sprintf(buf, "\t man_device: %s%d\n",
+		(void) sprintf(buf, "\t man_device: %s%d\n",
 		    ddi_major_to_name(manp->man_meta_major),
 		    manp->man_meta_ppa);
 	} else {
-		sprintf(buf, "\t major: %d", manp->man_meta_major);
-		sprintf(buf, "\t ppa: %d", manp->man_meta_ppa);
+		(void) sprintf(buf, "\t major: %d", manp->man_meta_major);
+		(void) sprintf(buf, "\t ppa: %d", manp->man_meta_ppa);
 	}
 
 	cmn_err(CE_CONT, "%s", buf);
@@ -8147,9 +8148,9 @@ man_print_dev(man_dev_t *mdevp)
 
 	if (mdevp->mdev_major == 0) {
 number:
-		sprintf(buf, "\t mdev_major: %d\n", mdevp->mdev_major);
+		(void) sprintf(buf, "\t mdev_major: %d\n", mdevp->mdev_major);
 	} else if (ddi_major_to_name(mdevp->mdev_major)) {
-		sprintf(buf, "\t mdev_device: %s%d\n",
+		(void) sprintf(buf, "\t mdev_device: %s%d\n",
 		    ddi_major_to_name(mdevp->mdev_major),
 		    mdevp->mdev_ppa);
 	} else
@@ -8164,12 +8165,12 @@ number:
 	state = mdevp->mdev_state;
 
 	if (state == 0) {
-		strcat(prbuf, _mdev_state[0]);
+		(void) strcat(prbuf, _mdev_state[0]);
 	} else {
 		for (i = 0; i < A_CNT(_mdev_state); i++) {
 			if ((state >> i) & 0x1) {
-				sprintf(buf, " %s |", _mdev_state[i+1]);
-				strcat(prbuf, buf);
+				(void) sprintf(buf, " %s |", _mdev_state[i+1]);
+				(void) strcat(prbuf, buf);
 			}
 		}
 	}

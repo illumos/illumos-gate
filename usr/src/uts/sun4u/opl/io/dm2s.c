@@ -515,7 +515,7 @@ dm2s_rsrv(queue_t *rq)
 		if (canputnext(rq)) {
 			putnext(rq, mp);
 		} else {
-			putbq(rq, mp);
+			(void) putbq(rq, mp);
 			break;
 		}
 	}
@@ -1027,7 +1027,7 @@ dm2s_receive(dm2s_t *dm2sp)
 		 * Queue the messages in the rq, so that the service
 		 * procedure handles sending the messages up the stream.
 		 */
-		putq(rq, mp);
+		(void) putq(rq, mp);
 	}
 
 	if ((!DM2S_MBOX_READY(dm2sp)) || (ret != ENOMSG && ret != EMSGSIZE)) {
@@ -1083,7 +1083,7 @@ dm2s_transmit(queue_t *wq, mblk_t *mp, target_id_t target, mkey_t key)
 	if ((ret = dm2s_prep_scatgath(mp, &numsg, dm2sp->ms_sg_tx,
 	    DM2S_MAX_SG)) != 0) {
 		DPRINTF(DBG_MBOX, ("dm2s_transmit: prep_scatgath failed\n"));
-		putbq(wq, mp);
+		(void) putbq(wq, mp);
 		return (EAGAIN);
 	}
 	DPRINTF(DBG_MBOX, ("dm2s_transmit: calling mb_putmsg numsg=%d len=%d\n",
@@ -1108,7 +1108,7 @@ dm2s_transmit(queue_t *wq, mblk_t *mp, target_id_t target, mkey_t key)
 		/*
 		 * Queue it back, so that we can retry again.
 		 */
-		putbq(wq, mp);
+		(void) putbq(wq, mp);
 		return (ret);
 	}
 	DMPBYTES("dm2s: Putmsg: ", len, numsg, dm2sp->ms_sg_tx);
@@ -1265,7 +1265,7 @@ dm2s_dump_bytes(char *str, uint32_t total_len,
 		}
 		tlen += len;
 	}
-	sprintf(bytestr, "%s Packet: Size=%d  Digest=%d\n",
+	(void) sprintf(bytestr, "%s Packet: Size=%d  Digest=%d\n",
 	    str, total_len, digest);
 	DTRACE_PROBE1(dm2s_dump_digest, unsigned char *, bytestr);
 
@@ -1277,7 +1277,8 @@ dm2s_dump_bytes(char *str, uint32_t total_len,
 		for (i = 0; i < len; ) {
 			for (j = 0; (j < BYTES_PER_LINE) &&
 			    (i < len); j++, i++) {
-				sprintf(&bytestr[j * 3], "%02X ", datap[i]);
+				(void) sprintf(&bytestr[j * 3], "%02X ",
+				    datap[i]);
 				digest += datap[i];
 			}
 			if (j != 0) {

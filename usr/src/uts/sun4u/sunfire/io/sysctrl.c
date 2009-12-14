@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -433,7 +433,7 @@ sysctrl_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	softsp->pdip = ddi_get_parent(softsp->dip);
 
 	DPRINTF(SYSCTRL_ATTACH_DEBUG, ("sysctrl: devi= 0x%p\n, softsp=0x%p\n",
-	    devi, softsp));
+	    (void *)devi, (void *)softsp));
 
 	/* First set all of the timeout values */
 	spur_timeout_hz = drv_usectohz(SPUR_TIMEOUT_USEC);

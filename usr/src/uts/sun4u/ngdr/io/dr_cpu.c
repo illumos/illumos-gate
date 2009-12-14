@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * CPU support routines for DR
@@ -662,7 +661,7 @@ dr_fill_cpu_stat(dr_cpu_unit_t *cp, drmach_status_t *pstat, sbd_cpu_stat_t *csp)
 	bzero((caddr_t)csp, sizeof (*csp));
 	csp->cs_type = cp->sbc_cm.sbdev_type;
 	csp->cs_unit = cp->sbc_cm.sbdev_unum;
-	strncpy(csp->cs_name, pstat->type, sizeof (csp->cs_name));
+	(void) strncpy(csp->cs_name, pstat->type, sizeof (csp->cs_name));
 	csp->cs_cond = cp->sbc_cm.sbdev_cond;
 	csp->cs_busy = cp->sbc_cm.sbdev_busy | pstat->busy;
 	csp->cs_time = cp->sbc_cm.sbdev_time;
@@ -710,7 +709,7 @@ dr_fill_cmp_stat(sbd_cpu_stat_t *csp, int ncores, int impl, sbd_cmp_stat_t *psp)
 	 */
 	psp->ps_type = SBD_COMP_CMP;
 	psp->ps_unit = DR_UNUM2SBD_UNUM(csp->cs_unit, SBD_COMP_CMP);
-	strncpy(psp->ps_name, csp->cs_name, sizeof (psp->ps_name));
+	(void) strncpy(psp->ps_name, csp->cs_name, sizeof (psp->ps_name));
 	psp->ps_cond = csp->cs_cond;
 	psp->ps_busy = csp->cs_busy;
 	psp->ps_time = csp->cs_time;

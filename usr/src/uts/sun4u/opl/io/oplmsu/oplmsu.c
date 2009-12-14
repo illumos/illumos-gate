@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -438,7 +438,7 @@ oplmsu_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		}
 
 		if (lpath->rtout_id) {
-			untimeout(lpath->rtout_id);
+			(void) untimeout(lpath->rtout_id);
 		}
 
 		if (lpath->rbuftbl) {
@@ -680,7 +680,7 @@ oplmsu_close(queue_t *urq, int flag, cred_t *cred_p)
 	}
 
 	if (wtout_id != 0) {
-		untimeout(wtout_id);
+		(void) untimeout(wtout_id);
 	}
 
 	/* Free kernel memory for ctrl_t */
@@ -724,7 +724,7 @@ oplmsu_uwput(queue_t *uwq, mblk_t *mp)
 		mutex_exit(&oplmsu_uinst->c_lock);
 		oplmsu_wcmn_high_qenable(WR(uwq), RW_READER);
 	} else {
-		putq(WR(uwq), mp);
+		(void) putq(WR(uwq), mp);
 	}
 	rw_exit(&oplmsu_uinst->lock);
 	return (SUCCESS);
@@ -841,7 +841,7 @@ oplmsu_lwsrv(queue_t *lwq)
 			putnext(dst_queue, mp);
 			rw_enter(&oplmsu_uinst->lock, RW_READER);
 		} else {
-			putbq(WR(lwq), mp);
+			(void) putbq(WR(lwq), mp);
 			break;
 		}
 	}
@@ -895,7 +895,7 @@ oplmsu_lrput(queue_t *lrq, mblk_t *mp)
 		rw_exit(&oplmsu_uinst->lock);
 		oplmsu_rcmn_high_qenable(lrq);
 	} else {
-		putq(lrq, mp);
+		(void) putq(lrq, mp);
 	}
 	return (SUCCESS);
 }
@@ -1063,7 +1063,7 @@ oplmsu_ursrv(queue_t *urq)
 			putnext(dst_queue, mp);
 			rw_enter(&oplmsu_uinst->lock, RW_READER);
 		} else {
-			putbq(urq, mp);
+			(void) putbq(urq, mp);
 			break;
 		}
 	}
@@ -1117,9 +1117,10 @@ oplmsu_plink_serial(dev_info_t *dip, ldi_handle_t msu_lh, int *id)
 	char		wrkbuf[MSU_PATHNAME_SIZE];
 
 	/* Create physical path-name for serial */
-	ddi_pathname(dip, wrkbuf);
+	(void) ddi_pathname(dip, wrkbuf);
 	*(wrkbuf + strlen(wrkbuf)) = '\0';
-	sprintf(pathname, "/devices%s:%c", wrkbuf, 'a'+ ddi_get_instance(dip));
+	(void) sprintf(pathname, "/devices%s:%c", wrkbuf,
+	    'a'+ ddi_get_instance(dip));
 
 	/* Allocate LDI identifier */
 	rval = ldi_ident_from_dip(dip, &li);
@@ -1451,14 +1452,14 @@ oplmsu_find_ser_dip(dev_info_t *cmuch_dip)
 	ebus_dip = ndi_devi_findchild(cmuch_dip, EBUS_PATH);
 
 	DBG_PRINT((CE_NOTE, "oplmsu: find-serial-dip: "
-	    "ebus_dip = %p", ebus_dip));
+	    "ebus_dip = %p", (void *)ebus_dip));
 
 	if (ebus_dip != NULL) {
 		ndi_devi_enter(ebus_dip, &circ2);
 		ser_dip = ndi_devi_findchild(ebus_dip, SERIAL_PATH);
 
 		DBG_PRINT((CE_NOTE, "oplmsu: find-serial-dip: "
-		    "ser_dip = %p", ser_dip));
+		    "ser_dip = %p", (void *)ser_dip));
 		ndi_devi_exit(ebus_dip, circ2);
 	}
 	ndi_devi_exit(cmuch_dip, circ1);
@@ -2148,7 +2149,7 @@ oplmsu_config_stop(int pathnum)
 
 			/* Make M_FLUSH and send to alternate path */
 			oplmsu_cmn_set_mflush(fmp);
-			putq(dst_queue, fmp);
+			(void) putq(dst_queue, fmp);
 
 			/* Change status of alternate path */
 			oplmsu_cmn_set_upath_sts(altn_upath, MSU_PSTAT_ACTIVE,
@@ -2160,7 +2161,8 @@ oplmsu_config_stop(int pathnum)
 			altn_lpath->status = MSU_EXT_NOTUSED;
 
 			/* Notify of the active path changing */
-			prom_opl_switch_console(altn_upath->ser_devcb.lsb);
+			(void) prom_opl_switch_console(
+			    altn_upath->ser_devcb.lsb);
 
 			/* Send XON to notify active path */
 			(void) oplmsu_cmn_put_xoffxon(dst_queue, MSU_XON_4);
@@ -2230,8 +2232,8 @@ oplmsu_config_stop(int pathnum)
 			mutex_exit(&oplmsu_uinst->u_lock);
 			rw_exit(&oplmsu_uinst->lock);
 			oplmsu_cmn_set_mflush(fmp);
-			putq(dst_queue, fmp);
-			putq(dst_queue, nmp);
+			(void) putq(dst_queue, fmp);
+			(void) putq(dst_queue, nmp);
 
 			mutex_enter(&oplmsu_uinst->l_lock);
 			lpath->sw_flag = 1;
@@ -2335,7 +2337,7 @@ oplmsu_config_start(int pathnum)
 
 		if (upath->ser_devcb.lsb == msu_tty_port) {
 			/* Notify of the active path changing */
-			prom_opl_switch_console(upath->ser_devcb.lsb);
+			(void) prom_opl_switch_console(upath->ser_devcb.lsb);
 
 			oplmsu_cmn_set_upath_sts(upath, MSU_PSTAT_ACTIVE,
 			    upath->status, MSU_ACTIVE);
@@ -2372,7 +2374,8 @@ oplmsu_config_start(int pathnum)
 			    altn_upath->status, MSU_ACTIVE);
 
 			/* Notify of the active path changing */
-			prom_opl_switch_console(altn_upath->ser_devcb.lsb);
+			(void) prom_opl_switch_console(
+			    altn_upath->ser_devcb.lsb);
 
 			altn_lpath = altn_upath->lpath;
 			if (altn_lpath) {

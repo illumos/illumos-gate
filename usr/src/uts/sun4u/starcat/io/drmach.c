@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -1197,7 +1198,7 @@ drmach_board_new(int bnum)
 	bp->devices = NULL;
 	bp->tree = drmach_node_new();
 
-	drmach_array_set(drmach_boards, bnum, bp);
+	(void) drmach_array_set(drmach_boards, bnum, bp);
 	return (bp);
 }
 
@@ -1248,7 +1249,7 @@ drmach_board_status(drmachid_t id, drmach_status_t *stat)
 			return (err);
 
 		bp->connected = (shb.bd_assigned && shb.bd_active);
-		strncpy(bp->type, shb.board_type, sizeof (bp->type));
+		(void) strncpy(bp->type, shb.board_type, sizeof (bp->type));
 		stat->assigned = bp->assigned = shb.bd_assigned;
 		stat->powered = bp->powered = shb.power_on;
 		stat->empty = bp->empty = shb.slot_empty;
@@ -1273,15 +1274,15 @@ drmach_board_status(drmachid_t id, drmach_status_t *stat)
 
 		}
 
-		strncpy(stat->type, shb.board_type, sizeof (stat->type));
-		snprintf(stat->info, sizeof (stat->info), "Test Level=%d",
-		    shb.test_level);
+		(void) strncpy(stat->type, shb.board_type, sizeof (stat->type));
+		(void) snprintf(stat->info, sizeof (stat->info),
+		    "Test Level=%d", shb.test_level);
 	} else {
 		stat->assigned = bp->assigned;
 		stat->powered = bp->powered;
 		stat->empty = bp->empty;
 		stat->cond = bp->cond;
-		strncpy(stat->type, bp->type, sizeof (stat->type));
+		(void) strncpy(stat->type, bp->type, sizeof (stat->type));
 	}
 
 	stat->busy = 0;			/* assume not busy */
@@ -1765,7 +1766,7 @@ drmach_mbox_event(void)
 		}
 
 		if (logsys)
-			drmach_log_sysevent(
+			(void) drmach_log_sysevent(
 			    DRMACH_EXPSLOT2BNUM(msg->p_hdr.expbrd,
 			    msg->p_hdr.slot), hint, SE_NOSLEEP, 1);
 	}
@@ -2723,7 +2724,7 @@ drmach_init(void)
 		    gdcd->dcd_testcage_mbyte_PA);
 		DRMACH_PR("drmach size=0x%x PA=0x%lx VA=0x%p\n",
 		    drmach_iocage_size, drmach_iocage_paddr,
-		    drmach_iocage_vaddr);
+		    (void *)drmach_iocage_vaddr);
 	}
 
 	if (drmach_iocage_size == 0) {
@@ -2822,7 +2823,7 @@ drmach_fini(void)
 		drmach_initialized = 0;
 	}
 
-	drmach_mbox_fini();
+	(void) drmach_mbox_fini();
 	if (drmach_xt_mb != NULL) {
 		vmem_free(static_alloc_arena, (void *)drmach_xt_mb,
 		    drmach_xt_mb_size);
@@ -3181,7 +3182,8 @@ drmach_prep_rename_script(drmach_mem_t *s_mp, drmach_mem_t *t_mp,
 			uint64_t v = *q++;	/* new register value */
 
 			DRMACH_PR("0x%lx = 0x%lx, basepa 0x%lx\n",
-			    r, v, DRMACH_MC_UM_TO_PA(v)|DRMACH_MC_LM_TO_PA(v));
+			    r, v, (long)(DRMACH_MC_UM_TO_PA(v)|
+			    DRMACH_MC_LM_TO_PA(v)));
 		}
 
 		/* skip terminator */
@@ -3205,8 +3207,8 @@ drmach_prep_rename_script(drmach_mem_t *s_mp, drmach_mem_t *t_mp,
 		/* verify final terminator is present */
 		ASSERT(*(q + 1) == 0);
 
-		DRMACH_PR("copy-rename script 0x%p, len %d\n", buf,
-		    (int)((intptr_t)p - (intptr_t)buf));
+		DRMACH_PR("copy-rename script 0x%p, len %d\n",
+		    (void *)buf, (int)((intptr_t)p - (intptr_t)buf));
 
 		if (drmach_debug)
 			DELAY(10000000);
@@ -3358,7 +3360,7 @@ drmach_copy_rename_init(drmachid_t t_id, uint64_t t_slice_offset,
 	while (p < (uint_t *)(bp + PAGESIZE))
 		*p++ = 0;
 
-	DRMACH_PR("drmach_rename function 0x%p, len %d\n", wp, len);
+	DRMACH_PR("drmach_rename function 0x%p, len %d\n", (void *)wp, len);
 	wp += (len + 15) & ~15;
 
 	err = drmach_prep_rename_script(s_mp, t_mp, t_slice_offset, wp,
@@ -3838,7 +3840,7 @@ drmach_io_new(drmach_device_t *proto, drmachid_t *idp)
 	ip->dev.cm.release = drmach_io_release;
 	ip->dev.cm.status = drmach_io_status;
 
-	snprintf(ip->dev.cm.name, sizeof (ip->dev.cm.name), "%s%d",
+	(void) snprintf(ip->dev.cm.name, sizeof (ip->dev.cm.name), "%s%d",
 	    ip->dev.type, ip->dev.unum);
 
 	*idp = (drmachid_t)ip;
@@ -4879,7 +4881,8 @@ drmach_board_lookup(int bnum, drmachid_t *id)
 				    shb.test_status);
 					break;
 			}
-			strncpy(bp->type, shb.board_type, sizeof (bp->type));
+			(void) strncpy(bp->type, shb.board_type,
+			    sizeof (bp->type));
 			bp->assigned = shb.bd_assigned;
 			bp->powered = shb.power_on;
 		}
@@ -4891,7 +4894,7 @@ drmach_board_lookup(int bnum, drmachid_t *id)
 sbd_error_t *
 drmach_board_name(int bnum, char *buf, int buflen)
 {
-	snprintf(buf, buflen, "%s%d", DRMACH_BNUM2SLOT(bnum) ?
+	(void) snprintf(buf, buflen, "%s%d", DRMACH_BNUM2SLOT(bnum) ?
 	    "IO" : "SB", DRMACH_BNUM2EXP(bnum));
 
 	return (NULL);
@@ -5075,7 +5078,7 @@ drmach_board_test(drmachid_t id, drmach_opts_t *opts, int force)
 			    obufp->msgdata.dm_tb.cpu_portid,
 			    tbr.cpu_recovered, tbr.cpu_portid);
 		}
-		drmach_iocage_mem_return(&tbr);
+		(void) drmach_iocage_mem_return(&tbr);
 	}
 	kmem_free(obufp, sizeof (dr_mbox_msg_t));
 
@@ -5306,7 +5309,7 @@ drmach_cpu_new(drmach_device_t *proto, drmachid_t *idp)
 	    "cpu_sram_offset=0x%lx, idx=%d\n", cp->cpuid, cp->coreid,
 	    cp->dev.bp->stardrb_offset, cpu_stardrb_offset, idx);
 
-	snprintf(cp->dev.cm.name, sizeof (cp->dev.cm.name), "%s%d",
+	(void) snprintf(cp->dev.cm.name, sizeof (cp->dev.cm.name), "%s%d",
 	    cp->dev.type, cp->dev.unum);
 
 	*idp = (drmachid_t)cp;
@@ -5378,7 +5381,7 @@ drmach_cpu_start(struct cpu *cp)
 	rv = drmach_array_get(drmach_boards, bnum, (drmachid_t)&bp);
 	if (rv == -1 || bp == NULL) {
 		DRMACH_PR("drmach_cpu_start: cannot read board info for "
-		    "cpuid=%d: rv=%d, bp=%p\n", cpuid, rv, bp);
+		    "cpuid=%d: rv=%d, bp=%p\n", cpuid, rv, (void *)bp);
 	} else if (DRMACH_L1_SET_LPA(bp) && drmach_reprogram_lpa) {
 		int exp;
 		int ntries;
@@ -5568,7 +5571,7 @@ drmach_cpu_status(drmachid_t id, drmach_status_t *stat)
 	stat->configured = (cpu_get(cp->cpuid) != NULL);
 	mutex_exit(&cpu_lock);
 	stat->busy = dp->busy;
-	strncpy(stat->type, dp->type, sizeof (stat->type));
+	(void) strncpy(stat->type, dp->type, sizeof (stat->type));
 	stat->info[0] = '\0';
 
 	return (NULL);
@@ -5879,7 +5882,7 @@ drmach_io_pre_release(drmachid_t id)
 	    (void *)&ios);
 
 	DRMACH_PR("drmach_io_pre_release: bnum=%d iosram=%d eri=0x%p\n",
-	    ios.bnum, ios.iosram_inst, ios.eri_dip);
+	    ios.bnum, ios.iosram_inst, (void *)ios.eri_dip);
 	ndi_devi_exit(rdip, circ);
 
 	if (ios.eri_dip) {
@@ -5957,7 +5960,7 @@ drmach_io_unrelease(drmachid_t id)
 			}
 
 			DRMACH_PR("drmach_io_unrelease: bnum=%d eri=0x%p\n",
-			    ios.bnum, ios.eri_dip);
+			    ios.bnum, (void *)ios.eri_dip);
 
 			if (ios.eri_dip) {
 				DRMACH_PR("calling man_dr_attach\n");
@@ -6027,7 +6030,7 @@ drmach_io_release(drmachid_t id)
 			}
 
 			DRMACH_PR("drmach_io_release: bnum=%d eri=0x%p\n",
-			    ios.bnum, ios.eri_dip);
+			    ios.bnum, (void *)ios.eri_dip);
 
 			if (ios.eri_dip) {
 				DRMACH_PR("calling man_dr_detach\n");
@@ -6137,8 +6140,8 @@ drmach_io_post_attach(drmachid_t id)
 		ndi_rele_devi(pdip);
 	}
 
-	DRMACH_PR("drmach_io_post_attach: bnum=%d eri=0x%p\n", ios.bnum,
-	    ios.eri_dip);
+	DRMACH_PR("drmach_io_post_attach: bnum=%d eri=0x%p\n",
+	    ios.bnum, (void *)ios.eri_dip);
 
 	if (ios.eri_dip) {
 		int (*func)(dev_info_t *dip);
@@ -6181,7 +6184,7 @@ drmach_io_status(drmachid_t id, drmach_status_t *stat)
 	stat->powered = dp->bp->powered;
 	stat->configured = (configured != 0);
 	stat->busy = dp->busy;
-	strncpy(stat->type, dp->type, sizeof (stat->type));
+	(void) strncpy(stat->type, dp->type, sizeof (stat->type));
 	stat->info[0] = '\0';
 
 	return (NULL);
@@ -6275,7 +6278,8 @@ drmach_mem_new(drmach_device_t *proto, drmachid_t *idp)
 	mp->dev.cm.status = drmach_mem_status;
 	mp->madr_pa = madr_pa;
 
-	snprintf(mp->dev.cm.name, sizeof (mp->dev.cm.name), "%s", mp->dev.type);
+	(void) snprintf(mp->dev.cm.name,
+	    sizeof (mp->dev.cm.name), "%s", mp->dev.type);
 
 	for (count = bank = 0; bank < DRMACH_MC_NBANKS; bank++) {
 		uint64_t madr;
@@ -6790,7 +6794,7 @@ drmach_mem_status(drmachid_t id, drmach_status_t *stat)
 	stat->powered = mp->dev.bp->powered;
 	stat->configured = (ml != NULL);
 	stat->busy = mp->dev.busy;
-	strncpy(stat->type, mp->dev.type, sizeof (stat->type));
+	(void) strncpy(stat->type, mp->dev.type, sizeof (stat->type));
 	stat->info[0] = '\0';
 
 	return (NULL);
@@ -6843,8 +6847,8 @@ drmach_pt_showlpa(drmachid_t id, drmach_opts_t *opts)
 	    dp->bp->cm.name,
 	    dp->cm.name,
 	    dp->portid,
-	    DRMACH_LPA_BASE_TO_PA(val),
-	    DRMACH_LPA_BND_TO_PA(val));
+	    (long)(DRMACH_LPA_BASE_TO_PA(val)),
+	    (long)(DRMACH_LPA_BND_TO_PA(val)));
 
 	return (NULL);
 }
@@ -7156,7 +7160,7 @@ drmach_unconfigure(drmachid_t id, int flags)
 
 					DRMACH_PR("drmach_unconfigure: bnum=%d"
 					    " eri=0x%p\n",
-					    ios.bnum, ios.eri_dip);
+					    ios.bnum, (void *)ios.eri_dip);
 
 					if (pdip) {
 						ndi_devi_exit(pdip, circ);
@@ -7268,7 +7272,7 @@ drmach_cpu_poweroff(struct cpu *cp)
 	 */
 	mp_cpu_quiesce(cp);
 
-	prom_hotremovecpu(cpuid);
+	(void) prom_hotremovecpu(cpuid);
 
 	start_cpus();
 
@@ -7317,8 +7321,8 @@ drmach_cpu_poweroff(struct cpu *cp)
 void
 drmach_iocage_mem_scrub(uint64_t nbytes)
 {
-	extern int drmach_bc_bzero(void*, size_t);
-	int	rv;
+	extern uint32_t drmach_bc_bzero(void*, size_t);
+	uint32_t	rv;
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 
@@ -7356,7 +7360,7 @@ drmach_iocage_mem_get(dr_testboard_req_t *tbrq)
 	basepfn = (pfn_t)(drmach_iocage_paddr >> PAGESHIFT);
 	npages = (pgcnt_t)(drmach_iocage_size >> PAGESHIFT);
 
-	memscrub_delete_span(basepfn, npages);
+	(void) memscrub_delete_span(basepfn, npages);
 
 	mutex_enter(&cpu_lock);
 	drmach_iocage_mem_scrub(drmach_iocage_size);
@@ -7396,7 +7400,7 @@ drmach_iocage_mem_return(dr_testboard_reply_t *tbr)
 	basepfn = (pfn_t)(drmach_iocage_paddr >> PAGESHIFT);
 	npages = (pgcnt_t)(drmach_iocage_size >> PAGESHIFT);
 
-	memscrub_add_span(basepfn, npages);
+	(void) memscrub_add_span(basepfn, npages);
 
 	mutex_enter(&cpu_lock);
 	mutex_enter(&drmach_iocage_lock);
@@ -7882,7 +7886,7 @@ drmach_is_slot1_pause_axq(dev_info_t *dip, char *name, int *id, uint64_t *reg)
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "reg", (caddr_t)regs, &reglen) != DDI_PROP_SUCCESS) {
 		DRMACH_PR("drmach_is_slot1_pause_axq: no reg prop for "
-		    "axq dip=%p\n", dip);
+		    "axq dip=%p\n", (void *)dip);
 		return (0);
 	}
 
@@ -7995,7 +7999,7 @@ drmach_find_slot1_io(dev_info_t *dip, void *arg)
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "reg", (caddr_t)regs, &reglen) != DDI_PROP_SUCCESS) {
 		DRMACH_PR("drmach_find_slot1_io: no reg prop for pci "
-		    "dip=%p\n", dip);
+		    "dip=%p\n", (void *)dip);
 		return (DDI_WALK_CONTINUE);
 	}
 
@@ -8034,7 +8038,7 @@ drmach_find_slot1_io(dev_info_t *dip, void *arg)
 	pci->csr_basepa = pci_csr_pa;
 
 	DRMACH_PR("drmach_find_slot1_io: name=%s, portid=0x%x, dip=%p\n",
-	    buf, portid, dip);
+	    buf, portid, (void *)dip);
 
 	return (DDI_WALK_PRUNECHILD);
 }
@@ -8286,7 +8290,8 @@ drmach_s1p_decode_slot_intr(int exp, int unum, drmach_s1p_pci_t *pci,
 	slot_devname = drmach_schz_slot_intr[slot][unum].name;
 	slot_valid = (slot_devname == NULL) ? 0 : 1;
 	if (!slot_valid) {
-		snprintf(namebuf, sizeof (namebuf), "slot %d (INVALID)", slot);
+		(void) snprintf(namebuf, sizeof (namebuf), "slot %d (INVALID)",
+		    slot);
 		slot_devname = namebuf;
 	}
 
@@ -8450,7 +8455,7 @@ drmach_sr_insert(struct drmach_sr_list **lp, dev_info_t *dip)
 {
 	struct drmach_sr_list *np;
 
-	DRMACH_PR("drmach_sr_insert: adding dip %p\n", dip);
+	DRMACH_PR("drmach_sr_insert: adding dip %p\n", (void *)dip);
 
 	np = (struct drmach_sr_list *)kmem_alloc(
 	    sizeof (struct drmach_sr_list), KM_SLEEP);
@@ -8473,7 +8478,7 @@ drmach_sr_insert(struct drmach_sr_list **lp, dev_info_t *dip)
 static void
 drmach_sr_delete(struct drmach_sr_list **lp, dev_info_t *dip)
 {
-	DRMACH_PR("drmach_sr_delete: searching for dip %p\n", dip);
+	DRMACH_PR("drmach_sr_delete: searching for dip %p\n", (void *)dip);
 
 	if (*lp) {
 		struct drmach_sr_list *xp;
@@ -8494,7 +8499,8 @@ drmach_sr_delete(struct drmach_sr_list **lp, dev_info_t *dip)
 				kmem_free(xp, sizeof (*xp));
 
 				DRMACH_PR("drmach_sr_delete:"
-				    " disposed sr node for dip %p", dip);
+				    " disposed sr node for dip %p",
+				    (void *)dip);
 				return;
 			}
 
@@ -8505,7 +8511,7 @@ drmach_sr_delete(struct drmach_sr_list **lp, dev_info_t *dip)
 	}
 
 	/* every dip should be found during resume */
-	DRMACH_PR("ERROR: drmach_sr_delete: can't find dip %p", dip);
+	DRMACH_PR("ERROR: drmach_sr_delete: can't find dip %p", (void *)dip);
 }
 
 int

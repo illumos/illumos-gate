@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains the Starcat Solaris Mailbox Client module.  This module
@@ -202,7 +200,7 @@ _init(void)
 	if ((error = mboxsc_init(DMSC_KEY, MBOXSC_MBOX_OUT, NULL)) != 0) {
 		cmn_err(CE_WARN, "%s mboxsc_init failed (0x%x)\n", scosmb_hdr,
 		    error);
-		mboxsc_fini(SCDM_KEY);
+		(void) mboxsc_fini(SCDM_KEY);
 		return (error);
 	}
 
@@ -229,8 +227,8 @@ _init(void)
 		taskq_destroy(scosmb_output_taskq);
 		taskq_destroy(scosmb_input_taskq);
 		mutex_destroy(&scosmb_mutex);
-		mboxsc_fini(DMSC_KEY);
-		mboxsc_fini(SCDM_KEY);
+		(void) mboxsc_fini(DMSC_KEY);
+		(void) mboxsc_fini(SCDM_KEY);
 	}
 
 	return (error);
@@ -304,7 +302,7 @@ dp_get_cores(uint16_t cpuid)
 	for (ii = 0; ii < nc; ii++)
 		if (cpu[MAKE_CPUID(exp, slot, ii)]) {
 			impl = cpunodes[MAKE_CPUID(exp, slot, ii)].
-				implementation;
+			    implementation;
 			break;
 		}
 
@@ -619,19 +617,19 @@ dp_trans_event(plat_datapath_info_t *dpmsg, int msgtype)
 
 	/* build ereport class name */
 	(void) snprintf(buf, FM_MAX_CLASS, "asic.starcat.%s.%s-%s",
-		dperrtype[dpmsg->type], dperrtype[dpmsg->type],
-		FM_ERROR_DATAPATH);
+	    dperrtype[dpmsg->type], dperrtype[dpmsg->type],
+	    FM_ERROR_DATAPATH);
 
 	fm_ereport_set(erp, FM_EREPORT_VERSION, buf,
-		fm_ena_generate(0, FM_ENA_FMT1), detector, NULL);
+	    fm_ena_generate(0, FM_ENA_FMT1), detector, NULL);
 
 	/* add payload elements */
 	if (msgtype == SCDM_DP_ERROR_MSG) {
 		fm_payload_set(erp,
-			DP_EREPORT_TYPE, DATA_TYPE_UINT16, DP_ERROR, NULL);
+		    DP_EREPORT_TYPE, DATA_TYPE_UINT16, DP_ERROR, NULL);
 	} else {
 		fm_payload_set(erp,
-			DP_EREPORT_TYPE, DATA_TYPE_UINT16, DP_FAULT, NULL);
+		    DP_EREPORT_TYPE, DATA_TYPE_UINT16, DP_FAULT, NULL);
 	}
 
 	fm_payload_set(erp, DP_TVALUE, DATA_TYPE_UINT32, dpmsg->t_value, NULL);
@@ -1247,7 +1245,7 @@ scosmb_log_ecc_error(plat_ecc_message_type_t msg_type, void *datap)
 		    (void *)msg_header_ptr, TQ_NOSLEEP) == 0) {
 #ifdef DEBUG
 			cmn_err(CE_WARN, "failed to dispatch a task to send "
-				    "ECC mailbox message.");
+			    "ECC mailbox message.");
 #endif	/* DEBUG */
 			kmem_free(msg_header_ptr->data, msg_header_ptr->length);
 			kmem_free(msg_header_ptr, sizeof (scosmb_msgdata_t));

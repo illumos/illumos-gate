@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -221,7 +221,7 @@ environ_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	DPRINTF(ENVIRON_ATTACH_DEBUG, ("environ: devi= 0x%p\n, softsp=0x%p,",
-	    devi, softsp));
+	    (void *)devi, (void *)softsp));
 
 	/*
 	 * Init the temperature device here. We start the overtemp

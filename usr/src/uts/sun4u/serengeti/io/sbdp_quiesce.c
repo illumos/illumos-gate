@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * A CPR derivative specifically for sbd
@@ -178,7 +176,7 @@ sbdp_is_real_device(dev_info_t *dip)
 	 * now the general case
 	 */
 	rc = ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS, "reg",
-		(caddr_t)&regbuf, &length);
+	    (caddr_t)&regbuf, &length);
 	ASSERT(rc != DDI_PROP_NO_MEMORY);
 	if (rc != DDI_PROP_SUCCESS) {
 		return (0);
@@ -272,7 +270,7 @@ sbdp_check_dip(dev_info_t *dip, void *arg, uint_t ref)
 	if (ref) {
 		(*sbrp->refcount)++;
 		SBDP_DBG_QR("\n%s (major# %d) is referenced\n",
-			dname, ddi_name_to_major(dname));
+		    dname, ddi_name_to_major(dname));
 		(void) ddi_pathname(dip, sbdp_get_err_buf(sbrp->sep));
 		sbdp_set_err(sbrp->sep, ESBD_BUSY, NULL);
 		return (DDI_WALK_TERMINATE);
@@ -332,10 +330,10 @@ sbdp_suspend_devices_(dev_info_t *dip, sbdp_sr_handle_t *srh)
 		if (sbdp_resolve_devname(dip, d_name, d_alias) == 0) {
 			if (d_alias[0] != 0) {
 				SBDP_DBG_QR("\tsuspending %s@%s (aka %s)\n",
-					d_name, d_info, d_alias);
+				    d_name, d_info, d_alias);
 			} else {
 				SBDP_DBG_QR("\tsuspending %s@%s\n",
-					d_name, d_info);
+				    d_name, d_info);
 			}
 		} else {
 			SBDP_DBG_QR("\tsuspending %s@%s\n", dname, d_info);
@@ -414,7 +412,7 @@ sbdp_resume_devices(dev_info_t *start, sbdp_sr_handle_t *srh)
 			ndi_rele_devi(dip);
 			SR_FAILED_DIP(srh) = NULL;
 		} else if (sbdp_is_real_device(dip) &&
-				SR_FAILED_DIP(srh) == NULL) {
+		    SR_FAILED_DIP(srh) == NULL) {
 
 			if (DEVI(dip)->devi_binding_name != NULL) {
 				bn = ddi_binding_name(dip);
@@ -432,24 +430,24 @@ sbdp_resume_devices(dev_info_t *start, sbdp_sr_handle_t *srh)
 					d_info = "<null>";
 
 				if (!sbdp_resolve_devname(dip, d_name,
-								d_alias)) {
+				    d_alias)) {
 					if (d_alias[0] != 0) {
 						SBDP_DBG_QR("\tresuming "
-							"%s@%s (aka %s)\n",
-							d_name, d_info,
-							d_alias);
+						    "%s@%s (aka %s)\n",
+						    d_name, d_info,
+						    d_alias);
 					} else {
 						SBDP_DBG_QR("\tresuming "
-							"%s@%s\n",
-							d_name, d_info);
+						    "%s@%s\n",
+						    d_name, d_info);
 					}
 				} else {
 					SBDP_DBG_QR("\tresuming %s@%s\n",
-						bn, d_info);
+					    bn, d_info);
 				}
 
 				if (devi_attach(dip, DDI_RESUME) !=
-							DDI_SUCCESS) {
+				    DDI_SUCCESS) {
 					/*
 					 * Print a console warning,
 					 * set an errno of ESGT_RESUME,
@@ -461,7 +459,7 @@ sbdp_resume_devices(dev_info_t *start, sbdp_sr_handle_t *srh)
 					    "%s@%s",
 					    d_name[0] ? d_name : bn, d_info);
 					SBDP_DBG_QR("\tFAILED to resume "
-						"%s\n", sbdp_get_err_buf(sep));
+					    "%s\n", sbdp_get_err_buf(sep));
 					sbdp_set_err(sep,
 					    ESGT_RESUME, NULL);
 				}
@@ -564,7 +562,7 @@ sbdp_stop_user_threads(sbdp_sr_handle_t *srh)
 		/* now, walk the threadlist again to see if we are done */
 		mutex_enter(&pidlock);
 		for (tp = curthread->t_next, bailout = 0;
-			tp != curthread; tp = tp->t_next) {
+		    tp != curthread; tp = tp->t_next) {
 			proc_t *p = ttoproc(tp);
 
 			/* handle kernel threads separately */
@@ -582,7 +580,7 @@ sbdp_stop_user_threads(sbdp_sr_handle_t *srh)
 
 				/* nope, cache the details for later */
 				bcopy(p->p_user.u_psargs, cache_psargs,
-					sizeof (cache_psargs));
+				    sizeof (cache_psargs));
 				cache_tp = tp;
 				cache_t_state = tp->t_state;
 				bailout = 1;
@@ -599,7 +597,7 @@ sbdp_stop_user_threads(sbdp_sr_handle_t *srh)
 	/* were we unable to stop all threads after a few tries? */
 	if (bailout) {
 		cmn_err(CE_NOTE, "process: %s id: %p state: %x\n",
-			cache_psargs, cache_tp, cache_t_state);
+		    cache_psargs, (void *)cache_tp, cache_t_state);
 
 		(void) sprintf(sbdp_get_err_buf(sep), "%s", cache_psargs);
 		sbdp_set_err(sep, ESGT_UTHREAD, NULL);
@@ -704,7 +702,7 @@ sbdp_resume(sbdp_sr_handle_t *srh)
 		if (SR_CHECK_FLAG(srh, SR_FLAG_WATCHDOG)) {
 			mutex_enter(&tod_lock);
 			tod_ops.tod_set_watchdog_timer(
-				saved_watchdog_seconds);
+			    saved_watchdog_seconds);
 			mutex_exit(&tod_lock);
 		}
 

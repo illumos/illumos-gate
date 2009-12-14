@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 /*
  * Netra ct800 and Netra ct400 (MonteCarlo/Tonga)
@@ -314,14 +313,14 @@ _init(void)
 
 	if (scsb_debug & 0x0005)
 		cmn_err(CE_NOTE, "scsb: _init()");
-	ddi_soft_state_init(&scsb_state, sizeof (scsb_state_t),
+	(void) ddi_soft_state_init(&scsb_state, sizeof (scsb_state_t),
 	    SCSB_NO_OF_BOARDS);
-	hsc_init();
+	(void) hsc_init();
 	if ((status = mod_install(&modlinkage)) != 0) {
 		if (scsb_debug & 0x0006)
 			cmn_err(CE_NOTE, "scsb: _init(): mod_install failed");
 		ddi_soft_state_fini(&scsb_state);
-		hsc_fini();
+		(void) hsc_fini();
 		return (status);
 	}
 	/*
@@ -349,7 +348,7 @@ _fini(void)
 
 	if ((status = mod_remove(&modlinkage)) == 0) {
 		ddi_soft_state_fini(&scsb_state);
-		hsc_fini();
+		(void) hsc_fini();
 	}
 	if (scsb_debug & 0x0006)
 		cmn_err(CE_NOTE, "scsb: _fini, error %x\n", status);
@@ -907,7 +906,7 @@ scsb_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	scsb->scsb_state &= ~SCSB_UP;
 	scsb_global_state &= ~SCSB_UP;
 	if (scsb->scsb_hsc_state & SCSB_HSC_INIT) {
-		scsb_hsc_detach(dip, scsb, instance);
+		(void) scsb_hsc_detach(dip, scsb, instance);
 		scsb->scsb_hsc_state &= ~SCSB_HSC_INIT;
 	}
 	if (scsb->scsb_state & SCSB_PSM_INT_ENABLED) {
@@ -1023,7 +1022,7 @@ scsb_fake_intr(scsb_state_t *scsb, uint32_t evcode)
 		scsb_event_code = evcode;
 	if (scsb_debug & 0x4001) {
 		cmn_err(CE_NOTE, "scsb_fake_intr: event = 0x%x, scsb_rq=0x%p",
-		    scsb_event_code, scsb->scsb_rq);
+		    scsb_event_code, (void *)scsb->scsb_rq);
 	}
 	/*
 	 * Allow access to shadow registers even though SCB is removed
@@ -1094,7 +1093,7 @@ sm_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		return (ENXIO);
 
 	if (scsb_debug & 0x0009) {
-		cmn_err(CE_NOTE, "sm_open(%d) q=0x%p", instance, q);
+		cmn_err(CE_NOTE, "sm_open(%d) q=0x%p", instance, (void *)q);
 	}
 	if (!(scsb->scsb_state & SCSB_UP)) {
 		return (ENODEV);
@@ -1155,7 +1154,7 @@ sm_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 			cmn_err(CE_NOTE,
 			    "sm_open(%d): new clone device minor: 0x%x"
 			    " stream queue is 0x%p",
-			    instance, clptr->cl_minor, q);
+			    instance, clptr->cl_minor, (void *)q);
 	} else {
 		/* scsb is being opened as a regular driver */
 		if (scsb_debug & 0x0008)
@@ -1188,7 +1187,8 @@ sm_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 			if (scsb_debug & 0x000a)
 				cmn_err(CE_WARN, "sm_open[%d]: q (0x%p) != "
 				    "scsb_rq (0x%p)",
-				    instance, RD(q), scsb->scsb_rq);
+				    instance, (void *)RD(q),
+				    (void *)scsb->scsb_rq);
 		}
 		scsb->scsb_rq = RD(q);
 		scsb->scsb_opens++;
@@ -1210,7 +1210,8 @@ sm_close(queue_t *q, int flag, int otyp, cred_t *credp)
 
 	scsb = (scsb_state_t *)q->q_ptr;
 	if (scsb_debug & 0x0009)
-		cmn_err(CE_NOTE, "sm_close[%d](0x%p)", scsb->scsb_instance, q);
+		cmn_err(CE_NOTE, "sm_close[%d](0x%p)", scsb->scsb_instance,
+		    (void *)q);
 	if (scsb->scsb_clopens) {
 		mutex_enter(&scsb->scsb_mutex);
 		if ((clone = scsb_queue_ops(scsb, QFIND_QUEUE, 0,
@@ -1267,8 +1268,8 @@ sm_wput(queue_t *q, mblk_t *mp)
 	scsb_state_t	*scsb = (scsb_state_t *)WR(q)->q_ptr;
 
 	if (scsb_debug & 0x0010)
-		cmn_err(CE_NOTE, "sm_wput(%d): mp %p", scsb->scsb_instance, mp);
-
+		cmn_err(CE_NOTE, "sm_wput(%d): mp %p", scsb->scsb_instance,
+		    (void *)mp);
 
 	switch (mp->b_datap->db_type) {
 	default:
@@ -1330,7 +1331,7 @@ smf_ioctl(queue_t *q, mblk_t *mp)
 
 	if (scsb_debug & 0x0020)
 		cmn_err(CE_NOTE, "smf_ioctl(%d): (%p)->cmd=%x",
-		    scsb->scsb_instance, mp, iocp->ioc_cmd);
+		    scsb->scsb_instance, (void *)mp, iocp->ioc_cmd);
 
 	if (!(scsb->scsb_state & SCSB_UP)) {
 		miocnak(q, mp, 0, ENXIO);
@@ -1559,7 +1560,7 @@ smf_ioctl(queue_t *q, mblk_t *mp)
 
 		slot_vals = (uint32_t *)mp->b_cont->b_rptr;
 		pslotnum = (int)*slot_vals;
-		hsc_ac_op(scsb->scsb_instance, pslotnum,
+		hsc_ac_op((int)scsb->scsb_instance, pslotnum,
 		    SCSB_HSC_AC_GET_SLOT_INFO, &slot_info);
 		if (slot_info == NULL) {
 			iocp->ioc_error = ENODEV;
@@ -1753,7 +1754,7 @@ smf_ioctl(queue_t *q, mblk_t *mp)
 			iocp->ioc_error = EACCES;
 		else {
 			scsb_restore(scsb);
-			scsb_toggle_psmint(scsb, 1);
+			(void) scsb_toggle_psmint(scsb, 1);
 			iocp->ioc_error = 0;
 		}
 		break;
@@ -4216,7 +4217,7 @@ scsb_freeze(scsb_state_t *scsb)
 		return;
 	scsb->scsb_state |= SCSB_FROZEN;
 	scsb->scsb_state &= ~SCSB_SCB_PRESENT;
-	scsb_hsc_freeze(scsb->scsb_dev);
+	(void) scsb_hsc_freeze(scsb->scsb_dev);
 	/*
 	 * Send the EVENT_SCB since there is evidence that the
 	 * System Controller Board has been removed.
@@ -4335,9 +4336,9 @@ scsb_intr_preprocess(caddr_t arg)
 	 */
 
 	if (scsb->scsb_state & SCSB_IN_INTR) {
-		untimeout(scsb_intr_tid);
-		scsb_invoke_intr_chain();
-		scsb_toggle_psmint(scsb, 1);
+		(void) untimeout(scsb_intr_tid);
+		(void) scsb_invoke_intr_chain();
+		(void) scsb_toggle_psmint(scsb, 1);
 		scsb->scsb_state &= ~SCSB_IN_INTR;
 		goto intr_end;
 	}
@@ -5122,7 +5123,7 @@ intr_error:
 	/*
 	 * Re-enable interrupt now.
 	 */
-	scsb_toggle_psmint(scsb, 1);
+	(void) scsb_toggle_psmint(scsb, 1);
 	scsb->scsb_state &= ~SCSB_IN_INTR;
 }
 
@@ -5997,7 +5998,7 @@ update_ks_topology(kstat_t *ksp, int rw)
 		 */
 		if (scsb->scsb_kstat_flag == B_FALSE) {
 			uchar_t		data;
-			scsb_blind_read(scsb, I2C_WR_RD,
+			(void) scsb_blind_read(scsb, I2C_WR_RD,
 			    (uchar_t)SCTRL_PROM_VERSION, 1, &data, 1);
 		}
 		pks_topo->mct_scb[i].fru_health = ((scsb->scsb_err_flag ==
@@ -6127,7 +6128,7 @@ update_fru_info(scsb_state_t *scsb, fru_info_t *fru_ptr)
 	fru_info_t	*acslot_ptr = NULL;
 	fru_id_t	acslot_id = 0;
 	if (scsb_debug & 0x00100001)
-		cmn_err(CE_NOTE, "update_fru_info(scsb,0x%p)", fru_ptr);
+		cmn_err(CE_NOTE, "update_fru_info(scsb,0x%p)", (void *)fru_ptr);
 	if (fru_ptr == (fru_info_t *)NULL ||
 	    fru_ptr->i2c_info == (fru_i2c_info_t *)NULL)
 		return;
@@ -6541,7 +6542,7 @@ scsb_queue_put(queue_t *rq, int count, uint32_t *data, char *caller)
 	mblk_t		*mp;
 	if (scsb_debug & 0x4001) {
 		cmn_err(CE_NOTE, "scsb_queue_put(0x%p, %d, 0x%x, %s)",
-		    rq, count, *data, caller);
+		    (void *)rq, count, *data, caller);
 	}
 	mp = allocb(sizeof (uint32_t) * count, BPRI_HI);
 	if (mp == NULL) {
@@ -7151,7 +7152,7 @@ scsb_hsc_ac_op(scsb_state_t *scsb, int pslotnum, int op)
 			 * has given permission to do so.
 			 */
 			scsb->scsb_hsc_state &= ~SCSB_ALARM_CARD_IN_USE;
-			hsc_ac_op(scsb->scsb_instance, pslotnum,
+			hsc_ac_op((int)scsb->scsb_instance, pslotnum,
 			    SCSB_HSC_AC_UNCONFIGURE, NULL);
 			rc = B_TRUE;
 			break;
@@ -7206,7 +7207,7 @@ scsb_healthy_intr(scsb_state_t *scsb, int pslotnum)
 	    SCSB_FRU_OP_GET_BITVAL);
 	if (val)
 		healthy = B_TRUE;
-	scsb_hsc_board_healthy(pslotnum, healthy);
+	(void) scsb_hsc_board_healthy(pslotnum, healthy);
 }
 
 /*

@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -432,7 +433,7 @@ cvc_wput(queue_t *q, mblk_t *mp)
 				case TCSETAW:
 				case TCSETAF:
 				case TCSBRK:
-					putq(q, mp);
+					(void) putq(q, mp);
 					break;
 
 				default:
@@ -476,7 +477,8 @@ cvc_wput(queue_t *q, mblk_t *mp)
 
 		default:
 			cmn_err(CE_WARN, "cvc_wput: unexpected mblk type - mp ="
-			    " 0x%p, type = 0x%x", mp, mp->b_datap->db_type);
+			    " 0x%p, type = 0x%x", (void *)mp,
+			    mp->b_datap->db_type);
 			freemsg(mp);
 			break;
 
@@ -763,7 +765,7 @@ cvc_register(queue_t *q)
 			cmn_err(CE_WARN, "cvc_register: duplicate q!");
 		else
 			cmn_err(CE_WARN, "cvc_register: nondup q = 0x%p",
-			    q);
+			    (void *)q);
 		return (error);
 	}
 	rw_exit(&cvclock);
@@ -785,7 +787,8 @@ cvc_unregister(queue_t *q)
 		cvcoutput_q = NULL;
 	} else {
 		rw_exit(&cvclock);
-		cmn_err(CE_WARN, "cvc_unregister: q = 0x%p not registered", q);
+		cmn_err(CE_WARN, "cvc_unregister: q = 0x%p not registered",
+		    (void *)q);
 		return;
 	}
 	rw_exit(&cvclock);
@@ -1425,8 +1428,8 @@ cvc_dbg(uint32_t flag, char *fmt,
 			break;
 		}
 
-		sprintf(buf, "!%s_%s(%d): %s", ddi_driver_name(cvcdip), s,
-		    cvc_instance, fmt);
+		(void) sprintf(buf, "!%s_%s(%d): %s", ddi_driver_name(cvcdip),
+		    s, cvc_instance, fmt);
 		cmn_err(CE_NOTE, buf, a1, a2, a3, a4, a5);
 	}
 }

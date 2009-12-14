@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * CPU management for serengeti DR
@@ -411,7 +409,7 @@ sbdp_cpu_poweroff(struct cpu *cp)
 	if ((bbsram_pa & MMU_PAGEOFFSET) != 0) {
 		cmn_err(CE_WARN, "cpu%d: CPU SRAM key \"%s\" not page aligned, "
 		    "offset = 0x%lx", cpuid, cpyren_key,
-		    bbsram_pa - SBDP_CPU_SRAM_ADDR);
+		    (bbsram_pa - (uint64_t)SBDP_CPU_SRAM_ADDR));
 		return (EBUSY);
 	}
 

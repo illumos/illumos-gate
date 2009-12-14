@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -379,7 +378,8 @@ pcf8574_do_detach(dev_info_t *dip)
 	attach_flag = unitp->attach_flag;
 
 	if (attach_flag & PCF8574_INTR_ADDED) {
-		scsb_intr_unregister((fru_id_t)unitp->props.slave_address);
+		(void) scsb_intr_unregister(
+		    (fru_id_t)unitp->props.slave_address);
 	}
 
 	if (attach_flag & PCF8574_KSTAT_INIT) {
@@ -417,7 +417,7 @@ pcf8574_do_detach(dev_info_t *dip)
 		    unitp->props.num_chans_used != 0) {
 			ddi_prop_free(unitp->props.channels_in_use);
 		} else {
-			ddi_prop_remove(DDI_DEV_T_NONE, dip,
+			(void) ddi_prop_remove(DDI_DEV_T_NONE, dip,
 			    "interrupt-priorities");
 		}
 	}
@@ -488,7 +488,7 @@ pcf8574_do_attach(dev_info_t *dip)
 	 */
 	unitp->current_mode = ENVCTRL_NORMAL_MODE;
 
-	snprintf(unitp->pcf8574_name, PCF8574_NAMELEN,
+	(void) snprintf(unitp->pcf8574_name, PCF8574_NAMELEN,
 	    "%s%d", ddi_driver_name(dip), instance);
 
 	if (unitp->pcf8574_type == PCF8574_TYPE_PWRSUPP) {
@@ -496,7 +496,7 @@ pcf8574_do_attach(dev_info_t *dip)
 		if (ddi_create_minor_node(dip, name, S_IFCHR, instance,
 		    PCF8574_NODE_TYPE, NULL) == DDI_FAILURE) {
 			ddi_remove_minor_node(dip, NULL);
-			pcf8574_do_detach(dip);
+			(void) pcf8574_do_detach(dip);
 
 			return (DDI_FAILURE);
 		}
@@ -507,7 +507,7 @@ pcf8574_do_attach(dev_info_t *dip)
 		if (ddi_create_minor_node(dip, name, S_IFCHR, instance,
 		    PCF8574_NODE_TYPE, NULL) == DDI_FAILURE) {
 			ddi_remove_minor_node(dip, NULL);
-			pcf8574_do_detach(dip);
+			(void) pcf8574_do_detach(dip);
 
 			return (DDI_FAILURE);
 		}
@@ -518,7 +518,7 @@ pcf8574_do_attach(dev_info_t *dip)
 		if (ddi_create_minor_node(dip, name, S_IFCHR, instance,
 		    PCF8574_NODE_TYPE, NULL) == DDI_FAILURE) {
 			ddi_remove_minor_node(dip, NULL);
-			pcf8574_do_detach(dip);
+			(void) pcf8574_do_detach(dip);
 
 			return (DDI_FAILURE);
 		}
@@ -559,8 +559,7 @@ pcf8574_do_attach(dev_info_t *dip)
 
 	if (i2c_client_register(dip, &unitp->pcf8574_hdl)
 	    != I2C_SUCCESS) {
-		pcf8574_do_detach(dip);
-
+		(void) pcf8574_do_detach(dip);
 		return (DDI_FAILURE);
 	}
 	unitp->attach_flag |= PCF8574_REGISTER_CLIENT;
@@ -570,9 +569,8 @@ pcf8574_do_attach(dev_info_t *dip)
 	 * is used throughout the driver.
 	 */
 	if (i2c_transfer_alloc(unitp->pcf8574_hdl, &unitp->i2c_tran,
-	    MAX_WLEN, MAX_RLEN, KM_SLEEP)
-	    != I2C_SUCCESS) {
-		pcf8574_do_detach(dip);
+	    MAX_WLEN, MAX_RLEN, KM_SLEEP) != I2C_SUCCESS) {
+		(void) pcf8574_do_detach(dip);
 		return (DDI_FAILURE);
 	}
 	unitp->attach_flag |= PCF8574_ALLOC_TRANSFER;
@@ -615,8 +613,7 @@ pcf8574_do_attach(dev_info_t *dip)
 	 */
 
 	if (pcf8574_add_kstat(unitp, dev_presence) != DDI_SUCCESS) {
-		pcf8574_do_detach(dip);
-
+		(void) pcf8574_do_detach(dip);
 		return (DDI_FAILURE);
 	}
 
@@ -630,7 +627,7 @@ pcf8574_do_attach(dev_info_t *dip)
 	 */
 
 	if (dev_presence == FRU_PRESENT) { /* program the chip */
-		pcf8574_init_chip(unitp, 0);   /* Disable intr first */
+		(void) pcf8574_init_chip(unitp, 0);   /* Disable intr first */
 	}
 
 	if (unitp->pcf8574_canintr == PCF8574_INTR_ON) {
@@ -644,8 +641,7 @@ pcf8574_do_attach(dev_info_t *dip)
 			unitp->pcf8574_canintr |= PCF8574_INTR_ENABLED;
 			unitp->attach_flag |= PCF8574_INTR_ADDED;
 		} else {
-			pcf8574_do_detach(dip);
-
+			(void) pcf8574_do_detach(dip);
 			return (DDI_FAILURE);
 		}
 	}
@@ -1240,7 +1236,7 @@ pcf8574_add_kstat(struct pcf8574_unit *unitp, scsb_fru_status_t dev_presence)
 		} else  {
 			id = i2c_address - PCF8574_ADR_PWRSUPPLY1;
 		}
-		sprintf(ksname, "%s%d", I2C_KSTAT_PWRSUPPLY, id);
+		(void) sprintf(ksname, "%s%d", I2C_KSTAT_PWRSUPPLY, id);
 		if ((unitp->kstatp = kstat_create(I2C_PCF8574_NAME,
 		    unitp->instance, ksname, "misc",
 		    KSTAT_TYPE_RAW, sizeof (envctrl_pwrsupp_t),
@@ -1280,7 +1276,7 @@ pcf8574_add_kstat(struct pcf8574_unit *unitp, scsb_fru_status_t dev_presence)
 		} else  {
 			id = i2c_address - PCF8574_ADR_FANTRAY1;
 		}
-		sprintf(ksname, "%s%d", I2C_KSTAT_FANTRAY, id);
+		(void) sprintf(ksname, "%s%d", I2C_KSTAT_FANTRAY, id);
 		if ((unitp->kstatp = kstat_create(I2C_PCF8574_NAME,
 		    unitp->instance, ksname, "misc",
 		    KSTAT_TYPE_RAW, sizeof (envctrl_fantray_t),
@@ -1756,7 +1752,7 @@ pcf8574_callback(void *softstate, scsb_fru_event_t cb_event,
 			} else
 			if (dev_presence == FRU_PRESENT &&
 			    envp->ps_present == FRU_NOT_PRESENT) {
-				pcf8574_init_chip(unitp, 0);
+				(void) pcf8574_init_chip(unitp, 0);
 			}
 			envp->ps_present = dev_presence;
 			unitp->poll_event = POLLIN;
@@ -1775,7 +1771,7 @@ pcf8574_callback(void *softstate, scsb_fru_event_t cb_event,
 			} else
 			if (dev_presence == FRU_PRESENT &&
 			    envp->fan_present == FRU_NOT_PRESENT) {
-				pcf8574_init_chip(unitp, 0);
+				(void) pcf8574_init_chip(unitp, 0);
 			}
 			envp->fan_present = dev_presence;
 			unitp->poll_event = POLLIN;

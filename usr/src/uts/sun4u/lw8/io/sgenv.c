@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -549,7 +549,7 @@ sgenv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    instance, DDI_PSEUDO, NULL);
 		if (err != DDI_SUCCESS) {
 			sgenv_remove_kstats(softsp);
-			sgenv_remove_cache_update_threads();
+			(void) sgenv_remove_cache_update_threads();
 			ddi_soft_state_free(sgenv_statep, instance);
 			return (DDI_FAILURE);
 		}
@@ -561,9 +561,9 @@ sgenv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		err = sgenv_add_intr_handlers();
 		if (err != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "Failed to add event handlers");
-			sgenv_remove_intr_handlers();
+			(void) sgenv_remove_intr_handlers();
 			sgenv_remove_kstats(softsp);
-			sgenv_remove_cache_update_threads();
+			(void) sgenv_remove_cache_update_threads();
 			ddi_soft_state_free(sgenv_statep, instance);
 			return (DDI_FAILURE);
 		}
@@ -1056,9 +1056,9 @@ sgenv_update_env_cache(void)
 		}
 
 		mutex_exit(&env_flag_lock);
-		sgenv_get_env_info_data();
+		(void) sgenv_get_env_info_data();
 
-		sgenv_check_sensor_thresholds();
+		(void) sgenv_check_sensor_thresholds();
 		mutex_enter(&env_flag_lock);
 
 		if (env_cache_update_needed == B_FALSE)
@@ -1288,7 +1288,7 @@ sgenv_update_board_cache(void)
 		}
 
 		mutex_exit(&board_flag_lock);
-		sgenv_get_board_info_data();
+		(void) sgenv_get_board_info_data();
 		mutex_enter(&board_flag_lock);
 
 		if (board_cache_update_needed == B_FALSE)
@@ -1821,7 +1821,8 @@ sgenv_get_board_info_data(void)
 				} else {
 					char	err_msg[40];
 
-					sprintf(err_msg, "Board data for "
+					(void) sprintf(err_msg,
+					    "Board data for "
 					    "Node%d/Slot%d", node, board);
 					sgenv_mbox_error_msg(err_msg, rv,
 					    resp.msg_status);
@@ -1856,7 +1857,7 @@ sgenv_get_board_info_data(void)
 					ptr->node_id = -1;
 					DCMN_ERR_CACHE(CE_NOTE, "%s: "
 					    "Clearing cache line %d [%p]",
-					    f, board, ptr);
+					    f, board, (void *)ptr);
 				}
 			} else {
 				/*
@@ -1873,7 +1874,7 @@ sgenv_get_board_info_data(void)
 				DCMN_ERR_CACHE(CE_NOTE, "%s: "
 				    "Writing data for bd=%d into "
 				    " the board_cache at [%p]",
-				    f, board, ptr);
+				    f, board, (void *)ptr);
 				ptr->node_id = node;
 				ptr->board_num = board;
 				ptr->condition = shbp->s_cond;
@@ -2334,7 +2335,7 @@ sgenv_check_sensor_thresholds(void)
 			 * We have handled all the special cases by now.
 			 */
 			default:
-				sgenv_process_threshold_event(sensor);
+				(void) sgenv_process_threshold_event(sensor);
 				break;
 			}
 
@@ -2556,8 +2557,8 @@ sgenv_tagid_to_string(sensor_id_t id, char *str)
 	part_str = sgenv_get_part_str(id.id.sensor_part);
 	type_str = sgenv_get_type_str(id.id.sensor_type);
 
-	sprintf(str, "Sensor: Node=%d, Board=%s%d, Device=%s%d, Type=%s%d"
-	    ": reading has ",
+	(void) sprintf(str,
+	    "Sensor: Node=%d, Board=%s%d, Device=%s%d, Type=%s%d: reading has ",
 	    id.id.node_id,
 	    ((hpu_str != NULL) ? hpu_str : ""),
 	    id.id.hpu_slot,
@@ -2845,24 +2846,25 @@ sgenv_fan_status_handler(char *arg)
 	/*
 	 * Create the message to be sent to sysevent.
 	 */
-	sprintf(fan_str, "The status of the fan in Node%d/Slot%d is now ",
+	(void) sprintf(fan_str,
+	    "The status of the fan in Node%d/Slot%d is now ",
 	    payload->node_id, payload->slot_number);
 	switch (payload->fan_speed) {
 	case SGENV_FAN_SPEED_OFF:
-		strcat(fan_str, SGENV_FAN_SPEED_OFF_STR);
+		(void) strcat(fan_str, SGENV_FAN_SPEED_OFF_STR);
 		break;
 
 	case SGENV_FAN_SPEED_LOW:
-		strcat(fan_str, SGENV_FAN_SPEED_LOW_STR);
+		(void) strcat(fan_str, SGENV_FAN_SPEED_LOW_STR);
 		break;
 
 	case SGENV_FAN_SPEED_HIGH:
-		strcat(fan_str, SGENV_FAN_SPEED_HIGH_STR);
+		(void) strcat(fan_str, SGENV_FAN_SPEED_HIGH_STR);
 		break;
 
 	case SGENV_FAN_SPEED_UNKNOWN:
 	default:
-		strcat(fan_str, SGENV_FAN_SPEED_UNKNOWN_STR);
+		(void) strcat(fan_str, SGENV_FAN_SPEED_UNKNOWN_STR);
 		break;
 	}
 
@@ -3060,28 +3062,28 @@ sgenv_process_threshold_event(env_sensor_t sensor)
 	 */
 	switch (SG_GET_SENSOR_STATUS(sensor.sd_status)) {
 	case SG_SENSOR_STATUS_OK:
-		strcat(sensor_str, SGENV_EVENT_MSG_OK);
+		(void) strcat(sensor_str, SGENV_EVENT_MSG_OK);
 		break;
 
 	case SG_SENSOR_STATUS_LO_WARN:
-		strcat(sensor_str, SGENV_EVENT_MSG_LO_WARN);
+		(void) strcat(sensor_str, SGENV_EVENT_MSG_LO_WARN);
 		break;
 
 	case SG_SENSOR_STATUS_HI_WARN:
-		strcat(sensor_str, SGENV_EVENT_MSG_HI_WARN);
+		(void) strcat(sensor_str, SGENV_EVENT_MSG_HI_WARN);
 		break;
 
 	case SG_SENSOR_STATUS_LO_DANGER:
-		strcat(sensor_str, SGENV_EVENT_MSG_LO_DANGER);
+		(void) strcat(sensor_str, SGENV_EVENT_MSG_LO_DANGER);
 		break;
 
 	case SG_SENSOR_STATUS_HI_DANGER:
-		strcat(sensor_str, SGENV_EVENT_MSG_HI_DANGER);
+		(void) strcat(sensor_str, SGENV_EVENT_MSG_HI_DANGER);
 		break;
 
 	default:
 		DCMN_ERR_EVENT(CE_NOTE, "%s: Unknown sensor status", f);
-		strcat(sensor_str, SGENV_EVENT_MSG_UNKNOWN);
+		(void) strcat(sensor_str, SGENV_EVENT_MSG_UNKNOWN);
 		break;
 	}
 

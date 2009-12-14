@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Interface for Serengeti IOSRAM mailbox
@@ -2562,7 +2560,7 @@ sbbc_dp_trans_event(char *arg)
 
 	fm_payload_set(erp, DP_TVALUE, DATA_TYPE_UINT32, dpmsg->t_value, NULL);
 
-	dp_payload_add_cpus(dpmsg, erp);
+	(void) dp_payload_add_cpus(dpmsg, erp);
 
 	/* post ereport */
 	fm_ereport_post(erp, EVCH_SLEEP);

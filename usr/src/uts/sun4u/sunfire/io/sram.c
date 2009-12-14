@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -190,7 +190,7 @@ sram_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	DPRINTF(SRAM_ATTACH_DEBUG, ("sram%d: devi= 0x%p\n, "
-	    " softsp=0x%p\n", instance, devi, softsp));
+	    " softsp=0x%p\n", instance, (void *)devi, (void *)softsp));
 
 	/* map in the registers for this device. */
 	if (ddi_map_regs(softsp->dip, 0,

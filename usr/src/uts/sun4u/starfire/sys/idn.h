@@ -3410,7 +3410,7 @@ struct idn_gkstat_named {
  */
 #ifdef DEBUG
 #define	IDNXDC(d, mt, a1, a2, a3, a4) \
-	(debug_idnxdc("idnxdc", (int)(d), (mt), \
+	((void) debug_idnxdc("idnxdc", (int)(d), (mt), \
 		(uint_t)(a1), (uint_t)(a2), (uint_t)(a3), (uint_t)(a4)))
 #else /* DEBUG */
 #define	IDNXDC(d, mt, a1, a2, a3, a4) \

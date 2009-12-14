@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -473,7 +473,8 @@ lw8_add_intr_handlers()
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to register MBOX_EVENT_GENERIC "
 		    " handler. Err=%d", err);
-		sbbc_mbox_unreg_intr(MBOX_EVENT_LW8, lw8_event_data_handler);
+		(void) sbbc_mbox_unreg_intr(MBOX_EVENT_LW8,
+		    lw8_event_data_handler);
 		return (DDI_FAILURE);
 	}
 
@@ -484,8 +485,10 @@ lw8_add_intr_handlers()
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to register MBOX_EVENT_ENV "
 		    " handler. Err=%d", err);
-		sbbc_mbox_unreg_intr(MBOX_EVENT_GENERIC, lw8_dr_data_handler);
-		sbbc_mbox_unreg_intr(MBOX_EVENT_LW8, lw8_event_data_handler);
+		(void) sbbc_mbox_unreg_intr(MBOX_EVENT_GENERIC,
+		    lw8_dr_data_handler);
+		(void) sbbc_mbox_unreg_intr(MBOX_EVENT_LW8,
+		    lw8_event_data_handler);
 		return (DDI_FAILURE);
 	}
 
@@ -496,9 +499,12 @@ lw8_add_intr_handlers()
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to register INFO_MBOX "
 		    " handler. Err=%d", err);
-		sbbc_mbox_unreg_intr(MBOX_EVENT_GENERIC, lw8_dr_data_handler);
-		sbbc_mbox_unreg_intr(MBOX_EVENT_LW8, lw8_event_data_handler);
-		sbbc_mbox_unreg_intr(INFO_MBOX, lw8_cap_ecc_msg_handler);
+		(void) sbbc_mbox_unreg_intr(MBOX_EVENT_GENERIC,
+		    lw8_dr_data_handler);
+		(void) sbbc_mbox_unreg_intr(MBOX_EVENT_LW8,
+		    lw8_event_data_handler);
+		(void) sbbc_mbox_unreg_intr(INFO_MBOX,
+		    lw8_cap_ecc_msg_handler);
 		return (DDI_FAILURE);
 	}
 
@@ -1149,7 +1155,7 @@ lw8_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 		lw8_info.fver = lw8_info2.fver;
 		lw8_info.fchksum = lw8_info2.fchksum;
 		lw8_info.prod_rev = lw8_info2.prod_rev;
-		strncpy(lw8_info.prod_id, lw8_info2.prod_id, MAX_ID_LEN);
+		(void) strncpy(lw8_info.prod_id, lw8_info2.prod_id, MAX_ID_LEN);
 		if (ddi_copyout((caddr_t)&lw8_info, (caddr_t)arg,
 		    sizeof (lw8_info), mode) != 0) {
 			retval = EFAULT;
@@ -1395,7 +1401,7 @@ lw8_logger(caddr_t arg)
 				/* Ensure NUL termination */
 				lw8_logmsgp->msg[
 				    sizeof (lw8_logmsgp->msg) - 1] = '\0';
-				strlog(0, 0, 0, SL_CONSOLE | level,
+				(void) strlog(0, 0, 0, SL_CONSOLE | level,
 				    lw8_logmsgp->msg);
 			}
 

@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/ddi.h>
 #include <sys/plat_ecc_dimm.h>
@@ -170,7 +169,7 @@ plat_populate_sid_cache_one(dimm_sid_cache_t *cache, int bd)
 			if (((1 << j) & valid) == 0)
 				continue;
 
-			strncpy(dimmsidsp[j],
+			(void) strncpy(dimmsidsp[j],
 			    domain_dimm_sids[bd].pdsb_dimm_sids[(i * 8) + j],
 			    PLAT_MAX_DIMM_SID_LEN);
 		}
@@ -307,7 +306,7 @@ plat_store_mem_sids(plat_dimm_sid_board_data_t *data)
 	domain_dimm_sids[bd].pdsb_valid_bitmap = data->pdsbd_valid_bitmap;
 	for (i = 0; i < PLAT_MAX_DIMMS_PER_BOARD; i++) {
 		if ((1 << i) & domain_dimm_sids[bd].pdsb_valid_bitmap) {
-			strncpy(domain_dimm_sids[bd].pdsb_dimm_sids[i],
+			(void) strncpy(domain_dimm_sids[bd].pdsb_dimm_sids[i],
 			    data->pdsbd_dimm_sids[i], PLAT_MAX_DIMM_SID_LEN);
 		}
 	}

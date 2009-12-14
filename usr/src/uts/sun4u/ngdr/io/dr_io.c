@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * I/O support routines for DR
@@ -182,11 +181,11 @@ dr_check_io_refs(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 				dr_dev_err(CE_WARN, &ip->sbi_cm, ESBD_BUSY);
 			}
 			PR_IO("%s: dip(%s) ref = %d\n",
-				f, ddi_get_name(dip), ref);
+			    f, ddi_get_name(dip), ref);
 			reftotal += ref;
 		} else {
 			PR_IO("%s: NO dip for id (0x%x)\n",
-				f, (uint_t)(uintptr_t)ip->sbi_cm.sbdev_id);
+			    f, (uint_t)(uintptr_t)ip->sbi_cm.sbdev_id);
 		}
 	}
 
@@ -207,7 +206,7 @@ dr_pre_release_io(dr_handle_t *hp,
 		dr_io_unit_t *ip = (dr_io_unit_t *)devlist[d];
 
 		if ((hp->h_err = drmach_io_pre_release(
-			ip->sbi_cm.sbdev_id)) != 0) {
+		    ip->sbi_cm.sbdev_id)) != 0) {
 			return (-1);
 		}
 	}
@@ -219,7 +218,7 @@ dr_pre_release_io(dr_handle_t *hp,
 		err = drmach_release(ip->sbi_cm.sbdev_id);
 		if (err) {
 			DRERR_SET_C(&ip->sbi_cm.sbdev_error,
-					&err);
+			    &err);
 			return (-1);
 		}
 	}
@@ -357,8 +356,8 @@ dr_io_status(dr_handle_t *hp, dr_devset_t devset, sbd_dev_stat_t *dsp)
 
 		isp->is_cm.c_id.c_type = ip->sbi_cm.sbdev_type;
 		isp->is_cm.c_id.c_unit = ip->sbi_cm.sbdev_unum;
-		strncpy(isp->is_cm.c_id.c_name, pstat.type,
-			sizeof (isp->is_cm.c_id.c_name));
+		(void) strncpy(isp->is_cm.c_id.c_name, pstat.type,
+		    sizeof (isp->is_cm.c_id.c_name));
 
 		dr_get_comp_cond(ip, dip);
 		isp->is_cm.c_cond = ip->sbi_cm.sbdev_cond;
@@ -381,7 +380,7 @@ dr_io_status(dr_handle_t *hp, dr_devset_t devset, sbd_dev_stat_t *dsp)
 			/* check reference and unsafe counts on devices */
 			isp->is_unsafe_count = 0;
 			dr_check_devices(dip, &refcount, hp, unsafe_devs,
-				&idx, SBD_MAX_UNSAFE);
+			    &idx, SBD_MAX_UNSAFE);
 			while (idx > 0) {
 				isp->is_unsafe_list[idx-1] = unsafe_devs[idx-1];
 				--idx;

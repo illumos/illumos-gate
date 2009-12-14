@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -459,7 +459,7 @@ grfans_io(dev_t dev, struct uio *uiop, int rw)
 				if (grfans_debug) {
 					printf("set output to %d at addr %p\n",
 					    out_value,
-					    unitp->cpufan_reg);
+					    (void *)unitp->cpufan_reg);
 				}
 			}
 		} else {
@@ -484,7 +484,7 @@ grfans_io(dev_t dev, struct uio *uiop, int rw)
 				if (grfans_debug) {
 					printf("set SYSFAN output to %d at "
 					    "addr %p\n", out_value,
-					    unitp->sysfan_reg);
+					    (void *)unitp->sysfan_reg);
 				}
 			}
 		}

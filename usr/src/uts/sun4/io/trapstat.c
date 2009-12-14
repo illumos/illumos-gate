@@ -915,7 +915,7 @@ trapstat_enable()
 			 * Invoke processor specific interface to enable
 			 * collection of TSB hit statistics.
 			 */
-			cpu_trapstat_conf(CPU_TSTATCONF_ENABLE);
+			(void) cpu_trapstat_conf(CPU_TSTATCONF_ENABLE);
 		} else {
 			/*
 			 * Collect TLB miss statistics by taking over
@@ -963,7 +963,7 @@ trapstat_disable()
 			 * Invoke processor specific interface to disable
 			 * collection of TSB hit statistics on each processor.
 			 */
-			cpu_trapstat_conf(CPU_TSTATCONF_DISABLE);
+			(void) cpu_trapstat_conf(CPU_TSTATCONF_DISABLE);
 		} else {
 			/*
 			 * As part of collecting TLB miss statistics, we took
@@ -2064,7 +2064,7 @@ trapstat_stop()
 #ifdef sun4v
 	tstat_traptab_initialized = 0;
 	if (tstat_options & TSTAT_OPT_TLBDATA)
-		cpu_trapstat_conf(CPU_TSTATCONF_FINI);
+		(void) cpu_trapstat_conf(CPU_TSTATCONF_FINI);
 	for (i = 0; i < tstat_num4m_mapping; i++)
 		contig_mem_free(tstat_va[i], MMU_PAGESIZE4M);
 #endif

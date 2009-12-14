@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
  * All Rights Reserved, Copyright (c) FUJITSU LIMITED 2006
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if defined(lint)
 #include <sys/types.h>
@@ -38,7 +36,7 @@
 
 /* ARGSUSED */
 void
-mc_prefetch(uint64_t va)
+mc_prefetch(caddr_t va)
 { return; }
 
 #else

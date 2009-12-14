@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -1892,7 +1893,7 @@ px_err_wuc_ruc_handle(dev_info_t *rpdip, caddr_t csr_base,
 	adv_reg.pcie_ue_hdr[2] = (uint32_t)(data >> 32);
 	adv_reg.pcie_ue_hdr[3] = (uint32_t)(data & 0xFFFFFFFF);
 
-	pf_tlp_decode(PCIE_DIP2BUS(rpdip), &adv_reg);
+	(void) pf_tlp_decode(PCIE_DIP2BUS(rpdip), &adv_reg);
 	sts = pf_hdl_lookup(rpdip, derr->fme_ena, adv_reg.pcie_ue_tgt_trans,
 	    adv_reg.pcie_ue_tgt_addr, adv_reg.pcie_ue_tgt_bdf);
 done:

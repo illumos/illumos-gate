@@ -299,7 +299,7 @@ iosram_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	instance = ddi_get_instance(dip);
 
-	DPRINTF(1, ("iosram(%d): attach dip:%p\n", instance));
+	DPRINTF(1, ("iosram(%d): attach dip:%p\n", instance, (void *)dip));
 
 	IOSRAMLOG(1, "ATTACH: dip:%p instance %d ... start\n",
 	    dip, instance, NULL, NULL);
@@ -412,7 +412,7 @@ iosram_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * let's set this instance as the master.
 	 */
 	if (iosram_master == NULL && iosram_is_chosen(softp)) {
-		iosram_switch_tunnel(softp);
+		(void) iosram_switch_tunnel(softp);
 
 		/*
 		 * XXX Do we need to panic if unable to setup master IOSRAM?
@@ -521,7 +521,7 @@ iosram_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	 */
 	if (iosram_master == softp || (softp->state & IOSRAM_STATE_TSWITCH)) {
 		mutex_exit(&iosram_mutex);
-		iosram_switchfrom(instance);
+		(void) iosram_switchfrom(instance);
 		mutex_enter(&iosram_mutex);
 	}
 
@@ -1350,7 +1350,7 @@ iosram_hdr_ctrl(uint32_t cmd, void *arg)
 			    (uint32_t)(uintptr_t)arg);
 			IOSRAM_SET_HDRFIELD32(iosram_master, os_change_mask,
 			    IOSRAM_HDRFIELD_OS_MBOX_VER);
-			iosram_send_intr();
+			(void) iosram_send_intr();
 			break;
 
 		case IOSRAM_HDRCMD_REG_CALLBACK:
@@ -1509,7 +1509,7 @@ iosram_softintr(caddr_t arg)
 			DPRINTF(1, ("IOSRAM(%d): softintr chunk #%d "
 			    "flag=0x%x handler=%p\n",
 			    softp->instance, i, (int)flag,
-			    chunkp->cback.handler));
+			    (void *)chunkp->cback.handler));
 #endif
 			if ((handler = chunkp->cback.handler) == NULL) {
 				continue;
@@ -1772,7 +1772,8 @@ iosram_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 		if (ddi_copyout(bufp, (void *)(uintptr_t)req.bufp, len, mode)) {
 			DPRINTF(1, ("IOSRAM_RD: copyout(%p, %p,%x,%x) failed\n",
-			    bufp, (void *)(uintptr_t)req.bufp, len, mode));
+			    (void *)bufp, (void *)(uintptr_t)req.bufp, len,
+			    mode));
 			error = EFAULT;
 		} else if (ddi_copyout(&req, (void *)arg, sizeof (req), mode)) {
 			DPRINTF(1, ("IOSRAM_RD: can't copyout retval (%x)\n",
@@ -1795,7 +1796,7 @@ iosram_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		}
 
 		DPRINTF(2, ("IOSRAM_WR(k:%x o:%x len:%x bufp:%p\n",
-		    req.key, req.off, req.len, req.bufp));
+		    req.key, req.off, req.len, (void *)(uintptr_t)req.bufp));
 		len = req.len;
 		bufp = kmem_alloc(len, KM_SLEEP);
 		if (ddi_copyin((void *)(uintptr_t)req.bufp, bufp, len, mode)) {
@@ -1836,7 +1837,8 @@ iosram_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		    mode)) {
 			DPRINTF(1,
 			    ("IOSRAM_TOC: copyout(%p, %p,%x,%x) failed\n",
-			    bufp, (void *)(uintptr_t)req.bufp, req.len, mode));
+			    (void *)bufp, (void *)(uintptr_t)req.bufp, req.len,
+			    mode));
 			error = EFAULT;
 		} else if (ddi_copyout(&req, (void *)arg, sizeof (req), mode)) {
 			DPRINTF(1, ("IOSRAM_TOC: can't copyout retval (%x)\n",
@@ -1981,7 +1983,7 @@ iosram_switch_tunnel(iosramsoft_t *softp)
 	ASSERT(mutex_owned(&iosram_mutex));
 
 	DPRINTF(1, ("tunnel switch new master:%p (%d) current master:%p (%d)\n",
-	    softp, instance, iosram_master,
+	    (void *)softp, instance, (void *)iosram_master,
 	    ((iosram_master) ? iosram_master->instance : -1)));
 	IOSRAMLOG(1, "TSWTCH: new_master:%p (%p) iosram_master:%p (%d)\n",
 	    softp, instance, iosram_master,
@@ -2105,7 +2107,7 @@ iosram_switch_tunnel(iosramsoft_t *softp)
 		 */
 		iosram_new_master = NULL;
 		mutex_exit(&iosram_mutex);
-		iosram_remove_intr(softp);
+		(void) iosram_remove_intr(softp);
 		iosram_remove_map(softp);
 	} else {
 		/*
@@ -2125,7 +2127,7 @@ iosram_switch_tunnel(iosramsoft_t *softp)
 		if (prev_master) {
 			IOSRAMLOG(1, "TSWTCH: unmapping prev_master:%p (%d)\n",
 			    prev_master, prev_master->instance, NULL, NULL);
-			iosram_remove_intr(prev_master);
+			(void) iosram_remove_intr(prev_master);
 			iosram_remove_map(prev_master);
 		}
 	}
@@ -2263,7 +2265,7 @@ iosram_abort_tswitch()
 			    iosram_new_master->instance, NULL, NULL,
 			    NULL);
 		} else {
-			prom_starcat_switch_tunnel(iosram_master->portid,
+			(void) prom_starcat_switch_tunnel(iosram_master->portid,
 			    OBP_TSWITCH_NOREPLY);
 
 			IOSRAMLOG(1, "ABORT: new master(%d) is INVALID\n",
@@ -2685,7 +2687,7 @@ iosram_is_chosen(struct iosramsoft *softp)
 
 	(void) ddi_pathname(softp->dip, pn);
 	DPRINTF(1, ("iosram(%d): ddi_pathname(%p) is '%s'\n",
-	    softp->instance, softp->dip, pn));
+	    softp->instance, (void *)softp->dip, pn));
 
 	chosen = (strcmp(chosen_iosram, pn) == 0) ? 1 : 0;
 	DPRINTF(1, ("iosram(%d): ... %s\n", softp->instance,
@@ -2805,10 +2807,10 @@ iosram_read_toc(struct iosramsoft *softp)
 		    softp->iosramlen)) {
 			chunkp->basep = softp->iosramp + chunkp->toc_data.off;
 			DPRINTF(1,
-			    ("iosram_read_toc(%d): k:%x o:%x l:%x p:%x\n",
+			    ("iosram_read_toc(%d): k:%x o:%x l:%x p:%p\n",
 			    instance, chunkp->toc_data.key,
 			    chunkp->toc_data.off, chunkp->toc_data.len,
-			    chunkp->basep));
+			    (void *)chunkp->basep));
 		} else {
 			cmn_err(CE_WARN, "iosram(%d): TOC entry %d"
 			    "out of range... off:%x  len:%x\n",
@@ -2931,7 +2933,7 @@ iosram_update_addrs(struct iosramsoft *softp)
 			flagsp = (iosram_flags_t *)(chunkp->basep);
 			DPRINTF(1,
 			    ("iosram_update_addrs flags: o:0x%08x p:%p",
-			    chunkp->toc_data.off, flagsp));
+			    chunkp->toc_data.off, (void *)flagsp));
 		}
 	}
 
@@ -2943,7 +2945,7 @@ iosram_update_addrs(struct iosramsoft *softp)
 	for (i = 0, chunkp = chunks; i < nchunks; i++, chunkp++) {
 		chunkp->flagsp = flagsp++;
 		DPRINTF(1, ("iosram_update_addrs: k:0x%x f:%p\n",
-		    chunkp->toc_data.key, chunkp->flagsp));
+		    chunkp->toc_data.key, (void *)chunkp->flagsp));
 	}
 }
 
@@ -3279,8 +3281,8 @@ iosram_log(caddr_t fmt, intptr_t a1, intptr_t a2, intptr_t a3, intptr_t a4)
 			}
 		} else {
 			cmn_err(CE_CONT, "fmt:%p args: %lx %lx %lx %lx\n",
-			    logp->fmt, logp->arg1, logp->arg2, logp->arg3,
-			    logp->arg4);
+			    (void *)logp->fmt, logp->arg1, logp->arg2,
+			    logp->arg3, logp->arg4);
 		}
 	}
 }
@@ -3359,12 +3361,12 @@ iosram_print_state(int instance)
 	cmn_err(CE_CONT, "  pathname:%s\n", pn);
 	cmn_err(CE_CONT, "  instance:%d  portid:%d iosramlen:0x%x\n",
 	    softp->instance, softp->portid, softp->iosramlen);
-	cmn_err(CE_CONT, "  softp:%p  handle:%p  iosramp:%p\n", softp,
-	    softp->handle, softp->iosramp);
+	cmn_err(CE_CONT, "  softp:%p  handle:%p  iosramp:%p\n", (void *)softp,
+	    (void *)softp->handle, (void *)softp->iosramp);
 	cmn_err(CE_CONT, "  state:0x%x  tswitch_ok:%x  tswitch_fail:%x\n",
 	    softp->state, softp->tswitch_ok, softp->tswitch_fail);
 	cmn_err(CE_CONT, "  softintr_id:%p  intr_busy:%x  intr_pending:%x\n",
-	    softp->softintr_id, softp->intr_busy, softp->intr_pending);
+	    (void *)softp->softintr_id, softp->intr_busy, softp->intr_pending);
 
 	mutex_exit(&softp->intr_mutex);
 	mutex_exit(&iosram_mutex);
@@ -3418,7 +3420,8 @@ iosram_print_cback()
 		if (chunkp->cback.handler) {
 			cmn_err(CE_CONT, "  %2d: key:0x%x  hdlr:%p  arg:%p "
 			    "busy:%d unreg:%d\n", i, chunkp->toc_data.key,
-			    chunkp->cback.handler, chunkp->cback.arg,
+			    (void *)chunkp->cback.handler,
+			    (void *)chunkp->cback.arg,
 			    chunkp->cback.busy, chunkp->cback.unregister);
 		}
 	}
@@ -3473,7 +3476,7 @@ iosram_dprintf(const char *fmt, ...)
 	va_list	adx;
 
 	va_start(adx, fmt);
-	vsprintf(msg_buf, fmt, adx);
+	(void) vsprintf(msg_buf, fmt, adx);
 	va_end(adx);
 
 	cmn_err(CE_CONT, "%s", msg_buf);
@@ -3502,7 +3505,7 @@ iosram_print_log(int cnt)
 	    "\niosram_logseq: 0x%x  lbolt: %lx  iosram_log_level:%x\n",
 	    iosram_logseq, ddi_get_lbolt(), iosram_log_level);
 	cmn_err(CE_CONT, "iosram_logbuf: %p  max entries:0x%x\n",
-	    iosram_logbuf, IOSRAM_MAXLOG);
+	    (void *)iosram_logbuf, IOSRAM_MAXLOG);
 	for (i = iosram_logseq;  --i >= 0 && --cnt >= 0; ) {
 		iosram_log_t	*logp;
 
@@ -3519,7 +3522,7 @@ iosram_print_log(int cnt)
 			}
 		} else {
 			cmn_err(CE_CONT, "fmt:%p args: %lx %lx %lx %lx\n",
-			    logp->fmt, logp->arg1, logp->arg2,
+			    (void *)logp->fmt, logp->arg1, logp->arg2,
 			    logp->arg3, logp->arg4);
 		}
 

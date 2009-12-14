@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -347,7 +347,7 @@ _fini(void)
 	if (error == 0) {
 		mutex_enter(&mboxsc_lock);
 
-		iosram_hdr_ctrl(IOSRAM_HDRCMD_REG_CALLBACK, NULL);
+		(void) iosram_hdr_ctrl(IOSRAM_HDRCMD_REG_CALLBACK, NULL);
 
 		for (i = 0; i < HASHTBL_SIZE; i++) {
 			while (mboxsc_hash_table[i] != NULL) {
@@ -398,7 +398,7 @@ mboxsc_init(uint32_t key, int direction, void (*event_handler)(void))
 	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "key = 0x%x\n", key);
 	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "direction = %d\n", direction);
 	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "event_handlerp = %p\n",
-	    event_handler);
+	    (void *)event_handler);
 
 	/*
 	 * Check for valid direction and callback specification.
@@ -416,8 +416,8 @@ mboxsc_init(uint32_t key, int direction, void (*event_handler)(void))
 	 */
 	mailboxp = (mboxsc_mbox_t *)kmem_zalloc(sizeof (mboxsc_mbox_t),
 	    KM_SLEEP);
-	DPRINTF2(DBG_KMEM, DBGACT_DEFAULT, "kmem_zalloc(%d) = %p\n",
-	    sizeof (mboxsc_mbox_t), mailboxp);
+	DPRINTF2(DBG_KMEM, DBGACT_DEFAULT, "kmem_zalloc(%lu) = %p\n",
+	    sizeof (mboxsc_mbox_t), (void *)mailboxp);
 	mailboxp->mbox_key = key;
 	mailboxp->mbox_direction = direction;
 	mailboxp->mbox_callback = event_handler;
@@ -431,8 +431,8 @@ mboxsc_init(uint32_t key, int direction, void (*event_handler)(void))
 	mutex_exit(&mboxsc_lock);
 
 	if (error != 0) {
-		DPRINTF2(DBG_KMEM, DBGACT_DEFAULT, "kmem_free(%p, %d)\n",
-		    mailboxp, sizeof (mboxsc_mbox_t));
+		DPRINTF2(DBG_KMEM, DBGACT_DEFAULT, "kmem_free(%p, %lu)\n",
+		    (void *)mailboxp, sizeof (mboxsc_mbox_t));
 		kmem_free(mailboxp, sizeof (mboxsc_mbox_t));
 	}
 
@@ -501,14 +501,14 @@ mboxsc_putmsg(uint32_t key, uint32_t type, uint32_t cmd, uint64_t *transidp,
 	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "key = 0x%x\n", key);
 	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "type = 0x%x\n", type);
 	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "cmd = 0x%x\n", cmd);
-	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "transidp = %p\n", transidp);
+	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "transidp = %p\n", (void *)transidp);
 	if (transidp != NULL) {
-		DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "*transidp = 0x%016llx\n",
+		DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "*transidp = 0x%016lx\n",
 		    *transidp);
 	}
 	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "length = 0x%x\n", length);
 	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "datap = %p\n", datap);
-	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "timeout = %d\n", timeout);
+	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "timeout = %ld\n", timeout);
 #endif /* DEBUG */
 
 	/*
@@ -811,20 +811,20 @@ mboxsc_getmsg(uint32_t key, uint32_t *typep, uint32_t *cmdp, uint64_t *transidp,
 #ifdef DEBUG /* because lint whines about if stmts without consequents */
 	DPRINTF0(DBG_CALLS, DBGACT_DEFAULT, "mboxsc_getmsg called\n");
 	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "key = 0x%x\n", key);
-	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "typep = %p\n", typep);
+	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "typep = %p\n", (void *)typep);
 	if (typep != NULL) {
 		DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "*typep = 0x%x\n", *typep);
 	}
-	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "cmdp = %p\n", cmdp);
+	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "cmdp = %p\n", (void *)cmdp);
 	if (cmdp != NULL) {
 		DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "*cmdp = 0x%x\n", *cmdp);
 	}
-	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "transidp = %p\n", transidp);
+	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "transidp = %p\n", (void *)transidp);
 	if (transidp != NULL) {
-		DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "*transidp = 0x%llx\n",
+		DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "*transidp = 0x%lx\n",
 		    *transidp);
 	}
-	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "lengthp = %p\n", lengthp);
+	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "lengthp = %p\n", (void *)lengthp);
 	if (lengthp != NULL) {
 		DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "*lengthp = 0x%x\n",
 		    *lengthp);
@@ -1093,7 +1093,7 @@ mboxsc_getmsg_retry:
 	if (error != 0) {
 		ASSERT((error != EINVAL) && (error != EMSGSIZE));
 		if (lock_held) {
-			mboxsc_unlock_flags(TRUE);
+			(void) mboxsc_unlock_flags(TRUE);
 		}
 		mutex_enter(&mboxsc_lock);
 		mailboxp->mbox_state &= ~STATE_READING;
@@ -1154,7 +1154,7 @@ mboxsc_getmsg_retry:
 	error = mboxsc_timed_set_flag(deadline, key, IOSRAM_DATA_INVALID,
 	    IOSRAM_INT_NONE);
 
-	mboxsc_unlock_flags(TRUE);
+	(void) mboxsc_unlock_flags(TRUE);
 	mutex_enter(&mboxsc_lock);
 
 	if (error != 0) {
@@ -1465,7 +1465,7 @@ mboxsc_add_mailbox(mboxsc_mbox_t *mailboxp)
 	uint32_t	key = mailboxp->mbox_key;
 
 	DPRINTF0(DBG_CALLS, DBGACT_DEFAULT, "mboxsc_add_mailbox called\n");
-	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "mailboxp = %p\n", mailboxp);
+	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "mailboxp = %p\n", (void *)mailboxp);
 
 	/*
 	 * The global lock must be held by the caller.
@@ -1535,7 +1535,7 @@ mboxsc_close_mailbox(mboxsc_mbox_t *mailboxp)
 	uint32_t	key = mailboxp->mbox_key;
 
 	DPRINTF0(DBG_CALLS, DBGACT_DEFAULT, "mboxsc_close_mailbox called\n");
-	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "mailboxp = %p\n", mailboxp);
+	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "mailboxp = %p\n", (void *)mailboxp);
 
 	/*
 	 * The global lock must be held by the caller.
@@ -1557,10 +1557,10 @@ mboxsc_close_mailbox(mboxsc_mbox_t *mailboxp)
 	/*
 	 * Remove the mailbox from the hash table and deallocate its resources.
 	 */
-	mboxsc_hashremove_mailbox_by_key(key);
+	(void) mboxsc_hashremove_mailbox_by_key(key);
 	cv_destroy(&(mailboxp->mbox_wait));
-	DPRINTF2(DBG_KMEM, DBGACT_DEFAULT, "kmem_free(%p, %d)\n", mailboxp,
-	    sizeof (mboxsc_mbox_t));
+	DPRINTF2(DBG_KMEM, DBGACT_DEFAULT, "kmem_free(%p, %lu)\n",
+	    (void *)mailboxp, sizeof (mboxsc_mbox_t));
 	kmem_free(mailboxp, sizeof (mboxsc_mbox_t));
 
 	DPRINTF0(DBG_RETS, DBGACT_DEFAULT, "mboxsc_close_mailbox ret\n");
@@ -1581,7 +1581,7 @@ mboxsc_hashinsert_mailbox(mboxsc_mbox_t *mailboxp)
 
 	DPRINTF0(DBG_CALLS, DBGACT_DEFAULT,
 	    "mboxsc_hashinsert_mailbox called\n");
-	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "mailboxp = %p\n", mailboxp);
+	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "mailboxp = %p\n", (void *)mailboxp);
 
 	/*
 	 * The global lock must be held by the caller.
@@ -1628,7 +1628,7 @@ mboxsc_hashfind_mailbox_by_key(uint32_t key)
 	}
 
 	DPRINTF1(DBG_RETS, DBGACT_DEFAULT,
-	    "mboxsc_hashfind_mailbox_by_key ret: %p\n", mailboxp);
+	    "mboxsc_hashfind_mailbox_by_key ret: %p\n", (void *)mailboxp);
 	return (mailboxp);
 }
 
@@ -1681,7 +1681,7 @@ mboxsc_hashremove_mailbox_by_key(uint32_t key)
 	}
 
 	DPRINTF1(DBG_RETS, DBGACT_DEFAULT,
-	    "mboxsc_hashremove_mailbox_by_key ret: %p\n", mailboxp);
+	    "mboxsc_hashremove_mailbox_by_key ret: %p\n", (void *)mailboxp);
 	return (mailboxp);
 }
 
@@ -1696,7 +1696,7 @@ mboxsc_checksum(mboxsc_chksum_t seed, uint8_t *buf, uint32_t length)
 {
 	DPRINTF0(DBG_CALLS, DBGACT_DEFAULT, "mboxsc_checksum called\n");
 	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "seed = 0x%x\n", seed);
-	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "buf = %p\n", buf);
+	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "buf = %p\n", (void *)buf);
 	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "length = 0x%x\n", length);
 
 	while (length-- > 0) {
@@ -1732,7 +1732,7 @@ mboxsc_lock_flags(uint8_t mandatory, clock_t deadline)
 
 	DPRINTF0(DBG_CALLS, DBGACT_DEFAULT, "mboxsc_lock_flags called\n");
 	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "mandatory = 0x%x\n", mandatory);
-	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "deadline = 0x%x\n", deadline);
+	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "deadline = 0x%lx\n", deadline);
 
 	/*
 	 * Keep trying to acquire the lock until successful or (if acquisition
@@ -1773,7 +1773,7 @@ mboxsc_lock_flags(uint8_t mandatory, clock_t deadline)
 		 */
 		if (error == EBUSY) {
 			if (IOSRAM_SEMA_GET_IDX(sema) != IOSRAM_SEMA_SMS_IDX) {
-				iosram_sema_release();
+				(void) iosram_sema_release();
 				cmn_err(CE_WARN,
 				    "Incorrect flag lock value read (0x%08x)",
 				    sema);
@@ -1918,11 +1918,11 @@ mboxsc_timed_read(clock_t deadline, uint32_t key, uint32_t off, uint32_t len,
 	int error;
 
 	DPRINTF0(DBG_CALLS, DBGACT_DEFAULT, "mboxsc_timed_read called\n");
-	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "deadline = 0x%x\n", deadline);
+	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "deadline = 0x%lx\n", deadline);
 	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "key = 0x%x\n", key);
 	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "off = 0x%x\n", off);
 	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "len = 0x%x\n", len);
-	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "dptr = %p\n", dptr);
+	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "dptr = %p\n", (void *)dptr);
 
 	do {
 		error = iosram_rd(key, off, len, dptr);
@@ -1950,11 +1950,11 @@ mboxsc_timed_write(clock_t deadline, uint32_t key, uint32_t off, uint32_t len,
 	int error;
 
 	DPRINTF0(DBG_CALLS, DBGACT_DEFAULT, "mboxsc_timed_write called\n");
-	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "deadline = 0x%x\n", deadline);
+	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "deadline = 0x%lx\n", deadline);
 	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "key = 0x%x\n", key);
 	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "off = 0x%x\n", off);
 	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "len = 0x%x\n", len);
-	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "dptr = %p\n", dptr);
+	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "dptr = %p\n", (void *)dptr);
 
 	do {
 		error = iosram_wr(key, off, len, dptr);
@@ -1982,10 +1982,12 @@ mboxsc_timed_get_flag(clock_t deadline, uint32_t key, uint8_t *data_validp,
 	int error;
 
 	DPRINTF0(DBG_CALLS, DBGACT_DEFAULT, "mboxsc_timed_get_flag called\n");
-	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "deadline = 0x%x\n", deadline);
+	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "deadline = 0x%lx\n", deadline);
 	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "key = 0x%x\n", key);
-	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "data_validp = %p\n", data_validp);
-	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "int_pendingp = %p\n", int_pendingp);
+	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "data_validp = %p\n",
+	    (void *)data_validp);
+	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "int_pendingp = %p\n",
+	    (void *)int_pendingp);
 
 	do {
 		error = iosram_get_flag(key, data_validp, int_pendingp);
@@ -2013,7 +2015,7 @@ mboxsc_timed_set_flag(clock_t deadline, uint32_t key, uint8_t data_valid,
 	int error;
 
 	DPRINTF0(DBG_CALLS, DBGACT_DEFAULT, "mboxsc_timed_set_flag called\n");
-	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "deadline = 0x%x\n", deadline);
+	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "deadline = 0x%lx\n", deadline);
 	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "key = 0x%x\n", key);
 	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "data_valid = %d\n", data_valid);
 	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "int_pending = %d\n", int_pending);
@@ -2043,7 +2045,7 @@ mboxsc_timed_send_intr(clock_t deadline)
 	int error;
 
 	DPRINTF0(DBG_CALLS, DBGACT_DEFAULT, "mboxsc_timed_send_intr called\n");
-	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "deadline = 0x%x\n", deadline);
+	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "deadline = 0x%lx\n", deadline);
 
 	do {
 		error = iosram_send_intr();
@@ -2080,7 +2082,7 @@ mboxsc_expire_message(uint32_t key, int *resultp)
 
 	DPRINTF0(DBG_CALLS, DBGACT_DEFAULT, "mboxsc_expire_message called\n");
 	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "key = 0x%x\n", key);
-	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "resultp = %p\n", resultp);
+	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "resultp = %p\n", (void *)resultp);
 
 	do {
 		error = 0;
@@ -2211,7 +2213,7 @@ mboxsc_generate_transid(uint64_t prev_transid)
 	static uint64_t	transid_counter = 0;
 
 	DPRINTF0(DBG_CALLS, DBGACT_DEFAULT, "mboxsc_generate_transid called");
-	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "prev_transid = 0x%016llx\n",
+	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "prev_transid = 0x%016lx\n",
 	    prev_transid);
 
 	do {
@@ -2222,7 +2224,7 @@ mboxsc_generate_transid(uint64_t prev_transid)
 	} while (new_transid == prev_transid);
 
 	DPRINTF1(DBG_RETS, DBGACT_DEFAULT,
-	    "mboxsc_generate_transid ret: 0x%016llx", new_transid);
+	    "mboxsc_generate_transid ret: 0x%016lx", new_transid);
 	return (new_transid);
 }
 
@@ -2239,7 +2241,8 @@ static void
 mboxsc_reference_mailbox(mboxsc_mbox_t *mailboxp)
 {
 	DPRINTF0(DBG_CALLS, DBGACT_DEFAULT, "mboxsc_reference_mailbox called");
-	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "mailboxp = 0x%p\n", mailboxp);
+	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "mailboxp = 0x%p\n",
+	    (void *)mailboxp);
 
 	ASSERT(mutex_owned(&mboxsc_lock));
 
@@ -2260,7 +2263,8 @@ mboxsc_dereference_mailbox(mboxsc_mbox_t *mailboxp)
 {
 	DPRINTF0(DBG_CALLS, DBGACT_DEFAULT,
 	    "mboxsc_dereference_mailbox called");
-	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "mailboxp = 0x%p\n", mailboxp);
+	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "mailboxp = 0x%p\n",
+	    (void *)mailboxp);
 
 	ASSERT(mutex_owned(&mboxsc_lock));
 
@@ -2347,11 +2351,11 @@ mboxsc_dprintf(
 	if (class & mboxsc_debug_mask) {
 		indent_buf[0] = '\0';
 		for (i = 0; i < indent; i++) {
-			strcat(indent_buf, "  ");
+			(void) strcat(indent_buf, "  ");
 		}
 
 		va_start(adx, fmt);
-		vsprintf(msg_buf, fmt, adx);
+		(void) vsprintf(msg_buf, fmt, adx);
 		va_end(adx);
 
 		cmn_err(CE_CONT, "%s%s", indent_buf, msg_buf);
@@ -2425,29 +2429,31 @@ static void
 print_mailbox(mboxsc_mbox_t *mailboxp)
 {
 	DPRINTF0(DBG_CALLS, DBGACT_DEFAULT, "print_mailbox called\n");
-	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "mailboxp = %p\n", mailboxp);
+	DPRINTF1(DBG_ARGS, DBGACT_DEFAULT, "mailboxp = %p\n",
+	    (void *)mailboxp);
 	if (mailboxp->mbox_direction == MBOXSC_MBOX_IN) {
 		DPRINTF3(DBG_DEV, DBGACT_DEFAULT,
 		    "key = 0x%08x, dir = %d, callback = %p\n",
 		    mailboxp->mbox_key, mailboxp->mbox_direction,
-		    mailboxp->mbox_callback);
+		    (void *)mailboxp->mbox_callback);
 	} else {
 		DPRINTF2(DBG_DEV, DBGACT_DEFAULT, "key = 0x%08x, dir = %d\n",
-		    mailboxp->mbox_key, mailboxp->mbox_direction);
+		    (int)mailboxp->mbox_key, mailboxp->mbox_direction);
 	}
 	DPRINTF3(DBG_DEV, DBGACT_DEFAULT,
 	    "length = %d, refcount = %d, state = %d\n",
 	    mailboxp->mbox_length, mailboxp->mbox_refcount,
 	    mailboxp->mbox_state);
-	DPRINTF2(DBG_DEV, DBGACT_DEFAULT, "waitcv = 0x%x, hashnext = %p\n",
-	    mailboxp->mbox_wait, mailboxp->mbox_hash_next);
+	/* LINTED E_BAD_FORMAT_ARG_TYPE2 */
+	DPRINTF2(DBG_DEV, DBGACT_DEFAULT, "waitcv = %p, hashnext = %p\n",
+	    (void *)&mailboxp->mbox_wait, (void *)mailboxp->mbox_hash_next);
 	if (mailboxp->mbox_direction == MBOXSC_MBOX_IN) {
 		DPRINTF3(DBG_DEV, DBGACT_DEFAULT,
 		    "hdr.type = 0x%x, hdr.cmd = 0x%x, hdr.len = 0x%x\n",
 		    mailboxp->mbox_header.msg_type,
 		    mailboxp->mbox_header.msg_cmd,
 		    mailboxp->mbox_header.msg_length);
-		DPRINTF1(DBG_DEV, DBGACT_DEFAULT, "hdr.tid = 0x%016llx\n",
+		DPRINTF1(DBG_DEV, DBGACT_DEFAULT, "hdr.tid = 0x%016lx\n",
 		    mailboxp->mbox_header.msg_transid);
 	}
 	DPRINTF0(DBG_RETS, DBGACT_DEFAULT, "print_mailbox ret\n");

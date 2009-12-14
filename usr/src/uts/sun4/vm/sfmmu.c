@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -807,7 +808,7 @@ ndata_alloc_tsbs(struct memlist *ndata, pgcnt_t npages)
 	/*
 	 * Set ktsb_phys to 1 if the processor supports ASI_QUAD_LDD_PHYS.
 	 */
-	sfmmu_setup_4lp();
+	(void) sfmmu_setup_4lp();
 
 	/*
 	 * Size the kernel TSBs based upon the amount of physical

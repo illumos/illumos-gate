@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -449,7 +450,8 @@ cvc_wput(register queue_t *q, register mblk_t *mp)
 			freemsg(mp);
 			break;
 		default:
-			cmn_err(CE_WARN, "cvc_wput: illegal mblk = 0x%p", mp);
+			cmn_err(CE_WARN, "cvc_wput: illegal mblk = 0x%p",
+			    (void *)mp);
 			cmn_err(CE_WARN, "cvc_wput: type = 0x%x",
 			    mp->b_datap->db_type);
 			/* FALLTHROUGH */
@@ -709,7 +711,7 @@ cvc_register(queue_t *q)
 			cmn_err(CE_WARN, "cvc_register: duplicate q!");
 		else
 			cmn_err(CE_WARN, "cvc_register: nondup q = 0x%p",
-			    q);
+			    (void *)q);
 		return (error);
 	}
 
@@ -742,7 +744,8 @@ cvc_unregister(queue_t *q)
 		cvcoutput_q = NULL;
 	} else {
 		rw_exit(&cvclock);
-		cmn_err(CE_WARN, "cvc_unregister: q = 0x%p not registered", q);
+		cmn_err(CE_WARN, "cvc_unregister: q = 0x%p not registered",
+		    (void *)q);
 		return;
 	}
 

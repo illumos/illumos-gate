@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -331,7 +331,8 @@ xcppm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    ppm_inst, "ddi_ppm", 0) == DDI_FAILURE) {
 			ddi_soft_state_free(ppm_statep, ppm_inst);
 			DPRINTF(D_ERROR,
-			    ("%s: Can't create minor for 0x%p\n", str, dip));
+			    ("%s: Can't create minor for 0x%p\n", str,
+			    (void *)dip));
 			return (DDI_FAILURE);
 		}
 		ddi_report_dev(dip);
@@ -367,7 +368,7 @@ xcppm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	default:
 		cmn_err(CE_CONT, "xcppm_attach: unknown "
-		    "attach command %d, dip 0x%p\n", cmd, dip);
+		    "attach command %d, dip 0x%p\n", cmd, (void *)dip);
 		retval = DDI_FAILURE;
 	}
 
@@ -445,7 +446,7 @@ xcppm_freeze_led(void *action)
 	tid = unitp->led_tid;
 	unitp->led_tid = 0;
 	mutex_exit(&unitp->unit_lock);
-	untimeout(tid);
+	(void) untimeout(tid);
 	mutex_enter(&unitp->unit_lock);
 	xcppm_set_led((int)(uintptr_t)action);
 	mutex_exit(&unitp->unit_lock);

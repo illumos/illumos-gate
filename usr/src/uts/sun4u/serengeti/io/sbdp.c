@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/cmn_err.h>
@@ -321,7 +319,7 @@ sbdp_get_unit_num(sbdp_handle_t *hp, dev_info_t *dip)
 
 		if ((portid % 2) != 0)
 			if ((regs[0].regspec_addr_lo & 0x700000) ==
-				0x700000)
+			    0x700000)
 				unit = 0;
 			else
 				unit = 1;
@@ -430,7 +428,7 @@ sbdp_update_bd_info(sbdp_bd_t *bdp)
 		hp->h_wnode = bdp->wnode;
 		hp->h_err = kmem_zalloc(sizeof (*hp->h_err), KM_SLEEP);
 		if (bdp->ml != NULL) {
-			sbdp_del_memlist(hp, bdp->ml);
+			(void) sbdp_del_memlist(hp, bdp->ml);
 		}
 		bdp->ml = sbdp_get_memlist(hp, (dev_info_t *)NULL);
 		/*
@@ -600,7 +598,7 @@ sbdp_cleanup_bd(int wnode, int board)
 	hp->h_board = bdp->bd;
 	hp->h_wnode = bdp->wnode;
 	if (bdp->ml) {
-		sbdp_del_memlist(hp, bdp->ml);
+		(void) sbdp_del_memlist(hp, bdp->ml);
 	}
 
 	bdp->ml = NULL;

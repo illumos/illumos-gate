@@ -354,16 +354,17 @@ lombus_trace(struct lombus_state *ssp, char code, const char *caller,
 
 	if (ssp->debug & (1 << (code-'@'))) {
 		p = buf;
-		snprintf(p, sizeof (buf) - (p - buf),
+		(void) snprintf(p, sizeof (buf) - (p - buf),
 		    "%s/%s: ", MYNAME, caller);
 		p += strlen(p);
 
 		va_start(va, fmt);
-		vsnprintf(p, sizeof (buf) - (p - buf), fmt, va);
+		(void) vsnprintf(p, sizeof (buf) - (p - buf), fmt, va);
 		va_end(va);
 
 		buf[sizeof (buf) - 1] = '\0';
-		strlog(ssp->majornum, ssp->instance, code, SL_TRACE, buf);
+		(void) strlog(ssp->majornum, ssp->instance, code, SL_TRACE,
+		    buf);
 	}
 }
 
@@ -893,7 +894,7 @@ lombus_cmd(HANDLE_TYPE *hdlp, ptrdiff_t vreg, uint_t val, uint_t cmd)
 		if (ddi_get_lbolt() > ssp->deadline)
 			break;
 
-		cv_reltimedwait(ssp->lo_cv, ssp->lo_mutex,
+		(void) cv_reltimedwait(ssp->lo_cv, ssp->lo_mutex,
 		    drv_usectohz(LOMBUS_CTS_POLL/1000), TR_CLOCK_TICK);
 	}
 
@@ -1242,7 +1243,7 @@ lombus_meta_get32(HANDLE_TYPE *hdlp, uint32_t *addr)
 		 * runs a NOP command and returns the fault code from that.
 		 */
 		HANDLE_FAULT(hdlp) = 0;
-		lombus_cmd(hdlp, 0, 0, LOMBUS_CMD_NOP);
+		(void) lombus_cmd(hdlp, 0, 0, LOMBUS_CMD_NOP);
 		return (HANDLE_FAULT(hdlp));
 
 	case LOMBUS_ASYNC_REG:
@@ -1297,7 +1298,7 @@ lombus_meta_put32(HANDLE_TYPE *hdlp, uint32_t *addr, uint32_t val)
 		 * code later if required.
 		 */
 		HANDLE_FAULT(hdlp) = 0;
-		lombus_cmd(hdlp, 0, 0, LOMBUS_CMD_NOP);
+		(void) lombus_cmd(hdlp, 0, 0, LOMBUS_CMD_NOP);
 		return;
 
 	default:

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file is through cpp before being used as
@@ -56,7 +54,8 @@
 
 /*ARGSUSED*/
 void
-drmach_shutdown_asm(uint64_t estack, uint64_t flushaddr, int size)
+drmach_shutdown_asm(uint64_t estack, uint64_t flushaddr,
+    int size, int lsz, uint64_t physmem)
 {}
 
 /*ARGSUSED*/
@@ -88,7 +87,7 @@ drmach_rename_abort(uint64_t not_used_0, uint64_t not_used_1)
 
 /*ARGSUSED*/
 uint64_t
-lddsafconfig(uint64_t physaddr)
+lddsafconfig(void)
 {
 	return (0x0ull);
 }

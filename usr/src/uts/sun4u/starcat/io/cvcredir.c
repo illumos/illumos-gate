@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -213,7 +213,7 @@ cvcr_open(queue_t *q, dev_t *dev, int flag, int sflag, cred_t *cred)
 	 */
 	if (cvc_register(RD(q)) == -1) {
 		cmn_err(CE_WARN, "cvcr_open: cvc_register failed for q = 0x%p",
-		    q);
+		    (void *)q);
 	}
 	return (0);
 }
@@ -226,7 +226,7 @@ cvcr_close(queue_t *q, int flag, cred_t *cred)
 	 * call into the cvc driver to un-register our queue.  cvc will
 	 * no longer use our queue to send console output data upstream.
 	 */
-	cvc_unregister(RD(q));
+	(void) cvc_unregister(RD(q));
 	WR(q)->q_ptr = q->q_ptr = NULL;
 	return (0);
 }

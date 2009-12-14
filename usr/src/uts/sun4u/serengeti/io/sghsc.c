@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -264,7 +264,7 @@ _fini(void)
 	/*
 	 * Unregister the event handler
 	 */
-	sbbc_mbox_unreg_intr(MBOX_EVENT_CPCI_ENUM, sghsc_event_handler);
+	(void) sbbc_mbox_unreg_intr(MBOX_EVENT_CPCI_ENUM, sghsc_event_handler);
 	mutex_destroy(&sghsc_event_lock);
 
 	/*
@@ -637,7 +637,7 @@ sghsc_register_slots(sghsc_t *sghsc, int board_type)
 		base_id = sghsc->sghsc_portid & SGHSC_SAFARI_ID_EVEN;
 		nexuspath = sghsc->sghsc_slot_table[i].nexus_path;
 
-		sprintf(nexuspath, SGHSC_PATH, sghsc->sghsc_node_id,
+		(void) sprintf(nexuspath, SGHSC_PATH, sghsc->sghsc_node_id,
 		    (base_id + slot2bus[i].agent_delta), slot2bus[i].off);
 		sghsc->sghsc_slot_table[i].pci_device_num =
 		    slot2bus[i].pcidev;
@@ -653,7 +653,7 @@ sghsc_register_slots(sghsc_t *sghsc, int board_type)
 		slot_info->pci_slot_capabilities = HPC_SLOT_64BITS;
 		slot_info->pci_dev_num = slot2bus[i].pcidev;
 
-		sprintf(slot_info->pci_slot_name,
+		(void) sprintf(slot_info->pci_slot_name,
 		    "sg%dslot%d", sghsc->sghsc_board, i);
 		DEBUGF(1, (CE_NOTE, "pci_slot_name is %s at pci_dev_num %d"
 		    " on node %d / board %d", slot_info->pci_slot_name,
@@ -1316,7 +1316,7 @@ sghsc_scctl(int cmd, int node_id, int board, int slot, int *resultp)
 	DEBUGF(1, (CE_NOTE,
 	    "sghsc: sending mbox command type=%d subtype=0x%x size=%d buf=%p",
 	    reqp->msg_type.type, reqp->msg_type.sub_type,
-	    reqp->msg_len, reqp->msg_buf));
+	    reqp->msg_len, (void *)reqp->msg_buf));
 
 	DEBUGF(1, (CE_NOTE,
 	    "sghsc: sending buf  cmd_id=0x%x node_id=0x%x board=0x%x "
@@ -1423,7 +1423,8 @@ sghsc_freemem(sghsc_t *sghsc)
 		if (sghsc->sghsc_slot_table[i].slot_ops)
 			hpc_free_slot_ops(sghsc->sghsc_slot_table[i].slot_ops);
 		if (sghsc->sghsc_slot_table[i].handle)
-			hpc_slot_unregister(&sghsc->sghsc_slot_table[i].handle);
+			(void) hpc_slot_unregister(
+			    &sghsc->sghsc_slot_table[i].handle);
 	}
 
 	/* finally free up slot_table */

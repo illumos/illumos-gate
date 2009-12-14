@@ -1177,7 +1177,7 @@ vsw_mac_remove_vlans(mac_client_handle_t mch, vsw_vlanid_t *vids, int nvids)
 		if (vidp->vl_set == B_FALSE) {
 			continue;
 		}
-		mac_unicast_remove(mch, vidp->vl_muh);
+		(void) mac_unicast_remove(mch, vidp->vl_muh);
 		vidp->vl_set = B_FALSE;
 	}
 }

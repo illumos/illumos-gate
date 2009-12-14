@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/cmn_err.h>
@@ -76,7 +75,7 @@ sbd_err_log(sbd_error_t *ep, int ce)
 	if (i < sbd_etab_len)
 		txt = tp->t_text[ep->e_code - tp->t_base];
 	else {
-		snprintf(buf, sizeof (buf), "error %d", ep->e_code);
+		(void) snprintf(buf, sizeof (buf), "error %d", ep->e_code);
 		txt = buf;
 	}
 
@@ -314,16 +313,15 @@ dr_memlist_add_span(struct memlist *mlist, uint64_t base, uint64_t len)
 					mlist = nl;
 			} else {
 				ml->size = MAX((base + len),
-					(ml->address + ml->size)) -
-					base;
+				    (ml->address + ml->size)) - base;
 				ml->address = base;
 			}
 			break;
 
 		} else if (base <= (ml->address + ml->size)) {
 			ml->size = MAX((base + len),
-				(ml->address + ml->size)) -
-				MIN(ml->address, base);
+			    (ml->address + ml->size)) -
+			    MIN(ml->address, base);
 			ml->address = MIN(ml->address, base);
 			break;
 		}

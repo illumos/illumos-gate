@@ -18,11 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * All Rights Reserved, Copyright (c) FUJITSU LIMITED 2006
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/errno.h>
 #include <sys/modctl.h>
@@ -299,7 +298,7 @@ oplmsu_uwioctl_ipunlink(queue_t *uwq, mblk_t *mp)
 	}
 
 	if (rtout_id != 0) {
-		untimeout(rtout_id);
+		(void) untimeout(rtout_id);
 	}
 	oplmsu_iocack(uwq, mp, 0);
 	return (SUCCESS);
@@ -437,7 +436,7 @@ oplmsu_uwioctl_termios(queue_t *uwq, mblk_t *mp)
 			mutex_exit(&oplmsu_uinst->c_lock);
 			rw_exit(&oplmsu_uinst->lock);
 
-			putbq(uwq, mp);
+			(void) putbq(uwq, mp);
 			return (SUCCESS);
 		} else {
 			rw_exit(&oplmsu_uinst->lock);
@@ -456,7 +455,7 @@ oplmsu_uwioctl_termios(queue_t *uwq, mblk_t *mp)
 		mutex_exit(&oplmsu_uinst->u_lock);
 		rw_exit(&oplmsu_uinst->lock);
 
-		putq(dst_queue, nmp);
+		(void) putq(dst_queue, nmp);
 		return (SUCCESS);
 	} else {
 		oplmsu_clear_ioctl_path(lpath);

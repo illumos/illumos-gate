@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -129,7 +129,7 @@ man_domain_configure(void)
 
 	status = mboxsc_init(IOSRAM_KEY_MDSC, MBOXSC_MBOX_OUT, NULL);
 	if (status != 0) {
-		mboxsc_fini(IOSRAM_KEY_SCMD);
+		(void) mboxsc_fini(IOSRAM_KEY_SCMD);
 		cmn_err(CE_WARN, "man_domain_configure: failed to initialize"
 		    " MBOXSC_MBOX_OUT, errno = %d", status);
 		goto exit;
@@ -139,8 +139,8 @@ man_domain_configure(void)
 
 	status = man_path_discovery();
 	if (status != 0) {
-		mboxsc_fini(IOSRAM_KEY_SCMD);
-		mboxsc_fini(IOSRAM_KEY_MDSC);
+		(void) mboxsc_fini(IOSRAM_KEY_SCMD);
+		(void) mboxsc_fini(IOSRAM_KEY_MDSC);
 		man_mbox_initialized = FALSE;
 	}
 
@@ -231,8 +231,8 @@ int
 man_domain_deconfigure(void)
 {
 
-	mboxsc_fini(IOSRAM_KEY_SCMD);
-	mboxsc_fini(IOSRAM_KEY_MDSC);
+	(void) mboxsc_fini(IOSRAM_KEY_SCMD);
+	(void) mboxsc_fini(IOSRAM_KEY_MDSC);
 	/*
 	 * We are about to unload and know that there are no open
 	 * streams, so this change outside of the perimiter is ok.
@@ -691,7 +691,7 @@ man_get_eri_dev_info(dev_info_t *dip, man_dev_t *mdevp)
 	 */
 	if (man_dip_is_attached(dip) == FALSE) {
 		MAN_DBG(MAN_DR, ("man_get_eri_dev_info: "
-		    "dip 0x%p not attached\n", dip));
+		    "dip 0x%p not attached\n", (void *)dip));
 		return (FALSE);
 	}
 	mdevp->mdev_exp_id = exp_id;
@@ -730,11 +730,11 @@ man_dip_is_schizoxmits0_pcib(dev_info_t *dip, int *exp_id, int *xmits)
 		return (FALSE);
 	if (strcmp(name, MAN_SCHIZO_BINDING_NAME) == 0) {
 		MAN_DBG(MAN_PATH, ("man_dip_is_schizoxmits0_pcib: "
-		    "SCHIZO found 0x%p\n", dip));
+		    "SCHIZO found 0x%p\n", (void *)dip));
 	} else if (strcmp(name, MAN_XMITS_BINDING_NAME) == 0) {
 		*xmits = TRUE;
 		MAN_DBG(MAN_PATH, ("man_dip_is_schizoxmits0_pcib: "
-		    "XMITS found 0x%p\n", dip));
+		    "XMITS found 0x%p\n", (void *)dip));
 	} else
 		return (FALSE);
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, MAN_DEVTYPE_PROP,
@@ -840,7 +840,7 @@ man_dip_is_attached(dev_info_t *dip)
 			return (TRUE);
 		}
 		cmn_err(CE_WARN, "man_dip_is_attached: "
-		    "eri 0x%p instance is not set yet", dip);
+		    "eri 0x%p instance is not set yet", (void *)dip);
 
 	}
 	return (FALSE);

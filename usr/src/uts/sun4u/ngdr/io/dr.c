@@ -18,11 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 /*
  * PIM-DR layer of DR driver.  Provides interface between user
@@ -2328,7 +2328,7 @@ dr_dev_status(dr_handle_t *hp)
 		/* Alignment Paranoia */
 		if ((ulong_t)dstat32p & 0x1) {
 			PR_ALL("%s: alignment: sz=0x%lx dstat32p=0x%p\n",
-			    f, sizeof (sbd_stat32_t), dstat32p);
+			    f, sizeof (sbd_stat32_t), (void *)dstat32p);
 			DR_OP_INTERNAL_ERROR(hp);
 			rv = EINVAL;
 			goto status_done;

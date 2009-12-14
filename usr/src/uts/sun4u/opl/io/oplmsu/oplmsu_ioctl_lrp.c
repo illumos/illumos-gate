@@ -18,11 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * All Rights Reserved, Copyright (c) FUJITSU LIMITED 2006
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/errno.h>
 #include <sys/modctl.h>
@@ -181,7 +180,7 @@ oplmsu_lrioctl_termios(queue_t *lrq, mblk_t *mp)
 				/* Put a message(M_DATA) on a queue */
 				if (ctrl != NULL) {
 					mutex_enter(&oplmsu_uinst->c_lock);
-					putq(RD(ctrl->queue), hndl_mp);
+					(void) putq(RD(ctrl->queue), hndl_mp);
 					mutex_exit(&oplmsu_uinst->c_lock);
 				}
 			}
@@ -192,7 +191,7 @@ oplmsu_lrioctl_termios(queue_t *lrq, mblk_t *mp)
 			lpath->status = MSU_EXT_NOTUSED;
 
 			/* Notify of the active path changing */
-			prom_opl_switch_console(upath->ser_devcb.lsb);
+			(void) prom_opl_switch_console(upath->ser_devcb.lsb);
 
 			/* Send XON to notify active path */
 			(void) oplmsu_cmn_put_xoffxon(WR(lrq), MSU_XON_4);
@@ -413,7 +412,7 @@ oplmsu_lrioctl_termios(queue_t *lrq, mblk_t *mp)
 			mutex_exit(&oplmsu_uinst->l_lock);
 			mutex_exit(&oplmsu_uinst->u_lock);
 			freemsg(mp);
-			putq(dst_queue, nmp);
+			(void) putq(dst_queue, nmp);
 
 			/* Check sleep flag and wake up thread */
 			oplmsu_cmn_wakeup(dst_queue);
@@ -433,7 +432,7 @@ oplmsu_lrioctl_termios(queue_t *lrq, mblk_t *mp)
 			mutex_exit(&oplmsu_uinst->l_lock);
 			mutex_exit(&oplmsu_uinst->u_lock);
 			freemsg(mp);
-			putq(dst_queue, nmp);
+			(void) putq(dst_queue, nmp);
 
 			/* Check sleep flag and wake up thread */
 			oplmsu_cmn_wakeup(dst_queue);
@@ -648,7 +647,7 @@ oplmsu_lrdata_xoffxon(queue_t *lrq, mblk_t *mp)
 			mutex_exit(&oplmsu_uinst->l_lock);
 			mutex_exit(&oplmsu_uinst->u_lock);
 			rw_exit(&oplmsu_uinst->lock);
-			putbq(lrq, mp);
+			(void) putbq(lrq, mp);
 			return (FAILURE);
 		}
 	}
@@ -662,7 +661,7 @@ oplmsu_lrdata_xoffxon(queue_t *lrq, mblk_t *mp)
 	    (upath->traditional_status == MSU_WCAR_ACK))) {
 		mutex_exit(&oplmsu_uinst->l_lock);
 		mutex_exit(&oplmsu_uinst->u_lock);
-		oplmsu_rcmn_through_hndl(lrq, mp, MSU_NORM);
+		(void) oplmsu_rcmn_through_hndl(lrq, mp, MSU_NORM);
 		rw_exit(&oplmsu_uinst->lock);
 		return (SUCCESS);
 	} else if ((upath->status != MSU_PSTAT_STANDBY) ||
@@ -732,9 +731,9 @@ oplmsu_lrdata_xoffxon(queue_t *lrq, mblk_t *mp)
 		lpath->status = MSU_EXT_NOTUSED;
 
 		/* Notify of the active path changing */
-		prom_opl_switch_console(upath->ser_devcb.lsb);
+		(void) prom_opl_switch_console(upath->ser_devcb.lsb);
 
-		putq(WR(lrq), fmp);
+		(void) putq(WR(lrq), fmp);
 
 		/* Send XON to notify active path */
 		(void) oplmsu_cmn_put_xoffxon(WR(lrq), MSU_XON_4);
@@ -742,7 +741,7 @@ oplmsu_lrdata_xoffxon(queue_t *lrq, mblk_t *mp)
 		if (lpath->hndl_mp != NULL) {
 			/* Put a message(M_DATA) on a queue */
 			if (ctrl != NULL) {
-				putq(RD(ctrl->queue), lpath->hndl_mp);
+				(void) putq(RD(ctrl->queue), lpath->hndl_mp);
 			}
 		}
 

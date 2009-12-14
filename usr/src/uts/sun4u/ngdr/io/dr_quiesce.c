@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * A CPR derivative specifically for starfire/starcat
@@ -251,10 +250,10 @@ dr_resolve_devname(dev_info_t *dip, char *buffer, char *alias)
 	if ((devmajor = ddi_name_to_major(aka)) != -1)
 		aka = ddi_major_to_name(devmajor);
 
-	strcpy(buffer, name);
+	(void) strcpy(buffer, name);
 
 	if (strcmp(name, aka))
-		strcpy(alias, aka);
+		(void) strcpy(alias, aka);
 	else
 		*alias = 0;
 
@@ -625,8 +624,8 @@ dr_stop_user_threads(dr_sr_handle_t *srh)
 					    "t_state=0x%x, t_proc_flag=0x%x, "
 					    "t_schedflag=0x%x\n",
 					    f, p->p_user.u_psargs, p->p_pid,
-					    tp, tp->t_state, tp->t_proc_flag,
-					    tp->t_schedflag);
+					    (void *)tp, tp->t_state,
+					    tp->t_proc_flag, tp->t_schedflag);
 				}
 
 			}
