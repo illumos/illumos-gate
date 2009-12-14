@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
+#include <stdlib.h>
 #include <errno.h>
+#include <unistd.h>
 #include <netconfig.h>
 #include <netdir.h>
 #include <rpc/rpc.h>
@@ -37,6 +36,7 @@
 #include <ndbm.h>
 #include <rpcsvc/yp_prot.h>
 #include <rpcsvc/nis.h>
+#include <strings.h>
 
 #include <sys/isa_defs.h>	/* for ENDIAN defines */
 
@@ -48,6 +48,7 @@ static struct timeval TIMEOUT = {25, 0};
 static	DBM	*db;
 
 extern bool secure_map;
+extern void logprintf(char *, ...);
 
 /* delete the dbm file with name file */
 static int
@@ -76,7 +77,7 @@ char *file;
 
 /* xdr just the .pag file of a dbm file */
 static	bool_t
-xdr_pages(xdrs, objp)
+xdr_pages(xdrs)
 	XDR	*xdrs;
 {
 	static struct pag res;
@@ -87,12 +88,14 @@ xdr_pages(xdrs, objp)
 #endif
 	bool_t	more;
 	bool_t	goteof;
+	off64_t	where;
+	int	true = 1;
 
 	goteof = FALSE;
 	if (!xdr_pag(xdrs, &res))
 		return (FALSE);
 	PAG = &res;
-	while (1) {
+	while (true) {
 		if (PAG->status == OK) {
 #ifdef DOSWAB
 		s = (short *)PAG->pag_u.ok.blkdat;
@@ -101,8 +104,8 @@ xdr_pages(xdrs, objp)
 			s[i] = ntohs(s[i]);
 #endif
 			errno = 0;
-			lseek(db->dbm_pagf,
-				PAG->pag_u.ok.blkno * PBLKSIZ, L_SET);
+			where = (((off64_t)PAG->pag_u.ok.blkno) * PBLKSIZ);
+			(void) lseek64(db->dbm_pagf, where, L_SET);
 			if (errno != 0) {
 				perror("seek");
 				exit(-1);
@@ -113,7 +116,7 @@ xdr_pages(xdrs, objp)
 				exit(-1);
 			}
 		} else if (PAG->status == GETDBM_ERROR) {
-			printf("clnt call getpag GETDBM_ERROR\n");
+			(void) printf("clnt call getpag GETDBM_ERROR\n");
 			exit(-1);
 		} else if (PAG->status == GETDBM_EOF)
 			goteof = TRUE;
@@ -124,26 +127,30 @@ xdr_pages(xdrs, objp)
 		if (!xdr_pag(xdrs, &res))
 			return (FALSE);
 	}
+	/*NOTREACHED*/
+	return (TRUE);
 }
 /* xdr  just the .dir part of a dbm file */
 static	bool_t
-xdr_dirs(xdrs, objp)
+xdr_dirs(xdrs)
 	XDR	*xdrs;
 {
 	static	struct dir res;
 	struct	dir	*DIR;
 	bool_t	more;
 	bool_t	goteof;
+	off64_t	where;
+	int	true = 1;
 
 	goteof = FALSE;
 	if (!xdr_dir(xdrs, &res))
 		return (FALSE);
 	DIR = &res;
-	while (1) {
+	while (true) {
 		if (DIR->status == OK) {
 			errno = 0;
-			lseek(db->dbm_dirf,
-				DIR->dir_u.ok.blkno * DBLKSIZ, L_SET);
+			where = (((off64_t)DIR->dir_u.ok.blkno) * DBLKSIZ);
+			(void) lseek64(db->dbm_dirf, where, L_SET);
 			if (errno != 0) {
 				perror("seek");
 				exit(-1);
@@ -154,7 +161,7 @@ xdr_dirs(xdrs, objp)
 				exit(-1);
 			}
 		} else if (DIR->status == GETDBM_ERROR) {
-			printf("clnt call getdir GETDBM_ERROR\n");
+			(void) printf("clnt call getdir GETDBM_ERROR\n");
 			exit(-1);
 		} else if (DIR->status == GETDBM_EOF)
 			goteof = TRUE;
@@ -165,6 +172,8 @@ xdr_dirs(xdrs, objp)
 		if (!xdr_dir(xdrs, &res))
 			return (FALSE);
 	}
+	/*NOTREACHED*/
+	return (TRUE);
 }
 
 /*
@@ -184,10 +193,10 @@ xdr_myfyl(xdrs, objp)
 	if (*objp != OK)
 		return (TRUE);
 
-	if (!xdr_pages(xdrs, NULL))
+	if (!xdr_pages(xdrs))
 		return (FALSE);
 
-	if (!xdr_dirs(xdrs, NULL))
+	if (!xdr_dirs(xdrs))
 		return (FALSE);
 
 	return (TRUE);
@@ -234,11 +243,12 @@ ypxfrd_getdbm(tempmap, master, domain, map)
 					continue;
 				logprintf(
 			"ypxfr: cannot bind to reserved port for %s\n%s\n",
-					netid[i], netdir_sperror(""));
+					netid[i], netdir_sperror());
 				return (-1);
 			}
 		}
 
+		/* LINTED pointer alignment */
 		if ((tbind = (struct t_bind *)t_alloc(fd, T_BIND, T_ADDR)) ==
 			NULL) {
 			(void) close(fd);
@@ -277,7 +287,7 @@ ypxfrd_getdbm(tempmap, master, domain, map)
 
 	rmap.map = map;
 	rmap.domain = domain;
-	memset((char *)&res, 0, sizeof (res));
+	(void) memset((char *)&res, 0, sizeof (res));
 	db = dbm_open(tempmap, O_RDWR + O_CREAT + O_TRUNC, 0777);
 	if (db == NULL) {
 		logprintf("dbm_open failed %s\n", tempmap);
@@ -289,13 +299,13 @@ ypxfrd_getdbm(tempmap, master, domain, map)
 		(char *)&res, TIMEOUT) != RPC_SUCCESS) {
 		logprintf("clnt call to ypxfrd getdbm failed.\n");
 		clnt_perror(clnt, "getdbm");
-		dbm_deletefile(tempmap);
+		(void) dbm_deletefile(tempmap);
 		return (-3);
 	}
 	if (res != OK) {
 		logprintf("clnt call %s ypxfrd getdbm NOTOK %s %s code=%d\n",
 			master, domain, map, res);
-		dbm_deletefile(tempmap);
+		(void) dbm_deletefile(tempmap);
 		return (-4);
 	}
 	return (0);
