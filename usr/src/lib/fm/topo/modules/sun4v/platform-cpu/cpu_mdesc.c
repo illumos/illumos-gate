@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -166,6 +166,7 @@ cpu_n2_mdesc_init(topo_mod_t *mod, md_t *mdp, md_info_t *chip)
 	int nnode, ncomp, nproc, ncpu;
 	char *str = NULL;
 	uint64_t x, sn;
+	char *strserial, *end;
 
 	nnode = md_node_count(mdp);
 	list1p = topo_mod_zalloc(mod, sizeof (mde_cookie_t) * nnode);
@@ -217,10 +218,22 @@ cpu_n2_mdesc_init(topo_mod_t *mod, md_t *mdp, md_info_t *chip)
 		    str == NULL || strcmp(str, MD_STR_PROCESSOR))
 			continue;
 		if (md_get_prop_val(mdp, list1p[i], MD_STR_SERIAL, &sn) < 0) {
-			topo_mod_dprintf(mod,
-			    "Failed to get the serial number of proc[%d]\n",
-			    nproc);
-			continue;
+			if (md_get_prop_str(mdp, list1p[i], MD_STR_SERIAL,
+			    &strserial) < 0) {
+				topo_mod_dprintf(mod,
+				    "Failed to get the serial number of"
+				    "proc[%d]\n", nproc);
+				continue;
+			} else {
+				sn = (uint64_t)strtoull(strserial, &end, 16);
+				if (strserial == end) {
+					topo_mod_dprintf(mod,
+					    "Failed to convert the serial "
+					    "string to serial int of "
+					    "proc[%d]\n", nproc);
+					continue;
+				}
+			}
 		}
 		procp->serialno = sn;
 

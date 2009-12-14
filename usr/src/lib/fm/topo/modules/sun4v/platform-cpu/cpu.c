@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,6 +86,33 @@ static void
 cpu_free(void *data, size_t size)
 {
 	umem_free(data, size);
+}
+
+static int
+cpu_read_serial(nvlist_t *in, uint64_t *serial)
+{
+	uint8_t version;
+	uint64_t int_serial;
+	char *str_serial, *end;
+	int rc = 0;
+
+	if (nvlist_lookup_uint8(in, FM_VERSION, &version) != 0)
+		return (1);
+
+	if (version == CPU_SCHEME_VERSION0) {
+		if ((rc = nvlist_lookup_uint64(in, FM_FMRI_CPU_SERIAL_ID,
+		    &int_serial)) == 0) {
+			*serial = int_serial;
+		}
+	} else {
+		if ((rc = nvlist_lookup_string(in, FM_FMRI_CPU_SERIAL_ID,
+		    &str_serial)) == 0) {
+			*serial = (uint64_t)strtoull(str_serial, &end, 16);
+			if (str_serial == end)
+				rc = 1;
+		}
+	}
+	return (rc);
 }
 
 int
@@ -165,8 +192,7 @@ cpu_present(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	 * Otherwise, the cpu is identified by the <cpuid>.
 	 */
 	if ((mcmp = cpu_find_cpumap(chip, cpuid)) != NULL) {
-		if (nvlist_lookup_uint64(in, FM_FMRI_CPU_SERIAL_ID, &nvlserid)
-		    == 0)
+		if (cpu_read_serial(in, &nvlserid) == 0)
 			present = nvlserid == mcmp->cpumap_serialno;
 		else
 			present = 1;
@@ -211,8 +237,7 @@ cpu_replaced(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	 * Otherwise, the cpu is identified by the <cpuid>.
 	 */
 	if ((mcmp = cpu_find_cpumap(chip, cpuid)) != NULL) {
-		if (nvlist_lookup_uint64(in, FM_FMRI_CPU_SERIAL_ID, &nvlserid)
-		    == 0)
+		if (cpu_read_serial(in, &nvlserid) == 0)
 			rval = (nvlserid == mcmp->cpumap_serialno) ?
 			    FMD_OBJ_STATE_STILL_PRESENT :
 			    FMD_OBJ_STATE_REPLACED;
@@ -253,8 +278,7 @@ cpu_expand(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	if ((mcmp = cpu_find_cpumap(chip, cpuid)) == NULL)
 		return (-1);
 
-	if ((rc = nvlist_lookup_uint64(in, FM_FMRI_CPU_SERIAL_ID,
-	    &nvlserid)) == 0) {
+	if ((rc = cpu_read_serial(in, &nvlserid)) == 0) {
 		if (nvlserid != mcmp->cpumap_serialno)
 			return (-1);
 	} else if (rc != ENOENT)
@@ -326,8 +350,7 @@ cpu_unusable(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	 * Check the cpu presence
 	 */
 	if ((mcmp = cpu_find_cpumap(chip, cpuid)) != NULL) {
-		if (nvlist_lookup_uint64(in, FM_FMRI_CPU_SERIAL_ID, &nvlserid)
-		    == 0)
+		if (cpu_read_serial(in, &nvlserid) == 0)
 			present = nvlserid == mcmp->cpumap_serialno;
 		else
 			present = 1;
