@@ -601,6 +601,31 @@ zfs_secpolicy_destroy(zfs_cmd_t *zc, cred_t *cr)
 }
 
 /*
+ * Destroying snapshots with delegated permissions requires
+ * descendent mount and destroy permissions.
+ * Reassemble the full filesystem@snap name so dsl_deleg_access()
+ * can do the correct permission check.
+ *
+ * Since this routine is used when doing a recursive destroy of snapshots
+ * and destroying snapshots requires descendent permissions, a successfull
+ * check of the top level snapshot applies to snapshots of all descendent
+ * datasets as well.
+ */
+static int
+zfs_secpolicy_destroy_snaps(zfs_cmd_t *zc, cred_t *cr)
+{
+	int error;
+	char *dsname;
+
+	dsname = kmem_asprintf("%s@%s", zc->zc_name, zc->zc_value);
+
+	error = zfs_secpolicy_destroy_perms(dsname, cr);
+
+	strfree(dsname);
+	return (error);
+}
+
+/*
  * Must have sys_config privilege to check the iscsi permission
  */
 /* ARGSUSED */
@@ -4264,8 +4289,8 @@ static zfs_ioc_vec_t zfs_ioc_vec[] = {
 	{ zfs_ioc_clear, zfs_secpolicy_config, POOL_NAME, B_TRUE, B_FALSE },
 	{ zfs_ioc_promote, zfs_secpolicy_promote, DATASET_NAME, B_TRUE,
 	    B_TRUE },
-	{ zfs_ioc_destroy_snaps, zfs_secpolicy_destroy,	DATASET_NAME, B_TRUE,
-	    B_TRUE },
+	{ zfs_ioc_destroy_snaps, zfs_secpolicy_destroy_snaps, DATASET_NAME,
+	    B_TRUE, B_TRUE },
 	{ zfs_ioc_snapshot, zfs_secpolicy_snapshot, DATASET_NAME, B_TRUE,
 	    B_TRUE },
 	{ zfs_ioc_dsobj_to_dsname, zfs_secpolicy_config, POOL_NAME, B_FALSE,
