@@ -954,7 +954,7 @@ list_setting(menu_t *mp, char *which, char *setting)
 	for (lp = ent->start; lp != NULL; lp = lp->next) {
 		if ((*setting == NULL) && (lp->flags != BAM_COMMENT))
 			bam_print(PRINT, lp->line);
-		else if (strcmp(setting, lp->cmd) == 0) {
+		else if (lp->cmd != NULL && strcmp(setting, lp->cmd) == 0) {
 			bam_print(PRINT, lp->arg);
 			found = 1;
 		}
@@ -4068,13 +4068,16 @@ check_cmd(const char *cmd, const int which, const char *arg, const char *str)
 
 	BAM_DPRINTF((D_FUNC_ENTRY2, fcn, arg, str));
 
-	if ((strcmp(cmd, menu_cmds[which]) != 0) &&
-	    (strcmp(cmd, menu_cmds[which + 1]) != 0)) {
-		BAM_DPRINTF((D_CHECK_CMD_CMD_NOMATCH,
-		    fcn, cmd, menu_cmds[which]));
-		return (0);
-	}
-	ret = (strstr(arg, str) != NULL);
+	if (cmd != NULL) {
+		if ((strcmp(cmd, menu_cmds[which]) != 0) &&
+		    (strcmp(cmd, menu_cmds[which + 1]) != 0)) {
+			BAM_DPRINTF((D_CHECK_CMD_CMD_NOMATCH,
+			    fcn, cmd, menu_cmds[which]));
+			return (0);
+		}
+		ret = (strstr(arg, str) != NULL);
+	} else
+		ret = 0;
 
 	if (ret) {
 		BAM_DPRINTF((D_RETURN_SUCCESS, fcn));
@@ -4345,7 +4348,7 @@ line_parser(menu_t *mp, char *str, int *lineNum, int *entryNum)
 	}
 
 	/* record default, old default, and entry line ranges */
-	if (lp->flags == BAM_GLOBAL &&
+	if (lp->flags == BAM_GLOBAL && lp->cmd != NULL &&
 	    strcmp(lp->cmd, menu_cmds[DEFAULT_CMD]) == 0) {
 		mp->curdefault = lp;
 	} else if (lp->flags == BAM_COMMENT &&
@@ -4394,7 +4397,7 @@ update_numbering(menu_t *mp)
 		/*
 		 * Get the value of the default command
 		 */
-		if (lp->entryNum == ENTRY_INIT && lp->cmd &&
+		if (lp->entryNum == ENTRY_INIT && lp->cmd != NULL &&
 		    strcmp(lp->cmd, menu_cmds[DEFAULT_CMD]) == 0 &&
 		    lp->arg) {
 			old_default_value = atoi(lp->arg);
@@ -4424,7 +4427,8 @@ update_numbering(menu_t *mp)
 		/*
 		 * Now fixup the entry number
 		 */
-		if (lp->cmd && strcmp(lp->cmd, menu_cmds[TITLE_CMD]) == 0) {
+		if (lp->cmd != NULL &&
+		    strcmp(lp->cmd, menu_cmds[TITLE_CMD]) == 0) {
 			lp->entryNum = ++entryNum;
 			/* fixup the bootadm header */
 			if (prev && prev->flags == BAM_COMMENT &&
@@ -7765,7 +7769,8 @@ find_boot_entry(
 		lp = lp->next;	/* advance to root line */
 		if (lp == NULL) {
 			continue;
-		} else if (strcmp(lp->cmd, menu_cmds[FINDROOT_CMD]) == 0) {
+		} else if (lp->cmd != NULL &&
+		    strcmp(lp->cmd, menu_cmds[FINDROOT_CMD]) == 0) {
 			INJECT_ERROR1("FIND_BOOT_ENTRY_NULL_FINDROOT",
 			    findroot = NULL);
 			if (findroot == NULL) {
@@ -7781,7 +7786,8 @@ find_boot_entry(
 			}
 			BAM_DPRINTF((D_MATCHED_FINDROOT, fcn, findroot));
 			lp = lp->next;	/* advance to kernel line */
-		} else if (strcmp(lp->cmd, menu_cmds[ROOT_CMD]) == 0) {
+		} else if (lp->cmd != NULL &&
+		    strcmp(lp->cmd, menu_cmds[ROOT_CMD]) == 0) {
 			INJECT_ERROR1("FIND_BOOT_ENTRY_NULL_ROOT", root = NULL);
 			if (root == NULL) {
 				BAM_DPRINTF((D_NOMATCH_ROOT_NULL,
@@ -7913,12 +7919,14 @@ update_boot_entry(menu_t *mp, char *title, char *findroot, char *root,
 	lp = lp->next;	/* root line */
 
 	/* if no root or findroot command, create a new line_t */
-	if (strcmp(lp->cmd, menu_cmds[ROOT_CMD]) != 0 &&
-	    strcmp(lp->cmd, menu_cmds[FINDROOT_CMD]) != 0) {
+	if ((lp->cmd != NULL) && (strcmp(lp->cmd, menu_cmds[ROOT_CMD]) != 0 &&
+	    strcmp(lp->cmd, menu_cmds[FINDROOT_CMD]) != 0)) {
 		lp = s_calloc(1, sizeof (line_t));
 		bam_add_line(mp, ent, tlp, lp);
 	} else {
-		free(lp->cmd);
+		if (lp->cmd != NULL)
+			free(lp->cmd);
+
 		free(lp->sep);
 		free(lp->arg);
 		free(lp->line);
@@ -7948,7 +7956,9 @@ update_boot_entry(menu_t *mp, char *title, char *findroot, char *root,
 			    menu_cmds[KERNEL_DOLLAR_CMD], menu_cmds[SEP_CMD],
 			    kernel);
 
-		free(lp->cmd);
+		if (lp->cmd != NULL)
+			free(lp->cmd);
+
 		free(lp->arg);
 		free(lp->line);
 		lp->cmd = s_strdup(menu_cmds[KERNEL_DOLLAR_CMD]);
@@ -7962,7 +7972,8 @@ update_boot_entry(menu_t *mp, char *title, char *findroot, char *root,
 		/*
 		 * We're upgrading from multiboot to directboot.
 		 */
-		if (strcmp(lp->cmd, menu_cmds[KERNEL_CMD]) == 0) {
+		if (lp->cmd != NULL &&
+		    strcmp(lp->cmd, menu_cmds[KERNEL_CMD]) == 0) {
 			(void) snprintf(linebuf, sizeof (linebuf), "%s%s%s",
 			    menu_cmds[KERNEL_DOLLAR_CMD], menu_cmds[SEP_CMD],
 			    kernel);
@@ -7975,7 +7986,8 @@ update_boot_entry(menu_t *mp, char *title, char *findroot, char *root,
 			lp = lp->next;
 			BAM_DPRINTF((D_ADDING_KERNEL_DOLLAR, fcn, kernel));
 		}
-		if (strcmp(lp->cmd, menu_cmds[MODULE_CMD]) == 0) {
+		if (lp->cmd != NULL &&
+		    strcmp(lp->cmd, menu_cmds[MODULE_CMD]) == 0) {
 			(void) snprintf(linebuf, sizeof (linebuf), "%s%s%s",
 			    menu_cmds[MODULE_DOLLAR_CMD], menu_cmds[SEP_CMD],
 			    module);
@@ -7994,7 +8006,8 @@ update_boot_entry(menu_t *mp, char *title, char *findroot, char *root,
 	lp = lp->next;
 
 	if (ent->flags & BAM_ENTRY_UPGFSMODULE) {
-		if (strcmp(lp->cmd, menu_cmds[MODULE_CMD]) == 0) {
+		if (lp->cmd != NULL &&
+		    strcmp(lp->cmd, menu_cmds[MODULE_CMD]) == 0) {
 			(void) snprintf(linebuf, sizeof (linebuf), "%s%s%s",
 			    menu_cmds[MODULE_DOLLAR_CMD], menu_cmds[SEP_CMD],
 			    module);
@@ -8689,7 +8702,7 @@ set_archive_line(entry_t *entryp, line_t *kernelp)
 	const char	*fcn = "set_archive_line()";
 
 	for (; lp != NULL; lp = lp->next) {
-		if (strncmp(lp->cmd, menu_cmds[MODULE_CMD],
+		if (lp->cmd != NULL && strncmp(lp->cmd, menu_cmds[MODULE_CMD],
 		    sizeof (menu_cmds[MODULE_CMD]) - 1) == 0) {
 			break;
 		}
@@ -8723,7 +8736,7 @@ set_archive_line(entry_t *entryp, line_t *kernelp)
 		return;
 	}
 
-	if (strcmp(lp->cmd, menu_cmds[m_cmd]) != 0) {
+	if (lp->cmd != NULL && strcmp(lp->cmd, menu_cmds[m_cmd]) != 0) {
 		free(lp->cmd);
 		lp->cmd = s_strdup(menu_cmds[m_cmd]);
 	}
@@ -9243,7 +9256,7 @@ line_free(line_t *lp)
 	if (lp == NULL)
 		return;
 
-	if (lp->cmd)
+	if (lp->cmd != NULL)
 		free(lp->cmd);
 	if (lp->sep)
 		free(lp->sep);

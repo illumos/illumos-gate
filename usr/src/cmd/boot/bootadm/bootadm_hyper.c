@@ -842,25 +842,29 @@ cvt_to_hyper(menu_t *mp, char *osroot, char *extra_args)
 		if (lp->flags == BAM_TITLE) {
 			title = alloca(strlen(lp->arg) + 1);
 			(void) strcpy(title, lp->arg);
-		} else if (strcmp(lp->cmd, "findroot") == 0) {
-			findroot = alloca(strlen(lp->arg) + 1);
-			(void) strcpy(findroot, lp->arg);
-		} else if (strcmp(lp->cmd, "bootfs") == 0) {
-			bootfs = alloca(strlen(lp->arg) + 1);
-			(void) strcpy(bootfs, lp->arg);
-		} else if (strcmp(lp->cmd, menu_cmds[MODULE_DOLLAR_CMD]) == 0) {
-			module = alloca(strlen(lp->arg) + 1);
-			(void) strcpy(module, lp->arg);
-		} else if ((strcmp(lp->cmd,
-		    menu_cmds[KERNEL_DOLLAR_CMD]) == 0) &&
-		    (ret = cvt_metal_kernel(lp->arg, &kern_path)) != 0) {
-			if (ret < 0) {
-				ret = BAM_ERROR;
-				bam_error(KERNEL_NOT_PARSEABLE, curdef);
-			} else
-				ret = BAM_NOCHANGE;
+		} else if (lp->cmd != NULL) {
+			if (strcmp(lp->cmd, "findroot") == 0) {
+				findroot = alloca(strlen(lp->arg) + 1);
+				(void) strcpy(findroot, lp->arg);
+			} else if (strcmp(lp->cmd, "bootfs") == 0) {
+				bootfs = alloca(strlen(lp->arg) + 1);
+				(void) strcpy(bootfs, lp->arg);
+			} else if (strcmp(lp->cmd,
+			    menu_cmds[MODULE_DOLLAR_CMD]) == 0) {
+				module = alloca(strlen(lp->arg) + 1);
+				(void) strcpy(module, lp->arg);
+			} else if ((strcmp(lp->cmd,
+			    menu_cmds[KERNEL_DOLLAR_CMD]) == 0) &&
+			    (ret = cvt_metal_kernel(lp->arg,
+			    &kern_path)) != 0) {
+				if (ret < 0) {
+					ret = BAM_ERROR;
+					bam_error(KERNEL_NOT_PARSEABLE, curdef);
+				} else
+					ret = BAM_NOCHANGE;
 
-			goto abort;
+				goto abort;
+			}
 		}
 
 		if (lp == ent->end)
@@ -1063,26 +1067,30 @@ cvt_to_metal(menu_t *mp, char *osroot, char *menu_root)
 		if (lp->flags == BAM_TITLE) {
 			title = alloca(strlen(lp->arg) + 1);
 			(void) strcpy(title, lp->arg);
-		} else if (strcmp(lp->cmd, "findroot") == 0) {
-			findroot = alloca(strlen(lp->arg) + 1);
-			(void) strcpy(findroot, lp->arg);
-		} else if (strcmp(lp->cmd, "bootfs") == 0) {
-			bootfs = alloca(strlen(lp->arg) + 1);
-			(void) strcpy(bootfs, lp->arg);
-		} else if (strcmp(lp->cmd, menu_cmds[MODULE_DOLLAR_CMD]) == 0) {
-			if (strstr(lp->arg, "boot_archive") == NULL) {
-				module = alloca(strlen(lp->arg) + 1);
-				(void) strcpy(module, lp->arg);
-				cvt_hyper_module(module, &kern_path);
-			} else {
-				barchive_path = alloca(strlen(lp->arg) + 1);
-				(void) strcpy(barchive_path, lp->arg);
+		} else if (lp->cmd != NULL) {
+			if (strcmp(lp->cmd, "findroot") == 0) {
+				findroot = alloca(strlen(lp->arg) + 1);
+				(void) strcpy(findroot, lp->arg);
+			} else if (strcmp(lp->cmd, "bootfs") == 0) {
+				bootfs = alloca(strlen(lp->arg) + 1);
+				(void) strcpy(bootfs, lp->arg);
+			} else if (strcmp(lp->cmd,
+			    menu_cmds[MODULE_DOLLAR_CMD]) == 0) {
+				if (strstr(lp->arg, "boot_archive") == NULL) {
+					module = alloca(strlen(lp->arg) + 1);
+					(void) strcpy(module, lp->arg);
+					cvt_hyper_module(module, &kern_path);
+				} else {
+					barchive_path =
+					    alloca(strlen(lp->arg) + 1);
+					(void) strcpy(barchive_path, lp->arg);
+				}
+			} else if ((strcmp(lp->cmd,
+			    menu_cmds[KERNEL_DOLLAR_CMD]) == 0) &&
+			    (cvt_hyper_kernel(lp->arg) < 0)) {
+				ret = BAM_NOCHANGE;
+				goto abort;
 			}
-		} else if ((strcmp(lp->cmd,
-		    menu_cmds[KERNEL_DOLLAR_CMD]) == 0) &&
-		    (cvt_hyper_kernel(lp->arg) < 0)) {
-			ret = BAM_NOCHANGE;
-			goto abort;
 		}
 
 		if (lp == ent->end)
