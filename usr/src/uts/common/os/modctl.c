@@ -140,6 +140,9 @@ int	last_module_id;
 clock_t	mod_uninstall_interval = 0;
 int	ddi_modclose_unload = 1;	/* 0 -> just decrement reference */
 
+int	devcnt_incr	= 256;		/* allow for additional drivers */
+int	devcnt_min	= 512;		/* and always at least this number */
+
 struct devnames *devnamesp;
 struct devnames orphanlist;
 
@@ -183,7 +186,8 @@ mod_setup(void)
 	/*
 	 * Leave space for expansion, but not more than L_MAXMAJ32
 	 */
-	devcnt = MIN(num_devs + 30, L_MAXMAJ32);
+	devcnt = MIN(num_devs + devcnt_incr, L_MAXMAJ32);
+	devcnt = MAX(devcnt, devcnt_min);
 	devopsp = kmem_alloc(devcnt * sizeof (struct dev_ops *), KM_SLEEP);
 	for (i = 0; i < devcnt; i++)
 		devopsp[i] = &mod_nodev_ops;
