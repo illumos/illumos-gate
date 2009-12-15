@@ -207,6 +207,7 @@ sctp_set_rtoinfo(sctp_t *sctp, const void *invalp)
 	boolean_t ispriv;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
 	conn_t		*connp = sctp->sctp_connp;
+	uint32_t	new_min, new_max;
 
 	srto = invalp;
 
@@ -232,11 +233,19 @@ sctp_set_rtoinfo(sctp_t *sctp, const void *invalp)
 		return (EINVAL);
 	}
 
+	new_min = (srto->srto_min != 0) ? srto->srto_min : sctp->sctp_rto_min;
+	new_max = (srto->srto_max != 0) ? srto->srto_max : sctp->sctp_rto_max;
+	if (new_max < new_min) {
+		return (EINVAL);
+	}
+
 	if (srto->srto_initial != 0) {
 		sctp->sctp_rto_initial = MSEC_TO_TICK(srto->srto_initial);
 	}
+
+	/* Ensure that sctp_rto_max will never be zero. */
 	if (srto->srto_max != 0) {
-		sctp->sctp_rto_max = MSEC_TO_TICK(srto->srto_max);
+		sctp->sctp_rto_max = MAX(MSEC_TO_TICK(srto->srto_max), 1);
 	}
 	if (srto->srto_min != 0) {
 		sctp->sctp_rto_min = MSEC_TO_TICK(srto->srto_min);
