@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,6 +59,7 @@ extern "C" {
 #define	SHOPT_PUBLIC	"public"
 #define	SHOPT_INDEX	"index"
 #define	SHOPT_LOG	"log"
+#define	SHOPT_NOACLFAB	"noaclfab"
 
 /* XXX The following are added for testing volatile fh's purposes only */
 #ifdef VOLATILE_FH_TEST

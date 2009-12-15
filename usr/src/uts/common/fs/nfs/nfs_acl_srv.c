@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -95,7 +93,7 @@ acl2_getacl(GETACL2args *args, GETACL2res *resp, struct exportinfo *exi,
 
 	error = VOP_GETSECATTR(vp, &resp->resok.acl, 0, cr, NULL);
 
-	if (error == ENOSYS) {
+	if ((error == ENOSYS) && !(exi->exi_export.ex_flags & EX_NOACLFAB)) {
 		/*
 		 * If the underlying file system doesn't support
 		 * aclent_t type acls, fabricate an acl.  This is
@@ -478,7 +476,7 @@ acl3_getacl(GETACL3args *args, GETACL3res *resp, struct exportinfo *exi,
 
 	error = VOP_GETSECATTR(vp, &resp->resok.acl, 0, cr, NULL);
 
-	if (error == ENOSYS) {
+	if ((error == ENOSYS) && !(exi->exi_export.ex_flags & EX_NOACLFAB)) {
 		/*
 		 * If the underlying file system doesn't support
 		 * aclent_t type acls, fabricate an acl.  This is

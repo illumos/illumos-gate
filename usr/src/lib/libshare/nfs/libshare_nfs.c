@@ -161,8 +161,10 @@ struct option_defs optdefs[] = {
 	{SHOPT_ROOT_MAPPING, OPT_ROOT_MAPPING, OPT_TYPE_USER},
 #define	OPT_CHARSET_MAP	16
 	{"", OPT_CHARSET_MAP, OPT_TYPE_ACCLIST},
+#define	OPT_NOACLFAB	17
+	{SHOPT_NOACLFAB, OPT_NOACLFAB, OPT_TYPE_BOOLEAN},
 #ifdef VOLATILE_FH_TEST	/* XXX added for testing volatile fh's only */
-#define	OPT_VOLFH	17
+#define	OPT_VOLFH	18
 	{SHOPT_VOLFH, OPT_VOLFH},
 #endif /* VOLATILE_FH_TEST */
 	NULL
@@ -1000,6 +1002,13 @@ fill_export_from_optionset(struct exportdata *export, sa_optionset_t optionset)
 			 * checked by the nfs server when it needs to.
 			 */
 			export->ex_flags |= EX_CHARMAP;
+			break;
+		case OPT_NOACLFAB:
+			if (value != NULL && (strcasecmp(value, "true") == 0 ||
+			    strcmp(value, "1") == 0))
+				export->ex_flags |= EX_NOACLFAB;
+			else
+				export->ex_flags &= ~EX_NOACLFAB;
 			break;
 		default:
 			/* have a syntactic error */

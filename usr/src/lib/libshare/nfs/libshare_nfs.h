@@ -53,6 +53,7 @@ extern "C" {
 #define	SHOPT_INDEX	"index"
 #define	SHOPT_LOG	"log"
 #define	SHOPT_CKSUM	"cksum"
+#define	SHOPT_NOACLFAB	"noaclfab"
 
 /*
  * defined options types. These should be in a file rather than
