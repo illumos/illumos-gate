@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -59,6 +57,7 @@ d none usr/platform/sun4v/include 755 root bin
 d none usr/platform/sun4v/include/sys 755 root bin
 f none usr/platform/sun4v/include/sys/memtestio.h 644 root bin
 f none usr/platform/sun4v/include/sys/memtestio_v.h 644 root bin
+f none usr/platform/sun4v/include/sys/memtestio_kt.h 644 root bin
 f none usr/platform/sun4v/include/sys/memtestio_ni.h 644 root bin
 f none usr/platform/sun4v/include/sys/memtestio_n2.h 644 root bin
 f none usr/platform/sun4v/include/sys/memtestio_vf.h 644 root bin

@@ -133,6 +133,7 @@ N2RNG_OBJS	+= n2rng.o n2rng_debug.o n2rng_hcall.o n2rng_kcf.o \
 #
 MEMTEST_OBJS	+= memtest.o memtest_asm.o \
 			memtest_v.o memtest_v_asm.o \
+			memtest_kt.o memtest_kt_asm.o \
 			memtest_ni.o memtest_ni_asm.o \
 			memtest_n2.o memtest_n2_asm.o \
 			memtest_vf.o

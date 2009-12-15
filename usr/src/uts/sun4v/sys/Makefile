@@ -93,6 +93,7 @@ HDRS=	\
 	vlds.h
 
 CLOSED_HDRS=	\
+	memtestio_kt.h		\
 	memtestio_ni.h		\
 	memtestio_n2.h		\
 	memtestio_v.h		\
