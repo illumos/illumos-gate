@@ -585,8 +585,7 @@ event fault.cpu.intel.quickpath.mem_redundant@CHIPDIMM,
 event error.cpu.intel.quickpath.mem_redundant@CHIPDIMM/rank;
 
 prop fault.cpu.intel.quickpath.mem_redundant@CHIPDIMM (1)->
-    error.cpu.intel.quickpath.mem_redundant@CHIPDIMM/rank
-    { is_under(CHIPDIMM, CHIPDIMM/rank) };
+    error.cpu.intel.quickpath.mem_redundant@CHIPDIMM/rank<>;
 prop error.cpu.intel.quickpath.mem_redundant@CHIPDIMM/rank
     { CONTAINS_RANK } (1)->
     ereport.cpu.intel.quickpath.mem_redundant@
