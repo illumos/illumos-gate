@@ -108,7 +108,7 @@ msgid_to_msgstr(const Msghdr *msghdr, const char *msgid)
 
 	off = msghdr->hdr_midlst;
 
-	do {
+	for (;;) {
 		_list = list + off;
 		_msgid = ids + _list->lst_idoff;
 
@@ -122,7 +122,7 @@ msgid_to_msgstr(const Msghdr *msghdr, const char *msgid)
 			if ((off = _list->lst_more) == LEAFINDICATOR)
 				return (msgid);
 		}
-	} while (off);
+	}
 	/* NOTREACHED */
 	return (NULL);	/* keep gcc happy */
 }

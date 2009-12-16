@@ -1536,8 +1536,10 @@ Bugid   Risk Synopsis
 	PSARC/2009/493 ld -z wrap option
 6888489 Null environment variables are not overriding crle(1) replaceable
 	environment variables.
-6885456 Need to implement GNU-ld behavior in construction of .init/.fini sections
+6885456 Need to implement GNU-ld behavior in construction of .init/.fini
+	sections
 6900241 ld should track SHT_GROUP sections by symbol name, not section name
 6901773 Special handling of STT_SECTION group signature symbol for GNU objects
 6901895 Failing asserts in ld update_osym() trying to build gcc 4.5 develpment
 	head
+6909523 core dump when run "LD_DEBUG=help ls" in non-English locale

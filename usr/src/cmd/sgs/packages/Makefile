@@ -140,6 +140,7 @@ package_dep_:	FRC
 			$(ROOT)/usr/include/sys/auxv.h \
 			$(ROOT)/usr/include/sys/auxv_SPARC.h \
 			$(ROOT)/usr/include/sys/auxv_386.h \
+			$(ROOT)/usr/include/sys/avl.h \
 			$(ROOT)/usr/include/sys/link.h \
 			$(ROOT)/usr/include/sys/machelf.h \
 			$(ROOT)/usr/include/sys/note.h \
