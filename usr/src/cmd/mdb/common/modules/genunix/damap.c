@@ -277,6 +277,8 @@ damap_print(struct dam *dam, void **kdamda, int kdamda_n)
 	if ((ss->n_items == 0) || (ss->array == NULL))
 		return;
 
+	mdb_printf("\t#: target-port       [ASR] ref lunmap::damap        "
+	    "hba-private\n");
 	for (i = 0; i < ss->n_items; i++) {
 		da = ss->array[i];
 		if (da == NULL)
@@ -303,7 +305,7 @@ damap_print(struct dam *dam, void **kdamda, int kdamda_n)
 		mdb_printf("] %2d %0?lx %0?lx\n",
 		    da->da_ref, da->da_cfg_priv, da->da_ppriv);
 
-		mdb_printf("\t\t\t\t%p::print -ta dam_da_t\n", kdamda[i]);
+		mdb_printf("\t\t\t\t      %p::print -ta dam_da_t\n", kdamda[i]);
 	}
 }
 

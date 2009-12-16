@@ -25,13 +25,24 @@
 
 #include <limits.h>
 #include <sys/mdb_modapi.h>
+#include <mdb/mdb_ctf.h>
 #include <sys/sysinfo.h>
 #include <sys/byteorder.h>
+#include <sys/nvpair.h>
+#include <sys/damap.h>
 #include <sys/scsi/scsi.h>
 #include <sys/scsi/adapters/pmcs/pmcs.h>
 
-#define	MDB_RD(a, b, c)	mdb_vread(a, b, (uintptr_t)c)
-#define	NOREAD(a, b)	mdb_warn("could not read " #a " at 0x%p", b)
+/*
+ * We need use this to pass the settings when display_iport
+ */
+typedef struct per_iport_setting {
+	uint_t  pis_damap_info; /* -m: DAM/damap */
+	uint_t  pis_dtc_info; /* -d: device tree children: dev_info/path_info */
+} per_iport_setting_t;
+
+#define	MDB_RD(a, b, c)		mdb_vread(a, b, (uintptr_t)c)
+#define	NOREAD(a, b)		mdb_warn("could not read " #a " at 0x%p", b)
 
 static pmcs_hw_t ss;
 static pmcs_xscsi_t **targets = NULL;
@@ -112,6 +123,185 @@ pmcs_iport_phy_walk_cb(uintptr_t addr, const void *wdata, void *priv)
 	return (0);
 }
 
+static int
+display_iport_damap(dev_info_t *pdip)
+{
+	int rval = DCMD_ERR;
+	struct dev_info dip;
+	scsi_hba_tran_t sht;
+	mdb_ctf_id_t istm_ctfid; /* impl_scsi_tgtmap_t ctf_id */
+	ulong_t tmd_offset = 0; /* tgtmap_dam offset to impl_scsi_tgtmap_t */
+	uintptr_t dam0;
+	uintptr_t dam1;
+
+	if (mdb_vread(&dip, sizeof (struct dev_info), (uintptr_t)pdip) !=
+	    sizeof (struct dev_info)) {
+		return (rval);
+	}
+
+	if (dip.devi_driver_data == NULL) {
+		return (rval);
+	}
+
+	if (mdb_vread(&sht, sizeof (scsi_hba_tran_t),
+	    (uintptr_t)dip.devi_driver_data) != sizeof (scsi_hba_tran_t)) {
+		return (rval);
+	}
+
+	if (sht.tran_tgtmap == NULL) {
+		return (rval);
+	}
+
+	if (mdb_ctf_lookup_by_name("impl_scsi_tgtmap_t", &istm_ctfid) != 0) {
+		return (rval);
+	}
+
+	if (mdb_ctf_offsetof(istm_ctfid, "tgtmap_dam", &tmd_offset) != 0) {
+		return (rval);
+	}
+
+	tmd_offset /= NBBY;
+	mdb_vread(&dam0, sizeof (dam0),
+	    (uintptr_t)(tmd_offset + (char *)sht.tran_tgtmap));
+	mdb_vread(&dam1, sizeof (dam1),
+	    (uintptr_t)(sizeof (dam0) + tmd_offset + (char *)sht.tran_tgtmap));
+
+	if (dam0 != NULL) {
+		rval = mdb_call_dcmd("damap", dam0, DCMD_ADDRSPEC, 0, NULL);
+		mdb_printf("\n");
+		if (rval != DCMD_OK) {
+			return (rval);
+		}
+	}
+
+	if (dam1 != NULL) {
+		rval = mdb_call_dcmd("damap", dam1, DCMD_ADDRSPEC, 0, NULL);
+		mdb_printf("\n");
+	}
+
+	return (rval);
+}
+
+/* ARGSUSED */
+static int
+display_iport_di_cb(uintptr_t addr, const void *wdata, void *priv)
+{
+	uint_t *idx = (uint_t *)priv;
+	struct dev_info dip;
+	char devi_name[MAXNAMELEN];
+	char devi_addr[MAXNAMELEN];
+
+	if (mdb_vread(&dip, sizeof (struct dev_info), (uintptr_t)addr) !=
+	    sizeof (struct dev_info)) {
+		return (DCMD_ERR);
+	}
+
+	if (mdb_readstr(devi_name, sizeof (devi_name),
+	    (uintptr_t)dip.devi_node_name) == -1) {
+		devi_name[0] = '?';
+		devi_name[1] = '\0';
+	}
+
+	if (mdb_readstr(devi_addr, sizeof (devi_addr),
+	    (uintptr_t)dip.devi_addr) == -1) {
+		devi_addr[0] = '?';
+		devi_addr[1] = '\0';
+	}
+
+	mdb_printf("  %3d: @%-21s%10s@\t%p::devinfo -s\n",
+	    (*idx)++, devi_addr, devi_name, addr);
+	return (DCMD_OK);
+}
+
+/* ARGSUSED */
+static int
+display_iport_pi_cb(uintptr_t addr, const void *wdata, void *priv)
+{
+	uint_t *idx = (uint_t *)priv;
+	struct mdi_pathinfo mpi;
+	char pi_addr[MAXNAMELEN];
+
+	if (mdb_vread(&mpi, sizeof (struct mdi_pathinfo), (uintptr_t)addr) !=
+	    sizeof (struct mdi_pathinfo)) {
+		return (DCMD_ERR);
+	}
+
+	if (mdb_readstr(pi_addr, sizeof (pi_addr),
+	    (uintptr_t)mpi.pi_addr) == -1) {
+		pi_addr[0] = '?';
+		pi_addr[1] = '\0';
+	}
+
+	mdb_printf("  %3d: @%-21s %p::print struct mdi_pathinfo\n",
+	    (*idx)++, pi_addr, addr);
+	return (DCMD_OK);
+}
+
+static int
+display_iport_dtc(dev_info_t *pdip)
+{
+	int rval = DCMD_ERR;
+	struct dev_info dip;
+	struct mdi_phci phci;
+	uint_t didx = 1;
+	uint_t pidx = 1;
+
+	if (mdb_vread(&dip, sizeof (struct dev_info), (uintptr_t)pdip) !=
+	    sizeof (struct dev_info)) {
+		return (rval);
+	}
+
+	mdb_printf("Device tree children - dev_info:\n");
+	if (dip.devi_child == NULL) {
+		mdb_printf("\tdevi_child is NULL, no dev_info\n\n");
+		goto skip_di;
+	}
+
+	/*
+	 * First, we dump the iport's children dev_info node information.
+	 * use existing walker: devinfo_siblings
+	 */
+	mdb_printf("\t#: @unit-address               name@\tdrill-down\n");
+	rval = mdb_pwalk("devinfo_siblings", display_iport_di_cb,
+	    (void *)&didx, (uintptr_t)dip.devi_child);
+	mdb_printf("\n");
+
+skip_di:
+	/*
+	 * Then we try to dump the iport's path_info node information.
+	 * use existing walker: mdipi_phci_list
+	 */
+	mdb_printf("Device tree children - path_info:\n");
+	if (mdb_vread(&phci, sizeof (struct mdi_phci),
+	    (uintptr_t)dip.devi_mdi_xhci) != sizeof (struct mdi_phci)) {
+		mdb_printf("\tdevi_mdi_xhci is NULL, no path_info\n\n");
+		return (rval);
+	}
+
+	if (phci.ph_path_head == NULL) {
+		mdb_printf("\tph_path_head is NULL, no path_info\n\n");
+		return (rval);
+	}
+
+	mdb_printf("\t#: @unit-address          drill-down\n");
+	rval = mdb_pwalk("mdipi_phci_list", display_iport_pi_cb,
+	    (void *)&pidx, (uintptr_t)phci.ph_path_head);
+	mdb_printf("\n");
+	return (rval);
+}
+
+static void
+display_iport_more(dev_info_t *dip, per_iport_setting_t *pis)
+{
+	if (pis->pis_damap_info) {
+		(void) display_iport_damap(dip);
+	}
+
+	if (pis->pis_dtc_info) {
+		(void) display_iport_dtc(dip);
+	}
+}
+
 /*ARGSUSED*/
 static int
 pmcs_iport_walk_cb(uintptr_t addr, const void *wdata, void *priv)
@@ -121,6 +311,7 @@ pmcs_iport_walk_cb(uintptr_t addr, const void *wdata, void *priv)
 	char			*ua_state;
 	char			portid[4];
 	char			unit_address[34];
+	per_iport_setting_t	*pis = (per_iport_setting_t *)priv;
 
 	if (mdb_vread(&iport, sizeof (struct pmcs_iport), addr) !=
 	    sizeof (struct pmcs_iport)) {
@@ -183,12 +374,18 @@ pmcs_iport_walk_cb(uintptr_t addr, const void *wdata, void *priv)
 		mdb_printf("\n");
 	}
 
+	/*
+	 * See if we need to show more information based on 'd' or 'm' options
+	 */
+	display_iport_more(iport.dip, pis);
+
 	return (0);
 }
 
 /*ARGSUSED*/
 static void
-display_iport(struct pmcs_hw m, uintptr_t addr, int verbose)
+display_iport(struct pmcs_hw m, uintptr_t addr, int verbose,
+    per_iport_setting_t *pis)
 {
 	uintptr_t	list_addr;
 
@@ -202,7 +399,7 @@ display_iport(struct pmcs_hw m, uintptr_t addr, int verbose)
 
 	list_addr = (uintptr_t)(addr + offsetof(struct pmcs_hw, iports));
 
-	if (mdb_pwalk("list", pmcs_iport_walk_cb, NULL, list_addr) == -1) {
+	if (mdb_pwalk("list", pmcs_iport_walk_cb, pis, list_addr) == -1) {
 		mdb_warn("pmcs iport walk failed");
 	}
 
@@ -2066,10 +2263,13 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	uint_t			tgt_phy_count = FALSE;
 	uint_t			compq = FALSE;
 	uint_t			unconfigured = FALSE;
+	uint_t			damap_info = FALSE;
+	uint_t			dtc_info = FALSE;
 	int			rv = DCMD_OK;
 	void			*pmcs_state;
 	char			*state_str;
 	struct dev_info		dip;
+	per_iport_setting_t	pis;
 
 	if (!(flags & DCMD_ADDRSPEC)) {
 		pmcs_state = NULL;
@@ -2087,9 +2287,11 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (mdb_getopts(argc, argv,
 	    'c', MDB_OPT_SETBITS, TRUE, &compq,
+	    'd', MDB_OPT_SETBITS, TRUE, &dtc_info,
 	    'h', MDB_OPT_SETBITS, TRUE, &hw_info,
 	    'i', MDB_OPT_SETBITS, TRUE, &ic_info,
 	    'I', MDB_OPT_SETBITS, TRUE, &iport_info,
+	    'm', MDB_OPT_SETBITS, TRUE, &damap_info,
 	    'p', MDB_OPT_SETBITS, TRUE, &phy_info,
 	    'q', MDB_OPT_SETBITS, TRUE, &ibq,
 	    'Q', MDB_OPT_SETBITS, TRUE, &obq,
@@ -2101,6 +2303,15 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    'W', MDB_OPT_SETBITS, TRUE, &waitqs_info,
 	    NULL) != argc)
 		return (DCMD_USAGE);
+
+	/*
+	 * The 'd' and 'm' options implicitly enable the 'I' option
+	 */
+	pis.pis_damap_info = damap_info;
+	pis.pis_dtc_info = dtc_info;
+	if (damap_info || dtc_info) {
+		iport_info = TRUE;
+	}
 
 	if (MDB_RD(&ss, sizeof (ss), addr) == -1) {
 		NOREAD(pmcs_hw_t, addr);
@@ -2176,7 +2387,7 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		display_outbound_queues(ss, verbose);
 
 	if (iport_info)
-		display_iport(ss, addr, verbose);
+		display_iport(ss, addr, verbose, &pis);
 
 	if (compq)
 		display_completion_queue(ss);
@@ -2194,9 +2405,11 @@ pmcs_help()
 {
 	mdb_printf("Prints summary information about each pmcs instance.\n"
 	    "    -c: Dump the completion queue\n"
+	    "    -d: Print per-iport information about device tree children\n"
 	    "    -h: Print more detailed hardware information\n"
 	    "    -i: Print interrupt coalescing information\n"
 	    "    -I: Print information about each iport\n"
+	    "    -m: Print per-iport information about DAM/damap state\n"
 	    "    -p: Print information about each attached PHY\n"
 	    "    -q: Dump inbound queues\n"
 	    "    -Q: Dump outbound queues\n"
@@ -2229,7 +2442,7 @@ pmcs_tag_help()
 }
 
 static const mdb_dcmd_t dcmds[] = {
-	{ "pmcs", "?[-chiIpQqtTuwWv]", "print pmcs information",
+	{ "pmcs", "?[-cdhiImpQqtTuwWv]", "print pmcs information",
 	    pmcs_dcmd, pmcs_help
 	},
 	{ "pmcs_log",
