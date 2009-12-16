@@ -311,6 +311,11 @@ enum dkio_state { DKIO_NONE, DKIO_EJECTED, DKIO_INSERTED, DKIO_DEV_GONE };
 #define	DKIOCGMEDIAINFOEXT	(DKIOC|48)
 
 /*
+ * ioctl to determine whether media is write-protected
+ */
+#define	DKIOCREADONLY	(DKIOC|49)
+
+/*
  * Used for providing the temperature.
  */
 

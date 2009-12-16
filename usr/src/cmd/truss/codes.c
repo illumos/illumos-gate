@@ -1327,6 +1327,8 @@ const struct ioc {
 		NULL},
 	{ (uint_t)DKIOCDUMPFINI,	"DKIOCDUMPFINI",
 		NULL},
+	{ (uint_t)DKIOCREADONLY,	"DKIOCREADONLY",
+		NULL},
 
 	/* disk ioctls - (0x04 << 8) - fdio.h */
 	{ (uint_t)FDIOGCHAR,		"FDIOGCHAR",

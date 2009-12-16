@@ -22347,6 +22347,20 @@ skip_ready_valid:
 		}
 		break;
 
+	case DKIOCREADONLY:
+		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCREADONLY\n");
+		i = 0;
+		if ((ISCD(un) && !un->un_f_mmc_writable_media) ||
+		    (sr_check_wp(dev) != 0)) {
+			i = 1;
+		}
+		if (ddi_copyout(&i, (void *)arg, sizeof (int), flag) != 0) {
+			err = EFAULT;
+		} else {
+			err = 0;
+		}
+		break;
+
 	case DKIOCGTEMPERATURE:
 		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCGTEMPERATURE\n");
 		err = sd_dkio_get_temp(dev, (caddr_t)arg, flag);

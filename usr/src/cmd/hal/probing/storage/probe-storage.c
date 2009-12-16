@@ -2,7 +2,7 @@
  *
  * probe-storage.c : Probe for storage devices
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
@@ -336,6 +336,7 @@ main (int argc, char *argv[])
 	dbus_bool_t is_cdrom;
 	dbus_bool_t is_floppy;
 	struct dk_minfo minfo;
+	int rdonly;
 	unsigned int block_size = 512;
 	dbus_bool_t only_check_for_media;
 	int got_media = FALSE;
@@ -416,9 +417,13 @@ main (int argc, char *argv[])
 		/* don't look for partitions on floppy */
 		goto out_cs;
 	} else {
-		got_media = TRUE;
-		if (get_media_info(rfd, &minfo)) {
-			block_size = minfo.dki_lbsize;
+		got_media = get_media_info(rfd, &minfo);
+		if (!got_media) {
+			goto out_cs;
+		}
+		block_size = minfo.dki_lbsize;
+		if ((ioctl(rfd, DKIOCREADONLY, &rdonly) == 0) && rdonly) {
+			is_write_protected = TRUE;
 		}
 	}
 
