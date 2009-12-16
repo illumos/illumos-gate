@@ -115,8 +115,8 @@
  *	SDC class. t must have an associated LWP (created by calling
  *	lwp_kernel_create()).  The thread will have a target DC of dc.
  *	Flags should be either 0 or SYSDC_THREAD_BATCH.  If
- *	SYSDC_THREAD_BATCH is specified, the thread will run with a
- *	slightly lower priority (see "Batch threads", below).
+ *	SYSDC_THREAD_BATCH is specified, the thread is expected to be
+ *	doing large amounts of processing.
  *
  *
  * Complications
@@ -190,10 +190,8 @@
  * - Batch threads
  *
  *	A thread joining the SDC class can specify the SDC_THREAD_BATCH
- *	flag.  This flag causes the maximum priority for that thread to be
- *	reduced (by default, the maximum is reduced by 1).  This allows
- *	longer-running, batch-oriented SDC threads to be interrupted by
- *	more immediate, higher-priority work.
+ *	flag.  This flag currently has no effect, but marks threads which
+ *	do bulk processing.
  *
  * - t_kpri_req
  *
@@ -234,10 +232,6 @@
  *
  *
  * Tunables
- *
- * - sysdc_batch_niceness:  The amount below sysdc_maxpri that
- *	SDC_THREAD_BATCH threads should use as their per-thread
- *	maximum priority.
  *
  * - sysdc_update_interval_msec:  Number of milliseconds between
  *	consecutive thread priority updates.
@@ -322,7 +316,6 @@ uint_t		sysdc_reset_interval_msec = 400;
 uint_t		sysdc_prune_interval_msec = 100;
 uint_t		sysdc_max_pset_DC = 90;
 uint_t		sysdc_break_msec = 80;
-pri_t		sysdc_batch_niceness = 1;
 
 /*
  * Internal state - constants set up by sysdc_initparam()
@@ -1313,9 +1306,6 @@ sysdc_thread_enter(kthread_t *t, uint_t dc, uint_t flags)
 	sdp.sdp_minpri = sysdc_minpri;
 	sdp.sdp_maxpri = sysdc_maxpri;
 	sdp.sdp_DC = MAX(MIN(dc, sysdc_maxDC), sysdc_minDC);
-
-	if (flags & SYSDC_THREAD_BATCH)
-		sdp.sdp_maxpri -= sysdc_batch_niceness;
 
 	VERIFY3U(CL_ALLOC(&buf, sysdccid, KM_SLEEP), ==, 0);
 

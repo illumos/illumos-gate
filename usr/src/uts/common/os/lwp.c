@@ -527,10 +527,10 @@ grow:
 			lgrp_move_thread(t, t->t_bound_cpu->cpu_lpl, 1);
 	} else if (CLASS_KERNEL(cid)) {
 		/*
-		 * For kernel threads, assign ourselves to the root lgrp.
+		 * Kernel threads are always in the root lgrp.
 		 */
 		lgrp_move_thread(t,
-		    &curthread->t_cpupart->cp_lgrploads[LGRP_ROOTID], 1);
+		    &t->t_cpupart->cp_lgrploads[LGRP_ROOTID], 1);
 	} else {
 		lgrp_move_thread(t, lgrp_choose(t, t->t_cpupart), 1);
 	}
@@ -545,20 +545,11 @@ grow:
 	    t->t_cpupart->cp_nlgrploads);
 
 	/*
-	 * If we're creating a new process, then inherit the project from our
-	 * parent. If we're only creating an additional lwp then use the
-	 * project pointer of the target process.
-	 */
-	if (p->p_task == NULL)
-		newkpj = ttoproj(curthread);
-	else
-		newkpj = p->p_task->tk_proj;
-
-	/*
 	 * It is safe to point the thread to the new project without holding it
 	 * since we're holding the target process' p_lock here and therefore
 	 * we're guaranteed that it will not move to another project.
 	 */
+	newkpj = p->p_task->tk_proj;
 	oldkpj = ttoproj(t);
 	if (newkpj != oldkpj) {
 		t->t_proj = newkpj;
