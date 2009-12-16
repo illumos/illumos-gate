@@ -136,6 +136,15 @@ struct	machcpu {
 	struct cpu_ucode_info	*mcpu_ucode_info;
 
 	void		*mcpu_pm_mach_state;
+
+	/*
+	 * A stamp that is unique per processor and changes
+	 * whenever an interrupt happens. Userful for detecting
+	 * if a section of code gets interrupted.
+	 * The high order 16 bits will hold the cpu->cpu_id.
+	 * The low order bits will be incremented on every interrupt.
+	 */
+	volatile uint32_t	mcpu_istamp;
 };
 
 #define	NINTR_THREADS	(LOCK_LEVEL-1)	/* number of interrupt threads */

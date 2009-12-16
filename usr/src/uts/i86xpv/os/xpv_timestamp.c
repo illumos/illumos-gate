@@ -87,14 +87,9 @@ dtrace_xpv_getsystime(void)
 	vcpu_time_info_t *src;
 	vcpu_time_info_t __vti, *dst = &__vti;
 	uint64_t tsc_delta;
-	kthread_t *t = curthread;
 	uint64_t tsc;
 	hrtime_t result;
-
-	/*
-	 * This stops us from wandering off the virtual cpu.
-	 */
-	t->t_preempt++;
+	uint32_t stamp;
 
 	src = &CPU->cpu_m.mcpu_vcpu_info->time;
 
@@ -104,6 +99,7 @@ dtrace_xpv_getsystime(void)
 	 */
 	do {
 		dst->version = src->version;
+		stamp = CPU->cpu_m.mcpu_istamp;
 
 		membar_consumer();
 
@@ -122,7 +118,8 @@ dtrace_xpv_getsystime(void)
 
 		membar_consumer();
 
-	} while ((src->version & 1) | (dst->version ^ src->version));
+	} while (((src->version & 1) | (dst->version ^ src->version)) ||
+	    CPU->cpu_m.mcpu_istamp != stamp);
 
 	if (dst->tsc_shift >= 0)
 		tsc_delta <<= dst->tsc_shift;
@@ -131,8 +128,6 @@ dtrace_xpv_getsystime(void)
 
 	result = dst->system_time +
 	    ((uint64_t)(tsc_delta * (uint64_t)dst->tsc_to_system_mul) >> 32);
-
-	t->t_preempt--;
 
 	return (result);
 }

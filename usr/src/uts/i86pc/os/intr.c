@@ -934,6 +934,8 @@ do_interrupt(struct regs *rp, trap_trace_rec_t *ttp)
 
 	cpu_idle_exit(CPU_IDLE_CB_FLAG_INTR);
 
+	++*(uint16_t *)&cpu->cpu_m.mcpu_istamp;
+
 	/*
 	 * If it's a softint go do it now.
 	 */

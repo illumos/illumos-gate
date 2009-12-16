@@ -258,6 +258,8 @@ mp_startup_init(int cpun)
 #endif
 		cp->cpu_m.mcpu_idle_cpu = cpu_idle;
 
+	cp->cpu_m.mcpu_istamp = cpun << 16;
+
 	procp = curthread->t_procp;
 
 	mutex_enter(&cpu_lock);
