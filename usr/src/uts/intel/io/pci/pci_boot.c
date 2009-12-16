@@ -1957,7 +1957,14 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 		pci_cfgacc_add_workaround(bdf, secbus, subbus);
 	}
 
-	if (mcfg_mem_base != NULL) {
+	/*
+	 * Only populate bus_t if this is a PCIE platform, and
+	 * the device is sitting under a PCIE root complex(RC) .
+	 * Some particular machines have both PCIE RC and PCI
+	 * hostbridge, in which case only devices under PCIE RC
+	 * get their bus_t populated.
+	 */
+	if ((mcfg_mem_base != NULL) && (pcie_get_rc_dip(dip) != NULL)) {
 		ck804_fix_aer_ptr(dip, bdf);
 		(void) pcie_init_bus(dip, bdf, PCIE_BUS_INITIAL);
 	}
