@@ -39,6 +39,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/time.h>
 #include <sys/kmem.h>
 #include <sys/proc.h>
 #include <sys/lock.h>
@@ -261,17 +262,14 @@ smb_rq_simple_timed(struct smb_rq *rqp, int timeout)
 			break;
 		SMBRQ_LOCK(rqp);
 		if (rqp->sr_share) {
-			cv_reltimedwait(&rqp->sr_cond, &(rqp)->sr_lock,
-			    (hz * SMB_RCNDELAY), TR_CLOCK_TICK);
+			(void) cv_reltimedwait(&rqp->sr_cond, &(rqp)->sr_lock,
+			    SEC_TO_TICK(SMB_RCNDELAY), TR_CLOCK_TICK);
 
 		} else {
-			delay(ddi_get_lbolt() + (hz * SMB_RCNDELAY));
+			delay(SEC_TO_TICK(SMB_RCNDELAY));
 		}
 		SMBRQ_UNLOCK(rqp);
 		rqp->sr_rexmit--;
-#ifdef XXX
-		timeout *= 2;
-#endif
 	}
 	return (error);
 }
@@ -469,8 +467,10 @@ smb_rq_reply(struct smb_rq *rqp)
 	u_int8_t tb;
 	int error, rperror = 0;
 
-	if (rqp->sr_timo == SMBNOREPLYWAIT)
-		return (smb_iod_removerq(rqp));
+	if (rqp->sr_timo == SMBNOREPLYWAIT) {
+		smb_iod_removerq(rqp);
+		return (0);
+	}
 
 	error = smb_iod_waitrq(rqp);
 	if (error)
@@ -533,10 +533,6 @@ smb_rq_reply(struct smb_rq *rqp)
 	error = md_get_uint16le(mdp, &rqp->sr_rppid);
 	error = md_get_uint16le(mdp, &rqp->sr_rpuid);
 	error = md_get_uint16le(mdp, &rqp->sr_rpmid);
-
-	SMBSDEBUG("M:%04x, P:%04x, U:%04x, T:%04x, E: %d:%d\n",
-	    rqp->sr_rpmid, rqp->sr_rppid, rqp->sr_rpuid, rqp->sr_rptid,
-	    rqp->sr_errclass, rqp->sr_serror);
 
 	return ((error) ? error : rperror);
 }
@@ -969,7 +965,7 @@ smb_t2_request_int(struct smb_t2rq *t2p)
 	m = t2p->t2_tdata.mb_top;
 	if (m) {
 		md_initm(&mbdata, m);	/* do not free it! */
-		totdcount =  m_fixhdr(m);
+		totdcount = m_fixhdr(m);
 		if (totdcount > 0xffff)
 			return (EINVAL);
 	} else
@@ -1045,12 +1041,14 @@ smb_t2_request_int(struct smb_t2rq *t2p)
 	smb_rq_bstart(rqp);
 	if (t2p->t_name) {
 		/* Put the string and terminating null. */
-		smb_put_dmem(mbp, vcp, t2p->t_name, nmlen + 1,
+		error = smb_put_dmem(mbp, vcp, t2p->t_name, nmlen + 1,
 		    SMB_CS_NONE, NULL);
 	} else {
 		/* nmsize accounts for padding, char size. */
-		mb_put_mem(mbp, NULL, nmsize, MB_MZERO);
+		error = mb_put_mem(mbp, NULL, nmsize, MB_MZERO);
 	}
+	if (error)
+		goto freerq;
 	len = mb_fixhdr(mbp);
 	if (txpcount) {
 		mb_put_mem(mbp, NULL, ALIGN4(len) - len, MB_MZERO);
@@ -1153,12 +1151,10 @@ smb_t2_request_int(struct smb_t2rq *t2p)
 		goto bad;
 	mdp = &t2p->t2_rdata;
 	if (mdp->md_top) {
-		m_fixhdr(mdp->md_top);
 		md_initm(mdp, mdp->md_top);
 	}
 	mdp = &t2p->t2_rparam;
 	if (mdp->md_top) {
-		m_fixhdr(mdp->md_top);
 		md_initm(mdp, mdp->md_top);
 	}
 bad:
@@ -1366,12 +1362,10 @@ smb_nt_request_int(struct smb_ntrq *ntp)
 		goto bad;
 	mdp = &ntp->nt_rdata;
 	if (mdp->md_top) {
-		m_fixhdr(mdp->md_top);
 		md_initm(mdp, mdp->md_top);
 	}
 	mdp = &ntp->nt_rparam;
 	if (mdp->md_top) {
-		m_fixhdr(mdp->md_top);
 		md_initm(mdp, mdp->md_top);
 	}
 bad:
@@ -1409,10 +1403,10 @@ smb_t2_request(struct smb_t2rq *t2p)
 			break;
 		mutex_enter(&(t2p)->t2_lock);
 		if (t2p->t2_share) {
-			cv_reltimedwait(&t2p->t2_cond, &(t2p)->t2_lock,
-			    (hz * SMB_RCNDELAY), TR_CLOCK_TICK);
+			(void) cv_reltimedwait(&t2p->t2_cond, &(t2p)->t2_lock,
+			    SEC_TO_TICK(SMB_RCNDELAY), TR_CLOCK_TICK);
 		} else {
-			delay(ddi_get_lbolt() + (hz * SMB_RCNDELAY));
+			delay(SEC_TO_TICK(SMB_RCNDELAY));
 		}
 		mutex_exit(&(t2p)->t2_lock);
 	}
@@ -1442,11 +1436,11 @@ smb_nt_request(struct smb_ntrq *ntp)
 			break;
 		mutex_enter(&(ntp)->nt_lock);
 		if (ntp->nt_share) {
-			cv_reltimedwait(&ntp->nt_cond, &(ntp)->nt_lock,
-			    (hz * SMB_RCNDELAY), TR_CLOCK_TICK);
+			(void) cv_reltimedwait(&ntp->nt_cond, &(ntp)->nt_lock,
+			    SEC_TO_TICK(SMB_RCNDELAY), TR_CLOCK_TICK);
 
 		} else {
-			delay(ddi_get_lbolt() + (hz * SMB_RCNDELAY));
+			delay(SEC_TO_TICK(SMB_RCNDELAY));
 		}
 		mutex_exit(&(ntp)->nt_lock);
 	}

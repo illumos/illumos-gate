@@ -27,8 +27,9 @@
  */
 
 /*
- * Node hash implementation borrowed from NFS.
- * See: uts/common/fs/nfs/nfs_subr.c
+ * Node hash implementation initially borrowed from NFS (nfs_subr.c)
+ * but then heavily modified. It's no longer an array of hash lists,
+ * but an AVL tree per mount point.  More on this below.
  */
 
 #include <sys/param.h>
@@ -39,14 +40,9 @@
 #include <sys/dnlc.h>
 #include <sys/kmem.h>
 #include <sys/sunddi.h>
+#include <sys/sysmacros.h>
 
-#ifdef APPLE
-#include <sys/smb_apple.h>
-#include <sys/utfconv.h>
-#include <sys/smb_iconv.h>
-#else
 #include <netsmb/smb_osdep.h>
-#endif
 
 #include <netsmb/smb.h>
 #include <netsmb/smb_conn.h>
@@ -58,61 +54,62 @@
 #include <smbfs/smbfs_subr.h>
 
 /*
- * The hash queues for the access to active and cached smbnodes
- * are organized as doubly linked lists.  A reader/writer lock
- * for each hash bucket is used to control access and to synchronize
- * lookups, additions, and deletions from the hash queue.
+ * The AVL trees (now per-mount) allow finding an smbfs node by its
+ * full remote path name.  It also allows easy traversal of all nodes
+ * below (path wise) any given node.  A reader/writer lock for each
+ * (per mount) AVL tree is used to control access and to synchronize
+ * lookups, additions, and deletions from that AVL tree.
+ *
+ * Previously, this code use a global array of hash chains, each with
+ * its own rwlock.  A few struct members, functions, and comments may
+ * still refer to a "hash", and those should all now be considered to
+ * refer to the per-mount AVL tree that replaced the old hash chains.
+ * (i.e. member smi_hash_lk, function sn_hashfind, etc.)
  *
  * The smbnode freelist is organized as a doubly linked list with
  * a head pointer.  Additions and deletions are synchronized via
  * a single mutex.
  *
- * In order to add an smbnode to the free list, it must be hashed into
- * a hash queue and the exclusive lock to the hash queue be held.
- * If an smbnode is not hashed into a hash queue, then it is destroyed
+ * In order to add an smbnode to the free list, it must be linked into
+ * the mount's AVL tree and the exclusive lock for the AVL must be held.
+ * If an smbnode is not linked into the AVL tree, then it is destroyed
  * because it represents no valuable information that can be reused
- * about the file.  The exclusive lock to the hash queue must be
- * held in order to prevent a lookup in the hash queue from finding
- * the smbnode and using it and assuming that the smbnode is not on the
- * freelist.  The lookup in the hash queue will have the hash queue
- * locked, either exclusive or shared.
+ * about the file.  The exclusive lock for the AVL tree must be held
+ * in order to prevent a lookup in the AVL tree from finding the
+ * smbnode and using it and assuming that the smbnode is not on the
+ * freelist.  The lookup in the AVL tree will have the AVL tree lock
+ * held, either exclusive or shared.
  *
  * The vnode reference count for each smbnode is not allowed to drop
  * below 1.  This prevents external entities, such as the VM
  * subsystem, from acquiring references to vnodes already on the
  * freelist and then trying to place them back on the freelist
  * when their reference is released.  This means that the when an
- * smbnode is looked up in the hash queues, then either the smbnode
+ * smbnode is looked up in the AVL tree, then either the smbnode
  * is removed from the freelist and that reference is tranfered to
  * the new reference or the vnode reference count must be incremented
  * accordingly.  The mutex for the freelist must be held in order to
  * accurately test to see if the smbnode is on the freelist or not.
- * The hash queue lock might be held shared and it is possible that
+ * The AVL tree lock might be held shared and it is possible that
  * two different threads may race to remove the smbnode from the
  * freelist.  This race can be resolved by holding the mutex for the
  * freelist.  Please note that the mutex for the freelist does not
  * need to held if the smbnode is not on the freelist.  It can not be
  * placed on the freelist due to the requirement that the thread
  * putting the smbnode on the freelist must hold the exclusive lock
- * to the hash queue and the thread doing the lookup in the hash
- * queue is holding either a shared or exclusive lock to the hash
- * queue.
+ * for the AVL tree and the thread doing the lookup in the AVL tree
+ * is holding either a shared or exclusive lock for the AVL tree.
  *
  * The lock ordering is:
  *
- *	hash bucket lock -> vnode lock
- *	hash bucket lock -> freelist lock
+ *	AVL tree lock -> vnode lock
+ *	AVL tree lock -> freelist lock
  */
-static rhashq_t *smbtable;
 
 static kmutex_t smbfreelist_lock;
 static smbnode_t *smbfreelist = NULL;
 static ulong_t	smbnodenew = 0;
 long	nsmbnode = 0;
-
-static int smbtablesize;
-static int smbtablemask;
-static int smbhashlen = 4;
 
 static struct kmem_cache *smbnode_cache;
 
@@ -125,19 +122,25 @@ kmutex_t smbfs_minor_lock;
 int smbfs_major;
 int smbfs_minor;
 
+/* See smbfs_node_findcreate() */
+struct smbfattr smbfs_fattr0;
+
 /*
  * Local functions.
- * Not static, to aid debugging.
+ * SN for Smb Node
  */
-void smb_rmfree(smbnode_t *);
-void smbinactive(smbnode_t *);
-void smb_rmhash_locked(smbnode_t *);
-void smb_destroy_node(smbnode_t *);
+static void sn_rmfree(smbnode_t *);
+static void sn_inactive(smbnode_t *);
+static void sn_addhash_locked(smbnode_t *, avl_index_t);
+static void sn_rmhash_locked(smbnode_t *);
+static void sn_destroy_node(smbnode_t *);
 void smbfs_kmem_reclaim(void *cdrarg);
 
-smbnode_t *smbhashfind(struct vfs *, const char *, int, rhashq_t *);
-static vnode_t *make_smbnode(vfs_t *, char *, int, rhashq_t *, int *);
+static smbnode_t *
+sn_hashfind(smbmntinfo_t *, const char *, int, avl_index_t *);
 
+static smbnode_t *
+make_smbnode(smbmntinfo_t *, const char *, int, int *);
 
 /*
  * Free the resources associated with an smbnode.
@@ -145,135 +148,147 @@ static vnode_t *make_smbnode(vfs_t *, char *, int, rhashq_t *, int *);
  *
  * NFS: nfs_subr.c:rinactive
  */
-void
-smbinactive(smbnode_t *np)
+static void
+sn_inactive(smbnode_t *np)
 {
+	cred_t		*oldcr;
+	char 		*orpath;
+	int		orplen;
 
-	if (np->n_rpath) {
-		kmem_free(np->n_rpath, np->n_rplen + 1);
-		np->n_rpath = NULL;
-	}
+	/*
+	 * Flush and invalidate all pages (todo)
+	 * Free any held credentials and caches...
+	 * etc.  (See NFS code)
+	 */
+	mutex_enter(&np->r_statelock);
+
+	oldcr = np->r_cred;
+	np->r_cred = NULL;
+
+	orpath = np->n_rpath;
+	orplen = np->n_rplen;
+	np->n_rpath = NULL;
+	np->n_rplen = 0;
+
+	mutex_exit(&np->r_statelock);
+
+	if (oldcr != NULL)
+		crfree(oldcr);
+
+	if (orpath != NULL)
+		kmem_free(orpath, orplen + 1);
 }
 
 /*
- * Return a vnode for the given CIFS directory and filename.
- * If no smbnode exists for this fhandle, create one and put it
- * into the hash queues.  If the smbnode for this fhandle
- * already exists, return it.
+ * Find and optionally create an smbnode for the passed
+ * mountinfo, directory, separator, and name.  If the
+ * desired smbnode already exists, return a reference.
+ * If the file attributes pointer is non-null, the node
+ * is created if necessary and linked into the AVL tree.
  *
- * Note: make_smbnode() may upgrade the hash bucket lock to exclusive.
+ * Callers that need a node created but don't have the
+ * real attributes pass smbfs_fattr0 to force creation.
+ *
+ * Note: make_smbnode() may upgrade the "hash" lock to exclusive.
  *
  * NFS: nfs_subr.c:makenfsnode
  */
-vnode_t *
-smbfs_make_node(
-	vfs_t *vfsp,
-	const char *dir,
+smbnode_t *
+smbfs_node_findcreate(
+	smbmntinfo_t *mi,
+	const char *dirnm,
 	int dirlen,
 	const char *name,
 	int nmlen,
 	char sep,
 	struct smbfattr *fap)
 {
-	char *rpath;
-	int rplen, idx;
-	uint32_t hash;
-	rhashq_t *rhtp;
+	char tmpbuf[256];
+	size_t rpalloc;
+	char *p, *rpath;
+	int rplen;
 	smbnode_t *np;
 	vnode_t *vp;
-#ifdef NOT_YET
-	vattr_t va;
-#endif
 	int newnode;
 
 	/*
-	 * Build the full path name in allocated memory
-	 * so we have it for lookup, etc.  Note the
-	 * special case at the root (dir=="\\", dirlen==1)
-	 * where this does not add a slash separator.
-	 * To do that would make a double slash, which
-	 * has special meaning in CIFS.
-	 *
-	 * ToDo:  Would prefer to allocate a remote path
-	 * only when we will create a new node.
+	 * Build the search string, either in tmpbuf or
+	 * in allocated memory if larger than tmpbuf.
 	 */
-	if (dirlen <= 1 && sep == '\\')
-		sep = '\0';	/* no slash */
-
-	/* Compute the length of rpath and allocate. */
 	rplen = dirlen;
-	if (sep)
+	if (sep != '\0')
 		rplen++;
-	if (name)
-		rplen += nmlen;
-
-	rpath = kmem_alloc(rplen + 1, KM_SLEEP);
-
-	/* Fill in rpath */
-	bcopy(dir, rpath, dirlen);
-	if (sep)
-		rpath[dirlen++] = sep;
-	if (name)
-		bcopy(name, &rpath[dirlen], nmlen);
-	rpath[rplen] = 0;
-
-	hash = smbfs_hash(rpath, rplen);
-	idx = hash & smbtablemask;
-	rhtp = &smbtable[idx];
-	rw_enter(&rhtp->r_lock, RW_READER);
-
-	vp = make_smbnode(vfsp, rpath, rplen, rhtp, &newnode);
-	np = VTOSMB(vp);
-	np->n_ino = hash;	/* Equivalent to: smbfs_getino() */
+	rplen += nmlen;
+	if (rplen < sizeof (tmpbuf)) {
+		/* use tmpbuf */
+		rpalloc = 0;
+		rpath = tmpbuf;
+	} else {
+		rpalloc = rplen + 1;
+		rpath = kmem_alloc(rpalloc, KM_SLEEP);
+	}
+	p = rpath;
+	bcopy(dirnm, p, dirlen);
+	p += dirlen;
+	if (sep != '\0')
+		*p++ = sep;
+	if (name != NULL) {
+		bcopy(name, p, nmlen);
+		p += nmlen;
+	}
+	ASSERT(p == rpath + rplen);
 
 	/*
-	 * Note: make_smbnode keeps a reference to rpath in
-	 * new nodes it creates, so only free when we found
-	 * an existing node.
+	 * Find or create a node with this path.
 	 */
-	if (!newnode) {
-		kmem_free(rpath, rplen + 1);
-		rpath = NULL;
-	}
+	rw_enter(&mi->smi_hash_lk, RW_READER);
+	if (fap == NULL)
+		np = sn_hashfind(mi, rpath, rplen, NULL);
+	else
+		np = make_smbnode(mi, rpath, rplen, &newnode);
+	rw_exit(&mi->smi_hash_lk);
+
+	if (rpalloc)
+		kmem_free(rpath, rpalloc);
 
 	if (fap == NULL) {
-#ifdef NOT_YET
-		if (newnode) {
-			PURGE_ATTRCACHE(vp);
-		}
-#endif
-		rw_exit(&rhtp->r_lock);
-		return (vp);
+		/*
+		 * Caller is "just looking" (no create)
+		 * so np may or may not be NULL here.
+		 * Either way, we're done.
+		 */
+		return (np);
 	}
 
-	/* Have SMB attributes. */
-	vp->v_type = (fap->fa_attr & SMB_FA_DIR) ? VDIR : VREG;
-	/* XXX: np->n_ino = fap->fa_ino; see above */
-	np->r_size = fap->fa_size;
-	/* XXX: np->r_attr = *fap here instead? */
-	np->r_atime = fap->fa_atime;
-	np->r_ctime = fap->fa_ctime;
-	np->r_mtime = fap->fa_mtime;
+	/*
+	 * We should have a node, possibly created.
+	 * Do we have (real) attributes to apply?
+	 */
+	ASSERT(np != NULL);
+	if (fap == &smbfs_fattr0)
+		return (np);
 
-#ifdef NOT_YET
+	/*
+	 * Apply the given attributes to this node,
+	 * dealing with any cache impact, etc.
+	 */
+	vp = SMBTOV(np);
 	if (!newnode) {
-		rw_exit(&rhtp->r_lock);
-		(void) nfs_cache_fattr(vp, attr, &va, t, cr);
-	} else {
-		if (attr->na_type < NFNON || attr->na_type > NFSOC)
-			vp->v_type = VBAD;
-		else
-			vp->v_type = n2v_type(attr);
-		vp->v_rdev = makedevice(attr->rdev.specdata1,
-		    attr->rdev.specdata2);
-		nfs_attrcache(vp, attr, t);
-		rw_exit(&rhtp->r_lock);
+		/*
+		 * Found an existing node.
+		 * Maybe purge caches...
+		 */
+		smbfs_cache_check(vp, fap);
 	}
-#else
-	rw_exit(&rhtp->r_lock);
-#endif
+	smbfs_attrcache_fa(vp, fap);
 
-	return (vp);
+	/*
+	 * Note NFS sets vp->v_type here, assuming it
+	 * can never change for the life of a node.
+	 * We allow v_type to change, and set it in
+	 * smbfs_attrcache().  Also: mode, uid, gid
+	 */
+	return (np);
 }
 
 /*
@@ -285,33 +300,32 @@ smbfs_make_node(
  * Find or create an smbnode.
  * NFS: nfs_subr.c:make_rnode
  */
-static vnode_t *
+static smbnode_t *
 make_smbnode(
-	vfs_t *vfsp,
-	char *rpath,
+	smbmntinfo_t *mi,
+	const char *rpath,
 	int rplen,
-	rhashq_t *rhtp,
 	int *newnode)
 {
 	smbnode_t *np;
 	smbnode_t *tnp;
 	vnode_t *vp;
-	smbmntinfo_t *mi;
+	vfs_t *vfsp;
+	avl_index_t where;
+	char *new_rpath = NULL;
 
-	ASSERT(RW_READ_HELD(&rhtp->r_lock));
-
-	mi = VFTOSMI(vfsp);
+	ASSERT(RW_READ_HELD(&mi->smi_hash_lk));
+	vfsp = mi->smi_vfsp;
 
 start:
-	np = smbhashfind(vfsp, rpath, rplen, rhtp);
+	np = sn_hashfind(mi, rpath, rplen, NULL);
 	if (np != NULL) {
-		vp = SMBTOV(np);
 		*newnode = 0;
-		return (vp);
+		return (np);
 	}
 
 	/* Note: will retake this lock below. */
-	rw_exit(&rhtp->r_lock);
+	rw_exit(&mi->smi_hash_lk);
 
 	/*
 	 * see if we can find something on the freelist
@@ -319,33 +333,36 @@ start:
 	mutex_enter(&smbfreelist_lock);
 	if (smbfreelist != NULL && smbnodenew >= nsmbnode) {
 		np = smbfreelist;
-		smb_rmfree(np);
+		sn_rmfree(np);
 		mutex_exit(&smbfreelist_lock);
 
 		vp = SMBTOV(np);
 
 		if (np->r_flags & RHASHED) {
-			rw_enter(&np->r_hashq->r_lock, RW_WRITER);
+			smbmntinfo_t *tmp_mi = np->n_mount;
+			ASSERT(tmp_mi != NULL);
+			rw_enter(&tmp_mi->smi_hash_lk, RW_WRITER);
 			mutex_enter(&vp->v_lock);
 			if (vp->v_count > 1) {
 				vp->v_count--;
 				mutex_exit(&vp->v_lock);
-				rw_exit(&np->r_hashq->r_lock);
-				rw_enter(&rhtp->r_lock, RW_READER);
+				rw_exit(&tmp_mi->smi_hash_lk);
+				/* start over */
+				rw_enter(&mi->smi_hash_lk, RW_READER);
 				goto start;
 			}
 			mutex_exit(&vp->v_lock);
-			smb_rmhash_locked(np);
-			rw_exit(&np->r_hashq->r_lock);
+			sn_rmhash_locked(np);
+			rw_exit(&tmp_mi->smi_hash_lk);
 		}
 
-		smbinactive(np);
+		sn_inactive(np);
 
 		mutex_enter(&vp->v_lock);
 		if (vp->v_count > 1) {
 			vp->v_count--;
 			mutex_exit(&vp->v_lock);
-			rw_enter(&rhtp->r_lock, RW_READER);
+			rw_enter(&mi->smi_hash_lk, RW_READER);
 			goto start;
 		}
 		mutex_exit(&vp->v_lock);
@@ -380,6 +397,13 @@ start:
 		vp = new_vp;
 	}
 
+	/*
+	 * Allocate and copy the rpath we'll need below.
+	 */
+	new_rpath = kmem_alloc(rplen + 1, KM_SLEEP);
+	bcopy(rpath, new_rpath, rplen);
+	new_rpath[rplen] = '\0';
+
 	/* Initialize smbnode_t */
 	bzero(np, sizeof (*np));
 
@@ -391,11 +415,11 @@ start:
 
 	np->r_vnode = vp;
 	np->n_mount = mi;
-	np->r_hashq = rhtp;
+
 	np->n_fid = SMB_FID_UNUSED;
-	np->n_uid = UID_NOBODY;
-	np->n_gid = GID_NOBODY;
-	/* XXX: make attributes stale? */
+	np->n_uid = mi->smi_uid;
+	np->n_gid = mi->smi_gid;
+	/* Leave attributes "stale." */
 
 #if 0 /* XXX dircache */
 	/*
@@ -414,77 +438,94 @@ start:
 	vp->v_type = VNON;
 
 	/*
-	 * There is a race condition if someone else
-	 * alloc's the smbnode while no locks are held, so we
-	 * check again and recover if found.
+	 * We entered with mi->smi_hash_lk held (reader).
+	 * Retake it now, (as the writer).
+	 * Will return with it held.
 	 */
-	rw_enter(&rhtp->r_lock, RW_WRITER);
-	tnp = smbhashfind(vfsp, rpath, rplen, rhtp);
+	rw_enter(&mi->smi_hash_lk, RW_WRITER);
+
+	/*
+	 * There is a race condition where someone else
+	 * may alloc the smbnode while no locks are held,
+	 * so check again and recover if found.
+	 */
+	tnp = sn_hashfind(mi, rpath, rplen, &where);
 	if (tnp != NULL) {
-		vp = SMBTOV(tnp);
+		/*
+		 * Lost the race.  Put the node we were building
+		 * on the free list and return the one we found.
+		 */
+		rw_exit(&mi->smi_hash_lk);
+		kmem_free(new_rpath, rplen + 1);
+		smbfs_addfree(np);
+		rw_enter(&mi->smi_hash_lk, RW_READER);
 		*newnode = 0;
-		rw_exit(&rhtp->r_lock);
-		/* The node we were building goes on the free list. */
-		smb_addfree(np);
-		rw_enter(&rhtp->r_lock, RW_READER);
-		return (vp);
+		return (tnp);
 	}
 
 	/*
-	 * Hash search identifies nodes by the full pathname,
-	 * so store that before linking in the hash list.
-	 * Note: caller allocates the rpath, and knows
-	 * about this reference when *newnode is set.
+	 * Hash search identifies nodes by the remote path
+	 * (n_rpath) so fill that in now, before linking
+	 * this node into the node cache (AVL tree).
 	 */
-	np->n_rpath = rpath;
+	np->n_rpath = new_rpath;
 	np->n_rplen = rplen;
+	np->n_ino = smbfs_gethash(new_rpath, rplen);
 
-	smb_addhash(np);
+	sn_addhash_locked(np, where);
 	*newnode = 1;
-	return (vp);
+	return (np);
 }
 
 /*
- * smb_addfree
- * Put a smbnode on the free list.
+ * smbfs_addfree
+ * Put an smbnode on the free list, or destroy it immediately
+ * if it offers no value were it to be reclaimed later.  Also
+ * destroy immediately when we have too many smbnodes, etc.
  *
  * Normally called by smbfs_inactive, but also
  * called in here during cleanup operations.
  *
- * Smbnodes which were allocated above and beyond the normal limit
- * are immediately freed.
- *
  * NFS: nfs_subr.c:rp_addfree
  */
 void
-smb_addfree(smbnode_t *np)
+smbfs_addfree(smbnode_t *np)
 {
 	vnode_t *vp;
 	struct vfs *vfsp;
+	smbmntinfo_t *mi;
+
+	ASSERT(np->r_freef == NULL && np->r_freeb == NULL);
 
 	vp = SMBTOV(np);
 	ASSERT(vp->v_count >= 1);
-	ASSERT(np->r_freef == NULL && np->r_freeb == NULL);
+
+	vfsp = vp->v_vfsp;
+	mi = VFTOSMI(vfsp);
 
 	/*
-	 * If we have too many smbnodes allocated and there are no
-	 * references to this smbnode, or if the smbnode is no longer
-	 * accessible by it does not reside in the hash queues,
-	 * or if an i/o error occurred while writing to the file,
-	 * then just free it instead of putting it on the smbnode
-	 * freelist.
+	 * If there are no more references to this smbnode and:
+	 * we have too many smbnodes allocated, or if the node
+	 * is no longer accessible via the AVL tree (!RHASHED),
+	 * or an i/o error occurred while writing to the file,
+	 * or it's part of an unmounted FS, then try to destroy
+	 * it instead of putting it on the smbnode freelist.
 	 */
-	vfsp = vp->v_vfsp;
-	if (((smbnodenew > nsmbnode || !(np->r_flags & RHASHED) ||
-	    np->r_error || (vfsp->vfs_flag & VFS_UNMOUNTED)) &&
-	    np->r_count == 0)) {
+	if (np->r_count == 0 && (
+	    (np->r_flags & RHASHED) == 0 ||
+	    (np->r_error != 0) ||
+	    (vfsp->vfs_flag & VFS_UNMOUNTED) ||
+	    (smbnodenew > nsmbnode))) {
+
+		/* Try to destroy this node. */
+
 		if (np->r_flags & RHASHED) {
-			rw_enter(&np->r_hashq->r_lock, RW_WRITER);
+			rw_enter(&mi->smi_hash_lk, RW_WRITER);
 			mutex_enter(&vp->v_lock);
 			if (vp->v_count > 1) {
 				vp->v_count--;
 				mutex_exit(&vp->v_lock);
-				rw_exit(&np->r_hashq->r_lock);
+				rw_exit(&mi->smi_hash_lk);
 				return;
 				/*
 				 * Will get another call later,
@@ -492,23 +533,23 @@ smb_addfree(smbnode_t *np)
 				 */
 			}
 			mutex_exit(&vp->v_lock);
-			smb_rmhash_locked(np);
-			rw_exit(&np->r_hashq->r_lock);
+			sn_rmhash_locked(np);
+			rw_exit(&mi->smi_hash_lk);
 		}
 
-		smbinactive(np);
+		sn_inactive(np);
 
 		/*
 		 * Recheck the vnode reference count.  We need to
 		 * make sure that another reference has not been
 		 * acquired while we were not holding v_lock.  The
-		 * smbnode is not in the smbnode hash queues, so the
-		 * only way for a reference to have been acquired
+		 * smbnode is not in the smbnode "hash" AVL tree, so
+		 * the only way for a reference to have been acquired
 		 * is for a VOP_PUTPAGE because the smbnode was marked
-		 * with RDIRTY or for a modified page.  This
+		 * with RDIRTY or for a modified page.  This vnode
 		 * reference may have been acquired before our call
-		 * to smbinactive.  The i/o may have been completed,
-		 * thus allowing smbinactive to complete, but the
+		 * to sn_inactive.  The i/o may have been completed,
+		 * thus allowing sn_inactive to complete, but the
 		 * reference to the vnode may not have been released
 		 * yet.  In any case, the smbnode can not be destroyed
 		 * until the other references to this vnode have been
@@ -525,33 +566,31 @@ smb_addfree(smbnode_t *np)
 		}
 		mutex_exit(&vp->v_lock);
 
-		smb_destroy_node(np);
+		sn_destroy_node(np);
 		return;
 	}
+
 	/*
-	 * Lock the hash queue and then recheck the reference count
+	 * Lock the AVL tree and then recheck the reference count
 	 * to ensure that no other threads have acquired a reference
 	 * to indicate that the smbnode should not be placed on the
 	 * freelist.  If another reference has been acquired, then
 	 * just release this one and let the other thread complete
 	 * the processing of adding this smbnode to the freelist.
 	 */
-	rw_enter(&np->r_hashq->r_lock, RW_WRITER);
+	rw_enter(&mi->smi_hash_lk, RW_WRITER);
 
 	mutex_enter(&vp->v_lock);
 	if (vp->v_count > 1) {
 		vp->v_count--;
 		mutex_exit(&vp->v_lock);
-		rw_exit(&np->r_hashq->r_lock);
+		rw_exit(&mi->smi_hash_lk);
 		return;
 	}
 	mutex_exit(&vp->v_lock);
 
 	/*
-	 * If there is no cached data or metadata for this file, then
-	 * put the smbnode on the front of the freelist so that it will
-	 * be reused before other smbnodes which may have cached data or
-	 * metadata associated with them.
+	 * Put this node on the free list.
 	 */
 	mutex_enter(&smbfreelist_lock);
 	if (smbfreelist == NULL) {
@@ -566,7 +605,7 @@ smb_addfree(smbnode_t *np)
 	}
 	mutex_exit(&smbfreelist_lock);
 
-	rw_exit(&np->r_hashq->r_lock);
+	rw_exit(&mi->smi_hash_lk);
 }
 
 /*
@@ -577,8 +616,8 @@ smb_addfree(smbnode_t *np)
  *
  * NFS: nfs_subr.c:rp_rmfree
  */
-void
-smb_rmfree(smbnode_t *np)
+static void
+sn_rmfree(smbnode_t *np)
 {
 
 	ASSERT(MUTEX_HELD(&smbfreelist_lock));
@@ -597,23 +636,21 @@ smb_rmfree(smbnode_t *np)
 }
 
 /*
- * Put a smbnode in the hash table.
+ * Put an smbnode in the "hash" AVL tree.
  *
- * The caller must be holding the exclusive hash queue lock.
+ * The caller must be hold the rwlock as writer.
  *
  * NFS: nfs_subr.c:rp_addhash
  */
-void
-smb_addhash(smbnode_t *np)
+static void
+sn_addhash_locked(smbnode_t *np, avl_index_t where)
 {
+	smbmntinfo_t *mi = np->n_mount;
 
-	ASSERT(RW_WRITE_HELD(&np->r_hashq->r_lock));
+	ASSERT(RW_WRITE_HELD(&mi->smi_hash_lk));
 	ASSERT(!(np->r_flags & RHASHED));
 
-	np->r_hashf = np->r_hashq->r_hashf;
-	np->r_hashq->r_hashf = np;
-	np->r_hashb = (smbnode_t *)np->r_hashq;
-	np->r_hashf->r_hashb = np;
+	avl_insert(&mi->smi_hash_avl, np, where);
 
 	mutex_enter(&np->r_statelock);
 	np->r_flags |= RHASHED;
@@ -621,21 +658,21 @@ smb_addhash(smbnode_t *np)
 }
 
 /*
- * Remove a smbnode from the hash table.
+ * Remove an smbnode from the "hash" AVL tree.
  *
- * The caller must be holding the hash queue lock.
+ * The caller must hold the rwlock as writer.
  *
  * NFS: nfs_subr.c:rp_rmhash_locked
  */
-void
-smb_rmhash_locked(smbnode_t *np)
+static void
+sn_rmhash_locked(smbnode_t *np)
 {
+	smbmntinfo_t *mi = np->n_mount;
 
-	ASSERT(RW_WRITE_HELD(&np->r_hashq->r_lock));
+	ASSERT(RW_WRITE_HELD(&mi->smi_hash_lk));
 	ASSERT(np->r_flags & RHASHED);
 
-	np->r_hashb->r_hashf = np->r_hashf;
-	np->r_hashf->r_hashb = np->r_hashb;
+	avl_remove(&mi->smi_hash_avl, np);
 
 	mutex_enter(&np->r_statelock);
 	np->r_flags &= ~RHASHED;
@@ -643,83 +680,177 @@ smb_rmhash_locked(smbnode_t *np)
 }
 
 /*
- * Remove a smbnode from the hash table.
+ * Remove an smbnode from the "hash" AVL tree.
  *
- * The caller must not be holding the hash queue lock.
+ * The caller must not be holding the rwlock.
  */
 void
-smb_rmhash(smbnode_t *np)
+smbfs_rmhash(smbnode_t *np)
 {
+	smbmntinfo_t *mi = np->n_mount;
 
-	rw_enter(&np->r_hashq->r_lock, RW_WRITER);
-	smb_rmhash_locked(np);
-	rw_exit(&np->r_hashq->r_lock);
+	rw_enter(&mi->smi_hash_lk, RW_WRITER);
+	sn_rmhash_locked(np);
+	rw_exit(&mi->smi_hash_lk);
 }
 
 /*
- * Lookup a smbnode by fhandle.
+ * Lookup an smbnode by remote pathname
  *
- * The caller must be holding the hash queue lock, either shared or exclusive.
- * XXX: make static?
+ * The caller must be holding the AVL rwlock, either shared or exclusive.
  *
  * NFS: nfs_subr.c:rfind
  */
-smbnode_t *
-smbhashfind(
-	struct vfs *vfsp,
+static smbnode_t *
+sn_hashfind(
+	smbmntinfo_t *mi,
 	const char *rpath,
 	int rplen,
-	rhashq_t *rhtp)
+	avl_index_t *pwhere) /* optional */
 {
+	smbfs_node_hdr_t nhdr;
 	smbnode_t *np;
 	vnode_t *vp;
 
-	ASSERT(RW_LOCK_HELD(&rhtp->r_lock));
+	ASSERT(RW_LOCK_HELD(&mi->smi_hash_lk));
 
-	for (np = rhtp->r_hashf; np != (smbnode_t *)rhtp; np = np->r_hashf) {
-		vp = SMBTOV(np);
-		if (vp->v_vfsp == vfsp &&
-		    np->n_rplen == rplen &&
-		    bcmp(np->n_rpath, rpath, rplen) == 0) {
-			/*
-			 * remove smbnode from free list, if necessary.
-			 */
-			if (np->r_freef != NULL) {
-				mutex_enter(&smbfreelist_lock);
-				/*
-				 * If the smbnode is on the freelist,
-				 * then remove it and use that reference
-				 * as the new reference.  Otherwise,
-				 * need to increment the reference count.
-				 */
-				if (np->r_freef != NULL) {
-					smb_rmfree(np);
-					mutex_exit(&smbfreelist_lock);
-				} else {
-					mutex_exit(&smbfreelist_lock);
-					VN_HOLD(vp);
-				}
-			} else
-				VN_HOLD(vp);
-			return (np);
+	bzero(&nhdr, sizeof (nhdr));
+	nhdr.hdr_n_rpath = (char *)rpath;
+	nhdr.hdr_n_rplen = rplen;
+
+	/* See smbfs_node_cmp below. */
+	np = avl_find(&mi->smi_hash_avl, &nhdr, pwhere);
+
+	if (np == NULL)
+		return (NULL);
+
+	/*
+	 * Found it in the "hash" AVL tree.
+	 * Remove from free list, if necessary.
+	 */
+	vp = SMBTOV(np);
+	if (np->r_freef != NULL) {
+		mutex_enter(&smbfreelist_lock);
+		/*
+		 * If the smbnode is on the freelist,
+		 * then remove it and use that reference
+		 * as the new reference.  Otherwise,
+		 * need to increment the reference count.
+		 */
+		if (np->r_freef != NULL) {
+			sn_rmfree(np);
+			mutex_exit(&smbfreelist_lock);
+		} else {
+			mutex_exit(&smbfreelist_lock);
+			VN_HOLD(vp);
 		}
+	} else
+		VN_HOLD(vp);
+
+	return (np);
+}
+
+static int
+smbfs_node_cmp(const void *va, const void *vb)
+{
+	const smbfs_node_hdr_t *a = va;
+	const smbfs_node_hdr_t *b = vb;
+	int clen, diff;
+
+	/*
+	 * Same semantics as strcmp, but does not
+	 * assume the strings are null terminated.
+	 */
+	clen = (a->hdr_n_rplen < b->hdr_n_rplen) ?
+	    a->hdr_n_rplen : b->hdr_n_rplen;
+	diff = strncmp(a->hdr_n_rpath, b->hdr_n_rpath, clen);
+	if (diff < 0)
+		return (-1);
+	if (diff > 0)
+		return (1);
+	/* they match through clen */
+	if (b->hdr_n_rplen > clen)
+		return (-1);
+	if (a->hdr_n_rplen > clen)
+		return (1);
+	return (0);
+}
+
+/*
+ * Setup the "hash" AVL tree used for our node cache.
+ * See: smbfs_mount, smbfs_destroy_table.
+ */
+void
+smbfs_init_hash_avl(avl_tree_t *avl)
+{
+	avl_create(avl, smbfs_node_cmp, sizeof (smbnode_t),
+	    offsetof(smbnode_t, r_avl_node));
+}
+
+/*
+ * Invalidate the cached attributes for all nodes "under" the
+ * passed-in node.  Note: the passed-in node is NOT affected by
+ * this call.  This is used both for files under some directory
+ * after the directory is deleted or renamed, and for extended
+ * attribute files (named streams) under a plain file after that
+ * file is renamed or deleted.
+ *
+ * Do this by walking the AVL tree starting at the passed in node,
+ * and continuing while the visited nodes have a path prefix matching
+ * the entire path of the passed-in node, and a separator just after
+ * that matching path prefix.  Watch out for cases where the AVL tree
+ * order may not exactly match the order of an FS walk, i.e.
+ * consider this sequence:
+ *	"foo"		(directory)
+ *	"foo bar"	(name containing a space)
+ *	"foo/bar"
+ * The walk needs to skip "foo bar" and keep going until it finds
+ * something that doesn't match the "foo" name prefix.
+ */
+void
+smbfs_attrcache_prune(smbnode_t *top_np)
+{
+	smbmntinfo_t *mi;
+	smbnode_t *np;
+	char *rpath;
+	int rplen;
+
+	mi = top_np->n_mount;
+	rw_enter(&mi->smi_hash_lk, RW_READER);
+
+	np = top_np;
+	rpath = top_np->n_rpath;
+	rplen = top_np->n_rplen;
+	for (;;) {
+		np = avl_walk(&mi->smi_hash_avl, np, AVL_AFTER);
+		if (np == NULL)
+			break;
+		if (np->n_rplen < rplen)
+			break;
+		if (0 != strncmp(np->n_rpath, rpath, rplen))
+			break;
+		if (np->n_rplen > rplen && (
+		    np->n_rpath[rplen] == ':' ||
+		    np->n_rpath[rplen] == '\\'))
+			smbfs_attrcache_remove(np);
 	}
-	return (NULL);
+
+	rw_exit(&mi->smi_hash_lk);
 }
 
 #ifdef SMB_VNODE_DEBUG
-int smb_check_table_debug = 1;
+int smbfs_check_table_debug = 1;
 #else /* SMB_VNODE_DEBUG */
-int smb_check_table_debug = 0;
+int smbfs_check_table_debug = 0;
 #endif /* SMB_VNODE_DEBUG */
 
 
 /*
  * Return 1 if there is a active vnode belonging to this vfs in the
- * smbtable cache.
+ * smbnode cache.
  *
  * Several of these checks are done without holding the usual
- * locks.  This is safe because destroy_smbtable(), smb_addfree(),
+ * locks.  This is safe because destroy_smbtable(), smbfs_addfree(),
  * etc. will redo the necessary checks before actually destroying
  * any smbnodes.
  *
@@ -729,117 +860,148 @@ int smb_check_table_debug = 0;
  * Relatively harmless, so left 'em in.
  */
 int
-smb_check_table(struct vfs *vfsp, smbnode_t *rtnp)
+smbfs_check_table(struct vfs *vfsp, smbnode_t *rtnp)
 {
+	smbmntinfo_t *mi;
 	smbnode_t *np;
 	vnode_t *vp;
-	int index;
 	int busycnt = 0;
 
-	for (index = 0; index < smbtablesize; index++) {
-		rw_enter(&smbtable[index].r_lock, RW_READER);
-		for (np = smbtable[index].r_hashf;
-		    np != (smbnode_t *)(&smbtable[index]);
-		    np = np->r_hashf) {
-			if (np == rtnp)
-				continue; /* skip the root */
-			vp = SMBTOV(np);
-			if (vp->v_vfsp != vfsp)
-				continue; /* skip other mount */
+	mi = VFTOSMI(vfsp);
+	rw_enter(&mi->smi_hash_lk, RW_READER);
+	for (np = avl_first(&mi->smi_hash_avl); np != NULL;
+	    np = avl_walk(&mi->smi_hash_avl, np, AVL_AFTER)) {
 
-			/* Now the 'busy' checks: */
-			/* Not on the free list? */
-			if (np->r_freef == NULL) {
-				SMBVDEBUG("!r_freef: node=0x%p, v_path=%s\n",
-				    (void *)np, vp->v_path);
-				busycnt++;
-			}
+		if (np == rtnp)
+			continue; /* skip the root */
+		vp = SMBTOV(np);
 
-			/* Has dirty pages? */
-			if (vn_has_cached_data(vp) &&
-			    (np->r_flags & RDIRTY)) {
-				SMBVDEBUG("is dirty: node=0x%p, v_path=%s\n",
-				    (void *)np, vp->v_path);
-				busycnt++;
-			}
-
-			/* Other refs? (not reflected in v_count) */
-			if (np->r_count > 0) {
-				SMBVDEBUG("+r_count: node=0x%p, v_path=%s\n",
-				    (void *)np, vp->v_path);
-				busycnt++;
-			}
-
-			if (busycnt && !smb_check_table_debug)
-				break;
-
+		/* Now the 'busy' checks: */
+		/* Not on the free list? */
+		if (np->r_freef == NULL) {
+			SMBVDEBUG("!r_freef: node=0x%p, rpath=%s\n",
+			    (void *)np, np->n_rpath);
+			busycnt++;
 		}
-		rw_exit(&smbtable[index].r_lock);
+
+		/* Has dirty pages? */
+		if (vn_has_cached_data(vp) &&
+		    (np->r_flags & RDIRTY)) {
+			SMBVDEBUG("is dirty: node=0x%p, rpath=%s\n",
+			    (void *)np, np->n_rpath);
+			busycnt++;
+		}
+
+		/* Other refs? (not reflected in v_count) */
+		if (np->r_count > 0) {
+			SMBVDEBUG("+r_count: node=0x%p, rpath=%s\n",
+			    (void *)np, np->n_rpath);
+			busycnt++;
+		}
+
+		if (busycnt && !smbfs_check_table_debug)
+			break;
+
 	}
+	rw_exit(&mi->smi_hash_lk);
+
 	return (busycnt);
 }
 
 /*
- * Destroy inactive vnodes from the hash queues which belong to this
+ * Destroy inactive vnodes from the AVL tree which belong to this
  * vfs.  It is essential that we destroy all inactive vnodes during a
  * forced unmount as well as during a normal unmount.
  *
  * NFS: nfs_subr.c:destroy_rtable
+ *
+ * In here, we're normally destrying all or most of the AVL tree,
+ * so the natural choice is to use avl_destroy_nodes.  However,
+ * there may be a few busy nodes that should remain in the AVL
+ * tree when we're done.  The solution: use a temporary tree to
+ * hold the busy nodes until we're done destroying the old tree,
+ * then copy the temporary tree over the (now emtpy) real tree.
  */
 void
 smbfs_destroy_table(struct vfs *vfsp)
 {
-	int index;
+	avl_tree_t tmp_avl;
+	smbmntinfo_t *mi;
 	smbnode_t *np;
 	smbnode_t *rlist;
-	smbnode_t *r_hashf;
-	vnode_t *vp;
+	void *v;
 
+	mi = VFTOSMI(vfsp);
 	rlist = NULL;
+	smbfs_init_hash_avl(&tmp_avl);
 
-	for (index = 0; index < smbtablesize; index++) {
-		rw_enter(&smbtable[index].r_lock, RW_WRITER);
-		for (np = smbtable[index].r_hashf;
-		    np != (smbnode_t *)(&smbtable[index]);
-		    np = r_hashf) {
-			/* save the hash pointer before destroying */
-			r_hashf = np->r_hashf;
-			vp = SMBTOV(np);
-			if (vp->v_vfsp == vfsp) {
-				mutex_enter(&smbfreelist_lock);
-				if (np->r_freef != NULL) {
-					smb_rmfree(np);
-					mutex_exit(&smbfreelist_lock);
-					smb_rmhash_locked(np);
-					np->r_hashf = rlist;
-					rlist = np;
-				} else
-					mutex_exit(&smbfreelist_lock);
-			}
+	rw_enter(&mi->smi_hash_lk, RW_WRITER);
+	v = NULL;
+	while ((np = avl_destroy_nodes(&mi->smi_hash_avl, &v)) != NULL) {
+
+		mutex_enter(&smbfreelist_lock);
+		if (np->r_freef == NULL) {
+			/*
+			 * Busy node (not on the free list).
+			 * Will keep in the final AVL tree.
+			 */
+			mutex_exit(&smbfreelist_lock);
+			avl_add(&tmp_avl, np);
+		} else {
+			/*
+			 * It's on the free list.  Remove and
+			 * arrange for it to be destroyed.
+			 */
+			sn_rmfree(np);
+			mutex_exit(&smbfreelist_lock);
+
+			/*
+			 * Last part of sn_rmhash_locked().
+			 * NB: avl_destroy_nodes has already
+			 * removed this from the "hash" AVL.
+			 */
+			mutex_enter(&np->r_statelock);
+			np->r_flags &= ~RHASHED;
+			mutex_exit(&np->r_statelock);
+
+			/*
+			 * Add to the list of nodes to destroy.
+			 * Borrowing avl_child[0] for this list.
+			 */
+			np->r_avl_node.avl_child[0] =
+			    (struct avl_node *)rlist;
+			rlist = np;
 		}
-		rw_exit(&smbtable[index].r_lock);
 	}
+	avl_destroy(&mi->smi_hash_avl);
 
-	for (np = rlist; np != NULL; np = rlist) {
-		rlist = np->r_hashf;
-		/*
-		 * This call to smb_addfree will end up destroying the
-		 * smbnode, but in a safe way with the appropriate set
-		 * of checks done.
-		 */
-		smb_addfree(np);
+	/*
+	 * Replace the (now destroyed) "hash" AVL with the
+	 * temporary AVL, which restores the busy nodes.
+	 */
+	mi->smi_hash_avl = tmp_avl;
+	rw_exit(&mi->smi_hash_lk);
+
+	/*
+	 * Now destroy the nodes on our temporary list (rlist).
+	 * This call to smbfs_addfree will end up destroying the
+	 * smbnode, but in a safe way with the appropriate set
+	 * of checks done.
+	 */
+	while ((np = rlist) != NULL) {
+		rlist = (smbnode_t *)np->r_avl_node.avl_child[0];
+		smbfs_addfree(np);
 	}
-
 }
 
 /*
  * This routine destroys all the resources associated with the smbnode
- * and then the smbnode itself.
+ * and then the smbnode itself.  Note: sn_inactive has been called.
  *
  * NFS: nfs_subr.c:destroy_rnode
  */
-void
-smb_destroy_node(smbnode_t *np)
+static void
+sn_destroy_node(smbnode_t *np)
 {
 	vnode_t *vp;
 	vfs_t *vfsp;
@@ -850,6 +1012,8 @@ smb_destroy_node(smbnode_t *np)
 	ASSERT(vp->v_count == 1);
 	ASSERT(np->r_count == 0);
 	ASSERT(np->r_mapcnt == 0);
+	ASSERT(np->r_cred == NULL);
+	ASSERT(np->n_rpath == NULL);
 	ASSERT(!(np->r_flags & RHASHED));
 	ASSERT(np->r_freef == NULL && np->r_freeb == NULL);
 	atomic_add_long((ulong_t *)&smbnodenew, -1);
@@ -859,7 +1023,17 @@ smb_destroy_node(smbnode_t *np)
 	VFS_RELE(vfsp);
 }
 
-/* rflush? */
+/*
+ * Flush all vnodes in this (or every) vfs.
+ * Used by nfs_sync and by nfs_unmount.
+ */
+/*ARGSUSED*/
+void
+smbfs_rflush(struct vfs *vfsp, cred_t *cr)
+{
+	/* Todo: mmap support. */
+}
+
 /* access cache */
 /* client handles */
 
@@ -867,17 +1041,15 @@ smb_destroy_node(smbnode_t *np)
  * initialize resources that are used by smbfs_subr.c
  * this is called from the _init() routine (by the way of smbfs_clntinit())
  *
- * allocate and initialze smbfs hash table
  * NFS: nfs_subr.c:nfs_subrinit
  */
 int
 smbfs_subrinit(void)
 {
-	int i;
 	ulong_t nsmbnode_max;
 
 	/*
-	 * Allocate and initialize the smbnode hash queues
+	 * Allocate and initialize the smbnode cache
 	 */
 	if (nsmbnode <= 0)
 		nsmbnode = ncsize; /* dnlc.h */
@@ -889,14 +1061,6 @@ smbfs_subrinit(void)
 		nsmbnode = nsmbnode_max;
 	}
 
-	smbtablesize = 1 << highbit(nsmbnode / smbhashlen);
-	smbtablemask = smbtablesize - 1;
-	smbtable = kmem_alloc(smbtablesize * sizeof (*smbtable), KM_SLEEP);
-	for (i = 0; i < smbtablesize; i++) {
-		smbtable[i].r_hashf = (smbnode_t *)(&smbtable[i]);
-		smbtable[i].r_hashb = (smbnode_t *)(&smbtable[i]);
-		rw_init(&smbtable[i].r_lock, NULL, RW_DEFAULT, NULL);
-	}
 	smbnode_cache = kmem_cache_create("smbnode_cache", sizeof (smbnode_t),
 	    0, NULL, NULL, smbfs_kmem_reclaim, NULL, NULL, 0);
 
@@ -926,16 +1090,11 @@ smbfs_subrinit(void)
 void
 smbfs_subrfini(void)
 {
-	int i;
 
 	/*
-	 * Deallocate the smbnode hash queues
+	 * Destroy the smbnode cache
 	 */
 	kmem_cache_destroy(smbnode_cache);
-
-	for (i = 0; i < smbtablesize; i++)
-		rw_destroy(&smbtable[i].r_lock);
-	kmem_free(smbtable, smbtablesize * sizeof (*smbtable));
 
 	/*
 	 * Destroy the various mutexes and reader/writer locks
@@ -950,43 +1109,42 @@ smbfs_subrfini(void)
  * Support functions for smbfs_kmem_reclaim
  */
 
-static int
+static void
 smbfs_node_reclaim(void)
 {
-	int freed;
+	smbmntinfo_t *mi;
 	smbnode_t *np;
 	vnode_t *vp;
 
-	freed = 0;
 	mutex_enter(&smbfreelist_lock);
 	while ((np = smbfreelist) != NULL) {
-		smb_rmfree(np);
+		sn_rmfree(np);
 		mutex_exit(&smbfreelist_lock);
 		if (np->r_flags & RHASHED) {
 			vp = SMBTOV(np);
-			rw_enter(&np->r_hashq->r_lock, RW_WRITER);
+			mi = np->n_mount;
+			rw_enter(&mi->smi_hash_lk, RW_WRITER);
 			mutex_enter(&vp->v_lock);
 			if (vp->v_count > 1) {
 				vp->v_count--;
 				mutex_exit(&vp->v_lock);
-				rw_exit(&np->r_hashq->r_lock);
+				rw_exit(&mi->smi_hash_lk);
 				mutex_enter(&smbfreelist_lock);
 				continue;
 			}
 			mutex_exit(&vp->v_lock);
-			smb_rmhash_locked(np);
-			rw_exit(&np->r_hashq->r_lock);
+			sn_rmhash_locked(np);
+			rw_exit(&mi->smi_hash_lk);
 		}
 		/*
-		 * This call to smb_addfree will end up destroying the
+		 * This call to smbfs_addfree will end up destroying the
 		 * smbnode, but in a safe way with the appropriate set
 		 * of checks done.
 		 */
-		smb_addfree(np);
+		smbfs_addfree(np);
 		mutex_enter(&smbfreelist_lock);
 	}
 	mutex_exit(&smbfreelist_lock);
-	return (freed);
 }
 
 /*
@@ -999,7 +1157,7 @@ smbfs_node_reclaim(void)
 void
 smbfs_kmem_reclaim(void *cdrarg)
 {
-	(void) smbfs_node_reclaim();
+	smbfs_node_reclaim();
 }
 
 /* nfs failover stuff */

@@ -290,8 +290,11 @@ smbfs_default_dom_usr(const char *home, const char *server,
 	if (err)
 		return (err);
 
-	if (server)
-		smb_ctx_setfullserver(ctx, server);
+	if (server) {
+		err = smb_ctx_setfullserver(ctx, server);
+		if (err != 0)
+			goto out;
+	}
 
 	if (home && *home) {
 		if (ctx->ct_home)

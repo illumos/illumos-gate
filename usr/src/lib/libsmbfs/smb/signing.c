@@ -142,7 +142,7 @@ smb_compute_MAC(struct smb_ctx *ctx, mbuf_t *m,
 /*
  * Sign a request with HMAC-MD5.
  */
-int
+void
 smb_rq_sign(struct smb_rq *rqp)
 {
 	struct smb_ctx *ctx = rqp->rq_ctx;
@@ -155,7 +155,7 @@ smb_rq_sign(struct smb_rq *rqp)
 	 * but just in case...
 	 */
 	if (m->m_len < SMB_HDRLEN)
-		return (EIO);
+		return;
 	sigloc = (uchar_t *)m->m_data + SMBSIGOFF;
 
 	if (ctx->ct_mackey == NULL) {
@@ -165,7 +165,7 @@ smb_rq_sign(struct smb_rq *rqp)
 		 * This happens with SPNEGO, NTLMSSP, ...
 		 */
 		bcopy("BSRSPLY", sigloc, 8);
-		return (0);
+		return;
 	}
 
 	/*
@@ -178,9 +178,7 @@ smb_rq_sign(struct smb_rq *rqp)
 	if (err) {
 		DPRINT("compute MAC, err %d", err);
 		bzero(sigloc, SMBSIGLEN);
-		return (ENOTSUP);
 	}
-	return (0);
 }
 
 /*
@@ -247,10 +245,10 @@ smb_rq_verify(struct smb_rq *rqp)
 	 * of the sequence # has gotten a bit out of sync.
 	 */
 	for (fudge = 1; fudge <= nsmb_signing_fudge; fudge++) {
-		smb_compute_MAC(ctx, m, rseqno + fudge, sigbuf);
+		(void) smb_compute_MAC(ctx, m, rseqno + fudge, sigbuf);
 		if (bcmp(sigbuf, sigloc, SMBSIGLEN) == 0)
 			break;
-		smb_compute_MAC(ctx, m, rseqno - fudge, sigbuf);
+		(void) smb_compute_MAC(ctx, m, rseqno - fudge, sigbuf);
 		if (bcmp(sigbuf, sigloc, SMBSIGLEN) == 0) {
 			fudge = -fudge;
 			break;

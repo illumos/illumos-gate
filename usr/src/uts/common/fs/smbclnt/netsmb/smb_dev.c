@@ -66,12 +66,7 @@
 #include <sys/types.h>
 #include <sys/zone.h>
 
-#ifdef APPLE
-#include <sys/smb_apple.h>
-#else
 #include <netsmb/smb_osdep.h>
-#endif
-
 #include <netsmb/mchain.h>		/* for "htoles()" */
 
 #include <netsmb/smb.h>
@@ -182,7 +177,7 @@ _init(void)
 {
 	int error;
 
-	ddi_soft_state_init(&statep, sizeof (smb_dev_t), 1);
+	(void) ddi_soft_state_init(&statep, sizeof (smb_dev_t), 1);
 
 	/* Can initialize some mutexes also. */
 	mutex_init(&dev_lck, NULL, MUTEX_DRIVER, NULL);
@@ -197,6 +192,9 @@ _init(void)
 
 	/* Initialize password Key chain DB. */
 	smb_pkey_init();
+
+	/* Time conversion stuff. */
+	smb_time_init();
 
 	/* Initialize crypto mechanisms. */
 	smb_crypto_mech_init();
@@ -246,6 +244,9 @@ _fini(void)
 	}
 
 	(void) zone_key_delete(nsmb_zone_key);
+
+	/* Time conversion stuff. */
+	smb_time_fini();
 
 	/* Destroy password Key chain DB. */
 	smb_pkey_fini();
@@ -384,7 +385,7 @@ nsmb_ioctl(dev_t dev, int cmd, intptr_t arg, int flags,	/* model.h */
 	err = 0;
 	switch (cmd) {
 	case SMBIOC_GETVERS:
-		ddi_copyout(&nsmb_version, (void *)arg,
+		(void) ddi_copyout(&nsmb_version, (void *)arg,
 		    sizeof (nsmb_version), flags);
 		break;
 

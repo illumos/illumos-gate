@@ -253,22 +253,30 @@ smb_ctx_init(struct smb_ctx *ctx)
 	ctx->ct_authflags = SMB_AT_DEFAULT;
 	ctx->ct_minauth = SMB_AT_DEFAULT;
 
-	nb_ctx_setscope(ctx->ct_nb, "");
+	error = nb_ctx_setscope(ctx->ct_nb, "");
+	if (error)
+		return (error);
 
 	/*
 	 * if the user name is not specified some other way,
 	 * use the current user name (built-in default)
 	 */
 	if (getpwuid_r(getuid(), &pw, pwbuf, sizeof (pwbuf)) != NULL) {
-		smb_ctx_setuser(ctx, pw.pw_name, 0);
+		error = smb_ctx_setuser(ctx, pw.pw_name, 0);
+		if (error)
+			return (error);
 		ctx->ct_home = strdup(pw.pw_name);
+		if (ctx->ct_home == NULL)
+			return (ENOMEM);
 	}
 
 	/*
 	 * Set a built-in default domain (workgroup).
 	 * Using the Windows/NT default for now.
 	 */
-	smb_ctx_setdomain(ctx, "WORKGROUP", 0);
+	error = smb_ctx_setdomain(ctx, "WORKGROUP", 0);
+	if (error)
+		return (error);
 
 	return (error);
 }
@@ -571,7 +579,7 @@ smb_ctx_parseunc(struct smb_ctx *ctx, const char *unc,
 	 */
 	if (strchr(tmp, '%'))
 		(void) unpercent(tmp);
-	smb_ctx_setfullserver(ctx, tmp);
+	error = smb_ctx_setfullserver(ctx, tmp);
 	if (error)
 		goto out;
 
@@ -771,7 +779,7 @@ smb_ctx_setpassword(struct smb_ctx *ctx, const char *passwd, int from_cmd)
 
 	memset(ctx->ct_password, 0, sizeof (ctx->ct_password));
 	if (strncmp(passwd, "$$1", 3) == 0)
-		smb_simpledecrypt(ctx->ct_password, passwd);
+		(void) smb_simpledecrypt(ctx->ct_password, passwd);
 	else
 		strlcpy(ctx->ct_password, passwd,
 		    sizeof (ctx->ct_password));
@@ -1387,14 +1395,15 @@ smb_ctx_readrcsection(struct smb_ctx *ctx, const char *sname, int level)
 		if (p) {
 			/*
 			 * "signing" was set in this section; override
-			 * the current signing settings.
+			 * the current signing settings.  Note:
+			 * setsigning flags are: enable, require
 			 */
 			if (strcmp(p, "disabled") == 0) {
-				smb_ctx_setsigning(ctx, FALSE, FALSE);
+				(void) smb_ctx_setsigning(ctx, FALSE, FALSE);
 			} else if (strcmp(p, "enabled") == 0) {
-				smb_ctx_setsigning(ctx, TRUE, FALSE);
+				(void) smb_ctx_setsigning(ctx, TRUE, FALSE);
 			} else if (strcmp(p, "required") == 0) {
-				smb_ctx_setsigning(ctx, TRUE, TRUE);
+				(void) smb_ctx_setsigning(ctx, TRUE, TRUE);
 			} else {
 				/*
 				 * Unknown "signing" value.

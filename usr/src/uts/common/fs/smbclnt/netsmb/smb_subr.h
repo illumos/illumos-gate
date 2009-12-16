@@ -122,12 +122,24 @@ struct sockaddr *smb_dup_sockaddr(struct sockaddr *sa);
 void smb_free_sockaddr(struct sockaddr *sa);
 int smb_toupper(const char *, char *, size_t);
 
-int smb_rq_sign(struct smb_rq *);
+void smb_rq_sign(struct smb_rq *);
 int smb_rq_verify(struct smb_rq *);
 int smb_calcv2mackey(struct smb_vc *, const uchar_t *,
 	const uchar_t *, size_t);
 int smb_calcmackey(struct smb_vc *, const uchar_t *,
 	const uchar_t *, size_t);
 void smb_crypto_mech_init(void);
+
+void smb_time_init(void);
+void smb_time_fini(void);
+
+void  smb_time_local2server(struct timespec *tsp, int tzoff, long *seconds);
+void  smb_time_server2local(ulong_t seconds, int tzoff, struct timespec *tsp);
+void  smb_time_NT2local(uint64_t nsec, struct timespec *tsp);
+void  smb_time_local2NT(struct timespec *tsp, uint64_t *nsec);
+void  smb_time_unix2dos(struct timespec *tsp, int tzoff, uint16_t *ddp,
+	uint16_t *dtp, uint8_t *dhp);
+void smb_dos2unixtime(uint_t dd, uint_t dt, uint_t dh, int tzoff,
+	struct timespec *tsp);
 
 #endif /* !_NETSMB_SMB_SUBR_H_ */

@@ -62,12 +62,7 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
-#ifdef APPLE
-#include <sys/smb_apple.h>
-#else
 #include <netsmb/smb_osdep.h>
-#endif
-
 #include <netsmb/mchain.h>
 #include <netsmb/netbios.h>
 
@@ -201,7 +196,7 @@ discon:
 			 * cleanup and state change on any call.
 			 */
 			freemsg(tm);
-			nb_disconnect(nbp);
+			(void) nb_disconnect(nbp);
 			return (ENOTCONN);
 		}
 
@@ -261,7 +256,7 @@ nb_snddis(TIUSER *tiptr)
 /*
  * Stuff the NetBIOS header into space already prepended.
  */
-static int
+static void
 nb_sethdr(mblk_t *m, uint8_t type, uint32_t len)
 {
 	uint32_t *p;
@@ -272,7 +267,6 @@ nb_sethdr(mblk_t *m, uint8_t type, uint32_t len)
 	/*LINTED*/
 	p = (uint32_t *)m->b_rptr;
 	*p = htonl(len);
-	return (0);
 }
 
 /*
@@ -517,9 +511,9 @@ smb_nbst_done(struct smb_vc *vcp)
 	 * But it's harmless.
 	 */
 	if (nbp->nbp_flags & NBF_CONNECTED)
-		nb_disconnect(nbp);
+		(void) nb_disconnect(nbp);
 	if (nbp->nbp_tiptr)
-		t_kclose(nbp->nbp_tiptr, 0);
+		(void) t_kclose(nbp->nbp_tiptr, 0);
 	if (nbp->nbp_laddr)
 		smb_free_sockaddr((struct sockaddr *)nbp->nbp_laddr);
 	if (nbp->nbp_paddr)
@@ -542,7 +536,7 @@ smb_nbst_loan_fp(struct smb_vc *vcp, struct file *fp, cred_t *cr)
 	 * Un-loan the existing one, if any.
 	 */
 	if (nbp->nbp_tiptr != NULL) {
-		t_kclose(nbp->nbp_tiptr, 0);
+		(void) t_kclose(nbp->nbp_tiptr, 0);
 		nbp->nbp_tiptr = NULL;
 		nbp->nbp_flags &= ~NBF_CONNECTED;
 		nbp->nbp_state = NBST_CLOSED;
@@ -595,6 +589,7 @@ nb_disconnect(struct nbpcb *nbp)
 {
 	TIUSER *tiptr;
 	int save_flags;
+	int err = 0;
 
 	tiptr = nbp->nbp_tiptr;
 	if (tiptr == NULL)
@@ -610,12 +605,13 @@ nb_disconnect(struct nbpcb *nbp)
 	mutex_exit(&nbp->nbp_lock);
 
 	if (save_flags & NBF_CONNECTED)
-		nb_snddis(tiptr);
+		err = nb_snddis(tiptr);
 
 	if (nbp->nbp_state != NBST_RETARGET) {
 		nbp->nbp_state = NBST_CLOSED;
 	}
-	return (0);
+
+	return (err);
 }
 
 /*

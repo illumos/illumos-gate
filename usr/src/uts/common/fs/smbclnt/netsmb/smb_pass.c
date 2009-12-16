@@ -166,7 +166,7 @@ smb_pkey_init()
 void
 smb_pkey_fini()
 {
-	smb_pkey_deluid((uid_t)-1, kcred);
+	(void) smb_pkey_deluid((uid_t)-1, kcred);
 	avl_destroy(&smb_ptd);
 	mutex_destroy(&smb_ptd_lock);
 }
@@ -187,15 +187,14 @@ smb_pkey_idle()
 	return ((n) ? EBUSY : 0);
 }
 
-int
-smb_node_delete(smb_passid_t *tmp)
+static void
+smb_pkey_delete(smb_passid_t *tmp)
 {
 	ASSERT(MUTEX_HELD(&smb_ptd_lock));
 	avl_remove(&smb_ptd, tmp);
 	strfree(tmp->srvdom);
 	strfree(tmp->username);
 	kmem_free(tmp, sizeof (*tmp));
-	return (0);
 }
 
 
@@ -225,7 +224,7 @@ smb_pkey_del(smbioc_pk_t *pk, cred_t *cr)
 	mutex_enter(&smb_ptd_lock);
 	if ((cpid = (smb_passid_t *)avl_find(&smb_ptd,
 	    tmp, &where)) != NULL) {
-		smb_node_delete(cpid);
+		smb_pkey_delete(cpid);
 	}
 	mutex_exit(&smb_ptd_lock);
 
@@ -259,7 +258,7 @@ smb_pkey_deluid(uid_t ioc_uid, cred_t *cr)
 			/*
 			 * Delete the node.
 			 */
-			smb_node_delete(tmp);
+			smb_pkey_delete(tmp);
 		}
 	}
 	mutex_exit(&smb_ptd_lock);
@@ -306,7 +305,7 @@ smb_pkey_add(smbioc_pk_t *pk, cred_t *cr)
 	/* If it already exists, delete it. */
 	ret = smb_pkey_check(pk, cr);
 	if (ret == 0) {
-		smb_pkey_del(pk, cr);
+		(void) smb_pkey_del(pk, cr);
 	}
 
 	mutex_enter(&smb_ptd_lock);

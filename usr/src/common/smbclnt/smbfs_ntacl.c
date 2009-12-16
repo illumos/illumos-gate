@@ -25,43 +25,39 @@
  */
 
 /*
- * ACL support for smbfs
- *
- * May want to move some of this to usr/src/common
- * and compile with the smbfs kmod too, once we
- * implement VOP_GETSECATTR, VOP_SETSECATTR.
+ * ACL conversion support for smbfs
+ * (To/from NT/ZFS-style ACLs.)
  */
 
 #include <sys/types.h>
 #include <sys/errno.h>
+#include <sys/acl.h>
+#include <sys/byteorder.h>
+
+#ifdef _KERNEL
+
 #include <sys/cred.h>
 #include <sys/cmn_err.h>
 #include <sys/kmem.h>
 #include <sys/sunddi.h>
-#include <sys/acl.h>
 #include <sys/vnode.h>
 #include <sys/vfs.h>
-#include <sys/byteorder.h>
 
-#include <errno.h>
+#include <sys/kidmap.h>
+
+#else	/* _KERNEL */
+
 #include <stdio.h>
-#include <string.h>
+#include <stdlib.h>
 #include <strings.h>
-#include <unistd.h>
 
-#include <umem.h>
 #include <idmap.h>
 
-#include <sys/fs/smbfs_ioctl.h>
+#endif	/* _KERNEL */
 
 #include <netsmb/mchain.h>
 #include <netsmb/smb.h>
-
-#include <netsmb/smb_lib.h>
-#include <netsmb/smbfs_acl.h>
-
-#include "acl_nt.h"
-#include "private.h"
+#include "smbfs_ntacl.h"
 
 #ifdef _KERNEL
 #define	MALLOC(size) kmem_alloc(size, KM_SLEEP)
@@ -79,7 +75,6 @@ FREESZ(void *p, size_t sz)
 }
 #endif	/* lint */
 #endif	/* _KERNEL */
-
 
 #define	ERRCHK(expr)	if ((error = expr) != 0) goto errout
 
@@ -99,7 +94,7 @@ ifree_sid(i_ntsid_t *sid)
 }
 
 static int
-mb_get_sid(mbdata_t *mbp, i_ntsid_t **sidp)
+md_get_sid(mdchain_t *mdp, i_ntsid_t **sidp)
 {
 	i_ntsid_t *sid = NULL;
 	uint8_t revision, subauthcount;
@@ -107,9 +102,9 @@ mb_get_sid(mbdata_t *mbp, i_ntsid_t **sidp)
 	size_t sidsz;
 	int error, i;
 
-	if ((error = mb_get_uint8(mbp, &revision)) != 0)
+	if ((error = md_get_uint8(mdp, &revision)) != 0)
 		return (error);
-	if ((error = mb_get_uint8(mbp, &subauthcount)) != 0)
+	if ((error = md_get_uint8(mdp, &subauthcount)) != 0)
 		return (error);
 
 	sidsz = I_SID_SIZE(subauthcount);
@@ -120,11 +115,11 @@ mb_get_sid(mbdata_t *mbp, i_ntsid_t **sidp)
 	bzero(sid, sidsz);
 	sid->sid_revision = revision;
 	sid->sid_subauthcount = subauthcount;
-	ERRCHK(mb_get_mem(mbp, (char *)sid->sid_authority, 6));
+	ERRCHK(md_get_mem(mdp, sid->sid_authority, 6, MB_MSYSTEM));
 
 	subauthp = &sid->sid_subauthvec[0];
 	for (i = 0; i < subauthcount; i++) {
-		ERRCHK(mb_get_uint32le(mbp, subauthp));
+		ERRCHK(md_get_uint32le(mdp, subauthp));
 		subauthp++;
 	}
 
@@ -138,7 +133,7 @@ errout:
 }
 
 static int
-mb_put_sid(mbdata_t *mbp, i_ntsid_t *sid)
+mb_put_sid(mbchain_t *mbp, i_ntsid_t *sid)
 {
 	uint32_t *subauthp;
 	int error, i;
@@ -148,7 +143,7 @@ mb_put_sid(mbdata_t *mbp, i_ntsid_t *sid)
 
 	ERRCHK(mb_put_uint8(mbp, sid->sid_revision));
 	ERRCHK(mb_put_uint8(mbp, sid->sid_subauthcount));
-	ERRCHK(mb_put_mem(mbp, (char *)sid->sid_authority, 6));
+	ERRCHK(mb_put_mem(mbp, sid->sid_authority, 6, MB_MSYSTEM));
 
 	subauthp = &sid->sid_subauthvec[0];
 	for (i = 0; i < sid->sid_subauthcount; i++) {
@@ -179,9 +174,9 @@ ifree_ace(i_ntace_t *ace)
 }
 
 static int
-mb_get_ace(mbdata_t *mbp, i_ntace_t **acep)
+md_get_ace(mdchain_t *mdp, i_ntace_t **acep)
 {
-	mbdata_t tmp_mb;
+	mdchain_t tmp_md;
 	i_ntace_t *ace = NULL;
 	uint16_t ace_len;
 	int error;
@@ -196,22 +191,22 @@ mb_get_ace(mbdata_t *mbp, i_ntace_t **acep)
 	 * XXX: This only decodes types 0-7
 	 *
 	 * There may also be padding after it, so
-	 * decode the using a copy of the mbdata,
+	 * decode the using a copy of the mdchain,
 	 * and then consume the specified length.
 	 */
-	tmp_mb = *mbp;
+	tmp_md = *mdp;
 
 	/* Fixed-size header */
-	ERRCHK(mb_get_uint8(&tmp_mb, &ace->ace_type));
-	ERRCHK(mb_get_uint8(&tmp_mb, &ace->ace_flags));
-	ERRCHK(mb_get_uint16le(&tmp_mb, &ace_len));
+	ERRCHK(md_get_uint8(&tmp_md, &ace->ace_type));
+	ERRCHK(md_get_uint8(&tmp_md, &ace->ace_flags));
+	ERRCHK(md_get_uint16le(&tmp_md, &ace_len));
 
 	/* Variable-size body */
-	ERRCHK(mb_get_uint32le(&tmp_mb, &ace->ace_rights));
-	ERRCHK(mb_get_sid(&tmp_mb, &ace->ace_sid));
+	ERRCHK(md_get_uint32le(&tmp_md, &ace->ace_rights));
+	ERRCHK(md_get_sid(&tmp_md, &ace->ace_sid));
 
 	/* Now actually consume ace_len */
-	ERRCHK(mb_get_mem(mbp, NULL, ace_len));
+	ERRCHK(md_get_mem(mdp, NULL, ace_len, MB_MSYSTEM));
 
 	/* Success! */
 	*acep = ace;
@@ -223,7 +218,7 @@ errout:
 }
 
 static int
-mb_put_ace(mbdata_t *mbp, i_ntace_t *ace)
+mb_put_ace(mbchain_t *mbp, i_ntace_t *ace)
 {
 	int cnt0, error;
 	uint16_t ace_len, *ace_len_p;
@@ -235,7 +230,11 @@ mb_put_ace(mbdata_t *mbp, i_ntace_t *ace)
 
 	ERRCHK(mb_put_uint8(mbp, ace->ace_type));
 	ERRCHK(mb_put_uint8(mbp, ace->ace_flags));
-	ERRCHK(mb_fit(mbp, 2, (char **)&ace_len_p));
+	ace_len_p = mb_reserve(mbp, sizeof (*ace_len_p));
+	if (ace_len_p == NULL) {
+		error = ENOMEM;
+		goto errout;
+	}
 	ERRCHK(mb_put_uint32le(mbp, ace->ace_rights));
 
 	ERRCHK(mb_put_sid(mbp, ace->ace_sid));
@@ -278,7 +277,7 @@ ifree_acl(i_ntacl_t *acl)
 }
 
 static int
-mb_get_acl(mbdata_t *mbp, i_ntacl_t **aclp)
+md_get_acl(mdchain_t *mdp, i_ntacl_t **aclp)
 {
 	i_ntacl_t *acl = NULL;
 	i_ntace_t **acep;
@@ -287,15 +286,15 @@ mb_get_acl(mbdata_t *mbp, i_ntacl_t **aclp)
 	size_t aclsz;
 	int i, error;
 
-	if ((error = mb_get_uint8(mbp, &revision)) != 0)
+	if ((error = md_get_uint8(mdp, &revision)) != 0)
 		return (error);
-	if ((error = mb_get_uint8(mbp, NULL)) != 0)
+	if ((error = md_get_uint8(mdp, NULL)) != 0)
 		return (error);
-	if ((error = mb_get_uint16le(mbp, &acl_len)) != 0)
+	if ((error = md_get_uint16le(mdp, &acl_len)) != 0)
 		return (error);
-	if ((error = mb_get_uint16le(mbp, &acecount)) != 0)
+	if ((error = md_get_uint16le(mdp, &acecount)) != 0)
 		return (error);
-	if ((error = mb_get_uint16(mbp, NULL)) != 0)
+	if ((error = md_get_uint16le(mdp, NULL)) != 0)
 		return (error);
 
 	aclsz = I_ACL_SIZE(acecount);
@@ -307,7 +306,7 @@ mb_get_acl(mbdata_t *mbp, i_ntacl_t **aclp)
 
 	acep = &acl->acl_acevec[0];
 	for (i = 0; i < acl->acl_acecount; i++) {
-		ERRCHK(mb_get_ace(mbp, acep));
+		ERRCHK(md_get_ace(mdp, acep));
 		acep++;
 	}
 	/*
@@ -325,7 +324,7 @@ errout:
 }
 
 static int
-mb_put_acl(mbdata_t *mbp, i_ntacl_t *acl)
+mb_put_acl(mbchain_t *mbp, i_ntacl_t *acl)
 {
 	i_ntace_t **acep;
 	uint16_t acl_len, *acl_len_p;
@@ -335,7 +334,11 @@ mb_put_acl(mbdata_t *mbp, i_ntacl_t *acl)
 
 	ERRCHK(mb_put_uint8(mbp, acl->acl_revision));
 	ERRCHK(mb_put_uint8(mbp, 0)); /* pad1 */
-	ERRCHK(mb_fit(mbp, 2, (char **)&acl_len_p));
+	acl_len_p = mb_reserve(mbp, sizeof (*acl_len_p));
+	if (acl_len_p == NULL) {
+		error = ENOMEM;
+		goto errout;
+	}
 	ERRCHK(mb_put_uint16le(mbp, acl->acl_acecount));
 	ERRCHK(mb_put_uint16le(mbp, 0)); /* pad2 */
 
@@ -380,14 +383,14 @@ smbfs_acl_free_sd(i_ntsd_t *sd)
  * (like "absolute" form per. NT docs)
  * Returns allocated data in sdp
  *
- * Note: does NOT consume all the mbp data, so the
+ * Note: does NOT consume all the mdp data, so the
  * caller has to take care of that if necessary.
  */
 int
-mb_get_ntsd(mbdata_t *mbp, i_ntsd_t **sdp)
+md_get_ntsd(mdchain_t *mdp, i_ntsd_t **sdp)
 {
 	i_ntsd_t *sd = NULL;
-	mbdata_t top_mb, tmp_mb;
+	mdchain_t top_md, tmp_md;
 	uint32_t owneroff, groupoff, sacloff, dacloff;
 	int error;
 
@@ -397,44 +400,44 @@ mb_get_ntsd(mbdata_t *mbp, i_ntsd_t **sdp)
 
 	/*
 	 * Offsets below are relative to this point,
-	 * so save the mbp state for use below.
+	 * so save the mdp state for use below.
 	 */
-	top_mb = *mbp;
+	top_md = *mdp;
 
-	ERRCHK(mb_get_uint8(mbp, &sd->sd_revision));
-	ERRCHK(mb_get_uint8(mbp, NULL));
-	ERRCHK(mb_get_uint16le(mbp, &sd->sd_flags));
-	ERRCHK(mb_get_uint32le(mbp, &owneroff));
-	ERRCHK(mb_get_uint32le(mbp, &groupoff));
-	ERRCHK(mb_get_uint32le(mbp, &sacloff));
-	ERRCHK(mb_get_uint32le(mbp, &dacloff));
+	ERRCHK(md_get_uint8(mdp, &sd->sd_revision));
+	ERRCHK(md_get_uint8(mdp, &sd->sd_rmctl));
+	ERRCHK(md_get_uint16le(mdp, &sd->sd_flags));
+	ERRCHK(md_get_uint32le(mdp, &owneroff));
+	ERRCHK(md_get_uint32le(mdp, &groupoff));
+	ERRCHK(md_get_uint32le(mdp, &sacloff));
+	ERRCHK(md_get_uint32le(mdp, &dacloff));
 
 	/*
 	 * For each section make a temporary copy of the
-	 * top_mb state, advance to the given offset, and
-	 * pass that to the lower mb_get_xxx functions.
+	 * top_md state, advance to the given offset, and
+	 * pass that to the lower md_get_xxx functions.
 	 * These could be marshalled in any order, but
 	 * are normally found in the order shown here.
 	 */
 	if (sacloff) {
-		tmp_mb = top_mb;
-		mb_get_mem(&tmp_mb, NULL, sacloff);
-		ERRCHK(mb_get_acl(&tmp_mb, &sd->sd_sacl));
+		tmp_md = top_md;
+		md_get_mem(&tmp_md, NULL, sacloff, MB_MSYSTEM);
+		ERRCHK(md_get_acl(&tmp_md, &sd->sd_sacl));
 	}
 	if (dacloff) {
-		tmp_mb = top_mb;
-		mb_get_mem(&tmp_mb, NULL, dacloff);
-		ERRCHK(mb_get_acl(&tmp_mb, &sd->sd_dacl));
+		tmp_md = top_md;
+		md_get_mem(&tmp_md, NULL, dacloff, MB_MSYSTEM);
+		ERRCHK(md_get_acl(&tmp_md, &sd->sd_dacl));
 	}
 	if (owneroff) {
-		tmp_mb = top_mb;
-		mb_get_mem(&tmp_mb, NULL, owneroff);
-		ERRCHK(mb_get_sid(&tmp_mb, &sd->sd_owner));
+		tmp_md = top_md;
+		md_get_mem(&tmp_md, NULL, owneroff, MB_MSYSTEM);
+		ERRCHK(md_get_sid(&tmp_md, &sd->sd_owner));
 	}
 	if (groupoff) {
-		tmp_mb = top_mb;
-		mb_get_mem(&tmp_mb, NULL, groupoff);
-		ERRCHK(mb_get_sid(&tmp_mb, &sd->sd_group));
+		tmp_md = top_md;
+		md_get_mem(&tmp_md, NULL, groupoff, MB_MSYSTEM);
+		ERRCHK(md_get_sid(&tmp_md, &sd->sd_group));
 	}
 
 	/* Success! */
@@ -452,7 +455,7 @@ errout:
  * Returns allocated mbchain in mbp.
  */
 int
-mb_put_ntsd(mbdata_t *mbp, i_ntsd_t *sd)
+mb_put_ntsd(mbchain_t *mbp, i_ntsd_t *sd)
 {
 	uint32_t *owneroffp, *groupoffp, *sacloffp, *dacloffp;
 	uint32_t owneroff, groupoff, sacloff, dacloff;
@@ -462,12 +465,18 @@ mb_put_ntsd(mbdata_t *mbp, i_ntsd_t *sd)
 	owneroff = groupoff = sacloff = dacloff = 0;
 
 	ERRCHK(mb_put_uint8(mbp, sd->sd_revision));
-	ERRCHK(mb_put_uint8(mbp, 0)); /* pad1 */
+	ERRCHK(mb_put_uint8(mbp, sd->sd_rmctl));
 	ERRCHK(mb_put_uint16le(mbp, sd->sd_flags));
-	ERRCHK(mb_fit(mbp, 4, (char **)&owneroffp));
-	ERRCHK(mb_fit(mbp, 4, (char **)&groupoffp));
-	ERRCHK(mb_fit(mbp, 4, (char **)&sacloffp));
-	ERRCHK(mb_fit(mbp, 4, (char **)&dacloffp));
+
+	owneroffp = mb_reserve(mbp, sizeof (*owneroffp));
+	groupoffp = mb_reserve(mbp, sizeof (*groupoffp));
+	sacloffp  = mb_reserve(mbp, sizeof (*sacloffp));
+	dacloffp  = mb_reserve(mbp, sizeof (*dacloffp));
+	if (owneroffp == NULL || groupoffp == NULL ||
+	    sacloffp == NULL || dacloffp == NULL) {
+		error = ENOMEM;
+		goto errout;
+	}
 
 	/*
 	 * These could be marshalled in any order, but
@@ -535,7 +544,7 @@ smbfs_sid2str(i_ntsid_t *sid,
 
 	for (i = 0; i < 6; i++)
 		auth = (auth << 8) | sid->sid_authority[i];
-	n = snprintf(s, osz, "-%llu", auth);
+	n = snprintf(s, osz, "-%llu", (u_longlong_t)auth);
 	if (n > osz)
 		return (-1);
 	s += n; osz -= n;
@@ -556,19 +565,29 @@ smbfs_sid2str(i_ntsid_t *sid,
 	if (ridp)
 		*ridp = *ip;
 
+	/* LINTED E_PTRDIFF_OVERFLOW */
 	return (s - obuf);
 }
 
 /*
  * Our interface to the idmap service.
+ *
+ * The idmap API is _almost_ the same between
+ * kernel and user-level.  But not quite...
+ * Hope this improves readability below.
  */
-
 #ifdef	_KERNEL
-#define	I_GetPidBySid kidmap_batch_getpidbysid
+
+#define	I_GetPidBySid(GH, SPP, RID, PIDP, ISUP, SP) \
+	kidmap_batch_getpidbysid(GH, SPP, RID, PIDP, ISUP, SP)
 #define	I_GetMappings kidmap_get_mappings
+
 #else /* _KERNEL */
-#define	I_GetPidBySid idmap_get_pidbysid
+
+#define	I_GetPidBySid(GH, SPP, RID, PIDP, ISUP, SP) \
+	idmap_get_pidbysid(GH, SPP, RID, 0, PIDP, ISUP, SP)
 #define	I_GetMappings idmap_get_mappings
+
 #endif /* _KERNEL */
 
 struct mapinfo {
@@ -615,7 +634,7 @@ mkrq_idmap_sid2ux(
 		return (0);
 	}
 
-	idms = I_GetPidBySid(idmap_gh, sid_prefix, rid, 0,
+	idms = I_GetPidBySid(idmap_gh, sid_prefix, rid,
 	    &mip->mi_uid, &mip->mi_isuser, &mip->mi_status);
 	if (idms != IDMAP_SUCCESS)
 		return (EINVAL);
@@ -824,9 +843,6 @@ smbfs_acl_sd2zfs(
 
 	idms = I_GetMappings(idmap_gh);
 	if (idms != IDMAP_SUCCESS) {
-#ifdef	DEBUG
-		printf("idmap_get_mappings: rc=%d\n", idms);
-#endif
 		/* creative error choice */
 		error = EIDRM;
 		goto errout;

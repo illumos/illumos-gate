@@ -280,9 +280,9 @@ smb_rap_NetShareEnum(struct smb_ctx *ctx, int sLevel, void *pbBuffer,
 	error = smb_rap_create(0, "WrLeh", "B13BWz", &rap);
 	if (error)
 		return (error);
-	smb_rap_setNparam(rap, sLevel);		/* W - sLevel */
-	smb_rap_setPparam(rap, pbBuffer);	/* r - pbBuffer */
-	smb_rap_setNparam(rap, *cbBuffer);	/* L - cbBuffer */
+	(void) smb_rap_setNparam(rap, sLevel);		/* W - sLevel */
+	(void) smb_rap_setPparam(rap, pbBuffer);	/* r - pbBuffer */
+	(void) smb_rap_setNparam(rap, *cbBuffer);	/* L - cbBuffer */
 	error = smb_rap_request(rap, ctx);
 	if (error == 0) {
 		*pcEntriesRead = rap->r_entries;

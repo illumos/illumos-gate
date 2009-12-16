@@ -87,13 +87,13 @@ static const char ntlmssp_id[ID_SZ] = "NTLMSSP";
  * Get a "security buffer" (header part)
  */
 static int
-mb_get_sb_hdr(struct mbdata *mbp, struct sec_buf *sb)
+md_get_sb_hdr(struct mbdata *mbp, struct sec_buf *sb)
 {
 	int err;
 
-	(void) mb_get_uint16le(mbp, &sb->sb_length);
-	(void) mb_get_uint16le(mbp, &sb->sb_maxlen);
-	err = mb_get_uint32le(mbp, &sb->sb_offset);
+	(void) md_get_uint16le(mbp, &sb->sb_length);
+	(void) md_get_uint16le(mbp, &sb->sb_maxlen);
+	err = md_get_uint32le(mbp, &sb->sb_offset);
 
 	return (err);
 }
@@ -103,7 +103,7 @@ mb_get_sb_hdr(struct mbdata *mbp, struct sec_buf *sb)
  * the data is delivered as an mbuf.
  */
 static int
-mb_get_sb_data(struct mbdata *mbp, struct sec_buf *sb, struct mbuf **mp)
+md_get_sb_data(struct mbdata *mbp, struct sec_buf *sb, struct mbuf **mp)
 {
 	struct mbdata tmp_mb;
 	int err;
@@ -115,12 +115,12 @@ mb_get_sb_data(struct mbdata *mbp, struct sec_buf *sb, struct mbuf **mp)
 	mb_initm(&tmp_mb, mbp->mb_top);
 
 	/* Skip data up to the offset. */
-	err = mb_get_mem(&tmp_mb, NULL, sb->sb_offset);
+	err = md_get_mem(&tmp_mb, NULL, sb->sb_offset, MB_MSYSTEM);
 	if (err)
 		return (err);
 
 	/* Get the data (as an mbuf). */
-	err = mb_get_mbuf(&tmp_mb, sb->sb_maxlen, mp);
+	err = md_get_mbuf(&tmp_mb, sb->sb_maxlen, mp);
 
 	return (err);
 }
@@ -174,10 +174,10 @@ mb_put_sb_string(struct mbdata *mbp, struct sec_buf *sb,
 	 * then chop off the null terminator
 	 * before appending to caller's mbp.
 	 */
-	err = mb_init(&tmp_mb, M_MINSIZE);
+	err = mb_init(&tmp_mb);
 	if (err)
 		return (err);
-	err = mb_put_dstring(&tmp_mb, s, unicode);
+	err = mb_put_string(&tmp_mb, s, unicode);
 	if (err)
 		return (err);
 
@@ -218,7 +218,7 @@ ntlmssp_put_type1(struct ssp_ctx *sp, struct mbdata *out_mb)
 	char *ucdom = NULL;
 	char *ucwks = NULL;
 
-	if ((err = mb_init(&mb2, M_MINSIZE)) != 0)
+	if ((err = mb_init(&mb2)) != 0)
 		return (err);
 	mb2.mb_count = sizeof (hdr);
 
@@ -269,7 +269,7 @@ ntlmssp_put_type1(struct ssp_ctx *sp, struct mbdata *out_mb)
 	 * Marshal the header (in LE order)
 	 * then concatenate the 2nd part.
 	 */
-	(void) mb_put_mem(out_mb, &hdr.h_id, ID_SZ);
+	(void) mb_put_mem(out_mb, &hdr.h_id, ID_SZ, MB_MSYSTEM);
 	(void) mb_put_uint32le(out_mb, hdr.h_type);
 	(void) mb_put_uint32le(out_mb, hdr.h_flags);
 	(void) mb_put_sb_hdr(out_mb, &hdr.h_cldom);
@@ -322,15 +322,15 @@ ntlmssp_get_type2(struct ssp_ctx *sp, struct mbdata *in_mb)
 
 	/* Parse the fixed size header stuff. */
 	bzero(&hdr, sizeof (hdr));
-	(void) mb_get_mem(in_mb, &hdr.h_id, ID_SZ);
-	(void) mb_get_uint32le(in_mb, &hdr.h_type);
+	(void) md_get_mem(in_mb, &hdr.h_id, ID_SZ, MB_MSYSTEM);
+	(void) md_get_uint32le(in_mb, &hdr.h_type);
 	if (hdr.h_type != 2) {
 		err = EPROTO;
 		goto out;
 	}
-	(void) mb_get_sb_hdr(in_mb, &hdr.h_target_name);
-	(void) mb_get_uint32le(in_mb, &hdr.h_flags);
-	(void) mb_get_mem(in_mb, &hdr.h_challenge, NTLM_CHAL_SZ);
+	(void) md_get_sb_hdr(in_mb, &hdr.h_target_name);
+	(void) md_get_uint32le(in_mb, &hdr.h_flags);
+	(void) md_get_mem(in_mb, &hdr.h_challenge, NTLM_CHAL_SZ, MB_MSYSTEM);
 
 	/*
 	 * Save flags, challenge for later.
@@ -344,9 +344,9 @@ ntlmssp_get_type2(struct ssp_ctx *sp, struct mbdata *in_mb)
 	 */
 	if ((m_totlen(top_mb.mb_top) > sizeof (hdr)) &&
 	    (hdr.h_target_name.sb_offset >= sizeof (hdr))) {
-		(void) mb_get_uint32le(in_mb, &hdr.h_context[0]);
-		(void) mb_get_uint32le(in_mb, &hdr.h_context[1]);
-		(void) mb_get_sb_hdr(in_mb, &hdr.h_target_info);
+		(void) md_get_uint32le(in_mb, &hdr.h_context[0]);
+		(void) md_get_uint32le(in_mb, &hdr.h_context[1]);
+		(void) md_get_sb_hdr(in_mb, &hdr.h_target_info);
 	}
 
 	/*
@@ -354,18 +354,18 @@ ntlmssp_get_type2(struct ssp_ctx *sp, struct mbdata *in_mb)
 	 * the data from the offset/length indicated in the
 	 * security buffer header; then parse the string.
 	 */
-	err = mb_get_sb_data(&top_mb, &hdr.h_target_name, &m);
+	err = md_get_sb_data(&top_mb, &hdr.h_target_name, &m);
 	if (err)
 		goto out;
 	mb_initm(&tmp_mb, m);
-	err = mb_get_string(&tmp_mb, &ssp_st->ss_target_name, uc);
+	err = md_get_string(&tmp_mb, &ssp_st->ss_target_name, uc);
 	mb_done(&tmp_mb);
 
 	/*
 	 * Get the target info blob, if present.
 	 */
 	if (hdr.h_target_info.sb_offset >= sizeof (hdr)) {
-		err = mb_get_sb_data(&top_mb, &hdr.h_target_info,
+		err = md_get_sb_data(&top_mb, &hdr.h_target_info,
 		    &ssp_st->ss_target_info);
 	}
 
@@ -422,7 +422,7 @@ ntlmssp_put_type3(struct ssp_ctx *sp, struct mbdata *out_mb)
 		goto out;
 	}
 
-	if ((err = mb_init(&mb2, M_MINSIZE)) != 0)
+	if ((err = mb_init(&mb2)) != 0)
 		goto out;
 	mb2.mb_count = sizeof (hdr);
 	uc = ssp_st->ss_flags & NTLMSSP_NEGOTIATE_UNICODE;
@@ -475,7 +475,7 @@ ntlmssp_put_type3(struct ssp_ctx *sp, struct mbdata *out_mb)
 	 * Marshal the header (in LE order)
 	 * then concatenate the 2nd part.
 	 */
-	(void) mb_put_mem(out_mb, &hdr.h_id, ID_SZ);
+	(void) mb_put_mem(out_mb, &hdr.h_id, ID_SZ, MB_MSYSTEM);
 	(void) mb_put_uint32le(out_mb, hdr.h_type);
 
 	(void) mb_put_sb_hdr(out_mb, &hdr.h_lm_resp);
@@ -555,7 +555,7 @@ ntlmssp_next_token(struct ssp_ctx *sp, struct mbdata *in_mb,
 	}
 
 	/* Will build an ouptut token. */
-	err = mb_init(out_mb, M_MINSIZE);
+	err = mb_init(out_mb);
 	if (err)
 		goto out;
 

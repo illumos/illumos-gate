@@ -51,12 +51,7 @@
 #include <sys/note.h>
 #include <sys/cmn_err.h>
 
-#ifdef APPLE
-#include <sys/smb_apple.h>
-#include <sys/utfconv.h>
-#else
 #include <netsmb/smb_osdep.h>
-#endif
 
 #include <netsmb/smb.h>
 #include <netsmb/smb_conn.h>
@@ -84,94 +79,15 @@ int smb_timo_read = 45;
 int smb_timo_write = 60;	/* was SMBWRTTIMO */
 int smb_timo_append = 90;
 
-/*
- * Debug/test feature to disable NTMLv2.
- * Set this to zero to skip NTLMv2
- */
-int nsmb_enable_ntlmv2 = 1;
-
-static int smb_smb_read(struct smb_share *ssp, u_int16_t fid,
+static int smb_smb_read(struct smb_share *ssp, uint16_t fid,
 	uint32_t *lenp, uio_t *uiop, smb_cred_t *scred, int timo);
-static int smb_smb_write(struct smb_share *ssp, u_int16_t fid,
+static int smb_smb_write(struct smb_share *ssp, uint16_t fid,
 	uint32_t *lenp, uio_t *uiop, smb_cred_t *scred, int timo);
 
-static int smb_smb_readx(struct smb_share *ssp, u_int16_t fid,
+static int smb_smb_readx(struct smb_share *ssp, uint16_t fid,
 	uint32_t *lenp, uio_t *uiop, smb_cred_t *scred, int timo);
-static int smb_smb_writex(struct smb_share *ssp, u_int16_t fid,
+static int smb_smb_writex(struct smb_share *ssp, uint16_t fid,
 	uint32_t *lenp, uio_t *uiop, smb_cred_t *scred, int timo);
-
-struct smb_dialect {
-	int		d_id;
-	const char	*d_name;
-};
-
-
-/*
- * Number of seconds between 1970 and 1601 year
- */
-const u_int64_t DIFF1970TO1601 = 11644473600ULL;
-
-void
-smb_time_local2server(struct timespec *tsp, int tzoff, long *seconds)
-{
-	/*
-	 * XXX - what if we connected to the server when it was in
-	 * daylight savings/summer time and we've subsequently switched
-	 * to standard time, or vice versa, so that the time zone
-	 * offset we got from the server is now wrong?
-	 */
-	*seconds = tsp->tv_sec - tzoff * 60;
-	/* - tz.tz_minuteswest * 60 - (wall_cmos_clock ? adjkerntz : 0) */
-}
-
-void
-smb_time_server2local(ulong_t seconds, int tzoff, struct timespec *tsp)
-{
-	/*
-	 * XXX - what if we connected to the server when it was in
-	 * daylight savings/summer time and we've subsequently switched
-	 * to standard time, or vice versa, so that the time zone
-	 * offset we got from the server is now wrong?
-	 */
-	tsp->tv_sec = seconds + tzoff * 60;
-	    /* + tz.tz_minuteswest * 60 + (wall_cmos_clock ? adjkerntz : 0); */
-	tsp->tv_nsec = 0;
-}
-
-/*
- * Time from server comes as UTC, so no need to use tz
- */
-/*ARGSUSED*/
-void
-smb_time_NT2local(u_int64_t nsec, int tzoff, struct timespec *tsp)
-{
-	smb_time_server2local(nsec / 10000000 - DIFF1970TO1601, 0, tsp);
-}
-
-/*ARGSUSED*/
-void
-smb_time_local2NT(struct timespec *tsp, int tzoff, u_int64_t *nsec)
-{
-	long seconds;
-
-	smb_time_local2server(tsp, 0, &seconds);
-	*nsec = (((u_int64_t)(seconds) & ~1) + DIFF1970TO1601) *
-	    (u_int64_t)10000000;
-}
-
-#if defined(NOICONVSUPPORT) || defined(lint)
-extern int iconv_open(const char *to, const char *from, void **handle);
-extern int iconv_close(void *handle);
-#endif
-
-/*
- * Moved to user space helper:
- *   smb_smb_negotiate()
- *   smb_smb_ssnsetup()
- *   smb_smb_ssnclose()
- *   smb_share_typename()
- */
-
 
 int
 smb_smb_treeconnect(struct smb_share *ssp, struct smb_cred *scred)
@@ -208,7 +124,7 @@ smb_smb_treeconnect(struct smb_share *ssp, struct smb_cred *scred)
 	 */
 	unc_len = 4 + strlen(vcp->vc_srvname) + strlen(ssp->ss_name);
 	unc_name = kmem_alloc(unc_len, KM_SLEEP);
-	snprintf(unc_name, unc_len, "\\\\%s\\%s",
+	(void) snprintf(unc_name, unc_len, "\\\\%s\\%s",
 	    vcp->vc_srvname, ssp->ss_name);
 
 	/*
@@ -274,14 +190,17 @@ smb_smb_treeconnect(struct smb_share *ssp, struct smb_cred *scred)
 		error = EBADRPC;
 		goto out;
 	}
-	md_get_uint16le(mdp, NULL);	/* AndX cmd */
-	md_get_uint16le(mdp, NULL);	/* AndX off */
-	md_get_uint16le(mdp, &options);	/* option bits (DFS, search) */
-	md_get_uint16le(mdp, &bcnt);	/* byte count */
+	md_get_uint16le(mdp, NULL);		/* AndX cmd */
+	md_get_uint16le(mdp, NULL);		/* AndX off */
+	md_get_uint16le(mdp, &options);		/* option bits (DFS, search) */
+	error = md_get_uint16le(mdp, &bcnt);	/* byte count */
+	if (error)
+		goto out;
 
 	/*
 	 * Get the returned share type string,
-	 * i.e. "IPC" or whatever.
+	 * i.e. "IPC" or whatever.   Don't care
+	 * if we get an error reading the type.
 	 */
 	tlen = sizeof (ssp->ss_type_ret);
 	bzero(ssp->ss_type_ret, tlen--);
@@ -476,53 +395,61 @@ smb_smb_readx(struct smb_share *ssp, uint16_t fid, uint32_t *lenp,
 	smb_rq_wend(rqp);
 	smb_rq_bstart(rqp);
 	smb_rq_bend(rqp);
-	do {
-		if (timo == 0)
-			timo = smb_timo_read;
-		error = smb_rq_simple_timed(rqp, timo);
-		if (error)
-			break;
-		smb_rq_getreply(rqp, &mdp);
-		md_get_uint8(mdp, &wc);
-		if (wc != 12) {
-			error = EBADRPC;
-			break;
-		}
-		md_get_uint8(mdp, NULL);
-		md_get_uint8(mdp, NULL);
-		md_get_uint16le(mdp, NULL);
-		md_get_uint16le(mdp, NULL);
-		md_get_uint16le(mdp, NULL);	/* data compaction mode */
-		md_get_uint16le(mdp, NULL);
-		md_get_uint16le(mdp, &lenlo);	/* data len ret. */
-		md_get_uint16le(mdp, &doff);	/* data offset */
-		md_get_uint16le(mdp, &lenhi);
-		rlen = (lenhi << 16) | lenlo;
-		md_get_mem(mdp, NULL, 4 * 2, MB_MSYSTEM);
-		md_get_uint16le(mdp, NULL);	/* ByteCount */
-		/*
-		 * Does the data offset indicate padding?
-		 * Add up the gets above, we have:
-		 */
-		off = SMB_HDRLEN + 3 + (12 * 2); /* =59 */
-		if (doff > off)	/* pad byte(s)? */
-			md_get_mem(mdp, NULL, doff - off, MB_MSYSTEM);
-		if (rlen == 0) {
-			*lenp = rlen;
-			break;
-		}
-		/* paranoid */
-		if (rlen > *lenp) {
-			SMBSDEBUG("bad server! rlen %d, len %d\n",
-			    rlen, *lenp);
-			rlen = *lenp;
-		}
-		error = md_get_uio(mdp, uiop, rlen);
-		if (error)
-			break;
+
+	if (timo == 0)
+		timo = smb_timo_read;
+	error = smb_rq_simple_timed(rqp, timo);
+	if (error)
+		goto out;
+
+	smb_rq_getreply(rqp, &mdp);
+	error = md_get_uint8(mdp, &wc);
+	if (error)
+		goto out;
+	if (wc != 12) {
+		error = EBADRPC;
+		goto out;
+	}
+	md_get_uint8(mdp, NULL);
+	md_get_uint8(mdp, NULL);
+	md_get_uint16le(mdp, NULL);
+	md_get_uint16le(mdp, NULL);
+	md_get_uint16le(mdp, NULL);	/* data compaction mode */
+	md_get_uint16le(mdp, NULL);
+	md_get_uint16le(mdp, &lenlo);	/* data len ret. */
+	md_get_uint16le(mdp, &doff);	/* data offset */
+	md_get_uint16le(mdp, &lenhi);
+	rlen = (lenhi << 16) | lenlo;
+	md_get_mem(mdp, NULL, 4 * 2, MB_MSYSTEM);
+	error = md_get_uint16le(mdp, NULL);	/* ByteCount */
+	if (error)
+		goto out;
+	/*
+	 * Does the data offset indicate padding?
+	 * The current offset is a constant, found
+	 * by counting the md_get_ calls above.
+	 */
+	off = SMB_HDRLEN + 3 + (12 * 2); /* =59 */
+	if (doff > off)	/* pad byte(s)? */
+		md_get_mem(mdp, NULL, doff - off, MB_MSYSTEM);
+	if (rlen == 0) {
 		*lenp = rlen;
-		/*LINTED*/
-	} while (0);
+		goto out;
+	}
+	/* paranoid */
+	if (rlen > *lenp) {
+		SMBSDEBUG("bad server! rlen %d, len %d\n",
+		    rlen, *lenp);
+		rlen = *lenp;
+	}
+	error = md_get_uio(mdp, uiop, rlen);
+	if (error)
+		goto out;
+
+	/* Success */
+	*lenp = rlen;
+
+out:
 	smb_rq_done(rqp);
 	return (error);
 }
@@ -563,34 +490,39 @@ smb_smb_writex(struct smb_share *ssp, uint16_t fid, uint32_t *lenp,
 	mb_put_uint32le(mbp, offhi);	/* offset (high part) */
 	smb_rq_wend(rqp);
 	smb_rq_bstart(rqp);
-	do {
-		mb_put_uint8(mbp, 0);	/* pad byte */
-		error = mb_put_uio(mbp, uiop, *lenp);
-		if (error)
-			break;
-		smb_rq_bend(rqp);
-		if (timo == 0)
-			timo = smb_timo_write;
-		error = smb_rq_simple_timed(rqp, timo);
-		if (error)
-			break;
-		smb_rq_getreply(rqp, &mdp);
-		md_get_uint8(mdp, &wc);
-		if (wc != 6) {
-			error = EBADRPC;
-			break;
-		}
-		md_get_uint8(mdp, NULL);	/* andx cmd */
-		md_get_uint8(mdp, NULL);	/* reserved */
-		md_get_uint16le(mdp, NULL);	/* andx offset */
-		md_get_uint16le(mdp, &lenlo);	/* data len ret. */
-		md_get_uint16le(mdp, NULL);	/* remaining */
-		md_get_uint16le(mdp, &lenhi);
-		rlen = (lenhi << 16) | lenlo;
-		*lenp = rlen;
-		/*LINTED*/
-	} while (0);
 
+	mb_put_uint8(mbp, 0);	/* pad byte */
+	error = mb_put_uio(mbp, uiop, *lenp);
+	if (error)
+		goto out;
+	smb_rq_bend(rqp);
+	if (timo == 0)
+		timo = smb_timo_write;
+	error = smb_rq_simple_timed(rqp, timo);
+	if (error)
+		goto out;
+	smb_rq_getreply(rqp, &mdp);
+	error = md_get_uint8(mdp, &wc);
+	if (error)
+		goto out;
+	if (wc != 6) {
+		error = EBADRPC;
+		goto out;
+	}
+	md_get_uint8(mdp, NULL);	/* andx cmd */
+	md_get_uint8(mdp, NULL);	/* reserved */
+	md_get_uint16le(mdp, NULL);	/* andx offset */
+	md_get_uint16le(mdp, &lenlo);	/* data len ret. */
+	md_get_uint16le(mdp, NULL);	/* remaining */
+	error = md_get_uint16le(mdp, &lenhi);
+	if (error)
+		goto out;
+
+	/* Success */
+	rlen = (lenhi << 16) | lenlo;
+	*lenp = rlen;
+
+out:
 	smb_rq_done(rqp);
 	return (error);
 }
@@ -626,44 +558,50 @@ smb_smb_read(struct smb_share *ssp, uint16_t fid, uint32_t *lenp,
 	smb_rq_wend(rqp);
 	smb_rq_bstart(rqp);
 	smb_rq_bend(rqp);
-	do {
-		if (timo == 0)
-			timo = smb_timo_read;
-		error = smb_rq_simple_timed(rqp, timo);
-		if (error)
-			break;
-		smb_rq_getreply(rqp, &mdp);
-		md_get_uint8(mdp, &wc);
-		if (wc != 5) {
-			error = EBADRPC;
-			break;
-		}
-		md_get_uint16le(mdp, &rcnt);	/* ret. count */
-		md_get_mem(mdp, NULL, 4 * 2, MB_MSYSTEM);  /* res. */
-		md_get_uint16le(mdp, &bc);	/* byte count */
-		md_get_uint8(mdp, NULL);	/* buffer format */
-		md_get_uint16le(mdp, &dlen);	/* data len */
-		if (dlen < rcnt) {
-			SMBSDEBUG("oops: dlen=%d rcnt=%d\n",
-			    (int)dlen, (int)rcnt);
-			rcnt = dlen;
-		}
-		if (rcnt == 0) {
-			*lenp = 0;
-			break;
-		}
-		/* paranoid */
-		if (rcnt > cnt) {
-			SMBSDEBUG("bad server! rcnt %d, cnt %d\n",
-			    (int)rcnt, (int)cnt);
-			rcnt = cnt;
-		}
-		error = md_get_uio(mdp, uiop, (int)rcnt);
-		if (error)
-			break;
-		*lenp = (int)rcnt;
-		/*LINTED*/
-	} while (0);
+
+	if (timo == 0)
+		timo = smb_timo_read;
+	error = smb_rq_simple_timed(rqp, timo);
+	if (error)
+		goto out;
+	smb_rq_getreply(rqp, &mdp);
+	error = md_get_uint8(mdp, &wc);
+	if (error)
+		goto out;
+	if (wc != 5) {
+		error = EBADRPC;
+		goto out;
+	}
+	md_get_uint16le(mdp, &rcnt);		/* ret. count */
+	md_get_mem(mdp, NULL, 4 * 2, MB_MSYSTEM);  /* res. */
+	md_get_uint16le(mdp, &bc);		/* byte count */
+	md_get_uint8(mdp, NULL);		/* buffer format */
+	error = md_get_uint16le(mdp, &dlen);	/* data len */
+	if (error)
+		goto out;
+	if (dlen < rcnt) {
+		SMBSDEBUG("oops: dlen=%d rcnt=%d\n",
+		    (int)dlen, (int)rcnt);
+		rcnt = dlen;
+	}
+	if (rcnt == 0) {
+		*lenp = 0;
+		goto out;
+	}
+	/* paranoid */
+	if (rcnt > cnt) {
+		SMBSDEBUG("bad server! rcnt %d, cnt %d\n",
+		    (int)rcnt, (int)cnt);
+		rcnt = cnt;
+	}
+	error = md_get_uio(mdp, uiop, (int)rcnt);
+	if (error)
+		goto out;
+
+	/* success */
+	*lenp = (int)rcnt;
+
+out:
 	smb_rq_done(rqp);
 	return (error);
 }
@@ -700,26 +638,30 @@ smb_smb_write(struct smb_share *ssp, uint16_t fid, uint32_t *lenp,
 	smb_rq_bstart(rqp);
 	mb_put_uint8(mbp, SMB_DT_DATA);
 	mb_put_uint16le(mbp, cnt);
-	do {
-		error = mb_put_uio(mbp, uiop, *lenp);
-		if (error)
-			break;
-		smb_rq_bend(rqp);
-		if (timo == 0)
-			timo = smb_timo_write;
-		error = smb_rq_simple_timed(rqp, timo);
-		if (error)
-			break;
-		smb_rq_getreply(rqp, &mdp);
-		md_get_uint8(mdp, &wc);
-		if (wc != 1) {
-			error = EBADRPC;
-			break;
-		}
-		md_get_uint16le(mdp, &rcnt);
-		*lenp = rcnt;
-		/*LINTED*/
-	} while (0);
+
+	error = mb_put_uio(mbp, uiop, *lenp);
+	if (error)
+		goto out;
+	smb_rq_bend(rqp);
+	if (timo == 0)
+		timo = smb_timo_write;
+	error = smb_rq_simple_timed(rqp, timo);
+	if (error)
+		goto out;
+	smb_rq_getreply(rqp, &mdp);
+	error = md_get_uint8(mdp, &wc);
+	if (error)
+		goto out;
+	if (wc != 1) {
+		error = EBADRPC;
+		goto out;
+	}
+	error = md_get_uint16le(mdp, &rcnt);
+	if (error)
+		goto out;
+	*lenp = rcnt;
+
+out:
 	smb_rq_done(rqp);
 	return (error);
 }

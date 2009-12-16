@@ -236,9 +236,9 @@ krb5ssp_put_request(struct ssp_ctx *sp, struct mbdata *out_mb)
 	if ((err = krb5ssp_tkt2gtok(tkt, tktlen, &gtok, &gtoklen)) != 0)
 		goto out;
 
-	if ((err = mb_init(out_mb, gtoklen)) != 0)
+	if ((err = mb_init_sz(out_mb, gtoklen)) != 0)
 		goto out;
-	if ((err = mb_put_mem(out_mb, gtok, gtoklen)) != 0)
+	if ((err = mb_put_mem(out_mb, gtok, gtoklen, MB_MSYSTEM)) != 0)
 		goto out;
 
 	if (ctx->ct_vcflags & SMBV_WILL_SIGN)

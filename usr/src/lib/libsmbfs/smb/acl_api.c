@@ -53,7 +53,7 @@
 #include <netsmb/smb_lib.h>
 #include <netsmb/smbfs_acl.h>
 
-#include "acl_nt.h"
+#include "smbfs_ntacl.h"
 #include "private.h"
 
 /* Sanity check SD sizes */
@@ -78,7 +78,7 @@ smbfs_acl_iocget(int fd, uint32_t selector, mbdata_t *mbp)
 	struct mbuf	*m;
 	int		error;
 
-	error = mb_init(mbp, MAX_RAW_SD_SIZE);
+	error = mb_init_sz(mbp, MAX_RAW_SD_SIZE);
 	if (error)
 		return (error);
 
@@ -157,7 +157,7 @@ smbfs_acl_getsd(int fd, uint32_t selector, i_ntsd_t **sdp)
 		 * (like "absolute" form per. NT docs)
 		 * Returns allocated data in sdp
 		 */
-		error = mb_get_ntsd(mbp, sdp);
+		error = md_get_ntsd(mbp, sdp);
 	}
 
 	mb_done(mbp);
@@ -174,7 +174,9 @@ smbfs_acl_setsd(int fd, uint32_t selector, i_ntsd_t *sd)
 	int error;
 
 	mbp = &mb_store;
-	mb_init(mbp, M_MINSIZE);
+	error = mb_init_sz(mbp, MAX_RAW_SD_SIZE);
+	if (error)
+		return (error);
 
 	/*
 	 * Export the "internal" SD into an mb chain.

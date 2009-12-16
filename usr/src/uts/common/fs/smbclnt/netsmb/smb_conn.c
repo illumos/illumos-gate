@@ -58,12 +58,7 @@
 #include <sys/atomic.h>
 #include <sys/u8_textprep.h>
 
-#ifdef APPLE
-#include <sys/smb_apple.h>
-#include <sys/smb_iconv.h>
-#else
 #include <netsmb/smb_osdep.h>
-#endif
 
 #include <netsmb/smb.h>
 #include <netsmb/smb_conn.h>
@@ -620,7 +615,7 @@ smb_share_gone(struct smb_connobj *cp)
 
 	smb_credinit(&scred, NULL);
 	smb_iod_shutdown_share(ssp);
-	smb_smb_treedisconnect(ssp, &scred);
+	(void) smb_smb_treedisconnect(ssp, &scred);
 	smb_credrele(&scred);
 }
 

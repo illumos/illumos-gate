@@ -81,13 +81,7 @@ typedef struct smb_cred {
 #define	SMBS_RECONNECTING	0x0002
 #define	SMBS_CONNECTED		0x0004
 #define	SMBS_TCON_WAIT		0x0008
-#define	SMBS_1980		0x0010
-/*
- * ^ This partition can't handle dates before 1980. It's probably a FAT
- * partition but could be some other ancient FS type
- */
-#define	SMBS_RESUMEKEYS		0x0020	/* must use resume keys */
-#define	SMBS_LONGNAMES		0x0040	/* share can use long names */
+#define	SMBS_FST_FAT		0x0010	/* share FS Type is FAT */
 /*
  * Note: the common "obj" level uses this GONE flag by
  * the name SMBO_GONE.  Keep this alias as a reminder.
@@ -274,7 +268,7 @@ typedef struct smb_fscb {
 	void (*fscb_up)(smb_share_t *);
 } smb_fscb_t;
 /* Install the above vector, or pass NULL to clear it. */
-int smb_fscb_set(smb_fscb_t *);
+void smb_fscb_set(smb_fscb_t *);
 
 /*
  * The driver per open instance object.
@@ -331,11 +325,11 @@ int smb_usr_iod_ioctl(smb_dev_t *sdp, int cmd, intptr_t arg, int flags);
 int  smb_iod_create(smb_vc_t *vcp);
 int  smb_iod_destroy(smb_vc_t *vcp);
 int  smb_iod_connect(smb_vc_t *vcp);
-int  smb_iod_disconnect(smb_vc_t *vcp);
+void smb_iod_disconnect(smb_vc_t *vcp);
 int  smb_iod_addrq(struct smb_rq *rqp);
 int  smb_iod_multirq(struct smb_rq *rqp);
 int  smb_iod_waitrq(struct smb_rq *rqp);
-int  smb_iod_removerq(struct smb_rq *rqp);
+void smb_iod_removerq(struct smb_rq *rqp);
 void smb_iod_shutdown_share(smb_share_t *ssp);
 
 void smb_iod_sendall(smb_vc_t *);

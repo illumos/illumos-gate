@@ -51,6 +51,8 @@
 #include <netsmb/smb_lib.h>
 #include "private.h"
 
+#define	MIN_REPLY_SIZE 4096
+
 static uint32_t smb_map_doserr(uint8_t, uint16_t);
 
 /*
@@ -85,11 +87,11 @@ smb_rq_init(struct smb_ctx *ctx, uchar_t cmd, struct smb_rq **rqpp)
 	 * Setup the request buffer.
 	 * Do the reply buffer later.
 	 */
-	if (mb_init(&rqp->rq_rq, M_MINSIZE))
+	if (mb_init(&rqp->rq_rq))
 		goto errout;
 
 	/* Space for the SMB header. (filled in later) */
-	mb_put_mem(&rqp->rq_rq, NULL, SMB_HDRLEN);
+	mb_put_mem(&rqp->rq_rq, NULL, SMB_HDRLEN, MB_MSYSTEM);
 
 	/*
 	 * Copy the ctx flags here, so the caller can
@@ -130,7 +132,7 @@ smb_rq_wstart(struct smb_rq *rqp)
 {
 	struct mbdata *mbp = &rqp->rq_rq;
 
-	mb_fit(mbp, 1, &rqp->rq_wcntp);
+	(void) mb_fit(mbp, 1, &rqp->rq_wcntp);
 	rqp->rq_wcbase = mbp->mb_count;
 }
 
@@ -176,7 +178,7 @@ smb_rq_bstart(struct smb_rq *rqp)
 {
 	struct mbdata *mbp = &rqp->rq_rq;
 
-	mb_fit(mbp, 2, &rqp->rq_bcntp);
+	(void) mb_fit(mbp, 2, &rqp->rq_bcntp);
 	rqp->rq_bcbase = mbp->mb_count;
 }
 
@@ -209,19 +211,16 @@ smb_rq_bend(struct smb_rq *rqp)
 	rqp->rq_bcntp[1] = (bcnt >> 8);
 }
 
-/*
- * Removed: smb_rq_dmem
- * which was mostly like: mb_put_mem
- */
-
 int
 smb_rq_simple(struct smb_rq *rqp)
 {
 	struct smbioc_rq krq;
 	struct mbdata *mbp;
+	mbuf_t *m;
 	char *data;
 	uint32_t len;
 	size_t rpbufsz;
+	int error;
 
 	bzero(&krq, sizeof (krq));
 	krq.ioc_cmd = rqp->rq_cmd;
@@ -231,7 +230,10 @@ smb_rq_simple(struct smb_rq *rqp)
 	 * and fill in the ioctl request.
 	 */
 	mbp = smb_rq_getrequest(rqp);
-	m_lineup(mbp->mb_top, &mbp->mb_top);
+	error = m_lineup(mbp->mb_top, &mbp->mb_top);
+	if (error)
+		return (error);
+
 	data = mtod(mbp->mb_top, char *);
 	len = m_totlen(mbp->mb_top);
 
@@ -246,20 +248,19 @@ smb_rq_simple(struct smb_rq *rqp)
 	krq.ioc_tbuf  = data + SMB_HDRLEN;
 
 	/*
-	 * Setup a buffer to hold the reply.
-	 *
-	 * Default size is M_MINSIZE, but the
-	 * caller may increase rq_rpbufsz
-	 * before calling this.
+	 * Setup a buffer to hold the reply,
+	 * at least MIN_REPLY_SIZE, or larger
+	 * if the caller increased rq_rpbufsz.
 	 */
 	mbp = smb_rq_getreply(rqp);
 	rpbufsz = rqp->rq_rpbufsz;
-	if (rpbufsz < M_MINSIZE)
-		rpbufsz = M_MINSIZE;
-	if (mb_init(mbp, rpbufsz))
-		return (ENOMEM);
+	if (rpbufsz < MIN_REPLY_SIZE)
+		rpbufsz = MIN_REPLY_SIZE;
+	if ((error = m_get(rpbufsz, &m)) != 0)
+		return (error);
+	mb_initm(mbp, m);
 	krq.ioc_rbufsz = rpbufsz;
-	krq.ioc_rbuf = mtod(mbp->mb_top, char *);
+	krq.ioc_rbuf = mtod(m, char *);
 
 	/*
 	 * Call the driver
@@ -271,7 +272,7 @@ smb_rq_simple(struct smb_rq *rqp)
 	 * Initialize returned mbdata.
 	 * SMB header already parsed.
 	 */
-	mbp->mb_top->m_len = krq.ioc_rbufsz;
+	m->m_len = krq.ioc_rbufsz;
 
 	return (0);
 }
@@ -360,14 +361,13 @@ smb_rq_internal(struct smb_ctx *ctx, struct smb_rq *rqp)
 	/*
 	 * rewind done; fill it in
 	 */
-	mb_put_mem(mbp, (char *)SMB_SIGNATURE, SMB_SIGLEN);
+	mb_put_mem(mbp, ffsmb, SMB_SIGLEN, MB_MSYSTEM);
 	mb_put_uint8(mbp, rqp->rq_cmd);
-	mb_put_mem(mbp, NULL, 4);	/* status */
+	mb_put_uint32le(mbp, 0);	/* status */
 	mb_put_uint8(mbp, rqp->rq_hflags);
 	mb_put_uint16le(mbp, rqp->rq_hflags2);
-	mb_put_uint16le(mbp, 0);	/* pid_hi */
-	mb_put_mem(mbp, NULL, 8);	/* signature */
-	mb_put_uint16le(mbp, 0);	/* reserved */
+	/* pid_hi(2), signature(8), reserved(2) */
+	mb_put_mem(mbp, NULL, 12, MB_MZERO);
 	mb_put_uint16le(mbp, rqp->rq_tid);
 	mb_put_uint16le(mbp, 0);	/* pid_lo */
 	mb_put_uint16le(mbp, rqp->rq_uid);
@@ -416,22 +416,21 @@ smb_rq_internal(struct smb_ctx *ctx, struct smb_rq *rqp)
 	/*
 	 * Decode the SMB header.
 	 */
-	mb_get_mem(mbp, (char *)sigbuf, 4);
+	md_get_mem(mbp, (char *)sigbuf, 4, MB_MSYSTEM);
 	if (0 != bcmp(sigbuf, ffsmb, 4)) {
 		DPRINT("not SMB");
 		return (EBADRPC);
 	}
-	mb_get_uint8(mbp, &ctmp);	/* SMB cmd */
-	mb_get_uint32le(mbp, &rqp->rq_status);
-	mb_get_uint8(mbp, &rqp->rq_hflags);
-	mb_get_uint16le(mbp, &rqp->rq_hflags2);
-	mb_get_uint16le(mbp, NULL);	/* pid_hi */
-	mb_get_mem(mbp, NULL, 8); /* signature */
-	mb_get_uint16le(mbp, NULL);	/* reserved */
-	mb_get_uint16le(mbp, &rqp->rq_tid);
-	mb_get_uint16le(mbp, NULL);	/* pid_lo */
-	mb_get_uint16le(mbp, &rqp->rq_uid);
-	mb_get_uint16le(mbp, &rqp->rq_mid);
+	md_get_uint8(mbp, &ctmp);	/* SMB cmd */
+	md_get_uint32le(mbp, &rqp->rq_status);
+	md_get_uint8(mbp, &rqp->rq_hflags);
+	md_get_uint16le(mbp, &rqp->rq_hflags2);
+	/* pid_hi(2), signature(8), reserved(2) */
+	md_get_mem(mbp, NULL, 12, MB_MSYSTEM);
+	md_get_uint16le(mbp, &rqp->rq_tid);
+	md_get_uint16le(mbp, NULL);	/* pid_lo */
+	md_get_uint16le(mbp, &rqp->rq_uid);
+	md_get_uint16le(mbp, &rqp->rq_mid);
 
 	/*
 	 * Figure out the status return.

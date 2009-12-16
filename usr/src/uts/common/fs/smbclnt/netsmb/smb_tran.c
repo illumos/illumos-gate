@@ -32,7 +32,6 @@
  * Selected code from smb_conn.c
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * Helper functions for smb_trantcp.c
  * (and maybe future transports)
@@ -46,14 +45,8 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
-/* Like smb_dev.h, this knows about all our sockaddr formats. */
-#include <netsmb/netbios.h>
-
-#ifdef APPLE
-#include <sys/smb_apple.h>
-#else
 #include <netsmb/smb_osdep.h>
-#endif
+#include <netsmb/netbios.h>
 
 #include <netsmb/smb.h>
 #include <netsmb/smb_conn.h>

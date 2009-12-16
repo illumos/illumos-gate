@@ -178,7 +178,7 @@ nb_ssn_recv(struct smb_ctx *ctx, struct mbdata *mb,
 	/*
 	 * Get a message buffer, read the payload
 	 */
-	if ((err = mb_init(mb, *mlen)) != 0)
+	if ((err = mb_init_sz(mb, *mlen)) != 0)
 		return (err);
 	buf = mb->mb_top->m_data;
 	len = *mlen;
@@ -274,7 +274,7 @@ nb_ssn_request(struct smb_ctx *ctx, char *srvname)
 	bzero(&req, sizeof (req));
 	bzero(&res, sizeof (res));
 
-	if ((err = mb_init(&req, M_MINSIZE)) != 0)
+	if ((err = mb_init(&req)) != 0)
 		goto errout;
 
 	ucwks = utf8_str_toupper(ctx->ct_locname);

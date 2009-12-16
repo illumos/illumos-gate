@@ -48,12 +48,7 @@
 #include <sys/sunddi.h>
 #include <sys/cmn_err.h>
 
-#ifdef APPLE
-#include <sys/smb_apple.h>
-#else
 #include <netsmb/smb_osdep.h>
-#endif
-
 #include <netsmb/mchain.h>
 
 #include <netsmb/smb.h>
@@ -623,7 +618,7 @@ md_done(struct mdchain *mdp)
  * Append a new message (separate mbuf chain).
  * It is caller responsibility to prevent
  * multiple calls to fetch/record routines.
- * XXX: Note (mis)use of mblk->b_next here.
+ * Note unusual use of mblk->b_next here.
  */
 void
 md_append_record(struct mdchain *mdp, mblk_t *top)
@@ -644,23 +639,31 @@ md_append_record(struct mdchain *mdp, mblk_t *top)
 
 /*
  * Advance mdp->md_top to the next message.
- * XXX: Note (mis)use of mblk->b_next here.
+ * Note unusual use of mblk->b_next here.
  */
-int
+void
 md_next_record(struct mdchain *mdp)
 {
-	mblk_t *m;
+	mblk_t *m, *top;
 
-	if (mdp->md_top == NULL)
-		return (ENOENT);
-	/* Get to next message (not b_cont chain) */
-	m = mdp->md_top->b_next;
-	mdp->md_top->b_next = NULL;
+	if ((top = mdp->md_top) == NULL)
+		return;
+
+	/*
+	 * Get the next message, if any,
+	 * stored by md_append_record.
+	 * Note: NOT b_cont chain
+	 */
+	m = top->b_next;
+	top->b_next = NULL;
+
+	/* Done with old "top". */
 	md_done(mdp);
 	if (m == NULL)
-		return (ENOENT);
+		return;
+
+	/* Setup new "top". */
 	md_initm(mdp, m);
-	return (0);
 }
 
 /*
@@ -961,7 +964,7 @@ m_copym(mblk_t *m, int off, int len, int wait)
 		if (len < dsz) {
 			adj = (ssize_t)len - (ssize_t)dsz;
 			ASSERT(adj < 0);
-			adjmsg(n, adj);
+			(void) adjmsg(n, adj);
 		}
 	}
 

@@ -68,14 +68,12 @@ CERRWARN	+= -erroff=E_STATEMENT_NOT_REACHED
 INC_PATH	+= -I$(UTSBASE)/common/fs/smbclnt
 LDFLAGS         += -dy -Ncrypto/md4 -Ncrypto/md5 -Nmisc/tlimod
 
-LINTTAGS	+= -erroff=E_FUNC_RET_ALWAYS_IGNOR2
-LINTTAGS	+= -erroff=E_FUNC_RET_MAYBE_IGNORED2
 # Until CR 4994570 is fixed...
 LINTTAGS	+= -erroff=E_BAD_FORMAT_ARG_TYPE2
 
 # The mb_put/md_get functions are intentionally used with and without
 # return value checks, so filter those out like LGREP.2 does.
-LGREP.nsmb =	egrep -v ' ignored: (mb_put|md_get)'
+LGREP.nsmb =	egrep -v ' ignored: (mb_init|mb_put|md_get)'
 LTAIL	+=	2>&1 | $(LGREP.2) | $(LGREP.nsmb) || true
 
 #
@@ -107,7 +105,7 @@ $(OBJECTS) : $(IOC_CHECK_H)
 $(IOC_CHECK_H): $(OFFSETS_SRC)
 	$(OFFSETS_CREATE) <$(OFFSETS_SRC) >$@.tmp
 	cmp -s ioc_check.ref $@.tmp && \
-	mv -f $@.tmp $@
+	  mv -f $@.tmp $@
 
 #
 #	Include common targets.

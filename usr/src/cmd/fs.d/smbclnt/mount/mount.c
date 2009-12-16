@@ -47,7 +47,6 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <err.h>
-#include <sysexits.h>
 #include <libintl.h>
 #include <locale.h>
 #include <libscf.h>
@@ -59,93 +58,110 @@
 #include <sys/mntent.h>
 #include <sys/mnttab.h>
 
-/* This needs to know ctx->ct_dev_fd, etc. */
-#include <netsmb/smb_lib.h>
-
 #include <sys/fs/smbfs_mount.h>
 
-#include "mntopts.h"
+/* This needs to know ctx->ct_dev_fd, etc. */
+#include <netsmb/smb_lib.h>
 
 extern char *optarg;
 extern int optind;
 
 static char mount_point[MAXPATHLEN + 1];
 static void usage(void);
-static int setsubopt(smb_ctx_t *, struct smbfs_args *, int, char *);
+static int setsubopt(smb_ctx_t *, struct smbfs_args *, char *);
 
-/* smbfs options */
-#define	MNTOPT_DOMAIN		"domain"
-#define	MNTOPT_USER		"user"
-#define	MNTOPT_DIRPERMS		"dirperms"
-#define	MNTOPT_FILEPERMS	"fileperms"
-#define	MNTOPT_GID		"gid"
-#define	MNTOPT_UID		"uid"
-#define	MNTOPT_NOPROMPT		"noprompt"
+const char * const optlist[] = {
 
-#define	OPT_DOMAIN	1
-#define	OPT_USER	2
-#define	OPT_DIRPERMS	3
-#define	OPT_FILEPERMS	4
-#define	OPT_GID		5
-#define	OPT_UID		6
-#define	OPT_NOPROMPT	7
+	/* Generic VFS options. */
+#define	OPT_RO		0
+	MNTOPT_RO,
+#define	OPT_RW		1
+	MNTOPT_RW,
+#define	OPT_SUID 	2
+	MNTOPT_SUID,
+#define	OPT_NOSUID 	3
+	MNTOPT_NOSUID,
+#define	OPT_DEVICES	4
+	MNTOPT_DEVICES,
+#define	OPT_NODEVICES	5
+	MNTOPT_NODEVICES,
+#define	OPT_SETUID	6
+	MNTOPT_SETUID,
+#define	OPT_NOSETUID	7
+	MNTOPT_NOSETUID,
+#define	OPT_EXEC	8
+	MNTOPT_EXEC,
+#define	OPT_NOEXEC	9
+	MNTOPT_NOEXEC,
+#define	OPT_XATTR	10
+	MNTOPT_XATTR,
+#define	OPT_NOXATTR	11
+	MNTOPT_NOXATTR,
 
-/* generic VFS options */
-#define	OPT_RO		10
-#define	OPT_RW		11
-#define	OPT_SUID 	12
-#define	OPT_NOSUID 	13
-#define	OPT_DEVICES	14
-#define	OPT_NODEVICES	15
-#define	OPT_SETUID	16
-#define	OPT_NOSETUID	17
-#define	OPT_EXEC	18
-#define	OPT_NOEXEC	19
+	/* Sort of generic (from NFS) */
+#define	OPT_NOAC	12
+	MNTOPT_NOAC,
+#define	OPT_ACTIMEO	13
+	MNTOPT_ACTIMEO,
+#define	OPT_ACREGMIN	14
+	MNTOPT_ACREGMIN,
+#define	OPT_ACREGMAX	15
+	MNTOPT_ACREGMAX,
+#define	OPT_ACDIRMIN	16
+	MNTOPT_ACDIRMIN,
+#define	OPT_ACDIRMAX	17
+	MNTOPT_ACDIRMAX,
 
-struct smbfsopts {
-	char *name;
-	int index;
-};
+	/* smbfs-specifis options */
+#define	OPT_DOMAIN	18
+	"domain",
+#define	OPT_USER	19
+	"user",
+#define	OPT_UID		20
+	"uid",
+#define	OPT_GID		21
+	"gid",
+#define	OPT_DIRPERMS	22
+	"dirperms",
+#define	OPT_FILEPERMS	23
+	"fileperms",
+#define	OPT_NOPROMPT	24
+	"noprompt",
 
-struct smbfsopts opts[] = {
-	{MNTOPT_DOMAIN,		OPT_DOMAIN},
-	{MNTOPT_USER,		OPT_USER},
-	{MNTOPT_DIRPERMS,	OPT_DIRPERMS},
-	{MNTOPT_FILEPERMS,	OPT_FILEPERMS},
-	{MNTOPT_GID,		OPT_GID},
-	{MNTOPT_UID,		OPT_UID},
-	{MNTOPT_NOPROMPT,	OPT_NOPROMPT},
-	{MNTOPT_RO,		OPT_RO},
-	{MNTOPT_RW,		OPT_RW},
-	{MNTOPT_SUID,		OPT_SUID},
-	{MNTOPT_NOSUID,		OPT_NOSUID},
-	{MNTOPT_DEVICES,	OPT_DEVICES},
-	{MNTOPT_NODEVICES,	OPT_NODEVICES},
-	{MNTOPT_SETUID,		OPT_SETUID},
-	{MNTOPT_NOSETUID,	OPT_NOSETUID},
-	{MNTOPT_EXEC,		OPT_EXEC},
-	{MNTOPT_NOEXEC,		OPT_NOEXEC},
-	{NULL,		0}
+	NULL
 };
 
 static int Oflg = 0;    /* Overlay mounts */
 static int qflg = 0;    /* quiet - don't print warnings on bad options */
-static int ro = 0;	/* read-only mount */
 static int noprompt = 0;	/* don't prompt for password */
 
-#define	RET_ERR	33
+/* Note: smbfs uses _both_ kinds of options. */
+static int mntflags = MS_DATA | MS_OPTIONSTR;
+
+#define	EX_OK	0	/* normal */
+#define	EX_OPT	1	/* bad options, usage, etc */
+#define	EX_MNT	2	/* mount point problems, etc */
+#define	RET_ERR	3	/* later errors */
+
 #define	SERVICE "svc:/network/smb/client:default"
 
 struct smbfs_args mdata;
 struct mnttab mnt;
-char optbuf[MAX_MNTOPT_STR];
+
+/*
+ * Initialize this with "rw" just to have something there,
+ * so we don't have to decide whether to add a comma when
+ * we strcat another option.  Note the "rw" may be changed
+ * to an "ro" by option processing.
+ */
+char optbuf[MAX_MNTOPT_STR] = "rw";
 
 int
 main(int argc, char *argv[])
 {
 	struct smb_ctx *ctx = NULL;
 	struct stat st;
-	int opt, error, err2, mntflags;
+	int opt, error, err2;
 	static char *fstype = MNTTYPE_SMBFS;
 	char *env, *state;
 
@@ -188,13 +204,11 @@ main(int argc, char *argv[])
 		exit(RET_ERR);
 
 	mnt.mnt_mntopts = optbuf;
-	mntflags = MS_DATA;
 
 	bzero(&mdata, sizeof (mdata));
 	mdata.version = SMBFS_VERSION;		/* smbfs mount version */
 	mdata.uid = (uid_t)-1;
 	mdata.gid = (gid_t)-1;
-	mdata.caseopt = SMB_CS_NONE;
 
 	error = smb_ctx_alloc(&ctx);
 	if (error)
@@ -209,11 +223,11 @@ main(int argc, char *argv[])
 	error = smb_ctx_parseunc(ctx, argv[argc - 2],
 	    SMBL_SHARE, SMBL_SHARE, USE_DISKDEV, NULL);
 	if (error)
-		exit(RET_ERR);
+		exit(EX_OPT);
 
 	error = smb_ctx_readrc(ctx);
 	if (error)
-		exit(RET_ERR);
+		exit(EX_OPT);
 
 	while ((opt = getopt(argc, argv, "ro:Oq")) != -1) {
 		switch (opt) {
@@ -226,19 +240,13 @@ main(int argc, char *argv[])
 			break;
 
 		case 'r':
-			ro++;
+			mntflags |= MS_RDONLY;
 			break;
 
 		case 'o': {
-			char *nextopt, *comma, *equals, *sopt, *soptval;
-			int i, ret;
+			char *nextopt, *comma, *sopt;
+			int ret;
 
-			if (strlen(optarg) >= MAX_MNTOPT_STR) {
-				if (!qflg)
-					warnx(gettext(
-					    "option string too long"));
-				exit(RET_ERR);
-			}
 			for (sopt = optarg; sopt != NULL; sopt = nextopt) {
 				comma = strchr(sopt, ',');
 				if (comma) {
@@ -246,33 +254,10 @@ main(int argc, char *argv[])
 					*comma = '\0';
 				} else
 					nextopt = NULL;
-				equals = strchr(sopt, '=');
-				if (equals) {
-					soptval = equals + 1;
-					*equals = '\0';
-				} else
-					soptval = NULL;
-				for (i = 0; opts[i].name != NULL; i++) {
-					if (strcmp(sopt, opts[i].name) == 0)
-						break;
-				}
-				if (opts[i].name == NULL) {
-					if (equals)
-						*equals = '=';
-					if (!qflg)
-						errx(RET_ERR, gettext(
-						    "Bad option '%s'"), sopt);
-					if (comma)
-						*comma = ',';
-					continue;
-				}
-				ret = setsubopt(ctx, &mdata,
-				    opts[i].index, soptval);
+				ret = setsubopt(ctx, &mdata, sopt);
 				if (ret != 0)
-					exit(RET_ERR);
-				if (equals)
-					*equals = '=';
-				(void) strcat(mnt.mnt_mntopts, sopt);
+					exit(EX_OPT);
+				/* undo changes to optarg */
 				if (comma)
 					*comma = ',';
 			}
@@ -288,12 +273,10 @@ main(int argc, char *argv[])
 	if (Oflg)
 		mntflags |= MS_OVERLAY;
 
-	if (ro) {
+	if (mntflags & MS_RDONLY) {
 		char *p;
-
-		mntflags |= MS_RDONLY;
 		/* convert "rw"->"ro" */
-		if (p = strstr(mnt.mnt_mntopts, "rw")) {
+		if (p = strstr(optbuf, "rw")) {
 			if (*(p+2) == ',' || *(p+2) == '\0')
 				*(p+1) = 'o';
 		}
@@ -307,11 +290,11 @@ main(int argc, char *argv[])
 
 	realpath(argv[optind+1], mount_point);
 	if (stat(mount_point, &st) == -1)
-		err(EX_OSERR, gettext("could not find mount point %s"),
+		err(EX_MNT, gettext("could not find mount point %s"),
 		    mount_point);
 	if (!S_ISDIR(st.st_mode)) {
 		errno = ENOTDIR;
-		err(EX_OSERR, gettext("can't mount on %s"), mount_point);
+		err(EX_MNT, gettext("can't mount on %s"), mount_point);
 	}
 
 	/*
@@ -379,40 +362,57 @@ again:
 	    mntflags, fstype, &mdata, sizeof (mdata),
 	    mnt.mnt_mntopts, MAX_MNTOPT_STR) < 0) {
 		if (errno != ENOENT) {
-			err(EX_OSERR, gettext("mount_smbfs: %s"),
+			err(EX_MNT, gettext("mount_smbfs: %s"),
 			    mnt.mnt_mountp);
 		} else {
 			struct stat sb;
 			if (stat(mnt.mnt_mountp, &sb) < 0 &&
 			    errno == ENOENT)
-				err(EX_OSERR, gettext("mount_smbfs: %s"),
+				err(EX_MNT, gettext("mount_smbfs: %s"),
 				    mnt.mnt_mountp);
 			else
-				err(EX_OSERR, gettext("mount_smbfs: %s"),
+				err(EX_MNT, gettext("mount_smbfs: %s"),
 				    mnt.mnt_special);
 		}
 	}
 
 	smb_ctx_free(ctx);
-	if (error) {
-		smb_error(gettext("mount error: %s"), error, mount_point);
-		exit(RET_ERR);
-	}
 	return (0);
 }
 
+#define	bad(val) (val == NULL || !isdigit(*val))
+
 int
-setsubopt(smb_ctx_t *ctx, struct smbfs_args *mdatap, int index, char *optarg)
+setsubopt(smb_ctx_t *ctx, struct smbfs_args *mdatap, char *subopt)
 {
+	char *equals, *optarg;
 	struct passwd *pwd;
 	struct group *grp;
-	long l;
-	int err = 0;
-	char *next;
+	long val;
+	int rc = EX_OK;
+	int index;
+	char *p;
+
+	equals = strchr(subopt, '=');
+	if (equals) {
+		*equals = '\0';
+		optarg = equals + 1;
+	} else
+		optarg = NULL;
+
+	for (index = 0; optlist[index] != NULL; index++) {
+		if (strcmp(subopt, optlist[index]) == 0)
+			break;
+	}
+
+	/*
+	 * Note: if the option was unknown, index will
+	 * point to the NULL at the end of optlist[],
+	 * and we'll take the switch default.
+	 */
 
 	switch (index) {
-	case OPT_RO:
-	case OPT_RW:
+
 	case OPT_SUID:
 	case OPT_NOSUID:
 	case OPT_DEVICES:
@@ -421,15 +421,106 @@ setsubopt(smb_ctx_t *ctx, struct smbfs_args *mdatap, int index, char *optarg)
 	case OPT_NOSETUID:
 	case OPT_EXEC:
 	case OPT_NOEXEC:
-		/* We don't have to handle generic options here */
-		return (0);
+	case OPT_XATTR:
+	case OPT_NOXATTR:
+		/*
+		 * These options are handled via the
+		 * generic option string mechanism.
+		 * None of these take an optarg.
+		 */
+		if (optarg != NULL)
+			goto badval;
+		(void) strlcat(optbuf, ",", sizeof (optbuf));
+		if (strlcat(optbuf, subopt, sizeof (optbuf)) >=
+		    sizeof (optbuf)) {
+			if (!qflg)
+				warnx(gettext("option string too long"));
+			rc = EX_OPT;
+		}
+		break;
 
+	/*
+	 * OPT_RO, OPT_RW, are actually generic too,
+	 * but we use the mntflags for these, and
+	 * then update the options string later.
+	 */
+	case OPT_RO:
+		mntflags |= MS_RDONLY;
+		break;
+	case OPT_RW:
+		mntflags &= ~MS_RDONLY;
+		break;
+
+	/*
+	 * NFS-derived options for attribute cache
+	 * handling (disable, set min/max timeouts)
+	 */
+	case OPT_NOAC:
+		mdatap->flags |= SMBFS_MF_NOAC;
+		break;
+
+	case OPT_ACTIMEO:
+		errno = 0;
+		val = strtol(optarg, &p, 10);
+		if (errno || *p != 0)
+			goto badval;
+		mdatap->acdirmin = mdatap->acregmin = val;
+		mdatap->acdirmax = mdatap->acregmax = val;
+		mdatap->flags |= SMBFS_MF_ACDIRMAX;
+		mdatap->flags |= SMBFS_MF_ACREGMAX;
+		mdatap->flags |= SMBFS_MF_ACDIRMIN;
+		mdatap->flags |= SMBFS_MF_ACREGMIN;
+		break;
+
+	case OPT_ACREGMIN:
+		errno = 0;
+		val = strtol(optarg, &p, 10);
+		if (errno || *p != 0)
+			goto badval;
+		mdatap->acregmin = val;
+		mdatap->flags |= SMBFS_MF_ACREGMIN;
+		break;
+
+	case OPT_ACREGMAX:
+		errno = 0;
+		val = strtol(optarg, &p, 10);
+		if (errno || *p != 0)
+			goto badval;
+		mdatap->acregmax = val;
+		mdatap->flags |= SMBFS_MF_ACREGMAX;
+		break;
+
+	case OPT_ACDIRMIN:
+		errno = 0;
+		val = strtol(optarg, &p, 10);
+		if (errno || *p != 0)
+			goto badval;
+		mdatap->acdirmin = val;
+		mdatap->flags |= SMBFS_MF_ACDIRMIN;
+		break;
+
+	case OPT_ACDIRMAX:
+		errno = 0;
+		val = strtol(optarg, &p, 10);
+		if (errno || *p != 0)
+			goto badval;
+		mdatap->acdirmax = val;
+		mdatap->flags |= SMBFS_MF_ACDIRMAX;
+		break;
+
+	/*
+	 * SMBFS-specific options.  Some of these
+	 * don't go through the mount system call,
+	 * but just set libsmbfs options.
+	 */
 	case OPT_DOMAIN:
-		err = smb_ctx_setdomain(ctx, optarg, B_TRUE);
+		if (smb_ctx_setdomain(ctx, optarg, B_TRUE) != 0)
+			rc = EX_OPT;
 		break;
 
 	case OPT_USER:
-		err = smb_ctx_setuser(ctx, optarg, B_TRUE);
+		if (smb_ctx_setuser(ctx, optarg, B_TRUE) != 0)
+			rc = EX_OPT;
 		break;
 
 	case OPT_UID:
@@ -438,49 +529,62 @@ setsubopt(smb_ctx_t *ctx, struct smbfs_args *mdatap, int index, char *optarg)
 		if (pwd == NULL) {
 			if (!qflg)
 				warnx(gettext("unknown user '%s'"), optarg);
-			err = -1;
+			rc = EX_OPT;
 		} else {
 			mdatap->uid = pwd->pw_uid;
 		}
 		break;
+
 	case OPT_GID:
 		grp = isdigit(optarg[0]) ?
 		    getgrgid(atoi(optarg)) : getgrnam(optarg);
 		if (grp == NULL) {
 			if (!qflg)
 				warnx(gettext("unknown group '%s'"), optarg);
-			err = -1;
+			rc = EX_OPT;
 		} else {
 			mdatap->gid = grp->gr_gid;
 		}
 		break;
+
 	case OPT_DIRPERMS:
 		errno = 0;
-		l = strtol(optarg, &next, 8);
-		if (errno || *next != 0) {
-			if (!qflg)
-				warnx(gettext(
-				    "invalid value for directory mode"));
-			err = -1;
-		} else {
-			mdatap->dir_mode = l;
-		}
+		val = strtol(optarg, &p, 8);
+		if (errno || *p != 0)
+			goto badval;
+		mdatap->dir_mode = val;
 		break;
+
 	case OPT_FILEPERMS:
 		errno = 0;
-		l = strtol(optarg, &next, 8);
-		if (errno || *next != 0) {
-			if (!qflg)
-				warnx(gettext("invalid value for file mode"));
-			err = -1;
-		} else {
-			mdatap->file_mode = l;
-		}
+		val = strtol(optarg, &p, 8);
+		if (errno || *p != 0)
+			goto badval;
+		mdatap->file_mode = val;
 		break;
+
 	case OPT_NOPROMPT:
 		noprompt++;
+		break;
+
+	default:
+		if (!qflg)
+			warnx(gettext("unknown option %s"), subopt);
+		rc = EX_OPT;
+		break;
+
+	badval:
+		if (!qflg)
+			warnx(gettext("invalid value for %s"), subopt);
+		rc = EX_OPT;
+		break;
 	}
-	return (err);
+
+	/* Undo changes made to subopt */
+	if (equals)
+		*equals = '=';
+
+	return (rc);
 }
 
 static void
@@ -490,5 +594,5 @@ usage(void)
 	gettext("usage: mount -F smbfs [-Orq] [-o option[,option]]"
 	"	//[workgroup;][user[:password]@]server[/share] path"));
 
-	exit(EX_USAGE);
+	exit(EX_OPT);
 }

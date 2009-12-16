@@ -53,8 +53,20 @@
 #include "private.h"
 #include "charsets.h"
 
-static int
-m_get(size_t len, struct mbuf **mpp)
+/*
+ * Note: Leaving a little space (8 bytes) between the
+ * mbuf header and the start of the data so we can
+ * prepend a NetBIOS header in that space.
+ */
+#define	M_ALIGNFACTOR	(sizeof (long))
+#define	M_ALIGN(len)	(((len) + M_ALIGNFACTOR - 1) & ~(M_ALIGNFACTOR - 1))
+#define	M_BASESIZE	(sizeof (struct mbuf) + 8)
+#define	M_MINSIZE	(1024 - M_BASESIZE)
+#define	M_TOP(m)	((char *)(m) + M_BASESIZE)
+#define	M_TRAILINGSPACE(m) ((m)->m_maxlen - (m)->m_len)
+
+int
+m_get(int len, struct mbuf **mpp)
 {
 	struct mbuf *m;
 
@@ -132,37 +144,42 @@ m_lineup(struct mbuf *m0, struct mbuf **mpp)
 }
 
 int
-mb_init(struct mbdata *mbp, size_t size)
+mb_init(struct mbdata *mbp)
+{
+	return (mb_init_sz(mbp, M_MINSIZE));
+}
+
+int
+mb_init_sz(struct mbdata *mbp, int size)
 {
 	struct mbuf *m;
 	int error;
 
 	if ((error = m_get(size, &m)) != 0)
 		return (error);
-	return (mb_initm(mbp, m));
+	mb_initm(mbp, m);
+	return (0);
 }
 
-int
+void
 mb_initm(struct mbdata *mbp, struct mbuf *m)
 {
 	bzero(mbp, sizeof (*mbp));
 	mbp->mb_top = mbp->mb_cur = m;
 	mbp->mb_pos = mtod(m, char *);
-	return (0);
 }
 
-int
+void
 mb_done(struct mbdata *mbp)
 {
 	if (mbp->mb_top) {
 		m_freem(mbp->mb_top);
 		mbp->mb_top = NULL;
 	}
-	return (0);
 }
 
 int
-m_getm(struct mbuf *top, size_t len, struct mbuf **mpp)
+m_getm(struct mbuf *top, int len, struct mbuf **mpp)
 {
 	struct mbuf *m, *mp;
 	int  error, ts;
@@ -190,13 +207,24 @@ out:
  * Routines to put data in a buffer
  */
 
+void *
+mb_reserve(mbchain_t *mbp, int size)
+{
+	char *p;
+
+	if (mb_fit(mbp, size, &p) != 0)
+		return (NULL);
+
+	return (p);
+}
+
 /*
  * Check if object of size 'size' fit to the current position and
  * allocate new mbuf if not. Advance pointers and increase length of mbuf(s).
  * Return pointer to the object placeholder or NULL if any error occured.
  */
 int
-mb_fit(struct mbdata *mbp, size_t size, char **pp)
+mb_fit(mbchain_t *mbp, int size, char **pp)
 {
 	struct mbuf *m, *mn;
 	int error;
@@ -217,56 +245,57 @@ mb_fit(struct mbdata *mbp, size_t size, char **pp)
 }
 
 int
-mb_put_uint8(struct mbdata *mbp, uint8_t x)
+mb_put_uint8(mbchain_t *mbp, uint8_t x)
 {
 	uint8_t y = x;
-	return (mb_put_mem(mbp, &y, sizeof (y)));
+	return (mb_put_mem(mbp, &y, sizeof (y), MB_MINLINE));
 }
 
 int
-mb_put_uint16be(struct mbdata *mbp, uint16_t x)
+mb_put_uint16be(mbchain_t *mbp, uint16_t x)
 {
 	uint16_t y = htobes(x);
-	return (mb_put_mem(mbp, &y, sizeof (y)));
+	return (mb_put_mem(mbp, &y, sizeof (y), MB_MINLINE));
 }
 
 int
-mb_put_uint16le(struct mbdata *mbp, uint16_t x)
+mb_put_uint16le(mbchain_t *mbp, uint16_t x)
 {
 	uint16_t y = htoles(x);
-	return (mb_put_mem(mbp, &y, sizeof (y)));
+	return (mb_put_mem(mbp, &y, sizeof (y), MB_MINLINE));
 }
 
 int
-mb_put_uint32be(struct mbdata *mbp, uint32_t x)
+mb_put_uint32be(mbchain_t *mbp, uint32_t x)
 {
 	uint32_t y = htobel(x);
-	return (mb_put_mem(mbp, &y, sizeof (y)));
+	return (mb_put_mem(mbp, &y, sizeof (y), MB_MINLINE));
 }
 
 int
-mb_put_uint32le(struct mbdata *mbp, uint32_t x)
+mb_put_uint32le(mbchain_t *mbp, uint32_t x)
 {
 	uint32_t y = htolel(x);
-	return (mb_put_mem(mbp, &y, sizeof (y)));
+	return (mb_put_mem(mbp, &y, sizeof (y), MB_MINLINE));
 }
 
 int
-mb_put_uint64be(struct mbdata *mbp, uint64_t x)
+mb_put_uint64be(mbchain_t *mbp, uint64_t x)
 {
 	uint64_t y = htobeq(x);
-	return (mb_put_mem(mbp, &y, sizeof (y)));
+	return (mb_put_mem(mbp, &y, sizeof (y), MB_MINLINE));
 }
 
 int
-mb_put_uint64le(struct mbdata *mbp, uint64_t x)
+mb_put_uint64le(mbchain_t *mbp, uint64_t x)
 {
 	uint64_t y = htoleq(x);
-	return (mb_put_mem(mbp, &y, sizeof (y)));
+	return (mb_put_mem(mbp, &y, sizeof (y), MB_MINLINE));
 }
 
+/* ARGSUSED */
 int
-mb_put_mem(struct mbdata *mbp, const void *vmem, size_t size)
+mb_put_mem(mbchain_t *mbp, const void *vmem, int size, int type)
 {
 	struct mbuf *m;
 	const char *src;
@@ -311,14 +340,14 @@ mb_put_mem(struct mbdata *mbp, const void *vmem, size_t size)
  * This always consumes the passed mbuf.
  */
 int
-mb_put_mbuf(struct mbdata *mbp, struct mbuf *m)
+mb_put_mbuf(mbchain_t *mbp, struct mbuf *m)
 {
 	struct mbuf *cm = mbp->mb_cur;
 	int ts = M_TRAILINGSPACE(cm);
 
 	if (m->m_next == NULL && m->m_len <= ts) {
 		/* just copy */
-		mb_put_mem(mbp, m->m_data, m->m_len);
+		mb_put_mem(mbp, m->m_data, m->m_len, MB_MSYSTEM);
 		m_freem(m);
 		return (0);
 	}
@@ -340,7 +369,7 @@ mb_put_mbuf(struct mbdata *mbp, struct mbuf *m)
  * null terminated, and aligned if necessary.
  */
 int
-mb_put_dstring(struct mbdata *mbp, const char *s, int uc)
+mb_put_string(mbchain_t *mbp, const char *s, int uc)
 {
 	int err;
 
@@ -361,7 +390,7 @@ mb_put_dstring(struct mbdata *mbp, const char *s, int uc)
  * Put an ASCII string (really OEM), given a UTF-8 string.
  */
 int
-mb_put_astring(struct mbdata *mbp, const char *s)
+mb_put_astring(mbchain_t *mbp, const char *s)
 {
 	char *abuf;
 	int err, len;
@@ -370,7 +399,7 @@ mb_put_astring(struct mbdata *mbp, const char *s)
 	if (abuf == NULL)
 		return (ENOMEM);
 	len = strlen(abuf) + 1;
-	err = mb_put_mem(mbp, abuf, len);
+	err = mb_put_mem(mbp, abuf, len, MB_MSYSTEM);
 	free(abuf);
 	return (err);
 }
@@ -379,7 +408,7 @@ mb_put_astring(struct mbdata *mbp, const char *s)
  * Put UCS-2LE, given a UTF-8 string.
  */
 int
-mb_put_ustring(struct mbdata *mbp, const char *s)
+mb_put_ustring(mbchain_t *mbp, const char *s)
 {
 	uint16_t *ubuf;
 	int err, len;
@@ -387,8 +416,8 @@ mb_put_ustring(struct mbdata *mbp, const char *s)
 	ubuf = convert_utf8_to_leunicode(s);
 	if (ubuf == NULL)
 		return (ENOMEM);
-	len = unicode_strlen(ubuf) + 1;
-	err = mb_put_mem(mbp, ubuf, (len << 1));
+	len = 2 * (unicode_strlen(ubuf) + 1);
+	err = mb_put_mem(mbp, ubuf, len, MB_MSYSTEM);
 	free(ubuf);
 	return (err);
 }
@@ -399,24 +428,18 @@ mb_put_ustring(struct mbdata *mbp, const char *s)
 #define	mb_left(m, p)	(mtod(m, char *) + (m)->m_len - (p))
 
 int
-mb_get_uint8(struct mbdata *mbp, uint8_t *x)
+md_get_uint8(mdchain_t *mbp, uint8_t *x)
 {
-	return (mb_get_mem(mbp, x, 1));
+	return (md_get_mem(mbp, x, 1, MB_MINLINE));
 }
 
 int
-mb_get_uint16(struct mbdata *mbp, uint16_t *x)
-{
-	return (mb_get_mem(mbp, x, 2));
-}
-
-int
-mb_get_uint16le(struct mbdata *mbp, uint16_t *x)
+md_get_uint16le(mdchain_t *mbp, uint16_t *x)
 {
 	uint16_t v;
 	int err;
 
-	if ((err = mb_get_mem(mbp, &v, 2)) != 0)
+	if ((err = md_get_mem(mbp, &v, sizeof (v), MB_MINLINE)) != 0)
 		return (err);
 	if (x != NULL)
 		*x = letohs(v);
@@ -424,11 +447,11 @@ mb_get_uint16le(struct mbdata *mbp, uint16_t *x)
 }
 
 int
-mb_get_uint16be(struct mbdata *mbp, uint16_t *x) {
+md_get_uint16be(mdchain_t *mbp, uint16_t *x) {
 	uint16_t v;
 	int err;
 
-	if ((err = mb_get_mem(mbp, &v, 2)) != 0)
+	if ((err = md_get_mem(mbp, &v, sizeof (v), MB_MINLINE)) != 0)
 		return (err);
 	if (x != NULL)
 		*x = betohs(v);
@@ -436,18 +459,12 @@ mb_get_uint16be(struct mbdata *mbp, uint16_t *x) {
 }
 
 int
-mb_get_uint32(struct mbdata *mbp, uint32_t *x)
-{
-	return (mb_get_mem(mbp, x, 4));
-}
-
-int
-mb_get_uint32be(struct mbdata *mbp, uint32_t *x)
+md_get_uint32be(mdchain_t *mbp, uint32_t *x)
 {
 	uint32_t v;
 	int err;
 
-	if ((err = mb_get_mem(mbp, &v, 4)) != 0)
+	if ((err = md_get_mem(mbp, &v, sizeof (v), MB_MINLINE)) != 0)
 		return (err);
 	if (x != NULL)
 		*x = betohl(v);
@@ -455,12 +472,12 @@ mb_get_uint32be(struct mbdata *mbp, uint32_t *x)
 }
 
 int
-mb_get_uint32le(struct mbdata *mbp, uint32_t *x)
+md_get_uint32le(mdchain_t *mbp, uint32_t *x)
 {
 	uint32_t v;
 	int err;
 
-	if ((err = mb_get_mem(mbp, &v, 4)) != 0)
+	if ((err = md_get_mem(mbp, &v, sizeof (v), MB_MINLINE)) != 0)
 		return (err);
 	if (x != NULL)
 		*x = letohl(v);
@@ -468,18 +485,12 @@ mb_get_uint32le(struct mbdata *mbp, uint32_t *x)
 }
 
 int
-mb_get_uint64(struct mbdata *mbp, uint64_t *x)
-{
-	return (mb_get_mem(mbp, x, 8));
-}
-
-int
-mb_get_uint64be(struct mbdata *mbp, uint64_t *x)
+md_get_uint64be(mdchain_t *mbp, uint64_t *x)
 {
 	uint64_t v;
 	int err;
 
-	if ((err = mb_get_mem(mbp, &v, 8)) != 0)
+	if ((err = md_get_mem(mbp, &v, sizeof (v), MB_MINLINE)) != 0)
 		return (err);
 	if (x != NULL)
 		*x = betohq(v);
@@ -487,20 +498,21 @@ mb_get_uint64be(struct mbdata *mbp, uint64_t *x)
 }
 
 int
-mb_get_uint64le(struct mbdata *mbp, uint64_t *x)
+md_get_uint64le(mdchain_t *mbp, uint64_t *x)
 {
 	uint64_t v;
 	int err;
 
-	if ((err = mb_get_mem(mbp, &v, 8)) != 0)
+	if ((err = md_get_mem(mbp, &v, sizeof (v), MB_MINLINE)) != 0)
 		return (err);
 	if (x != NULL)
 		*x = letohq(v);
 	return (0);
 }
 
+/* ARGSUSED */
 int
-mb_get_mem(struct mbdata *mbp, void *vmem, size_t size)
+md_get_mem(mdchain_t *mbp, void *vmem, int size, int type)
 {
 	struct mbuf *m = mbp->mb_cur;
 	char *dst = vmem;
@@ -539,7 +551,7 @@ mb_get_mem(struct mbdata *mbp, void *vmem, size_t size)
  * Nothing fancy here - just copy.
  */
 int
-mb_get_mbuf(struct mbdata *mbp, int size, struct mbuf **ret)
+md_get_mbuf(mdchain_t *mbp, int size, mbuf_t **ret)
 {
 	mbuf_t *m;
 	int err;
@@ -548,7 +560,7 @@ mb_get_mbuf(struct mbdata *mbp, int size, struct mbuf **ret)
 	if (err)
 		return (err);
 
-	err = mb_get_mem(mbp, m->m_data, size);
+	err = md_get_mem(mbp, m->m_data, size, MB_MSYSTEM);
 	if (err) {
 		m_freem(m);
 		return (err);
@@ -564,26 +576,27 @@ mb_get_mbuf(struct mbdata *mbp, int size, struct mbuf **ret)
  * either Unicode or OEM chars.
  */
 int
-mb_get_string(struct mbdata *mbp, char **str_pp, int uc)
+md_get_string(mdchain_t *mbp, char **str_pp, int uc)
 {
 	int err;
 
 	if (uc)
-		err = mb_get_ustring(mbp, str_pp);
+		err = md_get_ustring(mbp, str_pp);
 	else
-		err = mb_get_astring(mbp, str_pp);
+		err = md_get_astring(mbp, str_pp);
 	return (err);
 }
 
 /*
  * Get an ASCII (really OEM) string from the mbuf chain
  * and convert it to UTF-8
- * Similar to mb_get_ustring below.
+ *
+ * Similar to md_get_ustring below.
  */
 int
-mb_get_astring(struct mbdata *real_mbp, char **str_pp)
+md_get_astring(mdchain_t *real_mbp, char **str_pp)
 {
-	struct mbdata tmp_mb, *mbp;
+	mdchain_t tmp_mb, *mbp;
 	char *tstr, *ostr;
 	int err, i, slen;
 	uint8_t ch;
@@ -598,7 +611,7 @@ mb_get_astring(struct mbdata *real_mbp, char **str_pp)
 	mbp = &tmp_mb;
 	slen = 0;
 	for (;;) {
-		err = mb_get_uint8(mbp, &ch);
+		err = md_get_uint8(mbp, &ch);
 		if (err)
 			break;
 		if (ch == 0)
@@ -615,11 +628,11 @@ mb_get_astring(struct mbdata *real_mbp, char **str_pp)
 		return (ENOMEM);
 	mbp = real_mbp;
 	for (i = 0; i < slen; i++) {
-		mb_get_uint8(mbp, &ch);
+		md_get_uint8(mbp, &ch);
 		tstr[i] = ch;
 	}
 	tstr[i] = 0;
-	mb_get_uint8(mbp, NULL);
+	md_get_uint8(mbp, NULL);
 
 	/*
 	 * Convert OEM to UTF-8
@@ -637,12 +650,12 @@ mb_get_astring(struct mbdata *real_mbp, char **str_pp)
  * Get a UCS-2LE string from the mbuf chain, and
  * convert it to UTF-8.
  *
- * Similar to mb_get_astring below.
+ * Similar to md_get_astring above.
  */
 int
-mb_get_ustring(struct mbdata *real_mbp, char **str_pp)
+md_get_ustring(mdchain_t *real_mbp, char **str_pp)
 {
-	struct mbdata tmp_mb, *mbp;
+	mdchain_t tmp_mb, *mbp;
 	uint16_t *tstr;
 	char *ostr;
 	int err, i, slen;
@@ -652,7 +665,7 @@ mb_get_ustring(struct mbdata *real_mbp, char **str_pp)
 	 * First, align(2) on the real_mbp
 	 */
 	if (((uintptr_t)real_mbp->mb_pos) & 1)
-		mb_get_uint8(real_mbp, NULL);
+		md_get_uint8(real_mbp, NULL);
 
 	/*
 	 * Next, figure out the string length.
@@ -664,7 +677,7 @@ mb_get_ustring(struct mbdata *real_mbp, char **str_pp)
 	mbp = &tmp_mb;
 	slen = 0;
 	for (;;) {
-		err = mb_get_uint16le(mbp, &ch);
+		err = md_get_uint16le(mbp, &ch);
 		if (err)
 			break;
 		if (ch == 0)
@@ -682,11 +695,11 @@ mb_get_ustring(struct mbdata *real_mbp, char **str_pp)
 		return (ENOMEM);
 	mbp = real_mbp;
 	for (i = 0; i < slen; i++) {
-		mb_get_uint16le(mbp, &ch);
+		md_get_uint16le(mbp, &ch);
 		tstr[i] = ch;
 	}
 	tstr[i] = 0;
-	mb_get_uint16le(mbp, NULL);
+	md_get_uint16le(mbp, NULL);
 
 	/*
 	 * Convert UCS-2 (native!) to UTF-8

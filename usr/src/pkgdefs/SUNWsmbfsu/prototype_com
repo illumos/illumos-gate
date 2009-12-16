@@ -58,7 +58,6 @@ d none usr/lib/fs 755 root sys
 d none usr/lib/fs/smbfs 755 root sys
 f none usr/lib/fs/smbfs/mount 555 root bin
 f none usr/lib/fs/smbfs/umount 555 root bin
-d none usr/lib/fs/smb 755 root sys
 f none usr/lib/fs/smbfs/libshare_smbfs.so.1 755 root bin
 f none usr/lib/libsmbfs.so.1 755 root bin
 d none usr/lib/mdb 755 root sys

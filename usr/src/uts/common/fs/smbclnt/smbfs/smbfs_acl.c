@@ -39,11 +39,11 @@
 #include <sys/vfs.h>
 #include <sys/byteorder.h>
 
-#include <netsmb/smb_osdep.h>
+#include <netsmb/mchain.h>
 #include <netsmb/smb.h>
 #include <netsmb/smb_conn.h>
+#include <netsmb/smb_osdep.h>
 #include <netsmb/smb_subr.h>
-#include <netsmb/mchain.h>
 
 #include <smbfs/smbfs.h>
 #include <smbfs/smbfs_node.h>
@@ -51,17 +51,15 @@
 
 #include <sys/fs/smbfs_ioctl.h>
 #include <fs/fs_subr.h>
+#include "smbfs_ntacl.h"
 
 /* Sanity check SD sizes */
 #define	MAX_RAW_SD_SIZE	32768
 #define	SMALL_SD_SIZE	1024
 
-#undef	ACL_SUPPORT	/* not yet */
-
-
 /*
- * smbfs_getsd(), smbfs_setsd() are common functions used by
- * both ioctl get/set ACL and VOP_GETSECATTR, VOP_SETSECATTR.
+ * smbfs_getsd() is a common function used by both
+ * smbfs_ioctl SMBFSIO_GETSD and VOP_GETSECATTR.
  * Handles required rights, tmpopen/tmpclose.
  *
  * Note: smbfs_getsd allocates and returns an mblk chain,
@@ -119,7 +117,7 @@ again:
 
 	cerror = smbfs_smb_tmpclose(np, fid, &scred);
 	if (cerror)
-		SMBERROR("error %d closing file %s\n",
+		SMBVDEBUG("error %d closing file %s\n",
 		    cerror, np->n_rpath);
 
 out:
@@ -174,7 +172,7 @@ smbfs_setsd(vnode_t *vp, uint32_t selector, mblk_t **mp, cred_t *cr)
 
 	cerror = smbfs_smb_tmpclose(np, fid, &scred);
 	if (cerror)
-		SMBERROR("error %d closing file %s\n",
+		SMBVDEBUG("error %d closing file %s\n",
 		    cerror, np->n_rpath);
 
 out:
@@ -185,7 +183,7 @@ out:
 }
 
 /*
- * Entry points from VOP_IOCTL
+ * Helper for VOP_IOCTL: SMBFSIO_GETSD
  */
 int
 smbfs_ioc_getsd(vnode_t *vp, intptr_t arg, int flag, cred_t *cr)
@@ -245,6 +243,9 @@ out:
 	return (error);
 }
 
+/*
+ * Helper for VOP_IOCTL: SMBFSIO_SETSD
+ */
 int
 smbfs_ioc_setsd(vnode_t *vp, intptr_t arg, int flag, cred_t *cr)
 {
@@ -285,61 +286,25 @@ out:
 
 }
 
-#ifdef	ACL_SUPPORT
-/*
- * Conversion functions for VOP_GETSECATTR, VOP_SETSECATTR
- *
- * XXX: We may or may not add conversion code here, or we
- * may add that to usr/src/common (TBD).  For now all the
- * ACL conversion code is in libsmbfs.
- */
 
 /*
- * Convert a Windows SD (in the mdchain mdp) into a
- * ZFS-style vsecattr_t and possibly uid, gid.
- */
-/* ARGSUSED */
-static int
-smb_ntsd2vsec(mdchain_t *mdp, vsecattr_t *vsa,
-	int *uidp, int *gidp, cred_t *cr)
-{
-	/* XXX NOT_YET */
-	return (ENOSYS);
-}
-
-/*
- * Convert a ZFS-style vsecattr_t (and possibly uid, gid)
- * into a Windows SD (built in the mbchain mbp).
- */
-/* ARGSUSED */
-static int
-smb_vsec2ntsd(vsecattr_t *vsa, int uid, int gid,
-	mbchain_t *mbp, cred_t *cr)
-{
-	/* XXX NOT_YET */
-	return (ENOSYS);
-}
-#endif	/* ACL_SUPPORT */
-
-/*
- * Entry points from VOP_GETSECATTR, VOP_SETSECATTR
- *
- * Disabled the real _getacl functionality for now,
- * because we have no way to return the owner and
- * primary group until we replace our fake uid/gid
- * in getattr with something derived from _getsd.
+ * Helper for VOP_GETSECATTR
+ * Call smbfs_getsd, convert NT to ZFS form.
  */
 
 /* ARGSUSED */
 int
 smbfs_getacl(vnode_t *vp, vsecattr_t *vsa,
-	int *uidp, int *gidp, int flag, cred_t *cr)
+	uid_t *uidp, gid_t *gidp, int flag, cred_t *cr)
 {
-#ifdef	ACL_SUPPORT
 	mdchain_t *mdp, md_store;
-	mblk_t *m;
+	mblk_t *m = NULL;
+	i_ntsd_t *sd = NULL;
 	uint32_t	selector;
 	int		error;
+
+	bzero(&md_store, sizeof (md_store));
+	mdp = &md_store;
 
 	/*
 	 * Which parts of the SD we request.
@@ -365,40 +330,50 @@ smbfs_getacl(vnode_t *vp, vsecattr_t *vsa,
 	 */
 	error = smbfs_getsd(vp, selector, &m, cr);
 	if (error)
-		return (error);
+		goto out;
+	/* Note: allocated *m */
+	md_initm(mdp, m);
 
 	/*
-	 * Have m.  Must free it before return.
+	 * Parse the OtW security descriptor,
+	 * storing in our internal form.
 	 */
-	mdp = &md_store;
-	md_initm(mdp, m);
+	error = md_get_ntsd(mdp, &sd);
+	if (error)
+		goto out;
 
 	/*
 	 * Convert the Windows security descriptor to a
 	 * ZFS ACL (and owner ID, primary group ID).
-	 * This is the difficult part. (todo)
 	 */
-	error = smb_ntsd2vsec(mdp, vsa, uidp, gidp, cr);
+	error = smbfs_acl_sd2zfs(sd, vsa, uidp, gidp);
 
+out:
+	if (sd != NULL)
+		smbfs_acl_free_sd(sd);
 	/* Note: m_freem(m) is done by... */
 	md_done(mdp);
 
 	return (error);
-#else	/* ACL_SUPPORT */
-	return (ENOSYS);
-#endif	/* ACL_SUPPORT */
 }
 
+/*
+ * Helper for VOP_SETSECATTR
+ * Convert ZFS to NT form, call smbfs_setsd.
+ */
 
 /* ARGSUSED */
 int
 smbfs_setacl(vnode_t *vp, vsecattr_t *vsa,
-	int uid, int gid, int flag, cred_t *cr)
+	uid_t uid, gid_t gid, int flag, cred_t *cr)
 {
-#ifdef	ACL_SUPPORT
 	mbchain_t *mbp, mb_store;
+	i_ntsd_t *sd = NULL;
 	uint32_t	selector;
 	int		error;
+
+	bzero(&mb_store, sizeof (mb_store));
+	mbp = &mb_store;
 
 	/*
 	 * Which parts of the SD we'll modify.
@@ -407,25 +382,27 @@ smbfs_setacl(vnode_t *vp, vsecattr_t *vsa,
 	selector = 0;
 	if (vsa)
 		selector |= DACL_SECURITY_INFORMATION;
-	if (uid != -1)
+	if (uid != (uid_t)-1)
 		selector |= OWNER_SECURITY_INFORMATION;
-	if (gid != -1)
+	if (gid != (gid_t)-1)
 		selector |= GROUP_SECURITY_INFORMATION;
 	if (selector == 0)
 		return (0);
 
 	/*
-	 * Setup buffer for SD data.
+	 * Convert a ZFS ACL (and owner ID, group ID)
+	 * into an NT SD, internal form.
 	 */
-	mbp = &mb_store;
-	mb_init(mbp);
+	error = smbfs_acl_zfs2sd(vsa, uid, gid, &sd);
+	if (error)
+		goto out;
 
 	/*
-	 * Convert a ZFS ACL (and owner ID, group ID)
-	 * to a Windows security descriptor.
-	 * This is the difficult part. (todo)
+	 * Marshall the internal form SD into an
+	 * OtW security descriptor.
 	 */
-	error = smb_vsec2ntsd(vsa, uid, gid, mbp, cr);
+	mb_init(mbp);
+	error = mb_put_ntsd(mbp, sd);
 	if (error)
 		goto out;
 
@@ -436,9 +413,8 @@ smbfs_setacl(vnode_t *vp, vsecattr_t *vsa,
 	error = smbfs_setsd(vp, selector, &mbp->mb_top, cr);
 
 out:
+	if (sd != NULL)
+		smbfs_acl_free_sd(sd);
 	mb_done(mbp);
 	return (error);
-#else	/* ACL_SUPPORT */
-	return (ENOSYS);
-#endif	/* ACL_SUPPORT */
 }

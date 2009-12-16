@@ -50,7 +50,9 @@
 
 #include <sys/param.h>
 #include <sys/fstyp.h>
+#include <sys/avl.h>
 #include <sys/list.h>
+#include <sys/t_lock.h>
 #include <sys/vfs.h>
 #include <sys/fs/smbfs_mount.h>
 
@@ -85,11 +87,14 @@ struct smbnode;
 struct smb_share;
 
 /*
- * The values for smi_flags.
+ * The values for smi_flags (from nfs_clnt.h)
  */
-#define	SMI_INT		0x01		/* interrupts allowed */
-#define	SMI_DEAD	0x02		/* zone shutting down */
+#define	SMI_INT		0x04		/* interrupts allowed */
+#define	SMI_NOAC	0x10		/* don't cache attributes */
 #define	SMI_LLOCK	0x80		/* local locking only */
+#define	SMI_ACL		0x2000		/* share supports ACLs */
+#define	SMI_EXTATTR	0x80000		/* share supports ext. attrs */
+#define	SMI_DEAD	0x200000	/* mount has been terminated */
 
 /*
  * Stuff returned by smbfs_smb_qfsattr
@@ -118,6 +123,14 @@ typedef struct smbmntinfo {
 #define	smi_fsattr		smi_fsa.fsa_aflags
 
 	/*
+	 * The smbfs node cache for this mount.
+	 * Named "hash" for historical reasons.
+	 * See smbfs_node.h for details.
+	 */
+	avl_tree_t		smi_hash_avl;
+	krwlock_t		smi_hash_lk;
+
+	/*
 	 * Kstat statistics
 	 */
 	struct kstat    *smi_io_kstats;
@@ -131,20 +144,34 @@ typedef struct smbmntinfo {
 	/* Lock for the list is: smi_globals_t -> smg_lock */
 
 	/*
-	 * Copy of the args from mount.
+	 * Stuff copied or derived from the mount args
 	 */
-	struct smbfs_args	smi_args;
+	uid_t		smi_uid;		/* user id */
+	gid_t		smi_gid;		/* group id */
+	mode_t		smi_fmode;		/* mode for files */
+	mode_t		smi_dmode;		/* mode for dirs */
+
+	hrtime_t	smi_acregmin;	/* min time to hold cached file attr */
+	hrtime_t	smi_acregmax;	/* max time to hold cached file attr */
+	hrtime_t	smi_acdirmin;	/* min time to hold cached dir attr */
+	hrtime_t	smi_acdirmax;	/* max time to hold cached dir attr */
 } smbmntinfo_t;
 
-typedef struct smbfattr {
-	int		fa_attr;
-	len_t		fa_size;
-	struct timespec fa_atime;
-	struct timespec fa_ctime;
-	struct timespec fa_mtime;
-	ino64_t		fa_ino;
-	struct timespec fa_reqtime;
-} smbfattr_t;
+/*
+ * Attribute cache timeout defaults (in seconds).
+ */
+#define	SMBFS_ACREGMIN	3	/* min secs to hold cached file attr */
+#define	SMBFS_ACREGMAX	60	/* max secs to hold cached file attr */
+#define	SMBFS_ACDIRMIN	30	/* min secs to hold cached dir attr */
+#define	SMBFS_ACDIRMAX	60	/* max secs to hold cached dir attr */
+/* and limits for the mount options */
+#define	SMBFS_ACMINMAX	600	/* 10 min. is longest min timeout */
+#define	SMBFS_ACMAXMAX	3600	/* 1 hr is longest max timeout */
+
+/*
+ * High-res time is nanoseconds.
+ */
+#define	SEC2HR(sec)	((sec) * (hrtime_t)NANOSEC)
 
 /*
  * vnode pointer to mount info

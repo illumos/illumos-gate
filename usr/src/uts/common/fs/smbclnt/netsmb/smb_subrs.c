@@ -134,7 +134,7 @@ smb_errmsg(int cel, const char *func_name, const char *fmt, ...)
 		 * Don't bother to log these, but just
 		 * fire a dtrace probe with the message.
 		 */
-		vsnprintf(buf, sizeof (buf), fmt, adx);
+		(void) vsnprintf(buf, sizeof (buf), fmt, adx);
 		DTRACE_PROBE2(debugmsg2,
 		    (char *), func_name,
 		    (char *), buf);
@@ -144,7 +144,7 @@ smb_errmsg(int cel, const char *func_name, const char *fmt, ...)
 		 * Add a prefix to the fmt string,
 		 * then let vcmn_err do the args.
 		 */
-		snprintf(buf, sizeof (buf), "?%s: %s", func_name, fmt);
+		(void) snprintf(buf, sizeof (buf), "?%s: %s", func_name, fmt);
 		DTRACE_PROBE3(debugmsg3,
 		    (char *), func_name,
 		    (char *), buf,
@@ -186,19 +186,22 @@ m_dumpm(mblk_t *m)
 #define	ECOMM EIO
 #endif
 #ifndef ENOMEDIUM
-#define	ENOMEDIUM EIO
+#define	ENOMEDIUM ENXIO
 #endif
 #ifndef ETIME
 #define	ETIME ETIMEDOUT
 #endif
 
-static struct {
-	unsigned nterr;
-	unsigned errno;
+static const struct {
+	unsigned int nterr;
+	unsigned int errno;
 } nt2errno[] = {
+	/* Alphabetical order. */
 	{NT_STATUS_ACCESS_DENIED,		EACCES},
 	{NT_STATUS_ACCESS_VIOLATION,		EACCES},
 	{NT_STATUS_ACCOUNT_DISABLED,		EACCES},
+	{NT_STATUS_ACCOUNT_EXPIRED,		EACCES},
+	{NT_STATUS_ACCOUNT_LOCKED_OUT,		EACCES},
 	{NT_STATUS_ACCOUNT_RESTRICTION,		EACCES},
 	{NT_STATUS_ADDRESS_ALREADY_EXISTS,	EADDRINUSE},
 	{NT_STATUS_BAD_NETWORK_NAME,		ENOENT},
@@ -209,6 +212,7 @@ static struct {
 	{NT_STATUS_CONNECTION_DISCONNECTED,	ECONNABORTED},
 	{NT_STATUS_CONNECTION_REFUSED,		ECONNREFUSED},
 	{NT_STATUS_CONNECTION_RESET,		ENETRESET},
+	{NT_STATUS_DELETE_PENDING,		EACCES},
 	{NT_STATUS_DEVICE_DOES_NOT_EXIST,	ENODEV},
 	{NT_STATUS_DEVICE_PROTOCOL_ERROR,	EPROTO},
 	{NT_STATUS_DIRECTORY_NOT_EMPTY,		ENOTEMPTY},
@@ -216,13 +220,16 @@ static struct {
 	{NT_STATUS_DLL_NOT_FOUND,		ELIBACC},
 	{NT_STATUS_END_OF_FILE,			ENODATA},
 	{NT_STATUS_FILE_IS_A_DIRECTORY,		EISDIR},
+	{NT_STATUS_FILE_LOCK_CONFLICT,		EAGAIN},
 	{NT_STATUS_FLOAT_INEXACT_RESULT,	ERANGE},
 	{NT_STATUS_FLOAT_OVERFLOW,		ERANGE},
 	{NT_STATUS_FLOAT_UNDERFLOW,		ERANGE},
 	{NT_STATUS_HOST_UNREACHABLE,		EHOSTUNREACH},
 	{NT_STATUS_ILL_FORMED_PASSWORD,		EACCES},
 	{NT_STATUS_INTEGER_OVERFLOW,		ERANGE},
+	{NT_STATUS_INVALID_ACCOUNT_NAME,	EACCES},
 	{NT_STATUS_INVALID_HANDLE,		EBADF},
+	{NT_STATUS_INVALID_LEVEL,		ENOTSUP},
 	{NT_STATUS_INVALID_LOGON_HOURS,		EACCES},
 	{NT_STATUS_INVALID_PARAMETER,		EINVAL},
 	{NT_STATUS_INVALID_PIPE_STATE,		EPIPE},
@@ -232,6 +239,8 @@ static struct {
 	{NT_STATUS_IP_ADDRESS_CONFLICT1,	ENOTUNIQ},
 	{NT_STATUS_IP_ADDRESS_CONFLICT2,	ENOTUNIQ},
 	{NT_STATUS_LICENSE_QUOTA_EXCEEDED,	EDQUOT},
+	{NT_STATUS_LOCK_NOT_GRANTED,		EAGAIN},
+	{NT_STATUS_LOGIN_TIME_RESTRICTION,	EACCES},
 	{NT_STATUS_LOGON_FAILURE,		EACCES},
 	{NT_STATUS_MEDIA_WRITE_PROTECTED,	EROFS},
 	{NT_STATUS_MEMORY_NOT_ALLOCATED,	EFAULT},
@@ -241,6 +250,7 @@ static struct {
 	{NT_STATUS_NETWORK_UNREACHABLE,		ENETUNREACH},
 	{NT_STATUS_NET_WRITE_FAULT,		ECOMM},
 	{NT_STATUS_NONEXISTENT_SECTOR,		ESPIPE},
+	{NT_STATUS_NONE_MAPPED,			EINVAL},
 	{NT_STATUS_NOT_A_DIRECTORY,		ENOTDIR},
 	{NT_STATUS_NOT_IMPLEMENTED,		ENOSYS},
 	{NT_STATUS_NOT_MAPPED_VIEW,		EINVAL},
@@ -251,11 +261,13 @@ static struct {
 	{NT_STATUS_NO_SUCH_DEVICE,		ENODEV},
 	{NT_STATUS_NO_SUCH_FILE,		ENOENT},
 	{NT_STATUS_OBJECT_NAME_COLLISION,	EEXIST},
-	{NT_STATUS_OBJECT_NAME_NOT_FOUND,	ENOENT},
 	{NT_STATUS_OBJECT_NAME_INVALID,		EINVAL},
+	{NT_STATUS_OBJECT_NAME_NOT_FOUND,	ENOENT},
 	{NT_STATUS_OBJECT_PATH_INVALID,		ENOTDIR},
+	{NT_STATUS_OBJECT_PATH_NOT_FOUND,	ENOENT},
 	{NT_STATUS_PAGEFILE_QUOTA,		EDQUOT},
 	{NT_STATUS_PASSWORD_EXPIRED,		EACCES},
+	{NT_STATUS_PASSWORD_MUST_CHANGE,	EACCES},
 	{NT_STATUS_PASSWORD_RESTRICTION,	EACCES},
 	{NT_STATUS_PATH_NOT_COVERED,		ENOENT},
 	{NT_STATUS_PIPE_BROKEN,			EPIPE},
@@ -268,6 +280,7 @@ static struct {
 	{NT_STATUS_PORT_UNREACHABLE,		EHOSTUNREACH},
 	{NT_STATUS_PROTOCOL_UNREACHABLE,	ENOPROTOOPT},
 	{NT_STATUS_QUOTA_EXCEEDED,		EDQUOT},
+	{NT_STATUS_RANGE_NOT_LOCKED,		EIO},
 	{NT_STATUS_REGISTRY_QUOTA_LIMIT,	EDQUOT},
 	{NT_STATUS_REMOTE_DISCONNECT,		ESHUTDOWN},
 	{NT_STATUS_REMOTE_NOT_LISTENING,	ECONNREFUSED},
@@ -283,10 +296,10 @@ static struct {
 	{0,	0}
 };
 
-static struct {
-	unsigned dclass;
-	unsigned derr;
-	unsigned nterr;
+static const struct {
+	unsigned short dclass;
+	unsigned short derr;
+	unsigned int nterr;
 } nt2doserr[] = {
 	{ERRDOS,	ERRgeneral,	NT_STATUS_UNSUCCESSFUL},
 	{ERRDOS,	ERRbadfunc,	NT_STATUS_NOT_IMPLEMENTED},
@@ -614,7 +627,7 @@ static struct {
 	{ERRHRD,	ERRgeneral,	NT_STATUS_APP_INIT_FAILURE},
 	{ERRHRD,	ERRgeneral,	NT_STATUS_PAGEFILE_CREATE_FAILED},
 	{ERRHRD,	ERRgeneral,	NT_STATUS_NO_PAGEFILE},
-	{ERRDOS,	124,	NT_STATUS_INVALID_LEVEL},
+	{ERRDOS,	ERRunknownlevel,	NT_STATUS_INVALID_LEVEL},
 	{ERRDOS,	86,	NT_STATUS_WRONG_PASSWORD_CORE},
 	{ERRHRD,	ERRgeneral,	NT_STATUS_ILLEGAL_FLOAT_CONTEXT},
 	{ERRDOS,	109,	NT_STATUS_PIPE_BROKEN},
@@ -652,7 +665,8 @@ static struct {
 	{ERRHRD,	ERRgeneral,	NT_STATUS_DISK_RESET_FAILED},
 	{ERRHRD,	ERRgeneral,	NT_STATUS_SHARED_IRQ_BUSY},
 	{ERRHRD,	ERRgeneral,	NT_STATUS_FT_ORPHANING},
-	{ERRHRD,	ERRgeneral, NT_STATUS_BIOS_FAILED_TO_CONNECT_INTERRUPT},
+	{ERRHRD,	ERRgeneral,
+		NT_STATUS_BIOS_FAILED_TO_CONNECT_INTERRUPT},
 	{ERRHRD,	ERRgeneral,	NT_STATUS_16F},
 	{ERRHRD,	ERRgeneral,	NT_STATUS_170},
 	{ERRHRD,	ERRgeneral,	NT_STATUS_171},
@@ -695,7 +709,7 @@ static struct {
 	{ERRHRD,	ERRgeneral,	NT_STATUS_REMOTE_SESSION_LIMIT},
 	{ERRHRD,	ERRgeneral,	NT_STATUS_EVENTLOG_FILE_CHANGED},
 	{ERRDOS,	ERRnoaccess,
-	    NT_STATUS_NOLOGON_INTERDOMAIN_TRUST_ACCOUNT},
+		NT_STATUS_NOLOGON_INTERDOMAIN_TRUST_ACCOUNT},
 	{ERRDOS,	ERRnoaccess,
 		NT_STATUS_NOLOGON_WORKSTATION_TRUST_ACCOUNT},
 	{ERRDOS,	ERRnoaccess,	NT_STATUS_NOLOGON_SERVER_TRUST_ACCOUNT},
@@ -853,12 +867,13 @@ smb_maperror(int eclass, int eno)
 	switch (eclass) {
 	case ERRDOS:
 		switch (eno) {
+		case ERRunknownlevel:
+			return (ENOTSUP);
 		case ERRbadfunc:
 		case ERRbadenv:
 		case ERRbadformat:
 		case ERRremcd:
 		case ERRrmuns:
-		case ERRunknownlevel:
 			return (EINVAL);
 		case ERRbadfile:
 		case ERRbadpath:
@@ -910,7 +925,7 @@ smb_maperror(int eclass, int eno)
 		case ERRnofiles:
 			return (0);	/* eeof ? */
 		case ERRlock:
-			return (EDEADLK);
+			return (EAGAIN);
 		case ERRfilexists:
 			return (EEXIST);
 		case ERRinvalidname:	/* samba maps as noent */
@@ -937,9 +952,7 @@ smb_maperror(int eclass, int eno)
 		case ERRinvnid:
 			return (ENETRESET);
 		case ERRinvnetname:
-			SMBERROR("NetBIOS name is invalid: %d\n",
-			    ERRinvnetname);
-			return (EAUTH);
+			return (ENXIO);
 		case ERRbadtype:		/* reserved and returned */
 			return (EIO);
 		case ERRacctexpired: /* NT: account exists but disabled */
@@ -957,7 +970,7 @@ smb_maperror(int eclass, int eno)
 		case ERRbadshare:
 			return (ETXTBSY);
 		case ERRlock:
-			return (EDEADLK);
+			return (EAGAIN);
 		case ERRdiskfull:
 			return (EFBIG);
 		case ERRnotready:

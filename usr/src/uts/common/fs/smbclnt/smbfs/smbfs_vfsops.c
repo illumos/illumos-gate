@@ -39,6 +39,7 @@
 
 #include <sys/systm.h>
 #include <sys/cred.h>
+#include <sys/time.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
 #include <fs/fs_subr.h>
@@ -173,7 +174,7 @@ static void	smbfs_freevfs(vfs_t *);
 int
 _init(void)
 {
-	int		status;
+	int		error;
 
 	/*
 	 * Check compiled-in version of "nsmb"
@@ -186,13 +187,30 @@ _init(void)
 
 	smbfs_mountcount = 0;
 
-	if ((status = smbfs_clntinit()) != 0) {
-		cmn_err(CE_WARN, "_init: smbfs_clntinit failed");
-		return (status);
+	/*
+	 * NFS calls these two in _clntinit
+	 * Easier to follow this way.
+	 */
+	if ((error = smbfs_subrinit()) != 0) {
+		cmn_err(CE_WARN, "_init: smbfs_subrinit failed");
+		return (error);
 	}
 
-	status = mod_install((struct modlinkage *)&modlinkage);
-	return (status);
+	if ((error = smbfs_vfsinit()) != 0) {
+		cmn_err(CE_WARN, "_init: smbfs_vfsinit failed");
+		smbfs_subrfini();
+		return (error);
+	}
+
+	if ((error = smbfs_clntinit()) != 0) {
+		cmn_err(CE_WARN, "_init: smbfs_clntinit failed");
+		smbfs_vfsfini();
+		smbfs_subrfini();
+		return (error);
+	}
+
+	error = mod_install((struct modlinkage *)&modlinkage);
+	return (error);
 }
 
 /*
@@ -221,6 +239,10 @@ _fini(void)
 	 * Free the allocated smbnodes, etc.
 	 */
 	smbfs_clntfini();
+
+	/* NFS calls these two in _clntfini */
+	smbfs_vfsfini();
+	smbfs_subrfini();
 
 	/*
 	 * Free the ops vectors
@@ -298,10 +320,21 @@ smbfsfini()
 void
 smbfs_free_smi(smbmntinfo_t *smi)
 {
-	if (smi) {
-		smbfs_zonelist_remove(smi);
-		kmem_free(smi, sizeof (smbmntinfo_t));
-	}
+	if (smi == NULL)
+		return;
+
+	if (smi->smi_zone != NULL)
+		zone_rele(smi->smi_zone);
+
+	if (smi->smi_share != NULL)
+		smb_share_rele(smi->smi_share);
+
+	avl_destroy(&smi->smi_hash_avl);
+	rw_destroy(&smi->smi_hash_lk);
+	cv_destroy(&smi->smi_statvfs_cv);
+	mutex_destroy(&smi->smi_lock);
+
+	kmem_free(smi, sizeof (smbmntinfo_t));
 }
 
 /*
@@ -313,7 +346,7 @@ smbfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 {
 	char		*data = uap->dataptr;
 	int		error;
-	vnode_t 	*rtvp = NULL;	/* root of this fs */
+	smbnode_t 	*rtnp = NULL;	/* root of this fs */
 	smbmntinfo_t 	*smi = NULL;
 	dev_t 		smbfs_dev;
 	int 		version;
@@ -322,6 +355,7 @@ smbfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	zone_t		*mntzone = NULL;
 	smb_share_t 	*ssp = NULL;
 	smb_cred_t 	scred;
+	int		flags, sec;
 
 	STRUCT_DECL(smbfs_args, args);		/* smbfs mount arguments */
 
@@ -336,8 +370,6 @@ smbfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	 *
 	 * uap->datalen might be different from sizeof (args)
 	 * in a compatible situation.
-	 *
-	 * XXX - todo: handle mount options string
 	 */
 	STRUCT_INIT(args, get_udatamodel());
 	bzero(STRUCT_BUF(args), SIZEOF_STRUCT(smbfs_args, DATAMODEL_NATIVE));
@@ -356,6 +388,9 @@ smbfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 		return (EINVAL);
 	}
 
+	/*
+	 * Deal with re-mount requests.
+	 */
 	if (uap->flags & MS_REMOUNT) {
 		cmn_err(CE_WARN, "MS_REMOUNT not implemented");
 		return (ENOTSUP);
@@ -386,11 +421,9 @@ smbfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 		return (error);
 	}
 
-	smb_credinit(&scred, cr);
-
 	/*
 	 * Use "goto errout" from here on.
-	 * See: ssp, smi, rtvp, mntzone
+	 * See: ssp, smi, rtnp, mntzone
 	 */
 
 	/*
@@ -437,41 +470,93 @@ smbfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 		}
 	}
 
-	/*
-	 * Get root vnode.
-	 */
-proceed:
+	/* Prevent unload. */
+	atomic_inc_32(&smbfs_mountcount);
 
 	/*
 	 * Create a mount record and link it to the vfs struct.
+	 * No more possiblities for errors from here on.
+	 * Tear-down of this stuff is in smbfs_free_smi()
+	 *
 	 * Compare with NFS: nfsrootvp()
 	 */
-	smi = kmem_zalloc(sizeof (smbmntinfo_t), KM_SLEEP);
+	smi = kmem_zalloc(sizeof (*smi), KM_SLEEP);
 
-	smi->smi_share	= ssp;
-	smi->smi_zone	= mntzone;
-	smi->smi_flags	= SMI_LLOCK;
+	mutex_init(&smi->smi_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&smi->smi_statvfs_cv, NULL, CV_DEFAULT, NULL);
+
+	rw_init(&smi->smi_hash_lk, NULL, RW_DEFAULT, NULL);
+	smbfs_init_hash_avl(&smi->smi_hash_avl);
+
+	smi->smi_share = ssp;
+	ssp = NULL;
+	smi->smi_zone = mntzone;
+	mntzone = NULL;
 
 	/*
-	 * Handle mount options.  See also XATTR below.
-	 * XXX: forcedirectio, largefiles (later)
+	 * Initialize option defaults
+	 */
+	smi->smi_flags	= SMI_LLOCK;
+	smi->smi_acregmin = SEC2HR(SMBFS_ACREGMIN);
+	smi->smi_acregmax = SEC2HR(SMBFS_ACREGMAX);
+	smi->smi_acdirmin = SEC2HR(SMBFS_ACDIRMIN);
+	smi->smi_acdirmax = SEC2HR(SMBFS_ACDIRMAX);
+
+	/*
+	 * All "generic" mount options have already been
+	 * handled in vfs.c:domount() - see mntopts stuff.
+	 * Query generic options using vfs_optionisset().
 	 */
 	if (vfs_optionisset(vfsp, MNTOPT_INTR, NULL))
 		smi->smi_flags |= SMI_INT;
 
 	/*
-	 * XXX If not root, get uid/gid from the covered vnode.
+	 * Get the mount options that come in as smbfs_args,
+	 * starting with args.flags (SMBFS_MF_xxx)
 	 */
-	smi->smi_args.dir_mode	= STRUCT_FGET(args, dir_mode);
-	smi->smi_args.file_mode = STRUCT_FGET(args, file_mode);
-	smi->smi_args.uid 	= STRUCT_FGET(args, uid);
-	smi->smi_args.gid 	= STRUCT_FGET(args, gid);
+	flags = STRUCT_FGET(args, flags);
+	smi->smi_uid 	= STRUCT_FGET(args, uid);
+	smi->smi_gid 	= STRUCT_FGET(args, gid);
+	smi->smi_fmode	= STRUCT_FGET(args, file_mode) & 0777;
+	smi->smi_dmode	= STRUCT_FGET(args, dir_mode) & 0777;
+
+	/*
+	 * Hande the SMBFS_MF_xxx flags.
+	 */
+	if (flags & SMBFS_MF_NOAC)
+		smi->smi_flags |= SMI_NOAC;
+	if (flags & SMBFS_MF_ACREGMIN) {
+		sec = STRUCT_FGET(args, acregmin);
+		if (sec < 0 || sec > SMBFS_ACMINMAX)
+			sec = SMBFS_ACMINMAX;
+		smi->smi_acregmin = SEC2HR(sec);
+	}
+	if (flags & SMBFS_MF_ACREGMAX) {
+		sec = STRUCT_FGET(args, acregmax);
+		if (sec < 0 || sec > SMBFS_ACMAXMAX)
+			sec = SMBFS_ACMAXMAX;
+		smi->smi_acregmax = SEC2HR(sec);
+	}
+	if (flags & SMBFS_MF_ACDIRMIN) {
+		sec = STRUCT_FGET(args, acdirmin);
+		if (sec < 0 || sec > SMBFS_ACMINMAX)
+			sec = SMBFS_ACMINMAX;
+		smi->smi_acdirmin = SEC2HR(sec);
+	}
+	if (flags & SMBFS_MF_ACDIRMAX) {
+		sec = STRUCT_FGET(args, acdirmax);
+		if (sec < 0 || sec > SMBFS_ACMAXMAX)
+			sec = SMBFS_ACMAXMAX;
+		smi->smi_acdirmax = SEC2HR(sec);
+	}
 
 	/*
 	 * Get attributes of the remote file system,
 	 * i.e. ACL support, named streams, etc.
 	 */
-	error = smbfs_smb_qfsattr(ssp, &smi->smi_fsa, &scred);
+	smb_credinit(&scred, cr);
+	error = smbfs_smb_qfsattr(smi->smi_share, &smi->smi_fsa, &scred);
+	smb_credrele(&scred);
 	if (error) {
 		SMBVDEBUG("smbfs_smb_qfsattr error %d\n", error);
 	}
@@ -503,56 +588,39 @@ proceed:
 	vfsp->vfs_bcount = 0;
 
 	smi->smi_vfsp	= vfsp;
-	smbfs_zonelist_add(smi);
+	smbfs_zonelist_add(smi);	/* undo in smbfs_freevfs */
 
 	/*
 	 * Create the root vnode, which we need in unmount
-	 * for the call to smb_check_table(), etc.
+	 * for the call to smbfs_check_table(), etc.
+	 * Release this hold in smbfs_unmount.
 	 */
-	rtvp = smbfs_make_node(vfsp, "\\", 1, NULL, 0, 0, NULL);
-	if (!rtvp) {
-		cmn_err(CE_WARN, "smbfs_mount: make_node failed\n");
-		return (ENOENT);
-	}
-	rtvp->v_type = VDIR;
-	rtvp->v_flag |= VROOT;
+	rtnp = smbfs_node_findcreate(smi, "\\", 1, NULL, 0, 0,
+	    &smbfs_fattr0);
+	ASSERT(rtnp != NULL);
+	rtnp->r_vnode->v_type = VDIR;
+	rtnp->r_vnode->v_flag |= VROOT;
+	smi->smi_root = rtnp;
 
 	/*
-	 * Could get attributes here, but that can wait
-	 * until someone does a getattr call.
-	 *
 	 * NFS does other stuff here too:
 	 *   async worker threads
 	 *   init kstats
 	 *
 	 * End of code from NFS nfsrootvp()
 	 */
-
-	smb_credrele(&scred);
-
-	smi->smi_root = VTOSMB(rtvp);
-
-	atomic_inc_32(&smbfs_mountcount);
-
 	return (0);
 
 errout:
-
-	ASSERT(rtvp == NULL);
-
 	vfsp->vfs_data = NULL;
-	if (smi)
+	if (smi != NULL)
 		smbfs_free_smi(smi);
 
 	if (mntzone != NULL)
 		zone_rele(mntzone);
 
-	if (ssp)
+	if (ssp != NULL)
 		smb_share_rele(ssp);
-
-	smb_credrele(&scred);
-
-	/* args, if we allocated */
 
 	return (error);
 }
@@ -572,16 +640,14 @@ smbfs_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 		return (EPERM);
 
 	if ((flag & MS_FORCE) == 0) {
-#ifdef APPLE
 		smbfs_rflush(vfsp, cr);
-#endif
 
 		/*
 		 * If there are any active vnodes on this file system,
 		 * (other than the root vnode) then the file system is
 		 * busy and can't be umounted.
 		 */
-		if (smb_check_table(vfsp, smi->smi_root))
+		if (smbfs_check_table(vfsp, smi->smi_root))
 			return (EBUSY);
 
 		/*
@@ -625,7 +691,7 @@ smbfs_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 
 	/*
 	 * Remove all nodes from the node hash tables.
-	 * This (indirectly) calls: smb_addfree, smbinactive,
+	 * This (indirectly) calls: smbfs_addfree, smbinactive,
 	 * which will try to flush dirty pages, etc. so
 	 * don't destroy the underlying share just yet.
 	 *
@@ -652,10 +718,8 @@ smbfs_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 	}
 
 	/*
-	 * Note: the smb_share_rele()
-	 * happens in smbfs_freevfs()
+	 * The rest happens in smbfs_freevfs()
 	 */
-
 	return (0);
 }
 
@@ -801,12 +865,11 @@ smbfs_sync(vfs_t *vfsp, short flag, cred_t *cr)
 	 * Cross-zone calls are OK here, since this translates to a
 	 * VOP_PUTPAGE(B_ASYNC), which gets picked up by the right zone.
 	 */
-#ifdef APPLE
 	if (!(flag & SYNC_ATTR) && mutex_tryenter(&smbfs_syncbusy) != 0) {
 		smbfs_rflush(vfsp, cr);
 		mutex_exit(&smbfs_syncbusy);
 	}
-#endif /* APPLE */
+
 	return (0);
 }
 
@@ -833,7 +896,6 @@ void
 smbfs_freevfs(vfs_t *vfsp)
 {
 	smbmntinfo_t    *smi;
-	smb_share_t 	*ssp;
 
 	/* free up the resources */
 	smi = VFTOSMI(vfsp);
@@ -845,15 +907,7 @@ smbfs_freevfs(vfs_t *vfsp)
 	 */
 	ASSERT(smi->smi_io_kstats == NULL);
 
-	/*
-	 * Drop our reference to the share.
-	 * This usually leads to VC close.
-	 */
-	ssp = smi->smi_share;
-	smi->smi_share = NULL;
-	smb_share_rele(ssp);
-
-	zone_rele(smi->smi_zone);
+	smbfs_zonelist_remove(smi);
 
 	smbfs_free_smi(smi);
 

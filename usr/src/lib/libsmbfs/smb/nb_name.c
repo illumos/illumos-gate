@@ -206,7 +206,7 @@ nb_name_encode(struct mbdata *mbp, struct nb_name *nn)
 		return (0);
 	}
 
-	mb_fit(mbp, 1, &plen);
+	(void) mb_fit(mbp, 1, &plen);
 	*plen = 0; /* will update below */
 	lblen = 0;
 	for (p = nn->nn_scope; ; p++) {
@@ -218,7 +218,7 @@ nb_name_encode(struct mbdata *mbp, struct nb_name *nn)
 		}
 		if (*p == '.') {
 			*plen = lblen;
-			mb_fit(mbp, 1, &plen);
+			(void) mb_fit(mbp, 1, &plen);
 			*plen = 0;
 			lblen = 0;
 		} else {

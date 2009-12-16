@@ -53,7 +53,7 @@
 #include <netsmb/smb_lib.h>
 #include <netsmb/smbfs_acl.h>
 
-#include "acl_nt.h"
+#include "smbfs_ntacl.h"
 
 static void
 fprint_sid(FILE *fp, i_ntsid_t *sid)

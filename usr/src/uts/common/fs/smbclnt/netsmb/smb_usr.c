@@ -194,7 +194,7 @@ smb_usr_simplerq(smb_dev_t *sdp, intptr_t arg, int flags, cred_t *cr)
 	ioc->ioc_errclass = rqp->sr_errclass;
 	ioc->ioc_serror = rqp->sr_serror;
 	ioc->ioc_error = rqp->sr_error;
-	ddi_copyout(ioc, (void *)arg, sizeof (*ioc), flags);
+	(void) ddi_copyout(ioc, (void *)arg, sizeof (*ioc), flags);
 
 out:
 	if (rqp != NULL)
@@ -310,7 +310,7 @@ smb_usr_t2request(smb_dev_t *sdp, intptr_t arg, int flags, cred_t *cr)
 	ioc->ioc_error = t2p->t2_sr_error;
 	ioc->ioc_rpflags2 = t2p->t2_sr_rpflags2;
 
-	ddi_copyout(ioc, (void *)arg, sizeof (*ioc), flags);
+	(void) ddi_copyout(ioc, (void *)arg, sizeof (*ioc), flags);
 
 
 out:
@@ -404,7 +404,7 @@ smb_usr_rw(smb_dev_t *sdp, int cmd, intptr_t arg, int flags, cred_t *cr)
 	 */
 	ioc->ioc_cnt -= auio.uio_resid;
 
-	ddi_copyout(ioc, (void *)arg, sizeof (*ioc), flags);
+	(void) ddi_copyout(ioc, (void *)arg, sizeof (*ioc), flags);
 
 out:
 	if (ioc != NULL)
@@ -612,7 +612,7 @@ smb_usr_get_tree(smb_dev_t *sdp, int cmd, intptr_t arg, int flags, cred_t *cr)
 	 * the tree connect response, so they can
 	 * see if they got the requested type.
 	 */
-	memcpy(tcon->tc_sh.sh_type_ret,
+	(void) memcpy(tcon->tc_sh.sh_type_ret,
 	    ssp->ss_type_ret, SMBIOC_STYPE_LEN);
 
 	/*

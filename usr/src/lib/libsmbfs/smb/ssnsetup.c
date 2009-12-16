@@ -405,11 +405,11 @@ smb__ssnsetup(struct smb_ctx *ctx,
 			mb_put_mbuf(mbp, mbc2->mb_top);	/* NT password */
 			mbc2->mb_top = NULL; /* consumed */
 		}
-		mb_put_dstring(mbp, ctx->ct_user, uc);
-		mb_put_dstring(mbp, ctx->ct_domain, uc);
+		mb_put_string(mbp, ctx->ct_user, uc);
+		mb_put_string(mbp, ctx->ct_domain, uc);
 	}
-	mb_put_dstring(mbp, NativeOS, uc);
-	mb_put_dstring(mbp, LanMan, uc);
+	mb_put_string(mbp, NativeOS, uc);
+	mb_put_string(mbp, LanMan, uc);
 	smb_rq_bend(rqp);
 
 	err = smb_rq_internal(ctx, rqp);
@@ -436,7 +436,7 @@ smb__ssnsetup(struct smb_ctx *ctx,
 	is->is_smbuid = rqp->rq_uid;
 	mbp = &rqp->rq_rp;
 
-	err = mb_get_uint8(mbp, &wc);
+	err = md_get_uint8(mbp, &wc);
 	if (err)
 		goto out;
 
@@ -444,18 +444,18 @@ smb__ssnsetup(struct smb_ctx *ctx,
 	if (caps & SMB_CAP_EXT_SECURITY) {
 		if (wc != 4)
 			goto out;
-		mb_get_uint16le(mbp, NULL);	/* secondary cmd */
-		mb_get_uint16le(mbp, NULL);	/* andxoffset */
-		mb_get_uint16le(mbp, actionp);	/* action */
-		mb_get_uint16le(mbp, &sblen);	/* sec. blob len */
-		mb_get_uint16le(mbp, &bc);	/* byte count */
+		md_get_uint16le(mbp, NULL);	/* secondary cmd */
+		md_get_uint16le(mbp, NULL);	/* andxoffset */
+		md_get_uint16le(mbp, actionp);	/* action */
+		md_get_uint16le(mbp, &sblen);	/* sec. blob len */
+		md_get_uint16le(mbp, &bc);	/* byte count */
 		/*
 		 * Get the security blob, after
 		 * sanity-checking the length.
 		 */
 		if (sblen == 0 || bc < sblen)
 			goto out;
-		err = mb_get_mbuf(mbp, sblen, &m);
+		err = md_get_mbuf(mbp, sblen, &m);
 		if (err)
 			goto out;
 		mb_initm(mbc2, m);
@@ -463,10 +463,10 @@ smb__ssnsetup(struct smb_ctx *ctx,
 	} else {
 		if (wc != 3)
 			goto out;
-		mb_get_uint16le(mbp, NULL);	/* secondary cmd */
-		mb_get_uint16le(mbp, NULL);	/* andxoffset */
-		mb_get_uint16le(mbp, actionp);	/* action */
-		err = mb_get_uint16le(mbp, &bc); /* byte count */
+		md_get_uint16le(mbp, NULL);	/* secondary cmd */
+		md_get_uint16le(mbp, NULL);	/* andxoffset */
+		md_get_uint16le(mbp, actionp);	/* action */
+		err = md_get_uint16le(mbp, &bc); /* byte count */
 		if (err)
 			goto out;
 	}
@@ -485,9 +485,9 @@ smb__ssnsetup(struct smb_ctx *ctx,
 		goto out;
 
 	/* Ignore any parsing errors for these strings. */
-	err = mb_get_string(mbp, &ctx->ct_srv_OS, uc);
+	err = md_get_string(mbp, &ctx->ct_srv_OS, uc);
 	DPRINT("server OS: %s", err ? "?" : ctx->ct_srv_OS);
-	err = mb_get_string(mbp, &ctx->ct_srv_LM, uc);
+	err = md_get_string(mbp, &ctx->ct_srv_LM, uc);
 	DPRINT("server LM: %s", err ? "?" : ctx->ct_srv_LM);
 	/*
 	 * There's sometimes a server domain folloing

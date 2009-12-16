@@ -373,7 +373,7 @@ nbns_rq_create(int opcode, struct nb_ctx *ctx, struct nbns_rq **rqpp)
 	if (rqp == NULL)
 		return (ENOMEM);
 	bzero(rqp, sizeof (*rqp));
-	error = mb_init(&rqp->nr_rq, NBDG_MAXSIZE);
+	error = mb_init_sz(&rqp->nr_rq, NBDG_MAXSIZE);
 	if (error) {
 		free(rqp);
 		return (error);
@@ -416,15 +416,15 @@ nbns_rq_getrr(struct nbns_rq *rqp, struct nbns_rr *rrp)
 	if (len < 1)
 		return (NBERROR(NBERR_INVALIDRESPONSE));
 	rrp->rr_name = cp;
-	error = mb_get_mem(mbp, NULL, len);
+	error = md_get_mem(mbp, NULL, len, MB_MSYSTEM);
 	if (error)
 		return (error);
-	mb_get_uint16be(mbp, &rrp->rr_type);
-	mb_get_uint16be(mbp, &rrp->rr_class);
-	mb_get_uint32be(mbp, &rrp->rr_ttl);
-	mb_get_uint16be(mbp, &rrp->rr_rdlength);
+	md_get_uint16be(mbp, &rrp->rr_type);
+	md_get_uint16be(mbp, &rrp->rr_class);
+	md_get_uint32be(mbp, &rrp->rr_ttl);
+	md_get_uint16be(mbp, &rrp->rr_rdlength);
 	rrp->rr_data = (uchar_t *)mbp->mb_pos;
-	error = mb_get_mem(mbp, NULL, rrp->rr_rdlength);
+	error = md_get_mem(mbp, NULL, rrp->rr_rdlength, MB_MSYSTEM);
 	return (error);
 }
 
@@ -436,11 +436,7 @@ nbns_rq_prepare(struct nbns_rq *rqp)
 	uint16_t ofr; /* opcode, flags, rcode */
 	int error;
 
-	/*
-	 * Replacing with one argument.
-	 * error = mb_init(&rqp->nr_rp, NBDG_MAXSIZE);
-	 */
-	error = mb_init(&rqp->nr_rp, NBDG_MAXSIZE);
+	error = mb_init_sz(&rqp->nr_rp, NBDG_MAXSIZE);
 	if (error)
 		return (error);
 
@@ -455,15 +451,19 @@ nbns_rq_prepare(struct nbns_rq *rqp)
 	mb_put_uint16be(mbp, rqp->nr_qdcount);
 	mb_put_uint16be(mbp, rqp->nr_ancount);
 	mb_put_uint16be(mbp, rqp->nr_nscount);
-	mb_put_uint16be(mbp, rqp->nr_arcount);
+	error = mb_put_uint16be(mbp, rqp->nr_arcount);
 	if (rqp->nr_qdcount) {
 		if (rqp->nr_qdcount > 1)
 			return (EINVAL);
-		nb_name_encode(mbp, rqp->nr_qdname);
+		(void) nb_name_encode(mbp, rqp->nr_qdname);
 		mb_put_uint16be(mbp, rqp->nr_qdtype);
-		mb_put_uint16be(mbp, rqp->nr_qdclass);
+		error = mb_put_uint16be(mbp, rqp->nr_qdclass);
 	}
-	m_lineup(mbp->mb_top, &mbp->mb_top);
+	if (error)
+		return (error);
+	error = m_lineup(mbp->mb_top, &mbp->mb_top);
+	if (error)
+		return (error);
 	if (ctx->nb_timo == 0)
 		ctx->nb_timo = 1;	/* by default 1 second */
 	return (0);
@@ -652,7 +652,7 @@ do_recv:
 		mbp = &rqp->nr_rp;
 		if (mbp->mb_count < 12)
 			return (NBERROR(NBERR_INVALIDRESPONSE));
-		mb_get_uint16be(mbp, &rpid);
+		md_get_uint16be(mbp, &rpid);
 		if (rpid != rqp->nr_trnid)
 			return (NBERROR(NBERR_INVALIDRESPONSE));
 		break;
@@ -660,14 +660,14 @@ do_recv:
 	if (tries == maxretry)
 		return (NBERROR(NBERR_HOSTNOTFOUND));
 
-	mb_get_uint16be(mbp, &ofr);
+	md_get_uint16be(mbp, &ofr);
 	rqp->nr_rpnmflags = (ofr >> 4) & 0x7F;
 	rqp->nr_rprcode = ofr & 0xf;
 	if (rqp->nr_rprcode)
 		return (NBERROR(rqp->nr_rprcode));
-	mb_get_uint16be(mbp, &rpid);	/* QDCOUNT */
-	mb_get_uint16be(mbp, &rqp->nr_rpancount);
-	mb_get_uint16be(mbp, &rqp->nr_rpnscount);
-	mb_get_uint16be(mbp, &rqp->nr_rparcount);
+	md_get_uint16be(mbp, &rpid);	/* QDCOUNT */
+	md_get_uint16be(mbp, &rqp->nr_rpancount);
+	md_get_uint16be(mbp, &rqp->nr_rpnscount);
+	md_get_uint16be(mbp, &rqp->nr_rparcount);
 	return (0);
 }

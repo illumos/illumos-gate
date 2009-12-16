@@ -110,6 +110,7 @@ struct smbfs_fctx {
 	 * Return values
 	 */
 	struct smbfattr	f_attr;		/* current attributes */
+	u_longlong_t	f_inum;		/* current I number */
 	char		*f_name;	/* current file name */
 	int		f_nmlen;	/* name len */
 	int		f_namesz;	/* memory allocated */
@@ -148,7 +149,7 @@ typedef struct smbfs_fctx smbfs_fctx_t;
 #define	f_t2	f_urq.uf_t2
 
 /*
- * smb level
+ * smb level (smbfs_smb.c)
  */
 int  smbfs_smb_lock(struct smbnode *np, int op, caddr_t id,
 	offset_t start, uint64_t len,	int largelock,
@@ -163,25 +164,21 @@ int  smbfs_smb_setfsize(struct smbnode *np, uint16_t fid, uint64_t newsize,
 int  smbfs_smb_getfattr(struct smbnode *np, struct smbfattr *fap,
 	struct smb_cred *scrp);
 
-int  smbfs_smb_setfattr(struct smbnode *np, uint16_t fid,
+int  smbfs_smb_setfattr(struct smbnode *np, int fid,
 	uint32_t attr, struct timespec *mtime, struct timespec *atime,
 	struct smb_cred *scrp);
 
-int  smbfs_smb_setpattr(struct smbnode *np,
-	uint32_t attr, struct timespec *mtime, struct timespec *atime,
-	struct smb_cred *scrp);
-
-int  smbfs_smb_open(struct smbnode *np, uint32_t rights, struct smb_cred *scrp,
-	int *attrcacheupdated, uint16_t *fidp, const char *name, int nmlen,
-	int xattr, len_t *sizep, uint32_t *rightsp);
+int  smbfs_smb_open(struct smbnode *np, const char *name, int nmlen,
+	int xattr, uint32_t rights, struct smb_cred *scrp,
+	uint16_t *fidp, uint32_t *rightsp, struct smbfattr *fap);
 int  smbfs_smb_tmpopen(struct smbnode *np, uint32_t rights,
 	struct smb_cred *scrp, uint16_t *fidp);
 int  smbfs_smb_close(struct smb_share *ssp, uint16_t fid,
 	struct timespec *mtime, struct smb_cred *scrp);
 int  smbfs_smb_tmpclose(struct smbnode *ssp, uint16_t fid,
 	struct smb_cred *scrp);
-int  smbfs_smb_create(struct smbnode *dnp, const char *name, int len,
-	struct smb_cred *scrp, uint16_t *fidp, uint32_t disp, int xattr);
+int  smbfs_smb_create(struct smbnode *dnp, const char *name, int nmlen,
+	int xattr, uint32_t disp, struct smb_cred *scrp, uint16_t *fidp);
 int  smbfs_smb_delete(struct smbnode *np, struct smb_cred *scrp,
 	const char *name, int len, int xattr);
 int  smbfs_smb_rename(struct smbnode *src, struct smbnode *tdnp,
@@ -218,9 +215,9 @@ int  smbfs_smb_setsec_m(struct smb_share *ssp, uint16_t fid,
 	struct smb_cred *scrp, uint32_t selector, mblk_t **mp);
 
 int  smbfs_getacl(vnode_t *vp, vsecattr_t *vsecattr,
-	int *uidp, int *gidp, int flag, cred_t *cr);
+	uid_t *uidp, gid_t *gidp, int flag, cred_t *cr);
 int  smbfs_setacl(vnode_t *vp, vsecattr_t *vsecattr,
-	int uid, int gid, int flag, cred_t *cr);
+	uid_t uid, gid_t gid, int flag, cred_t *cr);
 
 int  smbfs_getsd(vnode_t *vp, uint32_t sel, mblk_t **mp, cred_t *cr);
 int  smbfs_setsd(vnode_t *vp, uint32_t sel, mblk_t **mp, cred_t *cr);
@@ -238,33 +235,62 @@ int  smbfs_smb_qstreaminfo(struct smbnode *np, struct smb_cred *scrp,
 	uio_t uio, size_t *sizep);
 #endif /* NOT_YET */
 
-void smbfs_fname_tolocal(struct smbfs_fctx *ctx);
+/*
+ * VFS-level init, fini stuff
+ */
 
-void  smb_time_local2server(struct timespec *tsp, int tzoff, long *seconds);
-void  smb_time_server2local(ulong_t seconds, int tzoff, struct timespec *tsp);
-void  smb_time_NT2local(uint64_t nsec, int tzoff, struct timespec *tsp);
-void  smb_time_local2NT(struct timespec *tsp, int tzoff, uint64_t *nsec);
-void  smb_time_unix2dos(struct timespec *tsp, int tzoff, uint16_t *ddp,
-	uint16_t *dtp, uint8_t *dhp);
-void smb_dos2unixtime(uint_t dd, uint_t dt, uint_t dh, int tzoff,
-	struct timespec *tsp);
 
-/* Stuff borrowed from NFS (and then hacked) */
-vnode_t *smbfs_make_node(vfs_t *vfsp,
-    const char *dir, int dirlen,
-    const char *name, int nmlen,
-    char sep, struct smbfattr *fap);
-void smb_addfree(smbnode_t *sp);
-void smb_addhash(smbnode_t *sp);
-void smb_rmhash(smbnode_t *);
-
+int smbfs_vfsinit(void);
+void smbfs_vfsfini(void);
 int smbfs_subrinit(void);
 void smbfs_subrfini(void);
 int smbfs_clntinit(void);
 void smbfs_clntfini(void);
+
 void smbfs_zonelist_add(smbmntinfo_t *smi);
 void smbfs_zonelist_remove(smbmntinfo_t *smi);
+
+int smbfs_check_table(struct vfs *vfsp, struct smbnode *srp);
 void smbfs_destroy_table(struct vfs *vfsp);
+void smbfs_rflush(struct vfs *vfsp, cred_t *cr);
+
+/*
+ * Function definitions - those having to do with
+ * smbfs nodes, vnodes, etc
+ */
+
+void smbfs_attrcache_prune(struct smbnode *np);
+void smbfs_attrcache_remove(struct smbnode *np);
+void smbfs_attrcache_rm_locked(struct smbnode *np);
+#ifndef	DEBUG
+#define	smbfs_attrcache_rm_locked(np)	(np)->r_attrtime = gethrtime()
+#endif
+void smbfs_attr_touchdir(struct smbnode *dnp);
+void smbfs_attrcache_fa(vnode_t *vp, struct smbfattr *fap);
+void smbfs_cache_check(struct vnode *vp, struct smbfattr *fap);
+
+void smbfs_addfree(struct smbnode *sp);
+void smbfs_rmhash(struct smbnode *);
+
+/* See avl_create in smbfs_vfsops.c */
+void smbfs_init_hash_avl(avl_tree_t *);
+
+uint32_t smbfs_gethash(const char *rpath, int prlen);
+uint32_t smbfs_getino(struct smbnode *dnp, const char *name, int nmlen);
+
+extern struct smbfattr smbfs_fattr0;
+smbnode_t *smbfs_node_findcreate(smbmntinfo_t *mi,
+    const char *dir, int dirlen,
+    const char *name, int nmlen,
+    char sep, struct smbfattr *fap);
+
+int smbfs_nget(vnode_t *dvp, const char *name, int nmlen,
+	struct smbfattr *fap, vnode_t **vpp);
+
+void smbfs_fname_tolocal(struct smbfs_fctx *ctx);
+char    *smbfs_name_alloc(const char *name, int nmlen);
+void	smbfs_name_free(const char *name, int nmlen);
+
 int smbfs_readvnode(vnode_t *, uio_t *, cred_t *, struct vattr *);
 int smbfs_writevnode(vnode_t *vp, uio_t *uiop, cred_t *cr,
 			int ioflag, int timo);

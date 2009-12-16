@@ -47,6 +47,7 @@
 #include <sys/byteorder.h>
 #include <sys/ccompile.h>
 
+#include <netsmb/mchain.h>
 #include <netsmb/netbios.h>
 
 extern void dprint(const char *, const char *, ...)
@@ -70,39 +71,6 @@ extern void dprint(const char *, const char *, ...)
 #define	SMBV_UNICODE		0x0040	/* conn configured to use Unicode */
 #define	SMBV_EXT_SEC		0x0080	/* conn to use extended security */
 #define	SMBV_WILL_SIGN		0x0100	/* negotiated signing */
-
-
-/*
- * BSD-style mbuf simulation
- */
-struct mbuf {
-	int		m_len;
-	int		m_maxlen;
-	char		*m_data;
-	struct mbuf	*m_next;
-};
-typedef struct mbuf mbuf_t;
-
-struct mbdata {
-	struct mbuf	*mb_top;
-	struct mbuf	*mb_cur;
-	char		*mb_pos;
-	int		mb_count;
-};
-typedef struct mbdata mbdata_t;
-
-/*
- * Note: Leaving a little space (8 bytes) between the
- * mbuf header and the start of the data so we can
- * prepend a NetBIOS header in that space.
- */
-#define	M_ALIGNFACTOR	(sizeof (long))
-#define	M_ALIGN(len)	(((len) + M_ALIGNFACTOR - 1) & ~(M_ALIGNFACTOR - 1))
-#define	M_BASESIZE	(sizeof (struct mbuf) + 8)
-#define	M_MINSIZE	(1024 - M_BASESIZE)
-#define	M_TOP(m)	((char *)(m) + M_BASESIZE)
-#define	M_TRAILINGSPACE(m) ((m)->m_maxlen - (m)->m_len)
-#define	mtod(m, t)	((t)(m)->m_data)
 
 /*
  * request handling structures
@@ -140,52 +108,26 @@ void smb_rq_wend(struct smb_rq *);
 int  smb_rq_simple(struct smb_rq *);
 int  smb_rq_dmem(struct mbdata *, const char *, size_t);
 int  smb_rq_internal(struct smb_ctx *, struct smb_rq *);
-int  smb_rq_sign(struct smb_rq *);
+void smb_rq_sign(struct smb_rq *);
 int  smb_rq_verify(struct smb_rq *);
 
-
 /*
- * Message compose/parse
+ * This library extends the mchain.h function set a little.
  */
-
-void m_freem(struct mbuf *);
-int  m_getm(struct mbuf *, size_t, struct mbuf **);
+int  m_getm(struct mbuf *, int, struct mbuf **);
 int  m_lineup(struct mbuf *, struct mbuf **);
 size_t m_totlen(struct mbuf *);
 
-int  mb_init(struct mbdata *, size_t);
-int  mb_initm(struct mbdata *, struct mbuf *);
-int  mb_done(struct mbdata *);
-int  mb_fit(struct mbdata *mbp, size_t size, char **pp);
-int  mb_put_uint8(struct mbdata *, uint8_t);
-int  mb_put_uint16be(struct mbdata *, uint16_t);
-int  mb_put_uint16le(struct mbdata *, uint16_t);
-int  mb_put_uint32be(struct mbdata *, uint32_t);
-int  mb_put_uint32le(struct mbdata *, uint32_t);
-int  mb_put_uint64be(struct mbdata *, uint64_t);
-int  mb_put_uint64le(struct mbdata *, uint64_t);
-int  mb_put_mem(struct mbdata *, const void *, size_t);
-int  mb_put_mbuf(struct mbdata *, struct mbuf *);
+int  mb_init_sz(struct mbdata *, int);
+int  mb_fit(struct mbdata *mbp, int size, char **pp);
+
+int  mb_put_string(struct mbdata *mbp, const char *s, int);
 int  mb_put_astring(struct mbdata *mbp, const char *s);
-int  mb_put_dstring(struct mbdata *mbp, const char *s, int);
 int  mb_put_ustring(struct mbdata *mbp, const char *s);
 
-int  mb_get_uint8(struct mbdata *, uint8_t *);
-int  mb_get_uint16(struct mbdata *, uint16_t *);
-int  mb_get_uint16le(struct mbdata *, uint16_t *);
-int  mb_get_uint16be(struct mbdata *, uint16_t *);
-int  mb_get_uint32(struct mbdata *, uint32_t *);
-int  mb_get_uint32be(struct mbdata *, uint32_t *);
-int  mb_get_uint32le(struct mbdata *, uint32_t *);
-int  mb_get_uint64(struct mbdata *, uint64_t *);
-int  mb_get_uint64be(struct mbdata *, uint64_t *);
-int  mb_get_uint64le(struct mbdata *, uint64_t *);
-int  mb_get_mem(struct mbdata *, void *, size_t);
-int  mb_get_mbuf(struct mbdata *, int, struct mbuf **);
-int  mb_get_string(struct mbdata *, char **, int);
-int  mb_get_astring(struct mbdata *, char **);
-int  mb_get_ustring(struct mbdata *, char **);
-
+int  md_get_string(struct mbdata *, char **, int);
+int  md_get_astring(struct mbdata *, char **);
+int  md_get_ustring(struct mbdata *, char **);
 
 /*
  * Network stuff (NetBIOS and otherwise)

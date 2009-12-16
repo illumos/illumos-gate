@@ -42,6 +42,7 @@
 
 /*
  * Much code copied into here from Sun NFS.
+ * Compare with nfs_clnt.h
  */
 
 #include <sys/avl.h>
@@ -51,6 +52,32 @@
 extern "C" {
 #endif
 
+/*
+ * These are the attributes we can get from the server via
+ * SMB commands such as TRANS2_QUERY_FILE_INFORMATION
+ * with info level SMB_QFILEINFO_ALL_INFO, and directory
+ * FindFirst/FindNext info. levels FIND_DIRECTORY_INFO
+ * and FIND_BOTH_DIRECTORY_INFO, etc.
+ *
+ * Values in this struct are always native endian,
+ * and times are converted converted to Unix form.
+ * Note: zero in any of the times means "unknown".
+ *
+ * XXX: Later, move this to nsmb
+ */
+typedef struct smbfattr {
+	timespec_t	fa_createtime;	/* Note, != ctime */
+	timespec_t	fa_atime;	/* these 3 are like unix */
+	timespec_t	fa_mtime;
+	timespec_t	fa_ctime;
+	u_offset_t	fa_size;	/* EOF position */
+	u_offset_t	fa_allocsz;	/* Allocated size. */
+	uint32_t	fa_attr;	/* Ext. file (DOS) attr */
+} smbfattr_t;
+
+/*
+ * Cache whole directories (not yet)
+ */
 typedef struct rddir_cache {
 	lloff_t _cookie;	/* cookie used to find this cache entry */
 	lloff_t _ncookie;	/* cookie used to find the next cache entry */
@@ -93,32 +120,59 @@ typedef struct smbfs_rwlock {
 } smbfs_rwlock_t;
 
 /*
- * The format of the hash bucket used to lookup smbnodes from a file handle.
+ * The format of the smbfs node header, which contains the
+ * fields used to link nodes in the AVL tree, and those
+ * fields needed by the AVL node comparison functions.
+ * It's a separate struct so we can call avl_find with
+ * this relatively small struct as a stack local.
+ *
+ * The AVL tree is mntinfo.smi_hash_avl,
+ * and its lock is mntinfo.smi_hash_lk.
  */
-typedef struct rhashq {
-	struct smbnode *r_hashf;
-	struct smbnode *r_hashb;
-	krwlock_t r_lock;
-} rhashq_t;
+typedef struct smbfs_node_hdr {
+	/*
+	 * Our linkage in the node cache AVL tree.
+	 */
+	avl_node_t	hdr_avl_node;
+
+	/*
+	 * Identity of this node:  The full path name,
+	 * in server form, relative to the share root.
+	 */
+	char		*hdr_n_rpath;
+	int		hdr_n_rplen;
+} smbfs_node_hdr_t;
 
 /*
- * Remote file information structure.
+ * Below is the SMBFS-specific representation of a "node".
+ * This struct is a mixture of Sun NFS and Darwin code.
+ * Fields starting with "r_" came from NFS struct "rnode"
+ * and fields starting with "n_" came from Darwin, or
+ * were added during the Solaris port.  We have avoided
+ * renaming fields so we would not cause excessive
+ * changes in the code using this struct.
+ *
+ * Now using an AVL tree instead of hash lists, but kept the
+ * "hash" in some member names and functions to reduce churn.
+ * One AVL tree per mount replaces the global hash buckets.
+ *
+ * Notes carried over from the NFS code:
  *
  * The smbnode is the "inode" for remote files.  It contains all the
  * information necessary to handle remote file on the client side.
  *
  * Note on file sizes:  we keep two file sizes in the smbnode: the size
  * according to the client (r_size) and the size according to the server
- * (r_attr.va_size).  They can differ because we modify r_size during a
+ * (r_attr.fa_size).  They can differ because we modify r_size during a
  * write system call (smbfs_rdwr), before the write request goes over the
  * wire (before the file is actually modified on the server).  If an OTW
  * request occurs before the cached data is written to the server the file
- * size returned from the server (r_attr.va_size) may not match r_size.
- * r_size is the one we use, in general.  r_attr.va_size is only used to
+ * size returned from the server (r_attr.fa_size) may not match r_size.
+ * r_size is the one we use, in general.  r_attr.fa_size is only used to
  * determine whether or not our cached data is valid.
  *
  * Each smbnode has 3 locks associated with it (not including the smbnode
- * hash table and free list locks):
+ * "hash" AVL tree and free list locks):
  *
  *	r_rwlock:	Serializes smbfs_write and smbfs_setattr requests
  *			and allows smbfs_read requests to proceed in parallel.
@@ -133,13 +187,12 @@ typedef struct rhashq {
  *			time (not accross entire putpage operations,
  *			for example).
  *
- * The following members are protected by the mutex rpfreelist_lock:
+ * The following members are protected by the mutex smbfreelist_lock:
  *	r_freef
  *	r_freeb
  *
- * The following members are protected by the hash bucket rwlock:
- *	r_hashf
- *	r_hashb
+ * The following members are protected by the AVL tree rwlock:
+ *	r_avl_node	(r__hdr.hdr_avl_node)
  *
  * Note: r_modaddr is only accessed when the r_statelock mutex is held.
  *	Its value is also controlled via r_rwlock.  It is assumed that
@@ -156,12 +209,83 @@ typedef struct rhashq {
  * Lock ordering:
  * 	r_rwlock > r_lkserlock > r_statelock
  */
-struct exportinfo;	/* defined in smbfs/export.h */
-struct failinfo;	/* defined in smbfs/smbfs_clnt.h */
-struct mntinfo;		/* defined in smbfs/smbfs_clnt.h */
 
-#ifdef _KERNEL
-/* Bits for smbnode.n_flag */
+typedef struct smbnode {
+	/* Our linkage in the node cache AVL tree (see above). */
+	smbfs_node_hdr_t	r__hdr;
+
+	/* short-hand names for r__hdr members */
+#define	r_avl_node	r__hdr.hdr_avl_node
+#define	n_rpath		r__hdr.hdr_n_rpath
+#define	n_rplen		r__hdr.hdr_n_rplen
+
+	smbmntinfo_t	*n_mount;	/* VFS data */
+	vnode_t		*r_vnode;	/* associated vnode */
+
+	/*
+	 * Linkage in smbfreelist, for reclaiming nodes.
+	 * Lock for the free list is: smbfreelist_lock
+	 */
+	struct smbnode	*r_freef;	/* free list forward pointer */
+	struct smbnode	*r_freeb;	/* free list back pointer */
+
+	smbfs_rwlock_t	r_rwlock;	/* serialize write/setattr requests */
+	smbfs_rwlock_t	r_lkserlock;	/* serialize lock with other ops */
+	kmutex_t	r_statelock;	/* protect (most) smbnode fields */
+
+	/*
+	 * File handle, directory search handle,
+	 * and reference counts for them, etc.
+	 * Lock for these is: r_lkserlock
+	 */
+	int		n_dirrefs;
+	struct smbfs_fctx	*n_dirseq;	/* ff context */
+	int		n_dirofs;	/* last ff offset */
+	int		n_fidrefs;
+	uint16_t	n_fid;		/* file handle */
+	enum vtype	n_ovtype;	/* vnode type opened */
+	uint32_t	n_rights;	/* granted rights */
+	int		n_vcgenid;	/* gereration no. (reconnect) */
+
+	/*
+	 * Misc. bookkeeping
+	 */
+	cred_t		*r_cred;	/* current credentials */
+	u_offset_t	r_nextr;	/* next read offset (read-ahead) */
+	long		r_mapcnt;	/* count of mmapped pages */
+	uint_t		r_count;	/* # of refs not reflect in v_count */
+	uint_t		r_awcount;	/* # of outstanding async write */
+	uint_t		r_gcount;	/* getattrs waiting to flush pages */
+	uint_t		r_flags;	/* flags, see below */
+	uint32_t	n_flag;		/* NXXX flags below */
+	uint_t		r_error;	/* async write error */
+	kcondvar_t	r_cv;		/* condvar for blocked threads */
+	avl_tree_t	r_dir;		/* cache of readdir responses */
+	rddir_cache	*r_direof;	/* pointer to the EOF entry */
+	kthread_t	*r_serial;	/* id of purging thread */
+	list_t		r_indelmap;	/* list of delmap callers */
+
+	/*
+	 * Attributes: local, and as last seen on the server.
+	 * See notes above re: r_size vs r_attr.fa_size, etc.
+	 */
+	smbfattr_t	r_attr;		/* attributes from the server */
+	hrtime_t	r_attrtime;	/* time attributes become invalid */
+	hrtime_t	r_mtime;	/* client time file last modified */
+	len_t		r_size;		/* client's view of file size */
+
+	/*
+	 * Other attributes, not carried in smbfattr_t
+	 */
+	u_longlong_t	n_ino;
+	uid_t		n_uid;
+	gid_t		n_gid;
+	mode_t		n_mode;
+} smbnode_t;
+
+/*
+ * Flag bits in: smbnode_t .n_flag
+ */
 #define	NFLUSHINPROG	0x00001
 #define	NFLUSHWANT	0x00002 /* they should gone ... */
 #define	NMODIFIED	0x00004 /* bogus, until async IO implemented */
@@ -170,85 +294,13 @@ struct mntinfo;		/* defined in smbfs/smbfs_clnt.h */
 #define	NRDIRSERIAL	0x00080	/* serialize readdir operation */
 #define	NISMAPPED	0x00800
 #define	NFLUSHWIRE	0x01000
-#define	NATTRCHANGED	0x02000 /* use smbfs_attr_cacheremove at close */
+#define	NATTRCHANGED	0x02000 /* kill cached attributes at close */
 #define	NALLOC		0x04000 /* being created */
 #define	NWALLOC		0x08000 /* awaiting creation */
 #define	N_XATTR 	0x10000 /* extended attribute (dir or file) */
 
-typedef struct smbnode {
-	/* from Sun NFS struct rnode (XXX: cleanup needed) */
-	/* the hash fields must be first to match the rhashq_t */
-	/* Lock for the hash queue is: np->r_hashq->r_lock */
-	struct smbnode	*r_hashf;	/* hash queue forward pointer */
-	struct smbnode	*r_hashb;	/* hash queue back pointer */
-	/* Lock for the free list is: smbfreelist_lock */
-	struct smbnode	*r_freef;	/* free list forward pointer */
-	struct smbnode	*r_freeb;	/* free list back pointer */
-	rhashq_t	*r_hashq;	/* pointer to the hash bucket */
-	vnode_t		*r_vnode;	/* vnode for remote file */
-	smbfs_rwlock_t	r_rwlock;	/* serializes write/setattr requests */
-	smbfs_rwlock_t	r_lkserlock;	/* serialize lock with other ops */
-	kmutex_t	r_statelock;	/* protects (most of) smbnode fields */
-	u_offset_t	r_nextr;	/* next byte read offset (read-ahead) */
-	cred_t		*r_cred;	/* current credentials */
-	len_t		r_size;		/* client's view of file size */
-	struct vattr	r_attr;		/* cached vnode attributes */
-	hrtime_t	r_attrtime;	/* time attributes become invalid */
-	long		r_mapcnt;	/* count of mmapped pages */
-	uint_t		r_count;	/* # of refs not reflect in v_count */
-	uint_t		r_awcount;	/* # of outstanding async write */
-	uint_t		r_gcount;	/* getattrs waiting to flush pages */
-	ushort_t	r_flags;	/* flags, see below */
-	short		r_error;	/* async write error */
-	kcondvar_t	r_cv;		/* condvar for blocked threads */
-	avl_tree_t	r_dir;		/* cache of readdir responses */
-	rddir_cache	*r_direof;	/* pointer to the EOF entry */
-	kthread_t	*r_serial;	/* id of purging thread */
-	list_t		r_indelmap;	/* list of delmap callers */
-	/*
-	 * Members derived from Darwin struct smbnode.
-	 * Note: n_parent node pointer removed because it
-	 * caused unwanted "holds" on nodes in our cache.
-	 * Now keeping just the full remote path instead,
-	 * in server form, relative to the share root.
-	 */
-	char		*n_rpath;
-	int		n_rplen;
-	uint32_t	n_flag;
-	smbmntinfo_t	*n_mount;
-	ino64_t		n_ino;
-	/* Lock for the next 7 is r_lkserlock */
-	enum vtype	n_ovtype;	/* vnode type opened */
-	int		n_dirrefs;
-	struct smbfs_fctx	*n_dirseq;	/* ff context */
-	int		n_dirofs;	/* last ff offset */
-	int		n_vcgenid;	/* gereration no. (reconnect) */
-	int		n_fidrefs;
-	uint16_t	n_fid;		/* file handle */
-	uint32_t	n_rights;	/* granted rights */
-	/* Lock for the rest is r_statelock */
-	uid_t		n_uid;
-	gid_t		n_gid;
-	mode_t		n_mode;
-	timestruc_t	r_atime;
-	timestruc_t	r_ctime;
-	timestruc_t	r_mtime;
-	int		n_dosattr;
-	/*
-	 * XXX: Maybe use this instead:
-	 *   #define n_atime  r_attr.va_atime
-	 * etc.
-	 */
-#define	n_size		r_size
-#define	n_atime		r_atime
-#define	n_ctime		r_ctime
-#define	n_mtime		r_mtime
-#define	n_attrage	r_attrtime
-} smbnode_t;
-#endif /* _KERNEL */
-
 /*
- * Flags
+ * Flag bits in: smbnode_t .r_flags
  */
 #define	RREADDIRPLUS	0x1	/* issue a READDIRPLUS instead of READDIR */
 #define	RDIRTY		0x2	/* dirty pages from write operation */
@@ -258,7 +310,7 @@ typedef struct smbnode {
 #define	RHAVEVERF	0x20	/* have a write verifier to compare against */
 #define	RCOMMIT		0x40	/* commit in progress */
 #define	RCOMMITWAIT	0x80	/* someone is waiting to do a commit */
-#define	RHASHED		0x100	/* smbnode is in hash queues */
+#define	RHASHED		0x100	/* smbnode is in the "hash" AVL tree */
 #define	ROUTOFSPACE	0x200	/* an out of space error has happened */
 #define	RDIRECTIO	0x400	/* bypass the buffer cache */
 #define	RLOOKUP		0x800	/* a lookup has been performed */
@@ -272,27 +324,12 @@ typedef struct smbnode {
 #define	VTOSMB(vp)	((smbnode_t *)((vp)->v_data))
 #define	SMBTOV(np)	((np)->r_vnode)
 
-/* Attribute cache timeouts in seconds */
-#define	SMB_MINATTRTIMO 2
-#define	SMB_MAXATTRTIMO 30
-
 /*
- * Function definitions.
+ * A macro to compute the separator that should be used for
+ * names under some directory.  See smbfs_fullpath().
  */
-struct smb_cred;
-int smbfs_nget(vnode_t *dvp, const char *name, int nmlen,
-	struct smbfattr *fap, vnode_t **vpp);
-void smbfs_attr_cacheenter(vnode_t *vp, struct smbfattr *fap);
-int  smbfs_attr_cachelookup(vnode_t *vp, struct vattr *va);
-void smbfs_attr_touchdir(struct smbnode *dnp);
-char    *smbfs_name_alloc(const char *name, int nmlen);
-void	smbfs_name_free(const char *name, int nmlen);
-uint32_t smbfs_hash(const char *name, int nmlen);
-uint32_t smbfs_hash3(uint32_t ival, const char *name, int nmlen);
-uint32_t smbfs_getino(struct smbnode *dnp, const char *name, int nmlen);
-int smb_check_table(struct vfs *vfsp, smbnode_t *srp);
-
-#define	smbfs_attr_cacheremove(np)	(np)->n_attrage = 0
+#define	SMBFS_DNP_SEP(dnp) \
+	(((dnp->n_flag & N_XATTR) == 0 && dnp->n_rplen > 1) ? '\\' : '\0')
 
 #ifdef __cplusplus
 }

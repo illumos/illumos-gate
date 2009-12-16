@@ -24,15 +24,15 @@
  * Use is subject to license terms.
  */
 
-#ifndef _ACL_NT_H
-#define	_ACL_NT_H
+#ifndef _SMBFS_NTACL_H
+#define	_SMBFS_NTACL_H
 
 /*
  * Internal functions for dealing with
  * NT Security data structures.
  */
 
-#include <netsmb/smbfs_acl.h>
+#include <netsmb/mchain.h>
 
 /*
  * Internal form of an NT SID
@@ -68,46 +68,60 @@ typedef struct i_ntacl {
 /*
  * Internal form of an NT Security Descriptor (SD)
  */
-struct i_ntsd {
+typedef struct i_ntsd {
 	uint8_t		sd_revision;	/* 0x01 observed between W2K */
+	uint8_t		sd_rmctl;	/* resource mgr control (MBZ) */
 	uint16_t	sd_flags;
 	i_ntsid_t	*sd_owner;
 	i_ntsid_t	*sd_group;
 	i_ntacl_t	*sd_sacl;
 	i_ntacl_t	*sd_dacl;
-};
-
-struct mbdata;
+} i_ntsd_t;
 
 /*
  * Import a raw SD (mb chain) into "internal" form.
  * (like "absolute" form per. NT docs)
  * Returns allocated data in sdp
  */
-int mb_get_ntsd(struct mbdata *mbp, i_ntsd_t **sdp);
+int md_get_ntsd(mdchain_t *mbp, i_ntsd_t **sdp);
 
 /*
  * Export an "internal" SD into an raw SD (mb chain).
  * (a.k.a "self-relative" form per. NT docs)
  * Returns allocated mbchain in mbp.
  */
-int mb_put_ntsd(struct mbdata *mbp, i_ntsd_t *sd);
-
-
-/*
- * Get an SD via ioctl on FD (with "selector" bits),
- * stroing the raw Windows SD in the mb chain mbp.
- */
-int smbfs_acl_iocget(int fd, uint32_t selector, struct mbdata *mbp);
+int mb_put_ntsd(mbchain_t *mbp, i_ntsd_t *sd);
 
 /*
- * Set an SD via ioctl on FD (with "selector" bits),
- * with a raw Windows SD from the chain mbp.
+ * Convert an internal SD to a ZFS-style ACL.
+ * Get uid/gid too if pointers != NULL.
  */
-int smbfs_acl_iocset(int fd, uint32_t selector, struct mbdata *mbp);
+#ifdef	_KERNEL
+int smbfs_acl_sd2zfs(i_ntsd_t *, vsecattr_t *, uid_t *, gid_t *);
+#else /* _KERNEL */
+int smbfs_acl_sd2zfs(i_ntsd_t *, acl_t *, uid_t *, gid_t *);
+#endif /* _KERNEL */
 
+/*
+ * Convert an internal SD to a ZFS-style ACL.
+ * Include owner/group too if uid/gid != -1.
+ */
+#ifdef	_KERNEL
+int smbfs_acl_zfs2sd(vsecattr_t *, uid_t, gid_t, i_ntsd_t **);
+#else /* _KERNEL */
+int smbfs_acl_zfs2sd(acl_t *, uid_t, gid_t, i_ntsd_t **);
+#endif /* _KERNEL */
 
+/*
+ * Free an i_ntsd_t, as returned by md_get_ntsd()
+ * or smbfs_acl_zfs2sd().
+ */
+void smbfs_acl_free_sd(struct i_ntsd *);
+
+/*
+ * Convert an NT SID to string format.
+ */
 int smbfs_sid2str(i_ntsid_t *sid,
 	char *obuf, size_t olen, uint32_t *ridp);
 
-#endif	/* _ACL_NT_H */
+#endif	/* _SMBFS_NTACL_H */

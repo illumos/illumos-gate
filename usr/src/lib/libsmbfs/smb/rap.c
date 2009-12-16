@@ -222,9 +222,11 @@ smb_rap_create(int fn, const char *param, const char *data,
 		len += plen;
 	}
 	rap->r_pbuf = rap->r_npbuf = malloc(len);
-	smb_rap_rqparam(rap, 'W', 1, fn);
-	smb_rap_rqparam_z(rap, rap->r_sparam);
-	smb_rap_rqparam_z(rap, rap->r_sdata);
+	if (rap->r_pbuf == NULL)
+		return (ENOMEM);
+	(void) smb_rap_rqparam(rap, 'W', 1, fn);
+	(void) smb_rap_rqparam_z(rap, rap->r_sparam);
+	(void) smb_rap_rqparam_z(rap, rap->r_sdata);
 	*rapp = rap;
 	return (0);
 }

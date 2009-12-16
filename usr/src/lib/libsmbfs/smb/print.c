@@ -75,19 +75,19 @@ smb_printer_open(struct smb_ctx *ctx, int setuplen, int mode,
 	smb_rq_wend(rqp);
 	smb_rq_bstart(rqp);
 	mb_put_uint8(mbp, SMB_DT_ASCII);
-	mb_put_dstring(mbp, ident, uc);
+	mb_put_string(mbp, ident, uc);
 	smb_rq_bend(rqp);
 	error = smb_rq_simple(rqp);
 	if (error)
 		goto out;
 
 	mbp = smb_rq_getreply(rqp);
-	error = mb_get_uint8(mbp, &wc);
+	error = md_get_uint8(mbp, &wc);
 	if (error || wc < 1) {
 		error = EBADRPC;
 		goto out;
 	}
-	mb_get_uint16(mbp, &fh);
+	md_get_uint16le(mbp, &fh);
 	*fhp = fh;
 	error = 0;
 

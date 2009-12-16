@@ -64,11 +64,7 @@
 #include <sys/zone.h>
 #include <sys/sdt.h>
 
-#ifdef APPLE
-#include <sys/smb_apple.h>
-#else
 #include <netsmb/smb_osdep.h>
-#endif
 
 #include <netsmb/smb.h>
 #include <netsmb/smb_conn.h>
@@ -85,11 +81,10 @@ int smb_iod_send_echo(smb_vc_t *);
  * can't unload until all the mounts are gone.
  */
 static smb_fscb_t *fscb;
-int
+void
 smb_fscb_set(smb_fscb_t *cb)
 {
 	fscb = cb;
-	return (0);
 }
 
 static void
@@ -161,7 +156,7 @@ smb_iod_invrq(struct smb_vc *vcp)
  *
  * Forcibly kill the connection and IOD.
  */
-int
+void
 smb_iod_disconnect(struct smb_vc *vcp)
 {
 
@@ -194,8 +189,6 @@ smb_iod_disconnect(struct smb_vc *vcp)
 	    vcp->iod_thr != curthread) {
 		tsignal(vcp->iod_thr, SIGKILL);
 	}
-
-	return (0);
 }
 
 /*
@@ -700,7 +693,7 @@ smb_iod_multirq(struct smb_rq *rqp)
 }
 
 
-int
+void
 smb_iod_removerq(struct smb_rq *rqp)
 {
 	struct smb_vc *vcp = rqp->sr_vc;
@@ -716,8 +709,6 @@ smb_iod_removerq(struct smb_rq *rqp)
 #endif
 	TAILQ_REMOVE(&vcp->iod_rqlist, rqp, sr_link);
 	rw_exit(&vcp->iod_rqlock);
-
-	return (0);
 }
 
 
@@ -789,7 +780,6 @@ smb_iod_waitrq(struct smb_rq *rqp)
 		tmo1 = SEC_TO_TICK(smb_timo_notice);
 	else
 		tmo1 = 0;
-
 	tmo2 = ddi_get_lbolt() + SEC_TO_TICK(rqp->sr_timo);
 
 	/*
@@ -914,14 +904,13 @@ void
 smb_iod_sendall(smb_vc_t *vcp)
 {
 	struct smb_rq *rqp;
-	int error, save_newrq, muxcnt;
+	int error, muxcnt;
 
 	/*
 	 * Clear "newrq" to make sure threads adding
 	 * new requests will run this function again.
 	 */
 	rw_enter(&vcp->iod_rqlock, RW_WRITER);
-	save_newrq = vcp->iod_newrq;
 	vcp->iod_newrq = 0;
 
 	/*
@@ -930,9 +919,6 @@ smb_iod_sendall(smb_vc_t *vcp)
 	 * some requesting thread may be blocked in send.
 	 */
 	rw_downgrade(&vcp->iod_rqlock);
-
-	/* Expect to find about this many requests. */
-	SMBIODEBUG("top, save_newrq=%d\n", save_newrq);
 
 	/*
 	 * Serialize to prevent multiple senders.

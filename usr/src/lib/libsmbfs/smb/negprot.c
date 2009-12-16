@@ -104,7 +104,7 @@ smb_negprot(struct smb_ctx *ctx, struct mbdata *oblob)
 	struct mbdata	*mbp;
 	struct smb_dialect *dp;
 	int err, len;
-	uint8_t wc, stime[8], eklen;
+	uint8_t wc, eklen;
 	uint16_t dindex, bc;
 	int will_sign = 0;
 
@@ -188,8 +188,8 @@ smb_negprot(struct smb_ctx *ctx, struct mbdata *oblob)
 	 * section 2.2.3
 	 */
 	mbp = &rqp->rq_rp;
-	(void) mb_get_uint8(mbp, &wc);
-	err = mb_get_uint16le(mbp, &dindex);
+	(void) md_get_uint8(mbp, &wc);
+	err = md_get_uint16le(mbp, &dindex);
 	if (err || dindex > SMB_DIALECT_MAX) {
 		DPRINT("err %d dindex %d", err, (int)dindex);
 		goto errout;
@@ -206,17 +206,17 @@ smb_negprot(struct smb_ctx *ctx, struct mbdata *oblob)
 		DPRINT("bad wc %d", (int)wc);
 		goto errout;
 	}
-	mb_get_uint8(mbp, &sv->sv_sm);		/* SecurityMode */
-	mb_get_uint16le(mbp, &sv->sv_maxmux);	/* MaxMpxCount */
-	mb_get_uint16le(mbp, &sv->sv_maxvcs);	/* MaxCountVCs */
-	mb_get_uint32le(mbp, &sv->sv_maxtx);	/* MaxBufferSize */
-	mb_get_uint32le(mbp, &sv->sv_maxraw);	/* MaxRawSize */
-	mb_get_uint32le(mbp, &sv->sv_skey);	/* SessionKey */
-	mb_get_uint32le(mbp, &sv->sv_caps);	/* Capabilities */
-	mb_get_mem(mbp, (char *)stime, 8);	/* SystemTime(s) */
-	mb_get_uint16le(mbp, (uint16_t *)&sv->sv_tz);
-	mb_get_uint8(mbp, &eklen);	/* EncryptionKeyLength */
-	err = mb_get_uint16le(mbp, &bc);	/* ByteCount */
+	md_get_uint8(mbp, &sv->sv_sm);		/* SecurityMode */
+	md_get_uint16le(mbp, &sv->sv_maxmux);	/* MaxMpxCount */
+	md_get_uint16le(mbp, &sv->sv_maxvcs);	/* MaxCountVCs */
+	md_get_uint32le(mbp, &sv->sv_maxtx);	/* MaxBufferSize */
+	md_get_uint32le(mbp, &sv->sv_maxraw);	/* MaxRawSize */
+	md_get_uint32le(mbp, &sv->sv_skey);	/* SessionKey */
+	md_get_uint32le(mbp, &sv->sv_caps);	/* Capabilities */
+	md_get_mem(mbp, NULL, 8, MB_MSYSTEM);	/* SystemTime(s) */
+	md_get_uint16le(mbp, (uint16_t *)&sv->sv_tz);
+	md_get_uint8(mbp, &eklen);	/* EncryptionKeyLength */
+	err = md_get_uint16le(mbp, &bc);	/* ByteCount */
 	if (err)
 		goto errout;
 
@@ -325,7 +325,7 @@ smb_negprot(struct smb_ctx *ctx, struct mbdata *oblob)
 		/*
 		 * Skip the server GUID.
 		 */
-		err = mb_get_mem(mbp, NULL, SMB_GUIDLEN);
+		err = md_get_mem(mbp, NULL, SMB_GUIDLEN, MB_MSYSTEM);
 		if (err)
 			goto errout;
 		/*
@@ -339,7 +339,7 @@ smb_negprot(struct smb_ctx *ctx, struct mbdata *oblob)
 		/*
 		 * Get the (optional) SPNEGO "hint".
 		 */
-		err = mb_get_mbuf(mbp, len, &m);
+		err = md_get_mbuf(mbp, len, &m);
 		if (err)
 			goto errout;
 		mb_initm(oblob, m);
@@ -358,7 +358,8 @@ smb_negprot(struct smb_ctx *ctx, struct mbdata *oblob)
 			err = EBADRPC;
 			goto errout;
 		}
-		err = mb_get_mem(mbp, (char *)ctx->ct_ntlm_chal, NTLM_CHAL_SZ);
+		err = md_get_mem(mbp, ctx->ct_ntlm_chal,
+		    NTLM_CHAL_SZ, MB_MSYSTEM);
 		/*
 		 * Server domain follows (ignored)
 		 * Note: NOT aligned(2) - unusual!

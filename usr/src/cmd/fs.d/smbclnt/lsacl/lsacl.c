@@ -61,7 +61,7 @@ main(int argc, char **argv)
 	uid_t uid;
 	gid_t gid;
 	int error, fd;
-	i_ntsd_t *sd;
+	struct i_ntsd *sd;
 
 	progname = argv[0];
 

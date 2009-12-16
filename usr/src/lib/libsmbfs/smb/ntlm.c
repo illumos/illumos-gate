@@ -187,11 +187,11 @@ ntlm_put_v1_responses(struct smb_ctx *ctx,
 	int err;
 
 	/* Get mbuf chain for the LM response. */
-	if ((err = mb_init(lm_mbp, NTLM_V1_RESP_SZ)) != 0)
+	if ((err = mb_init_sz(lm_mbp, NTLM_V1_RESP_SZ)) != 0)
 		return (err);
 
 	/* Get mbuf chain for the NT response. */
-	if ((err = mb_init(nt_mbp, NTLM_V1_RESP_SZ)) != 0)
+	if ((err = mb_init_sz(nt_mbp, NTLM_V1_RESP_SZ)) != 0)
 		return (err);
 
 	/*
@@ -199,7 +199,9 @@ ntlm_put_v1_responses(struct smb_ctx *ctx,
 	 * from the challenge and the ASCII
 	 * password (if authflags allow).
 	 */
-	mb_fit(lm_mbp, NTLM_V1_RESP_SZ, (char **)&lmresp);
+	err = mb_fit(lm_mbp, NTLM_V1_RESP_SZ, (char **)&lmresp);
+	if (err)
+		return (err);
 	bzero(lmresp, NTLM_V1_RESP_SZ);
 	if (ctx->ct_authflags & SMB_AT_LM1) {
 		/* They asked to send the LM hash too. */
@@ -213,7 +215,9 @@ ntlm_put_v1_responses(struct smb_ctx *ctx,
 	 * Compute the NTLM response, derived from
 	 * the challenge and the NT hash.
 	 */
-	mb_fit(nt_mbp, NTLM_V1_RESP_SZ, (char **)&ntresp);
+	err = mb_fit(nt_mbp, NTLM_V1_RESP_SZ, (char **)&ntresp);
+	if (err)
+		return (err);
 	bzero(ntresp, NTLM_V1_RESP_SZ);
 	err = ntlm_v1_response(ntresp, ctx->ct_nthash,
 	    ctx->ct_ntlm_chal, NTLM_CHAL_SZ);
@@ -408,9 +412,9 @@ ntlm_put_v2_responses(struct smb_ctx *ctx, struct mbdata *ti_mbp,
 	uchar_t v2hash[NTLM_HASH_SZ];
 	struct mbuf *tim = ti_mbp->mb_top;
 
-	if ((err = mb_init(lm_mbp, M_MINSIZE)) != 0)
+	if ((err = mb_init(lm_mbp)) != 0)
 		return (err);
-	if ((err = mb_init(nt_mbp, M_MINSIZE)) != 0)
+	if ((err = mb_init(nt_mbp)) != 0)
 		return (err);
 
 	/*
@@ -443,13 +447,13 @@ ntlm_put_v2_responses(struct smb_ctx *ctx, struct mbdata *ti_mbp,
 	 *	2: Client nonce
 	 */
 	lmresp = (uchar_t *)lm_mbp->mb_pos;
-	mb_put_mem(lm_mbp, NULL, NTLM_HASH_SZ);
+	mb_put_mem(lm_mbp, NULL, NTLM_HASH_SZ, MB_MSYSTEM);
 	err = ntlm_v2_resp_hash(lmresp,
 	    v2hash, ctx->ct_ntlm_chal,
 	    ctx->ct_clnonce, NTLM_CHAL_SZ);
 	if (err)
 		goto out;
-	mb_put_mem(lm_mbp, ctx->ct_clnonce, NTLM_CHAL_SZ);
+	mb_put_mem(lm_mbp, ctx->ct_clnonce, NTLM_CHAL_SZ, MB_MSYSTEM);
 
 	/*
 	 * Compute the NTLMv2 response, derived
@@ -461,13 +465,13 @@ ntlm_put_v2_responses(struct smb_ctx *ctx, struct mbdata *ti_mbp,
 	 *	2: "target info." blob
 	 */
 	ntresp = (uchar_t *)nt_mbp->mb_pos;
-	mb_put_mem(nt_mbp, NULL, NTLM_HASH_SZ);
+	mb_put_mem(nt_mbp, NULL, NTLM_HASH_SZ, MB_MSYSTEM);
 	err = ntlm_v2_resp_hash(ntresp,
 	    v2hash, ctx->ct_ntlm_chal,
 	    (uchar_t *)tim->m_data, tim->m_len);
 	if (err)
 		goto out;
-	mb_put_mem(nt_mbp, tim->m_data, tim->m_len);
+	mb_put_mem(nt_mbp, tim->m_data, tim->m_len, MB_MSYSTEM);
 
 	/*
 	 * Compute the session key
@@ -506,7 +510,7 @@ smb_put_blob_name(struct mbdata *mbp, char *name, int type)
 
 	mb_put_uint16le(mbp, type);
 	mb_put_uint16le(mbp, nlen);
-	mb_put_mem(mbp, (char *)ucs, nlen);
+	mb_put_mem(mbp, (char *)ucs, nlen, MB_MSYSTEM);
 
 	if (ucs)
 		free(ucs);
@@ -528,7 +532,7 @@ ntlm_build_target_info(struct smb_ctx *ctx, struct mbuf *names,
 	int err;
 
 	/* Get mbuf chain for the "target info". */
-	if ((err = mb_init(mbp, M_MINSIZE)) != 0)
+	if ((err = mb_init(mbp)) != 0)
 		return (err);
 
 	/*
@@ -556,7 +560,7 @@ ntlm_build_target_info(struct smb_ctx *ctx, struct mbuf *names,
 	mb_put_uint32le(mbp, 0x101);	/* Blob signature */
 	mb_put_uint32le(mbp, 0);		/* reserved */
 	mb_put_uint64le(mbp, nt_time);	/* NT time stamp */
-	mb_put_mem(mbp, ctx->ct_clnonce, NTLM_CHAL_SZ);
+	mb_put_mem(mbp, ctx->ct_clnonce, NTLM_CHAL_SZ, MB_MSYSTEM);
 	mb_put_uint32le(mbp, 0);		/* unknown */
 
 	/*
@@ -564,7 +568,7 @@ ntlm_build_target_info(struct smb_ctx *ctx, struct mbuf *names,
 	 * NTLMSSP Type 2 message or composed here.
 	 */
 	if (names) {
-		err = mb_put_mem(mbp, names->m_data, names->m_len);
+		err = mb_put_mem(mbp, names->m_data, names->m_len, MB_MSYSTEM);
 	} else {
 		/* Get upper-case names. */
 		ucdom  = utf8_str_toupper(ctx->ct_domain);

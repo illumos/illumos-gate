@@ -33,14 +33,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SMBFS_MOUNT_H
 #define	_SMBFS_MOUNT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file defines the interface used by mount_smbfs.
@@ -49,43 +47,34 @@
  */
 
 #define	SMBFS_VERMAJ	1
-#define	SMBFS_VERMIN	3200
+#define	SMBFS_VERMIN	3300
 #define	SMBFS_VERSION	(SMBFS_VERMAJ*100000 + SMBFS_VERMIN)
-#define	SMBFS_VER_STR	"1.32"
+#define	SMBFS_VER_STR	"1.33"
 
 #define	SMBFS_VFSNAME	"smbfs"
 
-/* Values for flags */
-#define	SMBFS_MOUNT_SOFT	0x0001
-#define	SMBFS_MOUNT_INTR	0x0002
-#define	SMBFS_MOUNT_STRONG	  0x0004
-#define	SMBFS_MOUNT_HAVE_NLS	0x0008
-#define	SMBFS_MOUNT_NO_LONG	 0x0010
-#define	SMBFS_MOUNT_HOSTNAME	0x020
-#define	SMBFS_MOUNT_SEMISOFT	0x200000 /* read soft, modify hard */
-#define	SMBFS_MOUNT_NOPRINT	 0x400000 /* don't print messages */
-
-#define	MNT_RDONLY		0x0001
-#define	MNT_NODEV		0x0002
-#define	MNT_NOEXEC		0x0004
-#define	MNT_NOSUID		0x0008
-#define	MNT_UNION		0x0010
-#define	MNT_DONTBROWSE		0x0020
-#define	MNT_AUTOMOUNTED		0x0040
+/* Values for smbfs_args.flags */
+#define	SMBFS_MF_SOFT		0x0001
+#define	SMBFS_MF_INTR		0x0002
+#define	SMBFS_MF_NOAC		0x0004
+#define	SMBFS_MF_ACREGMIN	0x0100	/* set min secs for file attr cache */
+#define	SMBFS_MF_ACREGMAX	0x0200	/* set max secs for file attr cache */
+#define	SMBFS_MF_ACDIRMIN	0x0400	/* set min secs for dir attr cache */
+#define	SMBFS_MF_ACDIRMAX	0x0800	/* set max secs for dir attr cache */
 
 /* Layout of the mount control block for an smb file system. */
 struct smbfs_args {
 	int		version;		/* smbfs mount version */
 	int		devfd;			/* file descriptor */
-	uint_t		flags;			/* mount options, eg: soft */
-	mode_t		file_mode;		/* octal srwx for files */
-	mode_t		dir_mode;		/* octal srwx for dirs */
-	int		caseopt;		/* convert upper|lower|none */
-	caddr_t		addr;			/* file server address */
-	caddr_t		hostname;		/* server's hostname */
-	caddr_t		sharename;		/* server's sharename */
+	uint_t		flags;			/* SMBFS_MF_ flags */
 	uid_t		uid;			/* octal user id */
 	gid_t		gid;			/* octal group id */
+	mode_t		file_mode;		/* octal srwx for files */
+	mode_t		dir_mode;		/* octal srwx for dirs */
+	int		acregmin;		/* attr cache file min secs */
+	int		acregmax;		/* attr cache file max secs */
+	int		acdirmin;		/* attr cache dir min secs */
+	int		acdirmax;		/* attr cache dir max secs */
 };
 
 #ifdef _SYSCALL32
@@ -94,15 +83,15 @@ struct smbfs_args {
 struct smbfs_args32 {
 	int32_t		version;		/* smbfs mount version */
 	int32_t		devfd;			/* file descriptor */
-	uint_t		flags;			/* mount options, eg: soft */
-	mode_t		file_mode;		/* octal srwx for files */
-	mode_t		dir_mode;		/* octal srwx for dirs */
-	int32_t		caseopt;		/* convert upper|lower|none */
-	caddr32_t	addr;			/* file server address */
-	caddr32_t	hostname;		/* server's hostname */
-	caddr32_t	sharename;		/* server's sharename */
+	uint32_t	flags;			/* SMBFS_MF_ flags */
 	uid32_t		uid;			/* octal user id */
 	gid32_t		gid;			/* octal group id */
+	mode32_t	file_mode;		/* octal srwx for files */
+	mode32_t	dir_mode;		/* octal srwx for dirs */
+	int32_t		acregmin;		/* attr cache file min secs */
+	int32_t		acregmax;		/* attr cache file max secs */
+	int32_t		acdirmin;		/* attr cache dir min secs */
+	int32_t		acdirmax;		/* attr cache dir max secs */
 };
 
 #endif /* _SYSCALL32 */

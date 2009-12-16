@@ -151,7 +151,7 @@ smb_iod_start(smb_ctx_t *ctx)
 		char *argv[2];
 		argv[0] = "smbiod";
 		argv[1] = NULL;
-		execv(smbiod_path, argv);
+		(void) execv(smbiod_path, argv);
 		_exit(1);
 	}
 
@@ -160,7 +160,7 @@ smb_iod_start(smb_ctx_t *ctx)
 	 */
 	tmo = iod_start_timeout;
 	while (--tmo >= 0) {
-		sleep(1);
+		(void) sleep(1);
 		err = smb_iod_open_door(&fd);
 		if (err == 0)
 			goto OK;

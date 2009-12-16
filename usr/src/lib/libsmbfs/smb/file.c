@@ -114,7 +114,7 @@ smb_fh_ntcreate(
 	mb_put_uint16le(mbp, 0xff);	/* secondary command */
 	mb_put_uint16le(mbp, 0);	/* offset to next command (none) */
 	mb_put_uint8(mbp, 0);		/* MBZ (pad?) */
-	mb_fit(mbp, 2, &pathsizep);	/* path size - fill in below */
+	(void) mb_fit(mbp, 2, &pathsizep); /* path size - fill in below */
 	mb_put_uint32le(mbp, flags);	/* create flags (oplock) */
 	mb_put_uint32le(mbp, 0);	/* FID - basis for path if not root */
 	mb_put_uint32le(mbp, req_acc);
@@ -138,7 +138,7 @@ smb_fh_ntcreate(
 		mb_put_uint8(mbp, 0);
 	}
 	pathstart = mbp->mb_count;
-	mb_put_dstring(mbp, path, uc);
+	mb_put_string(mbp, path, uc);
 	smb_rq_bend(rqp);
 
 	/* Now go back and fill in pathsizep */
@@ -155,30 +155,30 @@ smb_fh_ntcreate(
 	 * spec says 26 for word count, but 34 words are defined
 	 * and observed from win2000
 	 */
-	error = mb_get_uint8(mbp, &wc);
+	error = md_get_uint8(mbp, &wc);
 	if (error || wc < 26) {
 		smb_error(dgettext(TEXT_DOMAIN,
 		    "%s: open failed, bad word count"), 0, path);
 		error = EBADRPC;
 		goto out;
 	}
-	mb_get_uint8(mbp, NULL);	/* secondary cmd */
-	mb_get_uint8(mbp, NULL);	/* mbz */
-	mb_get_uint16le(mbp, NULL);	/* andxoffset */
-	mb_get_uint8(mbp, NULL);	/* oplock lvl granted */
-	mb_get_uint16le(mbp, &fh);	/* FID */
-	mb_get_uint32le(mbp, action_taken);
+	md_get_uint8(mbp, NULL);	/* secondary cmd */
+	md_get_uint8(mbp, NULL);	/* mbz */
+	md_get_uint16le(mbp, NULL);	/* andxoffset */
+	md_get_uint8(mbp, NULL);	/* oplock lvl granted */
+	md_get_uint16le(mbp, &fh);	/* FID */
+	md_get_uint32le(mbp, action_taken);
 #if 0	/* skip decoding the rest */
-	mb_get_uint64le(mbp, NULL);	/* creation time */
-	mb_get_uint64le(mbp, NULL);	/* access time */
-	mb_get_uint64le(mbp, NULL);	/* write time */
-	mb_get_uint64le(mbp, NULL);	/* change time */
-	mb_get_uint32le(mbp, NULL);	/* attributes */
-	mb_get_uint64le(mbp, NULL);	/* allocation size */
-	mb_get_uint64le(mbp, NULL);	/* EOF */
-	mb_get_uint16le(mbp, NULL);	/* file type */
-	mb_get_uint16le(mbp, NULL);	/* device state */
-	mb_get_uint8(mbp, NULL);	/* directory (boolean) */
+	md_get_uint64le(mbp, NULL);	/* creation time */
+	md_get_uint64le(mbp, NULL);	/* access time */
+	md_get_uint64le(mbp, NULL);	/* write time */
+	md_get_uint64le(mbp, NULL);	/* change time */
+	md_get_uint32le(mbp, NULL);	/* attributes */
+	md_get_uint64le(mbp, NULL);	/* allocation size */
+	md_get_uint64le(mbp, NULL);	/* EOF */
+	md_get_uint16le(mbp, NULL);	/* file type */
+	md_get_uint16le(mbp, NULL);	/* device state */
+	md_get_uint8(mbp, NULL);	/* directory (boolean) */
 #endif
 
 	/* success! */

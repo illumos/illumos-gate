@@ -61,37 +61,26 @@ int smbfs_acl_set(int fd, acl_t *, uid_t, gid_t);
 /*
  * Slightly lower-level functions, allowing access to
  * the raw Windows Security Descriptor (SD)
+ *
+ * The struct i_ntsid is opaque in this I/F.
+ * Real decl. in: common/smbclnt/smbfs_ntacl.h
  */
-typedef struct i_ntsd i_ntsd_t;
+struct i_ntsd;
 
 /*
  * Get an "internal form" SD from the FD (opened in smbfs).
  * Allocates a hierarchy in isdp.  Caller must free it via
  * smbfs_acl_free_isd()
  */
-int smbfs_acl_getsd(int fd, uint32_t, i_ntsd_t **);
+int smbfs_acl_getsd(int fd, uint32_t, struct i_ntsd **);
 
 /*
  * Set an "internal form" SD onto the FD (opened in smbfs).
  */
-int smbfs_acl_setsd(int fd, uint32_t, i_ntsd_t *);
-
-/*
- * Convert an internal SD to a ZFS-style ACL.
- * Get uid/gid too if pointers != NULL.
- */
-int smbfs_acl_sd2zfs(i_ntsd_t *, acl_t *, uid_t *, gid_t *);
-
-/*
- * Convert an internal SD to a ZFS-style ACL.
- * Include owner/group too if uid/gid != -1.
- */
-int smbfs_acl_zfs2sd(acl_t *, uid_t, gid_t, i_ntsd_t **);
-
-void smbfs_acl_free_sd(i_ntsd_t *);
+int smbfs_acl_setsd(int fd, uint32_t, struct i_ntsd *);
 
 struct __FILE;
-void smbfs_acl_print_sd(struct __FILE *, i_ntsd_t *);
+void smbfs_acl_print_sd(struct __FILE *, struct i_ntsd *);
 
 #ifdef	__cplusplus
 }

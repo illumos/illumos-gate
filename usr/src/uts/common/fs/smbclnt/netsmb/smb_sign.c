@@ -189,7 +189,7 @@ smb_compute_MAC(struct smb_vc *vcp, mblk_t *mp,
 /*
  * Sign a request with HMAC-MD5.
  */
-int
+void
 smb_rq_sign(struct smb_rq *rqp)
 {
 	struct smb_vc *vcp = rqp->sr_vc;
@@ -203,7 +203,7 @@ smb_rq_sign(struct smb_rq *rqp)
 	 */
 	if (MBLKL(mp) < SMB_HDRLEN) {
 		if (!pullupmsg(mp, SMB_HDRLEN))
-			return (0);
+			return;
 	}
 	sigloc = mp->b_rptr + SMBSIGOFF;
 
@@ -214,7 +214,7 @@ smb_rq_sign(struct smb_rq *rqp)
 		 * This happens with SPNEGO, NTLMSSP, ...
 		 */
 		bcopy("BSRSPLY", sigloc, 8);
-		return (0);
+		return;
 	}
 
 	/*
@@ -225,9 +225,7 @@ smb_rq_sign(struct smb_rq *rqp)
 	if (status != CRYPTO_SUCCESS) {
 		SMBSDEBUG("Crypto error %d", status);
 		bzero(sigloc, SMBSIGLEN);
-		return (ENOTSUP);
 	}
-	return (0);
 }
 
 /*
@@ -240,8 +238,7 @@ smb_rq_verify(struct smb_rq *rqp)
 	mblk_t *mp = rqp->sr_rp.md_top;
 	uint8_t sigbuf[SMBSIGLEN];
 	uint8_t *sigloc;
-	int status;
-	int fudge;
+	int fudge, rsn, status;
 
 	/*
 	 * Note vc_mackey and vc_mackeylen gets filled in by
@@ -266,9 +263,11 @@ smb_rq_verify(struct smb_rq *rqp)
 	}
 	sigloc = mp->b_rptr + SMBSIGOFF;
 
-	SMBSDEBUG("sr_rseqno = 0x%x\n", rqp->sr_rseqno);
-
-	status = smb_compute_MAC(vcp, mp, rqp->sr_rseqno, sigbuf);
+	/*
+	 * Compute the expected signature in sigbuf.
+	 */
+	rsn = rqp->sr_rseqno;
+	status = smb_compute_MAC(vcp, mp, rsn, sigbuf);
 	if (status != CRYPTO_SUCCESS) {
 		SMBSDEBUG("Crypto error %d", status);
 		/*
@@ -293,10 +292,10 @@ smb_rq_verify(struct smb_rq *rqp)
 	 * of the sequence # has gotten a bit out of sync.
 	 */
 	for (fudge = 1; fudge <= nsmb_signing_fudge; fudge++) {
-		smb_compute_MAC(vcp, mp, rqp->sr_rseqno + fudge, sigbuf);
+		(void) smb_compute_MAC(vcp, mp, rsn + fudge, sigbuf);
 		if (bcmp(sigbuf, sigloc, SMBSIGLEN) == 0)
 			break;
-		smb_compute_MAC(vcp, mp, rqp->sr_rseqno - fudge, sigbuf);
+		(void) smb_compute_MAC(vcp, mp, rsn - fudge, sigbuf);
 		if (bcmp(sigbuf, sigloc, SMBSIGLEN) == 0) {
 			fudge = -fudge;
 			break;
@@ -304,7 +303,7 @@ smb_rq_verify(struct smb_rq *rqp)
 	}
 	if (fudge <= nsmb_signing_fudge) {
 		SMBSDEBUG("sr_rseqno=%d, but %d would have worked\n",
-		    rqp->sr_rseqno, rqp->sr_rseqno + fudge);
+		    rsn, rsn + fudge);
 	}
 #endif
 	return (EBADRPC);

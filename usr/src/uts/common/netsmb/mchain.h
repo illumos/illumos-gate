@@ -87,7 +87,23 @@
 #endif	/* (BYTE_ORDER == LITTLE_ENDIAN) */
 
 
+/*
+ * Additions for Solaris to replace things that came from
+ * <sys/mbuf.h> in the Darwin code.  These are mostly just
+ * wrappers for streams functions.  See: subr_mchain.c
+ */
+
 #ifdef _KERNEL
+
+/*
+ * BSD-style mbuf "shim" for kernel code.  Note, this
+ * does NOT implement BSD mbufs in the kernel.  Rather,
+ * macros and wrapper functions are used so that code
+ * fomerly using mbuf_t now use STREAMS mblk_t instead.
+ */
+
+#include <sys/stream.h> /* mblk_t */
+typedef mblk_t mbuf_t;
 
 /* BEGIN CSTYLED */
 /*
@@ -115,7 +131,42 @@
  */
 /* END CSTYLED */
 
-#include <sys/stream.h> /* mblk_t */
+#define	mtod(m, t) ((t)((m)->b_rptr))
+
+/* length arg for m_copym to "copy all" */
+#define	M_COPYALL		-1
+
+mblk_t *m_copym(mblk_t *, int, int, int);
+mblk_t *m_pullup(mblk_t *, int);
+mblk_t *m_split(mblk_t *, int, int);
+void m_cat(mblk_t *, mblk_t *);
+#define	m_freem(x)	freemsg(x)
+mblk_t *m_getblk(int, int);
+int  m_fixhdr(mblk_t *m);
+
+#else	/* _KERNEL */
+
+/*
+ * BSD-style mbuf work-alike, for user-level.
+ * See libsmbfs mbuf.c
+ */
+typedef struct mbuf {
+	int		m_len;
+	int		m_maxlen;
+	char		*m_data;
+	struct mbuf	*m_next;
+} mbuf_t;
+
+#define	mtod(m, t)	((t)(m)->m_data)
+
+int m_get(int, mbuf_t **);
+void m_freem(mbuf_t *);
+
+#endif	/* _KERNEL */
+
+/*
+ * BSD-style mbchain/mdchain work-alike
+ */
 
 /*
  * Type of copy for mb_{put|get}_mem()
@@ -125,6 +176,8 @@
 #define	MB_MINLINE	2		/* use an inline copy loop */
 #define	MB_MZERO	3		/* bzero(), mb_put_mem only */
 #define	MB_MCUSTOM	4		/* use an user defined function */
+
+#ifdef _KERNEL
 
 struct mbchain {
 	mblk_t *mb_top;
@@ -136,65 +189,64 @@ typedef struct mbchain mbchain_t;
 struct mdchain {
 	mblk_t *md_top;		/* head of mblk chain */
 	mblk_t *md_cur;		/* current mblk */
-	uchar_t *md_pos;		/* offset in the current mblk */
+	uchar_t *md_pos;	/* position in md_cur */
+	/* NB: md_pos is same type as mblk_t b_rptr, b_wptr members. */
 };
 typedef struct mdchain mdchain_t;
 
-int  m_fixhdr(mblk_t *m);
+mblk_t *mb_detach(mbchain_t *mbp);
+int  mb_fixhdr(mbchain_t *mbp);
+int  mb_put_uio(mbchain_t *mbp, uio_t *uiop, size_t size);
 
-int  mb_init(struct mbchain *mbp);
-void mb_initm(struct mbchain *mbp, mblk_t *m);
-void mb_done(struct mbchain *mbp);
-mblk_t *mb_detach(struct mbchain *mbp);
-int  mb_fixhdr(struct mbchain *mbp);
-void *mb_reserve(struct mbchain *mbp, int size);
+void md_append_record(mdchain_t *mdp, mblk_t *top);
+void md_next_record(mdchain_t *mdp);
+int  md_get_uio(mdchain_t *mdp, uio_t *uiop, size_t size);
 
-int  mb_put_padbyte(struct mbchain *mbp);
-int  mb_put_uint8(struct mbchain *mbp, uint8_t x);
-int  mb_put_uint16be(struct mbchain *mbp, uint16_t x);
-int  mb_put_uint16le(struct mbchain *mbp, uint16_t x);
-int  mb_put_uint32be(struct mbchain *mbp, uint32_t x);
-int  mb_put_uint32le(struct mbchain *mbp, uint32_t x);
-int  mb_put_uint64be(struct mbchain *mbp, uint64_t x);
-int  mb_put_uint64le(struct mbchain *mbp, uint64_t x);
-int  mb_put_mem(struct mbchain *mbp, const void *src, int size, int type);
-
-int  mb_put_mbuf(struct mbchain *mbp, mblk_t *m);
-int  mb_put_uio(struct mbchain *mbp, uio_t *uiop, size_t size);
-
-int  md_init(struct mdchain *mdp);
-void md_initm(struct mdchain *mbp, mblk_t *m);
-void md_done(struct mdchain *mdp);
-void md_append_record(struct mdchain *mdp, mblk_t *top);
-int  md_next_record(struct mdchain *mdp);
-int  md_get_uint8(struct mdchain *mdp, uint8_t *x);
-int  md_get_uint16le(struct mdchain *mdp, uint16_t *x);
-int  md_get_uint16be(struct mdchain *mdp, uint16_t *x);
-int  md_get_uint32be(struct mdchain *mdp, uint32_t *x);
-int  md_get_uint32le(struct mdchain *mdp, uint32_t *x);
-int  md_get_uint64be(struct mdchain *mdp, uint64_t *x);
-int  md_get_uint64le(struct mdchain *mdp, uint64_t *x);
-int  md_get_mem(struct mdchain *mdp, void *vdst, int size, int type);
-int  md_get_mbuf(struct mdchain *mdp, int size, mblk_t **m);
-int  md_get_uio(struct mdchain *mdp, uio_t *uiop, size_t size);
+#else	/* _KERNEL */
 
 /*
- * Additions for Solaris to replace things that came from
- * <sys/mbuf.h> in the Darwin code.  These are mostly just
- * wrappers for streams functions.  See: subr_mchain.c
+ * user-level code uses the same struct for both (MB, MD)
  */
+typedef struct mbdata {
+	mbuf_t	*mb_top;	/* head of mbuf chain */
+	mbuf_t	*mb_cur;	/* current mbuf */
+	char	*mb_pos;	/* position in mb_cur (get) */
+	/* NB: mb_pos is same type as mbuf_t m_data member. */
+	int	mb_count;	/* bytes marshalled (put) */
+} mbdata_t;
+typedef struct mbdata mbchain_t;
+typedef struct mbdata mdchain_t;
 
-#define	mtod(m, t) ((t)((m)->b_rptr))
+#endif	/* _KERNEL */
 
-/* length to m_copym to copy all */
-#define	M_COPYALL		-1
+int  mb_init(mbchain_t *);
+void mb_initm(mbchain_t *, mbuf_t *);
+void mb_done(mbchain_t *);
+void *mb_reserve(mbchain_t *, int size);
 
-mblk_t *m_copym(mblk_t *, int, int, int);
-mblk_t *m_pullup(mblk_t *, int);
-mblk_t *m_split(mblk_t *, int, int);
-void m_cat(mblk_t *, mblk_t *);
-#define	m_freem(x)	freemsg(x)
-mblk_t *m_getblk(int, int);
+int  mb_put_padbyte(mbchain_t *mbp);
+int  mb_put_uint8(mbchain_t *, uint8_t);
+int  mb_put_uint16be(mbchain_t *, uint16_t);
+int  mb_put_uint16le(mbchain_t *, uint16_t);
+int  mb_put_uint32be(mbchain_t *, uint32_t);
+int  mb_put_uint32le(mbchain_t *, uint32_t);
+int  mb_put_uint64be(mbchain_t *, uint64_t);
+int  mb_put_uint64le(mbchain_t *, uint64_t);
+int  mb_put_mem(mbchain_t *, const void *, int, int);
+int  mb_put_mbuf(mbchain_t *, mbuf_t *);
 
-#endif	/* ifdef _KERNEL */
+int  md_init(mdchain_t *mdp);
+void md_initm(mdchain_t *mbp, mbuf_t *m);
+void md_done(mdchain_t *mdp);
+
+int  md_get_uint8(mdchain_t *, uint8_t *);
+int  md_get_uint16be(mdchain_t *, uint16_t *);
+int  md_get_uint16le(mdchain_t *, uint16_t *);
+int  md_get_uint32be(mdchain_t *, uint32_t *);
+int  md_get_uint32le(mdchain_t *, uint32_t *);
+int  md_get_uint64be(mdchain_t *, uint64_t *);
+int  md_get_uint64le(mdchain_t *, uint64_t *);
+int  md_get_mem(mdchain_t *, void *, int, int);
+int  md_get_mbuf(mdchain_t *, int, mbuf_t **);
+
 #endif	/* !_MCHAIN_H_ */

@@ -41,7 +41,6 @@
 #include <sys/kmem.h>
 #include <sys/stat.h>
 #include <sys/cmn_err.h>
-#include <sys/dnlc.h>
 #include <sys/u8_textprep.h>
 
 #include <netsmb/smb_osdep.h>
@@ -86,12 +85,20 @@ smbfs_get_xattrdir(vnode_t *pvp, vnode_t **vpp, cred_t *cr, int flags)
 
 	pnp = VTOSMB(pvp);
 
-	xvp = smbfs_make_node(pvp->v_vfsp,
-	    pnp->n_rpath, pnp->n_rplen,
-	    NULL, 0, ':', NULL);
-	ASSERT(xvp);
+	/*
+	 * We don't allow recursive extended attributes
+	 * (xattr under xattr dir.) so the "parent" node
+	 * (pnp) must NOT be an XATTR directory or file.
+	 */
+	if (pnp->n_flag & N_XATTR)
+		return (EINVAL);
+
+	xnp = smbfs_node_findcreate(pnp->n_mount,
+	    pnp->n_rpath, pnp->n_rplen, NULL, 0, ':',
+	    &smbfs_fattr0); /* force create */
+	ASSERT(xnp != NULL);
+	xvp = SMBTOV(xnp);
 	/* Note: xvp has a VN_HOLD, which our caller expects. */
-	xnp = VTOSMB(xvp);
 
 	/* If it's a new node, initialize. */
 	if (xvp->v_type == VNON) {
@@ -122,8 +129,10 @@ int
 smbfs_xa_parent(vnode_t *vp, vnode_t **vpp)
 {
 	smbnode_t *np = VTOSMB(vp);
-	vnode_t *pvp;
+	smbnode_t *pnp;
 	int rplen;
+
+	*vpp = NULL;
 
 	if ((np->n_flag & N_XATTR) == 0)
 		return (EINVAL);
@@ -163,13 +172,12 @@ smbfs_xa_parent(vnode_t *vp, vnode_t **vpp)
 		}
 	}
 
-	pvp = smbfs_make_node(vp->v_vfsp,
-	    np->n_rpath, rplen,
-	    NULL, 0, 0, NULL);
-	ASSERT(pvp);
-
-	/* Note: pvp has a VN_HOLD from _make_node */
-	*vpp = pvp;
+	pnp = smbfs_node_findcreate(np->n_mount,
+	    np->n_rpath, rplen, NULL, 0, 0,
+	    &smbfs_fattr0); /* force create */
+	ASSERT(pnp != NULL);
+	/* Note: have VN_HOLD from smbfs_node_findcreate */
+	*vpp = SMBTOV(pnp);
 	return (0);
 }
 

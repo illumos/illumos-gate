@@ -33,9 +33,8 @@ VERS=		.1
 
 # leaving out: kiconv.o
 
-OBJECTS=\
+OBJ_LIB=\
 	acl_api.o \
-	acl_conv.o \
 	acl_print.o \
 	charsets.o \
 	cfopt.o \
@@ -75,13 +74,19 @@ OBJECTS=\
 	ui-sun.o \
 	utf_str.o
 
+OBJ_CMN= smbfs_ntacl.o 
+
+OBJECTS= $(OBJ_LIB) $(OBJ_CMN)
+
 include $(SRC)/lib/Makefile.lib
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 
 SRCDIR=		../smb
+CMNDIR=		$(SRC)/common/smbclnt
 
-SRCS=		$(OBJECTS:%.o=../smb/%.c)
+SRCS=		$(OBJ_LIB:%.o=$(SRCDIR)/%.c) \
+		$(OBJ_CMN:%.o=$(CMNDIR)/%.c)
 
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
@@ -93,7 +98,9 @@ LDLIBS += -lsocket -lnsl -lc -lmd -lpkcs11 -lkrb5 -lsec -lidmap
 CFLAGS	+=	$(CCVERBOSE) 
 
 CPPFLAGS += -D__EXTENSIONS__ -D_REENTRANT -DMIA \
-	-I$(SRCDIR) -I.. -I$(SRC)/uts/common
+	-I$(SRCDIR) -I.. \
+	-I$(SRC)/uts/common \
+	-I$(SRC)/common/smbclnt
 
 # Debugging
 ${NOT_RELEASE_BUILD} CPPFLAGS += -DDEBUG
@@ -104,15 +111,22 @@ ${NOT_RELEASE_BUILD} CPPFLAGS += -DDEBUG
 #CTFCONVERT_O=
 #CTFMERGE_LIB=
 
-# disable some of the less important lint
-LINTCHECKFLAGS	+= -erroff=E_FUNC_RET_ALWAYS_IGNOR2
-LINTCHECKFLAGS	+= -erroff=E_FUNC_RET_MAYBE_IGNORED2
-LINTCHECKFLAGS	+= -DDEBUG
+# Filter out the less important lint.
+# See lgrep.awk
+LGREP =	nawk -f $(SRCDIR)/lgrep.awk
+LTAIL	+=	2>&1 | $(LGREP)
 
 all:	$(LIBS)
 
-lint:	lintcheck
+lint:	lintcheck_t
 
 include ../../Makefile.targ
+
+lintcheck_t: $$(SRCS)
+	$(LINT.c) $(LINTCHECKFLAGS) $(SRCS) $(LDLIBS) $(LTAIL)
+
+objs/%.o pics/%.o: $(CMNDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
 
 .KEEP_STATE:

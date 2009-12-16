@@ -277,7 +277,7 @@ ssp_ctx_next_token(struct smb_ctx *ctx,
 			err = EBADRPC;
 			goto out;
 		}
-		err = mb_init(&body_in, (size_t)toklen);
+		err = mb_init_sz(&body_in, (size_t)toklen);
 		if (err)
 			goto out;
 		m = body_in.mb_top;
@@ -354,7 +354,7 @@ ssp_ctx_next_token(struct smb_ctx *ctx,
 			err = EBADRPC;
 			goto out;
 		}
-		err = mb_init(caller_out, (size_t)toklen);
+		err = mb_init_sz(caller_out, (size_t)toklen);
 		if (err)
 			goto out;
 		m = caller_out->mb_top;
