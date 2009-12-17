@@ -724,3 +724,8 @@ Notes on packaging:
 ======
   This version has the following fix:
    6894476 e1000g is not lint clean
+
+5.3.19
+======
+  This version has the following fix:
+   6877343 e1000g's default tx/rx resource consumption too high for jumbograms

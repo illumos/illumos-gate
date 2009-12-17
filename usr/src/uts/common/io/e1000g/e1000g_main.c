@@ -46,7 +46,7 @@
 
 static char ident[] = "Intel PRO/1000 Ethernet";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.3.18";
+static char e1000g_version[] = "Driver Ver. 5.3.19";
 
 /*
  * Proto types for DDI entry points
@@ -109,7 +109,8 @@ static boolean_t e1000g_link_check(struct e1000g *);
 static boolean_t e1000g_stall_check(struct e1000g *);
 static void e1000g_smartspeed(struct e1000g *);
 static void e1000g_get_conf(struct e1000g *);
-static int e1000g_get_prop(struct e1000g *, char *, int, int, int);
+static boolean_t e1000g_get_prop(struct e1000g *, char *, int, int, int,
+    int *);
 static void enable_watchdog_timer(struct e1000g *);
 static void disable_watchdog_timer(struct e1000g *);
 static void start_watchdog_timer(struct e1000g *);
@@ -438,10 +439,11 @@ e1000g_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	/*
 	 * Initialize for fma support
 	 */
-	Adapter->fm_capabilities = e1000g_get_prop(Adapter, "fm-capable",
+	(void) e1000g_get_prop(Adapter, "fm-capable",
 	    0, 0x0f,
 	    DDI_FM_EREPORT_CAPABLE | DDI_FM_ACCCHK_CAPABLE |
-	    DDI_FM_DMACHK_CAPABLE | DDI_FM_ERRCB_CAPABLE);
+	    DDI_FM_DMACHK_CAPABLE | DDI_FM_ERRCB_CAPABLE,
+	    &Adapter->fm_capabilities);
 	e1000g_fm_init(Adapter);
 	Adapter->attach_progress |= ATTACH_PROGRESS_FMINIT;
 
@@ -773,9 +775,6 @@ e1000g_set_driver_params(struct e1000g *Adapter)
 	/* setup the maximum MTU size of the chip */
 	e1000g_setup_max_mtu(Adapter);
 
-	/* Get conf file properties */
-	e1000g_get_conf(Adapter);
-
 	/* Get speed/duplex settings in conf file */
 	hw->mac.forced_speed_duplex = ADVERTISE_100_FULL;
 	hw->phy.autoneg_advertised = AUTONEG_ADVERTISE_SPEED_DEFAULT;
@@ -783,6 +782,9 @@ e1000g_set_driver_params(struct e1000g *Adapter)
 
 	/* Get Jumbo Frames settings in conf file */
 	e1000g_get_max_frame_size(Adapter);
+
+	/* Get conf file properties */
+	e1000g_get_conf(Adapter);
 
 	/* enforce PCH limits */
 	e1000g_pch_limits(Adapter);
@@ -3116,6 +3118,48 @@ reset:
 				 */
 				e1000g_pch_limits(Adapter);
 				e1000g_set_bufsize(Adapter);
+
+				/*
+				 * decrease the number of descriptors and free
+				 * packets for jumbo frames to reduce tx/rx
+				 * resource consumption
+				 */
+				if (Adapter->max_frame_size >=
+				    (FRAME_SIZE_UPTO_4K -
+				    E1000G_IPALIGNPRESERVEROOM)) {
+
+					if (Adapter->tx_desc_num_flag == 0)
+						Adapter->tx_desc_num =
+						    DEFAULT_JUMBO_NUM_TX_DESC;
+
+					if (Adapter->rx_desc_num_flag == 0)
+						Adapter->rx_desc_num =
+						    DEFAULT_JUMBO_NUM_RX_DESC;
+
+					if (Adapter->tx_buf_num_flag == 0)
+						Adapter->tx_freelist_num =
+						    DEFAULT_JUMBO_NUM_TX_BUF;
+
+					if (Adapter->rx_buf_num_flag == 0)
+						Adapter->rx_freelist_num =
+						    DEFAULT_JUMBO_NUM_RX_BUF;
+				} else {
+					if (Adapter->tx_desc_num_flag == 0)
+						Adapter->tx_desc_num =
+						    DEFAULT_NUM_TX_DESCRIPTOR;
+
+					if (Adapter->rx_desc_num_flag == 0)
+						Adapter->rx_desc_num =
+						    DEFAULT_NUM_RX_DESCRIPTOR;
+
+					if (Adapter->tx_buf_num_flag == 0)
+						Adapter->tx_freelist_num =
+						    DEFAULT_NUM_TX_FREELIST;
+
+					if (Adapter->rx_buf_num_flag == 0)
+						Adapter->rx_freelist_num =
+						    DEFAULT_NUM_RX_FREELIST;
+				}
 			}
 			break;
 		case MAC_PROP_PRIVATE:
@@ -3597,6 +3641,17 @@ e1000g_get_conf(struct e1000g *Adapter)
 {
 	struct e1000_hw *hw = &Adapter->shared;
 	boolean_t tbi_compatibility = B_FALSE;
+	boolean_t is_jumbo = B_FALSE;
+	int propval;
+	/*
+	 * decrease the number of descriptors and free packets
+	 * for jumbo frames to reduce tx/rx resource consumption
+	 */
+	if (Adapter->max_frame_size >=
+	    (FRAME_SIZE_UPTO_4K -
+	    E1000G_IPALIGNPRESERVEROOM)) {
+		is_jumbo = B_TRUE;
+	}
 
 	/*
 	 * get each configurable property from e1000g.conf
@@ -3605,42 +3660,50 @@ e1000g_get_conf(struct e1000g *Adapter)
 	/*
 	 * NumTxDescriptors
 	 */
-	Adapter->tx_desc_num =
+	Adapter->tx_desc_num_flag =
 	    e1000g_get_prop(Adapter, "NumTxDescriptors",
 	    MIN_NUM_TX_DESCRIPTOR, MAX_NUM_TX_DESCRIPTOR,
-	    DEFAULT_NUM_TX_DESCRIPTOR);
+	    is_jumbo ? DEFAULT_JUMBO_NUM_TX_DESC
+	    : DEFAULT_NUM_TX_DESCRIPTOR, &propval);
+	Adapter->tx_desc_num = propval;
 
 	/*
 	 * NumRxDescriptors
 	 */
-	Adapter->rx_desc_num =
+	Adapter->rx_desc_num_flag =
 	    e1000g_get_prop(Adapter, "NumRxDescriptors",
 	    MIN_NUM_RX_DESCRIPTOR, MAX_NUM_RX_DESCRIPTOR,
-	    DEFAULT_NUM_RX_DESCRIPTOR);
+	    is_jumbo ? DEFAULT_JUMBO_NUM_RX_DESC
+	    : DEFAULT_NUM_RX_DESCRIPTOR, &propval);
+	Adapter->rx_desc_num = propval;
 
 	/*
 	 * NumRxFreeList
 	 */
-	Adapter->rx_freelist_num =
+	Adapter->rx_buf_num_flag =
 	    e1000g_get_prop(Adapter, "NumRxFreeList",
 	    MIN_NUM_RX_FREELIST, MAX_NUM_RX_FREELIST,
-	    DEFAULT_NUM_RX_FREELIST);
+	    is_jumbo ? DEFAULT_JUMBO_NUM_RX_BUF
+	    : DEFAULT_NUM_RX_FREELIST, &propval);
+	Adapter->rx_freelist_num = propval;
 
 	/*
 	 * NumTxPacketList
 	 */
-	Adapter->tx_freelist_num =
+	Adapter->tx_buf_num_flag =
 	    e1000g_get_prop(Adapter, "NumTxPacketList",
 	    MIN_NUM_TX_FREELIST, MAX_NUM_TX_FREELIST,
-	    DEFAULT_NUM_TX_FREELIST);
+	    is_jumbo ? DEFAULT_JUMBO_NUM_TX_BUF
+	    : DEFAULT_NUM_TX_FREELIST, &propval);
+	Adapter->tx_freelist_num = propval;
 
 	/*
 	 * FlowControl
 	 */
 	hw->fc.send_xon = B_TRUE;
-	hw->fc.requested_mode =
-	    e1000g_get_prop(Adapter, "FlowControl",
-	    e1000_fc_none, 4, DEFAULT_FLOW_CONTROL);
+	(void) e1000g_get_prop(Adapter, "FlowControl",
+	    e1000_fc_none, 4, DEFAULT_FLOW_CONTROL, &propval);
+	hw->fc.requested_mode = propval;
 	/* 4 is the setting that says "let the eeprom decide" */
 	if (hw->fc.requested_mode == 4)
 		hw->fc.requested_mode = e1000_fc_default;
@@ -3648,57 +3711,57 @@ e1000g_get_conf(struct e1000g *Adapter)
 	/*
 	 * Max Num Receive Packets on Interrupt
 	 */
-	Adapter->rx_limit_onintr =
-	    e1000g_get_prop(Adapter, "MaxNumReceivePackets",
+	(void) e1000g_get_prop(Adapter, "MaxNumReceivePackets",
 	    MIN_RX_LIMIT_ON_INTR, MAX_RX_LIMIT_ON_INTR,
-	    DEFAULT_RX_LIMIT_ON_INTR);
+	    DEFAULT_RX_LIMIT_ON_INTR, &propval);
+	Adapter->rx_limit_onintr = propval;
 
 	/*
 	 * PHY master slave setting
 	 */
-	hw->phy.ms_type =
-	    e1000g_get_prop(Adapter, "SetMasterSlave",
+	(void) e1000g_get_prop(Adapter, "SetMasterSlave",
 	    e1000_ms_hw_default, e1000_ms_auto,
-	    e1000_ms_hw_default);
+	    e1000_ms_hw_default, &propval);
+	hw->phy.ms_type = propval;
 
 	/*
 	 * Parameter which controls TBI mode workaround, which is only
 	 * needed on certain switches such as Cisco 6500/Foundry
 	 */
-	tbi_compatibility =
-	    e1000g_get_prop(Adapter, "TbiCompatibilityEnable",
-	    0, 1, DEFAULT_TBI_COMPAT_ENABLE);
+	(void) e1000g_get_prop(Adapter, "TbiCompatibilityEnable",
+	    0, 1, DEFAULT_TBI_COMPAT_ENABLE, &propval);
+	tbi_compatibility = (propval == 1);
 	e1000_set_tbi_compatibility_82543(hw, tbi_compatibility);
 
 	/*
 	 * MSI Enable
 	 */
-	Adapter->msi_enable =
-	    e1000g_get_prop(Adapter, "MSIEnable",
-	    0, 1, DEFAULT_MSI_ENABLE);
+	(void) e1000g_get_prop(Adapter, "MSIEnable",
+	    0, 1, DEFAULT_MSI_ENABLE, &propval);
+	Adapter->msi_enable = (propval == 1);
 
 	/*
 	 * Interrupt Throttling Rate
 	 */
-	Adapter->intr_throttling_rate =
-	    e1000g_get_prop(Adapter, "intr_throttling_rate",
+	(void) e1000g_get_prop(Adapter, "intr_throttling_rate",
 	    MIN_INTR_THROTTLING, MAX_INTR_THROTTLING,
-	    DEFAULT_INTR_THROTTLING);
+	    DEFAULT_INTR_THROTTLING, &propval);
+	Adapter->intr_throttling_rate = propval;
 
 	/*
 	 * Adaptive Interrupt Blanking Enable/Disable
 	 * It is enabled by default
 	 */
-	Adapter->intr_adaptive =
-	    (e1000g_get_prop(Adapter, "intr_adaptive", 0, 1, 1) == 1) ?
-	    B_TRUE : B_FALSE;
+	(void) e1000g_get_prop(Adapter, "intr_adaptive", 0, 1, 1,
+	    &propval);
+	Adapter->intr_adaptive = (propval == 1);
 
 	/*
 	 * Hardware checksum enable/disable parameter
 	 */
-	Adapter->tx_hcksum_enable =
-	    e1000g_get_prop(Adapter, "tx_hcksum_enable",
-	    0, 1, DEFAULT_TX_HCKSUM_ENABLE);
+	(void) e1000g_get_prop(Adapter, "tx_hcksum_enable",
+	    0, 1, DEFAULT_TX_HCKSUM_ENABLE, &propval);
+	Adapter->tx_hcksum_enable = (propval == 1);
 	/*
 	 * Checksum on/off selection via global parameters.
 	 *
@@ -3744,9 +3807,9 @@ e1000g_get_conf(struct e1000g *Adapter)
 	 * If the tx hardware checksum is not enabled, LSO should be
 	 * disabled.
 	 */
-	Adapter->lso_enable =
-	    e1000g_get_prop(Adapter, "lso_enable",
-	    0, 1, DEFAULT_LSO_ENABLE);
+	(void) e1000g_get_prop(Adapter, "lso_enable",
+	    0, 1, DEFAULT_LSO_ENABLE, &propval);
+	Adapter->lso_enable = (propval == 1);
 
 	switch (hw->mac.type) {
 		case e1000_82546:
@@ -3773,16 +3836,17 @@ e1000g_get_conf(struct e1000g *Adapter)
 	 * e1000_82545, e1000_82546 and e1000_82546_rev_3
 	 * will not cross 64k boundary.
 	 */
-	Adapter->mem_workaround_82546 =
-	    e1000g_get_prop(Adapter, "mem_workaround_82546",
-	    0, 1, DEFAULT_MEM_WORKAROUND_82546);
+	(void) e1000g_get_prop(Adapter, "mem_workaround_82546",
+	    0, 1, DEFAULT_MEM_WORKAROUND_82546, &propval);
+	Adapter->mem_workaround_82546 = (propval == 1);
 
 	/*
 	 * Max number of multicast addresses
 	 */
-	Adapter->mcast_max_num =
-	    e1000g_get_prop(Adapter, "mcast_max_num",
-	    MIN_MCAST_NUM, MAX_MCAST_NUM, hw->mac.mta_reg_count * 32);
+	(void) e1000g_get_prop(Adapter, "mcast_max_num",
+	    MIN_MCAST_NUM, MAX_MCAST_NUM, hw->mac.mta_reg_count * 32,
+	    &propval);
+	Adapter->mcast_max_num = propval;
 }
 
 /*
@@ -3792,21 +3856,24 @@ e1000g_get_conf(struct e1000g *Adapter)
  * file e1000g.conf.
  *
  * Caller provides name of the property, a default value, a minimum
- * value, and a maximum value.
+ * value, a maximum value and a pointer to the returned property
+ * value.
  *
- * Return configured value of the property, with default, minimum and
- * maximum properly applied.
+ * Return B_TRUE if the configured value of the property is not a default
+ * value, otherwise return B_FALSE.
  */
-static int
+static boolean_t
 e1000g_get_prop(struct e1000g *Adapter,	/* point to per-adapter structure */
     char *propname,		/* name of the property */
     int minval,			/* minimum acceptable value */
     int maxval,			/* maximim acceptable value */
-    int defval)			/* default value */
+    int defval,			/* default value */
+    int *propvalue)		/* property value return to caller */
 {
 	int propval;		/* value returned for requested property */
 	int *props;		/* point to array of properties returned */
 	uint_t nprops;		/* number of property value returned */
+	boolean_t ret = B_TRUE;
 
 	/*
 	 * get the array of properties from the config file
@@ -3823,6 +3890,7 @@ e1000g_get_prop(struct e1000g *Adapter,	/* point to per-adapter structure */
 			    "Not Enough %s values found in e1000g.conf"
 			    " - set to %d\n",
 			    propname, propval);
+			ret = B_FALSE;
 		}
 
 		/* free memory allocated for properties */
@@ -3830,6 +3898,7 @@ e1000g_get_prop(struct e1000g *Adapter,	/* point to per-adapter structure */
 
 	} else {
 		propval = defval;
+		ret = B_FALSE;
 	}
 
 	/*
@@ -3849,7 +3918,8 @@ e1000g_get_prop(struct e1000g *Adapter,	/* point to per-adapter structure */
 		    propname, propval);
 	}
 
-	return (propval);
+	*propvalue = propval;
+	return (ret);
 }
 
 static boolean_t
@@ -4170,14 +4240,15 @@ static void
 e1000g_force_speed_duplex(struct e1000g *Adapter)
 {
 	int forced;
+	int propval;
 	struct e1000_mac_info *mac = &Adapter->shared.mac;
 	struct e1000_phy_info *phy = &Adapter->shared.phy;
 
 	/*
 	 * get value out of config file
 	 */
-	forced = e1000g_get_prop(Adapter, "ForceSpeedDuplex",
-	    GDIAG_10_HALF, GDIAG_ANY, GDIAG_ANY);
+	(void) e1000g_get_prop(Adapter, "ForceSpeedDuplex",
+	    GDIAG_10_HALF, GDIAG_ANY, GDIAG_ANY, &forced);
 
 	switch (forced) {
 	case GDIAG_10_HALF:
@@ -4221,10 +4292,10 @@ e1000g_force_speed_duplex(struct e1000g *Adapter)
 		break;
 	default:	/* obey the setting of AutoNegAdvertised */
 		mac->autoneg = B_TRUE;
-		phy->autoneg_advertised =
-		    (uint16_t)e1000g_get_prop(Adapter, "AutoNegAdvertised",
+		(void) e1000g_get_prop(Adapter, "AutoNegAdvertised",
 		    0, AUTONEG_ADVERTISE_SPEED_DEFAULT,
-		    AUTONEG_ADVERTISE_SPEED_DEFAULT);
+		    AUTONEG_ADVERTISE_SPEED_DEFAULT, &propval);
+		phy->autoneg_advertised = (uint16_t)propval;
 		break;
 	}	/* switch */
 }
@@ -4242,7 +4313,8 @@ e1000g_get_max_frame_size(struct e1000g *Adapter)
 	/*
 	 * get value out of config file
 	 */
-	max_frame = e1000g_get_prop(Adapter, "MaxFrameSize", 0, 3, 0);
+	(void) e1000g_get_prop(Adapter, "MaxFrameSize", 0, 3, 0,
+	    &max_frame);
 
 	switch (max_frame) {
 	case 0:

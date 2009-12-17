@@ -140,6 +140,10 @@ extern "C" {
 #define	DEFAULT_NUM_TX_DESCRIPTOR	2048
 #define	DEFAULT_NUM_RX_FREELIST		4096
 #define	DEFAULT_NUM_TX_FREELIST		2304
+#define	DEFAULT_JUMBO_NUM_RX_DESC	1024
+#define	DEFAULT_JUMBO_NUM_TX_DESC	1024
+#define	DEFAULT_JUMBO_NUM_RX_BUF	2048
+#define	DEFAULT_JUMBO_NUM_TX_BUF	1152
 #define	DEFAULT_RX_LIMIT_ON_INTR	128
 
 #ifdef __sparc
@@ -876,6 +880,12 @@ typedef struct e1000g {
 	uint32_t rx_intr_delay;
 	uint32_t rx_intr_abs_delay;
 	uint32_t intr_throttling_rate;
+
+	uint32_t	tx_desc_num_flag:1,
+			rx_desc_num_flag:1,
+			tx_buf_num_flag:1,
+			rx_buf_num_flag:1,
+			pad_to_32:28;
 
 	uint32_t default_mtu;
 	uint32_t max_mtu;
