@@ -996,14 +996,13 @@ AcpiOsWritePciConfiguration(ACPI_PCI_ID *PciId, UINT32 Register,
 /*
  * Called with ACPI_HANDLEs for both a PCI Config Space
  * OpRegion and (what ACPI CA thinks is) the PCI device
- * to which this ConfigSpace OpRegion belongs.  Since
- * ACPI CA depends on a valid _BBN object being present
- * and this is not always true (one old x86 had broken _BBN),
- * we go ahead and get the correct PCI bus number using the
- * devinfo mapping (which compensates for broken _BBN).
+ * to which this ConfigSpace OpRegion belongs.
  *
- * Default values for bus, segment, device and function are
- * all 0 when ACPI CA can't figure them out.
+ * ACPI CA uses _BBN and _ADR objects to determine the default
+ * values for bus, segment, device and function; anything ACPI CA
+ * can't figure out from the ACPI tables will be 0.  One very
+ * old 32-bit x86 system is known to have broken _BBN; this is
+ * not addressed here.
  *
  * Some BIOSes implement _BBN() by reading PCI config space
  * on bus #0 - which means that we'll recurse when we attempt
@@ -1022,7 +1021,6 @@ AcpiOsDerivePciId(ACPI_HANDLE rhandle, ACPI_HANDLE chandle,
 	dev_info_t *dip;
 	int bus, device, func, devfn;
 
-
 	/*
 	 * See above - avoid recursing during scanning_d2a_map.
 	 */
@@ -1039,15 +1037,11 @@ AcpiOsDerivePciId(ACPI_HANDLE rhandle, ACPI_HANDLE chandle,
 	 * If we've mapped the ACPI node to the devinfo
 	 * tree, use the devinfo reg property
 	 */
-	if (acpica_get_devinfo(handle, &dip) == AE_OK) {
-		(void) acpica_get_bdf(dip, &bus, &device, &func);
+	if (ACPI_SUCCESS(acpica_get_devinfo(handle, &dip)) &&
+	    (acpica_get_bdf(dip, &bus, &device, &func) >= 0)) {
 		(*PciId)->Bus = bus;
 		(*PciId)->Device = device;
 		(*PciId)->Function = func;
-	} else if (acpica_eval_int(handle, "_ADR", &devfn) == AE_OK) {
-		/* no devinfo node - just confirm the d/f */
-		(*PciId)->Device = (devfn >> 16) & 0xFFFF;
-		(*PciId)->Function = devfn & 0xFFFF;
 	}
 }
 

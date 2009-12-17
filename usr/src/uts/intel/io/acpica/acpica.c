@@ -405,10 +405,14 @@ acpica_init()
 	if (ACPI_FAILURE(status = acpica_install_handlers()))
 		goto error;
 
+	/*
+	 * Create ACPI-to-devinfo mapping now so _INI and _STA
+	 * methods can access PCI config space when needed
+	 */
+	scan_d2a_map();
+
 	if (ACPI_FAILURE(status = AcpiEnableSubsystem(acpi_init_level)))
 		goto error;
-
-	scan_d2a_map();
 
 	/* do after AcpiEnableSubsystem() so GPEs are initialized */
 	acpica_ec_init();	/* initialize EC if present */
