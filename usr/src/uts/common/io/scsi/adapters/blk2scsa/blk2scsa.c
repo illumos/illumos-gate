@@ -63,6 +63,7 @@ struct b2s_request_impl {
 	b2s_request_t		ri_public;
 	struct scsi_pkt		*ri_pkt;
 	struct scsi_arq_status	*ri_sts;
+	buf_t			*ri_bp;
 
 	size_t			ri_resid;
 	b2s_nexus_t		*ri_nexus;
@@ -203,8 +204,10 @@ static void b2s_tran_tgt_free(dev_info_t *, dev_info_t *,
     scsi_hba_tran_t *, struct scsi_device *);
 static int b2s_tran_getcap(struct scsi_address *, char *, int);
 static int b2s_tran_setcap(struct scsi_address *, char *, int, int);
-static void b2s_tran_teardown_pkt(struct scsi_pkt *);
-static int b2s_tran_setup_pkt(struct scsi_pkt *, int (*)(caddr_t), caddr_t);
+static void b2s_tran_destroy_pkt(struct scsi_address *, struct scsi_pkt *);
+static struct scsi_pkt *b2s_tran_init_pkt(struct scsi_address *,
+    struct scsi_pkt *, struct buf *, int, int, int, int,
+    int (*)(caddr_t), caddr_t);
 static int b2s_tran_start(struct scsi_address *, struct scsi_pkt *);
 static int b2s_tran_abort(struct scsi_address *, struct scsi_pkt *);
 static int b2s_tran_reset(struct scsi_address *, int);
@@ -452,14 +455,11 @@ void
 b2s_request_mapin(b2s_request_t *req, caddr_t *addrp, size_t *lenp)
 {
 	b2s_request_impl_t	 *ri = (void *)req;
-	struct scsi_pkt		*pkt = ri->ri_pkt;
 	buf_t			*bp;
 
-	if ((pkt != NULL) && ((bp = scsi_pkt2bp(pkt)) != NULL) &&
-	    (bp->b_bcount != 0)) {
-		bp_mapin(bp);
-		*addrp = bp->b_un.b_addr + pkt->pkt_dma_offset;
-		*lenp = pkt->pkt_dma_len;
+	if (((bp = ri->ri_bp) != NULL) && (bp->b_bcount != 0)) {
+		*addrp = bp->b_un.b_addr;
+		*lenp = bp->b_bcount;
 	} else {
 		*addrp = 0;
 		*lenp = 0;
@@ -469,11 +469,15 @@ b2s_request_mapin(b2s_request_t *req, caddr_t *addrp, size_t *lenp)
 void
 b2s_request_dma(b2s_request_t *req, uint_t *ndmacp, ddi_dma_cookie_t **dmacsp)
 {
-	b2s_request_impl_t	*ri = (void *)req;
-	struct scsi_pkt		*pkt = ri->ri_pkt;
+	/*
+	 * Direct DMA support was removed; SCSA can't easily deal with
+	 * HBAs that have restrictions which would require partial DMA
+	 * to be used.
+	 */
+	_NOTE(ARGUNUSED(req));
 
-	*ndmacp = pkt->pkt_numcookies;
-	*dmacsp = pkt->pkt_cookies;
+	*ndmacp = 0;
+	*dmacsp = NULL;
 }
 
 void
@@ -661,28 +665,50 @@ b2s_tran_tgt_free(dev_info_t *hbadip, dev_info_t *tgtdip,
 	b2s_rele_leaf(l);
 }
 
-int
-b2s_tran_setup_pkt(struct scsi_pkt *pkt, int (*cb)(caddr_t), caddr_t arg)
+struct scsi_pkt *
+b2s_tran_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
+    struct buf *bp, int cmdlen, int statuslen, int tgtlen, int flags,
+    int (*cb)(caddr_t), caddr_t cbarg)
 {
-	b2s_request_impl_t *ri = pkt->pkt_ha_private;
+	dev_info_t		*dip;
+	scsi_hba_tran_t		*tran;
+	b2s_request_impl_t	*ri;
 
-	_NOTE(ARGUNUSED(cb));
-	_NOTE(ARGUNUSED(arg));
+	_NOTE(ARGUNUSED(cbarg));
+	_NOTE(ARGUNUSED(flags));
 
-	ri->ri_pkt = pkt;
-	ri->ri_sts = (struct scsi_arq_status *)(void *)pkt->pkt_scbp;
+	tran = ap->a_hba_tran;
+	dip = tran->tran_hba_dip;
 
 	/*
-	 * NB: The other fields are initialized properly at tran_start(9e).
-	 * We don't care about their values the rest of the time.
+	 * Unconditional mapin for now, so we will always have kernel
+	 * virtual addresses to work with.
 	 */
-	return (0);
+	if (bp && (bp->b_bcount)) {
+		bp_mapin(bp);
+	}
+
+	if (pkt == NULL) {
+		/* we can only support these two kinds of callbacks */
+		cb = (cb == SLEEP_FUNC) ? SLEEP_FUNC : NULL_FUNC;
+		pkt = scsi_hba_pkt_alloc(dip, ap, cmdlen, statuslen,
+		    tgtlen, sizeof (b2s_request_impl_t), cb, NULL);
+		if (pkt == NULL)
+			return (NULL);
+
+		ri = pkt->pkt_ha_private;
+		ri->ri_pkt = pkt;
+		ri->ri_sts = (void *)pkt->pkt_scbp;
+		ri->ri_bp = bp;
+	}
+
+	return (pkt);
 }
 
 void
-b2s_tran_teardown_pkt(struct scsi_pkt *pkt)
+b2s_tran_destroy_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 {
-	_NOTE(ARGUNUSED(pkt));
+	scsi_hba_pkt_free(ap, pkt);
 }
 
 int
@@ -1816,8 +1842,8 @@ b2s_alloc_nexus(b2s_nexus_info_t *info)
 	tran->tran_abort = 		b2s_tran_abort;
 	tran->tran_getcap = 		b2s_tran_getcap;
 	tran->tran_setcap = 		b2s_tran_setcap;
-	tran->tran_setup_pkt =		b2s_tran_setup_pkt;
-	tran->tran_teardown_pkt =	b2s_tran_teardown_pkt;
+	tran->tran_init_pkt =		b2s_tran_init_pkt;
+	tran->tran_destroy_pkt =	b2s_tran_destroy_pkt;
 	tran->tran_hba_len =		sizeof (b2s_request_impl_t);
 	tran->tran_bus_config =		b2s_bus_config;
 
