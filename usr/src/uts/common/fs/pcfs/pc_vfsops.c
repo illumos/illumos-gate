@@ -2176,7 +2176,8 @@ recheck:
 				validflags |= BPB_TOTSEC32_OK;
 			if (bpb_get_FatSz16(bpb) == fatsec)
 				validflags |= BPB_FATSZ16_OK;
-			if (fatsec * secsize >= ncl * 3 / 2)
+			if (fatsec * secsize >= (ncl + PCF_FIRSTCLUSTER)
+			    * 3 / 2)
 				validflags |= BPB_FATSZ_OK;
 			if (ncl < 4085)
 				validflags |= BPB_NCLUSTERS_OK;
@@ -2200,7 +2201,7 @@ recheck:
 				validflags |= BPB_TOTSEC32_OK;
 			if (bpb_get_FatSz16(bpb) == fatsec)
 				validflags |= BPB_FATSZ16_OK;
-			if (fatsec * secsize >= ncl * 2)
+			if (fatsec * secsize >= (ncl + PCF_FIRSTCLUSTER) * 2)
 				validflags |= BPB_FATSZ_OK;
 			if (ncl >= 4085 && ncl < 65525)
 				validflags |= BPB_NCLUSTERS_OK;
@@ -2224,7 +2225,7 @@ recheck:
 				validflags |= BPB_FATSZ16_OK;
 			if (bpb_get_FatSz32(bpb) == fatsec)
 				validflags |= BPB_FATSZ32_OK;
-			if (fatsec * secsize >= ncl * 4)
+			if (fatsec * secsize >= (ncl + PCF_FIRSTCLUSTER) * 4)
 				validflags |= BPB_FATSZ_OK;
 			if (ncl >= 65525 && ncl < PCF_LASTCLUSTER32)
 				validflags |= BPB_NCLUSTERS_OK;
