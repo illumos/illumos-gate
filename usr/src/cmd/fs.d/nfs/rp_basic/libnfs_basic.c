@@ -97,7 +97,8 @@ get_fs_locations(char *buf)
 {
 	fs_locations4 *result = NULL;
 	fs_location4 *fsl_array;
-	int i = 0, fsl_count = 0, gothost = 0, escape = 0, delimiter = 0;
+	int i, gothost;
+	int fsl_count = 0, escape = 0, delimiter = 0;
 	int len;
 	char *p, *sp, *dp, buf2[SYMLINK_MAX];
 
@@ -145,10 +146,10 @@ get_fs_locations(char *buf)
 		goto out;
 
 	/* Alloc space for everything */
-	result = malloc(sizeof (fs_locations4));
+	result = calloc(1, sizeof (fs_locations4));
 	if (result == NULL)
 		goto out;
-	fsl_array = malloc(fsl_count * sizeof (fs_location4));
+	fsl_array = calloc(fsl_count, sizeof (fs_location4));
 	if (fsl_array == NULL) {
 		free(result);
 		result = NULL;
@@ -166,6 +167,7 @@ get_fs_locations(char *buf)
 	dp = buf2;
 	bzero(buf2, sizeof (buf2));
 
+	i = gothost = 0;
 	while ((sp && *sp && (sp - buf < len)) || gothost) {
 
 		if (!gothost) {
@@ -181,6 +183,7 @@ get_fs_locations(char *buf)
 #ifdef DEBUG
 				printf("get_fs_locations: skipping %s\n", sp);
 #endif
+				fsl_count--;
 				sp += strlen(sp) + 1;
 			} else {
 				bcopy(sp, dp, p - sp);
@@ -233,6 +236,34 @@ get_fs_locations(char *buf)
 		/* Plain char, just copy it */
 		*dp++ = *sp++;
 	}
+
+	/*
+	 * If we're still expecting a path name, we don't have a
+	 * server:/path pair and should discard the server and
+	 * note that we got fewer locations than expected.
+	 */
+	if (gothost) {
+		fsl_count--;
+		free(fsl_array[i].server.server_val);
+		fsl_array[i].server.server_val = NULL;
+		fsl_array[i].server.server_len = 0;
+	}
+
+	/*
+	 * If we have zero entries, we never got a whole server:/path
+	 * pair, and so cannot have anything else allocated.
+	 */
+	if (fsl_count <= 0) {
+		free(result);
+		free(fsl_array);
+		return (NULL);
+	}
+
+	/*
+	 * Make sure we reflect the right number of locations.
+	 */
+	if (fsl_count < result->locations.locations_len)
+		result->locations.locations_len = fsl_count;
 
 out:
 	return (result);
