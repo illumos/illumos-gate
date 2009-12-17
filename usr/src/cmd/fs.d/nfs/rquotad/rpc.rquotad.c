@@ -468,34 +468,15 @@ quotactl(cmd, mountp, uid, dqp)
 }
 
 /*
- * Reduce unneeded slashes in the given path. e.g. "//the//dir/"
- */
-static void
-reduce_slashes(char *path)
-{
-	char *p, *q = path;
-
-	for (p = path; *p != '\0'; p++) {
-		if (p[0] == '/' && p[1] == '/')
-			continue;
-		*q++ = *p;
-	}
-	if ((q - path > 1) && q[-1] == '/')
-		q--;
-	*q = '\0';
-}
-
-/*
  * Return the quota information for the given path.  Returns NULL if none
  * was found.
  */
 
 struct fsquot *
-findfsq(dir)
-	char *dir;
+findfsq(char *dir)
 {
 	struct stat sb;
-	register struct fsquot *fsqp;
+	struct fsquot *fsqp;
 	static time_t lastmtime = 0; 	/* mount table's previous mtime */
 
 	/*
@@ -524,16 +505,11 @@ findfsq(dir)
 	if (stat(dir, &sb) < 0)
 		return (NULL);
 
-	reduce_slashes(dir);
-
 	for (fsqp = fsqlist; fsqp != NULL; fsqp = fsqp->fsq_next) {
-		if (strcmp(fsqp->fsq_fstype, MNTTYPE_ZFS) == 0) {
-			if (strcmp(fsqp->fsq_dir, dir) == 0)
-				return (fsqp);
-		} else if (sb.st_dev == fsqp->fsq_dev) {
+		if (sb.st_dev == fsqp->fsq_dev)
 			return (fsqp);
-		}
 	}
+
 	return (NULL);
 }
 
@@ -541,6 +517,10 @@ static void
 setup_zfs(struct mnttab *mp)
 {
 	struct fsquot *fsqp;
+	struct stat sb;
+
+	if (stat(mp->mnt_mountp, &sb) < 0)
+		return;
 
 	fsqp = malloc(sizeof (struct fsquot));
 	if (fsqp == NULL) {
@@ -553,7 +533,9 @@ setup_zfs(struct mnttab *mp)
 		syslog(LOG_ERR, "out of memory");
 		zexit(1);
 	}
+
 	fsqp->fsq_fstype = MNTTYPE_ZFS;
+	fsqp->fsq_dev = sb.st_dev;
 	fsqp->fsq_next = fsqlist;
 	fsqlist = fsqp;
 }
