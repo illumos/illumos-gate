@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * when a stat() is done for a non-device file, the devt returned
@@ -55,6 +53,7 @@
 #include <sys/lx_debug.h>
 #include <sys/lx_ptm.h>
 #include <sys/lx_audio.h>
+#include <sys/lx_fcntl.h>
 #include <sys/modctl.h>
 
 /* define _KERNEL to get the devt manipulation macros */
@@ -470,6 +469,27 @@ lx_fstat64(uintptr_t p1, uintptr_t p2)
 		return (-errno);
 
 	return (stat64_convert(p2, &sbuf, fd));
+}
+
+int
+lx_fstatat64(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
+{
+	int atfd = (int)p1;
+	const char *path = (const char *)p2;
+	int flag;
+	struct stat64 sbuf;
+
+	if (atfd == LX_AT_FDCWD)
+		atfd = AT_FDCWD;
+
+	flag = ltos_at_flag(p4, AT_SYMLINK_NOFOLLOW);
+	if (flag < 0)
+		return (-EINVAL);
+
+	if (fstatat64(atfd, path, &sbuf, flag))
+		return (-errno);
+
+	return (stat64_convert(p3, &sbuf, -1));
 }
 
 

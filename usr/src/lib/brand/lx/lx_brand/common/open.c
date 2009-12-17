@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -41,13 +39,10 @@
 #include <sys/lx_fcntl.h>
 #include <sys/lx_misc.h>
 
-int
-lx_open(uintptr_t p1, uintptr_t p2, uintptr_t p3)
+static int
+ltos_open_flags(uintptr_t p2)
 {
-	int flags, fd;
-	mode_t mode = 0;
-	char *path = (char *)p1;
-	struct stat64 statbuf;
+	int flags;
 
 	if ((p2 & O_ACCMODE) == LX_O_RDONLY)
 		flags = O_RDONLY;
@@ -58,7 +53,6 @@ lx_open(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 
 	if (p2 & LX_O_CREAT) {
 		flags |= O_CREAT;
-		mode = (mode_t)p3;
 	}
 
 	if (p2 & LX_O_EXCL)
@@ -99,10 +93,13 @@ lx_open(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	if (p2 & LX_O_DIRECT)
 		flags |= (O_RSYNC|O_SYNC);
 
-	lx_debug("\topen(%s, 0%o, 0%o)", path, flags, mode);
+	return (flags);
+}
 
-	if ((fd = open(path, flags, mode)) < 0)
-		return (-errno);
+static int
+lx_open_postprocess(int fd, uintptr_t p2)
+{
+	struct stat64 statbuf;
 
 	/*
 	 * Check the file type AFTER opening the file to avoid a race condition
@@ -137,4 +134,50 @@ lx_open(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	}
 
 	return (fd);
+}
+
+int
+lx_openat(uintptr_t ext1, uintptr_t p1, uintptr_t p2, uintptr_t p3)
+{
+	int atfd = (int)ext1;
+	int flags, fd;
+	mode_t mode = 0;
+	char *path = (char *)p1;
+
+	if (atfd == LX_AT_FDCWD)
+		atfd = AT_FDCWD;
+
+	flags = ltos_open_flags(p2);
+
+	if (flags & O_CREAT) {
+		mode = (mode_t)p3;
+	}
+
+	lx_debug("\topenat(%d, %s, 0%o, 0%o)", atfd, path, flags, mode);
+
+	if ((fd = openat(atfd, path, flags, mode)) < 0)
+		return (-errno);
+
+	return (lx_open_postprocess(fd, p2));
+}
+
+int
+lx_open(uintptr_t p1, uintptr_t p2, uintptr_t p3)
+{
+	int flags, fd;
+	mode_t mode = 0;
+	char *path = (char *)p1;
+
+	flags = ltos_open_flags(p2);
+
+	if (flags & O_CREAT) {
+		mode = (mode_t)p3;
+	}
+
+	lx_debug("\topen(%s, 0%o, 0%o)", path, flags, mode);
+
+	if ((fd = open(path, flags, mode)) < 0)
+		return (-errno);
+
+	return (lx_open_postprocess(fd, p2));
 }

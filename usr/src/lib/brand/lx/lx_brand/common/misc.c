@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <assert.h>
 #include <alloca.h>
@@ -44,6 +42,7 @@
 #include <sys/lx_stat.h>
 #include <sys/lx_syscall.h>
 #include <sys/lx_thunk_server.h>
+#include <sys/lx_fcntl.h>
 #include <unistd.h>
 #include <libintl.h>
 #include <zone.h>
@@ -76,6 +75,39 @@ lx_rename(uintptr_t p1, uintptr_t p2)
 
 			if (errno == EBUSY) {
 				(void) unlink((const char *)p1);
+				return (0);
+			}
+		}
+
+		return (-errno);
+	}
+
+	return (0);
+}
+
+int
+lx_renameat(uintptr_t ext1, uintptr_t p1, uintptr_t ext2, uintptr_t p2)
+{
+	int ret;
+	int atfd1 = (int)ext1;
+	int atfd2 = (int)ext2;
+
+	if (atfd1 == LX_AT_FDCWD)
+		atfd1 = AT_FDCWD;
+
+	if (atfd2 == LX_AT_FDCWD)
+		atfd2 = AT_FDCWD;
+
+	ret = renameat(atfd1, (const char *)p1, atfd2, (const char *)p2);
+
+	if (ret < 0) {
+		/* see lx_rename() for why we check lx_install */
+		if (lx_install != 0) {
+			if (errno == ENOENT)
+				return (0);
+
+			if (errno == EBUSY) {
+				(void) unlinkat(ext1, (const char *)p1, 0);
 				return (0);
 			}
 		}

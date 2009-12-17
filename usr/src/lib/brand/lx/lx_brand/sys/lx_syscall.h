@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_LX_SYSCALL_H
 #define	_SYS_LX_SYSCALL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if !defined(_ASM)
 
@@ -39,6 +37,20 @@ extern "C" {
 #endif
 
 extern int lx_install;
+
+extern int lx_openat(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+extern int lx_mkdirat(uintptr_t, uintptr_t, uintptr_t);
+extern int lx_mknodat(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+extern int lx_fchownat(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+extern int lx_futimesat(uintptr_t, uintptr_t, uintptr_t);
+extern int lx_fstatat64(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+extern int lx_unlinkat(uintptr_t, uintptr_t, uintptr_t);
+extern int lx_renameat(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+extern int lx_linkat(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+extern int lx_symlinkat(uintptr_t, uintptr_t, uintptr_t);
+extern int lx_readlinkat(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+extern int lx_fchmodat(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+extern int lx_faccessat(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
 extern int lx_stat(uintptr_t, uintptr_t);
 extern int lx_fstat(uintptr_t, uintptr_t);

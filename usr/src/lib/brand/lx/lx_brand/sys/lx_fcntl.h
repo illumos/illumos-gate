@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_LX_FCNTL_H
 #define	_SYS_LX_FCNTL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -86,6 +84,12 @@ extern "C" {
 #define	LX_LOCK_EX		2	/* exclusive */
 #define	LX_LOCK_NB		4	/* non-blocking */
 #define	LX_LOCK_UN		8	/* unlock */
+
+#define	LX_AT_FDCWD		-100
+#define	LX_AT_EACCESS		512
+#define	LX_AT_REMOVEDIR		512
+#define	LX_AT_SYMLINK_NOFOLLOW	256
+#define	LX_AT_SYMLINK_FOLLOW	1024
 
 struct lx_flock {
 	short		l_type;

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/fstyp.h>
 #include <sys/fsid.h>
@@ -44,6 +42,7 @@
 #include <sys/lx_types.h>
 #include <sys/lx_debug.h>
 #include <sys/lx_misc.h>
+#include <sys/lx_fcntl.h>
 
 static int
 install_checkpath(uintptr_t p1)
@@ -67,6 +66,45 @@ install_checkpath(uintptr_t p1)
 	errno = saved_errno;
 	return (-errno);
 }
+
+/*
+ * Convert linux LX_AT_* flags to solaris AT_* flags, while verifying allowed
+ * flags have been passed. This also allows EACCESS/REMOVEDIR to be translated
+ * correctly since on linux they have the same value.
+ */
+int
+ltos_at_flag(int lflag, int allow)
+{
+	int sflag = 0;
+
+	if ((lflag & LX_AT_EACCESS) && (allow & AT_EACCESS)) {
+		lflag &= ~LX_AT_EACCESS;
+		sflag |= AT_EACCESS;
+	}
+
+	if ((lflag & LX_AT_REMOVEDIR) && (allow & AT_REMOVEDIR)) {
+		lflag &= ~LX_AT_REMOVEDIR;
+		sflag |= AT_REMOVEDIR;
+	}
+
+	if ((lflag & LX_AT_SYMLINK_NOFOLLOW) && (allow & AT_SYMLINK_NOFOLLOW)) {
+		lflag &= ~LX_AT_SYMLINK_NOFOLLOW;
+		sflag |= AT_SYMLINK_NOFOLLOW;
+	}
+
+	/* right now solaris doesn't have a _FOLLOW flag, so use a fake one */
+	if ((lflag & LX_AT_SYMLINK_FOLLOW) && (allow & LX_AT_SYMLINK_FOLLOW)) {
+		lflag &= ~LX_AT_SYMLINK_FOLLOW;
+		sflag |= LX_AT_SYMLINK_FOLLOW;
+	}
+
+	/* if flag is not zero than some flags did not hit the above code */
+	if (lflag)
+		return (-EINVAL);
+
+	return (sflag);
+}
+
 
 /*
  * Miscellaneous file-related system calls.
@@ -167,6 +205,31 @@ lx_unlink(uintptr_t p)
 		return (-EISDIR);
 
 	return (unlink(pathname) ? -errno : 0);
+}
+
+int
+lx_unlinkat(uintptr_t ext1, uintptr_t p1, uintptr_t p2)
+{
+	int atfd = (int)ext1;
+	char *pathname = (char *)p1;
+	int flag = (int)p2;
+	struct stat64 statbuf;
+
+	if (atfd == LX_AT_FDCWD)
+		atfd = AT_FDCWD;
+
+	flag = ltos_at_flag(flag, AT_REMOVEDIR);
+	if (flag < 0)
+		return (-EINVAL);
+
+	if (!(flag & AT_REMOVEDIR)) {
+		/* Behave like unlink() */
+		if ((fstatat64(atfd, pathname, &statbuf, AT_SYMLINK_NOFOLLOW) ==
+		    0) && S_ISDIR(statbuf.st_mode))
+			return (-EISDIR);
+	}
+
+	return (unlinkat(atfd, pathname, flag) ? -errno : 0);
 }
 
 /*
@@ -465,4 +528,214 @@ lx_sysfs(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	}
 
 	return (-EINVAL);
+}
+
+int
+lx_faccessat(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
+{
+	int atfd = (int)p1;
+	char *path = (char *)p2;
+	int mode = (mode_t)p3;
+	int flag = (int)p4;
+
+	if (atfd == LX_AT_FDCWD)
+		atfd = AT_FDCWD;
+
+	flag = ltos_at_flag(flag, AT_EACCESS);
+	if (flag < 0)
+		return (-EINVAL);
+
+	return (faccessat(atfd, path, mode, flag) ? -errno : 0);
+}
+
+int
+lx_futimesat(uintptr_t p1, uintptr_t p2, uintptr_t p3)
+{
+	int atfd = (int)p1;
+	char *path = (char *)p2;
+	struct timeval *times = (struct timeval *)p3;
+
+	if (atfd == LX_AT_FDCWD)
+		atfd = AT_FDCWD;
+
+	return (futimesat(atfd, path, times) ? -errno : 0);
+}
+
+
+/*
+ * Constructs an absolute path string in buf from the path of fd and the
+ * relative path string pointed to by "p1". This is required for emulating
+ * *at() system calls.
+ * Example:
+ *    If the path of fd is "/foo/bar" and path is "etc" the string returned is
+ *    "/foo/bar/etc", if the fd is a file fd then it fails with ENOTDIR.
+ *    If path is absolute then no modifcations are made to it when copied.
+ */
+static int
+getpathat(int fd, uintptr_t p1, char *outbuf, size_t outbuf_size)
+{
+	char pathbuf[MAXPATHLEN];
+	char fdpathbuf[MAXPATHLEN];
+	char *fdpath;
+	struct stat64 statbuf;
+
+	if (uucopystr((void *)p1, pathbuf, MAXPATHLEN) == -1)
+		return (-errno);
+
+	/* If the path is absolute then we can early out */
+	if ((pathbuf[0] == '/') || (fd == LX_AT_FDCWD)) {
+		(void) strlcpy(outbuf, pathbuf, outbuf_size);
+		return (0);
+	}
+
+	fdpath = lx_fd_to_path(fd, fdpathbuf, sizeof (fdpathbuf));
+	if (fdpath == NULL)
+		return (-EBADF);
+
+	if ((fstat64(fd, &statbuf) < 0))
+		return (-EBADF);
+
+	if (!S_ISDIR(statbuf.st_mode))
+		return (-ENOTDIR);
+
+	if (snprintf(outbuf, outbuf_size, "%s/%s", fdpath, pathbuf) >
+	    (outbuf_size-1))
+		return (-ENAMETOOLONG);
+
+	return (0);
+}
+
+int
+lx_mkdirat(uintptr_t p1, uintptr_t p2, uintptr_t p3)
+{
+	int atfd = (int)p1;
+	mode_t mode = (mode_t)p3;
+	char pathbuf[MAXPATHLEN];
+	int ret;
+
+	ret = getpathat(atfd, p2, pathbuf, sizeof (pathbuf));
+	if (ret < 0)
+		return (ret);
+
+	return (mkdir(pathbuf, mode) ? -errno : 0);
+}
+
+int
+lx_mknodat(uintptr_t ext1, uintptr_t p1, uintptr_t p2, uintptr_t p3)
+{
+	int atfd = (int)ext1;
+	char pathbuf[MAXPATHLEN];
+	int ret;
+
+	ret = getpathat(atfd, p1, pathbuf, sizeof (pathbuf));
+	if (ret < 0)
+		return (ret);
+
+	return (lx_mknod((uintptr_t)pathbuf, p2, p3));
+}
+
+int
+lx_symlinkat(uintptr_t p1, uintptr_t ext1, uintptr_t p2)
+{
+	int atfd = (int)ext1;
+	char pathbuf[MAXPATHLEN];
+	int ret;
+
+	ret = getpathat(atfd, p2, pathbuf, sizeof (pathbuf));
+	if (ret < 0)
+		return (ret);
+
+	return (symlink((char *)p1, pathbuf) ? -errno : 0);
+}
+
+int
+lx_linkat(uintptr_t ext1, uintptr_t p1, uintptr_t ext2, uintptr_t p2,
+    uintptr_t p3)
+{
+	int atfd1 = (int)ext1;
+	int atfd2 = (int)ext2;
+	char pathbuf1[MAXPATHLEN];
+	char pathbuf2[MAXPATHLEN];
+	int ret;
+
+	/*
+	 * The flag specifies whether the hardlink will point to a symlink or
+	 * not, on solaris the default behaviour of link() is to dereference a
+	 * symlink and there is no obvious way to trigger the other behaviour.
+	 * So for now we just ignore this flag and act like link().
+	 */
+	/* LINTED [set but not used in function] */
+	int flag = p3;
+
+	ret = getpathat(atfd1, p1, pathbuf1, sizeof (pathbuf1));
+	if (ret < 0)
+		return (ret);
+
+	ret = getpathat(atfd2, p2, pathbuf2, sizeof (pathbuf2));
+	if (ret < 0)
+		return (ret);
+
+	return (lx_link((uintptr_t)pathbuf1, (uintptr_t)pathbuf2));
+}
+
+int
+lx_readlinkat(uintptr_t ext1, uintptr_t p1, uintptr_t p2, uintptr_t p3)
+{
+	int atfd = (int)ext1;
+	char pathbuf[MAXPATHLEN];
+	int ret;
+
+	ret = getpathat(atfd, p1, pathbuf, sizeof (pathbuf));
+	if (ret < 0)
+		return (ret);
+
+	ret = readlink(pathbuf, (char *)p2, (size_t)p3);
+	if (ret < 0)
+		return (-errno);
+
+	return (ret);
+}
+
+int
+lx_fchownat(uintptr_t ext1, uintptr_t p1, uintptr_t p2, uintptr_t p3,
+    uintptr_t p4)
+{
+	int flag;
+	int atfd = (int)ext1;
+	char pathbuf[MAXPATHLEN];
+	int ret;
+
+	flag = ltos_at_flag(p4, AT_SYMLINK_NOFOLLOW);
+	if (flag < 0)
+		return (-EINVAL);
+
+	ret = getpathat(atfd, p1, pathbuf, sizeof (pathbuf));
+	if (ret < 0)
+		return (ret);
+
+	if (flag & AT_SYMLINK_NOFOLLOW)
+		return (lchown(pathbuf, (uid_t)p2, (gid_t)p3) ? -errno : 0);
+	else
+		return (lx_chown((uintptr_t)pathbuf, p2, p3));
+}
+
+int
+lx_fchmodat(uintptr_t ext1, uintptr_t p1, uintptr_t p2, uintptr_t p3)
+{
+	int atfd = (int)ext1;
+	char pathbuf[MAXPATHLEN];
+	int ret;
+
+	/*
+	 * It seems that at least some versions of glibc do not set or clear
+	 * the flags arg, so checking them will result in random behaviour.
+	 */
+	/* LINTED [set but not used in function] */
+	int flag = p3;
+
+	ret = getpathat(atfd, p1, pathbuf, sizeof (pathbuf));
+	if (ret < 0)
+		return (ret);
+
+	return (lx_chmod((uintptr_t)pathbuf, p2));
 }

@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_LX_H
 #define	_SYS_LX_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <alloca.h>
@@ -131,6 +129,8 @@ extern int lx_get_kern_version(void);
 
 extern int lx_check_alloca(size_t);
 #define	SAFE_ALLOCA(sz)	(lx_check_alloca(sz) ? alloca(sz) : NULL)
+
+extern int ltos_at_flag(int lflag, int allow);
 
 /*
  * NO_UUCOPY disables calls to the uucopy* system calls to help with

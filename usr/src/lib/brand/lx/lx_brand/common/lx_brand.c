@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/syscall.h>
@@ -1274,19 +1272,19 @@ static struct lx_sysent sysents[] = {
 	{"inotify_add_watch", NULL,	NOSYS_NULL,	0},	/* 292 */
 	{"inotify_rm_watch", NULL,	NOSYS_NULL,	0},	/* 293 */
 	{"migrate_pages", NULL,		NOSYS_NULL,	0},	/* 294 */
-	{"openat",	NULL,		NOSYS_NULL,	0},	/* 295 */
-	{"mkdirat",	NULL,		NOSYS_NULL,	0},	/* 296 */
-	{"mknodat",	NULL,		NOSYS_NULL,	0},	/* 297 */
-	{"fchownat",	NULL,		NOSYS_NULL,	0},	/* 298 */
-	{"futimesat",	NULL,		NOSYS_NULL,	0},	/* 299 */
-	{"fstatat64",	NULL,		NOSYS_NULL,	0},	/* 300 */
-	{"unlinkat",	NULL,		NOSYS_NULL,	0},	/* 301 */
-	{"renameat",	NULL,		NOSYS_NULL,	0},	/* 302 */
-	{"linkat",	NULL,		NOSYS_NULL,	0},	/* 303 */
-	{"symlinkat",	NULL,		NOSYS_NULL,	0},	/* 304 */
-	{"readlinkat",	NULL,		NOSYS_NULL,	0},	/* 305 */
-	{"fchmodat",	NULL,		NOSYS_NULL,	0},	/* 306 */
-	{"faccessat",	NULL,		NOSYS_NULL,	0},	/* 307 */
+	{"openat",	lx_openat,	0,		4},	/* 295 */
+	{"mkdirat",	lx_mkdirat,	0,		3},	/* 296 */
+	{"mknodat",	lx_mknodat,	0,		4},	/* 297 */
+	{"fchownat",	lx_fchownat,	0,		5},	/* 298 */
+	{"futimesat",	lx_futimesat,	0,		3},	/* 299 */
+	{"fstatat64",	lx_fstatat64,	0,		4},	/* 300 */
+	{"unlinkat",	lx_unlinkat,	0,		3},	/* 301 */
+	{"renameat",	lx_renameat,	0,		4},	/* 302 */
+	{"linkat",	lx_linkat,	0,		5},	/* 303 */
+	{"symlinkat",	lx_symlinkat,	0,		3},	/* 304 */
+	{"readlinkat",	lx_readlinkat,	0,		4},	/* 305 */
+	{"fchmodat",	lx_fchmodat,	0,		4},	/* 306 */
+	{"faccessat",	lx_faccessat,	0,		4},	/* 307 */
 	{"pselect6",	NULL,		NOSYS_NULL,	0},	/* 308 */
 	{"ppoll",	NULL,		NOSYS_NULL,	0},	/* 309 */
 	{"unshare",	NULL,		NOSYS_NULL,	0},	/* 310 */
