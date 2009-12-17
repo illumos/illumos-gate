@@ -5156,11 +5156,11 @@ emlxs_power(dev_info_t *dip, int32_t comp, int32_t level)
 		return (DDI_FAILURE);
 	}
 
-	mutex_enter(&hba->pm_lock);
+	mutex_enter(&EMLXS_PM_LOCK);
 
 	/* If we are already at the proper level then return success */
 	if (hba->pm_level == level) {
-		mutex_exit(&hba->pm_lock);
+		mutex_exit(&EMLXS_PM_LOCK);
 		return (DDI_SUCCESS);
 	}
 
@@ -5229,7 +5229,7 @@ emlxs_power(dev_info_t *dip, int32_t comp, int32_t level)
 
 	}
 
-	mutex_exit(&hba->pm_lock);
+	mutex_exit(&EMLXS_PM_LOCK);
 
 	return (rval);
 
@@ -5426,7 +5426,7 @@ done:
  *
  */
 
-/* emlxs_pm_lock must be held for this call */
+/* EMLXS_PM_LOCK must be held for this call */
 static int
 emlxs_hba_resume(dev_info_t *dip)
 {
@@ -5461,7 +5461,7 @@ emlxs_hba_resume(dev_info_t *dip)
 } /* emlxs_hba_resume() */
 
 
-/* emlxs_pm_lock must be held for this call */
+/* EMLXS_PM_LOCK must be held for this call */
 static int
 emlxs_hba_suspend(dev_info_t *dip)
 {
@@ -5509,7 +5509,8 @@ emlxs_lock_init(emlxs_hba_t *hba)
 
 	/* Initialize the power management */
 	(void) sprintf(buf, "%s%d_pm_lock mutex", DRIVER_NAME, ddiinst);
-	mutex_init(&hba->pm_lock, buf, MUTEX_DRIVER, (void *)hba->intr_arg);
+	mutex_init(&EMLXS_PM_LOCK, buf, MUTEX_DRIVER,
+	    (void *)hba->intr_arg);
 
 	(void) sprintf(buf, "%s%d_adap_lock mutex", DRIVER_NAME, ddiinst);
 	mutex_init(&EMLXS_TIMER_LOCK, buf, MUTEX_DRIVER,
@@ -5568,6 +5569,10 @@ emlxs_lock_init(emlxs_hba_t *hba)
 	mutex_init(&EMLXS_DUMP_LOCK, buf, MUTEX_DRIVER,
 	    (void *)hba->intr_arg);
 #endif /* DUMP_SUPPORT */
+
+	(void) sprintf(buf, "%s%d_thread_lock mutex", DRIVER_NAME, ddiinst);
+	mutex_init(&EMLXS_SPAWN_LOCK, buf, MUTEX_DRIVER,
+	    (void *)hba->intr_arg);
 
 	/* Create per port locks */
 	for (i = 0; i < MAX_VPORTS; i++) {
@@ -5639,7 +5644,8 @@ emlxs_lock_destroy(emlxs_hba_t *hba)
 	mutex_destroy(&EMLXS_MEMGET_LOCK);
 	mutex_destroy(&EMLXS_MEMPUT_LOCK);
 	mutex_destroy(&EMLXS_IOCTL_LOCK);
-	mutex_destroy(&hba->pm_lock);
+	mutex_destroy(&EMLXS_SPAWN_LOCK);
+	mutex_destroy(&EMLXS_PM_LOCK);
 
 #ifdef DUMP_SUPPORT
 	mutex_destroy(&EMLXS_DUMP_LOCK);
@@ -5694,6 +5700,10 @@ emlxs_driver_remove(dev_info_t *dip, uint32_t init_flag, uint32_t failed)
 
 		if (init_flag & ATTACH_SPAWN) {
 			emlxs_thread_spawn_destroy(hba);
+		}
+
+		if (init_flag & ATTACH_EVENTS) {
+			(void) emlxs_event_queue_destroy(hba);
 		}
 
 		if (init_flag & ATTACH_ONLINE) {
@@ -5757,10 +5767,6 @@ emlxs_driver_remove(dev_info_t *dip, uint32_t init_flag, uint32_t failed)
 			emlxs_fm_fini(hba);
 		}
 #endif	/* FMA_SUPPORT */
-
-		if (init_flag & ATTACH_EVENTS) {
-			(void) emlxs_event_queue_destroy(hba);
-		}
 
 		if (init_flag & ATTACH_LOG) {
 			(void) emlxs_msg_log_destroy(hba);
@@ -6406,7 +6412,7 @@ emlxs_hba_attach(dev_info_t *dip)
 	init_flag |= ATTACH_LOCK;
 
 	/* Initialize the power management */
-	mutex_enter(&hba->pm_lock);
+	mutex_enter(&EMLXS_PM_LOCK);
 	hba->pm_state = EMLXS_PM_IN_ATTACH;
 	hba->pm_level = EMLXS_PM_ADAPTER_DOWN;
 	hba->pm_busy = 0;
@@ -6414,7 +6420,7 @@ emlxs_hba_attach(dev_info_t *dip)
 	hba->pm_active = 1;
 	hba->pm_idle_timer = 0;
 #endif	/* IDLE_TIMER */
-	mutex_exit(&hba->pm_lock);
+	mutex_exit(&EMLXS_PM_LOCK);
 
 	/* Set the pm component name */
 	(void) sprintf(local_pm_components, "NAME=%s%d", DRIVER_NAME,
@@ -6530,14 +6536,14 @@ emlxs_hba_attach(dev_info_t *dip)
 	 */
 	if (emlxs_pm_raise_power(dip) != DDI_SUCCESS) {
 		/* Set power up anyway. This should not happen! */
-		mutex_enter(&hba->pm_lock);
+		mutex_enter(&EMLXS_PM_LOCK);
 		hba->pm_level = EMLXS_PM_ADAPTER_UP;
 		hba->pm_state &= ~EMLXS_PM_IN_ATTACH;
-		mutex_exit(&hba->pm_lock);
+		mutex_exit(&EMLXS_PM_LOCK);
 	} else {
-		mutex_enter(&hba->pm_lock);
+		mutex_enter(&EMLXS_PM_LOCK);
 		hba->pm_state &= ~EMLXS_PM_IN_ATTACH;
-		mutex_exit(&hba->pm_lock);
+		mutex_exit(&EMLXS_PM_LOCK);
 	}
 
 #ifdef SFCT_SUPPORT
@@ -6572,9 +6578,9 @@ emlxs_hba_detach(dev_info_t *dip)
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_detach_debug_msg, NULL);
 
-	mutex_enter(&hba->pm_lock);
+	mutex_enter(&EMLXS_PM_LOCK);
 	hba->pm_state |= EMLXS_PM_IN_DETACH;
-	mutex_exit(&hba->pm_lock);
+	mutex_exit(&EMLXS_PM_LOCK);
 
 	/* Lower the power level */
 	/*
@@ -6585,9 +6591,9 @@ emlxs_hba_detach(dev_info_t *dip)
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_detach_failed_msg,
 		    "Unable to lower power.");
 
-		mutex_enter(&hba->pm_lock);
+		mutex_enter(&EMLXS_PM_LOCK);
 		hba->pm_state &= ~EMLXS_PM_IN_DETACH;
-		mutex_exit(&hba->pm_lock);
+		mutex_exit(&EMLXS_PM_LOCK);
 
 		return (DDI_FAILURE);
 	}
@@ -6597,9 +6603,9 @@ emlxs_hba_detach(dev_info_t *dip)
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_detach_failed_msg,
 		    "Unable to take adapter offline.");
 
-		mutex_enter(&hba->pm_lock);
+		mutex_enter(&EMLXS_PM_LOCK);
 		hba->pm_state &= ~EMLXS_PM_IN_DETACH;
-		mutex_exit(&hba->pm_lock);
+		mutex_exit(&EMLXS_PM_LOCK);
 
 		(void) emlxs_pm_raise_power(dip);
 
@@ -10394,15 +10400,15 @@ emlxs_pm_busy_component(emlxs_hba_t *hba)
 		return (DDI_SUCCESS);
 	}
 
-	mutex_enter(&hba->pm_lock);
+	mutex_enter(&EMLXS_PM_LOCK);
 
 	if (hba->pm_busy) {
-		mutex_exit(&hba->pm_lock);
+		mutex_exit(&EMLXS_PM_LOCK);
 		return (DDI_SUCCESS);
 	}
 	hba->pm_busy = 1;
 
-	mutex_exit(&hba->pm_lock);
+	mutex_exit(&EMLXS_PM_LOCK);
 
 	/* Attempt to notify system that we are busy */
 	if (cfg[CFG_PM_SUPPORT].current) {
@@ -10416,9 +10422,9 @@ emlxs_pm_busy_component(emlxs_hba_t *hba)
 			    "pm_busy_component failed. ret=%d", rval);
 
 			/* If this attempt failed then clear our flags */
-			mutex_enter(&hba->pm_lock);
+			mutex_enter(&EMLXS_PM_LOCK);
 			hba->pm_busy = 0;
-			mutex_exit(&hba->pm_lock);
+			mutex_exit(&EMLXS_PM_LOCK);
 
 			return (rval);
 		}
@@ -10439,15 +10445,15 @@ emlxs_pm_idle_component(emlxs_hba_t *hba)
 		return (DDI_SUCCESS);
 	}
 
-	mutex_enter(&hba->pm_lock);
+	mutex_enter(&EMLXS_PM_LOCK);
 
 	if (!hba->pm_busy) {
-		mutex_exit(&hba->pm_lock);
+		mutex_exit(&EMLXS_PM_LOCK);
 		return (DDI_SUCCESS);
 	}
 	hba->pm_busy = 0;
 
-	mutex_exit(&hba->pm_lock);
+	mutex_exit(&EMLXS_PM_LOCK);
 
 	if (cfg[CFG_PM_SUPPORT].current) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
@@ -10461,9 +10467,9 @@ emlxs_pm_idle_component(emlxs_hba_t *hba)
 
 			/* If this attempt failed then */
 			/* reset our flags for another attempt */
-			mutex_enter(&hba->pm_lock);
+			mutex_enter(&EMLXS_PM_LOCK);
 			hba->pm_busy = 1;
-			mutex_exit(&hba->pm_lock);
+			mutex_exit(&EMLXS_PM_LOCK);
 
 			return (rval);
 		}
@@ -10481,20 +10487,20 @@ emlxs_pm_idle_timer(emlxs_hba_t *hba)
 
 	if (hba->pm_active) {
 		/* Clear active flag and reset idle timer */
-		mutex_enter(&hba->pm_lock);
+		mutex_enter(&EMLXS_PM_LOCK);
 		hba->pm_active = 0;
 		hba->pm_idle_timer =
 		    hba->timer_tics + cfg[CFG_PM_IDLE].current;
-		mutex_exit(&hba->pm_lock);
+		mutex_exit(&EMLXS_PM_LOCK);
 	}
 
 	/* Check for idle timeout */
 	else if (hba->timer_tics >= hba->pm_idle_timer) {
 		if (emlxs_pm_idle_component(hba) == DDI_SUCCESS) {
-			mutex_enter(&hba->pm_lock);
+			mutex_enter(&EMLXS_PM_LOCK);
 			hba->pm_idle_timer =
 			    hba->timer_tics + cfg[CFG_PM_IDLE].current;
-			mutex_exit(&hba->pm_lock);
+			mutex_exit(&EMLXS_PM_LOCK);
 		}
 	}
 

@@ -2096,6 +2096,8 @@ typedef struct emlxs_hba
 #define	EMLXS_MEMGET_LOCK	hba->memget_lock	/* mempool get lock */
 #define	EMLXS_MEMPUT_LOCK	hba->memput_lock	/* mempool put lock */
 #define	EMLXS_IOCTL_LOCK	hba->ioctl_lock		/* ioctl lock */
+#define	EMLXS_SPAWN_LOCK	hba->spawn_lock		/* spawn lock */
+#define	EMLXS_PM_LOCK		hba->pm_lock		/* pm lock */
 #define	HBASTATS		hba->stats
 #define	EMLXS_CMD_RING_LOCK(n)	hba->sli.sli3.ring_cmd_lock[n]
 #define	EMLXS_FCTAB_LOCK	hba->iotag_lock

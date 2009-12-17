@@ -289,7 +289,7 @@ emlxs_thread(emlxs_thread_t *ethread)
 		ethread->flags &= ~EMLXS_THREAD_INITD;
 
 		/* Remove the thread from the spawn thread list */
-		mutex_enter(&hba->spawn_lock);
+		mutex_enter(&EMLXS_SPAWN_LOCK);
 		if (hba->spawn_thread_head == ethread)
 			hba->spawn_thread_head = ethread->next;
 		if (hba->spawn_thread_tail == ethread)
@@ -304,7 +304,7 @@ emlxs_thread(emlxs_thread_t *ethread)
 
 		kmem_free(ethread, sizeof (emlxs_thread_t));
 
-		mutex_exit(&hba->spawn_lock);
+		mutex_exit(&EMLXS_SPAWN_LOCK);
 	}
 	else
 	{
@@ -555,11 +555,11 @@ emlxs_thread_spawn(emlxs_hba_t *hba, void (*func) (), void *arg1, void *arg2)
 	ethread->arg2 = arg2;
 
 	/* Queue the thread on the spawn thread list */
-	mutex_enter(&hba->spawn_lock);
+	mutex_enter(&EMLXS_SPAWN_LOCK);
 
 	/* Dont spawn the thread if the spawn list is closed */
 	if (hba->spawn_open == 0) {
-		mutex_exit(&hba->spawn_lock);
+		mutex_exit(&EMLXS_SPAWN_LOCK);
 
 		/* destroy the thread */
 		kmem_free(ethread, sizeof (emlxs_thread_t));
@@ -576,7 +576,7 @@ emlxs_thread_spawn(emlxs_hba_t *hba, void (*func) (), void *arg1, void *arg2)
 	}
 
 	hba->spawn_thread_tail = ethread;
-	mutex_exit(&hba->spawn_lock);
+	mutex_exit(&EMLXS_SPAWN_LOCK);
 
 	(void) thread_create(NULL, 0, &emlxs_thread, (char *)ethread, 0, &p0,
 	    TS_RUN, v.v_maxsyspri - 2);
@@ -587,21 +587,17 @@ emlxs_thread_spawn(emlxs_hba_t *hba, void (*func) (), void *arg1, void *arg2)
 void
 emlxs_thread_spawn_create(emlxs_hba_t *hba)
 {
-	char	buf[64];
-
-	if (hba->spawn_open)
+	mutex_enter(&EMLXS_SPAWN_LOCK);
+	if (hba->spawn_open) {
+		mutex_exit(&EMLXS_SPAWN_LOCK);
 		return;
-
-	(void) sprintf(buf, "%s%d_thread_lock mutex", DRIVER_NAME,
-	    hba->ddiinst);
-	mutex_init(&hba->spawn_lock, buf, MUTEX_DRIVER, (void *)hba->intr_arg);
+	}
 
 	hba->spawn_thread_head = NULL;
 	hba->spawn_thread_tail = NULL;
 
-	mutex_enter(&hba->spawn_lock);
 	hba->spawn_open = 1;
-	mutex_exit(&hba->spawn_lock);
+	mutex_exit(&EMLXS_SPAWN_LOCK);
 
 }
 
@@ -611,11 +607,12 @@ emlxs_thread_spawn_destroy(emlxs_hba_t *hba)
 {
 	emlxs_thread_t	*ethread;
 
+	mutex_enter(&EMLXS_SPAWN_LOCK);
 	if (hba->spawn_open == 0) {
+		mutex_exit(&EMLXS_SPAWN_LOCK);
 		return;
 	}
 
-	mutex_enter(&hba->spawn_lock);
 	hba->spawn_open = 0;
 
 	for (ethread = hba->spawn_thread_head; ethread;
@@ -625,12 +622,10 @@ emlxs_thread_spawn_destroy(emlxs_hba_t *hba)
 
 	/* Wait for all the spawned threads to complete */
 	while (hba->spawn_thread_head) {
-		mutex_exit(&hba->spawn_lock);
+		mutex_exit(&EMLXS_SPAWN_LOCK);
 		delay(drv_usectohz(10000));
-		mutex_enter(&hba->spawn_lock);
+		mutex_enter(&EMLXS_SPAWN_LOCK);
 	}
 
-	mutex_exit(&hba->spawn_lock);
-	mutex_destroy(&hba->spawn_lock);
-
+	mutex_exit(&EMLXS_SPAWN_LOCK);
 }
