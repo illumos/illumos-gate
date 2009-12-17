@@ -175,6 +175,7 @@ usr/src/uts/common/io/rum/THIRDPARTYLICENSE
 usr/src/uts/common/io/rwd/THIRDPARTYLICENSE
 usr/src/uts/common/io/rwn/THIRDPARTYLICENSE
 usr/src/uts/common/io/rwn/fw-rt2860/LICENSE
+usr/src/uts/common/io/scsi/adapters/pmcs/LICENSE
 usr/src/uts/common/io/sfe/THIRDPARTYLICENSE
 usr/src/uts/common/io/uath/THIRDPARTYLICENSE
 usr/src/uts/common/io/uath/uath_fw/LICENSE

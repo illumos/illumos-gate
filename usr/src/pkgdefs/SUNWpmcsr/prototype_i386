@@ -49,3 +49,6 @@ f none kernel/drv/amd64/pmcs 0755 root sys
 f none kernel/kmdb/pmcs 0555 root sys
 d none kernel/kmdb/amd64 0755 root sys
 f none kernel/kmdb/amd64/pmcs 0555 root sys
+d none kernel/misc/pmcs/amd64 0755 root sys
+f none kernel/misc/pmcs/pmcs8001fw 0755 root sys
+f none kernel/misc/pmcs/amd64/pmcs8001fw 0755 root sys

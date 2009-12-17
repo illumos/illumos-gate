@@ -20,5 +20,5 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-PMCS_FW_VERSION=0x01080100
-PMCS_FW_VERSION_STRING="1.8.01 Released"
+PMCS_FW_VERSION=0x01080335
+PMCS_FW_VERSION_STRING="1.8.03 Special"

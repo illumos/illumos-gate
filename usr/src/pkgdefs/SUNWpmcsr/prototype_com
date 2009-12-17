@@ -48,3 +48,5 @@ d none kernel 0755 root sys
 d none kernel/drv 0755 root sys
 e pmcsconf kernel/drv/pmcs.conf 0644 root sys
 d none kernel/kmdb 0755 root sys
+d none kernel/misc 0755 root sys
+d none kernel/misc/pmcs 0755 root sys

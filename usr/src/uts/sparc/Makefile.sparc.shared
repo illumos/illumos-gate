@@ -320,6 +320,7 @@ DRV_KMODS	+= iscsi
 DRV_KMODS	+= emlxs
 DRV_KMODS	+= srpt
 DRV_KMODS	+= pmcs
+DRV_KMODS	+= pmcs8001fw
 
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ifp
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= uata

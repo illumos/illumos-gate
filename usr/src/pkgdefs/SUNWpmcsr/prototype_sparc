@@ -47,3 +47,5 @@ d none kernel/drv/sparcv9 0755 root sys
 f none kernel/drv/sparcv9/pmcs 0755 root sys
 d none kernel/kmdb/sparcv9 0755 root sys
 f none kernel/kmdb/sparcv9/pmcs 0555 root sys
+d none kernel/misc/pmcs/sparcv9 0755 root sys
+f none kernel/misc/pmcs/sparcv9/pmcs8001fw 0755 root sys
