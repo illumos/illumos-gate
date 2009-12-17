@@ -239,9 +239,9 @@ lsa_enum_trusted_domains(char *server, char *domain,
 	enum_context = 0;
 
 	status = lsar_enum_trusted_domains(&domain_handle, &enum_context, info);
-	if (status == MLSVC_NO_MORE_DATA) {
+	if (status == NT_STATUS_NO_MORE_DATA) {
 		/*
-		 * MLSVC_NO_MORE_DATA indicates that we
+		 * NT_STATUS_NO_MORE_DATA indicates that we
 		 * have all of the available information.
 		 */
 		status = NT_STATUS_SUCCESS;
@@ -279,9 +279,9 @@ lsa_enum_trusted_domains_ex(char *server, char *domain,
 
 	status = lsar_enum_trusted_domains_ex(&domain_handle, &enum_context,
 	    info);
-	if (status == MLSVC_NO_MORE_DATA) {
+	if (status == NT_STATUS_NO_MORE_DATA) {
 		/*
-		 * MLSVC_NO_MORE_DATA indicates that we
+		 * NT_STATUS_NO_MORE_DATA indicates that we
 		 * have all of the available information.
 		 */
 		status = NT_STATUS_SUCCESS;
@@ -357,14 +357,7 @@ lsa_lookup_name_domain(char *account_name, smb_account_t *info)
 	    &domain_handle) != 0)
 		return (NT_STATUS_INVALID_PARAMETER);
 
-	status = lsar_lookup_names2(&domain_handle, account_name, info);
-	if (status == NT_STATUS_REVISION_MISMATCH) {
-		/*
-		 * Not a Windows 2000 domain controller:
-		 * use the NT compatible call.
-		 */
-		status = lsar_lookup_names(&domain_handle, account_name, info);
-	}
+	status = lsar_lookup_names(&domain_handle, account_name, info);
 
 	(void) lsar_close(&domain_handle);
 	return (status);
@@ -547,17 +540,7 @@ lsa_lookup_sid_domain(smb_sid_t *sid, smb_account_t *ainfo)
 	    &domain_handle) != 0)
 		return (NT_STATUS_INVALID_PARAMETER);
 
-	status = lsar_lookup_sids2(&domain_handle, (struct mslsa_sid *)sid,
-	    ainfo);
-
-	if (status == NT_STATUS_REVISION_MISMATCH) {
-		/*
-		 * Not a Windows 2000 domain controller:
-		 * use the NT compatible call.
-		 */
-		status = lsar_lookup_sids(&domain_handle,
-		    (struct mslsa_sid *)sid, ainfo);
-	}
+	status = lsar_lookup_sids(&domain_handle, sid, ainfo);
 
 	(void) lsar_close(&domain_handle);
 	return (status);

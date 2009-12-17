@@ -28,7 +28,7 @@
 #include <smbsrv/smbinfo.h>
 #include <sys/nbmlock.h>
 
-static int smb_delete_check_path(smb_request_t *, boolean_t *);
+static int smb_delete_check_path(smb_request_t *);
 static int smb_delete_single_file(smb_request_t *, smb_error_t *);
 static int smb_delete_multiple_files(smb_request_t *, smb_error_t *);
 static int smb_delete_find_fname(smb_request_t *, smb_odir_t *, char *, int);
@@ -115,8 +115,7 @@ smb_post_delete(smb_request_t *sr)
 /*
  * smb_com_delete
  *
- * 1. pre-process pathname -  smb_delete_check_path()
- *    checks dot, bad path syntax, wildcards in path
+ * 1. intialize, pre-process and validate pathname
  *
  * 2. process the path to get directory node & last_comp,
  *    store these in fqi
@@ -143,13 +142,20 @@ smb_com_delete(smb_request_t *sr)
 	int rc;
 	smb_error_t err;
 	uint32_t status;
-	boolean_t wildcards;
+	boolean_t wildcards = B_FALSE;
 	smb_fqi_t *fqi;
+	smb_pathname_t *pn;
 
 	fqi = &sr->arg.dirop.fqi;
+	pn = &fqi->fq_path;
 
-	if (smb_delete_check_path(sr, &wildcards) != 0)
+	smb_pathname_init(sr, pn, pn->pn_path);
+	if (!smb_pathname_validate(sr, pn))
 		return (SDRC_ERROR);
+	if (smb_delete_check_path(sr) != 0)
+		return (SDRC_ERROR);
+
+	wildcards = smb_contains_wildcards(pn->pn_fname);
 
 	rc = smb_pathname_reduce(sr, sr->user_cr, fqi->fq_path.pn_path,
 	    sr->tid_tree->t_snode, sr->tid_tree->t_snode,
@@ -219,14 +225,15 @@ static int
 smb_delete_single_file(smb_request_t *sr, smb_error_t *err)
 {
 	smb_fqi_t *fqi;
-	uint32_t status;
+	smb_pathname_t *pn;
 
 	fqi = &sr->arg.dirop.fqi;
+	pn = &fqi->fq_path;
 
-	smb_pathname_setup(sr, &fqi->fq_path);
-	status = smb_validate_object_name(&fqi->fq_path);
-	if (status != NT_STATUS_SUCCESS) {
-		smb_delete_error(err, status, ERRDOS, ERROR_INVALID_NAME);
+	/* pn already initialized and validated */
+	if (!smb_validate_object_name(sr, pn)) {
+		smb_delete_error(err, sr->smb_error.status,
+		    ERRDOS, ERROR_INVALID_NAME);
 		return (-1);
 	}
 
@@ -539,98 +546,42 @@ smb_delete_remove_file(smb_request_t *sr, smb_error_t *err)
 /*
  * smb_delete_check_path
  *
- * Perform initial validation on the pathname and last_comp.
+ * smb_pathname_validate() should already have been used to
+ * perform initial validation on the pathname. Additional
+ * request specific validation of the filename is performed
+ * here.
  *
- * wildcards in path:
- * Wildcards in the path (excluding the last_comp) should result
- * in NT_STATUS_OBJECT_NAME_INVALID.
+ * - pn->pn_fname is NULL should result in NT_STATUS_FILE_IS_A_DIRECTORY
  *
- * bad path syntax:
- * On unix .. at the root of a file system links to the root. Thus
- * an attempt to lookup "/../../.." will be the same as looking up "/"
- * CIFs clients expect the above to result in
- * NT_STATUS_OBJECT_PATH_SYNTAX_BAD. It is currently not possible
- * (and questionable if it's desirable) to deal with all cases
- * but paths beginning with \\.. are handled. See bad_paths[].
- * Cases like "\\dir\\..\\.." will be caught and handled after the
- * pnreduce.  Cases like "\\dir\\..\\..\\filename" will still result
- * in "\\filename" which is contrary to windows behavior.
- *
- * dot:
- * A filename of '.' should result in NT_STATUS_OBJECT_NAME_INVALID
- * Any wildcard filename that resolves to '.' should result in
- * NT_STATUS_OBJECT_NAME_INVALID if the search attributes include
- * FILE_ATTRIBUTE_DIRECTORY
+ * - Any wildcard filename that resolves to '.' should result in
+ *   NT_STATUS_OBJECT_NAME_INVALID if the search attributes include
+ *   FILE_ATTRIBUTE_DIRECTORY
  *
  * Returns:
- *   0:  path is valid. Sets *wildcard to TRUE if wildcard delete
- *	         i.e. if wildcards in last component
+ *   0: path is valid.
  *  -1: path is invalid. Sets error information in sr.
  */
 static int
-smb_delete_check_path(smb_request_t *sr, boolean_t *wildcard)
+smb_delete_check_path(smb_request_t *sr)
 {
 	smb_fqi_t *fqi = &sr->arg.dirop.fqi;
-	char *p, *last_comp;
-	int i, wildcards;
 	smb_pathname_t *pn = &fqi->fq_path;
 
-	struct {
-		char *name;
-		int len;
-	} *bad, bad_paths[] = {
-		{"\\..\0", 4},
-		{"\\..\\", 4},
-		{"..\0", 3},
-		{"..\\", 3}
-	};
-
-	/* find last component, strip trailing '\\' */
-	p = pn->pn_path + strlen(pn->pn_path) - 1;
-	while (*p == '\\') {
-		*p = '\0';
-		--p;
+	if (pn->pn_fname == NULL) {
+		smbsr_error(sr, NT_STATUS_FILE_IS_A_DIRECTORY,
+		    ERRDOS, ERROR_ACCESS_DENIED);
+		return (-1);
 	}
 
-	if ((p = strrchr(pn->pn_path, '\\')) == NULL)
-		last_comp = pn->pn_path;
-	else
-		last_comp = ++p;
-
-	wildcards = smb_convert_wildcards(last_comp);
-
-	if (last_comp != pn->pn_path) {
-		/*
-		 * Wildcards are only allowed in the last component.
-		 * Check for additional wildcards in the path.
-		 */
-		if (smb_convert_wildcards(pn->pn_path) != wildcards) {
-			smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
-			    ERRDOS, ERROR_INVALID_NAME);
-			return (-1);
-		}
-	}
-
-	/* path above the mount point */
-	for (i = 0; i < sizeof (bad_paths) / sizeof (bad_paths[0]); ++i) {
-		bad = &bad_paths[i];
-		if (strncmp(pn->pn_path, bad->name, bad->len) == 0) {
-			smbsr_error(sr, NT_STATUS_OBJECT_PATH_SYNTAX_BAD,
-			    ERRDOS, ERROR_BAD_PATHNAME);
-			return (-1);
-		}
-	}
-
-	/* last component is, or resolves to, '.' (dot) */
-	if ((strcmp(last_comp, ".") == 0) ||
+	/* fname component is, or resolves to, '.' (dot) */
+	if ((strcmp(pn->pn_fname, ".") == 0) ||
 	    (SMB_SEARCH_DIRECTORY(fqi->fq_sattr) &&
-	    (smb_match(last_comp, ".")))) {
+	    (smb_match(pn->pn_fname, ".")))) {
 		smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
 		    ERRDOS, ERROR_INVALID_NAME);
 		return (-1);
 	}
 
-	*wildcard = (wildcards != 0);
 	return (0);
 }
 

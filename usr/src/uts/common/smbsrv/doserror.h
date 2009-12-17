@@ -19,15 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-
 #ifndef _SMBSRV_DOSERROR_H
 #define	_SMBSRV_DOSERROR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file defines the list of DOS error codes. I think the error
@@ -43,7 +40,6 @@ extern "C" {
 /*
  * Error source or class
  */
-#define	SUCCESS		0x00	/* The request was successful. */
 #define	ERRDOS		0x01	/* Core DOS operating system error. */
 #define	ERRSRV		0x02	/* Server network file error */
 #define	ERRHRD		0x03	/* Hardware error */

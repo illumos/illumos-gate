@@ -55,7 +55,6 @@ static struct {
 
 static void smb_sd_set_sacl(smb_sd_t *, smb_acl_t *, boolean_t, int);
 static void smb_sd_set_dacl(smb_sd_t *, smb_acl_t *, boolean_t, int);
-static uint32_t smb_sd_fromfs(smb_fssd_t *, smb_sd_t *);
 
 void
 smb_sd_init(smb_sd_t *sd, uint8_t revision)
@@ -384,7 +383,7 @@ smb_sd_tofs(smb_sd_t *sd, smb_fssd_t *fs_sd)
  * Should call smb_sd_term() for the returned sd to free allocated
  * members.
  */
-static uint32_t
+uint32_t
 smb_sd_fromfs(smb_fssd_t *fs_sd, smb_sd_t *sd)
 {
 	uint32_t status = NT_STATUS_SUCCESS;

@@ -27,16 +27,6 @@
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/smb_fsops.h>
 
-typedef struct smb_dirpath {
-	char	*sp_path;	/* Original path */
-	char	*sp_curp;	/* Current pointer into the original path */
-	smb_request_t *sp_sr;	/* Current request pointer */
-} smb_dirpath_t;
-
-static smb_dirpath_t *smb_dirpath_new(smb_request_t *);
-static int smb_dirpath_next(smb_dirpath_t *);
-static boolean_t smb_dirpath_isvalid(const char *);
-
 /*
  * The create directory message is sent to create a new directory.  The
  * appropriate Tid and additional pathname are passed.  The directory must
@@ -79,19 +69,11 @@ smb_post_create_directory(smb_request_t *sr)
 	DTRACE_SMB_1(op__CreateDirectory__done, smb_request_t *, sr);
 }
 
-/*
- * smb_com_create_directory
- *
- * It is possible to get a full pathname here and the client expects any
- * or all of the components to be created if they don't already exist.
- */
 smb_sdrc_t
 smb_com_create_directory(smb_request_t *sr)
 {
-	smb_dirpath_t *spp;
-	DWORD status;
 	int rc = 0;
-	char *path = sr->arg.dirop.fqi.fq_path.pn_path;
+	smb_pathname_t *pn = &sr->arg.dirop.fqi.fq_path;
 
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
@@ -99,85 +81,19 @@ smb_com_create_directory(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	if (!smb_dirpath_isvalid(path)) {
-		smbsr_error(sr, NT_STATUS_OBJECT_PATH_SYNTAX_BAD,
-		    ERRDOS, ERROR_BAD_PATHNAME);
+	smb_pathname_init(sr, pn, pn->pn_path);
+	if (!smb_pathname_validate(sr, pn) ||
+	    !smb_validate_dirname(sr, pn)) {
 		return (SDRC_ERROR);
 	}
 
-	status = smb_validate_dirname(path);
-	if (status != 0) {
-		smbsr_error(sr, status, ERRDOS, ERROR_INVALID_NAME);
-		return (SDRC_ERROR);
-	}
-
-	/*
-	 * Try each component of the path.  EEXIST on path
-	 * components is okay except on the last one.
-	 */
-	spp = smb_dirpath_new(sr);
-
-	while (smb_dirpath_next(spp)) {
-		rc = smb_common_create_directory(sr);
-
-		switch (rc) {
-		case 0:
-			break;
-		case EEXIST:
-			break;
-		case ENOENT:
-			smbsr_error(sr, NT_STATUS_OBJECT_NAME_NOT_FOUND,
-			    ERRDOS, ERROR_FILE_NOT_FOUND);
-			return (SDRC_ERROR);
-		case ENOTDIR:
-			/*
-			 * Spec says status should be OBJECT_PATH_INVALID
-			 * but testing shows OBJECT_PATH_NOT_FOUND
-			 */
-			smbsr_error(sr, NT_STATUS_OBJECT_PATH_NOT_FOUND,
-			    ERRDOS, ERROR_PATH_NOT_FOUND);
-			return (SDRC_ERROR);
-		default:
-			smbsr_errno(sr, rc);
-			return (SDRC_ERROR);
-		}
-	}
-
-	if (rc != 0) {
-		if (rc == EEXIST)
-			smbsr_error(sr, NT_STATUS_OBJECT_NAME_COLLISION,
-			    ERRDOS, ERROR_FILE_EXISTS);
-		else
-			smbsr_errno(sr, rc);
+	if ((rc = smb_common_create_directory(sr)) != 0) {
+		smbsr_errno(sr, rc);
 		return (SDRC_ERROR);
 	}
 
 	rc = smbsr_encode_empty_result(sr);
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
-}
-
-/*
- * smb_validate_dirname
- *
- * Very basic directory name validation: checks for colons in a path.
- * Need to skip the drive prefix since it contains a colon.
- *
- * Returns NT_STATUS_SUCCESS if the name is valid,
- *         otherwise NT_STATUS_NOT_A_DIRECTORY.
- */
-uint32_t
-smb_validate_dirname(char *path)
-{
-	char *name;
-
-	if ((name = path) != 0) {
-		name += strspn(name, "\\");
-
-		if (strchr(name, ':') != 0)
-			return (NT_STATUS_NOT_A_DIRECTORY);
-	}
-
-	return (NT_STATUS_SUCCESS);
 }
 
 /*
@@ -204,6 +120,11 @@ smb_common_create_directory(smb_request_t *sr)
 	    tnode, tnode, &fqi->fq_dnode, fqi->fq_last_comp);
 	if (rc != 0)
 		return (rc);
+
+	if (smb_is_invalid_filename(fqi->fq_last_comp)) {
+		smb_node_release(fqi->fq_dnode);
+		return (EILSEQ); /* NT_STATUS_OBJECT_NAME_INVALID */
+	}
 
 	/* lookup node - to ensure that it does NOT exist */
 	rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS,
@@ -248,70 +169,6 @@ smb_common_create_directory(smb_request_t *sr)
 	smb_node_release(fqi->fq_dnode);
 	smb_node_release(fqi->fq_fnode);
 	return (0);
-}
-
-static smb_dirpath_t *
-smb_dirpath_new(smb_request_t *sr)
-{
-	int pathLen;
-	char *xpath;
-	smb_dirpath_t *spp;
-
-	/* Allocate using request specific memory. */
-	spp = smb_srm_alloc(sr, sizeof (smb_dirpath_t));
-	spp->sp_path = sr->arg.dirop.fqi.fq_path.pn_path;
-	pathLen = strlen(spp->sp_path);
-	spp->sp_curp = spp->sp_path;
-	xpath = smb_srm_alloc(sr, pathLen + 1);
-	sr->arg.dirop.fqi.fq_path.pn_path = xpath;
-	spp->sp_sr = sr;
-
-	return (spp);
-}
-
-/*
- * Perhaps somewhat dangerous since everything happens as a side effect. The
- * returns 1 if there is a valid component updated to the fqi, 0 otherwise.
- */
-static int
-smb_dirpath_next(smb_dirpath_t *spp)
-{
-	char *xp;
-	int xlen;
-
-	if (spp == 0)
-		return (0);
-
-	/* Move the index to the "next" "\" and copy the path to the fqi */
-	/* path for the next component. */
-
-	/* First look for the next component */
-	while (*spp->sp_curp == '\\')
-		spp->sp_curp++;
-
-	/* Now get to the end of the component */
-	xp = spp->sp_curp; /* Remember from where we started */
-	while (*spp->sp_curp != '\0' && *spp->sp_curp != '\\') {
-		spp->sp_curp++;
-	}
-
-	/* If we made no progress, we are done */
-	if (xp == spp->sp_curp)
-		return (0);
-
-	/*
-	 * Now copy the original path up to but not including our current
-	 * pointer
-	 */
-
-	/*LINTED E_PTRDIFF_OVERFLOW*/
-	xlen = spp->sp_curp - spp->sp_path;
-	(void) strncpy(spp->sp_sr->arg.dirop.fqi.fq_path.pn_path,
-	    spp->sp_path, xlen);
-
-	/* Now NULL terminate it */
-	spp->sp_sr->arg.dirop.fqi.fq_path.pn_path[xlen] = '\0';
-	return (1);
 }
 
 /*
@@ -376,6 +233,12 @@ smb_com_delete_directory(smb_request_t *sr)
 	fqi = &sr->arg.dirop.fqi;
 	tnode = sr->tid_tree->t_snode;
 
+	smb_pathname_init(sr, &fqi->fq_path, fqi->fq_path.pn_path);
+	if (!smb_pathname_validate(sr, &fqi->fq_path) ||
+	    !smb_validate_dirname(sr, &fqi->fq_path)) {
+		return (SDRC_ERROR);
+	}
+
 	rc = smb_pathname_reduce(sr, sr->user_cr, fqi->fq_path.pn_path,
 	    tnode, tnode, &fqi->fq_dnode, fqi->fq_last_comp);
 	if (rc != 0) {
@@ -392,6 +255,15 @@ smb_com_delete_directory(smb_request_t *sr)
 		else
 			smbsr_errno(sr, rc);
 		smb_node_release(fqi->fq_dnode);
+		return (SDRC_ERROR);
+	}
+
+	/* Do not allow delete of root of share */
+	if (fqi->fq_fnode == tnode) {
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
+		    ERRDOS, ERROR_ACCESS_DENIED);
+		smb_node_release(fqi->fq_dnode);
+		smb_node_release(fqi->fq_fnode);
 		return (SDRC_ERROR);
 	}
 
@@ -496,6 +368,7 @@ smb_com_check_directory(smb_request_t *sr)
 	smb_fqi_t *fqi;
 	smb_node_t *tnode;
 	char *path;
+	smb_pathname_t *pn;
 
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS,
@@ -504,19 +377,20 @@ smb_com_check_directory(smb_request_t *sr)
 	}
 
 	fqi = &sr->arg.dirop.fqi;
-	path = fqi->fq_path.pn_path;
+	pn = &fqi->fq_path;
 
-	if (path[0] == '\0') {
+	if (pn->pn_path[0] == '\0') {
 		rc = smbsr_encode_empty_result(sr);
 		return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 	}
 
-	if (!smb_dirpath_isvalid(path)) {
-		smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
-		    ERRDOS, ERROR_PATH_NOT_FOUND);
+	smb_pathname_init(sr, pn, pn->pn_path);
+	if (!smb_pathname_validate(sr, pn) ||
+	    !smb_validate_dirname(sr, pn)) {
 		return (SDRC_ERROR);
 	}
 
+	path = pn->pn_path;
 	tnode = sr->tid_tree->t_snode;
 
 	rc = smb_pathname_reduce(sr, sr->user_cr, path, tnode, tnode,
@@ -564,41 +438,4 @@ smb_com_check_directory(smb_request_t *sr)
 
 	rc = smbsr_encode_empty_result(sr);
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
-}
-
-static boolean_t
-smb_dirpath_isvalid(const char *path)
-{
-	struct {
-		char *name;
-		int len;
-	} *bad, bad_paths[] = {
-		{ ".\0",   2 },
-		{ ".\\\0", 3 },
-		{ "..\0",  3 },
-		{ "..\\",  3 }
-	};
-
-	char *cp;
-	char *p;
-	int i;
-
-	if (*path == '\0')
-		return (B_TRUE);
-
-	cp = smb_strdup(path);
-	p = strcanon(cp, "\\");
-	p += strspn(p, "\\");
-
-	for (i = 0; i < sizeof (bad_paths) / sizeof (bad_paths[0]); ++i) {
-		bad = &bad_paths[i];
-
-		if (strncmp(p, bad->name, bad->len) == 0) {
-			smb_mfree(cp);
-			return (B_FALSE);
-		}
-	}
-
-	smb_mfree(cp);
-	return (B_TRUE);
 }

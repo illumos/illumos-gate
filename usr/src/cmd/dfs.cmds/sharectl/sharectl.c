@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -185,8 +183,12 @@ sc_get(sa_handle_t handle, int flags, int argc, char *argv[])
 				if (!first)
 					(void) printf("\n");
 				first = 0;
-				(void) printf("[%s]\n", section);
+				(void) printf("[%s]\n",
+				    section != NULL ? section : "");
 			}
+			if (section != NULL)
+				sa_free_attr_string(section);
+
 			/* Display properties for this section */
 			for (prop = sa_get_protocol_property(propsect, NULL);
 			    prop != NULL;
@@ -231,18 +233,21 @@ sc_get(sa_handle_t handle, int flags, int argc, char *argv[])
 					    SA_FEATURE_HAS_SECTIONS) {
 						(void) printf(
 						    gettext("[%s] %s=%s\n"),
-						    section, opt->optname,
+						    section != NULL ?
+						    section : "", opt->optname,
 						    value != NULL ? value : "");
-						sa_free_attr_string(section);
 					} else {
 						(void) printf(
 						    gettext("%s=%s\n"),
 						    opt->optname,
 						    value != NULL ? value : "");
 					}
-					sa_free_attr_string(value);
+					if (value != NULL)
+						sa_free_attr_string(value);
 					printed = 1;
 				}
+				if (section != NULL)
+					sa_free_attr_string(section);
 			}
 			if (!printed) {
 				(void) printf(gettext("%s: not defined\n"),

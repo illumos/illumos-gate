@@ -1073,21 +1073,7 @@ struct mslm_NetSessionDel {
 #define SV_TYPE_DOMAIN_ENUM         0x80000000
 #define SV_TYPE_ALL                 0xFFFFFFFF  /* handy for NetServerEnum2 */
 
-/* NT-Server 4.0 sends 0x0006_120B */
-#define SV_TYPE_SENT_BY_NT_4_0_SERVER \
-	(  SV_TYPE_WORKSTATION \
-	 | SV_TYPE_SERVER \
-	 | SV_TYPE_DOMAIN_CTRL \
-	 | SV_TYPE_NT \
-	 | SV_TYPE_BACKUP_BROWSER \
-	 | SV_TYPE_MASTER_BROWSER)
-/* NT-workstation 4.0 send 0x0004_1013 */
-#define SV_TYPE_SENT_BY_NT_4_0_WORKSTATION \
-	(  SV_TYPE_WORKSTATION \
-	 | SV_TYPE_SERVER \
-	 | SV_TYPE_DOMAIN_BAKCTRL \
-	 | SV_TYPE_NT \
-	 | SV_TYPE_MASTER_BROWSER)
+#define	SV_TYPE_DEFAULT	(SV_TYPE_WORKSTATION | SV_TYPE_SERVER | SV_TYPE_NT)
 
 /* Special value for sv102_disc that specifies infinite disconnect time */
 #define SV_NODISC           (-1L)  /* No autodisconnect timeout enforced */
@@ -1250,6 +1236,8 @@ struct mslm_NetRemoteTOD {
 	OUT struct mslm_TIME_OF_DAY_INFO *bufptr;
 	OUT DWORD	status;
 };
+
+#define	NAMEFLAG_LM2		0x80000000
 
 #define	NAMETYPE_USER		1
 #define	NAMETYPE_PASSWORD	2

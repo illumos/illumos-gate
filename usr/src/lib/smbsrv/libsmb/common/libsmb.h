@@ -47,6 +47,7 @@ extern "C" {
 #include <smbsrv/smb_idmap.h>
 #include <smbsrv/netbios.h>
 #include <smbsrv/smb_share.h>
+#include <smbsrv/nterror.h>
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/smb_door_svc.h>
 #include <smbsrv/alloc.h>
@@ -697,8 +698,8 @@ int smb_lgrp_iteropen(smb_giter_t *);
 void smb_lgrp_iterclose(smb_giter_t *);
 int smb_lgrp_iterate(smb_giter_t *, smb_group_t *);
 
-int smb_lookup_sid(smb_sid_t *, char *buf, int buflen);
-int smb_lookup_name(char *, smb_gsid_t *);
+int smb_lookup_sid(const char *, lsa_account_t *);
+int smb_lookup_name(const char *, sid_type_t, lsa_account_t *);
 
 #define	SMB_LGRP_SUCCESS		0
 #define	SMB_LGRP_INVALID_ARG		1
@@ -733,9 +734,7 @@ int smb_lookup_name(char *, smb_gsid_t *);
 #define	SMB_LGRP_LOOKUP_FAILED		30
 #define	SMB_LGRP_NOT_SUPPORTED		31
 
-#define	SMB_LGRP_NAME_CHAR_MAX	32
 #define	SMB_LGRP_COMMENT_MAX	256
-#define	SMB_LGRP_NAME_MAX	(SMB_LGRP_NAME_CHAR_MAX * MTS_MB_CHAR_MAX + 1)
 
 /*
  * values for smb_nic_t.smbflags
@@ -847,6 +846,7 @@ boolean_t smb_account_validate(smb_account_t *);
  */
 uint32_t smb_sd_read(char *path, smb_sd_t *, uint32_t);
 uint32_t smb_sd_write(char *path, smb_sd_t *, uint32_t);
+uint32_t smb_sd_fromfs(smb_fssd_t *, smb_sd_t *);
 
 /* Kernel Module Interface */
 int smb_kmod_bind(void);
@@ -866,6 +866,13 @@ smb_netsvc_t *smb_kmod_enum_init(smb_svcenum_t *);
 void smb_kmod_enum_fini(smb_netsvc_t *);
 int smb_kmod_session_close(const char *, const char *);
 int smb_kmod_file_close(uint32_t);
+
+void smb_name_parse(char *, char **, char **);
+uint32_t smb_name_validate_share(const char *);
+uint32_t smb_name_validate_account(const char *);
+uint32_t smb_name_validate_domain(const char *);
+uint32_t smb_name_validate_nbdomain(const char *);
+uint32_t smb_name_validate_workgroup(const char *);
 
 /*
  * Interposer library validation

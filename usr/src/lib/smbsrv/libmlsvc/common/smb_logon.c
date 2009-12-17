@@ -434,7 +434,8 @@ smb_logon(netr_client_t *clnt)
 	status = smb_logon_anon(clnt, token);
 	if (status == NT_STATUS_INVALID_LOGON_TYPE) {
 		status = smb_logon_local(clnt, token);
-		if (status != NT_STATUS_SUCCESS) {
+		if ((status != NT_STATUS_SUCCESS) &&
+		    (smb_config_get_secmode() == SMB_SECMODE_DOMAIN)) {
 			if ((status == NT_STATUS_INVALID_LOGON_TYPE) ||
 			    (*clnt->e_domain == '\0'))
 				status = smb_logon_domain(clnt, token);

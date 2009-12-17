@@ -44,9 +44,6 @@ extern uint32_t smb_is_executable(char *);
 static void smb_delete_new_object(smb_request_t *);
 static int smb_set_open_timestamps(smb_request_t *, smb_ofile_t *, boolean_t);
 
-static char *smb_pathname_strdup(smb_request_t *, const char *);
-static char *smb_pathname_strcat(smb_request_t *, char *, const char *);
-
 /*
  * smb_access_generic_to_file
  *
@@ -309,7 +306,6 @@ smb_open_subr(smb_request_t *sr)
 	int		rc;
 	smb_ofile_t	*of;
 	smb_attr_t	new_attr;
-	int		pathlen;
 	int		max_requested = 0;
 	uint32_t	max_allowed;
 	uint32_t	status = NT_STATUS_SUCCESS;
@@ -378,29 +374,21 @@ smb_open_subr(smb_request_t *sr)
 		return (NT_STATUS_BAD_DEVICE_TYPE);
 	}
 
-	if ((pathlen = strlen(pn->pn_path)) >= MAXPATHLEN) {
+	smb_pathname_init(sr, pn, pn->pn_path);
+	if (!smb_pathname_validate(sr, pn))
+		return (sr->smb_error.status);
+
+	if (strlen(pn->pn_path) >= MAXPATHLEN) {
 		smbsr_error(sr, 0, ERRSRV, ERRfilespecs);
 		return (NT_STATUS_NAME_TOO_LONG);
 	}
 
-	/*
-	 * Some clients pass null file names; NT interprets this as "\".
-	 */
-	if (pathlen == 0) {
-		pn->pn_path = "\\";
-		pathlen = 1;
-	}
-
-	smb_pathname_setup(sr, pn);
-
-	if (is_dir)
-		status = smb_validate_dirname(pn->pn_path);
-	else
-		status = smb_validate_object_name(pn);
-
-	if (status != NT_STATUS_SUCCESS) {
-		smbsr_error(sr, status, ERRDOS, ERROR_INVALID_NAME);
-		return (status);
+	if (is_dir) {
+		if (!smb_validate_dirname(sr, pn))
+			return (sr->smb_error.status);
+	} else {
+		if (!smb_validate_object_name(sr, pn))
+			return (sr->smb_error.status);
 	}
 
 	cur_node = op->fqi.fq_dnode ?
@@ -694,8 +682,7 @@ smb_open_subr(smb_request_t *sr)
 			return (NT_STATUS_OBJECT_NAME_NOT_FOUND);
 		}
 
-		if ((is_dir == 0) && (!is_stream) &&
-		    smb_is_invalid_filename(op->fqi.fq_last_comp)) {
+		if (smb_is_invalid_filename(pn->pn_fname)) {
 			smb_node_release(dnode);
 			smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
 			    ERRDOS, ERROR_INVALID_NAME);
@@ -945,34 +932,6 @@ smb_set_open_timestamps(smb_request_t *sr, smb_ofile_t *of, boolean_t created)
 }
 
 /*
- * smb_validate_object_name
- *
- * Very basic file name validation.
- * For filenames, we check for names of the form "AAAn:". Names that
- * contain three characters, a single digit and a colon (:) are reserved
- * as DOS device names, i.e. "COM1:".
- * Stream name validation is handed off to smb_validate_stream_name
- *
- * Returns NT status codes.
- */
-uint32_t
-smb_validate_object_name(smb_pathname_t *pn)
-{
-	if (pn->pn_fname &&
-	    strlen(pn->pn_fname) == 5 &&
-	    smb_isdigit(pn->pn_fname[3]) &&
-	    pn->pn_fname[4] == ':') {
-		return (NT_STATUS_OBJECT_NAME_INVALID);
-	}
-
-	if (pn->pn_sname)
-		return (smb_validate_stream_name(pn));
-
-	return (NT_STATUS_SUCCESS);
-}
-
-
-/*
  * This function is used to delete a newly created object (file or
  * directory) if an error occurs after creation of the object.
  */
@@ -994,115 +953,4 @@ smb_delete_new_object(smb_request_t *sr)
 	else
 		(void) smb_fsop_remove(sr, sr->user_cr, fqi->fq_dnode,
 		    fqi->fq_last_comp, flags);
-}
-
-/*
- * smb_pathname_setup
- * Parse path: pname/fname:sname:stype
- *
- * Elements of the smb_pathname_t structure are allocated using request
- * specific storage and will be free'd when the sr is destroyed.
- *
- * Eliminate duplicate slashes in pn->pn_path.
- * Populate pn structure elements with the individual elements
- * of pn->pn_path. pn->pn_sname will contain the whole stream name
- * including the stream type and preceding colon: :sname:%DATA
- * pn_stype will point to the stream type within pn_sname.
- *
- * If any element is missing the pointer in pn will be NULL.
- */
-void
-smb_pathname_setup(smb_request_t *sr, smb_pathname_t *pn)
-{
-	char *pname, *fname, *sname;
-	int len;
-
-	(void) strcanon(pn->pn_path, "/\\");
-
-	pname = pn->pn_path;
-	fname = strrchr(pn->pn_path, '\\');
-
-	if (fname) {
-		if (fname == pname)
-			pname = NULL;
-		else {
-			*fname = '\0';
-			pn->pn_pname =
-			    smb_pathname_strdup(sr, pname);
-			*fname = '\\';
-		}
-		++fname;
-	} else {
-		fname = pname;
-		pn->pn_pname = NULL;
-	}
-
-	if (!smb_is_stream_name(fname)) {
-		pn->pn_fname =
-		    smb_pathname_strdup(sr, fname);
-		return;
-	}
-
-	/* sname can't be NULL smb_is_stream_name checks this */
-	sname = strchr(fname, ':');
-	if (sname == fname)
-		fname = NULL;
-	else {
-		*sname = '\0';
-		pn->pn_fname =
-		    smb_pathname_strdup(sr, fname);
-		*sname = ':';
-	}
-
-	pn->pn_sname = smb_pathname_strdup(sr, sname);
-	pn->pn_stype = strchr(pn->pn_sname + 1, ':');
-	if (pn->pn_stype) {
-		(void) smb_strupr(pn->pn_stype);
-	} else {
-		len = strlen(pn->pn_sname);
-		pn->pn_sname = smb_pathname_strcat(sr, pn->pn_sname, ":$DATA");
-		pn->pn_stype = pn->pn_sname + len;
-	}
-	++pn->pn_stype;
-}
-
-/*
- * smb_pathname_strdup
- *
- * Duplicate NULL terminated string s.
- *
- * The new string is allocated using request specific storage and will
- * be free'd when the sr is destroyed.
- */
-static char *
-smb_pathname_strdup(smb_request_t *sr, const char *s)
-{
-	char *s2;
-	size_t n;
-
-	n = strlen(s) + 1;
-	s2 = smb_srm_alloc(sr, n);
-	(void) strlcpy(s2, s, n);
-	return (s2);
-}
-
-/*
- * smb_pathname_strcat
- *
- * Reallocate NULL terminated string s1 to accommodate
- * concatenating  NULL terminated string s2.
- * Append s2 and return resulting NULL terminated string.
- *
- * The string buffer is reallocated using request specific
- * storage and will be free'd when the sr is destroyed.
- */
-static char *
-smb_pathname_strcat(smb_request_t *sr, char *s1, const char *s2)
-{
-	size_t n;
-
-	n = strlen(s1) + strlen(s2) + 1;
-	s1 = smb_srm_realloc(sr, s1, n);
-	(void) strlcat(s1, s2, n);
-	return (s1);
 }

@@ -136,6 +136,7 @@
 #include <sys/nbmlock.h>
 
 uint32_t smb_is_executable(char *);
+static void smb_node_notify_parent(smb_node_t *);
 static void smb_node_delete_on_close(smb_node_t *);
 static void smb_node_create_audit_buf(smb_node_t *, int);
 static void smb_node_destroy_audit_buf(smb_node_t *);
@@ -814,6 +815,15 @@ smb_node_notify_change(smb_node_t *node)
 	}
 }
 
+static void
+smb_node_notify_parent(smb_node_t *node)
+{
+	SMB_NODE_VALID(node);
+
+	if (node->n_dnode != NULL)
+		smb_node_notify_change(node->n_dnode);
+}
+
 /*
  * smb_node_start_crit()
  *
@@ -1248,6 +1258,9 @@ smb_node_setattr(smb_request_t *sr, smb_node_t *node,
 
 	if (tmp_attr.sa_mask)
 		smb_node_set_cached_timestamps(node, &tmp_attr);
+
+	if (tmp_attr.sa_mask & SMB_AT_MTIME || explicit_times & SMB_AT_MTIME)
+		smb_node_notify_parent(node);
 
 	return (0);
 }

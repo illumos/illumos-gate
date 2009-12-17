@@ -138,7 +138,7 @@ sam_create_account(char *server, char *domain_name, char *account_name,
 
 		if (status == NT_STATUS_SUCCESS) {
 			(void) samr_query_user_info(&user_handle,
-			    SAMR_QUERY_USER_UNKNOWN16, &sui);
+			    SAMR_QUERY_USER_CONTROL_INFO, &sui);
 
 			(void) samr_get_user_pwinfo(&user_handle);
 			(void) samr_set_user_info(&user_handle);

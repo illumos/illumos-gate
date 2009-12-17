@@ -1195,7 +1195,7 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
 		smb_open_andx.o				\
 		smb_opipe.o				\
 		smb_oplock.o				\
-		smb_path_name_reduction.o		\
+		smb_pathname.o				\
 		smb_print.o				\
 		smb_process_exit.o			\
 		smb_query_fileinfo.o			\
@@ -1207,7 +1207,7 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
 		smb_server.o				\
 		smb_session.o				\
 		smb_session_setup_andx.o		\
-		smb_set_fileinfo.o		\
+		smb_set_fileinfo.o			\
 		smb_signing.o				\
                 smb_tree.o				\
 		smb_trans2_create_directory.o		\

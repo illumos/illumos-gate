@@ -177,7 +177,8 @@ smb_com_nt_rename(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	if (smb_convert_wildcards(src_fqi->fq_path.pn_path) != 0) {
+	smb_convert_wildcards(src_fqi->fq_path.pn_path);
+	if (smb_contains_wildcards(src_fqi->fq_path.pn_path)) {
 		smbsr_error(sr, NT_STATUS_OBJECT_PATH_SYNTAX_BAD,
 		    ERRDOS, ERROR_BAD_PATHNAME);
 		return (SDRC_ERROR);
@@ -336,6 +337,15 @@ smb_common_rename(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
 	rc = smb_fsop_lookup(sr, sr->user_cr, 0, tnode,
 	    dst_dnode, new_name, &dst_fqi->fq_fnode);
 
+	/* If the destination node doesn't already exist, validate new_name. */
+	if (rc == ENOENT) {
+		if (smb_is_invalid_filename(new_name)) {
+			smb_rename_release_src(sr);
+			smb_node_release(dst_dnode);
+			return (EILSEQ); /* NT_STATUS_OBJECT_NAME_INVALID */
+		}
+	}
+
 	/*
 	 * Handle case where changing case of the same directory entry.
 	 *
@@ -424,10 +434,7 @@ smb_common_rename(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
 			return (EACCES);
 		}
 
-		if (smb_maybe_mangled_name(new_name)) {
-			(void) strlcpy(new_name, dst_fnode->od_name,
-			    MAXNAMELEN);
-		}
+		new_name = dst_fnode->od_name;
 	}
 
 	rc = smb_fsop_rename(sr, sr->user_cr,
@@ -547,6 +554,12 @@ smb_make_link(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
 		smb_rename_release_src(sr);
 		smb_node_release(dst_fqi->fq_dnode);
 		return (0);
+	}
+
+	if (smb_is_invalid_filename(dst_fqi->fq_last_comp)) {
+		smb_rename_release_src(sr);
+		smb_node_release(dst_fqi->fq_dnode);
+		return (EILSEQ); /* NT_STATUS_INVALID_OBJECT_NAME */
 	}
 
 	/* Lookup the destination node. It MUST NOT exist. */

@@ -1014,7 +1014,8 @@ fill_export_from_optionset(struct exportdata *export, sa_optionset_t optionset)
 			/* have a syntactic error */
 			(void) printf(dgettext(TEXT_DOMAIN,
 			    "NFS: unrecognized option %s=%s\n"),
-			    name, value != NULL ? value : "");
+			    name != NULL ? name : "",
+			    value != NULL ? value : "");
 			break;
 		}
 		if (name != NULL)
@@ -1841,7 +1842,7 @@ nfs_enable_share(sa_share_t share)
 		    prop != NULL && i < num_secinfo;
 		    prop = sa_get_next_property(prop), i++) {
 			char *sectype;
-				sectype = sa_get_property_attr(prop, "type");
+			sectype = sa_get_property_attr(prop, "type");
 			/*
 			 * if sectype is NULL, we probably
 			 * have a memory problem and can't get
@@ -3023,6 +3024,7 @@ nfs_minmax_check(int index, int value)
 				    OPT_CMP_GE) {
 					ret = value >= val ? B_TRUE : B_FALSE;
 				}
+				sa_free_attr_string(pval);
 			}
 		}
 	}

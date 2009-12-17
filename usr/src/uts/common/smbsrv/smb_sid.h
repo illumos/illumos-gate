@@ -109,6 +109,7 @@ extern "C" {
 #define	SidTypeInvalid			7
 #define	SidTypeUnknown			8
 #define	SidTypeComputer			9
+#define	SidTypeLabel			10
 
 
 /*

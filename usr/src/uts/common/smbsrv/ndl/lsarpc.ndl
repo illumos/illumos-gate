@@ -27,9 +27,16 @@
 #define _MLSVC_LSA_NDL_
 
 /*
- ***********************************************************************
  * Local Security Authority RPC (LSARPC) interface definition.
- ***********************************************************************
+ *
+ * Names containing a backslash ('\') are known as qualified or composite
+ * names.  The string preceding the backslash is assumed to be the domain
+ * name and the string following the slash is assumed to be name to be
+ * resolved within that domain.
+ *
+ * Names that do not contain a backslash are known as isolated names.
+ * An isolated name may be a single label, such as john, or may be in
+ * user principal name (UPN) form, such as john@example.com.
  */
 
 #include "ndrtypes.ndl"
@@ -140,15 +147,49 @@
 #define	LSARPC_OPNUM_CredBackupCredentials		0x5e
 
 /*
- * There are at least two lookup level settings. Level 1 appears to mean
- * only look on the local host and level 2 means forward the request to
- * the PDC. On the PDC it probably doesn't matter which level you use but
- * on a BDC a level 1 lookup will fail if the BDC doesn't have the info
- * whereas a level 2 lookup will also check with the PDC.
+ * Lookup levels.  Level 1 appears to mean only look on the local host and
+ * level 2 means forward the request to the PDC.  On the PDC it probably
+ * doesn't matter which level you use but on a BDC a level 1 lookup will
+ * fail if the BDC doesn't have the info whereas a level 2 lookup will also
+ * check with the PDC.
  */
-#define MSLSA_LOOKUP_LEVEL_1		1
-#define MSLSA_LOOKUP_LEVEL_2		2
+#define	LSA_LOOKUP_WKSTA			1	/* Windows NT 3.1 */
+#define	LSA_LOOKUP_PDC				2
+#define	LSA_LOOKUP_TDL				3
+#define	LSA_LOOKUP_GC				4	/* Windows 2000 */
+#define	LSA_LOOKUP_XFORESTREFERRAL		5	/* Windows XP */
+#define	LSA_LOOKUP_XFORESTRESOLVE		6
+#define	LSA_LOOKUP_RODCREFERRALTOFULLDC		7	/* Windows Vista */
 
+/*
+ * Name/SID lookup flags
+ */
+#define	LSA_LOOKUP_NAME_NOT_SPN			0x00000001
+#define	LSA_LOOKUP_NAME_MAYBE_XFOREST		0x00000002
+#define	LSA_LOOKUP_NAME_IN_DBVIEW		0x00000004
+
+/*
+ * Name/SID lookup options
+ *
+ * 0x00000000	Lookup isolated names both locally and in domains/forests.
+ * 0x80000000	Lookup isolated names (except for UPNs) only in the local
+ *		account database.  Do not lookup UPNs.
+ */
+#define	LSA_LOOKUP_OPT_ALL			0x00000000
+#define	LSA_LOOKUP_OPT_LOCAL			0x80000000
+
+/*
+ * Client revision
+ *
+ * 0x00000001	Client does not understand DNS names or forests.
+ * 0x00000002	Client understands DNS names and forests.
+ *
+ * Notes:
+ *	0 means the same as 1
+ *	Anything greater than 2 means the same as 2
+ */
+#define	LSA_CLIENT_REVISION_NT			0x00000001
+#define	LSA_CLIENT_REVISION_AD			0x00000002
 
 /*
  * Definition for a SID. The ndl compiler won't allow a typedef of
@@ -521,7 +562,7 @@ struct mslsa_lup_name_table {
 
 struct mslsa_rid_entry {
 	WORD sid_name_use;
-	WORD pad;	 /* alignment - probably not required */
+	WORD pad;
 	DWORD rid;
 	DWORD domain_index;
 };
@@ -786,16 +827,10 @@ struct mslsa_LookupPrivDisplayName {
  ***********************************************************************
  * GetConnectedUser
  *
- * This is still guesswork. Netmon doesn't know about this
- * call and I'm not really sure what it is intended to achieve.
- * Another packet capture application, Ethereal, calls this RPC as
- * GetConnectedUser.
- * We will receive our own hostname in the request and it appears 
- * we should respond with an account name and the domain name of connected
- * user from the client that makes this call.
+ * Return the account name and NetBIOS domain name for the user making
+ * the request.  All input fields should be ignored by the server.
  ***********************************************************************
  */
-
 struct mslsa_DomainName {
 	struct mslsa_string_desc *name;
 };
@@ -804,8 +839,8 @@ struct mslsa_DomainName {
 OPERATION(LSARPC_OPNUM_GetConnectedUser)
 struct mslsa_GetConnectedUser {
 	IN	LPTSTR hostname;
-	IN  BYTE *unknown1;
-	IN  BYTE *unknown2;
+	IN	BYTE *owner_in;
+	IN	BYTE *domain_in;
 	OUT	struct mslsa_string_desc *owner;
 	OUT	struct mslsa_DomainName *domain;
 	OUT	DWORD status;
@@ -824,19 +859,19 @@ struct mslsa_GetConnectedUser {
  */
 struct lsar_name_entry2 {
 	WORD sid_name_use;
-	WORD unknown_flags;	/* maybe alignment */
+	WORD padding;
 	mslsa_string_t name;
 	DWORD domain_ix;	/* -1 means none */
-	DWORD unknown;		/* added */
+	DWORD flags;
 };
-
+typedef struct lsar_name_entry2 lsar_translated_name_ex_t;
 
 struct lsar_name_table2 {
 	DWORD n_entry;
   SIZE_IS(n_entry)
 	struct lsar_name_entry2 *entries;
 };
-
+typedef struct lsar_name_table2 lsar_translated_names_ex_t;
 
 OPERATION(LSARPC_OPNUM_LookupSids2)
 struct lsar_lookup_sids2 {
@@ -846,11 +881,22 @@ struct lsar_lookup_sids2 {
 	INOUT	struct lsar_name_table2 name_table;
 	IN		DWORD lookup_level;
 	INOUT	DWORD mapped_count;
-	IN		DWORD zero;
-	IN		DWORD requested_count;
+	IN		DWORD lookup_options;
+	IN		DWORD client_revision;
  	OUT		DWORD status;
 };
 
+OPERATION(LSARPC_OPNUM_LookupSids3)
+struct lsar_lookup_sids3 {
+	IN		struct mslsa_lup_sid_table	lup_sid_table;
+	OUT		struct mslsa_domain_table	*domain_table;
+	INOUT		lsar_translated_names_ex_t	name_table;
+	IN		DWORD				lookup_level;
+	INOUT		DWORD				mapped_count;
+	IN		DWORD				lookup_options;
+	IN		DWORD				client_revision;
+ 	OUT		DWORD				status;
+};
 
 /*
  ***********************************************************************
@@ -864,10 +910,10 @@ struct lsar_lookup_sids2 {
  */
 struct lsar_rid_entry2 {
 	WORD sid_name_use;
-	WORD pad;		/* alignment - probably not required */
+	WORD pad;
 	DWORD rid;
 	DWORD domain_index;	/* -1 means none */
-	DWORD unknown;		/* new */
+	DWORD flags;
 };
 
 
@@ -886,9 +932,50 @@ struct lsar_LookupNames2 {
 	INOUT	struct lsar_rid_table2 translated_sids;
 	IN		DWORD lookup_level;
 	INOUT	DWORD mapped_count;
-	IN		DWORD unknown_sbz;
-	IN		DWORD unknown_sb2;
+	IN		DWORD lookup_options;
+	IN		DWORD client_revision;
 	OUT		DWORD status;
+};
+
+struct lsar_translated_sid_ex2 {
+	WORD			sid_name_use;
+	WORD			pad;
+	struct mslsa_sid	*sid;
+	DWORD			domain_index;	/* -1 means none */
+	DWORD			flags;
+};
+typedef struct lsar_translated_sid_ex2 lsar_translated_sid_ex2_t;
+
+struct lsar_sid_ex2_table {
+	DWORD			n_entry;
+  SIZE_IS(n_entry)
+	struct lsar_translated_sid_ex2	*sids;
+};
+typedef struct lsar_sid_ex2_table lsar_sid_ex2_table_t;
+
+OPERATION(LSARPC_OPNUM_LookupNames3)
+struct lsar_LookupNames3 {
+	IN		mslsa_handle_t			policy_handle;
+	IN REFERENCE	struct mslsa_lup_name_table	*name_table;
+	OUT		struct mslsa_domain_table	*domain_table;
+	INOUT		struct lsar_sid_ex2_table	translated_sids;
+	IN		DWORD				lookup_level;
+	INOUT		DWORD				mapped_count;
+	IN		DWORD				lookup_options;
+	IN		DWORD				client_revision;
+	OUT		DWORD				status;
+};
+
+OPERATION(LSARPC_OPNUM_LookupNames4)
+struct lsar_LookupNames4 {
+	IN REFERENCE	struct mslsa_lup_name_table	*name_table;
+	OUT		struct mslsa_domain_table	*domain_table;
+	INOUT		struct lsar_sid_ex2_table	translated_sids;
+	IN		DWORD				lookup_level;
+	INOUT		DWORD				mapped_count;
+	IN		DWORD				lookup_options;
+	IN		DWORD				client_revision;
+	OUT		DWORD				status;
 };
 
 /*
@@ -936,8 +1023,14 @@ union lsarpc_interface {
 		struct mslsa_GetConnectedUser		GetConnectedUser;
 	CASE(LSARPC_OPNUM_LookupSids2)
 		struct lsar_lookup_sids2		LookupSids2;
+	CASE(LSARPC_OPNUM_LookupSids3)
+		struct lsar_lookup_sids3		LookupSids3;
 	CASE(LSARPC_OPNUM_LookupNames2)
 		struct lsar_LookupNames2		LookupNames2;
+	CASE(LSARPC_OPNUM_LookupNames3)
+		struct lsar_LookupNames3		LookupNames3;
+	CASE(LSARPC_OPNUM_LookupNames4)
+		struct lsar_LookupNames4		LookupNames4;
 };
 typedef union lsarpc_interface	lsarpc_interface_t;
 EXTERNTYPEINFO(lsarpc_interface)

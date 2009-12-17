@@ -77,9 +77,6 @@ static char *progname;
 static void smbadm_usage(boolean_t);
 static int smbadm_join_workgroup(const char *);
 static int smbadm_join_domain(const char *, const char *);
-static boolean_t smbadm_valid_domainname(const char *);
-static boolean_t smbadm_valid_username(const char *);
-static boolean_t smbadm_valid_workgroup(const char *);
 static void smbadm_extract_domain(char *, char **, char **);
 
 static int smbadm_join(int, char **);
@@ -88,6 +85,7 @@ static int smbadm_group_create(int, char **);
 static int smbadm_group_delete(int, char **);
 static int smbadm_group_rename(int, char **);
 static int smbadm_group_show(int, char **);
+static void smbadm_group_show_name(const char *, const char *);
 static int smbadm_group_getprop(int, char **);
 static int smbadm_group_setprop(int, char **);
 static int smbadm_group_addmember(int, char **);
@@ -497,7 +495,7 @@ smbadm_join_workgroup(const char *workgroup)
 	(void) strlcpy(jdi.domain_name, workgroup, sizeof (jdi.domain_name));
 	(void) strtrim(jdi.domain_name, " \t\n");
 
-	if (!smbadm_valid_workgroup(jdi.domain_name)) {
+	if (smb_name_validate_workgroup(jdi.domain_name) != ERROR_SUCCESS) {
 		(void) fprintf(stderr, gettext("workgroup name is invalid\n"));
 		smbadm_usage(B_FALSE);
 	}
@@ -539,7 +537,7 @@ smbadm_join_domain(const char *domain, const char *username)
 	(void) strlcpy(jdi.domain_name, domain, sizeof (jdi.domain_name));
 	(void) strtrim(jdi.domain_name, " \t\n");
 
-	if (!smbadm_valid_domainname(jdi.domain_name)) {
+	if (smb_name_validate_domain(jdi.domain_name) != ERROR_SUCCESS) {
 		(void) fprintf(stderr, gettext("domain name is invalid\n"));
 		smbadm_usage(B_FALSE);
 	}
@@ -562,7 +560,7 @@ smbadm_join_domain(const char *domain, const char *username)
 		    sizeof (jdi.domain_username));
 	}
 
-	if (!smbadm_valid_username(jdi.domain_username)) {
+	if (smb_name_validate_account(jdi.domain_username) != ERROR_SUCCESS) {
 		(void) fprintf(stderr,
 		    gettext("username contains invalid characters\n"));
 		smbadm_usage(B_FALSE);
@@ -648,125 +646,6 @@ smbadm_extract_domain(char *arg, char **username, char **domain)
 			*domain = arg;
 		}
 	}
-}
-
-/*
- * Check a domain name for RFC 1035 and 1123 compliance.  Domain names may
- * contain alphanumeric characters, hyphens and dots.  The first and last
- * character of a label must be alphanumeric.  Interior characters may be
- * alphanumeric or hypens.
- *
- * Domain names should not contain underscores but we allow them because
- * Windows names are often in non-compliance with this rule.
- */
-static boolean_t
-smbadm_valid_domainname(const char *domain)
-{
-	boolean_t new_label = B_TRUE;
-	const char *p;
-	char label_terminator;
-
-	if (domain == NULL || *domain == '\0')
-		return (B_FALSE);
-
-	label_terminator = *domain;
-
-	for (p = domain; *p != '\0'; ++p) {
-		if (new_label) {
-			if (!isalnum(*p))
-				return (B_FALSE);
-			new_label = B_FALSE;
-			label_terminator = *p;
-			continue;
-		}
-
-		if (*p == '.') {
-			if (!isalnum(label_terminator))
-				return (B_FALSE);
-			new_label = B_TRUE;
-			label_terminator = *p;
-			continue;
-		}
-
-		label_terminator = *p;
-
-		if (isalnum(*p) || *p == '-' || *p == '_')
-			continue;
-
-		return (B_FALSE);
-	}
-
-	if (!isalnum(label_terminator))
-		return (B_FALSE);
-	return (B_TRUE);
-}
-
-/*
- * Windows user names cannot contain the following characters
- * or control characters.
- *
- * " / \ [ ] < > + ; , ? * = @
- */
-static boolean_t
-smbadm_valid_username(const char *username)
-{
-	const char *invalid = "\"/\\[]<>+;,?*=@";
-	const char *p;
-
-	if (username == NULL)
-		return (B_FALSE);
-
-	if (strpbrk(username, invalid))
-		return (B_FALSE);
-
-	for (p = username; *p != '\0'; p++) {
-		if (iscntrl(*p))
-			return (B_FALSE);
-	}
-
-	return (B_TRUE);
-}
-
-/*
- * A workgroup name can contain 1 to 15 characters but cannot be the same
- * as the NetBIOS name.  The name must begin with a letter or number.
- *
- * The name cannot consist entirely of spaces or dots, which is covered
- * by the requirement that the name must begin with an alphanumeric
- * character.
- *
- * The name must not contain any of the following characters or control
- * characters.
- *
- * " / \ [ ] : | < > + = ; , ?
- */
-static boolean_t
-smbadm_valid_workgroup(const char *workgroup)
-{
-	char netbiosname[NETBIOS_NAME_SZ];
-	const char *invalid = "\"/\\[]:|<>+=;,?";
-	const char *p;
-
-	if (workgroup == NULL || *workgroup == '\0' || (!isalnum(*workgroup)))
-		return (B_FALSE);
-
-	if (strlen(workgroup) >= NETBIOS_NAME_SZ)
-		return (B_FALSE);
-
-	if (smb_getnetbiosname(netbiosname, NETBIOS_NAME_SZ) == 0) {
-		if (smb_strcasecmp(workgroup, netbiosname, 0) == 0)
-			return (B_FALSE);
-	}
-
-	if (strpbrk(workgroup, invalid))
-		return (B_FALSE);
-
-	for (p = workgroup; *p != '\0'; p++) {
-		if (iscntrl(*p))
-			return (B_FALSE);
-	}
-
-	return (B_TRUE);
 }
 
 /*
@@ -880,8 +759,9 @@ smbadm_group_create(int argc, char **argv)
 static void
 smbadm_group_dump_members(smb_gsid_t *members, int num)
 {
-	char sidstr[SMB_SID_STRSZ];
-	int i;
+	char		sidstr[SMB_SID_STRSZ];
+	lsa_account_t	acct;
+	int		i;
 
 	if (num == 0) {
 		(void) printf(gettext("\tNo members\n"));
@@ -890,13 +770,28 @@ smbadm_group_dump_members(smb_gsid_t *members, int num)
 
 	(void) printf(gettext("\tMembers:\n"));
 	for (i = 0; i < num; i++) {
-		*sidstr = '\0';
-		if (smb_lookup_sid(members[i].gs_sid, sidstr,
-		    sizeof (sidstr)) == NT_STATUS_SUCCESS)
+		smb_sid_tostr(members[i].gs_sid, sidstr);
+
+		if (smb_lookup_sid(sidstr, &acct) == 0) {
+			if (acct.a_status == NT_STATUS_SUCCESS)
+				smbadm_group_show_name(acct.a_domain,
+				    acct.a_name);
+			else
+				(void) printf(gettext("\t\t%s [%s]\n"),
+				    sidstr, xlate_nt_status(acct.a_status));
+		} else {
 			(void) printf(gettext("\t\t%s\n"), sidstr);
-		else
-			(void) printf(gettext("\t\tinvalid SID\n"));
+		}
 	}
+}
+
+static void
+smbadm_group_show_name(const char *domain, const char *name)
+{
+	if (strchr(domain, '.') != NULL)
+		(void) printf(gettext("\t\t%s@%s\n"), name, domain);
+	else
+		(void) printf(gettext("\t\t%s\\%s\n"), domain, name);
 }
 
 /*
@@ -1234,6 +1129,7 @@ smbadm_group_getprop(int argc, char **argv)
 static int
 smbadm_group_addmember(int argc, char **argv)
 {
+	lsa_account_t	acct;
 	char *gname = NULL;
 	char **mname;
 	char option;
@@ -1278,18 +1174,28 @@ smbadm_group_addmember(int argc, char **argv)
 
 
 	for (i = 0; i < mcnt; i++) {
+		ret = 0;
 		if (mname[i] == NULL)
 			continue;
 
-		if (smb_lookup_name(mname[i], &msid) != NT_STATUS_SUCCESS) {
+		ret = smb_lookup_name(mname[i], SidTypeUnknown, &acct);
+		if ((ret != 0) || (acct.a_status != NT_STATUS_SUCCESS)) {
 			(void) fprintf(stderr,
 			    gettext("failed to add %s: unable to obtain SID\n"),
 			    mname[i]);
 			continue;
 		}
 
+		msid.gs_type = acct.a_sidtype;
+
+		if ((msid.gs_sid = smb_sid_fromstr(acct.a_sid)) == NULL) {
+			(void) fprintf(stderr,
+			    gettext("failed to add %s: no memory\n"), mname[i]);
+			continue;
+		}
+
 		status = smb_lgrp_add_member(gname, msid.gs_sid, msid.gs_type);
-		free(msid.gs_sid);
+		smb_sid_free(msid.gs_sid);
 		if (status != SMB_LGRP_SUCCESS) {
 			(void) fprintf(stderr,
 			    gettext("failed to add %s (%s)\n"),
@@ -1311,6 +1217,7 @@ smbadm_group_addmember(int argc, char **argv)
 static int
 smbadm_group_delmember(int argc, char **argv)
 {
+	lsa_account_t	acct;
 	char *gname = NULL;
 	char **mname;
 	char option;
@@ -1354,10 +1261,12 @@ smbadm_group_delmember(int argc, char **argv)
 
 
 	for (i = 0; i < mcnt; i++) {
+		ret = 0;
 		if (mname[i] == NULL)
 			continue;
 
-		if (smb_lookup_name(mname[i], &msid) != NT_STATUS_SUCCESS) {
+		ret = smb_lookup_name(mname[i], SidTypeUnknown, &acct);
+		if ((ret != 0) || (acct.a_status != NT_STATUS_SUCCESS)) {
 			(void) fprintf(stderr,
 			    gettext("failed to remove %s: "
 			    "unable to obtain SID\n"),
@@ -1365,8 +1274,17 @@ smbadm_group_delmember(int argc, char **argv)
 			continue;
 		}
 
+		msid.gs_type = acct.a_sidtype;
+
+		if ((msid.gs_sid = smb_sid_fromstr(acct.a_sid)) == NULL) {
+			(void) fprintf(stderr,
+			    gettext("failed to remove %s: no memory\n"),
+			    mname[i]);
+			continue;
+		}
+
 		status = smb_lgrp_del_member(gname, msid.gs_sid, msid.gs_type);
-		free(msid.gs_sid);
+		smb_sid_free(msid.gs_sid);
 		if (status != SMB_LGRP_SUCCESS) {
 			(void) fprintf(stderr,
 			    gettext("failed to remove %s (%s)\n"),

@@ -24,7 +24,7 @@
  */
 
 /*
- * Local Security Authority RPC (LSARPC) server-side interface definition.
+ * Local Security Authority RPC (LSAR) server-side interface.
  */
 
 #include <unistd.h>
@@ -55,26 +55,29 @@ static int lsarpc_key_account;
 
 static int lsarpc_call_stub(ndr_xa_t *mxa);
 
-static int lsarpc_s_CloseHandle(void *arg, ndr_xa_t *);
-static int lsarpc_s_QuerySecurityObject(void *arg, ndr_xa_t *);
-static int lsarpc_s_EnumAccounts(void *arg, ndr_xa_t *);
-static int lsarpc_s_EnumTrustedDomain(void *arg, ndr_xa_t *);
-static int lsarpc_s_EnumTrustedDomainsEx(void *arg, ndr_xa_t *);
-static int lsarpc_s_OpenAccount(void *arg, ndr_xa_t *);
-static int lsarpc_s_EnumPrivsAccount(void *arg, ndr_xa_t *);
-static int lsarpc_s_LookupPrivValue(void *arg, ndr_xa_t *);
-static int lsarpc_s_LookupPrivName(void *arg, ndr_xa_t *);
-static int lsarpc_s_LookupPrivDisplayName(void *arg, ndr_xa_t *);
+static int lsarpc_s_CloseHandle(void *, ndr_xa_t *);
+static int lsarpc_s_QuerySecurityObject(void *, ndr_xa_t *);
+static int lsarpc_s_EnumAccounts(void *, ndr_xa_t *);
+static int lsarpc_s_EnumTrustedDomain(void *, ndr_xa_t *);
+static int lsarpc_s_EnumTrustedDomainsEx(void *, ndr_xa_t *);
+static int lsarpc_s_OpenAccount(void *, ndr_xa_t *);
+static int lsarpc_s_EnumPrivsAccount(void *, ndr_xa_t *);
+static int lsarpc_s_LookupPrivValue(void *, ndr_xa_t *);
+static int lsarpc_s_LookupPrivName(void *, ndr_xa_t *);
+static int lsarpc_s_LookupPrivDisplayName(void *, ndr_xa_t *);
 static int lsarpc_s_CreateSecret(void *, ndr_xa_t *);
 static int lsarpc_s_OpenSecret(void *, ndr_xa_t *);
-static int lsarpc_s_QueryInfoPolicy(void *arg, ndr_xa_t *);
-static int lsarpc_s_OpenDomainHandle(void *arg, ndr_xa_t *);
-static int lsarpc_s_OpenDomainHandle(void *arg, ndr_xa_t *);
-static int lsarpc_s_LookupSids(void *arg, ndr_xa_t *);
-static int lsarpc_s_LookupNames(void *arg, ndr_xa_t *);
-static int lsarpc_s_GetConnectedUser(void *arg, ndr_xa_t *);
-static int lsarpc_s_LookupSids2(void *arg, ndr_xa_t *);
-static int lsarpc_s_LookupNames2(void *arg, ndr_xa_t *);
+static int lsarpc_s_QueryInfoPolicy(void *, ndr_xa_t *);
+static int lsarpc_s_OpenDomainHandle(void *, ndr_xa_t *);
+static int lsarpc_s_OpenDomainHandle(void *, ndr_xa_t *);
+static int lsarpc_s_LookupSids(void *, ndr_xa_t *);
+static int lsarpc_s_LookupNames(void *, ndr_xa_t *);
+static int lsarpc_s_GetConnectedUser(void *, ndr_xa_t *);
+static int lsarpc_s_LookupSids2(void *, ndr_xa_t *);
+static int lsarpc_s_LookupSids3(void *, ndr_xa_t *);
+static int lsarpc_s_LookupNames2(void *, ndr_xa_t *);
+static int lsarpc_s_LookupNames3(void *, ndr_xa_t *);
+static int lsarpc_s_LookupNames4(void *, ndr_xa_t *);
 
 static DWORD lsarpc_s_PrimaryDomainInfo(struct mslsa_PrimaryDomainInfo *,
     ndr_xa_t *);
@@ -103,7 +106,10 @@ static ndr_stub_table_t lsarpc_stub_table[] = {
 	{ lsarpc_s_LookupNames,		  LSARPC_OPNUM_LookupNames },
 	{ lsarpc_s_GetConnectedUser,	  LSARPC_OPNUM_GetConnectedUser },
 	{ lsarpc_s_LookupSids2,		  LSARPC_OPNUM_LookupSids2 },
+	{ lsarpc_s_LookupSids3,		  LSARPC_OPNUM_LookupSids3 },
 	{ lsarpc_s_LookupNames2,	  LSARPC_OPNUM_LookupNames2 },
+	{ lsarpc_s_LookupNames3,	  LSARPC_OPNUM_LookupNames3 },
+	{ lsarpc_s_LookupNames4,	  LSARPC_OPNUM_LookupNames4 },
 	{0}
 };
 
@@ -214,7 +220,7 @@ lsarpc_s_QuerySecurityObject(void *arg, ndr_xa_t *mxa)
  * multiple enumeration calls to obtain the complete list of SIDs.
  * It should be set to 0 on the first call and passed unchanged on
  * subsequent calls until there are no more accounts - the server will
- * return NT_SC_WARNING(MLSVC_NO_MORE_DATA).
+ * return NT_SC_WARNING(NT_STATUS_NO_MORE_DATA).
  *
  * For now just set the status to access-denied. Note that we still have
  * to provide a valid address for enum_buf because it's a reference and
@@ -251,7 +257,7 @@ lsarpc_s_EnumAccounts(void *arg, ndr_xa_t *mxa)
  * support multiple enumeration calls to obtain the complete list.
  * It should be set to 0 on the first call and passed unchanged on
  * subsequent calls until there are no more accounts - the server will
- * return NT_SC_WARNING(MLSVC_NO_MORE_DATA).
+ * return NT_SC_WARNING(NT_STATUS_NO_MORE_DATA).
  *
  * For now just set the status to access-denied. Note that we still have
  * to provide a valid address for enum_buf because it's a reference and
@@ -286,7 +292,7 @@ lsarpc_s_EnumTrustedDomain(void *arg, ndr_xa_t *mxa)
  * support multiple enumeration calls to obtain the complete list.
  * It should be set to 0 on the first call and passed unchanged on
  * subsequent calls until there are no more accounts - the server will
- * return NT_SC_WARNING(MLSVC_NO_MORE_DATA).
+ * return NT_SC_WARNING(NT_STATUS_NO_MORE_DATA).
  *
  * For now just set the status to access-denied. Note that we still have
  * to provide a valid address for enum_buf because it's a reference and
@@ -506,13 +512,8 @@ lsarpc_s_OpenSecret(void *arg, ndr_xa_t *mxa)
 /*
  * lsarpc_s_GetConnectedUser
  *
- * This is still guesswork. Netmon doesn't know about this
- * call and I'm not really sure what it is intended to achieve.
- * Another packet capture application, Ethereal, calls this RPC as
- * GetConnectedUser.
- * We will receive our own hostname in the request and it appears
- * we should respond with an account name and the domain name of connected
- * user from the client that makes this call.
+ * Return the account name and NetBIOS domain name for the user making
+ * the request.  The hostname field should be ignored by the server.
  */
 static int
 lsarpc_s_GetConnectedUser(void *arg, ndr_xa_t *mxa)
@@ -781,6 +782,10 @@ lsarpc_s_LookupNames(void *arg, ndr_xa_t *mxa)
  * table and make the name entry point at the appropriate domain table
  * entry.
  *
+ *
+ * This RPC should behave as if LookupOptions is LSA_LOOKUP_OPT_ALL and
+ * ClientRevision is LSA_CLIENT_REVISION_NT.
+ *
  * On success return 0. Otherwise return an RPC specific error code.
  */
 static int
@@ -925,6 +930,8 @@ lsarpc_s_UpdateDomainTable(ndr_xa_t *mxa,
  *
  * Other than the use of lsar_lookup_sids2 and lsar_name_entry2, this
  * is identical to lsarpc_s_LookupSids.
+ *
+ * Ignore lookup_level, it is reserved and should be zero.
  */
 static int
 lsarpc_s_LookupSids2(void *arg, ndr_xa_t *mxa)
@@ -1005,10 +1012,28 @@ lookup_sid_failed:
 }
 
 /*
+ * LookupSids3 is only valid on domain controllers.
+ * Other servers must return NT_STATUS_INVALID_SERVER_STATE.
+ */
+/*ARGSUSED*/
+static int
+lsarpc_s_LookupSids3(void *arg, ndr_xa_t *mxa)
+{
+	struct lsar_lookup_sids3 *param = arg;
+
+	bzero(param, sizeof (struct lsar_lookup_sids3));
+	param->status = NT_SC_ERROR(NT_STATUS_INVALID_SERVER_STATE);
+	return (NDR_DRC_OK);
+}
+
+/*
  * lsarpc_s_LookupNames2
  *
  * Other than the use of lsar_LookupNames2 and lsar_rid_entry2, this
  * is identical to lsarpc_s_LookupNames.
+ *
+ * If LookupOptions contains LSA_LOOKUP_OPT_LOCAL and LookupLevel is not
+ * LSA_LOOKUP_WKSTA, return STATUS_INVALID_PARAMETER.
  */
 static int
 lsarpc_s_LookupNames2(void *arg, ndr_xa_t *mxa)
@@ -1024,6 +1049,13 @@ lsarpc_s_LookupNames2(void *arg, ndr_xa_t *mxa)
 
 	if (param->name_table->n_entry != 1)
 		return (NDR_DRC_FAULT_PARAM_0_UNIMPLEMENTED);
+
+	if ((param->lookup_options & LSA_LOOKUP_OPT_LOCAL) &&
+	    param->lookup_level != LSA_LOOKUP_WKSTA) {
+		bzero(param, sizeof (struct lsar_LookupNames2));
+		param->status = NT_SC_ERROR(NT_STATUS_INVALID_PARAMETER);
+		return (NDR_DRC_OK);
+	}
 
 	rids = NDR_NEW(mxa, struct lsar_rid_entry2);
 	domain_table = NDR_NEW(mxa, struct mslsa_domain_table);
@@ -1081,6 +1113,105 @@ lsarpc_s_LookupNames2(void *arg, ndr_xa_t *mxa)
 	return (NDR_DRC_OK);
 }
 
+/*
+ * Other than the use of lsar_LookupNames2 and lsar_rid_entry2, this
+ * is identical to lsarpc_s_LookupNames.
+ *
+ * If LookupOptions contains LSA_LOOKUP_OPT_LOCAL and LookupLevel is not
+ * LSA_LOOKUP_WKSTA, return STATUS_INVALID_PARAMETER.
+ */
+static int
+lsarpc_s_LookupNames3(void *arg, ndr_xa_t *mxa)
+{
+	struct lsar_LookupNames3	*param = arg;
+	struct lsar_translated_sid_ex2	*sids;
+	struct mslsa_domain_table	*domain_table;
+	struct mslsa_domain_entry	*domain_entry;
+	smb_account_t			account;
+	uint32_t			status;
+	char				*accname;
+	int				rc = 0;
+
+	if (param->name_table->n_entry != 1)
+		return (NDR_DRC_FAULT_PARAM_0_UNIMPLEMENTED);
+
+	if ((param->lookup_options & LSA_LOOKUP_OPT_LOCAL) &&
+	    param->lookup_level != LSA_LOOKUP_WKSTA) {
+		bzero(param, sizeof (struct lsar_LookupNames3));
+		param->status = NT_SC_ERROR(NT_STATUS_INVALID_PARAMETER);
+		return (NDR_DRC_OK);
+	}
+
+	sids = NDR_NEW(mxa, struct lsar_translated_sid_ex2);
+	domain_table = NDR_NEW(mxa, struct mslsa_domain_table);
+	domain_entry = NDR_NEW(mxa, struct mslsa_domain_entry);
+
+	if (sids == NULL || domain_table == NULL || domain_entry == NULL) {
+		bzero(param, sizeof (struct lsar_LookupNames3));
+		param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
+		return (NDR_DRC_OK);
+	}
+
+	accname = (char *)param->name_table->names->str;
+	status = lsa_lookup_name(accname, SidTypeUnknown, &account);
+	if (status != NT_STATUS_SUCCESS) {
+		bzero(param, sizeof (struct lsar_LookupNames3));
+		param->status = NT_SC_ERROR(status);
+		return (NDR_DRC_OK);
+	}
+
+	/*
+	 * Set up the SID table.
+	 */
+	bzero(sids, sizeof (struct lsar_translated_sid_ex2));
+	sids[0].sid_name_use = account.a_type;
+	sids[0].sid = (struct mslsa_sid *)NDR_SIDDUP(mxa, account.a_sid);
+	sids[0].domain_index = 0;
+	param->translated_sids.n_entry = 1;
+	param->translated_sids.sids = sids;
+
+	/*
+	 * Set up the domain table.
+	 */
+	domain_table->entries = domain_entry;
+	domain_table->n_entry = 1;
+	domain_table->max_n_entry = MLSVC_DOMAIN_MAX;
+
+	rc = NDR_MSTRING(mxa, account.a_domain,
+	    (ndr_mstring_t *)&domain_entry->domain_name);
+
+	domain_entry->domain_sid =
+	    (struct mslsa_sid *)NDR_SIDDUP(mxa, account.a_domsid);
+
+	if (rc == -1 || domain_entry->domain_sid == NULL) {
+		smb_account_free(&account);
+		bzero(param, sizeof (struct lsar_LookupNames3));
+		param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
+		return (NDR_DRC_OK);
+	}
+
+	param->domain_table = domain_table;
+	param->mapped_count = 1;
+	param->status = NT_STATUS_SUCCESS;
+
+	smb_account_free(&account);
+	return (NDR_DRC_OK);
+}
+
+/*
+ * LookupNames4 is only valid on domain controllers.
+ * Other servers must return NT_STATUS_INVALID_SERVER_STATE.
+ */
+/*ARGSUSED*/
+static int
+lsarpc_s_LookupNames4(void *arg, ndr_xa_t *mxa)
+{
+	struct lsar_LookupNames4 *param = arg;
+
+	bzero(param, sizeof (struct lsar_LookupNames4));
+	param->status = NT_SC_ERROR(NT_STATUS_INVALID_SERVER_STATE);
+	return (NDR_DRC_OK);
+}
 
 /*
  * There is a bug in the way that ndrgen and the marshalling code handles

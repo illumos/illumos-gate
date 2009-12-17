@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_lgrp.c	1.5	08/07/29 SMI"
-
 #include <stdlib.h>
 #include <strings.h>
 #include <unistd.h>
@@ -178,7 +176,7 @@ static int smb_lgrp_decode_privset(smb_group_t *, char *, char *);
 static int smb_lgrp_decode_members(smb_group_t *, char *, char *, sqlite *);
 
 static void smb_lgrp_set_default_privs(smb_group_t *);
-static boolean_t smb_lgrp_chkname(char *);
+static boolean_t smb_lgrp_normalize_name(char *);
 static boolean_t smb_lgrp_chkmember(uint16_t);
 static int smb_lgrp_getsid(int, uint32_t *, uint16_t, sqlite *, smb_sid_t **);
 static int smb_lgrp_getgid(uint32_t rid, gid_t *gid);
@@ -206,8 +204,7 @@ smb_lgrp_add(char *gname, char *cmnt)
 	sqlite *db;
 	int rc;
 
-	(void) trim_whitespace(gname);
-	if (!smb_lgrp_chkname(gname))
+	if (!smb_lgrp_normalize_name(gname))
 		return (SMB_LGRP_INVALID_NAME);
 
 	if (cmnt && (strlen(cmnt) > SMB_LGRP_COMMENT_MAX))
@@ -278,12 +275,10 @@ smb_lgrp_rename(char *gname, char *new_gname)
 	sqlite *db;
 	int rc;
 
-	(void) trim_whitespace(gname);
-	if (!smb_lgrp_chkname(gname))
+	if (!smb_lgrp_normalize_name(gname))
 		return (SMB_LGRP_INVALID_NAME);
 
-	(void) trim_whitespace(new_gname);
-	if (!smb_lgrp_chkname(gname))
+	if (!smb_lgrp_normalize_name(gname))
 		return (SMB_LGRP_INVALID_NAME);
 
 	if (smb_strcasecmp(gname, new_gname, 0) == 0)
@@ -317,8 +312,7 @@ smb_lgrp_delete(char *gname)
 	sqlite *db;
 	int rc;
 
-	(void) trim_whitespace(gname);
-	if (!smb_lgrp_chkname(gname))
+	if (!smb_lgrp_normalize_name(gname))
 		return (SMB_LGRP_INVALID_NAME);
 
 	/* Cannot remove a built-in group */
@@ -344,8 +338,7 @@ smb_lgrp_setcmnt(char *gname, char *cmnt)
 	sqlite *db;
 	int rc;
 
-	(void) trim_whitespace(gname);
-	if (!smb_lgrp_chkname(gname))
+	if (!smb_lgrp_normalize_name(gname))
 		return (SMB_LGRP_INVALID_NAME);
 
 	if (cmnt && (strlen(cmnt) > SMB_LGRP_COMMENT_MAX))
@@ -372,8 +365,7 @@ smb_lgrp_getcmnt(char *gname, char **cmnt)
 	sqlite *db;
 	int rc;
 
-	(void) trim_whitespace(gname);
-	if (!smb_lgrp_chkname(gname))
+	if (!smb_lgrp_normalize_name(gname))
 		return (SMB_LGRP_INVALID_NAME);
 
 	if (cmnt == NULL)
@@ -405,8 +397,7 @@ smb_lgrp_setpriv(char *gname, uint8_t priv_lid, boolean_t enable)
 	sqlite *db;
 	int rc;
 
-	(void) trim_whitespace(gname);
-	if (!smb_lgrp_chkname(gname))
+	if (!smb_lgrp_normalize_name(gname))
 		return (SMB_LGRP_INVALID_NAME);
 
 	if ((priv_lid < SE_MIN_LUID) || (priv_lid > SE_MAX_LUID))
@@ -439,8 +430,7 @@ smb_lgrp_getpriv(char *gname, uint8_t priv_lid, boolean_t *enable)
 	smb_group_t grp;
 	int rc;
 
-	(void) trim_whitespace(gname);
-	if (!smb_lgrp_chkname(gname))
+	if (!smb_lgrp_normalize_name(gname))
 		return (SMB_LGRP_INVALID_NAME);
 
 	if ((priv_lid < SE_MIN_LUID) || (priv_lid > SE_MAX_LUID))
@@ -471,8 +461,7 @@ smb_lgrp_add_member(char *gname, smb_sid_t *msid, uint16_t sid_type)
 	smb_gsid_t mid;
 	int rc;
 
-	(void) trim_whitespace(gname);
-	if (!smb_lgrp_chkname(gname))
+	if (!smb_lgrp_normalize_name(gname))
 		return (SMB_LGRP_INVALID_NAME);
 
 	if (!smb_sid_isvalid(msid))
@@ -503,8 +492,7 @@ smb_lgrp_del_member(char *gname, smb_sid_t *msid, uint16_t sid_type)
 	smb_gsid_t mid;
 	int rc;
 
-	(void) trim_whitespace(gname);
-	if (!smb_lgrp_chkname(gname))
+	if (!smb_lgrp_normalize_name(gname))
 		return (SMB_LGRP_INVALID_NAME);
 
 	if (!smb_sid_isvalid(msid))
@@ -538,8 +526,7 @@ smb_lgrp_getbyname(char *gname, smb_group_t *grp)
 	sqlite *db;
 	int rc;
 
-	(void) trim_whitespace(gname);
-	if (!smb_lgrp_chkname(gname))
+	if (!smb_lgrp_normalize_name(gname))
 		return (SMB_LGRP_INVALID_NAME);
 
 	db = smb_lgrp_db_open(SMB_LGRP_DB_ORD);
@@ -2127,39 +2114,17 @@ smb_lgrp_decode(smb_group_t *grp, char **values, int infolvl, sqlite *db)
 }
 
 /*
- * smb_lgrp_chkname
+ * smb_lgrp_normalize_name
  *
- * User account names are limited to 20 characters and group names are
- * limited to 256 characters. In addition, account names cannot be terminated
- * by a period and they cannot include commas or any of the following printable
- * characters: ", /, \, [, ], :, |, <, >, +, =, ;, ?, *.
- * Names also cannot include characters in the range 1-31, which are
- * nonprintable.
- *
- * Source: MSDN, description of NetLocalGroupAdd function.
+ * Trim whitespace, validate the group name and convert it to lowercase.
  */
 static boolean_t
-smb_lgrp_chkname(char *name)
+smb_lgrp_normalize_name(char *name)
 {
-	static char *invalid_chars =
-	    "\001\002\003\004\005\006\007\010\011\012\013\014\015\016\017"
-	    "\020\021\022\023\024\025\026\027\030\031"
-	    "\"/\\[]:|<>+=;,*?";
-	int len, i;
+	(void) trim_whitespace(name);
 
-	if (name == NULL || *name == '\0')
+	if (smb_name_validate_account(name) != ERROR_SUCCESS)
 		return (B_FALSE);
-
-	len = strlen(name);
-	if (len > SMB_LGRP_NAME_MAX)
-		return (B_FALSE);
-
-	if (name[len - 1] == '.')
-		return (B_FALSE);
-
-	for (i = 0; i < len; i++)
-		if (strchr(invalid_chars, name[i]))
-			return (B_FALSE);
 
 	(void) smb_strlwr(name);
 	return (B_TRUE);
@@ -2270,8 +2235,7 @@ smb_lgrp_exists(char *gname)
 	sqlite *db;
 	boolean_t rc;
 
-	(void) trim_whitespace(gname);
-	if (!smb_lgrp_chkname(gname))
+	if (!smb_lgrp_normalize_name(gname))
 		return (B_FALSE);
 
 	db = smb_lgrp_db_open(SMB_LGRP_DB_ORD);

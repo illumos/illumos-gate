@@ -32,6 +32,9 @@ static char *smb_pathname_catia_v5tov4(smb_request_t *, char *, char *, int);
 static char *smb_pathname_catia_v4tov5(smb_request_t *, char *, char *, int);
 static int smb_pathname_lookup(pathname_t *, pathname_t *, int,
     vnode_t **, vnode_t *, vnode_t *, cred_t *);
+static char *smb_pathname_strdup(smb_request_t *, const char *);
+static char *smb_pathname_strcat(smb_request_t *, char *, const char *);
+static void smb_pathname_preprocess(smb_request_t *, smb_pathname_t *);
 
 uint32_t
 smb_is_executable(char *path)
@@ -595,4 +598,387 @@ smb_lookuppathvptovp(smb_request_t *sr, char *path, vnode_t *startvp,
 
 	pn_free(&pn);
 	return (vp);
+}
+
+/*
+ * smb_pathname_init
+ * Parse path: pname\\fname:sname:stype
+ *
+ * Elements of the smb_pathname_t structure are allocated using request
+ * specific storage and will be free'd when the sr is destroyed.
+ *
+ * Populate pn structure elements with the individual elements
+ * of pn->pn_path. pn->pn_sname will contain the whole stream name
+ * including the stream type and preceding colon: :sname:%DATA
+ * pn_stype will point to the stream type within pn_sname.
+ *
+ * If the pname element is missing pn_pname will be set to "\\".
+ * If any other element is missing the pointer in pn will be NULL.
+ */
+void
+smb_pathname_init(smb_request_t *sr, smb_pathname_t *pn, char *path)
+{
+	char *pname, *fname, *sname;
+	int len;
+
+	bzero(pn, sizeof (smb_pathname_t));
+	pn->pn_path = smb_pathname_strdup(sr, path);
+
+	smb_pathname_preprocess(sr, pn);
+
+	/* parse pn->pn_path into its constituent parts */
+	pname = pn->pn_path;
+	fname = strrchr(pn->pn_path, '\\');
+
+	if (fname) {
+		if (fname == pname) {
+			pn->pn_pname = smb_pathname_strdup(sr, "\\");
+		} else {
+			*fname = '\0';
+			pn->pn_pname =
+			    smb_pathname_strdup(sr, pname);
+			*fname = '\\';
+		}
+		++fname;
+	} else {
+		fname = pname;
+		pn->pn_pname = smb_pathname_strdup(sr, "\\");
+	}
+
+	if (fname[0] == '\0') {
+		pn->pn_fname = NULL;
+		return;
+	}
+
+	if (!smb_is_stream_name(fname)) {
+		pn->pn_fname = smb_pathname_strdup(sr, fname);
+		return;
+	}
+
+	/*
+	 * find sname and stype in fname.
+	 * sname can't be NULL smb_is_stream_name checks this
+	 */
+	sname = strchr(fname, ':');
+	if (sname == fname)
+		fname = NULL;
+	else {
+		*sname = '\0';
+		pn->pn_fname =
+		    smb_pathname_strdup(sr, fname);
+		*sname = ':';
+	}
+
+	pn->pn_sname = smb_pathname_strdup(sr, sname);
+	pn->pn_stype = strchr(pn->pn_sname + 1, ':');
+	if (pn->pn_stype) {
+		(void) smb_strupr(pn->pn_stype);
+	} else {
+		len = strlen(pn->pn_sname);
+		pn->pn_sname = smb_pathname_strcat(sr, pn->pn_sname, ":$DATA");
+		pn->pn_stype = pn->pn_sname + len;
+	}
+	++pn->pn_stype;
+}
+
+/*
+ * smb_pathname_preprocess
+ *
+ * Perform common pre-processing of pn->pn_path:
+ * - if the pn_path is blank, set it to '\\'
+ * - perform unicode wildcard converstion.
+ * - convert any '/' to '\\'
+ * - eliminate duplicate slashes
+ * - remove trailing slashes
+ */
+static void
+smb_pathname_preprocess(smb_request_t *sr, smb_pathname_t *pn)
+{
+	char *p;
+
+	/* treat empty path as "\\" */
+	if (strlen(pn->pn_path) == 0) {
+		pn->pn_path = smb_pathname_strdup(sr, "\\");
+		return;
+	}
+
+	/* perform unicode wildcard conversion */
+	smb_convert_wildcards(pn->pn_path);
+
+	/* treat '/' as '\\' */
+	(void) strsubst(pn->pn_path, '/', '\\');
+
+	(void) strcanon(pn->pn_path, "\\");
+
+	/* remove trailing '\\' */
+	p = pn->pn_path + strlen(pn->pn_path) - 1;
+	if ((p != pn->pn_path) && (*p == '\\'))
+		*p = '\0';
+}
+
+/*
+ * smb_pathname_strdup
+ *
+ * Duplicate NULL terminated string s.
+ *
+ * The new string is allocated using request specific storage and will
+ * be free'd when the sr is destroyed.
+ */
+static char *
+smb_pathname_strdup(smb_request_t *sr, const char *s)
+{
+	char *s2;
+	size_t n;
+
+	n = strlen(s) + 1;
+	s2 = smb_srm_alloc(sr, n);
+	(void) strlcpy(s2, s, n);
+	return (s2);
+}
+
+/*
+ * smb_pathname_strcat
+ *
+ * Reallocate NULL terminated string s1 to accommodate
+ * concatenating  NULL terminated string s2.
+ * Append s2 and return resulting NULL terminated string.
+ *
+ * The string buffer is reallocated using request specific
+ * storage and will be free'd when the sr is destroyed.
+ */
+static char *
+smb_pathname_strcat(smb_request_t *sr, char *s1, const char *s2)
+{
+	size_t n;
+
+	n = strlen(s1) + strlen(s2) + 1;
+	s1 = smb_srm_realloc(sr, s1, n);
+	(void) strlcat(s1, s2, n);
+	return (s1);
+}
+
+/*
+ * smb_pathname_validate
+ *
+ * Perform basic validation of pn:
+ * - If first component of pn->path is ".." -> PATH_SYNTAX_BAD
+ * - If there are wildcards in pn->pn_pname -> OBJECT_NAME_INVALID
+ * - If fname is "." -> INVALID_OBJECT_NAME
+ *
+ * On unix .. at the root of a file system links to the root. Thus
+ * an attempt to lookup "/../../.." will be the same as looking up "/"
+ * CIFs clients expect the above to result in
+ * NT_STATUS_OBJECT_PATH_SYNTAX_BAD. It is currently not possible
+ * (and questionable if it's desirable) to deal with all cases
+ * but paths beginning with \\.. are handled.
+ *
+ * Returns: B_TRUE if pn is valid,
+ *          otherwise returns B_FALSE and sets error status in sr.
+ */
+boolean_t
+smb_pathname_validate(smb_request_t *sr, smb_pathname_t *pn)
+{
+	char *path = pn->pn_path;
+
+	/* ignore any initial "\\" */
+	path += strspn(path, "\\");
+
+	/* If first component of path is ".." -> PATH_SYNTAX_BAD */
+	if ((strcmp(path, "..") == 0) || (strncmp(path, "..\\", 3) == 0)) {
+		smbsr_error(sr, NT_STATUS_OBJECT_PATH_SYNTAX_BAD,
+		    ERRDOS, ERROR_BAD_PATHNAME);
+		return (B_FALSE);
+	}
+
+	/* If there are wildcards in pn->pn_pname -> OBJECT_NAME_INVALID */
+	if (pn->pn_pname && smb_contains_wildcards(pn->pn_pname)) {
+		smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
+		    ERRDOS, ERROR_INVALID_NAME);
+		return (B_FALSE);
+	}
+
+	/* If fname is "." -> INVALID_OBJECT_NAME */
+	if (pn->pn_fname && (strcmp(pn->pn_fname, ".") == 0)) {
+		smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
+		    ERRDOS, ERROR_PATH_NOT_FOUND);
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
+}
+
+/*
+ * smb_validate_dirname
+ *
+ * smb_pathname_validate() should have already been performed on pn.
+ *
+ * Very basic directory name validation:  checks for colons in a path.
+ * Need to skip the drive prefix since it contains a colon.
+ *
+ * Returns: B_TRUE if the name is valid,
+ *          otherwise returns B_FALSE and sets error status in sr.
+ */
+boolean_t
+smb_validate_dirname(smb_request_t *sr, smb_pathname_t *pn)
+{
+	char *name;
+	char *path = pn->pn_path;
+
+	if ((name = path) != 0) {
+		name += strspn(name, "\\");
+
+		if (strchr(name, ':') != 0) {
+			smbsr_error(sr, NT_STATUS_NOT_A_DIRECTORY,
+			    ERRDOS, ERROR_INVALID_NAME);
+			return (B_FALSE);
+		}
+	}
+
+	return (B_TRUE);
+}
+
+/*
+ * smb_validate_object_name
+ *
+ * smb_pathname_validate() should have already been pertformed on pn.
+ *
+ * Very basic file name validation.
+ * For filenames, we check for names of the form "AAAn:". Names that
+ * contain three characters, a single digit and a colon (:) are reserved
+ * as DOS device names, i.e. "COM1:".
+ * Stream name validation is handed off to smb_validate_stream_name
+ *
+ * Returns: B_TRUE if pn->pn_fname is valid,
+ *          otherwise returns B_FALSE and sets error status in sr.
+ */
+boolean_t
+smb_validate_object_name(smb_request_t *sr, smb_pathname_t *pn)
+{
+	if (pn->pn_fname &&
+	    strlen(pn->pn_fname) == 5 &&
+	    smb_isdigit(pn->pn_fname[3]) &&
+	    pn->pn_fname[4] == ':') {
+		smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
+		    ERRDOS, ERROR_INVALID_NAME);
+		return (B_FALSE);
+	}
+
+	if (pn->pn_sname)
+		return (smb_validate_stream_name(sr, pn));
+
+	return (B_TRUE);
+}
+
+/*
+ * smb_stream_parse_name
+ *
+ * smb_stream_parse_name should only be called for a path that
+ * contains a valid named stream.  Path validation should have
+ * been performed before this function is called.
+ *
+ * Find the last component of path and split it into filename
+ * and stream name.
+ *
+ * On return the named stream type will be present.  The stream
+ * type defaults to ":$DATA", if it has not been defined
+ * For exmaple, 'stream' contains :<sname>:$DATA
+ */
+void
+smb_stream_parse_name(char *path, char *filename, char *stream)
+{
+	char *fname, *sname, *stype;
+
+	ASSERT(path);
+	ASSERT(filename);
+	ASSERT(stream);
+
+	fname = strrchr(path, '\\');
+	fname = (fname == NULL) ? path : fname + 1;
+	(void) strlcpy(filename, fname, MAXNAMELEN);
+
+	sname = strchr(filename, ':');
+	(void) strlcpy(stream, sname, MAXNAMELEN);
+	*sname = '\0';
+
+	stype = strchr(stream + 1, ':');
+	if (stype == NULL)
+		(void) strlcat(stream, ":$DATA", MAXNAMELEN);
+	else
+		(void) smb_strupr(stype);
+}
+
+/*
+ * smb_is_stream_name
+ *
+ * Determines if 'path' specifies a named stream.
+ *
+ * path is a NULL terminated string which could be a stream path.
+ * [pathname/]fname[:stream_name[:stream_type]]
+ *
+ * - If there is no colon in the path or it's the last char
+ *   then it's not a stream name
+ *
+ * - '::' is a non-stream and is commonly used by Windows to designate
+ *   the unamed stream in the form "::$DATA"
+ */
+boolean_t
+smb_is_stream_name(char *path)
+{
+	char *colonp;
+
+	if (path == NULL)
+		return (B_FALSE);
+
+	colonp = strchr(path, ':');
+	if ((colonp == NULL) || (*(colonp+1) == '\0'))
+		return (B_FALSE);
+
+	if (strstr(path, "::"))
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+/*
+ * smb_validate_stream_name
+ *
+ * B_FALSE will be returned, and the error status ser in the sr, if:
+ * - the path is not a stream name
+ * - a path is specified but the fname is ommitted.
+ * - the stream_type is specified but not valid.
+ *
+ * Note: the stream type is case-insensitive.
+ */
+boolean_t
+smb_validate_stream_name(smb_request_t *sr, smb_pathname_t *pn)
+{
+	static char *strmtype[] = {
+		"$DATA",
+		"$INDEX_ALLOCATION"
+	};
+	int i;
+
+	ASSERT(pn);
+	ASSERT(pn->pn_sname);
+
+	if ((!(pn->pn_sname)) ||
+	    ((pn->pn_pname) && !(pn->pn_fname))) {
+		smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
+		    ERRDOS, ERROR_INVALID_NAME);
+		return (B_FALSE);
+	}
+
+
+	if (pn->pn_stype != NULL) {
+		for (i = 0; i < sizeof (strmtype) / sizeof (strmtype[0]); ++i) {
+			if (strcasecmp(pn->pn_stype, strmtype[i]) == 0)
+				return (B_TRUE);
+		}
+
+		smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
+		    ERRDOS, ERROR_INVALID_NAME);
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
 }

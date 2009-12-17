@@ -96,6 +96,7 @@ extern "C" {
  * limitation
  */
 #define	SMB_SHARE_OEMNAME_MAX		13
+#define	SMB_SHARE_NTNAME_MAX		81
 #define	SMB_SHARE_CMNT_MAX		(64 * MTS_MB_CHAR_MAX)
 
 /*
@@ -182,6 +183,8 @@ typedef struct smb_share {
 	uint32_t	shr_type;
 	uint32_t	shr_refcnt;
 	uint32_t	shr_access_value;	/* host return access value */
+	uid_t		shr_uid;		/* autohome only */
+	gid_t		shr_gid;		/* autohome only */
 	char		shr_access_none[MAXPATHLEN];
 	char		shr_access_ro[MAXPATHLEN];
 	char		shr_access_rw[MAXPATHLEN];
@@ -264,7 +267,6 @@ boolean_t smb_shr_exists(char *);
 int smb_shr_is_special(char *);
 boolean_t smb_shr_is_restricted(char *);
 boolean_t smb_shr_is_admin(char *);
-boolean_t smb_shr_chkname(char *);
 
 sa_handle_t smb_shr_sa_enter(void);
 void smb_shr_sa_exit(void);

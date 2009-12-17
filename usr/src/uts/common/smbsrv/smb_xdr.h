@@ -32,6 +32,8 @@ extern "C" {
 
 #include <rpc/xdr.h>
 #include <sys/param.h>
+#include <smbsrv/wintypes.h>
+#include <smbsrv/smb_sid.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/smb_ioctl.h>
 
@@ -171,6 +173,20 @@ bool_t smb_netconnectinfo_xdr(XDR *, smb_netconnectinfo_t *);
 int smb_netfileinfo_encode(smb_netfileinfo_t *, uint8_t *, uint32_t, uint_t *);
 int smb_netfileinfo_decode(smb_netfileinfo_t *, uint8_t *, uint32_t, uint_t *);
 bool_t smb_netfileinfo_xdr(XDR *, smb_netfileinfo_t *);
+
+typedef uint16_t sid_type_t;
+
+typedef struct lsa_account {
+	ntstatus_t	a_status;
+	sid_type_t	a_sidtype;
+	char		a_domain[MAXNAMELEN];
+	char		a_name[MAXNAMELEN];
+	char		a_sid[SMB_SID_STRSZ];
+} lsa_account_t;
+
+int lsa_account_encode(lsa_account_t *, uint8_t *, uint32_t);
+int lsa_account_decode(lsa_account_t *, uint8_t *, uint32_t);
+bool_t lsa_account_xdr(XDR *, lsa_account_t *);
 
 /*
  * VSS Door Structures

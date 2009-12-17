@@ -168,7 +168,7 @@ smbd_user_auth_logon(netr_client_t *clnt)
 		entry->sa_username = strdup(username);
 		entry->sa_domain = strdup(domain);
 
-		smb_autohome_add(entry->sa_username);
+		smb_autohome_add(token);
 		smbd_audit_link(entry);
 		token->tkn_audit_sid = entry->sa_audit_sid;
 	}

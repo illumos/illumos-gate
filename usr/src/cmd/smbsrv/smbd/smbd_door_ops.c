@@ -63,17 +63,17 @@ static char *smb_dop_ads_find_host(char *argp, size_t arg_size,
 /* SMB daemon's door operation table */
 smb_dr_op_t smb_doorsrv_optab[] =
 {
-	smb_dop_user_auth_logon,
-	smb_dop_user_nonauth_logon,
-	smb_dop_user_auth_logoff,
-	smb_dop_lookup_sid,
-	smb_dop_lookup_name,
-	smb_dop_join,
-	smb_dop_get_dcinfo,
-	smb_dop_vss_get_count,
-	smb_dop_vss_get_snapshots,
-	smb_dop_vss_map_gmttoken,
-	smb_dop_ads_find_host
+	smb_dop_user_auth_logon,	/* SMB_DR_USER_AUTH_LOGON */
+	smb_dop_user_nonauth_logon,	/* SMB_DR_USER_NONAUTH_LOGON */
+	smb_dop_user_auth_logoff,	/* SMB_DR_USER_AUTH_LOGOFF */
+	smb_dop_lookup_sid,		/* SMB_DR_LOOKUP_SID */
+	smb_dop_lookup_name,		/* SMB_DR_LOOKUP_NAME */
+	smb_dop_join,			/* SMB_DR_JOIN */
+	smb_dop_get_dcinfo,		/* SMB_DR_GET_DCINFO */
+	smb_dop_vss_get_count,		/* SMB_DR_VSS_GET_COUNT */
+	smb_dop_vss_get_snapshots,	/* SMB_DR_VSS_GET_SNAPSHOTS */
+	smb_dop_vss_map_gmttoken,	/* SMB_DR_VSS_MAP_GMTTOKEN */
+	smb_dop_ads_find_host		/* SMB_DR_ADS_FIND_HOST */
 };
 
 /*ARGSUSED*/
@@ -185,38 +185,46 @@ static char *
 smb_dop_lookup_name(char *argp, size_t arg_size,
     door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
 {
-	char *rbuf = NULL;
-	char *name = NULL;
-	uint32_t status;
-	smb_sid_t *sid;
-	uint16_t sid_type;
-	char strsid[SMB_SID_STRSZ];
-	char strres[SMB_SID_STRSZ];
+	smb_domain_t	dinfo;
+	smb_account_t	ainfo;
+	lsa_account_t	acct;
+	char		buf[MAXNAMELEN];
+	char		*rbuf = NULL;
 
 	*err = SMB_DR_OP_SUCCESS;
 	*rbufsize = 0;
 
-	/* Decode */
-	if ((name = smb_dr_decode_string(argp, arg_size)) == 0) {
+	if (smb_dr_decode_common(argp, arg_size, lsa_account_xdr, &acct) != 0) {
 		*err = SMB_DR_OP_ERR_DECODE;
 		return (NULL);
 	}
 
-	*strres = '\0';
-	sid_type = SidTypeUnknown;
-	status = mlsvc_lookup_name(name, &sid, &sid_type);
-	xdr_free(xdr_string, (char *)&name);
-	if (status == NT_STATUS_SUCCESS) {
-		/* pack the SID and its type in a string */
-		smb_sid_tostr(sid, strsid);
-		(void) snprintf(strres, sizeof (strres), "%d-%s",
-		    sid_type, strsid);
-		free(sid);
+	if (*acct.a_domain == '\0')
+		(void) snprintf(buf, MAXNAMELEN, "%s", acct.a_name);
+	else if (strchr(acct.a_domain, '.') != NULL)
+		(void) snprintf(buf, MAXNAMELEN, "%s@%s", acct.a_name,
+		    acct.a_domain);
+	else
+		(void) snprintf(buf, MAXNAMELEN, "%s\\%s", acct.a_domain,
+		    acct.a_name);
+
+	acct.a_status = lsa_lookup_name(buf, acct.a_sidtype, &ainfo);
+	if (acct.a_status == NT_STATUS_SUCCESS) {
+		acct.a_sidtype = ainfo.a_type;
+		smb_sid_tostr(ainfo.a_sid, acct.a_sid);
+		(void) strlcpy(acct.a_name, ainfo.a_name, MAXNAMELEN);
+
+		if (smb_domain_lookup_name(ainfo.a_domain, &dinfo))
+			(void) strlcpy(acct.a_domain, dinfo.di_fqname,
+			    MAXNAMELEN);
+		else
+			(void) strlcpy(acct.a_domain, ainfo.a_domain,
+			    MAXNAMELEN);
+		smb_account_free(&ainfo);
 	}
 
-	/* Encode the result and return */
-	if ((rbuf = smb_dr_encode_string(SMB_DR_OP_SUCCESS, strres,
-	    rbufsize)) == NULL) {
+	if ((rbuf = smb_dr_encode_common(SMB_DR_OP_SUCCESS, &acct,
+	    lsa_account_xdr, rbufsize)) == NULL) {
 		*err = SMB_DR_OP_ERR_ENCODE;
 		*rbufsize = 0;
 	}
@@ -229,38 +237,45 @@ static char *
 smb_dop_lookup_sid(char *argp, size_t arg_size,
     door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
 {
-	char *rbuf = NULL;
-	char *name = NULL;
-	uint32_t status;
-	smb_sid_t *sid;
-	char *strsid;
+	smb_domain_t	dinfo;
+	smb_account_t	ainfo;
+	lsa_account_t	acct;
+	smb_sid_t	*sid;
+	char		*rbuf = NULL;
 
 	*err = SMB_DR_OP_SUCCESS;
 	*rbufsize = 0;
 
-	/* Decode */
-	if ((strsid = smb_dr_decode_string(argp, arg_size)) == 0) {
+	if (smb_dr_decode_common(argp, arg_size, lsa_account_xdr, &acct) != 0) {
 		*err = SMB_DR_OP_ERR_DECODE;
 		return (NULL);
 	}
 
-	sid = smb_sid_fromstr(strsid);
-	status = mlsvc_lookup_sid(sid, &name);
-	free(sid);
-	if (status != NT_STATUS_SUCCESS)
-		name = strsid;
+	sid = smb_sid_fromstr(acct.a_sid);
+	acct.a_status = lsa_lookup_sid(sid, &ainfo);
+	smb_sid_free(sid);
 
-	/* Encode the result and return */
-	if ((rbuf = smb_dr_encode_string(SMB_DR_OP_SUCCESS, name,
-	    rbufsize)) == NULL) {
+	if (acct.a_status == NT_STATUS_SUCCESS) {
+		acct.a_sidtype = ainfo.a_type;
+		smb_sid_tostr(ainfo.a_sid, acct.a_sid);
+		(void) strlcpy(acct.a_name, ainfo.a_name, MAXNAMELEN);
+
+		if (smb_domain_lookup_name(ainfo.a_domain, &dinfo))
+			(void) strlcpy(acct.a_domain, dinfo.di_fqname,
+			    MAXNAMELEN);
+		else
+			(void) strlcpy(acct.a_domain, ainfo.a_domain,
+			    MAXNAMELEN);
+
+		smb_account_free(&ainfo);
+	}
+
+	if ((rbuf = smb_dr_encode_common(SMB_DR_OP_SUCCESS, &acct,
+	    lsa_account_xdr, rbufsize)) == NULL) {
 		*err = SMB_DR_OP_ERR_ENCODE;
 		*rbufsize = 0;
 	}
 
-	if (status == NT_STATUS_SUCCESS)
-		free(name);
-
-	xdr_free(xdr_string, (char *)&strsid);
 	return (rbuf);
 }
 

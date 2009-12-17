@@ -287,6 +287,8 @@ smb_odir_open(smb_request_t *sr, char *path, uint16_t sattr, uint32_t flags)
 
 	tree = sr->tid_tree;
 
+	smb_convert_wildcards(path);
+
 	rc = smb_pathname_reduce(sr, sr->user_cr, path,
 	    tree->t_snode, tree->t_snode, &dnode, pattern);
 	if (rc != 0) {
@@ -864,7 +866,7 @@ smb_odir_create(smb_request_t *sr, smb_node_t *dnode,
 	od->d_sattr = sattr;
 	(void) strlcpy(od->d_pattern, pattern, sizeof (od->d_pattern));
 	od->d_flags = 0;
-	if (smb_convert_wildcards(od->d_pattern) != 0)
+	if (smb_contains_wildcards(od->d_pattern))
 		od->d_flags |= SMB_ODIR_FLAG_WILDCARDS;
 	if (vfs_has_feature(dnode->vp->v_vfsp, VFSFT_DIRENTFLAGS))
 		od->d_flags |= SMB_ODIR_FLAG_EDIRENT;

@@ -309,7 +309,7 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 		return (SDRC_ERROR);
 
 	if (sr->smb_flg2 & SMB_FLAGS2_UNICODE)
-		(void) smb_convert_wildcards(path);
+		smb_convert_wildcards(path);
 
 	odid = smb_odir_open(sr, path, sattr, odir_flags);
 	if (odid == 0)

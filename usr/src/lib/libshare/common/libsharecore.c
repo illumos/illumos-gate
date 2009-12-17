@@ -410,7 +410,7 @@ adddfsentry(xfs_sharelist_t *list, sa_share_t share, char *proto)
 	if (item != NULL) {
 		parent = sa_get_parent_group(share);
 		groupname = sa_get_group_attr(parent, "name");
-		if (strcmp(groupname, "default") == 0) {
+		if (groupname != NULL && strcmp(groupname, "default") == 0) {
 			sa_free_attr_string(groupname);
 			groupname = NULL;
 		}
@@ -691,11 +691,15 @@ sa_update_legacy(sa_share_t share, char *proto)
 	 * set or the type is not "transient".
 	 */
 	if (persist == NULL || strcmp(persist, "transient") != 0) {
+		path = sa_get_share_attr(share, "path");
+		if (path == NULL) {
+			ret = SA_NO_MEMORY;
+			goto out;
+		}
 		dfstab = open_dfstab(SA_LEGACY_DFSTAB);
 		if (dfstab != NULL) {
 			(void) setvbuf(dfstab, NULL, _IOLBF, BUFSIZ * 8);
 			sablocksigs(&old);
-			path = sa_get_share_attr(share, "path");
 			(void) lockf(fileno(dfstab), F_LOCK, 0);
 			list = getdfstab(dfstab);
 			rewind(dfstab);
@@ -708,7 +712,6 @@ sa_update_legacy(sa_share_t share, char *proto)
 			(void) fsync(fileno(dfstab));
 			saunblocksigs(&old);
 			(void) fclose(dfstab);
-			sa_free_attr_string(path);
 			if (list != NULL)
 				dfs_free_list(list);
 		} else {
@@ -717,7 +720,9 @@ sa_update_legacy(sa_share_t share, char *proto)
 			else
 				ret = SA_CONFIG_ERR;
 		}
+		sa_free_attr_string(path);
 	}
+out:
 	if (persist != NULL)
 		sa_free_attr_string(persist);
 	return (ret);

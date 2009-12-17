@@ -434,7 +434,9 @@ smb_sid_type2str(uint16_t snu_id)
 		"SidTypeWellKnownGroup",
 		"SidTypeDeletedAccount",
 		"SidTypeInvalid",
-		"SidTypeUnknown"
+		"SidTypeUnknown",
+		"SidTypeComputer",
+		"SidTypeLabel"
 	};
 
 	if (snu_id < ((sizeof (snu_name)/sizeof (snu_name[0]))))

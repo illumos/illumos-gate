@@ -53,60 +53,6 @@ extern int netr_open(char *, char *, mlsvc_handle_t *);
 extern int netr_close(mlsvc_handle_t *);
 extern DWORD netlogon_auth(char *, mlsvc_handle_t *, DWORD);
 
-/*
- * mlsvc_lookup_name
- *
- * This is just a wrapper for lsa_lookup_name.
- *
- * The memory for the sid is allocated using malloc so the caller should
- * call free when it is no longer required.
- */
-uint32_t
-mlsvc_lookup_name(char *name, smb_sid_t **sid, uint16_t *sid_type)
-{
-	smb_account_t account;
-	uint32_t status;
-
-	status = lsa_lookup_name(name, *sid_type, &account);
-	if (status == NT_STATUS_SUCCESS) {
-		*sid = account.a_sid;
-		account.a_sid = NULL;
-		*sid_type = account.a_type;
-		smb_account_free(&account);
-	}
-
-	return (status);
-}
-
-/*
- * mlsvc_lookup_sid
- *
- * This is just a wrapper for lsa_lookup_sid.
- *
- * The allocated memory for the returned name must be freed by caller upon
- * successful return.
- */
-uint32_t
-mlsvc_lookup_sid(smb_sid_t *sid, char **name)
-{
-	smb_account_t ainfo;
-	uint32_t status;
-	int namelen;
-
-	if ((status = lsa_lookup_sid(sid, &ainfo)) == NT_STATUS_SUCCESS) {
-		namelen = strlen(ainfo.a_domain) + strlen(ainfo.a_name) + 2;
-		if ((*name = malloc(namelen)) != NULL)
-			(void) snprintf(*name, namelen, "%s\\%s",
-			    ainfo.a_domain, ainfo.a_name);
-		else
-			status = NT_STATUS_NO_MEMORY;
-
-		smb_account_free(&ainfo);
-	}
-
-	return (status);
-}
-
 DWORD
 mlsvc_netlogon(char *server, char *domain)
 {

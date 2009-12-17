@@ -990,6 +990,7 @@ add_resources(sa_share_t share, char *opt)
 		newopt = calloc(1, size);
 		if (newopt != NULL)
 			(void) snprintf(newopt, size, "%s,name=%s", opt, name);
+		sa_free_attr_string(name);
 		free(opt);
 		opt = newopt;
 		propstr = sa_proto_legacy_format("smb", resource, 0);

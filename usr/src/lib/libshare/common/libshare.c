@@ -727,11 +727,13 @@ sa_optionset_name(sa_optionset_t optionset, char *oname, size_t len, char *id)
 		} else {
 			char *index;
 			index = get_node_attr((void *)parent, "id");
-			if (index != NULL)
+			if (index != NULL) {
 				len = snprintf(oname, len, "%s_%s_%s", id,
 				    proto ? proto : "default", index);
-			else
+				sa_free_attr_string(index);
+			} else {
 				len = 0;
+			}
 		}
 
 		if (proto != NULL)
@@ -1387,7 +1389,6 @@ mark_excluded_protos(sa_group_t group, xmlNodePtr share, uint64_t flags)
 		if (value == NULL)
 			continue;
 		features = sa_proto_get_featureset(value);
-		sa_free_attr_string(value);
 		if (!(features & flags)) {
 			(void) strlcat(exclude_list, sep,
 			    sizeof (exclude_list));
@@ -1395,6 +1396,7 @@ mark_excluded_protos(sa_group_t group, xmlNodePtr share, uint64_t flags)
 			    sizeof (exclude_list));
 			sep = ",";
 		}
+		sa_free_attr_string(value);
 	}
 	if (exclude_list[0] != '\0')
 		(void) xmlSetProp(share, (xmlChar *)"exclude",
@@ -2043,7 +2045,7 @@ get_node_attr(void *nodehdl, char *tag)
 }
 
 /*
- * get_node_attr(node, tag)
+ * set_node_attr(node, tag)
  *
  * Set the specified tag(attribute) to the specified value This is
  * used internally by a number of attribute oriented functions. It
@@ -2897,6 +2899,8 @@ sa_create_security(sa_group_t group, char *sectype, char *proto)
 			}
 		}
 	}
+	if (id != NULL)
+		sa_free_attr_string(id);
 	if (groupname != NULL)
 		sa_free_attr_string(groupname);
 	return (security);
@@ -3109,6 +3113,8 @@ sa_set_prop_by_prop(sa_optionset_t optionset, sa_group_t group,
 					(void) sa_security_name(optionset,
 					    oname, sizeof (oname), id);
 				ret = sa_start_transaction(scf_handle, oname);
+				if (id != NULL)
+					sa_free_attr_string(id);
 			}
 			if (ret == SA_OK) {
 				switch (type) {

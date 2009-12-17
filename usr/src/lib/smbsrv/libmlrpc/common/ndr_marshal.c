@@ -138,8 +138,11 @@ ndr_buf_decode(ndr_buf_t *nbuf, unsigned opnum, const char *data,
 	else
 		pdu_size_hint = datalen;
 
-	nds_initialize(&nbuf->nb_nds, pdu_size_hint, NDR_MODE_BUF_DECODE,
+	rc = nds_initialize(&nbuf->nb_nds, pdu_size_hint, NDR_MODE_BUF_DECODE,
 	    nbuf->nb_heap);
+	if (NDR_DRC_IS_FAULT(rc))
+		return (rc);
+
 	bcopy(data, nbuf->nb_nds.pdu_base_addr, datalen);
 
 	rc = ndr_decode_hdr_common(&nbuf->nb_nds, &hdr);
@@ -147,7 +150,7 @@ ndr_buf_decode(ndr_buf_t *nbuf, unsigned opnum, const char *data,
 		return (rc);
 
 	if (!NDR_IS_SINGLE_FRAG(hdr.pfc_flags))
-		return (rc);
+		return (NDR_DRC_FAULT_DECODE_FAILED);
 
 	rc = ndr_encode_decode_common(&nbuf->nb_nds, opnum, nbuf->nb_ti,
 	    result);

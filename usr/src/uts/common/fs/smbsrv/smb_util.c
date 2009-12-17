@@ -40,8 +40,6 @@
 #include <sys/sid.h>
 #include <sys/priv_names.h>
 
-static void smb_replace_wildcards(char *);
-
 static boolean_t
 smb_thread_continue_timedwait_locked(smb_thread_t *thread, int ticks);
 
@@ -94,28 +92,18 @@ smb_ascii_or_unicode_null_len(struct smb_request *sr)
 }
 
 /*
- * Substitute wildcards and return the number of wildcards in the post
- * conversion pattern.
+ * Return B_TRUE if pattern contains wildcards
  */
-int
-smb_convert_wildcards(char *pattern)
+boolean_t
+smb_contains_wildcards(const char *pattern)
 {
-	char	*p = pattern;
-	int	n_wildcard = 0;
+	static const char *wildcards = "*?";
 
-	smb_replace_wildcards(pattern);
-
-	while (*p != '\0') {
-		if (*p == '*' || *p == '?')
-			++n_wildcard;
-		++p;
-	}
-
-	return (n_wildcard);
+	return (strpbrk(pattern, wildcards) != NULL);
 }
 
 /*
- * When replacing wildcards a '.' in a name is treated as a base and
+ * When converting wildcards a '.' in a name is treated as a base and
  * extension separator even if the name is longer than 8.3.
  *
  * The '*' character matches an entire part of the name.  For example,
@@ -140,8 +128,8 @@ smb_convert_wildcards(char *pattern)
  * Since " and < are illegal in Windows file names, we always convert
  * these Unicode wildcards without checking the following character.
  */
-static void
-smb_replace_wildcards(char *pattern)
+void
+smb_convert_wildcards(char *pattern)
 {
 	static char *match_all[] = {
 		"*.",
@@ -269,116 +257,6 @@ smb_sattr_check(uint16_t dosattr, uint16_t sattr)
 		return (B_FALSE);
 
 	return (B_TRUE);
-}
-
-/*
- * smb_stream_parse_name
- *
- * smb_stream_parse_name should only be called for a path that
- * contains a valid named stream.  Path validation should have
- * been performed before this function is called.
- *
- * Find the last component of path and split it into filename
- * and stream name.
- *
- * On return the named stream type will be present.  The stream
- * type defaults to ":$DATA", if it has not been defined
- * For exmaple, 'stream' contains :<sname>:$DATA
- */
-void
-smb_stream_parse_name(char *path, char *filename, char *stream)
-{
-	char *fname, *sname, *stype;
-
-	ASSERT(path);
-	ASSERT(filename);
-	ASSERT(stream);
-
-	fname = strrchr(path, '\\');
-	fname = (fname == NULL) ? path : fname + 1;
-	(void) strlcpy(filename, fname, MAXNAMELEN);
-
-	sname = strchr(filename, ':');
-	(void) strlcpy(stream, sname, MAXNAMELEN);
-	*sname = '\0';
-
-	stype = strchr(stream + 1, ':');
-	if (stype == NULL)
-		(void) strlcat(stream, ":$DATA", MAXNAMELEN);
-	else
-		(void) smb_strupr(stype);
-}
-
-/*
- * smb_is_stream_name
- *
- * Determines if 'path' specifies a named stream.
- *
- * path is a NULL terminated string which could be a stream path.
- * [pathname/]fname[:stream_name[:stream_type]]
- *
- * - If there is no colon in the path or it's the last char
- *   then it's not a stream name
- *
- * - '::' is a non-stream and is commonly used by Windows to designate
- *   the unamed stream in the form "::$DATA"
- */
-boolean_t
-smb_is_stream_name(char *path)
-{
-	char *colonp;
-
-	if (path == NULL)
-		return (B_FALSE);
-
-	colonp = strchr(path, ':');
-	if ((colonp == NULL) || (*(colonp+1) == '\0'))
-		return (B_FALSE);
-
-	if (strstr(path, "::"))
-		return (B_FALSE);
-
-	return (B_TRUE);
-}
-
-/*
- * smb_validate_stream_name
- *
- * NT_STATUS_OBJECT_NAME_INVALID will be returned if:
- * - the path is not a stream name
- * - a path is specified but the fname is ommitted.
- * - the stream_type is specified but not valid.
- *
- * Note: the stream type is case-insensitive.
- */
-uint32_t
-smb_validate_stream_name(smb_pathname_t *pn)
-{
-	static char *strmtype[] = {
-		"$DATA",
-		"$INDEX_ALLOCATION"
-	};
-	int i;
-
-	ASSERT(pn);
-	ASSERT(pn->pn_sname);
-
-	if (!(pn->pn_sname))
-		return (NT_STATUS_OBJECT_NAME_INVALID);
-
-	if ((pn->pn_pname) && !(pn->pn_fname))
-		return (NT_STATUS_OBJECT_NAME_INVALID);
-
-	if (pn->pn_stype != NULL) {
-		for (i = 0; i < sizeof (strmtype) / sizeof (strmtype[0]); ++i) {
-			if (strcasecmp(pn->pn_stype, strmtype[i]) == 0)
-				return (NT_STATUS_SUCCESS);
-		}
-
-		return (NT_STATUS_OBJECT_NAME_INVALID);
-	}
-
-	return (NT_STATUS_SUCCESS);
 }
 
 int

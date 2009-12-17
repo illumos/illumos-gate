@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* helper functions for using libscf with sharemgr */
 
@@ -1585,7 +1583,7 @@ sa_set_resource_property(scfutilhandle_t *handle, sa_share_t share)
 				    valstr ? valstr : "");
 			else
 				(void) snprintf(propstr, strsize, "%s:%s:%s",
-				    idstr ? idstr : "", valstr ? valstr : "",
+				    idstr, valstr ? valstr : "",
 				    description ? description : "");
 			if (scf_value_set_astring(value, propstr) != 0) {
 				ret = SA_SYSTEM_ERR;
@@ -1604,15 +1602,28 @@ sa_set_resource_property(scfutilhandle_t *handle, sa_share_t share)
 			free(propstr);
 		}
 err:
-		if (valstr != NULL)
+		if (valstr != NULL) {
 			sa_free_attr_string(valstr);
-		if (idstr != NULL)
+			valstr = NULL;
+		}
+		if (idstr != NULL) {
 			sa_free_attr_string(idstr);
-		if (description != NULL)
+			idstr = NULL;
+		}
+		if (description != NULL) {
 			sa_free_share_description(description);
+			description = NULL;
+		}
 	}
 	/* the entry is in the transaction */
 	entry = NULL;
+
+	if (valstr != NULL)
+		sa_free_attr_string(valstr);
+	if (idstr != NULL)
+		sa_free_attr_string(idstr);
+	if (description != NULL)
+		sa_free_share_description(description);
 
 	if (ret == SA_SYSTEM_ERR) {
 		switch (scf_error()) {

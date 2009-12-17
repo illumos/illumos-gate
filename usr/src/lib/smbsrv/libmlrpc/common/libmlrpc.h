@@ -457,6 +457,7 @@ typedef struct ndr_client {
 	ndr_binding_t		*binding_list;
 	ndr_binding_t		binding_pool[NDR_N_BINDING_POOL];
 
+	boolean_t		nonull;
 	boolean_t		heap_preserved;
 	ndr_heap_t		*heap;
 	ndr_stream_t		*recv_nds;
@@ -470,7 +471,6 @@ typedef struct ndr_handle {
 	ndr_hdid_t		nh_id;
 	struct ndr_handle	*nh_next;
 	int			nh_fid;
-	int			nh_remote_os;
 	const ndr_service_t	*nh_svc;
 	ndr_client_t		*nh_clnt;
 	void			*nh_data;
@@ -488,7 +488,7 @@ typedef struct ndr_buf {
 } ndr_buf_t;
 
 /* ndr_ops.c */
-void nds_initialize(ndr_stream_t *, unsigned, int, ndr_heap_t *);
+int nds_initialize(ndr_stream_t *, unsigned, int, ndr_heap_t *);
 void nds_finalize(ndr_stream_t *, ndr_fraglist_t *);
 void nds_destruct(ndr_stream_t *);
 void nds_show_state(ndr_stream_t *);

@@ -266,3 +266,59 @@ smb_dr_decode_arg_get_token(char *buf, size_t len)
 	xdr_free(xdr_smb_dr_bytes_t, (char *)&arg);
 	return (clnt_info);
 }
+
+/*
+ * Encode an lsa_account_t into a buffer.
+ */
+int
+lsa_account_encode(lsa_account_t *acct, uint8_t *buf, uint32_t buflen)
+{
+	XDR xdrs;
+	int rc = 0;
+
+	xdrmem_create(&xdrs, (const caddr_t)buf, buflen, XDR_ENCODE);
+
+	if (!lsa_account_xdr(&xdrs, acct))
+		rc = -1;
+
+	xdr_destroy(&xdrs);
+	return (rc);
+}
+
+/*
+ * Decode an XDR buffer into an lsa_account_t.
+ */
+int
+lsa_account_decode(lsa_account_t *acct, uint8_t *buf, uint32_t buflen)
+{
+	XDR xdrs;
+	int rc = 0;
+
+	xdrmem_create(&xdrs, (const caddr_t)buf, buflen, XDR_DECODE);
+
+	bzero(acct, sizeof (lsa_account_t));
+	if (!lsa_account_xdr(&xdrs, acct))
+		rc = -1;
+
+	xdr_destroy(&xdrs);
+	return (rc);
+}
+
+bool_t
+lsa_account_xdr(XDR *xdrs, lsa_account_t *objp)
+{
+	if (!xdr_uint16_t(xdrs, &objp->a_sidtype))
+		return (FALSE);
+	if (!xdr_uint32_t(xdrs, &objp->a_status))
+		return (FALSE);
+	if (!xdr_vector(xdrs, (char *)objp->a_domain, MAXNAMELEN,
+	    sizeof (char), (xdrproc_t)xdr_char))
+		return (FALSE);
+	if (!xdr_vector(xdrs, (char *)objp->a_name, MAXNAMELEN,
+	    sizeof (char), (xdrproc_t)xdr_char))
+		return (FALSE);
+	if (!xdr_vector(xdrs, (char *)objp->a_sid, SMB_SID_STRSZ,
+	    sizeof (char), (xdrproc_t)xdr_char))
+		return (FALSE);
+	return (TRUE);
+}

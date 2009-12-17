@@ -202,6 +202,7 @@ static boolean_t smb_ads_is_sought_host(smb_ads_host_info_t *, char *);
 static boolean_t smb_ads_is_same_domain(char *, char *);
 static boolean_t smb_ads_is_pdc_configured(void);
 static smb_ads_host_info_t *smb_ads_dup_host_info(smb_ads_host_info_t *);
+static char *smb_ads_get_sharedn(const char *, const char *, const char *);
 
 /*
  * smb_ads_init
@@ -1275,6 +1276,46 @@ smb_ads_free_spnset(char **spn_set)
 }
 
 /*
+ * Returns share DN in an allocated buffer.  The format of the DN is
+ * cn=<sharename>,<container RDNs>,<domain DN>
+ *
+ * If the domain DN is not included in the container parameter,
+ * then it will be appended to create the share DN.
+ *
+ * The caller must free the allocated buffer.
+ */
+static char *
+smb_ads_get_sharedn(const char *sharename, const char *container,
+    const char *domain_dn)
+{
+	char *share_dn;
+	int rc, offset, container_len, domain_len;
+	boolean_t append_domain = B_TRUE;
+
+	container_len = strlen(container);
+	domain_len = strlen(domain_dn);
+
+	if (container_len >= domain_len) {
+
+		/* offset to last domain_len characters */
+		offset = container_len - domain_len;
+
+		if (smb_strcasecmp(container + offset,
+		    domain_dn, domain_len) == 0)
+			append_domain = B_FALSE;
+	}
+
+	if (append_domain)
+		rc = asprintf(&share_dn, "cn=%s,%s,%s", sharename,
+		    container, domain_dn);
+	else
+		rc = asprintf(&share_dn, "cn=%s,%s", sharename,
+		    container);
+
+	return ((rc == -1) ? NULL : share_dn);
+}
+
+/*
  * smb_ads_add_share
  * Call by smb_ads_publish_share to create share object in ADS.
  * This routine specifies the attributes of an ADS LDAP share object. The first
@@ -1299,18 +1340,12 @@ smb_ads_add_share(smb_ads_handle_t *ah, const char *adsShareName,
 	LDAPMod *attrs[SMB_ADS_SHARE_NUM_ATTR];
 	int j = 0;
 	char *share_dn;
-	int len, ret;
+	int ret;
 	char *unc_names[] = {(char *)unc_name, NULL};
 
-	len = 5 + strlen(adsShareName) + strlen(adsContainer) +
-	    strlen(ah->domain_dn) + 1;
-
-	share_dn = (char *)malloc(len);
-	if (share_dn == NULL)
+	if ((share_dn = smb_ads_get_sharedn(adsShareName, adsContainer,
+	    ah->domain_dn)) == NULL)
 		return (-1);
-
-	(void) snprintf(share_dn, len, "cn=%s,%s,%s", adsShareName,
-	    adsContainer, ah->domain_dn);
 
 	if (smb_ads_alloc_attr(attrs, SMB_ADS_SHARE_NUM_ATTR) != 0) {
 		free(share_dn);
@@ -1355,17 +1390,12 @@ smb_ads_del_share(smb_ads_handle_t *ah, const char *adsShareName,
     const char *adsContainer)
 {
 	char *share_dn;
-	int len, ret;
+	int ret;
 
-	len = 5 + strlen(adsShareName) + strlen(adsContainer) +
-	    strlen(ah->domain_dn) + 1;
-
-	share_dn = (char *)malloc(len);
-	if (share_dn == NULL)
+	if ((share_dn = smb_ads_get_sharedn(adsShareName, adsContainer,
+	    ah->domain_dn)) == NULL)
 		return (-1);
 
-	(void) snprintf(share_dn, len, "cn=%s,%s,%s", adsShareName,
-	    adsContainer, ah->domain_dn);
 	if ((ret = ldap_delete_s(ah->ld, share_dn)) != LDAP_SUCCESS) {
 		smb_tracef("ldap_delete: %s", ldap_err2string(ret));
 		free(share_dn);
@@ -1450,22 +1480,16 @@ smb_ads_lookup_share(smb_ads_handle_t *ah, const char *adsShareName,
 {
 	char *attrs[4], filter[SMB_ADS_MAXBUFLEN];
 	char *share_dn;
-	int len, ret;
+	int ret;
 	LDAPMessage *res;
 	char tmpbuf[SMB_ADS_MAXBUFLEN];
 
 	if (adsShareName == NULL || adsContainer == NULL)
 		return (-1);
 
-	len = 5 + strlen(adsShareName) + strlen(adsContainer) +
-	    strlen(ah->domain_dn) + 1;
-
-	share_dn = (char *)malloc(len);
-	if (share_dn == NULL)
+	if ((share_dn = smb_ads_get_sharedn(adsShareName, adsContainer,
+	    ah->domain_dn)) == NULL)
 		return (-1);
-
-	(void) snprintf(share_dn, len, "cn=%s,%s,%s", adsShareName,
-	    adsContainer, ah->domain_dn);
 
 	res = NULL;
 	attrs[0] = "cn";

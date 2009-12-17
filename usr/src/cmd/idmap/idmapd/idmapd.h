@@ -219,10 +219,12 @@ typedef struct wksids_table {
 #define	IS_BATCH_GID(batch, i) \
 	(batch.idmap_mapping_batch_val[i].id1.idtype == IDMAP_GID)
 
-#define	IS_REQUEST_SID(req, n) \
-	((req).id##n.idtype == IDMAP_SID ||	\
-	(req).id##n.idtype == IDMAP_USID ||	\
-	(req).id##n.idtype == IDMAP_GSID)	\
+#define	IS_ID_SID(id)	\
+	((id).idtype == IDMAP_SID ||	\
+	(id).idtype == IDMAP_USID ||	\
+	(id).idtype == IDMAP_GSID)	\
+
+#define	IS_REQUEST_SID(req, n) IS_ID_SID((req).id##n)
 
 
 #define	IS_REQUEST_UID(request) \
@@ -276,7 +278,7 @@ extern idmap_retcode	sid2pid_first_pass(lookup_state_t *,
 extern idmap_retcode	sid2pid_second_pass(lookup_state_t *,
 				idmap_mapping *, idmap_id_res *);
 extern idmap_retcode	pid2sid_first_pass(lookup_state_t *,
-				idmap_mapping *, idmap_id_res *, int, int);
+				idmap_mapping *, idmap_id_res *, int);
 extern idmap_retcode	pid2sid_second_pass(lookup_state_t *,
 				idmap_mapping *, idmap_id_res *, int);
 extern idmap_retcode	update_cache_sid2pid(lookup_state_t *,

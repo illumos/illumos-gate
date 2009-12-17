@@ -1189,8 +1189,11 @@ ndr_outer_string(ndr_ref_t *outer_ref)
 			 * size_is is the number of characters in the
 			 * (multibyte) string, including the null.
 			 */
-			size_is = (smb_wcequiv_strlen(valp) /
-			    sizeof (smb_wchar_t)) + 1;
+			size_is = smb_wcequiv_strlen(valp) /
+			    sizeof (smb_wchar_t);
+
+			if (!(nds->flags & NDS_F_NONULL))
+				++size_is;
 
 			if (size_is > NDR_STRING_MAX) {
 				NDR_SET_ERROR(outer_ref, NDR_ERR_STRLEN);

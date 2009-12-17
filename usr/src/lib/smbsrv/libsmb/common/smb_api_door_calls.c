@@ -41,121 +41,110 @@
 #include <smbsrv/smb_common_door.h>
 
 /*
- * smb_lookup_sid
+ * Given a SID, make a door call to get  the associated name.
  *
- * Tries to get the account name associated with the given SID
- * The mapping is requested to be performed by smbd via a door
- * call. If no account name can be found the string format of
- * the SID will be returned as the name.
+ * Returns 0 if the door call is successful, otherwise -1.
  *
- * The passed namebuf should be big enough to hold the string
- * format of a SID.
+ * If 0 is returned, the lookup result will be available in a_status.
+ * NT_STATUS_SUCCESS		The SID was mapped to a name.
+ * NT_STATUS_NONE_MAPPED	The SID could not be mapped to a name.
  */
 int
-smb_lookup_sid(smb_sid_t *sid, char *namebuf, int namebuflen)
+smb_lookup_sid(const char *sid, lsa_account_t *acct)
 {
-	door_arg_t arg;
-	char *buf;
-	size_t len;
-	int opcode = SMB_DR_LOOKUP_SID;
-	char *name = NULL;
-	int fd;
+	door_arg_t	arg;
+	char		*buf;
+	size_t		len;
+	int		opcode = SMB_DR_LOOKUP_SID;
+	int		fd;
+	int		rc;
 
-	assert((namebuf != NULL) && (namebuflen != 0));
+	assert((sid != NULL) && (acct != NULL));
 
-	if (!smb_sid_isvalid(sid))
-		return (NT_STATUS_INVALID_SID);
+	bzero(acct, sizeof (lsa_account_t));
+	(void) strlcpy(acct->a_sid, sid, SMB_SID_STRSZ);
 
-	smb_sid_tostr(sid, namebuf);
+	if ((fd = open(SMB_DR_SVC_NAME, O_RDONLY)) < 0)
+		return (-1);
 
-	if ((fd = open(SMB_DR_SVC_NAME, O_RDONLY)) < 0) {
-		/* returning string SID */
-		return (NT_STATUS_SUCCESS);
-	}
-
-	if ((buf = smb_dr_encode_string(opcode, namebuf, &len)) == 0) {
-		/* returning string SID */
+	buf = smb_dr_encode_common(opcode, acct, lsa_account_xdr, &len);
+	if (buf == NULL) {
 		(void) close(fd);
-		return (NT_STATUS_SUCCESS);
+		return (-1);
 	}
 
 	smb_dr_clnt_setup(&arg, buf, len);
 
-	if (smb_dr_clnt_call(fd, &arg) == 0) {
+	if ((rc = smb_dr_clnt_call(fd, &arg)) == 0) {
 		buf = arg.rbuf + SMB_DR_DATA_OFFSET;
 		len = arg.rsize - SMB_DR_DATA_OFFSET;
-		name = smb_dr_decode_string(buf, len);
+
+		rc = smb_dr_decode_common(buf, len, lsa_account_xdr, acct);
 	}
 
 	smb_dr_clnt_cleanup(&arg);
 	(void) close(fd);
-
-	if (name) {
-		if (*name != '\0')
-			(void) strlcpy(namebuf, name, namebuflen);
-
-		xdr_free(xdr_string, (char *)&name);
-	}
-
-	return (NT_STATUS_SUCCESS);
+	return (rc);
 }
 
 /*
- * smb_lookup_name
+ * Given a name, make a door call to get the associated SID.
  *
- * Tries to get the SID associated with the given account name
- * The mapping is requested to be performed by smbd via a door
- * call. If no SID can be found NT_STATUS_NONE_MAPPED is returned.
+ * Returns 0 if the door call is successful, otherwise -1.
+ *
+ * If 0 is returned, the lookup result will be available in a_status.
+ * NT_STATUS_SUCCESS		The name was mapped to a SID.
+ * NT_STATUS_NONE_MAPPED	The name could not be mapped to a SID.
  */
 int
-smb_lookup_name(char *name, smb_gsid_t *sid)
+smb_lookup_name(const char *name, sid_type_t sidtype, lsa_account_t *acct)
 {
-	door_arg_t arg;
-	char *buf;
-	size_t len;
-	int opcode = SMB_DR_LOOKUP_NAME;
-	char *strsid = NULL;
-	char *p;
-	int fd;
+	char		tmp[MAXNAMELEN];
+	door_arg_t	arg;
+	char		*buf;
+	char		*dp = NULL;
+	char		*np = NULL;
+	size_t		len;
+	int		opcode = SMB_DR_LOOKUP_NAME;
+	int		fd;
+	int		rc;
 
-	assert(name && sid);
+	assert((name != NULL) && (acct != NULL));
 
-	if (*name == '\0')
-		return (NT_STATUS_NONE_MAPPED);
+	(void) strlcpy(tmp, name, MAXNAMELEN);
+	smb_name_parse(tmp, &np, &dp);
+
+	bzero(acct, sizeof (lsa_account_t));
+	acct->a_sidtype = sidtype;
+
+	if (dp != NULL && np != NULL) {
+		(void) strlcpy(acct->a_domain, dp, MAXNAMELEN);
+		(void) strlcpy(acct->a_name, np, MAXNAMELEN);
+	} else {
+		(void) strlcpy(acct->a_name, name, MAXNAMELEN);
+	}
 
 	if ((fd = open(SMB_DR_SVC_NAME, O_RDONLY)) < 0)
-		return (NT_STATUS_INTERNAL_ERROR);
+		return (-1);
 
-	if ((buf = smb_dr_encode_string(opcode, name, &len)) == 0) {
+	buf = smb_dr_encode_common(opcode, acct, lsa_account_xdr, &len);
+	if (buf == NULL) {
 		(void) close(fd);
-		return (NT_STATUS_INTERNAL_ERROR);
+		return (-1);
 	}
 
 	smb_dr_clnt_setup(&arg, buf, len);
 
-	if (smb_dr_clnt_call(fd, &arg) == 0) {
+	if ((rc = smb_dr_clnt_call(fd, &arg)) == 0) {
 		buf = arg.rbuf + SMB_DR_DATA_OFFSET;
 		len = arg.rsize - SMB_DR_DATA_OFFSET;
-		strsid = smb_dr_decode_string(buf, len);
+
+		rc = smb_dr_decode_common(buf, len, lsa_account_xdr, acct);
 	}
 
 	smb_dr_clnt_cleanup(&arg);
 	(void) close(fd);
-
-	if (strsid == NULL)
-		return (NT_STATUS_INTERNAL_ERROR);
-
-	p = strchr(strsid, '-');
-	if (p == NULL) {
-		xdr_free(xdr_string, (char *)&strsid);
-		return (NT_STATUS_NONE_MAPPED);
-	}
-
-	*p++ = '\0';
-	sid->gs_type = atoi(strsid);
-	sid->gs_sid = smb_sid_fromstr(p);
-	xdr_free(xdr_string, (char *)&strsid);
-	return (NT_STATUS_SUCCESS);
+	return (rc);
 }
 
 uint32_t

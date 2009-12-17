@@ -49,8 +49,8 @@
 extern "C" {
 #endif
 
-extern uint32_t mlsvc_lookup_name(char *, smb_sid_t **, uint16_t *);
-extern uint32_t mlsvc_lookup_sid(smb_sid_t *, char **);
+uint32_t lsa_lookup_name(char *, uint16_t, smb_account_t *);
+uint32_t lsa_lookup_sid(smb_sid_t *, smb_account_t *);
 
 /*
  * SMB domain API to discover a domain controller and obtain domain
@@ -72,13 +72,6 @@ extern DWORD mlsvc_join(smb_domainex_t *, char *, char *);
  * The maximum number of domains (NT limit).
  */
 #define	MLSVC_DOMAIN_MAX		32
-
-/*
- * Status code returned from enumeration RPCs to indicate
- * that the server has no more data. Normally returned at
- * severity level ERROR_SEVERITY_WARNING.
- */
-#define	MLSVC_NO_MORE_DATA		0x1A
 
 #define	MLSVC_ANON_USER			"IPC$"
 
@@ -110,7 +103,7 @@ typedef struct smb_autohome {
 	char *ah_container;	/* ADS container distinguished name */
 } smb_autohome_t;
 
-extern void smb_autohome_add(const char *);
+extern void smb_autohome_add(const smb_token_t *);
 extern void smb_autohome_remove(const char *);
 
 /*
@@ -151,7 +144,6 @@ int srvsvc_net_server_getinfo(char *, char *, srvsvc_server_info_t *);
 typedef struct mlsvc_handle {
 	ndr_hdid_t			handle;
 	ndr_client_t			*clnt;
-	uint32_t			remote_os;
 	srvsvc_server_info_t		svinfo;
 } mlsvc_handle_t;
 
@@ -160,6 +152,8 @@ void ndr_rpc_fini(void);
 int ndr_rpc_bind(mlsvc_handle_t *, char *, char *, char *, const char *);
 void ndr_rpc_unbind(mlsvc_handle_t *);
 int ndr_rpc_call(mlsvc_handle_t *, int, void *);
+void ndr_rpc_set_nonull(mlsvc_handle_t *);
+const srvsvc_server_info_t *ndr_rpc_server_info(mlsvc_handle_t *);
 uint32_t ndr_rpc_server_os(mlsvc_handle_t *);
 int ndr_rpc_get_ssnkey(mlsvc_handle_t *, unsigned char *, size_t);
 void *ndr_rpc_malloc(mlsvc_handle_t *, size_t);

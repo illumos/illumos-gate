@@ -97,14 +97,22 @@ static
 void
 sanitize_mapping_request(idmap_mapping *req)
 {
-	free(req->id1name);
-	req->id1name = NULL;
-	free(req->id1domain);
-	req->id1domain = NULL;
-	free(req->id2name);
-	req->id2name = NULL;
-	free(req->id2domain);
-	req->id2domain = NULL;
+	if (EMPTY_STRING(req->id1name)) {
+		free(req->id1name);
+		req->id1name = NULL;
+	}
+	if (EMPTY_STRING(req->id1domain)) {
+		free(req->id1domain);
+		req->id1domain = NULL;
+	}
+	if (EMPTY_STRING(req->id2name)) {
+		free(req->id2name);
+		req->id2name = NULL;
+	}
+	if (EMPTY_STRING(req->id2domain)) {
+		free(req->id2domain);
+		req->id2domain = NULL;
+	}
 	req->direction = _IDMAP_F_DONE;
 }
 
@@ -246,12 +254,12 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 			retcode = pid2sid_first_pass(
 			    &state,
 			    &batch.idmap_mapping_batch_val[i],
-			    &result->ids.ids_val[i], 1, 0);
+			    &result->ids.ids_val[i], 1);
 		} else if (IS_BATCH_GID(batch, i)) {
 			retcode = pid2sid_first_pass(
 			    &state,
 			    &batch.idmap_mapping_batch_val[i],
-			    &result->ids.ids_val[i], 0, 0);
+			    &result->ids.ids_val[i], 0);
 		} else {
 			result->ids.ids_val[i].retcode = IDMAP_ERR_IDTYPE;
 			continue;
@@ -915,63 +923,164 @@ out:
 	return (TRUE);
 }
 
+static
+int
+copy_string(char **to, char *from)
+{
+	if (EMPTY_STRING(from)) {
+		*to = NULL;
+	} else {
+		*to = strdup(from);
+		if (*to == NULL) {
+			idmapdlog(LOG_ERR, "Out of memory");
+			return (IDMAP_ERR_MEMORY);
+		}
+	}
+	return (IDMAP_SUCCESS);
+}
+
+static
+int
+copy_id(idmap_id *to, idmap_id *from)
+{
+	(void) memset(to, 0, sizeof (*to));
+
+	to->idtype = from->idtype;
+	if (IS_ID_SID(*from)) {
+		idmap_retcode retcode;
+
+		to->idmap_id_u.sid.rid = from->idmap_id_u.sid.rid;
+		retcode = copy_string(&to->idmap_id_u.sid.prefix,
+		    from->idmap_id_u.sid.prefix);
+
+		return (retcode);
+	} else {
+		to->idmap_id_u.uid = from->idmap_id_u.uid;
+		return (IDMAP_SUCCESS);
+	}
+}
+
+static
+int
+copy_mapping(idmap_mapping *mapping, idmap_mapping *request)
+{
+	idmap_retcode retcode;
+
+	(void) memset(mapping, 0, sizeof (*mapping));
+
+	mapping->flag = request->flag;
+	mapping->direction = _IDMAP_F_DONE;
+
+	retcode = copy_id(&mapping->id1, &request->id1);
+	if (retcode != IDMAP_SUCCESS)
+		goto errout;
+
+	retcode = copy_string(&mapping->id1domain, request->id1domain);
+	if (retcode != IDMAP_SUCCESS)
+		goto errout;
+
+	retcode = copy_string(&mapping->id1name, request->id1name);
+	if (retcode != IDMAP_SUCCESS)
+		goto errout;
+
+	retcode = copy_id(&mapping->id2, &request->id2);
+	if (retcode != IDMAP_SUCCESS)
+		goto errout;
+
+	retcode = copy_string(&mapping->id2domain, request->id2domain);
+	if (retcode != IDMAP_SUCCESS)
+		goto errout;
+	retcode = copy_string(&mapping->id2name, request->id2name);
+	if (retcode != IDMAP_SUCCESS)
+		goto errout;
+
+	return (IDMAP_SUCCESS);
+
+errout:
+	if (IS_ID_SID(mapping->id1))
+		free(mapping->id1.idmap_id_u.sid.prefix);
+	free(mapping->id1domain);
+	free(mapping->id1name);
+	if (IS_ID_SID(mapping->id2))
+		free(mapping->id2.idmap_id_u.sid.prefix);
+	free(mapping->id2domain);
+	free(mapping->id2name);
+
+	(void) memset(mapping, 0, sizeof (*mapping));
+	return (retcode);
+}
+
 
 /* ARGSUSED */
 bool_t
 idmap_get_mapped_id_by_name_1_svc(idmap_mapping request,
 		idmap_mappings_res *result, struct svc_req *rqstp)
 {
-	sqlite		*cache = NULL, *db = NULL;
+	idmap_mapping_batch batch_request;
+	idmap_ids_res batch_result;
+	idmap_mapping *map;
 
-	/* Init */
+	/* Clear out things we might want to xdr_free on error */
+	(void) memset(&batch_result, 0, sizeof (batch_result));
 	(void) memset(result, 0, sizeof (*result));
 
 	result->retcode = validate_mapped_id_by_name_req(&request);
 	if (result->retcode != IDMAP_SUCCESS)
 		goto out;
 
-	/* Get cache handle */
-	result->retcode = get_cache_handle(&cache);
-	if (result->retcode != IDMAP_SUCCESS)
-		goto out;
-
-	/* Get db handle */
-	result->retcode = get_db_handle(&db);
-	if (result->retcode != IDMAP_SUCCESS)
-		goto out;
-
-	/* Allocate result */
-	result->mappings.mappings_val = calloc(1, sizeof (idmap_mapping));
-	if (result->mappings.mappings_val == NULL) {
+	/*
+	 * Copy the request.  We need to modify it, and
+	 * what we have is a shallow copy.  Freeing pointers from
+	 * our copy will lead to problems, since the RPC framework
+	 * has its own copy of those pointers.  Besides, we need
+	 * a copy to return.
+	 */
+	map = calloc(1, sizeof (idmap_mapping));
+	if (map == NULL) {
 		idmapdlog(LOG_ERR, "Out of memory");
 		result->retcode = IDMAP_ERR_MEMORY;
 		goto out;
 	}
+
+	/*
+	 * Set up to return the filled-in mapping structure.
+	 * Note that we xdr_free result on error, and that'll take
+	 * care of freeing the mapping structure.
+	 */
+	result->mappings.mappings_val = map;
 	result->mappings.mappings_len = 1;
 
+	result->retcode = copy_mapping(map, &request);
+	if (result->retcode != IDMAP_SUCCESS)
+		goto out;
 
-	if (IS_REQUEST_SID(request, 1)) {
-		result->retcode = get_w2u_mapping(
-		    cache,
-		    db,
-		    &request,
-		    result->mappings.mappings_val);
-	} else if (IS_REQUEST_UID(request)) {
-		result->retcode = get_u2w_mapping(
-		    cache,
-		    db,
-		    &request,
-		    result->mappings.mappings_val,
-		    1);
-	} else if (IS_REQUEST_GID(request)) {
-		result->retcode = get_u2w_mapping(
-		    cache,
-		    db,
-		    &request,
-		    result->mappings.mappings_val,
-		    0);
-	} else {
-		result->retcode = IDMAP_ERR_IDTYPE;
+	/* Set up for the request to the batch API */
+	batch_request.idmap_mapping_batch_val = map;
+	batch_request.idmap_mapping_batch_len = 1;
+
+	/* Do the real work. */
+	(void) idmap_get_mapped_ids_1_svc(batch_request,
+	    &batch_result, rqstp);
+
+	/* Copy what we need out of the batch response */
+
+	if (batch_result.retcode != IDMAP_SUCCESS) {
+		result->retcode = batch_result.retcode;
+		goto out;
+	}
+
+	result->retcode = copy_id(&map->id2, &batch_result.ids.ids_val[0].id);
+	if (result->retcode != IDMAP_SUCCESS)
+		goto out;
+
+	map->direction = batch_result.ids.ids_val[0].direction;
+
+	result->retcode = batch_result.ids.ids_val[0].retcode;
+
+	if (map->flag & IDMAP_REQ_FLG_MAPPING_INFO ||
+	    result->retcode != IDMAP_SUCCESS) {
+		(void) idmap_info_mov(&map->info,
+		    &batch_result.ids.ids_val[0].info);
 	}
 
 out:
@@ -981,6 +1090,9 @@ out:
 		result->mappings.mappings_val = NULL;
 	}
 	result->retcode = idmap_stat4prot(result->retcode);
+
+	xdr_free(xdr_idmap_ids_res, (char *)&batch_result);
+
 	return (TRUE);
 }
 

@@ -296,6 +296,7 @@ typedef struct ndr_stream {
 
 #define	NDS_F_NONE		0x00
 #define	NDS_F_NOTERM		0x01	/* strings are not null terminated */
+#define	NDS_F_NONULL		0x02	/* strings: no null on size_is */
 #define	NDS_SETF(S, F)		((S)->flags |= (F))
 #define	NDS_CLEARF(S, F)	((S)->flags &= ~(F))
 

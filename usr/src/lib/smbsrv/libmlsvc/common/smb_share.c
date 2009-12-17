@@ -384,7 +384,7 @@ smb_shr_add(smb_share_t *si)
 
 	assert(si != NULL);
 
-	if (!smb_shr_chkname(si->shr_name))
+	if (smb_name_validate_share(si->shr_name) != ERROR_SUCCESS)
 		return (ERROR_INVALID_NAME);
 
 	if (smb_shr_cache_lock(SMB_SHR_CACHE_WRLOCK) != NERR_Success)
@@ -450,7 +450,7 @@ smb_shr_remove(char *sharename)
 
 	assert(sharename != NULL);
 
-	if (!smb_shr_chkname(sharename))
+	if (smb_name_validate_share(sharename) != ERROR_SUCCESS)
 		return (ERROR_INVALID_NAME);
 
 	if (smb_shr_cache_lock(SMB_SHR_CACHE_WRLOCK) != NERR_Success)
@@ -507,7 +507,8 @@ smb_shr_rename(char *from_name, char *to_name)
 
 	assert((from_name != NULL) && (to_name != NULL));
 
-	if (!smb_shr_chkname(from_name) || !smb_shr_chkname(to_name))
+	if (smb_name_validate_share(from_name) != ERROR_SUCCESS ||
+	    smb_name_validate_share(to_name) != ERROR_SUCCESS)
 		return (ERROR_INVALID_NAME);
 
 	if (smb_shr_cache_lock(SMB_SHR_CACHE_WRLOCK) != NERR_Success)
@@ -827,34 +828,6 @@ smb_shr_is_admin(char *sharename)
 	}
 
 	return (B_FALSE);
-}
-
-/*
- * smb_shr_chkname
- *
- * Check for invalid characters in a share name.  The list of invalid
- * characters includes control characters and the following:
- *
- * " / \ [ ] : | < > + ; , ? * =
- */
-boolean_t
-smb_shr_chkname(char *sharename)
-{
-	char *invalid = "\"/\\[]:|<>+;,?*=";
-	char *cp;
-
-	if (sharename == NULL)
-		return (B_FALSE);
-
-	if (strpbrk(sharename, invalid))
-		return (B_FALSE);
-
-	for (cp = sharename; *cp != '\0'; cp++) {
-		if (iscntrl(*cp))
-			return (B_FALSE);
-	}
-
-	return (B_TRUE);
 }
 
 /*

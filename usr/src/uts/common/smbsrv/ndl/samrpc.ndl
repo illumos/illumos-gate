@@ -150,6 +150,39 @@
 				| SAMR_AF_WORKSTATION_TRUST_ACCOUNT \
 				| SAMR_AF_SERVER_TRUST_ACCOUNT)
 
+/*
+ * QueryUserInfo UserAllInformation WhichFields
+ */
+#define	SAMR_USER_ALL_USERNAME			0x00000001
+#define	SAMR_USER_ALL_FULLNAME			0x00000002
+#define	SAMR_USER_ALL_USERID			0x00000004
+#define	SAMR_USER_ALL_PRIMARYGROUPID		0x00000008
+#define	SAMR_USER_ALL_ADMINCOMMENT		0x00000010
+#define	SAMR_USER_ALL_USERCOMMENT		0x00000020
+#define	SAMR_USER_ALL_HOMEDIRECTORY		0x00000040
+#define	SAMR_USER_ALL_HOMEDIRECTORYDRIVE	0x00000080
+#define	SAMR_USER_ALL_SCRIPTPATH		0x00000100
+#define	SAMR_USER_ALL_PROFILEPATH		0x00000200
+#define	SAMR_USER_ALL_WORKSTATIONS		0x00000400
+#define	SAMR_USER_ALL_LASTLOGON			0x00000800
+#define	SAMR_USER_ALL_LASTLOGOFF		0x00001000
+#define	SAMR_USER_ALL_LOGONHOURS		0x00002000
+#define	SAMR_USER_ALL_BADPASSWORDCOUNT		0x00004000
+#define	SAMR_USER_ALL_LOGONCOUNT		0x00008000
+#define	SAMR_USER_ALL_PASSWORDCANCHANGE		0x00010000
+#define	SAMR_USER_ALL_PASSWORDMUSTCHANGE	0x00020000
+#define	SAMR_USER_ALL_PASSWORDLASTSET		0x00040000
+#define	SAMR_USER_ALL_ACCOUNTEXPIRES		0x00080000
+#define	SAMR_USER_ALL_USERACCOUNTCONTROL	0x00100000
+#define	SAMR_USER_ALL_PARAMETERS		0x00200000
+#define	SAMR_USER_ALL_COUNTRYCODE		0x00400000
+#define	SAMR_USER_ALL_CODEPAGE			0x00800000
+#define	SAMR_USER_ALL_NTPASSWORDPRESENT		0x01000000
+#define	SAMR_USER_ALL_LMPASSWORDPRESENT		0x02000000
+#define	SAMR_USER_ALL_PRIVATEDATA		0x04000000
+#define	SAMR_USER_ALL_PASSWORDEXPIRED		0x08000000
+#define	SAMR_USER_ALL_SECURITYDESCRIPTOR	0x10000000
+#define	SAMR_USER_ALL_UNDEFINED_MASK		0xC0000000
 
 /*
  * specific access rights which can be used in OpenAlias.
@@ -191,6 +224,12 @@ struct samr_sec_desc {
 	struct samr_sid *dacl;
 };
 
+struct samr_sd {
+	DWORD length;
+  SIZE_IS(length)
+	BYTE *data;
+};
+typedef struct samr_sd samr_sd_t;
 
 /*
  * Definition for a string. The length and allosize should be set to
@@ -232,7 +271,7 @@ typedef struct samr_vcbuf samr_vcbuf_t;
 CONTEXT_HANDLE(samr_handle) samr_handle_t;
 
 /*
- * A long long, i.e. 64-bit, value.
+ * OLD_LARGE_INTEGER: a 64-bit value.
  */
 struct samr_quad {
 	DWORD low;
@@ -240,6 +279,70 @@ struct samr_quad {
 };
 typedef struct samr_quad samr_quad_t;
 
+/*
+ * Blob used for the NT and LM OWF passwords.
+ * The length and maxlen should be 16.
+ */
+struct samr_short_blob {
+	WORD	length;
+	WORD	maxlen;
+  SIZE_IS(length / 2)
+	WORD	*buf;
+};
+
+/*
+ * There is some sort of logon bitmap structure in here, which I
+ * think is a varying and conformant array, i.e.
+ *
+ *	struct samr_logon_hours {
+ *      DWORD size_is;		(1260)
+ *      DWORD first_is;		(zero)
+ *      DWORD length_is;	(168)
+ *      BYTE bitmap[21];
+ *  };
+ *
+ *	struct samr_logon_info {
+ *		DWORD length;
+ *	SIZE_IS(length / 8)
+ *		struct samr_logon_hours *hours;
+ *	};
+ *
+ * There are 10080 minutes/week => 10080/8 = 1260 (0x04EC).
+ * So size_is is set as some sort of maximum.
+ *
+ * There are 168 hours/week => 168/8 = 21 (0xA8). Since there are 21
+ * bytes (all set to 0xFF), this is is probably the default setting.
+ */
+
+#define SAMR_MINS_PER_WEEK		10080
+#define SAMR_HOURS_PER_WEEK		168
+
+#define SAMR_HOURS_MAX_SIZE		(SAMR_MINS_PER_WEEK / 8)
+#define SAMR_HOURS_SET_LEN(LEN)		((LEN) / 8)
+#define SAMR_SET_USER_HOURS_SZ		21
+
+struct samr_logon_hours {
+	DWORD size;
+	DWORD first;
+	DWORD length;
+	BYTE bitmap[SAMR_SET_USER_HOURS_SZ];
+};
+
+struct samr_logon_info {
+	DWORD units;
+	DWORD hours;
+};
+
+struct samr_logon_hours_all {
+	WORD	units_per_week;
+  SIZE_IS(units_per_week / 8)
+	BYTE	*hours;
+};
+
+struct samr_oem_password {
+	BYTE password[512];
+	DWORD length;
+};
 
 /*
  ***********************************************************************
@@ -684,13 +787,35 @@ struct samr_DeleteUser {
  *	OUT DWORD status
  * )
  *
- * The cases identified so far are:
+ * typedef enum _USER_INFORMATION_CLASS {
+ *	UserGeneralInformation		= 1,
+ *	UserPreferencesInformation	= 2,
+ *	UserLogonInformation		= 3,
+ *	UserLogonHoursInformation	= 4,
+ *	UserAccountInformation		= 5,
+ *	UserNameInformation		= 6,
+ *	UserAccountNameInformation	= 7,
+ *	UserFullNameInformation		= 8,
+ *	UserPrimaryGroupInformation	= 9,
+ *	UserHomeInformation		= 10,
+ *	UserScriptInformation		= 11,
+ *	UserProfileInformation		= 12,
+ *	UserAdminCommentInformation	= 13,
+ *	UserWorkStationsInformation	= 14,
+ *	UserControlInformation		= 16,
+ *	UserExpiresInformation		= 17,
+ *	UserInternal1Information	= 18,
+ *	UserParametersInformation	= 20,
+ *	UserAllInformation		= 21,
+ *	UserInternal4Information	= 23,
+ *	UserInternal5Information	= 24,
+ *	UserInternal4InformationNew	= 25,
+ *	UserInternal5InformationNew	= 26,
+ * } USER_INFORMATION_CLASS;
  *
  * 1 = username, fullname, description and some other stuff.
- * 2 = unknown
  * 3 = large structure containing user rid, group rid, username
  *     and fullname.
- * 4 = unknown
  * 5 = large structure (like 3) containing user rid, group rid,
  *     username, fullname and description.
  * 6 = username and fullname
@@ -713,7 +838,8 @@ struct samr_DeleteUser {
 #define SAMR_QUERY_USER_USERNAME		7
 #define SAMR_QUERY_USER_FULLNAME		8
 #define SAMR_QUERY_USER_GROUPRID		9
-#define SAMR_QUERY_USER_UNKNOWN16		16
+#define SAMR_QUERY_USER_CONTROL_INFO		16
+#define SAMR_QUERY_USER_ALL_INFO		21
 
 
 struct samr_QueryUserInfo1 {
@@ -749,6 +875,44 @@ struct samr_QueryUserInfo16 {
 	DWORD unknown;
 };
 
+/*
+ * SAMR_USER_ALL_INFORMATION
+ */
+struct samr_QueryUserInfo21 {
+	samr_quad_t		LastLogon;
+	samr_quad_t		LastLogoff;
+	samr_quad_t		PasswordLastSet;
+	samr_quad_t		AccountExpires;
+	samr_quad_t		PasswordCanChange;
+	samr_quad_t		PasswordMustChange;
+	samr_string_t		UserName;
+	samr_string_t		FullName;
+	samr_string_t		HomeDirectory;
+	samr_string_t		HomeDirectoryDrive;
+	samr_string_t		ScriptPath;
+	samr_string_t		ProfilePath;
+	samr_string_t		AdminComment;
+	samr_string_t		WorkStations;
+	samr_string_t		UserComment;
+	samr_string_t		Parameters;
+	struct samr_short_blob	LmOwfPassword;
+	struct samr_short_blob	NtOwfPassword;
+	samr_string_t		PrivateData;
+	samr_sd_t		SecurityDescriptor;
+	DWORD			UserId;
+	DWORD			PrimaryGroupId;
+	DWORD			UserAccountControl;
+	DWORD			WhichFields;
+	struct samr_logon_hours_all	LogonHours;
+	WORD			BadPasswordCount;
+	WORD			LogonCount;
+	WORD			CountryCode;
+	WORD			CodePage;
+	BYTE			LmPasswordPresent;
+	BYTE			NtPasswordPresent;
+	BYTE			PasswordExpired;
+	BYTE			PrivateDataSensitive;
+};
 
 union QueryUserInfo_result_u {
 	UNION_INFO_ENT(1,samr_QueryUserInfo);
@@ -757,6 +921,7 @@ union QueryUserInfo_result_u {
 	UNION_INFO_ENT(8,samr_QueryUserInfo);
 	UNION_INFO_ENT(9,samr_QueryUserInfo);
 	UNION_INFO_ENT(16,samr_QueryUserInfo);
+	UNION_INFO_ENT(21,samr_QueryUserInfo);
 	DEFAULT	char *nullptr;
 };
 
@@ -1123,67 +1288,6 @@ struct samr_GetDomainPwInfo {
 
 #define SAMR_SET_USER_INFO_23		23
 #define SAMR_SET_USER_DATA_SZ		516
-
-#define SAMR_MINS_PER_WEEK		10080
-#define SAMR_HOURS_PER_WEEK		168
-
-#define SAMR_HOURS_MAX_SIZE		(SAMR_MINS_PER_WEEK / 8)
-#define SAMR_HOURS_SET_LEN(LEN)		((LEN) / 8)
-#define SAMR_SET_USER_HOURS_SZ		21
-
-
-struct samr_sd {
-	DWORD length;
-  SIZE_IS(length)
-	BYTE *data;
-};
-
-
-/*
- * There is some sort of logon bitmap structure in here, which I
- * think is a varying and conformant array, i.e.
- *
- *	struct samr_logon_hours {
- *      DWORD size_is;		(0x04ec)
- *      DWORD first_is;		(zero)
- *      DWORD length_is;	(0xa8)
- *      BYTE bitmap[21];
- *  };
- *
- *	struct samr_logon_info {
- *		DWORD length;
- *	SIZE_IS(length / 8)
- *		struct samr_logon_hours *hours;
- *	};
- *
- * There are 10080 minutes/week => 10080/8 = 1260 (0x04EC).
- * So size_is is set as some sort of maximum.
- *
- * There are 168 hours/week => 168/8 = 21 (0xA8). Since there are 21
- * bytes (all set to 0xFF), this is is probably the default setting.
- *
- * ndrgen has a problem with complex [size_is] statements. For now,
- * we can try to fake it using two separate components.
- */
-struct samr_logon_hours {
-	DWORD size;
-	DWORD first;
-	DWORD length;
-	BYTE bitmap[SAMR_SET_USER_HOURS_SZ];
-};
-
-
-struct samr_logon_info {
-	DWORD units;
-	DWORD hours;
-};
-
-
-struct samr_oem_password {
-	BYTE password[512];
-	DWORD length;
-};
-
 
 struct samr_SetUserInfo23 {
 	samr_quad_t logon_time;			/* 00 00 00 00 00 00 00 00 */

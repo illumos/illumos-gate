@@ -61,7 +61,7 @@ smb_sdrc_t
 smb_com_trans2_create_directory(struct smb_request *sr, struct smb_xa *xa)
 {
 	int	rc;
-	DWORD	status;
+	smb_pathname_t *pn = &sr->arg.dirop.fqi.fq_path;
 
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
@@ -69,14 +69,12 @@ smb_com_trans2_create_directory(struct smb_request *sr, struct smb_xa *xa)
 		return (SDRC_ERROR);
 	}
 
-	if (smb_mbc_decodef(&xa->req_param_mb, "%4.u",
-	    sr, &sr->arg.dirop.fqi.fq_path.pn_path) != 0) {
+	if (smb_mbc_decodef(&xa->req_param_mb, "%4.u", sr, &pn->pn_path) != 0)
 		return (SDRC_ERROR);
-	}
 
-	status = smb_validate_dirname(sr->arg.dirop.fqi.fq_path.pn_path);
-	if (status != 0) {
-		smbsr_error(sr, status, ERRDOS, ERROR_INVALID_NAME);
+	smb_pathname_init(sr, pn, pn->pn_path);
+	if (!smb_pathname_validate(sr, pn) ||
+	    !smb_validate_dirname(sr, pn)) {
 		return (SDRC_ERROR);
 	}
 

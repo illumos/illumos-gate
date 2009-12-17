@@ -563,7 +563,8 @@ smb_disable_resource(sa_resource_t resource)
 
 	if (smb_isonline()) {
 		res = smb_share_delete(rname);
-		if (res != NERR_Success) {
+		if (res != NERR_Success &&
+		    res != NERR_NetNameNotFound) {
 			sa_free_attr_string(rname);
 			return (SA_CONFIG_ERR);
 		}
@@ -1775,8 +1776,9 @@ smb_parse_optstring(sa_group_t group, char *options)
 						    "prefix", prefix);
 					}
 				}
-				name = fix_resource_name((sa_share_t)group,
-				    value, prefix);
+				if (prefix != NULL)
+					name = fix_resource_name(
+					    (sa_share_t)group, value, prefix);
 				if (name != NULL) {
 					resource = sa_add_resource(
 					    (sa_share_t)group, name,
@@ -1980,6 +1982,8 @@ smb_rename_resource(sa_handle_t handle, sa_resource_t resource, char *newname)
 		return (SA_NO_SUCH_RESOURCE);
 
 	err = smb_share_rename(oldname, newname);
+
+	sa_free_attr_string(oldname);
 
 	/* improve error values somewhat */
 	switch (err) {

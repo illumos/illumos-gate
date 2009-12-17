@@ -24,7 +24,13 @@
  */
 
 /*
- * Security Accounts Manager RPC (SAMR) interface definition.
+ * Security Accounts Manager RPC (SAMR) server-side interface.
+ *
+ * The SAM is a hierarchical database:
+ * - If you want to talk to the SAM you need a SAM handle.
+ * - If you want to work with a domain, use the SAM handle.
+ *   to obtain a domain handle.
+ * - Use domain handles to obtain user handles etc.
  */
 
 #include <strings.h>
@@ -629,12 +635,7 @@ samr_s_OpenUser(void *arg, ndr_xa_t *mxa)
 		param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
 	} else {
 		bcopy(id, &param->user_handle, sizeof (samr_handle_t));
-		/*
-		 * Need QueryUserInfo(level 21).
-		 */
-		samr_hdfree(mxa, id);
-		bzero(&param->user_handle, sizeof (samr_handle_t));
-		param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
+		param->status = NT_STATUS_SUCCESS;
 	}
 
 	return (NDR_DRC_OK);
@@ -660,8 +661,6 @@ samr_s_DeleteUser(void *arg, ndr_xa_t *mxa)
 /*
  * samr_s_QueryUserInfo
  *
- * The caller should provide a valid user key.
- *
  * Returns:
  * NT_STATUS_SUCCESS
  * NT_STATUS_ACCESS_DENIED
@@ -671,10 +670,72 @@ samr_s_DeleteUser(void *arg, ndr_xa_t *mxa)
 static int
 samr_s_QueryUserInfo(void *arg, ndr_xa_t *mxa)
 {
-	struct samr_QueryUserInfo *param = arg;
+	static uint16_t			owf_buf[8];
+	static uint8_t			hour_buf[SAMR_SET_USER_HOURS_SZ];
+	struct samr_QueryUserInfo	*param = arg;
+	struct samr_QueryUserInfo21	*all_info;
+	ndr_hdid_t			*id;
+	ndr_handle_t			*hd;
+	samr_keydata_t			*data;
+	smb_domain_t			di;
+	smb_account_t			account;
+	smb_sid_t			*sid;
+	uint32_t			status;
 
+	id = (ndr_hdid_t *)&param->user_handle;
+	if ((hd = samr_hdlookup(mxa, id, SAMR_KEY_USER)) == NULL) {
+		status = NT_STATUS_INVALID_HANDLE;
+		goto QueryUserInfoError;
+	}
+
+	data = (samr_keydata_t *)hd->nh_data;
+
+	if (param->switch_value != SAMR_QUERY_USER_ALL_INFO) {
+		status = NT_STATUS_ACCESS_DENIED;
+		goto QueryUserInfoError;
+	}
+
+	if (!smb_domain_lookup_type(SMB_DOMAIN_LOCAL, &di)) {
+		status = NT_STATUS_ACCESS_DENIED;
+		goto QueryUserInfoError;
+	}
+
+	if ((sid = smb_sid_splice(di.di_binsid, data->kd_rid)) == NULL) {
+		status = NT_STATUS_ACCESS_DENIED;
+		goto QueryUserInfoError;
+	}
+
+	if (smb_sam_lookup_sid(sid, &account) != NT_STATUS_SUCCESS) {
+		status = NT_STATUS_ACCESS_DENIED;
+		goto QueryUserInfoError;
+	}
+
+	all_info = &param->ru.info21;
+	bzero(all_info, sizeof (struct samr_QueryUserInfo21));
+
+	all_info->WhichFields = SAMR_USER_ALL_USERNAME | SAMR_USER_ALL_USERID;
+
+	(void) NDR_MSTRING(mxa, account.a_name,
+	    (ndr_mstring_t *)&all_info->UserName);
+	all_info->UserId = data->kd_rid;
+
+	all_info->LmOwfPassword.length = 16;
+	all_info->LmOwfPassword.maxlen = 16;
+	all_info->LmOwfPassword.buf = owf_buf;
+	all_info->NtOwfPassword.length = 16;
+	all_info->NtOwfPassword.maxlen = 16;
+	all_info->NtOwfPassword.buf = owf_buf;
+	all_info->LogonHours.units_per_week = SAMR_HOURS_PER_WEEK;
+	all_info->LogonHours.hours = hour_buf;
+
+	param->address = 1;
+	param->switch_index = SAMR_QUERY_USER_ALL_INFO;
+	param->status = NT_STATUS_SUCCESS;
+	return (NDR_DRC_OK);
+
+QueryUserInfoError:
 	bzero(param, sizeof (struct samr_QueryUserInfo));
-	param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
+	param->status = NT_SC_ERROR(status);
 	return (NDR_DRC_OK);
 }
 
@@ -1567,6 +1628,7 @@ fixup_samr_QueryUserInfo(struct samr_QueryUserInfo *val)
 		CASE_INFO_ENT(samr_QueryUserInfo, 8);
 		CASE_INFO_ENT(samr_QueryUserInfo, 9);
 		CASE_INFO_ENT(samr_QueryUserInfo, 16);
+		CASE_INFO_ENT(samr_QueryUserInfo, 21);
 
 		default:
 			return;

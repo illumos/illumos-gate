@@ -225,7 +225,8 @@ int smbsr_connect_tree(smb_request_t *);
 
 int smb_common_create_directory(smb_request_t *);
 
-int	smb_convert_wildcards(char *);
+void	smb_convert_wildcards(char *);
+boolean_t smb_contains_wildcards(const char *);
 int	smb_ascii_or_unicode_strlen(smb_request_t *, char *);
 int	smb_ascii_or_unicode_strlen_null(smb_request_t *, char *);
 int	smb_ascii_or_unicode_null_len(smb_request_t *);
@@ -234,12 +235,13 @@ int	smb_search(smb_request_t *);
 
 uint32_t smb_common_open(smb_request_t *);
 
-void smb_pathname_setup(smb_request_t *, smb_pathname_t *);
-uint32_t smb_validate_dirname(char *path);
-uint32_t smb_validate_object_name(smb_pathname_t *pn);
+void smb_pathname_init(smb_request_t *, smb_pathname_t *, char *);
+boolean_t smb_pathname_validate(smb_request_t *, smb_pathname_t *);
+boolean_t smb_validate_dirname(smb_request_t *, smb_pathname_t *);
+boolean_t smb_validate_object_name(smb_request_t *, smb_pathname_t *);
+boolean_t smb_validate_stream_name(smb_request_t *, smb_pathname_t *);
 boolean_t smb_is_stream_name(char *);
-uint32_t smb_validate_stream_name(smb_pathname_t *pn);
-void	smb_stream_parse_name(char *, char *, char *);
+void smb_stream_parse_name(char *, char *, char *);
 
 
 uint32_t smb_omode_to_amask(uint32_t desired_access);

@@ -49,12 +49,11 @@
 #include "idmap_priv.h"
 #include "schema.h"
 #include "nldaputils.h"
+#include "miscutils.h"
 
 
 static idmap_retcode sql_compile_n_step_once(sqlite *, char *,
 		sqlite_vm **, int *, int, const char ***);
-static idmap_retcode ad_lookup_one(lookup_state_t *, idmap_mapping *,
-		idmap_id_res *);
 static idmap_retcode lookup_localsid2pid(idmap_mapping *, idmap_id_res *);
 static idmap_retcode lookup_cache_name2sid(sqlite *, const char *,
 		const char *, char **, char **, idmap_rid_t *, int *);
@@ -1266,11 +1265,10 @@ lookup_wksids_sid2pid(idmap_mapping *req, idmap_id_res *res, int *is_wksid)
 		const char *dom;
 
 		RDLOCK_CONFIG();
-		if (wksid->domain != NULL) {
+		if (wksid->domain != NULL)
 			dom = wksid->domain;
-		} else {
+		else
 			dom = _idmapdstate.hostname;
-		}
 		req->id1domain = strdup(dom);
 		UNLOCK_CONFIG();
 		if (req->id1domain == NULL)
@@ -1360,6 +1358,28 @@ lookup_wksids_pid2sid(idmap_mapping *req, idmap_id_res *res, int is_user)
 	if (res->id.idmap_id_u.sid.prefix == NULL) {
 		idmapdlog(LOG_ERR, "Out of memory");
 		return (IDMAP_ERR_MEMORY);
+	}
+
+	/* Fill in name if it was not already there. */
+	if (req->id2name == NULL) {
+		req->id2name = strdup(wksid->winname);
+		if (req->id2name == NULL)
+			return (IDMAP_ERR_MEMORY);
+	}
+
+	/* Fill in the canonical domain if not already there */
+	if (req->id2domain == NULL) {
+		const char *dom;
+
+		RDLOCK_CONFIG();
+		if (wksid->domain != NULL)
+			dom = wksid->domain;
+		else
+			dom = _idmapdstate.hostname;
+		req->id2domain = strdup(dom);
+		UNLOCK_CONFIG();
+		if (req->id2domain == NULL)
+			return (IDMAP_ERR_MEMORY);
 	}
 
 	res->direction = wksid->direction;
@@ -2405,8 +2425,7 @@ out:
  *              be set to IDMAP_USID/GSID depending upon whether the
  *              given SID is user or group respectively. The user/group-ness
  *              is determined either when looking up well-known SIDs table OR
- *              if the SID is found in namecache OR by ad_lookup_one() OR by
- *              ad_lookup_batch().
+ *              if the SID is found in namecache OR by ad_lookup_batch().
  * req->id1..sid.[prefix, rid] =
  *              SID if given otherwise SID found will be placed here.
  *
@@ -2470,17 +2489,42 @@ sid2pid_first_pass(lookup_state_t *state, idmap_mapping *req,
 	wksid = 0;
 
 	if (EMPTY_STRING(req->id1.idmap_id_u.sid.prefix)) {
+		/* They have to give us *something* to work with! */
 		if (req->id1name == NULL) {
 			retcode = IDMAP_ERR_ARG;
 			goto out;
 		}
+
 		/* sanitize sidprefix */
 		free(req->id1.idmap_id_u.sid.prefix);
 		req->id1.idmap_id_u.sid.prefix = NULL;
+
+		/* Allow for a fully-qualified name in the "name" parameter */
+		if (req->id1domain == NULL) {
+			char *p;
+			p = strchr(req->id1name, '@');
+			if (p != NULL) {
+				char *q;
+				q = req->id1name;
+				req->id1name = strndup(q, p - req->id1name);
+				req->id1domain = strdup(p+1);
+				free(q);
+				if (req->id1name == NULL ||
+				    req->id1domain == NULL) {
+					retcode = IDMAP_ERR_MEMORY;
+					goto out;
+				}
+			}
+		}
 	}
 
 	/* Lookup well-known SIDs table */
 	retcode = lookup_wksids_sid2pid(req, res, &wksid);
+	/*
+	 * Note that IDMAP_SUCCESS means that we found a hardwired mapping.
+	 * If we found a well-known identity but no mapping, wksid==true and
+	 * retcode==IDMAP_ERR_NOTFOUND.
+	 */
 	if (retcode != IDMAP_ERR_NOTFOUND)
 		goto out;
 
@@ -2492,6 +2536,26 @@ sid2pid_first_pass(lookup_state_t *state, idmap_mapping *req,
 
 		if (ALLOW_WK_OR_LOCAL_SIDS_ONLY(req)) {
 			retcode = IDMAP_ERR_NONE_GENERATED;
+			goto out;
+		}
+	}
+
+	/*
+	 * If this is a name-based request and we don't have a domain,
+	 * use the default domain.  Note that the well-known identity
+	 * cases will have supplied a SID prefix already, and that we
+	 * don't (yet?) support looking up a local user through a Windows
+	 * style name.
+	 */
+	if (req->id1.idmap_id_u.sid.prefix == NULL &&
+	    req->id1name != NULL && req->id1domain == NULL) {
+		if (state->defdom == NULL) {
+			retcode = IDMAP_ERR_DOMAIN_NOTFOUND;
+			goto out;
+		}
+		req->id1domain = strdup(state->defdom);
+		if (req->id1domain == NULL) {
+			retcode = IDMAP_ERR_MEMORY;
 			goto out;
 		}
 	}
@@ -3617,7 +3681,7 @@ out:
 static
 idmap_retcode
 lookup_cache_pid2sid(sqlite *cache, idmap_mapping *req, idmap_id_res *res,
-		int is_user, int getname)
+		int is_user)
 {
 	char		*end;
 	char		*sql = NULL;
@@ -3717,7 +3781,7 @@ lookup_cache_pid2sid(sqlite *cache, idmap_mapping *req, idmap_id_res *res,
 			else
 				res->direction = IDMAP_DIRECTION_U2W;
 
-			if (getname == 0 || values[2] == NULL)
+			if (values[2] == NULL)
 				break;
 			req->id2name = strdup(values[2]);
 			if (req->id2name == NULL) {
@@ -4361,7 +4425,7 @@ out:
  */
 idmap_retcode
 pid2sid_first_pass(lookup_state_t *state, idmap_mapping *req,
-		idmap_id_res *res, int is_user, int getname)
+		idmap_id_res *res, int is_user)
 {
 	idmap_retcode	retcode;
 	bool_t		gen_localsid_on_err = FALSE;
@@ -4378,6 +4442,11 @@ pid2sid_first_pass(lookup_state_t *state, idmap_mapping *req,
 
 	/* Find pid */
 	if (req->id1.idmap_id_u.uid == SENTINEL_PID) {
+		if (req->id1name == NULL) {
+			retcode = IDMAP_ERR_ARG;
+			goto out;
+		}
+
 		if (ns_lookup_byname(req->id1name, NULL, &req->id1)
 		    != IDMAP_SUCCESS) {
 			retcode = IDMAP_ERR_NOMAPPING;
@@ -4391,8 +4460,7 @@ pid2sid_first_pass(lookup_state_t *state, idmap_mapping *req,
 		goto out;
 
 	/* Lookup in cache */
-	retcode = lookup_cache_pid2sid(state->cache, req, res, is_user,
-	    getname);
+	retcode = lookup_cache_pid2sid(state->cache, req, res, is_user);
 	if (retcode != IDMAP_ERR_NOTFOUND)
 		goto out;
 
@@ -4552,300 +4620,4 @@ out:
 	if (!ARE_WE_DONE(req->direction))
 		state->pid2sid_done = FALSE;
 	return (retcode);
-}
-
-static
-int
-copy_mapping_request(idmap_mapping *mapping, idmap_mapping *request)
-{
-	(void) memset(mapping, 0, sizeof (*mapping));
-
-	mapping->flag = request->flag;
-	mapping->direction = _IDMAP_F_DONE;
-	mapping->id2.idtype = request->id2.idtype;
-
-	mapping->id1.idtype = request->id1.idtype;
-	if (IS_REQUEST_SID(*request, 1)) {
-		mapping->id1.idmap_id_u.sid.rid =
-		    request->id1.idmap_id_u.sid.rid;
-		if (!EMPTY_STRING(request->id1.idmap_id_u.sid.prefix)) {
-			mapping->id1.idmap_id_u.sid.prefix =
-			    strdup(request->id1.idmap_id_u.sid.prefix);
-			if (mapping->id1.idmap_id_u.sid.prefix == NULL)
-				goto errout;
-		}
-	} else {
-		mapping->id1.idmap_id_u.uid = request->id1.idmap_id_u.uid;
-	}
-
-	if (!EMPTY_STRING(request->id1domain)) {
-		mapping->id1domain = strdup(request->id1domain);
-		if (mapping->id1domain == NULL)
-			goto errout;
-	}
-
-	if (!EMPTY_STRING(request->id1name)) {
-		mapping->id1name = strdup(request->id1name);
-		if (mapping->id1name == NULL)
-			goto errout;
-	}
-
-	/* We don't need the rest of the request i.e request->id2 */
-	return (0);
-
-errout:
-	if (mapping->id1.idmap_id_u.sid.prefix != NULL)
-		free(mapping->id1.idmap_id_u.sid.prefix);
-	if (mapping->id1domain != NULL)
-		free(mapping->id1domain);
-	if (mapping->id1name != NULL)
-		free(mapping->id1name);
-
-	(void) memset(mapping, 0, sizeof (*mapping));
-	return (-1);
-}
-
-
-idmap_retcode
-get_w2u_mapping(sqlite *cache, sqlite *db, idmap_mapping *request,
-		idmap_mapping *mapping)
-{
-	idmap_id_res	idres;
-	lookup_state_t	state;
-	char		*cp;
-	idmap_retcode	retcode;
-	const char	*winname, *windomain;
-
-	(void) memset(&idres, 0, sizeof (idres));
-	(void) memset(&state, 0, sizeof (state));
-	state.cache = cache;
-	state.db = db;
-
-	/* Get directory-based name mapping info */
-	retcode = load_cfg_in_state(&state);
-	if (retcode != IDMAP_SUCCESS)
-		goto out;
-
-	/*
-	 * Copy data from "request" to "mapping". Note that
-	 * empty strings are not copied from "request" to
-	 * "mapping" and therefore the coresponding strings in
-	 * "mapping" will be NULL. This eliminates having to
-	 * check for empty strings henceforth.
-	 */
-	if (copy_mapping_request(mapping, request) < 0) {
-		retcode = IDMAP_ERR_MEMORY;
-		goto out;
-	}
-
-	winname = mapping->id1name;
-	windomain = mapping->id1domain;
-
-	if (winname == NULL && windomain != NULL) {
-		retcode = IDMAP_ERR_ARG;
-		goto out;
-	}
-
-	/* Need atleast winname or sid to proceed */
-	if (winname == NULL && mapping->id1.idmap_id_u.sid.prefix == NULL) {
-		retcode = IDMAP_ERR_ARG;
-		goto out;
-	}
-
-	/*
-	 * If domainname is not given but we have a fully qualified
-	 * winname then extract the domainname from the winname,
-	 * otherwise use the default_domain from the config
-	 */
-	if (winname != NULL && windomain == NULL) {
-		retcode = IDMAP_SUCCESS;
-		if ((cp = strchr(winname, '@')) != NULL) {
-			*cp = '\0';
-			mapping->id1domain = strdup(cp + 1);
-			if (mapping->id1domain == NULL)
-				retcode = IDMAP_ERR_MEMORY;
-		} else if (lookup_wksids_name2sid(winname, NULL, NULL, NULL,
-		    NULL, NULL, NULL) != IDMAP_SUCCESS) {
-			if (state.defdom == NULL) {
-				/*
-				 * We have a non-qualified winname which is
-				 * neither the name of a well-known SID nor
-				 * there is a default domain with which we can
-				 * qualify it.
-				 */
-				retcode = IDMAP_ERR_DOMAIN_NOTFOUND;
-			} else {
-				mapping->id1domain = strdup(state.defdom);
-				if (mapping->id1domain == NULL)
-					retcode = IDMAP_ERR_MEMORY;
-			}
-		}
-		if (retcode != IDMAP_SUCCESS)
-			goto out;
-	}
-
-	/*
-	 * First pass looks up the well-known SIDs table and cache
-	 * and handles localSIDs
-	 */
-	state.sid2pid_done = TRUE;
-	retcode = sid2pid_first_pass(&state, mapping, &idres);
-	if (IDMAP_ERROR(retcode) || state.sid2pid_done == TRUE)
-		goto out;
-
-	/* AD lookup */
-	if (state.ad_nqueries > 0) {
-		retcode = ad_lookup_one(&state, mapping, &idres);
-		if (IDMAP_ERROR(retcode))
-			goto out;
-	}
-
-	/* nldap lookup */
-	if (state.nldap_nqueries > 0) {
-		retcode = nldap_lookup_one(&state, mapping, &idres);
-		if (IDMAP_FATAL_ERROR(retcode))
-			goto out;
-	}
-
-	/* Next pass performs name-based mapping and ephemeral mapping. */
-	state.sid2pid_done = TRUE;
-	retcode = sid2pid_second_pass(&state, mapping, &idres);
-	if (IDMAP_ERROR(retcode) || state.sid2pid_done == TRUE)
-		goto out;
-
-	/* Update cache */
-	(void) update_cache_sid2pid(&state, mapping, &idres);
-
-out:
-	/*
-	 * Note that "mapping" is returned to the client. Therefore
-	 * copy whatever we have in "idres" to mapping->id2 and
-	 * free idres.
-	 */
-	mapping->direction = idres.direction;
-	mapping->id2 = idres.id;
-	if (mapping->flag & IDMAP_REQ_FLG_MAPPING_INFO ||
-	    retcode != IDMAP_SUCCESS)
-		(void) idmap_info_mov(&mapping->info, &idres.info);
-	else
-		idmap_info_free(&idres.info);
-	(void) memset(&idres, 0, sizeof (idres));
-	if (retcode != IDMAP_SUCCESS)
-		mapping->id2.idmap_id_u.uid = UID_NOBODY;
-	xdr_free(xdr_idmap_id_res, (caddr_t)&idres);
-	cleanup_lookup_state(&state);
-	return (retcode);
-}
-
-idmap_retcode
-get_u2w_mapping(sqlite *cache, sqlite *db, idmap_mapping *request,
-		idmap_mapping *mapping, int is_user)
-{
-	idmap_id_res	idres;
-	lookup_state_t	state;
-	idmap_retcode	retcode;
-
-	/*
-	 * In order to re-use the pid2sid code, we convert
-	 * our input data into structs that are expected by
-	 * pid2sid_first_pass.
-	 */
-
-	(void) memset(&idres, 0, sizeof (idres));
-	(void) memset(&state, 0, sizeof (state));
-	state.cache = cache;
-	state.db = db;
-
-	/* Get directory-based name mapping info */
-	retcode = load_cfg_in_state(&state);
-	if (retcode != IDMAP_SUCCESS)
-		goto out;
-
-	/*
-	 * Copy data from "request" to "mapping". Note that
-	 * empty strings are not copied from "request" to
-	 * "mapping" and therefore the coresponding strings in
-	 * "mapping" will be NULL. This eliminates having to
-	 * check for empty strings henceforth.
-	 */
-	if (copy_mapping_request(mapping, request) < 0) {
-		retcode = IDMAP_ERR_MEMORY;
-		goto out;
-	}
-
-	/*
-	 * For unix to windows mapping request, we need atleast a
-	 * unixname or uid/gid to proceed
-	 */
-	if (mapping->id1name == NULL &&
-	    mapping->id1.idmap_id_u.uid == SENTINEL_PID) {
-		retcode = IDMAP_ERR_ARG;
-		goto out;
-	}
-
-	/* First pass looks up cache and well-known SIDs */
-	state.pid2sid_done = TRUE;
-	retcode = pid2sid_first_pass(&state, mapping, &idres, is_user, 1);
-	if (IDMAP_ERROR(retcode) || state.pid2sid_done == TRUE)
-		goto out;
-
-	/* nldap lookup */
-	if (state.nldap_nqueries > 0) {
-		retcode = nldap_lookup_one(&state, mapping, &idres);
-		if (IDMAP_FATAL_ERROR(retcode))
-			goto out;
-	}
-
-	/* AD lookup */
-	if (state.ad_nqueries > 0) {
-		retcode = ad_lookup_one(&state, mapping, &idres);
-		if (IDMAP_FATAL_ERROR(retcode))
-			goto out;
-	}
-
-	/*
-	 * Next pass processes the result of the preceding passes/lookups.
-	 * It returns if there's nothing more to be done otherwise it
-	 * evaluates local name-based mapping rules
-	 */
-	state.pid2sid_done = TRUE;
-	retcode = pid2sid_second_pass(&state, mapping, &idres, is_user);
-	if (IDMAP_ERROR(retcode) || state.pid2sid_done == TRUE)
-		goto out;
-
-	/* Update cache */
-	(void) update_cache_pid2sid(&state, mapping, &idres);
-
-out:
-	/*
-	 * Note that "mapping" is returned to the client. Therefore
-	 * copy whatever we have in "idres" to mapping->id2 and
-	 * free idres.
-	 */
-	mapping->direction = idres.direction;
-	mapping->id2 = idres.id;
-	if (mapping->flag & IDMAP_REQ_FLG_MAPPING_INFO ||
-	    retcode != IDMAP_SUCCESS)
-		(void) idmap_info_mov(&mapping->info, &idres.info);
-	else
-		idmap_info_free(&idres.info);
-	(void) memset(&idres, 0, sizeof (idres));
-	xdr_free(xdr_idmap_id_res, (caddr_t)&idres);
-	cleanup_lookup_state(&state);
-	return (retcode);
-}
-
-/*ARGSUSED*/
-static
-idmap_retcode
-ad_lookup_one(lookup_state_t *state, idmap_mapping *req, idmap_id_res *res)
-{
-	idmap_mapping_batch	batch;
-	idmap_ids_res		result;
-
-	batch.idmap_mapping_batch_len = 1;
-	batch.idmap_mapping_batch_val = req;
-	result.ids.ids_len = 1;
-	result.ids.ids_val = res;
-	return (ad_lookup_batch(state, &batch, &result));
 }

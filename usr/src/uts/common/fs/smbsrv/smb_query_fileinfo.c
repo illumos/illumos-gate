@@ -726,6 +726,9 @@ smb_query_pathname(smb_tree_t *tree, smb_node_t *node, boolean_t include_share,
 	else
 		vp = node->vp;
 
+	if (vp == tree->t_snode->vp)
+		return (0);
+
 	rc = vnodetopath(tree->t_snode->vp, vp, buf, buflen, kcred);
 	if (rc == 0) {
 		(void) strsubst(buf, '/', '\\');

@@ -40,6 +40,7 @@
 #define	SRVSVC_ACE_OFFSET	8
 #define	SRVSVC_SID_OFFSET	8
 
+static uint32_t srvsvc_sd_get_autohome(const smb_share_t *, smb_sd_t *);
 static uint32_t srvsvc_sd_status_to_error(uint32_t);
 static uint32_t srvsvc_sd_set_relative(smb_sd_t *, uint8_t *);
 static uint32_t srvsvc_sd_set_absolute(uint8_t *, smb_sd_t *);
@@ -151,13 +152,19 @@ srvsvc_sd_get(smb_share_t *si, uint8_t *sdbuf, uint32_t *size)
 	if (sdbuf == NULL && size == NULL)
 		return (ERROR_INVALID_PARAMETER);
 
-	ret = srvsvc_shareacl_getpath(si, path);
-	if (ret != 0)
-		return (ERROR_PATH_NOT_FOUND);
-
 	bzero(&sd, sizeof (smb_sd_t));
-	status = smb_sd_read(path, &sd, SMB_ALL_SECINFO);
-	status = srvsvc_sd_status_to_error(status);
+
+	if (si->shr_flags & SMB_SHRF_AUTOHOME) {
+		status = srvsvc_sd_get_autohome(si, &sd);
+	} else {
+		ret = srvsvc_shareacl_getpath(si, path);
+		if (ret != 0)
+			return (ERROR_PATH_NOT_FOUND);
+
+		status = smb_sd_read(path, &sd, SMB_ALL_SECINFO);
+		status = srvsvc_sd_status_to_error(status);
+	}
+
 	if (status != ERROR_SUCCESS) {
 		smb_sd_term(&sd);
 		return (status);
@@ -172,6 +179,28 @@ srvsvc_sd_get(smb_share_t *si, uint8_t *sdbuf, uint32_t *size)
 	status = srvsvc_sd_set_relative(&sd, sdbuf);
 
 	smb_sd_term(&sd);
+	return (status);
+}
+
+static uint32_t
+srvsvc_sd_get_autohome(const smb_share_t *si, smb_sd_t *sd)
+{
+	smb_fssd_t	fs_sd;
+	acl_t		*acl;
+	uint32_t	status;
+
+	if (acl_fromtext("owner@:rwxpdDaARWcCos::allow", &acl) != 0)
+		return (ERROR_NOT_ENOUGH_MEMORY);
+
+	smb_fssd_init(&fs_sd, SMB_ALL_SECINFO, SMB_FSSD_FLAGS_DIR);
+	fs_sd.sd_uid = si->shr_uid;
+	fs_sd.sd_gid = si->shr_gid;
+	fs_sd.sd_zdacl = acl;
+	fs_sd.sd_zsacl = NULL;
+
+	status = smb_sd_fromfs(&fs_sd, sd);
+	status = srvsvc_sd_status_to_error(status);
+	smb_fssd_term(&fs_sd);
 	return (status);
 }
 

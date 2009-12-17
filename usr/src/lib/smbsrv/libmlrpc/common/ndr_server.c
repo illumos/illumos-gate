@@ -217,6 +217,7 @@ ndr_pipe_transact(ndr_pipe_t *np)
 	ndr_stream_t	*send_nds;
 	char		*data;
 	int		datalen;
+	int		rc;
 
 	data = np->np_buf;
 	datalen = np->np_uio.uio_offset;
@@ -235,7 +236,12 @@ ndr_pipe_transact(ndr_pipe_t *np)
 	}
 
 	recv_nds = &mxa->recv_nds;
-	nds_initialize(recv_nds, datalen, NDR_MODE_CALL_RECV, mxa->heap);
+	rc = nds_initialize(recv_nds, datalen, NDR_MODE_CALL_RECV, mxa->heap);
+	if (rc != 0) {
+		ndr_heap_destroy(mxa->heap);
+		free(mxa);
+		return (ENOMEM);
+	}
 
 	/*
 	 * Copy the input data and reset the input stream.
@@ -244,7 +250,13 @@ ndr_pipe_transact(ndr_pipe_t *np)
 	ndr_pipe_rewind(np);
 
 	send_nds = &mxa->send_nds;
-	nds_initialize(send_nds, 0, NDR_MODE_RETURN_SEND, mxa->heap);
+	rc = nds_initialize(send_nds, 0, NDR_MODE_RETURN_SEND, mxa->heap);
+	if (rc != 0) {
+		nds_destruct(&mxa->recv_nds);
+		ndr_heap_destroy(mxa->heap);
+		free(mxa);
+		return (ENOMEM);
+	}
 
 	(void) ndr_svc_process(mxa);
 

@@ -844,3 +844,246 @@ smb_getnameinfo(smb_inaddr_t *ip, char *hostname, int hostlen, int flags)
 	return (getnameinfo((struct sockaddr *)sp, salen,
 	    hostname, hostlen, NULL, 0, flags));
 }
+
+/*
+ * A share name is considered invalid if it contains control
+ * characters or any of the following characters (MSDN 236388).
+ *
+ *	" / \ [ ] : | < > + ; , ? * =
+ */
+uint32_t
+smb_name_validate_share(const char *sharename)
+{
+	const char *invalid = "\"/\\[]:|<>+;,?*=";
+	const char *p;
+
+	if (sharename == NULL)
+		return (ERROR_INVALID_PARAMETER);
+
+	if (strpbrk(sharename, invalid) != NULL)
+		return (ERROR_INVALID_NAME);
+
+	for (p = sharename; *p != '\0'; p++) {
+		if (iscntrl(*p))
+			return (ERROR_INVALID_NAME);
+	}
+
+	return (ERROR_SUCCESS);
+}
+
+/*
+ * User and group names are limited to 256 characters, cannot be terminated
+ * by '.' and must not contain control characters or any of the following
+ * characters.
+ *
+ *	" / \ [ ] < > + ; , ? * = @
+ */
+uint32_t
+smb_name_validate_account(const char *name)
+{
+	const char	*invalid = "\"/\\[]<>+;,?*=@";
+	const char	*p;
+	int		len;
+
+	if ((name == NULL) || (*name == '\0'))
+		return (ERROR_INVALID_PARAMETER);
+
+	len = strlen(name);
+	if ((len > MAXNAMELEN) || (name[len - 1] == '.'))
+		return (ERROR_INVALID_NAME);
+
+	if (strpbrk(name, invalid) != NULL)
+		return (ERROR_INVALID_NAME);
+
+	for (p = name; *p != '\0'; p++) {
+		if (iscntrl(*p))
+			return (ERROR_INVALID_NAME);
+	}
+
+	return (ERROR_SUCCESS);
+}
+
+/*
+ * Check a domain name for RFC 1035 and 1123 compliance.  Domain names may
+ * contain alphanumeric characters, hyphens and dots.  The first and last
+ * character of a label must be alphanumeric.  Interior characters may be
+ * alphanumeric or hypens.
+ *
+ * Domain names should not contain underscores but we allow them because
+ * Windows names are often in non-compliance with this rule.
+ */
+uint32_t
+smb_name_validate_domain(const char *domain)
+{
+	boolean_t new_label = B_TRUE;
+	const char *p;
+	char label_terminator;
+
+	if (domain == NULL)
+		return (ERROR_INVALID_PARAMETER);
+
+	if (*domain == '\0')
+		return (ERROR_INVALID_NAME);
+
+	label_terminator = *domain;
+
+	for (p = domain; *p != '\0'; ++p) {
+		if (new_label) {
+			if (!isalnum(*p))
+				return (ERROR_INVALID_NAME);
+			new_label = B_FALSE;
+			label_terminator = *p;
+			continue;
+		}
+
+		if (*p == '.') {
+			if (!isalnum(label_terminator))
+				return (ERROR_INVALID_NAME);
+			new_label = B_TRUE;
+			label_terminator = *p;
+			continue;
+		}
+
+		label_terminator = *p;
+
+		if (isalnum(*p) || *p == '-' || *p == '_')
+			continue;
+
+		return (ERROR_INVALID_NAME);
+	}
+
+	if (!isalnum(label_terminator))
+		return (ERROR_INVALID_NAME);
+
+	return (ERROR_SUCCESS);
+}
+
+/*
+ * A NetBIOS domain name can contain letters (a-zA-Z), numbers (0-9) and
+ * hyphens.
+ *
+ * It cannot:
+ * 	- be blank or longer than 15 chracters
+ * 	- contain all numbers
+ * 	- be the same as the computer name
+ */
+uint32_t
+smb_name_validate_nbdomain(const char *name)
+{
+	char		netbiosname[NETBIOS_NAME_SZ];
+	const char	*p;
+	int		len;
+
+	if (name == NULL)
+		return (ERROR_INVALID_PARAMETER);
+
+	len = strlen(name);
+	if (len == 0 || len >= NETBIOS_NAME_SZ)
+		return (ERROR_INVALID_NAME);
+
+	if (strspn(name, "0123456789") == len)
+		return (ERROR_INVALID_NAME);
+
+	if (smb_getnetbiosname(netbiosname, NETBIOS_NAME_SZ) == 0) {
+		if (smb_strcasecmp(name, netbiosname, 0) == 0)
+			return (ERROR_INVALID_NAME);
+	}
+
+	for (p = name; *p != '\0'; ++p) {
+		if (isalnum(*p) || *p == '-' || *p == '_')
+			continue;
+
+		return (ERROR_INVALID_NAME);
+	}
+
+	return (ERROR_SUCCESS);
+}
+
+/*
+ * A workgroup name can contain 1 to 15 characters but cannot be the same
+ * as the NetBIOS name.  The name must begin with a letter or number.
+ *
+ * The name cannot consist entirely of spaces or dots, which is covered
+ * by the requirement that the name must begin with an alphanumeric
+ * character.
+ *
+ * The name must not contain control characters or any of the following
+ * characters.
+ *
+ *	" / \ [ ] : | < > + = ; , ?
+ */
+uint32_t
+smb_name_validate_workgroup(const char *workgroup)
+{
+	char netbiosname[NETBIOS_NAME_SZ];
+	const char *invalid = "\"/\\[]:|<>+=;,?";
+	const char *p;
+
+	if (workgroup == NULL)
+		return (ERROR_INVALID_PARAMETER);
+
+	if (*workgroup == '\0' || (!isalnum(*workgroup)))
+		return (ERROR_INVALID_NAME);
+
+	if (strlen(workgroup) >= NETBIOS_NAME_SZ)
+		return (ERROR_INVALID_NAME);
+
+	if (smb_getnetbiosname(netbiosname, NETBIOS_NAME_SZ) == 0) {
+		if (smb_strcasecmp(workgroup, netbiosname, 0) == 0)
+			return (ERROR_INVALID_NAME);
+	}
+
+	if (strpbrk(workgroup, invalid) != NULL)
+		return (ERROR_INVALID_NAME);
+
+	for (p = workgroup; *p != '\0'; p++) {
+		if (iscntrl(*p))
+			return (ERROR_INVALID_NAME);
+	}
+
+	return (ERROR_SUCCESS);
+}
+
+/*
+ * Parse a string to obtain the account and domain names as separate strings.
+ *
+ * Names containing a backslash ('\') are known as qualified or composite
+ * names.  The string preceding the backslash should be the domain name
+ * and the string following the slash should be a name within that domain.
+ *
+ * Names that do not contain a backslash are known as isolated names.
+ * An isolated name may be a single label, such as john, or may be in
+ * user principal name (UPN) form, such as john@example.com.
+ *
+ *	domain\name
+ *	domain/name
+ *	name
+ *	name@domain
+ *
+ * If we encounter any of the forms above in arg, the @, / or \ separator
+ * is replaced by \0 and the name and domain pointers are set to point to
+ * the appropriate components in arg.  Otherwise, name and domain pointers
+ * will be set to NULL.
+ */
+void
+smb_name_parse(char *arg, char **account, char **domain)
+{
+	char *p;
+
+	*account = NULL;
+	*domain = NULL;
+
+	if ((p = strpbrk(arg, "/\\@")) != NULL) {
+		if (*p == '@') {
+			*p = '\0';
+			++p;
+			*domain = p;
+			*account = arg;
+		} else {
+			*p = '\0';
+			++p;
+			*account = p;
+			*domain = arg;
+		}
+	}
+}

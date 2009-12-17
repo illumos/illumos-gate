@@ -167,7 +167,17 @@ smb_pwd_init(boolean_t create_cache)
 {
 	if (create_cache) {
 		smb_lucache_create();
+#if 0
+		/*
+		 * This pre-loading of the cache results in idmapd requests.
+		 * With the change to allow idmapd to call into libsmb to
+		 * map names and SIDs, this creates a circular startup
+		 * dependency.  This call has been temporarily disabled to
+		 * avoid this issue.  It can be enabled when the name/SID
+		 * lookup can be done directly on the LSA service.
+		 */
 		smb_lucache_update();
+#endif
 	}
 
 	smb_pwd_hdl = smb_dlopen();

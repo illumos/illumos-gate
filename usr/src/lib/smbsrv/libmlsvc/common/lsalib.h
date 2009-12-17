@@ -45,6 +45,8 @@
 extern "C" {
 #endif
 
+typedef struct mslsa_sid lsa_sid_t;
+
 /*
  * lsalib.c
  */
@@ -70,11 +72,7 @@ int lsar_close(mlsvc_handle_t *);
 int lsar_query_security_desc(mlsvc_handle_t *);
 DWORD lsar_query_info_policy(mlsvc_handle_t *, WORD, smb_domain_t *);
 uint32_t lsar_lookup_names(mlsvc_handle_t *, char *, smb_account_t *);
-uint32_t lsar_lookup_names2(mlsvc_handle_t *, char *, smb_account_t *);
-uint32_t lsar_lookup_sids(mlsvc_handle_t *, struct mslsa_sid *,
-    smb_account_t *);
-uint32_t lsar_lookup_sids2(mlsvc_handle_t *, struct mslsa_sid *,
-    smb_account_t *);
+uint32_t lsar_lookup_sids(mlsvc_handle_t *, smb_sid_t *, smb_account_t *);
 
 int lsar_enum_accounts(mlsvc_handle_t *, DWORD *,
     struct mslsa_EnumAccountBuf *);

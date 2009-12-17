@@ -432,18 +432,32 @@ smb_tree_fclose(smb_tree_t *tree, uint32_t uniqid)
 
 #define	SHARES_DIR	".zfs/shares/"
 static void
-smb_tree_acl_access(cred_t *cred, const char *sharename, vnode_t *pathvp,
-		    uint32_t *access)
+smb_tree_acl_access(smb_request_t *sr, const smb_share_t *si, vnode_t *pathvp,
+    uint32_t *access)
 {
-	int rc;
-	vfs_t *vfsp;
-	vnode_t *root = NULL;
-	vnode_t *sharevp = NULL;
-	char *sharepath;
-	struct pathname pnp;
-	size_t size;
+	smb_user_t	*user;
+	cred_t		*cred;
+	int		rc;
+	vfs_t		*vfsp;
+	vnode_t		*root = NULL;
+	vnode_t		*sharevp = NULL;
+	char		*sharepath;
+	struct pathname	pnp;
+	size_t		size;
 
+	user = sr->uid_user;
+	cred = user->u_cred;
 	*access = ACE_ALL_PERMS; /* default to full "UNIX" access */
+
+	if (si->shr_flags & SMB_SHRF_AUTOHOME) {
+		/*
+		 * An autohome share owner gets full access to the share.
+		 * Everyone else is denied access.
+		 */
+		if (smb_strcasecmp(si->shr_name, user->u_name, 0) != 0)
+			*access = 0;
+		return;
+	}
 
 	/*
 	 * Using the vnode of the share path, we then find the root
@@ -469,9 +483,9 @@ smb_tree_acl_access(cred_t *cred, const char *sharename, vnode_t *pathvp,
 	 * lookuppnvp().
 	 */
 
-	size = sizeof (SHARES_DIR) + strlen(sharename) + 1;
+	size = sizeof (SHARES_DIR) + strlen(si->shr_name) + 1;
 	sharepath = kmem_alloc(size, KM_SLEEP);
-	(void) sprintf(sharepath, "%s%s", SHARES_DIR, sharename);
+	(void) sprintf(sharepath, "%s%s", SHARES_DIR, si->shr_name);
 
 	pn_alloc(&pnp);
 	(void) pn_set(&pnp, sharepath);
@@ -626,7 +640,7 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 	 * location. Needs to be done after finding a valid path but
 	 * before the tree is allocated.
 	 */
-	smb_tree_acl_access(u_cred, sharename, snode->vp, &aclaccess);
+	smb_tree_acl_access(sr, si, snode->vp, &aclaccess);
 	if ((aclaccess & ACE_ALL_PERMS) == 0) {
 		smb_tree_log(sr, sharename, "access denied: share ACL");
 		smbsr_error(sr, 0, ERRSRV, ERRaccess);

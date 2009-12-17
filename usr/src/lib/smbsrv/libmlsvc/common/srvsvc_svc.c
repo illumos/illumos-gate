@@ -57,8 +57,6 @@
 #include <smbsrv/smb_common_door.h>
 #include "mlsvc.h"
 
-#define	SV_TYPE_SENT_BY_ME (SV_TYPE_WORKSTATION | SV_TYPE_SERVER | SV_TYPE_NT)
-
 /*
  * Qualifier types for NetConnectEnum.
  */
@@ -1678,7 +1676,7 @@ netservergetinfo_no_memory:
 		info101->sv101_platform_id = SV_PLATFORM_ID_NT;
 		info101->sv101_version_major = 4;
 		info101->sv101_version_minor = 0;
-		info101->sv101_type = SV_TYPE_SENT_BY_ME;
+		info101->sv101_type = SV_TYPE_DEFAULT;
 		info101->sv101_name = (uint8_t *)NDR_STRDUP(mxa, hostname);
 		info101->sv101_comment
 		    = (uint8_t *)NDR_STRDUP(mxa, sys_comment);
@@ -1699,7 +1697,7 @@ netservergetinfo_no_memory:
 		info102->sv102_platform_id = SV_PLATFORM_ID_NT;
 		info102->sv102_version_major = 4;
 		info102->sv102_version_minor = 0;
-		info102->sv102_type = SV_TYPE_SENT_BY_ME;
+		info102->sv102_type = SV_TYPE_DEFAULT;
 		info102->sv102_name = (uint8_t *)NDR_STRDUP(mxa, hostname);
 		info102->sv102_comment
 		    = (uint8_t *)NDR_STRDUP(mxa, sys_comment);
@@ -1843,11 +1841,6 @@ srvsvc_s_NetRemoteTOD(void *arg, ndr_xa_t *mxa)
  *
  * Perform name validation.
  *
- * The share name is considered invalid if it contains any of the
- * following character (MSDN 236388).
- *
- * " / \ [ ] : | < > + ; , ? * =
- *
  * Returns Win32 error codes.
  */
 /*ARGSUSED*/
@@ -1856,6 +1849,7 @@ srvsvc_s_NetNameValidate(void *arg, ndr_xa_t *mxa)
 {
 	struct mslm_NetNameValidate *param = arg;
 	char *name;
+	int maxlen;
 	int len;
 
 	if ((name = (char *)param->pathname) == NULL) {
@@ -1863,34 +1857,41 @@ srvsvc_s_NetNameValidate(void *arg, ndr_xa_t *mxa)
 		return (NDR_DRC_OK);
 	}
 
-	len = strlen(name);
-
-	if ((param->flags == 0 && len > 81) ||
-	    (param->flags == 0x80000000 && len > 13)) {
-		param->status = ERROR_INVALID_NAME;
-		return (NDR_DRC_OK);
-	}
-
 	switch (param->type) {
 	case NAMETYPE_SHARE:
-		if (smb_shr_chkname(name))
-			param->status = ERROR_SUCCESS;
-		else
+		len = strlen(name);
+		maxlen = (param->flags & NAMEFLAG_LM2) ?
+		    SMB_SHARE_OEMNAME_MAX : SMB_SHARE_NTNAME_MAX;
+
+		if (len > maxlen) {
 			param->status = ERROR_INVALID_NAME;
+			return (NDR_DRC_OK);
+		}
+
+		param->status = smb_name_validate_share(name);
 		break;
 
 	case NAMETYPE_USER:
-	case NAMETYPE_PASSWORD:
 	case NAMETYPE_GROUP:
+		param->status = smb_name_validate_account(name);
+		break;
+
+	case NAMETYPE_DOMAIN:	/* NetBIOS domain name */
+		param->status = smb_name_validate_nbdomain(name);
+		break;
+
+	case NAMETYPE_WORKGROUP:
+		param->status = smb_name_validate_workgroup(name);
+		break;
+
+	case NAMETYPE_PASSWORD:
 	case NAMETYPE_COMPUTER:
 	case NAMETYPE_EVENT:
-	case NAMETYPE_DOMAIN:
 	case NAMETYPE_SERVICE:
 	case NAMETYPE_NET:
 	case NAMETYPE_MESSAGE:
 	case NAMETYPE_MESSAGEDEST:
 	case NAMETYPE_SHAREPASSWORD:
-	case NAMETYPE_WORKGROUP:
 		param->status = ERROR_NOT_SUPPORTED;
 		break;
 

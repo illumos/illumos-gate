@@ -68,10 +68,11 @@ static void smb_autohome_parse_options(smb_share_t *);
  * autohome shares.
  */
 void
-smb_autohome_add(const char *username)
+smb_autohome_add(const smb_token_t *token)
 {
-	smb_share_t si;
-	smb_autohome_t *ai;
+	smb_share_t	si;
+	smb_autohome_t	*ai;
+	char		*username = token->tkn_account_name;
 
 	assert(username);
 
@@ -98,8 +99,11 @@ smb_autohome_add(const char *username)
 
 	(void) strlcpy(si.shr_name, username, MAXNAMELEN);
 	(void) strlcpy(si.shr_container, ai->ah_container, MAXPATHLEN);
+	(void) strlcpy(si.shr_cmnt, "Autohome", SMB_SHARE_CMNT_MAX);
 	smb_autohome_parse_options(&si);
 	si.shr_flags |= SMB_SHRF_TRANS | SMB_SHRF_AUTOHOME;
+	si.shr_uid = token->tkn_user.i_id;
+	si.shr_gid = token->tkn_primary_grp.i_id;
 
 	(void) smb_shr_add(&si);
 }

@@ -224,6 +224,20 @@ pid$target::lsarpc_s_LookupNames2:return
 {
 }
 
+pid$target::lsar_lookup_names:entry
+{
+	printf("%s", copyinstr(arg1));
+}
+
+pid$target::lsar_lookup_*:entry
+{
+}
+
+pid$target::lsar_lookup_*:return
+{
+	printf("0x%08x", arg1);
+}
+
 /*
  * NetLogon
  */

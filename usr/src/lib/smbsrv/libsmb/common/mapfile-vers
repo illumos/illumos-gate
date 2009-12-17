@@ -70,6 +70,7 @@ SUNWprivate {
 	list_prev;
 	list_remove;
 	list_tail;
+	lsa_account_xdr;
 	netr_client_mkabsolute;
 	netr_client_xfree;
 	oemtoucs;
@@ -280,6 +281,12 @@ SUNWprivate {
 	smb_msgbuf_term;
 	smb_msgbuf_used;
 	smb_msgbuf_word_align;
+	smb_name_parse;
+	smb_name_validate_account;
+	smb_name_validate_share;
+	smb_name_validate_domain;
+	smb_name_validate_nbdomain;
+	smb_name_validate_workgroup;
 	smb_netconnectinfo_decode;
 	smb_netconnectinfo_encode;
 	smb_netfileinfo_decode;
@@ -330,6 +337,7 @@ SUNWprivate {
 	smb_sam_usr_groups;
 	smb_sbequiv_strlen;
 	smb_sd_get_secinfo;
+	smb_sd_fromfs;
 	smb_sd_init;
 	smb_sd_len;
 	smb_sd_term;
@@ -348,6 +356,7 @@ SUNWprivate {
 	smb_sid_len;
 	smb_sid_splice;
 	smb_sid_split;
+	smb_sid_splitstr;
 	smb_sid_tostr;
 	smb_sid_type2str;
 	smb_smf_maintenance_mode;

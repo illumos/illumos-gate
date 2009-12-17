@@ -99,7 +99,7 @@ struct xlate_table smb_xlate_com[] = {
 };
 
 struct xlate_table smb_xlate_rcls[] = {
-	{	SUCCESS,		"SUCCESS" },
+	{	0,			"SUCCESS" },
 	{	ERRDOS,			"ERRDOS" },
 	{	ERRSRV,			"ERRSRV" },
 	{	ERRHRD,			"ERRHRD" },

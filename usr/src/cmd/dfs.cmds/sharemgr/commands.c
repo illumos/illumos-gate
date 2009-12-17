@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -486,7 +486,8 @@ notify_or_enable_share(sa_share_t share, char *protocol)
 		groupproto = sa_get_optionset_attr(opt, "type");
 		if (groupproto == NULL ||
 		    (protocol != NULL && strcmp(groupproto, protocol) != 0)) {
-			sa_free_attr_string(groupproto);
+			if (groupproto != NULL)
+				sa_free_attr_string(groupproto);
 			continue;
 		}
 		if (sa_is_share(share)) {
@@ -650,6 +651,9 @@ enable_all_groups(sa_handle_t handle, struct list *work, int setstate,
 			 */
 			enable_group(group, zfs == NULL ? updateproto : NULL,
 			    enable, work->proto);
+			if (zfs != NULL)
+				sa_free_attr_string(zfs);
+
 			for (subgroup = sa_get_sub_group(group);
 			    subgroup != NULL;
 			    subgroup = sa_get_next_group(subgroup)) {
@@ -2950,13 +2954,12 @@ sa_moveshare(sa_handle_t handle, int flags, int argc, char *argv[])
 			 * aren't in the new group.
 			 */
 			oldstate = sa_get_group_attr(parent, "state");
-
-			/* enable_share determines what to do */
-			if (strcmp(oldstate, "enabled") == 0)
-				(void) sa_disable_share(share, NULL);
-
-			if (oldstate != NULL)
+			if (oldstate != NULL) {
+				/* enable_share determines what to do */
+				if (strcmp(oldstate, "enabled") == 0)
+					(void) sa_disable_share(share, NULL);
 				sa_free_attr_string(oldstate);
+			}
 		}
 
 		if (!dryrun && ret == SA_OK)
@@ -4767,6 +4770,8 @@ disable_all_groups(sa_handle_t handle, struct list *work, int setstate)
 			} else {
 				ret = disable_group(group, work->proto);
 			}
+			if (name != NULL)
+				sa_free_attr_string(name);
 			/*
 			 * We don't want to "disable" since it won't come
 			 * up after a reboot.  The SMF framework should do
@@ -5351,7 +5356,7 @@ out_share(FILE *out, sa_group_t group, char *proto)
 			    groupname != NULL ? "@" : "",
 			    groupname != NULL ? groupname : "");
 			(void) fprintf(out, "%-14.14s  %s   %s   \"%s\"  \n",
-			    resfmt, path,
+			    resfmt, (path != NULL) ? path : "",
 			    (soptions != NULL && strlen(soptions) > 0) ?
 			    soptions : defprop,
 			    (description != NULL) ? description : "");

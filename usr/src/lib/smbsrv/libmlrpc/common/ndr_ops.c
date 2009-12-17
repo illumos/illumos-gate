@@ -121,7 +121,7 @@ nds_bswap(void *srcbuf, void *dstbuf, size_t len)
  * operations and the reference to the heap. An external heap is provided
  * to the stream, rather than each stream creating its own heap.
  */
-void
+int
 nds_initialize(ndr_stream_t *nds, unsigned pdu_size_hint,
     int composite_op, ndr_heap_t *heap)
 {
@@ -133,11 +133,16 @@ nds_initialize(ndr_stream_t *nds, unsigned pdu_size_hint,
 	bzero(nds, sizeof (*nds));
 
 	if (pdu_size_hint > NDR_PDU_MAX_SIZE)
-		return;
+		return (0);
 
 	size = (pdu_size_hint == 0) ? NDR_PDU_BLOCK_SIZE : pdu_size_hint;
-	nds->pdu_base_addr = malloc(size);
-	assert(nds->pdu_base_addr);
+
+	if ((nds->pdu_base_addr = malloc(size)) == NULL) {
+		nds->error = NDR_ERR_MALLOC_FAILED;
+		nds->error_ref = __LINE__;
+		NDS_TATTLE_ERROR(nds, NULL, NULL);
+		return (NDR_DRC_FAULT_OUT_OF_MEMORY);
+	}
 
 	nds->pdu_max_size = size;
 	nds->pdu_size = 0;
@@ -150,6 +155,7 @@ nds_initialize(ndr_stream_t *nds, unsigned pdu_size_hint,
 	nds->dir  = NDR_MODE_TO_DIR(composite_op);
 
 	nds->outer_queue_tailp = &nds->outer_queue_head;
+	return (0);
 }
 
 void

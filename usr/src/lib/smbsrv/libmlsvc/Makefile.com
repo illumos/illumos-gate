@@ -33,14 +33,12 @@ OBJS_COMMON =		\
 	eventlog_svc.o	\
 	eventlog_syslog.o	\
 	lsalib.o	\
-	lsar_lookup.o	\
-	lsar_open.o	\
+	lsar_clnt.o	\
+	lsar_svc.o	\
 	mlsvc_client.o	\
 	mlsvc_domain.o	\
 	mlsvc_init.o	\
-	mlsvc_lsa.o	\
 	mlsvc_netr.o	\
-	mlsvc_sam.o	\
 	mlsvc_util.o	\
 	mlsvc_wkssvc.o	\
 	msgsvc_svc.o	\
@@ -48,8 +46,8 @@ OBJS_COMMON =		\
 	netr_auth.o	\
 	netr_logon.o	\
 	samlib.o	\
-	samr_open.o	\
-	samr_lookup.o	\
+	samr_clnt.o	\
+	samr_svc.o	\
 	smb_autohome.o	\
 	smb_logon.o	\
 	smb_share.o	\
@@ -84,7 +82,7 @@ INCS += -I$(SRC)/common/smbsrv
 
 LDLIBS +=	$(MACH_LDLIBS)
 LDLIBS += -lmlrpc -lsmbrdr -lsmb -lsmbns -lshare -lresolv -lnsl -lpkcs11 -lscf	\
-	-lnvpair -luutil -lzfs -lc
+	-lnvpair -lsec -luutil -lzfs -lc
 
 CPPFLAGS += $(INCS) -D_REENTRANT
 

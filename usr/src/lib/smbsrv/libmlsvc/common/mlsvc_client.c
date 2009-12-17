@@ -38,6 +38,7 @@
 #include <smbsrv/libsmbrdr.h>
 #include <smbsrv/libmlrpc.h>
 #include <smbsrv/libmlsvc.h>
+#include <smbsrv/ndl/srvsvc.ndl>
 
 /*
  * Server info cache entry expiration in seconds.
@@ -135,7 +136,6 @@ ndr_rpc_bind(mlsvc_handle_t *handle, char *server, char *domain,
 	ndr_client_t		*clnt;
 	ndr_service_t		*svc;
 	srvsvc_server_info_t	svinfo;
-	int			remote_os;
 	int			fid;
 	int			rc;
 
@@ -151,14 +151,17 @@ ndr_rpc_bind(mlsvc_handle_t *handle, char *server, char *domain,
 	 * servers will be Windows 2000 or later.
 	 * Don't lookup the svinfo if this is a SRVSVC request
 	 * because the SRVSVC is used to get the server info.
-	 * None of the SRVSVC calls depend on the remote OS.
+	 * None of the SRVSVC calls depend on the server info.
 	 */
-	remote_os = NATIVE_OS_WIN2000;
+	bzero(&svinfo, sizeof (srvsvc_server_info_t));
+	svinfo.sv_platform_id = SV_PLATFORM_ID_NT;
+	svinfo.sv_version_major = 5;
+	svinfo.sv_version_minor = 0;
+	svinfo.sv_type = SV_TYPE_DEFAULT;
+	svinfo.sv_os = NATIVE_OS_WIN2000;
 
-	if (strcasecmp(service, "SRVSVC") != 0) {
-		if (ndr_svinfo_lookup(server, domain, &svinfo) == 0)
-			remote_os = svinfo.sv_os;
-	}
+	if (strcasecmp(service, "SRVSVC") != 0)
+		(void) ndr_svinfo_lookup(server, domain, &svinfo);
 
 	if ((clnt = malloc(sizeof (ndr_client_t))) == NULL)
 		return (-1);
@@ -185,7 +188,7 @@ ndr_rpc_bind(mlsvc_handle_t *handle, char *server, char *domain,
 
 	bzero(&handle->handle, sizeof (ndr_hdid_t));
 	handle->clnt = clnt;
-	handle->remote_os = remote_os;
+	bcopy(&svinfo, &handle->svinfo, sizeof (srvsvc_server_info_t));
 
 	if (ndr_rpc_get_heap(handle) == NULL) {
 		free(clnt);
@@ -248,6 +251,12 @@ ndr_rpc_call(mlsvc_handle_t *handle, int opnum, void *params)
 
 	rc = ndr_clnt_call(clnt->binding, opnum, params);
 
+	/*
+	 * Always clear the nonull flag to ensure
+	 * it is not applied to subsequent calls.
+	 */
+	clnt->nonull = B_FALSE;
+
 	if (NDR_DRC_IS_FAULT(rc)) {
 		ndr_rpc_release(handle);
 		return (-1);
@@ -257,12 +266,30 @@ ndr_rpc_call(mlsvc_handle_t *handle, int opnum, void *params)
 }
 
 /*
- * Returns the Native-OS of the RPC server.
+ * Outgoing strings should not be null terminated.
+ */
+void
+ndr_rpc_set_nonull(mlsvc_handle_t *handle)
+{
+	handle->clnt->nonull = B_TRUE;
+}
+
+/*
+ * Return a reference to the server info.
+ */
+const srvsvc_server_info_t *
+ndr_rpc_server_info(mlsvc_handle_t *handle)
+{
+	return (&handle->svinfo);
+}
+
+/*
+ * Return the RPC server OS level.
  */
 uint32_t
 ndr_rpc_server_os(mlsvc_handle_t *handle)
 {
-	return (handle->remote_os);
+	return (handle->svinfo.sv_os);
 }
 
 /*
@@ -366,7 +393,7 @@ void
 ndr_inherit_handle(mlsvc_handle_t *child, mlsvc_handle_t *parent)
 {
 	child->clnt = parent->clnt;
-	child->remote_os = parent->remote_os;
+	bcopy(&parent->svinfo, &child->svinfo, sizeof (srvsvc_server_info_t));
 }
 
 void
@@ -401,9 +428,10 @@ ndr_rpc_status(mlsvc_handle_t *handle, int opnum, DWORD status)
 static int
 ndr_xa_init(ndr_client_t *clnt, ndr_xa_t *mxa)
 {
-	ndr_stream_t *recv_nds = &mxa->recv_nds;
-	ndr_stream_t *send_nds = &mxa->send_nds;
-	ndr_heap_t *heap = clnt->heap;
+	ndr_stream_t	*recv_nds = &mxa->recv_nds;
+	ndr_stream_t	*send_nds = &mxa->send_nds;
+	ndr_heap_t	*heap = clnt->heap;
+	int		rc;
 
 	if (heap == NULL) {
 		if ((heap = ndr_heap_create()) == NULL)
@@ -414,9 +442,23 @@ ndr_xa_init(ndr_client_t *clnt, ndr_xa_t *mxa)
 
 	mxa->heap = heap;
 
-	nds_initialize(send_nds, 0, NDR_MODE_CALL_SEND, heap);
-	nds_initialize(recv_nds, NDR_PDU_SIZE_HINT_DEFAULT,
-	    NDR_MODE_RETURN_RECV, heap);
+	rc = nds_initialize(send_nds, 0, NDR_MODE_CALL_SEND, heap);
+	if (rc == 0)
+		rc = nds_initialize(recv_nds, NDR_PDU_SIZE_HINT_DEFAULT,
+		    NDR_MODE_RETURN_RECV, heap);
+
+	if (rc != 0) {
+		nds_destruct(&mxa->recv_nds);
+		nds_destruct(&mxa->send_nds);
+		ndr_heap_destroy(mxa->heap);
+		mxa->heap = NULL;
+		clnt->heap = NULL;
+		return (-1);
+	}
+
+	if (clnt->nonull)
+		NDS_SETF(send_nds, NDS_F_NONULL);
+
 	return (0);
 }
 
@@ -530,6 +572,9 @@ ndr_xa_release(ndr_client_t *clnt)
  * Lookup platform, type and version information about a server.
  * If the cache doesn't already contain the data, contact the server and
  * cache the response before returning the server info to the caller.
+ *
+ * We don't provide the name or comment for now, which avoids the need
+ * to deal with unnecessary memory management.
  */
 static int
 ndr_svinfo_lookup(char *server, char *domain, srvsvc_server_info_t *svinfo)
@@ -549,6 +594,8 @@ ndr_svinfo_lookup(char *server, char *domain, srvsvc_server_info_t *svinfo)
 		if (ndr_svinfo_match(server, domain, svi)) {
 			bcopy(&svi->svi_svinfo, svinfo,
 			    sizeof (srvsvc_server_info_t));
+			svinfo->sv_name = NULL;
+			svinfo->sv_comment = NULL;
 			(void) mutex_unlock(&ndr_svlist.svl_mtx);
 			return (0);
 		}
@@ -572,6 +619,8 @@ ndr_svinfo_lookup(char *server, char *domain, srvsvc_server_info_t *svinfo)
 	(void) strlcpy(svi->svi_domain, domain, MAXNAMELEN);
 	list_insert_tail(&ndr_svlist.svl_list, svi);
 	bcopy(&svi->svi_svinfo, svinfo, sizeof (srvsvc_server_info_t));
+	svinfo->sv_name = NULL;
+	svinfo->sv_comment = NULL;
 	(void) mutex_unlock(&ndr_svlist.svl_mtx);
 	return (0);
 }

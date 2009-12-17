@@ -717,22 +717,6 @@ out:
 
 /* ARGSUSED */
 idmap_retcode
-nldap_lookup_one(lookup_state_t *state, idmap_mapping *req, idmap_id_res *res)
-{
-	idmap_mapping_batch	batch;
-	idmap_ids_res		result;
-
-	/* Using nldap_lookup_batch() */
-
-	batch.idmap_mapping_batch_len = 1;
-	batch.idmap_mapping_batch_val = req;
-	result.ids.ids_len = 1;
-	result.ids.ids_val = res;
-	return (nldap_lookup_batch(state, &batch, &result));
-}
-
-/* ARGSUSED */
-idmap_retcode
 nldap_lookup_batch(lookup_state_t *state, idmap_mapping_batch *batch,
 		idmap_ids_res *result)
 {
