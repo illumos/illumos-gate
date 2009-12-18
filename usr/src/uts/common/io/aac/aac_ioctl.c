@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -662,11 +662,23 @@ aac_get_pci_info(struct aac_softstate *softs, intptr_t arg, int mode)
 {
 	union aac_pci_info_align un;
 	struct aac_pci_info *resp = &un.d;
+	pci_regspec_t *pci_rp;
+	uint_t num;
 
 	DBCALLED(softs, 2);
 
-	resp->bus = 0;
-	resp->slot = 0;
+	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, softs->devinfo_p,
+	    DDI_PROP_DONTPASS, "reg", (int **)&pci_rp, &num) !=
+	    DDI_PROP_SUCCESS)
+		return (EINVAL);
+	if (num < (sizeof (pci_regspec_t) / sizeof (int))) {
+		ddi_prop_free(pci_rp);
+		return (EINVAL);
+	}
+
+	resp->bus = PCI_REG_BUS_G(pci_rp->pci_phys_hi);
+	resp->slot = PCI_REG_DEV_G(pci_rp->pci_phys_hi);
+	ddi_prop_free(pci_rp);
 
 	if (ddi_copyout(resp, (void *)arg,
 	    sizeof (struct aac_pci_info), mode) != 0)

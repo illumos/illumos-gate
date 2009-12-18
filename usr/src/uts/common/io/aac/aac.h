@@ -55,7 +55,7 @@ extern "C" {
 
 #define	AAC_DRIVER_MAJOR_VERSION	2
 #define	AAC_DRIVER_MINOR_VERSION	2
-#define	AAC_DRIVER_BUGFIX_LEVEL		7
+#define	AAC_DRIVER_BUGFIX_LEVEL		8
 #define	AAC_DRIVER_TYPE			AAC_TYPE_RELEASE
 
 #define	STR(s)				# s
@@ -95,6 +95,7 @@ extern "C" {
 #endif
 #define	AAC_FWUP_TIMEOUT		180	/* wait up to 3 minutes */
 #define	AAC_IOCTL_TIMEOUT		900	/* wait up to 15 minutes */
+#define	AAC_SYNC_TIMEOUT		900	/* wait up to 15 minutes */
 
 /* Adapter hardware interface types */
 #define	AAC_HWIF_UNKNOWN		0
@@ -208,17 +209,94 @@ struct aac_slot {
 	struct aac_fib *fibp;	/* virtual address of FIB memory */
 };
 
+/*
+ * Scatter-gather list structure defined by HBA hardware
+ */
+struct aac_sge {
+	uint32_t bcount;	/* byte count */
+	union {
+		uint32_t ad32;	/* 32 bit address */
+		struct {
+			uint32_t lo;
+			uint32_t hi;
+		} ad64;		/* 64 bit address */
+	} addr;
+};
+
+/* aac_cmd flags */
+#define	AAC_CMD_CONSISTENT		(1 << 0)
+#define	AAC_CMD_DMA_PARTIAL		(1 << 1)
+#define	AAC_CMD_DMA_VALID		(1 << 2)
+#define	AAC_CMD_BUF_READ		(1 << 3)
+#define	AAC_CMD_BUF_WRITE		(1 << 4)
+#define	AAC_CMD_SYNC			(1 << 5) /* use sync FIB */
+#define	AAC_CMD_NO_INTR			(1 << 6) /* poll IO, no intr */
+#define	AAC_CMD_NO_CB			(1 << 7) /* sync IO, no callback */
+#define	AAC_CMD_NTAG			(1 << 8)
+#define	AAC_CMD_CMPLT			(1 << 9) /* cmd exec'ed by driver/fw */
+#define	AAC_CMD_ABORT			(1 << 10)
+#define	AAC_CMD_TIMEOUT			(1 << 11)
+#define	AAC_CMD_ERR			(1 << 12)
+#define	AAC_CMD_IN_SYNC_SLOT		(1 << 13)
+
+struct aac_softstate;
+typedef void (*aac_cmd_fib_t)(struct aac_softstate *, struct aac_cmd *);
+
+struct aac_cmd {
+	/*
+	 * Note: should be the first member for aac_cmd_queue to work
+	 * correctly.
+	 */
+	struct aac_cmd *next;
+	struct aac_cmd *prev;
+
+	struct scsi_pkt *pkt;
+	int cmdlen;
+	int flags;
+	uint32_t timeout; /* time when the cmd should have completed */
+	struct buf *bp;
+	ddi_dma_handle_t buf_dma_handle;
+
+	/* For non-aligned buffer and SRB */
+	caddr_t abp;
+	ddi_acc_handle_t abh;
+
+	/* Data transfer state */
+	ddi_dma_cookie_t cookie;
+	uint_t left_cookien;
+	uint_t cur_win;
+	uint_t total_nwin;
+	size_t total_xfer;
+	uint64_t blkno;
+	uint32_t bcount;	/* buffer size in byte */
+	struct aac_sge *sgt;	/* sg table */
+
+	/* FIB construct function */
+	aac_cmd_fib_t aac_cmd_fib;
+	/* Call back function for completed command */
+	void (*ac_comp)(struct aac_softstate *, struct aac_cmd *);
+
+	struct aac_slot *slotp;	/* slot used by this command */
+	struct aac_device *dvp;	/* target device */
+
+	/* FIB for this IO command */
+	int fib_size; /* size of the FIB xferred to/from the card */
+	struct aac_fib *fibp;
+
+#ifdef DEBUG
+	uint32_t fib_flags;
+#endif
+};
+
 /* Flags for attach tracking */
 #define	AAC_ATTACH_SOFTSTATE_ALLOCED	(1 << 0)
 #define	AAC_ATTACH_CARD_DETECTED	(1 << 1)
 #define	AAC_ATTACH_PCI_MEM_MAPPED	(1 << 2)
 #define	AAC_ATTACH_KMUTEX_INITED	(1 << 3)
-#define	AAC_ATTACH_HARD_INTR_SETUP	(1 << 4)
-#define	AAC_ATTACH_SOFT_INTR_SETUP	(1 << 5)
-#define	AAC_ATTACH_SCSI_TRAN_SETUP	(1 << 6)
-#define	AAC_ATTACH_COMM_SPACE_SETUP	(1 << 7)
-#define	AAC_ATTACH_CREATE_DEVCTL	(1 << 8)
-#define	AAC_ATTACH_CREATE_SCSI		(1 << 9)
+#define	AAC_ATTACH_SCSI_TRAN_SETUP	(1 << 4)
+#define	AAC_ATTACH_COMM_SPACE_SETUP	(1 << 5)
+#define	AAC_ATTACH_CREATE_DEVCTL	(1 << 6)
+#define	AAC_ATTACH_CREATE_SCSI		(1 << 7)
 
 /* Driver running states */
 #define	AAC_STATE_STOPPED	0
@@ -261,8 +339,6 @@ struct aac_fib_context {
 	struct aac_fib_context *next, *prev;
 };
 
-typedef void (*aac_cmd_fib_t)(struct aac_softstate *, struct aac_cmd *);
-
 #define	AAC_VENDOR_LEN		8
 #define	AAC_PRODUCT_LEN		16
 
@@ -303,7 +379,7 @@ struct aac_softstate {
 
 	struct aac_interface aac_if;	/* adapter hardware interface */
 
-	struct aac_slot sync_slot;	/* sync FIB */
+	struct aac_cmd sync_ac;		/* sync FIB */
 
 	/* Communication space */
 	struct aac_comm_space *comm_space;
@@ -377,6 +453,7 @@ struct aac_softstate {
 	ddi_intr_handle_t *htable;	/* For array of interrupts */
 	int intr_type;			/* What type of interrupt */
 	int intr_cnt;			/* # of intrs count returned */
+	int intr_size;
 	uint_t intr_pri;		/* Interrupt priority   */
 	int intr_cap;			/* Interrupt capabilities */
 
@@ -400,81 +477,6 @@ _NOTE(SCHEME_PROTECTS_DATA("stable data", aac_softstate::{flags slen \
     buf_dma_attr pci_mem_handle pci_mem_base_vaddr \
     comm_space_acc_handle comm_space_dma_handle aac_max_fib_size \
     aac_sg_tablesize aac_cmd_fib aac_cmd_fib_scsi debug_flags bus_max tgt_max}))
-
-/*
- * Scatter-gather list structure defined by HBA hardware
- */
-struct aac_sge {
-	uint32_t bcount;	/* byte count */
-	union {
-		uint32_t ad32;	/* 32 bit address */
-		struct {
-			uint32_t lo;
-			uint32_t hi;
-		} ad64;		/* 64 bit address */
-	} addr;
-};
-
-/* aac_cmd flags */
-#define	AAC_CMD_CONSISTENT		(1 << 0)
-#define	AAC_CMD_DMA_PARTIAL		(1 << 1)
-#define	AAC_CMD_DMA_VALID		(1 << 2)
-#define	AAC_CMD_BUF_READ		(1 << 3)
-#define	AAC_CMD_BUF_WRITE		(1 << 4)
-#define	AAC_CMD_SYNC			(1 << 5) /* use sync FIB */
-#define	AAC_CMD_NO_INTR			(1 << 6) /* poll IO, no intr */
-#define	AAC_CMD_NO_CB			(1 << 7) /* sync IO, no callback */
-#define	AAC_CMD_NTAG			(1 << 8)
-#define	AAC_CMD_CMPLT			(1 << 9) /* cmd exec'ed by driver/fw */
-#define	AAC_CMD_ABORT			(1 << 10)
-#define	AAC_CMD_TIMEOUT			(1 << 11)
-#define	AAC_CMD_ERR			(1 << 12)
-
-struct aac_cmd {
-	/*
-	 * Note: should be the first member for aac_cmd_queue to work
-	 * correctly.
-	 */
-	struct aac_cmd *next;
-	struct aac_cmd *prev;
-
-	struct scsi_pkt *pkt;
-	int cmdlen;
-	int flags;
-	uint32_t timeout; /* time when the cmd should have completed */
-	struct buf *bp;
-	ddi_dma_handle_t buf_dma_handle;
-
-	/* For non-aligned buffer and SRB */
-	caddr_t abp;
-	ddi_acc_handle_t abh;
-
-	/* Data transfer state */
-	ddi_dma_cookie_t cookie;
-	uint_t left_cookien;
-	uint_t cur_win;
-	uint_t total_nwin;
-	size_t total_xfer;
-	uint64_t blkno;
-	uint32_t bcount;	/* buffer size in byte */
-	struct aac_sge *sgt;	/* sg table */
-
-	/* FIB construct function */
-	aac_cmd_fib_t aac_cmd_fib;
-	/* Call back function for completed command */
-	void (*ac_comp)(struct aac_softstate *, struct aac_cmd *);
-
-	struct aac_slot *slotp;	/* slot used by this command */
-	struct aac_device *dvp;	/* target device */
-
-	/* FIB for this IO command */
-	int fib_size; /* size of the FIB xferred to/from the card */
-	struct aac_fib *fibp;
-
-#ifdef DEBUG
-	uint32_t fib_flags;
-#endif
-};
 
 #ifdef DEBUG
 
