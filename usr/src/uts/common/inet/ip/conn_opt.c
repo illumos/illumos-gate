@@ -2834,6 +2834,7 @@ conn_inherit_parent(conn_t *lconnp, conn_t *econnp)
 	cred_t	*credp;
 	int	err;
 	void	*notify_cookie;
+	uint32_t xmit_hint;
 
 	econnp->conn_family = lconnp->conn_family;
 	econnp->conn_ipv6_v6only = lconnp->conn_ipv6_v6only;
@@ -2849,10 +2850,12 @@ conn_inherit_parent(conn_t *lconnp, conn_t *econnp)
 	ASSERT(econnp->conn_ixa->ixa_dce == NULL);
 	ASSERT(econnp->conn_ixa->ixa_nce == NULL);
 
-	/* Preserve ixa_notify_cookie */
+	/* Preserve ixa_notify_cookie and xmit_hint */
 	notify_cookie = econnp->conn_ixa->ixa_notify_cookie;
+	xmit_hint = econnp->conn_ixa->ixa_xmit_hint;
 	ixa_safe_copy(lconnp->conn_ixa, econnp->conn_ixa);
 	econnp->conn_ixa->ixa_notify_cookie = notify_cookie;
+	econnp->conn_ixa->ixa_xmit_hint = xmit_hint;
 
 	econnp->conn_bound_if = lconnp->conn_bound_if;
 	econnp->conn_incoming_ifindex = lconnp->conn_incoming_ifindex;
