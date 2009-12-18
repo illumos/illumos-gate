@@ -13062,7 +13062,7 @@ sata_set_dma_mode(sata_hba_inst_t *sata_hba_inst, sata_drive_info_t *sdinfo)
 	sata_pkt_t *spkt;
 	sata_cmd_t *scmd;
 	sata_pkt_txlate_t *spx;
-	int mode;
+	int i, mode;
 	uint8_t subcmd;
 	int rval = SATA_SUCCESS;
 
@@ -13088,14 +13088,26 @@ sata_set_dma_mode(sata_hba_inst_t *sata_hba_inst, sata_drive_info_t *sdinfo)
 #endif
 
 		/*
-		 * We're still going to set DMA mode whatever is selected
-		 * by default
+		 * For disk, we're still going to set DMA mode whatever is
+		 * selected by default
 		 *
 		 * We saw an old maxtor sata drive will select Ultra DMA and
 		 * Multi-Word DMA simultaneouly by default, which is going
 		 * to cause DMA command timed out, so we need to select DMA
 		 * mode even when it's already done by default
 		 */
+		if (sdinfo->satadrv_type != SATA_DTYPE_ATADISK) {
+
+			/* Find UDMA mode currently selected */
+			for (i = 6; i >= 0; --i) {
+				if (sdinfo->satadrv_id.ai_ultradma &
+				    (1 << (i + 8)))
+					break;
+			}
+			if (i >= mode)
+				/* Nothing to do */
+				return (SATA_SUCCESS);
+		}
 
 		subcmd = SATAC_TRANSFER_MODE_ULTRA_DMA;
 
@@ -13107,14 +13119,26 @@ sata_set_dma_mode(sata_hba_inst_t *sata_hba_inst, sata_drive_info_t *sdinfo)
 		}
 
 		/*
-		 * We're still going to set DMA mode whatever is selected
-		 * by default
+		 * For disk, We're still going to set DMA mode whatever is
+		 * selected by default
 		 *
 		 * We saw an old maxtor sata drive will select Ultra DMA and
 		 * Multi-Word DMA simultaneouly by default, which is going
 		 * to cause DMA command timed out, so we need to select DMA
 		 * mode even when it's already done by default
 		 */
+		if (sdinfo->satadrv_type != SATA_DTYPE_ATADISK) {
+
+			/* Find highest MultiWord DMA mode selected */
+			for (i = 2; i >= 0; --i) {
+				if (sdinfo->satadrv_id.ai_dworddma &
+				    (1 << (i + 8)))
+					break;
+			}
+			if (i >= mode)
+				/* Nothing to do */
+				return (SATA_SUCCESS);
+		}
 
 		subcmd = SATAC_TRANSFER_MODE_MULTI_WORD_DMA;
 	} else
