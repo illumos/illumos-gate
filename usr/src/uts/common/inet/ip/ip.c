@@ -14593,6 +14593,7 @@ ip_xmit(mblk_t *mp, nce_t *nce, iaflags_t ixaflags, uint_t pkt_len,
 	boolean_t	fp_mp;
 	ncec_t		*ncec = nce->nce_common;
 	int64_t		now = LBOLT_FASTPATH64;
+	boolean_t	is_probe;
 
 	DTRACE_PROBE1(ip__xmit, nce_t *, nce);
 
@@ -14855,13 +14856,14 @@ sendit:
 		 * the state could have changed since we didn't hold the lock.
 		 * Re-verify state under lock.
 		 */
+		is_probe = ipmp_packet_is_probe(mp, nce->nce_ill);
 		mutex_enter(&ncec->ncec_lock);
 		if (NCE_ISREACHABLE(ncec)) {
 			mutex_exit(&ncec->ncec_lock);
 			goto sendit;
 		}
 		/* queue the packet */
-		nce_queue_mp(ncec, mp, ipmp_packet_is_probe(mp, nce->nce_ill));
+		nce_queue_mp(ncec, mp, is_probe);
 		mutex_exit(&ncec->ncec_lock);
 		DTRACE_PROBE2(ip__xmit__incomplete,
 		    (ncec_t *), ncec, (mblk_t *), mp);
@@ -14872,12 +14874,13 @@ sendit:
 		 * State could have changed since we didn't hold the lock, so
 		 * re-verify state.
 		 */
+		is_probe = ipmp_packet_is_probe(mp, nce->nce_ill);
 		mutex_enter(&ncec->ncec_lock);
 		if (NCE_ISREACHABLE(ncec))  {
 			mutex_exit(&ncec->ncec_lock);
 			goto sendit;
 		}
-		nce_queue_mp(ncec, mp, ipmp_packet_is_probe(mp, nce->nce_ill));
+		nce_queue_mp(ncec, mp, is_probe);
 		if (ncec->ncec_state == ND_INITIAL) {
 			ncec->ncec_state = ND_INCOMPLETE;
 			mutex_exit(&ncec->ncec_lock);
