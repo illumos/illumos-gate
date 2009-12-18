@@ -53,7 +53,6 @@
 void	atge_l1e_device_reset(atge_t *);
 void	atge_l1e_stop_rx_mac(atge_t *);
 void	atge_l1e_stop_tx_mac(atge_t *);
-void	atge_l1e_interrupt(atge_t *, uint32_t, caddr_t);
 
 static ddi_dma_attr_t atge_l1e_dma_attr_tx_desc = {
 	DMA_ATTR_V0,		/* dma_attr_version */
@@ -151,20 +150,20 @@ atge_l1e_alloc_dma(atge_t *atgep)
 	atgep->atge_tx_ring->r_atge = atgep;
 	atgep->atge_tx_ring->r_desc_ring = NULL;
 	dma = atge_alloc_a_dma_blk(atgep, &atge_l1e_dma_attr_tx_desc,
-	    L1E_TX_RING_SZ, DDI_DMA_RDWR);
+	    ATGE_TX_RING_SZ, DDI_DMA_RDWR);
 	if (dma == NULL) {
 		ATGE_DB(("%s :%s failed",
 		    atgep->atge_name, __func__));
-		return (ATGE_FAILURE);
+		return (DDI_FAILURE);
 	}
 	atgep->atge_tx_ring->r_desc_ring = dma;
 
 	/*
 	 * Allocate DMA buffers for TX ring.
 	 */
-	err = atge_alloc_buffers(atgep->atge_tx_ring, L1E_TX_RING_CNT,
+	err = atge_alloc_buffers(atgep->atge_tx_ring, ATGE_TX_RING_CNT,
 	    atgep->atge_tx_buf_len, DDI_DMA_WRITE);
-	if (err != ATGE_SUCCESS) {
+	if (err != DDI_SUCCESS) {
 		ATGE_DB(("%s :%s() TX buffers failed",
 		    atgep->atge_name, __func__));
 		return (err);
@@ -190,23 +189,23 @@ atge_l1e_alloc_dma(atge_t *atgep)
 	    atgep->atge_name, __func__, l1e->atge_l1e_pagesize,
 	    L1E_RX_PAGE_SZ));
 
-	err = ATGE_SUCCESS;
+	err = DDI_SUCCESS;
 	for (pages = 0; pages < L1E_RX_PAGES; pages++) {
 		dma = atge_alloc_a_dma_blk(atgep, &atge_l1e_dma_attr_rx_desc,
 		    l1e->atge_l1e_pagesize, DDI_DMA_READ);
 
 		if (dma == NULL) {
-			err = ATGE_FAILURE;
+			err = DDI_FAILURE;
 			break;
 		}
 
 		l1e->atge_l1e_rx_page[pages] = dma;
 	}
 
-	if (err == ATGE_FAILURE) {
+	if (err == DDI_FAILURE) {
 		ATGE_DB(("%s :%s RX pages failed",
 		    atgep->atge_name, __func__));
-		return (ATGE_FAILURE);
+		return (DDI_FAILURE);
 	}
 
 	/*
@@ -215,25 +214,25 @@ atge_l1e_alloc_dma(atge_t *atgep)
 	ATGE_DB(("%s: %s() L1E_RX_CMB_SZ : %x", atgep->atge_name,
 	    __func__, L1E_RX_CMB_SZ));
 
-	err = ATGE_SUCCESS;
+	err = DDI_SUCCESS;
 	dma = atge_alloc_a_dma_blk(atgep, &atge_l1e_dma_attr_cmb,
 	    L1E_RX_CMB_SZ * L1E_RX_PAGES, DDI_DMA_RDWR);
 	if (dma == NULL) {
 		ATGE_DB(("%s :%s() RX CMB failed",
 		    atgep->atge_name, __func__));
-		return (ATGE_FAILURE);
+		return (DDI_FAILURE);
 	}
 	l1e->atge_l1e_rx_cmb = dma;
 
-	if (err == ATGE_FAILURE) {
+	if (err == DDI_FAILURE) {
 		ATGE_DB(("%s :%s() RX CMB failed",
 		    atgep->atge_name, __func__));
-		return (ATGE_FAILURE);
+		return (DDI_FAILURE);
 	}
 
 	atgep->atge_hw_stats = kmem_zalloc(sizeof (atge_l1e_smb_t), KM_SLEEP);
 
-	return (ATGE_SUCCESS);
+	return (DDI_SUCCESS);
 }
 
 void
@@ -245,7 +244,7 @@ atge_l1e_free_dma(atge_t *atgep)
 	 * Free TX ring.
 	 */
 	if (atgep->atge_tx_ring != NULL) {
-		atge_free_buffers(atgep->atge_tx_ring,  L1E_TX_RING_CNT);
+		atge_free_buffers(atgep->atge_tx_ring,  ATGE_TX_RING_CNT);
 
 		if (atgep->atge_tx_ring->r_desc_ring != NULL) {
 			atge_free_a_dma_blk(atgep->atge_tx_ring->r_desc_ring);
@@ -323,11 +322,11 @@ atge_l1e_init_tx_ring(atge_t *atgep)
 
 	atgep->atge_tx_ring->r_producer = 0;
 	atgep->atge_tx_ring->r_consumer = 0;
-	atgep->atge_tx_ring->r_avail_desc = L1E_TX_RING_CNT;
+	atgep->atge_tx_ring->r_avail_desc = ATGE_TX_RING_CNT;
 
-	bzero(atgep->atge_tx_ring->r_desc_ring->addr, L1E_TX_RING_SZ);
+	bzero(atgep->atge_tx_ring->r_desc_ring->addr, ATGE_TX_RING_SZ);
 
-	DMA_SYNC(atgep->atge_tx_ring->r_desc_ring, 0, L1E_TX_RING_SZ,
+	DMA_SYNC(atgep->atge_tx_ring->r_desc_ring, 0, ATGE_TX_RING_SZ,
 	    DDI_DMA_SYNC_FORDEV);
 }
 
@@ -355,7 +354,7 @@ atge_l1e_program_dma(atge_t *atgep)
 	OUTL(atgep, ATGE_DESC_ADDR_HI, ATGE_ADDR_HI(paddr));
 	OUTL(atgep, ATGE_DESC_TPD_ADDR_LO, ATGE_ADDR_LO(paddr));
 	OUTL(atgep, ATGE_DESC_TPD_CNT,
-	    (L1E_TX_RING_CNT << DESC_TPD_CNT_SHIFT) & DESC_TPD_CNT_MASK);
+	    (ATGE_TX_RING_CNT << DESC_TPD_CNT_SHIFT) & DESC_TPD_CNT_MASK);
 
 	/* Set Rx page base address, note we use single queue. */
 	paddr = l1e->atge_l1e_rx_page[0]->cookie.dmac_laddress;
@@ -654,68 +653,12 @@ atge_l1e_rx_next_pkt(atge_t *atgep, uint32_t len)
 }
 
 void
-atge_l1e_send_packet(atge_ring_t *r, int start, uint32_t pktlen)
+atge_l1e_send_packet(atge_ring_t *r)
 {
-	atge_l1e_tx_desc_t	*txd;
-	uchar_t *c;
-	uint32_t cflags = 0;
-
-	c = (uchar_t *)r->r_desc_ring->addr;
-	c += (sizeof (atge_l1e_tx_desc_t) * start);
-	txd = (atge_l1e_tx_desc_t *)c;
-
-	ATGE_PUT64(r->r_desc_ring, &txd->addr,
-	    r->r_buf_tbl[start]->cookie.dmac_laddress);
-
-	ATGE_PUT32(r->r_desc_ring, &txd->len, L1E_TX_BYTES(pktlen));
-
-	cflags |= L1E_TD_EOP;
-	ATGE_PUT32(r->r_desc_ring, &txd->flags, cflags);
-
-	/*
-	 * Sync buffer first.
-	 */
-	DMA_SYNC(r->r_buf_tbl[start], 0, pktlen, DDI_DMA_SYNC_FORDEV);
-
-	/*
-	 * Increment TX producer count by one.
-	 */
-	ATGE_DESC_INC(r->r_producer, L1E_TX_RING_CNT);
-
-	/*
-	 * Sync descriptor table.
-	 */
-	DMA_SYNC(r->r_desc_ring, 0, L1E_TX_RING_SZ, DDI_DMA_SYNC_FORDEV);
-
 	/*
 	 * Ask chip to send the packet now.
 	 */
 	OUTL(r->r_atge, ATGE_MBOX, r->r_producer);
-
-	r->r_atge->atge_opackets++;
-	r->r_atge->atge_obytes += pktlen;
-}
-
-void
-atge_l1e_tx_reclaim(atge_t *atgep)
-{
-	int start, end;
-
-	ASSERT(MUTEX_HELD(&atgep->atge_tx_lock));
-
-	end = INW(atgep, L1E_TPD_CONS_IDX);
-	start = atgep->atge_tx_ring->r_consumer;
-
-	ATGE_DB(("%s: %s() start : %d, end : %d, avail : %d",
-	    atgep->atge_name, __func__, start, end,
-	    atgep->atge_tx_ring->r_avail_desc));
-
-	while (start != end) {
-		atgep->atge_tx_ring->r_avail_desc++;
-		ATGE_DESC_INC(start, L1E_TX_RING_CNT);
-	}
-
-	atgep->atge_tx_ring->r_consumer = start;
 }
 
 void
@@ -889,4 +832,126 @@ atge_l1e_stop_mac(atge_t *atgep)
 		OUTL(atgep, ATGE_MAC_CFG, reg);
 		ATGE_DB(("%s: %s() mac stopped", atgep->atge_name, __func__));
 	}
+}
+
+/*
+ * The interrupt handler for L1E/L2E
+ */
+/*ARGSUSED*/
+uint_t
+atge_l1e_interrupt(caddr_t arg1, caddr_t arg2)
+{
+	atge_t *atgep = (void *)arg1;
+	mblk_t *rx_head = NULL;
+	uint32_t status;
+	int resched = 0;
+
+	ASSERT(atgep != NULL);
+
+	mutex_enter(&atgep->atge_intr_lock);
+
+	if (atgep->atge_chip_state & ATGE_CHIP_SUSPENDED) {
+		mutex_exit(&atgep->atge_intr_lock);
+		return (DDI_INTR_UNCLAIMED);
+	}
+
+	status = INL(atgep, ATGE_INTR_STATUS);
+	if (status == 0 || (status & atgep->atge_intrs) == 0) {
+		mutex_exit(&atgep->atge_intr_lock);
+
+		if (atgep->atge_flags & ATGE_FIXED_TYPE)
+			return (DDI_INTR_UNCLAIMED);
+
+		return (DDI_INTR_CLAIMED);
+	}
+
+	ATGE_DB(("%s: %s() entry status : %x",
+	    atgep->atge_name, __func__, status));
+
+
+	/*
+	 * Disable interrupts.
+	 */
+	OUTL(atgep, ATGE_INTR_STATUS, status | INTR_DIS_INT);
+	FLUSH(atgep, ATGE_INTR_STATUS);
+
+	/*
+	 * Check if chip is running, only then do the work.
+	 */
+	if (atgep->atge_chip_state & ATGE_CHIP_RUNNING) {
+		if (status & INTR_SMB) {
+			atge_l1e_gather_stats(atgep);
+		}
+
+		/*
+		 * Check for errors.
+		 */
+		if (status & L1E_INTR_ERRORS) {
+			atge_error(atgep->atge_dip,
+			    "L1E chip found an error intr status : %x",
+			    status);
+
+			if (status &
+			    (INTR_DMA_RD_TO_RST | INTR_DMA_WR_TO_RST)) {
+				atge_error(atgep->atge_dip, "DMA transfer err");
+
+				atge_device_stop(atgep);
+				goto done;
+			}
+
+			if (status & INTR_TX_FIFO_UNDERRUN) {
+				atge_error(atgep->atge_dip, "TX FIFO underrun");
+			}
+		}
+
+		rx_head = atge_l1e_receive(atgep);
+
+		if (status & INTR_TX_PKT) {
+			int cons;
+
+			mutex_enter(&atgep->atge_tx_lock);
+			cons = INW(atgep, L1E_TPD_CONS_IDX);
+			atge_tx_reclaim(atgep, cons);
+			if (atgep->atge_tx_resched) {
+				atgep->atge_tx_resched = 0;
+				resched = 1;
+			}
+
+			mutex_exit(&atgep->atge_tx_lock);
+		}
+	}
+
+	/*
+	 * Enable interrupts.
+	 */
+	OUTL(atgep, ATGE_INTR_STATUS, 0);
+
+done:
+
+	mutex_exit(&atgep->atge_intr_lock);
+
+	if (status & INTR_GPHY) {
+		/*
+		 * Ack interrupts from PHY
+		 */
+		(void) atge_mii_read(atgep,
+		    atgep->atge_phyaddr, ATGE_ISR_ACK_GPHY);
+
+		mii_check(atgep->atge_mii);
+	}
+
+	/*
+	 * Pass the list of packets received from chip to MAC layer.
+	 */
+	if (rx_head) {
+		mac_rx(atgep->atge_mh, 0, rx_head);
+	}
+
+	/*
+	 * Let MAC start sending pkts if the downstream was asked to pause.
+	 */
+	if (resched)
+		mac_tx_update(atgep->atge_mh);
+
+	return (DDI_INTR_CLAIMED);
 }

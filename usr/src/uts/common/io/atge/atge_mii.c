@@ -31,6 +31,7 @@
 #include "atge.h"
 #include "atge_cmn_reg.h"
 #include "atge_l1e_reg.h"
+#include "atge_l1_reg.h"
 
 uint16_t
 atge_mii_read(void *arg, uint8_t phy, uint8_t reg)
@@ -111,12 +112,12 @@ atge_l1e_mii_reset(void *arg)
 
 	phyaddr = mii_get_addr(atgep->atge_mii);
 
-	OUTW(atgep, L1E_GPHY_CTRL,
+	OUTW(atgep, ATGE_GPHY_CTRL,
 	    GPHY_CTRL_HIB_EN | GPHY_CTRL_HIB_PULSE | GPHY_CTRL_SEL_ANA_RESET |
 	    GPHY_CTRL_PHY_PLL_ON);
 	drv_usecwait(1000);
 
-	OUTW(atgep, L1E_GPHY_CTRL,
+	OUTW(atgep, ATGE_GPHY_CTRL,
 	    GPHY_CTRL_EXT_RESET | GPHY_CTRL_HIB_EN | GPHY_CTRL_HIB_PULSE |
 	    GPHY_CTRL_SEL_ANA_RESET | GPHY_CTRL_PHY_PLL_ON);
 	drv_usecwait(1000);
@@ -149,4 +150,63 @@ atge_l1e_mii_reset(void *arg)
 	atge_mii_write(atgep, phyaddr, ATPHY_DBG_ADDR, 0x05);
 	atge_mii_write(atgep, phyaddr, ATPHY_DBG_DATA, 0x2C46);
 	drv_usecwait(1000);
+}
+
+void
+atge_l1_mii_reset(void *arg)
+{
+	atge_t *atgep = arg;
+	int linkup, i;
+	uint16_t reg, pn;
+	int phyaddr;
+
+	phyaddr = mii_get_addr(atgep->atge_mii);
+
+	OUTL(atgep, ATGE_GPHY_CTRL, GPHY_CTRL_RST);
+	drv_usecwait(1000);
+
+	OUTL(atgep, ATGE_GPHY_CTRL, GPHY_CTRL_CLR);
+	drv_usecwait(1000);
+
+	atge_mii_write(atgep, phyaddr, MII_CONTROL, MII_CONTROL_RESET);
+
+	for (linkup = 0, pn = 0; pn < 4; pn++) {
+		atge_mii_write(atgep, phyaddr, ATPHY_CDTC,
+		    (pn << PHY_CDTC_POFF) | PHY_CDTC_ENB);
+
+		for (i = 200; i > 0; i--) {
+			drv_usecwait(1000);
+
+			reg = atge_mii_read(atgep, phyaddr, ATPHY_CDTC);
+
+			if ((reg & PHY_CDTC_ENB) == 0)
+				break;
+		}
+
+		drv_usecwait(1000);
+
+		reg = atge_mii_read(atgep, phyaddr, ATPHY_CDTS);
+
+		if ((reg & PHY_CDTS_STAT_MASK) != PHY_CDTS_STAT_OPEN) {
+			linkup++;
+			break;
+		}
+	}
+
+	atge_mii_write(atgep, phyaddr, MII_CONTROL,
+	    MII_CONTROL_RESET |  MII_CONTROL_ANE | MII_CONTROL_RSAN);
+
+	if (linkup == 0) {
+		atge_mii_write(atgep, phyaddr, ATPHY_DBG_ADDR, 0);
+		atge_mii_write(atgep, phyaddr, ATPHY_DBG_DATA, 0x124E);
+
+		atge_mii_write(atgep, phyaddr, ATPHY_DBG_ADDR, 1);
+		reg = atge_mii_read(atgep, phyaddr, ATPHY_DBG_DATA);
+		atge_mii_write(atgep, phyaddr, ATPHY_DBG_DATA, reg | 0x03);
+
+		drv_usecwait(1500 * 1000);
+
+		atge_mii_write(atgep, phyaddr, ATPHY_DBG_ADDR, 0);
+		atge_mii_write(atgep, phyaddr, ATPHY_DBG_DATA, 0x024E);
+	}
 }

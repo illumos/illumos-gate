@@ -124,6 +124,8 @@
 #define	INTR_FRAME_OK			0x04000000
 #define	INTR_CSUM_ERROR			0x08000000
 #define	INTR_PHY_LINK_DOWN		0x10000000
+#define	INTR_DIS_SM			0x20000000
+#define	INTR_DIS_DMA			0x40000000
 #define	INTR_DIS_INT			0x80000000
 
 /* L1E intr status */
@@ -214,6 +216,14 @@
 
 #define	MDIO_REG_ADDR(x)	\
 	(((x) << MDIO_REG_ADDR_SHIFT) & MDIO_REG_ADDR_MASK)
+
+#define	ATGE_GPHY_CTRL			0x140C	/* 16-bits */
+#define	GPHY_CTRL_RST			0x0000
+#define	GPHY_CTRL_CLR			0x0001
+#define	ATPHY_CDTC			0x16
+#define	PHY_CDTC_ENB			0x0001
+#define	PHY_CDTC_POFF			0x8
+#define	ATPHY_CDTS			0x1C
 
 
 #define	ATGE_PHY_ADDR			0
@@ -370,6 +380,14 @@
 
 #define	ATPHY_DBG_ADDR			0x1D
 #define	ATPHY_DBG_DATA			0x1E
+
+#define	ATGE_TD_EOP			0x00000001
+#define	ATGE_TD_BUFLEN_MASK		0x00003FFF
+#define	ATGE_TD_BUFLEN_SHIFT		0
+#define	ATGE_TX_BYTES(x)	\
+	(((x) << ATGE_TD_BUFLEN_SHIFT) & ATGE_TD_BUFLEN_MASK)
+
+#define	ATGE_ISR_ACK_GPHY		19
 
 #ifdef __cplusplus
 }

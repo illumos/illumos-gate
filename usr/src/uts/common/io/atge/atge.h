@@ -33,9 +33,6 @@
 #include <sys/mac_provider.h>
 #include "atge_l1e_reg.h"
 
-#define	ATGE_SUCCESS	1
-#define	ATGE_FAILURE	0
-
 #define	ATGE_PCI_REG_NUMBER	1
 
 #define	ROUNDUP(x, a)		(((x) + (a) - 1) & ~((a) - 1))
@@ -49,6 +46,7 @@
 #define	ATGE_MSIX_TYPE		0x0008
 #define	ATGE_FLAG_FASTETHER	0x0010
 #define	ATGE_FLAG_JUMBO		0x0020
+#define	ATGE_MII_CHECK		0x0040
 
 #define	ATGE_CHIP_L1_DEV_ID	0x1048
 #define	ATGE_CHIP_L2_DEV_ID	0x2048
@@ -75,7 +73,11 @@
 /*
  * Descriptor increment and decrment operation.
  */
-#define	ATGE_DESC_INC(x, y)	((x) = ((x) + 1) % (y))
+#define	ATGE_INC_SLOT(x, y)	\
+	((x) = ((x) + 1) % (y))
+
+#define	ATGE_DEC_SLOT(x, y)	\
+	(x = ((x + y - 1) % y))
 
 /*
  * I/O instructions
@@ -174,22 +176,6 @@ typedef	struct	atge_dma_data {
 	uint_t			count;
 } atge_dma_t;
 
-/*
- * TX descriptor table buffers.
- */
-typedef	struct	atge_tx_desc_tbl {
-	atge_dma_t	desc_dma;
-	void		*desc_buf;
-} atge_tx_desc_tbl_t;
-
-/*
- * RX descriptor table buffers.
- */
-typedef	struct	atge_rx_desc_tbl {
-	atge_dma_t	desc_dma;
-	void		*desc_buf;
-} atge_rx_desc_tbl_t;
-
 struct	atge;
 
 /*
@@ -220,6 +206,35 @@ typedef	struct	atge_l1e_data {
 } atge_l1e_data_t;
 
 /*
+ * L1 specific private data.
+ */
+typedef	struct	atge_l1_data {
+	atge_ring_t		*atge_rx_ring;
+	atge_dma_t		*atge_l1_cmb;
+	atge_dma_t		*atge_l1_rr;
+	atge_dma_t		*atge_l1_smb;
+	int			atge_l1_rr_consumers;
+	uint32_t		atge_l1_intr_status;
+	uint32_t		atge_l1_rx_prod_cons;
+	uint32_t		atge_l1_tx_prod_cons;
+} atge_l1_data_t;
+
+/*
+ * TX descriptor table is same with L1, L1E and L2E chips.
+ */
+#pragma pack(1)
+typedef struct  atge_tx_desc {
+	uint64_t	addr;
+	uint32_t	len;
+	uint32_t	flags;
+} atge_tx_desc_t;
+#pragma pack()
+
+#define	ATGE_TX_RING_CNT		256
+#define	ATGE_TX_RING_SZ	\
+	(sizeof (struct atge_tx_desc) * ATGE_TX_RING_CNT)
+
+/*
  * Private instance data structure (per-instance soft-state).
  */
 typedef	struct	atge {
@@ -232,6 +247,7 @@ typedef	struct	atge {
 	kmutex_t		atge_rx_lock;
 	kmutex_t		atge_intr_lock;
 	kmutex_t		atge_mii_lock;
+	kmutex_t		atge_mbox_lock;
 
 	/*
 	 * Instance number and devinfo pointer.
@@ -284,6 +300,7 @@ typedef	struct	atge {
 	int			atge_mtu;
 	int			atge_int_mod;
 	int			atge_max_frame_size;
+
 
 	/*
 	 * Ethernet addresses.
@@ -382,6 +399,10 @@ extern	void	atge_free_buffers(atge_ring_t *, size_t);
 extern	void	atge_stop_timer(atge_t *);
 extern	void	atge_start_timer(atge_t *);
 extern	void	atge_mii_write(void *, uint8_t, uint8_t, uint16_t);
+extern	uint16_t	atge_mii_read(void *, uint8_t, uint8_t);
+extern	void	atge_device_stop(atge_t *);
+extern	void	atge_tx_reclaim(atge_t *, int);
+
 
 #ifdef __cplusplus
 }

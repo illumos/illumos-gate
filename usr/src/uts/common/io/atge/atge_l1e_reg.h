@@ -46,12 +46,6 @@ typedef	struct	rx_rs	{
 typedef	struct	rx_cmb {
 	uint32_t	cmb[L1E_RX_PAGES];
 } rx_cmb_t;
-
-typedef	struct	atge_l1e_tx_desc {
-	uint64_t	addr;
-	uint32_t	len;
-	uint32_t	flags;
-} atge_l1e_tx_desc_t;
 #pragma	pack()
 
 /*
@@ -71,7 +65,6 @@ typedef	struct	atge_l1e_tx_desc {
 #define	DMA_CFG_RD_DELAY_CNT_DEFAULT	15
 #define	DMA_CFG_WR_DELAY_CNT_DEFAULT	4
 
-#define	L1E_TX_RING_CNT			256	/* Should be multiple of 4. */
 #define	L1E_TX_RING_CNT_MIN		32
 #define	L1E_TX_RING_CNT_MAX		1020
 #define	L1E_TX_RING_ALIGN		8
@@ -79,8 +72,6 @@ typedef	struct	atge_l1e_tx_desc {
 #define	L1E_CMB_ALIGN			32
 #define	L1E_MAX_FRAMELEN		ETHERMAX
 
-#define	L1E_TX_RING_SZ	\
-	(sizeof (struct atge_l1e_tx_desc) * L1E_TX_RING_CNT)
 #define	L1E_RX_PAGE_SZ_MIN		(8 * 1024)
 #define	L1E_RX_PAGE_SZ_MAX		(1024 * 1024)
 #define	L1E_RX_FRAMES_PAGE		128
@@ -108,7 +99,6 @@ typedef	struct	atge_l1e_tx_desc {
 
 #define	L1E_SMB_STAT_TIMER		0x15C4
 
-#define	L1E_GPHY_CTRL			0x140C	/* 16-bits */
 #define	GPHY_CTRL_EXT_RESET		0x0001
 #define	GPHY_CTRL_PIPE_MOD		0x0002
 #define	GPHY_CTRL_BERT_START		0x0010
@@ -166,10 +156,6 @@ typedef	struct	atge_l1e_tx_desc {
 #define	L1E_TX_CMB_ADDR_LO		0x1840
 #define	L1E_SMB_ADDR_LO			0x1844
 
-#define	L1E_ISR_GPHY			0x00001000U
-#define	L1E_ISR_ACK_GPHY		19
-
-
 #define	L1E_RD_SEQNO_MASK		0x0000FFFF
 #define	L1E_RD_HASH_MASK		0xFFFF0000
 #define	L1E_RD_SEQNO_SHIFT		0
@@ -220,13 +206,10 @@ typedef	struct	atge_l1e_tx_desc {
 #define	L1E_TD_VLAN_MASK		0xFFFF0000
 #define	L1E_TD_PKT_INT			0x00008000
 #define	L1E_TD_DMA_INT			0x00004000
-#define	L1E_TD_BUFLEN_MASK		0x00003FFF
 #define	L1E_TD_VLAN_SHIFT		16
 #define	L1E_TX_VLAN_TAG(x)	\
 	(((x) << 4) | ((x) >> 13) | (((x) >> 9) & 8))
 #define	L1E_TD_BUFLEN_SHIFT		0
-#define	L1E_TX_BYTES(x)		\
-	(((x) << L1E_TD_BUFLEN_SHIFT) & L1E_TD_BUFLEN_MASK)
 #define	L1E_TD_MSS			0xFFF80000
 #define	L1E_TD_TSO_HDR			0x00040000
 #define	L1E_TD_TCPHDR_LEN		0x0003C000
@@ -242,7 +225,6 @@ typedef	struct	atge_l1e_tx_desc {
 #define	L1E_TD_CXSUM			0x00000008
 #define	L1E_TD_INSERT_VLAN_TAG		0x00000004
 #define	L1E_TD_IPV6			0x00000002
-#define	L1E_TD_EOP			0x00000001
 
 #define	L1E_TD_CSUM_PLOADOFFSET		0x00FF0000
 #define	L1E_TD_CSUM_XSUMOFFSET		0xFF000000
