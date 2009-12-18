@@ -107,7 +107,8 @@ struct pmcs_xscsi {
 		dev_state	:	4;
 	uint16_t			maxdepth;
 	uint16_t			qdepth;
-	uint16_t			actv_cnt;
+	uint16_t			actv_cnt;	/* Pkts ON CHIP */
+	uint16_t			actv_pkts;	/* Pkts in driver */
 	uint16_t			target_num;
 	/* statlock protects both target stats and the special queue (sq) */
 	kmutex_t			statlock;
@@ -228,7 +229,7 @@ typedef struct pmcs_iqp_trace_s {
 /*
  * HBA iport node softstate
  */
-#define	PMCS_IPORT_INVALID_PORT_ID	0xffff
+#define	PMCS_IPORT_INVALID_PORT_ID	0xf
 
 struct pmcs_iport {
 	kmutex_t	lock;		/* iport lock */

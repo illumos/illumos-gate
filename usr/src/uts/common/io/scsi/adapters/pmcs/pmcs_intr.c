@@ -700,8 +700,27 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 				mutex_exit(&iport->lock);
 			}
 
+			/* Clear down all PHYs in the port */
+			for (pptr = pwp->root_phys; pptr;
+			    pptr = pptr->sibling) {
+				pmcs_lock_phy(pptr);
+				if (pptr->portid == portid) {
+					pptr->dtype = NOTHING;
+					pptr->portid =
+					    PMCS_IPORT_INVALID_PORT_ID;
+					if (pptr->valid_device_id) {
+						pptr->deregister_wait = 1;
+					}
+				}
+				pmcs_unlock_phy(pptr);
+				SCHEDULE_WORK(pwp, PMCS_WORK_DEREGISTER_DEV);
+				(void) ddi_taskq_dispatch(pwp->tq, pmcs_worker,
+				    pwp, DDI_NOSLEEP);
+			}
+
 			break;
 		}
+
 		if (IOP_EVENT_PORT_STATE(w3) == IOP_EVENT_PS_LOSTCOMM) {
 			pmcs_prt(pwp, PMCS_PRT_INFO, NULL, NULL,
 			    "PortID 0x%x: PHY 0x%x TEMPORARILY DOWN",
@@ -747,10 +766,12 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 			pptr->width = IOP_EVENT_NPIP(w3);
 			mutex_exit(&pptr->phy_lock);
 
-			/* Clear the iport reference on the subphy */
+			/* Clear the iport reference and portid on the subphy */
 			mutex_enter(&subphy->phy_lock);
 			iport = subphy->iport;
 			subphy->iport = NULL;
+			subphy->portid = PMCS_PHY_INVALID_PORT_ID;
+			subphy->dtype = NOTHING;
 			mutex_exit(&subphy->phy_lock);
 
 			/*
@@ -828,11 +849,17 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		    SAS_PHY_OFFLINE, pptr);
 		mutex_exit(&pptr->phy_lock);
 
-		/* Clear the iport reference on the subphy */
-		mutex_enter(&subphy->phy_lock);
+		/* Clear the iport reference and portid on the subphy */
+		pmcs_lock_phy(subphy);
 		iport = subphy->iport;
+		subphy->deregister_wait = 1;
 		subphy->iport = NULL;
-		mutex_exit(&subphy->phy_lock);
+		subphy->portid = PMCS_PHY_INVALID_PORT_ID;
+		subphy->dtype = NOTHING;
+		pmcs_unlock_phy(subphy);
+		SCHEDULE_WORK(pwp, PMCS_WORK_DEREGISTER_DEV);
+		(void) ddi_taskq_dispatch(pwp->tq, pmcs_worker,
+		    pwp, DDI_NOSLEEP);
 
 		/*
 		 * If the iport was set on this phy, decrement its

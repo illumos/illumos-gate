@@ -52,6 +52,7 @@ static int pmcs_smp_function_result(pmcs_hw_t *, smp_response_frame_t *);
 static boolean_t pmcs_validate_devid(pmcs_phy_t *, pmcs_phy_t *, uint32_t);
 static void pmcs_clear_phys(pmcs_hw_t *, pmcs_phy_t *);
 static int pmcs_configure_new_devices(pmcs_hw_t *, pmcs_phy_t *);
+static void pmcs_begin_observations(pmcs_hw_t *);
 static boolean_t pmcs_report_observations(pmcs_hw_t *);
 static boolean_t pmcs_report_iport_observations(pmcs_hw_t *, pmcs_iport_t *,
     pmcs_phy_t *);
@@ -716,6 +717,10 @@ pmcs_reset_phy(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint8_t type)
 	level = pptr->level;
 	if (level > 0) {
 		pdevid = pptr->parent->device_id;
+	} else if ((level == 0) && (pptr->dtype == EXPANDER)) {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, pptr->target,
+		    "%s: Not resetting HBA PHY @ %s", __func__, pptr->path);
+		return (0);
 	}
 
 	pwrk = pmcs_gwork(pwp, PMCS_TAG_TYPE_WAIT, pptr);
@@ -800,10 +805,9 @@ pmcs_reset_phy(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint8_t type)
 	pmcs_unlock_phy(pptr);
 	WAIT_FOR(pwrk, 1000, result);
 	pmcs_pwork(pwp, pwrk);
-	pmcs_lock_phy(pptr);
-
-	/* SMP serialization */
+	/* Release SMP lock before reacquiring PHY lock */
 	pmcs_smp_release(pptr->iport);
+	pmcs_lock_phy(pptr);
 
 	if (result) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL, pmcs_timeo, __func__);
@@ -832,7 +836,7 @@ pmcs_reset_phy(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint8_t type)
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 		    "%s: %s action returned %s for %s", __func__, mbar, es,
 		    pptr->path);
-		return (EIO);
+		return (status);
 	}
 
 	return (0);
@@ -1120,6 +1124,7 @@ int
 pmcs_abort_handler(pmcs_hw_t *pwp)
 {
 	pmcs_phy_t *pptr, *pnext, *pnext_uplevel[PMCS_MAX_XPND];
+	pmcs_xscsi_t *tgt;
 	int r, level = 0;
 
 	pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL, "%s", __func__);
@@ -1164,6 +1169,22 @@ pmcs_abort_handler(pmcs_hw_t *pwp)
 			goto next_phy;
 		}
 		pptr->abort_sent = 1;
+
+		/*
+		 * If the iport is no longer active, flush the queues
+		 */
+		if ((pptr->iport == NULL) ||
+		    (pptr->iport->ua_state != UA_ACTIVE)) {
+			tgt = pptr->target;
+			if (tgt) {
+				pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, tgt,
+				    "%s: Clearing target 0x%p, inactive iport",
+				    __func__, (void *) tgt);
+				mutex_enter(&tgt->statlock);
+				pmcs_clear_xp(pwp, tgt);
+				mutex_exit(&tgt->statlock);
+			}
+		}
 
 next_phy:
 		if (pptr->children) {
@@ -1338,6 +1359,8 @@ pmcs_deregister_device(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 		    "%s: device %s deregistered", __func__, pptr->path);
 		pptr->valid_device_id = 0;
 		pptr->device_id = PMCS_INVALID_DEVICE_ID;
+		pptr->configured = 0;
+		pptr->deregister_wait = 0;
 	}
 }
 
@@ -2155,6 +2178,8 @@ pmcs_promote_next_phy(pmcs_phy_t *prev_primary)
 	prev_primary->subsidiary = 1;
 	prev_primary->children = NULL;
 	prev_primary->target = NULL;
+	pptr->device_id = prev_primary->device_id;
+	pptr->valid_device_id = 1;
 	pmcs_unlock_phy(prev_primary);
 
 	/*
@@ -2339,6 +2364,11 @@ pmcs_discover(pmcs_hw_t *pwp)
 	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL, "Discovery begin");
 
 	/*
+	 * First, tell SCSA that we're beginning set operations.
+	 */
+	pmcs_begin_observations(pwp);
+
+	/*
 	 * The order of the following traversals is important.
 	 *
 	 * The first one checks for changed expanders.
@@ -2513,21 +2543,15 @@ pmcs_find_phy_needing_work(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 }
 
 /*
- * Report current observations to SCSA.
+ * We may (or may not) report observations to SCSA.  This is prefaced by
+ * issuing a set_begin for each iport target map.
  */
-static boolean_t
-pmcs_report_observations(pmcs_hw_t *pwp)
+static void
+pmcs_begin_observations(pmcs_hw_t *pwp)
 {
 	pmcs_iport_t		*iport;
 	scsi_hba_tgtmap_t	*tgtmap;
-	char			*ap;
-	pmcs_phy_t		*pptr;
-	uint64_t		wwn;
 
-	/*
-	 * Observation is stable, report what we currently see to the tgtmaps
-	 * for delta processing. Start by setting BEGIN on all tgtmaps.
-	 */
 	rw_enter(&pwp->iports_lock, RW_READER);
 	for (iport = list_head(&pwp->iports); iport != NULL;
 	    iport = list_next(&pwp->iports, iport)) {
@@ -2552,16 +2576,29 @@ pmcs_report_observations(pmcs_hw_t *pwp)
 			pmcs_prt(pwp, PMCS_PRT_DEBUG_MAP, NULL, NULL,
 			    "%s: cannot set_begin tgtmap ", __func__);
 			rw_exit(&pwp->iports_lock);
-			return (B_FALSE);
+			return;
 		}
 		pmcs_prt(pwp, PMCS_PRT_DEBUG_MAP, NULL, NULL,
 		    "%s: set begin on tgtmap [0x%p]", __func__, (void *)tgtmap);
 	}
 	rw_exit(&pwp->iports_lock);
+}
+
+/*
+ * Report current observations to SCSA.
+ */
+static boolean_t
+pmcs_report_observations(pmcs_hw_t *pwp)
+{
+	pmcs_iport_t		*iport;
+	scsi_hba_tgtmap_t	*tgtmap;
+	char			*ap;
+	pmcs_phy_t		*pptr;
+	uint64_t		wwn;
 
 	/*
-	 * Now, cycle through all levels of all phys and report
-	 * observations into their respective tgtmaps.
+	 * Observation is stable, report what we currently see to the tgtmaps
+	 * for delta processing.
 	 */
 	pptr = pwp->root_phys;
 
@@ -3013,6 +3050,7 @@ pmcs_clear_phy(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 	pptr->need_rl_ext = 0;
 	pptr->subsidiary = 0;
 	pptr->configured = 0;
+	pptr->deregister_wait = 0;
 	/* Only mark dead if it's not a root PHY and its dtype isn't NOTHING */
 	/* XXX: What about directly attached disks? */
 	if (!IS_ROOT_PHY(pptr) && (pptr->dtype != NOTHING))
@@ -3980,10 +4018,9 @@ again:
 
 	pmcs_unlock_phy(pptr);
 	WAIT_FOR(pwrk, 1000, result);
-	pmcs_lock_phy(pptr);
-
-	/* SMP serialization */
+	/* Release SMP lock before reacquiring PHY lock */
 	pmcs_smp_release(pptr->iport);
+	pmcs_lock_phy(pptr);
 
 	pmcs_pwork(pwp, pwrk);
 
@@ -4211,10 +4248,9 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
 	 */
 	pmcs_unlock_phy(expander);
 	WAIT_FOR(pwrk, 1000, result);
-	pmcs_lock_phy(expander);
-
-	/* SMP serialization */
+	/* Release SMP lock before reacquiring PHY lock */
 	pmcs_smp_release(expander->iport);
+	pmcs_lock_phy(expander);
 
 	pmcs_pwork(pwp, pwrk);
 
@@ -6590,6 +6626,7 @@ pmcs_clear_xp(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 	xp->wq_recovery_tail = NULL;
 	/* Don't clear xp->phy */
 	/* Don't clear xp->actv_cnt */
+	/* Don't clear xp->actv_pkts */
 
 	/*
 	 * Flush all target queues
@@ -7788,5 +7825,20 @@ pmcs_update_phy_pm_props(pmcs_phy_t *phyp, uint64_t att_bv, uint64_t tgt_bv,
 		(void) smp_device_prop_update_string(phyp->target->smpd,
 		    SCSI_ADDR_PROP_TARGET_PORT_PM,
 		    phyp->tgt_port_pm_str);
+	}
+}
+
+/* ARGSUSED */
+void
+pmcs_deregister_device_work(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
+{
+	pmcs_phy_t	*pptr;
+
+	for (pptr = pwp->root_phys; pptr; pptr = pptr->sibling) {
+		pmcs_lock_phy(pptr);
+		if (pptr->deregister_wait) {
+			pmcs_deregister_device(pwp, pptr);
+		}
+		pmcs_unlock_phy(pptr);
 	}
 }

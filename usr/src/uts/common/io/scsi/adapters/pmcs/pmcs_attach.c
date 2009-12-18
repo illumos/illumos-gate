@@ -866,6 +866,7 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		pmcs_phy_name(pwp, phyp, phyp->path, sizeof (phyp->path));
 		phyp->pwp = pwp;
 		phyp->device_id = PMCS_INVALID_DEVICE_ID;
+		phyp->portid = PMCS_PHY_INVALID_PORT_ID;
 		phyp++;
 	}
 
@@ -1754,6 +1755,10 @@ pmcs_worker(void *arg)
 		pmcs_dev_state_recovery(pwp, NULL);
 	}
 
+	if (work_flags & PMCS_WORK_FLAG_DEREGISTER_DEV) {
+		pmcs_deregister_device_work(pwp, NULL);
+	}
+
 	if (work_flags & PMCS_WORK_FLAG_DISCOVER) {
 		pmcs_discover(pwp);
 	}
@@ -1841,6 +1846,7 @@ pmcs_check_commands(pmcs_hw_t *pwp)
 	pmcwork_t *pwrk;
 	pmcs_xscsi_t *target;
 	pmcs_phy_t *phyp;
+	int rval;
 
 	for (pwrk = pwp->work; pwrk < &pwp->work[pwp->max_cmd]; pwrk++) {
 		mutex_enter(&pwrk->lock);
@@ -1962,20 +1968,39 @@ pmcs_check_commands(pmcs_hw_t *pwp)
 			continue;
 		}
 
-		/*
-		 * See if we're already waiting for device state recovery
-		 */
-		if (target->recover_wait) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, phyp, target,
-			    "%s: Target %p already in recovery", __func__,
-			    (void *)target);
-			mutex_exit(&target->statlock);
-			pmcs_unlock_phy(phyp);
-			continue;
-		}
-
-		pmcs_start_dev_state_recovery(target, phyp);
 		mutex_exit(&target->statlock);
+		rval = pmcs_abort(pwp, phyp, pwrk->htag, 0, 1);
+		if (rval) {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, phyp, target,
+			    "%s: Bad status (%d) on abort of HTAG 0x%08x",
+			    __func__, rval, pwrk->htag);
+			pmcs_unlock_phy(phyp);
+			mutex_enter(&pwrk->lock);
+			if (!PMCS_COMMAND_DONE(pwrk)) {
+				/* Complete this command here */
+				pmcs_prt(pwp, PMCS_PRT_DEBUG, phyp, target,
+				    "%s: Completing cmd (htag 0x%08x) "
+				    "anyway", __func__, pwrk->htag);
+				if (target->dev_gone) {
+					pwrk->dead = 1;
+					CMD2PKT(sp)->pkt_reason = CMD_DEV_GONE;
+					CMD2PKT(sp)->pkt_state = STATE_GOT_BUS;
+				}
+				pmcs_complete_work_impl(pwp, pwrk, NULL, 0);
+			} else {
+				mutex_exit(&pwrk->lock);
+			}
+			pmcs_lock_phy(phyp);
+			/*
+			 * No need to reschedule ABORT if we get any other
+			 * status
+			 */
+			if (rval == ENOMEM) {
+				phyp->abort_sent = 0;
+				phyp->abort_pending = 1;
+				SCHEDULE_WORK(pwp, PMCS_WORK_ABORT_HANDLE);
+			}
+		}
 		pmcs_unlock_phy(phyp);
 	}
 	/*

@@ -325,6 +325,8 @@ pmcs_iport_walk_cb(uintptr_t addr, const void *wdata, void *priv)
 
 	if (iport.portid == 0xffff) {
 		mdb_snprintf(portid, sizeof (portid), "%s", "-");
+	} else if (iport.portid == PMCS_IPORT_INVALID_PORT_ID) {
+		mdb_snprintf(portid, sizeof (portid), "%s", "N/A");
 	} else {
 		mdb_snprintf(portid, sizeof (portid), "%d", iport.portid);
 	}
@@ -560,8 +562,8 @@ display_targets(struct pmcs_hw m, int verbose, int totals_only)
 	if (!totals_only) {
 		mdb_printf("\nTarget information:\n");
 		mdb_printf("---------------------------------------\n");
-		mdb_printf("VTGT %-16s %-16s %-5s %8s %s", "SAS Address",
-		    "PHY Address", "DType", "Active", "DS");
+		mdb_printf("VTGT %-16s %-16s %-5s %4s %6s %s", "SAS Address",
+		    "PHY Address", "DType", "Actv", "OnChip", "DS");
 		mdb_printf("\n");
 	}
 
@@ -616,7 +618,8 @@ display_targets(struct pmcs_hw m, int verbose, int totals_only)
 			mdb_printf("%4d %16s", idx, "<no phy avail>");
 		}
 		mdb_printf(" %5s", dtype);
-		mdb_printf(" %8d", xs.actv_cnt);
+		mdb_printf(" %4d", xs.actv_pkts);
+		mdb_printf(" %6d", xs.actv_cnt);
 		mdb_printf(" %2d", xs.dev_state);
 
 		if (verbose) {
@@ -1682,8 +1685,8 @@ display_phys(struct pmcs_hw ss, int verbose, struct pmcs_phy *parent, int level,
 #define	MAX_INST_STRLEN	8
 
 static int
-pmcs_dump_tracelog(boolean_t filter, int instance, const char *phy_path,
-    uint64_t sas_address)
+pmcs_dump_tracelog(boolean_t filter, int instance, uint64_t tail_lines,
+    const char *phy_path, uint64_t sas_address)
 {
 	pmcs_tbuf_t *tbuf_addr;
 	uint_t tbuf_idx;
@@ -1737,13 +1740,37 @@ pmcs_dump_tracelog(boolean_t filter, int instance, const char *phy_path,
 #endif
 	sas_addressp = (uint8_t *)&sas_addr;
 
+	/* Ensure the tail number isn't greater than the size of the log */
+	if (tail_lines > tbuf_num_elems) {
+		tail_lines = tbuf_num_elems;
+	}
+
 	/* Figure out where we start and stop */
 	if (wrap) {
-		start_idx = tbuf_idx;
-		elems_to_print = tbuf_num_elems;
+		if (tail_lines) {
+			/* Do we need to wrap backwards? */
+			if (tail_lines > tbuf_idx) {
+				start_idx = tbuf_num_elems - (tail_lines -
+				    tbuf_idx);
+			} else {
+				start_idx = tbuf_idx - tail_lines;
+			}
+			elems_to_print = tail_lines;
+		} else {
+			start_idx = tbuf_idx;
+			elems_to_print = tbuf_num_elems;
+		}
 	} else {
-		start_idx = 0;
-		elems_to_print = tbuf_idx;
+		if (tail_lines > tbuf_idx) {
+			tail_lines = tbuf_idx;
+		}
+		if (tail_lines) {
+			start_idx = tbuf_idx - tail_lines;
+			elems_to_print = tail_lines;
+		} else {
+			start_idx = 0;
+			elems_to_print = tbuf_idx;
+		}
 	}
 
 	idx = start_idx;
@@ -2202,7 +2229,7 @@ pmcs_log(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	struct pmcs_hw	ss;
 	struct dev_info	dip;
 	const char	*match_phy_path = NULL;
-	uint64_t 	match_sas_address = 0;
+	uint64_t 	match_sas_address = 0, tail_lines = 0;
 
 	if (!(flags & DCMD_ADDRSPEC)) {
 		pmcs_state = NULL;
@@ -2219,6 +2246,7 @@ pmcs_log(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	if (mdb_getopts(argc, argv,
+	    'l', MDB_OPT_UINT64, &tail_lines,
 	    'p', MDB_OPT_STR, &match_phy_path,
 	    's', MDB_OPT_UINT64, &match_sas_address,
 	    NULL) != argc) {
@@ -2237,10 +2265,10 @@ pmcs_log(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (!(flags & DCMD_LOOP)) {
 		return (pmcs_dump_tracelog(B_TRUE, dip.devi_instance,
-		    match_phy_path, match_sas_address));
+		    tail_lines, match_phy_path, match_sas_address));
 	} else if (flags & DCMD_LOOPFIRST) {
-		return (pmcs_dump_tracelog(B_FALSE, 0, match_phy_path,
-		    match_sas_address));
+		return (pmcs_dump_tracelog(B_FALSE, 0, tail_lines,
+		    match_phy_path, match_sas_address));
 	} else {
 		return (DCMD_OK);
 	}
@@ -2425,6 +2453,7 @@ void
 pmcs_log_help()
 {
 	mdb_printf("Dump the pmcs log buffer, possibly with filtering.\n"
+	    "    -l TAIL_LINES:          Dump the last TAIL_LINES messages\n"
 	    "    -p PHY_PATH:            Dump messages matching PHY_PATH\n"
 	    "    -s SAS_ADDRESS:         Dump messages matching SAS_ADDRESS\n\n"
 	    "Where: PHY_PATH can be found with ::pmcs -p (e.g. pp04.18.18.01)\n"
@@ -2446,7 +2475,7 @@ static const mdb_dcmd_t dcmds[] = {
 	    pmcs_dcmd, pmcs_help
 	},
 	{ "pmcs_log",
-	    "?[-p PHY_PATH | -s SAS_ADDRESS]",
+	    "?[-p PHY_PATH | -s SAS_ADDRESS | -l TAIL_LINES]",
 	    "dump pmcs log file", pmcs_log, pmcs_log_help
 	},
 	{ "pmcs_tag", "?[-t tagtype|-s serialnum|-i index]",

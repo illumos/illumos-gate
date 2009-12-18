@@ -522,6 +522,7 @@ pmcs_scsa_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	 * First, check to see if the device is gone.
 	 */
 	if (xp->dev_gone) {
+		xp->actv_pkts++;
 		mutex_exit(&xp->statlock);
 		pmcs_prt(pwp, PMCS_PRT_DEBUG3, NULL, xp,
 		    "%s: dropping due to dead target 0x%p",
@@ -535,6 +536,7 @@ pmcs_scsa_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	if (blocked) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: hba blocked", __func__);
+		xp->actv_pkts++;
 		mutex_exit(&xp->statlock);
 		mutex_enter(&xp->wqlock);
 		STAILQ_INSERT_TAIL(&xp->wq, sp, cmd_next);
@@ -546,6 +548,7 @@ pmcs_scsa_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	 * If we're draining or resetting, queue and return.
 	 */
 	if (xp->draining || xp->resetting || xp->recover_wait) {
+		xp->actv_pkts++;
 		mutex_exit(&xp->statlock);
 		mutex_enter(&xp->wqlock);
 		STAILQ_INSERT_TAIL(&xp->wq, sp, cmd_next);
@@ -563,6 +566,8 @@ pmcs_scsa_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		SCHEDULE_WORK(pwp, PMCS_WORK_RUN_QUEUES);
 		return (TRAN_ACCEPT);
 	}
+
+	xp->actv_pkts++;
 	mutex_exit(&xp->statlock);
 
 	/*
@@ -885,6 +890,14 @@ pmcs_addr2xp(struct scsi_address *ap, uint64_t *lp, pmcs_cmd_t *sp)
 	mutex_enter(&xp->statlock);
 
 	if (xp->dev_gone || (xp->phy == NULL)) {
+		/*
+		 * This may be a retried packet, so it's possible cmd_target
+		 * and cmd_lun may still be populated.  Clear them.
+		 */
+		if (sp != NULL) {
+			sp->cmd_target = NULL;
+			sp->cmd_lun = NULL;
+		}
 		mutex_exit(&xp->statlock);
 		return (NULL);
 	}
@@ -1042,10 +1055,9 @@ pmcs_smp_start(struct smp_pkt *smp_pkt)
 	pmcs_unlock_phy(pptr);
 	WAIT_FOR(pwrk, smp_pkt->smp_pkt_timeout * 1000, result);
 	pmcs_pwork(pwp, pwrk);
-	pmcs_lock_phy(pptr);
-
-	/* SMP serialization */
+	/* Release SMP lock before reacquiring PHY lock */
 	pmcs_smp_release(pptr->iport);
+	pmcs_lock_phy(pptr);
 
 	if (result) {
 		pmcs_timed_out(pwp, htag, __func__);
@@ -1634,6 +1646,7 @@ pmcs_scsa_cq_run(void *arg)
 	pmcs_hw_t *pwp = cqti->cq_pwp;
 	pmcs_cmd_t *sp, *nxt;
 	struct scsi_pkt *pkt;
+	pmcs_xscsi_t *tgt;
 	pmcs_iocomp_cb_t *ioccb, *ioccb_next;
 	pmcs_cb_t callback;
 	uint32_t niodone;
@@ -1688,9 +1701,16 @@ pmcs_scsa_cq_run(void *arg)
 		while (sp) {
 			nxt = STAILQ_NEXT(sp, cmd_next);
 			pkt = CMD2PKT(sp);
-			pmcs_prt(pwp, PMCS_PRT_DEBUG3, NULL, sp->cmd_target,
+			tgt = sp->cmd_target;
+			pmcs_prt(pwp, PMCS_PRT_DEBUG3, NULL, tgt,
 			    "%s: calling completion on %p for tgt %p", __func__,
-			    (void *)sp, (void *)sp->cmd_target);
+			    (void *)sp, (void *)tgt);
+			if (tgt) {
+				mutex_enter(&tgt->statlock);
+				ASSERT(tgt->actv_pkts != 0);
+				tgt->actv_pkts--;
+				mutex_exit(&tgt->statlock);
+			}
 			scsi_hba_pkt_comp(pkt);
 			sp = nxt;
 		}
@@ -1904,6 +1924,10 @@ pmcs_SAS_done(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *msg)
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, xp,
 		    "%s: cmd 0x%p (tag 0x%x) timed out for %s",
 		    __func__, (void *)sp, pwrk->htag, pptr->path);
+		CMD2PKT(sp)->pkt_scbp[0] = STATUS_GOOD;
+		CMD2PKT(sp)->pkt_state |= STATE_GOT_BUS | STATE_GOT_TARGET |
+		    STATE_SENT_CMD;
+		CMD2PKT(sp)->pkt_statistics |= STAT_TIMEOUT;
 		goto out;
 	}
 
@@ -1925,7 +1949,7 @@ pmcs_SAS_done(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *msg)
 	case PMCOUT_STATUS_IO_DS_NON_OPERATIONAL:
 	case PMCOUT_STATUS_IO_DS_IN_RECOVERY:
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, xp,
-		    "%s: PHY %s requires device state recovery (status=%d)",
+		    "%s: PHY %s requires DS recovery (status=%d)",
 		    __func__, pptr->path, sts);
 		do_ds_recovery = B_TRUE;
 		break;

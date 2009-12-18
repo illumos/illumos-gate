@@ -34,7 +34,7 @@
  */
 static void pmcs_ds_operational(pmcs_phy_t *pptr, pmcs_xscsi_t *tgt);
 static void pmcs_handle_ds_recovery_error(pmcs_phy_t *phyp,
-    pmcs_xscsi_t *tgt, pmcs_hw_t *pwp, const char *func_name, int line,
+    pmcs_xscsi_t *tgt, pmcs_hw_t *pwp, const char *func_name,
     char *reason_string);
 
 /*
@@ -81,6 +81,7 @@ pmcs_get_dev_state(pmcs_hw_t *pwp, pmcs_phy_t *phyp, pmcs_xscsi_t *xp,
 	    PMCIN_GET_DEVICE_STATE));
 	msg[1] = LE_32(pwrk->htag);
 	msg[2] = LE_32(phyp->device_id);
+	CLEAN_MESSAGE(msg, 3);
 
 	mutex_enter(&pwp->iqp_lock[PMCS_IQ_OTHER]);
 	ptr = GET_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
@@ -172,6 +173,7 @@ pmcs_set_dev_state(pmcs_hw_t *pwp, pmcs_phy_t *phyp, pmcs_xscsi_t *xp,
 	msg[1] = LE_32(pwrk->htag);
 	msg[2] = LE_32(phyp->device_id);
 	msg[3] = LE_32(ds);
+	CLEAN_MESSAGE(msg, 4);
 
 	mutex_enter(&pwp->iqp_lock[PMCS_IQ_OTHER]);
 	ptr = GET_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
@@ -241,9 +243,8 @@ pmcs_ds_operational(pmcs_phy_t *pptr, pmcs_xscsi_t *tgt)
 	    drv_usectohz(PMCS_MAX_DS_RECOVERY_TIME)) {
 		pptr->ds_prev_good_recoveries++;
 	} else {
-		pmcs_handle_ds_recovery_error(pptr, tgt, pwp,
-		    __func__, __LINE__, "Max recovery"
-		    "attempts reached. Declaring PHY dead");
+		pmcs_handle_ds_recovery_error(pptr, tgt, pwp, __func__,
+		    "Max recovery attempts reached. Declaring PHY dead");
 	}
 
 	/* Don't bother to run the work queues if the PHY is dead */
@@ -298,7 +299,14 @@ pmcs_dev_state_recovery(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 		tgt = NULL;
 		pmcs_lock_phy(pptr);
 
-		if (pptr->dead) {
+		if (pptr->dead || !pptr->valid_device_id) {
+			goto next_phy;
+		}
+
+		if (pptr->iport && (pptr->iport->ua_state != UA_ACTIVE)) {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, pptr->target,
+			    "%s: No DS recovery on PHY %s, iport not active",
+			    __func__, pptr->path);
 			goto next_phy;
 		}
 
@@ -340,7 +348,7 @@ pmcs_dev_state_recovery(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 			    __func__, pptr->path, rc);
 
 			pmcs_handle_ds_recovery_error(pptr, tgt, pwp,
-			    __func__, __LINE__, "pmcs_get_dev_state");
+			    __func__, "pmcs_get_dev_state");
 
 			goto next_phy;
 		}
@@ -375,8 +383,7 @@ pmcs_dev_state_recovery(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 				    __func__, pptr->path, rc);
 
 				pmcs_handle_ds_recovery_error(pptr, tgt, pwp,
-				    __func__, __LINE__,
-				    "pmcs_send_err_recovery_cmd");
+				    __func__, "pmcs_send_err_recovery_cmd");
 
 				goto next_phy;
 			}
@@ -384,36 +391,30 @@ pmcs_dev_state_recovery(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 
 		/*
 		 * Step 2: Perform a hard reset on the PHY.
-		 * Note we do not reset HBA PHYs.
 		 */
-		if (pptr->level > 0) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, pptr, tgt,
-			    "%s: Issue HARD_RESET to PHY %s", __func__,
-			    pptr->path);
-			/*
-			 * Must release statlock here because pmcs_reset_phy
-			 * will drop and reacquire the PHY lock.
-			 */
-			if (tgt != NULL) {
-				mutex_exit(&tgt->statlock);
-			}
-			rc = pmcs_reset_phy(pwp, pptr, PMCS_PHYOP_HARD_RESET);
-			if (tgt != NULL) {
-				mutex_enter(&tgt->statlock);
-			}
-			if (rc) {
-				pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, tgt,
-				    "%s: HARD_RESET to PHY %s failed (rc=%d)",
-				    __func__, pptr->path, rc);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, pptr, tgt,
+		    "%s: Issue HARD_RESET to PHY %s", __func__,
+		    pptr->path);
+		/*
+		 * Must release statlock here because pmcs_reset_phy
+		 * will drop and reacquire the PHY lock.
+		 */
+		if (tgt != NULL) {
+			mutex_exit(&tgt->statlock);
+		}
+		rc = pmcs_reset_phy(pwp, pptr, PMCS_PHYOP_HARD_RESET);
+		if (tgt != NULL) {
+			mutex_enter(&tgt->statlock);
+		}
+		if (rc) {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, tgt,
+			    "%s: HARD_RESET to PHY %s failed (rc=%d)",
+			    __func__, pptr->path, rc);
 
-				pmcs_handle_ds_recovery_error(pptr, tgt, pwp,
-				    __func__, __LINE__, "HARD_RESET");
+			pmcs_handle_ds_recovery_error(pptr, tgt, pwp,
+			    __func__, "HARD_RESET");
 
-				goto next_phy;
-			}
-		} else {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, pptr, tgt,
-			    "%s: Not resetting HBA PHY...", __func__);
+			goto next_phy;
 		}
 
 		/*
@@ -441,7 +442,7 @@ pmcs_dev_state_recovery(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 				    __func__, pptr->path, rc);
 
 				pmcs_handle_ds_recovery_error(pptr, tgt,
-				    pwp, __func__, __LINE__, "pmcs_abort");
+				    pwp, __func__, "pmcs_abort");
 
 				goto next_phy;
 			}
@@ -463,7 +464,7 @@ pmcs_dev_state_recovery(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 			    __func__, (void *)tgt);
 
 			pmcs_handle_ds_recovery_error(pptr, tgt, pwp,
-			    __func__, __LINE__, "SET tgt to OPERATIONAL state");
+			    __func__, "SET tgt to OPERATIONAL state");
 
 			goto next_phy;
 		}
@@ -601,7 +602,6 @@ no_action:
  * If it is failure of a recovery command, let the recovery thread deal with it.
  * Called with pmcwork lock held.
  */
-
 void
 pmcs_start_ssp_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
     size_t amt)
@@ -705,7 +705,6 @@ pmcs_start_ssp_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
  * will do anything with it until this thread starts the chain of recovery.
  * Statlock may be acquired and released.
  */
-
 void
 pmcs_tgt_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk)
 {
@@ -795,70 +794,67 @@ restart:
 		mutex_enter(&pwp->lock);
 		tgt = pwp->targets[idx];
 		mutex_exit(&pwp->lock);
-		if (tgt != NULL) {
-			mutex_enter(&tgt->statlock);
-			if (!tgt->assigned) {
-				mutex_exit(&tgt->statlock);
-				continue;
-			}
-			pphy = tgt->phy;
-			er_flag = tgt->event_recovery;
-			mutex_exit(&tgt->statlock);
-			if (pphy != NULL && er_flag != 0) {
-				pmcs_lock_phy(pphy);
-				mutex_enter(&tgt->statlock);
-				pmcs_prt(pwp, PMCS_PRT_DEBUG, pphy, tgt,
-				    "%s: found target(0x%p)", __func__,
-				    (void *) tgt);
+		if (tgt == NULL) {
+			continue;
+		}
 
-				/* Check what cmd expects recovery */
-				mutex_enter(&tgt->aqlock);
-				STAILQ_FOREACH(cp, &tgt->aq, cmd_next) {
-					/*
-					 * Since work structure is on this
-					 * target aq, and only this thread
-					 * is accessing it now, we do not need
-					 * to lock it
-					 */
-					idxpwrk = PMCS_TAG_INDEX(cp->cmd_tag);
-					pwrk = &pwp->work[idxpwrk];
-					if (pwrk->htag != cp->cmd_tag) {
-						/*
-						 * aq may contain TMF commands,
-						 * so we may not find work
-						 * structure with htag
-						 */
-						break;
-					}
-					if (pwrk->ssp_event != 0 &&
-					    pwrk->ssp_event !=
-					    PMCS_REC_EVENT) {
-						pmcs_prt(pwp,
-						    PMCS_PRT_DEBUG, pphy, tgt,
-						    "%s: pwrk(%p) ctag(0x%x)",
-						    __func__, (void *) pwrk,
-						    cp->cmd_tag);
-						mutex_exit(&tgt->aqlock);
-						mutex_exit(&tgt->statlock);
-						pmcs_tgt_event_recovery(
-						    pwp, pwrk);
-						/*
-						 * We dropped statlock, so
-						 * restart scanning from scratch
-						 */
-						pmcs_unlock_phy(pphy);
-						goto restart;
-					}
-				}
-				mutex_exit(&tgt->aqlock);
-				tgt->event_recovery = 0;
+		mutex_enter(&tgt->statlock);
+		if (!tgt->assigned) {
+			mutex_exit(&tgt->statlock);
+			continue;
+		}
+		pphy = tgt->phy;
+		er_flag = tgt->event_recovery;
+		mutex_exit(&tgt->statlock);
+
+		if ((pphy == NULL) || (er_flag == 0)) {
+			continue;
+		}
+
+		pmcs_lock_phy(pphy);
+		mutex_enter(&tgt->statlock);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pphy, tgt,
+		    "%s: found target(0x%p)", __func__, (void *) tgt);
+
+		/* Check what cmd expects recovery */
+		mutex_enter(&tgt->aqlock);
+		STAILQ_FOREACH(cp, &tgt->aq, cmd_next) {
+			/*
+			 * Since work structure is on this target aq, and only
+			 * this thread is accessing it now, we do not need
+			 * to lock it
+			 */
+			idxpwrk = PMCS_TAG_INDEX(cp->cmd_tag);
+			pwrk = &pwp->work[idxpwrk];
+			if (pwrk->htag != cp->cmd_tag) {
+				/*
+				 * aq may contain TMF commands, so we
+				 * may not find work structure with htag
+				 */
+				break;
+			}
+			if ((pwrk->ssp_event != 0) &&
+			    (pwrk->ssp_event != PMCS_REC_EVENT)) {
 				pmcs_prt(pwp, PMCS_PRT_DEBUG, pphy, tgt,
-				    "%s: end of SSP event recovery for "
-				    "target(0x%p)", __func__, (void *) tgt);
+				    "%s: pwrk(%p) htag(0x%x)",
+				    __func__, (void *) pwrk, cp->cmd_tag);
+				mutex_exit(&tgt->aqlock);
 				mutex_exit(&tgt->statlock);
+				pmcs_tgt_event_recovery(pwp, pwrk);
+				/*
+				 * We dropped statlock, so restart the scan
+				 */
 				pmcs_unlock_phy(pphy);
+				goto restart;
 			}
 		}
+		mutex_exit(&tgt->aqlock);
+		tgt->event_recovery = 0;
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pphy, tgt,
+		    "%s: end of SSP event recovery for target(0x%p)",
+		    __func__, (void *) tgt);
+		mutex_exit(&tgt->statlock);
+		pmcs_unlock_phy(pphy);
 	}
 	pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 	    "%s: end of SSP event recovery for pwp(0x%p)", __func__,
@@ -894,7 +890,7 @@ pmcs_start_dev_state_recovery(pmcs_xscsi_t *xp, pmcs_phy_t *phyp)
  */
 static void
 pmcs_handle_ds_recovery_error(pmcs_phy_t *phyp, pmcs_xscsi_t *tgt,
-    pmcs_hw_t *pwp, const char *func_name, int line, char *reason_string)
+    pmcs_hw_t *pwp, const char *func_name, char *reason_string)
 {
 	ASSERT(mutex_owned(&phyp->phy_lock));
 	ASSERT((tgt == NULL) || mutex_owned(&tgt->statlock));
@@ -908,8 +904,14 @@ pmcs_handle_ds_recovery_error(pmcs_phy_t *phyp, pmcs_xscsi_t *tgt,
 		if (tgt != NULL) {
 			tgt->recover_wait = 0;
 		}
+		/*
+		 * Mark the PHY as dead and it and its parent as changed,
+		 * then restart discovery
+		 */
 		phyp->dead = 1;
-		PHY_CHANGED_AT_LOCATION(pwp, phyp, func_name, line);
+		PHY_CHANGED(pwp, phyp);
+		if (phyp->parent)
+			PHY_CHANGED(pwp, phyp->parent);
 		RESTART_DISCOVERY(pwp);
 	} else if ((phyp->ds_prev_good_recoveries >
 	    PMCS_MAX_DS_RECOVERY_RETRIES) &&
@@ -921,8 +923,14 @@ pmcs_handle_ds_recovery_error(pmcs_phy_t *phyp, pmcs_xscsi_t *tgt,
 		if (tgt != NULL) {
 			tgt->recover_wait = 0;
 		}
+		/*
+		 * Mark the PHY as dead and its parent as changed,
+		 * then restart discovery
+		 */
 		phyp->dead = 1;
-		PHY_CHANGED_AT_LOCATION(pwp, phyp, func_name, line);
+		PHY_CHANGED(pwp, phyp);
+		if (phyp->parent)
+			PHY_CHANGED(pwp, phyp->parent);
 		RESTART_DISCOVERY(pwp);
 	} else {
 		SCHEDULE_WORK(pwp, PMCS_WORK_DS_ERR_RECOVERY);

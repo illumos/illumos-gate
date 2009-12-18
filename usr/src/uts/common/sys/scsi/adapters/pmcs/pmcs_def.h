@@ -57,7 +57,8 @@ typedef enum {
 #define	PMCS_HW_MIN_LINK_RATE	SAS_LINK_RATE_1_5GBIT
 #define	PMCS_HW_MAX_LINK_RATE	SAS_LINK_RATE_6GBIT
 
-#define	PMCS_INVALID_DEVICE_ID	0xffffffff
+#define	PMCS_INVALID_DEVICE_ID		0xffffffff
+#define	PMCS_PHY_INVALID_PORT_ID	0xf
 
 #define	PMCS_PM_MAX_NAMELEN	16
 
@@ -94,7 +95,8 @@ struct pmcs_phy {
 		subsidiary	: 1,	/* this is part of a wide phy */
 		configured	: 1,	/* is configured */
 		dead		: 1,	/* dead */
-		changed		: 1;	/* this phy is changing */
+		changed		: 1,	/* this phy is changing */
+		deregister_wait : 1;	/* phy waiting to get deregistered */
 	clock_t		config_stop;	/* When config attempts will stop */
 	hrtime_t	abort_all_start;
 	kcondvar_t	abort_all_cv;	/* Wait for ABORT_ALL completion */
@@ -127,7 +129,7 @@ struct pmcs_phy {
 };
 
 /* maximum number of ds recovery retries (ds_recovery_retries) */
-#define	PMCS_MAX_DS_RECOVERY_RETRIES	4
+#define	PMCS_MAX_DS_RECOVERY_RETRIES	10
 
 /* max time allowed for successful recovery */
 #define	PMCS_MAX_DS_RECOVERY_TIME	(60 * 1000000) /* 60 seconds */
@@ -265,6 +267,7 @@ typedef struct {
 #define	PMCS_WORK_ADD_DMA_CHUNKS	8
 #define	PMCS_WORK_DS_ERR_RECOVERY	9
 #define	PMCS_WORK_SSP_EVT_RECOVERY	10
+#define	PMCS_WORK_DEREGISTER_DEV	11
 
 /*
  * The actual values as they appear in work_flags
@@ -278,6 +281,7 @@ typedef struct {
 #define	PMCS_WORK_FLAG_ADD_DMA_CHUNKS	(1 << 8)
 #define	PMCS_WORK_FLAG_DS_ERR_RECOVERY	(1 << 9)
 #define	PMCS_WORK_FLAG_SSP_EVT_RECOVERY (1 << 10)
+#define	PMCS_WORK_FLAG_DEREGISTER_DEV   (1 << 11)
 
 /*
  * This structure is used by this function to test MPI (and interrupts)
