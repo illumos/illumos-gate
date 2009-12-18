@@ -365,6 +365,7 @@ drm_sun_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	}
 
 	mutex_exit(&dp->dev_lock);
+	(void) kmem_free(newp, sizeof (drm_cminor_t));
 	return (EMFILE);
 
 gotminor:
@@ -375,7 +376,7 @@ gotminor:
 	if (err) {
 		mutex_enter(&dp->dev_lock);
 		TAILQ_REMOVE(&dp->minordevs, newp, link);
-		(void) kmem_free(mp, sizeof (drm_cminor_t));
+		(void) kmem_free(newp, sizeof (drm_cminor_t));
 		mutex_exit(&dp->dev_lock);
 
 		return (err);
