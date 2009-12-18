@@ -1519,7 +1519,7 @@ build_default_partition(
 	 * is in integral number of megabytes.
 	 */
 	capacity = ((diskaddr_t)(label->dkl_ncyl) * label->dkl_nhead *
-	    label->dkl_nsect) / (1024 * 1024) / cur_blksz;
+	    label->dkl_nsect) / (diskaddr_t)((1024 * 1024) / cur_blksz);
 	dpt = default_partitions;
 	for (i = 0; i < DEFAULT_PARTITION_TABLE_SIZE; i++, dpt++) {
 		if (capacity >= dpt->min_capacity &&

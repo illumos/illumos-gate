@@ -295,17 +295,17 @@ disk_callback_sas(di_minor_t minor, di_node_t node)
 		    (lun.sl_lun3_msb == 0) && (lun.sl_lun3_lsb == 0) &&
 		    (lun.sl_lun4_msb == 0) && (lun.sl_lun4_lsb == 0)) {
 			(void) snprintf(disk, DISK_SUBPATH_MAX,
-			    "t%sd%"PRId64, *intp, lun64);
+			    "t%dd%"PRId64, *intp, lun64);
 		} else if ((addr_method == SCSI_LUN_AM_FLAT) &&
 		    (lun.sl_lun2_msb == 0) && (lun.sl_lun2_lsb == 0) &&
 		    (lun.sl_lun3_msb == 0) && (lun.sl_lun3_lsb == 0) &&
 		    (lun.sl_lun4_msb == 0) && (lun.sl_lun4_lsb == 0)) {
 			sl = (lun.sl_lun1_msb << 8) | lun.sl_lun1_lsb;
 			(void) snprintf(disk, DISK_SUBPATH_MAX,
-			    "t%sd%"PRIX16, *intp, sl);
+			    "t%dd%"PRIX16, *intp, sl);
 		} else {
 			(void) snprintf(disk, DISK_SUBPATH_MAX,
-			    "t%sd%"PRIX64, *intp, lun64);
+			    "t%dd%"PRIX64, *intp, lun64);
 		}
 	} else {
 		return (DEVFSADM_CONTINUE);
