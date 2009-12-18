@@ -4838,8 +4838,9 @@ pmcs_ssp_tmf(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint8_t tmf, uint32_t tag,
 	COPY_MESSAGE(ptr, msg, 7);
 	pwrk->arg = msg;
 	pwrk->dtype = pptr->dtype;
-
 	xp = pptr->target;
+	pwrk->xp = xp;
+
 	if (xp != NULL) {
 		mutex_enter(&xp->statlock);
 		if (xp->dev_state == PMCS_DEVICE_STATE_NON_OPERATIONAL) {

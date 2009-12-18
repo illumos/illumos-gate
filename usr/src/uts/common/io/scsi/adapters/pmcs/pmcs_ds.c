@@ -622,6 +622,7 @@ pmcs_start_ssp_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
 		}
 		mutex_exit(&tgt->statlock);
 	}
+
 	if (pptr == NULL) {
 		/*
 		 * No target, need to run RE-DISCOVERY here.
@@ -642,9 +643,11 @@ pmcs_start_ssp_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
 		return;
 	} else {
 		pmcs_lock_phy(pptr);
-		mutex_enter(&tgt->statlock);
+		if (tgt) {
+			mutex_enter(&tgt->statlock);
+		}
 		if (event == PMCOUT_STATUS_OPEN_CNX_ERROR_IT_NEXUS_LOSS) {
-			if (tgt->dev_state !=
+			if (tgt && tgt->dev_state !=
 			    PMCS_DEVICE_STATE_NON_OPERATIONAL) {
 				pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, tgt,
 				    "%s: Device at %s is non-operational",
@@ -653,7 +656,9 @@ pmcs_start_ssp_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
 				    PMCS_DEVICE_STATE_NON_OPERATIONAL;
 			}
 			pptr->abort_pending = 1;
-			mutex_exit(&tgt->statlock);
+			if (tgt) {
+				mutex_exit(&tgt->statlock);
+			}
 			pmcs_unlock_phy(pptr);
 			mutex_exit(&pwrk->lock);
 			SCHEDULE_WORK(pwp, PMCS_WORK_ABORT_HANDLE);
@@ -673,9 +678,19 @@ pmcs_start_ssp_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
 				(void) memcpy(pwrk->arg, iomb, amt);
 			}
 			cv_signal(&pwrk->sleep_cv);
-			mutex_exit(&tgt->statlock);
+			if (tgt) {
+				mutex_exit(&tgt->statlock);
+			}
 			pmcs_unlock_phy(pptr);
 			mutex_exit(&pwrk->lock);
+			return;
+		}
+
+		if (!tgt) {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG1, pptr, NULL,
+			    "%s: Not scheduling SSP event recovery for NULL tgt"
+			    " pwrk(%p) tag(0x%x)", __func__, (void *)pwrk,
+			    pwrk->htag);
 			return;
 		}
 
