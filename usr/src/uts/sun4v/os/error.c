@@ -45,6 +45,7 @@
 
 errorq_t *ue_queue;			/* queue of uncorrectable errors */
 errorq_t *ce_queue;			/* queue of correctable errors */
+errorq_t *errh_queue;			/* queue of sun4v error reports  */
 
 /*
  * Being used by memory test driver.
@@ -98,9 +99,10 @@ static int errh_error_protected(struct regs *, struct async_flt *, int *);
 static void errh_rq_full(struct async_flt *);
 static void ue_drain(void *, struct async_flt *, errorq_elem_t *);
 static void ce_drain(void *, struct async_flt *, errorq_elem_t *);
+static void errh_drain(void *, errh_er_t *, errorq_elem_t *);
 static void errh_handle_attr(errh_async_flt_t *);
 static void errh_handle_asr(errh_async_flt_t *);
-static void errh_handle_sp(errh_async_flt_t *);
+static void errh_handle_sp(errh_er_t *);
 static void sp_ereport_post(uint8_t);
 
 /*ARGSUSED*/
@@ -159,7 +161,8 @@ process_resumable_error(struct regs *rp, uint32_t head_offset,
 			/*
 			 * The state of the SP has changed.
 			 */
-			errh_handle_sp(&errh_flt);
+			errorq_dispatch(errh_queue, &errh_flt.errh_er,
+			    sizeof (errh_er_t), ERRORQ_ASYNC);
 			continue;
 
 		default:
@@ -737,6 +740,23 @@ ce_drain(void *ignored, struct async_flt *aflt, errorq_elem_t *eqep)
 }
 
 /*
+ * Handler to process a sun4v errort report via an errorq_t.  This routine
+ * can be called from a softint.
+ *
+ * This is used for sun4v error reports that cannot be processed at high-level
+ * interrupt time.  Currently only error reports indicating an SP state change
+ * are handled in this manner.
+ */
+/*ARGSUSED*/
+static void
+errh_drain(void *ignored, errh_er_t *errh_erp, errorq_elem_t *eqep)
+{
+	ASSERT(errh_erp->desc == ERRH_DESC_SP);
+
+	errh_handle_sp(errh_erp);
+}
+
+/*
  * Handler to process vbsc hostshutdown (power-off button).
  */
 static int
@@ -773,7 +793,10 @@ error_init(void)
 	ce_queue = errorq_create("ce_queue", (errorq_func_t)ce_drain, NULL,
 	    MAX_CE_FLTS * (max_ncpus + 1), size, PIL_1, 0);
 
-	if (ue_queue == NULL || ce_queue == NULL)
+	errh_queue = errorq_create("errh_queue", (errorq_func_t)errh_drain,
+	    NULL, CPU_RQ_ENTRIES, sizeof (errh_er_t), PIL_1, 0);
+
+	if (ue_queue == NULL || ce_queue == NULL || errh_queue == NULL)
 		panic("failed to create required system error queue");
 
 	/*
@@ -880,11 +903,11 @@ errh_handle_asr(errh_async_flt_t *errh_fltp)
  * Handle a SP state change.
  */
 static void
-errh_handle_sp(errh_async_flt_t *errh_fltp)
+errh_handle_sp(errh_er_t *errh_erp)
 {
 	uint8_t		sp_state;
 
-	sp_state = (errh_fltp->errh_er.attr & ERRH_SP_MASK) >> ERRH_SP_SHIFT;
+	sp_state = (errh_erp->attr & ERRH_SP_MASK) >> ERRH_SP_SHIFT;
 
 	/*
 	 * Only the SP is unavailable state change is currently valid.
