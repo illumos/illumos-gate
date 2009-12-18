@@ -48,17 +48,11 @@ extern "C" {
 #define	AUDIOHD_CONTROLLER_MCP51	0x10de026c
 
 /*
- * specific codec id used by specific vendors
+ * codec special initial flags
  */
-#define	AUDIOHD_CODEC_IDT7608	0x111d7608
-#define	AUDIOHD_CODEC_IDT76B2	0x111d76b2
-#define	AUDIOHD_CODEC_AD1981	0x11d41981
-#define	AUDIOHD_CODEC_ALC272	0x10ec0272
-#define	AUDIOHD_CODEC_ALC885	0x10ec0885
-#define	AUDIOHD_CODECID_ALC888	0x10ec0888
-#define	AUDIOHD_CODECID_SONY1	0x10ec0260
-#define	AUDIOHD_CODECID_SONY2	0x10ec0262
-#define	AUDIOHD_CODEC_CX20549	0x14f15045
+#define	NO_GPIO		0x00000001
+#define	NO_MIXER	0x00000002
+#define	NO_SPDIF	0x00000004
 
 #define	AUDIOHD_INTS		50
 #define	AUDIOHD_MAX_INTS	1500
@@ -570,9 +564,10 @@ enum audiohd_pin_color {
 #define	AUDIOHD_PATH_NOMON	(1 << 3)
 #define	AUDIOHD_PATH_BEEP	(1 << 4)
 
-typedef struct audiohd_path		audiohd_path_t;
+typedef struct audiohd_path	audiohd_path_t;
 typedef struct audiohd_widget	audiohd_widget_t;
 typedef struct audiohd_state	audiohd_state_t;
+typedef struct audiohd_codec_info	audiohd_codec_info_t;
 typedef struct audiohd_pin	audiohd_pin_t;
 typedef struct hda_codec	hda_codec_t;
 typedef uint32_t	wid_t;		/* id of widget */
@@ -779,10 +774,10 @@ struct hda_codec {
 	uint32_t	pcm_format;
 
 	audiohd_state_t		*soft_statep;
+	audiohd_codec_info_t	*codec_info;
 
 	/* use wid as index to the array of widget pointers */
 	audiohd_widget_t	*widget[AUDIOHD_MAX_WIDGET];
-
 
 	audiohd_port_t		*port[AUDIOHD_PORT_MAX];
 	uint8_t			portnum;
@@ -871,6 +866,11 @@ struct audiohd_state {
 
 };
 
+struct audiohd_codec_info {
+	uint32_t	devid;
+	const char	*buf;
+	uint32_t	flags;
+};
 
 /*
  * Operation for high definition audio control system bus
