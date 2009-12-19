@@ -205,6 +205,35 @@ safe_replace()
 	chown $own $filename
 }
 
+safe_wrap()
+{
+	typeset filename="$1"
+	typeset runname="$2"
+	typeset mode="$3"
+	typeset own="$4"
+
+	if [ -f $filename ]; then
+		log "$e_cannot_wrap" "$filename"
+		exit 1
+	fi
+
+	cat <<-END >$filename || exit 1
+	#!/bin/sh
+	#
+	# Solaris Brand Wrapper
+	#
+	# Attention.  This file has been created for use in a
+	# virtualized environment.  Modification of this script
+	# is not supported and all changes will be lost upon reboot.
+	#
+	END
+
+	echo ". $runname \"\$@\"" >>$filename || exit 1
+
+	chmod $mode $filename
+	chown $own $filename
+}
+
 #
 # Read zonecfg ipd and fs entries and save the relevant data, one entry per
 # line.
@@ -1001,6 +1030,7 @@ install_image()
 TEXTDOMAIN="SUNW_OST_OSCMD"
 export TEXTDOMAIN
 
+e_cannot_wrap=$(gettext "%s: error: wrapper file already exists")
 e_baddir=$(gettext "Invalid '%s' directory within the zone")
 e_badfile=$(gettext "Invalid '%s' file within the zone")
 e_path_abs=$(gettext "Pathname specified to -a '%s' must be absolute.")

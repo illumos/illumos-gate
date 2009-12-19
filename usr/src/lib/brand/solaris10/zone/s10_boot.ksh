@@ -81,6 +81,10 @@ replace_with_native() {
 	fi
 }
 
+wrap_with_native() {
+	safe_wrap $ZONEROOT/$1 $BRANDDIR/s10_isaexec_wrapper $2 $3
+}
+
 #
 # Before we boot we validate and fix, if necessary, the required files within
 # the zone.  These modifications can be lost if a patch is applied within the
@@ -150,6 +154,20 @@ if [ ! -h $ZONEROOT/usr/lib/autofs -a -d $ZONEROOT/usr/lib/autofs ]; then
 	safe_replace $ZONEROOT/usr/lib/autofs/automountd \
 	    $BRANDDIR/s10_automountd 0555 root:bin remove
 fi
+
+#
+# The class-specific dispadmin(1M) and priocntl(1) binaries must be native
+# wrappers, and we must have all of the ones the native zone does.  This
+# allows new scheduling classes to appear without causing dispadmin and
+# priocntl to be unhappy.
+#
+rm -rf $ZONEROOT/usr/lib/class
+mkdir $ZONEROOT/usr/lib/class || exit 1
+
+find /usr/lib/class -type d -o -type f | while read x; do
+	[ -d $x ] && mkdir -p -m 755 $ZONEROOT$x
+	[ -f $x ] && wrap_with_native $x 0555 root:bin
+done
 
 #
 # END OF STEP TWO
