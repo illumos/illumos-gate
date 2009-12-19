@@ -49,8 +49,10 @@ typedef enum ELFsign_status_e {
 	ELFSIGN_NOTSIGNED,
 	ELFSIGN_INVALID_CERTPATH,
 	ELFSIGN_INVALID_ELFOBJ,
-	ELFSIGN_RESTRICTED
+	ELFSIGN_RESTRICTED,
+	ELFSIGN_UNAVAILABLE
 } ELFsign_status_t;
+
 
 /* Version values for da_version in kcf_door_args_t */
 #define	KCF_KCFD_VERSION1	1

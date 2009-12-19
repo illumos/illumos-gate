@@ -455,7 +455,7 @@ C_GetInfo(CK_INFO_PTR pInfo)
 	(void) strncpy((char *)pInfo->libraryDescription,
 	    LIBRARY_DESCRIPTION, 32);
 	pInfo->libraryVersion.major = LIBRARY_VERSION_MAJOR;
-	pInfo->libraryVersion.major = LIBRARY_VERSION_MINOR;
+	pInfo->libraryVersion.minor = LIBRARY_VERSION_MINOR;
 
 	return (CKR_OK);
 }

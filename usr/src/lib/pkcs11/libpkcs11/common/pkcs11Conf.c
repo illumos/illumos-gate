@@ -305,8 +305,8 @@ open_door_file:
 	}
 	if (kcfdfd == -1) {
 		if (!cryptosvc_is_online()) {
-			cryptoerror(LOG_ERR, "libpkcs11: unable to open"
-			    " kcfd door_file %s: %s.  %s is not online."
+			cryptoerror(LOG_ERR, "libpkcs11: unable to communicate"
+			    " with kcfd, door_file %s: %s.  %s is not online."
 			    " (see svcs -xv for details).",
 			    _PATH_KCFD_DOOR, strerror(door_errno),
 			    CRYPTOSVC_DEFAULT_INSTANCE_FMRI);
@@ -316,7 +316,7 @@ open_door_file:
 			    strerror(door_errno));
 		}
 		*rv = CKR_CRYPTOKI_NOT_INITIALIZED;
-		estatus = ELFSIGN_UNKNOWN;
+		estatus = ELFSIGN_UNAVAILABLE;
 		goto verifycleanup;
 	}
 
@@ -379,7 +379,7 @@ open_door_file:
 			    _PATH_KCFD_DOOR, strerror(door_errno));
 		}
 		*rv = CKR_CRYPTOKI_NOT_INITIALIZED;
-		estatus = ELFSIGN_UNKNOWN;
+		estatus = ELFSIGN_UNAVAILABLE;
 		goto verifycleanup;
 	}
 
@@ -698,7 +698,6 @@ pkcs11_slot_mapping(uentrylist_t *pplist, CK_VOID_PTR pInitArgs)
 		estatus = kcfd_door_call(fullpath, B_FALSE, &rv);
 
 		switch (estatus) {
-		case ELFSIGN_UNKNOWN:
 		case ELFSIGN_SUCCESS:
 		case ELFSIGN_RESTRICTED:
 			break;
@@ -708,22 +707,28 @@ pkcs11_slot_mapping(uentrylist_t *pplist, CK_VOID_PTR pInitArgs)
 		case ELFSIGN_FAILED:
 			estatus_str = strdup("signature verification failed.");
 			break;
+		case ELFSIGN_UNAVAILABLE:
+			estatus_str = strdup("kcfd(1m) is not available for "
+			    "signature verification. Cannot continue loading "
+			    "the cryptographic framework.");
+			break;
 		default:
 			estatus_str = strdup("unexpected failure in ELF "
-			    "signature verification. "
-			    "System may have been tampered with.");
+			    "signature verification.");
 		}
 		if (estatus_str != NULL) {
 			cryptoerror(LOG_ERR, "libpkcs11: %s %s %s",
-			    fullpath, estatus_str ? estatus_str : "",
-			    estatus == ELFSIGN_UNKNOWN ?
-			    "Cannot continue parsing " _PATH_PKCS11_CONF:
-			    conf_err);
+			    fullpath, estatus_str,
+			    (estatus == ELFSIGN_UNKNOWN ||
+			    estatus == ELFSIGN_UNAVAILABLE) ?
+			    "See cryptoadm (1M). Cannot continue parsing "
+			    _PATH_PKCS11_CONF : conf_err);
 			(void) prov_funcs->C_Finalize(NULL);
 			(void) dlclose(dldesc);
 			free(estatus_str);
 			estatus_str = NULL;
-			if (estatus == ELFSIGN_UNKNOWN) {
+			if (estatus == ELFSIGN_UNKNOWN ||
+			    estatus == ELFSIGN_UNAVAILABLE) {
 				prov_funcs = NULL;
 				dldesc = NULL;
 				rv = CKR_GENERAL_ERROR;
