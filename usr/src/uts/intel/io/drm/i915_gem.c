@@ -674,7 +674,7 @@ i915_retire_commands(struct drm_device *dev)
 	/* The sampler always gets flushed on i965 (sigh) */
 	if (IS_I965G(dev))
 		flush_domains |= I915_GEM_DOMAIN_SAMPLER;
-	BEGIN_LP_RING(3);
+	BEGIN_LP_RING(2);
 	OUT_RING(cmd);
 	OUT_RING(0); /* noop */
 	ADVANCE_LP_RING();
@@ -886,11 +886,23 @@ int
 i915_wait_request(struct drm_device *dev, uint32_t seqno)
 {
 	drm_i915_private_t *dev_priv = dev->dev_private;
+	u32 ier;
 	int ret = 0;
 
 	ASSERT(seqno != 0);
 
 	if (!i915_seqno_passed(i915_get_gem_seqno(dev), seqno)) {
+		if (IS_IGDNG(dev))
+			ier = I915_READ(DEIER) | I915_READ(GTIER);
+		else
+			ier = I915_READ(IER);
+		if (!ier) {
+ 			DRM_ERROR("something (likely vbetool) disabled "
+ 				  "interrupts, re-enabling\n");
+			(void) i915_driver_irq_preinstall(dev);
+			i915_driver_irq_postinstall(dev);
+		}
+
 		dev_priv->mm.waiting_gem_seqno = seqno;
 		i915_user_irq_on(dev);
 		DRM_WAIT(ret, &dev_priv->irq_queue,

@@ -108,6 +108,10 @@ extern "C" {
 #define	INTEL_BR_Q45			0x2e108086
 #define	INTEL_BR_G45			0x2e208086
 #define	INTEL_BR_G41			0x2e308086
+#define	INTEL_BR_IGDNG_D		0x00408086
+#define	INTEL_BR_IGDNG_M		0x00448086
+#define	INTEL_BR_IGDNG_MA		0x00628086
+#define	INTEL_BR_IGDNG_MC2		0x006a8086
 #define	INTEL_BR_B43			0x2e408086
 
 /* AGP common register offset in pci configuration space */
@@ -178,6 +182,8 @@ extern "C" {
 #define	INTEL_IGD_Q45			0x2e128086
 #define	INTEL_IGD_G45			0x2e228086
 #define	INTEL_IGD_G41			0x2e328086
+#define	INTEL_IGD_IGDNG_D		0x00428086
+#define	INTEL_IGD_IGDNG_M		0x00468086
 #define	INTEL_IGD_B43			0x2e428086
 
 /* Intel 915 and 945 series */
@@ -202,11 +208,16 @@ extern "C" {
 	(device == INTEL_IGD_G33) ||	\
 	(device == INTEL_IGD_Q33))
 
+/* IGDNG */
+#define	IS_IGDNG(device)	((device == INTEL_IGD_IGDNG_D) ||	\
+			(device == INTEL_IGD_IGDNG_M))
+
 /* Intel G4X series */
 #define	IS_INTEL_G4X(device) ((device == INTEL_IGD_EL) ||	\
 	(device == INTEL_IGD_Q45) ||	\
 	(device == INTEL_IGD_G45) ||	\
 	(device == INTEL_IGD_G41) ||	\
+	IS_IGDNG(device) ||	\
 	(device == INTEL_IGD_B43))
 
 /* register offsets in PCI config space */

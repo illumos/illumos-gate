@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # SUNWagp postinstall script
@@ -55,6 +55,12 @@ BRALIAS="\
 	\"pci8086,2e00\" \
 	\"pci8086,2e10\" \
 	\"pci8086,2e20\" \
+	\"pci8086,2e30\" \
+	\"pci8086,2e40\" \
+	\"pci8086,40\" \
+	\"pci8086,44\" \
+	\"pci8086,62\" \
+	\"pci8086,6a\" \
 	\"pci8086,1130\" \
 	"
 CPUGART='"pci1022,1103"'

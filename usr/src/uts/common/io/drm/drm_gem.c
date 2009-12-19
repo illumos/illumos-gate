@@ -80,7 +80,7 @@ idr_list_init(struct idr_list  *head)
 	struct idr_list  *entry;
 	/* HASH for accelerate */
 	entry = kmem_zalloc(DRM_GEM_OBJIDR_HASHNODE
-	    * sizeof (struct idr_list), KM_NOSLEEP);
+	    * sizeof (struct idr_list), KM_SLEEP);
 	head->next = entry;
 	for (int i = 0; i < DRM_GEM_OBJIDR_HASHNODE; i++) {
 		INIT_LIST_HEAD(&entry[i]);
@@ -94,7 +94,7 @@ idr_list_get_new_above(struct idr_list	*head,
 {
 	struct idr_list  *entry;
 	int key;
-	entry = kmem_zalloc(sizeof (*entry), KM_NOSLEEP);
+	entry = kmem_zalloc(sizeof (*entry), KM_SLEEP);
 	key = obj->name % DRM_GEM_OBJIDR_HASHNODE;
 	list_add(entry, &head->next[key], NULL);
 	entry->obj = obj;

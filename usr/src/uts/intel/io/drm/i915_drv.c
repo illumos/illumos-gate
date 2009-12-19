@@ -713,10 +713,7 @@ i915_resume(struct drm_device *dev)
 	for (i = 0; i < 3; i++)
 		S3_WRITE(SWF30 + (i << 2), s3_priv->saveSWF2[i]);
 
-	if (IS_I965GM(dev)) {
-		S3_WRITE(I915REG_PGTBL_CTRL, s3_priv->pgtbl_ctl);
-		(void) S3_READ(I915REG_PGTBL_CTRL);
-	}
+	S3_WRITE(I915REG_PGTBL_CTRL, s3_priv->pgtbl_ctl);
 
 	(void) pci_config_teardown(&conf_hdl);
 
@@ -777,8 +774,7 @@ i915_suspend(struct drm_device *dev)
 	/*
 	 * Save page table control register
 	 */
-	if (IS_I965GM(dev))
-		s3_priv->pgtbl_ctl = S3_READ(I915REG_PGTBL_CTRL);
+	s3_priv->pgtbl_ctl = S3_READ(I915REG_PGTBL_CTRL);
 
 	(void) pci_config_teardown(&conf_hdl);
 

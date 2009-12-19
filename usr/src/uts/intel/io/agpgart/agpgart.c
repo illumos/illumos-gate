@@ -71,7 +71,7 @@ list_head_init(struct list_head  *head) {
 	struct	list_head	*entry,	*tmp;
 	/* HASH for accelerate */
 	entry = kmem_zalloc(AGP_HASH_NODE *
-		sizeof (struct list_head), KM_NOSLEEP);
+		sizeof (struct list_head), KM_SLEEP);
 	head->next = entry;
 	for (int i = 0; i < AGP_HASH_NODE; i++) {
 	tmp = &entry[i];
@@ -87,7 +87,7 @@ list_head_add_new(struct list_head	*head,
 {
 	struct list_head  *entry, *tmp;
 	int key;
-	entry = kmem_zalloc(sizeof (*entry), KM_NOSLEEP);
+	entry = kmem_zalloc(sizeof (*entry), KM_SLEEP);
 	key = gttseg->igs_pgstart % AGP_HASH_NODE;
 	tmp = &head->next[key];
 	tmp->next->prev = entry;

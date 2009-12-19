@@ -177,6 +177,12 @@ i915_gem_detect_bit_6_swizzle(struct drm_device *dev)
 		}
 	}
 
+       /* FIXME: check with memory config on IGDNG */
+       if (IS_IGDNG(dev)) {
+               swizzle_x = I915_BIT_6_SWIZZLE_9_10;
+               swizzle_y = I915_BIT_6_SWIZZLE_9;
+       }
+
 	dev_priv->mm.bit_6_swizzle_x = swizzle_x;
 	dev_priv->mm.bit_6_swizzle_y = swizzle_y;
 }

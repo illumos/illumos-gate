@@ -626,6 +626,8 @@ detect_i8xx_device(agp_master_softc_t *master_softc)
 	case INTEL_IGD_Q45:
 	case INTEL_IGD_G45:
 	case INTEL_IGD_G41:
+	case INTEL_IGD_IGDNG_D:
+	case INTEL_IGD_IGDNG_M:
 	case INTEL_IGD_B43:
 		master_softc->agpm_dev_type = DEVICE_IS_I830;
 		break;
