@@ -418,6 +418,7 @@ COMMON_SUBDIRS = \
 	lib/libshare \
 	lib/libsldap \
 	lib/libslp \
+	lib/libsmbfs \
 	lib/libsmbios \
 	lib/libsmedia \
 	lib/libstmf \

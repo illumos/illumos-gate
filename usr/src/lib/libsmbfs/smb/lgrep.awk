@@ -29,6 +29,14 @@
 # It's nawk because sed doesn't do (a|b).
 # Also comments are easier here.
 
+# There's no lintlib for krb5 yet (CR 6911968)
+/: Warning: -lkrb5 not found/			{ next; }
+
+# Kill noise from xti.h with _XOPEN_SOURCE vs not. (CR 6911717)
+/: _xti_.* .E_INCONS_ARG_DECL2./		{ next; }
+/: _xti_.* .E_INCONS_ARG_USED2./		{ next; }
+/: _xti_.* .E_INCONS_VAL_TYPE_DECL2./		{ next; }
+
 # The mb_put/md_get functions are intentionally used both
 # with and without return value checks.  Not a concern.
 /: mb_put_.* .E_FUNC_RET_[A-Z]*_IGNOR/		{ next; }
