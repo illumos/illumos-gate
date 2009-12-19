@@ -10465,7 +10465,7 @@ tcp_input_data(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 			 * ACK.  We also shorten the abort timeout in case
 			 * this is an attack.
 			 */
-			if (ntohs(tcpha->tha_win) <
+			if ((ntohs(tcpha->tha_win) << tcp->tcp_snd_ws) <
 			    (tcp->tcp_mss >> tcp_init_wnd_shft)) {
 				freemsg(mp);
 				TCP_STAT(tcps, tcp_zwin_ack_syn);
