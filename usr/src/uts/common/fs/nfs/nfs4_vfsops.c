@@ -3120,6 +3120,14 @@ nfs4_freevfs(vfs_t *vfsp)
 
 	/* need to release the initial hold */
 	mi = VFTOMI4(vfsp);
+
+	/*
+	 * At this point, we can no longer reference the vfs
+	 * and need to inform other holders of the reference
+	 * to the mntinfo4_t.
+	 */
+	mi->mi_vfsp = NULL;
+
 	MI4_RELE(mi);
 }
 

@@ -803,6 +803,9 @@ nfs4_trigger_mount(vnode_t *vp, cred_t *cr, vnode_t **newvpp)
 		mi->mi_ephemeral_tree = net;
 		net->net_mount = mi;
 		mutex_exit(&mi->mi_lock);
+
+		MI4_HOLD(mi);
+		VFS_HOLD(mi->mi_vfsp);
 	} else {
 		net = mi->mi_ephemeral_tree;
 		nfs4_ephemeral_tree_hold(net);
@@ -2067,9 +2070,7 @@ nfs4_trigger_nargs_create(mntinfo4_t *mi, servinfo4_t *svp,
 		secdata = kmem_alloc(sizeof (sec_data_t), KM_SLEEP);
 		secdata->secmod = secdata->rpcflavor = AUTH_SYS;
 		secdata->data = NULL;
-	}
-
-	else if (svp->sv_flags & SV4_TRYSECDEFAULT) {
+	} else if (svp->sv_flags & SV4_TRYSECDEFAULT) {
 		/* enable negotiation for mirror mount */
 		nargs->flags |= NFSMNT_SECDEFAULT;
 
@@ -2186,6 +2187,8 @@ nfs4_record_ephemeral_mount(mntinfo4_t *mi, vnode_t *mvp)
 	 */
 	eph = kmem_zalloc(sizeof (*eph), KM_SLEEP);
 	eph->ne_mount = mi;
+	MI4_HOLD(mi);
+	VFS_HOLD(mi->mi_vfsp);
 	eph->ne_ref_time = gethrestime_sec();
 
 	/*
@@ -2220,6 +2223,8 @@ nfs4_record_ephemeral_mount(mntinfo4_t *mi, vnode_t *mvp)
 			mi->mi_flags &= ~MI4_EPHEMERAL;
 			mi->mi_ephemeral = NULL;
 			kmem_free(eph, sizeof (*eph));
+			VFS_RELE(mi->mi_vfsp);
+			MI4_RELE(mi);
 			nfs4_ephemeral_tree_rele(net);
 			rc = EBUSY;
 		} else {
@@ -2371,6 +2376,7 @@ nfs4_ephemeral_unmount_engine(nfs4_ephemeral_t *eph,
 		mi = e->ne_mount;
 		mutex_enter(&mi->mi_lock);
 		vfsp = mi->mi_vfsp;
+		ASSERT(vfsp != NULL);
 
 		/*
 		 * Cleared by umount2_engine.
@@ -2478,6 +2484,8 @@ nfs4_ephemeral_umount_activate(mntinfo4_t *mi, bool_t *pmust_unlock,
 
 		kmem_free(mi->mi_ephemeral, sizeof (*mi->mi_ephemeral));
 		mi->mi_ephemeral = NULL;
+		VFS_RELE(mi->mi_vfsp);
+		MI4_RELE(mi);
 	}
 	mutex_exit(&mi->mi_lock);
 
@@ -2772,6 +2780,12 @@ nfs4_ephemeral_record_umount(vfs_t *vfsp, int flag,
 {
 	int	error;
 
+	/*
+	 * Only act on if the fs is still mounted.
+	 */
+	if (vfsp == NULL)
+		return;
+
 	error = umount2_engine(vfsp, flag, kcred, FALSE);
 	if (error) {
 		if (prior) {
@@ -2861,7 +2875,9 @@ nfs4_ephemeral_harvest_forest(nfs4_trigger_globals_t *ntg,
 		if (force) {
 			if (net->net_root) {
 				mi = net->net_root->ne_mount;
+
 				vfsp = mi->mi_vfsp;
+				ASSERT(vfsp != NULL);
 
 				/*
 				 * Cleared by umount2_engine.
@@ -2970,7 +2986,8 @@ nfs4_ephemeral_harvest_forest(nfs4_trigger_globals_t *ntg,
 				/*
 				 * Cleared by umount2_engine.
 				 */
-				VFS_HOLD(vfsp);
+				if (vfsp != NULL)
+					VFS_HOLD(vfsp);
 
 				/*
 				 * Note that we effectively work down to the
@@ -3017,6 +3034,10 @@ check_done:
 
 			net->net_next = harvest;
 			harvest = net;
+
+			VFS_RELE(net->net_mount->mi_vfsp);
+			MI4_RELE(net->net_mount);
+
 			continue;
 		}
 
