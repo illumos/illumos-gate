@@ -1054,6 +1054,17 @@ ire_recv_forward_v4(ire_t *ire, mblk_t *mp, void *iph_arg, ip_recv_attr_t *ira)
 		mblk_t		*mp1;
 		uint32_t	old_pkt_len = ira->ira_pktlen;
 
+		/* Verify IP header checksum before adding/removing options */
+		if ((ira->ira_flags & IRAF_VERIFY_IP_CKSUM) &&
+		    ip_csum_hdr(ipha)) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInCksumErrs);
+			ip_drop_input("ipIfStatsInCksumErrs", mp, ill);
+			freemsg(mp);
+			nce_refrele(nce);
+			return;
+		}
+		ira->ira_flags &= ~IRAF_VERIFY_IP_CKSUM;
+
 		/*
 		 * Check if it can be forwarded and add/remove
 		 * CIPSO options as needed.

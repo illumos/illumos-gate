@@ -2802,11 +2802,10 @@ icmp_redirect_v4(mblk_t *mp, ipha_t *ipha, icmph_t *icmph, ip_recv_attr_t *ira)
 	 * Make sure we had a route for the dest in question and that
 	 * that route was pointing to the old gateway (the source of the
 	 * redirect packet.)
-	 * Note: this merely says that there is some IRE which matches that
-	 * gateway; not that the longest match matches that gateway.
+	 * We do longest match and then compare ire_gateway_addr below.
 	 */
-	prev_ire = ire_ftable_lookup_v4(dst, 0, src, 0, NULL, ALL_ZONES,
-	    NULL, MATCH_IRE_GW, 0, ipst, NULL);
+	prev_ire = ire_ftable_lookup_v4(dst, 0, 0, 0, NULL, ALL_ZONES,
+	    NULL, MATCH_IRE_DSTONLY, 0, ipst, NULL);
 	/*
 	 * Check that
 	 *	the redirect was not from ourselves
@@ -2815,7 +2814,8 @@ icmp_redirect_v4(mblk_t *mp, ipha_t *ipha, icmph_t *icmph, ip_recv_attr_t *ira)
 	if (prev_ire == NULL || ire == NULL ||
 	    (prev_ire->ire_type & (IRE_LOCAL|IRE_LOOPBACK)) ||
 	    (prev_ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) ||
-	    !(ire->ire_type & IRE_IF_ALL)) {
+	    !(ire->ire_type & IRE_IF_ALL) ||
+	    prev_ire->ire_gateway_addr != src) {
 		BUMP_MIB(&ipst->ips_icmp_mib, icmpInBadRedirects);
 		ip_drop_input("icmpInBadRedirects - ire", mp, ira->ira_ill);
 		freemsg(mp);

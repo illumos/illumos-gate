@@ -1088,11 +1088,10 @@ icmp_redirect_v6(mblk_t *mp, ip6_t *ip6h, nd_redirect_t *rd,
 	 * Also, Make sure we had a route for the dest in question and
 	 * that route was pointing to the old gateway (the source of the
 	 * redirect packet.)
-	 * Note: this merely says that there is some IRE which matches that
-	 * gateway; not that the longest match matches that gateway.
+	 * We do longest match and then compare ire_gateway_addr_v6 below.
 	 */
-	prev_ire = ire_ftable_lookup_v6(dst, 0, src, 0, rill,
-	    ALL_ZONES, NULL, MATCH_IRE_GW | MATCH_IRE_ILL, 0, ipst, NULL);
+	prev_ire = ire_ftable_lookup_v6(dst, 0, 0, 0, rill,
+	    ALL_ZONES, NULL, MATCH_IRE_ILL, 0, ipst, NULL);
 
 	/*
 	 * Check that
@@ -1101,7 +1100,8 @@ icmp_redirect_v6(mblk_t *mp, ip6_t *ip6h, nd_redirect_t *rd,
 	 */
 	if (prev_ire == NULL ||
 	    (prev_ire->ire_type & (IRE_LOCAL|IRE_LOOPBACK)) ||
-	    (prev_ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE))) {
+	    (prev_ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) ||
+	    !IN6_ARE_ADDR_EQUAL(src, &prev_ire->ire_gateway_addr_v6)) {
 		BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInBadRedirects);
 		ip_drop_input("ipv6IfIcmpInBadRedirects - ire", mp, ill);
 		goto fail_redirect;

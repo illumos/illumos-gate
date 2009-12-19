@@ -3671,6 +3671,7 @@ extern boolean_t ip_recv_attr_is_mblk(mblk_t *);
 #define	SQTAG_SYNCHRONOUS_OP		42
 #define	SQTAG_TCP_SHUTDOWN_OUTPUT	43
 #define	SQTAG_TCP_IXA_CLEANUP		44
+#define	SQTAG_TCP_SEND_SYNACK		45
 
 #endif	/* _KERNEL */
 

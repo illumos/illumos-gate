@@ -729,6 +729,8 @@ static void	tcp_timer_handler(void *arg, mblk_t *mp, void *arg2,
     ip_recv_attr_t *dummy);
 static void	tcp_linger_interrupted(void *arg, mblk_t *mp, void *arg2,
     ip_recv_attr_t *dummy);
+static void	tcp_send_synack(void *arg, mblk_t *mp, void *arg2,
+    ip_recv_attr_t *dummy);
 
 
 /* Prototype for TCP functions */
@@ -4649,6 +4651,9 @@ tcp_input_listener(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 	if (err != 0)
 		goto error3;
 
+	/* We already know the laddr of the new connection is ours */
+	econnp->conn_ixa->ixa_src_generation = ipst->ips_src_generation;
+
 	ASSERT(OK_32PTR(mp->b_rptr));
 	ASSERT(IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION ||
 	    IPH_HDR_VERSION(mp->b_rptr) == IPV6_VERSION);
@@ -5007,15 +5012,19 @@ tcp_input_listener(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 	if (ipcl_conn_insert(econnp) != 0)
 		goto error;
 
-	/*
-	 * Send the SYN-ACK. Can't use tcp_send_data since we can't update
-	 * pmtu etc; we are not on the eager's squeue
-	 */
 	ASSERT(econnp->conn_ixa->ixa_notify_cookie == econnp->conn_tcp);
-	(void) conn_ip_output(mp1, econnp->conn_ixa);
-	CONN_DEC_REF(econnp);
 	freemsg(mp);
-
+	/*
+	 * Send the SYN-ACK. Use the right squeue so that conn_ixa is
+	 * only used by one thread at a time.
+	 */
+	if (econnp->conn_sqp == lconnp->conn_sqp) {
+		(void) conn_ip_output(mp1, econnp->conn_ixa);
+		CONN_DEC_REF(econnp);
+	} else {
+		SQUEUE_ENTER_ONE(econnp->conn_sqp, mp1, tcp_send_synack,
+		    econnp, NULL, SQ_PROCESS, SQTAG_TCP_SEND_SYNACK);
+	}
 	return;
 error:
 	freemsg(mp1);
@@ -5060,6 +5069,22 @@ error2:
 	freemsg(mp);
 	if (tlc_set)
 		atomic_add_32(&listener->tcp_listen_cnt->tlc_cnt, -1);
+}
+
+/* ARGSUSED2 */
+void
+tcp_send_synack(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
+{
+	conn_t	*econnp = (conn_t *)arg;
+	tcp_t	*tcp = econnp->conn_tcp;
+
+	/* Guard against a RST having blown it away while on the squeue */
+	if (tcp->tcp_state == TCPS_CLOSED) {
+		freemsg(mp);
+		return;
+	}
+
+	(void) conn_ip_output(mp, econnp->conn_ixa);
 }
 
 /*
@@ -8592,9 +8617,13 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 	*outlenp = inlen;
 
 	if (coas.coa_changed & COA_HEADER_CHANGED) {
-		reterr = tcp_build_hdrs(tcp);
-		if (reterr != 0)
-			return (reterr);
+		/* If we are connected we rebuilt the headers */
+		if (!IN6_IS_ADDR_UNSPECIFIED(&connp->conn_faddr_v6) &&
+		    !IN6_IS_ADDR_V4MAPPED_ANY(&connp->conn_faddr_v6)) {
+			reterr = tcp_build_hdrs(tcp);
+			if (reterr != 0)
+				return (reterr);
+		}
 	}
 	if (coas.coa_changed & COA_ROUTE_CHANGED) {
 		in6_addr_t nexthop;
@@ -8756,9 +8785,9 @@ tcp_build_hdrs(tcp_t *tcp)
 	} else {
 		tcpha->tha_sum = 0;
 		tcpha->tha_offset_and_reserved = (5 << 4);
+		tcpha->tha_lport = connp->conn_lport;
+		tcpha->tha_fport = connp->conn_fport;
 	}
-	tcpha->tha_lport = connp->conn_lport;
-	tcpha->tha_fport = connp->conn_fport;
 
 	/*
 	 * IP wants our header length in the checksum field to
@@ -13060,6 +13089,14 @@ tcp_rwnd_set(tcp_t *tcp, uint32_t rwnd)
 			tcp_set_recv_threshold(tcp, sth_hiwat >> 3);
 		}
 
+		/* Caller could have changed tcp_rwnd; update tha_win */
+		if (tcp->tcp_tcpha != NULL) {
+			tcp->tcp_tcpha->tha_win =
+			    htons(tcp->tcp_rwnd >> tcp->tcp_rcv_ws);
+		}
+		if ((tcp->tcp_rcv_ws > 0) && rwnd > tcp->tcp_cwnd_max)
+			tcp->tcp_cwnd_max = rwnd;
+
 		/*
 		 * In the fusion case, the maxpsz stream head value of
 		 * our peer is set according to its send buffer size
@@ -15074,14 +15111,10 @@ tcp_tpi_accept(queue_t *q, mblk_t *mp)
 			sin6->sin6_family = AF_INET6;
 			sin6->sin6_port = econnp->conn_lport;
 			sin6->sin6_addr = econnp->conn_laddr_v6;
-			if (econnp->conn_ipversion == IPV4_VERSION) {
+			if (econnp->conn_ipversion == IPV4_VERSION)
 				sin6->sin6_flowinfo = 0;
-			} else {
-				ASSERT(eager->tcp_ip6h != NULL);
-				sin6->sin6_flowinfo =
-				    eager->tcp_ip6h->ip6_vcf &
-				    ~IPV6_VERS_AND_FLOW_MASK;
-			}
+			else
+				sin6->sin6_flowinfo = econnp->conn_flowinfo;
 			if (IN6_IS_ADDR_LINKSCOPE(&econnp->conn_laddr_v6) &&
 			    (econnp->conn_ixa->ixa_flags & IXAF_SCOPEID_SET)) {
 				sin6->sin6_scope_id =
@@ -16127,7 +16160,7 @@ tcp_send(tcp_t *tcp, const int mss, const int total_hdr_len,
 	 * loops.
 	 */
 	if (tcp->tcp_lso && (tcp->tcp_valid_bits & ~TCP_FSS_VALID) == 0)
-			do_lso_send = B_TRUE;
+		do_lso_send = B_TRUE;
 
 	for (;;) {
 		struct datab	*db;
@@ -17060,6 +17093,8 @@ tcp_xmit_ctl(char *str, tcp_t *tcp, uint32_t seq, uint32_t ack, int ctl)
 
 		/* Update the latest receive window size in TCP header. */
 		tcpha->tha_win = htons(tcp->tcp_rwnd >> tcp->tcp_rcv_ws);
+		/* Track what we sent to the peer */
+		tcp->tcp_tcpha->tha_win = tcpha->tha_win;
 		tcp->tcp_rack = ack;
 		tcp->tcp_rack_cnt = 0;
 		BUMP_MIB(&tcps->tcps_mib, tcpOutAck);
