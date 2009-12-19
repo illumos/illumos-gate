@@ -594,10 +594,21 @@ void	scsi_hba_iportmap_destroy(scsi_hba_iportmap_t	*iportmap);
 /*
  * SCSI target map interfaces
  */
-typedef enum { SCSI_TM_FULLSET = 0, SCSI_TM_PERADDR }	scsi_tgtmap_mode_t;
 typedef enum {
-    SCSI_TGT_SCSI_DEVICE = 0, SCSI_TGT_SMP_DEVICE, SCSI_TGT_NTYPES
-}	scsi_tgtmap_tgt_type_t;
+	SCSI_TM_FULLSET = 0,
+	SCSI_TM_PERADDR
+} scsi_tgtmap_mode_t;
+
+typedef enum {
+	SCSI_TGT_SCSI_DEVICE = 0,
+	SCSI_TGT_SMP_DEVICE,
+	SCSI_TGT_NTYPES
+} scsi_tgtmap_tgt_type_t;
+
+typedef enum {
+	SCSI_TGT_DEACT_RSN_GONE = 0,
+	SCSI_TGT_DEACT_RSN_CFG_FAIL
+} scsi_tgtmap_deact_rsn_t;
 
 typedef void	(*scsi_tgt_activate_cb_t)(
 				void			*tgtmap_priv,
@@ -608,7 +619,8 @@ typedef void	(*scsi_tgt_deactivate_cb_t)(
 				void			*tgtmap_priv,
 				char			*tgt_addr,
 				scsi_tgtmap_tgt_type_t	tgt_type,
-				void			*tgt_priv);
+				void			*tgt_priv,
+				scsi_tgtmap_deact_rsn_t tgt_deact_rsn);
 int	scsi_hba_tgtmap_create(
 				dev_info_t		*iport_dip,
 				scsi_tgtmap_mode_t	rpt_mode,

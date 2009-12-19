@@ -61,6 +61,7 @@ static void dam_addr_report(dam_t *, dam_da_t *, id_t, int);
 static void dam_addr_release(dam_t *, id_t);
 static void dam_addr_report_release(dam_t *, id_t);
 static void dam_addr_deactivate(dam_t *, id_t);
+static void dam_deact_cleanup(dam_t *, id_t, char *, damap_deact_rsn_t);
 static id_t dam_get_addrid(dam_t *, char *);
 static int dam_kstat_create(dam_t *);
 static int dam_map_alloc(dam_t *);
@@ -928,9 +929,12 @@ dam_addr_activate(dam_t *mapp, id_t addrid)
 		mutex_exit(&mapp->dam_lock);
 		DTRACE_PROBE3(damap__addr__activate__config__failure,
 		    char *, mapp->dam_name, char *, addrstr, dam_t *, mapp);
+		dam_deact_cleanup(mapp, addrid, addrstr,
+		    DAMAP_DEACT_RSN_CFG_FAIL);
+	} else {
+		DTRACE_PROBE3(damap__addr__activate__end, char *,
+		    mapp->dam_name, char *, addrstr, dam_t *, mapp);
 	}
-	DTRACE_PROBE3(damap__addr__activate__end, char *, mapp->dam_name,
-	    char *, addrstr, dam_t *, mapp);
 }
 
 /*
@@ -939,7 +943,6 @@ dam_addr_activate(dam_t *mapp, id_t addrid)
 static void
 dam_addr_deactivate(dam_t *mapp, id_t addrid)
 {
-	dam_da_t *passp;
 	char *addrstr;
 
 	addrstr = ddi_strid_id2str(mapp->dam_addr_hash, addrid);
@@ -950,12 +953,21 @@ dam_addr_deactivate(dam_t *mapp, id_t addrid)
 	 * call the unconfiguration callback
 	 */
 	(*mapp->dam_unconfig_cb)(mapp->dam_config_arg, mapp, addrid);
+	dam_deact_cleanup(mapp, addrid, addrstr, DAMAP_DEACT_RSN_GONE);
+}
+
+static void
+dam_deact_cleanup(dam_t *mapp, id_t addrid, char *addrstr,
+    damap_deact_rsn_t deact_rsn)
+{
+	dam_da_t *passp;
+
 	passp = ddi_get_soft_state(mapp->dam_da, addrid);
 	ASSERT(passp);
 	if (mapp->dam_deactivate_cb)
 		(*mapp->dam_deactivate_cb)(mapp->dam_activate_arg,
 		    ddi_strid_id2str(mapp->dam_addr_hash, addrid),
-		    addrid, passp->da_ppriv);
+		    addrid, passp->da_ppriv, deact_rsn);
 
 	/*
 	 * clear the active bit and free the backing info for
@@ -1457,7 +1469,7 @@ dam_addr_report_release(dam_t *mapp, id_t addrid)
 		mutex_exit(&mapp->dam_lock);
 		(*mapp->dam_deactivate_cb)(mapp->dam_activate_arg,
 		    ddi_strid_id2str(mapp->dam_addr_hash, addrid),
-		    addrid, passp->da_ppriv_rpt);
+		    addrid, passp->da_ppriv_rpt, DAMAP_DEACT_RSN_GONE);
 		mutex_enter(&mapp->dam_lock);
 	}
 	passp->da_ppriv_rpt = NULL;

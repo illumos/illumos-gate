@@ -55,7 +55,8 @@ typedef struct dam dam_t;
  * unconfig_cb:		Class callout to unconfigure deactivated addresses
  */
 typedef void (*activate_cb_t)(void *, char *addr, int idx, void **privp);
-typedef void (*deactivate_cb_t)(void *, char *addr, int idx, void *priv);
+typedef void (*deactivate_cb_t)(void *, char *addr, int idx, void *priv,
+    damap_deact_rsn_t deact_rsn);
 
 typedef int (*configure_cb_t)(void *, dam_t *mapp, id_t map_id);
 typedef int (*unconfig_cb_t)(void *, dam_t *mapp, id_t map_id);

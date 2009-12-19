@@ -103,8 +103,14 @@ typedef struct __damap_id_list *damap_id_list_t;
  * configure_cb:	Class callout to configure newly activated addresses
  * unconfig_cb:		Class callout to unconfigure deactivated addresses
  */
+typedef enum {
+	DAMAP_DEACT_RSN_GONE = 0,
+	DAMAP_DEACT_RSN_CFG_FAIL
+} damap_deact_rsn_t;
+
 typedef void (*damap_activate_cb_t)(void *, char *, int, void **);
-typedef void (*damap_deactivate_cb_t)(void *, char *, int, void *);
+typedef void (*damap_deactivate_cb_t)(void *, char *, int, void *,
+    damap_deact_rsn_t);
 
 typedef int (*damap_configure_cb_t)(void *, damap_t *, damap_id_t);
 typedef int (*damap_unconfig_cb_t)(void *, damap_t *, damap_id_t);

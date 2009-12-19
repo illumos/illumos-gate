@@ -8077,6 +8077,7 @@ scsi_tgtmap_scsi_config(void *arg, damap_t *mapp, damap_id_t tgtid)
 	if (cfg_status != NDI_SUCCESS) {
 		SCSI_HBA_LOG((_LOGCFG, self, NULL, "%s @%s config status %d",
 		    damap_name(mapp), tgtaddr, cfg_status));
+		scsi_lunmap_destroy(self, tgtmap, tgtaddr);
 		return (DAM_FAILURE);
 	}
 
@@ -8170,7 +8171,7 @@ scsi_tgtmap_smp_activate(void *map_priv, char *tgt_addr, int addrid,
 /* ARGSUSED1 */
 static void
 scsi_tgtmap_smp_deactivate(void *map_priv, char *tgt_addr, int addrid,
-    void *tgt_privp)
+    void *tgt_privp, damap_deact_rsn_t deact_rsn)
 {
 	impl_scsi_tgtmap_t	*tgtmap = (impl_scsi_tgtmap_t *)map_priv;
 	dev_info_t		*self = tgtmap->tgtmap_tran->tran_iport_dip;
@@ -8181,7 +8182,9 @@ scsi_tgtmap_smp_deactivate(void *map_priv, char *tgt_addr, int addrid,
 		    tgt_addr));
 
 		(*tgtmap->tgtmap_deactivate_cb)(tgtmap->tgtmap_mappriv,
-		    tgt_addr, SCSI_TGT_SMP_DEVICE, tgt_privp);
+		    tgt_addr, SCSI_TGT_SMP_DEVICE, tgt_privp,
+		    (deact_rsn == DAMAP_DEACT_RSN_CFG_FAIL) ?
+		    SCSI_TGT_DEACT_RSN_CFG_FAIL : SCSI_TGT_DEACT_RSN_GONE);
 	}
 }
 
@@ -8206,7 +8209,7 @@ scsi_tgtmap_scsi_activate(void *map_priv, char *tgt_addr, int addrid,
 /* ARGSUSED1 */
 static void
 scsi_tgtmap_scsi_deactivate(void *map_priv, char *tgt_addr, int addrid,
-    void *tgt_privp)
+    void *tgt_privp, damap_deact_rsn_t deact_rsn)
 {
 	impl_scsi_tgtmap_t	*tgtmap = (impl_scsi_tgtmap_t *)map_priv;
 	dev_info_t		*self = tgtmap->tgtmap_tran->tran_iport_dip;
@@ -8217,8 +8220,9 @@ scsi_tgtmap_scsi_deactivate(void *map_priv, char *tgt_addr, int addrid,
 		    tgt_addr));
 
 		(*tgtmap->tgtmap_deactivate_cb)(tgtmap->tgtmap_mappriv,
-		    tgt_addr, SCSI_TGT_SCSI_DEVICE, tgt_privp);
-
+		    tgt_addr, SCSI_TGT_SCSI_DEVICE, tgt_privp,
+		    (deact_rsn == DAMAP_DEACT_RSN_CFG_FAIL) ?
+		    SCSI_TGT_DEACT_RSN_CFG_FAIL : SCSI_TGT_DEACT_RSN_GONE);
 	}
 }
 

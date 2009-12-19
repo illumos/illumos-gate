@@ -26,6 +26,7 @@
 #include <mdb/mdb_modapi.h>
 #include <sys/sysmacros.h>
 #include <sys/sunddi.h>
+#include <sys/damap.h>
 #include <sys/damap_impl.h>
 
 #include "damap.h"
