@@ -455,12 +455,12 @@ krb5ssp_destroy(struct ssp_ctx *sp)
 	if ((kctx = ss->ss_krb5ctx) != NULL) {
 		/* from krb5ssp_get_tkt */
 		if (ss->ss_auth)
-			krb5_auth_con_free(kctx, ss->ss_auth);
+			(void) krb5_auth_con_free(kctx, ss->ss_auth);
 		/* from krb5ssp_init_client */
 		if (ss->ss_krb5clp)
 			krb5_free_principal(kctx, ss->ss_krb5clp);
 		if (ss->ss_krb5cc)
-			krb5_cc_close(kctx, ss->ss_krb5cc);
+			(void) krb5_cc_close(kctx, ss->ss_krb5cc);
 		krb5_free_context(kctx);
 	}
 

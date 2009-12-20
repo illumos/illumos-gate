@@ -37,6 +37,9 @@
 /: _xti_.* .E_INCONS_ARG_USED2./		{ next; }
 /: _xti_.* .E_INCONS_VAL_TYPE_DECL2./		{ next; }
 
+# This is third-party code we'd rather not "fix"
+/\/spnego.c.* .E_STMT_NOT_REACHED./		{ next; }
+
 # The mb_put/md_get functions are intentionally used both
 # with and without return value checks.  Not a concern.
 /: mb_put_.* .E_FUNC_RET_[A-Z]*_IGNOR/		{ next; }
