@@ -318,6 +318,7 @@ DRV_KMODS	+= ncall nsctl sdbc nskern sv
 DRV_KMODS	+= ii rdc rdcsrv rdcstub 
 DRV_KMODS	+= iscsi
 DRV_KMODS	+= emlxs
+DRV_KMODS	+= oce
 DRV_KMODS	+= srpt
 DRV_KMODS	+= pmcs
 DRV_KMODS	+= pmcs8001fw

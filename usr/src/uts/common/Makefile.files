@@ -920,6 +920,10 @@ EMLXS_OBJS +=	emlxs_clock.o emlxs_dfc.o emlxs_dhchap.o emlxs_diag.o \
 
 EMLXS_FW_OBJS +=	emlxs_fw.o
 
+OCE_OBJS +=	oce_buf.o oce_fm.o oce_gld.o oce_hw.o oce_intr.o oce_main.o \
+		oce_mbx.o oce_mq.o oce_queue.o oce_rx.o oce_stat.o oce_tx.o \
+		oce_utils.o
+
 FCT_OBJS += discovery.o fct.o
 
 QLT_OBJS += 2400.o 2500.o 8100.o qlt.o qlt_dma.o
