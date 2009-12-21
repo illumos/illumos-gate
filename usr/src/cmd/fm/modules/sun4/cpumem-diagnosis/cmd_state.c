@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Case management and saved state restoration
@@ -209,7 +208,7 @@ cmd_state_restore(fmd_hdl_t *hdl)
 		fmd_buf_read(hdl, cp, fmd_case_uuid(hdl, cp), &ptr,
 		    sizeof (cmd_case_ptr_t));
 
-		if (ptr.ptr_type == 0 || ptr.ptr_type >
+		if (ptr.ptr_type == 0 || ptr.ptr_type >=
 		    sizeof (cmd_case_restorers) /
 		    sizeof (cmd_case_restorer_f *))
 			return (cmd_set_errno(EINVAL));
