@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -611,8 +611,6 @@ rge_send(rge_t *rgep, mblk_t *mp)
 {
 	struct ether_vlan_header *ehp;
 	uint16_t tci;
-	rge_hw_stats_t *bstp;
-	uint8_t counter;
 
 	ASSERT(mp->b_next == NULL);
 
@@ -623,7 +621,6 @@ rge_send(rge_t *rgep, mblk_t *mp)
 		RGE_DEBUG(("rge_send: no free slots"));
 		rgep->stats.defer++;
 		rgep->resched_needed = B_TRUE;
-		(void) ddi_intr_trigger_softint(rgep->resched_hdl, NULL);
 		return (B_FALSE);
 	}
 
@@ -651,35 +648,9 @@ rge_send(rge_t *rgep, mblk_t *mp)
 	mutex_enter(rgep->tx_lock);
 	if (--rgep->tx_flow == 0) {
 		DMA_SYNC(rgep->tx_desc, DDI_DMA_SYNC_FORDEV);
-		rge_tx_trigger(rgep);
-		rgep->stats.opackets ++;
-		if (rgep->tx_free < RGE_SEND_SLOTS/2)
-			rge_send_recycle(rgep);
 		rgep->tc_tail = rgep->tx_next;
-
-		/*
-		 * It's observed that in current Realtek PCI-E chips, tx
-		 * request of the second fragment for upper layer packets
-		 * will be ignored if the hardware transmission is in
-		 * progress and will not be processed when the tx engine
-		 * is idle. So one solution is to re-issue the requests
-		 * if the hardware and the software tx packets statistics
-		 * are inconsistent.
-		 */
-		if (rgep->chipid.is_pcie && rgep->stats.tx_pre_ismax) {
-			for (counter = 0; counter < 10; counter ++) {
-				mutex_enter(rgep->genlock);
-				rge_hw_stats_dump(rgep);
-				mutex_exit(rgep->genlock);
-				bstp = rgep->hw_stats;
-				if (rgep->stats.opackets
-				    != RGE_BSWAP_64(bstp->rcv_ok))
-					rge_tx_trigger(rgep);
-				else
-					break;
-			}
-		}
 	}
+	rgep->stats.opackets++;
 	mutex_exit(rgep->tx_lock);
 
 	return (B_TRUE);
@@ -695,6 +666,19 @@ rge_reschedule(caddr_t arg1, caddr_t arg2)
 
 	rge_send_recycle(rgep);
 
+	if (rgep->chipid.is_pcie && rgep->tx_free != RGE_SEND_SLOTS) {
+		/*
+		 * It's observed that in current Realtek PCI-E chips, tx
+		 * request of the second fragment for upper layer packets
+		 * will be ignored if the hardware transmission is in
+		 * progress and will not be processed when the tx engine
+		 * is idle. So one solution is to re-issue the requests
+		 * if there are untransmitted packets after tx interrupts
+		 * occur.
+		 */
+		rge_tx_trigger(rgep);
+	}
+
 	return (DDI_INTR_CLAIMED);
 }
 
@@ -706,6 +690,7 @@ rge_m_tx(void *arg, mblk_t *mp)
 {
 	rge_t *rgep = arg;		/* private device info	*/
 	mblk_t *next;
+	mblk_t *mp_org = mp;
 
 	ASSERT(mp != NULL);
 
@@ -727,6 +712,9 @@ rge_m_tx(void *arg, mblk_t *mp)
 		}
 
 		mp = next;
+	}
+	if (mp != mp_org) {
+		rge_tx_trigger(rgep);
 	}
 	rw_exit(rgep->errlock);
 

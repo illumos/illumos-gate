@@ -1638,7 +1638,7 @@ rge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	/*
 	 * Map operating registers
 	 */
-	err = ddi_regs_map_setup(devinfo, 1, &regs,
+	err = ddi_regs_map_setup(devinfo, 2, &regs,
 	    0, 0, &rge_reg_accattr, &rgep->io_handle);
 	if (err != DDI_SUCCESS) {
 		rge_problem(rgep, "ddi_regs_map_setup() failed");

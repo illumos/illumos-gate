@@ -703,20 +703,8 @@ rge_chip_ident(rge_t *rgep)
 	val32 = rge_reg_get32(rgep, TX_CONFIG_REG);
 	val32 &= HW_VERSION_ID_0 | HW_VERSION_ID_1;
 	chip->mac_ver = val32;
-	switch (chip->mac_ver) {
-	case MAC_VER_8168:
-	case MAC_VER_8168B_B:
-	case MAC_VER_8168B_C:
-	case MAC_VER_8168C:
-	case MAC_VER_8101E:
-	case MAC_VER_8101E_B:
-		chip->is_pcie = B_TRUE;
-		break;
-
-	default:
-		chip->is_pcie = B_FALSE;
-		break;
-	}
+	chip->is_pcie = pci_lcap_locate(rgep->cfg_handle,
+	    PCI_CAP_ID_PCI_E, &val16) == DDI_SUCCESS;
 
 	/*
 	 * Read and record PHY version
@@ -775,6 +763,11 @@ rge_chip_ident(rge_t *rgep)
 	chip->rxconfig = RX_CONFIG_DEFAULT;
 	chip->txconfig = TX_CONFIG_DEFAULT;
 
+	/* interval to update statistics for polling mode */
+	rgep->tick_delta = drv_usectohz(1000*1000/CLK_TICK);
+
+	/* ensure we are not in polling mode */
+	rgep->curr_tick = ddi_get_lbolt() - 2*rgep->tick_delta;
 	RGE_TRACE(("%s: MAC version = %x, PHY version = %x",
 	    rgep->ifname, chip->mac_ver, chip->phy_ver));
 }
@@ -884,34 +877,31 @@ rge_chip_init(rge_t *rgep)
 	uint32_t *hashp;
 	chip_id_t *chip = &rgep->chipid;
 
-	if (chip->is_pcie) {
-		/*
-		 * Increase the threshold voltage of RX sensitivity
-		 */
-		if (chip->mac_ver != MAC_VER_8168 &&
-		    chip->mac_ver != MAC_VER_8168C &&
-		    chip->mac_ver != MAC_VER_8101E_B)
-			rge_ephy_put16(rgep, 0x01, 0x1bd3);
+	/*
+	 * Increase the threshold voltage of RX sensitivity
+	 */
+	if (chip->mac_ver == MAC_VER_8168B_B ||
+	    chip->mac_ver == MAC_VER_8168B_C ||
+	    chip->mac_ver == MAC_VER_8101E ||
+	    chip->mac_ver == MAC_VER_8101E_C) {
+		rge_ephy_put16(rgep, 0x01, 0x1bd3);
+	}
 
+	if (chip->mac_ver == MAC_VER_8168 ||
+	    chip->mac_ver == MAC_VER_8168B_B) {
 		val16 = rge_reg_get8(rgep, PHY_STATUS_REG);
 		val16 = 0x12<<8 | val16;
-		if (rgep->chipid.mac_ver != MAC_VER_8101E &&
-		    rgep->chipid.mac_ver != MAC_VER_8101E_B &&
-		    rgep->chipid.mac_ver != MAC_VER_8101E_C &&
-		    rgep->chipid.mac_ver != MAC_VER_8168B_C &&
-		    rgep->chipid.mac_ver != MAC_VER_8168C) {
-			rge_reg_put16(rgep, PHY_STATUS_REG, val16);
-			rge_reg_put32(rgep, RT_CSI_DATA_REG, 0x00021c01);
-			rge_reg_put32(rgep, RT_CSI_ACCESS_REG, 0x8000f088);
-			rge_reg_put32(rgep, RT_CSI_DATA_REG, 0x00004000);
-			rge_reg_put32(rgep, RT_CSI_ACCESS_REG, 0x8000f0b0);
-			rge_reg_put32(rgep, RT_CSI_ACCESS_REG, 0x0000f068);
-			val32 = rge_reg_get32(rgep, RT_CSI_DATA_REG);
-			val32 |= 0x7000;
-			val32 &= 0xffff5fff;
-			rge_reg_put32(rgep, RT_CSI_DATA_REG, val32);
-			rge_reg_put32(rgep, RT_CSI_ACCESS_REG, 0x8000f068);
-		}
+		rge_reg_put16(rgep, PHY_STATUS_REG, val16);
+		rge_reg_put32(rgep, RT_CSI_DATA_REG, 0x00021c01);
+		rge_reg_put32(rgep, RT_CSI_ACCESS_REG, 0x8000f088);
+		rge_reg_put32(rgep, RT_CSI_DATA_REG, 0x00004000);
+		rge_reg_put32(rgep, RT_CSI_ACCESS_REG, 0x8000f0b0);
+		rge_reg_put32(rgep, RT_CSI_ACCESS_REG, 0x0000f068);
+		val32 = rge_reg_get32(rgep, RT_CSI_DATA_REG);
+		val32 |= 0x7000;
+		val32 &= 0xffff5fff;
+		rge_reg_put32(rgep, RT_CSI_DATA_REG, val32);
+		rge_reg_put32(rgep, RT_CSI_ACCESS_REG, 0x8000f068);
 	}
 
 	/*
@@ -1067,6 +1057,9 @@ rge_chip_start(rge_t *rgep)
 	 * Enable interrupt
 	 */
 	rgep->int_mask = RGE_INT_MASK;
+	if (rgep->chipid.is_pcie) {
+		rgep->int_mask |= NO_TXDESC_INT;
+	}
 	rge_reg_put16(rgep, INT_MASK_REG, rgep->int_mask);
 
 	/*
@@ -1288,7 +1281,7 @@ void rge_tx_trigger(rge_t *rgep);
 void
 rge_tx_trigger(rge_t *rgep)
 {
-	rge_reg_set8(rgep, TX_RINGS_POLL_REG, NORMAL_TX_RING_POLL);
+	rge_reg_put8(rgep, TX_RINGS_POLL_REG, NORMAL_TX_RING_POLL);
 }
 
 void rge_hw_stats_dump(rge_t *rgep);
@@ -1345,6 +1338,14 @@ rge_intr(caddr_t arg1, caddr_t arg2)
 {
 	rge_t *rgep = (rge_t *)arg1;
 	uint16_t int_status;
+	clock_t	now;
+	uint32_t tx_pkts;
+	uint32_t rx_pkts;
+	uint32_t poll_rate;
+	uint32_t opt_pkts;
+	uint32_t opt_intrs;
+	boolean_t update_int_mask = B_FALSE;
+	uint32_t itimer;
 
 	_NOTE(ARGUNUSED(arg2))
 
@@ -1370,9 +1371,91 @@ rge_intr(caddr_t arg1, caddr_t arg2)
 	 * Clear interrupt
 	 *	For PCIE chipset, we need disable interrupt first.
 	 */
-	if (rgep->chipid.is_pcie)
+	if (rgep->chipid.is_pcie) {
 		rge_reg_put16(rgep, INT_MASK_REG, INT_MASK_NONE);
+		update_int_mask = B_TRUE;
+	}
 	rge_reg_put16(rgep, INT_STATUS_REG, int_status);
+
+	/*
+	 * Calculate optimal polling interval
+	 */
+	now = ddi_get_lbolt();
+	if (now - rgep->curr_tick >= rgep->tick_delta &&
+	    (rgep->param_link_speed == RGE_SPEED_1000M ||
+	    rgep->param_link_speed == RGE_SPEED_100M)) {
+		/* number of rx and tx packets in the last tick */
+		tx_pkts = rgep->stats.opackets - rgep->last_opackets;
+		rx_pkts = rgep->stats.rpackets - rgep->last_rpackets;
+
+		rgep->last_opackets = rgep->stats.opackets;
+		rgep->last_rpackets = rgep->stats.rpackets;
+
+		/* restore interrupt mask */
+		rgep->int_mask |= TX_OK_INT | RX_OK_INT;
+		if (rgep->chipid.is_pcie) {
+			rgep->int_mask |= NO_TXDESC_INT;
+		}
+
+		/* optimal number of packets in a tick */
+		if (rgep->param_link_speed == RGE_SPEED_1000M) {
+			opt_pkts = (1000*1000*1000/8)/ETHERMTU/CLK_TICK;
+		} else {
+			opt_pkts = (100*1000*1000/8)/ETHERMTU/CLK_TICK;
+		}
+
+		/*
+		 * calculate polling interval based on rx and tx packets
+		 * in the last tick
+		 */
+		poll_rate = 0;
+		if (now - rgep->curr_tick < 2*rgep->tick_delta) {
+			opt_intrs = opt_pkts/TX_COALESC;
+			if (tx_pkts > opt_intrs) {
+				poll_rate = max(tx_pkts/TX_COALESC, opt_intrs);
+				rgep->int_mask &= ~(TX_OK_INT | NO_TXDESC_INT);
+			}
+
+			opt_intrs = opt_pkts/RX_COALESC;
+			if (rx_pkts > opt_intrs) {
+				opt_intrs = max(rx_pkts/RX_COALESC, opt_intrs);
+				poll_rate = max(opt_intrs, poll_rate);
+				rgep->int_mask &= ~RX_OK_INT;
+			}
+			/* ensure poll_rate reasonable */
+			poll_rate = min(poll_rate, opt_pkts*4);
+		}
+
+		if (poll_rate) {
+			/* move to polling mode */
+			if (rgep->chipid.is_pcie) {
+				itimer = (TIMER_CLK_PCIE/CLK_TICK)/poll_rate;
+			} else {
+				itimer = (TIMER_CLK_PCI/CLK_TICK)/poll_rate;
+			}
+		} else {
+			/* move to normal mode */
+			itimer = 0;
+		}
+		RGE_DEBUG(("%s: poll: itimer:%d int_mask:0x%x",
+		    __func__, itimer, rgep->int_mask));
+		rge_reg_put32(rgep, TIMER_INT_REG, itimer);
+
+		/* update timestamp for statistics */
+		rgep->curr_tick = now;
+
+		/* reset timer */
+		int_status |= TIME_OUT_INT;
+
+		update_int_mask = B_TRUE;
+	}
+
+	if (int_status & TIME_OUT_INT) {
+		rge_reg_put32(rgep, TIMER_COUNT_REG, 0);
+	}
+
+	/* flush post writes */
+	(void) rge_reg_get16(rgep, INT_STATUS_REG);
 
 	/*
 	 * Cable link change interrupt
@@ -1390,9 +1473,22 @@ rge_intr(caddr_t arg1, caddr_t arg2)
 		rge_receive(rgep);
 
 	/*
-	 * Re-enable interrupt for PCIE chipset
+	 * Transmit interrupt
 	 */
-	if (rgep->chipid.is_pcie)
+	if (int_status & TX_ERR_INT) {
+		RGE_REPORT((rgep, "tx error happened, resetting the chip "));
+		mutex_enter(rgep->genlock);
+		rgep->rge_chip_state = RGE_CHIP_ERROR;
+		mutex_exit(rgep->genlock);
+	} else if ((rgep->chipid.is_pcie && (int_status & NO_TXDESC_INT)) ||
+	    ((int_status & TX_OK_INT) && rgep->tx_free < RGE_SEND_SLOTS/8)) {
+		(void) ddi_intr_trigger_softint(rgep->resched_hdl, NULL);
+	}
+
+	/*
+	 * Re-enable interrupt for PCIE chipset or install new int_mask
+	 */
+	if (update_int_mask)
 		rge_reg_put16(rgep, INT_MASK_REG, rgep->int_mask);
 
 	return (DDI_INTR_CLAIMED);	/* indicate it was our interrupt */

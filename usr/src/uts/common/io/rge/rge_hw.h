@@ -136,7 +136,9 @@ extern "C" {
 #define	INT_MASK_NONE			0x0000
 #define	RGE_RX_INT			(RX_OK_INT | RX_ERR_INT | \
 					    NO_RXDESC_INT)
-#define	RGE_INT_MASK			(RGE_RX_INT | LINK_CHANGE_INT)
+#define	RGE_INT_MASK			(TX_OK_INT | TX_ERR_INT | \
+					    RGE_RX_INT | LINK_CHANGE_INT | \
+					    TIME_OUT_INT)
 
 /*
  * Transmit configuration register
@@ -213,6 +215,8 @@ extern "C" {
  * Timer count register
  */
 #define	TIMER_COUNT_REG			0x0048
+#define	TIMER_CLK_PCIE			(125*1000*1000)
+#define	TIMER_CLK_PCI			(33*1000*1000)
 
 /*
  * Missed packet counter: indicates the number of packets

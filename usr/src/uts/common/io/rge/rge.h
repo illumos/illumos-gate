@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,7 @@ extern "C" {
 #include <sys/strsubr.h>
 #include <sys/stat.h>
 #include <sys/pci.h>
+#include <sys/pci_cap.h>
 #include <sys/note.h>
 #include <sys/modctl.h>
 #include <sys/kstat.h>
@@ -316,19 +317,23 @@ typedef struct sw_sbd {
 } sw_sbd_t;
 
 
-#define	HW_RBD_INIT(rbd, slot)					\
-	rbd->flags_len |= RGE_BSWAP_32(BD_FLAG_HW_OWN);		\
-	rbd->vlan_tag = 0;					\
-	if (slot == (RGE_RECV_SLOTS -1))			\
-		rbd->flags_len |= RGE_BSWAP_32(BD_FLAG_EOR);
-#define	HW_SBD_INIT(sbd, slot)					\
-	sbd->flags_len = 0;					\
-	if (slot == (RGE_SEND_SLOTS -1))			\
-		sbd->flags_len |= RGE_BSWAP_32(BD_FLAG_EOR);
-#define	HW_SBD_SET(sbd, slot)					\
-	sbd->flags_len |= RGE_BSWAP_32(SBD_FLAG_TX_PKT);	\
-	if (slot == (RGE_SEND_SLOTS -1))			\
-		sbd->flags_len |= RGE_BSWAP_32(BD_FLAG_EOR);
+#define	HW_RBD_INIT(rbd, slot) {				\
+	(rbd)->vlan_tag = 0;					\
+	if ((slot) == (RGE_RECV_SLOTS -1)) {			\
+		(rbd)->flags_len |=				\
+		    RGE_BSWAP_32(BD_FLAG_EOR | BD_FLAG_HW_OWN);	\
+	} else {						\
+		(rbd)->flags_len |= RGE_BSWAP_32(BD_FLAG_HW_OWN);	\
+	}							\
+}
+#define	HW_SBD_SET(sbd, slot) {					\
+	if ((slot) == (RGE_SEND_SLOTS -1)) {			\
+		(sbd)->flags_len |=				\
+		    RGE_BSWAP_32(BD_FLAG_EOR | SBD_FLAG_TX_PKT);	\
+	} else {						\
+		(sbd)->flags_len |= RGE_BSWAP_32(SBD_FLAG_TX_PKT); \
+	}							\
+}
 
 /*
  * Describes the characteristics of a specific chip
@@ -478,6 +483,17 @@ typedef struct rge {
 	enum rge_chip_state	rge_chip_state;	/* definitions above	*/
 
 	boolean_t		suspended;
+
+	/*
+	 * Polling
+	 */
+#define	TX_COALESC	max(RGE_BUF_SLOTS/32LL, 8)
+#define	RX_COALESC	8LL
+#define	CLK_TICK	100
+	clock_t			curr_tick;
+	clock_t			tick_delta;
+	uint64_t		last_opackets;
+	uint64_t		last_rpackets;
 } rge_t;
 
 /*
