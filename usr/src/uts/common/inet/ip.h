@@ -1646,7 +1646,9 @@ typedef struct ill_s {
 		ill_manual_token : 1,	/* system won't override ill_token */
 		ill_manual_linklocal : 1, /* system won't auto-conf linklocal */
 
-		ill_pad_bit_31 : 28;
+		ill_manual_dst_linklocal : 1, /* same for pt-pt dst linklocal */
+
+		ill_pad_bit_31 : 27;
 
 	/*
 	 * Used in SIOCSIFMUXID and SIOCGIFMUXID for 'ifconfig unplumb'.

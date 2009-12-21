@@ -1156,9 +1156,9 @@ ipif_setlinklocal(ipif_t *ipif)
 }
 
 /*
- * Set the destination link-local address for a point-to-point IPv6
- * interface with a destination interface id (IP tunnels are such
- * interfaces).
+ * Generate a destination link-local address for a point-to-point IPv6
+ * interface with a destination interface id (IP tunnels are such interfaces)
+ * based on the destination token.
  */
 void
 ipif_setdestlinklocal(ipif_t *ipif)
@@ -1166,10 +1166,11 @@ ipif_setdestlinklocal(ipif_t *ipif)
 	ill_t	*ill = ipif->ipif_ill;
 
 	ASSERT(IAM_WRITER_ILL(ill));
-	if (IN6_IS_ADDR_UNSPECIFIED(&ill->ill_dest_token))
+
+	if (ill->ill_manual_dst_linklocal)
 		return;
-	/* Skip if we've already set the pp_dst_addr */
-	if (!IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6pp_dst_addr))
+
+	if (IN6_IS_ADDR_UNSPECIFIED(&ill->ill_dest_token))
 		return;
 
 	ipif_get_linklocal(&ipif->ipif_v6pp_dst_addr, &ill->ill_dest_token);

@@ -9787,6 +9787,16 @@ ip_sioctl_dstaddr_tail(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		}
 	}
 
+	/*
+	 * If we've just manually set the IPv6 destination link-local address
+	 * (0th ipif), tag the ill so that future updates to the destination
+	 * interface ID (as can happen with interfaces over IP tunnels) don't
+	 * result in this address getting automatically reconfigured from
+	 * under the administrator.
+	 */
+	if (ipif->ipif_isv6 && ipif->ipif_id == 0)
+		ill->ill_manual_dst_linklocal = 1;
+
 	/* Set the new address. */
 	ipif->ipif_v6pp_dst_addr = v6addr;
 	/* Make sure subnet tracks pp_dst */
