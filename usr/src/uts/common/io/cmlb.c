@@ -1886,7 +1886,7 @@ cmlb_convert_geometry(struct cmlb_lun *cl, diskaddr_t capacity,
 
 		cl_g->dkg_nhead = nhead;
 
-		/* make nsect be smallest multiple of nhead */
+		/* make dkg_nsect be smallest multiple of nsect */
 		cl_g->dkg_nsect = ((capacity +
 		    (UINT16_MAX * nhead * nsect) - 1) /
 		    (UINT16_MAX * nhead * nsect)) * nsect;
