@@ -129,7 +129,9 @@ typedef struct sctp_ill_hash_s {
 
 
 #define	SCTP_IPIF_REFHOLD(sctp_ipif) {				\
-	atomic_add_32(&(sctp_ipif)->sctp_ipif_refcnt, 1);	\
+	rw_enter(&(sctp_ipif)->sctp_ipif_lock, RW_WRITER);	\
+	(sctp_ipif)->sctp_ipif_refcnt++;			\
+	rw_exit(&(sctp_ipif)->sctp_ipif_lock);			\
 }
 
 #define	SCTP_IPIF_REFRELE(sctp_ipif) {					\

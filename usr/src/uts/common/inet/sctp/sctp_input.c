@@ -643,6 +643,7 @@ sctp_free_reass(sctp_instr_t *sip)
 		}
 		freemsg(mp);
 	}
+	sip->istr_reass = NULL;
 }
 
 /*
@@ -4179,8 +4180,12 @@ nomorechunks:
 		if (sctp->sctp_cxmit_list != NULL)
 			sctp_wput_asconf(sctp, NULL);
 	}
-	/* If there is unsent data, make sure a timer is running */
-	if (sctp->sctp_unsent > 0 && !sctp->sctp_current->timer_running) {
+	/*
+	 * If there is unsent data, make sure a timer is running, check
+	 * timer_mp, if sctp_closei_local() ran the timers may be free.
+	 */
+	if (sctp->sctp_unsent > 0 && !sctp->sctp_current->timer_running &&
+	    sctp->sctp_current->timer_mp != NULL) {
 		SCTP_FADDR_TIMER_RESTART(sctp, sctp->sctp_current,
 		    sctp->sctp_current->rto);
 	}

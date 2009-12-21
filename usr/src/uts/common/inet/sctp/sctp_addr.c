@@ -55,7 +55,8 @@ static sctp_ipif_t	*sctp_lookup_ipif_addr(in6_addr_t *, boolean_t,
 static int		sctp_get_all_ipifs(sctp_t *, int);
 static int		sctp_ipif_hash_insert(sctp_t *, sctp_ipif_t *, int,
 			    boolean_t, boolean_t);
-static void		sctp_ipif_hash_remove(sctp_t *, sctp_ipif_t *);
+static void		sctp_ipif_hash_remove(sctp_t *, sctp_ipif_t *,
+			    boolean_t);
 static void		sctp_fix_saddr(sctp_t *, in6_addr_t *);
 static int		sctp_compare_ipif_list(sctp_ipif_hash_t *,
 			    sctp_ipif_hash_t *);
@@ -461,6 +462,7 @@ sctp_ipif_hash_insert(sctp_t *sctp, sctp_ipif_t *ipif, int sleep,
 
 	hindex = SCTP_IPIF_ADDR_HASH(ipif->sctp_ipif_saddr,
 	    ipif->sctp_ipif_isv6);
+	rw_enter(&sctp->sctp_saddrs[hindex].ipif_hash_lock, RW_WRITER);
 	ipif_obj = list_head(&sctp->sctp_saddrs[hindex].sctp_ipif_list);
 	for (cnt = 0; cnt < sctp->sctp_saddrs[hindex].ipif_count; cnt++) {
 		if (IN6_ARE_ADDR_EQUAL(&ipif_obj->saddr_ipifp->sctp_ipif_saddr,
@@ -473,9 +475,13 @@ sctp_ipif_hash_insert(sctp_t *sctp, sctp_ipif_t *ipif, int sleep,
 				SCTP_IPIF_REFRELE(ipif_obj->saddr_ipifp);
 				ipif_obj->saddr_ipifp = ipif;
 				ipif_obj->saddr_ipif_dontsrc = dontsrc ? 1 : 0;
+				rw_exit(
+				    &sctp->sctp_saddrs[hindex].ipif_hash_lock);
 				return (0);
 			} else if (!allow_dup || ipif->sctp_ipif_id ==
 			    ipif_obj->saddr_ipifp->sctp_ipif_id) {
+				rw_exit(
+				    &sctp->sctp_saddrs[hindex].ipif_hash_lock);
 				return (EALREADY);
 			}
 		}
@@ -484,6 +490,7 @@ sctp_ipif_hash_insert(sctp_t *sctp, sctp_ipif_t *ipif, int sleep,
 	}
 	ipif_obj = kmem_zalloc(sizeof (sctp_saddr_ipif_t), sleep);
 	if (ipif_obj == NULL) {
+		rw_exit(&sctp->sctp_saddrs[hindex].ipif_hash_lock);
 		/* Need to do something */
 		return (ENOMEM);
 	}
@@ -492,6 +499,7 @@ sctp_ipif_hash_insert(sctp_t *sctp, sctp_ipif_t *ipif, int sleep,
 	list_insert_tail(&sctp->sctp_saddrs[hindex].sctp_ipif_list, ipif_obj);
 	sctp->sctp_saddrs[hindex].ipif_count++;
 	sctp->sctp_nsaddrs++;
+	rw_exit(&sctp->sctp_saddrs[hindex].ipif_hash_lock);
 	return (0);
 }
 
@@ -514,7 +522,7 @@ sctp_fix_saddr(sctp_t *sctp, in6_addr_t *saddr)
 }
 
 static void
-sctp_ipif_hash_remove(sctp_t *sctp, sctp_ipif_t *ipif)
+sctp_ipif_hash_remove(sctp_t *sctp, sctp_ipif_t *ipif, boolean_t locked)
 {
 	int			cnt;
 	sctp_saddr_ipif_t	*ipif_obj;
@@ -522,6 +530,8 @@ sctp_ipif_hash_remove(sctp_t *sctp, sctp_ipif_t *ipif)
 
 	hindex = SCTP_IPIF_ADDR_HASH(ipif->sctp_ipif_saddr,
 	    ipif->sctp_ipif_isv6);
+	if (!locked)
+		rw_enter(&sctp->sctp_saddrs[hindex].ipif_hash_lock, RW_WRITER);
 	ipif_obj = list_head(&sctp->sctp_saddrs[hindex].sctp_ipif_list);
 	for (cnt = 0; cnt < sctp->sctp_saddrs[hindex].ipif_count; cnt++) {
 		if (IN6_ARE_ADDR_EQUAL(&ipif_obj->saddr_ipifp->sctp_ipif_saddr,
@@ -538,6 +548,8 @@ sctp_ipif_hash_remove(sctp_t *sctp, sctp_ipif_t *ipif)
 		ipif_obj = list_next(&sctp->sctp_saddrs[hindex].sctp_ipif_list,
 		    ipif_obj);
 	}
+	if (!locked)
+		rw_exit(&sctp->sctp_saddrs[hindex].ipif_hash_lock);
 }
 
 static int
@@ -549,6 +561,8 @@ sctp_compare_ipif_list(sctp_ipif_hash_t *list1, sctp_ipif_hash_t *list2)
 	sctp_saddr_ipif_t	*obj2;
 	int			overlap = 0;
 
+	rw_enter(&list1->ipif_hash_lock, RW_READER);
+	rw_enter(&list2->ipif_hash_lock, RW_READER);
 	obj1 = list_head(&list1->sctp_ipif_list);
 	for (i = 0; i < list1->ipif_count; i++) {
 		obj2 = list_head(&list2->sctp_ipif_list);
@@ -564,6 +578,8 @@ sctp_compare_ipif_list(sctp_ipif_hash_t *list1, sctp_ipif_hash_t *list2)
 		}
 		obj1 = list_next(&list1->sctp_ipif_list, obj1);
 	}
+	rw_exit(&list1->ipif_hash_lock);
+	rw_exit(&list2->ipif_hash_lock);
 	return (overlap);
 }
 
@@ -599,16 +615,20 @@ sctp_copy_ipifs(sctp_ipif_hash_t *list1, sctp_t *sctp2, int sleep)
 	sctp_saddr_ipif_t	*obj;
 	int			error = 0;
 
+	rw_enter(&list1->ipif_hash_lock, RW_READER);
 	obj = list_head(&list1->sctp_ipif_list);
 	for (i = 0; i < list1->ipif_count; i++) {
 		SCTP_IPIF_REFHOLD(obj->saddr_ipifp);
 		error = sctp_ipif_hash_insert(sctp2, obj->saddr_ipifp, sleep,
 		    B_FALSE, B_FALSE);
 		ASSERT(error != EALREADY);
-		if (error != 0)
+		if (error != 0) {
+			rw_exit(&list1->ipif_hash_lock);
 			return (error);
+		}
 		obj = list_next(&list1->sctp_ipif_list, obj);
 	}
+	rw_exit(&list1->ipif_hash_lock);
 	return (error);
 }
 
@@ -622,13 +642,18 @@ sctp_dup_saddrs(sctp_t *sctp1, sctp_t *sctp2, int sleep)
 		return (sctp_get_all_ipifs(sctp2, sleep));
 
 	for (i = 0; i < SCTP_IPIF_HASH; i++) {
-		if (sctp1->sctp_saddrs[i].ipif_count == 0)
+		rw_enter(&sctp1->sctp_saddrs[i].ipif_hash_lock, RW_READER);
+		if (sctp1->sctp_saddrs[i].ipif_count == 0) {
+			rw_exit(&sctp1->sctp_saddrs[i].ipif_hash_lock);
 			continue;
+		}
 		error = sctp_copy_ipifs(&sctp1->sctp_saddrs[i], sctp2, sleep);
 		if (error != 0) {
+			rw_exit(&sctp1->sctp_saddrs[i].ipif_hash_lock);
 			sctp_free_saddrs(sctp2);
 			return (error);
 		}
+		rw_exit(&sctp1->sctp_saddrs[i].ipif_hash_lock);
 	}
 	return (0);
 }
@@ -643,8 +668,11 @@ sctp_free_saddrs(sctp_t *sctp)
 	if (sctp->sctp_nsaddrs == 0)
 		return;
 	for (i = 0; i < SCTP_IPIF_HASH; i++) {
-		if (sctp->sctp_saddrs[i].ipif_count == 0)
+		rw_enter(&sctp->sctp_saddrs[i].ipif_hash_lock, RW_WRITER);
+		if (sctp->sctp_saddrs[i].ipif_count == 0) {
+			rw_exit(&sctp->sctp_saddrs[i].ipif_hash_lock);
 			continue;
+		}
 		obj = list_tail(&sctp->sctp_saddrs[i].sctp_ipif_list);
 		for (l = 0; l < sctp->sctp_saddrs[i].ipif_count; l++) {
 			list_remove(&sctp->sctp_saddrs[i].sctp_ipif_list, obj);
@@ -654,6 +682,7 @@ sctp_free_saddrs(sctp_t *sctp)
 			obj = list_tail(&sctp->sctp_saddrs[i].sctp_ipif_list);
 		}
 		sctp->sctp_saddrs[i].ipif_count = 0;
+		rw_exit(&sctp->sctp_saddrs[i].ipif_hash_lock);
 	}
 	if (sctp->sctp_bound_to_all == 1)
 		sctp->sctp_bound_to_all = 0;
@@ -1249,7 +1278,7 @@ sctp_del_saddr(sctp_t *sctp, sctp_saddr_ipif_t *sp)
 	if (sctp->sctp_listen_tfp != NULL)
 		mutex_enter(&sctp->sctp_listen_tfp->tf_lock);
 
-	sctp_ipif_hash_remove(sctp, sp->saddr_ipifp);
+	sctp_ipif_hash_remove(sctp, sp->saddr_ipifp, B_FALSE);
 
 	if (sctp->sctp_bound_to_all == 1)
 		sctp->sctp_bound_to_all = 0;
@@ -1303,7 +1332,7 @@ sctp_del_saddr_list(sctp_t *sctp, const void *addrs, int addcnt,
 		    IPCL_ZONEID(connp), !connp->conn_allzones,
 		    ifindex, 0, B_TRUE, sctp->sctp_sctps);
 		ASSERT(sctp_ipif != NULL);
-		sctp_ipif_hash_remove(sctp, sctp_ipif);
+		sctp_ipif_hash_remove(sctp, sctp_ipif, B_FALSE);
 	}
 	if (sctp->sctp_bound_to_all == 1)
 		sctp->sctp_bound_to_all = 0;
@@ -1329,8 +1358,11 @@ sctp_saddr_lookup(sctp_t *sctp, in6_addr_t *addr, uint_t ifindex)
 	sctp_ipif_t		*sctp_ipif;
 
 	hindex = SCTP_IPIF_ADDR_HASH(*addr, !IN6_IS_ADDR_V4MAPPED(addr));
-	if (sctp->sctp_saddrs[hindex].ipif_count == 0)
+	rw_enter(&sctp->sctp_saddrs[hindex].ipif_hash_lock, RW_READER);
+	if (sctp->sctp_saddrs[hindex].ipif_count == 0) {
+		rw_exit(&sctp->sctp_saddrs[hindex].ipif_hash_lock);
 		return (NULL);
+	}
 
 	ipif_obj = list_head(&sctp->sctp_saddrs[hindex].sctp_ipif_list);
 	for (cnt = 0; cnt < sctp->sctp_saddrs[hindex].ipif_count; cnt++) {
@@ -1342,11 +1374,13 @@ sctp_saddr_lookup(sctp_t *sctp, in6_addr_t *addr, uint_t ifindex)
 		    (ifindex == 0 ||
 		    ifindex == sctp_ipif->sctp_ipif_ill->sctp_ill_index) &&
 		    SCTP_IPIF_USABLE(sctp_ipif->sctp_ipif_state)) {
+			rw_exit(&sctp->sctp_saddrs[hindex].ipif_hash_lock);
 			return (ipif_obj);
 		}
 		ipif_obj = list_next(&sctp->sctp_saddrs[hindex].sctp_ipif_list,
 		    ipif_obj);
 	}
+	rw_exit(&sctp->sctp_saddrs[hindex].ipif_hash_lock);
 	return (NULL);
 }
 
@@ -1398,8 +1432,11 @@ sctp_check_saddr(sctp_t *sctp, int supp_af, boolean_t delete,
 
 	nsaddr = sctp->sctp_nsaddrs;
 	for (i = 0; i < SCTP_IPIF_HASH; i++) {
-		if (sctp->sctp_saddrs[i].ipif_count == 0)
+		rw_enter(&sctp->sctp_saddrs[i].ipif_hash_lock, RW_WRITER);
+		if (sctp->sctp_saddrs[i].ipif_count == 0) {
+			rw_exit(&sctp->sctp_saddrs[i].ipif_hash_lock);
 			continue;
+		}
 		obj = list_head(&sctp->sctp_saddrs[i].sctp_ipif_list);
 		naddr = sctp->sctp_saddrs[i].ipif_count;
 		for (l = 0; l < naddr; l++) {
@@ -1433,17 +1470,21 @@ sctp_check_saddr(sctp_t *sctp, int supp_af, boolean_t delete,
 				if (scanned < nsaddr) {
 					obj = list_next(&sctp->sctp_saddrs[i].
 					    sctp_ipif_list, obj);
-					sctp_ipif_hash_remove(sctp, ipif);
+					sctp_ipif_hash_remove(sctp, ipif,
+					    B_TRUE);
 					continue;
 				}
-				sctp_ipif_hash_remove(sctp, ipif);
+				sctp_ipif_hash_remove(sctp, ipif, B_TRUE);
 			}
 	next_obj:
-			if (scanned >= nsaddr)
+			if (scanned >= nsaddr) {
+				rw_exit(&sctp->sctp_saddrs[i].ipif_hash_lock);
 				return;
+			}
 			obj = list_next(&sctp->sctp_saddrs[i].sctp_ipif_list,
 			    obj);
 		}
+		rw_exit(&sctp->sctp_saddrs[i].ipif_hash_lock);
 	}
 }
 
@@ -1459,8 +1500,11 @@ sctp_get_valid_addr(sctp_t *sctp, boolean_t isv6, boolean_t *addr_set)
 	in6_addr_t		addr;
 
 	for (i = 0; i < SCTP_IPIF_HASH; i++) {
-		if (sctp->sctp_saddrs[i].ipif_count == 0)
+		rw_enter(&sctp->sctp_saddrs[i].ipif_hash_lock, RW_READER);
+		if (sctp->sctp_saddrs[i].ipif_count == 0) {
+			rw_exit(&sctp->sctp_saddrs[i].ipif_hash_lock);
 			continue;
+		}
 		obj = list_head(&sctp->sctp_saddrs[i].sctp_ipif_list);
 		for (l = 0; l < sctp->sctp_saddrs[i].ipif_count; l++) {
 			sctp_ipif_t	*ipif;
@@ -1470,14 +1514,18 @@ sctp_get_valid_addr(sctp_t *sctp, boolean_t isv6, boolean_t *addr_set)
 			    ipif->sctp_ipif_isv6 == isv6 &&
 			    ipif->sctp_ipif_state == SCTP_IPIFS_UP) {
 				*addr_set = B_TRUE;
+				rw_exit(&sctp->sctp_saddrs[i].ipif_hash_lock);
 				return (ipif->sctp_ipif_saddr);
 			}
 			scanned++;
-			if (scanned >= sctp->sctp_nsaddrs)
+			if (scanned >= sctp->sctp_nsaddrs) {
+				rw_exit(&sctp->sctp_saddrs[i].ipif_hash_lock);
 				goto got_none;
+			}
 			obj = list_next(&sctp->sctp_saddrs[i].sctp_ipif_list,
 			    obj);
 		}
+		rw_exit(&sctp->sctp_saddrs[i].ipif_hash_lock);
 	}
 got_none:
 	/* Need to double check this */
@@ -1524,8 +1572,11 @@ sctp_getmyaddrs(void *conn, void *myaddrs, int *addrcnt)
 	}
 
 	for (i = 0; i < SCTP_IPIF_HASH; i++) {
-		if (sctp->sctp_saddrs[i].ipif_count == 0)
+		rw_enter(&sctp->sctp_saddrs[i].ipif_hash_lock, RW_READER);
+		if (sctp->sctp_saddrs[i].ipif_count == 0) {
+			rw_exit(&sctp->sctp_saddrs[i].ipif_hash_lock);
 			continue;
+		}
 		obj = list_head(&sctp->sctp_saddrs[i].sctp_ipif_list);
 		for (l = 0; l < sctp->sctp_saddrs[i].ipif_count; l++) {
 			sctp_ipif_t	*ipif = obj->saddr_ipifp;
@@ -1535,8 +1586,11 @@ sctp_getmyaddrs(void *conn, void *myaddrs, int *addrcnt)
 			if ((ipif->sctp_ipif_state == SCTP_IPIFS_CONDEMNED) ||
 			    SCTP_DONT_SRC(obj) ||
 			    (SCTP_IS_IPIF_LOOPBACK(ipif) && skip_lback)) {
-				if (scanned >= sctp->sctp_nsaddrs)
+				if (scanned >= sctp->sctp_nsaddrs) {
+					rw_exit(&sctp->
+					    sctp_saddrs[i].ipif_hash_lock);
 					goto done;
+				}
 				obj = list_next(&sctp->sctp_saddrs[i].
 				    sctp_ipif_list, obj);
 				continue;
@@ -1569,11 +1623,14 @@ sctp_getmyaddrs(void *conn, void *myaddrs, int *addrcnt)
 				break;
 			}
 			added++;
-			if (added >= max || scanned >= sctp->sctp_nsaddrs)
+			if (added >= max || scanned >= sctp->sctp_nsaddrs) {
+				rw_exit(&sctp->sctp_saddrs[i].ipif_hash_lock);
 				goto done;
+			}
 			obj = list_next(&sctp->sctp_saddrs[i].sctp_ipif_list,
 			    obj);
 		}
+		rw_exit(&sctp->sctp_saddrs[i].ipif_hash_lock);
 	}
 done:
 	*addrcnt = added;
@@ -1616,8 +1673,11 @@ sctp_saddr_info(sctp_t *sctp, int supp_af, uchar_t *p, boolean_t modify)
 
 	nsaddr = sctp->sctp_nsaddrs;
 	for (i = 0; i < SCTP_IPIF_HASH; i++) {
-		if (sctp->sctp_saddrs[i].ipif_count == 0)
+		rw_enter(&sctp->sctp_saddrs[i].ipif_hash_lock, RW_WRITER);
+		if (sctp->sctp_saddrs[i].ipif_count == 0) {
+			rw_exit(&sctp->sctp_saddrs[i].ipif_hash_lock);
 			continue;
+		}
 		obj = list_head(&sctp->sctp_saddrs[i].sctp_ipif_list);
 		naddr = sctp->sctp_saddrs[i].ipif_count;
 		for (l = 0; l < naddr; l++) {
@@ -1644,10 +1704,12 @@ sctp_saddr_info(sctp_t *sctp, int supp_af, uchar_t *p, boolean_t modify)
 				if (scanned < nsaddr) {
 					obj = list_next(&sctp->sctp_saddrs[i].
 					    sctp_ipif_list, obj);
-					sctp_ipif_hash_remove(sctp, ipif);
+					sctp_ipif_hash_remove(sctp, ipif,
+					    B_TRUE);
 					continue;
 				}
-				sctp_ipif_hash_remove(sctp, ipif);
+				sctp_ipif_hash_remove(sctp, ipif, B_TRUE);
+
 				goto next_addr;
 			} else if (ipif_ll || unsupp_af ||
 			    (ipif_lb && (cl_sctp_check_addrs == NULL))) {
@@ -1678,11 +1740,14 @@ sctp_saddr_info(sctp_t *sctp, int supp_af, uchar_t *p, boolean_t modify)
 				paramlen += PARM_ADDR6_LEN;
 			}
 next_addr:
-			if (scanned >= nsaddr)
+			if (scanned >= nsaddr) {
+				rw_exit(&sctp->sctp_saddrs[i].ipif_hash_lock);
 				return (paramlen);
+			}
 			obj = list_next(&sctp->sctp_saddrs[i].sctp_ipif_list,
 			    obj);
 		}
+		rw_exit(&sctp->sctp_saddrs[i].ipif_hash_lock);
 	}
 	return (paramlen);
 }
@@ -1868,15 +1933,20 @@ sctp_get_saddr_list(sctp_t *sctp, uchar_t *p, size_t psize)
 	int			scanned = 0;
 
 	for (cnt = 0; cnt < SCTP_IPIF_HASH; cnt++) {
-		if (sctp->sctp_saddrs[cnt].ipif_count == 0)
+		rw_enter(&sctp->sctp_saddrs[cnt].ipif_hash_lock, RW_READER);
+		if (sctp->sctp_saddrs[cnt].ipif_count == 0) {
+			rw_exit(&sctp->sctp_saddrs[cnt].ipif_hash_lock);
 			continue;
+		}
 		obj = list_head(&sctp->sctp_saddrs[cnt].sctp_ipif_list);
 		naddr = sctp->sctp_saddrs[cnt].ipif_count;
 		for (icnt = 0; icnt < naddr; icnt++) {
 			sctp_ipif_t	*ipif;
 
-			if (psize < sizeof (ipif->sctp_ipif_saddr))
+			if (psize < sizeof (ipif->sctp_ipif_saddr)) {
+				rw_exit(&sctp->sctp_saddrs[cnt].ipif_hash_lock);
 				return;
+			}
 
 			scanned++;
 			ipif = obj->saddr_ipifp;
@@ -1884,12 +1954,15 @@ sctp_get_saddr_list(sctp_t *sctp, uchar_t *p, size_t psize)
 			    sizeof (ipif->sctp_ipif_saddr));
 			p += sizeof (ipif->sctp_ipif_saddr);
 			psize -= sizeof (ipif->sctp_ipif_saddr);
-			if (scanned >= sctp->sctp_nsaddrs)
+			if (scanned >= sctp->sctp_nsaddrs) {
+				rw_exit(&sctp->sctp_saddrs[cnt].ipif_hash_lock);
 				return;
+			}
 			obj = list_next(
 			    &sctp->sctp_saddrs[icnt].sctp_ipif_list,
 			    obj);
 		}
+		rw_exit(&sctp->sctp_saddrs[cnt].ipif_hash_lock);
 	}
 }
 

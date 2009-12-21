@@ -194,22 +194,25 @@ typedef struct sctpparam_s {
 
 #define	SCTP_SECRET_LEN	16
 
-#define	SCTP_REFHOLD(sctp) {			\
-	mutex_enter(&(sctp)->sctp_reflock);	\
-	(sctp)->sctp_refcnt++;			\
-	ASSERT((sctp)->sctp_refcnt != 0);	\
-	mutex_exit(&(sctp)->sctp_reflock);	\
+#define	SCTP_REFHOLD(sctp) {				\
+	mutex_enter(&(sctp)->sctp_reflock);		\
+	(sctp)->sctp_refcnt++;				\
+	DTRACE_PROBE1(sctp_refhold, sctp_t, sctp);	\
+	ASSERT((sctp)->sctp_refcnt != 0);		\
+	mutex_exit(&(sctp)->sctp_reflock);		\
 }
 
-#define	SCTP_REFRELE(sctp) {				\
-	mutex_enter(&(sctp)->sctp_reflock);		\
-	ASSERT((sctp)->sctp_refcnt != 0);		\
-	if (--(sctp)->sctp_refcnt == 0) {		\
-		mutex_exit(&(sctp)->sctp_reflock);	\
-		CONN_DEC_REF((sctp)->sctp_connp);	\
-	} else {					\
-		mutex_exit(&(sctp)->sctp_reflock);	\
-	}						\
+#define	SCTP_REFRELE(sctp) {					\
+	mutex_enter(&(sctp)->sctp_reflock);			\
+	ASSERT((sctp)->sctp_refcnt != 0);			\
+	if (--(sctp)->sctp_refcnt == 0) {			\
+		DTRACE_PROBE1(sctp_refrele, sctp_t, sctp);	\
+		mutex_exit(&(sctp)->sctp_reflock);		\
+		CONN_DEC_REF((sctp)->sctp_connp);		\
+	} else {						\
+		DTRACE_PROBE1(sctp_refrele, sctp_t, sctp);	\
+		mutex_exit(&(sctp)->sctp_reflock);		\
+	}							\
 }
 
 #define	SCTP_PRINTADDR(a)	(a).s6_addr32[0], (a).s6_addr32[1],\
@@ -520,8 +523,9 @@ typedef struct sctp_faddr_s {
 #define	SCTP_IPIF_HASH	16
 
 typedef	struct	sctp_ipif_hash_s {
-	list_t	sctp_ipif_list;
-	int	ipif_count;
+	list_t		sctp_ipif_list;
+	int		ipif_count;
+	krwlock_t	ipif_hash_lock;
 } sctp_ipif_hash_t;
 
 

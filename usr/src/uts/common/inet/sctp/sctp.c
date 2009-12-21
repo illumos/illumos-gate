@@ -600,6 +600,7 @@ sctp_instream_cleanup(sctp_t *sctp, boolean_t free)
 			mp->b_next = mp->b_prev = NULL;
 			freemsg(mp);
 		}
+		sctp->sctp_uo_frags = NULL;
 	}
 }
 
@@ -1932,6 +1933,7 @@ sctp_conn_cache_constructor(void *buf, void *cdrarg, int kmflags)
 {
 	conn_t	*connp = (conn_t *)buf;
 	sctp_t	*sctp = (sctp_t *)&connp[1];
+	int	cnt;
 
 	bzero(connp, sizeof (conn_t));
 	bzero(buf, (char *)&sctp[1] - (char *)buf);
@@ -1940,6 +1942,10 @@ sctp_conn_cache_constructor(void *buf, void *cdrarg, int kmflags)
 	mutex_init(&sctp->sctp_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&sctp->sctp_recvq_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&sctp->sctp_cv, NULL, CV_DEFAULT, NULL);
+	for (cnt = 0; cnt < SCTP_IPIF_HASH; cnt++) {
+		rw_init(&sctp->sctp_saddrs[cnt].ipif_hash_lock, NULL,
+		    RW_DEFAULT, NULL);
+	}
 
 	mutex_init(&connp->conn_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&connp->conn_cv, NULL, CV_DEFAULT, NULL);
@@ -1965,6 +1971,7 @@ sctp_conn_cache_destructor(void *buf, void *cdrarg)
 {
 	conn_t	*connp = (conn_t *)buf;
 	sctp_t	*sctp = (sctp_t *)&connp[1];
+	int	cnt;
 
 	ASSERT(sctp->sctp_connp == connp);
 	ASSERT(!MUTEX_HELD(&sctp->sctp_lock));
@@ -2035,6 +2042,9 @@ sctp_conn_cache_destructor(void *buf, void *cdrarg)
 	mutex_destroy(&sctp->sctp_lock);
 	mutex_destroy(&sctp->sctp_recvq_lock);
 	cv_destroy(&sctp->sctp_cv);
+	for (cnt = 0; cnt < SCTP_IPIF_HASH; cnt++) {
+		rw_destroy(&sctp->sctp_saddrs[cnt].ipif_hash_lock);
+	}
 
 	mutex_destroy(&connp->conn_lock);
 	cv_destroy(&connp->conn_cv);
