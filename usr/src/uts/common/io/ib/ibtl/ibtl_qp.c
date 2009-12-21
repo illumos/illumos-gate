@@ -457,6 +457,26 @@ ibt_flush_qp(ibt_qp_hdl_t ibt_qp)
 
 
 /*
+ * ibtl_cm_chan_is_opening()
+ *
+ *	Inform IBTL that the connection established process is in progress
+ *	on this channel so that care need to be taken while free'ing when
+ *	open is NOT yet complete.
+ *
+ *	chan	Channel Handle
+ */
+void
+ibtl_cm_chan_is_opening(ibt_channel_hdl_t chan)
+{
+	IBTF_DPRINTF_L3(ibtf_qp, "ibtl_cm_chan_is_opening(%p)", chan);
+	ASSERT(chan->ch_qp.qp_type == IBT_RC_SRV);
+	mutex_enter(&ibtl_free_qp_mutex);
+	ASSERT(chan->ch_transport.rc.rc_free_flags == 0);
+	chan->ch_transport.rc.rc_free_flags |= IBTL_RC_QP_CONNECTING;
+	mutex_exit(&ibtl_free_qp_mutex);
+}
+
+/*
  * ibtl_cm_chan_is_open()
  *
  *	Inform IBTL that the connection has been established on this
@@ -471,7 +491,7 @@ ibtl_cm_chan_is_open(ibt_channel_hdl_t chan)
 	IBTF_DPRINTF_L3(ibtf_qp, "ibtl_cm_chan_is_open(%p)", chan);
 	ASSERT(chan->ch_qp.qp_type == IBT_RC_SRV);
 	mutex_enter(&ibtl_free_qp_mutex);
-	ASSERT(chan->ch_transport.rc.rc_free_flags == 0);
+	chan->ch_transport.rc.rc_free_flags &= ~IBTL_RC_QP_CONNECTING;
 	chan->ch_transport.rc.rc_free_flags |= IBTL_RC_QP_CONNECTED;
 	mutex_exit(&ibtl_free_qp_mutex);
 }
@@ -633,6 +653,14 @@ ibt_free_qp(ibt_qp_hdl_t ibt_qp)
 	if (ibt_qp->ch_qp.qp_type == IBT_RC_SRV) {
 		ibtl_qp_flow_control_enter();
 		mutex_enter(&ibtl_free_qp_mutex);
+		if (ibt_qp->ch_transport.rc.rc_free_flags &
+		    IBTL_RC_QP_CONNECTING) {
+			IBTF_DPRINTF_L2(ibtf_qp, "ibt_free_qp: ERROR - "
+			    "Channel establishment is still in PROGRESS.");
+			mutex_exit(&ibtl_free_qp_mutex);
+			ibtl_qp_flow_control_exit();
+			return (IBT_CHAN_STATE_INVALID);
+		}
 		if (ibt_qp->ch_transport.rc.rc_free_flags &
 		    IBTL_RC_QP_CONNECTED) {
 			if ((ibt_qp->ch_transport.rc.rc_free_flags &

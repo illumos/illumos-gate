@@ -1050,6 +1050,8 @@ new_req:
 		statep->hcap		= hcap;
 		statep->remote_comid	= remote_comid;
 		statep->svcid		= b2h64(req_msgp->req_svc_id);
+		statep->local_qp_rnr_cnt =
+		    req_msgp->req_mtu_plus & 0x7;
 
 		/*
 		 * get the remote_ack_delay, etc.
@@ -1451,6 +1453,8 @@ ibcm_process_rep_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 	/* Lookup for an existing state structure */
 	rep_msgp = (ibcm_rep_msg_t *)(&input_madp[IBCM_MAD_HDR_SIZE]);
 
+	IBCM_DUMP_RAW_MSG((uchar_t *)input_madp);
+
 	IBTF_DPRINTF_L5(cmlog, "ibcm_process_rep_msg: active comid: %x",
 	    rep_msgp->rep_remote_comm_id);
 
@@ -1512,6 +1516,8 @@ ibcm_process_rep_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 		/* change state */
 		statep->state = IBCM_STATE_REP_RCVD;
 		statep->clnt_proceed = IBCM_BLOCK;
+		statep->local_qp_rnr_cnt =
+		    rep_msgp->rep_rnr_retry_cnt_plus >> 5;
 
 		/* cancel the REQ timer */
 		if (statep->timerid != 0) {
@@ -2467,6 +2473,8 @@ ibcm_process_dreq_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 				(void) untimeout(timer_val);
 			}
 		} else {	/* In ESTABLISHED State */
+			boolean_t	is_ofuv = statep->is_this_ofuv_chan;
+
 			statep->state = IBCM_STATE_DREQ_RCVD;
 			statep->clnt_proceed = IBCM_BLOCK;
 
@@ -2483,7 +2491,8 @@ ibcm_process_dreq_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 
 			close_event_type = IBT_CM_CLOSED_DREQ_RCVD;
 			/* Move CEP to error state */
-			(void) ibcm_cep_to_error_state(statep);
+			if (is_ofuv == B_FALSE) /* Skip for OFUV channel */
+				(void) ibcm_cep_to_error_state(statep);
 		}
 		mutex_enter(&statep->state_mutex);
 		statep->drep_in_progress = 0;
@@ -5609,7 +5618,8 @@ ibcm_invoke_qp_modify(ibcm_state_data_t *statep, ibcm_req_msg_t *req_msgp,
 
 		} else { /* Passive side CM */
 			/* Setting PSN on SQ and RQ */
-			IBCM_QPINFO_RC(qp_info).rc_rq_psn =
+			IBCM_QPINFO_RC(qp_info).rc_sq_psn =
+			    IBCM_QPINFO_RC(qp_info).rc_rq_psn =
 			    b2h32(rep_msgp->rep_starting_psn_plus) >> 8;
 
 			IBCM_QPINFO_RC(qp_info).rc_dst_qpn =
@@ -5654,12 +5664,13 @@ ibcm_invoke_qp_modify(ibcm_state_data_t *statep, ibcm_req_msg_t *req_msgp,
 
 	case IBT_UC_SRV:
 		if (statep->mode == IBCM_ACTIVE_MODE) { /* look at REP msg */
-			IBCM_QPINFO_UC(qp_info).uc_rq_psn =
+			IBCM_QPINFO_UC(qp_info).uc_sq_psn =
 			    b2h32(req_msgp->req_starting_psn_plus) >> 8;
 			IBCM_QPINFO_UC(qp_info).uc_dst_qpn =
 			    b2h32(rep_msgp->rep_local_qpn_plus) >> 8;
 		} else {
 			IBCM_QPINFO_UC(qp_info).uc_rq_psn =
+			    IBCM_QPINFO_UC(qp_info).uc_sq_psn =
 			    b2h32(rep_msgp->rep_starting_psn_plus) >> 8;
 			IBCM_QPINFO_UC(qp_info).uc_dst_qpn =
 			    b2h32(req_msgp->req_local_qpn_plus) >> 8;
@@ -6399,7 +6410,7 @@ ibcm_process_cep_req_cm_hdlr(ibcm_state_data_t *statep,
 		}
 
 		if (qp_attrs.qp_info.qp_state != IBT_STATE_INIT &&
-		    statep->skip_rtr == 0) {
+		    statep->is_this_ofuv_chan == B_FALSE) {
 			IBTF_DPRINTF_L3(cmlog, "ibcm_process_cep_req_cm_hdlr: "
 			    "qp state != INIT on server");
 			*reject_reason = IBT_CM_CHAN_INVALID_STATE;
@@ -6407,10 +6418,11 @@ ibcm_process_cep_req_cm_hdlr(ibcm_state_data_t *statep,
 			    IBT_CM_FAILURE_REQ, IBT_CM_CHAN_INVALID_STATE,
 			    NULL, 0);
 			return (IBCM_SEND_REJ);
-		} else if (qp_attrs.qp_info.qp_state != IBT_STATE_RTR &&
-		    statep->skip_rtr == 1) {
+		} else if (statep->is_this_ofuv_chan &&
+		    qp_attrs.qp_info.qp_state != IBT_STATE_RTR &&
+		    qp_attrs.qp_info.qp_state != IBT_STATE_INIT) {
 			IBTF_DPRINTF_L3(cmlog, "ibcm_process_cep_req_cm_hdlr: "
-			    "qp state != RTR on server");
+			    "qp state != INIT or RTR on server");
 			*reject_reason = IBT_CM_CHAN_INVALID_STATE;
 			ibcm_handler_conn_fail(statep, IBT_CM_FAILURE_REJ_SENT,
 			    IBT_CM_FAILURE_REQ, IBT_CM_CHAN_INVALID_STATE,
@@ -6418,7 +6430,8 @@ ibcm_process_cep_req_cm_hdlr(ibcm_state_data_t *statep,
 			return (IBCM_SEND_REJ);
 		}
 
-		if (statep->skip_rtr &&
+		if (statep->is_this_ofuv_chan &&
+		    qp_attrs.qp_info.qp_state == IBT_STATE_RTR &&
 		    qp_attrs.qp_info.qp_transport.rc.rc_path.cep_hca_port_num !=
 		    statep->prim_port) {
 			IBTF_DPRINTF_L2(cmlog, "ibcm_process_cep_req_cm_hdlr: "
@@ -6428,8 +6441,10 @@ ibcm_process_cep_req_cm_hdlr(ibcm_state_data_t *statep,
 			    IBT_CM_FAILURE_REQ, IBT_CM_CHAN_INVALID_STATE,
 			    NULL, 0);
 			return (IBCM_SEND_REJ);
-		} else if (statep->skip_rtr)
+		} else if (statep->is_this_ofuv_chan &&
+		    qp_attrs.qp_info.qp_state == IBT_STATE_RTR) {
 			goto skip_init_trans;
+		}
 
 		/* Init to Init, if required */
 		if (qp_attrs.qp_info.qp_transport.rc.rc_path.cep_hca_port_num !=
@@ -6549,7 +6564,8 @@ skip_init_trans:
 		bcopy(&local_ca_guid, rep_msgp->rep_local_ca_guid,
 		    sizeof (ib_guid_t));
 
-		if (statep->skip_rtr)
+		if (statep->is_this_ofuv_chan &&
+		    qp_attrs.qp_info.qp_state == IBT_STATE_RTR)
 			goto skip_rtr_trans;
 
 		/* Transition QP from Init to RTR state */
@@ -6594,7 +6610,7 @@ skip_rtr_trans:
 			break;
 		case IBT_RC_SRV:
 			rep_msgp->rep_starting_psn_plus =
-			    h2b32(IBCM_QP_RC(qp_attrs).rc_sq_psn << 8);
+			    h2b32(IBCM_QP_RC(qp_attrs).rc_rq_psn << 8);
 			break;
 		case IBT_UC_SRV:
 			rep_msgp->rep_starting_psn_plus =
@@ -6996,7 +7012,7 @@ ibcm_invoke_rtu_qp_modify(ibcm_state_data_t *statep, ib_time_t timeout,
 		IBCM_QPINFO_RC_PATH(qp_info).cep_timeout = timeout;
 		IBCM_QPINFO_RC(qp_info).rc_retry_cnt = statep->cep_retry_cnt;
 		IBCM_QPINFO_RC(qp_info).rc_rnr_retry_cnt =
-		    rep_msg->rep_rnr_retry_cnt_plus >> 5;
+		    statep->local_qp_rnr_cnt;
 		IBCM_QPINFO_RC(qp_info).rc_sq_psn = statep->starting_psn;
 
 		if (statep->mode == IBCM_ACTIVE_MODE) {
@@ -7652,6 +7668,12 @@ ibcm_process_sidr_req_cm_hdlr(ibcm_ud_state_data_t *ud_statep,
     ibt_cm_status_t cb_status, ibcm_ud_clnt_reply_info_t *ud_clnt_info,
     ibt_sidr_status_t *sidr_status, ibcm_sidr_rep_msg_t *sidr_repp)
 {
+	void	*sidr_rep_privp;
+
+	IBTF_DPRINTF_L5(cmlog, "ibcm_process_sidr_req_cm_hdlr(%p, %x, "
+	    "%p, %p, %p)", ud_statep, cb_status, ud_clnt_info,
+	    sidr_status, sidr_repp);
+
 	if (cb_status == IBT_CM_DEFAULT)
 		cb_status = IBT_CM_REJECT;
 
@@ -7665,6 +7687,20 @@ ibcm_process_sidr_req_cm_hdlr(ibcm_ud_state_data_t *ud_statep,
 	else if (cb_status == IBT_CM_REDIRECT)
 		*sidr_status = IBT_CM_SREP_REDIRECT;
 	else *sidr_status = IBT_CM_SREP_REJ;
+
+	/*
+	 * For Accept and reject copy the private data, if ud_clnt_info
+	 * priv_data does not point to SIDR Response private data. This
+	 * copy is needed for ibt_cm_ud_proceed().
+	 */
+	sidr_rep_privp = (void *)(&(sidr_repp->sidr_rep_private_data[0]));
+	if ((cb_status == IBT_CM_ACCEPT || cb_status == IBT_CM_REJECT) &&
+	    (ud_clnt_info->priv_data != sidr_rep_privp) &&
+	    ud_clnt_info->priv_data_len) {
+		bcopy(ud_clnt_info->priv_data, sidr_rep_privp,
+		    min(ud_clnt_info->priv_data_len,
+		    IBT_SIDR_REP_PRIV_DATA_SZ));
+	}
 
 	if (*sidr_status != IBT_CM_SREP_CHAN_VALID) {
 		IBTF_DPRINTF_L2(cmlog, "ibcm_process_sidr_req_cm_hdlr: "

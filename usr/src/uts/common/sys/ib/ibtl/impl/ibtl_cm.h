@@ -115,6 +115,11 @@ uint16_t ibtl_cm_get_1st_full_pkey_ix(ib_guid_t hca_guid, uint8_t port);
  *	channel so that a later call to ibtl_cm_chan_is_closed()
  *	will be required to free the QPN used by this channel.
  *
+ * ibtl_cm_chan_is_opening()
+ *
+ *	Inform IBTL that the connection established on this channel is
+ *	in progress.
+ *
  * ibtl_cm_chan_is_closing()
  *
  *	Inform IBTL that the TIMEWAIT delay for the connection has been
@@ -143,6 +148,7 @@ uint16_t ibtl_cm_get_1st_full_pkey_ix(ib_guid_t hca_guid, uint8_t port);
  *	rc_chan		Channel Handle
  */
 void ibtl_cm_chan_is_open(ibt_channel_hdl_t rc_chan);
+void ibtl_cm_chan_is_opening(ibt_channel_hdl_t rc_chan);
 void ibtl_cm_chan_is_closing(ibt_channel_hdl_t rc_chan);
 void ibtl_cm_chan_is_closed(ibt_channel_hdl_t rc_chan);
 void ibtl_cm_chan_is_reused(ibt_channel_hdl_t rc_chan);

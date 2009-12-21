@@ -858,6 +858,13 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	IBCM_REF_CNT_INCR(statep);	/* Decremented after REQ is posted */
 	statep->send_mad_flags |= IBCM_REQ_POST_BUSY;
 
+	/*
+	 * Skip moving channel to error state during close, for OFUV clients.
+	 * OFUV clients transition the channel to error state by itself.
+	 */
+	if (flags & IBT_OCHAN_OFUV)
+		statep->is_this_ofuv_chan = B_TRUE;
+
 	IBCM_OUT_HDRP(statep->stored_msg)->AttributeID =
 	    h2b16(IBCM_INCOMING_REQ + IBCM_ATTR_BASE_ID);
 
@@ -866,6 +873,8 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	    0));
 
 	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*statep))
+
+	ibtl_cm_chan_is_opening(channel);
 
 	ibcm_open_enqueue(statep);
 
@@ -3879,7 +3888,7 @@ ibt_ofuvcm_proceed(ibt_cm_event_type_t event, void *session_id,
 		return (IBT_INVALID_PARAM);
 	}
 	mutex_enter(&statep->state_mutex);
-	statep->skip_rtr = 1;
+	statep->is_this_ofuv_chan = B_TRUE;
 	mutex_exit(&statep->state_mutex);
 
 	ret = ibt_cm_proceed(event, session_id, status, cm_event_data,
@@ -4059,10 +4068,6 @@ ibcm_proceed_via_taskq(void *targs)
 
 		ibcm_handle_cep_req_response(statep, response, reject_reason,
 		    arej_len);
-
-		mutex_enter(&statep->state_mutex);
-		statep->skip_rtr = 0;
-		mutex_exit(&statep->state_mutex);
 
 	} else if (proceed_targs->event == IBT_CM_EVENT_REP_RCV) {
 		response =
@@ -6366,6 +6371,8 @@ ibt_get_src_ip(ib_gid_t gid, ib_pkey_t pkey, ibt_ip_addr_t *src_ip)
 
 	for (i = 0, ipp = ibds.ibcm_arp_ip; i < ibds.ibcm_arp_ibd_cnt;
 	    i++, ipp++) {
+		if (ipp->ip_inet_family == AF_UNSPEC)
+			continue;
 		if (ipp->ip_port_gid.gid_prefix == gid.gid_prefix &&
 		    ipp->ip_port_gid.gid_guid == gid.gid_guid) {
 			if (pkey) {

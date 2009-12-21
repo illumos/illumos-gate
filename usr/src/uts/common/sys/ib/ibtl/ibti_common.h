@@ -82,6 +82,7 @@ typedef enum ibt_clnt_class_e {
 	IBT_CM,			/* The CM Module */
 	IBT_DM,			/* The DM Module */
 	IBT_DM_AGENT,		/* DM Agent Module */
+	IBT_GENERIC_MISC,	/* Generic Misc Module */
 	IBT_CLASS_NUM		/* Place holder for class count */
 } ibt_clnt_class_t;
 
@@ -95,6 +96,7 @@ typedef enum ibt_clnt_class_e {
 					(class) == IBT_GENERIC || \
 					(class) == IBT_DM_AGENT || \
 					(class) == IBT_TEST_DEV || \
+					(class) == IBT_GENERIC_MISC ||	\
 					(class) == IBT_USER)
 
 #define	IBT_CLNT_MGMT_CLASS(class)	((class) == IBT_IBMA || \
@@ -110,6 +112,7 @@ typedef enum ibt_clnt_class_e {
 					(class) == IBT_CM || \
 					(class) == IBT_DM || \
 					(class) == IBT_DM_AGENT || \
+					(class) == IBT_GENERIC_MISC ||	\
 					(class) == IBT_TEST_DEV)
 
 /*
@@ -439,7 +442,8 @@ typedef enum ibt_chan_open_flags_e {
 	IBT_OCHAN_OPAQUE2		= 1 << 5,
 	IBT_OCHAN_OPAQUE3		= 1 << 6,
 	IBT_OCHAN_OPAQUE4		= 1 << 7,
-	IBT_OCHAN_OPAQUE5		= 1 << 8
+	IBT_OCHAN_OPAQUE5		= 1 << 8,
+	IBT_OCHAN_OPAQUE6		= 1 << 9
 } ibt_chan_open_flags_t;
 
 /*

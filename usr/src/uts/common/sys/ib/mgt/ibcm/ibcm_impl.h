@@ -421,7 +421,7 @@ typedef struct ibcm_state_data_s {
 	boolean_t		delete_mra_msg;
 	boolean_t		stale;
 	boolean_t		delete_state_data;
-	boolean_t		skip_rtr;
+	boolean_t		is_this_ofuv_chan;
 
 	boolean_t		open_done;
 	boolean_t		close_done;
@@ -468,6 +468,9 @@ typedef struct ibcm_state_data_s {
 
 	/* For ibt_ofuvcm_get_req_data() */
 	void			*req_msgp;
+
+	/* Stored RNR retry count from incoming REQ or REP */
+	ibt_rnr_retry_cnt_t	local_qp_rnr_cnt;
 
 } ibcm_state_data_t;
 

@@ -48,6 +48,7 @@ extern "C" {
 #define	IBT_OCHAN_LOCAL_CM_TM	IBT_OCHAN_OPAQUE3 /* ibt_chan_open_flags_t */
 #define	IBT_OCHAN_REMOTE_CM_TM	IBT_OCHAN_OPAQUE4 /* ibt_chan_open_flags_t */
 #define	IBT_OCHAN_RDC_EXISTS	IBT_OCHAN_OPAQUE5 /* ibt_chan_open_flags_t */
+#define	IBT_OCHAN_OFUV		IBT_OCHAN_OPAQUE6 /* ibt_chan_open_flags_t */
 
 #define	oc_cm_retry_cnt		oc_opaque1	/* ibt_chan_open_args_t */
 						/* The number of times the */

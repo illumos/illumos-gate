@@ -426,6 +426,7 @@ typedef struct ibtl_rc_chan_s {
 #define	IBTL_RC_QP_CLOSING	0x2
 #define	IBTL_RC_QP_CLOSED	0x4
 #define	IBTL_RC_QP_FREED	0x8
+#define	IBTL_RC_QP_CONNECTING	0x10
 
 /*
  * Define a per Channel state structure.
