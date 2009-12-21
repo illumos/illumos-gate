@@ -136,8 +136,10 @@ pciehpc_acpi_hpc_init(pcie_hp_ctrl_t *ctrl_p)
 	/* get the ACPI object handle for the child node */
 	status = AcpiGetNextObject(ACPI_TYPE_DEVICE, pcibus_obj,
 	    NULL, &slot_dev_obj);
-	if (status != AE_OK)
+	if (status != AE_OK) {
+		PCIE_DBG("pciehpc_acpi_hpc_init: Get ACPI object failed\n");
 		return (DDI_FAILURE);
+	}
 
 	/*
 	 * gather the info about the ACPI methods present on the bus node

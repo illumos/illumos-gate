@@ -223,7 +223,7 @@ pcie_hp_init(dev_info_t *dip, caddr_t arg)
 	}
 
 	if (ret != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "pcie_hp_init: initialize hotplug "
+		PCIE_DBG("pcie_hp_init: initialize hotplug "
 		    "controller failed with %d\n", ret);
 		return (ret);
 	}

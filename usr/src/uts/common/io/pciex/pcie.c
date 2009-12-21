@@ -224,13 +224,17 @@ pcie_init(dev_info_t *dip, caddr_t arg)
 
 	if ((ret = pcie_hp_init(dip, arg)) != DDI_SUCCESS) {
 		/*
-		 * On a few x86 platforms, we observed unexpected hotplug
-		 * initialization failures in recent years. Continue with
-		 * a message printed because we don't want to stop PCI
-		 * driver attach and system boot because of this hotplug
-		 * initialization failure before we address all those issues.
+		 * On some x86 platforms, we observed unexpected hotplug
+		 * initialization failures in recent years. The known cause
+		 * is a hardware issue: while the problem PCI bridges have
+		 * the Hotplug Capable registers set, the machine actually
+		 * does not implement the expected ACPI object.
+		 *
+		 * We don't want to stop PCI driver attach and system boot
+		 * just because of this hotplug initialization failure.
+		 * Continue with a debug message printed.
 		 */
-		cmn_err(CE_WARN, "%s%d: Failed setting hotplug framework\n",
+		PCIE_DBG("%s%d: Failed setting hotplug framework\n",
 		    ddi_driver_name(dip), ddi_get_instance(dip));
 
 #if defined(__sparc)
