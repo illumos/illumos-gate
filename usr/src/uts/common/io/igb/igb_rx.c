@@ -112,6 +112,8 @@ igb_rx_copy(igb_rx_ring_t *rx_ring, uint32_t index, uint32_t pkt_len)
 	if (igb_check_dma_handle(
 	    current_rcb->rx_buf.dma_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+		atomic_or_32(&igb->igb_state, IGB_ERROR);
+		return (NULL);
 	}
 
 	/*
@@ -184,6 +186,9 @@ igb_rx_bind(igb_rx_ring_t *rx_ring, uint32_t index, uint32_t pkt_len)
 	if (igb_check_dma_handle(
 	    current_rcb->rx_buf.dma_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+		atomic_or_32(&igb->igb_state, IGB_ERROR);
+		atomic_inc_32(&rx_ring->rcb_free);
+		return (NULL);
 	}
 
 	mp = current_rcb->mp;
@@ -253,8 +258,9 @@ igb_rx_ring_poll(void *arg, int bytes)
 
 	ASSERT(bytes >= 0);
 
-	if (bytes == 0)
-		return (mp);
+	if ((bytes == 0) || (rx_ring->igb->igb_state & IGB_SUSPENDED) ||
+	    !(rx_ring->igb->igb_state & IGB_STARTED))
+		return (NULL);
 
 	mutex_enter(&rx_ring->rx_lock);
 	mp = igb_rx(rx_ring, bytes);
@@ -290,6 +296,9 @@ igb_rx(igb_rx_ring_t *rx_ring, int poll_bytes)
 	mblk_head = NULL;
 	mblk_tail = &mblk_head;
 
+	if (igb->igb_state & IGB_ERROR)
+		return (NULL);
+
 	/*
 	 * Sync the receive descriptors before
 	 * accepting the packets
@@ -299,6 +308,8 @@ igb_rx(igb_rx_ring_t *rx_ring, int poll_bytes)
 	if (igb_check_dma_handle(
 	    rx_ring->rbd_area.dma_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+		atomic_or_32(&igb->igb_state, IGB_ERROR);
+		return (NULL);
 	}
 
 	/*
@@ -401,6 +412,7 @@ rx_discard:
 
 	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+		atomic_or_32(&igb->igb_state, IGB_ERROR);
 	}
 
 	return (mblk_head);

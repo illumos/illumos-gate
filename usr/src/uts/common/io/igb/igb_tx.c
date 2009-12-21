@@ -56,6 +56,13 @@ igb_tx_ring_send(void *arg, mblk_t *mp)
 
 	ASSERT(tx_ring != NULL);
 
+	if ((tx_ring->igb->igb_state & IGB_SUSPENDED) ||
+	    (tx_ring->igb->igb_state & IGB_ERROR) ||
+	    !(tx_ring->igb->igb_state & IGB_STARTED)) {
+		freemsg(mp);
+		return (NULL);
+	}
+
 	return ((igb_tx(tx_ring, mp)) ? NULL : mp);
 }
 
@@ -1013,6 +1020,7 @@ igb_tx_fill_ring(igb_tx_ring_t *tx_ring, link_list_t *pending_list,
 
 	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+		atomic_or_32(&igb->igb_state, IGB_ERROR);
 	}
 
 	return (desc_num);
@@ -1081,6 +1089,8 @@ igb_tx_recycle_legacy(igb_tx_ring_t *tx_ring)
 	if (igb_check_dma_handle(
 	    tx_ring->tbd_area.dma_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+		atomic_or_32(&igb->igb_state, IGB_ERROR);
+		return (0);
 	}
 
 	LINK_LIST_INIT(&pending_list);
@@ -1227,6 +1237,8 @@ igb_tx_recycle_head_wb(igb_tx_ring_t *tx_ring)
 	if (igb_check_dma_handle(
 	    tx_ring->tbd_area.dma_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+		atomic_or_32(&igb->igb_state, IGB_ERROR);
+		return (0);
 	}
 
 	LINK_LIST_INIT(&pending_list);

@@ -82,6 +82,7 @@ extern "C" {
 #define	IGB_STARTED			0x02
 #define	IGB_SUSPENDED			0x04
 #define	IGB_STALL			0x08
+#define	IGB_ERROR			0x80
 
 #define	IGB_INTR_NONE			0
 #define	IGB_INTR_MSIX			1
@@ -662,6 +663,8 @@ typedef struct igb {
 	uint32_t		link_speed;
 	uint32_t		link_duplex;
 	uint32_t		link_down_timeout;
+	boolean_t		link_complete;
+	timeout_id_t		link_tid;
 
 	uint32_t		reset_count;
 	uint32_t		attach_progress;
@@ -715,6 +718,7 @@ typedef struct igb {
 
 	kmutex_t		gen_lock; /* General lock for device access */
 	kmutex_t		watchdog_lock;
+	kmutex_t		link_lock;
 
 	boolean_t		watchdog_enable;
 	boolean_t		watchdog_start;

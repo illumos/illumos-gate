@@ -427,8 +427,10 @@ igb_m_stat(void *arg, uint_t stat, uint64_t *val)
 
 	mutex_exit(&igb->gen_lock);
 
-	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK)
-		ddi_fm_service_impact(igb->dip, DDI_SERVICE_UNAFFECTED);
+	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+		return (EIO);
+	}
 
 	return (0);
 }
@@ -454,7 +456,7 @@ igb_m_start(void *arg)
 		return (EIO);
 	}
 
-	igb->igb_state |= IGB_STARTED;
+	atomic_or_32(&igb->igb_state, IGB_STARTED);
 
 	mutex_exit(&igb->gen_lock);
 
@@ -482,7 +484,7 @@ igb_m_stop(void *arg)
 		return;
 	}
 
-	igb->igb_state &= ~IGB_STARTED;
+	atomic_and_32(&igb->igb_state, ~IGB_STARTED);
 
 	igb_stop(igb);
 

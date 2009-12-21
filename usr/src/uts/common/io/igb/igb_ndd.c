@@ -33,7 +33,7 @@ static int igb_nd_get(queue_t *, mblk_t *, caddr_t, cred_t *);
 static int igb_nd_set(queue_t *, mblk_t *, char *, caddr_t, cred_t *);
 static int igb_nd_param_load(igb_t *);
 static void igb_nd_get_param_val(nd_param_t *);
-static void igb_nd_set_param_val(nd_param_t *, uint32_t);
+static int igb_nd_set_param_val(nd_param_t *, uint32_t);
 
 /*
  * Notes:
@@ -146,7 +146,8 @@ igb_nd_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp, cred_t *credp)
 	if (new_value < nd->min || new_value > nd->max)
 		return (EINVAL);
 
-	igb_nd_set_param_val(nd, new_value);
+	if (igb_nd_set_param_val(nd, new_value) != IGB_SUCCESS)
+		return (EIO);
 
 	return (0);
 }
@@ -263,16 +264,17 @@ igb_nd_get_param_val(nd_param_t *nd)
 /*
  * igb_nd_set_param_val
  */
-static void
+static int
 igb_nd_set_param_val(nd_param_t *nd, uint32_t value)
 {
 	igb_t *igb = (igb_t *)nd->private;
+	int result = IGB_SUCCESS;
 
 	mutex_enter(&igb->gen_lock);
 
 	if (nd->val == value) {
 		mutex_exit(&igb->gen_lock);
-		return;
+		return (IGB_SUCCESS);
 	}
 
 	switch (nd->info) {
@@ -284,16 +286,19 @@ igb_nd_set_param_val(nd_param_t *nd, uint32_t value)
 	case PARAM_ADV_10HDX_CAP:
 		nd->val = value;
 		(void) igb_setup_link(igb, B_TRUE);
+		if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK) {
+			ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+			result = IGB_FAILURE;
+		}
 		break;
 
 	default:
 		break;
 	}
 
-	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK)
-		ddi_fm_service_impact(igb->dip, DDI_SERVICE_UNAFFECTED);
-
 	mutex_exit(&igb->gen_lock);
+
+	return (result);
 }
 
 /*

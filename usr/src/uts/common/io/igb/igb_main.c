@@ -29,7 +29,7 @@
 #include "igb_sw.h"
 
 static char ident[] = "Intel 1Gb Ethernet";
-static char igb_version[] = "igb 1.1.9";
+static char igb_version[] = "igb 1.1.10";
 
 /*
  * Local function protoypes
@@ -67,10 +67,13 @@ static int igb_get_prop(igb_t *, char *, int, int, int);
 static boolean_t igb_is_link_up(igb_t *);
 static boolean_t igb_link_check(igb_t *);
 static void igb_local_timer(void *);
+static void igb_link_timer(void *);
 static void igb_arm_watchdog_timer(igb_t *);
 static void igb_start_watchdog_timer(igb_t *);
 static void igb_restart_watchdog_timer(igb_t *);
 static void igb_stop_watchdog_timer(igb_t *);
+static void igb_start_link_timer(igb_t *);
+static void igb_stop_link_timer(igb_t *);
 static void igb_disable_adapter_interrupts(igb_t *);
 static void igb_enable_adapter_interrupts_82575(igb_t *);
 static void igb_enable_adapter_interrupts_82576(igb_t *);
@@ -507,7 +510,7 @@ igb_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	igb->attach_progress |= ATTACH_PROGRESS_ENABLE_INTR;
 
 	igb_log(igb, "%s", igb_version);
-	igb->igb_state |= IGB_INITIALIZED;
+	atomic_or_32(&igb->igb_state, IGB_INITIALIZED);
 
 	return (DDI_SUCCESS);
 
@@ -575,7 +578,7 @@ igb_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	 */
 	mutex_enter(&igb->gen_lock);
 	if (igb->igb_state & IGB_STARTED) {
-		igb->igb_state &= ~IGB_STARTED;
+		atomic_and_32(&igb->igb_state, ~IGB_STARTED);
 		igb_stop(igb);
 		mutex_exit(&igb->gen_lock);
 		/* Disable and stop the watchdog timer */
@@ -1027,6 +1030,9 @@ igb_init_locks(igb_t *igb)
 
 	mutex_init(&igb->watchdog_lock, NULL,
 	    MUTEX_DRIVER, DDI_INTR_PRI(igb->intr_pri));
+
+	mutex_init(&igb->link_lock, NULL,
+	    MUTEX_DRIVER, DDI_INTR_PRI(igb->intr_pri));
 }
 
 /*
@@ -1055,6 +1061,7 @@ igb_destroy_locks(igb_t *igb)
 
 	mutex_destroy(&igb->gen_lock);
 	mutex_destroy(&igb->watchdog_lock);
+	mutex_destroy(&igb->link_lock);
 }
 
 static int
@@ -1080,7 +1087,7 @@ igb_resume(dev_info_t *devinfo)
 		igb_enable_watchdog_timer(igb);
 	}
 
-	igb->igb_state &= ~IGB_SUSPENDED;
+	atomic_and_32(&igb->igb_state, ~IGB_SUSPENDED);
 
 	mutex_exit(&igb->gen_lock);
 
@@ -1098,7 +1105,7 @@ igb_suspend(dev_info_t *devinfo)
 
 	mutex_enter(&igb->gen_lock);
 
-	igb->igb_state |= IGB_SUSPENDED;
+	atomic_or_32(&igb->igb_state, IGB_SUSPENDED);
 
 	if (!(igb->igb_state & IGB_STARTED)) {
 		mutex_exit(&igb->gen_lock);
@@ -1148,6 +1155,11 @@ igb_init(igb_t *igb)
 		mutex_exit(&igb->tx_rings[i].tx_lock);
 	for (i = igb->num_rx_rings - 1; i >= 0; i--)
 		mutex_exit(&igb->rx_rings[i].rx_lock);
+
+	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_LOST);
+		return (IGB_FAILURE);
+	}
 
 	mutex_exit(&igb->gen_lock);
 
@@ -1325,6 +1337,11 @@ igb_init_adapter(igb_t *igb)
 	}
 
 	/*
+	 *  Start the link setup timer
+	 */
+	igb_start_link_timer(igb);
+
+	/*
 	 * Disable wakeup control by default
 	 */
 	E1000_WRITE_REG(hw, E1000_WUC, 0);
@@ -1394,6 +1411,9 @@ igb_stop_adapter(igb_t *igb)
 
 	ASSERT(mutex_owned(&igb->gen_lock));
 
+	/* Stop the link setup timer */
+	igb_stop_link_timer(igb);
+
 	/* Tell firmware driver is no longer in control */
 	igb_release_driver_control(hw);
 
@@ -1424,6 +1444,7 @@ igb_reset(igb_t *igb)
 	mutex_enter(&igb->gen_lock);
 
 	ASSERT(igb->igb_state & IGB_STARTED);
+	atomic_and_32(&igb->igb_state, ~IGB_STARTED);
 
 	/*
 	 * Disable the adapter interrupts to stop any rx/tx activities
@@ -1464,6 +1485,8 @@ igb_reset(igb_t *igb)
 	 */
 	igb_setup_rings(igb);
 
+	atomic_and_32(&igb->igb_state, ~(IGB_ERROR | IGB_STALL));
+
 	/*
 	 * Enable adapter interrupts
 	 * The interrupts must be enabled after the driver state is START
@@ -1480,6 +1503,8 @@ igb_reset(igb_t *igb)
 		mutex_exit(&igb->tx_rings[i].tx_lock);
 	for (i = igb->num_rx_rings - 1; i >= 0; i--)
 		mutex_exit(&igb->rx_rings[i].rx_lock);
+
+	atomic_or_32(&igb->igb_state, IGB_STARTED);
 
 	mutex_exit(&igb->gen_lock);
 
@@ -1840,9 +1865,6 @@ igb_setup_rings(igb_t *igb)
 	igb_setup_rx(igb);
 
 	igb_setup_tx(igb);
-
-	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK)
-		ddi_fm_service_impact(igb->dip, DDI_SERVICE_LOST);
 }
 
 static void
@@ -2397,9 +2419,6 @@ igb_init_unicst(igb_t *igb)
 			    igb->unicst_addr[slot].mac.group_index);
 		}
 	}
-
-	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK)
-		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
 }
 
 /*
@@ -2982,8 +3001,10 @@ igb_link_check(igb_t *igb)
 			igb->link_state = LINK_STATE_UP;
 			igb->link_down_timeout = 0;
 			link_changed = B_TRUE;
+			if (!igb->link_complete)
+				igb_stop_link_timer(igb);
 		}
-	} else {
+	} else if (igb->link_complete) {
 		if (igb->link_state != LINK_STATE_DOWN) {
 			igb->link_speed = 0;
 			igb->link_duplex = 0;
@@ -3002,8 +3023,10 @@ igb_link_check(igb_t *igb)
 		}
 	}
 
-	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK)
+	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+		return (B_FALSE);
+	}
 
 	return (link_changed);
 }
@@ -3020,17 +3043,24 @@ igb_local_timer(void *arg)
 	igb_t *igb = (igb_t *)arg;
 	boolean_t link_changed = B_FALSE;
 
-	if (igb_stall_check(igb))
-		igb->igb_state |= IGB_STALL;
+	if (igb->igb_state & IGB_ERROR) {
+		igb->reset_count++;
+		if (igb_reset(igb) == IGB_SUCCESS)
+			ddi_fm_service_impact(igb->dip, DDI_SERVICE_RESTORED);
 
-	if (igb->igb_state & IGB_STALL) {
+		igb_restart_watchdog_timer(igb);
+		return;
+	}
+
+	if (igb_stall_check(igb) || (igb->igb_state & IGB_STALL)) {
 		igb_fm_ereport(igb, DDI_FM_DEVICE_STALL);
 		ddi_fm_service_impact(igb->dip, DDI_SERVICE_LOST);
 		igb->reset_count++;
-		igb->igb_state &= ~IGB_STALL;
 		if (igb_reset(igb) == IGB_SUCCESS)
-			ddi_fm_service_impact(igb->dip,
-			    DDI_SERVICE_RESTORED);
+			ddi_fm_service_impact(igb->dip, DDI_SERVICE_RESTORED);
+
+		igb_restart_watchdog_timer(igb);
+		return;
 	}
 
 	mutex_enter(&igb->gen_lock);
@@ -3041,12 +3071,29 @@ igb_local_timer(void *arg)
 	if (link_changed)
 		mac_link_update(igb->mac_hdl, igb->link_state);
 
-	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK)
-		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
-
 	igb_restart_watchdog_timer(igb);
 }
 
+/*
+ * igb_link_timer - link setup timer function
+ *
+ * It is called when the timer for link setup is expired, which indicates
+ * the completion of the link setup. The link state will not be updated
+ * until the link setup is completed. And the link state will not be sent
+ * to the upper layer through mac_link_update() in this function. It will
+ * be updated in the local timer routine or the interrupts service routine
+ * after the interface is started (plumbed).
+ */
+static void
+igb_link_timer(void *arg)
+{
+	igb_t *igb = (igb_t *)arg;
+
+	mutex_enter(&igb->link_lock);
+	igb->link_complete = B_TRUE;
+	igb->link_tid = 0;
+	mutex_exit(&igb->link_lock);
+}
 /*
  * igb_stall_check - check for transmit stall
  *
@@ -3296,6 +3343,50 @@ igb_stop_watchdog_timer(igb_t *igb)
 	igb->watchdog_tid = 0;
 
 	mutex_exit(&igb->watchdog_lock);
+
+	if (tid != 0)
+		(void) untimeout(tid);
+}
+
+/*
+ * igb_start_link_timer - Start the link setup timer
+ */
+static void
+igb_start_link_timer(struct igb *igb)
+{
+	struct e1000_hw *hw = &igb->hw;
+	clock_t link_timeout;
+
+	if (hw->mac.autoneg)
+		link_timeout = PHY_AUTO_NEG_LIMIT *
+		    drv_usectohz(100000);
+	else
+		link_timeout = PHY_FORCE_LIMIT * drv_usectohz(100000);
+
+	mutex_enter(&igb->link_lock);
+	if (hw->phy.autoneg_wait_to_complete) {
+		igb->link_complete = B_TRUE;
+	} else {
+		igb->link_complete = B_FALSE;
+		igb->link_tid = timeout(igb_link_timer, (void *)igb,
+		    link_timeout);
+	}
+	mutex_exit(&igb->link_lock);
+}
+
+/*
+ * igb_stop_link_timer - Stop the link setup timer
+ */
+static void
+igb_stop_link_timer(struct igb *igb)
+{
+	timeout_id_t tid;
+
+	mutex_enter(&igb->link_lock);
+	igb->link_complete = B_TRUE;
+	tid = igb->link_tid;
+	igb->link_tid = 0;
+	mutex_exit(&igb->link_lock);
 
 	if (tid != 0)
 		(void) untimeout(tid);
@@ -3829,6 +3920,12 @@ igb_intr_legacy(void *arg1, void *arg2)
 	link_changed = B_FALSE;
 	icr = E1000_READ_REG(&igb->hw, E1000_ICR);
 
+	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+		atomic_or_32(&igb->igb_state, IGB_ERROR);
+		return (DDI_INTR_UNCLAIMED);
+	}
+
 	if (icr & E1000_ICR_INT_ASSERTED) {
 		/*
 		 * E1000_ICR_INT_ASSERTED bit was set:
@@ -3872,7 +3969,7 @@ igb_intr_legacy(void *arg1, void *arg2)
 
 		if (icr & E1000_ICR_DRSTA) {
 			/* 82580 Full Device Reset needed */
-			igb->igb_state |= IGB_STALL;
+			atomic_or_32(&igb->igb_state, IGB_STALL);
 		}
 
 		result = DDI_INTR_CLAIMED;
@@ -3917,6 +4014,12 @@ igb_intr_msi(void *arg1, void *arg2)
 
 	icr = E1000_READ_REG(&igb->hw, E1000_ICR);
 
+	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+		atomic_or_32(&igb->igb_state, IGB_ERROR);
+		return (DDI_INTR_CLAIMED);
+	}
+
 	/* Make sure all interrupt causes cleared */
 	(void) E1000_READ_REG(&igb->hw, E1000_EICR);
 
@@ -3941,7 +4044,7 @@ igb_intr_msi(void *arg1, void *arg2)
 
 	if (icr & E1000_ICR_DRSTA) {
 		/* 82580 Full Device Reset needed */
-		igb->igb_state |= IGB_STALL;
+		atomic_or_32(&igb->igb_state, IGB_STALL);
 	}
 
 	return (DDI_INTR_CLAIMED);
@@ -3999,6 +4102,12 @@ igb_intr_tx_other(void *arg1, void *arg2)
 
 	icr = E1000_READ_REG(&igb->hw, E1000_ICR);
 
+	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+		atomic_or_32(&igb->igb_state, IGB_ERROR);
+		return (DDI_INTR_CLAIMED);
+	}
+
 	/*
 	 * Look for tx reclaiming work first. Remember, in the
 	 * case of only interrupt sharing, only one tx ring is
@@ -4027,7 +4136,7 @@ igb_intr_tx_other(void *arg1, void *arg2)
 
 	if (icr & E1000_ICR_DRSTA) {
 		/* 82580 Full Device Reset needed */
-		igb->igb_state |= IGB_STALL;
+		atomic_or_32(&igb->igb_state, IGB_STALL);
 	}
 
 	return (DDI_INTR_CLAIMED);
