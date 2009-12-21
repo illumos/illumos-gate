@@ -49,9 +49,20 @@
 #include <sys/kidmap.h>
 
 typedef struct {
-	gfs_file_t	gfs_private;
+	gfs_file_t	xattr_gfs_private;
 	xattr_view_t	xattr_view;
 } xattr_file_t;
+
+typedef struct {
+	gfs_dir_t	xattr_gfs_private;
+	vnode_t		*xattr_realvp;  /* Only used for VOP_REALVP */
+} xattr_dir_t;
+
+/*
+ * xattr_realvp is only used for VOP_REALVP, this is so we don't
+ * keep an unnecessary hold on the *real* xattr dir unless we have
+ * no other choice.
+ */
 
 /* ARGSUSED */
 static int
@@ -1278,7 +1289,15 @@ static void
 xattr_dir_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 {
 	gfs_file_t *fp;
+	xattr_dir_t *xattr_dir;
 
+	mutex_enter(&vp->v_lock);
+	xattr_dir = vp->v_data;
+	if (xattr_dir->xattr_realvp) {
+		VN_RELE(xattr_dir->xattr_realvp);
+		xattr_dir->xattr_realvp = NULL;
+	}
+	mutex_exit(&vp->v_lock);
 	fp = gfs_dir_inactive(vp);
 	if (fp != NULL) {
 		kmem_free(fp, fp->gfs_size);
@@ -1300,6 +1319,27 @@ xattr_dir_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
 	}
 }
 
+/* ARGSUSED */
+static int
+xattr_dir_realvp(vnode_t *vp, vnode_t **realvp, caller_context_t *ct)
+{
+	xattr_dir_t *xattr_dir;
+	int error;
+
+	mutex_enter(&vp->v_lock);
+	xattr_dir = vp->v_data;
+	if (xattr_dir->xattr_realvp) {
+		*realvp = xattr_dir->xattr_realvp;
+		error = 0;
+	} else {
+		if ((error = xattr_dir_realdir(vp, &xattr_dir->xattr_realvp,
+		    LOOKUP_XATTR, kcred, NULL)) == 0)
+			*realvp = xattr_dir->xattr_realvp;
+	}
+	mutex_exit(&vp->v_lock);
+	return (error);
+}
+
 static const fs_operation_def_t xattr_dir_tops[] = {
 	{ VOPNAME_OPEN,		{ .vop_open = xattr_dir_open }		},
 	{ VOPNAME_CLOSE,	{ .vop_close = xattr_dir_close }	},
@@ -1318,6 +1358,7 @@ static const fs_operation_def_t xattr_dir_tops[] = {
 	{ VOPNAME_INACTIVE,	{ .vop_inactive = xattr_dir_inactive }	},
 	{ VOPNAME_FID,		{ .vop_fid = xattr_common_fid }		},
 	{ VOPNAME_PATHCONF,	{ .vop_pathconf = xattr_dir_pathconf }	},
+	{ VOPNAME_REALVP,	{ .vop_realvp = xattr_dir_realvp } },
 	{ NULL, NULL }
 };
 
@@ -1446,7 +1487,7 @@ xattr_dir_lookup(vnode_t *dvp, vnode_t **vpp, int flags, cred_t *cr)
 		 * but only for creation of the GFS directory.
 		 */
 		*vpp = gfs_dir_create(
-		    sizeof (gfs_dir_t), dvp, xattr_dir_ops, xattr_dirents,
+		    sizeof (xattr_dir_t), dvp, xattr_dir_ops, xattr_dirents,
 		    xattrdir_do_ino, MAXNAMELEN, NULL, xattr_lookup_cb);
 		mutex_enter(&dvp->v_lock);
 		if (dvp->v_xattrdir != NULL) {
