@@ -756,7 +756,7 @@ apic_picinit(void)
 	uint_t isr;
 
 	/*
-	 * initialize interrupt remapping before apic
+	 * Initialize and enable interrupt remapping before apic
 	 * hardware initialization
 	 */
 	apic_intrr_init(apic_mode);
@@ -795,6 +795,13 @@ apic_picinit(void)
 	if (!psm_add_nmintr(0, (avfunc) apic_nmi_intr,
 	    "pcplusmp NMI handler", (caddr_t)NULL))
 		cmn_err(CE_WARN, "pcplusmp: Unable to add nmi handler");
+
+	/*
+	 * Check for directed-EOI capability in the local APIC.
+	 */
+	if (apic_directed_EOI_supported() == 1) {
+		apic_set_directed_EOI_handler();
+	}
 
 	apic_init_intr();
 
@@ -2589,6 +2596,12 @@ apic_intrr_init(int apic_mode)
 	int suppress_brdcst_eoi = 0;
 
 	if (psm_vt_ops != NULL) {
+		/*
+		 * Since X2APIC requires the use of interrupt remapping
+		 * (though this is not documented explicitly in the Intel
+		 * documentation (yet)), initialize interrupt remapping
+		 * support before initializing the X2APIC unit.
+		 */
 		if (((apic_intrr_ops_t *)psm_vt_ops)->apic_intrr_init(apic_mode)
 		    == DDI_SUCCESS) {
 			apic_vt_ops = psm_vt_ops;
@@ -2600,10 +2613,17 @@ apic_intrr_init(int apic_mode)
 			 */
 			if (apic_directed_EOI_supported() == 0) {
 				suppress_brdcst_eoi = 1;
-				apic_set_directed_EOI_handler();
 			}
 
 			apic_vt_ops->apic_intrr_enable(suppress_brdcst_eoi);
+
+			if (apic_detect_x2apic()) {
+				apic_enable_x2apic();
+			}
+
+			if (apic_directed_EOI_supported() == 0) {
+				apic_set_directed_EOI_handler();
+			}
 		}
 	}
 }

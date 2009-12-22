@@ -636,22 +636,6 @@ acpi_probe(char *modname)
 	if (!apicadr)
 		return (PSM_FAILURE);
 
-	/*
-	 * We don't enable x2APIC when Solaris is running under xVM.
-	 */
-#if !defined(__xpv)
-	if (apic_detect_x2apic()) {
-		apic_enable_x2apic();
-	}
-#endif
-
-	/*
-	 * Check for directed-EOI capability in the local APIC.
-	 */
-	if (apic_directed_EOI_supported() == 1) {
-		apic_set_directed_EOI_handler();
-	}
-
 	id = apic_reg_ops->apic_read(APIC_LID_REG);
 	local_ids[0] = (uchar_t)(id >> 24);
 	apic_nproc = index = 1;
