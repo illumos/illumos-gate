@@ -290,6 +290,8 @@ arn_rx_handler(struct arn_softc *sc)
 	uint8_t phyerr;
 	int status;
 	struct ieee80211_node *in;
+	uint32_t cur_signal;
+	uint32_t subtype;
 
 	ngood = 0;
 	do {
@@ -379,12 +381,9 @@ arn_rx_handler(struct arn_softc *sc)
 			freemsg(rx_mp);
 			goto rx_next;
 		}
+
 		/* Remove the CRC at the end of IEEE80211 frame */
 		rx_mp->b_wptr -= IEEE80211_CRC_LEN;
-
-#ifdef DEBUG
-		arn_printrxbuf(bf, status == 0);
-#endif
 
 		/*
 		 * Locate the node for sender, track state, and then
@@ -393,11 +392,45 @@ arn_rx_handler(struct arn_softc *sc)
 		 */
 		in = ieee80211_find_rxnode(ic, wh);
 
+		if (ds->ds_rxstat.rs_rssi < 0)
+			ds->ds_rxstat.rs_rssi = 0;
+
+		if ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) ==
+		    IEEE80211_FC0_TYPE_MGT) {
+			subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
+			/* Update Beacon RSSI, this is used by ANI. */
+			if (subtype == IEEE80211_FC0_SUBTYPE_BEACON)
+				sc->sc_halstats.ns_avgbrssi =
+				    ds->ds_rxstat.rs_rssi;
+		}
+
+#ifdef DEBUG
+		arn_printrxbuf(bf, status == 0);
+#endif
+
+		/*
+		 * signal 13-15 DLADM_WLAN_STRENGTH_EXCELLENT
+		 * signal 10-12 DLADM_WLAN_STRENGTH_VERY_GOOD
+		 * signal 6-9   DLADM_WLAN_STRENGTH_GOOD
+		 * signal 3-5   DLADM_WLAN_STRENGTH_WEAK
+		 * signal 0-2   DLADM_WLAN_STRENGTH_VERY_WEAK
+		 */
+		if (rs->rs_rssi == 0)
+			cur_signal = 0;
+		else if (rs->rs_rssi >= 45)
+			cur_signal = MAX_RSSI;
+		else
+			cur_signal = rs->rs_rssi * MAX_RSSI / 45 + 1;
+
 		/*
 		 * Send the frame to net80211 for processing
 		 */
-		(void) ieee80211_input(ic, rx_mp, in,
-		    rs->rs_rssi, rs->rs_tstamp);
+		if (cur_signal <= 2 && ic->ic_state == IEEE80211_S_RUN)
+			(void) ieee80211_input(ic, rx_mp, in,
+			    (rs->rs_rssi + 10), rs->rs_tstamp);
+		else
+			(void) ieee80211_input(ic, rx_mp, in,
+			    rs->rs_rssi, rs->rs_tstamp);
 
 		/* release node */
 		ieee80211_free_node(in);

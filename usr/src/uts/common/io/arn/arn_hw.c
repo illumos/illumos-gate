@@ -3419,6 +3419,8 @@ ath9k_hw_set_sta_beacon_timers(struct ath_hal *ah,
 	    AR_TIM_TIMER_EN |
 	    AR_DTIM_TIMER_EN);
 
+	/* TSF Out of Range Threshold */
+	REG_WRITE(ah, AR_TSFOOR_THRESHOLD, bs->bs_tsfoor_threshold);
 }
 
 /* HW Capabilities */

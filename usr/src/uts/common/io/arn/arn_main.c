@@ -58,7 +58,7 @@
 #include "arn_reg.h"
 #include "arn_hw.h"
 
-#define	ARN_MAX_RSSI	63	/* max rssi */
+#define	ARN_MAX_RSSI	45	/* max rssi */
 
 /*
  * PIO access attributes for registers
@@ -1156,12 +1156,18 @@ arn_isr(caddr_t arg)
 		if (status & ATH9K_INT_BMISS) {
 			ARN_DBG((ARN_DBG_INTERRUPT, "arn: arn_isr(): "
 			    "ATH9K_INT_BMISS\n"));
-
+#ifdef HW_BEACON_MISS_HANDLE
+			ARN_DBG((ARN_DBG_INTERRUPT, "arn: arn_isr(): "
+			    "handle beacon mmiss by H/W mechanism\n"));
 			if (ddi_taskq_dispatch(sc->sc_tq, arn_bmiss_proc,
 			    sc, DDI_NOSLEEP) != DDI_SUCCESS) {
 				arn_problem("arn: arn_isr(): "
 				    "No memory available for bmiss taskq\n");
 			}
+#else
+			ARN_DBG((ARN_DBG_INTERRUPT, "arn: arn_isr(): "
+			    "handle beacon mmiss by S/W mechanism\n"));
+#endif /* HW_BEACON_MISS_HANDLE */
 		}
 
 		ARN_UNLOCK(sc);
@@ -1502,6 +1508,16 @@ arn_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 #else
 				/* Configure the beacon and sleep timers. */
 				arn_beacon_config(sc);
+
+				/* reset rssi stats */
+				sc->sc_halstats.ns_avgbrssi =
+				    ATH_RSSI_DUMMY_MARKER;
+				sc->sc_halstats.ns_avgrssi =
+				    ATH_RSSI_DUMMY_MARKER;
+				sc->sc_halstats.ns_avgtxrssi =
+				    ATH_RSSI_DUMMY_MARKER;
+				sc->sc_halstats.ns_avgtxrate =
+				    ATH_RATE_DUMMY_MARKER;
 #endif /* ARN_IBSS */
 			}
 			break;
@@ -1576,6 +1592,20 @@ arn_watchdog(void *arg)
 				    arn_rate_ctl, sc);
 		}
 
+#ifdef HW_BEACON_MISS_HANDLE
+		/* nothing to do here */
+#else
+		/* currently set 10 seconds as beacon miss threshold */
+		if (ic->ic_beaconmiss++ > 100) {
+			ARN_DBG((ARN_DBG_BEACON, "arn_watchdog():"
+			    "Beacon missed for 10 seconds, run"
+			    "ieee80211_new_state(ic, IEEE80211_S_INIT, -1)\n"));
+			ARN_UNLOCK(sc);
+			(void) ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
+			return;
+		}
+#endif /* HW_BEACON_MISS_HANDLE */
+
 		ntimer = 1;
 	}
 	ARN_UNLOCK(sc);
@@ -1622,8 +1652,16 @@ arn_node_free(struct ieee80211_node *in)
 	}
 
 	ic->ic_node_cleanup(in);
+
 	if (in->in_wpa_ie != NULL)
 		ieee80211_free(in->in_wpa_ie);
+
+	if (in->in_wme_ie != NULL)
+		ieee80211_free(in->in_wme_ie);
+
+	if (in->in_htcap_ie != NULL)
+		ieee80211_free(in->in_htcap_ie);
+
 	kmem_free(in, sizeof (struct ath_node));
 }
 

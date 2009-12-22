@@ -26,6 +26,8 @@
 extern "C" {
 #endif
 
+#define	FUDGE	2
+
 enum ath9k_band {
 	ATH9K_BAND_2GHZ,
 	ATH9K_BAND_5GHZ,
@@ -762,6 +764,7 @@ struct ath9k_beacon_state {
 #define	ATH9K_BEACON_PERIOD	0x0000ffff
 #define	ATH9K_BEACON_ENA	0x00800000
 #define	ATH9K_BEACON_RESET_TSF	0x01000000
+#define	ATH9K_TSFOOR_THRESHOLD	0x00004240 /* 16k us */
 	uint32_t bs_dtimperiod;
 	uint16_t bs_cfpperiod;
 	uint16_t bs_cfpmaxduration;
@@ -769,6 +772,7 @@ struct ath9k_beacon_state {
 	uint16_t bs_timoffset;
 	uint16_t bs_bmissthreshold;
 	uint32_t bs_sleepduration;
+	uint32_t bs_tsfoor_threshold;
 };
 
 struct ath9k_node_stats {

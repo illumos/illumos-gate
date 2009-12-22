@@ -34,6 +34,7 @@
  * settings and channel width min/max
  */
 static int
+/* LINTED E_STATIC_UNUSED */
 arn_beaconq_config(struct arn_softc *sc)
 {
 	struct ath_hal *ah = sc->sc_ah;
@@ -147,6 +148,7 @@ arn_beacon_setup(struct arn_softc *sc, struct ath_buf *bf)
  * by the hardware using the self-linked descriptor + veol trick.
  */
 static void
+/* LINTED E_STATIC_UNUSED */
 arn_beacon_start_adhoc(struct arn_softc *sc)
 
 {
@@ -252,13 +254,16 @@ arn_beacon_return(struct arn_softc *sc)
 
 void
 arn_beacon_config(struct arn_softc *sc)
-
 {
-	struct ath_hal *ah = sc->sc_ah;
 	struct ath_beacon_config conf;
 	ieee80211com_t *ic = (ieee80211com_t *)sc;
 	struct ieee80211_node *in = ic->ic_bss;
-	uint32_t nexttbtt, intval;
+
+	struct ath9k_beacon_state bs;
+	int dtimperiod, dtimcount, sleepduration;
+	int cfpperiod, cfpcount;
+	uint32_t nexttbtt = 0, intval, tsftu;
+	uint64_t tsf;
 
 	(void) memset(&conf, 0, sizeof (struct ath_beacon_config));
 
@@ -270,208 +275,95 @@ arn_beacon_config(struct arn_softc *sc)
 	conf.dtim_count = 1;
 	conf.bmiss_timeout = ATH_DEFAULT_BMISS_LIMIT * conf.beacon_interval;
 
-	/* extract tstamp from last beacon and convert to TU */
-	// nexttbtt = TSF_TO_TU(sc->bc_tstamp >> 32, sc->bc_tstamp);
-	/* XXX fix me */
-	nexttbtt = (ARN_LE_READ_32(in->in_tstamp.data + 4) << 22) |
-	    (ARN_LE_READ_32(in->in_tstamp.data) >> 10);
+	(void) memset(&bs, 0, sizeof (bs));
+	intval = conf.beacon_interval & ATH9K_BEACON_PERIOD;
 
-	/* XXX conditionalize multi-bss support? */
-	if (sc->sc_ah->ah_opmode == ATH9K_M_HOSTAP) {
-		/*
-		 * For multi-bss ap support beacons are either staggered
-		 * evenly over N slots or burst together.  For the former
-		 * arrange for the SWBA to be delivered for each slot.
-		 * Slots that are not occupied will generate nothing.
-		 */
-		/* NB: the beacon interval is kept internally in TU's */
-		intval = conf.beacon_interval & ATH9K_BEACON_PERIOD;
-		intval /= ATH_BCBUF; /* for staggered beacons */
+	/*
+	 * Setup dtim and cfp parameters according to
+	 * last beacon we received (which may be none).
+	 */
+	dtimperiod = conf.dtim_period;
+	if (dtimperiod <= 0)		/* NB: 0 if not known */
+		dtimperiod = 1;
+	dtimcount = conf.dtim_count;
+	if (dtimcount >= dtimperiod)	/* NB: sanity check */
+		dtimcount = 0;
+	cfpperiod = 1;			/* NB: no PCF support yet */
+	cfpcount = 0;
+
+	sleepduration = conf.listen_interval * intval;
+	if (sleepduration <= 0)
+		sleepduration = intval;
+
+	/*
+	 * Pull nexttbtt forward to reflect the current
+	 * TSF and calculate dtim+cfp state for the result.
+	 */
+	tsf = ath9k_hw_gettsf64(sc->sc_ah);
+	tsftu = TSF_TO_TU(tsf>>32, tsf) + FUDGE;
+	do {
+		nexttbtt += intval;
+		if (--dtimcount < 0) {
+			dtimcount = dtimperiod - 1;
+			if (--cfpcount < 0)
+				cfpcount = cfpperiod - 1;
+		}
+	} while (nexttbtt < tsftu);
+
+	bs.bs_intval = intval;
+	bs.bs_nexttbtt = nexttbtt;
+	bs.bs_dtimperiod = dtimperiod*intval;
+	bs.bs_nextdtim = bs.bs_nexttbtt + dtimcount*intval;
+	bs.bs_cfpperiod = cfpperiod*bs.bs_dtimperiod;
+	bs.bs_cfpnext = bs.bs_nextdtim + cfpcount*bs.bs_dtimperiod;
+	bs.bs_cfpmaxduration = 0;
+
+	/*
+	 * Calculate the number of consecutive beacons to miss* before taking
+	 * a BMISS interrupt. The configuration is specified in TU so we only
+	 * need calculate based on the beacon interval.  Note that we clamp the
+	 * result to at most 15 beacons.
+	 */
+	if (sleepduration > intval) {
+		bs.bs_bmissthreshold = conf.listen_interval *
+		    ATH_DEFAULT_BMISS_LIMIT / 2;
 	} else {
-		intval = conf.beacon_interval & ATH9K_BEACON_PERIOD;
+		bs.bs_bmissthreshold = DIV_ROUND_UP(conf.bmiss_timeout, intval);
+		if (bs.bs_bmissthreshold > 15)
+			bs.bs_bmissthreshold = 15;
+		else if (bs.bs_bmissthreshold == 0)
+			bs.bs_bmissthreshold = 1;
 	}
 
-	if (nexttbtt == 0)	/* e.g. for ap mode */
-		nexttbtt = intval;
-	else if (intval)	/* NB: can be 0 for monitor mode */
-		nexttbtt = roundup(nexttbtt, intval);
+	/*
+	 * Calculate sleep duration. The configuration is given in ms.
+	 * We ensure a multiple of the beacon period is used. Also, if the sleep
+	 * duration is greater than the DTIM period then it makes senses
+	 * to make it a multiple of that.
+	 *
+	 * XXX fixed at 100ms
+	 */
+
+	bs.bs_sleepduration = roundup(IEEE80211_MS_TO_TU(100), sleepduration);
+	if (bs.bs_sleepduration > bs.bs_dtimperiod)
+		bs.bs_sleepduration = bs.bs_dtimperiod;
+
+	/* TSF out of range threshold fixed at 1 second */
+	bs.bs_tsfoor_threshold = ATH9K_TSFOOR_THRESHOLD;
 
 	ARN_DBG((ARN_DBG_BEACON, "arn: arn_beacon_config(): "
-	    "nexttbtt %u intval %u (%u)\n",
-	    nexttbtt, intval, conf.beacon_interval));
+	    "tsf: %llu tsftu: %u\n", tsf, tsftu));
+	ARN_DBG((ARN_DBG_BEACON, "arn: arn_beacon_config(): "
+	    "bmiss: %u sleep: %u cfp-period: %u maxdur: %u next: %u\n",
+	    bs.bs_bmissthreshold, bs.bs_sleepduration,
+	    bs.bs_cfpperiod, bs.bs_cfpmaxduration, bs.bs_cfpnext));
 
-	/* Check for ATH9K_M_HOSTAP and sc_nostabeacons for WDS client */
-	if (sc->sc_ah->ah_opmode == ATH9K_M_STA) {
-		struct ath9k_beacon_state bs;
-		uint64_t tsf;
-		uint32_t tsftu;
-		int dtimperiod, dtimcount, sleepduration;
-		int cfpperiod, cfpcount;
+	/* Set the computed STA beacon timers */
 
-		/*
-		 * Setup dtim and cfp parameters according to
-		 * last beacon we received (which may be none).
-		 */
-		dtimperiod = conf.dtim_period;
-		if (dtimperiod <= 0)		/* NB: 0 if not known */
-			dtimperiod = 1;
-		dtimcount = conf.dtim_count;
-		if (dtimcount >= dtimperiod)	/* NB: sanity check */
-			dtimcount = 0;
-		cfpperiod = 1;			/* NB: no PCF support yet */
-		cfpcount = 0;
-
-		sleepduration = conf.listen_interval * intval;
-		if (sleepduration <= 0)
-			sleepduration = intval;
-
-#define	FUDGE	2
-		/*
-		 * Pull nexttbtt forward to reflect the current
-		 * TSF and calculate dtim+cfp state for the result.
-		 */
-		tsf = ath9k_hw_gettsf64(ah);
-		tsftu = TSF_TO_TU(tsf>>32, tsf) + FUDGE;
-		do {
-			nexttbtt += intval;
-			if (--dtimcount < 0) {
-				dtimcount = dtimperiod - 1;
-				if (--cfpcount < 0)
-					cfpcount = cfpperiod - 1;
-			}
-		} while (nexttbtt < tsftu);
-#undef FUDGE
-		(void) memset(&bs, 0, sizeof (bs));
-		bs.bs_intval = intval;
-		bs.bs_nexttbtt = nexttbtt;
-		bs.bs_dtimperiod = dtimperiod*intval;
-		bs.bs_nextdtim = bs.bs_nexttbtt + dtimcount*intval;
-		bs.bs_cfpperiod = cfpperiod*bs.bs_dtimperiod;
-		bs.bs_cfpnext = bs.bs_nextdtim + cfpcount*bs.bs_dtimperiod;
-		bs.bs_cfpmaxduration = 0;
-
-		/*
-		 * Calculate the number of consecutive beacons to miss
-		 * before taking a BMISS interrupt.  The configuration
-		 * is specified in TU so we only need calculate based
-		 * on the beacon interval.  Note that we clamp the
-		 * result to at most 15 beacons.
-		 */
-		if (sleepduration > intval) {
-			bs.bs_bmissthreshold = conf.listen_interval *
-			    ATH_DEFAULT_BMISS_LIMIT / 2;
-		} else {
-			bs.bs_bmissthreshold =
-				DIV_ROUND_UP(conf.bmiss_timeout, intval);
-			if (bs.bs_bmissthreshold > 15)
-				bs.bs_bmissthreshold = 15;
-			/* LINTED E_SUSPICIOUS_COMPARISON */
-			else if (bs.bs_bmissthreshold <= 0)
-				bs.bs_bmissthreshold = 1;
-		}
-
-		/*
-		 * Calculate sleep duration.  The configuration is
-		 * given in ms.  We insure a multiple of the beacon
-		 * period is used.  Also, if the sleep duration is
-		 * greater than the DTIM period then it makes senses
-		 * to make it a multiple of that.
-		 *
-		 * XXX fixed at 100ms
-		 */
-
-		bs.bs_sleepduration =
-		    roundup(IEEE80211_MS_TO_TU(100), sleepduration);
-		if (bs.bs_sleepduration > bs.bs_dtimperiod)
-			bs.bs_sleepduration = bs.bs_dtimperiod;
-
-		ARN_DBG((ARN_DBG_BEACON, "arn: arn_beacon_config(): "
-		    "tsf %llu "
-		    "tsf:tu %u "
-		    "intval %u "
-		    "nexttbtt %u "
-		    "dtim %u "
-		    "nextdtim %u "
-		    "bmiss %u "
-		    "sleep %u "
-		    "cfp:period %u "
-		    "maxdur %u "
-		    "next %u "
-		    "timoffset %u\n",
-		    (unsigned long long)tsf, tsftu,
-		    bs.bs_intval,
-		    bs.bs_nexttbtt,
-		    bs.bs_dtimperiod,
-		    bs.bs_nextdtim,
-		    bs.bs_bmissthreshold,
-		    bs.bs_sleepduration,
-		    bs.bs_cfpperiod,
-		    bs.bs_cfpmaxduration,
-		    bs.bs_cfpnext,
-		    bs.bs_timoffset));
-
-		(void) ath9k_hw_set_interrupts(ah, 0);
-		ath9k_hw_set_sta_beacon_timers(ah, &bs);
-		sc->sc_imask |= ATH9K_INT_BMISS;
-		(void) ath9k_hw_set_interrupts(ah, sc->sc_imask);
-	} else {
-		uint64_t tsf;
-		uint32_t tsftu;
-		(void) ath9k_hw_set_interrupts(ah, 0);
-		if (nexttbtt == intval)
-			intval |= ATH9K_BEACON_RESET_TSF;
-		if (sc->sc_ah->ah_opmode == ATH9K_M_IBSS) {
-			/*
-			 * Pull nexttbtt forward to reflect the current
-			 * TSF
-			 */
-#define	FUDGE	2
-			if (!(intval & ATH9K_BEACON_RESET_TSF)) {
-				tsf = ath9k_hw_gettsf64(ah);
-				tsftu = TSF_TO_TU((uint32_t)(tsf>>32),
-				    (uint32_t)tsf) + FUDGE;
-				do {
-					nexttbtt += intval;
-				} while (nexttbtt < tsftu);
-			}
-#undef FUDGE
-			ARN_DBG((ARN_DBG_BEACON, "arn: arn_beacon_config(): "
-			    "IBSS nexttbtt %u intval %u (%u)\n",
-			    nexttbtt, intval & ~ATH9K_BEACON_RESET_TSF,
-			    conf.beacon_interval));
-
-			/*
-			 * In IBSS mode enable the beacon timers but only
-			 * enable SWBA interrupts if we need to manually
-			 * prepare beacon frames.  Otherwise we use a
-			 * self-linked tx descriptor and let the hardware
-			 * deal with things.
-			 */
-			intval |= ATH9K_BEACON_ENA;
-			if (!(ah->ah_caps.hw_caps & ATH9K_HW_CAP_VEOL))
-				sc->sc_imask |= ATH9K_INT_SWBA;
-			(void) arn_beaconq_config(sc);
-		} else if (sc->sc_ah->ah_opmode == ATH9K_M_HOSTAP) {
-			/*
-			 * In AP mode we enable the beacon timers and
-			 * SWBA interrupts to prepare beacon frames.
-			 */
-			intval |= ATH9K_BEACON_ENA;
-			sc->sc_imask |= ATH9K_INT_SWBA;   /* beacon prepare */
-			(void) arn_beaconq_config(sc);
-		}
-		ath9k_hw_beaconinit(ah, nexttbtt, intval);
-		sc->sc_bmisscount = 0;
-		(void) ath9k_hw_set_interrupts(ah, sc->sc_imask);
-		/*
-		 * When using a self-linked beacon descriptor in
-		 * ibss mode load it once here.
-		 */
-		if (sc->sc_ah->ah_opmode == ATH9K_M_IBSS &&
-		    (ah->ah_caps.hw_caps & ATH9K_HW_CAP_VEOL))
-			arn_beacon_start_adhoc(sc);
-	}
-	sc->sc_bsync = 0;
+	(void) ath9k_hw_set_interrupts(sc->sc_ah, 0);
+	ath9k_hw_set_sta_beacon_timers(sc->sc_ah, &bs);
+	sc->sc_imask |= ATH9K_INT_BMISS;
+	(void) ath9k_hw_set_interrupts(sc->sc_ah, sc->sc_imask);
 }
 
 void
