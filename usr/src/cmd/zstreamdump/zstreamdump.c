@@ -91,7 +91,7 @@ main(int argc, char *argv[])
 	char c;
 	boolean_t verbose = B_FALSE;
 	boolean_t first = B_TRUE;
-	int i, err;
+	int err;
 	zio_cksum_t zc = { 0 };
 	zio_cksum_t pcksum = { 0 };
 
@@ -308,14 +308,20 @@ main(int argc, char *argv[])
 				drrw->drr_offset = BSWAP_64(drrw->drr_offset);
 				drrw->drr_length = BSWAP_64(drrw->drr_length);
 				drrw->drr_toguid = BSWAP_64(drrw->drr_toguid);
+				drrw->drr_key.ddk_prop =
+				    BSWAP_64(drrw->drr_key.ddk_prop);
 			}
 			if (verbose) {
 				(void) printf("WRITE object = %llu type = %u "
-				    "offset = %llu length = %llu\n",
+				    "checksum type = %u\n"
+				    "offset = %llu length = %llu "
+				    "props = %llx\n",
 				    (u_longlong_t)drrw->drr_object,
 				    drrw->drr_type,
+				    drrw->drr_checksumtype,
 				    (u_longlong_t)drrw->drr_offset,
-				    (u_longlong_t)drrw->drr_length);
+				    (u_longlong_t)drrw->drr_length,
+				    (u_longlong_t)drrw->drr_key.ddk_prop);
 			}
 			(void) ssread(buf, drrw->drr_length, &zc);
 			total_write_size += drrw->drr_length;
@@ -337,13 +343,18 @@ main(int argc, char *argv[])
 				    BSWAP_64(drrwbr->drr_refobject);
 				drrwbr->drr_refoffset =
 				    BSWAP_64(drrwbr->drr_refoffset);
+				drrwbr->drr_key.ddk_prop =
+				    BSWAP_64(drrwbr->drr_key.ddk_prop);
 			}
 			if (verbose) {
 				(void) printf("WRITE_BYREF object = %llu "
+				    "checksum type = %u props = %llx\n"
 				    "offset = %llu length = %llu\n"
 				    "toguid = %llx refguid = %llx\n"
 				    "refobject = %llu refoffset = %llu\n",
 				    (u_longlong_t)drrwbr->drr_object,
+				    drrwbr->drr_checksumtype,
+				    (u_longlong_t)drrwbr->drr_key.ddk_prop,
 				    (u_longlong_t)drrwbr->drr_offset,
 				    (u_longlong_t)drrwbr->drr_length,
 				    (u_longlong_t)drrwbr->drr_toguid,

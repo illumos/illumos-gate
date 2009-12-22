@@ -45,6 +45,8 @@
 #include "zfs_fletcher.h"
 #include "libzfs_impl.h"
 #include <sha2.h>
+#include <sys/zio_checksum.h>
+#include <sys/ddt.h>
 
 /* in libzfs_dataset.c */
 extern void zfs_setprop_error(libzfs_handle_t *, zfs_prop_t, int, char *);
@@ -69,6 +71,7 @@ typedef struct dataref {
 typedef struct dedup_entry {
 	struct dedup_entry	*dde_next;
 	zio_cksum_t dde_chksum;
+	uint64_t dde_prop;
 	dataref_t dde_ref;
 } dedup_entry_t;
 
@@ -108,7 +111,7 @@ ssread(void *buf, size_t len, FILE *stream)
 
 static void
 ddt_hash_append(libzfs_handle_t *hdl, dedup_table_t *ddt, dedup_entry_t **ddepp,
-    zio_cksum_t *cs, dataref_t *dr)
+    zio_cksum_t *cs, uint64_t prop, dataref_t *dr)
 {
 	dedup_entry_t	*dde;
 
@@ -127,6 +130,7 @@ ddt_hash_append(libzfs_handle_t *hdl, dedup_table_t *ddt, dedup_entry_t **ddepp,
 		assert(*ddepp == NULL);
 		dde->dde_next = NULL;
 		dde->dde_chksum = *cs;
+		dde->dde_prop = prop;
 		dde->dde_ref = *dr;
 		*ddepp = dde;
 		ddt->cur_ddt_size += sizeof (dedup_entry_t);
@@ -145,7 +149,7 @@ ddt_hash_append(libzfs_handle_t *hdl, dedup_table_t *ddt, dedup_entry_t **ddepp,
  */
 static boolean_t
 ddt_update(libzfs_handle_t *hdl, dedup_table_t *ddt, zio_cksum_t *cs,
-    dataref_t *dr)
+    uint64_t prop, dataref_t *dr)
 {
 	uint32_t hashcode;
 	dedup_entry_t **ddepp;
@@ -154,12 +158,13 @@ ddt_update(libzfs_handle_t *hdl, dedup_table_t *ddt, zio_cksum_t *cs,
 
 	for (ddepp = &(ddt->dedup_hash_array[hashcode]); *ddepp != NULL;
 	    ddepp = &((*ddepp)->dde_next)) {
-		if (ZIO_CHECKSUM_EQUAL(((*ddepp)->dde_chksum), *cs)) {
+		if (ZIO_CHECKSUM_EQUAL(((*ddepp)->dde_chksum), *cs) &&
+		    (*ddepp)->dde_prop == prop) {
 			*dr = (*ddepp)->dde_ref;
 			return (B_TRUE);
 		}
 	}
-	ddt_hash_append(hdl, ddt, ddepp, cs, dr);
+	ddt_hash_append(hdl, ddt, ddepp, cs, prop, dr);
 	return (B_FALSE);
 }
 
@@ -200,7 +205,7 @@ cksummer(void *arg)
 	struct drr_write *drrw = &thedrr.drr_u.drr_write;
 	FILE *ofp;
 	int outfd;
-	dmu_replay_record_t wbr_drr;
+	dmu_replay_record_t wbr_drr = {0};
 	struct drr_write_byref *wbr_drrr = &wbr_drr.drr_u.drr_write_byref;
 	dedup_table_t ddt;
 	zio_cksum_t stream_cksum;
@@ -243,7 +248,8 @@ cksummer(void *arg)
 
 			/* set the DEDUP feature flag for this stream */
 			fflags = DMU_GET_FEATUREFLAGS(drrb->drr_versioninfo);
-			fflags |= DMU_BACKUP_FEATURE_DEDUP;
+			fflags |= (DMU_BACKUP_FEATURE_DEDUP |
+			    DMU_BACKUP_FEATURE_DEDUPPROPS);
 			DMU_SET_FEATUREFLAGS(drrb->drr_versioninfo, fflags);
 
 			if (cksum_and_write(drr, sizeof (dmu_replay_record_t),
@@ -309,26 +315,31 @@ cksummer(void *arg)
 			dataref_t	dataref;
 
 			(void) ssread(buf, drrw->drr_length, ofp);
+
 			/*
-			 * If the block doesn't already have a dedup
-			 * checksum, calculate one.
+			 * Use the existing checksum if it's dedup-capable,
+			 * else calculate a SHA256 checksum for it.
 			 */
-			if (ZIO_CHECKSUM_EQUAL(drrw->drr_blkcksum,
-			    zero_cksum)) {
+
+			if (ZIO_CHECKSUM_EQUAL(drrw->drr_key.ddk_cksum,
+			    zero_cksum) ||
+			    !DRR_IS_DEDUP_CAPABLE(drrw->drr_checksumflags)) {
 				SHA256_CTX	ctx;
 				zio_cksum_t	tmpsha256;
 
 				SHA256Init(&ctx);
 				SHA256Update(&ctx, buf, drrw->drr_length);
 				SHA256Final(&tmpsha256, &ctx);
-				drrw->drr_blkcksum.zc_word[0] =
+				drrw->drr_key.ddk_cksum.zc_word[0] =
 				    BE_64(tmpsha256.zc_word[0]);
-				drrw->drr_blkcksum.zc_word[1] =
+				drrw->drr_key.ddk_cksum.zc_word[1] =
 				    BE_64(tmpsha256.zc_word[1]);
-				drrw->drr_blkcksum.zc_word[2] =
+				drrw->drr_key.ddk_cksum.zc_word[2] =
 				    BE_64(tmpsha256.zc_word[2]);
-				drrw->drr_blkcksum.zc_word[3] =
+				drrw->drr_key.ddk_cksum.zc_word[3] =
 				    BE_64(tmpsha256.zc_word[3]);
+				drrw->drr_checksumtype = ZIO_CHECKSUM_SHA256;
+				drrw->drr_checksumflags = DRR_CHECKSUM_DEDUP;
 			}
 
 			dataref.ref_guid = drrw->drr_toguid;
@@ -336,7 +347,8 @@ cksummer(void *arg)
 			dataref.ref_offset = drrw->drr_offset;
 
 			if (ddt_update(dda->dedup_hdl, &ddt,
-			    &drrw->drr_blkcksum, &dataref)) {
+			    &drrw->drr_key.ddk_cksum, drrw->drr_key.ddk_prop,
+			    &dataref)) {
 				/* block already present in stream */
 				wbr_drrr->drr_object = drrw->drr_object;
 				wbr_drrr->drr_offset = drrw->drr_offset;
@@ -348,7 +360,14 @@ cksummer(void *arg)
 				wbr_drrr->drr_refoffset =
 				    dataref.ref_offset;
 
-				wbr_drrr->drr_blkcksum = drrw->drr_blkcksum;
+				wbr_drrr->drr_checksumtype =
+				    drrw->drr_checksumtype;
+				wbr_drrr->drr_checksumflags =
+				    drrw->drr_checksumtype;
+				wbr_drrr->drr_key.ddk_cksum =
+				    drrw->drr_key.ddk_cksum;
+				wbr_drrr->drr_key.ddk_prop =
+				    drrw->drr_key.ddk_prop;
 
 				if (cksum_and_write(&wbr_drr,
 				    sizeof (dmu_replay_record_t), &stream_cksum,
@@ -1137,7 +1156,8 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 		holdsnaps = B_TRUE;
 
 	if (flags.dedup) {
-		featureflags |= DMU_BACKUP_FEATURE_DEDUP;
+		featureflags |= (DMU_BACKUP_FEATURE_DEDUP |
+		    DMU_BACKUP_FEATURE_DEDUPPROPS);
 		if (err = pipe(pipefd)) {
 			zfs_error_aux(zhp->zfs_hdl, strerror(errno));
 			return (zfs_error(zhp->zfs_hdl, EZFS_PIPEFAILED,

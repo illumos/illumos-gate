@@ -40,6 +40,7 @@
 #include <sys/zap.h>
 #include <sys/zio_checksum.h>
 #include <sys/avl.h>
+#include <sys/ddt.h>
 
 static char *dmu_recv_tag = "dmu_recv_tag";
 
@@ -142,9 +143,10 @@ dump_free(struct backuparg *ba, uint64_t object, uint64_t offset,
 
 static int
 dump_data(struct backuparg *ba, dmu_object_type_t type,
-    uint64_t object, uint64_t offset, int blksz, void *data)
+    uint64_t object, uint64_t offset, int blksz, const blkptr_t *bp, void *data)
 {
 	struct drr_write *drrw = &(ba->drr->drr_u.drr_write);
+
 
 	/*
 	 * If there is any kind of pending aggregation (currently either
@@ -165,6 +167,13 @@ dump_data(struct backuparg *ba, dmu_object_type_t type,
 	drrw->drr_offset = offset;
 	drrw->drr_length = blksz;
 	drrw->drr_toguid = ba->toguid;
+	drrw->drr_checksumtype = BP_GET_CHECKSUM(bp);
+	if (zio_checksum_table[drrw->drr_checksumtype].ci_dedup)
+		drrw->drr_checksumflags |= DRR_CHECKSUM_DEDUP;
+	DDK_SET_LSIZE(&drrw->drr_key, BP_GET_LSIZE(bp));
+	DDK_SET_PSIZE(&drrw->drr_key, BP_GET_PSIZE(bp));
+	DDK_SET_COMPRESS(&drrw->drr_key, BP_GET_COMPRESS(bp));
+	drrw->drr_key.ddk_cksum = bp->blk_cksum;
 
 	if (dump_bytes(ba, ba->drr, sizeof (dmu_replay_record_t)) != 0)
 		return (EINTR);
@@ -321,7 +330,7 @@ backup_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 			return (EIO);
 
 		err = dump_data(ba, type, zb->zb_object, zb->zb_blkid * blksz,
-		    blksz, abuf->b_data);
+		    blksz, bp, abuf->b_data);
 		(void) arc_buf_remove_ref(abuf, &abuf);
 	}
 
@@ -873,10 +882,11 @@ backup_byteswap(dmu_replay_record_t *drr)
 		DO64(drr_write.drr_offset);
 		DO64(drr_write.drr_length);
 		DO64(drr_write.drr_toguid);
-		DO64(drr_write.drr_blkcksum.zc_word[0]);
-		DO64(drr_write.drr_blkcksum.zc_word[1]);
-		DO64(drr_write.drr_blkcksum.zc_word[2]);
-		DO64(drr_write.drr_blkcksum.zc_word[3]);
+		DO64(drr_write.drr_key.ddk_cksum.zc_word[0]);
+		DO64(drr_write.drr_key.ddk_cksum.zc_word[1]);
+		DO64(drr_write.drr_key.ddk_cksum.zc_word[2]);
+		DO64(drr_write.drr_key.ddk_cksum.zc_word[3]);
+		DO64(drr_write.drr_key.ddk_prop);
 		break;
 	case DRR_WRITE_BYREF:
 		DO64(drr_write_byref.drr_object);
@@ -886,10 +896,11 @@ backup_byteswap(dmu_replay_record_t *drr)
 		DO64(drr_write_byref.drr_refguid);
 		DO64(drr_write_byref.drr_refobject);
 		DO64(drr_write_byref.drr_refoffset);
-		DO64(drr_write_byref.drr_blkcksum.zc_word[0]);
-		DO64(drr_write_byref.drr_blkcksum.zc_word[1]);
-		DO64(drr_write_byref.drr_blkcksum.zc_word[2]);
-		DO64(drr_write_byref.drr_blkcksum.zc_word[3]);
+		DO64(drr_write_byref.drr_key.ddk_cksum.zc_word[0]);
+		DO64(drr_write_byref.drr_key.ddk_cksum.zc_word[1]);
+		DO64(drr_write_byref.drr_key.ddk_cksum.zc_word[2]);
+		DO64(drr_write_byref.drr_key.ddk_cksum.zc_word[3]);
+		DO64(drr_write_byref.drr_key.ddk_prop);
 		break;
 	case DRR_FREE:
 		DO64(drr_free.drr_object);

@@ -70,11 +70,13 @@ typedef enum drr_headertype {
  */
 
 #define	DMU_BACKUP_FEATURE_DEDUP	(0x1)
+#define	DMU_BACKUP_FEATURE_DEDUPPROPS	(0x2)
 
 /*
  * Mask of all supported backup features
  */
-#define	DMU_BACKUP_FEATURE_MASK	(DMU_BACKUP_FEATURE_DEDUP)
+#define	DMU_BACKUP_FEATURE_MASK	(DMU_BACKUP_FEATURE_DEDUP | \
+		DMU_BACKUP_FEATURE_DEDUPPROPS)
 
 /* Are all features in the given flag word currently supported? */
 #define	DMU_STREAM_SUPPORTED(x)	(!((x) & ~DMU_BACKUP_FEATURE_MASK))
@@ -100,6 +102,14 @@ typedef enum drr_headertype {
 
 #define	DRR_FLAG_CLONE		(1<<0)
 #define	DRR_FLAG_CI_DATA	(1<<1)
+
+/*
+ * flags in the drr_checksumflags field in the DRR_WRITE and
+ * DRR_WRITE_BYREF blocks
+ */
+#define	DRR_CHECKSUM_DEDUP	(1<<0)
+
+#define	DRR_IS_DEDUP_CAPABLE(flags)	((flags) & DRR_CHECKSUM_DEDUP)
 
 /*
  * zfs ioctl command structure
@@ -151,8 +161,9 @@ typedef struct dmu_replay_record {
 			uint64_t drr_length;
 			uint64_t drr_toguid;
 			uint8_t drr_checksumtype;
-			uint8_t drr_pad2[7];
-			zio_cksum_t drr_blkcksum;
+			uint8_t drr_checksumflags;
+			uint8_t drr_pad2[6];
+			ddt_key_t drr_key; /* deduplication key */
 			/* content follows */
 		} drr_write;
 		struct drr_free {
@@ -171,9 +182,11 @@ typedef struct dmu_replay_record {
 			uint64_t drr_refguid;
 			uint64_t drr_refobject;
 			uint64_t drr_refoffset;
+			/* properties of the data */
 			uint8_t drr_checksumtype;
-			uint8_t drr_pad[7];
-			zio_cksum_t drr_blkcksum;
+			uint8_t drr_checksumflags;
+			uint8_t drr_pad2[6];
+			ddt_key_t drr_key; /* deduplication key */
 		} drr_write_byref;
 	} drr_u;
 } dmu_replay_record_t;
