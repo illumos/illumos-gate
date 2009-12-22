@@ -119,6 +119,145 @@ bail_msg(char *fmt, ...)
 	EXIT_FATAL(NULL);
 }
 
+/*
+ * bytecnt2str() wrapper. Zeroes out the input buffer and if the number
+ * of bytes to be converted is more than 1K, it will produce readable string
+ * in parentheses, store it in the original buffer and return the pointer to it.
+ * Maximum length of the returned string is 14 characters (not including
+ * the terminating zero).
+ */
+char *
+bytecnt2out(uint64_t num, char *buf, size_t bufsiz, int flags)
+{
+	char *str;
+
+	(void) memset(buf, '\0', bufsiz);
+
+	if (num > 1024) {
+		/* Return empty string in case of out-of-memory. */
+		if ((str = malloc(bufsiz)) == NULL)
+			return (buf);
+
+		(void) bytecnt2str(num, str, bufsiz);
+		/* Detect overflow. */
+		if (strlen(str) == 0) {
+			free(str);
+			return (buf);
+		}
+
+		/* Emit nothing in case of overflow. */
+		if (snprintf(buf, bufsiz, "%s(%sB)%s",
+		    flags & SPC_BEGIN ? " " : "", str,
+		    flags & SPC_END ? " " : "") >= bufsiz)
+			(void) memset(buf, '\0', bufsiz);
+
+		free(str);
+	}
+
+	return (buf);
+}
+
+/*
+ * Convert 64-bit number to human readable string. Useful mainly for the
+ * byte lifetime counters. Returns pointer to the user supplied buffer.
+ * Able to convert up to Exabytes. Maximum length of the string produced
+ * is 9 characters (not counting the terminating zero).
+ */
+char *
+bytecnt2str(uint64_t num, char *buf, size_t buflen)
+{
+	uint64_t n = num;
+	char u;
+	int index = 0;
+
+	while (n >= 1024) {
+		n /= 1024;
+		index++;
+	}
+
+	/* The field has all units this function can represent. */
+	u = " KMGTPE"[index];
+
+	if (index == 0) {
+		/* Less than 1K */
+		if (snprintf(buf, buflen, "%llu ", num) >= buflen)
+			(void) memset(buf, '\0', buflen);
+	} else {
+		/* Otherwise display 2 precision digits. */
+		if (snprintf(buf, buflen, "%.2f %c",
+		    (double)num / (1ULL << index * 10), u) >= buflen)
+			(void) memset(buf, '\0', buflen);
+	}
+
+	return (buf);
+}
+
+/*
+ * secs2str() wrapper. Zeroes out the input buffer and if the number of
+ * seconds to be converted is more than minute, it will produce readable
+ * string in parentheses, store it in the original buffer and return the
+ * pointer to it.
+ */
+char *
+secs2out(unsigned int secs, char *buf, int bufsiz, int flags)
+{
+	char *str;
+
+	(void) memset(buf, '\0', bufsiz);
+
+	if (secs > 60) {
+		/* Return empty string in case of out-of-memory. */
+		if ((str = malloc(bufsiz)) == NULL)
+			return (buf);
+
+		(void) secs2str(secs, str, bufsiz);
+		/* Detect overflow. */
+		if (strlen(str) == 0) {
+			free(str);
+			return (buf);
+		}
+
+		/* Emit nothing in case of overflow. */
+		if (snprintf(buf, bufsiz, "%s(%s)%s",
+		    flags & SPC_BEGIN ? " " : "", str,
+		    flags & SPC_END ? " " : "") >= bufsiz)
+			(void) memset(buf, '\0', bufsiz);
+
+		free(str);
+	}
+
+	return (buf);
+}
+
+/*
+ * Convert number of seconds to human readable string. Useful mainly for
+ * the lifetime counters. Returns pointer to the user supplied buffer.
+ * Able to convert up to days.
+ */
+char *
+secs2str(unsigned int secs, char *buf, int bufsiz)
+{
+	double val = secs;
+	char *unit = "second";
+
+	if (val >= 24*60*60) {
+		val /= 86400;
+		unit = "day";
+	} else if (val >= 60*60) {
+		val /= 60*60;
+		unit = "hour";
+	} else if (val >= 60) {
+		val /= 60;
+		unit = "minute";
+	}
+
+	/* Emit nothing in case of overflow. */
+	if (snprintf(buf, bufsiz, "%.2f %s%s", val, unit,
+	    val >= 2 ? "s" : "") >= bufsiz)
+		(void) memset(buf, '\0', bufsiz);
+
+	return (buf);
+}
 
 /*
  * dump_XXX functions produce ASCII output from various structures.
@@ -1740,6 +1879,8 @@ print_lifetimes(FILE *file, time_t wallclock, struct sadb_lifetime *current,
 	char *hard_prefix = dgettext(TEXT_DOMAIN, "HLT: ");
 	char *current_prefix = dgettext(TEXT_DOMAIN, "CLT: ");
 	char *idle_prefix = dgettext(TEXT_DOMAIN, "ILT: ");
+	char byte_str[BYTE_STR_SIZE]; /* byte lifetime string representation */
+	char secs_str[SECS_STR_SIZE]; /* buffer for seconds representation */
 
 	if (current != NULL &&
 	    current->sadb_lifetime_len != SADB_8TO64(sizeof (*current))) {
@@ -1770,15 +1911,20 @@ print_lifetimes(FILE *file, time_t wallclock, struct sadb_lifetime *current,
 	}
 
 	(void) fprintf(file, " LT: Lifetime information\n");
-
 	if (current != NULL) {
 		/* Express values as current values. */
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "%s%" PRIu64 " bytes protected, %u allocations used.\n"),
-		    current_prefix, current->sadb_lifetime_bytes,
+		    "%sCurrent lifetime information:\n"),
+		    current_prefix);
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
+		    "%s%" PRIu64 " bytes %sprotected, %u allocations "
+		    "used.\n"), current_prefix,
+		    current->sadb_lifetime_bytes,
+		    bytecnt2out(current->sadb_lifetime_bytes, byte_str,
+		    sizeof (byte_str), SPC_END),
 		    current->sadb_lifetime_allocations);
 		printsatime(file, current->sadb_lifetime_addtime,
-		    dgettext(TEXT_DOMAIN, "%sSA added at time %s\n"),
+		    dgettext(TEXT_DOMAIN, "%sSA added at time: %s\n"),
 		    current_prefix, current_prefix, vflag);
 		if (current->sadb_lifetime_usetime != 0) {
 			printsatime(file, current->sadb_lifetime_usetime,
@@ -1793,28 +1939,40 @@ print_lifetimes(FILE *file, time_t wallclock, struct sadb_lifetime *current,
 
 	if (soft != NULL) {
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "%sSoft lifetime information:  "),
+		    "%sSoft lifetime information:\n"),
 		    soft_prefix);
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "%" PRIu64 " bytes of lifetime, %u "
-		    "allocations.\n"), soft->sadb_lifetime_bytes,
+		    "%s%" PRIu64 " bytes %sof lifetime, %u allocations.\n"),
+		    soft_prefix,
+		    soft->sadb_lifetime_bytes,
+		    bytecnt2out(soft->sadb_lifetime_bytes, byte_str,
+		    sizeof (byte_str), SPC_END),
 		    soft->sadb_lifetime_allocations);
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "%s%" PRIu64 " seconds of post-add lifetime.\n"),
-		    soft_prefix, soft->sadb_lifetime_addtime);
+		    "%s%" PRIu64 " seconds %sof post-add lifetime.\n"),
+		    soft_prefix, soft->sadb_lifetime_addtime,
+		    secs2out(soft->sadb_lifetime_addtime, secs_str,
+		    sizeof (secs_str), SPC_END));
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "%s%" PRIu64 " seconds of post-use lifetime.\n"),
-		    soft_prefix, soft->sadb_lifetime_usetime);
+		    "%s%" PRIu64 " seconds %sof post-use lifetime.\n"),
+		    soft_prefix, soft->sadb_lifetime_usetime,
+		    secs2out(soft->sadb_lifetime_usetime, secs_str,
+		    sizeof (secs_str), SPC_END));
 		/* If possible, express values as time remaining. */
 		if (current != NULL) {
 			if (soft->sadb_lifetime_bytes != 0)
-				(void) fprintf(file, dgettext(TEXT_DOMAIN, "%s%"
-				    PRIu64 " more bytes can be protected.\n"),
-				    soft_prefix,
+				(void) fprintf(file, dgettext(TEXT_DOMAIN, "%s"
+				    "%" PRIu64 " bytes %smore can be "
+				    "protected.\n"), soft_prefix,
 				    (soft->sadb_lifetime_bytes >
 				    current->sadb_lifetime_bytes) ?
-				    (soft->sadb_lifetime_bytes -
-				    current->sadb_lifetime_bytes) : (0));
+				    soft->sadb_lifetime_bytes -
+				    current->sadb_lifetime_bytes : 0,
+				    (soft->sadb_lifetime_bytes >
+				    current->sadb_lifetime_bytes) ?
+				    bytecnt2out(soft->sadb_lifetime_bytes -
+				    current->sadb_lifetime_bytes, byte_str,
+				    sizeof (byte_str), SPC_END) : "");
 			if (soft->sadb_lifetime_addtime != 0 ||
 			    (soft->sadb_lifetime_usetime != 0 &&
 			    current->sadb_lifetime_usetime != 0)) {
@@ -1844,41 +2002,57 @@ print_lifetimes(FILE *file, time_t wallclock, struct sadb_lifetime *current,
 					(void) fprintf(file,
 					    dgettext(TEXT_DOMAIN,
 					    "Soft expiration occurs in %"
-					    PRId64 " seconds, "), scratch);
+					    PRId64 " seconds%s\n"), scratch,
+					    secs2out(scratch, secs_str,
+					    sizeof (secs_str), SPC_BEGIN));
 				} else {
 					(void) fprintf(file,
 					    dgettext(TEXT_DOMAIN,
-					    "Soft expiration occurred "));
+					    "Soft expiration occurred\n"));
 				}
 				scratch += wallclock;
 				printsatime(file, scratch, dgettext(TEXT_DOMAIN,
-				    "%sat %s.\n"), "", soft_prefix, vflag);
+				    "%sTime of expiration: %s.\n"),
+				    soft_prefix, soft_prefix, vflag);
 			}
 		}
 	}
 
 	if (hard != NULL) {
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "%sHard lifetime information:  "), hard_prefix);
+		    "%sHard lifetime information:\n"), hard_prefix);
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "%" PRIu64 " bytes of lifetime, %u allocations.\n"),
-		    hard->sadb_lifetime_bytes, hard->sadb_lifetime_allocations);
+		    "%s%" PRIu64 " bytes %sof lifetime, %u allocations.\n"),
+		    hard_prefix,
+		    hard->sadb_lifetime_bytes,
+		    bytecnt2out(hard->sadb_lifetime_bytes, byte_str,
+		    sizeof (byte_str), SPC_END),
+		    hard->sadb_lifetime_allocations);
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "%s%" PRIu64 " seconds of post-add lifetime.\n"),
-		    hard_prefix, hard->sadb_lifetime_addtime);
+		    "%s%" PRIu64 " seconds %sof post-add lifetime.\n"),
+		    hard_prefix, hard->sadb_lifetime_addtime,
+		    secs2out(hard->sadb_lifetime_addtime, secs_str,
+		    sizeof (secs_str), SPC_END));
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "%s%" PRIu64 " seconds of post-use lifetime.\n"),
-		    hard_prefix, hard->sadb_lifetime_usetime);
+		    "%s%" PRIu64 " seconds %sof post-use lifetime.\n"),
+		    hard_prefix, hard->sadb_lifetime_usetime,
+		    secs2out(hard->sadb_lifetime_usetime, secs_str,
+		    sizeof (secs_str), SPC_END));
 		/* If possible, express values as time remaining. */
 		if (current != NULL) {
 			if (hard->sadb_lifetime_bytes != 0)
-				(void) fprintf(file, dgettext(TEXT_DOMAIN, "%s%"
-				    PRIu64 " more bytes can be protected.\n"),
-				    hard_prefix,
+				(void) fprintf(file, dgettext(TEXT_DOMAIN, "%s"
+				    "%" PRIu64 " bytes %smore can be "
+				    "protected.\n"), hard_prefix,
 				    (hard->sadb_lifetime_bytes >
 				    current->sadb_lifetime_bytes) ?
-				    (hard->sadb_lifetime_bytes -
-				    current->sadb_lifetime_bytes) : (0));
+				    hard->sadb_lifetime_bytes -
+				    current->sadb_lifetime_bytes : 0,
+				    (hard->sadb_lifetime_bytes >
+				    current->sadb_lifetime_bytes) ?
+				    bytecnt2out(hard->sadb_lifetime_bytes -
+				    current->sadb_lifetime_bytes, byte_str,
+				    sizeof (byte_str), SPC_END) : "");
 			if (hard->sadb_lifetime_addtime != 0 ||
 			    (hard->sadb_lifetime_usetime != 0 &&
 			    current->sadb_lifetime_usetime != 0)) {
@@ -1908,27 +2082,34 @@ print_lifetimes(FILE *file, time_t wallclock, struct sadb_lifetime *current,
 					(void) fprintf(file,
 					    dgettext(TEXT_DOMAIN,
 					    "Hard expiration occurs in %"
-					    PRId64 " seconds, "), scratch);
+					    PRId64 " seconds%s\n"), scratch,
+					    secs2out(scratch, secs_str,
+					    sizeof (secs_str), SPC_BEGIN));
 				} else {
 					(void) fprintf(file,
 					    dgettext(TEXT_DOMAIN,
-					    "Hard expiration occured "));
+					    "Hard expiration occurred\n"));
 				}
 				scratch += wallclock;
 				printsatime(file, scratch, dgettext(TEXT_DOMAIN,
-				    "%sat %s.\n"), "", hard_prefix, vflag);
+				    "%sTime of expiration: %s.\n"),
+				    hard_prefix, hard_prefix, vflag);
 			}
 		}
 	}
 	if (idle != NULL) {
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "%sIdle lifetime information:  "), idle_prefix);
+		    "%sIdle lifetime information:\n"), idle_prefix);
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "%s%llu seconds of post-add lifetime.\n"),
-		    idle_prefix, idle->sadb_lifetime_addtime);
+		    "%s%" PRIu64 " seconds %sof post-add lifetime.\n"),
+		    idle_prefix, idle->sadb_lifetime_addtime,
+		    secs2out(idle->sadb_lifetime_addtime, secs_str,
+		    sizeof (secs_str), SPC_END));
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "%s%llu seconds of post-use lifetime.\n"),
-		    idle_prefix, idle->sadb_lifetime_usetime);
+		    "%s%" PRIu64 " seconds %sof post-use lifetime.\n"),
+		    idle_prefix, idle->sadb_lifetime_usetime,
+		    secs2out(idle->sadb_lifetime_usetime, secs_str,
+		    sizeof (secs_str), SPC_END));
 	}
 }
 

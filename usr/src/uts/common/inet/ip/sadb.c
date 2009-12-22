@@ -3740,13 +3740,6 @@ sadb_expire_assoc(queue_t *pfkey_q, ipsa_t *assoc)
 	if (pfkey_q == NULL)
 		return;
 
-	/* If the SA is one of a pair, only SOFT expire the OUTBOUND SA */
-	if (assoc->ipsa_state == IPSA_STATE_DYING &&
-	    (assoc->ipsa_flags & IPSA_F_PAIRED) &&
-	    !(assoc->ipsa_flags & IPSA_F_OUTBOUND)) {
-		return;
-	}
-
 	mp = sadb_keysock_out(0);
 	if (mp == NULL) {
 		/* cmn_err(CE_WARN, */

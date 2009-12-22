@@ -76,6 +76,21 @@ extern "C" {
 #define	COMMENT_LINE		1
 #define	SUCCESS			0
 
+/* Flags for {bytecnt,secs}2out() */
+#define	SPC_NOSPACES	0x00000000		/* no space prefix/suffix */
+#define	SPC_BEGIN	0x00000001		/* put space at the beginning */
+#define	SPC_END		0x00000002		/* put space at the end */
+#define	SPC_BOTH	SPC_BEGIN|SPC_END	/* print both spaces */
+
+/*
+ * The following lengths should be sufficient for character buffers passed to
+ * bytecnt2str(),secs2str(). This is because the string output of these
+ * functions consists of limited number and units. The lengths should be also
+ * sufficient for bytecnt2out(),secs2out() functions.
+ */
+#define	BYTE_STR_SIZE		16
+#define	SECS_STR_SIZE		20
+
 /*
  * Time printing defines...
  *
@@ -353,6 +368,10 @@ extern int in_masktoprefix(uint8_t *, boolean_t);
 
 /* SA support functions */
 
+extern char *secs2out(unsigned int, char *, int, int);
+extern char *secs2str(unsigned int, char *, int);
+extern char *bytecnt2out(uint64_t, char *, size_t, int);
+extern char *bytecnt2str(uint64_t, char *, size_t);
 extern void print_diagnostic(FILE *, uint16_t);
 extern void print_sadb_msg(FILE *, struct sadb_msg *, time_t, boolean_t);
 extern void print_sa(FILE *, char *, struct sadb_sa *);

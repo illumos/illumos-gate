@@ -193,11 +193,18 @@ typedef struct {
 	uint32_t	rule_p2_softlife_kb;
 	uint32_t	sys_p2_lifetime_bytes;
 	uint32_t	sys_p2_softlife_bytes;
-	uint32_t	rule_p2_minlife;
-	uint32_t	rule_p2_def_minlife;
+	uint32_t	rule_p2_minlife_hard_secs;
+	uint32_t	rule_p2_minlife_soft_secs;
+	uint32_t	rule_p2_minlife_idle_secs;
+	uint32_t	rule_p2_minlife_hard_kb;
+	uint32_t	rule_p2_minlife_soft_kb;
+	uint32_t	rule_p2_maxlife_secs;
+	uint32_t	rule_p2_maxlife_kb;
 	uint32_t	rule_p2_nonce_len;
 	uint32_t	rule_p2_pfs;
-	uint32_t	rule_p2_minsoft;
+	uint32_t	rule_p2_mindiff_secs;
+	uint32_t	rule_p2_mindiff_kb;
+	uint32_t	conversion_factor;	/* for secs to kbytes */
 	uint32_t	rule_max_certs;
 	uint32_t	rule_ike_port;
 	uint32_t	rule_natt_port;
@@ -435,7 +442,7 @@ typedef struct {
  */
 typedef struct {
 	uint32_t	cache_id;
-	uint32_t	class;
+	uint32_t	certclass;
 	int		linkage;
 	uint32_t	certcache_padding;	/* For 64-bit alignment. */
 	char		subject[DN_MAX];

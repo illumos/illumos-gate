@@ -1499,10 +1499,18 @@ print_hdr(char *prefix, ike_p1_hdr_t *hdrp)
 static void
 print_lt_limits(char *prefix, ike_p1_xform_t *xfp)
 {
+	char byte_str[BYTE_STR_SIZE]; /* byte lifetime string representation */
+	char secs_str[SECS_STR_SIZE]; /* lifetime string representation */
+
 	(void) printf(gettext("%s Lifetime limits:\n"), prefix);
-	(void) printf(gettext("%s %u seconds; %u kbytes protected; "),
-	    prefix, xfp->p1xf_max_secs, xfp->p1xf_max_kbytes);
-	(void) printf(gettext("%u keymat provided.\n"), xfp->p1xf_max_keyuses);
+	(void) printf(gettext("%s %u seconds%s; %u kbytes %sprotected\n"),
+	    prefix, xfp->p1xf_max_secs, secs2out(xfp->p1xf_max_secs,
+	    secs_str, sizeof (secs_str), SPC_BEGIN), xfp->p1xf_max_kbytes,
+	    bytecnt2out((uint64_t)xfp->p1xf_max_kbytes << 10, byte_str,
+	    sizeof (byte_str), SPC_END));
+	(void) printf(gettext("%s keying material for IPsec SAs can be "
+	    "provided %u times%s\n"), prefix, xfp->p1xf_max_keyuses,
+	    xfp->p1xf_max_keyuses == 0 ? " (no limit)" : "");
 }
 
 #define	LT_USAGE_LEN	16	/* 1 uint64 + 2 uint32s */
@@ -1511,6 +1519,7 @@ print_lt_usage(char *prefix, ike_p1_stats_t *sp)
 {
 	time_t	scratch;
 	char	tbuf[TBUF_SIZE];
+	char	bytestr[BYTE_STR_SIZE]; /* byte lifetime representation */
 
 	(void) printf(gettext("%s Current usage:\n"), prefix);
 	scratch = (time_t)sp->p1stat_start;
@@ -1518,8 +1527,12 @@ print_lt_usage(char *prefix, ike_p1_stats_t *sp)
 		(void) strlcpy(tbuf, gettext("<time conversion failed>"),
 		    TBUF_SIZE);
 	(void) printf(gettext("%s SA was created at %s\n"), prefix, tbuf);
-	(void) printf(gettext("%s %u kbytes protected; %u keymat provided.\n"),
-	    prefix, sp->p1stat_kbytes, sp->p1stat_keyuses);
+	(void) printf(gettext("%s %u kbytes %sprotected\n"),
+	    prefix, sp->p1stat_kbytes,
+	    bytecnt2out((uint64_t)sp->p1stat_kbytes << 10, bytestr,
+	    sizeof (bytestr), SPC_END));
+	(void) printf(gettext("%s keying material for IPsec SAs provided "
+	    "%u times\n"), prefix, sp->p1stat_keyuses);
 }
 
 static void
@@ -1565,6 +1578,8 @@ print_lifetime(char *prefix, ike_p1_xform_t *xfp, ike_p1_stats_t *sp,
 {
 	time_t	current, remain, exp;
 	char	tbuf[TBUF_SIZE];
+	char	byte_str[BYTE_STR_SIZE]; /* byte lifetime representation */
+	char	secs_str[SECS_STR_SIZE]; /* seconds lifetime representation */
 
 	current = time(NULL);
 
@@ -1584,8 +1599,12 @@ print_lifetime(char *prefix, ike_p1_xform_t *xfp, ike_p1_stats_t *sp,
 	(void) printf(gettext("%s Expiration info:\n"), prefix);
 
 	if (xfp->p1xf_max_kbytes != 0)
-		(void) printf(gettext("%s %u more bytes can be protected.\n"),
-		    prefix, xfp->p1xf_max_kbytes - sp->p1stat_kbytes);
+		(void) printf(gettext("%s %u more bytes %scan be "
+		    "protected.\n"),
+		    prefix, xfp->p1xf_max_kbytes - sp->p1stat_kbytes,
+		    bytecnt2out((uint64_t)(xfp->p1xf_max_kbytes -
+		    sp->p1stat_kbytes) << 10, byte_str, sizeof (byte_str),
+		    SPC_END));
 
 	if (xfp->p1xf_max_keyuses != 0)
 		(void) printf(gettext("%s Keying material can be provided "
@@ -1602,13 +1621,17 @@ print_lifetime(char *prefix, ike_p1_xform_t *xfp, ike_p1_stats_t *sp,
 		 * The SA may have expired but still exist because libike
 		 * has not freed it yet.
 		 */
-		if (remain > 0)
+		if (remain > 0) {
 			(void) printf(gettext(
-			    "%s SA expires in %lu seconds, at %s\n"),
-			    prefix, remain, tbuf);
-		else
+			    "%s SA expires in %lu seconds%s\n"),
+			    prefix, remain, secs2out(remain, secs_str,
+			    sizeof (secs_str), SPC_BEGIN));
+			(void) printf(gettext("%s Time of expiration: %s\n"),
+			    prefix, tbuf);
+		} else {
 			(void) printf(gettext("%s SA Expired at %s\n"),
 			    prefix, tbuf);
+		}
 	}
 }
 
@@ -1903,7 +1926,7 @@ print_certcache(ike_certcache_t *c)
 	    (c->subject != NULL) ? c->subject : gettext("Name unavailable"));
 	(void) printf(gettext("\t Issuer Name: <%s>\n"),
 	    (c->issuer != NULL) ? c->issuer : gettext("Name unavailable"));
-	if ((int)c->class == -1)
+	if ((int)c->certclass == -1)
 		(void) printf(gettext("\t\t[trusted certificate]\n"));
 	switch (c->linkage) {
 	case CERT_OFF_WIRE:
@@ -1974,6 +1997,8 @@ print_rule(ike_rule_t *rp)
 	ike_p1_xform_t	*xfp;
 	ike_addr_pr_t	*lipp, *ripp;
 	char		*lidp, *ridp;
+	char byte_str[BYTE_STR_SIZE]; /* kbyte string representation */
+	char secs_str[SECS_STR_SIZE]; /* seconds string representation */
 
 	(void) printf("\n");
 	(void) printf(gettext("GLOBL: Label '%s', key manager cookie %u\n"),
@@ -1987,15 +2012,31 @@ print_rule(ike_rule_t *rp)
 	    (rp->rule_p2_pfs) ? gettext("true") : gettext("false"),
 	    rp->rule_p2_pfs);
 	(void) printf(
-	    gettext("GLOBL: p2_lifetime=%u seconds, p2_softlife=%u seconds\n"),
-	    rp->rule_p2_lifetime_secs, rp->rule_p2_softlife_secs);
+	    gettext("GLOBL: p2_lifetime=%u seconds%s\n"),
+	    rp->rule_p2_lifetime_secs, secs2out(rp->rule_p2_lifetime_secs,
+	    secs_str, sizeof (secs_str), SPC_BEGIN));
 	(void) printf(
-	    gettext("GLOBL: p2_idletime=%u seconds\n"),
-	    rp->rule_p2_idletime_secs);
+	    gettext("GLOBL: p2_softlife=%u seconds%s\n"),
+	    rp->rule_p2_softlife_secs, secs2out(rp->rule_p2_softlife_secs,
+	    secs_str, sizeof (secs_str), SPC_BEGIN));
 	(void) printf(
-	    gettext("GLOBL: p2_lifetime_kb=%u seconds,"
-	    " p2_softlife_kb=%u seconds\n"),
-	    rp->rule_p2_lifetime_kb, rp->rule_p2_softlife_kb);
+	    gettext("GLOBL: p2_idletime=%u seconds%s\n"),
+	    rp->rule_p2_idletime_secs, secs2out(rp->rule_p2_idletime_secs,
+	    secs_str, sizeof (secs_str), SPC_BEGIN));
+	/*
+	 * Perform explicit conversion before passing to bytecnt2out()
+	 * to avoid integer overflow.
+	 */
+	(void) printf(
+	    gettext("GLOBL: p2_lifetime_kb=%u kilobytes%s\n"),
+	    rp->rule_p2_lifetime_kb,
+	    bytecnt2out((uint64_t)(rp->rule_p2_lifetime_kb) << 10,
+	    byte_str, sizeof (byte_str), SPC_BEGIN));
+	(void) printf(
+	    gettext("GLOBL: p2_softlife_kb=%u kilobytes%s\n"),
+	    rp->rule_p2_softlife_kb,
+	    bytecnt2out(((uint64_t)(rp->rule_p2_softlife_kb)) << 10,
+	    byte_str, sizeof (byte_str), SPC_BEGIN));
 
 	if (rp->rule_locip_cnt > 0) {
 		(void) printf(gettext("LOCIP: IP address range(s):\n"));
@@ -2083,14 +2124,14 @@ print_stats(ike_stats_t *sp, int len)
 		    sp->st_pkcs11_libname);
 }
 
+/* Print one line of 'get defaults' output (i.e. single value). */
 static void
-print_defaults(char *label, char *description, char *unit, boolean_t kbytes,
+print_defaults(char *label, char *description, char *unit,
     uint_t current, uint_t def)
 {
-	(void) printf("%-18s%-10s%14u%s%-10s%-26s\n", label,
+	(void) printf("%-18s%-10s%11u %-10s%-26s\n", label,
 	    (current != def) ? gettext("config") : gettext("default"),
-	    (current != def) ? current : def, (kbytes) ? "K " : "  ",
-	    unit, description);
+	    current, unit, description);
 }
 
 /*
@@ -2098,7 +2139,7 @@ print_defaults(char *label, char *description, char *unit, boolean_t kbytes,
  * two ike_defaults_t's, the first contains the hard coded defaults, the second
  * contains the actual values used. If these differ, then the defaults have been
  * changed via a config file entry. Note that "-" indicates this default
- * is not tunable.
+ * is not tunable via ike.config(4) or is system wide tunable.
  */
 static void
 do_print_defaults(ike_defaults_t *dp)
@@ -2107,91 +2148,124 @@ do_print_defaults(ike_defaults_t *dp)
 	ddp = (ike_defaults_t *)(dp + 1);
 
 	(void) printf(gettext("\nGlobal defaults. Some values can be"
-	    " over-ridden on a per rule basis.\n\n"));
+	    " over-ridden on a per rule basis.\n"));
+	(void) printf(gettext("\nSystem defaults are time delayed.\n\n"));
 
-	(void) printf("%-18s%-10s%-16s%-10s%-26s\n\n",
+	(void) printf("%-18s%-10s%-12s%-10s%-26s\n\n",
 	    gettext("Token:"), gettext("Source:"), gettext("Value:"),
 	    gettext("Unit:"), gettext("Description:"));
 
+	/* iked tunables */
 	print_defaults("p1_lifetime_secs", gettext("phase 1 lifetime"),
-	    gettext("seconds"), B_FALSE, ddp->rule_p1_lifetime_secs,
+	    gettext("seconds"), ddp->rule_p1_lifetime_secs,
 	    dp->rule_p1_lifetime_secs);
 
 	print_defaults("-", gettext("minimum phase 1 lifetime"),
-	    gettext("seconds"), B_FALSE, ddp->rule_p1_minlife,
+	    gettext("seconds"), ddp->rule_p1_minlife,
 	    dp->rule_p1_minlife);
 
 	print_defaults("p1_nonce_len", gettext("phase 1 nonce length"),
-	    gettext("bytes"), B_FALSE, ddp->rule_p1_nonce_len,
+	    gettext("bytes"), ddp->rule_p1_nonce_len,
 	    dp->rule_p1_nonce_len);
 
 	print_defaults("p2_lifetime_secs", gettext("phase 2 lifetime"),
-	    gettext("seconds"), B_FALSE, ddp->rule_p2_lifetime_secs,
+	    gettext("seconds"), ddp->rule_p2_lifetime_secs,
 	    dp->rule_p2_lifetime_secs);
 
 	print_defaults("p2_softlife_secs", gettext("phase 2 soft lifetime"),
-	    gettext("seconds"), B_FALSE, ddp->rule_p2_softlife_secs,
+	    gettext("seconds"), ddp->rule_p2_softlife_secs,
 	    dp->rule_p2_softlife_secs);
 
 	print_defaults("p2_idletime_secs", gettext("phase 2 idle time"),
-	    gettext("seconds"), B_FALSE, ddp->rule_p2_idletime_secs,
+	    gettext("seconds"), ddp->rule_p2_idletime_secs,
 	    dp->rule_p2_idletime_secs);
 
-	print_defaults("-", gettext("system phase 2 lifetime"),
-	    gettext("seconds"), B_FALSE, ddp->sys_p2_lifetime_secs,
-	    dp->sys_p2_lifetime_secs);
-
-	print_defaults("-", gettext("system phase 2 soft lifetime"),
-	    gettext("seconds"), B_FALSE, ddp->sys_p2_softlife_secs,
-	    dp->sys_p2_softlife_secs);
-
-	print_defaults("-", gettext("system phase 2 idle time"),
-	    gettext("seconds"), B_FALSE, ddp->sys_p2_idletime_secs,
-	    dp->sys_p2_idletime_secs);
-
 	print_defaults("p2_lifetime_kb", gettext("phase 2 lifetime"),
-	    gettext("bytes"), B_TRUE, ddp->rule_p2_lifetime_kb,
+	    gettext("kilobytes"), ddp->rule_p2_lifetime_kb,
 	    dp->rule_p2_lifetime_kb);
 
 	print_defaults("p2_softlife_kb", gettext("phase 2 soft lifetime"),
-	    gettext("bytes"), B_TRUE, ddp->rule_p2_softlife_kb,
+	    gettext("kilobytes"), ddp->rule_p2_softlife_kb,
 	    dp->rule_p2_softlife_kb);
 
+	/* system wide tunables */
 	print_defaults("-", gettext("system phase 2 lifetime"),
-	    gettext("bytes"), B_FALSE, ddp->sys_p2_lifetime_bytes,
+	    gettext("seconds"), ddp->sys_p2_lifetime_secs,
+	    dp->sys_p2_lifetime_secs);
+
+	print_defaults("-", gettext("system phase 2 soft lifetime"),
+	    gettext("seconds"), ddp->sys_p2_softlife_secs,
+	    dp->sys_p2_softlife_secs);
+
+	print_defaults("-", gettext("system phase 2 idle time"),
+	    gettext("seconds"), ddp->sys_p2_idletime_secs,
+	    dp->sys_p2_idletime_secs);
+
+	print_defaults("-", gettext("system phase 2 lifetime"),
+	    gettext("bytes"), ddp->sys_p2_lifetime_bytes,
 	    dp->sys_p2_lifetime_bytes);
 
 	print_defaults("-", gettext("system phase 2 soft lifetime"),
-	    gettext("bytes"), B_FALSE, ddp->sys_p2_softlife_bytes,
+	    gettext("bytes"), ddp->sys_p2_softlife_bytes,
 	    dp->sys_p2_softlife_bytes);
 
-	print_defaults("-", gettext("minimum phase 2 lifetime"),
-	    gettext("seconds"), B_FALSE, ddp->rule_p2_minlife,
-	    dp->rule_p2_minlife);
+	/* minimum and maximum values */
+	print_defaults("-", gettext("minimum phase 2 hard lifetime"),
+	    gettext("seconds"), ddp->rule_p2_minlife_hard_secs,
+	    dp->rule_p2_minlife_hard_secs);
 
+	print_defaults("-", gettext("minimum phase 2 soft lifetime"),
+	    gettext("seconds"), ddp->rule_p2_minlife_soft_secs,
+	    dp->rule_p2_minlife_soft_secs);
+
+	print_defaults("-", gettext("minimum phase 2 idle lifetime"),
+	    gettext("seconds"), ddp->rule_p2_minlife_idle_secs,
+	    dp->rule_p2_minlife_idle_secs);
+
+	print_defaults("-", gettext("minimum phase 2 hard lifetime"),
+	    gettext("kilobytes"), ddp->rule_p2_minlife_hard_kb,
+	    dp->rule_p2_minlife_hard_kb);
+
+	print_defaults("-", gettext("minimum phase 2 soft lifetime"),
+	    gettext("kilobytes"), ddp->rule_p2_minlife_soft_kb,
+	    dp->rule_p2_minlife_soft_kb);
+
+	print_defaults("-", gettext("minimum phase 2 delta"),
+	    gettext("seconds"), ddp->rule_p2_mindiff_secs,
+	    dp->rule_p2_mindiff_secs);
+
+	print_defaults("-", gettext("minimum phase 2 delta"),
+	    gettext("kilobytes"), ddp->rule_p2_mindiff_kb,
+	    dp->rule_p2_mindiff_kb);
+
+	print_defaults("-", gettext("maximum phase 2 lifetime"),
+	    gettext("seconds"), ddp->rule_p2_maxlife_secs,
+	    dp->rule_p2_maxlife_secs);
+
+	print_defaults("-", gettext("conversion factor"),
+	    gettext("kbytes/s"), ddp->conversion_factor,
+	    dp->conversion_factor);
+
+	print_defaults("-", gettext("maximum phase 2 lifetime"),
+	    gettext("kilobytes"), ddp->rule_p2_maxlife_kb,
+	    dp->rule_p2_maxlife_kb);
+
+	/* other values */
 	print_defaults("p2_nonce_len", gettext("phase 2 nonce length"),
-	    gettext("bytes"), B_FALSE, ddp->rule_p2_nonce_len,
+	    gettext("bytes"), ddp->rule_p2_nonce_len,
 	    dp->rule_p2_nonce_len);
 
-	print_defaults("-", gettext("default phase 2 lifetime"),
-	    gettext("seconds"), B_FALSE, ddp->rule_p2_def_minlife,
-	    dp->rule_p2_def_minlife);
-
-	print_defaults("-", gettext("minimum phase 2 soft delta"),
-	    gettext("seconds"), B_FALSE, ddp->rule_p2_minsoft,
-	    dp->rule_p2_minsoft);
-
 	print_defaults("p2_pfs", gettext("phase 2 PFS"),
-	    " ", B_FALSE, ddp->rule_p2_pfs, dp->rule_p2_pfs);
+	    " ", ddp->rule_p2_pfs, dp->rule_p2_pfs);
 
 	print_defaults("max_certs", gettext("max certificates"),
-	    " ", B_FALSE, ddp->rule_max_certs, dp->rule_max_certs);
+	    " ", ddp->rule_max_certs, dp->rule_max_certs);
 
 	print_defaults("-", gettext("IKE port number"),
-	    " ", B_FALSE, ddp->rule_ike_port, dp->rule_ike_port);
+	    " ", ddp->rule_ike_port, dp->rule_ike_port);
 
 	print_defaults("-", gettext("NAT-T port number"),
-	    " ", B_FALSE, ddp->rule_natt_port, dp->rule_natt_port);
+	    " ", ddp->rule_natt_port, dp->rule_natt_port);
 }
 
 static void

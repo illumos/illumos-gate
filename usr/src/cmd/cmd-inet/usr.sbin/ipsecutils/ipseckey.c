@@ -3701,7 +3701,7 @@ main(int argc, char *argv[])
 		in_cluster_mode = B_TRUE;
 		cluster_socket = socket(AF_INET, SOCK_DGRAM, 0);
 		cli_addr.sin_family = AF_INET;
-		cli_addr.sin_addr.s_addr = INADDR_LOOPBACK;
+		cli_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 		cli_addr.sin_port = htons(CLUSTER_UDP_PORT);
 	}
 
