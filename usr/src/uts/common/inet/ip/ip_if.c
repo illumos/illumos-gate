@@ -899,14 +899,15 @@ ipsq_xopq_mp_cleanup(ill_t *ill, conn_t *connp)
 	mblk_t	*prev;
 	mblk_t	*curr;
 	mblk_t	*next;
-	queue_t	*q;
+	queue_t	*rq, *wq;
 	mblk_t	*tmp_list = NULL;
 
 	ASSERT(IAM_WRITER_ILL(ill));
 	if (connp != NULL)
-		q = CONNP_TO_WQ(connp);
+		wq = CONNP_TO_WQ(connp);
 	else
-		q = ill->ill_wq;
+		wq = ill->ill_wq;
+	rq = RD(wq);
 
 	ipsq = ill->ill_phyint->phyint_ipsq;
 	/*
@@ -922,7 +923,7 @@ ipsq_xopq_mp_cleanup(ill_t *ill, conn_t *connp)
 	for (prev = NULL, curr = ipsq->ipsq_xopq_mphead; curr != NULL;
 	    curr = next) {
 		next = curr->b_next;
-		if (curr->b_queue == q || curr->b_queue == RD(q)) {
+		if (curr->b_queue == wq || curr->b_queue == rq) {
 			/* Unlink the mblk from the pending mp list */
 			if (prev != NULL) {
 				prev->b_next = curr->b_next;
@@ -954,7 +955,7 @@ ipsq_xopq_mp_cleanup(ill_t *ill, conn_t *connp)
 			DTRACE_PROBE4(ipif__ioctl,
 			    char *, "ipsq_xopq_mp_cleanup",
 			    int, 0, ill_t *, NULL, ipif_t *, NULL);
-			ip_ioctl_finish(q, curr, ENXIO, connp != NULL ?
+			ip_ioctl_finish(wq, curr, ENXIO, connp != NULL ?
 			    CONN_CLOSE : NO_COPYOUT, NULL);
 		} else {
 			/*
@@ -969,7 +970,7 @@ ipsq_xopq_mp_cleanup(ill_t *ill, conn_t *connp)
 
 /*
  * This conn has started closing. Cleanup any pending ioctl from this conn.
- * STREAMS ensures that there can be at most 1 ioctl pending on a stream.
+ * STREAMS ensures that there can be at most 1 active ioctl on a stream.
  */
 void
 conn_ioctl_cleanup(conn_t *connp)
@@ -979,13 +980,14 @@ conn_ioctl_cleanup(conn_t *connp)
 	boolean_t refheld;
 
 	/*
-	 * Is any exclusive ioctl pending ? If so clean it up. If the
-	 * ioctl has not yet started, the mp is pending in the list headed by
-	 * ipsq_xopq_head. If the ioctl has started the mp could be present in
-	 * ipx_pending_mp. If the ioctl timed out in the streamhead but
-	 * is currently executing now the mp is not queued anywhere but
-	 * conn_oper_pending_ill is null. The conn close will wait
-	 * till the conn_ref drops to zero.
+	 * Check for a queued ioctl. If the ioctl has not yet started, the mp
+	 * is pending in the list headed by ipsq_xopq_head. If the ioctl has
+	 * started the mp could be present in ipx_pending_mp. Note that if
+	 * conn_oper_pending_ill is NULL, the ioctl may still be in flight and
+	 * not yet queued anywhere. In this case, the conn close code will wait
+	 * until the conn_ref is dropped. If the stream was a tcp stream, then
+	 * tcp_close will wait first until all ioctls have completed for this
+	 * conn.
 	 */
 	mutex_enter(&connp->conn_lock);
 	ill = connp->conn_oper_pending_ill;

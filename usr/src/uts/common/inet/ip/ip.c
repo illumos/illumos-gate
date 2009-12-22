@@ -12805,10 +12805,13 @@ ip_ioctl_finish(queue_t *q, mblk_t *mp, int err, int mode, ipsq_t *ipsq)
 	}
 
 	/*
-	 * The refhold placed at the start of the ioctl is released here.
+	 * The conn refhold and ioctlref placed on the conn at the start of the
+	 * ioctl are released here.
 	 */
-	if (connp != NULL)
+	if (connp != NULL) {
+		CONN_DEC_IOCTLREF(connp);
 		CONN_OPER_PENDING_DONE(connp);
+	}
 
 	if (ipsq != NULL)
 		ipsq_current_finish(ipsq);
@@ -12895,16 +12898,19 @@ ip_wput_nondata(queue_t *q, mblk_t *mp)
 			/*
 			 * Refhold the conn, till the ioctl completes. This is
 			 * needed in case the ioctl ends up in the pending mp
-			 * list. Every mp in the ipx_pending_mp list
-			 * must have a refhold on the conn
-			 * to resume processing. The refhold is released when
-			 * the ioctl completes. (normally or abnormally)
+			 * list. Every mp in the ipx_pending_mp list must have
+			 * a refhold on the conn to resume processing. The
+			 * refhold is released when the ioctl completes
+			 * (whether normally or abnormally). An ioctlref is also
+			 * placed on the conn to prevent TCP from removing the
+			 * queue needed to send the ioctl reply back.
 			 * In all cases ip_ioctl_finish is called to finish
-			 * the ioctl.
+			 * the ioctl and release the refholds.
 			 */
 			if (connp != NULL) {
 				/* This is not a reentry */
 				CONN_INC_REF(connp);
+				CONN_INC_IOCTLREF(connp);
 			} else {
 				if (!(ipip->ipi_flags & IPI_MODOK)) {
 					mi_copy_done(q, mp, EINVAL);

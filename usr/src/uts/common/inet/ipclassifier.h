@@ -445,6 +445,7 @@ struct conn_s {
 	/* Checksum to compensate for source routed packets. Host byte order */
 	uint32_t	conn_sum;
 
+	uint32_t	conn_ioctlref;		/* ioctl ref count */
 #ifdef CONN_DEBUG
 #define	CONN_TRACE_MAX	10
 	int		conn_trace_last;	/* ndx of last used tracebuf */

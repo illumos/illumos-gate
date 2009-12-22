@@ -232,6 +232,43 @@ typedef struct ipoptp_s
 }
 
 /*
+ * Ref counter macros for ioctls. This provides a guard for TCP to stop
+ * tcp_close from removing the rq/wq whilst an ioctl is still in flight on the
+ * stream. The ioctl could have been queued on e.g. an ipsq. tcp_close will wait
+ * until the ioctlref count is zero before proceeding.
+ * Ideally conn_oper_pending_ill would be used for this purpose. However, in the
+ * case where an ioctl is aborted or interrupted, it can be cleared prematurely.
+ * There are also some race possibilities between ip and the stream head which
+ * can also end up with conn_oper_pending_ill being cleared prematurely. So, to
+ * avoid these situations, we use a dedicated ref counter for ioctls which is
+ * used in addition to and in parallel with the normal conn_ref count.
+ */
+#define	CONN_INC_IOCTLREF_LOCKED(connp)	{			\
+	ASSERT(MUTEX_HELD(&(connp)->conn_lock));		\
+	DTRACE_PROBE1(conn__inc__ioctlref, conn_t *, (connp));	\
+	(connp)->conn_ioctlref++;				\
+	mutex_exit(&(connp)->conn_lock);			\
+}
+
+#define	CONN_INC_IOCTLREF(connp)	{			\
+	mutex_enter(&(connp)->conn_lock);			\
+	CONN_INC_IOCTLREF_LOCKED(connp);			\
+}
+
+#define	CONN_DEC_IOCTLREF(connp)	{			\
+	mutex_enter(&(connp)->conn_lock);			\
+	DTRACE_PROBE1(conn__dec__ioctlref, conn_t *, (connp));	\
+	/* Make sure conn_ioctlref will not underflow. */	\
+	ASSERT((connp)->conn_ioctlref != 0);			\
+	if ((--(connp)->conn_ioctlref == 0) &&			\
+	    ((connp)->conn_state_flags & CONN_CLOSING)) {	\
+		cv_broadcast(&(connp)->conn_cv);		\
+	}							\
+	mutex_exit(&(connp)->conn_lock);			\
+}
+
+
+/*
  * Complete the pending operation. Usually an ioctl. Can also
  * be a bind or option management request that got enqueued
  * in an ipsq_t. Called on completion of the operation.

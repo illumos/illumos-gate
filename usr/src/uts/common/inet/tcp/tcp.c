@@ -3342,6 +3342,28 @@ tcp_close_common(conn_t *connp, int flags)
 
 	TCP_DEBUG_GETPCSTACK(tcp->tcmp_stk, 15);
 
+	/*
+	 * Cleanup any queued ioctls here. This must be done before the wq/rq
+	 * are re-written by tcp_close_output().
+	 */
+	if (conn_ioctl_cleanup_reqd)
+		conn_ioctl_cleanup(connp);
+
+	/*
+	 * As CONN_CLOSING is set, no further ioctls should be passed down to
+	 * IP for this conn (see the guards in tcp_ioctl, tcp_wput_ioctl and
+	 * tcp_wput_iocdata). If the ioctl was queued on an ipsq,
+	 * conn_ioctl_cleanup should have found it and removed it. If the ioctl
+	 * was still in flight at the time, we wait for it here. See comments
+	 * for CONN_INC_IOCTLREF in ip.h for details.
+	 */
+	mutex_enter(&connp->conn_lock);
+	while (connp->conn_ioctlref > 0)
+		cv_wait(&connp->conn_cv, &connp->conn_lock);
+	ASSERT(connp->conn_ioctlref == 0);
+	ASSERT(connp->conn_oper_pending_ill == NULL);
+	mutex_exit(&connp->conn_lock);
+
 	SQUEUE_ENTER_ONE(connp->conn_sqp, mp, tcp_close_output, connp,
 	    NULL, tcp_squeue_flag, SQTAG_IP_TCP_CLOSE);
 
@@ -3394,11 +3416,6 @@ tcp_close_common(conn_t *connp, int flags)
 		}
 		mutex_exit(&connp->conn_lock);
 	}
-	/*
-	 * ioctl cleanup. The mp is queued in the ipx_pending_mp.
-	 */
-	if (conn_ioctl_cleanup_reqd)
-		conn_ioctl_cleanup(connp);
 
 	connp->conn_cpid = NOPID;
 }
@@ -3857,7 +3874,6 @@ tcp_closei_local(tcp_t *tcp)
 	connp->conn_state_flags |= CONN_CONDEMNED;
 	mutex_exit(&connp->conn_lock);
 
-	/* Need to cleanup any pending ioctls */
 	ASSERT(tcp->tcp_time_wait_next == NULL);
 	ASSERT(tcp->tcp_time_wait_prev == NULL);
 	ASSERT(tcp->tcp_time_wait_expire == 0);
@@ -15283,7 +15299,9 @@ tcp_wput(queue_t *q, mblk_t *mp)
 				qreply(q, mp);
 				return;
 			}
+			CONN_INC_IOCTLREF(connp);
 			ip_wput_nondata(q, mp);
+			CONN_DEC_IOCTLREF(connp);
 			return;
 
 		default:
@@ -16679,7 +16697,26 @@ tcp_wput_iocdata(tcp_t *tcp, mblk_t *mp)
 	case TI_GETPEERNAME:
 		break;
 	default:
+		/*
+		 * If the conn is closing, then error the ioctl here. Otherwise
+		 * use the CONN_IOCTLREF_* macros to hold off tcp_close until
+		 * we're done here. We also need to decrement the ioctlref which
+		 * was bumped in either tcp_ioctl or tcp_wput_ioctl.
+		 */
+		mutex_enter(&connp->conn_lock);
+		if (connp->conn_state_flags & CONN_CLOSING) {
+			mutex_exit(&connp->conn_lock);
+			iocp = (struct iocblk *)mp->b_rptr;
+			iocp->ioc_error = EINVAL;
+			mp->b_datap->db_type = M_IOCNAK;
+			iocp->ioc_count = 0;
+			qreply(q, mp);
+			return;
+		}
+
+		CONN_INC_IOCTLREF_LOCKED(connp);
 		ip_wput_nondata(q, mp);
+		CONN_DEC_IOCTLREF(connp);
 		return;
 	}
 	switch (mi_copy_state(q, mp, &mp1)) {
@@ -16817,7 +16854,24 @@ tcp_wput_ioctl(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 		qreply(q, mp);
 		return;
 	}
+
+	/*
+	 * If the conn is closing, then error the ioctl here. Otherwise bump the
+	 * conn_ioctlref to hold off tcp_close until we're done here.
+	 */
+	mutex_enter(&(connp)->conn_lock);
+	if ((connp)->conn_state_flags & CONN_CLOSING) {
+		mutex_exit(&(connp)->conn_lock);
+		iocp->ioc_error = EINVAL;
+		mp->b_datap->db_type = M_IOCNAK;
+		iocp->ioc_count = 0;
+		qreply(q, mp);
+		return;
+	}
+
+	CONN_INC_IOCTLREF_LOCKED(connp);
 	ip_wput_nondata(q, mp);
+	CONN_DEC_IOCTLREF(connp);
 }
 
 /*
@@ -21876,16 +21930,27 @@ tcp_ioctl(sock_lower_handle_t proto_handle, int cmd, intptr_t arg,
 		case TCP_IOC_ABORT_CONN:
 		case TI_GETPEERNAME:
 		case TI_GETMYNAME:
-			ip1dbg(("tcp_ioctl: cmd 0x%x on non sreams socket",
+			ip1dbg(("tcp_ioctl: cmd 0x%x on non streams socket",
 			    cmd));
 			error = EINVAL;
 			break;
 		default:
 			/*
-			 * Pass on to IP using helper stream
+			 * If the conn is not closing, pass on to IP using
+			 * helper stream. Bump the ioctlref to prevent tcp_close
+			 * from closing the rq/wq out from underneath the ioctl
+			 * if it ends up queued or aborted/interrupted.
 			 */
+			mutex_enter(&connp->conn_lock);
+			if (connp->conn_state_flags & (CONN_CLOSING)) {
+				mutex_exit(&connp->conn_lock);
+				error = EINVAL;
+				break;
+			}
+			CONN_INC_IOCTLREF_LOCKED(connp);
 			error = ldi_ioctl(connp->conn_helper_info->iphs_handle,
 			    cmd, arg, mode, cr, rvalp);
+			CONN_DEC_IOCTLREF(connp);
 			break;
 	}
 	return (error);
