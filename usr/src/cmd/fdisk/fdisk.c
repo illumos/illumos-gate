@@ -638,14 +638,15 @@ static void abs_read(void);
 static void abs_write(void);
 static void load(int funct, char *file);
 static void Set_Table_CHS_Values(int ti);
+static int nopartdefined();
 static int insert_tbl(int id, int act,
     int bhead, int bsect, int bcyl,
     int ehead, int esect, int ecyl,
-    uint32_t rsect, uint32_t numsect);
+    uint32_t rsect, uint32_t numsect, int startindex);
 static int entry_from_old_table(int id, int act,
     int bhead, int bsect, int bcyl,
     int ehead, int esect, int ecyl,
-    uint32_t rsect, uint32_t numsect);
+    uint32_t rsect, uint32_t numsect, int startindex);
 static int verify_tbl(void);
 static int pars_fdisk(char *line,
     int *id, int *act,
@@ -1234,7 +1235,7 @@ main(int argc, char *argv[])
 
 	if (!io_ffdisk && !io_Afdisk && !io_Dfdisk) {
 		/* Check if there is no fdisk table */
-		if (Table[0].systid == UNUSED || io_wholedisk || io_EFIdisk) {
+		if (nopartdefined() || io_wholedisk || io_EFIdisk) {
 			if (io_ifdisk && !io_wholedisk && !io_EFIdisk) {
 				(void) printf(
 				    "No fdisk table exists. The default"
@@ -1274,7 +1275,7 @@ main(int argc, char *argv[])
 				nulltbl();
 				i = insert_tbl(EFI_PMBR, 0, 0, 0, 0, 0, 0, 0, 1,
 				    (dev_capacity > DK_MAX_2TB) ? DK_MAX_2TB :
-				    (dev_capacity - 1));
+				    (dev_capacity - 1), 0);
 				if (i != 0) {
 					(void) fprintf(stderr,
 					    "Error creating EFI partition\n");
@@ -1765,8 +1766,9 @@ load(int funct, char *file)
 	uint32_t	numsect;
 	char	line[256];
 	int	i = 0;
-	int	j;
 	FILE *fp;
+	int	startindex = 0;
+	int	tmpindex = 0;
 #ifdef i386
 	int 	ext_part_present = 0;
 	uint32_t	begsec, endsec, relsect;
@@ -1944,8 +1946,9 @@ load(int funct, char *file)
 				exit(1);
 			}
 
-			if (entry_from_old_table(id, act, bhead, bsect,
-			    bcyl, ehead, esect, ecyl, rsect, numsect)) {
+			if ((tmpindex = entry_from_old_table(id, act, bhead,
+			    bsect, bcyl, ehead, esect, ecyl, rsect, numsect,
+			    startindex)) != -1) {
 				/*
 				 * If we got here it means we copied an
 				 * unmodified entry. So there is no need
@@ -1982,6 +1985,7 @@ load(int funct, char *file)
 				 * a partition that runs off the end of the
 				 * disk.
 				 */
+				startindex = tmpindex + 1;
 				continue;
 			}
 
@@ -1989,13 +1993,15 @@ load(int funct, char *file)
 			 * Find an unused entry to use and put the entry
 			 * in table
 			 */
-			if (insert_tbl(id, act, bhead, bsect, bcyl, ehead,
-			    esect, ecyl, rsect, numsect) < 0) {
+			if ((startindex = insert_tbl(id, act, bhead, bsect,
+			    bcyl, ehead, esect, ecyl, rsect, numsect,
+			    startindex)) < 0) {
 				(void) fprintf(stderr,
 				    "fdisk: Error on entry \"%s\".\n",
 				    line);
 				exit(1);
 			}
+			startindex++;
 		} /* while (fgets(line, sizeof (line) - 1, fp)) */
 
 		if (verify_tbl() < 0) {
@@ -2032,33 +2038,8 @@ load(int funct, char *file)
 			    Table[i].relsect == LE_32(rsect) &&
 			    Table[i].numsect == LE_32(numsect)) {
 
-				/*
-				 * Found the entry. Now move rest of
-				 * entries up toward the top of the
-				 * table, leaving available entries at
-				 * the end of the fdisk table.
-				 */
-				for (j = i; j < FD_NUMPART - 1; j++) {
-					Table[j].systid = Table[j + 1].systid;
-					Table[j].bootid = Table[j + 1].bootid;
-					Table[j].beghead = Table[j + 1].beghead;
-					Table[j].begsect = Table[j + 1].begsect;
-					Table[j].begcyl = Table[j + 1].begcyl;
-					Table[j].endhead = Table[j + 1].endhead;
-					Table[j].endsect = Table[j + 1].endsect;
-					Table[j].endcyl = Table[j + 1].endcyl;
-					Table[j].relsect = Table[j + 1].relsect;
-					Table[j].numsect = Table[j + 1].numsect;
-				}
-
-				/*
-				 * Mark the last entry as unused in case
-				 * all table entries were in use prior
-				 * to the deletion.
-				 */
-
-				Table[FD_NUMPART - 1].systid = UNUSED;
-				Table[FD_NUMPART - 1].bootid = 0;
+				(void) memset(&Table[i], 0,
+				    sizeof (struct ipart));
 #ifdef i386
 				if (fdisk_is_dos_extended(id)) {
 					fdisk_delete_ext_part(epp);
@@ -2228,7 +2209,7 @@ load(int funct, char *file)
 
 		/* Find unused entry for use and put entry in table */
 		if (insert_tbl(id, act, bhead, bsect, bcyl, ehead, esect,
-		    ecyl, rsect, numsect) < 0) {
+		    ecyl, rsect, numsect, 0) < 0) {
 			(void) fprintf(stderr,
 			    "fdisk: Invalid entry could not be inserted:\n"
 			    "	\"%s\"\n",
@@ -2310,7 +2291,7 @@ insert_tbl(
     int id, int act,
     int bhead, int bsect, int bcyl,
     int ehead, int esect, int ecyl,
-    uint32_t rsect, uint32_t numsect)
+    uint32_t rsect, uint32_t numsect, int startindex)
 {
 	int	i;
 
@@ -2323,7 +2304,7 @@ insert_tbl(
 
 
 	/* find UNUSED partition table entry */
-	for (i = 0; i < FD_NUMPART; i++) {
+	for (i = startindex; i < FD_NUMPART; i++) {
 		if (Table[i].systid == UNUSED) {
 			break;
 		}
@@ -2339,14 +2320,17 @@ insert_tbl(
 	Table[i].numsect = LE_32(numsect);
 	Table[i].relsect = LE_32(rsect);
 
-	/*
-	 * If we have been called with a valid geometry, use it
-	 * valid means non-zero values that fit in the BIOS fields
-	 */
-	if (0 < bsect && bsect <= MAX_SECT &&
+	if (id == UNUSED) {
+		(void) memset(&Table[i], 0, sizeof (struct ipart));
+	} else if (0 < bsect && bsect <= MAX_SECT &&
 	    0 <= bhead && bhead <= MAX_HEAD &&
 	    0 < esect && esect <= MAX_SECT &&
 	    0 <= ehead && ehead <= MAX_HEAD) {
+
+		/*
+		 * If we have been called with a valid geometry, use it
+		 * valid means non-zero values that fit in the BIOS fields
+		 */
 		if (bcyl > MAX_CYL)
 			bcyl = MAX_CYL + 1;
 		if (ecyl > MAX_CYL)
@@ -2383,12 +2367,12 @@ entry_from_old_table(
     int id, int act,
     int bhead, int bsect, int bcyl,
     int ehead, int esect, int ecyl,
-    uint32_t rsect, uint32_t numsect)
+    uint32_t rsect, uint32_t numsect, int startindex)
 {
 	uint32_t	i, j;
 
-	if (id == SUNIXOS || id == SUNIXOS2)
-		return (0);
+	if (id == SUNIXOS || id == SUNIXOS2 || id == UNUSED)
+		return (-1);
 	for (i = 0; i < FD_NUMPART; i++) {
 		if (Old_Table[i].systid == id &&
 		    Old_Table[i].bootid == act &&
@@ -2403,20 +2387,20 @@ entry_from_old_table(
 		    Old_Table[i].relsect == lel(rsect) &&
 		    Old_Table[i].numsect == lel(numsect)) {
 			/* find UNUSED partition table entry */
-			for (j = 0; j < FD_NUMPART; j++) {
+			for (j = startindex; j < FD_NUMPART; j++) {
 				if (Table[j].systid == UNUSED) {
 					(void) memcpy(&Table[j], &Old_Table[i],
 					    sizeof (Table[0]));
 					skip_verify[j] = 1;
-					return (1);
+					return (j);
 
 				}
 			}
-			return (0);
+			return (-1);
 		}
 
 	}
-	return (0);
+	return (-1);
 }
 
 /*
@@ -2436,23 +2420,18 @@ verify_tbl(void)
 		if (Table[i].systid != UNUSED) {
 			numParts++;
 			/*
-			 * No valid partitions allowed after an UNUSED  or
-			 * EFI_PMBR part
+			 * No valid partitions allowed after EFI_PMBR part
 			 */
 			if (noMoreParts) {
 				return (-1);
 			}
 
-			/*
-			 * EFI_PMBR partitions must be the only partition
-			 * and must be Table entry 0
-			 */
 			if (Table[i].systid == EFI_PMBR) {
-				if (i == 0) {
-					noMoreParts = 1;
-				} else {
-					return (-1);
-				}
+				/*
+				 * EFI_PMBR partition must be the only
+				 * partition
+				 */
+				noMoreParts = 1;
 
 				if (Table[i].relsect != 1) {
 					(void) fprintf(stderr, "ERROR: "
@@ -2465,14 +2444,28 @@ verify_tbl(void)
 					return (-1);
 				}
 
-				if (Table[i].numsect != dev_capacity - 1) {
+				if (Table[i].numsect !=
+				    ((dev_capacity > DK_MAX_2TB) ? DK_MAX_2TB:
+				    (dev_capacity - 1))) {
+
 					(void) fprintf(stderr, "ERROR: "
 					    "EFI_PMBR partition must "
-					    "encompass the entire "
-					    "disk.\n numsect %d - "
-					    "actual %llu\n",
-					    Table[i].numsect,
-					    dev_capacity - 1);
+					    "encompass the entire");
+
+					if (dev_capacity > DK_MAX_2TB)
+						(void) fprintf(stderr,
+						    "maximum 2 TB.\n "
+						    "numsect %u - "
+						    "actual %llu\n",
+						    Table[i].numsect,
+						    (diskaddr_t)DK_MAX_2TB);
+
+					else
+						(void) fprintf(stderr,
+						    "disk.\n numsect %u - "
+						    "actual %llu\n",
+						    Table[i].numsect,
+						    dev_capacity - 1);
 
 					return (-1);
 				}
@@ -2548,8 +2541,6 @@ verify_tbl(void)
 					}
 				}
 			}
-		} else {
-			noMoreParts = 1;
 		}
 	}
 	if (Table[i].systid != UNUSED) {
@@ -3044,7 +3035,7 @@ pcreate(void)
 		/* create the table entry - i should be 0 */
 		i = insert_tbl(tsystid, 0, 0, 0, 0, 0, 0, 0, 1,
 		    (dev_capacity > DK_MAX_2TB) ? DK_MAX_2TB:
-		    (dev_capacity - 1));
+		    (dev_capacity - 1), 0);
 
 		if (i != 0) {
 			(void) printf("Error creating EFI partition!!!\n");
@@ -3077,6 +3068,7 @@ specify(uchar_t tsystid)
 	diskaddr_t max_free;
 	int	cyl_size;
 	struct ipart *partition[FD_NUMPART];
+	struct ipart localpart[FD_NUMPART];
 
 	cyl_size = heads * sectors;
 
@@ -3084,8 +3076,22 @@ specify(uchar_t tsystid)
 	 * make a local copy of the partition table
 	 * and sort it into relsect order
 	 */
+
+
+	for (i = 0, j = 0; i < FD_NUMPART; i++) {
+		if (Table[i].systid != UNUSED) {
+			localpart[j] = Table[i];
+			j++;
+		}
+	}
+
+	while (j < FD_NUMPART) {
+		(void) memset(&localpart[j], 0, sizeof (struct ipart));
+		j++;
+	}
+
 	for (i = 0; i < FD_NUMPART; i++)
-		partition[i] = &Table[i];
+		partition[i] = &localpart[i];
 
 	for (i = 0; i < FD_NUMPART - 1; i++) {
 		if (partition[i]->systid == UNUSED)
@@ -3223,7 +3229,7 @@ specify(uchar_t tsystid)
 		}
 
 		if ((i = insert_tbl(tsystid, 0, 0, 0, 0, 0, 0, 0,
-		    first_free, cylen * cyl_size)) >= 0)  {
+		    first_free, cylen * cyl_size, 0)) >= 0)  {
 			return (i);
 		}
 		return (-1);
@@ -3322,7 +3328,7 @@ specify(uchar_t tsystid)
 
 		(void) printf(E_LINE);
 		i = insert_tbl(tsystid, 0, 0, 0, 0, 0, 0, 0,
-		    cyl * cyl_size, cylen * cyl_size);
+		    cyl * cyl_size, cylen * cyl_size, 0);
 		if (i < 0)
 			return (-1);
 
@@ -3406,7 +3412,9 @@ pchange(void)
 			    "No partition is currently marked as active.");
 		return (0);
 	} else {	/* User has selected a partition to be active */
+
 		i = s[0] - '1';
+
 		if (Table[i].systid == UNUSED) {
 			(void) printf(E_LINE);
 			(void) printf("Partition does not exist.");
@@ -3470,6 +3478,7 @@ ppartid(void)
 		}
 
 		i -= 1;
+
 		if (Table[i].systid == SUNIXOS) {
 			Table[i].systid = SUNIXOS2;
 		} else if (Table[i].systid == SUNIXOS2) {
@@ -3496,7 +3505,7 @@ static char
 pdelete(void)
 {
 	char s[80];
-	int i, j;
+	int i;
 	char pactive;
 
 DEL1:	(void) printf(Q_LINE);
@@ -3571,14 +3580,8 @@ DEL1:	(void) printf(Q_LINE);
 		pactive = 0;
 	}
 
-	for (j = i; j < FD_NUMPART - 1; j++) {
-		Table[j] = Table[j + 1];
-	}
+	(void) memset(&Table[i], 0, sizeof (struct ipart));
 
-	Table[j].systid = UNUSED;
-	Table[j].numsect = 0;
-	Table[j].relsect = 0;
-	Table[j].bootid = 0;
 	(void) printf(E_LINE);
 	(void) printf("Partition %d has been deleted.", i + 1);
 
@@ -3673,12 +3676,14 @@ disptbl(void)
 	(void) printf(
 	    "      =========   ======    ============  =====   ===   ======"
 	    "   ===");
+
+
 	for (i = 0; i < FD_NUMPART; i++) {
+
 		if (Table[i].systid == UNUSED) {
-			(void) printf("\n");
-			(void) printf(CLR_LIN);
 			continue;
 		}
+
 		if (Table[i].bootid == ACTIVE)
 			stat = Actvstr;
 		else
@@ -3831,7 +3836,7 @@ disptbl(void)
 	}
 
 	/* Print warning message if table is empty */
-	if (Table[0].systid == UNUSED) {
+	if (nopartdefined()) {
 		(void) printf(W_LINE);
 		(void) printf("WARNING: no partitions are defined!");
 	} else {
@@ -3919,7 +3924,7 @@ nulltbl(void)
 static void
 copy_Bootblk_to_Table(void)
 {
-	int i, j;
+	int i;
 	char *bootptr;
 	struct ipart iparts[FD_NUMPART];
 
@@ -3938,24 +3943,16 @@ copy_Bootblk_to_Table(void)
 	 * follows looks at each entry in the Bootrec and copies all
 	 * those that are valid.
 	 */
-	j = 0;
 	for (i = 0; i < FD_NUMPART; i++) {
 		if (iparts[i].systid == 0) {
 			/* Null entry */
-			bootptr += sizeof (struct ipart);
+			(void) memset(&Table[i], 0, sizeof (struct ipart));
 		} else {
-			fill_ipart(bootptr, &Table[j]);
-			j++;
-			bootptr += sizeof (struct ipart);
+			fill_ipart(bootptr, &Table[i]);
 		}
+		bootptr += sizeof (struct ipart);
 	}
-	for (i = j; i < FD_NUMPART; i++) {
-		Table[i].systid = UNUSED;
-		Table[i].numsect = LE_32(UNUSED);
-		Table[i].relsect = LE_32(UNUSED);
-		Table[i].bootid = 0;
 
-	}
 	/* For now, always replace the bootcode with ours */
 	(void) memcpy(Bootblk->bootinst, &BootCod, BOOTSZ);
 	copy_Table_to_Bootblk();
@@ -5596,3 +5593,14 @@ ext_part_menu()
 	}
 }
 #endif
+
+static int
+nopartdefined()
+{
+	int i;
+
+	for (i = 0; i < FD_NUMPART; i++)
+		if (Table[i].systid != UNUSED)
+			return (0);
+	return (1);
+}
