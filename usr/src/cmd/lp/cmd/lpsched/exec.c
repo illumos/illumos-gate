@@ -561,16 +561,9 @@ exec(int type, ...)
 
 		(void)Close (1);
 
-		if (strchr (request->request->user, '@'))
-		{
-			procuid = Lp_Uid;
-			procgid = Lp_Gid;
-		}
-		else
-		{
-			procuid = request->secure->uid;
-			procgid = request->secure->gid;
-		}
+		procuid = request->secure->uid;
+		procgid = request->secure->gid;
+
 		if (printer->printer->dial_info)
 		{
 			ret = open_dialup(request->printer_type,
@@ -988,16 +981,9 @@ exec(int type, ...)
 		if (request->slow)
 			addenv(&envp, "FILTER", request->slow);
 
-		if (strchr (request->request->user, '@'))
-		{
-			procuid = Lp_Uid;
-			procgid = Lp_Gid;
-		}
-		else
-		{
-			procuid = request->secure->uid;
-			procgid = request->secure->gid;
-		}
+		procuid = request->secure->uid;
+		procgid = request->secure->gid;
+
 		cp = _alloc_files(
 			lenlist(request->request->file_list),
 			getreqno(request->secure->req_id),
@@ -1111,13 +1097,9 @@ exec(int type, ...)
 
 	case EX_NOTIFY:
 		if (request->request->alert) {
-			if (strchr(request->request->user, '@')) {
-				procuid = Lp_Uid;
-				procgid = Lp_Gid;
-			} else {
-				procuid = request->secure->uid;
-				procgid = request->secure->gid;
-			}
+			procuid = request->secure->uid;
+			procgid = request->secure->gid;
+
 			av[ac++] = arg_string(TRUSTED, "%s",
 					request->request->alert);
 		} else {
