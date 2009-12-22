@@ -1316,9 +1316,6 @@ hubd_config_one(hubd_t *hubd, int port)
 	mutex_enter(HUBD_MUTEX(hubd));
 
 	hubd_pm_busy_component(hubd, hubd->h_dip, 0);
-	hubd_stop_polling(hubd);
-
-
 
 	if (!hubd->h_children_dips[port]) {
 
@@ -1349,7 +1346,6 @@ hubd_config_one(hubd_t *hubd, int port)
 
 	mutex_enter(HUBD_MUTEX(hubd));
 
-	hubd_start_polling(hubd, 0);
 	(void) hubd_pm_idle_component(hubd, hubd->h_dip, 0);
 
 	USB_DPRINTF_L4(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
