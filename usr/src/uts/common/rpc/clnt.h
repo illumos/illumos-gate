@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -291,36 +291,36 @@ typedef struct calllist_s {
 
 #define	call_table_enter(e)				\
 {							\
-	call_table_t *ctp = e->call_bucket;		\
+	call_table_t *ctp = (e)->call_bucket;		\
 	mutex_enter(&ctp->ct_lock);			\
 	ctp->ct_len++;					\
-	e->call_next = (calllist_t *)ctp->ct_call_next;	\
-	e->call_prev = (calllist_t *)ctp;		\
-	((call_table_t *)ctp->ct_call_next)->ct_call_prev = e;		\
-	ctp->ct_call_next = e;				\
-	mutex_exit(&e->call_bucket->ct_lock);		\
+	(e)->call_next = ctp->ct_call_next;		\
+	(e)->call_prev = (calllist_t *)ctp;		\
+	ctp->ct_call_next->call_prev = (e);		\
+	ctp->ct_call_next = (e);			\
+	mutex_exit(&ctp->ct_lock);			\
 }
 
 #define	call_table_remove(e)				\
 {							\
-	call_table_t *ctp = e->call_bucket;		\
+	call_table_t *ctp = (e)->call_bucket;		\
 	mutex_enter(&ctp->ct_lock);			\
 	ctp->ct_len--;					\
-	((call_table_t *)e->call_prev)->ct_call_next = e->call_next;	\
-	((call_table_t *)e->call_next)->ct_call_prev = e->call_prev;	\
+	(e)->call_prev->call_next = (e)->call_next;	\
+	(e)->call_next->call_prev = (e)->call_prev;	\
 	mutex_exit(&ctp->ct_lock);			\
 }
 
 #define	call_table_find(ctp, xid, ele)			\
 {							\
 	calllist_t *cp;					\
-	ele = NULL;					\
+	(ele) = NULL;					\
 	mutex_enter(&(ctp)->ct_lock);			\
 	for (cp = (ctp)->ct_call_next;			\
-		cp != (calllist_t *)ctp;		\
+		cp != (calllist_t *)(ctp);		\
 		cp = cp->call_next) {			\
-		if (cp->call_xid == xid)		\
-			ele = cp;			\
+		if (cp->call_xid == (xid))		\
+			(ele) = cp;			\
 	}						\
 }
 

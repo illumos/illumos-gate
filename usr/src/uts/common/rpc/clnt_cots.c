@@ -1400,28 +1400,28 @@ read_again:
 					cm_entry = NULL;
 				}
 
+				(void) xdr_rpc_free_verifier(xdrs,
+				    &reply_msg);
+
+				if (p->cku_flags & CKU_ONQUEUE) {
+					call_table_remove(call);
+					p->cku_flags &= ~CKU_ONQUEUE;
+				}
+				RPCLOG(64,
+				    "clnt_cots_kcallit: AUTH_ERROR, xid"
+				    " 0x%x removed off dispatch list\n",
+				    p->cku_xid);
+				if (call->call_reply) {
+					freemsg(call->call_reply);
+					call->call_reply = NULL;
+				}
+
 				if ((refreshes > 0) &&
 				    AUTH_REFRESH(h->cl_auth, &reply_msg,
 				    p->cku_cred)) {
 					refreshes--;
-					(void) xdr_rpc_free_verifier(xdrs,
-					    &reply_msg);
 					freemsg(mp);
 					mp = NULL;
-
-					if (p->cku_flags & CKU_ONQUEUE) {
-						call_table_remove(call);
-						p->cku_flags &= ~CKU_ONQUEUE;
-					}
-
-					RPCLOG(64,
-					    "clnt_cots_kcallit: AUTH_ERROR, xid"
-					    " 0x%x removed off dispatch list\n",
-					    p->cku_xid);
-					if (call->call_reply) {
-						freemsg(call->call_reply);
-						call->call_reply = NULL;
-					}
 
 					COTSRCSTAT_INCR(p->cku_stats,
 					    rcbadcalls);
@@ -1455,9 +1455,8 @@ read_again:
 					if (p->cku_useresvport != 1) {
 						p->cku_useresvport = 1;
 						p->cku_xid = 0;
-						(void) xdr_rpc_free_verifier
-						    (xdrs, &reply_msg);
 						freemsg(mp);
+						mp = NULL;
 						goto call_again;
 					}
 					/* FALLTHRU */
@@ -1477,6 +1476,7 @@ read_again:
 				RPCLOG(1, "clnt_cots_kcallit : authentication"
 				    " failed with RPC_AUTHERROR of type %d\n",
 				    (int)p->cku_err.re_why);
+				goto cots_done;
 			}
 		}
 	} else {

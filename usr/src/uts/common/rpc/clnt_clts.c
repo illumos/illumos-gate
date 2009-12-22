@@ -463,7 +463,6 @@ clnt_clts_kcallit_addr(CLIENT *h, rpcproc_t procnum, xdrproc_t xdr_args,
 	int refreshes = REFRESHES;	/* number of times to refresh cred */
 	int round_trip;			/* time the RPC */
 	int error;
-	int hdrsz;
 	mblk_t *mp;
 	mblk_t *mpdup;
 	mblk_t *resp = NULL;
@@ -661,6 +660,7 @@ tryread:
 	 * will set this to true again.
 	 */
 	call->call_notified = FALSE;
+	call->call_status = RPC_TIMEDOUT;
 	mutex_exit(&call->call_lock);
 
 	if (status == RPC_TIMEDOUT) {
@@ -672,25 +672,6 @@ tryread:
 			p->cku_err.re_errno = EINTR;
 			goto done1;
 		} else {
-			/*
-			 * It's possible that our response arrived
-			 * right after we timed out.  Check to see
-			 * if it has arrived before we remove the
-			 * calllist from the dispatch queue.
-			 */
-			mutex_enter(&call->call_lock);
-			if (call->call_notified == TRUE) {
-				resp = call->call_reply;
-				call->call_reply = NULL;
-				mutex_exit(&call->call_lock);
-				RPCLOG(8, "clnt_clts_kcallit_addr: "
-				    "response received for request "
-				    "w/xid 0x%x after timeout\n",
-				    p->cku_xid);
-				goto getresponse;
-			}
-			mutex_exit(&call->call_lock);
-
 			RPCLOG(8, "clnt_clts_kcallit_addr: "
 			    "request w/xid 0x%x timedout "
 			    "waiting for reply\n", p->cku_xid);
@@ -714,20 +695,7 @@ tryread:
 		}
 	}
 
-getresponse:
-	/*
-	 * Check to see if a response arrived.  If it one is
-	 * present then proceed to process the reponse.  Otherwise
-	 * fall through to retry or retransmit the request.  This
-	 * is probably not the optimal thing to do, but since we
-	 * are most likely dealing with a unrealiable transport it
-	 * is the safe thing to so.
-	 */
-	if (resp == NULL) {
-		p->cku_err.re_status = RPC_CANTRECV;
-		p->cku_err.re_errno = EIO;
-		goto done1;
-	}
+	ASSERT(resp != NULL);
 
 	/*
 	 * Prepare the message for further processing.  We need to remove
@@ -748,28 +716,12 @@ getresponse:
 
 	/*
 	 * Pop off the datagram header.
+	 * It was retained in rpcmodrput().
 	 */
-	hdrsz = resp->b_wptr - resp->b_rptr;
-	if ((resp->b_wptr - (resp->b_rptr + hdrsz)) == 0) {
-		tmp = resp;
-		resp = resp->b_cont;
-		tmp->b_cont = NULL;
-		freeb(tmp);
-	} else {
-		unsigned char *ud_off = resp->b_rptr;
-		resp->b_rptr += hdrsz;
-		tmp = dupb(resp);
-		if (tmp == NULL) {
-			p->cku_err.re_status = RPC_SYSTEMERROR;
-			p->cku_err.re_errno = ENOSR;
-			freemsg(resp);
-			goto done1;
-		}
-		tmp->b_cont = resp->b_cont;
-		resp->b_rptr = ud_off;
-		freeb(resp);
-		resp = tmp;
-	}
+	tmp = resp;
+	resp = resp->b_cont;
+	tmp->b_cont = NULL;
+	freeb(tmp);
 
 	round_trip = ddi_get_lbolt() - round_trip;
 	/*
@@ -871,6 +823,14 @@ getresponse:
 		goto tryread;
 	}
 	if (re_status == RPC_AUTHERROR) {
+
+		(void) xdr_rpc_free_verifier(xdrs, &reply_msg);
+		call_table_remove(call);
+		if (call->call_reply != NULL) {
+			freemsg(call->call_reply);
+			call->call_reply = NULL;
+		}
+
 		/*
 		 * Maybe our credential need to be refreshed
 		 */
@@ -886,18 +846,10 @@ getresponse:
 			RCSTAT_INCR(p->cku_stats, rcbadcalls);
 			RCSTAT_INCR(p->cku_stats, rcnewcreds);
 
-			(void) xdr_rpc_free_verifier(xdrs, &reply_msg);
 			freemsg(mpdup);
-			call_table_remove(call);
-			mutex_enter(&call->call_lock);
-			if (call->call_reply != NULL) {
-				freemsg(call->call_reply);
-				call->call_reply = NULL;
-			}
-			mutex_exit(&call->call_lock);
-
-			freemsg(resp);
 			mpdup = NULL;
+			freemsg(resp);
+			resp = NULL;
 			goto call_again;
 		}
 		/*
@@ -919,19 +871,12 @@ getresponse:
 			 */
 			if (p->cku_useresvport != 1) {
 				p->cku_useresvport = 1;
-				(void) xdr_rpc_free_verifier(xdrs, &reply_msg);
+
 				freemsg(mpdup);
-
-				call_table_remove(call);
-				mutex_enter(&call->call_lock);
-				if (call->call_reply != NULL) {
-					freemsg(call->call_reply);
-					call->call_reply = NULL;
-				}
-				mutex_exit(&call->call_lock);
-
-				freemsg(resp);
 				mpdup = NULL;
+				freemsg(resp);
+				resp = NULL;
+
 				endpt = p->cku_endpnt;
 				if (endpt->e_tiptr != NULL) {
 					mutex_enter(&endpt->e_lock);
@@ -965,18 +910,17 @@ getresponse:
 		RPCLOG(1, "clnt_clts_kcallit : authentication failed "
 		    "with RPC_AUTHERROR of type %d\n",
 		    p->cku_err.re_why);
+		goto done;
 	}
 
 	(void) xdr_rpc_free_verifier(xdrs, &reply_msg);
 
 done1:
 	call_table_remove(call);
-	mutex_enter(&call->call_lock);
 	if (call->call_reply != NULL) {
 		freemsg(call->call_reply);
 		call->call_reply = NULL;
 	}
-	mutex_exit(&call->call_lock);
 	RPCLOG(64, "clnt_clts_kcallit_addr: xid 0x%x taken off dispatch list",
 	    p->cku_xid);
 
