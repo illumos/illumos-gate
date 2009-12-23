@@ -101,6 +101,17 @@ void		group_remove_at(group_t *, uint_t);
  */
 uint_t		group_find(group_t *, void *);
 
+/*
+ * Convert a group to a string with list of integers.
+ *
+ * The consecutive integer values are represented using x-y notation.
+ * The resulting string looks like "1,2-5,8"
+ *
+ * The convert argument is used to map group elements to integer IDs.
+ * The output buffer and its length are specfied in the arguments.
+ */
+extern char *group2intlist(group_t *, char *, size_t, int (convert)(void*));
+
 #endif	/* !_KERNEL && !_KMEMUSER */
 
 #ifdef	__cplusplus

@@ -35,6 +35,7 @@
 #include <sys/conf.h>
 #include <sys/kmem.h>
 #include <sys/kcpc.h>
+#include <sys/cap_util.h>
 #include <sys/cpc_pcbe.h>
 #include <sys/cpc_impl.h>
 #include <sys/dtrace_impl.h>
@@ -463,8 +464,7 @@ dcpc_program_cpu_event(cpu_t *c)
 
 	set = dcpc_create_set(c);
 
-	octx = NULL;
-	set->ks_ctx = ctx = kcpc_ctx_alloc();
+	set->ks_ctx = ctx = kcpc_ctx_alloc(KM_SLEEP);
 	ctx->kc_set = set;
 	ctx->kc_cpuid = c->cpu_id;
 
@@ -489,11 +489,9 @@ dcpc_program_cpu_event(cpu_t *c)
 	 * If we already have an active enabling then save the current cpc
 	 * context away.
 	 */
-	if (c->cpu_cpc_ctx != NULL)
-		octx = c->cpu_cpc_ctx;
+	octx = c->cpu_cpc_ctx;
 
-	c->cpu_cpc_ctx = ctx;
-	kcpc_remote_program(c);
+	kcpc_cpu_program(c, ctx);
 
 	if (octx != NULL) {
 		kcpc_set_t *oset = octx->kc_set;
@@ -528,9 +526,14 @@ dcpc_disable_cpu(cpu_t *c)
 	if (c->cpu_flags & CPU_OFFLINE)
 		return;
 
-	kcpc_remote_stop(c);
-
+	/*
+	 * Grab CPUs CPC context before kcpc_cpu_stop() stops counters and
+	 * changes it.
+	 */
 	ctx = c->cpu_cpc_ctx;
+
+	kcpc_cpu_stop(c, B_FALSE);
+
 	set = ctx->kc_set;
 
 	kcpc_free_configs(set);
@@ -538,7 +541,6 @@ dcpc_disable_cpu(cpu_t *c)
 	kmem_free(set->ks_data, set->ks_nreqs * sizeof (uint64_t));
 	kcpc_free_set(set);
 	kcpc_ctx_free(ctx);
-	c->cpu_cpc_ctx = NULL;
 }
 
 /*
@@ -615,8 +617,21 @@ dcpc_program_event(dcpc_probe_t *pp)
 		if (c->cpu_flags & CPU_OFFLINE)
 			continue;
 
+		/*
+		 * Stop counters but preserve existing DTrace CPC context
+		 * if there is one.
+		 *
+		 * If we come here when the first event is programmed for a CPU,
+		 * there should be no DTrace CPC context installed. In this
+		 * case, kcpc_cpu_stop() will ensure that there is no other
+		 * context on the CPU.
+		 *
+		 * If we add new enabling to the original one, the CPU should
+		 * have the old DTrace CPC context which we need to keep around
+		 * since dcpc_program_event() will add to it.
+		 */
 		if (c->cpu_cpc_ctx != NULL)
-			kcpc_remote_stop(c);
+			kcpc_cpu_stop(c, B_TRUE);
 	} while ((c = c->cpu_next) != cpu_list);
 
 	dcpc_release_interrupts();
@@ -708,6 +723,13 @@ dcpc_enable(void *arg, dtrace_id_t id, void *parg)
 	ASSERT(pp->dcpc_actv_req_idx >= 0);
 
 	/*
+	 * DTrace is taking over CPC contexts, so stop collecting
+	 * capacity/utilization data for all CPUs.
+	 */
+	if (dtrace_cpc_in_use == 1)
+		cu_disable();
+
+	/*
 	 * The following must hold true if we are to (attempt to) enable
 	 * this request:
 	 *
@@ -758,13 +780,20 @@ dcpc_enable(void *arg, dtrace_id_t id, void *parg)
 			if (c->cpu_flags & CPU_OFFLINE)
 				continue;
 
-			kcpc_remote_program(c);
+			kcpc_cpu_program(c, c->cpu_cpc_ctx);
 		} while ((c = c->cpu_next) != cpu_list);
 	}
 
 	dtrace_cpc_in_use--;
 	dcpc_actv_reqs[pp->dcpc_actv_req_idx] = NULL;
 	pp->dcpc_actv_req_idx = pp->dcpc_picno = -1;
+
+	/*
+	 * If all probes are removed, enable capacity/utilization data
+	 * collection for every CPU.
+	 */
+	if (dtrace_cpc_in_use == 0)
+		cu_enable();
 
 	return (-1);
 }
@@ -841,6 +870,13 @@ dcpc_disable(void *arg, dtrace_id_t id, void *parg)
 	dtrace_cpc_in_use--;
 	pp->dcpc_enabled = 0;
 	pp->dcpc_actv_req_idx = pp->dcpc_picno = pp->dcpc_disabling = -1;
+
+	/*
+	 * If all probes are removed, enable capacity/utilization data
+	 * collection for every CPU
+	 */
+	if (dtrace_cpc_in_use == 0)
+		cu_enable();
 }
 
 /*ARGSUSED*/
@@ -891,7 +927,6 @@ dcpc_cpu_setup(cpu_setup_t what, processorid_t cpu, void *arg)
 		 */
 		if (dtrace_cpc_in_use) {
 			c = cpu_get(cpu);
-
 			(void) dcpc_program_cpu_event(c);
 		}
 		break;

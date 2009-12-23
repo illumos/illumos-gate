@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/systm.h>
 #include <sys/archsystm.h>
@@ -224,6 +222,15 @@ xc_init(void)
  * In addition, callers are allowed to capture and release cpus by
  * calling the routines: xc_attention() and xc_dismissed().
  */
+
+/*
+ * spl_xcall - set PIL to xcall level
+ */
+int
+spl_xcall(void)
+{
+	return (splr(XCALL_PIL));
+}
 
 /*
  * xt_one - send a "x-trap" to a cpu

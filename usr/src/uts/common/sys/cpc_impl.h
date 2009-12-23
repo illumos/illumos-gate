@@ -131,7 +131,7 @@ typedef struct _kcpc_ctx kcpc_ctx_t;
 
 struct _kcpc_ctx {
 	struct _kcpc_set *kc_set;	/* linked list of all bound sets */
-	uint32_t	kc_flags;
+	volatile uint_t	kc_flags;
 	kcpc_pic_t	*kc_pics;	/* pointer to array of per-pic data */
 	hrtime_t	kc_hrtime;	/* gethrtime() at last sample */
 	uint64_t	kc_vtick;	/* virtualized %tick */
@@ -214,20 +214,18 @@ extern hrtime_t tsc_read(void);
 struct cpu;
 
 extern uint_t cpc_ncounters;
-extern kmutex_t	kcpc_ctx_llock[];	/* protects ctx_list */
-extern kcpc_ctx_t *kcpc_ctx_list[];	/* head of list */
 extern krwlock_t kcpc_cpuctx_lock;	/* lock for 'kcpc_cpuctx' below */
 extern int	kcpc_cpuctx;		/* number of cpu-specific contexts */
 
 extern void kcpc_invalidate_all(void);
 
 extern void kcpc_passivate(void);
-extern void kcpc_remote_stop(struct cpu *cp);
+extern void kcpc_cpu_stop(struct cpu *, boolean_t);
 extern int kcpc_pcbe_tryload(const char *, uint_t, uint_t, uint_t);
-extern void kcpc_remote_program(struct cpu *cp);
+extern void kcpc_cpu_program(struct cpu *, kcpc_ctx_t *);
 extern void kcpc_register_dcpc(void (*func)(uint64_t));
 extern void kcpc_unregister_dcpc(void);
-extern kcpc_ctx_t *kcpc_ctx_alloc(void);
+extern kcpc_ctx_t *kcpc_ctx_alloc(int);
 extern int kcpc_assign_reqs(struct _kcpc_set *, kcpc_ctx_t *);
 extern void kcpc_ctx_free(kcpc_ctx_t *);
 extern int kcpc_configure_reqs(kcpc_ctx_t *, struct _kcpc_set *, int *);

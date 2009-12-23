@@ -1203,12 +1203,14 @@ cpu_online(cpu_t *cp)
 		}
 		cp->cpu_flags &= ~(CPU_QUIESCED | CPU_OFFLINE | CPU_FROZEN |
 		    CPU_SPARE);
+		CPU_NEW_GENERATION(cp);
 		start_cpus();
 		cpu_stats_kstat_create(cp);
 		cpu_create_intrstat(cp);
 		lgrp_kstat_create(cp);
 		cpu_state_change_notify(cp->cpu_id, CPU_ON);
 		cpu_intr_enable(cp);	/* arch-dep hook */
+		cpu_state_change_notify(cp->cpu_id, CPU_INTR_ON);
 		cpu_set_state(cp);
 		cyclic_online(cp);
 		/*
@@ -1284,6 +1286,7 @@ cpu_offline(cpu_t *cp, int flags)
 	/*
 	 * Tell interested parties that this CPU is going offline.
 	 */
+	CPU_NEW_GENERATION(cp);
 	cpu_state_change_notify(cp->cpu_id, CPU_OFF);
 
 	/*
@@ -1557,8 +1560,11 @@ out:
 	/*
 	 * If we failed, we need to notify everyone that this CPU is back on.
 	 */
-	if (error != 0)
+	if (error != 0) {
+		CPU_NEW_GENERATION(cp);
 		cpu_state_change_notify(cp->cpu_id, CPU_ON);
+		cpu_state_change_notify(cp->cpu_id, CPU_INTR_ON);
+	}
 
 	return (error);
 }
@@ -2152,6 +2158,7 @@ static struct {
 	kstat_named_t ci_core_id;
 	kstat_named_t ci_curr_clock_Hz;
 	kstat_named_t ci_supp_freq_Hz;
+	kstat_named_t ci_pg_id;
 #if defined(__sparcv9)
 	kstat_named_t ci_device_ID;
 	kstat_named_t ci_cpu_fru;
@@ -2167,6 +2174,7 @@ static struct {
 	kstat_named_t ci_ncoreperchip;
 	kstat_named_t ci_max_cstates;
 	kstat_named_t ci_curr_cstate;
+	kstat_named_t ci_cacheid;
 	kstat_named_t ci_sktstr;
 #endif
 } cpu_info_template = {
@@ -2181,6 +2189,7 @@ static struct {
 	{ "core_id",			KSTAT_DATA_LONG },
 	{ "current_clock_Hz",		KSTAT_DATA_UINT64 },
 	{ "supported_frequencies_Hz",	KSTAT_DATA_STRING },
+	{ "pg_id",			KSTAT_DATA_LONG },
 #if defined(__sparcv9)
 	{ "device_ID",			KSTAT_DATA_UINT64 },
 	{ "cpu_fru",			KSTAT_DATA_STRING },
@@ -2196,6 +2205,7 @@ static struct {
 	{ "ncore_per_chip",		KSTAT_DATA_INT32 },
 	{ "supported_max_cstates",	KSTAT_DATA_INT32 },
 	{ "current_cstate",		KSTAT_DATA_INT32 },
+	{ "cache_id",			KSTAT_DATA_INT32 },
 	{ "socket_type",		KSTAT_DATA_STRING },
 #endif
 };
@@ -2253,6 +2263,9 @@ cpu_info_kstat_update(kstat_t *ksp, int rw)
 	cpu_info_template.ci_core_id.value.l = pg_plat_get_core_id(cp);
 	cpu_info_template.ci_curr_clock_Hz.value.ui64 =
 	    cp->cpu_curr_clock;
+	cpu_info_template.ci_pg_id.value.l =
+	    cp->cpu_pg && cp->cpu_pg->cmt_lineage ?
+	    cp->cpu_pg->cmt_lineage->pg_id : -1;
 	kstat_named_setstr(&cpu_info_template.ci_supp_freq_Hz,
 	    cp->cpu_supp_freqs);
 #if defined(__sparcv9)
@@ -2273,6 +2286,7 @@ cpu_info_kstat_update(kstat_t *ksp, int rw)
 	cpu_info_template.ci_pkg_core_id.value.l = cpuid_get_pkgcoreid(cp);
 	cpu_info_template.ci_max_cstates.value.l = cp->cpu_m.max_cstates;
 	cpu_info_template.ci_curr_cstate.value.l = cpu_idle_get_cpu_state(cp);
+	cpu_info_template.ci_cacheid.value.i32 = cpuid_get_cacheid(cp);
 	kstat_named_setstr(&cpu_info_template.ci_sktstr,
 	    cpuid_getsocketstr(cp));
 #endif

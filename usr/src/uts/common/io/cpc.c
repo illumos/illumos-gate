@@ -942,49 +942,19 @@ static struct modlinkage modl = {
 #endif
 };
 
-static void
-kcpc_init(void)
-{
-	long hash;
-
-	rw_init(&kcpc_cpuctx_lock, NULL, RW_DEFAULT, NULL);
-	for (hash = 0; hash < CPC_HASH_BUCKETS; hash++)
-		mutex_init(&kcpc_ctx_llock[hash],
-		    NULL, MUTEX_DRIVER, (void *)(uintptr_t)15);
-}
-
-static void
-kcpc_fini(void)
-{
-	long hash;
-
-	for (hash = 0; hash < CPC_HASH_BUCKETS; hash++)
-		mutex_destroy(&kcpc_ctx_llock[hash]);
-	rw_destroy(&kcpc_cpuctx_lock);
-}
-
 int
 _init(void)
 {
-	int ret;
-
-	if (kcpc_hw_load_pcbe() != 0)
+	if (kcpc_init() != 0)
 		return (ENOTSUP);
 
-	kcpc_init();
-	if ((ret = mod_install(&modl)) != 0)
-		kcpc_fini();
-	return (ret);
+	return (mod_install(&modl));
 }
 
 int
 _fini(void)
 {
-	int ret;
-
-	if ((ret = mod_remove(&modl)) == 0)
-		kcpc_fini();
-	return (ret);
+	return (mod_remove(&modl));
 }
 
 int

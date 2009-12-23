@@ -522,7 +522,7 @@ static const char *
 p4_pcbe_impl_name(void)
 {
 	if (p4_htt)
-		return ("Pentium 4 with HyperThreading");
+		return (PCBE_IMPL_NAME_P4HT);
 	return ("Pentium 4");
 }
 

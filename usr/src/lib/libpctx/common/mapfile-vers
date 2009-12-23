@@ -50,6 +50,7 @@ SUNWprivate_1.1 {
     global:
 	__pctx_cpc;
 	__pctx_cpc_register_callback;
+	pctx_terminate;
     local:
 	*;
 };

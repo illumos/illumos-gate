@@ -32,6 +32,8 @@
 #include <sys/systm.h>
 #include <sys/promif.h>
 #include <sys/xc_levels.h>
+#include <sys/spl.h>
+#include <sys/bitmap.h>
 
 /*
  * Interrupt another CPU.
@@ -53,4 +55,39 @@ poke_cpu(int cpun)
 	 * so just send out a directed interrupt.
 	 */
 	send_dirint(cpun, XC_CPUPOKE_PIL);
+}
+
+/*
+ * Call a function on a target CPU
+ */
+void
+cpu_call(cpu_t *cp, cpu_call_func_t func, uintptr_t arg1, uintptr_t arg2)
+{
+	cpuset_t set;
+
+	if (panicstr)
+		return;
+
+	/*
+	 * Prevent CPU from going off-line
+	 */
+	kpreempt_disable();
+
+	/*
+	 * If we are on the target CPU, call the function directly, but raise
+	 * the PIL to XC_PIL.
+	 * This guarantees that functions called via cpu_call() can not ever
+	 * interrupt each other.
+	 */
+	if (CPU == cp) {
+		int save_spl = splr(ipltospl(XC_HI_PIL));
+
+		(*func)(arg1, arg2);
+		splx(save_spl);
+	} else {
+		CPUSET_ONLY(set, cp->cpu_id);
+		xc_call((xc_arg_t)arg1, (xc_arg_t)arg2, 0, CPUSET2BV(set),
+		    (xc_func_t)func);
+	}
+	kpreempt_enable();
 }

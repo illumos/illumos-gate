@@ -270,6 +270,7 @@ int spl8(void);
 void splx(int);
 void set_base_spl(void);
 int __ipltospl(int);
+int spl_xcall(void);
 
 void softcall_init(void);
 void softcall(void (*)(void *), void *);

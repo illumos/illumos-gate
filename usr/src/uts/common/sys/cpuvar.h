@@ -222,6 +222,16 @@ typedef struct cpu {
 
 	uint_t		cpu_rotor;	/* for cheap pseudo-random numbers */
 
+	struct cu_cpu_info	*cpu_cu_info;	/* capacity & util. info */
+
+	/*
+	 * cpu_generation is updated whenever CPU goes on-line or off-line.
+	 * Updates to cpu_generation are protected by cpu_lock.
+	 *
+	 * See CPU_NEW_GENERATION() macro below.
+	 */
+	volatile uint_t		cpu_generation;	/* tracking on/off-line */
+
 	/*
 	 * New members must be added /before/ this member, as the CTF tools
 	 * rely on this being the last field before cpu_m, so they can
@@ -597,6 +607,13 @@ extern struct cpu *curcpup(void);
 #define	CPU_STATS(cp, stat)                                       \
 	((cp)->cpu_stats.stat)
 
+/*
+ * Increment CPU generation value.
+ * This macro should be called whenever CPU goes on-line or off-line.
+ * Updates to cpu_generation should be protected by cpu_lock.
+ */
+#define	CPU_NEW_GENERATION(cp)	((cp)->cpu_generation++)
+
 #endif /* _KERNEL || _KMEMUSER */
 
 /*
@@ -726,6 +743,49 @@ void	cpu_enable_intr(struct cpu *cp); /* start issuing interrupts to cpu */
  */
 extern kmutex_t	cpu_lock;	/* lock protecting CPU data */
 
+/*
+ * CPU state change events
+ *
+ * Various subsystems need to know when CPUs change their state. They get this
+ * information by registering  CPU state change callbacks using
+ * register_cpu_setup_func(). Whenever any CPU changes its state, the callback
+ * function is called. The callback function is passed three arguments:
+ *
+ *   Event, described by cpu_setup_t
+ *   CPU ID
+ *   Transparent pointer passed when registering the callback
+ *
+ * The callback function is called with cpu_lock held. The return value from the
+ * callback function is usually ignored, except for CPU_CONFIG and CPU_UNCONFIG
+ * events. For these two events, non-zero return value indicates a failure and
+ * prevents successful completion of the operation.
+ *
+ * New events may be added in the future. Callback functions should ignore any
+ * events that they do not understand.
+ *
+ * The following events provide notification callbacks:
+ *
+ *  CPU_INIT	A new CPU is started and added to the list of active CPUs
+ *		  This event is only used during boot
+ *
+ *  CPU_CONFIG	A newly inserted CPU is prepared for starting running code
+ *		  This event is called by DR code
+ *
+ *  CPU_UNCONFIG CPU has been powered off and needs cleanup
+ *		  This event is called by DR code
+ *
+ *  CPU_ON	CPU is enabled but does not run anything yet
+ *
+ *  CPU_INTR_ON	CPU is enabled and has interrupts enabled
+ *
+ *  CPU_OFF	CPU is going offline but can still run threads
+ *
+ *  CPU_CPUPART_OUT	CPU is going to move out of its partition
+ *
+ *  CPU_CPUPART_IN	CPU is going to move to a new partition
+ *
+ *  CPU_SETUP	CPU is set up during boot and can run threads
+ */
 typedef enum {
 	CPU_INIT,
 	CPU_CONFIG,
@@ -734,7 +794,8 @@ typedef enum {
 	CPU_OFF,
 	CPU_CPUPART_IN,
 	CPU_CPUPART_OUT,
-	CPU_SETUP
+	CPU_SETUP,
+	CPU_INTR_ON
 } cpu_setup_t;
 
 typedef int cpu_setup_func_t(cpu_setup_t, int, void *);
@@ -746,6 +807,13 @@ typedef int cpu_setup_func_t(cpu_setup_t, int, void *);
 extern void register_cpu_setup_func(cpu_setup_func_t *, void *);
 extern void unregister_cpu_setup_func(cpu_setup_func_t *, void *);
 extern void cpu_state_change_notify(int, cpu_setup_t);
+
+/*
+ * Call specified function on the given CPU
+ */
+typedef void (*cpu_call_func_t)(uintptr_t, uintptr_t);
+extern void cpu_call(cpu_t *, cpu_call_func_t, uintptr_t, uintptr_t);
+
 
 /*
  * Create various strings that describe the given CPU for the

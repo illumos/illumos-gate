@@ -98,6 +98,7 @@ CHKHDRS=			\
 	byteorder.h		\
 	callb.h			\
 	callo.h			\
+	cap_util.h		\
 	cpucaps.h		\
 	cpucaps_impl.h		\
 	ccompile.h		\

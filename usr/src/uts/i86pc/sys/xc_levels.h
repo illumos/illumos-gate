@@ -35,6 +35,7 @@ extern "C" {
 #define	XC_CPUPOKE_PIL	11	/* poke to cause wakeup, no service function */
 #define	XC_SYS_PIL	13	/* should be defined elsewhere */
 #define	XC_HI_PIL	15	/* cross call with service function */
+#define	XCALL_PIL	XC_HI_PIL /* alias for XC_HI_PIL */
 
 #ifdef	__cplusplus
 }

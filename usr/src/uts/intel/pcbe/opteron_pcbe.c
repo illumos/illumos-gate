@@ -563,26 +563,6 @@ opt_pcbe_list_attrs(void)
 	return ("edge,pc,inv,cmask,umask");
 }
 
-/*ARGSUSED*/
-static uint64_t
-opt_pcbe_event_coverage(char *event)
-{
-	/*
-	 * Fortunately, all counters can count all events.
-	 */
-	return (0xF);
-}
-
-static uint64_t
-opt_pcbe_overflow_bitmap(void)
-{
-	/*
-	 * Unfortunately, this chip cannot detect which counter overflowed, so
-	 * we must act as if they all did.
-	 */
-	return (0xF);
-}
-
 static amd_generic_event_t *
 find_generic_event(char *name)
 {
@@ -605,6 +585,32 @@ find_event(char *name)
 			return (evp);
 
 	return (NULL);
+}
+
+/*ARGSUSED*/
+static uint64_t
+opt_pcbe_event_coverage(char *event)
+{
+	/*
+	 * Check whether counter event is supported
+	 */
+	if (find_event(event) == NULL && find_generic_event(event) == NULL)
+		return (0);
+
+	/*
+	 * Fortunately, all counters can count all events.
+	 */
+	return (0xF);
+}
+
+static uint64_t
+opt_pcbe_overflow_bitmap(void)
+{
+	/*
+	 * Unfortunately, this chip cannot detect which counter overflowed, so
+	 * we must act as if they all did.
+	 */
+	return (0xF);
 }
 
 /*ARGSUSED*/

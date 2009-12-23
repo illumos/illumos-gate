@@ -34,6 +34,7 @@
 #include <sys/pg.h>
 #include <sys/pghw.h>
 #include <sys/cpu_pm.h>
+#include <sys/cap_util.h>
 
 /*
  * Processor Groups: Hardware sharing relationship layer
@@ -116,10 +117,10 @@ struct pghw_kstat {
 	kstat_named_t	pg_hw;
 	kstat_named_t	pg_policy;
 } pghw_kstat = {
-	{ "id",			KSTAT_DATA_UINT64 },
+	{ "id",			KSTAT_DATA_UINT32 },
 	{ "pg_class",		KSTAT_DATA_STRING },
-	{ "ncpus",		KSTAT_DATA_UINT64 },
-	{ "instance_id",	KSTAT_DATA_UINT64 },
+	{ "ncpus",		KSTAT_DATA_UINT32 },
+	{ "instance_id",	KSTAT_DATA_UINT32 },
 	{ "hardware",		KSTAT_DATA_STRING },
 	{ "policy",		KSTAT_DATA_STRING },
 };
@@ -127,11 +128,91 @@ struct pghw_kstat {
 kmutex_t		pghw_kstat_lock;
 
 /*
+ * Capacity and Utilization PG kstats
+ *
+ * These kstats are updated one at a time, so we can have a single scratch space
+ * to fill the data.
+ *
+ * kstat fields:
+ *
+ *   pgid		PG ID for PG described by this kstat
+ *
+ *   pg_ncpus		Number of CPUs within this PG
+ *
+ *   pg_cpus		String describing CPUs within this PG
+ *
+ *   pg_sharing		Name of sharing relationship for this PG
+ *
+ *   pg_generation	Generation value that increases whenever any CPU leaves
+ *			  or joins PG. Two kstat snapshots for the same
+ *			  CPU may only be compared if they have the same
+ *			  generation
+ *
+ *   pg_hw_util		Running value of PG utilization for the sharing
+ *			  relationship
+ *
+ *   pg_hw_util_time_running
+ *			Total time spent collecting CU data. The time may be
+ *			less than wall time if CU counters were stopped for
+ *			some time.
+ *
+ *   pg_hw_util_time_stopped Total time the CU counters were stopped.
+ *
+ *   pg_hw_util_rate	Utilization rate, expressed in operations per second.
+ *
+ *   pg_hw_util_rate_max Maximum observed value of utilization rate.
+ */
+struct pghw_cu_kstat {
+	kstat_named_t	pg_id;
+	kstat_named_t	pg_ncpus;
+	kstat_named_t	pg_generation;
+	kstat_named_t	pg_hw_util;
+	kstat_named_t	pg_hw_util_time_running;
+	kstat_named_t	pg_hw_util_time_stopped;
+	kstat_named_t	pg_hw_util_rate;
+	kstat_named_t	pg_hw_util_rate_max;
+	kstat_named_t	pg_cpus;
+	kstat_named_t	pg_sharing;
+} pghw_cu_kstat = {
+	{ "id",			KSTAT_DATA_UINT32 },
+	{ "ncpus",		KSTAT_DATA_UINT32 },
+	{ "generation",		KSTAT_DATA_UINT32   },
+	{ "hw_util",		KSTAT_DATA_UINT64   },
+	{ "hw_util_time_running",	KSTAT_DATA_UINT64   },
+	{ "hw_util_time_stopped",	KSTAT_DATA_UINT64   },
+	{ "hw_util_rate",	KSTAT_DATA_UINT64   },
+	{ "hw_util_rate_max",	KSTAT_DATA_UINT64   },
+	{ "cpus",		KSTAT_DATA_STRING   },
+	{ "sharing_relation",	KSTAT_DATA_STRING   },
+};
+
+/*
+ * Calculate the string size to represent NCPUS. Allow 5 digits for each CPU ID
+ * plus one space per CPU plus NUL byte in the end. This is only an estimate,
+ * since we try to compress CPU ranges as x-y. In the worst case the string
+ * representation of CPUs may be truncated.
+ */
+#define	CPUSTR_LEN(ncpus) ((ncpus) * 6)
+
+/*
+ * Maximum length of the string that represents list of CPUs
+ */
+static int pg_cpulist_maxlen = 0;
+
+static void		pghw_kstat_create(pghw_t *);
+static int		pghw_kstat_update(kstat_t *, int);
+static int		pghw_cu_kstat_update(kstat_t *, int);
+static int		cpu2id(void *);
+
+/*
  * hwset operations
  */
 static group_t		*pghw_set_create(pghw_type_t);
 static void		pghw_set_add(group_t *, pghw_t *);
 static void		pghw_set_remove(group_t *, pghw_t *);
+
+static void		pghw_cpulist_alloc(pghw_t *);
+static int		cpu2id(void *);
 
 /*
  * Initialize the physical portion of a hardware PG
@@ -150,6 +231,7 @@ pghw_init(pghw_t *pg, cpu_t *cp, pghw_type_t hw)
 
 	pghw_set_add(hwset, pg);
 	pg->pghw_hw = hw;
+	pg->pghw_generation = 0;
 	pg->pghw_instance =
 	    pg_plat_hw_instance_id(cp, hw);
 	pghw_kstat_create(pg);
@@ -186,8 +268,20 @@ pghw_fini(pghw_t *pg)
 	pg->pghw_instance = (id_t)PGHW_INSTANCE_ANON;
 	pg->pghw_hw = (pghw_type_t)-1;
 
-	if (pg->pghw_kstat)
+	if (pg->pghw_kstat != NULL)
 		kstat_delete(pg->pghw_kstat);
+
+	/*
+	 * Destroy string representation of CPUs
+	 */
+	if (pg->pghw_cpulist != NULL) {
+		kmem_free(pg->pghw_cpulist,
+		    pg->pghw_cpulist_len);
+		pg->pghw_cpulist = NULL;
+	}
+
+	if (pg->pghw_cu_kstat != NULL)
+		kstat_delete(pg->pghw_cu_kstat);
 }
 
 /*
@@ -344,11 +438,10 @@ pghw_set_remove(group_t *hwset, pghw_t *pg)
 	ASSERT(result == 0);
 }
 
-
 /*
  * Return a string name given a pg_hw sharing type
  */
-static char *
+char *
 pghw_type_string(pghw_type_t hw)
 {
 	switch (hw) {
@@ -374,6 +467,34 @@ pghw_type_string(pghw_type_t hw)
 }
 
 /*
+ * Return a short string name given a pg_hw sharing type
+ */
+char *
+pghw_type_shortstring(pghw_type_t hw)
+{
+	switch (hw) {
+	case PGHW_IPIPE:
+		return ("instr_pipeline");
+	case PGHW_CACHE:
+		return ("Cache");
+	case PGHW_FPU:
+		return ("FPU");
+	case PGHW_MPIPE:
+		return ("memory_pipeline");
+	case PGHW_CHIP:
+		return ("Socket");
+	case PGHW_MEMORY:
+		return ("Memory");
+	case PGHW_POW_ACTIVE:
+		return ("CPU_PM_Active");
+	case PGHW_POW_IDLE:
+		return ("CPU_PM_Idle");
+	default:
+		return ("unknown");
+	}
+}
+
+/*
  * Create / Update routines for PG hw kstats
  *
  * It is the intention of these kstats to provide some level
@@ -383,11 +504,14 @@ pghw_type_string(pghw_type_t hw)
 void
 pghw_kstat_create(pghw_t *pg)
 {
+	char *class = pghw_type_string(pg->pghw_hw);
+
 	/*
 	 * Create a physical pg kstat
 	 */
 	if ((pg->pghw_kstat = kstat_create("pg", ((pg_t *)pg)->pg_id,
-	    "pg", "pg", KSTAT_TYPE_NAMED,
+	    "pg", "pg",
+	    KSTAT_TYPE_NAMED,
 	    sizeof (pghw_kstat) / sizeof (kstat_named_t),
 	    KSTAT_FLAG_VIRTUAL)) != NULL) {
 		/* Class string, hw string, and policy string */
@@ -400,6 +524,28 @@ pghw_kstat_create(pghw_t *pg)
 		pg->pghw_kstat->ks_private = pg;
 		kstat_install(pg->pghw_kstat);
 	}
+
+	if (pg_cpulist_maxlen == 0)
+		pg_cpulist_maxlen = CPUSTR_LEN(max_ncpus);
+
+	/*
+	 * Create a physical pg kstat
+	 */
+	if ((pg->pghw_cu_kstat = kstat_create("pg", ((pg_t *)pg)->pg_id,
+	    "hardware", class,
+	    KSTAT_TYPE_NAMED,
+	    sizeof (pghw_cu_kstat) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL)) != NULL) {
+		pg->pghw_cu_kstat->ks_lock = &pghw_kstat_lock;
+		pg->pghw_cu_kstat->ks_data = &pghw_cu_kstat;
+		pg->pghw_cu_kstat->ks_update = pghw_cu_kstat_update;
+		pg->pghw_cu_kstat->ks_private = pg;
+		pg->pghw_cu_kstat->ks_data_size += strlen(class) + 1;
+		/* Allow space for CPU strings */
+		pg->pghw_cu_kstat->ks_data_size += PGHW_KSTAT_STR_LEN_MAX;
+		pg->pghw_cu_kstat->ks_data_size += pg_cpulist_maxlen;
+		kstat_install(pg->pghw_cu_kstat);
+	}
 }
 
 int
@@ -411,11 +557,147 @@ pghw_kstat_update(kstat_t *ksp, int rw)
 	if (rw == KSTAT_WRITE)
 		return (EACCES);
 
-	pgsp->pg_id.value.ui64 = ((pg_t *)pg)->pg_id;
-	pgsp->pg_ncpus.value.ui64 = GROUP_SIZE(&((pg_t *)pg)->pg_cpus);
-	pgsp->pg_instance_id.value.ui64 = (uint64_t)pg->pghw_instance;
+	pgsp->pg_id.value.ui32 = ((pg_t *)pg)->pg_id;
+	pgsp->pg_ncpus.value.ui32 = GROUP_SIZE(&((pg_t *)pg)->pg_cpus);
+	pgsp->pg_instance_id.value.ui32 = pg->pghw_instance;
 	kstat_named_setstr(&pgsp->pg_class, ((pg_t *)pg)->pg_class->pgc_name);
 	kstat_named_setstr(&pgsp->pg_hw, pghw_type_string(pg->pghw_hw));
 	kstat_named_setstr(&pgsp->pg_policy, pg_policy_name((pg_t *)pg));
 	return (0);
+}
+
+int
+pghw_cu_kstat_update(kstat_t *ksp, int rw)
+{
+	struct pghw_cu_kstat	*pgsp = &pghw_cu_kstat;
+	pghw_t			*pg = ksp->ks_private;
+	pghw_util_t		*hw_util = &pg->pghw_stats;
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+
+	pgsp->pg_id.value.ui32 = ((pg_t *)pg)->pg_id;
+	pgsp->pg_ncpus.value.ui32 = GROUP_SIZE(&((pg_t *)pg)->pg_cpus);
+
+	/*
+	 * Allocate memory for the string representing the list of CPUs in PG.
+	 * This memory should persist past the call to pghw_cu_kstat_update()
+	 * since the kstat snapshot routine will reference this memory.
+	 */
+	pghw_cpulist_alloc(pg);
+
+	if (pg->pghw_kstat_gen != pg->pghw_generation) {
+		/*
+		 * PG kstat generation number is out of sync with PG's
+		 * generation mumber. It means that some CPUs could have joined
+		 * or left PG and it is not possible to compare the numbers
+		 * obtained before and after the generation change.
+		 *
+		 * Reset the maximum utilization rate and start computing it
+		 * from scratch.
+		 */
+		hw_util->pghw_util = 0;
+		hw_util->pghw_rate_max = 0;
+		pg->pghw_kstat_gen = pg->pghw_generation;
+	}
+
+	/*
+	 * We can't block on CPU lock because when PG is destroyed (under
+	 * cpu_lock) it tries to delete this kstat and it will wait for us to
+	 * complete which will never happen since we are waiting for cpu_lock to
+	 * drop. Deadlocks are fun!
+	 */
+	if (mutex_tryenter(&cpu_lock)) {
+		if (pg->pghw_cpulist != NULL &&
+		    *(pg->pghw_cpulist) == '\0') {
+			(void) group2intlist(&(((pg_t *)pg)->pg_cpus),
+			    pg->pghw_cpulist, pg->pghw_cpulist_len, cpu2id);
+		}
+		cu_pg_update(pg);
+		mutex_exit(&cpu_lock);
+	}
+
+	pgsp->pg_generation.value.ui32 = pg->pghw_kstat_gen;
+	pgsp->pg_hw_util.value.ui64 = hw_util->pghw_util;
+	pgsp->pg_hw_util_time_running.value.ui64 = hw_util->pghw_time_running;
+	pgsp->pg_hw_util_time_stopped.value.ui64 = hw_util->pghw_time_stopped;
+	pgsp->pg_hw_util_rate.value.ui64 = hw_util->pghw_rate;
+	pgsp->pg_hw_util_rate_max.value.ui64 = hw_util->pghw_rate_max;
+	if (pg->pghw_cpulist != NULL)
+		kstat_named_setstr(&pgsp->pg_cpus, pg->pghw_cpulist);
+	else
+		kstat_named_setstr(&pgsp->pg_cpus, "");
+
+	kstat_named_setstr(&pgsp->pg_sharing, pghw_type_string(pg->pghw_hw));
+
+	return (0);
+}
+
+/*
+ * Update the string representation of CPUs in PG (pg->pghw_cpulist).
+ * The string representation is used for kstats.
+ *
+ * The string is allocated if it has not already been or if it is already
+ * allocated and PG has more CPUs now. If PG has smaller or equal number of
+ * CPUs, but the actual CPUs may have changed, the string is reset to the empty
+ * string causes the string representation to be recreated. The pghw_generation
+ * field is used to detect whether CPUs within the pg may have changed.
+ */
+static void
+pghw_cpulist_alloc(pghw_t *pg)
+{
+	uint_t	ncpus = GROUP_SIZE(&((pg_t *)pg)->pg_cpus);
+	size_t	len = CPUSTR_LEN(ncpus);
+
+	/*
+	 * If the pghw_cpulist string is already allocated we need to make sure
+	 * that it has sufficient length. Also if the set of CPUs may have
+	 * changed, we need to re-generate the string.
+	 */
+	if (pg->pghw_cpulist != NULL &&
+	    pg->pghw_kstat_gen != pg->pghw_generation) {
+		if (len <= pg->pghw_cpulist_len) {
+			/*
+			 * There is sufficient space in the pghw_cpulist for
+			 * the new set of CPUs. Just clear the string to trigger
+			 * re-generation of list of CPUs
+			 */
+			*(pg->pghw_cpulist) = '\0';
+		} else {
+			/*
+			 * There is, potentially, insufficient space in
+			 * pghw_cpulist, so reallocate the string.
+			 */
+			ASSERT(strlen(pg->pghw_cpulist) < pg->pghw_cpulist_len);
+			kmem_free(pg->pghw_cpulist, pg->pghw_cpulist_len);
+			pg->pghw_cpulist = NULL;
+			pg->pghw_cpulist_len = 0;
+		}
+	}
+
+	if (pg->pghw_cpulist == NULL) {
+		/*
+		 * Allocate space to hold cpulist.
+		 *
+		 * Length can not be bigger that the maximum space we have
+		 * allowed for the kstat buffer
+		 */
+		if (len > pg_cpulist_maxlen)
+			len = pg_cpulist_maxlen;
+		if (len > 0) {
+			pg->pghw_cpulist = kmem_zalloc(len, KM_NOSLEEP);
+			if (pg->pghw_cpulist != NULL)
+				pg->pghw_cpulist_len = len;
+		}
+	}
+}
+
+static int
+cpu2id(void *v)
+{
+	cpu_t *cp = (cpu_t *)v;
+
+	ASSERT(v != NULL);
+
+	return (cp->cpu_id);
 }

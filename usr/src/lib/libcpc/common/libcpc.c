@@ -168,6 +168,23 @@ cpc_close(cpc_t *cpc)
 	return (0);
 }
 
+/*
+ * Terminate everything that runs in pctx_run
+ */
+void
+cpc_terminate(cpc_t *cpc)
+{
+	cpc_set_t	*csp;
+	int		sigblocked;
+
+	sigblocked = cpc_lock(cpc);
+	for (csp = cpc->cpc_sets; csp != NULL; csp = csp->cs_next) {
+		if (csp->cs_pctx != NULL)
+			pctx_terminate(csp->cs_pctx);
+	}
+	cpc_unlock(cpc, sigblocked);
+}
+
 cpc_set_t *
 cpc_set_create(cpc_t *cpc)
 {
@@ -223,6 +240,14 @@ cpc_set_destroy(cpc_t *cpc, cpc_set_t *set)
 
 	if (csp->cs_state != CS_UNBOUND)
 		(void) cpc_unbind(cpc, csp);
+
+	/*
+	 * Detach from the process
+	 */
+	if (csp->cs_pctx != NULL) {
+		pctx_release(csp->cs_pctx);
+		csp->cs_pctx = NULL;
+	}
 
 	for (req = csp->cs_request; req != NULL; req = next) {
 		next = req->cr_next;

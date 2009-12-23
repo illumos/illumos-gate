@@ -110,7 +110,11 @@ static cpu_pg_t		bootstrap_pg_data;
  * and the next free id in the set.
  */
 static bitset_t		pg_id_set;
-static pgid_t		pg_id_next = 0;
+
+/*
+ * ID space starts from 1 to assume that root has ID 0;
+ */
+static pgid_t		pg_id_next = 1;
 
 /*
  * Default and externed PG ops vectors

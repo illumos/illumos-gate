@@ -2669,6 +2669,13 @@ cpuid_get_clogid(cpu_t *cpu)
 	return (cpu->cpu_m.mcpu_cpi->cpi_clogid);
 }
 
+int
+cpuid_get_cacheid(cpu_t *cpu)
+{
+	ASSERT(cpuid_checkpass(cpu, 1));
+	return (cpu->cpu_m.mcpu_cpi->cpi_last_lvl_cacheid);
+}
+
 uint_t
 cpuid_get_procnodeid(cpu_t *cpu)
 {

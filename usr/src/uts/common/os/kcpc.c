@@ -39,12 +39,17 @@
 #include <sys/sunddi.h>
 #include <sys/modctl.h>
 #include <sys/sdt.h>
+#include <sys/archsystm.h>
+#include <sys/promif.h>
+#include <sys/x_call.h>
+#include <sys/cap_util.h>
 #if defined(__x86)
 #include <asm/clock.h>
+#include <sys/xc_levels.h>
 #endif
 
-kmutex_t	kcpc_ctx_llock[CPC_HASH_BUCKETS];	/* protects ctx_list */
-kcpc_ctx_t	*kcpc_ctx_list[CPC_HASH_BUCKETS];	/* head of list */
+static kmutex_t	kcpc_ctx_llock[CPC_HASH_BUCKETS];	/* protects ctx_list */
+static kcpc_ctx_t *kcpc_ctx_list[CPC_HASH_BUCKETS];	/* head of list */
 
 
 krwlock_t	kcpc_cpuctx_lock;	/* lock for 'kcpc_cpuctx' below */
@@ -73,10 +78,75 @@ static int kcpc_nullctx_panic = 0;
 static void kcpc_lwp_create(kthread_t *t, kthread_t *ct);
 static void kcpc_restore(kcpc_ctx_t *ctx);
 static void kcpc_save(kcpc_ctx_t *ctx);
-static void kcpc_free(kcpc_ctx_t *ctx, int isexec);
 static void kcpc_ctx_clone(kcpc_ctx_t *ctx, kcpc_ctx_t *cctx);
 static int kcpc_tryassign(kcpc_set_t *set, int starting_req, int *scratch);
 static kcpc_set_t *kcpc_dup_set(kcpc_set_t *set);
+static kcpc_set_t *kcpc_set_create(kcpc_request_t *reqs, int nreqs,
+    int set_flags, int kmem_flags);
+
+/*
+ * Macros to manipulate context flags. All flag updates should use one of these
+ * two macros
+ *
+ * Flags should be always be updated atomically since some of the updates are
+ * not protected by locks.
+ */
+#define	KCPC_CTX_FLAG_SET(ctx, flag) atomic_or_uint(&(ctx)->kc_flags, (flag))
+#define	KCPC_CTX_FLAG_CLR(ctx, flag) atomic_and_uint(&(ctx)->kc_flags, ~(flag))
+
+/*
+ * The IS_HIPIL() macro verifies that the code is executed either from a
+ * cross-call or from high-PIL interrupt
+ */
+#ifdef DEBUG
+#define	IS_HIPIL() (getpil() >= XCALL_PIL)
+#else
+#define	IS_HIPIL()
+#endif	/* DEBUG */
+
+
+extern int kcpc_hw_load_pcbe(void);
+
+/*
+ * Return value from kcpc_hw_load_pcbe()
+ */
+static int kcpc_pcbe_error = 0;
+
+/*
+ * Perform one-time initialization of kcpc framework.
+ * This function performs the initialization only the first time it is called.
+ * It is safe to call it multiple times.
+ */
+int
+kcpc_init(void)
+{
+	long hash;
+	static uint32_t kcpc_initialized = 0;
+
+	/*
+	 * We already tried loading platform pcbe module and failed
+	 */
+	if (kcpc_pcbe_error != 0)
+		return (-1);
+
+	/*
+	 * The kcpc framework should be initialized at most once
+	 */
+	if (atomic_cas_32(&kcpc_initialized, 0, 1) != 0)
+		return (0);
+
+	rw_init(&kcpc_cpuctx_lock, NULL, RW_DEFAULT, NULL);
+	for (hash = 0; hash < CPC_HASH_BUCKETS; hash++)
+		mutex_init(&kcpc_ctx_llock[hash],
+		    NULL, MUTEX_DRIVER, (void *)(uintptr_t)15);
+
+	/*
+	 * Load platform-specific pcbe module
+	 */
+	kcpc_pcbe_error = kcpc_hw_load_pcbe();
+
+	return (kcpc_pcbe_error == 0 ? 0 : -1);
+}
 
 void
 kcpc_register_pcbe(pcbe_ops_t *ops)
@@ -103,8 +173,9 @@ kcpc_bind_cpu(kcpc_set_t *set, processorid_t cpuid, int *subcode)
 	cpu_t		*cp;
 	kcpc_ctx_t	*ctx;
 	int		error;
+	int		save_spl;
 
-	ctx = kcpc_ctx_alloc();
+	ctx = kcpc_ctx_alloc(KM_SLEEP);
 
 	if (kcpc_assign_reqs(set, ctx) != 0) {
 		kcpc_ctx_free(ctx);
@@ -141,28 +212,34 @@ kcpc_bind_cpu(kcpc_set_t *set, processorid_t cpuid, int *subcode)
 		goto unbound;
 
 	mutex_enter(&cp->cpu_cpc_ctxlock);
+	kpreempt_disable();
+	save_spl = spl_xcall();
 
-	if (cp->cpu_cpc_ctx != NULL) {
+	/*
+	 * Check to see whether counters for CPU already being used by someone
+	 * other than kernel for capacity and utilization (since kernel will
+	 * let go of counters for user in kcpc_program() below)
+	 */
+	if (cp->cpu_cpc_ctx != NULL && !CU_CPC_ON(cp)) {
 		/*
 		 * If this CPU already has a bound set, return an error.
 		 */
+		splx(save_spl);
+		kpreempt_enable();
 		mutex_exit(&cp->cpu_cpc_ctxlock);
 		goto unbound;
 	}
 
 	if (curthread->t_bind_cpu != cpuid) {
+		splx(save_spl);
+		kpreempt_enable();
 		mutex_exit(&cp->cpu_cpc_ctxlock);
 		goto unbound;
 	}
-	cp->cpu_cpc_ctx = ctx;
 
-	/*
-	 * Kernel preemption must be disabled while fiddling with the hardware
-	 * registers to prevent partial updates.
-	 */
-	kpreempt_disable();
-	ctx->kc_rawtick = KCPC_GET_TICK();
-	pcbe_ops->pcbe_program(ctx);
+	kcpc_program(ctx, B_FALSE, B_TRUE);
+
+	splx(save_spl);
 	kpreempt_enable();
 
 	mutex_exit(&cp->cpu_cpc_ctxlock);
@@ -197,14 +274,14 @@ kcpc_bind_thread(kcpc_set_t *set, kthread_t *t, int *subcode)
 	if (t->t_cpc_ctx != NULL)
 		return (EEXIST);
 
-	ctx = kcpc_ctx_alloc();
+	ctx = kcpc_ctx_alloc(KM_SLEEP);
 
 	/*
 	 * The context must begin life frozen until it has been properly
 	 * programmed onto the hardware. This prevents the context ops from
 	 * worrying about it until we're ready.
 	 */
-	ctx->kc_flags |= KCPC_CTX_FREEZE;
+	KCPC_CTX_FLAG_SET(ctx, KCPC_CTX_FREEZE);
 	ctx->kc_hrtime = gethrtime();
 
 	if (kcpc_assign_reqs(set, ctx) != 0) {
@@ -215,13 +292,13 @@ kcpc_bind_thread(kcpc_set_t *set, kthread_t *t, int *subcode)
 
 	ctx->kc_cpuid = -1;
 	if (set->ks_flags & CPC_BIND_LWP_INHERIT)
-		ctx->kc_flags |= KCPC_CTX_LWPINHERIT;
+		KCPC_CTX_FLAG_SET(ctx, KCPC_CTX_LWPINHERIT);
 	ctx->kc_thread = t;
 	t->t_cpc_ctx = ctx;
 	/*
 	 * Permit threads to look at their own hardware counters from userland.
 	 */
-	ctx->kc_flags |= KCPC_CTX_NONPRIV;
+	KCPC_CTX_FLAG_SET(ctx, KCPC_CTX_NONPRIV);
 
 	/*
 	 * Create the data store for this set.
@@ -248,12 +325,14 @@ kcpc_bind_thread(kcpc_set_t *set, kthread_t *t, int *subcode)
 	 * Ask the backend to program the hardware.
 	 */
 	if (t == curthread) {
+		int save_spl;
+
 		kpreempt_disable();
-		ctx->kc_rawtick = KCPC_GET_TICK();
-		atomic_and_uint(&ctx->kc_flags, ~KCPC_CTX_FREEZE);
-		pcbe_ops->pcbe_program(ctx);
+		save_spl = spl_xcall();
+		kcpc_program(ctx, B_TRUE, B_TRUE);
+		splx(save_spl);
 		kpreempt_enable();
-	} else
+	} else {
 		/*
 		 * Since we are the agent LWP, we know the victim LWP is stopped
 		 * until we're done here; no need to worry about preemption or
@@ -262,7 +341,8 @@ kcpc_bind_thread(kcpc_set_t *set, kthread_t *t, int *subcode)
 		 * still be accessed from, for instance, another CPU doing a
 		 * kcpc_invalidate_all().
 		 */
-		atomic_and_uint(&ctx->kc_flags, ~KCPC_CTX_FREEZE);
+		KCPC_CTX_FLAG_CLR(ctx, KCPC_CTX_FREEZE);
+	}
 
 	mutex_enter(&set->ks_lock);
 	set->ks_state |= KCPC_SET_BOUND;
@@ -304,7 +384,7 @@ kcpc_configure_reqs(kcpc_ctx_t *ctx, kcpc_set_t *set, int *subcode)
 			 * notification, we flag the context as being one that
 			 * cares about overflow.
 			 */
-			ctx->kc_flags |= KCPC_CTX_SIGOVF;
+			KCPC_CTX_FLAG_SET(ctx, KCPC_CTX_SIGOVF);
 		}
 
 		rp->kr_config = NULL;
@@ -349,7 +429,7 @@ int
 kcpc_sample(kcpc_set_t *set, uint64_t *buf, hrtime_t *hrtime, uint64_t *tick)
 {
 	kcpc_ctx_t	*ctx = set->ks_ctx;
-	uint64_t	curtick = KCPC_GET_TICK();
+	int		save_spl;
 
 	mutex_enter(&set->ks_lock);
 	if ((set->ks_state & KCPC_SET_BOUND) == 0) {
@@ -358,40 +438,52 @@ kcpc_sample(kcpc_set_t *set, uint64_t *buf, hrtime_t *hrtime, uint64_t *tick)
 	}
 	mutex_exit(&set->ks_lock);
 
-	if (ctx->kc_flags & KCPC_CTX_INVALID)
+	/*
+	 * Kernel preemption must be disabled while reading the hardware regs,
+	 * and if this is a CPU-bound context, while checking the CPU binding of
+	 * the current thread.
+	 */
+	kpreempt_disable();
+	save_spl = spl_xcall();
+
+	if (ctx->kc_flags & KCPC_CTX_INVALID) {
+		splx(save_spl);
+		kpreempt_enable();
 		return (EAGAIN);
+	}
 
 	if ((ctx->kc_flags & KCPC_CTX_FREEZE) == 0) {
-		/*
-		 * Kernel preemption must be disabled while reading the
-		 * hardware regs, and if this is a CPU-bound context, while
-		 * checking the CPU binding of the current thread.
-		 */
-		kpreempt_disable();
-
 		if (ctx->kc_cpuid != -1) {
 			if (curthread->t_bind_cpu != ctx->kc_cpuid) {
+				splx(save_spl);
 				kpreempt_enable();
 				return (EAGAIN);
 			}
 		}
 
 		if (ctx->kc_thread == curthread) {
-			ctx->kc_hrtime = gethrtime();
+			uint64_t curtick = KCPC_GET_TICK();
+
+			ctx->kc_hrtime = gethrtime_waitfree();
 			pcbe_ops->pcbe_sample(ctx);
 			ctx->kc_vtick += curtick - ctx->kc_rawtick;
 			ctx->kc_rawtick = curtick;
 		}
 
-		kpreempt_enable();
-
 		/*
 		 * The config may have been invalidated by
 		 * the pcbe_sample op.
 		 */
-		if (ctx->kc_flags & KCPC_CTX_INVALID)
+		if (ctx->kc_flags & KCPC_CTX_INVALID) {
+			splx(save_spl);
+			kpreempt_enable();
 			return (EAGAIN);
+		}
+
 	}
+
+	splx(save_spl);
+	kpreempt_enable();
 
 	if (copyout(set->ks_data, buf,
 	    set->ks_nreqs * sizeof (uint64_t)) == -1)
@@ -412,20 +504,17 @@ kcpc_stop_hw(kcpc_ctx_t *ctx)
 {
 	cpu_t *cp;
 
-	ASSERT((ctx->kc_flags & (KCPC_CTX_INVALID | KCPC_CTX_INVALID_STOPPED))
-	    == KCPC_CTX_INVALID);
-
 	kpreempt_disable();
 
-	cp = cpu_get(ctx->kc_cpuid);
-	ASSERT(cp != NULL);
+	if (ctx->kc_cpuid == CPU->cpu_id) {
+		cp = CPU;
+	} else {
+		cp = cpu_get(ctx->kc_cpuid);
+	}
 
-	if (cp == CPU) {
-		pcbe_ops->pcbe_allstop();
-		atomic_or_uint(&ctx->kc_flags,
-		    KCPC_CTX_INVALID_STOPPED);
-	} else
-		kcpc_remote_stop(cp);
+	ASSERT(cp != NULL && cp->cpu_cpc_ctx == ctx);
+	kcpc_cpu_stop(cp, B_FALSE);
+
 	kpreempt_enable();
 }
 
@@ -451,7 +540,7 @@ kcpc_unbind(kcpc_set_t *set)
 	 * Use kc_lock to synchronize with kcpc_restore().
 	 */
 	mutex_enter(&ctx->kc_lock);
-	ctx->kc_flags |= KCPC_CTX_INVALID;
+	KCPC_CTX_FLAG_SET(ctx, KCPC_CTX_INVALID);
 	mutex_exit(&ctx->kc_lock);
 
 	if (ctx->kc_cpuid == -1) {
@@ -461,12 +550,14 @@ kcpc_unbind(kcpc_set_t *set)
 		 * context.  It will be freed via removectx() calling
 		 * freectx() calling kcpc_free().
 		 */
-		if (t == curthread &&
-		    (ctx->kc_flags & KCPC_CTX_INVALID_STOPPED) == 0) {
+		if (t == curthread) {
+			int save_spl;
+
 			kpreempt_disable();
-			pcbe_ops->pcbe_allstop();
-			atomic_or_uint(&ctx->kc_flags,
-			    KCPC_CTX_INVALID_STOPPED);
+			save_spl = spl_xcall();
+			if (!(ctx->kc_flags & KCPC_CTX_INVALID_STOPPED))
+				kcpc_unprogram(ctx, B_TRUE);
+			splx(save_spl);
 			kpreempt_enable();
 		}
 #ifdef DEBUG
@@ -503,7 +594,6 @@ kcpc_unbind(kcpc_set_t *set)
 			if ((ctx->kc_flags & KCPC_CTX_INVALID_STOPPED) == 0)
 				kcpc_stop_hw(ctx);
 			ASSERT(ctx->kc_flags & KCPC_CTX_INVALID_STOPPED);
-			cp->cpu_cpc_ctx = NULL;
 			mutex_exit(&cp->cpu_cpc_ctxlock);
 		}
 		mutex_exit(&cpu_lock);
@@ -543,12 +633,20 @@ kcpc_restart(kcpc_set_t *set)
 {
 	kcpc_ctx_t	*ctx = set->ks_ctx;
 	int		i;
+	int		save_spl;
 
 	ASSERT(set->ks_state & KCPC_SET_BOUND);
 	ASSERT(ctx->kc_thread == curthread);
 	ASSERT(ctx->kc_cpuid == -1);
 
+	for (i = 0; i < set->ks_nreqs; i++) {
+		*(set->ks_req[i].kr_data) = set->ks_req[i].kr_preset;
+		pcbe_ops->pcbe_configure(0, NULL, set->ks_req[i].kr_preset,
+		    0, 0, NULL, &set->ks_req[i].kr_config, NULL);
+	}
+
 	kpreempt_disable();
+	save_spl = spl_xcall();
 
 	/*
 	 * If the user is doing this on a running set, make sure the counters
@@ -557,18 +655,13 @@ kcpc_restart(kcpc_set_t *set)
 	if ((ctx->kc_flags & KCPC_CTX_FREEZE) == 0)
 		pcbe_ops->pcbe_allstop();
 
-	for (i = 0; i < set->ks_nreqs; i++) {
-		*(set->ks_req[i].kr_data) = set->ks_req[i].kr_preset;
-		pcbe_ops->pcbe_configure(0, NULL, set->ks_req[i].kr_preset,
-		    0, 0, NULL, &set->ks_req[i].kr_config, NULL);
-	}
-
 	/*
 	 * Ask the backend to program the hardware.
 	 */
 	ctx->kc_rawtick = KCPC_GET_TICK();
-	atomic_and_uint(&ctx->kc_flags, ~KCPC_CTX_FREEZE);
+	KCPC_CTX_FLAG_CLR(ctx, KCPC_CTX_FREEZE);
 	pcbe_ops->pcbe_program(ctx);
+	splx(save_spl);
 	kpreempt_enable();
 
 	return (0);
@@ -604,7 +697,7 @@ kcpc_enable(kthread_t *t, int cmd, int enable)
 		if ((ctx->kc_flags & KCPC_CTX_FREEZE) == 0)
 			return (EINVAL);
 		kpreempt_disable();
-		atomic_and_uint(&ctx->kc_flags, ~KCPC_CTX_FREEZE);
+		KCPC_CTX_FLAG_CLR(ctx, KCPC_CTX_FREEZE);
 		kcpc_restore(ctx);
 		kpreempt_enable();
 	} else if (cmd == CPC_DISABLE) {
@@ -612,7 +705,7 @@ kcpc_enable(kthread_t *t, int cmd, int enable)
 			return (EINVAL);
 		kpreempt_disable();
 		kcpc_save(ctx);
-		atomic_or_uint(&ctx->kc_flags, KCPC_CTX_FREEZE);
+		KCPC_CTX_FLAG_SET(ctx, KCPC_CTX_FREEZE);
 		kpreempt_enable();
 	} else if (cmd == CPC_USR_EVENTS || cmd == CPC_SYS_EVENTS) {
 		/*
@@ -624,10 +717,11 @@ kcpc_enable(kthread_t *t, int cmd, int enable)
 		    CPC_COUNT_USER: CPC_COUNT_SYSTEM;
 
 		kpreempt_disable();
-		atomic_or_uint(&ctx->kc_flags,
+		KCPC_CTX_FLAG_SET(ctx,
 		    KCPC_CTX_INVALID | KCPC_CTX_INVALID_STOPPED);
 		pcbe_ops->pcbe_allstop();
 		kpreempt_enable();
+
 		for (i = 0; i < set->ks_nreqs; i++) {
 			set->ks_req[i].kr_preset = *(set->ks_req[i].kr_data);
 			if (enable)
@@ -715,12 +809,14 @@ kcpc_next_config(void *token, void *current, uint64_t **data)
 
 
 kcpc_ctx_t *
-kcpc_ctx_alloc(void)
+kcpc_ctx_alloc(int kmem_flags)
 {
 	kcpc_ctx_t	*ctx;
 	long		hash;
 
-	ctx = (kcpc_ctx_t *)kmem_zalloc(sizeof (kcpc_ctx_t), KM_SLEEP);
+	ctx = (kcpc_ctx_t *)kmem_zalloc(sizeof (kcpc_ctx_t), kmem_flags);
+	if (ctx == NULL)
+		return (NULL);
 
 	hash = CPC_HASH_CTX(ctx);
 	mutex_enter(&kcpc_ctx_llock[hash]);
@@ -909,9 +1005,10 @@ kcpc_overflow_intr(caddr_t arg, uint64_t bitmap)
 		 */
 		if (kcpc_nullctx_panic)
 			panic("null cpc context, thread %p", (void *)t);
-
-		cmn_err(CE_WARN,
+#ifdef DEBUG
+		cmn_err(CE_NOTE,
 		    "null cpc context found in overflow handler!\n");
+#endif
 		atomic_add_32(&kcpc_nullctx_count, 1);
 	} else if ((ctx->kc_flags & KCPC_CTX_INVALID) == 0) {
 		/*
@@ -935,13 +1032,20 @@ kcpc_overflow_intr(caddr_t arg, uint64_t bitmap)
 				 * so freeze the context. The interrupt handler
 				 * has already stopped the counter hardware.
 				 */
-				atomic_or_uint(&ctx->kc_flags, KCPC_CTX_FREEZE);
+				KCPC_CTX_FLAG_SET(ctx, KCPC_CTX_FREEZE);
 				atomic_or_uint(&ctx->kc_pics[i].kp_flags,
 				    KCPC_PIC_OVERFLOWED);
 			}
 		}
 		aston(t);
+	} else if (ctx->kc_flags & KCPC_CTX_INVALID_STOPPED) {
+		/*
+		 * Thread context is no longer valid, but here may be a valid
+		 * CPU context.
+		 */
+		return (curthread->t_cpu->cpu_cpc_ctx);
 	}
+
 	return (NULL);
 }
 
@@ -956,6 +1060,7 @@ kcpc_hw_overflow_intr(caddr_t arg1, caddr_t arg2)
 	kcpc_ctx_t *ctx;
 	uint64_t bitmap;
 	uint8_t *state;
+	int	save_spl;
 
 	if (pcbe_ops == NULL ||
 	    (bitmap = pcbe_ops->pcbe_overflow_bitmap()) == 0)
@@ -985,6 +1090,13 @@ kcpc_hw_overflow_intr(caddr_t arg1, caddr_t arg2)
 			(*dtrace_cpc_fire)(bitmap);
 
 			ctx = curthread->t_cpu->cpu_cpc_ctx;
+			if (ctx == NULL) {
+#ifdef DEBUG
+				cmn_err(CE_NOTE, "null cpc context in"
+				    "hardware overflow handler!\n");
+#endif
+				return (DDI_INTR_CLAIMED);
+			}
 
 			/* Reset any counters that have overflowed */
 			for (i = 0; i < ctx->kc_set->ks_nreqs; i++) {
@@ -1025,7 +1137,12 @@ kcpc_hw_overflow_intr(caddr_t arg1, caddr_t arg2)
 	 * the middle of updating it, no AST has been posted, and so we
 	 * should sample the counters here, and restart them with no
 	 * further fuss.
+	 *
+	 * The CPU's CPC context may disappear as a result of cross-call which
+	 * has higher PIL on x86, so protect the context by raising PIL to the
+	 * cross-call level.
 	 */
+	save_spl = spl_xcall();
 	if ((ctx = kcpc_overflow_intr(arg1, bitmap)) != NULL) {
 		uint64_t curtick = KCPC_GET_TICK();
 
@@ -1035,6 +1152,7 @@ kcpc_hw_overflow_intr(caddr_t arg1, caddr_t arg2)
 		pcbe_ops->pcbe_sample(ctx);
 		pcbe_ops->pcbe_program(ctx);
 	}
+	splx(save_spl);
 
 	return (DDI_INTR_CLAIMED);
 }
@@ -1087,7 +1205,7 @@ kcpc_overflow_ast()
 	 * Otherwise, re-enable the counters and continue life as before.
 	 */
 	kpreempt_disable();
-	atomic_and_uint(&ctx->kc_flags, ~KCPC_CTX_FREEZE);
+	KCPC_CTX_FLAG_CLR(ctx, KCPC_CTX_FREEZE);
 	pcbe_ops->pcbe_program(ctx);
 	kpreempt_enable();
 	return (0);
@@ -1099,43 +1217,68 @@ kcpc_overflow_ast()
 static void
 kcpc_save(kcpc_ctx_t *ctx)
 {
+	int err;
+	int save_spl;
+
+	kpreempt_disable();
+	save_spl = spl_xcall();
+
 	if (ctx->kc_flags & KCPC_CTX_INVALID) {
-		if (ctx->kc_flags & KCPC_CTX_INVALID_STOPPED)
+		if (ctx->kc_flags & KCPC_CTX_INVALID_STOPPED) {
+			splx(save_spl);
+			kpreempt_enable();
 			return;
+		}
 		/*
 		 * This context has been invalidated but the counters have not
 		 * been stopped. Stop them here and mark the context stopped.
 		 */
-		pcbe_ops->pcbe_allstop();
-		atomic_or_uint(&ctx->kc_flags, KCPC_CTX_INVALID_STOPPED);
+		kcpc_unprogram(ctx, B_TRUE);
+		splx(save_spl);
+		kpreempt_enable();
 		return;
 	}
 
 	pcbe_ops->pcbe_allstop();
-	if (ctx->kc_flags & KCPC_CTX_FREEZE)
+	if (ctx->kc_flags & KCPC_CTX_FREEZE) {
+		splx(save_spl);
+		kpreempt_enable();
 		return;
+	}
 
 	/*
 	 * Need to sample for all reqs into each req's current mpic.
 	 */
-	ctx->kc_hrtime = gethrtime();
+	ctx->kc_hrtime = gethrtime_waitfree();
 	ctx->kc_vtick += KCPC_GET_TICK() - ctx->kc_rawtick;
 	pcbe_ops->pcbe_sample(ctx);
+
+	/*
+	 * Program counter for measuring capacity and utilization since user
+	 * thread isn't using counter anymore
+	 */
+	ASSERT(ctx->kc_cpuid == -1);
+	cu_cpc_program(CPU, &err);
+	splx(save_spl);
+	kpreempt_enable();
 }
 
 static void
 kcpc_restore(kcpc_ctx_t *ctx)
 {
+	int save_spl;
+
 	mutex_enter(&ctx->kc_lock);
+
 	if ((ctx->kc_flags & (KCPC_CTX_INVALID | KCPC_CTX_INVALID_STOPPED)) ==
-	    KCPC_CTX_INVALID)
+	    KCPC_CTX_INVALID) {
 		/*
 		 * The context is invalidated but has not been marked stopped.
 		 * We mark it as such here because we will not start the
 		 * counters during this context switch.
 		 */
-		ctx->kc_flags |= KCPC_CTX_INVALID_STOPPED;
-
+		KCPC_CTX_FLAG_SET(ctx, KCPC_CTX_INVALID_STOPPED);
+	}
 
 	if (ctx->kc_flags & (KCPC_CTX_INVALID | KCPC_CTX_FREEZE)) {
 		mutex_exit(&ctx->kc_lock);
@@ -1151,7 +1294,7 @@ kcpc_restore(kcpc_ctx_t *ctx)
 	 * doing this, we're asking kcpc_free() to cv_wait() until
 	 * kcpc_restore() has completed.
 	 */
-	ctx->kc_flags |= KCPC_CTX_RESTORE;
+	KCPC_CTX_FLAG_SET(ctx, KCPC_CTX_RESTORE);
 	mutex_exit(&ctx->kc_lock);
 
 	/*
@@ -1159,14 +1302,17 @@ kcpc_restore(kcpc_ctx_t *ctx)
 	 * don't do an explicit pcbe_allstop() here because they should have
 	 * been stopped already by the last consumer.
 	 */
-	ctx->kc_rawtick = KCPC_GET_TICK();
-	pcbe_ops->pcbe_program(ctx);
+	kpreempt_disable();
+	save_spl = spl_xcall();
+	kcpc_program(ctx, B_TRUE, B_TRUE);
+	splx(save_spl);
+	kpreempt_enable();
 
 	/*
 	 * Wake the agent thread if it's waiting in kcpc_free().
 	 */
 	mutex_enter(&ctx->kc_lock);
-	ctx->kc_flags &= ~KCPC_CTX_RESTORE;
+	KCPC_CTX_FLAG_CLR(ctx, KCPC_CTX_RESTORE);
 	cv_signal(&ctx->kc_condv);
 	mutex_exit(&ctx->kc_lock);
 }
@@ -1177,7 +1323,6 @@ kcpc_restore(kcpc_ctx_t *ctx)
  * counters when the idle thread is switched on, and they start them again when
  * it is switched off.
  */
-
 /*ARGSUSED*/
 void
 kcpc_idle_save(struct cpu *cp)
@@ -1242,7 +1387,7 @@ kcpc_lwp_create(kthread_t *t, kthread_t *ct)
 		rw_exit(&kcpc_cpuctx_lock);
 		return;
 	}
-	cctx = kcpc_ctx_alloc();
+	cctx = kcpc_ctx_alloc(KM_SLEEP);
 	kcpc_ctx_clone(ctx, cctx);
 	rw_exit(&kcpc_cpuctx_lock);
 
@@ -1250,7 +1395,7 @@ kcpc_lwp_create(kthread_t *t, kthread_t *ct)
 	 * Copy the parent context's kc_flags field, but don't overwrite
 	 * the child's in case it was modified during kcpc_ctx_clone.
 	 */
-	cctx->kc_flags |= ctx->kc_flags;
+	KCPC_CTX_FLAG_SET(cctx,  ctx->kc_flags);
 	cctx->kc_thread = ct;
 	cctx->kc_cpuid = -1;
 	ct->t_cpc_set = cctx->kc_set;
@@ -1265,13 +1410,14 @@ kcpc_lwp_create(kthread_t *t, kthread_t *ct)
 		 * set to UINT64_MAX, and their pic's overflow flag turned on
 		 * so that our trap() processing knows to send a signal.
 		 */
-		atomic_or_uint(&cctx->kc_flags, KCPC_CTX_FREEZE);
+		KCPC_CTX_FLAG_SET(ctx, KCPC_CTX_FREEZE);
 		for (i = 0; i < ks->ks_nreqs; i++) {
 			kcpc_request_t *kr = &ks->ks_req[i];
 
 			if (kr->kr_flags & CPC_OVF_NOTIFY_EMT) {
 				*(kr->kr_data) = UINT64_MAX;
-				kr->kr_picp->kp_flags |= KCPC_PIC_OVERFLOWED;
+				atomic_or_uint(&kr->kr_picp->kp_flags,
+				    KCPC_PIC_OVERFLOWED);
 			}
 		}
 		ttolwp(ct)->lwp_pcb.pcb_flags |= CPC_OVERFLOW;
@@ -1315,7 +1461,7 @@ kcpc_lwp_create(kthread_t *t, kthread_t *ct)
  */
 
 /*ARGSUSED*/
-static void
+void
 kcpc_free(kcpc_ctx_t *ctx, int isexec)
 {
 	int		i;
@@ -1329,7 +1475,7 @@ kcpc_free(kcpc_ctx_t *ctx, int isexec)
 	mutex_enter(&ctx->kc_lock);
 	while (ctx->kc_flags & KCPC_CTX_RESTORE)
 		cv_wait(&ctx->kc_condv, &ctx->kc_lock);
-	ctx->kc_flags |= KCPC_CTX_INVALID;
+	KCPC_CTX_FLAG_SET(ctx, KCPC_CTX_INVALID);
 	mutex_exit(&ctx->kc_lock);
 
 	if (isexec) {
@@ -1356,21 +1502,22 @@ kcpc_free(kcpc_ctx_t *ctx, int isexec)
 			if (cp != NULL) {
 				mutex_enter(&cp->cpu_cpc_ctxlock);
 				kcpc_stop_hw(ctx);
-				cp->cpu_cpc_ctx = NULL;
 				mutex_exit(&cp->cpu_cpc_ctxlock);
 			}
 			mutex_exit(&cpu_lock);
 			ASSERT(curthread->t_cpc_ctx == NULL);
 		} else {
+			int save_spl;
+
 			/*
 			 * Thread-bound context; stop _this_ CPU's counters.
 			 */
 			kpreempt_disable();
-			pcbe_ops->pcbe_allstop();
-			atomic_or_uint(&ctx->kc_flags,
-			    KCPC_CTX_INVALID_STOPPED);
-			kpreempt_enable();
+			save_spl = spl_xcall();
+			kcpc_unprogram(ctx, B_TRUE);
 			curthread->t_cpc_ctx = NULL;
+			splx(save_spl);
+			kpreempt_enable();
 		}
 
 		/*
@@ -1435,7 +1582,7 @@ kcpc_invalidate_all(void)
 	for (hash = 0; hash < CPC_HASH_BUCKETS; hash++) {
 		mutex_enter(&kcpc_ctx_llock[hash]);
 		for (ctx = kcpc_ctx_list[hash]; ctx; ctx = ctx->kc_next)
-			atomic_or_uint(&ctx->kc_flags, KCPC_CTX_INVALID);
+			KCPC_CTX_FLAG_SET(ctx, KCPC_CTX_INVALID);
 		mutex_exit(&kcpc_ctx_llock[hash]);
 	}
 }
@@ -1451,7 +1598,7 @@ kcpc_invalidate_config(void *token)
 
 	ASSERT(ctx != NULL);
 
-	atomic_or_uint(&ctx->kc_flags, KCPC_CTX_INVALID);
+	KCPC_CTX_FLAG_SET(ctx, KCPC_CTX_INVALID);
 }
 
 /*
@@ -1462,17 +1609,10 @@ kcpc_passivate(void)
 {
 	kcpc_ctx_t *ctx = curthread->t_cpc_ctx;
 	kcpc_set_t *set = curthread->t_cpc_set;
+	int	save_spl;
 
 	if (set == NULL)
 		return;
-
-	/*
-	 * We're cleaning up after this thread; ensure there are no dangling
-	 * CPC pointers left behind. The context and set will be freed by
-	 * freectx() in the case of an LWP-bound set, and by kcpc_unbind() in
-	 * the case of a CPU-bound set.
-	 */
-	curthread->t_cpc_ctx = NULL;
 
 	if (ctx == NULL) {
 		/*
@@ -1491,6 +1631,8 @@ kcpc_passivate(void)
 		return;
 	}
 
+	kpreempt_disable();
+	save_spl = spl_xcall();
 	curthread->t_cpc_set = NULL;
 
 	/*
@@ -1500,13 +1642,20 @@ kcpc_passivate(void)
 	 * INVALID_STOPPED flag here and kcpc_restore() setting the flag during
 	 * a context switch.
 	 */
-
-	kpreempt_disable();
 	if ((ctx->kc_flags & KCPC_CTX_INVALID_STOPPED) == 0) {
-		pcbe_ops->pcbe_allstop();
-		atomic_or_uint(&ctx->kc_flags,
+		kcpc_unprogram(ctx, B_TRUE);
+		KCPC_CTX_FLAG_SET(ctx,
 		    KCPC_CTX_INVALID | KCPC_CTX_INVALID_STOPPED);
 	}
+
+	/*
+	 * We're cleaning up after this thread; ensure there are no dangling
+	 * CPC pointers left behind. The context and set will be freed by
+	 * freectx().
+	 */
+	curthread->t_cpc_ctx = NULL;
+
+	splx(save_spl);
 	kpreempt_enable();
 }
 
@@ -1667,7 +1816,7 @@ kcpc_invalidate(kthread_t *t)
 	kcpc_ctx_t *ctx = t->t_cpc_ctx;
 
 	if (ctx != NULL)
-		atomic_or_uint(&ctx->kc_flags, KCPC_CTX_INVALID);
+		KCPC_CTX_FLAG_SET(ctx, KCPC_CTX_INVALID);
 }
 
 /*
@@ -1689,6 +1838,648 @@ kcpc_pcbe_tryload(const char *prefix, uint_t first, uint_t second, uint_t third)
 
 	return (modload_qualified("pcbe",
 	    "pcbe", prefix, ".", s, 3, NULL) < 0 ? -1 : 0);
+}
+
+/*
+ * Create one or more CPC context for given CPU with specified counter event
+ * requests
+ *
+ * If number of requested counter events is less than or equal number of
+ * hardware counters on a CPU and can all be assigned to the counters on a CPU
+ * at the same time, then make one CPC context.
+ *
+ * Otherwise, multiple CPC contexts are created to allow multiplexing more
+ * counter events than existing counters onto the counters by iterating through
+ * all of the CPC contexts, programming the counters with each CPC context one
+ * at a time and measuring the resulting counter values.  Each of the resulting
+ * CPC contexts contains some number of requested counter events less than or
+ * equal the number of counters on a CPU depending on whether all the counter
+ * events can be programmed on all the counters at the same time or not.
+ *
+ * Flags to kmem_{,z}alloc() are passed in as an argument to allow specifying
+ * whether memory allocation should be non-blocking or not.  The code will try
+ * to allocate *whole* CPC contexts if possible.  If there is any memory
+ * allocation failure during the allocations needed for a given CPC context, it
+ * will skip allocating that CPC context because it cannot allocate the whole
+ * thing.  Thus, the only time that it will end up allocating none (ie. no CPC
+ * contexts whatsoever) is when it cannot even allocate *one* whole CPC context
+ * without a memory allocation failure occurring.
+ */
+int
+kcpc_cpu_ctx_create(cpu_t *cp, kcpc_request_list_t *req_list, int kmem_flags,
+    kcpc_ctx_t ***ctx_ptr_array, size_t *ctx_ptr_array_sz)
+{
+	kcpc_ctx_t	**ctx_ptrs;
+	int		nctx;
+	int		nctx_ptrs;
+	int		nreqs;
+	kcpc_request_t	*reqs;
+
+	if (cp == NULL || ctx_ptr_array == NULL || ctx_ptr_array_sz == NULL ||
+	    req_list == NULL || req_list->krl_cnt < 1)
+		return (-1);
+
+	/*
+	 * Allocate number of sets assuming that each set contains one and only
+	 * one counter event request for each counter on a CPU
+	 */
+	nreqs = req_list->krl_cnt;
+	nctx_ptrs = (nreqs + cpc_ncounters - 1) / cpc_ncounters;
+	ctx_ptrs = kmem_zalloc(nctx_ptrs * sizeof (kcpc_ctx_t *), kmem_flags);
+	if (ctx_ptrs == NULL)
+		return (-2);
+
+	/*
+	 * Fill in sets of requests
+	 */
+	nctx = 0;
+	reqs = req_list->krl_list;
+	while (nreqs > 0) {
+		kcpc_ctx_t	*ctx;
+		kcpc_set_t	*set;
+		int		subcode;
+
+		/*
+		 * Allocate CPC context and set for requested counter events
+		 */
+		ctx = kcpc_ctx_alloc(kmem_flags);
+		set = kcpc_set_create(reqs, nreqs, 0, kmem_flags);
+		if (set == NULL) {
+			kcpc_ctx_free(ctx);
+			break;
+		}
+
+		/*
+		 * Determine assignment of requested counter events to specific
+		 * counters
+		 */
+		if (kcpc_assign_reqs(set, ctx) != 0) {
+			/*
+			 * May not be able to assign requested counter events
+			 * to all counters since all counters may not be able
+			 * to do all events, so only do one counter event in
+			 * set of counter requests when this happens since at
+			 * least one of the counters must be able to do the
+			 * event.
+			 */
+			kcpc_free_set(set);
+			set = kcpc_set_create(reqs, 1, 0, kmem_flags);
+			if (set == NULL) {
+				kcpc_ctx_free(ctx);
+				break;
+			}
+			if (kcpc_assign_reqs(set, ctx) != 0) {
+#ifdef DEBUG
+				cmn_err(CE_NOTE, "!kcpc_cpu_ctx_create: can't "
+				    "assign counter event %s!\n",
+				    set->ks_req->kr_event);
+#endif
+				kcpc_free_set(set);
+				kcpc_ctx_free(ctx);
+				reqs++;
+				nreqs--;
+				continue;
+			}
+		}
+
+		/*
+		 * Allocate memory needed to hold requested counter event data
+		 */
+		set->ks_data = kmem_zalloc(set->ks_nreqs * sizeof (uint64_t),
+		    kmem_flags);
+		if (set->ks_data == NULL) {
+			kcpc_free_set(set);
+			kcpc_ctx_free(ctx);
+			break;
+		}
+
+		/*
+		 * Configure requested counter events
+		 */
+		if (kcpc_configure_reqs(ctx, set, &subcode) != 0) {
+#ifdef DEBUG
+			cmn_err(CE_NOTE,
+			    "!kcpc_cpu_ctx_create: can't configure "
+			    "set of counter event requests!\n");
+#endif
+			reqs += set->ks_nreqs;
+			nreqs -= set->ks_nreqs;
+			kmem_free(set->ks_data,
+			    set->ks_nreqs * sizeof (uint64_t));
+			kcpc_free_set(set);
+			kcpc_ctx_free(ctx);
+			continue;
+		}
+
+		/*
+		 * Point set of counter event requests at this context and fill
+		 * in CPC context
+		 */
+		set->ks_ctx = ctx;
+		ctx->kc_set = set;
+		ctx->kc_cpuid = cp->cpu_id;
+		ctx->kc_thread = curthread;
+
+		ctx_ptrs[nctx] = ctx;
+
+		/*
+		 * Update requests and how many are left to be assigned to sets
+		 */
+		reqs += set->ks_nreqs;
+		nreqs -= set->ks_nreqs;
+
+		/*
+		 * Increment number of CPC contexts and allocate bigger array
+		 * for context pointers as needed
+		 */
+		nctx++;
+		if (nctx >= nctx_ptrs) {
+			kcpc_ctx_t	**new;
+			int		new_cnt;
+
+			/*
+			 * Allocate more CPC contexts based on how many
+			 * contexts allocated so far and how many counter
+			 * requests left to assign
+			 */
+			new_cnt = nctx_ptrs +
+			    ((nreqs + cpc_ncounters - 1) / cpc_ncounters);
+			new = kmem_zalloc(new_cnt * sizeof (kcpc_ctx_t *),
+			    kmem_flags);
+			if (new == NULL)
+				break;
+
+			/*
+			 * Copy contents of old sets into new ones
+			 */
+			bcopy(ctx_ptrs, new,
+			    nctx_ptrs * sizeof (kcpc_ctx_t *));
+
+			/*
+			 * Free old array of context pointers and use newly
+			 * allocated one instead now
+			 */
+			kmem_free(ctx_ptrs, nctx_ptrs * sizeof (kcpc_ctx_t *));
+			ctx_ptrs = new;
+			nctx_ptrs = new_cnt;
+		}
+	}
+
+	/*
+	 * Return NULL if no CPC contexts filled in
+	 */
+	if (nctx == 0) {
+		kmem_free(ctx_ptrs, nctx_ptrs * sizeof (kcpc_ctx_t *));
+		*ctx_ptr_array = NULL;
+		*ctx_ptr_array_sz = 0;
+		return (-2);
+	}
+
+	*ctx_ptr_array = ctx_ptrs;
+	*ctx_ptr_array_sz = nctx_ptrs * sizeof (kcpc_ctx_t *);
+	return (nctx);
+}
+
+/*
+ * Return whether PCBE supports given counter event
+ */
+boolean_t
+kcpc_event_supported(char *event)
+{
+	if (pcbe_ops == NULL || pcbe_ops->pcbe_event_coverage(event) == 0)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+/*
+ * Program counters on current CPU with given CPC context
+ *
+ * If kernel is interposing on counters to measure hardware capacity and
+ * utilization, then unprogram counters for kernel *before* programming them
+ * with specified CPC context.
+ *
+ * kcpc_{program,unprogram}() may be called either directly by a thread running
+ * on the target CPU or from a cross-call from another CPU. To protect
+ * programming and unprogramming from being interrupted by cross-calls, callers
+ * who execute kcpc_{program,unprogram} should raise PIL to the level used by
+ * cross-calls.
+ */
+void
+kcpc_program(kcpc_ctx_t *ctx, boolean_t for_thread, boolean_t cu_interpose)
+{
+	int	error;
+
+	ASSERT(IS_HIPIL());
+
+	/*
+	 * CPC context shouldn't be NULL, its CPU field should specify current
+	 * CPU or be -1 to specify any CPU when the context is bound to a
+	 * thread, and preemption should be disabled
+	 */
+	ASSERT(ctx != NULL && (ctx->kc_cpuid == CPU->cpu_id ||
+	    ctx->kc_cpuid == -1) && curthread->t_preempt > 0);
+	if (ctx == NULL || (ctx->kc_cpuid != CPU->cpu_id &&
+	    ctx->kc_cpuid != -1) || curthread->t_preempt < 1)
+		return;
+
+	/*
+	 * Unprogram counters for kernel measuring hardware capacity and
+	 * utilization
+	 */
+	if (cu_interpose == B_TRUE) {
+		cu_cpc_unprogram(CPU, &error);
+	} else {
+		kcpc_set_t *set = ctx->kc_set;
+		int i;
+
+		ASSERT(set != NULL);
+
+		/*
+		 * Since cu_interpose is false, we are programming CU context.
+		 * In general, PCBE can continue from the state saved in the
+		 * set, but it is not very reliable, so we start again from the
+		 * preset value.
+		 */
+		for (i = 0; i < set->ks_nreqs; i++) {
+			/*
+			 * Reset the virtual counter value to the preset value.
+			 */
+			*(set->ks_req[i].kr_data) = set->ks_req[i].kr_preset;
+
+			/*
+			 * Reset PCBE to the preset value.
+			 */
+			pcbe_ops->pcbe_configure(0, NULL,
+			    set->ks_req[i].kr_preset,
+			    0, 0, NULL, &set->ks_req[i].kr_config, NULL);
+		}
+	}
+
+	/*
+	 * Program counters with specified CPC context
+	 */
+	ctx->kc_rawtick = KCPC_GET_TICK();
+	pcbe_ops->pcbe_program(ctx);
+
+	/*
+	 * Denote that counters programmed for thread or CPU CPC context
+	 * differently
+	 */
+	if (for_thread == B_TRUE)
+		KCPC_CTX_FLAG_CLR(ctx, KCPC_CTX_FREEZE);
+	else
+		CPU->cpu_cpc_ctx = ctx;
+}
+
+/*
+ * Unprogram counters with given CPC context on current CPU
+ *
+ * If kernel is interposing on counters to measure hardware capacity and
+ * utilization, then program counters for the kernel capacity and utilization
+ * *after* unprogramming them for given CPC context.
+ *
+ * See the comment for kcpc_program regarding the synchronization with
+ * cross-calls.
+ */
+void
+kcpc_unprogram(kcpc_ctx_t *ctx, boolean_t cu_interpose)
+{
+	int	error;
+
+	ASSERT(IS_HIPIL());
+
+	/*
+	 * CPC context shouldn't be NULL, its CPU field should specify current
+	 * CPU or be -1 to specify any CPU when the context is bound to a
+	 * thread, and preemption should be disabled
+	 */
+	ASSERT(ctx != NULL && (ctx->kc_cpuid == CPU->cpu_id ||
+	    ctx->kc_cpuid == -1) && curthread->t_preempt > 0);
+
+	if (ctx == NULL || (ctx->kc_cpuid != CPU->cpu_id &&
+	    ctx->kc_cpuid != -1) || curthread->t_preempt < 1 ||
+	    (ctx->kc_flags & KCPC_CTX_INVALID_STOPPED) != 0) {
+		return;
+	}
+
+	/*
+	 * Specified CPC context to be unprogrammed should be bound to current
+	 * CPU or thread
+	 */
+	ASSERT(CPU->cpu_cpc_ctx == ctx || curthread->t_cpc_ctx == ctx);
+
+	/*
+	 * Stop counters
+	 */
+	pcbe_ops->pcbe_allstop();
+	KCPC_CTX_FLAG_SET(ctx, KCPC_CTX_INVALID_STOPPED);
+
+	/*
+	 * Allow kernel to interpose on counters and program them for its own
+	 * use to measure hardware capacity and utilization if cu_interpose
+	 * argument is true
+	 */
+	if (cu_interpose == B_TRUE)
+		cu_cpc_program(CPU, &error);
+}
+
+/*
+ * Read CPU Performance Counter (CPC) on current CPU and call specified update
+ * routine with data for each counter event currently programmed on CPU
+ */
+int
+kcpc_read(kcpc_update_func_t update_func)
+{
+	kcpc_ctx_t	*ctx;
+	int		i;
+	kcpc_request_t	*req;
+	int		retval;
+	kcpc_set_t	*set;
+
+	ASSERT(IS_HIPIL());
+
+	/*
+	 * Can't grab locks or block because may be called inside dispatcher
+	 */
+	kpreempt_disable();
+
+	ctx = CPU->cpu_cpc_ctx;
+	if (ctx == NULL) {
+		kpreempt_enable();
+		return (0);
+	}
+
+	/*
+	 * Read counter data from current CPU
+	 */
+	pcbe_ops->pcbe_sample(ctx);
+
+	set = ctx->kc_set;
+	if (set == NULL || set->ks_req == NULL) {
+		kpreempt_enable();
+		return (0);
+	}
+
+	/*
+	 * Call update function with preset pointer and data for each CPC event
+	 * request currently programmed on current CPU
+	 */
+	req = set->ks_req;
+	retval = 0;
+	for (i = 0; i < set->ks_nreqs; i++) {
+		int	ret;
+
+		if (req[i].kr_data == NULL)
+			break;
+
+		ret = update_func(req[i].kr_ptr, *req[i].kr_data);
+		if (ret < 0)
+			retval = ret;
+	}
+
+	kpreempt_enable();
+
+	return (retval);
+}
+
+/*
+ * Initialize list of counter event requests
+ */
+kcpc_request_list_t *
+kcpc_reqs_init(int nreqs, int kmem_flags)
+{
+	kcpc_request_list_t	*req_list;
+	kcpc_request_t		*reqs;
+
+	if (nreqs < 1)
+		return (NULL);
+
+	req_list = kmem_zalloc(sizeof (kcpc_request_list_t), kmem_flags);
+	if (req_list == NULL)
+		return (NULL);
+
+	reqs = kmem_zalloc(nreqs * sizeof (kcpc_request_t), kmem_flags);
+	if (reqs == NULL) {
+		kmem_free(req_list, sizeof (kcpc_request_list_t));
+		return (NULL);
+	}
+
+	req_list->krl_list = reqs;
+	req_list->krl_cnt = 0;
+	req_list->krl_max = nreqs;
+	return (req_list);
+}
+
+
+/*
+ * Add counter event request to given list of counter event requests
+ */
+int
+kcpc_reqs_add(kcpc_request_list_t *req_list, char *event, uint64_t preset,
+    uint_t flags, uint_t nattrs, kcpc_attr_t *attr, void *ptr, int kmem_flags)
+{
+	kcpc_request_t	*req;
+
+	ASSERT(req_list->krl_max != 0);
+	if (req_list == NULL || req_list->krl_list == NULL)
+		return (-1);
+
+	/*
+	 * Allocate more space (if needed)
+	 */
+	if (req_list->krl_cnt > req_list->krl_max) {
+		kcpc_request_t	*new;
+		kcpc_request_t	*old;
+
+		old = req_list->krl_list;
+		new = kmem_zalloc((req_list->krl_max +
+		    cpc_ncounters) * sizeof (kcpc_request_t), kmem_flags);
+		if (new == NULL)
+			return (-2);
+
+		req_list->krl_list = new;
+		bcopy(old, req_list->krl_list,
+		    req_list->krl_cnt * sizeof (kcpc_request_t));
+		kmem_free(old, req_list->krl_max * sizeof (kcpc_request_t));
+		req_list->krl_cnt = 0;
+		req_list->krl_max += cpc_ncounters;
+	}
+
+	/*
+	 * Fill in request as much as possible now, but some fields will need
+	 * to be set when request is assigned to a set.
+	 */
+	req = &req_list->krl_list[req_list->krl_cnt];
+	req->kr_config = NULL;
+	req->kr_picnum = -1;	/* have CPC pick this */
+	req->kr_index = -1;	/* set when assigning request to set */
+	req->kr_data = NULL;	/* set when configuring request */
+	(void) strcpy(req->kr_event, event);
+	req->kr_preset = preset;
+	req->kr_flags = flags;
+	req->kr_nattrs = nattrs;
+	req->kr_attr = attr;
+	/*
+	 * Keep pointer given by caller to give to update function when this
+	 * counter event is sampled/read
+	 */
+	req->kr_ptr = ptr;
+
+	req_list->krl_cnt++;
+
+	return (0);
+}
+
+/*
+ * Reset list of CPC event requests so its space can be used for another set
+ * of requests
+ */
+int
+kcpc_reqs_reset(kcpc_request_list_t *req_list)
+{
+	/*
+	 * Return when pointer to request list structure or request is NULL or
+	 * when max requests is less than or equal to 0
+	 */
+	if (req_list == NULL || req_list->krl_list == NULL ||
+	    req_list->krl_max <= 0)
+		return (-1);
+
+	/*
+	 * Zero out requests and number of requests used
+	 */
+	bzero(req_list->krl_list, req_list->krl_max * sizeof (kcpc_request_t));
+	req_list->krl_cnt = 0;
+	return (0);
+}
+
+/*
+ * Free given list of counter event requests
+ */
+int
+kcpc_reqs_fini(kcpc_request_list_t *req_list)
+{
+	kmem_free(req_list->krl_list,
+	    req_list->krl_max * sizeof (kcpc_request_t));
+	kmem_free(req_list, sizeof (kcpc_request_list_t));
+	return (0);
+}
+
+/*
+ * Create set of given counter event requests
+ */
+static kcpc_set_t *
+kcpc_set_create(kcpc_request_t *reqs, int nreqs, int set_flags, int kmem_flags)
+{
+	int		i;
+	kcpc_set_t	*set;
+
+	/*
+	 * Allocate set and assign number of requests in set and flags
+	 */
+	set = kmem_zalloc(sizeof (kcpc_set_t), kmem_flags);
+	if (set == NULL)
+		return (NULL);
+
+	if (nreqs < cpc_ncounters)
+		set->ks_nreqs = nreqs;
+	else
+		set->ks_nreqs = cpc_ncounters;
+
+	set->ks_flags = set_flags;
+
+	/*
+	 * Allocate requests needed, copy requests into set, and set index into
+	 * data for each request (which may change when we assign requested
+	 * counter events to counters)
+	 */
+	set->ks_req = (kcpc_request_t *)kmem_zalloc(sizeof (kcpc_request_t) *
+	    set->ks_nreqs, kmem_flags);
+	if (set->ks_req == NULL) {
+		kmem_free(set, sizeof (kcpc_set_t));
+		return (NULL);
+	}
+
+	bcopy(reqs, set->ks_req, sizeof (kcpc_request_t) * set->ks_nreqs);
+
+	for (i = 0; i < set->ks_nreqs; i++)
+		set->ks_req[i].kr_index = i;
+
+	return (set);
+}
+
+
+/*
+ * Stop counters on current CPU.
+ *
+ * If preserve_context is true, the caller is interested in the CPU's CPC
+ * context and wants it to be preserved.
+ *
+ * If preserve_context is false, the caller does not need the CPU's CPC context
+ * to be preserved, so it is set to NULL.
+ */
+static void
+kcpc_cpustop_func(boolean_t preserve_context)
+{
+	kpreempt_disable();
+
+	/*
+	 * Someone already stopped this context before us, so there is nothing
+	 * to do.
+	 */
+	if (CPU->cpu_cpc_ctx == NULL) {
+		kpreempt_enable();
+		return;
+	}
+
+	kcpc_unprogram(CPU->cpu_cpc_ctx, B_TRUE);
+	/*
+	 * If CU does not use counters, then clear the CPU's CPC context
+	 * If the caller requested to preserve context it should disable CU
+	 * first, so there should be no CU context now.
+	 */
+	ASSERT(!preserve_context || !CU_CPC_ON(CPU));
+	if (!preserve_context && CPU->cpu_cpc_ctx != NULL && !CU_CPC_ON(CPU))
+		CPU->cpu_cpc_ctx = NULL;
+
+	kpreempt_enable();
+}
+
+/*
+ * Stop counters on given CPU and set its CPC context to NULL unless
+ * preserve_context is true.
+ */
+void
+kcpc_cpu_stop(cpu_t *cp, boolean_t preserve_context)
+{
+	cpu_call(cp, (cpu_call_func_t)kcpc_cpustop_func,
+	    preserve_context, 0);
+}
+
+/*
+ * Program the context on the current CPU
+ */
+static void
+kcpc_remoteprogram_func(kcpc_ctx_t *ctx, uintptr_t arg)
+{
+	boolean_t for_thread = (boolean_t)arg;
+
+	ASSERT(ctx != NULL);
+
+	kpreempt_disable();
+	kcpc_program(ctx, for_thread, B_TRUE);
+	kpreempt_enable();
+}
+
+/*
+ * Program counters on given CPU
+ */
+void
+kcpc_cpu_program(cpu_t *cp, kcpc_ctx_t *ctx)
+{
+	cpu_call(cp, (cpu_call_func_t)kcpc_remoteprogram_func, (uintptr_t)ctx,
+	    (uintptr_t)B_FALSE);
 }
 
 char *

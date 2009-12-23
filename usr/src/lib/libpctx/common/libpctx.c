@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains a set of generic routines for periodically
@@ -66,6 +64,7 @@ struct __pctx {
 	int verbose;
 	int created;
 	int sigblocked;
+	int terminate;
 	sigset_t savedset;
 	cpc_t *cpc;
 };
@@ -108,6 +107,7 @@ pctx_create(
 	pctx = calloc(1, sizeof (*pctx));
 	pctx->uarg = arg;
 	pctx->verbose = verbose;
+	pctx->terminate = 0;
 	pctx->errfn = errfn ? errfn : pctx_default_errfn;
 
 	if ((pctx->Pr = Pcreate(filename, argv, &err, 0, 0)) == NULL) {
@@ -487,6 +487,7 @@ pctx_release(pctx_t *pctx)
 		Prelease(pctx->Pr, PRELEASE_CLEAR);
 		pctx->Pr = NULL;
 	}
+
 	pctx_free(pctx);
 	bzero(pctx, sizeof (*pctx));
 	free(pctx);
@@ -577,7 +578,7 @@ pctx_run(
 	 * exited successfully or the number of time samples has expired.
 	 * Otherwise, if an error has occurred, running becomes -1.
 	 */
-	while (running == 1) {
+	while (running == 1 && !pctx->terminate) {
 
 		if (Psetrun(pctx->Pr, 0, 0) != 0) {
 			if (pctx->verbose)
@@ -609,10 +610,13 @@ pctx_run(
 					if (nsamples != 1)
 						nsamples--;
 				}
-			} while (mswait == 0);
+			} while (mswait == 0 && !pctx->terminate);
 		}
 
-		(void) Pwait(pctx->Pr, mswait);
+		if (pctx->terminate)
+			goto bailout;
+		else
+			(void) Pwait(pctx->Pr, mswait);
 
 checkstate:
 		switch (pstate = Pstate(pctx->Pr)) {
@@ -854,6 +858,9 @@ checkstate:
 bailout:
 	(void) signal(SIGCHLD, sigsaved);
 
+	if (pctx->terminate)
+		return (0);
+
 	switch (running) {
 	case 0:
 		return (0);
@@ -885,6 +892,7 @@ __pctx_cpc(pctx_t *pctx, cpc_t *cpc,
 	 * We store the last cpc_t used by libpctx, so that when this pctx is
 	 * destroyed, libpctx can notify libcpc.
 	 */
+
 	if (pctx->cpc != NULL && pctx->cpc != cpc && pctx_cpc_callback != NULL)
 		(*pctx_cpc_callback)(pctx->cpc, pctx);
 	pctx->cpc = cpc;
@@ -992,4 +1000,13 @@ void
 __pctx_cpc_register_callback(void (*arg)(struct __cpc *, struct __pctx *))
 {
 	pctx_cpc_callback = arg;
+}
+
+/*
+ * Tell pctx_run to bail out immediately
+ */
+void
+pctx_terminate(struct __pctx *pctx)
+{
+	pctx->terminate = 1;
 }

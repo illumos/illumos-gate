@@ -188,33 +188,6 @@ kcpc_hw_load_pcbe(void)
 	    cpuid_getmodel(CPU), cpuid_getstep(CPU)));
 }
 
-static int
-kcpc_remotestop_func(void)
-{
-	ASSERT(CPU->cpu_cpc_ctx != NULL);
-	pcbe_ops->pcbe_allstop();
-	atomic_or_uint(&CPU->cpu_cpc_ctx->kc_flags, KCPC_CTX_INVALID_STOPPED);
-
-	return (0);
-}
-
-/*
- * Ensure the counters are stopped on the given processor.
- *
- * Callers must ensure kernel preemption is disabled.
- */
-void
-kcpc_remote_stop(cpu_t *cp)
-{
-	cpuset_t set;
-
-	CPUSET_ZERO(set);
-
-	CPUSET_ADD(set, cp->cpu_id);
-
-	xc_sync(0, 0, 0, CPUSET2BV(set), (xc_func_t)kcpc_remotestop_func);
-}
-
 /*
  * Called by the generic framework to check if it's OK to bind a set to a CPU.
  */
@@ -291,29 +264,4 @@ kcpc_hw_lwp_hook(void)
 
 	mutex_exit(&cpu_lock);
 	return (0);
-}
-
-static int
-kcpc_remoteprogram_func(void)
-{
-	ASSERT(CPU->cpu_cpc_ctx != NULL);
-
-	pcbe_ops->pcbe_program(CPU->cpu_cpc_ctx);
-
-	return (0);
-}
-
-/*
- * Ensure counters are enabled on the given processor.
- */
-void
-kcpc_remote_program(cpu_t *cp)
-{
-	cpuset_t set;
-
-	CPUSET_ZERO(set);
-
-	CPUSET_ADD(set, cp->cpu_id);
-
-	xc_sync(0, 0, 0, CPUSET2BV(set), (xc_func_t)kcpc_remoteprogram_func);
 }

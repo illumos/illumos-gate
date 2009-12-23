@@ -626,6 +626,7 @@ extern int cpuid_get_chipid(struct cpu *);
 extern id_t cpuid_get_coreid(struct cpu *);
 extern int cpuid_get_pkgcoreid(struct cpu *);
 extern int cpuid_get_clogid(struct cpu *);
+extern int cpuid_get_cacheid(struct cpu *);
 extern uint32_t cpuid_get_apicid(struct cpu *);
 extern uint_t cpuid_get_procnodeid(struct cpu *cpu);
 extern uint_t cpuid_get_procnodes_per_pkg(struct cpu *cpu);

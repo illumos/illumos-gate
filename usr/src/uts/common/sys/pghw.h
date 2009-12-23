@@ -89,6 +89,27 @@ typedef enum pghw_type {
 typedef uintptr_t pghw_handle_t;
 
 /*
+ * Representation of PG hardware utilization NOTE: All the sums listed below are
+ * the sums of running total of each item for each CPU in the PG (eg.
+ * sum(utilization) is sum of running total utilization of each CPU in PG)
+ */
+typedef struct pghw_util {
+	uint64_t	pghw_util;	/* sum(utilization) */
+	uint64_t	pghw_rate;	/* Last observed utilization rate */
+	uint64_t	pghw_rate_max;	/* Max observed rate (in units/sec) */
+	hrtime_t	pghw_time_stamp; /* Timestamp of last snapshot */
+	/*
+	 * sum(time utilization counters on)
+	 */
+	hrtime_t	pghw_time_running;
+	/*
+	 * sum(time utilization counters off)
+	 */
+	hrtime_t	pghw_time_stopped;
+} pghw_util_t;
+
+
+/*
  * Processor Group (physical sharing relationship)
  */
 typedef struct pghw {
@@ -97,6 +118,23 @@ typedef struct pghw {
 	id_t		pghw_instance;	/* sharing instance identifier */
 	pghw_handle_t	pghw_handle;	/* hw specific opaque handle */
 	kstat_t		*pghw_kstat;	/* physical kstats exported */
+	kstat_t		*pghw_cu_kstat;  /* for capacity and utilization */
+	/*
+	 * pghw_generation should be updated by superclasses whenever PG changes
+	 * significanly (e.g.  new CPUs join or leave PG).
+	 */
+	uint_t		pghw_generation; /* generation number */
+
+	/*
+	 * The following fields are used by PGHW cu kstats
+	 */
+	char		*pghw_cpulist;	/* list of CPUs */
+	size_t		pghw_cpulist_len;	/* length of the list */
+	/*
+	 * Generation number at kstat update time
+	 */
+	uint_t		pghw_kstat_gen;
+	pghw_util_t	pghw_stats;	/* Utilization data */
 } pghw_t;
 
 /*
@@ -111,32 +149,35 @@ typedef struct cpu_physid {
 /*
  * Physical PG initialization / CPU service hooks
  */
-void		pghw_init(pghw_t *, cpu_t *, pghw_type_t);
-void		pghw_fini(pghw_t *);
-void		pghw_cpu_add(pghw_t *, cpu_t *);
-pghw_t		*pghw_place_cpu(cpu_t *, pghw_type_t);
+extern void		pghw_init(pghw_t *, cpu_t *, pghw_type_t);
+extern void		pghw_fini(pghw_t *);
+extern void		pghw_cpu_add(pghw_t *, cpu_t *);
+extern pghw_t		*pghw_place_cpu(cpu_t *, pghw_type_t);
 
 /*
  * Physical ID cache creation / destruction
  */
-void		pghw_physid_create(cpu_t *);
-void		pghw_physid_destroy(cpu_t *);
+extern void		pghw_physid_create(cpu_t *);
+extern void		pghw_physid_destroy(cpu_t *);
 
 /*
  * CPU / PG hardware related seach operations
  */
-pghw_t		*pghw_find_pg(cpu_t *, pghw_type_t);
-pghw_t		*pghw_find_by_instance(id_t, pghw_type_t);
-group_t		*pghw_set_lookup(pghw_type_t);
-
-void		pghw_kstat_create(pghw_t *);
-int		pghw_kstat_update(kstat_t *, int);
+extern pghw_t		*pghw_find_pg(cpu_t *, pghw_type_t);
+extern pghw_t		*pghw_find_by_instance(id_t, pghw_type_t);
+extern group_t		*pghw_set_lookup(pghw_type_t);
 
 /* Hardware sharing relationship platform interfaces */
-int		pg_plat_hw_shared(cpu_t *, pghw_type_t);
-int		pg_plat_cpus_share(cpu_t *, cpu_t *, pghw_type_t);
-id_t		pg_plat_hw_instance_id(cpu_t *, pghw_type_t);
-pghw_type_t	pg_plat_hw_rank(pghw_type_t, pghw_type_t);
+extern int		pg_plat_hw_shared(cpu_t *, pghw_type_t);
+extern int		pg_plat_cpus_share(cpu_t *, cpu_t *, pghw_type_t);
+extern id_t		pg_plat_hw_instance_id(cpu_t *, pghw_type_t);
+extern pghw_type_t	pg_plat_hw_rank(pghw_type_t, pghw_type_t);
+
+/*
+ * String representation of the hardware type
+ */
+extern char		*pghw_type_string(pghw_type_t);
+extern char		*pghw_type_shortstring(pghw_type_t);
 
 /*
  * What comprises a "core" may vary across processor implementations,
@@ -144,7 +185,7 @@ pghw_type_t	pg_plat_hw_rank(pghw_type_t, pghw_type_t);
  * is no PGHW_CORE type, but we provide an interface here to allow platforms
  * to express cpu <=> core mappings.
  */
-id_t		pg_plat_get_core_id(cpu_t *);
+extern id_t		pg_plat_get_core_id(cpu_t *);
 
 #endif	/* !_KERNEL && !_KMEMUSER */
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -162,6 +162,8 @@ extern void cpc_walk_attrs(cpc_t *cpc, void *arg,
 
 extern int cpc_enable(cpc_t *cpc);
 extern int cpc_disable(cpc_t *cpc);
+
+extern void cpc_terminate(cpc_t *);
 
 #if defined(__sparc) || defined(__i386)
 

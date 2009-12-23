@@ -212,6 +212,7 @@ extern void clock_timer_init(void);
 extern void clock_realtime_init(void);
 extern void clock_highres_init(void);
 extern void clock_tick_mp_init(void);
+extern void cu_init(void);
 extern void callout_mp_init(void);
 extern void cpu_seq_tbl_init(void);
 
@@ -257,6 +258,7 @@ void	(*mp_init_tbl[])(void) = {
 	siron_mp_init,
 #endif
 	clock_tick_mp_init,
+	cu_init,
 	callout_mp_init,
 	0
 };

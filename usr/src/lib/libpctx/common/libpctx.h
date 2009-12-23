@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_LIBPCTX_H
 #define	_LIBPCTX_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <fcntl.h>
@@ -66,6 +63,8 @@ typedef int pctx_sysc_lwp_createfn_t(pctx_t *, pid_t, id_t, void *);
 typedef int pctx_init_lwpfn_t(pctx_t *, pid_t, id_t, void *);
 typedef int pctx_fini_lwpfn_t(pctx_t *, pid_t, id_t, void *);
 typedef int pctx_sysc_lwp_exitfn_t(pctx_t *, pid_t, id_t, void *);
+
+extern void pctx_terminate(pctx_t *);
 
 typedef	enum {
 	PCTX_NULL_EVENT = 0,

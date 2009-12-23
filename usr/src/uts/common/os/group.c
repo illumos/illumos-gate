@@ -28,6 +28,7 @@
 #include <sys/debug.h>
 #include <sys/kmem.h>
 #include <sys/group.h>
+#include <sys/cmn_err.h>
 
 
 #define	GRP_SET_SIZE_DEFAULT 2
@@ -351,4 +352,103 @@ group_find(group_t *g, void *e)
 			return (idx);
 	}
 	return ((uint_t)-1);
+}
+
+/*
+ * Return a string in a given buffer with list of integer entries in a group.
+ * The string concatenates consecutive integer ranges ax x-y.
+ * The resulting string looks like "1,2-5,8"
+ *
+ * The convert argument is used to map group elements to integer IDs.
+ */
+char *
+group2intlist(group_t *group, char *buffer, size_t len, int (convert)(void*))
+{
+	char		*ptr = buffer;
+	void		*v;
+	group_iter_t	iter;
+	boolean_t	first_iteration = B_TRUE;
+	boolean_t	first_value = B_TRUE;
+	int		start = 0, end = 0;
+
+	/*
+	 * Allow for the terminating NULL-byte
+	 */
+	len = len -1;
+
+	group_iter_init(&iter);
+	while ((v = group_iterate(group, &iter)) != NULL && len > 0) {
+		int id = convert(v);
+		int nbytes = 0;
+
+		if (first_iteration) {
+			start = end = id;
+			first_iteration = B_FALSE;
+		} else if (end + 1 == id) {
+			/*
+			 * Got consecutive ID, so extend end of range without
+			 * doing anything since the range may extend further
+			 */
+			end = id;
+		} else {
+			if (first_value) {
+				first_value = B_FALSE;
+			} else {
+				*ptr++ = ',';
+				len--;
+			}
+
+			if (len == 0)
+				break;
+
+			/*
+			 * Next ID is not consecutive, so dump IDs gotten so
+			 * far.
+			 */
+			if (end > start + 1) /* range */
+				nbytes = snprintf(ptr, len, "%d-%d",
+				    start, end);
+			else if (end > start) /* different values */
+				nbytes = snprintf(ptr, len, "%d,%d",
+				    start, end);
+			else /* same value */
+				nbytes = snprintf(ptr, len, "%d", start);
+
+			if (nbytes <= 0) {
+				len = 0;
+				break;
+			}
+
+			/*
+			 * Advance position in the string
+			 */
+			ptr += nbytes;
+			len -= nbytes;
+
+			/*
+			 * Try finding consecutive range starting from current
+			 * ID.
+			 */
+			start = end = id;
+		}
+	}
+
+	if (!first_value) {
+		*ptr++ = ',';
+		len--;
+	}
+	/*
+	 * Print last ID(s)
+	 */
+	if (len > 0) {
+		if (end > start + 1) {
+			(void) snprintf(ptr, len, "%d-%d", start, end);
+		} else if (end != start) {
+			(void) snprintf(ptr, len, "%d,%d", start, end);
+		} else {
+			(void) snprintf(ptr, len, "%d", start);
+		}
+	}
+
+	return (buffer);
 }

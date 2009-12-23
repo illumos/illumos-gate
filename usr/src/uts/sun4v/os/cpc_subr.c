@@ -130,26 +130,6 @@ kcpc_hw_load_pcbe(void)
 }
 
 /*ARGSUSED*/
-static void
-kcpc_remotestop_func(uint64_t arg1, uint64_t arg2)
-{
-	ASSERT(CPU->cpu_cpc_ctx != NULL);
-	pcbe_ops->pcbe_allstop();
-	atomic_or_uint(&CPU->cpu_cpc_ctx->kc_flags, KCPC_CTX_INVALID_STOPPED);
-}
-
-/*
- * Ensure the counters are stopped on the given processor.
- *
- * Callers must ensure kernel preemption is disabled.
- */
-void
-kcpc_remote_stop(cpu_t *cp)
-{
-	xc_one(cp->cpu_id, kcpc_remotestop_func, 0, 0);
-}
-
-/*ARGSUSED*/
 int
 kcpc_hw_cpu_hook(processorid_t cpuid, ulong_t *kcpc_cpumap)
 {
@@ -160,22 +140,4 @@ int
 kcpc_hw_lwp_hook(void)
 {
 	return (0);
-}
-
-/*ARGSUSED*/
-static void
-kcpc_remoteprogram_func(uint64_t arg1, uint64_t arg2)
-{
-	ASSERT(CPU->cpu_cpc_ctx != NULL);
-
-	pcbe_ops->pcbe_program(CPU->cpu_cpc_ctx);
-}
-
-/*
- * Ensure counters are enabled on the given processor.
- */
-void
-kcpc_remote_program(cpu_t *cp)
-{
-	xc_one(cp->cpu_id, kcpc_remoteprogram_func, 0, 0);
 }

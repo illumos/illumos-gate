@@ -83,6 +83,7 @@ SUNW_1.2 {
 SUNWprivate_1.1 {
     global:
 	SUNWprivate_1.1;
+	cpc_terminate;
     local:
 	*;
 };

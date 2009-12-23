@@ -1,3 +1,4 @@
+
 /*
  * CDDL HEADER START
  *
@@ -61,6 +62,7 @@
 #include <sys/hpet.h>
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
+#include <sys/cpc_pcbe.h>
 
 #define	OFFSETOF(s, m)		(size_t)(&(((s *)0)->m))
 
@@ -1679,4 +1681,38 @@ pg_cmt_affinity_hw(pghw_type_t hw)
 		return (1);
 	else
 		return (0);
+}
+
+/*
+ * Return number of counter events requested to measure hardware capacity and
+ * utilization and setup CPC requests for specified CPU as needed
+ *
+ * May return 0 when platform or processor specific code knows that no CPC
+ * events should be programmed on this CPU or -1 when platform or processor
+ * specific code doesn't know which counter events are best to use and common
+ * code should decide for itself
+ */
+int
+/* LINTED E_FUNC_ARG_UNUSED */
+cu_plat_cpc_init(cpu_t *cp, kcpc_request_list_t *reqs, int nreqs)
+{
+	const char	*impl_name;
+
+	/*
+	 * Return error if pcbe_ops not set
+	 */
+	if (pcbe_ops == NULL)
+		return (-1);
+
+	/*
+	 * Return that no CPC events should be programmed on hyperthreaded
+	 * Pentium 4 and return error for all other x86 processors to tell
+	 * common code to decide what counter events to program on those CPUs
+	 * for measuring hardware capacity and utilization
+	 */
+	impl_name = pcbe_ops->pcbe_impl_name();
+	if (impl_name != NULL && strcmp(impl_name, PCBE_IMPL_NAME_P4HT) == 0)
+		return (0);
+	else
+		return (-1);
 }

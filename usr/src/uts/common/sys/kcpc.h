@@ -28,10 +28,12 @@
 
 #include <sys/cpc_impl.h>
 #include <sys/ksynch.h>
+#include <sys/types.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
 
 /*
  * Kernel clients need this file in order to know what a request is and how to
@@ -74,7 +76,32 @@ struct _kcpc_request {
 	uint_t			kr_flags;
 	uint_t			kr_nattrs;
 	kcpc_attr_t		*kr_attr;
+	void			*kr_ptr;	/* Ptr assigned by requester */
 };
+
+typedef struct _kcpc_request_list {
+	kcpc_request_t		*krl_list;	/* counter event requests */
+	int			krl_cnt;	/* how many requests */
+	int			krl_max;	/* max request entries */
+} kcpc_request_list_t;
+
+/*
+ * Type of update function to be called when reading counters on current CPU in
+ * kcpc_read()
+ */
+typedef int (*kcpc_update_func_t)(void *, uint64_t);
+
+/*
+ * Type of read function to be called when reading counters on current CPU
+ * (ie. should be same type signature as kcpc_read())
+ */
+typedef int (*kcpc_read_func_t)(kcpc_update_func_t);
+
+
+/*
+ * Initialize the kcpc framework
+ */
+extern int kcpc_init(void);
 
 /*
  * Bind the set to the indicated thread.
@@ -94,6 +121,56 @@ extern int kcpc_bind_cpu(kcpc_set_t *set, int cpuid, int *subcode);
  */
 extern int kcpc_sample(kcpc_set_t *set, uint64_t *buf, hrtime_t *hrtime,
     uint64_t *tick);
+
+/*
+ * Create CPC context containing specified list of requested counter events
+ */
+extern int kcpc_cpu_ctx_create(struct cpu *cp, kcpc_request_list_t *req_list,
+    int kmem_flags, kcpc_ctx_t ***ctx_ptr_array, size_t *ctx_ptr_array_sz);
+
+/*
+ * Returns whether specified counter event is supported
+ */
+extern boolean_t kcpc_event_supported(char *event);
+
+/*
+ * Initialize list of CPC event requests
+ */
+extern kcpc_request_list_t *kcpc_reqs_init(int nreqs, int kmem_flags);
+
+/*
+ * Add counter event request to given list of counter event requests
+ */
+extern int kcpc_reqs_add(kcpc_request_list_t *req_list, char *event,
+    uint64_t preset, uint_t flags, uint_t nattrs, kcpc_attr_t *attr, void *ptr,
+    int kmem_flags);
+
+/*
+ * Reset list of CPC event requests so its space can be used for another set
+ * of requests
+ */
+extern int kcpc_reqs_reset(kcpc_request_list_t *req_list);
+
+/*
+ * Free given list of counter event requests
+ */
+extern int kcpc_reqs_fini(kcpc_request_list_t *req_list);
+
+/*
+ * Read CPC data for given event on current CPU
+ */
+extern int kcpc_read(kcpc_update_func_t);
+
+/*
+ * Program current CPU with given CPC context
+ */
+extern void kcpc_program(kcpc_ctx_t *ctx, boolean_t for_thread,
+    boolean_t cu_interpose);
+
+/*
+ * Unprogram CPC counters on current CPU
+ */
+extern void kcpc_unprogram(kcpc_ctx_t *ctx, boolean_t cu_interpose);
 
 /*
  * Unbind a request and release the associated resources.
@@ -127,6 +204,8 @@ extern void kcpc_idle_restore(struct cpu *cp);
 
 extern krwlock_t	kcpc_cpuctx_lock;  /* lock for 'kcpc_cpuctx' below */
 extern int		kcpc_cpuctx;	   /* number of cpu-specific contexts */
+
+extern void kcpc_free(kcpc_ctx_t *ctx, int isexec);
 
 /*
  * 'dtrace_cpc_in_use' contains the number of currently active cpc provider

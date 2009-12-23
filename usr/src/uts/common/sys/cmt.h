@@ -63,6 +63,7 @@ typedef struct pg_cmt {
 	int		cmt_nchildren;		/* # of children CMT PGs */
 	struct group	cmt_cpus_actv;
 	struct bitset	cmt_cpus_actv_set;	/* bitset of active CPUs */
+	kstat_t		*cmt_kstat;		/* cmt kstats exported */
 } pg_cmt_t;
 
 /*

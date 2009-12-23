@@ -159,7 +159,6 @@ static void		cmt_ev_thread_remain_pwr(pg_t *, cpu_t *, kthread_t *);
 static cmt_lineage_validation_t	pg_cmt_lineage_validate(pg_cmt_t **, int *,
 			    cpu_pg_t *);
 
-
 /*
  * CMT PG ops
  */
@@ -583,6 +582,8 @@ pg_cmt_cpu_init(cpu_t *cp, cpu_pg_t *pgdata)
 			ASSERT(IS_CMT_PG(pg));
 		}
 
+		((pghw_t *)pg)->pghw_generation++;
+
 		/* Add the CPU to the PG */
 		pg_cpu_add((pg_t *)pg, cp, pgdata);
 
@@ -762,7 +763,7 @@ pg_cmt_cpu_init(cpu_t *cp, cpu_pg_t *pgdata)
  *
  * cp->cpu_pg is used by the dispatcher to access the CPU's PG data
  * references a "bootstrap" structure across this function's invocation.
- * pg_cmt_cpu_init() and the routines it calls must be careful to operate only
+ * pg_cmt_cpu_fini() and the routines it calls must be careful to operate only
  * on the "pgdata" argument, and not cp->cpu_pg.
  */
 static void
@@ -817,6 +818,8 @@ pg_cmt_cpu_fini(cpu_t *cp, cpu_pg_t *pgdata)
 	 */
 	pg = (pg_cmt_t *)pgdata->cmt_lineage;
 	while (pg != NULL) {
+
+		((pghw_t *)pg)->pghw_generation++;
 
 		/*
 		 * Remove the PG from the CPU's load balancing lineage
@@ -990,6 +993,11 @@ pg_cmt_cpu_active(cpu_t *cp)
 		if (IS_CMT_PG(pg) == 0)
 			continue;
 
+		/*
+		 * Move to the next generation since topology is changing
+		 */
+		((pghw_t *)pg)->pghw_generation++;
+
 		err = group_add(&pg->cmt_cpus_actv, cp, GRP_NORESIZE);
 		ASSERT(err == 0);
 
@@ -1054,6 +1062,11 @@ pg_cmt_cpu_inactive(cpu_t *cp)
 
 		if (IS_CMT_PG(pg) == 0)
 			continue;
+
+		/*
+		 * Move to the next generation since topology is changing
+		 */
+		((pghw_t *)pg)->pghw_generation++;
 
 		/*
 		 * Remove the CPU from the CMT PGs active CPU group

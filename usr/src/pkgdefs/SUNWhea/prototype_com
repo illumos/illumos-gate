@@ -682,6 +682,7 @@ f none usr/include/sys/bustypes.h 644 root bin
 f none usr/include/sys/byteorder.h 644 root bin
 f none usr/include/sys/callb.h 644 root bin
 f none usr/include/sys/callo.h 644 root bin
+f none usr/include/sys/cap_util.h 644 root bin
 f none usr/include/sys/cpucaps.h 644 root bin
 f none usr/include/sys/cpucaps_impl.h 644 root bin
 f none usr/include/sys/ccompile.h 644 root bin

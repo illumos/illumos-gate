@@ -1179,6 +1179,12 @@ getpil(void)
 }
 
 int
+spl_xcall(void)
+{
+	return (splr(ipltospl(XCALL_PIL)));
+}
+
+int
 interrupts_enabled(void)
 {
 	ulong_t	flag;

@@ -399,6 +399,12 @@ static uint64_t
 ni2_pcbe_event_coverage(char *event)
 {
 	/*
+	 * Check whether counter event is supported
+	 */
+	if (find_event(event) == NULL && find_generic_event(event) == NULL)
+		return (0);
+
+	/*
 	 * Fortunately, both pic0 and pic1 can count all events.
 	 */
 	return (0x3);

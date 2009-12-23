@@ -47,6 +47,7 @@ COMMON_CORE_OBJS +=		\
 		cpu_intr.o	\
 		cpu_pm.o	\
 		cpupart.o	\
+		cap_util.o	\
 		disp.o		\
 		group.o		\
 		kstat_fr.o	\

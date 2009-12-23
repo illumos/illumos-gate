@@ -303,3 +303,19 @@ pg_cmt_affinity_hw(pghw_type_t hw)
 	else
 		return (0);
 }
+
+/*
+ * Return number of counter events requested to measure hardware capacity and
+ * utilization and setup CPC requests for specified CPU if list where to add
+ * CPC requests is given
+ */
+int
+/* LINTED E_FUNC_ARG_UNUSED */
+cu_plat_cpc_init(cpu_t *cp, kcpc_request_list_t *reqs, int nreqs)
+{
+	/*
+	 * Return error to tell common code to decide what counter events to
+	 * program on this CPU for measuring hardware capacity and utilization
+	 */
+	return (-1);
+}

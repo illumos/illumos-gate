@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,6 +62,12 @@ static const struct options *opts = (const struct options *)&__options;
 
 static cpc_t *cpc;
 
+/*
+ * How many signals caught from terminal
+ * We bail out as soon as possible when interrupt is set
+ */
+static int	interrupt = 0;
+
 /*ARGSUSED*/
 static void
 cputrack_errfn(const char *fn, int subcode, const char *fmt, va_list ap)
@@ -79,6 +85,8 @@ cputrack_pctx_errfn(const char *fn, const char *fmt, va_list ap)
 }
 
 static int cputrack(int argc, char *argv[], int optind);
+static void intr(int);
+
 #if defined(__i386)
 static void p4_ht_error(void);
 #endif
@@ -220,6 +228,19 @@ main(int argc, char *argv[])
 		exit(2);
 	}
 
+	/*
+	 * Catch signals from terminal, so they can be handled asynchronously
+	 * when we're ready instead of when we're not (;-)
+	 */
+	if (sigset(SIGHUP, SIG_IGN) == SIG_DFL)
+		(void) sigset(SIGHUP, intr);
+	if (sigset(SIGINT, SIG_IGN) == SIG_DFL)
+		(void) sigset(SIGINT, intr);
+	if (sigset(SIGQUIT, SIG_IGN) == SIG_DFL)
+		(void) sigset(SIGQUIT, intr);
+	(void) sigset(SIGPIPE, intr);
+	(void) sigset(SIGTERM, intr);
+
 	cpc_setgrp_reset(opts->master);
 	(void) setvbuf(opts->log, NULL, _IOLBF, 0);
 	ret = cputrack(argc, argv, optind);
@@ -310,6 +331,9 @@ pinit_lwp(pctx_t *pctx, pid_t pid, id_t lwpid, void *arg)
 	char *errstr;
 	int nreq;
 
+	if (interrupt)
+		return (0);
+
 	if (state->maxlwpid < lwpid) {
 		state->sgrps = realloc(state->sgrps,
 		    lwpid * sizeof (state->sgrps));
@@ -373,6 +397,9 @@ pfini_lwp(pctx_t *pctx, pid_t pid, id_t lwpid, void *arg)
 	cpc_buf_t **data1, **data2, **scratch;
 	int nreq;
 
+	if (interrupt)
+		return (0);
+
 	set = cpc_setgrp_getset(sgrp);
 	nreq = cpc_setgrp_getbufs(sgrp, &data1, &data2, &scratch);
 	if (cpc_set_sample(cpc, set, *scratch) == 0) {
@@ -424,6 +451,9 @@ plwp_create(pctx_t *pctx, pid_t pid, id_t lwpid, void *arg)
 	cpc_buf_t	**data1, **data2, **scratch;
 	int		nreq;
 
+	if (interrupt)
+		return (0);
+
 	nreq = cpc_setgrp_getbufs(sgrp, &data1, &data2, &scratch);
 
 	print_sample(pid, lwpid, "lwp_create",
@@ -441,6 +471,9 @@ plwp_exit(pctx_t *pctx, pid_t pid, id_t lwpid, void *arg)
 	cpc_set_t	*start;
 	int		nreq;
 	cpc_buf_t	**data1, **data2, **scratch;
+
+	if (interrupt)
+		return (0);
 
 	start = cpc_setgrp_getset(sgrp);
 	do {
@@ -464,6 +497,9 @@ pexec(pctx_t *pctx, pid_t pid, id_t lwpid, char *name, void *arg)
 	int		nreq;
 	cpc_buf_t	**data1, **data2, **scratch;
 	hrtime_t	hrt;
+
+	if (interrupt)
+		return (0);
 
 	/*
 	 * Print the accumulated results from the previous program image
@@ -505,6 +541,9 @@ pexit(pctx_t *pctx, pid_t pid, id_t lwpid, int status, void *arg)
 	int		nreq;
 	cpc_buf_t	**data1, **data2, **scratch;
 
+	if (interrupt)
+		return;
+
 	cpc_setgrp_reset(state->accum);
 	start = cpc_setgrp_getset(state->accum);
 	do {
@@ -538,6 +577,9 @@ ptick(pctx_t *pctx, pid_t pid, id_t lwpid, void *arg)
 	cpc_buf_t **data1, **data2, **scratch, *tmp;
 	char *errstr;
 	int nreqs;
+
+	if (interrupt)
+		return (0);
 
 	nreqs = cpc_setgrp_getbufs(sgrp, &data1, &data2, &scratch);
 
@@ -704,7 +746,6 @@ cputrack(int argc, char *argv[], int optind)
 			state->accum = NULL;
 		}
 	}
-	pctx_release(pctx);
 
 	return (err != 0 ? 1 : 0);
 }
@@ -834,3 +875,12 @@ p4_ht_error(void)
 }
 
 #endif /* defined(__i386) */
+
+/*ARGSUSED*/
+static void
+intr(int sig)
+{
+	interrupt++;
+	if (cpc != NULL)
+		cpc_terminate(cpc);
+}
