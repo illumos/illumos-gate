@@ -353,12 +353,12 @@ hv_guest_suspend(void)
 
 /*ARGSUSED*/	
 uint64_t
-hv_set_tick_npt(uint64_t npt)
+hv_tick_set_npt(uint64_t npt)
 { return (0); }
 
 /*ARGSUSED*/	
 uint64_t
-hv_set_stick_npt(uint64_t npt)
+hv_stick_set_npt(uint64_t npt)
 { return (0); }
 
 /*ARGSUSED*/	

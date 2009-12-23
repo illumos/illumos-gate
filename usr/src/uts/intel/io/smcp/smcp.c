@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -558,7 +558,7 @@ SMCG_init_board(gld_mac_info_t *macinfo)
 		dbuf.fragment_list[0].fragment_ptr =
 		    (unsigned char *)smcg->bdesc[i]->physaddr;
 
-		LM_Put_Rx_Frag(&dbuf, pAd);
+		(void) LM_Put_Rx_Frag(&dbuf, pAd);
 	}
 
 	/*
@@ -1002,9 +1002,9 @@ SMCG_intr(gld_mac_info_t *macinfo)
 	mutex_enter(&smcg->rbuf_lock);
 	mutex_enter(&smcg->txbuf_lock);
 	mutex_enter(&smcg->lm_lock);
-	LM_Disable_Adapter(pAd);
+	(void) LM_Disable_Adapter(pAd);
 	rc = LM_Service_Events(pAd);
-	LM_Enable_Adapter(pAd);
+	(void) LM_Enable_Adapter(pAd);
 	mutex_exit(&smcg->lm_lock);
 	mutex_exit(&smcg->txbuf_lock);
 

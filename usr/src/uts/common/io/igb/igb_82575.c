@@ -1821,7 +1821,7 @@ e1000_reset_hw_82580(struct e1000_hw *hw)
 
 	/* If EEPROM is not present, run manual init scripts */
 	if ((E1000_READ_REG(hw, E1000_EECD) & E1000_EECD_PRES) == 0)
-		e1000_reset_init_script_82575(hw);
+		(void) e1000_reset_init_script_82575(hw);
 
 	/* clear global device reset status bit */
 	E1000_WRITE_REG(hw, E1000_STATUS, E1000_STAT_DEV_RST_SET);

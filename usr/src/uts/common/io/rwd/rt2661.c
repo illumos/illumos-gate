@@ -1034,7 +1034,7 @@ rt2661_rx_intr(struct rt2661_softc *sc)
 
 		rssi = rt2661_get_rssi(sc, desc->rssi);
 		/* send the frame to the 802.11 layer */
-		ieee80211_input(ic, m, ni, rssi + 95, 0);
+		(void) ieee80211_input(ic, m, ni, rssi + 95, 0);
 
 		sc->avg_rssi = (rssi + 7 * sc->avg_rssi) / 8;
 

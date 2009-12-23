@@ -3809,7 +3809,7 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus, uint_t device,
 	 * bus_t fields
 	 */
 	if (is_pcie)
-		pcie_init_bus(new_child, 0, PCIE_BUS_FINAL);
+		(void) pcie_init_bus(new_child, 0, PCIE_BUS_FINAL);
 
 	return (PCICFG_SUCCESS);
 
@@ -4465,7 +4465,7 @@ pf_setup_end:
 	(void) pcicfg_device_on(h);
 
 	if (is_pcie)
-		pcie_init_bus(new_child, 0, PCIE_BUS_FINAL);
+		(void) pcie_init_bus(new_child, 0, PCIE_BUS_FINAL);
 	if (ndi_devi_online(new_child, NDI_NO_EVENT|NDI_CONFIG)
 	    != NDI_SUCCESS) {
 		DEBUG0("Unable to online bridge\n");

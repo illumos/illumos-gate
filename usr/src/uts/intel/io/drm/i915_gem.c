@@ -102,8 +102,8 @@ i915_gem_init_ioctl(DRM_IOCTL_ARGS)
 
 	dev->gtt_total = (uint32_t) (args.gtt_end - args.gtt_start);
 
-	drm_mm_init(&dev_priv->mm.gtt_space, (unsigned long) args.gtt_start,
-	    dev->gtt_total);
+	(void) drm_mm_init(&dev_priv->mm.gtt_space,
+	    (unsigned long) args.gtt_start, dev->gtt_total);
 	DRM_DEBUG("i915_gem_init_ioctl dev->gtt_total %x, dev_priv->mm.gtt_space 0x%x gtt_start 0x%lx", dev->gtt_total, dev_priv->mm.gtt_space, args.gtt_start);
 	ASSERT(dev->gtt_total != 0);
 
@@ -868,7 +868,7 @@ void i965_reset(struct drm_device *dev, u8 flags)
 			   RING_VALID);
 		i915_kernel_lost_context(dev);
 
-		drm_irq_install(dev);
+		(void) drm_irq_install(dev);
 	}
 
 	/*
@@ -1089,7 +1089,8 @@ i915_gem_object_unbind(struct drm_gem_object *obj, uint32_t type)
 	}
 
 	if (!obj_priv->agp_mem) {
-		drm_agp_unbind_pages(dev, obj->size / PAGE_SIZE, obj_priv->gtt_offset, type);
+		(void) drm_agp_unbind_pages(dev, obj->size / PAGE_SIZE,
+		    obj_priv->gtt_offset, type);
 		obj_priv->agp_mem = -1;
 	}
 
@@ -2865,7 +2866,7 @@ i915_gem_entervt_ioctl(DRM_IOCTL_ARGS)
 
 	spin_unlock(&dev->struct_mutex);
 
-	drm_irq_install(dev);
+	(void) drm_irq_install(dev);
 
 	return 0;
 }
@@ -2882,7 +2883,7 @@ i915_gem_leavevt_ioctl(DRM_IOCTL_ARGS)
 		return ENODEV;
 
 	ret = i915_gem_idle(dev, 0);
-	drm_irq_uninstall(dev);
+	(void) drm_irq_uninstall(dev);
 
 	drm_core_ioremapfree(&dev_priv->mm.gtt_mapping, dev);
 	return ret;

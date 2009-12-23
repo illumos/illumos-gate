@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -218,7 +219,7 @@ start_again:
 		    "TX Descriptor ring is full: channel %d", tx_ring_p->tdc));
 		HXGE_DEBUG_MSG((hxgep, TX_CTL,
 		    "TX Descriptor ring is full: channel %d", tx_ring_p->tdc));
-		cas32((uint32_t *)&tx_ring_p->queueing, 0, 1);
+		(void) cas32((uint32_t *)&tx_ring_p->queueing, 0, 1);
 		tdc_stats->tx_no_desc++;
 		MUTEX_EXIT(&tx_ring_p->lock);
 		status = 1;

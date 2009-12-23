@@ -1973,7 +1973,7 @@ pmcs_iport_teardown_phys(pmcs_iport_t *iport)
 	/* Remove all phys from the phymap */
 	phys = sas_phymap_ua2phys(pwp->hss_phymap, iport->ua);
 	while ((phynum = sas_phymap_phys_next(phys)) != -1) {
-		sas_phymap_phy_rem(pwp->hss_phymap, phynum);
+		(void) sas_phymap_phy_rem(pwp->hss_phymap, phynum);
 	}
 	sas_phymap_phys_free(phys);
 }

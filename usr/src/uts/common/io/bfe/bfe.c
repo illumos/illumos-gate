@@ -2947,7 +2947,7 @@ bfe_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 fail4:
 	bfe_remove_intr(bfe);
 fail3:
-	mac_unregister(bfe->bfe_machdl);
+	(void) mac_unregister(bfe->bfe_machdl);
 fail2:
 	bfe_unmap_regs(bfe);
 fail1:

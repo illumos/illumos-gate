@@ -273,8 +273,8 @@ dboot_halt(void)
 	uint_t i = 10000;
 
 	while (--i)
-		HYPERVISOR_yield();
-	HYPERVISOR_shutdown(SHUTDOWN_poweroff);
+		(void) HYPERVISOR_yield();
+	(void) HYPERVISOR_shutdown(SHUTDOWN_poweroff);
 }
 
 /*
@@ -423,7 +423,7 @@ dump_tables(void)
 			goto next_entry;
 
 		dboot_printf("%s %p[0x%x] = %" PRIx64 ", va=%" PRIx64,
-		    tabs + l, table, index, (uint64_t)pteval, va);
+		    tabs + l, (void *)table, index, (uint64_t)pteval, va);
 		pa = ma_to_pa(pteval & MMU_PAGEMASK);
 		dboot_printf(" physaddr=%x\n", pa);
 

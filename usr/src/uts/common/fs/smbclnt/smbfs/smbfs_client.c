@@ -687,7 +687,7 @@ smbfs_clntinit(void)
 	zone_key_create(&smi_list_key, smbfs_zone_init, smbfs_zone_shutdown,
 	    smbfs_zone_destroy);
 #ifdef NEED_SMBFS_CALLBACKS
-	smb_fscb_set(&smbfs_cb);
+	(void) smb_fscb_set(&smbfs_cb);
 #endif /* NEED_SMBFS_CALLBACKS */
 	return (0);
 }
@@ -700,7 +700,7 @@ void
 smbfs_clntfini(void)
 {
 #ifdef NEED_SMBFS_CALLBACKS
-	smb_fscb_set(NULL);
+	(void) smb_fscb_set(NULL);
 #endif /* NEED_SMBFS_CALLBACKS */
 	(void) zone_key_delete(smi_list_key);
 }

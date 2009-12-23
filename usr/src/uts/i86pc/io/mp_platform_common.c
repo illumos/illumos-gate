@@ -653,13 +653,15 @@ acpi_probe(char *modname)
 			if (mpa->LapicFlags & ACPI_MADT_ENABLED) {
 				if (mpa->Id == local_ids[0]) {
 					proc_ids[0] = mpa->ProcessorId;
-					acpica_map_cpu(0, mpa->ProcessorId);
+					(void) acpica_map_cpu(0,
+					    mpa->ProcessorId);
 				} else if (apic_nproc < NCPU && use_mp &&
 				    apic_nproc < boot_ncpus) {
 					local_ids[index] = mpa->Id;
 					proc_ids[index] = mpa->ProcessorId;
 					CPUSET_ADD(apic_cpumask, index);
-					acpica_map_cpu(index, mpa->ProcessorId);
+					(void) acpica_map_cpu(index,
+					    mpa->ProcessorId);
 					index++;
 					apic_nproc++;
 				} else if (apic_nproc == NCPU && !warned) {
@@ -769,7 +771,8 @@ acpi_probe(char *modname)
 				    apic_nproc < boot_ncpus) {
 					local_ids[index] = mpx2a->LocalApicId;
 					CPUSET_ADD(apic_cpumask, index);
-					acpica_map_cpu(index, mpx2a->Uid);
+					(void) acpica_map_cpu(index,
+					    mpx2a->Uid);
 					index++;
 					apic_nproc++;
 				} else if (apic_nproc == NCPU && !warned) {
@@ -875,7 +878,7 @@ acpi_probe(char *modname)
 	 * Call acpica_build_processor_map() now that we have
 	 * ACPI namesspace access
 	 */
-	acpica_build_processor_map();
+	(void) acpica_build_processor_map();
 
 	/*
 	 * Squirrel away the SCI and flags for later on

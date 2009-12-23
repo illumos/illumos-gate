@@ -447,10 +447,10 @@ opt_pcbe_init(void)
 
 	if (amd_family == 0xf)
 		/* Some tools expect this string for family 0fh */
-		snprintf(amd_pcbe_impl_name, sizeof (amd_pcbe_impl_name),
+		(void) snprintf(amd_pcbe_impl_name, sizeof (amd_pcbe_impl_name),
 		    "AMD Opteron & Athlon64");
 	else
-		snprintf(amd_pcbe_impl_name, sizeof (amd_pcbe_impl_name),
+		(void) snprintf(amd_pcbe_impl_name, sizeof (amd_pcbe_impl_name),
 		    "AMD Family %02xh%s", amd_family,
 		    AMD_PCBE_SUPPORTED(amd_family) ? "" :" (unsupported)");
 
@@ -481,7 +481,7 @@ opt_pcbe_init(void)
 	} else {
 
 		amd_pcbe_cpuref = amd_generic_bkdg;
-		snprintf(amd_pcbe_cpuref, AMD_CPUREF_SIZE,
+		(void) snprintf(amd_pcbe_cpuref, AMD_CPUREF_SIZE,
 		    "See BIOS and Kernel Developer's Guide "    \
 		    "(BKDG) For AMD Family %02xh Processors. "  \
 		    "(Note that this pcbe does not explicitly " \

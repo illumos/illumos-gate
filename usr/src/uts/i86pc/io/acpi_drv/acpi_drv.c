@@ -800,7 +800,7 @@ acpi_drv_prt_notify(ACPI_HANDLE hdl, UINT32 val)
 
 	buf.Length = sizeof (str);
 	buf.Pointer = str;
-	AcpiGetName(hdl, ACPI_FULL_PATHNAME, &buf);
+	(void) AcpiGetName(hdl, ACPI_FULL_PATHNAME, &buf);
 	cmn_err(CE_NOTE, "AcpiNotify(%s, 0x%02x)", str, val);
 }
 #endif /* DEBUG */
@@ -1746,15 +1746,15 @@ acpi_drv_acpi_fini(void)
 	for (bp = &acpi_drv_cbat[0]; bp < &acpi_drv_cbat[ACPI_DRV_MAX_BAT_NUM];
 	    bp++) {
 		if (bp->dev.valid) {
-			AcpiRemoveNotifyHandler(bp->dev.hdl, ACPI_DEVICE_NOTIFY,
-			    acpi_drv_cbat_notify);
+			(void) AcpiRemoveNotifyHandler(bp->dev.hdl,
+			    ACPI_DEVICE_NOTIFY, acpi_drv_cbat_notify);
 		}
 	}
 	for (i = 0; i < nac; i++) {
-		AcpiRemoveNotifyHandler(acpi_drv_ac[i].dev.hdl,
+		(void) AcpiRemoveNotifyHandler(acpi_drv_ac[i].dev.hdl,
 		    ACPI_DEVICE_NOTIFY, acpi_drv_ac_notify);
 	}
-	AcpiRemoveNotifyHandler(lid.dev.hdl, ACPI_DEVICE_NOTIFY,
+	(void) AcpiRemoveNotifyHandler(lid.dev.hdl, ACPI_DEVICE_NOTIFY,
 	    acpi_drv_lid_notify);
 
 	if (acpi_hotkey.hotkey_method != HOTKEY_METHOD_NONE)

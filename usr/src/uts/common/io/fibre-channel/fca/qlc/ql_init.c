@@ -4252,7 +4252,7 @@ ql_mps_reset(ql_adapter_state_t *ha)
 			return;
 		}
 		if (ql_rd_risc_ram_word(ha, 0x7c00, &data) != QL_SUCCESS) {
-			ql_wrt_risc_ram_word(ha, 0x7c00, 0);
+			(void) ql_wrt_risc_ram_word(ha, 0x7c00, 0);
 			return;
 		}
 	} while (!(data & BIT_0));
@@ -4262,8 +4262,8 @@ ql_mps_reset(ql_adapter_state_t *ha)
 		if ((data & 0xe0) != (dctl & 0xe0)) {
 			data &= 0xff1f;
 			data |= dctl & 0xe0;
-			ql_wrt_risc_ram_word(ha, 0x7A15, data);
+			(void) ql_wrt_risc_ram_word(ha, 0x7A15, data);
 		}
 	}
-	ql_wrt_risc_ram_word(ha, 0x7c00, 0);
+	(void) ql_wrt_risc_ram_word(ha, 0x7c00, 0);
 }

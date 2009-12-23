@@ -2992,7 +2992,7 @@ ibnex_dm_callback(void *arg, ibdm_events_t flag)
 	case IBDM_EVENT_PORT_UP:
 	case IBDM_EVENT_PORT_PKEY_CHANGE:
 		phci = ibtl_ibnex_hcaguid2dip(*(longlong_t *)arg);
-		devfs_clean(phci, NULL, 0);
+		(void) devfs_clean(phci, NULL, 0);
 		break;
 	default:
 		break;

@@ -8262,7 +8262,7 @@ ql_task_thread(ql_adapter_state_t *ha)
 		if (ha->task_daemon_flags & SEND_PLOGI) {
 			ha->task_daemon_flags &= ~SEND_PLOGI;
 			TASK_DAEMON_UNLOCK(ha);
-			ql_n_port_plogi(ha);
+			(void) ql_n_port_plogi(ha);
 			TASK_DAEMON_LOCK(ha);
 		}
 

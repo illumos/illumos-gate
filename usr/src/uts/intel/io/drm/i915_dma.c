@@ -934,7 +934,7 @@ int i915_driver_load(drm_device_t *dev, unsigned long flags)
 	dev_priv->mmio_map->size = size;
 	dev_priv->mmio_map->type = _DRM_REGISTERS;
 	dev_priv->mmio_map->flags = _DRM_REMOVABLE;
-	drm_ioremap(dev, dev_priv->mmio_map);
+	(void) drm_ioremap(dev, dev_priv->mmio_map);
 
 	DRM_DEBUG("i915_driverload mmio %p mmio_map->dev_addr %x", dev_priv->mmio_map, dev_priv->mmio_map->dev_addr);
 

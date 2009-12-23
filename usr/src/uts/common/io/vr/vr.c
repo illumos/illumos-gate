@@ -528,7 +528,7 @@ vr_resume(dev_info_t *devinfo)
 	vrp = (vr_t *)ddi_get_driver_private(devinfo);
 	mutex_enter(&vrp->oplock);
 	if (vrp->chip.state == CHIPSTATE_SUSPENDED_RUNNING)
-		vr_start(vrp);
+		(void) vr_start(vrp);
 	mutex_exit(&vrp->oplock);
 	return (DDI_SUCCESS);
 }

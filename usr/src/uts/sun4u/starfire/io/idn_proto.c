@@ -12662,7 +12662,7 @@ idn_deactivate_channel_services(int channel, idn_chanop_t chanop)
 		}
 
 		PR_CHAN("%s: pointing chansvr %d to morgue (0x%p)\n",
-		    proc, c, central_morguep ? central_morguep
+		    proc, c, central_morguep ? (void *)central_morguep
 		    : (void *)(csp->ch_recv_morguep));
 
 		if (central_morguep == NULL) {

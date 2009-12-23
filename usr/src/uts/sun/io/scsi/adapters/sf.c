@@ -1092,7 +1092,7 @@ sf_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		}
 
 		/* detach this instance of the HBA driver */
-		scsi_hba_detach(dip);
+		(void) scsi_hba_detach(dip);
 		scsi_hba_tran_free(sf->sf_tran);
 
 		/* deallocate/unbind DMA handle for lilp map */

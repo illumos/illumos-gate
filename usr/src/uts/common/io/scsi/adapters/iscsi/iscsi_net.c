@@ -334,7 +334,8 @@ iscsi_net_accept(void *socket, struct sockaddr *addr, int *addr_len)
 	ksocket_t listen_ks;
 	ksocket_t ks = (ksocket_t)socket;
 
-	ksocket_accept(ks, addr, (socklen_t *)addr_len, &listen_ks, CRED());
+	(void) ksocket_accept(ks, addr, (socklen_t *)addr_len, &listen_ks,
+	    CRED());
 
 	return ((void *)listen_ks);
 }
@@ -482,7 +483,7 @@ iscsi_net_recvmsg(void *socket, struct msghdr *msg, int timeout)
 	 * data is received or timeout.
 	 */
 	ksocket_hold(ks);
-	ksocket_recvmsg(ks, msg, prflag, &recv, CRED());
+	(void) ksocket_recvmsg(ks, msg, prflag, &recv, CRED());
 	ksocket_rele(ks);
 	DTRACE_PROBE1(ksocket_recvmsg, size_t, recv);
 	return (recv);

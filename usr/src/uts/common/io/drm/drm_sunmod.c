@@ -224,7 +224,7 @@ exit4:
 exit3:
 	pci_config_teardown(&pci_cfg_handle);
 exit2:
-	gfxp_vgatext_detach(dip, DDI_DETACH, gfxp);
+	(void) gfxp_vgatext_detach(dip, DDI_DETACH, gfxp);
 exit1:
 	gfxp_vgatext_softc_free(gfxp);
 	drm_supp_free_drv_entry(dip);

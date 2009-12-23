@@ -680,7 +680,7 @@ sbd_handle_short_write_transfers(scsi_task_t *task,
 		dbuf->db_data_size = cdb_xfer_size;
 		dbuf->db_relative_offset = 0;
 		dbuf->db_flags = DB_DIRECTION_FROM_RPORT;
-		stmf_xfer_data(task, dbuf, 0);
+		(void) stmf_xfer_data(task, dbuf, 0);
 	} else {
 		if (dbuf->db_data_size < cdb_xfer_size) {
 			stmf_abort(STMF_QUEUE_TASK_ABORT, task,

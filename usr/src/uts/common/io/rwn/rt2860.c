@@ -1774,7 +1774,7 @@ rt2860_rx_intr(struct rt2860_softc *sc)
 		/* grab a reference to the source node */
 		ni = ieee80211_find_rxnode(ic, wh);
 
-		ieee80211_input(ic, mp0, ni, rssi, 0);
+		(void) ieee80211_input(ic, mp0, ni, rssi, 0);
 
 		/* node is no longer needed */
 		ieee80211_free_node(ni);

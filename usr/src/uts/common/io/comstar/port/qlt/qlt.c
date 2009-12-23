@@ -6228,7 +6228,7 @@ qlt_mps_reset(qlt_state_t *qlt)
 		}
 		if (qlt_raw_rd_risc_ram_word(qlt, 0x7c00, &data) !=
 		    QLT_SUCCESS) {
-			qlt_raw_wrt_risc_ram_word(qlt, 0x7c00, 0);
+			(void) qlt_raw_wrt_risc_ram_word(qlt, 0x7c00, 0);
 			return;
 		}
 	} while (!(data & BIT_0));
@@ -6238,10 +6238,10 @@ qlt_mps_reset(qlt_state_t *qlt)
 		if ((data & 0xe0) != (dctl & 0xe0)) {
 			data &= 0xff1f;
 			data |= dctl & 0xe0;
-			qlt_raw_wrt_risc_ram_word(qlt, 0x7A15, data);
+			(void) qlt_raw_wrt_risc_ram_word(qlt, 0x7A15, data);
 		}
 	}
-	qlt_raw_wrt_risc_ram_word(qlt, 0x7c00, 0);
+	(void) qlt_raw_wrt_risc_ram_word(qlt, 0x7c00, 0);
 }
 
 /*

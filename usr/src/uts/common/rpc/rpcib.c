@@ -4731,7 +4731,7 @@ rib_free_hca(rib_hca_t *hca)
 	rib_rbufpool_destroy(hca, SEND_BUFFER);
 	rib_destroy_cache(hca);
 	if (rib_mod.rdma_count == 0)
-		rdma_unregister_mod(&rib_mod);
+		(void) rdma_unregister_mod(&rib_mod);
 	(void) ibt_free_pd(hca->hca_hdl, hca->pd_hdl);
 	(void) ibt_close_hca(hca->hca_hdl);
 	hca->hca_hdl = NULL;

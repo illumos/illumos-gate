@@ -212,8 +212,8 @@ set_tick_offsets(uint64_t source_tick, uint64_t source_stick)
 static void
 enable_tick_stick_npt(void)
 {
-	hv_stick_set_npt(1);
-	hv_tick_set_npt(1);
+	(void) hv_stick_set_npt(1);
+	(void) hv_tick_set_npt(1);
 }
 
 /*
@@ -225,8 +225,8 @@ suspend_sync_tick_stick_npt(void)
 {
 	if (tick_stick_emulation_active) {
 		DBG("enabling {%%tick/%%stick}.NPT on CPU 0x%x", CPU->cpu_id);
-		hv_stick_set_npt(1);
-		hv_tick_set_npt(1);
+		(void) hv_stick_set_npt(1);
+		(void) hv_tick_set_npt(1);
 	} else {
 		ASSERT(gettick_npt() == 0);
 		ASSERT(getstick_npt() == 0);

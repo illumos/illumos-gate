@@ -16168,7 +16168,8 @@ fcp_pseudo_destroy_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 	/*
 	 * First we let FCA to uninitilize private part.
 	 */
-	fc_ulp_uninit_packet(pptr->port_fp_handle, PKT2CMD(pkt)->cmd_fp_pkt);
+	(void) fc_ulp_uninit_packet(pptr->port_fp_handle,
+	    PKT2CMD(pkt)->cmd_fp_pkt);
 
 	/*
 	 * Then we uninitialize fc_packet.
@@ -16196,7 +16197,7 @@ fcp_pseudo_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	int		 rval;
 
 	fpkt->pkt_pd = ptgt->tgt_pd_handle;
-	fc_ulp_init_packet(pptr->port_fp_handle, cmd->cmd_fp_pkt, 1);
+	(void) fc_ulp_init_packet(pptr->port_fp_handle, cmd->cmd_fp_pkt, 1);
 
 	/*
 	 * Firstly, we need initialize fcp_pkt_t

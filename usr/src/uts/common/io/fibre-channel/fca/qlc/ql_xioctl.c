@@ -6755,7 +6755,7 @@ ql_check_pci(ql_adapter_state_t *ha, ql_fcache_t *fcache, uint32_t *nextpos)
 			ql_flash_layout_table(ha, *nextpos +
 			    (pcid->imagelength[0] | (pcid->imagelength[1] <<
 			    8)) * PCI_SECTOR_SIZE);
-			ql_24xx_flash_desc(ha);
+			(void) ql_24xx_flash_desc(ha);
 		}
 		*nextpos = 0xffffffff;
 	} else {

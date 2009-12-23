@@ -551,7 +551,7 @@ global_init(void)
 	sighandler.sa_flags = 0;
 	(void) sigfillset(&sighandler.sa_mask);
 	sighandler.sa_handler = (void (*)(int)) setup_debug;
-	sigaction(SIGHUP, &sighandler, NULL);
+	(void) sigaction(SIGHUP, &sighandler, NULL);
 
 	__savetime = gethrtime();
 	(void) time(&clock_val);

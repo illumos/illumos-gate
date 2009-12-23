@@ -268,7 +268,7 @@ smbfs_ioc_setsd(vnode_t *vp, intptr_t arg, int flag, cred_t *cr)
 	 * Get the buffer contents (security descriptor data)
 	 */
 	mbp = &mb_store;
-	mb_init(mbp);
+	(void) mb_init(mbp);
 	ubuf = (void *)(uintptr_t)iocb.addr;
 	error = mb_put_mem(mbp, ubuf, iocb.used, MB_MUSER);
 	if (error)
@@ -401,7 +401,7 @@ smbfs_setacl(vnode_t *vp, vsecattr_t *vsa,
 	 * Marshall the internal form SD into an
 	 * OtW security descriptor.
 	 */
-	mb_init(mbp);
+	(void) mb_init(mbp);
 	error = mb_put_ntsd(mbp, sd);
 	if (error)
 		goto out;

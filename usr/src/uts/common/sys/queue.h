@@ -31,14 +31,12 @@
  *	@(#)queue.h	8.5 (Berkeley) 8/20/94
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_QUEUE_H
 #define	_SYS_QUEUE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/note.h>
 
@@ -444,22 +442,26 @@ struct {								\
 #define	QUEUEDEBUG_TAILQ_INSERT_HEAD(head, elm, field)			\
 	if ((head)->tqh_first &&					\
 	    (head)->tqh_first->field.tqe_prev != &(head)->tqh_first)	\
-		panic("TAILQ_INSERT_HEAD %p %s:%d", (head), __FILE__, __LINE__);
+		panic("TAILQ_INSERT_HEAD %p %s:%d", (void *)(head),	\
+		    __FILE__, __LINE__);
 #define	QUEUEDEBUG_TAILQ_INSERT_TAIL(head, elm, field)			\
 	if (*(head)->tqh_last != NULL)					\
-		panic("TAILQ_INSERT_TAIL %p %s:%d", (head), __FILE__, __LINE__);
+		panic("TAILQ_INSERT_TAIL %p %s:%d", (void *)(head),	\
+		    __FILE__, __LINE__);
 #define	QUEUEDEBUG_TAILQ_OP(elm, field)					\
 	if ((elm)->field.tqe_next &&					\
 	    (elm)->field.tqe_next->field.tqe_prev !=			\
 	    &(elm)->field.tqe_next)					\
-		panic("TAILQ_* forw %p %s:%d", (elm), __FILE__, __LINE__);\
+		panic("TAILQ_* forw %p %s:%d", (void *)(elm),		\
+		    __FILE__, __LINE__);\
 	if (*(elm)->field.tqe_prev != (elm))				\
-		panic("TAILQ_* back %p %s:%d", (elm), __FILE__, __LINE__);
+		panic("TAILQ_* back %p %s:%d", (void *)(elm),		\
+		    __FILE__, __LINE__);
 #define	QUEUEDEBUG_TAILQ_PREREMOVE(head, elm, field)			\
 	if ((elm)->field.tqe_next == NULL &&				\
 	    (head)->tqh_last != &(elm)->field.tqe_next)			\
 		panic("TAILQ_PREREMOVE head %p elm %p %s:%d",		\
-		(head), (elm), __FILE__, __LINE__);
+		    (void *)(head), (void *)(elm), __FILE__, __LINE__);
 #define	QUEUEDEBUG_TAILQ_POSTREMOVE(elm, field)				\
 	(elm)->field.tqe_next = (void *)1L;				\
 	(elm)->field.tqe_prev = (void *)1L;

@@ -336,9 +336,9 @@ smbfs_xa_findopen(struct smbfs_fctx *ctx, struct smbnode *dnp,
 	ctx->f_t2 = t2p;
 
 	mbp = &t2p->t2_tparam;
-	mb_init(mbp);
-	mb_put_uint16le(mbp, SMB_QFILEINFO_STREAM_INFO);
-	mb_put_uint32le(mbp, 0);
+	(void) mb_init(mbp);
+	(void) mb_put_uint16le(mbp, SMB_QFILEINFO_STREAM_INFO);
+	(void) mb_put_uint32le(mbp, 0);
 	error = smbfs_fullpath(mbp, vcp, pnp, NULL, NULL, 0);
 	if (error)
 		goto out;
@@ -393,9 +393,9 @@ again:
 		return (ENOENT);
 	if ((error = md_get_uint32le(mdp, &size)) != 0) /* name len */
 		return (ENOENT);
-	md_get_uint64le(mdp, &llongint); /* file size */
+	(void) md_get_uint64le(mdp, &llongint); /* file size */
 	ctx->f_attr.fa_size = llongint;
-	md_get_uint64le(mdp, NULL);	/* alloc. size */
+	(void) md_get_uint64le(mdp, NULL);	/* alloc. size */
 	used = 4 + 4 + 8 + 8;	/* how much we consumed */
 
 	/*
@@ -405,13 +405,13 @@ again:
 	if (SMB_UNICODE_STRINGS(SSTOVC(ctx->f_ssp))) {
 		if (size >= 2) {
 			size -= 2; used += 2;
-			md_get_uint16le(mdp, NULL);
+			(void) md_get_uint16le(mdp, NULL);
 		}
 		nmlen = min(size, SMB_MAXFNAMELEN * 2);
 	} else {
 		if (size >= 1) {
 			size -= 1; used += 1;
-			md_get_uint8(mdp, NULL);
+			(void) md_get_uint8(mdp, NULL);
 		}
 		nmlen = min(size, SMB_MAXFNAMELEN);
 	}
@@ -437,7 +437,7 @@ again:
 	 */
 	if (next > used) {
 		skip = next - used;
-		md_get_mem(mdp, NULL, skip, MB_MSYSTEM);
+		(void) md_get_mem(mdp, NULL, skip, MB_MSYSTEM);
 	}
 	if (next == 0)
 		ctx->f_flags |= SMBFS_RDD_EOF;

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -80,14 +78,14 @@ bcons_init_xen(char *cmdline)
 	 * Sets the "present" and "writable" bits in the PTE
 	 * plus user for amd64.
 	 */
-	HYPERVISOR_update_va_mapping(vaddr, xen_info->shared_info | PTE_BITS,
-	    UVMF_INVLPG | UVMF_LOCAL);
+	(void) HYPERVISOR_update_va_mapping(vaddr,
+	    xen_info->shared_info | PTE_BITS, UVMF_INVLPG | UVMF_LOCAL);
 
 	if (!DOMAIN_IS_INITDOMAIN(xen_info)) {
 		/*
 		 * map the xen console ring buffers
 		 */
-		HYPERVISOR_update_va_mapping(vaddr + MMU_PAGESIZE,
+		(void) HYPERVISOR_update_va_mapping(vaddr + MMU_PAGESIZE,
 		    mmu_ptob((x86pte_t)xen_info->console.domU.mfn) | PTE_BITS,
 		    UVMF_INVLPG | UVMF_LOCAL);
 	} else {
