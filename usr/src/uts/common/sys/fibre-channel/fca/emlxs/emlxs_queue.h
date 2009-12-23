@@ -267,8 +267,9 @@ typedef struct CQE_ASYNC
 	uint8_t		link_status;
 	uint8_t		phys_port;
 
-	uint32_t	Rsvd1: 24;	/* Word 1 */
-	uint32_t	port_fault: 8;
+	uint16_t	qos_link_speed;	/* Word 1 */
+	uint8_t		Rsvd1;
+	uint8_t		port_fault;
 
 	uint32_t	event_tag;	/* Word 2 */
 
@@ -285,8 +286,9 @@ typedef struct CQE_ASYNC
 	uint8_t		port_duplex;
 	uint8_t		port_speed;	/* Word 0 */
 
-	uint32_t	port_fault: 8;
-	uint32_t	Rsvd1: 24;	/* Word 1 */
+	uint8_t		port_fault;	/* Word 1 */
+	uint8_t		Rsvd1;
+	uint16_t	qos_link_speed;
 
 	uint32_t	event_tag;	/* Word 2 */
 

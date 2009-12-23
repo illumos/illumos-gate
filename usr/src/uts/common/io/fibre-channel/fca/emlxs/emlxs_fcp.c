@@ -158,8 +158,20 @@ emlxs_handle_fcp_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 #if (EMLXS_MODREVX == EMLXS_MODREV2X)
 		emlxs_unswap_pkt(sbp);
 #endif /* EMLXS_MODREV2X */
+
+#ifdef FMA_SUPPORT
+		emlxs_check_dma(hba, sbp);
+#endif  /* FMA_SUPPORT */
+
 		cp->ulpCmplCmd++;
 		(*pkt->pkt_comp) (pkt);
+
+#ifdef FMA_SUPPORT
+		if (hba->flag & FC_DMA_CHECK_ERROR) {
+			emlxs_thread_spawn(hba, emlxs_restart_thread,
+			    NULL, NULL);
+		}
+#endif  /* FMA_SUPPORT */
 
 		return;
 	}

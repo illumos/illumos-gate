@@ -224,6 +224,8 @@ extern void			emlxs_fm_service_impact(emlxs_hba_t *hba,
 extern int			emlxs_fm_error_cb(dev_info_t *dip,
 					ddi_fm_error_t *err,
 					const void *impl_data);
+extern void			emlxs_check_dma(emlxs_hba_t *hba,
+					emlxs_buf_t *sbp);
 #endif	/* FMA_SUPPORT */
 
 /* Module emlxs_pkt.c External Routine Declarations */

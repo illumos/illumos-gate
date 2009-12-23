@@ -83,7 +83,8 @@ static stmf_data_buf_t *emlxs_fct_dbuf_alloc(fct_local_port_t *fct_port,
     uint32_t size, uint32_t *pminsize, uint32_t flags);
 static void emlxs_fct_dbuf_free(fct_dbuf_store_t *fds, stmf_data_buf_t *dbuf);
 
-static void emlxs_fct_dbuf_dma_sync(stmf_data_buf_t *dbuf, uint_t sync_type);
+static int emlxs_fct_dbuf_dma_sync(emlxs_hba_t *hba, stmf_data_buf_t *dbuf,
+    uint_t sync_type);
 static emlxs_buf_t *emlxs_fct_pkt_init(emlxs_port_t *port,
     fct_cmd_t *fct_cmd, fc_packet_t *pkt);
 
@@ -96,7 +97,6 @@ static uint32_t emlxs_fct_pkt_abort_txq(emlxs_port_t *port,
     emlxs_buf_t *cmd_sbp);
 static fct_status_t emlxs_fct_send_qfull_reply(emlxs_port_t *port,
     emlxs_node_t *ndlp, uint16_t xid, uint32_t class, emlxs_fcp_cmd_t *fcp_cmd);
-static void emlxs_fct_dbuf_dma_sync(stmf_data_buf_t *dbuf, uint_t sync_type);
 
 #ifdef FCT_IO_TRACE
 uint8_t *emlxs_iotrace = 0;	/* global for mdb */
@@ -2535,7 +2535,7 @@ emlxs_fct_send_fcp_data(fct_cmd_t *fct_cmd, stmf_data_buf_t *dbuf,
 
 	int	channel;
 	int	channelno;
-	fct_status_t rval;
+	fct_status_t rval = 0;
 
 	rval = emlxs_fct_cmd_accept(port, fct_cmd, EMLXS_FCT_SEND_FCP_DATA);
 	if (rval) {
@@ -2588,7 +2588,12 @@ emlxs_fct_send_fcp_data(fct_cmd_t *fct_cmd, stmf_data_buf_t *dbuf,
 	}
 
 	if (dbuf->db_flags & DB_DIRECTION_TO_RPORT) {
-		emlxs_fct_dbuf_dma_sync(dbuf, DDI_DMA_SYNC_FORDEV);
+		if (emlxs_fct_dbuf_dma_sync(hba, dbuf, DDI_DMA_SYNC_FORDEV)) {
+			emlxs_fct_cmd_post(port, fct_cmd, EMLXS_FCT_CMD_POSTED);
+			/* mutex_exit(&cmd_sbp->fct_mtx); */
+
+			return (FCT_BUSY);
+		}
 	}
 
 	cmd_sbp->fct_flags |= EMLXS_FCT_IO_INP;
@@ -2902,6 +2907,7 @@ emlxs_fct_handle_fcp_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 	fct_cmd->cmd_comp_status = FCT_SUCCESS;
 
 	if (status) {
+emlxs_dma_error:
 		/*
 		 * The error indicates this IO should be terminated
 		 * immediately.
@@ -2935,8 +2941,10 @@ emlxs_fct_handle_fcp_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 	case CMD_FCP_TRECEIVE64_CX:
 
 		if (dbuf->db_flags & DB_DIRECTION_FROM_RPORT) {
-			emlxs_fct_dbuf_dma_sync(dbuf,
-			    DDI_DMA_SYNC_FORCPU);
+			if (emlxs_fct_dbuf_dma_sync(hba, dbuf,
+			    DDI_DMA_SYNC_FORCPU)) {
+				goto emlxs_dma_error;
+			}
 		}
 
 		if ((cmd_sbp->fct_flags & EMLXS_FCT_SEND_STATUS) &&
@@ -3818,6 +3826,20 @@ emlxs_fct_pkt_comp(fc_packet_t *pkt)
 		    fct_cmd, fct_cmd->cmd_comp_status);
 #endif /* FCT_API_TRACE */
 
+#ifdef FMA_SUPPORT
+		if (emlxs_fm_check_dma_handle(hba, pkt->pkt_resp_dma)
+		    != DDI_FM_OK) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_invalid_dma_handle_msg,
+			    "emlxs_fct_pkt_comp: hdl=%p",
+			    pkt->pkt_resp_dma);
+			MODSYM(fct_send_cmd_done) (fct_cmd, FCT_FAILURE,
+			    FCT_IOF_FCA_DONE);
+
+			break;
+		}
+#endif /* FMA_SUPPORT */
+
 		MODSYM(fct_send_cmd_done) (fct_cmd, FCT_SUCCESS,
 		    FCT_IOF_FCA_DONE);
 
@@ -3848,6 +3870,19 @@ emlxs_fct_pkt_comp(fc_packet_t *pkt)
 		    fct_cmd, fct_cmd->cmd_comp_status);
 #endif /* FCT_API_TRACE */
 
+#ifdef FMA_SUPPORT
+		if (emlxs_fm_check_dma_handle(hba, pkt->pkt_resp_dma)
+		    != DDI_FM_OK) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_invalid_dma_handle_msg,
+			    "emlxs_fct_pkt_comp: hdl=%p",
+			    pkt->pkt_resp_dma);
+			MODSYM(fct_send_cmd_done) (fct_cmd, FCT_FAILURE,
+			    FCT_IOF_FCA_DONE);
+
+			break;
+		}
+#endif /* FMA_SUPPORT */
 		MODSYM(fct_send_cmd_done) (fct_cmd, FCT_SUCCESS,
 		    FCT_IOF_FCA_DONE);
 
@@ -4988,16 +5023,32 @@ emlxs_fct_dbuf_free(fct_dbuf_store_t *fds, stmf_data_buf_t *dbuf)
 } /* emlxs_fct_dbuf_free() */
 
 
-static void
-emlxs_fct_dbuf_dma_sync(stmf_data_buf_t *dbuf, uint_t sync_type)
+static int
+emlxs_fct_dbuf_dma_sync(emlxs_hba_t *hba, stmf_data_buf_t *dbuf,
+    uint_t sync_type)
 {
 	emlxs_fct_dmem_bctl_t *bctl =
 	    (emlxs_fct_dmem_bctl_t *)dbuf->db_port_private;
 	emlxs_fct_dmem_bucket_t *p = bctl->bctl_bucket;
+	emlxs_port_t *port = &PPORT;
+	int retval = 0;
 
 	(void) ddi_dma_sync(p->dmem_dma_handle,
 	    (unsigned long)(bctl->bctl_dev_addr - p->dmem_dev_addr),
 	    dbuf->db_data_size, sync_type);
+
+#ifdef FMA_SUPPORT
+	if (emlxs_fm_check_dma_handle(hba, p->dmem_dma_handle)
+	    != DDI_FM_OK) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_invalid_dma_handle_msg,
+		    "emlxs_fct_dbuf_dma_sync: hdl=%p",
+		    p->dmem_dma_handle);
+		retval = 1;
+	}
+#endif  /* FMA_SUPPORT */
+
+	return (retval);
 
 } /* emlxs_fct_dbuf_dma_sync() */
 

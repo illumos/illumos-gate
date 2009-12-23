@@ -176,6 +176,7 @@ typedef struct sd_bucket_info
 #define	EMLXS_RD_BE_FCF			82
 #define	EMLXS_SET_BE_DCBX		83
 #define	EMLXS_GET_BE_DCBX		84
+#define	EMLXS_GET_QOS			85
 
 /* SAN DIAG SUPPORT */
 #define	EMLXS_SD_SET_BUCKET		100

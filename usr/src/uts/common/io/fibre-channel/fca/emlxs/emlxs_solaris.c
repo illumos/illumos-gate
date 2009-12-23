@@ -2581,6 +2581,7 @@ emlxs_poll(emlxs_port_t *port, emlxs_buf_t *sbp)
 	clock_t		time;
 	uint32_t	att_bit;
 	CHANNEL	*cp;
+	int		in_panic = 0;
 
 	mutex_enter(&EMLXS_PORT_LOCK);
 	hba->io_poll_count++;
@@ -2590,6 +2591,7 @@ emlxs_poll(emlxs_port_t *port, emlxs_buf_t *sbp)
 	cp = (CHANNEL *)sbp->channel;
 
 	if (ddi_in_panic()) {
+		in_panic = 1;
 		/*
 		 * In panic situations there will be one thread with
 		 * no interrrupts (hard or soft) and no timers
@@ -2752,11 +2754,24 @@ done:
 	hba->io_poll_count--;
 	mutex_exit(&EMLXS_PORT_LOCK);
 
+#ifdef FMA_SUPPORT
+	if (!in_panic) {
+		emlxs_check_dma(hba, sbp);
+	}
+#endif
+
 	/* Make ULP completion callback if required */
 	if (pkt->pkt_comp) {
 		cp->ulpCmplCmd++;
 		(*pkt->pkt_comp) (pkt);
 	}
+
+#ifdef FMA_SUPPORT
+	if (hba->flag & FC_DMA_CHECK_ERROR) {
+		emlxs_thread_spawn(hba, emlxs_restart_thread,
+		    NULL, NULL);
+	}
+#endif
 
 	return;
 
@@ -9482,6 +9497,13 @@ emlxs_iodone_server(void *arg1, void *arg2, void *arg3)
 
 	mutex_exit(&EMLXS_PORT_LOCK);
 
+#ifdef FMA_SUPPORT
+	if (hba->flag & FC_DMA_CHECK_ERROR) {
+		emlxs_thread_spawn(hba, emlxs_restart_thread,
+		    NULL, NULL);
+	}
+#endif /* FMA_SUPPORT */
+
 	return;
 
 } /* End emlxs_iodone_server */
@@ -9490,6 +9512,11 @@ emlxs_iodone_server(void *arg1, void *arg2, void *arg3)
 static void
 emlxs_iodone(emlxs_buf_t *sbp)
 {
+#ifdef FMA_SUPPORT
+	emlxs_port_t	*port = sbp->port;
+	emlxs_hba_t	*hba = port->hba;
+#endif  /* FMA_SUPPORT */
+
 	fc_packet_t	*pkt;
 	CHANNEL		*cp;
 
@@ -9510,6 +9537,9 @@ emlxs_iodone(emlxs_buf_t *sbp)
 	mutex_exit(&sbp->mtx);
 
 	if (pkt->pkt_comp) {
+#ifdef FMA_SUPPORT
+		emlxs_check_dma(hba, sbp);
+#endif  /* FMA_SUPPORT */
 		cp->ulpCmplCmd++;
 		(*pkt->pkt_comp) (pkt);
 	}
@@ -11017,9 +11047,6 @@ emlxs_fm_init(emlxs_hba_t *hba)
 	if (DDI_FM_ACC_ERR_CAP(hba->fm_caps)) {
 		emlxs_dev_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
 		emlxs_data_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
-	} else {
-		emlxs_dev_acc_attr.devacc_attr_access = DDI_DEFAULT_ACC;
-		emlxs_data_acc_attr.devacc_attr_access = DDI_DEFAULT_ACC;
 	}
 
 	if (DDI_FM_DMA_ERR_CAP(hba->fm_caps)) {
@@ -11155,6 +11182,8 @@ emlxs_fm_service_impact(emlxs_hba_t *hba, int impact)
 
 	ddi_fm_service_impact(hba->dip, impact);
 
+	return;
+
 } /* emlxs_fm_service_impact() */
 
 
@@ -11175,6 +11204,103 @@ emlxs_fm_error_cb(dev_info_t *dip, ddi_fm_error_t *err,
 	return (err->fme_status);
 
 } /* emlxs_fm_error_cb() */
+
+extern void
+emlxs_check_dma(emlxs_hba_t *hba, emlxs_buf_t *sbp)
+{
+	emlxs_port_t	*port = sbp->port;
+	fc_packet_t	*pkt = PRIV2PKT(sbp);
+
+	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+		if (emlxs_fm_check_dma_handle(hba,
+		    hba->sli.sli4.slim2.dma_handle)
+		    != DDI_FM_OK) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_invalid_dma_handle_msg,
+			    "slim2: hdl=%p",
+			    hba->sli.sli4.slim2.dma_handle);
+
+			mutex_enter(&EMLXS_PORT_LOCK);
+			hba->flag |= FC_DMA_CHECK_ERROR;
+			mutex_exit(&EMLXS_PORT_LOCK);
+		}
+	} else {
+		if (emlxs_fm_check_dma_handle(hba,
+		    hba->sli.sli3.slim2.dma_handle)
+		    != DDI_FM_OK) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_invalid_dma_handle_msg,
+			    "slim2: hdl=%p",
+			    hba->sli.sli3.slim2.dma_handle);
+
+			mutex_enter(&EMLXS_PORT_LOCK);
+			hba->flag |= FC_DMA_CHECK_ERROR;
+			mutex_exit(&EMLXS_PORT_LOCK);
+		}
+	}
+
+	if (hba->flag & FC_DMA_CHECK_ERROR) {
+		pkt->pkt_state  = FC_PKT_TRAN_ERROR;
+		pkt->pkt_reason = FC_REASON_DMA_ERROR;
+		pkt->pkt_expln  = FC_EXPLN_NONE;
+		pkt->pkt_action = FC_ACTION_RETRYABLE;
+		return;
+	}
+
+	if (pkt->pkt_cmdlen) {
+		if (emlxs_fm_check_dma_handle(hba, pkt->pkt_cmd_dma)
+		    != DDI_FM_OK) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_invalid_dma_handle_msg,
+			    "pkt_cmd_dma: hdl=%p",
+			    pkt->pkt_cmd_dma);
+
+			pkt->pkt_state  = FC_PKT_TRAN_ERROR;
+			pkt->pkt_reason = FC_REASON_DMA_ERROR;
+			pkt->pkt_expln  = FC_EXPLN_NONE;
+			pkt->pkt_action = FC_ACTION_RETRYABLE;
+
+			return;
+		}
+	}
+
+	if (pkt->pkt_rsplen) {
+		if (emlxs_fm_check_dma_handle(hba, pkt->pkt_resp_dma)
+		    != DDI_FM_OK) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_invalid_dma_handle_msg,
+			    "pkt_resp_dma: hdl=%p",
+			    pkt->pkt_resp_dma);
+
+			pkt->pkt_state  = FC_PKT_TRAN_ERROR;
+			pkt->pkt_reason = FC_REASON_DMA_ERROR;
+			pkt->pkt_expln  = FC_EXPLN_NONE;
+			pkt->pkt_action = FC_ACTION_RETRYABLE;
+
+			return;
+		}
+	}
+
+	if (pkt->pkt_datalen) {
+		if (emlxs_fm_check_dma_handle(hba, pkt->pkt_data_dma)
+		    != DDI_FM_OK) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_invalid_dma_handle_msg,
+			    "pkt_data_dma: hdl=%p",
+			    pkt->pkt_data_dma);
+
+			pkt->pkt_state  = FC_PKT_TRAN_ERROR;
+			pkt->pkt_reason = FC_REASON_DMA_ERROR;
+			pkt->pkt_expln  = FC_EXPLN_NONE;
+			pkt->pkt_action = FC_ACTION_RETRYABLE;
+
+			return;
+		}
+	}
+
+	return;
+
+}
 #endif	/* FMA_SUPPORT */
 
 

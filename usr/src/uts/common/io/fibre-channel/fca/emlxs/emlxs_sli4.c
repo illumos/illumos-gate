@@ -406,6 +406,22 @@ emlxs_data_dump(hba, "RD_REV", (uint32_t *)mb, 18, 0);
 			EMLXS_MPDATA_SYNC(hba->sli.sli4.dump_region.dma_handle,
 			    0, mb->un.varDmp4.rsp_cnt, DDI_DMA_SYNC_FORKERNEL);
 
+#ifdef FMA_SUPPORT
+			if (hba->sli.sli4.dump_region.dma_handle) {
+				if (emlxs_fm_check_dma_handle(hba,
+				    hba->sli.sli4.dump_region.dma_handle)
+				    != DDI_FM_OK) {
+					EMLXS_MSGF(EMLXS_CONTEXT,
+					    &emlxs_invalid_dma_handle_msg,
+					    "emlxs_sli4_online: hdl=%p",
+					    hba->sli.sli4.dump_region.
+					    dma_handle);
+					rval = EIO;
+					goto failed1;
+				}
+			}
+#endif /* FMA_SUPPORT */
+
 		}
 	}
 
@@ -1403,6 +1419,16 @@ emlxs_data_dump(hba, "EndianIN", (uint32_t *)iptr, 6, 0);
 	    MAILBOX_CMD_BSIZE, DDI_DMA_SYNC_FORKERNEL);
 emlxs_data_dump(hba, "EndianOUT", (uint32_t *)iptr, 6, 0);
 
+#ifdef FMA_SUPPORT
+	if (emlxs_fm_check_dma_handle(hba, hba->sli.sli4.bootstrapmb.dma_handle)
+	    != DDI_FM_OK) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_invalid_dma_handle_msg,
+		    "emlxs_init_bootstrap_mb: hdl=%p",
+		    hba->sli.sli4.bootstrapmb.dma_handle);
+		return (1);
+	}
+#endif
 	hba->flag |= FC_BOOTSTRAPMB_INIT;
 	return (0);
 
@@ -1806,6 +1832,7 @@ emlxs_sli4_issue_iocb_cmd(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 	uint32_t flag;
 	uint32_t wqdb;
 	uint32_t next_wqe;
+	off_t offset;
 
 
 	channelno = cp->channelno;
@@ -1996,7 +2023,12 @@ sendit:
 #ifdef DEBUG_WQE
 		emlxs_data_dump(hba, "WQE", (uint32_t *)wqe, 18, 0);
 #endif
-		EMLXS_MPDATA_SYNC(wq->addr.dma_handle, 0,
+		offset = (off_t)((uint64_t)((unsigned long)
+		    wq->addr.virt) -
+		    (uint64_t)((unsigned long)
+		    hba->sli.sli4.slim2.virt));
+
+		EMLXS_MPDATA_SYNC(wq->addr.dma_handle, offset,
 		    4096, DDI_DMA_SYNC_FORDEV);
 
 		/* Ring the WQ Doorbell */
@@ -2073,6 +2105,7 @@ emlxs_sli4_issue_mq(emlxs_hba_t *hba, MAILBOX4 *mqe, MAILBOX *mb, uint32_t tmo)
 	MATCHMAP	*mp;
 	uint32_t	*iptr;
 	uint32_t	mqdb;
+	off_t		offset;
 
 	mbq = (MAILBOXQ *)mb;
 	mb4 = (MAILBOX4 *)mb;
@@ -2117,7 +2150,12 @@ emlxs_sli4_issue_mq(emlxs_hba_t *hba, MAILBOX4 *mqe, MAILBOX *mb, uint32_t tmo)
 		BE_SWAP32_BCOPY((uint8_t *)mb, (uint8_t *)mqe,
 		    MAILBOX_CMD_SLI4_BSIZE);
 
-		EMLXS_MPDATA_SYNC(hba->sli.sli4.mq.addr.dma_handle, 0,
+		offset = (off_t)((uint64_t)((unsigned long)
+		    hba->sli.sli4.mq.addr.virt) -
+		    (uint64_t)((unsigned long)
+		    hba->sli.sli4.slim2.virt));
+
+		EMLXS_MPDATA_SYNC(hba->sli.sli4.mq.addr.dma_handle, offset,
 		    4096, DDI_DMA_SYNC_FORDEV);
 
 		emlxs_data_dump(hba, "MBOX EXT", (uint32_t *)mqe, 12, 0);
@@ -2146,8 +2184,9 @@ emlxs_sli4_issue_bootstrap(emlxs_hba_t *hba, MAILBOX *mb, uint32_t tmo)
 	emlxs_port_t	*port = &PPORT;
 	MAILBOXQ	*mbq;
 	MAILBOX4	*mb4;
-	MATCHMAP	*mp;
+	MATCHMAP	*mp = NULL;
 	uint32_t	*iptr;
+	int		nonembed = 0;
 
 	mbq = (MAILBOXQ *)mb;
 	mb4 = (MAILBOX4 *)mb;
@@ -2175,6 +2214,7 @@ emlxs_sli4_issue_bootstrap(emlxs_hba_t *hba, MAILBOX *mb, uint32_t tmo)
 		 * mp will point to the actual mailbox command which
 		 * should be copied into the non-embedded area.
 		 */
+		nonembed = 1;
 		mb4->un.varSLIConfig.be.sge_cnt = 1;
 		mb4->un.varSLIConfig.be.payload_length = mp->size;
 		iptr = (uint32_t *)&mb4->un.varSLIConfig.be.un_hdr.hdr_req;
@@ -2238,6 +2278,29 @@ emlxs_sli4_issue_bootstrap(emlxs_hba_t *hba, MAILBOX *mb, uint32_t tmo)
 		iptr = (uint32_t *)((uint8_t *)mp->virt);
 		emlxs_data_dump(hba, "EXT AREA", (uint32_t *)iptr, 24, 0);
 	}
+
+#ifdef FMA_SUPPORT
+	if (nonembed && mp) {
+		if (emlxs_fm_check_dma_handle(hba, mp->dma_handle)
+		    != DDI_FM_OK) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_invalid_dma_handle_msg,
+			    "emlxs_sli4_issue_bootstrap: mp_hdl=%p",
+			    mp->dma_handle);
+			return (MBXERR_DMA_ERROR);
+		}
+	}
+
+	if (emlxs_fm_check_dma_handle(hba,
+	    hba->sli.sli4.bootstrapmb.dma_handle)
+	    != DDI_FM_OK) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_invalid_dma_handle_msg,
+		    "emlxs_sli4_issue_bootstrap: hdl=%p",
+		    hba->sli.sli4.bootstrapmb.dma_handle);
+		return (MBXERR_DMA_ERROR);
+	}
+#endif
 
 	return (MBX_SUCCESS);
 
@@ -2640,6 +2703,7 @@ emlxs_sli4_prep_fcp_iocb(emlxs_port_t *port, emlxs_buf_t *sbp, int channel)
 	NODELIST *node;
 	uint16_t iotag;
 	uint32_t did;
+	off_t offset;
 
 	pkt = PRIV2PKT(sbp);
 	did = LE_SWAP24_LO(pkt->pkt_cmd_fhdr.d_id);
@@ -2707,7 +2771,12 @@ emlxs_sli4_prep_fcp_iocb(emlxs_port_t *port, emlxs_buf_t *sbp, int channel)
 	emlxs_data_dump(hba, "FCP CMD", (uint32_t *)pkt->pkt_cmd, 10, 0);
 #endif
 
-	EMLXS_MPDATA_SYNC(xp->SGList.dma_handle, 0,
+	offset = (off_t)((uint64_t)((unsigned long)
+	    xp->SGList.virt) -
+	    (uint64_t)((unsigned long)
+	    hba->sli.sli4.slim2.virt));
+
+	EMLXS_MPDATA_SYNC(xp->SGList.dma_handle, offset,
 	    xp->SGList.size, DDI_DMA_SYNC_FORDEV);
 
 	/* if device is FCP-2 device, set the following bit */
@@ -2785,6 +2854,7 @@ emlxs_sli4_prep_els_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 	ddi_dma_cookie_t *cp_cmd;
 	ddi_dma_cookie_t *cp_resp;
 	emlxs_node_t *node;
+	off_t offset;
 
 	pkt = PRIV2PKT(sbp);
 	did = LE_SWAP24_LO(pkt->pkt_cmd_fhdr.d_id);
@@ -2925,7 +2995,7 @@ emlxs_sli4_prep_els_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 		sge->addrHigh = PADDR_HI(cp_resp->dmac_laddress);
 		sge->addrLow = PADDR_LO(cp_resp->dmac_laddress);
 		sge->length = pkt->pkt_rsplen;
-		sge->offset = pkt->pkt_cmdlen;
+		sge->offset = 0;
 		sge->last = 1;
 		/* Now sge is fully staged */
 
@@ -2987,7 +3057,12 @@ emlxs_sli4_prep_els_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 		wqe->Timer = ((pkt->pkt_timeout > 0xff) ? 0 : pkt->pkt_timeout);
 	}
 
-	EMLXS_MPDATA_SYNC(xp->SGList.dma_handle, 0,
+	offset = (off_t)((uint64_t)((unsigned long)
+	    xp->SGList.virt) -
+	    (uint64_t)((unsigned long)
+	    hba->sli.sli4.slim2.virt));
+
+	EMLXS_MPDATA_SYNC(xp->SGList.dma_handle, offset,
 	    xp->SGList.size, DDI_DMA_SYNC_FORDEV);
 
 	if (pkt->pkt_cmd_fhdr.f_ctl & F_CTL_CHAINED_SEQ) {
@@ -3027,6 +3102,7 @@ emlxs_sli4_prep_ct_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 	RPIobj_t *rp;
 	XRIobj_t *xp;
 	uint32_t did;
+	off_t offset;
 
 	pkt = PRIV2PKT(sbp);
 	did = LE_SWAP24_LO(pkt->pkt_cmd_fhdr.d_id);
@@ -3169,7 +3245,12 @@ emlxs_sli4_prep_ct_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 	iocb->un.genreq64.w5.hcsw.Dfctl  = pkt->pkt_cmd_fhdr.df_ctl;
 	iocb->ULPPU = 1;	/* Wd4 is relative offset */
 
-	EMLXS_MPDATA_SYNC(xp->SGList.dma_handle, 0,
+	offset = (off_t)((uint64_t)((unsigned long)
+	    xp->SGList.virt) -
+	    (uint64_t)((unsigned long)
+	    hba->sli.sli4.slim2.virt));
+
+	EMLXS_MPDATA_SYNC(xp->SGList.dma_handle, offset,
 	    xp->SGList.size, DDI_DMA_SYNC_FORDEV);
 
 	wqe->ContextTag = rp->RPI;
@@ -3202,12 +3283,12 @@ emlxs_sli4_prep_ct_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 static int
 emlxs_sli4_poll_eq(emlxs_hba_t *hba, EQ_DESC_t *eq)
 {
-	emlxs_port_t *port = &PPORT;
 	uint32_t *ptr;
 	int num_entries = 0;
 	EQE_u eqe;
 	uint32_t host_index, shost_index;
 	int rc = 0;
+	off_t offset;
 
 	/* EMLXS_PORT_LOCK must be held when entering this routine */
 	ptr = eq->addr.virt;
@@ -3216,7 +3297,12 @@ emlxs_sli4_poll_eq(emlxs_hba_t *hba, EQ_DESC_t *eq)
 
 	shost_index = host_index;
 
-	EMLXS_MPDATA_SYNC(eq->addr.dma_handle, 0,
+	offset = (off_t)((uint64_t)((unsigned long)
+	    eq->addr.virt) -
+	    (uint64_t)((unsigned long)
+	    hba->sli.sli4.slim2.virt));
+
+	EMLXS_MPDATA_SYNC(eq->addr.dma_handle, offset,
 	    4096, DDI_DMA_SYNC_FORKERNEL);
 
 	mutex_enter(&EMLXS_PORT_LOCK);
@@ -3341,6 +3427,7 @@ emlxs_sli4_process_async_event(emlxs_hba_t *hba, CQE_ASYNC_t *cqe)
 					hba->linkspeed = LA_10GHZ_LINK;
 				}
 				hba->topology = TOPOLOGY_PT_PT;
+				hba->qos_linkspeed = cqe->qos_link_speed;
 
 				/*
 				 * This link is not really up till we have
@@ -3414,6 +3501,7 @@ emlxs_sli4_process_mbox_event(emlxs_hba_t *hba, CQE_MBOX_t *cqe)
 	uint32_t size;
 	uint32_t *iptr;
 	int rc;
+	off_t offset;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
 	    "CQ ENTRY: process mbox event");
@@ -3463,8 +3551,13 @@ emlxs_sli4_process_mbox_event(emlxs_hba_t *hba, CQE_MBOX_t *cqe)
 		return;
 	}
 
+	offset = (off_t)((uint64_t)((unsigned long)
+	    hba->sli.sli4.mq.addr.virt) -
+	    (uint64_t)((unsigned long)
+	    hba->sli.sli4.slim2.virt));
+
 	/* Now that we are the owner, DMA Sync entire MQ if needed */
-	EMLXS_MPDATA_SYNC(hba->sli.sli4.mq.addr.dma_handle, 0,
+	EMLXS_MPDATA_SYNC(hba->sli.sli4.mq.addr.dma_handle, offset,
 	    4096, DDI_DMA_SYNC_FORDEV);
 
 	BE_SWAP32_BCOPY((uint8_t *)hba->mbox_mqe, (uint8_t *)mb,
@@ -3487,6 +3580,17 @@ emlxs_sli4_process_mbox_event(emlxs_hba_t *hba, CQE_MBOX_t *cqe)
 		mbox_bp = (MATCHMAP *)mbq->bp;
 		EMLXS_MPDATA_SYNC(mbox_bp->dma_handle, 0, mbox_bp->size,
 		    DDI_DMA_SYNC_FORKERNEL);
+#ifdef FMA_SUPPORT
+		if (emlxs_fm_check_dma_handle(hba, mbox_bp->dma_handle)
+		    != DDI_FM_OK) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_invalid_dma_handle_msg,
+			    "emlxs_sli4_process_mbox_event: hdl=%p",
+			    mbox_bp->dma_handle);
+
+			mb->mbxStatus = MBXERR_DMA_ERROR;
+}
+#endif
 	}
 
 	/* Now sync the memory buffer if one was used */
@@ -3498,6 +3602,17 @@ emlxs_sli4_process_mbox_event(emlxs_hba_t *hba, CQE_MBOX_t *cqe)
 		iptr = (uint32_t *)((uint8_t *)mbox_nonembed->virt);
 		BE_SWAP32_BCOPY((uint8_t *)iptr, (uint8_t *)iptr, size);
 
+#ifdef FMA_SUPPORT
+		if (emlxs_fm_check_dma_handle(hba,
+		    mbox_nonembed->dma_handle) != DDI_FM_OK) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_invalid_dma_handle_msg,
+			    "emlxs_sli4_process_mbox_event: hdl=%p",
+			    mbox_nonembed->dma_handle);
+
+			mb->mbxStatus = MBXERR_DMA_ERROR;
+		}
+#endif
 emlxs_data_dump(hba, "EXT AREA", (uint32_t *)iptr, 24, 0);
 	}
 
@@ -4004,8 +4119,8 @@ emlxs_sli4_process_unsol_rcv(emlxs_hba_t *hba, CQ_DESC_t *cq,
 	emlxs_port_t *vport;
 	RQ_DESC_t *hdr_rq;
 	RQ_DESC_t *data_rq;
-	MATCHMAP *hdr_mp;
-	MATCHMAP *data_mp;
+	MBUF_INFO *hdr_mp;
+	MBUF_INFO *data_mp;
 	MATCHMAP *seq_mp;
 	uint32_t *data;
 	fc_frame_hdr_t fchdr;
@@ -4028,6 +4143,7 @@ emlxs_sli4_process_unsol_rcv(emlxs_hba_t *hba, CQ_DESC_t *cq,
 	uint32_t	cmd;
 	uint32_t posted = 0;
 	uint32_t abort = 1;
+	off_t offset;
 
 	hdr_rqi = hba->sli.sli4.rq_map[cqe->RQid];
 	hdr_rq  = &hba->sli.sli4.rq[hdr_rqi];
@@ -4086,9 +4202,12 @@ emlxs_sli4_process_unsol_rcv(emlxs_hba_t *hba, CQ_DESC_t *cq,
 	mutex_exit(&hba->sli.sli4.rq[hdr_rqi].lock);
 
 	/* Get the next header rqb */
-	hdr_mp  = hdr_rq->rqb[host_index];
+	hdr_mp  = &hdr_rq->rqb[host_index];
 
-	EMLXS_MPDATA_SYNC(hdr_mp->dma_handle, 0,
+	offset = (off_t)((uint64_t)((unsigned long)hdr_mp->virt) -
+	    (uint64_t)((unsigned long)hba->sli.sli4.slim2.virt));
+
+	EMLXS_MPDATA_SYNC(hdr_mp->dma_handle, offset,
 	    sizeof (fc_frame_hdr_t), DDI_DMA_SYNC_FORKERNEL);
 
 	LE_SWAP32_BCOPY(hdr_mp->virt, (uint8_t *)&fchdr,
@@ -4278,9 +4397,14 @@ emlxs_sli4_process_unsol_rcv(emlxs_hba_t *hba, CQ_DESC_t *cq,
 	/* Save the frame data to our seq buffer */
 	if (cqe->data_size && seq_mp) {
 		/* Get the next data rqb */
-		data_mp = data_rq->rqb[host_index];
+		data_mp = &data_rq->rqb[host_index];
 
-		EMLXS_MPDATA_SYNC(data_mp->dma_handle, 0,
+		offset = (off_t)((uint64_t)((unsigned long)
+		    data_mp->virt) -
+		    (uint64_t)((unsigned long)
+		    hba->sli.sli4.slim2.virt));
+
+		EMLXS_MPDATA_SYNC(data_mp->dma_handle, offset,
 		    cqe->data_size, DDI_DMA_SYNC_FORKERNEL);
 
 		data = (uint32_t *)data_mp->virt;
@@ -4551,6 +4675,19 @@ done:
 		(void) emlxs_mem_put(hba, MEM_IOCB, (uint8_t *)iocbq);
 	}
 
+#ifdef FMA_SUPPORT
+	if (emlxs_fm_check_dma_handle(hba,
+	    hba->sli.sli4.slim2.dma_handle)
+	    != DDI_FM_OK) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_invalid_dma_handle_msg,
+		    "emlxs_sli4_process_unsol_rcv: hdl=%p",
+		    hba->sli.sli4.slim2.dma_handle);
+
+		emlxs_thread_spawn(hba, emlxs_restart_thread,
+		    NULL, NULL);
+	}
+#endif
 	return;
 
 } /* emlxs_sli4_process_unsol_rcv() */
@@ -4597,13 +4734,19 @@ emlxs_sli4_process_cq(emlxs_hba_t *hba, CQ_DESC_t *cq)
 	CQE_u cq_entry;
 	uint32_t cqdb;
 	int num_entries = 0;
+	off_t offset;
 
 	/* EMLXS_PORT_LOCK must be held when entering this routine */
 
 	cqe = (CQE_u *)cq->addr.virt;
 	cqe += cq->host_index;
 
-	EMLXS_MPDATA_SYNC(cq->addr.dma_handle, 0,
+	offset = (off_t)((uint64_t)((unsigned long)
+	    cq->addr.virt) -
+	    (uint64_t)((unsigned long)
+	    hba->sli.sli4.slim2.virt));
+
+	EMLXS_MPDATA_SYNC(cq->addr.dma_handle, offset,
 	    4096, DDI_DMA_SYNC_FORKERNEL);
 
 	for (;;) {
@@ -4709,13 +4852,19 @@ emlxs_sli4_process_eq(emlxs_hba_t *hba, EQ_DESC_t *eq)
 	uint32_t i;
 	uint32_t value;
 	int num_entries = 0;
+	off_t offset;
 
 	/* EMLXS_PORT_LOCK must be held when entering this routine */
 
 	ptr = eq->addr.virt;
 	ptr += eq->host_index;
 
-	EMLXS_MPDATA_SYNC(eq->addr.dma_handle, 0,
+	offset = (off_t)((uint64_t)((unsigned long)
+	    eq->addr.virt) -
+	    (uint64_t)((unsigned long)
+	    hba->sli.sli4.slim2.virt));
+
+	EMLXS_MPDATA_SYNC(eq->addr.dma_handle, offset,
 	    4096, DDI_DMA_SYNC_FORKERNEL);
 
 	for (;;) {
@@ -4940,7 +5089,6 @@ emlxs_sli4_resource_free(emlxs_hba_t *hba)
 {
 	emlxs_port_t	*port = &PPORT;
 	MBUF_INFO	*buf_info;
-	XRIobj_t	*xp;
 	uint32_t	i;
 
 	if (hba->sli.sli4.FCFIp) {
@@ -4961,8 +5109,6 @@ emlxs_sli4_resource_free(emlxs_hba_t *hba)
 
 	buf_info = &hba->sli.sli4.HeaderTmplate;
 	if (buf_info->virt) {
-		buf_info->flags = FC_MBUF_DMA;
-		emlxs_mem_free(hba, buf_info);
 		bzero(buf_info, sizeof (MBUF_INFO));
 	}
 
@@ -4977,74 +5123,43 @@ emlxs_sli4_resource_free(emlxs_hba_t *hba)
 			    hba->sli.sli4.XRIinuse_b,
 			    &hba->sli.sli4.XRIinuse_f);
 		}
-		xp = hba->sli.sli4.XRIp;
-		for (i = 0; i < hba->sli.sli4.XRICount; i++) {
-			buf_info = &xp->SGList;
-			if (buf_info->virt) {
-				buf_info->flags = FC_MBUF_DMA;
-				emlxs_mem_free(hba, buf_info);
-				bzero(buf_info, sizeof (MBUF_INFO));
-			}
-			xp++;
-		}
 		kmem_free(hba->sli.sli4.XRIp,
 		    (sizeof (XRIobj_t) * hba->sli.sli4.XRICount));
 		hba->sli.sli4.XRIp = NULL;
-		hba->sli.sli4.XRIfree_tail = NULL;
-		hba->sli.sli4.XRIfree_list = NULL;
+
+		hba->sli.sli4.XRIfree_f =
+		    (XRIobj_t *)&hba->sli.sli4.XRIfree_f;
+		hba->sli.sli4.XRIfree_b =
+		    (XRIobj_t *)&hba->sli.sli4.XRIfree_f;
 		hba->sli.sli4.xrif_count = 0;
 	}
 
 	for (i = 0; i < EMLXS_MAX_EQS; i++) {
-		buf_info = &hba->sli.sli4.eq[i].addr;
-		if (buf_info->virt) {
-			buf_info->flags = FC_MBUF_DMA;
-			emlxs_mem_free(hba, buf_info);
-			mutex_destroy(&hba->sli.sli4.eq[i].lastwq_lock);
-		}
+		mutex_destroy(&hba->sli.sli4.eq[i].lastwq_lock);
 		bzero(&hba->sli.sli4.eq[i], sizeof (EQ_DESC_t));
 	}
 	for (i = 0; i < EMLXS_MAX_CQS; i++) {
-		buf_info = &hba->sli.sli4.cq[i].addr;
-		if (buf_info->virt) {
-			buf_info->flags = FC_MBUF_DMA;
-			emlxs_mem_free(hba, buf_info);
-		}
 		bzero(&hba->sli.sli4.cq[i], sizeof (CQ_DESC_t));
 	}
 	for (i = 0; i < EMLXS_MAX_WQS; i++) {
-		buf_info = &hba->sli.sli4.wq[i].addr;
-		if (buf_info->virt) {
-			buf_info->flags = FC_MBUF_DMA;
-			emlxs_mem_free(hba, buf_info);
-		}
 		bzero(&hba->sli.sli4.wq[i], sizeof (WQ_DESC_t));
 	}
 	for (i = 0; i < EMLXS_MAX_RQS; i++) {
-		/* Free the RQ */
-		buf_info = &hba->sli.sli4.rq[i].addr;
-		if (buf_info->virt) {
-			buf_info->flags = FC_MBUF_DMA;
-			emlxs_mem_free(hba, buf_info);
-
-			/* Free the RQB pool */
-			emlxs_mem_pool_free(hba, &hba->sli.sli4.rq[i].rqb_pool);
-			mutex_destroy(&hba->sli.sli4.rq[i].lock);
-
-			/* Free the associated RXQ */
-			mutex_destroy(&hba->sli.sli4.rxq[i].lock);
-			bzero(&hba->sli.sli4.rxq[i], sizeof (RXQ_DESC_t));
-		}
+		mutex_destroy(&hba->sli.sli4.rq[i].lock);
+		mutex_destroy(&hba->sli.sli4.rxq[i].lock);
+		bzero(&hba->sli.sli4.rxq[i], sizeof (RXQ_DESC_t));
 		bzero(&hba->sli.sli4.rq[i], sizeof (RQ_DESC_t));
 	}
 
 	/* Free the MQ */
-	buf_info = &hba->sli.sli4.mq.addr;
-	if (buf_info->virt == NULL) {
+	bzero(&hba->sli.sli4.mq, sizeof (MQ_DESC_t));
+
+	buf_info = &hba->sli.sli4.slim2;
+	if (buf_info->virt) {
 		buf_info->flags = FC_MBUF_DMA;
 		emlxs_mem_free(hba, buf_info);
+		bzero(buf_info, sizeof (MBUF_INFO));
 	}
-	bzero(&hba->sli.sli4.mq, sizeof (MQ_DESC_t));
 
 	/* Cleanup queue ordinal mapping */
 	for (i = 0; i < EMLXS_MAX_EQ_IDS; i++) {
@@ -5080,10 +5195,17 @@ emlxs_sli4_resource_alloc(emlxs_hba_t *hba)
 	RPIobj_t	*rp;
 	XRIobj_t	*xp;
 	char		buf[64];
-	emlxs_memseg_t	*seg;
-	MATCHMAP 	*mp;
-	MATCHMAP 	**rqb;
 	RQE_t		*rqe;
+	MBUF_INFO	*rqb;
+	uint64_t	phys;
+	uint64_t	tmp_phys;
+	char		*virt;
+	char		*tmp_virt;
+	void		*data_handle;
+	void		*dma_handle;
+	int32_t		size;
+	off_t		offset;
+	uint32_t	count = 0;
 
 	(void) sprintf(buf, "%s_id_lock mutex", DRIVER_NAME);
 	mutex_init(&hba->sli.sli4.id_lock, buf, MUTEX_DRIVER, NULL);
@@ -5130,106 +5252,72 @@ emlxs_sli4_resource_alloc(emlxs_hba_t *hba)
 		}
 	}
 
-	if ((!hba->sli.sli4.XRIp) && (hba->sli.sli4.XRICount)) {
-		hba->sli.sli4.XRIp = (XRIobj_t *)kmem_zalloc(
-		    (sizeof (XRIobj_t) * hba->sli.sli4.XRICount), KM_SLEEP);
-
-		xp = hba->sli.sli4.XRIp;
-		index = hba->sli.sli4.XRIBase;
-		for (i = 0; i < hba->sli.sli4.XRICount; i++) {
-			xp->sge_count =
-			    (hba->sli.sli4.mem_sgl_size / sizeof (ULP_SGE64));
-			xp->XRI = index;
-			xp->iotag = i;
-			if ((xp->XRI == 0) || (xp->iotag == 0)) {
-				index++; /* Skip XRI 0 or IOTag 0 */
-				xp++;
-				continue;
-			}
-			/* Add xp to end of single linked free list */
-			if (hba->sli.sli4.XRIfree_tail) {
-				hba->sli.sli4.XRIfree_tail->_f = xp;
-				hba->sli.sli4.XRIfree_tail = xp;
-			} else {
-				hba->sli.sli4.XRIfree_tail = xp;
-			}
-			if (hba->sli.sli4.XRIfree_list == NULL) {
-				hba->sli.sli4.XRIfree_list = xp;
-			}
-			xp->_f = NULL;
-			hba->sli.sli4.xrif_count++;
-
-			/* Allocate SGL for this xp */
-			buf_info = &xp->SGList;
-			buf_info->size = hba->sli.sli4.mem_sgl_size;
-			buf_info->flags =
-			    FC_MBUF_DMA | FC_MBUF_SNGLSG | FC_MBUF_DMA32;
-			buf_info->align = hba->sli.sli4.mem_sgl_size;
-
-			(void) emlxs_mem_alloc(hba, buf_info);
-
-			if (buf_info->virt == NULL) {
-				EMLXS_MSGF(EMLXS_CONTEXT,
-				    &emlxs_init_failed_msg,
-				    "Unable to allocate XRI SGL area: %d",
-				    hba->sli.sli4.mem_sgl_size);
-				goto failed;
-			}
-			bzero(buf_info->virt, hba->sli.sli4.mem_sgl_size);
-			xp++;
-			index++;
-		}
-		/* Initialize double linked list */
-		hba->sli.sli4.XRIinuse_f =
-		    (XRIobj_t *)&hba->sli.sli4.XRIinuse_f;
-		hba->sli.sli4.XRIinuse_b =
-		    (XRIobj_t *)&hba->sli.sli4.XRIinuse_f;
-		hba->sli.sli4.xria_count = 0;
-	}
-
-	buf_info = &hba->sli.sli4.HeaderTmplate;
-	if ((buf_info->virt == NULL) && (hba->sli.sli4.RPICount)) {
-		bzero(buf_info, sizeof (MBUF_INFO));
-		buf_info->size = (sizeof (RPIHdrTmplate_t) *
-		    hba->sli.sli4.RPICount);
-		buf_info->flags =
-		    FC_MBUF_DMA | FC_MBUF_DMA32;
-		buf_info->align = ddi_ptob(hba->dip, 1L);
-
-		(void) emlxs_mem_alloc(hba, buf_info);
-
-		if (buf_info->virt == NULL) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_failed_msg,
-			    "Unable to allocate Header Tmplate area: %d",
-			    (sizeof (RPIHdrTmplate_t) *
-			    hba->sli.sli4.RPICount));
-			goto failed;
-		}
-		bzero(buf_info->virt,
-		    (sizeof (RPIHdrTmplate_t) * hba->sli.sli4.RPICount));
-	}
-
-	/* Allocate space for queues */
 	/* EQs - 1 per Interrupt vector */
 	num_eq = hba->intr_count;
+	/* CQs  - number of WQs + 1 for RQs + 1 for mbox/async events */
+	num_wq = cfg[CFG_NUM_WQ].current * num_eq;
+
+	/* Calculate total dmable memory we need */
+	/* EQ */
+	count += num_eq * 4096;
+	/* CQ */
+	count += (num_wq + EMLXS_CQ_OFFSET_WQ) * 4096;
+	/* WQ */
+	count += num_wq * (4096 * EMLXS_NUM_WQ_PAGES);
+	/* MQ */
+	count +=  EMLXS_MAX_MQS * 4096;
+	/* RQ */
+	count +=  EMLXS_MAX_RQS * 4096;
+	/* RQB/E */
+	count += RQB_COUNT * (RQB_DATA_SIZE + RQB_HEADER_SIZE);
+	/* SGL */
+	count += hba->sli.sli4.XRICount * hba->sli.sli4.mem_sgl_size;
+	/* RPI Head Template */
+	count += hba->sli.sli4.RPICount * sizeof (RPIHdrTmplate_t);
+
+	/* Allocate slim2 for SLI4 */
+	buf_info = &hba->sli.sli4.slim2;
+	buf_info->size = count;
+	buf_info->flags = FC_MBUF_DMA | FC_MBUF_SNGLSG | FC_MBUF_DMA32;
+	buf_info->align = ddi_ptob(hba->dip, 1L);
+
+	(void) emlxs_mem_alloc(hba, buf_info);
+
+	if (buf_info->virt == NULL) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_init_failed_msg,
+		    "Unable to allocate internal memory for SLI4: %d",
+		    count);
+		goto failed;
+	}
+	bzero(buf_info->virt, buf_info->size);
+	EMLXS_MPDATA_SYNC(buf_info->dma_handle, 0,
+	    buf_info->size, DDI_DMA_SYNC_FORDEV);
+
+	/* Assign memory to SGL, Head Template, EQ, CQ, WQ, RQ and MQ */
+	data_handle = buf_info->data_handle;
+	dma_handle = buf_info->dma_handle;
+	phys = buf_info->phys;
+	virt = (char *)buf_info->virt;
+
+	/* Allocate space for queues */
+	size = 4096;
 	for (i = 0; i < num_eq; i++) {
 		buf_info = &hba->sli.sli4.eq[i].addr;
 		if (buf_info->virt == NULL) {
 			bzero(&hba->sli.sli4.eq[i], sizeof (EQ_DESC_t));
-			buf_info->size = 4096;
+			buf_info->size = size;
 			buf_info->flags =
 			    FC_MBUF_DMA | FC_MBUF_SNGLSG | FC_MBUF_DMA32;
 			buf_info->align = ddi_ptob(hba->dip, 1L);
+			buf_info->phys = phys;
+			buf_info->virt = virt;
+			buf_info->data_handle = data_handle;
+			buf_info->dma_handle = dma_handle;
 
-			(void) emlxs_mem_alloc(hba, buf_info);
+			phys += size;
+			virt += size;
 
-			if (buf_info->virt == NULL) {
-				EMLXS_MSGF(EMLXS_CONTEXT,
-				    &emlxs_init_failed_msg,
-				    "Unable to allocate EQ %d area", i);
-				goto failed;
-			}
-			bzero(buf_info->virt, 4096);
 			hba->sli.sli4.eq[i].max_index = EQ_DEPTH;
 		}
 
@@ -5238,51 +5326,69 @@ emlxs_sli4_resource_alloc(emlxs_hba_t *hba)
 		mutex_init(&hba->sli.sli4.eq[i].lastwq_lock, buf,
 		    MUTEX_DRIVER, NULL);
 	}
-	/* CQs  - number of WQs + 1 for RQs + 1 for mbox/async events */
-	num_wq = cfg[CFG_NUM_WQ].current * num_eq;
+
+	size = 4096;
 	for (i = 0; i < (num_wq + EMLXS_CQ_OFFSET_WQ); i++) {
 		buf_info = &hba->sli.sli4.cq[i].addr;
 		if (buf_info->virt == NULL) {
 			bzero(&hba->sli.sli4.cq[i], sizeof (CQ_DESC_t));
-			buf_info->size = 4096;
+			buf_info->size = size;
 			buf_info->flags =
 			    FC_MBUF_DMA | FC_MBUF_SNGLSG | FC_MBUF_DMA32;
 			buf_info->align = ddi_ptob(hba->dip, 1L);
+			buf_info->phys = phys;
+			buf_info->virt = virt;
+			buf_info->data_handle = data_handle;
+			buf_info->dma_handle = dma_handle;
 
-			(void) emlxs_mem_alloc(hba, buf_info);
+			phys += size;
+			virt += size;
 
-			if (buf_info->virt == NULL) {
-				EMLXS_MSGF(EMLXS_CONTEXT,
-				    &emlxs_init_failed_msg,
-				    "Unable to allocate CQ %d area", i);
-				goto failed;
-			}
-			bzero(buf_info->virt, 4096);
 			hba->sli.sli4.cq[i].max_index = CQ_DEPTH;
 		}
 	}
+
 	/* WQs - NUM_WQ config parameter * number of EQs */
+	size = 4096 * EMLXS_NUM_WQ_PAGES;
 	for (i = 0; i < num_wq; i++) {
 		buf_info = &hba->sli.sli4.wq[i].addr;
 		if (buf_info->virt == NULL) {
 			bzero(&hba->sli.sli4.wq[i], sizeof (WQ_DESC_t));
-			buf_info->size = (4096 * EMLXS_NUM_WQ_PAGES);
+			buf_info->size = size;
 			buf_info->flags =
 			    FC_MBUF_DMA | FC_MBUF_SNGLSG | FC_MBUF_DMA32;
 			buf_info->align = ddi_ptob(hba->dip, 1L);
+			buf_info->phys = phys;
+			buf_info->virt = virt;
+			buf_info->data_handle = data_handle;
+			buf_info->dma_handle = dma_handle;
 
-			(void) emlxs_mem_alloc(hba, buf_info);
+			phys += size;
+			virt += size;
 
-			if (buf_info->virt == NULL) {
-				EMLXS_MSGF(EMLXS_CONTEXT,
-				    &emlxs_init_failed_msg,
-				    "Unable to allocate WQ %d area", i);
-				goto failed;
-			}
-			bzero(buf_info->virt, (4096 * EMLXS_NUM_WQ_PAGES));
 			hba->sli.sli4.wq[i].max_index = WQ_DEPTH;
 			hba->sli.sli4.wq[i].release_depth = WQE_RELEASE_DEPTH;
 		}
+	}
+
+	/* MQ */
+	size = 4096;
+	buf_info = &hba->sli.sli4.mq.addr;
+	if (!buf_info->virt) {
+		bzero(&hba->sli.sli4.mq, sizeof (MQ_DESC_t));
+		buf_info->size = size;
+		buf_info->flags =
+		    FC_MBUF_DMA | FC_MBUF_SNGLSG | FC_MBUF_DMA32;
+		buf_info->align = ddi_ptob(hba->dip, 1L);
+		buf_info->phys = phys;
+		buf_info->virt = virt;
+		buf_info->data_handle = data_handle;
+		buf_info->dma_handle = dma_handle;
+
+		phys += size;
+		virt += size;
+
+		hba->sli.sli4.mq.max_index = MQ_DEPTH;
 	}
 
 	/* RXQs */
@@ -5294,6 +5400,7 @@ emlxs_sli4_resource_alloc(emlxs_hba_t *hba)
 	}
 
 	/* RQs */
+	size = 4096;
 	for (i = 0; i < EMLXS_MAX_RQS; i++) {
 		buf_info = &hba->sli.sli4.rq[i].addr;
 		if (buf_info->virt) {
@@ -5301,107 +5408,157 @@ emlxs_sli4_resource_alloc(emlxs_hba_t *hba)
 		}
 
 		bzero(&hba->sli.sli4.rq[i], sizeof (RQ_DESC_t));
-		buf_info->size = 4096;
+		buf_info->size = size;
 		buf_info->flags =
 		    FC_MBUF_DMA | FC_MBUF_SNGLSG | FC_MBUF_DMA32;
 		buf_info->align = ddi_ptob(hba->dip, 1L);
+		buf_info->phys = phys;
+		buf_info->virt = virt;
+		buf_info->data_handle = data_handle;
+		buf_info->dma_handle = dma_handle;
 
-		(void) emlxs_mem_alloc(hba, buf_info);
+		phys += size;
+		virt += size;
 
-		if (buf_info->virt == NULL) {
-			EMLXS_MSGF(EMLXS_CONTEXT,
-			    &emlxs_init_failed_msg,
-			    "Unable to allocate RQ %d area", i);
-			goto failed;
-		}
-		bzero(buf_info->virt, 4096);
 		hba->sli.sli4.rq[i].max_index = RQ_DEPTH;
 
-		/* RQBs */
-		seg = &hba->sli.sli4.rq[i].rqb_pool;
-		bzero(seg, sizeof (MEMSEG));
-		seg->fc_numblks = RQB_COUNT;
-		seg->fc_memflag = FC_MBUF_DMA | FC_MBUF_SNGLSG | FC_MBUF_DMA32;
-		seg->fc_memalign = 8;
-		seg->fc_memtag = (i<<16);
+		(void) sprintf(buf, "%s_rq%d_lock mutex", DRIVER_NAME, i);
+		mutex_init(&hba->sli.sli4.rq[i].lock, buf, MUTEX_DRIVER, NULL);
+	}
 
-		if ((i & 0x1)) {
-			/* Odd == Data pool */
-			seg->fc_memsize = RQB_DATA_SIZE;
-			(void) strcpy(seg->fc_label, "RQB Data Pool");
-
-		} else {
-			/* Even == Header pool */
-			seg->fc_memsize = RQB_HEADER_SIZE;
-			(void) strcpy(seg->fc_label, "RQB Header Pool");
-		}
-
-		/* Allocate the pool */
-		if (emlxs_mem_pool_alloc(hba, seg) == NULL) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_failed_msg,
-			    "Unable to allocate RQ %d pool", i);
-
-			goto failed;
-		}
+	/* Setup RQE */
+	for (i = 0; i < EMLXS_MAX_RQS; i++) {
+		size = (i & 0x1) ? RQB_DATA_SIZE : RQB_HEADER_SIZE;
+		tmp_phys = phys;
+		tmp_virt = virt;
 
 		/* Initialize the RQEs */
 		rqe = (RQE_t *)hba->sli.sli4.rq[i].addr.virt;
-		rqb = hba->sli.sli4.rq[i].rqb;
-
 		for (j = 0; j < (RQ_DEPTH/RQB_COUNT); j++) {
-			mp  = (MATCHMAP*)seg->fc_memget_ptr;
+			phys = tmp_phys;
+			virt = tmp_virt;
 			for (k = 0; k < RQB_COUNT; k++) {
-				if (j == 0) {
-					mp->tag = (seg->fc_memtag | k);
-				}
-
-				word = PADDR_HI(mp->phys);
+				word = PADDR_HI(phys);
 				rqe->AddrHi = BE_SWAP32(word);
 
-				word = PADDR_LO(mp->phys);
+				word = PADDR_LO(phys);
 				rqe->AddrLo = BE_SWAP32(word);
 
-				*rqb = mp;
+				rqb = &hba->sli.sli4.rq[i].
+				    rqb[k + (j * RQB_COUNT)];
+				rqb->size = size;
+				rqb->flags = FC_MBUF_DMA |
+				    FC_MBUF_SNGLSG | FC_MBUF_DMA32;
+				rqb->align = ddi_ptob(hba->dip, 1L);
+				rqb->phys = phys;
+				rqb->virt = virt;
+				rqb->data_handle = data_handle;
+				rqb->dma_handle = dma_handle;
 
+				phys += size;
+				virt += size;
 #ifdef RQ_DEBUG
 				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
 				    "RQ_ALLOC: rq[%d] rqb[%d,%d]=%p tag=%08x",
 				    i, j, k, mp, mp->tag);
 #endif
 
-				mp = (MATCHMAP *)mp->fc_mptr;
 				rqe++;
-				rqb++;
 			}
 		}
 
-		/* Sync the RQ buffer list */
-		EMLXS_MPDATA_SYNC(hba->sli.sli4.rq[i].addr.dma_handle, 0,
-		    hba->sli.sli4.rq[i].addr.size, DDI_DMA_SYNC_FORDEV);
+		offset = (off_t)((uint64_t)((unsigned long)
+		    hba->sli.sli4.rq[i].addr.virt) -
+		    (uint64_t)((unsigned long)
+		    hba->sli.sli4.slim2.virt));
 
-		(void) sprintf(buf, "%s_rq%d_lock mutex", DRIVER_NAME, i);
-		mutex_init(&hba->sli.sli4.rq[i].lock, buf, MUTEX_DRIVER, NULL);
+		/* Sync the RQ buffer list */
+		EMLXS_MPDATA_SYNC(hba->sli.sli4.rq[i].addr.dma_handle, offset,
+		    hba->sli.sli4.rq[i].addr.size, DDI_DMA_SYNC_FORDEV);
 	}
 
-	/* MQ */
-	buf_info = &hba->sli.sli4.mq.addr;
-	if (!buf_info->virt) {
-		bzero(&hba->sli.sli4.mq, sizeof (MQ_DESC_t));
-		buf_info->size = 4096;
-		buf_info->flags =
-		    FC_MBUF_DMA | FC_MBUF_SNGLSG | FC_MBUF_DMA32;
+	if ((!hba->sli.sli4.XRIp) && (hba->sli.sli4.XRICount)) {
+		/* Initialize double linked lists */
+		hba->sli.sli4.XRIinuse_f =
+		    (XRIobj_t *)&hba->sli.sli4.XRIinuse_f;
+		hba->sli.sli4.XRIinuse_b =
+		    (XRIobj_t *)&hba->sli.sli4.XRIinuse_f;
+		hba->sli.sli4.xria_count = 0;
+
+		hba->sli.sli4.XRIfree_f =
+		    (XRIobj_t *)&hba->sli.sli4.XRIfree_f;
+		hba->sli.sli4.XRIfree_b =
+		    (XRIobj_t *)&hba->sli.sli4.XRIfree_f;
+		hba->sli.sli4.xria_count = 0;
+
+		hba->sli.sli4.XRIp = (XRIobj_t *)kmem_zalloc(
+		    (sizeof (XRIobj_t) * hba->sli.sli4.XRICount), KM_SLEEP);
+
+		xp = hba->sli.sli4.XRIp;
+		index = hba->sli.sli4.XRIBase;
+		size = hba->sli.sli4.mem_sgl_size;
+		for (i = 0; i < hba->sli.sli4.XRICount; i++) {
+			xp->sge_count =
+			    (hba->sli.sli4.mem_sgl_size / sizeof (ULP_SGE64));
+			xp->XRI = index;
+			xp->iotag = i;
+			if ((xp->XRI == 0) || (xp->iotag == 0)) {
+				index++; /* Skip XRI 0 or IOTag 0 */
+				xp++;
+				continue;
+			}
+			/* Add xp to end of free list */
+			xp->_b = hba->sli.sli4.XRIfree_b;
+			hba->sli.sli4.XRIfree_b->_f = xp;
+			xp->_f = (XRIobj_t *)&hba->sli.sli4.XRIfree_f;
+			hba->sli.sli4.XRIfree_b = xp;
+			hba->sli.sli4.xrif_count++;
+
+			/* Allocate SGL for this xp */
+			buf_info = &xp->SGList;
+			buf_info->size = size;
+			buf_info->flags =
+			    FC_MBUF_DMA | FC_MBUF_SNGLSG | FC_MBUF_DMA32;
+			buf_info->align = size;
+			buf_info->phys = phys;
+			buf_info->virt = virt;
+			buf_info->data_handle = data_handle;
+			buf_info->dma_handle = dma_handle;
+
+			phys += size;
+			virt += size;
+
+			xp++;
+			index++;
+		}
+	}
+
+	size = sizeof (RPIHdrTmplate_t) * hba->sli.sli4.RPICount;
+	buf_info = &hba->sli.sli4.HeaderTmplate;
+	if ((buf_info->virt == NULL) && (hba->sli.sli4.RPICount)) {
+		bzero(buf_info, sizeof (MBUF_INFO));
+		buf_info->size = size;
+		buf_info->flags = FC_MBUF_DMA | FC_MBUF_DMA32;
 		buf_info->align = ddi_ptob(hba->dip, 1L);
+		buf_info->phys = phys;
+		buf_info->virt = virt;
+		buf_info->data_handle = data_handle;
+		buf_info->dma_handle = dma_handle;
+	}
 
-		(void) emlxs_mem_alloc(hba, buf_info);
-
-		if (buf_info->virt == NULL) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_failed_msg,
-			    "Unable to allocate MQ area");
+#ifdef FMA_SUPPORT
+	if (hba->sli.sli4.slim2.dma_handle) {
+		if (emlxs_fm_check_dma_handle(hba,
+		    hba->sli.sli4.slim2.dma_handle)
+		    != DDI_FM_OK) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_invalid_dma_handle_msg,
+			    "emlxs_sli4_resource_alloc: hdl=%p",
+			    hba->sli.sli4.slim2.dma_handle);
 			goto failed;
 		}
-		bzero(buf_info->virt, 4096);
-		hba->sli.sli4.mq.max_index = MQ_DEPTH;
 	}
+#endif
 
 	return (0);
 
@@ -5565,9 +5722,9 @@ emlxs_sli4_reserve_xri(emlxs_hba_t *hba,  RPIobj_t *rp)
 
 	mutex_enter(&EMLXS_FCTAB_LOCK);
 
-	xp = hba->sli.sli4.XRIfree_list;
+	xp = hba->sli.sli4.XRIfree_f;
 
-	if (xp == NULL) {
+	if (xp == (XRIobj_t *)&hba->sli.sli4.XRIfree_f) {
 		mutex_exit(&EMLXS_FCTAB_LOCK);
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_err_msg,
@@ -5600,8 +5757,10 @@ emlxs_sli4_reserve_xri(emlxs_hba_t *hba,  RPIobj_t *rp)
 	}
 
 	/* Take it off free list */
-	hba->sli.sli4.XRIfree_list = xp->_f;
+	(xp->_b)->_f = xp->_f;
+	(xp->_f)->_b = xp->_b;
 	xp->_f = NULL;
+	xp->_b = NULL;
 	hba->sli.sli4.xrif_count--;
 
 	/* Add it to end of inuse list */
@@ -5661,8 +5820,10 @@ emlxs_sli4_unreserve_xri(emlxs_hba_t *hba, uint16_t xri)
 	hba->sli.sli4.xria_count--;
 
 	/* Add it to end of free list */
-	hba->sli.sli4.XRIfree_tail->_f = xp;
-	hba->sli.sli4.XRIfree_tail = xp;
+	xp->_b = hba->sli.sli4.XRIfree_b;
+	hba->sli.sli4.XRIfree_b->_f = xp;
+	xp->_f = (XRIobj_t *)&hba->sli.sli4.XRIfree_f;
+	hba->sli.sli4.XRIfree_b = xp;
 	hba->sli.sli4.xrif_count++;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
@@ -5747,9 +5908,9 @@ emlxs_sli4_alloc_xri(emlxs_hba_t *hba, emlxs_buf_t *sbp, RPIobj_t *rp)
 
 	mutex_enter(&EMLXS_FCTAB_LOCK);
 
-	xp = hba->sli.sli4.XRIfree_list;
+	xp = hba->sli.sli4.XRIfree_f;
 
-	if (xp == NULL) {
+	if (xp == (XRIobj_t *)&hba->sli.sli4.XRIfree_f) {
 		mutex_exit(&EMLXS_FCTAB_LOCK);
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_err_msg,
@@ -5789,8 +5950,10 @@ emlxs_sli4_alloc_xri(emlxs_hba_t *hba, emlxs_buf_t *sbp, RPIobj_t *rp)
 	}
 
 	/* Take it off free list */
-	hba->sli.sli4.XRIfree_list = xp->_f;
+	(xp->_b)->_f = xp->_f;
+	(xp->_f)->_b = xp->_b;
 	xp->_f = NULL;
+	xp->_b = NULL;
 	hba->sli.sli4.xrif_count--;
 
 	/* Add it to end of inuse list */
@@ -6049,8 +6212,10 @@ emlxs_sli4_free_xri(emlxs_hba_t *hba, emlxs_buf_t *sbp, XRIobj_t *xp)
 		hba->sli.sli4.xria_count--;
 
 		/* Add it to end of free list */
-		hba->sli.sli4.XRIfree_tail->_f = xp;
-		hba->sli.sli4.XRIfree_tail = xp;
+		xp->_b = hba->sli.sli4.XRIfree_b;
+		hba->sli.sli4.XRIfree_b->_f = xp;
+		xp->_f = (XRIobj_t *)&hba->sli.sli4.XRIfree_f;
+		hba->sli.sli4.XRIfree_b = xp;
 		hba->sli.sli4.xrif_count++;
 	}
 

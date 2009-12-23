@@ -929,6 +929,32 @@ reset:
 	EMLXS_MPDATA_SYNC(mp1->dma_handle, 0, MEM_ELSBUF_SIZE,
 	    DDI_DMA_SYNC_FORKERNEL);
 
+#ifdef FMA_SUPPORT
+	if (mp->dma_handle) {
+		if (emlxs_fm_check_dma_handle(hba, mp->dma_handle)
+		    != DDI_FM_OK) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_invalid_dma_handle_msg,
+			    "emlxs_sli3_online: hdl=%p",
+			    mp->dma_handle);
+			rval = EIO;
+			goto failed;
+		}
+	}
+
+	if (mp1->dma_handle) {
+		if (emlxs_fm_check_dma_handle(hba, mp1->dma_handle)
+		    != DDI_FM_OK) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_invalid_dma_handle_msg,
+			    "emlxs_sli3_online: hdl=%p",
+			    mp1->dma_handle);
+			rval = EIO;
+			goto failed;
+		}
+	}
+#endif  /* FMA_SUPPORT */
+
 	outptr = mp->virt;
 	inptr = mp1->virt;
 
@@ -4991,6 +5017,19 @@ emlxs_handle_rcv_seq(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 		goto dropped;
 	}
 
+#ifdef FMA_SUPPORT
+	if (mp->dma_handle) {
+		if (emlxs_fm_check_dma_handle(hba, mp->dma_handle)
+		    != DDI_FM_OK) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_invalid_dma_handle_msg,
+			    "emlxs_handle_rcv_seq: hdl=%p",
+			    mp->dma_handle);
+			goto dropped;
+		}
+	}
+#endif  /* FMA_SUPPORT */
+
 	if (!size) {
 		(void) strcpy(error_str, "Buffer empty:");
 		goto dropped;
@@ -5573,6 +5612,22 @@ emlxs_reset_ring(emlxs_hba_t *hba, uint32_t ringno)
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ring_reset_msg, "%s",
 	    emlxs_ring_xlate(ringno));
+
+#ifdef FMA_SUPPORT
+	if (emlxs_fm_check_dma_handle(hba, hba->sli.sli3.slim2.dma_handle)
+	    != DDI_FM_OK) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_invalid_dma_handle_msg,
+		    "emlxs_reset_ring: hdl=%p",
+		    hba->sli.sli3.slim2.dma_handle);
+
+		emlxs_thread_spawn(hba, emlxs_restart_thread,
+		    NULL, NULL);
+
+		return ((uint32_t)FC_FAILURE);
+	}
+#endif  /* FMA_SUPPORT */
+
 
 	return (FC_SUCCESS);
 

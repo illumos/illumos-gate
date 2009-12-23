@@ -1456,8 +1456,7 @@ typedef struct RQ_DESC
 	uint16_t	cqid;
 
 	MBUF_INFO	addr;
-	MEMSEG		rqb_pool;
-	MATCHMAP	*rqb[RQ_DEPTH];
+	MBUF_INFO	rqb[RQ_DEPTH];
 
 	kmutex_t	lock;
 
@@ -1627,15 +1626,17 @@ typedef struct emlxs_sli4
 	tlv_fcoe_t	cfgFCOE;
 	tlv_fcfconnectlist_t	cfgFCF;
 
+	MBUF_INFO	slim2;
 	MBUF_INFO	dump_region;
 #define	EMLXS_DUMP_REGION_SIZE	1024
 
 	RPIobj_t	*RPIp;
 	MBUF_INFO	HeaderTmplate;
 	XRIobj_t	*XRIp;
-	/* Single linked list for available XRIs */
-	XRIobj_t	*XRIfree_list;
-	XRIobj_t	*XRIfree_tail;
+
+	/* Double linked list for available XRIs */
+	XRIobj_t	*XRIfree_f;
+	XRIobj_t	*XRIfree_b;
 	uint32_t	xrif_count;
 	uint32_t	mem_sgl_size;
 
@@ -1727,6 +1728,7 @@ typedef struct emlxs_hba
 	uint32_t	link_event_tag;
 	uint8_t		topology;
 	uint8_t		linkspeed;
+	uint16_t	qos_linkspeed;
 	uint32_t	linkup_wait_flag;
 	kcondvar_t	linkup_lock_cv;
 	kmutex_t	linkup_lock;
@@ -1804,6 +1806,8 @@ typedef struct emlxs_hba
 						/* over temperature event */
 #define	FC_MBOX_TIMEOUT		0x20000000	/* FC_ERROR reason: */
 						/* mailbox timeout event */
+#define	FC_DMA_CHECK_ERROR	0x40000000	/* Shared memory (slim,..) */
+						/* DMA handle went bad */
 #define	FC_HARDWARE_ERROR	0x80000000	/* FC_ERROR state triggered */
 
 #define	FC_RESET_MASK		0x00030C1F	/* Bits to protect during */

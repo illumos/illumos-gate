@@ -1868,8 +1868,7 @@ typedef struct
 	uint32_t	rsvd1;
 	uint32_t	rsvd2:8;
 	uint32_t	sid:24;
-	uint32_t	rsvd3;
-	uint32_t	rsvd4;
+	uint32_t	portname[2];    /* N_PORT name */
 	uint32_t	rsvd5;
 	uint16_t	vfi;
 	uint16_t	vpi;
@@ -1878,8 +1877,7 @@ typedef struct
 	uint32_t	rsvd1;
 	uint32_t	sid:24;
 	uint32_t	rsvd2:8;
-	uint32_t	rsvd3;
-	uint32_t	rsvd4;
+	uint32_t	portname[2];    /* N_PORT name */
 	uint32_t	rsvd5;
 	uint16_t	vpi;
 	uint16_t	vfi;
@@ -1953,8 +1951,7 @@ typedef struct
 	uint16_t	vpi;
 	uint16_t	fcfi;
 
-	uint32_t	rsvd3;
-	uint32_t	rsvd4;
+	uint32_t	portname[2];    /* N_PORT name */
 
 	ULP_BDE64	bde;
 
@@ -1974,8 +1971,7 @@ typedef struct
 	uint16_t	fcfi;
 	uint16_t	vpi;
 
-	uint32_t	rsvd3;
-	uint32_t	rsvd4;
+	uint32_t	portname[2];    /* N_PORT name */
 
 	ULP_BDE64	bde;
 

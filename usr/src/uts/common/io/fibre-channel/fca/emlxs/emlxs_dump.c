@@ -3777,6 +3777,17 @@ emlxs_dump_saturn_log(
 	    SID_NON_VOLATILE_LOG, LEGEND_NON_VOLATILE_LOG, LEGEND_NULL,
 	    fSwap);
 
+#ifdef FMA_SUPPORT
+	if (emlxs_fm_check_dma_handle(hba, mp->dma_handle)
+	    != DDI_FM_OK) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_invalid_dma_handle_msg,
+		    "emlxs_dump_saturn_log: hdl=%p",
+		    mp->dma_handle);
+		status = 1;
+	}
+#endif  /* FMA_SUPPORT */
+
 	(void) emlxs_mem_buf_free(hba, mp);
 	kmem_free(mbq, sizeof (MAILBOXQ));
 	return (status);

@@ -166,6 +166,8 @@ static int		emlxs_dfc_set_be_dcbx(emlxs_hba_t *hba, dfc_t *dfc,
 			    int32_t mode);
 static int		emlxs_dfc_get_be_dcbx(emlxs_hba_t *hba, dfc_t *dfc,
 			    int32_t mode);
+static int		emlxs_dfc_get_qos(emlxs_hba_t *hba, dfc_t *dfc,
+			    int32_t mode);
 
 
 uint32_t	emlxs_loopback_tmo = 60;
@@ -223,6 +225,7 @@ emlxs_table_t emlxs_dfc_table[] = {
 	{EMLXS_RD_BE_FCF, "RD_BE_FCF"},
 	{EMLXS_SET_BE_DCBX, "SET_BE_DCBX"},
 	{EMLXS_GET_BE_DCBX, "GET_BE_DCBX"},
+	{EMLXS_GET_QOS, "GET_QOS"},
 
 };	/* emlxs_dfc_table */
 
@@ -782,6 +785,10 @@ emlxs_dfc_manage(emlxs_hba_t *hba, void *arg, int32_t mode)
 
 	case EMLXS_GET_BE_DCBX:
 		rval = emlxs_dfc_get_be_dcbx(hba, dfc, mode);
+		break;
+
+	case EMLXS_GET_QOS:
+		rval = emlxs_dfc_get_qos(hba, dfc, mode);
 		break;
 
 	default:
@@ -3033,51 +3040,26 @@ emlxs_dfc_npiv_test(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	els->elsCode = 0x04;	/* FLOGI - This will be changed automatically */
 				/* by the drive (See emlxs_send_els()) */
 
-	els->un.logi.cmn.fcphHigh = 0x09;
-	els->un.logi.cmn.fcphLow = 0x08;
-	els->un.logi.cmn.bbCreditMsb = 0xff;
-	els->un.logi.cmn.bbCreditlsb = 0xff;
-	els->un.logi.cmn.reqMultipleNPort = 1;
-	els->un.logi.cmn.bbRcvSizeMsb = 0x08;
-	els->un.logi.cmn.bbRcvSizeLsb = 0x00;
-	els->un.logi.cmn.w2.nPort.totalConcurrSeq = 0xff;
-	els->un.logi.cmn.w2.nPort.roByCategoryMsb = 0xff;
-	els->un.logi.cmn.w2.nPort.roByCategoryLsb = 0xff;
-	els->un.logi.cmn.e_d_tov = 0x7d0;
+	/* Copy latest service parameters to payload */
+	bcopy((void *)&port->sparam,
+	    (void *)&els->un.logi, sizeof (SERV_PARM));
 
 	bcopy((caddr_t)&hba->wwnn, (caddr_t)wwn, 8);
 	wwn[0] = 0x28;
 	wwn[1] = hba->vpi_max;
 	bcopy((caddr_t)wwn, (caddr_t)&els->un.logi.nodeName, 8);
+	bcopy((caddr_t)wwn, (caddr_t)&vport->wwnn, 8);
 
 	bcopy((caddr_t)&hba->wwpn, (caddr_t)wwn, 8);
 	wwn[0] = 0x20;
 	wwn[1] = hba->vpi_max;
 	bcopy((caddr_t)wwn, (caddr_t)&els->un.logi.portName, 8);
-
-	els->un.logi.cls1.openSeqPerXchgMsb = 0x00;
-	els->un.logi.cls1.openSeqPerXchgLsb = 0x01;
-
-	els->un.logi.cls2.classValid = 1;
-	els->un.logi.cls2.rcvDataSizeMsb = 0x08;
-	els->un.logi.cls2.rcvDataSizeLsb = 0x00;
-	els->un.logi.cls2.concurrentSeqMsb = 0x00;
-	els->un.logi.cls2.concurrentSeqLsb = 0xff;
-	els->un.logi.cls2.EeCreditSeqMsb = 0x00;
-	els->un.logi.cls2.EeCreditSeqLsb = 0x0c;
-	els->un.logi.cls2.openSeqPerXchgMsb = 0x00;
-	els->un.logi.cls2.openSeqPerXchgLsb = 0x01;
-
-	els->un.logi.cls3.classValid = 1;
-	els->un.logi.cls3.rcvDataSizeMsb = 0x08;
-	els->un.logi.cls3.rcvDataSizeLsb = 0x00;
-	els->un.logi.cls3.concurrentSeqMsb = 0x00;
-	els->un.logi.cls3.concurrentSeqLsb = 0xff;
-	els->un.logi.cls3.openSeqPerXchgMsb = 0x00;
-	els->un.logi.cls3.openSeqPerXchgLsb = 0x01;
+	bcopy((caddr_t)wwn, (caddr_t)&vport->wwpn, 8);
 
 	bcopy((void *)&els->un.logi, (void *)&vport->sparam,
 	    sizeof (SERV_PARM));
+
+
 
 	/* Make this a polled IO */
 	pkt->pkt_tran_flags &= ~FC_TRAN_INTR;
@@ -4650,10 +4632,34 @@ done:
 
 	/* Free allocated mbuf memory */
 	if (rx_mp) {
+#ifdef FMA_SUPPORT
+		if (!rval) {
+			if (emlxs_fm_check_dma_handle(hba, rx_mp->dma_handle)
+			    != DDI_FM_OK) {
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_invalid_dma_handle_msg,
+				    "emlxs_dfc_send_mbox: hdl=%p",
+				    rx_mp->dma_handle);
+				rval = DFC_IO_ERROR;
+			}
+		}
+#endif  /* FMA_SUPPORT */
 		(void) emlxs_mem_buf_free(hba, rx_mp);
 	}
 
 	if (tx_mp) {
+#ifdef FMA_SUPPORT
+		if (!rval) {
+			if (emlxs_fm_check_dma_handle(hba, tx_mp->dma_handle)
+			    != DDI_FM_OK) {
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_invalid_dma_handle_msg,
+				    "emlxs_dfc_send_mbox: hdl=%p",
+				    tx_mp->dma_handle);
+				rval = DFC_IO_ERROR;
+			}
+		}
+#endif  /* FMA_SUPPORT */
 		(void) emlxs_mem_buf_free(hba, tx_mp);
 	}
 
@@ -10490,7 +10496,7 @@ emlxs_dfc_send_mbox4(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			    "%s: ddi_copyout failed. cmd=%x",
 			    emlxs_dfc_xlate(dfc->cmd), mb4->mbxCommand);
 
-			rval = DFC_COPYIN_ERROR;
+			rval = DFC_COPYOUT_ERROR;
 			goto done;
 		}
 	}
@@ -10697,6 +10703,35 @@ emlxs_dfc_get_be_dcbx(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 done:
 	if (mbq)
 		kmem_free(mbq, sizeof (MAILBOXQ));
+
+	return (rval);
+}
+
+
+static int
+emlxs_dfc_get_qos(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
+{
+	emlxs_port_t	*port = &PPORT;
+	uint32_t	rval = 0;
+
+	if (! (hba->model_info.flags & EMLXS_FCOE_SUPPORTED)) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+		    "%s: FCoE not  supported.", emlxs_dfc_xlate(dfc->cmd));
+
+		return (DFC_FCOE_NOTSUPPORTED);
+	}
+
+	if (dfc->buf1_size) {
+		if (ddi_copyout((void *)&hba->qos_linkspeed, (void *)dfc->buf1,
+		    dfc->buf1_size, mode) != 0) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+			    "%s: ddi_copyout failed.",
+			    emlxs_dfc_xlate(dfc->cmd));
+
+			rval = DFC_COPYOUT_ERROR;
+			return (rval);
+		}
+	}
 
 	return (rval);
 }

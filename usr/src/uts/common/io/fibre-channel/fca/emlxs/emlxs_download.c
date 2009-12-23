@@ -2794,6 +2794,19 @@ done:
 		kmem_free(mbox, sizeof (MAILBOXQ));
 	}
 
+#ifdef FMA_SUPPORT
+	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+		if (emlxs_fm_check_dma_handle(hba,
+		    hba->sli.sli4.dump_region.dma_handle) != DDI_FM_OK) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_invalid_dma_handle_msg,
+			    "emlxs_read_wakeup_parms: hdl=%p",
+			    hba->sli.sli4.dump_region.dma_handle);
+			rval = 1;
+		}
+	}
+#endif  /* FMA_SUPPORT */
+
 	return (rval);
 
 } /* emlxs_read_wakeup_parms() */
@@ -2888,6 +2901,19 @@ done:
 	if (mbox) {
 		kmem_free(mbox, sizeof (MAILBOXQ));
 	}
+
+#ifdef FMA_SUPPORT
+	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+		if (emlxs_fm_check_dma_handle(hba,
+		    hba->sli.sli4.dump_region.dma_handle) != DDI_FM_OK) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_invalid_dma_handle_msg,
+			    "emlxs_read_load_list: hdl=%p",
+			    hba->sli.sli4.dump_region.dma_handle);
+			return (1);
+		}
+	}
+#endif  /* FMA_SUPPORT */
 
 	return (0);
 
@@ -4407,6 +4433,19 @@ Exit_Function:
 	if (mbox) {
 		kmem_free(mbox, sizeof (MAILBOXQ));
 	}
+
+#ifdef FMA_SUPPORT
+	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+		if (emlxs_fm_check_dma_handle(hba,
+		    hba->sli.sli4.dump_region.dma_handle) != DDI_FM_OK) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_invalid_dma_handle_msg,
+			    "emlxs_get_max_sram: hdl=%p",
+			    hba->sli.sli4.dump_region.dma_handle);
+			rval = 1;
+		}
+	}
+#endif  /* FMA_SUPPORT */
 
 	return (rval);
 

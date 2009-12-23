@@ -487,6 +487,9 @@ emlxs_mbext_add_fcf_table(emlxs_hba_t *hba, MAILBOXQ *mbq, uint32_t index)
 	FCF_RECORD_t *fcfrec;
 	MATCHMAP *mp;
 	mbox_req_hdr_t	*hdr_req;
+	uint16_t i;
+	uint8_t bitmap[512];
+
 
 	bzero((void *) mb, MAILBOX_CMD_SLI4_BSIZE);
 
@@ -540,12 +543,13 @@ emlxs_mbext_add_fcf_table(emlxs_hba_t *hba, MAILBOXQ *mbq, uint32_t index)
 #endif
 
 	if (hba->sli.sli4.cfgFCOE.fip_flags & TLV_FCOE_VLAN) {
-		uint16_t i;
-		uint8_t bitmap[512];
-
 		bzero((void *) bitmap, 512);
 		i = hba->sli.sli4.cfgFCOE.VLanId;
 		bitmap[i / 8] = (1 << (i % 8));
+		BE_SWAP32_BCOPY(bitmap, fcfrec->vlan_bitmap, 512);
+	} else {
+		bzero((void *) bitmap, 512);
+		bitmap[0] = 1; /* represents bit 0 */
 		BE_SWAP32_BCOPY(bitmap, fcfrec->vlan_bitmap, 512);
 	}
 
@@ -3562,6 +3566,7 @@ emlxs_mb_reg_vpi(emlxs_port_t *port, emlxs_buf_t *sbp)
 	emlxs_hba_t *hba = HBA;
 	MAILBOXQ *mbq;
 	MAILBOX	*mb;
+	uint32_t *pn;
 	int rval;
 
 	if (!(hba->flag & FC_NPIV_ENABLED)) {
@@ -3600,6 +3605,12 @@ emlxs_mb_reg_vpi(emlxs_port_t *port, emlxs_buf_t *sbp)
 		bzero((void *) mb, MAILBOX_CMD_SLI4_BSIZE);
 		mbq->nonembed = NULL;
 		mb->un.varRegVpi.vfi = port->VFIp->VFI;
+
+		pn = (uint32_t *)&port->wwpn;
+		mb->un.varRegVpi.portname[0] = BE_SWAP32(*pn);
+		pn++;
+		mb->un.varRegVpi.portname[1] = BE_SWAP32(*pn);
+
 		mbq->mbox_cmpl = emlxs_cmpl_reg_vpi;
 	} else {
 		bzero((void *)mb, MAILBOX_CMD_BSIZE);
@@ -3858,9 +3869,6 @@ emlxs_mb_get(emlxs_hba_t *hba)
 void
 emlxs_mb_init(emlxs_hba_t *hba, MAILBOXQ *mbq, uint32_t flag, uint32_t tmo)
 {
-#ifdef FMA_SUPPORT
-	emlxs_port_t *port = &PPORT;
-#endif	/* FMA_SUPPORT */
 	MATCHMAP	*mp;
 
 	HBASTATS.MboxIssued++;

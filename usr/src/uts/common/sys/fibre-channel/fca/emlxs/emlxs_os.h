@@ -302,27 +302,11 @@ extern void ddi_fm_acc_err_clear();
 #define	DELAYMS(ms)		drv_usecwait((ms*1000))
 #define	DELAYUS(us)		drv_usecwait(us)
 
-#ifdef FMA_SUPPORT
-#define	EMLXS_MPDATA_SYNC(h, a, b, c)  \
-	if (h)  { \
-		(void) ddi_dma_sync((ddi_dma_handle_t)(h), \
-			(off_t)(a), (size_t)(b), (uint_t)c); \
-		if (emlxs_fm_check_dma_handle(hba, h) != DDI_FM_OK) { \
-			EMLXS_MSGF(EMLXS_CONTEXT, \
-			    &emlxs_invalid_dma_handle_msg, \
-			    "ddi_dma_sync hdl=%p off=%x " \
-			    "size=%d dir=%x ", \
-			    h, a, b, c); \
-		} \
-	}
-#else	/* !FMA_SUPPORT */
 #define	EMLXS_MPDATA_SYNC(h, a, b, c)  \
 	if (h)  { \
 		(void) ddi_dma_sync((ddi_dma_handle_t)(h), \
 			(off_t)(a), (size_t)(b), (uint_t)c); \
 	}
-#endif	/* FMA_SUPPORT */
-
 
 #define	PKT2PRIV(pkt)		((emlxs_buf_t *)(pkt)->pkt_fca_private)
 #define	PRIV2PKT(sbp)		sbp->pkt

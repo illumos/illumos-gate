@@ -397,9 +397,29 @@ emlxs_diag_biu_run(emlxs_hba_t *hba, uint32_t pattern)
 done:
 
 	if (mp) {
+#ifdef FMA_SUPPORT
+		if (emlxs_fm_check_dma_handle(hba, mp->dma_handle)
+		    != DDI_FM_OK) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_invalid_dma_handle_msg,
+			    "emlxs_diag_biu_run: hdl=%p",
+			    mp->dma_handle);
+			rval = EMLXS_TEST_FAILED;
+		}
+#endif  /* FMA_SUPPORT */
 		(void) emlxs_mem_put(hba, MEM_BUF, (uint8_t *)mp);
 	}
 	if (mp1) {
+#ifdef FMA_SUPPORT
+		if (emlxs_fm_check_dma_handle(hba, mp1->dma_handle)
+		    != DDI_FM_OK) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_invalid_dma_handle_msg,
+			    "emlxs_diag_biu_run: hdl=%p",
+			    mp1->dma_handle);
+			rval = EMLXS_TEST_FAILED;
+		}
+#endif  /* FMA_SUPPORT */
 		(void) emlxs_mem_put(hba, MEM_BUF, (uint8_t *)mp1);
 	}
 	if (mbq) {
