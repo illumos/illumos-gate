@@ -788,6 +788,7 @@ solo_aud1_start(solo_engine_t *e)
 
 	ASSERT(mutex_owned(&dev->mutex));
 
+	e->offset = 0;
 	len = SOLO_FRAGSZ / 2;
 	len = -len;
 
@@ -869,6 +870,7 @@ solo_aud2_start(solo_engine_t *e)
 
 	ASSERT(mutex_owned(&dev->mutex));
 
+	e->offset = 0;
 	len = SOLO_FRAGSZ / 2;
 	len = -len;
 
@@ -1110,6 +1112,12 @@ solo_release_resources(solo_dev_t *dev)
 		audio_engine_free(dev->rec.engine);
 	}
 
+	for (int i = 0; i < CTL_NUM; i++) {
+		if (dev->ctrls[i].ctrl != NULL) {
+			audio_dev_del_control(dev->ctrls[i].ctrl);
+		}
+	}
+
 	if (dev->adev != NULL) {
 		audio_dev_free(dev->adev);
 	}
@@ -1283,7 +1291,6 @@ solo_alloc_engine(solo_dev_t *dev, int engno)
 		return (false);
 	}
 
-	printf("%s %sswapped!", desc, e->swapped ? "" : "not ");
 	e->dev = dev;
 
 	if (ddi_dma_alloc_handle(dev->dip, dattr, DDI_DMA_SLEEP, NULL,
