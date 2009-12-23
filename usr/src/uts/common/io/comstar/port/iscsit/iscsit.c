@@ -1453,26 +1453,26 @@ iscsit_buf_xfer_cb(idm_buf_t *idb, idm_status_t status)
 	    status == IDM_STATUS_SUCCESS) {
 
 		/*
-		 * If iscsit_send_scsi_status succeeds then the TX PDU
-		 * callback will call stmf_send_status_done and set
-		 * STMF_IOF_LPORT_DONE.  Consequently we don't need
-		 * to call stmf_data_xfer_done in that case.  We
-		 * still need to call it if we get a failure.
-		 *
-		 * To elaborate on this some more, upon successful
-		 * return from iscsit_send_scsi_status it's possible
-		 * that itask and idb have been freed and are no
-		 * longer valid.
+		 * The iscsi target port provider - for iSER, emulates the
+		 * DB_SEND_STATUS_GOOD optimization if requested by STMF;
+		 * it sends the status in a separate PDU after the data
+		 * transfer. In this case the port provider should first
+		 * call stmf_data_xfer_done() to mark the transfer complete
+		 * and then send the status. Although STMF will free the
+		 * buffer at the time the task is freed, even if the transfer
+		 * is not marked complete, this behavior makes statistics
+		 * gathering and task state tracking more difficult than it
+		 * needs to be.
 		 */
+		stmf_data_xfer_done(itask->it_stmf_task, dbuf, 0);
 		if (iscsit_send_scsi_status(itask->it_stmf_task, 0)
 		    != STMF_SUCCESS) {
-			/* Failed to send status */
-			dbuf->db_xfer_status = STMF_FAILURE;
-			stmf_data_xfer_done(itask->it_stmf_task, dbuf,
-			    STMF_IOF_LPORT_DONE);
+			stmf_send_status_done(itask->it_stmf_task,
+			    STMF_FAILURE, STMF_IOF_LPORT_DONE);
 		}
 	} else {
 		stmf_data_xfer_done(itask->it_stmf_task, dbuf, 0);
+		/* don't touch dbuf after stmf_data_xfer_done */
 	}
 }
 
