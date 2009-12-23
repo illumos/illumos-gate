@@ -302,16 +302,12 @@ struct cmpci_dev {
 	ddi_acc_handle_t	acch;
 	caddr_t			regs;
 
+	boolean_t		softvol;
+
 	int			pintrs;
 	int			rintrs;
 	ddi_intr_handle_t	ihandle;
 	kstat_t			*ksp;
-
-	int			model;
-#define	MDL_CM8738		1
-#define	MDL_CM8338A		2
-#define	MDL_CM8338B		3
-#define	MDL_CM8768		4
 
 	int			maxch;
 

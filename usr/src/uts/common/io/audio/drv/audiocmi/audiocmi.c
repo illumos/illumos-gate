@@ -706,7 +706,11 @@ cmpci_alloc_ctrl(cmpci_dev_t *dev, uint32_t num, uint64_t val)
 static void
 cmpci_add_controls(cmpci_dev_t *dev)
 {
-	cmpci_alloc_ctrl(dev, CTL_VOLUME, 75);
+	if (dev->softvol) {
+		(void) audio_dev_add_soft_volume(dev->adev);
+	} else {
+		cmpci_alloc_ctrl(dev, CTL_VOLUME, 75);
+	}
 	cmpci_alloc_ctrl(dev, CTL_LINEOUT, 90 | (90 << 8));
 	cmpci_alloc_ctrl(dev, CTL_SPEAKER, 75);
 	cmpci_alloc_ctrl(dev, CTL_MIC, 32);
@@ -1105,6 +1109,7 @@ cmpci_attach(dev_info_t *dip)
 		} else if ((val & INTCTRL_MDL_068) == INTCTRL_MDL_068) {
 			audio_dev_set_version(adev, "CMI-8768");
 			dev->maxch = 8;
+			dev->softvol = B_TRUE;	/* No hardware PCM volume */
 		} else if ((val & INTCTRL_MDL_055) == INTCTRL_MDL_055) {
 			audio_dev_set_version(adev, "CMI-8738-055");
 			dev->maxch = 6;
