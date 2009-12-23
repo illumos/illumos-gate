@@ -1086,9 +1086,6 @@ ire_send_wire_v6(ire_t *ire, mblk_t *mp, void *iph_arg,
 			 */
 			ident = atomic_add_32_nv(identp, ixa->ixa_extra_ident +
 			    1);
-#ifndef _BIG_ENDIAN
-			ident = htonl(ident);
-#endif
 			ixa->ixa_ident = ident;	/* In case we do IPsec */
 		}
 		if (ixaflags & IXAF_IPSEC_SECURE) {

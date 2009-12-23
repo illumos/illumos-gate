@@ -811,7 +811,7 @@ prt_fragment_hdr(int flags, const struct ip6_frag *ipv6ext_frag)
 
 	if (flags & F_SUM) {
 		(void) snprintf(get_sum_line(), MAXLINE,
-		    "IPv6 fragment ID=%d Offset=%-4d MF=%d",
+		    "IPv6 fragment ID=%u Offset=%-4d MF=%d",
 		    fragident,
 		    fragoffset,
 		    morefrag);
@@ -826,7 +826,7 @@ prt_fragment_hdr(int flags, const struct ip6_frag *ipv6ext_frag)
 		(void) snprintf(get_line(0, 0), get_line_remain(),
 		    "More Fragments Flag = %s", morefrag ? "true" : "false");
 		(void) snprintf(get_line(0, 0), get_line_remain(),
-		    "Identification = %d", fragident);
+		    "Identification = %u", fragident);
 
 		show_space();
 	}

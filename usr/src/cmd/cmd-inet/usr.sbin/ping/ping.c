@@ -1298,13 +1298,24 @@ setup_socket(int family, int *send_sockp, int *recv_sockp, int *if_index,
 
 		if (setsockopt(recv_sock, (family == AF_INET) ? IPPROTO_IP :
 		    IPPROTO_IPV6, IP_SEC_OPT, &req, sizeof (req)) < 0) {
-			if (errno == EPERM)
+			switch (errno) {
+			case EPROTONOSUPPORT:
+				/*
+				 * No IPsec subsystem or policy loaded.
+				 * Bypass implicitly allowed.
+				 */
+				break;
+			case EPERM:
 				Fprintf(stderr, "%s: Insufficient privilege "
 				    "to bypass IPsec policy.\n", progname);
-			else
+				exit(EXIT_FAILURE);
+				break;
+			default:
 				Fprintf(stderr, "%s: setsockopt %s\n", progname,
 				    strerror(errno));
-			exit(EXIT_FAILURE);
+				exit(EXIT_FAILURE);
+				break;
+			}
 		}
 	}
 
@@ -1324,14 +1335,25 @@ setup_socket(int family, int *send_sockp, int *recv_sockp, int *if_index,
 			if (setsockopt(send_sock, (family == AF_INET) ?
 			    IPPROTO_IP : IPPROTO_IPV6, IP_SEC_OPT, &req,
 			    sizeof (req)) < 0) {
-				if (errno == EPERM)
+				switch (errno) {
+				case EPROTONOSUPPORT:
+					/*
+					 * No IPsec subsystem or policy loaded.
+					 * Bypass implicitly allowed.
+					 */
+					break;
+				case EPERM:
 					Fprintf(stderr, "%s: Insufficient "
 					    "privilege to bypass IPsec "
 					    "policy.\n", progname);
-				else
+					exit(EXIT_FAILURE);
+					break;
+				default:
 					Fprintf(stderr, "%s: setsockopt %s\n",
 					    progname, strerror(errno));
-				exit(EXIT_FAILURE);
+					exit(EXIT_FAILURE);
+					break;
+				}
 			}
 		}
 
