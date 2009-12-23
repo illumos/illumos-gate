@@ -3072,6 +3072,9 @@ sata_scsi_sync_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
  * Checks if a device exists and can be access and translates common
  * scsi_pkt data to sata_pkt data.
  *
+ * Flag argument indicates that ATA command may be sent to HBA to execute
+ * this packet.
+ *
  * Returns TRAN_ACCEPT and scsi pkt_reason CMD_CMPLT if device exists and
  * sata_pkt was set-up.
  * Returns TRAN_ACCEPT and scsi pkt_reason CMD_DEV_GONE if device does not
@@ -3082,7 +3085,7 @@ sata_scsi_sync_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
  * This function should be called with port mutex held.
  */
 static int
-sata_txlt_generic_pkt_info(sata_pkt_txlate_t *spx, int *reason)
+sata_txlt_generic_pkt_info(sata_pkt_txlate_t *spx, int *reason, int flag)
 {
 	sata_drive_info_t *sdinfo;
 	sata_device_t sata_device;
@@ -3158,11 +3161,13 @@ sata_txlt_generic_pkt_info(sata_pkt_txlate_t *spx, int *reason)
 		break;
 	}
 	/*
-	 * If in an interrupt context, reject packet if it is to be
-	 * executed in polling mode
+	 * If pkt is to be executed in polling mode and a command will not be
+	 * emulated in SATA module (requires sending ATA command to HBA
+	 * driver) and we are in the interrupt contex and not in panic dump,
+	 * then reject the packet to avoid a possible interrupt stack overrun.
 	 */
-	if (servicing_interrupt() &&
-	    (spx->txlt_scsi_pkt->pkt_flags & FLAG_NOINTR) != 0) {
+	if ((spx->txlt_scsi_pkt->pkt_flags & FLAG_NOINTR) != 0 && flag != 0 &&
+	    servicing_interrupt() && !ddi_in_panic()) {
 		SATADBG1(SATA_DBG_INTR_CTX, spx->txlt_sata_hba_inst,
 		    "sata_scsi_start: rejecting synchronous command because "
 		    "of interrupt context\n", NULL);
@@ -3423,7 +3428,7 @@ sata_txlt_nodata_cmd_immediate(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx, &reason)) !=
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 0)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
@@ -3486,7 +3491,7 @@ sata_txlt_inquiry(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx, &reason)) !=
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 0)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
@@ -3695,7 +3700,7 @@ sata_txlt_request_sense(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx, &reason)) !=
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 1)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
@@ -3829,7 +3834,7 @@ sata_txlt_test_unit_ready(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx, &reason)) !=
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 1)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
@@ -3934,7 +3939,7 @@ sata_txlt_start_stop_unit(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&SATA_CPORT_MUTEX(shi, cport));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx, &reason)) !=
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 1)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
@@ -4263,7 +4268,7 @@ sata_txlt_read_capacity(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx, &reason)) !=
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 0)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
@@ -4357,7 +4362,7 @@ sata_txlt_mode_sense(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx, &reason)) !=
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 0)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		kmem_free(buf, 1024);
@@ -4639,21 +4644,10 @@ sata_txlt_mode_select(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx, &reason)) !=
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 1)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
-	}
-	/*
-	 * If in interrupt context, reject this packet because it may result
-	 * in issuing a synchronous command to HBA.
-	 */
-	if (servicing_interrupt()) {
-		SATADBG1(SATA_DBG_INTR_CTX, spx->txlt_sata_hba_inst,
-		    "sata_txlt_mode_select: rejecting command because "
-		    "of interrupt context\n", NULL);
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
-		return (TRAN_BUSY);
 	}
 
 	rval = TRAN_ACCEPT;
@@ -4947,7 +4941,7 @@ sata_txlt_ata_pass_thru(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	rval = sata_txlt_generic_pkt_info(spx, &reason);
+	rval = sata_txlt_generic_pkt_info(spx, &reason, 1);
 	if ((rval != TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
@@ -5190,23 +5184,11 @@ sata_txlt_log_sense(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx, &reason)) !=
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 1)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		kmem_free(buf, MAX_LOG_SENSE_PAGE_SIZE);
 		return (rval);
-	}
-	/*
-	 * If in interrupt context, reject this packet because it may result
-	 * in issuing a synchronous command to HBA.
-	 */
-	if (servicing_interrupt()) {
-		SATADBG1(SATA_DBG_INTR_CTX, spx->txlt_sata_hba_inst,
-		    "sata_log_sense: rejecting command because "
-		    "of interrupt context\n", NULL);
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
-		kmem_free(buf, MAX_LOG_SENSE_PAGE_SIZE);
-		return (TRAN_BUSY);
 	}
 
 	scsipkt->pkt_reason = CMD_CMPLT;
@@ -5478,7 +5460,7 @@ sata_txlt_read(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx, &reason)) !=
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 1)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
@@ -5747,7 +5729,7 @@ sata_txlt_write(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx, &reason)) !=
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 1)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
@@ -5996,20 +5978,10 @@ sata_txlt_write_buffer(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if ((rval = sata_txlt_generic_pkt_info(spx, &reason)) != TRAN_ACCEPT) {
+	if ((rval = sata_txlt_generic_pkt_info(spx, &reason, 1)) !=
+	    TRAN_ACCEPT) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
-	}
-	/*
-	 * If in interrupt context, reject this packet because it would issue
-	 * a synchronous command to HBA.
-	 */
-	if (servicing_interrupt()) {
-		SATADBG1(SATA_DBG_INTR_CTX, spx->txlt_sata_hba_inst,
-		    "sata_txlt_write_buffer: rejecting command because "
-		    "of interrupt context\n", NULL);
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
-		return (TRAN_BUSY);
 	}
 
 	/* Use synchronous mode */
@@ -6247,7 +6219,7 @@ sata_txlt_synchronize_cache(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx, &reason)) !=
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 1)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
@@ -8609,7 +8581,7 @@ sata_txlt_atapi(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx, &reason)) !=
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 1)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
