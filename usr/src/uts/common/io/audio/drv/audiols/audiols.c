@@ -1061,9 +1061,14 @@ audigyls_configure_mixer(audigyls_dev_t *dev)
 		 * made a mistake somewhere.  But I can't seem to
 		 * figure out where it lies.
 		 */
-		r = 0xe4;
-		for (int i = 0; i < 4; i++)
-			r |= v1 << (16 + i * 3);	/* Select input */
+		if (dev->ac97_recsrc != NULL) {
+			r = 0xe4;
+			for (int i = 0; i < 4; i++)
+				r |= v1 << (16 + i * 3); /* Select input */
+		} else {
+			r = (v1 << 28) | (v1 << 24) | (v1 << 20) | (v1 << 16) |
+			    v1;
+		}
 	}
 
 	write_reg(dev, P17RECSEL, r);
