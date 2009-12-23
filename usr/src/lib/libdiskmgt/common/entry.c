@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fcntl.h>
 #include <libdevinfo.h>
@@ -72,7 +70,7 @@ dm_free_descriptor(dm_descriptor_t desc)
 	descriptor_t	*dp;
 
 	if (desc == NULL) {
-	    return;
+		return;
 	}
 	dp = (descriptor_t *)(uintptr_t)desc;
 
@@ -88,12 +86,12 @@ dm_free_descriptors(dm_descriptor_t *desc_list)
 	int		error;
 
 	if (desc_list == NULL) {
-	    return;
+		return;
 	}
 	dp = desc_array_to_ptr_array(desc_list, &error);
 	if (error != 0) {
-	    free(desc_list);
-	    return;
+		free(desc_list);
+		return;
 	}
 
 	cache_wlock();
@@ -121,46 +119,46 @@ dm_get_associated_descriptors(dm_descriptor_t desc, dm_desc_type_t type,
 	cache_wlock();
 
 	if (!cache_is_valid_desc(dp)) {
-	    cache_unlock();
-	    *errp = EBADF;
-	    return (NULL);
+		cache_unlock();
+		*errp = EBADF;
+		return (NULL);
 	}
 
 	/* verify that the descriptor is still valid */
 	if (dp->p.generic == NULL) {
-	    cache_unlock();
-	    *errp = ENODEV;
-	    return (NULL);
+		cache_unlock();
+		*errp = ENODEV;
+		return (NULL);
 	}
 
 	switch (dp->type) {
 	case DM_DRIVE:
-	    descs = drive_get_assoc_descriptors(dp, type, errp);
-	    break;
+		descs = drive_get_assoc_descriptors(dp, type, errp);
+		break;
 	case DM_BUS:
-	    descs = bus_get_assoc_descriptors(dp, type, errp);
-	    break;
+		descs = bus_get_assoc_descriptors(dp, type, errp);
+		break;
 	case DM_CONTROLLER:
-	    descs = controller_get_assoc_descriptors(dp, type, errp);
-	    break;
+		descs = controller_get_assoc_descriptors(dp, type, errp);
+		break;
 	case DM_MEDIA:
-	    descs = media_get_assoc_descriptors(dp, type, errp);
-	    break;
+		descs = media_get_assoc_descriptors(dp, type, errp);
+		break;
 	case DM_SLICE:
-	    descs = slice_get_assoc_descriptors(dp, type, errp);
-	    break;
+		descs = slice_get_assoc_descriptors(dp, type, errp);
+		break;
 	case DM_PARTITION:
-	    descs = partition_get_assoc_descriptors(dp, type, errp);
-	    break;
+		descs = partition_get_assoc_descriptors(dp, type, errp);
+		break;
 	case DM_PATH:
-	    descs = path_get_assoc_descriptors(dp, type, errp);
-	    break;
+		descs = path_get_assoc_descriptors(dp, type, errp);
+		break;
 	case DM_ALIAS:
-	    descs = alias_get_assoc_descriptors(dp, type, errp);
-	    break;
+		descs = alias_get_assoc_descriptors(dp, type, errp);
+		break;
 	default:
-	    *errp = EINVAL;
-	    break;
+		*errp = EINVAL;
+		break;
 	}
 
 	cache_unlock();
@@ -173,21 +171,21 @@ dm_get_associated_types(dm_desc_type_t type)
 {
 	switch (type) {
 	case DM_DRIVE:
-	    return (drive_assoc_types);
+		return (drive_assoc_types);
 	case DM_BUS:
-	    return (bus_assoc_types);
+		return (bus_assoc_types);
 	case DM_CONTROLLER:
-	    return (controller_assoc_types);
+		return (controller_assoc_types);
 	case DM_MEDIA:
-	    return (media_assoc_types);
+		return (media_assoc_types);
 	case DM_SLICE:
-	    return (slice_assoc_types);
+		return (slice_assoc_types);
 	case DM_PARTITION:
-	    return (partition_assoc_types);
+		return (partition_assoc_types);
 	case DM_PATH:
-	    return (path_assoc_types);
+		return (path_assoc_types);
 	case DM_ALIAS:
-	    return (alias_assoc_types);
+		return (alias_assoc_types);
 	}
 
 	return (NULL);
@@ -205,46 +203,46 @@ dm_get_attributes(dm_descriptor_t desc, int *errp)
 	cache_rlock();
 
 	if (!cache_is_valid_desc(dp)) {
-	    cache_unlock();
-	    *errp = EBADF;
-	    return (NULL);
+		cache_unlock();
+		*errp = EBADF;
+		return (NULL);
 	}
 
 	/* verify that the descriptor is still valid */
 	if (dp->p.generic == NULL) {
-	    cache_unlock();
-	    *errp = ENODEV;
-	    return (NULL);
+		cache_unlock();
+		*errp = ENODEV;
+		return (NULL);
 	}
 
 	switch (dp->type) {
 	case DM_DRIVE:
-	    attrs = drive_get_attributes(dp, errp);
-	    break;
+		attrs = drive_get_attributes(dp, errp);
+		break;
 	case DM_BUS:
-	    attrs = bus_get_attributes(dp, errp);
-	    break;
+		attrs = bus_get_attributes(dp, errp);
+		break;
 	case DM_CONTROLLER:
-	    attrs = controller_get_attributes(dp, errp);
-	    break;
+		attrs = controller_get_attributes(dp, errp);
+		break;
 	case DM_MEDIA:
-	    attrs = media_get_attributes(dp, errp);
-	    break;
+		attrs = media_get_attributes(dp, errp);
+		break;
 	case DM_SLICE:
-	    attrs = slice_get_attributes(dp, errp);
-	    break;
+		attrs = slice_get_attributes(dp, errp);
+		break;
 	case DM_PARTITION:
-	    attrs = partition_get_attributes(dp, errp);
-	    break;
+		attrs = partition_get_attributes(dp, errp);
+		break;
 	case DM_PATH:
-	    attrs = path_get_attributes(dp, errp);
-	    break;
+		attrs = path_get_attributes(dp, errp);
+		break;
 	case DM_ALIAS:
-	    attrs = alias_get_attributes(dp, errp);
-	    break;
+		attrs = alias_get_attributes(dp, errp);
+		break;
 	default:
-	    *errp = EINVAL;
-	    break;
+		*errp = EINVAL;
+		break;
 	}
 
 	cache_unlock();
@@ -262,34 +260,34 @@ dm_get_descriptor_by_name(dm_desc_type_t desc_type, char *name, int *errp)
 
 	switch (desc_type) {
 	case DM_DRIVE:
-	    desc = (uintptr_t)drive_get_descriptor_by_name(name, errp);
-	    break;
+		desc = (uintptr_t)drive_get_descriptor_by_name(name, errp);
+		break;
 	case DM_BUS:
-	    desc = (uintptr_t)bus_get_descriptor_by_name(name, errp);
-	    break;
+		desc = (uintptr_t)bus_get_descriptor_by_name(name, errp);
+		break;
 	case DM_CONTROLLER:
-	    desc = (uintptr_t)controller_get_descriptor_by_name(name,
-		errp);
-	    break;
+		desc = (uintptr_t)controller_get_descriptor_by_name(name,
+		    errp);
+		break;
 	case DM_MEDIA:
-	    desc = (uintptr_t)media_get_descriptor_by_name(name, errp);
-	    break;
+		desc = (uintptr_t)media_get_descriptor_by_name(name, errp);
+		break;
 	case DM_SLICE:
-	    desc = (uintptr_t)slice_get_descriptor_by_name(name, errp);
-	    break;
+		desc = (uintptr_t)slice_get_descriptor_by_name(name, errp);
+		break;
 	case DM_PARTITION:
-	    desc = (uintptr_t)partition_get_descriptor_by_name(name,
-		errp);
-	    break;
+		desc = (uintptr_t)partition_get_descriptor_by_name(name,
+		    errp);
+		break;
 	case DM_PATH:
-	    desc = (uintptr_t)path_get_descriptor_by_name(name, errp);
-	    break;
+		desc = (uintptr_t)path_get_descriptor_by_name(name, errp);
+		break;
 	case DM_ALIAS:
-	    desc = (uintptr_t)alias_get_descriptor_by_name(name, errp);
-	    break;
+		desc = (uintptr_t)alias_get_descriptor_by_name(name, errp);
+		break;
 	default:
-	    *errp = EINVAL;
-	    break;
+		*errp = EINVAL;
+		break;
 	}
 
 	cache_unlock();
@@ -307,32 +305,32 @@ dm_get_descriptors(dm_desc_type_t type, int filter[], int *errp)
 
 	switch (type) {
 	case DM_DRIVE:
-	    descs = drive_get_descriptors(filter, errp);
-	    break;
+		descs = drive_get_descriptors(filter, errp);
+		break;
 	case DM_BUS:
-	    descs = bus_get_descriptors(filter, errp);
-	    break;
+		descs = bus_get_descriptors(filter, errp);
+		break;
 	case DM_CONTROLLER:
-	    descs = controller_get_descriptors(filter, errp);
-	    break;
+		descs = controller_get_descriptors(filter, errp);
+		break;
 	case DM_MEDIA:
-	    descs = media_get_descriptors(filter, errp);
-	    break;
+		descs = media_get_descriptors(filter, errp);
+		break;
 	case DM_SLICE:
-	    descs = slice_get_descriptors(filter, errp);
-	    break;
+		descs = slice_get_descriptors(filter, errp);
+		break;
 	case DM_PARTITION:
-	    descs = partition_get_descriptors(filter, errp);
-	    break;
+		descs = partition_get_descriptors(filter, errp);
+		break;
 	case DM_PATH:
-	    descs = path_get_descriptors(filter, errp);
-	    break;
+		descs = path_get_descriptors(filter, errp);
+		break;
 	case DM_ALIAS:
-	    descs = alias_get_descriptors(filter, errp);
-	    break;
+		descs = alias_get_descriptors(filter, errp);
+		break;
 	default:
-	    *errp = EINVAL;
-	    break;
+		*errp = EINVAL;
+		break;
 	}
 
 	cache_unlock();
@@ -352,55 +350,55 @@ dm_get_name(dm_descriptor_t desc, int *errp)
 	cache_rlock();
 
 	if (!cache_is_valid_desc(dp)) {
-	    cache_unlock();
-	    *errp = EBADF;
-	    return (NULL);
+		cache_unlock();
+		*errp = EBADF;
+		return (NULL);
 	}
 
 	/* verify that the descriptor is still valid */
 	if (dp->p.generic == NULL) {
-	    cache_unlock();
-	    *errp = ENODEV;
-	    return (NULL);
+		cache_unlock();
+		*errp = ENODEV;
+		return (NULL);
 	}
 
 	switch (dp->type) {
 	case DM_DRIVE:
-	    nm = (drive_get_name(dp));
-	    break;
+		nm = (drive_get_name(dp));
+		break;
 	case DM_BUS:
-	    nm = (bus_get_name(dp));
-	    break;
+		nm = (bus_get_name(dp));
+		break;
 	case DM_CONTROLLER:
-	    nm = (controller_get_name(dp));
-	    break;
+		nm = (controller_get_name(dp));
+		break;
 	case DM_MEDIA:
-	    nm = (media_get_name(dp));
-	    break;
+		nm = (media_get_name(dp));
+		break;
 	case DM_SLICE:
-	    nm = (slice_get_name(dp));
-	    break;
+		nm = (slice_get_name(dp));
+		break;
 	case DM_PARTITION:
-	    nm = (partition_get_name(dp));
-	    break;
+		nm = (partition_get_name(dp));
+		break;
 	case DM_PATH:
-	    nm = (path_get_name(dp));
-	    break;
+		nm = (path_get_name(dp));
+		break;
 	case DM_ALIAS:
-	    nm = (alias_get_name(dp));
-	    break;
+		nm = (alias_get_name(dp));
+		break;
 	}
 
 	cache_unlock();
 
 	*errp = 0;
 	if (nm != NULL) {
-	    name = strdup(nm);
-	    if (name == NULL) {
-		*errp = ENOMEM;
-		return (NULL);
-	    }
-	    return (name);
+		name = strdup(nm);
+		if (name == NULL) {
+			*errp = ENOMEM;
+			return (NULL);
+		}
+		return (name);
 	}
 	return (NULL);
 }
@@ -485,8 +483,8 @@ dm_get_type(dm_descriptor_t desc)
 	cache_rlock();
 
 	if (!cache_is_valid_desc(dp)) {
-	    cache_unlock();
-	    return (-1);
+		cache_unlock();
+		return (-1);
 	}
 
 	cache_unlock();
@@ -979,7 +977,14 @@ dm_inuse(char *dev_name, char **msg, dm_who_type_t who, int *errp)
 				    strcmp(by, DM_USE_EXPORTED_ZPOOL) == 0) {
 					break;
 				}
-
+				if (strcmp(by, DM_USE_LU) == 0 &&
+				    strcmp(data, "-") == 0) {
+					break;
+				}
+				if (strcmp(by, DM_USE_VFSTAB) == 0 &&
+				    strcmp(data, "") == 0) {
+					break;
+				}
 				if (build_usage_string(dname,
 				    by, data, msg, &found, errp) != 0) {
 					if (*errp) {
@@ -1139,8 +1144,8 @@ libdiskmgt_empty_desc_array(int *errp)
 
 	empty = (descriptor_t **)calloc(1, sizeof (descriptor_t *));
 	if (empty == NULL) {
-	    *errp = ENOMEM;
-	    return (NULL);
+		*errp = ENOMEM;
+		return (NULL);
 	}
 	empty[0] = NULL;
 
@@ -1154,7 +1159,7 @@ libdiskmgt_init_debug()
 	char	*valp;
 
 	if ((valp = getenv(DM_DEBUG)) != NULL) {
-	    dm_debug = atoi(valp);
+		dm_debug = atoi(valp);
 	}
 }
 
@@ -1162,28 +1167,28 @@ int
 libdiskmgt_str_eq(char *nm1, char *nm2)
 {
 	if (nm1 == NULL) {
-	    if (dm_debug) {
-		(void) fprintf(stderr, "WARNING: str_eq nm1 NULL\n");
-	    }
+		if (dm_debug) {
+			(void) fprintf(stderr, "WARNING: str_eq nm1 NULL\n");
+		}
 
-	    if (nm2 == NULL) {
-		return (1);
-	    } else {
-		return (0);
-	    }
+		if (nm2 == NULL) {
+			return (1);
+		} else {
+			return (0);
+		}
 	}
 
 	/* nm1 != NULL */
 
 	if (nm2 == NULL) {
-	    if (dm_debug) {
-		(void) fprintf(stderr, "WARNING: str_eq nm2 NULL\n");
-	    }
-	    return (0);
+		if (dm_debug) {
+			(void) fprintf(stderr, "WARNING: str_eq nm2 NULL\n");
+		}
+		return (0);
 	}
 
 	if (strcmp(nm1, nm2) == 0) {
-	    return (1);
+		return (1);
 	}
 
 	return (0);
@@ -1201,16 +1206,17 @@ desc_array_to_ptr_array(dm_descriptor_t *descs, int *errp)
 	int	i;
 	descriptor_t **da;
 
-	for (cnt = 0; descs[cnt]; cnt++);
+	for (cnt = 0; descs[cnt]; cnt++)
+		;
 
 	da = (descriptor_t **)calloc(cnt + 1, sizeof (descriptor_t *));
 	if (da == NULL) {
-	    *errp = ENOMEM;
-	    return (NULL);
+		*errp = ENOMEM;
+		return (NULL);
 	}
 
 	for (i = 0; descs[i]; i++) {
-	    da[i] = (descriptor_t *)(uintptr_t)descs[i];
+		da[i] = (descriptor_t *)(uintptr_t)descs[i];
 	}
 	*errp = 0;
 	free(descs);
@@ -1232,19 +1238,20 @@ ptr_array_to_desc_array(descriptor_t **ptrs, int *errp)
 	dm_descriptor_t *da;
 
 	if (*errp != 0 || ptrs == NULL) {
-	    return (NULL);
+		return (NULL);
 	}
 
-	for (cnt = 0; ptrs[cnt]; cnt++);
+	for (cnt = 0; ptrs[cnt]; cnt++)
+		;
 
 	da = (dm_descriptor_t *)calloc(cnt + 1, sizeof (dm_descriptor_t));
 	if (da == NULL) {
-	    *errp = ENOMEM;
-	    return (NULL);
+		*errp = ENOMEM;
+		return (NULL);
 	}
 
 	for (i = 0; ptrs[i]; i++) {
-	    da[i] = (uintptr_t)ptrs[i];
+		da[i] = (uintptr_t)ptrs[i];
 	}
 	*errp = 0;
 	free(ptrs);
