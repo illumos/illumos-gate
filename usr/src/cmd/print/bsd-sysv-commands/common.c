@@ -75,6 +75,26 @@ match_job(int id, char *user, int ac, char *av[])
 	return (-1);
 }
 
+/*
+ * return 0 : argument passed is job-id && job-id matches
+ *		or argument passed is user
+ */
+static int
+match_job_rid(int id, int ac, char *av[])
+{
+	int i;
+
+	for (i = 0; i < ac; i++)
+		if (isdigit(av[i][0]) != 0) {
+			if (id == atoi(av[i]))
+				/* job-id match */
+				return (0);
+		} else
+			/* argument passed is user */
+			return (0);
+	return (-1);
+}
+
 static struct {
 	char *mime_type;
 	char *lp_type;
@@ -237,10 +257,11 @@ cancel_job(papi_service_t svc, FILE *fp, char *printer, papi_job_t job,
 {
 	papi_status_t status;
 	papi_attribute_t **list = papiJobGetAttributeList(job);
-	int id = 0;
+	int id = -1;
 	int rid = -1;
 	char *user = "";
 	char *mesg = gettext("cancelled");
+	int i = 0;
 
 	papiAttributeListGetInteger(list, NULL,
 	    "job-id", &id);
@@ -253,6 +274,16 @@ cancel_job(papi_service_t svc, FILE *fp, char *printer, papi_job_t job,
 	if ((ac > 0) && (match_job(id, user, ac, av) < 0) &&
 	    (match_job(rid, user, ac, av) < 0))
 		return;
+
+	/*
+	 * A remote lpd job should be cancelled only based on
+	 * job-id-requested
+	 */
+	if (rid != -1) {
+		if (match_job_rid(rid, ac, av) == -1)
+			/* job-id mismatch */
+			return;
+	}
 
 	status = papiJobCancel(svc, printer, id);
 	if (status != PAPI_OK)
@@ -586,6 +617,7 @@ job_to_be_queried(papi_service_t svc, char *printer, int32_t id)
 {
 	papi_job_t *jobs = NULL;
 	papi_status_t status;
+	int ret = -1;
 	char *jattrs[] = { "job-id",
 			"job-id-requested", NULL };
 
@@ -603,20 +635,41 @@ job_to_be_queried(papi_service_t svc, char *printer, int32_t id)
 
 		for (i = 0; jobs[i] != NULL; i++) {
 			int32_t rid = -1;
+			int32_t jid = -1;
 			papi_attribute_t **list =
 			    papiJobGetAttributeList(jobs[i]);
 
 			papiAttributeListGetInteger(list, NULL,
 			    "job-id-requested", &rid);
+			papiAttributeListGetInteger(list, NULL,
+			    "job-id", &jid);
 
-			/* check if this matches with id */
+			/*
+			 * check if id matches with either rid or jid
+			 */
 			if (rid == id) {
 				/* get the actual id and return it */
 				papiAttributeListGetInteger(list, NULL,
 				    "job-id", &id);
 				return (id);
+			} else if (id == jid) {
+				if (rid != -1) {
+					/*
+					 * It is a remote lpd job
+					 * can be cancelled only
+					 * using rid
+					 */
+					ret = -1;
+				} else {
+					/*
+					 * its local or
+					 * remote ipp job
+					 */
+					return (id);
+				}
 			}
 		}
+		return (ret);
 	}
 	return (id);
 }

@@ -1082,7 +1082,6 @@ job_query(char *request, int (*report)(char *, papi_job_t, int, int),
 			papiJobListFree(jobs);
 		} else {	/* a job */
 			papi_job_t job = NULL;
-			int rid = id;
 
 			/* Once a job has been found stop processing */
 			flag = 0;
@@ -1093,12 +1092,12 @@ job_query(char *request, int (*report)(char *, papi_job_t, int, int),
 			 */
 			id = job_to_be_queried(svc, printer, id);
 
-			if (id > 0)
+			if (id >= 0)
 				status = papiJobQuery(svc, printer, id,
 				    NULL, &job);
 			else
-				status = papiJobQuery(svc, printer, rid,
-				    NULL, &job);
+				/* id not found */
+				status = PAPI_NOT_FOUND;
 
 			if (status != PAPI_OK) {
 				if (!print_flag)

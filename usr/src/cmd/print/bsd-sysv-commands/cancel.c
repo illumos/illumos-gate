@@ -172,19 +172,26 @@ main(int ac, char *av[])
 			 * corresponding job-id and send it to cancel
 			 */
 			rid = job_to_be_queried(svc, printer, id);
-			if (rid >= 0)
+			if (rid < 0) {
+				/*
+				 * Either it is a remote job which cannot be
+				 * cancelled based on job-id or job-id is
+				 * not found
+				 */
+				exit_code = 1;
+				fprintf(OUT, "%s-%d: not-found\n", printer, id);
+			} else {
 				status = papiJobCancel(svc, printer, rid);
-			else
-				status = papiJobCancel(svc, printer, id);
-
-			if (status == PAPI_NOT_AUTHORIZED) {
-				mesg = papiStatusString(status);
-				exit_code = 1;
-			} else if (status != PAPI_OK) {
-				mesg = verbose_papi_message(svc, status);
-				exit_code = 1;
+				if (status == PAPI_NOT_AUTHORIZED) {
+					mesg = papiStatusString(status);
+					exit_code = 1;
+				} else if (status != PAPI_OK) {
+					mesg =
+					    verbose_papi_message(svc, status);
+					exit_code = 1;
+				}
+				fprintf(OUT, "%s-%d: %s\n", printer, id, mesg);
 			}
-			fprintf(OUT, "%s-%d: %s\n", printer, id, mesg);
 
 		} else {	/* it's a printer */
 			if (user == NULL) {
