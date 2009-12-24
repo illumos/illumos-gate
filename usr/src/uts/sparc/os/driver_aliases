@@ -136,6 +136,7 @@ power "ali1535d+-power"
 ramdisk SUNW,ramdisk
 ctsmc "nct-ds80ch11-smc"
 sd "scsiclass,00"
+sd "scsiclass,05"
 ssd "scsa,00.bfcp"
 ssd "scsa,00.bvhci"
 st "scsiclass,01"
