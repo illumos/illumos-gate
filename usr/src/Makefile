@@ -307,7 +307,6 @@ CRYPT_SRC:
 	@cd $(CLOSED)/lib/libike;   pwd; $(MAKE) CRYPT_SRC
 	@cd lib/libnsl;	 pwd; $(MAKE) CRYPT_SRC
 	@cd lib/libsasl;	 pwd; $(MAKE) CRYPT_SRC
-	@cd lib/libresolv2;	 pwd; $(MAKE) CRYPT_SRC
 	@cd lib/sasl_plugins; pwd; $(MAKE) CRYPT_SRC
 	@cd lib/pam_modules/krb5;   pwd; $(MAKE) CRYPT_SRC
 	@cd uts/common/gssapi;    pwd; $(MAKE) CRYPT_SRC
