@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * sckmd - Starcat Key Management Daemon
@@ -135,6 +133,18 @@ main(int argc, char **argv)
 	}
 
 	sckmd_log(LOG_DEBUG, "starting sckmd...\n");
+
+	/*
+	 * IPsec must get loaded in-kernel.  The easiest way to do this is
+	 * to open (then close) a PF_KEY socket.
+	 */
+	if ((keysock = socket(PF_KEY, SOCK_RAW, SCKMD_CURR_PFKEY_VER)) == -1) {
+		sckmd_log(LOG_DEBUG, "PF_KEY open for IPsec load failed: %s\n",
+		    strerror(errno));
+		exit(1);
+	}
+	(void) close(keysock);
+	sckmd_log(LOG_ERR, "PF_KEY socket for IPsec load succeeded.\n");
 
 	/* must be root */
 	if (geteuid() != 0) {
