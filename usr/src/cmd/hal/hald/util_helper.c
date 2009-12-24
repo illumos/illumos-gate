@@ -70,6 +70,9 @@ drop_privileges (int keep_auxgroups)
 	/* for sysevent need to be root and have this privilege */
 	(void) priv_addset(pPrivSet, PRIV_SYS_CONFIG);
 
+	/* need proc_audit privilege */
+	(void) priv_addset(pPrivSet, PRIV_PROC_AUDIT);
+
 	/* Set the permitted privilege set. */
 	if (setppriv(PRIV_SET, PRIV_PERMITTED, pPrivSet) != 0) {
 		return;
