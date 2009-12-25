@@ -551,17 +551,81 @@ fmd_adm_rsrcacquit_1_svc(char *name, char *uuid, int *rvp, struct svc_req *req)
 }
 
 static void
-fmd_adm_serdinfo_eng(fmd_serd_eng_t *sgp, void *arg)
+fmd_adm_serdlist_measure(fmd_serd_eng_t *sgp, void *arg)
 {
 	struct fmd_rpc_serdlist *rsl = arg;
-	struct fmd_rpc_serdinfo *rsi = malloc(sizeof (struct fmd_rpc_serdinfo));
 
+	rsl->rsl_len += strlen(sgp->sg_name) + 1;
+	rsl->rsl_cnt++;
+}
+
+static void
+fmd_adm_serdlist_record(fmd_serd_eng_t *sgp, void *arg)
+{
+	struct fmd_rpc_serdlist *rsl = arg;
+
+	bcopy(sgp->sg_name, rsl->rsl_buf.rsl_buf_val + rsl->rsl_len,
+	    strlen(sgp->sg_name));
+	rsl->rsl_len += strlen(sgp->sg_name) + 1;
+}
+
+bool_t
+fmd_adm_serdlist_1_svc(char *name, struct fmd_rpc_serdlist *rvp,
+    struct svc_req *req)
+{
+	fmd_module_t *mp;
+	void *p;
+
+	rvp->rsl_buf.rsl_buf_len = 0;
+	rvp->rsl_buf.rsl_buf_val = NULL;
+	rvp->rsl_len = 0;
+	rvp->rsl_cnt = 0;
+	rvp->rsl_err = 0;
+
+	if (fmd_rpc_deny(req)) {
+		rvp->rsl_err = FMD_ADM_ERR_PERM;
+		return (TRUE);
+	}
+
+	if ((mp = fmd_modhash_lookup(fmd.d_mod_hash, name)) == NULL) {
+		rvp->rsl_err = FMD_ADM_ERR_MODSRCH;
+		return (TRUE);
+	}
+
+	fmd_module_lock(mp);
+	/* In the first pass, collect the overall length of the buffer. */
+	fmd_serd_hash_apply(&mp->mod_serds, fmd_adm_serdlist_measure, rvp);
+	if (rvp->rsl_len == 0) {
+		fmd_module_unlock(mp);
+		fmd_module_rele(mp);
+		return (TRUE);
+	}
+	p = malloc(rvp->rsl_len);
+	if (p) {
+		rvp->rsl_buf.rsl_buf_val = p;
+		rvp->rsl_buf.rsl_buf_len = rvp->rsl_len;
+		bzero(rvp->rsl_buf.rsl_buf_val, rvp->rsl_buf.rsl_buf_len);
+		rvp->rsl_len = 0;
+		/* In the second pass, populate the buffer with data. */
+		fmd_serd_hash_apply(&mp->mod_serds, fmd_adm_serdlist_record,
+		    rvp);
+	} else {
+		rvp->rsl_err = FMD_ADM_ERR_NOMEM;
+	}
+	fmd_module_unlock(mp);
+
+	fmd_module_rele(mp);
+	return (TRUE);
+}
+
+static void
+fmd_adm_serdinfo_record(fmd_serd_eng_t *sgp, struct fmd_rpc_serdinfo *rsi)
+{
 	uint64_t old, now = fmd_time_gethrtime();
 	const fmd_serd_elem_t *oep;
 
-	if (rsi == NULL || (rsi->rsi_name = strdup(sgp->sg_name)) == NULL) {
-		rsl->rsl_err = FMD_ADM_ERR_NOMEM;
-		free(rsi);
+	if ((rsi->rsi_name = strdup(sgp->sg_name)) == NULL) {
+		rsi->rsi_err = FMD_ADM_ERR_NOMEM;
 		return;
 	}
 
@@ -575,38 +639,46 @@ fmd_adm_serdinfo_eng(fmd_serd_eng_t *sgp, void *arg)
 	rsi->rsi_fired = fmd_serd_eng_fired(sgp) != 0;
 	rsi->rsi_n = sgp->sg_n;
 	rsi->rsi_t = sgp->sg_t;
-	rsi->rsi_next = rsl->rsl_list;
-
-	rsl->rsl_list = rsi;
-	rsl->rsl_len++;
 }
 
 bool_t
-fmd_adm_serdinfo_1_svc(char *name,
-    struct fmd_rpc_serdlist *rvp, struct svc_req *req)
+fmd_adm_serdinfo_1_svc(char *mname, char *sname, struct fmd_rpc_serdinfo *rvp,
+    struct svc_req *req)
 {
 	fmd_module_t *mp;
+	fmd_serd_eng_t *sgp;
 
-	rvp->rsl_list = NULL;
-	rvp->rsl_err = 0;
-	rvp->rsl_len = 0;
+	bzero(rvp, sizeof (struct fmd_rpc_serdinfo));
 
 	if (fmd_rpc_deny(req)) {
-		rvp->rsl_err = FMD_ADM_ERR_PERM;
+		rvp->rsi_err = FMD_ADM_ERR_PERM;
 		return (TRUE);
 	}
 
-	if ((mp = fmd_modhash_lookup(fmd.d_mod_hash, name)) == NULL) {
-		rvp->rsl_err = FMD_ADM_ERR_MODSRCH;
+	if ((mp = fmd_modhash_lookup(fmd.d_mod_hash, mname)) == NULL) {
+		rvp->rsi_err = FMD_ADM_ERR_MODSRCH;
 		return (TRUE);
 	}
 
 	fmd_module_lock(mp);
-	fmd_serd_hash_apply(&mp->mod_serds, fmd_adm_serdinfo_eng, rvp);
-	fmd_module_unlock(mp);
 
+	if ((sgp = fmd_serd_eng_lookup(&mp->mod_serds, sname)) != NULL) {
+		fmd_adm_serdinfo_record(sgp, rvp);
+	} else
+		rvp->rsi_err = FMD_ADM_ERR_SERDSRCH;
+
+	fmd_module_unlock(mp);
 	fmd_module_rele(mp);
+
 	return (TRUE);
+}
+
+/*ARGSUSED*/
+bool_t
+fmd_adm_serdinfo_old_1_svc(char *name, struct fmd_rpc_serdlist *rvp,
+    struct svc_req *req)
+{
+	return (FALSE);
 }
 
 bool_t

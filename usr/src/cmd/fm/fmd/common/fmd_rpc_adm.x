@@ -94,13 +94,14 @@ struct fmd_rpc_serdinfo {
 	bool rsi_fired;
 	uint64_t rsi_n;
 	uint64_t rsi_t;
-	struct fmd_rpc_serdinfo *rsi_next;
+	enum fmd_adm_error rsi_err;
 };
 
 struct fmd_rpc_serdlist {
-	enum fmd_adm_error rsl_err;
-	struct fmd_rpc_serdinfo *rsl_list;
+	opaque rsl_buf<>;
 	uint32_t rsl_len;
+	uint32_t rsl_cnt;
+	enum fmd_adm_error rsl_err;
 };
 
 struct fmd_rpc_xprtlist {
@@ -135,7 +136,7 @@ program FMD_ADM {
 		struct fmd_rpc_rsrcinfo FMD_ADM_RSRCINFO(string) = 10;
 		int FMD_ADM_RSRCFLUSH(string) = 11;
 		int FMD_ADM_RSRCREPAIRED(string) = 12;
-		struct fmd_rpc_serdlist FMD_ADM_SERDINFO(string) = 13;
+		struct fmd_rpc_serdlist FMD_ADM_SERDINFO_OLD(string) = 13;
 		int FMD_ADM_SERDRESET(string, string) = 14;
 		int FMD_ADM_LOGROTATE(string) = 15;
 		int FMD_ADM_CASEREPAIR(string) = 16;
@@ -146,6 +147,8 @@ program FMD_ADM {
 		int FMD_ADM_RSRCREPLACED(string) = 21;
 		int FMD_ADM_RSRCACQUIT(string, string) = 22;
 		int FMD_ADM_CASEACQUIT(string) = 23;
+		struct fmd_rpc_serdlist FMD_ADM_SERDLIST(string) = 24;
+		struct fmd_rpc_serdinfo FMD_ADM_SERDINFO(string, string) = 25;
 	} = 1;
 } = 100169;
 

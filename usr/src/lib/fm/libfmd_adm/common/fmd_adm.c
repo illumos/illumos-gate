@@ -890,24 +890,25 @@ fmd_adm_case_iter(fmd_adm_t *ap, const char *url_token, fmd_adm_case_f *func,
 static int
 fmd_adm_serd_cmp(const void *lp, const void *rp)
 {
-	return (strcmp((*(struct fmd_rpc_serdinfo **)lp)->rsi_name,
-	    (*(struct fmd_rpc_serdinfo **)rp)->rsi_name));
+	return (strcmp(*(char **)lp, *(char **)rp));
 }
 
 int
 fmd_adm_serd_iter(fmd_adm_t *ap, const char *name,
     fmd_adm_serd_f *func, void *arg)
 {
-	struct fmd_rpc_serdinfo *rsi, **ris, **rip;
 	struct fmd_rpc_serdlist rsl;
+	struct fmd_rpc_serdinfo rsi;
+	char **serds, *p;
 	fmd_adm_serdinfo_t asi;
 	enum clnt_stat cs;
 	uint_t retries = 0;
+	int i, rv;
 
 	bzero(&rsl, sizeof (rsl)); /* tell xdr to allocate memory for us */
 
 	do {
-		cs = fmd_adm_serdinfo_1((char *)name, &rsl, ap->adm_clnt);
+		cs = fmd_adm_serdlist_1((char *)name, &rsl, ap->adm_clnt);
 	} while (fmd_adm_retry(ap, cs, &retries));
 
 	if (cs != RPC_SUCCESS)
@@ -918,34 +919,66 @@ fmd_adm_serd_iter(fmd_adm_t *ap, const char *name,
 		return (fmd_adm_set_svcerr(ap, rsl.rsl_err));
 	}
 
-	if ((ris = rip = malloc(sizeof (void *) * rsl.rsl_len)) == NULL) {
+	if ((serds = malloc(sizeof (char *) * rsl.rsl_cnt)) == NULL) {
 		xdr_free(xdr_fmd_rpc_serdlist, (char *)&rsl);
 		return (fmd_adm_set_errno(ap, EAGAIN));
 	}
 
-	for (rsi = rsl.rsl_list; rsi != NULL; rsi = rsi->rsi_next)
-		*rip++ = rsi; /* store copy of pointer in array for sorting */
+	p = rsl.rsl_buf.rsl_buf_val;
 
-	qsort(ris, rsl.rsl_len, sizeof (void *), fmd_adm_serd_cmp);
+	for (i = 0; i < rsl.rsl_cnt; i++, p += strlen(p) + 1)
+		serds[i] = p;
 
-	for (rip = ris; rip < ris + rsl.rsl_len; rip++) {
-		rsi = *rip;
+	qsort(serds, rsl.rsl_cnt, sizeof (char *), fmd_adm_serd_cmp);
 
-		asi.asi_name = rsi->rsi_name;
-		asi.asi_delta = rsi->rsi_delta;
-		asi.asi_n = rsi->rsi_n;
-		asi.asi_t = rsi->rsi_t;
-		asi.asi_count = rsi->rsi_count;
+	for (i = 0; i < rsl.rsl_cnt; i++) {
+		bzero(&rsi, sizeof (rsi));
+
+		retries = 0;
+		do {
+			cs = fmd_adm_serdinfo_1((char *)name, serds[i], &rsi,
+			    ap->adm_clnt);
+		} while (fmd_adm_retry(ap, cs, &retries));
+
+		if (cs != RPC_SUCCESS) {
+			free(serds);
+			xdr_free(xdr_fmd_rpc_serdlist, (char *)&rsl);
+			return (fmd_adm_set_errno(ap, EPROTO));
+		}
+
+		if (rsi.rsi_err != 0 && rsi.rsi_err != FMD_ADM_ERR_SERDSRCH) {
+			free(serds);
+			xdr_free(xdr_fmd_rpc_serdinfo, (char *)&rsi);
+			xdr_free(xdr_fmd_rpc_serdlist, (char *)&rsl);
+			return (fmd_adm_set_svcerr(ap, rsi.rsi_err));
+		}
+
+		if (rsi.rsi_err == FMD_ADM_ERR_SERDSRCH) {
+			xdr_free(xdr_fmd_rpc_serdinfo, (char *)&rsi);
+			continue;
+		}
+
+		bzero(&asi, sizeof (asi));
+
+		asi.asi_name = rsi.rsi_name;
+		asi.asi_delta = rsi.rsi_delta;
+		asi.asi_n = rsi.rsi_n;
+		asi.asi_t = rsi.rsi_t;
+		asi.asi_count = rsi.rsi_count;
 		asi.asi_flags = 0;
 
-		if (rsi->rsi_fired)
+		if (rsi.rsi_fired)
 			asi.asi_flags |= FMD_ADM_SERD_FIRED;
 
-		if (func(&asi, arg) != 0)
+		rv = func(&asi, arg);
+
+		xdr_free(xdr_fmd_rpc_serdinfo, (char *)&rsi);
+
+		if (rv != 0)
 			break;
 	}
 
-	free(ris);
+	free(serds);
 	xdr_free(xdr_fmd_rpc_serdlist, (char *)&rsl);
 	return (0);
 }
