@@ -3072,8 +3072,8 @@ sata_scsi_sync_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
  * Checks if a device exists and can be access and translates common
  * scsi_pkt data to sata_pkt data.
  *
- * Flag argument indicates that ATA command may be sent to HBA to execute
- * this packet.
+ * Flag argument indicates that a non-read/write ATA command may be sent
+ * to HBA in arbitrary SYNC mode to execute this packet.
  *
  * Returns TRAN_ACCEPT and scsi pkt_reason CMD_CMPLT if device exists and
  * sata_pkt was set-up.
@@ -3162,11 +3162,13 @@ sata_txlt_generic_pkt_info(sata_pkt_txlate_t *spx, int *reason, int flag)
 	}
 	/*
 	 * If pkt is to be executed in polling mode and a command will not be
-	 * emulated in SATA module (requires sending ATA command to HBA
-	 * driver) and we are in the interrupt contex and not in panic dump,
-	 * then reject the packet to avoid a possible interrupt stack overrun.
+	 * emulated in SATA module (requires sending a non-read/write ATA
+	 * command to HBA driver in arbitrary SYNC mode) and we are in the
+	 * interrupt context and not in the panic dump, then reject the packet
+	 * to avoid a possible interrupt stack overrun or hang caused by
+	 * a potentially blocked interrupt.
 	 */
-	if ((spx->txlt_scsi_pkt->pkt_flags & FLAG_NOINTR) != 0 && flag != 0 &&
+	if (((spx->txlt_scsi_pkt->pkt_flags & FLAG_NOINTR) != 0 || flag != 0) &&
 	    servicing_interrupt() && !ddi_in_panic()) {
 		SATADBG1(SATA_DBG_INTR_CTX, spx->txlt_sata_hba_inst,
 		    "sata_scsi_start: rejecting synchronous command because "
@@ -5460,7 +5462,7 @@ sata_txlt_read(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 1)) !=
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 0)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
@@ -5729,7 +5731,7 @@ sata_txlt_write(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 1)) !=
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 0)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
@@ -8581,7 +8583,7 @@ sata_txlt_atapi(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 1)) !=
+	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 0)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
