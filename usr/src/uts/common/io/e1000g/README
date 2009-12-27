@@ -729,3 +729,11 @@ Notes on packaging:
 ======
   This version has the following fix:
    6877343 e1000g's default tx/rx resource consumption too high for jumbograms
+
+5.3.20
+======
+  This version has the following fixes:
+   6901523 e1000g does not return failure when setting external loopback fails
+   6903712 Cannot install on DQ45EK system due to e1000g driver alias
+   6909097 e1000g specifies incorrect flag when allocating tx DMA buffers
+   6909553 e1000g stall reset leaves GLDv3 link state as "unknown"

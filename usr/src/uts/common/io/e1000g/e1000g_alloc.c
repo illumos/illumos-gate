@@ -898,7 +898,7 @@ e1000g_alloc_dma_buffer(struct e1000g *Adapter,
 	mystat = ddi_dma_addr_bind_handle(buf->dma_handle,
 	    (struct as *)NULL,
 	    buf->address,
-	    len, DDI_DMA_READ | DDI_DMA_STREAMING,
+	    len, DDI_DMA_RDWR | DDI_DMA_STREAMING,
 	    DDI_DMA_DONTWAIT, 0, &cookie, &count);
 
 	if (mystat != DDI_SUCCESS) {

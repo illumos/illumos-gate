@@ -46,7 +46,7 @@
 
 static char ident[] = "Intel PRO/1000 Ethernet";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.3.19";
+static char e1000g_version[] = "Driver Ver. 5.3.20";
 
 /*
  * Proto types for DDI entry points
@@ -1895,7 +1895,8 @@ e1000g_stop(struct e1000g *Adapter, boolean_t global)
 
 	if (Adapter->link_state == LINK_STATE_UP) {
 		Adapter->link_state = LINK_STATE_UNKNOWN;
-		mac_link_update(Adapter->mh, Adapter->link_state);
+		if (!Adapter->reset_flag)
+			mac_link_update(Adapter->mh, Adapter->link_state);
 	}
 }
 
@@ -2027,6 +2028,11 @@ e1000g_reset_adapter(struct e1000g *Adapter)
 	stop_82547_timer(Adapter->tx_ring);
 
 	rw_enter(&Adapter->chip_lock, RW_WRITER);
+
+	if (Adapter->stall_flag) {
+		Adapter->stall_flag = B_FALSE;
+		Adapter->reset_flag = B_TRUE;
+	}
 
 	if (!(Adapter->e1000g_state & E1000G_STARTED)) {
 		rw_exit(&Adapter->chip_lock);
@@ -4702,11 +4708,8 @@ e1000g_stall_check(struct e1000g *Adapter)
 
 	(void) e1000g_recycle(tx_ring);
 
-	if (Adapter->stall_flag) {
-		Adapter->stall_flag = B_FALSE;
-		Adapter->reset_flag = B_TRUE;
+	if (Adapter->stall_flag)
 		return (B_TRUE);
-	}
 
 	return (B_FALSE);
 }
@@ -5152,6 +5155,22 @@ again:
 			(void) e1000g_reset_adapter(Adapter);
 			goto again;
 		}
+
+		/*
+		 * Reset driver to loopback none when set loopback failed
+		 * for the second time.
+		 */
+		Adapter->loopback_mode = E1000G_LB_NONE;
+
+		/* Reset the chip */
+		hw->phy.autoneg_wait_to_complete = B_TRUE;
+		(void) e1000g_reset_adapter(Adapter);
+		hw->phy.autoneg_wait_to_complete = B_FALSE;
+
+		E1000G_DEBUGLOG_0(Adapter, E1000G_INFO_LEVEL,
+		    "Set loopback mode failed, reset to loopback none");
+
+		return (B_FALSE);
 	}
 
 	return (B_TRUE);
