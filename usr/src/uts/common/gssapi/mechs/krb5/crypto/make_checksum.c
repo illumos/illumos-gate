@@ -1,8 +1,7 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
@@ -84,9 +83,11 @@ krb5_c_make_checksum(krb5_context context, krb5_cksumtype cksumtype,
 		if (krb5_enctypes_list[e2].etype == key->enctype)
 		    break;
 
-	    if ((e1 == krb5_enctypes_length) ||
-		(e2 == krb5_enctypes_length) ||
-		(krb5_enctypes_list[e1].enc != krb5_enctypes_list[e2].enc)) {
+	    /*
+	     * Solaris Kerberos: The actual key encryption type could be
+	     * arbitrary, so the checksum enc type doesn't need to be the same.
+	     */
+	    if ((e1 == krb5_enctypes_length) || (e2 == krb5_enctypes_length)) {
 		ret = KRB5_BAD_ENCTYPE;
 		goto cleanup;
 	    }

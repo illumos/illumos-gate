@@ -1,9 +1,7 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/crypto/keyhash_provider/hmac_md5.c
@@ -75,13 +73,19 @@ k5_hmac_md5_hash (krb5_context context,
   }
 
   bzero(&ks, sizeof(krb5_keyblock));
-  ds.length = key->length;
+  /*
+   * Solaris Kerberos: The digest length is that of MD5_CKSUM_LENGTH not the key
+   * length, as keys can be of varying lengths but should not affect the digest
+   * length.  The signing key is the digest and therefore is also the same
+   * length, MD5_CKSUM_LENGTH.
+   */
+  ds.length = MD5_CKSUM_LENGTH;
   ds.data = MALLOC(ds.length);
   if (ds.data == NULL)
     return (ENOMEM);
-
   ks.contents = (void *) ds.data;
-  ks.length = key->length;
+  ks.length = MD5_CKSUM_LENGTH;
+
 #ifdef _KERNEL
   if (key->kef_key.ck_data == NULL) {
 	ret = init_key_kef(krb5_enctypes_list[i].kef_cipher_mt,
