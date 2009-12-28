@@ -32,6 +32,7 @@
  * peers using the GSS-API.
  *
  */
+
 /*
  * Copyright (c) 2006-2008, Novell, Inc.
  * All rights reserved.
@@ -1402,6 +1403,11 @@ acc_ctx_new(OM_uint32 *minor_status,
 					  negState);
 	if (*negState == REJECT) {
 		ret = GSS_S_BAD_MECH;
+		/*
+		 * Solaris Kerberos: If we can't negotiate a mechanism then
+		 * there is no context to associate with an error token. 
+		 */
+		*return_token = NO_TOKEN_SEND;
 		goto cleanup;
 	}
 	sc = (spnego_gss_ctx_id_t)*ctx;
