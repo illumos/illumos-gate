@@ -4144,7 +4144,6 @@ wx_fullreview() {
 #
 
 wx_rtichk() {
-	typeset bugs[]
 	# gate contains the gate dir, not full path
 	typeset gate=${parent##*/}
 	typeset -i rc=0
@@ -4201,7 +4200,8 @@ wx_putback() {
 	# Use pbargs array to store Teamware putback args.
 	# verbatim is for -v verbatim flag which doesn't get passed to
 	# putback.
-	typeset i verbatim pbargs[] pbfiles narg=false force=false
+	set -A pbargs
+	typeset i verbatim pbfiles narg=false force=false
 	typeset nolookup=false
 
 	if $FILES_PASSED; then
