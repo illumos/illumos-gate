@@ -1302,7 +1302,7 @@ bugdb_compare() {
 # making changes in here.
 #
 
-wx_summary() {
+function wx_summary {
 	typeset i comment arc arcerr bug bugnospc bugid buglist synopsis \
 		show_arcs=true \
 		show_bugs=true \
