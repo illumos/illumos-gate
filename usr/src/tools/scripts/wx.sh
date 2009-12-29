@@ -22,7 +22,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
 
@@ -4497,8 +4497,9 @@ backup_done=0
 NEED_WS_CLEAN='n'
 
 # XXX doing this because keywords doesn't work on new files
-# Note doing the echo so the tabs are apparent
-SCCSKEYWORD=$(echo "ident\t+\"(\%\Z\%\%\M\%\t+\%\I\%|\%W\%)\t+\%\E\% SMI\"")
+# Note doing the echo so the tabs are apparent,
+# % is escaped to prevent keyword expansion by sccs commands on this file.
+SCCSKEYWORD=$(echo "ident\t+\"(\%Z\%\%M\%\t+\%I\%|\%W\%)\t+\%E\% SMI\"")
 
 # file that contains comments for use in create and checkin
 comment_file=
