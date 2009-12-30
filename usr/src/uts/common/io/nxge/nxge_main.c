@@ -3799,6 +3799,7 @@ nxge_m_start(void *arg)
 #endif
 
 	nxgep->link_notify = B_TRUE;
+	nxgep->link_check_count = 0;
 	nxgep->nxge_mac_state = NXGE_MAC_STARTED;
 
 	/*

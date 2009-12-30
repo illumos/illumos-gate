@@ -770,6 +770,7 @@ struct _nxge_t {
 	uint64_t		niu_min_ver;
 #endif
 	boolean_t		link_notify;
+	int			link_check_count;
 
 	kmutex_t		poll_lock;
 	kcondvar_t		poll_cv;

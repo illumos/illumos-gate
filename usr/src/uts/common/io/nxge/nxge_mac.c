@@ -2158,7 +2158,7 @@ nxge_neptune_10G_serdes_init(p_nxge_t nxgep)
 			 * print the message for the debugging purpose when link
 			 * stays down
 			 */
-			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 			    "nxge_neptune_10G_serdes_init: "
 			    "Serdes/signal for port<%d> not ready", portn));
 				goto done;
@@ -2187,7 +2187,7 @@ nxge_neptune_10G_serdes_init(p_nxge_t nxgep)
 			 * print the message for the debugging purpose when link
 			 * stays down
 			 */
-			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 			    "nxge_neptune_10G_serdes_init: "
 			    "Serdes/signal for port<%d> not ready", portn));
 				goto done;
@@ -4683,11 +4683,16 @@ nxge_mii_check(p_nxge_t nxgep, mii_bmsr_t bmsr, mii_bmsr_t bmsr_ints,
 		    "==> nxge_mii_check (link up) soft bmsr 0x%x bmsr_int "
 		    "0x%x", bmsr.value, bmsr_ints.value));
 		} else {
+			/* Only status change will update *link_up */
+			if (statsp->mac_stats.link_up == 1) {
+				*link_up = LINK_IS_DOWN;
+				/* Will notify, turn off further msg */
+				nxgep->link_notify = B_FALSE;
+			}
 			statsp->mac_stats.link_up = 0;
 			soft_bmsr->bits.link_status = 0;
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 			    "Link down cable problem"));
-			*link_up = LINK_IS_DOWN;
 		}
 	}
 
@@ -4725,6 +4730,10 @@ nxge_mii_check(p_nxge_t nxgep, mii_bmsr_t bmsr, mii_bmsr_t bmsr_ints,
 	    bmsr_ints.bits.auto_neg_complete) &&
 	    soft_bmsr->bits.link_status &&
 	    soft_bmsr->bits.auto_neg_complete) {
+		if (statsp->mac_stats.link_up == 0) {
+			*link_up = LINK_IS_UP;
+			nxgep->link_notify = B_FALSE;
+		}
 		statsp->mac_stats.link_up = 1;
 
 		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
@@ -4845,10 +4854,10 @@ nxge_mii_check(p_nxge_t nxgep, mii_bmsr_t bmsr, mii_bmsr_t bmsr_ints,
 			statsp->mac_stats.link_speed = 1000;
 			statsp->mac_stats.link_duplex = 2;
 		}
-		*link_up = LINK_IS_UP;
 	}
-
-	if (nxgep->link_notify) {
+	/* Initial link_notify, delay link down msg */
+	if (nxgep->link_notify && nxgep->nxge_mac_state == NXGE_MAC_STARTED &&
+	    (statsp->mac_stats.link_up == 1 || nxgep->link_check_count > 3)) {
 		*link_up = ((statsp->mac_stats.link_up) ? LINK_IS_UP :
 		    LINK_IS_DOWN);
 		nxgep->link_notify = B_FALSE;
@@ -4878,7 +4887,8 @@ nxge_pcs_check(p_nxge_t nxgep, uint8_t portn, nxge_link_state_t *link_up)
 
 	(void) npi_mac_get_link_status(nxgep->npi_handle, portn, &linkup);
 	if (linkup) {
-		if (nxgep->link_notify ||
+		if ((nxgep->link_notify &&
+		    nxgep->nxge_mac_state == NXGE_MAC_STARTED) ||
 		    nxgep->statsp->mac_stats.link_up == 0) {
 			statsp->mac_stats.link_up = 1;
 			statsp->mac_stats.link_speed = 1000;
@@ -4887,7 +4897,8 @@ nxge_pcs_check(p_nxge_t nxgep, uint8_t portn, nxge_link_state_t *link_up)
 			nxgep->link_notify = B_FALSE;
 		}
 	} else {
-		if (nxgep->link_notify ||
+		if ((nxgep->link_notify && nxgep->link_check_count > 3 &&
+		    nxgep->nxge_mac_state == NXGE_MAC_STARTED) ||
 		    nxgep->statsp->mac_stats.link_up == 1) {
 			statsp->mac_stats.link_up = 0;
 			statsp->mac_stats.link_speed = 0;
@@ -5332,6 +5343,19 @@ phy_check_done:
 					break;
 				}
 
+				if (nxgep->link_notify &&
+				    nxgep->link_check_count > 3 &&
+				    nxgep->nxge_mac_state == NXGE_MAC_STARTED ||
+				    nxgep->statsp->mac_stats.link_up == 1) {
+					nxgep->statsp->mac_stats.link_up = 0;
+					nxgep->statsp->mac_stats.link_speed = 0;
+					nxgep->statsp->mac_stats.link_duplex =
+					    0;
+
+					nxge_link_is_down(nxgep);
+					nxgep->link_notify = B_FALSE;
+				}
+
 				goto start_link_check;
 
 			} else if (!phy_present_now) {
@@ -5381,7 +5405,8 @@ phy_check_done:
 	}
 
 	if (link_up) {
-		if (nxgep->link_notify ||
+		if ((nxgep->link_notify &&
+		    nxgep->nxge_mac_state == NXGE_MAC_STARTED) ||
 		    nxgep->statsp->mac_stats.link_up == 0) {
 			if (nxge_10g_link_led_on(nxgep) != NXGE_OK)
 				goto fail;
@@ -5393,7 +5418,8 @@ phy_check_done:
 			nxgep->link_notify = B_FALSE;
 		}
 	} else {
-		if (nxgep->link_notify ||
+		if ((nxgep->link_notify && nxgep->link_check_count > 3 &&
+		    nxgep->nxge_mac_state == NXGE_MAC_STARTED) ||
 		    nxgep->statsp->mac_stats.link_up == 1) {
 			if (nxge_10g_link_led_off(nxgep) != NXGE_OK)
 				goto fail;
@@ -5727,6 +5753,7 @@ nxge_link_monitor(p_nxge_t nxgep, link_mon_enable_t enable)
 				MUTEX_ENTER(&nxgep->poll_lock);
 				nxgep->nxge_link_poll_timerid = timerid;
 				MUTEX_EXIT(&nxgep->poll_lock);
+				nxgep->link_check_count ++;
 			} else {
 				return (NXGE_ERROR);
 			}
@@ -5847,7 +5874,8 @@ nxge_tn1010_check(p_nxge_t nxgep, nxge_link_state_t *link_up)
 	 * portmode and link_speed
 	 */
 	if (val & TN1010_AN_LINK_STAT_BIT) {
-		if (nxgep->link_notify ||
+		if ((nxgep->link_notify &&
+		    nxgep->nxge_mac_state == NXGE_MAC_STARTED) ||
 		    nxgep->statsp->mac_stats.link_up == 0) {
 			statsp->mac_stats.link_up = 1;
 			statsp->mac_stats.link_duplex = 2;
@@ -5855,7 +5883,8 @@ nxge_tn1010_check(p_nxge_t nxgep, nxge_link_state_t *link_up)
 			nxgep->link_notify = B_FALSE;
 		}
 	} else {
-		if (nxgep->link_notify ||
+		if ((nxgep->link_notify && nxgep->link_check_count > 3 &&
+		    nxgep->nxge_mac_state == NXGE_MAC_STARTED) ||
 		    nxgep->statsp->mac_stats.link_up == 1) {
 			statsp->mac_stats.link_up = 0;
 			statsp->mac_stats.link_speed = 0;
