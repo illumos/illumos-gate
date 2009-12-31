@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -166,14 +166,11 @@ rge_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp, cred_t *credp)
 {
 	nd_param_t *ndp;
 	long new_value;
-	char *end;
 
 	_NOTE(ARGUNUSED(q, mp, credp))
 
 	ndp = (nd_param_t *)cp;
-	new_value = mi_strtol(value, &end, 10);
-	if (end == value)
-		return (EINVAL);
+	(void) ddi_strtol(value, (char **)NULL, 0, &new_value);
 	if (new_value < ndp->ndp_min || new_value > ndp->ndp_max)
 		return (EINVAL);
 

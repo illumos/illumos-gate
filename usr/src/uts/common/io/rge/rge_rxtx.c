@@ -413,10 +413,10 @@ rge_send_claim(rge_t *rgep)
  * h/w transmit done in ISR.  Instead, we call this function in the
  * rge_send() when there're few or no free tx BDs remained.
  */
-static void rge_send_recycle(rge_t *rgep);
+void rge_send_recycle(rge_t *rgep);
 #pragma	inline(rge_send_recycle)
 
-static void
+void
 rge_send_recycle(rge_t *rgep)
 {
 	rge_bd_t *hw_sbd_p;
@@ -441,7 +441,8 @@ rge_send_recycle(rge_t *rgep)
 				 * thus guaranteeing that it's nonzero
 				 * (watchdog activated).
 				 */
-				rgep->watchdog += 1;
+				if (rgep->watchdog == 0)
+					rgep->watchdog = 1;
 				mutex_exit(rgep->tc_lock);
 				return;
 			}

@@ -42,7 +42,7 @@ static uint32_t rge_autorecover = 1;
  * globals:
  */
 #define	RGE_DBG		RGE_DBG_REGS	/* debug flag for this code	*/
-static uint32_t rge_watchdog_count	= 1 << 16;
+static uint32_t rge_watchdog_count	= 1 << 5;
 
 /*
  * Operating register get/set access routines
@@ -1486,6 +1486,16 @@ rge_intr(caddr_t arg1, caddr_t arg2)
 	}
 
 	/*
+	 * System error interrupt
+	 */
+	if (int_status & SYS_ERR_INT) {
+		RGE_REPORT((rgep, "sys error happened, resetting the chip "));
+		mutex_enter(rgep->genlock);
+		rgep->rge_chip_state = RGE_CHIP_ERROR;
+		mutex_exit(rgep->genlock);
+	}
+
+	/*
 	 * Re-enable interrupt for PCIE chipset or install new int_mask
 	 */
 	if (update_int_mask)
@@ -1670,6 +1680,8 @@ rge_chip_cyclic(void *arg)
 
 	case RGE_CHIP_RUNNING:
 		rge_phy_check(rgep);
+		if (rgep->tx_free < RGE_SEND_SLOTS)
+			rge_send_recycle(rgep);
 		break;
 
 	case RGE_CHIP_FAULT:

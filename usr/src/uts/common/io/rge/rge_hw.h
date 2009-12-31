@@ -138,7 +138,7 @@ extern "C" {
 					    NO_RXDESC_INT)
 #define	RGE_INT_MASK			(TX_OK_INT | TX_ERR_INT | \
 					    RGE_RX_INT | LINK_CHANGE_INT | \
-					    TIME_OUT_INT)
+					    TIME_OUT_INT | SYS_ERR_INT)
 
 /*
  * Transmit configuration register

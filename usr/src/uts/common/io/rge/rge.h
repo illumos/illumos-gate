@@ -761,6 +761,7 @@ void rge_nd_cleanup(rge_t *rgep);
 /* rge_rxtx.c */
 void rge_rx_recycle(caddr_t arg);
 void rge_receive(rge_t *rgep);
+void rge_send_recycle(rge_t *rgep);
 mblk_t *rge_m_tx(void *arg, mblk_t *mp);
 uint_t rge_reschedule(caddr_t arg1, caddr_t arg2);
 
