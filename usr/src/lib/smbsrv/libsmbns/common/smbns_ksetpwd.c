@@ -249,7 +249,7 @@ smb_krb5_setpwd(krb5_context ctx, krb5_principal princ, char *passwd)
 	code = krb5_set_password_using_ccache(ctx, cc, passwd, princ,
 	    &result_code, &result_code_string, &result_string);
 
-	krb5_cc_close(ctx, cc);
+	(void) krb5_cc_close(ctx, cc);
 
 	if (code != 0)
 		(void) syslog(LOG_ERR,
@@ -317,13 +317,13 @@ smb_krb5_add_keytab_entries(krb5_context ctx, krb5_principal *princs,
 		for (i = 0; i < enctype_count; i++) {
 			if (smb_krb5_ktadd(ctx, kt, princs[j], enctypes[i],
 			    kvno, passwd) != 0) {
-				krb5_kt_close(ctx, kt);
+				(void) krb5_kt_close(ctx, kt);
 				return (-1);
 			}
 		}
 
 	}
-	krb5_kt_close(ctx, kt);
+	(void) krb5_kt_close(ctx, kt);
 	return (0);
 }
 
@@ -360,10 +360,10 @@ smb_krb5_find_keytab_entries(const char *fqhn, char *fname)
 	if (krb5_kt_resolve(ctx, ktname, &kt) == 0) {
 		if (krb5_kt_get_entry(ctx, kt, princ, 0, 0, &entry) == 0) {
 			found = B_TRUE;
-			krb5_kt_free_entry(ctx, &entry);
+			(void) krb5_kt_free_entry(ctx, &entry);
 		}
 
-		krb5_kt_close(ctx, kt);
+		(void) krb5_kt_close(ctx, kt);
 	}
 
 	krb5_free_principal(ctx, princ);

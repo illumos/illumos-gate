@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lint.h"
 #include "thr_uberdata.h"
@@ -384,7 +382,7 @@ set_parking_flag(ulwp_t *self, int park)
 				scp->sc_flgs |= SC_CANCEL_FLG;
 		}
 	} else if (park == 0) {	/* schedctl failed, do it the long way */
-		__lwp_unpark(self->ul_lwpid);
+		(void) __lwp_unpark(self->ul_lwpid);
 	}
 	exit_critical(self);
 }

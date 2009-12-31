@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lint.h"
 #include <time.h>
@@ -111,7 +109,7 @@ timer_create(clockid_t clock_id, struct sigevent *sigevp, timer_t *timerid)
 	if (sigev_thread) {
 		if (rc == 0) {
 			if ((rc = launch_spawner(tcdp)) != 0)
-				__timer_delete(*timerid);
+				(void) __timer_delete(*timerid);
 			else
 				timer_tcd[*timerid] = tcdp;
 		}

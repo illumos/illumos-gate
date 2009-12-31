@@ -17,8 +17,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,7 +68,7 @@ addFormatting(xmlNodePtr parent, char *text)
 
 	snode = xmlNewText((const xmlChar *)text);
 	if (snode != NULL) {
-		xmlAddChild(parent, snode);
+		(void) xmlAddChild(parent, snode);
 	}
 }
 
@@ -1311,7 +1313,7 @@ kmf_add_policy_to_db(KMF_POLICY_RECORD *policy, char *dbfilename,
 		root = xmlNewDocNode(doc, NULL,
 		    (const xmlChar *)KMF_POLICY_ROOT, NULL);
 		if (root != NULL) {
-			xmlDocSetRootElement(doc, root);
+			(void) xmlDocSetRootElement(doc, root);
 		}
 	}
 

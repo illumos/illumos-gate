@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -140,7 +141,7 @@ cleanup:
 	if (me)
 		krb5_free_principal(ctx, me);
 	if (cc)
-		krb5_cc_close(ctx, cc);
+		(void) krb5_cc_close(ctx, cc);
 	if (ctx)
 		krb5_free_context(ctx);
 

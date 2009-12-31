@@ -142,7 +142,7 @@ libbrand_initialize()
 	 * us, libzonecfg initializes libxml2 to essentially
 	 * the same defaults as we're using below.
 	 */
-	xmlLineNumbersDefault(1);
+	(void) xmlLineNumbersDefault(1);
 	xmlLoadExtDtdDefaultValue |= XML_DETECT_IDS;
 	xmlDoValidityCheckingDefaultValue = 1;
 	(void) xmlKeepBlanksDefault(0);

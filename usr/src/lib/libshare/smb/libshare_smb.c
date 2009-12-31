@@ -476,7 +476,7 @@ smb_enable_share(sa_share_t share)
 		} else {
 			share_t sh;
 
-			sa_sharetab_fill_zfs(share, &sh, "smb");
+			(void) sa_sharetab_fill_zfs(share, &sh, "smb");
 			err = sa_share_zfs(share, resource, (char *)path, &sh,
 			    &si, ZFS_SHARE_SMB);
 			if (err != SA_OK) {
@@ -703,7 +703,7 @@ smb_disable_share(sa_share_t share, char *path)
 		} else {
 			share_t sh;
 
-			sa_sharetab_fill_zfs(share, &sh, "smb");
+			(void) sa_sharetab_fill_zfs(share, &sh, "smb");
 			err = sa_share_zfs(share, resource, (char *)path, &sh,
 			    rname, ZFS_UNSHARE_SMB);
 			if (err != SA_OK) {

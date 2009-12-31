@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -70,7 +71,7 @@ name_to_int(char *rep_name)
 				result = REP_FILES | REP_LDAP;
 			else
 				result = REP_ERANGE;
-			__nsw_freeconfig(cfg);
+			(void) __nsw_freeconfig(cfg);
 		}
 	}
 
@@ -91,7 +92,7 @@ get_compat_mode(void)
 		if (strcmp(cfg->lookups->service_name, "ldap") == 0)
 			result = REP_COMPAT_LDAP;
 	}
-	__nsw_freeconfig(cfg);
+	(void) __nsw_freeconfig(cfg);
 
 	return (result);
 }
@@ -214,7 +215,7 @@ get_ns(pwu_repository_t *rep, int accesstype)
 		result = REP_NSS;
 	}
 
-	__nsw_freeconfig(conf);
+	(void) __nsw_freeconfig(conf);
 	return (result);
 }
 

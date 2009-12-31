@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -249,7 +248,7 @@ pset_validate_remove(nvlist_t *nvl, char **errorp)
 		 */
 		rcm_log_message(RCM_TRACE1,
 		    gettext("POOL: 'old_total' (%d) is less than 'new_total' "
-			    "(%d)\n"), old_total, new_total);
+		    "(%d)\n"), old_total, new_total);
 		return (RCM_SUCCESS);
 	}
 	if ((removed_list = malloc((old_total - new_total + 1) * sizeof (int)))
@@ -261,7 +260,7 @@ pset_validate_remove(nvlist_t *nvl, char **errorp)
 		goto out;
 	}
 	if ((error = nvlist_lookup_int32_array(nvl, "old_cpu_list",
-		    &old_cpu_list, &nelem)) != 0) {
+	    &old_cpu_list, &nelem)) != 0) {
 		rcm_log_message(RCM_ERROR,
 		    gettext("POOL: 'old_cpu_list' not found in nvlist: %s\n"),
 		    strerror(error));
@@ -276,7 +275,7 @@ pset_validate_remove(nvlist_t *nvl, char **errorp)
 		goto out;
 	}
 	if ((error = nvlist_lookup_int32_array(nvl, "new_cpu_list",
-		    &new_cpu_list, &nelem)) != 0) {
+	    &new_cpu_list, &nelem)) != 0) {
 		rcm_log_message(RCM_ERROR,
 		    gettext("POOL: 'new_cpu_list' not found in nvlist: %s\n"),
 		    strerror(error));
@@ -315,8 +314,8 @@ pset_validate_remove(nvlist_t *nvl, char **errorp)
 	/*
 	 * Look for resources with "'type' = 'pset'"
 	 */
-	pool_value_set_name(pvals[0], "type");
-	pool_value_set_string(pvals[0], "pset");
+	(void) pool_value_set_name(pvals[0], "type");
+	(void) pool_value_set_string(pvals[0], "pset");
 	if ((res = pool_query_resources(conf, &nelem, pvals)) == NULL) {
 		rcm_log_message(RCM_ERROR,
 		    gettext("POOL: No psets found in configuration\n"));
@@ -402,12 +401,12 @@ pool_register(rcm_handle_t *hdl)
 	registered++;
 	for (i = 0; registrations[i].rsrc != NULL; i++) {
 		if (rcm_register_capacity(hdl, (char *)registrations[i].rsrc,
-				    0, NULL) != RCM_SUCCESS) {
-				rcm_log_message(RCM_ERROR,
-				    gettext("POOL: failed to register capacity "
-				    "change for '%s'\n"),
-				    registrations[i].rsrc);
-			}
+		    0, NULL) != RCM_SUCCESS) {
+			rcm_log_message(RCM_ERROR,
+			    gettext("POOL: failed to register capacity "
+			    "change for '%s'\n"),
+			    registrations[i].rsrc);
+		}
 	}
 	return (RCM_SUCCESS);
 }

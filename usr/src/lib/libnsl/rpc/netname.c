@@ -37,7 +37,6 @@
  * Well, at least the API doesn't involve pointers-to-static.
  */
 
-
 /*
  * netname utility routines (getnetname, user2netname, host2netname).
  *
@@ -233,7 +232,7 @@ user2netname(char netname[MAXNETNAMELEN + 1], const uid_t uid,
 				break;
 			case __NSW_RETURN :
 				if (needfree)
-					__nsw_freeconfig(conf);
+					(void) __nsw_freeconfig(conf);
 				(void) mutex_unlock(&serialize_netname);
 				return (res);
 			default :
@@ -243,7 +242,7 @@ user2netname(char netname[MAXNETNAMELEN + 1], const uid_t uid,
 			}
 	}
 	if (needfree)
-		__nsw_freeconfig(conf);
+		(void) __nsw_freeconfig(conf);
 	(void) mutex_unlock(&serialize_netname);
 	return (0);
 }

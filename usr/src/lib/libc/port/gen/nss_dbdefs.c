@@ -1078,7 +1078,7 @@ nss_pinit_funcs(int index, nss_db_initf_t *initf, nss_str2ent_t *s2e)
 		}
 		lmutex_unlock(&handle_lock);
 		if (htmp)
-			dlclose(htmp);
+			(void) dlclose(htmp);
 	}
 	membar_consumer();
 

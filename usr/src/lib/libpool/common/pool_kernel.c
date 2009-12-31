@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <assert.h>
 #include <errno.h>
@@ -621,7 +620,7 @@ pool_knl_find_nvpair(nvlist_t *l, const char *name)
 	nvpair_t *pair;
 
 	for (pair = nvlist_next_nvpair(l, NULL); pair != NULL;
-		pair = nvlist_next_nvpair(l, pair)) {
+	    pair = nvlist_next_nvpair(l, pair)) {
 		if (strcmp(nvpair_name(pair), name) == 0)
 			break;
 	}
@@ -878,7 +877,7 @@ prop_build_cb(pool_conf_t *UNUSED, pool_elem_t *pe, const char *name,
 	struct knl_to_xml *info = (struct knl_to_xml *)user;
 
 	return (pool_knl_put_xml_property((pool_elem_t *)pe, info->ktx_node,
-		name, pval));
+	    name, pval));
 }
 
 /*
@@ -937,7 +936,7 @@ pool_knl_export(const pool_conf_t *conf, const char *location,
 	switch (fmt) {
 	case POX_NATIVE:
 		info.ktx_doc = xmlNewDoc(BAD_CAST "1.0");
-		xmlCreateIntSubset(info.ktx_doc, BAD_CAST "system",
+		(void) xmlCreateIntSubset(info.ktx_doc, BAD_CAST "system",
 		    BAD_CAST "-//Sun Microsystems Inc//DTD Resource "
 		    "Management All//EN",
 		    BAD_CAST dtd_location);
@@ -964,8 +963,9 @@ pool_knl_export(const pool_conf_t *conf, const char *location,
 		system = info.ktx_node;
 		info.ktx_doc->_private = (void *)conf;
 
-		xmlDocSetRootElement(info.ktx_doc, info.ktx_node);
-		xmlSetProp(info.ktx_node, BAD_CAST c_ref_id, BAD_CAST "dummy");
+		(void) xmlDocSetRootElement(info.ktx_doc, info.ktx_node);
+		(void) xmlSetProp(info.ktx_node, BAD_CAST c_ref_id,
+		    BAD_CAST "dummy");
 		if ((node_comment = xmlNewDocComment(info.ktx_doc,
 		    BAD_CAST "\nConfiguration for pools facility. Do NOT"
 		    " edit this file by hand - use poolcfg(1)"
@@ -1053,7 +1053,7 @@ pool_knl_export(const pool_conf_t *conf, const char *location,
 					sep = " ";
 				}
 				free(rs);
-				xmlSetProp(info.ktx_node, BAD_CAST "res",
+				(void) xmlSetProp(info.ktx_node, BAD_CAST "res",
 				    BAD_CAST cb->cb_buf);
 				if (set_char_buf(cb, "%s_%d",
 				    pool_elem_class_string(elem),
@@ -1063,7 +1063,8 @@ pool_knl_export(const pool_conf_t *conf, const char *location,
 					xmlFreeDoc(info.ktx_doc);
 					return (PO_FAIL);
 				}
-				xmlSetProp(info.ktx_node, BAD_CAST c_ref_id,
+				(void) xmlSetProp(info.ktx_node,
+				    BAD_CAST c_ref_id,
 				    BAD_CAST  cb->cb_buf);
 			}
 			free(ps);
@@ -1106,7 +1107,8 @@ pool_knl_export(const pool_conf_t *conf, const char *location,
 					xmlFreeDoc(info.ktx_doc);
 					return (PO_FAIL);
 				}
-				xmlSetProp(info.ktx_node, BAD_CAST c_ref_id,
+				(void) xmlSetProp(info.ktx_node,
+				    BAD_CAST c_ref_id,
 				    BAD_CAST  cb->cb_buf);
 				if ((cs = pool_query_resource_components(conf,
 				    rs[i], &ncompelem, NULL)) != NULL) {
@@ -1153,7 +1155,7 @@ pool_knl_export(const pool_conf_t *conf, const char *location,
 							    ktx_doc);
 							return (PO_FAIL);
 						}
-						xmlSetProp(info.ktx_node,
+						(void) xmlSetProp(info.ktx_node,
 						    BAD_CAST c_ref_id,
 						    BAD_CAST  cb->cb_buf);
 					}
@@ -1295,7 +1297,7 @@ build_result_set(const void *key, void **value, void *cl)
 			}
 			if (matched == PO_TRUE)
 				(void) pool_knl_result_set_append(qo->rs,
-				(pool_knl_elem_t *)key);
+				    (pool_knl_elem_t *)key);
 		} else {
 			(void) pool_knl_result_set_append(qo->rs,
 			    (pool_knl_elem_t *)key);
@@ -1496,7 +1498,8 @@ pool_knl_set_binding(pool_conf_t *conf, const char *pool_name, idtype_t idtype,
 	bind.pb_o_pool_id = elem_get_sysid(TO_ELEM(pool));
 
 	while ((ret = ioctl(prov->pkc_fd, POOL_BIND, &bind)) < 0 &&
-	    errno == EAGAIN);
+	    errno == EAGAIN)
+		;
 	if (ret < 0) {
 		pool_seterror(POE_SYSTEM);
 		return (PO_FAIL);
@@ -2553,7 +2556,7 @@ pool_knl_get_properties(const pool_elem_t *pe, uint_t *nprops)
 	*nprops = 0;
 
 	for (pair = nvlist_next_nvpair(pke->pke_properties, NULL); pair != NULL;
-		pair = nvlist_next_nvpair(pke->pke_properties, pair))
+	    pair = nvlist_next_nvpair(pke->pke_properties, pair))
 		(*nprops)++;
 	if ((result = calloc(*nprops + 1, sizeof (pool_value_t *))) == NULL) {
 		pool_seterror(POE_SYSTEM);
@@ -2857,7 +2860,8 @@ log_item_commit(log_item_t *li)
 		(void) dict_remove(prov->pkc_elements,
 		    (pool_knl_elem_t *)destroy->pdu_elem);
 		while ((ret = ioctl(prov->pkc_fd, POOL_DESTROY,
-		    &destroy->pdu_ioctl)) < 0 && errno == EAGAIN);
+		    &destroy->pdu_ioctl)) < 0 && errno == EAGAIN)
+			;
 		if (ret < 0) {
 			pool_seterror(POE_SYSTEM);
 			return (PO_FAIL);
@@ -2876,7 +2880,8 @@ log_item_commit(log_item_t *li)
 		assoc->pau_ioctl.pa_o_res_id =
 		    elem_get_sysid(assoc->pau_newres);
 		while ((ret = ioctl(prov->pkc_fd, POOL_ASSOC,
-		    &assoc->pau_ioctl)) < 0 && errno == EAGAIN);
+		    &assoc->pau_ioctl)) < 0 && errno == EAGAIN)
+			;
 		if (ret < 0) {
 			pool_seterror(POE_SYSTEM);
 			return (PO_FAIL);
@@ -2890,7 +2895,8 @@ log_item_commit(log_item_t *li)
 		    elem_get_sysid(dissoc->pdu_dissoc);
 
 		while ((ret = ioctl(prov->pkc_fd, POOL_DISSOC,
-		    &dissoc->pdu_ioctl)) < 0 && errno == EAGAIN);
+		    &dissoc->pdu_ioctl)) < 0 && errno == EAGAIN)
+			;
 		if (ret < 0) {
 			pool_seterror(POE_SYSTEM);
 			return (PO_FAIL);
@@ -3148,7 +3154,8 @@ log_item_undo(log_item_t *li)
 		u_destroy.pd_o_id = create->pcu_ioctl.pc_i_id;
 
 		while ((ret = ioctl(prov->pkc_fd, POOL_DESTROY,
-		    &u_destroy)) < 0 && errno == EAGAIN);
+		    &u_destroy)) < 0 && errno == EAGAIN)
+			;
 		if (ret < 0) {
 			pool_seterror(POE_SYSTEM);
 			return (PO_FAIL);
@@ -3197,7 +3204,7 @@ log_item_undo(log_item_t *li)
 		 * to restore the state of the newly created property
 		 */
 		(void) nvlist_dup(((pool_knl_elem_t *)destroy->pdu_elem)->
-		pke_properties, &tmplist, 0);
+		    pke_properties, &tmplist, 0);
 		for (pair = nvlist_next_nvpair(tmplist, NULL); pair != NULL;
 		    pair = nvlist_next_nvpair(tmplist, pair)) {
 			const pool_prop_t *prop;
@@ -3250,7 +3257,8 @@ log_item_undo(log_item_t *li)
 		u_assoc.pa_o_id_type = assoc->pau_ioctl.pa_o_id_type;
 
 		while ((ret = ioctl(prov->pkc_fd, POOL_ASSOC, &u_assoc)) < 0 &&
-		    errno == EAGAIN);
+		    errno == EAGAIN)
+			;
 		if (ret < 0) {
 			pool_seterror(POE_SYSTEM);
 			return (PO_FAIL);
@@ -3265,7 +3273,8 @@ log_item_undo(log_item_t *li)
 		u_assoc.pa_o_id_type = dissoc->pdu_ioctl.pd_o_id_type;
 
 		while ((ret = ioctl(prov->pkc_fd, POOL_ASSOC, &u_assoc)) < 0 &&
-		    errno == EAGAIN);
+		    errno == EAGAIN)
+			;
 		if (ret < 0) {
 			pool_seterror(POE_SYSTEM);
 			return (PO_FAIL);

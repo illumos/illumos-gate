@@ -18,13 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * write binary audit records directly to a file.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	DEBUG   0
 
@@ -643,7 +643,7 @@ open_log(dirlist_t *current_dir)
 		 */
 		binfile_cursize = 0;
 
-		__logpost(newname);
+		(void) __logpost(newname);
 
 		DPRINT((dbfp, "binfile: Log opened: %s\n", newname));
 		return (1);
@@ -940,7 +940,7 @@ auditd_plugin(const char *input, size_t in_len, uint32_t sequence, char **error)
 				rc = AUDITD_RETRY;
 				*error = strdup(gettext(
 				    "all partitions full\n"));
-				__logpost("");
+				(void) __logpost("");
 			}
 		}
 	}
@@ -1017,11 +1017,11 @@ auditd_plugin_open(const kva_t *kvlist, char **ret_list, char **error)
 		status = loadauditlist(dirlist, minfree);
 
 		if (status == -1) {
-			__logpost("");
+			(void) __logpost("");
 			*error = strdup(gettext("no directories configured"));
 			return (AUDITD_RETRY);
 		} else if (status == AUDITD_NO_MEMORY) {
-			__logpost("");
+			(void) __logpost("");
 			*error = strdup(gettext("no memory"));
 			return (status);
 		} else {	/* status is 0 or -2 (no change or changed) */

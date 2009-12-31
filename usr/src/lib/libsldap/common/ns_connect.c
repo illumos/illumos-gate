@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -1334,7 +1335,7 @@ ldap_in_nss_switch(char *db)
 			break;
 		}
 	}
-	__nsw_freeconfig(conf);
+	(void) __nsw_freeconfig(conf);
 	return (found);
 }
 

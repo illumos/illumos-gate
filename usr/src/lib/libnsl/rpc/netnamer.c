@@ -435,7 +435,7 @@ netname2user(const char netname[MAXNETNAMELEN + 1], uid_t *uidp, gid_t *gidp,
 				break;
 			case __NSW_RETURN :
 				if (needfree)
-					__nsw_freeconfig(conf);
+					(void) __nsw_freeconfig(conf);
 				(void) mutex_unlock(&serialize_netname_r);
 				return (res);
 			default :
@@ -445,7 +445,7 @@ netname2user(const char netname[MAXNETNAMELEN + 1], uid_t *uidp, gid_t *gidp,
 		}
 	}
 	if (needfree)
-		__nsw_freeconfig(conf);
+		(void) __nsw_freeconfig(conf);
 	(void) mutex_unlock(&serialize_netname_r);
 	return (0);
 }

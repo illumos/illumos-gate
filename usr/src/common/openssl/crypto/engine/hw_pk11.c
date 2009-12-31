@@ -990,7 +990,7 @@ static ENGINE *engine_pk11(void)
 
 	if (!bind_pk11(ret))
 		{
-		ENGINE_free(ret);
+		(void) ENGINE_free(ret);
 		return (NULL);
 		}
 
@@ -1019,7 +1019,7 @@ ENGINE_load_pk11(void)
 	e_pk11 = engine_pk11();
 	if (!e_pk11)
 		{
-		DSO_free(pk11_dso);
+		(void) DSO_free(pk11_dso);
 		pk11_dso = NULL;
 		return;
 		}
@@ -1032,15 +1032,15 @@ ENGINE_load_pk11(void)
 	 */
 	if (!pk11_library_init(e_pk11))
 		{
-		DSO_free(pk11_dso);
+		(void) DSO_free(pk11_dso);
 		pk11_dso = NULL;
-		ENGINE_free(e_pk11);
+		(void) ENGINE_free(e_pk11);
 		return;
 		}
 
-	ENGINE_add(e_pk11);
+	(void) ENGINE_add(e_pk11);
 
-	ENGINE_free(e_pk11);
+	(void) ENGINE_free(e_pk11);
 	ERR_clear_error();
 	}
 #endif	/* ENGINE_DYNAMIC_SUPPORT */

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -267,11 +265,11 @@ xml_init()
 	/*
 	 * DTD validation, with line numbers.
 	 */
-	xmlLineNumbersDefault(1);
+	(void) xmlLineNumbersDefault(1);
 	xmlLoadExtDtdDefaultValue |= XML_DETECT_IDS;
 	xmlDoValidityCheckingDefaultValue = 1;
 	/* Try to improve indentation and readability */
-	xmlKeepBlanksDefault(0);
+	(void) xmlKeepBlanksDefault(0);
 	/* Send all XML errors to our debug handler */
 	xmlSetGenericErrorFunc(NULL, pool_error_func);
 	/* Load up DTD element a-dtype data to improve performance */
@@ -1218,9 +1216,9 @@ pool_xml_validate(const pool_conf_t *conf, pool_valid_level_t level)
 		 * Note: This is resource specific.
 		 */
 		return (((pool_validate_resource(conf, "pset", c_min_prop, 0) ==
-			    PO_SUCCESS) &&
-			(pool_validate_resource(conf, "pset", c_max_prop, 0) ==
-			    PO_SUCCESS)) ? PO_SUCCESS : PO_FAIL);
+		    PO_SUCCESS) &&
+		    (pool_validate_resource(conf, "pset", c_max_prop, 0) ==
+		    PO_SUCCESS)) ? PO_SUCCESS : PO_FAIL);
 	}
 	return (PO_SUCCESS);
 }
@@ -1539,7 +1537,7 @@ pool_xml_elem_create(pool_conf_t *conf, pool_elem_class_t class,
 		(void) memset(elem, 0, sizeof (pool_xml_resource_t));
 		if ((elem->pxe_node = node_create_with_id
 		    (((pool_xml_elem_t *)parent)->pxe_node,
-			BAD_CAST element_class_tags[class])) == NULL) {
+		    BAD_CAST element_class_tags[class])) == NULL) {
 			pool_seterror(POE_DATASTORE);
 			(void) pool_xml_elem_remove((pool_elem_t *)elem);
 			return (NULL);
@@ -1576,8 +1574,8 @@ pool_xml_elem_create(pool_conf_t *conf, pool_elem_class_t class,
 			return (NULL);
 		}
 		if (xmlSetProp(elem->pxe_node, BAD_CAST c_type,
-			BAD_CAST pool_elem_class_string(
-			    (pool_elem_t *)elem)) == NULL) {
+		    BAD_CAST pool_elem_class_string(
+		    (pool_elem_t *)elem)) == NULL) {
 			pool_seterror(POE_DATASTORE);
 			(void) pool_xml_elem_remove((pool_elem_t *)elem);
 			return (NULL);
@@ -1908,7 +1906,8 @@ pool_xml_set_container(pool_elem_t *pp, pool_elem_t *pc)
 
 	xmlUnlinkNode(pxc->pxe_node);
 	if (xmlAddChild(pxp->pxe_node, pxc->pxe_node) == NULL) {
-		xmlAddChild(parent, pxc->pxe_node); /* Try to move back */
+		/* Try to move back */
+		(void) xmlAddChild(parent, pxc->pxe_node);
 		pool_seterror(POE_INVALID_CONF);
 		return (PO_FAIL);
 	}
@@ -2326,7 +2325,7 @@ pool_build_xpath_buf(pool_xml_connection_t *prov, const pool_elem_t *src,
 				prop_name = attr_name;
 				if (class == PEC_RES_COMP ||
 				    class == PEC_RES_AGG ||
-				class == PEC_COMP) {
+				    class == PEC_COMP) {
 					if (type_prefix != NULL)
 						free(type_prefix);
 					type_prefix = strdup(prefix);
@@ -2412,8 +2411,10 @@ pool_build_xpath_buf(pool_xml_connection_t *prov, const pool_elem_t *src,
 				char *where = strrchr(cb->cb_buf, '[');
 				if (is_attr != PO_TRUE) {
 					/* repeat */
-					while (*--where != '[');
-					while (*--where != '[');
+					while (*--where != '[')
+						;
+					while (*--where != '[')
+						;
 				}
 				*(where - 1) = 'o';
 				*where = 'r';

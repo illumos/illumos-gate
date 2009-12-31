@@ -871,7 +871,7 @@ drv_set_blksize(uint64_t size)
 	 * Supresse SILI
 	 */
 	if (size == 0) {
-		dm_ioctl(MTIOCREADIGNOREILI, &one);
+		(void) dm_ioctl(MTIOCREADIGNOREILI, &one);
 	}
 
 	return (0);
@@ -2068,7 +2068,7 @@ drv_proc_error(void)
 			serr->se_senkey = SUN_KEY_BOT;
 			break;
 		case DRV_EC_NEEDS_CLEANING :
-			dm_send_clean_request();
+			(void) dm_send_clean_request();
 			break;
 		case DRV_EC_FORMAT :
 			break;
@@ -2130,9 +2130,9 @@ drv_get_statistics(void)
 	    sizeof (dumpbuf));
 	TRACE((MMS_DEBUG, "log sense page 0x02:\n%s", dumpbuf));
 
-	dm_get_log_sense_parm(buf, 0x0003, &val);
+	(void) dm_get_log_sense_parm(buf, 0x0003, &val);
 	dca->dca_rcvd_write_err = val;
-	dm_get_log_sense_parm(buf, 0x0006, &val);
+	(void) dm_get_log_sense_parm(buf, 0x0006, &val);
 	dca->dca_write_err = val;
 
 	DRV_CALL(drv_log_sense, (buf, 80, 1, 0x03));
@@ -2140,9 +2140,9 @@ drv_get_statistics(void)
 	    sizeof (dumpbuf));
 	TRACE((MMS_DEBUG, "log sense page 0x03:\n%s", dumpbuf));
 
-	dm_get_log_sense_parm(buf, 0x0003, &val);
+	(void) dm_get_log_sense_parm(buf, 0x0003, &val);
 	dca->dca_rcvd_read_err = val;
-	dm_get_log_sense_parm(buf, 0x0006, &val);
+	(void) dm_get_log_sense_parm(buf, 0x0006, &val);
 	dca->dca_read_err = val;
 
 	DRV_CALL(drv_log_sense, (buf, 80, 1, 0x0c));
@@ -2150,14 +2150,14 @@ drv_get_statistics(void)
 	    sizeof (dumpbuf));
 	TRACE((MMS_DEBUG, "log sense page 0x0c:\n%s", dumpbuf));
 
-	dm_get_log_sense_parm(buf, 0x0000, &val);
+	(void) dm_get_log_sense_parm(buf, 0x0000, &val);
 	dca->dca_bytes_written = val;
-	dm_get_log_sense_parm(buf, 0x0001, &val);
+	(void) dm_get_log_sense_parm(buf, 0x0001, &val);
 	dca->dca_bytes_written_med = val;
 
-	dm_get_log_sense_parm(buf, 0x0003, &val);
+	(void) dm_get_log_sense_parm(buf, 0x0003, &val);
 	dca->dca_bytes_read = val;
-	dm_get_log_sense_parm(buf, 0x0002, &val);
+	(void) dm_get_log_sense_parm(buf, 0x0002, &val);
 	dca->dca_bytes_read_med = val;
 
 	return (0);

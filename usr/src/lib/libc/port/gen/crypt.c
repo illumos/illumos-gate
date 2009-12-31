@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #pragma	weak _crypt = crypt
 #pragma weak _encrypt = encrypt
@@ -791,7 +789,7 @@ _unix_crypt_gensalt(char *gsbuffer,
 	    "./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 	struct timeval tv;
 
-	gettimeofday(&tv, (void *) 0);
+	(void) gettimeofday(&tv, (void *) 0);
 	srand48(tv.tv_sec ^ tv.tv_usec);
 	gsbuffer[0] = saltchars[lrand48() % 64]; /* lrand48() is MT-SAFE */
 	gsbuffer[1] = saltchars[lrand48() % 64]; /* lrand48() is MT-SAFE */

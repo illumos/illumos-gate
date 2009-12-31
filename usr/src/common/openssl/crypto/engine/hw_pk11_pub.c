@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1350,7 +1350,7 @@ static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa,
 		goto malloc_err;
 		}
 
-	BN_bn2bin(rsa->n, a_key_template[5].pValue);
+	(void) BN_bn2bin(rsa->n, a_key_template[5].pValue);
 
 	a_key_template[6].ulValueLen = BN_num_bytes(rsa->e);
 	a_key_template[6].pValue = (CK_VOID_PTR)OPENSSL_malloc(
@@ -1361,7 +1361,7 @@ static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa,
 		goto malloc_err;
 		}
 
-	BN_bn2bin(rsa->e, a_key_template[6].pValue);
+	(void) BN_bn2bin(rsa->e, a_key_template[6].pValue);
 
 	/* see find_lock array definition for more info on object locking */
 	LOCK_OBJSTORE(OP_RSA);
@@ -1853,8 +1853,9 @@ pk11_dsa_do_verify(const unsigned char *dgst, int dlen, DSA_SIG *sig,
 		 * to act accordingly and shift if necessary.
 		 */
 		(void) memset(sigbuf, 0, siglen);
-		BN_bn2bin(sig->r, sigbuf + siglen2 - BN_num_bytes(sig->r));
-		BN_bn2bin(sig->s, &sigbuf[siglen2] + siglen2 -
+		(void) BN_bn2bin(sig->r,
+		    sigbuf + siglen2 - BN_num_bytes(sig->r));
+		(void) BN_bn2bin(sig->s, &sigbuf[siglen2] + siglen2 -
 		    BN_num_bytes(sig->s));
 
 		rv = pFuncList->C_Verify(sp->session,
@@ -2495,7 +2496,7 @@ static int pk11_DH_compute_key(unsigned char *key, const BIGNUM *pub_key,
 		PK11err(PK11_F_DH_COMP_KEY, PK11_R_MALLOC_FAILURE);
 		goto err;
 		}
-	BN_bn2bin(pub_key, mechanism.pParameter);
+	(void) BN_bn2bin(pub_key, mechanism.pParameter);
 
 	(void) check_new_dh_key(sp, dh);
 
@@ -2645,7 +2646,7 @@ static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh,
 		goto malloc_err;
 		}
 
-	BN_bn2bin(dh->p, key_template[4].pValue);
+	(void) BN_bn2bin(dh->p, key_template[4].pValue);
 
 	key_template[5].ulValueLen = BN_num_bytes(dh->g);
 	key_template[5].pValue = (CK_VOID_PTR)OPENSSL_malloc(
@@ -2656,7 +2657,7 @@ static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh,
 		goto malloc_err;
 		}
 
-	BN_bn2bin(dh->g, key_template[5].pValue);
+	(void) BN_bn2bin(dh->g, key_template[5].pValue);
 
 	key_template[6].ulValueLen = BN_num_bytes(dh->priv_key);
 	key_template[6].pValue = (CK_VOID_PTR)OPENSSL_malloc(
@@ -2667,7 +2668,7 @@ static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh,
 		goto malloc_err;
 		}
 
-	BN_bn2bin(dh->priv_key, key_template[6].pValue);
+	(void) BN_bn2bin(dh->priv_key, key_template[6].pValue);
 
 	/* see find_lock array definition for more info on object locking */
 	LOCK_OBJSTORE(OP_DH);
@@ -2796,7 +2797,7 @@ static int init_template_value(BIGNUM *bn, CK_VOID_PTR *p_value,
 	if (*p_value == NULL)
 		return (0);
 
-	BN_bn2bin(bn, *p_value);
+	(void) BN_bn2bin(bn, *p_value);
 
 	return (1);
 	}

@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * NSS keystore wrapper
  *
@@ -172,13 +173,13 @@ typedef struct p12uContextStr {
 KMF_PLUGIN_FUNCLIST *
 KMF_Plugin_Initialize()
 {
-	SEC_PKCS12EnableCipher(PKCS12_RC4_40, 1);
-	SEC_PKCS12EnableCipher(PKCS12_RC4_128, 1);
-	SEC_PKCS12EnableCipher(PKCS12_RC2_CBC_40, 1);
-	SEC_PKCS12EnableCipher(PKCS12_RC2_CBC_128, 1);
-	SEC_PKCS12EnableCipher(PKCS12_DES_56, 1);
-	SEC_PKCS12EnableCipher(PKCS12_DES_EDE3_168, 1);
-	SEC_PKCS12SetPreferredCipher(PKCS12_DES_EDE3_168, 1);
+	(void) SEC_PKCS12EnableCipher(PKCS12_RC4_40, 1);
+	(void) SEC_PKCS12EnableCipher(PKCS12_RC4_128, 1);
+	(void) SEC_PKCS12EnableCipher(PKCS12_RC2_CBC_40, 1);
+	(void) SEC_PKCS12EnableCipher(PKCS12_RC2_CBC_128, 1);
+	(void) SEC_PKCS12EnableCipher(PKCS12_DES_56, 1);
+	(void) SEC_PKCS12EnableCipher(PKCS12_DES_EDE3_168, 1);
+	(void) SEC_PKCS12SetPreferredCipher(PKCS12_DES_EDE3_168, 1);
 
 	return (&nss_plugin_table);
 }
@@ -797,7 +798,7 @@ InitRandom(char *filename)
 
 	count = read(fd, buf, sizeof (buf));
 	if (count > 0) {
-		PK11_RandomUpdate(buf, count);
+		(void) PK11_RandomUpdate(buf, count);
 	}
 
 	(void) close(fd);
@@ -973,9 +974,9 @@ NSS_CreateKeypair(KMF_HANDLE_T handle,
 cleanup:
 	if (rv != KMF_OK) {
 		if (NSSpubkey)
-			PK11_DeleteTokenPublicKey(NSSpubkey);
+			(void) PK11_DeleteTokenPublicKey(NSSpubkey);
 		if (NSSprivkey)
-			PK11_DeleteTokenPrivateKey(NSSprivkey, PR_TRUE);
+			(void) PK11_DeleteTokenPrivateKey(NSSprivkey, PR_TRUE);
 
 		privkey->keyp = NULL;
 		pubkey->keyp = NULL;
@@ -1627,12 +1628,12 @@ p12u_DestroyContext(p12uContext **ppCtx, PRBool removeFile)
 	}
 
 	if ((*ppCtx)->file != NULL) {
-		PR_Close((*ppCtx)->file);
+		(void) PR_Close((*ppCtx)->file);
 	}
 
 	if ((*ppCtx)->filename != NULL) {
 		if (removeFile) {
-			PR_Delete((*ppCtx)->filename);
+			(void) PR_Delete((*ppCtx)->filename);
 		}
 		free((*ppCtx)->filename);
 	}
@@ -1682,7 +1683,7 @@ p12u_WriteToExportFile(void *arg, const char *buf, unsigned long len)
 	writeLen = PR_Write(p12cxt->file, (unsigned char *)buf, (int32)len);
 
 	if (writeLen != (int)len) {
-		PR_Close(p12cxt->file);
+		(void) PR_Close(p12cxt->file);
 		free(p12cxt->filename);
 		p12cxt->filename = NULL;
 		p12cxt->file = NULL;
@@ -1978,7 +1979,7 @@ out:
 		PK11_FreeSlot(nss_slot);
 
 	if (rv != KMF_OK && nsskey != NULL) {
-		PK11_DeleteTokenSymKey(nsskey);
+		(void) PK11_DeleteTokenSymKey(nsskey);
 		PK11_FreeSymKey(nsskey);
 	}
 	return (rv);
@@ -2511,7 +2512,7 @@ out:
 	}
 
 	if (nss_crl != NULL) {
-		SEC_DestroyCrl(nss_crl);
+		(void) SEC_DestroyCrl(nss_crl);
 	}
 
 	return (ret);
@@ -2671,7 +2672,7 @@ out:
 	}
 
 	if (crl != NULL) {
-		SEC_DestroyCrl(crl);
+		(void) SEC_DestroyCrl(crl);
 	}
 
 	return (rv);
@@ -2886,7 +2887,7 @@ out:
 	}
 
 	if (crl != NULL) {
-		SEC_DestroyCrl(crl);
+		(void) SEC_DestroyCrl(crl);
 	}
 
 	return (rv);

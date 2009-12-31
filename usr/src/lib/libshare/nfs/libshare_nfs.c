@@ -1921,7 +1921,7 @@ nfs_enable_share(sa_share_t share)
 			ea.dname = path;
 			ea.uex = &export;
 
-			sa_sharetab_fill_zfs(share, &sh, "nfs");
+			(void) sa_sharetab_fill_zfs(share, &sh, "nfs");
 			err = sa_share_zfs(share, NULL, path, &sh,
 			    &ea, ZFS_SHARE_NFS);
 			if (err != SA_OK) {

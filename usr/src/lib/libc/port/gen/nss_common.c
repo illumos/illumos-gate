@@ -1896,7 +1896,7 @@ nss_unpack(void *buffer, size_t bufsize, nss_db_root_t *rootp,
 		arg->numgids = i;
 		gidp = arg->gid_array;
 		gptr = (gid_t *)((void *)buf);
-		memcpy(gidp, gptr, len);
+		(void) memcpy(gidp, gptr, len);
 		return (NSS_SUCCESS);
 	}
 	if (fmt_type == 2) {
