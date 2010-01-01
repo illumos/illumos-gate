@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -370,9 +370,9 @@ swrand_get_entropy(uint8_t *ptr, size_t len, boolean_t nonblock)
 
 		/* Figure out how many bytes to extract */
 		bytes = min(HASHSIZE, len);
-		bytes = min(bytes, entropy_bits/8);
-		entropy_bits -= bytes * 8;
-		BUMP_SWRAND_STATS(ss_entOut, bytes * 8);
+		bytes = min(bytes, CRYPTO_BITS2BYTES(entropy_bits));
+		entropy_bits -= CRYPTO_BYTES2BITS(bytes);
+		BUMP_SWRAND_STATS(ss_entOut, CRYPTO_BYTES2BITS(bytes));
 		swrand_stats.ss_entEst = entropy_bits;
 
 		/* Extract entropy by hashing pool content */
@@ -535,8 +535,8 @@ swrand_mix_pool(uint16_t entropy_est)
 	}
 
 	entropy_bits += entropy_est;
-	if (entropy_bits > RNDPOOLSIZE * 8)
-		entropy_bits = RNDPOOLSIZE * 8;
+	if (entropy_bits > CRYPTO_BYTES2BITS(RNDPOOLSIZE))
+		entropy_bits = CRYPTO_BYTES2BITS(RNDPOOLSIZE);
 
 	swrand_stats.ss_entEst = entropy_bits;
 	BUMP_SWRAND_STATS(ss_entIn, entropy_est);
@@ -608,7 +608,7 @@ physmem_ent_init(physmem_entsrc_t *entsrc)
 	 * The maximum entropy amount in bits per block of memory read is
 	 * log_2(MEMBLOCKSIZE * 8);
 	 */
-	i = MEMBLOCKSIZE << 3;
+	i = CRYPTO_BYTES2BITS(MEMBLOCKSIZE);
 	while (i >>= 1)
 		entsrc->entperblock++;
 
@@ -682,7 +682,7 @@ physmem_ent_gen(physmem_entsrc_t *entsrc)
 	for (i = 0; i < RNDPOOLSIZE/4; i++) {
 
 		/* If the pool is "full", stop after one block */
-		if (entropy_bits + ent >= RNDPOOLSIZE * 8) {
+		if (entropy_bits + ent >= CRYPTO_BYTES2BITS(RNDPOOLSIZE)) {
 			if (i > 0)
 				break;
 		}

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -247,7 +247,8 @@ rc4_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 	    crypto_kmflag(req))) == NULL)
 		return (CRYPTO_HOST_MEMORY);
 
-	arcfour_key_init(keystream, key->ck_data, key->ck_length >> 3);
+	arcfour_key_init(keystream, key->ck_data,
+	    CRYPTO_BITS2BYTES(key->ck_length));
 
 	ctx->cc_provider_private = keystream;
 

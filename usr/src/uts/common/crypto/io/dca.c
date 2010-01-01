@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -183,7 +183,8 @@ static crypto_mech_info_t dca_mech_info_tab2[] = {
 	{SUN_CKM_DSA, DSA_MECH_INFO_TYPE,
 	    CRYPTO_FG_SIGN | CRYPTO_FG_VERIFY |
 	    CRYPTO_FG_SIGN_ATOMIC | CRYPTO_FG_VERIFY_ATOMIC,
-	    DSA_MIN_KEY_LEN * 8, DSA_MAX_KEY_LEN * 8,
+	    CRYPTO_BYTES2BITS(DSA_MIN_KEY_LEN),
+	    CRYPTO_BYTES2BITS(DSA_MAX_KEY_LEN),
 	    CRYPTO_KEYSIZE_UNIT_IN_BITS},
 
 	/* RSA */
@@ -194,7 +195,8 @@ static crypto_mech_info_t dca_mech_info_tab2[] = {
 	    CRYPTO_FG_ENCRYPT_ATOMIC | CRYPTO_FG_DECRYPT_ATOMIC |
 	    CRYPTO_FG_SIGN_ATOMIC | CRYPTO_FG_SIGN_RECOVER_ATOMIC |
 	    CRYPTO_FG_VERIFY_ATOMIC | CRYPTO_FG_VERIFY_RECOVER_ATOMIC,
-	    RSA_MIN_KEY_LEN * 8, RSA_MAX_KEY_LEN * 8,
+	    CRYPTO_BYTES2BITS(RSA_MIN_KEY_LEN),
+	    CRYPTO_BYTES2BITS(RSA_MAX_KEY_LEN),
 	    CRYPTO_KEYSIZE_UNIT_IN_BITS},
 	{SUN_CKM_RSA_PKCS, RSA_PKCS_MECH_INFO_TYPE,
 	    CRYPTO_FG_ENCRYPT | CRYPTO_FG_DECRYPT | CRYPTO_FG_SIGN |
@@ -203,7 +205,8 @@ static crypto_mech_info_t dca_mech_info_tab2[] = {
 	    CRYPTO_FG_ENCRYPT_ATOMIC | CRYPTO_FG_DECRYPT_ATOMIC |
 	    CRYPTO_FG_SIGN_ATOMIC | CRYPTO_FG_SIGN_RECOVER_ATOMIC |
 	    CRYPTO_FG_VERIFY_ATOMIC | CRYPTO_FG_VERIFY_RECOVER_ATOMIC,
-	    RSA_MIN_KEY_LEN * 8, RSA_MAX_KEY_LEN * 8,
+	    CRYPTO_BYTES2BITS(RSA_MIN_KEY_LEN),
+	    CRYPTO_BYTES2BITS(RSA_MAX_KEY_LEN),
 	    CRYPTO_KEYSIZE_UNIT_IN_BITS}
 };
 
@@ -1672,9 +1675,9 @@ dca_newreq(dca_t *dca)
 #if defined(i386) || defined(__i386)
 	/*
 	 * Use kmem_alloc instead of ddi_dma_mem_alloc here since the latter
-	 * may fail on x86 platform if a physically contigous memory chunk
+	 * may fail on x86 platform if a physically contiguous memory chunk
 	 * cannot be found. From initial testing, we did not see performance
-	 * degration as seen on Sparc.
+	 * degradation as seen on Sparc.
 	 */
 	if ((reqp->dr_ibuf_kaddr = kmem_alloc(size, KM_SLEEP)) == NULL) {
 		dca_error(dca, "unable to alloc request ibuf memory");
@@ -1688,9 +1691,9 @@ dca_newreq(dca_t *dca)
 	}
 #else
 	/*
-	 * We could kmem_alloc for sparc too. However, it gives worse
-	 * performance when transfering more than one page data. For example,
-	 * using 4 threads and 12032 byte data and 3DES on 900MHZ sparc system,
+	 * We could kmem_alloc for Sparc too. However, it gives worse
+	 * performance when transferring more than one page data. For example,
+	 * using 4 threads and 12032 byte data and 3DES on 900MHZ Sparc system,
 	 * kmem_alloc uses 80% CPU and ddi_dma_mem_alloc uses 50% CPU for
 	 * the same throughput.
 	 */
@@ -1888,9 +1891,9 @@ dca_freereq(dca_request_t *reqp)
 
 /*
  * Binds user buffers to DMA handles dynamically. On Sparc, a user buffer
- * is mapped to a single physicall address. On x86, a user buffer is mapped
- * to multiple physically addresses. These phsyical addresses are chained
- * using the method specified in Broadcom BCM5820 specification
+ * is mapped to a single physical address. On x86, a user buffer is mapped
+ * to multiple physical addresses. These physical addresses are chained
+ * using the method specified in Broadcom BCM5820 specification.
  */
 int
 dca_bindchains(dca_request_t *reqp, size_t incnt, size_t outcnt)

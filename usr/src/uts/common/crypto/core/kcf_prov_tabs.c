@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -157,7 +157,7 @@ kcf_prov_tab_rem_provider(crypto_provider_id_t prov_id)
 	kcf_provider_desc_t *prov_desc;
 
 	ASSERT(prov_tab != NULL);
-	ASSERT(prov_tab_num >= 0);
+	ASSERT(prov_tab_num != (uint_t)-1); /* underflow */
 
 	/*
 	 * Validate provider id, since it can be specified by a 3rd-party
@@ -652,7 +652,7 @@ again:
 			bcopy(p, final_buffer, final_size);
 		}
 		kmem_free(p, n);
-		p = (kcf_provider_desc_t **)final_buffer;
+		p = (kcf_provider_desc_t **)(void *)final_buffer;
 	}
 out:
 	*count = cnt;
@@ -757,7 +757,7 @@ again:
 			bcopy(p, final_buffer, final_size);
 		}
 		kmem_free(p, n);
-		p = (kcf_provider_desc_t **)final_buffer;
+		p = (kcf_provider_desc_t **)(void *)final_buffer;
 	}
 	cnt = j;
 out:

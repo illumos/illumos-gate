@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -567,12 +567,12 @@ bitrepeat(uint8_t *pattern, uint_t len_bytes, uint_t len_bits, uint8_t *dst,
 {
 /* EXPORT DELETE START */
 	uint8_t *current = dst;
-	uint_t bitsleft = dst_len_bytes << 3;
+	uint_t bitsleft = CRYPTO_BYTES2BITS(dst_len_bytes);
 	uint_t bitoffset = 0;
 	uint_t currentbits;
 	int i;
 
-	BLOWFISH_ASSERT(((len_bits + 7) >> 3) == len_bytes);
+	BLOWFISH_ASSERT(CRYPTO_BITS2BYTES(len_bits) == len_bytes);
 
 	bzero(dst, dst_len_bytes);
 

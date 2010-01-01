@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,7 +106,6 @@ static int sign_verify_init(dev_t, caddr_t, int, int (*)(crypto_provider_t,
 static int sign_verify_update(dev_t dev, caddr_t arg, int mode,
     int (*)(crypto_context_t, crypto_data_t *, crypto_call_req_t *));
 
-static void crypto_initialize_rctl(void);
 static void crypto_release_provider_session(crypto_minor_t *,
     crypto_provider_session_t *);
 static int crypto_buffer_check(size_t);
@@ -433,7 +432,7 @@ crypto_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	return (DDI_SUCCESS);
 }
 
-/* ARGSUSED */
+/* ARGSUSED3 */
 static int
 crypto_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 {
@@ -527,7 +526,7 @@ again:
 	return (0);
 }
 
-/* ARGSUSED */
+/* ARGSUSED1 */
 static int
 crypto_close(dev_t dev, int flag, int otyp, cred_t *credp)
 {
@@ -1079,8 +1078,12 @@ static int
 get_all_mechanism_info(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_get_all_mechanism_info, get_all_mech);
+#ifdef _LP64
+	STRUCT_DECL(crypto_mechanism_info, mi);
+#else
 	/* LINTED E_FUNC_SET_NOT_USED */
 	STRUCT_DECL(crypto_mechanism_info, mi);
+#endif
 	crypto_mech_name_t mech_name;
 	crypto_mech_type_t mech_type;
 	crypto_mechanism_info_t *mech_infos = NULL;
@@ -1960,7 +1963,7 @@ again:
 	    CRYPTO_SUCCESS) {
 		sp->sd_pre_approved_amount = 0;
 	} else {
-		sp->sd_pre_approved_amount = crypto_pre_approved_limit;
+		sp->sd_pre_approved_amount = (int)crypto_pre_approved_limit;
 	}
 
 	cm->cm_session_table[i] = sp;
@@ -2362,14 +2365,15 @@ copyin_key(int mode, crypto_session_data_t *sp, crypto_key_t *in_key,
 	case CRYPTO_KEY_RAW:
 		key_bits = STRUCT_FGET(key, ck_length);
 		if (key_bits != 0) {
-			key_bytes = CRYPTO_BITS2BYTES(key_bits);
-			if (key_bytes > crypto_max_buffer_len) {
+			if (key_bits >
+			    (CRYPTO_BYTES2BITS(crypto_max_buffer_len))) {
 				cmn_err(CE_NOTE, "copyin_key: buffer greater "
 				    "than %ld bytes, pid = %d",
 				    crypto_max_buffer_len, curproc->p_pid);
 				rv = CRYPTO_ARGUMENTS_BAD;
 				goto out;
 			}
+			key_bytes = CRYPTO_BITS2BYTES(key_bits);
 
 			rv = CRYPTO_BUFFER_CHECK(sp, key_bytes,
 			    *out_rctl_chk);
@@ -2389,7 +2393,7 @@ copyin_key(int mode, crypto_session_data_t *sp, crypto_key_t *in_key,
 				goto out;
 			}
 		}
-		out_key->ck_length = key_bits;
+		out_key->ck_length = (ulong_t)key_bits;
 		break;
 
 	case CRYPTO_KEY_ATTR_LIST:
@@ -2832,7 +2836,8 @@ cipher(dev_t dev, caddr_t arg, int mode,
 			error = EFAULT;
 			goto release_minor;
 		}
-		STRUCT_FSET(encrypt, ce_encrlen, encr.cd_length);
+		STRUCT_FSET(encrypt, ce_encrlen,
+		    (ulong_t)encr.cd_length);
 	}
 
 	if (rv == CRYPTO_BUFFER_TOO_SMALL) {
@@ -2843,7 +2848,8 @@ cipher(dev_t dev, caddr_t arg, int mode,
 		 */
 		if (STRUCT_FGETP(encrypt, ce_encrbuf) == NULL)
 			rv = CRYPTO_SUCCESS;
-		STRUCT_FSET(encrypt, ce_encrlen, encr.cd_length);
+		STRUCT_FSET(encrypt, ce_encrlen,
+		    (ulong_t)encr.cd_length);
 	}
 
 release_minor:
@@ -2998,7 +3004,8 @@ cipher_update(dev_t dev, caddr_t arg, int mode,
 			if (STRUCT_FGETP(encrypt_update, eu_encrbuf) == NULL)
 				rv = CRYPTO_SUCCESS;
 		}
-		STRUCT_FSET(encrypt_update, eu_encrlen, encr.cd_length);
+		STRUCT_FSET(encrypt_update, eu_encrlen,
+		    (ulong_t)encr.cd_length);
 	} else {
 		CRYPTO_CANCEL_CTX(ctxpp);
 	}
@@ -3134,7 +3141,8 @@ common_final(dev_t dev, caddr_t arg, int mode,
 			error = EFAULT;
 			goto release_minor;
 		}
-		STRUCT_FSET(encrypt_final, ef_encrlen, encr.cd_length);
+		STRUCT_FSET(encrypt_final, ef_encrlen,
+		    (ulong_t)encr.cd_length);
 	}
 
 	if (rv == CRYPTO_BUFFER_TOO_SMALL) {
@@ -3145,7 +3153,8 @@ common_final(dev_t dev, caddr_t arg, int mode,
 		 */
 		if (STRUCT_FGETP(encrypt_final, ef_encrbuf) == NULL)
 			rv = CRYPTO_SUCCESS;
-		STRUCT_FSET(encrypt_final, ef_encrlen, encr.cd_length);
+		STRUCT_FSET(encrypt_final, ef_encrlen,
+		    (ulong_t)encr.cd_length);
 	}
 
 release_minor:
@@ -3511,7 +3520,8 @@ common_digest(dev_t dev, caddr_t arg, int mode,
 			error = EFAULT;
 			goto release_minor;
 		}
-		STRUCT_FSET(crypto_digest, cd_digestlen, digest.cd_length);
+		STRUCT_FSET(crypto_digest, cd_digestlen,
+		    (ulong_t)digest.cd_length);
 	}
 
 	if (rv == CRYPTO_BUFFER_TOO_SMALL) {
@@ -3522,7 +3532,8 @@ common_digest(dev_t dev, caddr_t arg, int mode,
 		 */
 		if (STRUCT_FGETP(crypto_digest, cd_digestbuf) == NULL)
 			rv = CRYPTO_SUCCESS;
-		STRUCT_FSET(crypto_digest, cd_digestlen, digest.cd_length);
+		STRUCT_FSET(crypto_digest, cd_digestlen,
+		    (ulong_t)digest.cd_length);
 	}
 
 release_minor:
@@ -4484,9 +4495,9 @@ copyout_attributes(int mode, caddr_t out, uint_t count,
 		bcopy(p, STRUCT_BUF(oa), STRUCT_SIZE(oa));
 		value_len = k_attrs[i].oa_value_len;
 		STRUCT_FSET(oa, oa_type, k_attrs[i].oa_type);
-		STRUCT_FSET(oa, oa_value_len, value_len);
+		STRUCT_FSET(oa, oa_value_len, (ssize_t)value_len);
 		valuep = STRUCT_FGETP(oa, oa_value);
-		if (valuep != NULL && value_len != -1) {
+		if ((valuep != NULL) && (value_len != (size_t)-1)) {
 			if (copyout(k_attrs[i].oa_value,
 			    valuep, value_len) != 0) {
 				error = EFAULT;
@@ -4766,8 +4777,12 @@ static int
 object_get_attribute_value(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_object_get_attribute_value, get_attribute_value);
+#ifdef _LP64
+	STRUCT_DECL(crypto_object_attribute, oa);
+#else
 	/* LINTED E_FUNC_SET_NOT_USED */
 	STRUCT_DECL(crypto_object_attribute, oa);
+#endif
 	kcf_provider_desc_t *real_provider;
 	kcf_req_params_t params;
 	crypto_object_attribute_t *k_attrs = NULL;
@@ -4910,7 +4925,7 @@ object_get_size(dev_t dev, caddr_t arg, int mode, int *rval)
 	KCF_PROV_REFRELE(real_provider);
 
 	if (rv == CRYPTO_SUCCESS) {
-		STRUCT_FSET(object_get_size, gs_size, size);
+		STRUCT_FSET(object_get_size, gs_size, (ulong_t)size);
 	}
 
 release_minor:
@@ -5410,8 +5425,12 @@ static int
 nostore_generate_key(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_nostore_generate_key, generate_key);
+#ifdef _LP64
+	STRUCT_DECL(crypto_object_attribute, oa);
+#else
 	/* LINTED E_FUNC_SET_NOT_USED */
 	STRUCT_DECL(crypto_object_attribute, oa);
+#endif
 	kcf_provider_desc_t *real_provider = NULL;
 	kcf_req_params_t params;
 	crypto_mechanism_t mech;
@@ -5700,8 +5719,12 @@ static int
 nostore_generate_key_pair(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_nostore_generate_key_pair, generate_key_pair);
+#ifdef _LP64
+	STRUCT_DECL(crypto_object_attribute, oa);
+#else
 	/* LINTED E_FUNC_SET_NOT_USED */
 	STRUCT_DECL(crypto_object_attribute, oa);
+#endif
 	kcf_provider_desc_t *real_provider = NULL;
 	kcf_req_params_t params;
 	crypto_mechanism_t mech;
@@ -6000,7 +6023,8 @@ object_wrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 		    wrapped_key_buffer, new_wrapped_key_len) != 0) {
 			error = EFAULT;
 		}
-		STRUCT_FSET(wrap_key, wk_wrapped_key_len, new_wrapped_key_len);
+		STRUCT_FSET(wrap_key, wk_wrapped_key_len,
+		    (ulong_t)new_wrapped_key_len);
 	}
 
 	if (rv == CRYPTO_BUFFER_TOO_SMALL) {
@@ -6011,7 +6035,8 @@ object_wrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 		 */
 		if (STRUCT_FGETP(wrap_key, wk_wrapped_key) == NULL)
 			rv = CRYPTO_SUCCESS;
-		STRUCT_FSET(wrap_key, wk_wrapped_key_len, new_wrapped_key_len);
+		STRUCT_FSET(wrap_key, wk_wrapped_key_len,
+		    (ulong_t)new_wrapped_key_len);
 	}
 
 out:
@@ -6367,8 +6392,12 @@ static int
 nostore_derive_key(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_nostore_derive_key, derive_key);
+#ifdef _LP64
+	STRUCT_DECL(crypto_object_attribute, oa);
+#else
 	/* LINTED E_FUNC_SET_NOT_USED */
 	STRUCT_DECL(crypto_object_attribute, oa);
+#endif
 	kcf_provider_desc_t *real_provider = NULL;
 	kcf_req_params_t params;
 	crypto_object_attribute_t *k_in_attrs = NULL;

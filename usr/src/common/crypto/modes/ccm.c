@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -731,7 +731,7 @@ encode_adata_len(ulong_t auth_data_len, uint8_t *encoded, size_t *encoded_len)
 		encoded[0] = 0xff;
 		encoded[1] = 0xfe;
 #ifdef UNALIGNED_POINTERS_PERMITTED
-		lencoded_ptr = (uint32_t *)&encoded[2];
+		lencoded_ptr = (uint32_t *)(void *)&encoded[2];
 		*lencoded_ptr = htonl(auth_data_len);
 #else
 		encoded[2] = (auth_data_len & 0xff000000) >> 24;
@@ -747,7 +747,7 @@ encode_adata_len(ulong_t auth_data_len, uint8_t *encoded, size_t *encoded_len)
 		encoded[0] = 0xff;
 		encoded[1] = 0xff;
 #ifdef UNALIGNED_POINTERS_PERMITTED
-		llencoded_ptr = (uint64_t *)&encoded[2];
+		llencoded_ptr = (uint64_t *)(void *)&encoded[2];
 		*llencoded_ptr = htonl(auth_data_len);
 #else
 		encoded[2] = (auth_data_len & 0xff00000000000000) >> 56;
@@ -861,7 +861,7 @@ ccm_init_ctx(ccm_ctx_t *ccm_ctx, char *param, int kmflag,
 	CK_AES_CCM_PARAMS *ccm_param;
 
 	if (param != NULL) {
-		ccm_param = (CK_AES_CCM_PARAMS *)param;
+		ccm_param = (CK_AES_CCM_PARAMS *)(void *)param;
 
 		if ((rv = ccm_validate_args(ccm_param,
 		    is_encrypt_init)) != 0) {

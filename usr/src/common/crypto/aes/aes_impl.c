@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1597,7 +1597,7 @@ aes_init_keysched(const uint8_t *cipherKey, uint_t keyBits, void *keysched)
 		/* should never get here */
 		return;
 	}
-	keysize = keyBits >> 3;
+	keysize = CRYPTO_BITS2BYTES(keyBits);
 
 	/*
 	 * For _LITTLE_ENDIAN machines (except AMD64), reverse every

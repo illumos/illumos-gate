@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -430,8 +430,8 @@ rngprov_task(void *arg)
 static int
 rnd_get_bytes(uint8_t *ptr, size_t len, extract_type_t how)
 {
-	size_t bytes;
-	size_t got;
+	size_t	bytes;
+	int	got;
 
 	ASSERT(mutex_owned(&rndpool_lock));
 	/*

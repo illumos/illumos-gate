@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -8846,7 +8846,7 @@ dprov_key_value_secret(dprov_state_t *softc, crypto_session_id_t session_id,
 		 * The length of the array is expressed in bytes.
 		 * Convert to bits now since that's how keys are measured.
 		 */
-		len  = len << 3;
+		len  = CRYPTO_BYTES2BITS(len);
 
 		/* optional */
 		if ((dprov_get_key_attr_ulong(key, DPROV_CKA_VALUE_LEN,
@@ -8907,7 +8907,7 @@ dprov_key_value_secret(dprov_state_t *softc, crypto_session_id_t session_id,
 		 * The length of attributes are in bytes.
 		 * Convert to bits now since that's how keys are measured.
 		 */
-		len  = len << 3;
+		len  = CRYPTO_BYTES2BITS(len);
 
 		ret_key->ck_data = value;
 		ret_key->ck_length = (uint_t)len;

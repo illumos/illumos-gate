@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -178,7 +178,7 @@ crypto_cipher_init_prov(crypto_provider_t provider, crypto_session_id_t sid,
 			 * the provider in order to do a comparison.
 			 */
 			if (sinfo->cm_mech_flags & CRYPTO_KEYSIZE_UNIT_IN_BYTES)
-				tlen = key->ck_length >> 3;
+				tlen = CRYPTO_BITS2BYTES(key->ck_length);
 			else
 				tlen = key->ck_length;
 			/*

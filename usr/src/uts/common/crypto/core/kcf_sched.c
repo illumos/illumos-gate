@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1604,7 +1604,7 @@ kcf_failover_thread()
 		 * We check the kp_threads since kcfd could have started
 		 * while we are waiting on the global software queue.
 		 */
-		if (kcfpool->kp_threads <= 0 && !is_logged) {
+		if ((kcfpool->kp_threads == 0) && !is_logged) {
 			cmn_err(CE_WARN, "kcfd is not running. Please check "
 			    "and restart kcfd. Using the failover kernel "
 			    "thread for now.\n");
@@ -1879,7 +1879,7 @@ kcf_alloc_req(crypto_call_req_t *crq)
 	if (kcr == NULL)
 		return (NULL);
 
-	/* Copy the whole crypto_call_req struct, as it isn't persistant */
+	/* Copy the whole crypto_call_req struct, as it isn't persistent */
 	if (crq != NULL)
 		kcr->kr_callreq = *crq;
 	else
@@ -1907,7 +1907,7 @@ kcf_next_req(void *next_req_arg, int status)
 	kcf_provider_desc_t *pd;
 	crypto_dual_data_t *ct;
 
-	/* Stop the processing if an error occured at this step */
+	/* Stop the processing if an error occurred at this step */
 	if (error != CRYPTO_SUCCESS) {
 out:
 		areq->an_reqarg = next_req->kr_callreq;

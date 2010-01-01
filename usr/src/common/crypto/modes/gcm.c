@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -120,7 +120,9 @@ gcm_mul(uint64_t *x_in, uint64_t *y, uint64_t *res)
 
 #define	GHASH(c, d, t) \
 	xor_block((uint8_t *)(d), (uint8_t *)(c)->gcm_ghash); \
-	gcm_mul((uint64_t *)(c)->gcm_ghash, (c)->gcm_H, (uint64_t *)(t));
+	gcm_mul((uint64_t *)(void *)(c)->gcm_ghash, (c)->gcm_H, \
+	(uint64_t *)(void *)(t));
+
 
 /*
  * Encrypt multiple blocks of data in GCM mode.  Decrypt for GCM mode
@@ -299,7 +301,8 @@ gcm_encrypt_final(gcm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
 		ctx->gcm_processed_data_len += ctx->gcm_remainder_len;
 	}
 
-	ctx->gcm_len_a_len_c[1] = htonll(ctx->gcm_processed_data_len << 3);
+	ctx->gcm_len_a_len_c[1] =
+	    htonll(CRYPTO_BYTES2BITS(ctx->gcm_processed_data_len));
 	GHASH(ctx, ctx->gcm_len_a_len_c, ghash);
 	encrypt_block(ctx->gcm_keysched, (uint8_t *)ctx->gcm_J0,
 	    (uint8_t *)ctx->gcm_J0);
@@ -461,7 +464,7 @@ gcm_decrypt_final(gcm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
 		}
 	}
 out:
-	ctx->gcm_len_a_len_c[1] = htonll(pt_len << 3);
+	ctx->gcm_len_a_len_c[1] = htonll(CRYPTO_BYTES2BITS(pt_len));
 	GHASH(ctx, ctx->gcm_len_a_len_c, ghash);
 	encrypt_block(ctx->gcm_keysched, (uint8_t *)ctx->gcm_J0,
 	    (uint8_t *)ctx->gcm_J0);
@@ -547,7 +550,7 @@ gcm_format_initial_blocks(uchar_t *iv, ulong_t iv_len,
 		} while (remainder > 0);
 
 		len_a_len_c[0] = 0;
-		len_a_len_c[1] = htonll(iv_len << 3);
+		len_a_len_c[1] = htonll(CRYPTO_BYTES2BITS(iv_len));
 		GHASH(ctx, len_a_len_c, ctx->gcm_J0);
 
 		/* J0 will be used again in the final */
@@ -618,7 +621,7 @@ gcm_init_ctx(gcm_ctx_t *gcm_ctx, char *param, size_t block_size,
 	CK_AES_GCM_PARAMS *gcm_param;
 
 	if (param != NULL) {
-		gcm_param = (CK_AES_GCM_PARAMS *)param;
+		gcm_param = (CK_AES_GCM_PARAMS *)(void *)param;
 
 		if ((rv = gcm_validate_args(gcm_param)) != 0) {
 			return (rv);
@@ -629,7 +632,8 @@ gcm_init_ctx(gcm_ctx_t *gcm_ctx, char *param, size_t block_size,
 		gcm_ctx->gcm_processed_data_len = 0;
 
 		/* these values are in bits */
-		gcm_ctx->gcm_len_a_len_c[0] = htonll(gcm_param->ulAADLen << 3);
+		gcm_ctx->gcm_len_a_len_c[0]
+		    = htonll(CRYPTO_BYTES2BITS(gcm_param->ulAADLen));
 
 		rv = CRYPTO_SUCCESS;
 		gcm_ctx->gcm_flags |= GCM_MODE;
@@ -657,13 +661,14 @@ gmac_init_ctx(gcm_ctx_t *gcm_ctx, char *param, size_t block_size,
 	CK_AES_GMAC_PARAMS *gmac_param;
 
 	if (param != NULL) {
-		gmac_param = (CK_AES_GMAC_PARAMS *)param;
+		gmac_param = (CK_AES_GMAC_PARAMS *)(void *)param;
 
 		gcm_ctx->gcm_tag_len = CRYPTO_BITS2BYTES(AES_GMAC_TAG_BITS);
 		gcm_ctx->gcm_processed_data_len = 0;
 
 		/* these values are in bits */
-		gcm_ctx->gcm_len_a_len_c[0] = htonll(gmac_param->ulAADLen << 3);
+		gcm_ctx->gcm_len_a_len_c[0]
+		    = htonll(CRYPTO_BYTES2BITS(gmac_param->ulAADLen));
 
 		rv = CRYPTO_SUCCESS;
 		gcm_ctx->gcm_flags |= GMAC_MODE;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,8 +46,8 @@
  * variable defined as caddr_t *.
  */
 #define	KCF_PROV_NULL_ENTRY_POINT(pd, o1, o2, ops)			\
-	(ops = (caddr_t *)((caddr_t)(pd)->pd_ops_vector + (o1)),	\
-	(*ops == NULL || *(caddr_t *)((caddr_t)(*ops) + (o2)) == NULL))
+	(ops = (caddr_t *)(void *)((caddr_t)(pd)->pd_ops_vector + (o1)), \
+	(*ops == NULL || *(caddr_t *)(void *)((caddr_t)(*ops) + (o2)) == NULL))
 
 
 static int kcf_emulate_dual(kcf_provider_desc_t *, crypto_ctx_t *,
@@ -136,7 +136,7 @@ kcf_check_prov_mech_keylen(kcf_provider_desc_t *provider,
 				/* modulus length is returned in bytes */
 				if (mech_info->cm_mech_flags &
 				    CRYPTO_KEYSIZE_UNIT_IN_BITS)
-					keylen = attr_len * 8;
+					keylen = CRYPTO_BYTES2BITS(attr_len);
 				else
 					keylen = attr_len;
 			/* Check prime for DH/DSA operations. */
@@ -145,7 +145,7 @@ kcf_check_prov_mech_keylen(kcf_provider_desc_t *provider,
 				/* prime length is returned in bytes */
 				if (mech_info->cm_mech_flags &
 				    CRYPTO_KEYSIZE_UNIT_IN_BITS)
-					keylen = attr_len * 8;
+					keylen = CRYPTO_BYTES2BITS(attr_len);
 				else
 					keylen = attr_len;
 			}

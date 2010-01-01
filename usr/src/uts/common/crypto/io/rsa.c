@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -928,7 +928,8 @@ core_rsa_decrypt(crypto_key_t *key, uchar_t *in, int in_len,
 		return (CRYPTO_HOST_MEMORY);
 
 	/* psize and qsize for RSA_key_init is in bits. */
-	if (RSA_key_init(rsakey, prime2_len * 8, prime1_len * 8) != BIG_OK) {
+	if (RSA_key_init(rsakey, CRYPTO_BYTES2BITS(prime2_len),
+	    CRYPTO_BYTES2BITS(prime1_len)) != BIG_OK) {
 		rv = CRYPTO_HOST_MEMORY;
 		goto clean1;
 	}

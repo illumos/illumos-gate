@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -162,7 +162,7 @@ typedef struct CK_ECDH1_DERIVE_PARAMS32 {
 
 /*
  * The measurement unit bit flag for a mechanism's minimum or maximum key size.
- * The unit are mechanism dependant.  It can be in bits or in bytes.
+ * The unit are mechanism dependent.  It can be in bits or in bytes.
  */
 typedef uint32_t crypto_keysize_unit_t;
 
@@ -387,8 +387,10 @@ typedef struct crypto_key32 {
  * Raw key lengths are expressed in number of bits.
  * The following macro returns the minimum number of
  * bytes that can contain the specified number of bits.
+ * Round up without overflowing the integer type.
  */
-#define	CRYPTO_BITS2BYTES(n) (((n) + 7) >> 3)
+#define	CRYPTO_BITS2BYTES(n) ((n) == 0 ? 0 : (((n) - 1) >> 3) + 1)
+#define	CRYPTO_BYTES2BITS(n) ((n) << 3)
 
 /* Providers */
 

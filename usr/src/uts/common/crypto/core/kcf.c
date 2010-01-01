@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -282,7 +282,7 @@ kcf_fips140_integrity_check()
 
 	KCF_FRMWRK_DEBUG(1, ("Integrity Check door returned = %d\n", ret));
 
-	rkda = (kcf_door_arg_t *)darg.rbuf;
+	rkda = (kcf_door_arg_t *)(void *)darg.rbuf;
 	if (rkda->da_u.result.status != ELFSIGN_SUCCESS) {
 		ret = 1;
 		KCF_FRMWRK_DEBUG(1, ("Integrity Check failed = %d\n",
@@ -421,8 +421,8 @@ kcf_get_modctl(crypto_provider_info_t *pinfo)
 		major_t major;
 		char *drvmod;
 
-		if ((major =
-		    ddi_driver_major(pinfo->pi_provider_dev.pd_hw)) != -1) {
+		if ((major = ddi_driver_major(pinfo->pi_provider_dev.pd_hw))
+		    != DDI_MAJOR_T_NONE) {
 			drvmod = ddi_major_to_name(major);
 			mctlp = mod_find_by_filename("drv", drvmod);
 		} else
@@ -655,7 +655,7 @@ kcf_verify_signature(void *arg)
 	rv = door_ki_upcall_limited(ldh, &darg, NULL, SIZE_MAX, 0);
 
 	if (rv == 0) {
-		kcf_door_arg_t *rkda =  (kcf_door_arg_t *)darg.rbuf;
+		kcf_door_arg_t *rkda = (kcf_door_arg_t *)(void *)darg.rbuf;
 
 		KCF_FRMWRK_DEBUG(2,
 		    ("passed: %d\n", rkda->da_u.result.status));

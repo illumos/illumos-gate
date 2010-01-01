@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -297,7 +297,7 @@ crypto_copy_key_to_ctx(crypto_key_t *in_key, crypto_key_t **out_key,
 	key = kmem_alloc(len, kmflag);
 	if (key == NULL)
 		return (CRYPTO_HOST_MEMORY);
-	k_attrs = (crypto_object_attribute_t *)((caddr_t)key +
+	k_attrs = (crypto_object_attribute_t *)(void *)((caddr_t)key +
 	    sizeof (crypto_key_t));
 
 	attr_val = (caddr_t)k_attrs +

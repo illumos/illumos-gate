@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This makefile drives the production of the Kernel Cryptographic
@@ -58,21 +58,16 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-
-LINTTAGS	+= -I$(COM_DIR)
-
-#
 # Linkage dependencies
 #
 
+#
+# lint pass one enforcement
+#
 CFLAGS		+= $(CCVERBOSE) -I$(COM_DIR)
 AS_CPPFLAGS	+= -I../../$(PLATFORM)
+
+LINTTAGS	+= -I$(COM_DIR)
 
 #
 #	Default build targets.
