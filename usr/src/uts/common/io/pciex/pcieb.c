@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -460,7 +460,7 @@ pcieb_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 {
 	dev_info_t *pdip;
 
-	if (PCIE_IS_RP(PCIE_DIP2BUS(dip))) {
+	if (PCIE_IS_RP(PCIE_DIP2BUS(dip)) && mp->map_handlep != NULL) {
 		ddi_acc_impl_t *hdlp =
 		    (ddi_acc_impl_t *)(mp->map_handlep)->ah_platform_private;
 

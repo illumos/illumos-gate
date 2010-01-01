@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -451,7 +451,8 @@ ppb_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	ppb_devstate_t *ppb = ddi_get_soft_state(ppb_state,
 	    ddi_get_instance(dip));
 
-	if (strcmp(ddi_driver_name(ddi_get_parent(dip)), "npe") == 0) {
+	if (strcmp(ddi_driver_name(ddi_get_parent(dip)), "npe") == 0 &&
+	    mp->map_handlep != NULL) {
 		ddi_acc_impl_t *hdlp =
 		    (ddi_acc_impl_t *)(mp->map_handlep)->ah_platform_private;
 		hdlp->ahi_err_mutexp = &ppb->ppb_err_mutex;

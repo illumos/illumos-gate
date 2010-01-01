@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -344,12 +344,14 @@ pci_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	mr = *mp; /* Get private copy of request */
 	mp = &mr;
 
-	pcip = ddi_get_soft_state(pci_statep, ddi_get_instance(dip));
-	hdlp = (ddi_acc_impl_t *)(mp->map_handlep)->ah_platform_private;
-	hdlp->ahi_err_mutexp = &pcip->pci_err_mutex;
-	hdlp->ahi_peekpoke_mutexp = &pcip->pci_peek_poke_mutex;
-	hdlp->ahi_scan_dip = dip;
-	hdlp->ahi_scan = pci_peekpoke_cb;
+	if (mp->map_handlep != NULL) {
+		pcip = ddi_get_soft_state(pci_statep, ddi_get_instance(dip));
+		hdlp = (ddi_acc_impl_t *)(mp->map_handlep)->ah_platform_private;
+		hdlp->ahi_err_mutexp = &pcip->pci_err_mutex;
+		hdlp->ahi_peekpoke_mutexp = &pcip->pci_peek_poke_mutex;
+		hdlp->ahi_scan_dip = dip;
+		hdlp->ahi_scan = pci_peekpoke_cb;
+	}
 
 	/*
 	 * check for register number
