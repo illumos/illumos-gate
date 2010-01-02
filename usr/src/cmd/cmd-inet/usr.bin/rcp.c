@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -380,15 +380,15 @@ main(int argc, char *argv[])
 		/*
 		 * See if encryption should be done for this realm
 		 */
-		profile_get_options_boolean(bsd_context->profile, realmdef,
-						option);
+		(void) profile_get_options_boolean(bsd_context->profile,
+		    realmdef, option);
 		/*
 		 * Check the appdefaults section
 		 */
-		profile_get_options_boolean(bsd_context->profile, appdef,
-						option);
-		profile_get_options_string(bsd_context->profile, appdef,
-						rcmdversion);
+		(void) profile_get_options_boolean(bsd_context->profile,
+		    appdef, option);
+		(void) profile_get_options_string(bsd_context->profile,
+		    appdef, rcmdversion);
 		if ((encrypt_done > 0) || (encrypt_flag > 0)) {
 			if (krb5_privacy_allowed() == TRUE) {
 				encrypt_flag++;
@@ -2148,7 +2148,8 @@ answer_auth(char *config_file, char *ccache_file)
 		exit(1);
 	}
 	/* setup eblock for des_read and write */
-	krb5_copy_keyblock(bsd_context, &new_creds->keyblock, &session_key);
+	(void) krb5_copy_keyblock(bsd_context,
+	    &new_creds->keyblock, &session_key);
 
 	/* OK process key */
 	eblock.crypto_entry = session_key->enctype;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -254,7 +254,7 @@ main(int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		}
 		if (realm != NULL)
-			krb5_set_default_realm(krb_context, realm);
+			(void) krb5_set_default_realm(krb_context, realm);
 		if (keytab_file != NULL) {
 			if ((status = krb5_kt_resolve(krb_context,
 						    keytab_file,

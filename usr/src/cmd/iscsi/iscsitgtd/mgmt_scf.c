@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1591,11 +1591,11 @@ pgname_encode(char *instr, char *outstr, int max_len)
 	for (; *instr != '\0'; instr++) {
 		switch (*instr) {
 		case ':':
-			strcpy(outstr + i, SMF_COLON);
+			(void) strcpy(outstr + i, SMF_COLON);
 			i += 3;
 			break;
 		case '.':
-			strcpy(outstr + i, SMF_DOT);
+			(void) strcpy(outstr + i, SMF_DOT);
 			i += 3;
 			break;
 		default:

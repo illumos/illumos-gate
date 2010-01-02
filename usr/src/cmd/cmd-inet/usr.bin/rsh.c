@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -467,15 +467,15 @@ main(int argc, char **argv)
 		 * Check the realms section in krb5.conf for encryption,
 		 * forward & forwardable info
 		 */
-		profile_get_options_boolean(bsd_context->profile, realmdef,
-						option);
+		(void) profile_get_options_boolean(bsd_context->profile,
+		    realmdef, option);
 		/*
 		 * Check the appdefaults section
 		 */
-		profile_get_options_boolean(bsd_context->profile, appdef,
-						option);
-		profile_get_options_string(bsd_context->profile, appdef,
-						rcmdversion);
+		(void) profile_get_options_boolean(bsd_context->profile,
+		    appdef, option);
+		(void) profile_get_options_string(bsd_context->profile,
+		    appdef, rcmdversion);
 		/*
 		 * Set the *_flag variables, if the corresponding *_done are
 		 * set to 1, because we dont want the config file values

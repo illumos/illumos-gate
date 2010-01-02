@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,8 +38,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Telnet server.
@@ -734,20 +732,19 @@ kerberos5_is(AuthInfo *ap, uchar_t *data, int cnt)
 
 		if (name != NULL)
 			free(name);
-		krb5_auth_con_getremotesubkey(telnet_context, auth_context,
-					    &newkey);
+		(void) krb5_auth_con_getremotesubkey(telnet_context,
+		    auth_context, &newkey);
 		if (session_key != NULL) {
 			krb5_free_keyblock(telnet_context, session_key);
 			session_key = 0;
 		}
 		if (newkey != NULL) {
-			krb5_copy_keyblock(telnet_context,
-					newkey, &session_key);
+			(void) krb5_copy_keyblock(telnet_context,
+			    newkey, &session_key);
 			krb5_free_keyblock(telnet_context, newkey);
 		} else {
-			krb5_copy_keyblock(telnet_context,
-				ticket->enc_part2->session,
-				&session_key);
+			(void) krb5_copy_keyblock(telnet_context,
+			    ticket->enc_part2->session, &session_key);
 		}
 
 		/*
@@ -862,7 +859,7 @@ errout:
 	syslog(LOG_ERR, "%s", errbuf);
 
 	if (auth_context != NULL) {
-		krb5_auth_con_free(telnet_context, auth_context);
+		(void) krb5_auth_con_free(telnet_context, auth_context);
 		auth_context = 0;
 	}
 }
@@ -2251,7 +2248,8 @@ main(int argc, char *argv[])
 						"requested, exiting");
 					exit(1);
 				}
-				krb5_set_default_realm(telnet_context, optarg);
+				(void) krb5_set_default_realm(telnet_context,
+				    optarg);
 				syslog(LOG_NOTICE,
 				    "using %s as default KRB5 realm", optarg);
 			}
@@ -4676,14 +4674,16 @@ local_setenv(const char *name, const char *value, int rewrite)
 		if (!rewrite)
 			return (0);
 		if ((int)strlen(c) >= l_value) { /* old larger; copy over */
-			while (*c++ = *value++);
+			while (*c++ = *value++)
+				;
 			return (0);
 		}
 	} else {					/* create new slot */
 		int cnt;
 		char **p;
 
-		for (p = environ, cnt = 0; *p; ++p, ++cnt);
+		for (p = environ, cnt = 0; *p; ++p, ++cnt)
+			;
 		if (alloced) {			/* just increase size */
 			environ = (char **)realloc((char *)environ,
 			    (size_t)(sizeof (char *) * (cnt + 2)));
@@ -4701,12 +4701,15 @@ local_setenv(const char *name, const char *value, int rewrite)
 		environ[cnt + 1] = NULL;
 		offset = cnt;
 	}
-	for (c = (char *)name; *c && *c != '='; ++c);	/* no `=' in name */
+	for (c = (char *)name; *c && *c != '='; ++c)	/* no `=' in name */
+		;
 	if (!(environ[offset] =			/* name + `=' + value */
 	    malloc((size_t)((int)(c - name) + l_value + 2))))
 		return (-1);
-	for (c = environ[offset]; ((*c = *name++) != 0) && (*c != '='); ++c);
-	for (*c++ = '='; *c++ = *value++; );
+	for (c = environ[offset]; ((*c = *name++) != 0) && (*c != '='); ++c)
+		;
+	for (*c++ = '='; *c++ = *value++; )
+		;
 	return (0);
 }
 

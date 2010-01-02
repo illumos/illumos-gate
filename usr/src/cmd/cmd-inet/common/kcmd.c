@@ -1,9 +1,7 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (c) 1983 Regents of the University of California.
@@ -414,7 +412,7 @@ kcmd(int *sock, char **ahost, ushort_t rport,
 	*sock = s;
 
 	/* pass back credentials if wanted */
-	if (cred) krb5_copy_creds(bsd_context, ret_cred, cred);
+	if (cred) (void) krb5_copy_creds(bsd_context, ret_cred, cred);
 		krb5_free_creds(bsd_context, ret_cred);
 	/*
 	 * Initialize *authconp to auth_context, so

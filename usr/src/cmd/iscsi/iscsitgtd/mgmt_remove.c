@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -164,13 +164,13 @@ remove_zfs(tgt_node_t *x, ucred_t *cred)
 		c = tgt_node_alloc(XML_ELEMENT_TPGT, String, prop);
 		if ((list = tgt_node_next(t, XML_ELEMENT_TPGTLIST, NULL)) !=
 		    NULL) {
-			tgt_node_remove(list, c, MatchBoth);
+			(void) tgt_node_remove(list, c, MatchBoth);
 			if (list->x_child == NULL)
 				(void) tgt_node_remove(t, list, MatchName);
 		}
 		if ((list = tgt_node_next(n, XML_ELEMENT_TPGTLIST, NULL)) !=
 		    NULL) {
-			tgt_node_remove(list, c, MatchBoth);
+			(void) tgt_node_remove(list, c, MatchBoth);
 			if (list->x_child == NULL)
 				(void) tgt_node_remove(n, list, MatchName);
 		}
@@ -203,13 +203,13 @@ remove_zfs(tgt_node_t *x, ucred_t *cred)
 		c = tgt_node_alloc(XML_ELEMENT_INIT, String, prop);
 		if ((list = tgt_node_next(t, XML_ELEMENT_ACLLIST, NULL)) !=
 		    NULL) {
-			tgt_node_remove(list, c, MatchBoth);
+			(void) tgt_node_remove(list, c, MatchBoth);
 			if (list->x_child == NULL)
 				(void) tgt_node_remove(t, list, MatchName);
 		}
 		if ((list = tgt_node_next(n, XML_ELEMENT_ACLLIST, NULL)) !=
 		    NULL) {
-			tgt_node_remove(list, c, MatchBoth);
+			(void) tgt_node_remove(list, c, MatchBoth);
 			if (list->x_child == NULL)
 				(void) tgt_node_remove(n, list, MatchName);
 		}
@@ -231,7 +231,7 @@ remove_zfs(tgt_node_t *x, ucred_t *cred)
 				syslog(LOG_INFO, "ISNS dereg failed\n");
 		}
 
-		tgt_node_remove(targets_config, t, MatchBoth);
+		(void) tgt_node_remove(targets_config, t, MatchBoth);
 
 		/*
 		 * Wait until here to issue a logout to any initiators that
@@ -524,7 +524,7 @@ remove_tpgt(tgt_node_t *x)
 	}
 	if ((change_made != True) &&
 	    (tgt_find_value_str(x, XML_ELEMENT_ALL, &prop) == True)) {
-		tgt_node_remove(main_config, node, MatchBoth);
+		(void) tgt_node_remove(main_config, node, MatchBoth);
 		change_made = True;
 		free(prop);
 	}

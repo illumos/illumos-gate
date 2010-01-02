@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1041,7 +1041,7 @@ delete_element(char *name, tgt_node_t *p, match_type_t m)
 	if ((c = tgt_node_alloc(name, String, NULL)) == NULL) {
 		return (False);
 	}
-	tgt_node_remove(p, c, m);
+	(void) tgt_node_remove(p, c, m);
 	tgt_node_free(c);
 	return (True);
 }

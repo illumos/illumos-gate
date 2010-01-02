@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2243,7 +2243,7 @@ show_group_xml_init()
 	if (doc != NULL) {
 		root = xmlNewNode(NULL, (xmlChar *)"sharecfg");
 		if (root != NULL)
-			xmlDocSetRootElement(doc, root);
+			(void) xmlDocSetRootElement(doc, root);
 	}
 	return (doc);
 }
@@ -2263,7 +2263,7 @@ show_group_xml(xmlDocPtr doc, sa_group_t group)
 	root = xmlDocGetRootElement(doc);
 	node = xmlCopyNode((xmlNodePtr)group, 1);
 	if (node != NULL && root != NULL) {
-		xmlAddChild(root, node);
+		(void) xmlAddChild(root, node);
 		/*
 		 * In the future, we may have interally used tags that
 		 * should not appear in the XML output. Remove
@@ -2384,7 +2384,7 @@ sa_show(sa_handle_t handle, int flags, int argc, char *argv[])
 		}
 	}
 	if (xml && ret == SA_OK) {
-		xmlDocFormatDump(stdout, doc, 1);
+		(void) xmlDocFormatDump(stdout, doc, 1);
 		xmlFreeDoc(doc);
 	}
 	return (ret);

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -230,7 +230,7 @@ main(int argc, char **argv, char **renvp)
 			break;
 
 		case 'M':
-			krb5_set_default_realm(bsd_context, optarg);
+			(void) krb5_set_default_realm(bsd_context, optarg);
 			krb5auth_flag++;
 			break;
 
@@ -476,7 +476,9 @@ doit(int f, struct sockaddr_storage *fromp, char **renvp)
 	(void) signal(SIGHUP, SIG_DFL);
 
 #ifdef DEBUG
-	{ int t = open("/dev/tty", 2);
+	{
+	    int t = open("/dev/tty", 2);
+
 	    if (t >= 0) {
 		(void) setsid();
 		(void) close(t);

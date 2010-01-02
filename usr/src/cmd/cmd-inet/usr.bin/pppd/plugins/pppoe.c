@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -490,7 +490,8 @@ pppoe_device_pipe(int pipefd)
 	(void) saveenv(fd, "AC_MAC");
 	(void) saveenv(fd, "SESSION_ID");
 	for (i = 1; ; i++) {
-		slprintf(envname, sizeof (envname), "VENDOR_SPECIFIC_%d", i);
+		(void) slprintf(envname, sizeof (envname),
+		    "VENDOR_SPECIFIC_%d", i);
 		if (saveenv(fd, envname) <= 0)
 			break;
 	}

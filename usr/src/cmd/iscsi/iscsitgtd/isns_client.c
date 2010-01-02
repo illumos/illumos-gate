@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -702,7 +702,7 @@ isns_populate_and_update_server_info(Boolean_t update) {
 			}
 		}
 	} else {
-		strcpy(isns_args.server, isns_srv);
+		(void) strcpy(isns_args.server, isns_srv);
 	}
 	free(isns_srv);
 	return (retcode);
@@ -793,7 +793,7 @@ isns_update()
 			 * we should reap it
 			 */
 			connection_thr_bail_out = True;
-			pthread_join(isns_tid, NULL);
+			(void) pthread_join(isns_tid, NULL);
 			connection_thr_bail_out = False;
 
 			/*
