@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1305,7 +1305,7 @@ phy_start(phy_handle_t *ph)
 		if (ph->phy_adv_10_fdx) {
 			anar |= MII_ABILITY_10BASE_T_FD;
 		}
-		if (ph->phy_adv_100_hdx) {
+		if (ph->phy_adv_10_hdx) {
 			anar |= MII_ABILITY_10BASE_T;
 		}
 		if (ph->phy_adv_pause) {
