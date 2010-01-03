@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * eval.c -- constraint evaluation module
@@ -537,6 +537,7 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 			    strcmp(np->u.expr.right->u.quote.s, "") == 0 ?
 			    NULL : (char *)np->u.expr.right->u.quote.s);
 			out(O_ALTFP|O_VERB2, "returned %lld", valuep->v);
+			nvlist_free(rsrc);
 		}
 		valuep->t = UINT64;
 		return (1);

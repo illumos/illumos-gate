@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1774,13 +1774,29 @@ fmd_case_transition(fmd_case_t *cp, uint_t state, uint_t flags)
 
 		/*
 		 * If an orphaned case transitions to CLOSE_WAIT, the owning
-		 * module is no longer loaded: continue on to CASE_CLOSED.
+		 * module is no longer loaded: continue on to CASE_CLOSED or
+		 * CASE_REPAIRED as appropriate.
 		 */
-		if (fmd_case_orphaned(cp))
-			state = cip->ci_state = FMD_CASE_CLOSED;
+		if (fmd_case_orphaned(cp)) {
+			if (cip->ci_flags & FMD_CF_REPAIRED) {
+				state = cip->ci_state = FMD_CASE_REPAIRED;
+				TRACE((FMD_DBG_CASE, "case %s %s->%s",
+				    cip->ci_uuid,
+				    _fmd_case_snames[FMD_CASE_CLOSE_WAIT],
+				    _fmd_case_snames[FMD_CASE_REPAIRED]));
+				goto do_repair;
+			} else {
+				state = cip->ci_state = FMD_CASE_CLOSED;
+				TRACE((FMD_DBG_CASE, "case %s %s->%s",
+				    cip->ci_uuid,
+				    _fmd_case_snames[FMD_CASE_CLOSE_WAIT],
+				    _fmd_case_snames[FMD_CASE_CLOSED]));
+			}
+		}
 		break;
 
 	case FMD_CASE_REPAIRED:
+do_repair:
 		ASSERT(cip->ci_xprt != NULL || fmd_case_orphaned(cp));
 
 		/*

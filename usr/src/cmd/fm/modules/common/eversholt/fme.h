@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * fme.h -- public definitions for fme module
@@ -37,9 +37,10 @@ extern "C" {
 #endif
 
 #define	UNDIAG_DEFECT_CHKPT	"defect.sunos.eft.undiag.checkpoint"
-#define	UNDIAG_DEFECT_FME	"defect.sunos.eft.undiag.fme"
+#define	UNDIAG_DEFECT_FME	"defect.sunos.eft.unexpected_telemetry"
 #define	UNDIAG_DEFECT_LIMIT	"defect.sunos.eft.undiag.limit"
 #define	UNDIAG_DEFECT_UNKNOWN	"defect.sunos.eft.undiag.unknown"
+#define	UNDIAG_FAULT_FME	"fault.sunos.eft.unexpected_telemetry"
 
 #define	UNDIAG_REASON		"reason"
 
@@ -56,6 +57,8 @@ extern "C" {
 #define	UD_VAL_MISSINGZERO	9
 #define	UD_VAL_NOPATH		10
 #define	UD_VAL_UNSOLVD		11
+#define	UD_VAL_BADEVENTPATH	12
+#define	UD_VAL_BADEVENTCLASS	13
 
 /* Undiagnosable reason strings */
 #define	UD_STR_UNKNOWN		"undiagnosable reason unknown"
@@ -64,12 +67,14 @@ extern "C" {
 #define	UD_STR_MISSINGZERO	"buffer persisting principal ereport is AWOL"
 #define	UD_STR_CFGMISMATCH	"persisted config buffer size != actual size"
 #define	UD_STR_MISSINGOBS	"buffer persisting an observation is AWOL"
-#define	UD_STR_BADEVENTI	"ereport zero not found in instance tree"
-#define	UD_STR_INSTFAIL	"creation of instance tree failed"
-#define	UD_STR_UNSOLVD	"all hypotheses disproved"
+#define	UD_STR_BADEVENTI	"%s not found in pruned instance tree"
+#define	UD_STR_INSTFAIL		"%s pruned instance tree is empty"
+#define	UD_STR_UNSOLVD		"all hypotheses were disproved"
 #define	UD_STR_BADOBS	"persisted observation not found in instance tree"
-#define	UD_STR_NOPATH	"no path to component found in ereport"
+#define	UD_STR_NOPATH	"no valid path to component was found in %s"
 #define	UD_STR_MAXFME	"reached the maximum number of open FMEs (maxfme)"
+#define	UD_STR_BADEVENTPATH	"%s path was not in topology"
+#define	UD_STR_BADEVENTCLASS	"%s class and path are incompatible"
 
 #define	WOBUF_CFGLEN	"rawcfglen"
 #define	WOBUF_POSTD	"posted"

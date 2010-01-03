@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -519,7 +519,9 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 	if (nvlist_lookup_string(flt_copy, FM_CLASS, &class) == 0 &&
 	    strncmp(class, "fault", 5) == 0 &&
 	    nvlist_lookup_nvlist(flt_copy, FM_FAULT_RESOURCE, &rsrc) == 0 &&
-	    rsrc != NULL && topo_fmri_asru(thp, rsrc, &asru, &err) == 0) {
+	    rsrc != NULL &&
+	    (fmd_fmri_replaced(rsrc) != FMD_OBJ_STATE_REPLACED) &&
+	    topo_fmri_asru(thp, rsrc, &asru, &err) == 0) {
 		(void) nvlist_remove(flt_copy, FM_FAULT_ASRU, DATA_TYPE_NVLIST);
 		(void) nvlist_add_nvlist(flt_copy, FM_FAULT_ASRU, asru);
 		nvlist_free(asru);

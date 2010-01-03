@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -802,14 +802,14 @@ static void
 catalog_new_record(uurec_t *uurec_p, char *msgid, name_list_t *class,
     name_list_t *fru, name_list_t *asru, name_list_t *resource,
     name_list_t *serial, boolean_t not_suppressed,
-    hostid_t *hostid, boolean_t injected)
+    hostid_t *hostid, boolean_t injected, boolean_t dummy_fru)
 {
 	status_record_t *status_rec_p;
 
 	status_rec_p = new_record_init(uurec_p, msgid, class, fru, asru,
 	    resource, serial, not_suppressed, hostid, injected);
 	add_rec_list(status_rec_p, &status_rec_list);
-	if (status_rec_p->fru)
+	if (status_rec_p->fru && !dummy_fru)
 		add_list(status_rec_p, status_rec_p->fru, &status_fru_list);
 	if (status_rec_p->asru)
 		add_list(status_rec_p, status_rec_p->asru, &status_asru_list);
@@ -859,8 +859,8 @@ get_serial_no(nvlist_t *nvl, name_list_t **serial_p, uint8_t pct)
 
 static void
 extract_record_info(nvlist_t *nvl, name_list_t **class_p,
-    name_list_t **fru_p, name_list_t **serial_p,
-    name_list_t **resource_p, name_list_t **asru_p, uint8_t status)
+    name_list_t **fru_p, name_list_t **serial_p, name_list_t **resource_p,
+    name_list_t **asru_p, boolean_t *dummy_fru, uint8_t status)
 {
 	nvlist_t *lfru, *lasru, *rsrc;
 	name_list_t *nlp;
@@ -892,6 +892,7 @@ extract_record_info(nvlist_t *nvl, name_list_t **class_p,
 		 * No FRU or resource. But we want to display the repair status
 		 * somehow, so create a dummy FRU field.
 		 */
+		*dummy_fru = 1;
 		nlp = alloc_name_list(dgettext("FMD", "None"), lpct);
 		nlp->status = status & ~(FM_SUSPECT_UNUSABLE |
 		    FM_SUSPECT_DEGRADED);
@@ -937,6 +938,7 @@ add_fault_record_to_catalog(nvlist_t *nvl, uint64_t sec, char *uuid)
 	boolean_t not_suppressed = 1;
 	boolean_t any_present = 0;
 	boolean_t injected = 0;
+	boolean_t dummy_fru = 0;
 
 	(void) nvlist_lookup_string(nvl, FM_SUSPECT_DIAG_CODE, &msgid);
 	(void) nvlist_lookup_uint32(nvl, FM_SUSPECT_FAULT_SZ, &size);
@@ -951,7 +953,7 @@ add_fault_record_to_catalog(nvlist_t *nvl, uint64_t sec, char *uuid)
 		    &ba, &size);
 		for (i = 0; i < size; i++) {
 			extract_record_info(nva[i], &class, &fru, &serial,
-			    &resource, &asru, ba[i]);
+			    &resource, &asru, &dummy_fru, ba[i]);
 			if (!(ba[i] & FM_SUSPECT_NOT_PRESENT) &&
 			    (ba[i] & FM_SUSPECT_FAULTY))
 				any_present = 1;
@@ -971,7 +973,7 @@ add_fault_record_to_catalog(nvlist_t *nvl, uint64_t sec, char *uuid)
 	(void) nvlist_dup(nvl, &uurec_p->event, 0);
 	host = find_hostid(nvl);
 	catalog_new_record(uurec_p, msgid, class, fru, asru,
-	    resource, serial, not_suppressed, host, injected);
+	    resource, serial, not_suppressed, host, injected, dummy_fru);
 }
 
 static void
@@ -1514,7 +1516,7 @@ print_fru(int summary, int opt_a, int opt_i, int page_feed)
 	resource_list_t *tp = status_fru_list;
 	status_record_t *srp;
 	sr_list_t *slp, *end;
-	char *msgid, *fru_label;
+	char *fru_label;
 	uurec_t *uurp;
 	name_list_t *fru;
 	int status;
@@ -1532,6 +1534,10 @@ print_fru(int summary, int opt_a, int opt_i, int page_feed)
 			end = slp;
 			do {
 				srp = slp->status_record;
+				if (!srp->not_suppressed) {
+					slp = slp->next;
+					continue;
+				}
 				fru = find_fru(srp, tp->resource);
 				if (fru) {
 					if (fru->label)
@@ -1555,6 +1561,10 @@ print_fru(int summary, int opt_a, int opt_i, int page_feed)
 			status = 0;
 			do {
 				srp = slp->status_record;
+				if (!srp->not_suppressed) {
+					slp = slp->next;
+					continue;
+				}
 				fru = srp->fru;
 				while (fru) {
 					if (strcmp(tp->resource,
@@ -1589,6 +1599,10 @@ print_fru(int summary, int opt_a, int opt_i, int page_feed)
 			end = slp;
 			do {
 				srp = slp->status_record;
+				if (!srp->not_suppressed) {
+					slp = slp->next;
+					continue;
+				}
 				uurp = srp->uurec;
 				fru = find_fru(srp, tp->resource);
 				if (fru) {
@@ -1609,19 +1623,20 @@ print_fru(int summary, int opt_a, int opt_i, int page_feed)
 			if (!summary) {
 				slp = tp->status_rec_list;
 				end = slp;
-				srp = slp->status_record;
-				if (srp->serial &&
-				    !serial_in_fru(srp->fru, srp->serial)) {
-					print_name_list(srp->serial,
-					    dgettext("FMD", "Serial ID.  :"),
-					    NULL, 0, 0, NULL, 1);
-				}
-				msgid = NULL;
 				do {
-					if (msgid == NULL ||
-					    strcmp(msgid, srp->msgid) != 0) {
-						msgid = srp->msgid;
-						print_dict_info(uurp->event);
+					srp = slp->status_record;
+					if (!srp->not_suppressed) {
+						slp = slp->next;
+						continue;
+					}
+					if (srp->serial &&
+					    !serial_in_fru(srp->fru,
+					    srp->serial)) {
+						print_name_list(srp->serial,
+						    dgettext("FMD",
+						    "Serial ID.  :"),
+						    NULL, 0, 0, NULL, 1);
+						break;
 					}
 					slp = slp->next;
 				} while (slp != end);
@@ -1650,6 +1665,10 @@ print_asru(int opt_a)
 			end = slp;
 			do {
 				srp = slp->status_record;
+				if (!srp->not_suppressed) {
+					slp = slp->next;
+					continue;
+				}
 				asru = srp->asru;
 				while (asru) {
 					if (strcmp(tp->resource,

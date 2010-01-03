@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ipath.c -- instanced pathname module
@@ -336,6 +336,19 @@ ipath2str(const char *ename, const struct ipath *ipp)
 	*cp++ = '\0';
 
 	return (ret);
+}
+
+void
+ipathlastcomp(const struct ipath *ipp)
+{
+	int i;
+
+	for (i = 0; ipp[i].s != NULL; i++)
+		;
+
+	out(O_ALTFP, "newfme: add %s to Usednames", ipp[i - 1].s);
+	Usednames = lut_add(Usednames, (void *)ipp[i - 1].s,
+	    (void *)ipp[i - 1].s, NULL);
 }
 
 /*

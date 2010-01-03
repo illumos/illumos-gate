@@ -1,5 +1,5 @@
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -43,3 +43,4 @@ defect.sunos.eft.undiag.checkpoint=13
 defect.sunos.eft.undiag.fme=14
 defect.sunos.eft.undiag.limit=15
 defect.sunos.eft.undiag.unknown=16
+defect.sunos.eft.unexpected_telemetry fault.sunos.eft.unexpected_telemetry=17

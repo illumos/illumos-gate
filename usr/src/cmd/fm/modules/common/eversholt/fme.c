@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * fme.c -- fault management exercise module
@@ -141,8 +141,8 @@ static enum fme_state hypothesise(struct fme *fmep, struct event *ep,
 static struct node *eventprop_lookup(struct event *ep, const char *propname);
 static struct node *pathstring2epnamenp(char *path);
 static void publish_undiagnosable(fmd_hdl_t *hdl, fmd_event_t *ffep,
-	fmd_case_t *fmcase);
-static const char *undiag_2reason_str(int ud);
+	fmd_case_t *fmcase, nvlist_t *detector, char *arg);
+static char *undiag_2reason_str(int ud, char *arg);
 static const char *undiag_2defect_str(int ud);
 static void restore_suspects(struct fme *fmep);
 static void save_suspects(struct fme *fmep);
@@ -255,7 +255,7 @@ unset_needed_arrows(struct event *ep, struct event *ep2, struct fme *fmep)
 static void globals_destructor(void *left, void *right, void *arg);
 static void clear_arrows(struct event *ep, struct event *ep2, struct fme *fmep);
 
-static void
+static boolean_t
 prune_propagations(const char *e0class, const struct ipath *e0ipp)
 {
 	char nbuf[100];
@@ -268,11 +268,10 @@ prune_propagations(const char *e0class, const struct ipath *e0ipp)
 	Nfmep->eventtree = itree_create_dummy(e0class, e0ipp);
 	if ((Nfmep->e0 =
 	    itree_lookup(Nfmep->eventtree, e0class, e0ipp)) == NULL) {
-		out(O_ALTFP, "prune_propagations: e0 not in instance tree");
 		itree_free(Nfmep->eventtree);
 		FREE(Nfmep);
 		Nfmep = NULL;
-		return;
+		return (B_FALSE);
 	}
 	Nfmep->ecurrent = Nfmep->observations = Nfmep->e0;
 	Nfmep->e0->count++;
@@ -319,16 +318,66 @@ prune_propagations(const char *e0class, const struct ipath *e0ipp)
 	itree_free(Nfmep->eventtree);
 	lut_free(Nfmep->globals, globals_destructor, NULL);
 	FREE(Nfmep);
+	return (B_TRUE);
 }
 
 static struct fme *
 newfme(const char *e0class, const struct ipath *e0ipp, fmd_hdl_t *hdl,
-	fmd_case_t *fmcase)
+	fmd_case_t *fmcase, fmd_event_t *ffep, nvlist_t *nvl)
 {
 	struct cfgdata *cfgdata;
 	int init_size;
 	extern int alloc_total();
+	nvlist_t *detector = NULL;
+	char *pathstr;
+	char *arg;
 
+	/*
+	 * First check if e0ipp is actually in the topology so we can give a
+	 * more useful error message.
+	 */
+	ipathlastcomp(e0ipp);
+	pathstr = ipath2str(NULL, e0ipp);
+	cfgdata = config_snapshot();
+	platform_units_translate(0, cfgdata->cooked, NULL, NULL,
+	    &detector, pathstr);
+	FREE(pathstr);
+	structconfig_free(cfgdata->cooked);
+	config_free(cfgdata);
+	if (detector == NULL) {
+		Undiag_reason = UD_VAL_BADEVENTPATH;
+		(void) nvlist_lookup_nvlist(nvl, FM_EREPORT_DETECTOR,
+		    &detector);
+		arg = ipath2str(e0class, e0ipp);
+		publish_undiagnosable(hdl, ffep, fmcase, detector, arg);
+		FREE(arg);
+		return (NULL);
+	}
+
+	/*
+	 * Next run a quick first pass of the rules with a dummy config. This
+	 * allows us to prune those rules which can't possibly cause this
+	 * ereport.
+	 */
+	if (!prune_propagations(e0class, e0ipp)) {
+		/*
+		 * The fault class must have been in the rules or we would
+		 * not have registered for it (and got a "nosub"), and the
+		 * pathname must be in the topology or we would have failed the
+		 * previous test. So to get here means the combination of
+		 * class and pathname in the ereport must be invalid.
+		 */
+		Undiag_reason = UD_VAL_BADEVENTCLASS;
+		arg = ipath2str(e0class, e0ipp);
+		publish_undiagnosable(hdl, ffep, fmcase, detector, arg);
+		nvlist_free(detector);
+		FREE(arg);
+		return (NULL);
+	}
+
+	/*
+	 * Now go ahead and create the real fme using the pruned rules.
+	 */
 	init_size = alloc_total();
 	out(O_ALTFP|O_STAMP, "start config_snapshot using %d bytes", init_size);
 	cfgdata = config_snapshot();
@@ -351,8 +400,11 @@ newfme(const char *e0class, const struct ipath *e0ipp, fmd_hdl_t *hdl,
 	Nfmep->hdl = hdl;
 
 	if ((Nfmep->eventtree = itree_create(Nfmep->config)) == NULL) {
-		out(O_ALTFP, "newfme: NULL instance tree");
 		Undiag_reason = UD_VAL_INSTFAIL;
+		arg = ipath2str(e0class, e0ipp);
+		publish_undiagnosable(hdl, ffep, fmcase, detector, arg);
+		nvlist_free(detector);
+		FREE(arg);
 		structconfig_free(Nfmep->config);
 		destroy_fme_bufs(Nfmep);
 		FREE(Nfmep);
@@ -364,8 +416,11 @@ newfme(const char *e0class, const struct ipath *e0ipp, fmd_hdl_t *hdl,
 
 	if ((Nfmep->e0 =
 	    itree_lookup(Nfmep->eventtree, e0class, e0ipp)) == NULL) {
-		out(O_ALTFP, "newfme: e0 not in instance tree");
 		Undiag_reason = UD_VAL_BADEVENTI;
+		arg = ipath2str(e0class, e0ipp);
+		publish_undiagnosable(hdl, ffep, fmcase, detector, arg);
+		nvlist_free(detector);
+		FREE(arg);
 		itree_free(Nfmep->eventtree);
 		structconfig_free(Nfmep->config);
 		destroy_fme_bufs(Nfmep);
@@ -374,6 +429,7 @@ newfme(const char *e0class, const struct ipath *e0ipp, fmd_hdl_t *hdl,
 		return (NULL);
 	}
 
+	nvlist_free(detector);
 	return (fme_ready(Nfmep));
 }
 
@@ -632,6 +688,7 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 	struct node *epnamenp = NULL;
 	int init_size;
 	extern int alloc_total();
+	char *reason;
 
 	/*
 	 * ignore solved or closed cases
@@ -727,7 +784,7 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 		FREE(estr);
 		goto badcase;
 	}
-	prune_propagations(stable(estr), ipath(epnamenp));
+	(void) prune_propagations(stable(estr), ipath(epnamenp));
 	tree_free(epnamenp);
 	FREE(estr);
 
@@ -814,8 +871,9 @@ badcase:
 		out(O_ALTFP|O_NONL, "solving, ");
 		defect = fmd_nvl_create_fault(hdl,
 		    undiag_2defect_str(Undiag_reason), 100, NULL, NULL, NULL);
-		(void) nvlist_add_string(defect, UNDIAG_REASON,
-		    undiag_2reason_str(Undiag_reason));
+		reason = undiag_2reason_str(Undiag_reason, NULL);
+		(void) nvlist_add_string(defect, UNDIAG_REASON, reason);
+		FREE(reason);
 		fmd_case_add_suspect(hdl, bad->fmcase, defect);
 		fmd_case_solve(hdl, bad->fmcase);
 		Undiag_reason = UD_VAL_UNKNOWN;
@@ -1299,7 +1357,6 @@ upsets_eval(struct fme *fmep, fmd_event_t *ffep)
 		ep = fmep->e0;
 		eventstring = ep->enode->u.event.ename->u.name.s;
 		ipp = ep->ipp;
-		prune_propagations(eventstring, ipp);
 
 		/*
 		 * create a duplicate fme and case
@@ -1308,14 +1365,15 @@ upsets_eval(struct fme *fmep, fmd_event_t *ffep)
 		out(O_ALTFP|O_NONL, "duplicate fme for event [");
 		ipath_print(O_ALTFP|O_NONL, eventstring, ipp);
 		out(O_ALTFP, " ]");
+
 		if ((nfmep = newfme(eventstring, ipp, fmep->hdl,
-		    fmcase)) == NULL) {
+		    fmcase, ffep, ep->nvp)) == NULL) {
 			out(O_ALTFP|O_NONL, "[");
 			ipath_print(O_ALTFP|O_NONL, eventstring, ipp);
 			out(O_ALTFP, " CANNOT DIAGNOSE]");
-			publish_undiagnosable(fmep->hdl, ffep, fmcase);
 			continue;
 		}
+
 		Open_fme_count++;
 		nfmep->pull = fmep->pull;
 		init_fme_bufs(nfmep);
@@ -1433,6 +1491,7 @@ fme_receive_external_report(fmd_hdl_t *hdl, fmd_event_t *ffep, nvlist_t *nvl,
 	struct node		*epnamenp;
 	fmd_case_t		*fmcase;
 	const struct ipath	*ipp;
+	nvlist_t		*detector = NULL;
 
 	class = stable(class);
 
@@ -1452,11 +1511,19 @@ fme_receive_external_report(fmd_hdl_t *hdl, fmd_event_t *ffep, nvlist_t *nvl,
 			 * 'discard_if_config_unknown=1' was specified in the
 			 * ereport definition. Indicate undiagnosable.
 			 */
-			out(O_ALTFP, "XFILE: Unable to map \"%s\" ereport "
-			    "to component path.", class);
 			Undiag_reason = UD_VAL_NOPATH;
 			fmcase = fmd_case_open(hdl, NULL);
-			publish_undiagnosable(hdl, ffep, fmcase);
+
+			/*
+			 * We don't have a component path here (which means that
+			 * the detector was not in hc-scheme and couldn't be
+			 * converted to hc-scheme. Report the raw detector as
+			 * the suspect resource if there is one.
+			 */
+			(void) nvlist_lookup_nvlist(nvl, FM_EREPORT_DETECTOR,
+			    &detector);
+			publish_undiagnosable(hdl, ffep, fmcase, detector,
+			    (char *)class);
 		}
 		return;
 	}
@@ -1552,6 +1619,7 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 	int matched = 0;
 	nvlist_t *defect;
 	fmd_case_t *fmcase;
+	char *reason;
 
 	out(O_ALTFP|O_NONL, "fme_receive_report: ");
 	ipath_print(O_ALTFP|O_NONL, eventstring, ipp);
@@ -1663,7 +1731,6 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 		cfmep = svfmep;
 	}
 	ClosedFMEs = NULL;
-	prune_propagations(eventstring, ipp);
 
 	if (ofmep) {
 		out(O_ALTFP|O_NONL, "[");
@@ -1682,11 +1749,11 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 		fmcase = fmd_case_open(hdl, NULL);
 
 		/* Create overflow fme */
-		if ((fmep = newfme(eventstring, ipp, hdl, fmcase)) == NULL) {
+		if ((fmep = newfme(eventstring, ipp, hdl, fmcase, ffep,
+		    nvl)) == NULL) {
 			out(O_ALTFP|O_NONL, "[");
 			ipath_print(O_ALTFP|O_NONL, eventstring, ipp);
 			out(O_ALTFP, " CANNOT OPEN OVERFLOW FME]");
-			publish_undiagnosable(hdl, ffep, fmcase);
 			return;
 		}
 
@@ -1701,8 +1768,9 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 		Undiag_reason = UD_VAL_MAXFME;
 		defect = fmd_nvl_create_fault(hdl,
 		    undiag_2defect_str(Undiag_reason), 100, NULL, NULL, NULL);
-		(void) nvlist_add_string(defect, UNDIAG_REASON,
-		    undiag_2reason_str(Undiag_reason));
+		reason = undiag_2reason_str(Undiag_reason, NULL);
+		(void) nvlist_add_string(defect, UNDIAG_REASON, reason);
+		FREE(reason);
 		fmd_case_add_suspect(hdl, fmep->fmcase, defect);
 		fmd_case_solve(hdl, fmep->fmcase);
 		Undiag_reason = UD_VAL_UNKNOWN;
@@ -1713,11 +1781,10 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 	fmcase = fmd_case_open(hdl, NULL);
 
 	/* start a new FME */
-	if ((fmep = newfme(eventstring, ipp, hdl, fmcase)) == NULL) {
+	if ((fmep = newfme(eventstring, ipp, hdl, fmcase, ffep, nvl)) == NULL) {
 		out(O_ALTFP|O_NONL, "[");
 		ipath_print(O_ALTFP|O_NONL, eventstring, ipp);
 		out(O_ALTFP, " CANNOT DIAGNOSE]");
-		publish_undiagnosable(hdl, ffep, fmcase);
 		return;
 	}
 
@@ -2873,6 +2940,8 @@ undiag_2defect_str(int ud)
 		break;
 
 	case UD_VAL_BADEVENTI:
+	case UD_VAL_BADEVENTPATH:
+	case UD_VAL_BADEVENTCLASS:
 	case UD_VAL_INSTFAIL:
 	case UD_VAL_NOPATH:
 	case UD_VAL_UNSOLVD:
@@ -2890,48 +2959,101 @@ undiag_2defect_str(int ud)
 	}
 }
 
-const char *
-undiag_2reason_str(int ud)
+static const char *
+undiag_2fault_str(int ud)
 {
 	switch (ud) {
 	case UD_VAL_BADEVENTI:
-		return (UD_STR_BADEVENTI);
-	case UD_VAL_BADOBS:
-		return (UD_STR_BADOBS);
-	case UD_VAL_CFGMISMATCH:
-		return (UD_STR_CFGMISMATCH);
+	case UD_VAL_BADEVENTPATH:
+	case UD_VAL_BADEVENTCLASS:
 	case UD_VAL_INSTFAIL:
-		return (UD_STR_INSTFAIL);
-	case UD_VAL_MAXFME:
-		return (UD_STR_MAXFME);
-	case UD_VAL_MISSINGINFO:
-		return (UD_STR_MISSINGINFO);
-	case UD_VAL_MISSINGOBS:
-		return (UD_STR_MISSINGOBS);
-	case UD_VAL_MISSINGPATH:
-		return (UD_STR_MISSINGPATH);
-	case UD_VAL_MISSINGZERO:
-		return (UD_STR_MISSINGZERO);
 	case UD_VAL_NOPATH:
-		return (UD_STR_NOPATH);
 	case UD_VAL_UNSOLVD:
-		return (UD_STR_UNSOLVD);
-	case UD_VAL_UNKNOWN:
+		return (UNDIAG_FAULT_FME);
 	default:
-		return (UD_STR_UNKNOWN);
+		return (NULL);
 	}
 }
 
+static char *
+undiag_2reason_str(int ud, char *arg)
+{
+	const char *ptr;
+	char *buf;
+	int with_arg = 0;
+
+	switch (ud) {
+	case UD_VAL_BADEVENTPATH:
+		ptr = UD_STR_BADEVENTPATH;
+		with_arg = 1;
+		break;
+	case UD_VAL_BADEVENTCLASS:
+		ptr = UD_STR_BADEVENTCLASS;
+		with_arg = 1;
+		break;
+	case UD_VAL_BADEVENTI:
+		ptr = UD_STR_BADEVENTI;
+		with_arg = 1;
+		break;
+	case UD_VAL_BADOBS:
+		ptr = UD_STR_BADOBS;
+		break;
+	case UD_VAL_CFGMISMATCH:
+		ptr = UD_STR_CFGMISMATCH;
+		break;
+	case UD_VAL_INSTFAIL:
+		ptr = UD_STR_INSTFAIL;
+		with_arg = 1;
+		break;
+	case UD_VAL_MAXFME:
+		ptr = UD_STR_MAXFME;
+		break;
+	case UD_VAL_MISSINGINFO:
+		ptr = UD_STR_MISSINGINFO;
+		break;
+	case UD_VAL_MISSINGOBS:
+		ptr = UD_STR_MISSINGOBS;
+		break;
+	case UD_VAL_MISSINGPATH:
+		ptr = UD_STR_MISSINGPATH;
+		break;
+	case UD_VAL_MISSINGZERO:
+		ptr = UD_STR_MISSINGZERO;
+		break;
+	case UD_VAL_NOPATH:
+		ptr = UD_STR_NOPATH;
+		with_arg = 1;
+		break;
+	case UD_VAL_UNSOLVD:
+		ptr = UD_STR_UNSOLVD;
+		break;
+	case UD_VAL_UNKNOWN:
+	default:
+		ptr = UD_STR_UNKNOWN;
+		break;
+	}
+	if (with_arg) {
+		buf = MALLOC(strlen(ptr) + strlen(arg) - 1);
+		(void) sprintf(buf, ptr, arg);
+	} else {
+		buf = MALLOC(strlen(ptr) + 1);
+		(void) sprintf(buf, ptr);
+	}
+	return (buf);
+}
+
 static void
-publish_undiagnosable(fmd_hdl_t *hdl, fmd_event_t *ffep, fmd_case_t *fmcase)
+publish_undiagnosable(fmd_hdl_t *hdl, fmd_event_t *ffep, fmd_case_t *fmcase,
+    nvlist_t *detector, char *arg)
 {
 	struct case_list *newcase;
-	nvlist_t *defect;
+	nvlist_t *defect, *fault;
+	const char *faultstr;
+	char *reason = undiag_2reason_str(Undiag_reason, arg);
 
 	out(O_ALTFP,
 	    "[undiagnosable ereport received, "
-	    "creating and closing a new case (%s)]",
-	    undiag_2reason_str(Undiag_reason));
+	    "creating and closing a new case (%s)]", reason);
 
 	newcase = MALLOC(sizeof (struct case_list));
 	newcase->next = NULL;
@@ -2943,12 +3065,29 @@ publish_undiagnosable(fmd_hdl_t *hdl, fmd_event_t *ffep, fmd_case_t *fmcase)
 	if (ffep != NULL)
 		fmd_case_add_ereport(hdl, newcase->fmcase, ffep);
 
+	/* add defect */
 	defect = fmd_nvl_create_fault(hdl,
-	    undiag_2defect_str(Undiag_reason), 100, NULL, NULL, NULL);
-	(void) nvlist_add_string(defect, UNDIAG_REASON,
-	    undiag_2reason_str(Undiag_reason));
+	    undiag_2defect_str(Undiag_reason), 50, NULL, NULL, detector);
+	(void) nvlist_add_string(defect, UNDIAG_REASON, reason);
+	(void) nvlist_add_boolean_value(defect, FM_SUSPECT_RETIRE, B_FALSE);
+	(void) nvlist_add_boolean_value(defect, FM_SUSPECT_RESPONSE, B_FALSE);
 	fmd_case_add_suspect(hdl, newcase->fmcase, defect);
 
+	/* add fault if appropriate */
+	faultstr = undiag_2fault_str(Undiag_reason);
+	if (faultstr != NULL) {
+		fault = fmd_nvl_create_fault(hdl, faultstr, 50, NULL, NULL,
+		    detector);
+		(void) nvlist_add_string(fault, UNDIAG_REASON, reason);
+		(void) nvlist_add_boolean_value(fault, FM_SUSPECT_RETIRE,
+		    B_FALSE);
+		(void) nvlist_add_boolean_value(fault, FM_SUSPECT_RESPONSE,
+		    B_FALSE);
+		fmd_case_add_suspect(hdl, newcase->fmcase, fault);
+	}
+	FREE(reason);
+
+	/* solve and close case */
 	fmd_case_solve(hdl, newcase->fmcase);
 	fmd_case_close(hdl, newcase->fmcase);
 	Undiag_reason = UD_VAL_UNKNOWN;
@@ -2957,17 +3096,51 @@ publish_undiagnosable(fmd_hdl_t *hdl, fmd_event_t *ffep, fmd_case_t *fmcase)
 static void
 fme_undiagnosable(struct fme *f)
 {
-	nvlist_t *defect;
+	nvlist_t *defect, *fault, *detector = NULL;
+	struct event *ep;
+	char *pathstr;
+	const char *faultstr;
+	char *reason = undiag_2reason_str(Undiag_reason, NULL);
 
 	out(O_ALTFP, "[solving/closing FME%d, case %s (%s)]",
-	    f->id, fmd_case_uuid(f->hdl, f->fmcase),
-	    undiag_2reason_str(Undiag_reason));
+	    f->id, fmd_case_uuid(f->hdl, f->fmcase), reason);
 
-	defect = fmd_nvl_create_fault(f->hdl,
-	    undiag_2defect_str(Undiag_reason), 100, NULL, NULL, NULL);
-	(void) nvlist_add_string(defect, UNDIAG_REASON,
-	    undiag_2reason_str(Undiag_reason));
-	fmd_case_add_suspect(f->hdl, f->fmcase, defect);
+	for (ep = f->observations; ep; ep = ep->observations) {
+
+		if (ep->ffep != f->e0r)
+			fmd_case_add_ereport(f->hdl, f->fmcase, ep->ffep);
+
+		pathstr = ipath2str(NULL, ipath(platform_getpath(ep->nvp)));
+		platform_units_translate(0, f->config, NULL, NULL, &detector,
+		    pathstr);
+		FREE(pathstr);
+
+		/* add defect */
+		defect = fmd_nvl_create_fault(f->hdl,
+		    undiag_2defect_str(Undiag_reason), 50 / f->uniqobs,
+		    NULL, NULL, detector);
+		(void) nvlist_add_string(defect, UNDIAG_REASON, reason);
+		(void) nvlist_add_boolean_value(defect, FM_SUSPECT_RETIRE,
+		    B_FALSE);
+		(void) nvlist_add_boolean_value(defect, FM_SUSPECT_RESPONSE,
+		    B_FALSE);
+		fmd_case_add_suspect(f->hdl, f->fmcase, defect);
+
+		/* add fault if appropriate */
+		faultstr = undiag_2fault_str(Undiag_reason);
+		if (faultstr == NULL)
+			continue;
+		fault = fmd_nvl_create_fault(f->hdl, faultstr, 50 / f->uniqobs,
+		    NULL, NULL, detector);
+		(void) nvlist_add_string(fault, UNDIAG_REASON, reason);
+		(void) nvlist_add_boolean_value(fault, FM_SUSPECT_RETIRE,
+		    B_FALSE);
+		(void) nvlist_add_boolean_value(fault, FM_SUSPECT_RESPONSE,
+		    B_FALSE);
+		fmd_case_add_suspect(f->hdl, f->fmcase, fault);
+		nvlist_free(detector);
+	}
+	FREE(reason);
 	fmd_case_solve(f->hdl, f->fmcase);
 	fmd_case_close(f->hdl, f->fmcase);
 	Undiag_reason = UD_VAL_UNKNOWN;

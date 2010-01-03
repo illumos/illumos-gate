@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1251,7 +1251,7 @@ fmd_case_add_suspect(fmd_hdl_t *hdl, fmd_case_t *cp, nvlist_t *nvl)
 			    &asru) == 0) {
 				(void) nvlist_add_nvlist(nvl, FM_FAULT_ASRU,
 				    asru);
-				nvlist_free(asru);
+				nvlist_free(asru_prop);
 				(void) nvlist_lookup_nvlist(nvl, FM_FAULT_ASRU,
 				    &asru);
 			}
@@ -1280,14 +1280,17 @@ fmd_case_add_suspect(fmd_hdl_t *hdl, fmd_case_t *cp, nvlist_t *nvl)
 	/*
 	 * Try to find the location label for this resource
 	 */
-	if (fru != NULL)
-		(void) topo_fmri_label(thp, fru, &loc, &err);
-	else if (rsrc != NULL)
-		(void) topo_fmri_label(thp, rsrc, &loc, &err);
-	if (strncmp(class, "defect", 6) != 0 && loc != NULL) {
-		(void) nvlist_remove(nvl, FM_FAULT_LOCATION, DATA_TYPE_STRING);
-		(void) nvlist_add_string(nvl, FM_FAULT_LOCATION, loc);
-		topo_hdl_strfree(thp, loc);
+	if (strncmp(class, "defect", 6) != 0) {
+		if (fru != NULL)
+			(void) topo_fmri_label(thp, fru, &loc, &err);
+		else if (rsrc != NULL)
+			(void) topo_fmri_label(thp, rsrc, &loc, &err);
+		if (loc != NULL) {
+			(void) nvlist_remove(nvl, FM_FAULT_LOCATION,
+			    DATA_TYPE_STRING);
+			(void) nvlist_add_string(nvl, FM_FAULT_LOCATION, loc);
+			topo_hdl_strfree(thp, loc);
+		}
 	}
 
 	/*

@@ -1,5 +1,5 @@
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -230,7 +230,7 @@ msgstr "The service has been placed into the maintenance state."
 msgid "SUNOS-8000-DM.impact"
 msgstr "The service is unavailable."
 msgid "SUNOS-8000-DM.action"
-msgstr "Run svcs -x to determine why the service failed and the location of logfiles, if any."
+msgstr "Run 'svcs -x' to determine why the service failed and the location of logfiles, if any."
 #
 # code: SUNOS-8000-E8
 # keys: defect.sunos.eft.undiag.checkpoint
@@ -295,3 +295,19 @@ msgid "SUNOS-8000-HV.impact"
 msgstr "Automated diagnosis and response for these events will not occur."
 msgid "SUNOS-8000-HV.action"
 msgstr "Ensure that the latest Solaris Kernel and Predictive Self-Healing (PSH) patches are installed."
+#
+# code: SUNOS-8000-J0
+# keys: defect.sunos.eft.unexpected_telemetry fault.sunos.eft.unexpected_telemetry
+#
+msgid "SUNOS-8000-J0.type"
+msgstr "Fault"
+msgid "SUNOS-8000-J0.severity"
+msgstr "Major"
+msgid "SUNOS-8000-J0.description"
+msgstr "The diagnosis engine encountered telemetry from the listed devices for which it was unable to perform a diagnosis - %<fault-list[0].reason>.\n  Refer to %s for more information."
+msgid "SUNOS-8000-J0.response"
+msgstr "Error reports have been logged for examination by Sun.\n"
+msgid "SUNOS-8000-J0.impact"
+msgstr "Automated diagnosis and response for these events will not occur.\n"
+msgid "SUNOS-8000-J0.action"
+msgstr "Ensure that the latest Solaris Kernel and Predictive Self-Healing (PSH) patches are installed.\n"

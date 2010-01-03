@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,7 @@ extern "C" {
 /* FM event class values */
 #define	FM_EREPORT_CLASS		"ereport"
 #define	FM_FAULT_CLASS			"fault"
+#define	FM_DEFECT_CLASS			"defect"
 #define	FM_RSRC_CLASS			"resource"
 #define	FM_LIST_EVENT			"list"
 

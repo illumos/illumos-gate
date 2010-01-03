@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/fm/protocol.h>
 
@@ -143,7 +141,9 @@ self_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	    strcmp(class, FM_LIST_ISOLATED_CLASS) == 0 ||
 	    strcmp(class, FM_LIST_UPDATED_CLASS) == 0 ||
 	    strcmp(class, FM_LIST_RESOLVED_CLASS) == 0 ||
-	    strcmp(class, FM_LIST_REPAIRED_CLASS) == 0)
+	    strcmp(class, FM_LIST_REPAIRED_CLASS) == 0 ||
+	    strncmp(class, FM_FAULT_CLASS, strlen(FM_FAULT_CLASS)) == 0 ||
+	    strncmp(class, FM_DEFECT_CLASS, strlen(FM_DEFECT_CLASS)) == 0)
 		return; /* if no agents are present just drop list.* */
 
 	if (strncmp(class, FMD_ERR_CLASS, FMD_ERR_CLASS_LEN) == 0)
@@ -163,6 +163,7 @@ self_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	self_stats.nosub.fmds_value.ui64++;
 
 	flt = fmd_protocol_fault(FMD_FLT_NOSUB, 100, NULL, NULL, NULL, NULL);
+	(void) nvlist_add_string(flt, "nosub_class", class);
 	fmd_case_add_suspect(hdl, cp, flt);
 	fmd_case_solve(hdl, cp);
 }

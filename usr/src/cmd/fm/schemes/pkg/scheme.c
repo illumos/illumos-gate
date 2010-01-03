@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fm/fmd_fmri.h>
 #include <fm/libtopo.h>
@@ -57,10 +55,8 @@ fmd_fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 }
 
 /*
- * fmd_fmri_present() is called by fmadm to determine if a faulty ASRU
- * is still present in the system.  In general we don't expect to get
- * ASRUs in this scheme, so it's unlikely this routine will get called.
- * In case it does, though, we just return true by default, as we have no
+ * fmd_fmri_present() is called by fmadm to determine if a faulty resource
+ * is still present in the system. We just return true by default, as we have no
  * real way to look up the component in the system configuration.
  */
 /*ARGSUSED*/
@@ -68,6 +64,13 @@ int
 fmd_fmri_present(nvlist_t *nvl)
 {
 	return (1);
+}
+
+/*ARGSUSED*/
+int
+fmd_fmri_replaced(nvlist_t *nvl)
+{
+	return (FMD_OBJ_STATE_UNKNOWN);
 }
 
 /*
