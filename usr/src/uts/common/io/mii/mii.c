@@ -1767,6 +1767,7 @@ _mii_probe(mii_handle_t mh)
 	uint8_t		curr_addr;
 	phy_handle_t	*ph;
 	int		pri = 0;
+	int		first;
 
 	user_addr = ddi_prop_get_int(DDI_DEV_T_ANY, mh->m_dip, 0,
 	    "phy-addr", -1);
@@ -1780,13 +1781,22 @@ _mii_probe(mii_handle_t mh)
 	 * transceiver.  NICs with an external MII will often place
 	 * the external PHY at address 1, and use address 0 for the
 	 * internal PHY.
+	 *
+	 * Some devices have a different preference however.  They can
+	 * override the default starting point of the search by
+	 * exporting a "first-phy" property.
 	 */
 
-	for (int i = 1; i < 33; i++) {
+	first = ddi_prop_get_int(DDI_DEV_T_ANY, mh->m_dip, 0, "first-phy", 1);
+	if ((first < 0) || (first > 31)) {
+		first = 1;
+	}
+	for (int i = first; i < (first + 32); i++) {
 
 		/*
-		 * This is tricky: it lets us try 0 last by starting
-		 * loop at 1 instead of 0.
+		 * This is tricky: it lets us start searching at an
+		 * arbitrary address instead of 0, dealing with the
+		 * wrap-around at address 31 properly.
 		 */
 		curr_addr = i % 32;
 

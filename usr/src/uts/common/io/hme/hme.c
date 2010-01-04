@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -539,9 +539,31 @@ hme_mii_read(void *arg, uint8_t phyad, uint8_t regad)
 {
 	struct hme	*hmep = arg;
 	uint32_t	frame;
+	uint32_t	tmp_mif;
+	uint32_t	tmp_xif;
 
-	if (!hmep->hme_frame_enable)
-		return (hme_bb_mii_read(hmep, phyad, regad));
+	tmp_mif = GET_MIFREG(mif_cfg);
+	tmp_xif = GET_MACREG(xifc);
+
+	switch (phyad) {
+	case HME_EXTERNAL_PHYAD:
+		PUT_MIFREG(mif_cfg, tmp_mif | HME_MIF_CFGPS);
+		PUT_MACREG(xifc, tmp_xif | BMAC_XIFC_MIIBUFDIS);
+		break;
+	case HME_INTERNAL_PHYAD:
+		PUT_MIFREG(mif_cfg, tmp_mif & ~(HME_MIF_CFGPS));
+		PUT_MACREG(xifc, tmp_xif & ~(BMAC_XIFC_MIIBUFDIS));
+		break;
+	default:
+		return (0xffff);
+	}
+
+	if (!hmep->hme_frame_enable) {
+		frame = (hme_bb_mii_read(hmep, phyad, regad));
+		PUT_MACREG(xifc, tmp_xif);
+		PUT_MIFREG(mif_cfg, tmp_mif);
+		return (frame & 0xffff);
+	}
 
 	PUT_MIFREG(mif_frame,
 	    HME_MIF_FRREAD | (phyad << HME_MIF_FRPHYAD_SHIFT) |
@@ -552,6 +574,10 @@ hme_mii_read(void *arg, uint8_t phyad, uint8_t regad)
 	HMEDELAY((GET_MIFREG(mif_frame) & HME_MIF_FRTA0), 300);
 	frame = GET_MIFREG(mif_frame);
 	CHECK_MIFREG();
+
+	PUT_MACREG(xifc, tmp_xif);
+	PUT_MIFREG(mif_cfg, tmp_mif);
+
 	if ((frame & HME_MIF_FRTA0) == 0) {
 
 
@@ -567,9 +593,29 @@ hme_mii_write(void *arg, uint8_t phyad, uint8_t regad, uint16_t data)
 {
 	struct hme *hmep = arg;
 	uint32_t frame;
+	uint32_t tmp_mif;
+	uint32_t tmp_xif;
+
+	tmp_mif = GET_MIFREG(mif_cfg);
+	tmp_xif = GET_MACREG(xifc);
+
+	switch (phyad) {
+	case HME_EXTERNAL_PHYAD:
+		PUT_MIFREG(mif_cfg, tmp_mif | HME_MIF_CFGPS);
+		PUT_MACREG(xifc, tmp_xif | BMAC_XIFC_MIIBUFDIS);
+		break;
+	case HME_INTERNAL_PHYAD:
+		PUT_MIFREG(mif_cfg, tmp_mif & ~(HME_MIF_CFGPS));
+		PUT_MACREG(xifc, tmp_xif & ~(BMAC_XIFC_MIIBUFDIS));
+		break;
+	default:
+		return;
+	}
 
 	if (!hmep->hme_frame_enable) {
 		hme_bb_mii_write(hmep, phyad, regad, data);
+		PUT_MACREG(xifc, tmp_xif);
+		PUT_MIFREG(mif_cfg, tmp_mif);
 		return;
 	}
 
@@ -581,6 +627,8 @@ hme_mii_write(void *arg, uint8_t phyad, uint8_t regad, uint16_t data)
  */
 	HMEDELAY((GET_MIFREG(mif_frame) & HME_MIF_FRTA0), 300);
 	frame = GET_MIFREG(mif_frame);
+	PUT_MACREG(xifc, tmp_xif);
+	PUT_MIFREG(mif_cfg, tmp_mif);
 	CHECK_MIFREG();
 	if ((frame & HME_MIF_FRTA0) == 0) {
 		HME_FAULT_MSG1(hmep, SEVERITY_MID, MII_MSG,
@@ -1431,6 +1479,9 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	hmestatinit(hmep);
+
+	/* our external (preferred) PHY is at address 0 */
+	(void) ddi_prop_update_int(DDI_DEV_T_NONE, dip, "first-phy", 0);
 
 	hmep->hme_mii = mii_alloc(hmep, dip, &hme_mii_ops);
 	if (hmep->hme_mii == NULL) {
