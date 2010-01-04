@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983, 1988, 1993
@@ -1092,8 +1092,19 @@ kern_ioctl(struct khash *k,
 		break;
 	}
 
-	rtioctl(action, k->k_dst, k->k_gate, k->k_mask, k->k_ifp,
-	    k->k_metric, flags);
+	/*
+	 * We should be doing an RTM_CHANGE for a KS_CHANGE, but
+	 * RTM_CHANGE in the kernel is not currently multipath-aware and
+	 * assumes that RTF_GATEWAY implies that the gateway of the route for
+	 * dst has to be changed. Moreover, the only change that in.routed
+	 * wants to implement is a change in the ks_metric (rmx_hopcount)
+	 * which the kernel ignores anway, so we skip the RTM_CHANGE operation
+	 * on the kernel
+	 */
+	if (action != RTM_CHANGE) {
+		rtioctl(action, k->k_dst, k->k_gate, k->k_mask, k->k_ifp,
+		    k->k_metric, flags);
+	}
 }
 
 
@@ -1864,7 +1875,6 @@ xaddr_done:
 	return (retv);
 }
 
-
 /* after aggregating, note routes that belong in the kernel */
 static void
 kern_out(struct ag_info *ag)
@@ -2142,16 +2152,7 @@ fix_kern(void)
 				    ((0 != (k->k_state & (KS_GATEWAY |
 				    KS_DYNAMIC))) ? RTF_GATEWAY : 0));
 			} else if (k->k_state & KS_CHANGE) {
-				/*
-				 * Should be using RTM_CHANGE here, but
-				 * since RTM_CHANGE is currently
-				 * not multipath-aware, and assumes
-				 * that RTF_GATEWAY implies the gateway
-				 * of the route for dst has to be
-				 * changed, we play safe, and do a del + add.
-				 */
-				kern_ioctl(k,  RTM_DELETE, 0);
-				kern_ioctl(k, RTM_ADD,
+				kern_ioctl(k, RTM_CHANGE,
 				    ((0 != (k->k_state & (KS_GATEWAY |
 				    KS_DYNAMIC))) ? RTF_GATEWAY : 0));
 			}
