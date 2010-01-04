@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,6 +93,18 @@ static audio_engine_ops_t audioixp_engine_ops = {
 	NULL
 };
 
+/*
+ * We drive audioixp in stereo only, so we don't want to display controls
+ * that are used for multichannel codecs.  Note that this multichannel
+ * configuration limitation is a problem for audioixp devices.
+ */
+const char *audioixp_remove_ac97[] = {
+	AUDIO_CTRL_ID_CENTER,
+	AUDIO_CTRL_ID_LFE,
+	AUDIO_CTRL_ID_SURROUND,
+	AUDIO_CTRL_ID_JACK1,
+	AUDIO_CTRL_ID_JACK2,
+};
 
 /*
  * interrupt handler
@@ -797,8 +809,27 @@ audioixp_alloc_port(audioixp_state_t *statep, int num)
 		dir = DDI_DMA_WRITE;
 		caps = ENGINE_OUTPUT_CAP;
 		port->sync_dir = DDI_DMA_SYNC_FORDEV;
-		/* This could possibly be conditionalized */
-		port->nchan = 6;
+		/*
+		 * We allow for end users to configure more channels
+		 * than just two, but we default to just two.  The
+		 * default stereo configuration works well.  On the
+		 * configurations we have tested, we've found that
+		 * more than two channels (or rather 6 channels) can
+		 * cause inexplicable noise.  The noise is more
+		 * noticeable when the system is running under load.
+		 * (Holding the space bar in "top" while playing an
+		 * MP3 is an easy way to recreate it.)  End users who
+		 * want to experiment, or have configurations that
+		 * don't suffer from this, may increase the channels
+		 * by setting this max-channels property.  We leave it
+		 * undocumented for now.
+		 */
+		port->nchan = ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
+		    "max-channels", 2);
+		port->nchan = min(ac97_num_channels(statep->ac97),
+		    port->nchan);
+		port->nchan &= ~1;	/* make sure its an even number */
+		port->nchan = max(port->nchan, 2);
 		break;
 	default:
 		audio_dev_warn(adev, "bad port number (%d)!", num);
@@ -1031,10 +1062,7 @@ audioixp_reset_port(audioixp_port_t *port)
 
 	ASSERT(mutex_owned(&statep->inst_lock));
 
-	/*
-	 * XXX: reset counters.
-	 */
-	port->count = 0;
+	port->offset = 0;
 
 	if (statep->suspended)
 		return;
@@ -1065,13 +1093,17 @@ audioixp_reset_port(audioixp_port_t *port)
 		    IXP_AUDIO_OUT_DMA_SLOT_10 |
 		    IXP_AUDIO_OUT_DMA_SLOT_11 |
 		    IXP_AUDIO_OUT_DMA_SLOT_12);
-		/* enable 6 channel out, unconditional for now */
+		/* enable AC'97 output slots (depending on output channels) */
 		slot |= IXP_AUDIO_OUT_DMA_SLOT_3 |
-		    IXP_AUDIO_OUT_DMA_SLOT_4 |
-		    IXP_AUDIO_OUT_DMA_SLOT_6 |
-		    IXP_AUDIO_OUT_DMA_SLOT_9 |
-		    IXP_AUDIO_OUT_DMA_SLOT_7 |
-		    IXP_AUDIO_OUT_DMA_SLOT_8;
+		    IXP_AUDIO_OUT_DMA_SLOT_4;
+		if (port->nchan >= 4) {
+			slot |= IXP_AUDIO_OUT_DMA_SLOT_6 |
+			    IXP_AUDIO_OUT_DMA_SLOT_9;
+		}
+		if (port->nchan >= 6) {
+			slot |= IXP_AUDIO_OUT_DMA_SLOT_7 |
+			    IXP_AUDIO_OUT_DMA_SLOT_8;
+		}
 
 		PUT32(IXP_AUDIO_OUT_DMA_SLOT_EN_THRESHOLD, slot);
 
@@ -1522,11 +1554,10 @@ audioixp_attach(dev_info_t *dip)
 	audio_dev_set_description(adev, name);
 	audio_dev_set_version(adev, rev);
 
-	/* allocate port structures */
-	if ((audioixp_alloc_port(statep, IXP_PLAY) != DDI_SUCCESS) ||
-	    (audioixp_alloc_port(statep, IXP_REC) != DDI_SUCCESS)) {
-		goto error;
-	}
+	/* set PCI command register */
+	cmdeg = pci_config_get16(statep->pcih, PCI_CONF_COMM);
+	pci_config_put16(statep->pcih, PCI_CONF_COMM,
+	    cmdeg | PCI_COMM_IO | PCI_COMM_MAE);
 
 	statep->ac97 = ac97_alloc(dip, audioixp_rd97, audioixp_wr97, statep);
 	if (statep->ac97 == NULL) {
@@ -1534,10 +1565,28 @@ audioixp_attach(dev_info_t *dip)
 		goto error;
 	}
 
-	/* set PCI command register */
-	cmdeg = pci_config_get16(statep->pcih, PCI_CONF_COMM);
-	pci_config_put16(statep->pcih, PCI_CONF_COMM,
-	    cmdeg | PCI_COMM_IO | PCI_COMM_MAE);
+	/* allocate port structures */
+	if ((audioixp_alloc_port(statep, IXP_PLAY) != DDI_SUCCESS) ||
+	    (audioixp_alloc_port(statep, IXP_REC) != DDI_SUCCESS)) {
+		goto error;
+	}
+
+	/*
+	 * If we have locked in a stereo configuration, then don't expose
+	 * multichannel-specific AC'97 codec controls.
+	 */
+	if (statep->play_port->nchan == 2) {
+		int i;
+		ac97_ctrl_t *ctrl;
+		const char *name;
+
+		for (i = 0; (name = audioixp_remove_ac97[i]) != NULL; i++) {
+			ctrl = ac97_control_find(statep->ac97, name);
+			if (ctrl != NULL) {
+				ac97_control_unregister(ctrl);
+			}
+		}
+	}
 
 	/* set up kernel statistics */
 	if ((statep->ksp = kstat_create(IXP_NAME, ddi_get_instance(dip),
