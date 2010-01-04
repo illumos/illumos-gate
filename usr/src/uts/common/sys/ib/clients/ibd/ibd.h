@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -150,7 +150,6 @@ typedef struct ibd_copybuf_s {
 
 typedef struct ibd_wqe_s {
 	struct ibd_wqe_s	*w_next;
-	ibd_wqe_type_t		w_type;
 	ibd_copybuf_t		w_copybuf;
 	mblk_t			*im_mblk;
 } ibd_wqe_t;
@@ -168,7 +167,6 @@ typedef struct ibd_swqe_s {
 } ibd_swqe_t;
 
 #define	swqe_next		w_ibd_swqe.w_next
-#define	swqe_type		w_ibd_swqe.w_type
 #define	swqe_copybuf		w_ibd_swqe.w_copybuf
 #define	swqe_im_mblk		w_ibd_swqe.im_mblk
 #define	SWQE_TO_WQE(swqe)	(ibd_wqe_t *)&((swqe)->w_ibd_swqe)
@@ -181,12 +179,10 @@ typedef struct ibd_rwqe_s {
 	ibd_wqe_t		w_ibd_rwqe;
 	struct ibd_state_s	*w_state;
 	ibt_recv_wr_t		w_rwr;
-	boolean_t		w_freeing_wqe;
 	frtn_t			w_freemsg_cb;
 } ibd_rwqe_t;
 
 #define	rwqe_next		w_ibd_rwqe.w_next
-#define	rwqe_type		w_ibd_rwqe.w_type
 #define	rwqe_copybuf		w_ibd_rwqe.w_copybuf
 #define	rwqe_im_mblk		w_ibd_rwqe.im_mblk
 #define	RWQE_TO_WQE(rwqe)	(ibd_wqe_t *)&((rwqe)->w_ibd_rwqe)
@@ -240,15 +236,12 @@ typedef struct ibd_lsobkt_s {
  * Note: the RX_QUEUE_CACHE_LINE needs to change if the struct changes.
  */
 #define	RX_QUEUE_CACHE_LINE \
-	(64 - ((sizeof (kmutex_t) + 2 * sizeof (ibd_wqe_t *) + \
-	2 * sizeof (uint32_t))))
+	(64 - (sizeof (kmutex_t) + sizeof (ibd_wqe_t *) + sizeof (uint_t)))
 typedef struct ibd_rx_queue_s {
 	kmutex_t		rx_post_lock;
 	ibd_wqe_t		*rx_head;
-	ibd_wqe_t		*rx_tail;
-	uint32_t		rx_stat;
-	uint32_t		rx_cnt;
-	uint8_t			rx_cache_filler[RX_QUEUE_CACHE_LINE];
+	uint_t			rx_cnt;
+	uint8_t			rx_pad[RX_QUEUE_CACHE_LINE];
 } ibd_rx_queue_t;
 
 /*
@@ -263,6 +256,8 @@ typedef struct ibd_state_s {
 	kmem_cache_t		*id_req_kmc;
 
 	ibd_list_t		id_tx_rel_list;
+
+	uint32_t		id_running;
 
 	uint32_t		id_max_sqseg;
 	uint32_t		id_max_sqseg_hiwm;
@@ -291,11 +286,10 @@ typedef struct ibd_state_s {
 	ibt_wc_t		*id_txwcs;
 	uint32_t		id_txwcs_size;
 
-	kmutex_t		id_rx_post_lock;
-	int			id_rx_post_busy;
 	int			id_rx_nqueues;
 	ibd_rx_queue_t		*id_rx_queues;
-	ibd_wqe_t		*id_rx_post_head;
+	int			id_rx_post_queue_index;
+	uint32_t		id_rx_post_active;
 
 	ibd_rwqe_t		*id_rx_wqes;
 	uint8_t			*id_rx_bufs;

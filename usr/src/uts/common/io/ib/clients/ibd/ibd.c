@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -117,7 +117,7 @@ uint_t ibd_tx_copy_thresh = 0x1000;
 uint_t ibd_num_swqe = 4000;
 uint_t ibd_num_rwqe = 4000;
 uint_t ibd_num_lso_bufs = 0x400;
-uint_t ibd_num_ah = 64;
+uint_t ibd_num_ah = 256;
 uint_t ibd_hash_size = 32;
 uint_t ibd_rx_softintr = 1;
 uint_t ibd_tx_softintr = 1;
@@ -169,10 +169,10 @@ uint_t ibd_txcomp_usec = 300;
 #define	IBD_MAX_TX_POST_MULTIPLE	4
 
 /* Post IBD_RX_POST_CNT receive work requests at a time. */
-#define	IBD_RX_POST_CNT			16
+#define	IBD_RX_POST_CNT			8
 
 /* Hash into 1 << IBD_LOG_RX_POST number of rx post queues */
-#define	IBD_LOG_RX_POST			3
+#define	IBD_LOG_RX_POST			4
 
 /* Minimum number of receive work requests driver needs to always have */
 #define	IBD_RWQE_MIN	((IBD_RX_POST_CNT << IBD_LOG_RX_POST) * 4)
@@ -354,6 +354,7 @@ static int ibd_acquire_lsobufs(ibd_state_t *, uint_t, ibt_wr_ds_t *,
 static void ibd_free_rwqe(ibd_state_t *, ibd_rwqe_t *);
 static void ibd_free_tx_copybufs(ibd_state_t *);
 static void ibd_free_rx_copybufs(ibd_state_t *);
+static void ibd_free_rx_rsrcs(ibd_state_t *);
 static void ibd_free_tx_lsobufs(ibd_state_t *);
 static void ibd_release_swqe(ibd_state_t *, ibd_swqe_t *, ibd_swqe_t *, int);
 static void ibd_release_lsobufs(ibd_state_t *, ibt_wr_ds_t *, uint32_t);
@@ -701,6 +702,7 @@ _NOTE(SCHEME_PROTECTS_DATA("atomic update only",
     ibd_state_s::id_num_intrs
     ibd_state_s::id_rcv_bytes
     ibd_state_s::id_rcv_pkt
+    ibd_state_s::id_rx_post_queue_index
     ibd_state_s::id_tx_short
     ibd_state_s::id_xmt_bytes
     ibd_state_s::id_xmt_pkt))
@@ -1140,8 +1142,7 @@ ibd_get_allroutergroup(ibd_state_t *state, ipoib_mac_t *mcmac,
 		B_TRUE					\
 )
 #define	DEC_REF_DO_CYCLE(ace) (				\
-	atomic_add_32_nv(&ace->ac_ref, -1) ==		\
-	    CYCLEVAL ?					\
+	atomic_dec_32_nv(&ace->ac_ref) == CYCLEVAL ?	\
 		/*					\
 		 * Ref count known to be 0 from above.	\
 		 */					\
@@ -2395,6 +2396,14 @@ ibd_unattach(ibd_state_t *state, dev_info_t *dip)
 	uint32_t progress = state->id_mac_state;
 	ibt_status_t ret;
 
+	if (atomic_add_32_nv(&state->id_rx_list.dl_bufs_outstanding, 0) != 0) {
+		cmn_err(CE_CONT, "ibd_detach: failed: rx bufs outstanding\n");
+		return (DDI_FAILURE);
+	}
+
+	/* make sure rx resources are freed */
+	ibd_free_rx_rsrcs(state);
+
 	if (progress & IBD_DRV_MAC_REGISTERED) {
 		(void) mac_unregister(state->id_mh);
 		state->id_mac_state &= (~IBD_DRV_MAC_REGISTERED);
@@ -2620,9 +2629,7 @@ ibd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	 * done ibd_attach(), ibd_m_start() and ibd_m_stop() correctly
 	 * so far, we should find all the flags we need in id_mac_state.
 	 */
-	(void) ibd_unattach(state, dip);
-
-	return (DDI_SUCCESS);
+	return (ibd_unattach(state, dip));
 }
 
 /*
@@ -2648,17 +2655,7 @@ ibd_state_init(ibd_state_t *state, dev_info_t *dip)
 	mutex_init(&state->id_sched_lock, NULL, MUTEX_DRIVER, NULL);
 
 	mutex_init(&state->id_tx_list.dl_mutex, NULL, MUTEX_DRIVER, NULL);
-	mutex_enter(&state->id_tx_list.dl_mutex);
-	state->id_tx_list.dl_head = NULL;
-	state->id_tx_list.dl_pending_sends = B_FALSE;
-	state->id_tx_list.dl_cnt = 0;
-	mutex_exit(&state->id_tx_list.dl_mutex);
 	mutex_init(&state->id_tx_rel_list.dl_mutex, NULL, MUTEX_DRIVER, NULL);
-	mutex_enter(&state->id_tx_rel_list.dl_mutex);
-	state->id_tx_rel_list.dl_head = NULL;
-	state->id_tx_rel_list.dl_pending_sends = B_FALSE;
-	state->id_tx_rel_list.dl_cnt = 0;
-	mutex_exit(&state->id_tx_rel_list.dl_mutex);
 	mutex_init(&state->id_txpost_lock, NULL, MUTEX_DRIVER, NULL);
 	state->id_tx_busy = 0;
 	mutex_init(&state->id_lso_lock, NULL, MUTEX_DRIVER, NULL);
@@ -3394,6 +3391,17 @@ ibd_init_txlist(ibd_state_t *state)
 			state->id_lso_policy = B_FALSE;
 	}
 
+	mutex_enter(&state->id_tx_list.dl_mutex);
+	state->id_tx_list.dl_head = NULL;
+	state->id_tx_list.dl_pending_sends = B_FALSE;
+	state->id_tx_list.dl_cnt = 0;
+	mutex_exit(&state->id_tx_list.dl_mutex);
+	mutex_enter(&state->id_tx_rel_list.dl_mutex);
+	state->id_tx_rel_list.dl_head = NULL;
+	state->id_tx_rel_list.dl_pending_sends = B_FALSE;
+	state->id_tx_rel_list.dl_cnt = 0;
+	mutex_exit(&state->id_tx_rel_list.dl_mutex);
+
 	/*
 	 * Allocate and setup the swqe list
 	 */
@@ -3403,7 +3411,6 @@ ibd_init_txlist(ibd_state_t *state)
 	swqe = state->id_tx_wqes;
 	mutex_enter(&state->id_tx_list.dl_mutex);
 	for (i = 0; i < state->id_num_swqe; i++, swqe++, bufaddr += len) {
-		swqe->swqe_type = IBD_WQE_SEND;
 		swqe->swqe_next = NULL;
 		swqe->swqe_im_mblk = NULL;
 
@@ -3615,95 +3622,93 @@ ibd_free_tx_lsobufs(ibd_state_t *state)
 static void
 ibd_fini_txlist(ibd_state_t *state)
 {
-	ibd_swqe_t *node;
-
 	/*
 	 * Free the allocated swqes
 	 */
 	mutex_enter(&state->id_tx_list.dl_mutex);
-	while (state->id_tx_list.dl_head != NULL) {
-		node = WQE_TO_SWQE(state->id_tx_list.dl_head);
-		state->id_tx_list.dl_head = node->swqe_next;
-		ASSERT(state->id_tx_list.dl_cnt > 0);
-		state->id_tx_list.dl_cnt--;
-	}
-	ASSERT(state->id_tx_list.dl_cnt == 0);
-	mutex_exit(&state->id_tx_list.dl_mutex);
 	mutex_enter(&state->id_tx_rel_list.dl_mutex);
-	while (state->id_tx_rel_list.dl_head != NULL) {
-		node = WQE_TO_SWQE(state->id_tx_rel_list.dl_head);
-		state->id_tx_rel_list.dl_head = node->swqe_next;
-		ASSERT(state->id_tx_rel_list.dl_cnt > 0);
-		state->id_tx_rel_list.dl_cnt--;
-	}
-	ASSERT(state->id_tx_rel_list.dl_cnt == 0);
+	state->id_tx_list.dl_head = NULL;
+	state->id_tx_list.dl_pending_sends = B_FALSE;
+	state->id_tx_list.dl_cnt = 0;
+	state->id_tx_rel_list.dl_head = NULL;
+	state->id_tx_rel_list.dl_pending_sends = B_FALSE;
+	state->id_tx_rel_list.dl_cnt = 0;
 	mutex_exit(&state->id_tx_rel_list.dl_mutex);
+	mutex_exit(&state->id_tx_list.dl_mutex);
 
 	ibd_free_tx_lsobufs(state);
 	ibd_free_tx_copybufs(state);
 }
 
+/*
+ * post a list of rwqes, NULL terminated.
+ */
 static void
-ibd_post_recv_task(ibd_rwqe_t *rwqe, ibd_rwqe_t *tail)
+ibd_post_recv_list(ibd_state_t *state, ibd_rwqe_t *rwqe)
 {
 	uint_t		i;
 	uint_t		num_posted;
 	ibt_status_t	ibt_status;
 	ibt_recv_wr_t	wrs[IBD_RX_POST_CNT];
-	ibd_state_t	*state = rwqe->w_state;
 
-	mutex_enter(&state->id_rx_post_lock);
-	if (state->id_rx_post_busy) {
-		tail->rwqe_next = state->id_rx_post_head;
-		state->id_rx_post_head = RWQE_TO_WQE(rwqe);
-		mutex_exit(&state->id_rx_post_lock);
-		return;
+	while (rwqe) {
+		/* Post up to IBD_RX_POST_CNT receive work requests */
+		for (i = 0; i < IBD_RX_POST_CNT; i++) {
+			wrs[i] = rwqe->w_rwr;
+			rwqe = WQE_TO_RWQE(rwqe->rwqe_next);
+			if (rwqe == NULL) {
+				i++;
+				break;
+			}
+		}
+
+		/*
+		 * If posting fails for some reason, we'll never receive
+		 * completion intimation, so we'll need to cleanup. But
+		 * we need to make sure we don't clean up nodes whose
+		 * wrs have been successfully posted. We assume that the
+		 * hca driver returns on the first failure to post and
+		 * therefore the first 'num_posted' entries don't need
+		 * cleanup here.
+		 */
+		atomic_add_32(&state->id_rx_list.dl_cnt, i);
+
+		num_posted = 0;
+		ibt_status = ibt_post_recv(state->id_chnl_hdl, wrs, i,
+		    &num_posted);
+		if (ibt_status != IBT_SUCCESS) {
+			/* This cannot happen unless the device has an error. */
+			ibd_print_warn(state, "ibd_post_recv: FATAL: "
+			    "posting multiple wrs failed: "
+			    "requested=%d, done=%d, ret=%d",
+			    IBD_RX_POST_CNT, num_posted, ibt_status);
+			atomic_add_32(&state->id_rx_list.dl_cnt,
+			    num_posted - i);
+		}
 	}
-	state->id_rx_post_busy = 1;
-	mutex_exit(&state->id_rx_post_lock);
+}
 
-loop:
-	/* Post the IBD_RX_POST_CNT receive work requests pointed to by arg. */
-	for (i = 0; i < IBD_RX_POST_CNT; i++) {
-		wrs[i] = rwqe->w_rwr;
-		rwqe = WQE_TO_RWQE(rwqe->rwqe_next);
-	}
+/*
+ * Grab a list of rwqes from the array of lists, and post the list.
+ */
+static void
+ibd_post_recv_intr(ibd_state_t *state)
+{
+	ibd_rx_queue_t	*rxp;
+	ibd_rwqe_t *list;
 
-	/*
-	 * If posting fails for some reason, we'll never receive
-	 * completion intimation, so we'll need to cleanup. But
-	 * we need to make sure we don't clean up nodes whose
-	 * wrs have been successfully posted. We assume that the
-	 * hca driver returns on the first failure to post and
-	 * therefore the first 'num_posted' entries don't need
-	 * cleanup here.
-	 */
-	atomic_add_32(&state->id_rx_list.dl_cnt, IBD_RX_POST_CNT);
+	/* rotate through the rx_queue array, expecting an adequate number */
+	state->id_rx_post_queue_index =
+	    (state->id_rx_post_queue_index + 1) &
+	    (state->id_rx_nqueues - 1);
 
-	num_posted = 0;
-	ibt_status = ibt_post_recv(state->id_chnl_hdl,
-	    wrs, IBD_RX_POST_CNT, &num_posted);
-	if (ibt_status != IBT_SUCCESS) {
-		ibd_print_warn(state, "ibd_post_recv: FATAL: "
-		    "posting multiple wrs failed: "
-		    "requested=%d, done=%d, ret=%d",
-		    IBD_RX_POST_CNT, num_posted, ibt_status);
-		atomic_add_32(&state->id_rx_list.dl_cnt,
-		    -(IBD_RX_POST_CNT - num_posted));
-		/* This cannot happen! */
-	}
-	if (rwqe != NULL)	/* more rwqes on our list? */
-		goto loop;
-
-	/* check if we have a new list */
-	mutex_enter(&state->id_rx_post_lock);
-	if ((rwqe = WQE_TO_RWQE(state->id_rx_post_head)) != NULL) {
-		state->id_rx_post_head = NULL;
-		mutex_exit(&state->id_rx_post_lock);
-		goto loop;
-	}
-	state->id_rx_post_busy = 0;
-	mutex_exit(&state->id_rx_post_lock);
+	rxp = state->id_rx_queues + state->id_rx_post_queue_index;
+	mutex_enter(&rxp->rx_post_lock);
+	list = WQE_TO_RWQE(rxp->rx_head);
+	rxp->rx_head = NULL;
+	rxp->rx_cnt = 0;
+	mutex_exit(&rxp->rx_post_lock);
+	ibd_post_recv_list(state, list);
 }
 
 /* macro explained below */
@@ -3725,7 +3730,6 @@ static void
 ibd_post_recv(ibd_state_t *state, ibd_rwqe_t *rwqe)
 {
 	ibd_rx_queue_t	*rxp;
-	ibd_rwqe_t	*tail;
 
 	rxp = state->id_rx_queues + RX_QUEUE_HASH(rwqe);
 
@@ -3735,21 +3739,20 @@ ibd_post_recv(ibd_state_t *state, ibd_rwqe_t *rwqe)
 		mutex_enter(&rxp->rx_post_lock);
 	}
 	rwqe->rwqe_next = rxp->rx_head;
-	if (rxp->rx_cnt == 0)
-		rxp->rx_tail = RWQE_TO_WQE(rwqe);
-	if (++rxp->rx_cnt == IBD_RX_POST_CNT) {
-		rxp->rx_head = NULL;
-		tail = WQE_TO_RWQE(rxp->rx_tail);
-		rxp->rx_cnt = 0;
-	} else {
-		rxp->rx_head = RWQE_TO_WQE(rwqe);
-		rwqe = NULL;
+	if (++rxp->rx_cnt >= IBD_RX_POST_CNT - 2) {
+		uint_t active = atomic_inc_32_nv(&state->id_rx_post_active);
+
+		/* only call ibt_post_recv() every Nth time through here */
+		if ((active & (state->id_rx_nqueues - 1)) == 0) {
+			rxp->rx_head = NULL;
+			rxp->rx_cnt = 0;
+			mutex_exit(&rxp->rx_post_lock);
+			ibd_post_recv_list(state, rwqe);
+			return;
+		}
 	}
-	rxp->rx_stat++;
+	rxp->rx_head = RWQE_TO_WQE(rwqe);
 	mutex_exit(&rxp->rx_post_lock);
-	if (rwqe) {
-		ibd_post_recv_task(rwqe, tail);
-	}
 }
 
 static int
@@ -3805,11 +3808,46 @@ ibd_alloc_rx_copybufs(ibd_state_t *state)
 static int
 ibd_init_rxlist(ibd_state_t *state)
 {
-	ibd_rwqe_t *rwqe;
+	ibd_rwqe_t *rwqe, *next;
+	ibd_wqe_t *list;
 	ibt_lkey_t lkey;
 	int i;
 	uint_t len;
 	uint8_t *bufaddr;
+
+	mutex_enter(&state->id_rx_free_list.dl_mutex);
+	if (state->id_rx_free_list.dl_head != NULL) {
+		/* rx rsrcs were never freed.  Just repost them */
+		len = state->id_rx_buf_sz;
+		list = state->id_rx_free_list.dl_head;
+		state->id_rx_free_list.dl_head = NULL;
+		state->id_rx_free_list.dl_cnt = 0;
+		mutex_exit(&state->id_rx_free_list.dl_mutex);
+		for (rwqe = WQE_TO_RWQE(list); rwqe != NULL;
+		    rwqe = WQE_TO_RWQE(rwqe->rwqe_next)) {
+			if ((rwqe->rwqe_im_mblk = desballoc(
+			    rwqe->rwqe_copybuf.ic_bufaddr, len, 0,
+			    &rwqe->w_freemsg_cb)) == NULL) {
+				/* allow freemsg_cb to free the rwqes */
+				if (atomic_dec_32_nv(&state->id_running) != 0) {
+					cmn_err(CE_WARN, "ibd_init_rxlist: "
+					    "id_running was not 1\n");
+				}
+				DPRINT(10, "ibd_init_rxlist : "
+				    "failed in desballoc()");
+				for (rwqe = WQE_TO_RWQE(list); rwqe != NULL;
+				    rwqe = next) {
+					next = WQE_TO_RWQE(rwqe->rwqe_next);
+					freemsg(rwqe->rwqe_im_mblk);
+				}
+				atomic_inc_32(&state->id_running);
+				return (DDI_FAILURE);
+			}
+		}
+		ibd_post_recv_list(state, WQE_TO_RWQE(list));
+		return (DDI_SUCCESS);
+	}
+	mutex_exit(&state->id_rx_free_list.dl_mutex);
 
 	if (ibd_alloc_rx_copybufs(state) != DDI_SUCCESS)
 		return (DDI_FAILURE);
@@ -3817,14 +3855,13 @@ ibd_init_rxlist(ibd_state_t *state)
 	/*
 	 * Allocate and setup the rwqe list
 	 */
+	len = state->id_rx_buf_sz;
 	lkey = state->id_rx_mr_desc.md_lkey;
 	rwqe = state->id_rx_wqes;
 	bufaddr = state->id_rx_bufs;
-	len = state->id_rx_buf_sz;
+	list = NULL;
 	for (i = 0; i < state->id_num_rwqe; i++, rwqe++, bufaddr += len) {
-		rwqe->rwqe_type = IBD_WQE_RECV;
 		rwqe->w_state = state;
-		rwqe->w_freeing_wqe = B_FALSE;
 		rwqe->w_freemsg_cb.free_func = ibd_freemsg_cb;
 		rwqe->w_freemsg_cb.free_arg = (char *)rwqe;
 
@@ -3833,8 +3870,19 @@ ibd_init_rxlist(ibd_state_t *state)
 		if ((rwqe->rwqe_im_mblk = desballoc(bufaddr, len, 0,
 		    &rwqe->w_freemsg_cb)) == NULL) {
 			DPRINT(10, "ibd_init_rxlist : failed in desballoc()");
-			rwqe->rwqe_copybuf.ic_bufaddr = NULL;
-			ibd_fini_rxlist(state);
+			/* allow freemsg_cb to free the rwqes */
+			if (atomic_dec_32_nv(&state->id_running) != 0) {
+				cmn_err(CE_WARN, "ibd_init_rxlist: "
+				    "id_running was not 1\n");
+			}
+			DPRINT(10, "ibd_init_rxlist : "
+			    "failed in desballoc()");
+			for (rwqe = WQE_TO_RWQE(list); rwqe != NULL;
+			    rwqe = next) {
+				next = WQE_TO_RWQE(rwqe->rwqe_next);
+				freemsg(rwqe->rwqe_im_mblk);
+			}
+			atomic_inc_32(&state->id_running);
 			return (DDI_FAILURE);
 		}
 
@@ -3846,8 +3894,10 @@ ibd_init_rxlist(ibd_state_t *state)
 		rwqe->w_rwr.wr_nds = 1;
 		rwqe->w_rwr.wr_sgl = &rwqe->rwqe_copybuf.ic_sgl;
 
-		ibd_post_recv(state, rwqe);
+		rwqe->rwqe_next = list;
+		list = RWQE_TO_WQE(rwqe);
 	}
+	ibd_post_recv_list(state, WQE_TO_RWQE(list));
 
 	return (DDI_SUCCESS);
 }
@@ -3882,6 +3932,22 @@ ibd_free_rx_copybufs(ibd_state_t *state)
 	state->id_rx_bufs = NULL;
 }
 
+static void
+ibd_free_rx_rsrcs(ibd_state_t *state)
+{
+	mutex_enter(&state->id_rx_free_list.dl_mutex);
+	if (state->id_rx_free_list.dl_head == NULL) {
+		/* already freed */
+		mutex_exit(&state->id_rx_free_list.dl_mutex);
+		return;
+	}
+	ASSERT(state->id_rx_free_list.dl_cnt == state->id_num_rwqe);
+	ibd_free_rx_copybufs(state);
+	state->id_rx_free_list.dl_cnt = 0;
+	state->id_rx_free_list.dl_head = NULL;
+	mutex_exit(&state->id_rx_free_list.dl_mutex);
+}
+
 /*
  * Free the statically allocated Rx buffer list.
  *
@@ -3892,17 +3958,22 @@ ibd_fini_rxlist(ibd_state_t *state)
 	ibd_rwqe_t *rwqe;
 	int i;
 
-	mutex_enter(&state->id_rx_list.dl_mutex);
-	rwqe = state->id_rx_wqes;
-	for (i = 0; i < state->id_num_rwqe; i++, rwqe++) {
-		if (rwqe->rwqe_im_mblk != NULL) {
-			rwqe->w_freeing_wqe = B_TRUE;
+	/* run through the rx_queue's, calling freemsg() */
+	for (i = 0; i < state->id_rx_nqueues; i++) {
+		ibd_rx_queue_t *rxp = state->id_rx_queues + i;
+		mutex_enter(&rxp->rx_post_lock);
+		for (rwqe = WQE_TO_RWQE(rxp->rx_head); rwqe;
+		    rwqe = WQE_TO_RWQE(rwqe->rwqe_next)) {
 			freemsg(rwqe->rwqe_im_mblk);
+			rxp->rx_cnt--;
 		}
+		rxp->rx_head = NULL;
+		mutex_exit(&rxp->rx_post_lock);
 	}
-	mutex_exit(&state->id_rx_list.dl_mutex);
 
-	ibd_free_rx_copybufs(state);
+	/* cannot free rx resources unless gld returned everything */
+	if (atomic_add_32_nv(&state->id_rx_list.dl_bufs_outstanding, 0) == 0)
+		ibd_free_rx_rsrcs(state);
 }
 
 /*
@@ -3938,7 +4009,7 @@ ibd_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 {
 	ibd_state_t *state = (ibd_state_t *)arg;
 
-	atomic_add_64(&state->id_num_intrs, 1);
+	atomic_inc_64(&state->id_num_intrs);
 
 	if (ibd_rx_softintr == 1) {
 		mutex_enter(&state->id_rcq_poll_lock);
@@ -3964,7 +4035,7 @@ ibd_scq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 {
 	ibd_state_t *state = (ibd_state_t *)arg;
 
-	atomic_add_64(&state->id_num_intrs, 1);
+	atomic_inc_64(&state->id_num_intrs);
 
 	if (ibd_tx_softintr == 1) {
 		mutex_enter(&state->id_scq_poll_lock);
@@ -4364,6 +4435,9 @@ ibd_undo_start(ibd_state_t *state, link_state_t cur_link_state)
 	ibd_mce_t *mce;
 	uint8_t jstate;
 
+	if (atomic_dec_32_nv(&state->id_running) != 0)
+		cmn_err(CE_WARN, "ibd_undo_start: id_running was not 1\n");
+
 	/*
 	 * Before we try to stop/undo whatever we did in ibd_start(),
 	 * we need to mark the link state appropriately to prevent the
@@ -4389,14 +4463,12 @@ ibd_undo_start(ibd_state_t *state, link_state_t cur_link_state)
 	/*
 	 * First, stop receive interrupts; this stops the driver from
 	 * handing up buffers to higher layers.  Wait for receive buffers
-	 * to be returned and give up after 5 seconds.
+	 * to be returned and give up after 1 second.
 	 */
 	if (progress & IBD_DRV_RCQ_NOTIFY_ENABLED) {
-
-		ibt_set_cq_handler(state->id_rcq_hdl, 0, 0);
-
-		attempts = 50;
-		while (state->id_rx_list.dl_bufs_outstanding > 0) {
+		attempts = 10;
+		while (atomic_add_32_nv(&state->id_rx_list.dl_bufs_outstanding,
+		    0) > 0) {
 			delay(drv_usectohz(100000));
 			if (--attempts == 0) {
 				/*
@@ -4407,12 +4479,10 @@ ibd_undo_start(ibd_state_t *state, link_state_t cur_link_state)
 				 * we turned off the notification and
 				 * return failure.
 				 */
+				cmn_err(CE_CONT, "!ibd: bufs outstanding\n");
 				DPRINT(2, "ibd_undo_start: "
 				    "reclaiming failed");
-				ibd_poll_rcq(state, state->id_rcq_hdl);
-				ibt_set_cq_handler(state->id_rcq_hdl,
-				    ibd_rcq_handler, state);
-				return (DDI_FAILURE);
+				break;
 			}
 		}
 		state->id_mac_state &= (~IBD_DRV_RCQ_NOTIFY_ENABLED);
@@ -4445,14 +4515,40 @@ ibd_undo_start(ibd_state_t *state, link_state_t cur_link_state)
 		}
 
 		/*
-		 * Turn off Tx interrupts and poll. By the time the polling
-		 * returns an empty indicator, we are sure we have seen all
-		 * pending Tx callbacks. Note that after the call to
-		 * ibt_set_cq_handler() returns, the old handler is
-		 * guaranteed not to be invoked anymore.
+		 * Give some time for the TX CQ handler to process the
+		 * completions.
 		 */
+		mutex_enter(&state->id_tx_list.dl_mutex);
+		mutex_enter(&state->id_tx_rel_list.dl_mutex);
+		attempts = 10;
+		while (state->id_tx_list.dl_cnt + state->id_tx_rel_list.dl_cnt
+		    != state->id_num_swqe) {
+			if (--attempts == 0)
+				break;
+			mutex_exit(&state->id_tx_rel_list.dl_mutex);
+			mutex_exit(&state->id_tx_list.dl_mutex);
+			delay(drv_usectohz(100000));
+			mutex_enter(&state->id_tx_list.dl_mutex);
+			mutex_enter(&state->id_tx_rel_list.dl_mutex);
+		}
 		ibt_set_cq_handler(state->id_scq_hdl, 0, 0);
-		ibd_poll_scq(state, state->id_scq_hdl);
+		if (state->id_tx_list.dl_cnt + state->id_tx_rel_list.dl_cnt !=
+		    state->id_num_swqe) {
+			cmn_err(CE_WARN, "tx resources not freed\n");
+		}
+		mutex_exit(&state->id_tx_rel_list.dl_mutex);
+		mutex_exit(&state->id_tx_list.dl_mutex);
+
+		attempts = 10;
+		while (atomic_add_32_nv(&state->id_rx_list.dl_cnt, 0) != 0) {
+			if (--attempts == 0)
+				break;
+			delay(drv_usectohz(100000));
+		}
+		ibt_set_cq_handler(state->id_rcq_hdl, 0, 0);
+		if (atomic_add_32_nv(&state->id_rx_list.dl_cnt, 0) != 0) {
+			cmn_err(CE_WARN, "rx resources not freed\n");
+		}
 
 		state->id_mac_state &= (~IBD_DRV_SCQ_NOTIFY_ENABLED);
 	}
@@ -4629,6 +4725,13 @@ ibd_start(ibd_state_t *state)
 
 	if (state->id_mac_state & IBD_DRV_STARTED)
 		return (DDI_SUCCESS);
+
+	if (atomic_inc_32_nv(&state->id_running) != 1) {
+		DPRINT(10, "ibd_start: id_running is non-zero");
+		cmn_err(CE_WARN, "ibd_start: id_running was not 0\n");
+		atomic_dec_32(&state->id_running);
+		return (EINVAL);
+	}
 
 	/*
 	 * Get port details; if we fail here, very likely the port
@@ -5599,6 +5702,16 @@ ibd_send(ibd_state_t *state, mblk_t *mp)
 	if ((state->id_mac_state & IBD_DRV_STARTED) == 0)
 		return (B_FALSE);
 
+	/*
+	 * Obtain an address handle for the destination.
+	 */
+	ipibp = (ib_header_info_t *)mp->b_rptr;
+	dest = (ipoib_mac_t *)&ipibp->ib_dst;
+	if ((ntohl(dest->ipoib_qpn) & IB_QPN_MASK) == IB_MC_QPN)
+		IBD_FILL_SCOPE_PKEY(dest, state->id_scope, state->id_pkey);
+
+	ace = ibd_acache_lookup(state, dest, &ret, 1);
+
 	mutex_enter(&state->id_tx_list.dl_mutex);
 	node = WQE_TO_SWQE(state->id_tx_list.dl_head);
 	if (node != NULL) {
@@ -5635,14 +5748,6 @@ ibd_send(ibd_state_t *state, mblk_t *mp)
 	node->w_swr.wr_sgl = NULL;
 	node->w_swr.wr_opcode = IBT_WRC_SEND;
 
-	/*
-	 * Obtain an address handle for the destination.
-	 */
-	ipibp = (ib_header_info_t *)mp->b_rptr;
-	dest = (ipoib_mac_t *)&ipibp->ib_dst;
-	if ((ntohl(dest->ipoib_qpn) & IB_QPN_MASK) == IB_MC_QPN)
-		IBD_FILL_SCOPE_PKEY(dest, state->id_scope, state->id_pkey);
-
 	pktsize = msgsize(mp);
 
 	atomic_add_64(&state->id_xmt_bytes, pktsize);
@@ -5652,7 +5757,7 @@ ibd_send(ibd_state_t *state, mblk_t *mp)
 	else if ((ntohl(ipibp->ib_dst.ipoib_qpn) & IB_QPN_MASK) == IB_MC_QPN)
 		atomic_inc_64(&state->id_multi_xmt);
 
-	if ((ace = ibd_acache_lookup(state, dest, &ret, 1)) != NULL) {
+	if (ace != NULL) {
 		node->w_ahandle = ace;
 		node->w_swr.wr.ud.udwr_dest = ace->ac_dest;
 	} else {
@@ -5882,22 +5987,23 @@ ibd_drain_scq(ibd_state_t *state, ibt_cq_hdl_t cq_hdl)
 		head = tail = NULL;
 		for (i = 0, wc = wcs; i < num_polled; i++, wc++) {
 			wqe = (ibd_wqe_t *)(uintptr_t)wc->wc_id;
-			ASSERT(wqe->w_type == IBD_WQE_SEND);
 			if (wc->wc_status != IBT_WC_SUCCESS) {
 				/*
 				 * Channel being torn down.
 				 */
 				if (wc->wc_status == IBT_WC_WR_FLUSHED_ERR) {
 					DPRINT(5, "ibd_drain_scq: flush error");
-					/*
-					 * Only invoke the Tx handler to
-					 * release possibly held resources
-					 * like AH refcount etc.
-					 */
 					DPRINT(10, "ibd_drain_scq: Bad "
 					    "status %d", wc->wc_status);
+				} else {
+					DPRINT(10, "ibd_drain_scq: "
+					    "unexpected wc_status %d",
+					    wc->wc_status);
 				}
-				return;	/* give up.  no need to clean up */
+				/*
+				 * Fallthrough to invoke the Tx handler to
+				 * release held resources, e.g., AH refcount.
+				 */
 			}
 			/*
 			 * Add this swqe to the list to be cleaned up.
@@ -5926,7 +6032,7 @@ ibd_drain_rcq(ibd_state_t *state, ibt_cq_hdl_t cq_hdl)
 {
 	ibt_wc_t *wcs = state->id_rxwcs;
 	uint_t numwcs = state->id_rxwcs_size;
-	ibd_wqe_t *wqe;
+	ibd_rwqe_t *rwqe;
 	ibt_wc_t *wc;
 	uint_t num_polled;
 	int i;
@@ -5935,23 +6041,25 @@ ibd_drain_rcq(ibd_state_t *state, ibt_cq_hdl_t cq_hdl)
 	while (ibt_poll_cq(cq_hdl, wcs, numwcs, &num_polled) == IBT_SUCCESS) {
 		head = tail = NULL;
 		for (i = 0, wc = wcs; i < num_polled; i++, wc++) {
-			wqe = (ibd_wqe_t *)(uintptr_t)wc->wc_id;
-			ASSERT(wqe->w_type == IBD_WQE_RECV);
+			rwqe = (ibd_rwqe_t *)(uintptr_t)wc->wc_id;
 			if (wc->wc_status != IBT_WC_SUCCESS) {
 				/*
 				 * Channel being torn down.
 				 */
 				if (wc->wc_status == IBT_WC_WR_FLUSHED_ERR) {
-					DPRINT(5, "ibd_drain_rcq: flush error");
-					/*
-					 * Do not invoke Rx handler because
-					 * it might add buffers to the Rx pool
-					 * when we are trying to deinitialize.
-					 */
-					continue;
+					DPRINT(5, "ibd_drain_rcq: "
+					    "expected flushed rwqe");
+				} else {
+					DPRINT(5, "ibd_drain_rcq: "
+					    "unexpected wc_status %d",
+					    wc->wc_status);
 				}
+				atomic_inc_32(
+				    &state->id_rx_list.dl_bufs_outstanding);
+				freemsg(rwqe->rwqe_im_mblk);
+				continue;
 			}
-			mp = ibd_process_rx(state, WQE_TO_RWQE(wqe), wc);
+			mp = ibd_process_rx(state, rwqe, wc);
 			if (mp == NULL)
 				continue;
 
@@ -5966,6 +6074,14 @@ ibd_drain_rcq(ibd_state_t *state, ibt_cq_hdl_t cq_hdl)
 		}
 		if (head)
 			mac_rx(state->id_mh, state->id_rh, head);
+
+		/*
+		 * Account for #rwqes polled.
+		 * Post more here, if less than one fourth full.
+		 */
+		if (atomic_add_32_nv(&state->id_rx_list.dl_cnt, -num_polled) <
+		    (state->id_num_rwqe / 4))
+			ibd_post_recv_intr(state);
 	}
 }
 
@@ -6286,17 +6402,14 @@ ibd_process_rx(ibd_state_t *state, ibd_rwqe_t *rwqe, ibt_wc_t *wc)
 	ib_msglen_t pkt_len = wc->wc_bytes_xfer;
 	uint32_t bufs;
 
-	atomic_add_32(&state->id_rx_list.dl_cnt, -1);
-
 	/*
-	 * Track number handed to upper layer, and number still
-	 * available to receive packets.
+	 * Track number handed to upper layer that need to be returned.
 	 */
-	bufs = atomic_add_32_nv(&state->id_rx_list.dl_bufs_outstanding, 1);
+	bufs = atomic_inc_32_nv(&state->id_rx_list.dl_bufs_outstanding);
 
 	/* Never run out of rwqes, use allocb when running low */
 	if (bufs >= state->id_rx_bufs_outstanding_limit) {
-		atomic_add_32(&state->id_rx_list.dl_bufs_outstanding, -1);
+		atomic_dec_32(&state->id_rx_list.dl_bufs_outstanding);
 		atomic_inc_32(&state->id_rx_allocb);
 		mp = allocb(pkt_len, BPRI_HI);
 		if (mp) {
@@ -6419,11 +6532,15 @@ ibd_freemsg_cb(char *arg)
 	ibd_rwqe_t *rwqe = (ibd_rwqe_t *)arg;
 	ibd_state_t *state = rwqe->w_state;
 
+	atomic_dec_32(&state->id_rx_list.dl_bufs_outstanding);
+
 	/*
-	 * If the wqe is being destructed, do not attempt recycling.
+	 * If the driver is stopped, just free the rwqe.
 	 */
-	if (rwqe->w_freeing_wqe == B_TRUE) {
+	if (atomic_add_32_nv(&state->id_running, 0) == 0) {
 		DPRINT(6, "ibd_freemsg: wqe being freed");
+		rwqe->rwqe_im_mblk = NULL;
+		ibd_free_rwqe(state, rwqe);
 		return;
 	}
 
@@ -6436,8 +6553,6 @@ ibd_freemsg_cb(char *arg)
 	}
 
 	ibd_post_recv(state, rwqe);
-
-	atomic_add_32(&state->id_rx_list.dl_bufs_outstanding, -1);
 }
 
 static uint_t
