@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -220,6 +220,9 @@ libzfs_error_description(libzfs_handle_t *hdl)
 		return (dgettext(TEXT_DOMAIN, "pipe create failed"));
 	case EZFS_THREADCREATEFAILED:
 		return (dgettext(TEXT_DOMAIN, "thread create failed"));
+	case EZFS_POSTSPLIT_ONLINE:
+		return (dgettext(TEXT_DOMAIN, "disk was split from this pool "
+		    "into a new one"));
 	case EZFS_UNKNOWN:
 		return (dgettext(TEXT_DOMAIN, "unknown error"));
 	default:

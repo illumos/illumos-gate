@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -300,15 +300,12 @@ vdev_alloc_common(spa_t *spa, uint_t id, uint64_t guid, vdev_ops_t *ops)
 			 * The root vdev's guid will also be the pool guid,
 			 * which must be unique among all pools.
 			 */
-			while (guid == 0 || spa_guid_exists(guid, 0))
-				guid = spa_get_random(-1ULL);
+			guid = spa_generate_guid(NULL);
 		} else {
 			/*
 			 * Any other vdev's guid must be unique within the pool.
 			 */
-			while (guid == 0 ||
-			    spa_guid_exists(spa_guid(spa), guid))
-				guid = spa_get_random(-1ULL);
+			guid = spa_generate_guid(spa);
 		}
 		ASSERT(!spa_guid_exists(spa_guid(spa), guid));
 	}
@@ -482,7 +479,8 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 	/*
 	 * If we're a top-level vdev, try to load the allocation parameters.
 	 */
-	if (parent && !parent->vdev_parent && alloctype == VDEV_ALLOC_LOAD) {
+	if (parent && !parent->vdev_parent &&
+	    (alloctype == VDEV_ALLOC_LOAD || alloctype == VDEV_ALLOC_SPLIT)) {
 		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_METASLAB_ARRAY,
 		    &vd->vdev_ms_array);
 		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_METASLAB_SHIFT,
@@ -494,6 +492,7 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 	if (parent && !parent->vdev_parent) {
 		ASSERT(alloctype == VDEV_ALLOC_LOAD ||
 		    alloctype == VDEV_ALLOC_ADD ||
+		    alloctype == VDEV_ALLOC_SPLIT ||
 		    alloctype == VDEV_ALLOC_ROOTPOOL);
 		vd->vdev_mg = metaslab_group_create(islog ?
 		    spa_log_class(spa) : spa_normal_class(spa), vd);
@@ -778,6 +777,7 @@ vdev_remove_parent(vdev_t *cvd)
 	 */
 	if (mvd->vdev_top == mvd) {
 		uint64_t guid_delta = mvd->vdev_guid - cvd->vdev_guid;
+		cvd->vdev_orig_guid = cvd->vdev_guid;
 		cvd->vdev_guid += guid_delta;
 		cvd->vdev_guid_sum += guid_delta;
 	}
@@ -1282,7 +1282,7 @@ vdev_validate(vdev_t *vd)
 {
 	spa_t *spa = vd->vdev_spa;
 	nvlist_t *label;
-	uint64_t guid, top_guid;
+	uint64_t guid = 0, top_guid;
 	uint64_t state;
 
 	for (int c = 0; c < vd->vdev_children; c++)
@@ -1295,10 +1295,24 @@ vdev_validate(vdev_t *vd)
 	 * overwrite the previous state.
 	 */
 	if (vd->vdev_ops->vdev_op_leaf && vdev_readable(vd)) {
+		uint64_t aux_guid = 0;
+		nvlist_t *nvl;
 
 		if ((label = vdev_label_read_config(vd)) == NULL) {
 			vdev_set_state(vd, B_TRUE, VDEV_STATE_CANT_OPEN,
 			    VDEV_AUX_BAD_LABEL);
+			return (0);
+		}
+
+		/*
+		 * Determine if this vdev has been split off into another
+		 * pool.  If so, then refuse to open it.
+		 */
+		if (nvlist_lookup_uint64(label, ZPOOL_CONFIG_SPLIT_GUID,
+		    &aux_guid) == 0 && aux_guid == spa_guid(spa)) {
+			vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
+			    VDEV_AUX_SPLIT_POOL);
+			nvlist_free(label);
 			return (0);
 		}
 
@@ -1310,6 +1324,11 @@ vdev_validate(vdev_t *vd)
 			return (0);
 		}
 
+		if (nvlist_lookup_nvlist(label, ZPOOL_CONFIG_VDEV_TREE, &nvl)
+		    != 0 || nvlist_lookup_uint64(nvl, ZPOOL_CONFIG_ORIG_GUID,
+		    &aux_guid) != 0)
+			aux_guid = 0;
+
 		/*
 		 * If this vdev just became a top-level vdev because its
 		 * sibling was detached, it will have adopted the parent's
@@ -1317,12 +1336,16 @@ vdev_validate(vdev_t *vd)
 		 * Fortunately, either version of the label will have the
 		 * same top guid, so if we're a top-level vdev, we can
 		 * safely compare to that instead.
+		 *
+		 * If we split this vdev off instead, then we also check the
+		 * original pool's guid.  We don't want to consider the vdev
+		 * corrupt if it is partway through a split operation.
 		 */
 		if (nvlist_lookup_uint64(label, ZPOOL_CONFIG_GUID,
 		    &guid) != 0 ||
 		    nvlist_lookup_uint64(label, ZPOOL_CONFIG_TOP_GUID,
 		    &top_guid) != 0 ||
-		    (vd->vdev_guid != guid &&
+		    ((vd->vdev_guid != guid && vd->vdev_guid != aux_guid) &&
 		    (vd->vdev_guid != top_guid || vd != vd->vdev_top))) {
 			vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
 			    VDEV_AUX_CORRUPT_DATA);
@@ -1372,8 +1395,12 @@ vdev_close(vdev_t *vd)
 
 	ASSERT(spa_config_held(spa, SCL_STATE_ALL, RW_WRITER) == SCL_STATE_ALL);
 
+	/*
+	 * If our parent is reopening, then we are as well, unless we are
+	 * going offline.
+	 */
 	if (pvd != NULL && pvd->vdev_reopening)
-		vd->vdev_reopening = pvd->vdev_reopening;
+		vd->vdev_reopening = (pvd->vdev_reopening && !vd->vdev_offline);
 
 	vd->vdev_ops->vdev_op_close(vd);
 
@@ -1406,7 +1433,8 @@ vdev_reopen(vdev_t *vd)
 
 	ASSERT(spa_config_held(spa, SCL_STATE_ALL, RW_WRITER) == SCL_STATE_ALL);
 
-	vd->vdev_reopening = B_TRUE;
+	/* set the reopening flag unless we're taking the vdev offline */
+	vd->vdev_reopening = !vd->vdev_offline;
 	vdev_close(vd);
 	(void) vdev_open(vd);
 
@@ -2133,24 +2161,6 @@ vdev_online(spa_t *spa, uint64_t guid, uint64_t flags, vdev_state_t *newstate)
 	return (spa_vdev_state_exit(spa, vd, 0));
 }
 
-int
-vdev_offline_log(spa_t *spa)
-{
-	int error = 0;
-
-	if ((error = dmu_objset_find(spa_name(spa), zil_vdev_offline,
-	    NULL, DS_FIND_CHILDREN)) == 0) {
-
-		/*
-		 * We successfully offlined the log device, sync out the
-		 * current txg so that the "stubby" block can be removed
-		 * by zil_sync().
-		 */
-		txg_wait_synced(spa->spa_dsl_pool, 0);
-	}
-	return (error);
-}
-
 static int
 vdev_offline_locked(spa_t *spa, uint64_t guid, uint64_t flags)
 {
@@ -2198,7 +2208,7 @@ top:
 			metaslab_group_passivate(mg);
 			(void) spa_vdev_state_exit(spa, vd, 0);
 
-			error = vdev_offline_log(spa);
+			error = spa_offline_log(spa);
 
 			spa_vdev_state_enter(spa, SCL_ALLOC);
 
@@ -3034,4 +3044,23 @@ vdev_expand(vdev_t *vd, uint64_t txg)
 		VERIFY(vdev_metaslab_init(vd, txg) == 0);
 		vdev_config_dirty(vd);
 	}
+}
+
+/*
+ * Split a vdev.
+ */
+void
+vdev_split(vdev_t *vd)
+{
+	vdev_t *cvd, *pvd = vd->vdev_parent;
+
+	vdev_remove_child(pvd, vd);
+	vdev_compact_children(pvd);
+
+	cvd = pvd->vdev_child[0];
+	if (pvd->vdev_children == 1) {
+		vdev_remove_parent(cvd);
+		cvd->vdev_splitting = B_TRUE;
+	}
+	vdev_propagate_state(cvd);
 }

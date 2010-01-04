@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1039,6 +1039,12 @@ do_print_vdev(uintptr_t addr, int flags, int depth, int stats,
 			break;
 		case VDEV_AUX_BAD_LOG:
 			aux = "BAD_LOG";
+			break;
+		case VDEV_AUX_EXTERNAL:
+			aux = "EXTERNAL";
+			break;
+		case VDEV_AUX_SPLIT_POOL:
+			aux = "SPLIT_POOL";
 			break;
 		default:
 			aux = "UNKNOWN";

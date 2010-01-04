@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,7 +101,7 @@ zio_match_handler(zbookmark_t *zb, uint64_t type,
  * specified by tag.
  */
 void
-zio_handle_panic_injection(spa_t *spa, char *tag)
+zio_handle_panic_injection(spa_t *spa, char *tag, uint64_t type)
 {
 	inject_handler_t *handler;
 
@@ -113,7 +113,8 @@ zio_handle_panic_injection(spa_t *spa, char *tag)
 		if (spa != handler->zi_spa)
 			continue;
 
-		if (strcmp(tag, handler->zi_record.zi_func) == 0)
+		if (handler->zi_record.zi_type == type &&
+		    strcmp(tag, handler->zi_record.zi_func) == 0)
 			panic("Panic requested in function %s\n", tag);
 	}
 

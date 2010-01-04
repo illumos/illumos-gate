@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -498,6 +498,8 @@ spa_remove(spa_t *spa)
 	ASSERT(MUTEX_HELD(&spa_namespace_lock));
 	ASSERT(spa->spa_state == POOL_STATE_UNINITIALIZED);
 
+	nvlist_free(spa->spa_config_splitting);
+
 	avl_remove(&spa_namespace_avl, spa);
 	cv_broadcast(&spa_namespace_cv);
 
@@ -909,7 +911,7 @@ spa_vdev_config_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error, char *tag)
 	 * transactionally.
 	 */
 	if (zio_injection_enabled)
-		zio_handle_panic_injection(spa, tag);
+		zio_handle_panic_injection(spa, tag, 0);
 
 	/*
 	 * Note: this txg_wait_synced() is important because it ensures
@@ -1115,6 +1117,22 @@ spa_get_random(uint64_t range)
 	(void) random_get_pseudo_bytes((void *)&r, sizeof (uint64_t));
 
 	return (r % range);
+}
+
+uint64_t
+spa_generate_guid(spa_t *spa)
+{
+	uint64_t guid = spa_get_random(-1ULL);
+
+	if (spa != NULL) {
+		while (guid == 0 || spa_guid_exists(spa_guid(spa), guid))
+			guid = spa_get_random(-1ULL);
+	} else {
+		while (guid == 0 || spa_guid_exists(guid, 0))
+			guid = spa_get_random(-1ULL);
+	}
+
+	return (guid);
 }
 
 void

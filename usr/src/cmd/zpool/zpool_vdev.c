@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1360,6 +1360,52 @@ construct_spec(int argc, char **argv)
 	return (nvroot);
 }
 
+nvlist_t *
+split_mirror_vdev(zpool_handle_t *zhp, char *newname, nvlist_t *props,
+    splitflags_t flags, int argc, char **argv)
+{
+	nvlist_t *newroot = NULL, **child;
+	uint_t c, children;
+
+	if (argc > 0) {
+		if ((newroot = construct_spec(argc, argv)) == NULL) {
+			(void) fprintf(stderr, gettext("Unable to build a "
+			    "pool from the specified devices\n"));
+			return (NULL);
+		}
+
+		if (!flags.dryrun && make_disks(zhp, newroot) != 0) {
+			nvlist_free(newroot);
+			return (NULL);
+		}
+
+		/* avoid any tricks in the spec */
+		verify(nvlist_lookup_nvlist_array(newroot,
+		    ZPOOL_CONFIG_CHILDREN, &child, &children) == 0);
+		for (c = 0; c < children; c++) {
+			char *path;
+			const char *type;
+			int min, max;
+
+			verify(nvlist_lookup_string(child[c],
+			    ZPOOL_CONFIG_PATH, &path) == 0);
+			if ((type = is_grouping(path, &min, &max)) != NULL) {
+				(void) fprintf(stderr, gettext("Cannot use "
+				    "'%s' as a device for splitting\n"), type);
+				nvlist_free(newroot);
+				return (NULL);
+			}
+		}
+	}
+
+	if (zpool_vdev_split(zhp, newname, &newroot, props, flags) != 0) {
+		if (newroot != NULL)
+			nvlist_free(newroot);
+		return (NULL);
+	}
+
+	return (newroot);
+}
 
 /*
  * Get and validate the contents of the given vdev specification.  This ensures

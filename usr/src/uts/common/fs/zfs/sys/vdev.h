@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,6 +74,8 @@ extern int vdev_metaslab_init(vdev_t *vd, uint64_t txg);
 extern void vdev_metaslab_fini(vdev_t *vd);
 extern void vdev_metaslab_set_size(vdev_t *);
 extern void vdev_expand(vdev_t *vd, uint64_t txg);
+extern void vdev_split(vdev_t *vd);
+
 
 extern void vdev_get_stats(vdev_t *vd, vdev_stat_t *vs);
 extern void vdev_clear_stats(vdev_t *vd);
@@ -139,7 +141,8 @@ typedef enum {
 	VDEV_LABEL_REPLACE,	/* replace an existing device */
 	VDEV_LABEL_SPARE,	/* add a new hot spare */
 	VDEV_LABEL_REMOVE,	/* remove an existing device */
-	VDEV_LABEL_L2CACHE	/* add an L2ARC cache device */
+	VDEV_LABEL_L2CACHE,	/* add an L2ARC cache device */
+	VDEV_LABEL_SPLIT	/* generating new label for split-off dev */
 } vdev_labeltype_t;
 
 extern int vdev_label_init(vdev_t *vd, uint64_t txg, vdev_labeltype_t reason);

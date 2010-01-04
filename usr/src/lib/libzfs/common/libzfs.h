@@ -120,6 +120,7 @@ enum {
 	EZFS_TAGTOOLONG,	/* snapshot hold/rele: tag too long */
 	EZFS_PIPEFAILED,	/* pipe create failed */
 	EZFS_THREADCREATEFAILED, /* thread create failed */
+	EZFS_POSTSPLIT_ONLINE,	/* onlining a disk after splitting it */
 	EZFS_UNKNOWN
 };
 
@@ -214,6 +215,14 @@ extern int zpool_create(libzfs_handle_t *, const char *, nvlist_t *,
 extern int zpool_destroy(zpool_handle_t *);
 extern int zpool_add(zpool_handle_t *, nvlist_t *);
 
+typedef struct splitflags {
+	/* do not split, but return the config that would be split off */
+	int dryrun : 1;
+
+	/* after splitting, import the pool */
+	int import : 1;
+} splitflags_t;
+
 /*
  * Functions to manipulate pool and vdev state
  */
@@ -227,6 +236,8 @@ extern int zpool_vdev_attach(zpool_handle_t *, const char *,
     const char *, nvlist_t *, int);
 extern int zpool_vdev_detach(zpool_handle_t *, const char *);
 extern int zpool_vdev_remove(zpool_handle_t *, const char *);
+extern int zpool_vdev_split(zpool_handle_t *, char *, nvlist_t **, nvlist_t *,
+    splitflags_t);
 
 extern int zpool_vdev_fault(zpool_handle_t *, uint64_t, vdev_aux_t);
 extern int zpool_vdev_degrade(zpool_handle_t *, uint64_t, vdev_aux_t);

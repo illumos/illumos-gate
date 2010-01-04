@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -456,7 +456,7 @@ zvol_create_minor(const char *name)
 
 	mutex_enter(&zvol_state_lock);
 
-	if ((zv = zvol_minor_lookup(name)) != NULL) {
+	if (zvol_minor_lookup(name) != NULL) {
 		mutex_exit(&zvol_state_lock);
 		return (EEXIST);
 	}

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1397,6 +1397,7 @@ zfs_ioc_vdev_add(zfs_cmd_t *zc)
 	 * l2cache and spare devices are ok to be added to a rootpool.
 	 */
 	if (spa_bootfs(spa) != 0 && nl2cache == 0 && nspares == 0) {
+		nvlist_free(config);
 		spa_close(spa, FTAG);
 		return (EDOM);
 	}
@@ -1498,6 +1499,41 @@ zfs_ioc_vdev_detach(zfs_cmd_t *zc)
 	error = spa_vdev_detach(spa, zc->zc_guid, 0, B_FALSE);
 
 	spa_close(spa, FTAG);
+	return (error);
+}
+
+static int
+zfs_ioc_vdev_split(zfs_cmd_t *zc)
+{
+	spa_t *spa;
+	nvlist_t *config, *props = NULL;
+	int error;
+	boolean_t exp = !!(zc->zc_cookie & ZPOOL_EXPORT_AFTER_SPLIT);
+
+	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
+		return (error);
+
+	if (error = get_nvlist(zc->zc_nvlist_conf, zc->zc_nvlist_conf_size,
+	    zc->zc_iflags, &config)) {
+		spa_close(spa, FTAG);
+		return (error);
+	}
+
+	if (zc->zc_nvlist_src_size != 0 && (error =
+	    get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size,
+	    zc->zc_iflags, &props))) {
+		spa_close(spa, FTAG);
+		nvlist_free(config);
+		return (error);
+	}
+
+	error = spa_vdev_split_mirror(spa, zc->zc_string, config, props, exp);
+
+	spa_close(spa, FTAG);
+
+	nvlist_free(config);
+	nvlist_free(props);
+
 	return (error);
 }
 
@@ -3839,7 +3875,7 @@ static int
 zfs_ioc_userspace_upgrade(zfs_cmd_t *zc)
 {
 	objset_t *os;
-	int error;
+	int error = 0;
 	zfsvfs_t *zfsvfs;
 
 	if (getzfsvfs(zc->zc_name, &zfsvfs) == 0) {
@@ -4131,6 +4167,7 @@ zfs_ioc_smb_acl(zfs_cmd_t *zc)
 			VN_RELE(vp);
 			VN_RELE(ZTOV(sharedir));
 			ZFS_EXIT(zfsvfs);
+			nvlist_free(nvlist);
 			return (error);
 		}
 		error = VOP_RENAME(ZTOV(sharedir), src, ZTOV(sharedir), target,
@@ -4324,7 +4361,9 @@ static zfs_ioc_vec_t zfs_ioc_vec[] = {
 	{ zfs_ioc_get_holds, zfs_secpolicy_read, DATASET_NAME, B_FALSE,
 	    B_TRUE },
 	{ zfs_ioc_objset_recvd_props, zfs_secpolicy_read, DATASET_NAME, B_FALSE,
-	    B_FALSE }
+	    B_FALSE },
+	{ zfs_ioc_vdev_split, zfs_secpolicy_config, POOL_NAME, B_TRUE,
+	    B_TRUE }
 };
 
 int

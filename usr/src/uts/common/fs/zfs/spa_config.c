@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -335,6 +335,7 @@ spa_config_generate(spa_t *spa, vdev_t *vd, uint64_t txg, int getstats)
 	vdev_t *rvd = spa->spa_root_vdev;
 	unsigned long hostid = 0;
 	boolean_t locked = B_FALSE;
+	uint64_t split_guid;
 
 	if (vd == NULL) {
 		vd = rvd;
@@ -391,6 +392,14 @@ spa_config_generate(spa_t *spa, vdev_t *vd, uint64_t txg, int getstats)
 			VERIFY(nvlist_add_uint64(config, ZPOOL_CONFIG_IS_LOG,
 			    1ULL) == 0);
 		vd = vd->vdev_top;		/* label contains top config */
+	} else {
+		/*
+		 * Only add the (potentially large) split information
+		 * in the mos config, and not in the vdev labels
+		 */
+		if (spa->spa_config_splitting != NULL)
+			VERIFY(nvlist_add_nvlist(config, ZPOOL_CONFIG_SPLIT,
+			    spa->spa_config_splitting) == 0);
 	}
 
 	/*
@@ -399,6 +408,16 @@ spa_config_generate(spa_t *spa, vdev_t *vd, uint64_t txg, int getstats)
 	 * just ignore it.
 	 */
 	vdev_top_config_generate(spa, config);
+
+	/*
+	 * If we're splitting, record the original pool's guid.
+	 */
+	if (spa->spa_config_splitting != NULL &&
+	    nvlist_lookup_uint64(spa->spa_config_splitting,
+	    ZPOOL_CONFIG_SPLIT_GUID, &split_guid) == 0) {
+		VERIFY(nvlist_add_uint64(config, ZPOOL_CONFIG_SPLIT_GUID,
+		    split_guid) == 0);
+	}
 
 	nvroot = vdev_config_generate(spa, vd, getstats, B_FALSE, B_FALSE);
 	VERIFY(nvlist_add_nvlist(config, ZPOOL_CONFIG_VDEV_TREE, nvroot) == 0);

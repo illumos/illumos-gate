@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -125,9 +125,9 @@ static int zopt_verbose = 0;
 static int zopt_init = 1;
 static char *zopt_dir = "/tmp";
 static uint64_t zopt_time = 300;	/* 5 minutes */
-static int zopt_maxfaults;
 
 #define	BT_MAGIC	0x123456789abcdefULL
+#define	MAXFAULTS() (MAX(zs->zs_mirrors, 1) * (zopt_raidz_parity + 1) - 1)
 
 enum ztest_io_type {
 	ZTEST_IO_WRITE_TAG,
@@ -251,6 +251,7 @@ ztest_func_t ztest_vdev_attach_detach;
 ztest_func_t ztest_vdev_LUN_growth;
 ztest_func_t ztest_vdev_add_remove;
 ztest_func_t ztest_vdev_aux_add_remove;
+ztest_func_t ztest_split_pool;
 
 uint64_t zopt_always = 0ULL * NANOSEC;		/* all the time */
 uint64_t zopt_incessant = 1ULL * NANOSEC / 10;	/* every 1/10 second */
@@ -265,6 +266,7 @@ ztest_info_t ztest_info[] = {
 	{ ztest_dmu_commit_callbacks,		1,	&zopt_always	},
 	{ ztest_zap,				30,	&zopt_always	},
 	{ ztest_zap_parallel,			100,	&zopt_always	},
+	{ ztest_split_pool,			1,	&zopt_always	},
 	{ ztest_zil_commit,			1,	&zopt_incessant	},
 	{ ztest_dmu_read_write_zcopy,		1,	&zopt_often	},
 	{ ztest_dmu_objset_create_destroy,	1,	&zopt_often	},
@@ -318,6 +320,8 @@ typedef struct ztest_shared {
 	mutex_t		zs_vdev_lock;
 	rwlock_t	zs_name_lock;
 	ztest_info_t	zs_info[ZTEST_FUNCS];
+	uint64_t	zs_splits;
+	uint64_t	zs_mirrors;
 	ztest_ds_t	zs_zd[];
 } ztest_shared_t;
 
@@ -592,7 +596,6 @@ process_options(int argc, char **argv)
 
 	zopt_vdevtime = (zopt_vdevs > 0 ? zopt_time * NANOSEC / zopt_vdevs :
 	    UINT64_MAX >> 2);
-	zopt_maxfaults = MAX(zopt_mirrors, 1) * (zopt_raidz_parity + 1) - 1;
 }
 
 static void
@@ -2134,12 +2137,13 @@ ztest_vdev_add_remove(ztest_ds_t *zd, uint64_t id)
 {
 	ztest_shared_t *zs = ztest_shared;
 	spa_t *spa = zs->zs_spa;
-	uint64_t leaves = MAX(zopt_mirrors, 1) * zopt_raidz;
+	uint64_t leaves;
 	uint64_t guid;
 	nvlist_t *nvroot;
 	int error;
 
 	VERIFY(mutex_lock(&zs->zs_vdev_lock) == 0);
+	leaves = MAX(zs->zs_mirrors + zs->zs_splits, 1) * zopt_raidz;
 
 	spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
 
@@ -2177,7 +2181,7 @@ ztest_vdev_add_remove(ztest_ds_t *zd, uint64_t id)
 		 * Make 1/4 of the devices be log devices.
 		 */
 		nvroot = make_vdev_root(NULL, NULL, zopt_vdev_size, 0,
-		    ztest_random(4) == 0, zopt_raidz, zopt_mirrors, 1);
+		    ztest_random(4) == 0, zopt_raidz, zs->zs_mirrors, 1);
 
 		error = spa_vdev_add(spa, nvroot);
 		nvlist_free(nvroot);
@@ -2274,6 +2278,99 @@ ztest_vdev_aux_add_remove(ztest_ds_t *zd, uint64_t id)
 }
 
 /*
+ * split a pool if it has mirror tlvdevs
+ */
+/* ARGSUSED */
+void
+ztest_split_pool(ztest_ds_t *zd, uint64_t id)
+{
+	ztest_shared_t *zs = ztest_shared;
+	spa_t *spa = zs->zs_spa;
+	vdev_t *rvd = spa->spa_root_vdev;
+	nvlist_t *tree, **child, *config, *split, **schild;
+	uint_t c, children, schildren = 0, lastlogid = 0;
+	int error = 0;
+
+	VERIFY(mutex_lock(&zs->zs_vdev_lock) == 0);
+
+	/* ensure we have a useable config; mirrors of raidz aren't supported */
+	if (zs->zs_mirrors < 3 || zopt_raidz > 1) {
+		VERIFY(mutex_unlock(&zs->zs_vdev_lock) == 0);
+		return;
+	}
+
+	/* clean up the old pool, if any */
+	(void) spa_destroy("splitp");
+
+	spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
+
+	/* generate a config from the existing config */
+	VERIFY(nvlist_lookup_nvlist(spa->spa_config, ZPOOL_CONFIG_VDEV_TREE,
+	    &tree) == 0);
+	VERIFY(nvlist_lookup_nvlist_array(tree, ZPOOL_CONFIG_CHILDREN, &child,
+	    &children) == 0);
+
+	schild = malloc(rvd->vdev_children * sizeof (nvlist_t *));
+	for (c = 0; c < children; c++) {
+		vdev_t *tvd = rvd->vdev_child[c];
+		nvlist_t **mchild;
+		uint_t mchildren;
+
+		if (tvd->vdev_islog || tvd->vdev_ops == &vdev_hole_ops) {
+			VERIFY(nvlist_alloc(&schild[schildren], NV_UNIQUE_NAME,
+			    0) == 0);
+			VERIFY(nvlist_add_string(schild[schildren],
+			    ZPOOL_CONFIG_TYPE, VDEV_TYPE_HOLE) == 0);
+			VERIFY(nvlist_add_uint64(schild[schildren],
+			    ZPOOL_CONFIG_IS_HOLE, 1) == 0);
+			if (lastlogid == 0)
+				lastlogid = schildren;
+			++schildren;
+			continue;
+		}
+		lastlogid = 0;
+		VERIFY(nvlist_lookup_nvlist_array(child[c],
+		    ZPOOL_CONFIG_CHILDREN, &mchild, &mchildren) == 0);
+		VERIFY(nvlist_dup(mchild[0], &schild[schildren++], 0) == 0);
+	}
+
+	/* OK, create a config that can be used to split */
+	VERIFY(nvlist_alloc(&split, NV_UNIQUE_NAME, 0) == 0);
+	VERIFY(nvlist_add_string(split, ZPOOL_CONFIG_TYPE,
+	    VDEV_TYPE_ROOT) == 0);
+	VERIFY(nvlist_add_nvlist_array(split, ZPOOL_CONFIG_CHILDREN, schild,
+	    lastlogid != 0 ? lastlogid : schildren) == 0);
+
+	VERIFY(nvlist_alloc(&config, NV_UNIQUE_NAME, 0) == 0);
+	VERIFY(nvlist_add_nvlist(config, ZPOOL_CONFIG_VDEV_TREE, split) == 0);
+
+	for (c = 0; c < schildren; c++)
+		nvlist_free(schild[c]);
+	free(schild);
+	nvlist_free(split);
+
+	spa_config_exit(spa, SCL_VDEV, FTAG);
+
+	(void) rw_wrlock(&zs->zs_name_lock);
+	error = spa_vdev_split_mirror(spa, "splitp", config, NULL, B_FALSE);
+	(void) rw_unlock(&zs->zs_name_lock);
+
+	nvlist_free(config);
+
+	if (error == 0) {
+		(void) printf("successful split - results:\n");
+		mutex_enter(&spa_namespace_lock);
+		show_pool_stats(spa);
+		show_pool_stats(spa_lookup("splitp"));
+		mutex_exit(&spa_namespace_lock);
+		++zs->zs_splits;
+		--zs->zs_mirrors;
+	}
+	VERIFY(mutex_unlock(&zs->zs_vdev_lock) == 0);
+
+}
+
+/*
  * Verify that we can attach and detach devices.
  */
 /* ARGSUSED */
@@ -2286,7 +2383,7 @@ ztest_vdev_attach_detach(ztest_ds_t *zd, uint64_t id)
 	vdev_t *rvd = spa->spa_root_vdev;
 	vdev_t *oldvd, *newvd, *pvd;
 	nvlist_t *root;
-	uint64_t leaves = MAX(zopt_mirrors, 1) * zopt_raidz;
+	uint64_t leaves;
 	uint64_t leaf, top;
 	uint64_t ashift = ztest_get_ashift();
 	uint64_t oldguid, pguid;
@@ -2299,6 +2396,7 @@ ztest_vdev_attach_detach(ztest_ds_t *zd, uint64_t id)
 	int error, expected_error;
 
 	VERIFY(mutex_lock(&zs->zs_vdev_lock) == 0);
+	leaves = MAX(zs->zs_mirrors, 1) * zopt_raidz;
 
 	spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
 
@@ -2315,15 +2413,15 @@ ztest_vdev_attach_detach(ztest_ds_t *zd, uint64_t id)
 	/*
 	 * Pick a random leaf within it.
 	 */
-	leaf = ztest_random(leaves);
+	leaf = ztest_random(leaves) + zs->zs_splits;
 
 	/*
 	 * Locate this vdev.
 	 */
 	oldvd = rvd->vdev_child[top];
-	if (zopt_mirrors >= 1) {
+	if (zs->zs_mirrors >= 1) {
 		ASSERT(oldvd->vdev_ops == &vdev_mirror_ops);
-		ASSERT(oldvd->vdev_children >= zopt_mirrors);
+		ASSERT(oldvd->vdev_children >= zs->zs_mirrors);
 		oldvd = oldvd->vdev_child[leaf / zopt_raidz];
 	}
 	if (zopt_raidz > 1) {
@@ -4268,7 +4366,7 @@ ztest_fault_inject(ztest_ds_t *zd, uint64_t id)
 	spa_t *spa = zs->zs_spa;
 	int fd;
 	uint64_t offset;
-	uint64_t leaves = MAX(zopt_mirrors, 1) * zopt_raidz;
+	uint64_t leaves;
 	uint64_t bad = 0x1990c0ffeedecade;
 	uint64_t top, leaf;
 	char path0[MAXPATHLEN];
@@ -4276,10 +4374,17 @@ ztest_fault_inject(ztest_ds_t *zd, uint64_t id)
 	size_t fsize;
 	int bshift = SPA_MAXBLOCKSHIFT + 2;	/* don't scrog all labels */
 	int iters = 1000;
-	int maxfaults = zopt_maxfaults;
+	int maxfaults;
+	int mirror_save;
 	vdev_t *vd0 = NULL;
 	uint64_t guid0 = 0;
 	boolean_t islog = B_FALSE;
+
+	VERIFY(mutex_lock(&zs->zs_vdev_lock) == 0);
+	maxfaults = MAXFAULTS();
+	leaves = MAX(zs->zs_mirrors, 1) * zopt_raidz;
+	mirror_save = zs->zs_mirrors;
+	VERIFY(mutex_unlock(&zs->zs_vdev_lock) == 0);
 
 	ASSERT(leaves >= 1);
 
@@ -4293,7 +4398,7 @@ ztest_fault_inject(ztest_ds_t *zd, uint64_t id)
 		 * Inject errors on a normal data device or slog device.
 		 */
 		top = ztest_random_vdev_top(spa, B_TRUE);
-		leaf = ztest_random(leaves);
+		leaf = ztest_random(leaves) + zs->zs_splits;
 
 		/*
 		 * Generate paths to the first leaf in this top-level vdev,
@@ -4302,7 +4407,7 @@ ztest_fault_inject(ztest_ds_t *zd, uint64_t id)
 		 * and we'll write random garbage to the randomly chosen leaf.
 		 */
 		(void) snprintf(path0, sizeof (path0), ztest_dev_template,
-		    zopt_dir, zopt_pool, top * leaves + 0);
+		    zopt_dir, zopt_pool, top * leaves + zs->zs_splits);
 		(void) snprintf(pathrand, sizeof (pathrand), ztest_dev_template,
 		    zopt_dir, zopt_pool, top * leaves + leaf);
 
@@ -4405,13 +4510,22 @@ ztest_fault_inject(ztest_ds_t *zd, uint64_t id)
 		if (offset >= fsize)
 			continue;
 
-		if (zopt_verbose >= 7)
-			(void) printf("injecting bad word into %s,"
-			    " offset 0x%llx\n", pathrand, (u_longlong_t)offset);
+		VERIFY(mutex_lock(&zs->zs_vdev_lock) == 0);
+		if (mirror_save != zs->zs_mirrors) {
+			VERIFY(mutex_unlock(&zs->zs_vdev_lock) == 0);
+			(void) close(fd);
+			return;
+		}
 
 		if (pwrite(fd, &bad, sizeof (bad), offset) != sizeof (bad))
 			fatal(1, "can't inject bad word at 0x%llx in %s",
 			    offset, pathrand);
+
+		VERIFY(mutex_unlock(&zs->zs_vdev_lock) == 0);
+
+		if (zopt_verbose >= 7)
+			(void) printf("injected bad word into %s,"
+			    " offset 0x%llx\n", pathrand, (u_longlong_t)offset);
 	}
 
 	(void) close(fd);
@@ -4992,7 +5106,7 @@ ztest_run(ztest_shared_t *zs)
 	 * in which case ztest_fault_inject() temporarily takes away
 	 * the only valid replica.
 	 */
-	if (zopt_maxfaults == 0)
+	if (MAXFAULTS() == 0)
 		spa->spa_failmode = ZIO_FAILURE_MODE_WAIT;
 	else
 		spa->spa_failmode = ZIO_FAILURE_MODE_PANIC;
@@ -5202,6 +5316,23 @@ print_time(hrtime_t t, char *timebuf)
 		(void) sprintf(timebuf, "%llus", s);
 }
 
+static nvlist_t *
+make_random_props()
+{
+	nvlist_t *props;
+
+	if (ztest_random(2) == 0)
+		return (NULL);
+
+	VERIFY(nvlist_alloc(&props, NV_UNIQUE_NAME, 0) == 0);
+	VERIFY(nvlist_add_uint64(props, "autoreplace", 1) == 0);
+
+	(void) printf("props:\n");
+	dump_nvlist(props, 4);
+
+	return (props);
+}
+
 /*
  * Create a storage pool with the given name and initial vdev size.
  * Then test spa_freeze() functionality.
@@ -5210,7 +5341,7 @@ static void
 ztest_init(ztest_shared_t *zs)
 {
 	spa_t *spa;
-	nvlist_t *nvroot;
+	nvlist_t *nvroot, *props;
 
 	VERIFY(_mutex_init(&zs->zs_vdev_lock, USYNC_THREAD, NULL) == 0);
 	VERIFY(rwlock_init(&zs->zs_name_lock, USYNC_THREAD, NULL) == 0);
@@ -5222,9 +5353,12 @@ ztest_init(ztest_shared_t *zs)
 	 */
 	(void) spa_destroy(zs->zs_pool);
 	ztest_shared->zs_vdev_next_leaf = 0;
+	zs->zs_splits = 0;
+	zs->zs_mirrors = zopt_mirrors;
 	nvroot = make_vdev_root(NULL, NULL, zopt_vdev_size, 0,
-	    0, zopt_raidz, zopt_mirrors, 1);
-	VERIFY3U(0, ==, spa_create(zs->zs_pool, nvroot, NULL, NULL, NULL));
+	    0, zopt_raidz, zs->zs_mirrors, 1);
+	props = make_random_props();
+	VERIFY3U(0, ==, spa_create(zs->zs_pool, nvroot, props, NULL, NULL));
 	nvlist_free(nvroot);
 
 	VERIFY3U(0, ==, spa_open(zs->zs_pool, &spa, FTAG));

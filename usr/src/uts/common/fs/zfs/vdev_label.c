@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -354,6 +354,11 @@ vdev_config_generate(spa_t *spa, vdev_t *vd, boolean_t getstats,
 		if (aux != NULL)
 			VERIFY(nvlist_add_string(nv, ZPOOL_CONFIG_AUX_STATE,
 			    aux) == 0);
+
+		if (vd->vdev_splitting && vd->vdev_orig_guid != 0LL) {
+			VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_ORIG_GUID,
+			    vd->vdev_orig_guid) == 0);
+		}
 	}
 
 	return (nv);
@@ -590,7 +595,7 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 	/*
 	 * Determine if the vdev is in use.
 	 */
-	if (reason != VDEV_LABEL_REMOVE &&
+	if (reason != VDEV_LABEL_REMOVE && reason != VDEV_LABEL_SPLIT &&
 	    vdev_inuse(vd, crtxg, reason, &spare_guid, &l2cache_guid))
 		return (EBUSY);
 
@@ -616,7 +621,8 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 		 */
 		if (reason == VDEV_LABEL_SPARE)
 			return (0);
-		ASSERT(reason == VDEV_LABEL_REPLACE);
+		ASSERT(reason == VDEV_LABEL_REPLACE ||
+		    reason == VDEV_LABEL_SPLIT);
 	}
 
 	if (reason != VDEV_LABEL_REMOVE && reason != VDEV_LABEL_SPARE &&
@@ -681,7 +687,11 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 		VERIFY(nvlist_add_uint64(label, ZPOOL_CONFIG_GUID,
 		    vd->vdev_guid) == 0);
 	} else {
-		label = spa_config_generate(spa, vd, 0ULL, B_FALSE);
+		uint64_t txg = 0ULL;
+
+		if (reason == VDEV_LABEL_SPLIT)
+			txg = spa->spa_uberblock.ub_txg;
+		label = spa_config_generate(spa, vd, txg, B_FALSE);
 
 		/*
 		 * Add our creation time.  This allows us to detect multiple

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,6 +84,7 @@ const char *hist_event_table[LOG_END] = {
 	"pool scrub done",
 	"user hold",
 	"user release",
+	"pool split",
 };
 
 static int read_efi_label(nvlist_t *config, diskaddr_t *sb);
@@ -231,6 +232,8 @@ zpool_state_to_name(vdev_state_t state, vdev_aux_t aux)
 	case VDEV_STATE_CANT_OPEN:
 		if (aux == VDEV_AUX_CORRUPT_DATA || aux == VDEV_AUX_BAD_LOG)
 			return (gettext("FAULTED"));
+		else if (aux == VDEV_AUX_SPLIT_POOL)
+			return (gettext("SPLIT"));
 		else
 			return (gettext("UNAVAIL"));
 	case VDEV_STATE_FAULTED:
@@ -2074,8 +2077,15 @@ zpool_vdev_online(zpool_handle_t *zhp, const char *path, int flags,
 	zc.zc_cookie = VDEV_STATE_ONLINE;
 	zc.zc_obj = flags;
 
-	if (zfs_ioctl(zhp->zpool_hdl, ZFS_IOC_VDEV_SET_STATE, &zc) != 0)
+	if (zfs_ioctl(zhp->zpool_hdl, ZFS_IOC_VDEV_SET_STATE, &zc) != 0) {
+		if (errno == EINVAL) {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN, "was split "
+			    "from this pool into a new one.  Use '%s' "
+			    "instead"), "zpool detach");
+			return (zfs_error(hdl, EZFS_POSTSPLIT_ONLINE, msg));
+		}
 		return (zpool_standard_error(hdl, errno, msg));
+	}
 
 	*newstate = zc.zc_cookie;
 	return (0);
@@ -2465,6 +2475,257 @@ zpool_vdev_detach(zpool_handle_t *zhp, const char *path)
 	}
 
 	return (-1);
+}
+
+/*
+ * Find a mirror vdev in the source nvlist.
+ *
+ * The mchild array contains a list of disks in one of the top-level mirrors
+ * of the source pool.  The schild array contains a list of disks that the
+ * user specified on the command line.  We loop over the mchild array to
+ * see if any entry in the schild array matches.
+ *
+ * If a disk in the mchild array is found in the schild array, we return
+ * the index of that entry.  Otherwise we return -1.
+ */
+static int
+find_vdev_entry(zpool_handle_t *zhp, nvlist_t **mchild, uint_t mchildren,
+    nvlist_t **schild, uint_t schildren)
+{
+	uint_t mc;
+
+	for (mc = 0; mc < mchildren; mc++) {
+		uint_t sc;
+		char *mpath = zpool_vdev_name(zhp->zpool_hdl, zhp,
+		    mchild[mc], B_FALSE);
+
+		for (sc = 0; sc < schildren; sc++) {
+			char *spath = zpool_vdev_name(zhp->zpool_hdl, zhp,
+			    schild[sc], B_FALSE);
+			boolean_t result = (strcmp(mpath, spath) == 0);
+
+			free(spath);
+			if (result) {
+				free(mpath);
+				return (mc);
+			}
+		}
+
+		free(mpath);
+	}
+
+	return (-1);
+}
+
+/*
+ * Split a mirror pool.  If newroot points to null, then a new nvlist
+ * is generated and it is the responsibility of the caller to free it.
+ */
+int
+zpool_vdev_split(zpool_handle_t *zhp, char *newname, nvlist_t **newroot,
+    nvlist_t *props, splitflags_t flags)
+{
+	zfs_cmd_t zc = { 0 };
+	char msg[1024];
+	nvlist_t *tree, *config, **child, **newchild, *newconfig = NULL;
+	nvlist_t **varray = NULL, *zc_props = NULL;
+	uint_t c, children, newchildren, lastlog = 0, vcount, found = 0;
+	libzfs_handle_t *hdl = zhp->zpool_hdl;
+	uint64_t vers;
+	boolean_t freelist = B_FALSE, memory_err = B_TRUE;
+	int retval = 0;
+
+	(void) snprintf(msg, sizeof (msg),
+	    dgettext(TEXT_DOMAIN, "Unable to split %s"), zhp->zpool_name);
+
+	if (!zpool_name_valid(hdl, B_FALSE, newname))
+		return (zfs_error(hdl, EZFS_INVALIDNAME, msg));
+
+	if ((config = zpool_get_config(zhp, NULL)) == NULL) {
+		(void) fprintf(stderr, gettext("Internal error: unable to "
+		    "retrieve pool configuration\n"));
+		return (-1);
+	}
+
+	verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE, &tree)
+	    == 0);
+	verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_VERSION, &vers) == 0);
+
+	if (props) {
+		if ((zc_props = zpool_valid_proplist(hdl, zhp->zpool_name,
+		    props, vers, B_TRUE, msg)) == NULL)
+			return (-1);
+	}
+
+	if (nvlist_lookup_nvlist_array(tree, ZPOOL_CONFIG_CHILDREN, &child,
+	    &children) != 0) {
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "Source pool is missing vdev tree"));
+		if (zc_props)
+			nvlist_free(zc_props);
+		return (-1);
+	}
+
+	varray = zfs_alloc(hdl, children * sizeof (nvlist_t *));
+	vcount = 0;
+
+	if (*newroot == NULL ||
+	    nvlist_lookup_nvlist_array(*newroot, ZPOOL_CONFIG_CHILDREN,
+	    &newchild, &newchildren) != 0)
+		newchildren = 0;
+
+	for (c = 0; c < children; c++) {
+		uint64_t is_log = B_FALSE, is_hole = B_FALSE;
+		char *type;
+		nvlist_t **mchild, *vdev;
+		uint_t mchildren;
+		int entry;
+
+		/*
+		 * Unlike cache & spares, slogs are stored in the
+		 * ZPOOL_CONFIG_CHILDREN array.  We filter them out here.
+		 */
+		(void) nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_IS_LOG,
+		    &is_log);
+		(void) nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_IS_HOLE,
+		    &is_hole);
+		if (is_log || is_hole) {
+			/*
+			 * Create a hole vdev and put it in the config.
+			 */
+			if (nvlist_alloc(&vdev, NV_UNIQUE_NAME, 0) != 0)
+				goto out;
+			if (nvlist_add_string(vdev, ZPOOL_CONFIG_TYPE,
+			    VDEV_TYPE_HOLE) != 0)
+				goto out;
+			if (nvlist_add_uint64(vdev, ZPOOL_CONFIG_IS_HOLE,
+			    1) != 0)
+				goto out;
+			if (lastlog == 0)
+				lastlog = vcount;
+			varray[vcount++] = vdev;
+			continue;
+		}
+		lastlog = 0;
+		verify(nvlist_lookup_string(child[c], ZPOOL_CONFIG_TYPE, &type)
+		    == 0);
+		if (strcmp(type, VDEV_TYPE_MIRROR) != 0) {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "Source pool must be composed only of mirrors\n"));
+			retval = zfs_error(hdl, EZFS_INVALCONFIG, msg);
+			goto out;
+		}
+
+		verify(nvlist_lookup_nvlist_array(child[c],
+		    ZPOOL_CONFIG_CHILDREN, &mchild, &mchildren) == 0);
+
+		/* find or add an entry for this top-level vdev */
+		if (newchildren > 0 &&
+		    (entry = find_vdev_entry(zhp, mchild, mchildren,
+		    newchild, newchildren)) >= 0) {
+			/* We found a disk that the user specified. */
+			vdev = mchild[entry];
+			++found;
+		} else {
+			/* User didn't specify a disk for this vdev. */
+			vdev = mchild[mchildren - 1];
+		}
+
+		if (nvlist_dup(vdev, &varray[vcount++], 0) != 0)
+			goto out;
+	}
+
+	/* did we find every disk the user specified? */
+	if (found != newchildren) {
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN, "Device list must "
+		    "include at most one disk from each mirror"));
+		retval = zfs_error(hdl, EZFS_INVALCONFIG, msg);
+		goto out;
+	}
+
+	/* Prepare the nvlist for populating. */
+	if (*newroot == NULL) {
+		if (nvlist_alloc(newroot, NV_UNIQUE_NAME, 0) != 0)
+			goto out;
+		freelist = B_TRUE;
+		if (nvlist_add_string(*newroot, ZPOOL_CONFIG_TYPE,
+		    VDEV_TYPE_ROOT) != 0)
+			goto out;
+	} else {
+		verify(nvlist_remove_all(*newroot, ZPOOL_CONFIG_CHILDREN) == 0);
+	}
+
+	/* Add all the children we found */
+	if (nvlist_add_nvlist_array(*newroot, ZPOOL_CONFIG_CHILDREN, varray,
+	    lastlog == 0 ? vcount : lastlog) != 0)
+		goto out;
+
+	/*
+	 * If we're just doing a dry run, exit now with success.
+	 */
+	if (flags.dryrun) {
+		memory_err = B_FALSE;
+		freelist = B_FALSE;
+		goto out;
+	}
+
+	/* now build up the config list & call the ioctl */
+	if (nvlist_alloc(&newconfig, NV_UNIQUE_NAME, 0) != 0)
+		goto out;
+
+	if (nvlist_add_nvlist(newconfig,
+	    ZPOOL_CONFIG_VDEV_TREE, *newroot) != 0 ||
+	    nvlist_add_string(newconfig,
+	    ZPOOL_CONFIG_POOL_NAME, newname) != 0 ||
+	    nvlist_add_uint64(newconfig, ZPOOL_CONFIG_VERSION, vers) != 0)
+		goto out;
+
+	/*
+	 * The new pool is automatically part of the namespace unless we
+	 * explicitly export it.
+	 */
+	if (!flags.import)
+		zc.zc_cookie = ZPOOL_EXPORT_AFTER_SPLIT;
+	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
+	(void) strlcpy(zc.zc_string, newname, sizeof (zc.zc_string));
+	if (zcmd_write_conf_nvlist(hdl, &zc, newconfig) != 0)
+		goto out;
+	if (zc_props != NULL && zcmd_write_src_nvlist(hdl, &zc, zc_props) != 0)
+		goto out;
+
+	if (zfs_ioctl(hdl, ZFS_IOC_VDEV_SPLIT, &zc) != 0) {
+		retval = zpool_standard_error(hdl, errno, msg);
+		goto out;
+	}
+
+	freelist = B_FALSE;
+	memory_err = B_FALSE;
+
+out:
+	if (varray != NULL) {
+		int v;
+
+		for (v = 0; v < vcount; v++)
+			nvlist_free(varray[v]);
+		free(varray);
+	}
+	zcmd_free_nvlists(&zc);
+	if (zc_props)
+		nvlist_free(zc_props);
+	if (newconfig)
+		nvlist_free(newconfig);
+	if (freelist) {
+		nvlist_free(*newroot);
+		*newroot = NULL;
+	}
+
+	if (retval != 0)
+		return (retval);
+
+	if (memory_err)
+		return (no_memory(hdl));
+
+	return (0);
 }
 
 /*

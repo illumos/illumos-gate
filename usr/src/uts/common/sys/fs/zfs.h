@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -454,6 +454,10 @@ typedef struct zpool_rewind_policy {
 #define	ZPOOL_CONFIG_DDT_HISTOGRAM	"ddt_histogram"
 #define	ZPOOL_CONFIG_DDT_OBJ_STATS	"ddt_object_stats"
 #define	ZPOOL_CONFIG_DDT_STATS		"ddt_stats"
+#define	ZPOOL_CONFIG_SPLIT		"splitcfg"
+#define	ZPOOL_CONFIG_ORIG_GUID		"orig_guid"
+#define	ZPOOL_CONFIG_SPLIT_GUID		"split_guid"
+#define	ZPOOL_CONFIG_SPLIT_LIST		"guid_list"
 #define	ZPOOL_CONFIG_SUSPENDED		"suspended"	/* not stored on disk */
 #define	ZPOOL_CONFIG_TIMESTAMP		"timestamp"	/* not stored on disk */
 #define	ZPOOL_CONFIG_BOOTFS		"bootfs"	/* not stored on disk */
@@ -539,7 +543,8 @@ typedef enum vdev_aux {
 	VDEV_AUX_ERR_EXCEEDED,	/* too many errors			*/
 	VDEV_AUX_IO_FAILURE,	/* experienced I/O failure		*/
 	VDEV_AUX_BAD_LOG,	/* cannot read log chain(s)		*/
-	VDEV_AUX_EXTERNAL	/* external diagnosis			*/
+	VDEV_AUX_EXTERNAL,	/* external diagnosis			*/
+	VDEV_AUX_SPLIT_POOL	/* vdev was split off into another pool	*/
 } vdev_aux_t;
 
 /*
@@ -707,7 +712,8 @@ typedef enum zfs_ioc {
 	ZFS_IOC_HOLD,
 	ZFS_IOC_RELEASE,
 	ZFS_IOC_GET_HOLDS,
-	ZFS_IOC_OBJSET_RECVD_PROPS
+	ZFS_IOC_OBJSET_RECVD_PROPS,
+	ZFS_IOC_VDEV_SPLIT
 } zfs_ioc_t;
 
 /*
@@ -825,6 +831,7 @@ typedef enum history_internal_events {
 	LOG_POOL_SCRUB_DONE,
 	LOG_DS_USER_HOLD,
 	LOG_DS_USER_RELEASE,
+	LOG_POOL_SPLIT,
 	LOG_END
 } history_internal_events_t;
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -401,6 +401,11 @@ typedef struct blkptr {
 	(((BP_GET_LEVEL(bp) > 0) || (dmu_ot[BP_GET_TYPE(bp)].ot_metadata)) ? \
 	ARC_BUFC_METADATA : ARC_BUFC_DATA);
 
+typedef enum spa_import_type {
+	SPA_IMPORT_EXISTING,
+	SPA_IMPORT_ASSEMBLE
+} spa_import_type_t;
+
 /* state manipulation functions */
 extern int spa_open(const char *pool, spa_t **, void *tag);
 extern int spa_open_rewind(const char *pool, spa_t **, void *tag,
@@ -440,6 +445,8 @@ extern int spa_vdev_detach(spa_t *spa, uint64_t guid, uint64_t pguid,
 extern int spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare);
 extern int spa_vdev_setpath(spa_t *spa, uint64_t guid, const char *newpath);
 extern int spa_vdev_setfru(spa_t *spa, uint64_t guid, const char *newfru);
+extern int spa_vdev_split_mirror(spa_t *spa, char *newname, nvlist_t *config,
+    nvlist_t *props, boolean_t exp);
 
 /* spare state (which is global across all pools) */
 extern void spa_spare_add(vdev_t *vd);
@@ -537,6 +544,7 @@ typedef enum spa_log_state {
 
 extern spa_log_state_t spa_get_log_state(spa_t *spa);
 extern void spa_set_log_state(spa_t *spa, spa_log_state_t state);
+extern int spa_offline_log(spa_t *spa);
 
 /* Log claim callback */
 extern void spa_claim_notify(zio_t *zio);
@@ -579,6 +587,7 @@ extern boolean_t spa_guid_exists(uint64_t pool_guid, uint64_t device_guid);
 extern char *spa_strdup(const char *);
 extern void spa_strfree(char *);
 extern uint64_t spa_get_random(uint64_t range);
+extern uint64_t spa_generate_guid(spa_t *spa);
 extern void sprintf_blkptr(char *buf, const blkptr_t *bp);
 extern void spa_freeze(spa_t *spa);
 extern void spa_upgrade(spa_t *spa, uint64_t version);

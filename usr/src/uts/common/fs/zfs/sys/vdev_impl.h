@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -112,6 +112,7 @@ struct vdev {
 	uint64_t	vdev_id;	/* child number in vdev parent	*/
 	uint64_t	vdev_guid;	/* unique ID for this vdev	*/
 	uint64_t	vdev_guid_sum;	/* self guid + all child guids	*/
+	uint64_t	vdev_orig_guid;	/* orig. guid prior to remove	*/
 	uint64_t	vdev_asize;	/* allocatable device capacity	*/
 	uint64_t	vdev_min_asize;	/* min acceptable asize		*/
 	uint64_t	vdev_ashift;	/* block alignment shift	*/
@@ -174,6 +175,7 @@ struct vdev {
 	boolean_t	vdev_nowritecache; /* true if flushwritecache failed */
 	boolean_t	vdev_checkremove; /* temporary online test	*/
 	boolean_t	vdev_forcefault; /* force online fault		*/
+	boolean_t	vdev_splitting;	/* split or repair in progress  */
 	uint8_t		vdev_tmpoffline; /* device taken offline temporarily? */
 	uint8_t		vdev_detached;	/* device detached?		*/
 	uint8_t		vdev_cant_read;	/* vdev is failing all reads	*/
@@ -251,6 +253,7 @@ typedef struct vdev_label {
 #define	VDEV_ALLOC_SPARE	2
 #define	VDEV_ALLOC_L2CACHE	3
 #define	VDEV_ALLOC_ROOTPOOL	4
+#define	VDEV_ALLOC_SPLIT	5
 
 /*
  * Allocate or free a vdev

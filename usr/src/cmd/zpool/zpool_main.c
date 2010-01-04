@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,6 +69,7 @@ static int zpool_do_clear(int, char **);
 static int zpool_do_attach(int, char **);
 static int zpool_do_detach(int, char **);
 static int zpool_do_replace(int, char **);
+static int zpool_do_split(int, char **);
 
 static int zpool_do_scrub(int, char **);
 
@@ -121,7 +122,8 @@ typedef enum {
 	HELP_STATUS,
 	HELP_UPGRADE,
 	HELP_GET,
-	HELP_SET
+	HELP_SET,
+	HELP_SPLIT
 } zpool_help_t;
 
 
@@ -158,6 +160,7 @@ static zpool_command_t command_table[] = {
 	{ "attach",	zpool_do_attach,	HELP_ATTACH		},
 	{ "detach",	zpool_do_detach,	HELP_DETACH		},
 	{ "replace",	zpool_do_replace,	HELP_REPLACE		},
+	{ "split",	zpool_do_split,		HELP_SPLIT		},
 	{ NULL },
 	{ "scrub",	zpool_do_scrub,		HELP_SCRUB		},
 	{ NULL },
@@ -235,6 +238,10 @@ get_usage(zpool_help_t idx) {
 		    "<pool> ...\n"));
 	case HELP_SET:
 		return (gettext("\tset <property=value> <pool> \n"));
+	case HELP_SPLIT:
+		return (gettext("\tsplit [-n] [-R altroot] [-o mntopts]\n"
+		    "\t    [-o property=value] <pool> <newpool> "
+		    "[<device> ...]\n"));
 	}
 
 	abort();
@@ -1132,6 +1139,10 @@ print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 			(void) printf(gettext("external device fault"));
 			break;
 
+		case VDEV_AUX_SPLIT_POOL:
+			(void) printf(gettext("split into new pool"));
+			break;
+
 		default:
 			(void) printf(gettext("corrupted data"));
 			break;
@@ -1622,7 +1633,7 @@ zpool_do_import(int argc, char **argv)
 	char *cachefile = NULL;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":aCc:d:DEfFno:p:rR:VX")) != -1) {
+	while ((c = getopt(argc, argv, ":aCc:d:DEfFno:rR:VX")) != -1) {
 		switch (c) {
 		case 'a':
 			do_all = B_TRUE;
@@ -2695,6 +2706,146 @@ zpool_do_detach(int argc, char **argv)
 
 	return (ret);
 }
+
+/*
+ * zpool split [-n] [-o prop=val] ...
+ *		[-o mntopt] ...
+ *		[-R altroot] <pool> <newpool> [<device> ...]
+ *
+ *	-n	Do not split the pool, but display the resulting layout if
+ *		it were to be split.
+ *	-o	Set property=value, or set mount options.
+ *	-R	Mount the split-off pool under an alternate root.
+ *
+ * Splits the named pool and gives it the new pool name.  Devices to be split
+ * off may be listed, provided that no more than one device is specified
+ * per top-level vdev mirror.  The newly split pool is left in an exported
+ * state unless -R is specified.
+ *
+ * Restrictions: the top-level of the pool pool must only be made up of
+ * mirrors; all devices in the pool must be healthy; no device may be
+ * undergoing a resilvering operation.
+ */
+int
+zpool_do_split(int argc, char **argv)
+{
+	char *srcpool, *newpool, *propval;
+	char *mntopts = NULL;
+	splitflags_t flags;
+	int c, ret = 0;
+	zpool_handle_t *zhp;
+	nvlist_t *config, *props = NULL;
+
+	flags.dryrun = B_FALSE;
+	flags.import = B_FALSE;
+
+	/* check options */
+	while ((c = getopt(argc, argv, ":R:no:")) != -1) {
+		switch (c) {
+		case 'R':
+			flags.import = B_TRUE;
+			if (add_prop_list(
+			    zpool_prop_to_name(ZPOOL_PROP_ALTROOT), optarg,
+			    &props, B_TRUE) != 0) {
+				if (props)
+					nvlist_free(props);
+				usage(B_FALSE);
+			}
+			break;
+		case 'n':
+			flags.dryrun = B_TRUE;
+			break;
+		case 'o':
+			if ((propval = strchr(optarg, '=')) != NULL) {
+				*propval = '\0';
+				propval++;
+				if (add_prop_list(optarg, propval,
+				    &props, B_TRUE) != 0) {
+					if (props)
+						nvlist_free(props);
+					usage(B_FALSE);
+				}
+			} else {
+				mntopts = optarg;
+			}
+			break;
+		case ':':
+			(void) fprintf(stderr, gettext("missing argument for "
+			    "'%c' option\n"), optopt);
+			usage(B_FALSE);
+			break;
+		case '?':
+			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
+			    optopt);
+			usage(B_FALSE);
+			break;
+		}
+	}
+
+	if (!flags.import && mntopts != NULL) {
+		(void) fprintf(stderr, gettext("setting mntopts is only "
+		    "valid when importing the pool\n"));
+		usage(B_FALSE);
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc < 1) {
+		(void) fprintf(stderr, gettext("Missing pool name\n"));
+		usage(B_FALSE);
+	}
+	if (argc < 2) {
+		(void) fprintf(stderr, gettext("Missing new pool name\n"));
+		usage(B_FALSE);
+	}
+
+	srcpool = argv[0];
+	newpool = argv[1];
+
+	argc -= 2;
+	argv += 2;
+
+	if ((zhp = zpool_open(g_zfs, srcpool)) == NULL)
+		return (1);
+
+	config = split_mirror_vdev(zhp, newpool, props, flags, argc, argv);
+	if (config == NULL) {
+		ret = 1;
+	} else {
+		if (flags.dryrun) {
+			(void) printf(gettext("would create '%s' with the "
+			    "following layout:\n\n"), newpool);
+			print_vdev_tree(NULL, newpool, config, 0, B_FALSE);
+		}
+		nvlist_free(config);
+	}
+
+	zpool_close(zhp);
+
+	if (ret != 0 || flags.dryrun || !flags.import)
+		return (ret);
+
+	/*
+	 * The split was successful. Now we need to open the new
+	 * pool and import it.
+	 */
+	if ((zhp = zpool_open_canfail(g_zfs, newpool)) == NULL)
+		return (1);
+	if (zpool_get_state(zhp) != POOL_STATE_UNAVAIL &&
+	    zpool_enable_datasets(zhp, mntopts, 0) != 0) {
+		ret = 1;
+		(void) fprintf(stderr, gettext("Split was succssful, but "
+		    "the datasets could not all be mounted\n"));
+		(void) fprintf(stderr, gettext("Try doing '%s' with a "
+		    "different altroot\n"), "zpool import");
+	}
+	zpool_close(zhp);
+
+	return (ret);
+}
+
+
 
 /*
  * zpool online <pool> <device> ...

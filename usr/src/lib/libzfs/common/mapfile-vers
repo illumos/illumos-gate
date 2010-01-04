@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -216,6 +216,7 @@ SUNWprivate_1.1 {
 	zpool_vdev_offline;
 	zpool_vdev_online;
 	zpool_vdev_remove;
+	zpool_vdev_split;
 	zprop_free_list;
 	zprop_get_list;
 	zprop_iter;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -855,14 +855,16 @@ main(int argc, char **argv)
 			return (2);
 		}
 
-		if (argc != 1) {
+		if (argc < 1 || argc > 2) {
 			(void) fprintf(stderr, "panic (-p) injection requires "
-			    "a single pool name\n");
+			    "a single pool name and an optional id\n");
 			usage();
 			return (2);
 		}
 
 		(void) strcpy(pool, argv[0]);
+		if (argv[1] != NULL)
+			record.zi_type = atoi(argv[1]);
 		dataset[0] = '\0';
 	} else if (record.zi_duration != 0) {
 		if (nowrites == 0) {
