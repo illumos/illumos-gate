@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -512,7 +512,7 @@ extern int zfs_send(zfs_handle_t *, const char *, const char *,
 
 extern int zfs_promote(zfs_handle_t *);
 extern int zfs_hold(zfs_handle_t *, const char *, const char *, boolean_t,
-    boolean_t);
+    boolean_t, boolean_t);
 extern int zfs_hold_range(zfs_handle_t *, const char *, const char *,
     const char *, boolean_t);
 extern int zfs_release(zfs_handle_t *, const char *, const char *, boolean_t);

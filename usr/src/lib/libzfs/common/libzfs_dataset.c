@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3922,7 +3922,7 @@ zfs_userspace(zfs_handle_t *zhp, zfs_userquota_prop_t type,
 
 int
 zfs_hold(zfs_handle_t *zhp, const char *snapname, const char *tag,
-    boolean_t recursive, boolean_t temphold)
+    boolean_t recursive, boolean_t temphold, boolean_t enoent_ok)
 {
 	zfs_cmd_t zc = { 0 };
 	libzfs_handle_t *hdl = zhp->zfs_hdl;
@@ -3961,6 +3961,10 @@ zfs_hold(zfs_handle_t *zhp, const char *snapname, const char *tag,
 			return (zfs_error(hdl, EZFS_BADTYPE, errbuf));
 		case EEXIST:
 			return (zfs_error(hdl, EZFS_REFTAG_HOLD, errbuf));
+		case ENOENT:
+			if (enoent_ok)
+				return (0);
+			/* FALLTHROUGH */
 		default:
 			return (zfs_standard_error_fmt(hdl, errno, errbuf));
 		}
@@ -4001,8 +4005,9 @@ zfs_hold_range_one(zfs_handle_t *zhp, void *arg)
 	}
 
 	if (hra->holding) {
+		/* We could be racing with destroy, so ignore ENOENT. */
 		error = zfs_hold(hra->origin, thissnap, hra->tag, B_FALSE,
-		    hra->temphold);
+		    hra->temphold, B_TRUE);
 		if (error == 0) {
 			(void) strlcpy(hra->lastsnapheld, zfs_get_name(zhp),
 			    sizeof (hra->lastsnapheld));
