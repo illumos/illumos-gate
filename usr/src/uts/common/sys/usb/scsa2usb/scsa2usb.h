@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,7 @@ extern "C" {
  */
 
 
+#define	SCSA2USB_MAX_CLONE	256
 #define	SCSA2USB_INITIAL_ALLOC	4	/* initial soft space alloc */
 
 #define	MAX_COMPAT_NAMES	1	/* max compatible names for children */
@@ -285,7 +286,7 @@ typedef struct scsa2usb_state {
 	int			scsa2usb_transport_busy; /* ugen/sd traffic */
 	int			scsa2usb_ugen_open_count;
 	kcondvar_t		scsa2usb_transport_busy_cv;
-	kthread_t		*scsa2usb_busy_thread;
+	struct proc		*scsa2usb_busy_proc; /* owner of the hardware */
 
 	kmutex_t		scsa2usb_mutex;		/* Per instance lock  */
 
@@ -346,6 +347,8 @@ typedef struct scsa2usb_state {
 							/* READY sense data */
 
 	usb_ugen_hdl_t		scsa2usb_ugen_hdl;	/* ugen support */
+
+	uint8_t			scsa2usb_clones[SCSA2USB_MAX_CLONE];
 } scsa2usb_state_t;
 
 

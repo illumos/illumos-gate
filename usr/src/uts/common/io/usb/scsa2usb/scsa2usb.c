@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,9 +58,11 @@
 #include <sys/sysmacros.h>
 
 #include <sys/usb/usba.h>
+#include <sys/usb/clients/ugen/usb_ugen.h>
 #include <sys/usb/usba/usba_ugen.h>
 
 #include <sys/usb/usba/usba_private.h>
+#include <sys/usb/usba/usba_ugend.h>
 #include <sys/usb/clients/mass_storage/usb_bulkonly.h>
 #include <sys/usb/scsa2usb/scsa2usb.h>
 
@@ -1065,7 +1067,7 @@ scsa2usb_ugen_open(dev_t *devp, int flag, int sflag, cred_t *cr)
 	mutex_enter(&scsa2usbp->scsa2usb_mutex);
 
 	/* if this is the first ugen open, check on transport busy */
-	if (scsa2usbp->scsa2usb_ugen_open_count == 0) {
+	if (scsa2usbp->scsa2usb_busy_proc != curproc) {
 		while (scsa2usbp->scsa2usb_transport_busy ||
 		    (scsa2usb_all_waitQs_empty(scsa2usbp) !=
 		    USB_SUCCESS)) {
@@ -1079,8 +1081,9 @@ scsa2usb_ugen_open(dev_t *devp, int flag, int sflag, cred_t *cr)
 			}
 		}
 		scsa2usbp->scsa2usb_transport_busy++;
-		scsa2usbp->scsa2usb_busy_thread = curthread;
+		scsa2usbp->scsa2usb_busy_proc = curproc;
 	}
+
 	scsa2usbp->scsa2usb_ugen_open_count++;
 
 	scsa2usb_raise_power(scsa2usbp);
@@ -1091,6 +1094,54 @@ scsa2usb_ugen_open(dev_t *devp, int flag, int sflag, cred_t *cr)
 
 	rval = usb_ugen_open(scsa2usbp->scsa2usb_ugen_hdl, devp, flag,
 	    sflag, cr);
+	if (!rval) {
+		/*
+		 * if usb_ugen_open() succeeded, we'll change the minor number
+		 * so that we can keep track of every open()/close() issued by
+		 * the userland processes. We need to pick a minor number that
+		 * is not used by the ugen framework
+		 */
+
+		usb_ugen_hdl_impl_t	*usb_ugen_hdl_impl;
+		ugen_state_t		*ugenp;
+		int			ugen_minor, clone;
+
+		mutex_enter(&scsa2usbp->scsa2usb_mutex);
+
+		usb_ugen_hdl_impl =
+		    (usb_ugen_hdl_impl_t *)scsa2usbp->scsa2usb_ugen_hdl;
+		ugenp =  usb_ugen_hdl_impl->hdl_ugenp;
+
+		/* 'clone' is bigger than any ugen minor in use */
+		for (clone = ugenp->ug_minor_node_table_index + 1;
+		    clone < SCSA2USB_MAX_CLONE; clone++) {
+			if (!scsa2usbp->scsa2usb_clones[clone])
+				break;
+		}
+
+		if (clone >= SCSA2USB_MAX_CLONE) {
+			cmn_err(CE_WARN, "scsa2usb_ugen_open: too many clones");
+			rval = EBUSY;
+			mutex_exit(&scsa2usbp->scsa2usb_mutex);
+			goto open_done;
+		}
+
+		ugen_minor = getminor(*devp) & SCSA2USB_MINOR_UGEN_BITS_MASK;
+		*devp = makedevice(getmajor(*devp),
+		    (scsa2usbp->scsa2usb_instance
+		    << SCSA2USB_MINOR_INSTANCE_SHIFT)
+		    + clone);
+
+		/* save the ugen minor */
+		scsa2usbp->scsa2usb_clones[clone] = (uint8_t)ugen_minor;
+		USB_DPRINTF_L4(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
+		    "scsa2usb_ugen_open: new dev=%lx, old minor=%x",
+		    *devp, ugen_minor);
+
+		mutex_exit(&scsa2usbp->scsa2usb_mutex);
+	}
+
+open_done:
 
 	if (rval) {
 		mutex_enter(&scsa2usbp->scsa2usb_mutex);
@@ -1098,7 +1149,7 @@ scsa2usb_ugen_open(dev_t *devp, int flag, int sflag, cred_t *cr)
 		/* reopen the pipes */
 		if (--scsa2usbp->scsa2usb_ugen_open_count == 0) {
 			scsa2usbp->scsa2usb_transport_busy--;
-			scsa2usbp->scsa2usb_busy_thread = NULL;
+			scsa2usbp->scsa2usb_busy_proc = NULL;
 			cv_signal(&scsa2usbp->scsa2usb_transport_busy_cv);
 		}
 		mutex_exit(&scsa2usbp->scsa2usb_mutex);
@@ -1117,6 +1168,7 @@ static int
 scsa2usb_ugen_close(dev_t dev, int flag, int otype, cred_t *cr)
 {
 	int rval;
+	int	ugen_minor, clone;
 
 	scsa2usb_state_t *scsa2usbp = ddi_get_soft_state(scsa2usb_statep,
 	    SCSA2USB_MINOR_TO_INSTANCE(getminor(dev)));
@@ -1129,16 +1181,24 @@ scsa2usb_ugen_close(dev_t dev, int flag, int otype, cred_t *cr)
 	USB_DPRINTF_L4(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
 	    "scsa2usb_ugen_close: dev_t=0x%lx", dev);
 
+	clone = getminor(dev) & SCSA2USB_MINOR_UGEN_BITS_MASK;
+	ugen_minor = scsa2usbp->scsa2usb_clones[clone];
+	dev = makedevice(getmajor(dev),
+	    (scsa2usbp->scsa2usb_instance << SCSA2USB_MINOR_INSTANCE_SHIFT)
+	    + ugen_minor);
+	USB_DPRINTF_L4(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
+	    "scsa2usb_ugen_close: old dev=%lx", dev);
 	rval = usb_ugen_close(scsa2usbp->scsa2usb_ugen_hdl, dev, flag,
 	    otype, cr);
 
 	if (rval == 0) {
 		mutex_enter(&scsa2usbp->scsa2usb_mutex);
 
+		scsa2usbp->scsa2usb_clones[clone] = 0;
 		/* reopen the pipes */
 		if (--scsa2usbp->scsa2usb_ugen_open_count == 0) {
 			scsa2usbp->scsa2usb_transport_busy--;
-			scsa2usbp->scsa2usb_busy_thread = NULL;
+			scsa2usbp->scsa2usb_busy_proc = NULL;
 			cv_signal(&scsa2usbp->scsa2usb_transport_busy_cv);
 		}
 		mutex_exit(&scsa2usbp->scsa2usb_mutex);
@@ -1157,6 +1217,7 @@ scsa2usb_ugen_close(dev_t dev, int flag, int otype, cred_t *cr)
 static int
 scsa2usb_ugen_read(dev_t dev, struct uio *uiop, cred_t *credp)
 {
+	int clone, ugen_minor;
 	scsa2usb_state_t *scsa2usbp = ddi_get_soft_state(scsa2usb_statep,
 	    SCSA2USB_MINOR_TO_INSTANCE(getminor(dev)));
 
@@ -1168,6 +1229,11 @@ scsa2usb_ugen_read(dev_t dev, struct uio *uiop, cred_t *credp)
 	USB_DPRINTF_L4(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
 	    "scsa2usb_ugen_read: dev_t=0x%lx", dev);
 
+	clone = getminor(dev) & SCSA2USB_MINOR_UGEN_BITS_MASK;
+	ugen_minor = scsa2usbp->scsa2usb_clones[clone];
+	dev = makedevice(getmajor(dev),
+	    (scsa2usbp->scsa2usb_instance << SCSA2USB_MINOR_INSTANCE_SHIFT)
+	    + ugen_minor);
 
 	return (usb_ugen_read(scsa2usbp->scsa2usb_ugen_hdl, dev,
 	    uiop, credp));
@@ -1178,6 +1244,7 @@ scsa2usb_ugen_read(dev_t dev, struct uio *uiop, cred_t *credp)
 static int
 scsa2usb_ugen_write(dev_t dev, struct uio *uiop, cred_t *credp)
 {
+	int clone, ugen_minor;
 	scsa2usb_state_t *scsa2usbp = ddi_get_soft_state(scsa2usb_statep,
 	    SCSA2USB_MINOR_TO_INSTANCE(getminor(dev)));
 
@@ -1188,6 +1255,12 @@ scsa2usb_ugen_write(dev_t dev, struct uio *uiop, cred_t *credp)
 
 	USB_DPRINTF_L4(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
 	    "scsa2usb_ugen_write: dev_t=0x%lx", dev);
+
+	clone = getminor(dev) & SCSA2USB_MINOR_UGEN_BITS_MASK;
+	ugen_minor = scsa2usbp->scsa2usb_clones[clone];
+	dev = makedevice(getmajor(dev),
+	    (scsa2usbp->scsa2usb_instance << SCSA2USB_MINOR_INSTANCE_SHIFT)
+	    + ugen_minor);
 
 	return (usb_ugen_write(scsa2usbp->scsa2usb_ugen_hdl,
 	    dev, uiop, credp));
@@ -1201,6 +1274,7 @@ static int
 scsa2usb_ugen_poll(dev_t dev, short events,
     int anyyet,  short *reventsp, struct pollhead **phpp)
 {
+	int clone, ugen_minor;
 	scsa2usb_state_t *scsa2usbp = ddi_get_soft_state(scsa2usb_statep,
 	    SCSA2USB_MINOR_TO_INSTANCE(getminor(dev)));
 
@@ -1211,6 +1285,12 @@ scsa2usb_ugen_poll(dev_t dev, short events,
 
 	USB_DPRINTF_L4(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
 	    "scsa2usb_ugen_poll: dev_t=0x%lx", dev);
+
+	clone = getminor(dev) & SCSA2USB_MINOR_UGEN_BITS_MASK;
+	ugen_minor = scsa2usbp->scsa2usb_clones[clone];
+	dev = makedevice(getmajor(dev),
+	    (scsa2usbp->scsa2usb_instance << SCSA2USB_MINOR_INSTANCE_SHIFT)
+	    + ugen_minor);
 
 	return (usb_ugen_poll(scsa2usbp->scsa2usb_ugen_hdl, dev, events,
 	    anyyet, reventsp, phpp));
@@ -2572,17 +2652,6 @@ scsa2usb_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		mutex_exit(&scsa2usbp->scsa2usb_mutex);
 
 		return (TRAN_BADPKT);
-	}
-
-	/* is there a ugen open? */
-	if (scsa2usbp->scsa2usb_ugen_open_count) {
-		USB_DPRINTF_L2(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
-		    "ugen access in progress (count=%d)",
-		    scsa2usbp->scsa2usb_ugen_open_count);
-
-		mutex_exit(&scsa2usbp->scsa2usb_mutex);
-
-		return (TRAN_BUSY);
 	}
 
 	/* prepare packet */
@@ -4101,7 +4170,7 @@ scsa2usb_work_thread(void *arg)
 	}
 	ASSERT(scsa2usbp->scsa2usb_ugen_open_count == 0);
 	scsa2usbp->scsa2usb_transport_busy++;
-	scsa2usbp->scsa2usb_busy_thread = curthread;
+	scsa2usbp->scsa2usb_busy_proc = curproc;
 
 	scsa2usb_raise_power(scsa2usbp);
 
@@ -4130,7 +4199,7 @@ scsa2usb_work_thread(void *arg)
 	ASSERT(scsa2usbp->scsa2usb_ugen_open_count == 0);
 
 	scsa2usbp->scsa2usb_transport_busy--;
-	scsa2usbp->scsa2usb_busy_thread = NULL;
+	scsa2usbp->scsa2usb_busy_proc = NULL;
 	cv_signal(&scsa2usbp->scsa2usb_transport_busy_cv);
 
 	USB_DPRINTF_L4(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
