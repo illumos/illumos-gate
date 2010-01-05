@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -3916,19 +3916,21 @@ ill_lookup_on_ifindex(uint_t index, boolean_t isv6, ip_stack_t *ipst)
 }
 
 /*
- * Verify whether or not an interface index is valid.
+ * Verify whether or not an interface index is valid for the specified zoneid
+ * to transmit packets.
  * It can be zero (meaning "reset") or an interface index assigned
  * to a non-VNI interface. (We don't use VNI interface to send packets.)
  */
 boolean_t
-ip_ifindex_valid(uint_t ifindex, boolean_t isv6, ip_stack_t *ipst)
+ip_xmit_ifindex_valid(uint_t ifindex, zoneid_t zoneid, boolean_t isv6,
+    ip_stack_t *ipst)
 {
 	ill_t		*ill;
 
 	if (ifindex == 0)
 		return (B_TRUE);
 
-	ill = ill_lookup_on_ifindex(ifindex, isv6, ipst);
+	ill = ill_lookup_on_ifindex_zoneid(ifindex, zoneid, isv6, ipst);
 	if (ill == NULL)
 		return (B_FALSE);
 	if (IS_VNI(ill)) {
@@ -5690,7 +5692,8 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 	 * Get an interface IRE for the specified gateway.
 	 * If we don't have an IRE_IF_NORESOLVER or IRE_IF_RESOLVER for the
 	 * gateway, it is currently unreachable and we fail the request
-	 * accordingly.
+	 * accordingly. We reject any RTF_GATEWAY routes where the gateway
+	 * is an IRE_LOCAL or IRE_LOOPBACK.
 	 * If RTA_IFP was specified we look on that particular ill.
 	 */
 	if (ill != NULL)
@@ -5698,7 +5701,7 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 
 	/* Check whether the gateway is reachable. */
 again:
-	type = IRE_INTERFACE;
+	type = IRE_INTERFACE | IRE_LOCAL | IRE_LOOPBACK;
 	if (flags & RTF_INDIRECT)
 		type |= IRE_OFFLINK;
 
@@ -5716,7 +5719,12 @@ again:
 			match_flags |= MATCH_IRE_TESTHIDDEN;
 			goto again;
 		}
-
+		if (ipif != NULL)
+			ipif_refrele(ipif);
+		return (ENETUNREACH);
+	}
+	if (gw_ire->ire_type & (IRE_LOCAL|IRE_LOOPBACK)) {
+		ire_refrele(gw_ire);
 		if (ipif != NULL)
 			ipif_refrele(ipif);
 		return (ENETUNREACH);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -687,20 +687,39 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 	 * Get an interface IRE for the specified gateway.
 	 * If we don't have an IRE_IF_NORESOLVER or IRE_IF_RESOLVER for the
 	 * gateway, it is currently unreachable and we fail the request
-	 * accordingly.
+	 * accordingly. We reject any RTF_GATEWAY routes where the gateway
+	 * is an IRE_LOCAL or IRE_LOOPBACK.
 	 * If RTA_IFP was specified we look on that particular ill.
 	 */
 	if (ill != NULL)
 		match_flags |= MATCH_IRE_ILL;
 
 	/* Check whether the gateway is reachable. */
-	type = IRE_INTERFACE;
+again:
+	type = IRE_INTERFACE | IRE_LOCAL | IRE_LOOPBACK;
 	if (flags & RTF_INDIRECT)
 		type |= IRE_OFFLINK;
 
 	gw_ire = ire_ftable_lookup_v6(gw_addr, 0, 0, type, ill,
 	    ALL_ZONES, NULL, match_flags, 0, ipst, NULL);
 	if (gw_ire == NULL) {
+		/*
+		 * With IPMP, we allow host routes to influence in.mpathd's
+		 * target selection.  However, if the test addresses are on
+		 * their own network, the above lookup will fail since the
+		 * underlying IRE_INTERFACEs are marked hidden.  So allow
+		 * hidden test IREs to be found and try again.
+		 */
+		if (!(match_flags & MATCH_IRE_TESTHIDDEN))  {
+			match_flags |= MATCH_IRE_TESTHIDDEN;
+			goto again;
+		}
+		if (ipif != NULL)
+			ipif_refrele(ipif);
+		return (ENETUNREACH);
+	}
+	if (gw_ire->ire_type & (IRE_LOCAL|IRE_LOOPBACK)) {
+		ire_refrele(gw_ire);
 		if (ipif != NULL)
 			ipif_refrele(ipif);
 		return (ENETUNREACH);

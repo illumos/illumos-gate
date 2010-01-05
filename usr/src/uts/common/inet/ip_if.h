@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -172,7 +172,8 @@ extern  ill_t	*ill_lookup_on_ifindex_zoneid(uint_t, zoneid_t, boolean_t,
     ip_stack_t *);
 extern	ill_t	*ill_lookup_on_name(char *, boolean_t,
     boolean_t, boolean_t *, ip_stack_t *);
-extern boolean_t ip_ifindex_valid(uint_t, boolean_t, ip_stack_t *);
+extern boolean_t ip_xmit_ifindex_valid(uint_t, zoneid_t, boolean_t,
+    ip_stack_t *);
 extern uint_t	ill_get_next_ifindex(uint_t, boolean_t, ip_stack_t *);
 extern uint_t	ill_get_ifindex_by_name(char *, ip_stack_t *);
 extern uint_t	ill_get_upper_ifindex(const ill_t *);

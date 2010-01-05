@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -1265,7 +1265,8 @@ conn_opt_set_ip(conn_opt_arg_t *coa, t_scalar_t name, uint_t inlen,
 				return (EADDRNOTAVAIL);
 			}
 		}
-		if (!ip_ifindex_valid(pktinfo->ipi_ifindex, B_FALSE, ipst))
+		if (!ip_xmit_ifindex_valid(pktinfo->ipi_ifindex, zoneid,
+		    B_FALSE, ipst))
 			return (ENXIO);
 		break;
 	}
@@ -1273,7 +1274,7 @@ conn_opt_set_ip(conn_opt_arg_t *coa, t_scalar_t name, uint_t inlen,
 		ifindex = *(uint_t *)i1;
 
 		/* Just check it is ok. */
-		if (!ip_ifindex_valid(ifindex, B_FALSE, ipst))
+		if (!ip_xmit_ifindex_valid(ifindex, zoneid, B_FALSE, ipst))
 			return (ENXIO);
 		break;
 	}
@@ -1523,8 +1524,8 @@ conn_opt_set_ipv6(conn_opt_arg_t *coa, t_scalar_t name, uint_t inlen,
 		 */
 		ifindex = *(uint_t *)i1;
 
-		if (!ip_ifindex_valid(ifindex, B_TRUE, ipst) &&
-		    !ip_ifindex_valid(ifindex, B_FALSE, ipst))
+		if (!ip_xmit_ifindex_valid(ifindex, zoneid, B_TRUE, ipst) &&
+		    !ip_xmit_ifindex_valid(ifindex, zoneid, B_FALSE, ipst))
 			return (EINVAL);
 		break;
 	case IPV6_UNICAST_HOPS:
@@ -1544,7 +1545,7 @@ conn_opt_set_ipv6(conn_opt_arg_t *coa, t_scalar_t name, uint_t inlen,
 	case IPV6_BOUND_IF:
 		ifindex = *(uint_t *)i1;
 
-		if (!ip_ifindex_valid(ifindex, B_TRUE, ipst))
+		if (!ip_xmit_ifindex_valid(ifindex, zoneid, B_TRUE, ipst))
 			return (ENXIO);
 		break;
 	case IPV6_PKTINFO: {
@@ -1600,7 +1601,8 @@ conn_opt_set_ipv6(conn_opt_arg_t *coa, t_scalar_t name, uint_t inlen,
 			ixa->ixa_flags &= ~IXAF_VERIFY_SOURCE;
 		}
 		isv6 = !(IN6_IS_ADDR_V4MAPPED(&pkti->ipi6_addr));
-		if (!ip_ifindex_valid(pkti->ipi6_ifindex, isv6, ipst))
+		if (!ip_xmit_ifindex_valid(pkti->ipi6_ifindex, zoneid, isv6,
+		    ipst))
 			return (ENXIO);
 		break;
 	}
