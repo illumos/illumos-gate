@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,6 +28,7 @@
  */
 
 #include <sys/scsi/adapters/pmcs/pmcs.h>
+#include <sys/scsi/adapters/pmcs/pmcs_fwlog.h>
 
 static int pmcs_dump_ioqs(pmcs_hw_t *, caddr_t, uint32_t);
 static int pmcs_dump_spc_ver(pmcs_hw_t *, caddr_t, uint32_t);
@@ -38,6 +39,9 @@ static uint32_t pmcs_get_axil(pmcs_hw_t *);
 static boolean_t pmcs_shift_axil(pmcs_hw_t *, uint32_t);
 static void pmcs_restore_axil(pmcs_hw_t *, uint32_t);
 static int pmcs_dump_gsm(pmcs_hw_t *, caddr_t, uint32_t);
+static int pmcs_dump_gsm_addiregs(pmcs_hw_t *, caddr_t, uint32_t);
+static int pmcs_dump_hsst_sregs(pmcs_hw_t *, caddr_t, uint32_t);
+static int pmcs_dump_sspa_sregs(pmcs_hw_t *, caddr_t, uint32_t);
 static int pmcs_dump_fwlog(pmcs_hw_t *, caddr_t, uint32_t);
 
 /*
@@ -84,7 +88,6 @@ pmcs_register_dump_int(pmcs_hw_t *pwp)
 	n = pmcs_dump_ioqs(pwp, buf, size_left);
 	ASSERT(size_left >= n);
 	buf += n; size_left -= n;
-
 	mutex_exit(&pwp->lock);
 	slice = (PMCS_REGISTER_DUMP_FLASH_SIZE / PMCS_FLASH_CHUNK_SIZE);
 	n = snprintf(buf, size_left, "\nDump AAP1 register: \n"
@@ -190,21 +193,32 @@ pmcs_register_dump_int(pmcs_hw_t *pwp)
 	}
 	mutex_enter(&pwp->lock);
 
+	n = pmcs_dump_gsm_addiregs(pwp, buf, size_left);
+	ASSERT(size_left >= n);
+	buf += n; size_left -= n;
+
+	n = pmcs_dump_hsst_sregs(pwp, buf, size_left);
+	ASSERT(size_left >= n);
+	buf += n; size_left -= n;
+
+	n = pmcs_dump_sspa_sregs(pwp, buf, size_left);
+	ASSERT(size_left >= n);
+	buf += n; size_left -= n;
 	n = snprintf(buf, size_left, "\nDump firmware log: \n"
 	    "-----------------\n");
 	ASSERT(size_left >= n);
 	buf += n; size_left -= n;
 
 	n = pmcs_dump_fwlog(pwp, buf, size_left);
-
-	ASSERT(size_left >= n);
-	buf += n; size_left -= n;
-	n = snprintf(buf, size_left, "-----------------\n"
-	    "\n------------ Dump internal registers end  -------------\n");
 	ASSERT(size_left >= n);
 	buf += n; size_left -= n;
 
 	n = pmcs_dump_gsm(pwp, buf, size_left);
+	ASSERT(size_left >= n);
+	buf += n; size_left -= n;
+
+	n = snprintf(buf, size_left, "-----------------\n"
+	    "\n------------ Dump internal registers end  -------------\n");
 	ASSERT(size_left >= n);
 	buf += n; size_left -= n;
 }
@@ -841,6 +855,58 @@ pmcs_restore_axil(pmcs_hw_t *pwp, uint32_t oldaxil)
 }
 
 /*
+ * Dump Additional GSM Registers.
+ */
+static int
+pmcs_dump_gsm_addiregs(pmcs_hw_t *pwp, caddr_t buf, uint32_t size_left)
+{
+	uint32_t i = 0;
+	int n = 0, j = 0, nums = 0;
+	uint32_t gsm_addr = 0, addr = 0;
+
+	n += snprintf(&buf[n], (size_left - n), "\nDump GSM Sparse Registers:"
+	    "\n-----------------\n");
+	for (i = 0; i < sizeof (gsm_spregs) / sizeof (pmcs_sparse_regs_t);
+	    i++) {
+		gsm_addr =
+		    gsm_spregs[i].shift_addr + gsm_spregs[i].offset_start;
+		nums = gsm_spregs[i].offset_end - gsm_spregs[i].offset_start;
+		if (gsm_spregs[i].flag & PMCS_SPREGS_BLOCK_START) {
+			n += snprintf(&buf[n], (size_left - n), "\n%s - 0x%08X"
+			    "[MEMBASE-III SHIFT = 0x%08X]\nOffset:\n",
+			    gsm_spregs[i].desc ? gsm_spregs[i].desc : "NULL",
+			    gsm_spregs[i].base_addr, gsm_spregs[i].shift_addr);
+		}
+
+		if (nums == 0) {
+			n += snprintf(&buf[n], (size_left - n),
+			    "[%04X]: %08X\n", gsm_spregs[i].offset_start,
+			    pmcs_rd_gsm_reg(pwp, gsm_addr));
+		} else if (nums > 0) {
+			n += snprintf(&buf[n], (size_left - n),
+			    "\n[%04X] - [%04X]: \n", gsm_spregs[i].offset_start,
+			    gsm_spregs[i].offset_end);
+
+			j = 0;
+			while (nums > 0) {
+				addr = gsm_addr + j * 4;
+				n += snprintf(&buf[n], (size_left - n),
+				    "[%04X]: %08X\n", addr & GSM_BASE_MASK,
+				    pmcs_rd_gsm_reg(pwp, addr));
+				j++;
+				nums -= 4;
+			}
+		}
+
+	}
+
+	n += snprintf(&buf[n], (size_left - n), "-----------------\n"
+	    "------------ Dump GSM Sparse Registers end ------------\n");
+	return (n);
+
+}
+
+/*
  * Dump GSM Memory Regions.
  */
 static int
@@ -952,7 +1018,8 @@ pmcs_dump_gsm(pmcs_hw_t *pwp, caddr_t buf, uint32_t size_left)
 void
 pmcs_iqp_trace(pmcs_hw_t *pwp, uint32_t qnum)
 {
-	uint32_t k = 0, n = 0;
+	uint32_t k = 0;
+	int n = 0;
 	uint32_t *ptr = NULL;
 	char *tbuf = pwp->iqpt->curpos;
 	uint32_t size_left = pwp->iqpt->size_left;
@@ -987,6 +1054,70 @@ pmcs_iqp_trace(pmcs_hw_t *pwp, uint32_t qnum)
 		pwp->iqpt->curpos =
 		    pwp->iqpt->head + PMCS_IQP_TRACE_BUFFER_SIZE - 1;
 	}
+}
+
+/*
+ * Capture HSST State Registers.
+ */
+static int
+pmcs_dump_hsst_sregs(pmcs_hw_t *pwp, caddr_t buf, uint32_t size_left)
+{
+	uint32_t i = 0, j = 0, addr = 0;
+	int n = 0;
+
+	n += snprintf(&buf[n], (size_left - n), "\nHSST State Capture : \n"
+	    "-----------------\n");
+	n += snprintf(&buf[n], (size_left - n), "%s \t %s \n",
+	    hsst_state[8].desc ? hsst_state[8].desc : "NULL",
+	    hsst_state[16].desc ? hsst_state[16].desc : "NULL");
+
+	for (i = 0; i < 8; i++) {
+		addr = hsst_state[i].offset_start +
+		    hsst_state[i].shift_addr;
+		n += snprintf(&buf[n], (size_left - n), "Phy[%1d]\n", i);
+		for (j = 0; j < 6; j++) {
+			pmcs_wr_gsm_reg(pwp, addr, j);
+			pmcs_wr_gsm_reg(pwp, addr, (0x0100 + j));
+			addr = hsst_state[i+8].offset_start +
+			    hsst_state[i+8].shift_addr;
+			n += snprintf(&buf[n], (size_left - n),
+			    "[%08X]: %08X\t", addr, pmcs_rd_gsm_reg(pwp, addr));
+			addr = hsst_state[i+16].offset_start +
+			    hsst_state[i+16].shift_addr;
+			n += snprintf(&buf[n], (size_left - n),
+			    "[%08X]: %08X\n", addr, pmcs_rd_gsm_reg(pwp, addr));
+		}
+
+	}
+	return (n);
+
+}
+
+/*
+ * Capture SSPA State Registers.
+ */
+static int
+pmcs_dump_sspa_sregs(pmcs_hw_t *pwp, caddr_t buf, uint32_t size_left)
+{
+	uint32_t i = 0, rv = 0, addr = 0;
+	int n = 0;
+
+	n += snprintf(&buf[n], (size_left - n), "\nSSPA State Capture : \n"
+	    "-----------------\n");
+	for (i = 0; i < 8; i++) {
+		if (sspa_state[i].flag & PMCS_SPREGS_BLOCK_START) {
+			n += snprintf(&buf[n], (size_left - n), "%s \n",
+			    sspa_state[i].desc ? sspa_state[i].desc : "NULL");
+		}
+		addr = sspa_state[i].offset_start + sspa_state[i].shift_addr;
+		rv = pmcs_rd_gsm_reg(pwp, addr);
+		rv |= PMCS_SSPA_CONTROL_REGISTER_BIT27;
+		pmcs_wr_gsm_reg(pwp, addr, rv);
+		n += snprintf(&buf[n], (size_left - n), "[%08X]: %08X \n",
+		    addr, pmcs_rd_gsm_reg(pwp, addr));
+
+	}
+	return (n);
 }
 
 /*
