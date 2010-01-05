@@ -20,6 +20,11 @@
  */
 
 /*
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
  * Copyright 2007-2009 Myricom, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -4146,6 +4151,7 @@ myri10ge_slice_stat_init(struct myri10ge_slice_state *ss)
 	defined __i386__ || #cpu(x86_64) || defined __x86_64__
 
 #include <vm/hat.h>
+#include <sys/ddi_isa.h>
 void *device_arena_alloc(size_t size, int vm_flag);
 void device_arena_free(void *vaddr, size_t size);
 
@@ -4217,7 +4223,8 @@ myri10ge_enable_nvidia_ecrc(struct myri10ge_priv *mgp)
 			cmn_err(CE_WARN, "%s: failed to map nf4: cvaddr\n",
 			    mgp->name);
 
-		hat_devload(kas.a_hat, cvaddr, mmu_ptob(1), mmu_btop(base),
+		hat_devload(kas.a_hat, cvaddr, mmu_ptob(1),
+		    i_ddi_paddr_to_pfn(base),
 		    PROT_WRITE|HAT_STRICTORDER, HAT_LOAD_LOCK);
 
 		ptr = cvaddr + pgoffset;

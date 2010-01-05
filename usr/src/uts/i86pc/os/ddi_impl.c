@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2922,4 +2922,22 @@ i_ddi_dma_max(dev_info_t *dip, ddi_dma_attr_t *attrp)
 	}
 
 	return ((uint32_t)maxxfer);
+}
+
+pfn_t
+i_ddi_paddr_to_pfn(paddr_t paddr)
+{
+	pfn_t pfn;
+
+#ifdef __xpv
+	if (DOMAIN_IS_INITDOMAIN(xen_info)) {
+		pfn = xen_assign_pfn(mmu_btop(paddr));
+	} else {
+		pfn = mmu_btop(paddr);
+	}
+#else
+	pfn = mmu_btop(paddr);
+#endif
+
+	return (pfn);
 }

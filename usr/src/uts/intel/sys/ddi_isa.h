@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -575,6 +575,9 @@ void i_ddi_caut_rep_put64(ddi_acc_impl_t *hdl, uint64_t *host_addr,
 boolean_t i_ddi_copybuf_required(ddi_dma_attr_t *attrp);
 size_t i_ddi_copybuf_size();
 uint32_t i_ddi_dma_max(dev_info_t *dip, ddi_dma_attr_t *attrp);
+
+/* handles case of running on top of hypervisor */
+pfn_t i_ddi_paddr_to_pfn(paddr_t paddr);
 
 #endif	/* __STDC__ */
 
