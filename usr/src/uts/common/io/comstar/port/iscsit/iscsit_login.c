@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1333,9 +1333,11 @@ login_sm_session_bind(iscsit_conn_t *ict)
 				iscsit_tpgt_rele(tpgt);
 			}
 
+			mutex_enter(&iscsit_global.global_state_mutex);
 			if ((tgt->target_state != TS_STMF_ONLINE) ||
 			    ((iscsit_global.global_svc_state != ISE_ENABLED) &&
 			    ((iscsit_global.global_svc_state != ISE_BUSY)))) {
+				mutex_exit(&iscsit_global.global_state_mutex);
 				SET_LOGIN_ERROR(ict,
 				    ISCSI_STATUS_CLASS_TARGET_ERR,
 				    ISCSI_LOGIN_STATUS_SVC_UNAVAILABLE);
@@ -1343,6 +1345,7 @@ login_sm_session_bind(iscsit_conn_t *ict)
 				ISCSIT_GLOBAL_UNLOCK();
 				goto session_bind_error;
 			}
+			mutex_exit(&iscsit_global.global_state_mutex);
 			mutex_exit(&tgt->target_mutex);
 			ISCSIT_GLOBAL_UNLOCK();
 		}

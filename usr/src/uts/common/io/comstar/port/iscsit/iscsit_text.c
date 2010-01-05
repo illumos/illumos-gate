@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -300,12 +300,10 @@ iscsit_add_portals(iscsit_conn_t *ict, iscsit_tpgt_t *tpg_list,
  * Process all the portal groups bound to a particular target.
  */
 static void
-iscsit_add_tpgs(iscsit_conn_t *ict, iscsit_tgt_t *target, nvlist_t *nv_resp)
+iscsit_add_tpgs(iscsit_conn_t *ict, iscsit_tgt_t *target,
+    idm_addr_list_t *ipaddr_p,  nvlist_t *nv_resp)
 {
 	iscsit_tpgt_t *tpg_list;
-	idm_addr_list_t *ipaddr_p;
-	int ipsize;
-
 
 	/*
 	 * Look through the portal groups associated with this target.
@@ -324,14 +322,9 @@ iscsit_add_tpgs(iscsit_conn_t *ict, iscsit_tgt_t *target, nvlist_t *nv_resp)
 		 */
 		ASSERT(AVL_NEXT(&target->target_tpgt_list, tpg_list) == NULL);
 
-		/*
-		 * get the list of local interface addresses
-		 */
-		ipsize = idm_get_ipaddr(&ipaddr_p);
-		if (ipsize > 0) {
+		if (ipaddr_p != NULL) {
 			/* convert the ip address list to nvlist format */
 			iscsit_add_default_portals(ict, ipaddr_p, nv_resp);
-			kmem_free(ipaddr_p, ipsize);
 		}
 		mutex_exit(&target->target_mutex);
 		return;
@@ -538,6 +531,8 @@ iscsit_pdu_op_text_cmd(iscsit_conn_t *ict, idm_pdu_t *rx_pdu)
 	if (textbuflen >= strlen(kv_pair) &&
 	    strcmp(kv_pair, textbuf) == 0 &&
 	    ict->ict_op.op_discovery_session == B_TRUE) {
+		idm_addr_list_t *ipaddr_p;
+		int ipsize;
 
 		/*
 		 * Most common case of SendTargets=All during discovery.
@@ -550,6 +545,12 @@ iscsit_pdu_op_text_cmd(iscsit_conn_t *ict, idm_pdu_t *rx_pdu)
 			    ISCSI_REJECT_CMD_NOT_SUPPORTED);
 			return;
 		}
+
+		/*
+		 * get the list of local interface addresses
+		 */
+
+		ipsize = idm_get_ipaddr(&ipaddr_p);
 
 		/*
 		 * Add all the targets to the response list.
@@ -574,10 +575,13 @@ iscsit_pdu_op_text_cmd(iscsit_conn_t *ict, idm_pdu_t *rx_pdu)
 			value = target->target_name;
 			if (nvlist_add_string(nv_resp, key, value) == 0) {
 				/* add the portal groups bound to this target */
-				iscsit_add_tpgs(ict, target, nv_resp);
+				iscsit_add_tpgs(ict, target, ipaddr_p, nv_resp);
 			}
 		}
 		ISCSIT_GLOBAL_UNLOCK();
+		if (ipsize > 0) {
+			kmem_free(ipaddr_p, ipsize);
+		}
 
 		/*
 		 * Convert the response nvlist into an idm text buffer.

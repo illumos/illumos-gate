@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -179,10 +179,10 @@ iscsit_sess_create(iscsit_tgt_t *tgt, iscsit_conn_t *ict,
 		 * Make sure the service is still enabled and if so get a global
 		 * hold to represent this session.
 		 */
-		ISCSIT_GLOBAL_LOCK(RW_READER);
+		mutex_enter(&iscsit_global.global_state_mutex);
 		if (iscsit_global.global_svc_state == ISE_ENABLED) {
 			iscsit_global_hold();
-			ISCSIT_GLOBAL_UNLOCK();
+			mutex_exit(&iscsit_global.global_state_mutex);
 
 			/*
 			 * Kick session state machine (also binds connection
@@ -192,7 +192,7 @@ iscsit_sess_create(iscsit_tgt_t *tgt, iscsit_conn_t *ict,
 
 			*error_class = ISCSI_STATUS_CLASS_SUCCESS;
 		} else {
-			ISCSIT_GLOBAL_UNLOCK();
+			mutex_exit(&iscsit_global.global_state_mutex);
 			*error_class = ISCSI_STATUS_CLASS_TARGET_ERR;
 			*error_detail = ISCSI_LOGIN_STATUS_SVC_UNAVAILABLE;
 		}

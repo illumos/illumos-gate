@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -222,9 +222,12 @@ _init(void)
 	int rc;
 
 	rw_init(&iscsit_global.global_rwlock, NULL, RW_DRIVER, NULL);
+	mutex_init(&iscsit_global.global_state_mutex, NULL,
+	    MUTEX_DRIVER, NULL);
 	iscsit_global.global_svc_state = ISE_DETACHED;
 
 	if ((rc = mod_install(&modlinkage)) != 0) {
+		mutex_destroy(&iscsit_global.global_state_mutex);
 		rw_destroy(&iscsit_global.global_rwlock);
 		return (rc);
 	}
@@ -246,6 +249,7 @@ _fini(void)
 	rc = mod_remove(&modlinkage);
 
 	if (rc == 0) {
+		mutex_destroy(&iscsit_global.global_state_mutex);
 		rw_destroy(&iscsit_global.global_rwlock);
 	}
 
@@ -319,9 +323,17 @@ iscsit_drv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (cmd != DDI_DETACH)
 		return (DDI_FAILURE);
 
-	ISCSIT_GLOBAL_LOCK(RW_WRITER);
+	/*
+	 * drv_detach is called in a context that owns the
+	 * device node for the /dev/pseudo device.  If this thread blocks
+	 * for any resource, other threads that need the /dev/pseudo device
+	 * may end up in a deadlock with this thread.Hence, we use a
+	 * separate lock just for the structures that drv_detach needs
+	 * to access.
+	 */
+	mutex_enter(&iscsit_global.global_state_mutex);
 	if (iscsit_drv_busy()) {
-		ISCSIT_GLOBAL_UNLOCK();
+		mutex_exit(&iscsit_global.global_state_mutex);
 		return (EBUSY);
 	}
 
@@ -331,7 +343,7 @@ iscsit_drv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	ldi_ident_release(iscsit_global.global_li);
 	iscsit_global.global_svc_state = ISE_DETACHED;
 
-	ISCSIT_GLOBAL_UNLOCK();
+	mutex_exit(&iscsit_global.global_state_mutex);
 
 	return (DDI_SUCCESS);
 }
@@ -353,6 +365,8 @@ iscsit_drv_close(dev_t dev, int flag, int otyp, cred_t *credp)
 static boolean_t
 iscsit_drv_busy(void)
 {
+	ASSERT(MUTEX_HELD(&iscsit_global.global_state_mutex));
+
 	switch (iscsit_global.global_svc_state) {
 	case ISE_DISABLED:
 	case ISE_DETACHED:
@@ -380,7 +394,7 @@ iscsit_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flag, cred_t *cred,
 		return (EPERM);
 	}
 
-	ISCSIT_GLOBAL_LOCK(RW_WRITER);
+	mutex_enter(&iscsit_global.global_state_mutex);
 
 	/*
 	 * Validate ioctl requests against global service state
@@ -391,7 +405,7 @@ iscsit_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flag, cred_t *cred,
 			iscsit_global.global_svc_state = ISE_DISABLING;
 		} else if (cmd == ISCSIT_IOC_ENABLE_SVC) {
 			/* Already enabled */
-			ISCSIT_GLOBAL_UNLOCK();
+			mutex_exit(&iscsit_global.global_state_mutex);
 			return (0);
 		} else {
 			iscsit_global.global_svc_state = ISE_BUSY;
@@ -402,12 +416,13 @@ iscsit_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flag, cred_t *cred,
 			iscsit_global.global_svc_state = ISE_ENABLING;
 		} else if (cmd == ISCSIT_IOC_DISABLE_SVC) {
 			/* Already disabled */
-			ISCSIT_GLOBAL_UNLOCK();
+			mutex_exit(&iscsit_global.global_state_mutex);
 			return (0);
 		} else {
 			rc = EFAULT;
 		}
 		break;
+	case ISE_BUSY:
 	case ISE_ENABLING:
 	case ISE_DISABLING:
 		rc = EAGAIN;
@@ -418,7 +433,7 @@ iscsit_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flag, cred_t *cred,
 		break;
 	}
 
-	ISCSIT_GLOBAL_UNLOCK();
+	mutex_exit(&iscsit_global.global_state_mutex);
 	if (rc != 0)
 		return (rc);
 
@@ -498,16 +513,18 @@ cleanup:
 		 * Now that the reconfig is complete set our state back to
 		 * enabled.
 		 */
-		ISCSIT_GLOBAL_LOCK(RW_WRITER);
+		mutex_enter(&iscsit_global.global_state_mutex);
 		iscsit_global.global_svc_state = ISE_ENABLED;
-		ISCSIT_GLOBAL_UNLOCK();
+		mutex_exit(&iscsit_global.global_state_mutex);
 		break;
 	case ISCSIT_IOC_ENABLE_SVC: {
 		iscsit_hostinfo_t hostinfo;
 
 		if (ddi_copyin((void *)argp, &hostinfo.length,
 		    sizeof (hostinfo.length), flag) != 0) {
+			mutex_enter(&iscsit_global.global_state_mutex);
 			iscsit_global.global_svc_state = ISE_DISABLED;
+			mutex_exit(&iscsit_global.global_state_mutex);
 			return (EFAULT);
 		}
 
@@ -517,33 +534,35 @@ cleanup:
 		if (ddi_copyin((void *)((caddr_t)argp +
 		    sizeof (hostinfo.length)), &hostinfo.fqhn,
 		    hostinfo.length, flag) != 0) {
+			mutex_enter(&iscsit_global.global_state_mutex);
 			iscsit_global.global_svc_state = ISE_DISABLED;
+			mutex_exit(&iscsit_global.global_state_mutex);
 			return (EFAULT);
 		}
 
 		idmrc = iscsit_enable_svc(&hostinfo);
-		ISCSIT_GLOBAL_LOCK(RW_WRITER);
+		mutex_enter(&iscsit_global.global_state_mutex);
 		if (idmrc == IDM_STATUS_SUCCESS) {
 			iscsit_global.global_svc_state = ISE_ENABLED;
 		} else {
 			rc = EIO;
 			iscsit_global.global_svc_state = ISE_DISABLED;
 		}
-		ISCSIT_GLOBAL_UNLOCK();
+		mutex_exit(&iscsit_global.global_state_mutex);
 		break;
 	}
 	case ISCSIT_IOC_DISABLE_SVC:
 		iscsit_disable_svc();
-		ISCSIT_GLOBAL_LOCK(RW_WRITER);
+		mutex_enter(&iscsit_global.global_state_mutex);
 		iscsit_global.global_svc_state = ISE_DISABLED;
-		ISCSIT_GLOBAL_UNLOCK();
+		mutex_exit(&iscsit_global.global_state_mutex);
 		break;
 
 	default:
 		rc = EINVAL;
-		ISCSIT_GLOBAL_LOCK(RW_WRITER);
+		mutex_enter(&iscsit_global.global_state_mutex);
 		iscsit_global.global_svc_state = ISE_ENABLED;
-		ISCSIT_GLOBAL_UNLOCK();
+		mutex_exit(&iscsit_global.global_state_mutex);
 	}
 
 	return (rc);
@@ -784,6 +803,18 @@ iscsit_disable_svc(void)
 void
 iscsit_global_hold()
 {
+	/*
+	 * To take out a global hold, we must either own the global
+	 * state mutex or we must be running inside of an ioctl that
+	 * has set the global state to ISE_BUSY, ISE_DISABLING, or
+	 * ISE_ENABLING.  We don't track the "owner" for these flags,
+	 * so just checking if they are set is enough for now.
+	 */
+	ASSERT((iscsit_global.global_svc_state == ISE_ENABLING) ||
+	    (iscsit_global.global_svc_state == ISE_DISABLING) ||
+	    (iscsit_global.global_svc_state == ISE_BUSY) ||
+	    MUTEX_HELD(&iscsit_global.global_state_mutex));
+
 	idm_refcnt_hold(&iscsit_global.global_refcnt);
 }
 
@@ -1085,13 +1116,13 @@ iscsit_conn_accept(idm_conn_t *ic)
 	 * doesn't get shutdown prior to establishing a session. This
 	 * gets released in iscsit_conn_destroy().
 	 */
-	ISCSIT_GLOBAL_LOCK(RW_READER);
+	mutex_enter(&iscsit_global.global_state_mutex);
 	if (iscsit_global.global_svc_state != ISE_ENABLED) {
-		ISCSIT_GLOBAL_UNLOCK();
+		mutex_exit(&iscsit_global.global_state_mutex);
 		return (IDM_STATUS_FAIL);
 	}
 	iscsit_global_hold();
-	ISCSIT_GLOBAL_UNLOCK();
+	mutex_exit(&iscsit_global.global_state_mutex);
 
 	/*
 	 * Allocate an associated iscsit structure to represent this
@@ -2743,6 +2774,7 @@ iscsit_pp_cb(struct stmf_port_provider *pp, int cmd, void *arg, uint32_t flags)
 {
 	it_config_t		*cfg;
 	nvlist_t		*nvl;
+	iscsit_service_enabled_t	old_state;
 
 	if ((cmd != STMF_PROVIDER_DATA_UPDATED) || (arg == NULL)) {
 		return;
@@ -2756,10 +2788,43 @@ iscsit_pp_cb(struct stmf_port_provider *pp, int cmd, void *arg, uint32_t flags)
 		return;
 	}
 
+	/* Check that no iSCSI ioctl is currently running */
+	mutex_enter(&iscsit_global.global_state_mutex);
+	old_state = iscsit_global.global_svc_state;
+	switch (iscsit_global.global_svc_state) {
+	case ISE_ENABLED:
+	case ISE_DISABLED:
+		iscsit_global.global_svc_state = ISE_BUSY;
+		break;
+	case ISE_ENABLING:
+		/*
+		 * It is OK for the iscsit_pp_cb to be called from inside of
+		 * an iSCSI ioctl only if we are currently executing inside
+		 * of stmf_register_port_provider.
+		 */
+		ASSERT((flags & STMF_PCB_PREG_COMPLETE) != 0);
+		break;
+	default:
+		cmn_err(CE_WARN, "iscsit_pp_cb called when global_svc_state"
+		    " is not ENABLED(0x%x) -- ignoring",
+		    iscsit_global.global_svc_state);
+		mutex_exit(&iscsit_global.global_state_mutex);
+		it_config_free_cmn(cfg);
+		return;
+	}
+	mutex_exit(&iscsit_global.global_state_mutex);
+
 	/* Update config */
 	(void) iscsit_config_merge(cfg);
 
 	it_config_free_cmn(cfg);
+
+	/* Restore old iSCSI driver global state */
+	mutex_enter(&iscsit_global.global_state_mutex);
+	ASSERT(iscsit_global.global_svc_state == ISE_BUSY ||
+	    iscsit_global.global_svc_state == ISE_ENABLING);
+	iscsit_global.global_svc_state = old_state;
+	mutex_exit(&iscsit_global.global_state_mutex);
 }
 
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef _ISCSIT_H_
@@ -574,6 +574,7 @@ typedef struct {
 	iscsit_isns_cfg_t		global_isns_cfg;
 	iscsi_radius_props_t		global_radius_server;
 	krwlock_t			global_rwlock;
+	kmutex_t			global_state_mutex;
 } iscsit_global_t;
 
 extern iscsit_global_t iscsit_global;
