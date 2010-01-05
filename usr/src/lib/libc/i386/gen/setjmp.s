@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,13 +40,13 @@
 / env[3] = %ebp	 12	/ stack frame
 / env[4] = %esp	 16
 / env[5] = %eip	 20
+/ env[6] = jmp flags 24
 
 #include <sys/asm_linkage.h>
+#include <../assym.h>
 
 	ANSI_PRAGMA_WEAK(setjmp,function)
 	ANSI_PRAGMA_WEAK(longjmp,function)
-
-#include "SYS.h"
 
 	ENTRY(setjmp)
 	movl	4(%esp),%eax	/ jmpbuf address
@@ -53,10 +54,18 @@
 	movl	%esi,4(%eax)	/ save esi
 	movl	%edi,8(%eax)	/ save edi
 	movl	%ebp,12(%eax)	/ save caller's ebp
+
+	movl	%gs:UL_SIGLINK, %ecx
+	xorl	%edx, %edx
+	test	%ecx, %ecx	/ are we in a signal handler?
+	jnz	1f
+	inc	%edx		/ no, tell longjmp to clear ul_siglink
+1:	movl	%edx, 24(%eax)	/ set flag word
+
 	popl	%edx		/ return address
 	movl	%esp,16(%eax)	/ save caller's esp
-	movl	%edx,20(%eax)
-	subl	%eax,%eax	/ return 0
+	movl	%edx,20(%eax)	/ save caller's return address
+	xorl	%eax, %eax	/ return 0
 	pushl	%edx
 	ret
 	SET_SIZE(setjmp)
@@ -69,9 +78,16 @@
 	movl	8(%edx),%edi	/ restore edi
 	movl	12(%edx),%ebp	/ restore caller's ebp
 	movl	16(%edx),%esp	/ restore caller's esp
+
+	movl	24(%edx), %ecx
+	test	%ecx, %ecx	/ test flag word
+	jz	1f
+	xorl	%ecx, %ecx	/ if set, clear ul_siglink
+	movl	%ecx, %gs:UL_SIGLINK
+1:
 	test	%eax,%eax	/ if val != 0
-	jnz	.ret		/ 	return val
+	jnz	1f		/ 	return val
 	incl	%eax		/ else return 1
-.ret:
+1:
 	jmp	*20(%edx)	/ return to caller
 	SET_SIZE(longjmp)

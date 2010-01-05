@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -1119,6 +1119,7 @@ ASSYMDEP_OBJS=			\
 	_stack_grow.o		\
 	asm_subr.o		\
 	getcontext.o		\
+	setjmp.o		\
 	tls_get_addr.o		\
 	vforkx.o
 

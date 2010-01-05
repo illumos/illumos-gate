@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,7 @@
 	ANSI_PRAGMA_WEAK(setjmp,function)
 	ANSI_PRAGMA_WEAK(longjmp,function)
 
+#include <../assym.h>
 #include <sys/trap.h>
 
 JB_FLAGS	= (0*4)	! offsets in jmpbuf (see siglonglmp.c)
@@ -43,13 +44,23 @@ JB_FP		= (3*4)
 JB_I7		= (4*4)
 
 /*
+ * Flag telling longjmp to set curthread->ul_siglink to NULL.
+ */
+JB_CLEARLINK	= 0x10
+
+/*
  * setjmp(buf_ptr)
  * buf_ptr points to a twelve word array (jmp_buf)
  */
 	ENTRY(setjmp)
-	clr	[%o0 + JB_FLAGS]	! clear flags (used by sigsetjmp)
+	clr	%o2
+	ld	[%g7 + UL_SIGLINK], %o1	! are we in a signal context?
+	tst	%o1
+	be,a,pt	%icc, 1f
+	mov	JB_CLEARLINK, %o2	! no, tell longjmp to clear ul_siglink
+1:	st	%o2, [%o0 + JB_FLAGS]
 	st	%sp, [%o0 + JB_SP]	! save caller's sp
-	add	%o7, 8, %o1		! comupte return pc
+	add	%o7, 8, %o1		! compute return pc
 	st	%o1, [%o0 + JB_PC]	! save pc
 	st	%fp, [%o0 + JB_FP]	! save fp
 	st	%i7, [%o0 + JB_I7]	! save %i7
@@ -103,6 +114,11 @@ JB_I7		= (4*4)
 	ldd	[%o2 + (6*8)], %i4
 	ld	[%o0 + JB_FP], %fp	! restore fp
 	mov	%o2, %sp		! restore sp
+	ld	[%o0 + JB_FLAGS], %o2
+	btst	JB_CLEARLINK, %o2	! test JB_CLEARLINK flag
+	bne,a,pt %icc, 1f
+	clr	[%g7 + UL_SIGLINK]	! if set, clear ul_siglink
+1:
 	ld	[%o0 + JB_I7], %i7	! restore %i7
 	ld	[%o0 + JB_PC], %o3	! get new return pc
 	tst	%o1			! is return value 0?

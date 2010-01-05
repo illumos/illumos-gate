@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lint.h"
 #include <sys/feature_tests.h>
@@ -292,6 +290,17 @@ sigacthandler(int sig, siginfo_t *sip, void *uvp)
 	self->ul_sp = 0;
 	if (sig != SIGCANCEL)
 		self->ul_cancel_async = self->ul_save_async;
+
+	/*
+	 * If this thread has performed a longjmp() from a signal handler
+	 * back to main level some time in the past, it has left the kernel
+	 * thinking that it is still in the signal context.  We repair this
+	 * possible damage by setting ucp->uc_link to NULL if we know that
+	 * we are actually executing at main level (self->ul_siglink == NULL).
+	 * See the code for setjmp()/longjmp() for more details.
+	 */
+	if (self->ul_siglink == NULL)
+		ucp->uc_link = NULL;
 
 	/*
 	 * If we are not in a critical region and are
