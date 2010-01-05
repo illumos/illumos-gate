@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -565,8 +565,13 @@ print_control(FILE *sfp, device_t *d, cinfo_t *cinfop, int vopt)
 	col.col_sel = selbuf;
 	print_control_line(sfp, &col, vopt);
 
+	/* non-verbose mode prints don't display the enum values */
+	if ((!vopt) || (sfp != NULL)) {
+		return (0);
+	}
+
 	/* print leftover enum value selections */
-	while ((sfp == NULL) && (idx >= 0) && (idx < cinfop->ci.maxvalue)) {
+	while ((idx >= 0) && (idx < cinfop->ci.maxvalue)) {
 		selbuf[0] = 0;
 		for (i = idx; i < cinfop->ci.maxvalue; i++) {
 			str = get_enum_str(cinfop, i);
