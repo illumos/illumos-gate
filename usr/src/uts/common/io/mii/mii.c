@@ -401,8 +401,19 @@ mii_stop(mii_handle_t mh)
 {
 	mutex_enter(&mh->m_lock);
 	mh->m_started = B_FALSE;
+	/*
+	 * Reset link state to unknown defaults, since we're not
+	 * monitoring it anymore.  We'll reprobe all link state later.
+	 */
+	mh->m_link = LINK_STATE_UNKNOWN;
+	mh->m_phy = &mh->m_bogus_phy;
 	cv_broadcast(&mh->m_cv);
 	mutex_exit(&mh->m_lock);
+	/*
+	 * Notify the MAC driver.  This will allow it to call back
+	 * into the MAC framework to clear any previous link state.
+	 */
+	_mii_notify(mh);
 }
 
 void
