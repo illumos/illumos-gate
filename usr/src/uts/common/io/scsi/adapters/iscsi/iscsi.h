@@ -20,7 +20,7 @@
  */
 /*
  * Copyright 2000 by Cisco Systems, Inc.  All rights reserved.
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -993,6 +993,8 @@ typedef struct iscsi_sess {
 	kmutex_t		sess_reset_mutex;
 
 	boolean_t		sess_reset_in_progress;
+
+	boolean_t		sess_boot_nic_reset;
 } iscsi_sess_t;
 
 /*
@@ -1246,7 +1248,7 @@ void iscsi_conn_kstat_term(struct iscsi_conn *icp);
 /* iscsi_net.c */
 void iscsi_net_init();
 void iscsi_net_fini();
-iscsi_status_t iscsi_net_interface();
+iscsi_status_t iscsi_net_interface(boolean_t reset);
 
 /* iscsi_sess.c */
 iscsi_sess_t *iscsi_sess_create(iscsi_hba_t *ihp,

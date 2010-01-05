@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -217,7 +217,7 @@ idm_transport_t *
 idm_transport_lookup(idm_conn_req_t *cr);
 
 void
-idm_transport_setup(ldi_ident_t li);
+idm_transport_setup(ldi_ident_t li, boolean_t boot_conn);
 
 void
 idm_transport_teardown();

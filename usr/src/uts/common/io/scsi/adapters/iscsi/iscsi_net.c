@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * iSCSI Software Initiator
@@ -851,7 +851,7 @@ iscsi_prefixlentomask(int prefixlen, int maxlen, uchar_t *mask)
 }
 
 iscsi_status_t
-iscsi_net_interface()
+iscsi_net_interface(boolean_t reset)
 {
 	struct in_addr	braddr;
 	struct in_addr	subnet;
@@ -912,7 +912,10 @@ iscsi_net_interface()
 		if (t_kopen((file_t *)NULL, dl_udp_netconf.knc_rdev,
 		    FREAD|FWRITE, &tiptr, CRED()) == 0) {
 			int	ret	= 0;
-			if (defgateway.s_addr == 0) {
+			if (reset == B_TRUE) {
+				ret = kdlifconfig(tiptr, AF_INET, &myaddr,
+				    &subnet, NULL, NULL, ifname);
+			} else if (defgateway.s_addr == 0) {
 				/* No default gate way specified */
 				ret = kdlifconfig(tiptr, AF_INET, &myaddr,
 				    &subnet, &braddr, NULL, ifname);
@@ -921,11 +924,12 @@ iscsi_net_interface()
 				    &subnet, &braddr, &defgateway, ifname);
 			}
 			if (ret != 0) {
+				(void) t_kclose(tiptr, 0);
 				cmn_err(CE_WARN, "Failed to configure"
 				    " iSCSI boot nic");
-				(void) t_kclose(tiptr, 0);
 				return (ISCSI_STATUS_INTERNAL_ERROR);
 			}
+			(void) t_kclose(tiptr, 0);
 		} else {
 			cmn_err(CE_WARN, "Failed to configure"
 			    " iSCSI boot nic");
@@ -953,9 +957,10 @@ iscsi_net_interface()
 			    &subnet6, NULL, NULL, ifname)) {
 				cmn_err(CE_WARN, "Failed to configure"
 				    " iSCSI boot nic");
-				(void) t_kclose(tiptr, 0);
+				(void) t_kclose(tiptr6, 0);
 				return (ISCSI_STATUS_INTERNAL_ERROR);
 			}
+			(void) t_kclose(tiptr6, 0);
 		} else {
 			cmn_err(CE_WARN, "Failed to configure"
 			    " iSCSI boot nic");

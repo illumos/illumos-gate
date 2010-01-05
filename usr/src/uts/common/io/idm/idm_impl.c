@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -533,7 +533,7 @@ idm_transport_lookup(idm_conn_req_t *cr)
 	 * instead of at initialization time in case IB has become available
 	 * since we started (hotplug, etc).
 	 */
-	idm_transport_setup(cr->cr_li);
+	idm_transport_setup(cr->cr_li, cr->cr_boot_conn);
 
 	/* Determine the transport for this connection */
 	for (type = 0; type < IDM_TRANSPORT_NUM_TYPES; type++) {
@@ -554,7 +554,7 @@ idm_transport_lookup(idm_conn_req_t *cr)
 }
 
 void
-idm_transport_setup(ldi_ident_t li)
+idm_transport_setup(ldi_ident_t li, boolean_t boot_conn)
 {
 	idm_transport_type_t	type;
 	idm_transport_t		*it;
@@ -576,6 +576,15 @@ idm_transport_setup(ldi_ident_t li)
 			if (it->it_type == IDM_TRANSPORT_TYPE_SOCKETS) {
 				idm_so_init(it);
 			} else {
+				if (boot_conn == B_TRUE) {
+					/*
+					 * iSCSI boot doesn't need iSER.
+					 * Open iSER here may drive IO to
+					 * a failed session and cause
+					 * deadlock
+					 */
+					continue;
+				}
 				rc = ldi_open_by_name(it->it_device_path,
 				    FREAD | FWRITE, kcred, &it->it_ldi_hdl, li);
 				/*

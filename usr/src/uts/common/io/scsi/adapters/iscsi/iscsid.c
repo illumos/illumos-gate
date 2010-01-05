@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -776,7 +776,8 @@ iscsid_config_one(iscsi_hba_t *ihp, char *name, boolean_t protect)
 			iscsi_configroot_printed = B_TRUE;
 		}
 		if (iscsi_net_up == 0) {
-			if (iscsi_net_interface() == ISCSI_STATUS_SUCCESS) {
+			if (iscsi_net_interface(B_FALSE) ==
+			    ISCSI_STATUS_SUCCESS) {
 				iscsi_net_up = 1;
 			} else {
 				cmn_err(CE_WARN, "Failed to configure interface"
@@ -880,7 +881,8 @@ iscsid_config_all(iscsi_hba_t *ihp, boolean_t protect)
 			iscsi_configroot_printed = B_TRUE;
 		}
 		if (iscsi_net_up == 0) {
-			if (iscsi_net_interface() == ISCSI_STATUS_SUCCESS) {
+			if (iscsi_net_interface(B_FALSE) ==
+			    ISCSI_STATUS_SUCCESS) {
 				iscsi_net_up = 1;
 			}
 		}

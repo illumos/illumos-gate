@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * iSCSI session interfaces
@@ -218,6 +218,7 @@ clean_failed_sess:
 	isp->sess_tsid			= 0;
 	isp->sess_type			= type;
 	isp->sess_reset_in_progress	= B_FALSE;
+	isp->sess_boot_nic_reset	= B_FALSE;
 	idm_sm_audit_init(&isp->sess_state_audit);
 
 	/* copy default driver login parameters */

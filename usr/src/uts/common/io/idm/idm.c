@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -392,7 +392,7 @@ idm_tgt_svc_create(idm_svc_req_t *sr, idm_svc_t **new_svc)
 	 * instead of at initialization time in case IB has become available
 	 * since we started (hotplug, etc).
 	 */
-	idm_transport_setup(sr->sr_li);
+	idm_transport_setup(sr->sr_li, B_FALSE);
 
 	/*
 	 * Loop through the transports, configuring the transport-specific

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright 2000 by Cisco Systems, Inc.  All rights reserved.
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * iSCSI protocol login and enumeration
@@ -120,6 +120,21 @@ login_start:
 	 * iscsi_login() below.
 	 */
 	if (!ISCSI_SUCCESS(iscsi_login_connect(icp))) {
+		if ((isp->sess_boot == B_TRUE) &&
+		    (ihp->hba_service_status_overwrite == B_TRUE) &&
+		    (isp->sess_boot_nic_reset == B_FALSE)) {
+			/*
+			 * The connection to boot target failed
+			 * before the system fully started.
+			 * Reset the boot nic to the settings from
+			 * firmware before retrying the connect to
+			 * save the the system.
+			 */
+			if (iscsi_net_interface(B_TRUE) ==
+			    ISCSI_STATUS_SUCCESS) {
+				isp->sess_boot_nic_reset = B_TRUE;
+			}
+		}
 		/* retry this failure */
 		goto login_retry;
 	}
@@ -331,6 +346,8 @@ iscsi_login_end(iscsi_conn_t *icp, iscsi_status_t status, iscsi_task_t *itp)
 	if (itp->t_blocking == B_FALSE) {
 		kmem_free(itp, sizeof (iscsi_task_t));
 	}
+
+	isp->sess_boot_nic_reset = B_FALSE;
 }
 
 /*

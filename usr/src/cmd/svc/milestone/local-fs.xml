@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -46,19 +46,6 @@
 		restart_on='none'
 		type='service'>
 		<service_fmri value='svc:/milestone/single-user' />
-	</dependency>
-
-	<!--
-	  With the introduction of iSCSI Boot, local filesystem
-	  needs basic network setup (DHCP/IP and so on) to mount
-	-->
-	<dependency
-		name='root'
-		grouping='require_all'
-		restart_on='none'
-		type='service'>
-		<service_fmri value='svc:/system/filesystem/minimal' />
-		<service_fmri value='svc:/network/physical' />
 	</dependency>
 
 	<!--
