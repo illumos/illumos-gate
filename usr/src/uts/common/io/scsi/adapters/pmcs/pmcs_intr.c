@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -405,8 +405,8 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 			 * the PHY's phymask props while we're locked.
 			 */
 			pmcs_lock_phy(pptr);
-			pmcs_update_phy_pm_props(pptr, (1ULL << phy_id),
-			    (1ULL << phynum), B_TRUE);
+			pmcs_update_phy_pm_props(pptr, (1ULL << phynum),
+			    (1ULL << phy_id), B_TRUE);
 			iport = pmcs_get_iport_by_phy(pwp, pptr);
 			pmcs_unlock_phy(pptr);
 			if (iport) {
@@ -424,8 +424,8 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 				pmcs_rele_iport(iport);
 			}
 
-			pmcs_update_phy_pm_props(rp, (1ULL << phy_id),
-			    (1ULL << phynum), B_TRUE);
+			pmcs_update_phy_pm_props(rp, (1ULL << phynum),
+			    (1ULL << phy_id), B_TRUE);
 			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
 			    "PortID 0x%x: PHY 0x%x SAS LINK UP WIDENS PORT "
 			    "TO %d PHYS", portid, phynum, rp->width);
@@ -533,8 +533,8 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		}
 
 		pmcs_lock_phy(pptr);
-		pmcs_update_phy_pm_props(pptr, (1ULL << phy_id),
-		    (1ULL << phynum), B_TRUE);
+		pmcs_update_phy_pm_props(pptr, (1ULL << phynum),
+		    (1ULL << phy_id), B_TRUE);
 		pmcs_smhba_log_sysevent(pwp, ESC_SAS_PHY_EVENT,
 		    SAS_PHY_ONLINE, pptr);
 		pmcs_unlock_phy(pptr);
@@ -628,7 +628,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		}
 
 		pmcs_lock_phy(pptr);
-		pmcs_update_phy_pm_props(pptr, 1ULL, (1ULL << phynum), B_TRUE);
+		pmcs_update_phy_pm_props(pptr, (1ULL << phynum), 1ULL, B_TRUE);
 		pmcs_smhba_log_sysevent(pwp, ESC_SAS_PHY_EVENT,
 		    SAS_PHY_ONLINE, pptr);
 		pmcs_unlock_phy(pptr);

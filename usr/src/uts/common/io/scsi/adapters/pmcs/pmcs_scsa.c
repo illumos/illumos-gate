@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -366,6 +366,7 @@ pmcs_scsa_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	return (DDI_SUCCESS);
 
 tgt_init_fail:
+	scsi_device_hba_private_set(sd, NULL);
 	if (got_scratch) {
 		pmcs_release_scratch(pwp);
 	}

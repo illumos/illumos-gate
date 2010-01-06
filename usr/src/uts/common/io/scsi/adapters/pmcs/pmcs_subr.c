@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4382,9 +4382,8 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
 			    "%s: %s has tgt support=%x init support=(%x)",
 			    __func__, pptr->path, tgt_support, ini_support);
 		}
-		pmcs_update_phy_pm_props(pptr, (1ULL <<
-		    sdr->sdr_attached_phy_identifier), (1ULL << pptr->phynum),
-		    B_TRUE);
+		pmcs_update_phy_pm_props(pptr, (1ULL << pptr->phynum),
+		    (1ULL << sdr->sdr_attached_phy_identifier), B_TRUE);
 		break;
 	case SAS_IF_DTYPE_EDGE:
 	case SAS_IF_DTYPE_FANOUT:
@@ -4422,9 +4421,8 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
 			    pptr->path, tgt_support, ini_support);
 			pptr->dtype = EXPANDER;
 		}
-		pmcs_update_phy_pm_props(pptr, (1ULL <<
-		    sdr->sdr_attached_phy_identifier), (1ULL << pptr->phynum),
-		    B_TRUE);
+		pmcs_update_phy_pm_props(pptr, (1ULL << pptr->phynum),
+		    (1ULL << sdr->sdr_attached_phy_identifier), B_TRUE);
 		break;
 	default:
 		pptr->dtype = NOTHING;
@@ -7763,10 +7761,6 @@ pmcs_smp_release(pmcs_iport_t *iport)
  * prop_add_val: If TRUE, we're adding bits into the property value.
  * Otherwise, we're taking them out.  Either way, the properties for this
  * PHY will be updated.
- *
- * NOTE: The devinfo tree view of attached port and target port is reversed
- * from SAS.  Thus, the attached port phymask corresponds to the target port
- * phymask and vice-versa.
  */
 void
 pmcs_update_phy_pm_props(pmcs_phy_t *phyp, uint64_t att_bv, uint64_t tgt_bv,
@@ -7778,18 +7772,18 @@ pmcs_update_phy_pm_props(pmcs_phy_t *phyp, uint64_t att_bv, uint64_t tgt_bv,
 		 * phymask for just this PHY as well.
 		 */
 		if (phyp->att_port_pm_tmp == 0) {
-			phyp->att_port_pm = tgt_bv;
-			phyp->tgt_port_pm = att_bv;
+			phyp->att_port_pm = att_bv;
+			phyp->tgt_port_pm = tgt_bv;
 		}
-		phyp->att_port_pm_tmp |= tgt_bv;
-		phyp->tgt_port_pm_tmp |= att_bv;
+		phyp->att_port_pm_tmp |= att_bv;
+		phyp->tgt_port_pm_tmp |= tgt_bv;
 		(void) snprintf(phyp->att_port_pm_str, PMCS_PM_MAX_NAMELEN,
 		    "%"PRIx64, phyp->att_port_pm_tmp);
 		(void) snprintf(phyp->tgt_port_pm_str, PMCS_PM_MAX_NAMELEN,
 		    "%"PRIx64, phyp->tgt_port_pm_tmp);
 	} else {
-		phyp->att_port_pm_tmp &= ~tgt_bv;
-		phyp->tgt_port_pm_tmp &= ~att_bv;
+		phyp->att_port_pm_tmp &= ~att_bv;
+		phyp->tgt_port_pm_tmp &= ~tgt_bv;
 		if (phyp->att_port_pm_tmp) {
 			(void) snprintf(phyp->att_port_pm_str,
 			    PMCS_PM_MAX_NAMELEN, "%"PRIx64,
