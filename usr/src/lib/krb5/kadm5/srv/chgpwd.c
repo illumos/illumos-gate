@@ -1,9 +1,7 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/krb5/kadm5/srv/chgpwd.c
@@ -591,7 +589,13 @@ handle_chpw(krb5_context context, int s1,
 		return;
 	}
 
-	if ((ret = krb5_kt_resolve(context, params->admin_keytab, &kt))) {
+	/*
+	 * Solaris Kerberos:
+	 * The only caller is kadmind, which is the master and therefore has the
+	 * correct keys in the KDB, rather than obtaining them via the
+	 * kadm5.keytab, by default.
+	 */
+	if ((ret = krb5_kt_resolve(context, "KDB:", &kt))) {
 		krb5_klog_syslog(LOG_ERR, gettext("chpw: Couldn't open "
 				"admin keytab %s"), error_message(ret));
 		return;
