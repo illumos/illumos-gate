@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2131,47 +2131,56 @@ zonecfg_ifname_exists(sa_family_t af, char *ifname)
 }
 
 /*
- * Determines if the physical interface and IP address specified by 'tabptr'
- * are in the zone document to which 'handle' refers.  'tabptr' must have an
- * interface or an address or both.  If it contains both, then Z_OK is
- * returned iff there is exactly one match.  If it contains an interface
- * or an address, but not both, then Z_OK is returned iff there is exactly
- * one entry with that interface or address.  If there are multiple entries
- * matching the query, then Z_INSUFFICIENT_SPEC is returned.  If there
- * are no matches, then Z_NO_RESOURCE_ID is returned.
+ * Determines whether there is a net resource with the physical interface, IP
+ * address, and default router specified by 'tabptr' in the zone configuration
+ * to which 'handle' refers.  'tabptr' must have an interface, an address, a
+ * default router, or a combination of the three.  This function returns Z_OK
+ * iff there is exactly one net resource matching the query specified by
+ * 'tabptr'.  The function returns Z_INSUFFICIENT_SPEC if there are multiple
+ * matches or 'tabptr' does not specify a physical interface, address, or
+ * default router.  The function returns Z_NO_RESOURCE_ID if are no matches.
  *
  * Errors might also be returned if the entry that exactly matches the
  * query lacks critical network resource information.
  *
- * If there is a single exact match, then the matching entry's physical
- * interface, IP address, and router information is stored in 'tabptr'.
+ * If there is a single match, then the matching entry's physical interface, IP
+ * address, and default router information are stored in 'tabptr'.
  */
 int
 zonecfg_lookup_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 {
 	xmlNodePtr cur;
 	xmlNodePtr firstmatch;
-	boolean_t physfound;
 	int err;
 	char address[INET6_ADDRSTRLEN];
 	char physical[LIFNAMSIZ];
 	size_t addrspec;		/* nonzero if tabptr has IP addr */
 	size_t physspec;		/* nonzero if tabptr has interface */
+	size_t defrouterspec;		/* nonzero if tabptr has def. router */
 
 	if (tabptr == NULL)
 		return (Z_INVAL);
 
 	/*
-	 * zone_nwif_address and zone_nwif_physical are arrays, so no NULL
-	 * checks are necessary.
+	 * Determine the fields that will be searched.  There must be at least
+	 * one.
+	 *
+	 * zone_nwif_address, zone_nwif_physical, and zone_nwif_defrouter are
+	 * arrays, so no NULL checks are necessary.
 	 */
 	addrspec = strlen(tabptr->zone_nwif_address);
 	physspec = strlen(tabptr->zone_nwif_physical);
-	assert(addrspec > 0 || physspec > 0);
+	defrouterspec = strlen(tabptr->zone_nwif_defrouter);
+	if (addrspec == 0 && physspec == 0 && defrouterspec == 0)
+		return (Z_INSUFFICIENT_SPEC);
 
 	if ((err = operation_prep(handle)) != Z_OK)
 		return (err);
 
+	/*
+	 * Iterate over the configuration's elements and look for net elements
+	 * that match the query.
+	 */
 	firstmatch = NULL;
 	cur = handle->zone_dh_cur;
 	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
@@ -2180,55 +2189,32 @@ zonecfg_lookup_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 			continue;
 
 		/*
-		 * If an interface is specified, then first check if the current
-		 * element's interface matches the query's interface.
+		 * If any relevant fields don't match the query, then skip
+		 * the current net element.
 		 */
-		if (physspec > 0) {
-			physfound = B_FALSE;
-			if ((fetchprop(cur, DTD_ATTR_PHYSICAL, physical,
-			    sizeof (physical)) == Z_OK) &&
-			    (strcmp(tabptr->zone_nwif_physical,
-			    physical) == 0)) {
-				if (addrspec == 0) {
-					if (firstmatch == NULL)
-						firstmatch = cur;
-					else
-						return (Z_INSUFFICIENT_SPEC);
-				} else {
-					/*
-					 * We're also matching based on IP
-					 * address, so we can't say that the
-					 * current element matches the query
-					 * yet.  Indicate that the interfaces
-					 * match.
-					 */
-					physfound = B_TRUE;
-				}
-			}
-		}
-		if (addrspec > 0) {
-			if ((fetchprop(cur, DTD_ATTR_ADDRESS, address,
-			    sizeof (address)) == Z_OK) &&
-			    (zonecfg_same_net_address(
-			    tabptr->zone_nwif_address, address))) {
-				if (physspec == 0) {
-					/* We're only matching IP addresses. */
-					if (firstmatch == NULL)
-						firstmatch = cur;
-					else
-						return (Z_INSUFFICIENT_SPEC);
-				} else if (physfound) {
-					/*
-					 * Both the interfaces and the addresses
-					 * match.
-					 */
-					if (firstmatch == NULL)
-						firstmatch = cur;
-					else
-						return (Z_INSUFFICIENT_SPEC);
-				}
-			}
-		}
+		if (physspec != 0 && (fetchprop(cur, DTD_ATTR_PHYSICAL,
+		    physical, sizeof (physical)) != Z_OK ||
+		    strcmp(tabptr->zone_nwif_physical, physical) != 0))
+			continue;
+		if (addrspec != 0 && (fetchprop(cur, DTD_ATTR_ADDRESS, address,
+		    sizeof (address)) != Z_OK ||
+		    !zonecfg_same_net_address(tabptr->zone_nwif_address,
+		    address)))
+			continue;
+		if (defrouterspec != 0 && (fetchprop(cur, DTD_ATTR_DEFROUTER,
+		    address, sizeof (address)) != Z_OK ||
+		    !zonecfg_same_net_address(tabptr->zone_nwif_defrouter,
+		    address)))
+			continue;
+
+		/*
+		 * The current net element matches the query.  Select it if
+		 * it's the first match; otherwise, abort the search.
+		 */
+		if (firstmatch == NULL)
+			firstmatch = cur;
+		else
+			return (Z_INSUFFICIENT_SPEC);
 	}
 	if (firstmatch == NULL)
 		return (Z_NO_RESOURCE_ID);
@@ -4399,6 +4385,21 @@ zonecfg_warn_poold(zone_dochandle_t handle)
 	return (B_TRUE);
 }
 
+/*
+ * Retrieve the specified pool's thread scheduling class.  'poolname' must
+ * refer to the name of a configured resource pool.  The thread scheduling
+ * class specified by the pool will be stored in the buffer to which 'class'
+ * points.  'clsize' is the byte size of the buffer to which 'class' points.
+ *
+ * This function returns Z_OK if it successfully stored the specified pool's
+ * thread scheduling class into the buffer to which 'class' points.  It returns
+ * Z_NO_POOL if resource pools are not enabled, the function is unable to
+ * access the system's resource pools configuration, or the specified pool
+ * does not exist.  The function returns Z_TOO_BIG if the buffer to which
+ * 'class' points is not large enough to contain the thread scheduling class'
+ * name.  The function returns Z_NO_ENTRY if the pool does not specify a thread
+ * scheduling class.
+ */
 static int
 get_pool_sched_class(char *poolname, char *class, int clsize)
 {
@@ -4428,15 +4429,17 @@ get_pool_sched_class(char *poolname, char *class, int clsize)
 	}
 
 	pe = pool_to_elem(poolconf, pool);
-	if (pool_get_property(poolconf, pe, "pool.scheduler", pv)
-	    != POC_INVAL) {
-		(void) pool_value_get_string(pv, &sched_str);
-		if (strlcpy(class, sched_str, clsize) >= clsize)
-			return (Z_TOO_BIG);
+	if (pool_get_property(poolconf, pe, "pool.scheduler", pv) !=
+	    POC_STRING) {
+		(void) pool_conf_close(poolconf);
+		pool_conf_free(poolconf);
+		return (Z_NO_ENTRY);
 	}
-
+	(void) pool_value_get_string(pv, &sched_str);
 	(void) pool_conf_close(poolconf);
 	pool_conf_free(poolconf);
+	if (strlcpy(class, sched_str, clsize) >= clsize)
+		return (Z_TOO_BIG);
 	return (Z_OK);
 }
 
