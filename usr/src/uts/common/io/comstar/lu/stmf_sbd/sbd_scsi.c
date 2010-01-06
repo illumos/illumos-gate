@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1633,6 +1633,9 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		    cdb0 != SCMD_PERSISTENT_RESERVE_OUT &&
 		    cdb0 != SCMD_PERSISTENT_RESERVE_IN &&
 		    cdb0 != SCMD_REQUEST_SENSE &&
+		    cdb0 != SCMD_READ_CAPACITY &&
+		    !(cdb0 == SCMD_SVC_ACTION_IN_G4 &&
+		    cdb1 == SSVC_ACTION_READ_CAPACITY_G4) &&
 		    !(cdb0 == SCMD_MAINTENANCE_IN &&
 		    (cdb1 & 0x1F) == 0x0A)) {
 			stmf_scsilib_send_status(task, STATUS_CHECK,
