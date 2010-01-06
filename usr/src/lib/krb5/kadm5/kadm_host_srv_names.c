@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -26,7 +26,9 @@
 kadm5_ret_t
 kadm5_get_master(krb5_context context, const char *realm, char **master)
 {
-	char *def_realm;
+	/* Solaris Kerberos */
+	char *def_realm = NULL;
+
 	char *delim;
 #ifdef KRB5_DNS_LOOKUP
 	struct sockaddr *addrs;
@@ -65,6 +67,11 @@ kadm5_get_master(krb5_context context, const char *realm, char **master)
 			free(dns_realm.data);
 	}
 #endif /* KRB5_DNS_LOOKUP */
+
+	/* Solaris Kerberos */
+	if (def_realm != NULL)
+		krb5_free_default_realm(context, def_realm);
+
 	return (*master ? KADM5_OK : KADM5_NO_SRV);
 }
 
