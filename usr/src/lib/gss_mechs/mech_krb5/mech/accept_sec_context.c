@@ -71,7 +71,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -319,6 +319,9 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
    OM_uint32 t_minor_status = 0;
 
    KRB5_LOG0(KRB5_INFO,"krb5_gss_accept_sec_context() start");
+
+   /* Solaris Kerberos */
+   memset(&krb_error_data, 0, sizeof(krb_error_data));
 
    code = krb5int_accessor (&kaccess, KRB5INT_ACCESS_VERSION);
    if (code) {
@@ -1174,7 +1177,6 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
 	* The client is expecting a response, so we can send an
 	* error token back
 	*/
-       memset(&krb_error_data, 0, sizeof(krb_error_data));
 
        /*
         * Solaris Kerberos: We need to remap error conditions for buggy
@@ -1238,6 +1240,11 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
    }
 
 cleanup:
+
+   /* Solaris Kerberos */
+   if (krb_error_data.e_data.data != NULL)
+        free(krb_error_data.e_data.data);
+	
    if (!verifier_cred_handle && cred_handle) {
 	krb5_gss_release_cred(&t_minor_status, &cred_handle);
    }
