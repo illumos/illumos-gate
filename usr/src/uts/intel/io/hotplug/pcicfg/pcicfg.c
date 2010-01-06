@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2099,14 +2099,19 @@ pcicfg_device_assign(dev_info_t *dip)
 				offset += 4;
 				break;
 			case PCI_REG_ADDR_G(PCI_ADDR_IO):
-				/* allocate I/O space from the allocator */
+				/*
+				 * Try to allocate I/O space. If it fails,
+				 * continue here instead of returning failure
+				 * so that the hotplug for drivers that don't
+				 * use I/O space can succeed, For drivers
+				 * that need to use I/O space, the hotplug
+				 * will still fail later during driver attach.
+				 */
 				if (ndi_ra_alloc(ddi_get_parent(dip), &request,
 				    &answer, &alen, NDI_RA_TYPE_IO, NDI_RA_PASS)
 				    != NDI_SUCCESS) {
 					DEBUG0("Failed to allocate I/O\n");
-					kmem_free(reg, length);
-					(void) pcicfg_config_teardown(&handle);
-					return (PCICFG_NORESRC);
+					continue;
 				}
 				DEBUG3("I/O addr = [0x%x.0x%x] len [0x%x]\n",
 				    PCICFG_HIADDR(answer),
