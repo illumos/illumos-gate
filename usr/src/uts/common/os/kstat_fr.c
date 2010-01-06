@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1229,11 +1229,15 @@ kstat_delete(kstat_t *ksp)
 {
 	kmutex_t *lp;
 	ekstat_t *e = (ekstat_t *)ksp;
-	zoneid_t zoneid = e->e_zone.zoneid;
+	zoneid_t zoneid;
 	kstat_zone_t *kz;
+
+	ASSERT(ksp != NULL);
 
 	if (ksp == NULL)
 		return;
+
+	zoneid = e->e_zone.zoneid;
 
 	lp = ksp->ks_lock;
 
