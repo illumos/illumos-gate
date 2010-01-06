@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -624,9 +624,9 @@ accept(int sock, struct sockaddr *name, socklen_t *namelenp, int version)
 		return (set_errno(EMFILE));
 	}
 	error = socket_accept(so, fp->f_flag, CRED(), &nso);
-	releasef(sock);
 	if (error) {
 		setf(nfd, NULL);
+		releasef(sock);
 		return (set_errno(error));
 	}
 
@@ -652,6 +652,7 @@ accept(int sock, struct sockaddr *name, socklen_t *namelenp, int version)
 		setf(nfd, NULL);
 		(void) socket_close(nso, 0, CRED());
 		socket_destroy(nso);
+		releasef(sock);
 		return (set_errno(error));
 	}
 	if (error = falloc(NULL, FWRITE|FREAD, &nfp, NULL)) {
@@ -659,6 +660,7 @@ accept(int sock, struct sockaddr *name, socklen_t *namelenp, int version)
 		(void) socket_close(nso, 0, CRED());
 		socket_destroy(nso);
 		eprintsoline(so, error);
+		releasef(sock);
 		return (set_errno(error));
 	}
 	/*
@@ -695,6 +697,7 @@ accept(int sock, struct sockaddr *name, socklen_t *namelenp, int version)
 			mutex_exit(&nfp->f_tlock);
 		}
 	}
+	releasef(sock);
 	return (nfd);
 }
 
