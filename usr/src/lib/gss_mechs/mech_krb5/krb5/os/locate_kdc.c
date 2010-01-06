@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -807,6 +807,40 @@ krb5int_locate_server (krb5_context context, const krb5_data *realm,
 	    krb5_error_code code2;
 	    code2 = dns_locate_server(context, realm, &al, svc, socktype,
 				      family);
+
+	    /*
+	     * Solaris Kerberos:
+	     * If an entry for _kerberos-master. does not exist (checked for
+	     * above) but _kpasswd. does then treat that as an entry for the
+	     * master KDC (but use port 88 not the kpasswd port). MS AD creates
+	     * kpasswd entries by default in DNS.
+	     */
+	    if (code2 == 0 && svc == locate_service_master_kdc &&
+		al.naddrs == 0) {
+
+		/* Look for _kpasswd._tcp|udp */
+		code2 = dns_locate_server(context, realm, &al,
+		    locate_service_kpasswd, socktype, family);
+
+		/* Set the port to 88 instead of the kpasswd port */
+		if (code2 == 0 ) {
+		    int i;
+		    struct addrinfo *a;
+
+		    for (i = 0; i < al.naddrs; i++) {
+			if (al.addrs[i].ai->ai_family == AF_INET)
+			    for (a = al.addrs[i].ai; a != NULL; a = a->ai_next)
+				((struct sockaddr_in *)a->ai_addr)->sin_port =
+				    htons(KRB5_DEFAULT_PORT);
+
+			if (al.addrs[i].ai->ai_family == AF_INET6)
+			    for (a = al.addrs[i].ai; a != NULL; a = a->ai_next)
+				((struct sockaddr_in6 *)a->ai_addr)->sin6_port =
+				    htons(KRB5_DEFAULT_PORT);
+		    }
+		}
+	    }
+
 	    if (code2 != KRB5_PLUGIN_NO_HANDLE)
 		code = code2;
 	}
