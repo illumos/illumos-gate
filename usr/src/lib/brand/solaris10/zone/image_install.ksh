@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -209,6 +209,8 @@ create_active_ds
 
 vlog "Installation started for zone \"$ZONENAME\""
 install_image "$inst_type" "$install_media"
+
+[[ "$SANITY_SKIP" == "1" ]] && touch $ZONEROOT/.sanity_skip
 
 log "$p2ving"
 vlog "running: p2v $OPT_V $unconfig_zone $ZONENAME $ZONEPATH"

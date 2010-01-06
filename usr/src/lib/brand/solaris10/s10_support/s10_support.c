@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -230,16 +230,12 @@ read_pkg_data(FILE *fp)
  * Read the SUNWcakr pkginfo file and get the PATCHLIST for the pkg.
  */
 static int
-get_ku_patchlist(char *zonename, char **patchlist)
+get_ku_patchlist(char *zonepath, char **patchlist)
 {
-	char		zonepath[MAXPATHLEN];
 	char		pkginfo[MAXPATHLEN];
 	FILE		*fp;
 	char		*buf;
 	int		err = 0;
-
-	if (zone_get_zonepath(zonename, zonepath, sizeof (zonepath)) != Z_OK)
-		s10_err(gettext("error getting zone's path"));
 
 	if (snprintf(pkginfo, sizeof (pkginfo),
 	    "%s/root/var/sadm/pkg/SUNWcakr/pkginfo", zonepath)
@@ -285,12 +281,29 @@ have_valid_ku(char *zonename)
 	char		*pstr;
 	char		*patchlist = NULL;
 	int		i;
+	char		zonepath[MAXPATHLEN];
+	char		sanity_skip[MAXPATHLEN];
+	struct stat64	buf;
 	char 		*vers_table[] = {
 			    "141444-09",
 			    "141445-09",
 			    NULL};
 
-	if (get_ku_patchlist(zonename, &patchlist) != 0 || patchlist == NULL)
+	if (zone_get_zonepath(zonename, zonepath, sizeof (zonepath)) != Z_OK)
+		s10_err(gettext("error getting zone's path"));
+
+	/*
+	 * If the zone was installed to bypass sanity checking for internal
+	 * testing purposes, just return success.
+	 */
+	if (snprintf(sanity_skip, sizeof (sanity_skip), "%s/root/.sanity_skip",
+	    zonepath) >= sizeof (sanity_skip))
+		s10_err(gettext("error formating file path"));
+
+	if (stat64(sanity_skip, &buf) == 0)
+		return (B_TRUE);
+
+	if (get_ku_patchlist(zonepath, &patchlist) != 0 || patchlist == NULL)
 		return (B_FALSE);
 
 	pstr = patchlist;
