@@ -29,7 +29,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -888,7 +888,8 @@ cms_signeddata_create(krb5_context context,
 	X509_STORE_CTX_init(&certctx, certstore, cert,
 			    id_cryptoctx->intermediateCAs);
 	X509_STORE_CTX_trusted_stack(&certctx, id_cryptoctx->trustedCAs);
-	if (!X509_verify_cert(&certctx)) {
+	/* Solaris Kerberos */
+	if (X509_verify_cert(&certctx) <= 0) {
 	    pkiDebug("failed to create a certificate chain: %s\n", 
 	    X509_verify_cert_error_string(X509_STORE_CTX_get_error(&certctx)));
 	    if (!sk_X509_num(id_cryptoctx->trustedCAs)) 
