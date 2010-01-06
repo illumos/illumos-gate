@@ -4,10 +4,8 @@ divert(-1)
 # Copyright (c) 1988, 1993
 #	The Regents of the University of California.  All rights reserved.
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 #  This is a configuration file for SunOS 5.8 (a.k.a. Solaris 8) and later
 #  subsidiary machines.  It has support for local and SMTP mail.  The
@@ -22,7 +20,7 @@ divert(-1)
 #
 
 divert(0)dnl
-VERSIONID(`%W% (Sun) %G%')
+VERSIONID(`sendmail.mc (Sun)')
 OSTYPE(`solaris8')dnl
 DOMAIN(`solaris-generic')dnl
 define(`confFALLBACK_SMARTHOST', `mailhost$?m.$m$.')dnl

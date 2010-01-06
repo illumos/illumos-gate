@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *	Copyright (c) 1983, 1984, 1986, 1986, 1987, 1988, 1989 AT&T
@@ -16,8 +16,6 @@
  *  specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <pwd.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -26,6 +24,7 @@
 #include <sysexits.h>
 #include <string.h>
 #include <ctype.h>
+#include <sm/bitops.h>
 #include "conf.h"
 
 /*

@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 1999-2004 Sendmail, Inc. and its suppliers.
+ *  Copyright (c) 1999-2004, 2009 Sendmail, Inc. and its suppliers.
  *	All rights reserved.
  *
  * By using this file, you agree to the terms and conditions set
@@ -8,10 +8,8 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sm/gen.h>
-SM_RCSID("@(#)$Id: comm.c,v 8.66 2004/08/20 20:38:35 ca Exp $")
+SM_RCSID("@(#)$Id: comm.c,v 8.70 2009/12/16 16:33:48 ca Exp $")
 
 #include "libmilter.h"
 #include <sm/errstring.h>
@@ -20,7 +18,6 @@ SM_RCSID("@(#)$Id: comm.c,v 8.66 2004/08/20 20:38:35 ca Exp $")
 static ssize_t	retry_writev __P((socket_t, struct iovec *, int, struct timeval *));
 static size_t Maxdatasize = MILTER_MAX_DATA_SIZE;
 
-#if _FFR_MAXDATASIZE
 /*
 **  SMFI_SETMAXDATASIZE -- set limit for milter data read/write.
 **
@@ -41,7 +38,6 @@ smfi_setmaxdatasize(sz)
 	Maxdatasize = sz;
 	return old;
 }
-#endif /* _FFR_MAXDATASIZE */
 
 /*
 **  MI_RD_CMD -- read a command
@@ -124,8 +120,8 @@ mi_rd_cmd(sd, timeout, cmd, rlen, name)
 	else if (ret < 0)
 	{
 		smi_log(SMI_LOG_ERR,
-			"%s: mi_rd_cmd: select returned %d: %s",
-			name, ret, sm_errstring(errno));
+			"%s: mi_rd_cmd: %s() returned %d: %s",
+			name, MI_POLLSELECT, ret, sm_errstring(errno));
 		*cmd = SMFIC_RECVERR;
 		return NULL;
 	}
@@ -216,8 +212,8 @@ mi_rd_cmd(sd, timeout, cmd, rlen, name)
 	if (ret < 0)
 	{
 		smi_log(SMI_LOG_ERR,
-			"%s: mi_rd_cmd: select returned %d: %s",
-			name, ret, sm_errstring(save_errno));
+			"%s: mi_rd_cmd: %s() returned %d: %s",
+			name, MI_POLLSELECT, ret, sm_errstring(save_errno));
 		*cmd = SMFIC_RECVERR;
 		return NULL;
 	}
@@ -328,7 +324,7 @@ mi_wr_cmd(sd, timeout, cmd, buf, len)
 	char *buf;
 	size_t len;
 {
-	size_t sl, i;
+	size_t sl;
 	ssize_t l;
 	mi_int32 nl;
 	int iovcnt;
@@ -341,7 +337,6 @@ mi_wr_cmd(sd, timeout, cmd, buf, len)
 	nl = htonl(len + 1);	/* add 1 for the cmd char */
 	(void) memcpy(data, (void *) &nl, MILTER_LEN_BYTES);
 	data[MILTER_LEN_BYTES] = (char) cmd;
-	i = 0;
 	sl = MILTER_LEN_BYTES + 1;
 
 	/* set up the vector for the size / command */
@@ -354,7 +349,7 @@ mi_wr_cmd(sd, timeout, cmd, buf, len)
 		iov[1].iov_len  = len;
 		iovcnt = 2;
 	}
-    
+
 	l = retry_writev(sd, iov, iovcnt, timeout);
 	if (l == MI_FAILURE)
 		return MI_FAILURE;

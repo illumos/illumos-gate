@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998-2006, 2008 Sendmail, Inc. and its suppliers.
+ * Copyright (c) 1998-2006, 2008, 2009 Sendmail, Inc. and its suppliers.
  *	All rights reserved.
  * Copyright (c) 1983, 1995-1997 Eric P. Allman.  All rights reserved.
  * Copyright (c) 1988, 1993
@@ -33,10 +33,7 @@ SM_UNUSED(static char copyright[]) =
 @(#) Use is subject to license terms.\n";
 #endif /* ! lint */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-SM_RCSID("@(#)$Id: main.c,v 8.967 2008/03/31 16:32:13 ca Exp $")
-SM_IDSTR(i2, "%W% (Sun) %G%")
+SM_RCSID("@(#)$Id: main.c,v 8.971 2009/12/18 17:08:01 ca Exp $")
 
 #if NETINET || NETINET6
 # include <arpa/inet.h>
@@ -138,7 +135,7 @@ int		SyslogPrefixLen; /* estimated length of syslog prefix */
 {									\
 	if (extraprivs &&						\
 	    OpMode != MD_DELIVER && OpMode != MD_SMTP &&		\
-	    OpMode != MD_ARPAFTP &&					\
+	    OpMode != MD_ARPAFTP && OpMode != MD_CHECKCONFIG &&		\
 	    OpMode != MD_VERIFY && OpMode != MD_TEST)			\
 	{								\
 		(void) sm_io_fprintf(smioout, SM_TIME_DEFAULT,		\
@@ -410,6 +407,9 @@ main(argc, argv, envp)
 			  case MD_HOSTSTAT:
 			  case MD_PURGESTAT:
 			  case MD_ARPAFTP:
+#if _FFR_CHECKCONFIG
+			  case MD_CHECKCONFIG:
+#endif /* _FFR_CHECKCONFIG */
 				OpMode = j;
 				break;
 
@@ -1201,7 +1201,7 @@ main(argc, argv, envp)
 	}
 
 	/* if we've had errors so far, exit now */
-	if ((ExitStat != EX_OK && OpMode != MD_TEST) ||
+	if ((ExitStat != EX_OK && OpMode != MD_TEST && OpMode != MD_CHECKCONFIG) ||
 	    ExitStat == EX_OSERR)
 	{
 		finis(false, true, ExitStat);
@@ -1575,6 +1575,7 @@ main(argc, argv, envp)
 			break;
 
 		  case MD_TEST:
+		  case MD_CHECKCONFIG:
 		  case MD_PRINT:
 		  case MD_PRINTNQE:
 		  case MD_FREEZE:
@@ -1635,6 +1636,9 @@ main(argc, argv, envp)
 	  case MD_TEST:
 		/* don't have persistent host status in test mode */
 		HostStatDir = NULL;
+		/* FALLTHROUGH */
+
+	  case MD_CHECKCONFIG:
 		if (Verbose == 0)
 			Verbose = 2;
 		BlankEnvelope.e_errormode = EM_PRINT;
@@ -1942,8 +1946,8 @@ main(argc, argv, envp)
 		}
 	}
 
-	/* if we've had errors so far, exit now */
-	if (ExitStat != EX_OK && OpMode != MD_TEST)
+	/* if checking config or have had errors so far, exit now */
+	if (OpMode == MD_CHECKCONFIG || (ExitStat != EX_OK && OpMode != MD_TEST))
 	{
 		finis(false, true, ExitStat);
 		/* NOTREACHED */
@@ -1967,7 +1971,7 @@ main(argc, argv, envp)
 	  case MD_PRINT:
 		/* print the queue */
 		HoldErrs = false;
-		dropenvelope(&BlankEnvelope, true, false);
+		(void) dropenvelope(&BlankEnvelope, true, false);
 		(void) sm_signal(SIGPIPE, sigpipe);
 		if (qgrp != NOQGRP)
 		{
@@ -1990,7 +1994,7 @@ main(argc, argv, envp)
 
 	  case MD_PRINTNQE:
 		/* print number of entries in queue */
-		dropenvelope(&BlankEnvelope, true, false);
+		(void) dropenvelope(&BlankEnvelope, true, false);
 		(void) sm_signal(SIGPIPE, sigpipe);
 		printnqe(smioout, NULL);
 		finis(false, true, EX_OK);
@@ -2142,8 +2146,8 @@ main(argc, argv, envp)
 	else if (OpMode == MD_DAEMON || OpMode == MD_FGDAEMON ||
 		 OpMode == MD_SMTP)
 	{
-		/* check whether STARTTLS is turned off for the server */
-		if (chkdaemonmodifiers(D_NOTLS))
+		/* check whether STARTTLS is turned off */
+		if (chkdaemonmodifiers(D_NOTLS) && chkclientmodifiers(D_NOTLS))
 			tls_ok = false;
 	}
 	else	/* other modes don't need STARTTLS */
@@ -2539,7 +2543,7 @@ main(argc, argv, envp)
 				}
 			}
 		}
-		dropenvelope(&MainEnvelope, true, false);
+		(void) dropenvelope(&MainEnvelope, true, false);
 
 #if STARTTLS
 		/* init TLS for server, ignore result for now */
@@ -2961,7 +2965,11 @@ finis(drop, cleanup, exitstat)
 		{
 			if (CurEnv->e_id != NULL)
 			{
-				dropenvelope(CurEnv, true, false);
+				int r;
+
+				r = dropenvelope(CurEnv, true, false);
+				if (exitstat == EX_OK)
+					exitstat = r;
 				sm_rpool_free(CurEnv->e_rpool);
 				CurEnv->e_rpool = NULL;
 
