@@ -652,6 +652,7 @@ typedef struct ddt_histogram {
 #define	ZVOL_FULL_RDEV_DIR	ZVOL_DIR "/rdsk/"
 
 #define	ZVOL_PROP_NAME		"name"
+#define	ZVOL_DEFAULT_BLOCKSIZE	8192
 
 /*
  * /dev/zfs ioctl numbers.

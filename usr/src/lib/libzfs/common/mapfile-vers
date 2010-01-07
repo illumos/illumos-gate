@@ -222,6 +222,7 @@ SUNWprivate_1.1 {
 	zprop_iter;
 	zprop_print_one_property;
 	zvol_check_dump_config;
+	zvol_volsize_to_reservation;
     local:
 	*;
 };
