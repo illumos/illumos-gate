@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +40,8 @@
 #include <sys/pci_impl.h>
 #include <sys/pcie_impl.h>
 #include <sys/hotplug/pci/pcie_hp.h>
+#include <sys/hotplug/pci/pciehpc.h>
+#include <sys/hotplug/pci/pcishpc.h>
 #include <sys/hotplug/pci/pcicfg.h>
 #include <sys/pci_cfgacc.h>
 
@@ -266,6 +268,46 @@ pcie_uninit(dev_info_t *dip)
 	ddi_remove_minor_node(dip, "devctl");
 
 	return (ret);
+}
+
+/*
+ * PCIe module interface for enabling hotplug interrupt.
+ *
+ * It should be called after pcie_init() is done and bus driver's
+ * interrupt handlers have being attached.
+ */
+int
+pcie_hpintr_enable(dev_info_t *dip)
+{
+	pcie_bus_t	*bus_p = PCIE_DIP2BUS(dip);
+	pcie_hp_ctrl_t	*ctrl_p = PCIE_GET_HP_CTRL(dip);
+
+	if (PCIE_IS_PCIE_HOTPLUG_ENABLED(bus_p)) {
+		(void) (ctrl_p->hc_ops.enable_hpc_intr)(ctrl_p);
+	} else if (PCIE_IS_PCI_HOTPLUG_ENABLED(bus_p)) {
+		(void) pcishpc_enable_irqs(ctrl_p);
+	}
+	return (DDI_SUCCESS);
+}
+
+/*
+ * PCIe module interface for disabling hotplug interrupt.
+ *
+ * It should be called before pcie_uninit() is called and bus driver's
+ * interrupt handlers is dettached.
+ */
+int
+pcie_hpintr_disable(dev_info_t *dip)
+{
+	pcie_bus_t	*bus_p = PCIE_DIP2BUS(dip);
+	pcie_hp_ctrl_t	*ctrl_p = PCIE_GET_HP_CTRL(dip);
+
+	if (PCIE_IS_PCIE_HOTPLUG_ENABLED(bus_p)) {
+		(void) (ctrl_p->hc_ops.disable_hpc_intr)(ctrl_p);
+	} else if (PCIE_IS_PCI_HOTPLUG_ENABLED(bus_p)) {
+		(void) pcishpc_disable_irqs(ctrl_p);
+	}
+	return (DDI_SUCCESS);
 }
 
 /* ARGSUSED */

@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Upgrade a machine from a cpio archive area in about 5 minutes.
@@ -7277,37 +7277,6 @@ mondo_loop() {
 	rm -f $root/kernel/misc/sparcv9/pciehpc
 	rm -f $root/kernel/misc/sparcv9/pcishpc
 	rm -f $root/kernel/misc/sparcv9/pcicfg.e
-	rm -f $root/kernel/misc/sparcv9/pcicfg
-	rm -f $root/lib/svc/method/svc-hotplug
-	rm -f $root/var/svc/manifest/system/hotplug.xml
-	rm -f $usr/include/sys/ddi_hp.h
-	rm -f $usr/include/sys/ddi_hp_impl.h
-	rm -f $usr/lib/cfgadm/shp.so.1
-	rm -f $usr/lib/cfgadm/shp.so
-	rm -f $usr/lib/cfgadm/amd64/shp.so.1
-	rm -f $usr/lib/cfgadm/amd64/shp.so
-	rm -f $usr/lib/cfgadm/sparcv9/shp.so.1
-	rm -f $usr/lib/cfgadm/sparcv9/shp.so
-	rm -f $usr/lib/help/auths/locale/HotplugHeader.html
-	rm -f $usr/lib/help/auths/locale/HotplugModify.html
-	rm -f $usr/lib/help/auths/locale/SmfManageHotplug.html
-	rm -f $usr/lib/help/auths/locale/C/HotplugHeader.html
-	rm -f $usr/lib/help/auths/locale/C/HotplugModify.html
-	rm -f $usr/lib/help/auths/locale/C/SmfManageHotplug.html
-	rm -f $usr/lib/help/profiles/locale/RtHotplugMngmnt.html
-	rm -f $usr/lib/help/profiles/locale/C/RtHotplugMngmnt.html
-	rm -f $usr/lib/hotplugd
-	rm -f $usr/lib/libhotplug.so
-	rm -f $usr/lib/libhotplug.so.1
-	rm -f $usr/lib/amd64/libhotplug.so.1
-	rm -f $usr/lib/amd64/libhotplug.so
-	rm -f $usr/lib/sparcv9/libhotplug.so.1
-	rm -f $usr/lib/sparcv9/libhotplug.so
-	rm -f $usr/lib/llib-lhotplug
-	rm -f $usr/lib/llib-lhotplug.ln
-	rm -f $usr/lib/amd64/llib-lhotplug.ln
-	rm -f $usr/lib/sparcv9/llib-lhotplug.ln
-	rm -f $usr/sbin/hotplug
 
 	#
 	# Remove old pcie misc module. Also remove new pcie modules for

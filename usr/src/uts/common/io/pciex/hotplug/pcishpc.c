@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,8 +75,6 @@ static int	pcishpc_destroy_controller(dev_info_t *dip);
 static pcie_hp_slot_t	*pcishpc_create_slot(pcie_hp_ctrl_t *ctrl_p);
 static int	pcishpc_register_slot(pcie_hp_ctrl_t *ctrl_p, int slot);
 static int	pcishpc_destroy_slots(pcie_hp_ctrl_t *ctrl_p);
-static int	pcishpc_enable_irqs(pcie_hp_ctrl_t *ctrl_p);
-static int	pcishpc_disable_irqs(pcie_hp_ctrl_t *ctrl_p);
 static int	pcishpc_slot_get_property(pcie_hp_slot_t *slot_p,
 		    ddi_hp_property_t *arg, ddi_hp_property_t *rval);
 static int	pcishpc_slot_set_property(pcie_hp_slot_t *slot_p,
@@ -190,8 +188,6 @@ pcishpc_init(dev_info_t *dip)
 		}
 	}
 
-	(void) pcishpc_enable_irqs(ctrl_p);
-
 #ifdef	DEBUG
 	/* Dump out the SHPC registers. */
 	pcishpc_dump_regs(ctrl_p);
@@ -239,7 +235,6 @@ pcishpc_uninit(dev_info_t *dip)
 		pcie_remove_minor_node(ctrl_p, i);
 	}
 
-	(void) pcishpc_disable_irqs(ctrl_p);
 	ctrl_p->hc_flags = 0;
 
 	/*
@@ -1113,7 +1108,7 @@ pcishpc_destroy_slots(pcie_hp_ctrl_t *ctrl_p)
  *
  * Enable/unmask the different IRQ's we support from the SHPC controller.
  */
-static int
+int
 pcishpc_enable_irqs(pcie_hp_ctrl_t *ctrl_p)
 {
 	uint32_t reg;
@@ -1159,7 +1154,7 @@ pcishpc_enable_irqs(pcie_hp_ctrl_t *ctrl_p)
  *
  * Disable/Mask the different IRQ's we support from the SHPC controller.
  */
-static int
+int
 pcishpc_disable_irqs(pcie_hp_ctrl_t *ctrl_p)
 {
 	uint32_t reg;

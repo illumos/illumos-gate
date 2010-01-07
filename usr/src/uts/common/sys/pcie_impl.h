@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -450,6 +450,8 @@ typedef struct {
 /* PCIe Friendly Functions */
 extern int pcie_init(dev_info_t *dip, caddr_t arg);
 extern int pcie_uninit(dev_info_t *dip);
+extern int pcie_hpintr_enable(dev_info_t *dip);
+extern int pcie_hpintr_disable(dev_info_t *dip);
 extern int pcie_intr(dev_info_t *dip);
 extern int pcie_open(dev_info_t *dip, dev_t *devp, int flags, int otyp,
     cred_t *credp);

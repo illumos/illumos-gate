@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -323,6 +323,8 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (pcie_init(dip, (caddr_t)&regops) != DDI_SUCCESS)
 			goto err_bad_hotplug;
 
+		(void) pcie_hpintr_enable(dip);
+
 		if (pxtool_init(dip) != DDI_SUCCESS)
 			goto err_bad_pcitool_node;
 
@@ -369,6 +371,7 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		break;
 
 err_bad_pcitool_node:
+		(void) pcie_hpintr_disable(dip);
 		(void) pcie_uninit(dip);
 err_bad_hotplug:
 		(void) px_lib_hotplug_uninit(dip);
@@ -464,6 +467,8 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		 * remove cpr callback
 		 */
 		px_cpr_rem_callb(px_p);
+
+		(void) pcie_hpintr_disable(dip);
 
 		if (PCIE_IS_PCIE_HOTPLUG_ENABLED(bus_p))
 			(void) px_lib_hotplug_uninit(dip);

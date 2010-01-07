@@ -20,7 +20,7 @@
  */
 
 /*
- *  Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ *  Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  *  Use is subject to license terms.
  */
 
@@ -191,9 +191,6 @@ pciehpc_init(dev_info_t *dip, caddr_t arg)
 	pciehpc_dump_hpregs(ctrl_p);
 #endif	/* DEBUG */
 
-	/* enable hot plug interrupts/event */
-	(void) (ctrl_p->hc_ops.enable_hpc_intr)(ctrl_p);
-
 	return (DDI_SUCCESS);
 cleanup4:
 	(void) pciehpc_unregister_slot(ctrl_p);
@@ -228,9 +225,6 @@ pciehpc_uninit(dev_info_t *dip)
 	}
 
 	pcie_remove_minor_node(ctrl_p, 0);
-
-	/* disable interrupts */
-	(void) (ctrl_p->hc_ops.disable_hpc_intr)(ctrl_p);
 
 	/* unregister the slot */
 	(void) pciehpc_unregister_slot(ctrl_p);
@@ -375,6 +369,12 @@ pciehpc_intr(dev_info_t *dip)
 			 * card is inserted into the slot, ask DDI Hotplug
 			 * framework to change state to Present.
 			 */
+			cmn_err(CE_NOTE, "pciehpc (%s%d): card is inserted"
+			    " in the slot %s",
+			    ddi_driver_name(dip),
+			    ddi_get_instance(dip),
+			    slot_p->hs_info.cn_name);
+
 			(void) ndi_hp_state_change_req(dip,
 			    slot_p->hs_info.cn_name,
 			    DDI_HP_CN_STATE_PRESENT,

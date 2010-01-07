@@ -386,6 +386,8 @@ pcieb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 */
 	(void) pcieb_intr_attach(pcieb);
 
+	(void) pcie_hpintr_enable(devi);
+
 	/* Do any platform specific workarounds needed at this time */
 	pcieb_plat_attach_workaround(devi);
 
@@ -424,6 +426,9 @@ pcieb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	}
 
 	pcieb = ddi_get_soft_state(pcieb_state, ddi_get_instance(devi));
+
+	/* disable hotplug interrupt */
+	(void) pcie_hpintr_disable(devi);
 
 	/* remove interrupt handlers */
 	pcieb_intr_fini(pcieb);

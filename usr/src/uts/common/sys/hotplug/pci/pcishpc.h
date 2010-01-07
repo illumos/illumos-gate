@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,8 @@ extern "C" {
 int pcishpc_init(dev_info_t *dip);
 int pcishpc_uninit(dev_info_t *dip);
 int pcishpc_intr(dev_info_t *dip);
+int pcishpc_enable_irqs(pcie_hp_ctrl_t *ctrl_p);
+int pcishpc_disable_irqs(pcie_hp_ctrl_t *ctrl_p);
 int pcishpc_hp_ops(dev_info_t *dip, char *cn_name, ddi_hp_op_t op, void *arg,
     void *result);
 
