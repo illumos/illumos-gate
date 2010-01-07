@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -8800,6 +8800,8 @@ tcp_build_hdrs(tcp_t *tcp)
 		bcopy(buf, connp->conn_ht_ulp, buflen);
 	} else {
 		tcpha->tha_sum = 0;
+		tcpha->tha_urp = 0;
+		tcpha->tha_ack = 0;
 		tcpha->tha_offset_and_reserved = (5 << 4);
 		tcpha->tha_lport = connp->conn_lport;
 		tcpha->tha_fport = connp->conn_fport;
