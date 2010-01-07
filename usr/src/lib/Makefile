@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -644,7 +644,7 @@ libexacct/demo:	libexacct libproject libsocket libnsl
 libtsalarm:	libpcp
 smbsrv:		libsocket libnsl libmd libxnet libpthread librt \
 		libshare libidmap pkcs11 libsqlite
-libvrrpadm:	libsocket libdladm
+libvrrpadm:	libsocket libdladm libscf
 libvscan:	libscf
 scsi:		libnvpair
 mpapi:		libpthread libdevinfo libsysevent libnvpair

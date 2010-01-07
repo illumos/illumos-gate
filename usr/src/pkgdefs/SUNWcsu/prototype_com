@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -523,6 +523,7 @@ f none usr/lib/help/auths/locale/C/SmfSMBFSStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfSMBStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfSshStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfSyslogStates.html 444 root bin
+f none usr/lib/help/auths/locale/C/SmfVRRPStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfValueCoreadm.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfValueExAcctFlow.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfValueExAcctProcess.html 444 root bin

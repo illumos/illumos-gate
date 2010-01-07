@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,9 +46,77 @@
 #include <libdlvlan.h>
 #include <libdllink.h>
 #include <libintl.h>
+#include <libscf.h>
 #include <libvrrpadm.h>
 
+#define	VRRP_SERVICE	"network/vrrp:default"
+
 typedef vrrp_err_t vrrp_cmd_func_t(int, void *);
+
+static boolean_t
+vrrp_svc_isonline(char *svc_name)
+{
+	char		*s;
+	boolean_t	isonline = B_FALSE;
+
+	if ((s = smf_get_state(svc_name)) != NULL) {
+		if (strcmp(s, SCF_STATE_STRING_ONLINE) == 0)
+			isonline = B_TRUE;
+		free(s);
+	}
+
+	return (isonline);
+}
+
+#define	MAX_WAIT_TIME	15
+
+static vrrp_err_t
+vrrp_enable_service()
+{
+	int	i;
+
+	if (vrrp_svc_isonline(VRRP_SERVICE))
+		return (VRRP_SUCCESS);
+
+	if (smf_enable_instance(VRRP_SERVICE, 0) == -1) {
+		if (scf_error() == SCF_ERROR_PERMISSION_DENIED)
+			return (VRRP_EPERM);
+		else
+			return (VRRP_ENOSVC);
+	}
+
+	/*
+	 * Wait up to MAX_WAIT_TIME seconds for the VRRP service being brought
+	 * up online
+	 */
+	for (i = 0; i < MAX_WAIT_TIME; i++) {
+		if (vrrp_svc_isonline(VRRP_SERVICE))
+			break;
+		(void) sleep(1);
+	}
+	if (i == MAX_WAIT_TIME)
+		return (VRRP_ENOSVC);
+
+	return (VRRP_SUCCESS);
+}
+
+/*
+ * Disable the VRRP service if there is no VRRP router left.
+ */
+static void
+vrrp_disable_service_when_no_router()
+{
+	uint32_t	cnt = 0;
+
+	/*
+	 * Get the number of the existing routers. If there is no routers
+	 * left, disable the service.
+	 */
+	if (vrrp_list(NULL, VRRP_VRID_NONE, NULL, AF_UNSPEC, &cnt,
+	    NULL) == VRRP_SUCCESS && cnt == 0) {
+		(void) smf_disable_instance(VRRP_SERVICE, 0);
+	}
+}
 
 static vrrp_err_t
 vrrp_cmd_request(void *cmd, size_t csize, vrrp_cmd_func_t func, void *arg)
@@ -60,7 +128,7 @@ vrrp_cmd_request(void *cmd, size_t csize, vrrp_cmd_func_t func, void *arg)
 	vrrp_err_t		err;
 
 	if ((sock = socket(AF_UNIX, SOCK_STREAM, 0)) < 0)
-		return (VRRP_ECMD);
+		return (VRRP_ESYS);
 
 	/*
 	 * Set it to be non-blocking.
@@ -77,7 +145,7 @@ vrrp_cmd_request(void *cmd, size_t csize, vrrp_cmd_func_t func, void *arg)
 	 */
 	if (connect(sock, (const struct sockaddr *)&to, sizeof (to)) < 0) {
 		(void) close(sock);
-		return (VRRP_ECMD);
+		return (VRRP_ENOSVC);
 	}
 
 	/*
@@ -92,7 +160,7 @@ vrrp_cmd_request(void *cmd, size_t csize, vrrp_cmd_func_t func, void *arg)
 			continue;
 		}
 		(void) close(sock);
-		return (VRRP_ECMD);
+		return (VRRP_ENOSVC);
 	}
 
 	/*
@@ -110,7 +178,7 @@ vrrp_cmd_request(void *cmd, size_t csize, vrrp_cmd_func_t func, void *arg)
 			continue;
 		}
 		(void) close(sock);
-		return (VRRP_ECMD);
+		return (VRRP_ESYS);
 	}
 
 	if ((err = ret.vr_err) != VRRP_SUCCESS)
@@ -163,9 +231,6 @@ vrrp_err2str(vrrp_err_t err)
 		return (dgettext(TEXT_DOMAIN, "router name already exists"));
 	case VRRP_ENOTFOUND:
 		return (dgettext(TEXT_DOMAIN, "VRRP router not found"));
-	case VRRP_ECMD:
-		return (dgettext(TEXT_DOMAIN, "failed to communicate to "
-		    "vrrpd"));
 	case VRRP_EINVALADDR:
 		return (dgettext(TEXT_DOMAIN, "invalid IP address"));
 	case VRRP_EINVALAF:
@@ -185,6 +250,9 @@ vrrp_err2str(vrrp_err_t err)
 		    "created"));
 	case VRRP_ENOLINK:
 		return (dgettext(TEXT_DOMAIN, "the data-link does not exist"));
+	case VRRP_ENOSVC:
+		return (dgettext(TEXT_DOMAIN, "the VRRP service cannot "
+		    "be enabled"));
 	case VRRP_EINVAL:
 	default:
 		return (dgettext(TEXT_DOMAIN, "invalid argument"));
@@ -257,10 +325,31 @@ vrrp_create(vrrp_handle_t vh, vrrp_vr_conf_t *conf)
 	vrrp_cmd_create_t	cmd;
 	vrrp_err_t		err;
 
+again:
+	/*
+	 * Enable the VRRP service if it is not already enabled.
+	 */
+	if ((err = vrrp_enable_service()) != VRRP_SUCCESS)
+		return (err);
+
 	cmd.vcc_cmd = VRRP_CMD_CREATE;
 	(void) memcpy(&cmd.vcc_conf, conf, sizeof (vrrp_vr_conf_t));
 
 	err = vrrp_cmd_request(&cmd, sizeof (cmd), NULL, NULL);
+	if (err == VRRP_ENOSVC) {
+		/*
+		 * This may be due to another process is deleting the last
+		 * router and disabled the VRRP service, try again.
+		 */
+		goto again;
+	} else if (err != VRRP_SUCCESS) {
+		/*
+		 * If router cannot be created, check if the VRRP service
+		 * should be disabled, and disable if needed.
+		 */
+		vrrp_disable_service_when_no_router();
+	}
+
 	return (err);
 }
 
@@ -271,11 +360,20 @@ vrrp_delete(vrrp_handle_t vh, const char *vn)
 	vrrp_cmd_delete_t	cmd;
 	vrrp_err_t		err;
 
+	/*
+	 * If the VRRP service is not enabled, we assume there is no router
+	 * configured.
+	 */
+	if (!vrrp_svc_isonline(VRRP_SERVICE))
+		return (VRRP_ENOTFOUND);
+
 	cmd.vcd_cmd = VRRP_CMD_DELETE;
 	if (strlcpy(cmd.vcd_name, vn, VRRP_NAME_MAX) >= VRRP_NAME_MAX)
 		return (VRRP_EINVAL);
 
 	err = vrrp_cmd_request(&cmd, sizeof (cmd), NULL, NULL);
+	if (err == VRRP_SUCCESS)
+		vrrp_disable_service_when_no_router();
 	return (err);
 }
 
@@ -285,6 +383,13 @@ vrrp_enable(vrrp_handle_t vh, const char *vn)
 {
 	vrrp_cmd_enable_t	cmd;
 	vrrp_err_t		err;
+
+	/*
+	 * If the VRRP service is not enabled, we assume there is no router
+	 * configured.
+	 */
+	if (!vrrp_svc_isonline(VRRP_SERVICE))
+		return (VRRP_ENOTFOUND);
 
 	cmd.vcs_cmd = VRRP_CMD_ENABLE;
 	if (strlcpy(cmd.vcs_name, vn, VRRP_NAME_MAX) >= VRRP_NAME_MAX)
@@ -301,6 +406,13 @@ vrrp_disable(vrrp_handle_t vh, const char *vn)
 	vrrp_cmd_disable_t	cmd;
 	vrrp_err_t		err;
 
+	/*
+	 * If the VRRP service is not enabled, we assume there is no router
+	 * configured.
+	 */
+	if (!vrrp_svc_isonline(VRRP_SERVICE))
+		return (VRRP_ENOTFOUND);
+
 	cmd.vcx_cmd = VRRP_CMD_DISABLE;
 	if (strlcpy(cmd.vcx_name, vn, VRRP_NAME_MAX) >= VRRP_NAME_MAX)
 		return (VRRP_EINVAL);
@@ -315,6 +427,13 @@ vrrp_modify(vrrp_handle_t vh, vrrp_vr_conf_t *conf, uint32_t mask)
 {
 	vrrp_cmd_modify_t	cmd;
 	vrrp_err_t		err;
+
+	/*
+	 * If the VRRP service is not enabled, we assume there is no router
+	 * configured.
+	 */
+	if (!vrrp_svc_isonline(VRRP_SERVICE))
+		return (VRRP_ENOTFOUND);
 
 	cmd.vcm_cmd = VRRP_CMD_MODIFY;
 	cmd.vcm_mask = mask;
@@ -352,7 +471,7 @@ vrrp_list_func(int sock, void *arg)
 			cur_size += len;
 			continue;
 		}
-		return (VRRP_ECMD);
+		return (VRRP_ESYS);
 	}
 
 	*(list_arg->vfl_cnt) = out_cnt = ret.vrl_cnt;
@@ -369,7 +488,7 @@ vrrp_list_func(int sock, void *arg)
 			cur_size += len;
 			continue;
 		}
-		return (VRRP_ECMD);
+		return (VRRP_ESYS);
 	}
 	return (VRRP_SUCCESS);
 }
@@ -405,6 +524,15 @@ vrrp_list(vrrp_handle_t vh, vrid_t vrid, const char *intf, int af,
 		return (VRRP_EINVAL);
 	}
 
+	/*
+	 * If the service is not online, we assume there is no router
+	 * configured.
+	 */
+	if (!vrrp_svc_isonline(VRRP_SERVICE)) {
+		*cnt = 0;
+		return (VRRP_SUCCESS);
+	}
+
 	cmd.vcl_cmd = VRRP_CMD_LIST;
 	cmd.vcl_vrid = vrid;
 	cmd.vcl_af = af;
@@ -436,7 +564,7 @@ vrrp_query_func(int sock, void *arg)
 			cur_size += len;
 			continue;
 		}
-		return (VRRP_ECMD);
+		return (VRRP_ESYS);
 	}
 
 	out_cnt = qinfo->show_va.va_vipcnt;
@@ -458,7 +586,7 @@ vrrp_query_func(int sock, void *arg)
 			cur_size += len;
 			continue;
 		}
-		return (VRRP_ECMD);
+		return (VRRP_ESYS);
 	}
 	return (VRRP_SUCCESS);
 }
@@ -478,6 +606,13 @@ vrrp_query(vrrp_handle_t vh, const char *vn, vrrp_queryinfo_t **vqp)
 
 	if (strlcpy(cmd.vcq_name, vn, VRRP_NAME_MAX) >= VRRP_NAME_MAX)
 		return (VRRP_EINVAL);
+
+	/*
+	 * If the service is not online, we assume there is no router
+	 * configured.
+	 */
+	if (!vrrp_svc_isonline(VRRP_SERVICE))
+		return (VRRP_ENOTFOUND);
 
 	cmd.vcq_cmd = VRRP_CMD_QUERY;
 

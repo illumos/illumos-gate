@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -296,6 +296,7 @@ f none usr/lib/help/auths/locale/NetworkHeader.html 444 root bin
 f none usr/lib/help/auths/locale/NetworkILBconf.html 444 root bin
 f none usr/lib/help/auths/locale/NetworkILBenable.html 444 root bin
 f none usr/lib/help/auths/locale/NetworkVRRP.html 444 root bin
+f none usr/lib/help/auths/locale/SmfVRRPStates.html 444 root bin
 f none usr/lib/help/auths/locale/WifiConfig.html 444 root bin
 f none usr/lib/help/auths/locale/WifiWep.html 444 root bin
 f none usr/lib/help/auths/locale/LinkSecurity.html 444 root bin

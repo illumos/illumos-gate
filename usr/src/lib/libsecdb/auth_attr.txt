@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # /etc/security/auth_attr
@@ -157,6 +157,7 @@ solaris.smf.manage.stmf:::Manage STMF Service States::help=SmfSTMFStates.html
 solaris.smf.manage.system-log:::Manage Syslog Service States::help=SmfSyslogStates.html
 solaris.smf.manage.tnctl:::Manage Refresh of Trusted Network Parameters::help=TNctl.html
 solaris.smf.manage.tnd:::Manage Trusted Network Daemon::help=TNDaemon.html
+solaris.smf.manage.vrrp:::Manage VRRP Service States::help=SmfVRRPStates.html
 solaris.smf.manage.vscan:::Manage VSCAN Service States::help=SmfVscanStates.html
 solaris.smf.manage.vt:::Manage Virtual Console Service States::help=SmfVtStates.html
 solaris.smf.manage.wpa:::Manage WPA Service States::help=SmfWpaStates.html

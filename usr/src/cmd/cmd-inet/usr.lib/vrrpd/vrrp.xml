@@ -20,7 +20,7 @@
 
  CDDL HEADER END
 
-	Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+	Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 	Use is subject to license terms.
 
 	NOTE:  This service manifest is not editable; its contents will
@@ -36,7 +36,7 @@
 	type='service'
 	version='1'>
 
-	<create_default_instance enabled='true' />
+	<create_default_instance enabled='false' />
 
 	<single_instance/>
 
@@ -83,6 +83,14 @@
 	    name='stop'
 	    exec=':kill'
 	    timeout_seconds='60' />
+
+	<!-- to start/stop the VRRP service -->
+	<property_group name='general' type='framework'>
+		<propval name='action_authorization' type='astring' 
+			value='solaris.smf.manage.vrrp' />
+		<propval name='value_authorization' type='astring' 
+			value='solaris.smf.manage.vrrp' />
+	</property_group>
 
 	<property_group name='startd' type='framework'>
 		<!-- sub-process core dumps shouldn't restart session -->

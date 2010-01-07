@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,6 +119,7 @@ static vrrp_addr_t	vrrp_muladdr4;
 static vrrp_addr_t	vrrp_muladdr6;
 
 static int		vrrpd_scan_interval = 20000;	/* ms */
+static int		pfds[2];
 
 /*
  * macros to calculate skew_time and master_down_timer
@@ -520,6 +521,33 @@ rtm_event2str(uchar_t event)
 	}
 }
 
+/*
+ * This is called by the child process to inform the parent process to
+ * exit with the given return value. Note that the child process
+ * (the daemon process) informs the parent process to exit when anything
+ * goes wrong or when all the intialization is done.
+ */
+static int
+vrrpd_inform_parent_exit(int rv)
+{
+	int err = 0;
+
+	/*
+	 * If vrrp_debug_level is none-zero, vrrpd is not running as
+	 * a daemon. Return directly.
+	 */
+	if (vrrp_debug_level != 0)
+		return (0);
+
+	if (write(pfds[1], &rv, sizeof (int)) != sizeof (int)) {
+		err = errno;
+		(void) close(pfds[1]);
+		return (err);
+	}
+	(void) close(pfds[1]);
+	return (0);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -594,12 +622,12 @@ main(int argc, char *argv[])
 	rl.rlim_max = RLIM_INFINITY;
 	if (setrlimit(RLIMIT_NOFILE, &rl) == -1) {
 		vrrp_log(VRRP_ERR, "main(): setrlimit() failed");
-		return (EXIT_FAILURE);
+		goto child_out;
 	}
 
 	if (vrrpd_init() != VRRP_SUCCESS) {
 		vrrp_log(VRRP_ERR, "main(): vrrpd_init() failed");
-		return (EXIT_FAILURE);
+		goto child_out;
 	}
 
 	/*
@@ -615,6 +643,16 @@ main(int argc, char *argv[])
 	vrrpd_initconf();
 
 	/*
+	 * Inform the parent process that it can successfully exit.
+	 */
+	if ((err = vrrpd_inform_parent_exit(EXIT_SUCCESS)) != 0) {
+		vrrpd_cleanup();
+		vrrp_log(VRRP_WARNING, "vrrpd_inform_parent_exit() failed: %s",
+		    strerror(err));
+		return (EXIT_FAILURE);
+	}
+
+	/*
 	 * Start the loop to handle the timer and the IO events.
 	 */
 	switch (iu_handle_events(vrrpd_eh, vrrpd_timerq)) {
@@ -628,32 +666,65 @@ main(int argc, char *argv[])
 
 	vrrpd_cleanup();
 	return (EXIT_SUCCESS);
+
+child_out:
+	(void) vrrpd_inform_parent_exit(EXIT_FAILURE);
+	return (EXIT_FAILURE);
 }
 
 static int
 daemon_init()
 {
 	pid_t	pid;
+	int	rv;
 
 	vrrp_log(VRRP_DBG0, "daemon_init()");
 
 	if (getenv("SMF_FMRI") == NULL) {
-		vrrp_log(VRRP_ERR, "main(): vrrpd is an smf(5) managed service "
-		    "and should not be run from the command line.");
+		vrrp_log(VRRP_ERR, "daemon_init(): vrrpd is an smf(5) managed "
+		    "service and should not be run from the command line.");
 		return (-1);
 	}
 
-	if ((pid = fork()) < 0)
+	/*
+	 * Create the pipe used for the child process to inform the parent
+	 * process to exit after all initialization is done.
+	 */
+	if (pipe(pfds) < 0) {
+		vrrp_log(VRRP_ERR, "daemon_init(): pipe() failed: %s",
+		    strerror(errno));
 		return (-1);
+	}
 
-	if (pid != 0) {
-		/* in parent process: do nothing. */
-		exit(0);
+	if ((pid = fork()) < 0) {
+		vrrp_log(VRRP_ERR, "daemon_init(): fork() failed: %s",
+		    strerror(errno));
+		(void) close(pfds[0]);
+		(void) close(pfds[1]);
+		return (-1);
+	}
+
+	if (pid != 0) { /* Parent */
+		(void) close(pfds[1]);
+
+		/*
+		 * Read the child process's return value from the pfds.
+		 * If the child process exits unexpectedly, read() returns -1.
+		 */
+		if (read(pfds[0], &rv, sizeof (int)) != sizeof (int)) {
+			vrrp_log(VRRP_ERR, "daemon_init(): child process "
+			    "exited unexpectedly %s", strerror(errno));
+			(void) kill(pid, SIGTERM);
+			rv = EXIT_FAILURE;
+		}
+		(void) close(pfds[0]);
+		exit(rv);
 	}
 
 	/*
 	 * in child process, became a daemon, and return to main() to continue.
 	 */
+	(void) close(pfds[0]);
 	(void) chdir("/");
 	(void) setsid();
 	(void) close(0);
@@ -4436,6 +4507,7 @@ vrrp_log(int level, char *message, ...)
 			 * VRRP_ERR goes to stderr, others go to stdout
 			 */
 			FILE *out = (level <= VRRP_ERR) ? stderr : stdout;
+			(void) fprintf(out, "vrrpd: ");
 			/* LINTED: E_SEC_PRINTF_VAR_FMT */
 			(void) vfprintf(out, message, ap);
 			(void) fprintf(out, "\n");

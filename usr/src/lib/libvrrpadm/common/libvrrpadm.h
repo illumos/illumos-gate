@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -171,7 +171,7 @@ typedef enum {
 	VRRP_EDLADM,		/* dladm failure */
 	VRRP_EIPADM,		/* ipadm failure */
 	VRRP_ESYS,		/* system error */
-	VRRP_ECMD		/* command request error */
+	VRRP_ENOSVC		/* VRRP service not enabled */
 } vrrp_err_t;
 
 /*

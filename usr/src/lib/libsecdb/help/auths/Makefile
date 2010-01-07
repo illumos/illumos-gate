@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # lib/libsecdb/help/auths/Makefile
@@ -119,6 +119,7 @@ HTMLENTS = \
 	SmfValueVscan.html \
 	SmfVscanStates.html \
 	SmfValueVt.html	\
+	SmfVRRPStates.html \
 	SmfWpaStates.html \
 	NetworkAutoconf.html \
 	NetworkILBconf.html \
