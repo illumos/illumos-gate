@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <pthread.h>
 #include <stdlib.h>
@@ -89,7 +86,7 @@ soft_arcfour_crypt_init(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
  * soft_arcfour_crypt()
  *
  * Arguments:
- *      active_op:	pointer to the actiove operation in the session
+ *      active_op:	pointer to the active operation in the session
  *	input:		pointer to the input data to be transformed
  *	inputlen:	length of the input.
  *	output:		pointer to the output storage.
@@ -102,12 +99,18 @@ soft_arcfour_crypt_init(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
  *      CKR_OK: success
  *      CKR_BUFFER_TOO_SMALL: the output buffer provided by application
  *			      is too small
+ *      CKR_ARGUMENTS_BAD: keystream is a NULL pointer, cipher is not
+ *                         initialized
  */
 CK_RV
 soft_arcfour_crypt(crypto_active_op_t *active_op, CK_BYTE_PTR input,
     CK_ULONG inputlen, CK_BYTE_PTR output, CK_ULONG_PTR outputlenp)
 {
 	ARCFour_key *keystream = active_op->context;
+
+	if (keystream == NULL) {
+		return (CKR_ARGUMENTS_BAD);
+	}
 
 	/*
 	 * If application asks for the length of the output buffer
