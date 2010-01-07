@@ -23,12 +23,10 @@
 
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <dlfcn.h>
 #include <stdio.h>
@@ -1277,7 +1275,11 @@ adjust_total_blocks(struct df_request *dfrp, fsblkcnt64_t *total,
 		_zfs_close(zhp);
 	}
 
-	*total = quota / blocksize;
+	/*
+	 * Modify total only if we managed to get some stats from libzfs.
+	 */
+	if (quota != 0)
+		*total = quota / blocksize;
 	free(dataset);
 }
 
