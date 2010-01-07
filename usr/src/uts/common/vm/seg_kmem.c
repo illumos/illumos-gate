@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,11 @@
 #include <vm/seg_kp.h>
 #include <sys/bitmap.h>
 #include <sys/mem_cage.h>
+
+#ifdef __sparc
+#include <sys/ivintr.h>
+#include <sys/panic.h>
+#endif
 
 /*
  * seg_kmem is the primary kernel memory segment driver.  It
@@ -297,6 +302,18 @@ kernelheap_init(
 	heap32_arena = vmem_create("heap32", (void *)SYSBASE32,
 	    SYSLIMIT32 - SYSBASE32 - HEAPTEXT_SIZE, PAGESIZE, NULL,
 	    NULL, NULL, 0, VM_SLEEP);
+	/*
+	 * Prom claims the physical and virtual resources used by panicbuf
+	 * and inter_vec_table. So reserve space for panicbuf, intr_vec_table,
+	 * reserved interrupt vector data structures from 32-bit heap.
+	 */
+	(void) vmem_xalloc(heap32_arena, PANICBUFSIZE, PAGESIZE, 0, 0,
+	    panicbuf, panicbuf + PANICBUFSIZE,
+	    VM_NOSLEEP | VM_BESTFIT | VM_PANIC);
+
+	(void) vmem_xalloc(heap32_arena, IVSIZE, PAGESIZE, 0, 0,
+	    intr_vec_table, (caddr_t)intr_vec_table + IVSIZE,
+	    VM_NOSLEEP | VM_BESTFIT | VM_PANIC);
 
 	textbase = SYSLIMIT32 - HEAPTEXT_SIZE;
 	heaptext_parent = NULL;

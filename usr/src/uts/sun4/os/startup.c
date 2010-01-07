@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,7 +37,6 @@
 #include <sys/prom_plat.h>
 #include <sys/prom_isa.h>
 #include <sys/autoconf.h>
-#include <sys/intreg.h>
 #include <sys/ivintr.h>
 #include <sys/fpu/fpusystm.h>
 #include <sys/iommutsb.h>
@@ -465,8 +464,12 @@ printmemseg(struct memseg *memseg)
  *                       |                       |
  *                       |  segkmem32 segment    | (SYSLIMIT32 - SYSBASE32 =
  *                       |                       |    ~64MB)
- * 0x00000000.70002000  -|-----------------------|
+ *			-|-----------------------|
+ *			 |	IVSIZE		 |
+ * 0x00000000.70004000  -|-----------------------|
  *                       |     panicbuf          |
+ * 0x00000000.70002000	-|-----------------------|
+ *			 |	PAGESIZE	 |
  * 0x00000000.70000000  -|-----------------------|- SYSBASE32
  *                       |       boot-time       |
  *                       |    temporary space    |
@@ -821,10 +824,6 @@ alloc_kmem64(caddr_t base, caddr_t end)
 
 static prom_memlist_t *boot_physinstalled, *boot_physavail, *boot_virtavail;
 static size_t boot_physinstalled_len, boot_physavail_len, boot_virtavail_len;
-
-#define	IVSIZE	roundup(((MAXIVNUM * sizeof (intr_vec_t *)) + \
-			(MAX_RSVD_IV * sizeof (intr_vec_t)) + \
-			(MAX_RSVD_IVX * sizeof (intr_vecx_t))), PAGESIZE)
 
 #if !defined(C_OBP)
 /*
@@ -1470,16 +1469,8 @@ startup_memlist(void)
 	bp_init(shm_alignment, HAT_STRICTORDER);
 
 	/*
-	 * Reserve space for panicbuf, intr_vec_table, reserved interrupt
-	 * vector data structures and MPO mblock structs from the 32-bit heap.
+	 * Reserve space for MPO mblock structs from the 32-bit heap.
 	 */
-	(void) vmem_xalloc(heap32_arena, PANICBUFSIZE, PAGESIZE, 0, 0,
-	    panicbuf, panicbuf + PANICBUFSIZE,
-	    VM_NOSLEEP | VM_BESTFIT | VM_PANIC);
-
-	(void) vmem_xalloc(heap32_arena, IVSIZE, PAGESIZE, 0, 0,
-	    intr_vec_table, (caddr_t)intr_vec_table + IVSIZE,
-	    VM_NOSLEEP | VM_BESTFIT | VM_PANIC);
 
 	if (mpo_heap32_bufsz > (size_t)0) {
 		(void) vmem_xalloc(heap32_arena, mpo_heap32_bufsz,

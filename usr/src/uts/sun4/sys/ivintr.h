@@ -19,12 +19,15 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_IVINTR_H
 #define	_SYS_IVINTR_H
+
+#include <sys/intreg.h>
+#include <sys/param.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -44,6 +47,10 @@ extern "C" {
  */
 #define	MAX_RSVD_IV	((NCPU * 3) + 256) /* HW and Single target SW intrs */
 #define	MAX_RSVD_IVX	32		/* Multi target software intrs */
+
+#define	IVSIZE	roundup(((MAXIVNUM * sizeof (intr_vec_t *)) + \
+			(MAX_RSVD_IV * sizeof (intr_vec_t)) + \
+			(MAX_RSVD_IVX * sizeof (intr_vecx_t))), PAGESIZE)
 
 #ifndef _ASM
 
