@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2984,6 +2984,7 @@ dodelget(int cmd, int satype, char *argv[], char *ebuf)
 	uint16_t srcport = 0, dstport = 0;
 	uint8_t proto = 0;
 	char *ep = NULL;
+	uint32_t sa_flags = 0;
 
 	/* Set the first extension header to right past the base message. */
 	nextext = (uint64_t *)(msg + 1);
@@ -3133,10 +3134,10 @@ dodelget(int cmd, int satype, char *argv[], char *ebuf)
 			/* The rest is pre-bzeroed for us. */
 			break;
 		case TOK_FLAG_INBOUND:
-			assoc->sadb_sa_flags |= SADB_X_SAFLAGS_INBOUND;
+			sa_flags |= SADB_X_SAFLAGS_INBOUND;
 			break;
 		case TOK_FLAG_OUTBOUND:
-			assoc->sadb_sa_flags |= SADB_X_SAFLAGS_OUTBOUND;
+			sa_flags |= SADB_X_SAFLAGS_OUTBOUND;
 			break;
 		default:
 			ERROR2(ep, ebuf, gettext(
@@ -3147,6 +3148,14 @@ dodelget(int cmd, int satype, char *argv[], char *ebuf)
 	} while (token != TOK_EOF);
 
 	handle_errors(ep, ebuf, B_TRUE, B_FALSE);
+
+	if (assoc == NULL) {
+		FATAL1(ep, ebuf, gettext(
+		    "Need SA parameters for %s.\n"), thiscmd);
+	}
+
+	/* We can set the flags now with valid assoc in hand. */
+	assoc->sadb_sa_flags |= sa_flags;
 
 	if ((srcport != 0) && (src == NULL)) {
 		ALLOC_ADDR_EXT(src, SADB_EXT_ADDRESS_SRC);
@@ -3168,11 +3177,6 @@ dodelget(int cmd, int satype, char *argv[], char *ebuf)
 
 	/* So I have enough of the message to send it down! */
 	msg->sadb_msg_len = nextext - get_buffer;
-
-	if (assoc == NULL) {
-		FATAL1(ep, ebuf, gettext(
-		    "Need SA parameters for %s.\n"), thiscmd);
-	}
 
 	if (cflag) {
 		/*
