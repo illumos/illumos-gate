@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -6886,21 +6886,25 @@ bail:
  */
 
 /*
- * sadb_set_lpkt: Return TRUE if we can swap in a value to ipsa->ipsa_lpkt and
- * freemsg the previous value.  Return FALSE if we lost the race and the SA is
- * in a non-LARVAL state. We also return FALSE if we can't allocate the attrmp.
+ * sadb_set_lpkt:
+ *
+ * Returns the passed-in packet if the SA is no longer larval.
+ *
+ * Returns NULL if the SA is larval, and needs to be swapped into the SA for
+ * processing after an SADB_UPDATE.
  */
-boolean_t
+mblk_t *
 sadb_set_lpkt(ipsa_t *ipsa, mblk_t *npkt, ip_recv_attr_t *ira)
 {
 	mblk_t		*opkt;
-	netstack_t	*ns = ira->ira_ill->ill_ipst->ips_netstack;
-	ipsec_stack_t	*ipss = ns->netstack_ipsec;
-	boolean_t is_larval;
 
 	mutex_enter(&ipsa->ipsa_lock);
-	is_larval = (ipsa->ipsa_state == IPSA_STATE_LARVAL);
-	if (is_larval) {
+	opkt = ipsa->ipsa_lpkt;
+	if (ipsa->ipsa_state == IPSA_STATE_LARVAL) {
+		/*
+		 * Consume npkt and place it in the LARVAL SA's inbound
+		 * packet slot.
+		 */
 		mblk_t	*attrmp;
 
 		attrmp = ip_recv_attr_to_mblk(ira);
@@ -6911,27 +6915,37 @@ sadb_set_lpkt(ipsa_t *ipsa, mblk_t *npkt, ip_recv_attr_t *ira)
 			ip_drop_input("ipIfStatsInDiscards", npkt, ill);
 			freemsg(npkt);
 			opkt = NULL;
-			is_larval = B_FALSE;
 		} else {
 			ASSERT(attrmp->b_cont == NULL);
 			attrmp->b_cont = npkt;
-			npkt = attrmp;
-			opkt = ipsa->ipsa_lpkt;
-			ipsa->ipsa_lpkt = npkt;
+			ipsa->ipsa_lpkt = attrmp;
 		}
+		npkt = NULL;
 	} else {
-		/* We lost the race. */
-		opkt = NULL;
+		/*
+		 * If not larval, we lost the race.  NOTE: ipsa_lpkt may still
+		 * have been non-NULL in the non-larval case, because of
+		 * inbound packets arriving prior to sadb_common_add()
+		 * transferring the SA completely out of larval state, but
+		 * after lpkt was grabbed by the AH/ESP-specific add routines.
+		 * We should clear the old ipsa_lpkt in this case to make sure
+		 * that it doesn't linger on the now-MATURE IPsec SA, or get
+		 * picked up as an out-of-order packet.
+		 */
+		ipsa->ipsa_lpkt = NULL;
 	}
 	mutex_exit(&ipsa->ipsa_lock);
 
 	if (opkt != NULL) {
+		ipsec_stack_t	*ipss;
+
+		ipss = ira->ira_ill->ill_ipst->ips_netstack->netstack_ipsec;
 		opkt = ip_recv_attr_free_mblk(opkt);
 		ip_drop_packet(opkt, B_TRUE, ira->ira_ill,
 		    DROPPER(ipss, ipds_sadb_inlarval_replace),
 		    &ipss->ipsec_sadb_dropper);
 	}
-	return (is_larval);
+	return (npkt);
 }
 
 /*

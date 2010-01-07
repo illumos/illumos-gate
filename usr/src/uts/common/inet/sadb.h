@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -784,7 +784,7 @@ void sadb_ager(sadb_t *, queue_t *, int, netstack_t *);
 timeout_id_t sadb_retimeout(hrtime_t, queue_t *, void (*)(void *), void *,
     uint_t *, uint_t, short);
 void sadb_sa_refrele(void *target);
-boolean_t sadb_set_lpkt(ipsa_t *, mblk_t *, ip_recv_attr_t *);
+mblk_t *sadb_set_lpkt(ipsa_t *, mblk_t *, ip_recv_attr_t *);
 mblk_t *sadb_clear_lpkt(ipsa_t *);
 void sadb_buf_pkt(ipsa_t *, mblk_t *, ip_recv_attr_t *);
 void sadb_clear_buf_pkt(void *ipkt);

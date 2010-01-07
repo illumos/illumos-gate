@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -926,25 +926,27 @@ ah_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 		} /* Else sadb_common_add unlinks it for me! */
 	}
 
-	lpkt = NULL;
-	if (larval != NULL)
-		lpkt = sadb_clear_lpkt(larval);
+	if (larval != NULL) {
+		/*
+		 * Hold again, because sadb_common_add() consumes a reference,
+		 * and we don't want to clear_lpkt() without a reference.
+		 */
+		IPSA_REFHOLD(larval);
+	}
 
 	rc = sadb_common_add(ahstack->ah_pfkey_q, mp,
 	    samsg, ksi, primary, secondary, larval, clone, is_inbound,
 	    diagnostic, ns, &ahstack->ah_sadb);
 
-	if (lpkt != NULL) {
+	if (larval != NULL) {
 		if (rc == 0) {
-			rc = !taskq_dispatch(ah_taskq, inbound_task, lpkt,
-			    TQ_NOSLEEP);
+			lpkt = sadb_clear_lpkt(larval);
+			if (lpkt != NULL) {
+				rc = !taskq_dispatch(ah_taskq, inbound_task,
+				    lpkt, TQ_NOSLEEP);
+			}
 		}
-		if (rc != 0) {
-			lpkt = ip_recv_attr_free_mblk(lpkt);
-			ip_drop_packet(lpkt, B_TRUE, NULL,
-			    DROPPER(ipss, ipds_sadb_inlarval_timeout),
-			    &ahstack->ah_dropper);
-		}
+		IPSA_REFRELE(larval);
 	}
 
 	/*

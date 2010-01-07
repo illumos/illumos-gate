@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -744,11 +744,15 @@ ipsec_inbound_ah_sa(mblk_t *mp, ip_recv_attr_t *ira, ah_t **ahp)
 		return (NULL);
 	}
 
-	if (assoc->ipsa_state == IPSA_STATE_LARVAL &&
-	    sadb_set_lpkt(assoc, mp, ira)) {
+	if (assoc->ipsa_state == IPSA_STATE_LARVAL) {
 		/* Not fully baked; swap the packet under a rock until then */
-		IPSA_REFRELE(assoc);
-		return (NULL);
+
+		mp = sadb_set_lpkt(assoc, mp, ira);
+		if (mp == NULL) {
+			IPSA_REFRELE(assoc);
+			return (NULL);
+		}
+		/* Looks like the SA is no longer LARVAL. */
 	}
 
 	/* Are the IPsec fields initialized at all? */
@@ -883,11 +887,15 @@ ipsec_inbound_esp_sa(mblk_t *data_mp, ip_recv_attr_t *ira, esph_t **esphp)
 		return (NULL);
 	}
 
-	if (ipsa->ipsa_state == IPSA_STATE_LARVAL &&
-	    sadb_set_lpkt(ipsa, data_mp, ira)) {
+	if (ipsa->ipsa_state == IPSA_STATE_LARVAL) {
 		/* Not fully baked; swap the packet under a rock until then */
-		IPSA_REFRELE(ipsa);
-		return (NULL);
+
+		data_mp = sadb_set_lpkt(ipsa, data_mp, ira);
+		if (data_mp == NULL) {
+			IPSA_REFRELE(ipsa);
+			return (NULL);
+		}
+		/* Looks like the SA is no longer LARVAL. */
 	}
 
 	/* Are the IPsec fields initialized at all? */
