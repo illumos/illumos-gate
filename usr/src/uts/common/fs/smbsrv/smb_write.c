@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,9 +29,6 @@
 #include <smbsrv/netbios.h>
 
 
-#define	SMB_WRMODE_WRITE_THRU	0x0001
-#define	SMB_WRMODE_IS_STABLE(M)	((M) & SMB_WRMODE_WRITE_THRU)
-
 /*
  * The limit in bytes that the marshalling will grow the buffer
  * chain to accomodate incoming data on SmbWriteX requests.
@@ -40,7 +37,6 @@
  */
 #define	SMB_WRITEX_MAX		102400
 
-static int smb_write_common(smb_request_t *, smb_rw_param_t *);
 static int smb_write_truncate(smb_request_t *, smb_rw_param_t *);
 
 
@@ -114,7 +110,7 @@ smb_com_write(smb_request_t *sr)
 
 		param->rw_vdb.vdb_uio.uio_loffset = (offset_t)param->rw_offset;
 
-		rc = smb_write_common(sr, param);
+		rc = smb_common_write(sr, param);
 	}
 
 	if (rc != 0) {
@@ -209,7 +205,7 @@ smb_com_write_and_close(smb_request_t *sr)
 
 		param->rw_vdb.vdb_uio.uio_loffset = (offset_t)param->rw_offset;
 
-		rc = smb_write_common(sr, param);
+		rc = smb_common_write(sr, param);
 	}
 
 	if (rc != 0) {
@@ -311,7 +307,7 @@ smb_com_write_and_unlock(smb_request_t *sr)
 
 	param->rw_vdb.vdb_uio.uio_loffset = (offset_t)param->rw_offset;
 
-	if ((rc = smb_write_common(sr, param)) != 0) {
+	if ((rc = smb_common_write(sr, param)) != 0) {
 		if (sr->smb_error.status != NT_STATUS_FILE_LOCK_CONFLICT)
 			smbsr_errno(sr, rc);
 		return (SDRC_ERROR);
@@ -417,7 +413,7 @@ smb_com_write_andx(smb_request_t *sr)
 	sr->user_cr = smb_ofile_getcred(sr->fid_ofile);
 
 	if (SMB_WRMODE_IS_STABLE(param->rw_mode) &&
-	    STYPE_ISDSK(sr->tid_tree->t_res_type) == 0) {
+	    STYPE_ISIPC(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, 0, ERRSRV, ERRaccess);
 		return (SDRC_ERROR);
 	}
@@ -435,7 +431,7 @@ smb_com_write_andx(smb_request_t *sr)
 	param->rw_vdb.vdb_uio.uio_loffset = (offset_t)param->rw_offset;
 
 	if (param->rw_count != 0) {
-		if ((rc = smb_write_common(sr, param)) != 0) {
+		if ((rc = smb_common_write(sr, param)) != 0) {
 			if (sr->smb_error.status !=
 			    NT_STATUS_FILE_LOCK_CONFLICT)
 				smbsr_errno(sr, rc);
@@ -457,8 +453,8 @@ smb_com_write_andx(smb_request_t *sr)
  *
  * Returns errno values.
  */
-static int
-smb_write_common(smb_request_t *sr, smb_rw_param_t *param)
+int
+smb_common_write(smb_request_t *sr, smb_rw_param_t *param)
 {
 	smb_ofile_t *ofile = sr->fid_ofile;
 	smb_node_t *node;
@@ -468,6 +464,7 @@ smb_write_common(smb_request_t *sr, smb_rw_param_t *param)
 
 	switch (sr->tid_tree->t_res_type & STYPE_MASK) {
 	case STYPE_DISKTREE:
+	case STYPE_PRINTQ:
 		node = ofile->f_node;
 
 		if (!smb_node_is_dir(node)) {
@@ -537,7 +534,7 @@ smb_write_truncate(smb_request_t *sr, smb_rw_param_t *param)
 	uint32_t status;
 	int rc;
 
-	if (STYPE_ISDSK(sr->tid_tree->t_res_type) == 0)
+	if (STYPE_ISIPC(sr->tid_tree->t_res_type))
 		return (0);
 
 	mutex_enter(&node->n_mutex);

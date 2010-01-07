@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -646,6 +646,7 @@ smb_ofile_set_flags(
 	of->f_flags |= flags;
 	mutex_exit(&of->f_mutex);
 }
+
 /*
  * smb_ofile_seek
  *

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -123,7 +123,7 @@ smb_com_trans2_query_path_information(smb_request_t *sr, smb_xa_t *xa)
 	uint16_t infolev;
 	char *path;
 
-	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
+	if (STYPE_ISIPC(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_INVALID_DEVICE_REQUEST,
 		    ERRDOS, ERROR_INVALID_FUNCTION);
 		return (SDRC_ERROR);
@@ -168,7 +168,7 @@ smb_com_query_information(smb_request_t *sr)
 	char *path = sr->arg.dirop.fqi.fq_path.pn_path;
 	uint16_t infolev = SMB_QUERY_INFORMATION;
 
-	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
+	if (STYPE_ISIPC(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 		    ERRDOS, ERROR_ACCESS_DENIED);
 		return (SDRC_ERROR);

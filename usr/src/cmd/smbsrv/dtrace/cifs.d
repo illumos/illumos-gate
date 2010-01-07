@@ -20,11 +20,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
 #pragma D option flowindent
@@ -121,7 +119,7 @@ sdt:smbsrv::-smb_op-NtTransactCreate-start
 {
 	op =  (struct open_param *)arg1;
 
-	printf("%s", stringof(op->fqi.path));
+	printf("%s", stringof(op->fqi.fq_path.pn_path));
 }
 
 sdt:smbsrv::-smb_op-Open-done,
@@ -136,7 +134,7 @@ sdt:smbsrv::-smb_op-NtTransactCreate-done
 	sr = (struct smb_request *)arg0;
 
 	printf("%s: fid=%u",
-	    stringof(sr->arg.open.fqi.path), sr->smb_fid);
+	    stringof(sr->arg.open.fqi.fq_path.pn_path), sr->smb_fid);
 }
 
 sdt:smbsrv::-smb_op-Read-start,
@@ -174,7 +172,8 @@ sdt:smbsrv::-smb_op-Rename-start
 	p = (struct dirop *)arg1;
 
 	printf("%s to %s",
-	     stringof(p->fqi.path), stringof(p->dst_fqi.path));
+	     stringof(p->fqi.fq_path.pn_path),
+		 stringof(p->dst_fqi.fq_path.pn_path));
 }
 
 sdt:smbsrv::-smb_op-CheckDirectory-start,
@@ -184,7 +183,7 @@ sdt:smbsrv::-smb_op-Delete-start
 {
 	p = (struct dirop *)arg1;
 
-	printf("%s", stringof(p->fqi.path));
+	printf("%s", stringof(p->fqi.fq_path.pn_path));
 }
 
 /*

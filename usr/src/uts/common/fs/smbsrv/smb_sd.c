@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -325,8 +325,7 @@ smb_sd_fromfs(smb_fssd_t *fs_sd, smb_sd_t *sd)
 	/* DACL */
 	if (fs_sd->sd_secinfo & SMB_DACL_SECINFO) {
 		if (fs_sd->sd_zdacl != NULL) {
-			acl = smb_acl_from_zfs(fs_sd->sd_zdacl, fs_sd->sd_uid,
-			    fs_sd->sd_gid);
+			acl = smb_acl_from_zfs(fs_sd->sd_zdacl);
 			if (acl == NULL) {
 				smb_sd_term(sd);
 				return (NT_STATUS_INTERNAL_ERROR);
@@ -348,8 +347,7 @@ smb_sd_fromfs(smb_fssd_t *fs_sd, smb_sd_t *sd)
 	/* SACL */
 	if (fs_sd->sd_secinfo & SMB_SACL_SECINFO) {
 		if (fs_sd->sd_zsacl != NULL) {
-			acl = smb_acl_from_zfs(fs_sd->sd_zsacl, fs_sd->sd_uid,
-			    fs_sd->sd_gid);
+			acl = smb_acl_from_zfs(fs_sd->sd_zsacl);
 			if (acl == NULL) {
 				smb_sd_term(sd);
 				return (NT_STATUS_INTERNAL_ERROR);

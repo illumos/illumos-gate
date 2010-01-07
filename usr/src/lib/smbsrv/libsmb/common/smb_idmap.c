@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -348,9 +348,25 @@ smb_idmap_batch_getsid(idmap_get_handle_t *idmaph, smb_idmap_t *sim,
 		    &sim->sim_domsid, &sim->sim_rid, &sim->sim_stat);
 		break;
 
+	case SMB_IDMAP_OWNERAT:
+		/* Current Owner S-1-5-32-766 */
+		sim->sim_domsid = strdup(NT_BUILTIN_DOMAIN_SIDSTR);
+		sim->sim_rid = SECURITY_CURRENT_OWNER_RID;
+		sim->sim_stat = IDMAP_SUCCESS;
+		stat = IDMAP_SUCCESS;
+		break;
+
+	case SMB_IDMAP_GROUPAT:
+		/* Current Group S-1-5-32-767 */
+		sim->sim_domsid = strdup(NT_BUILTIN_DOMAIN_SIDSTR);
+		sim->sim_rid = SECURITY_CURRENT_GROUP_RID;
+		sim->sim_stat = IDMAP_SUCCESS;
+		stat = IDMAP_SUCCESS;
+		break;
+
 	case SMB_IDMAP_EVERYONE:
 		/* Everyone S-1-1-0 */
-		sim->sim_domsid = strdup("S-1-1");
+		sim->sim_domsid = strdup(NT_WORLD_AUTH_SIDSTR);
 		sim->sim_rid = 0;
 		sim->sim_stat = IDMAP_SUCCESS;
 		stat = IDMAP_SUCCESS;

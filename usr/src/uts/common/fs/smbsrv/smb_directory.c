@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -370,7 +370,7 @@ smb_com_check_directory(smb_request_t *sr)
 	char *path;
 	smb_pathname_t *pn;
 
-	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
+	if (STYPE_ISIPC(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS,
 		    ERROR_ACCESS_DENIED);
 		return (SDRC_ERROR);

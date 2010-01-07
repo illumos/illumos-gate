@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -815,9 +815,10 @@ typedef struct smb_wka {
  */
 int smb_wka_init(void);
 void smb_wka_fini(void);
-smb_wka_t *smb_wka_lookup_name(char *);
+smb_wka_t *smb_wka_lookup_builtin(const char *);
+smb_wka_t *smb_wka_lookup_name(const char *);
 smb_wka_t *smb_wka_lookup_sid(smb_sid_t *);
-smb_sid_t *smb_wka_get_sid(char *);
+smb_sid_t *smb_wka_get_sid(const char *);
 char *smb_wka_get_domain(int);
 uint32_t smb_wka_token_groups(uint32_t, smb_ids_t *);
 

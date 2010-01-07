@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +39,7 @@
 #include <smbsrv/string.h>
 #include <smbsrv/libmlrpc.h>
 
-#define	NDR_STRING_MAX		256
+#define	NDR_STRING_MAX		4096
 
 #define	NDR_IS_UNION(T)	\
 	(((T)->type_flags & NDR_F_TYPEOP_MASK) == NDR_F_UNION)
@@ -623,12 +623,14 @@ ndr_outer(ndr_ref_t *outer_ref)
 
 	case NDR_F_SIZE_IS:
 	case NDR_F_DIMENSION_IS:
+	case NDR_F_IS_POINTER+NDR_F_SIZE_IS:
+	case NDR_F_IS_REFERENCE+NDR_F_SIZE_IS:
 		if (is_varlen) {
 			error = NDR_ERR_ARRAY_VARLEN_ILLEGAL;
 			break;
 		}
 
-		if (params == NDR_F_SIZE_IS)
+		if (params & NDR_F_SIZE_IS)
 			return (ndr_outer_conformant_array(outer_ref));
 		else
 			return (ndr_outer_fixed_array(outer_ref));
@@ -694,9 +696,8 @@ ndr_outer_fixed(ndr_ref_t *outer_ref)
 	case NDR_M_OP_MARSHALL:
 		valp = outer_ref->datum;
 		assert(valp);
-		if (outer_ref->backptr) {
+		if (outer_ref->backptr)
 			assert(valp == *outer_ref->backptr);
-		}
 		break;
 
 	case NDR_M_OP_UNMARSHALL:
@@ -782,9 +783,8 @@ ndr_outer_fixed_array(ndr_ref_t *outer_ref)
 	case NDR_M_OP_MARSHALL:
 		valp = outer_ref->datum;
 		assert(valp);
-		if (outer_ref->backptr) {
+		if (outer_ref->backptr)
 			assert(valp == *outer_ref->backptr);
-		}
 		break;
 
 	case NDR_M_OP_UNMARSHALL:
@@ -841,12 +841,13 @@ ndr_outer_conformant_array(ndr_ref_t *outer_ref)
 	unsigned	n_variable;
 	unsigned	n_alloc;
 	unsigned	n_pdu_total;
+	unsigned	n_ptr_offset;
 	int		params;
 
 	params = outer_ref->outer_flags & NDR_F_PARAMS_MASK;
 
 	assert(!is_varlen && !is_string && !is_union);
-	assert(params == NDR_F_SIZE_IS);
+	assert(params & NDR_F_SIZE_IS);
 
 	/* conformant header for this */
 	n_hdr = 4;
@@ -877,20 +878,28 @@ ndr_outer_conformant_array(ndr_ref_t *outer_ref)
 
 		valp = outer_ref->datum;
 		assert(valp);
-		if (outer_ref->backptr) {
+		if (outer_ref->backptr)
 			assert(valp == *outer_ref->backptr);
-		}
+		n_ptr_offset = 4;
 		break;
 
 	case NDR_M_OP_UNMARSHALL:
-		rc = ndr_outer_peek_sizing(outer_ref, 0, &size_is);
-		if (!rc)
-			return (0);	/* error already set */
+		if (params & NDR_F_IS_REFERENCE) {
+			size_is = outer_ref->size_is;
+			n_ptr_offset = 0;
+		} else {
+			/* NDR_F_IS_POINTER */
+			rc = ndr_outer_peek_sizing(outer_ref, 0, &size_is);
+			if (!rc)
+				return (0);	/* error already set */
 
-		if (size_is != outer_ref->size_is) {
-			NDR_SET_ERROR(outer_ref,
-			    NDR_ERR_SIZE_IS_MISMATCH_PDU);
-			return (0);
+			if (size_is != outer_ref->size_is) {
+				NDR_SET_ERROR(outer_ref,
+				    NDR_ERR_SIZE_IS_MISMATCH_PDU);
+				return (0);
+			}
+
+			n_ptr_offset = 4;
 		}
 
 		if (size_is > 0) {
@@ -929,7 +938,7 @@ ndr_outer_conformant_array(ndr_ref_t *outer_ref)
 		myref.inner_flags = NDR_F_DIMENSION_IS;		/* convenient */
 		myref.dimension_is = outer_ref->size_is;	/* convenient */
 
-		myref.pdu_offset = outer_ref->pdu_offset + 4;
+		myref.pdu_offset = outer_ref->pdu_offset + n_ptr_offset;
 
 		rc = ndr_inner(&myref);
 		if (!rc)
@@ -998,9 +1007,8 @@ ndr_outer_conformant_construct(ndr_ref_t *outer_ref)
 
 		valp = outer_ref->datum;
 		assert(valp);
-		if (outer_ref->backptr) {
+		if (outer_ref->backptr)
 			assert(valp == *outer_ref->backptr);
-		}
 		break;
 
 	case NDR_M_OP_UNMARSHALL:
@@ -1202,7 +1210,7 @@ ndr_outer_string(ndr_ref_t *outer_ref)
 		} else {
 			valp = outer_ref->datum;
 			n_zeroes = 0;
-			for (ix = 0; ix < 1024; ix++) {
+			for (ix = 0; ix < NDR_STRING_MAX; ix++) {
 				if (valp[ix] == 0) {
 					n_zeroes++;
 					if (n_zeroes >= is_varlen &&
@@ -1213,7 +1221,7 @@ ndr_outer_string(ndr_ref_t *outer_ref)
 					n_zeroes = 0;
 				}
 			}
-			if (ix >= 1024) {
+			if (ix >= NDR_STRING_MAX) {
 				NDR_SET_ERROR(outer_ref, NDR_ERR_STRLEN);
 				return (0);
 			}
@@ -1614,15 +1622,19 @@ ndr_inner_pointer(ndr_ref_t *arg_ref)
 	if (!outer_ref)
 		return (0);	/* error already set */
 
-	/* move advice in inner_flags to outer_flags sans pointer */
+	/*
+	 * Move advice in inner_flags to outer_flags.
+	 * Retain pointer flag for conformant arrays.
+	 */
 	outer_ref->outer_flags = arg_ref->inner_flags & NDR_F_PARAMS_MASK;
-	outer_ref->outer_flags &= ~NDR_F_IS_POINTER;
-#ifdef NDR_INNER_NOT_YET
+	if ((outer_ref->outer_flags & NDR_F_SIZE_IS) == 0)
+		outer_ref->outer_flags &= ~NDR_F_IS_POINTER;
+#ifdef NDR_INNER_PTR_NOT_YET
 	outer_ref->outer_flags |= NDR_F_BACKPTR;
 	if (outer_ref->outer_flags & NDR_F_SIZE_IS) {
 		outer_ref->outer_flags |= NDR_F_ARRAY+NDR_F_CONFORMANT;
 	}
-#endif /* NDR_INNER_NOT_YET */
+#endif /* NDR_INNER_PTR_NOT_YET */
 
 	outer_ref->backptr = valpp;
 
@@ -1657,9 +1669,13 @@ ndr_inner_reference(ndr_ref_t *arg_ref)
 	if (!outer_ref)
 		return (0);	/* error already set */
 
-	/* move advice in inner_flags to outer_flags sans pointer */
+	/*
+	 * Move advice in inner_flags to outer_flags.
+	 * Retain reference flag for conformant arrays.
+	 */
 	outer_ref->outer_flags = arg_ref->inner_flags & NDR_F_PARAMS_MASK;
-	outer_ref->outer_flags &= ~NDR_F_IS_REFERENCE;
+	if ((outer_ref->outer_flags & NDR_F_SIZE_IS) == 0)
+		outer_ref->outer_flags &= ~NDR_F_IS_REFERENCE;
 #ifdef NDR_INNER_REF_NOT_YET
 	outer_ref->outer_flags |= NDR_F_BACKPTR;
 	if (outer_ref->outer_flags & NDR_F_SIZE_IS) {

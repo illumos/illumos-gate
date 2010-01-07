@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -151,9 +151,9 @@ struct file_time {
 typedef struct file_time file_time_t;
 
 struct winreg_secdesc {
-	DWORD	sd_length_is;
-  SIZE_IS(sd_length_is)
-	BYTE	value[ANY_SIZE_ARRAY];
+	struct winreg_value	*sd_buf;
+	DWORD			sd_len;
+	DWORD			sd_size;
 };
 
 OPERATION(WINREG_OPNUM_OpenHKCR)
@@ -279,15 +279,10 @@ struct winreg_FlushKey {
 
 OPERATION(WINREG_OPNUM_GetKeySec)
 struct winreg_GetKeySec {
-	IN winreg_handle_t	handle;
-	IN DWORD		sec_info;
-/*
-	OUT struct winreg_secdesc	sd;
-*/
-	OUT DWORD		sd_length_is;
-	OUT DWORD		sd_size_is;
-	OUT DWORD		sd_array;
-	OUT DWORD		status;
+	IN		winreg_handle_t		handle;
+	IN		DWORD			sec_info;
+	OUT REFERENCE	struct winreg_secdesc	*sd;
+	OUT		DWORD			status;
 };
 
 OPERATION(WINREG_OPNUM_NotifyChange)

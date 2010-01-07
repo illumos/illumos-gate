@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -188,16 +188,42 @@
 
 extern uint32_t smb_keep_alive;
 
-static int smb_write_raw_helper(smb_request_t *, struct uio *, int,
-    offset_t *, uint32_t *);
 static int smb_transfer_write_raw_data(smb_request_t *, uint16_t);
-
-#define	WR_MODE_WR_THRU	1
 
 smb_sdrc_t
 smb_pre_write_raw(smb_request_t *sr)
 {
-	int rc = 0;
+	smb_rw_param_t *param;
+	uint32_t off_low;
+	uint32_t off_high;
+	uint32_t timeout;
+	uint16_t datalen;
+	uint16_t total;
+	int rc;
+
+	param = kmem_zalloc(sizeof (smb_rw_param_t), KM_SLEEP);
+	sr->arg.rw = param;
+	param->rw_magic = SMB_RW_MAGIC;
+
+	if (sr->smb_wct == 12) {
+		off_high = 0;
+		rc = smbsr_decode_vwv(sr, "ww2.llw4.ww", &sr->smb_fid, &total,
+		    &off_low, &timeout, &param->rw_mode, &datalen,
+		    &param->rw_dsoff);
+
+		param->rw_offset = (uint64_t)off_low;
+		param->rw_dsoff -= 59;
+	} else {
+		rc = smbsr_decode_vwv(sr, "ww2.llw4.wwl", &sr->smb_fid, &total,
+		    &off_low, &timeout, &param->rw_mode, &datalen,
+		    &param->rw_dsoff, &off_high);
+
+		param->rw_offset = ((uint64_t)off_high << 32) | off_low;
+		param->rw_dsoff -= 63;
+	}
+
+	param->rw_count = (uint32_t)datalen;
+	param->rw_total = (uint32_t)total;
 
 	DTRACE_SMB_2(op__WriteRaw__start, smb_request_t *, sr,
 	    smb_rw_param_t *, sr->arg.rw);
@@ -214,48 +240,26 @@ smb_post_write_raw(smb_request_t *sr)
 	    smb_rw_param_t *, sr->arg.rw);
 
 	smb_rwx_rwexit(&sr->session->s_lock);
+	kmem_free(sr->arg.rw, sizeof (smb_rw_param_t));
 }
 
 smb_sdrc_t
 smb_com_write_raw(struct smb_request *sr)
 {
+	smb_rw_param_t		*param = sr->arg.rw;
 	int			rc = 0;
 	int			session_send_rc = 0;
-	unsigned short		addl_xfer_count;
-	unsigned short		count;
-	unsigned short		write_mode, data_offset, data_length;
-	offset_t		off;
-	uint32_t		off_low, off_high, timeout;
-	uint32_t		lcount = 0;
-	uint32_t		addl_lcount = 0;
-	struct uio		uio;
-	iovec_t			iovec;
-	int			stability;
+	uint16_t		addl_xfer_count;
+	offset_t		addl_xfer_offset;
 	struct mbuf_chain	reply;
-	smb_node_t		*fnode;
 	smb_error_t		err;
+	int32_t			chain_offset;
 
 	if (sr->session->s_state != SMB_SESSION_STATE_WRITE_RAW_ACTIVE)
 		return (SDRC_DROP_VC);
 
-	if (sr->smb_wct == 12) {
-		off_high = 0;
-		rc = smbsr_decode_vwv(sr, "ww2.llw4.ww", &sr->smb_fid, &count,
-		    &off_low, &timeout, &write_mode, &data_length,
-		    &data_offset);
-		data_offset -= 59;
-	} else {
-		rc = smbsr_decode_vwv(sr, "ww2.llw4.wwl", &sr->smb_fid, &count,
-		    &off_low, &timeout, &write_mode, &data_length,
-		    &data_offset, &off_high);
-		data_offset -= 63;
-	}
-
-	if (rc != 0)
-		return (SDRC_ERROR);
-
-	off = ((offset_t)off_high << 32) | off_low;
-	addl_xfer_count = count - data_length;
+	addl_xfer_count = param->rw_total - param->rw_count;
+	addl_xfer_offset = param->rw_count;
 
 	smbsr_lookup_file(sr);
 	if (sr->fid_ofile == NULL) {
@@ -265,45 +269,26 @@ smb_com_write_raw(struct smb_request *sr)
 
 	sr->user_cr = smb_ofile_getcred(sr->fid_ofile);
 
-	fnode = sr->fid_ofile->f_node;
-	stability = ((write_mode & WR_MODE_WR_THRU) ||
-	    (fnode->flags & NODE_FLAGS_WRITE_THROUGH)) ? FSYNC : 0;
-
-	if (STYPE_ISDSK(sr->tid_tree->t_res_type)) {
-		/*
-		 * See comments in smb_write.c
-		 */
-		if (!smb_node_is_dir(fnode)) {
-			rc = smb_lock_range_access(sr, fnode, off,
-			    count, B_TRUE);
-			if (rc != NT_STATUS_SUCCESS) {
-				smbsr_error(sr, rc, ERRSRV, ERRaccess);
-				return (SDRC_ERROR);
-			}
-		}
-	}
-
 	/*
 	 * Make sure any raw write data that is supposed to be
 	 * contained in this SMB is actually present.
 	 */
-	if (sr->smb_data.chain_offset + data_offset + data_length >
-	    sr->smb_data.max_bytes) {
+	chain_offset = sr->smb_data.chain_offset + param->rw_dsoff
+	    + param->rw_count;
+	if (chain_offset > sr->smb_data.max_bytes) {
 		/* Error handling code will wake up the session daemon */
 		return (SDRC_ERROR);
 	}
 
-	/*
-	 * Init uio (resid will get filled in later)
-	 */
-	uio.uio_iov = &iovec;
-	uio.uio_iovcnt = 1;
-	uio.uio_segflg = UIO_SYSSPACE;
-	uio.uio_loffset = off;
+	param->rw_vdb.vdb_uio.uio_iov = &param->rw_vdb.vdb_iovec[0];
+	param->rw_vdb.vdb_uio.uio_iovcnt = 1;
+	param->rw_vdb.vdb_uio.uio_segflg = UIO_SYSSPACE;
+	param->rw_vdb.vdb_uio.uio_extflg = UIO_COPY_DEFAULT;
+	param->rw_vdb.vdb_uio.uio_loffset = (offset_t)param->rw_offset;
 
 	/*
-	 * Send response if there is additional data to transfer.  This
-	 * will prompt the client to send the remaining data.
+	 * Send response if there is additional data to transfer.
+	 * This will prompt the client to send the remaining data.
 	 */
 	if (addl_xfer_count != 0) {
 		MBC_INIT(&reply, MLEN);
@@ -327,39 +312,24 @@ smb_com_write_raw(struct smb_request *sr)
 		session_send_rc = smb_session_send(sr->session, 0, &reply);
 
 		/*
-		 * If the session response failed we're not going to
-		 * return an error just yet -- we can still write the
-		 * data we received along with the SMB even if the
-		 * response failed.  If it failed, we need to force the
-		 * stability level to "write-through".
+		 * If the response failed, force write-through and
+		 * complete the write before dealing with the error.
 		 */
-		stability = (session_send_rc == 0) ? stability : FSYNC;
+		if (session_send_rc != 0)
+			param->rw_mode = SMB_WRMODE_WRITE_THRU;
 	}
 
 	/*
 	 * While the response is in flight (and the data begins to arrive)
-	 * write out the first data segment.  Start by setting up the
-	 * iovec list for the first transfer.
+	 * write out the first data segment.
 	 */
-	iovec.iov_base = sr->smb_data.chain->m_data +
-	    sr->smb_data.chain_offset + data_offset;
-	iovec.iov_len = data_length;
-	uio.uio_resid = data_length;
+	param->rw_vdb.vdb_iovec[0].iov_base = sr->smb_data.chain->m_data +
+	    sr->smb_data.chain_offset + param->rw_dsoff;
+	param->rw_vdb.vdb_iovec[0].iov_len = param->rw_count;
+	param->rw_vdb.vdb_uio.uio_resid = param->rw_count;
 
-	/*
-	 * smb_write_raw_helper will call smb_opipe_write or
-	 * smb_fsop_write as appropriate, and update the other f_node fields.
-	 * It's possible that data_length may be 0 for this transfer but
-	 * we still want to process it since it will update the file state
-	 * (seek position, file size (possibly), etc).
-	 */
-	rc = smb_write_raw_helper(sr, &uio, stability, &off, &lcount);
+	rc = smb_common_write(sr, param);
 
-	/*
-	 * If our initial session response failed then we're done.  Return
-	 * failure.  The client will know we wrote some of the data because
-	 * of the transfer count (count - lcount) in the response.
-	 */
 	if (session_send_rc != 0) {
 		sr->smb_rcls = ERRSRV;
 		sr->smb_err  = ERRusestd;
@@ -376,19 +346,14 @@ smb_com_write_raw(struct smb_request *sr)
 		 * is read successfully then the buffer (sr->sr_raw_data_buf)
 		 * will need to be freed after the data is written.
 		 */
-		if (smb_transfer_write_raw_data(sr, addl_xfer_count) != 0) {
-			/*
-			 * Raw data transfer failed
-			 */
-			goto write_raw_transfer_failed;
-		}
+		param->rw_offset += addl_xfer_offset;
 
-		/*
-		 * Fill in next iov entry
-		 */
-		iovec.iov_base = sr->sr_raw_data_buf;
-		iovec.iov_len = addl_xfer_count;
-		uio.uio_resid = addl_xfer_count;
+		if (smb_transfer_write_raw_data(sr, addl_xfer_count) != 0)
+			goto write_raw_transfer_failed;
+
+		param->rw_vdb.vdb_iovec[0].iov_base = sr->sr_raw_data_buf;
+		param->rw_vdb.vdb_iovec[0].iov_len = addl_xfer_count;
+		param->rw_vdb.vdb_uio.uio_resid = addl_xfer_count;
 	}
 
 	/*
@@ -405,30 +370,24 @@ smb_com_write_raw(struct smb_request *sr)
 	 * want to drop the connection and we need to read through
 	 * to the next SMB).
 	 */
-	if ((rc != 0) || (lcount != data_length)) {
+	if (rc != 0)
 		goto notify_write_raw_complete;
-	}
 
 	/*
 	 * Write any additional data
 	 */
-	if (addl_xfer_count) {
-		rc = smb_write_raw_helper(sr, &uio, stability, &off,
-		    &addl_lcount);
-	}
+	if (addl_xfer_count)
+		rc = smb_common_write(sr, param);
 
 	/*
-	 * If we were called in "Write-behind" mode ((write_mode & 1) == 0)
-	 * and the transfer was successful then we don't need to send
-	 * any further response.  If we were called in "Write-Through" mode
-	 * ((write_mode & 1) == 1) or if the transfer failed we need to
-	 * send a completion notification.  The "count" value will indicate
-	 * whether the transfer was successful.
+	 * If we were called in "Write-behind" mode and the transfer was
+	 * successful then we don't need to send any further response.
+	 * If we were called in "Write-Through" mode or if the transfer
+	 * failed we need to send a completion notification.  The "count"
+	 * value will indicate whether the transfer was successful.
 	 */
-	if ((rc != 0) || (write_mode & WR_MODE_WR_THRU) ||
-	    (lcount + addl_lcount != count)) {
+	if ((rc != 0) || SMB_WRMODE_IS_STABLE(param->rw_mode))
 		goto notify_write_raw_complete;
-	}
 
 	/*
 	 * Free raw write buffer (allocated in smb_transfer_write_raw_data)
@@ -440,8 +399,7 @@ smb_com_write_raw(struct smb_request *sr)
 
 write_raw_transfer_failed:
 	/*
-	 * Raw data transfer failed, wake up session
-	 * daemon
+	 * Raw data transfer failed, wake up session daemon
 	 */
 	sr->session->s_write_raw_status = 20;
 	sr->session->s_state = SMB_SESSION_STATE_NEGOTIATED;
@@ -458,58 +416,14 @@ notify_write_raw_complete:
 	/*
 	 * Free raw write buffer if present (from smb_transfer_write_raw_data)
 	 */
-	if (sr->sr_raw_data_buf != NULL) {
+	if (sr->sr_raw_data_buf != NULL)
 		kmem_free(sr->sr_raw_data_buf, sr->sr_raw_data_length);
-	}
-	/* Write complete notification */
+
 	sr->first_smb_com = SMB_COM_WRITE_COMPLETE;
 	rc = smbsr_encode_result(sr, 1, 0, "bww", 1,
-	    count - (lcount + addl_lcount), 0);
+	    param->rw_total - param->rw_count, 0);
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
-
-
-
-/*
- * smb_write_raw_helper
- *
- * This function will call smb_opipe_write or smb_fsop_write
- * as appropriate, and update the other f_node fields.
- * It's possible that data_length may be 0 for this transfer but
- * we still want process it since it will update the file state
- * (seek position, file size (possibly), etc).
- *
- * Returns 0 for success, non-zero for failure
- */
-static int
-smb_write_raw_helper(struct smb_request *sr, struct uio *uiop,
-    int stability, offset_t *offp, uint32_t *lcountp)
-{
-	smb_node_t *fnode;
-	int rc = 0;
-
-	if (STYPE_ISIPC(sr->tid_tree->t_res_type)) {
-		*lcountp = uiop->uio_resid;
-
-		if ((rc = smb_opipe_write(sr, uiop)) != 0)
-			*lcountp = 0;
-	} else {
-		fnode = sr->fid_ofile->f_node;
-		rc = smb_fsop_write(sr, sr->user_cr, fnode,
-		    uiop, lcountp, stability);
-
-		if (rc == 0)
-			smb_ofile_set_write_time_pending(sr->fid_ofile);
-	}
-
-	*offp += *lcountp;
-	mutex_enter(&sr->fid_ofile->f_mutex);
-	sr->fid_ofile->f_seek_pos = *offp;
-	mutex_exit(&sr->fid_ofile->f_mutex);
-
-	return (rc);
-}
-
 
 /*
  * smb_handle_write_raw

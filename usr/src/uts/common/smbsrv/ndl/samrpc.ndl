@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -289,6 +289,19 @@ struct samr_short_blob {
   SIZE_IS(length / 2)
 	WORD	*buf;
 };
+
+#define	DOMAIN_PASSWORD_COMPLEX			0x00000001
+#define	DOMAIN_PASSWORD_NO_ANON_CHANGE		0x00000002
+#define	DOMAIN_PASSWORD_NO_CLEAR_CHANGE		0x00000004
+#define	DOMAIN_LOCKOUT_ADMINS			0x00000008
+#define	DOMAIN_PASSWORD_STORE_CLEARTEXT		0x00000010
+#define	DOMAIN_REFUSE_PASSWORD_CHANGE		0x00000020
+
+struct samr_password_info {
+	WORD	min_length;
+	DWORD	properties;
+};
+typedef struct samr_password_info samr_password_info_t;
 
 /*
  * There is some sort of logon bitmap structure in here, which I
@@ -584,6 +597,17 @@ struct samr_QueryDomainInfo {
 	IN	WORD info_level;
 	OUT	struct samr_QueryDomainInfoRes *info;
 	OUT	DWORD status;
+};
+
+/*
+ * Identical to SAMR_OPNUM_QueryDomainInfo.
+ */
+OPERATION(SAMR_OPNUM_QueryInfoDomain2)
+struct samr_QueryInfoDomain2 {
+	IN	samr_handle_t	domain_handle;
+	IN	WORD		info_level;
+	OUT	struct samr_QueryDomainInfoRes *info;
+	OUT	DWORD		status;
 };
 
 #define SAMR_QUERY_ALIAS_INFO_1			1
@@ -1105,26 +1129,14 @@ struct samr_StoreGroupInfo {
 
 /*
  ***********************************************************************
- * Request 0x2c is a user request. The only parameter is a user handle.
- * The response is 12 bytes of the form:
- *		unknown: 00 00 BB 01 (443)
- *		unknown: 00 00 00 00
- *		status:  00 00 00 00
- * RPC book lists this as GetUsrDomPwInfo.
+ * GetUserDomainPasswordInformation
  ***********************************************************************
  */
-struct samr_UserPwInfo {
-	WORD	unknown1;
-	WORD	unknown2;
-	DWORD	unknown3;
-};
-
-
 OPERATION(SAMR_OPNUM_GetUserPwInfo)
 struct samr_GetUserPwInfo {
-	IN	samr_handle_t user_handle;
-	OUT struct samr_UserPwInfo pw_info;
-	OUT	DWORD status;
+	IN		samr_handle_t		user_handle;
+	OUT REFERENCE	samr_password_info_t	*pwinfo;
+	OUT		DWORD			status;
 };
 
 
@@ -1186,11 +1198,9 @@ struct samr_ChangeUserPasswd {
  */
 OPERATION(SAMR_OPNUM_GetDomainPwInfo)
 struct samr_GetDomainPwInfo {
-	IN	LPTSTR servername;
-	OUT	WORD unknown0;
-	OUT	WORD unknown1;
-	OUT	WORD unknown2;
-	OUT	DWORD status;
+	IN		DWORD			unused;
+	OUT REFERENCE	samr_password_info_t	*pwinfo;
+	OUT		DWORD			status;
 };
 
 
@@ -1386,6 +1396,8 @@ union samr_interface {
 		struct samr_OpenDomain		OpenDomain;
 	CASE(SAMR_OPNUM_QueryDomainInfo)
 		struct samr_QueryDomainInfo	QueryDomainInfo;
+	CASE(SAMR_OPNUM_QueryInfoDomain2)
+		struct samr_QueryInfoDomain2	QueryInfoDomain2;
 	CASE(SAMR_OPNUM_LookupNames)
 		struct samr_LookupNames		LookupNames;
 	CASE(SAMR_OPNUM_OpenUser)

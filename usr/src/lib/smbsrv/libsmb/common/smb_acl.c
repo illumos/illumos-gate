@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,25 +45,16 @@
 #define	SMB_AG_DNY_DRCT		3
 #define	SMB_AG_NUM		4
 
-/*
- * SID for Everyone group: S-1-1-0.
- */
-smb_sid_t everyone_sid = {
-	NT_SID_REVISION,
-	1,
-	NT_SECURITY_WORLD_AUTH,
-	{ 0 }
-};
-
 #define	DEFAULT_DACL_ACENUM	2
 acl_t *acl_alloc(enum acl_type);
 
-static idmap_stat smb_fsacl_getsids(smb_idmap_batch_t *, acl_t *, uid_t, gid_t);
+static idmap_stat smb_fsacl_getsids(smb_idmap_batch_t *, acl_t *);
 static acl_t *smb_fsacl_null_empty(boolean_t);
 static uint16_t smb_ace_len(smb_ace_t *);
 static uint32_t smb_ace_mask_g2s(uint32_t);
 static uint16_t smb_ace_flags_tozfs(uint8_t);
 static uint8_t smb_ace_flags_fromzfs(uint16_t);
+static boolean_t smb_ace_wellknown_update(const char *, ace_t *);
 
 smb_acl_t *
 smb_acl_alloc(uint8_t revision, uint16_t bsize, uint16_t acecnt)
@@ -245,7 +236,7 @@ smb_acl_sort(smb_acl_t *acl)
  * returned upon successful conversion.
  */
 smb_acl_t *
-smb_acl_from_zfs(acl_t *zacl, uid_t uid, gid_t gid)
+smb_acl_from_zfs(acl_t *zacl)
 {
 	ace_t *zace;
 	int numaces;
@@ -260,7 +251,7 @@ smb_acl_from_zfs(acl_t *zacl, uid_t uid, gid_t gid)
 	if (idm_stat != IDMAP_SUCCESS)
 		return (NULL);
 
-	if (smb_fsacl_getsids(&sib, zacl, uid, gid) != IDMAP_SUCCESS) {
+	if (smb_fsacl_getsids(&sib, zacl) != IDMAP_SUCCESS) {
 		smb_idmap_batch_destroy(&sib);
 		return (NULL);
 	}
@@ -308,6 +299,7 @@ smb_acl_from_zfs(acl_t *zacl, uid_t uid, gid_t gid)
 uint32_t
 smb_acl_to_zfs(smb_acl_t *acl, uint32_t flags, int which_acl, acl_t **fs_acl)
 {
+	char sidstr[SMB_SID_STRSZ];
 	smb_ace_t *ace;
 	acl_t *zacl;
 	ace_t *zace;
@@ -345,13 +337,14 @@ smb_acl_to_zfs(smb_acl_t *acl, uint32_t flags, int which_acl, acl_t **fs_acl)
 		zace->a_type = ace->se_hdr.se_type & ACE_ALL_TYPES;
 		zace->a_access_mask = smb_ace_mask_g2s(ace->se_mask);
 		zace->a_flags = smb_ace_flags_tozfs(ace->se_hdr.se_flags);
+		zace->a_who = (uid_t)-1;
 
-		if (smb_sid_cmp(ace->se_sid, &everyone_sid))
-			zace->a_flags |= ACE_EVERYONE;
-		else {
+		smb_sid_tostr(ace->se_sid, sidstr);
+
+		if (!smb_ace_wellknown_update(sidstr, zace)) {
 			sim->sim_id = &zace->a_who;
 			idm_stat = smb_idmap_batch_getid(sib.sib_idmaph, sim,
-			    ace->se_sid, -1);
+			    ace->se_sid, SMB_IDMAP_UNKNOWN);
 
 			if (idm_stat != IDMAP_SUCCESS) {
 				smb_fsacl_free(zacl);
@@ -375,7 +368,7 @@ smb_acl_to_zfs(smb_acl_t *acl, uint32_t flags, int which_acl, acl_t **fs_acl)
 	ace = acl->sl_aces;
 	sim = sib.sib_maps;
 	for (i = 0; i < acl->sl_acecnt; i++, zace++, ace++, sim++) {
-		if (zace->a_flags & ACE_EVERYONE)
+		if (zace->a_who == (uid_t)-1)
 			continue;
 
 		if (sim->sim_idtype == SMB_IDMAP_GROUP)
@@ -388,13 +381,38 @@ smb_acl_to_zfs(smb_acl_t *acl, uint32_t flags, int which_acl, acl_t **fs_acl)
 	return (NT_STATUS_SUCCESS);
 }
 
+static boolean_t
+smb_ace_wellknown_update(const char *sid, ace_t *zace)
+{
+	struct {
+		char		*sid;
+		uint16_t	flags;
+	} map[] = {
+		{ NT_WORLD_SIDSTR,			ACE_EVERYONE },
+		{ NT_BUILTIN_CURRENT_OWNER_SIDSTR,	ACE_OWNER },
+		{ NT_BUILTIN_CURRENT_GROUP_SIDSTR,
+			(ACE_GROUP | ACE_IDENTIFIER_GROUP) },
+	};
+
+	int	i;
+
+	for (i = 0; i < (sizeof (map) / sizeof (map[0])); ++i) {
+		if (strcmp(sid, map[i].sid) == 0) {
+			zace->a_flags |= map[i].flags;
+			return (B_TRUE);
+		}
+	}
+
+	return (B_FALSE);
+}
+
 /*
  * smb_fsacl_getsids
  *
  * Batch all the uid/gid in given ZFS ACL to get their corresponding SIDs.
  */
 static idmap_stat
-smb_fsacl_getsids(smb_idmap_batch_t *sib, acl_t *zacl, uid_t uid, gid_t gid)
+smb_fsacl_getsids(smb_idmap_batch_t *sib, acl_t *zacl)
 {
 	ace_t *zace;
 	idmap_stat idm_stat;
@@ -408,14 +426,12 @@ smb_fsacl_getsids(smb_idmap_batch_t *sib, acl_t *zacl, uid_t uid, gid_t gid)
 	    zace++, i++, sim++) {
 		switch (zace->a_flags & ACE_TYPE_FLAGS) {
 		case ACE_OWNER:
-			id = uid;
-			idtype = SMB_IDMAP_USER;
+			idtype = SMB_IDMAP_OWNERAT;
 			break;
 
 		case (ACE_GROUP | ACE_IDENTIFIER_GROUP):
 			/* owning group */
-			id = gid;
-			idtype = SMB_IDMAP_GROUP;
+			idtype = SMB_IDMAP_GROUPAT;
 			break;
 
 		case ACE_IDENTIFIER_GROUP:

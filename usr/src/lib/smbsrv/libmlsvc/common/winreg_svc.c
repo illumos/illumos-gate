@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,6 +94,8 @@ static winreg_keylist_t winreg_keylist;
 static boolean_t winreg_key_has_subkey(const char *);
 static char *winreg_enum_subkey(ndr_xa_t *, const char *, uint32_t);
 static char *winreg_lookup_value(const char *);
+static uint32_t winreg_sd_format(smb_sd_t *);
+uint32_t srvsvc_sd_set_relative(smb_sd_t *, uint8_t *);
 
 static int winreg_s_OpenHKCR(void *, ndr_xa_t *);
 static int winreg_s_OpenHKCU(void *, ndr_xa_t *);
@@ -633,15 +635,68 @@ winreg_s_FlushKey(void *arg, ndr_xa_t *mxa)
 /*
  * winreg_s_GetKeySec
  */
-/*ARGSUSED*/
 static int
 winreg_s_GetKeySec(void *arg, ndr_xa_t *mxa)
 {
 	struct winreg_GetKeySec *param = arg;
+	struct winreg_value	*sd_buf;
+	smb_sd_t		sd;
+	uint32_t		sd_len;
+	uint32_t		status;
 
-	bzero(param, sizeof (struct winreg_GetKeySec));
-	param->status = ERROR_ACCESS_DENIED;
+	bzero(&sd, sizeof (smb_sd_t));
+
+	if ((status = winreg_sd_format(&sd)) != ERROR_SUCCESS)
+		goto winreg_getkeysec_error;
+
+	sd_len = smb_sd_len(&sd, SMB_ALL_SECINFO);
+
+	param->sd = NDR_MALLOC(mxa, sizeof (struct winreg_secdesc));
+	if (param->sd == NULL) {
+		status = ERROR_NOT_ENOUGH_MEMORY;
+		goto winreg_getkeysec_error;
+	}
+
+	param->sd->sd_len = sd_len;
+	param->sd->sd_size = sd_len;
+
+	sd_buf = NDR_MALLOC(mxa, sd_len + sizeof (struct winreg_value));
+	param->sd->sd_buf = sd_buf;
+
+	sd_buf->vc_first_is = 0;
+	sd_buf->vc_length_is = sd_len;
+	param->status = srvsvc_sd_set_relative(&sd, sd_buf->value);
+
+	smb_sd_term(&sd);
 	return (NDR_DRC_OK);
+
+winreg_getkeysec_error:
+	smb_sd_term(&sd);
+	bzero(param, sizeof (struct winreg_GetKeySec));
+	param->status = status;
+	return (NDR_DRC_OK);
+}
+
+static uint32_t
+winreg_sd_format(smb_sd_t *sd)
+{
+	smb_fssd_t	fs_sd;
+	acl_t		*acl;
+	uint32_t	status = ERROR_SUCCESS;
+
+	if (acl_fromtext("owner@:rwxpdDaARWcCos::allow", &acl) != 0)
+		return (ERROR_NOT_ENOUGH_MEMORY);
+
+	smb_fssd_init(&fs_sd, SMB_ALL_SECINFO, SMB_FSSD_FLAGS_DIR);
+	fs_sd.sd_uid = 0;
+	fs_sd.sd_gid = 0;
+	fs_sd.sd_zdacl = acl;
+	fs_sd.sd_zsacl = NULL;
+
+	if (smb_sd_fromfs(&fs_sd, sd) != NT_STATUS_SUCCESS)
+		status = ERROR_ACCESS_DENIED;
+	smb_fssd_term(&fs_sd);
+	return (status);
 }
 
 /*

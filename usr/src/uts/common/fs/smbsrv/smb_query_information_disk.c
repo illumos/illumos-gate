@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -88,7 +88,7 @@ smb_com_query_information_disk(smb_request_t *sr)
 	unsigned short		blocks_per_unit, bytes_per_block;
 	unsigned short		total_units, free_units;
 
-	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
+	if (STYPE_ISIPC(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS, ERRnoaccess);
 		return (SDRC_ERROR);
 	}

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,6 +59,8 @@ static smb_wka_t wka_tbl[] = {
 	{ 0, "S-1-3-3",		"Creator Group Server",
 		SidTypeWellKnownGroup, 0, NULL, NULL },
 	{ 0, "S-1-3-4",		"Owner Rights",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 0, "S-1-3-5",		"Group Rights",
 		SidTypeWellKnownGroup, 0, NULL, NULL },
 	{ 1, "S-1-5",		"NT Pseudo Domain",
 		SidTypeDomain, 0, NULL, NULL },
@@ -124,7 +126,11 @@ static smb_wka_t wka_tbl[] = {
 	    SMB_WKAFLG_LGRP_ENABLE,
 	    "Members can bypass file security to back up files", NULL },
 	{ 3, "S-1-5-32-552",	"Replicator",
-		SidTypeAlias, 0, NULL, NULL }
+		SidTypeAlias, 0, NULL, NULL },
+	{ 3, "S-1-5-32-766",	"Current Owner",
+		SidTypeAlias, 0, NULL, NULL },
+	{ 3, "S-1-5-32-767",	"Current Group",
+		SidTypeAlias, 0, NULL, NULL },
 };
 
 #define	SMB_WKA_NUM	(sizeof (wka_tbl)/sizeof (wka_tbl[0]))
@@ -161,7 +167,7 @@ smb_wka_lookup_sid(smb_sid_t *sid)
  * entry, otherwise returns NULL.
  */
 smb_sid_t *
-smb_wka_get_sid(char *name)
+smb_wka_get_sid(const char *name)
 {
 	smb_wka_t *entry;
 	smb_sid_t *sid = NULL;
@@ -178,7 +184,7 @@ smb_wka_get_sid(char *name)
  * the table, otherwise returns NULL.
  */
 smb_wka_t *
-smb_wka_lookup_name(char *name)
+smb_wka_lookup_name(const char *name)
 {
 	smb_wka_t *entry;
 	int i;
@@ -186,6 +192,32 @@ smb_wka_lookup_name(char *name)
 	(void) rw_rdlock(&wk_rwlock);
 	for (i = 0; i < SMB_WKA_NUM; ++i) {
 		entry = &wka_tbl[i];
+		if (!smb_strcasecmp(name, entry->wka_name, 0)) {
+			(void) rw_unlock(&wk_rwlock);
+			return (entry);
+		}
+	}
+
+	(void) rw_unlock(&wk_rwlock);
+	return (NULL);
+}
+
+/*
+ * Lookup a name in the BUILTIN domain.
+ */
+smb_wka_t *
+smb_wka_lookup_builtin(const char *name)
+{
+	smb_wka_t	*entry;
+	int		i;
+
+	(void) rw_rdlock(&wk_rwlock);
+	for (i = 0; i < SMB_WKA_NUM; ++i) {
+		entry = &wka_tbl[i];
+
+		if (entry->wka_domidx != 3)
+			continue;
+
 		if (!smb_strcasecmp(name, entry->wka_name, 0)) {
 			(void) rw_unlock(&wk_rwlock);
 			return (entry);

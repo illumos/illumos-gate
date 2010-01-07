@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -578,7 +578,7 @@ void smb_fssd_term(smb_fssd_t *);
 void smb_acl_sort(smb_acl_t *);
 void smb_acl_free(smb_acl_t *);
 smb_acl_t *smb_acl_alloc(uint8_t, uint16_t, uint16_t);
-smb_acl_t *smb_acl_from_zfs(acl_t *, uid_t, gid_t);
+smb_acl_t *smb_acl_from_zfs(acl_t *);
 uint32_t smb_acl_to_zfs(smb_acl_t *, uint32_t, int, acl_t **);
 uint16_t smb_acl_len(smb_acl_t *);
 boolean_t smb_acl_isvalid(smb_acl_t *, int);

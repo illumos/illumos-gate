@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,9 +40,10 @@
 #define	SRVSVC_ACE_OFFSET	8
 #define	SRVSVC_SID_OFFSET	8
 
+uint32_t srvsvc_sd_set_relative(smb_sd_t *, uint8_t *);
+
 static uint32_t srvsvc_sd_get_autohome(const smb_share_t *, smb_sd_t *);
 static uint32_t srvsvc_sd_status_to_error(uint32_t);
-static uint32_t srvsvc_sd_set_relative(smb_sd_t *, uint8_t *);
 static uint32_t srvsvc_sd_set_absolute(uint8_t *, smb_sd_t *);
 
 /*
@@ -259,7 +260,7 @@ srvsvc_acl_set_relative(uint8_t *sdbuf, smb_acl_t *acl)
  *
  * Returns Win32 error codes.
  */
-static uint32_t
+uint32_t
 srvsvc_sd_set_relative(smb_sd_t *sd, uint8_t *sdbuf)
 {
 	mslm_security_descriptor_t *msd;

@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SMB_IDMAP_H
 #define	_SMB_IDMAP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef _KERNEL
 #include <sys/kidmap.h>
@@ -53,7 +51,9 @@ extern "C" {
 #define	SMB_IDMAP_UNKNOWN	-1
 #define	SMB_IDMAP_GROUP		0
 #define	SMB_IDMAP_USER		1
-#define	SMB_IDMAP_EVERYONE	2
+#define	SMB_IDMAP_OWNERAT	2
+#define	SMB_IDMAP_GROUPAT	3
+#define	SMB_IDMAP_EVERYONE	4
 
 #define	SMB_IDMAP_SID2ID	0x0001
 #define	SMB_IDMAP_ID2SID	0x0002

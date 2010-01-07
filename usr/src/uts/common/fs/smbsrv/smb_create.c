@@ -19,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include <smbsrv/smb_kproto.h>
 
 #define	SMB_CREATE_NAMEBUF_SZ	16
-
-static uint32_t smb_common_create(smb_request_t *sr);
 
 /*
  * Create a new file, or truncate an existing file to zero length,

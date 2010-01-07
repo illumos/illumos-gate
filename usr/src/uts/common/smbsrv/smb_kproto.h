@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,12 +63,26 @@ int		fd_dealloc(int);
 off_t		lseek(int fildes, off_t offset, int whence);
 
 int		arpioctl(int cmd, void *data);
-/* Why? uint32_t	inet_addr(char *str); */
 int		microtime(timestruc_t *tvp);
 int		clock_get_uptime(void);
 
 /*
- * SMB request handers called from the dispatcher.
+ * SMB request handers called from the dispatcher.  Each SMB request
+ * is handled in three phases: pre, com (command) and post.
+ *
+ * The pre-handler is primarily to set things up for the DTrace start
+ * probe.  Typically, the SMB request is unmarshalled so that request
+ * specific context can be traced.  This is also a useful place to
+ * allocate memory that will be used throughout the processing of the
+ * command.
+ *
+ * The com-handler performs the requested operation: request validation,
+ * bulk (write) incoming data decode, implementation of the appropriate
+ * algorithm and transmission of a response (as appropriate).
+ *
+ * The post-handler is always called, regardless of success or failure
+ * of the pre or com functions, to trigger the DTrace done probe and
+ * deallocate memory allocated in the pre-handler.
  */
 #define	SMB_SDT_OPS(NAME)	\
 	smb_pre_##NAME,		\
@@ -233,7 +247,9 @@ int	smb_ascii_or_unicode_null_len(smb_request_t *);
 
 int	smb_search(smb_request_t *);
 
+uint32_t smb_common_create(smb_request_t *);
 uint32_t smb_common_open(smb_request_t *);
+int smb_common_write(smb_request_t *, smb_rw_param_t *);
 
 void smb_pathname_init(smb_request_t *, smb_pathname_t *, char *);
 boolean_t smb_pathname_validate(smb_request_t *, smb_pathname_t *);

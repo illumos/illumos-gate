@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -238,6 +238,15 @@ pid$target::lsar_lookup_*:return
 	printf("0x%08x", arg1);
 }
 
+pid$target::lsar_*:entry
+{
+}
+
+pid$target::lsar_*:return
+{
+	printf("0x%08x", arg1);
+}
+
 /*
  * NetLogon
  */
@@ -259,6 +268,7 @@ pid$target::samr_s_LookupDomain:entry,
 pid$target::samr_s_EnumLocalDomains:entry,
 pid$target::samr_s_OpenDomain:entry,
 pid$target::samr_s_QueryDomainInfo:entry,
+pid$target::samr_s_QueryInfoDomain2:entry,
 pid$target::samr_s_LookupNames:entry,
 pid$target::samr_s_OpenUser:entry,
 pid$target::samr_s_DeleteUser:entry,
@@ -290,6 +300,7 @@ pid$target::samr_s_LookupDomain:return,
 pid$target::samr_s_EnumLocalDomains:return,
 pid$target::samr_s_OpenDomain:return,
 pid$target::samr_s_QueryDomainInfo:return,
+pid$target::samr_s_QueryInfoDomain2:return,
 pid$target::samr_s_LookupNames:return,
 pid$target::samr_s_OpenUser:return,
 pid$target::samr_s_DeleteUser:return,

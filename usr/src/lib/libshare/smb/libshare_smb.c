@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1616,6 +1616,9 @@ fix_resource_name(sa_share_t share, char *name, char *prefix)
 	size_t bufsz = SA_MAX_RESOURCE_NAME + 1;
 	size_t prelen;
 
+	if (prefix == NULL)
+		return (strdup(name));
+
 	dataset = sa_get_share_attr(share, "dataset");
 	if (dataset == NULL)
 		return (strdup(name));
@@ -1776,9 +1779,8 @@ smb_parse_optstring(sa_group_t group, char *options)
 						    "prefix", prefix);
 					}
 				}
-				if (prefix != NULL)
-					name = fix_resource_name(
-					    (sa_share_t)group, value, prefix);
+				name = fix_resource_name((sa_share_t)group,
+				    value, prefix);
 				if (name != NULL) {
 					resource = sa_add_resource(
 					    (sa_share_t)group, name,

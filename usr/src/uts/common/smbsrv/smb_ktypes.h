@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1144,6 +1144,9 @@ typedef struct vardata_block {
 	struct iovec		vdb_iovec[MAX_IOVEC];
 } smb_vdb_t;
 
+#define	SMB_WRMODE_WRITE_THRU	0x0001
+#define	SMB_WRMODE_IS_STABLE(M)	((M) & SMB_WRMODE_WRITE_THRU)
+
 #define	SMB_RW_MAGIC		0x52445257	/* 'RDRW' */
 
 typedef struct smb_rw_param {
@@ -1152,8 +1155,9 @@ typedef struct smb_rw_param {
 	uint64_t rw_offset;
 	uint32_t rw_last_write;
 	uint16_t rw_mode;
-	uint32_t rw_count;
+	uint32_t rw_count;		/* bytes in this request */
 	uint16_t rw_mincnt;
+	uint32_t rw_total;		/* total bytes (write-raw) */
 	uint16_t rw_dsoff;		/* SMB data offset */
 	uint8_t rw_andx;		/* SMB secondary andx command */
 } smb_rw_param_t;

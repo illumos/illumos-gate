@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -166,7 +166,7 @@ smb_pathname_reduce(
 	vss_root_node = NULL;
 
 	if (sr && sr->tid_tree) {
-		if (!STYPE_ISDSK(sr->tid_tree->t_res_type))
+		if (STYPE_ISIPC(sr->tid_tree->t_res_type))
 			return (EACCES);
 	}
 

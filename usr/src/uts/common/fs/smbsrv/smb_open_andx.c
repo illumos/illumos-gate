@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -354,6 +354,7 @@ smb_sdrc_t
 smb_com_open_andx(smb_request_t *sr)
 {
 	struct open_param	*op = &sr->arg.open;
+	smb_node_t		*node;
 	uint16_t		file_attr;
 	smb_attr_t		attr;
 	int rc;
@@ -385,9 +386,11 @@ smb_com_open_andx(smb_request_t *sr)
 		op->action_taken &= ~SMB_OACT_LOCK;
 
 	file_attr = op->dattr & FILE_ATTRIBUTE_MASK;
-	if (STYPE_ISDSK(sr->tid_tree->t_res_type)) {
 
-		smb_node_t *node = sr->fid_ofile->f_node;
+	switch (sr->tid_tree->t_res_type & STYPE_MASK) {
+	case STYPE_DISKTREE:
+	case STYPE_PRINTQ:
+		node = sr->fid_ofile->f_node;
 		if (smb_node_getattr(sr, node, &attr) != 0) {
 			smbsr_error(sr, NT_STATUS_INTERNAL_ERROR,
 			    ERRDOS, ERROR_INTERNAL_ERROR);
@@ -406,7 +409,9 @@ smb_com_open_andx(smb_request_t *sr)
 		    op->devstate,
 		    op->action_taken, op->fileid,
 		    0);
-	} else {
+		break;
+
+	case STYPE_IPC:
 		rc = smbsr_encode_result(sr, 15, 0,
 		    "bb.wwwllwwwwl2.w",
 		    15,
@@ -419,6 +424,12 @@ smb_com_open_andx(smb_request_t *sr)
 		    op->devstate,
 		    op->action_taken, op->fileid,
 		    0);
+		break;
+
+	default:
+		smbsr_error(sr, NT_STATUS_INVALID_DEVICE_REQUEST,
+		    ERRDOS, ERROR_INVALID_FUNCTION);
+		return (SDRC_ERROR);
 	}
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
@@ -480,7 +491,7 @@ smb_com_trans2_open2(smb_request_t *sr, smb_xa_t *xa)
 
 	file_attr = op->dattr & FILE_ATTRIBUTE_MASK;
 
-	if (!STYPE_ISDSK(sr->tid_tree->t_res_type))
+	if (STYPE_ISIPC(sr->tid_tree->t_res_type))
 		op->dsize = 0;
 
 	(void) smb_mbc_encodef(&xa->rep_param_mb, "wwllwwwwlwl",

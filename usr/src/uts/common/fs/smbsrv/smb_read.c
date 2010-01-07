@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -509,6 +509,7 @@ smb_common_read(smb_request_t *sr, smb_rw_param_t *param)
 	vdb->vdb_uio.uio_resid = param->rw_count;
 	vdb->vdb_uio.uio_loffset = (offset_t)param->rw_offset;
 	vdb->vdb_uio.uio_segflg = UIO_SYSSPACE;
+	vdb->vdb_uio.uio_extflg = UIO_COPY_DEFAULT;
 
 	switch (sr->tid_tree->t_res_type & STYPE_MASK) {
 	case STYPE_DISKTREE:

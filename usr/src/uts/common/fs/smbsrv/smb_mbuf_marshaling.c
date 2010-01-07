@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -246,6 +246,7 @@ smb_mbc_vdecodef(mbuf_chain_t *mbc, char *fmt, va_list ap)
 			vdp->vdb_len = repc;
 			vdp->vdb_uio.uio_iov = &vdp->vdb_iovec[0];
 			vdp->vdb_uio.uio_iovcnt = MAX_IOVEC;
+			vdp->vdb_uio.uio_extflg = UIO_COPY_DEFAULT;
 			vdp->vdb_uio.uio_resid = repc;
 			if (mbc_marshal_get_uio(mbc, &vdp->vdb_uio) != 0)
 				return (-1);
@@ -261,6 +262,7 @@ smb_mbc_vdecodef(mbuf_chain_t *mbc, char *fmt, va_list ap)
 			vdp->vdb_len = (uint32_t)wval;
 			vdp->vdb_uio.uio_iov = &vdp->vdb_iovec[0];
 			vdp->vdb_uio.uio_iovcnt = MAX_IOVEC;
+			vdp->vdb_uio.uio_extflg = UIO_COPY_DEFAULT;
 			vdp->vdb_uio.uio_resid = vdp->vdb_len;
 			if (vdp->vdb_len != 0) {
 				if (mbc_marshal_get_uio(mbc,
@@ -1353,6 +1355,7 @@ mbc_marshal_get_uio(mbuf_chain_t *mbc, struct uio *uio)
 	if (bytes != 0) {
 		iov = uio->uio_iov;
 		uio->uio_segflg = UIO_SYSSPACE;
+		uio->uio_extflg = UIO_COPY_DEFAULT;
 
 		if (MBC_ROOM_FOR(mbc, bytes) == 0) {
 			/* Data will never be available */

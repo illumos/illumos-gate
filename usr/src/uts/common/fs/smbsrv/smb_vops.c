@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -923,6 +923,7 @@ smb_vop_readdir(vnode_t *vp, uint32_t offset,
 	auio.uio_iovcnt = 1;
 	auio.uio_loffset = (uint64_t)offset;
 	auio.uio_segflg = UIO_SYSSPACE;
+	auio.uio_extflg = UIO_COPY_DEFAULT;
 	auio.uio_resid = *count;
 	auio.uio_fmode = 0;
 

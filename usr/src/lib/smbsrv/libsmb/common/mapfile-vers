@@ -18,7 +18,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -380,6 +380,7 @@ SUNWprivate {
 	smb_wka_get_domain;
 	smb_wka_get_sid;
 	smb_wka_init;
+	smb_wka_lookup_builtin;
 	smb_wka_lookup_name;
 	smb_wka_lookup_sid;
 	smb_wka_token_groups;

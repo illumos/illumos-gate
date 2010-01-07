@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -523,6 +523,15 @@ samr_s_QueryDomainInfo(void *arg, ndr_xa_t *mxa)
 }
 
 /*
+ * QueryInfoDomain2: Identical to QueryDomainInfo.
+ */
+static int
+samr_s_QueryInfoDomain2(void *arg, ndr_xa_t *mxa)
+{
+	return (samr_s_QueryDomainInfo(arg, mxa));
+}
+
+/*
  * Looks up the given name in the specified domain which could
  * be either the built-in or local domain.
  *
@@ -567,7 +576,7 @@ samr_s_LookupNames(void *arg, ndr_xa_t *mxa)
 
 	switch (data->kd_type) {
 	case SMB_DOMAIN_BUILTIN:
-		wka = smb_wka_lookup_name((char *)param->name.str);
+		wka = smb_wka_lookup_builtin((char *)param->name.str);
 		if (wka != NULL) {
 			param->rids.n_entry = 1;
 			(void) smb_sid_getrid(wka->wka_binsid,
@@ -904,16 +913,17 @@ samr_s_Connect(void *arg, ndr_xa_t *mxa)
 /*
  * samr_s_GetUserPwInfo
  *
- * This is a request to get a user's password.
+ * Request for a user's password policy information.
  */
 /*ARGSUSED*/
 static int
 samr_s_GetUserPwInfo(void *arg, ndr_xa_t *mxa)
 {
-	struct samr_GetUserPwInfo *param = arg;
+	static samr_password_info_t	pwinfo;
+	struct samr_GetUserPwInfo	*param = arg;
 
-	bzero(param, sizeof (struct samr_GetUserPwInfo));
-	param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
+	param->pwinfo = &pwinfo;
+	param->status = NT_STATUS_SUCCESS;
 	return (NDR_DRC_OK);
 }
 
@@ -947,15 +957,18 @@ samr_s_ChangeUserPasswd(void *arg, ndr_xa_t *mxa)
 
 /*
  * samr_s_GetDomainPwInfo
+ *
+ * Request for the domain password policy information.
  */
 /*ARGSUSED*/
 static int
 samr_s_GetDomainPwInfo(void *arg, ndr_xa_t *mxa)
 {
-	struct samr_GetDomainPwInfo *param = arg;
+	static samr_password_info_t	pwinfo;
+	struct samr_GetDomainPwInfo	*param = arg;
 
-	bzero(param, sizeof (struct samr_GetDomainPwInfo));
-	param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
+	param->pwinfo = &pwinfo;
+	param->status = NT_STATUS_SUCCESS;
 	return (NDR_DRC_OK);
 }
 
@@ -1177,11 +1190,16 @@ static int
 samr_s_OpenAlias(void *arg, ndr_xa_t *mxa)
 {
 	struct samr_OpenAlias *param = arg;
-	ndr_hdid_t *id = (ndr_hdid_t *)&param->domain_handle;
-	ndr_handle_t *hd;
-	uint32_t status;
-	samr_keydata_t *data;
-	int rc;
+	ndr_hdid_t	*id = (ndr_hdid_t *)&param->domain_handle;
+	ndr_handle_t	*hd;
+	samr_keydata_t	*data;
+	smb_gdomain_t	gd_type;
+	smb_sid_t	*sid;
+	smb_wka_t	*wka;
+	char		sidstr[SMB_SID_STRSZ];
+	uint32_t	rid;
+	uint32_t	status;
+	int		rc;
 
 	if ((hd = samr_hdlookup(mxa, id, SAMR_KEY_DOMAIN)) == NULL) {
 		status = NT_STATUS_INVALID_HANDLE;
@@ -1194,8 +1212,36 @@ samr_s_OpenAlias(void *arg, ndr_xa_t *mxa)
 	}
 
 	data = (samr_keydata_t *)hd->nh_data;
-	rc = smb_lgrp_getbyrid(param->rid, (smb_gdomain_t)data->kd_type, NULL);
-	if (rc != SMB_LGRP_SUCCESS) {
+	gd_type = (smb_gdomain_t)data->kd_type;
+	rid = param->rid;
+
+	switch (gd_type) {
+	case SMB_LGRP_BUILTIN:
+		(void) snprintf(sidstr, SMB_SID_STRSZ, "%s-%d",
+		    NT_BUILTIN_DOMAIN_SIDSTR, rid);
+		if ((sid = smb_sid_fromstr(sidstr)) == NULL) {
+			status = NT_STATUS_NO_SUCH_ALIAS;
+			goto open_alias_err;
+		}
+
+		wka = smb_wka_lookup_sid(sid);
+		smb_sid_free(sid);
+
+		if (wka == NULL) {
+			status = NT_STATUS_NO_SUCH_ALIAS;
+			goto open_alias_err;
+		}
+		break;
+
+	case SMB_LGRP_LOCAL:
+		rc = smb_lgrp_getbyrid(rid, gd_type, NULL);
+		if (rc != SMB_LGRP_SUCCESS) {
+			status = NT_STATUS_NO_SUCH_ALIAS;
+			goto open_alias_err;
+		}
+		break;
+
+	default:
 		status = NT_STATUS_NO_SUCH_ALIAS;
 		goto open_alias_err;
 	}
@@ -1313,12 +1359,19 @@ static int
 samr_s_QueryAliasInfo(void *arg, ndr_xa_t *mxa)
 {
 	struct samr_QueryAliasInfo *param = arg;
-	ndr_hdid_t *id = (ndr_hdid_t *)&param->alias_handle;
-	ndr_handle_t *hd;
-	samr_keydata_t *data;
-	smb_group_t grp;
-	uint32_t status;
-	int rc;
+	ndr_hdid_t	*id = (ndr_hdid_t *)&param->alias_handle;
+	ndr_handle_t	*hd;
+	samr_keydata_t	*data;
+	smb_group_t	grp;
+	smb_gdomain_t	gd_type;
+	smb_sid_t	*sid;
+	smb_wka_t	*wka;
+	char		sidstr[SMB_SID_STRSZ];
+	char		*name;
+	char		*desc;
+	uint32_t	rid;
+	uint32_t	status;
+	int		rc;
 
 	if ((hd = samr_hdlookup(mxa, id, SAMR_KEY_ALIAS)) == NULL) {
 		status = NT_STATUS_INVALID_HANDLE;
@@ -1326,9 +1379,41 @@ samr_s_QueryAliasInfo(void *arg, ndr_xa_t *mxa)
 	}
 
 	data = (samr_keydata_t *)hd->nh_data;
-	rc = smb_lgrp_getbyrid(data->kd_rid, (smb_gdomain_t)data->kd_type,
-	    &grp);
-	if (rc != SMB_LGRP_SUCCESS) {
+	gd_type = (smb_gdomain_t)data->kd_type;
+	rid = data->kd_rid;
+
+	switch (gd_type) {
+	case SMB_LGRP_BUILTIN:
+		(void) snprintf(sidstr, SMB_SID_STRSZ, "%s-%d",
+		    NT_BUILTIN_DOMAIN_SIDSTR, rid);
+		if ((sid = smb_sid_fromstr(sidstr)) == NULL) {
+			status = NT_STATUS_NO_SUCH_ALIAS;
+			goto query_alias_err;
+		}
+
+		wka = smb_wka_lookup_sid(sid);
+		smb_sid_free(sid);
+
+		if (wka == NULL) {
+			status = NT_STATUS_NO_SUCH_ALIAS;
+			goto query_alias_err;
+		}
+
+		name = wka->wka_name;
+		desc = (wka->wka_desc != NULL) ? wka->wka_desc : "";
+		break;
+
+	case SMB_LGRP_LOCAL:
+		rc = smb_lgrp_getbyrid(rid, gd_type, &grp);
+		if (rc != SMB_LGRP_SUCCESS) {
+			status = NT_STATUS_NO_SUCH_ALIAS;
+			goto query_alias_err;
+		}
+		name = grp.sg_name;
+		desc = grp.sg_cmnt;
+		break;
+
+	default:
 		status = NT_STATUS_NO_SUCH_ALIAS;
 		goto query_alias_err;
 	}
@@ -1336,10 +1421,10 @@ samr_s_QueryAliasInfo(void *arg, ndr_xa_t *mxa)
 	switch (param->level) {
 	case SAMR_QUERY_ALIAS_INFO_1:
 		param->ru.info1.level = param->level;
-		(void) NDR_MSTRING(mxa, grp.sg_name,
+		(void) NDR_MSTRING(mxa, name,
 		    (ndr_mstring_t *)&param->ru.info1.name);
 
-		(void) NDR_MSTRING(mxa, grp.sg_cmnt,
+		(void) NDR_MSTRING(mxa, desc,
 		    (ndr_mstring_t *)&param->ru.info1.desc);
 
 		param->ru.info1.unknown = 1;
@@ -1347,17 +1432,19 @@ samr_s_QueryAliasInfo(void *arg, ndr_xa_t *mxa)
 
 	case SAMR_QUERY_ALIAS_INFO_3:
 		param->ru.info3.level = param->level;
-		(void) NDR_MSTRING(mxa, grp.sg_cmnt,
+		(void) NDR_MSTRING(mxa, desc,
 		    (ndr_mstring_t *)&param->ru.info3.desc);
 		break;
 
 	default:
-		smb_lgrp_free(&grp);
+		if (gd_type == SMB_LGRP_LOCAL)
+			smb_lgrp_free(&grp);
 		status = NT_STATUS_INVALID_INFO_CLASS;
 		goto query_alias_err;
 	};
 
-	smb_lgrp_free(&grp);
+	if (gd_type == SMB_LGRP_LOCAL)
+		smb_lgrp_free(&grp);
 	param->address = (DWORD)(uintptr_t)&param->ru;
 	param->status = 0;
 	return (NDR_DRC_OK);
@@ -1511,23 +1598,24 @@ samr_s_EnumDomainAliases(void *arg, ndr_xa_t *mxa)
 
 /*
  * samr_s_Connect3
- *
- * This is the connect3 form of the  connect request. It contains an
- * extra parameter over samr_Connect. See samr_s_Connect for other
- * details. NT returns an RPC fault - so we can do the same for now.
- * Doing it this way should avoid the unsupported opnum error message
- * appearing in the log.
  */
-/*ARGSUSED*/
 static int
 samr_s_Connect3(void *arg, ndr_xa_t *mxa)
 {
-	struct samr_Connect3 *param = arg;
+	struct samr_Connect3	*param = arg;
+	ndr_hdid_t		*id;
 
-	bzero(param, sizeof (struct samr_Connect3));
-	return (NDR_DRC_FAULT_REQUEST_OPNUM_INVALID);
+	id = samr_hdalloc(mxa, SAMR_KEY_CONNECT, SMB_DOMAIN_NULL, 0);
+	if (id) {
+		bcopy(id, &param->handle, sizeof (samr_handle_t));
+		param->status = 0;
+	} else {
+		bzero(&param->handle, sizeof (samr_handle_t));
+		param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
+	}
+
+	return (NDR_DRC_OK);
 }
-
 
 /*
  * samr_s_Connect4
@@ -1552,6 +1640,7 @@ static ndr_stub_table_t samr_stub_table[] = {
 	{ samr_s_EnumLocalDomains,	SAMR_OPNUM_EnumLocalDomains },
 	{ samr_s_OpenDomain,		SAMR_OPNUM_OpenDomain },
 	{ samr_s_QueryDomainInfo,	SAMR_OPNUM_QueryDomainInfo },
+	{ samr_s_QueryInfoDomain2,	SAMR_OPNUM_QueryInfoDomain2 },
 	{ samr_s_LookupNames,		SAMR_OPNUM_LookupNames },
 	{ samr_s_OpenUser,		SAMR_OPNUM_OpenUser },
 	{ samr_s_DeleteUser,		SAMR_OPNUM_DeleteUser },

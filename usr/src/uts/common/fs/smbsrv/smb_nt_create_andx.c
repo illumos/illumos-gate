@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -278,7 +278,9 @@ smb_com_nt_create_andx(struct smb_request *sr)
 	if (smb_common_open(sr) != NT_STATUS_SUCCESS)
 		return (SDRC_ERROR);
 
-	if (STYPE_ISDSK(sr->tid_tree->t_res_type)) {
+	switch (sr->tid_tree->t_res_type & STYPE_MASK) {
+	case STYPE_DISKTREE:
+	case STYPE_PRINTQ:
 		switch (op->op_oplock_level) {
 		case SMB_OPLOCK_EXCLUSIVE:
 			OplockLevel = 1;
@@ -324,8 +326,9 @@ smb_com_nt_create_andx(struct smb_request *sr)
 		    op->devstate,
 		    DirFlag,
 		    0);
-	} else {
-		/* Named PIPE */
+		break;
+
+	case STYPE_IPC:
 		OplockLevel = 0;
 		rc = smbsr_encode_result(sr, 34, 0, "bb.wbwlqqqqlqqwwbw",
 		    34,
@@ -345,6 +348,12 @@ smb_com_nt_create_andx(struct smb_request *sr)
 		    op->devstate,
 		    0,
 		    0);
+		break;
+
+	default:
+		smbsr_error(sr, NT_STATUS_INVALID_DEVICE_REQUEST,
+		    ERRDOS, ERROR_INVALID_FUNCTION);
+		return (SDRC_ERROR);
 	}
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
