@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -161,6 +161,7 @@ static void spdsock_loadcheck(void *);
 static void spdsock_merge_algs(spd_stack_t *);
 static void spdsock_flush_one(ipsec_policy_head_t *, netstack_t *);
 static mblk_t *spdsock_dump_next_record(spdsock_t *);
+static void update_iptun_policy(ipsec_tun_pol_t *);
 
 static struct module_info info = {
 	5138, "spdsock", 1, INFPSZ, 512, 128
@@ -560,12 +561,14 @@ spdsock_flush_node(ipsec_tun_pol_t *itp, void *cookie, netstack_t *ns)
 	iph = active ? itp->itp_policy : itp->itp_inactive;
 	IPPH_REFHOLD(iph);
 	mutex_enter(&itp->itp_lock);
-	spdsock_flush_one(iph, ns);
+	spdsock_flush_one(iph, ns);  /* Releases iph refhold. */
 	if (active)
 		itp->itp_flags &= ~ITPF_PFLAGS;
 	else
 		itp->itp_flags &= ~ITPF_IFLAGS;
 	mutex_exit(&itp->itp_lock);
+	/* SPD_FLUSH is worth a tunnel MTU check. */
+	update_iptun_policy(itp);
 }
 
 /*
@@ -1282,6 +1285,8 @@ spdsock_flip_node(ipsec_tun_pol_t *itp, void *ignoreme, netstack_t *ns)
 	ITPF_SWAP(itp->itp_flags);
 	ipsec_swap_policy(itp->itp_policy, itp->itp_inactive, ns);
 	mutex_exit(&itp->itp_lock);
+	/* SPD_FLIP is worth a tunnel MTU check. */
+	update_iptun_policy(itp);
 }
 
 void
@@ -1341,7 +1346,7 @@ spdsock_flip(queue_t *q, mblk_t *mp, spd_if_t *tunname)
 				}
 				return;
 			}
-			spdsock_flip_node(itp, NULL, NULL);
+			spdsock_flip_node(itp, NULL, ns);
 			if (audit_active) {
 				boolean_t active;
 				spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
@@ -2835,6 +2840,22 @@ spdsock_updatealg(queue_t *q, mblk_t *mp, spd_ext_t *extv[])
 }
 
 /*
+ * Find a tunnel instance (using the name to link ID mapping), and
+ * update it after an IPsec change.  We need to do this always in case
+ * we add policy AFTER plumbing a tunnel.  We also need to do this
+ * because, as a side-effect, the tunnel's MTU is updated to reflect
+ * any IPsec overhead in the itp's policy.
+ */
+static void
+update_iptun_policy(ipsec_tun_pol_t *itp)
+{
+	datalink_id_t linkid;
+
+	if (dls_mgmt_get_linkid(itp->itp_name, &linkid) == 0)
+		iptun_set_policy(linkid, itp);
+}
+
+/*
  * Sort through the mess of polhead options to retrieve an appropriate one.
  * Returns NULL if we send an spdsock error.  Returns a valid pointer if we
  * found a valid polhead.  Returns ALL_ACTIVE_POLHEADS (aka. -1) or
@@ -2853,7 +2874,6 @@ get_appropriate_polhead(queue_t *q, mblk_t *mp, spd_if_t *tunname, int spdid,
 	spdsock_t *ss = (spdsock_t *)q->q_ptr;
 	netstack_t *ns = ss->spdsock_spds->spds_netstack;
 	uint64_t gen;	/* Placeholder */
-	datalink_id_t linkid;
 
 	active = (spdid == SPD_ACTIVE);
 	*itpp = NULL;
@@ -2895,13 +2915,9 @@ get_appropriate_polhead(queue_t *q, mblk_t *mp, spd_if_t *tunname, int spdid,
 				return (NULL);
 			}
 		}
-		/*
-		 * Troll the plumbed tunnels and see if we have a match.  We
-		 * need to do this always in case we add policy AFTER plumbing
-		 * a tunnel.
-		 */
-		if (dls_mgmt_get_linkid(tname, &linkid) == 0)
-			iptun_set_policy(linkid, itp);
+
+		/* Match up the itp to an iptun instance. */
+		update_iptun_policy(itp);
 
 		*itpp = itp;
 		/* For spdsock dump state, set the polhead's name. */
@@ -3072,9 +3088,15 @@ spdsock_parse(queue_t *q, mblk_t *mp)
 			else
 				itp->itp_flags &= ~ITPF_IFLAGS;
 			mutex_exit(&itp->itp_lock);
+		}
+
+		spdsock_flush(q, iph, itp, mp);
+
+		if (itp != NULL) {
+			/* SPD_FLUSH is worth a tunnel MTU check. */
+			update_iptun_policy(itp);
 			ITP_REFRELE(itp, ns);
 		}
-		spdsock_flush(q, iph, itp, mp);
 		return;
 	case SPD_DUMP:
 		if (itp != NULL)
@@ -3105,8 +3127,13 @@ spdsock_parse(queue_t *q, mblk_t *mp)
 	}
 
 	IPPH_REFRELE(iph, ns);
-	if (itp != NULL)
+	if (itp != NULL) {
+		/* SPD_{ADD,DELETE}RULE are worth a tunnel MTU check. */
+		if (spmsg->spd_msg_type == SPD_ADDRULE ||
+		    spmsg->spd_msg_type == SPD_DELETERULE)
+			update_iptun_policy(itp);
 		ITP_REFRELE(itp, ns);
+	}
 }
 
 /*

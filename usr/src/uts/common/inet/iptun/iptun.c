@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1736,9 +1736,12 @@ iptun_set_policy(datalink_id_t linkid, ipsec_tun_pol_t *itp)
 		ASSERT(iptun->iptun_itp == NULL);
 		ITP_REFHOLD(itp);
 		iptun->iptun_itp = itp;
-		/* IPsec policy means IPsec overhead, which means lower MTU. */
-		(void) iptun_update_mtu(iptun, NULL, 0);
 	}
+	/*
+	 * IPsec policy means IPsec overhead, which means lower MTU.
+	 * Refresh the MTU for this tunnel.
+	 */
+	(void) iptun_update_mtu(iptun, NULL, 0);
 	iptun_exit(iptun);
 }
 
