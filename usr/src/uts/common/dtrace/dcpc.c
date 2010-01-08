@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -496,6 +496,7 @@ dcpc_program_cpu_event(cpu_t *c)
 	if (octx != NULL) {
 		kcpc_set_t *oset = octx->kc_set;
 		kmem_free(oset->ks_data, oset->ks_nreqs * sizeof (uint64_t));
+		kcpc_free_configs(oset);
 		kcpc_free_set(oset);
 		kcpc_ctx_free(octx);
 	}
@@ -507,6 +508,7 @@ err:
 	 * We failed to configure this request up so free things up and
 	 * get out.
 	 */
+	kcpc_free_configs(set);
 	kmem_free(set->ks_data, set->ks_nreqs * sizeof (uint64_t));
 	kcpc_free_set(set);
 	kcpc_ctx_free(ctx);
@@ -537,30 +539,37 @@ dcpc_disable_cpu(cpu_t *c)
 	set = ctx->kc_set;
 
 	kcpc_free_configs(set);
-
 	kmem_free(set->ks_data, set->ks_nreqs * sizeof (uint64_t));
 	kcpc_free_set(set);
 	kcpc_ctx_free(ctx);
 }
 
 /*
- * Stop overflow interrupts being actively processed so that per-CPU
- * configuration state can be changed safely and correctly. Each CPU has a
- * dcpc interrupt state byte which is transitioned from DCPC_INTR_FREE (the
- * "free" state) to DCPC_INTR_CONFIG (the "configuration in process" state)
- * before any configuration state is changed on any CPUs. The hardware overflow
- * handler, kcpc_hw_overflow_intr(), will only process an interrupt when a
- * configuration is not in process (i.e. the state is marked as free). During
- * interrupt processing the state is set to DCPC_INTR_PROCESSING by the
- * overflow handler.
+ * The dcpc_*_interrupts() routines are responsible for manipulating the
+ * per-CPU dcpc interrupt state byte. The purpose of the state byte is to
+ * synchronize processing of hardware overflow interrupts wth configuration
+ * changes made to the CPU performance counter subsystem by the dcpc provider.
+ *
+ * The dcpc provider claims ownership of the overflow interrupt mechanism
+ * by transitioning the state byte from DCPC_INTR_INACTIVE (indicating the
+ * dcpc provider is not in use) to DCPC_INTR_FREE (the dcpc provider owns the
+ * overflow mechanism and interrupts may be processed). Before modifying
+ * a CPUs configuration state the state byte is transitioned from
+ * DCPC_INTR_FREE to DCPC_INTR_CONFIG ("configuration in process" state).
+ * The hardware overflow handler, kcpc_hw_overflow_intr(), will only process
+ * an interrupt when a configuration is not in process (i.e. the state is
+ * marked as free). During interrupt processing the state is set to
+ * DCPC_INTR_PROCESSING by the overflow handler. When the last dcpc based
+ * enabling is removed, the state byte is set to DCPC_INTR_INACTIVE to indicate
+ * the dcpc provider is no longer interested in overflow interrupts.
  */
 static void
 dcpc_block_interrupts(void)
 {
-	cpu_t *c;
+	cpu_t *c = cpu_list;
 	uint8_t *state;
 
-	c = cpu_list;
+	ASSERT(cpu_core[c->cpu_id].cpuc_dcpc_intr_state != DCPC_INTR_INACTIVE);
 
 	do {
 		state = &cpu_core[c->cpu_id].cpuc_dcpc_intr_state;
@@ -581,8 +590,47 @@ dcpc_release_interrupts(void)
 {
 	cpu_t *c = cpu_list;
 
+	ASSERT(cpu_core[c->cpu_id].cpuc_dcpc_intr_state != DCPC_INTR_INACTIVE);
+
 	do {
 		cpu_core[c->cpu_id].cpuc_dcpc_intr_state = DCPC_INTR_FREE;
+		membar_producer();
+	} while ((c = c->cpu_next) != cpu_list);
+}
+
+/*
+ * Transition all CPUs dcpc interrupt state from DCPC_INTR_INACTIVE to
+ * to DCPC_INTR_FREE. This indicates that the dcpc provider is now
+ * responsible for handling all overflow interrupt activity. Should only be
+ * called before enabling the first dcpc based probe.
+ */
+static void
+dcpc_claim_interrupts(void)
+{
+	cpu_t *c = cpu_list;
+
+	ASSERT(cpu_core[c->cpu_id].cpuc_dcpc_intr_state == DCPC_INTR_INACTIVE);
+
+	do {
+		cpu_core[c->cpu_id].cpuc_dcpc_intr_state = DCPC_INTR_FREE;
+		membar_producer();
+	} while ((c = c->cpu_next) != cpu_list);
+}
+
+/*
+ * Set all CPUs dcpc interrupt state to DCPC_INTR_INACTIVE to indicate that
+ * the dcpc provider is no longer processing overflow interrupts. Only called
+ * during removal of the last dcpc based enabling.
+ */
+static void
+dcpc_surrender_interrupts(void)
+{
+	cpu_t *c = cpu_list;
+
+	ASSERT(cpu_core[c->cpu_id].cpuc_dcpc_intr_state != DCPC_INTR_INACTIVE);
+
+	do {
+		cpu_core[c->cpu_id].cpuc_dcpc_intr_state = DCPC_INTR_INACTIVE;
 		membar_producer();
 	} while ((c = c->cpu_next) != cpu_list);
 }
@@ -751,10 +799,13 @@ dcpc_enable(void *arg, dtrace_id_t id, void *parg)
 	    dcpc_enablings < cpc_ncounters)) {
 		/*
 		 * Before attempting to program the first enabling we need to
-		 * invalidate any lwp-based contexts.
+		 * invalidate any lwp-based contexts and lay claim to the
+		 * overflow interrupt mechanism.
 		 */
-		if (dcpc_enablings == 0)
+		if (dcpc_enablings == 0) {
 			kcpc_invalidate_all();
+			dcpc_claim_interrupts();
+		}
 
 		if (dcpc_program_event(pp) == 0) {
 			dcpc_enablings++;
@@ -783,6 +834,13 @@ dcpc_enable(void *arg, dtrace_id_t id, void *parg)
 			kcpc_cpu_program(c, c->cpu_cpc_ctx);
 		} while ((c = c->cpu_next) != cpu_list);
 	}
+
+	/*
+	 * Give up any claim to the overflow interrupt mechanism if no
+	 * dcpc based enablings exist.
+	 */
+	if (dcpc_enablings == 0)
+		dcpc_surrender_interrupts();
 
 	dtrace_cpc_in_use--;
 	dcpc_actv_reqs[pp->dcpc_actv_req_idx] = NULL;
@@ -850,7 +908,7 @@ dcpc_disable(void *arg, dtrace_id_t id, void *parg)
 		} while ((c = c->cpu_next) != cpu_list);
 
 		dcpc_actv_reqs[pp->dcpc_actv_req_idx] = NULL;
-		dcpc_release_interrupts();
+		dcpc_surrender_interrupts();
 	} else {
 		/*
 		 * This platform can support multiple overflow events and

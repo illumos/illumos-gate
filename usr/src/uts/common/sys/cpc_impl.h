@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -189,17 +189,17 @@ typedef struct __cpc_args32 {
  * a platform supports.
  */
 
-/* No configuration events or overflow interrupts are currently in process. */
-#define	DCPC_INTR_FREE 0
+enum dcpc_intr_state {
+	DCPC_INTR_INACTIVE,	/* The dcpc provider is currently not in use */
+	DCPC_INTR_FREE,		/* No config events or ovf ints in progress */
+	DCPC_INTR_PROCESSING,	/* An overflow interrupt is being processed */
+	DCPC_INTR_CONFIG	/* cpc subsystem being configured by dcpc */
+};
 
-/* An overflow interrupt is currently being processed. */
-#define	DCPC_INTR_PROCESSING 1
-
-/* The cpc subsystem is currently being configured by the dcpc provider. */
-#define	DCPC_INTR_CONFIG 2
-
-#define	DCPC_UMASK 1	/* The platform supports a "umask" attribute. */
-#define	DCPC_EMASK 2	/* The platform supports an "emask" attribute. */
+enum dcpc_mask_attr {
+	DCPC_UMASK = 0x1,	/* The platform supports a "umask" attribute */
+	DCPC_EMASK = 0x2	/* The platform supports an "emask" attribute */
+};
 
 #ifdef __sparc
 extern uint64_t ultra_gettick(void);

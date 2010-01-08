@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,7 +89,7 @@ kcpc_cpu_setup(cpu_setup_t what, int cpuid, void *arg)
 	 * If any CPU-bound contexts exist, we don't need to invalidate
 	 * anything, as no per-LWP contexts can coexist.
 	 */
-	if (kcpc_cpuctx)
+	if (kcpc_cpuctx || dtrace_cpc_in_use)
 		return (0);
 
 	/*
