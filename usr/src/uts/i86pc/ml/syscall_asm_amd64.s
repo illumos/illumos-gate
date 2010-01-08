@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -134,14 +134,46 @@
  * stack:  --------------------------------------
  *      40 | user %gs				|
  *      32 | callback pointer			|
- *    | 24 | user stack pointer			|
+ *    | 24 | user (or interrupt) stack pointer	|
  *    | 16 | lwp pointer			|
  *    v  8 | userland return address		|
  *       0 | callback wrapper return addr	|
  *         --------------------------------------
  *
+ * Since we're pushing the userland return address onto the kernel stack
+ * we need to get that address without accessing the user's stack (since we
+ * can't trust that data).  There are different ways to get the userland
+ * return address depending on how the syscall trap was made:
+ *
+ * a) For sys_syscall and sys_syscall32 the return address is in %rcx.
+ * b) For sys_sysenter the return address is in %rdx.
+ * c) For sys_int80 and sys_syscall_int (int91), upon entry into the macro,
+ *    the stack pointer points at the state saved when we took the interrupt:
+ *	 ------------------------
+ *    |  | user's %ss		|
+ *    |  | user's %esp		|
+ *    |  | EFLAGS register	|
+ *    v  | user's %cs		|
+ *       | user's %eip		|
+ *	 ------------------------
+ *
+ * The 2nd parameter to the BRAND_CALLBACK macro is either the
+ * BRAND_URET_FROM_REG or BRAND_URET_FROM_INTR_STACK macro.  These macros are
+ * used to generate the proper code to get the userland return address for
+ * each syscall entry point.
  */
-#define	BRAND_CALLBACK(callback_id)					    \
+#define BRAND_URET_FROM_REG(rip_reg)					\
+	pushq	rip_reg			/* push the return address	*/
+
+/*
+ * The interrupt stack pointer we saved on entry to the BRAND_CALLBACK macro
+ * is currently pointing at the user return address (%eip).
+ */
+#define BRAND_URET_FROM_INTR_STACK()					\
+	movq	%gs:CPU_RTMP_RSP, %r15	/* grab the intr. stack pointer	*/ ;\
+	pushq	(%r15)			/* push the return address	*/
+
+#define	BRAND_CALLBACK(callback_id, push_userland_ret)			    \
 	movq	%rsp, %gs:CPU_RTMP_RSP	/* save the stack pointer	*/ ;\
 	movq	%r15, %gs:CPU_RTMP_R15	/* save %r15			*/ ;\
 	movq	%gs:CPU_THREAD, %r15	/* load the thread pointer	*/ ;\
@@ -160,8 +192,7 @@
 	cmpq	$0, %r15						   ;\
 	je	1f							   ;\
 	movq	%r15, 16(%rsp)		/* save the callback pointer	*/ ;\
-	movq	%gs:CPU_RTMP_RSP, %r15	/* grab the user stack pointer	*/ ;\
-	pushq	(%r15)			/* push the return address	*/ ;\
+	push_userland_ret		/* push the return address	*/ ;\
 	SWAPGS				/* user gsbase			*/ ;\
 	mov	%gs, %r15		/* get %gs			*/ ;\
 	movq	%r15, 32(%rsp)		/* save %gs on stack		*/ ;\
@@ -393,7 +424,7 @@ size_t _allsyscalls_size;
 	ENTRY_NP2(brand_sys_syscall,_allsyscalls)
 	SWAPGS				/* kernel gsbase */
 	XPV_SYSCALL_PROD
-	BRAND_CALLBACK(BRAND_CB_SYSCALL)
+	BRAND_CALLBACK(BRAND_CB_SYSCALL, BRAND_URET_FROM_REG(%rcx))
 	SWAPGS				/* user gsbase */
 
 #if defined(__xpv)
@@ -670,7 +701,7 @@ sys_syscall32()
 	ENTRY_NP(brand_sys_syscall32)
 	SWAPGS				/* kernel gsbase */
 	XPV_TRAP_POP
-	BRAND_CALLBACK(BRAND_CB_SYSCALL32)
+	BRAND_CALLBACK(BRAND_CB_SYSCALL32, BRAND_URET_FROM_REG(%rcx))
 	SWAPGS				/* user gsbase */
 
 #if defined(__xpv)
@@ -917,7 +948,7 @@ sys_sysenter()
 	ENTRY_NP(brand_sys_sysenter)
 	SWAPGS				/* kernel gsbase */
 	ALTENTRY(_brand_sys_sysenter_post_swapgs)
-	BRAND_CALLBACK(BRAND_CB_SYSENTER)
+	BRAND_CALLBACK(BRAND_CB_SYSENTER, BRAND_URET_FROM_REG(%rdx))
 	/*
 	 * Jump over sys_sysenter to allow single-stepping as described
 	 * above.
@@ -1129,7 +1160,7 @@ sys_int80()
 	ENTRY_NP(brand_sys_int80)
 	SWAPGS				/* kernel gsbase */
 	XPV_TRAP_POP
-	BRAND_CALLBACK(BRAND_CB_INT80)
+	BRAND_CALLBACK(BRAND_CB_INT80, BRAND_URET_FROM_INTR_STACK())
 	SWAPGS				/* user gsbase */
 #if defined(__xpv)
 	jmp	nopop_int80
@@ -1177,7 +1208,7 @@ sys_syscall_int()
 	ENTRY_NP(brand_sys_syscall_int)
 	SWAPGS				/* kernel gsbase */
 	XPV_TRAP_POP
-	BRAND_CALLBACK(BRAND_CB_INT91)
+	BRAND_CALLBACK(BRAND_CB_INT91, BRAND_URET_FROM_INTR_STACK())
 	SWAPGS				/* user gsbase */
 
 #if defined(__xpv)

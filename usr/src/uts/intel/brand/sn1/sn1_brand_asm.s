@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,12 +72,9 @@ sn1_brand_int91_callback(void)
  *      32 | callback pointer			|
  *      24 | saved stack pointer		|
  *    | 16 | lwp pointer			|
- *    v  8 | user return address (*)		|
+ *    v  8 | user return address		|
  *       0 | BRAND_CALLBACK()'s return addr 	|
  *         --------------------------------------
- *   (*) This is actually just the bottom value from the user's
- *       stack.  syscall puts this in %rcx instead of the stack,
- *       so it's just garbage for that entry point.
  */
 
 #define	V_COUNT	6
@@ -88,6 +85,7 @@ sn1_brand_int91_callback(void)
 #define	V_CB_ADDR	(CLONGSIZE * 0)
 
 #define	SP_REG		%rsp
+#define	SYSCALL_REG	%rax
 
 #else	/* !__amd64 */
 /*
@@ -113,6 +111,7 @@ sn1_brand_int91_callback(void)
 #define	V_CB_ADDR	(CLONGSIZE * 0)
 
 #define	SP_REG		%esp
+#define	SYSCALL_REG	%eax
 
 #endif	/* !__amd64 */
 
@@ -179,6 +178,8 @@ sn1_brand_int91_callback(void)
  * jump back into the normal syscall path and pretend nothing happened.
  */
 #define CHECK_FOR_INTERPOSITION(sysr, scr, scr_low)		 \
+	cmp	$NSYSCALL, sysr	/* is 0 <= syscall <= MAX? */	;\
+	ja	9f		/* no, take normal err path */	;\
 	lea	sn1_emulation_table, scr			;\
 	mov	(scr), scr					;\
 	add	sysr, scr					;\
@@ -191,6 +192,32 @@ sn1_brand_int91_callback(void)
 	CHECK_FOR_HANDLER(scr)					;\
 	CHECK_FOR_NATIVE(call)					;\
 	CHECK_FOR_INTERPOSITION(call, scr, scr_low)
+
+/*
+ * Rather than returning to the instruction after the syscall, we need to
+ * transfer control into the brand library's handler table at
+ * table_addr + (16 * syscall_num), thus encoding the system call number in the
+ * instruction pointer.  The CALC_TABLE_ADDR macro performs that calculation.
+ *
+ * This macro assumes the syscall number is in SYSCALL_REG and it clobbers
+ * that register.  It leaves the calculated handler table return address in
+ * the scratch reg.
+ */
+#define CALC_TABLE_ADDR(scr)						 \
+	GET_P_BRAND_DATA(SP_REG, 1, scr) /* get p_brand_data ptr */	;\
+	mov	SPD_HANDLER(scr), scr	/* get p_brand_data->spd_handler */ ;\
+	shl	$4, SYSCALL_REG		/* syscall_num * 16 */		;\
+	add	SYSCALL_REG, scr	/* leave return addr in scr reg. */
+
+/*
+ * To 'return' to our user-space handler, we just need to place its address
+ * into 'retreg'.  The original return address is passed in SYSCALL_REG.
+ */
+#define SETUP_RET_DATA(scr, retreg)					 \
+	CALC_TABLE_ADDR(scr)					 	;\
+	mov	retreg, SYSCALL_REG /* save orig return addr in %rax */	;\
+	mov	scr, retreg	/* save new return addr in ret reg */	;\
+	pop	scr		/* restore scratch register */
 
 /*
  * The callback routines:
@@ -206,24 +233,9 @@ sn1_brand_int91_callback(void)
 ENTRY(sn1_brand_syscall32_callback)
 
 	CALLBACK_PROLOGUE(%rax, %r15, %r15b)
-	movq	%rsp, %r15	/* save our stack pointer */
 
-	/*
-	 * Adjust the user's stack so that the 'ret' from our user-space
-	 * hdlr takes us to the post-syscall instruction instead of to
-	 * the routine that called the system call.
-	 */
-	GET_V(%r15, 1, V_SSP, %rsp) /* restore user's stack pointer	*/
-	subq	$4, %rsp	/* save room for the post-syscall addr	*/
-	movl	%ecx, (%rsp)	/* Save post-syscall addr on stack	*/
-
-	/*
-	 * To 'return' to our user-space handler, we just need to copy
-	 * its address into %rcx.
-	 */
-	GET_P_BRAND_DATA(%r15, 1, %rcx);/* get p_brand_data ptr	*/
-	movq	SPD_HANDLER(%rcx), %rcx	/* get p_brand_data->spd_handler ptr */
-	movq	(%r15), %r15		/* Restore scratch register	*/
+	SETUP_RET_DATA(%r15, %rcx)
+	GET_V(%rsp, 0, V_SSP, %rsp)	/* restore user's stack pointer	*/
 	jmp	nopop_sys_syscall32_swapgs_sysretl
 9:
 	popq	%r15
@@ -238,19 +250,9 @@ SET_SIZE(sn1_brand_syscall32_callback)
 ENTRY(sn1_brand_syscall_callback)
 
 	CALLBACK_PROLOGUE(%rax, %r15, %r15b)
-	movq	%rsp, %r15	/* save our stack pointer */
 
-	GET_V(%r15, 1, V_SSP, %rsp) /* restore user's stack pointer	*/
-	subq	$8, %rsp	/* save room for the post-syscall addr	*/
-	movq	%rcx, (%rsp)	/* Save post-syscall addr on stack	*/
-
-	/*
-	 * To 'return' to our user-space handler, we just need to copy
-	 * its address into %rcx.
-	 */
-	GET_P_BRAND_DATA(%r15, 1, %rcx);/* get p_brand_data ptr	*/
-	movq	SPD_HANDLER(%rcx), %rcx	/* get p_brand_data->spd_handler ptr */
-	movq	(%r15), %r15		/* Restore scratch register	*/
+	SETUP_RET_DATA(%r15, %rcx)
+	GET_V(%rsp, 0, V_SSP, %rsp)	/* restore user's stack pointer	*/
 	jmp	nopop_sys_syscall_swapgs_sysretq
 9:
 	popq	%r15
@@ -267,11 +269,7 @@ ENTRY(sn1_brand_sysenter_callback)
 
 	CALLBACK_PROLOGUE(%rax, %r15, %r15b)
 
-	subl	$4, %ecx		/* Save room for user ret addr	*/
-	movl	%edx, (%rcx)		/* Save current return addr	*/
-	GET_P_BRAND_DATA(%rsp, 1, %rdx)	/* get p_brand_data		*/
-	movq	SPD_HANDLER(%rdx), %rdx	/* get p_brand_data->spd_handler ptr */
-	popq	%r15			/* Restore scratch register	*/
+	SETUP_RET_DATA(%r15, %rdx)
 	jmp	sys_sysenter_swapgs_sysexit
 9:
 	popq	%r15
@@ -289,29 +287,23 @@ SET_SIZE(sn1_brand_sysenter_callback)
  *       0 | user's %eip			|
  *	   --------------------------------------
  */
+#define	V_U_EIP		(CLONGSIZE * 0)
+
 ENTRY(sn1_brand_int91_callback)
 
 	CALLBACK_PROLOGUE(%rax, %r15, %r15b)
-	pushq	%rax				/* Save scratch register */
-
-	GET_P_BRAND_DATA(%rsp, 2, %r15)	/* get p_brand_data */
-	movq	SPD_HANDLER(%r15), %r15	/* get sn1_proc_data->spd_handler ptr */
-	GET_V(%rsp, 2, V_SSP, %rax)	/* Get saved %esp */
-	movq	%r15, (%rax)	/* replace iret target address with hdlr */
 
 	/*
-	 * Adjust the caller's stack so we return to the instruction after
-	 * the syscall on the next 'ret' in userspace - not to the parent
-	 * routine.
+	 * To 'return' to our user-space handler we need to update the user's
+	 * %eip pointer in the saved interrupt state.  The interrupt state was
+	 * pushed onto our stack automatically when the interrupt occured; see
+	 * the comments above.  The original return address is passed in %rax.
 	 */
-	movq	24(%rax), %r15	/* Get user's %esp			*/
-	subq	$4, %r15	/* Make room for new ret addr		*/
-	movq	%r15, 24(%rax)	/* Replace current with updated %esp	*/
+	CALC_TABLE_ADDR(%r15)
+	GET_V(%rsp, 1, V_SSP, %rax)	/* get saved stack pointer */
+	SET_V(%rax, 0, V_U_EIP, %r15)	/* save new return addr in %eip */ 
+	GET_V(%rsp, 1, V_URET_ADDR, %rax) /* %rax has orig. return addr. */
 
-	GET_V(%rsp, 2, V_URET_ADDR, %rax)
-	movl	%eax, (%r15)	/* Put it on the user's stack		*/
-
-	popq	%rax			/* Restore scratch register	*/
 	popq	%r15			/* Restore scratch register	*/
 	movq	V_SSP(%rsp), %rsp	/* Remove callback stuff from stack */
 	jmp	sys_sysint_swapgs_iret
@@ -345,29 +337,20 @@ SET_SIZE(sn1_brand_int91_callback)
 ENTRY(sn1_brand_syscall_callback)
 
 	CALLBACK_PROLOGUE(%eax, %ebx, %bl)
-	pushl	%eax				/* Save scratch register */
-
-	/* replace iret target address with user-space hdlr */
-	GET_P_BRAND_DATA(%esp, 2, %ebx)	/* get p_brand_data ptr		*/
-	movl	SPD_HANDLER(%ebx), %ebx	/* get p_brand_data->spd_handler ptr */
-	SET_V(%esp, 2, V_U_EIP, %ebx)	/* set iret target address to hdlr */
 
 	/*
-	 * Adjust the caller's stack so we return to the instruction after
-	 * the syscall on the next 'ret' in userspace - not to the parent
-	 * routine.
+  	 * To 'return' to our user-space handler, we need to replace the
+	 * iret target address.
+	 * The original return address is passed in %eax.
 	 */
-	GET_V(%esp, 2, V_URET_ADDR, %ebx) /* Get new post-syscall ret addr  */
-	GET_V(%esp, 2, V_U_ESP, %eax)	  /* Get user %esp		    */
-	subl	$4, %eax		  /* Make room for new ret addr	    */
-	SET_V(%esp, 2, V_U_ESP, %eax)	  /* Updated user %esp		    */
-	movl	%ebx, (%eax)		  /* Put new ret addr on user stack */
+	CALC_TABLE_ADDR(%ebx)		/* new return addr is in %ebx */
+	SET_V(%esp, 1, V_U_EIP, %ebx)	/* set iret target address to hdlr */
+	GET_V(%esp, 1, V_URET_ADDR, %eax) /* save orig return addr in %eax */
 
-	GET_V(%esp, 2, V_U_GS, %ebx)	  /* grab the the user %gs	*/
-	movw	%bx, %gs		  /* restore the user %gs	*/
+	GET_V(%esp, 1, V_U_GS, %ebx)	/* grab the the user %gs	*/
+	movw	%bx, %gs		/* restore the user %gs	*/
 
-	popl	%eax		/* Restore scratch register 		*/
-	popl	%ebx		/* Restore scratch register 		*/
+	popl	%ebx			/* Restore scratch register	*/
 	addl	$V_END, %esp	/* Remove all callback stuff from stack	*/
 	jmp	nopop_sys_rtt_syscall
 9:
@@ -384,15 +367,19 @@ ENTRY(sn1_brand_sysenter_callback)
 
 	CALLBACK_PROLOGUE(%eax, %ebx, %bl)
 
-	subl	$4, %ecx		/* Save room for user ret addr	*/
-	movl	%edx, (%ecx)		/* Save current return addr	*/
-	GET_P_BRAND_DATA(%esp, 1, %edx)	/* get p_brand_data		*/
-	movl	SPD_HANDLER(%edx), %edx	/* get p_brand_data->spd_handler */
+	/*
+  	 * To 'return' to our user-space handler, we just need to place its
+	 * address into %edx.
+	 * The original return address is passed in %eax.
+	 */
+	movl    %edx, %ebx		/* save orig return addr in tmp reg */
+	CALC_TABLE_ADDR(%edx)		/* new return addr is in %edx */
+	movl    %ebx, %eax		/* save orig return addr in %eax */
 
-	GET_V(%esp, 1, V_U_GS, %ebx)	  /* grab the the user %gs	*/
-	movw	%bx, %gs		  /* restore the user %gs	*/
+	GET_V(%esp, 1, V_U_GS, %ebx)	/* grab the the user %gs	*/
+	movw	%bx, %gs		/* restore the user %gs	*/
 
-	popl	%ebx			/* Restore scratch register	*/
+	popl	%ebx			/* restore scratch register	*/
 	sysexit
 9:
 	popl	%ebx

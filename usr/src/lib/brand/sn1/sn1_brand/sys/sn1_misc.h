@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -155,6 +155,7 @@ extern void sn1_runexe(void *, ulong_t);
 /*
  * From sn1_handler.s
  */
+extern void sn1_handler_table(void);
 extern void sn1_handler(void);
 extern void sn1_error(void);
 extern void sn1_success(void);

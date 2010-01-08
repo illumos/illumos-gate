@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1839,7 +1839,12 @@ s10_init(int argc, char *argv[], char *envp[])
 	 * syscall.
 	 */
 	reg.sbr_version = S10_VERSION;
+#ifdef	__x86
+	reg.sbr_handler = (caddr_t)s10_handler_table;
+#else	/* !__x86 */
 	reg.sbr_handler = (caddr_t)s10_handler;
+#endif	/* !__x86 */
+
 	if ((err = __systemcall(&rval, SYS_brand, B_REGISTER, &reg)) != 0) {
 		s10_abort(err, "Failed to brand current process");
 		/*NOTREACHED*/

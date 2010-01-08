@@ -20,13 +20,30 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include <sn1_misc.h>
 
+/*
+ * Each JMP must occupy 16 bytes
+ */
+#define	JMP	\
+	pushl	$_CONST(. - sn1_handler_table); \
+	jmp	sn1_handler;	\
+	.align	16;	
+
+#define	JMP4	JMP; JMP; JMP; JMP
+#define JMP16	JMP4; JMP4; JMP4; JMP4
+#define JMP64	JMP16; JMP16; JMP16; JMP16
+#define JMP256	JMP64; JMP64; JMP64; JMP64
+
 #if defined(lint)
+
+void
+sn1_handler_table(void)
+{}
 
 void
 sn1_handler(void)
@@ -35,6 +52,17 @@ sn1_handler(void)
 
 #else	/* lint */
 
+	/*
+	 * On entry to this table, %eax will hold the return address. The
+	 * location where we enter the table is a function of the system
+	 * call number. The table needs the same alignment as the individual
+	 * entries.
+	 */
+	.align	16
+	ENTRY_NP(sn1_handler_table)
+	JMP256
+	SET_SIZE(sn1_handler_table)
+
 #define	PIC_SETUP(r)					\
 	call	9f;					\
 9:							\
@@ -42,12 +70,11 @@ sn1_handler(void)
 	addl	$_GLOBAL_OFFSET_TABLE_ + [. - 9b], r
 
 	/*
-	 * %eax - syscall number
+	 * %eax - userland return address
 	 * stack contains:
-	 *         --------------------------------------
-	 *    |  8 | syscall arguments			|
-	 *    v  4 | syscall wrapper return address	|
-	 *  %esp+0 | syscall return address		|
+	 *    |    --------------------------------------
+	 *    v  4 | syscall arguments			|
+	 *  %esp+0 | syscall number			|
 	 *         --------------------------------------
 	 */
 	ENTRY_NP(sn1_handler)
@@ -57,7 +84,6 @@ sn1_handler(void)
 	/* Save registers at the time of the syscall. */
 	movl	$0, EH_LOCALS_GREG(TRAPNO)(%ebp)
 	movl	$0, EH_LOCALS_GREG(ERR)(%ebp)
-	movl	%eax, EH_LOCALS_GREG(EAX)(%ebp)
 	movl	%ebx, EH_LOCALS_GREG(EBX)(%ebp)
 	movl	%ecx, EH_LOCALS_GREG(ECX)(%ebp)
 	movl	%edx, EH_LOCALS_GREG(EDX)(%ebp)
@@ -76,8 +102,18 @@ sn1_handler(void)
 	movl	%ebp, %ecx			/* save syscall esp */
 	addl	$CPTRSIZE, %ecx
 	movl	%ecx, EH_LOCALS_GREG(ESP)(%ebp)
-	movl	EH_ARGS_OFFSET(1)(%ebp), %ecx	/* save syscall ret address */
-	movl	%ecx, EH_LOCALS_GREG(EIP)(%ebp)
+
+	/*
+	 * The kernel drops us into the middle of the sn1_handle_table
+	 * above that then pushes that table offset onto the stack, and calls
+	 * into sn1_handler. That offset indicates the system call number while
+	 * %eax holds the return address for the system call. We replace the
+	 * value on the stack with the return address, and use the value to
+	 * compute the system call number by dividing by the table entry size.
+	 */
+	xchgl	CPTRSIZE(%ebp), %eax	/* swap JMP table offset and ret addr */
+	shrl	$4, %eax		/* table_offset/size = syscall num */
+	movl	%eax, EH_LOCALS_GREG(EAX)(%ebp)	/* save syscall num */
 
 	/*
 	 * Finish setting up our stack frame.  We would normally do this

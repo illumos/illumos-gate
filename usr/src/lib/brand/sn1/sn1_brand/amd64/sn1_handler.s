@@ -19,13 +19,30 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include <sn1_misc.h>
 
+/*
+ * Each JMP must occupy 16 bytes
+ */
+#define	JMP	\
+	pushq	$_CONST(. - sn1_handler_table); \
+	jmp	sn1_handler;	\
+	.align	16;	
+
+#define	JMP4	JMP; JMP; JMP; JMP
+#define JMP16	JMP4; JMP4; JMP4; JMP4
+#define JMP64	JMP16; JMP16; JMP16; JMP16
+#define JMP256	JMP64; JMP64; JMP64; JMP64
+
 #if defined(lint)
+
+void
+sn1_handler_table(void)
+{}
 
 void
 sn1_handler(void)
@@ -33,13 +50,24 @@ sn1_handler(void)
 }
 
 #else	/* lint */
+
 	/*
-	 * %rax - syscall number
+	 * On entry to this table, %rax will hold the return address. The
+	 * location where we enter the table is a function of the system
+	 * call number. The table needs the same alignment as the individual
+	 * entries.
+	 */
+	.align	16
+	ENTRY_NP(sn1_handler_table)
+	JMP256
+	SET_SIZE(sn1_handler_table)
+
+	/*
+	 * %rax - userland return address
 	 * stack contains:
-	 *         --------------------------------------
-	 *    | 16 | syscall arguments			|
-	 *    v  8 | syscall wrapper return address	|
-	 *  %rsp+0 | syscall return address		|
+	 *    |    --------------------------------------
+	 *    v  8 | syscall arguments			|
+	 *  %rsp+0 | syscall number			|
 	 *         --------------------------------------
 	 */
 	ENTRY_NP(sn1_handler)
@@ -59,7 +87,6 @@ sn1_handler(void)
 	movq	%r8, EH_LOCALS_GREG(REG_R8)(%rbp)
 	movq	%rdi, EH_LOCALS_GREG(REG_RDI)(%rbp)
 	movq	%rsi, EH_LOCALS_GREG(REG_RSI)(%rbp)
-	movq	%rax, EH_LOCALS_GREG(REG_RAX)(%rbp)
 	movq	%rbx, EH_LOCALS_GREG(REG_RBX)(%rbp)
 	movq	%rcx, EH_LOCALS_GREG(REG_RCX)(%rbp)
 	movq	%rdx, EH_LOCALS_GREG(REG_RDX)(%rbp)
@@ -84,11 +111,21 @@ sn1_handler(void)
 	movq	%rbp, %r12			/* save syscall rsp */
 	addq	$CPTRSIZE, %r12
 	movq	%r12, EH_LOCALS_GREG(REG_RSP)(%rbp)
-	movq	EH_ARGS_OFFSET(1)(%rbp), %r12	/* save syscall ret address */
-	movq	%r12, EH_LOCALS_GREG(REG_RIP)(%rbp)
 	movq	%fs:0, %r12			/* save syscall fsbase */
 	movq	%r12, EH_LOCALS_GREG(REG_FSBASE)(%rbp)
 	movq	$0, EH_LOCALS_GREG(REG_GSBASE)(%rbp)
+
+	/*
+	 * The kernel drops us into the middle of the sn1_handle_table
+	 * above that then pushes that table offset onto the stack, and calls
+	 * into sn1_handler. That offset indicates the system call number while
+	 * %rax holds the return address for the system call. We replace the
+	 * value on the stack with the return address, and use the value to
+	 * compute the system call number by dividing by the table entry size.
+	 */
+	xchgq	CPTRSIZE(%rbp), %rax	/* swap JMP table offset and ret addr */
+	shrq	$4, %rax		/* table_offset/size = syscall num */
+	movq	%rax, EH_LOCALS_GREG(REG_RAX)(%rbp) /* save syscall num */
 
 	/*
 	 * Finish setting up our stack frame.  We would normally do this
