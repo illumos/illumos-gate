@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,7 +42,7 @@ static entry_t *dup_entry(entry_t *);
 static mechlist_t *dup_mechlist(mechlist_t *);
 static entry_t *getent(char *, entrylist_t *);
 static int interpret(char *, entry_t **);
-static int parse_sup_dis_list(char *, entry_t *);
+static int parse_sup_dis_list(const char *buf, entry_t *pent);
 
 
 /*
@@ -178,7 +178,7 @@ dup_entry(entry_t *pent1)
  * Return value: SUCCESS or FAILURE.
  */
 static int
-parse_sup_dis_list(char *buf, entry_t *pent)
+parse_sup_dis_list(const char *buf, entry_t *pent)
 {
 	mechlist_t	*pmech = NULL;
 	mechlist_t	*phead = NULL;
@@ -215,9 +215,21 @@ parse_sup_dis_list(char *buf, entry_t *pent)
 	}
 
 	if (supflag) {
-		pent->suplist = phead = pmech;
+			if (pent->suplist != NULL) {
+				cryptodebug("multiple supportedlist entries "
+				    "for a mechanism in file kcf.conf.");
+				return (FAILURE);
+			} else {
+				pent->suplist = phead = pmech;
+			}
 	} else if (disflag) {
-		pent->dislist = phead = pmech;
+			if (pent->dislist != NULL) {
+				cryptodebug("multiple disabledlist entries "
+				    "for a mechanism in file kcf.conf.");
+				return (FAILURE);
+			} else {
+				pent->dislist = phead = pmech;
+			}
 	}
 
 	count = 1;
@@ -251,6 +263,8 @@ parse_sup_dis_list(char *buf, entry_t *pent)
  * Convert a char string containing a line about a provider
  * from kcf.conf into an entry_t structure.
  *
+ * Note: the input string, buf, may be modified by this function.
+ *
  * See ent2str(), the reverse of this function, for the format of
  * kcf.conf lines.
  */
@@ -282,28 +296,34 @@ interpret(char *buf, entry_t **ppent)
 
 	if (strncmp(token2, EF_UNLOAD, strlen(EF_UNLOAD)) == 0) {
 		pent->load = B_FALSE; /* cryptoadm unload */
-		if ((token2 = strtok(NULL, SEP_SEMICOLON)) == NULL) {
-			/* The entry contains a provider name:unload only */
+		token2 = strtok(NULL, SEP_SEMICOLON);
+		/*
+		 * If token2 is NULL, the entry contains a
+		 * provider name:unload only
+		 */
+	}
+
+	if (token2 != NULL) {
+		/*
+		 * Either supportedlist or disabledlist or both are present.
+		 * Need to call strtok() to get token3 first, as function
+		 * parse_sup_dis_list() makes strtok() calls on the
+		 * token2 substring.
+		 */
+		token3 = strtok(NULL, SEP_SEMICOLON); /* optional */
+
+		/* parse supportedlist (or disabledlist if no supportedlist) */
+		if ((rc = parse_sup_dis_list(token2, pent)) != SUCCESS) {
 			free_entry(pent);
-			return (FAILURE);
+			return (rc);
 		}
-	}
 
-	/* need to get token3 first to satisfy nested strtok invocations */
-	token3 = strtok(NULL, SEP_SEMICOLON); /* optional */
-
-	/* parse supportedlist (or disabledlist if no supportedlist) */
-	if ((token2 != NULL) && ((rc = parse_sup_dis_list(token2, pent)) !=
-	    SUCCESS)) {
-		free_entry(pent);
-		return (rc);
-	}
-
-	/* parse disabledlist (if there's a supportedlist) */
-	if ((token3 != NULL) && ((rc = parse_sup_dis_list(token3, pent)) !=
-	    SUCCESS)) {
-		free_entry(pent);
-		return (rc);
+		/* parse disabledlist (if there's a supportedlist) */
+		if ((token3 != NULL) && ((rc = parse_sup_dis_list(token3,
+		    pent)) != SUCCESS)) {
+			free_entry(pent);
+			return (rc);
+		}
 	}
 
 	*ppent = pent;
@@ -414,11 +434,12 @@ free_entrylist(entrylist_t *entrylist)
 /*
  * Convert an entry to a string.  This routine builds a string for the entry
  * to be inserted in the kcf.conf file.  Based on the content of each entry,
- * the result string can be one of these 6 forms:
+ * the result string can be one of these 7 forms:
  *  - name:supportedlist=m1,m2,...,mj
  *  - name:disabledlist=m1,m2,...,mj
  *  - name:supportedlist=m1,...,mj;disabledlist=m1,m2,...,mk
  *
+ *  - name:unload
  *  - name:unload;supportedlist=m1,m2,...,mj
  *  - name:unload;disabledlist=m1,m2,...,mj
  *  - name:unload;supportedlist=m1,...,mj;disabledlist=m1,m2,...,mk

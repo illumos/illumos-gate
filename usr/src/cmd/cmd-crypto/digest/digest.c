@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,20 +70,21 @@
 #define	EXIT_USAGE	2	/* usage/syntax error */
 
 #define	MAC_NAME	"mac"		/* name of mac command */
-#define	MAC_OPTIONS	"lva:k:T:K:"		/* for getopt */
-#define	DIGEST_NAME	"digest"	/* name of mac command */
+#define	MAC_OPTIONS	"lva:k:T:K:"	/* for getopt */
+#define	DIGEST_NAME	"digest"	/* name of digest command */
 #define	DIGEST_OPTIONS	"lva:"		/* for getopt */
 
+/* Saved command line options */
 static boolean_t vflag = B_FALSE;	/* -v (verbose) flag, optional */
 static boolean_t aflag = B_FALSE;	/* -a <algorithm> flag, required */
 static boolean_t lflag = B_FALSE;	/* -l flag, for mac and digest */
-static boolean_t kflag = B_FALSE;
-static boolean_t Tflag = B_FALSE;
-static boolean_t Kflag = B_FALSE;
+static boolean_t kflag = B_FALSE;	/* -k keyfile */
+static boolean_t Tflag = B_FALSE;	/* -T token_spec */
+static boolean_t Kflag = B_FALSE;	/* -K key_label */
 
-static char *keyfile = NULL;	/* name of keyfile */
-static char *token_label = NULL;
-static char *key_label = NULL;
+static char *keyfile = NULL;	 /* name of file containing key value */
+static char *token_label = NULL; /* tokensSpec: tokenName[:manufId[:serial]] */
+static char *key_label = NULL;	 /* PKCS#11 symmetric token key label */
 
 static CK_BYTE buf[BUFFERSIZE];
 
@@ -126,7 +127,6 @@ static CK_RV do_digest(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pmech,
 int
 main(int argc, char **argv)
 {
-
 	extern char *optarg;
 	extern int optind;
 	int errflag = 0;	/* We had an optstr parse error */
@@ -430,7 +430,8 @@ execute_cmd(char *algo_str, int filecount, char **filelist, boolean_t mac_cmd)
 
 			if (status != 0 || keylen == 0 || pkeydata == NULL) {
 				cryptoerror(LOG_STDERR,
-				    Kflag ? gettext("invalid passphrase.") :
+				    (Kflag || (keyfile == NULL)) ?
+				    gettext("invalid passphrase.") :
 				    gettext("invalid key."));
 				return (EXIT_FAILURE);
 			}
@@ -450,7 +451,7 @@ execute_cmd(char *algo_str, int filecount, char **filelist, boolean_t mac_cmd)
 	rv = C_GetSlotList(0, NULL_PTR, &slotcount);
 	if (rv != CKR_OK || slotcount == 0) {
 		cryptoerror(LOG_STDERR, gettext(
-		    "failed to find any cryptographic provider,"
+		    "failed to find any cryptographic provider; "
 		    "please check with your system administrator: %s"),
 		    pkcs11_strerror(rv));
 		exitcode = EXIT_FAILURE;
@@ -470,7 +471,7 @@ execute_cmd(char *algo_str, int filecount, char **filelist, boolean_t mac_cmd)
 	/* Get the list of slots */
 	if ((rv = C_GetSlotList(0, pSlotList, &slotcount)) != CKR_OK) {
 		cryptoerror(LOG_STDERR, gettext(
-		    "failed to find any cryptographic provider,"
+		    "failed to find any cryptographic provider; "
 		    "please check with your system administrator: %s"),
 		    pkcs11_strerror(rv));
 		exitcode = EXIT_FAILURE;
