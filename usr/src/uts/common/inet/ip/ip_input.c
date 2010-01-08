@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -564,6 +564,7 @@ ill_input_short_v4(mblk_t *mp, void *iph_arg, void *nexthop_arg,
 	ipha_t		*ipha = (ipha_t *)iph_arg;
 	ipaddr_t	nexthop = *(ipaddr_t *)nexthop_arg;
 	ilb_stack_t	*ilbs = ipst->ips_netstack->netstack_ilb;
+	uint_t		irr_flags;
 #define	rptr	((uchar_t *)ipha)
 
 	ASSERT(DB_TYPE(mp) == M_DATA);
@@ -769,6 +770,12 @@ after_ilb:
 			return;
 		}
 	}
+
+	if (ill->ill_flags & ILLF_ROUTER)
+		irr_flags = IRR_ALLOCATE;
+	else
+		irr_flags = IRR_NONE;
+
 	/* Can not use route cache with TX since the labels can differ */
 	if (ira->ira_flags & IRAF_SYSTEM_LABELED) {
 		if (CLASSD(nexthop)) {
@@ -777,8 +784,8 @@ after_ilb:
 			/* Match destination and label */
 			ire = ire_route_recursive_v4(nexthop, 0, NULL,
 			    ALL_ZONES, ira->ira_tsl, MATCH_IRE_SECATTR,
-			    (ill->ill_flags & ILLF_ROUTER),
-			    ira->ira_xmit_hint, ipst, NULL, NULL, NULL);
+			    irr_flags, ira->ira_xmit_hint, ipst, NULL, NULL,
+			    NULL);
 		}
 		/* Update the route cache so we do the ire_refrele */
 		ASSERT(ire != NULL);
@@ -796,9 +803,8 @@ after_ilb:
 			ire = ire_multicast(ill);
 		} else {
 			/* Just match the destination */
-			ire = ire_route_recursive_dstonly_v4(nexthop,
-			    (ill->ill_flags & ILLF_ROUTER), ira->ira_xmit_hint,
-			    ipst);
+			ire = ire_route_recursive_dstonly_v4(nexthop, irr_flags,
+			    ira->ira_xmit_hint, ipst);
 		}
 		ASSERT(ire != NULL);
 		if (rtc->rtc_ire != NULL)
@@ -939,8 +945,8 @@ ire_recv_forward_v4(ire_t *ire, mblk_t *mp, void *iph_arg, ip_recv_attr_t *ira)
 		}
 		ire = ire_route_recursive_v4(dst, 0, NULL, GLOBAL_ZONEID,
 		    ira->ira_tsl, MATCH_IRE_SECATTR,
-		    (ill->ill_flags & ILLF_ROUTER), ira->ira_xmit_hint, ipst,
-		    NULL, NULL, NULL);
+		    (ill->ill_flags & ILLF_ROUTER) ? IRR_ALLOCATE : IRR_NONE,
+		    ira->ira_xmit_hint, ipst, NULL, NULL, NULL);
 		ire->ire_ib_pkt_count++;
 		(*ire->ire_recvfn)(ire, mp, ipha, ira);
 		ire_refrele(ire);

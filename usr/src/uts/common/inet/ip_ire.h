@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -262,20 +262,20 @@ extern ire_t   	*ire_round_robin(irb_t *, ire_ftable_args_t *, uint_t,
     ire_t *, ip_stack_t *);
 
 extern ire_t	*ire_route_recursive_v4(ipaddr_t, uint_t, const ill_t *,
-    zoneid_t, const ts_label_t *, uint_t, boolean_t, uint32_t, ip_stack_t *,
+    zoneid_t, const ts_label_t *, uint_t, uint_t, uint32_t, ip_stack_t *,
     ipaddr_t *, tsol_ire_gw_secattr_t **, uint_t *);
 extern ire_t	*ire_route_recursive_v6(const in6_addr_t *, uint_t,
-    const ill_t *, zoneid_t, const ts_label_t *, uint_t, boolean_t, uint32_t,
+    const ill_t *, zoneid_t, const ts_label_t *, uint_t, uint_t, uint32_t,
     ip_stack_t *, in6_addr_t *, tsol_ire_gw_secattr_t **, uint_t *);
-extern ire_t	*ire_route_recursive_dstonly_v4(ipaddr_t, boolean_t,
+extern ire_t	*ire_route_recursive_dstonly_v4(ipaddr_t, uint_t,
     uint32_t, ip_stack_t *);
-extern ire_t	*ire_route_recursive_dstonly_v6(const in6_addr_t *, boolean_t,
+extern ire_t	*ire_route_recursive_dstonly_v6(const in6_addr_t *, uint_t,
     uint32_t, ip_stack_t *);
 extern ire_t	*ire_route_recursive_impl_v4(ire_t *ire, ipaddr_t, uint_t,
-    const ill_t *, zoneid_t, const ts_label_t *, uint_t, boolean_t, uint32_t,
+    const ill_t *, zoneid_t, const ts_label_t *, uint_t, uint_t, uint32_t,
     ip_stack_t *, ipaddr_t *, tsol_ire_gw_secattr_t **, uint_t *);
 extern ire_t	*ire_route_recursive_impl_v6(ire_t *ire, const in6_addr_t *,
-    uint_t, const ill_t *, zoneid_t, const ts_label_t *, uint_t, boolean_t,
+    uint_t, const ill_t *, zoneid_t, const ts_label_t *, uint_t, uint_t,
     uint32_t, ip_stack_t *, in6_addr_t *, tsol_ire_gw_secattr_t **, uint_t *);
 
 /* The different ire_sendfn functions */

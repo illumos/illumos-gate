@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -2299,7 +2299,7 @@ ip_postfrag_multirt_v4(mblk_t *mp, nce_t *nce, iaflags_t ixaflags,
 			ire2 = ire_route_recursive_impl_v4(ire1,
 			    ire1->ire_addr, ire1->ire_type, ire1->ire_ill,
 			    ire1->ire_zoneid, NULL, MATCH_IRE_DSTONLY,
-			    B_TRUE, 0, ipst, NULL, NULL, NULL);
+			    IRR_ALLOCATE, 0, ipst, NULL, NULL, NULL);
 			if (ire2 != NULL)
 				ire_refrele(ire2);
 			ill1 = ire_nexthop_ill(ire1);

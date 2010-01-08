@@ -7928,13 +7928,13 @@ ip_sioctl_dstinfo(queue_t *q, mblk_t *mp)
 			IN6_V4MAPPED_TO_IPADDR(daddr, v4daddr);
 			v4setsrc = INADDR_ANY;
 			ire = ire_route_recursive_v4(v4daddr, 0, NULL, zoneid,
-			    NULL, match_ire, B_TRUE, 0, ipst, &v4setsrc, NULL,
-			    NULL);
+			    NULL, match_ire, IRR_ALLOCATE, 0, ipst, &v4setsrc,
+			    NULL, NULL);
 		} else {
 			v6setsrc = ipv6_all_zeros;
 			ire = ire_route_recursive_v6(daddr, 0, NULL, zoneid,
-			    NULL, match_ire, B_TRUE, 0, ipst, &v6setsrc, NULL,
-			    NULL);
+			    NULL, match_ire, IRR_ALLOCATE, 0, ipst, &v6setsrc,
+			    NULL, NULL);
 		}
 		ASSERT(ire != NULL);
 		if (ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) {

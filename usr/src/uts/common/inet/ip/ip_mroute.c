@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -2506,8 +2506,8 @@ register_mforward(mblk_t *mp, ip_recv_attr_t *ira)
 
 	if (!CLASSD(ipha->ipha_dst)) {
 		ire = ire_route_recursive_v4(ipha->ipha_dst, 0, NULL, ALL_ZONES,
-		    ira->ira_tsl, MATCH_IRE_SECATTR, B_TRUE, 0, ipst, NULL,
-		    NULL, NULL);
+		    ira->ira_tsl, MATCH_IRE_SECATTR, IRR_ALLOCATE, 0, ipst,
+		    NULL, NULL, NULL);
 	} else {
 		ire = ire_multicast(ill);
 	}
@@ -2720,7 +2720,7 @@ ip_mroute_decap(mblk_t *mp, ip_recv_attr_t *ira)
 	    ipst->ips_ipcl_proto_fanout_v4[IPPROTO_RSVP].connf_head != NULL) {
 		ire = ire_route_recursive_v4(INADDR_BROADCAST, 0, ill,
 		    ALL_ZONES, ira->ira_tsl, MATCH_IRE_ILL|MATCH_IRE_SECATTR,
-		    B_TRUE, 0, ipst, NULL, NULL, NULL);
+		    IRR_ALLOCATE, 0, ipst, NULL, NULL, NULL);
 	} else {
 		ire = ire_multicast(ill);
 	}

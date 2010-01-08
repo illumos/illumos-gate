@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -88,7 +88,7 @@ static int	rts_getaddrs(rt_msghdr_t *rtm, in6_addr_t *dst_addrp,
     in6_addr_t *if_addrp, in6_addr_t *src_addrp, ushort_t *indexp,
     sa_family_t *afp, tsol_rtsecattr_t *rtsecattr, int *error);
 static void	rts_getifdata(if_data_t *if_data, const ipif_t *ipif);
-static int	rts_getmetrics(ire_t *ire, rt_metrics_t *metrics);
+static int	rts_getmetrics(ire_t *ire, ill_t *ill, rt_metrics_t *metrics);
 static mblk_t	*rts_rtmget(mblk_t *mp, ire_t *ire, ire_t *ifire,
     const in6_addr_t *setsrc, tsol_ire_gw_secattr_t *attrp, sa_family_t af);
 static void	rts_setmetrics(ire_t *ire, uint_t which, rt_metrics_t *metrics);
@@ -1026,12 +1026,23 @@ ire_lookup_v4(ipaddr_t dst_addr, ipaddr_t net_mask, ipaddr_t gw_addr,
 		dst_addr = ire->ire_gateway_addr;
 		match_flags &= ~(MATCH_IRE_GW|MATCH_IRE_MASK);
 		ifire = ire_route_recursive_v4(dst_addr, ire_type, ill, zoneid,
-		    tsl, match_flags, B_FALSE, 0, ipst, v4setsrcp, gwattrp,
-		    NULL);
+		    tsl, match_flags, IRR_INCOMPLETE, 0, ipst, v4setsrcp,
+		    gwattrp, NULL);
+		/*
+		 * Don't allow anything unusual past the first
+		 * iteration. Clearing ifire means caller will not see a
+		 * complete response - there will be no RTA_IFP returned.
+		 */
+		if ((ifire->ire_type &
+		    (IRE_LOCAL|IRE_LOOPBACK|IRE_BROADCAST)) ||
+		    ire_pref(ifire) <= ire_pref(ire)) {
+			ire_refrele(ifire);
+			ifire = NULL;
+		}
 	} else {
 		ire = ire_route_recursive_v4(dst_addr, ire_type, ill, zoneid,
-		    tsl, match_flags, B_FALSE, 0, ipst, v4setsrcp, gwattrp,
-		    NULL);
+		    tsl, match_flags, IRR_INCOMPLETE, 0, ipst, v4setsrcp,
+		    gwattrp, NULL);
 	}
 	*pifire = ifire;
 	return (ire);
@@ -1091,11 +1102,23 @@ ire_lookup_v6(const in6_addr_t *dst_addr_v6,
 		mutex_exit(&ire->ire_lock);
 		match_flags &= ~(MATCH_IRE_GW|MATCH_IRE_MASK);
 		ifire = ire_route_recursive_v6(&dst, ire_type, ill, zoneid, tsl,
-		    match_flags, B_FALSE, 0, ipst, v6setsrcp, gwattrp, NULL);
+		    match_flags, IRR_INCOMPLETE, 0, ipst, v6setsrcp, gwattrp,
+		    NULL);
+		/*
+		 * Don't allow anything unusual past the first
+		 * iteration. Clearing ifire means caller will not see a
+		 * complete response - there will be no RTA_IFP returned.
+		 */
+		if ((ifire->ire_type &
+		    (IRE_LOCAL|IRE_LOOPBACK|IRE_BROADCAST)) ||
+		    ire_pref(ifire) <= ire_pref(ire)) {
+			ire_refrele(ifire);
+			ifire = NULL;
+		}
 	} else {
 		ire = ire_route_recursive_v6(dst_addr_v6, ire_type, ill, zoneid,
-		    tsl, match_flags, B_FALSE, 0, ipst, v6setsrcp, gwattrp,
-		    NULL);
+		    tsl, match_flags, IRR_INCOMPLETE, 0, ipst, v6setsrcp,
+		    gwattrp, NULL);
 	}
 	*pifire = ifire;
 	return (ire);
@@ -1311,7 +1334,7 @@ rts_rtmget(mblk_t *mp, ire_t *ire, ire_t *ifire, const in6_addr_t *setsrc,
 	new_rtm->rtm_use = rtm->rtm_use;
 	new_rtm->rtm_addrs = rtm_addrs;
 	new_rtm->rtm_flags = rtm_flags;
-	new_rtm->rtm_inits = rts_getmetrics(ire, &new_rtm->rtm_rmx);
+	new_rtm->rtm_inits = rts_getmetrics(ire, ill, &new_rtm->rtm_rmx);
 	if (ill != NULL)
 		ill_refrele(ill);
 	return (new_mp);
@@ -1466,7 +1489,7 @@ rts_setmetrics(ire_t *ire, uint_t which, rt_metrics_t *metrics)
  * Get the metrics from a forwarding table route.
  */
 static int
-rts_getmetrics(ire_t *ire, rt_metrics_t *metrics)
+rts_getmetrics(ire_t *ire, ill_t *ill, rt_metrics_t *metrics)
 {
 	int	metrics_set = 0;
 
@@ -1479,8 +1502,13 @@ rts_getmetrics(ire_t *ire, rt_metrics_t *metrics)
 	 */
 	metrics->rmx_rtt = ire->ire_metrics.iulp_rtt * 1000;
 	metrics_set |= RTV_RTT;
-	metrics->rmx_mtu = ire->ire_metrics.iulp_mtu;
-	metrics_set |= RTV_MTU;
+	if (ire->ire_metrics.iulp_mtu != 0) {
+		metrics->rmx_mtu = ire->ire_metrics.iulp_mtu;
+		metrics_set |= RTV_MTU;
+	} else if (ill != NULL) {
+		metrics->rmx_mtu = ill->ill_mtu;
+		metrics_set |= RTV_MTU;
+	}
 	metrics->rmx_ssthresh = ire->ire_metrics.iulp_ssthresh;
 	metrics_set |= RTV_SSTHRESH;
 	metrics->rmx_rttvar = ire->ire_metrics.iulp_rtt_sd * 1000;

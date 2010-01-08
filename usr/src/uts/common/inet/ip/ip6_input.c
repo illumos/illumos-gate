@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -475,14 +475,14 @@ ip6_bad_address(in6_addr_t *addr, boolean_t is_src)
  */
 static ire_t *
 ire_linklocal(const in6_addr_t *nexthop, ill_t *ill, ip_recv_attr_t *ira,
-    boolean_t allocate, ip_stack_t *ipst)
+    uint_t irr_flags, ip_stack_t *ipst)
 {
 	int match_flags = MATCH_IRE_SECATTR | MATCH_IRE_ILL;
 	ire_t *ire;
 
 	ASSERT(IN6_IS_ADDR_LINKLOCAL(nexthop));
 	ire = ire_route_recursive_v6(nexthop, 0, ill, ALL_ZONES, ira->ira_tsl,
-	    match_flags, allocate, ira->ira_xmit_hint, ipst, NULL, NULL, NULL);
+	    match_flags, irr_flags, ira->ira_xmit_hint, ipst, NULL, NULL, NULL);
 	if (!(ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) ||
 	    !IS_UNDER_IPMP(ill))
 		return (ire);
@@ -500,7 +500,7 @@ ire_linklocal(const in6_addr_t *nexthop, ill_t *ill, ip_recv_attr_t *ira,
 
 	ire_refrele(ire);
 	ire = ire_route_recursive_v6(nexthop, 0, ill, ALL_ZONES, ira->ira_tsl,
-	    match_flags, allocate, ira->ira_xmit_hint, ipst, NULL, NULL, NULL);
+	    match_flags, irr_flags, ira->ira_xmit_hint, ipst, NULL, NULL, NULL);
 	ill_refrele(ill);
 	return (ire);
 }
@@ -521,6 +521,7 @@ ill_input_short_v6(mblk_t *mp, void *iph_arg, void *nexthop_arg,
 	ip6_t		*ip6h = (ip6_t *)iph_arg;
 	in6_addr_t	nexthop = *(in6_addr_t *)nexthop_arg;
 	ilb_stack_t	*ilbs = ipst->ips_netstack->netstack_ilb;
+	uint_t		irr_flags;
 #define	rptr	((uchar_t *)ip6h)
 
 	ASSERT(DB_TYPE(mp) == M_DATA);
@@ -755,19 +756,24 @@ ill_input_short_v6(mblk_t *mp, void *iph_arg, void *nexthop_arg,
 		}
 	}
 
+	if (ill->ill_flags & ILLF_ROUTER)
+		irr_flags = IRR_ALLOCATE;
+	else
+		irr_flags = IRR_NONE;
+
 	/* Can not use route cache with TX since the labels can differ */
 	if (ira->ira_flags & IRAF_SYSTEM_LABELED) {
 		if (IN6_IS_ADDR_MULTICAST(&nexthop)) {
 			ire = ire_multicast(ill);
 		} else if (IN6_IS_ADDR_LINKLOCAL(&nexthop)) {
-			ire = ire_linklocal(&nexthop, ill, ira,
-			    (ill->ill_flags & ILLF_ROUTER), ipst);
+			ire = ire_linklocal(&nexthop, ill, ira, irr_flags,
+			    ipst);
 		} else {
 			/* Match destination and label */
 			ire = ire_route_recursive_v6(&nexthop, 0, NULL,
-			    ALL_ZONES,  ira->ira_tsl, MATCH_IRE_SECATTR,
-			    (ill->ill_flags & ILLF_ROUTER), ira->ira_xmit_hint,
-			    ipst, NULL, NULL, NULL);
+			    ALL_ZONES, ira->ira_tsl, MATCH_IRE_SECATTR,
+			    irr_flags, ira->ira_xmit_hint, ipst, NULL, NULL,
+			    NULL);
 		}
 		/* Update the route cache so we do the ire_refrele */
 		ASSERT(ire != NULL);
@@ -784,12 +790,11 @@ ill_input_short_v6(mblk_t *mp, void *iph_arg, void *nexthop_arg,
 		if (IN6_IS_ADDR_MULTICAST(&nexthop)) {
 			ire = ire_multicast(ill);
 		} else if (IN6_IS_ADDR_LINKLOCAL(&nexthop)) {
-			ire = ire_linklocal(&nexthop, ill, ira,
-			    (ill->ill_flags & ILLF_ROUTER), ipst);
+			ire = ire_linklocal(&nexthop, ill, ira, irr_flags,
+			    ipst);
 		} else {
 			ire = ire_route_recursive_dstonly_v6(&nexthop,
-			    (ill->ill_flags & ILLF_ROUTER), ira->ira_xmit_hint,
-			    ipst);
+			    irr_flags, ira->ira_xmit_hint, ipst);
 		}
 		ASSERT(ire != NULL);
 		if (rtc->rtc_ire != NULL)
@@ -917,8 +922,8 @@ ire_recv_forward_v6(ire_t *ire, mblk_t *mp, void *iph_arg, ip_recv_attr_t *ira)
 		 */
 		ire = ire_route_recursive_v6(&ip6h->ip6_dst, 0, NULL,
 		    GLOBAL_ZONEID, ira->ira_tsl, MATCH_IRE_SECATTR,
-		    (ill->ill_flags & ILLF_ROUTER), ira->ira_xmit_hint, ipst,
-		    NULL, NULL, NULL);
+		    (ill->ill_flags & ILLF_ROUTER) ? IRR_ALLOCATE : IRR_NONE,
+		    ira->ira_xmit_hint, ipst, NULL, NULL, NULL);
 		ire->ire_ib_pkt_count++;
 		(*ire->ire_recvfn)(ire, mp, ip6h, ira);
 		ire_refrele(ire);

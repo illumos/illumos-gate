@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -522,6 +522,13 @@ extern	void ip_mcast_mapping(struct ill_s *, uchar_t *, uchar_t *);
 #define	IRE_FLUSH_DELETE	0
 #define	IRE_FLUSH_ADD		1
 #define	IRE_FLUSH_GWCHANGE	2
+
+/*
+ * Flags to ire_route_recursive
+ */
+#define	IRR_NONE		0
+#define	IRR_ALLOCATE		1	/* OK to allocate IRE_IF_CLONE */
+#define	IRR_INCOMPLETE		2	/* OK to return incomplete chain */
 
 /*
  * Open/close synchronization flags.

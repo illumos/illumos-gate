@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1077,12 +1077,12 @@ ip_routeto_impl(struct sockaddr *address, struct sockaddr *nexthop,
 
 	if (address->sa_family == AF_INET6) {
 		ire = ire_route_recursive_v6(&sin6->sin6_addr, 0, NULL,
-		    zoneid, NULL, MATCH_IRE_DSTONLY, B_TRUE, 0, ipst, NULL,
-		    NULL, NULL);
+		    zoneid, NULL, MATCH_IRE_DSTONLY, IRR_ALLOCATE, 0, ipst,
+		    NULL, NULL, NULL);
 	} else {
 		ire = ire_route_recursive_v4(sin->sin_addr.s_addr, 0, NULL,
-		    zoneid, NULL, MATCH_IRE_DSTONLY, B_TRUE, 0, ipst, NULL,
-		    NULL, NULL);
+		    zoneid, NULL, MATCH_IRE_DSTONLY, IRR_ALLOCATE, 0, ipst,
+		    NULL, NULL, NULL);
 	}
 	ASSERT(ire != NULL);
 	/*

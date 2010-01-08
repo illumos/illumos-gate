@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -493,7 +493,8 @@ tsol_compute_label_v4(const ts_label_t *tsl, zoneid_t zoneid, ipaddr_t dst,
 		 * next-hop gateway is labeled.
 		 */
 		ire = ire_route_recursive_v4(dst, 0, NULL, zoneid, tsl,
-		    MATCH_IRE_SECATTR, B_TRUE, 0, ipst, NULL, &attrp, NULL);
+		    MATCH_IRE_SECATTR, IRR_ALLOCATE, 0, ipst, NULL, &attrp,
+		    NULL);
 		ASSERT(ire != NULL);
 		if (ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) {
 			/* no route to destination */
@@ -1003,7 +1004,8 @@ tsol_compute_label_v6(const ts_label_t *tsl, zoneid_t zoneid,
 		 * next-hop gateway is labeled.
 		 */
 		ire = ire_route_recursive_v6(dst, 0, NULL, zoneid, tsl,
-		    MATCH_IRE_SECATTR, B_TRUE, 0, ipst, NULL, &attrp, NULL);
+		    MATCH_IRE_SECATTR, IRR_ALLOCATE, 0, ipst, NULL, &attrp,
+		    NULL);
 		ASSERT(ire != NULL);
 		if (ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) {
 			/* no route to destination */

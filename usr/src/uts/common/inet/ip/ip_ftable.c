@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -342,7 +342,7 @@ ire_lookup_multi_ill_v4(ipaddr_t group, zoneid_t zoneid, ip_stack_t *ipst,
 	ill_t	*ill;
 
 	ire = ire_route_recursive_v4(group, 0, NULL, zoneid, NULL,
-	    MATCH_IRE_DSTONLY, B_FALSE, 0, ipst, setsrcp, NULL, NULL);
+	    MATCH_IRE_DSTONLY, IRR_NONE, 0, ipst, setsrcp, NULL, NULL);
 	ASSERT(ire != NULL);
 	if (ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) {
 		ire_refrele(ire);
@@ -524,13 +524,13 @@ route_to_dst(const struct sockaddr *dst_addr, zoneid_t zoneid, ip_stack_t *ipst)
 	if (dst_addr->sa_family == AF_INET) {
 		ire = ire_route_recursive_v4(
 		    ((struct sockaddr_in *)dst_addr)->sin_addr.s_addr, 0, NULL,
-		    zoneid, NULL, match_flags, B_TRUE, 0, ipst, NULL, NULL,
-		    NULL);
+		    zoneid, NULL, match_flags, IRR_ALLOCATE, 0, ipst, NULL,
+		    NULL, NULL);
 	} else {
 		ire = ire_route_recursive_v6(
 		    &((struct sockaddr_in6 *)dst_addr)->sin6_addr, 0, NULL,
-		    zoneid, NULL, match_flags, B_TRUE, 0, ipst, NULL, NULL,
-		    NULL);
+		    zoneid, NULL, match_flags, IRR_ALLOCATE, 0, ipst, NULL,
+		    NULL, NULL);
 	}
 	ASSERT(ire != NULL);
 	if (ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) {
@@ -1118,13 +1118,13 @@ ip_select_route(const in6_addr_t *v6dst, ip_xmit_attr_t *ixa,
 
 		IN6_V4MAPPED_TO_IPADDR(&v6nexthop, v4nexthop);
 		ire = ire_route_recursive_v4(v4nexthop, ire_type, ill,
-		    ixa->ixa_zoneid, ixa->ixa_tsl, match_args, B_TRUE,
+		    ixa->ixa_zoneid, ixa->ixa_tsl, match_args, IRR_ALLOCATE,
 		    ixa->ixa_xmit_hint, ipst, &v4setsrc, NULL, generationp);
 		if (setsrcp != NULL)
 			IN6_IPADDR_TO_V4MAPPED(v4setsrc, setsrcp);
 	} else {
 		ire = ire_route_recursive_v6(&v6nexthop, ire_type, ill,
-		    ixa->ixa_zoneid, ixa->ixa_tsl, match_args, B_TRUE,
+		    ixa->ixa_zoneid, ixa->ixa_tsl, match_args, IRR_ALLOCATE,
 		    ixa->ixa_xmit_hint, ipst, setsrcp, NULL, generationp);
 	}
 
@@ -1210,6 +1210,12 @@ ip_select_route_v4(ipaddr_t dst, ip_xmit_attr_t *ixa, uint_t *generationp,
  *
  * If ill is set this means we will match it by adding MATCH_IRE_ILL.
  *
+ * If IRR_ALLOCATE is not set then we will only inspect the existing IREs; never
+ * create an IRE_IF_CLONE. This is used on the receive side when we are not
+ * forwarding.
+ * If IRR_INCOMPLETE is set then we return the IRE even if we can't correctly
+ * resolve the gateway.
+ *
  * Note that this function never returns NULL. It returns an IRE_NOROUTE
  * instead.
  *
@@ -1221,7 +1227,7 @@ ire_t *
 ire_route_recursive_impl_v4(ire_t *ire,
     ipaddr_t nexthop, uint_t ire_type, const ill_t *ill_arg,
     zoneid_t zoneid, const ts_label_t *tsl, uint_t match_args,
-    boolean_t allocate, uint32_t xmit_hint, ip_stack_t *ipst, ipaddr_t *setsrcp,
+    uint_t irr_flags, uint32_t xmit_hint, ip_stack_t *ipst, ipaddr_t *setsrcp,
     tsol_ire_gw_secattr_t **gwattrp, uint_t *generationp)
 {
 	int		i, j;
@@ -1280,7 +1286,12 @@ ire_route_recursive_impl_v4(ire_t *ire,
 			    (IRE_LOCAL|IRE_LOOPBACK|IRE_BROADCAST)) ||
 			    prefs[i] <= prefs[i-1]) {
 				ire_refrele(ire);
-				ire = ire_reject(ipst, B_FALSE);
+				if (irr_flags & IRR_INCOMPLETE) {
+					ire = ires[0];
+					ire_refhold(ire);
+				} else {
+					ire = ire_reject(ipst, B_FALSE);
+				}
 				goto error;
 			}
 		}
@@ -1340,16 +1351,16 @@ ire_route_recursive_impl_v4(ire_t *ire,
 
 			/*
 			 * In the case of ip_input and ILLF_FORWARDING not
-			 * being set, and in the case of RTM_GET,
-			 * there is no point in allocating
-			 * an IRE_IF_CLONE. We return the IRE_INTERFACE.
-			 * Note that !allocate can result in a ire_dep_parent
-			 * which is IRE_IF_* without an IRE_IF_CLONE.
+			 * being set, and in the case of RTM_GET, there is
+			 * no point in allocating an IRE_IF_CLONE. We return
+			 * the IRE_INTERFACE. Note that !IRR_ALLOCATE can
+			 * result in a ire_dep_parent which is IRE_IF_*
+			 * without an IRE_IF_CLONE.
 			 * We recover from that when we need to send packets
 			 * by ensuring that the generations become
 			 * IRE_GENERATION_VERIFY in this case.
 			 */
-			if (!allocate) {
+			if (!(irr_flags & IRR_ALLOCATE)) {
 				invalidate = B_TRUE;
 				ire = NULL;
 				goto done;
@@ -1430,7 +1441,8 @@ cleanup:
 	for (j = 0; j < i; j++)
 		ire_refrele(ires[j]);
 
-	ASSERT(ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE));
+	ASSERT((ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) ||
+	    (irr_flags & IRR_INCOMPLETE));
 	/*
 	 * Use IRE_GENERATION_VERIFY to ensure that ip_output will redo the
 	 * ip_select_route since the reject or lack of memory might be gone.
@@ -1495,11 +1507,11 @@ done:
 ire_t *
 ire_route_recursive_v4(ipaddr_t nexthop, uint_t ire_type, const ill_t *ill,
     zoneid_t zoneid, const ts_label_t *tsl, uint_t match_args,
-    boolean_t allocate, uint32_t xmit_hint, ip_stack_t *ipst, ipaddr_t *setsrcp,
+    uint_t irr_flags, uint32_t xmit_hint, ip_stack_t *ipst, ipaddr_t *setsrcp,
     tsol_ire_gw_secattr_t **gwattrp, uint_t *generationp)
 {
 	return (ire_route_recursive_impl_v4(NULL, nexthop, ire_type, ill,
-	    zoneid, tsl, match_args, allocate, xmit_hint, ipst, setsrcp,
+	    zoneid, tsl, match_args, irr_flags, xmit_hint, ipst, setsrcp,
 	    gwattrp, generationp));
 }
 
@@ -1516,7 +1528,7 @@ ire_route_recursive_v4(ipaddr_t nexthop, uint_t ire_type, const ill_t *ill,
  * Allow at most one RTF_INDIRECT.
  */
 ire_t *
-ire_route_recursive_dstonly_v4(ipaddr_t nexthop, boolean_t allocate,
+ire_route_recursive_dstonly_v4(ipaddr_t nexthop, uint_t irr_flags,
     uint32_t xmit_hint, ip_stack_t *ipst)
 {
 	ire_t	*ire;
@@ -1555,7 +1567,7 @@ ire_route_recursive_dstonly_v4(ipaddr_t nexthop, boolean_t allocate,
 	 * we found. Normally this would return the same ire.
 	 */
 	ire1 = ire_route_recursive_impl_v4(ire, nexthop, 0, NULL, ALL_ZONES,
-	    NULL, MATCH_IRE_DSTONLY, allocate, xmit_hint, ipst, NULL, NULL,
+	    NULL, MATCH_IRE_DSTONLY, irr_flags, xmit_hint, ipst, NULL, NULL,
 	    &generation);
 	ire_refrele(ire);
 	return (ire1);

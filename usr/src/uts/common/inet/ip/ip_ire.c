@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -919,23 +919,49 @@ ire_walk_ill_match(uint_t match_flags, uint_t ire_type, ire_t *ire,
 	/*
 	 * Except for ALL_ZONES, we only match the offlink routes
 	 * where ire_gateway_addr has an IRE_INTERFACE for the zoneid.
+	 * Since we can have leftover routes after the IP addresses have
+	 * changed, the global zone will also match offlink routes where the
+	 * gateway is unreachable from any zone.
 	 */
 	if ((ire->ire_type & IRE_OFFLINK) && zoneid != ALL_ZONES) {
 		in6_addr_t gw_addr_v6;
+		boolean_t reach;
 
 		if (ire->ire_ipversion == IPV4_VERSION) {
-			if (!ire_gateway_ok_zone_v4(ire->ire_gateway_addr,
-			    zoneid, dst_ill, NULL, ipst, B_FALSE))
-				return (B_FALSE);
+			reach = ire_gateway_ok_zone_v4(ire->ire_gateway_addr,
+			    zoneid, dst_ill, NULL, ipst, B_FALSE);
 		} else {
 			ASSERT(ire->ire_ipversion == IPV6_VERSION);
 			mutex_enter(&ire->ire_lock);
 			gw_addr_v6 = ire->ire_gateway_addr_v6;
 			mutex_exit(&ire->ire_lock);
 
-			if (!ire_gateway_ok_zone_v6(&gw_addr_v6, zoneid,
-			    dst_ill, NULL, ipst, B_FALSE))
+			reach = ire_gateway_ok_zone_v6(&gw_addr_v6, zoneid,
+			    dst_ill, NULL, ipst, B_FALSE);
+		}
+		if (!reach) {
+			if (zoneid != GLOBAL_ZONEID)
 				return (B_FALSE);
+
+			/*
+			 * Check if ALL_ZONES reachable - if not then let the
+			 * global zone see it.
+			 */
+			if (ire->ire_ipversion == IPV4_VERSION) {
+				reach = ire_gateway_ok_zone_v4(
+				    ire->ire_gateway_addr, ALL_ZONES,
+				    dst_ill, NULL, ipst, B_FALSE);
+			} else {
+				reach = ire_gateway_ok_zone_v6(&gw_addr_v6,
+				    ALL_ZONES, dst_ill, NULL, ipst, B_FALSE);
+			}
+			if (reach) {
+				/*
+				 * Some other zone could see it, hence hide it
+				 * in the global zone.
+				 */
+				return (B_FALSE);
+			}
 		}
 	}
 
@@ -2009,12 +2035,12 @@ ire_alt_local(ire_t *ire, zoneid_t zoneid, const ts_label_t *tsl,
 
 	if (ire->ire_ipversion == IPV4_VERSION) {
 		alt_ire = ire_route_recursive_v4(ire->ire_addr, ire_type,
-		    ill, zoneid, tsl, match_flags, B_TRUE, 0, ipst, NULL, NULL,
-		    &generation);
+		    ill, zoneid, tsl, match_flags, IRR_ALLOCATE, 0, ipst, NULL,
+		    NULL, &generation);
 	} else {
 		alt_ire = ire_route_recursive_v6(&ire->ire_addr_v6, ire_type,
-		    ill, zoneid, tsl, match_flags, B_TRUE, 0, ipst, NULL, NULL,
-		    &generation);
+		    ill, zoneid, tsl, match_flags, IRR_ALLOCATE, 0, ipst, NULL,
+		    NULL, &generation);
 	}
 	ASSERT(alt_ire != NULL);
 
