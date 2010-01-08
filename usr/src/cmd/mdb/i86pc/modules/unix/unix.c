@@ -694,8 +694,6 @@ static const mdb_dcmd_t dcmds[] = {
 	    ptable_dcmd, ptable_help },
 	{ "pte", ":[-p XXXXX] [-l N]", "print human readable page table entry",
 	    pte_dcmd },
-	{ "page_num2pp", ":", "page frame number to page structure",
-	    page_num2pp },
 	{ "pfntomfn", ":", "convert physical page to hypervisor machine page",
 	    pfntomfn_dcmd },
 	{ "mfntopfn", ":", "convert hypervisor machine page to physical page",

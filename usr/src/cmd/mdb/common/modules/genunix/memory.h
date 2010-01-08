@@ -39,6 +39,21 @@ int allpages_walk_step(mdb_walk_state_t *);
 void allpages_walk_fini(mdb_walk_state_t *);
 int memstat(uintptr_t, uint_t, int, const mdb_arg_t *);
 
+int pagelookup(uintptr_t, uint_t, int, const mdb_arg_t *);
+void pagelookup_help(void);
+int page_num2pp(uintptr_t, uint_t, int, const mdb_arg_t *);
+
+int seg_walk_init(mdb_walk_state_t *);
+int seg(uintptr_t, uint_t, int, const mdb_arg_t *);
+
+int vnode2smap(uintptr_t, uint_t, int, const mdb_arg_t *);
+int addr2smap(uintptr_t, uint_t, int, const mdb_arg_t *);
+
+int anon_walk_init(mdb_walk_state_t *);
+int anon_walk_step(mdb_walk_state_t *);
+void anon_walk_fini(mdb_walk_state_t *);
+int pmap(uintptr_t, uint_t, int, const mdb_arg_t *);
+
 int swap_walk_init(mdb_walk_state_t *);
 int swap_walk_step(mdb_walk_state_t *);
 int swapinfof(uintptr_t, uint_t, int, const mdb_arg_t *);

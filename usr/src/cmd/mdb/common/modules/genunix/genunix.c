@@ -35,7 +35,6 @@
 #include <sys/proc.h>
 #include <sys/var.h>
 #include <sys/t_lock.h>
-#include <sys/systm.h>
 #include <sys/callo.h>
 #include <sys/priocntl.h>
 #include <sys/class.h>
@@ -48,10 +47,6 @@
 #include <sys/kmem_impl.h>
 #include <sys/vmem_impl.h>
 #include <sys/kstat.h>
-#include <vm/seg_vn.h>
-#include <vm/anon.h>
-#include <vm/as.h>
-#include <vm/seg_map.h>
 #include <sys/dditypes.h>
 #include <sys/ddi_impldefs.h>
 #include <sys/sysmacros.h>
@@ -1804,284 +1799,6 @@ lminfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 /*ARGSUSED*/
 int
-seg(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
-{
-	struct seg s;
-
-	if (argc != 0)
-		return (DCMD_USAGE);
-
-	if ((flags & DCMD_LOOPFIRST) || !(flags & DCMD_LOOP)) {
-		mdb_printf("%<u>%?s %?s %?s %?s %s%</u>\n",
-		    "SEG", "BASE", "SIZE", "DATA", "OPS");
-	}
-
-	if (mdb_vread(&s, sizeof (s), addr) == -1) {
-		mdb_warn("failed to read seg at %p", addr);
-		return (DCMD_ERR);
-	}
-
-	mdb_printf("%?p %?p %?lx %?p %a\n",
-	    addr, s.s_base, s.s_size, s.s_data, s.s_ops);
-
-	return (DCMD_OK);
-}
-
-/*ARGSUSED*/
-static int
-pmap_walk_anon(uintptr_t addr, const struct anon *anon, int *nres)
-{
-	uintptr_t pp =
-	    mdb_vnode2page((uintptr_t)anon->an_vp, (uintptr_t)anon->an_off);
-
-	if (pp != NULL)
-		(*nres)++;
-
-	return (WALK_NEXT);
-}
-
-static int
-pmap_walk_seg(uintptr_t addr, const struct seg *seg, uintptr_t segvn)
-{
-
-	mdb_printf("%0?p %0?p %7dk", addr, seg->s_base, seg->s_size / 1024);
-
-	if (segvn == (uintptr_t)seg->s_ops) {
-		struct segvn_data svn;
-		int nres = 0;
-
-		(void) mdb_vread(&svn, sizeof (svn), (uintptr_t)seg->s_data);
-
-		if (svn.amp == NULL) {
-			mdb_printf(" %8s", "");
-			goto drive_on;
-		}
-
-		/*
-		 * We've got an amp for this segment; walk through
-		 * the amp, and determine mappings.
-		 */
-		if (mdb_pwalk("anon", (mdb_walk_cb_t)pmap_walk_anon,
-		    &nres, (uintptr_t)svn.amp) == -1)
-			mdb_warn("failed to walk anon (amp=%p)", svn.amp);
-
-		mdb_printf(" %7dk", (nres * PAGESIZE) / 1024);
-drive_on:
-
-		if (svn.vp != NULL) {
-			char buf[29];
-
-			mdb_vnode2path((uintptr_t)svn.vp, buf, sizeof (buf));
-			mdb_printf(" %s", buf);
-		} else
-			mdb_printf(" [ anon ]");
-	}
-
-	mdb_printf("\n");
-	return (WALK_NEXT);
-}
-
-static int
-pmap_walk_seg_quick(uintptr_t addr, const struct seg *seg, uintptr_t segvn)
-{
-	mdb_printf("%0?p %0?p %7dk", addr, seg->s_base, seg->s_size / 1024);
-
-	if (segvn == (uintptr_t)seg->s_ops) {
-		struct segvn_data svn;
-
-		(void) mdb_vread(&svn, sizeof (svn), (uintptr_t)seg->s_data);
-
-		if (svn.vp != NULL) {
-			mdb_printf(" %0?p", svn.vp);
-		} else {
-			mdb_printf(" [ anon ]");
-		}
-	}
-
-	mdb_printf("\n");
-	return (WALK_NEXT);
-}
-
-/*ARGSUSED*/
-int
-pmap(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
-{
-	uintptr_t segvn;
-	proc_t proc;
-	uint_t quick = FALSE;
-	mdb_walk_cb_t cb = (mdb_walk_cb_t)pmap_walk_seg;
-
-	GElf_Sym sym;
-
-	if (!(flags & DCMD_ADDRSPEC))
-		return (DCMD_USAGE);
-
-	if (mdb_getopts(argc, argv,
-	    'q', MDB_OPT_SETBITS, TRUE, &quick, NULL) != argc)
-		return (DCMD_USAGE);
-
-	if (mdb_vread(&proc, sizeof (proc), addr) == -1) {
-		mdb_warn("failed to read proc at %p", addr);
-		return (DCMD_ERR);
-	}
-
-	if (mdb_lookup_by_name("segvn_ops", &sym) == 0)
-		segvn = (uintptr_t)sym.st_value;
-	else
-		segvn = NULL;
-
-	mdb_printf("%?s %?s %8s ", "SEG", "BASE", "SIZE");
-
-	if (quick) {
-		mdb_printf("VNODE\n");
-		cb = (mdb_walk_cb_t)pmap_walk_seg_quick;
-	} else {
-		mdb_printf("%8s %s\n", "RES", "PATH");
-	}
-
-	if (mdb_pwalk("seg", cb, (void *)segvn, (uintptr_t)proc.p_as) == -1) {
-		mdb_warn("failed to walk segments of as %p", proc.p_as);
-		return (DCMD_ERR);
-	}
-
-	return (DCMD_OK);
-}
-
-typedef struct anon_walk_data {
-	uintptr_t *aw_levone;
-	uintptr_t *aw_levtwo;
-	int aw_nlevone;
-	int aw_levone_ndx;
-	int aw_levtwo_ndx;
-	struct anon_map aw_amp;
-	struct anon_hdr aw_ahp;
-} anon_walk_data_t;
-
-int
-anon_walk_init(mdb_walk_state_t *wsp)
-{
-	anon_walk_data_t *aw;
-
-	if (wsp->walk_addr == NULL) {
-		mdb_warn("anon walk doesn't support global walks\n");
-		return (WALK_ERR);
-	}
-
-	aw = mdb_alloc(sizeof (anon_walk_data_t), UM_SLEEP);
-
-	if (mdb_vread(&aw->aw_amp, sizeof (aw->aw_amp), wsp->walk_addr) == -1) {
-		mdb_warn("failed to read anon map at %p", wsp->walk_addr);
-		mdb_free(aw, sizeof (anon_walk_data_t));
-		return (WALK_ERR);
-	}
-
-	if (mdb_vread(&aw->aw_ahp, sizeof (aw->aw_ahp),
-	    (uintptr_t)(aw->aw_amp.ahp)) == -1) {
-		mdb_warn("failed to read anon hdr ptr at %p", aw->aw_amp.ahp);
-		mdb_free(aw, sizeof (anon_walk_data_t));
-		return (WALK_ERR);
-	}
-
-	if (aw->aw_ahp.size <= ANON_CHUNK_SIZE ||
-	    (aw->aw_ahp.flags & ANON_ALLOC_FORCE)) {
-		aw->aw_nlevone = aw->aw_ahp.size;
-		aw->aw_levtwo = NULL;
-	} else {
-		aw->aw_nlevone =
-		    (aw->aw_ahp.size + ANON_CHUNK_OFF) >> ANON_CHUNK_SHIFT;
-		aw->aw_levtwo =
-		    mdb_zalloc(ANON_CHUNK_SIZE * sizeof (uintptr_t), UM_SLEEP);
-	}
-
-	aw->aw_levone =
-	    mdb_alloc(aw->aw_nlevone * sizeof (uintptr_t), UM_SLEEP);
-
-	aw->aw_levone_ndx = 0;
-	aw->aw_levtwo_ndx = 0;
-
-	mdb_vread(aw->aw_levone, aw->aw_nlevone * sizeof (uintptr_t),
-	    (uintptr_t)aw->aw_ahp.array_chunk);
-
-	if (aw->aw_levtwo != NULL) {
-		while (aw->aw_levone[aw->aw_levone_ndx] == NULL) {
-			aw->aw_levone_ndx++;
-			if (aw->aw_levone_ndx == aw->aw_nlevone) {
-				mdb_warn("corrupt anon; couldn't"
-				    "find ptr to lev two map");
-				goto out;
-			}
-		}
-
-		mdb_vread(aw->aw_levtwo, ANON_CHUNK_SIZE * sizeof (uintptr_t),
-		    aw->aw_levone[aw->aw_levone_ndx]);
-	}
-
-out:
-	wsp->walk_data = aw;
-	return (0);
-}
-
-int
-anon_walk_step(mdb_walk_state_t *wsp)
-{
-	int status;
-	anon_walk_data_t *aw = (anon_walk_data_t *)wsp->walk_data;
-	struct anon anon;
-	uintptr_t anonptr;
-
-again:
-	/*
-	 * Once we've walked through level one, we're done.
-	 */
-	if (aw->aw_levone_ndx == aw->aw_nlevone)
-		return (WALK_DONE);
-
-	if (aw->aw_levtwo == NULL) {
-		anonptr = aw->aw_levone[aw->aw_levone_ndx];
-		aw->aw_levone_ndx++;
-	} else {
-		anonptr = aw->aw_levtwo[aw->aw_levtwo_ndx];
-		aw->aw_levtwo_ndx++;
-
-		if (aw->aw_levtwo_ndx == ANON_CHUNK_SIZE) {
-			aw->aw_levtwo_ndx = 0;
-
-			do {
-				aw->aw_levone_ndx++;
-
-				if (aw->aw_levone_ndx == aw->aw_nlevone)
-					return (WALK_DONE);
-			} while (aw->aw_levone[aw->aw_levone_ndx] == NULL);
-
-			mdb_vread(aw->aw_levtwo, ANON_CHUNK_SIZE *
-			    sizeof (uintptr_t),
-			    aw->aw_levone[aw->aw_levone_ndx]);
-		}
-	}
-
-	if (anonptr != NULL) {
-		mdb_vread(&anon, sizeof (anon), anonptr);
-		status = wsp->walk_callback(anonptr, &anon, wsp->walk_cbdata);
-	} else
-		goto again;
-
-	return (status);
-}
-
-void
-anon_walk_fini(mdb_walk_state_t *wsp)
-{
-	anon_walk_data_t *aw = (anon_walk_data_t *)wsp->walk_data;
-
-	if (aw->aw_levtwo != NULL)
-		mdb_free(aw->aw_levtwo, ANON_CHUNK_SIZE * sizeof (uintptr_t));
-
-	mdb_free(aw->aw_levone, aw->aw_nlevone * sizeof (uintptr_t));
-	mdb_free(aw, sizeof (anon_walk_data_t));
-}
-
-/*ARGSUSED*/
-int
 whereopen_fwalk(uintptr_t addr, struct file *f, uintptr_t *target)
 {
 	if ((uintptr_t)f->f_vnode == *target) {
@@ -2963,21 +2680,6 @@ generic_walk_step(mdb_walk_state_t *wsp)
 	    wsp->walk_cbdata));
 }
 
-int
-seg_walk_init(mdb_walk_state_t *wsp)
-{
-	if (wsp->walk_addr == NULL) {
-		mdb_warn("seg walk must begin at struct as *\n");
-		return (WALK_ERR);
-	}
-
-	/*
-	 * this is really just a wrapper to AVL tree walk
-	 */
-	wsp->walk_addr = (uintptr_t)&((struct as *)wsp->walk_addr)->a_segtree;
-	return (avl_walk_init(wsp));
-}
-
 static int
 cpu_walk_cmp(const void *l, const void *r)
 {
@@ -3476,123 +3178,6 @@ flipone(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	for (i = 0; i < sizeof (addr) * NBBY; i++)
 		mdb_printf("%p\n", addr ^ (1UL << i));
-
-	return (DCMD_OK);
-}
-
-/*
- * Grumble, grumble.
- */
-#define	SMAP_HASHFUNC(vp, off)	\
-	((((uintptr_t)(vp) >> 6) + ((uintptr_t)(vp) >> 3) + \
-	((off) >> MAXBSHIFT)) & smd_hashmsk)
-
-int
-vnode2smap(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
-{
-	long smd_hashmsk;
-	int hash;
-	uintptr_t offset = 0;
-	struct smap smp;
-	uintptr_t saddr, kaddr;
-	uintptr_t smd_hash, smd_smap;
-	struct seg seg;
-
-	if (!(flags & DCMD_ADDRSPEC))
-		return (DCMD_USAGE);
-
-	if (mdb_readvar(&smd_hashmsk, "smd_hashmsk") == -1) {
-		mdb_warn("failed to read smd_hashmsk");
-		return (DCMD_ERR);
-	}
-
-	if (mdb_readvar(&smd_hash, "smd_hash") == -1) {
-		mdb_warn("failed to read smd_hash");
-		return (DCMD_ERR);
-	}
-
-	if (mdb_readvar(&smd_smap, "smd_smap") == -1) {
-		mdb_warn("failed to read smd_hash");
-		return (DCMD_ERR);
-	}
-
-	if (mdb_readvar(&kaddr, "segkmap") == -1) {
-		mdb_warn("failed to read segkmap");
-		return (DCMD_ERR);
-	}
-
-	if (mdb_vread(&seg, sizeof (seg), kaddr) == -1) {
-		mdb_warn("failed to read segkmap at %p", kaddr);
-		return (DCMD_ERR);
-	}
-
-	if (argc != 0) {
-		const mdb_arg_t *arg = &argv[0];
-
-		if (arg->a_type == MDB_TYPE_IMMEDIATE)
-			offset = arg->a_un.a_val;
-		else
-			offset = (uintptr_t)mdb_strtoull(arg->a_un.a_str);
-	}
-
-	hash = SMAP_HASHFUNC(addr, offset);
-
-	if (mdb_vread(&saddr, sizeof (saddr),
-	    smd_hash + hash * sizeof (uintptr_t)) == -1) {
-		mdb_warn("couldn't read smap at %p",
-		    smd_hash + hash * sizeof (uintptr_t));
-		return (DCMD_ERR);
-	}
-
-	do {
-		if (mdb_vread(&smp, sizeof (smp), saddr) == -1) {
-			mdb_warn("couldn't read smap at %p", saddr);
-			return (DCMD_ERR);
-		}
-
-		if ((uintptr_t)smp.sm_vp == addr && smp.sm_off == offset) {
-			mdb_printf("vnode %p, offs %p is smap %p, vaddr %p\n",
-			    addr, offset, saddr, ((saddr - smd_smap) /
-			    sizeof (smp)) * MAXBSIZE + seg.s_base);
-			return (DCMD_OK);
-		}
-
-		saddr = (uintptr_t)smp.sm_hash;
-	} while (saddr != NULL);
-
-	mdb_printf("no smap for vnode %p, offs %p\n", addr, offset);
-	return (DCMD_OK);
-}
-
-/*ARGSUSED*/
-int
-addr2smap(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
-{
-	uintptr_t kaddr;
-	struct seg seg;
-	struct segmap_data sd;
-
-	if (!(flags & DCMD_ADDRSPEC))
-		return (DCMD_USAGE);
-
-	if (mdb_readvar(&kaddr, "segkmap") == -1) {
-		mdb_warn("failed to read segkmap");
-		return (DCMD_ERR);
-	}
-
-	if (mdb_vread(&seg, sizeof (seg), kaddr) == -1) {
-		mdb_warn("failed to read segkmap at %p", kaddr);
-		return (DCMD_ERR);
-	}
-
-	if (mdb_vread(&sd, sizeof (sd), (uintptr_t)seg.s_data) == -1) {
-		mdb_warn("failed to read segmap_data at %p", seg.s_data);
-		return (DCMD_ERR);
-	}
-
-	mdb_printf("%p is smap %p\n", addr,
-	    ((addr - (uintptr_t)seg.s_base) >> MAXBSHIFT) *
-	    sizeof (struct smap) + (uintptr_t)sd.smd_sm);
 
 	return (DCMD_OK);
 }
@@ -4194,7 +3779,6 @@ time_help(void)
 static const mdb_dcmd_t dcmds[] = {
 
 	/* from genunix.c */
-	{ "addr2smap", ":[offset]", "translate address to smap", addr2smap },
 	{ "as2proc", ":", "convert as to proc_t address", as2proc },
 	{ "binding_hash_entry", ":", "print driver names hash table entry",
 		binding_hash_entry },
@@ -4215,13 +3799,11 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "ndi_event_hdl", "?", "print ndi_event_hdl", ndi_event_hdl },
 	{ "panicinfo", NULL, "print panic information", panicinfo },
 	{ "pid2proc", "?", "convert PID to proc_t address", pid2proc },
-	{ "pmap", ":[-q]", "print process memory map", pmap },
 	{ "project", NULL, "display kernel project(s)", project },
 	{ "ps", "[-fltzTP]", "list processes (and associated thr,lwp)", ps },
 	{ "pgrep", "[-x] [-n | -o] pattern",
 		"pattern match against all processes", pgrep },
 	{ "ptree", NULL, "print process tree", ptree },
-	{ "seg", ":", "print address space segment", seg },
 	{ "sysevent", "?[-sv]", "print sysevent pending or sent queue",
 		sysevent},
 	{ "sysevent_channel", "?", "print sysevent channel database",
@@ -4234,7 +3816,6 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "task", NULL, "display kernel task(s)", task },
 	{ "time", "[-l]", "display system time", time, time_help },
 	{ "vnode2path", ":[-F]", "vnode address to pathname", vnode2path },
-	{ "vnode2smap", ":[offset]", "translate vnode to smap", vnode2smap },
 	{ "whereopen", ":", "given a vnode, dumps procs which have it open",
 	    whereopen },
 
@@ -4299,10 +3880,6 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "devinfo_fmce", ":", "devinfo fault managment cache entry",
 	    devinfo_fmce},
 
-	/* from fm.c */
-	{ "ereport", "[-v]", "print ereports logged in dump",
-	    ereport },
-
 	/* from findstack.c */
 	{ "findstack", ":[-v]", "find kernel thread stack", findstack },
 	{ "findstack_debug", NULL, "toggle findstack debugging",
@@ -4312,8 +3889,16 @@ static const mdb_dcmd_t dcmds[] = {
 		"print unique kernel thread stacks",
 		stacks, stacks_help },
 
+	/* from fm.c */
+	{ "ereport", "[-v]", "print ereports logged in dump",
+	    ereport },
+
 	/* from group.c */
 	{ "group", "?[-q]", "display a group", group},
+
+	/* from hotplug.c */
+	{ "hotplug", "?[-p]", "display a registered hotplug attachment",
+	    hotplug, hotplug_help },
 
 	/* from irm.c */
 	{ "irmpools", NULL, "display interrupt pools", irmpools_dcmd },
@@ -4388,10 +3973,19 @@ static const mdb_dcmd_t dcmds[] = {
 		mdiphcis },
 
 	/* from memory.c */
-	{ "page", "?", "display a summarized page_t", page },
-	{ "memstat", NULL, "display memory usage summary", memstat },
+	{ "addr2smap", ":[offset]", "translate address to smap", addr2smap },
 	{ "memlist", "?[-iav]", "display a struct memlist", memlist },
+	{ "memstat", NULL, "display memory usage summary", memstat },
+	{ "page", "?", "display a summarized page_t", page },
+	{ "pagelookup", "?[-v vp] [-o offset]",
+		"find the page_t with the name {vp, offset}",
+		pagelookup, pagelookup_help },
+	{ "page_num2pp", ":", "find the page_t for a given page frame number",
+		page_num2pp },
+	{ "pmap", ":[-q]", "print process memory map", pmap },
+	{ "seg", ":", "print address space segment", seg },
 	{ "swapinfo", "?", "display a struct swapinfo", swapinfof },
+	{ "vnode2smap", ":[offset]", "translate vnode to smap", vnode2smap },
 
 	/* from mmd.c */
 	{ "multidata", ":[-sv]", "display a summarized multidata_t",
@@ -4521,18 +4115,12 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "zsd", ":[-v] [zsd_key]", "display zone-specific-data entries for "
 	    "selected zones", zsd },
 
-	/* from hotplug.c */
-	{ "hotplug", "?[-p]", "display a registered hotplug attachment",
-	    hotplug, hotplug_help },
-
 	{ NULL }
 };
 
 static const mdb_walker_t walkers[] = {
 
 	/* from genunix.c */
-	{ "anon", "given an amp, list of anon structures",
-		anon_walk_init, anon_walk_step, anon_walk_fini },
 	{ "callouts_bytime", "walk callouts by list chain (expiration time)",
 		callout_walk_init, callout_walk_step, callout_walk_fini,
 		(void *)CALLOUT_WALK_BYLIST },
@@ -4568,8 +4156,6 @@ static const mdb_walker_t walkers[] = {
 		proc_walk_init, proc_walk_step, proc_walk_fini },
 	{ "projects", "walk a list of kernel projects",
 		project_walk_init, project_walk_step, NULL },
-	{ "seg", "given an as, list of segments",
-		seg_walk_init, avl_walk_step, avl_walk_fini },
 	{ "sysevent_pend", "walk sysevent pending queue",
 		sysevent_pend_walk_init, sysevent_walk_step,
 		sysevent_walk_fini},
@@ -4761,12 +4347,16 @@ static const mdb_walker_t walkers[] = {
 		mdi_phci_ph_next_walk_fini },
 
 	/* from memory.c */
-	{ "page", "walk all pages, or those from the specified vnode",
-		page_walk_init, page_walk_step, page_walk_fini },
 	{ "allpages", "walk all pages, including free pages",
 		allpages_walk_init, allpages_walk_step, allpages_walk_fini },
+	{ "anon", "given an amp, list of anon structures",
+		anon_walk_init, anon_walk_step, anon_walk_fini },
 	{ "memlist", "walk specified memlist",
 		NULL, memlist_walk_step, NULL },
+	{ "page", "walk all pages, or those from the specified vnode",
+		page_walk_init, page_walk_step, page_walk_fini },
+	{ "seg", "given an as, list of segments",
+		seg_walk_init, avl_walk_step, avl_walk_fini },
 	{ "swapinfo", "walk swapinfo structures",
 		swap_walk_init, swap_walk_step, NULL },
 

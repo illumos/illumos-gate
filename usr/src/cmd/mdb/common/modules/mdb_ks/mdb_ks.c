@@ -625,7 +625,7 @@ out:
 }
 
 uintptr_t
-mdb_vnode2page(uintptr_t vp, uintptr_t offset)
+mdb_page_lookup(uintptr_t vp, u_offset_t offset)
 {
 	long page_hashsz, ndx;
 	uintptr_t page_hash, pp;
@@ -645,7 +645,7 @@ mdb_vnode2page(uintptr_t vp, uintptr_t offset)
 		mdb_vread(&page, sizeof (page), pp);
 
 		if ((uintptr_t)page.p_vnode == vp &&
-		    (uintptr_t)page.p_offset == offset)
+		    (uint64_t)page.p_offset == offset)
 			return (pp);
 
 		pp = (uintptr_t)page.p_hash;
@@ -678,6 +678,70 @@ mdb_vtype2chr(vtype_t type, mode_t mode)
 		return ('*');
 
 	return (vttab[type]);
+}
+
+struct pfn2page {
+	pfn_t pfn;
+	page_t *pp;
+};
+
+/*ARGSUSED*/
+static int
+pfn2page_cb(uintptr_t addr, const struct memseg *msp, void *data)
+{
+	struct pfn2page *p = data;
+
+	if (p->pfn >= msp->pages_base && p->pfn < msp->pages_end) {
+		p->pp = msp->pages + (p->pfn - msp->pages_base);
+		return (WALK_DONE);
+	}
+
+	return (WALK_NEXT);
+}
+
+uintptr_t
+mdb_pfn2page(pfn_t pfn)
+{
+	struct pfn2page	arg;
+	struct page	page;
+
+	arg.pfn = pfn;
+	arg.pp = NULL;
+
+	if (mdb_walk("memseg", (mdb_walk_cb_t)pfn2page_cb, &arg) == -1) {
+		mdb_warn("pfn2page: can't walk memsegs");
+		return (0);
+	}
+	if (arg.pp == NULL) {
+		mdb_warn("pfn2page: unable to find page_t for pfn %lx\n",
+		    pfn);
+		return (0);
+	}
+
+	if (mdb_vread(&page, sizeof (page_t), (uintptr_t)arg.pp) == -1) {
+		mdb_warn("pfn2page: can't read page 0x%lx at %p", pfn, arg.pp);
+		return (0);
+	}
+	if (page.p_pagenum != pfn) {
+		mdb_warn("pfn2page: page_t 0x%p should have PFN 0x%lx, "
+		    "but actually has 0x%lx\n", arg.pp, pfn, page.p_pagenum);
+		return (0);
+	}
+
+	return ((uintptr_t)arg.pp);
+}
+
+pfn_t
+mdb_page2pfn(uintptr_t addr)
+{
+	struct page	page;
+
+	if (mdb_vread(&page, sizeof (page_t), addr) == -1) {
+		mdb_warn("pp2pfn: can't read page at %p", addr);
+		return ((pfn_t)(-1));
+	}
+
+	return (page.p_pagenum);
 }
 
 static int

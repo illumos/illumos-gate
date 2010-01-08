@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_I86MMU_H
 #define	_I86MMU_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -51,9 +49,6 @@ extern int mfntopfn_dcmd(uintptr_t addr, uint_t flags, int argc,
 	const mdb_arg_t *argv);
 
 extern int pfntomfn_dcmd(uintptr_t addr, uint_t flags, int argc,
-	const mdb_arg_t *argv);
-
-extern int page_num2pp(uintptr_t addr, uint_t flags, int argc,
 	const mdb_arg_t *argv);
 
 extern int memseg_list(uintptr_t addr, uint_t flags, int argc,

@@ -19,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This part of the file contains the mdb support for dcmds:
  *	::memseg_list
- *	::page_num2pp
  * and walkers for:
  *	memseg - a memseg list walker for ::memseg_list
  *
@@ -69,71 +67,6 @@ platform_vtop(uintptr_t addr, struct as *asp, physaddr_t *pap)
 
 	return (do_va2pa(addr, asp, 0, pap, NULL));
 }
-
-
-/*ARGSUSED*/
-int
-page_num2pp_cb(uintptr_t addr, void *ignored, uintptr_t *data)
-{
-	struct memseg ms, *msp = &ms;
-	struct pfn2pp *p = (struct pfn2pp *)data;
-
-	if (mdb_vread(msp, sizeof (struct memseg), addr) == -1) {
-		mdb_warn("can't read memseg at %#lx", addr);
-		return (DCMD_ERR);
-	}
-
-	if (p->pfn >= msp->pages_base && p->pfn < msp->pages_end) {
-		p->pp = msp->pages + (p->pfn - msp->pages_base);
-		return (WALK_DONE);
-	}
-
-	return (WALK_NEXT);
-}
-
-/*
- * ::page_num2pp dcmd
- */
-/*ARGSUSED*/
-int
-page_num2pp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
-{
-	struct pfn2pp pfn2pp;
-	page_t page;
-
-	if ((flags & DCMD_ADDRSPEC) == 0) {
-		mdb_warn("page frame number missing\n");
-			return (DCMD_USAGE);
-	}
-
-	pfn2pp.pfn = (pfn_t)addr;
-	pfn2pp.pp = NULL;
-
-	if (mdb_walk("memseg", (mdb_walk_cb_t)page_num2pp_cb,
-	    (void *)&pfn2pp) == -1) {
-		mdb_warn("can't walk memseg");
-		return (DCMD_ERR);
-	}
-
-	if (pfn2pp.pp == NULL)
-		return (DCMD_ERR);
-
-	mdb_printf("%x has page at %p\n", pfn2pp.pfn, pfn2pp.pp);
-
-	if (mdb_vread(&page, sizeof (page_t),
-	    (uintptr_t)pfn2pp.pp) == -1) {
-		mdb_warn("can't read page at %p", &page);
-		return (DCMD_ERR);
-	}
-
-	if (page.p_pagenum != pfn2pp.pfn) {
-		mdb_warn("WARNING! Found page structure contains "
-		    "different pagenumber %x\n", page.p_pagenum);
-	}
-
-	return (DCMD_OK);
-}
-
 
 /*
  * ::memseg_list dcmd and walker to implement it.

@@ -23,16 +23,28 @@
  * Use is subject to license terms.
  */
 
+#include <mdb/mdb_param.h>
 #include <mdb/mdb_modapi.h>
+#include <mdb/mdb_ks.h>
 #include <sys/types.h>
+#include <sys/memlist.h>
+#include <sys/swap.h>
+#include <sys/systm.h>
+#include <sys/thread.h>
+#include <vm/anon.h>
+#include <vm/as.h>
 #include <vm/page.h>
 #include <sys/thread.h>
 #include <sys/swap.h>
 #include <sys/memlist.h>
 #include <sys/vnode.h>
+#include <vm/seg_map.h>
+#include <vm/seg_vn.h>
 #if defined(__i386) || defined(__amd64)
 #include <sys/balloon_impl.h>
 #endif
+
+#include "avl.h"
 
 /*
  * Page walker.
@@ -485,7 +497,6 @@ memstat_callback(page_t *page, page_t *pp, memstat_t *stats)
 int
 memstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	ulong_t pagesize;
 	pgcnt_t total_pages, physmem;
 	ulong_t freemem;
 	memstat_t stats;
@@ -516,12 +527,6 @@ memstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	/* Initialize vnode hash list and queue */
 	vn_htable_init(&ht, vn_size);
 	stats.ms_vn_htable = &ht;
-
-	/* Grab base page size */
-	if (mdb_readvar(&pagesize, "_pagesize") == -1) {
-		mdb_warn("unable to read _pagesize");
-		return (DCMD_ERR);
-	}
 
 	/* Total physical memory */
 	if (mdb_readvar(&total_pages, "total_pages") == -1) {
@@ -578,30 +583,30 @@ memstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    "  ----\n");
 	mdb_printf("Kernel           %16llu  %16llu  %3lu%%\n",
 	    stats.ms_kmem,
-	    (uint64_t)stats.ms_kmem * pagesize / (1024 * 1024),
+	    (uint64_t)stats.ms_kmem * PAGESIZE / (1024 * 1024),
 	    MS_PCT_TOTAL(stats.ms_kmem));
 
 	if (stats.ms_zfs_data != 0)
 		mdb_printf("ZFS File Data    %16llu  %16llu  %3lu%%\n",
 		    stats.ms_zfs_data,
-		    (uint64_t)stats.ms_zfs_data * pagesize / (1024 * 1024),
+		    (uint64_t)stats.ms_zfs_data * PAGESIZE / (1024 * 1024),
 		    MS_PCT_TOTAL(stats.ms_zfs_data));
 
 	mdb_printf("Anon             %16llu  %16llu  %3lu%%\n",
 	    stats.ms_anon,
-	    (uint64_t)stats.ms_anon * pagesize / (1024 * 1024),
+	    (uint64_t)stats.ms_anon * PAGESIZE / (1024 * 1024),
 	    MS_PCT_TOTAL(stats.ms_anon));
 	mdb_printf("Exec and libs    %16llu  %16llu  %3lu%%\n",
 	    stats.ms_exec,
-	    (uint64_t)stats.ms_exec * pagesize / (1024 * 1024),
+	    (uint64_t)stats.ms_exec * PAGESIZE / (1024 * 1024),
 	    MS_PCT_TOTAL(stats.ms_exec));
 	mdb_printf("Page cache       %16llu  %16llu  %3lu%%\n",
 	    stats.ms_vnode,
-	    (uint64_t)stats.ms_vnode * pagesize / (1024 * 1024),
+	    (uint64_t)stats.ms_vnode * PAGESIZE / (1024 * 1024),
 	    MS_PCT_TOTAL(stats.ms_vnode));
 	mdb_printf("Free (cachelist) %16llu  %16llu  %3lu%%\n",
 	    stats.ms_cachelist,
-	    (uint64_t)stats.ms_cachelist * pagesize / (1024 * 1024),
+	    (uint64_t)stats.ms_cachelist * PAGESIZE / (1024 * 1024),
 	    MS_PCT_TOTAL(stats.ms_cachelist));
 
 	/*
@@ -624,29 +629,119 @@ memstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 #endif
 
 	mdb_printf("Free (freelist)  %16lu  %16llu  %3lu%%\n", freemem,
-	    (uint64_t)freemem * pagesize / (1024 * 1024),
+	    (uint64_t)freemem * PAGESIZE / (1024 * 1024),
 	    MS_PCT_TOTAL(freemem));
 
 #if defined(__i386) || defined(__amd64)
 	if (bln_size != -1) {
 		mdb_printf("Balloon          %16lu  %16llu  %3lu%%\n",
 		    bln_stats.bln_hv_pages,
-		    (uint64_t)bln_stats.bln_hv_pages * pagesize / (1024 * 1024),
+		    (uint64_t)bln_stats.bln_hv_pages * PAGESIZE / (1024 * 1024),
 		    MS_PCT_TOTAL(bln_stats.bln_hv_pages));
 	}
 #endif
 
 	mdb_printf("\nTotal            %16lu  %16lu\n",
 	    physmem,
-	    (uint64_t)physmem * pagesize / (1024 * 1024));
+	    (uint64_t)physmem * PAGESIZE / (1024 * 1024));
 
 	if (physmem != total_pages) {
 		mdb_printf("Physical         %16lu  %16lu\n",
 		    total_pages,
-		    (uint64_t)total_pages * pagesize / (1024 * 1024));
+		    (uint64_t)total_pages * PAGESIZE / (1024 * 1024));
 	}
 
 #undef MS_PCT_TOTAL
+
+	return (DCMD_OK);
+}
+
+void
+pagelookup_help(void)
+{
+	mdb_printf(
+	    "Finds the page with name { %<b>vp%</b>, %<b>offset%</b> }.\n"
+	    "\n"
+	    "Can be invoked three different ways:\n\n"
+	    "    ::pagelookup -v %<b>vp%</b> -o %<b>offset%</b>\n"
+	    "    %<b>vp%</b>::pagelookup -o %<b>offset%</b>\n"
+	    "    %<b>offset%</b>::pagelookup -v %<b>vp%</b>\n"
+	    "\n"
+	    "The latter two forms are useful in pipelines.\n"
+	    );
+}
+
+int
+pagelookup(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	uintptr_t vp = -(uintptr_t)1;
+	uint64_t offset = -(uint64_t)1;
+
+	uintptr_t pageaddr;
+	int hasaddr = (flags & DCMD_ADDRSPEC);
+	int usedaddr = 0;
+
+	if (mdb_getopts(argc, argv,
+	    'v', MDB_OPT_UINTPTR, &vp,
+	    'o', MDB_OPT_UINT64, &offset,
+	    0) != argc) {
+		return (DCMD_USAGE);
+	}
+
+	if (vp == -(uintptr_t)1) {
+		if (offset == -(uint64_t)1) {
+			mdb_warn(
+			    "pagelookup: at least one of -v vp or -o offset "
+			    "required.\n");
+			return (DCMD_USAGE);
+		}
+		vp = addr;
+		usedaddr = 1;
+	} else if (offset == -(uint64_t)1) {
+		offset = mdb_get_dot();
+		usedaddr = 1;
+	}
+	if (usedaddr && !hasaddr) {
+		mdb_warn("pagelookup: address required\n");
+		return (DCMD_USAGE);
+	}
+	if (!usedaddr && hasaddr) {
+		mdb_warn(
+		    "pagelookup: address specified when both -v and -o were "
+		    "passed");
+		return (DCMD_USAGE);
+	}
+
+	pageaddr = mdb_page_lookup(vp, offset);
+	if (pageaddr == 0) {
+		mdb_warn("pagelookup: no page for {vp = %p, offset = %llp)\n",
+		    vp, offset);
+		return (DCMD_OK);
+	}
+	mdb_printf("%#lr\n", pageaddr);		/* this is PIPE_OUT friendly */
+	return (DCMD_OK);
+}
+
+/*ARGSUSED*/
+int
+page_num2pp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	uintptr_t pp;
+
+	if (argc != 0 || !(flags & DCMD_ADDRSPEC)) {
+		return (DCMD_USAGE);
+	}
+
+	pp = mdb_pfn2page((pfn_t)addr);
+	if (pp == 0) {
+		return (DCMD_ERR);
+	}
+
+	if (flags & DCMD_PIPE_OUT) {
+		mdb_printf("%#lr\n", pp);
+	} else {
+		mdb_printf("%lx has page_t at %#lx\n", (pfn_t)addr, pp);
+	}
 
 	return (DCMD_OK);
 }
@@ -825,6 +920,416 @@ memlist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	mdb_printf("%0?lx %16llx %16llx\n", addr, ml.address, ml.size);
+
+	return (DCMD_OK);
+}
+
+int
+seg_walk_init(mdb_walk_state_t *wsp)
+{
+	if (wsp->walk_addr == NULL) {
+		mdb_warn("seg walk must begin at struct as *\n");
+		return (WALK_ERR);
+	}
+
+	/*
+	 * this is really just a wrapper to AVL tree walk
+	 */
+	wsp->walk_addr = (uintptr_t)&((struct as *)wsp->walk_addr)->a_segtree;
+	return (avl_walk_init(wsp));
+}
+
+/*ARGSUSED*/
+int
+seg(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	struct seg s;
+
+	if (argc != 0)
+		return (DCMD_USAGE);
+
+	if ((flags & DCMD_LOOPFIRST) || !(flags & DCMD_LOOP)) {
+		mdb_printf("%<u>%?s %?s %?s %?s %s%</u>\n",
+		    "SEG", "BASE", "SIZE", "DATA", "OPS");
+	}
+
+	if (mdb_vread(&s, sizeof (s), addr) == -1) {
+		mdb_warn("failed to read seg at %p", addr);
+		return (DCMD_ERR);
+	}
+
+	mdb_printf("%?p %?p %?lx %?p %a\n",
+	    addr, s.s_base, s.s_size, s.s_data, s.s_ops);
+
+	return (DCMD_OK);
+}
+
+/*ARGSUSED*/
+static int
+pmap_walk_anon(uintptr_t addr, const struct anon *anon, int *nres)
+{
+	uintptr_t pp =
+	    mdb_page_lookup((uintptr_t)anon->an_vp, (u_offset_t)anon->an_off);
+
+	if (pp != NULL)
+		(*nres)++;
+
+	return (WALK_NEXT);
+}
+
+static int
+pmap_walk_seg(uintptr_t addr, const struct seg *seg, uintptr_t segvn)
+{
+
+	mdb_printf("%0?p %0?p %7dk", addr, seg->s_base, seg->s_size / 1024);
+
+	if (segvn == (uintptr_t)seg->s_ops) {
+		struct segvn_data svn;
+		int nres = 0;
+
+		(void) mdb_vread(&svn, sizeof (svn), (uintptr_t)seg->s_data);
+
+		if (svn.amp == NULL) {
+			mdb_printf(" %8s", "");
+			goto drive_on;
+		}
+
+		/*
+		 * We've got an amp for this segment; walk through
+		 * the amp, and determine mappings.
+		 */
+		if (mdb_pwalk("anon", (mdb_walk_cb_t)pmap_walk_anon,
+		    &nres, (uintptr_t)svn.amp) == -1)
+			mdb_warn("failed to walk anon (amp=%p)", svn.amp);
+
+		mdb_printf(" %7dk", (nres * PAGESIZE) / 1024);
+drive_on:
+
+		if (svn.vp != NULL) {
+			char buf[29];
+
+			mdb_vnode2path((uintptr_t)svn.vp, buf, sizeof (buf));
+			mdb_printf(" %s", buf);
+		} else
+			mdb_printf(" [ anon ]");
+	}
+
+	mdb_printf("\n");
+	return (WALK_NEXT);
+}
+
+static int
+pmap_walk_seg_quick(uintptr_t addr, const struct seg *seg, uintptr_t segvn)
+{
+	mdb_printf("%0?p %0?p %7dk", addr, seg->s_base, seg->s_size / 1024);
+
+	if (segvn == (uintptr_t)seg->s_ops) {
+		struct segvn_data svn;
+
+		(void) mdb_vread(&svn, sizeof (svn), (uintptr_t)seg->s_data);
+
+		if (svn.vp != NULL) {
+			mdb_printf(" %0?p", svn.vp);
+		} else {
+			mdb_printf(" [ anon ]");
+		}
+	}
+
+	mdb_printf("\n");
+	return (WALK_NEXT);
+}
+
+/*ARGSUSED*/
+int
+pmap(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	uintptr_t segvn;
+	proc_t proc;
+	uint_t quick = FALSE;
+	mdb_walk_cb_t cb = (mdb_walk_cb_t)pmap_walk_seg;
+
+	GElf_Sym sym;
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (mdb_getopts(argc, argv,
+	    'q', MDB_OPT_SETBITS, TRUE, &quick, NULL) != argc)
+		return (DCMD_USAGE);
+
+	if (mdb_vread(&proc, sizeof (proc), addr) == -1) {
+		mdb_warn("failed to read proc at %p", addr);
+		return (DCMD_ERR);
+	}
+
+	if (mdb_lookup_by_name("segvn_ops", &sym) == 0)
+		segvn = (uintptr_t)sym.st_value;
+	else
+		segvn = NULL;
+
+	mdb_printf("%?s %?s %8s ", "SEG", "BASE", "SIZE");
+
+	if (quick) {
+		mdb_printf("VNODE\n");
+		cb = (mdb_walk_cb_t)pmap_walk_seg_quick;
+	} else {
+		mdb_printf("%8s %s\n", "RES", "PATH");
+	}
+
+	if (mdb_pwalk("seg", cb, (void *)segvn, (uintptr_t)proc.p_as) == -1) {
+		mdb_warn("failed to walk segments of as %p", proc.p_as);
+		return (DCMD_ERR);
+	}
+
+	return (DCMD_OK);
+}
+
+typedef struct anon_walk_data {
+	uintptr_t *aw_levone;
+	uintptr_t *aw_levtwo;
+	int aw_nlevone;
+	int aw_levone_ndx;
+	int aw_levtwo_ndx;
+	struct anon_map aw_amp;
+	struct anon_hdr aw_ahp;
+} anon_walk_data_t;
+
+int
+anon_walk_init(mdb_walk_state_t *wsp)
+{
+	anon_walk_data_t *aw;
+
+	if (wsp->walk_addr == NULL) {
+		mdb_warn("anon walk doesn't support global walks\n");
+		return (WALK_ERR);
+	}
+
+	aw = mdb_alloc(sizeof (anon_walk_data_t), UM_SLEEP);
+
+	if (mdb_vread(&aw->aw_amp, sizeof (aw->aw_amp), wsp->walk_addr) == -1) {
+		mdb_warn("failed to read anon map at %p", wsp->walk_addr);
+		mdb_free(aw, sizeof (anon_walk_data_t));
+		return (WALK_ERR);
+	}
+
+	if (mdb_vread(&aw->aw_ahp, sizeof (aw->aw_ahp),
+	    (uintptr_t)(aw->aw_amp.ahp)) == -1) {
+		mdb_warn("failed to read anon hdr ptr at %p", aw->aw_amp.ahp);
+		mdb_free(aw, sizeof (anon_walk_data_t));
+		return (WALK_ERR);
+	}
+
+	if (aw->aw_ahp.size <= ANON_CHUNK_SIZE ||
+	    (aw->aw_ahp.flags & ANON_ALLOC_FORCE)) {
+		aw->aw_nlevone = aw->aw_ahp.size;
+		aw->aw_levtwo = NULL;
+	} else {
+		aw->aw_nlevone =
+		    (aw->aw_ahp.size + ANON_CHUNK_OFF) >> ANON_CHUNK_SHIFT;
+		aw->aw_levtwo =
+		    mdb_zalloc(ANON_CHUNK_SIZE * sizeof (uintptr_t), UM_SLEEP);
+	}
+
+	aw->aw_levone =
+	    mdb_alloc(aw->aw_nlevone * sizeof (uintptr_t), UM_SLEEP);
+
+	aw->aw_levone_ndx = 0;
+	aw->aw_levtwo_ndx = 0;
+
+	mdb_vread(aw->aw_levone, aw->aw_nlevone * sizeof (uintptr_t),
+	    (uintptr_t)aw->aw_ahp.array_chunk);
+
+	if (aw->aw_levtwo != NULL) {
+		while (aw->aw_levone[aw->aw_levone_ndx] == NULL) {
+			aw->aw_levone_ndx++;
+			if (aw->aw_levone_ndx == aw->aw_nlevone) {
+				mdb_warn("corrupt anon; couldn't"
+				    "find ptr to lev two map");
+				goto out;
+			}
+		}
+
+		mdb_vread(aw->aw_levtwo, ANON_CHUNK_SIZE * sizeof (uintptr_t),
+		    aw->aw_levone[aw->aw_levone_ndx]);
+	}
+
+out:
+	wsp->walk_data = aw;
+	return (0);
+}
+
+int
+anon_walk_step(mdb_walk_state_t *wsp)
+{
+	int status;
+	anon_walk_data_t *aw = (anon_walk_data_t *)wsp->walk_data;
+	struct anon anon;
+	uintptr_t anonptr;
+
+again:
+	/*
+	 * Once we've walked through level one, we're done.
+	 */
+	if (aw->aw_levone_ndx == aw->aw_nlevone)
+		return (WALK_DONE);
+
+	if (aw->aw_levtwo == NULL) {
+		anonptr = aw->aw_levone[aw->aw_levone_ndx];
+		aw->aw_levone_ndx++;
+	} else {
+		anonptr = aw->aw_levtwo[aw->aw_levtwo_ndx];
+		aw->aw_levtwo_ndx++;
+
+		if (aw->aw_levtwo_ndx == ANON_CHUNK_SIZE) {
+			aw->aw_levtwo_ndx = 0;
+
+			do {
+				aw->aw_levone_ndx++;
+
+				if (aw->aw_levone_ndx == aw->aw_nlevone)
+					return (WALK_DONE);
+			} while (aw->aw_levone[aw->aw_levone_ndx] == NULL);
+
+			mdb_vread(aw->aw_levtwo, ANON_CHUNK_SIZE *
+			    sizeof (uintptr_t),
+			    aw->aw_levone[aw->aw_levone_ndx]);
+		}
+	}
+
+	if (anonptr != NULL) {
+		mdb_vread(&anon, sizeof (anon), anonptr);
+		status = wsp->walk_callback(anonptr, &anon, wsp->walk_cbdata);
+	} else
+		goto again;
+
+	return (status);
+}
+
+void
+anon_walk_fini(mdb_walk_state_t *wsp)
+{
+	anon_walk_data_t *aw = (anon_walk_data_t *)wsp->walk_data;
+
+	if (aw->aw_levtwo != NULL)
+		mdb_free(aw->aw_levtwo, ANON_CHUNK_SIZE * sizeof (uintptr_t));
+
+	mdb_free(aw->aw_levone, aw->aw_nlevone * sizeof (uintptr_t));
+	mdb_free(aw, sizeof (anon_walk_data_t));
+}
+
+/*
+ * Grumble, grumble.
+ */
+#define	SMAP_HASHFUNC(vp, off)	\
+	((((uintptr_t)(vp) >> 6) + ((uintptr_t)(vp) >> 3) + \
+	((off) >> MAXBSHIFT)) & smd_hashmsk)
+
+int
+vnode2smap(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	long smd_hashmsk;
+	int hash;
+	uintptr_t offset = 0;
+	struct smap smp;
+	uintptr_t saddr, kaddr;
+	uintptr_t smd_hash, smd_smap;
+	struct seg seg;
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (mdb_readvar(&smd_hashmsk, "smd_hashmsk") == -1) {
+		mdb_warn("failed to read smd_hashmsk");
+		return (DCMD_ERR);
+	}
+
+	if (mdb_readvar(&smd_hash, "smd_hash") == -1) {
+		mdb_warn("failed to read smd_hash");
+		return (DCMD_ERR);
+	}
+
+	if (mdb_readvar(&smd_smap, "smd_smap") == -1) {
+		mdb_warn("failed to read smd_hash");
+		return (DCMD_ERR);
+	}
+
+	if (mdb_readvar(&kaddr, "segkmap") == -1) {
+		mdb_warn("failed to read segkmap");
+		return (DCMD_ERR);
+	}
+
+	if (mdb_vread(&seg, sizeof (seg), kaddr) == -1) {
+		mdb_warn("failed to read segkmap at %p", kaddr);
+		return (DCMD_ERR);
+	}
+
+	if (argc != 0) {
+		const mdb_arg_t *arg = &argv[0];
+
+		if (arg->a_type == MDB_TYPE_IMMEDIATE)
+			offset = arg->a_un.a_val;
+		else
+			offset = (uintptr_t)mdb_strtoull(arg->a_un.a_str);
+	}
+
+	hash = SMAP_HASHFUNC(addr, offset);
+
+	if (mdb_vread(&saddr, sizeof (saddr),
+	    smd_hash + hash * sizeof (uintptr_t)) == -1) {
+		mdb_warn("couldn't read smap at %p",
+		    smd_hash + hash * sizeof (uintptr_t));
+		return (DCMD_ERR);
+	}
+
+	do {
+		if (mdb_vread(&smp, sizeof (smp), saddr) == -1) {
+			mdb_warn("couldn't read smap at %p", saddr);
+			return (DCMD_ERR);
+		}
+
+		if ((uintptr_t)smp.sm_vp == addr && smp.sm_off == offset) {
+			mdb_printf("vnode %p, offs %p is smap %p, vaddr %p\n",
+			    addr, offset, saddr, ((saddr - smd_smap) /
+			    sizeof (smp)) * MAXBSIZE + seg.s_base);
+			return (DCMD_OK);
+		}
+
+		saddr = (uintptr_t)smp.sm_hash;
+	} while (saddr != NULL);
+
+	mdb_printf("no smap for vnode %p, offs %p\n", addr, offset);
+	return (DCMD_OK);
+}
+
+/*ARGSUSED*/
+int
+addr2smap(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	uintptr_t kaddr;
+	struct seg seg;
+	struct segmap_data sd;
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (mdb_readvar(&kaddr, "segkmap") == -1) {
+		mdb_warn("failed to read segkmap");
+		return (DCMD_ERR);
+	}
+
+	if (mdb_vread(&seg, sizeof (seg), kaddr) == -1) {
+		mdb_warn("failed to read segkmap at %p", kaddr);
+		return (DCMD_ERR);
+	}
+
+	if (mdb_vread(&sd, sizeof (sd), (uintptr_t)seg.s_data) == -1) {
+		mdb_warn("failed to read segmap_data at %p", seg.s_data);
+		return (DCMD_ERR);
+	}
+
+	mdb_printf("%p is smap %p\n", addr,
+	    ((addr - (uintptr_t)seg.s_base) >> MAXBSHIFT) *
+	    sizeof (struct smap) + (uintptr_t)sd.smd_sm);
 
 	return (DCMD_OK);
 }

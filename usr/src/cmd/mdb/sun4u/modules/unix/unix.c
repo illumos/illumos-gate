@@ -1593,8 +1593,6 @@ static const mdb_dcmd_t dcmds[] = {
 	    softint_dcmd },
 	{ "sfmmu_vtop", ":[[-v] -a as]", "print virtual to physical mapping",
 	    sfmmu_vtop },
-	{ "page_num2pp", ":", "page frame number to page structure",
-	    page_num2pp },
 	{ "memseg_list", ":", "show memseg list", memseg_list },
 	{ "tsbinfo", ":[-l [-a]]", "show tsbinfo", tsbinfo_list,
 	    tsbinfo_help },

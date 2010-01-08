@@ -443,14 +443,9 @@ leaky_subr_fill(leak_mtab_t **lmpp)
 int
 leaky_subr_run(void)
 {
-	unsigned long ps;
+	unsigned long ps = PAGESIZE;
 	uintptr_t kstat_arena;
 	uintptr_t dmods;
-
-	if (mdb_readvar(&ps, "_pagesize") == -1) {
-		mdb_warn("couldn't read '_pagesize'");
-		return (DCMD_ERR);
-	}
 
 	leaky_kludge();
 

@@ -47,7 +47,10 @@ extern "C" {
 
 extern int mdb_vnode2path(uintptr_t, char *, size_t);
 
-extern uintptr_t mdb_vnode2page(uintptr_t, uintptr_t);
+extern uintptr_t mdb_page_lookup(uintptr_t, u_offset_t);
+
+extern pfn_t mdb_page2pfn(uintptr_t);
+extern uintptr_t mdb_pfn2page(pfn_t);
 
 extern uintptr_t mdb_pid2proc(pid_t, proc_t *);
 extern char mdb_vtype2chr(vtype_t, mode_t);
