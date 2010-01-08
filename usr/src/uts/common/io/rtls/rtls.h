@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,6 +72,10 @@ extern "C" {
 #define	RTLS_VENDOR_ID_3	0x1113	/* Accton */
 #define	RTLS_DEVICE_ID_3	0x1211
 #define	RTLS_SUPPORT_DEVICE_3	((RTLS_VENDOR_ID_3 << 16) | RTLS_DEVICE_ID_3)
+
+#define	RTLS_VENDOR_ID_4	0x1186	/* D-link */
+#define	RTLS_DEVICE_ID_4	0x1300
+#define	RTLS_SUPPORT_DEVICE_4	((RTLS_VENDOR_ID_4 << 16) | RTLS_DEVICE_ID_4)
 
 /*
  * Driver tx/rx parameters
@@ -139,12 +143,11 @@ typedef struct rtls_stats {
 	uint32_t	in_short;
 	uint32_t	too_long;
 	uint32_t	no_rcvbuf;	/* ifInDiscards */
-	uint32_t	speed;		/* ifSpeed */
-	uint32_t	duplex;		/* Invented for GLD */
 } rtls_stats_t;
 
 typedef struct rtls_instance {
 	mac_handle_t	mh;
+	mii_handle_t	mii;
 	dev_info_t	*devinfo;	/* device instance */
 	int32_t		instance;
 
@@ -190,23 +193,12 @@ typedef struct rtls_instance {
 
 	/* send reschedule used */
 	boolean_t	need_sched;
-	boolean_t	sched_running;
-	ddi_softintr_t	resched_id;	/* reschedule callback */
-
-	/* events:link change used */
-	boolean_t	link_change;
-	int32_t		link_state;
-	ddi_softintr_t	events_id;	/* events callback */
-	ddi_periodic_t	periodic_id;
 
 	boolean_t	chip_error;	/* chip error flag */
 
 	/* current MAC state */
 	boolean_t	rtls_running;
 	boolean_t	rtls_suspended;
-
-	/* value of rtls.conf file, default 5:FORCE_AUTO_NEGO */
-	uint_t		force_speed_duplex;
 
 	/* rtls statistics */
 	rtls_stats_t	stats;
@@ -444,7 +436,7 @@ typedef struct rtls_instance {
 /*
  * 93c46(93c56) commond register:
  */
-#define	RT_93c46_COMMOND_REG	0x0050
+#define	RT_93c46_COMMAND_REG	0x0050
 #define	RT_93c46_MODE_BITS	0xc0
 #define	RT_93c46_MODE_NORMAL	0x00
 #define	RT_93c46_MODE_AUTOLOAD	0x40

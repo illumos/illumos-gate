@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This Makefile defines all file modules for the directory uts/common
@@ -487,7 +487,7 @@ LX_PTM_OBJS +=	lx_ptm.o
 LX_AUDIO_OBJS += lx_audio.o
 
 MII_OBJS +=	mii.o mii_cicada.o mii_natsemi.o mii_intel.o mii_qualsemi.o \
-		mii_marvell.o mii_other.o
+		mii_marvell.o mii_realtek.o mii_other.o
 
 PTS_OBJS +=	pts.o
 

@@ -1,3 +1,4 @@
+#!/sbin/sh
 #
 # CDDL HEADER START
 #
@@ -18,17 +19,10 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-# Driver.conf file for the RealTek 8139 chip 
+include drv_utils
 
-# ForceSpeedDuplex: set nic speed and duplex mode
-#	5:	auto-negotiate
-#	4:	100 FDX
-#	3:	100 HDX
-#	2:	10 FDX
-#	1:	10 HDX
-ForceSpeedDuplex=5,5,5,5,5,5;
+pkg_drvrem rtls || exit 1

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -39,7 +39,6 @@ MODULE		= rtls
 OBJECTS		= $(RTLS_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(RTLS_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-CONF_SRCDIR	= $(UTSBASE)/common/io/rtls
 
 #
 #	Include common rules.
@@ -51,7 +50,7 @@ include $(UTSBASE)/intel/Makefile.intel
 #
 ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
 #	Overrides
@@ -60,7 +59,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 # Driver depends on Mac
 #
-LDFLAGS		+= -dy -N misc/mac
+LDFLAGS		+= -dy -N misc/mac -N misc/mii
 
 #
 #	Default build targets.

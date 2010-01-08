@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -214,6 +214,7 @@ boolean_t phy_natsemi_probe(phy_handle_t *);
 boolean_t phy_qualsemi_probe(phy_handle_t *);
 boolean_t phy_cicada_probe(phy_handle_t *);
 boolean_t phy_marvell_probe(phy_handle_t *);
+boolean_t phy_realtek_probe(phy_handle_t *);
 boolean_t phy_other_probe(phy_handle_t *);
 
 #endif /* _MIIPRIV_H */

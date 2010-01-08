@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,6 +56,8 @@
 #include <sys/strsun.h>
 #include <sys/pci.h>
 #include <sys/sunddi.h>
+#include <sys/mii.h>
+#include <sys/miiregs.h>
 #include <sys/mac_provider.h>
 #include <sys/mac_ether.h>
 
@@ -91,8 +93,19 @@ static int rtls_m_multicst(void *, boolean_t, const uint8_t *);
 static int rtls_m_promisc(void *, boolean_t);
 static mblk_t *rtls_m_tx(void *, mblk_t *);
 static int rtls_m_stat(void *, uint_t, uint64_t *);
+static int rtls_m_getprop(void *, const char *, mac_prop_id_t, uint_t,
+    uint_t, void *, uint_t *);
+static int rtls_m_setprop(void *, const char *, mac_prop_id_t, uint_t,
+    const void *);
 
 static uint_t rtls_intr(caddr_t);
+
+/*
+ * MII entry points
+ */
+static uint16_t rtls_mii_read(void *, uint8_t, uint8_t);
+static void rtls_mii_write(void *, uint8_t, uint8_t, uint16_t);
+static void rtls_mii_notify(void *, link_state_t);
 
 /*
  * Internal functions used by the above entry points
@@ -107,10 +120,6 @@ static void rtls_set_mac_addr(rtls_t *, const uint8_t *);
 static uint_t rtls_hash_index(const uint8_t *);
 static boolean_t rtls_send(rtls_t *, mblk_t *);
 static void rtls_receive(rtls_t *);
-static void rtls_periodic(void *);
-static uint_t rtls_reschedule(caddr_t arg);
-static uint_t rtls_events(caddr_t arg);
-static void rtls_chip_force_speed_duplex(rtls_t *);
 
 /*
  * Buffer Management Routines
@@ -168,7 +177,7 @@ uchar_t rtls_broadcastaddr[] = {
 };
 
 static mac_callbacks_t rtls_m_callbacks = {
-	0,
+	MC_SETPROP | MC_GETPROP,
 	rtls_m_stat,
 	rtls_m_start,
 	rtls_m_stop,
@@ -176,9 +185,20 @@ static mac_callbacks_t rtls_m_callbacks = {
 	rtls_m_multicst,
 	rtls_m_unicst,
 	rtls_m_tx,
-	NULL,		/* mc_resources */
 	NULL,		/* mc_ioctl */
-	NULL		/* mc_getcapab */
+	NULL,		/* mc_getcapab */
+	NULL,		/* mc_open */
+	NULL,		/* mc_close */
+	rtls_m_setprop,
+	rtls_m_getprop,
+};
+
+static mii_ops_t rtls_mii_ops = {
+	MII_OPS_VERSION,
+	rtls_mii_read,
+	rtls_mii_write,
+	rtls_mii_notify,	/* notify */
+	NULL,			/* reset */
 };
 
 DDI_DEFINE_STREAM_OPS(rtls_dev_ops, nulldev, nulldev, rtls_attach, rtls_detach,
@@ -196,10 +216,6 @@ static struct modldrv rtls_modldrv = {
 static struct modlinkage modlinkage = {
 	MODREV_1, { (void *)&rtls_modldrv, NULL }
 };
-
-/* Save ForceSpeedDuplex value for instances in rtls.conf file */
-#define	RTLS_MAX_DEVICES	256
-static uint_t	rtls_link_mode[RTLS_MAX_DEVICES];
 
 /*
  *    ========== RealTek chip register access Routines ==========
@@ -359,6 +375,8 @@ rtls_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		mutex_exit(&rtlsp->rtls_rx_lock);
 		mutex_exit(&rtlsp->rtls_io_lock);
 
+		mii_resume(rtlsp->mii);
+
 		mac_tx_update(rtlsp->mh);
 		return (DDI_SUCCESS);
 	default:
@@ -369,8 +387,7 @@ rtls_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * we don't support high level interrupts in the driver
 	 */
 	if (ddi_intr_hilevel(devinfo, 0) != 0) {
-		cmn_err(CE_WARN,
-		    "rtls_attach -- unsupported high level interrupt");
+		cmn_err(CE_WARN, "unsupported high level interrupt");
 		return (DDI_FAILURE);
 	}
 
@@ -378,7 +395,7 @@ rtls_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * Get handle to access pci configuration space
 	 */
 	if (pci_config_setup(devinfo, &pci_handle) != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "rtls_attach -- pci_config_setup fail.");
+		cmn_err(CE_WARN, "pci_config_setup fail.");
 		return (DDI_FAILURE);
 	}
 
@@ -390,12 +407,6 @@ rtls_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	device = vendorid;
 	device = (device << 16) | deviceid;	/* combine two id together */
 
-#ifdef RTLS_DEBUG
-	cmn_err(CE_NOTE,
-	    "rtls_attach: vendorID = 0x%x, deviceID = 0x%x",
-	    vendorid, deviceid);
-#endif
-
 	/*
 	 * See if we support this device
 	 * We do not return for wrong device id. It's user risk.
@@ -403,29 +414,17 @@ rtls_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	switch (device) {
 	default:
 		cmn_err(CE_WARN,
-		    "RTLS don't support this device: "
+		    "RTLS doesn't support this device: "
 		    "vendorID = 0x%x, deviceID = 0x%x",
 		    vendorid, deviceid);
 		break;
 	case RTLS_SUPPORT_DEVICE_1:
 	case RTLS_SUPPORT_DEVICE_2:
 	case RTLS_SUPPORT_DEVICE_3:
+	case RTLS_SUPPORT_DEVICE_4:
 		break;
 	}
 
-#ifdef RTLS_OEM
-	/*
-	 * RealTek required macro
-	 */
-	if ((vendorid != RT_VENDOR_ID) || (deviceid != RT_DEVICE_8139)) {
-		cmn_err(CE_WARN,
-		    "rtls_attach -- wrong OEM device: "
-		    "vendorID = 0x%x, deviceID = 0x%x",
-		    vendorid, deviceid);
-		pci_config_teardown(&pci_handle);
-		return (DDI_FAILURE);
-	}
-#endif
 	/*
 	 * Turn on Master Enable (DMA) and IO Enable bits.
 	 * Enable PCI Memory Space accesses
@@ -442,10 +441,6 @@ rtls_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	pci_config_teardown(&pci_handle);
 
 	rtlsp = kmem_zalloc(sizeof (rtls_t), KM_SLEEP);
-	if (rtlsp == NULL) {
-		cmn_err(CE_WARN, "rtls_attach -- rtls_t alloc fail.");
-		return (DDI_FAILURE);
-	}
 
 	ddi_set_driver_private(devinfo, rtlsp);
 	rtlsp->devinfo			= devinfo;
@@ -458,7 +453,7 @@ rtls_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	    (offset_t)0, 0, &rtls_reg_accattr, &rtlsp->io_handle);
 	if (err != DDI_SUCCESS) {
 		kmem_free((caddr_t)rtlsp, sizeof (rtls_t));
-		cmn_err(CE_WARN, "rtls_attach -- ddi_regs_map_setup fail.");
+		cmn_err(CE_WARN, "ddi_regs_map_setup fail.");
 		return (DDI_FAILURE);
 	}
 
@@ -466,7 +461,7 @@ rtls_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * Allocate the TX and RX descriptors/buffers
 	 */
 	if (rtls_alloc_bufs(rtlsp) == DDI_FAILURE) {
-		cmn_err(CE_WARN, "rtls_attach -- DMA buffer allocation fail.");
+		cmn_err(CE_WARN, "DMA buffer allocation fail.");
 		goto fail;
 	}
 
@@ -483,38 +478,6 @@ rtls_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	rtls_get_mac_addr(rtlsp, rtlsp->netaddr);
 
 	/*
-	 * Add the softint handlers:
-	 *
-	 * Both of these handlers are used to avoid restrictions on the
-	 * context and/or mutexes required for some operations. In
-	 * particular, the hardware interrupt handler and its subfunctions
-	 * can detect a number of conditions that we don't want to handle
-	 * in that context or with that set of mutexes held. So, these
-	 * softints are triggered instead:
-	 *
-	 * the <rtls_reschedule> softint is triggered if we have previously
-	 * had to refuse to send a packet because of resource shortage
-	 * (we've run out of transmit descriptors),Its only purpose is to
-	 * call mac_tx_update() to retry the pending transmits (we're not
-	 * allowed to hold driver-defined mutexes across mac_tx_update()).
-	 *
-	 * the <rtls_events> is triggered if the h/w interrupt handler
-	 * sees the <link state changed>.
-	 */
-	if (ddi_add_softintr(devinfo, DDI_SOFTINT_LOW, &rtlsp->resched_id,
-	    NULL, NULL, rtls_reschedule, (caddr_t)rtlsp) != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "rtls_attach -- ddi_add_softintr 1 fail.");
-		goto fail;
-	}
-
-	if (ddi_add_softintr(devinfo, DDI_SOFTINT_LOW, &rtlsp->events_id,
-	    NULL, NULL, rtls_events, (caddr_t)rtlsp) != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "rtls_attach -- ddi_add_softintr 2 fail.");
-		ddi_remove_softintr(rtlsp->resched_id);
-		goto fail;
-	}
-
-	/*
 	 * Add the interrupt handler
 	 *
 	 * This will prevent receiving interrupts before device is ready, as
@@ -526,12 +489,23 @@ rtls_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 	if (ddi_add_intr(devinfo, 0, &rtlsp->iblk, NULL, rtls_intr,
 	    (caddr_t)rtlsp) != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "rtls_attach -- ddi_add_intr fail.");
+		cmn_err(CE_WARN, "ddi_add_intr fail.");
 		goto late_fail;
 	}
 
+	if ((rtlsp->mii = mii_alloc(rtlsp, devinfo, &rtls_mii_ops)) == NULL) {
+		ddi_remove_intr(devinfo, 0, rtlsp->iblk);
+		goto late_fail;
+	}
+	/*
+	 * Note: Some models of 8139 can support pause, but we have
+	 * not implemented support for it at this time.  This might be
+	 * an interesting feature to add later.
+	 */
+	mii_set_pauseable(rtlsp->mii, B_FALSE, B_FALSE);
+
 	if ((macp = mac_alloc(MAC_VERSION)) == NULL) {
-		cmn_err(CE_WARN, "rtls_attach - mac_alloc fail.");
+		cmn_err(CE_WARN, "mac_alloc fail.");
 		ddi_remove_intr(devinfo, 0, rtlsp->iblk);
 		goto late_fail;
 	}
@@ -566,24 +540,13 @@ rtls_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 	mac_free(macp);
 
-	/*
-	 * Add the periodic timer to check link state.  We do this
-	 * once a second, in case the link interrupt is missed (or not
-	 * delivered -- qemu emulated 8139 devices don't deliver the
-	 * link change interrupt.)  This can run in ordinary kernel
-	 * context.
-	 */
-	rtlsp->periodic_id = ddi_periodic_add(rtls_periodic, rtlsp,
-	    1000000000U, 0);
-	ASSERT(rtlsp->periodic_id != NULL);	/* API guarantee */
-
 	return (DDI_SUCCESS);
 
 late_fail:
 	if (macp)
 		mac_free(macp);
-	ddi_remove_softintr(rtlsp->resched_id);
-	ddi_remove_softintr(rtlsp->events_id);
+	if (rtlsp->mii)
+		mii_free(rtlsp->mii);
 
 fail:
 	ddi_regs_map_free(&rtlsp->io_handle);
@@ -613,6 +576,8 @@ rtls_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 		break;
 
 	case DDI_SUSPEND:
+		mii_suspend(rtlsp->mii);
+
 		mutex_enter(&rtlsp->rtls_io_lock);
 		mutex_enter(&rtlsp->rtls_rx_lock);
 		mutex_enter(&rtlsp->rtls_tx_lock);
@@ -634,11 +599,9 @@ rtls_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	ddi_periodic_delete(rtlsp->periodic_id);
 	ddi_remove_intr(devinfo, 0, rtlsp->iblk);
 
-	ddi_remove_softintr(rtlsp->resched_id);
-	ddi_remove_softintr(rtlsp->events_id);
+	mii_free(rtlsp->mii);
 
 	mutex_destroy(&rtlsp->rtls_io_lock);
 	mutex_destroy(&rtlsp->rtls_tx_lock);
@@ -700,6 +663,10 @@ rtls_m_start(void *arg)
 	mutex_exit(&rtlsp->rtls_rx_lock);
 	mutex_exit(&rtlsp->rtls_io_lock);
 
+	drv_usecwait(100);
+
+	mii_start(rtlsp->mii);
+
 	return (0);
 }
 
@@ -710,6 +677,8 @@ static void
 rtls_m_stop(void *arg)
 {
 	rtls_t *rtlsp = (rtls_t *)arg;
+
+	mii_stop(rtlsp->mii);
 
 	mutex_enter(&rtlsp->rtls_io_lock);
 
@@ -754,13 +723,6 @@ rtls_m_multicst(void *arg, boolean_t enable, const uint8_t *mcast)
 	index = rtls_hash_index(mcast);
 			/* index value is between 0 and 63 */
 
-#ifdef RTLS_DEBUG
-	if (rtls_debug & RTLS_REGCFG) {
-		cmn_err(CE_NOTE,
-		    "%s: rtls_m_multicst: enable = %d, multi(%s), index=%d",
-		    rtlsp->ifname, enable, ether_sprintf((void *)mcast), index);
-	}
-#endif
 	if (enable) {
 		if (rtlsp->multicast_cnt[index]++) {
 			mutex_exit(&rtlsp->rtls_io_lock);
@@ -782,19 +744,6 @@ rtls_m_multicst(void *arg, boolean_t enable, const uint8_t *mcast)
 		rtls_reg_set32(rtlsp, MULTICAST_0_REG, hashp[0]);
 		rtls_reg_set32(rtlsp, MULTICAST_4_REG, hashp[1]);
 	}
-
-#ifdef RTLS_DEBUG
-	if (rtls_debug & RTLS_REGCFG) {
-		cmn_err(CE_NOTE,
-		    "%s: rtls_m_multicst =>: hash0=0x%x, hash1=0x%x",
-		    rtlsp->ifname, hashp[0], hashp[1]);
-		cmn_err(CE_NOTE,
-		    "%s: rtls_m_multicst <=, hash0=0x%x, hash1=0x%x",
-		    rtlsp->ifname,
-		    rtls_reg_get32(rtlsp, MULTICAST_0_REG),
-		    rtls_reg_get32(rtlsp, MULTICAST_4_REG));
-	}
-#endif
 
 	mutex_exit(&rtlsp->rtls_io_lock);
 
@@ -842,12 +791,6 @@ rtls_m_promisc(void *arg, boolean_t on)
 {
 	rtls_t *rtlsp = arg;
 
-#ifdef RTLS_DEBUG
-	if (rtls_debug & RTLS_REGCFG) {
-		cmn_err(CE_NOTE, "%s: rtls_m_promisc: on=%d",
-		    rtlsp->ifname, on);
-	}
-#endif
 	mutex_enter(&rtlsp->rtls_io_lock);
 
 	rtlsp->promisc = on;
@@ -878,24 +821,11 @@ rtls_m_stat(void *arg, uint_t stat, uint64_t *val)
 {
 	rtls_t *rtlsp = arg;
 
-	uint16_t	bmcr, bmsr, anar, anlpar, aner;
-
-	mutex_enter(&rtlsp->rtls_io_lock);
-	if (!rtlsp->rtls_suspended) {
-		bmcr = rtls_reg_get16(rtlsp, BASIC_MODE_CONTROL_REG);
-		bmsr = rtls_reg_get16(rtlsp, BASIC_MODE_STATUS_REG);
-		anar = rtls_reg_get16(rtlsp, AUTO_NEGO_AD_REG);
-		anlpar = rtls_reg_get16(rtlsp, AUTO_NEGO_LP_REG);
-		aner = rtls_reg_get16(rtlsp, AUTO_NEGO_EXP_REG);
-	} else {
-		bmcr = bmsr = anar = anlpar = aner = 0;
+	if (mii_m_getstat(rtlsp->mii, stat, val) == 0) {
+		return (0);
 	}
-	mutex_exit(&rtlsp->rtls_io_lock);
 
 	switch (stat) {
-	case MAC_STAT_IFSPEED:
-		*val = rtlsp->stats.speed;
-		break;
 	case MAC_STAT_IPACKETS:
 		*val = rtlsp->stats.ipackets;
 		break;
@@ -938,9 +868,6 @@ rtls_m_stat(void *arg, uint_t stat, uint64_t *val)
 	case MAC_STAT_COLLISIONS:
 		*val = rtlsp->stats.collisions;
 		break;
-	case ETHER_STAT_LINK_DUPLEX:
-		*val = rtlsp->stats.duplex;
-		break;
 	case ETHER_STAT_FCS_ERRORS:
 		*val = rtlsp->stats.crc_err;
 		break;
@@ -968,48 +895,6 @@ rtls_m_stat(void *arg, uint_t stat, uint64_t *val)
 	case ETHER_STAT_MULTI_COLLISIONS:
 		*val = rtlsp->stats.multicol;
 		break;
-	case ETHER_STAT_CAP_100FDX:
-	case ETHER_STAT_CAP_100HDX:
-	case ETHER_STAT_CAP_10FDX:
-	case ETHER_STAT_CAP_10HDX:
-	case ETHER_STAT_CAP_AUTONEG:
-		*val = 1;	/* these are all true by default */
-		break;
-	case ETHER_STAT_ADV_CAP_100FDX:
-		*val = anar & AUTO_NEGO_100FULL ? 1 : 0;
-		break;
-	case ETHER_STAT_ADV_CAP_100HDX:
-		*val = anar & AUTO_NEGO_100HALF ? 1 : 0;
-		break;
-	case ETHER_STAT_ADV_CAP_10FDX:
-		*val = anar & AUTO_NEGO_10FULL ? 1 : 0;
-		break;
-	case ETHER_STAT_ADV_CAP_10HDX:
-		*val = anar & AUTO_NEGO_10HALF ? 1 : 0;
-		break;
-	case ETHER_STAT_ADV_CAP_AUTONEG:
-		*val = bmcr & BASIC_MODE_AUTONEGO ? 1 : 0;
-		break;
-	case ETHER_STAT_LP_CAP_100FDX:
-		*val = anlpar & AUTO_NEGO_100FULL ? 1 : 0;
-		break;
-	case ETHER_STAT_LP_CAP_100HDX:
-		*val = anlpar & AUTO_NEGO_100HALF ? 1 : 0;
-		break;
-	case ETHER_STAT_LP_CAP_10FDX:
-		*val = anlpar & AUTO_NEGO_10FULL ? 1 : 0;
-		break;
-	case ETHER_STAT_LP_CAP_10HDX:
-		*val = anlpar & AUTO_NEGO_10HALF ? 1 : 0;
-		break;
-	case ETHER_STAT_LP_CAP_AUTONEG:
-		*val = aner & AUTO_NEGO_EXP_LPCANAN ? 1 : 0;
-		break;
-	case ETHER_STAT_LINK_AUTONEG:
-		*val = ((aner & AUTO_NEGO_EXP_LPCANAN) &&
-		    (bmcr & BASIC_MODE_AUTONEGO) &&
-		    (bmsr & BASIC_MODE_STATUS_AUTONEGO_DONE)) ? 1 : 0;
-		break;
 	default:
 		return (ENOTSUP);
 	}
@@ -1025,6 +910,24 @@ rtls_m_stat(void *arg, uint_t stat, uint64_t *val)
 #endif
 
 	return (0);
+}
+
+int
+rtls_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
+    uint_t sz, void *val, uint_t *perm)
+{
+	rtls_t	*rtlsp = arg;
+
+	return (mii_m_getprop(rtlsp->mii, name, num, flags, sz, val, perm));
+}
+
+int
+rtls_m_setprop(void *arg, const char *name, mac_prop_id_t num, uint_t sz,
+    const void *val)
+{
+	rtls_t	*rtlsp = arg;
+
+	return (mii_m_setprop(rtlsp->mii, name, num, sz, val));
 }
 
 /*
@@ -1073,9 +976,12 @@ rtls_send(rtls_t *rtlsp, mblk_t *mp)
 	}
 
 	/*
-	 * If chip link down ...
+	 * If chip link down ...  Note that experimentation shows that
+	 * the device seems not to care about whether or not we have
+	 * this check, but if we don't add the check here, it might
+	 * not be properly reported as a carrier error.
 	 */
-	if (rtlsp->link_state == LINK_STATE_DOWN) {
+	if (rtls_reg_get8(rtlsp, MEDIA_STATUS_REG) & MEDIA_STATUS_LINK) {
 #ifdef RTLS_DEBUG
 		cmn_err(CE_WARN,
 		    "%s: send fail--LINK DOWN!",
@@ -1477,11 +1383,14 @@ rtls_intr(caddr_t arg)
 {
 	rtls_t *rtlsp = (void *)arg;
 	uint32_t int_status;
-	uint8_t media_status;
-	int32_t link;
 	uint32_t val32;
+	boolean_t	resched = B_FALSE;
 
 	mutex_enter(&rtlsp->rtls_io_lock);
+	if (rtlsp->rtls_suspended) {
+		mutex_exit(&rtlsp->rtls_io_lock);
+		return (DDI_INTR_UNCLAIMED);
+	}
 
 	/*
 	 * Was this interrupt caused by our device...
@@ -1525,29 +1434,11 @@ rtls_intr(caddr_t arg)
 	}
 
 	/*
-	 * Cable link change interrupt
-	 */
-	if (int_status & LINK_CHANGE_INT) {
-		media_status = rtls_reg_get8(rtlsp, MEDIA_STATUS_REG);
-		link = (media_status & MEDIA_STATUS_LINK) ?
-		    LINK_STATE_DOWN : LINK_STATE_UP;
-
-		if (rtlsp->link_state != link) {
-			rtlsp->link_state = link;
-			rtlsp->link_change = B_TRUE;
-			/*
-			 * Trigger rtls_events
-			 */
-			ddi_trigger_softintr(rtlsp->events_id);
-		}
-	}
-
-	/*
 	 * Trigger mac_tx_update
 	 */
-	if (rtlsp->need_sched && !rtlsp->sched_running) {
-		rtlsp->sched_running = B_TRUE;
-		ddi_trigger_softintr(rtlsp->resched_id);
+	if (rtlsp->need_sched) {
+		rtlsp->need_sched = B_FALSE;
+		resched = B_TRUE;
 	}
 
 	mutex_exit(&rtlsp->rtls_io_lock);
@@ -1563,104 +1454,18 @@ rtls_intr(caddr_t arg)
 		rtls_receive(rtlsp);
 	}
 
-	return (DDI_INTR_CLAIMED);	/* indicate it was our interrupt */
-}
-
-static void
-rtls_periodic(void *arg)
-{
-	rtls_t		*rtlsp = (void *)arg;
-	uint32_t	link;
-	uint8_t		media_status;
-
-	mutex_enter(&rtlsp->rtls_io_lock);
-
-	if (rtlsp->rtls_suspended) {
-		mutex_exit(&rtlsp->rtls_io_lock);
-		return;
-	}
-
-	media_status = rtls_reg_get8(rtlsp, MEDIA_STATUS_REG);
-	link = (media_status & MEDIA_STATUS_LINK) ?
-	    LINK_STATE_DOWN : LINK_STATE_UP;
-
-	if (rtlsp->link_state != link) {
-		rtlsp->link_state = link;
-		rtlsp->link_change = B_TRUE;
-		/*
-		 * Trigger rtls_events
-		 */
-		ddi_trigger_softintr(rtlsp->events_id);
-	}
-	mutex_exit(&rtlsp->rtls_io_lock);
-}
-
-/*
- * rtls_reschedule() -- soft interrupt handler
- */
-static uint_t
-rtls_reschedule(caddr_t arg)
-{
-	rtls_t *rtlsp = (void *)arg;
-	uint_t tmp;
-
-	tmp = DDI_INTR_UNCLAIMED;
-
-	if (rtlsp->need_sched && rtlsp->rtls_running) {
-#ifdef RTLS_DEBUG
-		if (rtls_debug & RTLS_SEND) {
-			cmn_err(CE_NOTE, "%s: rtls_reschedule", rtlsp->ifname);
-		}
-#endif
-		rtlsp->need_sched = B_FALSE;
-		mac_tx_update(rtlsp->mh);
-		rtlsp->sched_running = B_FALSE;
-		tmp = DDI_INTR_CLAIMED;
-	}
-	return (tmp);
-}
-
-/*
- * rtls_events() -- soft interrupt handler
- *
- * The rtls_events is woken up when there's something to do that we'd rather
- * not do from inside a hardware interrupt handler.
- * Its main task now is just:
- *    notice mac the link status changed
- */
-static uint_t
-rtls_events(caddr_t arg)
-{
-	rtls_t *rtlsp = (void *)arg;
-	uint_t tmp = DDI_INTR_UNCLAIMED;
-	uint8_t media_status;
-	uint16_t duplex_mode;
-
 	/*
-	 * If the link state changed, tell the world about it.
-	 * Note: can't do this while still holding the mutex.
+	 * Link change interrupt.
 	 */
-	if (rtlsp->link_change) {
-		rtlsp->link_change = B_FALSE;
-
-		if (rtlsp->link_state == LINK_STATE_UP) {
-			media_status =
-			    rtls_reg_get8(rtlsp, MEDIA_STATUS_REG);
-			rtlsp->stats.speed =
-			    (media_status & MEDIA_STATUS_SPEED) ?
-			    RTLS_SPEED_10M : RTLS_SPEED_100M;
-			duplex_mode = rtls_reg_get16(rtlsp,
-			    BASIC_MODE_CONTROL_REG);
-			rtlsp->stats.duplex =
-			    (duplex_mode & BASIC_MODE_DUPLEX) ?
-			    LINK_DUPLEX_FULL : LINK_DUPLEX_HALF;
-		}
-		mac_link_update(rtlsp->mh, rtlsp->link_state);
-
-		tmp = DDI_INTR_CLAIMED;
+	if (int_status & LINK_CHANGE_INT) {
+		mii_check(rtlsp->mii);
 	}
 
-	return (tmp);
+	if (resched) {
+		mac_tx_update(rtlsp->mh);
+	}
+
+	return (DDI_INTR_CLAIMED);	/* indicate it was our interrupt */
 }
 
 /*
@@ -1878,14 +1683,9 @@ rtls_chip_reset(rtls_t *rtlsp, boolean_t quiesce)
 static void
 rtls_chip_init(rtls_t *rtlsp)
 {
-	static boolean_t first_time = B_TRUE;
-	int *forced_speed_and_duplex;
-	uint_t	item_num;
 	uint32_t val32;
 	uint16_t val16;
 	uint8_t val8;
-	int err;
-	int i;
 
 	/*
 	 * Initialize internal data structures
@@ -1893,53 +1693,6 @@ rtls_chip_init(rtls_t *rtlsp)
 	rtlsp->cur_rx = 0;
 	rtlsp->tx_current_desc = 0;
 	rtlsp->tx_first_loop = 0;
-
-	/*
-	 * Read ForceSpeedDuplex from rtls.conf file
-	 */
-	if (first_time) {
-		first_time = B_FALSE;
-		/*
-		 * Set ForceSpeedDuplex array default value
-		 * to 5:Anto-Negotiation
-		 */
-		for (i = 0; i < RTLS_MAX_DEVICES; i++)
-			rtls_link_mode[i] = FORCE_AUTO_NEGO;
-
-		/* Read ForceSpeedDuplex value */
-		err = ddi_prop_lookup_int_array(
-		    DDI_DEV_T_ANY,
-		    rtlsp->devinfo,
-		    DDI_PROP_DONTPASS,
-		    "ForceSpeedDuplex",
-		    &forced_speed_and_duplex,
-		    &item_num);
-		if (err == DDI_PROP_SUCCESS) {
-			for (i = 0; i <= item_num; i++) {
-				rtls_link_mode[i] =
-				    forced_speed_and_duplex[i];
-			}
-			ddi_prop_free(forced_speed_and_duplex);
-		}
-#ifdef RTLS_DEBUG
-		if (err == DDI_PROP_SUCCESS) {
-			for (i = 0; i < item_num; i++)
-				cmn_err(CE_NOTE,
-				    "rtls.conf: rtls%d, ForceSpeedDuplex = %d",
-				    i, rtls_link_mode[i]);
-		} else {
-			cmn_err(CE_NOTE,
-			    "rtls: read ForceSpeedDuplex in rtls.conf fail.");
-		}
-#endif
-	}
-	rtlsp->force_speed_duplex =
-	    rtls_link_mode[rtlsp->instance];
-
-	/*
-	 * Set duplex and speed
-	 */
-	rtls_chip_force_speed_duplex(rtlsp);
 
 	/*
 	 * Set DMA physical rx/tx buffer address to register
@@ -2102,18 +1855,12 @@ rtls_set_mac_addr(rtls_t *rtlsp, const uint8_t *macaddr)
 	uint32_t val32;
 	uint8_t val8;
 
-#ifdef RTLS_DEBUG
-	if (rtls_debug & RTLS_REGCFG) {
-		cmn_err(CE_NOTE, "%s:rtls_set_mac_addr(%s)",
-		    rtlsp->ifname, ether_sprintf((void *)macaddr));
-	}
-#endif
 	/*
 	 * Change to config register write enable mode
 	 */
-	val8 = rtls_reg_get8(rtlsp, RT_93c46_COMMOND_REG);
+	val8 = rtls_reg_get8(rtlsp, RT_93c46_COMMAND_REG);
 	val8 |= RT_93c46_MODE_CONFIG;
-	rtls_reg_set8(rtlsp, RT_93c46_COMMOND_REG, val8);
+	rtls_reg_set8(rtlsp, RT_93c46_COMMAND_REG, val8);
 
 	/*
 	 * Get first 4 bytes of mac address
@@ -2131,15 +1878,6 @@ rtls_set_mac_addr(rtls_t *rtlsp, const uint8_t *macaddr)
 	 */
 	rtls_reg_set32(rtlsp, ID_0_REG, val32);
 
-#ifdef RTLS_DEBUG
-	if (rtls_debug & RTLS_REGCFG) {
-		cmn_err(CE_NOTE, "%s: rtls_m_unicst 0 => 0x%x",
-		    rtlsp->ifname, val32);
-		val32 = rtls_reg_get32(rtlsp, ID_0_REG);
-		cmn_err(CE_NOTE, "%s: rtls_m_unicst 0 <= 0x%x",
-		    rtlsp->ifname, val32);
-	}
-#endif
 	/*
 	 * Get last 2 bytes of mac address
 	 */
@@ -2153,124 +1891,104 @@ rtls_set_mac_addr(rtls_t *rtlsp, const uint8_t *macaddr)
 	val32 |= rtls_reg_get32(rtlsp, ID_4_REG) & ~0xffff;
 	rtls_reg_set32(rtlsp, ID_4_REG, val32);
 
-#ifdef RTLS_DEBUG
-	if (rtls_debug & RTLS_REGCFG) {
-		cmn_err(CE_NOTE, "%s: rtls_m_unicst 1 => 0x%x",
-		    rtlsp->ifname, val32);
-		val32 = rtls_reg_get32(rtlsp, ID_4_REG);
-		cmn_err(CE_NOTE, "%s: rtls_m_unicst 1 <= 0x%x",
-		    rtlsp->ifname, val32);
-	}
-#endif
 	/*
 	 * Return to normal network/host communication mode
 	 */
 	val8 &= ~RT_93c46_MODE_CONFIG;
-	rtls_reg_set8(rtlsp, RT_93c46_COMMOND_REG, val8);
+	rtls_reg_set8(rtlsp, RT_93c46_COMMAND_REG, val8);
 }
 
-/*
- * rtls_chip_force_speed_duplex() -- set chip speed and duplex mode
- */
-static void
-rtls_chip_force_speed_duplex(rtls_t *rtlsp)
+static uint16_t
+rtls_mii_read(void *arg, uint8_t phy, uint8_t reg)
 {
-	uint16_t control;
-	uint16_t ad_mode;
-	uint8_t val8;
+	rtls_t		*rtlsp = arg;
+	uint16_t	val;
 
-	control = rtls_reg_get16(rtlsp, BASIC_MODE_CONTROL_REG);
-	control &= ~BASIC_MODE_CONTROL_BITS;
-	ad_mode = rtls_reg_get16(rtlsp, AUTO_NEGO_AD_REG);
-	ad_mode &= ~AUTO_NEGO_MODE_BITS;
-
-#ifdef RTLS_DEBUG
-	if (rtls_debug & RTLS_TRACE) {
-		cmn_err(CE_NOTE, "%s:rtls_chip_force_speed_duplex = %d",
-		    rtlsp->ifname, rtlsp->force_speed_duplex);
+	if (phy != 1) {
+		return (0xffff);
 	}
-#endif
-	switch (rtlsp->force_speed_duplex) {
+	switch (reg) {
+	case MII_CONTROL:
+		val = rtls_reg_get16(rtlsp, BASIC_MODE_CONTROL_REG);
+		break;
+	case MII_STATUS:
+		val = rtls_reg_get16(rtlsp, BASIC_MODE_STATUS_REG);
+		break;
+	case MII_AN_ADVERT:
+		val = rtls_reg_get16(rtlsp, AUTO_NEGO_AD_REG);
+		break;
+	case MII_AN_LPABLE:
+		val = rtls_reg_get16(rtlsp, AUTO_NEGO_LP_REG);
+		break;
+	case MII_AN_EXPANSION:
+		val = rtls_reg_get16(rtlsp, AUTO_NEGO_EXP_REG);
+		break;
+	case MII_VENDOR(0):
+		/*
+		 * We "simulate" a vendor private register so that the
+		 * PHY layer can access it to determine detected link
+		 * speed/duplex.
+		 */
+		val = rtls_reg_get8(rtlsp, MEDIA_STATUS_REG);
+		break;
+	case MII_PHYIDH:
+	case MII_PHYIDL:
 	default:
-		cmn_err(CE_WARN,
-		    "%s: Bad ForceSpeedDuplex = %d value, "
-		    "will use its default value 5: Anto-Negotiation",
-		    rtlsp->ifname, rtlsp->force_speed_duplex);
-		rtlsp->force_speed_duplex = FORCE_AUTO_NEGO;
-		control |= BASIC_MODE_AUTONEGO | BASIC_MODE_RESTAR_AUTONEGO;
-		ad_mode |= AUTO_NEGO_100FULL | AUTO_NEGO_100HALF |
-		    AUTO_NEGO_10FULL | AUTO_NEGO_10HALF;
-		rtlsp->stats.speed = RTLS_SPEED_UNKNOWN;
-		rtlsp->stats.duplex = LINK_DUPLEX_UNKNOWN;
-		break;
-	case FORCE_AUTO_NEGO:
-		control |= BASIC_MODE_AUTONEGO | BASIC_MODE_RESTAR_AUTONEGO;
-		ad_mode |= AUTO_NEGO_100FULL | AUTO_NEGO_100HALF |
-		    AUTO_NEGO_10FULL | AUTO_NEGO_10HALF;
-		if (!rtlsp->chip_error) {
-			rtlsp->stats.speed = RTLS_SPEED_UNKNOWN;
-			rtlsp->stats.duplex = LINK_DUPLEX_UNKNOWN;
-		}
-		break;
-	case FORCE_100_FDX:
-		/*
-		 * RTL8139 can't establish link correctly on this force mode
-		 * if the other side is not the same force mode. So We have to
-		 * realize this force mode in auto-negotiation mode advertising
-		 * 100M/Full ability only
-		 */
-		control |= BASIC_MODE_AUTONEGO | BASIC_MODE_RESTAR_AUTONEGO;
-		ad_mode |= AUTO_NEGO_100FULL;
-		rtlsp->stats.speed = RTLS_SPEED_100M;
-		rtlsp->stats.duplex = LINK_DUPLEX_FULL;
-		break;
-	case FORCE_100_HDX:
-		control |= BASIC_MODE_SPEED_100;
-		ad_mode |= AUTO_NEGO_100HALF;
-		rtlsp->stats.speed = RTLS_SPEED_100M;
-		rtlsp->stats.duplex = LINK_DUPLEX_HALF;
-		break;
-	case FORCE_10_FDX:
-		/*
-		 * RTL8139 can't establish link correctly on this force mode
-		 * if the other side is not the same force mode. So We have to
-		 * realize this force mode in auto-negotiation mode advertising
-		 * 10M/Full ability only
-		 */
-		control |= BASIC_MODE_AUTONEGO | BASIC_MODE_RESTAR_AUTONEGO;
-		ad_mode |= AUTO_NEGO_10FULL;
-		rtlsp->stats.speed = RTLS_SPEED_10M;
-		rtlsp->stats.duplex = LINK_DUPLEX_FULL;
-		break;
-	case FORCE_10_HDX:
-		ad_mode |= AUTO_NEGO_10HALF;
-		rtlsp->stats.speed = RTLS_SPEED_10M;
-		rtlsp->stats.duplex = LINK_DUPLEX_HALF;
+		val = 0;
 		break;
 	}
+	return (val);
+}
 
-	/*
-	 * Set auto-negotiation advertisement ability register
-	 */
-	rtls_reg_set16(rtlsp, AUTO_NEGO_AD_REG, ad_mode);
+void
+rtls_mii_write(void *arg, uint8_t phy, uint8_t reg, uint16_t val)
+{
+	rtls_t		*rtlsp = arg;
+	uint8_t		val8;
 
-	/*
-	 * Change to config register write enable mode
-	 */
-	val8 = rtls_reg_get8(rtlsp, RT_93c46_COMMOND_REG);
-	val8 |= RT_93c46_MODE_CONFIG;
-	rtls_reg_set8(rtlsp, RT_93c46_COMMOND_REG, val8);
+	if (phy != 1) {
+		return;
+	}
+	switch (reg) {
+	case MII_CONTROL:
+		/* Enable writes to all bits of BMCR */
+		val8 = rtls_reg_get8(rtlsp, RT_93c46_COMMAND_REG);
+		val8 |= RT_93c46_MODE_CONFIG;
+		rtls_reg_set8(rtlsp, RT_93c46_COMMAND_REG, val8);
+		/* write out the value */
+		rtls_reg_set16(rtlsp, BASIC_MODE_CONTROL_REG, val);
 
-	/*
-	 * Set MII control register
-	 */
-	rtls_reg_set16(rtlsp, BASIC_MODE_CONTROL_REG, control);
+		/* Return to normal network/host communication mode */
+		val8 &= ~RT_93c46_MODE_CONFIG;
+		rtls_reg_set8(rtlsp, RT_93c46_COMMAND_REG, val8);
+		return;
 
-	/*
-	 * Return to normal network/host communication mode
-	 */
-	val8 &= ~RT_93c46_MODE_CONFIG;
-	rtls_reg_set8(rtlsp, RT_93c46_COMMOND_REG, val8);
+	case MII_STATUS:
+		rtls_reg_set16(rtlsp, BASIC_MODE_STATUS_REG, val);
+		break;
+	case MII_AN_ADVERT:
+		rtls_reg_set16(rtlsp, AUTO_NEGO_AD_REG, val);
+		break;
+	case MII_AN_LPABLE:
+		rtls_reg_set16(rtlsp, AUTO_NEGO_LP_REG, val);
+		break;
+	case MII_AN_EXPANSION:
+		rtls_reg_set16(rtlsp, AUTO_NEGO_EXP_REG, val);
+		break;
+	case MII_PHYIDH:
+	case MII_PHYIDL:
+	default:
+		/* these are not writable */
+		break;
+	}
+}
+
+void
+rtls_mii_notify(void *arg, link_state_t link)
+{
+	rtls_t	*rtlsp = arg;
+
+	mac_link_update(rtlsp->mh, link);
 }
 
 #ifdef RTLS_DEBUG
@@ -2305,37 +2023,31 @@ rtls_reg_print(rtls_t *rtlsp)
 	delay(drv_usectohz(1000));
 
 	val16 = rtls_reg_get16(rtlsp, TX_DESC_STAUS_REG);
-	cmn_err(CE_NOTE,
-	    "%s: TX_DESC_STAUS_REG = 0x%x, cur_desc = %d",
+	cmn_err(CE_NOTE, "%s: TX_DESC_STAUS_REG = 0x%x, cur_desc = %d",
 	    rtlsp->ifname, val16, rtlsp->tx_current_desc);
 	delay(drv_usectohz(1000));
 
 	val32 = rtls_reg_get32(rtlsp, TX_STATUS_DESC0_REG);
-	cmn_err(CE_NOTE,
-	    "%s: TX_STATUS_DESC0_REG = 0x%x",
+	cmn_err(CE_NOTE, "%s: TX_STATUS_DESC0_REG = 0x%x",
 	    rtlsp->ifname, val32);
 	delay(drv_usectohz(1000));
 
 	val32 = rtls_reg_get32(rtlsp, TX_STATUS_DESC1_REG);
-	cmn_err(CE_NOTE,
-	    "%s: TX_STATUS_DESC1_REG = 0x%x",
+	cmn_err(CE_NOTE, "%s: TX_STATUS_DESC1_REG = 0x%x",
 	    rtlsp->ifname, val32);
 	delay(drv_usectohz(1000));
 
 	val32 = rtls_reg_get32(rtlsp, TX_STATUS_DESC2_REG);
-	cmn_err(CE_NOTE,
-	    "%s: TX_STATUS_DESC2_REG = 0x%x",
+	cmn_err(CE_NOTE, "%s: TX_STATUS_DESC2_REG = 0x%x",
 	    rtlsp->ifname, val32);
 	delay(drv_usectohz(1000));
 
 	val32 = rtls_reg_get32(rtlsp, TX_STATUS_DESC3_REG);
-	cmn_err(CE_NOTE,
-	    "%s: TX_STATUS_DESC3_REG = 0x%x",
+	cmn_err(CE_NOTE, "%s: TX_STATUS_DESC3_REG = 0x%x",
 	    rtlsp->ifname, val32);
 	delay(drv_usectohz(1000));
 
-	cmn_err(CE_NOTE,
-	    "%s: in  = %llu, multicast = %llu, broadcast = %llu",
+	cmn_err(CE_NOTE, "%s: in  = %llu, multicast = %llu, broadcast = %llu",
 	    rtlsp->ifname,
 	    (unsigned long long)rtlsp->stats.ipackets,
 	    (unsigned long long)rtlsp->stats.multi_rcv,
