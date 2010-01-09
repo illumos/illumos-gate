@@ -18,11 +18,9 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <link.h>
@@ -366,11 +364,12 @@ sign_csr(KMF_HANDLE_T handle,
 	KMF_X509_ALGORITHM_IDENTIFIER *algo,
 	KMF_DATA	*SignedCsr)
 {
-
 	KMF_CSR_DATA	subj_csr;
 	KMF_TBS_CSR	*tbs_csr = NULL;
 	KMF_DATA	signed_data = {0, NULL};
 	KMF_RETURN	ret = KMF_OK;
+	KMF_ATTRIBUTE	attlist[5];
+	int i = 0;
 
 	if (!SignedCsr)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -393,13 +392,25 @@ sign_csr(KMF_HANDLE_T handle,
 		goto cleanup;
 	}
 
-	/* Sign the data */
-	ret = KMF_SignDataWithKey(handle, Signkey, &algo->algorithm,
-	    (KMF_DATA *)SubjectCsr, &signed_data);
+	kmf_set_attr_at_index(attlist, i++,
+	    KMF_KEYSTORE_TYPE_ATTR, &Signkey->kstype,
+	    sizeof (Signkey->kstype));
 
+	kmf_set_attr_at_index(attlist, i++,
+	    KMF_KEY_HANDLE_ATTR, Signkey, sizeof (KMF_KEY_HANDLE));
+
+	kmf_set_attr_at_index(attlist, i++, KMF_OID_ATTR, &algo->algorithm,
+	    sizeof (KMF_OID));
+
+	kmf_set_attr_at_index(attlist, i++, KMF_DATA_ATTR,
+	    (KMF_DATA *)SubjectCsr, sizeof (KMF_DATA));
+
+	kmf_set_attr_at_index(attlist, i++, KMF_OUT_DATA_ATTR,
+	    &signed_data, sizeof (KMF_DATA));
+
+	ret = kmf_sign_data(handle, i, attlist);
 	if (KMF_OK != ret)
 		goto cleanup;
-
 	/*
 	 * If we got here OK, decode into a structure and then re-encode
 	 * the complete CSR.

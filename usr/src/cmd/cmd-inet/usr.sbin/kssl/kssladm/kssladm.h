@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,7 +44,7 @@ extern "C" {
 
 #define	MAX_CHAIN_LENGTH	12
 #define	REPORT_KMF_ERROR(r, t, e) { \
-	(void) KMF_GetKMFErrorString(r, &e); \
+	(void) kmf_get_kmf_error_str(r, &e); \
 	(void) fprintf(stderr, t ": %s\n", \
 		(e != NULL ? e : "<unknown error>")); \
 	if (e) free(e); \

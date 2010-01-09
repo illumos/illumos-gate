@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *
@@ -339,48 +339,6 @@ KMF_RETURN kmf_get_string_attr(KMF_ATTR_TYPE, KMF_ATTRIBUTE *, int, char **);
 KMF_RETURN kmf_set_attr(KMF_ATTRIBUTE *, int, KMF_ATTR_TYPE, void *, uint32_t);
 void kmf_set_attr_at_index(KMF_ATTRIBUTE *, int, KMF_ATTR_TYPE,
 	void *, uint32_t);
-
-/*
- * Legacy support only - do not use these APIs - they can be removed at any
- * time.
- */
-extern KMF_RETURN KMF_ConfigureKeystore(KMF_HANDLE_T, KMF_CONFIG_PARAMS *);
-extern KMF_RETURN KMF_CreateCSRFile(KMF_DATA *, KMF_ENCODE_FORMAT, char *);
-extern KMF_RETURN KMF_CreateKeypair(KMF_HANDLE_T,
-	KMF_CREATEKEYPAIR_PARAMS *, KMF_KEY_HANDLE *, KMF_KEY_HANDLE *);
-extern KMF_RETURN KMF_DNParser(char *, KMF_X509_NAME *);
-extern KMF_RETURN KMF_Finalize(KMF_HANDLE_T);
-extern KMF_RETURN KMF_FindCert(KMF_HANDLE_T, KMF_FINDCERT_PARAMS *,
-	KMF_X509_DER_CERT *, uint32_t *);
-extern KMF_RETURN KMF_FindKey(KMF_HANDLE_T, KMF_FINDKEY_PARAMS *,
-	KMF_KEY_HANDLE *, uint32_t *);
-extern void KMF_FreeData(KMF_DATA *);
-extern void KMF_FreeKMFCert(KMF_HANDLE_T, KMF_X509_DER_CERT *);
-extern void KMF_FreeKMFKey(KMF_HANDLE_T, KMF_KEY_HANDLE *);
-extern void KMF_FreeSignedCSR(KMF_CSR_DATA *);
-extern KMF_RETURN KMF_GetCertIDString(const KMF_DATA *, char **);
-extern KMF_RETURN KMF_GetCertIssuerNameString(KMF_HANDLE_T,
-	const KMF_DATA *, char **);
-extern KMF_RETURN KMF_GetCertSubjectNameString(KMF_HANDLE_T,
-	const KMF_DATA *, char **);
-extern KMF_RETURN KMF_GetKMFErrorString(KMF_RETURN, char **);
-extern KMF_RETURN KMF_Initialize(KMF_HANDLE_T *, char *, char *);
-extern KMF_RETURN KMF_ReadInputFile(KMF_HANDLE_T, char *, KMF_DATA *);
-extern KMF_RETURN KMF_SetCSRPubKey(KMF_HANDLE_T, KMF_KEY_HANDLE *,
-	KMF_CSR_DATA *);
-extern KMF_RETURN KMF_SetCSRSignatureAlgorithm(KMF_CSR_DATA *,
-	KMF_ALGORITHM_INDEX);
-extern KMF_RETURN KMF_SetCSRSubjectName(KMF_CSR_DATA *, KMF_X509_NAME *);
-extern KMF_RETURN KMF_SetCSRVersion(KMF_CSR_DATA *, uint32_t);
-extern KMF_RETURN KMF_SignCSR(KMF_HANDLE_T, const KMF_CSR_DATA *,
-	KMF_KEY_HANDLE *, KMF_DATA *);
-extern KMF_RETURN KMF_SignDataWithKey(KMF_HANDLE_T, KMF_KEY_HANDLE *,
-	KMF_OID *, KMF_DATA *, KMF_DATA *);
-extern KMF_RETURN KMF_VerifyCertWithCert(KMF_HANDLE_T, const KMF_DATA *,
-	const KMF_DATA *);
-extern KMF_RETURN KMF_VerifyDataWithCert(KMF_HANDLE_T,
-	KMF_KEYSTORE_TYPE, KMF_ALGORITHM_INDEX, KMF_DATA *, KMF_DATA *,
-	const KMF_DATA *);
 
 #ifdef __cplusplus
 }

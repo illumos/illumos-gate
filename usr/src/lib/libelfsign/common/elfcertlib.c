@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -154,9 +154,15 @@ elfcertlib_verifycert(ELFsign_t ess, ELFCert_t cert)
 	}
 
 	if (SECACERT != NULL) {
-		rv = KMF_VerifyCertWithCert(ess->es_kmfhandle,
-		    (const KMF_DATA *)&cert->c_cert,
-		    (const KMF_DATA *)&SECACERT->c_cert.certificate);
+		numattr = 0;
+		kmf_set_attr_at_index(attrlist, numattr++,
+		    KMF_CERT_DATA_ATTR, &cert->c_cert.certificate,
+		    sizeof (KMF_DATA));
+		kmf_set_attr_at_index(attrlist, numattr++,
+		    KMF_SIGNER_CERT_DATA_ATTR, &SECACERT->c_cert.certificate,
+		    sizeof (KMF_DATA));
+
+		rv = kmf_verify_cert(ess->es_kmfhandle, numattr, attrlist);
 		if (rv == KMF_OK) {
 			if (ess->es_certCAcallback != NULL)
 				(ess->es_certvercallback)(ess->es_callbackctx,

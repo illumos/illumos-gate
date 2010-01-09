@@ -2,7 +2,7 @@
  * Copyright (c) 1995-2000 Intel Corporation. All rights reserved.
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -128,7 +128,6 @@ typedef enum {
 	KMF_ALGID_SHA1WithDSA
 } KMF_ALGORITHM_INDEX;
 
-
 /*
  * Generic credential structure used by other structures below
  * to convey authentication information to the underlying
@@ -163,7 +162,6 @@ typedef enum {
 	KMF_CSR = 1,
 	KMF_CRL = 2
 }KMF_OBJECT_TYPE;
-
 
 typedef struct {
 	KMF_BIGINT	mod;
@@ -1211,146 +1209,6 @@ KMFOID_MS_KP_SCLogon_UPN;
 #define	KMF_EKU_EMAIL				0x08
 #define	KMF_EKU_TIMESTAMP			0x10
 #define	KMF_EKU_OCSPSIGNING			0x20
-
-
-/*
- * Legacy support only - do not use these data structures - they can be
- * removed at any time.
- */
-
-/* Keystore Configuration */
-typedef struct {
-	char    *configdir;
-	char    *certPrefix;
-	char    *keyPrefix;
-	char    *secModName;
-} KMF_NSS_CONFIG;
-
-typedef struct {
-	char		*label;
-	boolean_t	readonly;
-} KMF_PKCS11_CONFIG;
-
-typedef struct {
-	KMF_KEYSTORE_TYPE	kstype;
-	union {
-		KMF_NSS_CONFIG		nss_conf;
-		KMF_PKCS11_CONFIG	pkcs11_conf;
-	} ks_config_u;
-} KMF_CONFIG_PARAMS;
-
-#define	nssconfig	ks_config_u.nss_conf
-#define	pkcs11config	ks_config_u.pkcs11_conf
-
-
-typedef struct
-{
-	char    *trustflag;
-	char	*slotlabel;	/* "internal" by default */
-	int	issuerId;
-	int	subjectId;
-	char	*crlfile;	/* for ImportCRL */
-	boolean_t crl_check;	/* for ImportCRL */
-
-	/*
-	 * The following 2 variables are for FindCertInCRL. The caller can
-	 * either specify certLabel or provide the entire certificate in
-	 * DER format as input.
-	 */
-	char	*certLabel;	/* for FindCertInCRL */
-	KMF_DATA *certificate;  /* for FindCertInCRL */
-
-	/*
-	 * crl_subjName and crl_issuerName are used as the CRL deletion
-	 * criteria.  One should be non-NULL and the other one should be NULL.
-	 * If crl_subjName is not NULL, then delete CRL by the subject name.
-	 * Othewise, delete by the issuer name.
-	 */
-	char 	*crl_subjName;
-	char	*crl_issuerName;
-} KMF_NSS_PARAMS;
-
-typedef struct {
-	char	*dirpath;
-	char    *certfile;
-	char	*crlfile;
-	char    *keyfile;
-	char	*outcrlfile;
-	boolean_t crl_check;	/* CRL import check; default is true */
-	KMF_ENCODE_FORMAT	format; /* output file format */
-} KMF_OPENSSL_PARAMS;
-
-typedef struct {
-	boolean_t	private; /* for finding CKA_PRIVATE objects */
-	boolean_t	sensitive;
-	boolean_t	not_extractable;
-	boolean_t	token; /* true == token object, false == session */
-} KMF_PKCS11_PARAMS;
-
-typedef struct {
-	KMF_KEYSTORE_TYPE	kstype;
-	char			*certLabel;
-	char			*issuer;
-	char			*subject;
-	char			*idstr;
-	KMF_BIGINT		*serial;
-	KMF_CERT_VALIDITY	find_cert_validity;
-
-	union {
-		KMF_NSS_PARAMS		nss_opts;
-		KMF_OPENSSL_PARAMS	openssl_opts;
-		KMF_PKCS11_PARAMS	pkcs11_opts;
-	} ks_opt_u;
-} KMF_FINDCERT_PARAMS, KMF_DELETECERT_PARAMS;
-
-typedef struct {
-	KMF_KEYSTORE_TYPE	kstype;
-	KMF_CREDENTIAL		cred;
-	KMF_KEY_CLASS		keyclass;
-	KMF_KEY_ALG		keytype;
-	KMF_ENCODE_FORMAT	format; /* for key */
-	char			*findLabel;
-	char			*idstr;
-	union {
-		KMF_NSS_PARAMS		nss_opts;
-		KMF_OPENSSL_PARAMS	openssl_opts;
-		KMF_PKCS11_PARAMS	pkcs11_opts;
-	} ks_opt_u;
-} KMF_FINDKEY_PARAMS;
-
-typedef struct {
-	KMF_KEYSTORE_TYPE	kstype;
-	KMF_KEY_ALG		keytype;
-	uint32_t		keylength;
-	char			*keylabel;
-	KMF_CREDENTIAL		cred;
-	KMF_BIGINT		rsa_exponent;
-	union {
-	    KMF_NSS_PARAMS	nss_opts;
-	    KMF_OPENSSL_PARAMS	openssl_opts;
-	}ks_opt_u;
-} KMF_CREATEKEYPAIR_PARAMS;
-
-
-typedef struct {
-	KMF_KEYSTORE_TYPE	kstype;
-	KMF_CREDENTIAL		cred;
-	KMF_ENCODE_FORMAT	format; /* for key  */
-	char			*certLabel;
-	KMF_ALGORITHM_INDEX	algid;
-	union {
-	    KMF_NSS_PARAMS	nss_opts;
-	    KMF_OPENSSL_PARAMS	openssl_opts;
-	}ks_opt_u;
-} KMF_CRYPTOWITHCERT_PARAMS;
-
-typedef struct {
-	char			*crl_name;
-} KMF_CHECKCRLDATE_PARAMS;
-
-#define	nssparms	ks_opt_u.nss_opts
-#define	sslparms	ks_opt_u.openssl_opts
-#define	pkcs11parms	ks_opt_u.pkcs11_opts
 
 #ifdef __cplusplus
 }

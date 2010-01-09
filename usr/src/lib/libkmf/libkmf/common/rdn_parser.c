@@ -29,16 +29,12 @@
  * the GPL.  If you do not delete the provisions above, a recipient
  * may use your version of this file under either the MPL or the
  * GPL.
- */
-/*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ *
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * File: rdn_parser.c
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <strings.h>
 #include <stdlib.h>
@@ -538,10 +534,4 @@ kmf_dn_parser(char *string, KMF_X509_NAME *name)
 
 	err = ParseDistinguishedName(string, (int)strlen(string), name);
 	return (err);
-}
-
-KMF_RETURN
-KMF_DNParser(char *string, KMF_X509_NAME *name)
-{
-	return (kmf_dn_parser(string, name));
 }
