@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1921,23 +1921,11 @@ zfs_receive_package(libzfs_handle_t *hdl, int fd, const char *destname,
 	 * Read in the nvlist from the stream.
 	 */
 	if (drr->drr_payloadlen != 0) {
-		boolean_t recursive;
-
 		error = recv_read_nvlist(hdl, fd, drr->drr_payloadlen,
 		    &stream_nv, flags.byteswap, zc);
 		if (error) {
 			error = zfs_error(hdl, EZFS_BADSTREAM, errbuf);
 			goto out;
-		}
-
-		recursive = (nvlist_lookup_boolean(stream_nv,
-		    "not_recursive") == ENOENT);
-
-		if (recursive && !flags.isprefix) {
-			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "must use -d to receive replication "
-			    "(send -R) stream"));
-			return (zfs_error(hdl, EZFS_BADSTREAM, errbuf));
 		}
 	}
 
@@ -2189,23 +2177,27 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 	(void) strcpy(chopprefix, drrb->drr_toname);
 	if (flags.isprefix) {
 		/*
-		 * They specified a fs with -d, we want to tack on
-		 * everything but the pool name stored in the stream
+		 * They specified a fs with -d or -e. We want to tack on
+		 * everything but the first element of the sent snapshot path
+		 * (all but the pool name) in the case of -d, or only the tail
+		 * of the sent snapshot path in the case of -e.
 		 */
 		if (strchr(tosnap, '@')) {
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN, "invalid "
-			    "argument - snapshot not allowed with -d"));
+			    "argument - snapshot not allowed with %s"),
+			    (flags.istail ? "-e" : "-d"));
 			return (zfs_error(hdl, EZFS_INVALIDNAME, errbuf));
 		}
-		cp = strchr(chopprefix, '/');
+		cp = (flags.istail ? strrchr(chopprefix, '/') :
+		    strchr(chopprefix, '/'));
 		if (cp == NULL)
 			cp = strchr(chopprefix, '@');
 		*cp = '\0';
 	} else if (strchr(tosnap, '@') == NULL) {
 		/*
-		 * If they specified a filesystem without -d, we want to
-		 * tack on everything after the fs specified in the
-		 * first name from the stream.
+		 * If they specified a filesystem without -d or -e, we want to
+		 * tack on everything after the fs specified in the first name
+		 * from the stream.
 		 */
 		cp = strchr(chopprefix, '@');
 		*cp = '\0';

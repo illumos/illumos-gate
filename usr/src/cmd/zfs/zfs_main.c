@@ -2684,7 +2684,7 @@ zfs_do_send(int argc, char **argv)
 }
 
 /*
- * zfs receive [-dnvF] <fs@snap>
+ * zfs receive [-denvF] <fs@snap>
  *
  * Restore a backup stream from stdin.
  */
@@ -2695,10 +2695,14 @@ zfs_do_receive(int argc, char **argv)
 	recvflags_t flags = { 0 };
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":dnuvF")) != -1) {
+	while ((c = getopt(argc, argv, ":denuvF")) != -1) {
 		switch (c) {
 		case 'd':
 			flags.isprefix = B_TRUE;
+			break;
+		case 'e':
+			flags.isprefix = B_TRUE;
+			flags.istail = B_TRUE;
 			break;
 		case 'n':
 			flags.dryrun = B_TRUE;

@@ -544,6 +544,12 @@ typedef struct recvflags {
 	/* the destination is a prefix, not the exact fs (ie, -d) */
 	int isprefix : 1;
 
+	/*
+	 * Only the tail of the sent snapshot path is appended to the
+	 * destination to determine the received snapshot name (ie, -e).
+	 */
+	int istail : 1;
+
 	/* do not actually do the recv, just check if it would work (ie, -n) */
 	int dryrun : 1;
 
