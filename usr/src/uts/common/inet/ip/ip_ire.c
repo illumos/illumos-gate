@@ -230,6 +230,7 @@ static void	ire_walk_ill_ipvers(uint_t match_flags, uint_t ire_type,
 #ifdef DEBUG
 static void	ire_trace_cleanup(const ire_t *);
 #endif
+static void	ire_dep_incr_generation_locked(ire_t *);
 
 /*
  * Following are the functions to increment/decrement the reference
@@ -1481,22 +1482,14 @@ ire_delete(ire_t *ire)
 	ire_t	*ire1;
 	ire_t	**ptpn;
 	irb_t	*irb;
-	nce_t	*nce;
 	ip_stack_t	*ipst = ire->ire_ipst;
-
-	/* We can clear ire_nce_cache under ire_lock even if the IRE is used */
-	mutex_enter(&ire->ire_lock);
-	nce = ire->ire_nce_cache;
-	ire->ire_nce_cache = NULL;
-	mutex_exit(&ire->ire_lock);
-	if (nce != NULL)
-		nce_refrele(nce);
 
 	if ((irb = ire->ire_bucket) == NULL) {
 		/*
 		 * It was never inserted in the list. Should call REFRELE
 		 * to free this IRE.
 		 */
+		ire_make_condemned(ire);
 		ire_refrele_notr(ire);
 		return;
 	}
@@ -1649,8 +1642,8 @@ ire_inactive(ire_t *ire)
 	ASSERT(ire->ire_next == NULL);
 
 	/* Count how many condemned ires for kmem_cache callback */
-	if (IRE_IS_CONDEMNED(ire))
-		atomic_add_32(&ipst->ips_num_ire_condemned, -1);
+	ASSERT(IRE_IS_CONDEMNED(ire));
+	atomic_add_32(&ipst->ips_num_ire_condemned, -1);
 
 	if (ire->ire_gw_secattr != NULL) {
 		ire_gw_secattr_free(ire->ire_gw_secattr);
@@ -1753,17 +1746,31 @@ void
 irb_increment_generation(irb_t *irb)
 {
 	ire_t *ire;
+	ip_stack_t *ipst;
 
 	if (irb == NULL || irb->irb_ire_cnt == 0)
 		return;
 
-	irb_refhold(irb);
+	ipst = irb->irb_ipst;
+	/*
+	 * we cannot do an irb_refhold/irb_refrele here as the caller
+	 * already has the global RADIX_NODE_HEAD_WLOCK, and the irb_refrele
+	 * may result in an attempt to free the irb_t, which also needs
+	 * the RADIX_NODE_HEAD lock. However, since we want to traverse the
+	 * irb_ire list without fear of having a condemned ire removed from
+	 * the list, we acquire the irb_lock as WRITER. Moreover, since
+	 * the ire_generation increments are done under the ire_dep_lock,
+	 * acquire the locks in the prescribed lock order first.
+	 */
+	rw_enter(&ipst->ips_ire_dep_lock, RW_READER);
+	rw_enter(&irb->irb_lock, RW_WRITER);
 	for (ire = irb->irb_ire; ire != NULL; ire = ire->ire_next) {
 		if (!IRE_IS_CONDEMNED(ire))
 			ire_increment_generation(ire);	/* Ourselves */
-		ire_dep_incr_generation(ire);	/* Dependants */
+		ire_dep_incr_generation_locked(ire);	/* Dependants */
 	}
-	irb_refrele(irb);
+	rw_exit(&irb->irb_lock);
+	rw_exit(&ipst->ips_ire_dep_lock);
 }
 
 /*
@@ -2561,11 +2568,14 @@ ndp_nce_init(ill_t *ill, const in6_addr_t *addr6, int ire_type)
 
 /*
  * The caller should hold irb_lock as a writer if the ire is in a bucket.
+ * This routine will clear ire_nce_cache, and we make sure that we can never
+ * set ire_nce_cache after the ire is marked condemned.
  */
 void
 ire_make_condemned(ire_t *ire)
 {
 	ip_stack_t	*ipst = ire->ire_ipst;
+	nce_t		*nce;
 
 	mutex_enter(&ire->ire_lock);
 	ASSERT(ire->ire_bucket == NULL ||
@@ -2574,7 +2584,11 @@ ire_make_condemned(ire_t *ire)
 	ire->ire_generation = IRE_GENERATION_CONDEMNED;
 	/* Count how many condemned ires for kmem_cache callback */
 	atomic_add_32(&ipst->ips_num_ire_condemned, 1);
+	nce = ire->ire_nce_cache;
+	ire->ire_nce_cache = NULL;
 	mutex_exit(&ire->ire_lock);
+	if (nce != NULL)
+		nce_refrele(nce);
 }
 
 /*
@@ -3232,14 +3246,21 @@ ire_dep_increment_children(ire_t *child)
  * Walk all the children of this ire recursively and increment their
  * generation number.
  */
+static void
+ire_dep_incr_generation_locked(ire_t *parent)
+{
+	ASSERT(RW_READ_HELD(&parent->ire_ipst->ips_ire_dep_lock));
+	if (parent->ire_dep_children != NULL)
+		ire_dep_increment_children(parent->ire_dep_children);
+}
+
 void
 ire_dep_incr_generation(ire_t *parent)
 {
 	ip_stack_t	*ipst = parent->ire_ipst;
 
 	rw_enter(&ipst->ips_ire_dep_lock, RW_READER);
-	if (parent->ire_dep_children != NULL)
-		ire_dep_increment_children(parent->ire_dep_children);
+	ire_dep_incr_generation_locked(parent);
 	rw_exit(&ipst->ips_ire_dep_lock);
 }
 

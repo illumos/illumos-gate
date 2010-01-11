@@ -337,6 +337,7 @@ ire_add_v6(ire_t *ire)
 		}
 		for (i = 0; i < ipst->ips_ip6_ftable_hash_size; i++) {
 			rw_init(&ptr[i].irb_lock, NULL, RW_DEFAULT, NULL);
+			ptr[i].irb_ipst = ipst;
 		}
 		mutex_enter(&ipst->ips_ire_ft_init_lock);
 		if (ipst->ips_ip_forwarding_table_v6[mask_table_index] ==

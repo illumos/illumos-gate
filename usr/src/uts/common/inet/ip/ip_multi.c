@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -100,7 +100,7 @@ static int	ip_msfilter_ill(conn_t *, mblk_t *, const ip_ioctl_cmd_t *,
     ill_t **);
 
 static void	ilg_check_detach(conn_t *, ill_t *);
-static void	ilg_check_reattach(conn_t *);
+static void	ilg_check_reattach(conn_t *, ill_t *);
 
 /*
  * MT notes:
@@ -565,6 +565,12 @@ ip_addmulti(const in6_addr_t *v6group, ill_t *ill, zoneid_t zoneid,
 	ilm = ip_addmulti_serial(v6group, ill, zoneid, ILGSTAT_NONE,
 	    MODE_IS_EXCLUDE, NULL, errorp);
 	mutex_exit(&ill->ill_mcast_serializer);
+	/*
+	 * Now that all locks have been dropped, we can send any
+	 * deferred/queued DLPI or IP packets
+	 */
+	ill_mcast_send_queued(ill);
+	ill_dlpi_send_queued(ill);
 	return (ilm);
 }
 
@@ -573,7 +579,8 @@ ip_addmulti(const in6_addr_t *v6group, ill_t *ill, zoneid_t zoneid,
  * then this returns with a refhold on the ilm.
  *
  * Internal routine which assumes the caller has already acquired
- * ill_multi_serializer.
+ * ill_mcast_serializer. It is the caller's responsibility to send out
+ * queued DLPI/multicast packets after all locks are dropped.
  *
  * The unspecified address means all multicast addresses for in both the
  * case of IPv4 and IPv6.
@@ -605,6 +612,7 @@ ip_addmulti_serial(const in6_addr_t *v6group, ill_t *ill, zoneid_t zoneid,
 			ipaddr_t v4group;
 
 			IN6_V4MAPPED_TO_IPADDR(v6group, v4group);
+			ASSERT(!IS_UNDER_IPMP(ill));
 			if (!CLASSD(v4group)) {
 				*errorp = EINVAL;
 				return (NULL);
@@ -636,9 +644,6 @@ ip_addmulti_serial(const in6_addr_t *v6group, ill_t *ill, zoneid_t zoneid,
 	    ilg_flist, errorp);
 	rw_exit(&ill->ill_mcast_lock);
 
-	/* Send any deferred/queued DLPI or IP packets */
-	ill_mcast_send_queued(ill);
-	ill_dlpi_send_queued(ill);
 	ill_mcast_timer_start(ill->ill_ipst);
 	return (ilm);
 }
@@ -820,13 +825,21 @@ ip_delmulti(ilm_t *ilm)
 	mutex_enter(&ill->ill_mcast_serializer);
 	error = ip_delmulti_serial(ilm, B_TRUE, B_TRUE);
 	mutex_exit(&ill->ill_mcast_serializer);
+	/*
+	 * Now that all locks have been dropped, we can send any
+	 * deferred/queued DLPI or IP packets
+	 */
+	ill_mcast_send_queued(ill);
+	ill_dlpi_send_queued(ill);
 	return (error);
 }
 
 
 /*
  * Delete the ilm.
- * Assumes ill_multi_serializer is held by the caller.
+ * Assumes ill_mcast_serializer is held by the caller.
+ * Caller must send out queued dlpi/multicast packets after dropping
+ * all locks.
  */
 static int
 ip_delmulti_serial(ilm_t *ilm, boolean_t no_ilg, boolean_t leaving)
@@ -840,11 +853,7 @@ ip_delmulti_serial(ilm_t *ilm, boolean_t no_ilg, boolean_t leaving)
 	rw_enter(&ill->ill_mcast_lock, RW_WRITER);
 	ret = ip_delmulti_impl(ilm, no_ilg, leaving);
 	rw_exit(&ill->ill_mcast_lock);
-	/* Send any deferred/queued DLPI or IP packets */
-	ill_mcast_send_queued(ill);
-	ill_dlpi_send_queued(ill);
 	ill_mcast_timer_start(ill->ill_ipst);
-
 	return (ret);
 }
 
@@ -1903,6 +1912,12 @@ ip_set_srcfilter(conn_t *connp, struct group_filter *gf,
 		if (ilm != NULL)
 			(void) ip_delmulti_serial(ilm, B_FALSE, B_TRUE);
 		mutex_exit(&ill->ill_mcast_serializer);
+		/*
+		 * Now that all locks have been dropped, we can send any
+		 * deferred/queued DLPI or IP packets
+		 */
+		ill_mcast_send_queued(ill);
+		ill_dlpi_send_queued(ill);
 		return (0);
 	} else {
 		ilgstat = ILGSTAT_CHANGE;
@@ -2009,11 +2024,26 @@ ip_set_srcfilter(conn_t *connp, struct group_filter *gf,
 	}
 
 	if (ilm != NULL) {
+		if (ilg->ilg_ill == NULL) {
+			/* some other thread is re-attaching this.  */
+			rw_exit(&connp->conn_ilg_lock);
+			(void) ip_delmulti_serial(ilm, B_FALSE,
+			    (ilgstat == ILGSTAT_NEW));
+			err = 0;
+			goto free_and_exit;
+		}
 		/* Succeeded. Update the ilg to point at the ilm */
 		if (ilgstat == ILGSTAT_NEW) {
-			ASSERT(ilg->ilg_ilm == NULL);
-			ilg->ilg_ilm = ilm;
-			ilm->ilm_ifaddr = ifaddr;	/* For netstat */
+			if (ilg->ilg_ilm == NULL) {
+				ilg->ilg_ilm = ilm;
+				ilm->ilm_ifaddr = ifaddr; /* For netstat */
+			} else {
+				/* some other thread is re-attaching this. */
+				rw_exit(&connp->conn_ilg_lock);
+				(void) ip_delmulti_serial(ilm, B_FALSE, B_TRUE);
+				err = 0;
+				goto free_and_exit;
+			}
 		} else {
 			/*
 			 * ip_addmulti didn't get a held ilm for
@@ -2057,6 +2087,8 @@ ip_set_srcfilter(conn_t *connp, struct group_filter *gf,
 
 free_and_exit:
 	mutex_exit(&ill->ill_mcast_serializer);
+	ill_mcast_send_queued(ill);
+	ill_dlpi_send_queued(ill);
 	l_free(orig_filter);
 	l_free(new_filter);
 
@@ -2351,10 +2383,34 @@ ip_opt_add_group(conn_t *connp, boolean_t checkonly,
 		ill_refrele(ill);
 		return (0);
 	}
-
 	mutex_enter(&ill->ill_mcast_serializer);
+	/*
+	 * Multicast groups may not be joined on interfaces that are either
+	 * already underlying interfaces in an IPMP group, or in the process
+	 * of joining the IPMP group. The latter condition is enforced by
+	 * checking the value of ill->ill_grp_pending under the
+	 * ill_mcast_serializer lock.  We cannot serialize the
+	 * ill_grp_pending check on the ill_g_lock across ilg_add() because
+	 *  ill_mcast_send_queued -> ip_output_simple -> ill_lookup_on_ifindex
+	 * will take the ill_g_lock itself. Instead, we hold the
+	 * ill_mcast_serializer.
+	 */
+	if (ill->ill_grp_pending || IS_UNDER_IPMP(ill)) {
+		DTRACE_PROBE2(group__add__on__under, ill_t *, ill,
+		    in6_addr_t *, v6group);
+		mutex_exit(&ill->ill_mcast_serializer);
+		ill_refrele(ill);
+		return (EADDRNOTAVAIL);
+	}
 	err = ilg_add(connp, v6group, ifaddr, ifindex, ill, fmode, v6src);
 	mutex_exit(&ill->ill_mcast_serializer);
+	/*
+	 * We have done an addmulti_impl and/or delmulti_impl.
+	 * All locks have been dropped, we can send any
+	 * deferred/queued DLPI or IP packets
+	 */
+	ill_mcast_send_queued(ill);
+	ill_dlpi_send_queued(ill);
 	ill_refrele(ill);
 	return (err);
 }
@@ -2459,6 +2515,12 @@ retry:
 done:
 	if (ill != NULL) {
 		mutex_exit(&ill->ill_mcast_serializer);
+		/*
+		 * Now that all locks have been dropped, we can
+		 * send any deferred/queued DLPI or IP packets
+		 */
+		ill_mcast_send_queued(ill);
+		ill_dlpi_send_queued(ill);
 		ill_refrele(ill);
 	}
 	return (err);
@@ -2617,6 +2679,7 @@ ilg_add(conn_t *connp, const in6_addr_t *v6group, ipaddr_t ifaddr,
 		ilg->ilg_ill = ill;
 	} else {
 		int index;
+
 		if (ilg->ilg_fmode != fmode || IN6_IS_ADDR_UNSPECIFIED(v6src)) {
 			rw_exit(&connp->conn_ilg_lock);
 			l_free(new_filter);
@@ -2675,13 +2738,27 @@ ilg_add(conn_t *connp, const in6_addr_t *v6group, ipaddr_t ifaddr,
 		error = ENXIO;
 		goto free_and_exit;
 	}
-
 	if (ilm != NULL) {
+		if (ilg->ilg_ill == NULL) {
+			/* some other thread is re-attaching this.  */
+			rw_exit(&connp->conn_ilg_lock);
+			(void) ip_delmulti_serial(ilm, B_FALSE,
+			    (ilgstat == ILGSTAT_NEW));
+			error = 0;
+			goto free_and_exit;
+		}
 		/* Succeeded. Update the ilg to point at the ilm */
 		if (ilgstat == ILGSTAT_NEW) {
-			ASSERT(ilg->ilg_ilm == NULL);
-			ilg->ilg_ilm = ilm;
-			ilm->ilm_ifaddr = ifaddr;	/* For netstat */
+			if (ilg->ilg_ilm == NULL) {
+				ilg->ilg_ilm = ilm;
+				ilm->ilm_ifaddr = ifaddr; /* For netstat */
+			} else {
+				/* some other thread is re-attaching this. */
+				rw_exit(&connp->conn_ilg_lock);
+				(void) ip_delmulti_serial(ilm, B_FALSE, B_TRUE);
+				error = 0;
+				goto free_and_exit;
+			}
 		} else {
 			/*
 			 * ip_addmulti didn't get a held ilm for
@@ -2973,6 +3050,12 @@ ilg_delete_all(conn_t *connp)
 
 	next:
 		mutex_exit(&ill->ill_mcast_serializer);
+		/*
+		 * Now that all locks have been dropped, we can send any
+		 * deferred/queued DLPI or IP packets
+		 */
+		ill_mcast_send_queued(ill);
+		ill_dlpi_send_queued(ill);
 		if (need_refrele) {
 			/* Drop ill reference while we hold no locks */
 			ill_refrele(ill);
@@ -2986,8 +3069,7 @@ ilg_delete_all(conn_t *connp)
 
 /*
  * Attach the ilg to an ilm on the ill. If it fails we leave ilg_ill as NULL so
- * that a subsequent attempt can attach it.
- * Drops and reacquires conn_ilg_lock.
+ * that a subsequent attempt can attach it. Drops and reacquires conn_ilg_lock.
  */
 static void
 ilg_attach(conn_t *connp, ilg_t *ilg, ill_t *ill)
@@ -3034,10 +3116,11 @@ ilg_attach(conn_t *connp, ilg_t *ilg, ill_t *ill)
 	 * Must look up the ilg again since we've not been holding
 	 * conn_ilg_lock. The ilg could have disappeared due to an unplumb
 	 * having called conn_update_ill, which can run once we dropped the
-	 * conn_ilg_lock above.
+	 * conn_ilg_lock above. Alternatively, the ilg could have been attached
+	 * when the lock was dropped
 	 */
 	ilg = ilg_lookup(connp, &v6group, ifaddr, ifindex);
-	if (ilg == NULL) {
+	if (ilg == NULL || ilg->ilg_ilm != NULL) {
 		if (ilm != NULL) {
 			rw_exit(&connp->conn_ilg_lock);
 			(void) ip_delmulti_serial(ilm, B_FALSE,
@@ -3050,7 +3133,6 @@ ilg_attach(conn_t *connp, ilg_t *ilg, ill_t *ill)
 		ilg->ilg_ill = NULL;
 		return;
 	}
-	ASSERT(ilg->ilg_ilm == NULL);
 	ilg->ilg_ilm = ilm;
 	ilm->ilm_ifaddr = ifaddr;	/* For netstat */
 }
@@ -3111,7 +3193,7 @@ conn_update_ill(conn_t *connp, caddr_t arg)
 	if (ill != NULL)
 		ilg_check_detach(connp, ill);
 
-	ilg_check_reattach(connp);
+	ilg_check_reattach(connp, ill);
 
 	/* Do we need to wake up a thread in ilg_delete_all? */
 	mutex_enter(&connp->conn_lock);
@@ -3164,15 +3246,22 @@ ilg_check_detach(conn_t *connp, ill_t *ill)
 		ilg_refrele(held_ilg);
 	rw_exit(&connp->conn_ilg_lock);
 	mutex_exit(&ill->ill_mcast_serializer);
+	/*
+	 * Now that all locks have been dropped, we can send any
+	 * deferred/queued DLPI or IP packets
+	 */
+	ill_mcast_send_queued(ill);
+	ill_dlpi_send_queued(ill);
 }
 
 /*
  * Check if there is a place to attach the conn_ilgs. We do this for both
  * detached ilgs and attached ones, since for the latter there could be
- * a better ill to attach them to.
+ * a better ill to attach them to. oill is non-null if we just detached from
+ * that ill.
  */
 static void
-ilg_check_reattach(conn_t *connp)
+ilg_check_reattach(conn_t *connp, ill_t *oill)
 {
 	ill_t	*ill;
 	char	group_buf[INET6_ADDRSTRLEN];
@@ -3209,8 +3298,11 @@ ilg_check_reattach(conn_t *connp)
 			/* Note that ilg could have become condemned */
 		}
 
-		/* Is the ill unchanged, even if both are NULL? */
-		if (ill == ilg->ilg_ill) {
+		/*
+		 * Is the ill unchanged, even if both are NULL?
+		 * Did we just detach from that ill?
+		 */
+		if (ill == ilg->ilg_ill || (ill != NULL && ill == oill)) {
 			if (ill != NULL) {
 				/* Drop locks across ill_refrele */
 				ilg_transfer_hold(held_ilg, ilg);
@@ -3259,10 +3351,18 @@ ilg_check_reattach(conn_t *connp)
 			} else {
 				ilm = NULL;
 			}
+			ilg_transfer_hold(held_ilg, ilg);
+			held_ilg = ilg;
 			rw_exit(&connp->conn_ilg_lock);
 			if (ilm != NULL)
 				(void) ip_delmulti_serial(ilm, B_FALSE, B_TRUE);
 			mutex_exit(&ill2->ill_mcast_serializer);
+			/*
+			 * Now that all locks have been dropped, we can send any
+			 * deferred/queued DLPI or IP packets
+			 */
+			ill_mcast_send_queued(ill2);
+			ill_dlpi_send_queued(ill2);
 			if (need_refrele) {
 				/* Drop ill reference while we hold no locks */
 				ill_refrele(ill2);
@@ -3299,7 +3399,8 @@ ilg_check_reattach(conn_t *connp)
 				rw_enter(&connp->conn_ilg_lock, RW_WRITER);
 				/* Note that ilg could have become condemned */
 			}
-
+			ilg_transfer_hold(held_ilg, ilg);
+			held_ilg = ilg;
 			/*
 			 * Check that nobody else attached the ilg and that
 			 * it wasn't condemned while we dropped the lock.
@@ -3317,11 +3418,16 @@ ilg_check_reattach(conn_t *connp)
 				ilg_attach(connp, ilg, ill);
 				ASSERT(RW_WRITE_HELD(&connp->conn_ilg_lock));
 			}
-			mutex_exit(&ill->ill_mcast_serializer);
 			/* Drop locks across ill_refrele */
-			ilg_transfer_hold(held_ilg, ilg);
-			held_ilg = ilg;
 			rw_exit(&connp->conn_ilg_lock);
+			mutex_exit(&ill->ill_mcast_serializer);
+			/*
+			 * Now that all locks have been
+			 * dropped, we can send any
+			 * deferred/queued DLPI or IP packets
+			 */
+			ill_mcast_send_queued(ill);
+			ill_dlpi_send_queued(ill);
 			ill_refrele(ill);
 			rw_enter(&connp->conn_ilg_lock, RW_WRITER);
 		}

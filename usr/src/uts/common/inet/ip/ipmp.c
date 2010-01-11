@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1149,7 +1149,12 @@ ipmp_ill_join_illgrp(ill_t *ill, ipmp_illgrp_t *illg)
 	 * Blow away all multicast memberships that currently exist on `ill'.
 	 * This may seem odd, but it's consistent with the application view
 	 * that `ill' no longer exists (e.g., due to ipmp_ill_rtsaddrmsg()).
+	 * The ill_grp_pending bit prevents multicast group joins after
+	 * update_conn_ill() and before ill_grp assignment.
 	 */
+	mutex_enter(&ill->ill_mcast_serializer);
+	ill->ill_grp_pending = 1;
+	mutex_exit(&ill->ill_mcast_serializer);
 	update_conn_ill(ill, ill->ill_ipst);
 	if (ill->ill_isv6) {
 		reset_mrt_ill(ill);
@@ -1203,6 +1208,10 @@ ipmp_ill_join_illgrp(ill_t *ill, ipmp_illgrp_t *illg)
 	list_insert_tail(&illg->ig_if, ill);
 	ill->ill_grp = illg;
 	rw_exit(&ipst->ips_ill_g_lock);
+
+	mutex_enter(&ill->ill_mcast_serializer);
+	ill->ill_grp_pending = 0;
+	mutex_exit(&ill->ill_mcast_serializer);
 
 	/*
 	 * Hide the IREs on `ill' so that we don't accidentally find them when

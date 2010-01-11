@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -8606,7 +8606,6 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 					freemsg(mp);
 					return;
 				}
-				ASSERT(arp_no_defense || err != 0);
 				mp1 = ipsq_pending_mp_get(ipsq, &connp);
 			} else {
 				/* The conn has started closing */

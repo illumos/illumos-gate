@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -371,24 +371,37 @@ nce_lookup_then_add_v6(ill_t *ill, uchar_t *hw_addr, uint_t hw_addr_len,
 		 * until we are done.
 		 */
 		rw_enter(&ipst->ips_ill_g_lock, RW_READER);
-		if (IS_IN_SAME_ILLGRP(in_ill, ill)) {
-			under_nce = nce_fastpath_create(in_ill,
-			    nce->nce_common);
-			upper_nce = nce;
-			if ((nce = under_nce) == NULL)
-				err = EINVAL;
+		if (!IS_IN_SAME_ILLGRP(in_ill, ill)) {
+			DTRACE_PROBE2(ill__not__in__group, nce_t *, nce,
+			    ill_t *, ill);
+			rw_exit(&ipst->ips_ill_g_lock);
+			err = ENXIO;
+			nce_refrele(nce);
+			nce = NULL;
+			goto bail;
+		}
+		under_nce = nce_fastpath_create(in_ill, nce->nce_common);
+		if (under_nce == NULL) {
+			rw_exit(&ipst->ips_ill_g_lock);
+			err = EINVAL;
+			nce_refrele(nce);
+			nce = NULL;
+			goto bail;
 		}
 		rw_exit(&ipst->ips_ill_g_lock);
-		if (under_nce != NULL && NCE_ISREACHABLE(nce->nce_common))
+		upper_nce = nce;
+		nce = under_nce; /* will be returned to caller */
+		if (NCE_ISREACHABLE(nce->nce_common))
 			nce_fastpath_trigger(under_nce);
 	}
+	/* nce_refrele is deferred until the lock is dropped  */
 	if (nce != NULL) {
 		if (newnce != NULL)
 			*newnce = nce;
 		else
 			nce_refrele(nce);
 	}
-	/* nce_refrele is deferred until the lock is dropped  */
+bail:
 	if (upper_nce != NULL)
 		nce_refrele(upper_nce);
 	if (need_ill_refrele)
@@ -3605,15 +3618,27 @@ nce_lookup_then_add_v4(ill_t *ill, uchar_t *hw_addr, uint_t hw_addr_len,
 		 * until we are done.
 		 */
 		rw_enter(&ipst->ips_ill_g_lock, RW_READER);
-		if (IS_IN_SAME_ILLGRP(in_ill, ill)) {
-			under_nce = nce_fastpath_create(in_ill,
-			    nce->nce_common);
-			upper_nce = nce;
-			if ((nce = under_nce) == NULL)
-				err = EINVAL;
+		if (!IS_IN_SAME_ILLGRP(in_ill, ill)) {
+			DTRACE_PROBE2(ill__not__in__group, nce_t *, nce,
+			    ill_t *, ill);
+			rw_exit(&ipst->ips_ill_g_lock);
+			err = ENXIO;
+			nce_refrele(nce);
+			nce = NULL;
+			goto bail;
+		}
+		under_nce = nce_fastpath_create(in_ill, nce->nce_common);
+		if (under_nce == NULL) {
+			rw_exit(&ipst->ips_ill_g_lock);
+			err = EINVAL;
+			nce_refrele(nce);
+			nce = NULL;
+			goto bail;
 		}
 		rw_exit(&ipst->ips_ill_g_lock);
-		if (under_nce != NULL && NCE_ISREACHABLE(nce->nce_common))
+		upper_nce = nce;
+		nce = under_nce; /* will be returned to caller */
+		if (NCE_ISREACHABLE(nce->nce_common))
 			nce_fastpath_trigger(under_nce);
 	}
 	if (nce != NULL) {
@@ -3622,13 +3647,11 @@ nce_lookup_then_add_v4(ill_t *ill, uchar_t *hw_addr, uint_t hw_addr_len,
 		else
 			nce_refrele(nce);
 	}
-
+bail:
 	if (under != NULL)
 		ill_refrele(under);
-
 	if (upper_nce != NULL)
 		nce_refrele(upper_nce);
-
 	if (need_ill_refrele)
 		ill_refrele(ill);
 
@@ -4395,22 +4418,31 @@ nce_add_common(ill_t *ill, uchar_t *hw_addr, uint_t hw_addr_len,
 	for (; ncec != NULL; ncec = ncec->ncec_next) {
 		if (ncec->ncec_ill == ill) {
 			if (IN6_ARE_ADDR_EQUAL(&ncec->ncec_addr, addr)) {
+				/*
+				 * We should never find *retnce to be
+				 * MYADDR, since the caller may then
+				 * incorrectly restart a DAD timer that's
+				 * already running.  However, if we are in
+				 * forwarding mode, and the interface is
+				 * moving in/out of groups, the data
+				 * path ire lookup (e.g., ire_revalidate_nce)
+				 * may  have determined that some destination
+				 * is offlink while the control path is adding
+				 * that address as a local address.
+				 * Recover from  this case by failing the
+				 * lookup
+				 */
+				if (NCE_MYADDR(ncec))
+					return (ENXIO);
 				*retnce = nce_ill_lookup_then_add(ill, ncec);
 				if (*retnce != NULL)
 					break;
 			}
 		}
 	}
-	if (*retnce != NULL) {
-		/*
-		 * We should never find *retnce to be MYADDR, since the caller
-		 * may then incorrectly restart a DAD timer that's already
-		 * running.
-		 */
-		ASSERT(!NCE_MYADDR(ncec));
-		/* caller must trigger fastpath on nce */
+	if (*retnce != NULL) /* caller must trigger fastpath on nce */
 		return (0);
-	}
+
 	ncec = kmem_cache_alloc(ncec_cache, KM_NOSLEEP);
 	if (ncec == NULL)
 		return (ENOMEM);

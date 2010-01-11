@@ -635,7 +635,9 @@ typedef struct ilg_s {
  * ill_mcast_lock. Operations that change state on both an ilg and ilm
  * in addition use ill_mcast_serializer to ensure that we can't have
  * interleaving between e.g., add and delete operations for the same conn_t,
- * group, and ill.
+ * group, and ill. The ill_mcast_serializer is also used to ensure that
+ * multicast group joins do not occur on an interface that is in the process
+ * of joining an IPMP group.
  *
  * The comment below (and for other netstack_t references) refers
  * to the fact that we only do netstack_hold in particular cases,
@@ -1680,8 +1682,9 @@ typedef struct ill_s {
 
 		ill_replumbing : 1,
 		ill_arl_dlpi_pending : 1,
+		ill_grp_pending : 1,
 
-		ill_pad_to_bit_31 : 18;
+		ill_pad_to_bit_31 : 17;
 
 	/* Following bit fields protected by ill_lock */
 	uint_t
@@ -1942,6 +1945,7 @@ typedef struct ill_s {
  * ill_refresh_tid		ill_lock		ill_lock
  * ill_grp (for IPMP ill)	write once		write once
  * ill_grp (for underlying ill)	ipsq + ill_g_lock	ipsq OR ill_g_lock
+ * ill_grp_pending		ill_mcast_serializer	ill_mcast_serializer
  * ill_mrouter_cnt		atomics			atomics
  *
  * NOTE: It's OK to make heuristic decisions on an underlying interface
