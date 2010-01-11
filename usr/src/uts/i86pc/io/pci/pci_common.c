@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -813,7 +813,9 @@ pci_enable_intr(dev_info_t *pdip, dev_info_t *rdip,
 	ihdl_plat_datap->ip_ispecp = ispec;
 
 	/* translate the interrupt if needed */
-	(void) (*psm_intr_ops)(rdip, hdlp, PSM_INTR_OP_XLATE_VECTOR, &irq);
+	if ((*psm_intr_ops)(rdip, hdlp, PSM_INTR_OP_XLATE_VECTOR, &irq) ==
+	    PSM_FAILURE)
+		return (DDI_FAILURE);
 	DDI_INTR_NEXDBG((CE_CONT, "pci_enable_intr: priority=%x irq=%x\n",
 	    hdlp->ih_pri, irq));
 

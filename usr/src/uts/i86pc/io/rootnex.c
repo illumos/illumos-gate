@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1454,8 +1454,9 @@ rootnex_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 			return (DDI_FAILURE);
 
 		((ihdl_plat_t *)hdlp->ih_private)->ip_ispecp = ispec;
-		(void) (*psm_intr_ops)(rdip, hdlp, PSM_INTR_OP_XLATE_VECTOR,
-		    (int *)&hdlp->ih_vector);
+		if ((*psm_intr_ops)(rdip, hdlp, PSM_INTR_OP_XLATE_VECTOR,
+		    (int *)&hdlp->ih_vector) == PSM_FAILURE)
+			return (DDI_FAILURE);
 
 		/* Add the interrupt handler */
 		if (!add_avintr((void *)hdlp, ispec->intrspec_pri,

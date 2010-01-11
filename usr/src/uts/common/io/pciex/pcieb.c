@@ -60,7 +60,7 @@
 int pcieb_die = PF_ERR_FATAL_FLAGS;
 
 /* flag to turn on MSI support */
-int pcieb_enable_msi = 0;
+int pcieb_enable_msi = 1;
 
 #if defined(DEBUG)
 uint_t pcieb_dbg_print = 0;

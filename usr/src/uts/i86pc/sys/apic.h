@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -485,7 +485,7 @@ typedef struct	apic_irq {
 	uchar_t	airq_origirq;		/* original irq passed in */
 	uint_t	airq_busy;		/* How frequently did clock find */
 					/* us in this */
-	struct apic_irq *airq_next;	/* chain of shared intpts */
+	struct apic_irq *airq_next;	/* chain of intpts sharing a vector */
 	void		*airq_intrr_private; /* intr remap private data */
 } apic_irq_t;
 

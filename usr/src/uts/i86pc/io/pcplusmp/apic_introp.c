@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -268,19 +268,21 @@ apic_find_irq(dev_info_t *dip, struct intrspec *ispec, int type)
 	    ispec->intrspec_pri, type));
 
 	for (i = apic_min_device_irq; i <= apic_max_device_irq; i++) {
-		if ((irqp = apic_irq_table[i]) == NULL)
-			continue;
-		if ((irqp->airq_dip == dip) &&
-		    (irqp->airq_origirq == ispec->intrspec_vec) &&
-		    (irqp->airq_ipl == ispec->intrspec_pri)) {
-			if (type == DDI_INTR_TYPE_MSI) {
-				if (irqp->airq_mps_intr_index == MSI_INDEX)
+		for (irqp = apic_irq_table[i]; irqp; irqp = irqp->airq_next) {
+			if ((irqp->airq_dip == dip) &&
+			    (irqp->airq_origirq == ispec->intrspec_vec) &&
+			    (irqp->airq_ipl == ispec->intrspec_pri)) {
+				if (type == DDI_INTR_TYPE_MSI) {
+					if (irqp->airq_mps_intr_index ==
+					    MSI_INDEX)
+						return (irqp);
+				} else if (type == DDI_INTR_TYPE_MSIX) {
+					if (irqp->airq_mps_intr_index ==
+					    MSIX_INDEX)
+						return (irqp);
+				} else
 					return (irqp);
-			} else if (type == DDI_INTR_TYPE_MSIX) {
-				if (irqp->airq_mps_intr_index == MSIX_INDEX)
-					return (irqp);
-			} else
-				return (irqp);
+			}
 		}
 	}
 	DDI_INTR_IMPLDBG((CE_CONT, "apic_find_irq: return NULL\n"));
@@ -1002,6 +1004,8 @@ apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 	case PSM_INTR_OP_XLATE_VECTOR:
 		ispec = ((ihdl_plat_t *)hdlp->ih_private)->ip_ispecp;
 		*result = apic_introp_xlate(dip, ispec, hdlp->ih_type);
+		if (*result == -1)
+			return (PSM_FAILURE);
 		break;
 	case PSM_INTR_OP_GET_PENDING:
 		if ((irqp = apic_find_irq(dip, ispec, hdlp->ih_type)) == NULL)

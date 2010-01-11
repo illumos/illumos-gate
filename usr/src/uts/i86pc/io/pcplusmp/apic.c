@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1470,7 +1470,7 @@ apic_get_ipivect(int ipl, int type)
 	uchar_t vector;
 	int irq;
 
-	if (irq = apic_allocate_irq(APIC_VECTOR(ipl))) {
+	if ((irq = apic_allocate_irq(APIC_VECTOR(ipl))) != -1) {
 		if (vector = apic_allocate_vector(ipl, irq, 1)) {
 			apic_irq_table[irq]->airq_mps_intr_index =
 			    RESERVE_INDEX;

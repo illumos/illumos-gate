@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1549,12 +1549,12 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 	uint32_t bind_cpu;
 	int intin, irqindex;
 	int ioapic_ix;
-	apic_irq_t	*irqptr, *irqheadptr, *irqp;
+	apic_irq_t	*irqptr, *preirqptr, *irqheadptr, *irqp;
 	ulong_t iflag;
 
 	mutex_enter(&airq_mutex);
 	irqindex = IRQINDEX(irqno);
-	irqptr = irqheadptr = apic_irq_table[irqindex];
+	irqptr = preirqptr = irqheadptr = apic_irq_table[irqindex];
 
 	DDI_INTR_IMPLDBG((CE_CONT, "apic_delspl: dip=0x%p type=%d irqno=0x%x "
 	    "vector=0x%x\n", (void *)irqptr->airq_dip,
@@ -1563,6 +1563,7 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 	while (irqptr) {
 		if (VIRTIRQ(irqindex, irqptr->airq_share_id) == irqno)
 			break;
+		preirqptr = irqptr;
 		irqptr = irqptr->airq_next;
 	}
 	ASSERT(irqptr);
@@ -1571,6 +1572,10 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 
 	mutex_exit(&airq_mutex);
 
+	/*
+	 * If there are more interrupts at a higher IPL, we don't need
+	 * to disable anything.
+	 */
 	if (ipl < max_ipl)
 		return (PSM_SUCCESS);
 
@@ -1582,7 +1587,7 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 		/*
 		 * Clear irq_struct. If two devices shared an intpt
 		 * line & 1 unloaded before picinit, we are hosed. But, then
-		 * we hope the machine will ...
+		 * we hope the machine will survive.
 		 */
 		irqptr->airq_mps_intr_index = FREE_INDEX;
 		irqptr->airq_temp_cpu = IRQ_UNINIT;
@@ -1590,8 +1595,8 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 		return (PSM_SUCCESS);
 	}
 	/*
-	 * Downgrade vector to new max_ipl if needed.If we cannot allocate,
-	 * use old IPL. Not very elegant, but then we hope ...
+	 * Downgrade vector to new max_ipl if needed. If we cannot allocate,
+	 * use old IPL. Not very elegant, but it should work.
 	 */
 	if ((irqptr->airq_ipl != max_ipl) && (max_ipl != PSM_INVALID_IPL) &&
 	    !ioapic_mask_workaround[irqptr->airq_ioapicindex]) {
@@ -1705,6 +1710,9 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 		}
 	}
 
+	/*
+	 * If there are still active interrupts, we are done.
+	 */
 	if (irqptr->airq_share)
 		return (PSM_SUCCESS);
 
@@ -1754,7 +1762,10 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 	apic_vt_ops->apic_intrr_free_entry(irqptr);
 #endif
 
-	if (max_ipl == PSM_INVALID_IPL) {
+	/*
+	 * This irq entry is the only one in the chain.
+	 */
+	if (irqheadptr->airq_next == NULL) {
 		ASSERT(irqheadptr == irqptr);
 		bind_cpu = irqptr->airq_temp_cpu;
 		if (((uint32_t)bind_cpu != IRQ_UNBOUND) &&
@@ -1774,35 +1785,24 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 		apic_free_vector(irqptr->airq_vector);
 		return (PSM_SUCCESS);
 	}
+
+	/*
+	 * If we get here, we are sharing the vector and there are more than
+	 * one active irq entries in the chain.
+	 */
 	lock_clear(&apic_ioapic_lock);
 	intr_restore(iflag);
 
 	mutex_enter(&airq_mutex);
-	if ((irqptr == apic_irq_table[irqindex])) {
-		apic_irq_t	*oldirqptr;
-		/* Move valid irq entry to the head */
-		irqheadptr = oldirqptr = irqptr;
-		irqptr = irqptr->airq_next;
-		ASSERT(irqptr);
-		while (irqptr) {
-			if (irqptr->airq_mps_intr_index != FREE_INDEX)
-				break;
-			oldirqptr = irqptr;
-			irqptr = irqptr->airq_next;
-		}
-		/* remove all invalid ones from the beginning */
-		apic_irq_table[irqindex] = irqptr;
-		/*
-		 * and link them back after the head. The invalid ones
-		 * begin with irqheadptr and end at oldirqptr
-		 */
-		oldirqptr->airq_next = irqptr->airq_next;
-		irqptr->airq_next = irqheadptr;
+	/* Remove the irq entry from the chain */
+	if (irqptr == irqheadptr) { /* The irq entry is at the head */
+		apic_irq_table[irqindex] = irqptr->airq_next;
+	} else {
+		preirqptr->airq_next = irqptr->airq_next;
 	}
+	/* Free the irq entry */
+	kmem_free(irqptr, sizeof (apic_irq_t));
 	mutex_exit(&airq_mutex);
-
-	irqptr->airq_temp_cpu = IRQ_UNINIT;
-	irqptr->airq_mps_intr_index = FREE_INDEX;
 
 	return (PSM_SUCCESS);
 }
@@ -1812,6 +1812,10 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
  * called only from apic_intr_ops().  With the new ADII framework,
  * the priority can no longer be retrieved through i_ddi_get_intrspec().
  * It has to be passed in from the caller.
+ *
+ * Return value:
+ * 	Success: irqno for the given device
+ * 	Failure: -1
  */
 int
 apic_introp_xlate(dev_info_t *dip, struct intrspec *ispec, int type)
@@ -1894,31 +1898,27 @@ apic_introp_xlate(dev_info_t *dip, struct intrspec *ispec, int type)
 			busid = (int)apic_single_pci_busid;
 
 		if (pci_config_setup(dip, &cfg_handle) != DDI_SUCCESS)
-			goto nonpci;
+			return (-1);
 		ipin = pci_config_get8(cfg_handle, PCI_CONF_IPIN) - PCI_INTA;
 		pci_config_teardown(&cfg_handle);
 		if (apic_enable_acpi && !apic_use_acpi_madt_only) {
 			if (apic_acpi_translate_pci_irq(dip, busid, devid,
 			    ipin, &pci_irq, &intr_flag) != ACPI_PSM_SUCCESS)
-				goto nonpci;
+				return (-1);
 
 			intr_flag.bustype = child_is_pciex ? BUS_PCIE : BUS_PCI;
-			if ((newirq = apic_setup_irq_table(dip, pci_irq, NULL,
-			    ispec, &intr_flag, type)) == -1)
-				goto nonpci;
-			return (newirq);
+			return (apic_setup_irq_table(dip, pci_irq, NULL, ispec,
+			    &intr_flag, type));
 		} else {
 			pci_irq = ((devid & 0x1f) << 2) | (ipin & 0x3);
 			if ((intrp = apic_find_io_intr_w_busid(pci_irq, busid))
 			    == NULL) {
 				if ((pci_irq = apic_handle_pci_pci_bridge(dip,
 				    devid, ipin, &intrp)) == -1)
-					goto nonpci;
+					return (-1);
 			}
-			if ((newirq = apic_setup_irq_table(dip, pci_irq, intrp,
-			    ispec, NULL, type)) == -1)
-				goto nonpci;
-			return (newirq);
+			return (apic_setup_irq_table(dip, pci_irq, intrp, ispec,
+			    NULL, type));
 		}
 	} else if (strcmp(dev_type, "isa") == 0)
 		bustype = BUS_ISA;
@@ -1985,7 +1985,7 @@ nonpci:
 defconf:
 	newirq = apic_setup_irq_table(dip, irqno, NULL, ispec, NULL, type);
 	if (newirq == -1)
-		return (newirq);
+		return (-1);
 	ASSERT(IRQINDEX(newirq) == irqno);
 	ASSERT(apic_irq_table[irqno]);
 	return (newirq);
@@ -2212,7 +2212,12 @@ apic_share_vector(int irqno, iflag_t *intr_flagp, short intr_index, int ipl,
 }
 
 /*
+ * Allocate/Initialize the apic_irq_table[] entry for given irqno. If the entry
+ * is used already, we will try to allocate a new irqno.
  *
+ * Return value:
+ * 	Success: irqno
+ * 	Failure: -1
  */
 static int
 apic_setup_irq_table(dev_info_t *dip, int irqno, struct apic_io_intr *intrp,
@@ -2681,6 +2686,7 @@ apic_allocate_irq(int irq)
 			    psm_name);
 			return (-1);
 		}
+		apic_irq_table[freeirq]->airq_temp_cpu = IRQ_UNINIT;
 		apic_irq_table[freeirq]->airq_mps_intr_index = FREE_INDEX;
 	}
 	return (freeirq);
