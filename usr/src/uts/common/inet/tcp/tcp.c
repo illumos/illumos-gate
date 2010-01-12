@@ -16588,10 +16588,8 @@ tcp_send(tcp_t *tcp, const int mss, const int total_hdr_len,
 			ixa->ixa_flags &= ~IXAF_REACH_CONF;
 		}
 
-		/*
-		 * Append LSO information, both flags and mss, to the mp.
-		 */
 		if (do_lso_send) {
+			/* Append LSO information to the mp. */
 			lso_info_set(mp, mss, HW_LSO);
 			ixa->ixa_fragsize = IP_MAXPACKET;
 			ixa->ixa_extra_ident = num_lso_seg - 1;
@@ -16610,6 +16608,12 @@ tcp_send(tcp_t *tcp, const int mss, const int total_hdr_len,
 			TCP_STAT(tcps, tcp_lso_times);
 			TCP_STAT_UPDATE(tcps, tcp_lso_pkt_out, num_lso_seg);
 		} else {
+			/*
+			 * Make sure to clean up LSO information. Wherever a
+			 * new mp uses the prepended header room after dupb(),
+			 * lso_info_cleanup() should be called.
+			 */
+			lso_info_cleanup(mp);
 			tcp_send_data(tcp, mp);
 			BUMP_LOCAL(tcp->tcp_obsegs);
 		}

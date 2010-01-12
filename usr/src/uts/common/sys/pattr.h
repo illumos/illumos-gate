@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,6 +99,7 @@ typedef struct pattr_hcksum_s {
 #define	HW_LSO			0x10	/* On Transmit: hardware does LSO */
 					/* On Receive: N/A */
 
+#define	HW_LSO_FLAGS		HW_LSO	/* All LSO flags, currently only one */
 
 /*
  * Structure used for zerocopy attribute.

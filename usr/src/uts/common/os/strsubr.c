@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -8516,10 +8516,21 @@ void
 lso_info_set(mblk_t *mp, uint32_t mss, uint32_t flags)
 {
 	ASSERT(DB_TYPE(mp) == M_DATA);
+	ASSERT((flags & ~HW_LSO_FLAGS) == 0);
 
 	/* Set the flags */
 	DB_LSOFLAGS(mp) |= flags;
 	DB_LSOMSS(mp) = mss;
+}
+
+void
+lso_info_cleanup(mblk_t *mp)
+{
+	ASSERT(DB_TYPE(mp) == M_DATA);
+
+	/* Clear the flags */
+	DB_LSOFLAGS(mp) &= ~HW_LSO_FLAGS;
+	DB_LSOMSS(mp) = 0;
 }
 
 void
@@ -8528,7 +8539,7 @@ lso_info_get(mblk_t *mp, uint32_t *mss, uint32_t *flags)
 	ASSERT(DB_TYPE(mp) == M_DATA);
 
 	if (flags != NULL) {
-		*flags = DB_CKSUMFLAGS(mp) & HW_LSO;
+		*flags = DB_CKSUMFLAGS(mp) & HW_LSO_FLAGS;
 		if ((*flags != 0) && (mss != NULL))
 			*mss = (uint32_t)DB_LSOMSS(mp);
 	}

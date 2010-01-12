@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1244,6 +1244,7 @@ extern void hcksum_retrieve(mblk_t *, struct multidata_s *, struct pdesc_s *,
     uint32_t *, uint32_t *, uint32_t *, uint32_t *, uint32_t *);
 extern void lso_info_set(mblk_t *, uint32_t, uint32_t);
 extern void lso_info_get(mblk_t *, uint32_t *, uint32_t *);
+extern void lso_info_cleanup(mblk_t *);
 extern unsigned int bcksum(uchar_t *, int, unsigned int);
 extern boolean_t is_vmloaned_mblk(mblk_t *, struct multidata_s *,
     struct pdesc_s *);
