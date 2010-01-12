@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1856,7 +1856,7 @@ static datafmt_t kmemfmt[] = {
 	{ "   buf",	"  size",	"------",	"%6u "		},
 	{ "   buf",	"in use",	"------",	"%6u "		},
 	{ "   buf",	" total",	"------",	"%6u "		},
-	{ "   memory",	"   in use",	"----------",	"%9u%c "	},
+	{ "   memory",	"   in use",	"----------",	"%10lu%c "	},
 	{ "    alloc",	"  succeed",	"---------",	"%9u "		},
 	{ "alloc",	" fail",	"-----",	"%5u "		},
 	{ NULL,		NULL,		NULL,		NULL		}
@@ -1915,7 +1915,7 @@ kmastat_slab_avail(uintptr_t addr, const kmem_slab_t *sp, int *avail)
 typedef struct kmastat_vmem {
 	uintptr_t kv_addr;
 	struct kmastat_vmem *kv_next;
-	int kv_meminuse;
+	size_t kv_meminuse;
 	int kv_alloc;
 	int kv_fail;
 } kmastat_vmem_t;
@@ -1993,7 +1993,7 @@ kmastat_vmem_totals(uintptr_t addr, const vmem_t *v, kmastat_args_t *kap)
 
 	len = MIN(17, strlen(v->vm_name));
 
-	mdb_printf("Total [%s]%*s %6s %6s %6s %9u%c %9u %5u\n", v->vm_name,
+	mdb_printf("Total [%s]%*s %6s %6s %6s %10lu%c %9u %5u\n", v->vm_name,
 	    17 - len, "", "", "", "",
 	    kv->kv_meminuse >> kap->ka_shift,
 	    kap->ka_shift == GIGS ? 'G' : kap->ka_shift == MEGS ? 'M' :
