@@ -340,8 +340,15 @@ fmd_msg_init(const char *root, int version)
 	/*
 	 * Cache the message template for the current locale.  This is the
 	 * snprintf(3C) format string for the final human-readable message.
+	 * If the lookup fails for the current locale, fall back to the C locale
+	 * and try again.  Then restore the original locale.
 	 */
-	h->fmh_template = dgettext(FMD_MSG_DOMAIN, FMD_MSG_TEMPLATE);
+	if ((h->fmh_template = dgettext(FMD_MSG_DOMAIN, FMD_MSG_TEMPLATE))
+	    == FMD_MSG_TEMPLATE && strcmp(h->fmh_locale, "C") != 0) {
+		(void) setlocale(LC_ALL, "C");
+		h->fmh_template = dgettext(FMD_MSG_DOMAIN, FMD_MSG_TEMPLATE);
+		(void) setlocale(LC_ALL, h->fmh_locale);
+	}
 
 	return (h);
 }
