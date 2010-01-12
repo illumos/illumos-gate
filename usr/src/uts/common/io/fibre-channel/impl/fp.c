@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * NOT a DDI compliant Sun Fibre Channel port driver(fp)
@@ -6514,7 +6514,7 @@ fp_adisc_intr(fc_packet_t *pkt)
 {
 	int			rval;
 	int			bailout;
-	fp_cmd_t		*cmd;
+	fp_cmd_t		*cmd, *logi_cmd;
 	fc_local_port_t		*port;
 	fc_remote_port_t	*pd;
 	la_els_adisc_t		*acc;
@@ -6611,11 +6611,66 @@ fp_adisc_intr(fc_packet_t *pkt)
 		mutex_enter(&port->fp_mutex);
 		if (port->fp_statec_busy <= 1) {
 			mutex_exit(&port->fp_mutex);
-			fp_printf(port, CE_NOTE, FP_LOG_ONLY, 0, pkt,
-			    "ADISC to %x failed, cmd_flags=%x",
-			    pkt->pkt_cmd_fhdr.d_id, cmd->cmd_flags);
-			cmd->cmd_flags &= ~FP_CMD_PLOGI_RETAIN;
-			adiscfail = 1;
+			if (pkt->pkt_state == FC_PKT_LS_RJT &&
+			    pkt->pkt_reason == FC_REASON_CMD_UNABLE) {
+				uchar_t class;
+				int cmd_flag;
+				uint32_t src_id;
+
+				class = fp_get_nextclass(port,
+				    FC_TRAN_CLASS_INVALID);
+				if (class == FC_TRAN_CLASS_INVALID) {
+					fp_iodone(cmd);
+					return;
+				}
+
+				FP_TRACE(FP_NHEAD1(1, 0), "ADISC re-login; "
+				    "fp_state=0x%x, pkt_state=0x%x, "
+				    "reason=0x%x, class=0x%x",
+				    port->fp_state, pkt->pkt_state,
+				    pkt->pkt_reason, class);
+				cmd_flag = FP_CMD_PLOGI_RETAIN;
+
+				logi_cmd = fp_alloc_pkt(port, sizeof (la_els_logi_t),
+				    sizeof (la_els_logi_t), KM_SLEEP, pd);
+				if (logi_cmd == NULL) {
+					fp_iodone(cmd);
+					return;
+				}
+
+				logi_cmd->cmd_pkt.pkt_tran_flags = FC_TRAN_INTR | class;
+				logi_cmd->cmd_pkt.pkt_tran_type = FC_PKT_EXCHANGE;
+				logi_cmd->cmd_flags = cmd_flag;
+				logi_cmd->cmd_retry_count = fp_retry_count;
+				logi_cmd->cmd_ulp_pkt = NULL;
+
+				mutex_enter(&port->fp_mutex);
+				src_id = port->fp_port_id.port_id;
+				mutex_exit(&port->fp_mutex);
+
+				fp_xlogi_init(port, logi_cmd, src_id,
+				    pkt->pkt_cmd_fhdr.d_id, fp_plogi_intr,
+				    cmd->cmd_job, LA_ELS_PLOGI);
+				if (pd) {
+					mutex_enter(&pd->pd_mutex);
+					pd->pd_flags = PD_ELS_IN_PROGRESS;
+					mutex_exit(&pd->pd_mutex);
+				}
+
+				if (fp_sendcmd(port, logi_cmd,
+				    port->fp_fca_handle) == FC_SUCCESS) {
+					fp_free_pkt(cmd);
+					return;
+				} else {
+					fp_free_pkt(logi_cmd);
+				}
+			} else {
+				fp_printf(port, CE_NOTE, FP_LOG_ONLY, 0, pkt,
+				    "ADISC to %x failed, cmd_flags=%x",
+				    pkt->pkt_cmd_fhdr.d_id, cmd->cmd_flags);
+				cmd->cmd_flags &= ~FP_CMD_PLOGI_RETAIN;
+				adiscfail = 1;
+			}
 		} else {
 			mutex_exit(&port->fp_mutex);
 		}
