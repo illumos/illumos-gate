@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -192,6 +192,9 @@ void snmpplugin_fini(void);
 
 #define	SNMPP_LINK_RESET	\
     gettext("PICL snmpplugin: snmp ds reset happened, rebuilding tree\n")
+
+#define	SIGACT_FAILED	\
+    gettext("PICL snmpplugin: Failed to install signal handler for %s: %s\n")
 
 #ifdef SNMPPLUGIN_DEBUG
 #define	SNMPPLUGIN_DBLOCK_SZ		4096

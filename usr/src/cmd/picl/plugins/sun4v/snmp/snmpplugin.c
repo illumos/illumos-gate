@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +41,7 @@
 #include <synch.h>
 #include <errno.h>
 #include <time.h>
+#include <signal.h>
 
 #include <picldefs.h>
 #include <picl.h>
@@ -396,6 +397,9 @@ snmpplugin_fini(void)
 	(void) cond_signal(&rebuild_tree_cv);
 	(void) mutex_unlock(&rebuild_tree_lock);
 
+	/* send SIGUSR1 to get tree_builder out of a blocked system call */
+	(void) thr_kill(tree_builder_thr_id, SIGUSR1);
+
 	/* reap the thread */
 	(void) thr_join(tree_builder_thr_id, NULL, NULL);
 
@@ -412,6 +416,20 @@ snmpplugin_fini(void)
 }
 
 /*ARGSUSED*/
+static void
+usr1_handler(int sig, siginfo_t *siginfo, void *sigctx)
+{
+	/*
+	 * Nothing to do here.
+	 * The act of catching the signal causes any cond_wait() or blocked
+	 * system call to return EINTR. This is used to trigger early exit from
+	 * the tree builder thread which may be blocked in snmp_init. More work
+	 * would be required to allow early exit if the tree builder thread is
+	 * already in its main processing loop and not blocked in cond_wait.
+	 */
+}
+
+/*ARGSUSED*/
 static void *
 tree_builder(void *arg)
 {
@@ -419,6 +437,19 @@ tree_builder(void *arg)
 	picl_nodehdl_t	root_node;
 	picl_nodehdl_t	physplat_root;
 	picl_nodehdl_t	old_physplat_root;
+	struct sigaction	act;
+
+	/*
+	 * catch SIGUSR1 to allow early exit from snmp_init which may block
+	 * indefinitely in a guest domain.
+	 */
+	act.sa_sigaction = usr1_handler;
+	(void) sigemptyset(&act.sa_mask);
+	act.sa_flags = 0;
+	if (sigaction(SIGUSR1, &act, NULL) == -1) {
+		syslog(LOG_ERR, SIGACT_FAILED, strsignal(SIGUSR1),
+		    strerror(errno));
+	}
 
 	/*
 	 * Initialize SNMP service
