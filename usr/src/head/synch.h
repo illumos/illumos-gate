@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYNCH_H
 #define	_SYNCH_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * synch.h:
@@ -243,10 +241,17 @@ int	sema_trywait();
 
 #ifdef	__STDC__
 
-int _sema_held(sema_t *);
-int _rw_read_held(rwlock_t *);
-int _rw_write_held(rwlock_t *);
-int _mutex_held(mutex_t *);
+/*
+ * The *_held() functions apply equally well to Solaris threads
+ * and to Posix threads synchronization objects, but the formal
+ * type declarations are different, so we just declare the argument
+ * to each *_held() function to be a void *, expecting that they will
+ * be called with the proper type of argument in each case.
+ */
+int _sema_held(void *);			/* sema_t or sem_t */
+int _rw_read_held(void *);		/* rwlock_t or pthread_rwlock_t */
+int _rw_write_held(void *);		/* rwlock_t or pthread_rwlock_t */
+int _mutex_held(void *);		/* mutex_t or pthread_mutex_t */
 
 #else	/* __STDC__ */
 

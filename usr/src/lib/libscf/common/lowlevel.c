@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,7 @@
 #include <libuutil.h>
 #include <poll.h>
 #include <pthread.h>
+#include <synch.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -92,13 +93,6 @@ static char index32[128] = {
 };
 
 #define	DECODE32_GS	(8)	/* scf_decode32 group size */
-
-/*
- * We want MUTEX_HELD, but we also want pthreads.
- */
-struct _lwp_mutex;
-extern int _mutex_held(struct _lwp_mutex *);
-#define	MUTEX_HELD(m)		_mutex_held((struct _lwp_mutex *)(m))
 
 #ifdef lint
 #define	assert_nolint(x) (void)0

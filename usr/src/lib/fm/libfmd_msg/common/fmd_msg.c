@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,6 +100,7 @@
 #include <alloca.h>
 #include <assert.h>
 #include <pthread.h>
+#include <synch.h>
 #include <strings.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -242,14 +243,11 @@ static int fmd_msg_nv_parse_nvpair(fmd_msg_buf_t *, nvpair_t *, char *);
 static int fmd_msg_nv_parse_nvname(fmd_msg_buf_t *, nvlist_t *, char *);
 static int fmd_msg_nv_parse_nvlist(fmd_msg_buf_t *, nvlist_t *, char *);
 
-struct _rwlock;
-
 /*ARGSUSED*/
 static int
 fmd_msg_lock_held(fmd_msg_hdl_t *h)
 {
-	extern int _rw_write_held(struct _rwlock *);
-	return (_rw_write_held((struct _rwlock *)&fmd_msg_rwlock));
+	return (RW_WRITE_HELD(&fmd_msg_rwlock));
 }
 
 void

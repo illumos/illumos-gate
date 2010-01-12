@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -576,7 +576,7 @@ dt_pid_create_usdt_probes(dtrace_probedesc_t *pdp, dtrace_hdl_t *dtp,
 	struct ps_prochandle *P = dpr->dpr_proc;
 	int ret = 0;
 
-	assert(DT_MUTEX_HELD(&dpr->dpr_lock));
+	assert(MUTEX_HELD(&dpr->dpr_lock));
 
 	(void) Pupdate_maps(P);
 	if (Pobject_iter(P, dt_pid_usdt_mapping, P) != 0) {

@@ -18,14 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_STARTD_H
 #define	_STARTD_H
-
 
 #include <sys/time.h>
 #include <librestart.h>
@@ -34,6 +34,7 @@
 #include <libsysevent.h>
 #include <libuutil.h>
 #include <pthread.h>
+#include <synch.h>
 #include <stdio.h>
 #include <syslog.h>
 #include <umem.h>
@@ -43,9 +44,14 @@ extern "C" {
 #endif
 
 /*
- * We want MUTEX_HELD, but we also want pthreads.  So we're stuck with this.
+ * We want MUTEX_HELD, but we also want pthreads.  So we're stuck with this
+ * for the native build, at least until the build machines can catch up
+ * with the latest version of MUTEX_HELD() in <synch.h>.
  */
-#define	PTHREAD_MUTEX_HELD(m)	_mutex_held((struct _lwp_mutex *)(m))
+#if defined(NATIVE_BUILD)
+#undef	MUTEX_HELD
+#define	MUTEX_HELD(m)		_mutex_held((mutex_t *)(m))
+#endif
 
 #ifndef NDEBUG
 

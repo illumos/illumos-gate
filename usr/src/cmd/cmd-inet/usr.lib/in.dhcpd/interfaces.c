@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -169,7 +170,7 @@ refresh_pktlist(dsvc_clnt_t *pcd, PKT_LIST *plp)
 	PKT_LIST	*wplp, *tplp, *retplp = NULL;
 	IF		*ifp = pcd->ifp;
 
-	assert(_mutex_held(&pcd->pkt_mtx));
+	assert(MUTEX_HELD(&pcd->pkt_mtx));
 
 	wplp = pcd->pkthead;
 	while (wplp != NULL) {
@@ -452,7 +453,7 @@ zap_ifp(IF **ifp_prevpp, IF *ifp)
 {
 	IF	*tifp;
 
-	assert(_mutex_held(&if_head_mtx));
+	assert(MUTEX_HELD(&if_head_mtx));
 
 	if (*ifp_prevpp == ifp) {
 		if_head = ifp->next;
@@ -1104,7 +1105,7 @@ open_interfaces(void)
 void
 detach_plp(dsvc_clnt_t *pcd, PKT_LIST *plp)
 {
-	assert(_mutex_held(&pcd->pkt_mtx));
+	assert(MUTEX_HELD(&pcd->pkt_mtx));
 
 	if (plp->prev == NULL) {
 		pcd->pkthead = plp->next;
@@ -1160,7 +1161,7 @@ close_interface(IF *ifp)
 
 	assert(ifp != NULL);
 
-	assert(_mutex_held(&if_head_mtx));
+	assert(MUTEX_HELD(&if_head_mtx));
 
 	(void) mutex_lock(&ifp->ifp_mtx);
 	ifp->thr_exit = 1;
@@ -1429,7 +1430,7 @@ free_pktlist(dsvc_clnt_t *pcd)
 	PKT_LIST *plp, *plp_next;
 	IF *ifp = pcd->ifp;
 
-	assert(_mutex_held(&pcd->pcd_mtx));
+	assert(MUTEX_HELD(&pcd->pcd_mtx));
 
 	plp = pcd->pkthead;
 	while (plp != NULL) {

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -617,7 +617,7 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 	int id = inst->ri_id;
 	int forkerr;
 
-	assert(PTHREAD_MUTEX_HELD(&inst->ri_lock));
+	assert(MUTEX_HELD(&inst->ri_lock));
 	assert(instance_in_transition(inst));
 
 	if (inst->ri_mi_deleted)

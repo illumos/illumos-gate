@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -297,7 +298,7 @@ vertex_get_by_name(const char *name)
 {
 	int id;
 
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 
 	id = dict_lookup_byname(name);
 	if (id == -1)
@@ -309,7 +310,7 @@ vertex_get_by_name(const char *name)
 static graph_vertex_t *
 vertex_get_by_id(int id)
 {
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 
 	if (id == -1)
 		return (NULL);
@@ -329,7 +330,7 @@ graph_add_vertex(const char *name)
 	void *p;
 	uu_list_index_t idx;
 
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 
 	id = dict_insert(name);
 
@@ -359,7 +360,7 @@ graph_add_vertex(const char *name)
 static void
 graph_remove_vertex(graph_vertex_t *v)
 {
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 
 	assert(uu_list_numnodes(v->gv_dependencies) == 0);
 	assert(uu_list_numnodes(v->gv_dependents) == 0);
@@ -379,7 +380,7 @@ graph_add_edge(graph_vertex_t *fv, graph_vertex_t *tv)
 	graph_edge_t *e, *re;
 	int r;
 
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 
 	e = startd_alloc(sizeof (graph_edge_t));
 	re = startd_alloc(sizeof (graph_edge_t));
@@ -432,7 +433,7 @@ remove_inst_vertex(graph_vertex_t *v)
 	graph_vertex_t *sv;
 	int i;
 
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 	assert(uu_list_numnodes(v->gv_dependents) == 1);
 	assert(uu_list_numnodes(v->gv_dependencies) == 0);
 	assert(v->gv_refs == 0);
@@ -476,7 +477,7 @@ graph_walk_dependencies(graph_vertex_t *v, void (*func)(graph_vertex_t *,
 {
 	graph_edge_t *e;
 
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 
 	for (e = uu_list_first(v->gv_dependencies);
 	    e != NULL;
@@ -678,7 +679,7 @@ path_to_str(int *path, char **cpp, size_t *sz)
 	size_t allocd, new_allocd;
 	char *new, *name;
 
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 	assert(path[0] != -1);
 
 	allocd = 1;
@@ -725,7 +726,7 @@ path_to_str(int *path, char **cpp, size_t *sz)
 static void
 graph_clogin_start(graph_vertex_t *v)
 {
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 
 	if (sulogin_running)
 		console_login_ready = B_TRUE;
@@ -859,7 +860,7 @@ vertex_send_event(graph_vertex_t *v, restarter_event_type_t e)
 static void
 graph_unset_restarter(graph_vertex_t *v)
 {
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 	assert(v->gv_flags & GV_CONFIGURED);
 
 	vertex_send_event(v, RESTARTER_EVENT_TYPE_REMOVE_INSTANCE);
@@ -882,7 +883,7 @@ graph_unset_restarter(graph_vertex_t *v)
 static int
 free_if_unrefed(graph_vertex_t *v)
 {
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 
 	if (v->gv_refs > 0)
 		return (VERTEX_INUSE);
@@ -909,7 +910,7 @@ delete_depgroup(graph_vertex_t *v)
 	graph_edge_t *e;
 	graph_vertex_t *dv;
 
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 	assert(v->gv_type == GVT_GROUP);
 	assert(uu_list_numnodes(v->gv_dependents) == 0);
 
@@ -990,7 +991,7 @@ delete_instance_dependencies(graph_vertex_t *v, boolean_t delete_restarter_dep)
 	void *ptrs[2];
 	int r;
 
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 	assert(v->gv_type == GVT_INST);
 
 	ptrs[0] = v;
@@ -1018,7 +1019,7 @@ graph_insert_vertex_unconfigured(const char *fmri, gv_type_t type,
 	int r;
 	int i;
 
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 
 	switch (type) {
 	case GVT_SVC:
@@ -1113,7 +1114,7 @@ graph_insert_dependency(graph_vertex_t *fv, graph_vertex_t *tv, int **pathp)
 {
 	hrtime_t now;
 
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 
 	/* cycle detection */
 	now = gethrtime();
@@ -1860,7 +1861,7 @@ graph_enable_by_vertex(graph_vertex_t *vertex, int enable, int admin)
 	graph_vertex_t *v;
 	int r;
 
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 	assert((vertex->gv_flags & GV_CONFIGURED));
 
 	vertex->gv_flags = (vertex->gv_flags & ~GV_ENABLED) |
@@ -1992,7 +1993,7 @@ graph_change_restarter(graph_vertex_t *v, const char *fmri_arg, scf_handle_t *h,
 	int err;
 	int id;
 
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 
 	if (fmri_arg[0] != '\0') {
 		err = fmri_canonify(fmri_arg, &restarter_fmri, B_TRUE);
@@ -2271,7 +2272,7 @@ process_dependency_fmri(const char *fmri, struct depfmri_info *info)
 	scf_instance_t *inst;
 	boolean_t rebound;
 
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 
 	/* Get or create vertex for FMRI */
 	depgroup_v = info->v;
@@ -2469,7 +2470,7 @@ process_dependency_pg(scf_propertygroup_t *pg, struct deppg_info *info)
 	scf_error_t scferr;
 	ssize_t len;
 
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 
 	h = scf_pg_handle(pg);
 
@@ -2623,7 +2624,7 @@ set_dependencies(graph_vertex_t *v, scf_instance_t *inst, int **pathp)
 	int err;
 	uint_t old_configured;
 
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 
 	/*
 	 * Mark the vertex as configured during dependency insertion to avoid
@@ -2668,7 +2669,7 @@ handle_cycle(const char *fmri, int *path)
 	const char *cp;
 	size_t sz;
 
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 
 	path_to_str(path, (char **)&cp, &sz);
 
@@ -2686,7 +2687,7 @@ handle_cycle(const char *fmri, int *path)
 static void
 vertex_ref(graph_vertex_t *v)
 {
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 
 	v->gv_refs++;
 }
@@ -2701,7 +2702,7 @@ vertex_ref(graph_vertex_t *v)
 static int
 vertex_unref(graph_vertex_t *v)
 {
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 	assert(v->gv_refs > 0);
 
 	v->gv_refs--;
@@ -2948,7 +2949,7 @@ refresh_vertex(graph_vertex_t *v, scf_instance_t *inst)
 	graph_edge_t *e;
 	graph_vertex_t *vv;
 
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 	assert(v->gv_type == GVT_INST);
 
 	log_framework(LOG_DEBUG, "Graph engine: Refreshing %s.\n", v->gv_name);
@@ -3081,7 +3082,7 @@ configure_vertex(graph_vertex_t *v, scf_instance_t *inst)
 
 	restarter_fmri[0] = '\0';
 
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 	assert(v->gv_type == GVT_INST);
 	assert((v->gv_flags & GV_CONFIGURED) == 0);
 
@@ -3645,7 +3646,7 @@ can_come_up(void)
 {
 	int i;
 
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 
 	/*
 	 * If we are booting to single user (boot -s),
@@ -3752,7 +3753,7 @@ run_sulogin(const char *msg)
 {
 	graph_vertex_t *v;
 
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 
 	if (sulogin_running)
 		return (EALREADY);
@@ -4036,7 +4037,7 @@ dgraph_add_instance(const char *inst_fmri, scf_instance_t *inst,
 	if (lock_graph) {
 		MUTEX_LOCK(&dgraph_lock);
 	} else {
-		assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+		assert(MUTEX_HELD(&dgraph_lock));
 	}
 
 	v = vertex_get_by_name(inst_fmri);
@@ -4229,7 +4230,7 @@ dgraph_refresh_instance(graph_vertex_t *v, scf_instance_t *inst)
 	int r;
 	int enabled;
 
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 	assert(v->gv_type == GVT_INST);
 
 	/* Only refresh services with valid general/enabled properties. */
@@ -4282,7 +4283,7 @@ insubtree_dependents_down(graph_vertex_t *v)
 	graph_vertex_t *vv;
 	graph_edge_t *e;
 
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 
 	for (e = uu_list_first(v->gv_dependents); e != NULL;
 	    e = uu_list_next(v->gv_dependents, e)) {
@@ -4320,7 +4321,7 @@ is_nonsubgraph_leaf(graph_vertex_t *v)
 	graph_vertex_t *vv;
 	graph_edge_t *e;
 
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 
 	for (e = uu_list_first(v->gv_dependents);
 	    e != NULL;
@@ -4453,7 +4454,7 @@ disable_service_temporarily(graph_vertex_t *v, scf_handle_t *h)
 void
 offline_subtree_leaves(graph_vertex_t *v, void *arg)
 {
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 
 	/* If v isn't an instance, recurse on its dependencies. */
 	if (v->gv_type != GVT_INST) {
@@ -4499,7 +4500,7 @@ graph_offline_subtree_leaves(graph_vertex_t *v, void *h)
 static void
 disable_nonsubgraph_leaves(graph_vertex_t *v, void *arg)
 {
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 
 	/*
 	 * We must skip exclusion dependencies because they are allowed to
@@ -4694,7 +4695,7 @@ void
 graph_transition_sulogin(restarter_instance_state_t state,
     restarter_instance_state_t old_state)
 {
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 
 	if (state != old_state && st->st_load_complete &&
 	    !go_single_user_mode && !go_to_level1 &&
@@ -4837,7 +4838,7 @@ dgraph_remove_instance(const char *fmri, scf_handle_t *h)
 static char
 target_milestone_as_runlevel()
 {
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 
 	if (milestone == NULL)
 		return ('3');
@@ -4880,7 +4881,7 @@ signal_init(char rl)
 	pid_t init_pid;
 	int i;
 
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 
 	if (zone_getattr(getzoneid(), ZONE_ATTR_INITPID, &init_pid,
 	    sizeof (init_pid)) != sizeof (init_pid)) {
@@ -4931,7 +4932,7 @@ graph_runlevel_changed(char rl, int online)
 {
 	char trl;
 
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(MUTEX_HELD(&dgraph_lock));
 
 	trl = target_milestone_as_runlevel();
 

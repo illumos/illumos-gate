@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,30 +33,6 @@
 
 #include <topo_error.h>
 #include <topo_subr.h>
-
-struct _rwlock;
-struct _lwp_mutex;
-
-int
-topo_rw_read_held(pthread_rwlock_t *lock)
-{
-	extern int _rw_read_held(struct _rwlock *);
-	return (_rw_read_held((struct _rwlock *)lock));
-}
-
-int
-topo_rw_write_held(pthread_rwlock_t *lock)
-{
-	extern int _rw_write_held(struct _rwlock *);
-	return (_rw_write_held((struct _rwlock *)lock));
-}
-
-int
-topo_mutex_held(pthread_mutex_t *lock)
-{
-	extern int _mutex_held(struct _lwp_mutex *);
-	return (_mutex_held((struct _lwp_mutex *)lock));
-}
 
 void
 topo_hdl_lock(topo_hdl_t *thp)

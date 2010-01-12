@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -800,30 +801,6 @@ dt_popcb(const ulong_t *bp, ulong_t n)
 		popc += dt_popc(bp[w]);
 
 	return (popc + dt_popc(bp[maxw] & ((1UL << maxb) - 1)));
-}
-
-struct _rwlock;
-struct _lwp_mutex;
-
-int
-dt_rw_read_held(pthread_rwlock_t *lock)
-{
-	extern int _rw_read_held(struct _rwlock *);
-	return (_rw_read_held((struct _rwlock *)lock));
-}
-
-int
-dt_rw_write_held(pthread_rwlock_t *lock)
-{
-	extern int _rw_write_held(struct _rwlock *);
-	return (_rw_write_held((struct _rwlock *)lock));
-}
-
-int
-dt_mutex_held(pthread_mutex_t *lock)
-{
-	extern int _mutex_held(struct _lwp_mutex *);
-	return (_mutex_held((struct _lwp_mutex *)lock));
 }
 
 static int

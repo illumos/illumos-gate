@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Stubs for the standalone to reduce the dependence on external libraries
@@ -96,7 +94,7 @@ mutex_destroy(mutex_t *mp)
 
 /*ARGSUSED*/
 int
-_mutex_held(mutex_t *mp)
+_mutex_held(void *mp)
 {
 	return (1);
 }

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -114,10 +114,6 @@ extern topo_name_trans_t topo_sensor_states_generic_status_table[];
 extern topo_name_trans_t topo_sensor_states_generic_acpi_pwr_table[];
 extern topo_name_trans_t topo_sensor_states_generic_failure_table[];
 extern topo_name_trans_t topo_sensor_states_generic_ok_table[];
-
-extern int topo_rw_read_held(pthread_rwlock_t *);
-extern int topo_rw_write_held(pthread_rwlock_t *);
-extern int topo_mutex_held(pthread_mutex_t *);
 
 extern void topo_hdl_lock(topo_hdl_t *);
 extern void topo_hdl_unlock(topo_hdl_t *);

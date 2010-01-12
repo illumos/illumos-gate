@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <atomic.h>
 #include <alloca.h>
@@ -46,30 +44,6 @@
 #include <fmd_log.h>
 
 #include <fmd.h>
-
-struct _rwlock;
-struct _lwp_mutex;
-
-int
-fmd_rw_read_held(pthread_rwlock_t *lock)
-{
-	extern int _rw_read_held(struct _rwlock *);
-	return (_rw_read_held((struct _rwlock *)lock));
-}
-
-int
-fmd_rw_write_held(pthread_rwlock_t *lock)
-{
-	extern int _rw_write_held(struct _rwlock *);
-	return (_rw_write_held((struct _rwlock *)lock));
-}
-
-int
-fmd_mutex_held(pthread_mutex_t *lock)
-{
-	extern int _mutex_held(struct _lwp_mutex *);
-	return (_mutex_held((struct _lwp_mutex *)lock));
-}
 
 int
 fmd_assert(const char *expr, const char *file, int line)

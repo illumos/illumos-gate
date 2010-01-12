@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -672,7 +673,7 @@ restarter_delete_inst(restarter_inst_t *ri)
 	void *cookie = NULL;
 	restarter_instance_qentry_t *e;
 
-	assert(PTHREAD_MUTEX_HELD(&ri->ri_lock));
+	assert(MUTEX_HELD(&ri->ri_lock));
 
 	/*
 	 * Must drop the instance lock so we can pick up the instance_list
@@ -735,7 +736,7 @@ restarter_delete_inst(restarter_inst_t *ri)
 int
 instance_is_wait_style(restarter_inst_t *inst)
 {
-	assert(PTHREAD_MUTEX_HELD(&inst->ri_lock));
+	assert(MUTEX_HELD(&inst->ri_lock));
 	return ((inst->ri_flags & RINST_STYLE_MASK) == RINST_WAIT);
 }
 
@@ -747,7 +748,7 @@ instance_is_wait_style(restarter_inst_t *inst)
 int
 instance_is_transient_style(restarter_inst_t *inst)
 {
-	assert(PTHREAD_MUTEX_HELD(&inst->ri_lock));
+	assert(MUTEX_HELD(&inst->ri_lock));
 	return ((inst->ri_flags & RINST_STYLE_MASK) == RINST_TRANSIENT);
 }
 
@@ -758,7 +759,7 @@ instance_is_transient_style(restarter_inst_t *inst)
 int
 instance_in_transition(restarter_inst_t *inst)
 {
-	assert(PTHREAD_MUTEX_HELD(&inst->ri_lock));
+	assert(MUTEX_HELD(&inst->ri_lock));
 	if (inst->ri_i.i_next_state == RESTARTER_STATE_NONE)
 		return (0);
 	return (1);
@@ -772,7 +773,7 @@ instance_started(restarter_inst_t *inst)
 {
 	int ret;
 
-	assert(PTHREAD_MUTEX_HELD(&inst->ri_lock));
+	assert(MUTEX_HELD(&inst->ri_lock));
 
 	if (inst->ri_i.i_state == RESTARTER_STATE_ONLINE ||
 	    inst->ri_i.i_state == RESTARTER_STATE_DEGRADED)
@@ -800,7 +801,7 @@ restarter_instance_update_states(scf_handle_t *h, restarter_inst_t *ri,
 	int prev_state_online;
 	int state_online;
 
-	assert(PTHREAD_MUTEX_HELD(&ri->ri_lock));
+	assert(MUTEX_HELD(&ri->ri_lock));
 
 	prev_state_online = instance_started(ri);
 
@@ -988,7 +989,7 @@ stop_instance(scf_handle_t *local_handle, restarter_inst_t *inst,
 	int err;
 	restarter_error_t re;
 
-	assert(PTHREAD_MUTEX_HELD(&inst->ri_lock));
+	assert(MUTEX_HELD(&inst->ri_lock));
 	assert(inst->ri_method_thread == 0);
 
 	switch (cause) {
@@ -1165,7 +1166,7 @@ unmaintain_instance(scf_handle_t *h, restarter_inst_t *rip,
 	uint_t tries = 0, msecs = ALLOC_DELAY;
 	const char *cp;
 
-	assert(PTHREAD_MUTEX_HELD(&rip->ri_lock));
+	assert(MUTEX_HELD(&rip->ri_lock));
 
 	if (rip->ri_i.i_state != RESTARTER_STATE_MAINT) {
 		log_error(LOG_DEBUG, "Restarter: "
@@ -1286,7 +1287,7 @@ enable_inst(scf_handle_t *h, restarter_inst_t *inst, restarter_event_type_t e)
 	restarter_instance_state_t state;
 	int r;
 
-	assert(PTHREAD_MUTEX_HELD(&inst->ri_lock));
+	assert(MUTEX_HELD(&inst->ri_lock));
 	assert(e == RESTARTER_EVENT_TYPE_ADMIN_DISABLE ||
 	    e == RESTARTER_EVENT_TYPE_DISABLE ||
 	    e == RESTARTER_EVENT_TYPE_ENABLE);
@@ -1377,7 +1378,7 @@ start_instance(scf_handle_t *local_handle, restarter_inst_t *inst)
 {
 	fork_info_t *info;
 
-	assert(PTHREAD_MUTEX_HELD(&inst->ri_lock));
+	assert(MUTEX_HELD(&inst->ri_lock));
 	assert(instance_in_transition(inst) == 0);
 	assert(inst->ri_method_thread == 0);
 
@@ -1437,7 +1438,7 @@ maintain_instance(scf_handle_t *h, restarter_inst_t *rip, int immediate,
 	fork_info_t *info;
 	scf_instance_t *scf_inst = NULL;
 
-	assert(PTHREAD_MUTEX_HELD(&rip->ri_lock));
+	assert(MUTEX_HELD(&rip->ri_lock));
 	assert(aux != NULL);
 	assert(rip->ri_method_thread == 0);
 
@@ -1515,7 +1516,7 @@ refresh_instance(scf_handle_t *h, restarter_inst_t *rip)
 	fork_info_t *info;
 	int r;
 
-	assert(PTHREAD_MUTEX_HELD(&rip->ri_lock));
+	assert(MUTEX_HELD(&rip->ri_lock));
 
 	log_instance(rip, B_TRUE, "Rereading configuration.");
 	log_framework(LOG_DEBUG, "%s: rereading configuration.\n",
@@ -1780,8 +1781,8 @@ restarter_queue_event(restarter_inst_t *ri, restarter_protocol_event_t *e)
 	restarter_instance_qentry_t *qe;
 	int r;
 
-	assert(PTHREAD_MUTEX_HELD(&ri->ri_queue_lock));
-	assert(!PTHREAD_MUTEX_HELD(&ri->ri_lock));
+	assert(MUTEX_HELD(&ri->ri_queue_lock));
+	assert(!MUTEX_HELD(&ri->ri_lock));
 
 	qe = startd_zalloc(sizeof (restarter_instance_qentry_t));
 	qe->riq_type = e->rpe_type;
@@ -1949,7 +1950,7 @@ contract_action(scf_handle_t *h, restarter_inst_t *inst, ctid_t id,
 {
 	const char *fmri = inst->ri_i.i_fmri;
 
-	assert(PTHREAD_MUTEX_HELD(&inst->ri_lock));
+	assert(MUTEX_HELD(&inst->ri_lock));
 
 	/*
 	 * If startd has stopped this contract, there is no need to
@@ -2251,7 +2252,7 @@ timeout_insert(restarter_inst_t *inst, ctid_t cid, uint64_t timeout_sec)
 	timeout_entry_t *entry;
 	uu_list_index_t idx;
 
-	assert(PTHREAD_MUTEX_HELD(&inst->ri_lock));
+	assert(MUTEX_HELD(&inst->ri_lock));
 
 	now = gethrtime();
 
@@ -2294,7 +2295,7 @@ timeout_insert(restarter_inst_t *inst, ctid_t cid, uint64_t timeout_sec)
 void
 timeout_remove(restarter_inst_t *inst, ctid_t cid)
 {
-	assert(PTHREAD_MUTEX_HELD(&inst->ri_lock));
+	assert(MUTEX_HELD(&inst->ri_lock));
 
 	if (inst->ri_timeout == NULL)
 		return;

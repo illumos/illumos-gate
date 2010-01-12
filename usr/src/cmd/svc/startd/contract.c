@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef _FILE_OFFSET_BITS
 #undef _FILE_OFFSET_BITS
@@ -270,7 +268,7 @@ contract_hold_bucket(ctid_t ctid)
 static void
 contract_release_bucket(contract_bucket_t *bp)
 {
-	assert(PTHREAD_MUTEX_HELD(&bp->cb_lock));
+	assert(MUTEX_HELD(&bp->cb_lock));
 	MUTEX_UNLOCK(&bp->cb_lock);
 }
 
@@ -279,7 +277,7 @@ contract_lookup(contract_bucket_t *bp, ctid_t ctid)
 {
 	contract_entry_t *ce;
 
-	assert(PTHREAD_MUTEX_HELD(&bp->cb_lock));
+	assert(MUTEX_HELD(&bp->cb_lock));
 
 	if (bp->cb_list == NULL)
 		return (NULL);

@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <signal.h>
 #include <dirent.h>
@@ -32,6 +31,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <pthread.h>
+#include <synch.h>
 #include <errno.h>
 #include <strings.h>
 #include <assert.h>
@@ -185,7 +185,7 @@ topo_mod_destroy(topo_mod_t *mod)
 		return;
 
 	assert(mod->tm_refs == 0);
-	assert(!topo_mutex_held(&mod->tm_lock));
+	assert(!MUTEX_HELD(&mod->tm_lock));
 
 	if (mod->tm_name != NULL)
 		topo_hdl_strfree(thp, mod->tm_name);
@@ -339,7 +339,7 @@ topo_modhash_unload(topo_mod_t *mod)
 	topo_hdl_t *thp = mod->tm_hdl;
 	topo_modhash_t *mhp;
 
-	assert(topo_mutex_held(&mod->tm_lock));
+	assert(MUTEX_HELD(&mod->tm_lock));
 	assert(mod->tm_busy == 0);
 
 	mhp = thp->th_modhash;

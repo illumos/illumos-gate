@@ -18,19 +18,19 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_CONFIGD_H
 #define	_CONFIGD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <bsm/adt.h>
 #include <door.h>
 #include <pthread.h>
+#include <synch.h>
 #include <string.h>
 #include <sys/types.h>
 
@@ -72,11 +72,14 @@ extern "C" {
 #define	offsetofend(t, f)	(offsetof(t, f) + sizeof (((t *)0)->f))
 
 /*
- * We want MUTEX_HELD, but we also want pthreads.  So we're stuck with this.
+ * We want MUTEX_HELD, but we also want pthreads.  So we're stuck with this
+ * for the native build, at least until the build machines can catch up
+ * with the latest version of MUTEX_HELD() in <synch.h>.
  */
-struct _lwp_mutex_t;
-extern int _mutex_held(struct _lwp_mutex_t *);
-#define	MUTEX_HELD(m)		_mutex_held((struct _lwp_mutex_t *)(m))
+#if defined(NATIVE_BUILD)
+#undef	MUTEX_HELD
+#define	MUTEX_HELD(m)		_mutex_held((mutex_t *)(m))
+#endif
 
 /*
  * Maximum levels of composition.
