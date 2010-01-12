@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -413,21 +413,30 @@ meta_DeriveKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 	if (rv != CKR_OK)
 		goto finish;
 
-	/* Make the derived key(s) active and visible to other threads. */
-	meta_object_activate(newKey1);
-	if (ssl_keys) {
-		meta_object_activate(newKey2);
-		meta_object_activate(newKey3);
-		meta_object_activate(newKey4);
+	if (tlsprf) {
+		(void) meta_object_dealloc(session, newKey1, B_TRUE);
+		newKey1 = NULL;
+		/* phKey isn't used (is NULL) for mechanism CKM_TLS_PRF. */
 
-		ssl_key_mat->hClientMacSecret = (CK_OBJECT_HANDLE) newKey1;
-		ssl_key_mat->hServerMacSecret = (CK_OBJECT_HANDLE) newKey2;
-		ssl_key_mat->hClientKey = (CK_OBJECT_HANDLE) newKey3;
-		ssl_key_mat->hServerKey = (CK_OBJECT_HANDLE) newKey4;
-		/* phKey is not used (it's NULL) for these SSL/TLS mechs. */
+	} else {
+		/* Make derived key(s) active and visible to other threads. */
+		meta_object_activate(newKey1);
+		if (ssl_keys) {
+			meta_object_activate(newKey2);
+			meta_object_activate(newKey3);
+			meta_object_activate(newKey4);
 
-	} else if (!tlsprf) {
-		*phKey = (CK_OBJECT_HANDLE) newKey1;
+			ssl_key_mat->hClientMacSecret
+			    = (CK_OBJECT_HANDLE) newKey1;
+			ssl_key_mat->hServerMacSecret
+			    = (CK_OBJECT_HANDLE) newKey2;
+			ssl_key_mat->hClientKey = (CK_OBJECT_HANDLE) newKey3;
+			ssl_key_mat->hServerKey = (CK_OBJECT_HANDLE) newKey4;
+			/* phKey isn't used (is NULL) for these SSL/TLS mechs */
+
+		} else {
+			*phKey = (CK_OBJECT_HANDLE) newKey1;
+		}
 	}
 
 finish:
