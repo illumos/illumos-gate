@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1291,14 +1291,20 @@ void
 rge_hw_stats_dump(rge_t *rgep)
 {
 	int i = 0;
+	uint32_t regval = 0;
 
-	while (rge_reg_get32(rgep, DUMP_COUNTER_REG_0) & DUMP_START) {
+	if (rgep->rge_mac_state == RGE_MAC_STOPPED)
+		return;
+
+	regval = rge_reg_get32(rgep, DUMP_COUNTER_REG_0);
+	while (regval & DUMP_START) {
 		drv_usecwait(100);
 		if (++i > STATS_DUMP_LOOP) {
 			RGE_DEBUG(("rge h/w statistics dump fail!"));
 			rgep->rge_chip_state = RGE_CHIP_ERROR;
 			return;
 		}
+		regval = rge_reg_get32(rgep, DUMP_COUNTER_REG_0);
 	}
 	DMA_SYNC(rgep->dma_area_stats, DDI_DMA_SYNC_FORKERNEL);
 
