@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,6 +69,7 @@ extern "C" {
 #define	DEVICE_ID_5705F			0x166e
 #define	DEVICE_ID_5780			0x166a
 #define	DEVICE_ID_5782			0x1696
+#define	DEVICE_ID_5785			0x1699
 #define	DEVICE_ID_5787			0x169b
 #define	DEVICE_ID_5787M			0x1693
 #define	DEVICE_ID_5788			0x169c
@@ -186,7 +187,8 @@ extern "C" {
 		((bgep->chipid.device == DEVICE_ID_5723) ||\
 		(bgep->chipid.device == DEVICE_ID_5761) ||\
 		(bgep->chipid.device == DEVICE_ID_5761E) ||\
-		(bgep->chipid.device == DEVICE_ID_5764))
+		(bgep->chipid.device == DEVICE_ID_5764) ||\
+		(bgep->chipid.device == DEVICE_ID_5785))
 
 #define	DEVICE_5714_SERIES_CHIPSETS(bgep) \
 		((bgep->chipid.device == DEVICE_ID_5714C) ||\

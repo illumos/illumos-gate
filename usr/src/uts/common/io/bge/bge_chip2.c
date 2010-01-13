@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1853,6 +1853,7 @@ bge_nvmem_id(bge_t *bgep)
 	case DEVICE_ID_5705_2:
 	case DEVICE_ID_5780:
 	case DEVICE_ID_5782:
+	case DEVICE_ID_5785:
 	case DEVICE_ID_5787:
 	case DEVICE_ID_5787M:
 	case DEVICE_ID_5788:
@@ -2144,15 +2145,19 @@ bge_chip_id_init(bge_t *bgep)
 	case DEVICE_ID_5761E:
 		cidp->msi_enabled = bge_enable_msi;
 		/*
-		 * We don't use MSI for BCM5764, as the status block may
-		 * fail to update when the network traffic is heavy.
+		 * We don't use MSI for BCM5764 and BCM5785, as the
+		 * status block may fail to update when the network
+		 * traffic is heavy.
 		 */
 		/* FALLTHRU */
+	case DEVICE_ID_5785:
 	case DEVICE_ID_5764:
 		if (cidp->device == DEVICE_ID_5723)
 			cidp->chip_label = 5723;
 		else if (cidp->device == DEVICE_ID_5764)
 			cidp->chip_label = 5764;
+		else if (cidp->device == DEVICE_ID_5785)
+			cidp->chip_label = 5785;
 		else
 			cidp->chip_label = 5761;
 		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5721;
@@ -2848,6 +2853,17 @@ bge_sync_mac_modes(bge_t *bgep)
 	bge_reg_put32(bgep, RECEIVE_MAC_MODE_REG, macmode);
 	BGE_DEBUG(("bge_sync_mac_modes($%p) Receive MAC mode 0x%x => 0x%x",
 	    (void *)bgep, regval, macmode));
+
+	/*
+	 * For BCM5785, we need to configure the link status in the MI Status
+	 * register with a write command when auto-polling is disabled.
+	 */
+	if (bgep->chipid.device == DEVICE_ID_5785)
+		if (bgep->param_link_speed == 10)
+			bge_reg_put32(bgep, MI_STATUS_REG, MI_STATUS_LINK
+			    | MI_STATUS_10MBPS);
+		else
+			bge_reg_put32(bgep, MI_STATUS_REG, MI_STATUS_LINK);
 }
 
 /*
@@ -3961,6 +3977,8 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	if (!bge_chip_enable_engine(bgep, WRITE_DMA_MODE_REG,
 	    dma_wrprio))
 		retval = DDI_FAILURE;
+	if (DEVICE_5723_SERIES_CHIPSETS(bgep))
+		bge_dma_rdprio = 0;
 	if (!bge_chip_enable_engine(bgep, READ_DMA_MODE_REG,
 	    (bge_dma_rdprio << DMA_PRIORITY_SHIFT) | ALL_DMA_ATTN_BITS))
 		retval = DDI_FAILURE;

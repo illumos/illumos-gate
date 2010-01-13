@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -157,6 +157,7 @@ then
 	"pci14e4,166a"
 	"pci14e4,166e"
 	"pci14e4,1696"
+	"pci14e4,1699"
 	"pci14e4,169c"
 	"pci14e4,1677"
 	"pciex14e4,1677"
