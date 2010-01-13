@@ -70,6 +70,7 @@
 #include <vm/seg.h>
 #include <vm/seg_kmem.h>
 #include <sys/clock_impl.h>
+#include <sys/hold_page.h>
 
 #include <bzip2/bzlib.h>
 
@@ -2625,6 +2626,15 @@ dumpsys(void)
 
 		for (bitnum = 0; bitnum < dumpcfg.bitmapsize; bitnum++) {
 			dump_timeleft = dump_timeout;
+			pfn = dump_bitnum_to_pfn(bitnum, &mlw);
+			/*
+			 * Some hypervisors do not have all pages available to
+			 * be accessed by the guest OS.  Check for page
+			 * accessibility.
+			 */
+			if (plat_hold_page(pfn, PLAT_HOLD_NO_LOCK, NULL) !=
+			    PLAT_HOLD_OK)
+				continue;
 			BT_SET(dumpcfg.bitmap, bitnum);
 		}
 		dumphdr->dump_npages = dumpcfg.bitmapsize;
