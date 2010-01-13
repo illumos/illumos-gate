@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -5384,7 +5384,18 @@ stmf_scsilib_prepare_vpd_page83(scsi_task_t *task, uint8_t *page,
 			p[3] = 4;
 			ilport = (stmf_i_local_port_t *)
 			    task->task_lport->lport_stmf_private;
-			if (ilport->ilport_rtpid > 255) {
+			/*
+			 * If we're in alua mode, group 1 contains all alua
+			 * participating ports and all standby ports
+			 * > 255. Otherwise, if we're in alua mode, any local
+			 * ports (non standby/pppt) are also in group 1 if the
+			 * alua node is 1. Otherwise the group is 0.
+			 */
+			if ((stmf_state.stmf_alua_state &&
+			    (ilport->ilport_alua || ilport->ilport_standby) &&
+			    ilport->ilport_rtpid > 255) ||
+			    (stmf_state.stmf_alua_node == 1 &&
+			    ilport->ilport_standby != 1)) {
 				p[7] = 1;	/* Group 1 */
 			}
 			sz = 8;
