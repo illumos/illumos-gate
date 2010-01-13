@@ -19,10 +19,8 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PATH="/usr/bin:/usr/sbin:${PATH}"
@@ -45,8 +43,8 @@ while read src dest; do
 	else
 		# Remove obsoleted drivers
 		grep -v 'name="ssd" parent="SUNW,pln" port=' $dest > /tmp/d.$$
-		grep -v 'name="ssd" parent="scsi_vhci" target=0;' /tmp/d.$$ > /tmp/d.$$
-		mv /tmp/d.$$ $dest
+		grep -v 'name="ssd" parent="scsi_vhci" target=0;' /tmp/d.$$ > $dest
+		rm /tmp/d.$$
 
 		# Process conf files for missing entries
 		while read confline; do
