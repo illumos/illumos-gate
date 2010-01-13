@@ -394,8 +394,8 @@ typedef enum {
 
 #define	RINST_RETAKE_MASK	0x0f000000
 
-#define	RINST_START_TIMES	10		/* failures to consider */
-#define	RINST_FAILURE_RATE_NS	1000000000LL	/* 1 failure/second */
+#define	RINST_START_TIMES	5		/* failures to consider */
+#define	RINST_FAILURE_RATE_NS	600000000000LL	/* 1 failure/10 minutes */
 
 /* Number of events in the queue when we start dropping ADMIN events. */
 #define	RINST_QUEUE_THRESHOLD	100
@@ -653,6 +653,7 @@ typedef int (*callback_t)(void *, void *);
 
 int walk_dependency_pgs(scf_instance_t *, callback_t, void *);
 int walk_property_astrings(scf_property_t *, callback_t, void *);
+void libscf_reset_start_times(restarter_inst_t *, int);
 
 /* libscf.c - used by restarter.c/method.c/expand.c */
 char *libscf_get_method(scf_handle_t *, int, restarter_inst_t *,

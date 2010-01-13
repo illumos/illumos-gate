@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -124,6 +124,7 @@ typedef uint32_t restarter_event_type_t;
 #define	RESTARTER_EVENT_TYPE_DEPENDENCY_CYCLE		13
 #define	RESTARTER_EVENT_TYPE_INVALID_DEPENDENCY		14
 #define	RESTARTER_EVENT_TYPE_ADMIN_DISABLE		15
+#define	RESTARTER_EVENT_TYPE_STOP_RESET			16
 
 #define	RESTARTER_EVENT_ERROR			-1
 

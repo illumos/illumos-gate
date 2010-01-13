@@ -140,6 +140,18 @@ static restarter_instance_list_t instance_list;
 
 static uu_list_pool_t *restarter_queue_pool;
 
+/*
+ * Function used to reset the restart times for an instance, when
+ * an administrative task comes along and essentially makes the times
+ * in this array ineffective.
+ */
+static void
+reset_start_times(restarter_inst_t *inst)
+{
+	inst->ri_start_index = 0;
+	bzero(inst->ri_start_time, sizeof (inst->ri_start_time));
+}
+
 /*ARGSUSED*/
 static int
 restarter_instance_compare(const void *lc_arg, const void *rc_arg,
@@ -1643,8 +1655,12 @@ again:
 		switch (event->riq_type) {
 		case RESTARTER_EVENT_TYPE_ENABLE:
 		case RESTARTER_EVENT_TYPE_DISABLE:
-		case RESTARTER_EVENT_TYPE_ADMIN_DISABLE:
 			(void) enable_inst(h, inst, event->riq_type);
+			break;
+
+		case RESTARTER_EVENT_TYPE_ADMIN_DISABLE:
+			if (enable_inst(h, inst, event->riq_type) == 0)
+				reset_start_times(inst);
 			break;
 
 		case RESTARTER_EVENT_TYPE_REMOVE_INSTANCE:
@@ -1652,6 +1668,9 @@ again:
 			inst = NULL;
 			goto cont;
 
+		case RESTARTER_EVENT_TYPE_STOP_RESET:
+			reset_start_times(inst);
+			/* FALLTHROUGH */
 		case RESTARTER_EVENT_TYPE_STOP:
 			(void) stop_instance(h, inst, RSTOP_DEPENDENCY);
 			break;
@@ -1710,7 +1729,8 @@ again:
 				 * Stop the instance.  If it can be restarted,
 				 * the graph engine will send a new event.
 				 */
-				(void) stop_instance(h, inst, RSTOP_RESTART);
+				if (stop_instance(h, inst, RSTOP_RESTART) == 0)
+					reset_start_times(inst);
 			}
 			break;
 
@@ -1980,6 +2000,9 @@ contract_action(scf_handle_t *h, restarter_inst_t *inst, ctid_t id,
 		 * process we're monitoring, then the
 		 * wait_thread will stop the instance.
 		 */
+		if (type == CT_PR_EV_EMPTY)
+			reset_start_times(inst);
+
 		log_framework(LOG_DEBUG,
 		    "%s: ignoring contract event on wait-style service\n",
 		    fmri);

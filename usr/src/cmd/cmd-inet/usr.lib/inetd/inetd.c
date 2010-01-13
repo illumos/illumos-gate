@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1726,6 +1726,7 @@ handle_restarter_event(instance_t *instance, restarter_event_type_t event,
 	case RESTARTER_EVENT_TYPE_REMOVE_INSTANCE:
 		remove_instance(instance);
 		goto done;
+	case RESTARTER_EVENT_TYPE_STOP_RESET:
 	case RESTARTER_EVENT_TYPE_STOP:
 		switch (instance->cur_istate) {
 		case IIS_OFFLINE_CONRATE:

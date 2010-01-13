@@ -825,6 +825,7 @@ vertex_send_event(graph_vertex_t *v, restarter_event_type_t e)
 		assert(v->gv_state != RESTARTER_STATE_DISABLED);
 		break;
 
+	case RESTARTER_EVENT_TYPE_STOP_RESET:
 	case RESTARTER_EVENT_TYPE_STOP:
 		log_framework(LOG_DEBUG, "Stopping %s.\n", v->gv_name);
 		assert(v->gv_state == RESTARTER_STATE_DEGRADED ||
@@ -1730,8 +1731,14 @@ propagate_stop(graph_vertex_t *v, void *arg)
 	switch (v->gv_type) {
 	case GVT_INST:
 		/* Restarter */
-		if (err > RERR_NONE && inst_running(v))
-			vertex_send_event(v, RESTARTER_EVENT_TYPE_STOP);
+		if (err > RERR_NONE && inst_running(v)) {
+			if (err == RERR_RESTART) {
+				vertex_send_event(v,
+				    RESTARTER_EVENT_TYPE_STOP_RESET);
+			} else {
+				vertex_send_event(v, RESTARTER_EVENT_TYPE_STOP);
+			}
+		}
 		break;
 
 	case GVT_SVC:
@@ -1759,8 +1766,15 @@ propagate_stop(graph_vertex_t *v, void *arg)
 		e = uu_list_first(v->gv_dependents);
 		svc = e->ge_vertex;
 
-		if (inst_running(svc))
-			vertex_send_event(svc, RESTARTER_EVENT_TYPE_STOP);
+		if (inst_running(svc)) {
+			if (err == RERR_RESTART) {
+				vertex_send_event(svc,
+				    RESTARTER_EVENT_TYPE_STOP_RESET);
+			} else {
+				vertex_send_event(svc,
+				    RESTARTER_EVENT_TYPE_STOP);
+			}
+		}
 		break;
 
 	default:
@@ -1846,7 +1860,7 @@ rep_retry:
 	(void) scf_handle_unbind(h);
 	scf_handle_destroy(h);
 
-	vertex_send_event(v, RESTARTER_EVENT_TYPE_STOP);
+	vertex_send_event(v, RESTARTER_EVENT_TYPE_STOP_RESET);
 }
 
 /*
