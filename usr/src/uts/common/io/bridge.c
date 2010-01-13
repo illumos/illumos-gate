@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -881,7 +881,8 @@ link_unref(bridge_link_t *blp)
 
 		ASSERT(blp->bl_flags & BLF_DELETED);
 		rw_enter(&bip->bi_rwlock, RW_WRITER);
-		list_remove(&bip->bi_links, blp);
+		if (blp->bl_flags & BLF_LINK_ADDED)
+			list_remove(&bip->bi_links, blp);
 		rw_exit(&bip->bi_rwlock);
 		if (bip->bi_trilldata != NULL && list_is_empty(&bip->bi_links))
 			cv_broadcast(&bip->bi_linkwait);
@@ -2856,10 +2857,12 @@ bridge_add_link(void *arg)
 	blp->bl_lfailmp = allocb(sizeof (bridge_ctl_t), BPRI_MED);
 	if (blp->bl_lfailmp == NULL) {
 		kmem_free(blp, sizeof (*blp));
+		blp = NULL;
 		err = ENOMEM;
 		goto fail;
 	}
 
+	blp->bl_refs = 1;
 	atomic_inc_uint(&bip->bi_refs);
 	blp->bl_inst = bip;
 	blp->bl_mh = mh;
@@ -2881,6 +2884,7 @@ bridge_add_link(void *arg)
 
 	blp->bl_mnh = mac_notify_add(mh, bridge_notify_cb, blp);
 
+	/* Enable Bridging on the link */
 	err = mac_bridge_set(mh, (mac_handle_t)blp);
 	if (err != 0)
 		goto fail;
@@ -2900,13 +2904,14 @@ bridge_add_link(void *arg)
 	/*
 	 * The link holds a reference to the bridge instance, so that the
 	 * instance can't go away before the link is freed.  The insertion into
-	 * bi_links holds a reference on the link.  When marking as removed
-	 * from bi_links (BLF_DELETED), drop the reference on the link.  When
-	 * freeing the link, drop the reference on the instance.
+	 * bi_links holds a reference on the link (reference set to 1 above).
+	 * When marking as removed from bi_links (BLF_DELETED), drop the
+	 * reference on the link. When freeing the link, drop the reference on
+	 * the instance. BLF_LINK_ADDED tracks link insertion in bi_links list.
 	 */
 	rw_enter(&bip->bi_rwlock, RW_WRITER);
 	list_insert_tail(&bip->bi_links, blp);
-	atomic_inc_uint(&blp->bl_refs);
+	blp->bl_flags |= BLF_LINK_ADDED;
 
 	/*
 	 * If the new link is no good on this bridge, then let the daemon know
@@ -2941,7 +2946,6 @@ fail:
 			mac_close(mh);
 	} else {
 		link_shutdown(blp);
-		link_free(blp);
 	}
 	miocnak(bsp->bs_wq, mp, 0, err);
 	stream_unref(bsp);

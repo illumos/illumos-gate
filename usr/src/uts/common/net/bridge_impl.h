@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -204,6 +204,7 @@ typedef struct bridge_link_s {
 #define	BLF_FREED		0x0020	/* free has begun; debug assertion */
 #define	BLF_TRILLACTIVE		0x0040	/* in active forwarding use */
 #define	BLF_SDUFAIL		0x0080	/* has mismatched SDU */
+#define	BLF_LINK_ADDED		0x0100	/* link added in bridge instance */
 
 /*
  * This represents a learned forwarding entry.  These are generally created and

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1541,14 +1541,6 @@ trill_bind(sock_lower_handle_t proto_handle, struct sockaddr *sa,
 
 /* ARGSUSED */
 static int
-trill_connect(sock_lower_handle_t proto_handle, const struct sockaddr *sa,
-    socklen_t len, sock_connid_t *id, cred_t *cr)
-{
-	return (EOPNOTSUPP);
-}
-
-/* ARGSUSED */
-static int
 trill_send(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
     cred_t *cr)
 {
@@ -1641,22 +1633,6 @@ trill_ioctl(sock_lower_handle_t proto_handle, int cmd, intptr_t arg,
 	return (rc);
 }
 
-/* ARGSUSED */
-static int
-trill_accept(sock_lower_handle_t lproto_handle,
-    sock_lower_handle_t eproto_handle, sock_upper_handle_t sock_handle,
-    cred_t *cr)
-{
-	return (EINVAL);
-}
-
-/* ARGSUSED */
-static int
-trill_listen(sock_lower_handle_t proto_handle, int backlog, cred_t *cr)
-{
-	return (EINVAL);
-}
-
 static void
 trill_clr_flowctrl(sock_lower_handle_t proto_handle)
 {
@@ -1667,63 +1643,24 @@ trill_clr_flowctrl(sock_lower_handle_t proto_handle)
 	mutex_exit(&tsock->ts_socklock);
 }
 
-/* ARGSUSED */
-static int
-trill_getsockname(sock_lower_handle_t proto_handle, struct sockaddr *addr,
-    socklen_t *addrlen, cred_t *cr)
-{
-	return (EOPNOTSUPP);
-}
-
-/* ARGSUSED */
-static int
-trill_getpeername(sock_lower_handle_t proto_handle, struct sockaddr *addr,
-    socklen_t *addrlen, cred_t *cr)
-{
-	return (EOPNOTSUPP);
-}
-
-/* ARGSUSED */
-static int
-trill_getsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
-    void *optvalp, socklen_t *optlen, cred_t *cr)
-{
-	return (EOPNOTSUPP);
-}
-
-/* ARGSUSED */
-static int
-trill_setsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
-    const void *optvalp, socklen_t optlen, cred_t *cr)
-{
-	return (EOPNOTSUPP);
-}
-
-/* ARGSUSED */
-static int
-trill_shutdown(sock_lower_handle_t proto_handle, int how, cred_t *cr)
-{
-	return (EOPNOTSUPP);
-}
-
 static sock_downcalls_t sock_trill_downcalls = {
-	trill_activate,		/* sd_activate */
-	trill_accept,		/* sd_accept */
-	trill_bind,		/* sd_bind */
-	trill_listen,		/* sd_listen */
-	trill_connect,		/* sd_connect */
-	trill_getpeername,	/* sd_getpeername */
-	trill_getsockname,	/* sd_getsockname */
-	trill_getsockopt,	/* sd_getsockopt */
-	trill_setsockopt,	/* sd_setsockopt */
-	trill_send,		/* sd_send */
-	NULL,			/* sd_send_uio */
-	NULL,			/* sd_recv_uio */
-	NULL,			/* sd_poll */
-	trill_shutdown,		/* sd_shutdown */
-	trill_clr_flowctrl,	/* sd_setflowctrl */
-	trill_ioctl,		/* sd_ioctl */
-	trill_close		/* sd_close */
+	trill_activate,			/* sd_activate */
+	sock_accept_notsupp,		/* sd_accept */
+	trill_bind,			/* sd_bind */
+	sock_listen_notsupp,		/* sd_listen */
+	sock_connect_notsupp,		/* sd_connect */
+	sock_getpeername_notsupp,	/* sd_getpeername */
+	sock_getsockname_notsupp,	/* sd_getsockname */
+	sock_getsockopt_notsupp,	/* sd_getsockopt */
+	sock_setsockopt_notsupp,	/* sd_setsockopt */
+	trill_send,			/* sd_send */
+	NULL,				/* sd_send_uio */
+	NULL,				/* sd_recv_uio */
+	NULL,				/* sd_poll */
+	sock_shutdown_notsupp,		/* sd_shutdown */
+	trill_clr_flowctrl,		/* sd_setflowctrl */
+	trill_ioctl,			/* sd_ioctl */
+	trill_close			/* sd_close */
 };
 
 /* ARGSUSED */

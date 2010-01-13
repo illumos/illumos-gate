@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2322,7 +2322,8 @@ do_create_vlan(int argc, char *argv[], const char *use)
 		break;
 
 	case DLADM_STATUS_LINKBUSY:
-		die("VLAN over '%s' may not use default_tag ID", link);
+		die("VLAN over '%s' may not use default_tag ID "
+		    "(see dladm(1M))", link);
 		break;
 
 	default:
@@ -4595,8 +4596,18 @@ do_create_vnic(int argc, char *argv[], const char *use)
 	status = dladm_vnic_create(handle, name, dev_linkid, mac_addr_type,
 	    mac_addr, maclen, &mac_slot, mac_prefix_len, vid, vrid, af,
 	    &linkid, proplist, flags);
-	if (status != DLADM_STATUS_OK)
+	switch (status) {
+	case DLADM_STATUS_OK:
+		break;
+
+	case DLADM_STATUS_LINKBUSY:
+		die("VLAN over '%s' may not use default_tag ID "
+		    "(see dladm(1M))", devname);
+		break;
+
+	default:
 		die_dlerr(status, "vnic creation over %s failed", devname);
+	}
 
 	dladm_free_props(proplist);
 	free(mac_addr);
