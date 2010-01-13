@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -301,12 +301,12 @@ proto_info_req(dld_str_t *dsp, mblk_t *mp)
 	}
 
 done:
-	ASSERT(IMPLY(dlp->dl_qos_offset != 0, dlp->dl_qos_length != 0));
-	ASSERT(IMPLY(dlp->dl_qos_range_offset != 0,
-	    dlp->dl_qos_range_length != 0));
-	ASSERT(IMPLY(dlp->dl_addr_offset != 0, dlp->dl_addr_length != 0));
-	ASSERT(IMPLY(dlp->dl_brdcst_addr_offset != 0,
-	    dlp->dl_brdcst_addr_length != 0));
+	IMPLY(dlp->dl_qos_offset != 0, dlp->dl_qos_length != 0);
+	IMPLY(dlp->dl_qos_range_offset != 0,
+	    dlp->dl_qos_range_length != 0);
+	IMPLY(dlp->dl_addr_offset != 0, dlp->dl_addr_length != 0);
+	IMPLY(dlp->dl_brdcst_addr_offset != 0,
+	    dlp->dl_brdcst_addr_length != 0);
 
 	qreply(q, mp);
 }

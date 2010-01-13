@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -386,20 +386,20 @@ kcage_range_init(struct memlist *ml, kcage_dir_t d, pgcnt_t preferred_size)
 	ASSERT(kcage_arena != NULL);
 
 	if (d == KCAGE_DOWN) {
-		while (ml->next != NULL)
-			ml = ml->next;
+		while (ml->ml_next != NULL)
+			ml = ml->ml_next;
 	}
 
 	rw_enter(&kcage_range_rwlock, RW_WRITER);
 
 	while (ml != NULL) {
-		ret = kcage_range_add_internal(btop(ml->address),
-		    btop(ml->size), d);
+		ret = kcage_range_add_internal(btop(ml->ml_address),
+		    btop(ml->ml_size), d);
 		if (ret)
 			panic("kcage_range_add_internal failed: "
 			    "ml=%p, ret=0x%x\n", (void *)ml, ret);
 
-		ml = (d == KCAGE_DOWN ? ml->prev : ml->next);
+		ml = (d == KCAGE_DOWN ? ml->ml_prev : ml->ml_next);
 	}
 
 	rw_exit(&kcage_range_rwlock);

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -194,9 +194,9 @@ do_bop_phys_alloc(uint64_t size, uint64_t align)
 	 * find the highest available memory in physinstalled
 	 */
 	size = P2ROUNDUP(size, align);
-	for (; ml; ml = ml->next) {
-		start = P2ROUNDUP(ml->address, align);
-		end = P2ALIGN(ml->address + ml->size, align);
+	for (; ml; ml = ml->ml_next) {
+		start = P2ROUNDUP(ml->ml_address, align);
+		end = P2ALIGN(ml->ml_address + ml->ml_size, align);
 		if (start < next_phys)
 			start = P2ROUNDUP(next_phys, align);
 		if (end > high_phys)

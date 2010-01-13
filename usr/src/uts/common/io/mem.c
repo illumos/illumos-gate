@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -762,9 +762,9 @@ mmmmap(dev_t dev, off_t off, int prot)
 	case M_MEM:
 		pf = btop(off);
 		memlist_read_lock();
-		for (pmem = phys_install; pmem != NULL; pmem = pmem->next) {
-			if (pf >= BTOP(pmem->address) &&
-			    pf < BTOP(pmem->address + pmem->size)) {
+		for (pmem = phys_install; pmem != NULL; pmem = pmem->ml_next) {
+			if (pf >= BTOP(pmem->ml_address) &&
+			    pf < BTOP(pmem->ml_address + pmem->ml_size)) {
 				memlist_read_unlock();
 				return (impl_obmem_pfnum(pf));
 			}
@@ -983,7 +983,7 @@ mm_kstat_update(kstat_t *ksp, int rw)
 
 	count = 0;
 	memlist_read_lock();
-	for (pmem = phys_install; pmem != NULL; pmem = pmem->next) {
+	for (pmem = phys_install; pmem != NULL; pmem = pmem->ml_next) {
 		count++;
 	}
 	memlist_read_unlock();
@@ -1010,11 +1010,12 @@ mm_kstat_snapshot(kstat_t *ksp, void *buf, int rw)
 
 	kspmem = (struct memunit *)buf;
 	memlist_read_lock();
-	for (pmem = phys_install; pmem != NULL; pmem = pmem->next, kspmem++) {
+	for (pmem = phys_install; pmem != NULL;
+	    pmem = pmem->ml_next, kspmem++) {
 		if ((caddr_t)kspmem >= (caddr_t)buf + ksp->ks_data_size)
 			break;
-		kspmem->address = pmem->address;
-		kspmem->size = pmem->size;
+		kspmem->address = pmem->ml_address;
+		kspmem->size = pmem->ml_size;
 	}
 	memlist_read_unlock();
 

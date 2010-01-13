@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -280,14 +280,14 @@ lgrp_plat_mem_size_default(lgrp_handle_t lgrphand, lgrp_mem_query_t query)
 		return ((pgcnt_t)freemem);
 	case LGRP_MEM_SIZE_AVAIL:
 		memlist_read_lock();
-		for (mlist = phys_avail; mlist; mlist = mlist->next)
-			npgs += btop(mlist->size);
+		for (mlist = phys_avail; mlist; mlist = mlist->ml_next)
+			npgs += btop(mlist->ml_size);
 		memlist_read_unlock();
 		return (npgs);
 	case LGRP_MEM_SIZE_INSTALL:
 		memlist_read_lock();
-		for (mlist = phys_install; mlist; mlist = mlist->next)
-			npgs += btop(mlist->size);
+		for (mlist = phys_install; mlist; mlist = mlist->ml_next)
+			npgs += btop(mlist->ml_size);
 		memlist_read_unlock();
 		return (npgs);
 	default:

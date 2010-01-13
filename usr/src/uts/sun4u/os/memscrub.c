@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * sun4u Memory Scrubbing
@@ -318,10 +316,10 @@ memscrub_init(void)
 		/*
 		 * copy phys_install to memscrub_memlist
 		 */
-		for (src = phys_install; src; src = src->next) {
+		for (src = phys_install; src; src = src->ml_next) {
 			if (memscrub_add_span(
-			    (pfn_t)(src->address >> PAGESHIFT),
-			    (pgcnt_t)(src->size >> PAGESHIFT))) {
+			    (pfn_t)(src->ml_address >> PAGESHIFT),
+			    (pgcnt_t)(src->ml_size >> PAGESHIFT))) {
 				memscrub_cleanup();
 				return (-1);
 			}
@@ -331,9 +329,9 @@ memscrub_init(void)
 		 * initialize kstats
 		 */
 		memscrub_ksp = kstat_create("unix", 0, "memscrub_kstat",
-			"misc", KSTAT_TYPE_NAMED,
-			sizeof (memscrub_counts) / sizeof (kstat_named_t),
-			KSTAT_FLAG_VIRTUAL | KSTAT_FLAG_WRITABLE);
+		    "misc", KSTAT_TYPE_NAMED,
+		    sizeof (memscrub_counts) / sizeof (kstat_named_t),
+		    KSTAT_FLAG_VIRTUAL | KSTAT_FLAG_WRITABLE);
 
 		if (memscrub_ksp) {
 			memscrub_ksp->ks_data = (void *)&memscrub_counts;
@@ -366,8 +364,8 @@ memscrub_cleanup(void)
 	memscrub_uninit_mem_config();
 	while (memscrub_memlist) {
 		(void) memscrub_delete_span(
-			(pfn_t)(memscrub_memlist->address >> PAGESHIFT),
-			(pgcnt_t)(memscrub_memlist->size >> PAGESHIFT));
+		    (pfn_t)(memscrub_memlist->ml_address >> PAGESHIFT),
+		    (pgcnt_t)(memscrub_memlist->ml_size >> PAGESHIFT));
 	}
 	if (memscrub_ksp)
 		kstat_delete(memscrub_ksp);
@@ -383,9 +381,9 @@ memscrub_printmemlist(char *title, struct memlist *listp)
 
 	cmn_err(CE_CONT, "%s:\n", title);
 
-	for (list = listp; list; list = list->next) {
+	for (list = listp; list; list = list->ml_next) {
 		cmn_err(CE_CONT, "addr = 0x%llx, size = 0x%llx\n",
-		    list->address, list->size);
+		    list->ml_address, list->ml_size);
 	}
 }
 #endif /* MEMSCRUB_DEBUG */
@@ -478,7 +476,7 @@ memscrubber(void)
 		goto memscrub_exit;
 	}
 
-	address = memscrub_memlist->address;
+	address = memscrub_memlist->ml_address;
 
 	deadline = gethrestime_sec() + memscrub_delay_start_sec;
 
@@ -525,7 +523,7 @@ memscrubber(void)
 			if (now >= deadline) {
 				memscrub_counts.done_late.value.ui32++;
 				memscrub_counts.late_sec.value.ui32 +=
-					(now - deadline);
+				    (now - deadline);
 				/*
 				 * past deadline, start right away
 				 */
@@ -540,7 +538,7 @@ memscrubber(void)
 				interval_ticks = (deadline - now) * hz;
 				memscrub_counts.done_early.value.ui32++;
 				memscrub_counts.early_sec.value.ui32 +=
-					(deadline - now);
+				    (deadline - now);
 				deadline += memscrub_period_sec;
 			}
 			reached_end = 0;
@@ -597,7 +595,7 @@ memscrubber(void)
 					cmn_err(CE_NOTE, "Memory scrubber "
 					    "reading all memory per request");
 
-				addr = memscrub_memlist->address;
+				addr = memscrub_memlist->ml_address;
 				reached_end = 0;
 				while (!reached_end) {
 					if (disable_memscrub)
@@ -672,18 +670,18 @@ memscrub_verify_span(ms_paddr_t *addrp, pgcnt_t *pagesp)
 	 * find memlist struct that contains addrp
 	 * assumes memlist is sorted by ascending address.
 	 */
-	for (mlp = memscrub_memlist; mlp != NULL; mlp = mlp->next) {
+	for (mlp = memscrub_memlist; mlp != NULL; mlp = mlp->ml_next) {
 		/*
 		 * if before this chunk, round up to beginning
 		 */
-		if (address < mlp->address) {
-			address = mlp->address;
+		if (address < mlp->ml_address) {
+			address = mlp->ml_address;
 			break;
 		}
 		/*
 		 * if before end of chunk, then we found it
 		 */
-		if (address < (mlp->address + mlp->size))
+		if (address < (mlp->ml_address + mlp->ml_size))
 			break;
 
 		/* else go to next struct memlist */
@@ -693,13 +691,13 @@ memscrub_verify_span(ms_paddr_t *addrp, pgcnt_t *pagesp)
 	 */
 	if (mlp == NULL) {
 		mlp = memscrub_memlist;
-		address = mlp->address;
+		address = mlp->ml_address;
 	}
 
 	/*
 	 * now we have legal address, and its mlp, condition bytes
 	 */
-	bytes_remaining = (mlp->address + mlp->size) - address;
+	bytes_remaining = (mlp->ml_address + mlp->ml_size) - address;
 
 	if (bytes > bytes_remaining)
 		bytes = bytes_remaining;
@@ -707,8 +705,8 @@ memscrub_verify_span(ms_paddr_t *addrp, pgcnt_t *pagesp)
 	/*
 	 * will this span take us to end of list?
 	 */
-	if ((mlp->next == NULL) &&
-	    ((mlp->address + mlp->size) == (address + bytes)))
+	if ((mlp->ml_next == NULL) &&
+	    ((mlp->ml_address + mlp->ml_size) == (address + bytes)))
 		reached_end = 1;
 
 	/* return values */
@@ -779,15 +777,15 @@ memscrub_add_span_gen(
 		goto add_done;
 	}
 
-	dst->address = address;
-	dst->size = bytes;
+	dst->ml_address = address;
+	dst->ml_size = bytes;
 
 	/*
 	 * first insert
 	 */
 	if (*list == NULL) {
-		dst->prev = NULL;
-		dst->next = NULL;
+		dst->ml_prev = NULL;
+		dst->ml_next = NULL;
 		*list = dst;
 
 		goto add_done;
@@ -798,8 +796,8 @@ memscrub_add_span_gen(
 	 */
 	for (prev = NULL, next = *list;
 	    next != NULL;
-	    prev = next, next = next->next) {
-		if (address > (next->address + next->size))
+	    prev = next, next = next->ml_next) {
+		if (address > (next->ml_address + next->ml_size))
 			continue;
 
 		/*
@@ -809,11 +807,11 @@ memscrub_add_span_gen(
 		/*
 		 * prepend to next
 		 */
-		if ((address + bytes) == next->address) {
+		if ((address + bytes) == next->ml_address) {
 			kmem_free(dst, sizeof (struct memlist));
 
-			next->address = address;
-			next->size += bytes;
+			next->ml_address = address;
+			next->ml_size += bytes;
 
 			goto add_done;
 		}
@@ -821,47 +819,49 @@ memscrub_add_span_gen(
 		/*
 		 * append to next
 		 */
-		if (address == (next->address + next->size)) {
+		if (address == (next->ml_address + next->ml_size)) {
 			kmem_free(dst, sizeof (struct memlist));
 
-			if (next->next) {
+			if (next->ml_next) {
 				/*
-				 * don't overlap with next->next
+				 * don't overlap with next->ml_next
 				 */
-				if ((address + bytes) > next->next->address) {
+				if ((address + bytes) >
+				    next->ml_next->ml_address) {
 					retval = -1;
 					goto add_done;
 				}
 				/*
-				 * concatenate next and next->next
+				 * concatenate next and next->ml_next
 				 */
-				if ((address + bytes) == next->next->address) {
-					struct memlist *mlp = next->next;
+				if ((address + bytes) ==
+				    next->ml_next->ml_address) {
+					struct memlist *mlp = next->ml_next;
 
 					if (next == *list)
-						*list = next->next;
+						*list = next->ml_next;
 
-					mlp->address = next->address;
-					mlp->size += next->size;
-					mlp->size += bytes;
+					mlp->ml_address = next->ml_address;
+					mlp->ml_size += next->ml_size;
+					mlp->ml_size += bytes;
 
-					if (next->prev)
-						next->prev->next = mlp;
-					mlp->prev = next->prev;
+					if (next->ml_prev)
+						next->ml_prev->ml_next = mlp;
+					mlp->ml_prev = next->ml_prev;
 
 					kmem_free(next,
-						sizeof (struct memlist));
+					    sizeof (struct memlist));
 					goto add_done;
 				}
 			}
 
-			next->size += bytes;
+			next->ml_size += bytes;
 
 			goto add_done;
 		}
 
 		/* don't overlap with next */
-		if ((address + bytes) > next->address) {
+		if ((address + bytes) > next->ml_address) {
 			retval = -1;
 			kmem_free(dst, sizeof (struct memlist));
 			goto add_done;
@@ -870,13 +870,13 @@ memscrub_add_span_gen(
 		/*
 		 * insert before next
 		 */
-		dst->prev = prev;
-		dst->next = next;
-		next->prev = dst;
+		dst->ml_prev = prev;
+		dst->ml_next = next;
+		next->ml_prev = dst;
 		if (prev == NULL) {
 			*list = dst;
 		} else {
-			prev->next = dst;
+			prev->ml_next = dst;
 		}
 		goto add_done;
 	}	/* end for */
@@ -884,9 +884,9 @@ memscrub_add_span_gen(
 	/*
 	 * end of list, prev is valid and next is NULL
 	 */
-	prev->next = dst;
-	dst->prev = prev;
-	dst->next = NULL;
+	prev->ml_next = dst;
+	dst->ml_prev = prev;
+	dst->ml_next = NULL;
 
 add_done:
 
@@ -920,9 +920,9 @@ memscrub_delete_span(pfn_t pfn, pgcnt_t pages)
 	/*
 	 * find struct memlist containing page
 	 */
-	for (next = memscrub_memlist; next != NULL; next = next->next) {
-		if ((address >= next->address) &&
-		    (address < next->address + next->size))
+	for (next = memscrub_memlist; next != NULL; next = next->ml_next) {
+		if ((address >= next->ml_address) &&
+		    (address < next->ml_address + next->ml_size))
 			break;
 	}
 
@@ -937,7 +937,7 @@ memscrub_delete_span(pfn_t pfn, pgcnt_t pages)
 	/*
 	 * error if size goes off end of this struct memlist
 	 */
-	if (address + bytes > next->address + next->size) {
+	if (address + bytes > next->ml_address + next->ml_size) {
 		retval = -1;
 		goto delete_done;
 	}
@@ -945,25 +945,25 @@ memscrub_delete_span(pfn_t pfn, pgcnt_t pages)
 	/*
 	 * pages at beginning of struct memlist
 	 */
-	if (address == next->address) {
+	if (address == next->ml_address) {
 		/*
 		 * if start & size match, delete from list
 		 */
-		if (bytes == next->size) {
+		if (bytes == next->ml_size) {
 			if (next == memscrub_memlist)
-				memscrub_memlist = next->next;
-			if (next->prev != NULL)
-				next->prev->next = next->next;
-			if (next->next != NULL)
-				next->next->prev = next->prev;
+				memscrub_memlist = next->ml_next;
+			if (next->ml_prev != NULL)
+				next->ml_prev->ml_next = next->ml_next;
+			if (next->ml_next != NULL)
+				next->ml_next->ml_prev = next->ml_prev;
 
 			kmem_free(next, sizeof (struct memlist));
 		} else {
 		/*
 		 * increment start address by bytes
 		 */
-			next->address += bytes;
-			next->size -= bytes;
+			next->ml_address += bytes;
+			next->ml_size -= bytes;
 		}
 		goto delete_done;
 	}
@@ -971,11 +971,11 @@ memscrub_delete_span(pfn_t pfn, pgcnt_t pages)
 	/*
 	 * pages at end of struct memlist
 	 */
-	if (address + bytes == next->address + next->size) {
+	if (address + bytes == next->ml_address + next->ml_size) {
 		/*
 		 * decrement size by bytes
 		 */
-		next->size -= bytes;
+		next->ml_size -= bytes;
 		goto delete_done;
 	}
 
@@ -998,9 +998,10 @@ memscrub_delete_span(pfn_t pfn, pgcnt_t pages)
 		 * existing struct memlist gets address
 		 * and size up to pfn
 		 */
-		dst->address = address + bytes;
-		dst->size = (next->address + next->size) - dst->address;
-		next->size = address - next->address;
+		dst->ml_address = address + bytes;
+		dst->ml_size =
+		    (next->ml_address + next->ml_size) - dst->ml_address;
+		next->ml_size = address - next->ml_address;
 
 		/*
 		 * new struct memlist gets address starting
@@ -1010,12 +1011,12 @@ memscrub_delete_span(pfn_t pfn, pgcnt_t pages)
 		/*
 		 * link in new memlist after old
 		 */
-		dst->next = next->next;
-		dst->prev = next;
+		dst->ml_next = next->ml_next;
+		dst->ml_prev = next;
 
-		if (next->next != NULL)
-			next->next->prev = dst;
-		next->next = dst;
+		if (next->ml_next != NULL)
+			next->ml_next->ml_prev = dst;
+		next->ml_next = dst;
 	}
 
 delete_done:
@@ -1066,15 +1067,15 @@ memscrub_scan(uint_t blks, ms_paddr_t src)
 	while (blks != 0) {
 		/* Ensure the PA is properly aligned */
 		if (((pa & MMU_PAGEMASK4M) == pa) &&
-			(blks >= MEMSCRUB_BPP4M)) {
+		    (blks >= MEMSCRUB_BPP4M)) {
 			psz = MMU_PAGESIZE4M;
 			bpp = MEMSCRUB_BPP4M;
 		} else if (((pa & MMU_PAGEMASK512K) == pa) &&
-			(blks >= MEMSCRUB_BPP512K)) {
+		    (blks >= MEMSCRUB_BPP512K)) {
 			psz = MMU_PAGESIZE512K;
 			bpp = MEMSCRUB_BPP512K;
 		} else if (((pa & MMU_PAGEMASK64K) == pa) &&
-			(blks >= MEMSCRUB_BPP64K)) {
+		    (blks >= MEMSCRUB_BPP64K)) {
 			psz = MMU_PAGESIZE64K;
 			bpp = MEMSCRUB_BPP64K;
 		} else if ((pa & MMU_PAGEMASK) == pa) {
@@ -1104,7 +1105,7 @@ memscrub_scan(uint_t blks, ms_paddr_t src)
 		pfn = mmu_btop(pa);
 		va = (caddr_t)MEMSCRUBBASE;
 		hat_devload(kas.a_hat, va, psz, pfn, PROT_READ,
-			HAT_LOAD_NOCONSIST | HAT_LOAD_LOCK);
+		    HAT_LOAD_NOCONSIST | HAT_LOAD_LOCK);
 
 		/*
 		 * Can't allow the memscrubber to migrate across CPUs as
@@ -1342,15 +1343,15 @@ new_memscrub(int update_page_retire_list)
 	list = NULL;
 	npgs = 0;
 	memlist_read_lock();
-	for (src = phys_install; src; src = src->next) {
-		if (memscrub_add_span_gen((pfn_t)(src->address >> PAGESHIFT),
-		    (pgcnt_t)(src->size >> PAGESHIFT), &list, &npgs)) {
+	for (src = phys_install; src; src = src->ml_next) {
+		if (memscrub_add_span_gen((pfn_t)(src->ml_address >> PAGESHIFT),
+		    (pgcnt_t)(src->ml_size >> PAGESHIFT), &list, &npgs)) {
 			memlist_read_unlock();
 			while (list) {
 				struct memlist *el;
 
 				el = list;
-				list = list->next;
+				list = list->ml_next;
 				kmem_free(el, sizeof (struct memlist));
 			}
 			return (-1);
@@ -1372,7 +1373,7 @@ new_memscrub(int update_page_retire_list)
 		struct memlist *el;
 
 		el = old_list;
-		old_list = old_list->next;
+		old_list = old_list->ml_next;
 		kmem_free(el, sizeof (struct memlist));
 	}
 

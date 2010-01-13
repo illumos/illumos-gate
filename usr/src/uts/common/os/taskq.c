@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1741,8 +1741,6 @@ taskq_create_sysdc(const char *name, int nthreads, int minalloc,
 	return (taskq_create_common(name, 0, nthreads, minclsyspri, minalloc,
 	    maxalloc, proc, dc, flags | TASKQ_NOINSTANCE | TASKQ_DUTY_CYCLE));
 }
-
-#define	IMPLY(a, b)	ASSERT((!(a)) || (b)) /* if (a) { ASSERT (b) } */
 
 static taskq_t *
 taskq_create_common(const char *name, int instance, int nthreads, pri_t pri,

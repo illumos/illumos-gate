@@ -19,15 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -383,10 +380,10 @@ int
 address_in_memlist(struct memlist *mp, uint64_t addr, size_t len)
 {
 	while (mp != 0)	 {
-		if ((addr >= mp->address) &&
-		    (addr + len <= mp->address + mp->size))
+		if ((addr >= mp->ml_address) &&
+		    (addr + len <= mp->ml_address + mp->ml_size))
 			return (1);	 /* TRUE */
-		mp = mp->next;
+		mp = mp->ml_next;
 	}
 	return (0);	/* FALSE */
 }

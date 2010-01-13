@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -2442,7 +2442,7 @@ mc_memlist_delete(struct memlist *mlist)
 	struct memlist *ml;
 
 	for (ml = mlist; ml; ml = mlist) {
-		mlist = ml->next;
+		mlist = ml->ml_next;
 		kmem_free(ml, sizeof (struct memlist));
 	}
 }
@@ -2457,13 +2457,13 @@ mc_memlist_dup(struct memlist *mlist)
 
 	mlp = &hl;
 	tl = *mlp;
-	for (; mlist; mlist = mlist->next) {
+	for (; mlist; mlist = mlist->ml_next) {
 		*mlp = kmem_alloc(sizeof (struct memlist), KM_SLEEP);
-		(*mlp)->address = mlist->address;
-		(*mlp)->size = mlist->size;
-		(*mlp)->prev = tl;
+		(*mlp)->ml_address = mlist->ml_address;
+		(*mlp)->ml_size = mlist->ml_size;
+		(*mlp)->ml_prev = tl;
 		tl = *mlp;
-		mlp = &((*mlp)->next);
+		mlp = &((*mlp)->ml_next);
 	}
 	*mlp = NULL;
 
@@ -2481,27 +2481,27 @@ mc_memlist_del_span(struct memlist *mlist, uint64_t base, uint64_t len)
 		return (NULL);
 
 	end = base + len;
-	if ((end <= mlist->address) || (base == end))
+	if ((end <= mlist->ml_address) || (base == end))
 		return (mlist);
 
 	for (tl = ml = mlist; ml; tl = ml, ml = nlp) {
 		uint64_t	mend;
 
-		nlp = ml->next;
+		nlp = ml->ml_next;
 
-		if (end <= ml->address)
+		if (end <= ml->ml_address)
 			break;
 
-		mend = ml->address + ml->size;
+		mend = ml->ml_address + ml->ml_size;
 		if (base < mend) {
-			if (base <= ml->address) {
-				ml->address = end;
+			if (base <= ml->ml_address) {
+				ml->ml_address = end;
 				if (end >= mend)
-					ml->size = 0ull;
+					ml->ml_size = 0ull;
 				else
-					ml->size = mend - ml->address;
+					ml->ml_size = mend - ml->ml_address;
 			} else {
-				ml->size = base - ml->address;
+				ml->ml_size = base - ml->ml_address;
 				if (end < mend) {
 					struct memlist	*nl;
 					/*
@@ -2509,26 +2509,26 @@ mc_memlist_del_span(struct memlist *mlist, uint64_t base, uint64_t len)
 					 */
 					nl = kmem_alloc(sizeof (struct memlist),
 					    KM_SLEEP);
-					nl->address = end;
-					nl->size = mend - nl->address;
-					if ((nl->next = nlp) != NULL)
-						nlp->prev = nl;
-					nl->prev = ml;
-					ml->next = nl;
+					nl->ml_address = end;
+					nl->ml_size = mend - nl->ml_address;
+					if ((nl->ml_next = nlp) != NULL)
+						nlp->ml_prev = nl;
+					nl->ml_prev = ml;
+					ml->ml_next = nl;
 					nlp = nl;
 				}
 			}
-			if (ml->size == 0ull) {
+			if (ml->ml_size == 0ull) {
 				if (ml == mlist) {
 					if ((mlist = nlp) != NULL)
-						nlp->prev = NULL;
+						nlp->ml_prev = NULL;
 					kmem_free(ml, sizeof (struct memlist));
 					if (mlist == NULL)
 						break;
 					ml = nlp;
 				} else {
-					if ((tl->next = nlp) != NULL)
-						nlp->prev = tl;
+					if ((tl->ml_next = nlp) != NULL)
+						nlp->ml_prev = tl;
 					kmem_free(ml, sizeof (struct memlist));
 					ml = tl;
 				}

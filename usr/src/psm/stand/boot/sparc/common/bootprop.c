@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/promif.h>
@@ -135,8 +133,8 @@ bgetproplen(struct bootops *bop, char *name)
 		    strequal(name, p->name))) {
 
 			for (ml = *((struct memlist **)p->val);
-					ml != NIL;
-					ml = ml->next)
+			    ml != NIL;
+			    ml = ml->ml_next)
 
 				/*
 				 *  subtract out the ptrs for our local
@@ -144,7 +142,7 @@ bgetproplen(struct bootops *bop, char *name)
 				 *  only see an array.
 				 */
 				size += (int)(sizeof (struct memlist) -
-						2*sizeof (struct memlist *));
+				    2*sizeof (struct memlist *));
 			return (size);
 
 		} else if (strequal(name, p->name)) {
@@ -209,12 +207,12 @@ bgetprop(struct bootops *bop, char *name, void *buf)
 			u_longlong_t *t = buf;
 
 			for (ml = *((struct memlist **)p->val);
-					ml != NIL;
-					ml = ml->next) {
+			    ml != NIL;
+			    ml = ml->ml_next) {
 
 				/* copy out into an array */
-				*t++ = ml->address;
-				*t++ = ml->size;
+				*t++ = ml->ml_address;
+				*t++ = ml->ml_size;
 			}
 			return (BOOT_SUCCESS);
 		} else if (strequal(name, p->name)) {

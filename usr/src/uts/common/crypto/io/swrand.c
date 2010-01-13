@@ -701,15 +701,15 @@ physmem_ent_gen(physmem_entsrc_t *entsrc)
 		/* Pick a memory block to read */
 		block = oblock = srndpool[i] % entsrc->nblocks;
 
-		for (pmem = phys_install; pmem != NULL; pmem = pmem->next) {
-			if (block < pmem->size / MEMBLOCKSIZE)
+		for (pmem = phys_install; pmem != NULL; pmem = pmem->ml_next) {
+			if (block < pmem->ml_size / MEMBLOCKSIZE)
 				break;
-			block -= pmem->size / MEMBLOCKSIZE;
+			block -= pmem->ml_size / MEMBLOCKSIZE;
 		}
 
 		ASSERT(pmem != NULL);
 
-		offset = pmem->address + block * MEMBLOCKSIZE;
+		offset = pmem->ml_address + block * MEMBLOCKSIZE;
 
 		if (!address_in_memlist(phys_install, offset, MEMBLOCKSIZE)) {
 			memlist_read_unlock();
@@ -842,8 +842,8 @@ physmem_count_blocks()
 
 	memlist_read_lock();
 	entsrc.nblocks = 0;
-	for (pmem = phys_install; pmem != NULL; pmem = pmem->next) {
-		entsrc.nblocks += pmem->size / MEMBLOCKSIZE;
+	for (pmem = phys_install; pmem != NULL; pmem = pmem->ml_next) {
+		entsrc.nblocks += pmem->ml_size / MEMBLOCKSIZE;
 		if (entsrc.nblocks > MAXMEMBLOCKS) {
 			entsrc.nblocks = MAXMEMBLOCKS;
 			break;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -329,20 +329,20 @@ opl_memlist_per_board(struct memlist *ml)
 
 	head = tail = NULL;
 
-	for (; ml; ml = ml->next) {
-		low  = (uint64_t)ml->address;
-		high = low+(uint64_t)(ml->size);
+	for (; ml; ml = ml->ml_next) {
+		low  = (uint64_t)ml->ml_address;
+		high = low+(uint64_t)(ml->ml_size);
 		while (low < high) {
 			boundary = roundup(low+1, ssize);
 			boundary = MIN(high, boundary);
 			new = kmem_zalloc(sizeof (struct memlist), KM_SLEEP);
-			new->address = low;
-			new->size = boundary - low;
+			new->ml_address = low;
+			new->ml_size = boundary - low;
 			if (head == NULL)
 				head = new;
 			if (tail) {
-				tail->next = new;
-				new->prev = tail;
+				tail->ml_next = new;
+				new->ml_prev = tail;
 			}
 			tail = new;
 			low = boundary;
@@ -377,7 +377,7 @@ set_platform_cage_params(void)
 
 		/* free the memlist */
 		do {
-			tml = ml->next;
+			tml = ml->ml_next;
 			kmem_free(ml, sizeof (struct memlist));
 			ml = tml;
 		} while (ml != NULL);

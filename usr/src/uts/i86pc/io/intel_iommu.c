@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Portions Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Portions Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -1935,16 +1935,16 @@ domain_vmem_init(dmar_domain_state_t *domain)
 
 	memlist_read_lock();
 	mp = phys_install;
-	end = (mp->address + mp->size);
+	end = (mp->ml_address + mp->ml_size);
 
 	/*
 	 * Skip page 0: vmem_create wont like it for obvious
 	 * reasons.
 	 */
-	if (mp->address == 0) {
+	if (mp->ml_address == 0) {
 		start = IOMMU_PAGE_SIZE;
 	} else {
-		start = mp->address;
+		start = mp->ml_address;
 	}
 
 	cmn_err(CE_CONT, "?Adding iova [0x%" PRIx64
@@ -1965,17 +1965,17 @@ domain_vmem_init(dmar_domain_state_t *domain)
 		cmn_err(CE_PANIC, "Unable to inialize vmem map\n");
 	}
 
-	mp = mp->next;
+	mp = mp->ml_next;
 	while (mp) {
 		vmem_ret = vmem_add(domain->dm_dvma_map,
-		    (void *)((uintptr_t)mp->address),
-		    mp->size, VM_NOSLEEP);
+		    (void *)((uintptr_t)mp->ml_address),
+		    mp->ml_size, VM_NOSLEEP);
 		cmn_err(CE_CONT, "?Adding iova [0x%" PRIx64
-		    " - 0x%" PRIx64 "] to %s\n", mp->address,
-		    mp->address + mp->size, vmem_name);
+		    " - 0x%" PRIx64 "] to %s\n", mp->ml_address,
+		    mp->ml_address + mp->ml_size, vmem_name);
 		if (!vmem_ret)
 			cmn_err(CE_PANIC, "Unable to inialize vmem map\n");
-		mp = mp->next;
+		mp = mp->ml_next;
 	}
 
 	memlist_read_unlock();
@@ -2834,12 +2834,12 @@ build_dev_identity_map(dev_info_t *dip)
 	mp = phys_install;
 	while (mp != NULL) {
 		(void) iommu_map_page_range(domain,
-		    mp->address & IOMMU_PAGE_MASK,
-		    mp->address & IOMMU_PAGE_MASK,
-		    (mp->address + mp->size - 1) & IOMMU_PAGE_MASK,
+		    mp->ml_address & IOMMU_PAGE_MASK,
+		    mp->ml_address & IOMMU_PAGE_MASK,
+		    (mp->ml_address + mp->ml_size - 1) & IOMMU_PAGE_MASK,
 		    DDI_DMA_READ | DDI_DMA_WRITE |
 		    IOMMU_PAGE_PROP_NOSYNC);
-		mp = mp->next;
+		mp = mp->ml_next;
 	}
 
 	memlist_read_unlock();
@@ -2870,15 +2870,15 @@ map_bios_rsvd_mem_pool(dev_info_t *dip)
 	mp = bios_rsvd;
 	while (mp != 0) {
 		(void) iommu_map_page_range(domain,
-		    mp->address & IOMMU_PAGE_MASK,
-		    mp->address & IOMMU_PAGE_MASK,
-		    (mp->address + mp->size - 1) & IOMMU_PAGE_MASK,
+		    mp->ml_address & IOMMU_PAGE_MASK,
+		    mp->ml_address & IOMMU_PAGE_MASK,
+		    (mp->ml_address + mp->ml_size - 1) & IOMMU_PAGE_MASK,
 		    DDI_DMA_READ | DDI_DMA_WRITE |
 		    IOMMU_PAGE_PROP_NOSYNC);
 		cmn_err(CE_CONT, "?Mapping Reservd [0x%" PRIx64
-		    " - 0x%" PRIx64 "]\n", mp->address,
-		    (mp->address + mp->size));
-		mp = mp->next;
+		    " - 0x%" PRIx64 "]\n", mp->ml_address,
+		    (mp->ml_address + mp->ml_size));
+		mp = mp->ml_next;
 	}
 }
 

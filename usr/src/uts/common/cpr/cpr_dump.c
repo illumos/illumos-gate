@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -177,8 +177,8 @@ cpr_set_bitmap_size(void)
 	size_t size = 0;
 
 	memlist_read_lock();
-	for (pmem = phys_install; pmem; pmem = pmem->next)
-		size += pmem->size;
+	for (pmem = phys_install; pmem; pmem = pmem->ml_next)
+		size += pmem->ml_size;
 	memlist_read_unlock();
 	cpr_bitmap_size = BITMAP_BYTES(size);
 }

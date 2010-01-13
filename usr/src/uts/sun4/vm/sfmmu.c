@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -494,10 +494,10 @@ ndata_alloc_init(struct memlist *ndata, uintptr_t base, uintptr_t end)
 
 	ASSERT(base < end);
 
-	ndata->address = base;
-	ndata->size = end - base;
-	ndata->next = NULL;
-	ndata->prev = NULL;
+	ndata->ml_address = base;
+	ndata->ml_size = end - base;
+	ndata->ml_next = NULL;
+	ndata->ml_prev = NULL;
 }
 
 /*
@@ -506,11 +506,11 @@ ndata_alloc_init(struct memlist *ndata, uintptr_t base, uintptr_t end)
 size_t
 ndata_maxsize(struct memlist *ndata)
 {
-	size_t chunksize = ndata->size;
+	size_t chunksize = ndata->ml_size;
 
-	while ((ndata = ndata->next) != NULL) {
-		if (chunksize < ndata->size)
-			chunksize = ndata->size;
+	while ((ndata = ndata->ml_next) != NULL) {
+		if (chunksize < ndata->ml_size)
+			chunksize = ndata->ml_size;
 	}
 
 	return (chunksize);
@@ -540,34 +540,34 @@ ndata_extra_base(struct memlist *ndata, size_t alignment, caddr_t endaddr)
 	 */
 	ASSERT((alignment % ecache_alignsize) ==  0);
 
-	while (ndata->next != NULL) {
-		wasteage += ndata->size;
-		ndata = ndata->next;
+	while (ndata->ml_next != NULL) {
+		wasteage += ndata->ml_size;
+		ndata = ndata->ml_next;
 	}
 
-	base = roundup(ndata->address, alignment);
+	base = roundup(ndata->ml_address, alignment);
 
-	if (base >= ndata->address + ndata->size)
+	if (base >= ndata->ml_address + ndata->ml_size)
 		return (NULL);
 
-	if ((caddr_t)(ndata->address + ndata->size) != endaddr) {
+	if ((caddr_t)(ndata->ml_address + ndata->ml_size) != endaddr) {
 #ifdef DEBUG
 		ndata_middle_hole_detected = 1;	/* see if we hit this again */
 #endif
 		return (NULL);
 	}
 
-	if (base == ndata->address) {
-		if (ndata->prev != NULL)
-			ndata->prev->next = NULL;
+	if (base == ndata->ml_address) {
+		if (ndata->ml_prev != NULL)
+			ndata->ml_prev->ml_next = NULL;
 		else
-			ndata->size = 0;
+			ndata->ml_size = 0;
 
 		bzero((void *)base, sizeof (struct memlist));
 
 	} else {
-		ndata->size = base - ndata->address;
-		wasteage += ndata->size;
+		ndata->ml_size = base - ndata->ml_address;
+		wasteage += ndata->ml_size;
 	}
 	PRM_DEBUG(wasteage);
 
@@ -606,22 +606,22 @@ ndata_select_chunk(struct memlist *ndata, size_t wanted, size_t alignment)
 	 *   4. avoid wasting space, take first fitting buffer
 	 *   5. take the last buffer in chain
 	 */
-	for (frlist = ndata; frlist != NULL; frlist = frlist->next) {
-		base = roundup(frlist->address, alignment);
+	for (frlist = ndata; frlist != NULL; frlist = frlist->ml_next) {
+		base = roundup(frlist->ml_address, alignment);
 		end = roundup(base + wanted, ecache_alignsize);
 
-		if (end > frlist->address + frlist->size)
+		if (end > frlist->ml_address + frlist->ml_size)
 			continue;
 
-		below = (base - frlist->address) / ecache_alignsize;
-		above = (frlist->address + frlist->size - end) /
+		below = (base - frlist->ml_address) / ecache_alignsize;
+		above = (frlist->ml_address + frlist->ml_size - end) /
 		    ecache_alignsize;
 		unused = below + above;
 
 		if (unused == 0)
 			return (frlist);
 
-		if (frlist->next == NULL)
+		if (frlist->ml_next == NULL)
 			break;
 
 		if (below < best_below) {
@@ -674,52 +674,53 @@ ndata_alloc(struct memlist *ndata, size_t wanted, size_t alignment)
 	/*
 	 * Allocate the nucleus data buffer.
 	 */
-	base = roundup(found->address, alignment);
+	base = roundup(found->ml_address, alignment);
 	end = roundup(base + wanted, ecache_alignsize);
-	ASSERT(end <= found->address + found->size);
+	ASSERT(end <= found->ml_address + found->ml_size);
 
-	below = base - found->address;
-	above = found->address + found->size - end;
+	below = base - found->ml_address;
+	above = found->ml_address + found->ml_size - end;
 	ASSERT(above == 0 || (above % ecache_alignsize) == 0);
 
 	if (below >= ecache_alignsize) {
 		/*
 		 * There is free memory below the allocated memory chunk.
 		 */
-		found->size = below - below % ecache_alignsize;
+		found->ml_size = below - below % ecache_alignsize;
 
 		if (above) {
 			fnd_above = (struct memlist *)end;
-			fnd_above->address = end;
-			fnd_above->size = above;
+			fnd_above->ml_address = end;
+			fnd_above->ml_size = above;
 
-			if ((fnd_above->next = found->next) != NULL)
-				found->next->prev = fnd_above;
-			fnd_above->prev = found;
-			found->next = fnd_above;
+			if ((fnd_above->ml_next = found->ml_next) != NULL)
+				found->ml_next->ml_prev = fnd_above;
+			fnd_above->ml_prev = found;
+			found->ml_next = fnd_above;
 		}
 
 		return ((void *)base);
 	}
 
-	if (found->prev == NULL) {
+	if (found->ml_prev == NULL) {
 		/*
 		 * The first chunk (ndata) is selected.
 		 */
 		ASSERT(found == ndata);
 		if (above) {
-			found->address = end;
-			found->size = above;
-		} else if (found->next != NULL) {
-			found->address = found->next->address;
-			found->size = found->next->size;
-			if ((found->next = found->next->next) != NULL)
-				found->next->prev = found;
+			found->ml_address = end;
+			found->ml_size = above;
+		} else if (found->ml_next != NULL) {
+			found->ml_address = found->ml_next->ml_address;
+			found->ml_size = found->ml_next->ml_size;
+			if ((found->ml_next = found->ml_next->ml_next) != NULL)
+				found->ml_next->ml_prev = found;
 
-			bzero((void *)found->address, sizeof (struct memlist));
+			bzero((void *)found->ml_address,
+			    sizeof (struct memlist));
 		} else {
-			found->address = end;
-			found->size = 0;
+			found->ml_address = end;
+			found->ml_size = 0;
 		}
 
 		return ((void *)base);
@@ -730,20 +731,20 @@ ndata_alloc(struct memlist *ndata, size_t wanted, size_t alignment)
 	 */
 	if (above) {
 		fnd_above = (struct memlist *)end;
-		fnd_above->address = end;
-		fnd_above->size = above;
+		fnd_above->ml_address = end;
+		fnd_above->ml_size = above;
 
-		if ((fnd_above->next = found->next) != NULL)
-			fnd_above->next->prev = fnd_above;
-		fnd_above->prev = found->prev;
-		found->prev->next = fnd_above;
+		if ((fnd_above->ml_next = found->ml_next) != NULL)
+			fnd_above->ml_next->ml_prev = fnd_above;
+		fnd_above->ml_prev = found->ml_prev;
+		found->ml_prev->ml_next = fnd_above;
 
 	} else {
-		if ((found->prev->next = found->next) != NULL)
-			found->next->prev = found->prev;
+		if ((found->ml_prev->ml_next = found->ml_next) != NULL)
+			found->ml_next->ml_prev = found->ml_prev;
 	}
 
-	bzero((void *)found->address, sizeof (struct memlist));
+	bzero((void *)found->ml_address, sizeof (struct memlist));
 
 	return ((void *)base);
 }

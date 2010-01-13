@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -554,8 +554,8 @@ print_memlist(char *title, struct memlist *mp)
 	prom_printf("MEMLIST: %s:\n", title);
 	while (mp != NULL)  {
 		prom_printf("\tAddress 0x%" PRIx64 ", size 0x%" PRIx64 "\n",
-		    mp->address, mp->size);
-		mp = mp->next;
+		    mp->ml_address, mp->ml_size);
+		mp = mp->ml_next;
 	}
 }
 
@@ -2388,13 +2388,13 @@ kphysm_init(
 	ASSERT(page_hash != NULL && page_hashsz != 0);
 
 	cur_memseg = memseg_base;
-	for (pmem = phys_avail; pmem && npages; pmem = pmem->next) {
+	for (pmem = phys_avail; pmem && npages; pmem = pmem->ml_next) {
 		/*
 		 * In a 32 bit kernel can't use higher memory if we're
 		 * not booting in PAE mode. This check takes care of that.
 		 */
-		addr = pmem->address;
-		size = pmem->size;
+		addr = pmem->ml_address;
+		size = pmem->ml_size;
 		if (btop(addr) > physmax)
 			continue;
 
@@ -2404,7 +2404,7 @@ kphysm_init(
 		if ((addr & MMU_PAGEOFFSET) != 0) {
 			addr += MMU_PAGEOFFSET;
 			addr &= ~(uint64_t)MMU_PAGEOFFSET;
-			size -= addr - pmem->address;
+			size -= addr - pmem->ml_address;
 		}
 
 		/* only process pages below or equal to physmax */
@@ -2824,28 +2824,28 @@ memlist_add(
 	struct memlist *cur;
 	uint64_t end = start + len;
 
-	new->address = start;
-	new->size = len;
+	new->ml_address = start;
+	new->ml_size = len;
 
 	cur = *memlistp;
 
 	while (cur) {
-		if (cur->address >= end) {
-			new->next = cur;
+		if (cur->ml_address >= end) {
+			new->ml_next = cur;
 			*memlistp = new;
-			new->prev = cur->prev;
-			cur->prev = new;
+			new->ml_prev = cur->ml_prev;
+			cur->ml_prev = new;
 			return;
 		}
-		ASSERT(cur->address + cur->size <= start);
-		if (cur->next == NULL) {
-			cur->next = new;
-			new->prev = cur;
-			new->next = NULL;
+		ASSERT(cur->ml_address + cur->ml_size <= start);
+		if (cur->ml_next == NULL) {
+			cur->ml_next = new;
+			new->ml_prev = cur;
+			new->ml_next = NULL;
 			return;
 		}
-		memlistp = &cur->next;
-		cur = cur->next;
+		memlistp = &cur->ml_next;
+		cur = cur->ml_next;
 	}
 }
 

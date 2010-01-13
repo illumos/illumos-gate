@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -879,10 +879,10 @@ span_to_install(pfn_t base, pgcnt_t npgs)
 	size = (uint64_t)npgs << PAGESHIFT;
 	while (size != 0) {
 		memlist_read_lock();
-		for (mlp = phys_install; mlp != NULL; mlp = mlp->next) {
-			if (address >= (mlp->address + mlp->size))
+		for (mlp = phys_install; mlp != NULL; mlp = mlp->ml_next) {
+			if (address >= (mlp->ml_address + mlp->ml_size))
 				continue;
-			if ((address + size) > mlp->address)
+			if ((address + size) > mlp->ml_address)
 				break;
 		}
 		if (mlp == NULL) {
@@ -890,13 +890,15 @@ span_to_install(pfn_t base, pgcnt_t npgs)
 			size = 0;
 			thislen = 0;
 		} else {
-			if (address < mlp->address) {
-				size -= (mlp->address - address);
-				address = mlp->address;
+			if (address < mlp->ml_address) {
+				size -= (mlp->ml_address - address);
+				address = mlp->ml_address;
 			}
-			ASSERT(address >= mlp->address);
-			if ((address + size) > (mlp->address + mlp->size)) {
-				thislen = mlp->size - (address - mlp->address);
+			ASSERT(address >= mlp->ml_address);
+			if ((address + size) >
+			    (mlp->ml_address + mlp->ml_size)) {
+				thislen =
+				    mlp->ml_size - (address - mlp->ml_address);
 			} else {
 				thislen = size;
 			}

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -114,7 +111,7 @@ fill_memlists(char *name, char *prop, struct memlist *old)
 		prom_panic("Cannot get list.\n");
 	if (links > sizeof (scratch_memlist)) {
 		prom_printf("%s list <%s> exceeds boot capabilities\n",
-			name, prop);
+		    name, prop);
 		prom_panic("fill_memlists - memlist size");
 	}
 	links = links / sizeof (struct sun4u_prom_memlist);
@@ -203,10 +200,10 @@ reg_to_list(struct sun4u_prom_memlist *ar, size_t n, struct memlist *old)
 		if (!head)
 			head = ptr;
 		if (last)
-			last->next = ptr;
-		ptr->address = flag ? addr : start1;
-		ptr->size = size ? size : ar[i].size;
-		ptr->prev = last;
+			last->ml_next = ptr;
+		ptr->ml_address = flag ? addr : start1;
+		ptr->ml_size = size ? size : ar[i].size;
+		ptr->ml_prev = last;
 		last = ptr;
 
 		size = 0;
@@ -214,6 +211,6 @@ reg_to_list(struct sun4u_prom_memlist *ar, size_t n, struct memlist *old)
 		addr = 0;
 	}
 
-	last->next = NULL;
+	last->ml_next = NULL;
 	return (head);
 }

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3289,17 +3289,18 @@ drmach_copy_rename_init(drmachid_t t_id, uint64_t t_slice_offset,
 	off_mask = DRMACH_MEM_SLICE_SIZE - 1;
 
 	/* calculate source and target base pa */
-	s_copybasepa = c_ml->address;
-	t_copybasepa = t_basepa + ((c_ml->address & off_mask) - t_slice_offset);
+	s_copybasepa = c_ml->ml_address;
+	t_copybasepa =
+	    t_basepa + ((c_ml->ml_address & off_mask) - t_slice_offset);
 
 	/* paranoia */
-	ASSERT((c_ml->address & off_mask) >= t_slice_offset);
+	ASSERT((c_ml->ml_address & off_mask) >= t_slice_offset);
 
 	/* adjust copy memlist addresses to be relative to copy base pa */
 	x_ml = c_ml;
 	while (x_ml != NULL) {
-		x_ml->address -= s_copybasepa;
-		x_ml = x_ml->next;
+		x_ml->ml_address -= s_copybasepa;
+		x_ml = x_ml->ml_next;
 	}
 
 #ifdef DEBUG
@@ -3307,16 +3308,16 @@ drmach_copy_rename_init(drmachid_t t_id, uint64_t t_slice_offset,
 	uint64_t s_basepa, s_size, t_size;
 
 	x_ml = c_ml;
-	while (x_ml->next != NULL)
-		x_ml = x_ml->next;
+	while (x_ml->ml_next != NULL)
+		x_ml = x_ml->ml_next;
 
 	DRMACH_PR("source copy span: base pa 0x%lx, end pa 0x%lx\n",
 	    s_copybasepa,
-	    s_copybasepa + x_ml->address + x_ml->size);
+	    s_copybasepa + x_ml->ml_address + x_ml->ml_size);
 
 	DRMACH_PR("target copy span: base pa 0x%lx, end pa 0x%lx\n",
 	    t_copybasepa,
-	    t_copybasepa + x_ml->address + x_ml->size);
+	    t_copybasepa + x_ml->ml_address + x_ml->ml_size);
 
 	DRMACH_PR("copy memlist (relative to copy base pa):\n");
 	DRMACH_MEMLIST_DUMP(c_ml);
@@ -3612,13 +3613,13 @@ drmach_copy_rename(drmachid_t id)
 	/*
 	 * DO COPY.
 	 */
-	for (ml = cr->c_ml; ml; ml = ml->next) {
+	for (ml = cr->c_ml; ml; ml = ml->ml_next) {
 		uint64_t	s_pa, t_pa;
 		uint64_t	nbytes;
 
-		s_pa = cr->s_copybasepa + ml->address;
-		t_pa = cr->t_copybasepa + ml->address;
-		nbytes = ml->size;
+		s_pa = cr->s_copybasepa + ml->ml_address;
+		t_pa = cr->t_copybasepa + ml->ml_address;
+		nbytes = ml->ml_size;
 
 		while (nbytes != 0ull) {
 			/* copy 32 bytes at src_pa to dst_pa */
@@ -6785,8 +6786,8 @@ drmach_mem_status(drmachid_t id, drmach_status_t *stat)
 
 	/* stop at first span that is in slice */
 	memlist_read_lock();
-	for (ml = phys_install; ml; ml = ml->next)
-		if (ml->address >= pa && ml->address < pa + slice_size)
+	for (ml = phys_install; ml; ml = ml->ml_next)
+		if (ml->ml_address >= pa && ml->ml_address < pa + slice_size)
 			break;
 	memlist_read_unlock();
 
@@ -6913,11 +6914,11 @@ drmach_pt_readmem(drmachid_t id, drmach_opts_t *opts)
 	dst_pa = va_to_pa(&dst);
 
 	memlist_read_lock();
-	for (ml = phys_install; ml; ml = ml->next) {
+	for (ml = phys_install; ml; ml = ml->ml_next) {
 		uint64_t	nbytes;
 
-		src_pa = ml->address;
-		nbytes = ml->size;
+		src_pa = ml->ml_address;
+		nbytes = ml->ml_size;
 
 		while (nbytes != 0ull) {
 

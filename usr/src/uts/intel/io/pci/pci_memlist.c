@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,9 +46,9 @@ memlist_dump(struct memlist *listp)
 	dprintf("memlist 0x%p content", (void *)listp);
 	while (listp) {
 		dprintf("(0x%x%x, 0x%x%x)",
-		    (int)(listp->address >> 32), (int)listp->address,
-		    (int)(listp->size >> 32), (int)listp->size);
-		listp = listp->next;
+		    (int)(listp->ml_address >> 32), (int)listp->ml_address,
+		    (int)(listp->ml_size >> 32), (int)listp->ml_size);
+		listp = listp->ml_next;
 	}
 }
 
@@ -73,7 +73,7 @@ memlist_free_all(struct memlist **list)
 	next = *list;
 	while (next) {
 		buf = next;
-		next = buf->next;
+		next = buf->ml_next;
 		kmem_free(buf, sizeof (struct memlist));
 	}
 	*list = 0;
@@ -89,54 +89,54 @@ memlist_insert(struct memlist **listp, uint64_t addr, uint64_t size)
 
 	/* find the location in list */
 	next = *listp;
-	while (next && next->address <= addr) {
+	while (next && next->ml_address <= addr) {
 		/*
 		 * Drop if this entry already exists, in whole
 		 * or in part
 		 */
-		if (next->address <= addr &&
-		    next->address + next->size >= addr + size) {
+		if (next->ml_address <= addr &&
+		    next->ml_address + next->ml_size >= addr + size) {
 			/* next already contains this entire element; drop */
 			return;
 		}
 
 		/* Is this a "grow block size" request? */
-		if (next->address == addr) {
+		if (next->ml_address == addr) {
 			break;
 		}
 		prev = next;
-		next = prev->next;
+		next = prev->ml_next;
 	}
 
-	merge_left = (prev && addr == prev->address + prev->size);
-	merge_right = (next && addr + size == next->address);
+	merge_left = (prev && addr == prev->ml_address + prev->ml_size);
+	merge_right = (next && addr + size == next->ml_address);
 	if (merge_left && merge_right) {
-		prev->size += size + next->size;
-		prev->next = next->next;
+		prev->ml_size += size + next->ml_size;
+		prev->ml_next = next->ml_next;
 		memlist_free(next);
 		return;
 	}
 
 	if (merge_left) {
-		prev->size += size;
+		prev->ml_size += size;
 		return;
 	}
 
 	if (merge_right) {
-		next->address = addr;
-		next->size += size;
+		next->ml_address = addr;
+		next->ml_size += size;
 		return;
 	}
 
 	entry = memlist_alloc();
-	entry->address = addr;
-	entry->size = size;
+	entry->ml_address = addr;
+	entry->ml_size = size;
 	if (prev == 0) {
-		entry->next = *listp;
+		entry->ml_next = *listp;
 		*listp = entry;
 	} else {
-		entry->next = next;
-		prev->next = entry;
+		entry->ml_next = next;
+		prev->ml_next = entry;
 	}
 }
 
@@ -167,8 +167,8 @@ memlist_remove(struct memlist **listp, uint64_t addr, uint64_t size)
 	rem_end = addr + size - 1;
 	chunk = *listp;
 	while (chunk) {
-		chunk_begin = chunk->address;
-		chunk_end = chunk->address + chunk->size - 1;
+		chunk_begin = chunk->ml_address;
+		chunk_end = chunk->ml_address + chunk->ml_size - 1;
 		begin_in_chunk = IN_RANGE(rem_begin, chunk_begin, chunk_end);
 		end_in_chunk = IN_RANGE(rem_end, chunk_begin, chunk_end);
 
@@ -178,9 +178,9 @@ memlist_remove(struct memlist **listp, uint64_t addr, uint64_t size)
 			/* spans entire chunk - delete chunk */
 			delete_chunk = chunk;
 			if (prev == 0)
-				chunk = *listp = chunk->next;
+				chunk = *listp = chunk->ml_next;
 			else
-				chunk = prev->next = chunk->next;
+				chunk = prev->ml_next = chunk->ml_next;
 
 			memlist_free(delete_chunk);
 			/* skip to start of while-loop */
@@ -190,25 +190,25 @@ memlist_remove(struct memlist **listp, uint64_t addr, uint64_t size)
 			struct memlist *new;
 			/* split chunk */
 			new = memlist_alloc();
-			new->address = rem_end + 1;
-			new->size = chunk_end - new->address + 1;
-			chunk->size = rem_begin - chunk_begin;
-			new->next = chunk->next;
-			chunk->next = new;
+			new->ml_address = rem_end + 1;
+			new->ml_size = chunk_end - new->ml_address + 1;
+			chunk->ml_size = rem_begin - chunk_begin;
+			new->ml_next = chunk->ml_next;
+			chunk->ml_next = new;
 			/* done - break out of while-loop */
 			break;
 		} else if (begin_in_chunk || end_in_chunk) {
 			/* trim chunk */
-			chunk->size -= MIN(chunk_end, rem_end) -
+			chunk->ml_size -= MIN(chunk_end, rem_end) -
 			    MAX(chunk_begin, rem_begin) + 1;
 			if (rem_begin <= chunk_begin) {
-				chunk->address = rem_end + 1;
+				chunk->ml_address = rem_end + 1;
 				break;
 			}
 			/* fall-through to next chunk */
 		}
 		prev = chunk;
-		chunk = chunk->next;
+		chunk = chunk->ml_next;
 	}
 
 	return (0);
@@ -227,21 +227,21 @@ memlist_find(struct memlist **listp, uint64_t size, int align)
 	/* find the chunk with sufficient size */
 	next = *listp;
 	while (next) {
-		delta = next->address & ((align != 0) ? (align - 1) : 0);
+		delta = next->ml_address & ((align != 0) ? (align - 1) : 0);
 		if (delta != 0)
 			total_size = size + align - delta;
 		else
 			total_size = size; /* the addr is already aligned */
-		if (next->size >= total_size)
+		if (next->ml_size >= total_size)
 			break;
 		prev = next;
-		next = prev->next;
+		next = prev->ml_next;
 	}
 
 	if (next == 0)
 		return (0);	/* Not found */
 
-	paddr = next->address;
+	paddr = next->ml_address;
 	if (delta)
 		paddr += align - delta;
 	(void) memlist_remove(listp, paddr, size);
@@ -263,21 +263,21 @@ memlist_find_with_startaddr(struct memlist **listp, uint64_t address,
 
 	/* find the chunk starting at 'address' */
 	next = *listp;
-	while (next && (next->address != address)) {
-		next = next->next;
+	while (next && (next->ml_address != address)) {
+		next = next->ml_next;
 	}
 	if (next == 0)
 		return (0);	/* Not found */
 
-	delta = next->address & ((align != 0) ? (align - 1) : 0);
+	delta = next->ml_address & ((align != 0) ? (align - 1) : 0);
 	if (delta != 0)
 		total_size = size + align - delta;
 	else
 		total_size = size;	/* the addr is already aligned */
-	if (next->size < total_size)
+	if (next->ml_size < total_size)
 		return (0);	/* unsufficient size */
 
-	paddr = next->address;
+	paddr = next->ml_address;
 	if (delta)
 		paddr += align - delta;
 	(void) memlist_remove(listp, paddr, size);
@@ -295,9 +295,9 @@ memlist_subsume(struct memlist **src, struct memlist **dest)
 
 	head = *src;
 	while (head) {
-		memlist_insert(dest, head->address, head->size);
+		memlist_insert(dest, head->ml_address, head->ml_size);
 		prev = head;
-		head = head->next;
+		head = head->ml_next;
 		memlist_free(prev);
 	}
 	*src = 0;
@@ -313,8 +313,8 @@ memlist_merge(struct memlist **src, struct memlist **dest)
 
 	p = *src;
 	while (p) {
-		memlist_insert(dest, p->address, p->size);
-		p = p->next;
+		memlist_insert(dest, p->ml_address, p->ml_size);
+		p = p->ml_next;
 	}
 }
 
@@ -328,15 +328,15 @@ memlist_dup(struct memlist *listp)
 
 	while (listp) {
 		struct memlist *entry = memlist_alloc();
-		entry->address = listp->address;
-		entry->size = listp->size;
-		entry->next = 0;
+		entry->ml_address = listp->ml_address;
+		entry->ml_size = listp->ml_size;
+		entry->ml_next = 0;
 		if (prev)
-			prev->next = entry;
+			prev->ml_next = entry;
 		else
 			head = entry;
 		prev = entry;
-		listp = listp->next;
+		listp = listp->ml_next;
 	}
 
 	return (head);
@@ -348,7 +348,7 @@ memlist_count(struct memlist *listp)
 	int count = 0;
 	while (listp) {
 		count++;
-		listp = listp->next;
+		listp = listp->ml_next;
 	}
 
 	return (count);

@@ -19,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc. */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989, 1990 AT&T   */
 /*	All Rights Reserved   */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -130,12 +128,12 @@ installed_top_size(
 	pfn_t highp;		/* high page in a chunk */
 	int cnt = 0;
 
-	for (; list; list = list->next) {
+	for (; list; list = list->ml_next) {
 		++cnt;
-		highp = (list->address + list->size - 1) >> PAGESHIFT;
+		highp = (list->ml_address + list->ml_size - 1) >> PAGESHIFT;
 		if (top < highp)
 			top = highp;
-		sumpages += btop(list->size);
+		sumpages += btop(list->ml_size);
 	}
 
 	*high_pfn = top;
@@ -168,24 +166,24 @@ copy_memlist_filter(
 	 * each range of memory. Note that we may apply the
 	 * filter multiple times against each memlist entry.
 	 */
-	for (; src; src = src->next) {
-		addr = P2ROUNDUP(src->address, PAGESIZE);
-		eaddr = P2ALIGN(src->address + src->size, PAGESIZE);
+	for (; src; src = src->ml_next) {
+		addr = P2ROUNDUP(src->ml_address, PAGESIZE);
+		eaddr = P2ALIGN(src->ml_address + src->ml_size, PAGESIZE);
 		while (addr < eaddr) {
 			size = eaddr - addr;
 			if (filter != NULL)
 				filter(&addr, &size);
 			if (size == 0)
 				break;
-			dst->address = addr;
-			dst->size = size;
-			dst->next = 0;
+			dst->ml_address = addr;
+			dst->ml_size = size;
+			dst->ml_next = 0;
 			if (prev == dst) {
-				dst->prev = 0;
+				dst->ml_prev = 0;
 				dst++;
 			} else {
-				dst->prev = prev;
-				prev->next = dst;
+				dst->ml_prev = prev;
+				prev->ml_next = dst;
 				dst++;
 				prev++;
 			}

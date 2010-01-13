@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3880,9 +3880,9 @@ sbd_check_unit_attached(sbd_board_t *sbp, dev_info_t *dip, int unit,
 		 * Check if base address is in phys_install.
 		 */
 		memlist_read_lock();
-		for (ml = phys_install; ml; ml = ml->next)
-			if ((endpa <= ml->address) ||
-					(basepa >= (ml->address + ml->size)))
+		for (ml = phys_install; ml; ml = ml->ml_next)
+			if ((endpa <= ml->ml_address) ||
+			    (basepa >= (ml->ml_address + ml->ml_size)))
 				continue;
 			else
 				break;
@@ -4740,9 +4740,9 @@ sbd_board_discovery(sbd_board_t *sbp)
 		 * Check if base address is in phys_install.
 		 */
 		memlist_read_lock();
-		for (ml = phys_install; ml; ml = ml->next)
-			if ((endpa <= ml->address) ||
-					(basepa >= (ml->address + ml->size)))
+		for (ml = phys_install; ml; ml = ml->ml_next)
+			if ((endpa <= ml->ml_address) ||
+			    (basepa >= (ml->ml_address + ml->ml_size)))
 				continue;
 			else
 				break;

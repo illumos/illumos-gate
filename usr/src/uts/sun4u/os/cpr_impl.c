@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1518,9 +1518,9 @@ i_cpr_find_ppages(void)
 	 */
 	pcnt = 0;
 	memlist_read_lock();
-	for (pmem = phys_install; pmem; pmem = pmem->next) {
-		npages = mmu_btop(pmem->size);
-		ppn = mmu_btop(pmem->address);
+	for (pmem = phys_install; pmem; pmem = pmem->ml_next) {
+		npages = mmu_btop(pmem->ml_size);
+		ppn = mmu_btop(pmem->ml_address);
 		for (plast = ppn + npages; ppn < plast; ppn++) {
 			if (page_numtopp_nolock(ppn))
 				continue;
@@ -1574,9 +1574,9 @@ i_cpr_find_ppages(void)
 	 */
 	dst = pphys_list;
 	memlist_read_lock();
-	for (pmem = phys_install; pmem; pmem = pmem->next) {
-		npages = mmu_btop(pmem->size);
-		ppn = mmu_btop(pmem->address);
+	for (pmem = phys_install; pmem; pmem = pmem->ml_next) {
+		npages = mmu_btop(pmem->ml_size);
+		ppn = mmu_btop(pmem->ml_address);
 		for (plast = ppn + npages; ppn < plast; ppn++) {
 			if (cpr_isset(ppn, mapflag)) {
 				ASSERT(dst < (pphys_list + ppage_count));
@@ -1851,7 +1851,7 @@ i_cpr_bitmap_setup(void)
 	 * phys_install ranges plus 1 for a trailing NULL struct.
 	 */
 	cpr_nbitmaps = 1;
-	for (pmem = phys_install; pmem; pmem = pmem->next)
+	for (pmem = phys_install; pmem; pmem = pmem->ml_next)
 		cpr_nbitmaps++;
 
 	if (cpr_nbitmaps > (CPR_MAX_BMDESC - 1)) {
@@ -1869,15 +1869,15 @@ i_cpr_bitmap_setup(void)
 	tail = dp + cpr_nbitmaps;
 
 	CPR->c_bmda = dp;
-	for (pmem = phys_install; pmem; pmem = pmem->next) {
-		size = BITMAP_BYTES(pmem->size);
+	for (pmem = phys_install; pmem; pmem = pmem->ml_next) {
+		size = BITMAP_BYTES(pmem->ml_size);
 		space = kmem_zalloc(size * 2, KM_NOSLEEP);
 		if (space == NULL)
 			return (ENOMEM);
 		ASSERT(dp < tail);
 		dp->cbd_magic = CPR_BITMAP_MAGIC;
-		dp->cbd_spfn = mmu_btop(pmem->address);
-		dp->cbd_epfn = mmu_btop(pmem->address + pmem->size) - 1;
+		dp->cbd_spfn = mmu_btop(pmem->ml_address);
+		dp->cbd_epfn = mmu_btop(pmem->ml_address + pmem->ml_size) - 1;
 		dp->cbd_size = size;
 		dp->cbd_reg_bitmap = (cpr_ptr)space;
 		dp->cbd_vlt_bitmap = (cpr_ptr)((caddr_t)space + size);

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -492,11 +492,11 @@ plat_build_mem_nodes(struct memlist *list)
 	while (list) {
 		int	node;
 
-		start = list->address >> PAGESHIFT;
-		end = (list->address + list->size - 1) >> PAGESHIFT;
+		start = list->ml_address >> PAGESHIFT;
+		end = (list->ml_address + list->ml_size - 1) >> PAGESHIFT;
 
 		if (start > physmax) {
-			list = list->next;
+			list = list->ml_next;
 			continue;
 		}
 		if (end > physmax)
@@ -507,7 +507,7 @@ plat_build_mem_nodes(struct memlist *list)
 		 */
 		if (max_mem_nodes == 1) {
 			mem_node_add_slice(start, end);
-			list = list->next;
+			list = list->ml_next;
 			continue;
 		}
 
@@ -565,7 +565,7 @@ plat_build_mem_nodes(struct memlist *list)
 			cur_start = cur_end + 1;
 		} while (cur_end < end);
 
-		list = list->next;
+		list = list->ml_next;
 	}
 	mem_node_physalign = 0;
 	mem_node_pfn_shift = 0;
@@ -1829,14 +1829,14 @@ lgrp_plat_mem_size_default(lgrp_handle_t lgrphand, lgrp_mem_query_t query)
 		return ((pgcnt_t)freemem);
 	case LGRP_MEM_SIZE_AVAIL:
 		memlist_read_lock();
-		for (mlist = phys_avail; mlist; mlist = mlist->next)
-			npgs += btop(mlist->size);
+		for (mlist = phys_avail; mlist; mlist = mlist->ml_next)
+			npgs += btop(mlist->ml_size);
 		memlist_read_unlock();
 		return (npgs);
 	case LGRP_MEM_SIZE_INSTALL:
 		memlist_read_lock();
-		for (mlist = phys_install; mlist; mlist = mlist->next)
-			npgs += btop(mlist->size);
+		for (mlist = phys_install; mlist; mlist = mlist->ml_next)
+			npgs += btop(mlist->ml_size);
 		memlist_read_unlock();
 		return (npgs);
 	default:

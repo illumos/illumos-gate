@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1992-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -53,9 +50,9 @@ print_memlist(struct memlist *av)
 
 	while (p != NULL) {
 		printf("addr = 0x%x:0x%x, size = 0x%x:0x%x\n",
-		    (uint_t)(p->address >> 32), (uint_t)p->address,
-		    (uint_t)(p->size >> 32), (uint_t)p->size);
-		p = p->next;
+		    (uint_t)(p->ml_address >> 32), (uint_t)p->ml_address,
+		    (uint_t)(p->ml_size >> 32), (uint_t)p->ml_size);
+		p = p->ml_next;
 	}
 
 }
@@ -125,11 +122,11 @@ get_memlist_struct(void)
 		    sizeof (struct memlist));
 		bzero(free_memlist_ptr, (ALLOC_SZ * sizeof (struct memlist)));
 		for (i = 0; i < ALLOC_SZ; i++)
-			ptr[i].next = &ptr[i+1];
-		ptr[i-1].next = NULL;
+			ptr[i].ml_next = &ptr[i+1];
+		ptr[i-1].ml_next = NULL;
 	}
 	ptr = free_memlist_ptr;
-	free_memlist_ptr = ptr->next;
+	free_memlist_ptr = ptr->ml_next;
 	return (ptr);
 }
 
@@ -144,8 +141,8 @@ add_to_freelist(struct memlist *ptr)
 	if (free_memlist_ptr == NULL) {
 		free_memlist_ptr = ptr;
 	} else {
-		for (tmp = free_memlist_ptr; tmp->next; tmp = tmp->next)
+		for (tmp = free_memlist_ptr; tmp->ml_next; tmp = tmp->ml_next)
 			;
-		tmp->next = ptr;
+		tmp->ml_next = ptr;
 	}
 }

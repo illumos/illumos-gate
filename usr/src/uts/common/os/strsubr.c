@@ -384,17 +384,6 @@ struct  qinit passthru_winit = {
 };
 
 /*
- * Special form of assertion: verify that X implies Y i.e. when X is true Y
- * should also be true.
- */
-#define	IMPLY(X, Y)	ASSERT(!(X) || (Y))
-
-/*
- * Logical equivalence. Verify that both X and Y are either TRUE or FALSE.
- */
-#define	EQUIV(X, Y)	{ IMPLY(X, Y); IMPLY(Y, X); }
-
-/*
  * Verify correctness of list head/tail pointers.
  */
 #define	LISTCHECK(head, tail, link) {				\

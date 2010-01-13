@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -96,8 +96,8 @@ num_phys_pages()
 	pgcnt_t npages = 0;
 	struct memlist *mp;
 
-	for (mp = phys_install; mp != NULL; mp = mp->next)
-		npages += mp->size >> PAGESHIFT;
+	for (mp = phys_install; mp != NULL; mp = mp->ml_next)
+		npages += mp->ml_size >> PAGESHIFT;
 
 	return (npages);
 }
@@ -166,9 +166,9 @@ get_max_phys_size(
 {
 	uint64_t	max_size = 0;
 
-	for (; physavail; physavail = physavail->next) {
-		if (physavail->size > max_size)
-			max_size = physavail->size;
+	for (; physavail; physavail = physavail->ml_next) {
+		if (physavail->ml_size > max_size)
+			max_size = physavail->ml_size;
 	}
 
 	return (max_size);
@@ -247,24 +247,24 @@ diff_memlists(struct memlist *proto, struct memlist *diff, void (*func)())
 		 * if none, apply func to all of proto item
 		 */
 		while (diff != NULL &&
-		    proto->address >= diff->address + diff->size)
-			diff = diff->next;
+		    proto->ml_address >= diff->ml_address + diff->ml_size)
+			diff = diff->ml_next;
 		if (diff == NULL) {
-			(*func)(proto->address, proto->size);
-			proto = proto->next;
+			(*func)(proto->ml_address, proto->ml_size);
+			proto = proto->ml_next;
 			continue;
 		}
-		if (proto->address == diff->address &&
-		    proto->size == diff->size) {
-			proto = proto->next;
-			diff = diff->next;
+		if (proto->ml_address == diff->ml_address &&
+		    proto->ml_size == diff->ml_size) {
+			proto = proto->ml_next;
+			diff = diff->ml_next;
 			continue;
 		}
 
-		p_base = proto->address;
-		p_end = p_base + proto->size;
-		d_base = diff->address;
-		d_end = d_base + diff->size;
+		p_base = proto->ml_address;
+		p_end = p_base + proto->ml_size;
+		d_base = diff->ml_address;
+		d_end = d_base + diff->ml_size;
 		/*
 		 * here p_base < d_end
 		 * there are 5 cases
@@ -279,8 +279,8 @@ diff_memlists(struct memlist *proto, struct memlist *diff, void (*func)())
 		 * apply func to all of proto item
 		 */
 		if (p_end <= d_base) {
-			(*func)(p_base, proto->size);
-			proto = proto->next;
+			(*func)(p_base, proto->ml_size);
+			proto = proto->ml_next;
 			continue;
 		}
 
@@ -311,7 +311,7 @@ diff_memlists(struct memlist *proto, struct memlist *diff, void (*func)())
 			 * any non-overlapping ranges applied above,
 			 * so just continue
 			 */
-			proto = proto->next;
+			proto = proto->ml_next;
 			continue;
 		}
 
@@ -332,10 +332,10 @@ diff_memlists(struct memlist *proto, struct memlist *diff, void (*func)())
 		 * where no overlap occurs.  Stop when d_base is above
 		 * p_end
 		 */
-		for (p_base = d_end, diff = diff->next; diff != NULL;
-		    p_base = d_end, diff = diff->next) {
-			d_base = diff->address;
-			d_end = d_base + diff->size;
+		for (p_base = d_end, diff = diff->ml_next; diff != NULL;
+		    p_base = d_end, diff = diff->ml_next) {
+			d_base = diff->ml_address;
+			d_end = d_base + diff->ml_size;
 			if (p_end <= d_base) {
 				(*func)(p_base, p_end - p_base);
 				break;
@@ -344,7 +344,7 @@ diff_memlists(struct memlist *proto, struct memlist *diff, void (*func)())
 		}
 		if (diff == NULL)
 			(*func)(p_base, p_end - p_base);
-		proto = proto->next;
+		proto = proto->ml_next;
 	}
 }
 
@@ -412,15 +412,15 @@ copy_memlist(
 	prev = dst;
 
 	for (i = 0; i < nelems; src++, i++) {
-		dst->address = src->addr;
-		dst->size = src->size;
-		dst->next = 0;
+		dst->ml_address = src->addr;
+		dst->ml_size = src->size;
+		dst->ml_next = 0;
 		if (prev == dst) {
-			dst->prev = 0;
+			dst->ml_prev = 0;
 			dst++;
 		} else {
-			dst->prev = prev;
-			prev->next = dst;
+			dst->ml_prev = prev;
+			prev->ml_next = dst;
 			dst++;
 			prev++;
 		}
@@ -618,11 +618,11 @@ installed_top_size(
 	pfn_t highp;		/* high page in a chunk */
 	pgcnt_t sumpages = 0;
 
-	for (; list; list = list->next) {
-		highp = (list->address + list->size - 1) >> PAGESHIFT;
+	for (; list; list = list->ml_next) {
+		highp = (list->ml_address + list->ml_size - 1) >> PAGESHIFT;
 		if (top < highp)
 			top = highp;
-		sumpages += (uint_t)(list->size >> PAGESHIFT);
+		sumpages += (uint_t)(list->ml_size >> PAGESHIFT);
 	}
 
 	*topp = top;

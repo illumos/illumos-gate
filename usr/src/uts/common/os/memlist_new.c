@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/cmn_err.h>
@@ -48,7 +46,7 @@ memlist_get_one(void)
 	mutex_enter(&memlist_freelist_mutex);
 	mlp = memlist_freelist;
 	if (mlp != NULL) {
-		memlist_freelist = mlp->next;
+		memlist_freelist = mlp->ml_next;
 		memlist_freelist_count--;
 	}
 	mutex_exit(&memlist_freelist_mutex);
@@ -62,7 +60,7 @@ memlist_free_one(struct memlist *mlp)
 	ASSERT(mlp != NULL);
 
 	mutex_enter(&memlist_freelist_mutex);
-	mlp->next = memlist_freelist;
+	mlp->ml_next = memlist_freelist;
 	memlist_freelist = mlp;
 	memlist_freelist_count++;
 	mutex_exit(&memlist_freelist_mutex);
@@ -79,10 +77,10 @@ memlist_free_list(struct memlist *mlp)
 	}
 
 	count = 1;
-	for (mlendp = mlp; mlendp->next != NULL; mlendp = mlendp->next)
+	for (mlendp = mlp; mlendp->ml_next != NULL; mlendp = mlendp->ml_next)
 		count++;
 	mutex_enter(&memlist_freelist_mutex);
-	mlendp->next = memlist_freelist;
+	mlendp->ml_next = memlist_freelist;
 	memlist_freelist = mlp;
 	memlist_freelist_count += count;
 	mutex_exit(&memlist_freelist_mutex);
@@ -101,11 +99,11 @@ memlist_free_block(caddr_t base, size_t bytes)
 	mlp = (struct memlist *)base;
 	mlendp = &mlp[count - 1];
 	for (; mlp != mlendp; mlp++)
-		mlp->next = mlp + 1;
-	mlendp->next = NULL;
+		mlp->ml_next = mlp + 1;
+	mlendp->ml_next = NULL;
 	mlp = (struct memlist *)base;
 	mutex_enter(&memlist_freelist_mutex);
-	mlendp->next = memlist_freelist;
+	mlendp->ml_next = memlist_freelist;
 	memlist_freelist = mlp;
 	memlist_freelist_count += count;
 	mutex_exit(&memlist_freelist_mutex);
@@ -124,29 +122,29 @@ memlist_insert(
 	struct memlist *cur, *last;
 	uint64_t start, end;
 
-	start = new->address;
-	end = start + new->size;
+	start = new->ml_address;
+	end = start + new->ml_size;
 	last = NULL;
-	for (cur = *curmemlistp; cur; cur = cur->next) {
+	for (cur = *curmemlistp; cur; cur = cur->ml_next) {
 		last = cur;
-		if (cur->address >= end) {
-			new->next = cur;
-			new->prev = cur->prev;
-			cur->prev = new;
+		if (cur->ml_address >= end) {
+			new->ml_next = cur;
+			new->ml_prev = cur->ml_prev;
+			cur->ml_prev = new;
 			if (cur == *curmemlistp)
 				*curmemlistp = new;
 			else
-				new->prev->next = new;
+				new->ml_prev->ml_next = new;
 			return;
 		}
-		if (cur->address + cur->size > start)
+		if (cur->ml_address + cur->ml_size > start)
 			panic("munged memory list = 0x%p\n",
 			    (void *)curmemlistp);
 	}
-	new->next = NULL;
-	new->prev = last;
+	new->ml_next = NULL;
+	new->ml_prev = last;
 	if (last != NULL)
-		last->next = new;
+		last->ml_next = new;
 }
 
 void
@@ -159,31 +157,31 @@ memlist_del(struct memlist *memlistp,
 	 */
 	struct memlist *mlp;
 
-	for (mlp = *curmemlistp; mlp != NULL; mlp = mlp->next)
+	for (mlp = *curmemlistp; mlp != NULL; mlp = mlp->ml_next)
 		if (mlp == memlistp)
 			break;
 	ASSERT(mlp == memlistp);
 #endif /* DEBUG */
 	if (*curmemlistp == memlistp) {
-		ASSERT(memlistp->prev == NULL);
-		*curmemlistp = memlistp->next;
+		ASSERT(memlistp->ml_prev == NULL);
+		*curmemlistp = memlistp->ml_next;
 	}
-	if (memlistp->prev != NULL) {
-		ASSERT(memlistp->prev->next == memlistp);
-		memlistp->prev->next = memlistp->next;
+	if (memlistp->ml_prev != NULL) {
+		ASSERT(memlistp->ml_prev->ml_next == memlistp);
+		memlistp->ml_prev->ml_next = memlistp->ml_next;
 	}
-	if (memlistp->next != NULL) {
-		ASSERT(memlistp->next->prev == memlistp);
-		memlistp->next->prev = memlistp->prev;
+	if (memlistp->ml_next != NULL) {
+		ASSERT(memlistp->ml_next->ml_prev == memlistp);
+		memlistp->ml_next->ml_prev = memlistp->ml_prev;
 	}
 }
 
 struct memlist *
 memlist_find(struct memlist *mlp, uint64_t address)
 {
-	for (; mlp != NULL; mlp = mlp->next)
-		if (address >= mlp->address &&
-		    address < (mlp->address + mlp->size))
+	for (; mlp != NULL; mlp = mlp->ml_next)
+		if (address >= mlp->ml_address &&
+		    address < (mlp->ml_address + mlp->ml_size))
 			break;
 	return (mlp);
 }
@@ -214,15 +212,15 @@ memlist_add_span(
 		return (MEML_SPANOP_EALLOC);
 	}
 
-	dst->address = address;
-	dst->size = bytes;
+	dst->ml_address = address;
+	dst->ml_size = bytes;
 
 	/*
 	 * First insert.
 	 */
 	if (*curmemlistp == NULL) {
-		dst->prev = NULL;
-		dst->next = NULL;
+		dst->ml_prev = NULL;
+		dst->ml_next = NULL;
 		*curmemlistp = dst;
 		return (MEML_SPANOP_OK);
 	}
@@ -231,8 +229,8 @@ memlist_add_span(
 	 * Insert into sorted list.
 	 */
 	for (prev = NULL, next = *curmemlistp; next != NULL;
-	    prev = next, next = next->next) {
-		if (address > (next->address + next->size))
+	    prev = next, next = next->ml_next) {
+		if (address > (next->ml_address + next->ml_size))
 			continue;
 
 		/*
@@ -242,11 +240,11 @@ memlist_add_span(
 		/*
 		 * Prepend to next.
 		 */
-		if ((address + bytes) == next->address) {
+		if ((address + bytes) == next->ml_address) {
 			memlist_free_one(dst);
 
-			next->address = address;
-			next->size += bytes;
+			next->ml_address = address;
+			next->ml_size += bytes;
 
 			return (MEML_SPANOP_OK);
 		}
@@ -254,45 +252,47 @@ memlist_add_span(
 		/*
 		 * Append to next.
 		 */
-		if (address == (next->address + next->size)) {
+		if (address == (next->ml_address + next->ml_size)) {
 			memlist_free_one(dst);
 
-			if (next->next) {
+			if (next->ml_next) {
 				/*
-				 * don't overlap with next->next
+				 * don't overlap with next->ml_next
 				 */
-				if ((address + bytes) > next->next->address) {
+				if ((address + bytes) >
+				    next->ml_next->ml_address) {
 					return (MEML_SPANOP_ESPAN);
 				}
 				/*
-				 * Concatenate next and next->next
+				 * Concatenate next and next->ml_next
 				 */
-				if ((address + bytes) == next->next->address) {
-					struct memlist *mlp = next->next;
+				if ((address + bytes) ==
+				    next->ml_next->ml_address) {
+					struct memlist *mlp = next->ml_next;
 
 					if (next == *curmemlistp)
-						*curmemlistp = next->next;
+						*curmemlistp = next->ml_next;
 
-					mlp->address = next->address;
-					mlp->size += next->size;
-					mlp->size += bytes;
+					mlp->ml_address = next->ml_address;
+					mlp->ml_size += next->ml_size;
+					mlp->ml_size += bytes;
 
-					if (next->prev)
-						next->prev->next = mlp;
-					mlp->prev = next->prev;
+					if (next->ml_prev)
+						next->ml_prev->ml_next = mlp;
+					mlp->ml_prev = next->ml_prev;
 
 					memlist_free_one(next);
 					return (MEML_SPANOP_OK);
 				}
 			}
 
-			next->size += bytes;
+			next->ml_size += bytes;
 
 			return (MEML_SPANOP_OK);
 		}
 
 		/* don't overlap with next */
-		if ((address + bytes) > next->address) {
+		if ((address + bytes) > next->ml_address) {
 			memlist_free_one(dst);
 			return (MEML_SPANOP_ESPAN);
 		}
@@ -300,13 +300,13 @@ memlist_add_span(
 		/*
 		 * Insert before next.
 		 */
-		dst->prev = prev;
-		dst->next = next;
-		next->prev = dst;
+		dst->ml_prev = prev;
+		dst->ml_next = next;
+		next->ml_prev = dst;
 		if (prev == NULL) {
 			*curmemlistp = dst;
 		} else {
-			prev->next = dst;
+			prev->ml_next = dst;
 		}
 		return (MEML_SPANOP_OK);
 	}
@@ -314,9 +314,9 @@ memlist_add_span(
 	/*
 	 * End of list, prev is valid and next is NULL.
 	 */
-	prev->next = dst;
-	dst->prev = prev;
-	dst->next = NULL;
+	prev->ml_next = dst;
+	dst->ml_prev = prev;
+	dst->ml_next = NULL;
 
 	return (MEML_SPANOP_OK);
 }
@@ -339,9 +339,9 @@ memlist_delete_span(
 	/*
 	 * Find element containing address.
 	 */
-	for (next = *curmemlistp; next != NULL; next = next->next) {
-		if ((address >= next->address) &&
-		    (address < next->address + next->size))
+	for (next = *curmemlistp; next != NULL; next = next->ml_next) {
+		if ((address >= next->ml_address) &&
+		    (address < next->ml_address + next->ml_size))
 			break;
 	}
 
@@ -355,32 +355,32 @@ memlist_delete_span(
 	/*
 	 * Error if size goes off end of this struct memlist.
 	 */
-	if (address + bytes > next->address + next->size) {
+	if (address + bytes > next->ml_address + next->ml_size) {
 		return (MEML_SPANOP_ESPAN);
 	}
 
 	/*
 	 * Span at beginning of struct memlist.
 	 */
-	if (address == next->address) {
+	if (address == next->ml_address) {
 		/*
 		 * If start & size match, delete from list.
 		 */
-		if (bytes == next->size) {
+		if (bytes == next->ml_size) {
 			if (next == *curmemlistp)
-				*curmemlistp = next->next;
-			if (next->prev != NULL)
-				next->prev->next = next->next;
-			if (next->next != NULL)
-				next->next->prev = next->prev;
+				*curmemlistp = next->ml_next;
+			if (next->ml_prev != NULL)
+				next->ml_prev->ml_next = next->ml_next;
+			if (next->ml_next != NULL)
+				next->ml_next->ml_prev = next->ml_prev;
 
 			memlist_free_one(next);
 		} else {
 			/*
 			 * Increment start address by bytes.
 			 */
-			next->address += bytes;
-			next->size -= bytes;
+			next->ml_address += bytes;
+			next->ml_size -= bytes;
 		}
 		return (MEML_SPANOP_OK);
 	}
@@ -388,11 +388,11 @@ memlist_delete_span(
 	/*
 	 * Span at end of struct memlist.
 	 */
-	if (address + bytes == next->address + next->size) {
+	if (address + bytes == next->ml_address + next->ml_size) {
 		/*
 		 * decrement size by bytes
 		 */
-		next->size -= bytes;
+		next->ml_size -= bytes;
 		return (MEML_SPANOP_OK);
 	}
 
@@ -413,9 +413,10 @@ memlist_delete_span(
 		 * Existing struct memlist gets address
 		 * and size up to start of span.
 		 */
-		dst->address = address + bytes;
-		dst->size = (next->address + next->size) - dst->address;
-		next->size = address - next->address;
+		dst->ml_address = address + bytes;
+		dst->ml_size =
+		    (next->ml_address + next->ml_size) - dst->ml_address;
+		next->ml_size = address - next->ml_address;
 
 		/*
 		 * New struct memlist gets address starting
@@ -425,12 +426,12 @@ memlist_delete_span(
 		/*
 		 * link in new memlist after old
 		 */
-		dst->next = next->next;
-		dst->prev = next;
+		dst->ml_next = next->ml_next;
+		dst->ml_prev = next;
 
-		if (next->next != NULL)
-			next->next->prev = dst;
-		next->next = dst;
+		if (next->ml_next != NULL)
+			next->ml_next->ml_prev = dst;
+		next->ml_next = dst;
 	}
 	return (MEML_SPANOP_OK);
 }

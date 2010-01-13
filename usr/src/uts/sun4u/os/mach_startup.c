@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -525,9 +525,9 @@ ecache_flush_address(void)
 	uint64_t ret_val;
 
 	flush_size = ecache_size * 2;
-	for (pmem = phys_install; pmem; pmem = pmem->next) {
-		ret_val = P2ROUNDUP(pmem->address, ecache_size);
-		if (ret_val + flush_size <= pmem->address + pmem->size)
+	for (pmem = phys_install; pmem; pmem = pmem->ml_next) {
+		ret_val = P2ROUNDUP(pmem->ml_address, ecache_size);
+		if (ret_val + flush_size <= pmem->ml_address + pmem->ml_size)
 			return (ret_val);
 	}
 	return ((uint64_t)-1);

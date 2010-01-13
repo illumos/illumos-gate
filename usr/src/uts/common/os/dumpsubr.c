@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -692,9 +692,9 @@ dump_init_memlist_walker(dumpmlw_t *pw)
 {
 	pw->mp = phys_install;
 	pw->basenum = 0;
-	pw->mppages = pw->mp->size >> PAGESHIFT;
+	pw->mppages = pw->mp->ml_size >> PAGESHIFT;
 	pw->mpleft = pw->mppages;
-	pw->mpaddr = pw->mp->address >> PAGESHIFT;
+	pw->mpaddr = pw->mp->ml_address >> PAGESHIFT;
 }
 
 /*
@@ -713,11 +713,11 @@ dump_bitnum_to_pfn(pgcnt_t bitnum, dumpmlw_t *pw)
 		}
 		bitnum -= pw->mppages;
 		pw->basenum += pw->mppages;
-		pw->mp = pw->mp->next;
+		pw->mp = pw->mp->ml_next;
 		if (pw->mp != NULL) {
-			pw->mppages = pw->mp->size >> PAGESHIFT;
+			pw->mppages = pw->mp->ml_size >> PAGESHIFT;
 			pw->mpleft = pw->mppages;
-			pw->mpaddr = pw->mp->address >> PAGESHIFT;
+			pw->mpaddr = pw->mp->ml_address >> PAGESHIFT;
 		}
 	}
 	return (PFN_INVALID);
@@ -729,11 +729,11 @@ dump_pfn_to_bitnum(pfn_t pfn)
 	struct memlist *mp;
 	pgcnt_t bitnum = 0;
 
-	for (mp = phys_install; mp != NULL; mp = mp->next) {
-		if (pfn >= (mp->address >> PAGESHIFT) &&
-		    pfn < ((mp->address + mp->size) >> PAGESHIFT))
-			return (bitnum + pfn - (mp->address >> PAGESHIFT));
-		bitnum += mp->size >> PAGESHIFT;
+	for (mp = phys_install; mp != NULL; mp = mp->ml_next) {
+		if (pfn >= (mp->ml_address >> PAGESHIFT) &&
+		    pfn < ((mp->ml_address + mp->ml_size) >> PAGESHIFT))
+			return (bitnum + pfn - (mp->ml_address >> PAGESHIFT));
+		bitnum += mp->ml_size >> PAGESHIFT;
 	}
 	return ((pgcnt_t)-1);
 }

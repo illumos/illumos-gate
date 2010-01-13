@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -333,8 +333,9 @@ sbd_post_attach_mem(sbd_handle_t *hp, sbd_devlist_t devlist[], int devnum)
 		}
 		memlist_read_unlock();
 
-		for (ml = mlist; ml != NULL; ml = ml->next) {
-			(void) sbdp_mem_add_span(hdp, ml->address, ml->size);
+		for (ml = mlist; ml != NULL; ml = ml->ml_next) {
+			(void) sbdp_mem_add_span(hdp, ml->ml_address,
+			    ml->ml_size);
 		}
 
 		memlist_delete(mlist);
@@ -489,14 +490,14 @@ sbd_add_memory_spans(sbd_board_t *sbp, struct memlist *ml)
 #endif
 	hdp = sbd_get_sbdp_handle(NULL, NULL);
 
-	for (; ml; ml = ml->next) {
+	for (; ml; ml = ml->ml_next) {
 		update_membounds_t umb;
 		pfn_t	base;
 		pgcnt_t	npgs;
 		int	rv;
 
-		base = _b64top(ml->address);
-		npgs = _b64top(ml->size);
+		base = _b64top(ml->ml_address);
+		npgs = _b64top(ml->ml_size);
 
 		umb.u_board = sbp->sb_num;
 		umb.u_base = (uint64_t)base << MMU_PAGESHIFT;
@@ -505,7 +506,7 @@ sbd_add_memory_spans(sbd_board_t *sbp, struct memlist *ml)
 		lgrp_plat_config(LGRP_CONFIG_MEM_ADD, (uintptr_t)&umb);
 		rv = kphysm_add_memory_dynamic(base, npgs);
 
-		(void) sbdp_mem_add_span(hdp, ml->address, ml->size);
+		(void) sbdp_mem_add_span(hdp, ml->ml_address, ml->ml_size);
 
 		if (rv != KPHYSM_OK) {
 			cmn_err(CE_WARN, "sbd:%s:"
@@ -632,9 +633,9 @@ sbd_post_detach_mem_unit(sbd_mem_unit_t *s_mp, sbderror_t *ep)
 		 * memlists accordingly with new base
 		 * addresses.
 		 */
-		for (ml = t_mp->sbm_mlist; ml; ml = ml->next) {
-			ml->address -= t_basepa;
-			ml->address += s_new_basepa;
+		for (ml = t_mp->sbm_mlist; ml; ml = ml->ml_next) {
+			ml->ml_address -= t_basepa;
+			ml->ml_address += s_new_basepa;
 		}
 
 		/*
@@ -647,9 +648,9 @@ sbd_post_detach_mem_unit(sbd_mem_unit_t *s_mp, sbderror_t *ep)
 		PR_MEM("%s: renamed target memlist and delete memlist", f);
 		SBD_MEMLIST_DUMP(t_mp->sbm_mlist);
 
-		for (ml = s_mp->sbm_mlist; ml; ml = ml->next) {
-			ml->address -= s_basepa;
-			ml->address += t_basepa;
+		for (ml = s_mp->sbm_mlist; ml; ml = ml->ml_next) {
+			ml->ml_address -= s_basepa;
+			ml->ml_address += t_basepa;
 		}
 
 		PR_MEM("%s: renamed source memlist", f);
@@ -662,9 +663,9 @@ sbd_post_detach_mem_unit(sbd_mem_unit_t *s_mp, sbderror_t *ep)
 		 * list is not used beyond this point, and in fact, is
 		 *  disposed of at the end of this function.
 		 */
-		for (ml = s_mp->sbm_del_mlist; ml; ml = ml->next) {
-			ml->address -= s_basepa;
-			ml->address += t_basepa;
+		for (ml = s_mp->sbm_del_mlist; ml; ml = ml->ml_next) {
+			ml->ml_address -= s_basepa;
+			ml->ml_address += t_basepa;
 		}
 
 		PR_MEM("%s: renamed source delete memlist", f);
@@ -1454,8 +1455,8 @@ sbd_init_mem_unit_data(sbd_mem_unit_t *mp, sbderror_t *ep)
 	if (mp->sbm_npages == 0) {
 		struct memlist	*ml, *mlist;
 		mlist = sbd_get_memlist(mp, ep);
-		for (ml = mlist; ml; ml = ml->next)
-			mp->sbm_npages += btop(ml->size);
+		for (ml = mlist; ml; ml = ml->ml_next)
+			mp->sbm_npages += btop(ml->ml_size);
 		memlist_delete(mlist);
 	}
 
@@ -1499,9 +1500,9 @@ sbd_reserve_mem_spans(memhandle_t *mhp, struct memlist *ml)
 	 * with kphysm_del_span.  It is possible that a span may intersect
 	 * an area occupied by the cage.
 	 */
-	for (mc = ml; mc != NULL; mc = mc->next) {
-		base = _b64top(mc->address);
-		npgs = _b64top(mc->size);
+	for (mc = ml; mc != NULL; mc = mc->ml_next) {
+		base = _b64top(mc->ml_address);
+		npgs = _b64top(mc->ml_size);
 
 		err = kphysm_del_span(*mhp, base, npgs);
 		if (err != KPHYSM_OK) {
@@ -1825,11 +1826,11 @@ sbd_select_mem_target(sbd_handle_t *hp,
 #ifdef DEBUG
 			/* sanity check memlist */
 			d_ml = x_ml;
-			while (d_ml->next != NULL)
-				d_ml = d_ml->next;
-			ASSERT(x_ml->address == _ptob64(s_mp->sbm_basepfn) +
+			while (d_ml->ml_next != NULL)
+				d_ml = d_ml->ml_next;
+			ASSERT(x_ml->ml_address == _ptob64(s_mp->sbm_basepfn) +
 				_ptob64(t_mp->sbm_slice_offset));
-			ASSERT(d_ml->address + d_ml->size ==
+			ASSERT(d_ml->ml_address + d_ml->ml_size ==
 				_ptob64(s_mq.last_nonrelocatable + 1));
 #endif
 
@@ -2087,7 +2088,7 @@ memlist_dup(struct memlist *mlist)
 
 	prev = NULL;
 	hl = NULL;
-	for (; mlist; mlist = mlist->next) {
+	for (; mlist; mlist = mlist->ml_next) {
 		struct memlist *mp;
 
 		mp = memlist_get_one();
@@ -2097,15 +2098,15 @@ memlist_dup(struct memlist *mlist)
 			hl = NULL;
 			break;
 		}
-		mp->address = mlist->address;
-		mp->size = mlist->size;
-		mp->next = NULL;
-		mp->prev = prev;
+		mp->ml_address = mlist->ml_address;
+		mp->ml_size = mlist->ml_size;
+		mp->ml_next = NULL;
+		mp->ml_prev = prev;
 
 		if (prev == NULL)
 			hl = mp;
 		else
-			prev->next = mp;
+			prev->ml_next = mp;
 		prev = mp;
 	}
 
@@ -2120,10 +2121,10 @@ memlist_dump(struct memlist *mlist)
 	if (mlist == NULL) {
 		PR_MEM("memlist> EMPTY\n");
 	} else {
-		for (ml = mlist; ml; ml = ml->next)
+		for (ml = mlist; ml; ml = ml->ml_next)
 			PR_MEM("memlist> 0x%" PRIx64 " "
 				"0x%" PRIx64 " \n",
-				ml->address, ml->size);
+				ml->ml_address, ml->ml_size);
 	}
 }
 
@@ -2135,27 +2136,27 @@ memlist_intersect(struct memlist *al, struct memlist *bl)
 	if ((al == NULL) || (bl == NULL))
 		return (0);
 
-	aend = al->address + al->size;
-	bstart = bl->address;
-	bend = bl->address + bl->size;
+	aend = al->ml_address + al->ml_size;
+	bstart = bl->ml_address;
+	bend = bl->ml_address + bl->ml_size;
 
 	while (al && bl) {
 		while (al && (aend <= bstart))
-			if ((al = al->next) != NULL)
-				aend = al->address + al->size;
+			if ((al = al->ml_next) != NULL)
+				aend = al->ml_address + al->ml_size;
 		if (al == NULL)
 			return (0);
 
-		if ((astart = al->address) <= bstart)
+		if ((astart = al->ml_address) <= bstart)
 			return (1);
 
 		while (bl && (bend <= astart))
-			if ((bl = bl->next) != NULL)
-				bend = bl->address + bl->size;
+			if ((bl = bl->ml_next) != NULL)
+				bend = bl->ml_address + bl->ml_size;
 		if (bl == NULL)
 			return (0);
 
-		if ((bstart = bl->address) <= astart)
+		if ((bstart = bl->ml_address) <= astart)
 			return (1);
 	}
 
@@ -2180,26 +2181,26 @@ memlist_canfit(struct memlist *s_mlist, struct memlist *t_mlist)
 	/*
 	 * Base both memlists on common base address (0).
 	 */
-	s_basepa = s_mlist->address;
-	t_basepa = t_mlist->address;
+	s_basepa = s_mlist->ml_address;
+	t_basepa = t_mlist->ml_address;
 
-	for (s_ml = s_mlist; s_ml; s_ml = s_ml->next)
-		s_ml->address -= s_basepa;
+	for (s_ml = s_mlist; s_ml; s_ml = s_ml->ml_next)
+		s_ml->ml_address -= s_basepa;
 
-	for (t_ml = t_mlist; t_ml; t_ml = t_ml->next)
-		t_ml->address -= t_basepa;
+	for (t_ml = t_mlist; t_ml; t_ml = t_ml->ml_next)
+		t_ml->ml_address -= t_basepa;
 
 	s_ml = s_mlist;
-	for (t_ml = t_mlist; t_ml && s_ml; t_ml = t_ml->next) {
+	for (t_ml = t_mlist; t_ml && s_ml; t_ml = t_ml->ml_next) {
 		uint64_t	s_start, s_end;
 		uint64_t	t_start, t_end;
 
-		t_start = t_ml->address;
-		t_end = t_start + t_ml->size;
+		t_start = t_ml->ml_address;
+		t_end = t_start + t_ml->ml_size;
 
-		for (; s_ml; s_ml = s_ml->next) {
-			s_start = s_ml->address;
-			s_end = s_start + s_ml->size;
+		for (; s_ml; s_ml = s_ml->ml_next) {
+			s_start = s_ml->ml_address;
+			s_end = s_start + s_ml->ml_size;
 
 			if ((s_start < t_start) || (s_end > t_end))
 				break;
@@ -2216,11 +2217,11 @@ memlist_canfit(struct memlist *s_mlist, struct memlist *t_mlist)
 	 * Need to add base addresses back since memlists
 	 * are probably in use by caller.
 	 */
-	for (s_ml = s_mlist; s_ml; s_ml = s_ml->next)
-		s_ml->address += s_basepa;
+	for (s_ml = s_mlist; s_ml; s_ml = s_ml->ml_next)
+		s_ml->ml_address += s_basepa;
 
-	for (t_ml = t_mlist; t_ml; t_ml = t_ml->next)
-		t_ml->address += t_basepa;
+	for (t_ml = t_mlist; t_ml; t_ml = t_ml->ml_next)
+		t_ml->ml_address += t_basepa;
 
 	return (rv);
 }
@@ -2314,13 +2315,13 @@ error:
 
 	SBD_MEMLIST_DUMP(ml);
 	err = 0;
-	for (mc = ml; mc; mc = mc->next) {
+	for (mc = ml; mc; mc = mc->ml_next) {
 		update_membounds_t umb;
 		pfn_t	base;
 		pgcnt_t npgs;
 
-		base = (pfn_t)(mc->address >> PAGESHIFT);
-		npgs = (pgcnt_t)(mc->size >> PAGESHIFT);
+		base = (pfn_t)(mc->ml_address >> PAGESHIFT);
+		npgs = (pgcnt_t)(mc->ml_size >> PAGESHIFT);
 
 		umb.u_board = sbp->sb_num;
 		umb.u_base = (uint64_t)base << MMU_PAGESHIFT;
@@ -2366,7 +2367,7 @@ error:
 			}
 			break;
 		}
-		(void) sbdp_mem_add_span(hdp, mc->address, mc->size);
+		(void) sbdp_mem_add_span(hdp, mc->ml_address, mc->ml_size);
 	}
 
 	if (err != 0) {

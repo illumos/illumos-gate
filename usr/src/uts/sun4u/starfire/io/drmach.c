@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -696,8 +696,8 @@ drmach_device_new(drmach_node_t *node,
 	if (rv) {
 		/* every node is expected to have a name */
 		err = drerr_new(1, ESTF_GETPROP,
-			"PROM Node 0x%x: property %s",
-			(uint_t)node->get_dnode(node), OBP_NAME);
+		    "PROM Node 0x%x: property %s",
+		    (uint_t)node->get_dnode(node), OBP_NAME);
 
 		return (err);
 	}
@@ -761,8 +761,8 @@ drmach_device_get_prop(drmach_device_t *dp, char *name, void *buf)
 	rv = drmach_node_get_prop(dp->node, name, buf);
 	if (rv) {
 		err = drerr_new(1, ESTF_GETPROP,
-			"%s::%s: property %s",
-			dp->bp->cm.name, dp->cm.name, name);
+		    "%s::%s: property %s",
+		    dp->bp->cm.name, dp->cm.name, name);
 	}
 
 	return (err);
@@ -777,8 +777,8 @@ drmach_device_get_proplen(drmach_device_t *dp, char *name, int *len)
 	rv = drmach_node_get_proplen(dp->node, name, len);
 	if (rv) {
 		err = drerr_new(1, ESTF_GETPROPLEN,
-			"%s::%s: property %s",
-			dp->bp->cm.name, dp->cm.name, name);
+		    "%s::%s: property %s",
+		    dp->bp->cm.name, dp->cm.name, name);
 	}
 
 	return (err);
@@ -953,12 +953,12 @@ drmach_init(void)
 
 		if (drmach_array_get(drmach_boards, bnum, &id) == -1) {
 			cmn_err(CE_WARN, "OBP node 0x%x has"
-				" invalid property value, %s=%d",
-				nodeid, OBP_BOARDNUM, bnum);
+			    " invalid property value, %s=%d",
+			    nodeid, OBP_BOARDNUM, bnum);
 
 			/* clean up */
 			drmach_array_dispose(
-				drmach_boards, drmach_board_dispose);
+			    drmach_boards, drmach_board_dispose);
 
 			mutex_exit(&drmach_i_lock);
 			return (-1);
@@ -1208,7 +1208,7 @@ drmach_prep_rename_script(drmach_device_t *s_mem, drmach_device_t *t_mem,
 		return (err);
 	else if (s_masr & STARFIRE_MC_INTERLEAVE_MASK) {
 		return (drerr_new(1, ESTF_INTERBOARD, "%s::%s",
-				s_mem->bp->cm.name, s_mem->cm.name));
+		    s_mem->bp->cm.name, s_mem->cm.name));
 	}
 
 	/* fetch target mc asr register value */
@@ -1217,7 +1217,7 @@ drmach_prep_rename_script(drmach_device_t *s_mem, drmach_device_t *t_mem,
 		return (err);
 	else if (t_masr & STARFIRE_MC_INTERLEAVE_MASK) {
 		return (drerr_new(1, ESTF_INTERBOARD, "%s::%s",
-				t_mem->bp->cm.name, t_mem->cm.name));
+		    t_mem->bp->cm.name, t_mem->cm.name));
 	}
 
 	/* get new source base pa from target's masr */
@@ -1395,15 +1395,15 @@ drmach_prep_rename_script(drmach_device_t *s_mem, drmach_device_t *t_mem,
 		DRMACH_PR("mc idle register address list:");
 		isp = (drmach_mc_idle_script_t *)buf;
 		DRMACH_PR("source mc idle addr 0x%lx, mem id %p",
-			isp[0].idle_addr, (void *)isp[0].mem);
+		    isp[0].idle_addr, (void *)isp[0].mem);
 		DRMACH_PR("target mc idle addr 0x%lx, mem id %p",
-			isp[1].idle_addr, (void *)isp[1].mem);
+		    isp[1].idle_addr, (void *)isp[1].mem);
 		ASSERT(isp[2].idle_addr == 0);
 
 		DRMACH_PR("copy-rename script:");
 		for (j = 0; j < m; j++) {
 			DRMACH_PR("0x%lx = 0x%08x",
-				rsp[j].masr_addr, rsp[j].masr);
+			    rsp[j].masr_addr, rsp[j].masr);
 		}
 
 		DELAY(1000000);
@@ -1468,13 +1468,13 @@ drmach_copy_rename_prog__relocatable(drmach_copy_rename_program_t *prog)
 	/*
 	 * DO COPY.
 	 */
-	for (ml = prog->c_ml; ml; ml = ml->next) {
+	for (ml = prog->c_ml; ml; ml = ml->ml_next) {
 		uint64_t	s_pa, t_pa;
 		uint64_t	nbytes;
 
-		s_pa = prog->s_copybasepa + ml->address;
-		t_pa = prog->t_copybasepa + ml->address;
-		nbytes = ml->size;
+		s_pa = prog->s_copybasepa + ml->ml_address;
+		t_pa = prog->t_copybasepa + ml->ml_address;
+		nbytes = ml->ml_size;
 
 		while (nbytes != 0ull) {
 			/*
@@ -1520,7 +1520,7 @@ drmach_copy_rename_prog__relocatable(drmach_copy_rename_program_t *prog)
 		/* loop t cycles waiting for each mc to indicate it's idle */
 		do {
 			v = ldphysio_il(isp->idle_addr)
-				& STARFIRE_MC_IDLE_MASK;
+			    & STARFIRE_MC_IDLE_MASK;
 
 		} while (v != STARFIRE_MC_IDLE_MASK && t-- > 0);
 
@@ -1592,17 +1592,18 @@ drmach_copy_rename_init(drmachid_t t_id, uint64_t t_slice_offset,
 	off_mask = mc_get_mem_alignment() - 1;
 
 	/* calculate source and target base pa */
-	s_copybasepa = c_ml->address;
-	t_copybasepa = t_basepa + ((c_ml->address & off_mask) - t_slice_offset);
+	s_copybasepa = c_ml->ml_address;
+	t_copybasepa =
+	    t_basepa + ((c_ml->ml_address & off_mask) - t_slice_offset);
 
 	/* paranoia */
-	ASSERT((c_ml->address & off_mask) >= t_slice_offset);
+	ASSERT((c_ml->ml_address & off_mask) >= t_slice_offset);
 
 	/* adjust copy memlist addresses to be relative to copy base pa */
 	x_ml = c_ml;
 	while (x_ml != NULL) {
-		x_ml->address -= s_copybasepa;
-		x_ml = x_ml->next;
+		x_ml->ml_address -= s_copybasepa;
+		x_ml = x_ml->ml_next;
 	}
 
 #ifdef DEBUG
@@ -1610,16 +1611,16 @@ drmach_copy_rename_init(drmachid_t t_id, uint64_t t_slice_offset,
 	uint64_t s_basepa, s_size, t_size;
 
 	x_ml = c_ml;
-	while (x_ml->next != NULL)
-		x_ml = x_ml->next;
+	while (x_ml->ml_next != NULL)
+		x_ml = x_ml->ml_next;
 
 	DRMACH_PR("source copy span: base pa 0x%lx, end pa 0x%lx\n",
-		s_copybasepa,
-		s_copybasepa + x_ml->address + x_ml->size);
+	    s_copybasepa,
+	    s_copybasepa + x_ml->ml_address + x_ml->ml_size);
 
 	DRMACH_PR("target copy span: base pa 0x%lx, end pa 0x%lx\n",
-		t_copybasepa,
-		t_copybasepa + x_ml->address + x_ml->size);
+	    t_copybasepa,
+	    t_copybasepa + x_ml->ml_address + x_ml->ml_size);
 
 	DRMACH_PR("copy memlist (relative to copy base pa):\n");
 	MEMLIST_DUMP(c_ml);
@@ -1634,12 +1635,14 @@ drmach_copy_rename_init(drmachid_t t_id, uint64_t t_slice_offset,
 	ASSERT(err == NULL);
 
 	DRMACH_PR("current source base pa 0x%lx, size 0x%lx\n",
-		s_basepa, s_size);
+	    s_basepa, s_size);
 	DRMACH_PR("current target base pa 0x%lx, size 0x%lx\n",
-		t_basepa, t_size);
+	    t_basepa, t_size);
 
-	ASSERT(s_copybasepa + x_ml->address + x_ml->size <= s_basepa + s_size);
-	ASSERT(t_copybasepa + x_ml->address + x_ml->size <= t_basepa + t_size);
+	ASSERT(s_copybasepa + x_ml->ml_address + x_ml->ml_size <=
+	    s_basepa + s_size);
+	ASSERT(t_copybasepa + x_ml->ml_address + x_ml->ml_size <=
+	    t_basepa + t_size);
 	}
 #endif
 
@@ -1667,7 +1670,7 @@ drmach_copy_rename_init(drmachid_t t_id, uint64_t t_slice_offset,
 	 * pages.
 	 */
 	len = (int)((ulong_t)drmach_copy_rename_end -
-		    (ulong_t)drmach_copy_rename_prog__relocatable);
+	    (ulong_t)drmach_copy_rename_prog__relocatable);
 	ASSERT(wp + len < bp + PAGESIZE);
 	bcopy((caddr_t)drmach_copy_rename_prog__relocatable, wp, len);
 
@@ -1681,7 +1684,7 @@ drmach_copy_rename_init(drmachid_t t_id, uint64_t t_slice_offset,
 	 * Allocate temporary buffer to hold script.
 	 */
 	err = drmach_prep_rename_script(s_mem, t_mem, t_slice_offset,
-		wp, PAGESIZE - (wp - bp));
+	    wp, PAGESIZE - (wp - bp));
 	if (err) {
 		(void) drmach_copy_rename_fini(prog);
 		return (err);
@@ -1714,7 +1717,7 @@ drmach_copy_rename_fini(drmachid_t id)
 
 	if (prog->restless_mc != 0) {
 		cmn_err(CE_WARN, "MC did not idle; OBP Node 0x%x",
-			(uint_t)drmach_node_get_dnode(prog->restless_mc->node));
+		    (uint_t)drmach_node_get_dnode(prog->restless_mc->node));
 
 		err = DRMACH_INTERNAL_ERROR();
 	}
@@ -1797,8 +1800,8 @@ drmach_iopc_op(pda_handle_t ph, drmach_iopc_op_t op)
 
 			default:
 				cmn_err(CE_PANIC,
-					"drmach_iopc_op: unknown op (%d)",
-					(int)op);
+				    "drmach_iopc_op: unknown op (%d)",
+				    (int)op);
 				/*NOTREACHED*/
 			}
 			stbphysio(idle_addr, value);
@@ -2077,7 +2080,7 @@ drmach_board_connect(drmachid_t id, drmach_opts_t *opts)
 	}
 
 	cmn_err(CE_CONT, "DRMACH: PROM attach %s CPU %d\n",
-		obj->cm.name, obj->connect_cpuid);
+	    obj->cm.name, obj->connect_cpuid);
 
 	retval = prom_tree_update(drmach_attach_board, obj);
 
@@ -2085,7 +2088,7 @@ drmach_board_connect(drmachid_t id, drmach_opts_t *opts)
 		err = NULL;
 	else {
 		cmn_err(CE_WARN, "prom error: prom_starfire_add_brd(%d) "
-			"returned %d", obj->connect_cpuid, retval);
+		    "returned %d", obj->connect_cpuid, retval);
 
 		err = drerr_new(1, ESTF_PROBE, obj->cm.name);
 	}
@@ -2384,11 +2387,11 @@ drmach_cpu_obp_detach(int cpuid)
 	 * helper on a prior attach.
 	 */
 	if (CPU_SGN_EXISTS(cpuid) &&
-			!SGN_CPU_IS_OS(cpuid) &&
-			!SGN_CPU_IS_OBP(cpuid)) {
+	    !SGN_CPU_IS_OS(cpuid) &&
+	    !SGN_CPU_IS_OBP(cpuid)) {
 		cmn_err(CE_WARN,
-			"unexpected signature (0x%x) for cpu %d",
-			get_cpu_sgn(cpuid), cpuid);
+		    "unexpected signature (0x%x) for cpu %d",
+		    get_cpu_sgn(cpuid), cpuid);
 	}
 
 	/*
@@ -2413,7 +2416,7 @@ static int
 drmach_cpu_obp_is_detached(int cpuid)
 {
 	if (!CPU_SGN_EXISTS(cpuid) ||
-		(SGN_CPU_IS_OS(cpuid) && SGN_CPU_STATE_IS_DETACHED(cpuid)))
+	    (SGN_CPU_IS_OS(cpuid) && SGN_CPU_STATE_IS_DETACHED(cpuid)))
 		return (1);
 	else
 		return (0);
@@ -2455,10 +2458,10 @@ drmach_cpu_start(struct cpu *cp)
 	}
 
 	DRMACH_PR("waited %d out of %d loops for cpu %d\n",
-		drmach_cpu_ntries - ntries, drmach_cpu_ntries, cpuid);
+	    drmach_cpu_ntries - ntries, drmach_cpu_ntries, cpuid);
 
 	xt_one(cpuid, vtag_flushpage_tl1,
-		(uint64_t)drmach_shutdown_va, (uint64_t)ksfmmup);
+	    (uint64_t)drmach_shutdown_va, (uint64_t)ksfmmup);
 
 	return (0);
 }
@@ -2519,22 +2522,22 @@ drmach_cpu_stop_self(void)
 	drmach_shutdown_asm_mbox->estack = bbsram_addr + (uint64_t)funclen;
 
 	tte.tte_inthi = TTE_VALID_INT | TTE_SZ_INT(TTE8K) |
-			TTE_PFN_INTHI(bbsram_pfn);
+	    TTE_PFN_INTHI(bbsram_pfn);
 	tte.tte_intlo = TTE_PFN_INTLO(bbsram_pfn) |
-			TTE_HWWR_INT | TTE_PRIV_INT | TTE_LCK_INT;
+	    TTE_HWWR_INT | TTE_PRIV_INT | TTE_LCK_INT;
 	sfmmu_dtlb_ld_kva(drmach_shutdown_va, &tte);	/* load dtlb */
 	sfmmu_itlb_ld_kva(drmach_shutdown_va, &tte);	/* load itlb */
 
 	for (src = (uint_t *)drmach_shutdown_asm, dst = (uint_t *)bbsram_addr;
-		src < (uint_t *)drmach_shutdown_asm_end; src++, dst++)
+	    src < (uint_t *)drmach_shutdown_asm_end; src++, dst++)
 		*dst = *src;
 
 	bbsram_func = (void (*)())bbsram_addr;
 	drmach_shutdown_asm_mbox->flushaddr = ecache_flushaddr;
 	drmach_shutdown_asm_mbox->size = (cpunodes[cpuid].ecache_size << 1);
 	drmach_shutdown_asm_mbox->linesize = cpunodes[cpuid].ecache_linesize;
-	drmach_shutdown_asm_mbox->physaddr
-				    = va_to_pa((void *)&drmach_xt_mb[cpuid]);
+	drmach_shutdown_asm_mbox->physaddr =
+	    va_to_pa((void *)&drmach_xt_mb[cpuid]);
 
 	/*
 	 * Signal to drmach_cpu_poweroff() is via drmach_xt_mb cleared
@@ -2611,14 +2614,14 @@ drmach_cpu_juggle_bootproc(drmach_device_t *dst_cpu)
 
 		if ((cp = cpu_get(cpuid)) == NULL) {
 			err = drerr_new(1, ESTF_NODEV, "%s::%s",
-				dst_cpu->bp->cm.name, dst_cpu->cm.name);
+			    dst_cpu->bp->cm.name, dst_cpu->cm.name);
 			return (err);
 		}
 
 		if (cpuid == SIGBCPU->cpu_id) {
 			cmn_err(CE_WARN,
-				"SIGBCPU(%d) same as new selection(%d)",
-				SIGBCPU->cpu_id, cpuid);
+			    "SIGBCPU(%d) same as new selection(%d)",
+			    SIGBCPU->cpu_id, cpuid);
 
 			/* technically not an error, but a no-op */
 			return (NULL);
@@ -2626,7 +2629,7 @@ drmach_cpu_juggle_bootproc(drmach_device_t *dst_cpu)
 	}
 
 	cmn_err(CE_NOTE, "?relocating SIGBCPU from %d to %d",
-		SIGBCPU->cpu_id, cpuid);
+	    SIGBCPU->cpu_id, cpuid);
 
 	DRMACH_PR("moving SIGBCPU to CPU %d\n", cpuid);
 
@@ -2654,7 +2657,7 @@ drmach_cpu_juggle_bootproc(drmach_device_t *dst_cpu)
 		return (NULL);
 	} else {
 		DRMACH_PR("prom error: prom_starfire_move_cpu0(%d) "
-			"returned %d\n", cpuid, rv);
+		    "returned %d\n", cpuid, rv);
 
 		/*
 		 * The move failed, hopefully obp_helper is still back
@@ -2733,7 +2736,7 @@ drmach_cpu_disconnect(drmachid_t id)
 	if (SIGBCPU->cpu_id == cpuid) {
 		/* this cpu is SIGBCPU, can't disconnect */
 		return (drerr_new(1, ESTF_HASSIGB, "%s::%s",
-				cpu->bp->cm.name, cpu->cm.name));
+		    cpu->bp->cm.name, cpu->cm.name));
 	}
 
 	/*
@@ -2747,7 +2750,7 @@ drmach_cpu_disconnect(drmachid_t id)
 	}
 	if (!drmach_cpu_obp_is_detached(cpuid)) {
 		cmn_err(CE_WARN, "failed to mark cpu %d detached in sigblock",
-			cpuid);
+		    cpuid);
 	}
 
 	/* map out signature block */
@@ -2763,7 +2766,7 @@ drmach_cpu_disconnect(drmachid_t id)
 	pc_addr = STARFIRE_BB_PC_ADDR(cpu->bp->bnum, cpu->unum, 0);
 
 	DRMACH_PR("PC idle cpu %d (addr = 0x%llx, port = %d, p = %d)",
-		drmach_cpu_calc_id(cpu), pc_addr, cpu->unum, p);
+	    drmach_cpu_calc_id(cpu), pc_addr, cpu->unum, p);
 
 	rvalue = ldbphysio(pc_addr);
 	rvalue |= STARFIRE_BB_PC_IDLE(p);
@@ -2956,13 +2959,13 @@ drmach_mem_add_span(drmachid_t id, uint64_t basepa, uint64_t size)
 	rv = kcage_range_add(basepfn, npages, KCAGE_DOWN);
 	if (rv == ENOMEM) {
 		cmn_err(CE_WARN, "%lu megabytes not available to kernel cage",
-			(ulong_t)(size == 0 ? 0 : size / MBYTE));
+		    (ulong_t)(size == 0 ? 0 : size / MBYTE));
 	} else if (rv != 0) {
 		/* catch this in debug kernels */
 		ASSERT(0);
 
 		cmn_err(CE_WARN, "unexpected kcage_range_add"
-			" return value %d", rv);
+		    " return value %d", rv);
 	}
 
 	/*
@@ -2994,7 +2997,7 @@ drmach_mem_del_span(drmachid_t id, uint64_t basepa, uint64_t size)
 		return (err);
 	else if (mcreg & STARFIRE_MC_INTERLEAVE_MASK) {
 		return (drerr_new(1, ESTF_INTERBOARD, "%s::%s",
-				mem->bp->cm.name, mem->cm.name));
+		    mem->bp->cm.name, mem->cm.name));
 	}
 
 	if (size > 0) {
@@ -3231,7 +3234,7 @@ drmach_mem_get_memlist(drmachid_t id, struct memlist **ml)
 	if (rv) {
 #ifdef DEBUG
 		DRMACH_PR("OBP derived memlist intersects"
-			" with phys_install\n");
+		    " with phys_install\n");
 		memlist_dump(mlist);
 
 		DRMACH_PR("phys_install memlist:\n");
@@ -3374,8 +3377,8 @@ drmach_mem_status(drmachid_t id, drmach_status_t *stat)
 
 	/* stop at first span that is in slice */
 	memlist_read_lock();
-	for (ml = phys_install; ml; ml = ml->next)
-		if (ml->address >= pa && ml->address < pa + slice_size)
+	for (ml = phys_install; ml; ml = ml->ml_next)
+		if (ml->ml_address >= pa && ml->ml_address < pa + slice_size)
 			break;
 	memlist_read_unlock();
 
@@ -3424,7 +3427,7 @@ drmach_board_deprobe(drmachid_t id)
 		return (NULL);
 	else {
 		cmn_err(CE_WARN, "prom error: prom_starfire_rm_brd(%d) "
-			"returned %d", bp->bnum, retval);
+		    "returned %d", bp->bnum, retval);
 		return (drerr_new(1, ESTF_DEPROBE, "%s", bp->cm.name));
 	}
 }
@@ -3479,8 +3482,8 @@ drmach_pt_dump_pdainfo(drmachid_t id, drmach_opts_t *opts)
 	bdesc = (board_desc_t *)pda_get_board_info(ph, board);
 	if (bdesc == NULL) {
 		cmn_err(CE_CONT,
-			"no board descriptor found for board %d\n",
-			board);
+		    "no board descriptor found for board %d\n",
+		    board);
 		pda_close(ph);
 		return (DRMACH_INTERNAL_ERROR());
 	}
@@ -3491,19 +3494,19 @@ drmach_pt_dump_pdainfo(drmachid_t id, drmach_opts_t *opts)
 	for (i = 0; i < MAX_PROCMODS; i++) {
 		if (BDA_NBL(bdesc->bda_proc, i) == BDAN_GOOD)
 			cmn_err(CE_CONT,
-				"proc %d.%d PRESENT\n", board, i);
+			    "proc %d.%d PRESENT\n", board, i);
 		else
 			cmn_err(CE_CONT,
-				"proc %d.%d MISSING\n", board, i);
+			    "proc %d.%d MISSING\n", board, i);
 	}
 
 	for (i = 0; i < MAX_MGROUPS; i++) {
 		if (BDA_NBL(bdesc->bda_mgroup, i) == BDAN_GOOD)
 			cmn_err(CE_CONT,
-				"mgroup %d.%d PRESENT\n", board, i);
+			    "mgroup %d.%d PRESENT\n", board, i);
 		else
 			cmn_err(CE_CONT,
-				"mgroup %d.%d MISSING\n", board, i);
+			    "mgroup %d.%d MISSING\n", board, i);
 	}
 
 	/* make sure definition in platmod is in sync with pda */
@@ -3514,24 +3517,24 @@ drmach_pt_dump_pdainfo(drmachid_t id, drmach_opts_t *opts)
 
 		if (BDA_NBL(bdesc->bda_ioc, i) == BDAN_GOOD) {
 			cmn_err(CE_CONT,
-				"ioc %d.%d PRESENT\n", board, i);
+			    "ioc %d.%d PRESENT\n", board, i);
 			for (s = 0; s < MAX_SLOTS_PER_IOC; s++) {
 				if (BDA_NBL(bdesc->bda_ios[i], s) != BDAN_GOOD)
 					continue;
 				cmn_err(CE_CONT,
-					"..scard %d.%d.%d PRESENT\n",
-					board, i, s);
+				    "..scard %d.%d.%d PRESENT\n",
+				    board, i, s);
 			}
 		} else {
 			cmn_err(CE_CONT,
-				"ioc %d.%d MISSING\n",
-				board, i);
+			    "ioc %d.%d MISSING\n",
+			    board, i);
 		}
 	}
 
 	cmn_err(CE_CONT,
-		"board %d memsize = %d pages\n",
-		board, pda_get_mem_size(ph, board));
+	    "board %d memsize = %d pages\n",
+	    board, pda_get_mem_size(ph, board));
 
 	pda_close(ph);
 
@@ -3550,11 +3553,11 @@ drmach_pt_readmem(drmachid_t id, drmach_opts_t *opts)
 	dst_pa = va_to_pa(&dst);
 
 	memlist_read_lock();
-	for (ml = phys_install; ml; ml = ml->next) {
+	for (ml = phys_install; ml; ml = ml->ml_next) {
 		uint64_t	nbytes;
 
-		src_pa = ml->address;
-		nbytes = ml->size;
+		src_pa = ml->ml_address;
+		nbytes = ml->ml_size;
 
 		while (nbytes != 0ull) {
 
@@ -3751,7 +3754,7 @@ drmach_cpu_poweroff(struct cpu *cp)
 	drmach_xt_mb[cpuid] = 0x80;
 
 	xt_one_unchecked(cpuid, (xcfunc_t *)idle_stop_xcall,
-		(uint64_t)drmach_cpu_shutdown_self, NULL);
+	    (uint64_t)drmach_cpu_shutdown_self, NULL);
 
 	ntries = drmach_cpu_ntries;
 	cnt = 0;
@@ -3766,8 +3769,8 @@ drmach_cpu_poweroff(struct cpu *cp)
 	start_cpus();
 
 	DRMACH_PR("waited %d out of %d tries for "
-		"drmach_cpu_shutdown_self on cpu%d",
-		drmach_cpu_ntries - ntries, drmach_cpu_ntries, cp->cpu_id);
+	    "drmach_cpu_shutdown_self on cpu%d",
+	    drmach_cpu_ntries - ntries, drmach_cpu_ntries, cp->cpu_id);
 
 	drmach_cpu_obp_detach(cpuid);
 
@@ -3815,23 +3818,23 @@ drmach_log_sysevent(int board, char *hint, int flag, int verbose)
 	}
 	if (verbose)
 		DRMACH_PR("drmach_log_sysevent: %s %s, flag: %d, verbose: %d\n",
-			    attach_pnt, hint, flag, verbose);
+		    attach_pnt, hint, flag, verbose);
 
 	if ((ev = sysevent_alloc(EC_DR, ESC_DR_AP_STATE_CHANGE,
-				    SUNW_KERN_PUB"dr", km_flag)) == NULL) {
+	    SUNW_KERN_PUB"dr", km_flag)) == NULL) {
 		rv = -2;
 		goto logexit;
 	}
 	evnt_val.value_type = SE_DATA_TYPE_STRING;
 	evnt_val.value.sv_string = attach_pnt;
 	if ((rv = sysevent_add_attr(&evnt_attr_list, DR_AP_ID,
-				    &evnt_val, km_flag)) != 0)
+	    &evnt_val, km_flag)) != 0)
 		goto logexit;
 
 	evnt_val.value_type = SE_DATA_TYPE_STRING;
 	evnt_val.value.sv_string = hint;
 	if ((rv = sysevent_add_attr(&evnt_attr_list, DR_HINT,
-				    &evnt_val, km_flag)) != 0) {
+	    &evnt_val, km_flag)) != 0) {
 		sysevent_free_attr(evnt_attr_list);
 		goto logexit;
 	}
@@ -3849,8 +3852,8 @@ logexit:
 		sysevent_free(ev);
 	if ((rv != 0) && verbose)
 		cmn_err(CE_WARN,
-			    "drmach_log_sysevent failed (rv %d) for %s  %s\n",
-			    rv, attach_pnt, hint);
+		    "drmach_log_sysevent failed (rv %d) for %s  %s\n",
+		    rv, attach_pnt, hint);
 
 	return (rv);
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,12 +40,12 @@ extern "C" {
  * Boot programs of version 4 and greater pass a linked list
  * of struct memlist to the kernel.
  */
-struct memlist {
-	uint64_t	address;	/* starting address of memory segment */
-	uint64_t	size;		/* size of same */
-	struct memlist	*next;		/* link to next list element */
-	struct memlist	*prev;		/* link to previous list element */
-};
+typedef struct memlist {
+	uint64_t	ml_address;	/* starting address of memory segment */
+	uint64_t	ml_size;	/* size of same */
+	struct memlist	*ml_next;	/* link to next list element */
+	struct memlist	*ml_prev;	/* link to previous list element */
+} memlist_t;
 
 extern int address_in_memlist(struct memlist *, uint64_t, size_t);
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -667,8 +667,7 @@ pagelookup_help(void)
 	    "    %<b>vp%</b>::pagelookup -o %<b>offset%</b>\n"
 	    "    %<b>offset%</b>::pagelookup -v %<b>vp%</b>\n"
 	    "\n"
-	    "The latter two forms are useful in pipelines.\n"
-	    );
+	    "The latter two forms are useful in pipelines.\n");
 }
 
 int
@@ -863,7 +862,7 @@ memlist_walk_step(mdb_walk_state_t *wsp)
 		return (WALK_ERR);
 	}
 
-	wsp->walk_addr = (uintptr_t)ml.next;
+	wsp->walk_addr = (uintptr_t)ml.ml_next;
 
 	return (wsp->walk_callback(mlp, &ml, wsp->walk_cbdata));
 }
@@ -919,7 +918,7 @@ memlist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	mdb_printf("%0?lx %16llx %16llx\n", addr, ml.address, ml.size);
+	mdb_printf("%0?lx %16llx %16llx\n", addr, ml.ml_address, ml.ml_size);
 
 	return (DCMD_OK);
 }

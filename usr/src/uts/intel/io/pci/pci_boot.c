@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -665,8 +665,8 @@ remove_subtractive_res()
 				for (j = 0; j <= pci_bios_maxbus; j++)
 					(void) memlist_remove(
 					    &pci_bus_res[j].io_avail,
-					    list->address, list->size);
-				list = list->next;
+					    list->ml_address, list->ml_size);
+				list = list->ml_next;
 			}
 			/* remove used mem resource */
 			list = pci_bus_res[i].mem_used;
@@ -674,12 +674,12 @@ remove_subtractive_res()
 				for (j = 0; j <= pci_bios_maxbus; j++) {
 					(void) memlist_remove(
 					    &pci_bus_res[j].mem_avail,
-					    list->address, list->size);
+					    list->ml_address, list->ml_size);
 					(void) memlist_remove(
 					    &pci_bus_res[j].pmem_avail,
-					    list->address, list->size);
+					    list->ml_address, list->ml_size);
 				}
-				list = list->next;
+				list = list->ml_next;
 			}
 			/* remove used prefetchable mem resource */
 			list = pci_bus_res[i].pmem_used;
@@ -687,12 +687,12 @@ remove_subtractive_res()
 				for (j = 0; j <= pci_bios_maxbus; j++) {
 					(void) memlist_remove(
 					    &pci_bus_res[j].pmem_avail,
-					    list->address, list->size);
+					    list->ml_address, list->ml_size);
 					(void) memlist_remove(
 					    &pci_bus_res[j].mem_avail,
-					    list->address, list->size);
+					    list->ml_address, list->ml_size);
 				}
-				list = list->next;
+				list = list->ml_next;
 			}
 		}
 	}
@@ -864,11 +864,11 @@ is_vga(struct memlist *elem, enum io_mem io)
 {
 
 	if (io == IO) {
-		if ((elem->address == 0x3b0 && elem->size == 0xc) ||
-		    (elem->address == 0x3c0 && elem->size == 0x20))
+		if ((elem->ml_address == 0x3b0 && elem->ml_size == 0xc) ||
+		    (elem->ml_address == 0x3c0 && elem->ml_size == 0x20))
 			return (1);
 	} else {
-		if (elem->address == 0xa0000 && elem->size == 0x20000)
+		if (elem->ml_address == 0xa0000 && elem->ml_size == 0x20000)
 			return (1);
 	}
 	return (0);
@@ -884,7 +884,7 @@ list_is_vga_only(struct memlist *l, enum io_mem io)
 	do {
 		if (!is_vga(l, io))
 			return (0);
-	} while ((l = l->next) != NULL);
+	} while ((l = l->ml_next) != NULL);
 	return (1);
 }
 
@@ -1117,20 +1117,20 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 				if (is_vga(list, IO))
 					continue;
 				if (!io_base) {
-					io_base = (uint_t)list->address;
-					io_limit = (uint_t)
-					    list->address + list->size - 1;
+					io_base = (uint_t)list->ml_address;
+					io_limit = (uint_t)list->ml_address +
+					    list->ml_size - 1;
 					io_base =
 					    P2ALIGN(io_base, PPB_IO_ALIGNMENT);
 				} else {
-					if (list->address + list->size >
+					if (list->ml_address + list->ml_size >
 					    io_limit) {
 						io_limit = (uint_t)
-						    (list->address +
-						    list->size - 1);
+						    (list->ml_address +
+						    list->ml_size - 1);
 					}
 				}
-			} while ((list = list->next) != NULL);
+			} while ((list = list->ml_next) != NULL);
 			/* 4K aligned */
 			io_limit = P2ROUNDUP(io_limit, PPB_IO_ALIGNMENT) - 1;
 			io_size = io_limit - io_base + 1;
@@ -1199,20 +1199,20 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 				if (is_vga(list, MEM))
 					continue;
 				if (mem_base == 0) {
-					mem_base = (uint_t)list->address;
+					mem_base = (uint_t)list->ml_address;
 					mem_base = P2ALIGN(mem_base,
 					    PPB_MEM_ALIGNMENT);
-					mem_limit = (uint_t)
-					    (list->address + list->size - 1);
+					mem_limit = (uint_t)(list->ml_address +
+					    list->ml_size - 1);
 				} else {
-					if ((list->address + list->size) >
+					if ((list->ml_address + list->ml_size) >
 					    mem_limit) {
 						mem_limit = (uint_t)
-						    (list->address +
-						    list->size - 1);
+						    (list->ml_address +
+						    list->ml_size - 1);
 					}
 				}
-			} while ((list = list->next) != NULL);
+			} while ((list = list->ml_next) != NULL);
 			mem_limit = P2ROUNDUP(mem_limit, PPB_MEM_ALIGNMENT) - 1;
 			mem_size = mem_limit + 1 - mem_base;
 			ASSERT(mem_base <= mem_limit);
@@ -1445,10 +1445,10 @@ populate_bus_res(uchar_t bus)
 
 		entry = pci_bus_res[bus].bus_avail;
 		while (entry != NULL) {
-			current = entry->address + entry->size - 1;
+			current = entry->ml_address + entry->ml_size - 1;
 			if (current > pci_bus_res[bus].sub_bus)
 				pci_bus_res[bus].sub_bus = current;
-			entry = entry->next;
+			entry = entry->ml_next;
 		}
 	}
 
@@ -3091,25 +3091,25 @@ memlist_to_ranges(void **rp, struct memlist *entry, int type, int ppb)
 		if (ppb) {
 			ppb_rp->child_high = ppb_rp->parent_high = type;
 			ppb_rp->child_mid = ppb_rp->parent_mid =
-			    (uint32_t)(entry->address >> 32); /* XXX */
+			    (uint32_t)(entry->ml_address >> 32); /* XXX */
 			ppb_rp->child_low = ppb_rp->parent_low =
-			    (uint32_t)entry->address;
+			    (uint32_t)entry->ml_address;
 			ppb_rp->size_high =
-			    (uint32_t)(entry->size >> 32); /* XXX */
-			ppb_rp->size_low = (uint32_t)entry->size;
+			    (uint32_t)(entry->ml_size >> 32); /* XXX */
+			ppb_rp->size_low = (uint32_t)entry->ml_size;
 			*rp = ++ppb_rp;
 		} else {
 			pci_rp->child_high = type;
 			pci_rp->child_mid = pci_rp->parent_high =
-			    (uint32_t)(entry->address >> 32); /* XXX */
+			    (uint32_t)(entry->ml_address >> 32); /* XXX */
 			pci_rp->child_low = pci_rp->parent_low =
-			    (uint32_t)entry->address;
+			    (uint32_t)entry->ml_address;
 			pci_rp->size_high =
-			    (uint32_t)(entry->size >> 32); /* XXX */
-			pci_rp->size_low = (uint32_t)entry->size;
+			    (uint32_t)(entry->ml_size >> 32); /* XXX */
+			pci_rp->size_low = (uint32_t)entry->ml_size;
 			*rp = ++pci_rp;
 		}
-		entry = entry->next;
+		entry = entry->ml_next;
 	}
 }
 
@@ -3165,9 +3165,9 @@ static void
 memlist_remove_list(struct memlist **list, struct memlist *remove_list)
 {
 	while (list && *list && remove_list) {
-		(void) memlist_remove(list, remove_list->address,
-		    remove_list->size);
-		remove_list = remove_list->next;
+		(void) memlist_remove(list, remove_list->ml_address,
+		    remove_list->ml_size);
+		remove_list = remove_list->ml_next;
 	}
 }
 
@@ -3180,11 +3180,11 @@ memlist_to_spec(struct pci_phys_spec *sp, struct memlist *list, int type)
 		/* assume 32-bit addresses */
 		sp->pci_phys_hi = type;
 		sp->pci_phys_mid = 0;
-		sp->pci_phys_low = (uint32_t)list->address;
+		sp->pci_phys_low = (uint32_t)list->ml_address;
 		sp->pci_size_hi = 0;
-		sp->pci_size_low = (uint32_t)list->size;
+		sp->pci_size_low = (uint32_t)list->ml_size;
 
-		list = list->next;
+		list = list->ml_next;
 		sp++, i++;
 	}
 	return (i);

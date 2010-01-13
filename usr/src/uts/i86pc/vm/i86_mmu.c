@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/t_lock.h>
 #include <sys/memlist.h>
@@ -333,9 +331,9 @@ hat_kern_alloc(
 		 * hypervisor these are made read/only at first.
 		 * Later we'll add write permission where possible.
 		 */
-		for (pmem = phys_install; pmem; pmem = pmem->next) {
-			paddr = pmem->address;
-			psize = pmem->size;
+		for (pmem = phys_install; pmem; pmem = pmem->ml_next) {
+			paddr = pmem->ml_address;
+			psize = pmem->ml_size;
 			while (psize >= MMU_PAGESIZE) {
 				/* find the largest page size */
 				for (l = lpagel; l > 0; l--) {

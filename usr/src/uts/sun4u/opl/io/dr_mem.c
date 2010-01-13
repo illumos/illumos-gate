@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -323,13 +323,13 @@ dr_attach_mem(dr_handle_t *hp, dr_common_unit_t *cp)
 	}
 
 	ml = dr_get_memlist(mp);
-	for (mc = ml; mc; mc = mc->next) {
+	for (mc = ml; mc; mc = mc->ml_next) {
 		int		 rv;
 		sbd_error_t	*err;
 
 		rv = kphysm_add_memory_dynamic(
-		    (pfn_t)(mc->address >> PAGESHIFT),
-		    (pgcnt_t)(mc->size >> PAGESHIFT));
+		    (pfn_t)(mc->ml_address >> PAGESHIFT),
+		    (pgcnt_t)(mc->ml_size >> PAGESHIFT));
 		if (rv != KPHYSM_OK) {
 			/*
 			 * translate kphysm error and
@@ -357,7 +357,7 @@ dr_attach_mem(dr_handle_t *hp, dr_common_unit_t *cp)
 		}
 
 		err = drmach_mem_add_span(
-		    mp->sbm_cm.sbdev_id, mc->address, mc->size);
+		    mp->sbm_cm.sbdev_id, mc->ml_address, mc->ml_size);
 		if (err) {
 			DRERR_SET_C(&mp->sbm_cm.sbdev_error, &err);
 			break;
@@ -459,8 +459,8 @@ dr_move_memory(dr_handle_t *hp, dr_mem_unit_t *s_mp, dr_mem_unit_t *t_mp)
 	c_ml = memlist_dup(s_mp->sbm_mlist);
 	d_ml = s_mp->sbm_del_mlist;
 	while (d_ml != NULL) {
-		c_ml = memlist_del_span(c_ml, d_ml->address, d_ml->size);
-		d_ml = d_ml->next;
+		c_ml = memlist_del_span(c_ml, d_ml->ml_address, d_ml->ml_size);
+		d_ml = d_ml->ml_next;
 	}
 
 	/*
@@ -657,11 +657,11 @@ dr_del_mlist_query(struct memlist *mlist, memquery_t *mp)
 	mp->first_nonrelocatable = (pfn_t)-1;	/* XXX */
 	mp->last_nonrelocatable = 0;
 
-	for (ml = mlist; ml; ml = ml->next) {
+	for (ml = mlist; ml; ml = ml->ml_next) {
 		memquery_t mq;
 
 		rv = kphysm_del_span_query(
-		    _b64top(ml->address), _b64top(ml->size), &mq);
+		    _b64top(ml->ml_address), _b64top(ml->ml_size), &mq);
 		if (rv)
 			break;
 
@@ -979,13 +979,13 @@ dr_post_attach_mem(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 		}
 		memlist_read_unlock();
 
-		for (ml = mlist; ml != NULL; ml = ml->next) {
+		for (ml = mlist; ml != NULL; ml = ml->ml_next) {
 			sbd_error_t *err;
 
 			err = drmach_mem_add_span(
 			    mp->sbm_cm.sbdev_id,
-			    ml->address,
-			    ml->size);
+			    ml->ml_address,
+			    ml->ml_size);
 			if (err)
 				DRERR_SET_C(&mp->sbm_cm.sbdev_error, &err);
 		}
@@ -1072,21 +1072,21 @@ dr_add_memory_spans(dr_mem_unit_t *mp, struct memlist *ml)
 	memlist_read_unlock();
 #endif
 
-	for (; ml; ml = ml->next) {
+	for (; ml; ml = ml->ml_next) {
 		pfn_t		 base;
 		pgcnt_t		 npgs;
 		int		 rv;
 		sbd_error_t	*err;
 
-		base = _b64top(ml->address);
-		npgs = _b64top(ml->size);
+		base = _b64top(ml->ml_address);
+		npgs = _b64top(ml->ml_size);
 
 		rv = kphysm_add_memory_dynamic(base, npgs);
 
 		err = drmach_mem_add_span(
 		    mp->sbm_cm.sbdev_id,
-		    ml->address,
-		    ml->size);
+		    ml->ml_address,
+		    ml->ml_size);
 
 		if (err)
 			DRERR_SET_C(&mp->sbm_cm.sbdev_error, &err);
@@ -1107,10 +1107,10 @@ static int
 memlist_touch(struct memlist *ml, uint64_t add)
 {
 	while (ml != NULL) {
-		if ((add == ml->address) ||
-		    (add == (ml->address + ml->size)))
+		if ((add == ml->ml_address) ||
+		    (add == (ml->ml_address + ml->ml_size)))
 			return (1);
-		ml = ml->next;
+		ml = ml->ml_next;
 	}
 	return (0);
 }
@@ -1138,14 +1138,14 @@ dr_process_excess_mlist(dr_mem_unit_t *s_mp,
 	 * the kernel cage glist.
 	 */
 	for (ml = s_mp->sbm_del_mlist; ml;
-	    ml = ml->next) {
+	    ml = ml->ml_next) {
 		PR_MEM("%s: delete small<->big copy-"
 		    "rename source excess memory", f);
 		PR_MEMLIST_DUMP(ml);
 
 		err = drmach_mem_del_span(
 		    s_mp->sbm_cm.sbdev_id,
-		    ml->address, ml->size);
+		    ml->ml_address, ml->ml_size);
 		if (err)
 			DRERR_SET_C(&s_mp->
 			    sbm_cm.sbdev_error, &err);
@@ -1157,12 +1157,12 @@ dr_process_excess_mlist(dr_mem_unit_t *s_mp,
 	    f, t_mp->sbm_cm.sbdev_path);
 	PR_MEMLIST_DUMP(t_excess_mlist);
 
-	for (ml = t_excess_mlist; ml; ml = ml->next) {
+	for (ml = t_excess_mlist; ml; ml = ml->ml_next) {
 		struct memlist ml0;
 
-		ml0.address = ml->address;
-		ml0.size = ml->size;
-		ml0.next = ml0.prev = NULL;
+		ml0.ml_address = ml->ml_address;
+		ml0.ml_size = ml->ml_size;
+		ml0.ml_next = ml0.ml_prev = NULL;
 
 		/*
 		 * If the memory object is 256 MB aligned (max page size
@@ -1178,57 +1178,57 @@ dr_process_excess_mlist(dr_mem_unit_t *s_mp,
 		 * The extreme case of 8K segment will fail
 		 * kphysm_add_memory_dynamic(), e.g.
 		 */
-		if ((ml->address & (MH_MPSS_ALIGNMENT - 1)) ||
-		    (ml->size & (MH_MPSS_ALIGNMENT - 1))) {
+		if ((ml->ml_address & (MH_MPSS_ALIGNMENT - 1)) ||
+		    (ml->ml_size & (MH_MPSS_ALIGNMENT - 1))) {
 
 		memlist_read_lock();
-		rv = memlist_touch(phys_install, ml0.address);
+		rv = memlist_touch(phys_install, ml0.ml_address);
 		memlist_read_unlock();
 
 		if (rv) {
-			new_pa = roundup(ml0.address + 1, MH_MIN_ALIGNMENT);
-			nbytes = (new_pa -  ml0.address);
-			if (nbytes >= ml0.size) {
+			new_pa = roundup(ml0.ml_address + 1, MH_MIN_ALIGNMENT);
+			nbytes = (new_pa -  ml0.ml_address);
+			if (nbytes >= ml0.ml_size) {
 				t_mp->sbm_dyn_segs =
 				    memlist_del_span(t_mp->sbm_dyn_segs,
-				    ml0.address, ml0.size);
+				    ml0.ml_address, ml0.ml_size);
 				continue;
 			}
 			t_mp->sbm_dyn_segs =
 			    memlist_del_span(t_mp->sbm_dyn_segs,
-			    ml0.address, nbytes);
-			ml0.size -= nbytes;
-			ml0.address = new_pa;
+			    ml0.ml_address, nbytes);
+			ml0.ml_size -= nbytes;
+			ml0.ml_address = new_pa;
 		}
 
-		if (ml0.size == 0) {
+		if (ml0.ml_size == 0) {
 			continue;
 		}
 
 		memlist_read_lock();
-		rv = memlist_touch(phys_install, ml0.address + ml0.size);
+		rv = memlist_touch(phys_install, ml0.ml_address + ml0.ml_size);
 		memlist_read_unlock();
 
 		if (rv) {
-			new_pa = rounddown(ml0.address + ml0.size - 1,
+			new_pa = rounddown(ml0.ml_address + ml0.ml_size - 1,
 			    MH_MIN_ALIGNMENT);
-			nbytes = (ml0.address + ml0.size - new_pa);
-			if (nbytes >= ml0.size) {
+			nbytes = (ml0.ml_address + ml0.ml_size - new_pa);
+			if (nbytes >= ml0.ml_size) {
 				t_mp->sbm_dyn_segs =
 				    memlist_del_span(t_mp->sbm_dyn_segs,
-				    ml0.address, ml0.size);
+				    ml0.ml_address, ml0.ml_size);
 				continue;
 			}
 			t_mp->sbm_dyn_segs =
 			    memlist_del_span(t_mp->sbm_dyn_segs,
 			    new_pa, nbytes);
-			ml0.size -= nbytes;
+			ml0.ml_size -= nbytes;
 		}
 
-		if (ml0.size > 0) {
+		if (ml0.ml_size > 0) {
 			dr_add_memory_spans(s_mp, &ml0);
 		}
-		} else if (ml0.size > 0) {
+		} else if (ml0.ml_size > 0) {
 			dr_add_memory_spans(s_mp, &ml0);
 		}
 	}
@@ -1349,9 +1349,9 @@ dr_post_detach_mem_unit(dr_mem_unit_t *s_mp)
 		 * Used to add back excess target mem.
 		 */
 		s_copy_mlist = memlist_dup(s_mp->sbm_mlist);
-		for (ml = s_mp->sbm_del_mlist; ml; ml = ml->next) {
+		for (ml = s_mp->sbm_del_mlist; ml; ml = ml->ml_next) {
 			s_copy_mlist = memlist_del_span(s_copy_mlist,
-			    ml->address, ml->size);
+			    ml->ml_address, ml->ml_size);
 		}
 
 		PR_MEM("%s: source copy list:\n:", f);
@@ -1362,9 +1362,9 @@ dr_post_detach_mem_unit(dr_mem_unit_t *s_mp)
 		 * memlists accordingly with new base
 		 * addresses.
 		 */
-		for (ml = t_mp->sbm_mlist; ml; ml = ml->next) {
-			ml->address -= t_old_basepa;
-			ml->address += t_new_basepa;
+		for (ml = t_mp->sbm_mlist; ml; ml = ml->ml_next) {
+			ml->ml_address -= t_old_basepa;
+			ml->ml_address += t_new_basepa;
 		}
 
 		/*
@@ -1377,9 +1377,9 @@ dr_post_detach_mem_unit(dr_mem_unit_t *s_mp)
 		PR_MEM("%s: renamed target memlist and delete memlist:\n", f);
 		PR_MEMLIST_DUMP(t_mp->sbm_mlist);
 
-		for (ml = s_mp->sbm_mlist; ml; ml = ml->next) {
-			ml->address -= s_old_basepa;
-			ml->address += s_new_basepa;
+		for (ml = s_mp->sbm_mlist; ml; ml = ml->ml_next) {
+			ml->ml_address -= s_old_basepa;
+			ml->ml_address += s_new_basepa;
 		}
 
 		PR_MEM("%s: renamed source memlist:\n", f);
@@ -1404,10 +1404,10 @@ dr_post_detach_mem_unit(dr_mem_unit_t *s_mp)
 		 * node.
 		 */
 		t_excess_mlist = memlist_dup(t_mp->sbm_mlist);
-		for (ml = s_copy_mlist; ml; ml = ml->next) {
+		for (ml = s_copy_mlist; ml; ml = ml->ml_next) {
 			t_excess_mlist =
 			    memlist_del_span(t_excess_mlist,
-			    ml->address, ml->size);
+			    ml->ml_address, ml->ml_size);
 		}
 		PR_MEM("%s: excess memlist:\n", f);
 		PR_MEMLIST_DUMP(t_excess_mlist);
@@ -1415,15 +1415,15 @@ dr_post_detach_mem_unit(dr_mem_unit_t *s_mp)
 		/*
 		 * Update dynamically added segs
 		 */
-		for (ml = s_mp->sbm_del_mlist; ml; ml = ml->next) {
+		for (ml = s_mp->sbm_del_mlist; ml; ml = ml->ml_next) {
 			t_mp->sbm_dyn_segs =
 			    memlist_del_span(t_mp->sbm_dyn_segs,
-			    ml->address, ml->size);
+			    ml->ml_address, ml->ml_size);
 		}
-		for (ml = t_excess_mlist; ml; ml = ml->next) {
+		for (ml = t_excess_mlist; ml; ml = ml->ml_next) {
 			t_mp->sbm_dyn_segs =
 			    memlist_cat_span(t_mp->sbm_dyn_segs,
-			    ml->address, ml->size);
+			    ml->ml_address, ml->ml_size);
 		}
 		PR_MEM("%s: %s: updated dynamic seg list:\n",
 		    f, t_mp->sbm_cm.sbdev_path);
@@ -1465,12 +1465,12 @@ dr_post_detach_mem_unit(dr_mem_unit_t *s_mp)
 		 * source board's sbm_del_mlist
 		 */
 		for (ml = s_mp->sbm_del_mlist; !s_excess_mem_deleted && ml;
-		    ml = ml->next) {
+		    ml = ml->ml_next) {
 			PR_MEM("%s: delete source excess memory", f);
 			PR_MEMLIST_DUMP(ml);
 
 			err = drmach_mem_del_span(s_mp->sbm_cm.sbdev_id,
-			    ml->address, ml->size);
+			    ml->ml_address, ml->ml_size);
 			if (err)
 				DRERR_SET_C(&s_mp->sbm_cm.sbdev_error, &err);
 			ASSERT(err == NULL);
@@ -2094,9 +2094,9 @@ dr_reserve_mem_spans(memhandle_t *mhp, struct memlist *ml)
 	 * with kphysm_del_span.  It is possible that a span may intersect
 	 * an area occupied by the cage.
 	 */
-	for (mc = ml; mc != NULL; mc = mc->next) {
-		base = _b64top(mc->address);
-		npgs = _b64top(mc->size);
+	for (mc = ml; mc != NULL; mc = mc->ml_next) {
+		base = _b64top(mc->ml_address);
+		npgs = _b64top(mc->ml_size);
 
 		err = kphysm_del_span(*mhp, base, npgs);
 		if (err != KPHYSM_OK) {
@@ -2183,9 +2183,9 @@ dr_select_mem_target(dr_handle_t *hp,
 	/* break down s_ml if it contains dynamic segments */
 	b_ml = memlist_dup(s_ml);
 
-	for (ml = s_mp->sbm_dyn_segs; ml; ml = ml->next) {
-		b_ml = memlist_del_span(b_ml, ml->address, ml->size);
-		b_ml = memlist_cat_span(b_ml, ml->address, ml->size);
+	for (ml = s_mp->sbm_dyn_segs; ml; ml = ml->ml_next) {
+		b_ml = memlist_del_span(b_ml, ml->ml_address, ml->ml_size);
+		b_ml = memlist_cat_span(b_ml, ml->ml_address, ml->ml_size);
 	}
 
 
@@ -2363,9 +2363,9 @@ dr_select_mem_target(dr_handle_t *hp,
 			ASSERT(d_ml != NULL);
 			ASSERT(x_ml != NULL);
 
-			for (ml = x_ml; ml != NULL; ml = ml->next) {
-				d_ml = memlist_del_span(d_ml, ml->address,
-				    ml->size);
+			for (ml = x_ml; ml != NULL; ml = ml->ml_next) {
+				d_ml = memlist_del_span(d_ml, ml->ml_address,
+				    ml->ml_size);
 			}
 
 			PR_MEM("%s: %s: reserving src brd memlist:\n", f,
@@ -2544,10 +2544,10 @@ dr_get_copy_mlist(struct memlist *s_mlist, struct memlist *t_mlist,
 	ASSERT(t_mp->sbm_slice_size == s_mp->sbm_slice_size);
 
 	s_slice_mask = s_mp->sbm_slice_size - 1;
-	s_slice_base = s_mlist->address & ~s_slice_mask;
+	s_slice_base = s_mlist->ml_address & ~s_slice_mask;
 
 	t_slice_mask = t_mp->sbm_slice_size - 1;
-	t_slice_base = t_mlist->address & ~t_slice_mask;
+	t_slice_base = t_mlist->ml_address & ~t_slice_mask;
 
 	t_ml = memlist_dup(t_mlist);
 	s_del_ml = memlist_dup(s_mlist);
@@ -2568,34 +2568,36 @@ dr_get_copy_mlist(struct memlist *s_mlist, struct memlist *t_mlist,
 	 * give the source delete memlist.  The copy memlist is
 	 * the reciprocal of the source delete memlist.
 	 */
-	for (ml = t_ml; ml != NULL; ml = ml->next) {
+	for (ml = t_ml; ml != NULL; ml = ml->ml_next) {
 		/*
 		 * Normalize relative to target slice base PA
 		 * in order to preseve slice offsets.
 		 */
-		ml->address -= t_slice_base;
+		ml->ml_address -= t_slice_base;
 		/*
 		 * Convert to source slice PA address.
 		 */
-		ml->address += s_slice_base;
+		ml->ml_address += s_slice_base;
 	}
 
-	for (ml = t_ml; ml != NULL; ml = ml->next) {
-		s_del_ml = memlist_del_span(s_del_ml, ml->address, ml->size);
+	for (ml = t_ml; ml != NULL; ml = ml->ml_next) {
+		s_del_ml = memlist_del_span(s_del_ml,
+		    ml->ml_address, ml->ml_size);
 	}
 
 	/*
 	 * Expand the delete mlist to fully include any dynamic segments
 	 * it intersects with.
 	 */
-	for (x_ml = NULL, ml = s_del_ml; ml != NULL; ml = ml->next) {
-		uint64_t del_base = ml->address;
-		uint64_t del_end = ml->address + ml->size;
+	for (x_ml = NULL, ml = s_del_ml; ml != NULL; ml = ml->ml_next) {
+		uint64_t del_base = ml->ml_address;
+		uint64_t del_end = ml->ml_address + ml->ml_size;
 		struct memlist *dyn;
 
-		for (dyn = s_mp->sbm_dyn_segs; dyn != NULL; dyn = dyn->next) {
-			uint64_t dyn_base = dyn->address;
-			uint64_t dyn_end = dyn->address + dyn->size;
+		for (dyn = s_mp->sbm_dyn_segs; dyn != NULL;
+		    dyn = dyn->ml_next) {
+			uint64_t dyn_base = dyn->ml_address;
+			uint64_t dyn_end = dyn->ml_address + dyn->ml_size;
 
 			if (del_base > dyn_base && del_base < dyn_end)
 				del_base = dyn_base;
@@ -2610,8 +2612,9 @@ dr_get_copy_mlist(struct memlist *s_mlist, struct memlist *t_mlist,
 	memlist_delete(s_del_ml);
 	s_del_ml = x_ml;
 
-	for (ml = s_del_ml; ml != NULL; ml = ml->next) {
-		s_copy_ml = memlist_del_span(s_copy_ml, ml->address, ml->size);
+	for (ml = s_del_ml; ml != NULL; ml = ml->ml_next) {
+		s_copy_ml = memlist_del_span(s_copy_ml,
+		    ml->ml_address, ml->ml_size);
 	}
 
 	PR_MEM("%s: source delete mlist\n", f);
@@ -2642,14 +2645,14 @@ dr_get_nonreloc_mlist(struct memlist *s_ml, dr_mem_unit_t *s_mp)
 	PR_MEM("%s: checking for split of dyn seg list:\n", f);
 	PR_MEMLIST_DUMP(s_mp->sbm_dyn_segs);
 
-	for (ml = s_ml; ml; ml = ml->next) {
+	for (ml = s_ml; ml; ml = ml->ml_next) {
 		int rv;
 		uint64_t nr_base, nr_end;
 		memquery_t mq;
 		struct memlist *dyn;
 
 		rv = kphysm_del_span_query(
-		    _b64top(ml->address), _b64top(ml->size), &mq);
+		    _b64top(ml->ml_address), _b64top(ml->ml_size), &mq);
 		if (rv) {
 			memlist_delete(x_ml);
 			return (NULL);
@@ -2678,9 +2681,10 @@ dr_get_nonreloc_mlist(struct memlist *s_ml, dr_mem_unit_t *s_mp)
 		 * Expand the non-reloc span to fully include any
 		 * dynamic segments it intersects with.
 		 */
-		for (dyn = s_mp->sbm_dyn_segs; dyn != NULL; dyn = dyn->next) {
-			uint64_t dyn_base = dyn->address;
-			uint64_t dyn_end = dyn->address + dyn->size;
+		for (dyn = s_mp->sbm_dyn_segs; dyn != NULL;
+		    dyn = dyn->ml_next) {
+			uint64_t dyn_base = dyn->ml_address;
+			uint64_t dyn_end = dyn->ml_address + dyn->ml_size;
 
 			if (nr_base > dyn_base && nr_base < dyn_end)
 				nr_base = dyn_base;
@@ -2730,11 +2734,11 @@ dr_memlist_canfit(struct memlist *s_mlist, struct memlist *t_mlist,
 	/*
 	 * Normalize to slice relative offsets.
 	 */
-	for (ml = s_ml; ml; ml = ml->next)
-		ml->address &= s_slice_mask;
+	for (ml = s_ml; ml; ml = ml->ml_next)
+		ml->ml_address &= s_slice_mask;
 
-	for (ml = t_ml; ml; ml = ml->next)
-		ml->address &= t_slice_mask;
+	for (ml = t_ml; ml; ml = ml->ml_next)
+		ml->ml_address &= t_slice_mask;
 
 	canfit = memlist_canfit(s_ml, t_ml);
 done:
@@ -2764,16 +2768,16 @@ memlist_canfit(struct memlist *s_mlist, struct memlist *t_mlist)
 		return (0);
 
 	s_ml = s_mlist;
-	for (t_ml = t_mlist; t_ml && s_ml; t_ml = t_ml->next) {
+	for (t_ml = t_mlist; t_ml && s_ml; t_ml = t_ml->ml_next) {
 		uint64_t	s_start, s_end;
 		uint64_t	t_start, t_end;
 
-		t_start = t_ml->address;
-		t_end = t_start + t_ml->size;
+		t_start = t_ml->ml_address;
+		t_end = t_start + t_ml->ml_size;
 
-		for (; s_ml; s_ml = s_ml->next) {
-			s_start = s_ml->address;
-			s_end = s_start + s_ml->size;
+		for (; s_ml; s_ml = s_ml->ml_next) {
+			s_start = s_ml->ml_address;
+			s_end = s_start + s_ml->ml_size;
 
 			if ((s_start < t_start) || (s_end > t_end))
 				break;

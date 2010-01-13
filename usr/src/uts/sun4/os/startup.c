@@ -312,9 +312,11 @@ printmemlist(char *title, struct memlist *list)
 
 	while (list) {
 		prom_printf("\taddr = 0x%x %8x, size = 0x%x %8x\n",
-		    (uint32_t)(list->address >> 32), (uint32_t)list->address,
-		    (uint32_t)(list->size >> 32), (uint32_t)(list->size));
-		list = list->next;
+		    (uint32_t)(list->ml_address >> 32),
+		    (uint32_t)list->ml_address,
+		    (uint32_t)(list->ml_size >> 32),
+		    (uint32_t)(list->ml_size));
+		list = list->ml_next;
 	}
 }
 
@@ -1373,17 +1375,18 @@ startup_memlist(void)
 	virt_avail = memlist;
 	copy_memlist(boot_virtavail, boot_virtavail_len, &memlist);
 
-	for (cur = virt_avail; cur->next; cur = cur->next) {
+	for (cur = virt_avail; cur->ml_next; cur = cur->ml_next) {
 		uint64_t range_base, range_size;
 
-		if ((range_base = cur->address + cur->size) < (uint64_t)sysbase)
+		if ((range_base = cur->ml_address + cur->ml_size) <
+		    (uint64_t)sysbase)
 			continue;
 		if (range_base >= (uint64_t)syslimit)
 			break;
 		/*
 		 * Limit the range to end at syslimit.
 		 */
-		range_size = MIN(cur->next->address,
+		range_size = MIN(cur->ml_next->ml_address,
 		    (uint64_t)syslimit) - range_base;
 		(void) vmem_xalloc(heap_arena, (size_t)range_size, PAGESIZE,
 		    0, 0, (void *)range_base, (void *)(range_base + range_size),
@@ -2411,8 +2414,8 @@ memlist_new(uint64_t start, uint64_t len, struct memlist **memlistp)
 	struct memlist *new;
 
 	new = *memlistp;
-	new->address = start;
-	new->size = len;
+	new->ml_address = start;
+	new->ml_size = len;
 	*memlistp = new + 1;
 }
 
@@ -2731,8 +2734,8 @@ kphysm_init(void)
 	/*
 	 * Free the avail list
 	 */
-	for (pmem = phys_avail; pmem != NULL; pmem = pmem->next)
-		kphysm_add(pmem->address, pmem->size, 0);
+	for (pmem = phys_avail; pmem != NULL; pmem = pmem->ml_next)
+		kphysm_add(pmem->ml_address, pmem->ml_size, 0);
 
 	/*
 	 * Erase pages that aren't available

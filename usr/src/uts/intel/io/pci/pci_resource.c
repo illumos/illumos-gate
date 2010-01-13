@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * pci_resource.c -- routines to retrieve available bus resources from
@@ -152,31 +152,31 @@ acpi_trim_bus_ranges()
 		 * 'prev' pointer to link existing to new copy
 		 */
 		new = memlist_alloc();
-		new->address = orig->address;
-		new->size = orig->size;
-		new->prev = orig;
+		new->ml_address = orig->ml_address;
+		new->ml_size = orig->ml_size;
+		new->ml_prev = orig;
 
 		/* sorted insertion of 'new' into ranges list */
 		for (current = ranges, prev = NULL; current != NULL;
-		    prev = current, current = current->next)
-			if (new->address < current->address)
+		    prev = current, current = current->ml_next)
+			if (new->ml_address < current->ml_address)
 				break;
 
 		if (prev == NULL) {
 			/* place at beginning of (possibly) empty list */
-			new->next = ranges;
+			new->ml_next = ranges;
 			ranges = new;
 		} else {
 			/* place in list (possibly at end) */
-			new->next = current;
-			prev->next = new;
+			new->ml_next = current;
+			prev->ml_next = new;
 		}
 	}
 
 	/* scan the list, perform trimming */
 	current = ranges;
 	while (current != NULL) {
-		struct memlist *next = current->next;
+		struct memlist *next = current->ml_next;
 
 		/* done when no range above current */
 		if (next == NULL)
@@ -184,10 +184,11 @@ acpi_trim_bus_ranges()
 
 		/*
 		 * trim size in original range element
-		 * (current->prev points to the original range)
+		 * (current->ml_prev points to the original range)
 		 */
-		if ((current->address + current->size) > next->address)
-			current->prev->size = next->address - current->address;
+		if ((current->ml_address + current->ml_size) > next->ml_address)
+			current->ml_prev->ml_size =
+			    next->ml_address - current->ml_address;
 
 		current = next;
 	}
@@ -495,7 +496,7 @@ mps_find_bus_res(int bus, int type, struct memlist **res)
 			    *extp);
 			while (*res) {
 				struct memlist *tmp = *res;
-				*res = tmp->next;
+				*res = tmp->ml_next;
 				memlist_free(tmp);
 			}
 			return (0);

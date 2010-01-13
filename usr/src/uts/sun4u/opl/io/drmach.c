@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -428,11 +428,11 @@ drmach_setup_mc_info(dev_info_t *dip, drmach_mem_t *mp)
 	if (ml) {
 		uint64_t nbytes = 0;
 		struct memlist *p;
-		for (p = ml; p; p = p->next) {
-			nbytes += p->size;
+		for (p = ml; p; p = p->ml_next) {
+			nbytes += p->ml_size;
 		}
 		if ((mp->nbytes = nbytes) > 0)
-			mp->base_pa = ml->address;
+			mp->base_pa = ml->ml_address;
 		else
 			mp->base_pa = 0;
 		mp->memlist = ml;
@@ -2476,8 +2476,8 @@ drmach_mem_status(drmachid_t id, drmach_status_t *stat)
 
 	/* stop at first span that is in slice */
 	memlist_read_lock();
-	for (ml = phys_install; ml; ml = ml->next)
-		if (ml->address >= pa && ml->address < pa + slice_size)
+	for (ml = phys_install; ml; ml = ml->ml_next)
+		if (ml->ml_address >= pa && ml->ml_address < pa + slice_size)
 			break;
 	memlist_read_unlock();
 
@@ -2574,11 +2574,11 @@ drmach_pt_readmem(drmachid_t id, drmach_opts_t *opts)
 	dst_pa = va_to_pa(&dst);
 
 	memlist_read_lock();
-	for (ml = phys_install; ml; ml = ml->next) {
+	for (ml = phys_install; ml; ml = ml->ml_next) {
 		uint64_t	nbytes;
 
-		src_pa = ml->address;
-		nbytes = ml->size;
+		src_pa = ml->ml_address;
+		nbytes = ml->ml_size;
 
 		while (nbytes != 0ull) {
 
@@ -2969,40 +2969,41 @@ drmach_memlist_add_span(drmach_copy_rename_program_t *p,
 		mlist = p->free_mlist;
 		if (mlist == NULL)
 			return (NULL);
-		p->free_mlist = mlist->next;
-		mlist->address = base;
-		mlist->size = len;
-		mlist->next = mlist->prev = NULL;
+		p->free_mlist = mlist->ml_next;
+		mlist->ml_address = base;
+		mlist->ml_size = len;
+		mlist->ml_next = mlist->ml_prev = NULL;
 
 		return (mlist);
 	}
 
-	for (tl = ml = mlist; ml; tl = ml, ml = ml->next) {
-		if (base < ml->address) {
-			if ((base + len) < ml->address) {
+	for (tl = ml = mlist; ml; tl = ml, ml = ml->ml_next) {
+		if (base < ml->ml_address) {
+			if ((base + len) < ml->ml_address) {
 				nl = p->free_mlist;
 				if (nl == NULL)
 					return (NULL);
-				p->free_mlist = nl->next;
-				nl->address = base;
-				nl->size = len;
-				nl->next = ml;
-				if ((nl->prev = ml->prev) != NULL)
-					nl->prev->next = nl;
-				ml->prev = nl;
+				p->free_mlist = nl->ml_next;
+				nl->ml_address = base;
+				nl->ml_size = len;
+				nl->ml_next = ml;
+				if ((nl->ml_prev = ml->ml_prev) != NULL)
+					nl->ml_prev->ml_next = nl;
+				ml->ml_prev = nl;
 				if (mlist == ml)
 					mlist = nl;
 			} else {
-				ml->size = MAX((base + len), (ml->address +
-				    ml->size)) - base;
-				ml->address = base;
+				ml->ml_size = MAX((base + len),
+				    (ml->ml_address + ml->ml_size)) - base;
+				ml->ml_address = base;
 			}
 			break;
 
-		} else if (base <= (ml->address + ml->size)) {
-			ml->size = MAX((base + len), (ml->address + ml->size)) -
-			    MIN(ml->address, base);
-			ml->address = MIN(ml->address, base);
+		} else if (base <= (ml->ml_address + ml->ml_size)) {
+			ml->ml_size =
+			    MAX((base + len), (ml->ml_address + ml->ml_size)) -
+			    MIN(ml->ml_address, base);
+			ml->ml_address = MIN(ml->ml_address, base);
 			break;
 		}
 	}
@@ -3010,12 +3011,12 @@ drmach_memlist_add_span(drmach_copy_rename_program_t *p,
 		nl = p->free_mlist;
 		if (nl == NULL)
 			return (NULL);
-		p->free_mlist = nl->next;
-		nl->address = base;
-		nl->size = len;
-		nl->next = NULL;
-		nl->prev = tl;
-		tl->next = nl;
+		p->free_mlist = nl->ml_next;
+		nl->ml_address = base;
+		nl->ml_size = len;
+		nl->ml_next = NULL;
+		nl->ml_prev = tl;
+		tl->ml_next = nl;
 	}
 
 	return (mlist);
@@ -3184,13 +3185,13 @@ drmach_copy_rename_prog__relocatable(drmach_copy_rename_program_t *prog,
 	 * DO COPY.
 	 */
 	if (CPU_IN_SET(prog->data->cpu_copy_set, cpuid)) {
-		for (ml = prog->data->cpu_ml[cpuid]; ml; ml = ml->next) {
+		for (ml = prog->data->cpu_ml[cpuid]; ml; ml = ml->ml_next) {
 			uint64_t	s_pa, t_pa;
 			uint64_t	nbytes;
 
-			s_pa = prog->data->s_copybasepa + ml->address;
-			t_pa = prog->data->t_copybasepa + ml->address;
-			nbytes = ml->size;
+			s_pa = prog->data->s_copybasepa + ml->ml_address;
+			t_pa = prog->data->t_copybasepa + ml->ml_address;
+			nbytes = ml->ml_size;
 
 			while (nbytes != 0ull) {
 				/*
@@ -3369,7 +3370,7 @@ drmach_setup_memlist(drmach_copy_rename_program_t *p)
 	buf = p->memlist_buffer;
 	while (nbytes >= sizeof (struct memlist)) {
 		ml = (struct memlist *)buf;
-		ml->next = p->free_mlist;
+		ml->ml_next = p->free_mlist;
 		p->free_mlist = ml;
 		buf += s;
 		n_elements++;
@@ -3517,8 +3518,8 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 	x_ml = c_ml;
 	mlist_size = 0;
 	while (x_ml != NULL) {
-		x_ml->address -= s_copybasepa;
-		x_ml = x_ml->next;
+		x_ml->ml_address -= s_copybasepa;
+		x_ml = x_ml->ml_next;
 		mlist_size++;
 	}
 
@@ -3754,8 +3755,8 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 	x_ml = c_ml;
 	sz = 0;
 	while (x_ml != NULL) {
-		sz += x_ml->size;
-		x_ml = x_ml->next;
+		sz += x_ml->ml_size;
+		x_ml = x_ml->ml_next;
 	}
 
 	copy_sz = sz/active_cpus;
@@ -3770,8 +3771,8 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 	    system_clock_freq;
 
 	x_ml = c_ml;
-	c_addr = x_ml->address;
-	c_size = x_ml->size;
+	c_addr = x_ml->ml_address;
+	c_size = x_ml->ml_size;
 
 	for (i = 0; i < NCPU; i++) {
 		prog->stat->nbytes[i] = 0;
@@ -3812,10 +3813,10 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 					goto out;
 				}
 
-				x_ml = x_ml->next;
+				x_ml = x_ml->ml_next;
 				if (x_ml != NULL) {
-					c_addr = x_ml->address;
-					c_size = x_ml->size;
+					c_addr = x_ml->ml_address;
+					c_size = x_ml->ml_size;
 				} else {
 					goto end;
 				}
@@ -3985,15 +3986,15 @@ drmach_swap_pa(drmach_mem_t *s_mem, drmach_mem_t *t_mem)
 	s_mem->slice_base = t_base;
 	s_mem->base_pa = (s_mem->base_pa - s_base) + t_base;
 
-	for (ml = s_mem->memlist; ml; ml = ml->next) {
-		ml->address = ml->address - s_base + t_base;
+	for (ml = s_mem->memlist; ml; ml = ml->ml_next) {
+		ml->ml_address = ml->ml_address - s_base + t_base;
 	}
 
 	t_mem->slice_base = s_base;
 	t_mem->base_pa = (t_mem->base_pa - t_base) + s_base;
 
-	for (ml = t_mem->memlist; ml; ml = ml->next) {
-		ml->address = ml->address - t_base + s_base;
+	for (ml = t_mem->memlist; ml; ml = ml->ml_next) {
+		ml->ml_address = ml->ml_address - t_base + s_base;
 	}
 
 	/*

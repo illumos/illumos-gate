@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1614,7 +1614,7 @@ pr_addr(int family, struct sockaddr *addr, t_uscalar_t addrlen)
 }
 
 /* The logical equivalence operator (a if-and-only-if b) */
-#define	EQUIV(a, b)	(((a) && (b)) || (!(a) && (!(b))))
+#define	EQUIVALENT(a, b)	(((a) && (b)) || (!(a) && (!(b))))
 
 /*
  * Verify limitations and invariants on oob state.
@@ -1663,7 +1663,7 @@ so_verify_oobstate(struct sonode *so)
 	havemark = (SOCK_IS_NONSTR(so)) ? so->so_oobmark > 0 :
 	    SOTOTPI(so)->sti_oobsigcnt > 0;
 
-	if (!EQUIV(havemark || (so->so_state & SS_RCVATMARK),
+	if (!EQUIVALENT(havemark || (so->so_state & SS_RCVATMARK),
 	    so->so_state & SS_OOBPEND)) {
 		printf("Bad oob state 3 (%p): state %s\n",
 		    (void *)so, pr_state(so->so_state, so->so_mode));
@@ -1674,7 +1674,7 @@ so_verify_oobstate(struct sonode *so)
 	 * Unless SO_OOBINLINE we have so_oobmsg != NULL iff SS_HAVEOOBDATA
 	 */
 	if (!(so->so_options & SO_OOBINLINE) &&
-	    !EQUIV(so->so_oobmsg != NULL, so->so_state & SS_HAVEOOBDATA)) {
+	    !EQUIVALENT(so->so_oobmsg != NULL, so->so_state & SS_HAVEOOBDATA)) {
 		printf("Bad oob state 4 (%p): state %s\n",
 		    (void *)so, pr_state(so->so_state, so->so_mode));
 		return (0);
@@ -1691,7 +1691,7 @@ so_verify_oobstate(struct sonode *so)
 
 	return (1);
 }
-#undef	EQUIV
+#undef	EQUIVALENT
 #endif /* DEBUG */
 
 /* initialize sockfs zone specific kstat related items			*/

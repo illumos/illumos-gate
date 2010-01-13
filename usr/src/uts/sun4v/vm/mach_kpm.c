@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,20 +56,20 @@ mach_kpm_init()
 	 * possible pages.
 	 */
 	pmem = phys_install;
-	start = pmem->address;
-	end = start + pmem->size;
+	start = pmem->ml_address;
+	end = start + pmem->ml_size;
 	for (;;) {
-		if (pmem == NULL || pmem->address > end) {
+		if (pmem == NULL || pmem->ml_address > end) {
 			hat_devload(kas.a_hat, kpm_vbase + start,
 			    end - start, mmu_btop(start),
 			    PROT_READ | PROT_WRITE,
 			    HAT_LOAD | HAT_LOAD_LOCK | HAT_LOAD_NOCONSIST);
 			if (pmem == NULL)
 				break;
-			start = pmem->address;
+			start = pmem->ml_address;
 		}
-		end = pmem->address + pmem->size;
-		pmem = pmem->next;
+		end = pmem->ml_address + pmem->ml_size;
+		pmem = pmem->ml_next;
 	}
 }
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -117,9 +117,9 @@ sbdp_memlist_dump(struct memlist *mlist)
 	if (mlist == NULL) {
 		SBDP_DBG_MEM("memlist> EMPTY\n");
 	} else {
-		for (ml = mlist; ml; ml = ml->next)
+		for (ml = mlist; ml; ml = ml->ml_next)
 			SBDP_DBG_MEM("memlist>  0x%" PRIx64", 0x%" PRIx64"\n",
-			    ml->address, ml->size);
+			    ml->ml_address, ml->ml_size);
 	}
 }
 
@@ -227,7 +227,7 @@ sbdp_memlist_dup(struct memlist *mlist)
 
 	prev = NULL;
 	hl = NULL;
-	for (; mlist; mlist = mlist->next) {
+	for (; mlist; mlist = mlist->ml_next) {
 		struct memlist *mp;
 
 		mp = memlist_get_one();
@@ -237,15 +237,15 @@ sbdp_memlist_dup(struct memlist *mlist)
 			hl = NULL;
 			break;
 		}
-		mp->address = mlist->address;
-		mp->size = mlist->size;
-		mp->next = NULL;
-		mp->prev = prev;
+		mp->ml_address = mlist->ml_address;
+		mp->ml_size = mlist->ml_size;
+		mp->ml_next = NULL;
+		mp->ml_prev = prev;
 
 		if (prev == NULL)
 			hl = mp;
 		else
-			prev->next = mp;
+			prev->ml_next = mp;
 		prev = mp;
 	}
 
@@ -1092,13 +1092,13 @@ sbdp_copy_rename__relocatable(sbdp_cr_handle_t *hp, struct memlist *mlist,
 	/*
 	 * DO COPY.
 	 */
-	for (ml = mlist; ml; ml = ml->next) {
+	for (ml = mlist; ml; ml = ml->ml_next) {
 		uint64_t	s_pa, t_pa;
 		uint64_t	nbytes;
 
-		s_pa = ml->address;
-		t_pa = t_base + (ml->address - s_base);
-		nbytes = ml->size;
+		s_pa = ml->ml_address;
+		t_pa = t_base + (ml->ml_address - s_base);
+		nbytes = ml->ml_size;
 
 		size += nbytes;
 		while (nbytes != 0ull) {
@@ -1652,8 +1652,8 @@ sbdp_get_mem_size(sbdp_handle_t *hp)
 
 	mlist = sbdp_get_memlist(hp, (dev_info_t *)NULL);
 
-	for (ml = mlist; ml; ml = ml->next)
-		size += ml->size;
+	for (ml = mlist; ml; ml = ml->ml_next)
+		size += ml->ml_size;
 
 	(void) sbdp_del_memlist(hp, mlist);
 
@@ -2086,11 +2086,11 @@ sbdp_passthru_readmem(sbdp_handle_t *hp, void *arg)
 	dst_pa = va_to_pa(&dst);
 
 	memlist_read_lock();
-	for (ml = phys_install; ml; ml = ml->next) {
+	for (ml = phys_install; ml; ml = ml->ml_next) {
 		uint64_t	nbytes;
 
-		src_pa = ml->address;
-		nbytes = ml->size;
+		src_pa = ml->ml_address;
+		nbytes = ml->ml_size;
 
 		while (nbytes != 0ull) {
 

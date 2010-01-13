@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -725,7 +725,7 @@ dr_mem_list_query(dr_mem_hdr_t *req, dr_mem_hdr_t **resp, int *resp_len)
 		 * Request is for domain's full view of it's memory.
 		 */
 		memlist_read_lock();
-		for (ml = phys_install; ml; ml = ml->next)
+		for (ml = phys_install; ml; ml = ml->ml_next)
 			nml++;
 
 		rlen += nml * sizeof (dr_mem_query_t);
@@ -744,9 +744,9 @@ dr_mem_list_query(dr_mem_hdr_t *req, dr_mem_hdr_t **resp, int *resp_len)
 
 	/* get the status for each of the mblocks */
 	if (nml) {
-		for (idx = 0, ml = phys_install; ml; ml = ml->next, idx++) {
-			mb.addr = ml->address;
-			mb.size = ml->size;
+		for (idx = 0, ml = phys_install; ml; ml = ml->ml_next, idx++) {
+			mb.addr = ml->ml_address;
+			mb.size = ml->ml_size;
 			dr_mem_query(&mb, &stat[idx]);
 		}
 		memlist_read_unlock();
@@ -1201,9 +1201,9 @@ done:
 		/*
 		 * Add back the spans to the kcage growth list.
 		 */
-		for (ml = d_ml; ml; ml = ml->next)
-			if (err = kcage_range_add(btop(ml->address),
-			    btop(ml->size), KCAGE_DOWN))
+		for (ml = d_ml; ml; ml = ml->ml_next)
+			if (err = kcage_range_add(btop(ml->ml_address),
+			    btop(ml->ml_size), KCAGE_DOWN))
 				cmn_err(CE_WARN, "kcage_range_add() = %d", err);
 	}
 	memlist_free_list(d_ml);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -911,18 +911,6 @@ optdb_obj_t tl_opt_obj = {
 };
 
 /*
- * Logical operations.
- *
- * IMPLY(X, Y) means that X implies Y i.e. when X is true, Y
- * should also be true.
- *
- * EQUIV(X, Y) is logical equivalence. Both X and Y should be true or false at
- * the same time.
- */
-#define	IMPLY(X, Y)	(!(X) || (Y))
-#define	EQUIV(X, Y)	(IMPLY(X, Y) && IMPLY(Y, X))
-
-/*
  * LOCAL FUNCTIONS AND DRIVER ENTRY POINTS
  * ---------------------------------------
  */
@@ -1082,7 +1070,7 @@ tl_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		if ((i == TL_UNUSED) || (i == TL_SOCK_COTSORD))
 			continue;
 
-		ASSERT(EQUIV(i & TL_TICLTS, t->tr_serializer != NULL));
+		EQUIV(i & TL_TICLTS, t->tr_serializer != NULL);
 		if (t->tr_serializer != NULL) {
 			tl_serializer_refrele(t->tr_serializer);
 			t->tr_serializer = NULL;
@@ -1692,8 +1680,8 @@ static void
 tl_close_finish_ser(mblk_t *mp, tl_endpt_t *tep)
 {
 	ASSERT(tep->te_closing);
-	ASSERT(IMPLY(IS_CLTS(tep), tep->te_closewait == 0));
-	ASSERT(IMPLY(IS_COTS(tep), tep->te_closewait == 1));
+	IMPLY(IS_CLTS(tep), tep->te_closewait == 0);
+	IMPLY(IS_COTS(tep), tep->te_closewait == 1);
 
 	tep->te_state = -1;	/* Uninitialized */
 	if (IS_COTS(tep)) {
@@ -1945,7 +1933,7 @@ tl_wput_data_ser(mblk_t *mp, tl_endpt_t *tep)
 	ASSERT(DB_TYPE(mp) == M_DATA);
 	ASSERT(IS_COTS(tep));
 
-	ASSERT(IMPLY(peer_tep, tep->te_serializer == peer_tep->te_serializer));
+	IMPLY(peer_tep, tep->te_serializer == peer_tep->te_serializer);
 
 	/*
 	 * fastpath for data. Ignore flow control if tep is closing.
@@ -3958,8 +3946,8 @@ tl_discon_req(mblk_t *mp, tl_endpt_t *tep)
 		 * the code below will avoid any action on the client side.
 		 */
 
-		ASSERT(IMPLY(tip->ti_tep != NULL,
-		    tip->ti_tep->te_seqno == dr->SEQ_number));
+		IMPLY(tip->ti_tep != NULL,
+		    tip->ti_tep->te_seqno == dr->SEQ_number);
 		peer_tep = tip->ti_tep;
 	}
 
@@ -5279,10 +5267,10 @@ tl_find_peer(tl_endpt_t *tep, tl_addr_t *ap)
 	ASSERT(ap != NULL && ap->ta_alen > 0);
 	ASSERT(ap->ta_zoneid == tep->te_zoneid);
 	ASSERT(ap->ta_abuf != NULL);
-	ASSERT(EQUIV(rc == 0, peer_tep != NULL));
-	ASSERT(IMPLY(rc == 0,
+	EQUIV(rc == 0, peer_tep != NULL);
+	IMPLY(rc == 0,
 	    (tep->te_zoneid == peer_tep->te_zoneid) &&
-	    (tep->te_transport == peer_tep->te_transport)));
+	    (tep->te_transport == peer_tep->te_transport));
 
 	if ((rc == 0) && (peer_tep->te_closing)) {
 		tl_refrele(peer_tep);
@@ -5307,8 +5295,8 @@ tl_sock_find_peer(tl_endpt_t *tep, soux_addr_t *ux_addr)
 	    (mod_hash_val_t *)&peer_tep, tl_find_callback);
 
 	ASSERT(IS_SOCKET(tep));
-	ASSERT(EQUIV(rc == 0, peer_tep != NULL));
-	ASSERT(IMPLY(rc == 0, (tep->te_transport == peer_tep->te_transport)));
+	EQUIV(rc == 0, peer_tep != NULL);
+	IMPLY(rc == 0, (tep->te_transport == peer_tep->te_transport));
 
 	if (peer_tep != NULL) {
 		/* Don't attempt to use closing peer. */

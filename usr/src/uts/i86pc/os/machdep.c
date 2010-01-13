@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1196,8 +1196,8 @@ num_phys_pages()
 		return (xpv_nr_phys_pages());
 #endif /* __xpv */
 
-	for (mp = phys_install; mp != NULL; mp = mp->next)
-		npages += mp->size >> PAGESHIFT;
+	for (mp = phys_install; mp != NULL; mp = mp->ml_next)
+		npages += mp->ml_size >> PAGESHIFT;
 
 	return (npages);
 }

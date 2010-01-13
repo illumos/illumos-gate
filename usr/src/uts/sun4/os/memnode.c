@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -256,9 +256,9 @@ mem_node_memlist_pages(int mnode, struct memlist *mlist)
 	if (&plat_mem_node_intersect_range != NULL) {
 		memlist_read_lock();
 
-		for (pmem = mlist; pmem; pmem = pmem->next) {
-			plat_mem_node_intersect_range(btop(pmem->address),
-			    btop(pmem->size), mnode, &pages);
+		for (pmem = mlist; pmem; pmem = pmem->ml_next) {
+			plat_mem_node_intersect_range(btop(pmem->ml_address),
+			    btop(pmem->ml_size), mnode, &pages);
 			npgs += pages;
 		}
 
@@ -271,9 +271,9 @@ mem_node_memlist_pages(int mnode, struct memlist *mlist)
 
 	memlist_read_lock();
 
-	for (pmem = mlist; pmem; pmem = pmem->next) {
-		cur_base = btop(pmem->address);
-		cur_end = cur_base + btop(pmem->size) - 1;
+	for (pmem = mlist; pmem; pmem = pmem->ml_next) {
+		cur_base = btop(pmem->ml_address);
+		cur_end = cur_base + btop(pmem->ml_size) - 1;
 		if (end < cur_base || base > cur_end)
 			continue;
 		npgs = npgs + (MIN(cur_end, end) -

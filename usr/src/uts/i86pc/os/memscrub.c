@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -182,8 +182,8 @@ memscrub_init()
 	/*
 	 * copy phys_install to memscrub_memlist
 	 */
-	for (src = phys_install; src; src = src->next) {
-		if (memscrub_add_span(src->address, src->size)) {
+	for (src = phys_install; src; src = src->ml_next) {
+		if (memscrub_add_span(src->ml_address, src->ml_size)) {
 			cmn_err(CE_WARN,
 			    "Software memory scrubber failed to initialize\n");
 			return;
@@ -278,8 +278,8 @@ memscrubber()
 	}
 
 	mlp = memscrub_memlist;
-	mlp_next_addr = mlp->address;
-	mlp_last_addr = mlp->address + mlp->size;
+	mlp_next_addr = mlp->ml_address;
+	mlp_last_addr = mlp->ml_address + mlp->ml_size;
 
 	deadline = gethrestime_sec() + memscrub_delay_start_sec;
 
@@ -358,13 +358,13 @@ memscrubber()
 			reached_end = 0;
 			if (address + mmu_ptob(pages) >= mlp_last_addr) {
 				pages = mmu_btop(mlp_last_addr - address);
-				mlp = mlp->next;
+				mlp = mlp->ml_next;
 				if (mlp == NULL) {
 					reached_end = 1;
 					mlp = memscrub_memlist;
 				}
-				mlp_next_addr = mlp->address;
-				mlp_last_addr = mlp->address + mlp->size;
+				mlp_next_addr = mlp->ml_address;
+				mlp_last_addr = mlp->ml_address + mlp->ml_size;
 			} else {
 				mlp_next_addr += mmu_ptob(pages);
 			}
@@ -477,8 +477,8 @@ memscrub_add_span(uint64_t start, uint64_t bytes)
 	prev = NULL;
 	next = memscrub_memlist;
 	while (next) {
-		uint64_t ns = next->address;
-		uint64_t ne = next->address + next->size - 1;
+		uint64_t ns = next->ml_address;
+		uint64_t ne = next->ml_address + next->ml_size - 1;
 
 		/*
 		 * If this span overlaps with an existing span, then
@@ -496,7 +496,7 @@ memscrub_add_span(uint64_t start, uint64_t bytes)
 		 * New span can be appended to an existing one.
 		 */
 		if (start == ne + 1) {
-			next->size += bytes;
+			next->ml_size += bytes;
 			goto add_done;
 		}
 
@@ -504,8 +504,8 @@ memscrub_add_span(uint64_t start, uint64_t bytes)
 		 * New span can be prepended to an existing one.
 		 */
 		if (end + 1 == ns) {
-			next->size += bytes;
-			next->address = start;
+			next->ml_size += bytes;
+			next->ml_address = start;
 			goto add_done;
 		}
 
@@ -518,7 +518,7 @@ memscrub_add_span(uint64_t start, uint64_t bytes)
 			break;
 
 		prev = next;
-		next = next->next;
+		next = next->ml_next;
 	}
 
 	/*
@@ -529,18 +529,18 @@ memscrub_add_span(uint64_t start, uint64_t bytes)
 		retval = -1;
 		goto add_done;
 	}
-	dst->address = start;
-	dst->size = bytes;
-	dst->prev = prev;
-	dst->next = next;
+	dst->ml_address = start;
+	dst->ml_size = bytes;
+	dst->ml_prev = prev;
+	dst->ml_next = next;
 
 	if (prev)
-		prev->next = dst;
+		prev->ml_next = dst;
 	else
 		memscrub_memlist = dst;
 
 	if (next)
-		next->prev = dst;
+		next->ml_prev = dst;
 
 add_done:
 

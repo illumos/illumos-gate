@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -177,7 +177,7 @@ dr_memlist_delete(struct memlist *mlist)
 	register struct memlist	*ml;
 
 	for (ml = mlist; ml; ml = mlist) {
-		mlist = ml->next;
+		mlist = ml->ml_next;
 		FREESTRUCT(ml, struct memlist, 1);
 	}
 }
@@ -190,27 +190,27 @@ dr_memlist_intersect(struct memlist *al, struct memlist *bl)
 	if ((al == NULL) || (bl == NULL))
 		return (0);
 
-	aend = al->address + al->size;
-	bstart = bl->address;
-	bend = bl->address + bl->size;
+	aend = al->ml_address + al->ml_size;
+	bstart = bl->ml_address;
+	bend = bl->ml_address + bl->ml_size;
 
 	while (al && bl) {
 		while (al && (aend <= bstart))
-			if ((al = al->next) != NULL)
-				aend = al->address + al->size;
+			if ((al = al->ml_next) != NULL)
+				aend = al->ml_address + al->ml_size;
 		if (al == NULL)
 			return (0);
 
-		if ((astart = al->address) <= bstart)
+		if ((astart = al->ml_address) <= bstart)
 			return (1);
 
 		while (bl && (bend <= astart))
-			if ((bl = bl->next) != NULL)
-				bend = bl->address + bl->size;
+			if ((bl = bl->ml_next) != NULL)
+				bend = bl->ml_address + bl->ml_size;
 		if (bl == NULL)
 			return (0);
 
-		if ((bstart = bl->address) <= astart)
+		if ((bstart = bl->ml_address) <= astart)
 			return (1);
 	}
 
@@ -222,26 +222,27 @@ dr_memlist_coalesce(struct memlist *mlist)
 {
 	uint64_t	end, nend;
 
-	if ((mlist == NULL) || (mlist->next == NULL))
+	if ((mlist == NULL) || (mlist->ml_next == NULL))
 		return;
 
-	while (mlist->next) {
-		end = mlist->address + mlist->size;
-		if (mlist->next->address <= end) {
+	while (mlist->ml_next) {
+		end = mlist->ml_address + mlist->ml_size;
+		if (mlist->ml_next->ml_address <= end) {
 			struct memlist 	*nl;
 
-			nend = mlist->next->address + mlist->next->size;
+			nend = mlist->ml_next->ml_address +
+			    mlist->ml_next->ml_size;
 			if (nend > end)
-				mlist->size += (nend - end);
-			nl = mlist->next;
-			mlist->next = mlist->next->next;
+				mlist->ml_size += (nend - end);
+			nl = mlist->ml_next;
+			mlist->ml_next = mlist->ml_next->ml_next;
 			if (nl) {
 				FREESTRUCT(nl, struct memlist, 1);
 			}
-			if (mlist->next)
-				mlist->next->prev = mlist;
+			if (mlist->ml_next)
+				mlist->ml_next->ml_prev = mlist;
 		} else {
-			mlist = mlist->next;
+			mlist = mlist->ml_next;
 		}
 	}
 }
@@ -254,8 +255,8 @@ memlist_dump(struct memlist *mlist)
 
 	if (mlist == NULL)
 		printf("memlist> EMPTY\n");
-	else for (ml = mlist; ml; ml = ml->next)
-		printf("memlist> 0x%lx, 0x%lx\n", ml->address, ml->size);
+	else for (ml = mlist; ml; ml = ml->ml_next)
+		printf("memlist> 0x%lx, 0x%lx\n", ml->ml_address, ml->ml_size);
 }
 #endif
 
@@ -269,13 +270,13 @@ dr_memlist_dup(struct memlist *mlist)
 
 	mlp = &hl;
 	tl = *mlp;
-	for (; mlist; mlist = mlist->next) {
+	for (; mlist; mlist = mlist->ml_next) {
 		*mlp = GETSTRUCT(struct memlist, 1);
-		(*mlp)->address = mlist->address;
-		(*mlp)->size = mlist->size;
-		(*mlp)->prev = tl;
+		(*mlp)->ml_address = mlist->ml_address;
+		(*mlp)->ml_size = mlist->ml_size;
+		(*mlp)->ml_prev = tl;
 		tl = *mlp;
-		mlp = &((*mlp)->next);
+		mlp = &((*mlp)->ml_next);
 	}
 	*mlp = NULL;
 
@@ -292,47 +293,47 @@ dr_memlist_add_span(struct memlist *mlist, uint64_t base, uint64_t len)
 
 	if (mlist == NULL) {
 		mlist = GETSTRUCT(struct memlist, 1);
-		mlist->address = base;
-		mlist->size = len;
-		mlist->next = mlist->prev = NULL;
+		mlist->ml_address = base;
+		mlist->ml_size = len;
+		mlist->ml_next = mlist->ml_prev = NULL;
 
 		return (mlist);
 	}
 
-	for (tl = ml = mlist; ml; tl = ml, ml = ml->next) {
-		if (base < ml->address) {
-			if ((base + len) < ml->address) {
+	for (tl = ml = mlist; ml; tl = ml, ml = ml->ml_next) {
+		if (base < ml->ml_address) {
+			if ((base + len) < ml->ml_address) {
 				nl = GETSTRUCT(struct memlist, 1);
-				nl->address = base;
-				nl->size = len;
-				nl->next = ml;
-				if ((nl->prev = ml->prev) != NULL)
-					nl->prev->next = nl;
-				ml->prev = nl;
+				nl->ml_address = base;
+				nl->ml_size = len;
+				nl->ml_next = ml;
+				if ((nl->ml_prev = ml->ml_prev) != NULL)
+					nl->ml_prev->ml_next = nl;
+				ml->ml_prev = nl;
 				if (mlist == ml)
 					mlist = nl;
 			} else {
-				ml->size = MAX((base + len),
-				    (ml->address + ml->size)) - base;
-				ml->address = base;
+				ml->ml_size = MAX((base + len),
+				    (ml->ml_address + ml->ml_size)) - base;
+				ml->ml_address = base;
 			}
 			break;
 
-		} else if (base <= (ml->address + ml->size)) {
-			ml->size = MAX((base + len),
-			    (ml->address + ml->size)) -
-			    MIN(ml->address, base);
-			ml->address = MIN(ml->address, base);
+		} else if (base <= (ml->ml_address + ml->ml_size)) {
+			ml->ml_size = MAX((base + len),
+			    (ml->ml_address + ml->ml_size)) -
+			    MIN(ml->ml_address, base);
+			ml->ml_address = MIN(ml->ml_address, base);
 			break;
 		}
 	}
 	if (ml == NULL) {
 		nl = GETSTRUCT(struct memlist, 1);
-		nl->address = base;
-		nl->size = len;
-		nl->next = NULL;
-		nl->prev = tl;
-		tl->next = nl;
+		nl->ml_address = base;
+		nl->ml_size = len;
+		nl->ml_next = NULL;
+		nl->ml_prev = tl;
+		tl->ml_next = nl;
 	}
 
 	dr_memlist_coalesce(mlist);
@@ -350,53 +351,53 @@ dr_memlist_del_span(struct memlist *mlist, uint64_t base, uint64_t len)
 		return (NULL);
 
 	end = base + len;
-	if ((end <= mlist->address) || (base == end))
+	if ((end <= mlist->ml_address) || (base == end))
 		return (mlist);
 
 	for (tl = ml = mlist; ml; tl = ml, ml = nlp) {
 		uint64_t	mend;
 
-		nlp = ml->next;
+		nlp = ml->ml_next;
 
-		if (end <= ml->address)
+		if (end <= ml->ml_address)
 			break;
 
-		mend = ml->address + ml->size;
+		mend = ml->ml_address + ml->ml_size;
 		if (base < mend) {
-			if (base <= ml->address) {
-				ml->address = end;
+			if (base <= ml->ml_address) {
+				ml->ml_address = end;
 				if (end >= mend)
-					ml->size = 0ull;
+					ml->ml_size = 0ull;
 				else
-					ml->size = mend - ml->address;
+					ml->ml_size = mend - ml->ml_address;
 			} else {
-				ml->size = base - ml->address;
+				ml->ml_size = base - ml->ml_address;
 				if (end < mend) {
 					struct memlist	*nl;
 					/*
 					 * splitting an memlist entry.
 					 */
 					nl = GETSTRUCT(struct memlist, 1);
-					nl->address = end;
-					nl->size = mend - nl->address;
-					if ((nl->next = nlp) != NULL)
-						nlp->prev = nl;
-					nl->prev = ml;
-					ml->next = nl;
+					nl->ml_address = end;
+					nl->ml_size = mend - nl->ml_address;
+					if ((nl->ml_next = nlp) != NULL)
+						nlp->ml_prev = nl;
+					nl->ml_prev = ml;
+					ml->ml_next = nl;
 					nlp = nl;
 				}
 			}
-			if (ml->size == 0ull) {
+			if (ml->ml_size == 0ull) {
 				if (ml == mlist) {
 					if ((mlist = nlp) != NULL)
-						nlp->prev = NULL;
+						nlp->ml_prev = NULL;
 					FREESTRUCT(ml, struct memlist, 1);
 					if (mlist == NULL)
 						break;
 					ml = nlp;
 				} else {
-					if ((tl->next = nlp) != NULL)
-						nlp->prev = tl;
+					if ((tl->ml_next = nlp) != NULL)
+						nlp->ml_prev = tl;
 					FREESTRUCT(ml, struct memlist, 1);
 					ml = tl;
 				}
@@ -420,22 +421,22 @@ dr_memlist_cat_span(struct memlist *mlist, uint64_t base, uint64_t len)
 
 	if (mlist == NULL) {
 		mlist = GETSTRUCT(struct memlist, 1);
-		mlist->address = base;
-		mlist->size = len;
-		mlist->next = mlist->prev = NULL;
+		mlist->ml_address = base;
+		mlist->ml_size = len;
+		mlist->ml_next = mlist->ml_prev = NULL;
 
 		return (mlist);
 	}
 
-	for (tl = ml = mlist; ml; tl = ml, ml = ml->next) {
-		if (base < ml->address) {
+	for (tl = ml = mlist; ml; tl = ml, ml = ml->ml_next) {
+		if (base < ml->ml_address) {
 			nl = GETSTRUCT(struct memlist, 1);
-			nl->address = base;
-			nl->size = len;
-			nl->next = ml;
-			if ((nl->prev = ml->prev) != NULL)
-				nl->prev->next = nl;
-			ml->prev = nl;
+			nl->ml_address = base;
+			nl->ml_size = len;
+			nl->ml_next = ml;
+			if ((nl->ml_prev = ml->ml_prev) != NULL)
+				nl->ml_prev->ml_next = nl;
+			ml->ml_prev = nl;
 			if (mlist == ml)
 				mlist = nl;
 			break;
@@ -444,11 +445,11 @@ dr_memlist_cat_span(struct memlist *mlist, uint64_t base, uint64_t len)
 
 	if (ml == NULL) {
 		nl = GETSTRUCT(struct memlist, 1);
-		nl->address = base;
-		nl->size = len;
-		nl->next = NULL;
-		nl->prev = tl;
-		tl->next = nl;
+		nl->ml_address = base;
+		nl->ml_size = len;
+		nl->ml_next = NULL;
+		nl->ml_prev = tl;
+		tl->ml_next = nl;
 	}
 
 	return (mlist);
