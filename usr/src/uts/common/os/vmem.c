@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1582,7 +1582,7 @@ vmem_destroy(vmem_t *vmp)
 {
 	vmem_t *cur, **vmpp;
 	vmem_seg_t *seg0 = &vmp->vm_seg0;
-	vmem_seg_t *vsp;
+	vmem_seg_t *vsp, *anext;
 	size_t leaked;
 	int i;
 
@@ -1612,8 +1612,10 @@ vmem_destroy(vmem_t *vmp)
 	 * arena, e.g. the primary spans and their free segments.
 	 */
 	VMEM_DELETE(&vmp->vm_rotor, a);
-	for (vsp = seg0->vs_anext; vsp != seg0; vsp = vsp->vs_anext)
+	for (vsp = seg0->vs_anext; vsp != seg0; vsp = anext) {
+		anext = vsp->vs_anext;
 		vmem_putseg_global(vsp);
+	}
 
 	while (vmp->vm_nsegfree > 0)
 		vmem_putseg_global(vmem_getseg(vmp));
