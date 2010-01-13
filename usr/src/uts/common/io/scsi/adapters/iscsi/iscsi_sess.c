@@ -101,6 +101,7 @@ iscsi_sess_create(iscsi_hba_t *ihp, iSCSIDiscoveryMethod_t method,
 	int		len		= 0;
 	char		*tq_name;
 	char		*th_name;
+	iscsi_status_t	status;
 
 	len = strlen(target_name);
 
@@ -118,28 +119,45 @@ clean_failed_sess:
 			if (isp->sess_tpgt_conf == tpgt) {
 				/* Found mathing session, return oid/ptr */
 				*oid = isp->sess_oid;
-				if (isp->sess_wd_thread)
+				if (isp->sess_wd_thread != NULL &&
+				    isp->sess_ic_thread != NULL) {
 					return (isp);
-				/*
-				 * Under rare cases wd thread is already
-				 * freed, create it if so.
-				 */
-				th_name = kmem_zalloc(ISCSI_TH_MAX_NAME_LEN,
-				    KM_SLEEP);
-				if (snprintf(th_name, (ISCSI_TH_MAX_NAME_LEN
-				    - 1), ISCSI_SESS_WD_NAME_FORMAT,
-				    ihp->hba_oid, isp->sess_oid) <
-				    ISCSI_TH_MAX_NAME_LEN) {
-					isp->sess_wd_thread =
-					    iscsi_thread_create(ihp->hba_dip,
-					    th_name, iscsi_wd_thread, isp);
-					(void) iscsi_thread_start(
-					    isp->sess_wd_thread);
 				}
-				kmem_free(th_name, ISCSI_TH_MAX_NAME_LEN);
+
 				if (isp->sess_wd_thread == NULL) {
-					/* No way to save it */
-					goto clean_failed_sess;
+					/*
+					 * Under rare cases wd thread is already
+					 * freed, create it if so.
+					 */
+					th_name = kmem_zalloc(
+					    ISCSI_TH_MAX_NAME_LEN, KM_SLEEP);
+					if (snprintf(th_name,
+					    (ISCSI_TH_MAX_NAME_LEN - 1),
+					    ISCSI_SESS_WD_NAME_FORMAT,
+					    ihp->hba_oid, isp->sess_oid) <
+					    ISCSI_TH_MAX_NAME_LEN) {
+						isp->sess_wd_thread =
+						    iscsi_thread_create(
+						    ihp->hba_dip,
+						    th_name,
+						    iscsi_wd_thread,
+						    isp);
+						(void) iscsi_thread_start(
+						    isp->sess_wd_thread);
+					}
+					kmem_free(th_name,
+					    ISCSI_TH_MAX_NAME_LEN);
+					if (isp->sess_wd_thread == NULL) {
+						/* No way to save it */
+						goto clean_failed_sess;
+					}
+				}
+
+				if (isp->sess_ic_thread == NULL) {
+					status = iscsi_sess_threads_create(isp);
+					if (status != ISCSI_STATUS_SUCCESS) {
+						goto clean_failed_sess;
+					}
 				}
 				return (isp);
 			}
@@ -268,8 +286,14 @@ clean_failed_sess:
 		    th_name, iscsi_wd_thread, isp);
 		(void) iscsi_thread_start(isp->sess_wd_thread);
 	}
+
 	kmem_free(th_name, ISCSI_TH_MAX_NAME_LEN);
 	if (isp->sess_wd_thread == NULL) {
+		goto iscsi_sess_cleanup1;
+	}
+
+	status = iscsi_sess_threads_create(isp);
+	if (status != ISCSI_STATUS_SUCCESS) {
 		goto iscsi_sess_cleanup1;
 	}
 
@@ -289,6 +313,14 @@ clean_failed_sess:
 iscsi_sess_cleanup1:
 	ddi_taskq_destroy(isp->sess_taskq);
 iscsi_sess_cleanup2:
+	if (isp->sess_wd_thread != NULL) {
+		iscsi_thread_destroy(isp->sess_wd_thread);
+		isp->sess_wd_thread  = NULL;
+	}
+	if (isp->sess_ic_thread != NULL) {
+		iscsi_thread_destroy(isp->sess_ic_thread);
+		isp->sess_ic_thread = NULL;
+	}
 	mutex_destroy(&isp->sess_cmdsn_mutex);
 	rw_destroy(&isp->sess_conn_list_rwlock);
 	rw_destroy(&isp->sess_lun_list_rwlock);
@@ -537,6 +569,12 @@ iscsi_sess_destroy(iscsi_sess_t *isp)
 		icp = isp->sess_conn_list;
 	}
 	rw_exit(&isp->sess_conn_list_rwlock);
+
+	/* Destroy Session ic thread */
+	if (isp->sess_ic_thread != NULL) {
+		iscsi_thread_destroy(isp->sess_ic_thread);
+		isp->sess_ic_thread = NULL;
+	}
 
 	/* Destroy session task queue */
 	ddi_taskq_destroy(isp->sess_taskq);
@@ -1063,7 +1101,6 @@ iscsi_sess_state_str(iscsi_sess_state_t state)
 static void
 iscsi_sess_state_free(iscsi_sess_t *isp, iscsi_sess_event_t event)
 {
-	iscsi_status_t		status;
 	iscsi_hba_t		*ihp;
 	iscsi_task_t		*itp;
 
@@ -1078,32 +1115,27 @@ iscsi_sess_state_free(iscsi_sess_t *isp, iscsi_sess_event_t event)
 	 * -N1: A connection logged in
 	 */
 	case ISCSI_SESS_EVENT_N1:
-		status = iscsi_sess_threads_create(isp);
-		if (ISCSI_SUCCESS(status)) {
-			isp->sess_state = ISCSI_SESS_STATE_LOGGED_IN;
-			if (isp->sess_type == ISCSI_SESS_TYPE_NORMAL) {
-				cmn_err(CE_NOTE,
-				    "!iscsi session(%u) %s online\n",
-				    isp->sess_oid, isp->sess_name);
+		isp->sess_state = ISCSI_SESS_STATE_LOGGED_IN;
+		if (isp->sess_type == ISCSI_SESS_TYPE_NORMAL) {
+			cmn_err(CE_NOTE,
+			    "!iscsi session(%u) %s online\n",
+			    isp->sess_oid, isp->sess_name);
 
-				if (isp->sess_enum_in_progress == B_FALSE) {
-					isp->sess_enum_in_progress = B_TRUE;
-					mutex_exit(&isp->sess_state_mutex);
+			if (isp->sess_enum_in_progress == B_FALSE) {
+				isp->sess_enum_in_progress = B_TRUE;
+				mutex_exit(&isp->sess_state_mutex);
 
-					/* start enumeration */
-					itp = kmem_zalloc(sizeof (iscsi_task_t),
-					    KM_SLEEP);
-					itp->t_arg = isp;
-					itp->t_blocking = B_TRUE;
-					iscsi_sess_enumeration(itp);
-					kmem_free(itp, sizeof (iscsi_task_t));
+				/* start enumeration */
+				itp = kmem_zalloc(sizeof (iscsi_task_t),
+				    KM_SLEEP);
+				itp->t_arg = isp;
+				itp->t_blocking = B_TRUE;
+				iscsi_sess_enumeration(itp);
+				kmem_free(itp, sizeof (iscsi_task_t));
 
-					mutex_enter(&isp->sess_state_mutex);
-					isp->sess_enum_in_progress = B_FALSE;
-				}
+				mutex_enter(&isp->sess_state_mutex);
+				isp->sess_enum_in_progress = B_FALSE;
 			}
-		} else {
-			ASSERT(FALSE);
 		}
 		break;
 
@@ -1217,10 +1249,8 @@ iscsi_sess_state_logged_in(iscsi_sess_t *isp, iscsi_sess_event_t event)
 			 */
 			mutex_exit(&isp->sess_state_mutex);
 			iscsi_sess_offline_luns(isp);
-			iscsi_thread_destroy(isp->sess_ic_thread);
 		} else {
 			mutex_exit(&isp->sess_state_mutex);
-			iscsi_thread_destroy(isp->sess_ic_thread);
 		}
 
 		mutex_enter(&isp->sess_reset_mutex);
@@ -1264,7 +1294,6 @@ iscsi_sess_state_logged_in(iscsi_sess_t *isp, iscsi_sess_event_t event)
 static void
 iscsi_sess_state_failed(iscsi_sess_t *isp, iscsi_sess_event_t event)
 {
-	iscsi_status_t		rval;
 	iscsi_hba_t		*ihp;
 	iscsi_task_t		*itp;
 
@@ -1277,35 +1306,29 @@ iscsi_sess_state_failed(iscsi_sess_t *isp, iscsi_sess_event_t event)
 	switch (event) {
 	/* -N1: A session continuation attempt succeeded */
 	case ISCSI_SESS_EVENT_N1:
-		rval = iscsi_sess_threads_create(isp);
-		if (ISCSI_SUCCESS(rval)) {
-			isp->sess_state = ISCSI_SESS_STATE_LOGGED_IN;
-			if ((isp->sess_type == ISCSI_SESS_TYPE_NORMAL) &&
-			    (isp->sess_enum_in_progress == B_FALSE)) {
-				isp->sess_enum_in_progress = B_TRUE;
-				mutex_exit(&isp->sess_state_mutex);
+		isp->sess_state = ISCSI_SESS_STATE_LOGGED_IN;
+		if ((isp->sess_type == ISCSI_SESS_TYPE_NORMAL) &&
+		    (isp->sess_enum_in_progress == B_FALSE)) {
+			isp->sess_enum_in_progress = B_TRUE;
+			mutex_exit(&isp->sess_state_mutex);
 
-				/* start enumeration */
-				itp = kmem_zalloc(sizeof (iscsi_task_t),
-				    KM_SLEEP);
-				itp->t_arg = isp;
-				itp->t_blocking = B_FALSE;
-				if (ddi_taskq_dispatch(isp->sess_taskq,
-				    iscsi_sess_enumeration, itp, DDI_SLEEP) !=
-				    DDI_SUCCESS) {
-					kmem_free(itp, sizeof (iscsi_task_t));
-					cmn_err(CE_WARN,
-					    "iscsi connection (%u) failure - "
-					    "unable to schedule enumeration",
-					    isp->sess_oid);
-				}
-
-				mutex_enter(&isp->sess_state_mutex);
-				isp->sess_enum_in_progress = B_FALSE;
+			/* start enumeration */
+			itp = kmem_zalloc(sizeof (iscsi_task_t),
+			    KM_SLEEP);
+			itp->t_arg = isp;
+			itp->t_blocking = B_FALSE;
+			if (ddi_taskq_dispatch(isp->sess_taskq,
+			    iscsi_sess_enumeration, itp, DDI_SLEEP) !=
+			    DDI_SUCCESS) {
+				kmem_free(itp, sizeof (iscsi_task_t));
+				cmn_err(CE_WARN,
+				    "iscsi connection (%u) failure - "
+				    "unable to schedule enumeration",
+				    isp->sess_oid);
 			}
-		} else {
-			isp->sess_state = ISCSI_SESS_STATE_FREE;
-			ASSERT(FALSE);
+
+			mutex_enter(&isp->sess_state_mutex);
+			isp->sess_enum_in_progress = B_FALSE;
 		}
 		break;
 
@@ -1405,10 +1428,8 @@ iscsi_sess_state_in_flush(iscsi_sess_t *isp, iscsi_sess_event_t event)
 			 */
 			mutex_exit(&isp->sess_state_mutex);
 			iscsi_sess_offline_luns(isp);
-			iscsi_thread_destroy(isp->sess_ic_thread);
 		} else {
 			mutex_exit(&isp->sess_state_mutex);
-			iscsi_thread_destroy(isp->sess_ic_thread);
 		}
 
 		mutex_enter(&isp->sess_reset_mutex);
@@ -1452,7 +1473,6 @@ iscsi_sess_state_in_flush(iscsi_sess_t *isp, iscsi_sess_event_t event)
 static void
 iscsi_sess_state_flushed(iscsi_sess_t *isp, iscsi_sess_event_t event)
 {
-	iscsi_status_t	rval;
 	iscsi_hba_t	*ihp;
 	iscsi_task_t	*itp;
 
@@ -1465,35 +1485,29 @@ iscsi_sess_state_flushed(iscsi_sess_t *isp, iscsi_sess_event_t event)
 	switch (event) {
 	/* -N1: A session continuation attempt succeeded */
 	case ISCSI_SESS_EVENT_N1:
-		rval = iscsi_sess_threads_create(isp);
-		if (ISCSI_SUCCESS(rval)) {
-			isp->sess_state = ISCSI_SESS_STATE_LOGGED_IN;
-			if ((isp->sess_type == ISCSI_SESS_TYPE_NORMAL) &&
-			    (isp->sess_enum_in_progress == B_FALSE)) {
-				isp->sess_enum_in_progress = B_TRUE;
-				mutex_exit(&isp->sess_state_mutex);
+		isp->sess_state = ISCSI_SESS_STATE_LOGGED_IN;
+		if ((isp->sess_type == ISCSI_SESS_TYPE_NORMAL) &&
+		    (isp->sess_enum_in_progress == B_FALSE)) {
+			isp->sess_enum_in_progress = B_TRUE;
+			mutex_exit(&isp->sess_state_mutex);
 
-				/* start enumeration */
-				itp = kmem_zalloc(sizeof (iscsi_task_t),
-				    KM_SLEEP);
-				itp->t_arg = isp;
-				itp->t_blocking = B_FALSE;
-				if (ddi_taskq_dispatch(isp->sess_taskq,
-				    iscsi_sess_enumeration, itp, DDI_SLEEP) !=
-				    DDI_SUCCESS) {
-					kmem_free(itp, sizeof (iscsi_task_t));
-					cmn_err(CE_WARN,
-					    "iscsi connection (%u) failure - "
-					    "unable to schedule enumeration",
-					    isp->sess_oid);
-				}
-
-				mutex_enter(&isp->sess_state_mutex);
-				isp->sess_enum_in_progress = B_FALSE;
+			/* start enumeration */
+			itp = kmem_zalloc(sizeof (iscsi_task_t),
+			    KM_SLEEP);
+			itp->t_arg = isp;
+			itp->t_blocking = B_FALSE;
+			if (ddi_taskq_dispatch(isp->sess_taskq,
+			    iscsi_sess_enumeration, itp, DDI_SLEEP) !=
+			    DDI_SUCCESS) {
+				kmem_free(itp, sizeof (iscsi_task_t));
+				cmn_err(CE_WARN,
+				    "iscsi connection (%u) failure - "
+				    "unable to schedule enumeration",
+				    isp->sess_oid);
 			}
-		} else {
-			isp->sess_state = ISCSI_SESS_STATE_FREE;
-			ASSERT(FALSE);
+
+			mutex_enter(&isp->sess_state_mutex);
+			isp->sess_enum_in_progress = B_FALSE;
 		}
 		break;
 
