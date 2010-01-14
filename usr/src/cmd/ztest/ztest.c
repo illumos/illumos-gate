@@ -2413,7 +2413,7 @@ ztest_vdev_attach_detach(ztest_ds_t *zd, uint64_t id)
 	/*
 	 * Pick a random leaf within it.
 	 */
-	leaf = ztest_random(leaves) + zs->zs_splits;
+	leaf = ztest_random(leaves);
 
 	/*
 	 * Locate this vdev.

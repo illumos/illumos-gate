@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2619,13 +2619,18 @@ find_zpool(char **target, nvlist_t **configp, int dirc, char **dirv)
 	char *sepp = NULL;
 	char sep;
 	int count = 0;
+	importargs_t args = { 0 };
+
+	args.paths = dirc;
+	args.path = dirv;
+	args.can_be_active = B_TRUE;
 
 	if ((sepp = strpbrk(*target, "/@")) != NULL) {
 		sep = *sepp;
 		*sepp = '\0';
 	}
 
-	pools = zpool_find_import_activeok(g_zfs, dirc, dirv);
+	pools = zpool_search_import(g_zfs, &args);
 
 	if (pools != NULL) {
 		nvpair_t *elem = NULL;

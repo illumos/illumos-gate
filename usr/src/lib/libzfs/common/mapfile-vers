@@ -164,9 +164,6 @@ SUNWprivate_1.1 {
 	zpool_export;
 	zpool_export_force;
 	zpool_find_import;
-	zpool_find_import_activeok;
-	zpool_find_import_byguid;
-	zpool_find_import_byname;
 	zpool_find_import_cached;
 	zpool_find_vdev;
 	zpool_find_vdev_by_physpath;
@@ -201,6 +198,7 @@ SUNWprivate_1.1 {
 	zpool_read_label;
 	zpool_refresh_stats;
 	zpool_scrub;
+	zpool_search_import;
 	zpool_set_history_str;
 	zpool_set_prop;
 	zpool_stage_history;

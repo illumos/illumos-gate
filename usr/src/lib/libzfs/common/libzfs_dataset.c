@@ -1701,6 +1701,7 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zprop_source_t *src,
 		break;
 
 	case ZFS_PROP_CANMOUNT:
+	case ZFS_PROP_VOLSIZE:
 	case ZFS_PROP_QUOTA:
 	case ZFS_PROP_REFQUOTA:
 	case ZFS_PROP_RESERVATION:
@@ -2509,6 +2510,27 @@ zfs_iter_children(zfs_handle_t *zhp, zfs_iter_f func, void *data)
 }
 
 /*
+ * Is one dataset name a child dataset of another?
+ *
+ * Needs to handle these cases:
+ * Dataset 1	"a/foo"		"a/foo"		"a/foo"		"a/foo"
+ * Dataset 2	"a/fo"		"a/foobar"	"a/bar/baz"	"a/foo/bar"
+ * Descendant?	No.		No.		No.		Yes.
+ */
+static boolean_t
+is_descendant(const char *ds1, const char *ds2)
+{
+	size_t d1len = strlen(ds1);
+
+	/* ds2 can't be a descendant if it's smaller */
+	if (strlen(ds2) < d1len)
+		return (B_FALSE);
+
+	/* otherwise, compare strings and verify that there's a '/' char */
+	return (ds2[d1len] == '/' && (strncmp(ds1, ds2, d1len) == 0));
+}
+
+/*
  * Given a complete name, return just the portion that refers to the parent.
  * Can return NULL if this is a pool.
  */
@@ -2543,6 +2565,7 @@ check_parents(libzfs_handle_t *hdl, const char *path, uint64_t *zoned,
 	char *slash;
 	zfs_handle_t *zhp;
 	char errbuf[1024];
+	uint64_t is_zoned;
 
 	(void) snprintf(errbuf, sizeof (errbuf),
 	    dgettext(TEXT_DOMAIN, "cannot create '%s'"), path);
@@ -2585,9 +2608,12 @@ check_parents(libzfs_handle_t *hdl, const char *path, uint64_t *zoned,
 			return (zfs_standard_error(hdl, errno, errbuf));
 	}
 
-	*zoned = zfs_prop_get_int(zhp, ZFS_PROP_ZONED);
+	is_zoned = zfs_prop_get_int(zhp, ZFS_PROP_ZONED);
+	if (zoned != NULL)
+		*zoned = is_zoned;
+
 	/* we are in a non-global zone, but parent is in the global zone */
-	if (getzoneid() != GLOBAL_ZONEID && !(*zoned)) {
+	if (getzoneid() != GLOBAL_ZONEID && !is_zoned) {
 		(void) zfs_standard_error(hdl, EPERM, errbuf);
 		zfs_close(zhp);
 		return (-1);
@@ -2719,11 +2745,10 @@ int
 zfs_create_ancestors(libzfs_handle_t *hdl, const char *path)
 {
 	int prefix;
-	uint64_t zoned;
 	char *path_copy;
 	int rc;
 
-	if (check_parents(hdl, path, &zoned, B_TRUE, &prefix) != 0)
+	if (check_parents(hdl, path, NULL, B_TRUE, &prefix) != 0)
 		return (-1);
 
 	if ((path_copy = strdup(path)) != NULL) {
@@ -3461,13 +3486,10 @@ zfs_rename(zfs_handle_t *zhp, const char *target, boolean_t recursive)
 
 		if (!zfs_validate_name(hdl, target, zhp->zfs_type, B_TRUE))
 			return (zfs_error(hdl, EZFS_INVALIDNAME, errbuf));
-		uint64_t unused;
 
 		/* validate parents */
-		if (check_parents(hdl, target, &unused, B_FALSE, NULL) != 0)
+		if (check_parents(hdl, target, NULL, B_FALSE, NULL) != 0)
 			return (-1);
-
-		(void) parent_name(target, parent, sizeof (parent));
 
 		/* make sure we're in the same pool */
 		verify((delim = strchr(target, '/')) != NULL);
@@ -3479,10 +3501,9 @@ zfs_rename(zfs_handle_t *zhp, const char *target, boolean_t recursive)
 		}
 
 		/* new name cannot be a child of the current dataset name */
-		if (strncmp(parent, zhp->zfs_name,
-		    strlen(zhp->zfs_name)) == 0) {
+		if (is_descendant(zhp->zfs_name, target)) {
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "New dataset name cannot be a descendent of "
+			    "New dataset name cannot be a descendant of "
 			    "current dataset name"));
 			return (zfs_error(hdl, EZFS_INVALIDNAME, errbuf));
 		}

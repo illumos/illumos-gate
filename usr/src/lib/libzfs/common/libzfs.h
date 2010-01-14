@@ -332,14 +332,24 @@ extern int zpool_import_props(libzfs_handle_t *, nvlist_t *, const char *,
 /*
  * Search for pools to import
  */
+
+typedef struct importargs {
+	char **path;		/* a list of paths to search		*/
+	int paths;		/* number of paths to search		*/
+	char *poolname;		/* name of a pool to find		*/
+	uint64_t guid;		/* guid of a pool to find		*/
+	char *cachefile;	/* cachefile to use for import		*/
+	int can_be_active : 1;	/* can the pool be active?		*/
+	int unique : 1;		/* does 'poolname' already exist?	*/
+	int exists : 1;		/* set on return if pool already exists	*/
+} importargs_t;
+
+extern nvlist_t *zpool_search_import(libzfs_handle_t *, importargs_t *);
+
+/* legacy pool search routines */
 extern nvlist_t *zpool_find_import(libzfs_handle_t *, int, char **);
 extern nvlist_t *zpool_find_import_cached(libzfs_handle_t *, const char *,
     char *, uint64_t);
-extern nvlist_t *zpool_find_import_byname(libzfs_handle_t *, int, char **,
-    char *);
-extern nvlist_t *zpool_find_import_byguid(libzfs_handle_t *, int, char **,
-    uint64_t);
-extern nvlist_t *zpool_find_import_activeok(libzfs_handle_t *, int, char **);
 
 /*
  * Miscellaneous pool functions

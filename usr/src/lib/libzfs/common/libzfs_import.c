@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1117,14 +1117,13 @@ zpool_clear_label(int fd)
  * to import a specific pool.
  */
 static nvlist_t *
-zpool_find_import_impl(libzfs_handle_t *hdl, int argc, char **argv,
-    boolean_t active_ok, char *poolname, uint64_t guid)
+zpool_find_import_impl(libzfs_handle_t *hdl, importargs_t *iarg)
 {
-	int i;
+	int i, dirs = iarg->paths;
 	DIR *dirp = NULL;
 	struct dirent64 *dp;
 	char path[MAXPATHLEN];
-	char *end;
+	char *end, **dir = iarg->path;
 	size_t pathleft;
 	nvlist_t *ret = NULL;
 	static char *default_dir = "/dev/dsk";
@@ -1137,11 +1136,9 @@ zpool_find_import_impl(libzfs_handle_t *hdl, int argc, char **argv,
 	rdsk_node_t *slice;
 	void *cookie;
 
-	verify(poolname == NULL || guid == 0);
-
-	if (argc == 0) {
-		argc = 1;
-		argv = &default_dir;
+	if (dirs == 0) {
+		dirs = 1;
+		dir = &default_dir;
 	}
 
 	/*
@@ -1149,16 +1146,15 @@ zpool_find_import_impl(libzfs_handle_t *hdl, int argc, char **argv,
 	 * possible device, organizing the information according to pool GUID
 	 * and toplevel GUID.
 	 */
-	for (i = 0; i < argc; i++) {
+	for (i = 0; i < dirs; i++) {
 		tpool_t *t;
 		char *rdsk;
 		int dfd;
 
 		/* use realpath to normalize the path */
-		if (realpath(argv[i], path) == 0) {
+		if (realpath(dir[i], path) == 0) {
 			(void) zfs_error_fmt(hdl, EZFS_BADPATH,
-			    dgettext(TEXT_DOMAIN, "cannot open '%s'"),
-			    argv[i]);
+			    dgettext(TEXT_DOMAIN, "cannot open '%s'"), dir[i]);
 			goto error;
 		}
 		end = &path[strlen(path)];
@@ -1229,20 +1225,20 @@ zpool_find_import_impl(libzfs_handle_t *hdl, int argc, char **argv,
 				nvlist_t *config = slice->rn_config;
 				boolean_t matched = B_TRUE;
 
-				if (poolname != NULL) {
+				if (iarg->poolname != NULL) {
 					char *pname;
 
 					matched = nvlist_lookup_string(config,
 					    ZPOOL_CONFIG_POOL_NAME,
 					    &pname) == 0 &&
-					    strcmp(poolname, pname) == 0;
-				} else if (guid != 0) {
+					    strcmp(iarg->poolname, pname) == 0;
+				} else if (iarg->guid != 0) {
 					uint64_t this_guid;
 
 					matched = nvlist_lookup_uint64(config,
 					    ZPOOL_CONFIG_POOL_GUID,
 					    &this_guid) == 0 &&
-					    guid == this_guid;
+					    iarg->guid == this_guid;
 				}
 				if (!matched) {
 					nvlist_free(config);
@@ -1263,7 +1259,7 @@ zpool_find_import_impl(libzfs_handle_t *hdl, int argc, char **argv,
 		dirp = NULL;
 	}
 
-	ret = get_configs(hdl, &pools, active_ok);
+	ret = get_configs(hdl, &pools, iarg->can_be_active);
 
 error:
 	for (pe = pools.pools; pe != NULL; pe = penext) {
@@ -1297,27 +1293,12 @@ error:
 nvlist_t *
 zpool_find_import(libzfs_handle_t *hdl, int argc, char **argv)
 {
-	return (zpool_find_import_impl(hdl, argc, argv, B_FALSE, NULL, 0));
-}
+	importargs_t iarg = { 0 };
 
-nvlist_t *
-zpool_find_import_byname(libzfs_handle_t *hdl, int argc, char **argv,
-    char *pool)
-{
-	return (zpool_find_import_impl(hdl, argc, argv, B_FALSE, pool, 0));
-}
+	iarg.paths = argc;
+	iarg.path = argv;
 
-nvlist_t *
-zpool_find_import_byguid(libzfs_handle_t *hdl, int argc, char **argv,
-    uint64_t guid)
-{
-	return (zpool_find_import_impl(hdl, argc, argv, B_FALSE, NULL, guid));
-}
-
-nvlist_t *
-zpool_find_import_activeok(libzfs_handle_t *hdl, int argc, char **argv)
-{
-	return (zpool_find_import_impl(hdl, argc, argv, B_TRUE, NULL, 0));
+	return (zpool_find_import_impl(hdl, &iarg));
 }
 
 /*
@@ -1439,6 +1420,46 @@ zpool_find_import_cached(libzfs_handle_t *hdl, const char *cachefile,
 	return (pools);
 }
 
+static int
+name_or_guid_exists(zpool_handle_t *zhp, void *data)
+{
+	importargs_t *import = data;
+	int found = 0;
+
+	if (import->poolname != NULL) {
+		char *pool_name;
+
+		verify(nvlist_lookup_string(zhp->zpool_config,
+		    ZPOOL_CONFIG_POOL_NAME, &pool_name) == 0);
+		if (strcmp(pool_name, import->poolname) == 0)
+			found = 1;
+	} else {
+		uint64_t pool_guid;
+
+		verify(nvlist_lookup_uint64(zhp->zpool_config,
+		    ZPOOL_CONFIG_POOL_GUID, &pool_guid) == 0);
+		if (pool_guid == import->guid)
+			found = 1;
+	}
+
+	zpool_close(zhp);
+	return (found);
+}
+
+nvlist_t *
+zpool_search_import(libzfs_handle_t *hdl, importargs_t *import)
+{
+	verify(import->poolname == NULL || import->guid == 0);
+
+	if (import->unique)
+		import->exists = zpool_iter(hdl, name_or_guid_exists, import);
+
+	if (import->cachefile != NULL)
+		return (zpool_find_import_cached(hdl, import->cachefile,
+		    import->poolname, import->guid));
+
+	return (zpool_find_import_impl(hdl, import));
+}
 
 boolean_t
 find_guid(nvlist_t *nv, uint64_t guid)

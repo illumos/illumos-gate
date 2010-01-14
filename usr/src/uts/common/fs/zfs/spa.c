@@ -1524,7 +1524,8 @@ spa_vdev_err(vdev_t *vdev, vdev_aux_t aux, int err)
  * marked online indicates it was successfully split off (VDEV_AUX_SPLIT_POOL)
  * then we call vdev_split() on each disk, and complete the split.
  *
- * Otherwise we leave the config alone, and rejoined to the original pool.
+ * Otherwise we leave the config alone, with all the vdevs in place in
+ * the original pool.
  */
 static void
 spa_try_repair(spa_t *spa, nvlist_t *config)
@@ -4130,6 +4131,7 @@ spa_vdev_split_mirror(spa_t *spa, char *newname, nvlist_t *config,
 		    vml[c]->vdev_isspare ||
 		    vml[c]->vdev_isl2cache ||
 		    !vdev_writeable(vml[c]) ||
+		    vml[c]->vdev_children != 0 ||
 		    vml[c]->vdev_state != VDEV_STATE_HEALTHY ||
 		    c != spa->spa_root_vdev->vdev_child[c]->vdev_id) {
 			error = EINVAL;
@@ -4192,8 +4194,8 @@ spa_vdev_split_mirror(spa_t *spa, char *newname, nvlist_t *config,
 	(void) nvlist_lookup_string(props,
 	    zpool_prop_to_name(ZPOOL_PROP_ALTROOT), &altroot);
 
+	/* add the new pool to the namespace */
 	newspa = spa_add(newname, config, altroot);
-	mutex_enter(&newspa->spa_vdev_top_lock);
 	newspa->spa_config_txg = spa->spa_config_txg;
 	spa_set_log_state(newspa, SPA_LOG_CLEAR);
 
@@ -4232,9 +4234,7 @@ spa_vdev_split_mirror(spa_t *spa, char *newname, nvlist_t *config,
 	/* flush everything */
 	txg = spa_vdev_config_enter(newspa);
 	vdev_config_dirty(newspa->spa_root_vdev);
-	spa_config_sync(newspa, B_FALSE, B_TRUE);
 	(void) spa_vdev_config_exit(newspa, NULL, txg, 0, FTAG);
-	mutex_exit(&newspa->spa_vdev_top_lock);
 
 	if (zio_injection_enabled)
 		zio_handle_panic_injection(spa, FTAG, 2);
@@ -4281,7 +4281,6 @@ spa_vdev_split_mirror(spa_t *spa, char *newname, nvlist_t *config,
 	return (error);
 
 out:
-	mutex_exit(&newspa->spa_vdev_top_lock);
 	spa_unload(newspa);
 	spa_deactivate(newspa);
 	spa_remove(newspa);
@@ -4289,7 +4288,7 @@ out:
 	txg = spa_vdev_config_enter(spa);
 	nvlist_free(spa->spa_config_splitting);
 	spa->spa_config_splitting = NULL;
-	(void) spa_vdev_exit(spa, NULL, txg, 0);
+	(void) spa_vdev_exit(spa, NULL, txg, error);
 
 	kmem_free(vml, children * sizeof (vdev_t *));
 	return (error);
