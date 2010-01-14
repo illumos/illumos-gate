@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,6 +100,8 @@ extern "C" {
 
 #define	IXGBE_RX_STOPPED		0x1
 
+#define	IXGBE_PKG_BUF_16k		16384
+
 /*
  * MAX_xx_QUEUE_NUM and MAX_INTR_VECTOR values need to be the maximum of all
  * supported silicon types.
@@ -159,6 +161,7 @@ extern "C" {
 #define	DEFAULT_TX_HCKSUM_ENABLE	B_TRUE
 #define	DEFAULT_RX_HCKSUM_ENABLE	B_TRUE
 #define	DEFAULT_LSO_ENABLE		B_TRUE
+#define	DEFAULT_LRO_ENABLE		B_FALSE
 #define	DEFAULT_MR_ENABLE		B_TRUE
 #define	DEFAULT_TX_HEAD_WB_ENABLE	B_TRUE
 
@@ -214,6 +217,7 @@ extern "C" {
 #define	PROP_TX_HCKSUM_ENABLE		"tx_hcksum_enable"
 #define	PROP_RX_HCKSUM_ENABLE		"rx_hcksum_enable"
 #define	PROP_LSO_ENABLE			"lso_enable"
+#define	PROP_LRO_ENABLE			"lro_enable"
 #define	PROP_MR_ENABLE			"mr_enable"
 #define	PROP_TX_HEAD_WB_ENABLE		"tx_head_wb_enable"
 #define	PROP_TX_COPY_THRESHOLD		"tx_copy_threshold"
@@ -245,6 +249,7 @@ extern "C" {
 #define	IXGBE_FLAG_VMDQ_CAPABLE		(u32)(1 << 6)
 #define	IXGBE_FLAG_VMDQ_ENABLED		(u32)(1 << 7)
 #define	IXGBE_FLAG_FAN_FAIL_CAPABLE	(u32)(1 << 8)
+#define	IXGBE_FLAG_RSC_CAPABLE		(u32)(1 << 9)
 
 /* adapter-specific info for each supported device type */
 typedef struct adapter_info {
@@ -418,6 +423,9 @@ typedef struct rx_control_block {
 	dma_buffer_t		rx_buf;
 	frtn_t			free_rtn;
 	struct ixgbe_rx_data	*rx_data;
+	int			lro_next;	/* Index of next rcb */
+	int			lro_prev;	/* Index of previous rcb */
+	boolean_t		lro_pkt;	/* Flag for LRO rcb */
 } rx_control_block_t;
 
 /*
@@ -527,6 +535,9 @@ typedef struct ixgbe_rx_data {
 	uint32_t		rcb_pending;
 	uint32_t		flag;
 
+	uint32_t		lro_num;	/* Number of rcbs of one LRO */
+	uint32_t		lro_first;	/* Index of first LRO rcb */
+
 	struct ixgbe_rx_ring	*rx_ring;	/* Pointer to rx ring */
 } ixgbe_rx_data_t;
 
@@ -598,7 +609,6 @@ typedef struct ixgbe {
 	link_state_t		link_state;
 	uint32_t		link_speed;
 	uint32_t		link_duplex;
-	uint32_t		link_down_timeout;
 
 	uint32_t		reset_count;
 	uint32_t		attach_progress;
@@ -620,7 +630,8 @@ typedef struct ixgbe {
 	uint32_t		num_rx_rings;	/* Number of rx rings in use */
 	uint32_t		rx_ring_size;	/* Rx descriptor ring size */
 	uint32_t		rx_buf_size;	/* Rx buffer size */
-
+	boolean_t		lro_enable;	/* Large Receive Offload */
+	uint64_t		lro_pkt_count;	/* LRO packet count */
 	/*
 	 * Receive Groups
 	 */
@@ -769,6 +780,7 @@ typedef struct ixgbe_stat {
 	kstat_named_t tpt;	/* Total Packets Xmitted */
 	kstat_named_t mptc;	/* Multicast Packets Xmited Count */
 	kstat_named_t bptc;	/* Broadcast Packets Xmited Count */
+	kstat_named_t lroc;	/* LRO Packets Received Count */
 } ixgbe_stat_t;
 
 /*

@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,6 +52,7 @@ ixgbe_update_stats(kstat_t *ks, int rw)
 	 */
 	ixgbe_ks->link_speed.value.ui64 = ixgbe->link_speed;
 	ixgbe_ks->reset_count.value.ui64 = ixgbe->reset_count;
+	ixgbe_ks->lroc.value.ui64 = ixgbe->lro_pkt_count;
 
 #ifdef IXGBE_DEBUG
 	ixgbe_ks->rx_frame_error.value.ui64 = 0;
@@ -421,7 +422,8 @@ ixgbe_init_stats(ixgbe_t *ixgbe)
 	    KSTAT_DATA_UINT64);
 	kstat_named_init(&ixgbe_ks->rnbc, "recv_no_buffer",
 	    KSTAT_DATA_UINT64);
-
+	kstat_named_init(&ixgbe_ks->lroc, "lro_pkt_count",
+	    KSTAT_DATA_UINT64);
 	/*
 	 * Function to provide kernel stat update on demand
 	 */

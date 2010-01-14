@@ -21,14 +21,14 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include "ixgbe_sw.h"
 
-static char ident[] = "Intel 10Gb Ethernet";
-static char ixgbe_version[] = "ixgbe 1.1.3";
+static char ixgbe_ident[] = "Intel 10Gb Ethernet";
+static char ixgbe_version[] = "driver version 1.1.4";
 
 /*
  * Local function protoypes
@@ -168,7 +168,7 @@ static struct dev_ops ixgbe_dev_ops = {
 
 static struct modldrv ixgbe_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	ident,			/* Discription string */
+	ixgbe_ident,		/* Discription string */
 	&ixgbe_dev_ops		/* driver ops */
 };
 
@@ -261,7 +261,8 @@ static adapter_info_t ixgbe_82599eb_cap = {
 	IXGBE_EICR_LSC,	/* "other" interrupt types handled */
 	(IXGBE_FLAG_DCA_CAPABLE	/* capability flags */
 	| IXGBE_FLAG_RSS_CAPABLE
-	| IXGBE_FLAG_VMDQ_CAPABLE)
+	| IXGBE_FLAG_VMDQ_CAPABLE
+	| IXGBE_FLAG_RSC_CAPABLE)
 };
 
 /*
@@ -524,7 +525,7 @@ ixgbe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	}
 	ixgbe->attach_progress |= ATTACH_PROGRESS_ENABLE_INTR;
 
-	ixgbe_log(ixgbe, "%s", ixgbe_version);
+	ixgbe_log(ixgbe, "%s, %s", ixgbe_ident, ixgbe_version);
 	atomic_or_32(&ixgbe->ixgbe_state, IXGBE_INITIALIZED);
 
 	return (DDI_SUCCESS);
@@ -1787,6 +1788,7 @@ ixgbe_setup_rx_ring(ixgbe_rx_ring_t *rx_ring)
 	IXGBE_WRITE_REG(hw, IXGBE_RDH(rx_ring->index), 0);
 
 	rx_data->rbd_next = 0;
+	rx_data->lro_first = 0;
 
 	/*
 	 * Setup the Receive Descriptor Control Register (RXDCTL)
@@ -1918,6 +1920,36 @@ ixgbe_setup_rx(ixgbe_t *ixgbe)
 	 */
 	if (ixgbe->num_rx_rings > 1)
 		ixgbe_setup_rss(ixgbe);
+
+	/*
+	 * Setup RSC for multiple receive queues.
+	 */
+	if (ixgbe->lro_enable) {
+		for (i = 0; i < ixgbe->num_rx_rings; i++) {
+			/*
+			 * Make sure rx_buf_size * MAXDESC not greater
+			 * than 65535.
+			 * Intel recommends 4 for MAXDESC field value.
+			 */
+			reg_val = IXGBE_READ_REG(hw, IXGBE_RSCCTL(i));
+			reg_val |= IXGBE_RSCCTL_RSCEN;
+			if (ixgbe->rx_buf_size == IXGBE_PKG_BUF_16k)
+				reg_val |= IXGBE_RSCCTL_MAXDESC_1;
+			else
+				reg_val |= IXGBE_RSCCTL_MAXDESC_4;
+			IXGBE_WRITE_REG(hw,  IXGBE_RSCCTL(i), reg_val);
+		}
+
+		reg_val = IXGBE_READ_REG(hw, IXGBE_RSCDBU);
+		reg_val |= IXGBE_RSCDBU_RSCACKDIS;
+		IXGBE_WRITE_REG(hw, IXGBE_RSCDBU, reg_val);
+
+		reg_val = IXGBE_READ_REG(hw, IXGBE_RDRXCTL);
+		reg_val |= IXGBE_RDRXCTL_RSCACKC;
+		reg_val &= ~IXGBE_RDRXCTL_RSCFRSTSIZE;
+
+		IXGBE_WRITE_REG(hw, IXGBE_RDRXCTL, reg_val);
+	}
 }
 
 static void
@@ -2430,6 +2462,8 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 	    0, 1, DEFAULT_RX_HCKSUM_ENABLE);
 	ixgbe->lso_enable = ixgbe_get_prop(ixgbe, PROP_LSO_ENABLE,
 	    0, 1, DEFAULT_LSO_ENABLE);
+	ixgbe->lro_enable = ixgbe_get_prop(ixgbe, PROP_LRO_ENABLE,
+	    0, 1, DEFAULT_LRO_ENABLE);
 	ixgbe->tx_head_wb_enable = ixgbe_get_prop(ixgbe, PROP_TX_HEAD_WB_ENABLE,
 	    0, 1, DEFAULT_TX_HEAD_WB_ENABLE);
 
@@ -2447,6 +2481,21 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 		ixgbe->lso_enable = B_FALSE;
 	}
 
+	/*
+	 * ixgbe LRO needs the rx h/w checksum support.
+	 * LRO will be disabled if rx h/w checksum is not
+	 * enabled.
+	 */
+	if (ixgbe->rx_hcksum_enable == B_FALSE) {
+		ixgbe->lro_enable = B_FALSE;
+	}
+
+	/*
+	 * ixgbe LRO only been supported by 82599 now
+	 */
+	if (hw->mac.type != ixgbe_mac_82599EB) {
+		ixgbe->lro_enable = B_FALSE;
+	}
 	ixgbe->tx_copy_thresh = ixgbe_get_prop(ixgbe, PROP_TX_COPY_THRESHOLD,
 	    MIN_TX_COPY_THRESHOLD, MAX_TX_COPY_THRESHOLD,
 	    DEFAULT_TX_COPY_THRESHOLD);
@@ -2620,7 +2669,6 @@ ixgbe_driver_link_check(ixgbe_t *ixgbe)
 			}
 			ixgbe->link_duplex = LINK_DUPLEX_FULL;
 			ixgbe->link_state = LINK_STATE_UP;
-			ixgbe->link_down_timeout = 0;
 			link_changed = B_TRUE;
 		}
 	} else {
@@ -2637,17 +2685,6 @@ ixgbe_driver_link_check(ixgbe_t *ixgbe)
 				ixgbe->link_duplex = LINK_DUPLEX_UNKNOWN;
 				ixgbe->link_state = LINK_STATE_DOWN;
 				link_changed = B_TRUE;
-			}
-
-			if (ixgbe->ixgbe_state & IXGBE_STARTED) {
-				if (ixgbe->link_down_timeout <
-				    MAX_LINK_DOWN_TIMEOUT) {
-					ixgbe->link_down_timeout++;
-				} else if (ixgbe->link_down_timeout ==
-				    MAX_LINK_DOWN_TIMEOUT) {
-					ixgbe_tx_clean(ixgbe);
-					ixgbe->link_down_timeout++;
-				}
 			}
 		}
 	}
@@ -2744,8 +2781,9 @@ ixgbe_local_timer(void *arg)
 		ixgbe->reset_count++;
 		if (ixgbe_reset(ixgbe) == IXGBE_SUCCESS)
 			ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_RESTORED);
-		ixgbe_restart_watchdog_timer(ixgbe);
 	}
+
+	ixgbe_restart_watchdog_timer(ixgbe);
 }
 
 /*
@@ -3069,7 +3107,10 @@ ixgbe_enable_adapter_interrupts(ixgbe_t *ixgbe)
 		gpie |= IXGBE_SDP2_GPIEN; /* pluggable optics intr */
 		gpie |= IXGBE_SDP1_GPIEN; /* LSC interrupt */
 	}
-
+	/* Enable RSC Dealy 8us for 82599  */
+	if (ixgbe->lro_enable) {
+		gpie |= (1 << IXGBE_GPIE_RSC_DELAY_SHIFT);
+	}
 	/* write to interrupt control registers */
 	IXGBE_WRITE_REG(hw, IXGBE_EIMS, ixgbe->eims);
 	IXGBE_WRITE_REG(hw, IXGBE_EIAC, eiac);

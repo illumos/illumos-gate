@@ -22,7 +22,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -867,6 +867,7 @@
 #define	IXGBE_RDRXCTL_AGGDIS	0x00010000 /* Aggregation disable */
 #define	IXGBE_RDRXCTL_RSCFRSTSIZE	0x003E0000 /* RSC First packet size */
 #define	IXGBE_RDRXCTL_RSCLLIDIS	0x00800000 /* Disable RSC compl on LLI */
+#define	IXGBE_RDRXCTL_RSCACKC	0x02000000 /* RSCACKC bit */
 
 /* RQTC Bit Masks and Shifts */
 #define	IXGBE_RQTC_SHIFT_TC(_i)	((_i) * 4)

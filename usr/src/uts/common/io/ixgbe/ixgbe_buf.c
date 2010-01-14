@@ -22,7 +22,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -864,7 +864,9 @@ ixgbe_alloc_rcb_lists(ixgbe_rx_data_t *rx_data)
 		rcb->rx_data = (ixgbe_rx_data_t *)rx_data;
 		rcb->free_rtn.free_func = ixgbe_rx_recycle;
 		rcb->free_rtn.free_arg = (char *)rcb;
-
+		rcb->lro_prev = -1;
+		rcb->lro_next = -1;
+		rcb->lro_pkt = B_FALSE;
 		rcb->mp = desballoc((unsigned char *)
 		    rx_buf->address,
 		    rx_buf->size,
