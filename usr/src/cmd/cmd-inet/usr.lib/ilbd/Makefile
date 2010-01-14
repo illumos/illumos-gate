@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -42,6 +42,7 @@ SRCS=		$(ILBD_SRCS) $(LIST_SRCS)
 ILBSUBDIRS=	ilb
 
 include		../../../Makefile.cmd
+include		../../../Makefile.ctf
 include		../../Makefile.cmd-inet
 
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORK)/loadbalancer
@@ -65,9 +66,6 @@ clobber:=	TARGET= clobber
 lint:=		TARGET= lint
 
 # used for debugging ONLY:
-
-CFLAGS =		-g -K pic 
-STRIP_STABS=		:
 CTFCVTFLAGS +=		-g
 
 
