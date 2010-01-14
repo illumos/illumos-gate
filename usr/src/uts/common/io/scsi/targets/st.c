@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1446,6 +1446,10 @@ st_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		if (ddi_removing_power(devi)) {
 			return (DDI_FAILURE);
 		}
+
+		if (un->un_dev == 0)
+			un->un_dev = MTMINOR(instance);
+
 		mutex_enter(ST_MUTEX);
 
 		/*
