@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,14 @@ extern "C" {
 #endif
 
 
+/*
+ * boot platform defaults per architecture
+ */
+typedef struct bootplat_defaults {
+	char	*plat_defaults_name;
+	char	*plat_defaults_path;
+	int	plat_defaults_vac;
+} bootplat_defaults_t;
 
 /* boot_plat.c */
 extern int	verbosemode;

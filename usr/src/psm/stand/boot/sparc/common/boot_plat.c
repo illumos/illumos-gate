@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,7 +72,15 @@ extern	void exitto64(int (*entrypoint)(), void *bootvec);
 
 int openfile(char *filename);
 
-int client_isLP64 = 1;			/* SPARC clients are always LP64 */
+char *default_name;
+char *default_path;
+
+int vac;			/* virtual address cache type (none == 0) */
+int is_sun4v;			/* sun4u vs. sun4v */
+int client_isLP64 = 1;		/* SPARC clients are always LP64 */
+
+extern bootplat_defaults_t sun4u_plat_defaults;
+extern bootplat_defaults_t sun4v_plat_defaults;
 
 /*
  * filename is the name of the standalone we're going to execute.
@@ -451,12 +459,49 @@ void
 system_check(void)
 {
 	char buf[PROM_VERS_MAX_LEN];
+	pnode_t	n;
+	char	arch[128];
+	size_t	len;
+	bootplat_defaults_t *plat_defaults;
 
-	if (cpu_is_ultrasparc_1()) {
+	/*
+	 * This is a sun4v machine iff the device_type property
+	 * exists on the root node and has the value "sun4v".
+	 * Some older sunfire proms do not have such a property.
+	 */
+	is_sun4v = 0;
+	n = prom_rootnode();
+	len = prom_getproplen(n, "device_type");
+	if (len > 0 && len < sizeof (arch)) {
+		(void) prom_getprop(n, "device_type", arch);
+		arch[len] = '\0';
+		dprintf("device_type=%s\n", arch);
+		if (strcmp(arch, "sun4v") == 0) {
+			is_sun4v = 1;
+		}
+	} else {
+		dprintf("device_type: no such property, len=%d\n", (int)len);
+	}
+
+	if (!is_sun4v && cpu_is_ultrasparc_1()) {
 		printf("UltraSPARC I processors are not supported by this "
 		    "release of Solaris.\n");
 		prom_exit_to_mon();
 	}
+
+	/*
+	 * Set up defaults per platform
+	 */
+	plat_defaults = (is_sun4v) ?
+	    &sun4v_plat_defaults : &sun4u_plat_defaults;
+
+	default_name = plat_defaults->plat_defaults_name;
+	default_path = plat_defaults->plat_defaults_path;
+	vac = plat_defaults->plat_defaults_vac;
+
+	dprintf("default_name: %s\n", default_name);
+	dprintf("default_path: %s\n", default_path);
+	dprintf("vac: %d\n", vac);
 
 	if (prom_version_check(buf, PROM_VERS_MAX_LEN, NULL) != PROM_VER64_OK) {
 		printf("The firmware on this system does not support the 64-bit"
@@ -557,6 +602,7 @@ main(void *cookie, char **argv, int argc)
 	(void) strncpy(bpath, prom_bootpath(), sizeof (bpath) - 1);
 	bpath[sizeof (bpath) - 1] = '\0';
 
+	dprintf("arch: %s\n", is_sun4v ? "sun4v" : "sun4u");
 	dprintf("bootpath: 0x%p %s\n", (void *)bpath, bpath);
 	dprintf("bootargs: 0x%p %s\n", (void *)bargs, bargs);
 	dprintf("filename: 0x%p %s\n", (void *)filename, filename);
@@ -580,9 +626,13 @@ main(void *cookie, char **argv, int argc)
 	 */
 	mangle_os_bootpath(bpath);
 
-#ifdef	sun4u
-	retain_nvram_page();
-#endif
+	/*
+	 * Not necessary on sun4v as nvram is virtual
+	 * and kept by the guest manager on the SP.
+	 */
+	if (!is_sun4v) {
+		retain_nvram_page();
+	}
 
 	if (bootprog(bpath, bargs, user_specified_filename) == 0) {
 		post_mountroot(filename, NULL);

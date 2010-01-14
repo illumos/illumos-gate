@@ -18,10 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # psm/stand/boot/sparcv9/Makefile.com
@@ -36,10 +33,14 @@ BOOTSRCDIR	= ../..
 TOP_CMN_DIR	= $(SRC)/common
 CMN_DIR		= $(BOOTSRCDIR)/common
 MACH_DIR	= ../../sparc/common
-PLAT_DIR	= .
+PLAT_DIR	= sun4
 BOOT_DIR        = $(SRC)/psm/stand/boot
 
-BOOT_SRC	= inetboot.c wanboot.c
+WANBOOT		= wanboot
+NFSBOOT		= inetboot
+
+WANBOOT_SRC	= $(WANBOOT).c
+NFSBOOT_SRC	= $(NFSBOOT).c
 
 CONF_SRC	= nfsconf.c wbfsconf.c wbcli.c
 
@@ -50,10 +51,14 @@ MISC_SRC	= ramdisk.c
 CMN_C_SRC	= heap_kmem.c readfile.c
 
 MACH_C_SRC	= boot_plat.c bootops.c bootprop.c bootflags.c
+MACH_C_SRC	+= machdep.c sun4u_machdep.c sun4v_machdep.c
 MACH_C_SRC	+= get.c
 
-BOOT_OBJS	= $(BOOT_SRC:%.c=%.o)
-BOOT_L_OBJS	= $(BOOT_OBJS:%.o=%.ln)
+WANBOOT_OBJS	= $(WANBOOT_SRC:%.c=%.o)
+WANBOOT_L_OBJS	= $(WANBOOT_OBJS:%.o=%.ln)
+
+NFSBOOT_OBJS	= $(NFSBOOT_SRC:%.c=%.o)
+NFSBOOT_L_OBJS	= $(NFSBOOT_OBJS:%.o=%.ln)
 
 CONF_OBJS	= $(CONF_SRC:%.c=%.o)
 CONF_L_OBJS	= $(CONF_OBJS:%.o=%.ln)
@@ -97,11 +102,26 @@ ASFLAGS		+= $(CPPDEFS) -P -D_ASM $(CPPINCS)
 CFLAGS64	+= ../../sparc/common/sparc.il
 
 #
-# Until we are building on a MACH=sparcv9 machine, we have to override
-# where to look for libraries.
+# Where to look for libraries.
 #
 PSMNAMELIBDIR	= $(PSMSTANDDIR)/lib/names/$(TARG_MACH)
 PSMPROMLIBDIR	= $(PSMSTANDDIR)/lib/promif/$(TARG_MACH)
+
+#
+# Install targets
+#
+ROOT_PLAT_SUN4U_WANBOOT= $(ROOT_PLAT_DIR)/sun4u/$(WANBOOT)
+ROOT_PLAT_SUN4V_WANBOOT= $(ROOT_PLAT_DIR)/sun4v/$(WANBOOT)
+
+USR_PLAT_SUN4U_LIB=$(USR_PLAT_DIR)/sun4u/lib
+USR_PLAT_SUN4U_LIB_FS=$(USR_PLAT_SUN4U_LIB)/fs
+USR_PLAT_SUN4U_LIB_FS_NFS=$(USR_PLAT_SUN4U_LIB_FS)/nfs
+USR_PLAT_SUN4U_LIB_FS_NFS_NFSBOOT=$(USR_PLAT_SUN4U_LIB_FS_NFS)/$(NFSBOOT)
+
+USR_PLAT_SUN4V_LIB=$(USR_PLAT_DIR)/sun4v/lib
+USR_PLAT_SUN4V_LIB_FS=$(USR_PLAT_SUN4V_LIB)/fs
+USR_PLAT_SUN4V_LIB_FS_NFS=$(USR_PLAT_SUN4V_LIB_FS)/nfs
+USR_PLAT_SUN4V_LIB_FS_NFS_NFSBOOT=$(USR_PLAT_SUN4V_LIB_FS_NFS)/$(NFSBOOT)
 
 #
 # The following libraries are built in LIBNAME_DIR
@@ -120,27 +140,14 @@ LIBPROM_LIBS    += libprom.a
 #
 LIBSYS_DIR      += $(SYSLIBDIR)
 
+#.KEEP_STATE:
 #
-# Used to convert ELF to an a.out and ensure alignment
-#
-STRIPALIGN = stripalign
 
-#
-# Program used to post-process the ELF executables
-#
-ELFCONV	= ./$(STRIPALIGN)			# Default value
-
-.KEEP_STATE:
-
-.PARALLEL:	$(OBJS) $(CONF_OBJS) $(MISC_OBJS) $(SRT0_OBJ) $(BOOT_OBJS)
+.PARALLEL:	$(OBJS) $(CONF_OBJS) $(MISC_OBJS) $(SRT0_OBJ) \
+		$(WANBOOT_OBJS) $(NFSBOOT_OBJS)
 .PARALLEL:	$(L_OBJS) $(CONF_L_OBJS) $(MISC_L_OBJS) $(SRT0_L_OBJ) \
-		$(BOOT_L_OBJS)
+		$(WANBOOT_L_OBJS) $(NFSBOOT_L_OBJS)
 .PARALLEL:	$(NFSBOOT) $(WANBOOT)
-
-all: $(ELFCONV) $(NFSBOOT) $(WANBOOT)
-
-$(STRIPALIGN): $(CMN_DIR)/$$(@).c
-	$(NATIVECC) -o $@ $(CMN_DIR)/$@.c
 
 #
 # Note that the presumption is that someone has already done a `make
@@ -153,126 +160,5 @@ LIBDEPS=	$(LIBPROM_DIR)/libprom.a $(LIBPLAT_DEP) \
 L_LIBDEPS=	$(LIBPROM_DIR)/llib-lprom.ln $(LIBPLAT_DEP_L) \
 		$(LIBNAME_DIR)/llib-lnames.ln
 
-#
-#  WANboot booter
-#
-# Libraries used to build wanboot
-#
-# EXPORT DELETE START
-LIBWANBOOT =	libwanboot.a
-LIBSCRYPT =	libscrypt.a
-LIBSSL =	libssl.a
-LIBCRYPTO =	libcrypto.a
-# EXPORT DELETE END
-
-LIBWAN_LIBS     = \
-		$(LIBWANBOOT) \
-		libnvpair.a libufs.a libhsfs.a libnfs.a \
-		libxdr.a libnames.a libsock.a libinet.a libtcp.a \
-		$(LIBSCRYPT) $(LIBSSL) $(LIBCRYPTO) \
-		libmd5.a libsa.a libprom.a \
-		$(LIBSSL) \
-		$(LIBPLAT_LIBS)
-WAN_LIBS        = $(LIBWAN_LIBS:lib%.a=-l%)
-WAN_DIRS        = $(LIBNAME_DIR:%=-L%) $(LIBSYS_DIR:%=-L%)
-WAN_DIRS        += $(LIBPLAT_DIR:%=-L%) $(LIBPROM_DIR:%=-L%)
-
-#
-# Loader flags used to build wanboot
-#
-WAN_MAPFILE	= $(MACH_DIR)/mapfile
-WAN_LDFLAGS	= -dn -M $(WAN_MAPFILE) -e _start $(WAN_DIRS)
-WAN_L_LDFLAGS	= $(WAN_DIRS)
-
-#
-# Object files used to build wanboot
-#
-WAN_SRT0        = $(SRT0_OBJ)
-WAN_OBJS        = $(OBJS) wbfsconf.o wbcli.o wanboot.o ramdisk.o
-WAN_L_OBJS      = $(WAN_SRT0:%.o=%.ln) $(WAN_OBJS:%.o=%.ln)
-
-#
-# Build rules to build wanboot
-#
-
-$(WANBOOT).elf: $(WAN_MAPFILE) $(WAN_SRT0) $(WAN_OBJS) $(LIBDEPS)
-	$(LD) $(WAN_LDFLAGS) -o $@ $(WAN_SRT0) $(WAN_OBJS) $(WAN_LIBS)
-	$(MCS) -d $@
-	$(POST_PROCESS)
-	$(POST_PROCESS)
-	$(MCS) -c $@
-
-$(WANBOOT): $(WANBOOT).elf
-	$(RM) $@; cp $@.elf $@
-	$(STRIP) $@
-
-$(WANBOOT)_lint: $(L_LIBDEPS) $(WAN_L_OBJS)
-	@echo ""
-	@echo wanboot lint: global crosschecks:
-	$(LINT.c) $(WAN_L_LDFLAGS) $(WAN_L_OBJS) $(WAN_LIBS)
-
-# High-sierra filesystem booter.  Probably doesn't work.
-
-# NFS booter
-
-#
-# Libraries used to build nfsboot
-#
-LIBNFS_LIBS     = libnfs.a libxdr.a libnames.a \
-		libsock.a libinet.a libtcp.a libsa.a libprom.a \
-		$(LIBPLAT_LIBS)
-NFS_LIBS        = $(LIBNFS_LIBS:lib%.a=-l%)
-NFS_DIRS        = $(LIBNAME_DIR:%=-L%) $(LIBSYS_DIR:%=-L%)
-NFS_DIRS        += $(LIBPLAT_DIR:%=-L%) $(LIBPROM_DIR:%=-L%)
-
-#
-# Loader flags used to build inetboot
-#
-NFS_MAPFILE	= $(MACH_DIR)/mapfile
-NFS_LDFLAGS	= -dn -M $(NFS_MAPFILE) -e _start $(NFS_DIRS)
-NFS_L_LDFLAGS	= $(NFS_DIRS)
-
-#
-# Object files used to build inetboot
-#
-NFS_SRT0        = $(SRT0_OBJ)
-NFS_OBJS        = $(OBJS) nfsconf.o inetboot.o ramdisk.o
-NFS_L_OBJS      = $(NFS_SRT0:%.o=%.ln) $(NFS_OBJS:%.o=%.ln)
-
-$(NFSBOOT).elf: $(ELFCONV) $(NFS_MAPFILE) $(NFS_SRT0) $(NFS_OBJS) $(LIBDEPS)
-	$(LD) $(NFS_LDFLAGS) -o $@ $(NFS_SRT0) $(NFS_OBJS) $(NFS_LIBS)
-	$(MCS) -d $@
-	$(POST_PROCESS)
-	$(POST_PROCESS)
-	$(MCS) -c $@
-
-#
-# This is a bit strange because some platforms boot elf and some don't.
-# So this rule strips the file no matter which ELFCONV is used.
-#
-$(NFSBOOT): $(NFSBOOT).elf
-	$(RM) $@.tmp; cp $@.elf $@.tmp; $(STRIP) $@.tmp
-	$(RM) $@; $(ELFCONV) $@.tmp $@; $(RM) $@.tmp
-
-$(NFSBOOT)_lint: $(NFS_L_OBJS) $(L_LIBDEPS)
-	@echo ""
-	@echo inetboot lint: global crosschecks:
-	$(LINT.c) $(NFS_L_LDFLAGS) $(NFS_L_OBJS) $(NFS_LIBS)
-
 include $(BOOTSRCDIR)/Makefile.rules
-
-install: $(ROOT_PSM_WANBOOT)
-
-clean:
-	$(RM) make.out lint.out
-	$(RM) $(OBJS) $(CONF_OBJS) $(MISC_OBJS) $(BOOT_OBJS) $(SRT0_OBJ)
-	$(RM) $(NFSBOOT).elf $(WANBOOT).elf
-	$(RM) $(L_OBJS) $(CONF_L_OBJS) $(MISC_L_OBJS) $(BOOT_L_OBJS) \
-	      $(SRT0_L_OBJ)
-
-clobber: clean
-	$(RM) $(NFSBOOT) $(WANBOOT) $(STRIPALIGN)
-
-lint: $(NFSBOOT)_lint $(WANBOOT)_lint
-
 include $(BOOTSRCDIR)/Makefile.targ

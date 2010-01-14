@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # psm/stand/bootblks/Makefile.com
@@ -33,16 +33,6 @@ CLASS	= 32
 
 include $(TOPDIR)/Makefile.master
 include $(TOPDIR)/Makefile.psm
-
-STANDDIR	= $(TOPDIR)/stand
-PSMSTANDDIR	= $(TOPDIR)/psm/stand
-
-SYSHDRDIR	= $(STANDDIR)
-SYSLIBDIR	= $(ROOT)/stand/lib
-
-PSMSYSHDRDIR	= $(PSMSTANDDIR)
-PSMNAMELIBDIR	= $(PSMSTANDDIR)/lib/names/$(MACH)
-PSMPROMLIBDIR	= $(PSMSTANDDIR)/lib/promif/$(MACH)
 
 #
 # 'bootblk' is the basic target we build - in many flavours
@@ -65,22 +55,3 @@ TOKENIZE	= tokenize
 FILEMODE	= 444
 DIRMODE		= 755
 
-#
-# For building lint objects
-#
-LINTFLAGS.c	= -nsxum
-LINT.c		= $(LINT) $(LINTFLAGS.c) $(LINT_DEFS) $(CPPFLAGS) -c
-LINT.s		= $(LINT) $(LINTFLAGS.s) $(LINT_DEFS) $(CPPFLAGS) -c
-
-#
-# For building lint libraries
-#
-LINTFLAGS.lib	= -nsxum
-LINT.lib	= $(LINT) $(LINTFLAGS.lib) $(LINT_DEFS) $(CPPFLAGS)
-
-#
-# For complete pass 2 cross-checks
-# XXX: lint flags should exclude -u, but the standalone libs confuse lint.
-#
-LINTFLAGS.2	= -nsxum
-LINT.2		= $(LINT) $(LINTFLAGS.2) $(LINT_DEFS) $(CPPFLAGS)

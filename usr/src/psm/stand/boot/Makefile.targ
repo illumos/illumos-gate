@@ -18,10 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # psm/stand/boot/Makefile.files
@@ -29,7 +26,7 @@
 #
 # Targets common to all versions
 #
-install: all $(USR_PSM_NFSBOOT)
+install: all
 
 #
 # Install rules

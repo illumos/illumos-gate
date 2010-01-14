@@ -34,17 +34,13 @@ include $(TOPDIR)/psm/Makefile.psm.64
 
 CFLAGS64	+= -xchip=ultra $(CCABS32)
 
-PLATDIR =	$(TOPDIR)/psm/promif/ieee1275/sun4u
 PLATSUN4DIR =	$(TOPDIR)/psm/promif/ieee1275/sun4
 SYSDIR =	$(TOPDIR)/uts
 
 LIBPLAT =	libplat.a
 LINTLIBPLAT =	llib-lplat.ln
 
-PLAT_PFILES = 			\
-	prom_serengeti.c	\
-	prom_sunfire.c		\
-	prom_tlb.c
+PLAT_PFILES =
 
 PLAT_PSUN4FILES =		\
 	prom_alloc.c		\
@@ -111,6 +107,7 @@ $(OBJSDIR):
 #
 # build rules using standard library object subdirectory
 #
+
 $(OBJSDIR)/%.o: $(PLATDIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)

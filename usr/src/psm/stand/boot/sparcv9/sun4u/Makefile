@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -77,62 +77,23 @@ ARCHMMU  =	sfmmu
 PROMVERS =	ieee1275
 ASFLAGS +=	$(sparcv9_XARCH)
 
-PLAT_C_SRC =	machdep.c
-ARCH_C_SRC =	sun4u_memlist.c sun4x_standalloc.c sun4dep.c
-ARCH_S_SRC =	sparcv9_subr.s
-SRT0_S =	sun4u_srt0.s
-INLINES =
-
-LDFLAGS +=	-L$(TOPDIR)/psm/stand/lib/promif/$(TARG_MACH)/$(PROMVERS)/common
-
-#
-# The following libraries are build in LIBPLAT_DIR
-#
-LIBPLAT_DIR =	$(TOPDIR)/psm/stand/lib/promif/$(TARG_MACH)/$(PROMVERS)/$(PLATFORM)
-LIBPLAT_LIBS =  libplat.a
-LIBPLAT_L_LIBS=	$(LIBPLAT_LIBS:lib%.a=llib-l%.ln)
-LIBPLAT_DEP = 	$(LIBPLAT_DIR)/$(LIBPLAT_LIBS)
-LIBPLAT_DEP_L =	$(LIBPLAT_DIR)/$(LIBPLAT_L_LIBS)
-
-#
-# Platform specific libraries
-#
-PSMLIBS +=      $(LIBPLAT_LIBS:lib%.a=-l%)
-PSMLIB_DIRS +=  $(LIBPLAT_DIR)
-
 include ../Makefile.com
 
-# re-define ELFCONV for 4u--- sun4u can boot ELF directly
-ELFCONV = /usr/bin/cp
-
-# Don't need mapfile.inet for 4u inetboot
-NFS_MAPFILE = $(MACH_DIR)/mapfile
-
-#
-# Set the choice of compiler. 
-
 include $(TOPDIR)/psm/Makefile.psm.64
+include $(BOOTSRCDIR)/Makefile.rules
 
-CFLAGS64	+= -xchip=ultra $(CCABS32)
+FRC:
 
-#
-# XXX this totally sucks since it effectively turns off -errchk=longptr64,
-# which we really should be using.
-#
-LINTFLAGS64 = $(LINTFLAGS) -m64
+.KEEP_STATE:
 
-#
-# Cross-reference customization: include all boot-related source files.
-#
-STANDLIBDIR=	../../../../../stand/lib
-STANDSYSDIR=	../../../../../stand/sys
-PROMDIRS=	../../../../promif
-NAMESDIRS=	../../../lib/names/sparcv9 ../../../lib/names/sparc/common
-XRDIRS +=	../../sparc/common ../../common $(STANDLIBDIR) \
-		$(STANDSYSDIR) $(PROMDIRS) $(NAMESDIRS)
-XRPRUNE =	i86pc i386
+all: 
 
-cscope.out tags: FRC
-	$(XREF) -x $@
+install: all $(LINKED_DIRS) $(LINKED_LIB_DIRS) $(LINKED_LIB_FS_DIRS)
+
+clean:
+
+clobber: clean
+
+lint:
 
 FRC:

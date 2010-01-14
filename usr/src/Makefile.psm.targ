@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Makefile.psm.targ, global targets for platform specific modules
@@ -79,7 +79,7 @@ $(ROOT_PSM_SCHED_DIR)/%:	$(OBJS_DIR)/% $(ROOT_PSM_SCHED_DIR) FRC
 $(ROOT_PSM_STRMOD_DIR)/%:	$(OBJS_DIR)/% $(ROOT_PSM_STRMOD_DIR) FRC
 	$(INS.file)
 
-$(ROOT_PSM_SYS_DIR)/%:		$(OBJS_DIR)% $(ROOT_PSM_SYS_DIR) FRC
+$(ROOT_PSM_SYS_DIR)/%:		$(OBJS_DIR)/% $(ROOT_PSM_SYS_DIR) FRC
 	$(INS.file)
 
 $(ROOT_PSM_MISC_DIR)/%:		$(OBJS_DIR)/% $(ROOT_PSM_MISC_DIR) FRC

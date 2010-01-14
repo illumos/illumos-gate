@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # psm/stand/boot/Makefile.boot
@@ -45,25 +45,10 @@ PSMPROMLIBDIR	= $(PSMSTANDDIR)/lib/promif/$(MACH)
 PSMPROMLIBDIR64	= $(PSMSTANDDIR)/lib/promif/$(MACH64)
 
 #
-# XXX	one day we should just be able to set PROG to 'cfsboot'..
-#	and everything will become a lot easier.
-#
-UNIBOOT		= multiboot
-WANBOOT		= wanboot
-NFSBOOT		= inetboot
-
-#
 # Common install modes and owners
 #
 FILEMODE	= 644
 DIRMODE		= 755
-
-#
-# Install locations
-#
-ROOT_PSM_UNIBOOT= $(ROOT_PSM_DIR)/$(UNIBOOT)
-ROOT_PSM_WANBOOT= $(ROOT_PSM_DIR)/$(WANBOOT)
-USR_PSM_NFSBOOT	= $(USR_PSM_LIB_NFS_DIR)/$(NFSBOOT)
 
 #
 # While things are pretty much 32-bit lint-clean, there are a ton of

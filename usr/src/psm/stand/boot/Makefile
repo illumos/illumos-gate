@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include		../../../Makefile.master
@@ -93,9 +91,9 @@ EXPORT_SRC:
 	$(CHMOD) 444 sparc/common/ramdisk.c
 	$(RM) sparcv9/Makefile.com+
 	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-		< sparcv9/Makefile.com > sparcv9/Makefile.com+
-	$(MV) sparcv9/Makefile.com+ sparcv9/Makefile.com
-	$(CHMOD) 444 sparcv9/Makefile.com
+		< sparcv9/sun4/Makefile > sparcv9/sun4/Makefile+
+	$(MV) sparcv9/sun4/Makefile+ sparcv9/sun4/Makefile
+	$(CHMOD) 444 sparcv9/sun4/Makefile
 	$(RM) Makefile+
 	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
 		< Makefile > Makefile+

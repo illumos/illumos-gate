@@ -19,13 +19,11 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # psm/stand/boot/sparcv9/ieee1275/sun4v/Makefile
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 TOPDIR =	../../../../../../..
 
@@ -43,24 +41,24 @@ SYSDIR =	$(TOPDIR)/uts
 LIBPLAT =	libplat.a
 LINTLIBPLAT =	llib-lplat.ln
 
-PLAT_PFILES = 			\
-	prom_heartbeat.c	\
-	prom_mmu.c		\
-	prom_vercheck.c
+PLAT_PFILES =
 
 PLAT_PSUN4FILES =		\
 	prom_alloc.c		\
 	prom_cpuctl.c		\
 	prom_fio.c		\
 	prom_getunum.c		\
+	prom_heartbeat.c	\
 	prom_idprom.c		\
 	prom_init.c		\
 	prom_macaddr.c		\
 	prom_map.c		\
 	prom_mem.c		\
+	prom_mmu.c		\
 	prom_retain.c		\
 	prom_sparc.c		\
-	prom_vername.c
+	prom_vername.c		\
+	prom_vercheck.c
 
 KARCH =		sun4v
 MMU =		sfmmu
