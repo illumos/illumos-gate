@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,35 +60,35 @@ static void audiohd_build_path(audiohd_state_t *);
 static void audiohd_destroy_codec(audiohd_state_t *);
 static int audiohd_alloc_dma_mem(audiohd_state_t *, audiohd_dma_t *,
     size_t, ddi_dma_attr_t *, uint_t);
-static void audiohd_finish_output_path(hda_codec_t *codec);
+static void audiohd_finish_output_path(hda_codec_t *);
 static uint32_t audioha_codec_verb_get(void *, uint8_t,
     uint8_t, uint16_t, uint8_t);
 static uint32_t audioha_codec_4bit_verb_get(void *, uint8_t,
     uint8_t, uint16_t, uint16_t);
 static int audiohd_reinit_hda(audiohd_state_t *);
-static int audiohd_response_from_codec(audiohd_state_t *statep,
-    uint32_t *resp, uint32_t *respex);
-static void audiohd_restore_codec_gpio(audiohd_state_t *statep);
-static void audiohd_change_speaker_state(audiohd_state_t *statep, int on);
-static int audiohd_allocate_port(audiohd_state_t *statep);
-static void audiohd_free_port(audiohd_state_t *statep);
-static void audiohd_restore_path(audiohd_state_t *statep);
-static int audiohd_add_controls(audiohd_state_t *statep);
-static void audiohd_get_channels(audiohd_state_t *statep);
-static void audiohd_init_path(audiohd_state_t *statep);
-static void audiohd_del_controls(audiohd_state_t *statep);
-static void audiohd_destroy(audiohd_state_t *statep);
-static void audiohd_beep_on(void *arg);
-static void audiohd_beep_off(void *arg);
-static void audiohd_beep_freq(void *arg, int freq);
-static wid_t audiohd_find_beep(hda_codec_t *codec, wid_t wid, int depth);
-static void audiohd_build_beep_path(hda_codec_t *codec);
-static void audiohd_build_beep_amp(hda_codec_t *codec);
-static void  audiohd_finish_beep_path(hda_codec_t *codec);
-static void audiohd_do_set_beep_volume(audiohd_state_t *statep,
-    audiohd_path_t *path, uint64_t val);
-static void audiohd_set_beep_volume(audiohd_state_t *statep);
-static int audiohd_set_beep(void *arg, uint64_t val);
+static int audiohd_response_from_codec(audiohd_state_t *,
+    uint32_t *, uint32_t *);
+static void audiohd_restore_codec_gpio(audiohd_state_t *);
+static void audiohd_change_speaker_state(audiohd_state_t *, int);
+static int audiohd_allocate_port(audiohd_state_t *);
+static void audiohd_free_port(audiohd_state_t *);
+static void audiohd_restore_path(audiohd_state_t *);
+static int audiohd_add_controls(audiohd_state_t *);
+static void audiohd_get_channels(audiohd_state_t *);
+static void audiohd_init_path(audiohd_state_t *);
+static void audiohd_del_controls(audiohd_state_t *);
+static void audiohd_destroy(audiohd_state_t *);
+static void audiohd_beep_on(void *);
+static void audiohd_beep_off(void *);
+static void audiohd_beep_freq(void *, int);
+static wid_t audiohd_find_beep(hda_codec_t *, wid_t, int);
+static void audiohd_build_beep_path(hda_codec_t *);
+static void audiohd_build_beep_amp(hda_codec_t *);
+static void  audiohd_finish_beep_path(hda_codec_t *);
+static void audiohd_do_set_beep_volume(audiohd_state_t *,
+    audiohd_path_t *, uint64_t);
+static void audiohd_set_beep_volume(audiohd_state_t *);
+static int audiohd_set_beep(void *, uint64_t);
 
 static	int	audiohd_beep;
 static	int	audiohd_beep_divider;
@@ -143,6 +143,8 @@ static audiohd_codec_info_t audiohd_codecs[] = {
 	{0x1002aa01, "ATI R600 HDMI", 0x0},
 	{0x10134206, "Cirrus CS4206", 0x0},
 	{0x10de0002, "nVidia MCP78 HDMI", 0x0},
+	{0x10de0003, "nVidia MCP78 HDMI", 0x0},
+	{0x10de0006, "nVidia MCP78 HDMI", 0x0},
 	{0x10de0007, "nVidia MCP7A HDMI", 0x0},
 	{0x10ec0260, "Realtek ALC260", (NO_GPIO)},
 	{0x10ec0262, "Realtek ALC262", (NO_GPIO)},
@@ -157,6 +159,7 @@ static audiohd_codec_info_t audiohd_codecs[] = {
 	{0x10ec0883, "Realtek ALC883", 0x0},
 	{0x10ec0885, "Realtek ALC885", 0x0},
 	{0x10ec0888, "Realtek ALC888", (NO_SPDIF)},
+	{0x111d7603, "Integrated Devices 92HD75B3X5", 0x0},
 	{0x111d7608, "Integrated Devices 92HD75B2X5", (NO_MIXER)},
 	{0x111d76b2, "Integrated Devices 92HD71B7X", (NO_MIXER)},
 	{0x11d4194a, "Analog Devices AD1984A", 0x0},
@@ -836,7 +839,7 @@ audiohd_init_play_path(audiohd_path_t *path)
 			 * SPDIF path. So we just return here without setting
 			 * the tag for the path as a workaround.
 			 */
-			if (codec->codec_info->flags & NO_MIXER)
+			if (codec->codec_info->flags & NO_SPDIF)
 				return;
 		}
 	}
@@ -1250,7 +1253,7 @@ audiohd_set_output_gain(audiohd_state_t *statep)
 {
 	int			i;
 	audiohd_path_t		*path;
-	uint_t			tmp;
+	uint_t			verb;
 	wid_t			wid;
 	audiohd_widget_t	*w;
 	uint8_t			gain;
@@ -1270,19 +1273,23 @@ audiohd_set_output_gain(audiohd_state_t *statep)
 		    AUDIOHDC_AMP_CAP_STEP_NUMS;
 		maxgain >>= AUDIOHD_GAIN_OFF;
 		if (w->outamp_cap) {
-			tmp = gain * maxgain / 100;
+			verb = AUDIOHDC_AMP_SET_OUTPUT |
+			    (gain * maxgain / 100);
+			if (gain == 0) {
+				/* set mute bit in amplifier */
+				verb |= AUDIOHDC_AMP_SET_MUTE;
+			}
+
 			(void) audioha_codec_4bit_verb_get(statep,
 			    path->codec->index,
 			    wid,
 			    AUDIOHDC_VERB_SET_AMP_MUTE,
-			    AUDIOHDC_AMP_SET_LEFT |
-			    AUDIOHDC_AMP_SET_OUTPUT | tmp);
+			    AUDIOHDC_AMP_SET_LEFT | verb);
 			(void) audioha_codec_4bit_verb_get(statep,
 			    path->codec->index,
 			    wid,
 			    AUDIOHDC_VERB_SET_AMP_MUTE,
-			    AUDIOHDC_AMP_SET_RIGHT |
-			    AUDIOHDC_AMP_SET_OUTPUT | tmp);
+			    AUDIOHDC_AMP_SET_RIGHT | verb);
 		}
 	}
 }
@@ -1324,6 +1331,7 @@ audiohd_do_set_pin_volume(audiohd_state_t *statep, audiohd_path_t *path,
 	    AUDIOHDC_VERB_SET_AMP_MUTE,
 	    AUDIOHDC_AMP_SET_RIGHT | path->gain_dir |
 	    tmp);
+
 	if (path->mute_wid && path->mute_wid != path->gain_wid) {
 		gain = AUDIOHDC_GAIN_MAX;
 		(void) audioha_codec_4bit_verb_get(
@@ -3300,7 +3308,7 @@ audiohd_create_codec(audiohd_state_t *statep)
 
 		/* power-up audio function group */
 		(void) audioha_codec_verb_get(statep, i, wid,
-		    AUDIOHDC_VERB_SET_POWER_STATE, 0);
+		    AUDIOHDC_VERB_SET_POWER_STATE, AUDIOHD_PW_D0);
 
 		/* subsystem id is attached to funtion group */
 		codec->outamp_cap = audioha_codec_verb_get(statep, i, wid,
@@ -5316,54 +5324,33 @@ audiohd_free_port(audiohd_state_t *statep)
 }
 
 /*
- * audiohd_change_widget_power_state(audiohd_state_t *statep, int off)
+ * audiohd_change_widget_power_state(audiohd_state_t *statep, int state)
  * Description:
  * 	This routine is used to change the widget power betwen D0 and D2.
  * 	D0 is fully on; D2 allows the lowest possible power consuming state
  * 	from which it can return to the fully on state: D0.
  */
 static void
-audiohd_change_widget_power_state(audiohd_state_t *statep, int off)
+audiohd_change_widget_power_state(audiohd_state_t *statep, int state)
 {
 	int			i;
 	wid_t			wid;
 	hda_codec_t		*codec;
 	audiohd_widget_t	*widget;
 
-	/* Change power to D2 */
-	if (off) {
-		for (i = 0; i < AUDIOHD_CODEC_MAX; i++) {
-			codec = statep->codec[i];
-			if (!codec)
-				continue;
-			for (wid = codec->first_wid; wid <= codec->last_wid;
-			    wid++) {
-				widget = codec->widget[wid];
-				if (widget->widget_cap &
-				    AUDIOHD_WIDCAP_PWRCTRL) {
-					(void) audioha_codec_verb_get(statep,
-					    codec->index, wid,
-					    AUDIOHDC_VERB_SET_POWER_STATE,
-					    AUDIOHD_PW_D2);
-				}
-			}
-		}
-	/* Change power to D0 */
-	} else {
-		for (i = 0; i < AUDIOHD_CODEC_MAX; i++) {
-			codec = statep->codec[i];
-			if (!codec)
-				continue;
-			for (wid = codec->first_wid; wid <= codec->last_wid;
-			    wid++) {
-				widget = codec->widget[wid];
-				if (widget->widget_cap &
-				    AUDIOHD_WIDCAP_PWRCTRL) {
-					(void) audioha_codec_verb_get(statep,
-					    codec->index, wid,
-					    AUDIOHDC_VERB_SET_POWER_STATE,
-					    AUDIOHD_PW_D0);
-				}
+	for (i = 0; i < AUDIOHD_CODEC_MAX; i++) {
+		codec = statep->codec[i];
+		if (codec == NULL)
+			continue;
+		for (wid = codec->first_wid; wid <= codec->last_wid;
+		    wid++) {
+			widget = codec->widget[wid];
+			if (widget->widget_cap &
+			    AUDIOHD_WIDCAP_PWRCTRL) {
+				(void) audioha_codec_verb_get(statep,
+				    codec->index, wid,
+				    AUDIOHDC_VERB_SET_POWER_STATE,
+				    state);
 			}
 		}
 	}
@@ -5381,7 +5368,7 @@ audiohd_restore_path(audiohd_state_t *statep)
 
 	for (i = 0; i < AUDIOHD_CODEC_MAX; i++) {
 		codec = statep->codec[i];
-		if (!codec)
+		if (codec == NULL)
 			continue;
 		audiohd_finish_output_path(statep->codec[i]);
 		audiohd_finish_input_path(statep->codec[i]);
@@ -5403,8 +5390,8 @@ audiohd_restore_play_and_record(audiohd_state_t *statep)
 		port = statep->port[i];
 		if (port == NULL)
 			continue;
-		if (port != NULL)
-			audio_engine_reset(port->engine);
+
+		audio_engine_reset(port->engine);
 		if (port->triggered) {
 			(void) audiohd_reset_port(port);
 			audiohd_start_port(port);
@@ -5432,7 +5419,7 @@ audiohd_reset_pins_ur_cap(audiohd_state_t *statep)
 
 	for (i = 0; i < AUDIOHD_CODEC_MAX; i++) {
 		codec = statep->codec[i];
-		if (!codec)
+		if (codec == NULL)
 			continue;
 		pin = codec->first_pin;
 		while (pin) {
@@ -5472,7 +5459,8 @@ audiohd_restore_codec_gpio(audiohd_state_t *statep)
 
 		/* power-up audio function group */
 		(void) audioha_codec_verb_get(statep, i, wid,
-		    AUDIOHDC_VERB_SET_POWER_STATE, 0);
+		    AUDIOHDC_VERB_SET_POWER_STATE, AUDIOHD_PW_D0);
+
 		/* work around for Sony VAIO laptop with specific codec */
 		if ((codec->codec_info->flags & NO_GPIO) == 0) {
 			/*
@@ -5508,7 +5496,7 @@ audiohd_resume(audiohd_state_t *statep)
 		audio_dev_warn(statep->adev,
 		    "hda reinit failed");
 		mutex_exit(&statep->hda_mutex);
-		return (DDI_SUCCESS);
+		return (DDI_FAILURE);
 	}
 	/* reset to enable the capability of unsolicited response for pin */
 	audiohd_reset_pins_ur_cap(statep);
@@ -5526,7 +5514,7 @@ audiohd_resume(audiohd_state_t *statep)
 	audiohd_configure_input(statep);
 
 	/* set widget power to D0 */
-	audiohd_change_widget_power_state(statep, AUDIOHD_PW_ON);
+	audiohd_change_widget_power_state(statep, AUDIOHD_PW_D0);
 
 	return (DDI_SUCCESS);
 }	/* audiohd_resume */
@@ -5541,7 +5529,7 @@ audiohd_suspend(audiohd_state_t *statep)
 	statep->suspended = B_TRUE;
 
 	/* set widget power to D2 */
-	audiohd_change_widget_power_state(statep, AUDIOHD_PW_OFF);
+	audiohd_change_widget_power_state(statep, AUDIOHD_PW_D2);
 	/* Disable h/w */
 	audiohd_disable_intr(statep);
 	audiohd_stop_dma(statep);

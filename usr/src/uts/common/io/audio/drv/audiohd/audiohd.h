@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef _SYS_AUDIOHD_IMPL_H_
@@ -90,8 +90,6 @@ extern "C" {
 #define	AUDIOHD_NVIDIA_SNOOP	0x0f
 
 /* Power On/Off */
-#define	AUDIOHD_PW_OFF		1
-#define	AUDIOHD_PW_ON		0
 #define	AUDIOHD_PW_D0		0
 #define	AUDIOHD_PW_D2		2
 
