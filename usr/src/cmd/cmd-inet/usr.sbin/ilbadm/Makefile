@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -35,13 +35,16 @@ LIST_SRCS=	$(LIST_OBJS:%.o=../../../../uts/common/os/%.c)
 SRCS=		$(ILB_SRC) $(LIST_SRCS)
 
 include	../../../Makefile.cmd
-include ../../../Makefile.ctf
 include ../../Makefile.cmd-inet
 
 LDLIBS +=	-lsocket -lnsl -lilb -linetutil -lkstat
 CPPFLAGS +=	-I$(SRC)/lib/libilb/common -I$(SRC)/uts/common
 
 C99MODE =	$(C99_ENABLE)
+
+# for debug:
+CFLAGS = -g
+STRIP_STABS= :
 
 POFILES =	$(ILB_OBJS:%.o=%.po)
 POFILE =	$(PROG)_all.po
