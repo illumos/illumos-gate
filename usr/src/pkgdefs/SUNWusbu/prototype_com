@@ -20,7 +20,7 @@
 #
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -57,6 +57,8 @@ d none usr/include/sys/usb/clients/hwarc 755 root bin
 d none usr/include/sys/usb/clients/mass_storage 755 root bin
 d none usr/include/sys/usb/clients/printer 755 root bin
 d none usr/include/sys/usb/clients/usbcdc 755 root bin
+d none usr/include/sys/usb/clients/usbinput 755 root bin
+d none usr/include/sys/usb/clients/usbinput/usbwcm 755 root bin
 d none usr/include/sys/usb/clients/video 755 root bin
 d none usr/include/sys/usb/clients/video/usbvc 755 root bin
 d none usr/include/sys/uwb 755 root bin
@@ -72,6 +74,7 @@ f none usr/include/sys/usb/clients/mass_storage/usb_bulkonly.h 644 root bin
 f none usr/include/sys/usb/clients/mass_storage/usb_cbi.h 644 root bin
 f none usr/include/sys/usb/clients/printer/usb_printer.h 644 root bin
 f none usr/include/sys/usb/clients/usbcdc/usb_cdc.h 644 root bin
+f none usr/include/sys/usb/clients/usbinput/usbwcm/usbwcm.h 644 root bin
 f none usr/include/sys/usb/clients/video/usbvc/usbvc.h 644 root bin
 f none usr/include/sys/uwb/uwb.h 644 root bin
 f none usr/include/sys/uwb/uwbai.h 644 root bin

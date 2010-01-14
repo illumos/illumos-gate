@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -68,6 +68,7 @@ f none kernel/misc/hidparser 0755 root sys
 f none kernel/misc/hwa1480_fw 0755 root sys
 f none kernel/strmod/usbkbm 0755 root sys
 f none kernel/strmod/usbms 0755 root sys
+f none kernel/strmod/usbwcm 0755 root sys
 f none kernel/strmod/usb_ah 0755 root sys
 d none kernel/dacf/amd64 0755 root sys
 d none kernel/drv/amd64 0755 root sys
@@ -94,4 +95,5 @@ f none kernel/misc/amd64/hwa1480_fw 0755 root sys
 d none kernel/strmod/amd64 0755 root sys
 f none kernel/strmod/amd64/usbkbm 0755 root sys
 f none kernel/strmod/amd64/usbms 0755 root sys
+f none kernel/strmod/amd64/usbwcm 0755 root sys
 f none kernel/strmod/amd64/usb_ah 0755 root sys

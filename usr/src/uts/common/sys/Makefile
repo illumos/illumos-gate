@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -1008,6 +1008,9 @@ USBCDCHDRS=		\
 USBVIDHDRS=           \
 	usbvc.h
 
+USBWCMHDRS=		\
+	usbwcm.h
+
 UGENHDRS=           \
 	usb_ugen.h
 
@@ -1159,6 +1162,7 @@ CHECKHDRS=						\
 	$(USBPRNHDRS:%.h=usb/clients/printer/%.check)   \
 	$(USBCDCHDRS:%.h=usb/clients/usbcdc/%.check)	\
 	$(USBVIDHDRS:%.h=usb/clients/video/usbvc/%.check)   \
+	$(USBWCMHDRS:%.h=usb/clients/usbinput/usbwcm/%.check)	\
 	$(UGENHDRS:%.h=usb/clients/ugen/%.check)   \
 	$(USBHDRS:%.h=usb/%.check)                      \
 	$(UWBHDRS:%.h=uwb/%.check)                      \
@@ -1222,6 +1226,7 @@ CHECKHDRS=						\
 	$(ROOTUSBPRNHDRS)       \
 	$(ROOTUSBCDCHDRS)       \
 	$(ROOTUSBVIDHDRS)       \
+	$(ROOTUSBWCMHDRS)	\
 	$(ROOTUGENHDRS)		\
 	$(ROOT1394HDRS)         \
 	$(ROOTHOTPLUGHDRS)	\
@@ -1284,6 +1289,7 @@ install_h:			\
 	$(ROOTUSBPRNHDRS)       \
 	$(ROOTUSBCDCHDRS)       \
 	$(ROOTUSBVIDHDRS)       \
+	$(ROOTUSBWCMHDRS)	\
 	$(ROOTUGENHDRS)		\
 	$(ROOT1394HDRS)         \
 	$(ROOTHOTPLUGHDRS)	\

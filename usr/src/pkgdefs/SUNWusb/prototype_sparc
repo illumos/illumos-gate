@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -72,4 +72,5 @@ f none kernel/misc/sparcv9/hwa1480_fw 0755 root sys
 d none kernel/strmod/sparcv9 0755 root sys
 f none kernel/strmod/sparcv9/usbkbm 0755 root sys
 f none kernel/strmod/sparcv9/usbms 0755 root sys
+f none kernel/strmod/sparcv9/usbwcm 0755 root sys
 f none kernel/strmod/sparcv9/usb_ah 0755 root sys

@@ -728,6 +728,8 @@ LLC1_OBJS += llc1.o
 
 USBKBM_OBJS += usbkbm.o
 
+USBWCM_OBJS += usbwcm.o
+
 BOFI_OBJS += bofi.o
 
 HID_OBJS += hid.o

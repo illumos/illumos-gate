@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This makefile contains the common definitions for all sparc
@@ -376,7 +376,7 @@ STRMOD_KMODS	+= bufmod connld dedump ldterm ms pckt pfmod
 STRMOD_KMODS	+= pipemod ptem redirmod rpcmod rlmod telmod timod
 STRMOD_KMODS	+= spppasyn spppcomp
 STRMOD_KMODS	+= tirdwr ttcompat
-STRMOD_KMODS	+= usbkbm usbms usb_ah
+STRMOD_KMODS	+= usbkbm usbms usbwcm usb_ah
 STRMOD_KMODS	+= drcompat
 STRMOD_KMODS	+= cryptmod
 STRMOD_KMODS	+= vuid3ps2

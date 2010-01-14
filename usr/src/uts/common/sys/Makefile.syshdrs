@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -131,9 +131,6 @@ usb/clients/hwarc/%.check:	usb/clients/hwarc/%.h
 usb/clients/mass_storage/%.check:	usb/clients/mass_storage/%.h
 	$(DOT_H_CHECK)
 
-usb/clients/hid/%.check:	usb/clients/hid/%.h
-	$(DOT_H_CHECK)
-
 usb/clients/printer/%.check:  usb/clients/printer/%.h
 	$(DOT_H_CHECK)
 
@@ -141,6 +138,9 @@ usb/clients/usbcdc/%.check:	usb/clients/usbcdc/%.h
 	$(DOT_H_CHECK)
 
 usb/clients/video/usbvc/%.check:  usb/clients/video/usbvc/%.h
+	$(DOT_H_CHECK)
+
+usb/clients/usbinput/usbwcm/%.check:	usb/clients/usbinput/usbwcm/%.h
 	$(DOT_H_CHECK)
 
 1394/%.check:         1394/%.h
@@ -210,6 +210,7 @@ ROOTDIRS=			\
 	$(ROOTDIR)/usb/clients/printer  \
 	$(ROOTDIR)/usb/clients/usbcdc  \
 	$(ROOTDIR)/usb/clients/video/usbvc  \
+	$(ROOTDIR)/usb/clients/usbinput/usbwcm \
 	$(ROOTDIR)/usb/clients/ugen  \
 	$(ROOTDIR)/uwb \
 	$(ROOTDIR)/uwb/uwba \
@@ -291,6 +292,7 @@ ROOTUSBMSHDRS= $(USBMSHDRS:%=$(ROOTDIR)/usb/clients/mass_storage/%)
 ROOTUSBPRNHDRS= $(USBPRNHDRS:%=$(ROOTDIR)/usb/clients/printer/%)
 ROOTUSBCDCHDRS= $(USBCDCHDRS:%=$(ROOTDIR)/usb/clients/usbcdc/%)
 ROOTUSBVIDHDRS= $(USBVIDHDRS:%=$(ROOTDIR)/usb/clients/video/usbvc/%)
+ROOTUSBWCMHDRS= $(USBWCMHDRS:%=$(ROOTDIR)/usb/clients/usbinput/usbwcm/%)
 ROOTUGENHDRS= $(UGENHDRS:%=$(ROOTDIR)/usb/clients/ugen/%)
 
 ROOT1394HDRS= $(I1394HDRS:%=$(ROOTDIR)/1394/%)
