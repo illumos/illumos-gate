@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -396,8 +396,6 @@ int
 tavor_post_recv(tavor_state_t *state, tavor_qphdl_t qp,
     ibt_recv_wr_t *wr, uint_t num_wr, uint_t *num_posted)
 {
-	tavor_wrid_list_hdr_t		*wridlist;
-	tavor_wrid_entry_t		*wre_last;
 	uint64_t			*desc, *prev, *first;
 	uint32_t			desc_sz, first_sz;
 	uint32_t			wqeaddrsz, signaled_dbd;
@@ -451,7 +449,6 @@ tavor_post_recv(tavor_state_t *state, tavor_qphdl_t qp,
 
 	/* Grab the lock for the WRID list */
 	mutex_enter(&qp->qp_rq_wqhdr->wq_wrid_wql->wql_lock);
-	wridlist  = qp->qp_rq_wqhdr->wq_wrid_post;
 
 	/* Save away some initial QP state */
 	qsize_msk = qp->qp_rq_wqhdr->wq_size - 1;
@@ -543,12 +540,15 @@ tavor_post_recv(tavor_state_t *state, tavor_qphdl_t qp,
 			 * Add a WRID entry to the WRID list.  Need to
 			 * calculate the "wqeaddrsz" and "signaled_dbd"
 			 * values to pass to tavor_wrid_add_entry().  Note:
-			 * all Recv WQEs are essentially "signaled"
+			 * all Recv WQEs are essentially "signaled" and
+			 * "doorbelled" (since Tavor HW requires all
+			 * RecvWQE's to have their "DBD" bits set).
 			 */
 			wqeaddrsz = TAVOR_QP_WQEADDRSZ((uint64_t *)(uintptr_t)
 			    ((uint64_t)(uintptr_t)desc - qp->qp_desc_off),
 			    desc_sz);
-			signaled_dbd = TAVOR_WRID_ENTRY_SIGNALED;
+			signaled_dbd = TAVOR_WRID_ENTRY_SIGNALED |
+			    TAVOR_WRID_ENTRY_DOORBELLED;
 			tavor_wrid_add_entry(qp->qp_rq_wqhdr,
 			    wr[wrindx].wr_id, wqeaddrsz, signaled_dbd);
 
@@ -615,24 +615,6 @@ tavor_post_recv(tavor_state_t *state, tavor_qphdl_t qp,
 				sync_from = (sync_from - 1) & qsize_msk;
 				tavor_wqe_sync(qp, sync_from, sync_to,
 				    TAVOR_WR_RECV, DDI_DMA_SYNC_FORDEV);
-			}
-
-			/*
-			 * Now if the WRID tail entry is non-NULL, then this
-			 * represents the entry to which we are chaining the
-			 * new entries.  Since we are going to ring the
-			 * doorbell for this WQE, we want set its "dbd" bit.
-			 *
-			 * On the other hand, if the tail is NULL, even though
-			 * we will have rung the doorbell for the previous WQE
-			 * (for the hardware's sake) it is irrelevant to our
-			 * purposes (for tracking WRIDs) because we know the
-			 * request must have already completed.
-			 */
-			wre_last = wridlist->wl_wre_old_tail;
-			if (wre_last != NULL) {
-				wre_last->wr_signaled_dbd |=
-				    TAVOR_WRID_ENTRY_DOORBELLED;
 			}
 
 			/* Update some of the state in the QP */
