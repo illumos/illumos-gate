@@ -22,7 +22,7 @@
 /*	  All Rights Reserved	*/
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2402,10 +2402,9 @@ lbolt_event_driven(void)
 					ret = atomic_dec_32_nv(
 					    &lb_info->lbi_token);
 					ASSERT(ret == 0);
-					return (lb);
+				} else {
+					lbolt_softint_post();
 				}
-
-				lbolt_softint_post();
 			}
 		}
 	} else {
