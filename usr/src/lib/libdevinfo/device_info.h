@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -127,6 +127,12 @@ extern int devfs_get_all_prom_names(const char *, uint_t,
  * free a list of devfs_prom_path structures
  */
 extern void devfs_free_all_prom_names(struct devfs_prom_path *);
+
+/*
+ *  Interpret a /dev link to its /devices path (does not require path to
+ *  still exist, as long as the links exist)
+ */
+extern int devfs_resolve_link(char *, char **);
 
 /*
  * map a device name from install OS environment to target OS environment or

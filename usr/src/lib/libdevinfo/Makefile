@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include	../Makefile.lib
@@ -46,7 +44,7 @@ CHECKHDRS=      $(HDRS:%.h=%.check)
 
 .KEEP_STATE:
 
-all install clean clobber lint: $(SUBDIRS)
+all install clean clobber lint: install_h $(SUBDIRS)
 
 # install rule for install_h target
 

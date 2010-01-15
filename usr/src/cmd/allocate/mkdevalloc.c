@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * scan /dev directory for mountable objects and construct device_allocate
@@ -94,7 +92,7 @@ struct tape {
 #define	DFLT_NTAPE  10		/* size of initial array */
 #define	SIZE_OF_RST  3		/* |rmt| */
 #define	SIZE_OF_NRST 4		/* |nrmt| */
-#define	SIZE_OF_TMP  4		/* |/tmp| */
+#define	SIZE_OF_TMP 4		/* |/tmp| */
 #define	SIZE_OF_RMT  8		/* |/dev/rmt| */
 #define	TAPE_CLEAN    SECLIB"/st_clean"
 
@@ -909,7 +907,7 @@ docd()
 			continue;
 
 		/* get device # (disk #) */
-		if (sscanf(dep->d_name, "c%dt%d", &ctrl, &id) <= 0)
+		if (sscanf(dep->d_name, "c%dt%d", &ctrl, &id) != 2)
 			continue;
 
 		/* see if this is one of the cd special devices */
@@ -1117,7 +1115,7 @@ dormdisk(int cd_count)
 			continue;
 
 		/* get device # (disk #) */
-		if (sscanf(dep->d_name, "c%dt%d", &ctrl, &id) <= 0)
+		if (sscanf(dep->d_name, "c%dt%d", &ctrl, &id) != 2)
 			continue;
 
 		/* see if we've already examined this device */
@@ -1164,6 +1162,9 @@ dormdisk(int cd_count)
 		if (i == nrmdisk) {
 			/* will exit(1) if insufficient memory */
 			nrmdisk = expandmem(i, (void **)&rmdisk,
+			    sizeof (struct rmdisk));
+			/* When we expand rmdisk, need to expand rmdisk_r */
+			(void) expandmem(i, (void **)&rmdisk_r,
 			    sizeof (struct rmdisk));
 		}
 		nm = (char *)malloc(SIZE_OF_DSK + 1 + strlen(dep->d_name) + 1);
