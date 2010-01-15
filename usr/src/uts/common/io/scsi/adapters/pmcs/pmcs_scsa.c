@@ -317,7 +317,8 @@ pmcs_scsa_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	}
 
 	tgt->dip = sd->sd_dev;
-	tgt->sd = sd;
+	lun->sd = sd;
+	list_insert_tail(&tgt->lun_list, lun);
 
 	if (!pmcs_assign_device(pwp, tgt)) {
 		pmcs_release_scratch(pwp);
@@ -357,20 +358,24 @@ pmcs_scsa_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	 * By passing in 0s, we're not actually updating any values, but
 	 * the properties should now get updated on the node.
 	 */
-	pmcs_update_phy_pm_props(phyp, 0, 0, B_TRUE);
 
 	mutex_exit(&tgt->statlock);
+	pmcs_update_phy_pm_props(phyp, 0, 0, B_TRUE);
 	pmcs_unlock_phy(phyp);
 	mutex_exit(&pwp->lock);
 	scsi_device_prop_free(sd, SCSI_DEVICE_PROP_PATH, tgt_port);
 	return (DDI_SUCCESS);
 
 tgt_init_fail:
+	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, phyp, tgt, "%s: failed for "
+	    "@%s tgt 0x%p phy 0x%p", __func__, ua, (void *)tgt, (void *)phyp);
+
 	scsi_device_hba_private_set(sd, NULL);
 	if (got_scratch) {
 		pmcs_release_scratch(pwp);
 	}
 	if (lun) {
+		list_remove(&tgt->lun_list, lun);
 		ddi_soft_state_bystr_free(tgt->lun_sstate, ua);
 	}
 	if (phyp) {
@@ -421,15 +426,19 @@ pmcs_scsa_tran_tgt_free(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	ASSERT(lun->target->ref_count > 0);
 
 	target = lun->target;
-
 	unit_address = lun->unit_address;
-	ddi_soft_state_bystr_free(lun->target->lun_sstate, unit_address);
+	list_remove(&target->lun_list, lun);
 
 	pwp = ITRAN2PMC(tran);
 	mutex_enter(&pwp->lock);
 	mutex_enter(&target->statlock);
 	ASSERT(target->phy);
 	phyp = target->phy;
+
+	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, phyp, target,
+	    "%s: for @%s tgt 0x%p phy 0x%p", __func__, unit_address,
+	    (void *)target, (void *)phyp);
+	ddi_soft_state_bystr_free(lun->target->lun_sstate, unit_address);
 
 	if (target->recover_wait) {
 		mutex_exit(&target->statlock);
@@ -1161,8 +1170,6 @@ pmcs_smp_init(dev_info_t *self, dev_info_t *child,
 	ASSERT(pwp);
 	if (pwp == NULL)
 		return (DDI_FAILURE);
-	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL, "%s: %s", __func__,
-	    ddi_get_name(child));
 
 	/* Get "target-port" prop from devinfo node */
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, child,
@@ -1196,6 +1203,10 @@ pmcs_smp_init(dev_info_t *self, dev_info_t *child,
 		return (DDI_FAILURE);
 	}
 
+	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, tgt, "%s: %s (%s)",
+	    __func__, ddi_get_name(child), tgt_port);
+
+	mutex_enter(&tgt->statlock);
 	phy = tgt->phy;
 	ASSERT(mutex_owned(&phy->phy_lock));
 
@@ -1211,11 +1222,13 @@ pmcs_smp_init(dev_info_t *self, dev_info_t *child,
 		 * to drop the lock so we can acquire the parent's lock.
 		 */
 		pphy = phy->parent;
+		mutex_exit(&tgt->statlock);
 		pmcs_unlock_phy(phy);
 		pmcs_lock_phy(pphy);
 		wwn = pmcs_barray2wwn(pphy->sas_address);
 		pmcs_unlock_phy(pphy);
 		pmcs_lock_phy(phy);
+		mutex_enter(&tgt->statlock);
 	}
 
 	/*
@@ -1254,13 +1267,15 @@ pmcs_smp_init(dev_info_t *self, dev_info_t *child,
 	 * Update the attached port and target port pm properties
 	 */
 	tgt->smpd = smp_sd;
-	pmcs_update_phy_pm_props(phy, 0, 0, B_TRUE);
 
 	pmcs_unlock_phy(phy);
 	mutex_exit(&pwp->lock);
 
 	tgt->ref_count++;
 	tgt->dtype = phy->dtype;
+	mutex_exit(&tgt->statlock);
+
+	pmcs_update_phy_pm_props(phy, 0, 0, B_TRUE);
 
 	addr = scsi_wwn_to_wwnstr(wwn, ua_form, NULL);
 	if (smp_device_prop_update_string(smp_sd, SCSI_ADDR_PROP_ATTACHED_PORT,
@@ -1279,6 +1294,7 @@ smp_init_fail:
 	if (!IS_ROOT_PHY(phy)) {
 		pmcs_dec_phy_ref_count(phy);
 	}
+	mutex_exit(&tgt->statlock);
 	pmcs_unlock_phy(phy);
 	mutex_exit(&pwp->lock);
 	ddi_soft_state_bystr_free(iport->tgt_sstate, tgt->unit_address);
@@ -1306,8 +1322,6 @@ pmcs_smp_free(dev_info_t *self, dev_info_t *child,
 	if (pwp == NULL)
 		return;
 	ASSERT(pwp);
-	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL, "%s: %s", __func__,
-	    ddi_get_name(child));
 
 	/* Get "target-port" prop from devinfo node */
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, child,
@@ -1326,6 +1340,9 @@ pmcs_smp_free(dev_info_t *self, dev_info_t *child,
 		    "%s: tgt softstate not found", __func__);
 		return;
 	}
+
+	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, tgt, "%s: %s (%s)", __func__,
+	    ddi_get_name(child), tgt_port);
 
 	mutex_enter(&pwp->lock);
 	mutex_enter(&tgt->statlock);
@@ -3022,6 +3039,8 @@ pmcs_get_target(pmcs_iport_t *iport, char *tgt_port)
 	    DDI_INTR_PRI(pwp->intr_pri));
 	cv_init(&tgt->reset_cv, NULL, CV_DRIVER, NULL);
 	cv_init(&tgt->abort_cv, NULL, CV_DRIVER, NULL);
+	list_create(&tgt->lun_list, sizeof (pmcs_lun_t),
+	    offsetof(pmcs_lun_t, lun_list_next));
 	tgt->qdepth = 1;
 	tgt->target_num = PMCS_INVALID_TARGET_NUM;
 	bcopy(unit_address, tgt->unit_address, PMCS_MAX_UA_SIZE);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef	_PMCS_DEF_H
@@ -114,6 +114,7 @@ struct pmcs_phy {
 	char		path[32];	/* path name for this phy */
 	pmcs_hw_t	*pwp;		/* back ptr to hba struct */
 	pmcs_iport_t	*iport;		/* back ptr to the iport handle */
+	pmcs_iport_t	*last_iport;	/* last iport this PHY was on */
 	pmcs_xscsi_t	*target;	/* back ptr to current target */
 	kstat_t		*phy_stats;	/* kstats for this phy */
 	/*

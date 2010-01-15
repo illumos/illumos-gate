@@ -40,7 +40,7 @@ static int tgtmap_usec = MICROSEC;
 static void pmcs_new_tport(pmcs_hw_t *, pmcs_phy_t *);
 static void pmcs_configure_expander(pmcs_hw_t *, pmcs_phy_t *, pmcs_iport_t *);
 
-static boolean_t pmcs_check_expanders(pmcs_hw_t *, pmcs_phy_t *);
+static void pmcs_check_expanders(pmcs_hw_t *, pmcs_phy_t *);
 static void pmcs_check_expander(pmcs_hw_t *, pmcs_phy_t *);
 static void pmcs_clear_expander(pmcs_hw_t *, pmcs_phy_t *, int);
 
@@ -2305,7 +2305,6 @@ pmcs_discover(pmcs_hw_t *pwp)
 {
 	pmcs_phy_t		*pptr;
 	pmcs_phy_t		*root_phy;
-	boolean_t		config_changed;
 
 	DTRACE_PROBE2(pmcs__discover__entry, ulong_t, pwp->work_flags,
 	    boolean_t, pwp->config_changed);
@@ -2396,14 +2395,15 @@ pmcs_discover(pmcs_hw_t *pwp)
 	 * changed until *after* we run pmcs_kill_devices.
 	 */
 	root_phy = pwp->root_phys;
-	config_changed = pmcs_check_expanders(pwp, root_phy);
+	pmcs_check_expanders(pwp, root_phy);
 
 	/*
 	 * 2. Descend the tree looking for dead devices and kill them
 	 * by aborting all active commands and then deregistering them.
 	 */
-	if (pmcs_kill_devices(pwp, root_phy) || config_changed) {
-		goto out;
+	if (pmcs_kill_devices(pwp, root_phy)) {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
+		    "%s: pmcs_kill_devices failed!", __func__);
 	}
 
 	/*
@@ -3061,6 +3061,7 @@ pmcs_clear_phy(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 	/* keep ref_count */
 	/* Don't clear iport on root PHYs - they are handled in pmcs_intr.c */
 	if (!IS_ROOT_PHY(pptr)) {
+		pptr->last_iport = pptr->iport;
 		pptr->iport = NULL;
 	}
 	/* keep target */
@@ -3094,11 +3095,47 @@ pmcs_new_tport(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 	pptr->changed = 0;
 
 	/*
-	 * If the PHY has no target pointer, see if there's a dead PHY that
-	 * matches.
+	 * If the PHY has no target pointer:
+	 *
+	 * If it's a root PHY, see if another PHY in the iport holds the
+	 * target pointer (primary PHY changed).  If so, move it over.
+	 *
+	 * If it's not a root PHY, see if there's a PHY on the dead_phys
+	 * list that matches.
 	 */
 	if (pptr->target == NULL) {
-		pmcs_reap_dead_phy(pptr);
+		if (IS_ROOT_PHY(pptr)) {
+			pmcs_phy_t *rphy = pwp->root_phys;
+
+			while (rphy) {
+				if (rphy == pptr) {
+					rphy = rphy->sibling;
+					continue;
+				}
+
+				mutex_enter(&rphy->phy_lock);
+				if ((rphy->iport == pptr->iport) &&
+				    (rphy->target != NULL)) {
+					mutex_enter(&rphy->target->statlock);
+					pptr->target = rphy->target;
+					rphy->target = NULL;
+					pptr->target->phy = pptr;
+					/* The target is now on pptr */
+					mutex_exit(&pptr->target->statlock);
+					mutex_exit(&rphy->phy_lock);
+					pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+					    pptr, pptr->target,
+					    "%s: Moved target from %s to %s",
+					    __func__, rphy->path, pptr->path);
+					break;
+				}
+				mutex_exit(&rphy->phy_lock);
+
+				rphy = rphy->sibling;
+			}
+		} else {
+			pmcs_reap_dead_phy(pptr);
+		}
 	}
 
 	/*
@@ -3636,6 +3673,12 @@ pmcs_check_expander(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 				pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, ctmp, NULL,
 				    "%s: %s type changed from NOTHING to %s",
 				    __func__, ctmp->path, PHY_TYPE(local));
+				/*
+				 * Since this PHY was nothing and is now
+				 * something, reset the config_stop timer.
+				 */
+				ctmp->config_stop = ddi_get_lbolt() +
+				    drv_usectohz(PMCS_MAX_CONFIG_TIME);
 			}
 
 		} else if (ctmp->atdt != local->atdt) {
@@ -3773,11 +3816,10 @@ pmcs_check_expander(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
  * each expander.  Since we're not doing any configuration right now, it
  * doesn't matter if this is breadth-first.
  */
-static boolean_t
+static void
 pmcs_check_expanders(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 {
 	pmcs_phy_t *phyp, *pnext, *pchild;
-	boolean_t config_changed = B_FALSE;
 
 	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
 	    "%s: %s", __func__, pptr->path);
@@ -3786,7 +3828,7 @@ pmcs_check_expanders(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 	 * Check each expander at this level
 	 */
 	phyp = pptr;
-	while (phyp && !config_changed) {
+	while (phyp) {
 		pmcs_lock_phy(phyp);
 
 		if ((phyp->dtype == EXPANDER) && phyp->changed &&
@@ -3797,43 +3839,25 @@ pmcs_check_expanders(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 
 		pnext = phyp->sibling;
 		pmcs_unlock_phy(phyp);
-
-		mutex_enter(&pwp->config_lock);
-		config_changed = pwp->config_changed;
-		mutex_exit(&pwp->config_lock);
-
 		phyp = pnext;
-	}
-
-	if (config_changed) {
-		return (config_changed);
 	}
 
 	/*
 	 * Now check the children
 	 */
 	phyp = pptr;
-	while (phyp && !config_changed) {
+	while (phyp) {
 		pmcs_lock_phy(phyp);
 		pnext = phyp->sibling;
 		pchild = phyp->children;
 		pmcs_unlock_phy(phyp);
 
 		if (pchild) {
-			(void) pmcs_check_expanders(pwp, pchild);
+			pmcs_check_expanders(pwp, pchild);
 		}
-
-		mutex_enter(&pwp->config_lock);
-		config_changed = pwp->config_changed;
-		mutex_exit(&pwp->config_lock);
 
 		phyp = pnext;
 	}
-
-	/*
-	 * We're done
-	 */
-	return (config_changed);
 }
 
 /*
@@ -6609,7 +6633,6 @@ pmcs_clear_xp(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 	 * but this device is going away anyway, so no matter.
 	 */
 	xp->dip = NULL;
-	xp->sd = NULL;
 	xp->smpd = NULL;
 	xp->special_running = 0;
 	xp->recovering = 0;
@@ -7529,6 +7552,7 @@ pmcs_reap_dead_phy(pmcs_phy_t *phyp)
 {
 	pmcs_hw_t *pwp = phyp->pwp;
 	pmcs_phy_t *ctmp;
+	pmcs_iport_t *iport_cmp;
 
 	ASSERT(mutex_owned(&phyp->phy_lock));
 
@@ -7538,7 +7562,16 @@ pmcs_reap_dead_phy(pmcs_phy_t *phyp)
 	mutex_enter(&pwp->dead_phylist_lock);
 	ctmp = pwp->dead_phys;
 	while (ctmp) {
-		if ((ctmp->iport != phyp->iport) ||
+		/*
+		 * If the iport is NULL, compare against last_iport.
+		 */
+		if (ctmp->iport) {
+			iport_cmp = ctmp->iport;
+		} else {
+			iport_cmp = ctmp->last_iport;
+		}
+
+		if ((iport_cmp != phyp->iport) ||
 		    (memcmp((void *)&ctmp->sas_address[0],
 		    (void *)&phyp->sas_address[0], 8))) {
 			ctmp = ctmp->dead_next;
@@ -7571,30 +7604,27 @@ pmcs_reap_dead_phy(pmcs_phy_t *phyp)
 	 */
 	if (ctmp) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, ctmp, NULL,
-		    "%s: Found match in dead PHY list for new PHY %s",
-		    __func__, phyp->path);
+		    "%s: Found match in dead PHY list (0x%p) for new PHY %s",
+		    __func__, (void *)ctmp, phyp->path);
+		/*
+		 * If there is a pointer to the target in the dead PHY, move
+		 * all reference counts to the new PHY.
+		 */
 		if (ctmp->target) {
-			/*
-			 * If there is a pointer to the target in the dead
-			 * PHY, and that PHY's ref_count drops to 0, we can
-			 * clear the target linkage now.  If the PHY's
-			 * ref_count is > 1, then there may be multiple
-			 * LUNs still remaining, so leave the linkage.
-			 */
-			pmcs_inc_phy_ref_count(phyp);
-			pmcs_dec_phy_ref_count(ctmp);
+			mutex_enter(&ctmp->target->statlock);
 			phyp->target = ctmp->target;
+
+			while (ctmp->ref_count != 0) {
+				pmcs_inc_phy_ref_count(phyp);
+				pmcs_dec_phy_ref_count(ctmp);
+			}
 			/*
 			 * Update the target's linkage as well
 			 */
-			mutex_enter(&phyp->target->statlock);
 			phyp->target->phy = phyp;
 			phyp->target->dtype = phyp->dtype;
+			ctmp->target = NULL;
 			mutex_exit(&phyp->target->statlock);
-
-			if (ctmp->ref_count == 0) {
-				ctmp->target = NULL;
-			}
 		}
 	}
 }
@@ -7806,13 +7836,22 @@ pmcs_update_phy_pm_props(pmcs_phy_t *phyp, uint64_t att_bv, uint64_t tgt_bv,
 		return;
 	}
 
-	if (phyp->target->sd) {
-		(void) scsi_device_prop_update_string(phyp->target->sd,
-		    SCSI_DEVICE_PROP_PATH, SCSI_ADDR_PROP_ATTACHED_PORT_PM,
-		    phyp->att_port_pm_str);
-		(void) scsi_device_prop_update_string(phyp->target->sd,
-		    SCSI_DEVICE_PROP_PATH, SCSI_ADDR_PROP_TARGET_PORT_PM,
-		    phyp->tgt_port_pm_str);
+	mutex_enter(&phyp->target->statlock);
+	if (!list_is_empty(&phyp->target->lun_list)) {
+		pmcs_lun_t *lunp;
+
+		lunp = list_head(&phyp->target->lun_list);
+		while (lunp) {
+			(void) scsi_device_prop_update_string(lunp->sd,
+			    SCSI_DEVICE_PROP_PATH,
+			    SCSI_ADDR_PROP_ATTACHED_PORT_PM,
+			    phyp->att_port_pm_str);
+			(void) scsi_device_prop_update_string(lunp->sd,
+			    SCSI_DEVICE_PROP_PATH,
+			    SCSI_ADDR_PROP_TARGET_PORT_PM,
+			    phyp->tgt_port_pm_str);
+			lunp = list_next(&phyp->target->lun_list, lunp);
+		}
 	} else if (phyp->target->smpd) {
 		(void) smp_device_prop_update_string(phyp->target->smpd,
 		    SCSI_ADDR_PROP_ATTACHED_PORT_PM,
@@ -7821,6 +7860,7 @@ pmcs_update_phy_pm_props(pmcs_phy_t *phyp, uint64_t att_bv, uint64_t tgt_bv,
 		    SCSI_ADDR_PROP_TARGET_PORT_PM,
 		    phyp->tgt_port_pm_str);
 	}
+	mutex_exit(&phyp->target->statlock);
 }
 
 /* ARGSUSED */

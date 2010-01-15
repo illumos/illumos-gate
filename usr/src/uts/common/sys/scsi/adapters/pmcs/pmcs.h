@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -130,7 +130,7 @@ struct pmcs_xscsi {
 	kcondvar_t			abort_cv;
 	char				*ua;
 	pmcs_dtype_t			dtype;
-	struct scsi_device		*sd;		/* Ptr to scsi_device */
+	list_t				lun_list;	/* list of LUNs */
 	struct smp_device		*smpd;		/* Ptr to smp_device */
 };
 
@@ -155,10 +155,12 @@ struct pmcs_xscsi {
  */
 
 struct pmcs_lun {
-	pmcs_xscsi_t	*target;
-	uint64_t	lun_num;	/* lun64 */
-	scsi_lun_t	scsi_lun;	/* Wire format */
-	char		unit_address[PMCS_MAX_UA_SIZE];
+	list_node_t		lun_list_next;
+	pmcs_xscsi_t		*target;
+	struct scsi_device	*sd;
+	uint64_t		lun_num;	/* lun64 */
+	scsi_lun_t		scsi_lun;	/* Wire format */
+	char			unit_address[PMCS_MAX_UA_SIZE];
 };
 
 /*

@@ -72,7 +72,7 @@
 	    __func__, (void *)x, ci, w0, n)
 
 #define	EVT_PRT(hwp, msg, phy)	\
-	pmcs_prt(hwp, PMCS_PRT_INFO, NULL, NULL, "Phy 0x%x: %s", phy, # msg)
+	pmcs_prt(hwp, PMCS_PRT_DEBUG, NULL, NULL, "Phy 0x%x: %s", phy, # msg)
 
 
 /*
