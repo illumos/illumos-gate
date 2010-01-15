@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Fibre Channel SCSI ULP Mapping driver
@@ -1829,6 +1829,7 @@ fcp_get_target_mappings(struct fcp_ioctl *data,
 		for (ptgt = pptr->port_tgt_hash_table[i]; ptgt != NULL;
 		    ptgt = ptgt->tgt_next) {
 
+			mutex_enter(&ptgt->tgt_mutex);
 
 			/* Loop through all LUNs on this target */
 			for (plun = ptgt->tgt_lun; plun != NULL;
@@ -1898,6 +1899,7 @@ fcp_get_target_mappings(struct fcp_ioctl *data,
 				}
 				kmem_free(path, MAXPATHLEN);
 			}
+			mutex_exit(&ptgt->tgt_mutex);
 		}
 	}
 	mutex_exit(&pptr->port_mutex);
@@ -13296,10 +13298,11 @@ static int
 fcp_offline_child(struct fcp_lun *plun, child_info_t *cip, int lcount,
     int tcount, int flags, int *circ)
 {
-	int rval;
-	struct fcp_port		*pptr = plun->lun_tgt->tgt_port;
+	int		rval;
+	int		lun_mpxio;
+	struct fcp_port	*pptr = plun->lun_tgt->tgt_port;
 	struct fcp_tgt	*ptgt = plun->lun_tgt;
-	dev_info_t		*cdip;
+	dev_info_t	*cdip;
 
 	ASSERT(MUTEX_HELD(&plun->lun_mutex));
 	ASSERT(MUTEX_HELD(&pptr->port_mutex));
@@ -13314,7 +13317,13 @@ fcp_offline_child(struct fcp_lun *plun, child_info_t *cip, int lcount,
 		return (NDI_FAILURE);
 	}
 
-	if (plun->lun_mpxio == 0) {
+	/*
+	 * We will use this value twice. Make a copy to be sure we use
+	 * the same value in both places.
+	 */
+	lun_mpxio = plun->lun_mpxio;
+
+	if (lun_mpxio == 0) {
 		cdip = DIP(cip);
 		mutex_exit(&plun->lun_mutex);
 		mutex_exit(&pptr->port_mutex);
@@ -13342,7 +13351,43 @@ fcp_offline_child(struct fcp_lun *plun, child_info_t *cip, int lcount,
 		mdi_devi_enter_phci(pptr->port_dip, circ);
 		mdi_rele_path(PIP(cip));
 
-		if (rval == MDI_SUCCESS) {
+		rval = (rval == MDI_SUCCESS) ? NDI_SUCCESS : NDI_FAILURE;
+	}
+
+	mutex_enter(&ptgt->tgt_mutex);
+	plun->lun_state &= ~FCP_LUN_INIT;
+	mutex_exit(&ptgt->tgt_mutex);
+
+	if (rval == NDI_SUCCESS) {
+		cdip = NULL;
+		if (flags & NDI_DEVI_REMOVE) {
+			mutex_enter(&plun->lun_mutex);
+			/*
+			 * If the guid of the LUN changes, lun_cip will not
+			 * equal to cip, and after offlining the LUN with the
+			 * old guid, we should keep lun_cip since it's the cip
+			 * of the LUN with the new guid.
+			 * Otherwise remove our reference to child node.
+			 *
+			 * This must be done before the child node is freed,
+			 * otherwise other threads could see a stale lun_cip
+			 * pointer.
+			 */
+			if (plun->lun_cip == cip) {
+				plun->lun_cip = NULL;
+			}
+			if (plun->lun_old_guid) {
+				kmem_free(plun->lun_old_guid,
+				    plun->lun_old_guid_size);
+				plun->lun_old_guid = NULL;
+				plun->lun_old_guid_size = 0;
+			}
+			mutex_exit(&plun->lun_mutex);
+		}
+	}
+
+	if (lun_mpxio != 0) {
+		if (rval == NDI_SUCCESS) {
 			/*
 			 * Clear MPxIO path permanent disable as the path is
 			 * already offlined.
@@ -13358,37 +13403,10 @@ fcp_offline_child(struct fcp_lun *plun, child_info_t *cip, int lcount,
 			    "fcp_offline_child: mdi_pi_offline failed "
 			    "rval=%x cip=%p", rval, cip);
 		}
-		rval = (rval == MDI_SUCCESS) ? NDI_SUCCESS : NDI_FAILURE;
 	}
-
-	mutex_enter(&ptgt->tgt_mutex);
-	plun->lun_state &= ~FCP_LUN_INIT;
-	mutex_exit(&ptgt->tgt_mutex);
 
 	mutex_enter(&pptr->port_mutex);
 	mutex_enter(&plun->lun_mutex);
-
-	if (rval == NDI_SUCCESS) {
-		cdip = NULL;
-		if (flags & NDI_DEVI_REMOVE) {
-			/*
-			 * If the guid of the LUN changes, lun_cip will not
-			 * equal to cip, and after offlining the LUN with the
-			 * old guid, we should keep lun_cip since it's the cip
-			 * of the LUN with the new guid.
-			 * Otherwise remove our reference to child node.
-			 */
-			if (plun->lun_cip == cip) {
-				plun->lun_cip = NULL;
-			}
-			if (plun->lun_old_guid) {
-				kmem_free(plun->lun_old_guid,
-				    plun->lun_old_guid_size);
-				plun->lun_old_guid = NULL;
-				plun->lun_old_guid_size = 0;
-			}
-		}
-	}
 
 	if (cdip) {
 		FCP_TRACE(fcp_logq, pptr->port_instbuf,
@@ -13403,14 +13421,27 @@ fcp_offline_child(struct fcp_lun *plun, child_info_t *cip, int lcount,
 static void
 fcp_remove_child(struct fcp_lun *plun)
 {
+	child_info_t *cip;
 	int circ;
+
 	ASSERT(MUTEX_HELD(&plun->lun_mutex));
 
 	if (fcp_is_child_present(plun, plun->lun_cip) == FC_SUCCESS) {
 		if (plun->lun_mpxio == 0) {
 			(void) ndi_prop_remove_all(DIP(plun->lun_cip));
 			(void) ndi_devi_free(DIP(plun->lun_cip));
+			plun->lun_cip = NULL;
 		} else {
+			/*
+			 * Clear reference to the child node in the lun.
+			 * This must be done before freeing it with mdi_pi_free
+			 * and with lun_mutex held so that other threads always
+			 * see either valid lun_cip or NULL when holding
+			 * lun_mutex. We keep a copy in cip.
+			 */
+			cip = plun->lun_cip;
+			plun->lun_cip = NULL;
+
 			mutex_exit(&plun->lun_mutex);
 			mutex_exit(&plun->lun_tgt->tgt_mutex);
 			mutex_exit(&plun->lun_tgt->tgt_port->port_mutex);
@@ -13422,14 +13453,14 @@ fcp_remove_child(struct fcp_lun *plun)
 			 * Exit phci to avoid deadlock with power management
 			 * code during mdi_pi_offline
 			 */
-			mdi_hold_path(PIP(plun->lun_cip));
+			mdi_hold_path(PIP(cip));
 			mdi_devi_exit_phci(
 			    plun->lun_tgt->tgt_port->port_dip, circ);
-			(void) mdi_pi_offline(PIP(plun->lun_cip),
+			(void) mdi_pi_offline(PIP(cip),
 			    NDI_DEVI_REMOVE);
 			mdi_devi_enter_phci(
 			    plun->lun_tgt->tgt_port->port_dip, &circ);
-			mdi_rele_path(PIP(plun->lun_cip));
+			mdi_rele_path(PIP(cip));
 
 			mdi_devi_exit(
 			    plun->lun_tgt->tgt_port->port_dip, circ);
@@ -13437,17 +13468,18 @@ fcp_remove_child(struct fcp_lun *plun)
 			FCP_TRACE(fcp_logq,
 			    plun->lun_tgt->tgt_port->port_instbuf,
 			    fcp_trace, FCP_BUF_LEVEL_3, 0,
-			    "lun=%p pip freed %p", plun, plun->lun_cip);
-			(void) mdi_prop_remove(PIP(plun->lun_cip), NULL);
-			(void) mdi_pi_free(PIP(plun->lun_cip), 0);
+			    "lun=%p pip freed %p", plun, cip);
+
+			(void) mdi_prop_remove(PIP(cip), NULL);
+			(void) mdi_pi_free(PIP(cip), 0);
 
 			mutex_enter(&plun->lun_tgt->tgt_port->port_mutex);
 			mutex_enter(&plun->lun_tgt->tgt_mutex);
 			mutex_enter(&plun->lun_mutex);
 		}
+	} else {
+		plun->lun_cip = NULL;
 	}
-
-	plun->lun_cip = NULL;
 }
 
 /*
@@ -15624,27 +15656,55 @@ fcp_update_mpxio_path(struct fcp_lun *plun, child_info_t *cip, int what)
 static char *
 fcp_get_lun_path(struct fcp_lun *plun) {
 	dev_info_t	*dip = NULL;
-	char	*path = NULL;
+	char		*path = NULL;
+	mdi_pathinfo_t	*pip = NULL;
+
 	if (plun == NULL) {
 		return (NULL);
 	}
+
+	mutex_enter(&plun->lun_mutex);
 	if (plun->lun_mpxio == 0) {
 		dip = DIP(plun->lun_cip);
+		mutex_exit(&plun->lun_mutex);
 	} else {
-		dip = mdi_pi_get_client(PIP(plun->lun_cip));
-	}
-	if (dip == NULL) {
-		return (NULL);
-	}
-	if (ddi_get_instance(dip) < 0) {
-		return (NULL);
-	}
-	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-	if (path == NULL) {
-		return (NULL);
+		/*
+		 * lun_cip must be accessed with lun_mutex held. Here
+		 * plun->lun_cip either points to a valid node or it is NULL.
+		 * Make a copy so that we can release lun_mutex.
+		 */
+		pip = PIP(plun->lun_cip);
+
+		/*
+		 * Increase ref count on the path so that we can release
+		 * lun_mutex and still be sure that the pathinfo node (and thus
+		 * also the client) is not deallocated. If pip is NULL, this
+		 * has no effect.
+		 */
+		mdi_hold_path(pip);
+
+		mutex_exit(&plun->lun_mutex);
+
+		/* Get the client. If pip is NULL, we get NULL. */
+		dip = mdi_pi_get_client(pip);
 	}
 
+	if (dip == NULL)
+		goto out;
+	if (ddi_get_instance(dip) < 0)
+		goto out;
+
+	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	if (path == NULL)
+		goto out;
+
 	(void) ddi_pathname(dip, path);
+
+	/* Clean up. */
+out:
+	if (pip != NULL)
+		mdi_rele_path(pip);
+
 	/*
 	 * In reality, the user wants a fully valid path (one they can open)
 	 * but this string is lacking the mount point, and the minor node.
