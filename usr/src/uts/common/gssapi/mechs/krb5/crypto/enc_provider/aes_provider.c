@@ -1,9 +1,7 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -51,6 +49,8 @@ krb5int_aes_encrypt(krb5_context context,
 	KRB5_LOG0(KRB5_INFO, "In krb5int_aes_encrypt(kernel): start");
 
 	ASSERT(input != NULL);
+	if (input->length < BLOCK_SIZE)
+		return (KRB5_BAD_MSIZE);
 	ASSERT(output != NULL);
 	ASSERT(input->length == output->length);
 	ASSERT(key != NULL);
@@ -284,6 +284,8 @@ krb5int_aes_encrypt(krb5_context context,
 	char tmp_ivec[BLOCK_SIZE];
 
 	assert(input != NULL);
+	if (input->length < BLOCK_SIZE)
+		return (KRB5_BAD_MSIZE);
 	assert(output != NULL);
 	assert(input->length == output->length);
 	assert(key != NULL);
@@ -493,6 +495,8 @@ krb5int_aes_decrypt(krb5_context context,
 	KRB5_LOG0(KRB5_INFO, "In krb5int_aes_decrypt: start");
 
 	ASSERT(input != NULL);
+	if (input->length < BLOCK_SIZE)
+		return (KRB5_BAD_MSIZE);
 	ASSERT(output != NULL);
 	ASSERT(input->length == output->length);
 	ASSERT(key != NULL);
@@ -727,6 +731,8 @@ krb5int_aes_decrypt(krb5_context context,
 	char tmp_ivec[BLOCK_SIZE];
 
 	assert(input != NULL);
+	if (input->length < BLOCK_SIZE)
+		return (KRB5_BAD_MSIZE);
 	assert(output != NULL);
 	assert(input->length == output->length);
 	assert(key != NULL);
@@ -809,9 +815,6 @@ krb5int_aes_decrypt(krb5_context context,
 			bcopy(nlibp, tmp, BLOCK_SIZE);
 			bcopy(libp, nlibp, BLOCK_SIZE);
 			bcopy(tmp, libp, BLOCK_SIZE);
-		} else {
-			if (input->length < BLOCK_SIZE)
-				return (KRB5_CRYPTO_INTERNAL);
 		}
 
 		/*

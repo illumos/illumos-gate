@@ -1,9 +1,7 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
 
@@ -91,7 +89,7 @@ krb5_arcfour_encrypt(context, enc, hash, key, usage, ivec, input, output)
   blocksize = enc->block_size;
   keybytes = enc->keybytes;
   hashsize = hash->hashsize;
-  
+
   bzero(&d2, sizeof(krb5_data));
   bzero(&k2, sizeof(krb5_keyblock));
   /*
@@ -286,6 +284,12 @@ krb5_arcfour_decrypt(context, enc, hash, key, usage, ivec, input, output)
 
   keybytes = enc->keybytes;
   hashsize = hash->hashsize;
+
+  /* Verify input and output lengths. */
+  if (input->length < hashsize + CONFOUNDERLENGTH)
+	return KRB5_BAD_MSIZE;
+  if (output->length < input->length - hashsize - CONFOUNDERLENGTH)
+	return KRB5_BAD_MSIZE;
 
   bzero(&d2, sizeof(krb5_data));
   bzero(&k2, sizeof(krb5_keyblock));

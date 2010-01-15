@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,6 +110,12 @@ krb5_dk_decrypt_maybe_trunc_hmac(
 	hmacsize = hashsize;
     else if (hmacsize > hashsize)
 	return (KRB5KRB_AP_ERR_BAD_INTEGRITY);
+
+    /* Verify input and output lengths. */
+    if (input->length < blocksize + hmacsize)
+        return KRB5_BAD_MSIZE;
+    if (output->length < input->length - blocksize - hmacsize)
+        return KRB5_BAD_MSIZE;
 
     enclen = input->length - hmacsize;
 

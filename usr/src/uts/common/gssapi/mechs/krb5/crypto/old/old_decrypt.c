@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,8 +54,10 @@ krb5_old_decrypt(krb5_context context,
     blocksize = enc->block_size;
     hashsize = hash->hashsize;
 
+    /* Verify input and output lengths. */
+    if (input->length < blocksize + hashsize || input->length % blocksize != 0)
+        return(KRB5_BAD_MSIZE);
     plainsize = input->length - blocksize - hashsize;
-
     if (arg_output->length < plainsize)
 	return(KRB5_BAD_MSIZE);
 

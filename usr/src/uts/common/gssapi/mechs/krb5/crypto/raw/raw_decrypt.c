@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,5 +42,7 @@ krb5_raw_decrypt(krb5_context context,
 		 const krb5_data *ivec, const krb5_data *input,
 		 krb5_data *output)
 {
+    if (output->length < input->length)
+        return KRB5_BAD_MSIZE;
     return((*(enc->decrypt))(context, key, ivec, input, output));
 }
