@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -577,6 +577,10 @@ shm_dtor(kipc_perm_t *perm)
 	kshmid_t *sp = (kshmid_t *)perm;
 	uint_t cnt;
 	size_t rsize;
+
+	ANON_LOCK_ENTER(&sp->shm_amp->a_rwlock, RW_WRITER);
+	anonmap_purge(sp->shm_amp);
+	ANON_LOCK_EXIT(&sp->shm_amp->a_rwlock);
 
 	if (sp->shm_sptinfo) {
 		if (isspt(sp)) {
@@ -1261,7 +1265,6 @@ shm_rm_amp(kshmid_t *sp)
 	 */
 	lgrp_shm_policy_fini(amp, NULL);
 	ANON_LOCK_ENTER(&amp->a_rwlock, RW_WRITER);
-	anonmap_purge(amp);
 	if (amp->a_szc != 0) {
 		anon_shmap_free_pages(amp, 0, amp->size);
 	} else {
