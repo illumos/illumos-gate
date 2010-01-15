@@ -931,7 +931,7 @@ cat >> $dest <<EOM
 # set on login; PRIV_LIMIT defines the Limit set on login.
 # Individual users can have privileges assigned or taken away through
 # user_attr.  Privileges can also be assigned to profiles in which case
-# the users with those profiles can use those privileges through pfexec(1m).
+# the users with those profiles can use those privileges through pfexec(1).
 # For maximum future compatibility, the specifications should
 # always include "basic" or "all"; privileges should then be removed using
 # the negation.  E.g., PRIV_LIMIT=all,!sys_linkdir takes away only the

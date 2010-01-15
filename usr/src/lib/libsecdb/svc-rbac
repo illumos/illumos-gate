@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -59,6 +59,8 @@ do
 		# No directory, nothing to do
 		continue
 	fi
+	# cache user/owner of file to update
+	ownergroup=`ls -ln $f | awk '{printf("%s:%s\n", $3, $4);'}`
 	#
 	# List all the files in the directory and the destination file
 	# in the order of their timestamp.  Most recent files are
@@ -66,6 +68,7 @@ do
 	# done as the rest of the files are older and they are already
 	# incorporated.
 	#
+	update=0
 	for frag in `ls -t $f $d/* 2> /dev/null`
 	do
 		if [ "$frag" = "$f" ]
@@ -74,9 +77,14 @@ do
 		fi
 		if [ -f "$frag" ]
 		then
+			update=1
 			echo $frag $f | $irbac
 		fi
 	done
+	if [ $update -eq 1 ]
+	then
+		chown $ownergroup $f
+	fi
 done
 
 exit $SMF_EXIT_OK
