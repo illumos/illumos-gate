@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #include <fm/libtopo.h>
@@ -71,6 +71,8 @@ fab_update_topo(fmd_hdl_t *hdl)
 
 	/* Init xpath */
 	fab_xpathCtx = xmlXPathNewContext(fab_doc);
+
+	fab_set_fake_rp(hdl);
 
 	fab_valid_topo = 1;
 }

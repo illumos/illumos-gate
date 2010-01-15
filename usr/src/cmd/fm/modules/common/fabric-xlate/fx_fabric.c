@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #include <stddef.h>
@@ -271,15 +271,6 @@ fab_pci_fabric_to_data(fmd_hdl_t *hdl, nvlist_t *nvl, fab_data_t *data)
 	FAB_LOOKUP(32,	"pcie_adv_rp_command",	&data->pcie_rp_err_cmd);
 	FAB_LOOKUP(16,	"pcie_adv_rp_ce_src_id", &data->pcie_rp_ce_src_id);
 	FAB_LOOKUP(16,	"pcie_adv_rp_ue_src_id", &data->pcie_rp_ue_src_id);
-
-	/*
-	 * If the system has a PCIe complaint RP with AER, turn off translating
-	 * fake RP ereports.
-	 */
-	if (fab_xlate_fake_rp &&
-	    (data->dev_type == PCIE_PCIECAP_DEV_TYPE_ROOT) &&
-	    data->aer_off)
-		fab_xlate_fake_rp = B_FALSE;
 }
 
 static int
@@ -804,6 +795,39 @@ fab_xlate_fabric_erpts(fmd_hdl_t *hdl, nvlist_t *nvl, const char *class)
 
 	fab_pci_fabric_to_data(hdl, nvl, &data);
 	fab_xlate_pcie_erpts(hdl, &data);
+}
+
+void
+fab_set_fake_rp(fmd_hdl_t *hdl)
+{
+	char *rppath = fab_get_rpdev(hdl), *str = NULL;
+	int count = 0;
+
+	if (!rppath) {
+		fmd_hdl_debug(hdl, "Can't find root port dev path");
+		return;
+	}
+
+	/*
+	 * For the path '/pci@xxx' is fake root port,
+	 * and  '/pci@xxx/pci@y' is real root port.
+	 */
+	str = rppath;
+	while (*str) {
+		if (*str == '/')
+			count++;
+		str++;
+	}
+
+	if (count == 1)
+		fab_xlate_fake_rp = B_TRUE;
+	else
+		/*
+		 * If count is 0, then it should still be B_FALSE
+		 */
+		fab_xlate_fake_rp = B_FALSE;
+
+	fmd_hdl_strfree(hdl, rppath);
 }
 
 #define	SET_TBL(n, err, reg, sz) \

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -165,6 +165,8 @@ extern char *fab_find_addr(fmd_hdl_t *hdl, nvlist_t *nvl, uint64_t addr);
 extern char *fab_find_bdf(fmd_hdl_t *hdl, nvlist_t *nvl, pcie_req_id_t bdf);
 extern boolean_t fab_hc2dev(fmd_hdl_t *, const char *, char **);
 extern boolean_t fab_hc2dev_nvl(fmd_hdl_t *, nvlist_t *, char **);
+extern char *fab_get_rpdev(fmd_hdl_t *hdl);
+extern void fab_set_fake_rp(fmd_hdl_t *hdl);
 
 #ifdef __cplusplus
 }

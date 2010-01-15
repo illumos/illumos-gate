@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #include <strings.h>
@@ -834,4 +834,24 @@ fab_pr(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl)
 			break;
 		}
 	}
+}
+
+char *
+fab_get_rpdev(fmd_hdl_t *hdl)
+{
+	char 	*retval;
+	char 	query[500];
+
+	(void) snprintf(query, sizeof (query), "//propval["
+	    "@name='extended-capabilities' and contains(@value, '%s')]"
+	    "/parent::*/parent::*/propgroup[@name='io']"
+	    "/propval[@name='dev']/@value", PCIEX_ROOT);
+
+	retval = fab_xpath_query(hdl, query);
+	if (retval) {
+		fmd_hdl_debug(hdl, "Root port path is %s\n", retval);
+		return (retval);
+	}
+
+	return (NULL);
 }
