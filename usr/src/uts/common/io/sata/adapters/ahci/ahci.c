@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -646,7 +646,7 @@ ahci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	cap_status = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
 	    (uint32_t *)AHCI_GLOBAL_CAP(ahci_ctlp));
 
-	AHCIDBG(AHCIDBG_INIT, ahci_ctlp, "hba capabilites = 0x%x",
+	AHCIDBG(AHCIDBG_INIT, ahci_ctlp, "hba capabilities = 0x%x",
 	    cap_status);
 
 #if AHCI_DEBUG
@@ -5453,10 +5453,24 @@ ahci_find_dev_signature(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	uint32_t signature;
 	uint8_t port = addrp->aa_port;
 	uint8_t pmport = addrp->aa_pmport;
-	ASSERT(AHCI_ADDR_IS_VALID(addrp));
 	int rval;
 
-	if (AHCI_ADDR_IS_PORT(addrp)) {
+	ASSERT(AHCI_ADDR_IS_VALID(addrp));
+
+	/*
+	 * If the HBA doesn't support port multiplier, then the driver
+	 * doesn't need to bother to check port multiplier device.
+	 *
+	 * The second port of ICH7 on ASUS P5W DH deluxe motherboard is
+	 * connected to Silicon Image 4723, to which the two sata drives
+	 * attached can be set with RAID1, RAID0 or Spanning mode.
+	 *
+	 * We found software reset will get failure if port multiplier address
+	 * 0xf is used by software reset, so just ignore the check since
+	 * ICH7 doesn't support port multiplier device at all.
+	 */
+	if (AHCI_ADDR_IS_PORT(addrp) &&
+	    (ahci_ctlp->ahcictl_cap & AHCI_CAP_PMULT_CBSS)) {
 		AHCIDBG(AHCIDBG_ENTRY, ahci_ctlp,
 		    "ahci_find_dev_signature enter: port %d", port);
 
