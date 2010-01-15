@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -29,9 +29,7 @@ export PATH
 case "${ARCH}" in
 sparc)
 	rem_drv -b ${BASEDIR} pcs
-	rem_drv -b ${BASEDIR} stp4020
 	rem_drv -b ${BASEDIR} pcic
-	rm -f ${BASEDIR}/dev/stp4020
 	rm -f ${BASEDIR}/dev/pcic
 	;;
 i386)

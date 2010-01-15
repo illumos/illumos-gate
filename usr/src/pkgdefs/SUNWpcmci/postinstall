@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -33,15 +33,6 @@ grep '^pcs\>' ${BASEDIR}/etc/name_to_major > /dev/null && \
 rem_drv -b ${BASEDIR} pcs
 add_drv -b ${BASEDIR} -n pcs \
 || EXIT=1
-
-case "${ARCH}" in
-sparc)
-	grep '^stp4020\>' ${BASEDIR}/etc/name_to_major > /dev/null && \
-	rem_drv -b ${BASEDIR} stp4020
-	add_drv -b ${BASEDIR} -n -i 'SUNW,pcmcia' -c 'pcmcia' stp4020 \
-	|| EXIT=1
-	;;
-esac
 
 grep '^pcic\>' ${BASEDIR}/etc/name_to_major > /dev/null && \
 rem_drv -b ${BASEDIR} pcic

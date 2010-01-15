@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,7 +86,7 @@ static struct di_priv_format ppd_format[] = {
 	},
 
 	{	/* pcmcia format */
-		"pcic stp4020",
+		"pcic",
 		sizeof (struct pcmcia_parent_private),
 
 		sizeof (struct pcm_regs),		/* first pointer */

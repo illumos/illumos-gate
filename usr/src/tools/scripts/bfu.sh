@@ -6951,7 +6951,6 @@ mondo_loop() {
 		$root/kernel/drv/spdsock \
 		$root/kernel/drv/ssd \
 		$root/kernel/drv/st \
-		$root/kernel/drv/stp4020 \
 		$root/kernel/drv/sy \
 		$root/kernel/drv/sysmsg \
 		$root/kernel/drv/tcp \
@@ -8203,6 +8202,9 @@ mondo_loop() {
 	rm -f $root/kernel/drv/sparcv9/pcmem
 	rm -f $root/kernel/drv/sparcv9/pcram
 	rm -f $root/kernel/drv/sparcv9/pem
+	rm -f $root/kernel/drv/stp4020
+	rm -f $root/kernel/drv/stp4020.conf
+	rm -f $root/kernel/drv/sparcv9/stp4020
 	rm -f $root/etc/init.d/pcmcia
 	rm -f $usr/lib/pcmciad
 	rm -f $usr/lib/smedia/sm_pcmem.so.1

@@ -338,7 +338,7 @@ DRV_KMODS	+= emul64
 #
 # PCMCIA specific module(s)
 #
-DRV_KMODS	+= stp4020 pcs
+DRV_KMODS	+= pcs
 MISC_KMODS	+= busra cardbus dada pcmcia
 DRV_KMODS	+= pcata
 DRV_KMODS	+= pcic

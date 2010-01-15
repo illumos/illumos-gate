@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # include global definitions
@@ -37,7 +37,6 @@ promif.h		promimpl.h \
 ser_async.h		ser_zscc.h \
 socalio.h		socalreg.h \
 socal_cq_defs.h		socalmap.h		socalvar.h \
-stp4020_reg.h		stp4020_var.h \
 ttymux.h		ttymuxuser.h \
 zsdev.h
 

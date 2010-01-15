@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -43,7 +43,6 @@ remove_minor()
 # We remove any dangling /dev links in this order:
 #
 #    SPARC:
-#	/dev/stp4020
 #	/dev/pem
 #
 #    x86:
@@ -53,7 +52,6 @@ remove_minor()
 #
 case "${ARCH}" in
 	sparc)
-		remove_minor stp4020
 		;;
 	i386)
 		remove_minor ra
@@ -73,10 +71,9 @@ rem_drv -b ${BASEDIR} pcmcia
 [ -c ${BASEDIR}/dev/pcmcia ] && rm -f ${BASEDIR}/dev/pcmcia
 
 #
-# make sure we don't have left over /dev/ra, /dev/pcic or /dev/stp4020
+# make sure we don't have left over /dev/ra, /dev/pcic
 #
 [ ! -h ${BASEDIR}/dev/ra ]      && rm -f ${BASEDIR}/dev/ra
 [ ! -h ${BASEDIR}/dev/pcic ]    && rm -f ${BASEDIR}/dev/pcic
-[ ! -h ${BASEDIR}/dev/stp4020 ] && rm -f ${BASEDIR}/dev/stp4020
 
 exit 0

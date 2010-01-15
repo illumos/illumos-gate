@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -76,8 +76,6 @@ f none usr/include/sys/scsi/adapters/ispvar.h 644 root bin
 f none usr/include/sys/scsi/targets/ssddef.h 644 root bin
 f none usr/include/sys/ser_async.h 644 root bin
 f none usr/include/sys/ser_zscc.h 644 root bin
-f none usr/include/sys/stp4020_reg.h 644 root bin
-f none usr/include/sys/stp4020_var.h 644 root bin
 f none usr/include/sys/zsdev.h 644 root bin
 d none usr/platform/sun4u 755 root sys
 d none usr/platform/sun4u/include 755 root bin
