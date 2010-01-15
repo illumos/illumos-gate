@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -311,7 +311,6 @@ get_start_sector(int fd)
 	 */
 	if ((rval = libfdisk_init(&epp, device_p0, NULL, FDISK_READ_DISK))
 	    != FDISK_SUCCESS) {
-		libfdisk_fini(&epp);
 		switch (rval) {
 			/*
 			 * The first 3 cases are not an error per-se, just that

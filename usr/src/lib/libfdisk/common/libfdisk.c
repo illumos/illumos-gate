@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -158,6 +158,7 @@ libfdisk_init(ext_part_t **epp, char *devstr, struct ipart *parttab, int opflag)
 	int found_bad_magic = 0;
 
 	if ((temp = calloc(1, sizeof (ext_part_t))) == NULL) {
+		*epp = NULL;
 		return (ENOMEM);
 	}
 
@@ -185,23 +186,24 @@ libfdisk_init(ext_part_t **epp, char *devstr, struct ipart *parttab, int opflag)
 			if (stat(temp->device_name, &sbuf) != 0) {
 
 				/* Failed all options, give up */
-				free(temp);
-				return (EINVAL);
+				rval = EINVAL;
+				goto fail;
 			}
 		}
 	}
 
 	/* Make sure the device is a raw device */
 	if ((sbuf.st_mode & S_IFMT) != S_IFCHR) {
-		return (EINVAL);
+		rval = EINVAL;
+		goto fail;
 	}
 
 	temp->ld_head = NULL;
 	temp->sorted_ld_head = NULL;
 
 	if ((temp->dev_fd = open(temp->device_name, O_RDWR, 0666)) < 0) {
-		free(temp);
-		return (EINVAL);
+		rval = EINVAL;
+		goto fail;
 	}
 
 	if ((temp->mtable = parttab) == NULL) {
@@ -213,7 +215,7 @@ libfdisk_init(ext_part_t **epp, char *devstr, struct ipart *parttab, int opflag)
 			 * obtaining the disk geometry.
 			 */
 			if (rval != FDISK_EBADMAGIC)
-				return (rval);
+				goto fail;
 			else
 				found_bad_magic = 1;
 		}
@@ -222,7 +224,7 @@ libfdisk_init(ext_part_t **epp, char *devstr, struct ipart *parttab, int opflag)
 	temp->op_flag = opflag;
 
 	if ((rval = fdisk_init_disk_geom(temp)) != FDISK_SUCCESS) {
-		return (rval);
+		goto fail;
 	}
 
 	*epp = temp;
@@ -234,6 +236,11 @@ libfdisk_init(ext_part_t **epp, char *devstr, struct ipart *parttab, int opflag)
 	if (opflag & FDISK_READ_DISK) {
 		rval = fdisk_read_extpart(*epp);
 	}
+	return (rval);
+
+fail:
+	*epp = NULL;
+	free(temp);
 	return (rval);
 }
 
@@ -256,6 +263,9 @@ libfdisk_reset(ext_part_t *epp)
 void
 libfdisk_fini(ext_part_t **epp)
 {
+	if (*epp == NULL)
+		return;
+
 	fdisk_free_ld_nodes(*epp);
 	(void) close((*epp)->dev_fd);
 	free(*epp);

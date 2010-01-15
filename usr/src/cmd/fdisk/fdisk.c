@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1195,24 +1195,20 @@ main(int argc, char *argv[])
 			case FDISK_ENOVGEOM:
 				fprintf(stderr, "Could not get virtual"
 				    " geometry for this device\n");
-				libfdisk_fini(&epp);
 				exit(1);
 				break;
 			case FDISK_ENOPGEOM:
 				fprintf(stderr, "Could not get physical"
 				    " geometry for this device\n");
-				libfdisk_fini(&epp);
 				exit(1);
 				break;
 			case FDISK_ENOLGEOM:
 				fprintf(stderr, "Could not get label"
 				    " geometry for this device\n");
-				libfdisk_fini(&epp);
 				exit(1);
 				break;
 			default:
 				perror("Failed to initialise libfdisk.\n");
-				libfdisk_fini(&epp);
 				exit(1);
 				break;
 		}

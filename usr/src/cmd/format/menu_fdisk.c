@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -965,24 +965,20 @@ extpart_init(ext_part_t **epp)
 			case FDISK_ENOVGEOM:
 				err_print("Could not get virtual geometry for"
 				    " this device\n");
-				libfdisk_fini(epp);
 				fullabort();
 				break;
 			case FDISK_ENOPGEOM:
 				err_print("Could not get physical geometry for"
 				    " this device\n");
-				libfdisk_fini(epp);
 				fullabort();
 				break;
 			case FDISK_ENOLGEOM:
 				err_print("Could not get label geometry for "
 				    " this device\n");
-				libfdisk_fini(epp);
 				fullabort();
 				break;
 			default:
 				err_print("Failed to initialise libfdisk.\n");
-				libfdisk_fini(epp);
 				fullabort();
 				break;
 		}
