@@ -43,6 +43,7 @@ static uint32_t rge_autorecover = 1;
  */
 #define	RGE_DBG		RGE_DBG_REGS	/* debug flag for this code	*/
 static uint32_t rge_watchdog_count	= 1 << 5;
+static uint32_t rge_rx_watchdog_count	= 1 << 3;
 
 /*
  * Operating register get/set access routines
@@ -716,6 +717,7 @@ rge_chip_ident(rge_t *rgep)
 	/* set pci latency timer */
 	if (chip->mac_ver == MAC_VER_8169 ||
 	    chip->mac_ver == MAC_VER_8169S_D ||
+	    chip->mac_ver == MAC_VER_8169S_E ||
 	    chip->mac_ver == MAC_VER_8169SC)
 		pci_config_put8(rgep->cfg_handle, PCI_CONF_LATENCY_TIMER, 0x40);
 
@@ -723,9 +725,9 @@ rge_chip_ident(rge_t *rgep)
 		val16 = rge_reg_get16(rgep, RT_CONFIG_1_REG);
 		val16 &= 0x0300;
 		if (val16 == 0x1)	/* 66Mhz PCI */
-			pci_config_put32(rgep->cfg_handle, 0x7c, 0x00ff00ff);
+			rge_reg_put32(rgep, 0x7c, 0x000700ff);
 		else if (val16 == 0x0) /* 33Mhz PCI */
-			pci_config_put32(rgep->cfg_handle, 0x7c, 0x00ffff00);
+			rge_reg_put32(rgep, 0x7c, 0x0007ff00);
 	}
 
 	/*
@@ -921,6 +923,10 @@ rge_chip_init(rge_t *rgep)
 		val16 |= CPLUS_BIT14 | MUL_PCI_RW_ENABLE;
 		rge_reg_put8(rgep, RESV_82_REG, 0x01);
 	}
+	if (chip->mac_ver == MAC_VER_8169S_E ||
+	    chip->mac_ver == MAC_VER_8169SC) {
+		val16 |= MUL_PCI_RW_ENABLE;
+	}
 	rge_reg_put16(rgep, CPLUS_COMMAND_REG, val16 & (~0x03));
 
 	/*
@@ -1060,6 +1066,8 @@ rge_chip_start(rge_t *rgep)
 	if (rgep->chipid.is_pcie) {
 		rgep->int_mask |= NO_TXDESC_INT;
 	}
+	rgep->rx_fifo_ovf = 0;
+	rgep->int_mask |= RX_FIFO_OVERFLOW_INT;
 	rge_reg_put16(rgep, INT_MASK_REG, rgep->int_mask);
 
 	/*
@@ -1470,6 +1478,22 @@ rge_intr(caddr_t arg1, caddr_t arg2)
 		rge_chip_cyclic(rgep);
 	}
 
+	if (int_status & RX_FIFO_OVERFLOW_INT) {
+		/* start rx watchdog timeout detection */
+		rgep->rx_fifo_ovf = 1;
+		if (rgep->int_mask & RX_FIFO_OVERFLOW_INT) {
+			rgep->int_mask &= ~RX_FIFO_OVERFLOW_INT;
+			update_int_mask = B_TRUE;
+		}
+	} else if (int_status & RGE_RX_INT) {
+		/* stop rx watchdog timeout detection */
+		rgep->rx_fifo_ovf = 0;
+		if ((rgep->int_mask & RX_FIFO_OVERFLOW_INT) == 0) {
+			rgep->int_mask |= RX_FIFO_OVERFLOW_INT;
+			update_int_mask = B_TRUE;
+		}
+	}
+
 	mutex_exit(rgep->genlock);
 
 	/*
@@ -1565,6 +1589,15 @@ rge_factotum_stall_check(rge_t *rgep)
 	uint32_t dogval;
 
 	ASSERT(mutex_owned(rgep->genlock));
+
+	/*
+	 * Specific check for RX stall ...
+	 */
+	rgep->rx_fifo_ovf <<= 1;
+	if (rgep->rx_fifo_ovf > rge_rx_watchdog_count) {
+		RGE_REPORT((rgep, "rx_hang detected"));
+		return (B_TRUE);
+	}
 
 	/*
 	 * Specific check for Tx stall ...

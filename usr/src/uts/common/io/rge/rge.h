@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -494,6 +494,7 @@ typedef struct rge {
 	clock_t			tick_delta;
 	uint64_t		last_opackets;
 	uint64_t		last_rpackets;
+	uint32_t		rx_fifo_ovf;
 } rge_t;
 
 /*

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -697,10 +697,12 @@ rge_m_tx(void *arg, mblk_t *mp)
 
 	rw_enter(rgep->errlock, RW_READER);
 	if ((rgep->rge_mac_state != RGE_MAC_STARTED) ||
-	    (rgep->rge_chip_state != RGE_CHIP_RUNNING)) {
-		RGE_DEBUG(("rge_m_tx: tx doesn't work"));
+	    (rgep->rge_chip_state != RGE_CHIP_RUNNING) ||
+	    (rgep->param_link_up != LINK_STATE_UP)) {
 		rw_exit(rgep->errlock);
-		return (mp);
+		RGE_DEBUG(("rge_m_tx: tx doesn't work"));
+		freemsgchain(mp);
+		return (NULL);
 	}
 
 	while (mp != NULL) {
