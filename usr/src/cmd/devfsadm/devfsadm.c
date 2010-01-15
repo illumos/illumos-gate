@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,9 +95,6 @@ static int update_all_drivers = FALSE;
 
 /* set if invoked via /usr/lib/devfsadm/devfsadmd */
 static int daemon_mode = FALSE;
-
-/* set if event_handler triggered */
-int event_driven = FALSE;
 
 /* output directed to syslog during daemon mode if set */
 static int logflag = FALSE;
@@ -1648,12 +1645,6 @@ event_handler(sysevent_t *ev)
 	int instance;
 	int branch_event = 0;
 
-	/*
-	 * If this is event-driven, then we cannot trust the static devlist
-	 * to be correct.
-	 */
-
-	event_driven = TRUE;
 	subclass = sysevent_get_subclass_name(ev);
 	vprint(EVENT_MID, "event_handler: %s id:0X%llx\n",
 	    subclass, sysevent_get_seq(ev));
@@ -4316,22 +4307,22 @@ hot_cleanup(char *node_path, char *minor_name, char *ev_subclass,
 
 	/* update device allocation database */
 	if (system_labeled) {
+		int	ret = 0;
 		int	devtype = 0;
+		char	devname[MAXNAMELEN];
 
-		if (strstr(path, DA_SOUND_NAME))
+		devname[0] = '\0';
+		if (strstr(node_path, DA_SOUND_NAME))
 			devtype = DA_AUDIO;
-		else if (strstr(path, "storage"))
-			devtype = DA_RMDISK;
-		else if (strstr(path, "disk"))
-			devtype = DA_RMDISK;
-		else if (strstr(path, "floppy"))
-			/* TODO: detect usb cds and floppies at insert time */
+		else if (strstr(node_path, "disk"))
 			devtype = DA_RMDISK;
 		else
 			goto out;
-
-		(void) _update_devalloc_db(&devlist, devtype, DA_REMOVE,
-		    node_path, root_dir);
+		ret = da_remove_list(&devlist, NULL, devtype, devname,
+		    sizeof (devname));
+		if (ret != -1)
+			(void) _update_devalloc_db(&devlist, devtype, DA_REMOVE,
+			    devname, root_dir);
 	}
 
 out:

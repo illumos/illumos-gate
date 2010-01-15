@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -59,7 +59,7 @@ CHECKHDRS =	$(GENHDRS:%.h=%.check)
 $(ROOTHDRS) := 	FILEMODE = 0644
 $(ROOTCHDRS) :=	FILEMODE = 0644
 
-all install lint package: install_h $(GENSRCS) $(SUBDIRS)
+all install lint package: $(GENSRCS) $(SUBDIRS)
 clean clobber delete: $(SUBDIRS)
 
 #

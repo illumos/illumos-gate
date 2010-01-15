@@ -19,8 +19,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY =	libbsm.a
@@ -86,7 +88,7 @@ ROOTLINT=	$(LINTSRC:%=$(ROOTLINTDIR)/%)
 CLEANFILES +=	$(LINTOUT) $(LINTLIB)
 
 CFLAGS	+=	$(CCVERBOSE)
-LDLIBS +=	-lsocket -lnsl -lmd -lc -ldevinfo -lsecdb -ltsol -linetutil
+LDLIBS +=	-lsocket -lnsl -lmd -lc -lsecdb -ltsol -linetutil
 
 COMDIR=		../common
 

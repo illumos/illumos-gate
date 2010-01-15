@@ -20,9 +20,11 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Device allocation related work.
@@ -44,9 +46,8 @@
 #define	DEALLOCATE	 "/usr/sbin/deallocate"
 #define	MKDEVALLOC	"/usr/sbin/mkdevalloc"
 
-static char *_update_dev(deventry_t *, int, const char *, char *, char *);
+static void _update_dev(deventry_t *, int, char *);
 static int _make_db();
-extern int event_driven;
 
 
 /*
@@ -166,10 +167,6 @@ _make_db()
  * _update_devalloc_db
  * 	Forms allocatable device entries to be written to device_allocate and
  *	device_maps.
- *
- *      Or finds the correct entry to remove, and removes it.
- *
- *    Note: devname is a /devices link in the REMOVE case.
  */
 /* ARGSUSED */
 void
@@ -178,8 +175,6 @@ _update_devalloc_db(devlist_t *devlist, int devflag, int action, char *devname,
 {
 	int		i;
 	deventry_t	*entry = NULL, *dentry = NULL;
-	char 		*typestring;
-	char 		*nickname;  /* typestring + instance */
 
 	if (action == DA_ADD) {
 		for (i = 0; i < DA_COUNT; i++) {
@@ -203,147 +198,61 @@ _update_devalloc_db(devlist_t *devlist, int devflag, int action, char *devname,
 				return;
 			}
 			if (dentry)
-				(void) _update_dev(dentry, action, NULL, NULL,
-				    NULL);
+				_update_dev(dentry, action, NULL);
 		}
 	} else if (action == DA_REMOVE) {
-		if (devflag & DA_AUDIO) {
+		if (devflag & DA_AUDIO)
 			dentry = devlist->audio;
-			typestring = DA_AUDIO_TYPE;
-		} else if (devflag & DA_CD) {
+		else if (devflag & DA_CD)
 			dentry = devlist->cd;
-			typestring = DA_CD_TYPE;
-		} else if (devflag & DA_FLOPPY) {
+		else if (devflag & DA_FLOPPY)
 			dentry = devlist->floppy;
-			typestring = DA_FLOPPY_TYPE;
-		} else if (devflag & DA_TAPE) {
+		else if (devflag & DA_TAPE)
 			dentry = devlist->tape;
-			typestring = DA_TAPE_TYPE;
-		} else if (devflag & DA_RMDISK) {
+		else if (devflag & DA_RMDISK)
 			dentry = devlist->rmdisk;
-			typestring = DA_RMDISK_TYPE;
-		} else
+		else
 			return;
 
-		if (event_driven) {
-			nickname = _update_dev(NULL, action, typestring, NULL,
-			    devname);
-
-			if (nickname != NULL) {
-				(void) da_rm_list_entry(devlist, devname,
-				    devflag, nickname);
-				free(nickname);
-			}
-			return;
-		}
-		/*
-		 * Not reached as of now, could be reached if devfsadm is
-		 * enhanced to clean up devalloc database more thoroughly.
-		 * Will not reliably match for event-driven removes
-		 */
 		for (entry = dentry; entry != NULL; entry = entry->next) {
 			if (strcmp(entry->devinfo.devname, devname) == 0)
 				break;
 		}
-		(void) _update_dev(entry, action, NULL, devname, NULL);
+		_update_dev(entry, action, devname);
 	}
 }
 
-/*
- *	_update_dev: Update device_allocate and/or device_maps files
- *
- *      If adding a device:
- *	    dentry:	A linked list of allocatable devices
- *	    action:	DA_ADD or DA_REMOVE
- *	    devtype:	type of device linked list to update on removal
- *	    devname:	short name (i.e. rmdisk5, cdrom0)  of device if known
- *	    rm_link:	name of real /device from hot_cleanup
- *
- *	If the action is ADD or if the action is triggered by an event
- *      from syseventd,  read the files FIRST and treat their data as
- *      more-accurate than the dentry list, adjusting dentry contents if needed.
- *
- *	For DA_ADD, try to add each device in the list to the files.
- *
- *      If the action is DA_REMOVE and not a hotplug remove, adjust the files
- *	as indicated by the linked list.
- *
- *	RETURNS:
- *          If we successfully remove a device from the files,  returns
- *          a char * to strdup'd devname of the device removed.
- *
- *	    The caller is responsible for freeing the return value.
- *
- *	NULL for all other cases, both success and failure.
- *
- */
-static char *
-_update_dev(deventry_t *dentry, int action, const char *devtype, char *devname,
-    char *rm_link)
+static void
+_update_dev(deventry_t *dentry, int action, char *devname)
 {
 	da_args		dargs;
 	deventry_t	newentry, *entry;
-	int status;
 
 	dargs.rootdir = NULL;
 	dargs.devnames = NULL;
 
-	if (event_driven)
-		dargs.optflag = DA_EVENT;
-	else
-		dargs.optflag = 0;
-
 	if (action == DA_ADD) {
-		dargs.optflag |= DA_ADD;
-		/*
-		 * Add Events do not have enough information to overrride the
-		 * existing file contents.
-		 */
-
+		dargs.optflag = DA_ADD | DA_FORCE;
 		for (entry = dentry; entry != NULL; entry = entry->next) {
 			dargs.devinfo = &(entry->devinfo);
 			(void) da_update_device(&dargs);
 		}
 	} else if (action == DA_REMOVE) {
-		dargs.optflag |= DA_REMOVE;
+		dargs.optflag = DA_REMOVE;
 		if (dentry) {
 			entry = dentry;
-		} else if (dargs.optflag & DA_EVENT) {
-			if (devname == NULL)
-				newentry.devinfo.devname = NULL;
-			else
-				newentry.devinfo.devname = strdup(devname);
-			newentry.devinfo.devtype = (char *)devtype;
-			newentry.devinfo.devauths =
-			    newentry.devinfo.devopts =
-			    newentry.devinfo.devexec = NULL;
-			newentry.devinfo.devlist = strdup(rm_link);
-			newentry.devinfo.instance = 0;
-			newentry.next = NULL;
-			entry = &newentry;
 		} else {
 			newentry.devinfo.devname = strdup(devname);
-			newentry.devinfo.devtype = (char *)devtype;
+			newentry.devinfo.devtype =
 			newentry.devinfo.devauths =
-			    newentry.devinfo.devexec =
-			    newentry.devinfo.devopts =
-			    newentry.devinfo.devlist = NULL;
+			newentry.devinfo.devexec =
+			newentry.devinfo.devopts =
+			newentry.devinfo.devlist = NULL;
 			newentry.devinfo.instance = 0;
 			newentry.next = NULL;
 			entry = &newentry;
 		}
 		dargs.devinfo = &(entry->devinfo);
-		/*
-		 * da_update_device will fill in entry devname if
-		 * event_driven is true and device is in the file
-		 */
-		status = da_update_device(&dargs);
-		if (event_driven)
-			if (newentry.devinfo.devlist != NULL)
-				free(newentry.devinfo.devlist);
-		if (status == 0)
-			return (dargs.devinfo->devname);
-		else free(dargs.devinfo->devname);
+		(void) da_update_device(&dargs);
 	}
-	return (NULL);
 }

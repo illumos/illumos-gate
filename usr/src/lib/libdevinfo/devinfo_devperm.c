@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -269,8 +269,8 @@ logindevperm(const char *ttyn, uid_t uid, gid_t gid, void (*errmsg)(char *))
  * devpath: Absolute path to /dev link
  * devfs_path: Returns malloced string: /devices path w/out "/devices"
  */
-int
-devfs_resolve_link(char *devpath, char **devfs_path)
+static int
+resolve_link(char *devpath, char **devfs_path)
 {
 	char contents[PATH_MAX + 1];
 	char stage_link[PATH_MAX + 1];
@@ -313,7 +313,7 @@ devfs_resolve_link(char *devpath, char **devfs_path)
 			(void) strcat(stage_link, contents);
 
 		}
-		return (devfs_resolve_link(stage_link, devfs_path));
+		return (resolve_link(stage_link, devfs_path));
 	}
 
 	if (devfs_path) {
@@ -339,7 +339,7 @@ check_driver_match(char *path, char *line)
 	char saveline[MAX_LINELEN];
 	char *p;
 
-	if (devfs_resolve_link(path, &devfs_path) == 0) {
+	if (resolve_link(path, &devfs_path) == 0) {
 		char *p;
 		char pwd_buf[PATH_MAX];
 		di_node_t node;
