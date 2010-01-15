@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -433,12 +433,12 @@ dimm_to_addr(int node, int channel, int rank, uint64_t rank_addr,
 				rlimit = rir[node][channel][i].way[way].rlimit;
 				if (rlimit && rank_addr >= rlimit)
 					continue;
+				cbaddr = base;
 				if (closed_page) {
 					caddr = (rank_addr & ~0x3f) *
 					    rir[node][channel][i].interleave -
 					    (int64_t)rir[node][channel][i].
 					    way[way].soffset * VRANK_SZ;
-					cbaddr = caddr;
 					caddr += way << 6;
 					caddr |= rank_addr & 0x3f;
 				} else {
@@ -446,7 +446,6 @@ dimm_to_addr(int node, int channel, int rank, uint64_t rank_addr,
 					    rir[node][channel][i].interleave -
 					    (int64_t)rir[node][channel][i].
 					    way[way].soffset * VRANK_SZ;
-					cbaddr = caddr;
 					caddr += way << 12;
 					caddr |= rank_addr & 0xfff;
 				}
@@ -504,6 +503,9 @@ dimm_to_addr(int node, int channel, int rank, uint64_t rank_addr,
 			baddr -= (int64_t)
 			    sag_ch[node][lchannel][i].soffset << 16;
 			if (addr < tad[node][i].limit) {
+				/*
+				 * this is the target address descripter to use
+				 */
 				sinterleave = socket_interleave(addr,
 				    node, channel, i, &way);
 				if (socket_interleave_p) {
@@ -520,8 +522,16 @@ dimm_to_addr(int node, int channel, int rank, uint64_t rank_addr,
 				if (channel_interleave_p) {
 					*channel_interleave_p = cinterleave;
 				}
-				if (baddr + (rank_sz * rinterleave) >
+				if (baddr + (rank_sz * rinterleave *
+				    cinterleave * sinterleave) >
 				    tad[node][i].limit) {
+					/*
+					 * The system address mapped to this
+					 * rank is not contiguous or has
+					 * different socket/channel interleave
+					 * adjust vitual rank to address where
+					 * change or break occures
+					 */
 					rank_sz = (tad[node][i].limit - baddr) /
 					    (cinterleave * sinterleave *
 					    rinterleave);
@@ -595,6 +605,26 @@ dimm_to_addr(int node, int channel, int rank, uint64_t rank_addr,
 					break;
 				}
 				break;
+			} else if (baddr < tad[node][i].limit) {
+				/*
+				 * the channel address is not contiguous or
+				 * socket/channel interleave changes in the
+				 * middle of the rank adjust base and size for
+				 * virtual rank to where the break occurs
+				 */
+				sinterleave = socket_interleave(baddr,
+				    node, channel, i, &way);
+				if ((no_interleave && sinterleave == 1) ||
+				    mirror_mode[node] || lockstep[node]) {
+					cinterleave = 1;
+				} else {
+					cinterleave =
+					    channels_interleave(baddr);
+				}
+				rank_sz -= (tad[node][i].limit - baddr) /
+				    (cinterleave * sinterleave * rinterleave);
+				cbaddr += (tad[node][i].limit - baddr) /
+				    (cinterleave * sinterleave);
 			}
 		}
 		base = tad[node][i].limit;
@@ -839,13 +869,27 @@ set_rank(int socket, int channel, int rule, int way, int rank,
 	int k, l;
 	if (rank_addr == 0)
 		return;
-	for (k = 0; k <= rule; k++) {
-		for (l = 0; l < way; l++) {
+	/*
+	 * set limit on any rules which have virtual rank in current rank and
+	 * are not already limited by earlier rule
+	 */
+	for (k = 0; k < rule; k++) {
+		for (l = 0; l < MAX_RIR_WAY; l++) {
 			if (rir[socket][channel][k].way[l].dimm_rank == rank &&
 			    rir[socket][channel][k].way[l].rlimit == 0) {
 				rir[socket][channel][k].way[l].rlimit =
 				    rank_addr;
 			}
+		}
+	}
+	/*
+	 * set limit if this rule supplies more than 1 virtual rank from current
+	 * rank
+	 */
+	for (l = 0; l < way; l++) {
+		if (rir[socket][channel][k].way[l].dimm_rank == rank &&
+		    rir[socket][channel][k].way[l].rlimit == 0) {
+			rir[socket][channel][k].way[l].rlimit = rank_addr;
 		}
 	}
 }

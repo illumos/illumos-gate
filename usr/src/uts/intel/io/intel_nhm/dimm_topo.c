@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -111,7 +111,7 @@ inhm_rank(nvlist_t *newdimm, nhm_dimm_t *nhm_dimm, uint32_t node,
 			pa = dimm_to_addr(node, channel, dimm * 4 + i,
 			    rank_addr, &dimm_base, &vrank_sz, &sinterleave,
 			    &cinterleave, &rinterleave, &sway, &cway, &rway);
-			if (pa == -1)
+			if (pa == -1 || vrank_sz == 0)
 				break;
 			inhm_vrank(newrank[i], num, dimm_base,
 			    vrank_sz * sinterleave * cinterleave * rinterleave,

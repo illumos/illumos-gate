@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -252,7 +252,7 @@ extern "C" {
 
 #define	MAX_TAD_DRAM_RULE 8
 
-#define	VRANK_SZ 0x40000000
+#define	VRANK_SZ 0x10000000
 
 typedef struct sad {
 	uint64_t limit;
