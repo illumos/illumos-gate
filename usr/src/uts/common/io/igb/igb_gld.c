@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -451,7 +451,7 @@ igb_m_start(void *arg)
 		return (ECANCELED);
 	}
 
-	if (igb_start(igb) != IGB_SUCCESS) {
+	if (igb_start(igb, B_TRUE) != IGB_SUCCESS) {
 		mutex_exit(&igb->gen_lock);
 		return (EIO);
 	}
@@ -486,7 +486,7 @@ igb_m_stop(void *arg)
 
 	atomic_and_32(&igb->igb_state, ~IGB_STARTED);
 
-	igb_stop(igb);
+	igb_stop(igb, B_TRUE);
 
 	mutex_exit(&igb->gen_lock);
 
@@ -570,17 +570,20 @@ igb_m_ioctl(void *arg, queue_t *q, mblk_t *mp)
 	iocp = (struct iocblk *)(uintptr_t)mp->b_rptr;
 	iocp->ioc_error = 0;
 
+	mutex_enter(&igb->gen_lock);
+	if (igb->igb_state & IGB_SUSPENDED) {
+		mutex_exit(&igb->gen_lock);
+		miocnak(q, mp, 0, EINVAL);
+		return;
+	}
+	mutex_exit(&igb->gen_lock);
+
 	switch (iocp->ioc_cmd) {
 	case LB_GET_INFO_SIZE:
 	case LB_GET_INFO:
 	case LB_GET_MODE:
 	case LB_SET_MODE:
 		status = igb_loopback_ioctl(igb, iocp, mp);
-		break;
-
-	case ND_GET:
-	case ND_SET:
-		status = igb_nd_ioctl(igb, q, mp, iocp);
 		break;
 
 	default:
@@ -971,4 +974,631 @@ igb_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		return (B_FALSE);
 	}
 	return (B_TRUE);
+}
+
+int
+igb_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
+    uint_t pr_valsize, const void *pr_val)
+{
+	igb_t *igb = (igb_t *)arg;
+	struct e1000_hw *hw = &igb->hw;
+	int err = 0;
+	uint32_t flow_control;
+	uint32_t cur_mtu, new_mtu;
+	uint32_t rx_size;
+	uint32_t tx_size;
+
+	mutex_enter(&igb->gen_lock);
+	if (igb->igb_state & IGB_SUSPENDED) {
+		mutex_exit(&igb->gen_lock);
+		return (ECANCELED);
+	}
+
+	if (igb->loopback_mode != IGB_LB_NONE && igb_param_locked(pr_num)) {
+		/*
+		 * All en_* parameters are locked (read-only)
+		 * while the device is in any sort of loopback mode.
+		 */
+		mutex_exit(&igb->gen_lock);
+		return (EBUSY);
+	}
+
+	switch (pr_num) {
+	case MAC_PROP_EN_1000FDX_CAP:
+		/* read/write on copper, read-only on serdes */
+		if (hw->phy.media_type != e1000_media_type_copper) {
+			err = ENOTSUP;
+			break;
+		}
+		igb->param_en_1000fdx_cap = *(uint8_t *)pr_val;
+		igb->param_adv_1000fdx_cap = *(uint8_t *)pr_val;
+		goto setup_link;
+	case MAC_PROP_EN_100FDX_CAP:
+		if (hw->phy.media_type != e1000_media_type_copper) {
+			err = ENOTSUP;
+			break;
+		}
+		igb->param_en_100fdx_cap = *(uint8_t *)pr_val;
+		igb->param_adv_100fdx_cap = *(uint8_t *)pr_val;
+		goto setup_link;
+	case MAC_PROP_EN_100HDX_CAP:
+		if (hw->phy.media_type != e1000_media_type_copper) {
+			err = ENOTSUP;
+			break;
+		}
+		igb->param_en_100hdx_cap = *(uint8_t *)pr_val;
+		igb->param_adv_100hdx_cap = *(uint8_t *)pr_val;
+		goto setup_link;
+	case MAC_PROP_EN_10FDX_CAP:
+		if (hw->phy.media_type != e1000_media_type_copper) {
+			err = ENOTSUP;
+			break;
+		}
+		igb->param_en_10fdx_cap = *(uint8_t *)pr_val;
+		igb->param_adv_10fdx_cap = *(uint8_t *)pr_val;
+		goto setup_link;
+	case MAC_PROP_EN_10HDX_CAP:
+		if (hw->phy.media_type != e1000_media_type_copper) {
+			err = ENOTSUP;
+			break;
+		}
+		igb->param_en_10hdx_cap = *(uint8_t *)pr_val;
+		igb->param_adv_10hdx_cap = *(uint8_t *)pr_val;
+		goto setup_link;
+	case MAC_PROP_AUTONEG:
+		if (hw->phy.media_type != e1000_media_type_copper) {
+			err = ENOTSUP;
+			break;
+		}
+		igb->param_adv_autoneg_cap = *(uint8_t *)pr_val;
+		goto setup_link;
+	case MAC_PROP_FLOWCTRL:
+		bcopy(pr_val, &flow_control, sizeof (flow_control));
+
+		switch (flow_control) {
+		default:
+			err = EINVAL;
+			break;
+		case LINK_FLOWCTRL_NONE:
+			hw->fc.requested_mode = e1000_fc_none;
+			break;
+		case LINK_FLOWCTRL_RX:
+			hw->fc.requested_mode = e1000_fc_rx_pause;
+			break;
+		case LINK_FLOWCTRL_TX:
+			hw->fc.requested_mode = e1000_fc_tx_pause;
+			break;
+		case LINK_FLOWCTRL_BI:
+			hw->fc.requested_mode = e1000_fc_full;
+			break;
+		}
+setup_link:
+		if (err == 0) {
+			if (igb_setup_link(igb, B_TRUE) != IGB_SUCCESS)
+				err = EINVAL;
+		}
+		break;
+	case MAC_PROP_ADV_1000FDX_CAP:
+	case MAC_PROP_ADV_1000HDX_CAP:
+	case MAC_PROP_ADV_100T4_CAP:
+	case MAC_PROP_ADV_100FDX_CAP:
+	case MAC_PROP_ADV_100HDX_CAP:
+	case MAC_PROP_ADV_10FDX_CAP:
+	case MAC_PROP_ADV_10HDX_CAP:
+	case MAC_PROP_EN_1000HDX_CAP:
+	case MAC_PROP_EN_100T4_CAP:
+	case MAC_PROP_STATUS:
+	case MAC_PROP_SPEED:
+	case MAC_PROP_DUPLEX:
+		err = ENOTSUP; /* read-only prop. Can't set this. */
+		break;
+	case MAC_PROP_MTU:
+		/* adapter must be stopped for an MTU change */
+		if (igb->igb_state & IGB_STARTED) {
+			err = EBUSY;
+			break;
+		}
+
+		cur_mtu = igb->default_mtu;
+		bcopy(pr_val, &new_mtu, sizeof (new_mtu));
+		if (new_mtu == cur_mtu) {
+			err = 0;
+			break;
+		}
+
+		if (new_mtu < MIN_MTU || new_mtu > MAX_MTU) {
+			err = EINVAL;
+			break;
+		}
+
+		err = mac_maxsdu_update(igb->mac_hdl, new_mtu);
+		if (err == 0) {
+			igb->default_mtu = new_mtu;
+			igb->max_frame_size = igb->default_mtu +
+			    sizeof (struct ether_vlan_header) + ETHERFCSL;
+
+			/*
+			 * Set rx buffer size
+			 */
+			rx_size = igb->max_frame_size + IPHDR_ALIGN_ROOM;
+			igb->rx_buf_size = ((rx_size >> 10) + ((rx_size &
+			    (((uint32_t)1 << 10) - 1)) > 0 ? 1 : 0)) << 10;
+
+			/*
+			 * Set tx buffer size
+			 */
+			tx_size = igb->max_frame_size;
+			igb->tx_buf_size = ((tx_size >> 10) + ((tx_size &
+			    (((uint32_t)1 << 10) - 1)) > 0 ? 1 : 0)) << 10;
+		}
+		break;
+	case MAC_PROP_PRIVATE:
+		err = igb_set_priv_prop(igb, pr_name, pr_valsize, pr_val);
+		break;
+	default:
+		err = EINVAL;
+		break;
+	}
+
+	mutex_exit(&igb->gen_lock);
+
+	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
+		return (EIO);
+	}
+
+	return (err);
+}
+
+int
+igb_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
+    uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
+{
+	igb_t *igb = (igb_t *)arg;
+	struct e1000_hw *hw = &igb->hw;
+	int err = 0;
+	uint32_t flow_control;
+	uint64_t tmp = 0;
+	mac_propval_range_t range;
+
+	if (pr_valsize == 0)
+		return (EINVAL);
+
+	*perm = MAC_PROP_PERM_RW;
+
+	bzero(pr_val, pr_valsize);
+	if ((pr_flags & MAC_PROP_DEFAULT) && (pr_num != MAC_PROP_PRIVATE))
+		return (igb_get_def_val(igb, pr_num, pr_valsize, pr_val));
+
+	switch (pr_num) {
+	case MAC_PROP_DUPLEX:
+		*perm = MAC_PROP_PERM_READ;
+		if (pr_valsize >= sizeof (link_duplex_t)) {
+			bcopy(&igb->link_duplex, pr_val,
+			    sizeof (link_duplex_t));
+		} else
+			err = EINVAL;
+		break;
+	case MAC_PROP_SPEED:
+		*perm = MAC_PROP_PERM_READ;
+		if (pr_valsize >= sizeof (uint64_t)) {
+			tmp = igb->link_speed * 1000000ull;
+			bcopy(&tmp, pr_val, sizeof (tmp));
+		} else
+			err = EINVAL;
+		break;
+	case MAC_PROP_AUTONEG:
+		if (hw->phy.media_type != e1000_media_type_copper)
+			*perm = MAC_PROP_PERM_READ;
+		*(uint8_t *)pr_val = igb->param_adv_autoneg_cap;
+		break;
+	case MAC_PROP_FLOWCTRL:
+		if (pr_valsize >= sizeof (uint32_t)) {
+			switch (hw->fc.requested_mode) {
+				case e1000_fc_none:
+					flow_control = LINK_FLOWCTRL_NONE;
+					break;
+				case e1000_fc_rx_pause:
+					flow_control = LINK_FLOWCTRL_RX;
+					break;
+				case e1000_fc_tx_pause:
+					flow_control = LINK_FLOWCTRL_TX;
+					break;
+				case e1000_fc_full:
+					flow_control = LINK_FLOWCTRL_BI;
+					break;
+			}
+			bcopy(&flow_control, pr_val, sizeof (flow_control));
+		} else
+			err = EINVAL;
+		break;
+	case MAC_PROP_ADV_1000FDX_CAP:
+		*perm = MAC_PROP_PERM_READ;
+		*(uint8_t *)pr_val = igb->param_adv_1000fdx_cap;
+		break;
+	case MAC_PROP_EN_1000FDX_CAP:
+		if (hw->phy.media_type != e1000_media_type_copper)
+			*perm = MAC_PROP_PERM_READ;
+		*(uint8_t *)pr_val = igb->param_en_1000fdx_cap;
+		break;
+	case MAC_PROP_ADV_1000HDX_CAP:
+		*perm = MAC_PROP_PERM_READ;
+		*(uint8_t *)pr_val = igb->param_adv_1000hdx_cap;
+		break;
+	case MAC_PROP_EN_1000HDX_CAP:
+		*perm = MAC_PROP_PERM_READ;
+		*(uint8_t *)pr_val = igb->param_en_1000hdx_cap;
+		break;
+	case MAC_PROP_ADV_100T4_CAP:
+		*perm = MAC_PROP_PERM_READ;
+		*(uint8_t *)pr_val = igb->param_adv_100t4_cap;
+		break;
+	case MAC_PROP_EN_100T4_CAP:
+		*perm = MAC_PROP_PERM_READ;
+		*(uint8_t *)pr_val = igb->param_en_100t4_cap;
+		break;
+	case MAC_PROP_ADV_100FDX_CAP:
+		*perm = MAC_PROP_PERM_READ;
+		*(uint8_t *)pr_val = igb->param_adv_100fdx_cap;
+		break;
+	case MAC_PROP_EN_100FDX_CAP:
+		if (hw->phy.media_type != e1000_media_type_copper)
+			*perm = MAC_PROP_PERM_READ;
+		*(uint8_t *)pr_val = igb->param_en_100fdx_cap;
+		break;
+	case MAC_PROP_ADV_100HDX_CAP:
+		*perm = MAC_PROP_PERM_READ;
+		*(uint8_t *)pr_val = igb->param_adv_100hdx_cap;
+		break;
+	case MAC_PROP_EN_100HDX_CAP:
+		if (hw->phy.media_type != e1000_media_type_copper)
+			*perm = MAC_PROP_PERM_READ;
+		*(uint8_t *)pr_val = igb->param_en_100hdx_cap;
+		break;
+	case MAC_PROP_ADV_10FDX_CAP:
+		*perm = MAC_PROP_PERM_READ;
+		*(uint8_t *)pr_val = igb->param_adv_10fdx_cap;
+		break;
+	case MAC_PROP_EN_10FDX_CAP:
+		if (hw->phy.media_type != e1000_media_type_copper)
+			*perm = MAC_PROP_PERM_READ;
+		*(uint8_t *)pr_val = igb->param_en_10fdx_cap;
+		break;
+	case MAC_PROP_ADV_10HDX_CAP:
+		*perm = MAC_PROP_PERM_READ;
+		*(uint8_t *)pr_val = igb->param_adv_10hdx_cap;
+		break;
+	case MAC_PROP_EN_10HDX_CAP:
+		if (hw->phy.media_type != e1000_media_type_copper)
+			*perm = MAC_PROP_PERM_READ;
+		*(uint8_t *)pr_val = igb->param_en_10hdx_cap;
+		break;
+	case MAC_PROP_PRIVATE:
+		err = igb_get_priv_prop(igb, pr_name,
+		    pr_flags, pr_valsize, pr_val, perm);
+		break;
+	case MAC_PROP_MTU:
+		if (!(pr_flags & MAC_PROP_POSSIBLE))
+			return (ENOTSUP);
+		if (pr_valsize < sizeof (mac_propval_range_t))
+			return (EINVAL);
+		range.mpr_count = 1;
+		range.mpr_type = MAC_PROPVAL_UINT32;
+		range.range_uint32[0].mpur_min = MIN_MTU;
+		range.range_uint32[0].mpur_max = MAX_MTU;
+		bcopy(&range, pr_val, sizeof (range));
+		break;
+	default:
+		err = EINVAL;
+		break;
+	}
+	return (err);
+}
+
+int
+igb_get_def_val(igb_t *igb, mac_prop_id_t pr_num,
+    uint_t pr_valsize, void *pr_val)
+{
+	uint32_t flow_control;
+	struct e1000_hw *hw = &igb->hw;
+	uint16_t phy_status;
+	uint16_t phy_ext_status;
+	int err = 0;
+
+	ASSERT(pr_valsize > 0);
+	switch (pr_num) {
+	case MAC_PROP_AUTONEG:
+		if (hw->phy.media_type != e1000_media_type_copper) {
+			*(uint8_t *)pr_val = 0;
+		} else {
+			(void) e1000_read_phy_reg(hw, PHY_STATUS, &phy_status);
+			*(uint8_t *)pr_val =
+			    (phy_status & MII_SR_AUTONEG_CAPS) ? 1 : 0;
+		}
+		break;
+	case MAC_PROP_FLOWCTRL:
+		if (pr_valsize < sizeof (uint32_t))
+			return (EINVAL);
+		flow_control = LINK_FLOWCTRL_BI;
+		bcopy(&flow_control, pr_val, sizeof (flow_control));
+		break;
+	case MAC_PROP_ADV_1000FDX_CAP:
+	case MAC_PROP_EN_1000FDX_CAP:
+		if (hw->phy.media_type != e1000_media_type_copper) {
+			*(uint8_t *)pr_val = 1;
+		} else {
+			(void) e1000_read_phy_reg(hw,
+			    PHY_EXT_STATUS, &phy_ext_status);
+			*(uint8_t *)pr_val =
+			    ((phy_ext_status & IEEE_ESR_1000T_FD_CAPS) ||
+			    (phy_ext_status & IEEE_ESR_1000X_FD_CAPS)) ? 1 : 0;
+		}
+		break;
+	case MAC_PROP_ADV_1000HDX_CAP:
+	case MAC_PROP_EN_1000HDX_CAP:
+	case MAC_PROP_ADV_100T4_CAP:
+	case MAC_PROP_EN_100T4_CAP:
+		*(uint8_t *)pr_val = 0;
+		break;
+	case MAC_PROP_ADV_100FDX_CAP:
+	case MAC_PROP_EN_100FDX_CAP:
+		if (hw->phy.media_type != e1000_media_type_copper) {
+			*(uint8_t *)pr_val = 0;
+		} else {
+			(void) e1000_read_phy_reg(hw, PHY_STATUS, &phy_status);
+			*(uint8_t *)pr_val =
+			    ((phy_status & MII_SR_100X_FD_CAPS) ||
+			    (phy_status & MII_SR_100T2_FD_CAPS)) ? 1 : 0;
+		}
+		break;
+	case MAC_PROP_ADV_100HDX_CAP:
+	case MAC_PROP_EN_100HDX_CAP:
+		if (hw->phy.media_type != e1000_media_type_copper) {
+			*(uint8_t *)pr_val = 0;
+		} else {
+			(void) e1000_read_phy_reg(hw, PHY_STATUS, &phy_status);
+			*(uint8_t *)pr_val =
+			    ((phy_status & MII_SR_100X_HD_CAPS) ||
+			    (phy_status & MII_SR_100T2_HD_CAPS)) ? 1 : 0;
+		}
+		break;
+	case MAC_PROP_ADV_10FDX_CAP:
+	case MAC_PROP_EN_10FDX_CAP:
+		if (hw->phy.media_type != e1000_media_type_copper) {
+			*(uint8_t *)pr_val = 0;
+		} else {
+			(void) e1000_read_phy_reg(hw, PHY_STATUS, &phy_status);
+			*(uint8_t *)pr_val =
+			    (phy_status & MII_SR_10T_FD_CAPS) ? 1 : 0;
+		}
+		break;
+	case MAC_PROP_ADV_10HDX_CAP:
+	case MAC_PROP_EN_10HDX_CAP:
+		if (hw->phy.media_type != e1000_media_type_copper) {
+			*(uint8_t *)pr_val = 0;
+		} else {
+			(void) e1000_read_phy_reg(hw, PHY_STATUS, &phy_status);
+			*(uint8_t *)pr_val =
+			    (phy_status & MII_SR_10T_HD_CAPS) ? 1 : 0;
+		}
+		break;
+	default:
+		err = ENOTSUP;
+		break;
+	}
+	return (err);
+}
+
+boolean_t
+igb_param_locked(mac_prop_id_t pr_num)
+{
+	/*
+	 * All en_* parameters are locked (read-only) while
+	 * the device is in any sort of loopback mode ...
+	 */
+	switch (pr_num) {
+		case MAC_PROP_EN_1000FDX_CAP:
+		case MAC_PROP_EN_1000HDX_CAP:
+		case MAC_PROP_EN_100T4_CAP:
+		case MAC_PROP_EN_100FDX_CAP:
+		case MAC_PROP_EN_100HDX_CAP:
+		case MAC_PROP_EN_10FDX_CAP:
+		case MAC_PROP_EN_10HDX_CAP:
+		case MAC_PROP_AUTONEG:
+		case MAC_PROP_FLOWCTRL:
+			return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
+/* ARGSUSED */
+int
+igb_set_priv_prop(igb_t *igb, const char *pr_name,
+    uint_t pr_valsize, const void *pr_val)
+{
+	int err = 0;
+	long result;
+	struct e1000_hw *hw = &igb->hw;
+	int i;
+
+	if (strcmp(pr_name, "_tx_copy_thresh") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < MIN_TX_COPY_THRESHOLD ||
+		    result > MAX_TX_COPY_THRESHOLD)
+			err = EINVAL;
+		else {
+			igb->tx_copy_thresh = (uint32_t)result;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_tx_recycle_thresh") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < MIN_TX_RECYCLE_THRESHOLD ||
+		    result > MAX_TX_RECYCLE_THRESHOLD)
+			err = EINVAL;
+		else {
+			igb->tx_recycle_thresh = (uint32_t)result;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_tx_overload_thresh") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < MIN_TX_OVERLOAD_THRESHOLD ||
+		    result > MAX_TX_OVERLOAD_THRESHOLD)
+			err = EINVAL;
+		else {
+			igb->tx_overload_thresh = (uint32_t)result;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_tx_resched_thresh") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < MIN_TX_RESCHED_THRESHOLD ||
+		    result > MAX_TX_RESCHED_THRESHOLD)
+			err = EINVAL;
+		else {
+			igb->tx_resched_thresh = (uint32_t)result;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_rx_copy_thresh") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < MIN_RX_COPY_THRESHOLD ||
+		    result > MAX_RX_COPY_THRESHOLD)
+			err = EINVAL;
+		else {
+			igb->rx_copy_thresh = (uint32_t)result;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_rx_limit_per_intr") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < MIN_RX_LIMIT_PER_INTR ||
+		    result > MAX_RX_LIMIT_PER_INTR)
+			err = EINVAL;
+		else {
+			igb->rx_limit_per_intr = (uint32_t)result;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_intr_throttling") == 0) {
+		if (pr_val == NULL) {
+			err = EINVAL;
+			return (err);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+
+		if (result < igb->capab->min_intr_throttle ||
+		    result > igb->capab->max_intr_throttle)
+			err = EINVAL;
+		else {
+			igb->intr_throttling[0] = (uint32_t)result;
+
+			for (i = 0; i < MAX_NUM_EITR; i++)
+				igb->intr_throttling[i] =
+				    igb->intr_throttling[0];
+
+			/* Set interrupt throttling rate */
+			for (i = 0; i < igb->intr_cnt; i++)
+				E1000_WRITE_REG(hw, E1000_EITR(i),
+				    igb->intr_throttling[i]);
+		}
+		return (err);
+	}
+	return (ENOTSUP);
+}
+
+int
+igb_get_priv_prop(igb_t *igb, const char *pr_name,
+    uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
+{
+	int err = ENOTSUP;
+	boolean_t is_default = (pr_flags & MAC_PROP_DEFAULT);
+	int value;
+
+	*perm = MAC_PROP_PERM_RW;
+
+	if (strcmp(pr_name, "_adv_pause_cap") == 0) {
+		*perm = MAC_PROP_PERM_READ;
+		value = (is_default ? 1 : igb->param_adv_pause_cap);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_adv_asym_pause_cap") == 0) {
+		*perm = MAC_PROP_PERM_READ;
+		value = (is_default ? 1 : igb->param_adv_asym_pause_cap);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_tx_copy_thresh") == 0) {
+		value = (is_default ? DEFAULT_TX_COPY_THRESHOLD :
+		    igb->tx_copy_thresh);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_tx_recycle_thresh") == 0) {
+		value = (is_default ? DEFAULT_TX_RECYCLE_THRESHOLD :
+		    igb->tx_recycle_thresh);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_tx_overload_thresh") == 0) {
+		value = (is_default ? DEFAULT_TX_OVERLOAD_THRESHOLD :
+		    igb->tx_overload_thresh);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_tx_resched_thresh") == 0) {
+		value = (is_default ? DEFAULT_TX_RESCHED_THRESHOLD :
+		    igb->tx_resched_thresh);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_rx_copy_thresh") == 0) {
+		value = (is_default ? DEFAULT_RX_COPY_THRESHOLD :
+		    igb->rx_copy_thresh);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_rx_limit_per_intr") == 0) {
+		value = (is_default ? DEFAULT_RX_LIMIT_PER_INTR :
+		    igb->rx_limit_per_intr);
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_intr_throttling") == 0) {
+		value = (is_default ? igb->capab->def_intr_throttle :
+		    igb->intr_throttling[0]);
+		err = 0;
+		goto done;
+	}
+done:
+	if (err == 0) {
+		(void) snprintf(pr_val, pr_valsize, "%d", value);
+	}
+	return (err);
 }

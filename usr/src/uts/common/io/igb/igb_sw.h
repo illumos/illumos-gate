@@ -22,7 +22,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,6 +83,8 @@ extern "C" {
 #define	IGB_SUSPENDED			0x04
 #define	IGB_STALL			0x08
 #define	IGB_ERROR			0x80
+
+#define	IGB_RX_STOPPED			0x1
 
 #define	IGB_INTR_NONE			0
 #define	IGB_INTR_MSIX			1
@@ -182,9 +184,7 @@ extern "C" {
 #define	ATTACH_PROGRESS_ADD_INTR	0x0020	/* Intr handlers added */
 #define	ATTACH_PROGRESS_LOCKS		0x0040	/* Locks initialized */
 #define	ATTACH_PROGRESS_INIT_ADAPTER	0x0080	/* Adapter initialized */
-#define	ATTACH_PROGRESS_ALLOC_DMA	0x0100	/* DMA resources allocated */
 #define	ATTACH_PROGRESS_STATS		0x0200	/* Kstats created */
-#define	ATTACH_PROGRESS_NDD		0x0400	/* NDD initialized */
 #define	ATTACH_PROGRESS_MAC		0x0800	/* MAC registered */
 #define	ATTACH_PROGRESS_ENABLE_INTR	0x1000	/* DDI interrupts enabled */
 #define	ATTACH_PROGRESS_FMINIT		0x2000	/* FMA initialized */
@@ -222,45 +222,6 @@ extern "C" {
 #define	IGB_LB_INTERNAL_MAC		2
 #define	IGB_LB_INTERNAL_PHY		3
 #define	IGB_LB_INTERNAL_SERDES		4
-
-/*
- * Shorthand for the NDD parameters
- */
-#define	param_autoneg_cap	nd_params[PARAM_AUTONEG_CAP].val
-#define	param_pause_cap		nd_params[PARAM_PAUSE_CAP].val
-#define	param_asym_pause_cap	nd_params[PARAM_ASYM_PAUSE_CAP].val
-#define	param_1000fdx_cap	nd_params[PARAM_1000FDX_CAP].val
-#define	param_1000hdx_cap	nd_params[PARAM_1000HDX_CAP].val
-#define	param_100t4_cap		nd_params[PARAM_100T4_CAP].val
-#define	param_100fdx_cap	nd_params[PARAM_100FDX_CAP].val
-#define	param_100hdx_cap	nd_params[PARAM_100HDX_CAP].val
-#define	param_10fdx_cap		nd_params[PARAM_10FDX_CAP].val
-#define	param_10hdx_cap		nd_params[PARAM_10HDX_CAP].val
-#define	param_rem_fault		nd_params[PARAM_REM_FAULT].val
-
-#define	param_adv_autoneg_cap	nd_params[PARAM_ADV_AUTONEG_CAP].val
-#define	param_adv_pause_cap	nd_params[PARAM_ADV_PAUSE_CAP].val
-#define	param_adv_asym_pause_cap nd_params[PARAM_ADV_ASYM_PAUSE_CAP].val
-#define	param_adv_1000fdx_cap	nd_params[PARAM_ADV_1000FDX_CAP].val
-#define	param_adv_1000hdx_cap	nd_params[PARAM_ADV_1000HDX_CAP].val
-#define	param_adv_100t4_cap	nd_params[PARAM_ADV_100T4_CAP].val
-#define	param_adv_100fdx_cap	nd_params[PARAM_ADV_100FDX_CAP].val
-#define	param_adv_100hdx_cap	nd_params[PARAM_ADV_100HDX_CAP].val
-#define	param_adv_10fdx_cap	nd_params[PARAM_ADV_10FDX_CAP].val
-#define	param_adv_10hdx_cap	nd_params[PARAM_ADV_10HDX_CAP].val
-#define	param_adv_rem_fault	nd_params[PARAM_ADV_REM_FAULT].val
-
-#define	param_lp_autoneg_cap	nd_params[PARAM_LP_AUTONEG_CAP].val
-#define	param_lp_pause_cap	nd_params[PARAM_LP_PAUSE_CAP].val
-#define	param_lp_asym_pause_cap	nd_params[PARAM_LP_ASYM_PAUSE_CAP].val
-#define	param_lp_1000fdx_cap	nd_params[PARAM_LP_1000FDX_CAP].val
-#define	param_lp_1000hdx_cap	nd_params[PARAM_LP_1000HDX_CAP].val
-#define	param_lp_100t4_cap	nd_params[PARAM_LP_100T4_CAP].val
-#define	param_lp_100fdx_cap	nd_params[PARAM_LP_100FDX_CAP].val
-#define	param_lp_100hdx_cap	nd_params[PARAM_LP_100HDX_CAP].val
-#define	param_lp_10fdx_cap	nd_params[PARAM_LP_10FDX_CAP].val
-#define	param_lp_10hdx_cap	nd_params[PARAM_LP_10HDX_CAP].val
-#define	param_lp_rem_fault	nd_params[PARAM_LP_REM_FAULT].val
 
 enum ioc_reply {
 	IOC_INVAL = -1,	/* bad, NAK with EINVAL */
@@ -370,73 +331,6 @@ typedef struct adapter_info {
 	uint32_t	rxdctl_mask;	/* mask for RXDCTL register */
 } adapter_info_t;
 
-/*
- * Named Data (ND) Parameter Management Structure
- */
-typedef struct {
-	struct igb *private;
-	uint32_t info;
-	uint32_t min;
-	uint32_t max;
-	uint32_t val;
-	char *name;
-} nd_param_t;
-
-/*
- * NDD parameter indexes, divided into:
- *
- *	read-only parameters describing the hardware's capabilities
- *	read-write parameters controlling the advertised capabilities
- *	read-only parameters describing the partner's capabilities
- *	read-write parameters controlling the force speed and duplex
- *	read-only parameters describing the link state
- *	read-only parameters describing the driver properties
- *	read-write parameters controlling the driver properties
- */
-enum {
-	PARAM_AUTONEG_CAP,
-	PARAM_PAUSE_CAP,
-	PARAM_ASYM_PAUSE_CAP,
-	PARAM_1000FDX_CAP,
-	PARAM_1000HDX_CAP,
-	PARAM_100T4_CAP,
-	PARAM_100FDX_CAP,
-	PARAM_100HDX_CAP,
-	PARAM_10FDX_CAP,
-	PARAM_10HDX_CAP,
-	PARAM_REM_FAULT,
-
-	PARAM_ADV_AUTONEG_CAP,
-	PARAM_ADV_PAUSE_CAP,
-	PARAM_ADV_ASYM_PAUSE_CAP,
-	PARAM_ADV_1000FDX_CAP,
-	PARAM_ADV_1000HDX_CAP,
-	PARAM_ADV_100T4_CAP,
-	PARAM_ADV_100FDX_CAP,
-	PARAM_ADV_100HDX_CAP,
-	PARAM_ADV_10FDX_CAP,
-	PARAM_ADV_10HDX_CAP,
-	PARAM_ADV_REM_FAULT,
-
-	PARAM_LP_AUTONEG_CAP,
-	PARAM_LP_PAUSE_CAP,
-	PARAM_LP_ASYM_PAUSE_CAP,
-	PARAM_LP_1000FDX_CAP,
-	PARAM_LP_1000HDX_CAP,
-	PARAM_LP_100T4_CAP,
-	PARAM_LP_100FDX_CAP,
-	PARAM_LP_100HDX_CAP,
-	PARAM_LP_10FDX_CAP,
-	PARAM_LP_10HDX_CAP,
-	PARAM_LP_REM_FAULT,
-
-	PARAM_LINK_STATUS,
-	PARAM_LINK_SPEED,
-	PARAM_LINK_DUPLEX,
-
-	PARAM_COUNT
-};
-
 typedef union igb_ether_addr {
 	struct {
 		uint32_t	high;
@@ -454,11 +348,6 @@ typedef enum {
 	USE_COPY,
 	USE_DMA
 } tx_type_t;
-
-typedef enum {
-	RCB_FREE,
-	RCB_SENDUP
-} rcb_state_t;
 
 typedef struct tx_context {
 	uint32_t		hcksum_flags;
@@ -505,10 +394,10 @@ typedef struct tx_control_block {
  */
 typedef struct rx_control_block {
 	mblk_t			*mp;
-	rcb_state_t		state;
+	uint32_t		ref_cnt;
 	dma_buffer_t		rx_buf;
 	frtn_t			free_rtn;
-	struct igb_rx_ring	*rx_ring;
+	struct igb_rx_data	*rx_data;
 } rx_control_block_t;
 
 /*
@@ -558,10 +447,6 @@ typedef struct igb_tx_ring {
 	 */
 	uint32_t		ring_size; /* Tx descriptor ring size */
 	uint32_t		free_list_size;	/* Tx free list size */
-	uint32_t		copy_thresh;
-	uint32_t		recycle_thresh;
-	uint32_t		overload_thresh;
-	uint32_t		resched_thresh;
 
 	boolean_t		reschedule;
 	uint32_t		recycle_fail;
@@ -589,14 +474,7 @@ typedef struct igb_tx_ring {
 /*
  * Software Receive Ring
  */
-typedef struct igb_rx_ring {
-	uint32_t		index;		/* Ring index */
-	uint32_t		intr_vector;	/* Interrupt vector index */
-
-	/*
-	 * Mutexes
-	 */
-	kmutex_t		rx_lock;	/* Rx access lock */
+typedef struct igb_rx_data {
 	kmutex_t		recycle_lock;	/* Recycle lock, for rcb_tail */
 
 	/*
@@ -617,12 +495,27 @@ typedef struct igb_rx_ring {
 	uint32_t		rcb_free;	/* Number of free rcbs */
 
 	/*
-	 * Rx ring settings and status
+	 * Rx sw ring settings and status
 	 */
 	uint32_t		ring_size;	/* Rx descriptor ring size */
 	uint32_t		free_list_size;	/* Rx free list size */
-	uint32_t		limit_per_intr;	/* Max packets per interrupt */
-	uint32_t		copy_thresh;
+
+	uint32_t		rcb_pending;
+	uint32_t		flag;
+
+	struct igb_rx_ring	*rx_ring;	/* Pointer to rx ring */
+} igb_rx_data_t;
+
+/*
+ * Software Data Structure for Rx Ring
+ */
+typedef struct igb_rx_ring {
+	uint32_t		index;		/* Ring index */
+	uint32_t		intr_vector;	/* Interrupt vector index */
+
+	igb_rx_data_t		*rx_data;	/* Rx software ring */
+
+	kmutex_t		rx_lock;	/* Rx access lock */
 
 #ifdef IGB_DEBUG
 	/*
@@ -669,8 +562,11 @@ typedef struct igb {
 	uint32_t		reset_count;
 	uint32_t		attach_progress;
 	uint32_t		loopback_mode;
+	uint32_t		default_mtu;
 	uint32_t		max_frame_size;
 	uint32_t		dout_sync;
+
+	uint32_t		rcb_pending;
 
 	uint32_t		mr_enable;	/* Enable multiple rings */
 	uint32_t		vmdq_mode;	/* Mode of VMDq */
@@ -693,6 +589,7 @@ typedef struct igb {
 	uint32_t		tx_ring_size;	/* Tx descriptor ring size */
 	uint32_t		tx_buf_size;	/* Tx buffer size */
 
+	boolean_t		tx_ring_init;
 	boolean_t		tx_head_wb_enable; /* Tx head wrtie-back */
 	boolean_t		tx_hcksum_enable; /* Tx h/w cksum offload */
 	boolean_t 		lso_enable; 	/* Large Segment Offload */
@@ -719,6 +616,7 @@ typedef struct igb {
 	kmutex_t		gen_lock; /* General lock for device access */
 	kmutex_t		watchdog_lock;
 	kmutex_t		link_lock;
+	kmutex_t		rx_pending_lock;
 
 	boolean_t		watchdog_enable;
 	boolean_t		watchdog_start;
@@ -738,11 +636,48 @@ typedef struct igb {
 	 */
 	kstat_t			*igb_ks;
 
-	/*
-	 * NDD definitions
-	 */
-	caddr_t			nd_data;
-	nd_param_t		nd_params[PARAM_COUNT];
+	uint32_t		param_en_1000fdx_cap:1,
+				param_en_1000hdx_cap:1,
+				param_en_100t4_cap:1,
+				param_en_100fdx_cap:1,
+				param_en_100hdx_cap:1,
+				param_en_10fdx_cap:1,
+				param_en_10hdx_cap:1,
+				param_1000fdx_cap:1,
+				param_1000hdx_cap:1,
+				param_100t4_cap:1,
+				param_100fdx_cap:1,
+				param_100hdx_cap:1,
+				param_10fdx_cap:1,
+				param_10hdx_cap:1,
+				param_autoneg_cap:1,
+				param_pause_cap:1,
+				param_asym_pause_cap:1,
+				param_rem_fault:1,
+				param_adv_1000fdx_cap:1,
+				param_adv_1000hdx_cap:1,
+				param_adv_100t4_cap:1,
+				param_adv_100fdx_cap:1,
+				param_adv_100hdx_cap:1,
+				param_adv_10fdx_cap:1,
+				param_adv_10hdx_cap:1,
+				param_adv_autoneg_cap:1,
+				param_adv_pause_cap:1,
+				param_adv_asym_pause_cap:1,
+				param_adv_rem_fault:1,
+				param_lp_1000fdx_cap:1,
+				param_lp_1000hdx_cap:1,
+				param_lp_100t4_cap:1;
+
+	uint32_t		param_lp_100fdx_cap:1,
+				param_lp_100hdx_cap:1,
+				param_lp_10fdx_cap:1,
+				param_lp_10hdx_cap:1,
+				param_lp_autoneg_cap:1,
+				param_lp_pause_cap:1,
+				param_lp_asym_pause_cap:1,
+				param_lp_rem_fault:1,
+				param_pad_to_32:24;
 
 	/*
 	 * FMA capabilities
@@ -838,12 +773,15 @@ void e1000_rar_set_vmdq(struct e1000_hw *, const uint8_t *, uint32_t,
  */
 int igb_alloc_dma(igb_t *);
 void igb_free_dma(igb_t *);
+void igb_free_dma_buffer(dma_buffer_t *);
+int igb_alloc_rx_ring_data(igb_rx_ring_t *rx_ring);
+void igb_free_rx_ring_data(igb_rx_data_t *rx_data);
 
 /*
  * Function prototypes in igb_main.c
  */
-int igb_start(igb_t *);
-void igb_stop(igb_t *);
+int igb_start(igb_t *, boolean_t);
+void igb_stop(igb_t *, boolean_t);
 int igb_setup_link(igb_t *, boolean_t);
 int igb_unicst_find(igb_t *, const uint8_t *);
 int igb_unicst_set(igb_t *, const uint8_t *, int);
@@ -872,10 +810,18 @@ void igb_m_ioctl(void *, queue_t *, mblk_t *);
 boolean_t igb_m_getcapab(void *, mac_capab_t, void *);
 void igb_fill_ring(void *, mac_ring_type_t, const int, const int,
     mac_ring_info_t *, mac_ring_handle_t);
+int igb_m_setprop(void *, const char *, mac_prop_id_t, uint_t, const void *);
+int igb_m_getprop(void *, const char *, mac_prop_id_t,
+    uint_t, uint_t, void *, uint_t *);
+int igb_set_priv_prop(igb_t *, const char *, uint_t, const void *);
+int igb_get_priv_prop(igb_t *, const char *,
+    uint_t, uint_t, void *, uint_t *);
+boolean_t igb_param_locked(mac_prop_id_t);
 void igb_fill_group(void *arg, mac_ring_type_t, const int,
     mac_group_info_t *, mac_group_handle_t);
 int igb_rx_ring_intr_enable(mac_intr_handle_t);
 int igb_rx_ring_intr_disable(mac_intr_handle_t);
+int igb_get_def_val(igb_t *, mac_prop_id_t, uint_t, void *);
 
 /*
  * Function prototypes in igb_rx.c
@@ -897,13 +843,6 @@ uint32_t igb_tx_recycle_head_wb(igb_tx_ring_t *);
 void igb_notice(void *, const char *, ...);
 void igb_log(void *, const char *, ...);
 void igb_error(void *, const char *, ...);
-
-/*
- * Function prototypes in igb_ndd.c
- */
-int igb_nd_init(igb_t *);
-void igb_nd_cleanup(igb_t *);
-enum ioc_reply igb_nd_ioctl(igb_t *, queue_t *, mblk_t *, struct iocblk *);
 
 /*
  * Function prototypes in igb_stat.c

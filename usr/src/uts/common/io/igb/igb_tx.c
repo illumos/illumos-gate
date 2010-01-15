@@ -22,7 +22,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,13 +109,14 @@ igb_tx(igb_tx_ring_t *tx_ring, mblk_t *mp)
 	tx_control_block_t *tcb;
 	tx_context_t tx_context, *ctx;
 	link_list_t pending_list;
-	mblk_t *new_mp;
-	mblk_t *previous_mp;
+	mblk_t *hdr_new_mp = NULL;
+	mblk_t *hdr_previous_mp = NULL;
+	mblk_t *hdr_current_mp = NULL;
 	uint32_t hdr_frag_len;
 	uint32_t hdr_len, len;
 	uint32_t copy_thresh;
 
-	copy_thresh = tx_ring->copy_thresh;
+	copy_thresh = igb->tx_copy_thresh;
 
 	/* Get the mblk size */
 	mbsize = 0;
@@ -156,15 +157,15 @@ igb_tx(igb_tx_ring_t *tx_ring, mblk_t *mp)
 	 * Check and recycle tx descriptors.
 	 * The recycle threshold here should be selected carefully
 	 */
-	if (tx_ring->tbd_free < tx_ring->recycle_thresh)
+	if (tx_ring->tbd_free < igb->tx_recycle_thresh)
 		tx_ring->tx_recycle(tx_ring);
 
 	/*
 	 * After the recycling, if the tbd_free is less than the
-	 * overload_threshold, assert overload, return B_FALSE;
+	 * tx_overload_threshold, assert overload, return B_FALSE;
 	 * and we need to re-schedule the tx again.
 	 */
-	if (tx_ring->tbd_free < tx_ring->overload_thresh) {
+	if (tx_ring->tbd_free < igb->tx_overload_thresh) {
 		tx_ring->reschedule = B_TRUE;
 		IGB_DEBUG_STAT(tx_ring->stat_overload);
 		return (B_FALSE);
@@ -177,77 +178,64 @@ igb_tx(igb_tx_ring_t *tx_ring, mblk_t *mp)
 	 * the headers(MAC+IP+TCP) is physical memory non-contiguous.
 	 */
 	if (ctx && ctx->lso_flag) {
-		hdr_len = ctx->mac_hdr_len + ctx->ip_hdr_len +
-		    ctx->l4_hdr_len;
+		hdr_len = ctx->mac_hdr_len + ctx->ip_hdr_len + ctx->l4_hdr_len;
 		len = MBLKL(mp);
-		current_mp = mp;
-		previous_mp = NULL;
+		hdr_current_mp = mp;
 		while (len < hdr_len) {
-			previous_mp = current_mp;
-			current_mp = current_mp->b_cont;
-			len += MBLKL(current_mp);
+			hdr_previous_mp = hdr_current_mp;
+			hdr_current_mp = hdr_current_mp->b_cont;
+			len += MBLKL(hdr_current_mp);
 		}
-
 		/*
-		 * If len is larger than copy_thresh, we do not
-		 * need to do anything since igb's tx copy mechanism
-		 * will ensure that the headers will be handled
-		 * in one descriptor.
+		 * If the header and the payload are in different mblks,
+		 * we simply force the header to be copied into pre-allocated
+		 * page-aligned buffer.
 		 */
-		if (len > copy_thresh) {
-			if (len != hdr_len) {
-				/*
-				 * If the header and the payload are in
-				 * different mblks, we simply force the
-				 * header to be copied into a
-				 * new-allocated buffer.
-				 */
-				hdr_frag_len = hdr_len -
-				    (len - MBLKL(current_mp));
+		if (len == hdr_len)
+			goto adjust_threshold;
 
-				/*
-				 * There are two cases we will reallocate
-				 * a mblk for the last header fragment.
-				 * 1. the header is in multiple mblks and
-				 *    the last fragment shares the same mblk
-				 *    with the payload
-				 * 2. the header is in a single mblk shared
-				 *    with the payload but the header crosses
-				 *    a page.
-				 */
-				if ((current_mp != mp) ||
-				    (P2NPHASE((uintptr_t)current_mp->b_rptr,
-				    igb->page_size) < hdr_len)) {
-					/*
-					 * reallocate the mblk for the last
-					 * header fragment, expect it to be
-					 * copied into pre-allocated
-					 * page-aligned buffer
-					 */
-					new_mp = allocb(hdr_frag_len, NULL);
-					if (!new_mp) {
-						return (B_FALSE);
-					}
-
-					/*
-					 * Insert the new mblk
-					 */
-					bcopy(current_mp->b_rptr,
-					    new_mp->b_rptr, hdr_frag_len);
-					new_mp->b_wptr = new_mp->b_rptr +
-					    hdr_frag_len;
-					new_mp->b_cont = current_mp;
-					if (previous_mp)
-						previous_mp->b_cont = new_mp;
-					else
-						mp = new_mp;
-					current_mp->b_rptr += hdr_frag_len;
-				}
+		hdr_frag_len = hdr_len - (len - MBLKL(hdr_current_mp));
+		/*
+		 * There are two cases we will reallocate
+		 * a mblk for the last header fragment.
+		 * 1. the header is in multiple mblks and
+		 *    the last fragment shares the same mblk
+		 *    with the payload
+		 * 2. the header is in a single mblk shared
+		 *    with the payload but the header crosses
+		 *    a page.
+		 */
+		if ((hdr_current_mp != mp) ||
+		    (P2NPHASE((uintptr_t)hdr_current_mp->b_rptr, igb->page_size)
+		    < hdr_len)) {
+			/*
+			 * reallocate the mblk for the last header fragment,
+			 * expect it to be copied into pre-allocated
+			 * page-aligned buffer
+			 */
+			hdr_new_mp = allocb(hdr_frag_len, NULL);
+			if (!hdr_new_mp) {
+				return (B_FALSE);
 			}
 
-			if (copy_thresh < hdr_len)
-				copy_thresh = hdr_len;
+			/* link the new header fragment with the other parts */
+			bcopy(hdr_current_mp->b_rptr,
+			    hdr_new_mp->b_rptr, hdr_frag_len);
+			hdr_new_mp->b_wptr = hdr_new_mp->b_rptr + hdr_frag_len;
+			hdr_new_mp->b_cont = hdr_current_mp;
+			if (hdr_previous_mp)
+				hdr_previous_mp->b_cont = hdr_new_mp;
+			else
+				mp = hdr_new_mp;
+			hdr_current_mp->b_rptr += hdr_frag_len;
 		}
+adjust_threshold:
+		/*
+		 * adjust the bcopy threshhold to guarantee
+		 * the header to use bcopy way
+		 */
+		if (copy_thresh < hdr_len)
+			copy_thresh = hdr_len;
 	}
 
 	/*
@@ -435,6 +423,21 @@ igb_tx(igb_tx_ring_t *tx_ring, mblk_t *mp)
 	return (B_TRUE);
 
 tx_failure:
+	/*
+	 * If new mblk has been allocted for the last header
+	 * fragment of a LSO packet, we should restore the
+	 * modified mp.
+	 */
+	if (hdr_new_mp) {
+		hdr_new_mp->b_cont = NULL;
+		freeb(hdr_new_mp);
+		hdr_current_mp->b_rptr -= hdr_frag_len;
+		if (hdr_previous_mp)
+			hdr_previous_mp->b_cont = hdr_current_mp;
+		else
+			mp = hdr_current_mp;
+	}
+
 	/*
 	 * Discard the mblk and free the used resources
 	 */

@@ -22,15 +22,15 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDL.
  */
 
 #include "igb_sw.h"
 
 /* function prototypes */
-static mblk_t *igb_rx_bind(igb_rx_ring_t *, uint32_t, uint32_t);
-static mblk_t *igb_rx_copy(igb_rx_ring_t *, uint32_t, uint32_t);
+static mblk_t *igb_rx_bind(igb_rx_data_t *, uint32_t, uint32_t);
+static mblk_t *igb_rx_copy(igb_rx_data_t *, uint32_t, uint32_t);
 static void igb_rx_assoc_hcksum(mblk_t *, uint32_t);
 
 #ifndef IGB_DEBUG
@@ -48,17 +48,25 @@ static void igb_rx_assoc_hcksum(mblk_t *, uint32_t);
 void
 igb_rx_recycle(caddr_t arg)
 {
+	igb_t *igb;
 	igb_rx_ring_t *rx_ring;
+	igb_rx_data_t	*rx_data;
 	rx_control_block_t *recycle_rcb;
 	uint32_t free_index;
+	uint32_t ref_cnt;
 
 	recycle_rcb = (rx_control_block_t *)(uintptr_t)arg;
-	rx_ring = recycle_rcb->rx_ring;
+	rx_data = recycle_rcb->rx_data;
+	rx_ring = rx_data->rx_ring;
+	igb = rx_ring->igb;
 
-	if (recycle_rcb->state == RCB_FREE)
+	if (recycle_rcb->ref_cnt == 0) {
+		/*
+		 * This case only happens when rx buffers are being freed
+		 * in igb_stop() and freemsg() is called.
+		 */
 		return;
-
-	recycle_rcb->state = RCB_FREE;
+	}
 
 	ASSERT(recycle_rcb->mp == NULL);
 
@@ -73,23 +81,52 @@ igb_rx_recycle(caddr_t arg)
 	/*
 	 * Put the recycled rx control block into free list
 	 */
-	mutex_enter(&rx_ring->recycle_lock);
+	mutex_enter(&rx_data->recycle_lock);
 
-	free_index = rx_ring->rcb_tail;
-	ASSERT(rx_ring->free_list[free_index] == NULL);
+	free_index = rx_data->rcb_tail;
+	ASSERT(rx_data->free_list[free_index] == NULL);
 
-	rx_ring->free_list[free_index] = recycle_rcb;
-	rx_ring->rcb_tail = NEXT_INDEX(free_index, 1, rx_ring->free_list_size);
+	rx_data->free_list[free_index] = recycle_rcb;
+	rx_data->rcb_tail = NEXT_INDEX(free_index, 1, rx_data->free_list_size);
 
-	mutex_exit(&rx_ring->recycle_lock);
+	mutex_exit(&rx_data->recycle_lock);
 
 	/*
 	 * The atomic operation on the number of the available rx control
 	 * blocks in the free list is used to make the recycling mutual
 	 * exclusive with the receiving.
 	 */
-	atomic_inc_32(&rx_ring->rcb_free);
-	ASSERT(rx_ring->rcb_free <= rx_ring->free_list_size);
+	atomic_inc_32(&rx_data->rcb_free);
+	ASSERT(rx_data->rcb_free <= rx_data->free_list_size);
+
+	/*
+	 * Considering the case that the interface is unplumbed
+	 * and there are still some buffers held by the upper layer.
+	 * When the buffer is returned back, we need to free it.
+	 */
+	ref_cnt = atomic_dec_32_nv(&recycle_rcb->ref_cnt);
+	if (ref_cnt == 0) {
+		if (recycle_rcb->mp != NULL) {
+			freemsg(recycle_rcb->mp);
+			recycle_rcb->mp = NULL;
+		}
+
+		igb_free_dma_buffer(&recycle_rcb->rx_buf);
+
+		mutex_enter(&igb->rx_pending_lock);
+		atomic_dec_32(&rx_data->rcb_pending);
+		atomic_dec_32(&igb->rcb_pending);
+
+		/*
+		 * When there is not any buffer belonging to this rx_data
+		 * held by the upper layer, the rx_data can be freed.
+		 */
+		if ((rx_data->flag & IGB_RX_STOPPED) &&
+		    (rx_data->rcb_pending == 0))
+			igb_free_rx_ring_data(rx_data);
+
+		mutex_exit(&igb->rx_pending_lock);
+	}
 }
 
 /*
@@ -99,13 +136,13 @@ igb_rx_recycle(caddr_t arg)
  * and send the copied packet upstream
  */
 static mblk_t *
-igb_rx_copy(igb_rx_ring_t *rx_ring, uint32_t index, uint32_t pkt_len)
+igb_rx_copy(igb_rx_data_t *rx_data, uint32_t index, uint32_t pkt_len)
 {
 	rx_control_block_t *current_rcb;
 	mblk_t *mp;
-	igb_t *igb = rx_ring->igb;
+	igb_t *igb = rx_data->rx_ring->igb;
 
-	current_rcb = rx_ring->work_list[index];
+	current_rcb = rx_data->work_list[index];
 
 	DMA_SYNC(&current_rcb->rx_buf, DDI_DMA_SYNC_FORKERNEL);
 
@@ -121,7 +158,7 @@ igb_rx_copy(igb_rx_ring_t *rx_ring, uint32_t index, uint32_t pkt_len)
 	 */
 	mp = allocb(pkt_len + IPHDR_ALIGN_ROOM, 0);
 	if (mp == NULL) {
-		igb_log(rx_ring->igb, "igb_rx_copy: allocate buffer failed");
+		igb_log(igb, "igb_rx_copy: allocate buffer failed");
 		return (NULL);
 	}
 
@@ -142,23 +179,23 @@ igb_rx_copy(igb_rx_ring_t *rx_ring, uint32_t index, uint32_t pkt_len)
  * and build mblk that will be sent upstream.
  */
 static mblk_t *
-igb_rx_bind(igb_rx_ring_t *rx_ring, uint32_t index, uint32_t pkt_len)
+igb_rx_bind(igb_rx_data_t *rx_data, uint32_t index, uint32_t pkt_len)
 {
 	rx_control_block_t *current_rcb;
 	rx_control_block_t *free_rcb;
 	uint32_t free_index;
 	mblk_t *mp;
-	igb_t *igb = rx_ring->igb;
+	igb_t *igb = rx_data->rx_ring->igb;
 
 	/*
 	 * If the free list is empty, we cannot proceed to send
 	 * the current DMA buffer upstream. We'll have to return
 	 * and use bcopy to process the packet.
 	 */
-	if (igb_atomic_reserve(&rx_ring->rcb_free, 1) < 0)
+	if (igb_atomic_reserve(&rx_data->rcb_free, 1) < 0)
 		return (NULL);
 
-	current_rcb = rx_ring->work_list[index];
+	current_rcb = rx_data->work_list[index];
 	/*
 	 * If the mp of the rx control block is NULL, try to do
 	 * desballoc again.
@@ -174,7 +211,7 @@ igb_rx_bind(igb_rx_ring_t *rx_ring, uint32_t index, uint32_t pkt_len)
 		 * process the packet.
 		 */
 		if (current_rcb->mp == NULL) {
-			atomic_inc_32(&rx_ring->rcb_free);
+			atomic_inc_32(&rx_data->rcb_free);
 			return (NULL);
 		}
 	}
@@ -187,13 +224,13 @@ igb_rx_bind(igb_rx_ring_t *rx_ring, uint32_t index, uint32_t pkt_len)
 	    current_rcb->rx_buf.dma_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
 		atomic_or_32(&igb->igb_state, IGB_ERROR);
-		atomic_inc_32(&rx_ring->rcb_free);
+		atomic_inc_32(&rx_data->rcb_free);
 		return (NULL);
 	}
 
 	mp = current_rcb->mp;
 	current_rcb->mp = NULL;
-	current_rcb->state = RCB_SENDUP;
+	atomic_inc_32(&current_rcb->ref_cnt);
 
 	mp->b_wptr = mp->b_rptr + pkt_len;
 	mp->b_next = mp->b_cont = NULL;
@@ -201,16 +238,16 @@ igb_rx_bind(igb_rx_ring_t *rx_ring, uint32_t index, uint32_t pkt_len)
 	/*
 	 * Strip off one free rx control block from the free list
 	 */
-	free_index = rx_ring->rcb_head;
-	free_rcb = rx_ring->free_list[free_index];
+	free_index = rx_data->rcb_head;
+	free_rcb = rx_data->free_list[free_index];
 	ASSERT(free_rcb != NULL);
-	rx_ring->free_list[free_index] = NULL;
-	rx_ring->rcb_head = NEXT_INDEX(free_index, 1, rx_ring->free_list_size);
+	rx_data->free_list[free_index] = NULL;
+	rx_data->rcb_head = NEXT_INDEX(free_index, 1, rx_data->free_list_size);
 
 	/*
 	 * Put the rx control block to the work list
 	 */
-	rx_ring->work_list[index] = free_rcb;
+	rx_data->work_list[index] = free_rcb;
 
 	return (mp);
 }
@@ -292,6 +329,7 @@ igb_rx(igb_rx_ring_t *rx_ring, int poll_bytes)
 	uint32_t pkt_num;
 	uint32_t total_bytes;
 	igb_t *igb = rx_ring->igb;
+	igb_rx_data_t *rx_data = rx_ring->rx_data;
 
 	mblk_head = NULL;
 	mblk_tail = &mblk_head;
@@ -303,10 +341,10 @@ igb_rx(igb_rx_ring_t *rx_ring, int poll_bytes)
 	 * Sync the receive descriptors before
 	 * accepting the packets
 	 */
-	DMA_SYNC(&rx_ring->rbd_area, DDI_DMA_SYNC_FORKERNEL);
+	DMA_SYNC(&rx_data->rbd_area, DDI_DMA_SYNC_FORKERNEL);
 
 	if (igb_check_dma_handle(
-	    rx_ring->rbd_area.dma_handle) != DDI_FM_OK) {
+	    rx_data->rbd_area.dma_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
 		atomic_or_32(&igb->igb_state, IGB_ERROR);
 		return (NULL);
@@ -316,9 +354,9 @@ igb_rx(igb_rx_ring_t *rx_ring, int poll_bytes)
 	 * Get the start point of rx bd ring which should be examined
 	 * during this cycle.
 	 */
-	rx_next = rx_ring->rbd_next;
+	rx_next = rx_data->rbd_next;
 
-	current_rbd = &rx_ring->rbd_ring[rx_next];
+	current_rbd = &rx_data->rbd_ring[rx_next];
 	pkt_num = 0;
 	total_bytes = 0;
 	status_error = current_rbd->wb.upper.status_error;
@@ -358,11 +396,11 @@ igb_rx(igb_rx_ring_t *rx_ring, int poll_bytes)
 		 * than the copy threshold, we'll allocate a new mblk and
 		 * copy the packet data to the mblk.
 		 */
-		if (pkt_len > rx_ring->copy_thresh)
-			mp = igb_rx_bind(rx_ring, rx_next, pkt_len);
+		if (pkt_len > igb->rx_copy_thresh)
+			mp = igb_rx_bind(rx_data, rx_next, pkt_len);
 
 		if (mp == NULL)
-			mp = igb_rx_copy(rx_ring, rx_next, pkt_len);
+			mp = igb_rx_copy(rx_data, rx_next, pkt_len);
 
 		if (mp != NULL) {
 			/*
@@ -379,34 +417,34 @@ rx_discard:
 		/*
 		 * Reset rx descriptor read bits
 		 */
-		current_rcb = rx_ring->work_list[rx_next];
+		current_rcb = rx_data->work_list[rx_next];
 		current_rbd->read.pkt_addr = current_rcb->rx_buf.dma_address;
 		current_rbd->read.hdr_addr = 0;
 
-		rx_next = NEXT_INDEX(rx_next, 1, rx_ring->ring_size);
+		rx_next = NEXT_INDEX(rx_next, 1, rx_data->ring_size);
 
 		/*
 		 * The receive function is in interrupt context, so here
-		 * limit_per_intr is used to avoid doing receiving too long
+		 * rx_limit_per_intr is used to avoid doing receiving too long
 		 * per interrupt.
 		 */
-		if (++pkt_num > rx_ring->limit_per_intr) {
+		if (++pkt_num > igb->rx_limit_per_intr) {
 			IGB_DEBUG_STAT(rx_ring->stat_exceed_pkt);
 			break;
 		}
 
-		current_rbd = &rx_ring->rbd_ring[rx_next];
+		current_rbd = &rx_data->rbd_ring[rx_next];
 		status_error = current_rbd->wb.upper.status_error;
 	}
 
-	DMA_SYNC(&rx_ring->rbd_area, DDI_DMA_SYNC_FORDEV);
+	DMA_SYNC(&rx_data->rbd_area, DDI_DMA_SYNC_FORDEV);
 
-	rx_ring->rbd_next = rx_next;
+	rx_data->rbd_next = rx_next;
 
 	/*
 	 * Update the h/w tail accordingly
 	 */
-	rx_tail = PREV_INDEX(rx_next, 1, rx_ring->ring_size);
+	rx_tail = PREV_INDEX(rx_next, 1, rx_data->ring_size);
 
 	E1000_WRITE_REG(&igb->hw, E1000_RDT(rx_ring->index), rx_tail);
 

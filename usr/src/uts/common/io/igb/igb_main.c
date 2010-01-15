@@ -22,14 +22,14 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include "igb_sw.h"
 
 static char ident[] = "Intel 1Gb Ethernet";
-static char igb_version[] = "igb 1.1.10";
+static char igb_version[] = "igb 1.1.11";
 
 /*
  * Local function protoypes
@@ -50,6 +50,8 @@ static void igb_tx_clean(igb_t *);
 static boolean_t igb_tx_drain(igb_t *);
 static boolean_t igb_rx_drain(igb_t *);
 static int igb_alloc_rings(igb_t *);
+static int igb_alloc_rx_data(igb_t *);
+static void igb_free_rx_data(igb_t *);
 static void igb_free_rings(igb_t *);
 static void igb_setup_rings(igb_t *);
 static void igb_setup_rx(igb_t *);
@@ -62,6 +64,7 @@ static void igb_setup_mac_classify(igb_t *);
 static void igb_init_unicst(igb_t *);
 static void igb_setup_multicst(igb_t *);
 static void igb_get_phy_state(igb_t *);
+static void igb_param_sync(igb_t *);
 static void igb_get_conf(igb_t *);
 static int igb_get_prop(igb_t *, char *, int, int, int);
 static boolean_t igb_is_link_up(igb_t *);
@@ -119,6 +122,21 @@ static void igb_fm_init(igb_t *);
 static void igb_fm_fini(igb_t *);
 static void igb_release_multicast(igb_t *);
 
+mac_priv_prop_t igb_priv_props[] = {
+	{"_tx_copy_thresh", MAC_PROP_PERM_RW},
+	{"_tx_recycle_thresh", MAC_PROP_PERM_RW},
+	{"_tx_overload_thresh", MAC_PROP_PERM_RW},
+	{"_tx_resched_thresh", MAC_PROP_PERM_RW},
+	{"_rx_copy_thresh", MAC_PROP_PERM_RW},
+	{"_rx_limit_per_intr", MAC_PROP_PERM_RW},
+	{"_intr_throttling", MAC_PROP_PERM_RW},
+	{"_adv_pause_cap", MAC_PROP_PERM_READ},
+	{"_adv_asym_pause_cap", MAC_PROP_PERM_READ}
+};
+
+#define	IGB_MAX_PRIV_PROPS \
+	(sizeof (igb_priv_props) / sizeof (mac_priv_prop_t))
+
 static struct cb_ops igb_cb_ops = {
 	nulldev,		/* cb_open */
 	nulldev,		/* cb_close */
@@ -173,7 +191,8 @@ ddi_device_acc_attr_t igb_regs_acc_attr = {
 	DDI_FLAGERR_ACC
 };
 
-#define	IGB_M_CALLBACK_FLAGS	(MC_IOCTL | MC_GETCAPAB)
+#define	IGB_M_CALLBACK_FLAGS \
+	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
 
 static mac_callbacks_t igb_m_callbacks = {
 	IGB_M_CALLBACK_FLAGS,
@@ -185,7 +204,11 @@ static mac_callbacks_t igb_m_callbacks = {
 	NULL,
 	NULL,
 	igb_m_ioctl,
-	igb_m_getcapab
+	igb_m_getcapab,
+	NULL,
+	NULL,
+	igb_m_setprop,
+	igb_m_getprop
 };
 
 /*
@@ -455,16 +478,7 @@ igb_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	igb->attach_progress |= ATTACH_PROGRESS_LOCKS;
 
 	/*
-	 * Allocate DMA resources
-	 */
-	if (igb_alloc_dma(igb) != IGB_SUCCESS) {
-		igb_error(igb, "Failed to allocate DMA resources");
-		goto attach_fail;
-	}
-	igb->attach_progress |= ATTACH_PROGRESS_ALLOC_DMA;
-
-	/*
-	 * Initialize the adapter and setup the rx/tx rings
+	 * Initialize the adapter
 	 */
 	if (igb_init(igb) != IGB_SUCCESS) {
 		igb_error(igb, "Failed to initialize adapter");
@@ -480,15 +494,6 @@ igb_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		goto attach_fail;
 	}
 	igb->attach_progress |= ATTACH_PROGRESS_STATS;
-
-	/*
-	 * Initialize NDD parameters
-	 */
-	if (igb_nd_init(igb) != IGB_SUCCESS) {
-		igb_error(igb, "Failed to initialize ndd");
-		goto attach_fail;
-	}
-	igb->attach_progress |= ATTACH_PROGRESS_NDD;
 
 	/*
 	 * Register the driver to the MAC
@@ -579,7 +584,7 @@ igb_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	mutex_enter(&igb->gen_lock);
 	if (igb->igb_state & IGB_STARTED) {
 		atomic_and_32(&igb->igb_state, ~IGB_STARTED);
-		igb_stop(igb);
+		igb_stop(igb, B_TRUE);
 		mutex_exit(&igb->gen_lock);
 		/* Disable and stop the watchdog timer */
 		igb_disable_watchdog_timer(igb);
@@ -667,13 +672,6 @@ igb_unconfigure(dev_info_t *devinfo, igb_t *igb)
 	}
 
 	/*
-	 * Free ndd parameters
-	 */
-	if (igb->attach_progress & ATTACH_PROGRESS_NDD) {
-		igb_nd_cleanup(igb);
-	}
-
-	/*
 	 * Free statistics
 	 */
 	if (igb->attach_progress & ATTACH_PROGRESS_STATS) {
@@ -699,13 +697,6 @@ igb_unconfigure(dev_info_t *devinfo, igb_t *igb)
 	 */
 	if (igb->attach_progress & ATTACH_PROGRESS_PROPS) {
 		(void) ddi_prop_remove_all(devinfo);
-	}
-
-	/*
-	 * Release the DMA resources of rx/tx rings
-	 */
-	if (igb->attach_progress & ATTACH_PROGRESS_ALLOC_DMA) {
-		igb_free_dma(igb);
 	}
 
 	/*
@@ -792,6 +783,8 @@ igb_register_mac(igb_t *igb)
 	mac->m_max_sdu = igb->max_frame_size -
 	    sizeof (struct ether_vlan_header) - ETHERFCSL;
 	mac->m_margin = VLAN_TAGSZ;
+	mac->m_priv_props = igb_priv_props;
+	mac->m_priv_prop_count = IGB_MAX_PRIV_PROPS;
 	mac->m_v12n = MAC_VIRT_LEVEL1;
 
 	status = mac_register(mac, &igb->mac_hdl);
@@ -956,11 +949,6 @@ igb_init_driver_settings(igb_t *igb)
 		rx_ring = &igb->rx_rings[i];
 		rx_ring->index = i;
 		rx_ring->igb = igb;
-
-		rx_ring->ring_size = igb->rx_ring_size;
-		rx_ring->free_list_size = igb->rx_ring_size;
-		rx_ring->copy_thresh = igb->rx_copy_thresh;
-		rx_ring->limit_per_intr = igb->rx_limit_per_intr;
 	}
 
 	for (i = 0; i < igb->num_tx_rings; i++) {
@@ -975,10 +963,6 @@ igb_init_driver_settings(igb_t *igb)
 		tx_ring->ring_size = igb->tx_ring_size;
 		tx_ring->free_list_size = igb->tx_ring_size +
 		    (igb->tx_ring_size >> 1);
-		tx_ring->copy_thresh = igb->tx_copy_thresh;
-		tx_ring->recycle_thresh = igb->tx_recycle_thresh;
-		tx_ring->overload_thresh = igb->tx_overload_thresh;
-		tx_ring->resched_thresh = igb->tx_resched_thresh;
 	}
 
 	/*
@@ -1008,8 +992,6 @@ igb_init_locks(igb_t *igb)
 	for (i = 0; i < igb->num_rx_rings; i++) {
 		rx_ring = &igb->rx_rings[i];
 		mutex_init(&rx_ring->rx_lock, NULL,
-		    MUTEX_DRIVER, DDI_INTR_PRI(igb->intr_pri));
-		mutex_init(&rx_ring->recycle_lock, NULL,
 		    MUTEX_DRIVER, DDI_INTR_PRI(igb->intr_pri));
 	}
 
@@ -1048,7 +1030,6 @@ igb_destroy_locks(igb_t *igb)
 	for (i = 0; i < igb->num_rx_rings; i++) {
 		rx_ring = &igb->rx_rings[i];
 		mutex_destroy(&rx_ring->rx_lock);
-		mutex_destroy(&rx_ring->recycle_lock);
 	}
 
 	for (i = 0; i < igb->num_tx_rings; i++) {
@@ -1076,7 +1057,7 @@ igb_resume(dev_info_t *devinfo)
 	mutex_enter(&igb->gen_lock);
 
 	if (igb->igb_state & IGB_STARTED) {
-		if (igb_start(igb) != IGB_SUCCESS) {
+		if (igb_start(igb, B_FALSE) != IGB_SUCCESS) {
 			mutex_exit(&igb->gen_lock);
 			return (DDI_FAILURE);
 		}
@@ -1112,7 +1093,7 @@ igb_suspend(dev_info_t *devinfo)
 		return (DDI_SUCCESS);
 	}
 
-	igb_stop(igb);
+	igb_stop(igb, B_FALSE);
 
 	mutex_exit(&igb->gen_lock);
 
@@ -1127,8 +1108,6 @@ igb_suspend(dev_info_t *devinfo)
 static int
 igb_init(igb_t *igb)
 {
-	int i;
-
 	mutex_enter(&igb->gen_lock);
 
 	/*
@@ -1137,26 +1116,6 @@ igb_init(igb_t *igb)
 	if (igb_init_adapter(igb) != IGB_SUCCESS) {
 		mutex_exit(&igb->gen_lock);
 		igb_fm_ereport(igb, DDI_FM_DEVICE_INVAL_STATE);
-		ddi_fm_service_impact(igb->dip, DDI_SERVICE_LOST);
-		return (IGB_FAILURE);
-	}
-
-	/*
-	 * Setup the rx/tx rings
-	 */
-	for (i = 0; i < igb->num_rx_rings; i++)
-		mutex_enter(&igb->rx_rings[i].rx_lock);
-	for (i = 0; i < igb->num_tx_rings; i++)
-		mutex_enter(&igb->tx_rings[i].tx_lock);
-
-	igb_setup_rings(igb);
-
-	for (i = igb->num_tx_rings - 1; i >= 0; i--)
-		mutex_exit(&igb->tx_rings[i].tx_lock);
-	for (i = igb->num_rx_rings - 1; i >= 0; i--)
-		mutex_exit(&igb->rx_rings[i].rx_lock);
-
-	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(igb->dip, DDI_SERVICE_LOST);
 		return (IGB_FAILURE);
 	}
@@ -1389,6 +1348,8 @@ igb_init_adapter(igb_t *igb)
 	 */
 	igb_get_phy_state(igb);
 
+	igb_param_sync(igb);
+
 	return (IGB_SUCCESS);
 
 init_adapter_fail:
@@ -1483,6 +1444,7 @@ igb_reset(igb_t *igb)
 	/*
 	 * Setup the rx/tx rings
 	 */
+	igb->tx_ring_init = B_FALSE;
 	igb_setup_rings(igb);
 
 	atomic_and_32(&igb->igb_state, ~(IGB_ERROR | IGB_STALL));
@@ -1634,9 +1596,8 @@ igb_tx_drain(igb_t *igb)
 static boolean_t
 igb_rx_drain(igb_t *igb)
 {
-	igb_rx_ring_t *rx_ring;
 	boolean_t done;
-	int i, j;
+	int i;
 
 	/*
 	 * Polling the rx free list to check if those rx buffers held by
@@ -1649,13 +1610,7 @@ igb_rx_drain(igb_t *igb)
 	 * Otherwise return B_FALSE;
 	 */
 	for (i = 0; i < RX_DRAIN_TIME; i++) {
-
-		done = B_TRUE;
-		for (j = 0; j < igb->num_rx_rings; j++) {
-			rx_ring = &igb->rx_rings[j];
-			done = done &&
-			    (rx_ring->rcb_free == rx_ring->free_list_size);
-		}
+		done = (igb->rcb_pending == 0);
 
 		if (done)
 			break;
@@ -1670,11 +1625,29 @@ igb_rx_drain(igb_t *igb)
  * igb_start - Start the driver/chipset
  */
 int
-igb_start(igb_t *igb)
+igb_start(igb_t *igb, boolean_t alloc_buffer)
 {
 	int i;
 
 	ASSERT(mutex_owned(&igb->gen_lock));
+
+	if (alloc_buffer) {
+		if (igb_alloc_rx_data(igb) != IGB_SUCCESS) {
+			igb_error(igb,
+			    "Failed to allocate software receive rings");
+			return (IGB_FAILURE);
+		}
+
+		/* Allocate buffers for all the rx/tx rings */
+		if (igb_alloc_dma(igb) != IGB_SUCCESS) {
+			igb_error(igb, "Failed to allocate DMA resource");
+			return (IGB_FAILURE);
+		}
+
+		igb->tx_ring_init = B_TRUE;
+	} else {
+		igb->tx_ring_init = B_FALSE;
+	}
 
 	for (i = 0; i < igb->num_rx_rings; i++)
 		mutex_enter(&igb->rx_rings[i].rx_lock);
@@ -1690,12 +1663,12 @@ igb_start(igb_t *igb)
 			goto start_failure;
 		}
 		igb->attach_progress |= ATTACH_PROGRESS_INIT_ADAPTER;
-
-		/*
-		 * Setup the rx/tx rings
-		 */
-		igb_setup_rings(igb);
 	}
+
+	/*
+	 * Setup the rx/tx rings
+	 */
+	igb_setup_rings(igb);
 
 	/*
 	 * Enable adapter interrupts
@@ -1731,7 +1704,7 @@ start_failure:
  * igb_stop - Stop the driver/chipset
  */
 void
-igb_stop(igb_t *igb)
+igb_stop(igb_t *igb, boolean_t free_buffer)
 {
 	int i;
 
@@ -1771,6 +1744,19 @@ igb_stop(igb_t *igb)
 
 	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK)
 		ddi_fm_service_impact(igb->dip, DDI_SERVICE_LOST);
+
+	if (igb->link_state == LINK_STATE_UP) {
+		igb->link_state = LINK_STATE_UNKNOWN;
+		mac_link_update(igb->mac_hdl, igb->link_state);
+	}
+
+	if (free_buffer) {
+		/*
+		 * Release the DMA/memory resources of rx/tx rings
+		 */
+		igb_free_dma(igb);
+		igb_free_rx_data(igb);
+	}
 }
 
 /*
@@ -1849,6 +1835,50 @@ igb_free_rings(igb_t *igb)
 	}
 }
 
+static int
+igb_alloc_rx_data(igb_t *igb)
+{
+	igb_rx_ring_t *rx_ring;
+	int i;
+
+	for (i = 0; i < igb->num_rx_rings; i++) {
+		rx_ring = &igb->rx_rings[i];
+		if (igb_alloc_rx_ring_data(rx_ring) != IGB_SUCCESS)
+			goto alloc_rx_rings_failure;
+	}
+	return (IGB_SUCCESS);
+
+alloc_rx_rings_failure:
+	igb_free_rx_data(igb);
+	return (IGB_FAILURE);
+}
+
+static void
+igb_free_rx_data(igb_t *igb)
+{
+	igb_rx_ring_t *rx_ring;
+	igb_rx_data_t *rx_data;
+	int i;
+
+	for (i = 0; i < igb->num_rx_rings; i++) {
+		rx_ring = &igb->rx_rings[i];
+
+		mutex_enter(&igb->rx_pending_lock);
+		rx_data = rx_ring->rx_data;
+
+		if (rx_data != NULL) {
+			rx_data->flag |= IGB_RX_STOPPED;
+
+			if (rx_data->rcb_pending == 0) {
+				igb_free_rx_ring_data(rx_data);
+				rx_ring->rx_data = NULL;
+			}
+		}
+
+		mutex_exit(&igb->rx_pending_lock);
+	}
+}
+
 /*
  * igb_setup_rings - Setup rx/tx rings
  */
@@ -1871,6 +1901,7 @@ static void
 igb_setup_rx_ring(igb_rx_ring_t *rx_ring)
 {
 	igb_t *igb = rx_ring->igb;
+	igb_rx_data_t *rx_data = rx_ring->rx_data;
 	struct e1000_hw *hw = &igb->hw;
 	rx_control_block_t *rcb;
 	union e1000_adv_rx_desc	*rbd;
@@ -1887,8 +1918,8 @@ igb_setup_rx_ring(igb_rx_ring_t *rx_ring)
 	 * Initialize descriptor ring with buffer addresses
 	 */
 	for (i = 0; i < igb->rx_ring_size; i++) {
-		rcb = rx_ring->work_list[i];
-		rbd = &rx_ring->rbd_ring[i];
+		rcb = rx_data->work_list[i];
+		rbd = &rx_data->rbd_ring[i];
 
 		rbd->read.pkt_addr = rcb->rx_buf.dma_address;
 		rbd->read.hdr_addr = NULL;
@@ -1897,15 +1928,15 @@ igb_setup_rx_ring(igb_rx_ring_t *rx_ring)
 	/*
 	 * Initialize the base address registers
 	 */
-	buf_low = (uint32_t)rx_ring->rbd_area.dma_address;
-	buf_high = (uint32_t)(rx_ring->rbd_area.dma_address >> 32);
+	buf_low = (uint32_t)rx_data->rbd_area.dma_address;
+	buf_high = (uint32_t)(rx_data->rbd_area.dma_address >> 32);
 	E1000_WRITE_REG(hw, E1000_RDBAH(rx_ring->index), buf_high);
 	E1000_WRITE_REG(hw, E1000_RDBAL(rx_ring->index), buf_low);
 
 	/*
 	 * Initialize the length register
 	 */
-	size = rx_ring->ring_size * sizeof (union e1000_adv_rx_desc);
+	size = rx_data->ring_size * sizeof (union e1000_adv_rx_desc);
 	E1000_WRITE_REG(hw, E1000_RDLEN(rx_ring->index), size);
 
 	/*
@@ -1926,25 +1957,14 @@ igb_setup_rx_ring(igb_rx_ring_t *rx_ring)
 	rxdctl |= 1 << 16;	/* wthresh */
 	E1000_WRITE_REG(hw, E1000_RXDCTL(rx_ring->index), rxdctl);
 
-	rx_ring->rbd_next = 0;
-
-	/*
-	 * Note: Considering the case that the chipset is being reset
-	 * and there are still some buffers held by the upper layer,
-	 * we should not reset the values of rcb_head, rcb_tail and
-	 * rcb_free;
-	 */
-	if (igb->igb_state == IGB_UNKNOWN) {
-		rx_ring->rcb_head = 0;
-		rx_ring->rcb_tail = 0;
-		rx_ring->rcb_free = rx_ring->free_list_size;
-	}
+	rx_data->rbd_next = 0;
 }
 
 static void
 igb_setup_rx(igb_t *igb)
 {
 	igb_rx_ring_t *rx_ring;
+	igb_rx_data_t *rx_data;
 	igb_rx_group_t *rx_group;
 	struct e1000_hw *hw = &igb->hw;
 	uint32_t rctl, rxcsum;
@@ -2053,8 +2073,9 @@ igb_setup_rx(igb_t *igb)
 	 */
 	for (i = 0; i < igb->num_rx_rings; i++) {
 		rx_ring = &igb->rx_rings[i];
+		rx_data = rx_ring->rx_data;
 		E1000_WRITE_REG(hw, E1000_RDH(i), 0);
-		E1000_WRITE_REG(hw, E1000_RDT(i), rx_ring->ring_size - 1);
+		E1000_WRITE_REG(hw, E1000_RDT(i), rx_data->ring_size - 1);
 	}
 
 	/*
@@ -2141,13 +2162,7 @@ igb_setup_tx_ring(igb_tx_ring_t *tx_ring)
 	tx_ring->tbd_tail = 0;
 	tx_ring->tbd_free = tx_ring->ring_size;
 
-	/*
-	 * Note: for the case that the chipset is being reset, we should not
-	 * reset the values of tcb_head, tcb_tail. And considering there might
-	 * still be some packets kept in the pending_list, we should not assert
-	 * (tcb_free == free_list_size) here.
-	 */
-	if (igb->igb_state == IGB_UNKNOWN) {
+	if (igb->tx_ring_init == B_TRUE) {
 		tx_ring->tcb_head = 0;
 		tx_ring->tcb_tail = 0;
 		tx_ring->tcb_free = tx_ring->free_list_size;
@@ -3632,6 +3647,7 @@ static boolean_t
 igb_set_loopback_mode(igb_t *igb, uint32_t mode)
 {
 	struct e1000_hw *hw;
+	int i;
 
 	if (mode == igb->loopback_mode)
 		return (B_TRUE);
@@ -3673,6 +3689,41 @@ igb_set_loopback_mode(igb_t *igb, uint32_t mode)
 	}
 
 	mutex_exit(&igb->gen_lock);
+
+	/*
+	 * When external loopback is set, wait up to 1000ms to get the link up.
+	 * According to test, 1000ms can work and it's an experimental value.
+	 */
+	if (mode == IGB_LB_EXTERNAL) {
+		for (i = 0; i <= 10; i++) {
+			mutex_enter(&igb->gen_lock);
+			(void) igb_link_check(igb);
+			mutex_exit(&igb->gen_lock);
+
+			if (igb->link_state == LINK_STATE_UP)
+				break;
+
+			msec_delay(100);
+		}
+
+		if (igb->link_state != LINK_STATE_UP) {
+			/*
+			 * Does not support external loopback.
+			 * Reset driver to loopback none.
+			 */
+			igb->loopback_mode = IGB_LB_NONE;
+
+			/* Reset the chip */
+			hw->phy.autoneg_wait_to_complete = B_TRUE;
+			(void) igb_reset(igb);
+			hw->phy.autoneg_wait_to_complete = B_FALSE;
+
+			IGB_DEBUGLOG_0(igb, "Set external loopback failed, "
+			    "reset to loopback none.");
+
+			return (B_FALSE);
+		}
+	}
 
 	return (B_TRUE);
 }
@@ -3847,12 +3898,14 @@ igb_intr_rx_work(igb_rx_ring_t *rx_ring)
 static void
 igb_intr_tx_work(igb_tx_ring_t *tx_ring)
 {
+	igb_t *igb = tx_ring->igb;
+
 	/* Recycle the tx descriptors */
 	tx_ring->tx_recycle(tx_ring);
 
 	/* Schedule the re-transmit */
 	if (tx_ring->reschedule &&
-	    (tx_ring->tbd_free >= tx_ring->resched_thresh)) {
+	    (tx_ring->tbd_free >= igb->tx_resched_thresh)) {
 		tx_ring->reschedule = B_FALSE;
 		mac_tx_ring_update(tx_ring->igb->mac_hdl, tx_ring->ring_handle);
 		IGB_DEBUG_STAT(tx_ring->stat_reschedule);
@@ -3950,7 +4003,7 @@ igb_intr_legacy(void *arg1, void *arg2)
 
 			/* Schedule the re-transmit */
 			tx_reschedule = (tx_ring->reschedule &&
-			    (tx_ring->tbd_free >= tx_ring->resched_thresh));
+			    (tx_ring->tbd_free >= igb->tx_resched_thresh));
 		}
 
 		if (icr & E1000_ICR_LSC) {
@@ -4869,84 +4922,146 @@ igb_get_phy_state(igb_t *igb)
 
 	ASSERT(mutex_owned(&igb->gen_lock));
 
-	(void) e1000_read_phy_reg(hw, PHY_CONTROL, &phy_ctrl);
-	(void) e1000_read_phy_reg(hw, PHY_STATUS, &phy_status);
-	(void) e1000_read_phy_reg(hw, PHY_AUTONEG_ADV, &phy_an_adv);
-	(void) e1000_read_phy_reg(hw, PHY_AUTONEG_EXP, &phy_an_exp);
-	(void) e1000_read_phy_reg(hw, PHY_EXT_STATUS, &phy_ext_status);
-	(void) e1000_read_phy_reg(hw, PHY_1000T_CTRL, &phy_1000t_ctrl);
-	(void) e1000_read_phy_reg(hw, PHY_1000T_STATUS, &phy_1000t_status);
-	(void) e1000_read_phy_reg(hw, PHY_LP_ABILITY, &phy_lp_able);
+	if (hw->phy.media_type == e1000_media_type_copper) {
+		(void) e1000_read_phy_reg(hw, PHY_CONTROL, &phy_ctrl);
+		(void) e1000_read_phy_reg(hw, PHY_STATUS, &phy_status);
+		(void) e1000_read_phy_reg(hw, PHY_AUTONEG_ADV, &phy_an_adv);
+		(void) e1000_read_phy_reg(hw, PHY_AUTONEG_EXP, &phy_an_exp);
+		(void) e1000_read_phy_reg(hw, PHY_EXT_STATUS, &phy_ext_status);
+		(void) e1000_read_phy_reg(hw, PHY_1000T_CTRL, &phy_1000t_ctrl);
+		(void) e1000_read_phy_reg(hw,
+		    PHY_1000T_STATUS, &phy_1000t_status);
+		(void) e1000_read_phy_reg(hw, PHY_LP_ABILITY, &phy_lp_able);
 
-	igb->param_autoneg_cap =
-	    (phy_status & MII_SR_AUTONEG_CAPS) ? 1 : 0;
-	igb->param_pause_cap =
-	    (phy_an_adv & NWAY_AR_PAUSE) ? 1 : 0;
-	igb->param_asym_pause_cap =
-	    (phy_an_adv & NWAY_AR_ASM_DIR) ? 1 : 0;
-	igb->param_1000fdx_cap = ((phy_ext_status & IEEE_ESR_1000T_FD_CAPS) ||
-	    (phy_ext_status & IEEE_ESR_1000X_FD_CAPS)) ? 1 : 0;
-	igb->param_1000hdx_cap = ((phy_ext_status & IEEE_ESR_1000T_HD_CAPS) ||
-	    (phy_ext_status & IEEE_ESR_1000X_HD_CAPS)) ? 1 : 0;
-	igb->param_100t4_cap =
-	    (phy_status & MII_SR_100T4_CAPS) ? 1 : 0;
-	igb->param_100fdx_cap = ((phy_status & MII_SR_100X_FD_CAPS) ||
-	    (phy_status & MII_SR_100T2_FD_CAPS)) ? 1 : 0;
-	igb->param_100hdx_cap = ((phy_status & MII_SR_100X_HD_CAPS) ||
-	    (phy_status & MII_SR_100T2_HD_CAPS)) ? 1 : 0;
-	igb->param_10fdx_cap =
-	    (phy_status & MII_SR_10T_FD_CAPS) ? 1 : 0;
-	igb->param_10hdx_cap =
-	    (phy_status & MII_SR_10T_HD_CAPS) ? 1 : 0;
-	igb->param_rem_fault =
-	    (phy_status & MII_SR_REMOTE_FAULT) ? 1 : 0;
+		igb->param_autoneg_cap =
+		    (phy_status & MII_SR_AUTONEG_CAPS) ? 1 : 0;
+		igb->param_pause_cap =
+		    (phy_an_adv & NWAY_AR_PAUSE) ? 1 : 0;
+		igb->param_asym_pause_cap =
+		    (phy_an_adv & NWAY_AR_ASM_DIR) ? 1 : 0;
+		igb->param_1000fdx_cap =
+		    ((phy_ext_status & IEEE_ESR_1000T_FD_CAPS) ||
+		    (phy_ext_status & IEEE_ESR_1000X_FD_CAPS)) ? 1 : 0;
+		igb->param_1000hdx_cap =
+		    ((phy_ext_status & IEEE_ESR_1000T_HD_CAPS) ||
+		    (phy_ext_status & IEEE_ESR_1000X_HD_CAPS)) ? 1 : 0;
+		igb->param_100t4_cap =
+		    (phy_status & MII_SR_100T4_CAPS) ? 1 : 0;
+		igb->param_100fdx_cap = ((phy_status & MII_SR_100X_FD_CAPS) ||
+		    (phy_status & MII_SR_100T2_FD_CAPS)) ? 1 : 0;
+		igb->param_100hdx_cap = ((phy_status & MII_SR_100X_HD_CAPS) ||
+		    (phy_status & MII_SR_100T2_HD_CAPS)) ? 1 : 0;
+		igb->param_10fdx_cap =
+		    (phy_status & MII_SR_10T_FD_CAPS) ? 1 : 0;
+		igb->param_10hdx_cap =
+		    (phy_status & MII_SR_10T_HD_CAPS) ? 1 : 0;
+		igb->param_rem_fault =
+		    (phy_status & MII_SR_REMOTE_FAULT) ? 1 : 0;
 
-	igb->param_adv_autoneg_cap = hw->mac.autoneg;
-	igb->param_adv_pause_cap =
-	    (phy_an_adv & NWAY_AR_PAUSE) ? 1 : 0;
-	igb->param_adv_asym_pause_cap =
-	    (phy_an_adv & NWAY_AR_ASM_DIR) ? 1 : 0;
-	igb->param_adv_1000hdx_cap =
-	    (phy_1000t_ctrl & CR_1000T_HD_CAPS) ? 1 : 0;
-	igb->param_adv_100t4_cap =
-	    (phy_an_adv & NWAY_AR_100T4_CAPS) ? 1 : 0;
-	igb->param_adv_rem_fault =
-	    (phy_an_adv & NWAY_AR_REMOTE_FAULT) ? 1 : 0;
-	if (igb->param_adv_autoneg_cap == 1) {
-		igb->param_adv_1000fdx_cap =
-		    (phy_1000t_ctrl & CR_1000T_FD_CAPS) ? 1 : 0;
-		igb->param_adv_100fdx_cap =
-		    (phy_an_adv & NWAY_AR_100TX_FD_CAPS) ? 1 : 0;
-		igb->param_adv_100hdx_cap =
-		    (phy_an_adv & NWAY_AR_100TX_HD_CAPS) ? 1 : 0;
-		igb->param_adv_10fdx_cap =
-		    (phy_an_adv & NWAY_AR_10T_FD_CAPS) ? 1 : 0;
-		igb->param_adv_10hdx_cap =
-		    (phy_an_adv & NWAY_AR_10T_HD_CAPS) ? 1 : 0;
+		igb->param_adv_autoneg_cap = hw->mac.autoneg;
+		igb->param_adv_pause_cap =
+		    (phy_an_adv & NWAY_AR_PAUSE) ? 1 : 0;
+		igb->param_adv_asym_pause_cap =
+		    (phy_an_adv & NWAY_AR_ASM_DIR) ? 1 : 0;
+		igb->param_adv_1000hdx_cap =
+		    (phy_1000t_ctrl & CR_1000T_HD_CAPS) ? 1 : 0;
+		igb->param_adv_100t4_cap =
+		    (phy_an_adv & NWAY_AR_100T4_CAPS) ? 1 : 0;
+		igb->param_adv_rem_fault =
+		    (phy_an_adv & NWAY_AR_REMOTE_FAULT) ? 1 : 0;
+		if (igb->param_adv_autoneg_cap == 1) {
+			igb->param_adv_1000fdx_cap =
+			    (phy_1000t_ctrl & CR_1000T_FD_CAPS) ? 1 : 0;
+			igb->param_adv_100fdx_cap =
+			    (phy_an_adv & NWAY_AR_100TX_FD_CAPS) ? 1 : 0;
+			igb->param_adv_100hdx_cap =
+			    (phy_an_adv & NWAY_AR_100TX_HD_CAPS) ? 1 : 0;
+			igb->param_adv_10fdx_cap =
+			    (phy_an_adv & NWAY_AR_10T_FD_CAPS) ? 1 : 0;
+			igb->param_adv_10hdx_cap =
+			    (phy_an_adv & NWAY_AR_10T_HD_CAPS) ? 1 : 0;
+		}
+
+		igb->param_lp_autoneg_cap =
+		    (phy_an_exp & NWAY_ER_LP_NWAY_CAPS) ? 1 : 0;
+		igb->param_lp_pause_cap =
+		    (phy_lp_able & NWAY_LPAR_PAUSE) ? 1 : 0;
+		igb->param_lp_asym_pause_cap =
+		    (phy_lp_able & NWAY_LPAR_ASM_DIR) ? 1 : 0;
+		igb->param_lp_1000fdx_cap =
+		    (phy_1000t_status & SR_1000T_LP_FD_CAPS) ? 1 : 0;
+		igb->param_lp_1000hdx_cap =
+		    (phy_1000t_status & SR_1000T_LP_HD_CAPS) ? 1 : 0;
+		igb->param_lp_100t4_cap =
+		    (phy_lp_able & NWAY_LPAR_100T4_CAPS) ? 1 : 0;
+		igb->param_lp_100fdx_cap =
+		    (phy_lp_able & NWAY_LPAR_100TX_FD_CAPS) ? 1 : 0;
+		igb->param_lp_100hdx_cap =
+		    (phy_lp_able & NWAY_LPAR_100TX_HD_CAPS) ? 1 : 0;
+		igb->param_lp_10fdx_cap =
+		    (phy_lp_able & NWAY_LPAR_10T_FD_CAPS) ? 1 : 0;
+		igb->param_lp_10hdx_cap =
+		    (phy_lp_able & NWAY_LPAR_10T_HD_CAPS) ? 1 : 0;
+		igb->param_lp_rem_fault =
+		    (phy_lp_able & NWAY_LPAR_REMOTE_FAULT) ? 1 : 0;
+	} else {
+		/*
+		 * 1Gig Fiber adapter only offers 1Gig Full Duplex.
+		 */
+		igb->param_autoneg_cap = 0;
+		igb->param_pause_cap = 1;
+		igb->param_asym_pause_cap = 1;
+		igb->param_1000fdx_cap = 1;
+		igb->param_1000hdx_cap = 0;
+		igb->param_100t4_cap = 0;
+		igb->param_100fdx_cap = 0;
+		igb->param_100hdx_cap = 0;
+		igb->param_10fdx_cap = 0;
+		igb->param_10hdx_cap = 0;
+
+		igb->param_adv_autoneg_cap = 0;
+		igb->param_adv_pause_cap = 1;
+		igb->param_adv_asym_pause_cap = 1;
+		igb->param_adv_1000fdx_cap = 1;
+		igb->param_adv_1000hdx_cap = 0;
+		igb->param_adv_100t4_cap = 0;
+		igb->param_adv_100fdx_cap = 0;
+		igb->param_adv_100hdx_cap = 0;
+		igb->param_adv_10fdx_cap = 0;
+		igb->param_adv_10hdx_cap = 0;
+
+		igb->param_lp_autoneg_cap = 0;
+		igb->param_lp_pause_cap = 0;
+		igb->param_lp_asym_pause_cap = 0;
+		igb->param_lp_1000fdx_cap = 0;
+		igb->param_lp_1000hdx_cap = 0;
+		igb->param_lp_100t4_cap = 0;
+		igb->param_lp_100fdx_cap = 0;
+		igb->param_lp_100hdx_cap = 0;
+		igb->param_lp_10fdx_cap = 0;
+		igb->param_lp_10hdx_cap = 0;
+		igb->param_lp_rem_fault = 0;
 	}
+}
 
-	igb->param_lp_autoneg_cap =
-	    (phy_an_exp & NWAY_ER_LP_NWAY_CAPS) ? 1 : 0;
-	igb->param_lp_pause_cap =
-	    (phy_lp_able & NWAY_LPAR_PAUSE) ? 1 : 0;
-	igb->param_lp_asym_pause_cap =
-	    (phy_lp_able & NWAY_LPAR_ASM_DIR) ? 1 : 0;
-	igb->param_lp_1000fdx_cap =
-	    (phy_1000t_status & SR_1000T_LP_FD_CAPS) ? 1 : 0;
-	igb->param_lp_1000hdx_cap =
-	    (phy_1000t_status & SR_1000T_LP_HD_CAPS) ? 1 : 0;
-	igb->param_lp_100t4_cap =
-	    (phy_lp_able & NWAY_LPAR_100T4_CAPS) ? 1 : 0;
-	igb->param_lp_100fdx_cap =
-	    (phy_lp_able & NWAY_LPAR_100TX_FD_CAPS) ? 1 : 0;
-	igb->param_lp_100hdx_cap =
-	    (phy_lp_able & NWAY_LPAR_100TX_HD_CAPS) ? 1 : 0;
-	igb->param_lp_10fdx_cap =
-	    (phy_lp_able & NWAY_LPAR_10T_FD_CAPS) ? 1 : 0;
-	igb->param_lp_10hdx_cap =
-	    (phy_lp_able & NWAY_LPAR_10T_HD_CAPS) ? 1 : 0;
-	igb->param_lp_rem_fault =
-	    (phy_lp_able & NWAY_LPAR_REMOTE_FAULT) ? 1 : 0;
+/*
+ * synchronize the adv* and en* parameters.
+ *
+ * See comments in <sys/dld.h> for details of the *_en_*
+ * parameters. The usage of ndd for setting adv parameters will
+ * synchronize all the en parameters with the e1000g parameters,
+ * implicitly disabling any settings made via dladm.
+ */
+static void
+igb_param_sync(igb_t *igb)
+{
+	igb->param_en_1000fdx_cap = igb->param_adv_1000fdx_cap;
+	igb->param_en_1000hdx_cap = igb->param_adv_1000hdx_cap;
+	igb->param_en_100t4_cap = igb->param_adv_100t4_cap;
+	igb->param_en_100fdx_cap = igb->param_adv_100fdx_cap;
+	igb->param_en_100hdx_cap = igb->param_adv_100hdx_cap;
+	igb->param_en_10fdx_cap = igb->param_adv_10fdx_cap;
+	igb->param_en_10hdx_cap = igb->param_adv_10hdx_cap;
 }
 
 /*
