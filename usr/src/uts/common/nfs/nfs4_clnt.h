@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,7 @@
 #include <sys/list.h>
 #include <rpc/auth.h>
 #include <sys/door.h>
+#include <sys/condvar_impl.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -80,6 +81,21 @@ extern "C" {
 
 /* Number of times we should retry on open after getting NFS4ERR_BAD_SEQID */
 #define	NFS4_NUM_RETRY_BAD_SEQID	3
+
+/*
+ * Macro to wakeup sleeping async worker threads.
+ */
+#define	NFS4_WAKE_ASYNC_WORKER(work_cv)	{				\
+	if (CV_HAS_WAITERS(&work_cv[NFS4_ASYNC_QUEUE])) 		\
+		cv_signal(&work_cv[NFS4_ASYNC_QUEUE]);			\
+	else if (CV_HAS_WAITERS(&work_cv[NFS4_ASYNC_PGOPS_QUEUE])) 	\
+		cv_signal(&work_cv[NFS4_ASYNC_PGOPS_QUEUE]);		\
+}
+
+#define	NFS4_WAKEALL_ASYNC_WORKERS(work_cv) {				\
+		cv_broadcast(&work_cv[NFS4_ASYNC_QUEUE]);		\
+		cv_broadcast(&work_cv[NFS4_ASYNC_PGOPS_QUEUE]);		\
+}
 
 /*
  * Is the attribute cache valid?  If client holds a delegation, then attrs
@@ -196,18 +212,36 @@ extern struct clstat4_debug clstat4_debug;
 #endif
 
 /*
- * The NFS specific async_reqs structure.
+ * The NFS specific async_reqs structure. iotype4 is grouped to support two
+ * types of async thread pools, please read comments section of mntinfo4_t
+ * definition for more information. Care should be taken while adding new
+ * members to this group.
  */
 
 enum iotype4 {
-	NFS4_READ_AHEAD,
 	NFS4_PUTAPAGE,
 	NFS4_PAGEIO,
+	NFS4_COMMIT,
+	NFS4_READ_AHEAD,
 	NFS4_READDIR,
 	NFS4_INACTIVE,
-	NFS4_COMMIT
+	NFS4_ASYNC_TYPES
 };
-#define	NFS4_ASYNC_TYPES	(NFS4_COMMIT + 1)
+#define	NFS4_ASYNC_PGOPS_TYPES	(NFS4_COMMIT + 1)
+
+/*
+ * NFS async requests queue type.
+ */
+enum ioqtype4 {
+	NFS4_ASYNC_QUEUE,
+	NFS4_ASYNC_PGOPS_QUEUE,
+	NFS4_MAX_ASYNC_QUEUES
+};
+
+/*
+ * Number of NFS async threads operating exclusively on page op requests.
+ */
+#define	NUM_ASYNC_PGOPS_THREADS	0x2
 
 struct nfs4_async_read_req {
 	void (*readahead)();		/* pointer to readahead function */
@@ -846,10 +880,10 @@ typedef struct nfs4_debug_msg {
  *		mi_async_reqs
  *		mi_async_req_count
  *		mi_async_tail
- *		mi_async_curr
+ *		mi_async_curr[NFS4_MAX_ASYNC_QUEUES]
  *		mi_async_clusters
  *		mi_async_init_clusters
- *		mi_threads
+ *		mi_threads[NFS4_MAX_ASYNC_QUEUES]
  *		mi_inactive_thread
  *		mi_manager_thread
  *
@@ -943,24 +977,40 @@ typedef struct mntinfo4 {
 	int		mi_curwrite;	/* current write size */
 	uint_t 		mi_count; 	/* ref count */
 	/*
-	 * async I/O management.  There may be a pool of threads to handle
-	 * async I/O requests, etc., plus there is always one thread that
-	 * handles over-the-wire requests for VOP_INACTIVE.  The async pool
-	 * can also help out with VOP_INACTIVE.
+	 * Async I/O management
+	 * We have 2 pools of threads working on async I/O:
+	 * 	(1) Threads which work on all async queues. Default number of
+	 *	threads in this queue is 8. Threads in this pool work on async
+	 *	queue pointed by mi_async_curr[NFS4_ASYNC_QUEUE]. Number of
+	 *	active threads in this pool is tracked by
+	 *	mi_threads[NFS4_ASYNC_QUEUE].
+	 * 	(ii)Threads which work only on page op async queues.
+	 *	Page ops queue comprises of NFS4_PUTAPAGE, NFS4_PAGEIO &
+	 *	NFS4_COMMIT. Default number of threads in this queue is 2
+	 *	(NUM_ASYNC_PGOPS_THREADS). Threads in this pool work on async
+	 *	queue pointed by mi_async_curr[NFS4_ASYNC_PGOPS_QUEUE]. Number
+	 *	of active threads in this pool is tracked by
+	 *	mi_threads[NFS4_ASYNC_PGOPS_QUEUE].
+	 *
+	 * In addition to above two pools, there is always one thread that
+	 * handles over-the-wire requests for VOP_INACTIVE.
 	 */
 	struct nfs4_async_reqs *mi_async_reqs[NFS4_ASYNC_TYPES];
 	struct nfs4_async_reqs *mi_async_tail[NFS4_ASYNC_TYPES];
-	struct nfs4_async_reqs **mi_async_curr;	/* current async queue */
+	struct nfs4_async_reqs **mi_async_curr[NFS4_MAX_ASYNC_QUEUES];
+						/* current async queue */
 	uint_t		mi_async_clusters[NFS4_ASYNC_TYPES];
 	uint_t		mi_async_init_clusters;
 	uint_t		mi_async_req_count; /* # outstanding work requests */
 	kcondvar_t	mi_async_reqs_cv; /* signaled when there's work */
-	ushort_t	mi_threads;	/* number of active async threads */
+	ushort_t	mi_threads[NFS4_MAX_ASYNC_QUEUES];
+					/* number of active async threads */
 	ushort_t	mi_max_threads;	/* max number of async threads */
 	kthread_t	*mi_manager_thread; /* async manager thread id */
 	kthread_t	*mi_inactive_thread; /* inactive thread id */
 	kcondvar_t	mi_inact_req_cv; /* notify VOP_INACTIVE thread */
-	kcondvar_t	mi_async_work_cv; /* tell workers to work */
+	kcondvar_t	mi_async_work_cv[NFS4_MAX_ASYNC_QUEUES];
+					/* tell workers to work */
 	kcondvar_t	mi_async_cv;	/* all pool threads exited */
 	kmutex_t	mi_async_lock;
 	/*

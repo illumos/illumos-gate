@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1067,6 +1067,8 @@ recov_retry:
  */
 
 static void	nfs4_async_start(struct vfs *);
+static void	nfs4_async_pgops_start(struct vfs *);
+static void	nfs4_async_common_start(struct vfs *, int);
 
 static void
 free_async_args4(struct nfs4_async_reqs *args)
@@ -1165,17 +1167,27 @@ nfs4_async_manager(vfs_t *vfsp)
 			 * purposes, but who told them they could change
 			 * random values on a live kernel anyhow?
 			 */
-			if (mi->mi_threads <
+			if (mi->mi_threads[NFS4_ASYNC_QUEUE] <
 			    MAX(mi->mi_max_threads, max_threads)) {
-				mi->mi_threads++;
+				mi->mi_threads[NFS4_ASYNC_QUEUE]++;
 				mutex_exit(&mi->mi_async_lock);
 				MI4_HOLD(mi);
 				VFS_HOLD(vfsp);	/* hold for new thread */
 				(void) zthread_create(NULL, 0, nfs4_async_start,
 				    vfsp, 0, minclsyspri);
 				mutex_enter(&mi->mi_async_lock);
+			} else if (mi->mi_threads[NFS4_ASYNC_PGOPS_QUEUE] <
+			    NUM_ASYNC_PGOPS_THREADS) {
+				mi->mi_threads[NFS4_ASYNC_PGOPS_QUEUE]++;
+				mutex_exit(&mi->mi_async_lock);
+				MI4_HOLD(mi);
+				VFS_HOLD(vfsp); /* hold for new thread */
+				(void) zthread_create(NULL, 0,
+				    nfs4_async_pgops_start, vfsp, 0,
+				    minclsyspri);
+				mutex_enter(&mi->mi_async_lock);
 			}
-			cv_signal(&mi->mi_async_work_cv);
+			NFS4_WAKE_ASYNC_WORKER(mi->mi_async_work_cv);
 			ASSERT(mi->mi_async_req_count != 0);
 			mi->mi_async_req_count--;
 		}
@@ -1338,6 +1350,18 @@ noasync:
 	return (-1);
 }
 
+static void
+nfs4_async_start(struct vfs *vfsp)
+{
+	nfs4_async_common_start(vfsp, NFS4_ASYNC_QUEUE);
+}
+
+static void
+nfs4_async_pgops_start(struct vfs *vfsp)
+{
+	nfs4_async_common_start(vfsp, NFS4_ASYNC_PGOPS_QUEUE);
+}
+
 /*
  * The async queues for each mounted file system are arranged as a
  * set of queues, one for each async i/o type.  Requests are taken
@@ -1348,13 +1372,13 @@ noasync:
  * because it will take multiple write requests from the queue
  * before processing any of the other async i/o types.
  *
- * XXX The nfs4_async_start thread is unsafe in the light of the present
+ * XXX The nfs4_async_common_start thread is unsafe in the light of the present
  * model defined by cpr to suspend the system. Specifically over the
  * wire calls are cpr-unsafe. The thread should be reevaluated in
  * case of future updates to the cpr model.
  */
 static void
-nfs4_async_start(struct vfs *vfsp)
+nfs4_async_common_start(struct vfs *vfsp, int async_queue)
 {
 	struct nfs4_async_reqs *args;
 	mntinfo4_t *mi = VFTOMI4(vfsp);
@@ -1362,6 +1386,16 @@ nfs4_async_start(struct vfs *vfsp)
 	callb_cpr_t cprinfo;
 	int i;
 	extern int nfs_async_timeout;
+	int async_types;
+	kcondvar_t *async_work_cv;
+
+	if (async_queue == NFS4_ASYNC_QUEUE) {
+		async_types = NFS4_ASYNC_TYPES;
+		async_work_cv = &mi->mi_async_work_cv[NFS4_ASYNC_QUEUE];
+	} else {
+		async_types = NFS4_ASYNC_PGOPS_TYPES;
+		async_work_cv = &mi->mi_async_work_cv[NFS4_ASYNC_PGOPS_QUEUE];
+	}
 
 	/*
 	 * Dynamic initialization of nfs_async_timeout to allow nfs to be
@@ -1380,14 +1414,16 @@ nfs4_async_start(struct vfs *vfsp)
 		 * through all of them until we either find a non-empty
 		 * queue or have looked through all of them.
 		 */
-		for (i = 0; i < NFS4_ASYNC_TYPES; i++) {
-			args = *mi->mi_async_curr;
+		for (i = 0; i < async_types; i++) {
+			args = *mi->mi_async_curr[async_queue];
 			if (args != NULL)
 				break;
-			mi->mi_async_curr++;
-			if (mi->mi_async_curr ==
-			    &mi->mi_async_reqs[NFS4_ASYNC_TYPES])
-				mi->mi_async_curr = &mi->mi_async_reqs[0];
+			mi->mi_async_curr[async_queue]++;
+			if (mi->mi_async_curr[async_queue] ==
+			    &mi->mi_async_reqs[async_types]) {
+				mi->mi_async_curr[async_queue] =
+				    &mi->mi_async_reqs[0];
+			}
 		}
 		/*
 		 * If we didn't find a entry, then block until woken up
@@ -1407,7 +1443,10 @@ nfs4_async_start(struct vfs *vfsp)
 			 * then get rid of this thread.
 			 */
 			if (mi->mi_max_threads == 0 || time_left <= 0) {
-				if (--mi->mi_threads == 0)
+				--mi->mi_threads[async_queue];
+
+				if (mi->mi_threads[NFS4_ASYNC_QUEUE] == 0 &&
+				    mi->mi_threads[NFS4_ASYNC_PGOPS_QUEUE] == 0)
 					cv_signal(&mi->mi_async_cv);
 				CALLB_CPR_EXIT(&cprinfo);
 				VFS_RELE(vfsp);	/* release thread's hold */
@@ -1415,7 +1454,7 @@ nfs4_async_start(struct vfs *vfsp)
 				zthread_exit();
 				/* NOTREACHED */
 			}
-			time_left = cv_reltimedwait(&mi->mi_async_work_cv,
+			time_left = cv_reltimedwait(async_work_cv,
 			    &mi->mi_async_lock, nfs_async_timeout,
 			    TR_CLOCK_TICK);
 
@@ -1434,15 +1473,17 @@ nfs4_async_start(struct vfs *vfsp)
 		 * for this queue and then move the current pointer to
 		 * the next queue.
 		 */
-		*mi->mi_async_curr = args->a_next;
-		if (*mi->mi_async_curr == NULL ||
+		*mi->mi_async_curr[async_queue] = args->a_next;
+		if (*mi->mi_async_curr[async_queue] == NULL ||
 		    --mi->mi_async_clusters[args->a_io] == 0) {
 			mi->mi_async_clusters[args->a_io] =
 			    mi->mi_async_init_clusters;
-			mi->mi_async_curr++;
-			if (mi->mi_async_curr ==
-			    &mi->mi_async_reqs[NFS4_ASYNC_TYPES])
-				mi->mi_async_curr = &mi->mi_async_reqs[0];
+			mi->mi_async_curr[async_queue]++;
+			if (mi->mi_async_curr[async_queue] ==
+			    &mi->mi_async_reqs[async_types]) {
+				mi->mi_async_curr[async_queue] =
+				    &mi->mi_async_reqs[0];
+			}
 		}
 
 		if (args->a_io != NFS4_INACTIVE && mi->mi_io_kstats) {
@@ -1577,8 +1618,9 @@ nfs4_async_stop(struct vfs *vfsp)
 	 */
 	mutex_enter(&mi->mi_async_lock);
 	mi->mi_max_threads = 0;
-	cv_broadcast(&mi->mi_async_work_cv);
-	while (mi->mi_threads != 0)
+	NFS4_WAKEALL_ASYNC_WORKERS(mi->mi_async_work_cv);
+	while (mi->mi_threads[NFS4_ASYNC_QUEUE] != 0 ||
+	    mi->mi_threads[NFS4_ASYNC_PGOPS_QUEUE] != 0)
 		cv_wait(&mi->mi_async_cv, &mi->mi_async_lock);
 
 	/*
@@ -1619,8 +1661,9 @@ nfs4_async_stop_sig(struct vfs *vfsp)
 	mutex_enter(&mi->mi_async_lock);
 	omax = mi->mi_max_threads;
 	mi->mi_max_threads = 0;
-	cv_broadcast(&mi->mi_async_work_cv);
-	while (mi->mi_threads != 0) {
+	NFS4_WAKEALL_ASYNC_WORKERS(mi->mi_async_work_cv);
+	while (mi->mi_threads[NFS4_ASYNC_QUEUE] != 0 ||
+	    mi->mi_threads[NFS4_ASYNC_PGOPS_QUEUE] != 0) {
 		if (!cv_wait_sig(&mi->mi_async_cv, &mi->mi_async_lock)) {
 			intr = TRUE;
 			goto interrupted;
@@ -2850,7 +2893,7 @@ nfs4_mi_shutdown(zoneid_t zoneid, void *data)
 		 */
 		mutex_enter(&mi->mi_async_lock);
 		mi->mi_max_threads = 0;
-		cv_broadcast(&mi->mi_async_work_cv);
+		NFS4_WAKEALL_ASYNC_WORKERS(mi->mi_async_work_cv);
 		/*
 		 * Set the appropriate flags, signal and wait for both the
 		 * async manager and the inactive thread to exit when they're
@@ -3028,7 +3071,8 @@ nfs_free_mi4(mntinfo4_t *mi)
 	ASSERT(mi->mi_flags & MI4_ASYNC_MGR_STOP);
 	mutex_exit(&mi->mi_lock);
 	mutex_enter(&mi->mi_async_lock);
-	ASSERT(mi->mi_threads == 0);
+	ASSERT(mi->mi_threads[NFS4_ASYNC_QUEUE] == 0 &&
+	    mi->mi_threads[NFS4_ASYNC_PGOPS_QUEUE] == 0);
 	ASSERT(mi->mi_manager_thread == NULL);
 	mutex_exit(&mi->mi_async_lock);
 	if (mi->mi_io_kstats) {
@@ -3066,7 +3110,8 @@ nfs_free_mi4(mntinfo4_t *mi)
 	nfs_rw_destroy(&mi->mi_fh_lock);
 	cv_destroy(&mi->mi_failover_cv);
 	cv_destroy(&mi->mi_async_reqs_cv);
-	cv_destroy(&mi->mi_async_work_cv);
+	cv_destroy(&mi->mi_async_work_cv[NFS4_ASYNC_QUEUE]);
+	cv_destroy(&mi->mi_async_work_cv[NFS4_ASYNC_PGOPS_QUEUE]);
 	cv_destroy(&mi->mi_async_cv);
 	cv_destroy(&mi->mi_inact_req_cv);
 	/*

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,8 +29,6 @@
 #ifndef	_NFS_NFS_CLNT_H
 #define	_NFS_NFS_CLNT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/utsname.h>
 #include <sys/kstat.h>
 #include <sys/time.h>
@@ -39,6 +36,7 @@
 #include <sys/thread.h>
 #include <nfs/rnode.h>
 #include <sys/list.h>
+#include <sys/condvar_impl.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -65,18 +63,37 @@ extern "C" {
 #define	ENFS_TRYAGAIN	999
 
 /*
- * The NFS specific async_reqs structure.
+ * The NFS specific async_reqs structure. iotype is grouped to support two
+ * types of async thread pools, please read comments section of mntinfo_t
+ * definition for more information. Care should be taken while adding new
+ * members to this group.
  */
 
 enum iotype {
-	NFS_READ_AHEAD,
 	NFS_PUTAPAGE,
 	NFS_PAGEIO,
-	NFS_READDIR,
 	NFS_COMMIT,
-	NFS_INACTIVE
+	NFS_READ_AHEAD,
+	NFS_READDIR,
+	NFS_INACTIVE,
+	NFS_ASYNC_TYPES
 };
-#define	NFS_ASYNC_TYPES	(NFS_INACTIVE + 1)
+#define	NFS_ASYNC_PGOPS_TYPES	(NFS_COMMIT + 1)
+
+/*
+ * NFS async requests queue type.
+ */
+
+enum ioqtype {
+	NFS_ASYNC_QUEUE,
+	NFS_ASYNC_PGOPS_QUEUE,
+	NFS_MAX_ASYNC_QUEUES
+};
+
+/*
+ * Number of NFS async threads operating exclusively on page op requests.
+ */
+#define	NUM_ASYNC_PGOPS_THREADS	0x2
 
 struct nfs_async_read_req {
 	void (*readahead)();		/* pointer to readahead function */
@@ -289,10 +306,10 @@ typedef struct servinfo {
  *		mi_async_reqs
  *		mi_async_req_count
  *		mi_async_tail
- *		mi_async_curr
+ *		mi_async_curr[NFS_MAX_ASYNC_QUEUES]
  *		mi_async_clusters
  *		mi_async_init_clusters
- *		mi_threads
+ *		mi_threads[NFS_MAX_ASYNC_QUEUES]
  *		mi_manager_thread
  *
  *	Normally the netconfig information for the mount comes from
@@ -335,20 +352,36 @@ typedef struct mntinfo {
 	int		mi_curread;	/* current read size */
 	int		mi_curwrite;	/* current write size */
 	/*
-	 * async I/O management
+	 * Async I/O management
+	 * We have 2 pools of threads working on async I/O:
+	 *	(i) Threads which work on all async queues. Default number of
+	 *	threads in this queue is 8. Threads in this pool work on async
+	 *	queue pointed by mi_async_curr[NFS_ASYNC_QUEUE]. Number of
+	 *	active threads in this pool is tracked by
+	 *	mi_threads[NFS_ASYNC_QUEUE].
+	 * 	(ii)Threads which work only on page op async queues.
+	 *	Page ops queue comprises of NFS_PUTAPAGE, NFS_PAGEIO &
+	 *	NFS_COMMIT. Default number of threads in this queue is 2
+	 *	(NUM_ASYNC_PGOPS_THREADS). Threads in this pool work on async
+	 *	queue pointed by mi_async_curr[NFS_ASYNC_PGOPS_QUEUE]. Number
+	 *	of active threads in this pool is tracked by
+	 *	mi_threads[NFS_ASYNC_PGOPS_QUEUE].
 	 */
 	struct nfs_async_reqs *mi_async_reqs[NFS_ASYNC_TYPES];
 	struct nfs_async_reqs *mi_async_tail[NFS_ASYNC_TYPES];
-	struct nfs_async_reqs **mi_async_curr;	/* current async queue */
+	struct nfs_async_reqs **mi_async_curr[NFS_MAX_ASYNC_QUEUES];
+						/* current async queue */
 	uint_t		mi_async_clusters[NFS_ASYNC_TYPES];
 	uint_t		mi_async_init_clusters;
 	uint_t		mi_async_req_count; /* # outstanding work requests */
 	kcondvar_t	mi_async_reqs_cv; /* signaled when there's work */
-	ushort_t	mi_threads;	/* number of active async threads */
+	ushort_t	mi_threads[NFS_MAX_ASYNC_QUEUES];
+					/* number of active async threads */
 	ushort_t	mi_max_threads;	/* max number of async worker threads */
 	kthread_t	*mi_manager_thread;  /* async manager thread */
 	kcondvar_t	mi_async_cv; /* signaled when the last worker dies */
-	kcondvar_t	mi_async_work_cv; /* tell workers to work */
+	kcondvar_t	mi_async_work_cv[NFS_MAX_ASYNC_QUEUES];
+					/* tell workers to work */
 	kmutex_t	mi_async_lock;	/* lock to protect async list */
 	/*
 	 * Other stuff
@@ -457,6 +490,21 @@ struct mntinfo_kstat {
 	uint32_t	mik_remap;
 	char		mik_curserver[SYS_NMLN];
 };
+
+/*
+ * Macro to wakeup sleeping async worker threads.
+ */
+#define	NFS_WAKE_ASYNC_WORKER(work_cv)	{				\
+	if (CV_HAS_WAITERS(&work_cv[NFS_ASYNC_QUEUE]))			\
+		cv_signal(&work_cv[NFS_ASYNC_QUEUE]);			\
+	else if (CV_HAS_WAITERS(&work_cv[NFS_ASYNC_PGOPS_QUEUE]))	\
+		cv_signal(&work_cv[NFS_ASYNC_PGOPS_QUEUE]);		\
+}
+
+#define	NFS_WAKEALL_ASYNC_WORKERS(work_cv) {				\
+	cv_broadcast(&work_cv[NFS_ASYNC_QUEUE]);			\
+	cv_broadcast(&work_cv[NFS_ASYNC_PGOPS_QUEUE]);			\
+}
 
 /*
  * Mark cached attributes as timed out

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *	Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
@@ -1230,11 +1230,14 @@ nfsrootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo *svp,
 	for (i = 0; i < NFS_ASYNC_TYPES; i++)
 		mi->mi_async_clusters[i] = nfs_async_clusters;
 	mi->mi_async_init_clusters = nfs_async_clusters;
-	mi->mi_async_curr = &mi->mi_async_reqs[0];
+	mi->mi_async_curr[NFS_ASYNC_QUEUE] =
+	    mi->mi_async_curr[NFS_ASYNC_PGOPS_QUEUE] = &mi->mi_async_reqs[0];
 	mi->mi_max_threads = nfs_max_threads;
 	mutex_init(&mi->mi_async_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&mi->mi_async_reqs_cv, NULL, CV_DEFAULT, NULL);
-	cv_init(&mi->mi_async_work_cv, NULL, CV_DEFAULT, NULL);
+	cv_init(&mi->mi_async_work_cv[NFS_ASYNC_QUEUE], NULL, CV_DEFAULT, NULL);
+	cv_init(&mi->mi_async_work_cv[NFS_ASYNC_PGOPS_QUEUE], NULL,
+	    CV_DEFAULT, NULL);
 	cv_init(&mi->mi_async_cv, NULL, CV_DEFAULT, NULL);
 
 	mi->mi_vfsp = vfsp;
@@ -1369,7 +1372,7 @@ nfs_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 		 */
 		mutex_enter(&mi->mi_async_lock);
 		mi->mi_max_threads = 0;
-		cv_broadcast(&mi->mi_async_work_cv);
+		NFS_WAKEALL_ASYNC_WORKERS(mi->mi_async_work_cv);
 		mutex_exit(&mi->mi_async_lock);
 
 		/*
