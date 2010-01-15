@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #include <stdlib.h>
@@ -103,7 +103,7 @@ static char m_tgt[] = "itadm modify-target [-a radius|chap|none|default] [-s] \
 
 static char d_tgt[] = "itadm delete-target [-f] target-node-name";
 
-static char l_tgt[] = "itadm list-target [-v] [target-node-name";
+static char l_tgt[] = "itadm list-target [-v] [target-node-name]";
 
 static char c_tpg[] = "itadm create-tpg tpg-name IP-address[:port] \
 [IP-address[:port]] [...]";
@@ -457,7 +457,12 @@ main(int argc, char *argv[])
 		case CREATE_INI:
 		case MODIFY_INI:
 		case DELETE_INI:
-			/* These subcommands need operands */
+			/* These subcommands need at least one operand */
+			(void) fprintf(stderr,
+			    gettext("Error, %s requires an operand"),
+			    subcmds[idx].name);
+			(void) fprintf(stderr, "\n");
+
 			ret = 1;
 			goto usage_error;
 		default:
@@ -477,6 +482,30 @@ main(int argc, char *argv[])
 		case LIST_INI:
 		case DELETE_INI:
 			/* These subcommands should have at most one operand */
+			(void) fprintf(stderr,
+			    gettext("Error, %s accepts only a single operand"),
+			    subcmds[idx].name);
+			(void) fprintf(stderr, "\n");
+
+			ret = 1;
+			goto usage_error;
+
+		default:
+			break;
+		}
+	}
+
+	if (newargc > 0) {
+		switch ((itadm_sub_t)idx) {
+		case CREATE_TGT:
+		case MODIFY_DEF:
+		case LIST_DEF:
+			/* These subcommands do not support an operand */
+			(void) fprintf(stderr,
+			    gettext("Error, %s does not support any operands"),
+			    subcmds[idx].name);
+			(void) fprintf(stderr, "\n");
+
 			ret = 1;
 			goto usage_error;
 
@@ -516,16 +545,12 @@ main(int argc, char *argv[])
 
 	switch ((itadm_sub_t)idx) {
 		case CREATE_TGT:
-			if (targetname) {
-				ret = create_target(targetname, proplist);
-			} else {
-				/*
-				 * OK for objp to be NULL here.  If the
-				 * user did not specify a target name,
-				 * one will be generated.
-				 */
-				ret = create_target(objp, proplist);
-			}
+			/*
+			 * OK for targetname to be NULL here.  If the
+			 * user did not specify a target name,
+			 * one will be generated.
+			 */
+			ret = create_target(targetname, proplist);
 			break;
 		case MODIFY_TGT:
 			ret = modify_target(objp, targetname, proplist);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -317,6 +317,7 @@ int
 it_config_setprop(it_config_t *cfg, nvlist_t *proplist, nvlist_t **errlist)
 {
 	int		ret;
+	nvlist_t	*errs = NULL;
 	it_portal_t	*isns = NULL;
 	it_portal_t	*pnext = NULL;
 	it_portal_t	*newisnslist = NULL;
@@ -331,7 +332,8 @@ it_config_setprop(it_config_t *cfg, nvlist_t *proplist, nvlist_t **errlist)
 	}
 
 	if (errlist) {
-		(void) nvlist_alloc(errlist, 0, 0);
+		(void) nvlist_alloc(&errs, 0, 0);
+		*errlist = errs;
 	}
 
 	/*
@@ -350,7 +352,7 @@ it_config_setprop(it_config_t *cfg, nvlist_t *proplist, nvlist_t **errlist)
 	if (val) {
 		char		bsecret[MAX_BASE64_LEN];
 
-		ret = it_val_pass(PROP_RADIUS_SECRET, val, *errlist);
+		ret = it_val_pass(PROP_RADIUS_SECRET, val, errs);
 
 		if (ret == 0) {
 			(void) memset(bsecret, 0, MAX_BASE64_LEN);
@@ -385,7 +387,7 @@ it_config_setprop(it_config_t *cfg, nvlist_t *proplist, nvlist_t **errlist)
 	}
 
 	if (ret == 0) {
-		ret = it_validate_configprops(cprops, *errlist);
+		ret = it_validate_configprops(cprops, errs);
 	}
 
 	if (ret != 0) {
@@ -600,6 +602,7 @@ it_tgt_setprop(it_config_t *cfg, it_tgt_t *tgt, nvlist_t *proplist,
     nvlist_t **errlist)
 {
 	int		ret;
+	nvlist_t	*errs = NULL;
 	nvlist_t	*tprops = NULL;
 	char		*val = NULL;
 
@@ -614,7 +617,8 @@ it_tgt_setprop(it_config_t *cfg, it_tgt_t *tgt, nvlist_t *proplist,
 	canonical_iscsi_name(tgt->tgt_name);
 
 	if (errlist) {
-		(void) nvlist_alloc(errlist, 0, 0);
+		(void) nvlist_alloc(&errs, 0, 0);
+		*errlist = errs;
 	}
 
 	/*
@@ -650,7 +654,7 @@ it_tgt_setprop(it_config_t *cfg, it_tgt_t *tgt, nvlist_t *proplist,
 	if (val) {
 		char		bsecret[MAX_BASE64_LEN];
 
-		ret = it_val_pass(PROP_TARGET_CHAP_SECRET, val, *errlist);
+		ret = it_val_pass(PROP_TARGET_CHAP_SECRET, val, errs);
 
 		if (ret == 0) {
 			(void) memset(bsecret, 0, MAX_BASE64_LEN);
@@ -667,7 +671,7 @@ it_tgt_setprop(it_config_t *cfg, it_tgt_t *tgt, nvlist_t *proplist,
 	}
 
 	if (ret == 0) {
-		ret = it_validate_tgtprops(tprops, *errlist);
+		ret = it_validate_tgtprops(tprops, errs);
 	}
 
 	if (ret != 0) {
@@ -1354,6 +1358,7 @@ int
 it_ini_setprop(it_ini_t *ini, nvlist_t *proplist, nvlist_t **errlist)
 {
 	int		ret;
+	nvlist_t	*errs = NULL;
 	nvlist_t	*iprops = NULL;
 	char		*val = NULL;
 
@@ -1362,7 +1367,8 @@ it_ini_setprop(it_ini_t *ini, nvlist_t *proplist, nvlist_t **errlist)
 	}
 
 	if (errlist) {
-		(void) nvlist_alloc(errlist, 0, 0);
+		(void) nvlist_alloc(&errs, 0, 0);
+		*errlist = errs;
 	}
 
 	/*
@@ -1390,7 +1396,7 @@ it_ini_setprop(it_ini_t *ini, nvlist_t *proplist, nvlist_t **errlist)
 	if ((nvlist_lookup_string(proplist, PROP_CHAP_SECRET, &val)) == 0) {
 		char		bsecret[MAX_BASE64_LEN];
 
-		ret = it_val_pass(PROP_CHAP_SECRET, val, *errlist);
+		ret = it_val_pass(PROP_CHAP_SECRET, val, errs);
 		if (ret == 0) {
 			(void) memset(bsecret, 0, MAX_BASE64_LEN);
 
@@ -1406,7 +1412,7 @@ it_ini_setprop(it_ini_t *ini, nvlist_t *proplist, nvlist_t **errlist)
 	}
 
 	if (ret == 0) {
-		ret = it_validate_iniprops(iprops, *errlist);
+		ret = it_validate_iniprops(iprops, errs);
 	}
 
 	if (ret != 0) {
