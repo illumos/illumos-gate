@@ -21,10 +21,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -211,6 +209,7 @@ i386)
 		"pci8086,1229.8086.100c" "pci8086,1229.8086.1012"
 		"pci8086,1229.8086.1013" "pci8086,1229.8086.1015"
 		"pci8086,1229.8086.1016" "pci8086,1229.8086.1017"
+		"pci8086,1229.8086.10f0"
 		"pci8086,1030" "pci8086,1031" "pci8086,1032" "pci8086,1038"
 		"pci8086,1039" "pci8086,103d" "pci8086,1050" "pci8086,1059"
 		"pci8086,1068" "pci8086,1069" "pci8086,1092" "pci8086,1209"
