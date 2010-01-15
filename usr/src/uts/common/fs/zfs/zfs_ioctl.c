@@ -2289,6 +2289,9 @@ zfs_ioc_inherit_prop(zfs_cmd_t *zc)
 				return (EINVAL);
 
 			type = PROP_TYPE_STRING;
+		} else if (prop == ZFS_PROP_VOLSIZE ||
+		    prop == ZFS_PROP_VERSION) {
+			return (EINVAL);
 		} else {
 			type = zfs_prop_get_type(prop);
 		}

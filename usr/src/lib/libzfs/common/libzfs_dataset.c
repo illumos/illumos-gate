@@ -1902,10 +1902,22 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 		if (str[0] == '/') {
 			char buf[MAXPATHLEN];
 			char *root = buf;
-			const char *relpath = zhp->zfs_name + strlen(source);
+			const char *relpath;
 
-			if (relpath[0] == '/')
-				relpath++;
+			/*
+			 * If we inherit the mountpoint, even from a dataset
+			 * with a received value, the source will be the path of
+			 * the dataset we inherit from. If source is
+			 * ZPROP_SOURCE_VAL_RECVD, the received value is not
+			 * inherited.
+			 */
+			if (strcmp(source, ZPROP_SOURCE_VAL_RECVD) == 0) {
+				relpath = "";
+			} else {
+				relpath = zhp->zfs_name + strlen(source);
+				if (relpath[0] == '/')
+					relpath++;
+			}
 
 			if ((zpool_get_prop(zhp->zpool_hdl,
 			    ZPOOL_PROP_ALTROOT, buf, MAXPATHLEN, NULL)) ||

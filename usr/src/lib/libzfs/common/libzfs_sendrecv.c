@@ -1535,6 +1535,7 @@ guid_to_name_cb(zfs_handle_t *zhp, void *arg)
 
 	if (zhp->zfs_dmustats.dds_guid == gtnd->guid) {
 		(void) strcpy(gtnd->name, zhp->zfs_name);
+		zfs_close(zhp);
 		return (EEXIST);
 	}
 	err = zfs_iter_children(zhp, guid_to_name_cb, gtnd);

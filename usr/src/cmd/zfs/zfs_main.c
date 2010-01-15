@@ -1505,6 +1505,12 @@ zfs_do_inherit(int argc, char **argv)
 				    "%s=none' to clear\n"), propname);
 			return (1);
 		}
+		if (received && (prop == ZFS_PROP_VOLSIZE ||
+		    prop == ZFS_PROP_VERSION)) {
+			(void) fprintf(stderr, gettext("'%s' property cannot "
+			    "be reverted to a received value\n"), propname);
+			return (1);
+		}
 	} else if (!zfs_prop_user(propname)) {
 		(void) fprintf(stderr, gettext("invalid property '%s'\n"),
 		    propname);
