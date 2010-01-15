@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,10 +28,12 @@
 #include <sys/async.h>		/* ecc_flt for pci_ecc.h */
 #include <sys/ddi_subrdefs.h>
 #include <sys/pci/pci_obj.h>
+#include "niumx_var.h"
 #include "px_obj.h"
 
 static int intr_pci_walk_step(mdb_walk_state_t *);
 static int intr_px_walk_step(mdb_walk_state_t *);
+static int intr_niumx_walk_step(mdb_walk_state_t *);
 static void intr_pci_print_items(mdb_walk_state_t *);
 static void intr_px_print_items(mdb_walk_state_t *);
 static char *intr_get_intr_type(uint16_t type);
@@ -72,6 +74,7 @@ intr_walk_step(mdb_walk_state_t *wsp)
 {
 	pci_t		*pci_per_p;
 	px_t		*px_state_p;
+	niumx_devstate_t *niumx_state_p;
 
 	/* read globally declared structures in the pci driver */
 	if (mdb_readvar(&pci_per_p, "per_pci_state") != -1) {
@@ -83,6 +86,12 @@ intr_walk_step(mdb_walk_state_t *wsp)
 	if (mdb_readvar(&px_state_p, "px_state_p") != -1) {
 		wsp->walk_addr = (uintptr_t)px_state_p;
 		intr_px_walk_step(wsp);
+	}
+
+	/* read globally declared structures in the niumx driver */
+	if (mdb_readvar(&niumx_state_p, "niumx_state") != -1) {
+		wsp->walk_addr = (uintptr_t)niumx_state_p;
+		intr_niumx_walk_step(wsp);
 	}
 
 	return (WALK_DONE);
@@ -160,6 +169,89 @@ intr_px_walk_step(mdb_walk_state_t *wsp)
 
 		wsp->walk_addr = (uintptr_t)px_state.px_ib_p;
 		intr_px_print_items(wsp);
+	}
+
+	return (WALK_DONE);
+}
+
+static int
+intr_niumx_walk_step(mdb_walk_state_t *wsp)
+{
+	niumx_devstate_t *niumx_state_p;
+	niumx_devstate_t niumx_state;
+	uintptr_t	start_addr;
+	char		name[MODMAXNAMELEN + 1];
+	struct dev_info	dev;
+	intr_info_t	info;
+	int		i;
+
+	/* Read start of state structure array */
+	if (mdb_vread(&niumx_state_p, sizeof (uintptr_t),
+	    (uintptr_t)wsp->walk_addr) == -1) {
+		mdb_warn("intr: failed to read the initial niumx_state_p "
+		    "structure\n");
+		return (WALK_ERR);
+	}
+
+	/* Figure out how many items are here */
+	start_addr = (uintptr_t)niumx_state_p;
+
+	while (mdb_vread(&niumx_state_p, sizeof (uintptr_t),
+	    (uintptr_t)start_addr) >= 0) {
+
+		start_addr += sizeof (uintptr_t);
+
+		/* Read if anything is there */
+		if (mdb_vread(&niumx_state, sizeof (niumx_devstate_t),
+		    (uintptr_t)niumx_state_p) == -1) {
+			return (WALK_DONE);
+		}
+
+		for (i = 0; i < NIUMX_MAX_INTRS; i++) {
+			if (niumx_state.niumx_ihtable[i].ih_sysino == 0)
+				continue;
+
+			if (niumx_state.niumx_ihtable[i].ih_dip == 0)
+				continue;
+
+			bzero((void *)&info, sizeof (intr_info_t));
+
+			info.shared = 0;
+
+			(void) mdb_devinfo2driver(
+			    (uintptr_t)niumx_state.niumx_ihtable[i].ih_dip,
+			    name, sizeof (name));
+
+			(void) mdb_ddi_pathname(
+			    (uintptr_t)niumx_state.niumx_ihtable[i].ih_dip,
+			    info.pathname, sizeof (info.pathname));
+
+			/* Get instance */
+			if (mdb_vread(&dev, sizeof (struct dev_info),
+			    (uintptr_t)niumx_state.niumx_ihtable[i].ih_dip) ==
+			    -1) {
+				mdb_warn("intr: failed to read DIP "
+				    "structure\n");
+
+				return (WALK_DONE);
+			}
+
+			/* Make sure the name doesn't over run */
+			(void) mdb_snprintf(info.driver_name,
+			    sizeof (info.driver_name), "%s", name);
+
+			info.instance = dev.devi_instance;
+			info.inum = niumx_state.niumx_ihtable[i].ih_inum;
+			info.intr_type = DDI_INTR_TYPE_FIXED;
+			info.num = 0;
+			info.intr_state = niumx_state.niumx_ihtable[i].ih_state;
+			info.ino_ino = i;
+			info.mondo = niumx_state.niumx_ihtable[i].ih_sysino;
+			info.pil = niumx_state.niumx_ihtable[i].ih_pri;
+			info.cpuid = niumx_state.niumx_ihtable[i].ih_cpuid;
+
+			intr_print_elements(info);
+		}
 	}
 
 	return (WALK_DONE);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,17 +31,17 @@ extern "C" {
 #endif
 
 typedef enum {	/* same sequence as niumx_debug_sym[] */
-	/*  0 */ DBG_ATTACH,
-	/*  1 */ DBG_MAP,
-	/*  2 */ DBG_CTLOPS,
-	/*  3 */ DBG_INTROPS,
-	/*  4 */ DBG_A_INTX,
-	/*  5 */ DBG_R_INTX,
-	/*  6 */ DBG_INTR,
-	/*  7 */ DBG_DMA_ALLOCH,
-	/*  8 */ DBG_DMA_BINDH,
-	/*  9 */ DBG_DMA_UNBINDH,
-	/* 10 */ DBG_CHK_MOD
+	/*  0 */ NIUMX_DBG_ATTACH,
+	/*  1 */ NIUMX_DBG_MAP,
+	/*  2 */ NIUMX_DBG_CTLOPS,
+	/*  3 */ NIUMX_DBG_INTROPS,
+	/*  4 */ NIUMX_DBG_A_INTX,
+	/*  5 */ NIUMX_DBG_R_INTX,
+	/*  6 */ NIUMX_DBG_INTR,
+	/*  7 */ NIUMX_DBG_DMA_ALLOCH,
+	/*  8 */ NIUMX_DBG_DMA_BINDH,
+	/*  9 */ NIUMX_DBG_DMA_UNBINDH,
+	/* 10 */ NIUMX_DBG_CHK_MOD
 } niumx_debug_bit_t;
 
 #if defined(DEBUG)
@@ -51,11 +51,11 @@ extern void niumx_dbg(niumx_debug_bit_t bit, dev_info_t *dip, char *fmt, ...);
 #define	DBG 0 &&
 #endif	/* DEBUG */
 
-typedef uint64_t devhandle_t;
+typedef uint64_t niudevhandle_t;
 #define	NIUMX_DEVHDLE_MASK	0xFFFFFFF
-typedef uint32_t cpuid_t;
-typedef uint32_t devino_t;
-typedef	uint64_t sysino_t;
+typedef uint32_t niucpuid_t;
+typedef uint32_t niudevino_t;
+typedef	uint64_t niusysino_t;
 
 /*
  * The following structure represents an interrupt handler control block for
@@ -64,19 +64,28 @@ typedef	uint64_t sysino_t;
 typedef struct niumx_ih {
 	dev_info_t	*ih_dip;	/* devinfo structure */
 	uint32_t	ih_inum;	/* interrupt index, from leaf */
-	sysino_t	ih_sysino;	/* System virtual inumber, from HV */
-	cpuid_t		ih_cpuid;	/* cpu that ino is targeting */
+	niusysino_t	ih_sysino;	/* System virtual inumber, from HV */
+	niucpuid_t	ih_cpuid;	/* cpu that ino is targeting */
+	int		ih_state;	/* interrupt valid state */
+	int		ih_pri;		/* interrupt priority */
 	uint_t		(*ih_hdlr)();	/* interrupt handler */
 	caddr_t		ih_arg1;	/* interrupt handler argument #1 */
 	caddr_t		ih_arg2;	/* interrupt handler argument #2 */
 	struct niumx_ih	*ih_next;	/* next in the chain */
 } niumx_ih_t;
 
-#define	NIUMX_MAX_INTRS	64
+#define	NIUMX_MAX_INTRS			64
+
+#define	NIUMX_SOFT_STATE_OPEN		1
+#define	NIUMX_SOFT_STATE_OPEN_EXCL	2
+#define	NIUMX_SOFT_STATE_CLOSED		4
+
 
 typedef struct niumx_devstate {
 	dev_info_t *dip;
-	devhandle_t	niumx_dev_hdl;	/* device handle */
+	int niumx_soft_state;
+	int niumx_open_count;
+	niudevhandle_t	niumx_dev_hdl;	/* device handle */
 	kmutex_t niumx_mutex;
 	int niumx_fm_cap;
 	ddi_iblock_cookie_t niumx_fm_ibc;
@@ -127,12 +136,15 @@ typedef struct {
 #define	NIUMX_INTR_MINOR_VER_0	0x0ull
 #define	NIUMX_INTR_MINOR_VER	NIUMX_INTR_MINOR_VER_0
 
-#define	NAMEINST(dip)   ddi_driver_name(dip), ddi_get_instance(dip)
-#define	DIP_TO_HANDLE(dip) \
-		((niumx_devstate_t *)DIP_TO_STATE(dip))->niumx_dev_hdl
-#define	DIP_TO_INST(dip)	ddi_get_instance(dip)
-#define	INST_TO_STATE(inst)	ddi_get_soft_state(niumx_state, inst)
-#define	DIP_TO_STATE(dip)	INST_TO_STATE(DIP_TO_INST(dip))
+#define	NIUMX_NAMEINST(dip)   ddi_driver_name(dip), ddi_get_instance(dip)
+#define	NIUMX_DIP_TO_HANDLE(dip) \
+		((niumx_devstate_t *)NIUMX_DIP_TO_STATE(dip))->niumx_dev_hdl
+#define	NIUMX_DIP_TO_INST(dip)	ddi_get_instance(dip)
+#define	NIUMX_INST_TO_STATE(inst)	ddi_get_soft_state(niumx_state, inst)
+#define	NIUMX_DIP_TO_STATE(dip)	NIUMX_INST_TO_STATE(NIUMX_DIP_TO_INST(dip))
+#define	NIUMX_DEV_TO_SOFTSTATE(dev) \
+	((pci_t *)ddi_get_soft_state(niumx_state, \
+	PCI_MINOR_NUM_TO_INSTANCE(getminor(dev))))
 
 #ifdef	__cplusplus
 }

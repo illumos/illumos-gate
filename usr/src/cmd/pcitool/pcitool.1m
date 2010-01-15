@@ -17,14 +17,14 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.\" Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+.\" Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 .\" Use is subject to license terms.
 .TH pcitool 1M
 .SH "NAME"
 pcitool \- interrupt routing tool
 .SH "SYNOPSIS"
 .PP
-/usr/sbin/pcitool \fIpci@<unit-address>\fR -i \fI<ino#> | all\fR [ -r [ -c ] | -w \fI<cpu#>\fR [ -g ] ] [ -v ] [ -q ]
+/usr/sbin/pcitool \fIpci@<unit-address>\fR|\f I niu@<unit-address>\fR -i \fI<ino#> | all\fR [ -r [ -c ] | -w \fI<cpu#>\fR [ -g ] ] [ -v ] [ -q ]
 
 /usr/sbin/pcitool \fIpci@<unit-address>\fR -m \fI<msi#> | all\fR [ -r [ -c ] | -w \fI<cpu#>\fR [ -g ] ] [ -v ] [ -q ]
 

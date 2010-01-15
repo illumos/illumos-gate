@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,7 +53,8 @@
 /* #define	DEBUG	1		*/
 /* #define	STANDALONE	1	*/
 
-#define		DEVNAME_START	"/pci"
+#define		DEVNAME_START_PCI	"/pci"
+#define		DEVNAME_START_NIU	"/niu"
 
 /* Default read/write size when -s not specified. */
 #define	DEFAULT_SIZE	4
@@ -131,7 +132,8 @@ get_commandline_args(int argc, char *argv[], pcitool_uiargs_t *parsed_args)
 	}
 
 	/* 1st arg is not a device name. */
-	if (strstr(argv[1], DEVNAME_START) != argv[1]) {
+	if ((strstr(argv[1], DEVNAME_START_PCI) != argv[1]) &&
+	    (strstr(argv[1], DEVNAME_START_NIU) != argv[1])) {
 
 		/* Default is to probe all trees accounting for bus ranges. */
 		parsed_args->flags = PROBEALL_FLAG | PROBERNG_FLAG;
@@ -792,8 +794,8 @@ print_bad_option(char *argv[], int optopt, char *optarg)
 	/* getopt wasn't even called.  Bad device spec. */
 	} else {
 		(void) fprintf(stderr,
-		    "%s: device spec must start with %s...\n", argv[0],
-		    DEVNAME_START);
+		    "%s: device spec must start with %s or %s...\n", argv[0],
+		    DEVNAME_START_PCI, DEVNAME_START_NIU);
 	}
 
 	(void) fprintf(stderr,

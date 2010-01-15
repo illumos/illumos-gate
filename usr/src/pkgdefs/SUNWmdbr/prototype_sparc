@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -52,6 +52,7 @@ s none kernel/kmdb/sparcv9/pcipsy=intr
 s none kernel/kmdb/sparcv9/pcisch=intr
 f none kernel/kmdb/sparcv9/ptm 555 root sys
 s none kernel/kmdb/sparcv9/px=intr
+s none kernel/kmdb/sparcv9/niumx=intr
 f none kernel/kmdb/sparcv9/random 555 root sys
 f none kernel/kmdb/sparcv9/s1394 555 root sys
 f none kernel/kmdb/sparcv9/scsi_vhci 555 root sys

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This Makefile defines all file modules for the directory uts/sun4v
@@ -123,7 +123,7 @@ N2PIUPC_OBJS	+= n2piupc.o n2piupc_tables.o n2piupc_kstats.o \
 			n2piupc_biterr.o n2piupc_asm.o
 IOSPC_OBJS	+= iospc.o rfios_iospc.o rfios_tables.o rfios_asm.o
 TRAPSTAT_OBJS	+= trapstat.o
-NIUMX_OBJS	+= niumx.o
+NIUMX_OBJS	+= niumx.o niumx_tools.o
 N2RNG_OBJS	+= n2rng.o n2rng_debug.o n2rng_hcall.o n2rng_kcf.o \
 		   n2rng_entp_algs.o n2rng_entp_setup.o n2rng_kstat.o \
 		   n2rng_provider.o

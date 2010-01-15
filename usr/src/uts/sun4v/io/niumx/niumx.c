@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +42,7 @@
 #include <sys/hsvc.h>
 #include <sys/sdt.h>
 #include <sys/hypervisor_api.h>
+#include <sys/cpuvar.h>
 #include "niumx_var.h"
 
 static int niumx_fm_init_child(dev_info_t *, dev_info_t *, int,
@@ -71,6 +72,14 @@ static int niumx_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
 	ddi_dma_handle_t handle);
 static int niumx_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	ddi_ctl_enum_t op, void *arg, void *result);
+
+int niumxtool_init(dev_info_t *dip);
+int niumxtool_uninit(dev_info_t *dip);
+
+int niumx_get_intr_target(niumx_devstate_t *niumxds_p, niudevino_t ino,
+    niucpuid_t *cpu_id);
+int niumx_set_intr_target(niumx_devstate_t *niumxds_p, niudevino_t ino,
+    niucpuid_t cpu_id);
 
 static struct bus_ops niumx_bus_ops = {
 	BUSO_REV,
@@ -104,6 +113,8 @@ static struct bus_ops niumx_bus_ops = {
 	niumx_intr_ops			/* (*bus_intr_op)(); 		*/
 };
 
+extern  struct cb_ops niumx_cb_ops;
+
 static struct dev_ops niumx_ops = {
 	DEVO_REV,		/* devo_rev */
 	0,			/* refcnt  */
@@ -113,7 +124,7 @@ static struct dev_ops niumx_ops = {
 	niumx_attach,		/* attach */
 	niumx_detach,		/* detach */
 	nulldev,		/* reset */
-	(struct cb_ops *)0,	/* driver operations */
+	&niumx_cb_ops,		/* driver operations */
 	&niumx_bus_ops,		/* bus operations */
 	0,			/* power */
 	ddi_quiesce_not_supported,	/* devo_quiesce */
@@ -132,7 +143,7 @@ static struct modlinkage modlinkage = {
 	NULL
 };
 
-static void *niumx_state;
+void *niumx_state;
 
 /*
  * forward function declarations:
@@ -193,18 +204,16 @@ niumx_intr_dist(void *arg)
 	int		i;
 	niumx_ih_t	*ih_p = niumxds_p->niumx_ihtable;
 
-	DBG(DBG_A_INTX, NULL, "niumx_intr_dist entered\n");
+	DBG(NIUMX_DBG_A_INTX, NULL, "niumx_intr_dist entered\n");
 	mutex_enter(lock_p);
 	for (i = 0; i < NIUMX_MAX_INTRS; i++, ih_p++) {
-		sysino_t sysino = ih_p->ih_sysino;
-		cpuid_t	cpuid;
-		int	intr_state, state;
+		niusysino_t sysino = ih_p->ih_sysino;
+		niucpuid_t	cpuid;
+		int		state;
 		hrtime_t	start;
 		dev_info_t	*dip = ih_p->ih_dip;
-		if (!sysino ||	/* sequence is significant */
-		    (hvio_intr_getvalid(sysino, &intr_state) != H_EOK) ||
-		    (intr_state == HV_INTR_NOTVALID) ||
-		    (cpuid = intr_dist_cpuid()) == ih_p->ih_cpuid)
+
+		if (!sysino || (cpuid = intr_dist_cpuid()) == ih_p->ih_cpuid)
 			continue;
 
 		(void) hvio_intr_setvalid(sysino, HV_INTR_NOTVALID);
@@ -224,7 +233,12 @@ niumx_intr_dist(void *arg)
 			}
 		}
 		(void) hvio_intr_settarget(sysino, cpuid);
-		(void) hvio_intr_setvalid(sysino, HV_INTR_VALID);
+
+		if (ih_p->ih_state == HV_INTR_VALID)
+			(void) hvio_intr_setvalid(sysino, HV_INTR_VALID);
+		else
+			(void) hvio_intr_setvalid(sysino, HV_INTR_NOTVALID);
+
 		ih_p->ih_cpuid = cpuid;
 	}
 	mutex_exit(lock_p);
@@ -236,15 +250,16 @@ niumx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	int instance = ddi_get_instance(dip);
 	niumx_devstate_t *niumxds_p;	/* devstate pointer */
 	niu_regspec_t	*reg_p;
+	niumx_ih_t	*ih_p;
 	uint_t		reglen;
-	int		ret = DDI_SUCCESS;
+	int		i, ret = DDI_SUCCESS;
 
 	switch (cmd) {
 	case DDI_ATTACH:
 		if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
 		    DDI_PROP_DONTPASS, "reg", (int **)&reg_p, &reglen)
 		    != DDI_PROP_SUCCESS) {
-			DBG(DBG_ATTACH, dip, "reg lookup failed\n");
+			DBG(NIUMX_DBG_ATTACH, dip, "reg lookup failed\n");
 			ret = DDI_FAILURE;
 			goto done;
 		}
@@ -260,14 +275,21 @@ niumx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		niumxds_p = (niumx_devstate_t *)ddi_get_soft_state(niumx_state,
 		    instance);
 		niumxds_p->dip = dip;
+		niumxds_p->niumx_open_count = 0;
 		mutex_init(&niumxds_p->niumx_mutex, NULL, MUTEX_DRIVER, NULL);
 
-		DBG(DBG_ATTACH, dip, "soft state alloc'd instance = %d, "
+		DBG(NIUMX_DBG_ATTACH, dip, "soft state alloc'd instance = %d, "
 		    "niumxds_p = %p\n", instance, niumxds_p);
 
 		/* hv devhdl: low 28-bit of 1st "reg" entry's addr.hi */
-		niumxds_p->niumx_dev_hdl = (devhandle_t)(reg_p->addr_high &
+		niumxds_p->niumx_dev_hdl = (niudevhandle_t)(reg_p->addr_high &
 		    NIUMX_DEVHDLE_MASK);
+
+		ih_p = niumxds_p->niumx_ihtable;
+		for (i = 0; i < NIUMX_MAX_INTRS; i++, ih_p++) {
+			ih_p->ih_sysino = 0;
+			ih_p->ih_state = HV_INTR_NOTVALID;
+		}
 
 		/* add interrupt redistribution callback */
 		intr_dist_add(niumx_intr_dist, niumxds_p);
@@ -276,6 +298,11 @@ niumx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		ddi_fm_init(niumxds_p->dip, &niumxds_p->niumx_fm_cap,
 		    &niumxds_p->niumx_fm_ibc);
+
+		if (niumxtool_init(dip) != DDI_SUCCESS) {
+			ret = DDI_FAILURE;
+			goto cleanup;
+		}
 
 		ret = DDI_SUCCESS;
 		goto prop_free;
@@ -307,6 +334,7 @@ niumx_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 		intr_dist_rem(niumx_intr_dist, niumxds_p);
 		ddi_fm_fini(dip);
+		niumxtool_uninit(dip);
 		mutex_destroy(&niumxds_p->niumx_mutex);
 		ddi_soft_state_free(niumx_state, ddi_get_instance(dip));
 		return (DDI_SUCCESS);
@@ -328,7 +356,7 @@ int
 niumx_fm_init_child(dev_info_t *dip, dev_info_t *cdip, int cap,
     ddi_iblock_cookie_t *ibc_p)
 {
-	niumx_devstate_t	*niumxds_p = DIP_TO_STATE(dip);
+	niumx_devstate_t	*niumxds_p = NIUMX_DIP_TO_STATE(dip);
 
 	ASSERT(ibc_p != NULL);
 	*ibc_p = niumxds_p->niumx_fm_ibc;
@@ -350,15 +378,15 @@ niumx_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 
 	uint32_t	reg_begin, rng_begin;
 
-	DBG(DBG_MAP, dip, "%s%d: mapping %s%d reg %d\n", NAMEINST(dip),
-	    NAMEINST(rdip), rn);
+	DBG(NIUMX_DBG_MAP, dip, "%s%d: mapping %s%d reg %d\n",
+	    NIUMX_NAMEINST(dip), NIUMX_NAMEINST(rdip), rn);
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
 	    "reg", (caddr_t)&reg_p, &reglen) != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
 	if (rn < 0 || (rn >= reglen / sizeof (niu_regspec_t))) {
-		DBG(DBG_MAP, dip,  "rnumber out of range: %d\n", rn);
+		DBG(NIUMX_DBG_MAP, dip,  "rnumber out of range: %d\n", rn);
 		kmem_free(reg_p, reglen);
 		return (DDI_ME_RNUMBER_RANGE);
 	}
@@ -370,7 +398,7 @@ niumx_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS, "ranges",
 	    (caddr_t)&rng_p, &rnglen) != DDI_SUCCESS) {
-			DBG(DBG_MAP,  dip, "%s%d: no ranges property\n",
+			DBG(NIUMX_DBG_MAP,  dip, "%s%d: no ranges property\n",
 			    ddi_driver_name(dip), ddi_get_instance(dip));
 			kmem_free(reg_p, reglen);
 			return (DDI_FAILURE);
@@ -384,7 +412,8 @@ niumx_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	}
 
 	if (i >= rngnum) {
-		DBG(DBG_MAP, dip, "ranges record for reg[%d] not found.\n", rn);
+		DBG(NIUMX_DBG_MAP, dip, "ranges record for reg[%d] "
+		    "not found.\n", rn);
 		ret = DDI_ME_REGSPEC_RANGE;
 		goto err;
 	}
@@ -401,7 +430,7 @@ niumx_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	/* check to verify reg bounds are within rng bounds */
 	if (reg_begin < rng_begin || (reg_begin + (reg_p->size_low - 1)) >
 	    (rng_begin + (rng_p->size_lo - 1))) {
-		DBG(DBG_MAP, dip, "size out of range for reg[%d].\n", rn);
+		DBG(NIUMX_DBG_MAP, dip, "size out of range for reg[%d].\n", rn);
 		ret = DDI_ME_REGSPEC_RANGE;
 		goto err;
 	}
@@ -409,11 +438,11 @@ niumx_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	p_regspec.regspec_bustype = rng_p->parent_hi;
 	p_regspec.regspec_addr = reg_begin - rng_begin + rng_p->parent_lo;
 	p_regspec.regspec_size = reg_p->size_low;
-	DBG(DBG_MAP, dip, "regspec:bus,addr,size = (%x,%x,%x)\n",
+	DBG(NIUMX_DBG_MAP, dip, "regspec:bus,addr,size = (%x,%x,%x)\n",
 	    p_regspec.regspec_bustype, p_regspec.regspec_addr,
 	    p_regspec.regspec_size);
 	ret = ddi_map(dip, &p_mapreq, 0, 0, vaddrp);
-	DBG(DBG_MAP, dip, "niumx_map: ret %d.\n", ret);
+	DBG(NIUMX_DBG_MAP, dip, "niumx_map: ret %d.\n", ret);
 err:
 	kmem_free(rng_p - i, rnglen);
 	kmem_free(reg_p - rn, reglen);
@@ -430,7 +459,7 @@ niumx_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	niu_regspec_t *reg_p;
 	int	reglen, totreg;
 
-	DBG(DBG_CTLOPS, dip, "niumx_ctlops ctlop=%d.\n", ctlop);
+	DBG(NIUMX_DBG_CTLOPS, dip, "niumx_ctlops ctlop=%d.\n", ctlop);
 	if (rdip == (dev_info_t *)0)
 		return (DDI_FAILURE);
 
@@ -438,7 +467,7 @@ niumx_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	case DDI_CTLOPS_REPORTDEV:
 		cmn_err(CE_NOTE, "device: %s@%s, %s%d\n",
 		    ddi_node_name(rdip), ddi_get_name_addr(rdip),
-		    NAMEINST(rdip));
+		    NIUMX_NAMEINST(rdip));
 		return (DDI_SUCCESS);
 
 	case DDI_CTLOPS_INITCHILD:
@@ -453,7 +482,7 @@ niumx_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		/* fall through */
 		break;
 	default:
-		DBG(DBG_CTLOPS, dip, "just pass to ddi_cltops.\n");
+		DBG(NIUMX_DBG_CTLOPS, dip, "just pass to ddi_cltops.\n");
 		return (ddi_ctlops(dip, rdip, ctlop, arg, result));
 	}
 
@@ -467,8 +496,8 @@ niumx_ctlops(dev_info_t *dip, dev_info_t *rdip,
 
 	totreg = reglen / sizeof (niu_regspec_t);
 	if (ctlop == DDI_CTLOPS_NREGS) {
-		DBG(DBG_CTLOPS, (dev_info_t *)dip, "niumx_ctlops NREGS=%d.\n",
-		    totreg);
+		DBG(NIUMX_DBG_CTLOPS, (dev_info_t *)dip,
+		    "niumx_ctlops NREGS=%d.\n", totreg);
 		*(int *)result = totreg;
 	} else if (ctlop == DDI_CTLOPS_REGSIZE) {
 		int	rn;
@@ -478,8 +507,8 @@ niumx_ctlops(dev_info_t *dip, dev_info_t *rdip,
 			return (DDI_FAILURE);
 		}
 		*(off_t *)result = (reg_p + rn)->size_low;
-		DBG(DBG_CTLOPS, (dev_info_t *)dip, "rn = %d, REGSIZE=%x.\n",
-		    rn, *(off_t *)result);
+		DBG(NIUMX_DBG_CTLOPS, (dev_info_t *)dip,
+		    "rn = %d, REGSIZE=%x.\n", rn, *(off_t *)result);
 	}
 
 	kmem_free(reg_p, reglen);
@@ -500,7 +529,7 @@ niumx_name_child(dev_info_t *child, char *name, int namelen)
 	niu_regspec_t *r;
 	uint_t n;
 
-	DBG(DBG_CHK_MOD, (dev_info_t *)child, "==> niumx_name_child\n");
+	DBG(NIUMX_DBG_CHK_MOD, (dev_info_t *)child, "==> niumx_name_child\n");
 
 	if (ndi_dev_is_persistent_node(child) == 0) {
 		char **unit_addr;
@@ -541,7 +570,7 @@ niumx_initchild(dev_info_t *child)
 {
 	char name[MAXNAMELEN];
 
-	DBG(DBG_CHK_MOD, (dev_info_t *)child, "==> niumx_initchild\n");
+	DBG(NIUMX_DBG_CHK_MOD, (dev_info_t *)child, "==> niumx_initchild\n");
 	/*
 	 * Non-peristent nodes indicate a prototype node with per-instance
 	 * properties to be merged into the real h/w device node.
@@ -621,16 +650,17 @@ niumx_dma_allochdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attrp,
 	ddi_dma_impl_t *mp;
 	int sleep = (waitfp == DDI_DMA_SLEEP) ? KM_SLEEP : KM_NOSLEEP;
 
-	DBG(DBG_DMA_ALLOCH, dip, "rdip=%s%d\n", NAMEINST(rdip));
+	DBG(NIUMX_DBG_DMA_ALLOCH, dip, "rdip=%s%d\n", NIUMX_NAMEINST(rdip));
 
 	if (attrp->dma_attr_version != DMA_ATTR_V0) {
-		DBG(DBG_DMA_ALLOCH, (dev_info_t *)dip, "DDI_DMA_BADATTR\n");
+		DBG(NIUMX_DBG_DMA_ALLOCH,
+		    (dev_info_t *)dip, "DDI_DMA_BADATTR\n");
 		return (DDI_DMA_BADATTR);
 	}
 
 	/* Caution: we don't use zalloc to enhance performance! */
 	if ((mp = kmem_alloc(sizeof (ddi_dma_impl_t), sleep)) == 0) {
-		DBG(DBG_DMA_ALLOCH, dip, "can't alloc ddi_dma_impl_t\n");
+		DBG(NIUMX_DBG_DMA_ALLOCH, dip, "can't alloc ddi_dma_impl_t\n");
 		return (DDI_FAILURE);
 	}
 	mp->dmai_rdip = rdip;
@@ -642,7 +672,7 @@ niumx_dma_allochdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attrp,
 
 	mp->dmai_attr = *attrp; 	/* set requestors attr info */
 
-	DBG(DBG_DMA_ALLOCH, dip, "mp=%p\n", mp);
+	DBG(NIUMX_DBG_DMA_ALLOCH, dip, "mp=%p\n", mp);
 
 	*handlep = (ddi_dma_handle_t)mp;
 	return (DDI_SUCCESS);
@@ -701,8 +731,8 @@ niumx_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 	pfn_t pfn0;
 	int ret;
 
-	DBG(DBG_DMA_BINDH, dip, "rdip=%s%d mp=%p dmareq=%p\n", NAMEINST(rdip),
-	    mp, dmareq);
+	DBG(NIUMX_DBG_DMA_BINDH, dip, "rdip=%s%d mp=%p dmareq=%p\n",
+	    NIUMX_NAMEINST(rdip), mp, dmareq);
 
 	/* first check dma type */
 	mp->dmai_rflags = dmareq->dmar_flags & DMP_DDIFLAGS | DMP_NOSYNC;
@@ -721,13 +751,13 @@ niumx_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 	case DMA_OTYP_PADDR:
 	default:
 		cmn_err(CE_WARN, "%s%d requested unsupported dma type %x",
-		    NAMEINST(mp->dmai_rdip), dobj_p->dmao_type);
+		    NIUMX_NAMEINST(mp->dmai_rdip), dobj_p->dmao_type);
 		ret = DDI_DMA_NOMAPPING;
 		goto err;
 	}
 	if (pfn0 == PFN_INVALID) {
 		cmn_err(CE_WARN, "%s%d: invalid pfn0 for DMA object %p",
-		    NAMEINST(dip), (void *)dobj_p);
+		    NIUMX_NAMEINST(dip), (void *)dobj_p);
 		ret = DDI_DMA_NOMAPPING;
 		goto err;
 	}
@@ -737,7 +767,7 @@ niumx_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 	mp->dmai_mapping = mp->dmai_roffset | NIUMX_PTOB(pfn0);
 	mp->dmai_size = mp->dmai_object.dmao_size;
 
-	DBG(DBG_DMA_BINDH, dip, "check pfn: mp=%p pfn0=%x\n",
+	DBG(NIUMX_DBG_DMA_BINDH, dip, "check pfn: mp=%p pfn0=%x\n",
 	    mp, mp->dmai_pfn0);
 	if (!(mp->dmai_cookie = kmem_zalloc(sizeof (ddi_dma_cookie_t),
 	    waitfp == DDI_DMA_SLEEP ? KM_SLEEP : KM_NOSLEEP))) {
@@ -748,12 +778,12 @@ niumx_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 	mp->dmai_cookie->dmac_size = mp->dmai_size;
 	*ccountp = 1;
 	*cookiep = *mp->dmai_cookie;
-	DBG(DBG_DMA_BINDH, dip, "cookie %" PRIx64 "+%x, count=%d\n",
+	DBG(NIUMX_DBG_DMA_BINDH, dip, "cookie %" PRIx64 "+%x, count=%d\n",
 	    cookiep->dmac_address, cookiep->dmac_size, *ccountp);
 	return (DDI_DMA_MAPPED);
 
 err:
-	DBG(DBG_DMA_BINDH, (dev_info_t *)dip,
+	DBG(NIUMX_DBG_DMA_BINDH, (dev_info_t *)dip,
 	    "niumx_dma_bindhdl error ret=%d\n", ret);
 	return (ret);
 }
@@ -767,7 +797,7 @@ niumx_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
 {
 	ddi_dma_impl_t *mp = (ddi_dma_impl_t *)handle;
 
-	DBG(DBG_DMA_UNBINDH, dip, "rdip=%s%d, mp=%p\n",
+	DBG(NIUMX_DBG_DMA_UNBINDH, dip, "rdip=%s%d, mp=%p\n",
 	    ddi_driver_name(rdip), ddi_get_instance(rdip), handle);
 	if (mp->dmai_cookie) {
 		kmem_free(mp->dmai_cookie, sizeof (ddi_dma_cookie_t));
@@ -785,7 +815,7 @@ niumx_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 
 	int	ret = DDI_SUCCESS;
 
-	DBG(DBG_INTROPS, dip, "niumx_intr_ops: dip=%p rdip=%p intr_op=%x "
+	DBG(NIUMX_DBG_INTROPS, dip, "niumx_intr_ops: dip=%p rdip=%p intr_op=%x "
 	    "handle=%p\n", dip, rdip, intr_op, hdlp);
 
 	switch (intr_op) {
@@ -794,7 +824,8 @@ niumx_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		*(int *)result = DDI_INTR_TYPE_FIXED;
 		break;
 	case DDI_INTROP_GETCAP:
-		*(int *)result =  DDI_INTR_FLAG_LEVEL;
+		*(int *)result =  DDI_INTR_FLAG_LEVEL |
+		    DDI_INTR_FLAG_RETARGETABLE;
 		break;
 	case DDI_INTROP_SETCAP:
 		ret = DDI_ENOTSUP;
@@ -835,8 +866,9 @@ niumx_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		break;
 	case DDI_INTROP_NINTRS:
 	case DDI_INTROP_NAVAIL: {
-		devino_t	*inos_p;
+		niudevino_t	*inos_p;
 		int		inoslen;
+
 		if (ddi_getlongprop(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
 		    "interrupts", (caddr_t)&inos_p, &inoslen)
 		    != DDI_SUCCESS) {
@@ -847,12 +879,34 @@ niumx_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		kmem_free(inos_p, inoslen);
 		}
 		break;
+	case DDI_INTROP_GETTARGET: {
+		niumx_devstate_t *niumxds_p;
+
+		niumxds_p = (niumx_devstate_t *)ddi_get_soft_state(niumx_state,
+		    ddi_get_instance(dip));
+
+		ret = niumx_get_intr_target(niumxds_p, hdlp->ih_vector,
+		    (niucpuid_t *)result);
+
+		}
+		break;
+	case DDI_INTROP_SETTARGET: {
+		niumx_devstate_t *niumxds_p;
+
+		niumxds_p = (niumx_devstate_t *)ddi_get_soft_state(niumx_state,
+		    ddi_get_instance(dip));
+
+		ret = niumx_set_intr_target(niumxds_p, hdlp->ih_vector,
+		    *(niucpuid_t *)result);
+
+		}
+		break;
 	default:
 		ret = DDI_ENOTSUP;
 		break;
 	}
 
-	DBG(DBG_INTROPS, dip, "niumx_intr_ops: ret=%d\n", ret);
+	DBG(NIUMX_DBG_INTROPS, dip, "niumx_intr_ops: ret=%d\n", ret);
 	return (ret);
 }
 
@@ -861,8 +915,7 @@ niumx_set_intr(dev_info_t *dip, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp, int valid)
 {
 	niumx_ih_t	*ih_p;
-	devino_t	*inos_p;
-	int		inoslen, ret = DDI_SUCCESS;
+	int		ret = DDI_SUCCESS;
 	uint64_t	hvret;
 	niumx_devstate_t	*niumxds_p;	/* devstate pointer */
 	int 		instance = ddi_get_instance(dip);
@@ -872,31 +925,115 @@ niumx_set_intr(dev_info_t *dip, dev_info_t *rdip,
 
 	ASSERT(hdlp->ih_inum < NIUMX_MAX_INTRS);
 
-	/* find the appropriate slot from the fixed table */
-	if (ddi_getlongprop(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
-	    "interrupts", (caddr_t)&inos_p, &inoslen) != DDI_SUCCESS) {
-		ret = DDI_FAILURE;
-		goto fail;
-	}
+	ih_p = niumxds_p->niumx_ihtable +  hdlp->ih_vector;
 
-	ih_p = niumxds_p->niumx_ihtable + inos_p[hdlp->ih_inum];
-	DBG(DBG_A_INTX, dip, "niumx_set_intr: rdip=%s%d, valid=%d %s (%x,%x)\n",
-	    NAMEINST(rdip), valid, valid ? "enabling" : "disabling",
+	DBG(NIUMX_DBG_A_INTX, dip,
+	    "niumx_set_intr: rdip=%s%d, valid=%d %s (%x,%x)\n",
+	    NIUMX_NAMEINST(rdip), valid, valid ? "enabling" : "disabling",
 	    ih_p->ih_inum, ih_p->ih_sysino);
 
 	if (valid == HV_INTR_VALID)
 		(void) hvio_intr_setstate(ih_p->ih_sysino, HV_INTR_IDLE_STATE);
 	if ((hvret = hvio_intr_setvalid(ih_p->ih_sysino, valid))
 	    != H_EOK) {
-		DBG(DBG_A_INTX, dip, "hvio_intr_setvalid failed, ret 0x%x\n",
-		    hvret);
+		DBG(NIUMX_DBG_A_INTX, dip,
+		    "hvio_intr_setvalid failed, ret 0x%x\n", hvret);
 		ret = DDI_FAILURE;
-	}
-	kmem_free(inos_p, inoslen);
-fail:
+	} else
+		ih_p->ih_state = valid;
+
 	return (ret);
 }
 
+int
+niumx_get_intr_target(niumx_devstate_t *niumxds_p, niudevino_t ino,
+    niucpuid_t *cpu_id)
+{
+	niumx_ih_t *ih_p;
+	niusysino_t sysino;
+	int rval = DDI_SUCCESS;
+
+	ih_p = niumxds_p->niumx_ihtable + ino;
+
+	sysino = ih_p->ih_sysino;
+
+	if (sysino == 0) {
+		rval = EINVAL;
+		goto done;
+	}
+
+	if (hvio_intr_gettarget(sysino, cpu_id) != H_EOK) {
+		rval = EINVAL;
+		goto done;
+	}
+
+	if (ih_p->ih_cpuid != *cpu_id)
+		rval = EIO;
+
+done:
+	return (rval);
+}
+
+int
+niumx_set_intr_target(niumx_devstate_t *niumxds_p, niudevino_t ino,
+    niucpuid_t cpu_id)
+{
+	dev_info_t *dip = niumxds_p->dip;
+	niumx_ih_t *ih_p;
+	niucpuid_t old_cpu_id;
+	niusysino_t sysino;
+	int ret = DDI_SUCCESS;
+	int state;
+	hrtime_t start;
+	extern const int _ncpu;
+	extern cpu_t *cpu[];
+
+	mutex_enter(&cpu_lock);
+
+	ih_p = niumxds_p->niumx_ihtable + ino;
+
+	sysino = ih_p->ih_sysino;
+	if (sysino == 0) {
+		ret = EINVAL;
+		goto done;
+	}
+
+	if (hvio_intr_gettarget(sysino, &old_cpu_id) != H_EOK) {
+		ret = EINVAL;
+		goto done;
+	}
+	if ((cpu_id < _ncpu) && (cpu[cpu_id] && cpu_is_online(cpu[cpu_id]))) {
+		if (cpu_id == old_cpu_id)
+			goto done;
+
+		/* check for pending interrupts, busy wait if so */
+		for (start = gethrtime(); !panicstr &&
+		    (hvio_intr_getstate(sysino, &state) == H_EOK) &&
+		    (state == HV_INTR_DELIVERED_STATE); /* */) {
+			if (gethrtime() - start > niumx_intr_timeout) {
+				cmn_err(CE_WARN, "%s%d: niumx_intr_dist: "
+				    "pending interrupt (%x,%lx) timedout\n",
+				    ddi_driver_name(dip), ddi_get_instance(dip),
+				    ih_p->ih_inum, sysino);
+				(void) hvio_intr_setstate(sysino,
+				    HV_INTR_IDLE_STATE);
+				break;
+			}
+		}
+		(void) hvio_intr_settarget(sysino, cpu_id);
+		if (ih_p->ih_state == HV_INTR_VALID)
+			(void) hvio_intr_setvalid(sysino, HV_INTR_VALID);
+		else
+			(void) hvio_intr_setvalid(sysino, HV_INTR_NOTVALID);
+		ih_p->ih_cpuid = cpu_id;
+	} else {
+		ret = DDI_EINVAL;
+	}
+
+done:
+	mutex_exit(&cpu_lock);
+	return (ret);
+}
 
 
 /*
@@ -909,10 +1046,9 @@ niumx_add_intr(dev_info_t *dip, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp)
 {
 	niumx_ih_t	*ih_p;
-	int		inoslen, ret = DDI_SUCCESS;
+	int		ret = DDI_SUCCESS;
 	uint64_t	hvret;
-	devino_t	*inos_p, ino; /* INO numbers, from "interrupts" prop */
-	sysino_t	sysino;
+	niusysino_t	sysino;
 	niumx_devstate_t	*niumxds_p;	/* devstate pointer */
 	int		instance = ddi_get_instance(dip);
 
@@ -921,40 +1057,40 @@ niumx_add_intr(dev_info_t *dip, dev_info_t *rdip,
 
 	/* get new ino */
 	if (hdlp->ih_inum >= NIUMX_MAX_INTRS) {
-		DBG(DBG_INTR, dip, "error: inum %d out of range\n",
+		DBG(NIUMX_DBG_INTR, dip, "error: inum %d out of range\n",
 		    hdlp->ih_inum);
 		ret = DDI_FAILURE;
 		goto done;
 	}
-	if (ddi_getlongprop(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
-	    "interrupts", (caddr_t)&inos_p, &inoslen) != DDI_SUCCESS) {
-		ret = DDI_FAILURE;
-		goto done;
-	}
-	ih_p = niumxds_p->niumx_ihtable + inos_p[hdlp->ih_inum];
-	ino = inos_p[hdlp->ih_inum];
-	kmem_free(inos_p, inoslen);
-	if ((hvret = hvio_intr_devino_to_sysino(DIP_TO_HANDLE(dip), ino,
-	    &sysino)) != H_EOK) {
-		DBG(DBG_INTR, dip, "hvio_intr_devino_to_sysino failed, "
+
+	ih_p = niumxds_p->niumx_ihtable + hdlp->ih_vector;
+
+	if ((hvret = hvio_intr_devino_to_sysino(NIUMX_DIP_TO_HANDLE(dip),
+	    hdlp->ih_vector, &sysino)) != H_EOK) {
+		DBG(NIUMX_DBG_INTR, dip, "hvio_intr_devino_to_sysino failed, "
 		    "ret 0x%x\n", hvret);
 		ret = DDI_FAILURE;
 		goto done;
 	}
 	ih_p->ih_sysino = sysino;
-	ih_p->ih_dip = dip;
+	ih_p->ih_dip = rdip;
 	ih_p->ih_inum = hdlp->ih_inum;
 	ih_p->ih_hdlr = hdlp->ih_cb_func;
 	ih_p->ih_arg1 = hdlp->ih_cb_arg1;
 	ih_p->ih_arg2 = hdlp->ih_cb_arg2;
 
-	DBG(DBG_A_INTX, dip, "niumx_add_intr: rdip=%s%d inum=0x%x "
-	    "handler=%p arg1=%p arg2=%p, new ih_p = %p\n", NAMEINST(rdip),
+	DBG(NIUMX_DBG_A_INTX, dip, "niumx_add_intr: rdip=%s%d inum=0x%x "
+	    "handler=%p arg1=%p arg2=%p, new ih_p = %p\n", NIUMX_NAMEINST(rdip),
 	    hdlp->ih_inum, hdlp->ih_cb_func, hdlp->ih_cb_arg1,
 	    hdlp->ih_cb_arg2, ih_p);
 
 	if (hdlp->ih_pri == 0)
 		hdlp->ih_pri = NIUMX_DEFAULT_PIL;
+
+	ih_p->ih_pri = hdlp->ih_pri;
+
+	DBG(NIUMX_DBG_A_INTX, dip, "for ino %x adding (%x,%x)\n",
+	    hdlp->ih_vector, ih_p->ih_inum, ih_p->ih_sysino);
 
 	/* Save sysino value in hdlp */
 	hdlp->ih_vector = ih_p->ih_sysino;
@@ -963,8 +1099,6 @@ niumx_add_intr(dev_info_t *dip, dev_info_t *rdip,
 	DDI_INTR_ASSIGN_HDLR_N_ARGS(hdlp, (ddi_intr_handler_t *)niumx_intr_hdlr,
 	    (void *)ih_p, NULL);
 
-	DBG(DBG_A_INTX, dip, "for ino %x adding (%x,%x)\n", ino, ih_p->ih_inum,
-	    ih_p->ih_sysino);
 	ret = i_ddi_add_ivintr(hdlp);
 
 	/* Restore orig. interrupt handler & args in handle. */
@@ -972,7 +1106,8 @@ niumx_add_intr(dev_info_t *dip, dev_info_t *rdip,
 	    ih_p->ih_arg2);
 
 	if (ret != DDI_SUCCESS) {
-		DBG(DBG_A_INTX, dip, "i_ddi_add_ivintr error ret=%x\n", ret);
+		DBG(NIUMX_DBG_A_INTX, dip, "i_ddi_add_ivintr error ret=%x\n",
+		    ret);
 		goto done;
 	}
 
@@ -981,13 +1116,13 @@ niumx_add_intr(dev_info_t *dip, dev_info_t *rdip,
 
 	if ((hvret = hvio_intr_settarget(ih_p->ih_sysino, ih_p->ih_cpuid))
 	    != H_EOK) {
-		DBG(DBG_A_INTX, dip, "hvio_intr_settarget failed, ret 0x%x\n",
-		    hvret);
+		DBG(NIUMX_DBG_A_INTX, dip,
+		    "hvio_intr_settarget failed, ret 0x%x\n", hvret);
 		ret = DDI_FAILURE;
 	}
 done:
-	DBG(DBG_A_INTX, dip, "done, ret = %d, ih_p 0x%p, hdlp 0x%p\n", ih_p,
-	    hdlp, ret);
+	DBG(NIUMX_DBG_A_INTX, dip, "done, ret = %d, ih_p 0x%p, hdlp 0x%p\n",
+	    ih_p, hdlp, ret);
 	return (ret);
 }
 
@@ -996,15 +1131,15 @@ done:
  *
  * This function is called to unregister interrupts.
  */
+/*ARGSUSED*/
 int
 niumx_rem_intr(dev_info_t *dip, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp)
 {
 	niumx_ih_t	*ih_p;
-	devino_t	*inos_p;
-	int		inoslen, ret = DDI_SUCCESS, state;
+	int		ret = DDI_SUCCESS, state;
 	hrtime_t	start;
-	sysino_t 	sysino;
+	niusysino_t 	sysino;
 	niumx_devstate_t	*niumxds_p;	/* devstate pointer */
 	int		instance = ddi_get_instance(dip);
 
@@ -1013,15 +1148,10 @@ niumx_rem_intr(dev_info_t *dip, dev_info_t *rdip,
 
 	ASSERT(hdlp->ih_inum < NIUMX_MAX_INTRS);
 
-	/* find the appropriate slot from the fixed table */
-	if (ddi_getlongprop(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
-	    "interrupts", (caddr_t)&inos_p, &inoslen) != DDI_SUCCESS) {
-		ret = DDI_FAILURE;
-		goto fail1;
-	}
-	ih_p = niumxds_p->niumx_ihtable + inos_p[hdlp->ih_inum];
+	ih_p = niumxds_p->niumx_ihtable +  hdlp->ih_vector;
+
 	sysino = ih_p->ih_sysino;
-	DBG(DBG_R_INTX, dip, "removing (%x,%x)\n", ih_p->ih_inum, sysino);
+	DBG(NIUMX_DBG_R_INTX, dip, "removing (%x,%x)\n", ih_p->ih_inum, sysino);
 
 	(void) hvio_intr_setvalid(sysino, HV_INTR_NOTVALID);
 
@@ -1035,7 +1165,7 @@ niumx_rem_intr(dev_info_t *dip, dev_info_t *rdip,
 			    ddi_driver_name(dip), ddi_get_instance(dip),
 			    ih_p->ih_inum, sysino);
 			ret = DDI_FAILURE;
-			goto fail2;
+			goto fail;
 		}
 	}
 
@@ -1044,9 +1174,7 @@ niumx_rem_intr(dev_info_t *dip, dev_info_t *rdip,
 	hdlp->ih_vector = (uint32_t)sysino;
 	if (hdlp->ih_vector !=  NULL) i_ddi_rem_ivintr(hdlp);
 
-fail2:
-	kmem_free(inos_p, inoslen);
-fail1:
+fail:
 	return (ret);
 }
 
