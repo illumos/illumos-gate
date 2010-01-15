@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -82,7 +82,7 @@
 		type='method'
 		name='start'
 		exec='/lib/svc/method/svc-auditd'
-		timeout_seconds='15'>
+		timeout_seconds='60'>
 		<method_context>
 			<method_credential user='root' group='root' />
 		</method_context>
