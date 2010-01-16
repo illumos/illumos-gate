@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,10 +77,10 @@ px_msiq_attach(px_t *px_p)
 	msiq_state_p->msiq_1st_msg_qid = msiq_state_p->msiq_1st_msiq_id +
 	    msiq_state_p->msiq_msi_qcnt;
 
-	mutex_init(&msiq_state_p->msiq_mutex, NULL, MUTEX_DRIVER, NULL);
 	msiq_state_p->msiq_p = kmem_zalloc(msiq_state_p->msiq_cnt *
 	    sizeof (px_msiq_t), KM_SLEEP);
 
+	mutex_enter(&ib_p->ib_ino_lst_mutex);
 	for (i = 0; i < msiq_state_p->msiq_cnt; i++) {
 		msiq_state_p->msiq_p[i].msiq_id =
 		    msiq_state_p->msiq_1st_msiq_id + i;
@@ -90,10 +90,12 @@ px_msiq_attach(px_t *px_p)
 		    msiq_state_p->msiq_p[i].msiq_id));
 	}
 
+	msiq_state_p->msiq_redist_flag = B_TRUE;
+	mutex_exit(&ib_p->ib_ino_lst_mutex);
+
 	if ((ret = px_lib_msiq_init(px_p->px_dip)) != DDI_SUCCESS)
 		px_msiq_detach(px_p);
 
-	msiq_state_p->msiq_redist_flag = B_TRUE;
 	return (ret);
 }
 
@@ -112,7 +114,6 @@ px_msiq_detach(px_t *px_p)
 		    "px_lib_msiq_fini: failed\n");
 	}
 
-	mutex_destroy(&msiq_state_p->msiq_mutex);
 	kmem_free(msiq_state_p->msiq_p,
 	    msiq_state_p->msiq_cnt * sizeof (px_msiq_t));
 
@@ -154,7 +155,6 @@ px_msiq_alloc(px_t *px_p, msiq_rec_type_t rec_type, msgcode_t msg_code,
 	DBG(DBG_MSIQ, px_p->px_dip, "px_msiq_alloc\n");
 
 	ASSERT(MUTEX_HELD(&ib_p->ib_ino_lst_mutex));
-	mutex_enter(&msiq_state_p->msiq_mutex);
 
 	if (rec_type == MSG_REC) {
 		/*
@@ -180,7 +180,6 @@ px_msiq_alloc(px_t *px_p, msiq_rec_type_t rec_type, msgcode_t msg_code,
 			DBG(DBG_MSIQ, px_p->px_dip,
 			    "px_msiq_alloc: msiq_id 0x%x\n", *msiq_id_p);
 
-			mutex_exit(&msiq_state_p->msiq_mutex);
 			return (DDI_SUCCESS);
 		}
 
@@ -216,7 +215,6 @@ px_msiq_alloc(px_t *px_p, msiq_rec_type_t rec_type, msgcode_t msg_code,
 	DBG(DBG_MSIQ, px_p->px_dip,
 	    "px_msiq_alloc: msiq_id 0x%x\n", *msiq_id_p);
 
-	mutex_exit(&msiq_state_p->msiq_mutex);
 	return (DDI_SUCCESS);
 }
 
@@ -239,8 +237,6 @@ px_msiq_alloc_based_on_cpuid(px_t *px_p, msiq_rec_type_t rec_type,
 	    "cpuid 0x%x\n", cpuid);
 
 	ASSERT(MUTEX_HELD(&ib_p->ib_ino_lst_mutex));
-
-	mutex_enter(&msiq_state_p->msiq_mutex);
 
 	if (rec_type == MSG_REC) {
 		msiq_cnt = msiq_state_p->msiq_msg_qcnt;
@@ -273,8 +269,6 @@ px_msiq_alloc_based_on_cpuid(px_t *px_p, msiq_rec_type_t rec_type,
 			DBG(DBG_MSIQ, px_p->px_dip,
 			    "px_msiq_alloc_based_on_cpuid: No EQ is available "
 			    "for CPU 0x%x\n", cpuid);
-
-			mutex_exit(&msiq_state_p->msiq_mutex);
 			return (DDI_EINVAL);
 		}
 
@@ -295,7 +289,6 @@ px_msiq_alloc_based_on_cpuid(px_t *px_p, msiq_rec_type_t rec_type,
 	DBG(DBG_MSIQ, px_p->px_dip,
 	    "px_msiq_alloc_based_on_cpuid: msiq_id 0x%x\n", *msiq_id_p);
 
-	mutex_exit(&msiq_state_p->msiq_mutex);
 	return (DDI_SUCCESS);
 }
 
@@ -311,21 +304,17 @@ px_msiq_free(px_t *px_p, msiqid_t msiq_id)
 	DBG(DBG_MSIQ, px_p->px_dip, "px_msiq_free: msiq_id 0x%x", msiq_id);
 
 	ASSERT(MUTEX_HELD(&ib_p->ib_ino_lst_mutex));
-	mutex_enter(&msiq_state_p->msiq_mutex);
 
 	if ((msiq_id < msiq_state_p->msiq_1st_msiq_id) || (msiq_id >=
 	    (msiq_state_p->msiq_1st_msiq_id + msiq_state_p->msiq_cnt))) {
 		DBG(DBG_MSIQ, px_p->px_dip,
 		    "px_msiq_free: Invalid msiq_id 0x%x", msiq_id);
-
-		mutex_exit(&msiq_state_p->msiq_mutex);
 		return (DDI_FAILURE);
 	}
 
 	if (--msiq_state_p->msiq_p[msiq_id].msiq_refcnt == 0)
 		msiq_state_p->msiq_p[msiq_id].msiq_state = MSIQ_STATE_FREE;
 
-	mutex_exit(&msiq_state_p->msiq_mutex);
 	return (DDI_SUCCESS);
 }
 
@@ -342,12 +331,8 @@ px_msiq_redist(px_t *px_p)
 
 	ASSERT(MUTEX_HELD(&ib_p->ib_ino_lst_mutex));
 
-	mutex_enter(&msiq_state_p->msiq_mutex);
-
-	if (msiq_state_p->msiq_redist_flag == B_FALSE) {
-		mutex_exit(&msiq_state_p->msiq_mutex);
+	if (msiq_state_p->msiq_redist_flag == B_FALSE)
 		return;
-	}
 
 	for (i = 0; i < msiq_state_p->msiq_cnt; i++) {
 		ino_p = px_ib_locate_ino(ib_p,
@@ -365,7 +350,6 @@ px_msiq_redist(px_t *px_p)
 	}
 
 	msiq_state_p->msiq_redist_flag = B_FALSE;
-	mutex_exit(&msiq_state_p->msiq_mutex);
 }
 
 /*

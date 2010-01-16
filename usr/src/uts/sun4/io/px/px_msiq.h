@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,7 +69,6 @@ typedef struct px_msiq_state {
 
 	px_msiq_t	*msiq_p;	/* Pointer to MSIQs array */
 	void		*msiq_buf_p; /* Pointer to MSIQs array */
-	kmutex_t	msiq_mutex;	/* Mutex for MSIQ alloc/free */
 } px_msiq_state_t;
 
 /*

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -808,6 +808,7 @@ px_ib_alloc_ih(dev_info_t *rdip, uint32_t inum,
 	ih_p->ih_dip = rdip;
 	ih_p->ih_inum = inum;
 	ih_p->ih_intr_state = PX_INTR_STATE_DISABLE;
+	ih_p->ih_intr_flags = PX_INTR_IDLE;
 	ih_p->ih_handler = int_handler;
 	ih_p->ih_handler_arg1 = int_handler_arg1;
 	ih_p->ih_handler_arg2 = int_handler_arg2;
@@ -1022,35 +1023,47 @@ px_ib_set_msix_target(px_t *px_p, ddi_intr_handle_impl_t *hdlp,
 
 	if ((ret = px_lib_msi_setmsiq(dip, msi_num,
 	    msiq_id, msi_type)) != DDI_SUCCESS) {
+		mutex_exit(&cpu_lock);
+
 		(void) px_rem_msiq_intr(dip, rdip,
 		    hdlp, msiq_rec_type, msi_num, msiq_id);
 
-		mutex_exit(&cpu_lock);
 		return (ret);
 	}
 
 	if ((ret = px_ib_update_intr_state(px_p, rdip, hdlp->ih_inum,
 	    px_msiqid_to_devino(px_p, msiq_id), hdlp->ih_pri,
 	    PX_INTR_STATE_ENABLE, msiq_rec_type, msi_num)) != DDI_SUCCESS) {
+		mutex_exit(&cpu_lock);
+
 		(void) px_rem_msiq_intr(dip, rdip,
 		    hdlp, msiq_rec_type, msi_num, msiq_id);
 
-		mutex_exit(&cpu_lock);
 		return (ret);
 	}
 
 	mutex_exit(&cpu_lock);
+
+	/*
+	 * Remove the old handler, but first ensure it is finished.
+	 *
+	 * Each handler sets its PENDING flag before it clears the MSI state.
+	 * Then it clears that flag when finished.  If a re-target occurs while
+	 * the MSI state is DELIVERED, then it is not yet known which of the
+	 * two handlers will take the interrupt.  So the re-target operation
+	 * sets a RETARGET flag on both handlers in that case.  Monitoring both
+	 * flags on both handlers then determines when the old handler can be
+	 * be safely removed.
+	 */
 	mutex_enter(&ib_p->ib_ino_lst_mutex);
 
 	ino_p = px_ib_locate_ino(ib_p, px_msiqid_to_devino(px_p, old_msiq_id));
 	old_ih_p = px_ib_intr_locate_ih(px_ib_ino_locate_ipil(ino_p,
 	    hdlp->ih_pri), rdip, hdlp->ih_inum, msiq_rec_type, msi_num);
-	old_ih_p->ih_retarget_flag = B_TRUE;
 
 	ino_p = px_ib_locate_ino(ib_p, px_msiqid_to_devino(px_p, msiq_id));
 	ih_p = px_ib_intr_locate_ih(px_ib_ino_locate_ipil(ino_p, hdlp->ih_pri),
 	    rdip, hdlp->ih_inum, msiq_rec_type, msi_num);
-	ih_p->ih_retarget_flag = B_TRUE;
 
 	if ((ret = px_lib_msi_getstate(dip, msi_num,
 	    &msi_state)) != DDI_SUCCESS) {
@@ -1061,24 +1074,29 @@ px_ib_set_msix_target(px_t *px_p, ddi_intr_handle_impl_t *hdlp,
 		return (ret);
 	}
 
-	if (msi_state == PCI_MSI_STATE_IDLE)
-		ih_p->ih_retarget_flag = B_FALSE;
+	if (msi_state == PCI_MSI_STATE_DELIVERED) {
+		ih_p->ih_intr_flags |= PX_INTR_RETARGET;
+		old_ih_p->ih_intr_flags |= PX_INTR_RETARGET;
+	}
 
 	start_time = gethrtime();
-	while ((ih_p->ih_retarget_flag == B_TRUE) &&
-	    (old_ih_p->ih_retarget_flag == B_TRUE)) {
-		if ((end_time = (gethrtime() - start_time)) >
-		    px_ib_msix_retarget_timeout) {
-			cmn_err(CE_WARN, "MSIX retarget %x is not completed, "
-			    "even after waiting %llx ticks\n",
-			    msi_num, end_time);
-
-			break;
-		}
+	while (((ih_p->ih_intr_flags & PX_INTR_RETARGET) &&
+	    (old_ih_p->ih_intr_flags & PX_INTR_RETARGET)) ||
+	    (old_ih_p->ih_intr_flags & PX_INTR_PENDING)) {
 
 		/* Wait for one second */
 		delay(drv_usectohz(1000000));
+
+		end_time = gethrtime() - start_time;
+		if (end_time > px_ib_msix_retarget_timeout) {
+			cmn_err(CE_WARN, "MSIX retarget %x is not completed, "
+			    "even after waiting %llx ticks\n",
+			    msi_num, end_time);
+			break;
+		}
 	}
+
+	ih_p->ih_intr_flags &= ~(PX_INTR_RETARGET);
 
 	mutex_exit(&ib_p->ib_ino_lst_mutex);
 

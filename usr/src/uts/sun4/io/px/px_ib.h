@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,7 +68,7 @@ struct px_ih {
 	uint_t		ih_intr_state;	/* only used for fixed interrupts */
 	msiq_rec_type_t	ih_rec_type;	/* MSI or PCIe record type */
 	msgcode_t	ih_msg_code;	/* MSI number or PCIe message code */
-	boolean_t	ih_retarget_flag; /* MSI/X retarget flag */
+	uint8_t		ih_intr_flags;	/* interrupt handler status flags */
 	px_ih_t		*ih_next;	/* Next entry in list */
 	uint64_t	ih_ticks;	/* ticks spent in this handler */
 	uint64_t	ih_nsec;	/* nsec spent in this handler */
@@ -79,6 +79,11 @@ struct px_ih {
 /* Only used for fixed or legacy interrupts */
 #define	PX_INTR_STATE_DISABLE	0	/* disabled */
 #define	PX_INTR_STATE_ENABLE	1	/* enabled */
+
+/* Only used for MSI/X to track interrupt handler status */
+#define	PX_INTR_IDLE		0x0	/* handler is idle */
+#define	PX_INTR_RETARGET	0x1	/* retarget in progress */
+#define	PX_INTR_PENDING		0x2	/* handler is pending */
 
 /*
  * ino_pil structure: one per each ino and pil pair with interrupt registered

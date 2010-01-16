@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -332,10 +332,6 @@ px_msiq_intr(caddr_t arg)
 			msg_code = msiq_rec_p->msiq_rec_data.msi.msi_data;
 			DBG(DBG_MSIQ_INTR, dip, "px_msiq_intr: MSI record, "
 			    "msi 0x%x\n", msg_code);
-
-			/* Clear MSI state */
-			px_lib_msi_setstate(dip, (msinum_t)msg_code,
-			    PCI_MSI_STATE_IDLE);
 			break;
 		default:
 			msg_code = 0;
@@ -360,19 +356,19 @@ px_msiq_intr(caddr_t arg)
 
 		if ((ih_p->ih_msg_code == msg_code) &&
 		    (ih_p->ih_rec_type == rec_type)) {
-			dev_info_t *dip = ih_p->ih_dip;
+			dev_info_t *ih_dip = ih_p->ih_dip;
 			uint_t (*handler)() = ih_p->ih_handler;
 			caddr_t arg1 = ih_p->ih_handler_arg1;
 			caddr_t arg2 = ih_p->ih_handler_arg2;
 
-			DBG(DBG_MSIQ_INTR, dip, "px_msiq_intr: ino=%x data=%x "
-			    "handler=%p arg1 =%p arg2=%p\n", ino_p->ino_ino,
-			    msg_code, handler, arg1, arg2);
+			DBG(DBG_MSIQ_INTR, ih_dip, "px_msiq_intr: ino=%x "
+			    "data=%x handler=%p arg1 =%p arg2=%p\n",
+			    ino_p->ino_ino, msg_code, handler, arg1, arg2);
 
-			DTRACE_PROBE4(interrupt__start, dev_info_t, dip,
+			DTRACE_PROBE4(interrupt__start, dev_info_t, ih_dip,
 			    void *, handler, caddr_t, arg1, caddr_t, arg2);
 
-			ih_p->ih_retarget_flag = B_FALSE;
+			ih_p->ih_intr_flags = PX_INTR_PENDING;
 
 			/*
 			 * Special case for PCIE Error Messages.
@@ -386,8 +382,13 @@ px_msiq_intr(caddr_t arg)
 			    (msg_code == PCIE_MSG_CODE_ERR_FATAL))) {
 				ret = px_err_fabric_intr(px_p, msg_code,
 				    msiq_rec_p->msiq_rec_rid);
-			} else
+			} else {
+				/* Clear MSI state */
+				px_lib_msi_setstate(dip, (msinum_t)msg_code,
+				    PCI_MSI_STATE_IDLE);
+
 				ret = (*handler)(arg1, arg2);
+			}
 
 			/*
 			 * Account for time used by this interrupt. Protect
@@ -398,13 +399,16 @@ px_msiq_intr(caddr_t arg)
 			if (pil <= LOCK_LEVEL)
 				atomic_add_64(&ih_p->ih_ticks, intr_get_time());
 
-			DTRACE_PROBE4(interrupt__complete, dev_info_t, dip,
+			DTRACE_PROBE4(interrupt__complete, dev_info_t, ih_dip,
 			    void *, handler, caddr_t, arg1, int, ret);
 
+			/* clear handler status flags */
+			ih_p->ih_intr_flags = PX_INTR_IDLE;
+
 			msiq_p->msiq_new_head_index++;
-			px_lib_clr_msiq_rec(dip, curr_head_p);
+			px_lib_clr_msiq_rec(ih_dip, curr_head_p);
 		} else {
-			DBG(DBG_MSIQ_INTR, dip, "px_msiq_intr:"
+			DBG(DBG_MSIQ_INTR, dip, "px_msiq_intr: "
 			    "No matching MSIQ record found\n");
 		}
 next_rec:
