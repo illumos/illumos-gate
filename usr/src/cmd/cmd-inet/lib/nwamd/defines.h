@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +32,7 @@
 #define	PKILL		"/usr/bin/pkill"
 #define	IFCONFIG	"/sbin/ifconfig"
 #define	NET_SVC_METHOD	"/lib/svc/method/net-svc"
-#define	DEV_LOCAL_SVC_FMRI "svc:/system/device/local:default"
+#define	DEV_FS_ROOT_FMRI "svc:/system/filesystem/root:default"
 #define	PFEXEC		"/usr/bin/pfexec"
 
 #define	ULP_DIR		"/etc/nwam/ulp"

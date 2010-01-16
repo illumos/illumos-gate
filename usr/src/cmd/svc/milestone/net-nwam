@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -63,6 +63,11 @@ case "$1" in
 		/sbin/dladm up-simnet
 		# Initialize security objects.
 		/sbin/dladm init-secobj
+
+		# Bring up VNICs, VLANs and flows
+		/sbin/dladm up-vnic
+		/sbin/dladm up-vlan
+		/sbin/flowadm init-flow
 	fi
 	# start nwamd in foreground; it will daemonize itself
 	if /lib/inet/nwamd ; then

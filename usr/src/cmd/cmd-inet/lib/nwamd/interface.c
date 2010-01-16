@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -107,6 +107,7 @@
 #include <sys/sysmacros.h>
 #include <sys/wait.h>
 #include <libdllink.h>
+#include <zone.h>
 
 #include "defines.h"
 #include "structures.h"
@@ -995,26 +996,59 @@ print_interface_list(void)
 	}
 }
 
+static boolean_t
+link_belongs_to_this_zone(const char *linkname)
+{
+	zoneid_t zoneid;
+	char zonename[ZONENAME_MAX];
+	int ret;
+
+	zoneid = getzoneid();
+	if (zoneid == GLOBAL_ZONEID) {
+		datalink_id_t linkid;
+		dladm_status_t status;
+		char errstr[DLADM_STRSIZE];
+
+		if ((status = dladm_name2info(dld_handle, linkname, &linkid,
+		    NULL, NULL, NULL)) != DLADM_STATUS_OK) {
+			dprintf("link_belongs_to_this_zone: could not get "
+			    "linkid for %s: %s", linkname,
+			    dladm_status2str(status, errstr));
+			return (B_FALSE);
+		}
+		zoneid = ALL_ZONES;
+		ret = zone_check_datalink(&zoneid, linkid);
+		if (ret == 0) {
+			(void) getzonenamebyid(zoneid, zonename, ZONENAME_MAX);
+			dprintf("link_belongs_to_this_zone: %s is used by "
+			    "non-global zone: %s", linkname, zonename);
+			return (B_FALSE);
+		}
+	}
+	return (B_TRUE);
+}
+
 /*
- * Walker function passed to icfg_iterate_if() below - the icfg_if_it *
- * argument is guaranteed to be non-NULL by icfg_iterate_if(),
- * since the function it uses to generate the list - icfg_get_if_list()) -
- * guarantees this.
+ * Walker function passed to dladm_walk() below - the linkname is
+ * passed as the first argument, and is guaranteed to be non-NULL.
  */
 /* ARGSUSED */
 static int
-do_add_interface(icfg_if_t *intf, void *arg)
+do_add_interface(const char *name, void *arg)
 {
-	uint64_t flags = get_ifflags(intf->if_name, intf->if_protocol);
+	uint64_t flags;
 
-	/* We don't touch loopback interface. */
-	if (flags & IFF_LOOPBACK)
-		return (ICFG_SUCCESS);
+	/* Do not add links belonging to other zones */
+	if (!link_belongs_to_this_zone(name))
+		return (DLADM_WALK_CONTINUE);
+
+	(void) start_child(IFCONFIG, name, "plumb", NULL);
+	flags = get_ifflags(name, AF_INET);
 
 	/* If adding fails, just ignore that interface... */
-	(void) add_interface(intf->if_protocol, intf->if_name, flags);
+	(void) add_interface(AF_INET, name, flags);
 
-	return (ICFG_SUCCESS);
+	return (DLADM_WALK_CONTINUE);
 }
 
 /*
@@ -1042,10 +1076,6 @@ do_unplumb_if(icfg_if_t *intf, void *arg)
 void
 initialize_interfaces(void)
 {
-	int numifs;
-	unsigned int wait_time = 1;
-	boolean_t found_nonlo_if;
-
 	/*
 	 * Bring down all interfaces bar lo0.
 	 */
@@ -1061,54 +1091,28 @@ initialize_interfaces(void)
 	(void) start_child(PKILL, "-z", zonename, "dhcpagent", NULL);
 
 	/*
-	 * Really we should walk the device tree instead of doing
-	 * the 'ifconfig -a plumb'.  On the first reconfigure boot
-	 * (after install) 'ifconfig -a plumb' comes back quickly
-	 * without any devices configured if we start before
-	 * 'svc:/system/device/local' finishes.  We can't create a
-	 * dependency on device/local because that would create a
-	 * dependency loop through 'svc:/system/filesystem/usr'.  So
-	 * instead we wait on device/local.
+	 * Though our dependence on svc:/network/datalink-management
+	 * and use of dladm_walk() assures us of being able to find
+	 * all available links, we still need to be sure that
+	 * svc:/system/filesystem/root is up, as that ensures that
+	 * permissions are set up properly on the things we need to
+	 * open to plumb ip on links.
 	 */
-	if (!check_svc_up(DEV_LOCAL_SVC_FMRI, 60))
-		syslog(LOG_WARNING, DEV_LOCAL_SVC_FMRI " never came up");
+	if (!check_svc_up(DEV_FS_ROOT_FMRI, 60))
+		syslog(LOG_ERR, DEV_FS_ROOT_FMRI " never came up");
 
-	for (;;) {
-		icfg_if_t *if_list;
-
-		(void) start_child(IFCONFIG, "-a", "plumb", NULL);
-
-		/*
-		 * There are cases where we get here and the devices list
-		 * still isn't initialized yet.  Hang out until we see
-		 * something other than loopback.
-		 */
-		if (icfg_get_if_list(&if_list, &numifs, AF_INET, ICFG_PLUMBED)
-		    != ICFG_SUCCESS) {
-			syslog(LOG_ERR, "couldn't get the interface list: %m");
-			numifs = 0;
-			if_list = NULL;
-		} else {
-			dprintf("found %d plumbed interfaces", numifs);
-		}
-
-		found_nonlo_if = B_FALSE;
-		while (numifs > 0 && !found_nonlo_if) {
-			if (strcmp(if_list[--numifs].if_name, LOOPBACK_IF) != 0)
-				found_nonlo_if = B_TRUE;
-		}
-		icfg_free_if_list(if_list);
-
-		if (found_nonlo_if)
-			break;
-
-		(void) sleep(wait_time);
-		wait_time *= 2;
-		if (wait_time > NWAM_IF_WAIT_DELTA_MAX)
-			wait_time = NWAM_IF_WAIT_DELTA_MAX;
-	}
-
-	(void) icfg_iterate_if(AF_INET, ICFG_PLUMBED, NULL, do_add_interface);
+	/*
+	 * Since network/physical depends on network/datalink-management,
+	 * we know that service is up and can provide us with a complete
+	 * list of links by the time nwamd is started.  Use dladm_walk()
+	 * to walk that complete list of links, filtering for just the
+	 * physical links (we're explicitly avoiding management of virtual
+	 * links such as vnics/vlans/aggrs at this point).  We continue
+	 * to plumb each link (in do_add_interface() now) to preserve the
+	 * old 'ifconfig -a plumb' behavior.
+	 */
+	(void) dladm_walk(do_add_interface, dld_handle, NULL,
+	    DATALINK_CLASS_PHYS, DATALINK_ANY_MEDIATYPE, DLADM_OPT_ACTIVE);
 
 	print_interface_list();
 
