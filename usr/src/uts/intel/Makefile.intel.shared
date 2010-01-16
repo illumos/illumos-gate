@@ -457,7 +457,6 @@ DRV_KMODS	+= iscsi
 DRV_KMODS	+= pcs
 DRV_KMODS	+= pcata
 MISC_KMODS	+= cardbus
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= pcelx
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= pcser
 
 #

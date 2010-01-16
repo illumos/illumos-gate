@@ -6924,7 +6924,6 @@ mondo_loop() {
 		$root/kernel/drv/openeepr \
 		$root/kernel/drv/options \
 		$root/kernel/drv/pcata \
-		$root/kernel/drv/pcelx \
 		$root/kernel/drv/pcic \
 		$root/kernel/drv/pcmem \
 		$root/kernel/drv/pcram \
@@ -7597,6 +7596,14 @@ mondo_loop() {
 	rm -f $root/boot/solaris/drivers/notisa.010/mega.bef
 	rm -f $root/kernel/mach/compaq
 	rm -f $root/kernel/mach/corollary
+
+	#
+	# Remove driver for EOF of pcelx as per PSARC 2009/662
+	#
+	rm -f $root/kernel/drv/pcelx
+	rm -f $root/kernel/drv/amd64/pcelx
+	rm -f $usr/include/sys/pcmcia/pcgld.h
+	rm -f $usr/include/sys/pcmcia/pcelx.h
 
 	#
 	# Remove eisa nexus driver and header files for EOF of EISA
@@ -8653,8 +8660,6 @@ mondo_loop() {
 			bge:*			bge*
 			clone:dmfe		dmfe
 			dmfe:*			dmfe*
-			clone:pcelx		pcelx
-			pcelx:*			pcelx*
 			clone:dnet		dnet
 			dnet:*			dnet*
 			clone:elxl		elxl

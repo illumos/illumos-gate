@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -123,8 +123,6 @@ pcwl:*                          0600 root sys 0666 root sys     /dev/pcwl*
 pcan:*                          0600 root sys 0666 root sys     /dev/pcan*
 clone:dmfe			0600 root sys 0666 root sys	/dev/dmfe
 dmfe:*				0600 root sys 0666 root sys	/dev/dmfe*
-clone:pcelx			0600 root sys 0666 root sys	/dev/pcelx
-pcelx:*				0600 root sys 0666 root sys	/dev/pcelx*
 afe:*				0600 root sys 0666 root sys	/dev/afe*
 mxfe:*				0600 root sys 0666 root sys	/dev/mxfe*
 rtls:*				0600 root sys 0666 root sys	/dev/rtls*
@@ -182,6 +180,7 @@ clone:ipsecah
 clone:ipsecesp
 clone:keysock
 clone:le
+clone:pcelx
 su:*
 profile:profile
 clone:qe
@@ -194,6 +193,7 @@ dbri:*
 SUNW,DBRId:*
 SUNW,DBRIe:*
 SUNW,DBRIf:*
+pcelx:*
 vni:*
 EOF
 }
@@ -313,8 +313,6 @@ mxfe:*
 rtls:*
 clone:dmfe
 dmfe:*
-clone:pcelx
-pcelx:*
 clone:ibd
 ibd:*
 sysevent:*

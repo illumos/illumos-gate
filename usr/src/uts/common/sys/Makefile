@@ -848,7 +848,6 @@ FSHDRS=				\
 
 PCMCIAHDRS=		\
 	pcata.h		\
-	pcgld.h		\
 	pcser_conf.h	\
 	pcser_io.h	\
 	pcser_reg.h	\

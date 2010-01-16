@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -1105,8 +1105,6 @@ f none usr/include/sys/pci.h 644 root bin
 f none usr/include/sys/pcie.h 644 root bin
 d none usr/include/sys/pcmcia 755 root bin
 f none usr/include/sys/pcmcia/pcata.h 644 root bin
-f none usr/include/sys/pcmcia/pcelx.h 644 root bin
-f none usr/include/sys/pcmcia/pcgld.h 644 root bin
 f none usr/include/sys/pcmcia/pcser_conf.h 644 root bin
 f none usr/include/sys/pcmcia/pcser_io.h 644 root bin
 f none usr/include/sys/pcmcia/pcser_manuspec.h 644 root bin

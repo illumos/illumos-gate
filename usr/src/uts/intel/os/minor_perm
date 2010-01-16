@@ -7,8 +7,6 @@ clone:ibd 0666 root sys
 ibd:* 0666 root sys
 clone:iprb 0666 root sys
 iprb:* 0666 root sys
-clone:pcelx 0666 root sys
-pcelx:* 0666 root sys
 clone:spwr 0666 root sys
 spwr:* 0666 root sys
 icmp:icmp 0666 root sys
