@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1570,7 +1570,6 @@ so_strioc_nread(struct sonode *so, intptr_t arg, int mode, int32_t *rvalp)
 		if (so->so_rcv_wakeup)
 			goto out;
 
-		so->so_flag |= SOWANT;
 		/* Do a timed sleep, in case the reader goes to sleep. */
 		(void) cv_reltimedwait(&so->so_state_cv, &so->so_lock, wakeup,
 		    TR_CLOCK_TICK);

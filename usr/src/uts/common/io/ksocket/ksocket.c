@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -541,7 +541,8 @@ ksocket_close(ksocket_t ks, struct cred *cr)
 		mutex_exit(&so->so_acceptq_lock);
 		cv_broadcast(&so->so_rcv_cv);
 		cv_broadcast(&so->so_state_cv);
-		cv_broadcast(&so->so_want_cv);
+		cv_broadcast(&so->so_single_cv);
+		cv_broadcast(&so->so_read_cv);
 		cv_broadcast(&so->so_snd_cv);
 		cv_broadcast(&so->so_copy_cv);
 	}

@@ -309,8 +309,7 @@ so_lock_single(struct sonode *so)
 	ASSERT(MUTEX_HELD(&so->so_lock));
 
 	while (so->so_flag & (SOLOCKED | SOASYNC_UNBIND)) {
-		so->so_flag |= SOWANT;
-		cv_wait_stop(&so->so_want_cv, &so->so_lock,
+		cv_wait_stop(&so->so_single_cv, &so->so_lock,
 		    SO_LOCK_WAKEUP_TIME);
 	}
 	so->so_flag |= SOLOCKED;
@@ -340,9 +339,8 @@ so_unlock_single(struct sonode *so, int flag)
 			so_drain_discon_ind(so);
 	}
 
-	if (so->so_flag & SOWANT)
-		cv_broadcast(&so->so_want_cv);
-	so->so_flag &= ~(SOWANT|flag);
+	cv_signal(&so->so_single_cv);
+	so->so_flag &= ~flag;
 }
 
 /*
@@ -357,8 +355,7 @@ so_lock_read(struct sonode *so, int fmode)
 	while (so->so_flag & SOREADLOCKED) {
 		if (fmode & (FNDELAY|FNONBLOCK))
 			return (EWOULDBLOCK);
-		so->so_flag |= SOWANT;
-		cv_wait_stop(&so->so_want_cv, &so->so_lock,
+		cv_wait_stop(&so->so_read_cv, &so->so_lock,
 		    SO_LOCK_WAKEUP_TIME);
 	}
 	so->so_flag |= SOREADLOCKED;
@@ -376,8 +373,7 @@ so_lock_read_intr(struct sonode *so, int fmode)
 	while (so->so_flag & SOREADLOCKED) {
 		if (fmode & (FNDELAY|FNONBLOCK))
 			return (EWOULDBLOCK);
-		so->so_flag |= SOWANT;
-		if (!cv_wait_sig(&so->so_want_cv, &so->so_lock))
+		if (!cv_wait_sig(&so->so_read_cv, &so->so_lock))
 			return (EINTR);
 	}
 	so->so_flag |= SOREADLOCKED;
@@ -394,9 +390,8 @@ so_unlock_read(struct sonode *so)
 	ASSERT(MUTEX_HELD(&so->so_lock));
 	ASSERT(so->so_flag & SOREADLOCKED);
 
-	if (so->so_flag & SOWANT)
-		cv_broadcast(&so->so_want_cv);
-	so->so_flag &= ~(SOWANT|SOREADLOCKED);
+	cv_signal(&so->so_read_cv);
+	so->so_flag &= ~SOREADLOCKED;
 }
 
 /*

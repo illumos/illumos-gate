@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -482,7 +482,8 @@ sonode_constructor(void *buf, void *cdrarg, int kmflags)
 	mutex_init(&so->so_acceptq_lock, NULL, MUTEX_DEFAULT, NULL);
 	rw_init(&so->so_fallback_rwlock, NULL, RW_DEFAULT, NULL);
 	cv_init(&so->so_state_cv, NULL, CV_DEFAULT, NULL);
-	cv_init(&so->so_want_cv, NULL, CV_DEFAULT, NULL);
+	cv_init(&so->so_single_cv, NULL, CV_DEFAULT, NULL);
+	cv_init(&so->so_read_cv, NULL, CV_DEFAULT, NULL);
 
 	cv_init(&so->so_acceptq_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&so->so_snd_cv, NULL, CV_DEFAULT, NULL);
@@ -521,7 +522,8 @@ sonode_destructor(void *buf, void *cdrarg)
 	rw_destroy(&so->so_fallback_rwlock);
 
 	cv_destroy(&so->so_state_cv);
-	cv_destroy(&so->so_want_cv);
+	cv_destroy(&so->so_single_cv);
+	cv_destroy(&so->so_read_cv);
 	cv_destroy(&so->so_acceptq_cv);
 	cv_destroy(&so->so_snd_cv);
 	cv_destroy(&so->so_rcv_cv);

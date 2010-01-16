@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -140,7 +140,8 @@ struct sonode {
 	kmutex_t	so_lock;	/* protects sonode fields */
 
 	kcondvar_t	so_state_cv;	/* synchronize state changes */
-	kcondvar_t	so_want_cv;	/* wait due to SOLOCKED */
+	kcondvar_t	so_single_cv;	/* wait due to SOLOCKED */
+	kcondvar_t	so_read_cv;	/* wait due to SOREADLOCKED */
 
 	/* These fields are protected by so_lock */
 
@@ -259,9 +260,8 @@ struct sonode {
 
 #define	SOLOCKED	0x0010		/* use to serialize open/closes */
 #define	SOREADLOCKED	0x0020		/* serialize kstrgetmsg calls */
-#define	SOWANT		0x0040		/* some process waiting on lock */
-#define	SOCLONE		0x0080		/* child of clone driver */
-#define	SOASYNC_UNBIND	0x0100		/* wait for ACK of async unbind */
+#define	SOCLONE		0x0040		/* child of clone driver */
+#define	SOASYNC_UNBIND	0x0080		/* wait for ACK of async unbind */
 
 #define	SOCK_IS_NONSTR(so)	((so)->so_not_str)
 
