@@ -1571,7 +1571,7 @@ so_strioc_nread(struct sonode *so, intptr_t arg, int mode, int32_t *rvalp)
 			goto out;
 
 		/* Do a timed sleep, in case the reader goes to sleep. */
-		(void) cv_reltimedwait(&so->so_state_cv, &so->so_lock, wakeup,
+		(void) cv_reltimedwait(&so->so_read_cv, &so->so_lock, wakeup,
 		    TR_CLOCK_TICK);
 	}
 
