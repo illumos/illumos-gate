@@ -331,6 +331,7 @@ socket_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
 	default:
 		break;
 	case EINTR:
+	case ENOMEM:
 	/* EAGAIN is EWOULDBLOCK */
 	case EWOULDBLOCK:
 		/* We did a partial send */
