@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -318,6 +318,8 @@ static int avl_compare(const void *t1, const void *t2);
 static void rib_stop_services(rib_hca_t *);
 static void rib_close_channels(rib_conn_list_t *);
 static void rib_conn_close(void *);
+static void rib_recv_rele(rib_qp_t *);
+static rdma_stat rib_conn_release_locked(CONN *conn);
 
 /*
  * RPCIB addressing operations
@@ -392,7 +394,7 @@ static int rib_free_svc_recv(struct svc_recv *);
 static struct recv_wid *rib_create_wid(rib_qp_t *, ibt_wr_ds_t *, uint32_t);
 static void rib_free_wid(struct recv_wid *);
 static rdma_stat rib_disconnect_channel(CONN *, rib_conn_list_t *);
-static void rib_detach_hca(rib_hca_t *);
+static void rib_detach_hca(ibt_hca_hdl_t);
 static void rib_close_a_channel(CONN *);
 static void rib_send_hold(rib_qp_t *);
 static void rib_send_rele(rib_qp_t *);
@@ -1194,6 +1196,7 @@ rib_clnt_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 
 		rwid = (struct recv_wid *)(uintptr_t)wc.wc_id;
 		qp = rwid->qp;
+
 		if (wc.wc_status == IBT_WC_SUCCESS) {
 			XDR	inxdrs, *xdrs;
 			uint_t	xid, vers, op, find_xid = 0;
@@ -1230,6 +1233,7 @@ rib_clnt_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 				rib_rbuf_free(conn, RECV_BUFFER,
 				    (void *)(uintptr_t)rwid->addr);
 				rib_free_wid(rwid);
+				rib_recv_rele(qp);
 				continue;
 			}
 
@@ -1300,6 +1304,7 @@ rib_clnt_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 			    (void *)(uintptr_t)rwid->addr);
 		}
 		rib_free_wid(rwid);
+		rib_recv_rele(qp);
 	}
 }
 
@@ -1332,11 +1337,6 @@ rib_svc_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 		s_recvp = (struct svc_recv *)(uintptr_t)wc.wc_id;
 		qp = s_recvp->qp;
 		conn = qptoc(qp);
-		mutex_enter(&qp->posted_rbufs_lock);
-		qp->n_posted_rbufs--;
-		if (qp->n_posted_rbufs == 0)
-			cv_signal(&qp->posted_rbufs_cv);
-		mutex_exit(&qp->posted_rbufs_lock);
 
 		if (wc.wc_status == IBT_WC_SUCCESS) {
 			XDR	inxdrs, *xdrs;
@@ -1361,6 +1361,7 @@ rib_svc_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 				rib_rbuf_free(conn, RECV_BUFFER,
 				    (void *)(uintptr_t)s_recvp->vaddr);
 				XDR_DESTROY(xdrs);
+				rib_recv_rele(qp);
 				(void) rib_free_svc_recv(s_recvp);
 				continue;
 			}
@@ -1373,6 +1374,7 @@ rib_svc_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 				 */
 				rib_rbuf_free(conn, RECV_BUFFER,
 				    (void *)(uintptr_t)s_recvp->vaddr);
+				rib_recv_rele(qp);
 				(void) rib_free_svc_recv(s_recvp);
 				continue;
 			}
@@ -1389,6 +1391,7 @@ rib_svc_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 				mutex_enter(&qp->rdlist_lock);
 				rdma_done_notify(qp, xid);
 				mutex_exit(&qp->rdlist_lock);
+				rib_recv_rele(qp);
 				(void) rib_free_svc_recv(s_recvp);
 				continue;
 			}
@@ -1433,6 +1436,7 @@ rib_svc_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 			rib_rbuf_free(conn, RECV_BUFFER,
 			    (void *)(uintptr_t)s_recvp->vaddr);
 		}
+		rib_recv_rele(qp);
 		(void) rib_free_svc_recv(s_recvp);
 	}
 }
@@ -1459,30 +1463,11 @@ rib_async_handler(void *clnt_private, ibt_hca_hdl_t hca_hdl,
 		rib_attach_hca();
 		break;
 	case IBT_HCA_DETACH_EVENT:
-	{
-		rib_hca_t *hca;
-
-		rw_enter(&rib_stat->hcas_list_lock, RW_READER);
-		for (hca = rib_stat->hcas_list; hca; hca = hca->next) {
-			rw_enter(&hca->state_lock, RW_READER);
-			if ((hca->state != HCA_DETACHED) &&
-			    (hca->hca_hdl == hca_hdl)) {
-				rw_exit(&hca->state_lock);
-				break;
-			}
-			rw_exit(&hca->state_lock);
-		}
-		rw_exit(&rib_stat->hcas_list_lock);
-
-		if (hca == NULL)
-			return;
-		ASSERT(hca->hca_hdl == hca_hdl);
-		rib_detach_hca(hca);
+		rib_detach_hca(hca_hdl);
 #ifdef DEBUG
 		cmn_err(CE_NOTE, "rib_async_handler(): HCA being detached!\n");
 #endif
 		break;
-	}
 	case IBT_EVENT_PORT_UP:
 		/*
 		 * A port is up. We should call rib_listen() since there is
@@ -2068,10 +2053,10 @@ rib_disconnect_channel(CONN *conn, rib_conn_list_t *conn_list)
 		mutex_enter(&qp->send_rbufs_lock);
 		while (qp->n_send_rbufs)
 			cv_wait(&qp->send_rbufs_cv, &qp->send_rbufs_lock);
-		mutex_exit(&qp->send_rbufs_lock);
+			mutex_exit(&qp->send_rbufs_lock);
 
 		(void) ibt_free_channel(qp->qp_hdl);
-		qp->qp_hdl = NULL;
+			qp->qp_hdl = NULL;
 	}
 
 	ASSERT(qp->rdlist == NULL);
@@ -2165,6 +2150,16 @@ rib_send_rele(rib_qp_t *qp)
 	if (qp->n_send_rbufs == 0)
 		cv_signal(&qp->send_rbufs_cv);
 	mutex_exit(&qp->send_rbufs_lock);
+}
+
+void
+rib_recv_rele(rib_qp_t *qp)
+{
+	mutex_enter(&qp->posted_rbufs_lock);
+	qp->n_posted_rbufs--;
+	if (qp->n_posted_rbufs == 0)
+		cv_signal(&qp->posted_rbufs_cv);
+	mutex_exit(&qp->posted_rbufs_lock);
 }
 
 /*
@@ -2538,6 +2533,11 @@ rib_clnt_post(CONN* conn, struct clist *cl, uint32_t msgid)
 		ret = RDMA_CONNLOST;
 		goto done;
 	}
+
+	mutex_enter(&qp->posted_rbufs_lock);
+	qp->n_posted_rbufs++;
+	mutex_exit(&qp->posted_rbufs_lock);
+
 	mutex_exit(&conn->c_lock);
 	return (RDMA_SUCCESS);
 
@@ -2610,7 +2610,6 @@ rib_svc_post(CONN* conn, struct clist *cl)
 rdma_stat
 rib_post_resp(CONN* conn, struct clist *cl, uint32_t msgid)
 {
-
 	return (rib_clnt_post(conn, cl, msgid));
 }
 
@@ -4261,13 +4260,11 @@ again:
 				    cn->c_state == C_CONN_PEND)
 					;
 				if (cv_stat == 0) {
-					cn->c_ref--;
-					mutex_exit(&cn->c_lock);
+					(void) rib_conn_release_locked(cn);
 					return (RDMA_INTR);
 				}
 				if (cv_stat < 0) {
-					cn->c_ref--;
-					mutex_exit(&cn->c_lock);
+					(void) rib_conn_release_locked(cn);
 					return (RDMA_TIMEDOUT);
 				}
 				if (cn->c_state == C_CONNECTED) {
@@ -4275,8 +4272,7 @@ again:
 					mutex_exit(&cn->c_lock);
 					return (RDMA_SUCCESS);
 				} else {
-					cn->c_ref--;
-					mutex_exit(&cn->c_lock);
+					(void) rib_conn_release_locked(cn);
 					return (RDMA_TIMEDOUT);
 				}
 			}
@@ -4390,6 +4386,29 @@ rib_connect(struct netbuf *s_svcaddr, struct netbuf *d_svcaddr,
 	(void) rib_add_connlist(cn, &hca->cl_conn_list);
 	status = rib_conn_to_srv(hca, qp, rpt);
 	mutex_enter(&cn->c_lock);
+
+	if (cn->c_flags & C_CLOSE_PENDING) {
+		/*
+		 * This handles a case where the module or
+		 * HCA detached in the time a connection is
+		 * established. In such a case close the
+		 * connection immediately if this is the
+		 * only reference.
+		 */
+		if (cn->c_ref == 1) {
+			cn->c_ref--;
+			cn->c_state = C_DISCONN_PEND;
+			mutex_exit(&cn->c_lock);
+			rib_conn_close((void *)cn);
+			return (RDMA_FAILED);
+		}
+
+		/*
+		 * Connection to be closed later when c_ref = 0
+		 */
+		status = RDMA_FAILED;
+	}
+
 	if (status == RDMA_SUCCESS) {
 		cn->c_state = C_CONNECTED;
 		*conn = cn;
@@ -4397,7 +4416,7 @@ rib_connect(struct netbuf *s_svcaddr, struct netbuf *d_svcaddr,
 		cn->c_state = C_ERROR_CONN;
 		cn->c_ref--;
 	}
-	cv_broadcast(&cn->c_cv);
+	cv_signal(&cn->c_cv);
 	mutex_exit(&cn->c_lock);
 	return (status);
 }
@@ -4412,6 +4431,7 @@ rib_conn_close(void *rarg)
 	if (!(conn->c_flags & C_CLOSE_NOTNEEDED)) {
 
 		conn->c_flags |= (C_CLOSE_NOTNEEDED | C_CLOSE_PENDING);
+
 		/*
 		 * Live connection in CONNECTED state.
 		 */
@@ -4424,7 +4444,6 @@ rib_conn_close(void *rarg)
 
 		mutex_enter(&conn->c_lock);
 		conn->c_flags &= ~C_CLOSE_PENDING;
-		cv_signal(&conn->c_cv);
 	}
 
 	mutex_exit(&conn->c_lock);
@@ -4490,8 +4509,17 @@ rib_conn_timeout_call(void *carg)
 static rdma_stat
 rib_conn_release(CONN *conn)
 {
-
 	mutex_enter(&conn->c_lock);
+	return (rib_conn_release_locked(conn));
+}
+
+/*
+ * Expects conn->c_lock to be held on entry.
+ * c_lock released on return
+ */
+static rdma_stat
+rib_conn_release_locked(CONN *conn)
+{
 	conn->c_ref--;
 
 	conn->c_last_used = gethrestime_sec();
@@ -4641,6 +4669,11 @@ rib_close_channels(rib_conn_list_t *connlist)
 		tmp = conn->c_next;
 		if (!(conn->c_flags & C_CLOSE_NOTNEEDED)) {
 
+			if (conn->c_state == C_CONN_PEND) {
+				conn->c_flags |= C_CLOSE_PENDING;
+				goto next;
+			}
+
 			conn->c_flags |= (C_CLOSE_NOTNEEDED | C_CLOSE_PENDING);
 
 			/*
@@ -4657,6 +4690,7 @@ rib_close_channels(rib_conn_list_t *connlist)
 			/* Signal a pending rib_disconnect_channel() */
 			cv_signal(&conn->c_cv);
 		}
+next:
 		mutex_exit(&conn->c_lock);
 		conn = tmp;
 	}
@@ -4787,9 +4821,34 @@ rib_stop_hca_services(rib_hca_t *hca)
  * Cleans and closes up all uses of the HCA
  */
 static void
-rib_detach_hca(rib_hca_t *hca)
+rib_detach_hca(ibt_hca_hdl_t hca_hdl)
 {
+	rib_hca_t *hca = NULL;
 	rib_hca_t **hcap;
+
+	rw_enter(&rib_stat->hcas_list_lock, RW_WRITER);
+	for (hcap = &rib_stat->hcas_list; *hcap; hcap = &(*hcap)->next) {
+		hca = *hcap;
+		rw_enter(&hca->state_lock, RW_WRITER);
+		if (hca->hca_hdl == hca_hdl) {
+			/*
+			 * Mark as detached and remove from
+			 * hca list.
+			 */
+			hca->state = HCA_DETACHED;
+			*hcap = hca->next;
+			rib_stat->nhca_inited--;
+			rib_mod.rdma_count--;
+			rw_exit(&hca->state_lock);
+			break;
+		}
+		rw_exit(&hca->state_lock);
+	}
+	rw_exit(&rib_stat->hcas_list_lock);
+
+	if (hca == NULL)
+		return;
+	ASSERT(hca->hca_hdl == hca_hdl);
 
 	/*
 	 * Stop all services on the HCA
@@ -4802,24 +4861,6 @@ rib_detach_hca(rib_hca_t *hca)
 	 * Free the protection domain
 	 * ibt_close_hca()
 	 */
-	rw_enter(&hca->state_lock, RW_WRITER);
-	if (hca->state == HCA_DETACHED) {
-		rw_exit(&hca->state_lock);
-		return;
-	}
-
-	hca->state = HCA_DETACHED;
-	rw_enter(&rib_stat->hcas_list_lock, RW_WRITER);
-	for (hcap = &rib_stat->hcas_list; *hcap && (*hcap != hca);
-	    hcap = &(*hcap)->next)
-		;
-	ASSERT(*hcap == hca);
-	*hcap = hca->next;
-	rib_stat->nhca_inited--;
-	rib_mod.rdma_count--;
-	rw_exit(&rib_stat->hcas_list_lock);
-	rw_exit(&hca->state_lock);
-
 	rib_stop_hca_services(hca);
 
 	kmem_free(hca, sizeof (*hca));
