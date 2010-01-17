@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1417,6 +1417,11 @@ fct_deque_rp(fct_i_local_port_t *iport, fct_i_remote_port_t *irp)
 	irp_last = NULL;
 	while (irp_next != NULL) {
 		if (irp == irp_next) {
+			if (irp->irp_flags & IRP_PLOGI_DONE) {
+				atomic_add_32(&iport->iport_nrps_login, -1);
+			}
+			atomic_and_32(&irp->irp_flags,
+			    ~(IRP_PLOGI_DONE | IRP_PRLI_DONE));
 			break;
 		}
 		irp_last = irp_next;
