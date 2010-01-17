@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -462,7 +462,7 @@ mac_pkt_drop(void *arg, mac_resource_handle_t resource, mblk_t *mp,
  */
 boolean_t
 mac_ip_hdr_length_v6(mblk_t *mp, ip6_t *ip6h, uint16_t *hdr_length,
-    uint8_t *next_hdr)
+    uint8_t *next_hdr, boolean_t *ip_fragmented, uint32_t *ip_frag_ident)
 {
 	uint16_t length;
 	uint_t	ehdrlen;
@@ -479,6 +479,9 @@ mac_ip_hdr_length_v6(mblk_t *mp, ip6_t *ip6h, uint16_t *hdr_length,
 	ASSERT(IPH_HDR_VERSION(ip6h) == IPV6_VERSION);
 	length = IPV6_HDR_LEN;
 	whereptr = ((uint8_t *)&ip6h[1]); /* point to next hdr */
+
+	if (ip_fragmented != NULL)
+		*ip_fragmented = B_FALSE;
 
 	nexthdrp = &ip6h->ip6_nxt;
 	while (whereptr < endptr) {
@@ -509,6 +512,10 @@ mac_ip_hdr_length_v6(mblk_t *mp, ip6_t *ip6h, uint16_t *hdr_length,
 			if ((uchar_t *)&fraghdr[1] > endptr)
 				return (B_FALSE);
 			nexthdrp = &fraghdr->ip6f_nxt;
+			if (ip_fragmented != NULL)
+				*ip_fragmented = B_TRUE;
+			if (ip_frag_ident != NULL)
+				*ip_frag_ident = fraghdr->ip6f_ident;
 			break;
 		case IPPROTO_NONE:
 			/* No next header means we're finished */
@@ -833,6 +840,7 @@ mac_get_devinfo(mac_handle_t mh)
 	return ((void *)mip->mi_dip);
 }
 
+#define	PKT_HASH_2BYTES(x) ((x)[0] ^ (x)[1])
 #define	PKT_HASH_4BYTES(x) ((x)[0] ^ (x)[1] ^ (x)[2] ^ (x)[3])
 #define	PKT_HASH_MAC(x) ((x)[0] ^ (x)[1] ^ (x)[2] ^ (x)[3] ^ (x)[4] ^ (x)[5])
 
@@ -844,6 +852,7 @@ mac_pkt_hash(uint_t media, mblk_t *mp, uint8_t policy, boolean_t is_outbound)
 	uint16_t sap;
 	uint_t skip_len;
 	uint8_t proto;
+	boolean_t ip_fragmented;
 
 	/*
 	 * We may want to have one of these per MAC type plugin in the
@@ -925,7 +934,16 @@ mac_pkt_hash(uint_t media, mblk_t *mp, uint8_t policy, boolean_t is_outbound)
 		proto = iphp->ipha_protocol;
 		skip_len += IPH_HDR_LENGTH(iphp);
 
-		if ((policy & MAC_PKT_HASH_L3) != 0) {
+		/* Check if the packet is fragmented. */
+		ip_fragmented = ntohs(iphp->ipha_fragment_offset_and_flags) &
+		    IPH_OFFSET;
+
+		/*
+		 * For fragmented packets, use addresses in addition to
+		 * the frag_id to generate the hash inorder to get
+		 * better distribution.
+		 */
+		if (ip_fragmented || (policy & MAC_PKT_HASH_L3) != 0) {
 			uint8_t *ip_src = (uint8_t *)&(iphp->ipha_src);
 			uint8_t *ip_dst = (uint8_t *)&(iphp->ipha_dst);
 
@@ -933,11 +951,18 @@ mac_pkt_hash(uint_t media, mblk_t *mp, uint8_t policy, boolean_t is_outbound)
 			    PKT_HASH_4BYTES(ip_dst));
 			policy &= ~MAC_PKT_HASH_L3;
 		}
+
+		if (ip_fragmented) {
+			uint8_t *identp = (uint8_t *)&iphp->ipha_ident;
+			hash ^= PKT_HASH_2BYTES(identp);
+			goto done;
+		}
 		break;
 	}
 	case ETHERTYPE_IPV6: {
 		ip6_t *ip6hp;
 		uint16_t hdr_length;
+		uint32_t ip_frag_ident;
 
 		/*
 		 * If the header is not aligned or the header doesn't fit
@@ -950,17 +975,29 @@ mac_pkt_hash(uint_t media, mblk_t *mp, uint8_t policy, boolean_t is_outbound)
 		    !OK_32PTR((char *)ip6hp))
 			goto done;
 
-		if (!mac_ip_hdr_length_v6(mp, ip6hp, &hdr_length, &proto))
+		if (!mac_ip_hdr_length_v6(mp, ip6hp, &hdr_length, &proto,
+		    &ip_fragmented, &ip_frag_ident))
 			goto done;
 		skip_len += hdr_length;
 
-		if ((policy & MAC_PKT_HASH_L3) != 0) {
+		/*
+		 * For fragmented packets, use addresses in addition to
+		 * the frag_id to generate the hash inorder to get
+		 * better distribution.
+		 */
+		if (ip_fragmented || (policy & MAC_PKT_HASH_L3) != 0) {
 			uint8_t *ip_src = &(ip6hp->ip6_src.s6_addr8[12]);
 			uint8_t *ip_dst = &(ip6hp->ip6_dst.s6_addr8[12]);
 
 			hash ^= (PKT_HASH_4BYTES(ip_src) ^
 			    PKT_HASH_4BYTES(ip_dst));
 			policy &= ~MAC_PKT_HASH_L3;
+		}
+
+		if (ip_fragmented) {
+			uint8_t *identp = (uint8_t *)&ip_frag_ident;
+			hash ^= PKT_HASH_4BYTES(identp);
+			goto done;
 		}
 		break;
 	}

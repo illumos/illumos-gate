@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -796,7 +796,7 @@ mac_rx_srs_long_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *mp,
 		 * pullupmsg().
 		 */
 		if (mac_src_ipv6_fanout || !mac_ip_hdr_length_v6(mp, ip6h,
-		    &hdr_len, &nexthdr)) {
+		    &hdr_len, &nexthdr, NULL, NULL)) {
 			goto src_based_fanout;
 		}
 		whereptr = (uint8_t *)ip6h + hdr_len;

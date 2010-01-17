@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1890,7 +1890,7 @@ flow_ip_accept(flow_tab_t *ft, flow_state_t *s)
 		uint8_t	 nexthdr;
 
 		if (!mac_ip_hdr_length_v6(s->fs_mp, ip6h, &ip6_hdrlen,
-		    &nexthdr)) {
+		    &nexthdr, NULL, NULL)) {
 			return (ENOBUFS);
 		}
 		l3info->l3_hdrsize = ip6_hdrlen;

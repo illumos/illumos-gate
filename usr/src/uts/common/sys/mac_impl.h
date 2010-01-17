@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -610,7 +610,7 @@ extern uint64_t	mac_stat_default(mac_impl_t *, uint_t);
 extern void	mac_ndd_ioctl(mac_impl_t *, queue_t *, mblk_t *);
 extern void	mac_create_soft_ring_kstats(mac_impl_t *, int32_t);
 extern boolean_t mac_ip_hdr_length_v6(mblk_t *, ip6_t *, uint16_t *,
-    uint8_t *);
+    uint8_t *, boolean_t *, uint32_t *);
 
 extern mblk_t *mac_copymsgchain_cksum(mblk_t *);
 extern mblk_t *mac_fix_cksum(mblk_t *);
