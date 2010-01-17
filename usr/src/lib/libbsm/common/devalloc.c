@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <ctype.h>
@@ -40,6 +38,7 @@
 #include <libintl.h>
 #include <errno.h>
 #include <auth_list.h>
+#include <syslog.h>
 #include <bsm/devices.h>
 #include <bsm/devalloc.h>
 
@@ -53,6 +52,10 @@ extern int da_matchname(devalloc_t *, char *);
 extern int da_match(devalloc_t *, da_args *);
 extern int dmap_matchname(devmap_t *, char *);
 extern int dm_match(devmap_t *, da_args *);
+extern int dmap_matchtype(devmap_t *dmap, char *type);
+extern int dmap_matchdev(devmap_t *dmap, char *dev);
+extern int dmap_exact_dev(devmap_t *dmap, char *dev, int *num);
+extern char *dmap_physname(devmap_t *dmap);
 
 /*
  * The following structure is for recording old entries to be retained.
@@ -332,7 +335,7 @@ _update_zonename(da_args *dargs, devalloc_t *dap)
  */
 /*ARGSUSED*/
 static int
-_dmap2str(da_args *dargs, devmap_t *dmp, char *buf, int size, const char *sep)
+_dmap2str(devmap_t *dmp, char *buf, int size, const char *sep)
 {
 	int	length;
 
@@ -356,13 +359,13 @@ _dmap2str(da_args *dargs, devmap_t *dmp, char *buf, int size, const char *sep)
  *	returns pointer to decoded entry, NULL on error.
  */
 static strentry_t *
-_dmap2strentry(da_args *dargs, devmap_t *devmapp)
+_dmap2strentry(devmap_t *devmapp)
 {
 	strentry_t	*sep;
 
 	if ((sep = (strentry_t *)malloc(sizeof (strentry_t))) == NULL)
 		return (NULL);
-	if (_dmap2str(dargs, devmapp, sep->se_str, sizeof (sep->se_str),
+	if (_dmap2str(devmapp, sep->se_str, sizeof (sep->se_str),
 	    KV_TOKEN_DELIMIT"\\\n\t") != 0) {
 		free(sep);
 		return (NULL);
@@ -562,8 +565,216 @@ _build_defattrs(da_args *dargs, strentry_t **head_defent)
 }
 
 /*
+ * _rebuild_lists -
+ *
+ *      If dargs->optflag & DA_EVENT, does not assume the dargs list is
+ *      complete or completely believable, since devfsadm caches
+ *      ONLY what it has been exposed to via syseventd.
+ *
+ *	Cycles through all the entries in the /etc files, stores them
+ *      in memory, takes note of device->dname numbers (i.e. rmdisk0,
+ *      rmdisk12)
+ *
+ *      Cycles through again, adds dargs entry
+ *	with the name tname%d (lowest unused number for the device type)
+ *	to the list of things for the caller to write out to a file,
+ *      IFF it is a new entry.
+ *
+ *      It is an error for it to already be there.
+ *
+ *	Add:
+ *         Returns 0 if successful and 2 on error.
+ *      Remove:
+ *         Returns 0 if not found, 1 if found,  2 on error.
+ */
+static int
+_rebuild_lists(da_args *dargs, strentry_t **head_devallocp,
+    strentry_t **head_devmapp)
+{
+	int		rc = 0;
+	devalloc_t	*devallocp;
+	devmap_t	*devmapp;
+	strentry_t	*tail_str;
+	strentry_t	*tmp_str;
+	uint64_t	tmp_bitmap = 0;
+	int		tmp = 0;
+	char		new_devname[DA_MAXNAME + 1];
+	char		errmsg[DA_MAXNAME + 1 + (PATH_MAX * 2) + 80];
+	char		*realname;
+	int		suffix = DA_MAX_DEVNO + 1;
+	int		found = 0;
+
+	if (dargs->optflag & (DA_MAPS_ONLY | DA_ALLOC_ONLY))
+		return (2);
+
+	if (dargs->optflag & DA_FORCE)
+		return (2);
+
+	/* read both files, maps first so we can compare actual devices */
+
+	/* build device_maps */
+	setdmapent();
+	while ((devmapp = getdmapent()) != NULL) {
+		if ((rc = dmap_matchtype(devmapp, dargs->devinfo->devtype))
+		    == 1) {
+			if (dargs->optflag & DA_REMOVE) {
+				if ((devmapp->dmap_devarray == NULL) ||
+				    (devmapp->dmap_devarray[0] == NULL)) {
+					freedmapent(devmapp);
+					enddmapent();
+					return (2);
+				}
+				realname = dmap_physname(devmapp);
+				if (realname == NULL) {
+					freedmapent(devmapp);
+					enddmapent();
+					return (2);
+				}
+				if (strstr(realname, dargs->devinfo->devlist)
+				    != NULL) {
+					if (dargs->devinfo->devname != NULL)
+						free(dargs->devinfo->devname);
+					dargs->devinfo->devname =
+					    strdup(devmapp->dmap_devname);
+					found = 1;
+					freedmapent(devmapp);
+					continue; /* don't retain */
+				}
+			} else if (dargs->optflag & DA_ADD) {
+				/*
+				 * Need to know which suffixes are in use
+				 */
+				rc = (dmap_exact_dev(devmapp,
+				    dargs->devinfo->devlist, &suffix));
+
+				if (rc == 0) {
+					/*
+					 * Same type, different device.  Record
+					 * device suffix already in use.
+					 */
+					if (suffix > DA_MAX_DEVNO) {
+						freedmapent(devmapp);
+						enddmapent();
+						return (2);
+					}
+					tmp_bitmap |= (uint64_t)(1LL << suffix);
+				} else {
+					/*
+					 * Match on add is an error
+					 * or mapping attempt returned error
+					 */
+					freedmapent(devmapp);
+					enddmapent();
+					return (2);
+				}
+			} else
+				/* add other transaction types as needed */
+				return (2);
+
+		}  /* if same type */
+
+		tmp_str = _dmap2strentry(devmapp);
+		if (tmp_str == NULL) {
+			freedmapent(devmapp);
+			enddmapent();
+			return (2);
+		}
+		/* retaining devmap entry: tmp_str->se_str */
+		tmp_str->se_next = NULL;
+		if (*head_devmapp == NULL) {
+			*head_devmapp = tail_str = tmp_str;
+		} else {
+			tail_str->se_next = tmp_str;
+			tail_str = tmp_str;
+		}
+		freedmapent(devmapp);
+	}
+	enddmapent();
+
+	/*
+	 * No need to rewrite the files if the item to be removed is not
+	 * in the files -- wait for another call on another darg.
+	 */
+	if ((dargs->optflag & DA_REMOVE) && !found)
+		return (0);
+
+
+	if (dargs->optflag & DA_ADD) {
+		/*
+		 * Since we got here from an event, we know the stored
+		 * devname is a useless guess, since the files had not
+		 * been read when the name was chosen, and we don't keep
+		 * them anywhere else that is sufficiently definitive.
+		 */
+
+		for (tmp = 0; tmp <= DA_MAX_DEVNO; tmp++)
+			if (!(tmp_bitmap & (1LL << tmp)))
+				break;
+		/* Future: support more than 64 hotplug devices per type? */
+		if (tmp > DA_MAX_DEVNO)
+			return (2);
+
+		(void) snprintf(new_devname, DA_MAXNAME + 1, "%s%u",
+		    dargs->devinfo->devtype, tmp);
+		if (dargs->devinfo->devname != NULL)
+			free(dargs->devinfo->devname);
+		dargs->devinfo->devname = strdup(new_devname);
+	}
+
+	/*
+	 * Now adjust devalloc list to match devmaps
+	 * Note we now have the correct devname for da_match to use.
+	 */
+	setdaent();
+	while ((devallocp = getdaent()) != NULL) {
+		rc = da_match(devallocp, dargs);
+		if (rc == 1) {
+			if (dargs->optflag & DA_ADD) {
+				/* logging is on if DA_EVENT is set */
+				if (dargs->optflag & DA_EVENT) {
+					(void) snprintf(errmsg, sizeof (errmsg),
+					    "%s and %s out of sync,"
+					    "%s only in %s.",
+					    DEVALLOC, DEVMAP,
+					    devallocp->da_devname, DEVALLOC);
+					syslog(LOG_ERR, "%s", errmsg);
+				}
+				freedaent(devallocp);
+				enddaent();
+				return (2);
+			} else if (dargs->optflag & DA_REMOVE) {
+				/* make list w/o this entry */
+				freedaent(devallocp);
+				continue;
+			}
+		}
+		tmp_str = _da2strentry(dargs, devallocp);
+		if (tmp_str == NULL) {
+			freedaent(devallocp);
+			enddaent();
+			return (2);
+		}
+		/* retaining devalloc entry: tmp_str->se_str */
+		tmp_str->se_next = NULL;
+		if (*head_devallocp == NULL) {
+			*head_devallocp = tail_str = tmp_str;
+		} else {
+			tail_str->se_next = tmp_str;
+			tail_str = tmp_str;
+		}
+		freedaent(devallocp);
+	}
+	enddaent();
+
+	/* the caller needs to know if a remove needs to rewrite files */
+	if (dargs->optflag & DA_REMOVE)
+		return (1);  /* 0 and 2 cases returned earlier */
+
+	return (0);  /* Successful DA_ADD */
+}
+/*
  * _build_lists -
- *	cycles through all the entries, stores them in memory. removes entries
+ *	Cycles through all the entries, stores them in memory. removes entries
  *	with the given search_key (device name or type).
  *	returns 0 if given entry not found, 1 if given entry removed, 2 on
  *	error.
@@ -633,7 +844,7 @@ dmap_only:
 			rc = 0;
 		}
 		if (rc == 0) {
-			tmp_str = _dmap2strentry(dargs, devmapp);
+			tmp_str = _dmap2strentry(devmapp);
 			if (tmp_str == NULL) {
 				freedmapent(devmapp);
 				enddmapent();
@@ -675,12 +886,13 @@ _write_defattrs(FILE *fp, strentry_t *head_defent)
 /*
  * _write_device_allocate -
  *	writes current entries in the list to device_allocate.
+ *	frees the strings
  */
 static void
 _write_device_allocate(char *odevalloc, FILE *dafp, strentry_t *head_devallocp)
 {
 	int		is_on = -1;
-	strentry_t	*tmp_str;
+	strentry_t	*tmp_str, *old_str;
 	struct stat	dastat;
 
 	(void) fseek(dafp, (off_t)0, SEEK_SET);
@@ -702,18 +914,21 @@ _write_device_allocate(char *odevalloc, FILE *dafp, strentry_t *head_devallocp)
 	while (tmp_str) {
 		(void) fputs(tmp_str->se_str, dafp);
 		(void) fputs("\n", dafp);
+		old_str = tmp_str;
 		tmp_str = tmp_str->se_next;
+		free(old_str);
 	}
 }
 
 /*
  * _write_device_maps -
  *	writes current entries in the list to device_maps.
+ *	and frees the strings
  */
 static void
 _write_device_maps(FILE *dmfp, strentry_t *head_devmapp)
 {
-	strentry_t	*tmp_str;
+	strentry_t	*tmp_str, *old_str;
 
 	(void) fseek(dmfp, (off_t)0, SEEK_SET);
 
@@ -721,7 +936,9 @@ _write_device_maps(FILE *dmfp, strentry_t *head_devmapp)
 	while (tmp_str) {
 		(void) fputs(tmp_str->se_str, dmfp);
 		(void) fputs("\n", dmfp);
+		old_str = tmp_str;
 		tmp_str = tmp_str->se_next;
+		free(old_str);
 	}
 }
 
@@ -744,7 +961,7 @@ _write_new_defattrs(FILE *fp, da_args *dargs)
 		return (0);
 	(void) fprintf(fp, "%s%s", (devinfo->devtype ? devinfo->devtype : ""),
 	    KV_TOKEN_DELIMIT);
-	if ((tokp = (char *)malloc(strlen(devinfo->devopts))) != NULL) {
+	if ((tokp = (char *)malloc(strlen(devinfo->devopts) +1)) != NULL) {
 		(void) strcpy(tokp, devinfo->devopts);
 		if ((tok = strtok_r(tokp, KV_DELIMITER, &lasts)) != NULL) {
 			(void) fprintf(fp, "%s", tok);
@@ -791,7 +1008,8 @@ _write_new_entry(FILE *fp, da_args *dargs, int flag)
 		(void) fprintf(fp, "%s%s\\\n\t", DA_RESERVED,
 		    KV_DELIMITER);
 	} else {
-		if ((tokp = (char *)malloc(strlen(devinfo->devopts))) != NULL) {
+		if ((tokp = (char *)malloc(strlen(devinfo->devopts) + 1))
+		    != NULL) {
 			(void) strcpy(tokp, devinfo->devopts);
 			if ((tok = strtok_r(tokp, KV_TOKEN_DELIMIT, &lasts)) !=
 			    NULL) {
@@ -1058,7 +1276,7 @@ _record_on_off(da_args *dargs, FILE *tafp, FILE *dafp)
 		str_found = 0;
 		nsize = dastat.st_size + actionlen + 1;
 	}
-	if ((nbuf = (char *)malloc(nsize)) == NULL)
+	if ((nbuf = (char *)malloc(nsize + 1)) == NULL)
 		return (-1);
 	nbuf[0] = '\0';
 	/* put the on/off string */
@@ -1168,8 +1386,9 @@ da_update_defattrs(da_args *dargs)
 
 /*
  * da_update_device -
- *	writes devices entries to device_allocate and device_maps.
- * 	returns 0 on success, -1 on error.
+ *	Writes existing entries and the SINGLE change requested by da_args,
+ *      to device_allocate and device_maps.
+ * 	Returns 0 on success, -1 on error.
  */
 int
 da_update_device(da_args *dargs)
@@ -1288,25 +1507,58 @@ da_update_device(da_args *dargs)
 	}
 
 	/*
-	 * examine all the entries, remove an old one if forced to,
-	 * and check that they are suitable for updating.
-	 *  we need to do this only if the file exists already.
+	 * If reacting to a hotplug, read the file entries,
+	 * figure out what dname (tname + a new number) goes to the
+	 * device being added/removed, and create a good head_devallocp and
+	 * head_devmapp with everything good still in it (_rebuild_lists)
+	 *
+	 * Else examine all the entries, remove an old one if it is
+	 * a duplicate with a device being added, returning the
+	 * remaining list (_build_lists.)
+	 *
+	 * We need to do this only if the file exists already.
+	 *
+	 * Once we have built these lists, we need to free the strings
+	 * in the head_* arrays before returning.
 	 */
 	if (stat(dapathp, &dastat) == 0) {
-		if ((rc = _build_lists(dargs, &head_devallocp,
-		    &head_devmapp)) != 0) {
-			if (rc != 1) {
-				(void) close(tafd);
-				(void) unlink(apathp);
-				(void) close(lockfd);
-				return (rc);
-			}
+		/* for device allocation, the /etc files are the "master" */
+		if ((dargs->optflag & (DA_ADD| DA_EVENT)) &&
+		    (!(dargs->optflag & DA_FORCE)))
+			rc = _rebuild_lists(dargs, &head_devallocp,
+			    &head_devmapp);
+		else
+			rc = _build_lists(dargs, &head_devallocp,
+			    &head_devmapp);
+
+		if (rc != 0 && rc != 1) {
+			(void) close(tafd);
+			(void) unlink(apathp);
+			(void) close(lockfd);
+			return (-1);
 		}
+	} else
+		rc = 0;
+
+	if ((dargs->optflag & DA_REMOVE) && (rc == 0)) {
+		(void) close(tafd);
+		(void) unlink(apathp);
+		(void) close(lockfd);
+		return (0);
 	}
+	/*
+	 * TODO: clean up the workings of DA_UPDATE.
+	 * Due to da_match looking at fields that are missing
+	 * in dargs for DA_UPDATE, the da_match call returns no match,
+	 * but due to the way _da2str combines the devalloc_t info with
+	 * the *dargs info, the DA_ADD_ZONE and DA_REMOVE_ZONE work.
+	 *
+	 * This would not scale if any type of update was ever needed
+	 * from the daemon.
+	 */
 
 	/*
-	 * write back any existing devalloc entries, along with
-	 * the devalloc on/off string.
+	 * Write out devallocp along with the devalloc on/off string.
 	 */
 	_write_device_allocate(dapathp, tafp, head_devallocp);
 
@@ -1330,11 +1582,16 @@ dmap_only:
 		return (-1);
 	}
 
-	/* write back any existing devmap entries */
+	/*
+	 * Write back any non-removed pre-existing entries.
+	 */
 	if (head_devmapp != NULL)
 		_write_device_maps(tmfp, head_devmapp);
 
 out:
+	/*
+	 * Add any new entries here.
+	 */
 	if (dargs->optflag & DA_ADD && !(dargs->optflag & DA_NO_OVERRIDE)) {
 		/* add any new entries */
 		rc = _write_new_entry(tafp, dargs, DA_ALLOC_ONLY);
@@ -1382,7 +1639,7 @@ da_add_list(devlist_t *dlist, char *link, int new_instance, int flag)
 	int		new_entry = 0;
 	char		*dtype, *dexec, *tname, *kval;
 	char		*minstr = NULL, *maxstr = NULL;
-	char		dname[DA_MAXNAME];
+	char		dname[DA_MAXNAME + 1];
 	kva_t		*kva;
 	deventry_t	*dentry = NULL, *nentry = NULL, *pentry = NULL;
 	da_defs_t	*da_defs;
@@ -1500,9 +1757,7 @@ da_add_list(devlist_t *dlist, char *link, int new_instance, int flag)
 	if ((nentry->devinfo.devlist =
 	    (char *)realloc(nentry->devinfo.devlist, nlen)) == NULL) {
 		if (new_entry) {
-			nentry->devinfo.devname = NULL;
 			free(nentry->devinfo.devname);
-			nentry = NULL;
 			free(nentry);
 			if (pentry != NULL)
 				pentry->next = NULL;
@@ -1690,6 +1945,78 @@ remove_dev:
 	}
 
 	return (flag);
+}
+
+/*
+ * da_rm_list_entry -
+ *
+ *	The adding of devnames to a devlist and the removal of a
+ *	device are not symmetrical -- hot_cleanup gives a /devices
+ *	name which is used to remove the dentry whose links all point to
+ *	that /devices entry.
+ *
+ *	The link argument is present if available to make debugging
+ *	easier.
+ *
+ *	da_rm_list_entry removes an entry from the linked list of devices.
+ *
+ *	Returns 1 if the devname was removed successfully,
+ *	0 if not found, -1 for error.
+ */
+/*ARGSUSED*/
+int
+da_rm_list_entry(devlist_t *dlist, char *link, int type, char *devname)
+{
+	int		retval = 0;
+	deventry_t	**dentry, *current, *prev;
+
+	switch (type) {
+	case DA_AUDIO:
+		dentry = &(dlist->audio);
+		break;
+	case DA_CD:
+		dentry = &(dlist->cd);
+		break;
+	case DA_FLOPPY:
+		dentry = &(dlist->floppy);
+		break;
+	case DA_TAPE:
+		dentry = &(dlist->tape);
+		break;
+	case DA_RMDISK:
+		dentry = &(dlist->rmdisk);
+		break;
+	default:
+		return (-1);
+	}
+
+	/* Presumably in daemon mode, no need to remove entry, list is empty */
+	if (*dentry == (deventry_t *)NULL)
+		return (0);
+
+	prev = NULL;
+	for (current = *dentry; current != NULL;
+	    prev = current, current = current->next) {
+		if (strcmp(devname, current->devinfo.devname))
+			continue;
+		retval = 1;
+		break;
+	}
+	if (retval == 0)
+		return (0);
+	free(current->devinfo.devname);
+	if (current->devinfo.devlist != NULL)
+		free(current->devinfo.devlist);
+	if (current->devinfo.devopts != NULL)
+		free(current->devinfo.devopts);
+
+	if (prev == NULL)
+		*dentry = current->next;
+	else
+		prev->next = current->next;
+
+	free(current);
+	return (retval);
 }
 
 /*

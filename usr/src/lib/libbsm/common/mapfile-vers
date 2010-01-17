@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -297,6 +297,7 @@ SUNWprivate_1.1 {
 	da_open_devdb;
 	da_print_device;
 	da_remove_list;
+	da_rm_list_entry;
 	da_update_defattrs;
 	da_update_device;
 	_endac;

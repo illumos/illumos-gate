@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_DEVALLOC_H
 #define	_DEVALLOC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -45,7 +43,7 @@ extern "C" {
 #define	DA_UID			(uid_t)0	/* root */
 #define	DA_GID			(gid_t)3	/* sys */
 #define	ALLOC_MODE		0600
-#define	DEALLOC_MODE    	0000
+#define	DEALLOC_MODE		0000
 
 #define	LOGINDEVPERM		"/etc/logindevperm"
 #define	DA_DB_LOCK		"/etc/security/.da_db_lock"
@@ -73,6 +71,7 @@ extern "C" {
 #define	DA_AUTHLEN		MAX_CANON   /* approx. sum of strlen of all */
 					    /* device auths in auth_list.h */
 #define	DA_MAXNAME		80
+#define	DA_MAX_DEVNO		((8 * sizeof (uint64_t)) - 1)
 #define	DA_BUFSIZE		4096
 
 #define	DA_RDWR			O_RDWR|O_CREAT|O_NONBLOCK
@@ -95,6 +94,7 @@ extern "C" {
 #define	DA_OFF			0x00000800
 #define	DA_NO_OVERRIDE		0x00001000
 #define	DA_DEFATTRS		0x00002000
+#define	DA_EVENT		0x00004000
 
 #define	DA_AUDIO		0x00001000
 #define	DA_CD			0x00002000
@@ -171,6 +171,7 @@ int da_update_device(da_args *);
 int da_update_defattrs(da_args *);
 int da_add_list(devlist_t *, char *, int, int);
 int da_remove_list(devlist_t *, char *, int, char *, int);
+int da_rm_list_entry(devlist_t *, char *, int, char *);
 void da_print_device(int, devlist_t *);
 
 

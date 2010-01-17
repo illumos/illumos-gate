@@ -19,14 +19,16 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <string.h>
+#include <strings.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <limits.h>
+#include <device_info.h>
 #include <bsm/devices.h>
 #include <bsm/devalloc.h>
 
@@ -281,6 +283,31 @@ getdmaptype(char *type)
 }
 
 /*
+ * dmap_match_one_dev -
+ *    Checks if the specified devmap_t contains strings
+ *    for the same logical link as the device specified.
+ *    This guarantees that the beginnings of a devlist build
+ *    match a more-complete devlist for the same device.
+ *
+ *    Returns 1 for a match, else returns 0.
+ */
+static int
+dmap_match_one_dev(devmap_t *dmap, char *dev)
+{
+	char **dva;
+	char *dv;
+
+	if (dmap->dmap_devarray == NULL)
+		return (0);
+
+	for (dva = dmap->dmap_devarray; (dv = *dva) != NULL; dva++) {
+		if (strstr(dev, dv) != NULL)
+			return (1);
+	}
+	return (0);
+}
+
+/*
  * dmap_matchdev -
  * 	checks if the specified devmap_t is for the device specified.
  *	returns 1 if it is, else returns 0.
@@ -299,6 +326,25 @@ dmap_matchdev(devmap_t *dmap, char *dev)
 	}
 
 	return (0);
+}
+
+/*
+ * Requires a match of the /dev/?dsk links, not just the logical devname
+ * Returns 1 for match found, 0 for match not found, 2 for invalid arguments.
+ */
+int
+dmap_exact_dev(devmap_t *dmap, char *dev, int *num)
+{
+	char *dv;
+
+	if ((dev == NULL) || (dmap->dmap_devname == NULL))
+		return (2);
+	dv = dmap->dmap_devname;
+	dv +=  strcspn(dmap->dmap_devname, "0123456789");
+	if (sscanf(dv, "%d", num) != 1)
+		return (2);
+	/* during some add processes, dev can be shorter than dmap */
+	return (dmap_match_one_dev(dmap, dev));
 }
 
 /*
@@ -327,6 +373,29 @@ dmap_matchname(devmap_t *dmap, char *name)
 		return (0);
 
 	return ((strcmp(dmap->dmap_devname, name) == 0));
+}
+
+/*
+ * dmap_physname: path to /devices device
+ * Returns:
+ *	strdup'd (i.e. malloc'd) real device file if successful
+ *      NULL on error
+ */
+char *
+dmap_physname(devmap_t *dmap)
+{
+	char *oldlink;
+	char stage_link[PATH_MAX + 1];
+
+	if ((dmap == NULL) || (dmap->dmap_devarray == NULL) ||
+	    (dmap->dmap_devarray[0] == NULL))
+		return (NULL);
+
+	(void) strncpy(stage_link, dmap->dmap_devarray[0], sizeof (stage_link));
+
+	if (devfs_resolve_link(stage_link, &oldlink) == 0)
+		return (oldlink);
+	return (NULL);
 }
 
 /*
