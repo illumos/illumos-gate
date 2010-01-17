@@ -213,6 +213,8 @@ static	void	ill_trace_cleanup(const ill_t *);
 static	void	ipif_trace_cleanup(const ipif_t *);
 #endif
 
+static	void	ill_dlpi_clear_deferred(ill_t *ill);
+
 /*
  * if we go over the memory footprint limit more than once in this msec
  * interval, we'll start pruning aggressively.
@@ -822,6 +824,9 @@ ipsq_pending_mp_get(ipsq_t *ipsq, conn_t **connpp)
  * - Called in the ill_delete path
  * - Called in the M_ERROR or M_HANGUP path on the ill.
  * - Called in the conn close path.
+ *
+ * Returns success on finding the pending mblk associated with the ioctl or
+ * exclusive operation in progress, failure otherwise.
  */
 boolean_t
 ipsq_pending_mp_cleanup(ill_t *ill, conn_t *connp)
@@ -844,18 +849,14 @@ ipsq_pending_mp_cleanup(ill_t *ill, conn_t *connp)
 	 */
 	mutex_enter(&ipx->ipx_lock);
 	mp = ipx->ipx_pending_mp;
-	if (mp == NULL || (connp != NULL &&
-	    mp->b_queue != CONNP_TO_WQ(connp))) {
+	if ((connp != NULL) &&
+	    (mp == NULL || mp->b_queue != CONNP_TO_WQ(connp))) {
 		mutex_exit(&ipx->ipx_lock);
 		return (B_FALSE);
 	}
+
 	/* Now remove from the ipx_pending_mp */
 	ipx->ipx_pending_mp = NULL;
-	q = mp->b_queue;
-	mp->b_next = NULL;
-	mp->b_prev = NULL;
-	mp->b_queue = NULL;
-
 	ipif = ipx->ipx_pending_ipif;
 	ipx->ipx_pending_ipif = NULL;
 	ipx->ipx_waitfor = 0;
@@ -864,6 +865,14 @@ ipsq_pending_mp_cleanup(ill_t *ill, conn_t *connp)
 	ipx->ipx_current_ioctl = 0;
 	ipx->ipx_current_done = B_TRUE;
 	mutex_exit(&ipx->ipx_lock);
+
+	if (mp == NULL)
+		return (B_FALSE);
+
+	q = mp->b_queue;
+	mp->b_next = NULL;
+	mp->b_prev = NULL;
+	mp->b_queue = NULL;
 
 	if (DB_TYPE(mp) == M_IOCTL || DB_TYPE(mp) == M_IOCDATA) {
 		DTRACE_PROBE4(ipif__ioctl,
@@ -879,11 +888,6 @@ ipsq_pending_mp_cleanup(ill_t *ill, conn_t *connp)
 			mutex_exit(&ipif->ipif_ill->ill_lock);
 		}
 	} else {
-		/*
-		 * IP-MT XXX In the case of TLI/XTI bind / optmgmt this can't
-		 * be just inet_freemsg. we have to restart it
-		 * otherwise the thread will be stuck.
-		 */
 		inet_freemsg(mp);
 	}
 	return (B_TRUE);
@@ -1101,6 +1105,16 @@ ill_down_start(queue_t *q, mblk_t *mp)
 	/* no more nce addition allowed */
 	mutex_exit(&ill->ill_lock);
 
+	/*
+	 * It is possible that some ioctl is already in progress while we
+	 * received the M_ERROR / M_HANGUP in which case, we need to abort
+	 * the ioctl. (ill_down_start() is being processed as CUR_OP since
+	 * the cause of the M_ERROR / M_HANGUP may prevent the in progress
+	 * ioctl from completion.)
+	 */
+	(void) ipsq_pending_mp_cleanup(ill, NULL);
+	ill_dlpi_clear_deferred(ill);
+
 	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next)
 		(void) ipif_down(ipif, NULL, NULL);
 
@@ -1115,9 +1129,6 @@ ill_down_start(queue_t *q, mblk_t *mp)
 	/* With IPv6 we have dce_ifindex. Cleanup for neatness */
 	if (ill->ill_isv6)
 		dce_cleanup(ill->ill_phyint->phyint_ifindex, ill->ill_ipst);
-
-
-	(void) ipsq_pending_mp_cleanup(ill, NULL);
 
 	ipsq_current_start(ill->ill_phyint->phyint_ipsq, ill->ill_ipif, 0);
 
@@ -12568,6 +12579,27 @@ ill_dlpi_send_deferred(ill_t *ill)
 		nextmp = mp->b_next;
 		mp->b_next = NULL;
 		ill_dlpi_send(ill, mp);
+	}
+}
+
+/*
+ * Clear all the deferred DLPI messages. Called on receiving an M_ERROR
+ * or M_HANGUP
+ */
+static void
+ill_dlpi_clear_deferred(ill_t *ill)
+{
+	mblk_t	*mp, *nextmp;
+
+	mutex_enter(&ill->ill_lock);
+	ill->ill_dlpi_pending = DL_PRIM_INVAL;
+	mp = ill->ill_dlpi_deferred;
+	ill->ill_dlpi_deferred = NULL;
+	mutex_exit(&ill->ill_lock);
+
+	for (; mp != NULL; mp = nextmp) {
+		nextmp = mp->b_next;
+		inet_freemsg(mp);
 	}
 }
 
