@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_CTLR_SCSI_H
 #define	_CTLR_SCSI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -134,10 +132,7 @@ struct scsi_ms_header {
 /*
  *	Local prototypes for ANSI C compilers
  */
-#ifdef sparc
 int	scsi_rdwr(int, int, diskaddr_t, int, caddr_t, int, int *);
-#endif /* sparc */
-
 int	scsi_ex_man(struct defect_list *);
 int	scsi_ex_cur(struct defect_list *);
 int	scsi_ex_grown(struct defect_list *);
@@ -163,9 +158,9 @@ int	scsi_ms_page3();
 int	scsi_ms_page4();
 int	scsi_read_defect_data();
 int	scsi_repair();
-int	scsi_rdwr();
 #endif /* sparc */
 
+int	scsi_rdwr();
 int	scsi_ck_format();
 int	scsi_ex_man();
 int	scsi_ex_cur();

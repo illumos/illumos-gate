@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -895,6 +895,10 @@ auto_sense(
 		err_print("disk name:  `%s`\n", disk_name);
 	}
 
+	if (scsi_rdwr(DIR_READ, fd, (diskaddr_t)0, 1, (caddr_t)label,
+	    F_SILENT, NULL))
+		return ((struct disk_type *)NULL);
+
 	/*
 	 * Figure out which method we use for auto sense.
 	 * If a particular method fails, we fall back to
@@ -1096,8 +1100,9 @@ generic_disk_sense(
 	 * adjust it to AVG_RPM, 3600.
 	 */
 	if (rpm < MIN_RPM || rpm > MAX_RPM) {
-		err_print("The current rpm value %d is invalid,"
-		    " adjusting it to %d\n", rpm, AVG_RPM);
+		if (option_msg && diag_msg)
+			err_print("The current rpm value %d is invalid,"
+			    " adjusting it to %d\n", rpm, AVG_RPM);
 		rpm = AVG_RPM;
 	}
 

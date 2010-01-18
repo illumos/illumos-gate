@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,10 +98,6 @@ static int	scsi_repair(uint64_t, int);
 static int	scsi_read_defect_data(struct defect_list *, int);
 static int	scsi_ck_format(void);
 
-#ifdef i386
-static int	scsi_rdwr(int, int, diskaddr_t, int, caddr_t, int, int *);
-#endif /* i386 */
-
 #else	/* __STDC__ */
 
 static int	scsi_format();
@@ -128,10 +124,6 @@ static int	scsi_ms_page4();
 static int	scsi_repair();
 static int	scsi_read_defect_data();
 static int	scsi_ck_format();
-
-#ifdef i386
-static int	scsi_rdwr(int, int, diskaddr_t, int, caddr_t, int, int *);
-#endif /* i386 */
 
 #endif	/* __STDC__ */
 
