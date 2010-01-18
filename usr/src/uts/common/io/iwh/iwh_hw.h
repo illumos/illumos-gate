@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -944,6 +944,7 @@ extern "C" {
 #define	CSR_HW_IF_CONFIG_REG_BIT_RADIO_SI	(0x00000200)
 #define	CSR_HW_IF_CONFIG_REG_EEP_SEM		(0x00200000)
 #define	IWH_CSR_ANA_PLL_CFG			(0x00880300)
+#define	CSR_DBG_HPET_MEM_REG_VAL		(0xFFFF0000)
 
 /* IWH-END */
 
@@ -988,6 +989,7 @@ extern "C" {
 #define	CSR_GIO_CHICKEN_BITS	(CSR_BASE+0x100)
 #define	CSR_ANA_PLL_CFG		(CSR_BASE+0x20c)
 #define	CSR_HW_REV_WA_REG	(CSR_BASE+0x22C)
+#define	CSR_DBG_HPET_MEM_REG	(CSR_BASE+0x240)
 
 /*
  * BSM (Bootstrap State Machine)
@@ -1038,6 +1040,10 @@ extern "C" {
 #define	CSR_HW_IF_CONFIG_REG_BIT_BOARD_TYPE	(0x00000800)
 #define	CSR_HW_IF_CONFIG_REG_BITS_SILICON_TYPE_A	(0x00000000)
 #define	CSR_HW_IF_CONFIG_REG_BITS_SILICON_TYPE_B	(0x00001000)
+#define	CSR_HW_IF_CONFIG_REG_BITS_NIC_READY		(0x00400000)
+#define	CSR_HW_IF_CONFIG_REG_BITS_HAP_WAKE_L1A		(0x00080000)
+#define	CSR_HW_IF_CONFIG_REG_BITS_NIC_PREPARE_DONE	(0x02000000)
+#define	CSR_HW_IF_CONFIG_REG_BITS_PREPARE		(0x08000000)
 
 #define	CSR_UCODE_DRV_GP1_BIT_MAC_SLEEP    	(0x00000001)
 #define	CSR_UCODE_SW_BIT_RFKILL			(0x00000002)

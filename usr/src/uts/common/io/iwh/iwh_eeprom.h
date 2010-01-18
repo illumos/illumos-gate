@@ -1,10 +1,10 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
- * Copyright (c) 2008, Intel Corporation
+ * Copyright (c) 2009, Intel Corporation
  * All rights reserved.
  */
 
@@ -18,7 +18,7 @@
  *
  * GPL LICENSE SUMMARY
  *
- * Copyright(c) 2005 - 2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 2005 - 2009 Intel Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of version 2 of the GNU General Public License as
@@ -43,7 +43,7 @@
  *
  * BSD LICENSE
  *
- * Copyright(c) 2005 - 2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 2005 - 2009 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

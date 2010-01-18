@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -363,6 +363,7 @@ static int	iwh_alloc_dma_mem(iwh_sc_t *, size_t,
     ddi_dma_attr_t *, ddi_device_acc_attr_t *,
     uint_t, iwh_dma_t *);
 static void	iwh_free_dma_mem(iwh_dma_t *);
+static int	iwh_reset_hw(iwh_sc_t *);
 
 /*
  * GLD specific operations
@@ -687,6 +688,13 @@ iwh_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		cmn_err(CE_WARN, "iwh_attach(): "
 		    "failed to allocate keep warm page\n");
 		goto attach_fail8;
+	}
+
+	err = iwh_reset_hw(sc);
+	if (err != IWH_SUCCESS) {
+		cmn_err(CE_WARN, "iwh_attach(): "
+		    "failed to reset hardware\n");
+		goto attach_fail9;
 	}
 
 	/*
@@ -5449,6 +5457,7 @@ iwh_save_calib_result(iwh_sc_t *sc, iwh_rx_desc_t *desc)
 		if (NULL == res_p->tx_iq_perd_res) {
 			cmn_err(CE_WARN, "iwh_save_calib_result(): "
 			    "failed to allocate memory.\n");
+			return;
 		}
 
 		res_p->tx_iq_perd_res_len = len;
@@ -5463,6 +5472,7 @@ iwh_save_calib_result(iwh_sc_t *sc, iwh_rx_desc_t *desc)
 		if (NULL == res_p->dc_res) {
 			cmn_err(CE_WARN, "iwh_save_calib_result(): "
 			    "failed to allocate memory.\n");
+			return;
 		}
 
 		res_p->dc_res_len = len;
@@ -5477,6 +5487,7 @@ iwh_save_calib_result(iwh_sc_t *sc, iwh_rx_desc_t *desc)
 		if (NULL == res_p->base_band_res) {
 			cmn_err(CE_WARN, "iwh_save_calib_result(): "
 			    "failed to allocate memory.\n");
+			return;
 		}
 
 		res_p->base_band_res_len = len;
@@ -5578,6 +5589,12 @@ iwh_init_common(iwh_sc_t *sc)
 {
 	int32_t	qid;
 	uint32_t tmp;
+
+	if (iwh_reset_hw(sc) != IWH_SUCCESS) {
+		cmn_err(CE_WARN, "iwh_init_common(): "
+		    "failed to reset hardware\n");
+		return (IWH_FAIL);
+	}
 
 	(void) iwh_preinit(sc);
 
@@ -6506,4 +6523,67 @@ iwh_send_action(struct ieee80211_node *in,
 	}
 
 	return (ret);
+}
+
+static int
+iwh_reset_hw(iwh_sc_t *sc)
+{
+	uint32_t tmp;
+	int n;
+
+	tmp = IWH_READ(sc, CSR_HW_IF_CONFIG_REG);
+	IWH_WRITE(sc, CSR_HW_IF_CONFIG_REG,
+	    tmp | CSR_HW_IF_CONFIG_REG_BITS_NIC_READY);
+
+	/*
+	 * wait for HW ready
+	 */
+	for (n = 0; n < 5; n++) {
+		if (IWH_READ(sc, CSR_HW_IF_CONFIG_REG) &
+		    CSR_HW_IF_CONFIG_REG_BITS_NIC_READY) {
+			break;
+		}
+		DELAY(10);
+	}
+
+	if (n != 5) {
+		return (IWH_SUCCESS);
+	}
+
+	tmp = IWH_READ(sc, CSR_HW_IF_CONFIG_REG);
+	IWH_WRITE(sc, CSR_HW_IF_CONFIG_REG,
+	    tmp | CSR_HW_IF_CONFIG_REG_BITS_PREPARE);
+
+	for (n = 0; n < 15000; n++) {
+		if (0 == (IWH_READ(sc, CSR_HW_IF_CONFIG_REG) &
+		    CSR_HW_IF_CONFIG_REG_BITS_NIC_PREPARE_DONE)) {
+			break;
+		}
+		DELAY(10);
+	}
+
+	if (15000 == n) {
+		return (ETIMEDOUT);
+	}
+
+	tmp = IWH_READ(sc, CSR_HW_IF_CONFIG_REG);
+	IWH_WRITE(sc, CSR_HW_IF_CONFIG_REG,
+	    tmp | CSR_HW_IF_CONFIG_REG_BITS_NIC_READY);
+
+	/*
+	 * wait for HW ready
+	 */
+	for (n = 0; n < 5; n++) {
+		if (IWH_READ(sc, CSR_HW_IF_CONFIG_REG) &
+		    CSR_HW_IF_CONFIG_REG_BITS_NIC_READY) {
+			break;
+		}
+		DELAY(10);
+	}
+
+	if (n != 5) {
+		return (IWH_SUCCESS);
+	} else {
+		return (ETIMEDOUT);
+	}
 }
