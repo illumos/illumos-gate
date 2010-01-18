@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,7 @@
 #include <sys/cmn_err.h>
 #include <sys/sysmacros.h>
 #include <sys/filio.h>
+#include <sys/policy.h>
 
 #include <sys/project.h>
 #include <sys/tihdr.h>
@@ -176,6 +177,7 @@ sosctp_init(struct sonode *so, struct sonode *pso, struct cred *cr, int flags)
 	struct sctp_sonode *pss;
 	sctp_sockbuf_limits_t sbl;
 	sock_upcalls_t *upcalls;
+	int err;
 
 	ss = SOTOSSO(so);
 
@@ -206,6 +208,10 @@ sosctp_init(struct sonode *so, struct sonode *pso, struct cred *cr, int flags)
 		ASSERT(so->so_type == SOCK_SEQPACKET);
 		upcalls = &sosctp_assoc_upcalls;
 	}
+
+	if ((err = secpolicy_basic_net_access(cr)) != 0)
+		return (err);
+
 	so->so_proto_handle = (sock_lower_handle_t)sctp_create(so, NULL,
 	    so->so_family, so->so_type, SCTP_CAN_BLOCK, upcalls, &sbl, cr);
 	if (so->so_proto_handle == NULL)

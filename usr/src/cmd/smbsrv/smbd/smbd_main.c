@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -391,7 +391,7 @@ smbd_daemonize_fini(int fd, int exit_status)
 	if (pset == NULL)
 		return;
 
-	priv_emptyset(pset);
+	priv_basicset(pset);
 
 	/* list of privileges for smbd */
 	(void) priv_addset(pset, PRIV_NET_MAC_AWARE);

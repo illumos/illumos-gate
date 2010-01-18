@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -731,6 +731,16 @@ gexec(
 			oldcred = curthread->t_cred;
 			curthread->t_cred = cred;
 			crfree(oldcred);
+
+			if (priv_debug && priv_basic_test >= 0 &&
+			    !PRIV_ISASSERT(&CR_IPRIV(newcred),
+			    priv_basic_test)) {
+				pid_t pid = pp->p_pid;
+				char *fn = PTOU(pp)->u_comm;
+
+				cmn_err(CE_WARN, "%s[%d]: exec: basic_test "
+				    "privilege removed from E/I", fn, pid);
+			}
 		}
 		/*
 		 * On emerging from a successful exec(), the saved

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -197,6 +197,9 @@ typedef struct priv_info_names {
 #ifdef _KERNEL
 
 #define	PRIV_ALLOC			0x1
+
+extern int priv_debug;
+extern int priv_basic_test;
 
 struct proc;
 struct prpriv;

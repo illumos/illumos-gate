@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -198,7 +198,7 @@ static int	udp_kstat_update(kstat_t *kp, int rw);
 static void	udp_ulp_recv(conn_t *, mblk_t *, uint_t, ip_recv_attr_t *);
 
 /* Common routine for TPI and socket module */
-static conn_t	*udp_do_open(cred_t *, boolean_t, int);
+static conn_t	*udp_do_open(cred_t *, boolean_t, int, int *);
 static void	udp_do_close(conn_t *);
 static int	udp_do_bind(conn_t *, struct sockaddr *, socklen_t, cred_t *,
     boolean_t);
@@ -1515,6 +1515,7 @@ udp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 	conn_t		*connp;
 	dev_t		conn_dev;
 	vmem_t		*minor_arena;
+	int		err;
 
 	/* If the stream is already open, return immediately. */
 	if (q->q_ptr != NULL)
@@ -1549,10 +1550,10 @@ udp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 		return (0);
 	}
 
-	connp = udp_do_open(credp, isv6, KM_SLEEP);
+	connp = udp_do_open(credp, isv6, KM_SLEEP, &err);
 	if (connp == NULL) {
 		inet_minor_free(minor_arena, conn_dev);
-		return (ENOMEM);
+		return (err);
 	}
 	udp = connp->conn_udp;
 
@@ -5051,7 +5052,7 @@ udp_lwput(queue_t *q, mblk_t *mp)
  */
 
 static conn_t *
-udp_do_open(cred_t *credp, boolean_t isv6, int flags)
+udp_do_open(cred_t *credp, boolean_t isv6, int flags, int *errorp)
 {
 	udp_t		*udp;
 	conn_t		*connp;
@@ -5059,6 +5060,11 @@ udp_do_open(cred_t *credp, boolean_t isv6, int flags)
 	netstack_t 	*ns;
 	udp_stack_t 	*us;
 	int		len;
+
+	ASSERT(errorp != NULL);
+
+	if ((*errorp = secpolicy_basic_net_access(credp)) != 0)
+		return (NULL);
 
 	ns = netstack_find_by_cred(credp);
 	ASSERT(ns != NULL);
@@ -5079,6 +5085,7 @@ udp_do_open(cred_t *credp, boolean_t isv6, int flags)
 	connp = ipcl_conn_create(IPCL_UDPCONN, flags, ns);
 	if (connp == NULL) {
 		netstack_rele(ns);
+		*errorp = ENOMEM;
 		return (NULL);
 	}
 	udp = connp->conn_udp;
@@ -5183,11 +5190,9 @@ udp_create(int family, int type, int proto, sock_downcalls_t **sock_downcalls,
 	else
 		isv6 = B_FALSE;
 
-	connp = udp_do_open(credp, isv6, flags);
-	if (connp == NULL) {
-		*errorp = ENOMEM;
+	connp = udp_do_open(credp, isv6, flags, errorp);
+	if (connp == NULL)
 		return (NULL);
-	}
 
 	udp = connp->conn_udp;
 	ASSERT(udp != NULL);

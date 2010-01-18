@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -194,19 +194,17 @@ main(int argc, char **argv)
 		gid_nobody = pwd->pw_gid;
 	}
 
-	(void) __init_daemon_priv(
-	    PU_LIMITPRIVS,
-	    uid_nobody, gid_nobody,
-	    PRIV_PROC_FORK, PRIV_PROC_CHROOT, PRIV_NET_PRIVADDR, NULL);
+	/* Tftp will not start new executables; clear the limit set.  */
+	(void) __init_daemon_priv(PU_CLEARLIMITSET, uid_nobody, gid_nobody,
+	    PRIV_PROC_CHROOT, PRIV_NET_PRIVADDR, NULL);
 
-	/*
-	 *  Limit set is still "all."  Trim it down to just what we need:
-	 *  fork and chroot.
-	 */
-	(void) priv_set(PRIV_SET, PRIV_ALLSETS,
-	    PRIV_PROC_FORK, PRIV_PROC_CHROOT, PRIV_NET_PRIVADDR, NULL);
-	(void) priv_set(PRIV_SET, PRIV_EFFECTIVE, NULL);
-	(void) priv_set(PRIV_SET, PRIV_INHERITABLE, NULL);
+	/* Remove the unneeded basic privileges everywhere. */
+	(void) priv_set(PRIV_OFF, PRIV_ALLSETS, PRIV_PROC_EXEC,
+	    PRIV_FILE_LINK_ANY, PRIV_PROC_INFO, PRIV_PROC_SESSION, NULL);
+
+	/* Remove the other privileges from E until we need them. */
+	(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_PROC_CHROOT,
+	    PRIV_NET_PRIVADDR, NULL);
 
 	while ((c = getopt(argc, argv, "dspST:")) != EOF)
 		switch (c) {
@@ -272,14 +270,15 @@ usage:
 		sin6_ptr->sin6_port = htons(IPPORT_TFTP);
 
 		/* Enable privilege as tftp port is < 1024 */
-		(void) priv_set(PRIV_SET,
+		(void) priv_set(PRIV_ON,
 		    PRIV_EFFECTIVE, PRIV_NET_PRIVADDR, NULL);
 		if (bind(reqsock, (struct sockaddr *)&client,
 		    clientlen) == -1) {
 			perror("bind");
 			exit(1);
 		}
-		(void) priv_set(PRIV_SET, PRIV_EFFECTIVE, NULL);
+		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_NET_PRIVADDR,
+		    NULL);
 
 		if (debug)
 			(void) puts("running in standalone mode...");
@@ -296,15 +295,14 @@ usage:
 
 	(void) chdir(homedir);
 
-	(void) priv_set(PRIV_SET, PRIV_EFFECTIVE, PRIV_PROC_FORK, NULL);
+	(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_PROC_FORK, NULL);
 	if ((child = fork()) < 0) {
 		syslog(LOG_ERR, "fork (main): %m");
 		exit(1);
 	}
-	(void) priv_set(PRIV_SET, PRIV_EFFECTIVE, NULL);
+	(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_PROC_FORK, NULL);
 
 	if (child == 0) {
-		(void) priv_set(PRIV_SET, PRIV_ALLSETS, NULL);
 		delayed_responder();
 	} /* child */
 
@@ -809,17 +807,17 @@ tftp(struct tftphdr *tp, int size)
 	 * new socket as that requires library access to system files
 	 * and devices.
 	 */
-	(void) priv_set(PRIV_SET, PRIV_EFFECTIVE, PRIV_PROC_FORK, NULL);
+	(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_PROC_FORK, NULL);
 	switch (fork()) {
 	case -1:
 		syslog(LOG_ERR, "fork (tftp): %m");
-		(void) priv_set(PRIV_SET, PRIV_EFFECTIVE, NULL);
+		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_PROC_FORK, NULL);
 		return;
 	case 0:
-		(void) priv_set(PRIV_SET, PRIV_EFFECTIVE, NULL);
+		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_PROC_FORK, NULL);
 		break;
 	default:
-		(void) priv_set(PRIV_SET, PRIV_EFFECTIVE, NULL);
+		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_PROC_FORK, NULL);
 		return;
 	}
 
@@ -829,8 +827,8 @@ tftp(struct tftphdr *tp, int size)
 	 * the chroot() call.  We only want to execute the chroot()  once.
 	 */
 	if (securetftp && firsttime) {
-		(void) priv_set(
-		    PRIV_SET, PRIV_EFFECTIVE, PRIV_PROC_CHROOT, NULL);
+		(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_PROC_CHROOT,
+		    NULL);
 		if (chroot(homedir) == -1) {
 			syslog(LOG_ERR,
 			    "tftpd: cannot chroot to directory %s: %m\n",
@@ -841,10 +839,12 @@ tftp(struct tftphdr *tp, int size)
 		{
 			firsttime = B_FALSE;
 		}
-		(void) priv_set(PRIV_SET, PRIV_EFFECTIVE, NULL);
+		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_PROC_CHROOT,
+		    NULL);
 		(void) chdir("/");  /* cd to  new root */
 	}
-	(void) priv_set(PRIV_SET, PRIV_ALLSETS, NULL);
+	(void) priv_set(PRIV_OFF, PRIV_ALLSETS, PRIV_PROC_CHROOT,
+	    PRIV_NET_PRIVADDR, NULL);
 
 	ecode = (*pf->f_validate)(tp->th_opcode);
 	if (ecode != 0)

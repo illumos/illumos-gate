@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,6 +87,15 @@ priv_init(void)
 	PRIV_BASIC_ASSERT(priv_basic);
 	PRIV_UNSAFE_ASSERT(&priv_unsafe);
 	priv_fillset(&priv_fullset);
+
+	/*
+	 * When booting with priv_debug set, then we'll add an additional
+	 * basic privilege and we verify that it is always present in E.
+	 */
+	if (priv_debug == 1 &&
+	    (priv_basic_test = priv_getbyname("basic_test", PRIV_ALLOC)) >= 0) {
+		priv_addset(priv_basic, priv_basic_test);
+	}
 
 	devpolicy_init();
 }

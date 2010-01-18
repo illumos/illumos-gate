@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -120,21 +120,35 @@ daemonize_init(char *arg)
 {
 	sigset_t set, oset;
 	pid_t pid;
+	priv_set_t *pset = priv_allocset();
 
 	/*
 	 * Set effective sets privileges to 'least' required. If fails, send
 	 * error messages to log file and proceed.
 	 */
-	if (priv_set(PRIV_SET, PRIV_EFFECTIVE,
-	    PRIV_FILE_LINK_ANY, PRIV_PROC_INFO, PRIV_PROC_SESSION,
-	    PRIV_PROC_FORK, PRIV_PROC_EXEC,
-	    PRIV_PROC_AUDIT, PRIV_PROC_SETID, PRIV_PROC_OWNER, PRIV_FILE_CHOWN,
-	    PRIV_FILE_CHOWN_SELF, PRIV_FILE_DAC_READ, PRIV_FILE_DAC_SEARCH,
-	    PRIV_FILE_DAC_WRITE, PRIV_FILE_OWNER, PRIV_FILE_SETID,
-	    PRIV_SYS_LINKDIR, PRIV_SYS_DEVICES, PRIV_SYS_MOUNT, PRIV_SYS_CONFIG,
-	    NULL))
-		syslog(LOG_ERR,
-		    "Failed to set least required privileges to the service.");
+	if (pset != NULL) {
+		priv_basicset(pset);
+		(void) priv_addset(pset, PRIV_PROC_AUDIT);
+		(void) priv_addset(pset, PRIV_PROC_SETID);
+		(void) priv_addset(pset, PRIV_PROC_OWNER);
+		(void) priv_addset(pset, PRIV_FILE_CHOWN);
+		(void) priv_addset(pset, PRIV_FILE_CHOWN_SELF);
+		(void) priv_addset(pset, PRIV_FILE_DAC_READ);
+		(void) priv_addset(pset, PRIV_FILE_DAC_SEARCH);
+		(void) priv_addset(pset, PRIV_FILE_DAC_WRITE);
+		(void) priv_addset(pset, PRIV_FILE_OWNER);
+		(void) priv_addset(pset, PRIV_FILE_SETID);
+		(void) priv_addset(pset, PRIV_SYS_LINKDIR);
+		(void) priv_addset(pset, PRIV_SYS_DEVICES);
+		(void) priv_addset(pset, PRIV_SYS_MOUNT);
+		(void) priv_addset(pset, PRIV_SYS_CONFIG);
+	}
+
+	if (pset == NULL || setppriv(PRIV_SET, PRIV_EFFECTIVE, pset) != 0) {
+		syslog(LOG_ERR, "Failed to set least required privileges to "
+		    "the service.");
+	}
+	priv_freeset(pset);
 
 	/*
 	 * Block all signals prior to the fork and leave them blocked in the

@@ -7805,6 +7805,12 @@ tcp_create_common(cred_t *credp, boolean_t isv6, boolean_t issocket,
 		ASSERT(tcps != NULL);
 	} else {
 		netstack_t *ns;
+		int err;
+
+		if ((err = secpolicy_basic_net_access(credp)) != 0) {
+			*errorp = err;
+			return (NULL);
+		}
 
 		ns = netstack_find_by_cred(credp);
 		ASSERT(ns != NULL);

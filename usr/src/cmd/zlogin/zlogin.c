@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -190,19 +190,24 @@ prefork_dropprivs()
 {
 	if ((dropprivs = priv_allocset()) == NULL)
 		return (1);
-	priv_emptyset(dropprivs);
+
+	priv_basicset(dropprivs);
+	(void) priv_delset(dropprivs, PRIV_PROC_INFO);
+	(void) priv_delset(dropprivs, PRIV_PROC_FORK);
+	(void) priv_delset(dropprivs, PRIV_PROC_EXEC);
+	(void) priv_delset(dropprivs, PRIV_FILE_LINK_ANY);
 
 	/*
-	 * We need these privileges in order to query session information and
+	 * We need to keep the basic privilege PROC_SESSION and all unknown
+	 * basic privileges as well as the privileges PROC_ZONE and
+	 * PROC_OWNER in order to query session information and
 	 * send signals.
 	 */
 	if (interactive == 0) {
-		if (priv_addset(dropprivs, "proc_session") == -1)
-			return (1);
-		if (priv_addset(dropprivs, "proc_zone") == -1)
-			return (1);
-		if (priv_addset(dropprivs, "proc_owner") == -1)
-			return (1);
+		(void) priv_addset(dropprivs, PRIV_PROC_ZONE);
+		(void) priv_addset(dropprivs, PRIV_PROC_OWNER);
+	} else {
+		(void) priv_delset(dropprivs, PRIV_PROC_SESSION);
 	}
 
 	return (0);

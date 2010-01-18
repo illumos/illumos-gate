@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #pragma weak _getprivimplinfo	= getprivimplinfo
 #pragma weak _priv_addset	= priv_addset
@@ -32,6 +30,7 @@
 #pragma weak _priv_copyset	= priv_copyset
 #pragma weak _priv_delset	= priv_delset
 #pragma weak _priv_emptyset	= priv_emptyset
+#pragma weak _priv_basicset	= priv_basicset
 #pragma weak _priv_fillset	= priv_fillset
 #pragma weak _priv_freeset	= priv_freeset
 #pragma weak _priv_getbyname	= priv_getbyname
@@ -867,6 +866,16 @@ void
 priv_emptyset(priv_set_t *set)
 {
 	__priv_emptyset(GETPRIVDATA(), set);
+}
+
+void
+priv_basicset(priv_set_t *set)
+{
+	priv_data_t *d;
+
+	LOADPRIVDATA(d);
+
+	priv_copyset(d->pd_basicset, set);
 }
 
 void

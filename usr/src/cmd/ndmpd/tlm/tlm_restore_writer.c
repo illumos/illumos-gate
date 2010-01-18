@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1911,22 +1911,23 @@ ndmp_set_eprivs_least(void)
 		NDMP_LOG(LOG_ERR, "Out of memory.");
 		return (-1);
 	}
-	priv_emptyset(priv_set);
-	(void) priv_addset(priv_set, "basic");
-	(void) priv_addset(priv_set, "proc_audit");
-	(void) priv_addset(priv_set, "proc_setid");
-	(void) priv_addset(priv_set, "proc_owner");
-	(void) priv_addset(priv_set, "file_chown");
-	(void) priv_addset(priv_set, "file_chown_self");
-	(void) priv_addset(priv_set, "file_dac_read");
-	(void) priv_addset(priv_set, "file_dac_search");
-	(void) priv_addset(priv_set, "file_dac_write");
-	(void) priv_addset(priv_set, "file_owner");
-	(void) priv_addset(priv_set, "file_setid");
-	(void) priv_addset(priv_set, "sys_linkdir");
-	(void) priv_addset(priv_set, "sys_devices");
-	(void) priv_addset(priv_set, "sys_mount");
-	(void) priv_addset(priv_set, "sys_config");
+
+	priv_basicset(priv_set);
+
+	(void) priv_addset(priv_set, PRIV_PROC_AUDIT);
+	(void) priv_addset(priv_set, PRIV_PROC_SETID);
+	(void) priv_addset(priv_set, PRIV_PROC_OWNER);
+	(void) priv_addset(priv_set, PRIV_FILE_CHOWN);
+	(void) priv_addset(priv_set, PRIV_FILE_CHOWN_SELF);
+	(void) priv_addset(priv_set, PRIV_FILE_DAC_READ);
+	(void) priv_addset(priv_set, PRIV_FILE_DAC_SEARCH);
+	(void) priv_addset(priv_set, PRIV_FILE_DAC_WRITE);
+	(void) priv_addset(priv_set, PRIV_FILE_OWNER);
+	(void) priv_addset(priv_set, PRIV_FILE_SETID);
+	(void) priv_addset(priv_set, PRIV_SYS_LINKDIR);
+	(void) priv_addset(priv_set, PRIV_SYS_DEVICES);
+	(void) priv_addset(priv_set, PRIV_SYS_MOUNT);
+	(void) priv_addset(priv_set, PRIV_SYS_CONFIG);
 
 	if (setppriv(PRIV_SET, PRIV_EFFECTIVE, priv_set) == -1) {
 		NDMP_LOG(LOG_ERR, "Additional privileges required.");
@@ -1942,10 +1943,13 @@ ndmp_set_eprivs_all(void)
 {
 	priv_set_t *priv_set;
 
-	if ((priv_set = priv_str_to_set("all", ",", NULL)) == NULL) {
-		NDMP_LOG(LOG_ERR, "Could not set privileges to 'all'.");
+	if ((priv_set = priv_allocset()) == NULL) {
+		NDMP_LOG(LOG_ERR, "Out of memory.");
 		return (-1);
 	}
+
+	priv_fillset(priv_set);
+
 	if (setppriv(PRIV_SET, PRIV_EFFECTIVE, priv_set) != 0) {
 		NDMP_LOG(LOG_ERR, "Additional privileges required.");
 		return (-1);

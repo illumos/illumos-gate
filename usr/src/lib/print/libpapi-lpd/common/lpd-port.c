@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -686,7 +686,7 @@ main(int ac, char *av[])
 	char *host = NULL, *queue = NULL;
 	uid_t uid = getuid();
 #ifdef	PRIV_ALLSETS
-	priv_set_t *saveset = NULL;
+	priv_set_t *saveset;
 #endif
 
 	openlog("lpd-port", LOG_PID, LOG_LPR);
@@ -695,30 +695,33 @@ main(int ac, char *av[])
 
 	/* lose as much as we can perminently and temporarily drop the rest. */
 
-	if ((saveset = priv_str_to_set("PRIV_NET_PRIVADDR,"
-	    "PRIV_FILE_DAC_READ,PRIV_FILE_DAC_WRITE,",
-	    ",", (const char **)NULL)) == NULL) {
-		syslog(LOG_ERR,
-		    "lpd_port: priv_str_to_set saveset failed: %m\n");
+	if ((saveset = priv_allocset()) == NULL) {
+		syslog(LOG_ERR, "lpd_port: priv_allocset saveset failed: %m\n");
 		return (-1);
 	}
+
+	priv_basicset(saveset);
+	(void) priv_addset(saveset, PRIV_NET_PRIVADDR);
+	(void) priv_addset(saveset, PRIV_FILE_DAC_READ);
+	(void) priv_addset(saveset, PRIV_FILE_DAC_WRITE);
 
 	if ((setppriv(PRIV_SET, PRIV_PERMITTED, saveset)) < 0) {
 		syslog(LOG_ERR, "lpd_port:setppriv:priv_set failed: %m");
 		return (-1);
 	}
 
+	priv_freeset(saveset);
+
 	/*
 	 * These privileges permanently dropped in next_job_id() and
 	 * reserved_port()
 	 */
 
-	if ((setppriv(PRIV_OFF, PRIV_EFFECTIVE, saveset)) < 0) {
-		syslog(LOG_ERR, "lpd_port:setppriv:priv_off failed: %m");
+	if (priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_NET_PRIVADDR,
+	    PRIV_FILE_DAC_READ, PRIV_FILE_DAC_WRITE, (char *)NULL) < 0) {
+		syslog(LOG_ERR, "lpd_port:priv_set:priv_off failed: %m");
 		return (-1);
 	}
-
-	priv_freeset(saveset);
 
 	syslog(LOG_DEBUG, "using privs");
 #else

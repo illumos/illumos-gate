@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
 INSERT COMMENT
@@ -115,6 +115,11 @@ privilege PRIV_FILE_DOWNGRADE_SL
 	This privilege is interpreted only if the system is configured
 	with Trusted Extensions.
 
+privilege PRIV_FILE_FLAG_SET
+
+	Allows a process to set immutable, nounlink or appendonly
+	file attributes.
+
 basic privilege PRIV_FILE_LINK_ANY
 
 	Allows a process to create hardlinks to files owned by a uid
@@ -152,11 +157,6 @@ privilege PRIV_FILE_UPGRADE_SL
 	This privilege is interpreted only if the system is configured
 	with Trusted Extensions.
 
-privilege PRIV_FILE_FLAG_SET
-
-	Allows a process to set immutable, nounlink or appendonly
-	file attributes.
-
 privilege PRIV_GRAPHICS_ACCESS
 
 	Allows a process to make privileged ioctls to graphics devices.
@@ -165,7 +165,7 @@ privilege PRIV_GRAPHICS_ACCESS
 	privileged graphics device mappings.
 
 privilege PRIV_GRAPHICS_MAP
-	
+
 	Allows a process to perform privileged mappings through a
 	graphics device.
 
@@ -196,6 +196,10 @@ privilege PRIV_IPC_OWNER
 	Additional restrictions apply if the owner of the object has uid 0
 	and the effective uid of the current process is not 0.
 
+basic privilege PRIV_NET_ACCESS
+
+	Allows a process to open a TCP, UDP, SDP or SCTP network endpoint.
+
 privilege PRIV_NET_BINDMLP
 
 	Allow a process to bind to a port that is configured as a
@@ -212,7 +216,7 @@ privilege PRIV_NET_ICMPACCESS
 
 privilege PRIV_NET_MAC_AWARE
 
-	Allows a process to set NET_MAC_AWARE process flag by using 
+	Allows a process to set NET_MAC_AWARE process flag by using
 	setpflags(2). This privilege also allows a process to set
 	SO_MAC_EXEMPT socket option by using setsockopt(3SOCKET).
 	The NET_MAC_AWARE process flag and the SO_MAC_EXEMPT socket
@@ -270,7 +274,7 @@ basic privilege PRIV_PROC_FORK
 	Allows a process to call fork1()/forkall()/vfork()
 
 basic privilege PRIV_PROC_INFO
-	
+
 	Allows a process to examine the status of processes other
 	than those it can send signals to.  Processes which cannot
 	be examined cannot be seen in /proc and appear not to exist.
@@ -353,7 +357,7 @@ privilege PRIV_SYS_DEVICES
 	Allows a process to open devices that have been exclusively opened.
 
 privilege PRIV_SYS_IPC_CONFIG
-	
+
 	Allows a process to increase the size of a System V IPC Message
 	Queue buffer.
 
@@ -368,7 +372,7 @@ privilege PRIV_SYS_MOUNT
 	of snapshots.
 	Allows a process to mount and unmount filesystems which would
 	otherwise be restricted (i.e., most filesystems except
-	namefs). 
+	namefs).
 	A process performing a mount operation needs to have
 	appropriate access to the device being mounted (read-write for
 	"rw" mounts, read for "ro" mounts).
@@ -584,7 +588,7 @@ set PRIV_EFFECTIVE
 	Set of privileges currently in effect.
 
 set PRIV_INHERITABLE
-	
+
 	Set of privileges that comes into effect on exec.
 
 set PRIV_PERMITTED

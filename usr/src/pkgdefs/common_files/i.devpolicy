@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #  NOTE:  When a change is made to the source file for
@@ -37,6 +37,10 @@ do
 	# changes
 	cp $dest $dest.$$
 	sed < $dest.$$ > $dest \
+	    -e '/^sctp6\{0,1\}[ 	]/'d \
+	    -e '/^sdp6\{0,1\}[ 	]/'d \
+	    -e '/^tcp6\{0,1\}[ 	]/'d \
+	    -e '/^udp6\{0,1\}[ 	]/'d \
 	    -e '/md:admin/s/read_priv_set=sys_config/			/' \
 	    -e '/^icmp[ 	]*read_priv_set=net_rawaccess[ 	]*write_priv_set=net_rawaccess$/d' \
 	    -e '/^icmp6[ 	]*read_priv_set=net_rawaccess[ 	]*write_priv_set=net_rawaccess$/d' \

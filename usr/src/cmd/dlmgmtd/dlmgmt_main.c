@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -379,18 +379,22 @@ dlmgmt_drop_privileges(void)
 	 * sysevents, and PRIV_SYS_DL_CONFIG to initialize link properties in
 	 * dlmgmt_upcall_linkprop_init().
 	 *
-	 * We remove all privileges from the permitted (and thus effective)
-	 * set in the non-global zone.  When executing in a non-global zone,
-	 * dlmgmtd only needs to read and write to files that it already owns.
+	 * We remove non-basic privileges from the permitted (and thus
+	 * effective) set.  When executing in a non-global zone, dlmgmtd
+	 * only needs to read and write to files that it already owns.
 	 */
-	priv_emptyset(pset);
+	priv_basicset(pset);
+	(void) priv_delset(pset, PRIV_PROC_EXEC);
+	(void) priv_delset(pset, PRIV_PROC_INFO);
+	(void) priv_delset(pset, PRIV_PROC_SESSION);
+	(void) priv_delset(pset, PRIV_FILE_LINK_ANY);
 	if (zoneid == GLOBAL_ZONEID) {
 		ptype = PRIV_EFFECTIVE;
-		if (priv_addset(pset, PRIV_PROC_FORK) == -1 ||
-		    priv_addset(pset, PRIV_SYS_CONFIG) == -1 ||
+		if (priv_addset(pset, PRIV_SYS_CONFIG) == -1 ||
 		    priv_addset(pset, PRIV_SYS_DL_CONFIG) == -1)
 			err = errno;
 	} else {
+		(void) priv_delset(pset, PRIV_PROC_FORK);
 		ptype = PRIV_PERMITTED;
 	}
 	if (err == 0 && setppriv(PRIV_SET, ptype, pset) == -1)

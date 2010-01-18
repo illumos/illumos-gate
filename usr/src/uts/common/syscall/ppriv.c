@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,7 @@
 #include <sys/policy.h>
 #include <sys/ddi.h>
 #include <sys/thread.h>
+#include <sys/cmn_err.h>
 #include <c2/audit.h>
 
 /*
@@ -179,6 +180,21 @@ retry:
 		mutex_enter(&p->p_lock);
 		p->p_flag |= SNOCD;
 		mutex_exit(&p->p_lock);
+	}
+
+	/*
+	 * The basic_test privilege should not be removed from E;
+	 * if that has happened, then some programmer typically set the E/P to
+	 * empty. That is not portable.
+	 */
+	if ((type == PRIV_EFFECTIVE || type == PRIV_PERMITTED) && priv_debug &&
+	    priv_basic_test >= 0 && !PRIV_ISASSERT(target, priv_basic_test)) {
+		proc_t *p = curproc;
+		pid_t pid = p->p_pid;
+		char *fn = PTOU(p)->u_comm;
+
+		cmn_err(CE_WARN, "%s[%d]: setppriv: basic_test privilege "
+		    "removed from E/P", fn, pid);
 	}
 
 	crset(p, cr);		/* broadcast to process threads */

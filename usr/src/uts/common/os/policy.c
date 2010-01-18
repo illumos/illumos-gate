@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,7 +63,12 @@
  */
 #define	MAXPRIVSTACK		6
 
+#ifdef DEBUG
+int priv_debug = 1;
+#else
 int priv_debug = 0;
+#endif
+int priv_basic_test = -1;
 
 /*
  * This file contains the majority of the policy routines.
@@ -1900,6 +1905,12 @@ int
 secpolicy_basic_link(const cred_t *cr)
 {
 	return (PRIV_POLICY(cr, PRIV_FILE_LINK_ANY, B_FALSE, EPERM, NULL));
+}
+
+int
+secpolicy_basic_net_access(const cred_t *cr)
+{
+	return (PRIV_POLICY(cr, PRIV_NET_ACCESS, B_FALSE, EACCES, NULL));
 }
 
 /*

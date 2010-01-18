@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -141,6 +141,7 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	posix_spawn_file_actions_addclosefrom_np;
 	posix_spawnattr_getsigignore_np;
 	posix_spawnattr_setsigignore_np;
+	priv_basicset;
 	pthread_key_create_once_np;
 	pthread_mutexattr_getrobust;
 	pthread_mutexattr_setrobust;

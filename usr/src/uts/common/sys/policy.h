@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -171,6 +171,7 @@ int secpolicy_xvm_control(const cred_t *);
 int secpolicy_basic_exec(const cred_t *, vnode_t *);
 int secpolicy_basic_fork(const cred_t *);
 int secpolicy_basic_link(const cred_t *);
+int secpolicy_basic_net_access(const cred_t *);
 int secpolicy_basic_proc(const cred_t *);
 int secpolicy_basic_procinfo(const cred_t *, struct proc *, struct proc *);
 

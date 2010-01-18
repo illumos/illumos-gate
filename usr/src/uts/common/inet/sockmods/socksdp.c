@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,7 @@
 #include <sys/stropts.h>
 #include <sys/cmn_err.h>
 #include <sys/sysmacros.h>
+#include <sys/policy.h>
 
 #include <sys/filio.h>
 #include <sys/sockio.h>
@@ -149,6 +150,9 @@ sosdp_init(struct sonode *so, struct sonode *pso, struct cred *cr, int flags)
 
 		return (0);
 	}
+
+	if ((error = secpolicy_basic_net_access(cr)) != 0)
+		return (error);
 
 	upcalls = &sosdp_sock_upcalls;
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * This file defines and implements the re-entrant getipnodebyname(),
@@ -742,6 +742,12 @@ again:
 	return (*num);
 fail:
 	free(buf);
+	/*
+	 * If the process is running without the NET_ACCESS basic privilege,
+	 * pretend we still have inet/inet6 interfaces.
+	 */
+	if (errno == EACCES)
+		return (1);
 	return (-1);
 }
 

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <assert.h>
 #include <priv.h>
@@ -132,7 +130,7 @@ audit_logout(adt_session_data_t *ah)
 	}
 	if ((priv = priv_allocset())  == NULL) {
 		syslog(LOG_AUTH | LOG_ALERT,
-		    "login audit_logout: could not alloc privs: %m");
+		    "login audit_logout: could not alloc basic privs: %m");
 		adt_free_event(logout);
 		return;
 	}
@@ -177,7 +175,12 @@ audit_logout(adt_session_data_t *ah)
 	/*
 	 * Reduce privileges to just those needed.
 	 */
-	priv_emptyset(priv);
+	priv_basicset(priv);
+	(void) priv_delset(priv, PRIV_PROC_EXEC);
+	(void) priv_delset(priv, PRIV_PROC_FORK);
+	(void) priv_delset(priv, PRIV_PROC_INFO);
+	(void) priv_delset(priv, PRIV_PROC_SESSION);
+	(void) priv_delset(priv, PRIV_FILE_LINK_ANY);
 	if ((priv_addset(priv, PRIV_PROC_AUDIT) != 0) ||
 	    (setppriv(PRIV_SET, PRIV_PERMITTED, priv) != 0)) {
 		syslog(LOG_AUTH | LOG_ALERT,

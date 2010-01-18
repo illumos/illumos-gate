@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -316,14 +316,9 @@ change_user_set_privs(void)
 		dprintf("started with privs %s", p != NULL ? p : "Unknown");
 		free(p);
 	}
-	priv_freeset(priv_set);
 
 	/* always start with the basic set */
-	priv_set = priv_str_to_set("basic", ",", NULL);
-	if (priv_set == NULL) {
-		syslog(LOG_ERR, "converting basic privilege set: %m");
-		exit(EXIT_FAILURE);
-	}
+	priv_basicset(priv_set);
 	(void) priv_addset(priv_set, PRIV_FILE_CHOWN_SELF);
 	(void) priv_addset(priv_set, PRIV_FILE_DAC_READ);
 	(void) priv_addset(priv_set, PRIV_FILE_DAC_WRITE);
