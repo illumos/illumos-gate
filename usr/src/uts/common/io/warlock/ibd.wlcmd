@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -44,13 +44,22 @@ root	ibd_rcq_handler
 root	ibd_scq_handler
 root	ibd_async_handler
 root	ibd_snet_notices_handler
+root	ibd_rc_rcq_handler
+root	ibd_rc_scq_handler
+root	ibd_rc_dispatch_pass_mad
+root	ibd_rc_dispatch_actv_mad
 
 ### Streams callback funtions
 root	ibd_freemsg_cb
+root	ibd_rc_freemsg_cb
+root	ibd_rc_srq_freemsg_cb
 
 ### Hash callback functions
 root	ibd_hash_by_id
 root	ibd_hash_key_cmp
+
+### Kstat functions
+root	ibd_rc_update_stats
 
 add     bus_ops::bus_add_eventcall 	targets warlock_dummy
 add     bus_ops::bus_get_eventcookie 	targets warlock_dummy

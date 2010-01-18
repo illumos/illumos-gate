@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -36,7 +36,8 @@ MODULE		= ibd
 OBJECTS		= $(IBD_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(IBD_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-LDFLAGS		+= -dy -Nmisc/mac -Nmisc/ibtl -Nmisc/ibcm -Nmisc/ibmf
+CONF_SRCDIR	= $(UTSBASE)/common/io/ib/clients/ibd
+LDFLAGS		+= -dy -Nmisc/mac -Nmisc/ibtl -Nmisc/ibcm -Nmisc/ibmf -Ndrv/ip
 WARLOCK_OUT     = $(IBD_OBJS:%.o=%.ll)
 WARLOCK_OK	= $(MODULE).ok
 WLCMD_DIR	= $(UTSBASE)/common/io/warlock
@@ -48,9 +49,9 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY)
+ALL_TARGET	= $(BINARY) $(SRC_CONFFILE)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
 #	Overrides
