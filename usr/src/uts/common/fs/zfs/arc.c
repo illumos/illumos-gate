@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1241,12 +1241,29 @@ arc_return_buf(arc_buf_t *buf, void *tag)
 {
 	arc_buf_hdr_t *hdr = buf->b_hdr;
 
-	ASSERT(hdr->b_state == arc_anon);
 	ASSERT(buf->b_data != NULL);
-	VERIFY(refcount_remove(&hdr->b_refcnt, arc_onloan_tag) == 0);
-	VERIFY(refcount_add(&hdr->b_refcnt, tag) == 1);
+	(void) refcount_add(&hdr->b_refcnt, tag);
+	(void) refcount_remove(&hdr->b_refcnt, arc_onloan_tag);
 
 	atomic_add_64(&arc_loaned_bytes, -hdr->b_size);
+}
+
+/* Detach an arc_buf from a dbuf (tag) */
+void
+arc_loan_inuse_buf(arc_buf_t *buf, void *tag)
+{
+	arc_buf_hdr_t *hdr;
+
+	rw_enter(&buf->b_lock, RW_WRITER);
+	ASSERT(buf->b_data != NULL);
+	hdr = buf->b_hdr;
+	(void) refcount_add(&hdr->b_refcnt, arc_onloan_tag);
+	(void) refcount_remove(&hdr->b_refcnt, tag);
+	buf->b_efunc = NULL;
+	buf->b_private = NULL;
+
+	atomic_add_64(&arc_loaned_bytes, hdr->b_size);
+	rw_exit(&buf->b_lock);
 }
 
 static arc_buf_t *

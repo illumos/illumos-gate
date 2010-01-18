@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_FEM_H
 #define	_SYS_FEM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/mutex.h>
@@ -260,7 +258,13 @@ struct fem_head {
 			struct shrlock *shr, int flag, cred_t *cr,	\
 			caller_context_t *ct);				\
 	int (*femop_vnevent)(femarg_t *vf, vnevent_t vnevent,		\
-			vnode_t *dvp, char *cname, caller_context_t *ct)
+			vnode_t *dvp, char *cname, 			\
+			caller_context_t *ct);				\
+	int (*femop_reqzcbuf)(femarg_t *vf, enum uio_rw ioflag,		\
+			xuio_t *xuio, cred_t *cr,			\
+			caller_context_t *ct);				\
+	int (*femop_retzcbuf)(femarg_t *vf, xuio_t *xuio, cred_t *cr,	\
+			caller_context_t *ct)
 	/* NB: No ";" */
 
 struct fem {
@@ -392,6 +396,10 @@ extern int vnext_shrlock(femarg_t *vf, int cmd, struct shrlock *shr,
 			int flag, cred_t *cr, caller_context_t *ct);
 extern int vnext_vnevent(femarg_t *vf, vnevent_t vevent, vnode_t *dvp,
 			char *cname, caller_context_t *ct);
+extern int vnext_reqzcbuf(femarg_t *vf, enum uio_rw ioflag, xuio_t *xuiop,
+			cred_t *cr, caller_context_t *ct);
+extern int vnext_retzcbuf(femarg_t *vf, xuio_t *xuiop, cred_t *cr,
+			caller_context_t *ct);
 
 extern int vfsnext_mount(fsemarg_t *vf, vnode_t *mvp, struct mounta *uap,
 			cred_t *cr);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,6 +84,8 @@ static int rfs4_maxlock_tries = RFS4_MAXLOCK_TRIES;
 #define	RFS4_LOCK_DELAY 10	/* Milliseconds */
 static clock_t  rfs4_lock_delay = RFS4_LOCK_DELAY;
 extern struct svc_ops rdma_svc_ops;
+extern int nfs_loaned_buffers;
+/* End of Tunables */
 
 static int rdma_setup_read_data4(READ4args *, READ4res *);
 
@@ -3140,9 +3142,12 @@ rfs4_op_read(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	bool_t *deleg = &cs->deleg;
 	nfsstat4 stat;
 	int in_crit = 0;
-	mblk_t *mp;
+	mblk_t *mp = NULL;
 	int alloc_err = 0;
+	int rdma_used = 0;
+	int loaned_buffers;
 	caller_context_t ct;
+	struct uio *uiop;
 
 	DTRACE_NFSV4_2(op__read__start, struct compound_state *, cs,
 	    READ4args, args);
@@ -3182,6 +3187,12 @@ rfs4_op_read(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		*cs->statusp = resp->status = stat;
 		goto out;
 	}
+
+	if (args->wlist)
+		rdma_used = 1;
+
+	/* use loaned buffers for TCP */
+	loaned_buffers = (nfs_loaned_buffers && !rdma_used) ? 1 : 0;
 
 	va.va_mask = AT_MODE|AT_SIZE|AT_UID;
 	verror = VOP_GETATTR(vp, &va, 0, cs->cr, &ct);
@@ -3250,11 +3261,38 @@ rfs4_op_read(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	if (args->count > rfs4_tsize(req))
 		args->count = rfs4_tsize(req);
 
+	if (loaned_buffers) {
+		uiop = (uio_t *)rfs_setup_xuio(vp);
+		ASSERT(uiop != NULL);
+		uiop->uio_segflg = UIO_SYSSPACE;
+		uiop->uio_loffset = args->offset;
+		uiop->uio_resid = args->count;
+
+		/* Jump to do the read if successful */
+		if (!VOP_REQZCBUF(vp, UIO_READ, (xuio_t *)uiop, cs->cr, &ct)) {
+			/*
+			 * Need to hold the vnode until after VOP_RETZCBUF()
+			 * is called.
+			 */
+			VN_HOLD(vp);
+			goto doio_read;
+		}
+
+		DTRACE_PROBE2(nfss__i__reqzcbuf_failed, int,
+		    uiop->uio_loffset, int, uiop->uio_resid);
+
+		uiop->uio_extflg = 0;
+
+		/* failure to setup for zero copy */
+		rfs_free_xuio((void *)uiop);
+		loaned_buffers = 0;
+	}
+
 	/*
 	 * If returning data via RDMA Write, then grab the chunk list. If we
 	 * aren't returning READ data w/RDMA_WRITE, then grab a mblk.
 	 */
-	if (args->wlist) {
+	if (rdma_used) {
 		mp = NULL;
 		(void) rdma_get_wchunk(req, &iov, args->wlist);
 	} else {
@@ -3287,27 +3325,38 @@ rfs4_op_read(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	uio.uio_extflg = UIO_COPY_CACHED;
 	uio.uio_loffset = args->offset;
 	uio.uio_resid = args->count;
+	uiop = &uio;
 
-	error = do_io(FREAD, vp, &uio, 0, cs->cr, &ct);
+doio_read:
+	error = do_io(FREAD, vp, uiop, 0, cs->cr, &ct);
 
 	va.va_mask = AT_SIZE;
 	verror = VOP_GETATTR(vp, &va, 0, cs->cr, &ct);
 
 	if (error) {
-		freeb(mp);
+		if (mp)
+			freemsg(mp);
 		*cs->statusp = resp->status = puterrno4(error);
 		goto out;
 	}
 
+	/* make mblk using zc buffers */
+	if (loaned_buffers) {
+		mp = uio_to_mblk(uiop);
+		ASSERT(mp != NULL);
+	}
+
 	*cs->statusp = resp->status = NFS4_OK;
 
-	ASSERT(uio.uio_resid >= 0);
-	resp->data_len = args->count - uio.uio_resid;
+	ASSERT(uiop->uio_resid >= 0);
+	resp->data_len = args->count - uiop->uio_resid;
 	if (mp) {
 		resp->data_val = (char *)mp->b_datap->db_base;
+		rfs_rndup_mblks(mp, resp->data_len, loaned_buffers);
 	} else {
 		resp->data_val = (caddr_t)iov.iov_base;
 	}
+
 	resp->mblk = mp;
 
 	if (!verror && offset + resp->data_len == va.va_size)
@@ -3315,7 +3364,7 @@ rfs4_op_read(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	else
 		resp->eof = FALSE;
 
-	if (args->wlist) {
+	if (rdma_used) {
 		if (!rdma_setup_read_data4(args, resp)) {
 			*cs->statusp = resp->status = NFS4ERR_INVAL;
 		}
@@ -3337,7 +3386,7 @@ rfs4_op_read_free(nfs_resop4 *resop)
 	READ4res	*resp = &resop->nfs_resop4_u.opread;
 
 	if (resp->status == NFS4_OK && resp->mblk != NULL) {
-		freeb(resp->mblk);
+		freemsg(resp->mblk);
 		resp->mblk = NULL;
 		resp->data_val = NULL;
 		resp->data_len = 0;

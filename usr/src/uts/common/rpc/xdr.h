@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -584,6 +584,8 @@ extern bool_t xdrrec_eof();
 extern uint_t xdrrec_readbytes();
 #endif
 #else
+
+#define	DLEN(mp) (mp->b_cont ? msgdsize(mp) : (mp->b_wptr - mp->b_rptr))
 
 extern void	xdrmem_create(XDR *, caddr_t, uint_t, enum xdr_op);
 extern void	xdrmblk_init(XDR *, mblk_t *, enum xdr_op, int);

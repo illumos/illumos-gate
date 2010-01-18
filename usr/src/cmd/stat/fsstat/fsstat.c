@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -428,6 +428,8 @@ vop_display(char *name, vopstats_t *oldvsp, vopstats_t *newvsp, int dispflag)
 	PRINT_VOPSTAT(niceflag, setsecattr);
 	PRINT_VOPSTAT(niceflag, shrlock);
 	PRINT_VOPSTAT(niceflag, vnevent);
+	PRINT_VOPSTAT(niceflag, reqzcbuf);
+	PRINT_VOPSTAT(niceflag, retzcbuf);
 
 	if (niceflag) {
 		/* Make it easier on the eyes */

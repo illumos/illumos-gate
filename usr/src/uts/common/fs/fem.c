@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/atomic.h>
@@ -124,6 +123,8 @@ static fs_operation_trans_def_t	fem_opdef[] = {
 	_FEMOPDEF(GETSECATTR,	getsecattr),
 	_FEMOPDEF(SHRLOCK,	shrlock),
 	_FEMOPDEF(VNEVENT,	vnevent),
+	_FEMOPDEF(REQZCBUF,	reqzcbuf),
+	_FEMOPDEF(RETZCBUF,	retzcbuf),
 	{ NULL, 0, NULL, NULL }
 };
 
@@ -176,6 +177,8 @@ static struct fs_operation_def fem_guard_ops[] = {
 	_FEMGUARD(GETSECATTR,	getsecattr),
 	_FEMGUARD(SHRLOCK,	shrlock),
 	_FEMGUARD(VNEVENT,	vnevent),
+	_FEMGUARD(REQZCBUF,	reqzcbuf),
+	_FEMGUARD(RETZCBUF,	retzcbuf),
 	{ NULL, NULL }
 };
 
@@ -1645,6 +1648,61 @@ vhead_vnevent(vnode_t *vp, vnevent_t vnevent, vnode_t *dvp, char *cname,
 }
 
 static int
+vhead_reqzcbuf(vnode_t *vp, enum uio_rw ioflag, xuio_t *xuiop, cred_t *cr,
+    caller_context_t *ct)
+{
+	femarg_t	farg;
+	struct fem_list	*femsp;
+	int		(*func)();
+	void		*arg0;
+	int		errc;
+
+	if ((femsp = fem_lock(vp->v_femhead)) == NULL) {
+		func = (int (*)()) (vp->v_op->vop_reqzcbuf);
+		arg0 = vp;
+		fem_unlock(vp->v_femhead);
+		errc = (*func)(arg0, ioflag, xuiop, cr, ct);
+	} else {
+		fem_addref(femsp);
+		fem_unlock(vp->v_femhead);
+		farg.fa_vnode.vp = vp;
+		farg.fa_fnode = femsp->feml_nodes + femsp->feml_tos;
+		vsop_find(&farg, &func, int, &arg0, vop_reqzcbuf,
+		    femop_reqzcbuf);
+		errc = (*func)(arg0, ioflag, xuiop, cr, ct);
+		fem_release(femsp);
+	}
+	return (errc);
+}
+
+static int
+vhead_retzcbuf(vnode_t *vp, xuio_t *xuiop, cred_t *cr, caller_context_t *ct)
+{
+	femarg_t	farg;
+	struct fem_list	*femsp;
+	int		(*func)();
+	void		*arg0;
+	int		errc;
+
+	if ((femsp = fem_lock(vp->v_femhead)) == NULL) {
+		func = (int (*)()) (vp->v_op->vop_retzcbuf);
+		arg0 = vp;
+		fem_unlock(vp->v_femhead);
+		errc = (*func)(arg0, xuiop, cr, ct);
+	} else {
+		fem_addref(femsp);
+		fem_unlock(vp->v_femhead);
+		farg.fa_vnode.vp = vp;
+		farg.fa_fnode = femsp->feml_nodes + femsp->feml_tos;
+		vsop_find(&farg, &func, int, &arg0, vop_retzcbuf,
+		    femop_retzcbuf);
+		errc = (*func)(arg0, xuiop, cr, ct);
+		fem_release(femsp);
+	}
+	return (errc);
+}
+
+static int
 fshead_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 {
 	fsemarg_t	farg;
@@ -1942,6 +2000,8 @@ static struct fs_operation_def fhead_vn_spec[] = {
 	{ VOPNAME_GETSECATTR, (femop_t *)vhead_getsecattr },
 	{ VOPNAME_SHRLOCK, (femop_t *)vhead_shrlock },
 	{ VOPNAME_VNEVENT, (femop_t *)vhead_vnevent },
+	{ VOPNAME_REQZCBUF, (femop_t *)vhead_reqzcbuf },
+	{ VOPNAME_RETZCBUF, (femop_t *)vhead_retzcbuf },
 	{	NULL,	NULL	}
 };
 
@@ -2639,6 +2699,35 @@ vnext_vnevent(femarg_t *vf, vnevent_t vnevent, vnode_t *dvp, char *cname,
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
 	return ((*func)(arg0, vnevent, dvp, cname, ct));
+}
+
+int
+vnext_reqzcbuf(femarg_t *vf, enum uio_rw ioflag, xuio_t *xuiop, cred_t *cr,
+    caller_context_t *ct)
+{
+	int (*func)() = NULL;
+	void *arg0 = NULL;
+
+	ASSERT(vf != NULL);
+	vf->fa_fnode--;
+	vsop_find(vf, &func, int, &arg0, vop_reqzcbuf, femop_reqzcbuf);
+	ASSERT(func != NULL);
+	ASSERT(arg0 != NULL);
+	return ((*func)(arg0, ioflag, xuiop, cr, ct));
+}
+
+int
+vnext_retzcbuf(femarg_t *vf, xuio_t *xuiop, cred_t *cr, caller_context_t *ct)
+{
+	int (*func)() = NULL;
+	void *arg0 = NULL;
+
+	ASSERT(vf != NULL);
+	vf->fa_fnode--;
+	vsop_find(vf, &func, int, &arg0, vop_retzcbuf, femop_retzcbuf);
+	ASSERT(func != NULL);
+	ASSERT(arg0 != NULL);
+	return ((*func)(arg0, xuiop, cr, ct));
 }
 
 int

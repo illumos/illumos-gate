@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -118,6 +118,8 @@ typedef struct vopstats {
 	kstat_named_t	ngetsecattr;	/* VOP_GETSECATTR */
 	kstat_named_t	nshrlock;	/* VOP_SHRLOCK */
 	kstat_named_t	nvnevent;	/* VOP_VNEVENT */
+	kstat_named_t	nreqzcbuf;	/* VOP_REQZCBUF */
+	kstat_named_t	nretzcbuf;	/* VOP_RETZCBUF */
 } vopstats_t;
 
 /*
@@ -900,7 +902,11 @@ struct taskq;
 	int	(*vop_shrlock)(vnode_t *, int, struct shrlock *,	\
 				int, cred_t *, caller_context_t *);	\
 	int	(*vop_vnevent)(vnode_t *, vnevent_t, vnode_t *,		\
-				char *, caller_context_t *)
+				char *, caller_context_t *);		\
+	int	(*vop_reqzcbuf)(vnode_t *, enum uio_rw, xuio_t *,	\
+				cred_t *, caller_context_t *);		\
+	int	(*vop_retzcbuf)(vnode_t *, xuio_t *, cred_t *,		\
+				caller_context_t *)
 	/* NB: No ";" */
 
 /*
@@ -997,6 +1003,9 @@ extern int	fop_shrlock(vnode_t *, int, struct shrlock *, int, cred_t *,
 				caller_context_t *);
 extern int	fop_vnevent(vnode_t *, vnevent_t, vnode_t *, char *,
 				caller_context_t *);
+extern int	fop_reqzcbuf(vnode_t *, enum uio_rw, xuio_t *, cred_t *,
+				caller_context_t *);
+extern int	fop_retzcbuf(vnode_t *, xuio_t *, cred_t *, caller_context_t *);
 
 #endif	/* _KERNEL */
 
@@ -1088,6 +1097,10 @@ extern int	fop_vnevent(vnode_t *, vnevent_t, vnode_t *, char *,
 	fop_shrlock(vp, cmd, shr, f, cr, ct)
 #define	VOP_VNEVENT(vp, vnevent, dvp, fnm, ct) \
 	fop_vnevent(vp, vnevent, dvp, fnm, ct)
+#define	VOP_REQZCBUF(vp, rwflag, xuiop, cr, ct) \
+	fop_reqzcbuf(vp, rwflag, xuiop, cr, ct)
+#define	VOP_RETZCBUF(vp, xuiop, cr, ct) \
+	fop_retzcbuf(vp, xuiop, cr, ct)
 
 #define	VOPNAME_OPEN		"open"
 #define	VOPNAME_CLOSE		"close"
@@ -1133,6 +1146,8 @@ extern int	fop_vnevent(vnode_t *, vnevent_t, vnode_t *, char *,
 #define	VOPNAME_SETSECATTR	"setsecattr"
 #define	VOPNAME_SHRLOCK		"shrlock"
 #define	VOPNAME_VNEVENT		"vnevent"
+#define	VOPNAME_REQZCBUF	"reqzcbuf"
+#define	VOPNAME_RETZCBUF	"retzcbuf"
 
 /*
  * Flags for VOP_LOOKUP

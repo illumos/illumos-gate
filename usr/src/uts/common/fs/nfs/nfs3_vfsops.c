@@ -1003,7 +1003,7 @@ errout:
 
 static int nfs3_dynamic = 0;	/* global variable to enable dynamic retrans. */
 static ushort_t nfs3_max_threads = 8;	/* max number of active async threads */
-static uint_t nfs3_bsize = 32 * 1024;	/* client `block' size */
+uint_t nfs3_bsize = 32 * 1024;	/* client `block' size */
 static uint_t nfs3_async_clusters = 1;	/* # of reqs from each async queue */
 static uint_t nfs3_cots_timeo = NFS_COTS_TIMEO;
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,6 +106,9 @@ static struct modlinkage modlinkage = {
 
 char _depends_on[] = "misc/klmmod";
 
+kmem_cache_t *nfs_xuio_cache;
+int nfs_loaned_buffers = 0;
+
 int
 _init(void)
 {
@@ -138,6 +141,11 @@ _init(void)
 
 	/* setup DSS paths here; must be done before initial server startup */
 	rfs4_dss_paths = rfs4_dss_oldpaths = NULL;
+
+	/* initialize the copy reduction caches */
+
+	nfs_xuio_cache = kmem_cache_create("nfs_xuio_cache",
+	    sizeof (nfs_xuio_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
 
 	return (status);
 }
@@ -3214,4 +3222,141 @@ do_rfs_label_check(bslabel_t *clabel, vnode_t *vp, int flag,
 		result = bldominates(clabel, slabel);
 	label_rele(tslabel);
 	return (result);
+}
+
+/*
+ * Callback function to return the loaned buffers.
+ * Calls VOP_RETZCBUF() only after all uio_iov[]
+ * buffers are returned. nu_ref maintains the count.
+ */
+void
+rfs_free_xuio(void *free_arg)
+{
+	uint_t ref;
+	nfs_xuio_t *nfsuiop = (nfs_xuio_t *)free_arg;
+
+	ref = atomic_dec_uint_nv(&nfsuiop->nu_ref);
+
+	/*
+	 * Call VOP_RETZCBUF() only when all the iov buffers
+	 * are sent OTW.
+	 */
+	if (ref != 0)
+		return;
+
+	if (((uio_t *)nfsuiop)->uio_extflg & UIO_XUIO) {
+		(void) VOP_RETZCBUF(nfsuiop->nu_vp, (xuio_t *)free_arg, NULL,
+		    NULL);
+		VN_RELE(nfsuiop->nu_vp);
+	}
+
+	kmem_cache_free(nfs_xuio_cache, free_arg);
+}
+
+xuio_t *
+rfs_setup_xuio(vnode_t *vp)
+{
+	nfs_xuio_t *nfsuiop;
+
+	nfsuiop = kmem_cache_alloc(nfs_xuio_cache, KM_SLEEP);
+
+	bzero(nfsuiop, sizeof (nfs_xuio_t));
+	nfsuiop->nu_vp = vp;
+
+	/*
+	 * ref count set to 1. more may be added
+	 * if multiple mblks refer to multiple iov's.
+	 * This is done in uio_to_mblk().
+	 */
+
+	nfsuiop->nu_ref = 1;
+
+	nfsuiop->nu_frtn.free_func = rfs_free_xuio;
+	nfsuiop->nu_frtn.free_arg = (char *)nfsuiop;
+
+	nfsuiop->nu_uio.xu_type = UIOTYPE_ZEROCOPY;
+
+	return (&nfsuiop->nu_uio);
+}
+
+mblk_t *
+uio_to_mblk(uio_t *uiop)
+{
+	struct iovec *iovp;
+	int i;
+	mblk_t *mp, *mp1;
+	nfs_xuio_t *nfsuiop = (nfs_xuio_t *)uiop;
+
+	if (uiop->uio_iovcnt == 0)
+		return (NULL);
+
+	iovp = uiop->uio_iov;
+	mp = mp1 = esballoca((uchar_t *)iovp->iov_base, iovp->iov_len,
+	    BPRI_MED, &nfsuiop->nu_frtn);
+	ASSERT(mp != NULL);
+
+	mp->b_wptr += iovp->iov_len;
+	mp->b_datap->db_type = M_DATA;
+
+	for (i = 1; i < uiop->uio_iovcnt; i++) {
+		iovp = (uiop->uio_iov + i);
+
+		mp1->b_cont = esballoca(
+		    (uchar_t *)iovp->iov_base, iovp->iov_len, BPRI_MED,
+		    &nfsuiop->nu_frtn);
+
+		mp1 = mp1->b_cont;
+		ASSERT(mp1 != NULL);
+		mp1->b_wptr += iovp->iov_len;
+		mp1->b_datap->db_type = M_DATA;
+	}
+
+	nfsuiop->nu_ref = uiop->uio_iovcnt;
+
+	return (mp);
+}
+
+void
+rfs_rndup_mblks(mblk_t *mp, uint_t len, int buf_loaned)
+{
+	int i, rndup;
+	int alloc_err = 0;
+	mblk_t *rmp;
+
+	rndup = BYTES_PER_XDR_UNIT - (len % BYTES_PER_XDR_UNIT);
+
+	/* single mblk_t non copy-reduction case */
+	if (!buf_loaned) {
+		mp->b_wptr += len;
+		if (rndup != BYTES_PER_XDR_UNIT) {
+			for (i = 0; i < rndup; i++)
+				*mp->b_wptr++ = '\0';
+		}
+		return;
+	}
+
+	/* no need for extra rndup */
+	if (rndup == BYTES_PER_XDR_UNIT)
+		return;
+
+	while (mp->b_cont)
+		mp = mp->b_cont;
+
+	/*
+	 * In case of copy-reduction mblks, the size of the mblks
+	 * are fixed and are of the size of the loaned buffers.
+	 * Allocate a roundup mblk and chain it to the data
+	 * buffers. This is sub-optimal, but not expected to
+	 * happen in regular common workloads.
+	 */
+
+	rmp = allocb_wait(rndup, BPRI_MED, STR_NOSIG, &alloc_err);
+	ASSERT(rmp != NULL);
+	ASSERT(alloc_err == 0);
+
+	for (i = 0; i < rndup; i++)
+		*rmp->b_wptr++ = '\0';
+
+	rmp->b_datap->db_type = M_DATA;
+	mp->b_cont = rmp;
 }

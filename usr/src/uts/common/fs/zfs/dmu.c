@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -661,12 +661,136 @@ dmu_prealloc(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
 	dmu_buf_rele_array(dbp, numbufs, FTAG);
 }
 
+/*
+ * DMU support for xuio
+ */
+kstat_t *xuio_ksp = NULL;
+
+int
+dmu_xuio_init(xuio_t *xuio, int nblk)
+{
+	dmu_xuio_t *priv;
+	uio_t *uio = &xuio->xu_uio;
+
+	uio->uio_iovcnt = nblk;
+	uio->uio_iov = kmem_zalloc(nblk * sizeof (iovec_t), KM_SLEEP);
+
+	priv = kmem_zalloc(sizeof (dmu_xuio_t), KM_SLEEP);
+	priv->cnt = nblk;
+	priv->bufs = kmem_zalloc(nblk * sizeof (arc_buf_t *), KM_SLEEP);
+	priv->iovp = uio->uio_iov;
+	XUIO_XUZC_PRIV(xuio) = priv;
+
+	if (XUIO_XUZC_RW(xuio) == UIO_READ)
+		XUIOSTAT_INCR(xuiostat_onloan_rbuf, nblk);
+	else
+		XUIOSTAT_INCR(xuiostat_onloan_wbuf, nblk);
+
+	return (0);
+}
+
+void
+dmu_xuio_fini(xuio_t *xuio)
+{
+	dmu_xuio_t *priv = XUIO_XUZC_PRIV(xuio);
+	int nblk = priv->cnt;
+
+	kmem_free(priv->iovp, nblk * sizeof (iovec_t));
+	kmem_free(priv->bufs, nblk * sizeof (arc_buf_t *));
+	kmem_free(priv, sizeof (dmu_xuio_t));
+
+	if (XUIO_XUZC_RW(xuio) == UIO_READ)
+		XUIOSTAT_INCR(xuiostat_onloan_rbuf, -nblk);
+	else
+		XUIOSTAT_INCR(xuiostat_onloan_wbuf, -nblk);
+}
+
+/*
+ * Initialize iov[priv->next] and priv->bufs[priv->next] with { off, n, abuf }
+ * and increase priv->next by 1.
+ */
+int
+dmu_xuio_add(xuio_t *xuio, arc_buf_t *abuf, offset_t off, size_t n)
+{
+	struct iovec *iov;
+	uio_t *uio = &xuio->xu_uio;
+	dmu_xuio_t *priv = XUIO_XUZC_PRIV(xuio);
+	int i = priv->next++;
+
+	ASSERT(i < priv->cnt);
+	ASSERT(off + n <= arc_buf_size(abuf));
+	iov = uio->uio_iov + i;
+	iov->iov_base = (char *)abuf->b_data + off;
+	iov->iov_len = n;
+	priv->bufs[i] = abuf;
+	return (0);
+}
+
+int
+dmu_xuio_cnt(xuio_t *xuio)
+{
+	dmu_xuio_t *priv = XUIO_XUZC_PRIV(xuio);
+	return (priv->cnt);
+}
+
+arc_buf_t *
+dmu_xuio_arcbuf(xuio_t *xuio, int i)
+{
+	dmu_xuio_t *priv = XUIO_XUZC_PRIV(xuio);
+
+	ASSERT(i < priv->cnt);
+	return (priv->bufs[i]);
+}
+
+void
+dmu_xuio_clear(xuio_t *xuio, int i)
+{
+	dmu_xuio_t *priv = XUIO_XUZC_PRIV(xuio);
+
+	ASSERT(i < priv->cnt);
+	priv->bufs[i] = NULL;
+}
+
+static void
+xuio_stat_init(void)
+{
+	xuio_ksp = kstat_create("zfs", 0, "xuio_stats", "misc",
+	    KSTAT_TYPE_NAMED, sizeof (xuio_stats) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL);
+	if (xuio_ksp != NULL) {
+		xuio_ksp->ks_data = &xuio_stats;
+		kstat_install(xuio_ksp);
+	}
+}
+
+static void
+xuio_stat_fini(void)
+{
+	if (xuio_ksp != NULL) {
+		kstat_delete(xuio_ksp);
+		xuio_ksp = NULL;
+	}
+}
+
+void
+xuio_stat_wbuf_copied()
+{
+	XUIOSTAT_BUMP(xuiostat_wbuf_copied);
+}
+
+void
+xuio_stat_wbuf_nocopy()
+{
+	XUIOSTAT_BUMP(xuiostat_wbuf_nocopy);
+}
+
 #ifdef _KERNEL
 int
 dmu_read_uio(objset_t *os, uint64_t object, uio_t *uio, uint64_t size)
 {
 	dmu_buf_t **dbp;
 	int numbufs, i, err;
+	xuio_t *xuio = NULL;
 
 	/*
 	 * NB: we could do this block-at-a-time, but it's nice
@@ -676,6 +800,9 @@ dmu_read_uio(objset_t *os, uint64_t object, uio_t *uio, uint64_t size)
 	    &numbufs, &dbp);
 	if (err)
 		return (err);
+
+	if (uio->uio_extflg == UIO_XUIO)
+		xuio = (xuio_t *)uio;
 
 	for (i = 0; i < numbufs; i++) {
 		int tocpy;
@@ -687,8 +814,24 @@ dmu_read_uio(objset_t *os, uint64_t object, uio_t *uio, uint64_t size)
 		bufoff = uio->uio_loffset - db->db_offset;
 		tocpy = (int)MIN(db->db_size - bufoff, size);
 
-		err = uiomove((char *)db->db_data + bufoff, tocpy,
-		    UIO_READ, uio);
+		if (xuio) {
+			dmu_buf_impl_t *dbi = (dmu_buf_impl_t *)db;
+			arc_buf_t *dbuf_abuf = dbi->db_buf;
+			arc_buf_t *abuf = dbuf_loan_arcbuf(dbi);
+			err = dmu_xuio_add(xuio, abuf, bufoff, tocpy);
+			if (!err) {
+				uio->uio_resid -= tocpy;
+				uio->uio_loffset += tocpy;
+			}
+
+			if (abuf == dbuf_abuf)
+				XUIOSTAT_BUMP(xuiostat_rbuf_nocopy);
+			else
+				XUIOSTAT_BUMP(xuiostat_rbuf_copied);
+		} else {
+			err = uiomove((char *)db->db_data + bufoff, tocpy,
+			    UIO_READ, uio);
+		}
 		if (err)
 			break;
 
@@ -857,6 +1000,7 @@ dmu_assign_arcbuf(dmu_buf_t *handle, uint64_t offset, arc_buf_t *buf,
 		dmu_write(dn->dn_objset, dn->dn_object, offset, blksz,
 		    buf->b_data, tx);
 		dmu_return_arcbuf(buf);
+		XUIOSTAT_BUMP(xuiostat_wbuf_copied);
 	}
 }
 
@@ -1369,6 +1513,7 @@ dmu_init(void)
 	zfetch_init();
 	arc_init();
 	l2arc_init();
+	xuio_stat_init();
 }
 
 void
@@ -1379,4 +1524,5 @@ dmu_fini(void)
 	dnode_fini();
 	dbuf_fini();
 	l2arc_fini();
+	xuio_stat_fini();
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1115,6 +1115,7 @@ zfs_domount(vfs_t *vfsp, char *osname)
 		vfs_set_feature(vfsp, VFSFT_DIRENTFLAGS);
 		vfs_set_feature(vfsp, VFSFT_CASEINSENSITIVE);
 	}
+	vfs_set_feature(vfsp, VFSFT_ZEROCOPY_SUPPORTED);
 
 	if (dmu_objset_is_snapshot(zfsvfs->z_os)) {
 		uint64_t pval;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,6 +86,8 @@ static int	vattr_to_wcc_attr(struct vattr *, wcc_attr *);
 static void	vattr_to_pre_op_attr(struct vattr *, pre_op_attr *);
 static void	vattr_to_wcc_data(struct vattr *, struct vattr *, wcc_data *);
 static int	rdma_setup_read_data3(READ3args *, READ3resok *);
+
+extern int nfs_loaned_buffers;
 
 u_longlong_t nfs3_srv_caller_id;
 
@@ -994,6 +996,9 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 	int in_crit = 0;
 	int need_rwunlock = 0;
 	caller_context_t ct;
+	int rdma_used = 0;
+	int loaned_buffers;
+	struct uio *uiop;
 
 	vap = NULL;
 
@@ -1006,6 +1011,12 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 		error = ESTALE;
 		goto out;
 	}
+
+	if (args->wlist)
+		rdma_used = 1;
+
+	/* use loaned buffers for TCP */
+	loaned_buffers = (nfs_loaned_buffers && !rdma_used) ? 1 : 0;
 
 	if (is_system_labeled()) {
 		bslabel_t *clabel = req->rq_label;
@@ -1136,12 +1147,38 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 	if (args->count > rfs3_tsize(req))
 		args->count = rfs3_tsize(req);
 
+	if (loaned_buffers) {
+		uiop = (uio_t *)rfs_setup_xuio(vp);
+		ASSERT(uiop != NULL);
+		uiop->uio_segflg = UIO_SYSSPACE;
+		uiop->uio_loffset = args->offset;
+		uiop->uio_resid = args->count;
+
+		/* Jump to do the read if successful */
+		if (VOP_REQZCBUF(vp, UIO_READ, (xuio_t *)uiop, cr, &ct) == 0) {
+			/*
+			 * Need to hold the vnode until after VOP_RETZCBUF()
+			 * is called.
+			 */
+			VN_HOLD(vp);
+			goto doio_read;
+		}
+
+		DTRACE_PROBE2(nfss__i__reqzcbuf_failed, int,
+		    uiop->uio_loffset, int, uiop->uio_resid);
+
+		uiop->uio_extflg = 0;
+		/* failure to setup for zero copy */
+		rfs_free_xuio((void *)uiop);
+		loaned_buffers = 0;
+	}
+
 	/*
 	 * If returning data via RDMA Write, then grab the chunk list.
 	 * If we aren't returning READ data w/RDMA_WRITE, then grab
 	 * a mblk.
 	 */
-	if (args->wlist) {
+	if (rdma_used) {
 		mp = NULL;
 		(void) rdma_get_wchunk(req, &iov, args->wlist);
 	} else {
@@ -1167,17 +1204,26 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 	uio.uio_extflg = UIO_COPY_CACHED;
 	uio.uio_loffset = args->offset;
 	uio.uio_resid = args->count;
+	uiop = &uio;
 
-	error = VOP_READ(vp, &uio, 0, cr, &ct);
+doio_read:
+	error = VOP_READ(vp, uiop, 0, cr, &ct);
 
 	if (error) {
-		freeb(mp);
+		if (mp)
+			freemsg(mp);
 		/* check if a monitor detected a delegation conflict */
 		if (error == EAGAIN && (ct.cc_flags & CC_WOULDBLOCK)) {
 			resp->status = NFS3ERR_JUKEBOX;
 			goto out1;
 		}
 		goto out;
+	}
+
+	/* make mblk using zc buffers */
+	if (loaned_buffers) {
+		mp = uio_to_mblk(uiop);
+		ASSERT(mp != NULL);
 	}
 
 	va.va_mask = AT_ALL;
@@ -1205,16 +1251,20 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 
 	resp->status = NFS3_OK;
 	vattr_to_post_op_attr(vap, &resp->resok.file_attributes);
-	resp->resok.count = args->count - uio.uio_resid;
+	resp->resok.count = args->count - uiop->uio_resid;
 	if (!error && offset + resp->resok.count == va.va_size)
 		resp->resok.eof = TRUE;
 	else
 		resp->resok.eof = FALSE;
 	resp->resok.data.data_len = resp->resok.count;
+
+	if (mp)
+		rfs_rndup_mblks(mp, resp->resok.count, loaned_buffers);
+
 	resp->resok.data.mp = mp;
 	resp->resok.size = (uint_t)args->count;
 
-	if (args->wlist) {
+	if (rdma_used) {
 		resp->resok.data.data_val = (caddr_t)iov.iov_base;
 		if (!rdma_setup_read_data3(args, &(resp->resok))) {
 			resp->status = NFS3ERR_INVAL;
@@ -1260,7 +1310,7 @@ rfs3_read_free(READ3res *resp)
 	if (resp->status == NFS3_OK) {
 		mp = resp->resok.data.mp;
 		if (mp != NULL)
-			freeb(mp);
+			freemsg(mp);
 	}
 }
 

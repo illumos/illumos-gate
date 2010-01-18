@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -1058,8 +1058,6 @@ rpcmod_release(queue_t *q, mblk_t *bp)
 #define	MIR_SVC_IDLE_TIMEOUT	(6 * (60 * 1000L))	/* 6 minutes */
 #define	MIR_SVC_ORDREL_TIMEOUT	(10 * (60 * 1000L))	/* 10 minutes */
 #define	MIR_LASTFRAG	0x80000000	/* Record marker */
-
-#define	DLEN(mp) (mp->b_cont ? msgdsize(mp) : (mp->b_wptr - mp->b_rptr))
 
 #define	MIR_SVC_QUIESCED(mir)	\
 	(mir->mir_ref_cnt == 0 && mir->mir_inrservice == 0)

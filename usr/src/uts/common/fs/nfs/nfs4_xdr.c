@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3350,7 +3350,6 @@ xdr_READ4args(XDR *xdrs, READ4args *objp)
 static bool_t
 xdr_READ4res(XDR *xdrs, READ4res *objp)
 {
-	int i, rndup;
 	mblk_t *mp;
 
 	if (xdrs->x_op == XDR_DECODE)
@@ -3378,12 +3377,6 @@ xdr_READ4res(XDR *xdrs, READ4res *objp)
 
 	mp = objp->mblk;
 	if (mp != NULL && xdrs->x_ops == &xdrmblk_ops) {
-		mp->b_wptr += objp->data_len;
-		rndup = BYTES_PER_XDR_UNIT -
-		    (objp->data_len % BYTES_PER_XDR_UNIT);
-		if (rndup != BYTES_PER_XDR_UNIT)
-			for (i = 0; i < rndup; i++)
-				*mp->b_wptr++ = '\0';
 		if (xdrmblk_putmblk(xdrs, mp, objp->data_len) == TRUE) {
 			objp->mblk = NULL;
 			return (TRUE);

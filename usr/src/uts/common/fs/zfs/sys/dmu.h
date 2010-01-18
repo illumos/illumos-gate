@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +45,7 @@ extern "C" {
 #endif
 
 struct uio;
+struct xuio;
 struct page;
 struct vnode;
 struct spa;
@@ -500,6 +501,15 @@ struct arc_buf *dmu_request_arcbuf(dmu_buf_t *handle, int size);
 void dmu_return_arcbuf(struct arc_buf *buf);
 void dmu_assign_arcbuf(dmu_buf_t *handle, uint64_t offset, struct arc_buf *buf,
     dmu_tx_t *tx);
+int dmu_xuio_init(struct xuio *uio, int niov);
+void dmu_xuio_fini(struct xuio *uio);
+int dmu_xuio_add(struct xuio *uio, struct arc_buf *abuf, offset_t off,
+    size_t n);
+int dmu_xuio_cnt(struct xuio *uio);
+struct arc_buf *dmu_xuio_arcbuf(struct xuio *uio, int i);
+void dmu_xuio_clear(struct xuio *uio, int i);
+void xuio_stat_wbuf_copied();
+void xuio_stat_wbuf_nocopy();
 
 extern int zfs_prefetch_disable;
 

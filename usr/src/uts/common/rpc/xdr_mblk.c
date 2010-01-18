@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -361,20 +361,24 @@ xdrmblk_putbytes(XDR *xdrs, caddr_t addr, int len)
  * not a multiple of BYTES_PER_XDR_UNIT, the caller has the option
  * of making the data a BYTES_PER_XDR_UNIT multiple (b_wptr - b_rptr is
  * a BYTES_PER_XDR_UNIT multiple), but in this case the caller has to ensure
- * that the filler bytes are initialized to zero. Note: Doesn't to work for
- * chained mblks.
+ * that the filler bytes are initialized to zero.
  */
 bool_t
 xdrmblk_putmblk(XDR *xdrs, mblk_t *m, uint_t len)
 {
 	int32_t llen = (int32_t)len;
 
-	if (((m->b_wptr - m->b_rptr) % BYTES_PER_XDR_UNIT) != 0)
+	if ((DLEN(m) % BYTES_PER_XDR_UNIT) != 0)
 		return (FALSE);
 	if (!xdrmblk_putint32(xdrs, &llen))
 		return (FALSE);
+
 	/* LINTED pointer alignment */
 	((mblk_t *)xdrs->x_base)->b_cont = m;
+
+	/* base points to the last mblk */
+	while (m->b_cont)
+		m = m->b_cont;
 	xdrs->x_base = (caddr_t)m;
 	xdrs->x_handy = 0;
 	return (TRUE);

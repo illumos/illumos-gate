@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1447,6 +1447,7 @@ struct READ3resok {
 #ifdef _KERNEL
 	uint_t wlist_len;
 	struct clist *wlist;
+	frtn_t zcopy;
 #endif
 };
 typedef struct READ3resok READ3resok;
@@ -2322,6 +2323,24 @@ extern int do_xattr_exists_check(vnode_t *, ulong_t *, cred_t *);
 extern ts_label_t	*nfs_getflabel(vnode_t *, struct exportinfo *);
 extern boolean_t	do_rfs_label_check(bslabel_t *, vnode_t *, int,
 			    struct exportinfo *);
+
+/*
+ * Copy Reduction support.
+ * xuio_t wrapper with additional private data.
+ */
+
+typedef struct nfs_xuio {
+	xuio_t nu_uio;
+	vnode_t *nu_vp;
+	uint_t nu_ref;
+	frtn_t nu_frtn;
+} nfs_xuio_t;
+
+xuio_t *rfs_setup_xuio(vnode_t *);
+mblk_t *uio_to_mblk(uio_t *);
+void rfs_rndup_mblks(mblk_t *, uint_t, int);
+void rfs_free_xuio(void *);
+
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -404,6 +404,29 @@ dbuf_set_data(dmu_buf_impl_t *db, arc_buf_t *buf)
 		if (db->db_state != DB_NOFILL)
 			db->db_state = DB_UNCACHED;
 	}
+}
+
+/*
+ * Loan out an arc_buf for read.  Return the loaned arc_buf.
+ */
+arc_buf_t *
+dbuf_loan_arcbuf(dmu_buf_impl_t *db)
+{
+	arc_buf_t *abuf;
+
+	mutex_enter(&db->db_mtx);
+	if (arc_released(db->db_buf) || refcount_count(&db->db_holds) > 1) {
+		int blksz = db->db.db_size;
+		mutex_exit(&db->db_mtx);
+		abuf = arc_loan_buf(db->db_dnode->dn_objset->os_spa, blksz);
+		bcopy(db->db.db_data, abuf->b_data, blksz);
+	} else {
+		abuf = db->db_buf;
+		arc_loan_inuse_buf(abuf, db);
+		dbuf_set_data(db, NULL);
+		mutex_exit(&db->db_mtx);
+	}
+	return (abuf);
 }
 
 uint64_t
@@ -1162,7 +1185,6 @@ dbuf_undirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 	ASSERT(db->db_blkid != DB_BONUS_BLKID);
 
 	mutex_enter(&db->db_mtx);
-
 	/*
 	 * If this buffer is not dirty, we're done.
 	 */
@@ -1341,9 +1363,11 @@ dbuf_assign_arcbuf(dmu_buf_impl_t *db, arc_buf_t *buf, dmu_tx_t *tx)
 		(void) dbuf_dirty(db, tx);
 		bcopy(buf->b_data, db->db.db_data, db->db.db_size);
 		VERIFY(arc_buf_remove_ref(buf, db) == 1);
+		xuio_stat_wbuf_copied();
 		return;
 	}
 
+	xuio_stat_wbuf_nocopy();
 	if (db->db_state == DB_CACHED) {
 		dbuf_dirty_record_t *dr = db->db_last_dirty;
 

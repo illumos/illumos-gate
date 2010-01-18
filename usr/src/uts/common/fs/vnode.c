@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -362,6 +362,12 @@ static const fs_operation_trans_def_t vn_ops_table[] = {
 	    (fs_generic_func_p) fs_vnevent_nosupport,
 	    (fs_generic_func_p) fs_vnevent_nosupport,
 
+	VOPNAME_REQZCBUF, offsetof(struct vnodeops, vop_reqzcbuf),
+	    fs_nosys, fs_nosys,
+
+	VOPNAME_RETZCBUF, offsetof(struct vnodeops, vop_retzcbuf),
+	    fs_nosys, fs_nosys,
+
 	NULL, 0, NULL, NULL
 };
 
@@ -522,6 +528,10 @@ create_vopstats_template()
 	kstat_named_init(&vsp->nshrlock, "nshrlock", KSTAT_DATA_UINT64);
 	/* VOP_VNEVENT */
 	kstat_named_init(&vsp->nvnevent, "nvnevent", KSTAT_DATA_UINT64);
+	/* VOP_REQZCBUF */
+	kstat_named_init(&vsp->nreqzcbuf, "nreqzcbuf", KSTAT_DATA_UINT64);
+	/* VOP_RETZCBUF */
+	kstat_named_init(&vsp->nretzcbuf, "nretzcbuf", KSTAT_DATA_UINT64);
 
 	return (vsp);
 }
@@ -4148,6 +4158,31 @@ fop_vnevent(vnode_t *vp, vnevent_t vnevent, vnode_t *dvp, char *fnm,
 
 	err = (*(vp)->v_op->vop_vnevent)(vp, vnevent, dvp, fnm, ct);
 	VOPSTATS_UPDATE(vp, vnevent);
+	return (err);
+}
+
+int
+fop_reqzcbuf(vnode_t *vp, enum uio_rw ioflag, xuio_t *uiop, cred_t *cr,
+    caller_context_t *ct)
+{
+	int err;
+
+	if (vfs_has_feature(vp->v_vfsp, VFSFT_ZEROCOPY_SUPPORTED) == 0)
+		return (ENOTSUP);
+	err = (*(vp)->v_op->vop_reqzcbuf)(vp, ioflag, uiop, cr, ct);
+	VOPSTATS_UPDATE(vp, reqzcbuf);
+	return (err);
+}
+
+int
+fop_retzcbuf(vnode_t *vp, xuio_t *uiop, cred_t *cr, caller_context_t *ct)
+{
+	int err;
+
+	if (vfs_has_feature(vp->v_vfsp, VFSFT_ZEROCOPY_SUPPORTED) == 0)
+		return (ENOTSUP);
+	err = (*(vp)->v_op->vop_retzcbuf)(vp, uiop, cr, ct);
+	VOPSTATS_UPDATE(vp, retzcbuf);
 	return (err);
 }
 

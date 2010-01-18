@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -133,6 +133,49 @@ typedef struct uioa_s {
 	uioa_page_t	uioa_locked[UIOA_IOV_MAX]; /* Per iov locked pages */
 } uioa_t;
 
+/*
+ * uio extensions
+ *
+ * PSARC 2009/478: Copy Reduction Interfaces
+ */
+typedef enum xuio_type {
+	UIOTYPE_ASYNCIO,
+	UIOTYPE_ZEROCOPY
+} xuio_type_t;
+
+typedef struct xuio {
+	uio_t xu_uio;		/* Embedded UIO structure */
+
+	/* Extended uio fields */
+	enum xuio_type xu_type;	/* What kind of uio structure? */
+	union {
+		/* Async I/O Support, intend to replace uioa_t. */
+		struct {
+			uint32_t xu_a_state;	/* state of async i/o */
+			/* bytes that have been uioamove()ed */
+			ssize_t xu_a_mbytes;
+			uioa_page_t *xu_a_lcur;	/* pointer into uioa_locked[] */
+			/* pointer into lcur->uioa_ppp[] */
+			void **xu_a_lppp;
+			void *xu_a_hwst[4];	/* opaque hardware state */
+			/* Per iov locked pages */
+			uioa_page_t xu_a_locked[UIOA_IOV_MAX];
+		} xu_aio;
+
+		/*
+		 * Copy Reduction Support -- facilate loaning / returning of
+		 * filesystem cache buffers.
+		 */
+		struct {
+			int xu_zc_rw;	/* read or write buffer */
+			void *xu_zc_priv;	/* fs specific */
+		} xu_zc;
+	} xu_ext;
+} xuio_t;
+
+#define	XUIO_XUZC_PRIV(xuio)    xuio->xu_ext.xu_zc.xu_zc_priv
+#define	XUIO_XUZC_RW(xuio)	xuio->xu_ext.xu_zc.xu_zc_rw
+
 #define	UIOA_ALLOC	0x0001		/* allocated but not yet initialized */
 #define	UIOA_INIT	0x0002		/* initialized but not yet enabled */
 #define	UIOA_ENABLED	0x0004		/* enabled, asynch i/o active */
@@ -177,6 +220,7 @@ typedef enum uio_rw { UIO_READ, UIO_WRITE } uio_rw_t;
 #define	UIO_COPY_CACHED		0x0001	/* copy should not bypass caches */
 
 #define	UIO_ASYNC		0x0002	/* uio_t is really a uioa_t */
+#define	UIO_XUIO		0x0004	/* Structure is xuio_t */
 
 /*
  * Global uioasync capability shadow state.
