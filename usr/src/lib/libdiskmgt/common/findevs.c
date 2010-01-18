@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,7 +91,7 @@ static int		add_int2array(int p, int **parray);
 static int		add_ptr2array(void *p, void ***parray);
 static char		*bus_type(di_node_t node, di_minor_t minor,
 			    di_prom_handle_t ph);
-static int		can_remove_controller(controller_t *cp,
+static void		remove_controller(controller_t *cp,
 			    controller_t *currp);
 static void		clean_paths(struct search_args *args);
 static disk_t		*create_disk(char *deviceid, char *kernel_name,
@@ -173,7 +173,7 @@ findevs(struct search_args *args)
 	di_root = di_init("/", flags);
 	(void) di_walk_minor(di_root, DDI_PSEUDO, 0, args, add_cluster_devs);
 	if (args->ph != DI_PROM_HANDLE_NIL) {
-	    (void) di_prom_fini(args->ph);
+		(void) di_prom_fini(args->ph);
 	}
 	di_fini(di_root);
 
@@ -197,97 +197,98 @@ add_bus(struct search_args *args, di_node_t node, di_minor_t minor,
 	di_node_t	pnode;
 
 	if (node == DI_NODE_NIL) {
-	    return (NULL);
+		return (NULL);
 	}
 
 	if ((btype = bus_type(node, minor, args->ph)) == NULL) {
-	    return (add_bus(args, di_parent_node(node),
-		di_minor_next(di_parent_node(node), NULL), cp));
+		return (add_bus(args, di_parent_node(node),
+		    di_minor_next(di_parent_node(node), NULL), cp));
 	}
 
 	devpath = di_devfs_path(node);
 
 	if ((bp = find_bus(args, devpath)) != NULL) {
-	    di_devfs_path_free((void *) devpath);
+		di_devfs_path_free((void *) devpath);
 
-	    if (cp != NULL) {
-		if (add_ptr2array(cp, (void ***)&bp->controllers) != 0) {
-		    args->dev_walk_status = ENOMEM;
-		    return (NULL);
+		if (cp != NULL) {
+			if (add_ptr2array(cp,
+			    (void ***)&bp->controllers) != 0) {
+				args->dev_walk_status = ENOMEM;
+				return (NULL);
+			}
 		}
-	    }
-	    return (bp);
+		return (bp);
 	}
 
 	/* Special handling for root node. */
 	if (strcmp(devpath, "/") == 0) {
-	    di_devfs_path_free((void *) devpath);
-	    return (NULL);
+		di_devfs_path_free((void *) devpath);
+		return (NULL);
 	}
 
 	if (dm_debug) {
-	    (void) fprintf(stderr, "INFO: add_bus %s\n", devpath);
+		(void) fprintf(stderr, "INFO: add_bus %s\n", devpath);
 	}
 
 	bp = (bus_t *)calloc(1, sizeof (bus_t));
 	if (bp == NULL) {
-	    return (NULL);
+		return (NULL);
 	}
 
 	bp->name = strdup(devpath);
 	di_devfs_path_free((void *) devpath);
 	if (bp->name == NULL) {
-	    args->dev_walk_status = ENOMEM;
-	    cache_free_bus(bp);
-	    return (NULL);
+		args->dev_walk_status = ENOMEM;
+		cache_free_bus(bp);
+		return (NULL);
 	}
 
 	bp->btype = strdup(btype);
 	if (bp->btype == NULL) {
-	    args->dev_walk_status = ENOMEM;
-	    cache_free_bus(bp);
-	    return (NULL);
+		args->dev_walk_status = ENOMEM;
+		cache_free_bus(bp);
+		return (NULL);
 	}
 
 	(void) snprintf(kstat_name, sizeof (kstat_name), "%s%d",
 	    di_node_name(node), di_instance(node));
 
 	if ((bp->kstat_name = strdup(kstat_name)) == NULL) {
-	    args->dev_walk_status = ENOMEM;
-	    cache_free_bus(bp);
-	    return (NULL);
+		args->dev_walk_status = ENOMEM;
+		cache_free_bus(bp);
+		return (NULL);
 	}
 
 	/* if parent node is a bus, get its name */
 	if ((pnode = get_parent_bus(node, args)) != NULL) {
-	    devpath = di_devfs_path(pnode);
-	    bp->pname = strdup(devpath);
-	    di_devfs_path_free((void *) devpath);
-	    if (bp->pname == NULL) {
-		args->dev_walk_status = ENOMEM;
-		cache_free_bus(bp);
-		return (NULL);
-	    }
+		devpath = di_devfs_path(pnode);
+		bp->pname = strdup(devpath);
+		di_devfs_path_free((void *) devpath);
+		if (bp->pname == NULL) {
+			args->dev_walk_status = ENOMEM;
+			cache_free_bus(bp);
+			return (NULL);
+		}
 
 	} else {
-	    bp->pname = NULL;
+		bp->pname = NULL;
 	}
 
 	bp->freq = get_prom_int("clock-frequency", node, args->ph);
 
 	bp->controllers = (controller_t **)calloc(1, sizeof (controller_t *));
 	if (bp->controllers == NULL) {
-	    args->dev_walk_status = ENOMEM;
-	    cache_free_bus(bp);
-	    return (NULL);
+		args->dev_walk_status = ENOMEM;
+		cache_free_bus(bp);
+		return (NULL);
 	}
 	bp->controllers[0] = NULL;
 
 	if (cp != NULL) {
-	    if (add_ptr2array(cp, (void ***)&bp->controllers) != 0) {
-		args->dev_walk_status = ENOMEM;
-		return (NULL);
-	    }
+		if (add_ptr2array(cp, (void ***)&bp->controllers) != 0) {
+			args->dev_walk_status = ENOMEM;
+			return (NULL);
+		}
 	}
 
 	bp->next = args->bus_listp;
@@ -305,22 +306,22 @@ add_cluster_devs(di_node_t node, di_minor_t minor, void *arg)
 	int			result = DI_WALK_CONTINUE;
 
 	if (!is_cluster_disk(node, minor)) {
-	    return (DI_WALK_CONTINUE);
+		return (DI_WALK_CONTINUE);
 	}
 
 	args = (struct search_args *)arg;
 
 	if (dm_debug > 1) {
-	    /* This is all just debugging code */
-	    char	*devpath;
-	    char	dev_name[MAXPATHLEN];
+		/* This is all just debugging code */
+		char	*devpath;
+		char	dev_name[MAXPATHLEN];
 
-	    devpath = di_devfs_path(node);
-	    (void) snprintf(dev_name, sizeof (dev_name), "%s:%s", devpath,
-		di_minor_name(minor));
-	    di_devfs_path_free((void *) devpath);
+		devpath = di_devfs_path(node);
+		(void) snprintf(dev_name, sizeof (dev_name), "%s:%s", devpath,
+		    di_minor_name(minor));
+		di_devfs_path_free((void *) devpath);
 
-	    (void) fprintf(stderr, "INFO: cluster dev: %s\n", dev_name);
+		(void) fprintf(stderr, "INFO: cluster dev: %s\n", dev_name);
 	}
 
 	args->node = node;
@@ -342,7 +343,7 @@ add_cluster_devs(di_node_t node, di_minor_t minor, void *arg)
 	    DI_PRIMARY_LINK, arg, fix_cluster_devpath);
 
 	if (args->dev_walk_status != 0) {
-	    result = DI_WALK_TERMINATE;
+		result = DI_WALK_TERMINATE;
 	}
 
 	return (result);
@@ -359,48 +360,48 @@ add_controller(struct search_args *args, di_node_t node, di_minor_t minor)
 	devpath = di_devfs_path(node);
 
 	if ((cp = find_controller(args, devpath)) != NULL) {
-	    di_devfs_path_free((void *) devpath);
-	    return (cp);
+		di_devfs_path_free((void *) devpath);
+		return (cp);
 	}
 
 	/* Special handling for fp attachment node. */
 	if (strcmp(di_node_name(node), "fp") == 0) {
-	    di_node_t pnode;
+		di_node_t pnode;
 
-	    pnode = di_parent_node(node);
-	    if (pnode != DI_NODE_NIL) {
-		di_devfs_path_free((void *) devpath);
-		devpath = di_devfs_path(pnode);
+		pnode = di_parent_node(node);
+		if (pnode != DI_NODE_NIL) {
+			di_devfs_path_free((void *) devpath);
+			devpath = di_devfs_path(pnode);
 
-		if ((cp = find_controller(args, devpath)) != NULL) {
-		    di_devfs_path_free((void *) devpath);
-		    return (cp);
+			if ((cp = find_controller(args, devpath)) != NULL) {
+				di_devfs_path_free((void *) devpath);
+				return (cp);
+			}
+
+			/* not in the list, create it */
+			node = pnode;
+			c_type = DM_CTYPE_FIBRE;
 		}
-
-		/* not in the list, create it */
-		node = pnode;
-		c_type = DM_CTYPE_FIBRE;
-	    }
 	}
 
 	if (dm_debug) {
-	    (void) fprintf(stderr, "INFO: add_controller %s\n", devpath);
+		(void) fprintf(stderr, "INFO: add_controller %s\n", devpath);
 	}
 
 	cp = (controller_t *)calloc(1, sizeof (controller_t));
 	if (cp == NULL) {
-	    return (NULL);
+		return (NULL);
 	}
 
 	cp->name = strdup(devpath);
 	di_devfs_path_free((void *) devpath);
 	if (cp->name == NULL) {
-	    cache_free_controller(cp);
-	    return (NULL);
+		cache_free_controller(cp);
+		return (NULL);
 	}
 
 	if (strcmp(c_type, DM_CTYPE_UNKNOWN) == 0) {
-	    c_type = ctype(node, minor);
+		c_type = ctype(node, minor);
 	}
 	cp->ctype = c_type;
 
@@ -408,26 +409,26 @@ add_controller(struct search_args *args, di_node_t node, di_minor_t minor)
 	    di_node_name(node), di_instance(node));
 
 	if ((cp->kstat_name = strdup(kstat_name)) == NULL) {
-	    cache_free_controller(cp);
-	    return (NULL);
+		cache_free_controller(cp);
+		return (NULL);
 	}
 
 	if (libdiskmgt_str_eq(cp->ctype, "scsi")) {
-	    cp->scsi_options = get_prop(SCSI_OPTIONS_PROP, node);
+		cp->scsi_options = get_prop(SCSI_OPTIONS_PROP, node);
 	}
 
 	if (libdiskmgt_str_eq(di_node_name(node), "scsi_vhci")) {
-	    cp->multiplex = 1;
+		cp->multiplex = 1;
 	} else {
-	    cp->multiplex = 0;
+		cp->multiplex = 0;
 	}
 
 	cp->freq = get_prom_int("clock-frequency", node, args->ph);
 
 	cp->disks = (disk_t **)calloc(1, sizeof (disk_t *));
 	if (cp->disks == NULL) {
-	    cache_free_controller(cp);
-	    return (NULL);
+		cache_free_controller(cp);
+		return (NULL);
 	}
 	cp->disks[0] = NULL;
 
@@ -469,41 +470,44 @@ add_devpath(di_devlink_t devlink, void *arg)
 	 * (e.g. /dev/rdsk/c0t0d0p0).
 	 */
 	if (diskp != NULL) {
-	    alias_t	*ap;
-	    char	*devlink_path;
+		alias_t	*ap;
+		char	*devlink_path;
 
-	    if (diskp->drv_type != DM_DT_FLOPPY) {
-		/*
-		 * Add other controllers for multipath disks.  This will have
-		 * no effect if the controller relationship is already set up.
-		 */
-		if (add_disk2controller(diskp, args) != 0) {
-		    args->dev_walk_status = ENOMEM;
+		if (diskp->drv_type != DM_DT_FLOPPY) {
+			/*
+			 * Add other controllers for multipath disks.
+			 * This will have no effect if the controller
+			 * relationship is already set up.
+			 */
+			if (add_disk2controller(diskp, args) != 0) {
+				args->dev_walk_status = ENOMEM;
+			}
 		}
-	    }
 
-	    (void) snprintf(kernel_name, sizeof (kernel_name), "%s%d",
-		di_node_name(args->node), di_instance(args->node));
-	    devlink_path = (char *)di_devlink_path(devlink);
+		(void) snprintf(kernel_name, sizeof (kernel_name), "%s%d",
+		    di_node_name(args->node), di_instance(args->node));
+		devlink_path = (char *)di_devlink_path(devlink);
 
-	    if (dm_debug > 1) {
-		(void) fprintf(stderr, "INFO:     devpath %s\n", devlink_path);
-	    }
-
-	    if ((ap = find_alias(diskp, kernel_name)) == NULL) {
-		if (new_alias(diskp, kernel_name, devlink_path, args) != 0) {
-		    args->dev_walk_status = ENOMEM;
+		if (dm_debug > 1) {
+			(void) fprintf(stderr,
+			    "INFO:     devpath %s\n", devlink_path);
 		}
-	    } else {
-		/*
-		 * It is possible that we have already added this devpath.
-		 * Do not add it again. new_devpath will return a 0 if
-		 * found, and not add the path.
-		 */
-		if (new_devpath(ap, devlink_path) != 0) {
-		    args->dev_walk_status = ENOMEM;
+
+		if ((ap = find_alias(diskp, kernel_name)) == NULL) {
+			if (new_alias(diskp, kernel_name, devlink_path,
+			    args) != 0) {
+				args->dev_walk_status = ENOMEM;
+			}
+		} else {
+			/*
+			 * It is possible that we have already added this
+			 * devpath.  Do not add it again. new_devpath will
+			 * return a 0 if found, and not add the path.
+			 */
+			if (new_devpath(ap, devlink_path) != 0) {
+				args->dev_walk_status = ENOMEM;
+			}
 		}
-	    }
 	}
 
 	return (DI_WALK_CONTINUE);
@@ -518,124 +522,131 @@ add_devs(di_node_t node, di_minor_t minor, void *arg)
 	args = (struct search_args *)arg;
 
 	if (dm_debug > 1) {
-	    /* This is all just debugging code */
-	    char	*devpath;
-	    char	dev_name[MAXPATHLEN];
+		/* This is all just debugging code */
+		char	*devpath;
+		char	dev_name[MAXPATHLEN];
 
-	    devpath = di_devfs_path(node);
-	    (void) snprintf(dev_name, sizeof (dev_name), "%s:%s", devpath,
-		di_minor_name(minor));
-	    di_devfs_path_free((void *) devpath);
+		devpath = di_devfs_path(node);
+		(void) snprintf(dev_name, sizeof (dev_name), "%s:%s", devpath,
+		    di_minor_name(minor));
+		di_devfs_path_free((void *) devpath);
 
-	    (void) fprintf(stderr,
-		"INFO: dev: %s, node: %s%d, minor: 0x%x, type: %s\n",
-		dev_name,
-		di_node_name(node), di_instance(node),
-		di_minor_spectype(minor),
-		(di_minor_nodetype(minor) != NULL ?
+		(void) fprintf(stderr,
+		    "INFO: dev: %s, node: %s%d, minor: 0x%x, type: %s\n",
+		    dev_name, di_node_name(node), di_instance(node),
+		    di_minor_spectype(minor),
+		    (di_minor_nodetype(minor) != NULL ?
 		    di_minor_nodetype(minor) : "NULL"));
 	}
 
 	if (bus_type(node, minor, args->ph) != NULL) {
-	    if (add_bus(args, node, minor, NULL) == NULL) {
-		args->dev_walk_status = ENOMEM;
-		result = DI_WALK_TERMINATE;
-	    }
+		if (add_bus(args, node, minor, NULL) == NULL) {
+			args->dev_walk_status = ENOMEM;
+			result = DI_WALK_TERMINATE;
+		}
 
 	} else if (is_HBA(node, minor)) {
-	    if (add_controller(args, node, minor) == NULL) {
-		args->dev_walk_status = ENOMEM;
-		result = DI_WALK_TERMINATE;
-	    }
+		if (add_controller(args, node, minor) == NULL) {
+			args->dev_walk_status = ENOMEM;
+			result = DI_WALK_TERMINATE;
+		}
 
 	} else if (di_minor_spectype(minor) == S_IFCHR &&
-		(is_drive(minor) || is_zvol(node, minor))) {
-	    char	*devidstr;
-	    char	kernel_name[MAXPATHLEN];
-	    disk_t	*diskp;
+	    (is_drive(minor) || is_zvol(node, minor))) {
+		char	*devidstr;
+		char	kernel_name[MAXPATHLEN];
+		disk_t	*diskp;
 
-	    (void) snprintf(kernel_name, sizeof (kernel_name), "%s%d",
-		di_node_name(node), di_instance(node));
-	    devidstr = get_str_prop(DEVICE_ID_PROP, node);
+		(void) snprintf(kernel_name, sizeof (kernel_name), "%s%d",
+		    di_node_name(node), di_instance(node));
+		devidstr = get_str_prop(DEVICE_ID_PROP, node);
 
-	    args->node = node;
-	    args->minor = minor;
-
-	    /* Check if we already got this disk and this is another slice */
-	    if (!have_disk(args, devidstr, kernel_name, &diskp)) {
-
-		args->dev_walk_status = 0;
-		/* This is a newly found disk, create the disk structure. */
-		diskp = create_disk(devidstr, kernel_name, args);
-		if (diskp == NULL) {
-		    args->dev_walk_status = ENOMEM;
-		}
-
-		if (diskp->drv_type != DM_DT_FLOPPY) {
-		    /* add the controller relationship */
-		    if (args->dev_walk_status == 0) {
-			if (add_disk2controller(diskp, args) != 0) {
-			    args->dev_walk_status = ENOMEM;
-			}
-		    }
-		}
-	    }
-	    if (is_zvol(node, minor)) {
-		char zvdsk[MAXNAMELEN];
-		char *str;
-		alias_t *ap;
-
-		if (di_prop_lookup_strings(di_minor_devt(minor),
-		    node, "name", &str) == -1)
-		      return (DI_WALK_CONTINUE);
-		(void) snprintf(zvdsk, MAXNAMELEN, "/dev/zvol/rdsk/%s",
-		    str);
-		if ((ap = find_alias(diskp, kernel_name)) == NULL) {
-			if (new_alias(diskp, kernel_name,
-			    zvdsk, args) != 0) {
-				args->dev_walk_status = ENOMEM;
-		    }
-		} else {
-		    /*
-		     * It is possible that we have already added this devpath.
-		     * Do not add it again. new_devpath will return a 0 if
-		     * found, and not add the path.
-		     */
-		    if (new_devpath(ap, zvdsk) != 0) {
-			args->dev_walk_status = ENOMEM;
-		    }
-		}
-	    }
-
-	    /* Add the devpaths for the drive. */
-	    if (args->dev_walk_status == 0) {
-		char	*devpath;
-		char	slice_path[MAXPATHLEN];
-		char	*pattern;
-
+		args->node = node;
+		args->minor = minor;
 		/*
-		 * We will come through here once for each of the raw slice
-		 * device names.
+		 * Check if we already got this disk and
+		 * this is another slice.
 		 */
-		devpath = di_devfs_path(node);
-		(void) snprintf(slice_path, sizeof (slice_path), "%s:%s",
-		    devpath, di_minor_name(minor));
-		di_devfs_path_free((void *) devpath);
+		if (!have_disk(args, devidstr, kernel_name, &diskp)) {
+			args->dev_walk_status = 0;
+			/*
+			 * This is a newly found disk, create the
+			 * disk structure.
+			 */
+			diskp = create_disk(devidstr, kernel_name, args);
+			if (diskp == NULL) {
+				args->dev_walk_status = ENOMEM;
+			}
 
-		if (libdiskmgt_str_eq(di_minor_nodetype(minor), DDI_NT_FD)) {
-		    pattern = DEVLINK_FLOPPY_REGEX;
-		} else {
-		    pattern = DEVLINK_REGEX;
+			if (diskp->drv_type != DM_DT_FLOPPY) {
+				/* add the controller relationship */
+				if (args->dev_walk_status == 0) {
+					if (add_disk2controller(diskp,
+					    args) != 0) {
+						args->dev_walk_status = ENOMEM;
+					}
+				}
+			}
+		}
+		if (is_zvol(node, minor)) {
+			char zvdsk[MAXNAMELEN];
+			char *str;
+			alias_t *ap;
+
+			if (di_prop_lookup_strings(di_minor_devt(minor),
+			    node, "name", &str) == -1)
+				return (DI_WALK_CONTINUE);
+			(void) snprintf(zvdsk, MAXNAMELEN, "/dev/zvol/rdsk/%s",
+			    str);
+			if ((ap = find_alias(diskp, kernel_name)) == NULL) {
+				if (new_alias(diskp, kernel_name,
+				    zvdsk, args) != 0) {
+					args->dev_walk_status = ENOMEM;
+				}
+			} else {
+				/*
+				 * It is possible that we have already added
+				 * this devpath.
+				 * Do not add it again. new_devpath will
+				 * return a 0 if found, and not add the path.
+				 */
+				if (new_devpath(ap, zvdsk) != 0) {
+					args->dev_walk_status = ENOMEM;
+				}
+			}
 		}
 
-		/* Walk the /dev tree to get the devlinks. */
-		(void) di_devlink_walk(args->handle, pattern, slice_path,
-		    DI_PRIMARY_LINK, arg, add_devpath);
-	    }
+		/* Add the devpaths for the drive. */
+		if (args->dev_walk_status == 0) {
+			char	*devpath;
+			char	slice_path[MAXPATHLEN];
+			char	*pattern;
 
-	    if (args->dev_walk_status != 0) {
-		result = DI_WALK_TERMINATE;
-	    }
+			/*
+			 * We will come through here once for each of
+			 * the raw slice device names.
+			 */
+			devpath = di_devfs_path(node);
+			(void) snprintf(slice_path,
+			    sizeof (slice_path), "%s:%s",
+			    devpath, di_minor_name(minor));
+			di_devfs_path_free((void *) devpath);
+
+			if (libdiskmgt_str_eq(di_minor_nodetype(minor),
+			    DDI_NT_FD)) {
+				pattern = DEVLINK_FLOPPY_REGEX;
+			} else {
+				pattern = DEVLINK_REGEX;
+			}
+
+			/* Walk the /dev tree to get the devlinks. */
+			(void) di_devlink_walk(args->handle, pattern,
+			    slice_path, DI_PRIMARY_LINK, arg, add_devpath);
+		}
+
+		if (args->dev_walk_status != 0) {
+			result = DI_WALK_TERMINATE;
+		}
 	}
 
 	return (result);
@@ -654,73 +665,78 @@ add_disk2controller(disk_t *diskp, struct search_args *args)
 
 	pnode = di_parent_node(node);
 	if (pnode == DI_NODE_NIL) {
-	    return (0);
+		return (0);
 	}
 
 	minor = di_minor_next(pnode, NULL);
 	if (minor == NULL) {
-	    return (0);
+		return (0);
 	}
 
 	if ((cp = add_controller(args, pnode, minor)) == NULL) {
-	    return (ENOMEM);
+		return (ENOMEM);
 	}
 
 	/* check if the disk <-> ctrl assoc is already there */
 	for (i = 0; diskp->controllers[i]; i++) {
-	    if (cp == diskp->controllers[i]) {
-		return (0);
-	    }
+		if (cp == diskp->controllers[i]) {
+			return (0);
+		}
 	}
 
 	/* this is a new controller for this disk */
 
 	/* add the disk to the controlller */
 	if (add_ptr2array(diskp, (void ***)&cp->disks) != 0) {
-	    return (ENOMEM);
+		return (ENOMEM);
 	}
 
 	/* add the controlller to the disk */
 	if (add_ptr2array(cp, (void ***)&diskp->controllers) != 0) {
-	    return (ENOMEM);
+		return (ENOMEM);
 	}
 
 	/*
 	 * Set up paths for mpxio controlled drives.
 	 */
 	if (libdiskmgt_str_eq(di_node_name(pnode), "scsi_vhci")) {
-	    /* note: mpxio di_path stuff is all consolidation private */
-	    di_path_t   pi = DI_PATH_NIL;
+		/* note: mpxio di_path stuff is all consolidation private */
+		di_path_t   pi = DI_PATH_NIL;
 
-	    while ((pi = di_path_client_next_path(node, pi)) != DI_PATH_NIL) {
-		int	cnt;
-		uchar_t	*bytes;
-		char	str[MAXPATHLEN];
-		char	*wwn;
+		while (
+		    (pi = di_path_client_next_path(node, pi)) != DI_PATH_NIL) {
+			int	cnt;
+			uchar_t	*bytes;
+			char	str[MAXPATHLEN];
+			char	*wwn;
 
-		di_node_t phci_node = di_path_phci_node(pi);
+			di_node_t phci_node = di_path_phci_node(pi);
 
-		/* get the node wwn */
-		cnt = di_path_prop_lookup_bytes(pi, WWN_PROP, &bytes);
-		wwn = NULL;
-		if (cnt > 0) {
-		    int	i;
+			/* get the node wwn */
+			cnt = di_path_prop_lookup_bytes(pi, WWN_PROP, &bytes);
+			wwn = NULL;
+			if (cnt > 0) {
+				int	i;
+				str[0] = 0;
 
-		    str[0] = 0;
-		    for (i = 0; i < cnt; i++) {
-			char bstr[8];	/* a byte is only 2 hex chars + null */
+				for (i = 0; i < cnt; i++) {
+					/*
+					 * A byte is only 2 hex chars + null.
+					 */
+					char bstr[8];
 
-			(void) snprintf(bstr, sizeof (bstr), "%.2x", bytes[i]);
-			(void) strlcat(str, bstr, sizeof (str));
-		    }
-		    wwn = str;
+					(void) snprintf(bstr,
+					    sizeof (bstr), "%.2x", bytes[i]);
+					(void) strlcat(str, bstr, sizeof (str));
+				}
+				wwn = str;
+			}
+
+			if (new_path(cp, diskp, phci_node,
+			    di_path_state(pi), wwn) == NULL) {
+				return (ENOMEM);
+			}
 		}
-
-		if (new_path(cp, diskp, phci_node, di_path_state(pi), wwn)
-		    == NULL) {
-		    return (ENOMEM);
-		}
-	    }
 	}
 
 	return (0);
@@ -731,32 +747,32 @@ add_disk2path(disk_t *dp, path_t *pp, di_path_state_t st, char *wwn)
 {
 	/* add the disk to the path */
 	if (add_ptr2array(dp, (void ***)&pp->disks) != 0) {
-	    cache_free_path(pp);
-	    return (0);
+		cache_free_path(pp);
+		return (0);
 	}
 
 	/* add the path to the disk */
 	if (add_ptr2array(pp, (void ***)&dp->paths) != 0) {
-	    cache_free_path(pp);
-	    return (0);
+		cache_free_path(pp);
+		return (0);
 	}
 
 	/* add the path state for this disk */
 	if (add_int2array(st, &pp->states) != 0) {
-	    cache_free_path(pp);
-	    return (0);
+		cache_free_path(pp);
+		return (0);
 	}
 
 	/* add the path state for this disk */
 	if (wwn != NULL) {
-	    char	*wp;
+		char	*wp;
 
-	    if ((wp = strdup(wwn)) != NULL) {
-		if (add_ptr2array(wp, (void ***)(&pp->wwns)) != 0) {
-		    cache_free_path(pp);
-		    return (0);
+		if ((wp = strdup(wwn)) != NULL) {
+			if (add_ptr2array(wp, (void ***)(&pp->wwns)) != 0) {
+				cache_free_path(pp);
+				return (0);
+			}
 		}
-	    }
 	}
 
 	return (1);
@@ -774,18 +790,18 @@ add_int2array(int p, int **parray)
 
 	cnt = 0;
 	if (pa != NULL) {
-	    for (; pa[cnt] != -1; cnt++)
-		;
+		for (; pa[cnt] != -1; cnt++)
+			;
 	}
 
 	new_array = (int *)calloc(cnt + 2, sizeof (int *));
 	if (new_array == NULL) {
-	    return (ENOMEM);
+		return (ENOMEM);
 	}
 
 	/* copy the existing array */
 	for (i = 0; i < cnt; i++) {
-	    new_array[i] = pa[i];
+		new_array[i] = pa[i];
 	}
 
 	new_array[i] = p;
@@ -809,18 +825,18 @@ add_ptr2array(void *p, void ***parray)
 
 	cnt = 0;
 	if (pa != NULL) {
-	    for (; pa[cnt]; cnt++)
-		;
+		for (; pa[cnt]; cnt++)
+			;
 	}
 
 	new_array = (void **)calloc(cnt + 2, sizeof (void *));
 	if (new_array == NULL) {
-	    return (ENOMEM);
+		return (ENOMEM);
 	}
 
 	/* copy the existing array */
 	for (i = 0; i < cnt; i++) {
-	    new_array[i] = pa[i];
+		new_array[i] = pa[i];
 	}
 
 	new_array[i] = p;
@@ -833,29 +849,70 @@ add_ptr2array(void *p, void ***parray)
 }
 
 /*
- * This double checks that we aren't going to get into a bad situation.
- * This function should never fail, but I just want to double check things.
+ * This function checks to see if a controller has other associations
+ * that may be valid. If we are calling this function, we have found that
+ * a controller for an mpxio device is showing up independently of the
+ * mpxio controller, noted as /scsi_vhci. This can happen with some FC
+ * cards that have inbound management devices that show up as well, with
+ * the real controller data associated. We do not want to display these
+ * 'devices' as real devices in libdiskmgt.
  */
-static int
-can_remove_controller(controller_t *cp, controller_t *currp)
+static void
+remove_controller(controller_t *cp, controller_t *currp)
 {
-	if (dm_debug) {
-	    if (cp == currp) {
-		(void) fprintf(stderr, "ERROR: remove current controller\n");
-	    }
+	disk_t *dp;
+	int	i;
 
-	    if (cp->disks != NULL && cp->disks[0] != NULL) {
-		(void) fprintf(stderr,
-		    "ERROR: remove controller with disk ptrs\n");
-	    }
-
-	    if (cp->paths != NULL && cp->paths[0] != NULL) {
-		(void) fprintf(stderr,
-		    "ERROR: remove controller with path ptrs\n");
-	    }
+	if (cp == currp) {
+		if (dm_debug) {
+			(void) fprintf(stderr, "ERROR: removing current"
+			    " controller\n");
+		}
+		return;
 	}
 
-	return (1);
+	if (cp->disks != NULL && cp->disks[0] != NULL) {
+		if (dm_debug) {
+			(void) fprintf(stderr,
+			    "INFO: removing inbound management controller"
+			    " with disk ptrs.\n");
+		}
+		/*
+		 * loop through the disks and remove the reference to the
+		 * controller for this disk structure. The disk itself
+		 * is still a valid device, the controller being removed
+		 * is a 'path' so any disk that has a reference to it
+		 * as a controller needs to have this reference removed.
+		 */
+		dp = cp->disks[0];
+		while (dp != NULL) {
+			for (i = 0; dp->controllers[i]; i++) {
+				if (libdiskmgt_str_eq(dp->controllers[i]->name,
+				    cp->name)) {
+					int j;
+
+					for (j = i; dp->controllers[j]; j++) {
+						dp->controllers[j] =
+						    dp->controllers[j + 1];
+					}
+				}
+			}
+			dp = dp->next;
+		}
+	}
+	/*
+	 * Paths are removed with the call to cache_free_controller()
+	 * below.
+	 */
+
+	if (cp->paths != NULL && cp->paths[0] != NULL) {
+		if (dm_debug) {
+			(void) fprintf(stderr,
+			    "INFO: removing inbound management controller"
+			    " with path ptrs. \n");
+		}
+	}
+	cache_free_controller(cp);
 }
 
 /*
@@ -870,17 +927,18 @@ clean_paths(struct search_args *args)
 
 	cp = args->controller_listp;
 	while (cp != NULL) {
-	    path_t	**pp;
+		path_t	**pp;
 
-	    pp = cp->paths;
-	    if (pp != NULL) {
-		int i;
+		pp = cp->paths;
+		if (pp != NULL) {
+			int i;
 
-		for (i = 0; pp[i]; i++) {
-		    remove_invalid_controller(pp[i]->name, cp, args);
+			for (i = 0; pp[i]; i++) {
+				remove_invalid_controller(pp[i]->name, cp,
+				    args);
+			}
 		}
-	    }
-	    cp = cp->next;
+		cp = cp->next;
 	}
 }
 
@@ -893,38 +951,37 @@ create_disk(char *deviceid, char *kernel_name, struct search_args *args)
 	char	*vendor_id;
 
 	if (dm_debug) {
-	    (void) fprintf(stderr, "INFO: create_disk %s\n", kernel_name);
+		(void) fprintf(stderr, "INFO: create_disk %s\n", kernel_name);
 	}
 
 	diskp = calloc(1, sizeof (disk_t));
 	if (diskp == NULL) {
-	    return (NULL);
+		return (NULL);
 	}
 
 	diskp->controllers = (controller_t **)
 	    calloc(1, sizeof (controller_t *));
 	if (diskp->controllers == NULL) {
-	    cache_free_disk(diskp);
-	    return (NULL);
+		cache_free_disk(diskp);
+		return (NULL);
 	}
 	diskp->controllers[0] = NULL;
 
 	diskp->devid = NULL;
 	if (deviceid != NULL) {
-	    if ((diskp->device_id = strdup(deviceid)) == NULL) {
-		cache_free_disk(diskp);
-		return (NULL);
-	    }
-
-	    (void) devid_str_decode(deviceid, &(diskp->devid), NULL);
+		if ((diskp->device_id = strdup(deviceid)) == NULL) {
+			cache_free_disk(diskp);
+			return (NULL);
+		}
+		(void) devid_str_decode(deviceid, &(diskp->devid), NULL);
 	}
 
 	if (kernel_name != NULL) {
-	    diskp->kernel_name = strdup(kernel_name);
-	    if (diskp->kernel_name == NULL) {
-		cache_free_disk(diskp);
-		return (NULL);
-	    }
+		diskp->kernel_name = strdup(kernel_name);
+		if (diskp->kernel_name == NULL) {
+			cache_free_disk(diskp);
+			return (NULL);
+		}
 	}
 
 	diskp->paths = NULL;
@@ -936,34 +993,34 @@ create_disk(char *deviceid, char *kernel_name, struct search_args *args)
 
 	prod_id = get_str_prop(PROD_ID_PROP, args->node);
 	if (prod_id != NULL) {
-	    if ((diskp->product_id = strdup(prod_id)) == NULL) {
-		cache_free_disk(diskp);
-		return (NULL);
-	    }
-	} else {
-	    prod_id = get_str_prop(PROD_ID_USB_PROP, args->node);
-	    if (prod_id != NULL) {
 		if ((diskp->product_id = strdup(prod_id)) == NULL) {
-		    cache_free_disk(diskp);
-		    return (NULL);
+			cache_free_disk(diskp);
+			return (NULL);
 		}
-	    }
+	} else {
+		prod_id = get_str_prop(PROD_ID_USB_PROP, args->node);
+		if (prod_id != NULL) {
+			if ((diskp->product_id = strdup(prod_id)) == NULL) {
+				cache_free_disk(diskp);
+				return (NULL);
+			}
+		}
 	}
 
 	vendor_id = get_str_prop(VENDOR_ID_PROP, args->node);
 	if (vendor_id != NULL) {
-	    if ((diskp->vendor_id = strdup(vendor_id)) == NULL) {
-		cache_free_disk(diskp);
-		return (NULL);
-	    }
-	} else {
-	    vendor_id = get_str_prop(VENDOR_ID_PROP, args->node);
-	    if (vendor_id != NULL) {
 		if ((diskp->vendor_id = strdup(vendor_id)) == NULL) {
-		    cache_free_disk(diskp);
-		    return (NULL);
+			cache_free_disk(diskp);
+			return (NULL);
 		}
-	    }
+	} else {
+		vendor_id = get_str_prop(VENDOR_ID_PROP, args->node);
+		if (vendor_id != NULL) {
+			if ((diskp->vendor_id = strdup(vendor_id)) == NULL) {
+				cache_free_disk(diskp);
+				return (NULL);
+			}
+		}
 	}
 
 	/*
@@ -975,55 +1032,58 @@ create_disk(char *deviceid, char *kernel_name, struct search_args *args)
 	 * unknown is what triggers the uscsi probe in drive.c.
 	 */
 	if (disk_is_cdrom(type)) {
-	    diskp->drv_type = DM_DT_UNKNOWN;
-	    diskp->cd_rom = 1;
-	    diskp->removable = 1;
+		diskp->drv_type = DM_DT_UNKNOWN;
+		diskp->cd_rom = 1;
+		diskp->removable = 1;
 	} else if (libdiskmgt_str_eq(type, DDI_NT_FD)) {
-	    diskp->drv_type = DM_DT_FLOPPY;
-	    diskp->removable = 1;
+		diskp->drv_type = DM_DT_FLOPPY;
+		diskp->removable = 1;
 	} else {
 		/* not a "CD-ROM" or Floppy */
+		diskp->removable = get_prop(REMOVABLE_PROP, args->node);
 
-	    diskp->removable = get_prop(REMOVABLE_PROP, args->node);
-
-	    if (diskp->removable == -1) {
-		diskp->removable = 0;
+		if (diskp->removable == -1) {
+			diskp->removable = 0;
 #if defined(i386) || defined(__amd64)
-		/*
-		 * x86 does not have removable property.  Check for common
-		 * removable drives, zip & jaz, and mark those correctly.
-		 */
-		if (vendor_id != NULL && prod_id != NULL) {
-		    if (str_case_index(vendor_id, "iomega") != NULL) {
-			if (str_case_index(prod_id, "jaz") != NULL) {
-			    diskp->removable = 1;
-			} else if (str_case_index(prod_id, "zip") != NULL) {
-			    diskp->removable = 1;
+			/*
+			 * x86 does not have removable property.
+			 * Check for common removable drives, zip & jaz,
+			 * and mark those correctly.
+			 */
+			if (vendor_id != NULL && prod_id != NULL) {
+				if (str_case_index(vendor_id,
+				    "iomega") != NULL) {
+					if (str_case_index(prod_id,
+					    "jaz") != NULL) {
+						diskp->removable = 1;
+					} else if (str_case_index(prod_id,
+					    "zip") != NULL) {
+						diskp->removable = 1;
+					}
+				}
 			}
-		    }
-		}
 #endif
-	    }
-
-	    if (diskp->removable) {
-		/*
-		 * For removable jaz or zip drives there is no way
-		 * to get the drive type unless media is inserted, so we
-		 * look at the product-id for a hint.
-		 */
-
-		diskp->drv_type = DM_DT_UNKNOWN;
-
-		if (prod_id != NULL) {
-		    if (str_case_index(prod_id, "jaz") != NULL) {
-			diskp->drv_type = DM_DT_JAZ;
-		    } else if (str_case_index(prod_id, "zip") != NULL) {
-			diskp->drv_type = DM_DT_ZIP;
-		    }
 		}
-	    } else {
-		diskp->drv_type = DM_DT_FIXED;
-	    }
+
+		if (diskp->removable) {
+			/*
+			 * For removable jaz or zip drives there is no way
+			 * to get the drive type unless media is inserted,so
+			 * we look at the product-id for a hint.
+			 */
+			diskp->drv_type = DM_DT_UNKNOWN;
+
+			if (prod_id != NULL) {
+				if (str_case_index(prod_id, "jaz") != NULL) {
+					diskp->drv_type = DM_DT_JAZ;
+				} else if (str_case_index(prod_id,
+				    "zip") != NULL) {
+					diskp->drv_type = DM_DT_ZIP;
+				}
+			}
+		} else {
+			diskp->drv_type = DM_DT_FIXED;
+		}
 	}
 
 	diskp->next = args->disk_listp;
@@ -1043,30 +1103,30 @@ ctype(di_node_t node, di_minor_t minor)
 
 	/* IDE disks use SCSI nexus as the type, so handle this special case */
 	if (libdiskmgt_str_eq(name, "ide")) {
-	    return (DM_CTYPE_ATA);
+		return (DM_CTYPE_ATA);
 	}
 
 	if (libdiskmgt_str_eq(di_minor_name(minor), "scsa2usb")) {
-	    return (DM_CTYPE_USB);
+		return (DM_CTYPE_USB);
 	}
 
 	if (libdiskmgt_str_eq(type, DDI_NT_SCSI_NEXUS) ||
 	    libdiskmgt_str_eq(type, DDI_NT_SCSI_ATTACHMENT_POINT)) {
-	    return (DM_CTYPE_SCSI);
+			return (DM_CTYPE_SCSI);
 	}
 
 	if (libdiskmgt_str_eq(type, DDI_NT_FC_ATTACHMENT_POINT)) {
-	    return (DM_CTYPE_FIBRE);
+		return (DM_CTYPE_FIBRE);
 	}
 
 	if (libdiskmgt_str_eq(type, DDI_NT_NEXUS) &&
 	    libdiskmgt_str_eq(name, "fp")) {
-	    return (DM_CTYPE_FIBRE);
+		return (DM_CTYPE_FIBRE);
 	}
 
 	if (libdiskmgt_str_eq(type, DDI_PSEUDO) &&
 	    libdiskmgt_str_eq(name, "ide")) {
-	    return (DM_CTYPE_ATA);
+		return (DM_CTYPE_ATA);
 	}
 
 	return (DM_CTYPE_UNKNOWN);
@@ -1085,10 +1145,10 @@ find_alias(disk_t *diskp, char *kernel_name)
 
 	ap = diskp->aliases;
 	while (ap != NULL) {
-	    if (libdiskmgt_str_eq(ap->kstat_name, kernel_name)) {
-		return (ap);
-	    }
-	    ap = ap->next;
+		if (libdiskmgt_str_eq(ap->kstat_name, kernel_name)) {
+			return (ap);
+		}
+		ap = ap->next;
 	}
 
 	return (NULL);
@@ -1101,11 +1161,10 @@ find_bus(struct search_args *args, char *name)
 
 	listp = args->bus_listp;
 	while (listp != NULL) {
-	    if (libdiskmgt_str_eq(listp->name, name)) {
-		return (listp);
-	    }
-
-	    listp = listp->next;
+		if (libdiskmgt_str_eq(listp->name, name)) {
+			return (listp);
+		}
+		listp = listp->next;
 	}
 
 	return (NULL);
@@ -1118,11 +1177,10 @@ find_controller(struct search_args *args, char *name)
 
 	listp = args->controller_listp;
 	while (listp != NULL) {
-	    if (libdiskmgt_str_eq(listp->name, name)) {
-		return (listp);
-	    }
-
-	    listp = listp->next;
+		if (libdiskmgt_str_eq(listp->name, name)) {
+			return (listp);
+		}
+		listp = listp->next;
 	}
 
 	return (NULL);
@@ -1146,117 +1204,124 @@ fix_cluster_devpath(di_devlink_t devlink, void *arg)
 	/* Find the disk by the deviceid we read from the cluster disk. */
 	devlink_path = (char *)di_devlink_path(devlink);
 	if (devlink_path == NULL) {
-	    return (DI_WALK_CONTINUE);
+		return (DI_WALK_CONTINUE);
 	}
 
 	if ((fd = open(devlink_path, O_RDONLY|O_NDELAY)) >= 0) {
-	    ddi_devid_t	devid;
+		ddi_devid_t	devid;
 
-	    if (dm_debug > 1) {
-		(void) fprintf(stderr, "INFO:     cluster devpath %s\n",
-		    devlink_path);
-	    }
-
-	    if (devid_get(fd, &devid) == 0) {
-		char *minor;
-		char *devidstr;
-
-		minor = di_minor_name(args->minor);
-
-		if ((devidstr = devid_str_encode(devid, minor)) != NULL) {
-		    diskp = get_disk_by_deviceid(args->disk_listp, devidstr);
-
-			/*
-			 * This really shouldn't happen, since we should have
-			 * found all of the disks during our first pass through
-			 * the dev tree, but just in case...
-			 */
-			if (diskp == NULL) {
-			    if (dm_debug > 1) {
-				(void) fprintf(stderr,
-				    "INFO:     cluster create disk\n");
-			    }
-
-			    diskp = create_disk(devidstr, NULL, args);
-			    if (diskp == NULL) {
-				args->dev_walk_status = ENOMEM;
-			    }
-
-			    /* add the controller relationship */
-			    if (args->dev_walk_status == 0) {
-				if (add_disk2controller(diskp, args) != 0) {
-				    args->dev_walk_status = ENOMEM;
-				}
-			    }
-
-			    if (new_alias(diskp, NULL, devlink_path, args)
-				!= 0) {
-				args->dev_walk_status = ENOMEM;
-			    }
-			}
-
-			devid_str_free(devidstr);
+		if (dm_debug > 1) {
+			(void) fprintf(stderr, "INFO:     cluster devpath %s\n",
+			    devlink_path);
 		}
 
-		devid_free(devid);
-	    }
-	    (void) close(fd);
+		if (devid_get(fd, &devid) == 0) {
+			char *minor;
+			char *devidstr;
+
+			minor = di_minor_name(args->minor);
+
+			if ((devidstr =
+			    devid_str_encode(devid, minor)) != NULL) {
+				diskp = get_disk_by_deviceid(args->disk_listp,
+				    devidstr);
+				/*
+				 * This really shouldn't happen, since
+				 * we should have found all of the disks
+				 * during our first pass through
+				 * the dev tree, but just in case...
+				 */
+				if (diskp == NULL) {
+					if (dm_debug > 1) {
+						(void) fprintf(stderr,
+						    "INFO:    cluster create"
+						    " disk\n");
+					}
+
+					diskp = create_disk(devidstr,
+					    NULL, args);
+					if (diskp == NULL) {
+						args->dev_walk_status = ENOMEM;
+					}
+
+					/* add the controller relationship */
+					if (args->dev_walk_status == 0) {
+						if (add_disk2controller(diskp,
+						    args) != 0) {
+							args->dev_walk_status
+							    = ENOMEM;
+						}
+					}
+
+					if (new_alias(diskp, NULL,
+					    devlink_path, args) != 0) {
+						args->dev_walk_status = ENOMEM;
+					}
+				}
+				devid_str_free(devidstr);
+			}
+			devid_free(devid);
+		}
+		(void) close(fd);
 	}
 
 
 	if (diskp != NULL) {
-	    if (dm_debug > 1) {
-		(void) fprintf(stderr, "INFO:     cluster found disk\n");
-	    }
-
-	    ap = diskp->aliases;
+		if (dm_debug > 1) {
+			(void) fprintf(stderr, "INFO:     cluster found"
+			    " disk\n");
+		}
+		ap = diskp->aliases;
 	}
 
 	if (ap != NULL) {
-	    /* NOTE: if ap->next != NULL have cluster disks w/ multiple paths */
-
-	    if (!ap->cluster) {
-		char	*basep;
-		char	*namep;
-		int	cnt = 0;
-		int	size;
-		char	alias[MAXPATHLEN];
-
 		/*
-		 * First time; save the /dev/rdsk devpaths and update the
-		 * alias info with the new alias name.
+		 * NOTE: if ap->next != NULL have cluster
+		 * disks w/ multiple paths.
 		 */
-		ap->orig_paths = ap->devpaths;
-		ap->devpaths = NULL;
 
-		free(ap->alias);
+		if (!ap->cluster) {
+			char	*basep;
+			char	*namep;
+			int	cnt = 0;
+			int	size;
+			char	alias[MAXPATHLEN];
 
-		/* get the new cluster alias name */
-		basep = strrchr(devlink_path, '/');
-		if (basep == NULL) {
-		    basep = devlink_path;
-		} else {
-		    basep++;
+			/*
+			 * First time; save the /dev/rdsk devpaths and
+			 * update the alias info with the new alias name.
+			 */
+			ap->orig_paths = ap->devpaths;
+			ap->devpaths = NULL;
+
+			free(ap->alias);
+
+			/* get the new cluster alias name */
+			basep = strrchr(devlink_path, '/');
+			if (basep == NULL) {
+				basep = devlink_path;
+			} else {
+				basep++;
+			}
+			size = sizeof (alias) - 1;
+			namep = alias;
+
+			while (*basep != 0 && *basep != 's' && cnt < size) {
+				*namep++ = *basep++;
+				cnt++;
+			}
+			*namep = 0;
+
+			if ((ap->alias = strdup(alias)) == NULL) {
+				args->dev_walk_status = ENOMEM;
+			}
+
+			ap->cluster = 1;
 		}
 
-		size = sizeof (alias) - 1;
-		namep = alias;
-		while (*basep != 0 && *basep != 's' && cnt < size) {
-		    *namep++ = *basep++;
-		    cnt++;
+		if (new_devpath(ap, devlink_path) != 0) {
+			args->dev_walk_status = ENOMEM;
 		}
-		*namep = 0;
-
-		if ((ap->alias = strdup(alias)) == NULL) {
-		    args->dev_walk_status = ENOMEM;
-		}
-
-		ap->cluster = 1;
-	    }
-
-	    if (new_devpath(ap, devlink_path) != 0) {
-		args->dev_walk_status = ENOMEM;
-	    }
 	}
 
 	return (DI_WALK_CONTINUE);
@@ -1275,20 +1340,18 @@ get_disk_by_deviceid(disk_t *listp, char *devidstr)
 	ddi_devid_t	devid;
 
 	if (devidstr == NULL || devid_str_decode(devidstr, &devid, NULL) != 0) {
-	    return (NULL);
+		return (NULL);
 	}
 
 	while (listp != NULL) {
-	    if (listp->devid != NULL &&
-		devid_compare(listp->devid, devid) == 0) {
-		break;
-	    }
-
-	    listp = listp->next;
+		if (listp->devid != NULL &&
+		    devid_compare(listp->devid, devid) == 0) {
+			break;
+		}
+		listp = listp->next;
 	}
 
 	devid_free(devid);
-
 	return (listp);
 }
 
@@ -1309,30 +1372,31 @@ get_disk_name_from_path(char *path, char *name, int size)
 
 	basep = strrchr(path, '/');
 	if (basep == NULL) {
-	    basep = path;
+		basep = path;
 	} else {
-	    basep++;
+		basep++;
 	}
 
 	size = size - 1;	/* leave room for terminating 0 */
 
 	if (is_ctds(basep)) {
-	    while (*basep != 0 && *basep != 's' && cnt < size) {
-		*name++ = *basep++;
-		cnt++;
-	    }
-	    *name = 0;
+		while (*basep != 0 && *basep != 's' && cnt < size) {
+			*name++ = *basep++;
+				cnt++;
+		}
+		*name = 0;
 	} else {
-	    if (strncmp(basep, FLOPPY_NAME, sizeof (FLOPPY_NAME) - 1) == 0) {
-		/*
-		 * a floppy, convert rdiskette name to diskette name,
-		 * by skipping over the 'r' for raw diskette
-		 */
-		basep++;
-	    }
+		if (strncmp(basep, FLOPPY_NAME,
+		    sizeof (FLOPPY_NAME) - 1) == 0) {
+			/*
+			 * a floppy, convert rdiskette name to diskette name,
+			 * by skipping over the 'r' for raw diskette
+			 */
+			basep++;
+		}
 
-	    /* not a ctds name, just copy it */
-	    (void) strlcpy(name, basep, size);
+		/* not a ctds name, just copy it */
+		(void) strlcpy(name, basep, size);
 	}
 }
 
@@ -1346,15 +1410,15 @@ get_byte_prop(char *prop_name, di_node_t node)
 
 	cnt = di_prop_lookup_bytes(DDI_DEV_T_ANY, node, prop_name, &bytes);
 	if (cnt < 1) {
-	    return (NULL);
+		return (NULL);
 	}
 
 	str[0] = 0;
 	for (i = 0; i < cnt; i++) {
-	    char bstr[8];	/* a byte is only 2 hex chars + null */
+		char bstr[8];	/* a byte is only 2 hex chars + null */
 
-	    (void) snprintf(bstr, sizeof (bstr), "%.2x", bytes[i]);
-	    (void) strlcat(str, bstr, sizeof (str));
+		(void) snprintf(bstr, sizeof (bstr), "%.2x", bytes[i]);
+		(void) strlcat(str, bstr, sizeof (str));
 	}
 	return (strdup(str));
 }
@@ -1366,11 +1430,11 @@ get_parent_bus(di_node_t node, struct search_args *args)
 
 	pnode = di_parent_node(node);
 	if (pnode == DI_NODE_NIL) {
-	    return (NULL);
+		return (NULL);
 	}
 
 	if (bus_type(pnode, di_minor_next(pnode, NULL), args->ph) != NULL) {
-	    return (pnode);
+		return (pnode);
 	}
 
 	return (get_parent_bus(pnode, args));
@@ -1382,7 +1446,7 @@ get_prom_int(char *prop_name, di_node_t node, di_prom_handle_t ph)
 	int *n;
 
 	if (di_prom_prop_lookup_ints(ph, node, prop_name, &n) == 1) {
-	    return (*n);
+		return (*n);
 	}
 
 	return (0);
@@ -1394,7 +1458,7 @@ get_prom_str(char *prop_name, di_node_t node, di_prom_handle_t ph)
 	char *str;
 
 	if (di_prom_prop_lookup_strings(ph, node, prop_name, &str) == 1) {
-	    return (str);
+		return (str);
 	}
 
 	return (NULL);
@@ -1411,15 +1475,14 @@ get_prop(char *prop_name, di_node_t node)
 
 	if ((num = di_prop_lookup_ints(DDI_DEV_T_ANY, node, prop_name, &ip))
 	    >= 0) {
-	    if (num == 0) {
-		/* boolean */
-		return (1);
-	    } else if (num == 1) {
-		/* single int */
-		return (*ip);
-	    }
+		if (num == 0) {
+			/* boolean */
+			return (1);
+		} else if (num == 1) {
+			/* single int */
+			return (*ip);
+		}
 	}
-
 	return (-1);
 }
 
@@ -1429,7 +1492,7 @@ get_str_prop(char *prop_name, di_node_t node)
 	char *str;
 
 	if (di_prop_lookup_strings(DDI_DEV_T_ANY, node, prop_name, &str) == 1) {
-	    return (str);
+		return (str);
 	}
 
 	return (NULL);
@@ -1448,21 +1511,21 @@ have_disk(struct search_args *args, char *devidstr, char *kernel_name,
 	*diskp = NULL;
 	listp = args->disk_listp;
 	if (devidstr != NULL) {
-	    if ((*diskp = get_disk_by_deviceid(listp, devidstr)) != NULL) {
-		return (1);
-	    }
+		if ((*diskp = get_disk_by_deviceid(listp, devidstr)) != NULL) {
+			return (1);
+		}
 
 	} else {
-	    /* no devid, try matching the kernel names on the drives */
-	    while (listp != NULL) {
-		if (libdiskmgt_str_eq(kernel_name, listp->kernel_name)) {
-		    *diskp = listp;
-		    return (1);
+		/* no devid, try matching the kernel names on the drives */
+		while (listp != NULL) {
+			if (libdiskmgt_str_eq(kernel_name,
+			    listp->kernel_name)) {
+				*diskp = listp;
+				return (1);
+			}
+			listp = listp->next;
 		}
-		listp = listp->next;
-	    }
 	}
-
 	return (0);
 }
 
@@ -1474,18 +1537,18 @@ bus_type(di_node_t node, di_minor_t minor, di_prom_handle_t ph)
 
 	type = get_prom_str("device_type", node, ph);
 	if (type == NULL) {
-	    type = di_node_name(node);
+		type = di_node_name(node);
 	}
 
 	for (i = 0; bustypes[i]; i++) {
-	    if (libdiskmgt_str_eq(type, bustypes[i])) {
-		return (type);
-	    }
+		if (libdiskmgt_str_eq(type, bustypes[i])) {
+			return (type);
+		}
 	}
 
 	if (minor != NULL && strcmp(di_minor_nodetype(minor),
 	    DDI_NT_USB_ATTACHMENT_POINT) == 0) {
-	    return ("usb");
+		return ("usb");
 	}
 
 	return (NULL);
@@ -1497,7 +1560,7 @@ is_cluster_disk(di_node_t node, di_minor_t minor)
 	if (di_minor_spectype(minor) == S_IFCHR &&
 	    libdiskmgt_str_eq(di_minor_nodetype(minor), DDI_PSEUDO) &&
 	    libdiskmgt_str_eq(di_node_name(node), CLUSTER_DEV)) {
-	    return (1);
+		return (1);
 	}
 
 	return (0);
@@ -1514,40 +1577,40 @@ is_ctds(char *name)
 	p = name;
 
 	if (*p++ != 'c') {
-	    return (0);
+		return (0);
 	}
 	/* skip controller digits */
 	while (isdigit(*p)) {
-	    p++;
+		p++;
 	}
 
 	/* handle optional target */
 	if (*p == 't') {
-	    p++;
-	    /* skip over target */
-	    while (isdigit(*p) || isupper(*p)) {
 		p++;
-	    }
+		/* skip over target */
+		while (isdigit(*p) || isupper(*p)) {
+			p++;
+		}
 	}
 
 	if (*p++ != 'd') {
-	    return (0);
+		return (0);
 	}
 	while (isdigit(*p)) {
-	    p++;
+		p++;
 	}
 
 	if (*p++ != 's') {
-	    return (0);
+		return (0);
 	}
 
 	/* check the slice number */
 	while (isdigit(*p)) {
-	    p++;
+		p++;
 	}
 
 	if (*p != 0) {
-	    return (0);
+		return (0);
 	}
 
 	return (1);
@@ -1580,16 +1643,16 @@ is_HBA(di_node_t node, di_minor_t minor)
 	type_index = 0;
 
 	while (ctrltypes[type_index] != NULL) {
-	    if (libdiskmgt_str_eq(type, ctrltypes[type_index])) {
-		return (1);
-	    }
-	    type_index++;
+		if (libdiskmgt_str_eq(type, ctrltypes[type_index])) {
+			return (1);
+		}
+		type_index++;
 	}
 
 	name = di_node_name(node);
 	if (libdiskmgt_str_eq(type, DDI_PSEUDO) &&
 	    libdiskmgt_str_eq(name, "ide")) {
-	    return (1);
+		return (1);
 	}
 
 	return (0);
@@ -1605,7 +1668,7 @@ new_alias(disk_t *diskp, char *kernel_name, char *devlink_path,
 
 	aliasp = malloc(sizeof (alias_t));
 	if (aliasp == NULL) {
-	    return (ENOMEM);
+		return (ENOMEM);
 	}
 
 	aliasp->alias = NULL;
@@ -1618,18 +1681,18 @@ new_alias(disk_t *diskp, char *kernel_name, char *devlink_path,
 
 	aliasp->alias = strdup(alias);
 	if (aliasp->alias == NULL) {
-	    cache_free_alias(aliasp);
-	    return (ENOMEM);
+		cache_free_alias(aliasp);
+		return (ENOMEM);
 	}
 
 	if (kernel_name != NULL) {
-	    aliasp->kstat_name = strdup(kernel_name);
-	    if (aliasp->kstat_name == NULL) {
-		cache_free_alias(aliasp);
-		return (ENOMEM);
-	    }
+		aliasp->kstat_name = strdup(kernel_name);
+		if (aliasp->kstat_name == NULL) {
+			cache_free_alias(aliasp);
+			return (ENOMEM);
+		}
 	} else {
-	    aliasp->kstat_name = NULL;
+		aliasp->kstat_name = NULL;
 	}
 
 	aliasp->cluster = 0;
@@ -1639,19 +1702,19 @@ new_alias(disk_t *diskp, char *kernel_name, char *devlink_path,
 
 	pnode = di_parent_node(args->node);
 	if (pnode != DI_NODE_NIL) {
-	    char prop_name[MAXPROPLEN];
+		char prop_name[MAXPROPLEN];
 
-	    (void) snprintf(prop_name, sizeof (prop_name),
-		"target%d-sync-speed", aliasp->target);
-	    diskp->sync_speed = get_prop(prop_name, pnode);
-	    (void) snprintf(prop_name, sizeof (prop_name), "target%d-wide",
-		aliasp->target);
-	    diskp->wide = get_prop(prop_name, pnode);
+		(void) snprintf(prop_name, sizeof (prop_name),
+		    "target%d-sync-speed", aliasp->target);
+		diskp->sync_speed = get_prop(prop_name, pnode);
+		(void) snprintf(prop_name, sizeof (prop_name), "target%d-wide",
+		    aliasp->target);
+		diskp->wide = get_prop(prop_name, pnode);
 	}
 
 	if (new_devpath(aliasp, devlink_path) != 0) {
-	    cache_free_alias(aliasp);
-	    return (ENOMEM);
+		cache_free_alias(aliasp);
+		return (ENOMEM);
 	}
 
 	aliasp->next = diskp->aliases;
@@ -1677,9 +1740,9 @@ new_devpath(alias_t *ap, char *devpath)
 	 */
 
 	for (alistp = ap->devpaths; alistp != NULL; alistp = alistp->next) {
-	    if (libdiskmgt_str_eq(alistp->devpath, devpath)) {
-		return (0);
-	    }
+		if (libdiskmgt_str_eq(alistp->devpath, devpath)) {
+			return (0);
+		}
 	}
 
 	/*
@@ -1688,29 +1751,29 @@ new_devpath(alias_t *ap, char *devpath)
 
 	newdp = malloc(sizeof (slice_t));
 	if (newdp == NULL) {
-	    return (ENOMEM);
+		return (ENOMEM);
 	}
 
 	newdp->devpath = strdup(devpath);
 	if (newdp->devpath == NULL) {
-	    free(newdp);
-	    return (ENOMEM);
+		free(newdp);
+		return (ENOMEM);
 	}
 	newdp->slice_num = -1;
 	newdp->next = NULL;
 
 	if (ap->devpaths == NULL) {
-	    ap->devpaths = newdp;
+		ap->devpaths = newdp;
 	} else {
-	    /* append the devpath to the end of the list */
-	    slice_t	*dp;
+		/* append the devpath to the end of the list */
+		slice_t	*dp;
 
-	    dp = ap->devpaths;
-	    while (dp->next != NULL) {
-		dp = dp->next;
-	    }
+		dp = ap->devpaths;
+		while (dp->next != NULL) {
+			dp = dp->next;
+		}
 
-	    dp->next = newdp;
+		dp->next = newdp;
 	}
 
 	return (0);
@@ -1726,12 +1789,12 @@ new_path(controller_t *cp, disk_t *dp, di_node_t node, di_path_state_t st,
 
 	/* Special handling for fp attachment node. */
 	if (strcmp(di_node_name(node), "fp") == 0) {
-	    di_node_t pnode;
+		di_node_t pnode;
 
-	    pnode = di_parent_node(node);
-	    if (pnode != DI_NODE_NIL) {
-		node = pnode;
-	    }
+		pnode = di_parent_node(node);
+		if (pnode != DI_NODE_NIL) {
+			node = pnode;
+		}
 	}
 
 	devpath = di_devfs_path(node);
@@ -1739,52 +1802,50 @@ new_path(controller_t *cp, disk_t *dp, di_node_t node, di_path_state_t st,
 	/* check if the path is already there */
 	pp = NULL;
 	if (cp->paths != NULL) {
-	    int i;
+		int i;
 
-	    for (i = 0; cp->paths[i]; i++) {
-		if (libdiskmgt_str_eq(devpath, cp->paths[i]->name)) {
-		    pp = cp->paths[i];
-		    break;
+		for (i = 0; cp->paths[i]; i++) {
+			if (libdiskmgt_str_eq(devpath, cp->paths[i]->name)) {
+				pp = cp->paths[i];
+				break;
+			}
 		}
-	    }
 	}
 
 	if (pp != NULL) {
-	    /* the path exists, add this disk to it */
+		/* the path exists, add this disk to it */
 
-	    di_devfs_path_free((void *) devpath);
-
-	    if (!add_disk2path(dp, pp, st, wwn)) {
-		return (NULL);
-	    }
-
-	    return (pp);
+		di_devfs_path_free((void *) devpath);
+		if (!add_disk2path(dp, pp, st, wwn)) {
+			return (NULL);
+		}
+		return (pp);
 	}
 
 	/* create a new path */
 
 	pp = calloc(1, sizeof (path_t));
 	if (pp == NULL) {
-	    di_devfs_path_free((void *) devpath);
-	    return (NULL);
+		di_devfs_path_free((void *) devpath);
+		return (NULL);
 	}
 
 	pp->name = strdup(devpath);
 	di_devfs_path_free((void *) devpath);
 	if (pp->name == NULL) {
-	    cache_free_path(pp);
-	    return (NULL);
+		cache_free_path(pp);
+		return (NULL);
 	}
 
 	/* add the disk to the path */
 	if (!add_disk2path(dp, pp, st, wwn)) {
-	    return (NULL);
+		return (NULL);
 	}
 
 	/* add the path to the controller */
 	if (add_ptr2array(pp, (void ***)&cp->paths) != 0) {
-	    cache_free_path(pp);
-	    return (NULL);
+		cache_free_path(pp);
+		return (NULL);
 	}
 
 	/* add the controller to the path */
@@ -1792,9 +1853,9 @@ new_path(controller_t *cp, disk_t *dp, di_node_t node, di_path_state_t st,
 
 	minor = di_minor_next(node, NULL);
 	if (minor != NULL) {
-	    pp->ctype = ctype(node, minor);
+		pp->ctype = ctype(node, minor);
 	} else {
-	    pp->ctype = DM_CTYPE_UNKNOWN;
+		pp->ctype = DM_CTYPE_UNKNOWN;
 	}
 
 	return (pp);
@@ -1815,46 +1876,55 @@ remove_invalid_controller(char *name, controller_t *currp,
 
 	bp = args->bus_listp;
 	while (bp != NULL) {
-	    int i;
+		int i;
 
-	    for (i = 0; bp->controllers[i]; i++) {
-		if (libdiskmgt_str_eq(bp->controllers[i]->name, name)) {
-		    int j;
-
-		    /* remove pointer to invalid controller (it is a path) */
-		    for (j = i; bp->controllers[j]; j++) {
-			bp->controllers[j] = bp->controllers[j + 1];
-		    }
+		for (i = 0; bp->controllers[i]; i++) {
+			if (libdiskmgt_str_eq(bp->controllers[i]->name, name)) {
+				int j;
+				/*
+				 * remove pointer to invalid controller.
+				 * (it is a path)
+				 */
+				for (j = i; bp->controllers[j]; j++) {
+					bp->controllers[j] =
+					    bp->controllers[j + 1];
+				}
+			}
 		}
-	    }
-	    bp = bp->next;
+		bp = bp->next;
 	}
 
 	if (args->controller_listp == NULL) {
-	    return;
+		return;
 	}
 
 	cp = args->controller_listp;
 	if (libdiskmgt_str_eq(cp->name, name)) {
-	    if (can_remove_controller(cp, currp)) {
 		args->controller_listp = cp->next;
-		cache_free_controller(cp);
-	    }
-	    return;
+		if (dm_debug) {
+			(void) fprintf(stderr,
+			    "INFO: Removed controller %s from list\n",
+			    cp->name);
+		}
+		remove_controller(cp, currp);
+		return;
 	}
 
 	prevp = cp;
 	cp = cp->next;
 	while (cp != NULL) {
-	    if (libdiskmgt_str_eq(cp->name, name)) {
-		if (can_remove_controller(cp, currp)) {
-		    prevp->next = cp->next;
-		    cache_free_controller(cp);
+		if (libdiskmgt_str_eq(cp->name, name)) {
+			if (dm_debug) {
+				(void) fprintf(stderr,
+				    "INFO: Removed controller %s from list\n",
+				    cp->name);
+			}
+			prevp->next = cp->next;
+			remove_controller(cp, currp);
+			return;
 		}
-		return;
-	    }
-	    prevp = cp;
-	    cp = cp->next;
+		prevp = cp;
+		cp = cp->next;
 	}
 }
 
@@ -1868,14 +1938,14 @@ str_case_index(register char *s1, register char *s2)
 
 	/* If the length of the second string is 0, return the first arg. */
 	if (s2len == 0) {
-	    return (s1);
+		return (s1);
 	}
 
 	while (strlen(s1) >= s2len) {
-	    if (strncasecmp(s1, s2, s2len) == 0) {
-		return (s1);
-	    }
-	    s1++;
+		if (strncasecmp(s1, s2, s2len) == 0) {
+			return (s1);
+		}
+		s1++;
 	}
 	return (NULL);
 }
