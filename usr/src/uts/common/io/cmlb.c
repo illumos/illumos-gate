@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4194,13 +4194,14 @@ cmlb_dkio_partition(struct cmlb_lun *cl, caddr_t arg, int flag,
 	efi_gpe_t		*partitions;
 	efi_gpt_t		*buffer;
 	diskaddr_t		gpe_lba;
+	int			n_gpe_per_blk = 0;
 
 	if (ddi_copyin((const void *)arg, &p64,
 	    sizeof (struct partition64), flag)) {
 		return (EFAULT);
 	}
 
-	buffer = kmem_alloc(EFI_MIN_ARRAY_SIZE, KM_SLEEP);
+	buffer = kmem_alloc(cl->cl_sys_blocksize, KM_SLEEP);
 	rval = DK_TG_READ(cl, buffer, 1, cl->cl_sys_blocksize, tg_cookie);
 	if (rval != 0)
 		goto done_error;
@@ -4212,17 +4213,17 @@ cmlb_dkio_partition(struct cmlb_lun *cl, caddr_t arg, int flag,
 
 	nparts = buffer->efi_gpt_NumberOfPartitionEntries;
 	gpe_lba = buffer->efi_gpt_PartitionEntryLBA;
-	if (p64.p_partno > nparts) {
+	if (p64.p_partno >= nparts) {
 		/* couldn't find it */
 		rval = ESRCH;
 		goto done_error;
 	}
 	/*
-	 * if we're dealing with a partition that's out of the normal
-	 * 16K block, adjust accordingly
+	 * Read the block that contains the requested GPE.
 	 */
-	gpe_lba += p64.p_partno / sizeof (efi_gpe_t);
-	rval = DK_TG_READ(cl, buffer, gpe_lba, EFI_MIN_ARRAY_SIZE, tg_cookie);
+	n_gpe_per_blk = cl->cl_sys_blocksize / sizeof (efi_gpe_t);
+	gpe_lba += p64.p_partno / n_gpe_per_blk;
+	rval = DK_TG_READ(cl, buffer, gpe_lba, cl->cl_sys_blocksize, tg_cookie);
 
 	if (rval) {
 		goto done_error;
@@ -4231,7 +4232,7 @@ cmlb_dkio_partition(struct cmlb_lun *cl, caddr_t arg, int flag,
 
 	cmlb_swap_efi_gpe(nparts, partitions);
 
-	partitions += p64.p_partno;
+	partitions += p64.p_partno % n_gpe_per_blk;
 	bcopy(&partitions->efi_gpe_PartitionTypeGUID, &p64.p_type,
 	    sizeof (struct uuid));
 	p64.p_start = partitions->efi_gpe_StartingLBA;
@@ -4242,7 +4243,7 @@ cmlb_dkio_partition(struct cmlb_lun *cl, caddr_t arg, int flag,
 		rval = EFAULT;
 
 done_error:
-	kmem_free(buffer, EFI_MIN_ARRAY_SIZE);
+	kmem_free(buffer, cl->cl_sys_blocksize);
 	return (rval);
 }
 
