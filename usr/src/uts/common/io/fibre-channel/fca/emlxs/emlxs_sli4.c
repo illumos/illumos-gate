@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -172,7 +172,6 @@ emlxs_sli4_online(emlxs_hba_t *hba)
 	MAILBOXQ *mbq = NULL;
 	MAILBOX4 *mb  = NULL;
 	MATCHMAP *mp  = NULL;
-	MATCHMAP *mp1 = NULL;
 	uint32_t i;
 	uint32_t j;
 	uint32_t rval = 0;
@@ -810,30 +809,6 @@ emlxs_data_dump(hba, "XRIp", (uint32_t *)hba->sli.sli4.XRIp, 18, 0);
 	/* Get and save the current firmware version (based on sli_mode) */
 	emlxs_decode_firmware_rev(hba, vpd);
 
-	/*
-	 * Setup and issue mailbox RUN BIU DIAG command Setup test buffers
-	 */
-	if (((mp = (MATCHMAP *)emlxs_mem_get(hba, MEM_BUF, 1)) == 0) ||
-	    ((mp1 = (MATCHMAP *)emlxs_mem_get(hba, MEM_BUF, 1)) == 0)) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_failed_msg,
-		    "Unable to allocate diag buffers.");
-
-		rval = ENOMEM;
-		goto failed3;
-	}
-
-	bcopy((caddr_t)&emlxs_diag_pattern[0], (caddr_t)mp->virt,
-	    MEM_ELSBUF_SIZE);
-	EMLXS_MPDATA_SYNC(mp->dma_handle, 0, MEM_ELSBUF_SIZE,
-	    DDI_DMA_SYNC_FORDEV);
-
-	bzero(mp1->virt, MEM_ELSBUF_SIZE);
-	EMLXS_MPDATA_SYNC(mp1->dma_handle, 0, MEM_ELSBUF_SIZE,
-	    DDI_DMA_SYNC_FORDEV);
-
-
-	(void) emlxs_mem_put(hba, MEM_BUF, (uint8_t *)mp);
-	mp = NULL;
 
 	EMLXS_STATE_CHANGE(hba, FC_INIT_INITLINK);
 
@@ -1005,6 +980,11 @@ emlxs_data_dump(hba, "XRIp", (uint32_t *)hba->sli.sli4.XRIp, 18, 0);
 	 * The leadvile driver will now handle the FLOGI at the driver level
 	 */
 
+	if (mbq) {
+		(void) kmem_free((uint8_t *)mbq, sizeof (MAILBOXQ));
+		mbq = NULL;
+		mb = NULL;
+	}
 	return (0);
 
 failed3:
@@ -1015,10 +995,6 @@ failed3:
 		mp = NULL;
 	}
 
-	if (mp1) {
-		(void) emlxs_mem_put(hba, MEM_BUF, (uint8_t *)mp1);
-		mp1 = NULL;
-	}
 
 	if (hba->intr_flags & EMLXS_MSI_ADDED) {
 		(void) EMLXS_INTR_REMOVE(hba);
@@ -1074,7 +1050,6 @@ emlxs_sli4_offline(emlxs_hba_t *hba)
 	} else {
 		mutex_exit(&EMLXS_PORT_LOCK);
 	}
-
 
 	/* Shutdown the adapter interface */
 	emlxs_sli4_hba_kill(hba);
@@ -2325,7 +2300,6 @@ emlxs_sli4_issue_mbox_cmd(emlxs_hba_t *hba, MAILBOXQ *mbq, int32_t flag,
 	mb4 = (MAILBOX4 *)mbq;
 	mb = (MAILBOX *)mbq;
 
-
 	mb->mbxStatus = MBX_SUCCESS;
 	rc = MBX_SUCCESS;
 
@@ -2379,8 +2353,11 @@ emlxs_sli4_issue_mbox_cmd(emlxs_hba_t *hba, MAILBOXQ *mbq, int32_t flag,
 		}
 	}
 
-	/* Check for hardware error */
-	if (hba->flag & FC_HARDWARE_ERROR) {
+	/* Check for hardware error ; special case SLI_CONFIG */
+	if ((hba->flag & FC_HARDWARE_ERROR) &&
+	    ! ((mb4->mbxCommand == MBX_SLI_CONFIG) &&
+	    (mb4->un.varSLIConfig.be.un_hdr.hdr_req.opcode ==
+	    COMMON_OPCODE_RESET))) {
 		mb->mbxStatus = MBX_HARDWARE_ERROR;
 
 		mutex_exit(&EMLXS_PORT_LOCK);
@@ -3680,10 +3657,13 @@ done:
 } /* emlxs_sli4_process_mbox_event() */
 
 
+/*ARGSUSED*/
 static void
 emlxs_CQE_to_IOCB(emlxs_hba_t *hba, CQE_CmplWQ_t *cqe, emlxs_buf_t *sbp)
 {
+#ifdef SLI4_FASTPATH_DEBUG
 	emlxs_port_t *port = &PPORT;
+#endif
 	IOCBQ *iocbq;
 	IOCB *iocb;
 	emlxs_wqe_t *wqe;
@@ -3752,6 +3732,11 @@ emlxs_CQE_to_IOCB(emlxs_hba_t *hba, CQE_CmplWQ_t *cqe, emlxs_buf_t *sbp)
 static void
 emlxs_sli4_hba_flush_chipq(emlxs_hba_t *hba)
 {
+#ifdef SFCT_SUPPORT
+#ifdef FCT_IO_TRACE
+	emlxs_port_t *port = &PPORT;
+#endif /* FCT_IO_TRACE */
+#endif /* SFCT_SUPPORT */
 	CHANNEL *cp;
 	emlxs_buf_t *sbp;
 	IOCBQ *iocbq;
@@ -3961,7 +3946,9 @@ static void
 emlxs_sli4_process_release_wqe(emlxs_hba_t *hba, CQ_DESC_t *cq,
     CQE_RelWQ_t *cqe)
 {
+#ifdef SLI4_FASTPATH_DEBUG
 	emlxs_port_t *port = &PPORT;
+#endif
 	WQ_DESC_t *wq;
 	CHANNEL *cp;
 	uint32_t i;
@@ -4844,7 +4831,9 @@ emlxs_sli4_process_cq(emlxs_hba_t *hba, CQ_DESC_t *cq)
 static void
 emlxs_sli4_process_eq(emlxs_hba_t *hba, EQ_DESC_t *eq)
 {
+#ifdef SLI4_FASTPATH_DEBUG
 	emlxs_port_t *port = &PPORT;
+#endif
 	uint32_t eqdb;
 	uint32_t *ptr;
 	CHANNEL *cp;
@@ -4932,7 +4921,9 @@ static uint32_t
 emlxs_sli4_msi_intr(char *arg1, char *arg2)
 {
 	emlxs_hba_t *hba = (emlxs_hba_t *)arg1;
+#ifdef SLI4_FASTPATH_DEBUG
 	emlxs_port_t *port = &PPORT;
+#endif
 	uint16_t msgid;
 	int rc;
 
@@ -4959,7 +4950,7 @@ emlxs_sli4_msi_intr(char *arg1, char *arg2)
 
 	mutex_enter(&EMLXS_PORT_LOCK);
 
-	if (hba->flag & FC_OFFLINE_MODE) {
+	if ((hba->state == FC_KILLED) || (hba->flag & FC_OFFLINE_MODE)) {
 		mutex_exit(&EMLXS_PORT_LOCK);
 		mutex_exit(&EMLXS_INTR_LOCK(msgid));
 		return (DDI_INTR_UNCLAIMED);
@@ -4981,7 +4972,9 @@ static int
 emlxs_sli4_intx_intr(char *arg)
 {
 	emlxs_hba_t *hba = (emlxs_hba_t *)arg;
+#ifdef SLI4_FASTPATH_DEBUG
 	emlxs_port_t *port = &PPORT;
+#endif
 
 #ifdef SLI4_FASTPATH_DEBUG
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
@@ -4990,7 +4983,7 @@ emlxs_sli4_intx_intr(char *arg)
 
 	mutex_enter(&EMLXS_PORT_LOCK);
 
-	if (hba->flag & FC_OFFLINE_MODE) {
+	if ((hba->state == FC_KILLED) || (hba->flag & FC_OFFLINE_MODE)) {
 		mutex_exit(&EMLXS_PORT_LOCK);
 		return (DDI_INTR_UNCLAIMED);
 	}

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -116,6 +116,7 @@ typedef enum emlxs_cfg_parm
 
 #ifdef SFCT_SUPPORT
 	CFG_TARGET_MODE,	/* target-mode */
+	CFG_FCT_QDEPTH,		/* fct-queue-depth */
 #endif /* SFCT_SUPPORT */
 	CFG_NUM_WQ,		/* num-wq (hidden) */
 	CFG_PERSIST_LINKDOWN,	/* persist-linkdown */
@@ -487,8 +488,15 @@ emlxs_config_t  emlxs_cfg[] = {
 #else
 		0, 1, 0, 0,
 #endif /* SFCT_ENABLED */
-		PARM_BOOLEAN,
+		0,
 	"Enables target mode support in driver. [0=Disabled, 1=Enabled]"},
+
+	/* CFG_FCT_QDEPTH */
+	{"fct-queue-depth",
+		0, 4096, 0, 0,
+		PARM_BOOLEAN,
+	"Queue depth of target mode port. "
+		"[0=max determined by type of HBA]"},
 #endif /* SFCT_SUPPORT */
 
 	/* CFG_NUM_WQ */

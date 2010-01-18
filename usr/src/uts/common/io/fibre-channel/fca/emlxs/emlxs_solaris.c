@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2852,7 +2852,7 @@ emlxs_ub_alloc(opaque_t fca_port_handle, uint64_t tokens[], uint32_t size,
 		err = "IS8802_SNAP";
 
 		if (cfg[CFG_NETWORK_ON].current == 0) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_msg,
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 			    "ub_alloc failed: IP support is disabled.");
 
 			return (FC_FAILURE);

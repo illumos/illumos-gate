@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -862,22 +862,32 @@ emlxs_init_fct_bufpool(emlxs_hba_t *hba, char **arrayp, uint32_t cnt)
 
 	bzero((uint8_t *)port->dmem_bucket, sizeof (port->dmem_bucket));
 	bck = 0;
+
+	if (!cnt || !arrayp) {
+		goto done;
+	}
+
 	for (i = 0; i < cnt; i++) {
 		datap = (uint8_t *)arrayp[i];
-		if (datap == 0)
+		if (datap == 0) {
 			break;
+		}
 
-		while (*datap == ' ')	/* Skip spaces */
+		while (*datap == ' ') {	/* Skip spaces */
 			datap++;
+		}
 
 		size = emlxs_str_atoi(datap);
 
-		while ((*datap != ':') && (*datap != 0))
+		while ((*datap != ':') && (*datap != 0)) {
 			datap++;
-		if (*datap == ':')	/* Skip past delimeter */
+		}
+		if (*datap == ':') {	/* Skip past delimeter */
 			datap++;
-		while (*datap == ' ')	/* Skip spaces */
+		}
+		while (*datap == ' ') {	/* Skip spaces */
 			datap++;
+		}
 
 		nbufs = emlxs_str_atoi(datap);
 
@@ -923,74 +933,64 @@ emlxs_init_fct_bufpool(emlxs_hba_t *hba, char **arrayp, uint32_t cnt)
 			break;
 		}
 	}
-}
+
+done:
+	/* If no entries found then use defaults */
+	if (bck == 0) {
+		port->dmem_bucket[0].dmem_buf_size = 512;
+		port->dmem_bucket[0].dmem_nbufs = FCT_BUF_COUNT_512;
+		port->dmem_bucket[1].dmem_buf_size = 8192;
+		port->dmem_bucket[1].dmem_nbufs = FCT_BUF_COUNT_8K;
+		port->dmem_bucket[2].dmem_buf_size = 65536;
+		port->dmem_bucket[2].dmem_nbufs = FCT_BUF_COUNT_64K;
+		port->dmem_bucket[3].dmem_buf_size = 131072;
+		port->dmem_bucket[3].dmem_nbufs = FCT_BUF_COUNT_128K;
+	}
+
+} /* emlxs_init_fct_bufpool() */
 
 
 static void
 emlxs_fct_cfg_init(emlxs_hba_t *hba)
 {
+#ifdef FCT_IO_TRACE
 	emlxs_port_t *port = &PPORT;
+	emlxs_config_t *cfg = &CFG;
+#endif /* FCT_IO_TRACE */
 	char **arrayp;
 	uint32_t cnt;
 	char buf[32];
-	int status;
+	uint32_t rval;
 
-	bzero((void *)buf, 32);
+	/* Check for the per adapter setting */
+	(void) sprintf(buf, "%s%d-fct-bufpool", DRIVER_NAME, hba->ddiinst);
 	cnt = 0;
 	arrayp = NULL;
-
-	(void) sprintf(buf, "emlxs%d-fct-bufpool", ddi_get_instance(hba->dip));
-	status = ddi_prop_lookup_string_array(DDI_DEV_T_ANY, hba->dip,
+	rval = ddi_prop_lookup_string_array(DDI_DEV_T_ANY, hba->dip,
 	    (DDI_PROP_DONTPASS), buf, &arrayp, &cnt);
 
-	if ((status == DDI_PROP_SUCCESS) && cnt && arrayp) {
-		emlxs_init_fct_bufpool(hba, arrayp, cnt);
-	} else {
-		status = ddi_prop_lookup_string_array(DDI_DEV_T_ANY, hba->dip,
+	if ((rval != DDI_PROP_SUCCESS) || !cnt || !arrayp) {
+		/* Check for the global setting */
+		cnt = 0;
+		arrayp = NULL;
+		rval =
+		    ddi_prop_lookup_string_array(DDI_DEV_T_ANY, hba->dip,
 		    (DDI_PROP_DONTPASS), "fct-bufpool", &arrayp, &cnt);
 
-		if ((status == DDI_PROP_SUCCESS) && cnt && arrayp) {
-			emlxs_init_fct_bufpool(hba, arrayp, cnt);
-		} else {
-			bzero((uint8_t *)port->dmem_bucket,
-			    sizeof (port->dmem_bucket));
-			port->dmem_bucket[0].dmem_buf_size = 512;
-			port->dmem_bucket[0].dmem_nbufs = FCT_BUF_COUNT_512;
-			port->dmem_bucket[1].dmem_buf_size = (2 * 65536);
-			port->dmem_bucket[1].dmem_nbufs = FCT_BUF_COUNT_128K;
+		if ((rval != DDI_PROP_SUCCESS) || !cnt || !arrayp) {
+			cnt = 0;
+			arrayp = NULL;
 		}
 	}
 
-	bzero((void *)buf, 32);
-	cnt = 0;
-
-	/*
-	 * 0 means use HBA throttle for target queue depth,
-	 * non-0 value is the actual target queue depth,
-	 * default is EMLXS_FCT_DFLT_QDEPTH.
-	 */
-	(void) sprintf(buf, "emlxs%d-fct-queue-depth",
-	    ddi_get_instance(hba->dip));
-	cnt = ddi_prop_get_int(DDI_DEV_T_ANY, hba->dip,
-	    (DDI_PROP_DONTPASS), buf, EMLXS_FCT_DFLT_QDEPTH);
-
-	if ((cnt == DDI_PROP_NOT_FOUND) || (cnt == EMLXS_FCT_DFLT_QDEPTH)) {
-		cnt = ddi_prop_get_int(DDI_DEV_T_ANY, hba->dip,
-		    (DDI_PROP_DONTPASS), "fct-queue-depth",
-		    EMLXS_FCT_DFLT_QDEPTH);
-
-		if (cnt == DDI_PROP_NOT_FOUND) {
-			cnt = EMLXS_FCT_DFLT_QDEPTH;
-		}
-	}
-
-	port->fct_queue_depth = cnt;
+	emlxs_init_fct_bufpool(hba, arrayp, cnt);
 
 #ifdef FCT_IO_TRACE
 	port->iotrace_cnt = 1024;
 	port->iotrace_index = 0;
-	if (cnt)
-		port->iotrace_cnt = (2 * cnt);
+	if (cfg[CFG_FCT_QDEPTH].current) {
+		port->iotrace_cnt = (2 * cfg[CFG_FCT_QDEPTH].current);
+	}
 	port->iotrace =
 	    kmem_zalloc(port->iotrace_cnt * sizeof (emlxs_iotrace_t),
 	    KM_SLEEP);
@@ -1005,6 +1005,7 @@ emlxs_fct_cfg_init(emlxs_hba_t *hba)
 	    "FCT_ABORT_SUCCESS:%lx FCT_SUCCESS:%lx", FCT_ABORT_SUCCESS,
 	    FCT_SUCCESS);
 #endif /* FCT_IO_TRACE */
+
 	return;
 
 } /* emlxs_fct_cfg_init() */
@@ -1368,9 +1369,9 @@ emlxs_fct_bind_port(emlxs_port_t *port)
 	fct_port->port_pp = port->port_provider;
 	fct_port->port_max_logins = hba->max_nodes;
 
-	if ((port->fct_queue_depth) &&
-	    (port->fct_queue_depth < hba->io_throttle)) {
-		fct_port->port_max_xchges = port->fct_queue_depth;
+	if (cfg[CFG_FCT_QDEPTH].current &&
+	    (cfg[CFG_FCT_QDEPTH].current < hba->io_throttle)) {
+		fct_port->port_max_xchges = cfg[CFG_FCT_QDEPTH].current;
 	} else {
 		fct_port->port_max_xchges = hba->io_throttle;
 	}
@@ -3918,7 +3919,7 @@ emlxs_fct_abort_pkt_comp(fc_packet_t *pkt)
 	iocb = &iocbq->iocb;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
-	    "emlxs_fct_handle_abort: %p: xri=%x status=%x", iocb->ULPCONTEXT,
+	    "emlxs_fct_abort_pkt_comp: %p: xri=%x status=%x", iocb->ULPCONTEXT,
 	    iocb->ULPCOMMAND, iocb->ULPSTATUS);
 #endif /* FCT_API_TRACE */
 

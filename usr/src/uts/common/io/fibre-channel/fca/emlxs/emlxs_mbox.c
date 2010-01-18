@@ -3641,13 +3641,17 @@ emlxs_cmpl_unreg_vpi(void *arg1, MAILBOXQ *mbq)
 {
 	emlxs_hba_t *hba = (emlxs_hba_t *)arg1;
 	emlxs_port_t *vport;
-	MAILBOX *mb;
+	MAILBOX4 *mb4;
+	uint16_t vpi;
 
-	mb = (MAILBOX *)mbq;
-	if (mb->mbxStatus == MBX_SUCCESS) {
-		vport = &VPORT(mb->un.varUnregVpi.vpi);
-		vport->flag &= ~EMLXS_PORT_INIT_VPI_CMPL;
-		vport->flag &= ~EMLXS_PORT_REG_VPI_CMPL;
+	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+		mb4 = (MAILBOX4 *)mbq->mbox;
+		if (mb4->mbxStatus == MBX_SUCCESS) {
+			vpi = mb4->un.varUnRegVPI4.index - hba->vpi_base;
+			vport = &VPORT(vpi);
+			vport->flag &= ~EMLXS_PORT_INIT_VPI_CMPL;
+			vport->flag &= ~EMLXS_PORT_REG_VPI_CMPL;
+		}
 	}
 	return (0);
 

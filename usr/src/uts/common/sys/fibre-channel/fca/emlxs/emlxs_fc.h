@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1071,8 +1071,6 @@ typedef struct emlxs_port
 #define	FCT_DMEM_MAX_BUF_SEGMENT	8388608  /* 8M */
 
 	struct emlxs_fct_dmem_bucket dmem_bucket[FCT_MAX_BUCKETS];
-	int			fct_queue_depth;
-#define	EMLXS_FCT_DFLT_QDEPTH   64
 
 	char			cfd_name[24];
 	stmf_port_provider_t	*port_provider;

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -499,8 +499,6 @@ emlxs_timer_check_pkts(emlxs_hba_t *hba, uint8_t *flag)
 		sbp = hba->fc_table[iotag];
 		if (sbp && (sbp != STALE_PACKET) &&
 		    (sbp->pkt_flags & PACKET_IN_CHIPQ) &&
-		    !(sbp->pkt_flags & (PACKET_IN_FLUSH |
-		    PACKET_XRI_CLOSED)) &&
 		    (hba->timer_tics >= sbp->ticks)) {
 			rc = emlxs_pkt_chip_timeout(sbp->iocbq.port,
 			    sbp, &abort, flag);

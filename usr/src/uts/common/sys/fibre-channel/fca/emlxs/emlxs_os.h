@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,8 +53,6 @@ extern "C" {
 #define	DUMP_SUPPORT		/* 2.40 driver */
 #define	SAN_DIAG_SUPPORT	/* 2.40 driver */
 #define	FMA_SUPPORT		/* 2.40 driver */
-
-#define	SLI4_FASTPATH_DEBUG
 
 /* #define	IDLE_TIMER	 Not yet - untested */
 
