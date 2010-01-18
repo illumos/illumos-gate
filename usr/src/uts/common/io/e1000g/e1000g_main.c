@@ -19,7 +19,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,7 +46,7 @@
 
 static char ident[] = "Intel PRO/1000 Ethernet";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.3.20";
+static char e1000g_version[] = "Driver Ver. 5.3.21";
 
 /*
  * Proto types for DDI entry points
@@ -123,6 +123,7 @@ static void e1000g_setup_max_mtu(struct e1000g *);
 static void e1000g_get_max_frame_size(struct e1000g *);
 static boolean_t is_valid_mac_addr(uint8_t *);
 static void e1000g_unattach(dev_info_t *, struct e1000g *);
+static int e1000g_get_bar_info(dev_info_t *, int, bar_info_t *);
 #ifdef E1000G_DEBUG
 static void e1000g_ioc_peek_reg(struct e1000g *, e1000g_peekpoke_t *);
 static void e1000g_ioc_poke_reg(struct e1000g *, e1000g_peekpoke_t *);
@@ -652,9 +653,12 @@ e1000g_regs_map(struct e1000g *Adapter)
 	struct e1000_hw *hw = &Adapter->shared;
 	struct e1000g_osdep *osdep = &Adapter->osdep;
 	off_t mem_size;
+	bar_info_t bar_info;
+	int offset, rnumber;
 
+	rnumber = ADAPTER_REG_SET;
 	/* Get size of adapter register memory */
-	if (ddi_dev_regsize(devinfo, ADAPTER_REG_SET, &mem_size) !=
+	if (ddi_dev_regsize(devinfo, rnumber, &mem_size) !=
 	    DDI_SUCCESS) {
 		E1000G_DEBUGLOG_0(Adapter, CE_WARN,
 		    "ddi_dev_regsize for registers failed");
@@ -662,7 +666,7 @@ e1000g_regs_map(struct e1000g *Adapter)
 	}
 
 	/* Map adapter register memory */
-	if ((ddi_regs_map_setup(devinfo, ADAPTER_REG_SET,
+	if ((ddi_regs_map_setup(devinfo, rnumber,
 	    (caddr_t *)&hw->hw_addr, 0, mem_size, &e1000g_regs_acc_attr,
 	    &osdep->reg_handle)) != DDI_SUCCESS) {
 		E1000G_DEBUGLOG_0(Adapter, CE_WARN,
@@ -671,12 +675,15 @@ e1000g_regs_map(struct e1000g *Adapter)
 	}
 
 	/* ICH needs to map flash memory */
-	if (hw->mac.type == e1000_ich8lan ||
-	    hw->mac.type == e1000_ich9lan ||
-	    hw->mac.type == e1000_ich10lan ||
-	    hw->mac.type == e1000_pchlan) {
+	switch (hw->mac.type) {
+	case e1000_ich8lan:
+	case e1000_ich9lan:
+	case e1000_ich10lan:
+	case e1000_pchlan:
+		rnumber = ICH_FLASH_REG_SET;
+
 		/* get flash size */
-		if (ddi_dev_regsize(devinfo, ICH_FLASH_REG_SET,
+		if (ddi_dev_regsize(devinfo, rnumber,
 		    &mem_size) != DDI_SUCCESS) {
 			E1000G_DEBUGLOG_0(Adapter, CE_WARN,
 			    "ddi_dev_regsize for ICH flash failed");
@@ -684,7 +691,7 @@ e1000g_regs_map(struct e1000g *Adapter)
 		}
 
 		/* map flash in */
-		if (ddi_regs_map_setup(devinfo, ICH_FLASH_REG_SET,
+		if (ddi_regs_map_setup(devinfo, rnumber,
 		    (caddr_t *)&hw->flash_address, 0,
 		    mem_size, &e1000g_regs_acc_attr,
 		    &osdep->ich_flash_handle) != DDI_SUCCESS) {
@@ -692,6 +699,59 @@ e1000g_regs_map(struct e1000g *Adapter)
 			    "ddi_regs_map_setup for ICH flash failed");
 			goto regs_map_fail;
 		}
+		break;
+	default:
+		break;
+	}
+
+	/* map io space */
+	switch (hw->mac.type) {
+	case e1000_82544:
+	case e1000_82540:
+	case e1000_82545:
+	case e1000_82546:
+	case e1000_82541:
+	case e1000_82541_rev_2:
+		/* find the IO bar */
+		rnumber = -1;
+		for (offset = PCI_CONF_BASE1;
+		    offset <= PCI_CONF_BASE5; offset += 4) {
+			if (e1000g_get_bar_info(devinfo, offset, &bar_info)
+			    != DDI_SUCCESS)
+				continue;
+			if (bar_info.type == E1000G_BAR_IO) {
+				rnumber = bar_info.rnumber;
+				break;
+			}
+		}
+
+		if (rnumber < 0) {
+			E1000G_DEBUGLOG_0(Adapter, CE_WARN,
+			    "No io space is found");
+			goto regs_map_fail;
+		}
+
+		/* get io space size */
+		if (ddi_dev_regsize(devinfo, rnumber,
+		    &mem_size) != DDI_SUCCESS) {
+			E1000G_DEBUGLOG_0(Adapter, CE_WARN,
+			    "ddi_dev_regsize for io space failed");
+			goto regs_map_fail;
+		}
+
+		/* map io space */
+		if ((ddi_regs_map_setup(devinfo, rnumber,
+		    (caddr_t *)&hw->io_base, 0, mem_size,
+		    &e1000g_regs_acc_attr,
+		    &osdep->io_reg_handle)) != DDI_SUCCESS) {
+			E1000G_DEBUGLOG_0(Adapter, CE_WARN,
+			    "ddi_regs_map_setup for io space failed");
+			goto regs_map_fail;
+		}
+		break;
+	default:
+		hw->io_base = 0;
+		break;
 	}
 
 	return (DDI_SUCCESS);
@@ -699,7 +759,8 @@ e1000g_regs_map(struct e1000g *Adapter)
 regs_map_fail:
 	if (osdep->reg_handle != NULL)
 		ddi_regs_map_free(&osdep->reg_handle);
-
+	if (osdep->ich_flash_handle != NULL)
+		ddi_regs_map_free(&osdep->ich_flash_handle);
 	return (DDI_FAILURE);
 }
 
@@ -707,7 +768,6 @@ static int
 e1000g_set_driver_params(struct e1000g *Adapter)
 {
 	struct e1000_hw *hw;
-	uint32_t mem_bar, io_bar, bar64;
 
 	hw = &Adapter->shared;
 
@@ -723,27 +783,6 @@ e1000g_set_driver_params(struct e1000g *Adapter)
 		E1000G_DEBUGLOG_0(Adapter, CE_WARN,
 		    "Could not get bus information");
 		return (DDI_FAILURE);
-	}
-
-	/* get mem_base addr */
-	mem_bar = pci_config_get32(Adapter->osdep.cfg_handle, PCI_CONF_BASE0);
-	bar64 = mem_bar & PCI_BASE_TYPE_ALL;
-
-	/* get io_base addr */
-	if (hw->mac.type >= e1000_82544) {
-		if (bar64) {
-			/* IO BAR is different for 64 bit BAR mode */
-			io_bar = pci_config_get32(Adapter->osdep.cfg_handle,
-			    PCI_CONF_BASE4);
-		} else {
-			/* normal 32-bit BAR mode */
-			io_bar = pci_config_get32(Adapter->osdep.cfg_handle,
-			    PCI_CONF_BASE2);
-		}
-		hw->io_base = io_bar & PCI_BASE_IO_ADDR_M;
-	} else {
-		/* no I/O access for adapters prior to 82544 */
-		hw->io_base = 0x0;
 	}
 
 	e1000_read_pci_cfg(hw, PCI_COMMAND_REGISTER, &hw->bus.pci_cmd_word);
@@ -1072,6 +1111,8 @@ e1000g_unattach(dev_info_t *devinfo, struct e1000g *Adapter)
 			ddi_regs_map_free(&Adapter->osdep.reg_handle);
 		if (Adapter->osdep.ich_flash_handle != NULL)
 			ddi_regs_map_free(&Adapter->osdep.ich_flash_handle);
+		if (Adapter->osdep.io_reg_handle != NULL)
+			ddi_regs_map_free(&Adapter->osdep.io_reg_handle);
 	}
 
 	if (Adapter->attach_progress & ATTACH_PROGRESS_PCI_CONFIG) {
@@ -1105,6 +1146,63 @@ e1000g_unattach(dev_info_t *devinfo, struct e1000g *Adapter)
 	 * run ddi_set_driver_private(devinfo, null);
 	 */
 	ddi_set_driver_private(devinfo, NULL);
+}
+
+/*
+ * Get the BAR type and rnumber for a given PCI BAR offset
+ */
+static int
+e1000g_get_bar_info(dev_info_t *dip, int bar_offset, bar_info_t *bar_info)
+{
+	pci_regspec_t *regs;
+	uint_t regs_length;
+	int type, rnumber;
+
+	ASSERT((bar_offset >= PCI_CONF_BASE0) &&
+	    (bar_offset <= PCI_CONF_BASE5));
+
+	/*
+	 * Get the DDI "reg" property
+	 */
+	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, "reg", (int **)&regs,
+	    &regs_length) != DDI_PROP_SUCCESS) {
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * Check the BAR offset
+	 */
+	for (rnumber = 0; rnumber < regs_length; ++rnumber) {
+		if (PCI_REG_REG_G(regs[rnumber].pci_phys_hi) == bar_offset) {
+			type = regs[rnumber].pci_phys_hi & PCI_ADDR_MASK;
+			break;
+		}
+	}
+
+	ddi_prop_free(regs);
+
+	if (rnumber >= regs_length)
+		return (DDI_FAILURE);
+
+	switch (type) {
+	case PCI_ADDR_CONFIG:
+		bar_info->type = E1000G_BAR_CONFIG;
+		break;
+	case PCI_ADDR_IO:
+		bar_info->type = E1000G_BAR_IO;
+		break;
+	case PCI_ADDR_MEM32:
+		bar_info->type = E1000G_BAR_MEM32;
+		break;
+	case PCI_ADDR_MEM64:
+		bar_info->type = E1000G_BAR_MEM64;
+		break;
+	default:
+		return (DDI_FAILURE);
+	}
+	bar_info->rnumber = rnumber;
+	return (DDI_SUCCESS);
 }
 
 static void

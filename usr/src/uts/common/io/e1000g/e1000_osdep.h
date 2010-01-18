@@ -19,7 +19,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
@@ -192,6 +192,7 @@ struct e1000g_osdep {
 	ddi_acc_handle_t reg_handle;
 	ddi_acc_handle_t cfg_handle;
 	ddi_acc_handle_t ich_flash_handle;
+	ddi_acc_handle_t io_reg_handle;
 	struct e1000g *adapter;
 };
 
@@ -209,8 +210,13 @@ struct e1000g_osdep {
 #define	E1000_WRITE_REG_IO	E1000_WRITE_REG
 #else	/* on x86, use port io routines */
 #define	E1000_WRITE_REG_IO(a, reg, val)	{ \
-	outl(((a)->io_base), reg); \
-	outl(((a)->io_base + 4), val); }
+	ddi_put32((OS_DEP(a))->io_reg_handle, \
+	    (uint32_t *)(a)->io_base, \
+	    reg); \
+	ddi_put32((OS_DEP(a))->io_reg_handle, \
+	    (uint32_t *)((a)->io_base + 4), \
+	    val); \
+}
 #endif	/* __sparc */
 
 #ifdef __cplusplus

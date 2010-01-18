@@ -19,7 +19,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -506,6 +506,18 @@ typedef struct _LIST_DESCRIBER {
 	struct _SINGLE_LIST_LINK *volatile Flink;
 	struct _SINGLE_LIST_LINK *volatile Blink;
 } LIST_DESCRIBER, *PLIST_DESCRIBER;
+
+enum e1000g_bar_type {
+	E1000G_BAR_CONFIG = 0,
+	E1000G_BAR_IO,
+	E1000G_BAR_MEM32,
+	E1000G_BAR_MEM64
+};
+
+typedef struct {
+	enum e1000g_bar_type type;
+	int rnumber;
+} bar_info_t;
 
 /*
  * Address-Length pair structure that stores descriptor info

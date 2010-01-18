@@ -18,7 +18,7 @@
 # and limitations under the License.
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -737,3 +737,8 @@ Notes on packaging:
    6903712 Cannot install on DQ45EK system due to e1000g driver alias
    6909097 e1000g specifies incorrect flag when allocating tx DMA buffers
    6909553 e1000g stall reset leaves GLDv3 link state as "unknown"
+
+5.3.21
+======
+  This version has the following fix:
+   6909134 e1000g doesn't use ddi_get/ddi_put to access its IO space
