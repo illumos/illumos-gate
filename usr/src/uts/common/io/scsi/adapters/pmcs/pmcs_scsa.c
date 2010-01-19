@@ -615,7 +615,6 @@ pmcs_scsa_abort(struct scsi_address *ap, struct scsi_pkt *pkt)
 	pmcs_phy_t *pptr = NULL;
 	pmcs_lun_t *pmcs_lun = (pmcs_lun_t *)
 	    scsi_device_hba_private_get(scsi_address_device(ap));
-	int rc;
 	uint32_t tag;
 	uint64_t lun;
 	pmcwork_t *pwrk;
