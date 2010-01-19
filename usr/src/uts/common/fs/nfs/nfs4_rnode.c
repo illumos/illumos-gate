@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1433,8 +1433,14 @@ nfs4_active_data_reclaim(rnode4_t *rp)
 	 * on the same r_hashq queue. We are not mandated to free all caches.
 	 * VN_RELE(rp->r_xattr_dir) will be done sometime later - e.g. when the
 	 * rnode 'rp' is freed or put on the free list.
+	 *
+	 * We will retain NFS4_XATTR_DIR_NOTSUPP because:
+	 * - it has no associated rnode4_t (its v_data is NULL),
+	 * - it is preallocated statically and will never go away,
+	 * so we cannot save anything by releasing it.
 	 */
-	if (rp->r_xattr_dir && VTOR4(rp->r_xattr_dir)->r_hashq != rp->r_hashq) {
+	if (rp->r_xattr_dir && rp->r_xattr_dir != NFS4_XATTR_DIR_NOTSUPP &&
+	    VTOR4(rp->r_xattr_dir)->r_hashq != rp->r_hashq) {
 		xattr = rp->r_xattr_dir;
 		rp->r_xattr_dir = NULL;
 	}
