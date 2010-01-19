@@ -1091,6 +1091,7 @@ igb_tx_recycle_legacy(igb_tx_ring_t *tx_ring)
 
 	if (igb_check_dma_handle(
 	    tx_ring->tbd_area.dma_handle) != DDI_FM_OK) {
+		mutex_exit(&tx_ring->recycle_lock);
 		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
 		atomic_or_32(&igb->igb_state, IGB_ERROR);
 		return (0);
@@ -1239,6 +1240,7 @@ igb_tx_recycle_head_wb(igb_tx_ring_t *tx_ring)
 
 	if (igb_check_dma_handle(
 	    tx_ring->tbd_area.dma_handle) != DDI_FM_OK) {
+		mutex_exit(&tx_ring->recycle_lock);
 		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
 		atomic_or_32(&igb->igb_state, IGB_ERROR);
 		return (0);

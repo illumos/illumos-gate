@@ -29,7 +29,7 @@
 #include "igb_sw.h"
 
 static char ident[] = "Intel 1Gb Ethernet";
-static char igb_version[] = "igb 1.1.11";
+static char igb_version[] = "igb 1.1.12";
 
 /*
  * Local function protoypes
@@ -3974,6 +3974,7 @@ igb_intr_legacy(void *arg1, void *arg2)
 	icr = E1000_READ_REG(&igb->hw, E1000_ICR);
 
 	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK) {
+		mutex_exit(&igb->gen_lock);
 		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
 		atomic_or_32(&igb->igb_state, IGB_ERROR);
 		return (DDI_INTR_UNCLAIMED);
