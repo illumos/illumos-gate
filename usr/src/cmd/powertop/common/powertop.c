@@ -149,8 +149,11 @@ main(int argc, char **argv)
 			g_gui = B_FALSE;
 			dump_count = (int)strtod(optarg, &endptr);
 
-			if (dump_count <= 0 || *endptr != NULL)
+			if (dump_count <= 0 || *endptr != NULL) {
 				pt_usage();
+				exit(EXIT_USAGE);
+			}
+
 			break;
 		case 't':
 			if (PT_ON_TIME) {
@@ -211,8 +214,10 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (optind < argc)
+	if (optind < argc) {
 		pt_usage();
+		exit(EXIT_USAGE);
+	}
 
 	(void) printf("%s   %s\n\n", TITLE, COPYRIGHT_INTEL);
 
