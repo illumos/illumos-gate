@@ -4518,19 +4518,21 @@ pmcs_gwork(pmcs_hw_t *pwp, uint32_t tag_type, pmcs_phy_t *phyp)
 		 * If we couldn't get a work structure, it's time to bite
 		 * the bullet, grab the pfree_lock and copy over all the
 		 * work structures from the pending free list to the actual
-		 * free list.  This shouldn't happen all that often.
+		 * free list (assuming it's not also empty).
 		 */
 		mutex_enter(&pwp->pfree_lock);
+		if (STAILQ_FIRST(&pwp->pf) == NULL) {
+			mutex_exit(&pwp->pfree_lock);
+			mutex_exit(&pwp->wfree_lock);
+			return (NULL);
+		}
 		pwp->wf.stqh_first = pwp->pf.stqh_first;
 		pwp->wf.stqh_last = pwp->pf.stqh_last;
 		STAILQ_INIT(&pwp->pf);
 		mutex_exit(&pwp->pfree_lock);
 
 		p = STAILQ_FIRST(&pwp->wf);
-		if (p == NULL) {
-			mutex_exit(&pwp->wfree_lock);
-			return (NULL);
-		}
+		ASSERT(p != NULL);
 	}
 	STAILQ_REMOVE(&pwp->wf, p, pmcwork, next);
 	snum = pwp->wserno++;

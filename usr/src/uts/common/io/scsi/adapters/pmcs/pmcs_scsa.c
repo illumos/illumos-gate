@@ -605,13 +605,17 @@ dead_target:
 	return (TRAN_ACCEPT);
 }
 
+/* Return code 1 = Success */
 static int
 pmcs_scsa_abort(struct scsi_address *ap, struct scsi_pkt *pkt)
 {
 	pmcs_hw_t *pwp = ADDR2PMC(ap);
-	pmcs_cmd_t *sp = PKT2CMD(pkt);
-	pmcs_xscsi_t *xp = sp->cmd_target;
-	pmcs_phy_t *pptr;
+	pmcs_cmd_t *sp = NULL;
+	pmcs_xscsi_t *xp = NULL;
+	pmcs_phy_t *pptr = NULL;
+	pmcs_lun_t *pmcs_lun = (pmcs_lun_t *)
+	    scsi_device_hba_private_get(scsi_address_device(ap));
+	int rc;
 	uint32_t tag;
 	uint64_t lun;
 	pmcwork_t *pwrk;
@@ -624,6 +628,33 @@ pmcs_scsa_abort(struct scsi_address *ap, struct scsi_pkt *pkt)
 		return (0);
 	}
 	mutex_exit(&pwp->lock);
+
+	if (pkt == NULL) {
+		if (pmcs_lun == NULL) {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL, "%s: "
+			    "No pmcs_lun_t struct to do ABORT_ALL", __func__);
+			return (0);
+		}
+		xp = pmcs_lun->target;
+		if (xp != NULL) {
+			pptr = xp->phy;
+		}
+		if (pptr == NULL) {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, xp, "%s: pkt is "
+			    "NULL. No tgt/phy to do ABORT_ALL", __func__);
+			return (0);
+		}
+		pmcs_lock_phy(pptr);
+		if (pmcs_abort(pwp, pptr, 0, 1, 0)) {
+			pptr->abort_pending = 1;
+			SCHEDULE_WORK(pwp, PMCS_WORK_ABORT_HANDLE);
+		}
+		pmcs_unlock_phy(pptr);
+		return (1);
+	}
+
+	sp = PKT2CMD(pkt);
+	xp = sp->cmd_target;
 
 	if (sp->cmd_lun) {
 		lun = sp->cmd_lun->lun_num;
