@@ -16712,13 +16712,11 @@ tcp_wput_iocdata(tcp_t *tcp, mblk_t *mp)
 		/*
 		 * If the conn is closing, then error the ioctl here. Otherwise
 		 * use the CONN_IOCTLREF_* macros to hold off tcp_close until
-		 * we're done here. We also need to decrement the ioctlref which
-		 * was bumped in either tcp_ioctl or tcp_wput_ioctl.
+		 * we're done here.
 		 */
 		mutex_enter(&connp->conn_lock);
 		if (connp->conn_state_flags & CONN_CLOSING) {
 			mutex_exit(&connp->conn_lock);
-			iocp = (struct iocblk *)mp->b_rptr;
 			iocp->ioc_error = EINVAL;
 			mp->b_datap->db_type = M_IOCNAK;
 			iocp->ioc_count = 0;

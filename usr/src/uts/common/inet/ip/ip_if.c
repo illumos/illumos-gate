@@ -903,7 +903,7 @@ ipsq_xopq_mp_cleanup(ill_t *ill, conn_t *connp)
 	mblk_t	*prev;
 	mblk_t	*curr;
 	mblk_t	*next;
-	queue_t	*rq, *wq;
+	queue_t	*wq, *rq = NULL;
 	mblk_t	*tmp_list = NULL;
 
 	ASSERT(IAM_WRITER_ILL(ill));
@@ -911,7 +911,13 @@ ipsq_xopq_mp_cleanup(ill_t *ill, conn_t *connp)
 		wq = CONNP_TO_WQ(connp);
 	else
 		wq = ill->ill_wq;
-	rq = RD(wq);
+
+	/*
+	 * In the case of lo0 being unplumbed, ill_wq will be NULL. Guard
+	 * against this here.
+	 */
+	if (wq != NULL)
+		rq = RD(wq);
 
 	ipsq = ill->ill_phyint->phyint_ipsq;
 	/*
