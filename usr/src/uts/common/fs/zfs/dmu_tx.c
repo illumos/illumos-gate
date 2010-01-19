@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -518,11 +518,15 @@ dmu_tx_count_free(dmu_tx_hold_t *txh, uint64_t off, uint64_t len)
 		dbuf = dbuf_hold_level(dn, 1, blkid >> epbs, FTAG);
 
 		txh->txh_memory_tohold += dbuf->db.db_size;
-		if (txh->txh_memory_tohold > DMU_MAX_ACCESS) {
-			txh->txh_tx->tx_err = E2BIG;
-			dbuf_rele(dbuf, FTAG);
-			break;
-		}
+
+		/*
+		 * We don't check memory_tohold against DMU_MAX_ACCESS because
+		 * memory_tohold is an over-estimation (especially the >L1
+		 * indirect blocks), so it could fail.  Callers should have
+		 * already verified that they will not be holding too much
+		 * memory.
+		 */
+
 		err = dbuf_read(dbuf, NULL, DB_RF_HAVESTRUCT | DB_RF_CANFAIL);
 		if (err != 0) {
 			txh->txh_tx->tx_err = err;
