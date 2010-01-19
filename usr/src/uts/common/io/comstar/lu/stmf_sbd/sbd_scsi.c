@@ -338,28 +338,34 @@ sbd_handle_read(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 
 void
 sbd_do_write_xfer(struct scsi_task *task, sbd_cmd_t *scmd,
-					struct stmf_data_buf *dbuf)
+    struct stmf_data_buf *dbuf, uint8_t dbuf_reusable)
 {
 	uint32_t len;
 	int bufs_to_take;
+
+	if (scmd->len == 0) {
+		goto DO_WRITE_XFER_DONE;
+	}
 
 	/* Lets try not to hog all the buffers the port has. */
 	bufs_to_take = ((task->task_max_nbufs > 2) &&
 	    (task->task_cmd_xfer_length < (32 * 1024))) ? 2 :
 	    task->task_max_nbufs;
 
-	len = scmd->len > dbuf->db_buf_size ? dbuf->db_buf_size : scmd->len;
-
-	dbuf->db_relative_offset = scmd->current_ro;
-	dbuf->db_data_size = len;
-	dbuf->db_flags = DB_DIRECTION_FROM_RPORT;
-	(void) stmf_xfer_data(task, dbuf, 0);
-	scmd->len -= len;
-	scmd->current_ro += len;
-	if (scmd->len && (scmd->nbufs < bufs_to_take)) {
+	if ((dbuf != NULL) &&
+	    ((dbuf->db_flags & DB_DONT_REUSE) || (dbuf_reusable == 0))) {
+		/* free current dbuf and allocate a new one */
+		stmf_free_dbuf(task, dbuf);
+		dbuf = NULL;
+	}
+	if (scmd->nbufs >= bufs_to_take) {
+		goto DO_WRITE_XFER_DONE;
+	}
+	if (dbuf == NULL) {
 		uint32_t maxsize, minsize, old_minsize;
 
-		maxsize = (scmd->len > (128*1024)) ? 128*1024 : scmd->len;
+		maxsize = (scmd->len > (128*1024)) ? 128*1024 :
+		    scmd->len;
 		minsize = maxsize >> 2;
 		do {
 			old_minsize = minsize;
@@ -367,10 +373,33 @@ sbd_do_write_xfer(struct scsi_task *task, sbd_cmd_t *scmd,
 		} while ((dbuf == NULL) && (old_minsize > minsize) &&
 		    (minsize >= 512));
 		if (dbuf == NULL) {
+			if (scmd->nbufs == 0) {
+				stmf_abort(STMF_QUEUE_TASK_ABORT, task,
+				    STMF_ALLOC_FAILURE, NULL);
+			}
 			return;
 		}
-		scmd->nbufs++;
-		sbd_do_write_xfer(task, scmd, dbuf);
+	}
+
+	len = scmd->len > dbuf->db_buf_size ? dbuf->db_buf_size :
+	    scmd->len;
+
+	dbuf->db_relative_offset = scmd->current_ro;
+	dbuf->db_data_size = len;
+	dbuf->db_flags = DB_DIRECTION_FROM_RPORT;
+	(void) stmf_xfer_data(task, dbuf, 0);
+	scmd->nbufs++; /* outstanding port xfers and bufs used */
+	scmd->len -= len;
+	scmd->current_ro += len;
+
+	if ((scmd->len != 0) && (scmd->nbufs < bufs_to_take)) {
+		sbd_do_write_xfer(task, scmd, NULL, 0);
+	}
+	return;
+
+DO_WRITE_XFER_DONE:
+	if (dbuf != NULL) {
+		stmf_free_dbuf(task, dbuf);
 	}
 }
 
@@ -383,6 +412,15 @@ sbd_handle_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 	uint32_t buflen, iolen;
 	int ndx;
 
+	if (scmd->nbufs > 0) {
+		/*
+		 * Decrement the count to indicate the port xfer
+		 * into the dbuf has completed even though the buf is
+		 * still in use here in the LU provider.
+		 */
+		scmd->nbufs--;
+	}
+
 	if (dbuf->db_xfer_status != STMF_SUCCESS) {
 		stmf_abort(STMF_QUEUE_TASK_ABORT, task,
 		    dbuf->db_xfer_status, NULL);
@@ -391,6 +429,14 @@ sbd_handle_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 
 	if (scmd->flags & SBD_SCSI_CMD_XFER_FAIL) {
 		goto WRITE_XFER_DONE;
+	}
+
+	if (scmd->len != 0) {
+		/*
+		 * Initiate the next port xfer to occur in parallel
+		 * with writing this buf.
+		 */
+		sbd_do_write_xfer(task, scmd, NULL, 0);
 	}
 
 	laddr = scmd->addr + dbuf->db_relative_offset;
@@ -413,7 +459,6 @@ sbd_handle_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 WRITE_XFER_DONE:
 	if (scmd->len == 0 || scmd->flags & SBD_SCSI_CMD_XFER_FAIL) {
 		stmf_free_dbuf(task, dbuf);
-		scmd->nbufs--;
 		if (scmd->nbufs)
 			return;	/* wait for all buffers to complete */
 		scmd->flags &= ~SBD_SCSI_CMD_ACTIVE;
@@ -424,28 +469,7 @@ WRITE_XFER_DONE:
 			stmf_scsilib_send_status(task, STATUS_GOOD, 0);
 		return;
 	}
-	if (dbuf->db_flags & DB_DONT_REUSE || dbuf_reusable == 0) {
-		uint32_t maxsize, minsize, old_minsize;
-		/* free current dbuf and allocate a new one */
-		stmf_free_dbuf(task, dbuf);
-
-		maxsize = (scmd->len > (128*1024)) ? 128*1024 : scmd->len;
-		minsize = maxsize >> 2;
-		do {
-			old_minsize = minsize;
-			dbuf = stmf_alloc_dbuf(task, maxsize, &minsize, 0);
-		} while ((dbuf == NULL) && (old_minsize > minsize) &&
-		    (minsize >= 512));
-		if (dbuf == NULL) {
-			scmd->nbufs --;
-			if (scmd->nbufs == 0) {
-				stmf_abort(STMF_QUEUE_TASK_ABORT, task,
-				    STMF_ALLOC_FAILURE, NULL);
-			}
-			return;
-		}
-	}
-	sbd_do_write_xfer(task, scmd, dbuf);
+	sbd_do_write_xfer(task, scmd, dbuf, dbuf_reusable);
 }
 
 void
@@ -507,23 +531,7 @@ sbd_handle_write(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		return;
 	}
 
-	if (initial_dbuf == NULL) {
-		uint32_t maxsize, minsize, old_minsize;
-
-		maxsize = (len > (128*1024)) ? 128*1024 : len;
-		minsize = maxsize >> 2;
-		do {
-			old_minsize = minsize;
-			initial_dbuf = stmf_alloc_dbuf(task, maxsize,
-			    &minsize, 0);
-		} while ((initial_dbuf == NULL) && (old_minsize > minsize) &&
-		    (minsize >= 512));
-		if (initial_dbuf == NULL) {
-			stmf_abort(STMF_QUEUE_TASK_ABORT, task,
-			    STMF_ALLOC_FAILURE, NULL);
-			return;
-		}
-	} else if (task->task_flags & TF_INITIAL_BURST) {
+	if ((initial_dbuf != NULL) && (task->task_flags & TF_INITIAL_BURST)) {
 		if (initial_dbuf->db_data_size > len) {
 			if (initial_dbuf->db_data_size >
 			    task->task_expected_xfer_length) {
@@ -546,7 +554,7 @@ sbd_handle_write(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	}
 	scmd->flags = SBD_SCSI_CMD_ACTIVE;
 	scmd->cmd_type = SBD_CMD_SCSI_WRITE;
-	scmd->nbufs = 1;
+	scmd->nbufs = 0;
 	scmd->addr = laddr;
 	scmd->len = len;
 	scmd->current_ro = 0;
@@ -557,7 +565,7 @@ sbd_handle_write(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		dbuf->db_xfer_status = STMF_SUCCESS;
 		sbd_handle_write_xfer_completion(task, scmd, dbuf, 0);
 	} else {
-		sbd_do_write_xfer(task, scmd, dbuf);
+		sbd_do_write_xfer(task, scmd, dbuf, 0);
 	}
 }
 
