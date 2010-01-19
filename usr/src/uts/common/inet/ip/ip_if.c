@@ -840,19 +840,30 @@ ipsq_pending_mp_cleanup(ill_t *ill, conn_t *connp)
 	ASSERT(IAM_WRITER_ILL(ill));
 	ipx = ill->ill_phyint->phyint_ipsq->ipsq_xop;
 
-	/*
-	 * If connp is null, unconditionally clean up the ipx_pending_mp.
-	 * This happens in M_ERROR/M_HANGUP. We need to abort the current ioctl
-	 * even if it is meant for another ill, since we have to enqueue
-	 * a new mp now in ipx_pending_mp to complete the ipif_down.
-	 * If connp is non-null we are called from the conn close path.
-	 */
 	mutex_enter(&ipx->ipx_lock);
 	mp = ipx->ipx_pending_mp;
-	if ((connp != NULL) &&
-	    (mp == NULL || mp->b_queue != CONNP_TO_WQ(connp))) {
-		mutex_exit(&ipx->ipx_lock);
-		return (B_FALSE);
+	if (connp != NULL) {
+		if (mp == NULL || mp->b_queue != CONNP_TO_WQ(connp)) {
+			/*
+			 * Nothing to clean since the conn that is closing
+			 * does not have a matching pending mblk in
+			 * ipx_pending_mp.
+			 */
+			mutex_exit(&ipx->ipx_lock);
+			return (B_FALSE);
+		}
+	} else {
+		/*
+		 * A non-zero ill_error signifies we are called in the
+		 * M_ERROR or M_HANGUP path and we need to unconditionally
+		 * abort any current ioctl and do the corresponding cleanup.
+		 * A zero ill_error means we are in the ill_delete path and
+		 * we do the cleanup only if there is a pending mp.
+		 */
+		if (mp == NULL && ill->ill_error == 0) {
+			mutex_exit(&ipx->ipx_lock);
+			return (B_FALSE);
+		}
 	}
 
 	/* Now remove from the ipx_pending_mp */
@@ -1114,9 +1125,16 @@ ill_down_start(queue_t *q, mblk_t *mp)
 	/*
 	 * It is possible that some ioctl is already in progress while we
 	 * received the M_ERROR / M_HANGUP in which case, we need to abort
-	 * the ioctl. (ill_down_start() is being processed as CUR_OP since
-	 * the cause of the M_ERROR / M_HANGUP may prevent the in progress
-	 * ioctl from completion.)
+	 * the ioctl. ill_down_start() is being processed as CUR_OP rather
+	 * than as NEW_OP since the cause of the M_ERROR / M_HANGUP may prevent
+	 * the in progress ioctl from ever completing.
+	 *
+	 * The thread that started the ioctl (if any) must have returned,
+	 * since we are now executing as writer. After the 2 calls below,
+	 * the state of the ipsq and the ill would reflect no trace of any
+	 * pending operation. Subsequently if there is any response to the
+	 * original ioctl from the driver, it would be discarded as an
+	 * unsolicited message from the driver.
 	 */
 	(void) ipsq_pending_mp_cleanup(ill, NULL);
 	ill_dlpi_clear_deferred(ill);

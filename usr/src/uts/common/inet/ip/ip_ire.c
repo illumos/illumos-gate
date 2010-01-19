@@ -2334,12 +2334,19 @@ ip_ire_fini(ip_stack_t *ipst)
 	rw_destroy(&ipst->ips_ire_dep_lock);
 	rw_destroy(&ipst->ips_ip6_ire_head_lock);
 
+	ire_make_condemned(ipst->ips_ire_reject_v6);
 	ire_refrele_notr(ipst->ips_ire_reject_v6);
 	ipst->ips_ire_reject_v6 = NULL;
+
+	ire_make_condemned(ipst->ips_ire_reject_v4);
 	ire_refrele_notr(ipst->ips_ire_reject_v4);
 	ipst->ips_ire_reject_v4 = NULL;
+
+	ire_make_condemned(ipst->ips_ire_blackhole_v6);
 	ire_refrele_notr(ipst->ips_ire_blackhole_v6);
 	ipst->ips_ire_blackhole_v6 = NULL;
+
+	ire_make_condemned(ipst->ips_ire_blackhole_v4);
 	ire_refrele_notr(ipst->ips_ire_blackhole_v4);
 	ipst->ips_ire_blackhole_v4 = NULL;
 
