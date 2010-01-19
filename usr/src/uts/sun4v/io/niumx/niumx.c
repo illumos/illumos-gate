@@ -74,7 +74,7 @@ static int niumx_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	ddi_ctl_enum_t op, void *arg, void *result);
 
 int niumxtool_init(dev_info_t *dip);
-int niumxtool_uninit(dev_info_t *dip);
+void niumxtool_uninit(dev_info_t *dip);
 
 int niumx_get_intr_target(niumx_devstate_t *niumxds_p, niudevino_t ino,
     niucpuid_t *cpu_id);
