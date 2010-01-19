@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2009 QLogic Corporation */
+/* Copyright 2010 QLogic Corporation */
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"Copyright 2009 QLogic Corporation; ql_mbx.c"
+#pragma ident	"Copyright 2010 QLogic Corporation; ql_mbx.c"
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) driver source file.
@@ -34,7 +34,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -958,8 +958,16 @@ ql_target_reset(ql_adapter_state_t *ha, ql_tgt_t *tq, uint16_t delay)
 					    tq->loop_id)) {
 						continue;
 					}
-					rval = ql_task_mgmt_iocb(ha, tq, 0,
-					    CF_TARGET_RESET, delay);
+
+					if (CFG_IST(ha, CFG_FAST_TIMEOUT)) {
+						rval = ql_task_mgmt_iocb(ha,
+						    tq, 0, CF_DO_NOT_SEND |
+						    CF_TARGET_RESET, delay);
+					} else {
+						rval = ql_task_mgmt_iocb(ha,
+						    tq, 0, CF_TARGET_RESET,
+						    delay);
+					}
 
 					if (rval != QL_SUCCESS) {
 						break;
@@ -972,8 +980,14 @@ ql_target_reset(ql_adapter_state_t *ha, ql_tgt_t *tq, uint16_t delay)
 			}
 			tq = NULL;
 		} else {
-			rval = ql_task_mgmt_iocb(ha, tq, 0, CF_TARGET_RESET,
-			    delay);
+
+			if (CFG_IST(ha, CFG_FAST_TIMEOUT)) {
+				rval = ql_task_mgmt_iocb(ha, tq, 0,
+				    CF_TARGET_RESET | CF_DO_NOT_SEND, delay);
+			} else {
+				rval = ql_task_mgmt_iocb(ha, tq, 0,
+				    CF_TARGET_RESET, delay);
+			}
 		}
 	} else {
 		/* queue = NULL, all targets. */

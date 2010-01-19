@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2009 QLogic Corporation */
+/* Copyright 2010 QLogic Corporation */
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) driver header file.
@@ -27,7 +27,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -42,7 +42,7 @@ extern "C" {
 #endif
 
 #ifndef QL_VERSION
-#define	QL_VERSION	"20090924-2.38"
+#define	QL_VERSION	"20100107-2.39"
 #endif
 
 #ifndef	QL_NAME

@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2009 QLogic Corporation */
+/* Copyright 2010 QLogic Corporation */
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"Copyright 2009 QLogic Corporation; ql_xioctl.c"
+#pragma ident	"Copyright 2010 QLogic Corporation; ql_xioctl.c"
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) driver source file.
@@ -34,7 +34,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -2839,15 +2839,12 @@ ql_host_drvname(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 static void
 ql_read_nvram(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 {
-	uint32_t	nv_size;
 
 	QL_PRINT_9(CE_CONT, "(%d): started\n", ha->instance);
 
-	nv_size = (uint32_t)(CFG_IST(ha, CFG_CTRL_242581) ?
-	    sizeof (nvram_24xx_t) : sizeof (nvram_t));
-	if (cmd->ResponseLen < nv_size) {
+	if (cmd->ResponseLen < ha->nvram_cache->size) {
 		cmd->Status = EXT_STATUS_BUFFER_TOO_SMALL;
-		cmd->DetailStatus = nv_size;
+		cmd->DetailStatus = ha->nvram_cache->size;
 		EL(ha, "failed, ResponseLen != NVRAM, Len=%xh\n",
 		    cmd->ResponseLen);
 		cmd->ResponseLen = 0;
@@ -2861,7 +2858,7 @@ ql_read_nvram(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 		cmd->ResponseLen = 0;
 		EL(ha, "failed, copy error\n");
 	} else {
-		cmd->ResponseLen = nv_size;
+		cmd->ResponseLen = ha->nvram_cache->size;
 		QL_PRINT_9(CE_CONT, "(%d): done\n", ha->instance);
 	}
 }
@@ -2884,15 +2881,12 @@ ql_read_nvram(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 static void
 ql_write_nvram(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 {
-	uint32_t	nv_size;
 
 	QL_PRINT_9(CE_CONT, "(%d): started\n", ha->instance);
 
-	nv_size = (uint32_t)(CFG_IST(ha, CFG_CTRL_242581) ?
-	    sizeof (nvram_24xx_t) : sizeof (nvram_t));
-	if (cmd->RequestLen < nv_size) {
+	if (cmd->RequestLen < ha->nvram_cache->size) {
 		cmd->Status = EXT_STATUS_BUFFER_TOO_SMALL;
-		cmd->DetailStatus = sizeof (nvram_t);
+		cmd->DetailStatus = ha->nvram_cache->size;
 		EL(ha, "failed, RequestLen != NVRAM, Len=%xh\n",
 		    cmd->RequestLen);
 		return;

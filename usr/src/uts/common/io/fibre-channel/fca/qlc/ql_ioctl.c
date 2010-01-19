@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2009 QLogic Corporation */
+/* Copyright 2010 QLogic Corporation */
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"Copyright 2009 QLogic Corporation; ql_ioctl.c"
+#pragma ident	"Copyright 2010 QLogic Corporation; ql_ioctl.c"
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) driver source file.
@@ -35,7 +35,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -929,23 +929,20 @@ ql_nv_util_load(ql_adapter_state_t *ha, void *bp, int mode)
 	void		*nv;
 	uint16_t	*wptr;
 	uint16_t	data;
-	uint32_t	start_addr, nv_size, *lptr, data32;
+	uint32_t	start_addr, *lptr, data32;
 	nvram_t		*nptr;
 	int		rval;
 
 	QL_PRINT_9(CE_CONT, "(%d): started\n", ha->instance);
 
-	nv_size = (uint32_t)(CFG_IST(ha, CFG_CTRL_242581) ?
-	    sizeof (nvram_24xx_t) : sizeof (nvram_t));
-
-	if ((nv = kmem_zalloc(nv_size, KM_SLEEP)) == NULL) {
+	if ((nv = kmem_zalloc(ha->nvram_cache->size, KM_SLEEP)) == NULL) {
 		EL(ha, "failed, kmem_zalloc\n");
 		return (ENOMEM);
 	}
 
-	if (ddi_copyin(bp, nv, nv_size, mode) != 0) {
+	if (ddi_copyin(bp, nv, ha->nvram_cache->size, mode) != 0) {
 		EL(ha, "Buffer copy failed\n");
-		kmem_free(nv, nv_size);
+		kmem_free(nv, ha->nvram_cache->size);
 		return (EFAULT);
 	}
 
@@ -954,21 +951,21 @@ ql_nv_util_load(ql_adapter_state_t *ha, void *bp, int mode)
 	if (nptr->id[0] != 'I' || nptr->id[1] != 'S' || nptr->id[2] != 'P' ||
 	    nptr->id[3] != ' ') {
 		EL(ha, "failed, buffer sanity check\n");
-		kmem_free(nv, nv_size);
+		kmem_free(nv, ha->nvram_cache->size);
 		return (EINVAL);
 	}
 
 	/* Quiesce I/O */
 	if (ql_stall_driver(ha, 0) != QL_SUCCESS) {
 		EL(ha, "ql_stall_driver failed\n");
-		kmem_free(nv, nv_size);
+		kmem_free(nv, ha->nvram_cache->size);
 		return (EBUSY);
 	}
 
 	rval = ql_lock_nvram(ha, &start_addr, LNF_NVRAM_DATA);
 	if (rval != QL_SUCCESS) {
 		EL(ha, "failed, ql_lock_nvram=%xh\n", rval);
-		kmem_free(nv, nv_size);
+		kmem_free(nv, ha->nvram_cache->size);
 		ql_restart_driver(ha);
 		return (EIO);
 	}
@@ -978,14 +975,14 @@ ql_nv_util_load(ql_adapter_state_t *ha, void *bp, int mode)
 		GLOBAL_HW_UNLOCK();
 		start_addr &= ~ha->flash_data_addr;
 		start_addr <<= 2;
-		if ((rval = ql_r_m_w_flash(ha, bp, nv_size, start_addr,
-		    mode)) != QL_SUCCESS) {
+		if ((rval = ql_r_m_w_flash(ha, bp, ha->nvram_cache->size,
+		    start_addr, mode)) != QL_SUCCESS) {
 			EL(ha, "nvram load failed, rval = %0xh\n", rval);
 		}
 		GLOBAL_HW_LOCK();
 	} else if (CFG_IST(ha, CFG_CTRL_2422)) {
 		lptr = (uint32_t *)nv;
-		for (cnt = 0; cnt < nv_size / 4; cnt++) {
+		for (cnt = 0; cnt < ha->nvram_cache->size / 4; cnt++) {
 			data32 = *lptr++;
 			LITTLE_ENDIAN_32(&data32);
 			rval = ql_24xx_load_nvram(ha, cnt + start_addr,
@@ -997,14 +994,20 @@ ql_nv_util_load(ql_adapter_state_t *ha, void *bp, int mode)
 		}
 	} else {
 		wptr = (uint16_t *)nv;
-		for (cnt = 0; cnt < nv_size / 2; cnt++) {
+		for (cnt = 0; cnt < ha->nvram_cache->size / 2; cnt++) {
 			data = *wptr++;
 			LITTLE_ENDIAN_16(&data);
 			ql_load_nvram(ha, (uint8_t)(cnt + start_addr), data);
 		}
 	}
+	/* switch to the new one */
+	NVRAM_CACHE_LOCK(ha);
 
-	kmem_free(nv, nv_size);
+	kmem_free(ha->nvram_cache->cache, ha->nvram_cache->size);
+	ha->nvram_cache->cache = (void *)nptr;
+
+	NVRAM_CACHE_UNLOCK(ha);
+
 	ql_release_nvram(ha);
 	ql_restart_driver(ha);
 
@@ -1033,84 +1036,97 @@ ql_nv_util_load(ql_adapter_state_t *ha, void *bp, int mode)
 int
 ql_nv_util_dump(ql_adapter_state_t *ha, void *bp, int mode)
 {
-	uint32_t	cnt, nv_size;
-	void		*nv;
 	uint32_t	start_addr;
 	int		rval2, rval = 0;
 
 	QL_PRINT_9(CE_CONT, "(%d): started\n", ha->instance);
 
-	nv_size = (uint32_t)(CFG_IST(ha, CFG_CTRL_242581) ?
-	    sizeof (nvram_24xx_t) : sizeof (nvram_t));
-
-	if ((nv = kmem_zalloc(nv_size, KM_SLEEP)) == NULL) {
+	if (ha->nvram_cache == NULL ||
+	    ha->nvram_cache->size == NULL ||
+	    ha->nvram_cache->cache == NULL) {
 		EL(ha, "failed, kmem_zalloc\n");
 		return (ENOMEM);
-	}
+	} else if (ha->nvram_cache->valid != 1) {
 
-	/* Quiesce I/O */
-	if (ql_stall_driver(ha, 0) != QL_SUCCESS) {
-		EL(ha, "ql_stall_driver failed\n");
-		kmem_free(nv, nv_size);
-		return (EBUSY);
-	}
+		/* Quiesce I/O */
+		if (ql_stall_driver(ha, 0) != QL_SUCCESS) {
+			EL(ha, "ql_stall_driver failed\n");
+			return (EBUSY);
+		}
 
-	if ((rval2 = ql_lock_nvram(ha, &start_addr, LNF_NVRAM_DATA)) !=
-	    QL_SUCCESS) {
-		EL(ha, "failed, ql_lock_nvram=%xh\n", rval2);
-		kmem_free(nv, nv_size);
+		rval2 = ql_lock_nvram(ha, &start_addr, LNF_NVRAM_DATA);
+		if (rval2 != QL_SUCCESS) {
+			EL(ha, "failed, ql_lock_nvram=%xh\n", rval2);
+			ql_restart_driver(ha);
+			return (EIO);
+		}
+		NVRAM_CACHE_LOCK(ha);
+
+		rval2 = ql_get_nvram(ha, ha->nvram_cache->cache,
+		    start_addr, ha->nvram_cache->size);
+		if (rval2 != QL_SUCCESS) {
+			rval = rval2;
+		} else {
+			ha->nvram_cache->valid = 1;
+			EL(ha, "nvram cache now valid.");
+		}
+
+		NVRAM_CACHE_UNLOCK(ha);
+
+		ql_release_nvram(ha);
 		ql_restart_driver(ha);
-		return (EIO);
+
+		if (rval != 0) {
+			EL(ha, "failed to dump nvram, rval=%x\n", rval);
+			return (rval);
+		}
 	}
 
+	if (ddi_copyout(ha->nvram_cache->cache, bp,
+	    ha->nvram_cache->size, mode) != 0) {
+		EL(ha, "Buffer copy failed\n");
+		return (EFAULT);
+	}
+
+	EL(ha, "nvram cache accessed.");
+
+	QL_PRINT_9(CE_CONT, "(%d): done\n", ha->instance);
+
+	return (0);
+}
+
+int
+ql_get_nvram(ql_adapter_state_t *ha, void *dest_addr, uint32_t src_addr,
+    uint32_t size)
+{
+	int rval = QL_SUCCESS;
+	int cnt;
 	/* Dump NVRAM. */
 	if (CFG_IST(ha, CFG_CTRL_242581)) {
+		uint32_t	*lptr = (uint32_t *)dest_addr;
 
-		uint32_t	*lptr = (uint32_t *)nv;
-
-		for (cnt = 0; cnt < nv_size / 4; cnt++) {
-			rval2 = ql_24xx_read_flash(ha, start_addr++, lptr);
-			if (rval2 != QL_SUCCESS) {
-				EL(ha, "read_flash failed=%xh\n", rval2);
+		for (cnt = 0; cnt < size / 4; cnt++) {
+			rval = ql_24xx_read_flash(ha, src_addr++, lptr);
+			if (rval != QL_SUCCESS) {
+				EL(ha, "read_flash failed=%xh\n", rval);
 				rval = EAGAIN;
 				break;
 			}
-
 			LITTLE_ENDIAN_32(lptr);
 			lptr++;
 		}
 	} else {
 		uint16_t	data;
-		uint16_t	*wptr = (uint16_t *)nv;
+		uint16_t	*wptr = (uint16_t *)dest_addr;
 
-		for (cnt = 0; cnt < nv_size / 2; cnt++) {
+		for (cnt = 0; cnt < size / 2; cnt++) {
 			data = (uint16_t)ql_get_nvram_word(ha, cnt +
-			    start_addr);
+			    src_addr);
 			LITTLE_ENDIAN_16(&data);
 			*wptr++ = data;
 		}
 	}
-
-	ql_release_nvram(ha);
-	ql_restart_driver(ha);
-
-	if (rval != 0) {
-		EL(ha, "failed to dump nvram\n");
-		kmem_free(nv, nv_size);
-		return (rval);
-	}
-
-	if (ddi_copyout(nv, bp, nv_size, mode) != 0) {
-		EL(ha, "Buffer copy failed\n");
-		kmem_free(nv, nv_size);
-		return (EFAULT);
-	}
-
-	kmem_free(nv, nv_size);
-
-	QL_PRINT_9(CE_CONT, "(%d): done\n", ha->instance);
-
-	return (0);
+	return (rval);
 }
 
 /*
@@ -2121,16 +2137,13 @@ ql_adm_fw_dump(ql_adapter_state_t *ha, ql_adm_op_t *dop, void *udop, int mode)
 static int
 ql_adm_nvram_dump(ql_adapter_state_t *ha, ql_adm_op_t *dop, int mode)
 {
-	uint32_t	nv_size;
 	int		rval;
 
 	QL_PRINT_9(CE_CONT, "(%d): started\n", ha->instance);
 
-	nv_size = (uint32_t)(CFG_IST(ha, CFG_CTRL_242581) ?
-	    sizeof (nvram_24xx_t) : sizeof (nvram_t));
-
-	if (dop->length < nv_size) {
-		EL(ha, "failed, length=%xh, size=%xh\n", dop->length, nv_size);
+	if (dop->length < ha->nvram_cache->size) {
+		EL(ha, "failed, length=%xh, size=%xh\n", dop->length,
+		    ha->nvram_cache->size);
 		return (EINVAL);
 	}
 
@@ -2162,16 +2175,13 @@ ql_adm_nvram_dump(ql_adapter_state_t *ha, ql_adm_op_t *dop, int mode)
 static int
 ql_adm_nvram_load(ql_adapter_state_t *ha, ql_adm_op_t *dop, int mode)
 {
-	uint32_t	nv_size;
 	int		rval;
 
 	QL_PRINT_9(CE_CONT, "(%d): started\n", ha->instance);
 
-	nv_size = (uint32_t)(CFG_IST(ha, CFG_CTRL_242581) ?
-	    sizeof (nvram_24xx_t) : sizeof (nvram_t));
-
-	if (dop->length < nv_size) {
-		EL(ha, "failed, length=%xh, size=%xh\n", dop->length, nv_size);
+	if (dop->length < ha->nvram_cache->size) {
+		EL(ha, "failed, length=%xh, size=%xh\n", dop->length,
+		    ha->nvram_cache->size);
 		return (EINVAL);
 	}
 

@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2009 QLogic Corporation */
+/* Copyright 2010 QLogic Corporation */
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"Copyright 2009 QLogic Corporation; ql_isr.c"
+#pragma ident	"Copyright 2010 QLogic Corporation; ql_isr.c"
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) driver source file.
@@ -34,7 +34,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -3247,7 +3247,7 @@ ql_els_passthru_entry(ql_adapter_state_t *ha, els_passthru_entry_rsp_t *rsp,
 static void
 ql_signal_abort(ql_adapter_state_t *ha, uint32_t *set_flags)
 {
-if (!(ha->task_daemon_flags & (ISP_ABORT_NEEDED | ABORT_ISP_ACTIVE))) {
+	if (!(ha->task_daemon_flags & (ISP_ABORT_NEEDED | ABORT_ISP_ACTIVE))) {
 		*set_flags |= ISP_ABORT_NEEDED;
 	}
 }

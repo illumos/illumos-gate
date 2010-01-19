@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2009 QLogic Corporation */
+/* Copyright 2010 QLogic Corporation */
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
@@ -35,7 +35,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -346,6 +346,11 @@ extern "C" {
 #define	FAC_ADDR_MASK		0x3fff
 
 /*
+ * MBC_DIAGNOSTIC_LOOP_BACK
+ */
+#define	MBC_LOOP_BACK_POINT_MASK	0x07
+
+/*
  * Mbc 20h (Get ID) returns the switch capabilities in mailbox7.
  * The extra bits were added with 4.00.28 MID firmware.
  */
@@ -653,6 +658,24 @@ typedef struct port_database_24 {
 #define	CNX_NPORT_2_NPORT_P2P		2
 #define	CNX_FLPORT_P2P			3
 #define	CNX_NPORT_2_NPORT_NO_TGT_RSP	4
+
+/*
+ * Set/Get Port Configuration MBC
+ */
+#define	LINK_CONFIG_PAUSE_MASK		(BIT_6 | BIT_5)
+#define	LINK_CONFIG_PAUSE_DISABLE	0x00
+#define	LINK_CONFIG_PAUSE_STD_ETH	0x01
+#define	LINK_CONFIG_PAUSE_PER_PRIO	0x02
+
+#define	LINK_CONFIG_DCBX_ENA		BIT_4
+
+#define	LINK_CONFIG_LB_MODE_MASK	(BIT_3 | BIT_2 | BIT_1)
+#define	LINK_CONFIG_LB_NONE		0x00
+#define	LINK_CONFIG_LB_INTERNAL		0x02
+
+#define	LINK_CONFIG2_BP_TRAIN_ENA	BIT_15
+#define	LINK_CONFIG2_BP_AUTO_NEGO_ENA	BIT_14
+#define	LINK_CONFIG2_JUMBO_FRM_ENA	BIT_0
 
 /*
  * Global Data in ql_mbx.c source file.

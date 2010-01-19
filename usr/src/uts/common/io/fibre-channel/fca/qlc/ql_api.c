@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2009 QLogic Corporation */
+/* Copyright 2010 QLogic Corporation */
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"Copyright 2009 QLogic Corporation; ql_api.c"
+#pragma ident	"Copyright 2010 QLogic Corporation; ql_api.c"
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) driver source file.
@@ -34,7 +34,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -1079,6 +1079,12 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		progress |= (QL_INTR_ADDED | QL_MUTEX_CV_INITED);
 
+		if (ql_nvram_cache_desc_ctor(ha) != DDI_SUCCESS) {
+			cmn_err(CE_WARN, "%s(%d): can't setup nvram cache",
+			    QL_NAME, instance);
+			goto attach_failed;
+		}
+
 		/*
 		 * Allocate an N Port information structure
 		 * for use when in P2P topology.
@@ -1449,6 +1455,8 @@ attach_failed:
 			if (ha->fw_module != NULL) {
 				(void) ddi_modclose(ha->fw_module);
 			}
+			ql_el_trace_desc_dtor(ha);
+			ql_nvram_cache_desc_dtor(ha);
 
 			ddi_soft_state_free(ql_state, instance);
 			progress &= ~QL_SOFT_STATE_ALLOCED;
@@ -2099,6 +2107,8 @@ ql_quiesce(dev_info_t *dip)
 		/* Release RISC module. */
 		WRT16_IO_REG(ha, hccr, HC_RELEASE_RISC);
 	}
+
+	ql_disable_intr(ha);
 
 	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
 
@@ -7634,6 +7644,19 @@ ql_done(ql_link_t *link)
 				tq->qfull_retry_count = ha->qfull_retry_count;
 			}
 
+
+			/* Alter aborted status for fast timeout feature */
+			if (CFG_IST(ha, CFG_FAST_TIMEOUT) &&
+			    (sp->flags & (SRB_MS_PKT | SRB_ELS_PKT) ||
+			    !(tq->flags & TQF_NEED_AUTHENTICATION)) &&
+			    sp->flags & SRB_RETRY &&
+			    (sp->flags & SRB_WATCHDOG_ENABLED &&
+			    sp->wdg_q_time > 1)) {
+				EL(ha, "fast abort modify change\n");
+				sp->flags &= ~(SRB_RETRY);
+				sp->pkt->pkt_reason = CS_TIMEOUT;
+			}
+
 			/* Place request back on top of target command queue */
 			if ((sp->flags & (SRB_MS_PKT | SRB_ELS_PKT) ||
 			    !(tq->flags & TQF_NEED_AUTHENTICATION)) &&
@@ -11585,6 +11608,7 @@ ql_binary_fw_dump(ql_adapter_state_t *vha, int lock_needed)
 		/* Acquire mailbox register lock. */
 		MBX_REGISTER_LOCK(ha);
 		timer = (ha->mcp->timeout + 2) * drv_usectohz(1000000);
+
 		/* Check for mailbox available, if not wait for signal. */
 		while (ha->mailbox_flags & MBX_BUSY_FLG) {
 			ha->mailbox_flags = (uint8_t)
@@ -17435,5 +17459,86 @@ ql_wait_for_td_stop(ql_adapter_state_t *ha)
 			break;
 		}
 	}
+	return (rval);
+}
+
+/*
+ * ql_nvram_cache_desc_ctor - Construct an nvram cache descriptor.
+ *
+ * Input:	Pointer to the adapter state structure.
+ * Returns:	Success or Failure.
+ * Context:	Kernel context.
+ */
+int
+ql_nvram_cache_desc_ctor(ql_adapter_state_t *ha)
+{
+	int	rval = DDI_SUCCESS;
+
+	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+
+	ha->nvram_cache =
+	    (nvram_cache_desc_t *)kmem_zalloc(sizeof (nvram_cache_desc_t),
+	    KM_SLEEP);
+
+	if (ha->nvram_cache == NULL) {
+		cmn_err(CE_WARN, "%s(%d): can't construct nvram cache"
+		    " descriptor", QL_NAME, ha->instance);
+		rval = DDI_FAILURE;
+	} else {
+		if (CFG_IST(ha, CFG_CTRL_242581)) {
+			ha->nvram_cache->size = sizeof (nvram_24xx_t);
+		} else {
+			ha->nvram_cache->size = sizeof (nvram_t);
+		}
+		ha->nvram_cache->cache =
+		    (void *)kmem_zalloc(ha->nvram_cache->size, KM_SLEEP);
+		if (ha->nvram_cache->cache == NULL) {
+			cmn_err(CE_WARN, "%s(%d): can't get nvram cache buffer",
+			    QL_NAME, ha->instance);
+			kmem_free(ha->nvram_cache,
+			    sizeof (nvram_cache_desc_t));
+			ha->nvram_cache = 0;
+			rval = DDI_FAILURE;
+		} else {
+			mutex_init(&ha->nvram_cache->mutex, NULL,
+			    MUTEX_DRIVER, NULL);
+			ha->nvram_cache->valid = 0;
+		}
+	}
+
+	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+
+	return (rval);
+}
+
+/*
+ * ql_nvram_cache_desc_dtor - Destroy an nvram cache descriptor.
+ *
+ * Input:	Pointer to the adapter state structure.
+ * Returns:	Success or Failure.
+ * Context:	Kernel context.
+ */
+int
+ql_nvram_cache_desc_dtor(ql_adapter_state_t *ha)
+{
+	int	rval = DDI_SUCCESS;
+
+	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+
+	if (ha->nvram_cache == NULL) {
+		cmn_err(CE_WARN, "%s(%d): can't destroy nvram descriptor",
+		    QL_NAME, ha->instance);
+		rval = DDI_FAILURE;
+	} else {
+		if (ha->nvram_cache->cache != NULL) {
+			kmem_free(ha->nvram_cache->cache,
+			    ha->nvram_cache->size);
+		}
+		mutex_destroy(&ha->nvram_cache->mutex);
+		kmem_free(ha->nvram_cache, sizeof (nvram_cache_desc_t));
+	}
+
+	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+
 	return (rval);
 }

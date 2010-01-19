@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2009 QLogic Corporation */
+/* Copyright 2010 QLogic Corporation */
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
@@ -35,7 +35,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -1351,6 +1351,16 @@ typedef struct el_trace_desc {
 } el_trace_desc_t;
 
 /*
+ * NVRAM cache descriptor.
+ */
+typedef struct nvram_cache_desc {
+	kmutex_t	mutex;
+	uint32_t	valid;
+	uint32_t	size;
+	void		*cache;
+} nvram_cache_desc_t;
+
+/*
  * ql attach progress indication
  */
 #define	QL_SOFT_STATE_ALLOCED		BIT_0
@@ -1613,6 +1623,7 @@ typedef struct ql_adapter_state {
 	uint16_t		fabric_params;
 	uint16_t		fcoe_vlan_id;
 	uint16_t		fcoe_fcf_idx;
+	nvram_cache_desc_t	*nvram_cache;
 } ql_adapter_state_t;
 
 /*
@@ -1711,6 +1722,7 @@ typedef struct ql_adapter_state {
 #define	CFG_ENABLE_FWFCETRACE			BIT_26
 #define	CFG_FW_MISMATCH				BIT_27
 #define	CFG_CTRL_81XX				BIT_28
+#define	CFG_FAST_TIMEOUT			BIT_29
 
 #define	CFG_CTRL_2425  		(CFG_CTRL_2422 | CFG_CTRL_25XX)
 #define	CFG_CTRL_2581  		(CFG_CTRL_25XX | CFG_CTRL_81XX)
@@ -1872,6 +1884,9 @@ typedef struct ql_adapter_state {
 
 #define	GLOBAL_HW_LOCK()		mutex_enter(&ql_global_hw_mutex)
 #define	GLOBAL_HW_UNLOCK()		mutex_exit(&ql_global_hw_mutex)
+
+#define	NVRAM_CACHE_LOCK(ha)		mutex_enter(&ha->nvram_cache->mutex);
+#define	NVRAM_CACHE_UNLOCK(ha)		mutex_exit(&ha->nvram_cache->mutex);
 
 /*
  * PCI power management control/status register location
@@ -2146,6 +2161,8 @@ void ql_isp_els_handle_endian(ql_adapter_state_t *ha, uint8_t *ptr,
     uint8_t ls_code);
 int ql_el_trace_desc_ctor(ql_adapter_state_t *ha);
 int ql_el_trace_desc_dtor(ql_adapter_state_t *ha);
+int ql_nvram_cache_desc_ctor(ql_adapter_state_t *ha);
+int ql_nvram_cache_desc_dtor(ql_adapter_state_t *ha);
 int ql_wwn_cmp(ql_adapter_state_t *, la_wwn_t *, la_wwn_t *);
 void ql_dev_free(ql_adapter_state_t *, ql_tgt_t *);
 

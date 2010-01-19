@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2009 QLogic Corporation */
+/* Copyright 2010 QLogic Corporation */
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
@@ -35,7 +35,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -58,6 +58,7 @@ int ql_vpd_load(ql_adapter_state_t *, void *, int);
 int ql_vpd_dump(ql_adapter_state_t *, void *, int);
 int32_t ql_vpd_lookup(ql_adapter_state_t *, uint8_t *, uint8_t *, int32_t);
 int ql_r_m_w_flash(ql_adapter_state_t *, caddr_t, uint32_t, uint32_t, int);
+int ql_get_nvram(ql_adapter_state_t *, void *, uint32_t, uint32_t);
 
 #ifdef	__cplusplus
 }
