@@ -176,6 +176,19 @@ pmcs_scsa_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	iport = ITRAN2IPORT(tran);
 
 	/*
+	 * Get the unit-address
+	 */
+	ua = scsi_device_unit_address(sd);
+	if (ua == NULL) {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
+		    "%s: Couldn't get UA", __func__);
+		pwp = NULL;
+		goto tgt_init_fail;
+	}
+	pmcs_prt(pwp, PMCS_PRT_DEBUG3, NULL, NULL,
+	    "got ua '%s'", ua);
+
+	/*
 	 * Get the target address
 	 */
 	rval = scsi_device_prop_lookup_string(sd, SCSI_DEVICE_PROP_PATH,
@@ -224,20 +237,10 @@ pmcs_scsa_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	}
 	ASSERT(mutex_owned(&phyp->phy_lock));
 
-	pmcs_prt(pwp, PMCS_PRT_DEBUG2, phyp, tgt, "tgt = 0x%p, dip = 0x%p",
-	    (void *)tgt, (void *)tgt_dip);
+	pmcs_prt(pwp, PMCS_PRT_DEBUG2, phyp, tgt, "@%s tgt = 0x%p, dip = 0x%p",
+	    ua, (void *)tgt, (void *)tgt_dip);
 
-	/*
-	 * Now get the full "w<WWN>,LUN" unit-address (including LU).
-	 */
-	ua = scsi_device_unit_address(sd);
-	if (ua == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, phyp, tgt,
-		    "Couldn't get LU unit address");
-		goto tgt_init_fail;
-	}
-	pmcs_prt(pwp, PMCS_PRT_DEBUG2, NULL, tgt, "got lun ua '%s'", ua);
-
+	/* Now get the lun */
 	lun_num = scsi_device_prop_get_int64(sd, SCSI_DEVICE_PROP_PATH,
 	    SCSI_ADDR_PROP_LUN64, SCSI_LUN64_ILLEGAL);
 	if (lun_num == SCSI_LUN64_ILLEGAL) {
@@ -367,9 +370,6 @@ pmcs_scsa_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	return (DDI_SUCCESS);
 
 tgt_init_fail:
-	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, phyp, tgt, "%s: failed for "
-	    "@%s tgt 0x%p phy 0x%p", __func__, ua, (void *)tgt, (void *)phyp);
-
 	scsi_device_hba_private_set(sd, NULL);
 	if (got_scratch) {
 		pmcs_release_scratch(pwp);
@@ -395,6 +395,9 @@ tgt_init_fail:
 	}
 	if (pwp) {
 		mutex_exit(&pwp->lock);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, phyp, tgt,
+		    "%s: failed for @%s tgt 0x%p phy 0x%p", __func__, ua,
+		    (void *)tgt, (void *)phyp);
 	}
 	if (tgt_port) {
 		scsi_device_prop_free(sd, SCSI_DEVICE_PROP_PATH, tgt_port);

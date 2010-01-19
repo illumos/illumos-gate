@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4053,6 +4053,7 @@ vhci_pathinfo_init(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 	 * call hba's target init entry point if it exists
 	 */
 	if (hba->tran_tgt_init != NULL) {
+		psd->sd_tran_tgt_free_done = 0;
 		if ((rval = (*hba->tran_tgt_init)(pdip, tgt_dip,
 		    hba, psd)) != DDI_SUCCESS) {
 			VHCI_DEBUG(1, (CE_WARN, pdip,
@@ -4131,8 +4132,9 @@ vhci_pathinfo_uninit(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 		ASSERT(hba->tran_sd == psd);
 	}
 
-	if (hba->tran_tgt_free != NULL) {
+	if ((hba->tran_tgt_free != NULL) && !psd->sd_tran_tgt_free_done) {
 		(*hba->tran_tgt_free) (pdip, cdip, hba, psd);
+		psd->sd_tran_tgt_free_done = 1;
 	}
 	mutex_destroy(&psd->sd_mutex);
 	if (hba->tran_hba_flags & SCSI_HBA_TRAN_CLONE) {

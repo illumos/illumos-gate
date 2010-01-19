@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,10 +93,10 @@ static struct scsi_lunchg2 {
 }			*scsi_lunchg2_list;
 static void		scsi_lunchg2_daemon(void *arg);
 
-static int	scsi_hba_find_child(dev_info_t *self, char *name, char *addr,
+static int	scsi_findchild(dev_info_t *self, char *name, char *addr,
     int init, dev_info_t **dchildp, mdi_pathinfo_t **pchildp, int *ppi);
 
-/* return value defines for scsi_hba_find_child */
+/* return value defines for scsi_findchild */
 #define	CHILD_TYPE_NONE		0
 #define	CHILD_TYPE_DEVINFO	1
 #define	CHILD_TYPE_PATHINFO	2
@@ -108,7 +108,7 @@ static int	scsi_hba_find_child(dev_info_t *self, char *name, char *addr,
  * Since hotplug enumeration is based on information obtained from hardware
  * (tgtmap/report_lun) the type/severity of enumeration error messages is
  * sometimes based SE_HP (indirectly via ndi_dev_is_hotplug_node()). By
- * convention, these messages all contain "enumeration failed during ...".
+ * convention, these messages are all produced by scsi_enumeration_failed().
  */
 typedef enum { SE_BUSCONFIG = 0, SE_HP = 1 } scsi_enum_t;
 
@@ -120,6 +120,12 @@ static char	*scsi_probe_ascii[] = SCSIPROBE_ASCII;
 /* number of LUNs we attempt to get on the first SCMD_REPORT_LUNS command */
 int	scsi_lunrpt_default_max = 256;
 int	scsi_lunrpt_timeout = 3;	/* seconds */
+
+/*
+ * Only enumerate one lun if reportluns fails on a SCSI_VERSION_3 device
+ * (tunable based on calling context).
+ */
+int	scsi_lunrpt_failed_do1lun = (1 << SE_HP);
 
 /* 'scsi-binding-set' value for legacy enumerated 'spi' transports */
 char	*scsi_binding_set_spi = "spi";
@@ -563,6 +569,36 @@ scsi_hba_log(int level, const char *func, dev_info_t *self, dev_info_t *child,
 		cmn_err(clevel, scsi_hba_fmt, scsi_hba_log_i,
 		    scsi_hba_log_buf, clevel == CE_CONT ? "\n" : "");
 	mutex_exit(&scsi_hba_log_mutex);
+}
+
+static int	scsi_enumeration_failed_panic = 0;
+static int	scsi_enumeration_failed_hotplug = 1;
+static void
+scsi_enumeration_failed(dev_info_t *child, scsi_enum_t se,
+    char *arg, char *when)
+{
+	/* If 'se' is -1 the 'se' value comes from child. */
+	if (se == -1) {
+		ASSERT(child);
+		se = ndi_dev_is_hotplug_node(child) ? SE_HP : SE_BUSCONFIG;
+	}
+
+	if (scsi_enumeration_failed_panic) {
+		/* set scsi_enumeration_failed_panic to debug */
+		SCSI_HBA_LOG((_LOG(PANIC), NULL, child,
+		    "%s%senumeration failed during %s",
+		    arg ? arg : "", arg ? " " : "", when));
+	} else if (scsi_enumeration_failed_hotplug && (se == SE_HP)) {
+		/* set scsi_enumeration_failed_hotplug for console messages */
+		SCSI_HBA_LOG((_LOG(WARN), NULL, child,
+		    "%s%senumeration failed during %s",
+		    arg ? arg : "", arg ? " " : "", when));
+	} else {
+		/* default */
+		SCSI_HBA_LOG((_LOG(2), NULL, child,
+		    "%s%senumeration failed during %s",
+		    arg ? arg : "", arg ? " " : "", when));
+	}
 }
 
 /*
@@ -1547,12 +1583,7 @@ smp_busctl_initchild(dev_info_t *child)
 	if (tran->smp_tran_init && ((*tran->smp_tran_init)(self, child,
 	    tran, smp_sd) != DDI_SUCCESS)) {
 		kmem_free(smp_sd, sizeof (struct smp_device));
-		if (ndi_dev_is_hotplug_node(child))
-			SCSI_HBA_LOG((_LOG(WARN), NULL, child,
-			    "enumeration failed during smp_tran_init"));
-		else
-			SCSI_HBA_LOG((_LOG(2), NULL, child,
-			    "enumeration failed during smp_tran_init"));
+		scsi_enumeration_failed(child, -1, NULL, "smp_tran_init");
 		ddi_set_driver_private(child, NULL);
 		ddi_set_name_addr(child, NULL);
 		return (DDI_FAILURE);
@@ -1585,7 +1616,7 @@ smp_busctl_uninitchild(dev_info_t *child)
 
 /* Find an "smp" child at the specified address. */
 static dev_info_t *
-smp_hba_find_child(dev_info_t *self, char *addr)
+smp_findchild(dev_info_t *self, char *addr)
 {
 	dev_info_t	*child;
 
@@ -1630,7 +1661,7 @@ smp_hba_bus_config(dev_info_t *self, char *addr, dev_info_t **childp)
 
 	/* Search for "smp" child. */
 	scsi_hba_devi_enter(self, &circ);
-	if ((child = smp_hba_find_child(self, addr)) == NULL) {
+	if ((child = smp_findchild(self, addr)) == NULL) {
 		scsi_hba_devi_exit(self, circ);
 		return (NDI_FAILURE);
 	}
@@ -1666,7 +1697,7 @@ smp_hba_bus_config_taddr(dev_info_t *self, char *addr)
 
 	/* Search for "smp" child. */
 	scsi_hba_devi_enter(self, &circ);
-	child = smp_hba_find_child(self, addr);
+	child = smp_findchild(self, addr);
 	if (child) {
 		/* Child exists, note if this was a new reinsert. */
 		if (ndi_devi_device_insert(child))
@@ -2033,15 +2064,11 @@ scsi_busctl_initchild(dev_info_t *child)
 	/* call HBA's target init entry point if it exists */
 	if (tran->tran_tgt_init != NULL) {
 		SCSI_HBA_LOG((_LOG(4), NULL, child, "init tran_tgt_init"));
-
+		sd->sd_tran_tgt_free_done = 0;
 		if ((*tran->tran_tgt_init)
 		    (self, child, tran, sd) != DDI_SUCCESS) {
-			if (ndi_dev_is_hotplug_node(child))
-				SCSI_HBA_LOG((_LOG(WARN), NULL, child,
-				    "enumeration failed during tran_tgt_init"));
-			else
-				SCSI_HBA_LOG((_LOG(2), NULL, child,
-				    "enumeration failed during tran_tgt_init"));
+			scsi_enumeration_failed(child, -1, NULL,
+			    "tran_tgt_init");
 			goto failure;
 		}
 	}
@@ -2124,7 +2151,7 @@ scsi_busctl_uninitchild(dev_info_t *child)
 	/*
 	 * To simplify host adapter drivers we guarantee that multiple
 	 * tran_tgt_init(9E) calls of the same unit address are never
-	 * active at the same time.  This requires that we call
+	 * active at the same time.  This requires that we always call
 	 * tran_tgt_free on probe/barrier nodes directly prior to
 	 * uninitchild.
 	 *
@@ -2133,11 +2160,11 @@ scsi_busctl_uninitchild(dev_info_t *child)
 	 * instead of hba_tran.
 	 */
 	if (tran->tran_tgt_free) {
-		if (!scsi_hba_devi_is_barrier(child)) {
+		if (!sd->sd_tran_tgt_free_done) {
 			SCSI_HBA_LOG((_LOG(4), NULL, child,
 			    "uninit tran_tgt_free"));
-
 			(*tran->tran_tgt_free) (self, child, tran, sd);
+			sd->sd_tran_tgt_free_done = 1;
 		} else {
 			SCSI_HBA_LOG((_LOG(4), NULL, child,
 			    "uninit tran_tgt_free already done"));
@@ -3098,8 +3125,7 @@ scsi_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		 */
 		scsi_hba_devi_enter(self, &circ);
 
-		(void) scsi_hba_find_child(self, name, addr,
-		    1, &child, &path, NULL);
+		(void) scsi_findchild(self, name, addr, 1, &child, &path, NULL);
 		if (path) {
 			/* Found a pathinfo */
 			ASSERT(path && (child == NULL));
@@ -4860,10 +4886,10 @@ scsi_hba_ua_set(char *ua, dev_info_t *dchild, mdi_pathinfo_t *pchild)
  * recursion could occur (like scsi_busctl_initchild) and when the caller
  * has already performed a search for name@addr with init set (performance).
  *
- * Future: Integrate ndi_devi_findchild_by_callback into scsi_hba_find_child.
+ * Future: Integrate ndi_devi_findchild_by_callback into scsi_findchild.
  */
 static int
-scsi_hba_find_child(dev_info_t *self, char *name, char *addr, int init,
+scsi_findchild(dev_info_t *self, char *name, char *addr, int init,
     dev_info_t **dchildp, mdi_pathinfo_t **pchildp, int *ppi)
 {
 	dev_info_t	*dchild;	/* devinfo child */
@@ -5267,9 +5293,8 @@ scsi_device_createchild(dev_info_t *self, char *addr, scsi_enum_t se,
 			    "%s pathinfo decoration failed",
 			    mdi_pi_spathname(pchild)));
 
-			/* For hotplug, path exists even on failure. */
-			if (se != SE_HP)
-				(void) mdi_pi_free(pchild, 0);
+			(void) mdi_pi_free(pchild, 0);
+			pchild = NULL;
 			goto out;
 		}
 	}
@@ -5353,13 +5378,10 @@ scsi_device_configchild(dev_info_t *self, char *addr, scsi_enum_t se,
 		mdi_rele_path(pchild);
 
 		if (rval != MDI_SUCCESS) {
-			SCSI_HBA_LOG((_LOG(2), self, NULL,
-			    "%s pathinfo online failed",
-			    mdi_pi_spathname(pchild)));
-
-			/* For hotplug, path exists even when online fails */
-			if (se != SE_HP)
-				(void) mdi_pi_free(pchild, 0);
+			/* pathinfo form of "failed during tran_tgt_init" */
+			scsi_enumeration_failed(NULL, se,
+			    mdi_pi_spathname(pchild), "path online");
+			(void) mdi_pi_free(pchild, 0);
 			return (NULL);
 		}
 
@@ -5554,9 +5576,16 @@ scsi_hba_barrier_tran_tgt_free(dev_info_t *probe)
 		 */
 		if (tran->tran_hba_flags & SCSI_HBA_TRAN_CLONE)
 			tran = sdprobe->sd_address.a_hba_tran;
-		SCSI_HBA_LOG((_LOG(4), NULL, probe, "tran_tgt_free EARLY"));
 
-		(*tran->tran_tgt_free) (self, probe, tran, sdprobe);
+		if (!sdprobe->sd_tran_tgt_free_done) {
+			SCSI_HBA_LOG((_LOG(4), NULL, probe,
+			    "tran_tgt_free EARLY"));
+			(*tran->tran_tgt_free) (self, probe, tran, sdprobe);
+			sdprobe->sd_tran_tgt_free_done = 1;
+		} else {
+			SCSI_HBA_LOG((_LOG(4), NULL, probe,
+			    "tran_tgt_free EARLY already done"));
+		}
 	}
 }
 
@@ -5589,7 +5618,6 @@ scsi_hba_barrier_add(dev_info_t *probe, int seconds)
 
 	/* HBA is no longer responsible for nodes on the barrier list. */
 	scsi_hba_barrier_tran_tgt_free(probe);
-
 	nb = kmem_alloc(sizeof (struct scsi_hba_barrier), KM_SLEEP);
 	mutex_enter(&scsi_hba_barrier_mutex);
 	endtime = ddi_get_lbolt() + drv_usectohz(seconds * MICROSEC);
@@ -5607,7 +5635,7 @@ scsi_hba_barrier_add(dev_info_t *probe, int seconds)
 }
 
 /*
- * Attempt to remove devinfo node node, return 1 if removed. We don't
+ * Attempt to remove devinfo node node, return 1 if removed. We
  * don't try to remove barrier nodes that have sd_uninit_prevent set
  * (even though they should fail device_uninitchild).
  */
@@ -5964,7 +5992,7 @@ scsi_device_config(dev_info_t *self, char *name, char *addr, scsi_enum_t se,
 	/*
 	 * Fastpath: search to see if we are requesting a named SID node that
 	 * already exists (we already created) - probe node does not count.
-	 * scsi_hba_find_child() does not hold the returned devinfo node, but
+	 * scsi_findchild() does not hold the returned devinfo node, but
 	 * this is OK since the caller has a scsi_hba_devi_enter on the
 	 * attached parent HBA (self). The caller is responsible for attaching
 	 * and placing a hold on the child (directly via ndi_hold_devi or
@@ -5975,8 +6003,7 @@ scsi_device_config(dev_info_t *self, char *name, char *addr, scsi_enum_t se,
 	 * (autodetach) if the same nodename is used for old and new binding.
 	 */
 	/* first call is with init set */
-	(void) scsi_hba_find_child(self, name, addr,
-	    1, &dsearch, NULL, &pi);
+	(void) scsi_findchild(self, name, addr, 1, &dsearch, NULL, &pi);
 	if (dsearch && scsi_hba_dev_is_sid(dsearch) &&
 	    !scsi_hba_devi_is_barrier(dsearch)) {
 		SCSI_HBA_LOG((_LOG(4), NULL, dsearch,
@@ -6041,7 +6068,7 @@ scsi_device_config(dev_info_t *self, char *name, char *addr, scsi_enum_t se,
 		 * Search for probe node - they should only exist as devinfo
 		 * nodes.
 		 */
-		(void) scsi_hba_find_child(self, "probe", addr,
+		(void) scsi_findchild(self, "probe", addr,
 		    0, &probe, &psearch, NULL);
 		if (probe == NULL) {
 			if (psearch)
@@ -6105,12 +6132,11 @@ scsi_device_config(dev_info_t *self, char *name, char *addr, scsi_enum_t se,
 	/*
 	 * Search to see if we are requesting a SID node that already exists.
 	 * We hold the HBA (self) and there is not another probe in progress at
-	 * the same @addr. scsi_hba_find_child() does not hold the returned
+	 * the same @addr. scsi_findchild() does not hold the returned
 	 * devinfo node but this is OK since we hold the HBA (self).
 	 */
 	if (name) {
-		(void) scsi_hba_find_child(self, name, addr,
-		    1, &dsearch, NULL, &pi);
+		(void) scsi_findchild(self, name, addr, 1, &dsearch, NULL, &pi);
 		if (dsearch && scsi_hba_dev_is_sid(dsearch)) {
 			SCSI_HBA_LOG((_LOG(4), NULL, dsearch,
 			    "%s@%s probe devinfo fastpath",
@@ -6143,8 +6169,7 @@ scsi_device_config(dev_info_t *self, char *name, char *addr, scsi_enum_t se,
 	 */
 	for (;;) {
 		/* first NULL name call is with init set */
-		(void) scsi_hba_find_child(self, NULL, addr,
-		    1, &dsearch, NULL, &pi);
+		(void) scsi_findchild(self, NULL, addr, 1, &dsearch, NULL, &pi);
 		if (dsearch == NULL)
 			break;
 		ASSERT(!scsi_hba_devi_is_barrier(dsearch));
@@ -6316,12 +6341,7 @@ scsi_device_config(dev_info_t *self, char *name, char *addr, scsi_enum_t se,
 		 * we pretend that device does not exist.
 		 */
 		if (scsi_device_identity(sdprobe, SLEEP_FUNC)) {
-			if (ndi_dev_is_hotplug_node(probe))
-				SCSI_HBA_LOG((_LOG(WARN), NULL, probe,
-				    "enumeration failed during identity"));
-			else
-				SCSI_HBA_LOG((_LOG(2), NULL, probe,
-				    "enumeration failed during identity"));
+			scsi_enumeration_failed(probe, -1, NULL, "identify");
 			sp = SCSIPROBE_FAILURE;
 		}
 
@@ -6334,12 +6354,7 @@ scsi_device_config(dev_info_t *self, char *name, char *addr, scsi_enum_t se,
 	sdprobe->sd_uninit_prevent--;
 
 	if (sp != SCSIPROBE_EXISTS) {
-		if (ndi_dev_is_hotplug_node(probe))
-			SCSI_HBA_LOG((_LOG(WARN), NULL, probe,
-			    "enumeration failed during probe"));
-		else
-			SCSI_HBA_LOG((_LOG(2), NULL, probe,
-			    "enumeration failed durning probe"));
+		scsi_enumeration_failed(probe, -1, NULL, "probe");
 
 		if (scsi_hba_barrier_timeout) {
 			/*
@@ -6370,7 +6385,7 @@ scsi_device_config(dev_info_t *self, char *name, char *addr, scsi_enum_t se,
 		 * via driver_alias. We may still have a conf node.
 		 */
 		if (name) {
-			(void) scsi_hba_find_child(self, name, addr,
+			(void) scsi_findchild(self, name, addr,
 			    0, &child, NULL, &pi);
 			if (child)
 				SCSI_HBA_LOG((_LOG(2), NULL, child,
@@ -6401,7 +6416,7 @@ scsi_device_config(dev_info_t *self, char *name, char *addr, scsi_enum_t se,
 	 */
 	if (name && (strcmp(ddi_node_name(child), name) != 0) &&
 	    (strcmp(ddi_driver_name(child), name) != 0)) {
-		(void) scsi_hba_find_child(self, name, addr,
+		(void) scsi_findchild(self, name, addr,
 		    0, &dsearch, NULL, &pi);
 		if (dsearch == NULL) {
 			SCSI_HBA_LOG((_LOG(2), NULL, child,
@@ -6464,16 +6479,8 @@ done:		ASSERT(child);
 					    name ? name : "", addr,
 					    chg ? "" : "ed already"));
 				} else {
-					if (se == SE_HP)
-						SCSI_HBA_LOG((_LOG(WARN),
-						    NULL, child,
-						    "enumeration failed during "
-						    "reprobe"));
-					else
-						SCSI_HBA_LOG((_LOG(2),
-						    NULL, child,
-						    "enumeration failed during "
-						    "reprobe"));
+					scsi_enumeration_failed(child, se,
+					    NULL, "reprobe");
 
 					chg = ndi_devi_device_remove(child);
 					SCSI_HBA_LOG((_LOG(2), NULL, child,
@@ -6533,7 +6540,7 @@ fail:		ASSERT(child == NULL);
 	if (sdchild && pi && (probe == NULL)) {
 		ASSERT(MDI_PHCI(self));
 
-		(void) scsi_hba_find_child(self, NULL, addr,
+		(void) scsi_findchild(self, NULL, addr,
 		    0, &dsearch, &psearch, NULL);
 		ASSERT((psearch == NULL) ||
 		    (mdi_pi_get_client(psearch) == child));
@@ -6574,11 +6581,9 @@ fail:		ASSERT(child == NULL);
 						    0);
 
 				} else {
-					SCSI_HBA_LOG((_LOG(WARN), NULL, child,
-					    "%s enumeration failed "
-					    "during reprobe",
-					    mdi_pi_spathname(psearch)));
-
+					scsi_enumeration_failed(child, se,
+					    mdi_pi_spathname(psearch),
+					    "reprobe");
 					child = NULL;
 					sdchild = NULL;
 				}
@@ -6614,10 +6619,10 @@ scsi_device_unconfig(dev_info_t *self, char *name, char *addr, int *circp)
 	/*
 	 * We have a catch-22. We may have a demoted node that we need to find
 	 * and offline/remove. To find the node it it isn't demoted, we
-	 * use scsi_hba_find_child. If it's demoted, we then use
+	 * use scsi_findchild. If it's demoted, we then use
 	 * ndi_devi_findchild_by_callback.
 	 */
-	(void) scsi_hba_find_child(self, name, addr, 0, &child, &path, NULL);
+	(void) scsi_findchild(self, name, addr, 0, &child, &path, NULL);
 
 	if ((child == NULL) && (path == NULL)) {
 		child = ndi_devi_findchild_by_callback(self, name, addr,
@@ -7165,18 +7170,21 @@ scsi_hba_enum_lsf_of_t(struct scsi_device *sd0,
 		/* free the LUN array allocated by scsi_device_reportluns */
 		kmem_free(lunp, size);
 	} else {
-		/* Couldn't get SCMD_REPORT_LUNS data */
-		if (aver >= SCSI_VERSION_3) {
-			if (se == SE_HP)
-				SCSI_HBA_LOG((_LOG(WARN), NULL, child,
-				    "enumeration failed during report_lun"));
-			else
-				SCSI_HBA_LOG((_LOG(2), NULL, child,
-				    "enumeration failed during report_lun"));
-		}
-
 		/* Determine the number of LUNs to enumerate. */
 		maxluns = scsi_get_scsi_maxluns(sd0);
+
+		/* Couldn't get SCMD_REPORT_LUNS data */
+		if (aver >= SCSI_VERSION_3) {
+			scsi_enumeration_failed(child, se, taddr, "report_lun");
+
+			/*
+			 * Based on calling context tunable, only enumerate one
+			 * lun (lun0) if scsi_device_reportluns() fails on a
+			 * SCSI_VERSION_3 or greater device.
+			 */
+			if (scsi_lunrpt_failed_do1lun & (1 << se))
+				maxluns = 1;
+		}
 
 		/* loop over possible LUNs, skipping LUN0 */
 		if (maxluns > 1)

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -141,11 +141,18 @@ struct scsi_device {
 	void			*sd_pathinfo;
 
 	/*
-	 * Counter that prevents demotion of DS_INITIALIZED node (esp loss of
-	 * devi_addr) by causing DDI_CTLOPS_UNINITCHILD failure - devi_ref
-	 * will not protect demotion of DS_INITIALIZED node.
+	 * sd_uninit_prevent - Counter that prevents demotion of
+	 * DS_INITIALIZED node (esp loss of devi_addr) by causing
+	 * DDI_CTLOPS_UNINITCHILD failure - devi_ref will not protect
+	 * demotion of DS_INITIALIZED node.
+	 *
+	 * sd_tran_tgt_free_done - in some cases SCSA will call
+	 * tran_tgt_free(9E) independent of devinfo node state, this means
+	 * that uninitchild code should not call tran_tgt_free(9E).
 	 */
-	int			sd_uninit_prevent;
+	int			sd_uninit_prevent:16,
+				sd_tran_tgt_free_done:1,
+				sd_flags_pad:15;
 
 	/*
 	 * The 'sd_tran_safe' field is a grotty hack that allows direct-access
