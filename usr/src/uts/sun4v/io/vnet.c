@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -734,23 +734,28 @@ vnet_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 {
 	_NOTE(ARGUNUSED(add, mca))
 
-	vnet_t *vnetp = arg;
+	vnet_t		*vnetp = arg;
 	vnet_res_t	*vresp;
 	mac_register_t	*macp;
 	mac_callbacks_t	*cbp;
-	int rv = VNET_SUCCESS;
+	int		rv = VNET_SUCCESS;
 
 	DBG1(vnetp, "enter\n");
 
-	READ_ENTER(&vnetp->vrwlock);
-	for (vresp = vnetp->vres_list; vresp != NULL; vresp = vresp->nextp) {
-		if (vresp->type == VIO_NET_RES_LDC_SERVICE) {
-			macp = &vresp->macreg;
-			cbp = macp->m_callbacks;
-			rv = cbp->mc_multicst(macp->m_driver, add, mca);
-		}
+	READ_ENTER(&vnetp->vsw_fp_rw);
+	if (vnetp->vsw_fp == NULL) {
+		RW_EXIT(&vnetp->vsw_fp_rw);
+		return (EAGAIN);
 	}
-	RW_EXIT(&vnetp->vrwlock);
+	VNET_FDBE_REFHOLD(vnetp->vsw_fp);
+	RW_EXIT(&vnetp->vsw_fp_rw);
+
+	vresp = vnetp->vsw_fp;
+	macp = &vresp->macreg;
+	cbp = macp->m_callbacks;
+	rv = cbp->mc_multicst(macp->m_driver, add, mca);
+
+	VNET_FDBE_REFRELE(vnetp->vsw_fp);
 
 	DBG1(vnetp, "exit(%d)\n", rv);
 	return (rv);

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,7 +119,6 @@ static int vgen_port_read_props(vgen_port_t *portp, vgen_t *vgenp, md_t *mdp,
 	mde_cookie_t mdex);
 static int vgen_remove_port(vgen_t *vgenp, md_t *mdp, mde_cookie_t mdex);
 static int vgen_port_attach(vgen_port_t *portp);
-static void vgen_port_detach_mdeg(vgen_port_t *portp);
 static void vgen_port_detach_mdeg(vgen_port_t *portp);
 static int vgen_update_port(vgen_t *vgenp, md_t *curr_mdp,
 	mde_cookie_t curr_mdex, md_t *prev_mdp, mde_cookie_t prev_mdex);
@@ -702,8 +701,10 @@ vgen_stop(void *arg)
 	DBG1(vgenp, NULL, "enter\n");
 
 	mutex_enter(&portp->lock);
-	vgen_port_uninit(portp);
-	portp->flags &= ~(VGEN_STARTED);
+	if (portp->flags & VGEN_STARTED) {
+		vgen_port_uninit(portp);
+		portp->flags &= ~(VGEN_STARTED);
+	}
 	mutex_exit(&portp->lock);
 	DBG1(vgenp, NULL, "exit\n");
 
@@ -1244,7 +1245,11 @@ send_dring_exit:
 	return (VGEN_TX_SUCCESS);
 }
 
-/* enable/disable a multicast address */
+/*
+ * enable/disable a multicast address
+ * note that the cblock of the ldc channel connected to the vsw is used for
+ * synchronization of the mctab.
+ */
 int
 vgen_multicst(void *arg, boolean_t add, const uint8_t *mca)
 {
@@ -1252,7 +1257,6 @@ vgen_multicst(void *arg, boolean_t add, const uint8_t *mca)
 	vnet_mcast_msg_t	mcastmsg;
 	vio_msg_tag_t		*tagp;
 	vgen_port_t		*portp;
-	vgen_portlist_t		*plistp;
 	vgen_ldc_t		*ldcp;
 	vgen_ldclist_t		*ldclp;
 	struct ether_addr	*addrp;
@@ -1262,7 +1266,7 @@ vgen_multicst(void *arg, boolean_t add, const uint8_t *mca)
 	portp = (vgen_port_t *)arg;
 	vgenp = portp->vgenp;
 
-	if (portp != vgenp->vsw_portp) {
+	if (portp->is_vsw_port != B_TRUE) {
 		return (DDI_SUCCESS);
 	}
 
@@ -1270,25 +1274,15 @@ vgen_multicst(void *arg, boolean_t add, const uint8_t *mca)
 	tagp = &mcastmsg.tag;
 	bzero(&mcastmsg, sizeof (mcastmsg));
 
-	mutex_enter(&vgenp->lock);
-
-	plistp = &(vgenp->vgenports);
-
-	READ_ENTER(&plistp->rwlock);
-
-	portp = vgenp->vsw_portp;
-	if (portp == NULL) {
-		RW_EXIT(&plistp->rwlock);
-		mutex_exit(&vgenp->lock);
-		return (rv);
-	}
 	ldclp = &portp->ldclist;
 
 	READ_ENTER(&ldclp->rwlock);
 
 	ldcp = ldclp->headp;
-	if (ldcp == NULL)
-		goto vgen_mcast_exit;
+	if (ldcp == NULL) {
+		RW_EXIT(&ldclp->rwlock);
+		return (DDI_FAILURE);
+	}
 
 	mutex_enter(&ldcp->cblock);
 
@@ -1309,12 +1303,10 @@ vgen_multicst(void *arg, boolean_t add, const uint8_t *mca)
 		if (vgen_sendmsg(ldcp, (caddr_t)tagp, sizeof (mcastmsg),
 		    B_FALSE) != VGEN_SUCCESS) {
 			DWARN(vgenp, ldcp, "vgen_sendmsg failed\n");
-			mutex_exit(&ldcp->cblock);
+			rv = DDI_FAILURE;
 			goto vgen_mcast_exit;
 		}
 	}
-
-	mutex_exit(&ldcp->cblock);
 
 	if (add) {
 
@@ -1367,10 +1359,9 @@ vgen_multicst(void *arg, boolean_t add, const uint8_t *mca)
 	rv = DDI_SUCCESS;
 
 vgen_mcast_exit:
+	mutex_exit(&ldcp->cblock);
 	RW_EXIT(&ldclp->rwlock);
-	RW_EXIT(&plistp->rwlock);
 
-	mutex_exit(&vgenp->lock);
 	return (rv);
 }
 
@@ -2673,6 +2664,7 @@ vgen_port_detach_mdeg(vgen_port_t *portp)
 	/* stop the port if needed */
 	if (portp->flags & VGEN_STARTED) {
 		vgen_port_uninit(portp);
+		portp->flags &= ~(VGEN_STARTED);
 	}
 
 	mutex_exit(&portp->lock);
@@ -4974,11 +4966,10 @@ vgen_handshake(vgen_ldc_t *ldcp)
 			 * If this channel(port) is connected to vsw,
 			 * need to sync multicast table with vsw.
 			 */
-			mutex_exit(&ldcp->cblock);
-
-			mutex_enter(&vgenp->lock);
 			rv = vgen_send_mcast_info(ldcp);
-			mutex_exit(&vgenp->lock);
+			if (rv != VGEN_SUCCESS) {
+				break;
+			}
 
 			if (vgenp->pls_negotiated == B_FALSE) {
 				/*
@@ -4994,12 +4985,11 @@ vgen_handshake(vgen_ldc_t *ldcp)
 				 * vswitch sends us the initial phys link state
 				 * (see vgen_handle_physlink_info()).
 				 */
+				mutex_exit(&ldcp->cblock);
 				vgen_link_update(vgenp, ldcp->link_state);
+				mutex_enter(&ldcp->cblock);
 			}
 
-			mutex_enter(&ldcp->cblock);
-			if (rv != VGEN_SUCCESS)
-				break;
 		}
 
 		/*

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -422,14 +422,8 @@ mdeg_register(mdeg_node_spec_t *pspecp, mdeg_node_match_t *nmatchp,
 {
 	mdeg_clnt_t	*clnt;
 
-	/*
-	 * If the RW lock is held, a client is calling
-	 * register from its own callback.
-	 */
-	if (RW_LOCK_HELD(&mdeg.rwlock)) {
-		MDEG_DBG("mdeg_register: rwlock already held\n");
-		return (MDEG_FAILURE);
-	}
+	/* should never be called from a callback */
+	ASSERT(!taskq_member(mdeg.taskq, curthread));
 
 	/* node spec and node match must both be valid, or both NULL */
 	if (((pspecp != NULL) && (nmatchp == NULL)) ||
@@ -480,21 +474,16 @@ mdeg_unregister(mdeg_handle_t hdl)
 	mdeg_clnt_t	*clnt;
 	mdeg_handle_t	mdh;
 
-	/*
-	 * If the RW lock is held, a client is calling
-	 * unregister from its own callback.
-	 */
-	if (RW_LOCK_HELD(&mdeg.rwlock)) {
-		MDEG_DBG("mdeg_unregister: rwlock already held\n");
-		return (MDEG_FAILURE);
-	}
+	/* should never be called from a callback */
+	ASSERT(!taskq_member(mdeg.taskq, curthread));
+
+	rw_enter(&mdeg.rwlock, RW_WRITER);
 
 	/* lookup the client */
 	if ((clnt = mdeg_get_client(hdl)) == NULL) {
+		rw_exit(&mdeg.rwlock);
 		return (MDEG_FAILURE);
 	}
-
-	rw_enter(&mdeg.rwlock, RW_WRITER);
 
 	MDEG_DBG("client unregistered (0x%lx):\n", hdl);
 	MDEG_DUMP_CLNT(clnt);
