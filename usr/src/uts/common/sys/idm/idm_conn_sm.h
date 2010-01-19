@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef	_IDM_CONN_SM_H_
@@ -187,10 +187,11 @@ typedef enum {
 	CS_S7_LOGOUT_REQ,
 	CS_S8_CLEANUP,
 	CS_S9_INIT_ERROR,
-	CS_S9A_REJECTED,
 	CS_S10_IN_CLEANUP,
 	CS_S11_COMPLETE,
 	CS_S12_ENABLE_DM,
+	CS_S9A_REJECTED,
+	CS_S9B_WAIT_SND_DONE,
 
 	/* Add new connection states above CS_MAX_STATE */
 	CS_MAX_STATE
@@ -209,10 +210,11 @@ static const char *idm_cs_name[CS_MAX_STATE+1] = {
 	"CS_S7_LOGOUT_REQ",
 	"CS_S8_CLEANUP",
 	"CS_S9_INIT_ERROR",
-	"CS_S9A_REJECTED",
 	"CS_S10_IN_CLEANUP",
 	"CS_S11_COMPLETE",
 	"CS_S12_ENABLE_DM",
+	"CS_S9A_REJECTED",
+	"CS_S9B_WAIT_SND_DONE",
 	"CS_MAX_STATE"
 };
 #endif

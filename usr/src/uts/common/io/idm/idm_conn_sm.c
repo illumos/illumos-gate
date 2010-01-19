@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,6 +76,14 @@ idm_state_s9_init_error(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx);
 
 static void
 idm_state_s9a_rejected(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx);
+
+static void
+idm_state_s9b_wait_snd_done_cb(idm_pdu_t *pdu,
+    idm_status_t status);
+
+static void
+idm_state_s9b_wait_snd_done(idm_conn_t *ic,
+    idm_conn_event_ctx_t *event_ctx);
 
 static void
 idm_state_s10_in_cleanup(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx);
@@ -366,6 +374,9 @@ idm_conn_event_handler(void *event_ctx_opaque)
 	case CS_S9A_REJECTED:
 		idm_state_s9a_rejected(ic, event_ctx);
 		break;
+	case CS_S9B_WAIT_SND_DONE:
+		idm_state_s9b_wait_snd_done(ic, event_ctx);
+		break;
 	case CS_S9_INIT_ERROR:
 		idm_state_s9_init_error(ic, event_ctx);
 		break;
@@ -529,19 +540,6 @@ idm_state_s3_xpt_up(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 }
 
 static void
-idm_state_s4_in_login_fail_snd_done(idm_pdu_t *pdu, idm_status_t status)
-{
-	idm_conn_t		*ic = pdu->isp_ic;
-
-	/*
-	 * This pdu callback can be invoked by the tx thread,
-	 * so run the disconnect code from another thread.
-	 */
-	pdu->isp_status = status;
-	idm_conn_event(ic, CE_LOGIN_FAIL_SND_DONE, (uintptr_t)pdu);
-}
-
-static void
 idm_state_s4_in_login(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 {
 	idm_pdu_t *pdu;
@@ -553,6 +551,8 @@ idm_state_s4_in_login(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 	switch (event_ctx->iec_event) {
 	case CE_LOGIN_SUCCESS_RCV:
 	case CE_LOGIN_SUCCESS_SND:
+		ASSERT(ic->ic_client_callback == NULL);
+
 		(void) untimeout(ic->ic_state_timeout);
 		idm_login_success_actions(ic, event_ctx);
 		if (ic->ic_rdma_extensions) {
@@ -568,20 +568,10 @@ idm_state_s4_in_login(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 		(void) idm_notify_client(ic, CN_LOGIN_FAIL, NULL);
 		idm_update_state(ic, CS_S9_INIT_ERROR, event_ctx);
 		break;
-	case CE_LOGIN_FAIL_SND_DONE:
-		pdu = (idm_pdu_t *)event_ctx->iec_info;
-		/* restore client callback */
-		pdu->isp_callback =  ic->ic_client_callback;
-		ic->ic_client_callback = NULL;
-		idm_pdu_complete(pdu, pdu->isp_status);
-		(void) idm_notify_client(ic, CN_LOGIN_FAIL, NULL);
-		(void) untimeout(ic->ic_state_timeout);
-		idm_update_state(ic, CS_S9_INIT_ERROR, event_ctx);
-		break;
 	case CE_LOGIN_FAIL_SND:
 		/*
 		 * Allow the logout response pdu to be sent and defer
-		 * the state machine update until the completion callback.
+		 * the state machine cleanup until the completion callback.
 		 * Only 1 level or callback interposition is allowed.
 		 */
 		(void) untimeout(ic->ic_state_timeout);
@@ -589,9 +579,12 @@ idm_state_s4_in_login(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 		ASSERT(ic->ic_client_callback == NULL);
 		ic->ic_client_callback = pdu->isp_callback;
 		pdu->isp_callback =
-		    idm_state_s4_in_login_fail_snd_done;
+		    idm_state_s9b_wait_snd_done_cb;
+		idm_update_state(ic, CS_S9B_WAIT_SND_DONE,
+		    event_ctx);
 		break;
 	case CE_LOGIN_FAIL_RCV:
+		ASSERT(ic->ic_client_callback == NULL);
 		/*
 		 * Need to deliver this PDU to the initiator now because after
 		 * we update the state to CS_S9_INIT_ERROR the initiator will
@@ -610,6 +603,7 @@ idm_state_s4_in_login(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 		idm_update_state(ic, CS_S9_INIT_ERROR, event_ctx);
 		break;
 	case CE_LOGIN_SND:
+		ASSERT(ic->ic_client_callback == NULL);
 		/*
 		 * Initiator connections will see initial login PDU
 		 * in this state.  Target connections see initial
@@ -949,21 +943,58 @@ idm_state_s8_cleanup(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 static void
 idm_state_s9_init_error(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 {
-	if (ic->ic_conn_type == CONN_TYPE_INI) {
-		mutex_enter(&ic->ic_state_mutex);
-		ic->ic_state_flags |= CF_ERROR;
-		ic->ic_conn_sm_status = IDM_STATUS_FAIL;
-		cv_signal(&ic->ic_state_cv);
-		mutex_exit(&ic->ic_state_mutex);
-	}
+	/* All events ignored in this state */
 }
 
 /* ARGSUSED */
 static void
 idm_state_s9a_rejected(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 {
-	/* Ignore events */
+	/* All events ignored in this state */
 }
+
+
+static void
+idm_state_s9b_wait_snd_done_cb(idm_pdu_t *pdu, idm_status_t status)
+{
+	idm_conn_t		*ic = pdu->isp_ic;
+
+	/*
+	 * This pdu callback can be invoked by the tx thread,
+	 * so run the disconnect code from another thread.
+	 */
+	pdu->isp_status = status;
+	idm_conn_event(ic, CE_LOGIN_FAIL_SND_DONE, (uintptr_t)pdu);
+}
+
+/*
+ * CS_S9B_WAIT_SND_DONE -- wait for callback completion.
+ */
+/* ARGSUSED */
+static void
+idm_state_s9b_wait_snd_done(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
+{
+	idm_pdu_t *pdu;
+	/*
+	 * Wait for completion of the login fail sequence and then
+	 * go to state S9_INIT_ERROR to clean up the connection.
+	 */
+	switch (event_ctx->iec_event) {
+	case CE_LOGIN_FAIL_SND_DONE:
+		pdu = (idm_pdu_t *)event_ctx->iec_info;
+		/* restore client callback */
+		pdu->isp_callback =  ic->ic_client_callback;
+		ic->ic_client_callback = NULL;
+		idm_pdu_complete(pdu, pdu->isp_status);
+		idm_update_state(ic, CS_S9_INIT_ERROR, event_ctx);
+		break;
+
+	/* All other events ignored */
+	}
+}
+
+
+
 
 static void
 idm_state_s10_in_cleanup(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
@@ -1017,6 +1048,12 @@ idm_state_s11_complete(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 	/*
 	 * Cleanup logout success/fail completion if it's been delayed
 	 * until now.
+	 *
+	 * All new events are filtered out before reaching this state, but
+	 * there might already be events in the event queue, so handle the
+	 * SND_DONE events here. Note that if either of the following
+	 * SND_DONE events happens AFTER the change to state S11, then the
+	 * event filter inside dm_conn_event_locked does enough cleanup.
 	 */
 	switch (event_ctx->iec_event) {
 	case CE_LOGOUT_SUCCESS_SND_DONE:
@@ -1028,6 +1065,7 @@ idm_state_s11_complete(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 		idm_pdu_complete(pdu, pdu->isp_status);
 		break;
 	}
+
 }
 
 static void
@@ -1190,11 +1228,13 @@ idm_update_state(idm_conn_t *ic, idm_conn_state_t new_state,
 	case CS_S9A_REJECTED:
 		/*
 		 * We never finished establishing the connection so no
-		 * disconnect.  No client notificatiosn because the client
+		 * disconnect.  No client notifications because the client
 		 * rejected the connection.
 		 */
 		idm_refcnt_async_wait_ref(&ic->ic_refcnt,
 		    &idm_conn_reject_unref);
+		break;
+	case CS_S9B_WAIT_SND_DONE:
 		break;
 	case CS_S9_INIT_ERROR:
 		if (IDM_CONN_ISTGT(ic)) {
@@ -1259,6 +1299,11 @@ idm_update_state(idm_conn_t *ic, idm_conn_state_t new_state,
 		}
 
 		break;
+
+	default:
+		ASSERT(0);
+		break;
+
 	}
 }
 

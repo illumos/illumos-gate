@@ -402,6 +402,9 @@ idm_svc_conn_create(idm_svc_t *is, idm_transport_type_t tt,
 
 	ic = idm_conn_create_common(CONN_TYPE_TGT, tt,
 	    &is->is_svc_req.sr_conn_ops);
+	if (ic == NULL) {
+		return (IDM_STATUS_FAIL);
+	}
 	ic->ic_svc_binding = is;
 
 	/*

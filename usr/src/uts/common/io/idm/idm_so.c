@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1062,7 +1062,8 @@ idm_so_conn_connect_common(idm_conn_t *ic)
 	so_conn->ic_rx_thread = thread_create(NULL, 0, idm_sorx_thread, ic, 0,
 	    &p0, TS_RUN, minclsyspri);
 
-	while (!so_conn->ic_rx_thread_running || !so_conn->ic_tx_thread_running)
+	while (so_conn->ic_rx_thread_did == 0 ||
+	    so_conn->ic_tx_thread_did == 0)
 		cv_wait(&ic->ic_cv, &ic->ic_mutex);
 	mutex_exit(&ic->ic_mutex);
 }
