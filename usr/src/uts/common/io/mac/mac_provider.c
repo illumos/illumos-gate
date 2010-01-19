@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -485,6 +485,11 @@ fail:
 	}
 
 	mac_unregister_priv_prop(mip);
+
+	/*
+	 * Clear the state before destroying the mac_impl_t
+	 */
+	mip->mi_state_flags = 0;
 
 	kmem_cache_free(i_mac_impl_cachep, mip);
 	return (err);
