@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -551,6 +551,7 @@ clnt_setup_long_reply(CONN *conn, struct clist **clpp, uint_t length)
 		DTRACE_PROBE(krpc__e__clntrdma__longrep_regbuf);
 		rdma_buf_free(conn, &((*clpp)->rb_longbuf));
 		clist_free(*clpp);
+		*clpp = NULL;
 		return (CLNT_RDMA_FAIL);
 	}
 
