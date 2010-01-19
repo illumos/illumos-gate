@@ -1755,7 +1755,9 @@ zfs_ioc_dataset_list_next(zfs_cmd_t *zc)
 	objset_t *os;
 	int error;
 	char *p;
+	size_t orig_len = strlen(zc->zc_name);
 
+top:
 	if (error = dmu_objset_hold(zc->zc_name, FTAG, &os)) {
 		if (error == ENOENT)
 			error = ESRCH;
@@ -1793,8 +1795,14 @@ zfs_ioc_dataset_list_next(zfs_cmd_t *zc)
 	 * If it's an internal dataset (ie. with a '$' in its name),
 	 * don't try to get stats for it, otherwise we'll return ENOENT.
 	 */
-	if (error == 0 && strchr(zc->zc_name, '$') == NULL)
+	if (error == 0 && strchr(zc->zc_name, '$') == NULL) {
 		error = zfs_ioc_objset_stats(zc); /* fill in the stats */
+		if (error == ENOENT) {
+			/* We lost a race with destroy, get the next one. */
+			zc->zc_name[orig_len] = '\0';
+			goto top;
+		}
+	}
 	return (error);
 }
 
@@ -1816,6 +1824,7 @@ zfs_ioc_snapshot_list_next(zfs_cmd_t *zc)
 	objset_t *os;
 	int error;
 
+top:
 	if (zc->zc_cookie == 0)
 		(void) dmu_objset_find(zc->zc_name, dmu_objset_prefetch,
 		    NULL, DS_FIND_SNAPSHOTS);
@@ -1837,10 +1846,16 @@ zfs_ioc_snapshot_list_next(zfs_cmd_t *zc)
 	    sizeof (zc->zc_name) - strlen(zc->zc_name),
 	    zc->zc_name + strlen(zc->zc_name), NULL, &zc->zc_cookie, NULL);
 	dmu_objset_rele(os, FTAG);
-	if (error == 0)
+	if (error == 0) {
 		error = zfs_ioc_objset_stats(zc); /* fill in the stats */
-	else if (error == ENOENT)
+		if (error == ENOENT)  {
+			/* We lost a race with destroy, get the next one. */
+			*strchr(zc->zc_name, '@') = '\0';
+			goto top;
+		}
+	} else if (error == ENOENT) {
 		error = ESRCH;
+	}
 
 	/* if we failed, undo the @ that we tacked on to zc_name */
 	if (error)

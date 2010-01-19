@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -532,7 +532,15 @@ dsl_dataset_hold_ref(dsl_dataset_t *ds, void *tag)
 			rw_enter(&dp->dp_config_rwlock, RW_READER);
 			return (ENOENT);
 		}
+		/*
+		 * The dp_config_rwlock lives above the ds_lock. And
+		 * we need to check DSL_DATASET_IS_DESTROYED() while
+		 * holding the ds_lock, so we have to drop and reacquire
+		 * the ds_lock here.
+		 */
+		mutex_exit(&ds->ds_lock);
 		rw_enter(&dp->dp_config_rwlock, RW_READER);
+		mutex_enter(&ds->ds_lock);
 	}
 	mutex_exit(&ds->ds_lock);
 	return (0);
@@ -3608,6 +3616,7 @@ dsl_dataset_user_release(char *dsname, char *snapname, char *htag,
 	spa_t *spa;
 	int error;
 
+top:
 	ha = kmem_zalloc(sizeof (struct dsl_ds_holdarg), KM_SLEEP);
 
 	(void) strlcpy(ha->failed, dsname, sizeof (ha->failed));
@@ -3650,12 +3659,24 @@ dsl_dataset_user_release(char *dsname, char *snapname, char *htag,
 	if (error == 0 && recursive && !ha->gotone)
 		error = ENOENT;
 
-	if (error)
+	if (error && error != EBUSY)
 		(void) strlcpy(dsname, ha->failed, sizeof (ha->failed));
 
 	dsl_sync_task_group_destroy(ha->dstg);
 	kmem_free(ha, sizeof (struct dsl_ds_holdarg));
 	spa_close(spa, FTAG);
+
+	/*
+	 * We can get EBUSY if we were racing with deferred destroy and
+	 * dsl_dataset_user_release_check() hadn't done the necessary
+	 * open context setup.  We can also get EBUSY if we're racing
+	 * with destroy and that thread is the ds_owner.  Either way
+	 * the busy condition should be transient, and we should retry
+	 * the release operation.
+	 */
+	if (error == EBUSY)
+		goto top;
+
 	return (error);
 }
 

@@ -535,10 +535,10 @@ extern int zfs_promote(zfs_handle_t *);
 extern int zfs_hold(zfs_handle_t *, const char *, const char *, boolean_t,
     boolean_t, boolean_t);
 extern int zfs_hold_range(zfs_handle_t *, const char *, const char *,
-    const char *, boolean_t);
+    const char *, boolean_t, boolean_t);
 extern int zfs_release(zfs_handle_t *, const char *, const char *, boolean_t);
 extern int zfs_release_range(zfs_handle_t *, const char *, const char *,
-    const char *);
+    const char *, boolean_t);
 extern uint64_t zvol_volsize_to_reservation(uint64_t, nvlist_t *);
 
 typedef int (*zfs_userspace_cb_t)(void *arg, const char *domain,

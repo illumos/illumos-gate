@@ -4017,6 +4017,7 @@ struct hold_range_arg {
 	boolean_t	seento;
 	boolean_t	seenfrom;
 	boolean_t	holding;
+	boolean_t	recursive;
 };
 
 static int
@@ -4040,14 +4041,15 @@ zfs_hold_range_one(zfs_handle_t *zhp, void *arg)
 
 	if (hra->holding) {
 		/* We could be racing with destroy, so ignore ENOENT. */
-		error = zfs_hold(hra->origin, thissnap, hra->tag, B_FALSE,
-		    hra->temphold, B_TRUE);
+		error = zfs_hold(hra->origin, thissnap, hra->tag,
+		    hra->recursive, hra->temphold, B_TRUE);
 		if (error == 0) {
 			(void) strlcpy(hra->lastsnapheld, zfs_get_name(zhp),
 			    sizeof (hra->lastsnapheld));
 		}
 	} else {
-		error = zfs_release(hra->origin, thissnap, hra->tag, B_FALSE);
+		error = zfs_release(hra->origin, thissnap, hra->tag,
+		    hra->recursive);
 	}
 
 	if (!hra->seento && strcmp(hra->tosnap, thissnap) == 0)
@@ -4064,7 +4066,7 @@ zfs_hold_range_one(zfs_handle_t *zhp, void *arg)
  */
 int
 zfs_hold_range(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
-    const char *tag, boolean_t temphold)
+    const char *tag, boolean_t recursive, boolean_t temphold)
 {
 	struct hold_range_arg arg = { 0 };
 	int error;
@@ -4075,6 +4077,7 @@ zfs_hold_range(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 	arg.tag = tag;
 	arg.temphold = temphold;
 	arg.holding = B_TRUE;
+	arg.recursive = recursive;
 
 	error = zfs_iter_snapshots_sorted(zhp, zfs_hold_range_one, &arg);
 
@@ -4083,7 +4086,7 @@ zfs_hold_range(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 	 */
 	if (error && arg.lastsnapheld[0] != '\0') {
 		(void) zfs_release_range(zhp, fromsnap,
-		    (const char *)arg.lastsnapheld, tag);
+		    (const char *)arg.lastsnapheld, tag, recursive);
 	}
 	return (error);
 }
@@ -4110,7 +4113,8 @@ zfs_release(zfs_handle_t *zhp, const char *snapname, const char *tag,
 		 * zc.zc_name.
 		 */
 		(void) snprintf(errbuf, sizeof (errbuf), dgettext(TEXT_DOMAIN,
-		    "cannot release '%s@%s'"), zc.zc_name, snapname);
+		    "cannot release '%s' from '%s@%s'"), tag, zc.zc_name,
+		    snapname);
 		switch (errno) {
 		case ESRCH:
 			return (zfs_error(hdl, EZFS_REFTAG_RELE, errbuf));
@@ -4134,7 +4138,7 @@ zfs_release(zfs_handle_t *zhp, const char *snapname, const char *tag,
  */
 int
 zfs_release_range(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
-    const char *tag)
+    const char *tag, boolean_t recursive)
 {
 	struct hold_range_arg arg = { 0 };
 
@@ -4142,6 +4146,7 @@ zfs_release_range(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 	arg.fromsnap = fromsnap;
 	arg.tosnap = tosnap;
 	arg.tag = tag;
+	arg.recursive = recursive;
 
 	return (zfs_iter_snapshots_sorted(zhp, zfs_hold_range_one, &arg));
 }
