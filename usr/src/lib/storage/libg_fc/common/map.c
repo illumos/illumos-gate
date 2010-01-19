@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -222,25 +222,25 @@ g_device_in_map(gfc_map_t *map, int tid)
 
 	dev_ptr = map->dev_addr;
 	if ((map->hba_addr.port_topology == FC_TOP_PUBLIC_LOOP) ||
-		(map->hba_addr.port_topology == FC_TOP_FABRIC)) {
+	    (map->hba_addr.port_topology == FC_TOP_FABRIC)) {
 		for (i = 0; i < map->count; i++, dev_ptr++) {
 			if (dev_ptr->
-				gfc_port_dev.pub_port.dev_did.port_id == tid) {
+			    gfc_port_dev.pub_port.dev_did.port_id == tid) {
 				/* Does not count if WWN == 0 */
 				for (j = 0; j < FC_WWN_SIZE; j++)
 					if (dev_ptr->gfc_port_dev.pub_port.
-						dev_pwwn.raw_wwn[j] != 0)
+					    dev_pwwn.raw_wwn[j] != 0)
 						return (1);
 			}
 		}
 	} else {
 		for (i = 0; i < map->count; i++, dev_ptr++) {
 			if (dev_ptr->gfc_port_dev.priv_port.sf_al_pa ==
-				(int)g_switch_to_alpa[tid]) {
+			    (int)g_switch_to_alpa[tid]) {
 				/* Does not count if WWN == 0 */
 				for (j = 0; j < WWN_SIZE; j++)
 					if (dev_ptr->gfc_port_dev.priv_port.
-						sf_port_wwn[j] != 0)
+					    sf_port_wwn[j] != 0)
 						return (1);
 			}
 		}
@@ -255,10 +255,10 @@ g_device_in_map(gfc_map_t *map, int tid)
 static int
 insert_missing_pwwn(char *phys_path, struct wwn_list_struct **wwn_list_ptr)
 {
-mp_pathlist_t	pathlist;
-int	i, pathcnt, match;
-struct	wwn_list_struct *new_wwn, *wwn_list_s, *wwn_list_found;
-char	pwwn1[WWN_S_LEN];
+	mp_pathlist_t	pathlist;
+	int	i, pathcnt, match;
+	struct	wwn_list_struct *new_wwn, *wwn_list_s, *wwn_list_found;
+	char	pwwn1[WWN_S_LEN];
 
 	/*
 	 * Now check each scsi_vhci device path to find any missed
@@ -287,7 +287,7 @@ char	pwwn1[WWN_S_LEN];
 		    pathlist.path_info[i].path_state ==
 		    MDI_PATHINFO_STATE_STANDBY) {
 			(void) strncpy(pwwn1, pathlist.path_info[i].path_addr,
-				WWN_S_LEN - 1);
+			    WWN_S_LEN - 1);
 			pwwn1[WWN_S_LEN - 1] = '\0';
 			/*
 			 * Now search through wwn list for matching
@@ -300,12 +300,12 @@ char	pwwn1[WWN_S_LEN];
 			for (wwn_list_s = *wwn_list_ptr; wwn_list_s != NULL;
 			    wwn_list_s = wwn_list_s->wwn_next) {
 				if (strncmp(phys_path,
-					    wwn_list_s->physical_path,
-					    strlen(phys_path)) == 0) {
+				    wwn_list_s->physical_path,
+				    strlen(phys_path)) == 0) {
 					wwn_list_found = wwn_list_s;
 					if (strncmp(pwwn1,
-						    wwn_list_s->port_wwn_s,
-						    WWN_S_LEN) == 0) {
+					    wwn_list_s->port_wwn_s,
+					    WWN_S_LEN) == 0) {
 						match++;
 						break;
 					}
@@ -321,25 +321,25 @@ char	pwwn1[WWN_S_LEN];
 				 * and add it to the list.
 				 */
 				if ((new_wwn = (struct  wwn_list_struct *)
-					calloc(1,
-					sizeof (struct  wwn_list_struct)))
-					== NULL) {
-				    S_FREE(pathlist.path_info);
-				    return (L_MALLOC_FAILED);
+				    calloc(1,
+				    sizeof (struct  wwn_list_struct)))
+				    == NULL) {
+					S_FREE(pathlist.path_info);
+					return (L_MALLOC_FAILED);
 				}
 				if ((new_wwn->physical_path = (char *)
-					calloc(1,
-					strlen(wwn_list_found->physical_path)
-					+1)) == NULL) {
-				    S_FREE(pathlist.path_info);
-				    return (L_MALLOC_FAILED);
+				    calloc(1,
+				    strlen(wwn_list_found->physical_path)
+				    + 1)) == NULL) {
+					S_FREE(pathlist.path_info);
+					return (L_MALLOC_FAILED);
 				}
 				if ((new_wwn->logical_path = (char *)
-					calloc(1,
-					strlen(wwn_list_found->logical_path)
-					+ 1)) == NULL) {
-				    S_FREE(pathlist.path_info);
-				    return (L_MALLOC_FAILED);
+				    calloc(1,
+				    strlen(wwn_list_found->logical_path)
+				    + 1)) == NULL) {
+					S_FREE(pathlist.path_info);
+					return (L_MALLOC_FAILED);
 				}
 
 				/*
@@ -353,10 +353,10 @@ char	pwwn1[WWN_S_LEN];
 
 				memcpy(new_wwn->physical_path,
 				    wwn_list_found->physical_path,
-					strlen(wwn_list_found->physical_path));
+				    strlen(wwn_list_found->physical_path));
 				memcpy(new_wwn->logical_path,
 				    wwn_list_found->logical_path,
-					strlen(wwn_list_found->logical_path));
+				    strlen(wwn_list_found->logical_path));
 				/*
 				 * Copy found node wwn data to this new entry
 				 * Node wwn is required for the wwn_list
@@ -385,9 +385,9 @@ char	pwwn1[WWN_S_LEN];
 static int
 get_scsi_vhci_port_wwn(char *phys_path, uchar_t *port_wwn)
 {
-mp_pathlist_t	pathlist;
-int	i, pathcnt, found;
-char	pwwn1[WWN_S_LEN];
+	mp_pathlist_t	pathlist;
+	int	i, pathcnt, found;
+	char	pwwn1[WWN_S_LEN];
 
 	if (g_get_pathlist(phys_path, &pathlist)) {
 		return (L_INVALID_PATH);
@@ -404,7 +404,7 @@ char	pwwn1[WWN_S_LEN];
 		if (pathlist.path_info[i].path_state ==
 		    MDI_PATHINFO_STATE_ONLINE) {
 			(void) strncpy(pwwn1, pathlist.path_info[i].path_addr,
-				WWN_S_LEN - 1);
+			    WWN_S_LEN - 1);
 			pwwn1[WWN_S_LEN - 1] = '\0';
 			found++;
 		}
@@ -414,7 +414,7 @@ char	pwwn1[WWN_S_LEN];
 		if (pathlist.path_info[i].path_state ==
 		    MDI_PATHINFO_STATE_STANDBY) {
 			(void) strncpy(pwwn1, pathlist.path_info[i].path_addr,
-				WWN_S_LEN - 1);
+			    WWN_S_LEN - 1);
 			pwwn1[WWN_S_LEN - 1] = '\0';
 			found++;
 		}
@@ -435,14 +435,13 @@ char	pwwn1[WWN_S_LEN];
  */
 static int
 search_wwn_entry(struct wwn_list_found_struct *wwn_list_found, uchar_t *pwwn,
-		uchar_t *nwwn)
+    uchar_t *nwwn)
 {
-struct	wwn_list_found_struct *wwn_list_s;
+	struct	wwn_list_found_struct *wwn_list_s;
 
 	for (wwn_list_s = wwn_list_found; wwn_list_s != NULL;
 	    wwn_list_s = wwn_list_s->wwn_next) {
-		if (memcmp(pwwn,
-			    wwn_list_s->port_wwn, WWN_SIZE) == 0) {
+		if (memcmp(pwwn, wwn_list_s->port_wwn, WWN_SIZE) == 0) {
 			memcpy(nwwn, wwn_list_s->node_wwn, WWN_SIZE);
 			return (0);
 		}
@@ -455,14 +454,13 @@ struct	wwn_list_found_struct *wwn_list_s;
  */
 static int
 add_wwn_entry(struct wwn_list_found_struct **wwn_list_found, uchar_t *pwwn,
-		uchar_t *nwwn)
+    uchar_t *nwwn)
 {
-struct wwn_list_found_struct *new_wwn, *temp_wwn_list_found = NULL;
+	struct wwn_list_found_struct *new_wwn, *temp_wwn_list_found = NULL;
 
 	/* Got wwns, load data in list */
 	if ((new_wwn = (struct  wwn_list_found_struct *)
-		calloc(1, sizeof (struct  wwn_list_found_struct)))
-			== NULL) {
+	    calloc(1, sizeof (struct  wwn_list_found_struct))) == NULL) {
 		return (L_MALLOC_FAILED);
 	}
 
@@ -498,13 +496,13 @@ struct wwn_list_found_struct *new_wwn, *temp_wwn_list_found = NULL;
 int
 g_get_wwn_list(struct wwn_list_struct **wwn_list_ptr, int verbose)
 {
-struct wwn_list_struct *wwn_list_p = NULL, *wwn_list_tmp_p = NULL;
-struct wwn_list_found_struct *wwn_list_found = NULL;
-int err;
-int al_pa;
-uchar_t node_wwn[WWN_SIZE], port_wwn[WWN_SIZE];
-hrtime_t	start_time, end_time;
-char *env = NULL;
+	struct wwn_list_struct *wwn_list_p = NULL, *wwn_list_tmp_p = NULL;
+	struct wwn_list_found_struct *wwn_list_found = NULL;
+	int err;
+	int al_pa;
+	uchar_t node_wwn[WWN_SIZE], port_wwn[WWN_SIZE];
+	hrtime_t	start_time, end_time;
+	char *env = NULL;
 
 	/* return L_NULL_WWN_LIST if wwn_list_ptr is NULL */
 	if (wwn_list_ptr == NULL) {
@@ -515,8 +513,7 @@ char *env = NULL;
 		start_time = gethrtime();
 	}
 
-	if ((err = g_devices_get_all(wwn_list_ptr))
-		!= 0) {
+	if ((err = g_devices_get_all(wwn_list_ptr)) != 0) {
 		return (err);
 	}
 
@@ -530,61 +527,72 @@ char *env = NULL;
 	 */
 	wwn_list_p = *wwn_list_ptr;
 	while (wwn_list_p != NULL) {
-	    if (strstr(wwn_list_p->physical_path, SCSI_VHCI) != NULL) {
-		/* get port wwn of first ONLINE, STANDBY */
-		if ((get_scsi_vhci_port_wwn(wwn_list_p->physical_path,
-			port_wwn)) == 0) {
-		    if ((search_wwn_entry(wwn_list_found, port_wwn,
-			node_wwn)) != 0) {
-			if ((err = get_wwns(wwn_list_p->physical_path, port_wwn,
-				node_wwn, &al_pa, &wwn_list_found)) != 0) {
-				g_free_wwn_list_found(&wwn_list_found);
-				return (err);
-			}
-		    }
-		} else {
-		    /* Use g_get_wwn as a last resort */
-		    if ((err = g_get_wwn(wwn_list_p->physical_path, port_wwn,
-			node_wwn, &al_pa, 0)) != 0) {
-			/*
-			 * this is a bad WWN.  remove it from the
-			 * wwn_list.
-			 *
-			 * After removing the bad WWN, wwn_list_p
-			 * should point to the next node in the list
-			 */
-			if ((wwn_list_p->wwn_prev == NULL) &&
-			    (wwn_list_p->wwn_next == NULL)) {
-			    *wwn_list_ptr = NULL;
-			    free(wwn_list_p);
-			    g_free_wwn_list_found(&wwn_list_found);
-			    return (L_NO_DEVICES_FOUND);
-			} else if (wwn_list_p->wwn_prev == NULL) {
-			    *wwn_list_ptr = wwn_list_p->wwn_next;
-			    free(wwn_list_p);
-			    wwn_list_p = *wwn_list_ptr;
-			    wwn_list_p->wwn_prev = NULL;
-			} else if (wwn_list_p->wwn_next == NULL) {
-			    wwn_list_p->wwn_prev->wwn_next = NULL;
-			    free(wwn_list_p);
-			    wwn_list_p = NULL;
+		if (strstr(wwn_list_p->physical_path, SCSI_VHCI) != NULL) {
+			/* get port wwn of first ONLINE, STANDBY */
+			if ((get_scsi_vhci_port_wwn(wwn_list_p->physical_path,
+			    port_wwn)) == 0) {
+				if ((search_wwn_entry(wwn_list_found, port_wwn,
+				    node_wwn)) != 0) {
+					if ((err =
+					    get_wwns(wwn_list_p->physical_path,
+					    port_wwn,
+					    node_wwn, &al_pa,
+					    &wwn_list_found)) != 0) {
+						g_free_wwn_list_found(
+						    &wwn_list_found);
+						return (err);
+					}
+				}
 			} else {
-			    wwn_list_tmp_p = wwn_list_p->wwn_next;
-			    wwn_list_p->wwn_prev->wwn_next =
-				wwn_list_p->wwn_next;
-			    wwn_list_p->wwn_next->wwn_prev =
-				wwn_list_p->wwn_prev;
-			    free(wwn_list_p);
-			    wwn_list_p = wwn_list_tmp_p;
+				/* Use g_get_wwn as a last resort */
+				if ((err = g_get_wwn(wwn_list_p->physical_path,
+				    port_wwn, node_wwn, &al_pa, 0)) != 0) {
+					/*
+					 * this is a bad WWN.
+					 * remove it from the wwn_list.
+					 *
+					 * After removing the bad WWN,
+					 * wwn_list_p should point to the next
+					 * node in the list.
+					 */
+					if ((wwn_list_p->wwn_prev == NULL) &&
+					    (wwn_list_p->wwn_next == NULL)) {
+						*wwn_list_ptr = NULL;
+						free(wwn_list_p);
+						g_free_wwn_list_found(
+						    &wwn_list_found);
+						return (L_NO_DEVICES_FOUND);
+					} else if (
+					    wwn_list_p->wwn_prev == NULL) {
+						*wwn_list_ptr =
+						    wwn_list_p->wwn_next;
+						free(wwn_list_p);
+						wwn_list_p = *wwn_list_ptr;
+						wwn_list_p->wwn_prev = NULL;
+					} else if (
+					    wwn_list_p->wwn_next == NULL) {
+						wwn_list_p->wwn_prev->wwn_next =
+						    NULL;
+						free(wwn_list_p);
+						wwn_list_p = NULL;
+					} else {
+						wwn_list_tmp_p =
+						    wwn_list_p->wwn_next;
+						wwn_list_p->wwn_prev->wwn_next =
+						    wwn_list_p->wwn_next;
+						wwn_list_p->wwn_next->wwn_prev =
+						    wwn_list_p->wwn_prev;
+						free(wwn_list_p);
+						wwn_list_p = wwn_list_tmp_p;
+					}
+					continue;
+				}
 			}
-			continue;
-		    }
+			copy_wwn_data_to_str(wwn_list_p->node_wwn_s, node_wwn);
+			copy_wwn_data_to_str(wwn_list_p->port_wwn_s, port_wwn);
+			memcpy(wwn_list_p->w_node_wwn, node_wwn, WWN_SIZE);
 		}
-		copy_wwn_data_to_str(wwn_list_p->node_wwn_s, node_wwn);
-		copy_wwn_data_to_str(wwn_list_p->port_wwn_s, port_wwn);
-		memcpy(wwn_list_p->w_node_wwn, node_wwn, WWN_SIZE);
-	    }
-	    wwn_list_p = wwn_list_p->wwn_next;
+		wwn_list_p = wwn_list_p->wwn_next;
 	}
 	g_free_wwn_list_found(&wwn_list_found);
 
@@ -597,18 +605,18 @@ char *env = NULL;
 	 */
 	for (wwn_list_p = *wwn_list_ptr; wwn_list_p != NULL;
 	    wwn_list_p = wwn_list_p->wwn_next) {
-	    if (strstr(wwn_list_p->physical_path, SCSI_VHCI) != NULL) {
-		if ((err = insert_missing_pwwn(wwn_list_p->physical_path,
-				    wwn_list_ptr)) != 0)
-			return (err);
-	    }
+		if (strstr(wwn_list_p->physical_path, SCSI_VHCI) != NULL) {
+			if ((err = insert_missing_pwwn(
+			    wwn_list_p->physical_path, wwn_list_ptr)) != 0)
+				return (err);
+		}
 	}
 
 	if (env != NULL) {
 		end_time = gethrtime();
 		fprintf(stdout, "      g_get_wwn_list: "
-		"\t\tTime = %lld millisec\n",
-		(end_time - start_time)/1000000);
+		    "\t\tTime = %lld millisec\n",
+		    (end_time - start_time)/1000000);
 	}
 	return (0);
 
@@ -617,12 +625,12 @@ char *env = NULL;
 int
 g_devices_get_all(struct wwn_list_struct **wwn_list_ptr)
 {
-struct wwn_list_struct *tape_ptr = NULL;
-struct wwn_list_struct *tmp;
-int err;
-di_node_t root;
-hrtime_t	start_time, end_time;
-char *env = NULL;
+	struct wwn_list_struct *tape_ptr = NULL;
+	struct wwn_list_struct *tmp;
+	int err;
+	di_node_t root;
+	hrtime_t	start_time, end_time;
+	char *env = NULL;
 
 	if ((env = getenv("_LUX_T_DEBUG")) != NULL) {
 		start_time = gethrtime();
@@ -643,8 +651,8 @@ char *env = NULL;
 	if (env != NULL) {
 		end_time = gethrtime();
 		fprintf(stdout, "      di_init - /:  "
-		"\t\tTime = %lld millisec\n",
-		(end_time - start_time)/1000000);
+		    "\t\tTime = %lld millisec\n",
+		    (end_time - start_time)/1000000);
 	}
 
 	if (env != NULL) {
@@ -652,7 +660,7 @@ char *env = NULL;
 	}
 
 	if ((err = devices_get_all(root, SSD_DRVR_NAME, SSD_MINOR_NAME,
-			wwn_list_ptr)) != 0) {
+	    wwn_list_ptr)) != 0) {
 		if (err != L_NO_DEVICES_FOUND) {
 			di_fini(root);
 			g_free_wwn_list(&tape_ptr);
@@ -664,8 +672,8 @@ char *env = NULL;
 	if (env != NULL) {
 		end_time = gethrtime();
 		fprintf(stdout, "      devices_get_all - ssd:  "
-		"\t\tTime = %lld millisec\n",
-		(end_time - start_time)/1000000);
+		    "\t\tTime = %lld millisec\n",
+		    (end_time - start_time)/1000000);
 	}
 
 	if (env != NULL) {
@@ -673,7 +681,7 @@ char *env = NULL;
 	}
 
 	if ((err = devices_get_all(root, ST_DRVR_NAME, ST_MINOR_NAME,
-			&tape_ptr)) != 0) {
+	    &tape_ptr)) != 0) {
 		di_fini(root);
 		if (err != L_NO_DEVICES_FOUND) {
 			g_free_wwn_list(&tape_ptr);
@@ -701,15 +709,16 @@ char *env = NULL;
 	if (env != NULL) {
 		end_time = gethrtime();
 		fprintf(stdout, "      devices_get_all - st: "
-		"\t\tTime = %lld millisec\n",
-		(end_time - start_time)/1000000);
+		    "\t\tTime = %lld millisec\n",
+		    (end_time - start_time)/1000000);
 	}
 
 	/* Now link the two together */
 	if (*wwn_list_ptr != NULL) { /* We have both disks and tapes */
 		/* Walk to the end of it */
 		for (tmp = *wwn_list_ptr; tmp->wwn_next != NULL;
-			tmp = tmp->wwn_next);
+		    tmp = tmp->wwn_next)
+			;
 		tmp->wwn_next = tape_ptr;
 		tape_ptr->wwn_prev = tmp;
 		di_fini(root);
@@ -740,7 +749,7 @@ g_free_wwn_list_found(struct wwn_list_found_struct **wwn_list_found) {
 void
 g_free_wwn_list(struct wwn_list_struct **wwn_list)
 {
-WWN_list	*next = NULL;
+	WWN_list	*next = NULL;
 
 	/* return if wwn_list is NULL */
 	if (wwn_list == NULL) {
@@ -810,8 +819,8 @@ g_sort_wwn_list(struct wwn_list_struct **wwn_list)
 	wwn_list_array_ptr2 = wwn_list_array_ptr1 + 1;
 	(*wwn_list_array_ptr1)->wwn_prev = NULL;
 	for (i = 0; i < n - 1; i++) {
-	    (*wwn_list_array_ptr2)->wwn_prev = *wwn_list_array_ptr1;
-	    (*wwn_list_array_ptr1++)->wwn_next = *wwn_list_array_ptr2++;
+		(*wwn_list_array_ptr2)->wwn_prev = *wwn_list_array_ptr1;
+		(*wwn_list_array_ptr1++)->wwn_next = *wwn_list_array_ptr2++;
 	}
 	(*wwn_list_array_ptr1)->wwn_next = NULL;
 
@@ -867,9 +876,9 @@ wwn_list_name_compare(const void *arg1, const void *arg2)
 int
 g_get_limited_map(char *path, struct lilpmap *map_ptr, int verbose)
 {
-int	fd, i;
-char	drvr_path[MAXPATHLEN];
-struct	stat	stbuf;
+	int	fd, i;
+	char	drvr_path[MAXPATHLEN];
+	struct	stat	stbuf;
 
 
 	/* initialize map */
@@ -895,7 +904,7 @@ struct	stat	stbuf;
 	}
 
 	P_DPRINTF("  g_get_limited_map: Geting drive map from:"
-		" %s\n", drvr_path);
+	    " %s\n", drvr_path);
 
 	/* open controller */
 	if ((fd = g_object_open(drvr_path, O_NDELAY | O_RDONLY)) == -1)
@@ -939,10 +948,10 @@ struct	stat	stbuf;
 int
 g_get_host_params(char *host_path, fc_port_dev_t *host_val, int verbose)
 {
-int		err;
-int		fd;
-int		dev_type;
-fcio_t		fcio;
+	int		err;
+	int		fd;
+	int		dev_type;
+	fcio_t		fcio;
 
 	/* return invalid path if host_path is NULL */
 	if (host_path == NULL) {
@@ -978,7 +987,7 @@ fcio_t		fcio;
 
 	/* get the inquiry information for the leadville HBA. */
 	if ((err = get_fca_inq_dtype(host_path, host_val->dev_pwwn,
-				&host_val->dev_dtype)) != 0) {
+	    &host_val->dev_dtype)) != 0) {
 		return (err);
 	}
 	return (0);
@@ -1003,19 +1012,20 @@ fcio_t		fcio;
 int
 g_issue_fcio_ioctl(int fd, fcio_t *fcio, int verbose)
 {
-int	ntries;
+	int	ntries;
 
 	for (ntries = 0; ntries < RETRY_FCIO_IOCTL; ntries++) {
 		if (ioctl(fd, FCIO_CMD, fcio) != 0) {
 			if ((errno == EAGAIN) &&
-				(ntries+1 < RETRY_FCIO_IOCTL)) {
+			    (ntries+1 < RETRY_FCIO_IOCTL)) {
 				/* wait WAIT_FCIO_IOCTL */
 				(void) usleep(WAIT_FCIO_IOCTL);
 				continue;
 			}
 			I_DPRINTF("FCIO ioctl failed.\n"
-				"Error: %s. fc_error = %d (0x%x)\n",
-			strerror(errno), fcio->fcio_errno, fcio->fcio_errno);
+			    "Error: %s. fc_error = %d (0x%x)\n",
+			    strerror(errno), fcio->fcio_errno,
+			    fcio->fcio_errno);
 			if (errno == EINVAL) {
 				if (fcio->fcio_errno == FC_TOOMANY) {
 					return (L_INVALID_DEVICE_COUNT);
@@ -1116,16 +1126,16 @@ g_issue_fcp_ioctl(int fd, struct fcp_ioctl *fcp_data, int verbose)
 int
 g_get_dev_list(char *path, fc_port_dev_t **dev_list, int *ndevs)
 {
-int		num_devices = 0;
-int		i, err, ulp_failure = 0, new_count = 0;
-int		dev_type;
-int		fd;
-char		fcapath[MAXPATHLEN];
-char		*char_ptr;
-struct	stat	stbuf;
-fcio_t		fcio;
-uint32_t	port_top;
-fc_port_dev_t	*dlist;
+	int		num_devices = 0;
+	int		i, err, ulp_failure = 0, new_count = 0;
+	int		dev_type;
+	int		fd;
+	char		fcapath[MAXPATHLEN];
+	char		*char_ptr;
+	struct	stat	stbuf;
+	fcio_t		fcio;
+	uint32_t	port_top;
+	fc_port_dev_t	*dlist;
 
 	*dev_list = dlist = NULL;
 	(void) strcpy(fcapath, path);
@@ -1184,7 +1194,7 @@ fc_port_dev_t	*dlist;
 	}
 
 	if ((dlist = (fc_port_dev_t *)calloc(num_devices,
-				sizeof (fc_port_dev_t))) == NULL) {
+	    sizeof (fc_port_dev_t))) == NULL) {
 		(void) close(fd);
 		return (L_MALLOC_FAILED);
 	}
@@ -1199,50 +1209,52 @@ fc_port_dev_t	*dlist;
 	fcio.fcio_alen = sizeof (new_count);
 	fcio.fcio_abuf = (caddr_t)&new_count;
 	if ((err = g_issue_fcio_ioctl(fd, &fcio, 0)) != 0) {
-	    if (err == L_INVALID_DEVICE_COUNT) {
-		/*
-		 * original buffer was small so allocate buffer
-		 * with a new count and retry.
-		 */
-		free(dlist);
-		num_devices = new_count;
-		new_count = 0;
-		if ((dlist = (fc_port_dev_t *)calloc(num_devices,
-				sizeof (fc_port_dev_t))) == NULL) {
-			(void) close(fd);
-			return (L_MALLOC_FAILED);
-		}
-		fcio.fcio_cmd = FCIO_GET_DEV_LIST;
-		/* Information read operation */
-		fcio.fcio_xfer = FCIO_XFER_READ;
-		fcio.fcio_obuf = (caddr_t)dlist;
-		fcio.fcio_olen = num_devices * sizeof (fc_port_dev_t);
-		/* new device count */
-		fcio.fcio_alen = sizeof (new_count);
-		fcio.fcio_abuf = (caddr_t)&new_count;
-		if ((err = g_issue_fcio_ioctl(fd, &fcio, 0)) != 0) {
-		    if (err == L_INVALID_DEVICE_COUNT) {
+		if (err == L_INVALID_DEVICE_COUNT) {
 			/*
-			 * No more retry. There may be severe hardware
-			 * problem so return error here.
+			 * original buffer was small so allocate buffer
+			 * with a new count and retry.
 			 */
-			I_DPRINTF(" Device count was %d"
-			" should have been %d\n",
-			num_devices, new_count);
-		    } else {
+			free(dlist);
+			num_devices = new_count;
+			new_count = 0;
+			if ((dlist = (fc_port_dev_t *)calloc(num_devices,
+			    sizeof (fc_port_dev_t))) == NULL) {
+				(void) close(fd);
+				return (L_MALLOC_FAILED);
+			}
+			fcio.fcio_cmd = FCIO_GET_DEV_LIST;
+			/* Information read operation */
+			fcio.fcio_xfer = FCIO_XFER_READ;
+			fcio.fcio_obuf = (caddr_t)dlist;
+			fcio.fcio_olen = num_devices * sizeof (fc_port_dev_t);
+			/* new device count */
+			fcio.fcio_alen = sizeof (new_count);
+			fcio.fcio_abuf = (caddr_t)&new_count;
+			if ((err = g_issue_fcio_ioctl(fd, &fcio, 0)) != 0) {
+				if (err == L_INVALID_DEVICE_COUNT) {
+					/*
+					 * No more retry. There may be severe
+					 * hardware problem so return error
+					 * here.
+					 */
+					I_DPRINTF(" Device count was %d"
+					    " should have been %d\n",
+					    num_devices, new_count);
+				} else {
+					I_DPRINTF(
+					    " FCIO_GET_DEV_LIST ioctl failed.");
+					err = L_FCIO_GET_DEV_LIST_FAIL;
+				}
+				free(dlist);
+				(void) close(fd);
+				return (err);
+			}
+		} else {
 			I_DPRINTF(" FCIO_GET_DEV_LIST ioctl failed.");
-			err = L_FCIO_GET_DEV_LIST_FAIL;
-		    }
-		    free(dlist);
-		    (void) close(fd);
-		    return (err);
+			free(dlist);
+			(void) close(fd);
+			return (L_FCIO_GET_DEV_LIST_FAIL);
 		}
-	    } else {
-		I_DPRINTF(" FCIO_GET_DEV_LIST ioctl failed.");
-		free(dlist);
-		(void) close(fd);
-		return (L_FCIO_GET_DEV_LIST_FAIL);
-	    }
 	}
 
 	/*
@@ -1259,8 +1271,8 @@ fc_port_dev_t	*dlist;
 		}
 		num_devices = new_count;
 		if ((dlist = (fc_port_dev_t *)realloc(dlist,
-				(new_count * sizeof (fc_port_dev_t))))
-				== NULL) {
+		    (new_count * sizeof (fc_port_dev_t))))
+		    == NULL) {
 			S_FREE(dlist);
 			(void) close(fd);
 			return (L_MALLOC_FAILED);
@@ -1283,7 +1295,7 @@ fc_port_dev_t	*dlist;
 	for (i = 0; i < num_devices; i++, dlist++) {
 		/* Get the inq_dtype for each device. */
 		if ((err = g_get_inq_dtype(fcapath, dlist->dev_pwwn,
-				&dlist->dev_dtype)) != 0) {
+		    &dlist->dev_dtype)) != 0) {
 			/*
 			 * if g_get_inq_dtype failed on g_dev_login
 			 * or g_issue_fcp_ioctl, continue to the next
@@ -1292,7 +1304,7 @@ fc_port_dev_t	*dlist;
 			 * after processing the whole dlist.
 			 */
 			if ((err == L_FCIO_DEV_LOGIN_FAIL) ||
-				(err == L_FCP_TGT_INQUIRY_FAIL)) {
+			    (err == L_FCP_TGT_INQUIRY_FAIL)) {
 				ulp_failure = 1;
 				dlist->dev_dtype = GFC_ERR_INQ_DTYPE;
 			} else {
@@ -1357,7 +1369,7 @@ g_get_inq_dtype(char *fcapath, la_wwn_t pwwn, uchar_t *inq_dtype)
 		 * effect on invalid state device.
 		 */
 		if (((err = g_get_dev_port_state(fcapath, pwwn, &state))
-				!= 0) || (state != PORT_DEVICE_LOGGED_IN)) {
+		    != 0) || (state != PORT_DEVICE_LOGGED_IN)) {
 			/* do port login to fabric device.  */
 			if ((err = g_dev_login(fcapath, pwwn)) != 0) {
 				return (err);
@@ -1527,18 +1539,18 @@ g_get_lilp_map(char *path, gfc_map_t *map_ptr, int verbose)
 int
 create_map(char *path, gfc_map_t *map_ptr, int verbose, int map_type)
 {
-int		fd, i, j, num_devices = 0, err, pathcnt = 1;
-char		drvr_path[MAXPATHLEN], drvr_path0[MAXPATHLEN];
-char		*char_ptr;
-struct stat	stbuf;
-fc_port_dev_t	*dev_list, *dlistptr;
-uint32_t	hba_port_top = 0;
-uint_t		dev_type;
-sf_al_map_t	sf_map;
-gfc_port_dev_info_t	*dev_ptr;
-fc_port_dev_t	fp_hba_port;
-mp_pathlist_t	pathlist;
-int		p_on = 0, p_st = 0;
+	int		fd, i, j, num_devices = 0, err, pathcnt = 1;
+	char		drvr_path[MAXPATHLEN], drvr_path0[MAXPATHLEN];
+	char		*char_ptr;
+	struct stat	stbuf;
+	fc_port_dev_t	*dev_list, *dlistptr;
+	uint32_t	hba_port_top = 0;
+	uint_t		dev_type;
+	sf_al_map_t	sf_map;
+	gfc_port_dev_info_t	*dev_ptr;
+	fc_port_dev_t	fp_hba_port;
+	mp_pathlist_t	pathlist;
+	int		p_on = 0, p_st = 0;
 
 	/* return invalid path if path is NULL */
 	if (path == NULL) {
@@ -1574,11 +1586,11 @@ int		p_on = 0, p_st = 0;
 		for (i = 0; i < pathcnt; i++) {
 			if (pathlist.path_info[i].path_state < MAXPATHSTATE) {
 				if (pathlist.path_info[i].path_state ==
-					MDI_PATHINFO_STATE_ONLINE) {
+				    MDI_PATHINFO_STATE_ONLINE) {
 					p_on = i;
 					break;
 				} else if (pathlist.path_info[i].path_state ==
-					MDI_PATHINFO_STATE_STANDBY) {
+				    MDI_PATHINFO_STATE_STANDBY) {
 					p_st = i;
 				}
 			}
@@ -1587,19 +1599,19 @@ int		p_on = 0, p_st = 0;
 		    MDI_PATHINFO_STATE_ONLINE) {
 			/* on_line path */
 			(void) strcpy(drvr_path,
-				pathlist.path_info[p_on].path_hba);
+			    pathlist.path_info[p_on].path_hba);
 		} else {
 			/* standby or path0 */
 			(void) strcpy(drvr_path,
-				pathlist.path_info[p_st].path_hba);
+			    pathlist.path_info[p_st].path_hba);
 		}
 		free(pathlist.path_info);
 		(void) strcat(drvr_path, FC_CTLR);
 	} else {
 		(void) strcpy(drvr_path, path);
 		if (strstr(drvr_path, DRV_NAME_SSD) ||
-			strstr(drvr_path, SES_NAME) ||
-			strstr(drvr_path, DRV_NAME_ST)) {
+		    strstr(drvr_path, SES_NAME) ||
+		    strstr(drvr_path, DRV_NAME_ST)) {
 			if ((char_ptr = strrchr(drvr_path, '/')) == NULL) {
 				return (L_INVALID_PATH);
 			}
@@ -1618,7 +1630,7 @@ int		p_on = 0, p_st = 0;
 	}
 
 	P_DPRINTF("  g_get_dev_map: Geting drive map from:"
-		" %s\n", drvr_path);
+	    " %s\n", drvr_path);
 
 	dev_type = g_get_path_type(drvr_path);
 	if ((dev_type == 0) || !(dev_type & XPORT_MASK)) {
@@ -1627,7 +1639,7 @@ int		p_on = 0, p_st = 0;
 
 	/* get fiber topology */
 	if ((err = g_get_fca_port_topology(drvr_path,
-			&hba_port_top, verbose)) != 0) {
+	    &hba_port_top, verbose)) != 0) {
 		return (err);
 	}
 
@@ -1646,7 +1658,7 @@ int		p_on = 0, p_st = 0;
 		 * L_NO_DEVICES_FOUND
 		 */
 		if ((err = g_get_dev_list(drvr_path, &dev_list,
-				&num_devices)) != 0) {
+		    &num_devices)) != 0) {
 			/*
 			 * g_get_dev_map doesn't allow ulp failure
 			 * to continue thus we need to free dev_list
@@ -1662,7 +1674,7 @@ int		p_on = 0, p_st = 0;
 
 		/* Get local HBA information */
 		if ((err = g_get_host_params(drvr_path, &fp_hba_port,
-				verbose)) != 0) {
+		    verbose)) != 0) {
 			(void) free(dev_list);
 			if (num_devices == 0)
 				return (L_NO_DEVICES_FOUND);
@@ -1684,9 +1696,9 @@ int		p_on = 0, p_st = 0;
 
 			if ((map_ptr->dev_addr = (gfc_port_dev_info_t *)
 			    calloc(map_ptr->count,
-				sizeof (gfc_port_dev_info_t))) == NULL) {
-			    (void) free(dev_list);
-			    return (L_MALLOC_FAILED);
+			    sizeof (gfc_port_dev_info_t))) == NULL) {
+				(void) free(dev_list);
+				return (L_MALLOC_FAILED);
 			}
 		}
 
@@ -1702,8 +1714,8 @@ int		p_on = 0, p_st = 0;
 			/* device to the dev_addr structure, for the 	*/
 			/* local hba					*/
 			if ((dev_list = (fc_port_dev_t *)realloc(dev_list,
-				(num_devices * sizeof (fc_port_dev_t))))
-				== NULL) {
+			    (num_devices * sizeof (fc_port_dev_t))))
+			    == NULL) {
 				S_FREE(dev_list);
 				(void) free(map_ptr->dev_addr);
 				map_ptr->dev_addr = NULL;
@@ -1712,7 +1724,7 @@ int		p_on = 0, p_st = 0;
 
 			/* Next, copy the local hba into this new loc.	*/
 			if (memcpy(dev_list+(num_devices-1), &fp_hba_port,
-					sizeof (fc_port_dev_t)) == NULL) {
+			    sizeof (fc_port_dev_t)) == NULL) {
 				(void) free(dev_list);
 				(void) free(map_ptr->dev_addr);
 				map_ptr->dev_addr = NULL;
@@ -1721,7 +1733,7 @@ int		p_on = 0, p_st = 0;
 
 			/* Now sort by physical location		*/
 			qsort((void*)dev_list, num_devices,
-				sizeof (fc_port_dev_t), lilp_map_cmp);
+			    sizeof (fc_port_dev_t), lilp_map_cmp);
 		}
 
 		dlistptr = dev_list;
@@ -1738,10 +1750,10 @@ int		p_on = 0, p_st = 0;
 			} else {
 				map_ptr->hba_addr.port_topology = hba_port_top;
 				map_ptr->hba_addr.gfc_port_dev.pub_port =
-					fp_hba_port;
+				    fp_hba_port;
 			}
 			for (i = 0; i < num_devices; i++, dev_ptr++,
-					dev_list++) {
+			    dev_list++) {
 				if (dev_list->dev_did.port_id <= 0xffff) {
 					(void) free(dlistptr);
 					(void) free(map_ptr->dev_addr);
@@ -1750,7 +1762,7 @@ int		p_on = 0, p_st = 0;
 				} else {
 					dev_ptr->port_topology = hba_port_top;
 					dev_ptr->gfc_port_dev.pub_port =
-						*dev_list;
+					    *dev_list;
 				}
 			}
 			break;
@@ -1769,27 +1781,27 @@ int		p_on = 0, p_st = 0;
 			} else {
 				map_ptr->hba_addr.port_topology = hba_port_top;
 				map_ptr->hba_addr.gfc_port_dev.
-					priv_port.sf_al_pa =
-					(uchar_t)fp_hba_port.dev_did.port_id;
+				    priv_port.sf_al_pa =
+				    (uchar_t)fp_hba_port.dev_did.port_id;
 				map_ptr->hba_addr.gfc_port_dev.
-					priv_port.sf_hard_address = (uchar_t)
-					fp_hba_port.dev_hard_addr.hard_addr;
+				    priv_port.sf_hard_address = (uchar_t)
+				    fp_hba_port.dev_hard_addr.hard_addr;
 				for (j = 0; j < FC_WWN_SIZE; j++) {
 					map_ptr->hba_addr.gfc_port_dev.
-						priv_port.sf_node_wwn[j] =
-					fp_hba_port.dev_nwwn.raw_wwn[j];
+					    priv_port.sf_node_wwn[j] =
+					    fp_hba_port.dev_nwwn.raw_wwn[j];
 					map_ptr->hba_addr.gfc_port_dev.
-						priv_port.sf_port_wwn[j] =
-					fp_hba_port.dev_pwwn.raw_wwn[j];
+					    priv_port.sf_port_wwn[j] =
+					    fp_hba_port.dev_pwwn.raw_wwn[j];
 				}
 				map_ptr->hba_addr.gfc_port_dev.
-					priv_port.sf_inq_dtype =
-					fp_hba_port.dev_dtype;
+				    priv_port.sf_inq_dtype =
+				    fp_hba_port.dev_dtype;
 			}
 
 			for (i = 0; (i < num_devices &&
-					i < SF_NUM_ENTRIES_IN_MAP);
-					i++, dev_ptr++, dev_list++) {
+			    i < SF_NUM_ENTRIES_IN_MAP);
+			    i++, dev_ptr++, dev_list++) {
 				/*
 				 * Out of 24 bits of port_id, copy only
 				 * 8 bits to al_pa. This works okay for
@@ -1803,20 +1815,22 @@ int		p_on = 0, p_st = 0;
 				}
 				dev_ptr->port_topology = hba_port_top;
 				dev_ptr->gfc_port_dev.priv_port.sf_al_pa
-					= (uchar_t)dev_list->dev_did.port_id;
-				dev_ptr->gfc_port_dev.priv_port.sf_hard_address
-					= (uchar_t)dev_list->dev_hard_addr.
-						hard_addr;
+				    = (uchar_t)dev_list->dev_did.port_id;
+
+			/* Code refactorization is needed for C style */
+			dev_ptr->gfc_port_dev.priv_port.sf_hard_address
+			    = (uchar_t)dev_list->dev_hard_addr.hard_addr;
+
 				for (j = 0; j < FC_WWN_SIZE; j++) {
-					dev_ptr->
-					gfc_port_dev.priv_port.sf_node_wwn[j] =
-						dev_list->dev_nwwn.raw_wwn[j];
-					dev_ptr->
-					gfc_port_dev.priv_port.sf_port_wwn[j] =
-						dev_list->dev_pwwn.raw_wwn[j];
+
+			dev_ptr->gfc_port_dev.priv_port.sf_node_wwn[j] =
+			    dev_list->dev_nwwn.raw_wwn[j];
+			dev_ptr->gfc_port_dev.priv_port.sf_port_wwn[j] =
+			    dev_list->dev_pwwn.raw_wwn[j];
+
 				}
 				dev_ptr->gfc_port_dev.priv_port.sf_inq_dtype =
-					dev_list->dev_dtype;
+				    dev_list->dev_dtype;
 			}
 			break;
 		case FC_TOP_PT_PT:
@@ -1854,8 +1868,8 @@ int		p_on = 0, p_st = 0;
 
 		map_ptr->count = sf_map.sf_count;
 		if ((map_ptr->dev_addr =
-			(gfc_port_dev_info_t *)calloc(map_ptr->count,
-			sizeof (gfc_port_dev_info_t))) == NULL) {
+		    (gfc_port_dev_info_t *)calloc(map_ptr->count,
+		    sizeof (gfc_port_dev_info_t))) == NULL) {
 			(void) close(fd);
 			return (L_MALLOC_FAILED);
 		}
@@ -1869,11 +1883,11 @@ int		p_on = 0, p_st = 0;
 			}
 			dev_ptr->port_topology = hba_port_top;
 			dev_ptr->gfc_port_dev.priv_port =
-				sf_map.sf_addr_pair[i];
+			    sf_map.sf_addr_pair[i];
 		}
 		map_ptr->hba_addr.port_topology = hba_port_top;
 		map_ptr->hba_addr.gfc_port_dev.priv_port =
-				sf_map.sf_hba_addr;
+		    sf_map.sf_hba_addr;
 		(void) close(fd);
 	}
 
@@ -1889,33 +1903,30 @@ int		p_on = 0, p_st = 0;
  * otherwise returns error code.
  */
 static int
-update_map_dev_fc_prop(
-	impl_map_dev_prop_t **prop_list, uint32_t map_topo,
-	uchar_t *port_wwn, uchar_t *node_wwn, int port_addr,
-	int hard_addr)
+update_map_dev_fc_prop(impl_map_dev_prop_t **prop_list, uint32_t map_topo,
+    uchar_t *port_wwn, uchar_t *node_wwn, int port_addr, int hard_addr)
 {
 	impl_map_dev_prop_t	*prop_ptr, *pl_start = NULL, *pl_end = NULL;
 	uchar_t *port_wwn_data, *node_wwn_data;
 	int *port_addr_data, *hard_addr_data;
 
 	/* consrtruct port addr property. */
-	if ((map_topo == FC_TOP_FABRIC) ||
-		(map_topo == FC_TOP_PUBLIC_LOOP)) {
+	if ((map_topo == FC_TOP_FABRIC) || (map_topo == FC_TOP_PUBLIC_LOOP)) {
 		if (port_addr <= 0xffff) {
-		    return (L_INVALID_FABRIC_ADDRESS);
+			return (L_INVALID_FABRIC_ADDRESS);
 		}
 	} else if (map_topo == FC_TOP_PRIVATE_LOOP) {
 		if (port_addr > 0xff) {
-		    return (L_INVALID_PRIVATE_LOOP_ADDRESS);
+			return (L_INVALID_PRIVATE_LOOP_ADDRESS);
 		}
 	}
 
 	if ((prop_ptr = (impl_map_dev_prop_t *)calloc(
-		1, sizeof (impl_map_dev_prop_t))) == NULL) {
+	    1, sizeof (impl_map_dev_prop_t))) == NULL) {
 		return (L_MALLOC_FAILED);
 	}
 	(void) strncpy(prop_ptr->prop_name, PORT_ADDR_PROP,
-			strlen(PORT_ADDR_PROP));
+	    strlen(PORT_ADDR_PROP));
 	prop_ptr->prop_type = GFC_PROP_TYPE_INT;
 
 	if ((port_addr_data = (int *)calloc(1, sizeof (int))) == NULL) {
@@ -1929,16 +1940,15 @@ update_map_dev_fc_prop(
 
 	/* consrtruct port WWN property. */
 	if ((prop_ptr = (impl_map_dev_prop_t *)calloc(
-		1, sizeof (impl_map_dev_prop_t))) == NULL) {
+	    1, sizeof (impl_map_dev_prop_t))) == NULL) {
 		free_prop_list(&pl_start);
 		return (L_MALLOC_FAILED);
 	}
 	(void) strncpy(prop_ptr->prop_name, PORT_WWN_PROP,
-			strlen(PORT_WWN_PROP));
+	    strlen(PORT_WWN_PROP));
 	prop_ptr->prop_type = GFC_PROP_TYPE_BYTES;
 
-	if ((port_wwn_data = (uchar_t *)calloc(
-		1, FC_WWN_SIZE)) == NULL) {
+	if ((port_wwn_data = (uchar_t *)calloc(1, FC_WWN_SIZE)) == NULL) {
 		free_prop_list(&pl_start);
 		return (L_MALLOC_FAILED);
 	}
@@ -1950,16 +1960,16 @@ update_map_dev_fc_prop(
 
 	/* consrtruct node WWN property. */
 	if ((prop_ptr = (impl_map_dev_prop_t *)calloc(
-		1, sizeof (impl_map_dev_prop_t))) == NULL) {
+	    1, sizeof (impl_map_dev_prop_t))) == NULL) {
 		free_prop_list(&pl_start);
 		return (L_MALLOC_FAILED);
 	}
 	(void) strncpy(prop_ptr->prop_name, NODE_WWN_PROP,
-			strlen(NODE_WWN_PROP));
+	    strlen(NODE_WWN_PROP));
 	prop_ptr->prop_type = GFC_PROP_TYPE_BYTES;
 
 	if ((node_wwn_data = (uchar_t *)calloc(
-		1, FC_WWN_SIZE)) == NULL) {
+	    1, FC_WWN_SIZE)) == NULL) {
 		free_prop_list(&pl_start);
 		return (L_MALLOC_FAILED);
 	}
@@ -1971,16 +1981,15 @@ update_map_dev_fc_prop(
 
 	/* consrtruct hard addr property. */
 	if ((prop_ptr = (impl_map_dev_prop_t *)calloc(
-		1, sizeof (impl_map_dev_prop_t))) == NULL) {
+	    1, sizeof (impl_map_dev_prop_t))) == NULL) {
 		free_prop_list(&pl_start);
 		return (L_MALLOC_FAILED);
 	}
 	(void) strncpy(prop_ptr->prop_name, HARD_ADDR_PROP,
-			strlen(HARD_ADDR_PROP));
+	    strlen(HARD_ADDR_PROP));
 	prop_ptr->prop_type = GFC_PROP_TYPE_INT;
 
-	if ((hard_addr_data = (int *)calloc(
-		1, sizeof (int))) == NULL) {
+	if ((hard_addr_data = (int *)calloc(1, sizeof (int))) == NULL) {
 		free_prop_list(&pl_start);
 		return (L_MALLOC_FAILED);
 	}
@@ -2006,27 +2015,26 @@ update_map_dev_fc_prop(
  * L_MALLOC_FAILED is the only possible error.
  */
 static int
-update_map_dev_FCP_prop(
-	impl_map_dev_prop_t **prop_list,
-	uchar_t *inq_dtype, int err, int exist)
+update_map_dev_FCP_prop(impl_map_dev_prop_t **prop_list,
+    uchar_t *inq_dtype, int err, int exist)
 {
 	impl_map_dev_prop_t	*prop_ptr, *old_prop_ptr;
 	uchar_t *inq_dtype_data;
 
 	if ((prop_ptr = (impl_map_dev_prop_t *)calloc(
-		1, sizeof (impl_map_dev_prop_t))) == NULL) {
+	    1, sizeof (impl_map_dev_prop_t))) == NULL) {
 		return (L_MALLOC_FAILED);
 	}
 
 	(void) strncpy(prop_ptr->prop_name, INQ_DTYPE_PROP,
-		strlen(INQ_DTYPE_PROP));
+	    strlen(INQ_DTYPE_PROP));
 
 	if (inq_dtype == NULL) {
 		prop_ptr->prop_data = NULL;
 		prop_ptr->prop_error = err;
 	} else {
 		if ((inq_dtype_data = (uchar_t *)calloc(
-			1, sizeof (uchar_t))) == NULL) {
+		    1, sizeof (uchar_t))) == NULL) {
 			free(prop_ptr);
 			return (L_MALLOC_FAILED);
 		}
@@ -2064,10 +2072,8 @@ update_map_dev_FCP_prop(
  * return error from update_map_dev_FCP_prop().
  */
 static int
-handle_map_dev_FCP_prop(
-	minor_t fp_xport_minor,
-	la_wwn_t port_wwn,
-	impl_map_dev_prop_t **prop_list)
+handle_map_dev_FCP_prop(minor_t fp_xport_minor, la_wwn_t port_wwn,
+    impl_map_dev_prop_t **prop_list)
 {
 	struct device_data	inq_data;
 	int 			fcp_fd, err;
@@ -2076,7 +2082,7 @@ handle_map_dev_FCP_prop(
 
 	if ((fcp_fd = g_object_open(FCP_PATH, O_RDONLY)) == -1) {
 		update_map_dev_FCP_prop(prop_list, NULL,
-			L_OPEN_PATH_FAIL, PROP_NOEXIST);
+		    L_OPEN_PATH_FAIL, PROP_NOEXIST);
 	}
 
 	/* Get the minor number for an fp instance */
@@ -2089,16 +2095,16 @@ handle_map_dev_FCP_prop(
 
 	if (err = g_issue_fcp_ioctl(fcp_fd, &fcp_data, 0)) {
 		/* if ioctl error then set the prop_error.	*/
-	    if ((err = update_map_dev_FCP_prop(
-		prop_list, NULL, err, PROP_NOEXIST)) != 0) {
-		return (err);
-	    }
+		if ((err = update_map_dev_FCP_prop(
+		    prop_list, NULL, err, PROP_NOEXIST)) != 0) {
+			return (err);
+		}
 	} else {
-	    inq_dtype = inq_data.dev0_type;
-	    if ((err = update_map_dev_FCP_prop(
-		prop_list, &inq_dtype, 0, PROP_NOEXIST)) != 0) {
-		return (err);
-	    }
+		inq_dtype = inq_data.dev0_type;
+		if ((err = update_map_dev_FCP_prop(
+		    prop_list, &inq_dtype, 0, PROP_NOEXIST)) != 0) {
+			return (err);
+		}
 	}
 
 	return (0);
@@ -2145,21 +2151,22 @@ handle_map_dev_FCP_prop(
 gfc_dev_t
 g_dev_map_init(char *path, int *l_err, int flag)
 {
-int		fd, i, num_devices = 0, err, pathcnt = 1, new_count = 0;
-char		drvr_path[MAXPATHLEN], drvr_path0[MAXPATHLEN];
-char		*char_ptr, *nexus_path;
-struct stat	stbuf;
-fc_port_dev_t	*dev_list = NULL, *dlist;
-uint32_t	hba_port_top, state;
-uint_t		path_type;
-sf_al_map_t	sf_map;
-fc_port_dev_t	fp_hba_port;
-mp_pathlist_t	pathlist;
-int		p_on = 0, p_st = 0, hba_alpa_found = 0, nexus_fd;
-fcio_t		fcio;
-struct lilpmap	limited_map;
-impl_map_dev_t	*impl_map, *impl_dev, *mdl_start = NULL, *mdl_end = NULL;
-struct stat	sbuf;
+	int		fd, i, num_devices = 0, err, pathcnt = 1, new_count = 0;
+	char		drvr_path[MAXPATHLEN], drvr_path0[MAXPATHLEN];
+	char		*char_ptr, *nexus_path;
+	struct stat	stbuf;
+	fc_port_dev_t	*dev_list = NULL, *dlist;
+	uint32_t	hba_port_top, state;
+	uint_t		path_type;
+	sf_al_map_t	sf_map;
+	fc_port_dev_t	fp_hba_port;
+	mp_pathlist_t	pathlist;
+	int		p_on = 0, p_st = 0, hba_alpa_found = 0, nexus_fd;
+	fcio_t		fcio;
+	struct lilpmap	limited_map;
+	impl_map_dev_t	*impl_map, *impl_dev;
+	impl_map_dev_t	*mdl_start = NULL, *mdl_end = NULL;
+	struct stat	sbuf;
 
 	if (l_err == NULL) {
 		return (NULL);
@@ -2196,11 +2203,11 @@ struct stat	sbuf;
 		for (i = 0; i < pathcnt; i++) {
 			if (pathlist.path_info[i].path_state < MAXPATHSTATE) {
 				if (pathlist.path_info[i].path_state ==
-					MDI_PATHINFO_STATE_ONLINE) {
+				    MDI_PATHINFO_STATE_ONLINE) {
 					p_on = i;
 					break;
 				} else if (pathlist.path_info[i].path_state ==
-					MDI_PATHINFO_STATE_STANDBY) {
+				    MDI_PATHINFO_STATE_STANDBY) {
 					p_st = i;
 				}
 			}
@@ -2209,19 +2216,19 @@ struct stat	sbuf;
 		    MDI_PATHINFO_STATE_ONLINE) {
 			/* on_line path */
 			(void) strcpy(drvr_path,
-				pathlist.path_info[p_on].path_hba);
+			    pathlist.path_info[p_on].path_hba);
 		} else {
 			/* standby or path0 */
 			(void) strcpy(drvr_path,
-				pathlist.path_info[p_st].path_hba);
+			    pathlist.path_info[p_st].path_hba);
 		}
 		free(pathlist.path_info);
 		(void) strcat(drvr_path, FC_CTLR);
 	} else {
 		(void) strcpy(drvr_path, path);
 		if (strstr(drvr_path, DRV_NAME_SSD) ||
-			strstr(drvr_path, SES_NAME) ||
-			strstr(drvr_path, DRV_NAME_ST)) {
+		    strstr(drvr_path, SES_NAME) ||
+		    strstr(drvr_path, DRV_NAME_ST)) {
 			if ((char_ptr = strrchr(drvr_path, '/')) == NULL) {
 				*l_err = L_INVALID_PATH;
 				return (NULL);
@@ -2242,7 +2249,7 @@ struct stat	sbuf;
 	}
 
 	P_DPRINTF("  g_dev_map_init: Geting drive map from:"
-		" %s\n", drvr_path);
+	    " %s\n", drvr_path);
 
 	path_type = g_get_path_type(drvr_path);
 	if ((path_type == 0) || !(path_type & XPORT_MASK)) {
@@ -2252,7 +2259,7 @@ struct stat	sbuf;
 
 	/* get fiber topology */
 	if ((err = g_get_fca_port_topology(drvr_path,
-			&hba_port_top, 0)) != 0) {
+	    &hba_port_top, 0)) != 0) {
 		*l_err = err;
 		return (NULL);
 	}
@@ -2265,439 +2272,487 @@ struct stat	sbuf;
 	/* for FC devices. */
 	if (path_type & FC_FCA_MASK) {
 		/* get the number of device first. */
-	    fcio.fcio_cmd = FCIO_GET_NUM_DEVS;
-	    fcio.fcio_olen = sizeof (num_devices);
-	    fcio.fcio_xfer = FCIO_XFER_READ;
-	    fcio.fcio_obuf = (caddr_t)&num_devices;
-	    if (g_issue_fcio_ioctl(fd, &fcio, 0) != 0) {
-		I_DPRINTF(" FCIO_GET_NUM_DEVS ioctl failed.\n");
-		(void) close(fd);
-		*l_err = L_FCIO_GET_NUM_DEVS_FAIL;
-		return (NULL);
-	    }
-	    if (num_devices != 0) {
-		if ((dev_list = (fc_port_dev_t *)calloc(num_devices,
-			sizeof (fc_port_dev_t))) == NULL) {
-		    (void) close(fd);
-		    *l_err = L_MALLOC_FAILED;
-		    return (NULL);
-		}
-
-		bzero((caddr_t)&fcio, sizeof (fcio));
-		/* Get the device list */
-		fcio.fcio_cmd = FCIO_GET_DEV_LIST;
-		/* Information read operation */
+		fcio.fcio_cmd = FCIO_GET_NUM_DEVS;
+		fcio.fcio_olen = sizeof (num_devices);
 		fcio.fcio_xfer = FCIO_XFER_READ;
-		fcio.fcio_olen = num_devices * sizeof (fc_port_dev_t);
-		fcio.fcio_obuf = (caddr_t)dev_list;
-		/* new device count */
-		fcio.fcio_alen = sizeof (new_count);
-		fcio.fcio_abuf = (caddr_t)&new_count;
-		if ((err = g_issue_fcio_ioctl(fd, &fcio, 0)) != 0) {
-		    if (err == L_INVALID_DEVICE_COUNT) {
-			/*
-			 * original buffer was small so allocate buffer
-			 * with a new count and retry.
-			 */
-			free(dev_list);
-			num_devices = new_count;
-			new_count = 0;
+		fcio.fcio_obuf = (caddr_t)&num_devices;
+		if (g_issue_fcio_ioctl(fd, &fcio, 0) != 0) {
+			I_DPRINTF(" FCIO_GET_NUM_DEVS ioctl failed.\n");
+			(void) close(fd);
+			*l_err = L_FCIO_GET_NUM_DEVS_FAIL;
+			return (NULL);
+		}
+		if (num_devices != 0) {
 			if ((dev_list = (fc_port_dev_t *)calloc(num_devices,
-				sizeof (fc_port_dev_t))) == NULL) {
-			    (void) close(fd);
-			    *l_err = L_MALLOC_FAILED;
-			    return (NULL);
+			    sizeof (fc_port_dev_t))) == NULL) {
+				(void) close(fd);
+				*l_err = L_MALLOC_FAILED;
+				return (NULL);
 			}
+
+			bzero((caddr_t)&fcio, sizeof (fcio));
+			/* Get the device list */
 			fcio.fcio_cmd = FCIO_GET_DEV_LIST;
 			/* Information read operation */
 			fcio.fcio_xfer = FCIO_XFER_READ;
-			fcio.fcio_obuf = (caddr_t)dev_list;
 			fcio.fcio_olen = num_devices * sizeof (fc_port_dev_t);
+			fcio.fcio_obuf = (caddr_t)dev_list;
 			/* new device count */
 			fcio.fcio_alen = sizeof (new_count);
 			fcio.fcio_abuf = (caddr_t)&new_count;
 			if ((err = g_issue_fcio_ioctl(fd, &fcio, 0)) != 0) {
-			    if (err == L_INVALID_DEVICE_COUNT) {
-				/*
-				 * No more retry. There may be severe hardware
-				 * problem so return error here.
-				 */
-				I_DPRINTF(" Device count was %d"
-				" should have been %d\n",
-				num_devices, new_count);
-				free(dev_list);
-				(void) close(fd);
-				*l_err = L_INVALID_DEVICE_COUNT;
-				return (NULL);
-			    } else {
+				if (err == L_INVALID_DEVICE_COUNT) {
+					/*
+					 * original buffer was small so allocate
+					 * buffer with a new count and retry.
+					 */
+					free(dev_list);
+					num_devices = new_count;
+					new_count = 0;
+					if ((dev_list = (fc_port_dev_t *)
+					    calloc(num_devices,
+					    sizeof (fc_port_dev_t))) == NULL) {
+						(void) close(fd);
+						*l_err = L_MALLOC_FAILED;
+						return (NULL);
+					}
+					fcio.fcio_cmd = FCIO_GET_DEV_LIST;
+					/* Information read operation */
+					fcio.fcio_xfer = FCIO_XFER_READ;
+					fcio.fcio_obuf = (caddr_t)dev_list;
+					fcio.fcio_olen = num_devices *
+					    sizeof (fc_port_dev_t);
+					/* new device count */
+					fcio.fcio_alen = sizeof (new_count);
+					fcio.fcio_abuf = (caddr_t)&new_count;
+					if ((err = g_issue_fcio_ioctl(fd, &fcio,
+					    0)) != 0) {
+						if (err ==
+						    L_INVALID_DEVICE_COUNT) {
+							/*
+							 * No more retry. There
+							 * may be severe
+							 * hardware problem so
+							 * return error here.
+							 */
+							I_DPRINTF(" Device"
+							    " count was %d"
+							    " should have been"
+							    " %d\n",
+							    num_devices,
+							    new_count);
+							free(dev_list);
+							(void) close(fd);
+
+						*l_err = L_INVALID_DEVICE_COUNT;
+
+							return (NULL);
+						} else {
+
+				/* Code refactorization is needed for C style */
 				I_DPRINTF(" FCIO_GET_DEV_LIST ioctl failed.");
-				free(dev_list);
-				(void) close(fd);
-				*l_err = L_FCIO_GET_DEV_LIST_FAIL;
-				return (NULL);
-			    }
+
+							free(dev_list);
+							(void) close(fd);
+
+					*l_err = L_FCIO_GET_DEV_LIST_FAIL;
+
+							return (NULL);
+						}
+					}
+				}
 			}
-		    }
 		}
-	    }
 
 		/*
 		 * if new count is smaller than the original number from
 		 * FCIO_GET_NUM_DEVS, adjust new count and buffer size
 		 * and continue.
 		 */
-	    if (new_count < num_devices) {
-		num_devices = new_count;
-		if (new_count > 0) {
-		    if ((dev_list = (fc_port_dev_t *)realloc(dev_list,
-			(new_count * sizeof (fc_port_dev_t))))
-				== NULL) {
-			S_FREE(dev_list);
-			(void) close(fd);
-			*l_err = L_MALLOC_FAILED;
-			return (NULL);
-		    }
+		if (new_count < num_devices) {
+			num_devices = new_count;
+			if (new_count > 0) {
+				if ((dev_list = (fc_port_dev_t *)
+				    realloc(dev_list,
+				    (new_count * sizeof (fc_port_dev_t))))
+				    == NULL) {
+					S_FREE(dev_list);
+					(void) close(fd);
+					*l_err = L_MALLOC_FAILED;
+					return (NULL);
+				}
+			}
 		}
-	    }
 
 		/* get the host param info */
-	    (void) memset(&fp_hba_port, 0, sizeof (struct fc_port_dev));
-	    fcio.fcio_cmd = FCIO_GET_HOST_PARAMS;
-	    fcio.fcio_xfer = FCIO_XFER_READ;
-	    fcio.fcio_obuf = (caddr_t)&fp_hba_port;
-	    fcio.fcio_olen = sizeof (fc_port_dev_t);
+		(void) memset(&fp_hba_port, 0, sizeof (struct fc_port_dev));
+		fcio.fcio_cmd = FCIO_GET_HOST_PARAMS;
+		fcio.fcio_xfer = FCIO_XFER_READ;
+		fcio.fcio_obuf = (caddr_t)&fp_hba_port;
+		fcio.fcio_olen = sizeof (fc_port_dev_t);
 
-	    if (g_issue_fcio_ioctl(fd, &fcio, 0) != 0) {
-		I_DPRINTF(" FCIO_GET_HOST_PARAMS ioctl failed.\n");
-		(void) close(fd);
-		if (num_devices == 0) {
-			*l_err = L_NO_DEVICES_FOUND;
-		} else {
-			free(dev_list);
-			*l_err = L_FCIO_GET_HOST_PARAMS_FAIL;
+		if (g_issue_fcio_ioctl(fd, &fcio, 0) != 0) {
+			I_DPRINTF(" FCIO_GET_HOST_PARAMS ioctl failed.\n");
+			(void) close(fd);
+			if (num_devices == 0) {
+				*l_err = L_NO_DEVICES_FOUND;
+			} else {
+				free(dev_list);
+				*l_err = L_FCIO_GET_HOST_PARAMS_FAIL;
+			}
+			(void) close(fd);
+			return (NULL);
 		}
-		(void) close(fd);
-		return (NULL);
-	    }
 
 		/* If we want the lilp map then we need to do a little	*/
 		/* work here.  The lilp map contains the local hba in	*/
 		/* the dev_addr.  Once this has been added qsort the	*/
 		/* dev_addr array so it's in physical order.		*/
-	    if ((flag & MAP_FORMAT_LILP) == MAP_FORMAT_LILP) {
-		/* First we need to allocate one additional	*/
-		/* device to the dev_addr structure, for the 	*/
-		/* local hba					*/
-		if (num_devices > 0) {
-		    if ((dev_list = (fc_port_dev_t *)realloc(dev_list,
-			(++num_devices * sizeof (fc_port_dev_t)))) == NULL) {
-			(void) close(fd);
-			/* in case dev_list is not null free it. */
-			S_FREE(dev_list);
-			*l_err =  L_MALLOC_FAILED;
-			return (NULL);
-		    }
+		if ((flag & MAP_FORMAT_LILP) == MAP_FORMAT_LILP) {
+			/* First we need to allocate one additional	*/
+			/* device to the dev_addr structure, for the 	*/
+			/* local hba					*/
+			if (num_devices > 0) {
+				if ((dev_list = (fc_port_dev_t *)
+				    realloc(dev_list,
+				    (++num_devices *
+				    sizeof (fc_port_dev_t)))) == NULL) {
+					(void) close(fd);
+					/*
+					 * In case dev_list is not null free
+					 * it.
+					 */
+					S_FREE(dev_list);
+					*l_err =  L_MALLOC_FAILED;
+					return (NULL);
+				}
 
-		    /* Next, copy the local hba into this new loc.	*/
-		    if (memcpy(dev_list+(num_devices-1), &fp_hba_port,
-				sizeof (fc_port_dev_t)) == NULL) {
-			(void) free(dev_list);
-			(void) close(fd);
-			*l_err =  L_MEMCPY_FAILED;
-			return (NULL);
-		    }
+				/*
+				 * Next, copy the local hba into this new
+				 * loc.
+				 */
+				if (memcpy(dev_list+(num_devices-1),
+				    &fp_hba_port,
+				    sizeof (fc_port_dev_t)) == NULL) {
+					(void) free(dev_list);
+					(void) close(fd);
+					*l_err =  L_MEMCPY_FAILED;
+					return (NULL);
+				}
 
-			/* Now sort by physical location		*/
-		    qsort((void*)dev_list, num_devices,
-			sizeof (fc_port_dev_t), lilp_map_cmp);
+				/* Now sort by physical location */
+				qsort((void*)dev_list, num_devices,
+				    sizeof (fc_port_dev_t), lilp_map_cmp);
+			}
 		}
-	    }
 
 
 		/* We have dev list info and host param info.	*/
 		/* Now constructs map tree with these info.	*/
 		/* First consturct the root of the map tree	*/
 		/* with host param.				*/
-	    if ((impl_map = (impl_map_dev_t *)calloc(
-			1, sizeof (impl_map_dev_t))) == NULL) {
-		(void) free(dev_list);
-		(void) close(fd);
-		*l_err = L_MALLOC_FAILED;
-		return (NULL);
-	    }
-	    impl_map->flag = flag;
-	    impl_map->topo = hba_port_top;
+		if ((impl_map = (impl_map_dev_t *)calloc(
+		    1, sizeof (impl_map_dev_t))) == NULL) {
+			(void) free(dev_list);
+			(void) close(fd);
+			*l_err = L_MALLOC_FAILED;
+			return (NULL);
+		}
+		impl_map->flag = flag;
+		impl_map->topo = hba_port_top;
 
 		/* consturct hba property list.	*/
-	    if ((err = update_map_dev_fc_prop(&impl_map->prop_list,
+		if ((err = update_map_dev_fc_prop(&impl_map->prop_list,
 		    hba_port_top, fp_hba_port.dev_pwwn.raw_wwn,
 		    fp_hba_port.dev_nwwn.raw_wwn, fp_hba_port.dev_did.port_id,
 		    fp_hba_port.dev_hard_addr.hard_addr)) != 0) {
-		(void) free(dev_list);
-		(void) close(fd);
-		g_dev_map_fini(impl_map);
-		*l_err = err;
-		return (NULL);
-	    }
+			(void) free(dev_list);
+			(void) close(fd);
+			g_dev_map_fini(impl_map);
+			*l_err = err;
+			return (NULL);
+		}
 
-	    if ((flag & MAP_XPORT_PROP_ONLY) != MAP_XPORT_PROP_ONLY) {
-		if (fstat(fd, &sbuf) == -1) {
-		    (void) free(dev_list);
-		    (void) close(fd);
-		    g_dev_map_fini(impl_map);
-		    *l_err = L_FSTAT_ERROR;
-		    return (NULL);
-		}
-		if ((err = handle_map_dev_FCP_prop(minor(sbuf.st_rdev),
-			fp_hba_port.dev_pwwn, &impl_map->prop_list)) != 0) {
-		    (void) free(dev_list);
-		    (void) close(fd);
-		    g_dev_map_fini(impl_map);
-		    *l_err = err;
-		    return (NULL);
-		}
-	    }
-
-		/* consturct child for each device and	*/
-		/* set device property list.		*/
-	    dlist = dev_list;
-	    for (i = 0; i < num_devices; i++, dlist++) {
-		if ((impl_dev = (impl_map_dev_t *)calloc(
-			1, sizeof (impl_map_dev_t))) == NULL) {
-		    (void) free(dev_list);
-		    (void) close(fd);
-		    g_dev_map_fini(impl_map);
-		    *l_err = L_MALLOC_FAILED;
-		    return (NULL);
-		}
-		/* set the map as parent */
-		impl_dev->parent = impl_map;
-		if ((err = update_map_dev_fc_prop(&impl_dev->prop_list,
-		    hba_port_top, dlist->dev_pwwn.raw_wwn,
-		    dlist->dev_nwwn.raw_wwn, dlist->dev_did.port_id,
-		    dlist->dev_hard_addr.hard_addr)) != 0) {
-		    (void) free(dev_list);
-		    (void) close(fd);
-		    g_dev_map_fini(impl_map);
-		    *l_err = err;
-		    return (NULL);
-		}
-		if (i == 0) {
-		    mdl_start = mdl_end = impl_dev;
-		} else {
-		    mdl_end->next = impl_dev;
-		    mdl_end = impl_dev;
-		}
 		if ((flag & MAP_XPORT_PROP_ONLY) != MAP_XPORT_PROP_ONLY) {
-		    if (((hba_port_top == FC_TOP_PUBLIC_LOOP) ||
-			(hba_port_top == FC_TOP_FABRIC)) &&
-			(memcmp(fp_hba_port.dev_pwwn.raw_wwn,
-			dlist->dev_pwwn.raw_wwn, FC_WWN_SIZE) != 0)) {
-			(void) memset(&fcio, 0, sizeof (fcio_t));
-			fcio.fcio_cmd = FCIO_GET_STATE;
-			fcio.fcio_ilen = sizeof (dlist->dev_pwwn);
-			fcio.fcio_ibuf = (caddr_t)&dlist->dev_pwwn;
-			fcio.fcio_xfer = FCIO_XFER_READ | FCIO_XFER_WRITE;
-			fcio.fcio_olen = sizeof (uint32_t);
-			fcio.fcio_obuf = (caddr_t)&state;
-			fcio.fcio_alen = 0;
-			fcio.fcio_abuf = NULL;
-			if (g_issue_fcio_ioctl(fd, &fcio, 0) != 0) {
-			    I_DPRINTF(" FCIO_GET_STATE ioctl failed.\n");
-			    if ((err = update_map_dev_FCP_prop(
-				&impl_dev->prop_list, NULL,
-				L_FCIO_GET_STATE_FAIL, PROP_NOEXIST)) != 0) {
+			if (fstat(fd, &sbuf) == -1) {
+				(void) free(dev_list);
+				(void) close(fd);
+				g_dev_map_fini(impl_map);
+				*l_err = L_FSTAT_ERROR;
+				return (NULL);
+			}
+			if ((err = handle_map_dev_FCP_prop(minor(sbuf.st_rdev),
+			    fp_hba_port.dev_pwwn, &impl_map->prop_list)) != 0) {
 				(void) free(dev_list);
 				(void) close(fd);
 				g_dev_map_fini(impl_map);
 				*l_err = err;
 				return (NULL);
-			    }
 			}
-			if (state != PORT_DEVICE_LOGGED_IN) {
-			    (void) close(fd);
-			    if ((fd = g_object_open(drvr_path,
-				O_NDELAY | O_RDONLY | O_EXCL)) == -1) {
+		}
+
+		/* consturct child for each device and	*/
+		/* set device property list.		*/
+		dlist = dev_list;
+		for (i = 0; i < num_devices; i++, dlist++) {
+			if ((impl_dev = (impl_map_dev_t *)calloc(
+			    1, sizeof (impl_map_dev_t))) == NULL) {
 				(void) free(dev_list);
+				(void) close(fd);
 				g_dev_map_fini(impl_map);
-				*l_err = L_OPEN_PATH_FAIL;
+				*l_err = L_MALLOC_FAILED;
 				return (NULL);
-			    }
-			    (void) memset(&fcio, 0, sizeof (fcio_t));
-			    fcio.fcio_cmd = FCIO_DEV_LOGIN;
-			    fcio.fcio_ilen = sizeof (dlist->dev_pwwn);
-			    fcio.fcio_ibuf = (caddr_t)&dlist->dev_pwwn;
-			    fcio.fcio_xfer = FCIO_XFER_WRITE;
-			    fcio.fcio_olen = fcio.fcio_alen = 0;
-			    fcio.fcio_obuf = fcio.fcio_abuf = NULL;
-			    if (g_issue_fcio_ioctl(fd, &fcio, 0) != 0) {
+			}
+			/* set the map as parent */
+			impl_dev->parent = impl_map;
+			if ((err = update_map_dev_fc_prop(&impl_dev->prop_list,
+			    hba_port_top, dlist->dev_pwwn.raw_wwn,
+			    dlist->dev_nwwn.raw_wwn, dlist->dev_did.port_id,
+			    dlist->dev_hard_addr.hard_addr)) != 0) {
+				(void) free(dev_list);
+				(void) close(fd);
+				g_dev_map_fini(impl_map);
+				*l_err = err;
+				return (NULL);
+			}
+			if (i == 0) {
+				mdl_start = mdl_end = impl_dev;
+			} else {
+				mdl_end->next = impl_dev;
+				mdl_end = impl_dev;
+			}
+			if ((flag & MAP_XPORT_PROP_ONLY) !=
+			    MAP_XPORT_PROP_ONLY) {
+			if (((hba_port_top == FC_TOP_PUBLIC_LOOP) ||
+			    (hba_port_top == FC_TOP_FABRIC)) &&
+			    (memcmp(fp_hba_port.dev_pwwn.raw_wwn,
+			    dlist->dev_pwwn.raw_wwn, FC_WWN_SIZE) != 0)) {
+				(void) memset(&fcio, 0, sizeof (fcio_t));
+				fcio.fcio_cmd = FCIO_GET_STATE;
+				fcio.fcio_ilen = sizeof (dlist->dev_pwwn);
+				fcio.fcio_ibuf = (caddr_t)&dlist->dev_pwwn;
+				fcio.fcio_xfer = FCIO_XFER_READ |
+				    FCIO_XFER_WRITE;
+				fcio.fcio_olen = sizeof (uint32_t);
+				fcio.fcio_obuf = (caddr_t)&state;
+				fcio.fcio_alen = 0;
+				fcio.fcio_abuf = NULL;
+				if (g_issue_fcio_ioctl(fd, &fcio, 0) != 0) {
+					I_DPRINTF(
+					    " FCIO_GET_STATE ioctl failed.\n");
+					if ((err = update_map_dev_FCP_prop(
+					    &impl_dev->prop_list, NULL,
+					    L_FCIO_GET_STATE_FAIL,
+					    PROP_NOEXIST)) != 0) {
+						(void) free(dev_list);
+						(void) close(fd);
+						g_dev_map_fini(impl_map);
+						*l_err = err;
+						return (NULL);
+					}
+				}
+				if (state != PORT_DEVICE_LOGGED_IN) {
+					(void) close(fd);
+					if ((fd = g_object_open(drvr_path,
+					    O_NDELAY | O_RDONLY | O_EXCL)) ==
+					    -1) {
+						(void) free(dev_list);
+						g_dev_map_fini(impl_map);
+						*l_err = L_OPEN_PATH_FAIL;
+						return (NULL);
+					}
+					(void) memset(&fcio, 0,
+					    sizeof (fcio_t));
+					fcio.fcio_cmd = FCIO_DEV_LOGIN;
+					fcio.fcio_ilen =
+					    sizeof (dlist->dev_pwwn);
+					fcio.fcio_ibuf =
+					    (caddr_t)&dlist->dev_pwwn;
+					fcio.fcio_xfer = FCIO_XFER_WRITE;
+					fcio.fcio_olen = fcio.fcio_alen = 0;
+					fcio.fcio_obuf = fcio.fcio_abuf = NULL;
+					if (g_issue_fcio_ioctl(fd, &fcio, 0) !=
+					    0) {
+
+				/* Code refactorization is needed for C style */
 				I_DPRINTF(" FCIO_DEV_LOGIN ioctl failed.\n");
+
 				if ((err = update_map_dev_FCP_prop(
 				    &impl_dev->prop_list, NULL,
 				    L_FCIO_DEV_LOGIN_FAIL,
 				    PROP_NOEXIST)) != 0) {
-				    (void) free(dev_list);
-				    (void) close(fd);
-				    g_dev_map_fini(impl_map);
-				    *l_err = err;
-				    return (NULL);
+					(void) free(dev_list);
+					(void) close(fd);
+					g_dev_map_fini(impl_map);
+					*l_err = err;
+					return (NULL);
 				}
-				/* plogi failed continue to next dev */
-				continue;
-			    }
+
+							/*
+							 * plogi failed continue
+							 * to next dev
+							 */
+							continue;
+						}
+					}
+				}
+				/* sbuf should be set from hba_port handling. */
+				if ((err = handle_map_dev_FCP_prop(
+				    minor(sbuf.st_rdev),
+				    dlist->dev_pwwn, &impl_dev->prop_list)) !=
+				    0) {
+					(void) free(dev_list);
+					(void) close(fd);
+					g_dev_map_fini(impl_map);
+					*l_err = err;
+					return (NULL);
+				}
 			}
-		    }
-			/* sbuf should be set from hba_port handling. */
-		    if ((err = handle_map_dev_FCP_prop(minor(sbuf.st_rdev),
-			dlist->dev_pwwn, &impl_dev->prop_list)) != 0) {
-			(void) free(dev_list);
-			(void) close(fd);
-			g_dev_map_fini(impl_map);
-			*l_err = err;
-			return (NULL);
-		    }
 		}
-	    }
 		/* connect the children to to map.	*/
-	    impl_map->child = mdl_start;
-	    S_FREE(dev_list);
+		impl_map->child = mdl_start;
+		S_FREE(dev_list);
 
 	} else {	/* sf and fc4/pci devices */
-	    /* initialize map */
-	    (void) memset(&sf_map, 0, sizeof (struct sf_al_map));
-	    if (ioctl(fd, SFIOCGMAP, &sf_map) != 0) {
-		I_DPRINTF("  SFIOCGMAP ioctl failed.\n");
-		(void) close(fd);
-		*l_err = L_SFIOCGMAP_IOCTL_FAIL;
-		return (NULL);
-	    }
+		/* initialize map */
+		(void) memset(&sf_map, 0, sizeof (struct sf_al_map));
+		if (ioctl(fd, SFIOCGMAP, &sf_map) != 0) {
+			I_DPRINTF("  SFIOCGMAP ioctl failed.\n");
+			(void) close(fd);
+			*l_err = L_SFIOCGMAP_IOCTL_FAIL;
+			return (NULL);
+		}
 		/* Check for reasonableness. */
-	    if ((sf_map.sf_count > 126) || (sf_map.sf_count < 0)) {
-		(void) close(fd);
-		*l_err = L_INVALID_LOOP_MAP;
-		return (NULL);
-	    }
+		if ((sf_map.sf_count > 126) || (sf_map.sf_count < 0)) {
+			(void) close(fd);
+			*l_err = L_INVALID_LOOP_MAP;
+			return (NULL);
+		}
 
-	    if (sf_map.sf_count == 0) {
-		(void) close(fd);
-		*l_err = L_NO_DEVICES_FOUND;
-		return (NULL);
-	    }
+		if (sf_map.sf_count == 0) {
+			(void) close(fd);
+			*l_err = L_NO_DEVICES_FOUND;
+			return (NULL);
+		}
 
-	    if ((err = g_get_nexus_path(drvr_path, &nexus_path)) != 0) {
-		(void) close(fd);
-		*l_err = err;
-		return (NULL);
-	    }
+		if ((err = g_get_nexus_path(drvr_path, &nexus_path)) != 0) {
+			(void) close(fd);
+			*l_err = err;
+			return (NULL);
+		}
 
-	    if ((nexus_fd = g_object_open(nexus_path, O_NDELAY | O_RDONLY)) ==
-			-1) {
-		(void) close(fd);
-		S_FREE(nexus_path);
-		*l_err = errno;
-		return (NULL);
-	    }
+		if ((nexus_fd =
+		    g_object_open(nexus_path, O_NDELAY | O_RDONLY)) == -1) {
+			(void) close(fd);
+			S_FREE(nexus_path);
+			*l_err = errno;
+			return (NULL);
+		}
 
 		/* get limited map to get hba param info */
-	    if (ioctl(nexus_fd, FCIO_GETMAP, &limited_map) != 0) {
-		I_DPRINTF("  FCIO_GETMAP ioctl failed\n");
-		(void) close(fd);
+		if (ioctl(nexus_fd, FCIO_GETMAP, &limited_map) != 0) {
+			I_DPRINTF("  FCIO_GETMAP ioctl failed\n");
+			(void) close(fd);
+			(void) close(nexus_fd);
+			S_FREE(nexus_path);
+			*l_err = L_FCIO_GETMAP_IOCTL_FAIL;
+			return (NULL);
+		}
 		(void) close(nexus_fd);
 		S_FREE(nexus_path);
-		*l_err = L_FCIO_GETMAP_IOCTL_FAIL;
-		return (NULL);
-	    }
-	    (void) close(nexus_fd);
-	    S_FREE(nexus_path);
 
-	    for (i = 0; i < sf_map.sf_count; i++) {
-		if (sf_map.sf_addr_pair[i].sf_al_pa ==
-			limited_map.lilp_myalpa) {
-			sf_map.sf_hba_addr = sf_map.sf_addr_pair[i];
-			hba_alpa_found = 1;
+		for (i = 0; i < sf_map.sf_count; i++) {
+			if (sf_map.sf_addr_pair[i].sf_al_pa ==
+			    limited_map.lilp_myalpa) {
+				sf_map.sf_hba_addr = sf_map.sf_addr_pair[i];
+				hba_alpa_found = 1;
+			}
 		}
-	    }
 
-	    if (!(hba_alpa_found)) {
-		(void) close(fd);
-		*l_err = L_INVALID_LOOP_MAP;
-		return (NULL);
-	    }
+		if (!(hba_alpa_found)) {
+			(void) close(fd);
+			*l_err = L_INVALID_LOOP_MAP;
+			return (NULL);
+		}
 
 		/* We have dev list info and host param info.	*/
 		/* Now constructs map tree with these info.	*/
 		/* First consturct the root of the map tree	*/
 		/* with host param.				*/
-	    if ((impl_map = (impl_map_dev_t *)calloc(
-			1, sizeof (impl_map_dev_t))) == NULL) {
-		(void) close(fd);
-		*l_err = L_MALLOC_FAILED;
-		return (NULL);
-	    }
-	    impl_map->flag = flag;
-	    impl_map->topo = hba_port_top;
+		if ((impl_map = (impl_map_dev_t *)calloc(
+		    1, sizeof (impl_map_dev_t))) == NULL) {
+			(void) close(fd);
+			*l_err = L_MALLOC_FAILED;
+			return (NULL);
+		}
+		impl_map->flag = flag;
+		impl_map->topo = hba_port_top;
 
 		/* consturct hba property list.	*/
-	    if ((err = update_map_dev_fc_prop(&impl_map->prop_list,
+		if ((err = update_map_dev_fc_prop(&impl_map->prop_list,
 		    hba_port_top, sf_map.sf_hba_addr.sf_port_wwn,
 		    sf_map.sf_hba_addr.sf_node_wwn,
 		    (int)sf_map.sf_hba_addr.sf_al_pa,
 		    (int)sf_map.sf_hba_addr.sf_hard_address)) != 0) {
-		(void) close(fd);
-		g_dev_map_fini(impl_map);
-		*l_err = err;
-		return (NULL);
-	    }
-
-	    if ((flag & MAP_XPORT_PROP_ONLY) != MAP_XPORT_PROP_ONLY) {
-		if ((err = update_map_dev_FCP_prop(&impl_map->prop_list,
-		    &sf_map.sf_hba_addr.sf_inq_dtype, 0, PROP_NOEXIST)) != 0) {
-		    (void) close(fd);
-		    g_dev_map_fini(impl_map);
-		    *l_err = err;
-		    return (NULL);
-		}
-	    }
-
-	    for (i = 0; i < sf_map.sf_count; i++) {
-		if ((impl_dev = (impl_map_dev_t *)calloc(
-			1, sizeof (impl_map_dev_t))) == NULL) {
-		    (void) close(fd);
-		    g_dev_map_fini(impl_map);
-		    *l_err = L_MALLOC_FAILED;
-		    return (NULL);
-		}
-		/* set the map as parent */
-		impl_dev->parent = impl_map;
-		if ((err = update_map_dev_fc_prop(&impl_dev->prop_list,
-		    hba_port_top, sf_map.sf_addr_pair[i].sf_port_wwn,
-		    sf_map.sf_addr_pair[i].sf_node_wwn,
-		    (int)(sf_map.sf_addr_pair[i].sf_al_pa),
-		    (int)(sf_map.sf_addr_pair[i].sf_hard_address))) != 0) {
-		    (void) close(fd);
-		    g_dev_map_fini(impl_map);
-		    *l_err = err;
-		    return (NULL);
-		}
-		if (i == 0) {
-		    mdl_start = mdl_end = impl_dev;
-		} else {
-		    mdl_end->next = impl_dev;
-		    mdl_end = impl_dev;
-		}
-		if ((flag & MAP_XPORT_PROP_ONLY) != MAP_XPORT_PROP_ONLY) {
-		    if ((err = update_map_dev_FCP_prop(&impl_dev->prop_list,
-			&sf_map.sf_addr_pair[i].sf_inq_dtype, 0,
-			PROP_NOEXIST)) != 0) {
 			(void) close(fd);
 			g_dev_map_fini(impl_map);
 			*l_err = err;
 			return (NULL);
-		    }
 		}
-	    } /* end of for loop */
 
-	    impl_map->child = mdl_start;
+		if ((flag & MAP_XPORT_PROP_ONLY) != MAP_XPORT_PROP_ONLY) {
+			if ((err = update_map_dev_FCP_prop(&impl_map->prop_list,
+			    &sf_map.sf_hba_addr.sf_inq_dtype, 0,
+			    PROP_NOEXIST)) != 0) {
+				(void) close(fd);
+				g_dev_map_fini(impl_map);
+				*l_err = err;
+				return (NULL);
+			}
+		}
+
+		for (i = 0; i < sf_map.sf_count; i++) {
+			if ((impl_dev = (impl_map_dev_t *)calloc(
+			    1, sizeof (impl_map_dev_t))) == NULL) {
+				(void) close(fd);
+				g_dev_map_fini(impl_map);
+				*l_err = L_MALLOC_FAILED;
+				return (NULL);
+			}
+			/* set the map as parent */
+			impl_dev->parent = impl_map;
+			if ((err = update_map_dev_fc_prop(&impl_dev->prop_list,
+			    hba_port_top, sf_map.sf_addr_pair[i].sf_port_wwn,
+			    sf_map.sf_addr_pair[i].sf_node_wwn,
+			    (int)(sf_map.sf_addr_pair[i].sf_al_pa),
+			    (int)(sf_map.sf_addr_pair[i].sf_hard_address))) !=
+			    0) {
+				(void) close(fd);
+				g_dev_map_fini(impl_map);
+				*l_err = err;
+				return (NULL);
+			}
+			if (i == 0) {
+				mdl_start = mdl_end = impl_dev;
+			} else {
+				mdl_end->next = impl_dev;
+				mdl_end = impl_dev;
+			}
+			if ((flag & MAP_XPORT_PROP_ONLY) !=
+			    MAP_XPORT_PROP_ONLY) {
+				if ((err = update_map_dev_FCP_prop(
+				    &impl_dev->prop_list,
+				    &sf_map.sf_addr_pair[i].sf_inq_dtype, 0,
+				    PROP_NOEXIST)) != 0) {
+					(void) close(fd);
+					g_dev_map_fini(impl_map);
+					*l_err = err;
+					return (NULL);
+				}
+			}
+		} /* end of for loop */
+
+		impl_map->child = mdl_start;
 	} /* end of else */
 
 	close(fd);
@@ -2766,9 +2821,9 @@ g_dev_map_fini(gfc_dev_t map)
 	impl_map = (impl_map_dev_t *)map;
 
 	if (impl_map != NULL) {
-	    free_prop_list(&impl_map->prop_list);
-	    free_child_list(&impl_map->child);
-	    S_FREE(impl_map);
+		free_prop_list(&impl_map->prop_list);
+		free_child_list(&impl_map->child);
+		S_FREE(impl_map);
 	}
 }
 
@@ -2780,9 +2835,7 @@ g_dev_map_fini(gfc_dev_t map)
  * return error code otherwise.
  */
 int
-g_get_map_topology(
-	gfc_dev_t map,
-	uint_t *topology)
+g_get_map_topology(gfc_dev_t map, uint_t *topology)
 {
 	impl_map_dev_t	*impl_map;
 
@@ -2809,9 +2862,7 @@ g_get_map_topology(
  * l_err set to error code otherwise.
  */
 gfc_dev_t
-g_get_first_dev(
-	gfc_dev_t map,
-	int *l_err)
+g_get_first_dev(gfc_dev_t map, int *l_err)
 {
 	impl_map_dev_t	*impl_map;
 
@@ -2843,9 +2894,7 @@ g_get_first_dev(
  * l_err set to error code otherwise.
  */
 gfc_dev_t
-g_get_next_dev(
-	gfc_dev_t map_dev,
-	int *l_err)
+g_get_next_dev(gfc_dev_t map_dev, int *l_err)
 {
 	impl_map_dev_t	*impl_dev;
 
@@ -2877,11 +2926,8 @@ g_get_next_dev(
  * return error code otherwise.
  */
 int
-g_dev_prop_lookup_bytes(
-	gfc_dev_t map_dev,
-	const char *prop_name,
-	int *prop_data_count,
-	uchar_t **prop_data)
+g_dev_prop_lookup_bytes(gfc_dev_t map_dev, const char *prop_name,
+    int *prop_data_count, uchar_t **prop_data)
 {
 	impl_map_dev_t *impl_dev;
 	impl_map_dev_prop_t *impl_prop;
@@ -2892,7 +2938,7 @@ g_dev_prop_lookup_bytes(
 	}
 
 	if ((prop_name == NULL) || (prop_data == NULL) ||
-		(prop_data_count == NULL)) {
+	    (prop_data_count == NULL)) {
 		return (L_INVALID_ARG);
 	}
 
@@ -2902,22 +2948,22 @@ g_dev_prop_lookup_bytes(
 	err = L_INVALID_MAP_DEV_PROP_NAME;
 
 	while (impl_prop) {
-	    if (strncmp(impl_prop->prop_name, prop_name,
-		strlen(prop_name)) == 0) {
-		if (impl_prop->prop_type != GFC_PROP_TYPE_BYTES) {
-		    err = L_INVALID_MAP_DEV_PROP_TYPE;
-		    break;
+		if (strncmp(impl_prop->prop_name, prop_name,
+		    strlen(prop_name)) == 0) {
+			if (impl_prop->prop_type != GFC_PROP_TYPE_BYTES) {
+				err = L_INVALID_MAP_DEV_PROP_TYPE;
+				break;
+			}
+			if (impl_prop->prop_data) {
+				*prop_data = (uchar_t *)(impl_prop->prop_data);
+				*prop_data_count = impl_prop->prop_size;
+				return (0);
+			} else {
+				err = impl_prop->prop_error;
+			}
+			break;
 		}
-		if (impl_prop->prop_data) {
-		    *prop_data = (uchar_t *)(impl_prop->prop_data);
-		    *prop_data_count = impl_prop->prop_size;
-		    return (0);
-		} else {
-		    err = impl_prop->prop_error;
-		}
-		break;
-	    }
-	    impl_prop = impl_prop->next;
+		impl_prop = impl_prop->next;
 	}
 
 	return (err);
@@ -2931,10 +2977,8 @@ g_dev_prop_lookup_bytes(
  * return error code otherwise.
  */
 int
-g_dev_prop_lookup_ints(
-	gfc_dev_t map_dev,
-	const char *prop_name,
-	int **prop_data)
+g_dev_prop_lookup_ints(gfc_dev_t map_dev, const char *prop_name,
+    int **prop_data)
 {
 	impl_map_dev_t *impl_dev;
 	impl_map_dev_prop_t *impl_prop;
@@ -2954,21 +2998,21 @@ g_dev_prop_lookup_ints(
 	err = L_INVALID_MAP_DEV_PROP_NAME;
 
 	while (impl_prop) {
-	    if (strncmp(impl_prop->prop_name, prop_name,
-		strlen(prop_name)) == 0) {
-		if (impl_prop->prop_type != GFC_PROP_TYPE_INT) {
-		    err = L_INVALID_MAP_DEV_PROP_TYPE;
-		    break;
+		if (strncmp(impl_prop->prop_name, prop_name,
+		    strlen(prop_name)) == 0) {
+			if (impl_prop->prop_type != GFC_PROP_TYPE_INT) {
+			err = L_INVALID_MAP_DEV_PROP_TYPE;
+			break;
+			}
+			if (impl_prop->prop_data) {
+				*prop_data = (int *)(impl_prop->prop_data);
+				return (0);
+			} else {
+				err = impl_prop->prop_error;
+			}
+			break;
 		}
-		if (impl_prop->prop_data) {
-		    *prop_data = (int *)(impl_prop->prop_data);
-		    return (0);
-		} else {
-		    err = impl_prop->prop_error;
-		}
-		break;
-	    }
-	    impl_prop = impl_prop->next;
+		impl_prop = impl_prop->next;
 	}
 
 	return (err);
@@ -2982,10 +3026,8 @@ g_dev_prop_lookup_ints(
  * return error code otherwise.
  */
 int
-g_dev_prop_lookup_strings(
-	gfc_dev_t map_dev,
-	const char *prop_name,
-	char **prop_data)
+g_dev_prop_lookup_strings(gfc_dev_t map_dev, const char *prop_name,
+    char **prop_data)
 {
 	impl_map_dev_t *impl_dev;
 	impl_map_dev_prop_t *impl_prop;
@@ -3005,21 +3047,21 @@ g_dev_prop_lookup_strings(
 	err = L_INVALID_MAP_DEV_PROP_NAME;
 
 	while (impl_prop) {
-	    if (strncmp(impl_prop->prop_name, prop_name,
-		strlen(prop_name)) == 0) {
-		if (impl_prop->prop_type != GFC_PROP_TYPE_STRING) {
-		    err = L_INVALID_MAP_DEV_PROP_TYPE;
-		    break;
+		if (strncmp(impl_prop->prop_name, prop_name,
+		    strlen(prop_name)) == 0) {
+			if (impl_prop->prop_type != GFC_PROP_TYPE_STRING) {
+				err = L_INVALID_MAP_DEV_PROP_TYPE;
+				break;
+			}
+			if (impl_prop->prop_data) {
+				*prop_data = (char *)(impl_prop->prop_data);
+				return (0);
+			} else {
+				err = impl_prop->prop_error;
+			}
+			break;
 		}
-		if (impl_prop->prop_data) {
-		    *prop_data = (char *)(impl_prop->prop_data);
-		    return (0);
-		} else {
-		    err = impl_prop->prop_error;
-		}
-		break;
-	    }
-	    impl_prop = impl_prop->next;
+		impl_prop = impl_prop->next;
 	}
 
 	return (err);
@@ -3033,9 +3075,7 @@ g_dev_prop_lookup_strings(
  * l_err set to error code otherwise.
  */
 gfc_prop_t
-g_get_first_dev_prop(
-	gfc_dev_t map_dev,
-	int *l_err)
+g_get_first_dev_prop(gfc_dev_t map_dev, int *l_err)
 {
 	impl_map_dev_t	*impl_dev;
 
@@ -3067,9 +3107,7 @@ g_get_first_dev_prop(
  * l_err set to error code otherwise.
  */
 gfc_prop_t
-g_get_next_dev_prop(
-	gfc_prop_t map_prop,
-	int *l_err)
+g_get_next_dev_prop(gfc_prop_t map_prop, int *l_err)
 {
 	impl_map_dev_prop_t	*impl_prop;
 
@@ -3101,9 +3139,7 @@ g_get_next_dev_prop(
  * returns NULL and l_err set to error code otherwise.
  */
 char *
-g_get_dev_prop_name(
-	gfc_prop_t map_prop,
-	int *l_err)
+g_get_dev_prop_name(gfc_prop_t map_prop, int *l_err)
 {
 	impl_map_dev_prop_t	*impl_prop;
 
@@ -3131,9 +3167,7 @@ g_get_dev_prop_name(
  * returns GFC_PROP_TYPE_UNKNOWN and l_err set to error code otherwise.
  */
 int
-g_get_dev_prop_type(
-	gfc_prop_t map_prop,
-	int *l_err)
+g_get_dev_prop_type(gfc_prop_t map_prop, int *l_err)
 {
 	impl_map_dev_prop_t	*impl_prop;
 
@@ -3161,10 +3195,8 @@ g_get_dev_prop_type(
  * return error code otherwise.
  */
 int
-g_get_dev_prop_bytes(
-	gfc_prop_t map_prop,
-	int *prop_data_count,
-	uchar_t **prop_data)
+g_get_dev_prop_bytes(gfc_prop_t map_prop, int *prop_data_count,
+    uchar_t **prop_data)
 {
 	impl_map_dev_prop_t *impl_prop;
 
@@ -3179,13 +3211,13 @@ g_get_dev_prop_bytes(
 	impl_prop = (impl_map_dev_prop_t *)map_prop;
 
 	if (impl_prop->prop_type != GFC_PROP_TYPE_BYTES) {
-		    return (L_INVALID_MAP_DEV_PROP_TYPE);
+		return (L_INVALID_MAP_DEV_PROP_TYPE);
 	}
 	if (impl_prop->prop_data) {
-	    *prop_data = (uchar_t *)(impl_prop->prop_data);
-	    *prop_data_count = impl_prop->prop_size;
+		*prop_data = (uchar_t *)(impl_prop->prop_data);
+		*prop_data_count = impl_prop->prop_size;
 	} else {
-	    return (impl_prop->prop_error);
+		return (impl_prop->prop_error);
 	}
 
 	return (0);
@@ -3199,9 +3231,7 @@ g_get_dev_prop_bytes(
  * return error code otherwise.
  */
 int
-g_get_dev_prop_ints(
-	gfc_prop_t map_prop,
-	int **prop_data)
+g_get_dev_prop_ints(gfc_prop_t map_prop, int **prop_data)
 {
 	impl_map_dev_prop_t *impl_prop;
 
@@ -3216,12 +3246,12 @@ g_get_dev_prop_ints(
 	impl_prop = (impl_map_dev_prop_t *)map_prop;
 
 	if (impl_prop->prop_type != GFC_PROP_TYPE_INT) {
-		    return (L_INVALID_MAP_DEV_PROP_TYPE);
+		return (L_INVALID_MAP_DEV_PROP_TYPE);
 	}
 	if (impl_prop->prop_data) {
-	    *prop_data = (int *)(impl_prop->prop_data);
+		*prop_data = (int *)(impl_prop->prop_data);
 	} else {
-	    return (impl_prop->prop_error);
+		return (impl_prop->prop_error);
 	}
 
 	return (0);
@@ -3235,9 +3265,7 @@ g_get_dev_prop_ints(
  * return error code otherwise.
  */
 int
-g_get_dev_prop_strings(
-	gfc_prop_t map_prop,
-	char **prop_data)
+g_get_dev_prop_strings(gfc_prop_t map_prop, char **prop_data)
 {
 	impl_map_dev_prop_t *impl_prop;
 
@@ -3252,12 +3280,12 @@ g_get_dev_prop_strings(
 	impl_prop = (impl_map_dev_prop_t *)map_prop;
 
 	if (impl_prop->prop_type != GFC_PROP_TYPE_STRING) {
-		    return (L_INVALID_MAP_DEV_PROP_TYPE);
+		return (L_INVALID_MAP_DEV_PROP_TYPE);
 	}
 	if (impl_prop->prop_data) {
-	    *prop_data = (char *)(impl_prop->prop_data);
+		*prop_data = (char *)(impl_prop->prop_data);
 	} else {
-	    return (impl_prop->prop_error);
+		return (impl_prop->prop_error);
 	}
 
 	return (0);
@@ -3293,24 +3321,24 @@ g_free_rls(AL_rls *rlsptr)
 int
 g_rdls(char *path_phys, struct al_rls **rls_ptr, int verbose)
 {
-char		nexus_path[MAXPATHLEN], *nexus_path_ptr;
-int		fd, fp_fd, err, length, exp_map_flag = 0, *port_addr;
-struct lilpmap	map;
-AL_rls		*rls, *c1 = NULL, *c2 = NULL;
-uchar_t		i, *port_wwn_byte;
-la_wwn_t	port_wwn;
-sf_al_map_t	exp_map;
-char		*charPtr, fp_path[MAXPATHLEN];
-uint_t		dev_type;
-struct stat	stbuf;
-fcio_t		fcio;
-fc_portid_t	rls_req;
-fc_rls_acc_t	rls_payload;
-gfc_dev_t	map_root, map_dev;
-uint32_t	hba_port_top, state;
-int		pathcnt = 1, count;
-mp_pathlist_t	pathlist;
-int		p_on = 0, p_st = 0;
+	char		nexus_path[MAXPATHLEN], *nexus_path_ptr;
+	int		fd, fp_fd, err, length, exp_map_flag = 0, *port_addr;
+	struct lilpmap	map;
+	AL_rls		*rls, *c1 = NULL, *c2 = NULL;
+	uchar_t		i, *port_wwn_byte;
+	la_wwn_t	port_wwn;
+	sf_al_map_t	exp_map;
+	char		*charPtr, fp_path[MAXPATHLEN];
+	uint_t		dev_type;
+	struct stat	stbuf;
+	fcio_t		fcio;
+	fc_portid_t	rls_req;
+	fc_rls_acc_t	rls_payload;
+	gfc_dev_t	map_root, map_dev;
+	uint32_t	hba_port_top, state;
+	int		pathcnt = 1, count;
+	mp_pathlist_t	pathlist;
+	int		p_on = 0, p_st = 0;
 
 	/* return invalid path if path_phys is NULL */
 	if (path_phys == NULL) {
@@ -3333,11 +3361,11 @@ int		p_on = 0, p_st = 0;
 		for (i = 0; i < pathcnt; i++) {
 			if (pathlist.path_info[i].path_state < MAXPATHSTATE) {
 				if (pathlist.path_info[i].path_state ==
-					MDI_PATHINFO_STATE_ONLINE) {
+				    MDI_PATHINFO_STATE_ONLINE) {
 					p_on = i;
 					break;
 				} else if (pathlist.path_info[i].path_state ==
-					MDI_PATHINFO_STATE_STANDBY) {
+				    MDI_PATHINFO_STATE_STANDBY) {
 					p_st = i;
 				}
 			}
@@ -3346,11 +3374,11 @@ int		p_on = 0, p_st = 0;
 		    MDI_PATHINFO_STATE_ONLINE) {
 			/* on_line path */
 			(void) strcpy(fp_path,
-				pathlist.path_info[p_on].path_hba);
+			    pathlist.path_info[p_on].path_hba);
 		} else {
 			/* standby or path0 */
 			(void) strcpy(fp_path,
-				pathlist.path_info[p_st].path_hba);
+			    pathlist.path_info[p_st].path_hba);
 		}
 		free(pathlist.path_info);
 	} else {
@@ -3366,7 +3394,7 @@ int		p_on = 0, p_st = 0;
 			(void) strcat(fp_path, FC_CTLR);
 		} else if (strstr(fp_path, DRV_NAME_SSD) ||
 		    strstr(fp_path, DRV_NAME_ST) ||
-				strstr(fp_path, SES_NAME)) {
+		    strstr(fp_path, SES_NAME)) {
 			if ((charPtr = strrchr(fp_path, '/')) == NULL) {
 				return (L_INVALID_PATH);
 			}
@@ -3384,116 +3412,120 @@ int		p_on = 0, p_st = 0;
 		}
 
 		if ((map_root = g_dev_map_init(fp_path, &err,
-			MAP_XPORT_PROP_ONLY)) == NULL) {
+		    MAP_XPORT_PROP_ONLY)) == NULL) {
 			return (err);
 		}
 
 	} else { /* FC4_FCA_MASK type path */
-	    (void) memset(&map, 0, sizeof (struct lilpmap));
+		(void) memset(&map, 0, sizeof (struct lilpmap));
 
-	    if ((err = g_get_nexus_path(path_phys,
+		if ((err = g_get_nexus_path(path_phys,
 		    &nexus_path_ptr)) != 0) {
-		return (err);
-	    }
-	    (void) strcpy(nexus_path, nexus_path_ptr);
-	    g_destroy_data(nexus_path_ptr);
+			return (err);
+		}
+		(void) strcpy(nexus_path, nexus_path_ptr);
+		g_destroy_data(nexus_path_ptr);
 
 		/* open driver */
-	    if ((fd = g_object_open(nexus_path,
-			O_NDELAY | O_RDONLY)) == -1)
-		return (errno);
+		if ((fd = g_object_open(nexus_path,
+		    O_NDELAY | O_RDONLY)) == -1)
+			return (errno);
 
 		/*
 		 * First try using the socal version of the map.
 		 * If that fails get the expanded vesion.
 		 */
-	    if (ioctl(fd, FCIO_GETMAP, &map) != 0) {
-		I_DPRINTF("  FCIO_GETMAP ioctl failed.\n");
-		if (ioctl(fd, SFIOCGMAP, &exp_map) != 0) {
-			I_DPRINTF("  SFIOCGMAP ioctl failed.\n");
-			(void) close(fd);
-			return (L_SFIOCGMAP_IOCTL_FAIL);
-		}
-		/* Check for reasonableness. */
-		if ((exp_map.sf_count > 126) ||
-				(exp_map.sf_count < 0)) {
-			(void) close(fd);
-			return (L_INVALID_LOOP_MAP);
-		}
-		for (i = 0; i < exp_map.sf_count; i++) {
-			if (exp_map.sf_addr_pair[i].sf_al_pa > 0xef) {
+		if (ioctl(fd, FCIO_GETMAP, &map) != 0) {
+			I_DPRINTF("  FCIO_GETMAP ioctl failed.\n");
+			if (ioctl(fd, SFIOCGMAP, &exp_map) != 0) {
+				I_DPRINTF("  SFIOCGMAP ioctl failed.\n");
+				(void) close(fd);
+				return (L_SFIOCGMAP_IOCTL_FAIL);
+			}
+			/* Check for reasonableness. */
+			if ((exp_map.sf_count > 126) ||
+			    (exp_map.sf_count < 0)) {
 				(void) close(fd);
 				return (L_INVALID_LOOP_MAP);
 			}
-		}
-		length = exp_map.sf_count;
-		exp_map_flag++;
-	    } else {
-		I_DPRINTF("  g_rdls:"
-			" FCIO_GETMAP ioctl returned %d entries.\n",
-			map.lilp_length);
-		/* Check for reasonableness. */
-		if (map.lilp_length > sizeof (map.lilp_list)) {
-			(void) close(fd);
-			return (L_FCIOGETMAP_INVLD_LEN);
-		}
-		length = map.lilp_length;
-	    }
-	    for (i = 0; i < length; i++) {
-		if ((c2 = (struct al_rls *)
-			g_zalloc(sizeof (struct al_rls))) == NULL) {
-			close(fd);
-			return (L_MALLOC_FAILED);
-		}
-		if (rls == NULL) {
-			c1 = rls = c2;
-		} else {
-			for (c1 = rls; c1->next; c1 =  c1->next) {};
-			c1 = c1->next = c2;
-		}
-		(void) strcpy(c1->driver_path, nexus_path);
-		if (exp_map_flag) {
-			c1->payload.rls_portno = c1->al_ha =
-				exp_map.sf_addr_pair[i].sf_al_pa;
-		} else {
-			c1->payload.rls_portno = c1->al_ha = map.lilp_list[i];
-		}
-		c1->payload.rls_linkfail =
-				(uint_t)0xff000000; /* get LESB for this port */
-		I_DPRINTF("  g_rdls:" " al_pa 0x%x\n", c1->payload.rls_portno);
-
-		if (ioctl(fd, FCIO_LINKSTATUS, &c1->payload) != 0) {
-			/*
-			 * The ifp driver will return ENXIO when rls
-			 * is issued for same initiator on loop when
-			 * there is more than one on the loop.
-			 * Rather than completely fail, continue on.
-			 * Set values in the payload struct to -1 as
-			 * this is what socal is currently doing for
-			 * the case of same initiator rls.
-			 */
-			if ((dev_type & FC4_PCI_FCA) && (errno == ENXIO)) {
-				c1->payload.rls_linkfail =
-				c1->payload.rls_syncfail =
-				c1->payload.rls_sigfail =
-				c1->payload.rls_primitiverr =
-				c1->payload.rls_invalidword =
-				c1->payload.rls_invalidcrc = (uint_t)0xffffffff;
-			} else {
-				I_DPRINTF("  FCIO_LINKSTATUS ioctl"
-				" failed with errno %d.\n", errno);
-				g_free_rls(rls);
-				(void) close(fd);
-				return (L_FCIO_LINKSTATUS_FAILED);
+			for (i = 0; i < exp_map.sf_count; i++) {
+				if (exp_map.sf_addr_pair[i].sf_al_pa > 0xef) {
+					(void) close(fd);
+					return (L_INVALID_LOOP_MAP);
+				}
 			}
+			length = exp_map.sf_count;
+			exp_map_flag++;
+		} else {
+			I_DPRINTF("  g_rdls:"
+			    " FCIO_GETMAP ioctl returned %d entries.\n",
+			    map.lilp_length);
+			/* Check for reasonableness. */
+			if (map.lilp_length > sizeof (map.lilp_list)) {
+				(void) close(fd);
+				return (L_FCIOGETMAP_INVLD_LEN);
+			}
+			length = map.lilp_length;
 		}
-		I_DPRINTF("  g_rdls: al_pa returned by ioctl 0x%x\n",
-			c1->payload.rls_portno);
-	    }
-	    *rls_ptr = rls; /* Pass back pointer */
+		for (i = 0; i < length; i++) {
+			if ((c2 = (struct al_rls *)
+			    g_zalloc(sizeof (struct al_rls))) == NULL) {
+				close(fd);
+				return (L_MALLOC_FAILED);
+			}
+			if (rls == NULL) {
+				c1 = rls = c2;
+			} else {
+				for (c1 = rls; c1->next; c1 =  c1->next) {};
+				c1 = c1->next = c2;
+			}
+			(void) strcpy(c1->driver_path, nexus_path);
+			if (exp_map_flag) {
+				c1->payload.rls_portno = c1->al_ha =
+				    exp_map.sf_addr_pair[i].sf_al_pa;
+			} else {
+				c1->payload.rls_portno = c1->al_ha =
+				    map.lilp_list[i];
+			}
+			c1->payload.rls_linkfail =
+			    (uint_t)0xff000000; /* get LESB for this port */
+			I_DPRINTF("  g_rdls:"
+			    " al_pa 0x%x\n", c1->payload.rls_portno);
 
-	    (void) close(fd);
-	    return (0);
+			if (ioctl(fd, FCIO_LINKSTATUS, &c1->payload) != 0) {
+				/*
+				 * The ifp driver will return ENXIO when rls
+				 * is issued for same initiator on loop when
+				 * there is more than one on the loop.
+				 * Rather than completely fail, continue on.
+				 * Set values in the payload struct to -1 as
+				 * this is what socal is currently doing for
+				 * the case of same initiator rls.
+				 */
+				if ((dev_type & FC4_PCI_FCA) &&
+				    (errno == ENXIO)) {
+					c1->payload.rls_linkfail =
+					    c1->payload.rls_syncfail =
+					    c1->payload.rls_sigfail =
+					    c1->payload.rls_primitiverr =
+					    c1->payload.rls_invalidword =
+					    c1->payload.rls_invalidcrc =
+					    (uint_t)0xffffffff;
+				} else {
+					I_DPRINTF("  FCIO_LINKSTATUS ioctl"
+					    " failed with errno %d.\n", errno);
+					g_free_rls(rls);
+					(void) close(fd);
+					return (L_FCIO_LINKSTATUS_FAILED);
+				}
+			}
+			I_DPRINTF("  g_rdls: al_pa returned by ioctl 0x%x\n",
+			    c1->payload.rls_portno);
+		}
+		*rls_ptr = rls; /* Pass back pointer */
+
+		(void) close(fd);
+		return (0);
 	}
 
 	/* Now we need to take care of FC_FCA_MASK case.	*/
@@ -3513,28 +3545,28 @@ int		p_on = 0, p_st = 0;
 	}
 
 	while (map_dev) {
-	    if ((err = g_dev_prop_lookup_ints(
-		map_dev, PORT_ADDR_PROP, &port_addr)) != 0) {
-		g_dev_map_fini(map_root);
-		g_free_rls(rls);
-		return (err);
-	    }
+		if ((err = g_dev_prop_lookup_ints(
+		    map_dev, PORT_ADDR_PROP, &port_addr)) != 0) {
+			g_dev_map_fini(map_root);
+			g_free_rls(rls);
+			return (err);
+		}
 
-	    if ((c2 = (struct al_rls *)
-		g_zalloc(sizeof (struct al_rls))) == NULL) {
-		g_dev_map_fini(map_root);
-		g_free_rls(rls);
-		close(fd);
-		return (L_MALLOC_FAILED);
-	    }
-	    if (rls == NULL) {
-		c1 = rls = c2;
-	    } else {
-		for (c1 = rls; c1->next; c1 =  c1->next) {};
-		c1 = c1->next = c2;
-	    }
-	    /* Set the al_ha here */
-	    c1->al_ha = rls_req.port_id = *port_addr;
+		if ((c2 = (struct al_rls *)
+		    g_zalloc(sizeof (struct al_rls))) == NULL) {
+			g_dev_map_fini(map_root);
+			g_free_rls(rls);
+			close(fd);
+			return (L_MALLOC_FAILED);
+		}
+		if (rls == NULL) {
+			c1 = rls = c2;
+		} else {
+			for (c1 = rls; c1->next; c1 =  c1->next) {};
+			c1 = c1->next = c2;
+		}
+		/* Set the al_ha here */
+		c1->al_ha = rls_req.port_id = *port_addr;
 
 		/*
 		 * fp uses different input/output structures for
@@ -3544,85 +3576,95 @@ int		p_on = 0, p_st = 0;
 		 * to be loaded into AL_rls as is done for socal/ifp
 		 * above.
 		 */
-	    if ((hba_port_top == FC_TOP_FABRIC) ||
-		(hba_port_top == FC_TOP_PUBLIC_LOOP)) {
-		if ((err = g_dev_prop_lookup_bytes(
-			map_dev, PORT_WWN_PROP, &count, &port_wwn_byte)) != 0) {
+		if ((hba_port_top == FC_TOP_FABRIC) ||
+		    (hba_port_top == FC_TOP_PUBLIC_LOOP)) {
+			if ((err = g_dev_prop_lookup_bytes(
+			    map_dev, PORT_WWN_PROP, &count,
+			    &port_wwn_byte)) != 0) {
+				g_dev_map_fini(map_root);
+				g_free_rls(rls);
+				return (err);
+			}
+			memcpy(port_wwn.raw_wwn, port_wwn_byte, FC_WWN_SIZE);
+			if ((err = g_get_dev_port_state(
+			    fp_path, port_wwn, &state)) == 0) {
+				if (state != PORT_DEVICE_LOGGED_IN) {
+					if ((err = g_dev_login(fp_path,
+					    port_wwn)) != 0) {
+
+					c1->payload.rls_linkfail =
+					    c1->payload.rls_syncfail =
+					    c1->payload.rls_sigfail =
+					    c1->payload.rls_primitiverr =
+					    c1->payload.rls_invalidword =
+					    c1->payload.rls_invalidcrc =
+					    (uint_t)0xffffffff;
+						if (((map_dev =
+						    g_get_next_dev(map_dev,
+						    &err))
+						    == NULL) &&
+						    (err !=
+						    L_NO_SUCH_DEV_FOUND)) {
+							g_dev_map_fini(
+							    map_root);
+							g_free_rls(rls);
+							return (err);
+						}
+						continue;
+					}
+				}
+			} /* if g_get_dev_port_state fails proceed. */
+		}
+
+		fcio.fcio_cmd_flags = FCIO_CFLAGS_RLS_DEST_NPORT;
+		if ((fp_fd = g_object_open(fp_path, O_RDONLY | O_EXCL)) < 0) {
+			g_dev_map_fini(map_root);
+			g_free_rls(rls);
+			return (L_OPEN_PATH_FAIL);
+		}
+		fcio.fcio_cmd = FCIO_LINK_STATUS;
+		fcio.fcio_ibuf = (caddr_t)&rls_req;
+		fcio.fcio_ilen = sizeof (rls_req);
+		fcio.fcio_xfer = FCIO_XFER_RW;
+		fcio.fcio_flags = 0;
+		fcio.fcio_obuf = (caddr_t)&rls_payload;
+		fcio.fcio_olen = sizeof (rls_payload);
+		if (g_issue_fcio_ioctl(fp_fd, &fcio, verbose) != 0) {
+			c1->payload.rls_linkfail =
+			    c1->payload.rls_syncfail =
+			    c1->payload.rls_sigfail =
+			    c1->payload.rls_primitiverr =
+			    c1->payload.rls_invalidword =
+			    c1->payload.rls_invalidcrc = (uint_t)0xffffffff;
+		} else {
+			/*
+			 * Load the values into the struct passed
+			 * back to the caller
+			 */
+			c1->payload.rls_linkfail = rls_payload.rls_link_fail;
+			c1->payload.rls_syncfail = rls_payload.rls_sync_loss;
+			c1->payload.rls_sigfail = rls_payload.rls_sig_loss;
+			c1->payload.rls_primitiverr =
+			    rls_payload.rls_prim_seq_err;
+			c1->payload.rls_invalidword =
+			    rls_payload.rls_invalid_word;
+			c1->payload.rls_invalidcrc =
+			    rls_payload.rls_invalid_crc;
+		}
+		(void) close(fp_fd);
+
+		if (((map_dev = g_get_next_dev(map_dev, &err)) == NULL) &&
+		    (err != L_NO_SUCH_DEV_FOUND)) {
 			g_dev_map_fini(map_root);
 			g_free_rls(rls);
 			return (err);
 		}
-		memcpy(port_wwn.raw_wwn, port_wwn_byte, FC_WWN_SIZE);
-		if ((err = g_get_dev_port_state(
-			fp_path, port_wwn, &state)) == 0) {
-		    if (state != PORT_DEVICE_LOGGED_IN) {
-			if ((err = g_dev_login(fp_path, port_wwn)) != 0) {
-				c1->payload.rls_linkfail =
-				c1->payload.rls_syncfail =
-				c1->payload.rls_sigfail =
-				c1->payload.rls_primitiverr =
-				c1->payload.rls_invalidword =
-				c1->payload.rls_invalidcrc = (uint_t)0xffffffff;
-				if (((map_dev =
-					g_get_next_dev(map_dev, &err))
-					== NULL) &&
-					(err != L_NO_SUCH_DEV_FOUND)) {
-					g_dev_map_fini(map_root);
-					g_free_rls(rls);
-					return (err);
-				}
-				continue;
-			}
-		    }
-		} /* if g_get_dev_port_state fails proceed. */
-	    }
-
-	    fcio.fcio_cmd_flags = FCIO_CFLAGS_RLS_DEST_NPORT;
-	    if ((fp_fd = g_object_open(fp_path, O_RDONLY | O_EXCL)) < 0) {
-		g_dev_map_fini(map_root);
-		g_free_rls(rls);
-		return (L_OPEN_PATH_FAIL);
-	    }
-	    fcio.fcio_cmd = FCIO_LINK_STATUS;
-	    fcio.fcio_ibuf = (caddr_t)&rls_req;
-	    fcio.fcio_ilen = sizeof (rls_req);
-	    fcio.fcio_xfer = FCIO_XFER_RW;
-	    fcio.fcio_flags = 0;
-	    fcio.fcio_obuf = (caddr_t)&rls_payload;
-	    fcio.fcio_olen = sizeof (rls_payload);
-	    if (g_issue_fcio_ioctl(fp_fd, &fcio, verbose) != 0) {
-		c1->payload.rls_linkfail =
-		c1->payload.rls_syncfail =
-		c1->payload.rls_sigfail =
-		c1->payload.rls_primitiverr =
-		c1->payload.rls_invalidword =
-		c1->payload.rls_invalidcrc = (uint_t)0xffffffff;
-	    } else {
-		/*
-		 * Load the values into the struct passed
-		 * back to the caller
-		 */
-		c1->payload.rls_linkfail = rls_payload.rls_link_fail;
-		c1->payload.rls_syncfail = rls_payload.rls_sync_loss;
-		c1->payload.rls_sigfail = rls_payload.rls_sig_loss;
-		c1->payload.rls_primitiverr = rls_payload.rls_prim_seq_err;
-		c1->payload.rls_invalidword = rls_payload.rls_invalid_word;
-		c1->payload.rls_invalidcrc = rls_payload.rls_invalid_crc;
-	    }
-	    (void) close(fp_fd);
-
-	    if (((map_dev = g_get_next_dev(map_dev, &err)) == NULL) &&
-		(err != L_NO_SUCH_DEV_FOUND)) {
-		g_dev_map_fini(map_root);
-		g_free_rls(rls);
-		return (err);
-	    }
 	}
 
 	/* for Leadville issue a final call for the initiator */
 
 	if ((err = g_dev_prop_lookup_ints(
-		map_root, PORT_ADDR_PROP, &port_addr)) != 0) {
+	    map_root, PORT_ADDR_PROP, &port_addr)) != 0) {
 		g_dev_map_fini(map_root);
 		g_free_rls(rls);
 		return (err);
@@ -3660,11 +3702,11 @@ int		p_on = 0, p_st = 0;
 
 	if (g_issue_fcio_ioctl(fp_fd, &fcio, verbose) != 0) {
 		c1->payload.rls_linkfail =
-		c1->payload.rls_syncfail =
-		c1->payload.rls_sigfail =
-		c1->payload.rls_primitiverr =
-		c1->payload.rls_invalidword =
-		c1->payload.rls_invalidcrc = (uint_t)0xffffffff;
+		    c1->payload.rls_syncfail =
+		    c1->payload.rls_sigfail =
+		    c1->payload.rls_primitiverr =
+		    c1->payload.rls_invalidword =
+		    c1->payload.rls_invalidcrc = (uint_t)0xffffffff;
 	} else {
 		/*
 		 * Load the values into the struct passed
@@ -3704,25 +3746,25 @@ static u_longlong_t wwnConversion(uchar_t *wwn)
  */
 static int
 get_wwns(char *path_phys, uchar_t port_wwn[], uchar_t node_wwn[], int *al_pa,
-	struct wwn_list_found_struct **wwn_list_found)
+    struct wwn_list_found_struct **wwn_list_found)
 {
-uint32_t	hba_port_top;
-int		i, err, count;
-char		*char_ptr, *ptr;
-int		found = 0, pathcnt, *port_addr;
-unsigned long long 	pwwn;
-uchar_t			*port_wwn_byte, *node_wwn_byte;
-char		drvr_path[MAXPATHLEN];
-int		p_on = 0, p_st = 0;
-mp_pathlist_t	pathlist;
-char		pwwn1[WWN_S_LEN];
-gfc_dev_t	map_root, map_dev;
-hrtime_t	start_time, end_time;
-char *env = NULL;
+	uint32_t	hba_port_top;
+	int		i, err, count;
+	char		*char_ptr, *ptr;
+	int		found = 0, pathcnt, *port_addr;
+	unsigned long long 	pwwn;
+	uchar_t			*port_wwn_byte, *node_wwn_byte;
+	char		drvr_path[MAXPATHLEN];
+	int		p_on = 0, p_st = 0;
+	mp_pathlist_t	pathlist;
+	char		pwwn1[WWN_S_LEN];
+	gfc_dev_t	map_root, map_dev;
+	hrtime_t	start_time, end_time;
+	char *env = NULL;
 
 	P_DPRINTF("  g_get_wwn: Getting device WWN"
-			" and al_pa for device: %s\n",
-			path_phys);
+	    " and al_pa for device: %s\n",
+	    path_phys);
 
 	if ((env = getenv("_LUX_T_DEBUG")) != NULL) {
 		start_time = gethrtime();
@@ -3752,11 +3794,11 @@ char *env = NULL;
 		for (i = 0; i < pathcnt; i++) {
 			if (pathlist.path_info[i].path_state < MAXPATHSTATE) {
 				if (pathlist.path_info[i].path_state ==
-					MDI_PATHINFO_STATE_ONLINE) {
+				    MDI_PATHINFO_STATE_ONLINE) {
 					p_on = i;
 					break;
 				} else if (pathlist.path_info[i].path_state ==
-					MDI_PATHINFO_STATE_STANDBY) {
+				    MDI_PATHINFO_STATE_STANDBY) {
 					p_st = i;
 				}
 			}
@@ -3764,25 +3806,25 @@ char *env = NULL;
 		if (p_on == i) {
 			/* on_line path */
 			(void) strcpy(drvr_path,
-				pathlist.path_info[p_on].path_hba);
+			    pathlist.path_info[p_on].path_hba);
 			(void) strncpy(pwwn1,
-				pathlist.path_info[p_on].path_addr,
-				WWN_S_LEN - 1);
+			    pathlist.path_info[p_on].path_addr,
+			    WWN_S_LEN - 1);
 			pwwn1[WWN_S_LEN - 1] = '\0';
 		} else {
 			/* standby or path0 */
 			(void) strcpy(drvr_path,
-				pathlist.path_info[p_st].path_hba);
+			    pathlist.path_info[p_st].path_hba);
 			(void) strncpy(pwwn1,
-				pathlist.path_info[p_st].path_addr,
-				WWN_S_LEN - 1);
+			    pathlist.path_info[p_st].path_addr,
+			    WWN_S_LEN - 1);
 			pwwn1[WWN_S_LEN - 1] = '\0';
 		}
 		free(pathlist.path_info);
 		(void) strcat(drvr_path, FC_CTLR);
 	}
 	if ((map_root = g_dev_map_init(drvr_path, &err,
-		MAP_XPORT_PROP_ONLY)) == NULL) {
+	    MAP_XPORT_PROP_ONLY)) == NULL) {
 		return (err);
 	}
 
@@ -3820,12 +3862,12 @@ char *env = NULL;
 
 	while (map_dev) {
 		if ((err = g_dev_prop_lookup_bytes(map_dev,
-			PORT_WWN_PROP, &count, &port_wwn_byte)) != 0) {
+		    PORT_WWN_PROP, &count, &port_wwn_byte)) != 0) {
 			g_dev_map_fini(map_root);
 			return (err);
 		}
 		if ((err = g_dev_prop_lookup_bytes(map_dev,
-			NODE_WWN_PROP, &count, &node_wwn_byte)) != 0) {
+		    NODE_WWN_PROP, &count, &node_wwn_byte)) != 0) {
 			g_dev_map_fini(map_root);
 			return (err);
 		}
@@ -3835,7 +3877,7 @@ char *env = NULL;
 			memcpy(port_wwn, port_wwn_byte, FC_WWN_SIZE);
 			memcpy(node_wwn, node_wwn_byte, FC_WWN_SIZE);
 			if ((err = g_dev_prop_lookup_ints(
-				map_dev, PORT_ADDR_PROP, &port_addr)) != 0) {
+			    map_dev, PORT_ADDR_PROP, &port_addr)) != 0) {
 				g_dev_map_fini(map_root);
 				return (err);
 			}
@@ -3859,8 +3901,8 @@ char *env = NULL;
 	if (env != NULL) {
 		end_time = gethrtime();
 		fprintf(stdout, "      get_wwns: "
-		"\t\tTime = %lld millisec\n",
-		(end_time - start_time)/1000000);
+		    "\t\tTime = %lld millisec\n",
+		    (end_time - start_time)/1000000);
 	}
 	return (0);
 }
@@ -3875,7 +3917,7 @@ char *env = NULL;
  */
 int
 g_get_wwn(char *path_phys, uchar_t port_wwn[], uchar_t node_wwn[],
-	int *al_pa, int verbose)
+    int *al_pa, int verbose)
 {
 	struct wwn_list_found_struct *wwn_list_found = NULL;
 	int ret;
@@ -3885,8 +3927,7 @@ g_get_wwn(char *path_phys, uchar_t port_wwn[], uchar_t node_wwn[],
 		return (L_INVALID_PATH);
 	}
 	/* return invalid arg if the argument is NULL */
-	if ((port_wwn == NULL) ||
-		(node_wwn == NULL) || (al_pa == NULL)) {
+	if ((port_wwn == NULL) || (node_wwn == NULL) || (al_pa == NULL)) {
 		return (L_INVALID_ARG);
 	}
 
@@ -3899,8 +3940,8 @@ int
 g_get_serial_number(char *path, uchar_t *serial_number,
     size_t *serial_number_len)
 {
-int	    fd, status = 0;
-L_inquiry80 inq80;
+	int	    fd, status = 0;
+	L_inquiry80 inq80;
 
 	/* return invalid path if path is NULL */
 	if (path == NULL) {
@@ -3958,7 +3999,7 @@ L_inquiry80 inq80;
 int
 g_get_inquiry(char *path, L_inquiry *l_inquiry)
 {
-int	    fd, status;
+	int	    fd, status;
 
 	/* return invalid path if path is NULL */
 	if (path == NULL) {
@@ -3973,7 +4014,7 @@ int	    fd, status;
 	if ((fd = g_object_open(path, O_NDELAY | O_RDONLY)) == -1)
 		return (L_OPEN_PATH_FAIL);
 	status = g_scsi_inquiry_cmd(fd,
-		(uchar_t *)l_inquiry, sizeof (struct l_inquiry_struct));
+	    (uchar_t *)l_inquiry, sizeof (struct l_inquiry_struct));
 
 	(void) close(fd);
 	return (status);
@@ -3985,9 +4026,9 @@ int	    fd, status;
 static int
 g_scsi_inquiry_cmd80(int fd, uchar_t *buf_ptr, int buf_len)
 {
-struct uscsi_cmd	ucmd;
-my_cdb_g0	cdb = {SCMD_INQUIRY, 0x1, 0x80, 0, 0x10, 0};
-struct	scsi_extended_sense	sense;
+	struct uscsi_cmd	ucmd;
+	my_cdb_g0		cdb = {SCMD_INQUIRY, 0x1, 0x80, 0, 0x10, 0};
+	struct scsi_extended_sense	sense;
 
 	(void) memset(buf_ptr, 0, buf_len);
 	(void) memset((char *)&ucmd, 0, sizeof (ucmd));
@@ -4008,13 +4049,13 @@ struct	scsi_extended_sense	sense;
 static int
 g_find_supported_inq_page(int fd, int page_num)
 {
-struct	uscsi_cmd	ucmd;
-my_cdb_g0	cdb = {SCMD_INQUIRY, 0x1, 0, 0, 0xff, 0};
-struct	scsi_extended_sense	sense;
-L_inquiry00			inq00;
-uchar_t				*data;
-int				status = 0;
-int				index;
+	struct	uscsi_cmd	ucmd;
+	my_cdb_g0	cdb = {SCMD_INQUIRY, 0x1, 0, 0, 0xff, 0};
+	struct	scsi_extended_sense	sense;
+	L_inquiry00			inq00;
+	uchar_t				*data;
+	int				status = 0;
+	int				index;
 
 	(void) memset((char *)&ucmd, 0, sizeof (ucmd));
 	cdb.count = (uchar_t)(sizeof (L_inquiry00));
@@ -4042,11 +4083,11 @@ int				index;
 int
 g_get_perf_statistics(char *path, uchar_t *perf_ptr)
 {
-int	fd;
+	int	fd;
 
 	P_DPRINTF("  g_get_perf_statistics: Get Performance Statistics:"
-		"\n  Path:%s\n",
-		path);
+	    "\n  Path:%s\n",
+	    path);
 
 	/* initialize tables */
 	(void) memset(perf_ptr, 0, sizeof (int));
@@ -4070,8 +4111,8 @@ int	fd;
 int
 g_start(char *path)
 {
-int	status;
-int	fd;
+	int	status;
+	int	fd;
 
 	P_DPRINTF("  g_start: Start: Path %s\n", path);
 	if ((fd = g_object_open(path, O_NDELAY | O_RDONLY)) == -1)
@@ -4084,7 +4125,7 @@ int	fd;
 int
 g_stop(char *path, int immediate_flag)
 {
-int	status, fd;
+	int	status, fd;
 
 	P_DPRINTF("  g_stop: Stop: Path %s\n", path);
 	if ((fd = g_object_open(path, O_NDELAY | O_RDONLY)) == -1)
@@ -4097,7 +4138,7 @@ int	status, fd;
 int
 g_reserve(char *path)
 {
-int 	fd, status;
+	int 	fd, status;
 
 	P_DPRINTF("  g_reserve: Reserve: Path %s\n", path);
 	if ((fd = g_object_open(path, O_NDELAY | O_RDONLY)) == -1)
@@ -4110,7 +4151,7 @@ int 	fd, status;
 int
 g_release(char *path)
 {
-int 	fd, status;
+	int 	fd, status;
 
 	P_DPRINTF("  g_release: Release: Path %s\n", path);
 	if ((fd = g_object_open(path, O_NDELAY | O_RDONLY)) == -1)
@@ -4199,9 +4240,9 @@ string_to_wwn(uchar_t *string, uchar_t *wwn)
 int
 g_get_port_multipath(char *port_wwn_s, struct dlist **dlh, int verbose)
 {
-int		err;
-WWN_list	*wwn_list, *wwn_list_ptr;
-struct dlist	*dlt, *dl;
+	int		err;
+	WWN_list	*wwn_list, *wwn_list_ptr;
+	struct dlist	*dlt, *dl;
 
 
 	/* Initialize list structures. */
@@ -4209,18 +4250,18 @@ struct dlist	*dlt, *dl;
 	wwn_list = wwn_list_ptr = NULL;
 
 	H_DPRINTF("  g_get_port_multipath: Looking for multiple paths for"
-		" device with\n    port WWW:"
-		"%s\n", port_wwn_s);
+	    " device with\n    port WWW:"
+	    "%s\n", port_wwn_s);
 
 	if (err = g_get_wwn_list(&wwn_list, verbose)) {
 		return (err);
 	}
 
 	for (wwn_list_ptr = wwn_list; wwn_list_ptr != NULL;
-				wwn_list_ptr = wwn_list_ptr->wwn_next) {
+	    wwn_list_ptr = wwn_list_ptr->wwn_next) {
 		if (strcmp(port_wwn_s, wwn_list_ptr->port_wwn_s) == 0) {
 			if ((dl = (struct dlist *)
-				g_zalloc(sizeof (struct dlist))) == NULL) {
+			    g_zalloc(sizeof (struct dlist))) == NULL) {
 				while (*dlh != NULL) {
 					dl = (*dlh)->next;
 					(void) g_destroy_data(*dlh);
@@ -4230,8 +4271,8 @@ struct dlist	*dlt, *dl;
 				return (L_MALLOC_FAILED);
 			}
 			H_DPRINTF("  g_get_port_multipath:"
-				" Found multipath:\n    %s\n",
-				wwn_list_ptr->physical_path);
+			    " Found multipath:\n    %s\n",
+			    wwn_list_ptr->physical_path);
 			dl->dev_path = strdup(wwn_list_ptr->physical_path);
 			dl->logical_path = strdup(wwn_list_ptr->logical_path);
 			if (*dlh == NULL) {
@@ -4263,12 +4304,12 @@ struct dlist	*dlt, *dl;
  */
 int
 g_get_multipath(char *devpath, struct dlist **multipath_list,
-	struct wwn_list_struct *wwn_list, int verbose)
+    struct wwn_list_struct *wwn_list, int verbose)
 {
-int	err;
+	int	err;
 
 	H_DPRINTF("  g_get_multipath: Looking for multiple paths for"
-		" device at path: %s\n", devpath);
+	    " device at path: %s\n", devpath);
 
 	/* return invalid path if devpath is NULL */
 	if (devpath == NULL) {
@@ -4302,14 +4343,14 @@ int	err;
  */
 int
 get_multipath_disk(char *devpath, struct dlist **multipath_list,
-	struct wwn_list_struct *wwn_list)
+    struct wwn_list_struct *wwn_list)
 {
-WWN_list	*wwn_list_ptr;
-struct dlist	*dl = NULL, *dlt = NULL;
-ddi_devid_t	devid = NULL;
-int		err;
-di_node_t	root;
-struct mplist_struct	*mplistp = NULL, *mplisth = NULL;
+	WWN_list	*wwn_list_ptr;
+	struct dlist	*dl = NULL, *dlt = NULL;
+	ddi_devid_t	devid = NULL;
+	int		err;
+	di_node_t	root;
+	struct mplist_struct	*mplistp = NULL, *mplisth = NULL;
 
 	if (wwn_list == NULL || multipath_list == NULL || devpath == NULL) {
 		return (L_NULL_WWN_LIST);
@@ -4336,39 +4377,43 @@ struct mplist_struct	*mplistp = NULL, *mplisth = NULL;
 	}
 
 	for (wwn_list_ptr = wwn_list; wwn_list_ptr != NULL;
-				wwn_list_ptr = wwn_list_ptr->wwn_next) {
+	    wwn_list_ptr = wwn_list_ptr->wwn_next) {
 		/*
 		 * When a path is found from the list, load the logical
 		 * and physical dev path
 		 */
 		for (mplistp = mplisth; mplistp != NULL;
-				mplistp = mplistp->next) {
-		    if (strncmp(mplistp->devpath, wwn_list_ptr->physical_path,
-			strlen(mplistp->devpath)) == 0) {
+		    mplistp = mplistp->next) {
+			if (strncmp(mplistp->devpath,
+			    wwn_list_ptr->physical_path,
+			    strlen(mplistp->devpath)) == 0) {
 
-			/* Load multipath list */
-			if ((dl = (struct dlist *)
-				calloc(1, sizeof (struct dlist))) == NULL) {
-				while (*multipath_list != NULL) {
-					dl = dlt->next;
-					g_destroy_data(dlt);
+				/* Load multipath list */
+				if ((dl = (struct dlist *)
+				    calloc(1, sizeof (struct dlist))) == NULL) {
+					while (*multipath_list != NULL) {
+						dl = dlt->next;
+						g_destroy_data(dlt);
+						dlt = dl;
+					}
+					di_fini(root);
+					return (L_MALLOC_FAILED);
+				}
+				H_DPRINTF(
+				    "  g_get_multipath: Found multipath=%s\n",
+				    wwn_list_ptr->physical_path);
+				dl->logical_path =
+				    strdup(wwn_list_ptr->logical_path);
+				dl->dev_path =
+				    strdup(wwn_list_ptr->physical_path);
+				if (*multipath_list == NULL) {
+					*multipath_list = dlt = dl;
+				} else {
+					dlt->next = dl;
+					dl->prev = dlt;
 					dlt = dl;
 				}
-				di_fini(root);
-				return (L_MALLOC_FAILED);
 			}
-			H_DPRINTF("  g_get_multipath: Found multipath=%s\n",
-					wwn_list_ptr->physical_path);
-			dl->logical_path = strdup(wwn_list_ptr->logical_path);
-			dl->dev_path = strdup(wwn_list_ptr->physical_path);
-			if (*multipath_list == NULL) {
-				*multipath_list = dlt = dl;
-			} else {
-				dlt->next = dl;
-				dl->prev = dlt;
-				dlt = dl;
-			}
-		    }
 		}
 	}
 	di_fini(root);
@@ -4380,12 +4425,12 @@ int
 get_multipath(char *devpath, struct dlist **multipath_list,
 	struct wwn_list_struct *wwn_list)
 {
-WWN_list	*wwn_list_ptr;
-struct dlist	*dl, *dlt;
-char		path[MAXPATHLEN], m_phys_path[MAXPATHLEN], *ptr;
-int		len;
-int		lun_a = -1;
-char		node_wwn_s[WWN_S_LEN];
+	WWN_list	*wwn_list_ptr;
+	struct dlist	*dl, *dlt;
+	char		path[MAXPATHLEN], m_phys_path[MAXPATHLEN], *ptr;
+	int		len;
+	int		lun_a = -1;
+	char		node_wwn_s[WWN_S_LEN];
 
 	if (devpath == NULL) {
 		return (L_INVALID_PATH);
@@ -4408,13 +4453,13 @@ char		node_wwn_s[WWN_S_LEN];
 	}
 
 	for (*node_wwn_s = NULL, wwn_list_ptr = wwn_list;
-				wwn_list_ptr != NULL;
-				wwn_list_ptr = wwn_list_ptr->wwn_next) {
+	    wwn_list_ptr != NULL;
+	    wwn_list_ptr = wwn_list_ptr->wwn_next) {
 
 		if ((ptr = strrchr(wwn_list_ptr->physical_path, ':')) != NULL) {
 			len = strlen(wwn_list_ptr->physical_path) - strlen(ptr);
 			(void) strncpy(m_phys_path, wwn_list_ptr->physical_path,
-					len);
+			    len);
 			m_phys_path[len] = '\0';
 		} else {
 			(void) strcpy(m_phys_path, wwn_list_ptr->physical_path);
@@ -4434,13 +4479,13 @@ char		node_wwn_s[WWN_S_LEN];
 	lun_a = g_get_lun_number(wwn_list_ptr->physical_path);
 
 	for (wwn_list_ptr = wwn_list; wwn_list_ptr != NULL;
-				wwn_list_ptr = wwn_list_ptr->wwn_next) {
+	    wwn_list_ptr = wwn_list_ptr->wwn_next) {
 		if ((strcmp(node_wwn_s, wwn_list_ptr->node_wwn_s) == 0) &&
-			((lun_a < 0) || (lun_a ==
-			g_get_lun_number(wwn_list_ptr->physical_path)))) {
+		    ((lun_a < 0) || (lun_a ==
+		    g_get_lun_number(wwn_list_ptr->physical_path)))) {
 
 			if ((dl = (struct dlist *)
-				g_zalloc(sizeof (struct dlist))) == NULL) {
+			    g_zalloc(sizeof (struct dlist))) == NULL) {
 				while (*multipath_list != NULL) {
 					dl = dlt->next;
 					(void) g_destroy_data(dlt);
@@ -4449,7 +4494,7 @@ char		node_wwn_s[WWN_S_LEN];
 				return (L_MALLOC_FAILED);
 			}
 			H_DPRINTF("  g_get_multipath: Found multipath=%s\n",
-					wwn_list_ptr->physical_path);
+			    wwn_list_ptr->physical_path);
 			dl->dev_path = strdup(wwn_list_ptr->physical_path);
 			dl->logical_path = strdup(wwn_list_ptr->logical_path);
 			if (*multipath_list == NULL) {
@@ -4471,7 +4516,7 @@ char		node_wwn_s[WWN_S_LEN];
 void
 g_free_multipath(struct dlist *dlh)
 {
-struct dlist	*dl;
+	struct dlist	*dl;
 
 	while (dlh != NULL) {
 		dl = dlh->next;
@@ -4513,16 +4558,16 @@ struct dlist	*dl;
 int
 g_get_nexus_path(char *path_phys, char **nexus_path)
 {
-uchar_t		port = 0;
-int		port_flag = 0, i = 0, pathcnt = 1;
-char		*char_ptr;
-char		drvr_path[MAXPATHLEN];
-char		buf[MAXPATHLEN];
-char		temp_buf[MAXPATHLEN];
-struct stat	stbuf;
-uint_t		path_type;
-mp_pathlist_t	pathlist;
-int		p_on = 0, p_st = 0;
+	uchar_t		port = 0;
+	int		port_flag = 0, i = 0, pathcnt = 1;
+	char		*char_ptr;
+	char		drvr_path[MAXPATHLEN];
+	char		buf[MAXPATHLEN];
+	char		temp_buf[MAXPATHLEN];
+	struct stat	stbuf;
+	uint_t		path_type;
+	mp_pathlist_t	pathlist;
+	int		p_on = 0, p_st = 0;
 
 	/* return invalid path if the path_phys is NULL */
 	if (path_phys == NULL) {
@@ -4541,11 +4586,11 @@ int		p_on = 0, p_st = 0;
 		for (i = 0; i < pathcnt; i++) {
 			if (pathlist.path_info[i].path_state < MAXPATHSTATE) {
 				if (pathlist.path_info[i].path_state ==
-					MDI_PATHINFO_STATE_ONLINE) {
+				    MDI_PATHINFO_STATE_ONLINE) {
 					p_on = i;
 					break;
 				} else if (pathlist.path_info[i].path_state ==
-					MDI_PATHINFO_STATE_STANDBY) {
+				    MDI_PATHINFO_STATE_STANDBY) {
 					p_st = i;
 				}
 			}
@@ -4554,17 +4599,17 @@ int		p_on = 0, p_st = 0;
 		    MDI_PATHINFO_STATE_ONLINE) {
 			/* on_line path */
 			(void) strcpy(drvr_path,
-				pathlist.path_info[p_on].path_hba);
+			    pathlist.path_info[p_on].path_hba);
 		} else {
 			/* standby or path0 */
 			(void) strcpy(drvr_path,
-				pathlist.path_info[p_st].path_hba);
+			    pathlist.path_info[p_st].path_hba);
 		}
 		free(pathlist.path_info);
 		(void) strcat(drvr_path, FC_CTLR);
 	} else {
 		if (strstr(drvr_path, DRV_NAME_SSD) || strstr(drvr_path,
-			DRV_NAME_ST) || strstr(drvr_path, SES_NAME)) {
+		    DRV_NAME_ST) || strstr(drvr_path, SES_NAME)) {
 			if ((char_ptr = strrchr(drvr_path, '/')) == NULL) {
 				return (L_INVALID_PATH);
 			}
@@ -4591,8 +4636,8 @@ int		p_on = 0, p_st = 0;
 		port_flag++;
 
 		L_DPRINTF("  g_get_nexus_path:"
-			" sf driver in path so use port #%d.\n",
-			port);
+		    " sf driver in path so use port #%d.\n",
+		    port);
 	} else if (path_type & FC_GEN_XPORT) {
 		/*
 		 * check to see if it 3rd party vendor FCA.
@@ -4647,10 +4692,10 @@ int		p_on = 0, p_st = 0;
 				 * did exist.
 				 */
 				ER_DPRINTF("Since a complete path"
-					" was not supplied "
-					"a default path is being"
-					" used:\n  %s\n",
-					temp_buf);
+				    " was not supplied "
+				    "a default path is being"
+				    " used:\n  %s\n",
+				    temp_buf);
 				(void) sprintf(buf, ":0");
 			}
 		}
@@ -4716,14 +4761,14 @@ int		p_on = 0, p_st = 0;
 int
 g_get_fca_port_topology(char *path, uint32_t *port_top, int verbose)
 {
-fcio_t		fcio;
-int		fd, i = 0, pathcnt = 1;
-char		drvr_path[MAXPATHLEN];
-char		*char_ptr;
-struct stat	stbuf;
-uint_t		dev_type;
-mp_pathlist_t	pathlist;
-int		p_on = 0, p_st = 0;
+	fcio_t		fcio;
+	int		fd, i = 0, pathcnt = 1;
+	char		drvr_path[MAXPATHLEN];
+	char		*char_ptr;
+	struct stat	stbuf;
+	uint_t		dev_type;
+	mp_pathlist_t	pathlist;
+	int		p_on = 0, p_st = 0;
 
 	/* return invalid path if the path is NULL */
 	if (path == NULL) {
@@ -4744,11 +4789,11 @@ int		p_on = 0, p_st = 0;
 		for (i = 0; i < pathcnt; i++) {
 			if (pathlist.path_info[i].path_state < MAXPATHSTATE) {
 				if (pathlist.path_info[i].path_state ==
-					MDI_PATHINFO_STATE_ONLINE) {
+				    MDI_PATHINFO_STATE_ONLINE) {
 					p_on = i;
 					break;
 				} else if (pathlist.path_info[i].path_state ==
-					MDI_PATHINFO_STATE_STANDBY) {
+				    MDI_PATHINFO_STATE_STANDBY) {
 					p_st = i;
 				}
 			}
@@ -4757,11 +4802,11 @@ int		p_on = 0, p_st = 0;
 		    MDI_PATHINFO_STATE_ONLINE) {
 			/* on_line path */
 			(void) strcpy(drvr_path,
-				pathlist.path_info[p_on].path_hba);
+			    pathlist.path_info[p_on].path_hba);
 		} else {
 			/* standby or path0 */
 			(void) strcpy(drvr_path,
-				pathlist.path_info[p_st].path_hba);
+			    pathlist.path_info[p_st].path_hba);
 		}
 		free(pathlist.path_info);
 		(void) strcat(drvr_path, FC_CTLR);
@@ -4785,8 +4830,8 @@ int		p_on = 0, p_st = 0;
 	 *
 	 */
 		if ((strstr(drvr_path, DRV_NAME_SSD) ||
-			strstr(drvr_path, SES_NAME)) ||
-			strstr(drvr_path, DRV_NAME_ST)) {
+		    strstr(drvr_path, SES_NAME)) ||
+		    strstr(drvr_path, DRV_NAME_ST)) {
 			if ((char_ptr = strrchr(drvr_path, '/')) == NULL) {
 				return (L_INVALID_PATH);
 			}
@@ -4822,7 +4867,7 @@ int		p_on = 0, p_st = 0;
 		return (errno);
 
 	P_DPRINTF("  g_get_fca_port_topology: Geting topology from:"
-		" %s\n", drvr_path);
+	    " %s\n", drvr_path);
 
 	fcio.fcio_cmd = FCIO_GET_TOPOLOGY;
 	fcio.fcio_olen = sizeof (uint32_t);
@@ -4873,7 +4918,7 @@ g_set_port_state(char *nexus_port_ptr, int cmd)
 				 * even if the ioctl has completed successfully.
 				 */
 				if (ioctl(fd, FCIO_LOOPBACK_INTERNAL,
-							NULL) == -1) {
+				    NULL) == -1) {
 					close(fd);
 					return (L_PORT_OFFLINE_FAIL);
 				}
@@ -4976,7 +5021,7 @@ g_loopback_mode(char *portpath, int cmd)
 		case EXT_LPBACK:
 			if (path_type & FC4_SOCAL_FCA) {
 				if (ioctl(fd, FCIO_LOOPBACK_MANUAL,
-							NULL) == -1) {
+				    NULL) == -1) {
 					/* Check for previous mode set */
 					if (errno != EALREADY) {
 						close(fd);
@@ -5008,7 +5053,7 @@ g_loopback_mode(char *portpath, int cmd)
 		case INT_LPBACK:
 			if (path_type & FC4_SOCAL_FCA) {
 				if (ioctl(fd, FCIO_LOOPBACK_INTERNAL,
-					NULL) == -1) {
+				    NULL) == -1) {
 					/* Check for previous mode set */
 					if (errno != EALREADY) {
 						close(fd);
@@ -5075,7 +5120,7 @@ g_get_port_state(char *portpath, int *portstate, int verbose)
 	 */
 	if (dev_type & FC_FCA_MASK) {
 		if ((map_root = g_dev_map_init(portpath, &err,
-			MAP_XPORT_PROP_ONLY)) == NULL) {
+		    MAP_XPORT_PROP_ONLY)) == NULL) {
 			return (err);
 		}
 
@@ -5109,7 +5154,7 @@ g_get_port_state(char *portpath, int *portstate, int verbose)
 
 		/* Non-Leadville stacks report the FCA in the count */
 		*portstate = (num_devices > 1) ? PORT_CONNECTED :
-							PORT_NOTCONNECTED;
+		    PORT_NOTCONNECTED;
 		(void) close(fd);
 	}
 	return (0);
@@ -5166,18 +5211,18 @@ g_dev_logout(char *port_path, la_wwn_t port_wwn)
 static int
 g_dev_log_in_out(char *port_path, la_wwn_t port_wwn, uint16_t cmd)
 {
-int		fd, err;
-uint32_t	hba_port_top;
-fcio_t		fcio;
-int		verbose = 0;
+	int		fd, err;
+	uint32_t	hba_port_top;
+	fcio_t		fcio;
+	int		verbose = 0;
 
 	if ((err = g_get_fca_port_topology(port_path,
-		&hba_port_top, verbose)) != 0) {
+	    &hba_port_top, verbose)) != 0) {
 		return (err);
 	}
 
 	if (!((hba_port_top == FC_TOP_PUBLIC_LOOP) ||
-		(hba_port_top == FC_TOP_FABRIC))) {
+	    (hba_port_top == FC_TOP_FABRIC))) {
 		return (L_OPNOSUPP_ON_TOPOLOGY);
 	}
 
@@ -5197,12 +5242,12 @@ int		verbose = 0;
 	fcio.fcio_obuf = fcio.fcio_abuf = NULL;
 	if (g_issue_fcio_ioctl(fd, &fcio, verbose) != 0) {
 		I_DPRINTF((cmd == FCIO_DEV_LOGIN) ?
-			" FCIO_DEV_LOGIN ioctl failed.\n"
-			: " FCIO_DEV_LOGOUT ioctl failed.\n");
+		    " FCIO_DEV_LOGIN ioctl failed.\n"
+		    : " FCIO_DEV_LOGOUT ioctl failed.\n");
 		(void) close(fd);
 		return ((cmd == FCIO_DEV_LOGIN) ?
-			L_FCIO_DEV_LOGIN_FAIL
-			: L_FCIO_DEV_LOGOUT_FAIL);
+		    L_FCIO_DEV_LOGIN_FAIL
+		    : L_FCIO_DEV_LOGOUT_FAIL);
 	} else {
 		(void) close(fd);
 		return (0);
@@ -5236,11 +5281,11 @@ int		verbose = 0;
 int
 g_wwn_in_dev_list(char *fca_path, la_wwn_t dev_wwn, int flag)
 {
-uint_t		dev_type;
-int		i, err;
-fc_port_dev_t	*dev_list;
-fc_port_dev_t	*dev_list_save;
-int		num_devices = 0;
+	uint_t		dev_type;
+	int		i, err;
+	fc_port_dev_t	*dev_list;
+	fc_port_dev_t	*dev_list_save;
+	int		num_devices = 0;
 
 	if ((dev_type = g_get_path_type(fca_path)) == 0) {
 		return (L_INVALID_PATH);
@@ -5251,7 +5296,7 @@ int		num_devices = 0;
 	}
 
 	if (((err = g_get_dev_list(fca_path, &dev_list, &num_devices))
-		!= 0) && (err != L_GET_DEV_LIST_ULP_FAILURE)) {
+	    != 0) && (err != L_GET_DEV_LIST_ULP_FAILURE)) {
 		return (err);
 	}
 
@@ -5261,7 +5306,7 @@ int		num_devices = 0;
 	case MATCH_NODE_WWN:
 		for (i = 0; i < num_devices; i++, dev_list++) {
 			if (memcmp(dev_list->dev_nwwn.raw_wwn,
-					dev_wwn.raw_wwn, FC_WWN_SIZE) == 0) {
+			    dev_wwn.raw_wwn, FC_WWN_SIZE) == 0) {
 				(void) free(dev_list_save);
 				return (0);
 			}
@@ -5273,7 +5318,7 @@ int		num_devices = 0;
 	case MATCH_PORT_WWN:
 		for (i = 0; i < num_devices; i++, dev_list++) {
 			if (memcmp(dev_list->dev_pwwn.raw_wwn,
-					dev_wwn.raw_wwn, FC_WWN_SIZE) == 0) {
+			    dev_wwn.raw_wwn, FC_WWN_SIZE) == 0) {
 				(void) free(dev_list_save);
 				return (0);
 			}
@@ -5304,10 +5349,10 @@ int		num_devices = 0;
 static int
 g_get_dev_port_state(char *fca_path, la_wwn_t port_wwn, uint32_t *state)
 {
-int		fd;
-int		dev_type;
-fcio_t		fcio;
-int		verbose = 0;
+	int		fd;
+	int		dev_type;
+	fcio_t		fcio;
+	int		verbose = 0;
 
 	if ((dev_type = g_get_path_type(fca_path)) == 0) {
 		return (L_INVALID_PATH);
@@ -5389,17 +5434,17 @@ static int lilp_map_cmp(const void* dev1, const void* dev2) {
 
 static int
 devid_get_all(ddi_devid_t devid, di_node_t root, char *drvr_name,
-		struct mplist_struct **mplistp)
+    struct mplist_struct **mplistp)
 {
-ddi_devid_t mydevid;
-di_node_t node;
-char *devfs_path = NULL;
-struct mplist_struct *mpl, *mpln;
+	ddi_devid_t mydevid;
+	di_node_t node;
+	char *devfs_path = NULL;
+	struct mplist_struct *mpl, *mpln;
 
 	if (devid == NULL || root == NULL || drvr_name == NULL ||
-		mplistp == NULL ||
-		(strncmp(drvr_name, SSD_DRVR_NAME, strlen(SSD_DRVR_NAME))
-			!= 0)) {
+	    mplistp == NULL ||
+	    (strncmp(drvr_name, SSD_DRVR_NAME, strlen(SSD_DRVR_NAME))
+	    != 0)) {
 		return (EINVAL);
 	}
 
@@ -5414,36 +5459,37 @@ struct mplist_struct *mpl, *mpln;
 	while (node != DI_NODE_NIL) {
 		if ((mydevid = di_devid(node)) != NULL) {
 			if (((devid_compare(mydevid, devid)) == 0)) {
-			    /* Load multipath list */
-			    if ((mpl = (struct mplist_struct *)
-				calloc(1, sizeof (struct mplist_struct)))
-					== NULL) {
-				mplist_free(*mplistp);
-				return (L_MALLOC_FAILED);
-			    }
-			    if ((devfs_path = my_devfs_path(node)) == NULL) {
-				node = di_drv_next_node(node);
-				S_FREE(mpl);
-				continue;
-			    }
-			    mpl->devpath = (char *)calloc(1,
-					strlen(devfs_path) +
-					strlen(SSD_MINOR_NAME) + 1);
-			    if (mpl->devpath == NULL) {
-				S_FREE(mpl);
-				mplist_free(*mplistp);
+				/* Load multipath list */
+				if ((mpl = (struct mplist_struct *)
+				    calloc(1, sizeof (struct mplist_struct)))
+				    == NULL) {
+					mplist_free(*mplistp);
+					return (L_MALLOC_FAILED);
+				}
+				if ((devfs_path = my_devfs_path(node)) ==
+				    NULL) {
+					node = di_drv_next_node(node);
+					S_FREE(mpl);
+					continue;
+				}
+				mpl->devpath = (char *)calloc(1,
+				    strlen(devfs_path) +
+				    strlen(SSD_MINOR_NAME) + 1);
+				if (mpl->devpath == NULL) {
+					S_FREE(mpl);
+					mplist_free(*mplistp);
+					my_devfs_path_free(devfs_path);
+					return (L_MALLOC_FAILED);
+				}
+				sprintf(mpl->devpath, "%s%s", devfs_path,
+				    SSD_MINOR_NAME);
+				if (*mplistp == NULL) {
+					*mplistp = mpln = mpl;
+				} else {
+					mpln->next = mpl;
+					mpln = mpl;
+				}
 				my_devfs_path_free(devfs_path);
-				return (L_MALLOC_FAILED);
-			    }
-			    sprintf(mpl->devpath, "%s%s", devfs_path,
-					SSD_MINOR_NAME);
-			    if (*mplistp == NULL) {
-				*mplistp = mpln = mpl;
-			    } else {
-				mpln->next = mpl;
-				mpln = mpl;
-			    }
-			    my_devfs_path_free(devfs_path);
 			}
 		}
 	node = di_drv_next_node(node);
@@ -5457,7 +5503,7 @@ struct mplist_struct *mpl, *mpln;
 static void
 mplist_free(struct mplist_struct *mplistp)
 {
-struct mplist_struct *mplistn;
+	struct mplist_struct *mplistn;
 
 	while (mplistp != NULL) {
 		mplistn = mplistp->next;
@@ -5486,19 +5532,19 @@ struct mplist_struct *mplistn;
  */
 static int
 devices_get_all(di_node_t root, char *drvr_name, char *minor_name,
-	struct wwn_list_struct **wwn_list_ptr)
+    struct wwn_list_struct **wwn_list_ptr)
 {
-di_node_t node;
-char *devfs_path;
-char devicepath[MAXPATHLEN];
-uchar_t *nwwn = NULL, *pwwn = NULL;
-uchar_t node_wwn[WWN_SIZE], port_wwn[WWN_SIZE];
-WWN_list *wwn_list, *l1, *l2;
-int scsi_vhci = 0;
-int err, devtype;
+	di_node_t node;
+	char *devfs_path;
+	char devicepath[MAXPATHLEN];
+	uchar_t *nwwn = NULL, *pwwn = NULL;
+	uchar_t node_wwn[WWN_SIZE], port_wwn[WWN_SIZE];
+	WWN_list *wwn_list, *l1, *l2;
+	int scsi_vhci = 0;
+	int err, devtype;
 
 	if (root == DI_NODE_NIL || drvr_name == NULL ||
-		wwn_list_ptr == NULL) {
+	    wwn_list_ptr == NULL) {
 		return (EINVAL);
 	}
 
@@ -5526,87 +5572,92 @@ int err, devtype;
 
 	while (node != DI_NODE_NIL) {
 
-	    if ((devfs_path = my_devfs_path(node)) != NULL) {
+		if ((devfs_path = my_devfs_path(node)) != NULL) {
 
-		/*
-		 * Check for offline state
-		 */
-		if ((di_state(node) & DI_DEVICE_OFFLINE) == DI_DEVICE_OFFLINE) {
-			my_devfs_path_free(devfs_path);
-			node = di_drv_next_node(node);
-			continue;
-		}
-
-		/*
-		 * Only support st, ssd nodes
-		 */
-		if (!strstr(devfs_path, SLSH_DRV_NAME_SSD) &&
-			!strstr(devfs_path, SLSH_DRV_NAME_ST)) {
-			my_devfs_path_free(devfs_path);
-			node = di_drv_next_node(node);
-			continue;
-		}
-
-		devicepath[0] = '\0';
-
-		/*
-		 * form device path
-		 */
-		sprintf(devicepath, "%s%s", devfs_path, minor_name);
-
-		if ((strstr(devicepath, SCSI_VHCI) == NULL)) {
-			if ((err = get_wwn_data(node, &nwwn, &pwwn)) != 0) {
-				my_devfs_path_free(devfs_path);
-				return (err);
-			} else {
-				memcpy(node_wwn, nwwn, sizeof (node_wwn));
-				memcpy(port_wwn, pwwn, sizeof (port_wwn));
-			}
-		} else {
 			/*
-			 * Clear values for SCSI VHCI devices.
-			 * node wwn, port wwn are irrevelant at
-			 * the SCSI VHCI level
+			 * Check for offline state
 			 */
-			scsi_vhci++;
-			memset(port_wwn, 0, sizeof (port_wwn));
-			memset(node_wwn, 0, sizeof (node_wwn));
-		}
+			if ((di_state(node) &
+			    DI_DEVICE_OFFLINE) == DI_DEVICE_OFFLINE) {
+				my_devfs_path_free(devfs_path);
+				node = di_drv_next_node(node);
+				continue;
+			}
 
-		/* Got wwns, load data in list */
-		if ((l2 = (struct  wwn_list_struct *)
-			calloc(1, sizeof (struct  wwn_list_struct))) == NULL) {
+			/*
+			 * Only support st, ssd nodes
+			 */
+			if (!strstr(devfs_path, SLSH_DRV_NAME_SSD) &&
+			    !strstr(devfs_path, SLSH_DRV_NAME_ST)) {
+				my_devfs_path_free(devfs_path);
+				node = di_drv_next_node(node);
+				continue;
+			}
+
+			devicepath[0] = '\0';
+
+			/*
+			 * form device path
+			 */
+			sprintf(devicepath, "%s%s", devfs_path, minor_name);
+
+			if ((strstr(devicepath, SCSI_VHCI) == NULL)) {
+				if ((err = get_wwn_data(node, &nwwn, &pwwn)) !=
+				    0) {
+					my_devfs_path_free(devfs_path);
+					return (err);
+				} else {
+					memcpy(node_wwn, nwwn,
+					    sizeof (node_wwn));
+					memcpy(port_wwn, pwwn,
+					    sizeof (port_wwn));
+				}
+			} else {
+				/*
+				 * Clear values for SCSI VHCI devices.
+				 * node wwn, port wwn are irrevelant at
+				 * the SCSI VHCI level
+				 */
+				scsi_vhci++;
+				memset(port_wwn, 0, sizeof (port_wwn));
+				memset(node_wwn, 0, sizeof (node_wwn));
+			}
+
+			/* Got wwns, load data in list */
+			if ((l2 = (struct  wwn_list_struct *)
+			    calloc(1, sizeof (struct  wwn_list_struct))) ==
+			    NULL) {
+				my_devfs_path_free(devfs_path);
+				return (L_MALLOC_FAILED);
+			}
+			if ((l2->physical_path = (char *)
+			    calloc(1, strlen(devicepath) +1)) == NULL) {
+				my_devfs_path_free(devfs_path);
+				return (L_MALLOC_FAILED);
+			}
+
+			memcpy(l2->w_node_wwn, node_wwn, WWN_SIZE);
+
+			if (scsi_vhci) {
+				strcpy(l2->node_wwn_s, MSGSTR(12000, "N/A"));
+			} else {
+				copy_wwn_data_to_str(l2->node_wwn_s, node_wwn);
+				copy_wwn_data_to_str(l2->port_wwn_s, port_wwn);
+			}
+
+			strcpy(l2->physical_path, devicepath);
+
+			l2->device_type = devtype;
+			if (wwn_list == NULL) {
+				l1 = wwn_list = l2;
+			} else {
+				l2->wwn_prev = l1;
+				l1 = l1->wwn_next = l2;
+			}
 			my_devfs_path_free(devfs_path);
-			return (L_MALLOC_FAILED);
+			scsi_vhci = 0;
 		}
-		if ((l2->physical_path = (char *)
-			calloc(1, strlen(devicepath) +1)) == NULL) {
-			my_devfs_path_free(devfs_path);
-			return (L_MALLOC_FAILED);
-		}
-
-		memcpy(l2->w_node_wwn, node_wwn, WWN_SIZE);
-
-		if (scsi_vhci) {
-		    strcpy(l2->node_wwn_s, MSGSTR(12000, "N/A"));
-		} else {
-		    copy_wwn_data_to_str(l2->node_wwn_s, node_wwn);
-		    copy_wwn_data_to_str(l2->port_wwn_s, port_wwn);
-		}
-
-		strcpy(l2->physical_path, devicepath);
-
-		l2->device_type = devtype;
-		if (wwn_list == NULL) {
-			l1 = wwn_list = l2;
-		} else {
-			l2->wwn_prev = l1;
-			l1 = l1->wwn_next = l2;
-		}
-		my_devfs_path_free(devfs_path);
-		scsi_vhci = 0;
-	    }
-	    node = di_drv_next_node(node);
+		node = di_drv_next_node(node);
 	}
 
 	*wwn_list_ptr = wwn_list; /* pass back ptr to list */
@@ -5619,13 +5670,13 @@ int err, devtype;
 		 */
 		if (strcmp(drvr_name, SSD_DRVR_NAME) == 0) {
 			if ((err = get_dev_path(wwn_list_ptr, DEV_RDIR,
-					DIR_MATCH_SSD)) != 0) {
+			    DIR_MATCH_SSD)) != 0) {
 				g_free_wwn_list(wwn_list_ptr);
 				return (err);
 			}
 		} else if (strcmp(drvr_name, ST_DRVR_NAME) == 0) {
 			if ((err = get_dev_path(wwn_list_ptr, DEV_TAPE_DIR,
-					DIR_MATCH_ST)) != 0) {
+			    DIR_MATCH_ST)) != 0) {
 				g_free_wwn_list(wwn_list_ptr);
 				return (err);
 			}
@@ -5644,13 +5695,13 @@ static int
 get_wwn_data(di_node_t node, uchar_t **nwwn, uchar_t **pwwn)
 {
 	if (di_prop_lookup_bytes(DDI_DEV_T_ANY, node, NODE_WWN_PROP,
-			nwwn) != WWN_SIZE) {
-	/* If we didn't get back the right count, return error */
+	    nwwn) != WWN_SIZE) {
+		/* If we didn't get back the right count, return error */
 		return (L_NO_WWN_PROP_FOUND);
 	}
 	if (di_prop_lookup_bytes(DDI_DEV_T_ANY, node, PORT_WWN_PROP,
-			pwwn) != WWN_SIZE) {
-	/* If we didn't get back the right count, return error */
+	    pwwn) != WWN_SIZE) {
+		/* If we didn't get back the right count, return error */
 		return (L_NO_WWN_PROP_FOUND);
 	}
 	return (0);
@@ -5666,18 +5717,18 @@ get_wwn_data(di_node_t node, uchar_t **nwwn, uchar_t **pwwn)
  */
 static int
 get_dev_path(struct wwn_list_struct **wwn_list_ptr, char *dir_name,
-	char *pattern_match)
+    char *pattern_match)
 {
-DIR		*dirp;
-struct dirent	*entp;
-char		namebuf[MAXPATHLEN];
-char		*result = NULL;
-WWN_list	*wwn_list, *wwn_list_save;
-char		*env;
-hrtime_t	start_time, end_time;
+	DIR		*dirp;
+	struct dirent	*entp;
+	char		namebuf[MAXPATHLEN];
+	char		*result = NULL;
+	WWN_list	*wwn_list, *wwn_list_save;
+	char		*env;
+	hrtime_t	start_time, end_time;
 
 	if (wwn_list_ptr == NULL || *wwn_list_ptr == NULL ||
-		dir_name == NULL || pattern_match == NULL) {
+	    dir_name == NULL || pattern_match == NULL) {
 		return (EINVAL);
 	}
 
@@ -5707,23 +5758,23 @@ hrtime_t	start_time, end_time;
 
 		if ((result = g_get_physical_name_from_link(namebuf)) == NULL) {
 			ER_DPRINTF("  Warning: Get physical name from"
-				" link failed. Link=%s\n", namebuf);
+			    " link failed. Link=%s\n", namebuf);
 			continue;
 		}
 		for (wwn_list = *wwn_list_ptr; wwn_list != NULL;
 		    wwn_list = wwn_list->wwn_next) {
-		    if (strcmp(wwn_list->physical_path, result) == 0) {
-			/*
-			 * Add information to the list.
-			 */
-			if ((wwn_list->logical_path = (char *)
-				calloc(1, strlen(namebuf) + 1)) == NULL) {
-				free(result);
-				return (L_MALLOC_FAILED);
+			if (strcmp(wwn_list->physical_path, result) == 0) {
+				/*
+				 * Add information to the list.
+				 */
+				if ((wwn_list->logical_path = (char *)
+				    calloc(1, strlen(namebuf) + 1)) == NULL) {
+					free(result);
+					return (L_MALLOC_FAILED);
+				}
+				strcpy(wwn_list->logical_path, namebuf);
+				break;
 			}
-			strcpy(wwn_list->logical_path, namebuf);
-			break;
-		    }
 		}
 		free(result);
 	}
@@ -5743,7 +5794,7 @@ hrtime_t	start_time, end_time;
 			wwn_list_save = wwn_list;
 			if (wwn_list->wwn_prev != NULL) {
 				wwn_list->wwn_prev->wwn_next =
-					wwn_list->wwn_next;
+				    wwn_list->wwn_next;
 			} else {
 				/*
 				 * No previous entries
@@ -5752,7 +5803,7 @@ hrtime_t	start_time, end_time;
 			}
 			if (wwn_list->wwn_next != NULL) {
 				wwn_list->wwn_next->wwn_prev =
-					wwn_list->wwn_prev;
+				    wwn_list->wwn_prev;
 			}
 			wwn_list = wwn_list->wwn_next;
 			free(wwn_list_save);
@@ -5764,9 +5815,9 @@ hrtime_t	start_time, end_time;
 	if (env != NULL) {
 		end_time = gethrtime();
 		fprintf(stdout,
-		"      get_dev_path %s:  "
-		"\t\tTime = %lld millisec\n",
-		dir_name, (end_time - start_time)/1000000);
+		    "      get_dev_path %s:  "
+		    "\t\tTime = %lld millisec\n",
+		    dir_name, (end_time - start_time)/1000000);
 	}
 
 	if (*wwn_list_ptr == NULL) {
@@ -5787,18 +5838,21 @@ hrtime_t	start_time, end_time;
  * The argument 'path' points to the final value upon return.
  * Caller must use my_devfs_path_free on returned char *
  * Note: Only support FC/SCSI_VHCI devices,
- *       for FC check for node-wwn prop
+ *       for FC check for initiator-interconnect-type prop
  *
  */
 static char *
 my_devfs_path(di_node_t node)
 {
 	uchar_t	*pwwn = NULL;
+	char	*interconnect = NULL;
 	char	pwwns[WWN_SIZE*2+1];
 	char	*mypath;
 	int	scsi_vhci = 0;
+	int	rval;
 	char	*tptr = NULL, *lun_guid = NULL;
 	int	*lunnump = NULL;
+	di_node_t	parentnode;
 
 	/* sanity check */
 	if (node == DI_NODE_NIL) {
@@ -5810,6 +5864,8 @@ my_devfs_path(di_node_t node)
 		return (NULL);
 	}
 
+	parentnode = di_parent_node(node);
+
 	if ((mypath = (char *)calloc(1, MAXPATHLEN + 1)) == NULL) {
 		di_devfs_path_free(tptr);
 		return (NULL);
@@ -5820,14 +5876,17 @@ my_devfs_path(di_node_t node)
 
 	di_devfs_path_free(tptr);
 
-
 	/*
 	 * Is this a FC device?
-	 * Check the pwwn property
+	 * Check initiator-interconnect-type property
 	 */
 	if (strstr(mypath, SCSI_VHCI) == NULL) {
-		if (di_prop_lookup_bytes(DDI_DEV_T_ANY, node, PORT_WWN_PROP,
-				&pwwn) < 0) {
+		rval = di_prop_lookup_strings(DDI_DEV_T_ANY, parentnode,
+		    "initiator-interconnect-type", &interconnect);
+		/* Check for INTERCONNECT_FABRIC_STR & INTERCONNECT_FIBRE_STR */
+		if ((rval <= 0) ||
+		    ((strcmp(interconnect, "FABRIC") != 0) &&
+		    (strcmp(interconnect, "FIBRE") != 0))) {
 			/* Not a FC device. Free path and return */
 			free(mypath);
 			return (NULL);
@@ -5866,7 +5925,7 @@ my_devfs_path(di_node_t node)
 		sprintf(&mypath[strlen(mypath)], "@w%s,%x", pwwn, *lunnump);
 	} else {
 		di_prop_lookup_strings(DDI_DEV_T_ANY, node,
-			LUN_GUID_PROP, &lun_guid);
+		    LUN_GUID_PROP, &lun_guid);
 		sprintf(&mypath[strlen(mypath)], "@g%s", lun_guid);
 	}
 	return (mypath);
@@ -5891,8 +5950,8 @@ copy_wwn_data_to_str(char *to_ptr, const uchar_t *from_ptr)
 		return;
 
 	sprintf(to_ptr, "%1.2x%1.2x%1.2x%1.2x%1.2x%1.2x%1.2x%1.2x",
-	from_ptr[0], from_ptr[1], from_ptr[2], from_ptr[3],
-	from_ptr[4], from_ptr[5], from_ptr[6], from_ptr[7]);
+	    from_ptr[0], from_ptr[1], from_ptr[2], from_ptr[3],
+	    from_ptr[4], from_ptr[5], from_ptr[6], from_ptr[7]);
 }
 
 /*
@@ -5913,11 +5972,11 @@ copy_wwn_data_to_str(char *to_ptr, const uchar_t *from_ptr)
 static void
 init_drv(char *dir_name, char *pattern_match, char *drvr_path)
 {
-DIR		*dirp;
-struct dirent	*entp;
-char		namebuf[MAXPATHLEN];
-char		*result = NULL;
-int		fd;
+	DIR		*dirp;
+	struct dirent	*entp;
+	char		namebuf[MAXPATHLEN];
+	char		*result = NULL;
+	int		fd;
 
 	if ((dirp = opendir(dir_name)) == NULL) {
 		return;
@@ -5939,7 +5998,7 @@ int		fd;
 
 		if ((result = g_get_physical_name_from_link(namebuf)) == NULL) {
 			ER_DPRINTF("  Warning: Get physical name from"
-				" link failed. Link=%s\n", namebuf);
+			    " link failed. Link=%s\n", namebuf);
 			continue;
 		}
 
