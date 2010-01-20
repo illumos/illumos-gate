@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * From	"tsol_tndb_parser.c	7.24	01/09/05 SMI; TSOL 2.x"
@@ -39,8 +39,6 @@
  * colons in a line, nor any unescaped ';' characters in the non-MLP fields.
  * Such things are indicative of typing errors, not intentional configuration.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <ctype.h>
 #include <stdlib.h>
@@ -157,6 +155,7 @@ tsol_zcent_t *
 tsol_sgetzcent(const char *instr, int *errp, char **errstrp)
 {
 	int err;
+	m_label_t *slp;
 	char *errstr;
 	tsol_zcent_t *zc;
 	const char *nextf;
@@ -215,7 +214,10 @@ tsol_sgetzcent(const char *instr, int *errp, char **errstrp)
 		*errp = LTSNET_NO_LABEL;
 		goto err_ret;
 	}
-	if (stobsl(fieldbuf, &zc->zc_label, NO_CORRECTION, &err) == 0) {
+
+	slp = &zc->zc_label;
+	if (str_to_label(fieldbuf, &slp, MAC_LABEL, L_NO_CORRECTION, NULL)
+	    != 0) {
 		*errstrp = (char *)instr;
 		*errp = LTSNET_ILL_LABEL;
 		goto err_ret;

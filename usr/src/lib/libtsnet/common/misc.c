@@ -19,13 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * From "misc.c	5.15	00/05/31 SMI; TSOL 2.x"
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	Miscellaneous user interfaces to trusted label functions.
@@ -43,7 +41,6 @@
 
 #include <net/route.h>
 
-#define	MAX_STRING_SIZE 256
 #define	MAX_ATTR_LEN	1024
 
 /*
@@ -91,18 +88,19 @@ parse_entry(char *outbuf, size_t outlen, const char *instr,
 	return (instr);
 }
 
-const char *
-sl_to_str(const bslabel_t *sl)
+char *
+sl_to_str(const m_label_t *sl)
 {
-	const char *sl_str;
-	static const char unknown_str[] = "UNKNOWN";
+	char *sl_str = NULL;
+	static char unknown_str[] = "UNKNOWN";
 
 	if (sl == NULL)
-		return (unknown_str);
+		return (strdup(unknown_str));
 
-	if ((sl_str = sbsltos(sl, MAX_STRING_SIZE)) == NULL &&
-	    (sl_str = bsltoh(sl)) == NULL)
-		sl_str = unknown_str;
+	if ((label_to_str(sl, &sl_str, M_LABEL, DEF_NAMES) != 0) &&
+	    (label_to_str(sl, &sl_str, M_INTERNAL, DEF_NAMES) != 0))
+		return (strdup(unknown_str));
+
 	return (sl_str);
 }
 
@@ -126,6 +124,7 @@ rtsa_to_str(const struct rtsa_s *rtsa, char *line, size_t len)
 {
 	size_t slen;
 	uint32_t mask, i;
+	char *sl_str = NULL;
 
 	slen = 0;
 	*line = '\0';
@@ -143,18 +142,28 @@ rtsa_to_str(const struct rtsa_s *rtsa, char *line, size_t len)
 			if ((mask & RTSA_MAXSL) &&
 			    blequal(&rtsa->rtsa_slrange.lower_bound,
 			    &rtsa->rtsa_slrange.upper_bound)) {
+
+				sl_str =
+				    sl_to_str(&rtsa->rtsa_slrange.lower_bound);
 				slen += snprintf(line + slen, len - slen,
-				    "sl=%s",
-				    sl_to_str(&rtsa->rtsa_slrange.lower_bound));
+				    "sl=%s", sl_str);
+				free(sl_str);
+				sl_str = NULL;
 				mask ^= RTSA_MAXSL;
 				break;
 			}
+			sl_str = sl_to_str(&rtsa->rtsa_slrange.lower_bound);
 			slen += snprintf(line + slen, len - slen, "min_sl=%s",
-			    sl_to_str(&rtsa->rtsa_slrange.lower_bound));
+			    sl_str);
+			free(sl_str);
+			sl_str = NULL;
 			break;
 		case RTSA_MAXSL:
+			sl_str = sl_to_str(&rtsa->rtsa_slrange.upper_bound);
 			slen += snprintf(line + slen, len - slen, "max_sl=%s",
-			    sl_to_str(&rtsa->rtsa_slrange.upper_bound));
+			    sl_str);
+			free(sl_str);
+			sl_str = NULL;
 			break;
 		case RTSA_DOI:
 			slen += snprintf(line + slen, len - slen, "doi=%d",
@@ -175,7 +184,7 @@ rtsa_keyword(const char *options, struct rtsa_s *sp, int *errp, char **errstrp)
 	const char *valptr, *nxtopt;
 	uint32_t mask = 0, doi;
 	int key;
-	bslabel_t min_sl, max_sl;
+	m_label_t *min_sl = NULL, *max_sl = NULL;
 	char attrbuf[MAX_ATTR_LEN];
 	const char **keyword;
 	int err;
@@ -194,7 +203,7 @@ rtsa_keyword(const char *options, struct rtsa_s *sp, int *errp, char **errstrp)
 		if (attrbuf[0] == '\0') {
 			*errstrp = (char *)options;
 			*errp = LTSNET_ILL_ENTRY;
-			return (B_FALSE);
+			goto out_err;
 		}
 		for (keyword = rtsa_keywords; *keyword != NULL; keyword++)
 			if (strcmp(*keyword, attrbuf) == 0)
@@ -202,13 +211,13 @@ rtsa_keyword(const char *options, struct rtsa_s *sp, int *errp, char **errstrp)
 		if ((key = keyword - rtsa_keywords) == SAK_INVAL) {
 			*errstrp = (char *)options;
 			*errp = LTSNET_ILL_KEY;
-			return (B_FALSE);
+			goto out_err;
 		}
 		if ((key == SAK_CIPSO && *valptr == '=') ||
 		    (key != SAK_CIPSO && *valptr != '=')) {
 			*errstrp = (char *)valptr;
 			*errp = LTSNET_ILL_VALDELIM;
-			return (B_FALSE);
+			goto out_err;
 		}
 
 		nxtopt = valptr;
@@ -219,7 +228,7 @@ rtsa_keyword(const char *options, struct rtsa_s *sp, int *errp, char **errstrp)
 			if (*nxtopt == '=') {
 				*errstrp = (char *)nxtopt;
 				*errp = LTSNET_ILL_KEYDELIM;
-				return (B_FALSE);
+				goto out_err;
 			}
 		}
 		if (*nxtopt == ',')
@@ -230,13 +239,15 @@ rtsa_keyword(const char *options, struct rtsa_s *sp, int *errp, char **errstrp)
 			if (mask & RTSA_MINSL) {
 				*errstrp = (char *)options;
 				*errp = LTSNET_DUP_KEY;
-				return (B_FALSE);
+				goto out_err;
 			}
-			if (stobsl(attrbuf, &min_sl, NO_CORRECTION,
-			    &err) != 1) {
+			m_label_free(min_sl);		/* in case of duplicate */
+			min_sl = NULL;
+			if (str_to_label(attrbuf, &min_sl, MAC_LABEL,
+			    L_NO_CORRECTION, NULL) != 0) {
 				*errstrp = (char *)valptr;
 				*errp = LTSNET_ILL_LOWERBOUND;
-				return (B_FALSE);
+				goto out_err;
 			}
 			mask |= RTSA_MINSL;
 			break;
@@ -245,13 +256,15 @@ rtsa_keyword(const char *options, struct rtsa_s *sp, int *errp, char **errstrp)
 			if (mask & RTSA_MAXSL) {
 				*errstrp = (char *)options;
 				*errp = LTSNET_DUP_KEY;
-				return (B_FALSE);
+				goto out_err;
 			}
-			if (stobsl(attrbuf, &max_sl, NO_CORRECTION,
-			    &err) != 1) {
+			m_label_free(max_sl);		/* in case of duplicate */
+			max_sl = NULL;
+			if (str_to_label(attrbuf, &max_sl, MAC_LABEL,
+			    L_NO_CORRECTION, NULL) != 0) {
 				*errstrp = (char *)valptr;
 				*errp = LTSNET_ILL_UPPERBOUND;
-				return (B_FALSE);
+				goto out_err;
 			}
 			mask |= RTSA_MAXSL;
 			break;
@@ -260,15 +273,17 @@ rtsa_keyword(const char *options, struct rtsa_s *sp, int *errp, char **errstrp)
 			if (mask & (RTSA_MAXSL|RTSA_MINSL)) {
 				*errstrp = (char *)options;
 				*errp = LTSNET_DUP_KEY;
-				return (B_FALSE);
+				goto out_err;
 			}
-			if (stobsl(attrbuf, &min_sl, NO_CORRECTION,
-			    &err) != 1) {
+			m_label_free(min_sl);		/* in case of duplicate */
+			min_sl = NULL;
+			if (str_to_label(attrbuf, &min_sl, MAC_LABEL,
+			    L_NO_CORRECTION, NULL) != 0) {
 				*errstrp = (char *)valptr;
 				*errp = LTSNET_ILL_LABEL;
-				return (B_FALSE);
+				goto out_err;
 			}
-			bcopy(&min_sl, &max_sl, sizeof (bslabel_t));
+			*max_sl = *min_sl;
 			mask |= (RTSA_MINSL | RTSA_MAXSL);
 			break;
 
@@ -276,14 +291,14 @@ rtsa_keyword(const char *options, struct rtsa_s *sp, int *errp, char **errstrp)
 			if (mask & RTSA_DOI) {
 				*errstrp = (char *)options;
 				*errp = LTSNET_DUP_KEY;
-				return (B_FALSE);
+				goto out_err;
 			}
 			errno = 0;
 			doi = strtoul(attrbuf, &cp, 0);
 			if (doi == 0 || errno != 0 || *cp != '\0') {
 				*errstrp = (char *)valptr;
 				*errp = LTSNET_ILL_DOI;
-				return (B_FALSE);
+				goto out_err;
 			}
 			mask |= RTSA_DOI;
 			break;
@@ -292,7 +307,7 @@ rtsa_keyword(const char *options, struct rtsa_s *sp, int *errp, char **errstrp)
 			if (mask & RTSA_CIPSO) {
 				*errstrp = (char *)options;
 				*errp = LTSNET_DUP_KEY;
-				return (B_FALSE);
+				goto out_err;
 			}
 			mask |= RTSA_CIPSO;
 			break;
@@ -307,38 +322,47 @@ rtsa_keyword(const char *options, struct rtsa_s *sp, int *errp, char **errstrp)
 	/* If RTSA_CIPSO is specified, RTSA_DOI must be specified */
 	if (!(mask & RTSA_DOI)) {
 		*errp = LTSNET_NO_DOI;
-		return (B_FALSE);
+		goto out_err;
 	}
 
 	/* SL range must be specified */
 	if (!(mask & (RTSA_MINSL|RTSA_MAXSL))) {
 		*errp = LTSNET_NO_RANGE;
-		return (B_FALSE);
+		goto out_err;
 	}
 	if (!(mask & RTSA_MINSL)) {
 		*errp = LTSNET_NO_LOWERBOUND;
-		return (B_FALSE);
+		goto out_err;
 	}
 	if (!(mask & RTSA_MAXSL)) {
 		*errp = LTSNET_NO_UPPERBOUND;
-		return (B_FALSE);
+		goto out_err;
 	}
 
 	/* SL range must have upper bound dominating lower bound */
-	if (!bldominates(&max_sl, &min_sl)) {
+	if (!bldominates(max_sl, min_sl)) {
 		*errp = LTSNET_ILL_RANGE;
-		return (B_FALSE);
+		goto out_err;
 	}
 
 	if (mask & RTSA_MINSL)
-		sp->rtsa_slrange.lower_bound = min_sl;
+		sp->rtsa_slrange.lower_bound = *min_sl;
 	if (mask & RTSA_MAXSL)
-		sp->rtsa_slrange.upper_bound = max_sl;
+		sp->rtsa_slrange.upper_bound = *max_sl;
 	if (mask & RTSA_DOI)
 		sp->rtsa_doi = doi;
 	sp->rtsa_mask = mask;
 
+	m_label_free(min_sl);
+	m_label_free(max_sl);
+
 	return (B_TRUE);
+
+out_err:
+	m_label_free(min_sl);
+	m_label_free(max_sl);
+
+	return (B_FALSE);
 }
 
 /* Keep in sync with libtsnet.h */

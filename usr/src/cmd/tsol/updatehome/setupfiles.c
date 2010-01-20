@@ -20,12 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <errno.h>
 #include <pwd.h>
@@ -74,7 +71,7 @@ static int linkfile(const char *min_home, const char *home, const char *target,
  *
  *	Uses	COPY, CP, LINK, MAXPATHLEN.
  *
- *	Calls	blequal, copyfile, feof, fgets, fopen, getcmwplabel, stobsl,
+ *	Calls	blequal, copyfile, feof, fgets, fopen,
  *		mkdirs, getzoneid, getzonelabelbyid, linkfile, strcat, strcpy,
  *		strlen.
  *
@@ -89,9 +86,9 @@ static int linkfile(const char *min_home, const char *home, const char *target,
  */
 
 int
-__setupfiles(const struct passwd *pwd, const bslabel_t *min_sl, int flags)
+__setupfiles(const struct passwd *pwd, const m_label_t *min_sl, int flags)
 {
-	bslabel_t *plabel;		/* process label */
+	m_label_t *plabel;		/* process label */
 	char	home[MAXPATHLEN];	/* real path to current $HOME */
 	char	min_home[MAXPATHLEN];	/* real path to min $HOME */
 	char	cl_file[MAXPATHLEN];	/* real path to .copy/.link_files */

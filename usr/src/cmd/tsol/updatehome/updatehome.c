@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	updatehome - Update the current label's $HOME copy and link files.
@@ -173,12 +171,11 @@ main(int argc, char **argv)
 	}
 
 	if (kv_str != NULL) {
-
 		if (str_to_label(kv_str, &min_sl, MAC_LABEL, L_NO_CORRECTION,
 		    NULL) == -1) {
 			(void) fprintf(stderr,
-			    gettext("stobsl failure on min_label for user"
-			    " %s.\n"), pwd->pw_name);
+			    gettext("str_to_label failure on min_label for"
+			    " user %s.\n"), pwd->pw_name);
 			exit(1);
 		}
 	}

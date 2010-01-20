@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SETUPFILES_H
 #define	_SETUPFILES_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -46,7 +44,7 @@ extern "C" {
 #define	REPC	0x008		/* replace existing copies */
 #define	REPL	0x010		/* replace existing links */
 
-extern int __setupfiles(const struct passwd *pwd, const bslabel_t *, int flags);
+extern int __setupfiles(const struct passwd *pwd, const m_label_t *, int flags);
 
 #ifdef	__cplusplus
 }

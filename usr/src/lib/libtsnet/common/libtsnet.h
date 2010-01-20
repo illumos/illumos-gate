@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * All symbols and functions in this header file and library are private to Sun
@@ -29,8 +29,6 @@
 
 #ifndef	_LIBTSNET_H
 #define	_LIBTSNET_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <sys/tsol/tndb.h>
@@ -94,7 +92,7 @@ extern tsol_zcent_t *tsol_sgetzcent(const char *, int *, char **);
 extern void tsol_freezcent(tsol_zcent_t *);
 
 /* Routing attribute parsing */
-extern const char *sl_to_str(const bslabel_t *);
+extern char *sl_to_str(const m_label_t *);
 struct rtsa_s;
 extern const char *rtsa_to_str(const struct rtsa_s *, char *, size_t);
 extern boolean_t rtsa_keyword(const char *, struct rtsa_s *, int *, char **);

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * tninfo.c - Trusted network reporting utility
@@ -41,9 +39,6 @@
 #include <netdb.h>
 #include <tsol/label.h>
 #include <zone.h>
-
-/* maximum string size desired as returned by sb*tos calls */
-#define	MAX_STRING_SIZE		60
 
 static void usage(void);
 static int print_rhtp(const char *);
@@ -94,12 +89,19 @@ usage(void)
 	exit(1);
 }
 
+static void
+l_to_str(const m_label_t *l, char **str, int ltype)
+{
+	if (label_to_str(l, str, ltype, DEF_NAMES) != 0)
+		*str = strdup(gettext("translation failed"));
+}
+
 static int
 print_rhtp(const char *rhtp_name)
 {
 	tsol_tpent_t tp;
-	const char *str, *str2;
-	const bslabel_t *l1, *l2;
+	char *str, *str2;
+	const m_label_t *l1, *l2;
 	int i;
 
 	(void) strlcpy(tp.name, rhtp_name, sizeof (tp.name));
@@ -127,50 +129,45 @@ print_rhtp(const char *rhtp_name)
 		(void) printf(gettext("doi: %d\n"), tp.tp_doi);
 
 		if (tp.tp_mask_unl & TSOL_MSK_DEF_LABEL) {
-			str = sbsltos(&tp.tp_def_label, MAX_STRING_SIZE);
-			if (str == NULL)
-				str = gettext("translation failed");
-			str2 = bsltoh(&tp.tp_def_label);
-			if (str2 == NULL)
-				str2 = gettext("translation failed");
+			l_to_str(&tp.tp_def_label, &str, M_LABEL);
+			l_to_str(&tp.tp_def_label, &str2, M_INTERNAL);
 			(void) printf(gettext("def_label: %s\nhex: %s\n"),
 			    str, str2);
+			free(str);
+			free(str2);
 		}
 
 		if (tp.tp_mask_unl & TSOL_MSK_SL_RANGE_TSOL) {
 			(void) printf(gettext("For routing only:\n"));
-			str = sbsltos(&tp.tp_gw_sl_range.lower_bound,
-			    MAX_STRING_SIZE);
-			if (str == NULL)
-				str = gettext("translation failed");
-			str2 = bsltoh(&tp.tp_gw_sl_range.lower_bound);
-			if (str2 == NULL)
-				str2 = gettext("translation failed");
+			l_to_str(&tp.tp_gw_sl_range.lower_bound,
+			    &str, M_LABEL);
+			l_to_str(&tp.tp_gw_sl_range.lower_bound,
+			    &str2, M_INTERNAL);
 			(void) printf(gettext("min_sl: %s\nhex: %s\n"),
 			    str, str2);
+			free(str);
+			free(str2);
 
-			str = sbsltos(&tp.tp_gw_sl_range.upper_bound,
-			    MAX_STRING_SIZE);
-			if (str == NULL)
-				str = gettext("translation failed");
-			str2 = bsltoh(&tp.tp_gw_sl_range.upper_bound);
-			if (str2 == NULL)
-				str2 = gettext("translation failed");
+			l_to_str(&tp.tp_gw_sl_range.upper_bound,
+			    &str, M_LABEL);
+			l_to_str(&tp.tp_gw_sl_range.upper_bound,
+			    &str2, M_INTERNAL);
 			(void) printf(gettext("max_sl: %s\nhex: %s\n"),
 			    str, str2);
+			free(str);
+			free(str2);
 
-			l1 = (const blevel_t *)&tp.tp_gw_sl_set[0];
-			l2 = (const blevel_t *)&tp.tp_gw_sl_set[NSLS_MAX];
+			l1 = (const m_label_t *)&tp.tp_gw_sl_set[0];
+			l2 = (const m_label_t *)&tp.tp_gw_sl_set[NSLS_MAX];
 			for (i = 0; l1 < l2; l1++, i++) {
-				if (bisinvalid(l1))
+				if (label_to_str(l1, &str2, M_INTERNAL,
+				    DEF_NAMES) != 0)
 					break;
-				str = sbsltos(l1, MAX_STRING_SIZE);
-				if (str == NULL)
-					str = gettext("translation failed");
-				if ((str2 = bsltoh(l1)) == NULL)
-					str2 = gettext("translation failed");
+				l_to_str(l1, &str, M_LABEL);
 				(void) printf(gettext("sl_set[%1$d]: %2$s\n"
 				    "hex: %3$s\n"), i, str, str2);
+				free(str);
+				free(str2);
 			}
 		}
 		break;
@@ -179,37 +176,38 @@ print_rhtp(const char *rhtp_name)
 		(void) printf(gettext("host_type: CIPSO\n"));
 		(void) printf(gettext("doi: %d\n"), tp.tp_doi);
 		if (tp.tp_mask_cipso & TSOL_MSK_SL_RANGE_TSOL) {
-			str = sbsltos(&tp.tp_sl_range_cipso.lower_bound,
-			    MAX_STRING_SIZE);
-			if (str == NULL)
-				str = gettext("translation failed");
-			str2 = bsltoh(&tp.tp_sl_range_cipso.lower_bound);
-			if (str2 == NULL)
-				str2 = gettext("translation failed");
+			l_to_str(&tp.tp_sl_range_cipso.lower_bound,
+			    &str, M_LABEL);
+			l_to_str(&tp.tp_sl_range_cipso.lower_bound,
+			    &str2, M_INTERNAL);
+
 			(void) printf(gettext("min_sl: %s\nhex: %s\n"),
 			    str, str2);
-			str = sbsltos(&tp.tp_sl_range_cipso.upper_bound,
-			    MAX_STRING_SIZE);
-			if (str == NULL)
-				str = gettext("translation failed");
-			str2 = bsltoh(&tp.tp_sl_range_cipso.upper_bound);
-			if (str2 == NULL)
-				str2 = gettext("translation failed");
+			free(str);
+			free(str2);
+
+			l_to_str(&tp.tp_sl_range_cipso.upper_bound,
+			    &str, M_LABEL);
+			l_to_str(&tp.tp_sl_range_cipso.upper_bound,
+			    &str2, M_INTERNAL);
+
 			(void) printf(gettext("max_sl: %s\nhex: %s\n"),
 			    str, str2);
+			free(str);
+			free(str2);
 
-			l1 = (const blevel_t *)&tp.tp_sl_set_cipso[0];
-			l2 = (const blevel_t *)&tp.tp_sl_set_cipso[NSLS_MAX];
+			l1 = (const m_label_t *)&tp.tp_sl_set_cipso[0];
+			l2 = (const m_label_t *)&tp.tp_sl_set_cipso[NSLS_MAX];
 			for (i = 0; l1 < l2; l1++, i++) {
-				if (bisinvalid(l1))
+				if (label_to_str(l1, &str2, M_INTERNAL,
+				    DEF_NAMES) != 0)
 					break;
-				str = sbsltos(l1, MAX_STRING_SIZE);
-				if (str == NULL)
-					str = gettext("translation failed");
-				if ((str2 = bsltoh(l1)) == NULL)
-					str2 = gettext("translation failed");
+				l_to_str(l1, &str, M_LABEL);
+
 				(void) printf(gettext("sl_set[%1$d]: %2$s\n"
 				    "hex: %3$s\n"), i, str, str2);
+				free(str);
+				free(str2);
 			}
 		}
 		break;

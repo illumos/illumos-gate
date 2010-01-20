@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4710,10 +4710,15 @@ print_transport_label(const mib2_transportMLPEntry_t *attr)
 	    !(attr->tme_flags & MIB2_TMEF_IS_LABELED))
 		return;
 
-	if (bisinvalid(&attr->tme_label))
+	if (bisinvalid(&attr->tme_label)) {
 		(void) printf("   INVALID\n");
-	else if (!blequal(&attr->tme_label, zone_security_label))
-		(void) printf("   %s\n", sl_to_str(&attr->tme_label));
+	} else if (!blequal(&attr->tme_label, zone_security_label)) {
+		char *sl_str;
+
+		sl_str = sl_to_str(&attr->tme_label);
+		(void) printf("   %s\n", sl_str);
+		free(sl_str);
+	}
 }
 
 /* ------------------------------ TCP_REPORT------------------------------- */

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * From	"tsol_tndb_parser.c	7.24	01/09/05 SMI; TSOL 2.x"
@@ -34,8 +34,6 @@
  * name.  Such things are indicative of typing errors, not intentional
  * configuration.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <ctype.h>
@@ -74,7 +72,7 @@ get_tn_doi(tsol_tpent_t *tpentp, kva_t *kv)
 static int
 get_tn_sl_range(brange_t *range, char *min, char *max)
 {
-	int	err = 0;
+	m_label_t	*slp;
 
 	if (min == NULL && max == NULL)
 		return (LTSNET_NO_RANGE);
@@ -83,9 +81,11 @@ get_tn_sl_range(brange_t *range, char *min, char *max)
 	if (max == NULL)
 		return (LTSNET_NO_UPPERBOUND);
 
-	if (stobsl(min, &range->lower_bound, NO_CORRECTION, &err) == 0)
+	slp = &range->lower_bound;
+	if (str_to_label(min, &slp, MAC_LABEL, L_NO_CORRECTION, NULL) != 0)
 		return (LTSNET_ILL_LOWERBOUND);
-	if (stobsl(max, &range->upper_bound, NO_CORRECTION, &err) == 0)
+	slp = &range->upper_bound;
+	if (str_to_label(max, &slp, MAC_LABEL, L_NO_CORRECTION, NULL) != 0)
 		return (LTSNET_ILL_UPPERBOUND);
 	if (!bldominates(&range->upper_bound, &range->lower_bound))
 		return (LTSNET_ILL_RANGE);
@@ -96,15 +96,17 @@ get_tn_sl_range(brange_t *range, char *min, char *max)
 static int
 get_tn_sl_set(blset_t *labelset, char *setstr)
 {
-	int		sc, err;
+	int		sc;
 	char		*tokp, *finally;
-	bslabel_t	*labels;
+	m_label_t	*labels, *slp;
 
 	(void) memset(labelset, 0, sizeof (blset_t));
-	labels = (bslabel_t *)labelset;
+	labels = (m_label_t *)labelset;
 	tokp = strtok_r(setstr, TNDB_COMMA, &finally);
 	for (sc = 0; tokp != NULL && sc < NSLS_MAX; sc++) {
-		if (stobsl(tokp, &labels[sc], NO_CORRECTION, &err) == 0)
+		slp = &labels[sc];
+		if (str_to_label(tokp, &slp, MAC_LABEL, L_NO_CORRECTION,
+		    NULL) != 0)
 			return (LTSNET_ILL_LABEL);
 		tokp = strtok_r(NULL, TNDB_COMMA, &finally);
 	}
@@ -137,6 +139,8 @@ parse_remainder(tsol_tpent_t *tpentp, kva_t *kv)
 	 * add on to the following if statement for each new host type.
 	 */
 	if (tpentp->host_type == UNLABELED) {
+		m_label_t	*slp;
+
 		tpentp->tp_mask_unl = 0;
 		/*
 		 * doi
@@ -150,8 +154,9 @@ parse_remainder(tsol_tpent_t *tpentp, kva_t *kv)
 		val = kva_match(kv, TP_DEFLABEL);
 		if (val == NULL)
 			return (LTSNET_NO_LABEL);
-		if (stobsl(val, &tpentp->tp_def_label, NO_CORRECTION,
-		    &err) == 0)
+		slp = &tpentp->tp_def_label;
+		if (str_to_label(val, &slp, MAC_LABEL, L_NO_CORRECTION,
+		    NULL) != 0)
 			return (LTSNET_ILL_LABEL);
 		tpentp->tp_mask_unl |= TSOL_MSK_DEF_LABEL;
 		/*
@@ -160,11 +165,16 @@ parse_remainder(tsol_tpent_t *tpentp, kva_t *kv)
 		val = kva_match(kv, TP_MINLABEL);
 		val2 = kva_match(kv, TP_MAXLABEL);
 		if (val == NULL && val2 == NULL) {
+			m_label_t	*llow = NULL;
 			/*
 			 * This is the old format.  Use ADMIN_LOW to SL of the
 			 * default label as the gw_sl_range.
 			 */
-			bsllow(&tpentp->tp_gw_sl_range.lower_bound);
+			if (str_to_label(ADMIN_LOW, &llow, MAC_LABEL,
+			    L_NO_CORRECTION, NULL) == -1)
+				return (LTSNET_ILL_LABEL);
+			tpentp->tp_gw_sl_range.lower_bound = *llow;
+			m_label_free(llow);
 			tpentp->tp_gw_sl_range.upper_bound =
 			    tpentp->tp_def_label;
 		} else {
@@ -255,7 +265,7 @@ tpstr_to_ent(tsol_tpstr_t *tpstrp, int *errp, char **errstrp)
 	if (*template == '\0') {
 		*errp = LTSNET_NO_NAME;
 		if (attrs && *attrs != '\0' && *attrs != '#' && *attrs != '\n')
-		    *errstrp = attrs;
+			*errstrp = attrs;
 		goto err_ret;
 	}
 	if (attrs == NULL || *attrs == '\0' || *attrs == '#' ||
