@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *	Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
@@ -113,6 +113,8 @@ long	nsmbnode = 0;
 
 static struct kmem_cache *smbnode_cache;
 
+static const vsecattr_t smbfs_vsa0 = { 0 };
+
 /*
  * Mutex to protect the following variables:
  *	smbfs_major
@@ -151,6 +153,7 @@ make_smbnode(smbmntinfo_t *, const char *, int, int *);
 static void
 sn_inactive(smbnode_t *np)
 {
+	vsecattr_t	ovsa;
 	cred_t		*oldcr;
 	char 		*orpath;
 	int		orplen;
@@ -162,6 +165,10 @@ sn_inactive(smbnode_t *np)
 	 */
 	mutex_enter(&np->r_statelock);
 
+	ovsa = np->r_secattr;
+	np->r_secattr = smbfs_vsa0;
+	np->r_sectime = 0;
+
 	oldcr = np->r_cred;
 	np->r_cred = NULL;
 
@@ -171,6 +178,9 @@ sn_inactive(smbnode_t *np)
 	np->n_rplen = 0;
 
 	mutex_exit(&np->r_statelock);
+
+	if (ovsa.vsa_aclentp != NULL)
+		kmem_free(ovsa.vsa_aclentp, ovsa.vsa_aclentsz);
 
 	if (oldcr != NULL)
 		crfree(oldcr);
@@ -1012,6 +1022,7 @@ sn_destroy_node(smbnode_t *np)
 	ASSERT(vp->v_count == 1);
 	ASSERT(np->r_count == 0);
 	ASSERT(np->r_mapcnt == 0);
+	ASSERT(np->r_secattr.vsa_aclentp == NULL);
 	ASSERT(np->r_cred == NULL);
 	ASSERT(np->n_rpath == NULL);
 	ASSERT(!(np->r_flags & RHASHED));

@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -798,11 +798,11 @@ smbfs_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag,
 		 * Useful for testing, diagnosing idmap problems, etc.
 		 */
 	case SMBFSIO_GETSD:
-		error = smbfs_ioc_getsd(vp, arg, flag, cr);
+		error = smbfs_acl_iocget(vp, arg, flag, cr);
 		break;
 
 	case SMBFSIO_SETSD:
-		error = smbfs_ioc_setsd(vp, arg, flag, cr);
+		error = smbfs_acl_iocset(vp, arg, flag, cr);
 		break;
 
 	default:
@@ -900,16 +900,43 @@ smbfs_setattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
 	if (vfsp->vfs_flag & VFS_RDONLY)
 		return (EROFS);
 
+	/*
+	 * This is a _local_ access check so that only the owner of
+	 * this mount can set attributes.  With ACLs enabled, the
+	 * file owner can be different from the mount owner, and we
+	 * need to check the _mount_ owner here.  See _access_rwx
+	 */
 	bzero(&oldva, sizeof (oldva));
-	oldva.va_mask = AT_TYPE | AT_MODE | AT_UID | AT_GID;
+	oldva.va_mask = AT_TYPE | AT_MODE;
 	error = smbfsgetattr(vp, &oldva, cr);
 	if (error)
 		return (error);
+	oldva.va_mask |= AT_UID | AT_GID;
+	oldva.va_uid = smi->smi_uid;
+	oldva.va_gid = smi->smi_gid;
 
 	error = secpolicy_vnode_setattr(cr, vp, vap, &oldva, flags,
 	    smbfs_accessx, vp);
 	if (error)
 		return (error);
+
+	if (mask & (AT_UID | AT_GID)) {
+		if (smi->smi_flags & SMI_ACL)
+			error = smbfs_acl_setids(vp, vap, cr);
+		else
+			error = ENOSYS;
+		if (error != 0) {
+			SMBVDEBUG("error %d seting UID/GID on %s",
+			    error, VTOSMB(vp)->n_rpath);
+			/*
+			 * It might be more correct to return the
+			 * error here, but that causes complaints
+			 * when root extracts a cpio archive, etc.
+			 * So ignore this error, and go ahead with
+			 * the rest of the setattr work.
+			 */
+		}
+	}
 
 	return (smbfssetattr(vp, vap, flags, cr));
 }
@@ -1080,13 +1107,9 @@ out:
  * Common function for smbfs_access, etc.
  *
  * The security model implemented by the FS is unusual
- * due to our "single user mounts" restriction.
- *
+ * due to the current "single user mounts" restriction:
  * All access under a given mount point uses the CIFS
  * credentials established by the owner of the mount.
- * The Unix uid/gid/mode information is not (easily)
- * provided by CIFS, and is instead fabricated using
- * settings held in the mount structure.
  *
  * Most access checking is handled by the CIFS server,
  * but we need sufficient Unix access checks here to
@@ -2941,8 +2964,6 @@ smbfs_getsecattr(vnode_t *vp, vsecattr_t *vsa, int flag, cred_t *cr,
 {
 	vfs_t *vfsp;
 	smbmntinfo_t *smi;
-	uid_t uid;
-	gid_t gid;
 	int	error;
 	uint_t	mask;
 
@@ -2967,7 +2988,7 @@ smbfs_getsecattr(vnode_t *vp, vsecattr_t *vsa, int flag, cred_t *cr,
 		return (ENOSYS);
 
 	if (smi->smi_flags & SMI_ACL)
-		error = smbfs_getacl(vp, vsa, &uid, &gid, flag, cr);
+		error = smbfs_acl_getvsa(vp, vsa, flag, cr);
 	else
 		error = ENOSYS;
 
@@ -3016,7 +3037,7 @@ smbfs_setsecattr(vnode_t *vp, vsecattr_t *vsa, int flag, cred_t *cr,
 		return (error);
 
 	if (smi->smi_flags & SMI_ACL)
-		error = smbfs_setacl(vp, vsa, -1, -1, flag, cr);
+		error = smbfs_acl_setvsa(vp, vsa, flag, cr);
 	else
 		error = ENOSYS;
 

@@ -18,45 +18,34 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-#
-# cmd/fs.d/smbclnt/Makefile
-#  contains the CIFS client commands
-#
+FSTYPE=		smbfs
+LIBPROG=	chacl
+ROOTFS_PROG=	$(LIBPROG)
 
-include $(SRC)/Makefile.master
+include		../../Makefile.fstype
 
-SUBDIRS_CATALOG=	smbutil smbiod mount umount
-SUBDIRS=		$(SUBDIRS_CATALOG) chacl lsacl svc
+OBJS=	$(LIBPROG).o
+SRCS=	$(LIBPROG).c $(FSLIBSRC)
 
-# for messaging catalog files
-#
-POFILES=        smbutil/smbutil_all.po mount/mount.po umount/umount.po
-POFILE=         smbclnt.po
+LDLIBS += -lsmbfs -lsec
 
-all:=		TARGET= all
-install:=	TARGET= install
-clean:=		TARGET= clean
-clobber:=	TARGET= clobber
-lint:=		TARGET= lint
-catalog:=       TARGET= catalog
+CFLAGS += $(CCVERBOSE)
+C99MODE= $(C99_ENABLE)
+
+CLOBBERFILES	+= $(LIBPROG)
+
+all:	$(ROOTFS_PROG)
+
+install:	$(ROOTLIBFSTYPEPROG)
+
+lint:	lint_SRCS
+
+clean:     
+	$(RM) $(OBJS)
 
 .KEEP_STATE:
-
-.PARALLEL:	$(SUBDIRS)
-
-all install clean clobber lint: $(SUBDIRS)
-
-catalog: $(SUBDIRS_CATALOG)
-	$(RM) $(POFILE)
-	cat $(POFILES) > $(POFILE)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:

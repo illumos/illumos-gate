@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -274,9 +274,13 @@ out:
 int
 smbfs_acl_set(int fd, acl_t *acl, uid_t uid, gid_t gid)
 {
+	struct stat st;
 	i_ntsd_t *sd = NULL;
 	uint32_t selector;
 	int error;
+
+	if (acl && acl->acl_type != ACE_T)
+		return (EINVAL);
 
 	/*
 	 * Which parts of the SD are being modified?
@@ -292,14 +296,25 @@ smbfs_acl_set(int fd, acl_t *acl, uid_t uid, gid_t gid)
 	if (selector == 0)
 		return (0);
 
-	if (acl && acl->acl_type != ACE_T)
-		return (EINVAL);
+	if (uid == (uid_t)-1 || gid == (gid_t)-1) {
+		/*
+		 * If not setting owner or group, we need the
+		 * current owner and group for translating
+		 * references via owner@ or group@ ACEs.
+		 */
+		if (fstat(fd, &st) != 0)
+			return (errno);
+		if (uid == (uid_t)-1)
+			uid = st.st_uid;
+		if (gid == (gid_t)-1)
+			gid = st.st_gid;
+	}
 
 	/*
 	 * Convert the ZFS ACL to an internal SD.
 	 * Returns allocated data in sd
 	 */
-	error = smbfs_acl_zfs2sd(acl, uid, gid, &sd);
+	error = smbfs_acl_zfs2sd(acl, uid, gid, selector, &sd);
 	if (error == 0)
 		error = smbfs_acl_setsd(fd, selector, sd);
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,74 +33,117 @@
 #include <sys/errno.h>
 #include <sys/stat.h>
 #include <sys/acl.h>
+#include <sys/acl_impl.h>
 
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <aclutils.h>
 
 #include <netsmb/smbfs_acl.h>
 
+extern acl_t *acl_alloc(acl_type_t);
+
 char *progname;
+int Vflag;
 
-extern void acl_printacl(acl_t *, int, int);
+uint32_t selector =  DACL_SECURITY_INFORMATION |
+	OWNER_SECURITY_INFORMATION |
+	GROUP_SECURITY_INFORMATION;
 
+void lsacl(char *);
 
 void
 usage(void)
 {
-	fprintf(stderr, "usage: %s file\n", progname);
+	fprintf(stderr, "Usage: %s [-v] file ...\n", progname);
 	exit(1);
 }
 
 int
 main(int argc, char **argv)
 {
-	struct acl_info *acl;
-	uid_t uid;
-	gid_t gid;
-	int error, fd;
-	struct i_ntsd *sd;
+	int c;
 
 	progname = argv[0];
 
-	if (argc < 2)
+	while ((c = getopt(argc, argv, "v")) != -1) {
+		switch (c) {
+		case 'v':
+			Vflag++;
+			break;
+
+		badopt:
+		default:
+			fprintf(stderr, "%s: bad option: %c\n",
+			    progname, c);
+			usage();
+			break;
+		}
+	}
+
+	if (optind == argc)
 		usage();
+	for (; optind < argc; optind++)
+		lsacl(argv[optind]);
 
-	fd = open(argv[1], O_RDONLY, 0);
+	return (0);
+}
+
+void
+lsacl(char *file)
+{
+	struct i_ntsd *sd;
+	acl_t *acl;
+	uid_t uid;
+	gid_t gid;
+	int error, fd;
+
+	fd = open(file, O_RDONLY, 0);
 	if (fd < 0) {
-		perror(argv[1]);
+		perror(file);
 		exit(1);
 	}
 
-	/* First, get the raw NT SD. */
-	error = smbfs_acl_getsd(fd, 7, &sd);
+	/* First, get the SD in internal form. */
+	error = smbfs_acl_getsd(fd, selector, &sd);
+	(void) close(fd);
+
 	if (error) {
-		fprintf(stderr, "getsd: %s\n",
-		    strerror(error));
+		fprintf(stderr, "%s: getsd, %s\n",
+		    progname, strerror(error));
 		exit(1);
+	}
+
+	if (Vflag) {
+		/*
+		 * Print it first in Windows form.  This way,
+		 * if any of the conversion has problems,
+		 * one can try mapping each SID by hand, i.e.:
+		 *    idmap show sid:S-1-xxx-yyy-zzz
+		 */
+		printf("CIFS security data:\n");
+		smbfs_acl_print_sd(stdout, sd);
+		printf("\n");
 	}
 
 	/*
-	 * Print it first in Windows form.  This way,
-	 * if any of the conversion has problems,
-	 * one can try mapping each SID by hand, i.e.:
-	 *    idmap show sid:S-1-xxx-yyy-zzz
+	 * Convert the internal SD to a ZFS ACL.
 	 */
-	printf("CIFS security data:\n");
-	smbfs_acl_print_sd(stdout, sd);
-	printf("\n");
-
-	/*
-	 * Get it again as a ZFS-style ACL (ACE_T)
-	 */
-	error = smbfs_acl_get(fd, &acl, &uid, &gid);
+	acl = acl_alloc(ACE_T);
+	error = smbfs_acl_sd2zfs(sd, acl, &uid, &gid);
 	if (error) {
-		fprintf(stderr, "getacl: %s\n",
-		    strerror(error));
+		fprintf(stderr, "%s: sd2zfs, %s\n",
+		    progname, strerror(error));
 		exit(1);
 	}
+	smbfs_acl_free_sd(sd);
+
+	/*
+	 * Print it as a ZFS-style ACL (ACE_T)
+	 */
 	printf("Solaris security data:\n");
 	if (uid == (uid_t)-1)
 		printf("owner: -1\n");
@@ -110,8 +153,8 @@ main(int argc, char **argv)
 		printf("group: -1\n");
 	else
 		printf("group: %u\n", gid);
-	acl_printacl(acl, 80, 0);
+	acl_printacl(acl, 80, 1);
 	printf("\n");
 
-	return (0);
+	acl_free(acl);
 }

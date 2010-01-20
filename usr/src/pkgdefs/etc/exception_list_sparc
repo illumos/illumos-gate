@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Exception List for protocmp
@@ -1188,6 +1188,7 @@ usr/lib/sparcv9/llib-lsmbfs.ln		sparc
 #
 # demo & test program for smbfs (private) ACL support
 #
+usr/lib/fs/smbfs/chacl		sparc
 usr/lib/fs/smbfs/lsacl		sparc
 #
 # FC related files

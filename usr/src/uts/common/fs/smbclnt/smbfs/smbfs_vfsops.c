@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,12 +87,8 @@ static int	smbfs_mount_label_policy(vfs_t *, void *, int, cred_t *);
  */
 static char *intr_cancel[] = { MNTOPT_NOINTR, NULL };
 static char *nointr_cancel[] = { MNTOPT_INTR, NULL };
-#ifdef NOT_YET
-static char *force_dio_cancel[] = { MNTOPT_NOFORCEDIRECTIO, NULL };
-static char *noforce_dio_cancel[] = { MNTOPT_FORCEDIRECTIO, NULL };
-static char *largefiles_cancel[] = { MNTOPT_NOLARGEFILES, NULL };
-static char *nolargefiles_cancel[] = { MNTOPT_LARGEFILES, NULL };
-#endif
+static char *acl_cancel[] = { MNTOPT_NOACL, NULL };
+static char *noacl_cancel[] = { MNTOPT_ACL, NULL };
 static char *xattr_cancel[] = { MNTOPT_NOXATTR, NULL };
 static char *noxattr_cancel[] = { MNTOPT_XATTR, NULL };
 
@@ -103,12 +99,8 @@ static mntopt_t mntopts[] = {
  */
 	{ MNTOPT_INTR,		intr_cancel,	NULL,	MO_DEFAULT, 0 },
 	{ MNTOPT_NOINTR,	nointr_cancel,	NULL,	0,	0 },
-#ifdef NOT_YET
-	{ MNTOPT_FORCEDIRECTIO,	force_dio_cancel, NULL, 0,	0 },
-	{ MNTOPT_NOFORCEDIRECTIO, noforce_dio_cancel, NULL, 0, 0 },
-	{ MNTOPT_LARGEFILES,	largefiles_cancel, NULL, MO_DEFAULT, 0 },
-	{ MNTOPT_NOLARGEFILES,	nolargefiles_cancel, NULL, 0,	0 },
-#endif
+	{ MNTOPT_ACL,		acl_cancel,	NULL,	MO_DEFAULT, 0 },
+	{ MNTOPT_NOACL,		noacl_cancel,	NULL,	0,	0 },
 	{ MNTOPT_XATTR,		xattr_cancel,	NULL,	MO_DEFAULT, 0 },
 	{ MNTOPT_NOXATTR,	noxattr_cancel, NULL,	0,	0 }
 };
@@ -509,6 +501,8 @@ smbfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	 */
 	if (vfs_optionisset(vfsp, MNTOPT_INTR, NULL))
 		smi->smi_flags |= SMI_INT;
+	if (vfs_optionisset(vfsp, MNTOPT_ACL, NULL))
+		smi->smi_flags |= SMI_ACL;
 
 	/*
 	 * Get the mount options that come in as smbfs_args,
@@ -569,6 +563,14 @@ smbfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	 */
 	if ((smi->smi_fsattr & FILE_NAMED_STREAMS) == 0)
 		vfs_setmntopt(vfsp, MNTOPT_NOXATTR, NULL, 0);
+
+	/*
+	 * Ditto ACLs (disable if not supported on this share)
+	 */
+	if ((smi->smi_fsattr & FILE_PERSISTENT_ACLS) == 0) {
+		vfs_setmntopt(vfsp, MNTOPT_NOACL, NULL, 0);
+		smi->smi_flags &= ~SMI_ACL;
+	}
 
 	/*
 	 * Assign a unique device id to the mount

@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -273,6 +273,12 @@ typedef struct smbnode {
 	hrtime_t	r_attrtime;	/* time attributes become invalid */
 	hrtime_t	r_mtime;	/* client time file last modified */
 	len_t		r_size;		/* client's view of file size */
+
+	/*
+	 * Security attributes.
+	 */
+	vsecattr_t	r_secattr;
+	hrtime_t	r_sectime;
 
 	/*
 	 * Other attributes, not carried in smbfattr_t

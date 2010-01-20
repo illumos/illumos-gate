@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,8 +79,27 @@ int smbfs_acl_getsd(int fd, uint32_t, struct i_ntsd **);
  */
 int smbfs_acl_setsd(int fd, uint32_t, struct i_ntsd *);
 
+/*
+ * Selector bits (2nd arg above) copied from smb.h so we
+ * don't need that whole thing exposed to our consumers.
+ * Any mismatch would be detected in smb/acl_api.c
+ */
+#define	OWNER_SECURITY_INFORMATION		0x00000001
+#define	GROUP_SECURITY_INFORMATION		0x00000002
+#define	DACL_SECURITY_INFORMATION		0x00000004
+#define	SACL_SECURITY_INFORMATION		0x00000008
+
 struct __FILE;
 void smbfs_acl_print_sd(struct __FILE *, struct i_ntsd *);
+
+/*
+ * These are duplicated from common/smbclnt/smbfs_ntacl.h
+ * rather than exporting that header for this library.
+ * Any mismatch would be detected in smb/acl_api.c
+ */
+int smbfs_acl_sd2zfs(struct i_ntsd *, acl_t *, uid_t *, gid_t *);
+int smbfs_acl_zfs2sd(acl_t *, uid_t, gid_t, uint32_t, struct i_ntsd **);
+void smbfs_acl_free_sd(struct i_ntsd *);
 
 #ifdef	__cplusplus
 }

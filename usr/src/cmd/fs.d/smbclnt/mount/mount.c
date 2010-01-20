@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,6 +65,7 @@
 
 extern char *optarg;
 extern int optind;
+int enable_noacl_option = 0;
 
 static char mount_point[MAXPATHLEN + 1];
 static void usage(void);
@@ -127,6 +128,10 @@ const char * const optlist[] = {
 	"fileperms",
 #define	OPT_NOPROMPT	24
 	"noprompt",
+#define	OPT_ACL		25
+	MNTOPT_ACL,
+#define	OPT_NOACL	26
+	MNTOPT_NOACL,
 
 	NULL
 };
@@ -413,6 +418,12 @@ setsubopt(smb_ctx_t *ctx, struct smbfs_args *mdatap, char *subopt)
 
 	switch (index) {
 
+	case OPT_ACL:
+	case OPT_NOACL:
+		/* Some of our tests use this. */
+		if (enable_noacl_option == 0)
+			goto badopt;
+		/* fallthrough */
 	case OPT_SUID:
 	case OPT_NOSUID:
 	case OPT_DEVICES:
@@ -568,6 +579,7 @@ setsubopt(smb_ctx_t *ctx, struct smbfs_args *mdatap, char *subopt)
 		break;
 
 	default:
+	badopt:
 		if (!qflg)
 			warnx(gettext("unknown option %s"), subopt);
 		rc = EX_OPT;

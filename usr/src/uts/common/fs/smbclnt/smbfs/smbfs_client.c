@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *  	Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
@@ -154,10 +154,7 @@ smbfs_cache_check(
 {
 	smbnode_t *np;
 	int purge_data = 0;
-#if 0	/* not yet: ACL support */
 	int purge_acl = 0;
-	vsecattr_t *vsp = NULL;
-#endif	/* not yet */
 
 	np = VTOSMB(vp);
 	mutex_enter(&np->r_statelock);
@@ -173,31 +170,19 @@ smbfs_cache_check(
 	if (np->r_attr.fa_size != fap->fa_size)
 		purge_data = 1;
 
-#if 0	/* not yet: ACL support */
 	if (np->r_attr.fa_ctime.tv_sec != fap->fa_ctime.tv_sec ||
 	    np->r_attr.fa_ctime.tv_nsec != fap->fa_ctime.tv_nsec)
 		purge_acl = 1;
-#endif	/* not yet */
+
+	if (purge_acl) {
+		/* just invalidate r_secattr (XXX: OK?) */
+		np->r_sectime = gethrtime();
+	}
 
 	mutex_exit(&np->r_statelock);
 
 	if (purge_data)
 		smbfs_purge_caches(vp);
-
-#if 0	/* not yet: ACL support */
-	if (purge_acl) {
-		vsecattr_t *vsp;
-
-		if (np->r_secattr != NULL) {
-			mutex_enter(&np->r_statelock);
-			vsp = np->r_secattr;
-			np->r_secattr = NULL;
-			mutex_exit(&np->r_statelock);
-			if (vsp != NULL)
-				smbfs_acl_free(vsp);
-		}
-	}
-#endif	/* not yet */
 }
 
 /*
@@ -247,14 +232,7 @@ smbfs_attrcache_fa(vnode_t *vp, struct smbfattr *fap)
 		mode = S_IFREG | smi->smi_fmode;
 	}
 
-	/*
-	 * For now, n_uid/n_gid never change after they are
-	 * set by: smbfs_node_findcreate / make_smbnode.
-	 * Later, they will change in getsecattr.
-	 */
-
 	mutex_enter(&np->r_statelock);
-
 	now = gethrtime();
 
 	/*
@@ -381,8 +359,10 @@ smbfs_getattr_otw(vnode_t *vp, struct smbfattr *fap, cred_t *cr)
 	np = VTOSMB(vp);
 
 	/*
-	 * NFS uses the ACL rpc here
-	 * (if smi_flags & SMI_ACL)
+	 * NFS uses the ACL rpc here (if smi_flags & SMI_ACL)
+	 * With SMB, getting the ACL is a significantly more
+	 * expensive operation, so we do that only when asked
+	 * for the uid/gid.  See smbfsgetattr().
 	 */
 
 	/* Shared lock for (possible) n_fid use. */
@@ -432,9 +412,25 @@ int
 smbfsgetattr(vnode_t *vp, struct vattr *vap, cred_t *cr)
 {
 	struct smbfattr fa;
+	smbmntinfo_t *smi;
+	uint_t mask;
 	int error;
 
-	ASSERT(curproc->p_zone == VTOSMI(vp)->smi_zone);
+	smi = VTOSMI(vp);
+
+	ASSERT(curproc->p_zone == smi->smi_zone);
+
+	/*
+	 * If asked for UID or GID, update n_uid, n_gid.
+	 */
+	mask = AT_ALL;
+	if (vap->va_mask & (AT_UID | AT_GID)) {
+		if (smi->smi_flags & SMI_ACL)
+			(void) smbfs_acl_getids(vp, cr);
+		/* else leave as set in make_smbnode */
+	} else {
+		mask &= ~(AT_UID | AT_GID);
+	}
 
 	/*
 	 * If we've got cached attributes, just use them;
@@ -453,6 +449,8 @@ smbfsgetattr(vnode_t *vp, struct vattr *vap, cred_t *cr)
 	 */
 
 	error = smbfattr_to_vattr(vp, &fa, vap);
+	vap->va_mask = mask;
+
 	return (error);
 }
 
@@ -467,7 +465,7 @@ smbfattr_to_vattr(vnode_t *vp, struct smbfattr *fa, struct vattr *vap)
 {
 	struct smbnode *np = VTOSMB(vp);
 
-	vap->va_mask = AT_ALL;
+	/* Set va_mask in caller */
 
 	/*
 	 * Take type, mode, uid, gid from the smbfs node,

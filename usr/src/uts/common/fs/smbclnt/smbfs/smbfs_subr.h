@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -214,31 +214,9 @@ int  smbfs_smb_getsec_m(struct smb_share *ssp, uint16_t fid,
 int  smbfs_smb_setsec_m(struct smb_share *ssp, uint16_t fid,
 	struct smb_cred *scrp, uint32_t selector, mblk_t **mp);
 
-int  smbfs_getacl(vnode_t *vp, vsecattr_t *vsecattr,
-	uid_t *uidp, gid_t *gidp, int flag, cred_t *cr);
-int  smbfs_setacl(vnode_t *vp, vsecattr_t *vsecattr,
-	uid_t uid, gid_t gid, int flag, cred_t *cr);
-
-int  smbfs_getsd(vnode_t *vp, uint32_t sel, mblk_t **mp, cred_t *cr);
-int  smbfs_setsd(vnode_t *vp, uint32_t sel, mblk_t **mp, cred_t *cr);
-int  smbfs_ioc_getsd(vnode_t *vp, intptr_t arg, int flag, cred_t *cr);
-int  smbfs_ioc_setsd(vnode_t *vp, intptr_t arg, int flag, cred_t *cr);
-
-#ifdef NOT_YET
-int  smbfs_smb_getsec(struct smb_share *ssp, uint16_t fid,
-	struct smb_cred *scrp, uint32_t selector, struct ntsecdesc **res);
-int  smbfs_smb_setsec(struct smb_share *ssp, uint16_t fid,
-	struct smb_cred *scrp, uint32_t selector, uint16_t flags,
-	struct ntsid *owner, struct ntsid *group, struct ntacl *sacl,
-	struct ntacl *dacl);
-int  smbfs_smb_qstreaminfo(struct smbnode *np, struct smb_cred *scrp,
-	uio_t uio, size_t *sizep);
-#endif /* NOT_YET */
-
 /*
  * VFS-level init, fini stuff
  */
-
 
 int smbfs_vfsinit(void);
 void smbfs_vfsfini(void);
@@ -295,6 +273,14 @@ int smbfs_readvnode(vnode_t *, uio_t *, cred_t *, struct vattr *);
 int smbfs_writevnode(vnode_t *vp, uio_t *uiop, cred_t *cr,
 			int ioflag, int timo);
 int smbfsgetattr(vnode_t *vp, struct vattr *vap, cred_t *cr);
+
+/* smbfs ACL support */
+int smbfs_acl_getids(vnode_t *, cred_t *);
+int smbfs_acl_setids(vnode_t *, vattr_t *, cred_t *);
+int smbfs_acl_getvsa(vnode_t *, vsecattr_t *, int, cred_t *);
+int smbfs_acl_setvsa(vnode_t *, vsecattr_t *, int, cred_t *);
+int smbfs_acl_iocget(vnode_t *, intptr_t, int, cred_t *);
+int smbfs_acl_iocset(vnode_t *, intptr_t, int, cred_t *);
 
 /* smbfs_xattr.c */
 int smbfs_get_xattrdir(vnode_t *dvp, vnode_t **vpp, cred_t *cr, int);

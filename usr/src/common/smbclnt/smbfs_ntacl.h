@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,20 +47,46 @@ typedef struct i_ntsid {
 #define	I_SID_SIZE(sacnt)	(8 + 4 * (sacnt))
 
 /*
- * Internal form of an NT ACE
+ * Internal form of an NT ACE - first the header.
+ * See MS SDK: ACE_HEADER  (For MS, it's the OtW form)
+ * Note: ace_size here is the in-memoy size, not OtW.
  */
-typedef struct i_ntace {
-	uint8_t	ace_type;
-	uint8_t	ace_flags;
+typedef struct i_ntace_hdr {
+	uint8_t		ace_type;
+	uint8_t		ace_flags;
+	uint16_t	ace_size;
+} i_ntace_hdr_t;
+
+/*
+ * Simple ACE for types: ACCESS_ALLOWED through SYSTEM_ALARM
+ * See MS SDK: ACCESS_ALLOWED_ACE, ACCESS_DENIED_ACE,
+ * SYSTEM_AUDIT_ACE, SYSTEM_ALARM_ACE.
+ *
+ * The above are the only types that appear in a V2 ACL.
+ * Note that in the Windows SDK, the SID is stored as
+ * "flat" data after the ACE header.  This implementation
+ * stores the SID as a pointer instead.
+ */
+typedef struct i_ntace_v2 {
+	i_ntace_hdr_t	ace_hdr;
 	uint32_t	ace_rights; /* generic, standard, specific, etc */
 	i_ntsid_t	*ace_sid;
+} i_ntace_v2_t;
+
+/*
+ * A union for convenience of the conversion code.
+ * There are lots more ACE types, ignored for now.
+ */
+typedef union i_ntace_u {
+	i_ntace_hdr_t	ace_hdr;
+	i_ntace_v2_t	ace_v2;
 } i_ntace_t;
 
 /*
  * Internal form of an NT ACL (see sacl/dacl below)
  */
 typedef struct i_ntacl {
-	uint8_t	acl_revision;	/* 0x02 observed with W2K */
+	uint8_t		acl_revision;	/* 0x02 observed with W2K */
 	uint16_t	acl_acecount;
 	i_ntace_t	*acl_acevec[1]; /* actually, len=acecount */
 } i_ntacl_t;
@@ -99,22 +125,27 @@ int mb_put_ntsd(mbchain_t *mbp, i_ntsd_t *sd);
 #ifdef	_KERNEL
 int smbfs_acl_sd2zfs(i_ntsd_t *, vsecattr_t *, uid_t *, gid_t *);
 #else /* _KERNEL */
-int smbfs_acl_sd2zfs(i_ntsd_t *, acl_t *, uid_t *, gid_t *);
+/* See also: lib/libsmbfs/netsmb/smbfs_acl.h */
+int smbfs_acl_sd2zfs(struct i_ntsd *, acl_t *, uid_t *, gid_t *);
 #endif /* _KERNEL */
 
 /*
- * Convert an internal SD to a ZFS-style ACL.
- * Include owner/group too if uid/gid != -1.
+ * Convert a ZFS-style ACL to an internal SD.
+ * Set owner/group too if selector indicates.
+ * Always need to pass uid+gid, either the new
+ * (when setting them) or existing, so that any
+ * owner@ or group@ ACEs can be translated.
  */
 #ifdef	_KERNEL
-int smbfs_acl_zfs2sd(vsecattr_t *, uid_t, gid_t, i_ntsd_t **);
+int smbfs_acl_zfs2sd(vsecattr_t *, uid_t, gid_t, uint32_t, i_ntsd_t **);
 #else /* _KERNEL */
-int smbfs_acl_zfs2sd(acl_t *, uid_t, gid_t, i_ntsd_t **);
+/* See also: lib/libsmbfs/netsmb/smbfs_acl.h */
+int smbfs_acl_zfs2sd(acl_t *, uid_t, gid_t, uint32_t, struct i_ntsd **);
 #endif /* _KERNEL */
 
 /*
- * Free an i_ntsd_t, as returned by md_get_ntsd()
- * or smbfs_acl_zfs2sd().
+ * Free an i_ntsd_t from md_get_ntsd() or smbfs_acl_zfs2sd().
+ * See also: lib/libsmbfs/netsmb/smbfs_acl.h
  */
 void smbfs_acl_free_sd(struct i_ntsd *);
 

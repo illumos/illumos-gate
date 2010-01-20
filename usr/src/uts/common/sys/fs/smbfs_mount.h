@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,6 +52,10 @@
 #define	SMBFS_VER_STR	"1.33"
 
 #define	SMBFS_VFSNAME	"smbfs"
+
+/* Additions not in mntent.h */
+#define	MNTOPT_ACL	"acl"		/* enable smbfs ACLs */
+#define	MNTOPT_NOACL	"noacl"		/* disable smbfs ACLs */
 
 /* Values for smbfs_args.flags */
 #define	SMBFS_MF_SOFT		0x0001

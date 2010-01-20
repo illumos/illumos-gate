@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,10 +81,11 @@ fprint_ntace(FILE *fp, i_ntace_t *ace)
 
 	/* ACEs are always printed in a list, so indent by 2. */
 	fprintf(fp, "  ace_type=%d ace_flags=0x%x ace_rights=0x%x\n",
-	    ace->ace_type, ace->ace_flags, ace->ace_rights);
+	    ace->ace_hdr.ace_type, ace->ace_hdr.ace_flags,
+	    ace->ace_v2.ace_rights);
 	/* Show the SID as a "continuation" line. */
 	fprintf(fp, "    ace_sid: ");
-	fprint_sid(fp, ace->ace_sid);
+	fprint_sid(fp, ace->ace_v2.ace_sid);
 }
 
 static void
