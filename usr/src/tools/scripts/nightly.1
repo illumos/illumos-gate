@@ -17,9 +17,9 @@
 .\" "
 .\" " CDDL HEADER END
 .\" "
-.\" "Copyright 2009 Sun Microsystems, Inc.  All rights reserved."
+.\" "Copyright 2010 Sun Microsystems, Inc.  All rights reserved."
 .\" "Use is subject to license terms."
-.TH nightly 1 "08 Sep 2009"
+.TH nightly 1 "14 Jan 2010"
 .SH NAME
 .I nightly
 \- build an OS-Net consolidation overnight
@@ -251,10 +251,12 @@ a time.
 .B Miscellaneous options
 .TP 10
 .B \-O
-generate deliverables for OpenSolaris.  Tarballs containing
-a source snapshot,
-binaries of closed-source components, compiled ON tools (SUNWonbld),
-and BFU archives are put in $CODEMGR_WS.
+generate deliverables for OpenSolaris.  Tarballs containing a source
+snapshot, binaries of closed-source components, compiled ON tools
+(SUNWonbld), and BFU archives are put in $CODEMGR_WS.  A tarball
+containing signed cryptographic binaries is put in the parent
+directory of $PKGARCHIVE (by default they are put in
+$CODEMGR_WS/packages/$MACH).
 .TP 10
 .B \-V VERS
 set the build version string to VERS, overriding VERSION
@@ -373,21 +375,21 @@ by \fIuname -p\fP, e.g. sparc, i386.
 .B LOCKNAME
 .RS 5
 The name of the file used to lock out multiple runs of
-.I nightly.
+.IR nightly .
 This should generally be left to the default setting.
 .RE
 .LP
 .B ATLOG
 .RS 5
 The location of the log directory maintained by
-.I nightly
+.IR nightly .
 This should generally be left to the default setting.
 .RE
 .LP
 .B LOGFILE
 .RS 5
 The name of the log file in the $ATLOG directory maintained by
-.I nightly
+.IR nightly .
 This should generally be left to the default setting.
 .RE
 .LP
@@ -465,9 +467,9 @@ Points to "$SRC/pkgdefs."  Not used these days.
 .B PKGARCHIVE
 .RS 5
 The destination for packages.  This may be relative to
-$CODEMGR_WS for private archives or relative to $PARENT_WS
+$CODEMGR_WS for private packages or relative to $PARENT_WS
 if you have different workspaces for different architectures
-but want one hierarchy of BFU archives.
+but want one hierarchy of packages.
 .RE
 .LP
 .B MAKEFLAGS
@@ -557,6 +559,20 @@ the developer downloads a closed binaries tree and unpacks it.
 tells nightly
 where to find these closed binaries, so that it can add them into the
 build.
+.LP
+.RE
+.B ON_CRYPTO_BINS
+.RS 5
+This is the path to a compressed tarball that contains debug
+cryptographic binaries that have been signed to allow execution
+outside of Sun, e.g., $PARENT_WS/packages/$MACH/on-crypto.$MACH.bz2.
+.I nightly
+will automatically adjust the path for non-debug builds.  This tarball
+is needed if the closed-source tree is not present.  Also, it is
+usually needed when generating OpenSolaris deliverables from a project
+workspace.  This is because most projects do not have access to the
+necessary key and certificate that would let them sign their own
+cryptographic binaries.
 .LP
 .RE
 .B CHECK_PATHS

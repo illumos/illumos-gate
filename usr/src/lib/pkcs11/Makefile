@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # lib/pkcs11/Makefile
@@ -36,18 +36,10 @@ CHECKHDRS =	$(HDRDIR)/cryptoki.h
 SUBDIRS = \
 	libpkcs11	\
 	libsoftcrypto   \
-	libkcfd
-
-#
-# Don't build these for OpenSolaris, since they will be replaced by
-# binaries that are signed by ON Gatekeepers.
-#
-$(CLOSED_BUILD)SUBDIRS += \
-			pkcs11_kernel	\
-			pkcs11_softtoken \
-			pkcs11_tpm
-
-$(CLOSED_BUILD)SUBDIRS += $($(MACH)_SUBDIRS)
+	libkcfd		\
+	pkcs11_kernel	\
+	pkcs11_softtoken \
+	pkcs11_tpm
 
 all 	:=	TARGET= all
 clean 	:=	TARGET= clean

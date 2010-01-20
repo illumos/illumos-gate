@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -60,12 +60,14 @@ f none opt/onbld/bin/check_rtime 555 root bin
 f none opt/onbld/bin/checkpaths 555 root bin
 f none opt/onbld/bin/checkproto 555 root bin
 f none opt/onbld/bin/copyrightchk 555 root bin
+f none opt/onbld/bin/cryptodrop 555 root bin
 f none opt/onbld/bin/cstyle 555 root bin
 f none opt/onbld/bin/ctfcvtptbl 555 root bin
 f none opt/onbld/bin/ctffindmod 555 root bin
 f none opt/onbld/bin/elfcmp 555 root bin
 f none opt/onbld/bin/elfsigncmp 555 root bin
 f none opt/onbld/bin/find_elf 555 root bin
+f none opt/onbld/bin/findcrypto 555 root bin
 f none opt/onbld/bin/flg.flp 555 root bin
 f none opt/onbld/bin/genoffsets 555 root bin
 f none opt/onbld/bin/get_depend_info 555 root bin

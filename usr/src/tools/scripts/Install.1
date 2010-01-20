@@ -1,5 +1,5 @@
 .\"
-.\" Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+.\" Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 .\" Use is subject to license terms.
 .\"
 .\" CDDL HEADER START
@@ -21,7 +21,7 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.TH Install 1 "16 Dec 2008"
+.TH Install 1 "14 Jan 2010"
 .SH NAME
 Install \- install a kernel from an ON workspace
 .SH SYNOPSIS
@@ -289,6 +289,11 @@ you will need to do the following on the target machine:
 .SH "ENVIRONMENT"
 .LP
 You can set the following variables in your environment:
+.LP
+ON_CRYPTO_BINS
+.IP
+file containing signed cryptographic binaries.  This is only needed if
+you are not building the closed-source tree.
 .LP
 INSTALL_RC [default: $HOME/.Installrc]
 .IP

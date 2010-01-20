@@ -1,6 +1,5 @@
 #!/bin/ksh
 #
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -20,12 +19,13 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
+#
 # signproto cred_file
 #
 # Utility to find cryptographic modules in the proto area and
@@ -36,42 +36,17 @@
 # list of signing server credentials and the corresponding
 # regular expressions to match against the file signatures.
 
-# Directories in proto area that may contain crypto objects
-DIRS="platform kernel usr/lib/security"
-
 # Get absolute path of current directory; used later to invoke signit
 cd .
 dir=`dirname $0`
 dir=`[[ $dir = /* ]] && print $dir || print $PWD/$dir`
 
-# Read list of credentials and regular expressions
-n=0
-grep -v "^#" $1 | while read c r
-do
-	cred[$n]=$c
-	regex[$n]=$r
-	(( n = n + 1 ))
-done
+findcrypto $1 | $dir/signit -i $ROOT -l ${CODESIGN_USER:-${LOGNAME}}
+stat=$?
 
-# Search proto area for crypto modules
-cd $ROOT
-find $DIRS -type f -print | while read f; do
-	s=`elfsign list -f signer -e $f 2>/dev/null`
-	if [[ $? != 0 ]]; then 
-		continue
-	fi
-	# Determine credential based on signature
-	i=0
-	while [[ i -lt n ]]
-	do
-		if expr "$s" : ".*${regex[i]}" >/dev/null; then
-			echo "${cred[i]} $f"
-			break
-		fi
-		(( i = i + 1 ))
-	done
-done | $dir/signit -i $ROOT -l ${CODESIGN_USER:-${LOGNAME}}
-
-if [ $? != 0 ]; then
+if [ $stat != 0 ]; then
 	echo "ERROR failure in signing operation"
+	exit $stat
 fi
+
+exit 0

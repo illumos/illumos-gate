@@ -1,43 +1,59 @@
-		     OpenSolaris Buildable Source
+		     OS/Net (ON) Buildable Source
 
-Note: if this is your first OpenSolaris installation, please see the
-currently known issues section below to see the minimum build of
-Solaris Express - Community Release required to build and install
-OpenSolaris.  Either an initial install or an upgrade will work,
-provided you use the "Entire Distribution" metacluster.
-
-This delivery of the Buildable Source consists of 4 or 5 pieces:
+This delivery of the Buildable Source consists of 5 pieces:
 
 1. encumbered binaries tarball (on-closed-bins-DATE.PLATFORM.tar.bz2)
-2. compiler (Sun Studio 11 is the preferred compiler, and it is free
-   for OpenSolaris community members.  You can also use gcc; more on
-   that below.)
+2. signed cryptographic binaries (on-crypto-DATE.PLATFORM.tar.bz2)
 3. ON build tools package (SUNWonbld-DATE.PLATFORM.tar.bz2)
 4. Pre-built BFU archives (on-bfu-DATE.PLATFORM.tar.bz2)
 5. source tarball (on-src-DATE.tar.bz2; numbered builds only)
 
 If you just want to install the pre-built archives, you'll need the ON
 build tools and the BFU archives.  The tar file will unpack the
-archives into archives-DATE/PLATFORM/ (e.g.,
-archives-20050612/i386/).  You should review Section A
-(changes since the last delivery) and Section B (known issues) before
-following the BFU instructions in the Developer's Reference 
+archives into archives-DATE/PLATFORM/ (e.g., archives-20050612/i386/).
+You should review the Known Issues section (below) before following
+the BFU instructions in the Developer's Reference
 (http://hub.opensolaris.org/bin/view/Community+Group+on/devref_toc).
 
-If you want to build from source, you will need the source, compiler,
-ON tools, and "extras" tools.  The encumbered binaries tarball contains
-complete binaries (libraries, kernel modules, commands) that are
-compatible with the source.  These are binaries that cannot be built
-using only the source tarball for one reason or another.  If you wish
-to build the kernel (or some portion of it), or if you wish to build a
-complete set of installable archives, you will want the encumbered
+If you want to build the entire source tree, you will need the source,
+the ON build tools, the encumbered binaries, and the cryptographic
 binaries.
 
-Currently, to obtain source, you can either download the
-on-src-DATE.tar.bz2 tarball if you are downloading a
-build-synchronised delivery.  Or, you can checkout from the Mercurial
-repository; please see instructions at:
-http://hub.opensolaris.org/bin/view/Project+onnv/WebHome
+The encumbered binaries tarball contains complete binaries (libraries,
+kernel modules, commands) that are compatible with the source.  These
+are binaries that cannot be built using only the source tarball for
+one reason or another.
+
+The cryptographic binaries have been signed with a certificate and key
+that enables their use.  The cryptographic binaries that you build
+from source will not be usable unless you have obtained your own
+certificate and key.  See elfsign(1) for more information related to
+signing binaries.
+
+To obtain source, you can download the on-src-DATE.tar.bz2
+tarball if you are downloading a build-synchronised delivery.  Or, you
+can checkout from the Mercurial repository; please see instructions
+at: http://hub.opensolaris.org/bin/view/Project+onnv/.
+
+
+Build Environment
+-----------------
+
+To build from source, you will also need the proper compiler, and you
+must be running a recent build.
+
+The standard compiler for building OpenSolaris code is Sun Studio,
+which is free to download and use.  You can also use gcc.  See the
+section "Installing from Source" (below) for details.
+
+Build machines are expected to be running an OpenSolaris build that is
+no more than 2 builds behind the source that you're building.  For
+example, if you're building snv_120, your build machine should be
+running snv_118 or later.
+
+
+Other Important Information
+---------------------------
 
 The buildable source contains the source for our high key-strength
 crypto, known as the Encryption Kit (SUNWcry, SUNWcryr, SUNWcryptoint).
@@ -48,17 +64,19 @@ country's laws in this area.
 
 For general questions on the buildable source, please ask on the
 OpenSolaris Help discussion list (opensolaris-help <at> opensolaris
-<dot> org).  For detailed comments about the code, please use
-OpenSolaris Code discussion list.  Please note that the mailing lists
-are configured to only allow posts via the web forum interface or from
-list subscribers.
+<dot> org).  For detailed comments about the code, please use the
+on-discuss list.  Please note that the mailing lists are configured to
+only allow posts from list subscribers.  The Help list also has a web
+forum that is gatewayed with the mailing list.  More information about
+OpenSolaris lists is available at
+http://hub.opensolaris.org/bin/view/Main/discussions.
 
 
 Currently Known Issues
 ----------------------
 	These were some of the major known issues at the time of this
 delivery.  The most recent list is available on the OpenSolaris.org
-website in the Nevada community at:
+website in the ON community at:
 http://hub.opensolaris.org/bin/view/Community+Group+on/known_issues
 
 <!-- #include http://hub.opensolaris.org/bin/view/Community+Group+on/known_issues -->

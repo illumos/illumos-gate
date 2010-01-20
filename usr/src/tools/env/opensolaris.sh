@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -103,6 +103,10 @@ LOCKNAME="`basename $CODEMGR_WS`_nightly.lock"; export LOCKNAME
 ATLOG="$CODEMGR_WS/log";			export ATLOG
 LOGFILE="$ATLOG/nightly.log";			export LOGFILE
 MACH=`uname -p`;				export MACH
+
+# Location of signed cryptographic binaries.
+ON_CRYPTO_BINS="$CODEMGR_WS/on-crypto.$MACH.tar.bz2"
+export ON_CRYPTO_BINS
 
 # REF_PROTO_LIST - for comparing the list of stuff in your proto area
 # with. Generally this should be left alone, since you want to see differences

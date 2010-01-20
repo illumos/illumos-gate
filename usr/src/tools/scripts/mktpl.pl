@@ -21,10 +21,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -34,14 +32,20 @@
 use Cwd;
 use Env;
 use strict;
+use vars qw($opt_c);
+use Getopt::Std;
 
-my $usage = "mktpl license-list-file";
+# -c: only generate crypto license file
+my $usage = "mktpl [-c] license-list-file";
 
 my $top = $ENV{"CODEMGR_WS"};
 if (! $top) {
 	die "CODEMGR_WS must be set.\n";
 }
 
+if (! getopts('c')) {
+	die "usage: $usage\n";
+}
 if (@ARGV != 1) {
 	die "usage: $usage\n";
 }
@@ -50,7 +54,9 @@ my $indexfile = $ARGV[0];
 
 my $exitstatus = 0;
 
-# create a THIRDPARTYLICENSE file from the given license list and suffix.
+#
+# Create a THIRDPARTYLICENSE file from the given license list and suffix.
+#
 sub maketpl {
 	my ($suffix, @tpllist) = @_;
 	my $licnum = 1;
@@ -91,6 +97,18 @@ sub maketpl {
 }
 
 #
+# Return non-zero if we expect the crypto for the given
+# third-party license file to be signed.  Else, return zero.
+#
+my $hashes = qr"/(rng|md4|md5|sha1/sha2)/";
+sub signedcrypto {
+	my ($licpath) = @_;
+
+	return 0 if $licpath =~ m#$hashes#;
+	return 1;
+}
+
+#
 # Make file list for each TPL file.
 #
 
@@ -99,21 +117,29 @@ $top = getcwd();
 
 my $isclosed = qr"^usr/closed";
 my $istools = qr"^usr/src/tools";
+my $iscrypto = qr"(^usr/src/common/crypto)|(^usr/src/lib/pkcs11)";
 
 my @closedlist;
 my @toolslist;
 my @bfulist;
+my @cryptolist;
 
 open(IX, "<$indexfile") or die "Can't open $indexfile: $!\n";
 while (<IX>) {
 	chomp;
-	if (/$isclosed/) {
-		push @closedlist, $_;
+	my $lic = $_;
+	if (! $opt_c && $lic =~ /$isclosed/) {
+		push @closedlist, $lic;
 	}
-	if (/$istools/) {
-		push @toolslist, $_;
-	} else {
-		push @bfulist, $_;
+	if ($lic =~ /$iscrypto/ && signedcrypto($lic)) {
+		push @cryptolist, $lic;
+	}
+	if (! $opt_c) {
+		if ($lic =~ /$istools/) {
+			push @toolslist, $lic;
+		} else {
+			push @bfulist, $lic;
+		}
 	}
 }
 close IX;
@@ -125,5 +151,6 @@ close IX;
 maketpl("ON-BINARIES", @closedlist) if (@closedlist);
 maketpl("ON-BUILD-TOOLS", @toolslist) if (@toolslist);
 maketpl("BFU-ARCHIVES", @bfulist) if (@bfulist);
+maketpl("ON-CRYPTO", @cryptolist) if (@cryptolist);
 
 exit $exitstatus;

@@ -230,6 +230,7 @@ DRV_KMODS	+= cpuid
 DRV_KMODS	+= cpunex
 DRV_KMODS	+= crypto
 DRV_KMODS	+= cryptoadm
+DRV_KMODS	+= dca
 DRV_KMODS	+= dda
 DRV_KMODS	+= devinfo
 DRV_KMODS	+= dld
@@ -372,12 +373,6 @@ DRV_KMODS	+= pppt
 DRV_KMODS	+= ncall nsctl sdbc nskern sv
 DRV_KMODS	+= ii rdc rdcsrv rdcstub 
 DRV_KMODS	+= iptun
-
-#
-# Don't build some of these for OpenSolaris, since they will be
-# replaced by binaries that are signed by Sun Release Engineering.
-#
-$(CLOSED_BUILD)DRV_KMODS	+= dca
 
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= bmc
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= elxl
@@ -663,14 +658,11 @@ $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= scsi_vhci_f_sym_emc
 #
 #	Software Cryptographic Providers (/kernel/crypto):
 #
-# Don't build some of these for OpenSolaris, since they will be
-# replaced by binaries that are signed by Sun RE.
-#
-$(CLOSED_BUILD)CRYPTO_KMODS	+= aes
-$(CLOSED_BUILD)CRYPTO_KMODS	+= arcfour
-$(CLOSED_BUILD)CRYPTO_KMODS	+= blowfish
-$(CLOSED_BUILD)CRYPTO_KMODS	+= des
-$(CLOSED_BUILD)CRYPTO_KMODS	+= ecc
+CRYPTO_KMODS	+= aes
+CRYPTO_KMODS	+= arcfour
+CRYPTO_KMODS	+= blowfish
+CRYPTO_KMODS	+= des
+CRYPTO_KMODS	+= ecc
 CRYPTO_KMODS	+= md4
 CRYPTO_KMODS	+= md5
 CRYPTO_KMODS	+= rsa

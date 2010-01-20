@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This makefile contains the common definitions for the sun4v unix
@@ -411,10 +411,7 @@ BRAND_KMODS	+= sn1_brand s10_brand
 #
 #	Software Cryptographic Providers (/kernel/crypto):
 #
-# Don't build this for OpenSolaris, since it will be replaced by
-# a binary that is signed by Sun RE.
-#
-$(CLOSED_BUILD)CRYPTO_KMODS	+= arcfour
+CRYPTO_KMODS	+= arcfour
 
 #
 #	generic-unix module (/kernel/genunix):

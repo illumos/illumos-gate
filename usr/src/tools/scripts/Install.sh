@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Author:  Jeff Bonwick
@@ -98,7 +98,7 @@ modstatedir=/tmp/modstate$$
 
 trap 'fail "User Interrupt" "You can resume by typing \"$INSTALL -R\""' 1 2 3 15
 
-usage() {
+function usage {
 	echo ""
 	echo $1
 	echo '
@@ -144,7 +144,7 @@ For full details:
 # Save the current state of Install
 #
 
-save_state() {
+function save_state {
 	rm -f $INSTALL_STATE
 	(echo "# State of previous Install
 TARGET=$TARGET
@@ -170,7 +170,7 @@ STATE=$STATE" >$INSTALL_STATE) || verbose "Warning: cannot save state"
 # Restore the previous state of Install
 #
 
-restore_state() {
+function restore_state {
 	test -s $INSTALL_STATE || fail "Can't find $INSTALL_STATE"
 	eval "`cat $INSTALL_STATE`"
 }
@@ -179,7 +179,7 @@ restore_state() {
 # Install failed -- print error messages and exit 2
 #
 
-fail() {
+function fail {
 	save_state
 	#
 	# We might have gotten here via a trap.  So wait for any
@@ -202,7 +202,7 @@ fail() {
 # Echo a string in verbose mode only
 #
 
-verbose() {
+function verbose {
 	test "$VERBOSE" != "q" && echo $1
 }
 
@@ -210,7 +210,7 @@ verbose() {
 # hack for tmpfs bug -- remove files gradually
 #
 
-remove_dir() {
+function remove_dir {
 	test -d $1 || return
 	local_dot=`pwd`
 	cd $1
@@ -226,7 +226,7 @@ remove_dir() {
 # message.
 #
 
-tstmkdir() {
+function tstmkdir {
 	[ -d $1 ] || mkdir -p $1 || fail
 }
 
@@ -235,7 +235,7 @@ tstmkdir() {
 # usage: fixglom listfile glomname
 #
 
-fixglom() {
+function fixglom {
 	nawk \
 	    -v glomname=$2 \
 	    -v karch=$KARCH ' 
@@ -269,7 +269,7 @@ fixglom() {
 # usage: filtimpl listfile implname
 #
 
-filtimpl() {
+function filtimpl {
 	nawk \
 	    -v impl=$2 '
 	$1 == "MOD" || $1 == "SYMLINK" {
@@ -292,7 +292,7 @@ filtimpl() {
 # Filter the module list to match the user's request.
 # Usage: filtmod listfile modules
 #
-filtmod() {
+function filtmod {
 	nawk -v reqstring="$2" '
 	function modmatch(modname) {
 		if (reqstring == "All") {
@@ -336,12 +336,85 @@ filtmod() {
 }
 
 #
+# Unpack the crypto tarball into the given tree, then massage the
+# tree so that the binaries are all in objNN or debugNN directories.
+#
+function unpack_crypto {
+	typeset tarfile=$1
+	typeset ctop=$2
+	[ -d "$ctop" ] || fail "Can't create tree for crypto modules."
+
+	[ "$VERBOSE" = "V" ] && echo "unpacking crypto tarball into $ctop..."
+	bzcat "$tarfile" | (cd "$ctop"; tar xf -)
+
+	typeset root="$ctop/proto/root_$MACH"
+	[ $OBJD = obj ] && root="$ctop/proto/root_$MACH-nd"
+	[ -d "$root" ] || fail "Can't unpack crypto tarball."
+
+	(cd "$root"; for d in platform kernel usr/kernel; do
+		[ ! -d $d ] && continue
+		find $d -type f -print
+	done) | while read file; do
+		typeset dir=$(dirname "$file")
+		typeset base=$(basename "$file")
+		typeset type=$(basename "$dir")
+		if [ "$type" = amd64 ]; then
+			newdir="$dir/${OBJD}64"
+		elif [ "$type" = sparcv9 ]; then
+			newdir="$dir/${OBJD}64"
+		else
+			newdir="$dir/${OBJD}32"
+		fi
+		mkdir -p "$root/$newdir"
+		[ "$VERBOSE" = "V" ] && echo "mv $file $newdir"
+		mv "$root/$file" "$root/$newdir"
+	done
+}
+
+#
+# usage: fixcrypto listfile ctop
+# Massage entries in listfile for crypto modules, so that they point
+# into ctop.
+#
+function fixcrypto {
+	typeset listfile=$1
+	typeset ctop=$2
+
+	typeset ccontents=/tmp/crypto-toc$$
+	find "$ctop" -type f -print > $ccontents
+	typeset root=root_$MACH
+	[ "$OBJD" = obj ] && root=root_$MACH-nd
+
+	grep -v ^MOD $listfile > $listfile.no-mod
+	grep ^MOD $listfile | while read tag module targdir size impl srcdir; do
+		#
+		# We don't just grep for ${OBJD}$size/$module because
+		# there can be generic and platform-dependent versions
+		# of a module.
+		#
+		newsrcfile=$(grep -w $root/$targdir/${OBJD}$size/$module $ccontents)
+		if [ -n "$newsrcfile" ]; then
+			# srcdir doesn't include final objNN or debugNN
+			echo $tag $module $targdir $size $impl \
+			    $(dirname $(dirname "$newsrcfile"))
+		else
+			echo $tag $module $targdir $size $impl $srcdir
+		fi
+	done > $listfile.mod
+	cat $listfile.mod $listfile.no-mod > $listfile
+
+	rm -f $listfile.mod
+	rm -f $listfile.no-mod
+	rm -f $ccontents
+}
+
+#
 # Copy a module, or create a link, as needed.
 # See $SRC/uts/Makefile.targ ($(MODLIST_DEPS) target) for the format
 # of the different input lines.
 #
 
-copymod() {
+function copymod {
 	case $1 in
 	MOD)
 		targdir=$INSTALL_FILES/$3
@@ -384,7 +457,7 @@ copymod() {
 # Copy kernel modules to $INSTALL_DIR
 #
 
-copy_kernel() {
+function copy_kernel {
 
 	case $KARCH in
 		sun4*)		ISA=sparc;	MACH=sparc	;;
@@ -445,7 +518,25 @@ copy_kernel() {
 	verbose "Building module list..."
 	(cd $KARCH; MAKEFLAGS=e $make -K $MODSTATE modlist.karch) | \
 	    egrep "^MOD|^CONF|^LINK|^SYMLINK" > $modlist
-	[ $VERBOSE = "V" ] && cat $modlist
+	[ "$VERBOSE" = "V" ] && cat $modlist
+	if [ -n "$ON_CRYPTO_BINS" ]; then
+		cryptotar="$ON_CRYPTO_BINS"
+		if [ "$OBJD" = obj ]; then
+			isa=$(uname -p)
+			cryptotar=$(echo "$ON_CRYPTO_BINS" |
+			    sed -e s/.$isa.tar.bz2/-nd.$isa.tar.bz2/)
+		fi
+		[ -f "$cryptotar" ] || fail "crypto ($cryptotar) doesn't exist"
+		cryptotree=$(mktemp -d /tmp/crypto.XXXXXX)
+		[ -n "$cryptotree" ] || fail "can't create tree for crypto"
+		unpack_crypto "$cryptotar" "$cryptotree"
+		#
+		# fixcrypto must come before fixglom, because
+		# fixcrypto uses the unglommed path to find things in
+		# the unpacked crypto.
+		#
+		fixcrypto $modlist "$cryptotree"
+	fi
 	if [ "$GLOM" = "yes" ]; then
 		fixglom $modlist $GLOMNAME
 		filtimpl $modlist $IMPL
@@ -499,22 +590,22 @@ copy_kernel() {
 	save_state
 }
 
-kmdb_copy() {
+function kmdb_copy {
 	typeset src="$1"
 	typeset destdir="$2"
 
 	if [[ ! -d $dest ]] ; then
-		[[ $VERBOSE != "q" ]] && echo "mkdir -p $destdir"
+		[[ "$VERBOSE" != "q" ]] && echo "mkdir -p $destdir"
 
 		mkdir -p $destdir || fail "failed to create $destdir"
 	fi
 
-	[[ $VERBOSE != "q" ]] && echo "cp $src $destdir"
+	[[ "$VERBOSE" != "q" ]] && echo "cp $src $destdir"
 
 	cp $src $destdir || fail "failed to copy $src to $destdir"
 }
 
-kmdb_copy_machkmods() {
+function kmdb_copy_machkmods {
 	typeset modbase="$1"
 	typeset destdir="$2"
 	typeset dir=
@@ -536,7 +627,7 @@ kmdb_copy_machkmods() {
 	done
 }
 
-kmdb_copy_karchkmods() {
+function kmdb_copy_karchkmods {
 	typeset modbase="$1"
 	typeset destdir="$2"
 	typeset bitdir="$3"
@@ -562,7 +653,7 @@ kmdb_copy_karchkmods() {
 	done
 }
 
-kmdb_copy_kmdbmod() {
+function kmdb_copy_kmdbmod {
 	typeset kmdbpath="$1"
 	typeset destdir="$2"
 
@@ -573,7 +664,7 @@ kmdb_copy_kmdbmod() {
 	return 0
 }
 
-copy_kmdb() {
+function copy_kmdb {
 	typeset kmdbtgtdir=$INSTALL_FILES/platform/$KARCH/$GLOMNAME/misc
 	typeset bitdirs=
 	typeset isadir=
@@ -620,6 +711,11 @@ copy_kmdb() {
 	srctrees=$SRC
 	if [[ -d $SRC/../closed && "$CLOSED_IS_PRESENT" != no ]]; then
 		srctrees="$srctrees $SRC/../closed"
+	else
+		if [ -z "$ON_CRYPTO_BINS" ]; then
+			echo "Warning: ON_CRYPTO_BINS not set; pre-signed" \
+			    "crypto not provided."
+		fi
 	fi
 	if [[ $WANT64 = "yes" ]] ; then
 		# kmdbmod for sparc and x86 are built and installed
@@ -679,7 +775,7 @@ copy_kmdb() {
 # Make tarfile
 #
 
-make_tarfile() {
+function make_tarfile {
 	echo "Creating tarfile $TARFILE"
 	test -d $INSTALL_FILES || fail "Can't find $INSTALL_FILES"
 	cd $INSTALL_FILES
@@ -699,7 +795,7 @@ make_tarfile() {
 # Routines to copy files to the target machine
 #
 
-remote_fail() {
+function remote_fail {
 	fail "" "$1" "" \
 		"Make sure that $TARGET_MACHINE is up." \
 "Check .rhosts in the home directory of user $TARGET_USER on $TARGET_MACHINE." \
@@ -708,7 +804,7 @@ remote_fail() {
 		"Then, use \"$INSTALL -R\" to resume the install." ""
 }
 
-remote_install() {
+function remote_install {
 	if [ "$IMODE" = "n" ]; then
 		STATE=4
 		return 0
@@ -747,12 +843,13 @@ $TARGET_MACHINE using 'tar xvf $TARGET_DIR/Install.tar'"
 	STATE=4
 }
 
-okexit() {
+function okexit {
 	cd /tmp
 	test "$CLEANUP" = c && remove_dir $INSTALL_DIR
 	save_state
 	rm -rf $modstatedir
 	rm -f $modlist
+	[ -n "$cryptotree" ] && rm -rf "$cryptotree"
 	verbose "Install complete"
 	exit 0
 }
@@ -815,7 +912,7 @@ if [[ $# -gt 0 ]] ; then
 	KMDB="no"
 fi
 
-case $VERBOSE in
+case "$VERBOSE" in
 	v)	V="v"; SHV="x";;
 	V)	V="v"; SHV="x"; set -x;;
 	q)	V=""; SHV="";;

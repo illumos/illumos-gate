@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Based on the nightly script from the integration folks,
@@ -71,11 +71,107 @@ if [[ ! -x $WHICH_SCM ]]; then
 fi
 
 #
+# Datestamp for crypto tarballs.  We don't use BUILD_DATE because it
+# doesn't sort right and it uses English abbreviations for the month.
+# We want to guarantee a consistent string, so just invoke date(1)
+# once and save the result in a global variable.  YYYY-MM-DD is easier
+# to parse visually than YYYYMMDD.
+#
+cryptostamp=$(date +%Y-%m-%d)
+
+#
+# Echo the path for depositing a crypto tarball, creating the target
+# directory if it doesn't already exist.
+# usage: cryptodest suffix
+# where "suffix" is "" or "-nd".
+#
+function cryptodest {
+	typeset suffix=$1
+	#
+	# $PKGARCHIVE gets wiped out with each build, so put the
+	# tarball one level up.
+	#
+	typeset dir=$(dirname "$PKGARCHIVE")
+	[ -d "$dir" ] || mkdir -p "$dir" >> "$LOGFILE" 2>&1
+	#
+	# Put the suffix after the datestamp to make it easier for
+	# gatelings to use crypto from a specific date (no need to
+	# copy and rename the gate tarball).
+	#
+	echo "$dir/on-crypto-$cryptostamp$suffix.$MACH.tar"
+}
+
+#
+# Create a non-stamped symlink to the given crypto tarball.
+# Return 0 on success, non-zero on failure.
+#
+function cryptolink {
+	typeset targpath=$1
+	typeset suffix=$2
+	if [ ! -f "$targpath" ]; then
+		echo "no crypto at $targpath"
+		return 1
+	fi
+	typeset dir=$(dirname "$targpath")
+	typeset targfile=$(basename "$targpath")
+	typeset link=on-crypto$suffix.$MACH.tar.bz2
+	(cd "$dir"; rm -f "$link")
+	(cd "$dir"; ln -s "$targfile" "$link")
+	return $?
+}
+
+#
+# Generate a crypto tarball from the proto area and put it in the
+# canonical location, along with the datestamp-free symlink.
+# Sets build_ok to "n" if there is a problem.
+#
+function crypto_from_proto {
+	typeset label=$1
+	typeset suffix=$2
+	typeset -i stat
+	typeset to
+
+	echo "Creating $label crypto tarball..." >> "$LOGFILE"
+
+	#
+	# Generate the crypto THIRDPARTYLICENSE file.  This needs to
+	# be done after the build has finished and before we run
+	# cryptodrop.  We'll generate the file twice if we're building
+	# both debug and non-debug, but it's a cheap operation and not
+	# worth the complexity to only do once.
+	#
+	mktpl -c usr/src/tools/opensolaris/license-list >> "$LOGFILE" 2>&1
+	if (( $? != 0 )) ; then
+		echo "Couldn't create crypto THIRDPARTYLICENSE file." |
+		    tee -a "$mail_msg_file" >> "$LOGFILE"
+		build_ok=n
+		return
+	fi
+
+	to=$(cryptodest "$suffix")
+	if [ "$suffix" = "-nd" ]; then
+		cryptodrop -n "$to" >> "$LOGFILE" 2>&1
+	else
+		cryptodrop "$to" >> "$LOGFILE" 2>&1
+	fi
+	if (( $? != 0 )) ; then
+		echo "\nCould not create $label crypto tarball." |
+		   tee -a "$mail_msg_file" >> "$LOGFILE"
+		build_ok=n
+	else
+		cryptolink "$to.bz2" "$suffix" >> "$LOGFILE" 2>&1
+		if (( $? != 0 )) ; then
+			build_ok=n
+		fi
+	fi
+}
+
+#
 # Print the tag string used to identify a build (e.g., "DEBUG
 # open-only")
 # usage: tagstring debug-part open-part
 #
-tagstring() {
+function tagstring {
 	debug_part=$1
 	open_part=$2
 
@@ -95,18 +191,23 @@ tagstring() {
 # -O	OpenSolaris delivery build.  Put the proto area and
 #	(eventually) packages in -open directories.  Use skeleton
 #	closed binaries.  Don't generate archives--that needs to be
-#	done later, after we've generated the closed binaries.  Also
-#	skip the package build (until 6414822 is fixed).
+#	done later, after we've generated the closed binaries.  Use
+#	the signed binaries from the earlier full build.  Skip the
+#	package build (until 6414822 is fixed).
 #
 
-normal_build() {
+function normal_build {
 
 	typeset orig_p_FLAG="$p_FLAG"
 	typeset orig_a_FLAG="$a_FLAG"
 	typeset orig_zero_FLAG="$zero_FLAG"
+	typeset crypto_in="$ON_CRYPTO_BINS"
+	typeset crypto_signer="$CODESIGN_USER"
+	typeset gencrypto=no
 
 	suffix=""
 	open_only=""
+	[ -n "$CODESIGN_USER" ] && gencrypto=yes
 	while getopts O FLAG $*; do
 		case $FLAG in
 		O)
@@ -115,6 +216,18 @@ normal_build() {
 			p_FLAG=n
 			a_FLAG=n
 			zero_FLAG=n
+			gencrypto=no
+			if [ -n "$CODESIGN_USER" ]; then
+				#
+				# Crypto doesn't get signed in the
+				# open-only build (no closed tree ->
+				# no internal signing -> no signing
+				# for off-SWAN).  So use the earlier
+				# signed crypto.
+				#
+				crypto_in=$PKGARCHIVE/../on-crypto.$MACH.tar.bz2
+				crypto_signer=""
+			fi
 			;;
 		esac
 	done
@@ -124,11 +237,18 @@ normal_build() {
 	if [ "$F_FLAG" = "n" ]; then
 		set_non_debug_build_flags
 		mytag=`tagstring "non-DEBUG" "$open_only"`
-		build "$mytag" "$suffix-nd" "$MULTI_PROTO"
+		CODESIGN_USER="$crypto_signer" \
+		    build "$mytag" "$suffix-nd" "-nd" "$MULTI_PROTO" \
+		    $(ndcrypto "$crypto_in")
 		if [ "$build_ok" = "y" -a "$X_FLAG" = "y" -a \
 		    "$p_FLAG" = "y" ]; then
 			copy_ihv_pkgs non-DEBUG -nd
 		fi
+
+		if [[ "$gencrypto" = yes && "$build_ok" = y ]]; then
+			crypto_from_proto non-DEBUG -nd
+		fi
+
 	else
 		echo "\n==== No non-DEBUG $open_only build ====\n" >> "$LOGFILE"
 	fi
@@ -140,10 +260,15 @@ normal_build() {
 	if [ "$D_FLAG" = "y" ]; then
 		set_debug_build_flags
 		mytag=`tagstring "DEBUG" "$open_only"`
-		build "$mytag" "$suffix" "$MULTI_PROTO"
+		CODESIGN_USER="$crypto_signer" \
+		    build "$mytag" "$suffix" "" "$MULTI_PROTO" "$crypto_in"
 		if [ "$build_ok" = "y" -a "$X_FLAG" = "y" -a \
 		    "$p_FLAG" = "y" ]; then
 			copy_ihv_pkgs DEBUG ""
+		fi
+
+		if [[ "$gencrypto" = yes && "$build_ok" = y ]]; then
+			crypto_from_proto DEBUG ""
 		fi
 
 	else
@@ -163,7 +288,7 @@ normal_build() {
 # If variable "$HOOKNAME" is defined, insert a section header into 
 # our logs and then run the command with ARGS
 #
-run_hook() {
+function run_hook {
 	HOOKNAME=$1
     	eval HOOKCMD=\$$HOOKNAME
 	shift
@@ -190,7 +315,7 @@ run_hook() {
 #
 # usage: filelist DESTDIR PATTERN
 #
-filelist() {
+function filelist {
 	DEST=$1
 	PATTERN=$2
 	cd ${DEST}
@@ -217,7 +342,7 @@ filelist() {
 
 # function to save off binaries after a full build for later
 # restoration
-save_binaries() {
+function save_binaries {
 	# save off list of binaries
 	echo "\n==== Saving binaries from build at `date` ====\n" | \
 	    tee -a $mail_msg_file >> $LOGFILE
@@ -231,7 +356,7 @@ save_binaries() {
 
 # delete files
 # usage: hybridize_files DESTDIR MAKE_TARGET
-hybridize_files() {
+function hybridize_files {
 	DEST=$1
 	MAKETARG=$2
 
@@ -254,7 +379,7 @@ hybridize_files() {
 
 # restore binaries into the proper source tree.
 # usage: restore_binaries DESTDIR MAKE_TARGET
-restore_binaries() {
+function restore_binaries {
 	DEST=$1
 	MAKETARG=$2
 
@@ -267,7 +392,7 @@ restore_binaries() {
 
 # rename files we save binaries of
 # usage: rename_files DESTDIR MAKE_TARGET
-rename_files() {
+function rename_files {
 	DEST=$1
 	MAKETARG=$2
 	echo "\n==== Renaming source files in ${MAKETARG} at `date` ====\n" | \
@@ -287,7 +412,7 @@ rename_files() {
 #
 # usage: copy_source CODEMGR_WS DESTDIR LABEL SRCROOT
 #
-copy_source() {
+function copy_source {
 	WS=$1
 	DEST=$2
 	label=$3
@@ -418,7 +543,7 @@ function copy_source_mercurial {
 # Sets SRC to the modified source tree, for use by the caller when it
 # builds the tree.
 #
-set_up_source_build() {
+function set_up_source_build {
 	WS=$1
 	DEST=$2
 	MAKETARG=$3
@@ -498,12 +623,12 @@ set_up_source_build() {
 }
 
 # Return library search directive as function of given root.
-myldlibs() {
+function myldlibs {
 	echo "-L$1/lib -L$1/usr/lib"
 }
 
 # Return header search directive as function of given root.
-myheaders() {
+function myheaders {
 	echo "-I$1/usr/include"
 }
 
@@ -513,7 +638,7 @@ myheaders() {
 # are written to the mail message.  Returns with the status of the
 # original command.
 #
-makebfu_filt() {
+function makebfu_filt {
 	typeset tmplog
 	typeset errors
 	typeset cmd
@@ -538,17 +663,48 @@ makebfu_filt() {
 }
 
 #
+# Unpack the crypto tarball into the proto area.  We first extract the
+# tarball into a temp directory so that we can handle the non-debug
+# tarball correctly with MULTI_PROTO=no.
+# Return 0 on success, non-zero on failure.
+# 
+function unpack_crypto {
+	typeset tarfile=$1
+	typeset suffix=$2
+	typeset ctop=$(mktemp -d /tmp/crypto.XXXXXX)
+	[ -n "$ctop" ] || return 1
+	typeset croot=$ctop/proto/root_$MACH$suffix
+	echo "Unpacking crypto ($tarfile)..."
+	bzcat "$tarfile" | (cd "$ctop"; tar xfBp -)
+	if [[ $? -ne 0 || ! -d "$croot" ]]; then
+		return 1
+	fi
+	#
+	# We extract with -p so that we maintain permissions on directories.
+	#
+	(cd "$croot"; tar cf - *) | (cd "$ROOT"; tar xfBp -)
+	typeset -i stat=$?
+	rm -rf "$ctop"
+	return $stat
+}
+
+#
 # Function to do the build, including cpio archive and package generation.
-# usage: build LABEL SUFFIX MULTIPROTO
+# usage: build LABEL SUFFIX ND MULTIPROTO CRYPTO
 # - LABEL is used to tag build output.
-# - SUFFIX is used to distinguish files (e.g., debug vs non-debug).
+# - SUFFIX is used to distinguish files (e.g., debug vs non-debug,
+#   open-only vs full tree).
+# - ND is "-nd" (non-debug builds) or "" (debug builds).
 # - If MULTIPROTO is "yes", it means to name the proto area according to
 #   SUFFIX.  Otherwise ("no"), (re)use the standard proto area.
+# - CRYPTO is the path to the crypto tarball, or null.
 #
-build() {
+function build {
 	LABEL=$1
 	SUFFIX=$2
-	MULTIPROTO=$3
+	ND=$3
+	MULTIPROTO=$4
+	CRYPTOPATH=$5
 	INSTALLOG=install${SUFFIX}-${MACH}
 	NOISE=noise${SUFFIX}-${MACH}
 	CPIODIR=${CPIODIR_ORIG}${SUFFIX}
@@ -596,6 +752,16 @@ build() {
 	if [ "$?" = "0" ]; then
 		build_ok=n
 		this_build_ok=n
+	fi
+
+	if [ -n "$CRYPTOPATH" ]; then
+		unpack_crypto "$CRYPTOPATH" "$ND" >> "$LOGFILE" 2>&1
+		if (( $? != 0 )) ; then
+			echo "Could not unpack crypto ($CRYPTOPATH)" |
+			    tee -a "$mail_msg_file" >> "$LOGFILE"
+			build_ok=n
+			this_build_ok=n
+		fi
 	fi
 
 	if [ "$W_FLAG" = "n" ]; then
@@ -729,9 +895,9 @@ build() {
 		echo "\n==== Creating $LABEL packages at `date` ====\n" \
 			>> $LOGFILE
 		rm -f $SRC/pkgdefs/${INSTALLOG}.out
-		echo "Clearing out $PKGARCHIVE ..." >> $LOGFILE
-		rm -rf $PKGARCHIVE
-		mkdir -p $PKGARCHIVE
+		echo "Clearing out $PKGARCHIVE ..." >> "$LOGFILE"
+		rm -rf "$PKGARCHIVE" >> "$LOGFILE" 2>&1
+		mkdir -p "$PKGARCHIVE" >> "$LOGFILE" 2>&1
 
 		#
 		# Optional build of sparc realmode on i386
@@ -739,8 +905,8 @@ build() {
 		if [ "$MACH" = "i386" ] && [ "${SPARC_RM_PKGARCHIVE}" ]; then
 			echo "Clearing out ${SPARC_RM_PKGARCHIVE} ..." \
 				>> $LOGFILE
-			rm -rf ${SPARC_RM_PKGARCHIVE}
-			mkdir -p ${SPARC_RM_PKGARCHIVE}
+			rm -rf ${SPARC_RM_PKGARCHIVE} >> "$LOGFILE" 2>&1
+			mkdir -p ${SPARC_RM_PKGARCHIVE} >> "$LOGFILE" 2>&1
 		fi
 
 		cd $SRC/pkgdefs
@@ -778,7 +944,7 @@ build() {
 
 # Usage: dolint /dir y|n
 # Arg. 2 is a flag to turn on/off the lint diff output
-dolint() {
+function dolint {
 	if [ ! -d "$1" ]; then
 		echo "dolint error: $1 is not a directory"
 		exit 1
@@ -862,7 +1028,7 @@ dolint() {
 
 # Install proto area from IHV build
 
-copy_ihv_proto() {
+function copy_ihv_proto {
 
 	echo "\n==== Installing IHV proto area ====\n" \
 		>> $LOGFILE
@@ -901,7 +1067,7 @@ copy_ihv_proto() {
 
 # Install IHV packages in PKGARCHIVE
 # usage: copy_ihv_pkgs LABEL SUFFIX
-copy_ihv_pkgs() {
+function copy_ihv_pkgs {
 	LABEL=$1
 	SUFFIX=$2
 	# always use non-DEBUG IHV packages
@@ -936,7 +1102,7 @@ copy_ihv_pkgs() {
 #
 # returns non-zero status if the build was successful.
 #
-build_tools() {
+function build_tools {
 	DESTROOT=$1
 
 	INSTALLOG=install-${MACH}
@@ -963,7 +1129,7 @@ build_tools() {
 #
 # usage: use_tools TOOLSROOT
 #
-use_tools() {
+function use_tools {
 	TOOLSROOT=$1
 
 	STABS=${TOOLSROOT}/opt/onbld/bin/${MACH}/stabs
@@ -1009,7 +1175,7 @@ use_tools() {
 	echo "ONBLD_TOOLS=${ONBLD_TOOLS}" >> $LOGFILE
 }
 
-staffer() {
+function staffer {
 	if [ $ISUSER -ne 0 ]; then
 		"$@"
 	else
@@ -1027,7 +1193,7 @@ staffer() {
 # Verify that the closed tree is present if it needs to be.
 # Sets CLOSED_IS_PRESENT for future use.
 #
-check_closed_tree() {
+function check_closed_tree {
 	if [ -z "$CLOSED_IS_PRESENT" ]; then
 		if [ -d $CODEMGR_WS/usr/closed ]; then
 			CLOSED_IS_PRESENT="yes"
@@ -1051,7 +1217,7 @@ check_closed_tree() {
 	fi
 }
 
-obsolete_build() {
+function obsolete_build {
     	echo "WARNING: Obsolete $1 build requested; request will be ignored"
 }
 
@@ -1059,7 +1225,7 @@ obsolete_build() {
 # wrapper over wsdiff.
 # usage: do_wsdiff LABEL OLDPROTO NEWPROTO
 #
-do_wsdiff() {
+function do_wsdiff {
 	label=$1
 	oldproto=$2
 	newproto=$3
@@ -1079,14 +1245,14 @@ do_wsdiff() {
 # together.
 #
 
-set_non_debug_build_flags() {
+function set_non_debug_build_flags {
 	export INTERNAL_RELEASE_BUILD ; INTERNAL_RELEASE_BUILD=
 	export RELEASE_BUILD ; RELEASE_BUILD=
 	unset EXTRA_OPTIONS
 	unset EXTRA_CFLAGS
 }
 
-set_debug_build_flags() {
+function set_debug_build_flags {
 	export INTERNAL_RELEASE_BUILD ; INTERNAL_RELEASE_BUILD=
 	unset RELEASE_BUILD
 	unset EXTRA_OPTIONS
@@ -1206,7 +1372,7 @@ XMOD_OPT=
 build_ok=y
 tools_build_ok=y
 
-is_source_build() {
+function is_source_build {
 	[ "$SE_FLAG" = "y" -o "$SD_FLAG" = "y" -o \
 	    "$SH_FLAG" = "y" -o "$SO_FLAG" = "y" ]
 	return $?
@@ -1221,7 +1387,7 @@ is_source_build() {
 # usage: set_S_flag <type>
 # where <type> is the source build type ("E", "D", ...).
 #
-set_S_flag() {
+function set_S_flag {
 	if is_source_build; then
 		echo "Can only build one source variant at a time."
 		exit 1
@@ -1587,6 +1753,63 @@ fi
 export PATH
 export MAKE
 
+#
+# Make sure the crypto tarball is available if it's needed.
+#
+
+# Echo the non-debug name corresponding to the given crypto tarball path.
+function ndcrypto {
+	typeset dir file
+
+	if [ -z "$1" ]; then
+		echo ""
+		return
+	fi
+
+	dir=$(dirname "$1")
+	file=$(basename "$1" ".$MACH.tar.bz2")
+
+	echo "$dir/$file-nd.$MACH.tar.bz2"
+}
+
+# Return 0 (success) if the required crypto tarball(s) are present.
+function crypto_is_present {
+	if [ -z "$ON_CRYPTO_BINS" ]; then
+		echo "ON_CRYPTO_BINS is null or not set."
+		return 1
+	fi
+	if [ "$D_FLAG" = y ]; then
+		if [ ! -f "$ON_CRYPTO_BINS" ]; then
+			echo "DEBUG crypto tarball is unavailable."
+			return 1
+		fi
+	fi
+	if [ "$F_FLAG" = n ]; then
+		if [ ! -f $(ndcrypto "$ON_CRYPTO_BINS") ]; then
+			echo "Non-DEBUG crypto tarball is unavailable."
+			return 1
+		fi
+	fi
+
+	return 0
+}
+
+#
+# Canonicalize ON_CRYPTO_BINS, just in case it was set to the -nd
+# tarball.
+#
+if [ -n "$ON_CRYPTO_BINS" ]; then
+	export ON_CRYPTO_BINS=$(echo "$ON_CRYPTO_BINS" | 
+	    sed -e s/-nd.$MACH.tar/.$MACH.tar/)
+fi
+
+if [[ "$O_FLAG" = y && -z "$CODESIGN_USER" ]]; then
+	if ! crypto_is_present; then
+		echo "OpenSolaris deliveries need signed crypto."
+		exit 1
+	fi
+fi
+
 if [ "${SUNWSPRO}" != "" ]; then
 	PATH="${SUNWSPRO}/bin:$PATH"
 	export PATH
@@ -1678,7 +1901,7 @@ unset   CFLAGS LD_LIBRARY_PATH LDFLAGS
 
 # create directories that are automatically removed if the nightly script
 # fails to start correctly
-newdir() {
+function newdir {
 	dir=$1
 	toadd=
 	while [ ! -d $dir ]; do
@@ -1730,7 +1953,7 @@ fi
 # Juggle the logs and optionally send mail on completion.
 #
 
-logshuffle() {
+function logshuffle {
     	LLOG="$ATLOG/log.`date '+%F.%H:%M'`"
 	if [ -f $LLOG -o -d $LLOG ]; then
 	    	LLOG=$LLOG.$$
@@ -1808,7 +2031,7 @@ logshuffle() {
 #
 #	Remove the locks and temporary files on any exit
 #
-cleanup() {
+function cleanup {
     	logshuffle
 
 	[ -z "$lockfile" ] || staffer rm -f $lockfile
@@ -1824,7 +2047,7 @@ cleanup() {
 	rm -rf $TMPDIR
 }
 
-cleanup_signal() {
+function cleanup_signal {
     	build_ok=i
 	# this will trigger cleanup(), above.
 	exit 1
@@ -1840,7 +2063,7 @@ trap cleanup_signal 1 2 3 15
 # known to be stale (assumes host name is unique among build systems
 # for the workspace).
 #
-create_lock() {
+function create_lock {
 	lockf=$1
 	lockvar=$2
 
@@ -1870,7 +2093,7 @@ create_lock() {
 # Return the list of interesting proto areas, depending on the current
 # options.
 #
-allprotos() {
+function allprotos {
 	roots="$ROOT"
 	if [ $O_FLAG = y ]; then
 		# OpenSolaris deliveries require separate proto areas.
@@ -2088,6 +2311,12 @@ yes|no)	;;
 	;;
 esac
 
+# If CODESIGN_USER is set, we'll want the crypto that we just built.
+if [[ -n "$CODESIGN_USER" && -n "$ON_CRYPTO_BINS" ]]; then
+	echo "Clearing ON_CRYPTO_BINS for signing build." >> "$LOGFILE"
+	unset ON_CRYPTO_BINS
+fi
+
 echo "\n==== Build version ====\n" | tee -a $mail_msg_file >> $LOGFILE
 echo $VERSION | tee -a $mail_msg_file >> $LOGFILE
 
@@ -2214,7 +2443,7 @@ else
 	echo "\n==== No clobber at `date` ====\n" >> $LOGFILE
 fi
 
-type bringover_teamware > /dev/null 2>&1 || bringover_teamware() {
+type bringover_teamware > /dev/null 2>&1 || function bringover_teamware {
 	# sleep on the parent workspace's lock
 	while egrep -s write $BRINGOVER_WS/Codemgr_wsdata/locks
 	do
@@ -2236,7 +2465,7 @@ type bringover_teamware > /dev/null 2>&1 || bringover_teamware() {
 	fi
 }
 
-type bringover_mercurial > /dev/null 2>&1 || bringover_mercurial() {
+type bringover_mercurial > /dev/null 2>&1 || function bringover_mercurial {
 	typeset -x PATH=$PATH
 
 	# If the repository doesn't exist yet, then we want to populate it.
@@ -2451,7 +2680,7 @@ type bringover_mercurial > /dev/null 2>&1 || bringover_mercurial() {
 	fi
 }
 
-type bringover_subversion > /dev/null 2>&1 || bringover_subversion() {
+type bringover_subversion > /dev/null 2>&1 || function bringover_subversion {
 	typeset -x PATH=$PATH
 
 	if [[ ! -d $CODEMGR_WS/.svn ]]; then
@@ -2481,7 +2710,7 @@ type bringover_subversion > /dev/null 2>&1 || bringover_subversion() {
 	fi
 }
 
-type bringover_none > /dev/null 2>&1 || bringover_none() {
+type bringover_none > /dev/null 2>&1 || function bringover_none {
 	echo "Couldn't figure out what kind of SCM to use for $BRINGOVER_WS."
 	touch $TMPDIR/bringover_failed
 }
@@ -2491,7 +2720,7 @@ type bringover_none > /dev/null 2>&1 || bringover_none() {
 # be eval'ed by the caller to associate values (possibly empty) with
 # variables.  In that case, passing in a printf string would let the caller
 # choose the variable names.
-parse_url() {
+function parse_url {
 	typeset url method host port path
 
 	url=$1
@@ -2511,7 +2740,7 @@ parse_url() {
 	echo $method ${host:-localhost} ${path:-/} $port
 }
 
-http_get() {
+function http_get {
 	typeset url method host port path
 
 	url=$1
@@ -2571,6 +2800,17 @@ if [ "$n_FLAG" = "n" ]; then
 	check_closed_tree
 else
 	echo "\n==== No bringover to $CODEMGR_WS ====\n" >> $LOGFILE
+fi
+
+if [ "$CLOSED_IS_PRESENT" = no ]; then
+	crypto_is_present >> "$LOGFILE"
+	if (( $? != 0 )); then
+		build_ok=n
+		echo "A crypto tarball must be provided when" \
+		    "there is no closed tree." |
+		    tee -a "$mail_msg_file" >> "$LOGFILE"
+		exit 1
+	fi
 fi
 
 echo "\n==== Build environment ====\n" | tee -a $build_environ_file >> $LOGFILE
@@ -2713,18 +2953,19 @@ else
 fi
 
 #
-# Generate the THIRDPARTYLICENSE files if needed.  This is done before
-# findunref to help identify license files that need to be added to
-# the list.
+# Generate the THIRDPARTYLICENSE files if needed.  This is done after
+# the build, so that dynamically-created license files are there.
+# It's done before findunref to help identify license files that need
+# to be added to tools/opensolaris/license-list.
 #
 if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
-	echo "\n==== Generating THIRDPARTYLICENSE files ====\n" | \
-	    tee -a $mail_msg_file >> $LOGFILE
+	echo "\n==== Generating THIRDPARTYLICENSE files ====\n" |
+	    tee -a "$mail_msg_file" >> "$LOGFILE"
 
-	mktpl usr/src/tools/opensolaris/license-list >>$LOGFILE 2>&1
+	mktpl usr/src/tools/opensolaris/license-list >> "$LOGFILE" 2>&1
 	if (( $? != 0 )) ; then
 		echo "Couldn't create THIRDPARTYLICENSE files" |
-		    tee -a $mail_msg_file >> $LOGFILE
+		    tee -a "$mail_msg_file" >> "$LOGFILE"
 	fi
 fi
 
@@ -3179,6 +3420,50 @@ fi
 # Generate the OpenSolaris deliverables if requested.  Some of these
 # steps need to come after findunref and are commented below.
 #
+
+#
+# Copy an input crypto tarball to the canonical destination (with
+# datestamp), and point the non-stamped symlink at it.
+# Usage: copycrypto from_path suffix
+# Returns 0 if successful, non-zero if not.
+#
+function copycrypto {
+	typeset from=$1
+	typeset suffix=$2
+	typeset to=$(cryptodest "$suffix").bz2
+	typeset -i stat
+	cp "$from" "$to"
+	stat=$?
+	if (( $stat == 0 )); then
+		cryptolink "$to" "$suffix"
+		stat=$?
+	fi
+	return $stat
+}
+
+#
+# Pass through the crypto tarball(s) that we were given, putting it in
+# the same place that crypto_from_proto puts things.
+#
+function crypto_passthrough {
+	echo "Reusing $ON_CRYPTO_BINS for crypto tarball(s)..." >> "$LOGFILE"
+	if [ "$D_FLAG" = y ]; then
+		copycrypto "$ON_CRYPTO_BINS" "" >> "$LOGFILE" 2>&1
+		if (( $? != 0 )) ; then
+			echo "Couldn't create DEBUG crypto tarball." |
+			    tee -a "$mail_msg_file" >> "$LOGFILE"
+		fi
+	fi
+	if [ "$F_FLAG" = n ]; then
+		copycrypto $(ndcrypto "$ON_CRYPTO_BINS") "-nd" \
+		    >> "$LOGFILE" 2>&1
+		if (( $? != 0 )) ; then
+			echo "Couldn't create non-DEBUG crypto tarball." |
+			    tee -a "$mail_msg_file" >> "$LOGFILE"
+		fi
+	fi
+}
+
 if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
 	echo "\n==== Generating OpenSolaris tarballs ====\n" | \
 	    tee -a $mail_msg_file >> $LOGFILE
@@ -3250,6 +3535,10 @@ if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
 			echo "Couldn't create non-DEBUG archives tarball." |
 			    tee -a $mail_msg_file >> $LOGFILE
 		fi
+	fi
+
+	if [ -n "$ON_CRYPTO_BINS" ]; then
+		crypto_passthrough
 	fi
 fi
 
