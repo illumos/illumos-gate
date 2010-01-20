@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1007,7 +1007,7 @@ rfs4_fattr4_acl(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 
 		if (whichacl & _ACL_ACE_ENABLED) {
 			error = vs_ace4_to_acet(&vs_ace4, &vs_native,
-			    vap->va_uid, vap->va_gid, TRUE, FALSE);
+			    vap->va_uid, vap->va_gid, TRUE);
 			if (error != 0)
 				break;
 			(void) VOP_RWLOCK(vp, V_WRITELOCK_TRUE, NULL);
@@ -1017,8 +1017,7 @@ rfs4_fattr4_acl(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 			vs_acet_destroy(&vs_native);
 		} else if (whichacl & _ACL_ACLENT_ENABLED) {
 			error = vs_ace4_to_aent(&vs_ace4, &vs_native,
-			    vap->va_uid, vap->va_gid, vp->v_type == VDIR, TRUE,
-			    FALSE);
+			    vap->va_uid, vap->va_gid, vp->v_type == VDIR, TRUE);
 			if (error != 0)
 				break;
 			(void) VOP_RWLOCK(vp, V_WRITELOCK_TRUE, NULL);

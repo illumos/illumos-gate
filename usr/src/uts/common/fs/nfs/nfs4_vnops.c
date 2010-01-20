@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -12478,8 +12478,7 @@ nfs4_create_getsecattr_return(vsecattr_t *filled_vsap, vsecattr_t *vsap,
 	uint_t	orig_mask = vsap->vsa_mask;
 
 	if (orig_mask & (VSA_ACE | VSA_ACECNT)) {
-		error = vs_ace4_to_acet(filled_vsap, vsap, uid, gid,
-		    FALSE, ((orig_mask & VSA_ACE) ? FALSE : TRUE));
+		error = vs_ace4_to_acet(filled_vsap, vsap, uid, gid, FALSE);
 
 		if (error)
 			return (error);
@@ -12500,8 +12499,7 @@ nfs4_create_getsecattr_return(vsecattr_t *filled_vsap, vsecattr_t *vsap,
 	} else if (orig_mask & (VSA_ACL | VSA_ACLCNT | VSA_DFACL |
 	    VSA_DFACLCNT)) {
 		error = vs_ace4_to_aent(filled_vsap, vsap, uid, gid,
-		    isdir, FALSE,
-		    ((orig_mask & (VSA_ACL | VSA_DFACL)) ? FALSE : TRUE));
+		    isdir, FALSE);
 
 		if (error)
 			return (error);

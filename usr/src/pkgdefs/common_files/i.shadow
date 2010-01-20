@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -142,6 +142,18 @@ do
 			printf '/^postgres:NP\na\n%s\n.\nw\nq\n' \
 			    "$SVCTAG_LINE" | ed -s $dest > /dev/null
 		fi
+
+		#
+		# Add the 'unknown' reserved user if it doesn't exist.
+		#
+		UNKNOWN_LINE="unknown:*LK*:::::::"
+		if grep "^unknown:" $dest >/dev/null 2>&1 >/dev/null; then
+			:
+		else
+			printf '/^svctag:*LK*\na\n%s\n.\nw\nq\n' \
+			    "$UNKNOWN_LINE" | ed -s $dest > /dev/null
+		fi
+	
 
 		#
 		# Add the 'dladm' reserved user if it doesn't exist.

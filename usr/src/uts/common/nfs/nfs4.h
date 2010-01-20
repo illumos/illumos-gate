@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1312,9 +1312,9 @@ extern char	*utf8_strchr(utf8string *, const char);
 extern int	ln_ace4_cmp(nfsace4 *, nfsace4 *, int);
 extern int	vs_aent_to_ace4(vsecattr_t *, vsecattr_t *, int, int);
 extern int	vs_ace4_to_aent(vsecattr_t *, vsecattr_t *, uid_t, gid_t,
-    int, int, int);
-extern int	vs_ace4_to_acet(vsecattr_t *, vsecattr_t *, uid_t, gid_t,
     int, int);
+extern int	vs_ace4_to_acet(vsecattr_t *, vsecattr_t *, uid_t, gid_t,
+    int);
 extern int	vs_acet_to_ace4(vsecattr_t *, vsecattr_t *, int);
 extern void	vs_acet_destroy(vsecattr_t *);
 extern void	vs_ace4_destroy(vsecattr_t *);

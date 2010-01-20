@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -292,6 +292,25 @@ do
                 else
                         sed '/^mysql::70:/ a\
 '"$OPENLDAPGROUP_LINE"'' $dest > $TEMPF
+			mv -f $TEMPF $dest
+                fi
+   	        #	
+		# Add the 'unknown' group if it doesn't already exist.
+                #
+		UNKNOWNGROUP_LINE="unknown::96:"
+                cur_name=`awk -F: '$3 == 96 {print $1}' $dest`
+                cur_id=`awk -F: '$1 == "unknown" {print $3}' $dest`
+                if [ ! -z "$cur_name" -a "$cur_name" != "unknown" ]; then
+                        echo "ERROR: Reserved GID 96 already assigned" \
+                            "to '$cur_name'" >> /tmp/CLEANUP
+                elif [ ! -z "$cur_id" -a "$cur_id" != "96" ]; then
+                        echo "NOTE: unknown group already assigned" \
+                            "to id '$cur_id'" >> /tmp/CLEANUP
+                elif grep "$UNKNOWNGROUP_LINE" $dest >/dev/null 2>&1; then
+                        :
+                else
+                        sed '/^slocate::95:/ a\
+'"$UNKNOWNGROUP_LINE"'' $dest > $TEMPF
 			mv -f $TEMPF $dest
                 fi
 	fi

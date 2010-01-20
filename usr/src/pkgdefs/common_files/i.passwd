@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -269,6 +269,26 @@ do
 		else
 			sed '/^zfssnap:x/ a\
 '"$UPNP_LIN"'' $dest > $TEMPF
+			mv -f $TEMPF $dest
+		fi
+
+		#
+		# Add the 'unknown' user if it doesn't exist.
+		#
+     		UNKNOWN_LIN="unknown:x:96:96:Unknown Remote UID:/:"
+		cur_name=`awk -F: '$3 == 96 { print $1 }' $dest`
+		cur_id=`awk -F: '$1 == "unknown" { print $3 }' $dest`
+		if [ ! -z "$cur_name" -a "$cur_name" != "unknown" ]; then
+			echo "ERROR: Reserved UID 96 already assigned" \
+			    "to '$cur_name'" >> /tmp/CLEANUP
+		elif [ ! -z "$cur_id" -a "$cur_id" != "96" ]; then
+			echo "NOTE: unknown username already assigned" \
+			    "to id '$cur_id'" >> /tmp/CLEANUP
+		elif grep "$UNKNOWN_LIN" $dest > /dev/null 2>&1; then
+			:
+		else
+			sed '/^svctag:x/ a\
+'"$UNKNOWN_LIN"'' $dest > $TEMPF
 			mv -f $TEMPF $dest
 		fi
 	fi

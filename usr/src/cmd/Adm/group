@@ -21,6 +21,7 @@ openldap::75:
 webservd::80:
 postgres::90:
 slocate::95:
+unknown::96:
 nobody::60001:
 noaccess::60002:
 nogroup::65534:

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The following naming convention is used in function names.
@@ -73,16 +71,17 @@ static int ace4_allow_to_mode(acemask4, o_mode_t *, int);
 static ace4vals_t *ace4vals_find(nfsace4 *, avl_tree_t *, int *);
 static int ace4_to_aent_legal(nfsace4 *, int);
 static int ace4vals_to_aent(ace4vals_t *, aclent_t *, ace4_list_t *,
-    uid_t, gid_t, int, int, int);
+    uid_t, gid_t, int, int);
 static int ace4_list_to_aent(ace4_list_t *, aclent_t **, int *, uid_t, gid_t,
-    int, int, int);
+    int, int);
 static int ln_ace4_to_aent(nfsace4 *ace4, int n, uid_t, gid_t,
-    aclent_t **, int *, aclent_t **, int *, int, int, int);
+    aclent_t **, int *, aclent_t **, int *, int, int);
 static int ace4_cmp(nfsace4 *, nfsace4 *);
 static int acet_to_ace4(ace_t *, nfsace4 *, int);
-static int ace4_to_acet(nfsace4 *, ace_t *, uid_t, gid_t, int, int);
-static int validate_idmapping(utf8string *, uid_t, int, int, int);
+static int ace4_to_acet(nfsace4 *, ace_t *, uid_t, gid_t, int);
+static int validate_idmapping(utf8string *, uid_t *, int, int);
 static int u8s_mapped_to_nobody(utf8string *, uid_t, int);
+static void remap_id(uid_t *, int);
 static void ace4_mask_to_acet_mask(acemask4, uint32_t *);
 static void acet_mask_to_ace4_mask(uint32_t, acemask4 *);
 static void ace4_flags_to_acet_flags(aceflag4, uint16_t *);
@@ -616,9 +615,44 @@ ln_aent_to_ace4(aclent_t *aclent, int n, nfsace4 **acepp, int *rescount,
 				acep->flag |= ACE4_IDENTIFIER_GROUP;
 				error = 0;
 			} else if (aclent[i].a_type & USER) {
+				/*
+				 * On the client, we do not allow an ACL with
+				 * ACEs containing the UID_UNKNOWN user to be
+				 * set.  This is because having UID_UNKNOWN in
+				 * an ACE can only come from the user having
+				 * done a read-modify-write ACL manipulation
+				 * (e.g. setfacl -m or chmod A+) when there
+				 * was an ACE with an unmappable group already
+				 * present.
+				 */
+				if (aclent[i].a_id == UID_UNKNOWN &&
+				    !isserver) {
+					DTRACE_PROBE(
+					    nfs4clnt__err__acl__uid__unknown);
+					NFS4_DEBUG(nfs4_acl_debug, (CE_NOTE,
+					    "ln_aent_to_ace4: UID_UNKNOWN is "
+					    "not allowed in the ACL"));
+					error = EACCES;
+					goto out;
+				}
+
 				error = nfs_idmap_uid_str(aclent[i].a_id,
 				    &acep->who, isserver);
 			} else {
+				/*
+				 * Same rule as UID_UNKNOWN (above).
+				 */
+				if (aclent[i].a_id == GID_UNKNOWN &&
+				    !isserver) {
+					DTRACE_PROBE(
+					    nfs4clnt__err__acl__gid__unknown);
+					NFS4_DEBUG(nfs4_acl_debug, (CE_NOTE,
+					    "ln_aent_to_ace4: GID_UNKNOWN is "
+					    "not allowed in the ACL"));
+					error = EACCES;
+					goto out;
+				}
+
 				error = nfs_idmap_gid_str(aclent[i].a_id,
 				    &acep->who, isserver);
 				acep->flag |= ACE4_IDENTIFIER_GROUP;
@@ -812,15 +846,14 @@ vs_aent_to_ace4(vsecattr_t *aclentacl, vsecattr_t *vs_ace4,
 
 	if (aclentacl->vsa_aclcnt > 0) {
 		error = ln_aent_to_ace4(aclentacl->vsa_aclentp,
-			aclentacl->vsa_aclcnt, &acebuf, &acecnt,
-			    isdir, isserver);
+		    aclentacl->vsa_aclcnt, &acebuf, &acecnt, isdir, isserver);
 		if (error != 0)
 			goto out;
 	}
 	if (aclentacl->vsa_dfaclcnt > 0) {
 		error = ln_aent_to_ace4(aclentacl->vsa_dfaclentp,
-			aclentacl->vsa_dfaclcnt, &dfacebuf, &dfacecnt,
-			    isdir, isserver);
+		    aclentacl->vsa_dfaclcnt, &dfacebuf, &dfacecnt, isdir,
+		    isserver);
 		if (error != 0)
 			goto out;
 	}
@@ -1157,7 +1190,7 @@ out:
 
 static int
 ace4vals_to_aent(ace4vals_t *vals, aclent_t *dest, ace4_list_t *list,
-    uid_t owner, gid_t group, int isdir, int isserver, int just_count)
+    uid_t owner, gid_t group, int isdir, int isserver)
 {
 	int error;
 	acemask4 flips = ACE4_POSIX_SUPPORTED_BITS;
@@ -1197,8 +1230,8 @@ ace4vals_to_aent(ace4vals_t *vals, aclent_t *dest, ace4_list_t *list,
 			goto out;
 		}
 
-		error = validate_idmapping(vals->key, dest->a_id,
-		    (dest->a_type & USER ? 1 : 0), isserver, just_count);
+		error = validate_idmapping(vals->key, &dest->a_id,
+		    (dest->a_type & USER ? 1 : 0), isserver);
 		if (error != 0) {
 			goto out;
 		}
@@ -1222,7 +1255,7 @@ out:
 
 static int
 ace4_list_to_aent(ace4_list_t *list, aclent_t **aclentp, int *aclcnt,
-    uid_t owner, gid_t group, int isdir, int isserver, int just_count)
+    uid_t owner, gid_t group, int isdir, int isserver)
 {
 	int error = 0;
 	aclent_t *aent, *result = NULL;
@@ -1232,14 +1265,13 @@ ace4_list_to_aent(ace4_list_t *list, aclent_t **aclentp, int *aclcnt,
 	if ((list->seen & (USER_OBJ | GROUP_OBJ | OTHER_OBJ)) !=
 	    (USER_OBJ | GROUP_OBJ | OTHER_OBJ)) {
 		NFS4_DEBUG(nfs4_acl_debug, (CE_NOTE,
-			"ace4_list_to_aent: required aclent_t entites "
-			"missing"));
+		    "ace4_list_to_aent: required aclent_t entites missing"));
 		error = ENOTSUP;
 		goto out;
 	}
 	if ((! list->hasmask) && (list->numusers + list->numgroups > 0)) {
 		NFS4_DEBUG(nfs4_acl_debug, (CE_NOTE,
-			"ace4_list_to_aent: CLASS_OBJ (mask) missing"));
+		    "ace4_list_to_aent: CLASS_OBJ (mask) missing"));
 		error = ENOTSUP;
 		goto out;
 	}
@@ -1257,7 +1289,7 @@ ace4_list_to_aent(ace4_list_t *list, aclent_t **aclentp, int *aclcnt,
 	/* USER_OBJ */
 	ASSERT(list->user_obj.aent_type & USER_OBJ);
 	error = ace4vals_to_aent(&list->user_obj, aent, list, owner, group,
-	    isdir, isserver, just_count);
+	    isdir, isserver);
 
 	if (error != 0)
 		goto out;
@@ -1268,7 +1300,7 @@ ace4_list_to_aent(ace4_list_t *list, aclent_t **aclentp, int *aclcnt,
 	    vals = AVL_NEXT(&list->user, vals)) {
 		ASSERT(vals->aent_type & USER);
 		error = ace4vals_to_aent(vals, aent, list, owner, group,
-		    isdir, isserver, just_count);
+		    isdir, isserver);
 		if (error != 0)
 			goto out;
 		++aent;
@@ -1276,7 +1308,7 @@ ace4_list_to_aent(ace4_list_t *list, aclent_t **aclentp, int *aclcnt,
 	/* GROUP_OBJ */
 	ASSERT(list->group_obj.aent_type & GROUP_OBJ);
 	error = ace4vals_to_aent(&list->group_obj, aent, list, owner, group,
-	    isdir, isserver, just_count);
+	    isdir, isserver);
 	if (error != 0)
 		goto out;
 	++aent;
@@ -1286,7 +1318,7 @@ ace4_list_to_aent(ace4_list_t *list, aclent_t **aclentp, int *aclcnt,
 	    vals = AVL_NEXT(&list->group, vals)) {
 		ASSERT(vals->aent_type & GROUP);
 		error = ace4vals_to_aent(vals, aent, list, owner, group,
-		    isdir, isserver, just_count);
+		    isdir, isserver);
 		if (error != 0)
 			goto out;
 		++aent;
@@ -1320,7 +1352,7 @@ ace4_list_to_aent(ace4_list_t *list, aclent_t **aclentp, int *aclcnt,
 	/* OTHER_OBJ */
 	ASSERT(list->other_obj.aent_type & OTHER_OBJ);
 	error = ace4vals_to_aent(&list->other_obj, aent, list, owner, group,
-	    isdir, isserver, just_count);
+	    isdir, isserver);
 	if (error != 0)
 		goto out;
 	++aent;
@@ -1346,7 +1378,7 @@ ln_ace4_to_aent(nfsace4 *ace4, int n,
     uid_t owner, gid_t group,
     aclent_t **aclentp, int *aclcnt,
     aclent_t **dfaclentp, int *dfaclcnt,
-    int isdir, int isserver, int just_count)
+    int isdir, int isserver)
 {
 	int error = 0;
 	nfsace4 *ace4p;
@@ -1527,13 +1559,13 @@ ln_ace4_to_aent(nfsace4 *ace4, int n,
 	/* done collating; produce the aclent_t lists */
 	if (normacl->state != ace4_unused) {
 		error = ace4_list_to_aent(normacl, aclentp, aclcnt,
-		    owner, group, isdir, isserver, just_count);
+		    owner, group, isdir, isserver);
 		if (error != 0)
 			goto out;
 	}
 	if (dfacl->state != ace4_unused) {
 		error = ace4_list_to_aent(dfacl, dfaclentp, dfaclcnt,
-		    owner, group, isdir, isserver, just_count);
+		    owner, group, isdir, isserver);
 		if (error != 0)
 			goto out;
 	}
@@ -1554,7 +1586,7 @@ out:
  */
 int
 vs_ace4_to_aent(vsecattr_t *vs_ace4, vsecattr_t *vs_aent,
-    uid_t owner, gid_t group, int isdir, int isserver, int just_count)
+    uid_t owner, gid_t group, int isdir, int isserver)
 {
 	int error = 0;
 
@@ -1562,7 +1594,7 @@ vs_ace4_to_aent(vsecattr_t *vs_ace4, vsecattr_t *vs_aent,
 	    owner, group,
 	    (aclent_t **)&vs_aent->vsa_aclentp, &vs_aent->vsa_aclcnt,
 	    (aclent_t **)&vs_aent->vsa_dfaclentp, &vs_aent->vsa_dfaclcnt,
-	    isdir, isserver, just_count);
+	    isdir, isserver);
 	if (error != 0)
 		goto out;
 
@@ -1665,6 +1697,22 @@ acet_to_ace4(ace_t *ace, nfsace4 *nfsace4, int isserver)
 		(void) str_to_utf8(ACE4_WHO_GROUP, &nfsace4->who);
 	} else if (ace->a_flags & ACE_IDENTIFIER_GROUP) {
 		nfsace4->flag |= ACE4_IDENTIFIER_GROUP;
+		/*
+		 * On the client, we do not allow an ACL with ACEs containing
+		 * the "unknown"/GID_UNKNOWN group to be set.  This is because
+		 * it having GID_UNKNOWN in an ACE can only come from
+		 * the user having done a read-modify-write ACL manipulation
+		 * (e.g. setfacl -m or chmod A+) when there was an ACE with
+		 * an unmappable group already present.
+		 */
+		if (ace->a_who == GID_UNKNOWN && !isserver) {
+			DTRACE_PROBE(nfs4clnt__err__acl__gid__unknown);
+			NFS4_DEBUG(nfs4_acl_debug, (CE_NOTE,
+			    "acet_to_ace4: GID_UNKNOWN is not allowed in "
+			    "the ACL"));
+			error = EACCES;
+			goto out;
+		}
 		error = nfs_idmap_gid_str(ace->a_who, &nfsace4->who, isserver);
 		if (error != 0)
 			NFS4_DEBUG(nfs4_acl_debug, (CE_NOTE,
@@ -1674,6 +1722,17 @@ acet_to_ace4(ace_t *ace, nfsace4 *nfsace4, int isserver)
 	} else if (ace->a_flags & ACE_EVERYONE) {
 		(void) str_to_utf8(ACE4_WHO_EVERYONE, &nfsace4->who);
 	} else {
+		/*
+		 * Same rule as GID_UNKNOWN (above).
+		 */
+		if (ace->a_who == UID_UNKNOWN && !isserver) {
+			DTRACE_PROBE(nfs4clnt__err__acl__uid__unknown);
+			NFS4_DEBUG(nfs4_acl_debug, (CE_NOTE,
+			    "acet_to_ace4: UID_UNKNOWN is not allowed in "
+			    "the ACL"));
+			error = EACCES;
+			goto out;
+		}
 		error = nfs_idmap_uid_str(ace->a_who, &nfsace4->who, isserver);
 		if (error != 0)
 			NFS4_DEBUG(nfs4_acl_debug, (CE_NOTE,
@@ -1690,7 +1749,7 @@ out:
  */
 static int
 ace4_to_acet(nfsace4 *nfsace4, ace_t *ace, uid_t owner, gid_t group,
-    int isserver, int just_count)
+    int isserver)
 {
 	int error = 0;
 
@@ -1774,7 +1833,7 @@ ace4_to_acet(nfsace4 *nfsace4, ace_t *ace, uid_t owner, gid_t group,
 			goto out;
 		}
 		error = validate_idmapping(&nfsace4->who,
-		    ace->a_who, FALSE, isserver, just_count);
+		    &ace->a_who, FALSE, isserver);
 		if (error != 0)
 			goto out;
 	} else {
@@ -1789,7 +1848,7 @@ ace4_to_acet(nfsace4 *nfsace4, ace_t *ace, uid_t owner, gid_t group,
 			goto out;
 		}
 		error = validate_idmapping(&nfsace4->who,
-		    ace->a_who, TRUE, isserver, just_count);
+		    &ace->a_who, TRUE, isserver);
 		if (error != 0)
 			goto out;
 	}
@@ -1910,7 +1969,7 @@ acet_flags_to_ace4_flags(uint16_t acet_flags, aceflag4 *ace4_flags)
 
 int
 vs_ace4_to_acet(vsecattr_t *vs_ace4, vsecattr_t *vs_acet,
-    uid_t owner, gid_t group, int isserver, int just_count)
+    uid_t owner, gid_t group, int isserver)
 {
 	int error;
 	int i;
@@ -1935,7 +1994,7 @@ vs_ace4_to_acet(vsecattr_t *vs_ace4, vsecattr_t *vs_acet,
 	for (i = 0; i < vs_ace4->vsa_aclcnt; i++) {
 		error = ace4_to_acet((nfsace4 *)(vs_ace4->vsa_aclentp) + i,
 		    (ace_t *)(vs_acet->vsa_aclentp) + i, owner, group,
-		    isserver, just_count);
+		    isserver);
 		if (error != 0)
 			goto out;
 	}
@@ -2086,14 +2145,14 @@ nfs4_acl_free_cache(vsecattr_t *vsap)
 }
 
 static int
-validate_idmapping(utf8string *orig_who, uid_t mapped_id, int isuser,
-	int isserver, int just_count)
+validate_idmapping(utf8string *orig_who, uid_t *mapped_id, int isuser,
+	int isserver)
 {
-	if (u8s_mapped_to_nobody(orig_who, mapped_id, isuser)) {
+	if (u8s_mapped_to_nobody(orig_who, *mapped_id, isuser)) {
 		if (isserver) {
 			char	*who = NULL;
 			uint_t	len = 0;
-
+			/* SERVER */
 			/*
 			 * This code path gets executed on the server
 			 * in the case that we are setting an ACL.
@@ -2120,35 +2179,24 @@ validate_idmapping(utf8string *orig_who, uid_t mapped_id, int isuser,
 			 * This code path gets executed on the client
 			 * when we are getting an ACL.
 			 *
-			 * If the caller just requested the count
-			 * don't fail the request just because we
-			 * failed mapping the other portions of the
-			 * ACL.  Things such as vn_createat expect it's
-			 * call to VOP_GETSECATTR (to get the
-			 * default acl count) to succeed in order to
-			 * create a file.
-			 *
-			 * If the caller requested more than the count,
-			 * return an error as we will not want to
-			 * silently map user or group to "nobody"
-			 * because of the semantics that an ACL
-			 * modification interface (i.e. - setfacl -m)
+			 * We do not want to silently map user or group to
+			 * "nobody" because of the semantics that an ACL
+			 * modification interface (i.e. - setfacl -m, chmod A+)
 			 * may use to modify an ACL (i.e. - get the ACL
 			 * then use it as a basis for setting the
-			 * modified ACL).
+			 * modified ACL).  Therefore, change the mapping.
 			 */
 			who = utf8_to_str(orig_who, &len, NULL);
-			if (just_count) {
-				DTRACE_PROBE1(nfs4__acl__nobody, char *, who);
-				if (who != NULL)
-					kmem_free(who, len);
-				return (0);
-			} else {
-				DTRACE_PROBE1(nfs4__acl__nobody, char *, who);
-				if (who != NULL)
-					kmem_free(who, len);
-				return (EACCES);
-			}
+			DTRACE_PROBE1(nfs4__acl__nobody, char *, who);
+			if (who != NULL)
+				kmem_free(who, len);
+
+			/*
+			 * Re-mapped from UID_NOBODY/GID_NOBODY
+			 * to UID_UNKNOWN/GID_UNKNOWN and return.
+			 */
+			remap_id(mapped_id, isuser);
+			return (0);
 		}
 	}
 	return (0);
@@ -2168,4 +2216,18 @@ u8s_mapped_to_nobody(utf8string *orig_who, uid_t mapped_id, int isuser)
 		return (mapped_id == UID_NOBODY);
 
 	return (mapped_id == GID_NOBODY);
+}
+
+/*
+ * This function is used in the case that the utf8string passed over the wire
+ * was mapped to UID_NOBODY or GID_NOBODY and we will remap the id to
+ * to the appropriate mapping.  That is UID_UNKNOWN or GID_UNKNOWN.
+ */
+static void
+remap_id(uid_t *id, int isuser)
+{
+	if (isuser)
+		*id = UID_UNKNOWN;
+
+	*id = GID_UNKNOWN;
 }
