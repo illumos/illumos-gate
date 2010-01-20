@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4194,6 +4194,7 @@ vhci_mpapi_update_tpg_acc_state_for_lu(struct scsi_vhci *vhci,
 	mpapi_lu_data_t		*lu_data;
 	mpapi_path_data_t	*path_data;
 	mpapi_tpg_data_t	*tpg_data;
+	char			*tgt_port;
 
 	lu_list = vhci_get_mpapi_item(vhci, NULL, MP_OBJECT_TYPE_MULTIPATH_LU,
 	    (void *)vlun);
@@ -4219,8 +4220,18 @@ vhci_mpapi_update_tpg_acc_state_for_lu(struct scsi_vhci *vhci,
 		path_list = lu_data->path_list->head;
 		while (path_list != NULL) {
 			path_data = path_list->item->idata;
-			if (strncmp(path_data->pclass, tpg_data->pclass,
-			    strlen(tpg_data->pclass)) == 0) {
+			/*
+			 * path class is not reliable for ALUA if the
+			 * vhci has done the update on one of the class
+			 * but ignore to update on another one.
+			 */
+			tgt_port = NULL;
+			if ((mdi_prop_lookup_string(path_data->resp,
+			    SCSI_ADDR_PROP_TARGET_PORT,
+			    &tgt_port) == DDI_PROP_SUCCESS) &&
+			    tgt_port != NULL &&
+			    (vhci_mpapi_check_tp_in_tpg(
+			    tpg_data, tgt_port) == 1)) {
 				if (path_data->valid == 1) {
 					VHCI_DEBUG(4, (CE_NOTE, NULL,
 					    "vhci_mpapi_update_tpg_acc_state_"
