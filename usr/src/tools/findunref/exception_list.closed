@@ -64,3 +64,14 @@
 #
 ./usr/closed/uts/common/io/bnxe/577xx
 ./usr/closed/uts/common/io/bnxe/src/bnxe_debug.h
+
+#
+# Ignore some files originally shared by Broadcom as part of bnx driver
+#
+./usr/closed/uts/common/io/bnx/hsi.h
+./usr/closed/uts/common/io/bnx/invm_cfg.h
+./usr/closed/uts/common/io/bnx/iparms.h
+./usr/closed/uts/common/io/bnx/itypes.h
+./usr/closed/uts/common/io/bnx/status_code.h
+./usr/closed/uts/common/io/bnx/tcp_ctx.h
+./usr/closed/uts/common/io/bnx/toe_ctx.h
