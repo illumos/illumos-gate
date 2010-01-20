@@ -19,11 +19,8 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 #
 # This is a clean script for removable disks
@@ -181,18 +178,39 @@ get_reply() {
 }
 
 #
-# Find the first disk slice containing a HSFS file system
+# Find the first disk slice containing a file system
 #
 find_fs()
 {
-	for DEVn in $FILES ; do
-		x="`labelit -F hsfs $DEVn 2>&1| grep 'Volume id'`"
+	# The list of files in device_maps(4) is in an unspecified order.
+	# To speed up the fstyp(1M) scanning below in most cases, perform
+	# the search for filesystems as follows:
+	# 1) Select only block device files of the form "/dev/dsk/*".
+	# 2) Sort the list of files in an order more likely to yield
+	#    matches: first the fdisk(1M) partitions ("/dev/dsk/cNtNdNpN")
+	#    then the format(1M) slices ("/dev/dsk/cNtNdNsN"), in ascending
+	#    numeric order within each group.
+	DEVall="`echo $FILES | \
+	    /usr/bin/tr ' ' '\n' | \
+	    /usr/bin/sed '/^\/dev\/dsk\//!d; s/\([sp]\)\([0-9]*\)$/ \1 \2/;' | \
+	    /usr/bin/sort -t ' ' -k 2,2d -k 3,3n | \
+	    /usr/bin/tr -d ' '`"
+	for DEVn in $DEVall ; do
+		fstyp_output="`/usr/sbin/fstyp -a $DEVn 2>&1`"
 		if [ $? = 0 ]; then
 			FSPATH=$DEVn
-			if [ "$x" != "" ]; then
-				y="`echo $x|cut -f3- -d' '|\
+			gen_volume_label="`echo "$fstyp_output" | \
+			    sed -n '/^gen_volume_label: .\(.*\).$/s//\1/p'`"
+			if [ "$gen_volume_label" != "" ]; then
+				FSNAME="`echo $gen_volume_label | \
 				    /usr/xpg4/bin/tr '[:upper:] ' '[:lower:]_'`"
-				FSNAME=$y
+			fi
+			# For consistency, hsfs filesystems detected at
+			# /dev/dsk/*p0 are mounted as /dev/dsk/*s2
+			FSTYPE=`echo "$fstyp_output" | /usr/bin/head -1`
+			if [ "$FSTYPE" = hsfs -a \
+			    `/usr/bin/expr $FSPATH : '.*p0'` -gt 0 ]; then
+				FSPATH=`echo $FSPATH | /usr/bin/sed 's/p0$/s2/'`
 			fi
 			return
 		fi
@@ -318,34 +336,37 @@ do_allocate()
 do_deallocate()
 {
 	if [ $VOLUME_MEDIATYPE = cdrom -o $VOLUME_MEDIATYPE = rmdisk ]; then
-		# Get the device path and volume name of a partition
-		find_fs
-		if [ "$FSPATH" != "" ]; then
-			VOLUME_PATH=$FSPATH	
-		fi
-		if [ "$FSNAME" != "" ]; then
-			VOLUME_NAME=$FSNAME
+		if [ -h /$VOLUME_MEDIATYPE/$DEVICE ]; then
+			# Get the device path and volume name of a partition
+			VOLUME_PATH=`ls -l /$VOLUME_MEDIATYPE/$DEVICE|\
+			    cut -d '>' -f2`
+			VOLUME_DEVICE=`mount -p|grep $VOLUME_PATH|\
+			    cut -d ' ' -f1`
 		fi
 	fi
-	VOLUME_ACTION=eject
 
-	# Do the actual unmount.  VOLUME_* environment variables are inputs to
-	# rmmount.
-	rmmount_msg="`/usr/sbin/rmmount 2>&1`"
-	rmmount_status="$?"
+	if [ -d "$VOLUME_PATH" ]; then
+		VOLUME_ACTION=eject
+		# Do the actual unmount.
+		# VOLUME_* environment variables are inputs to rmmount.
+		rmmount_msg="`/usr/sbin/rmmount 2>&1`"
+		rmmount_status="$?"
 
-	# Remove symbolic links to mount point
-	for name in $VOLUME_ZONE_PATH/$VOLUME_MEDIATYPE/*; do
-		if [ -h $name ]; then
-			target=`ls -l $name | awk '{ print $NF; }'`
-			target_dir=`dirname $target`
-			target_device=`echo $target_dir | \
-			    sed -e 's/^.*-\(.*\)$/\1/'`
-			if [ "$target_device" = "$DEVICE" ]; then
-				rm -f $name
+		# Remove symbolic links to mount point
+		for name in /$VOLUME_MEDIATYPE/*; do
+			if [ -h $name ]; then
+				target=`ls -l $name | awk '{ print $NF; }'`
+				target_dir=`dirname $target`
+				target_device=`echo $target_dir | \
+				    sed -e 's/^.*-\(.*\)$/\1/'`
+				if [ "$target_device" = "$DEVICE" ]; then
+					rm -f $name
+				fi
 			fi
-		fi
-	done
+		done
+	else
+		rmmount_status=0
+	fi
 
 	case $rmmount_status in
 	1) # still mounted
@@ -353,21 +374,20 @@ do_deallocate()
 	0) # not mounted
 		# Eject the media
 		if [ "$FLAG" = "f" ] ; then
-			eject_msg="`eject -f $DEVFILE 2>&1`"
+			eject_msg="`eject -f $DEVICE 2>&1`"
 		else
-			eject_msg="`eject $DEVFILE 2>&1`"
+			eject_msg="`eject $DEVICE 2>&1`"
 		fi
 		eject_status="$?"
 		case $eject_status in
-		0|4) # Media has been ejected
+		0|1|4) # Media has been ejected
 			case $VOLUME_MEDIATYPE in
 			floppy|cdrom|rmdisk)
 				msg "Please remove the disk from $DEVICE.";;
 			esac;;
-		1|3) # Media didn't eject
-			EXIT_STATUS=2
+		3) # Media didn't eject
 			msg $DEVICE "Error ejecting disk from $DEVICE" \
-			"$eject_msg";;
+			    "$eject_msg";;
 		esac
 	esac
 }
@@ -377,7 +397,7 @@ do_deallocate()
 #
 do_init()
 {
-	eject_msg="`eject -f $DEVFILE 2>&1`"
+	eject_msg="`eject -f $DEVICE 2>&1`"
 	eject_status="$?"
 
 	case $eject_status in
@@ -396,7 +416,7 @@ do_init()
 			error_msg
 		fi
 		msg $DEVICE "Error ejecting disk from $DEVICE" \
-		    "$eject_msg"
+		"$eject_msg"
 		exit 2;;
 	esac
 }
@@ -514,7 +534,7 @@ VOLUME_NAME=unnamed_${VOLUME_MEDIATYPE}
 					# e.g., "joeuser-cdrom0/unnamed_cdrom"
 
 if [ "$VOLUME_MEDIATYPE" = "rmdisk" ]; then
-	VOLUME_PCFS_ID=c
+	VOLUME_PCFS_ID=1
 else
 	VOLUME_PCFS_ID=
 fi
