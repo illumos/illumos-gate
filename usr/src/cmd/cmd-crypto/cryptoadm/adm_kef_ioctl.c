@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -659,10 +659,6 @@ do_fips_actions(int action, int caller)
 		if (action == FIPS140_ENABLE) {
 			(void) printf(gettext(
 			    "FIPS-140 mode was enabled successfully.\n"));
-			(void) printf(gettext(
-			    "Warning: In this release, the Cryptographic "
-			    "Framework has not been FIPS 140-2 "
-			    "certified.\n\n"));
 		} else {
 			(void) printf(gettext(
 			    "FIPS-140 mode was disabled successfully.\n"));
