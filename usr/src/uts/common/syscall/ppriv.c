@@ -187,7 +187,7 @@ retry:
 	 * if that has happened, then some programmer typically set the E/P to
 	 * empty. That is not portable.
 	 */
-	if ((type == PRIV_EFFECTIVE || type == PRIV_PERMITTED) && priv_debug &&
+	if ((type == PRIV_EFFECTIVE || type == PRIV_PERMITTED) &&
 	    priv_basic_test >= 0 && !PRIV_ISASSERT(target, priv_basic_test)) {
 		proc_t *p = curproc;
 		pid_t pid = p->p_pid;

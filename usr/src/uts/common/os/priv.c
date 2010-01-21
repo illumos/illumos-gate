@@ -82,6 +82,11 @@ priv_set_t priv_unsafe;	/* unsafe to exec set-uid root if these are not in L */
 void
 priv_init(void)
 {
+#ifdef DEBUG
+	int alloc_test_priv = 1;
+#else
+	int alloc_test_priv = priv_debug;
+#endif
 	rw_init(&privinfo_lock, NULL, RW_DRIVER, NULL);
 
 	PRIV_BASIC_ASSERT(priv_basic);
@@ -89,10 +94,11 @@ priv_init(void)
 	priv_fillset(&priv_fullset);
 
 	/*
-	 * When booting with priv_debug set, then we'll add an additional
-	 * basic privilege and we verify that it is always present in E.
+	 * When booting with priv_debug set or in a DEBUG kernel, then we'll
+	 * add an additional basic privilege and we verify that it is always
+	 * present in E.
 	 */
-	if (priv_debug == 1 &&
+	if (alloc_test_priv != 0 &&
 	    (priv_basic_test = priv_getbyname("basic_test", PRIV_ALLOC)) >= 0) {
 		priv_addset(priv_basic, priv_basic_test);
 	}

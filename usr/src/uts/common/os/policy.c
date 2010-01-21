@@ -63,11 +63,7 @@
  */
 #define	MAXPRIVSTACK		6
 
-#ifdef DEBUG
-int priv_debug = 1;
-#else
 int priv_debug = 0;
-#endif
 int priv_basic_test = -1;
 
 /*
