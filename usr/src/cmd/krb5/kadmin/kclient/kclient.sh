@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This script is used to setup the Kerberos client by
@@ -1104,7 +1104,7 @@ function setSMB {
 	typeset server=$2
 	smbFMRI=svc:/network/smb/server
 
-	printf "%s" $newpw | $KSMB -d $domain -s $server
+	printf "%s" "$newpw" | $KSMB -d $domain -s $server
 	if [[ $? -ne 0 ]]; then
 		printf "$(gettext "Warning: unable to set %s domain, server and password information").\n" $smbFMRI
 		return
@@ -1153,6 +1153,14 @@ function getKDCDC {
 			error_message
 		fi
 	fi
+}
+
+function gen_rand {
+	typeset -u hex
+
+	dd if=/dev/random bs=1 count=1 2>/dev/null | od -A n -tx1 | read hex
+
+	printf %s $((16#$hex))
 }
 
 function join_domain {
@@ -1372,39 +1380,33 @@ EOF
 	fi
 
 	# Generate a new password for the new account
-	MAX_PASS=32
+	MAX_PASS=120
         i=0
 
-	while :
+	# first check to see if /dev/random exists to generate a new password
+	if [[ ! -h /dev/random ]]; then
+		printf "$(gettext "/dev/random does not exist").\n" >&2
+		error_message
+	fi
+
+	while ((MAX_PASS > i))
 	do
-		while ((MAX_PASS > i))
-		do
-			# 94 elements in the printable character set starting
-			# at decimal 33, contiguous.
-			dig=$((RANDOM%94+33))
-			c=$(printf "\\`printf %o $dig`\n")
-			p=$p$c
-			((i+=1))
-		done
-
-		# Ensure that we have four character classes.
-		d=${p%[[:digit:]]*}
-		a=${p%[[:lower:]]*}
-		A=${p%[[:upper:]]*}
-		x=${p%[[:punct:]]*}
-
-		# Just compare the number of characters from what was previously
-		# matched.  If there is a difference then we found a match.
-		n=${#p}
-		[[ ${#d} -ne $n && ${#a} -ne $n && \
-		   ${#A} -ne $n && ${#x} -ne $n ]] && break
-		i=0
-		p=
+		# [MS-DISO] A machine password is an ASCII string of randomly
+		# chosen characters. Each character's ASCII code is between 32
+		# and 122 inclusive.
+		c=$(printf "\\$(printf %o $(($(gen_rand) % 91 + 32)))\n")
+		p="$p$c"
+		((i+=1))
 	done
+
 	newpw=$p
+	if [[ ${#newpw} -ne MAX_PASS ]]; then
+		printf "$(gettext "Password created was of incorrect length").\n" >&2
+		error_message
+	fi
 
 	# Set the new password
-	printf "%s" $newpw | $KSETPW ${netbios_nodename}@${realm} > /dev/null 2>&1
+	printf "%s" "$newpw" | $KSETPW ${netbios_nodename}@${realm} > /dev/null 2>&1
 	if [[ $? -ne 0 ]]
 	then
 		printf "$(gettext "Failed to set account password").\n" >&2
@@ -1527,42 +1529,42 @@ EOF
 	#
 	salt=host/${locase_nodename}.${domain}@${realm}
 
-	printf "%s" $newpw | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" host/${fqdn}@${realm} > /dev/null 2>&1
+	printf "%s" "$newpw" | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" host/${fqdn}@${realm} > /dev/null 2>&1
 	if [[ $? -ne 0 ]]
 	then
 		printf "$(gettext "Failed to set account password").\n" >&2
 		error_message
 	fi
 
-	printf "%s" $newpw | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" nfs/${fqdn}@${realm} > /dev/null 2>&1
+	printf "%s" "$newpw" | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" nfs/${fqdn}@${realm} > /dev/null 2>&1
 	if [[ $? -ne 0 ]]
 	then
 		printf "$(gettext "Failed to set account password").\n" >&2
 		error_message
 	fi
 
-	printf "%s" $newpw | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" HTTP/${fqdn}@${realm} > /dev/null 2>&1
+	printf "%s" "$newpw" | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" HTTP/${fqdn}@${realm} > /dev/null 2>&1
 	if [[ $? -ne 0 ]]
 	then
 		printf "$(gettext "Failed to set account password").\n" >&2
 		error_message
 	fi
 
-	printf "%s" $newpw | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" root/${fqdn}@${realm} > /dev/null 2>&1
+	printf "%s" "$newpw" | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" root/${fqdn}@${realm} > /dev/null 2>&1
 	if [[ $? -ne 0 ]]
 	then
 		printf "$(gettext "Failed to set account password").\n" >&2
 		error_message
 	fi
 
-	printf "%s" $newpw | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" cifs/${fqdn}@${realm} > /dev/null 2>&1
+	printf "%s" "$newpw" | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" cifs/${fqdn}@${realm} > /dev/null 2>&1
 	if [[ $? -ne 0 ]]
 	then
 		printf "$(gettext "Failed to set account password").\n" >&2
 		error_message
 	fi
 
-	printf "%s" $newpw | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" ${netbios_nodename}@${realm} > /dev/null 2>&1
+	printf "%s" "$newpw" | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" ${netbios_nodename}@${realm} > /dev/null 2>&1
 	if [[ $? -ne 0 ]]
 	then
 		printf "$(gettext "Failed to set account password").\n" >&2
