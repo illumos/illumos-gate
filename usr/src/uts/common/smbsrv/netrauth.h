@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -96,9 +96,9 @@ typedef struct netr_session_key {
 #define	NETR_FLG_INIT		0x00000002
 
 /*
- * 32-byte machine account password (null-terminated)
+ * 120-byte machine account password (null-terminated)
  */
-#define	NETR_MACHINE_ACCT_PASSWD_MAX	32 + 1
+#define	NETR_MACHINE_ACCT_PASSWD_MAX	120 + 1
 
 typedef struct netr_info {
 	DWORD flags;

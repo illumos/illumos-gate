@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -128,6 +128,7 @@ mlsvc_join(smb_domainex_t *dxi, char *user, char *plain_text)
 			if (erc != 0) {
 				syslog(LOG_NOTICE, "Failed to update CIFS "
 				    "configuration");
+				bzero(machine_passwd, sizeof (machine_passwd));
 				return (NT_STATUS_UNSUCCESSFUL);
 			}
 
@@ -137,6 +138,7 @@ mlsvc_join(smb_domainex_t *dxi, char *user, char *plain_text)
 		status = NT_STATUS_LOGON_FAILURE;
 	}
 
+	bzero(machine_passwd, sizeof (machine_passwd));
 	return (status);
 }
 

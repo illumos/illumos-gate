@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,6 +59,7 @@ typedef struct smb_ads_host_info {
 typedef enum smb_adjoin_status {
 	SMB_ADJOIN_SUCCESS = 0,
 	SMB_ADJOIN_ERR_GET_HANDLE,
+	SMB_ADJOIN_ERR_GEN_PWD,
 	SMB_ADJOIN_ERR_GET_DCLEVEL,
 	SMB_ADJOIN_ERR_ADD_TRUST_ACCT,
 	SMB_ADJOIN_ERR_MOD_TRUST_ACCT,
@@ -89,7 +90,7 @@ extern int smb_ads_lookup_share(smb_ads_handle_t *, const char *, const char *,
     char *);
 extern int smb_ads_add_share(smb_ads_handle_t *, const char *, const char *,
     const char *);
-extern smb_adjoin_status_t smb_ads_join(char *, char *, char *, char *, int);
+extern smb_adjoin_status_t smb_ads_join(char *, char *, char *, char *, size_t);
 extern void smb_ads_join_errmsg(smb_adjoin_status_t);
 extern boolean_t smb_ads_lookup_msdcs(char *, char *, char *, uint32_t);
 extern smb_ads_host_info_t *smb_ads_find_host(char *, char *);

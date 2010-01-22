@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +45,8 @@
 #include <assert.h>
 #include <sasl/sasl.h>
 #include <note.h>
+#include <errno.h>
+#include <cryptoutil.h>
 
 #include <smbsrv/libsmbns.h>
 #include <smbns_dyndns.h>
@@ -57,6 +59,13 @@
 #define	SMB_ADS_COMPUTER_NUM_ATTR 8
 #define	SMB_ADS_SHARE_NUM_ATTR 3
 #define	SMB_ADS_SITE_MAX MAXHOSTNAMELEN
+
+/*
+ * [MS-DISO] A machine password is an ASCII string of randomly chosen
+ * characters. Each character's ASCII code is between 32 and 122 inclusive.
+ */
+#define	SMB_ADS_PWD_CHAR_NUM	91
+#define	SMB_ADS_PWD_CHAR_START	32
 
 #define	SMB_ADS_MSDCS_SRV_DC_RR		"_ldap._tcp.dc._msdcs"
 #define	SMB_ADS_MSDCS_SRV_SITE_RR	"_ldap._tcp.%s._sites.dc._msdcs"
@@ -184,7 +193,7 @@ static smb_ads_qstat_t smb_ads_lookup_computer_n_attr(smb_ads_handle_t *,
     smb_ads_avpair_t *, int, char *);
 static int smb_ads_update_computer_cntrl_attr(smb_ads_handle_t *, int, char *);
 static krb5_kvno smb_ads_lookup_computer_attr_kvno(smb_ads_handle_t *, char *);
-static void smb_ads_gen_machine_passwd(char *, int);
+static int smb_ads_gen_machine_passwd(char *, size_t);
 static void smb_ads_free_cached_host(void);
 static int smb_ads_get_spnset(char *, char **);
 static void smb_ads_free_spnset(char **);
@@ -2120,36 +2129,37 @@ smb_ads_lookup_computer_attr_kvno(smb_ads_handle_t *ah, char *dn)
 	return (kvno);
 }
 
-/*
- * smb_ads_gen_machine_passwd
- *
- * Returned a null-terminated machine password generated randomly
- * from [0-9a-zA-Z] character set. In order to pass the password
- * quality check (three character classes), an uppercase letter is
- * used as the first character of the machine password.
- */
-static void
-smb_ads_gen_machine_passwd(char *machine_passwd, int bufsz)
+static int
+smb_ads_gen_machine_passwd(char *machine_passwd, size_t bufsz)
 {
-	char *data = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJK"
-	    "LMNOPQRSTUVWXYZ";
-	int datalen = strlen(data);
-	int i, data_idx;
+	int i;
+	size_t pwdlen;
+	uint8_t *random_bytes;
 
-	assert(machine_passwd);
-	assert(bufsz > 0);
-
-	/*
-	 * The decimal value of upper case 'A' is 65. Randomly pick
-	 * an upper-case letter from the ascii table.
-	 */
-	machine_passwd[0] = (random() % 26) + 65;
-	for (i = 1; i < bufsz - 1; i++) {
-		data_idx = random() % datalen;
-		machine_passwd[i] = data[data_idx];
+	errno = 0;
+	if (machine_passwd == NULL || bufsz == 0) {
+		errno = EINVAL;
+		return (-1);
 	}
 
-	machine_passwd[bufsz - 1] = 0;
+	pwdlen = bufsz - 1;
+	random_bytes = calloc(1, pwdlen);
+	if (random_bytes == NULL)
+		return (-1);
+
+	if (pkcs11_get_random(random_bytes, pwdlen) != 0) {
+		free(random_bytes);
+		return (-1);
+	}
+
+	for (i = 0; i < pwdlen; i++)
+		machine_passwd[i] = (random_bytes[i] % SMB_ADS_PWD_CHAR_NUM) +
+		    SMB_ADS_PWD_CHAR_START;
+
+	machine_passwd[pwdlen] = 0;
+	bzero(random_bytes, pwdlen);
+	free(random_bytes);
+	return (0);
 }
 
 /*
@@ -2179,7 +2189,7 @@ smb_ads_gen_machine_passwd(char *machine_passwd, int bufsz)
  */
 smb_adjoin_status_t
 smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
-    int len)
+    size_t len)
 {
 	smb_ads_handle_t *ah = NULL;
 	krb5_context ctx = NULL;
@@ -2218,7 +2228,12 @@ smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
 		return (SMB_ADJOIN_ERR_GET_HANDLE);
 	}
 
-	smb_ads_gen_machine_passwd(machine_passwd, len);
+	if (smb_ads_gen_machine_passwd(machine_passwd, len) != 0) {
+		syslog(LOG_NOTICE, "machine password generation: %m");
+		smb_ads_close(ah);
+		smb_ccache_remove(SMB_CCACHE_PATH);
+		return (SMB_ADJOIN_ERR_GEN_PWD);
+	}
 
 	if ((dclevel = smb_ads_get_dc_level(ah)) == -1) {
 		smb_ads_close(ah);
@@ -2378,6 +2393,8 @@ smb_ads_join_errmsg(smb_adjoin_status_t status)
 	} adjoin_table[] = {
 		{ SMB_ADJOIN_ERR_GET_HANDLE, "Failed to connect to an "
 		    "Active Directory server." },
+		{ SMB_ADJOIN_ERR_GEN_PWD, "Failed to generate machine "
+		    "password." },
 		{ SMB_ADJOIN_ERR_GET_DCLEVEL, "Unknown functional level of "
 		    "the domain controller. The rootDSE attribute named "
 		    "\"domainControllerFunctionality\" is missing from the "

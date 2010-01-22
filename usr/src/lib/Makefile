@@ -643,7 +643,7 @@ libshare:	libscf libzfs libuuid libfsmgt libsecdb libumem libsmbfs
 libexacct/demo:	libexacct libproject libsocket libnsl
 libtsalarm:	libpcp
 smbsrv:		libsocket libnsl libmd libxnet libpthread librt \
-		libshare libidmap pkcs11 libsqlite
+		libshare libidmap pkcs11 libsqlite libcryptoutil
 libvrrpadm:	libsocket libdladm libscf
 libvscan:	libscf
 scsi:		libnvpair
