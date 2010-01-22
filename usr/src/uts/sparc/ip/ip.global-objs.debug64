@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -255,6 +255,7 @@ tcp_acceptor_rinit
 tcp_acceptor_winit
 tcp_conn_cache
 tcp_conn_hash_size
+tcp_do_reclaim
 tcp_drop_ack_unsent_cnt
 tcp_early_abort
 tcp_fallback_sock_winit

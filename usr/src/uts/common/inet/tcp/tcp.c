@@ -616,6 +616,9 @@ typedef struct tcp_listener_s {
  */
 uint32_t tcp_init_wnd_shft = 0;
 
+/* Control whether TCP can enter defensive mode when under memory pressure. */
+boolean_t tcp_do_reclaim = B_TRUE;
+
 /*
  * When the system is under memory pressure, stack variable tcps_reclaim is
  * true, we shorten the connection timeout abort interval to tcp_early_abort
@@ -21998,9 +22001,6 @@ tcp_reclaim_timer(void *arg)
 	tcps->tcps_reclaim = B_FALSE;
 	tcps->tcps_reclaim_tid = 0;
 	mutex_exit(&tcps->tcps_reclaim_lock);
-	/* Only need to print this once. */
-	if (tcps->tcps_netstack->netstack_stackid == GLOBAL_ZONEID)
-		cmn_err(CE_WARN, "TCP defensive mode off\n");
 }
 
 /*
@@ -22019,7 +22019,17 @@ tcp_conn_reclaim(void *arg)
 	netstack_handle_t nh;
 	netstack_t *ns;
 	tcp_stack_t *tcps;
-	boolean_t new = B_FALSE;
+	extern pgcnt_t lotsfree, needfree;
+
+	if (!tcp_do_reclaim)
+		return;
+
+	/*
+	 * The reclaim function may be called even when the system is not
+	 * really under memory pressure.
+	 */
+	if (freemem >= lotsfree + needfree)
+		return;
 
 	netstack_next_init(&nh);
 	while ((ns = netstack_next(&nh)) != NULL) {
@@ -22029,14 +22039,11 @@ tcp_conn_reclaim(void *arg)
 			tcps->tcps_reclaim = B_TRUE;
 			tcps->tcps_reclaim_tid = timeout(tcp_reclaim_timer,
 			    tcps, MSEC_TO_TICK(tcps->tcps_reclaim_period));
-			new = B_TRUE;
 		}
 		mutex_exit(&tcps->tcps_reclaim_lock);
 		netstack_rele(ns);
 	}
 	netstack_next_fini(&nh);
-	if (new)
-		cmn_err(CE_WARN, "Memory pressure: TCP defensive mode on\n");
 }
 
 /*
