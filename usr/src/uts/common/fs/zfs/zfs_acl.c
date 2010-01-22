@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1874,9 +1874,24 @@ zfs_acl_ids_create(znode_t *dzp, int flag, vattr_t *vap, cred_t *cr,
 		}
 		if (acl_ids->z_fgid == 0) {
 			if (dzp->z_phys->zp_mode & S_ISGID) {
+				char		*domain;
+				uint32_t	rid;
+
 				acl_ids->z_fgid = dzp->z_phys->zp_gid;
 				gid = zfs_fuid_map_id(zfsvfs, acl_ids->z_fgid,
 				    cr, ZFS_GROUP);
+
+				if (zfsvfs->z_use_fuids &&
+				    IS_EPHEMERAL(acl_ids->z_fgid)) {
+					domain = zfs_fuid_idx_domain(
+					    &zfsvfs->z_fuid_idx,
+					    FUID_INDEX(acl_ids->z_fgid));
+					rid = FUID_RID(acl_ids->z_fgid);
+					zfs_fuid_node_add(&acl_ids->z_fuidp,
+					    domain, rid,
+					    FUID_INDEX(acl_ids->z_fgid),
+					    acl_ids->z_fgid, ZFS_GROUP);
+				}
 			} else {
 				acl_ids->z_fgid = zfs_fuid_create_cred(zfsvfs,
 				    ZFS_GROUP, cr, &acl_ids->z_fuidp);

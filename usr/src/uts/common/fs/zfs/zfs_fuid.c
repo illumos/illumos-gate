@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -426,7 +426,7 @@ zfs_fuid_map_id(zfsvfs_t *zfsvfs, uint64_t fuid,
  * If ACL has multiple domains, then keep only one copy of each unique
  * domain.
  */
-static void
+void
 zfs_fuid_node_add(zfs_fuid_info_t **fuidpp, const char *domain, uint32_t rid,
     uint64_t idx, uint64_t id, zfs_fuid_type_t type)
 {
@@ -509,6 +509,11 @@ zfs_fuid_create_cred(zfsvfs_t *zfsvfs, zfs_fuid_type_t type,
 			id = crgetuid(cr);
 		else
 			id = crgetgid(cr);
+
+		if (IS_EPHEMERAL(id)) {
+			return ((uint64_t)(type == ZFS_OWNER ?
+			    UID_NOBODY : GID_NOBODY));
+		}
 	}
 
 	if (!zfsvfs->z_use_fuids || (!IS_EPHEMERAL(id)))
