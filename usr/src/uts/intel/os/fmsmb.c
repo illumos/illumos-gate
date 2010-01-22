@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -331,7 +331,7 @@ smb_bb_contains(smbios_hdl_t *shp, smbs_cnt_t *stype)
 static int
 fm_smb_check(smbios_hdl_t *shp)
 {
-	int i;
+	int i, j;
 	int bb_cnt = 0;
 	int pr_cnt = 0;
 	int expr_cnt = 0;
@@ -343,9 +343,12 @@ fm_smb_check(smbios_hdl_t *shp)
 	uint16_t pr_id, expr_id;
 	uint16_t ma_id, exma_id;
 	uint16_t mdev_id, exmdev_id;
+	uint16_t *sys_ma;
 	smbios_bboard_t bb;
 	smbios_processor_ext_t exproc;
+	smbios_memarray_t ma;
 	smbios_memarray_ext_t exma;
+	smbios_memdevice_t mdev;
 	smbios_memdevice_ext_t exmdev;
 	smbs_cnt_t *bb_stype;
 	smbs_cnt_t *pr_stype, *expr_stype;
@@ -365,8 +368,8 @@ fm_smb_check(smbios_hdl_t *shp)
 	mdev_cnt = smb_cnttypes(shp, SMB_TYPE_MEMDEVICE);
 	exmdev_cnt = smb_cnttypes(shp, SUN_OEM_EXT_MEMDEVICE);
 	if (expr_cnt == 0 || exma_cnt == 0 || exmdev_cnt == 0 ||
-	    expr_cnt != pr_cnt || exma_cnt != ma_cnt ||
-	    exmdev_cnt != mdev_cnt) {
+	    expr_cnt != pr_cnt || exma_cnt > ma_cnt ||
+	    exmdev_cnt > mdev_cnt) {
 #ifdef	DEBUG
 		cmn_err(CE_NOTE, "!Structure mismatch: ext_proc (%d) "
 		    "proc (%d) ext_ma (%d) ma (%d) ext_mdev (%d) mdev (%d)\n",
@@ -413,6 +416,7 @@ fm_smb_check(smbios_hdl_t *shp)
 	/* allocate memory array stypes */
 	ma_stype = smb_create_strcnt(ma_cnt);
 	exma_stype = smb_create_strcnt(exma_cnt);
+	sys_ma = kmem_zalloc(sizeof (uint16_t) * ma_cnt, KM_SLEEP);
 
 	/* fill in stypes */
 	ma_stype->type = SMB_TYPE_MEMARRAY;
@@ -422,7 +426,13 @@ fm_smb_check(smbios_hdl_t *shp)
 
 	/* verify linkage from ext memarray struct to memarray struct */
 	for (i = 0; i < ma_cnt; i++) {
+		sys_ma[i] = (uint16_t)-1;
 		ma_id = ma_stype->ids[i]->id;
+		(void) smbios_info_memarray(shp, ma_id, &ma);
+		if (ma.smbma_use != SMB_MAU_SYSTEM)
+			continue;
+		/* this memarray is system memory */
+		sys_ma[i] = ma_id;
 		exma_id = exma_stype->ids[i]->id;
 		(void) smbios_info_extmemarray(shp, exma_id, &exma);
 		if (exma.smbmae_ma != ma_id) {
@@ -432,6 +442,7 @@ fm_smb_check(smbios_hdl_t *shp)
 #endif	/* DEBUG */
 			smb_free_strcnt(ma_stype, ma_cnt);
 			smb_free_strcnt(exma_stype, exma_cnt);
+			kmem_free(sys_ma, sizeof (uint16_t) * ma_cnt);
 			return (-1);
 		}
 	}
@@ -453,6 +464,14 @@ fm_smb_check(smbios_hdl_t *shp)
 	/* verify linkage */
 	for (i = 0; i < mdev_cnt; i++) {
 		mdev_id = mdev_stype->ids[i]->id;
+		(void) smbios_info_memdevice(shp, mdev_id, &mdev);
+		/* only check system memory devices */
+		for (j = 0; j < ma_cnt; j++) {
+			if (sys_ma[j] == mdev.smbmd_array)
+				break;
+		}
+		if (j == ma_cnt)
+			continue;
 		exmdev_id = exmdev_stype->ids[i]->id;
 		(void) smbios_info_extmemdevice(shp, exmdev_id, &exmdev);
 		if (exmdev.smbmdeve_md != mdev_id) {
@@ -462,6 +481,7 @@ fm_smb_check(smbios_hdl_t *shp)
 #endif	/* DEBUG */
 			smb_free_strcnt(mdev_stype, mdev_cnt);
 			smb_free_strcnt(exmdev_stype, exmdev_cnt);
+			kmem_free(sys_ma, sizeof (uint16_t) * ma_cnt);
 			return (-1);
 		}
 	}
@@ -469,6 +489,7 @@ fm_smb_check(smbios_hdl_t *shp)
 	/* free stypes */
 	smb_free_strcnt(mdev_stype, mdev_cnt);
 	smb_free_strcnt(exmdev_stype, exmdev_cnt);
+	kmem_free(sys_ma, sizeof (uint16_t) * ma_cnt);
 
 	/*
 	 * Verify the presece of contained handles if there are more
