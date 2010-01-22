@@ -2803,13 +2803,23 @@ else
 fi
 
 if [ "$CLOSED_IS_PRESENT" = no ]; then
-	crypto_is_present >> "$LOGFILE"
-	if (( $? != 0 )); then
-		build_ok=n
-		echo "A crypto tarball must be provided when" \
-		    "there is no closed tree." |
-		    tee -a "$mail_msg_file" >> "$LOGFILE"
-		exit 1
+	#
+	# Not all consolidations have a closed tree, and even if they
+	# did, they wouldn't necessarily have signed crypto.  But if
+	# the current source base does have signed crypto and it can't
+	# be generated, error out, rather than silently building
+	# unusable binaries.
+	#
+	grep -s ELFSIGN_CRYPTO "$SRC/Makefile.master" > /dev/null
+	if (( $? == 0 )); then
+		crypto_is_present >> "$LOGFILE"
+		if (( $? != 0 )); then
+			build_ok=n
+			echo "A crypto tarball must be provided when" \
+			    "there is no closed tree." |
+			    tee -a "$mail_msg_file" >> "$LOGFILE"
+			exit 1
+		fi
 	fi
 fi
 
