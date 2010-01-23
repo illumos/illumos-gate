@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -155,7 +156,7 @@ parse_opts(int argc, char *argv[])
 		switch (c) {
 			case 'f':
 			/* printf("\n%s", optarg); */
-			strcpy(config_file, optarg);
+			(void) strcpy(config_file, optarg);
 			break;
 		case 'b':
 			/* bufsize between 1*512 and 512*512 */
@@ -753,13 +754,13 @@ do_sdtest7(int fd, nsc_size_t loops, nsc_size_t filesize, int h, nsc_fd_t *sdfd)
 	    name[h], err);
 
 	for (i = 0; i < readercount; i++)
-		wait(0);
+		(void) wait(0);
 
 	/*  No lock needed here - everybody's finished  */
 	err += ERR;
 
 	(void) mutex_destroy(&ERRMUTEX);
-	shmctl(shmid, IPC_RMID, 0);
+	(void) shmctl(shmid, IPC_RMID, 0);
 	return (err);
 }
 
@@ -1014,7 +1015,7 @@ main(int argc, char *argv[])
 		print_usage();
 		exit(0);
 	}
-	strcpy(config_file, DISKLIST);
+	(void) strcpy(config_file, DISKLIST);
 	parse_opts(argc, argv);
 
 	_nsc_nocheck();
@@ -1084,7 +1085,7 @@ main(int argc, char *argv[])
 			continue;
 	    } /* for */
 	    for (i = 0; i < h; i++)
-		wait(0);
+		(void) wait(0);
 	} else {
 
 	for (h = 0; h < procs; h++) {
@@ -1161,7 +1162,7 @@ main(int argc, char *argv[])
 			continue;
 	}
 	for (i = 0; i < h; i++)
-		wait(0);
+		(void) wait(0);
 	}
 
 	return (0);

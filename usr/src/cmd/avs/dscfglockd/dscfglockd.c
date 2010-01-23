@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -125,8 +125,8 @@ daemonaddr_t	localhost;
 #define	STATE_OKAYED	2
 #define	STATE_WANTS	3
 #define	lockdaemon_dead(ldp)	((ticker - (ldp)->timeout) > MAX_TIMEOUTS)
-#define	CRIT_BEGIN()	sighold(SIGALRM)
-#define	CRIT_END()	sigrelse(SIGALRM)
+#define	CRIT_BEGIN()	(void) sighold(SIGALRM)
+#define	CRIT_END()	(void) sigrelse(SIGALRM)
 
 #define	NORMAL_UNLOCK	0
 #define	FORCE_UNLOCK	1
@@ -280,7 +280,7 @@ islocalhost(daemonaddr_t *host)
 		s2 = (struct sockaddr_in *)&ifr->ifr_addr;
 
 		if (memcmp((char *)&s2->sin_addr,
-			(char *)&s1->sin_addr, sizeof (s1->sin_addr)) == 0) {
+		    (char *)&s1->sin_addr, sizeof (s1->sin_addr)) == 0) {
 			retval = 1;
 			/* it's me */
 			break;
@@ -301,7 +301,7 @@ send_lockmsg(int cmd, pid_t pid, daemonaddr_t *dp, uint8_t seq)
 		    ctime(&t), lockd_msg(cmd), dp_addr(dp));
 	}
 	DPF((stderr, "send %d to %s port %hu\n", cmd,
-			dp_addr(dp), dp->sin_port));
+	    dp_addr(dp), dp->sin_port));
 	message_buf.message = cmd;
 	message_buf.pid = pid;
 	message_buf.order = order;
@@ -1037,7 +1037,7 @@ check_for_dead()
 			continue; /* can't take lock, must be still alive */
 		cfg_readpid(i, &pid);
 		cfg_writepid(i, (pid_t)0);
-		cfg_fileunlock(i);
+		(void) cfg_fileunlock(i);
 		if (pid != (pid_t)0)
 			purge_pid(pid);
 	}
@@ -1061,7 +1061,7 @@ build_daemon_list(char *cf_file, int exe)
 	}
 
 	(void) memcpy(&(localhost.sin_addr.s_addr), *(hp->h_addr_list),
-			sizeof (localhost.sin_addr));
+	    sizeof (localhost.sin_addr));
 	if (cf_file == NULL) {
 		(void) endhostent();
 		return;
@@ -1105,7 +1105,7 @@ build_daemon_list(char *cf_file, int exe)
 		(void) memcpy(&(ldp->host.sin_addr.s_addr), *(hp->h_addr_list),
 		    sizeof (ldp->host.sin_addr));
 		DPF((stderr, "daemon: %s\t%s\n",
-				inet_ntoa(ldp->host.sin_addr), hp->h_name));
+		    inet_ntoa(ldp->host.sin_addr), hp->h_name));
 		if (islocalhost(&(ldp->host))) {
 			DPF((stderr, "is an alias for this host, skipping\n"));
 			continue;
@@ -1297,7 +1297,7 @@ init(int argc, char *argv[])
 			continue; /* can't take lock, must be still alive */
 		}
 		cfg_writepid(i, 0);
-		cfg_fileunlock(i);
+		(void) cfg_fileunlock(i);
 	}
 
 	tv.it_interval.tv_sec = TIMEOUT_SECS;
@@ -1326,7 +1326,7 @@ init(int argc, char *argv[])
 	if (getsockname(lock_soc, (struct sockaddr *)&thishost, &len) < 0)
 		perror("getsockname");
 	send_aliveall();
-	sigset(SIGALRM, keepalive);
+	(void) sigset(SIGALRM, keepalive);
 	(void) setitimer(ITIMER_REAL, &tv, NULL);
 	/*
 	 * wait 2 time outs before allowing a lock to find if someone else

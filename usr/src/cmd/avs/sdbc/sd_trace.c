@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -395,11 +396,13 @@ disp_stats(void)
 				status_bit = ' ';
 			if ((len = strlen(cs_cur->st_shared[i].sh_filename))
 			    > 15) {
-				strcpy(fn, "...");
-				strcat(fn, cs_cur->st_shared[i].sh_filename +
+				(void) strcpy(fn, "...");
+				(void) strcat(fn,
+				    cs_cur->st_shared[i].sh_filename +
 				    len - 12);
 			} else
-				strcpy(fn, cs_cur->st_shared[i].sh_filename);
+				(void) strcpy(fn,
+				    cs_cur->st_shared[i].sh_filename);
 			if (on_off[i]) {
 				(void) mvprintw(4 + j, 1,
 				    "%3d %-15s%c %6d %6d %6d %6d %6d %6d %6d",
@@ -493,17 +496,17 @@ init_dual(void)
 #define	IND_BITMAP_FAILED	8
 #define	IND_FULL_SYNC_NEEDED	9
 #define	IND_FCAL_FAILED		10
-	strcpy(status[IND_ENABLED], "replicating");
-	strcpy(status[IND_RESYNC], "sync");
-	strcpy(status[IND_RESYNC_REVERSE], "rev sync");
-	strcpy(status[IND_VOLUME_DOWN], "volume down");
-	strcpy(status[IND_MIRROR_DOWN], "mirror down");
-	strcpy(status[IND_LOGGING], "logging");
-	strcpy(status[IND_RESYNC_NEEDED], "need sync");
-	strcpy(status[IND_REV_RESYNC_NEEDED], "need rev sync");
-	strcpy(status[IND_BITMAP_FAILED], "bitmap failed");
-	strcpy(status[IND_FULL_SYNC_NEEDED], "full sync needed");
-	strcpy(status[IND_FCAL_FAILED], "fcal failed");
+	(void) strcpy(status[IND_ENABLED], "replicating");
+	(void) strcpy(status[IND_RESYNC], "sync");
+	(void) strcpy(status[IND_RESYNC_REVERSE], "rev sync");
+	(void) strcpy(status[IND_VOLUME_DOWN], "volume down");
+	(void) strcpy(status[IND_MIRROR_DOWN], "mirror down");
+	(void) strcpy(status[IND_LOGGING], "logging");
+	(void) strcpy(status[IND_RESYNC_NEEDED], "need sync");
+	(void) strcpy(status[IND_REV_RESYNC_NEEDED], "need rev sync");
+	(void) strcpy(status[IND_BITMAP_FAILED], "bitmap failed");
+	(void) strcpy(status[IND_FULL_SYNC_NEEDED], "full sync needed");
+	(void) strcpy(status[IND_FCAL_FAILED], "fcal failed");
 	dual_initted = 1;
 }
 
@@ -712,11 +715,11 @@ no_stats:
 
 		len = strlen(rdc_info[rdcindex].secondary.file);
 		if (len > 15) {
-			strcpy(fn, "...");
-			strcat(fn,
+			(void) strcpy(fn, "...");
+			(void) strcat(fn,
 			    rdc_info[rdcindex].secondary.file + len - 12);
 		} else
-			strcpy(fn, rdc_info[rdcindex].secondary.file);
+			(void) strcpy(fn, rdc_info[rdcindex].secondary.file);
 		(void) mvprintw(k, 0, "%-15s", fn);
 
 		segs = FBA_TO_LOG_LEN(rdc_info[rdcindex].volume_size);
@@ -892,11 +895,13 @@ disp_total_stats(void)
 				status_bit = ' ';
 			if ((len =
 			    strlen(cs_cur->st_shared[i].sh_filename)) > 15) {
-				strcpy(fn, "...");
-				strcat(fn, cs_cur->st_shared[i].sh_filename +
+				(void) strcpy(fn, "...");
+				(void) strcat(fn,
+				    cs_cur->st_shared[i].sh_filename +
 				    len - 12);
 			} else
-				strcpy(fn, cs_cur->st_shared[i].sh_filename);
+				(void) strcpy(fn,
+				    cs_cur->st_shared[i].sh_filename);
 
 			if (on_off[i]) {
 				(void) mvprintw(4 + j, 1,

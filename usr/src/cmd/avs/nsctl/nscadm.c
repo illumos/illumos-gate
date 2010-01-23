@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,11 +56,11 @@ static void show_maps(char *, int);
 static void
 usage(void)
 {
-	fprintf(stderr, gettext("usage: nscadm [-h] command\n"));
-	fprintf(stderr, gettext("valid commands:\n"));
-	fprintf(stderr, gettext("	freeze <device>\n"));
-	fprintf(stderr, gettext("	unfreeze <device>\n"));
-	fprintf(stderr, gettext("	isfrozen <device>\n"));
+	(void) fprintf(stderr, gettext("usage: nscadm [-h] command\n"));
+	(void) fprintf(stderr, gettext("valid commands:\n"));
+	(void) fprintf(stderr, gettext("	freeze <device>\n"));
+	(void) fprintf(stderr, gettext("	unfreeze <device>\n"));
+	(void) fprintf(stderr, gettext("	isfrozen <device>\n"));
 }
 
 static void
@@ -67,12 +68,12 @@ is_chr_dev(char *dev, char *op)
 {
 	struct stat sbuf;
 	if (stat(dev, &sbuf) < 0) {
-		fprintf(stderr, gettext("nscadm: "));
+		(void) fprintf(stderr, gettext("nscadm: "));
 		perror(op);
 		exit(255);
 	}
 	if (!S_ISCHR(sbuf.st_mode)) {
-		fprintf(stderr, gettext("nscadm: %s: not a valid device "
+		(void) fprintf(stderr, gettext("nscadm: %s: not a valid device "
 		    "<%s>\n"), op, dev);
 		exit(255);
 	}
@@ -109,7 +110,7 @@ main(int argc, char *argv[])
 	}
 
 	if (strcoll(argv[optind], gettext("freeze")) == 0 ||
-			strcmp(argv[optind], "freeze") == 0) {
+	    strcmp(argv[optind], "freeze") == 0) {
 		if (argc - optind != 2) {
 			usage();
 			exit(255);
@@ -127,14 +128,15 @@ main(int argc, char *argv[])
 				exit(255);
 			}
 		} else {
-			fprintf(stderr, gettext("nscadm: device <%s> is "
+			(void) fprintf(stderr, gettext("nscadm: device <%s> is "
 			    "already frozen\n"), argv[optind+1]);
 			exit(255);
 		}
 
-		printf(gettext("nscadm: device <%s> frozen\n"), argv[optind+1]);
+		(void) printf(gettext("nscadm: device <%s> frozen\n"),
+		    argv[optind+1]);
 	} else if (strcoll(argv[optind], gettext("unfreeze")) == 0 ||
-			strcmp(argv[optind], "unfreeze") == 0) {
+	    strcmp(argv[optind], "unfreeze") == 0) {
 		if (argc - optind != 2) {
 			usage();
 			exit(255);
@@ -152,15 +154,16 @@ main(int argc, char *argv[])
 				exit(255);
 			}
 		} else {
-			fprintf(stderr, gettext("nscadm: device <%s> is not "
+			(void) fprintf(stderr,
+			    gettext("nscadm: device <%s> is not "
 			    "frozen\n"), argv[optind+1]);
 			exit(255);
 		}
 
-		printf(gettext("nscadm: device <%s> unfrozen\n"),
-			argv[optind+1]);
+		(void) printf(gettext("nscadm: device <%s> unfrozen\n"),
+		    argv[optind+1]);
 	} else if (strcoll(argv[optind], gettext("isfrozen")) == 0 ||
-			strcmp(argv[optind], "isfrozen") == 0) {
+	    strcmp(argv[optind], "isfrozen") == 0) {
 		if (argc - optind != 2) {
 			usage();
 			exit(255);
@@ -173,18 +176,18 @@ main(int argc, char *argv[])
 			exit(255);
 		}
 
-		printf(gettext("nscadm: device <%s> is %sfrozen\n"),
-			argv[optind+1], rc ? gettext("not ") : "");
+		(void) printf(gettext("nscadm: device <%s> is %sfrozen\n"),
+		    argv[optind+1], rc ? gettext("not ") : "");
 #ifdef DEBUG
 	} else if (strcoll(argv[optind], gettext("nvclean")) == 0 ||
-			strcmp(argv[optind], "nvclean") == 0) {
+	    strcmp(argv[optind], "nvclean") == 0) {
 		rc = nsc_nvclean(0);
 		if (rc < 0) {
 			perror(gettext("nscadm: nvclean"));
 			exit(255);
 		}
 	} else if (strcoll(argv[optind], gettext("nvclean_force")) == 0 ||
-			strcmp(argv[optind], "nvclean_force") == 0) {
+	    strcmp(argv[optind], "nvclean_force") == 0) {
 		rc = nsc_nvclean(1);
 		if (rc < 0) {
 			perror(gettext("nscadm: nvclean_force"));
@@ -192,7 +195,7 @@ main(int argc, char *argv[])
 		}
 #endif /* DEBUG */
 	} else if (strcoll(argv[optind], gettext("gmem")) == 0 ||
-			strcmp(argv[optind], "gmem") == 0) {
+	    strcmp(argv[optind], "gmem") == 0) {
 		rc = _nsc_gmem();
 		if (rc < 0) {
 			perror(gettext("nscadm: gmem"));
@@ -219,7 +222,7 @@ _nsc_gmem(void)
 	if (rc < 0)
 		return (rc);
 
-	printf(gettext("size %d\n"), size);
+	(void) printf(gettext("size %d\n"), size);
 
 	if ((addr = (char *)malloc(size * 2)) == NULL) {
 		errno = ENOMEM;
@@ -233,10 +236,10 @@ _nsc_gmem(void)
 		return (rc);
 	}
 
-	printf(gettext("Global map entries:\n"));
+	(void) printf(gettext("Global map entries:\n"));
 	show_maps(addr, size);
 
-	printf(gettext("\nGlobal NVMEM map entries:\n"));
+	(void) printf(gettext("\nGlobal NVMEM map entries:\n"));
 	show_maps(addr + size, size);
 
 	free(addr);
@@ -253,7 +256,8 @@ show_maps(char *addr, int len)
 	char tname[_NSC_MAXNAME + 1];
 	int i;
 
-	printf(gettext("magic 0x%x ver %d size %d dirty (nvmem systems): %d\n"),
+	(void) printf(
+	    gettext("magic 0x%x ver %d size %d dirty (nvmem systems): %d\n"),
 	    rhp->magic, rhp->ver, rhp->size, rhp->rh_dirty);
 
 	for (i = 0, rmap = rhp->map;
@@ -261,10 +265,10 @@ show_maps(char *addr, int len)
 	    rmap < (nsc_rmmap_t *)(addr + len); ++i, ++rmap) {
 		if (!rmap->name[0])
 			continue;
-		strncpy(tname, rmap->name, _NSC_MAXNAME);
-		strcpy(&tname[strlen(tname)], "                     ");
+		(void) strncpy(tname, rmap->name, _NSC_MAXNAME);
+		(void) strcpy(&tname[strlen(tname)], "                     ");
 		tname[_NSC_MAXNAME] = '\0';
-		printf(gettext(
+		(void) printf(gettext(
 		    "%d:\tname %s\toffset 0x%x size 0x%x inuse 0x%x\n"),
 		    i, tname, rmap->offset, rmap->size, rmap->inuse);
 	}

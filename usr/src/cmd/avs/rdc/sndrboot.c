@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -212,26 +213,26 @@ main(int argc, char *argv[])
  * At this point, this is the child process.  Do the operation
  */
 
-		strncpy(fromfile,
-			pair_list[pairs].ffile, NSC_MAXPATH);
-		strncpy(tofile,
-			pair_list[pairs].tfile, NSC_MAXPATH);
-		strncpy(frombitmap,
-			pair_list[pairs].fbitmap, NSC_MAXPATH);
-		strncpy(fromhost,
-			pair_list[pairs].fhost, MAX_RDC_HOST_SIZE);
-		strncpy(tohost,
-			pair_list[pairs].thost, MAX_RDC_HOST_SIZE);
-		strncpy(tobitmap,
-			pair_list[pairs].tbitmap, NSC_MAXPATH);
-		strncpy(directfile,
-			pair_list[pairs].directfile, NSC_MAXPATH);
-		strncpy(diskqueue,
-			pair_list[pairs].diskqueue, NSC_MAXPATH);
-		strncpy(group,
-			pair_list[pairs].group, NSC_MAXPATH);
-		strncpy(lhost,
-			pair_list[pairs].lhost, MAX_RDC_HOST_SIZE);
+		(void) strncpy(fromfile,
+		    pair_list[pairs].ffile, NSC_MAXPATH);
+		(void) strncpy(tofile,
+		    pair_list[pairs].tfile, NSC_MAXPATH);
+		(void) strncpy(frombitmap,
+		    pair_list[pairs].fbitmap, NSC_MAXPATH);
+		(void) strncpy(fromhost,
+		    pair_list[pairs].fhost, MAX_RDC_HOST_SIZE);
+		(void) strncpy(tohost,
+		    pair_list[pairs].thost, MAX_RDC_HOST_SIZE);
+		(void) strncpy(tobitmap,
+		    pair_list[pairs].tbitmap, NSC_MAXPATH);
+		(void) strncpy(directfile,
+		    pair_list[pairs].directfile, NSC_MAXPATH);
+		(void) strncpy(diskqueue,
+		    pair_list[pairs].diskqueue, NSC_MAXPATH);
+		(void) strncpy(group,
+		    pair_list[pairs].group, NSC_MAXPATH);
+		(void) strncpy(lhost,
+		    pair_list[pairs].lhost, MAX_RDC_HOST_SIZE);
 
 		doasync = pair_list[pairs].doasync;
 		setid = pair_list[pairs].setid;
@@ -283,11 +284,12 @@ char *lhost;
 		    program, fromhost);
 	}
 	if (strcmp(hp->h_name, fromhost) == 0)
-		strncpy(fromname, hp->h_name, MAXHOSTNAMELEN);
+		(void) strncpy(fromname, hp->h_name, MAXHOSTNAMELEN);
 	else {
 	for (i = 0; hp->h_aliases[i] != NULL; i++) {
 		if (strcmp(hp->h_aliases[i], fromhost) == 0)
-			strncpy(fromname, hp->h_aliases[i], MAXHOSTNAMELEN);
+			(void) strncpy(fromname, hp->h_aliases[i],
+			    MAXHOSTNAMELEN);
 		}
 	}
 	if (fromname[0] == '\0') {
@@ -304,11 +306,12 @@ char *lhost;
 		    program, tohost);
 	}
 	if (strcmp(hp->h_name, tohost) == 0)
-		strncpy(toname, hp->h_name, MAXHOSTNAMELEN);
+		(void) strncpy(toname, hp->h_name, MAXHOSTNAMELEN);
 	else {
 	for (i = 0; hp->h_aliases[i] != NULL; i++) {
 		if (strcmp(hp->h_aliases[i], tohost) == 0)
-			strncpy(toname, hp->h_aliases[i], MAXHOSTNAMELEN);
+			(void) strncpy(toname, hp->h_aliases[i],
+			    MAXHOSTNAMELEN);
 		}
 	}
 	if (toname[0] == '\0') {
@@ -406,16 +409,18 @@ char *lhost;
 		rdc_err(NULL, gettext("Neither %s nor %s is local"),
 		    fromhost, tohost);
 	}
-	strncpy(parms.rdc_set->primary.intf, fromhost, MAX_RDC_HOST_SIZE);
-	strncpy(parms.rdc_set->primary.file, fromfile, NSC_MAXPATH);
-	strncpy(parms.rdc_set->primary.bitmap, frombitmap, NSC_MAXPATH);
+	(void) strncpy(parms.rdc_set->primary.intf, fromhost,
+	    MAX_RDC_HOST_SIZE);
+	(void) strncpy(parms.rdc_set->primary.file, fromfile, NSC_MAXPATH);
+	(void) strncpy(parms.rdc_set->primary.bitmap, frombitmap, NSC_MAXPATH);
 
-	strncpy(parms.rdc_set->secondary.intf, tohost, MAX_RDC_HOST_SIZE);
-	strncpy(parms.rdc_set->secondary.file, tofile, NSC_MAXPATH);
-	strncpy(parms.rdc_set->secondary.bitmap, tobitmap, NSC_MAXPATH);
+	(void) strncpy(parms.rdc_set->secondary.intf, tohost,
+	    MAX_RDC_HOST_SIZE);
+	(void) strncpy(parms.rdc_set->secondary.file, tofile, NSC_MAXPATH);
+	(void) strncpy(parms.rdc_set->secondary.bitmap, tobitmap, NSC_MAXPATH);
 
-	strncpy(parms.rdc_set->group_name, group, NSC_MAXPATH);
-	strncpy(parms.rdc_set->disk_queue, diskqueue, NSC_MAXPATH);
+	(void) strncpy(parms.rdc_set->group_name, group, NSC_MAXPATH);
+	(void) strncpy(parms.rdc_set->disk_queue, diskqueue, NSC_MAXPATH);
 
 	parms.rdc_set->maxqfbas = maxqfbas;
 	parms.rdc_set->maxqitems = maxqitems;
@@ -448,8 +453,8 @@ char *lhost;
 
 		if (strcmp(lhost, fromname) == 0) {
 			parms.options |= RDC_OPT_PRIMARY;
-			strncpy(parms.rdc_set->direct_file, directfile,
-				NSC_MAXPATH);
+			(void) strncpy(parms.rdc_set->direct_file, directfile,
+			    NSC_MAXPATH);
 
 		} else {
 			parms.options |= RDC_OPT_SECONDARY;
@@ -465,8 +470,8 @@ noconfig:
 
 		if (self_check(fromname)) {
 			parms.options |= RDC_OPT_PRIMARY;
-			strncpy(parms.rdc_set->direct_file, directfile,
-				NSC_MAXPATH);
+			(void) strncpy(parms.rdc_set->direct_file, directfile,
+			    NSC_MAXPATH);
 		} else {
 			parms.options |= RDC_OPT_SECONDARY;
 			parms.rdc_set->direct_file[0] = 0; /* no fcal direct */
@@ -720,20 +725,20 @@ read_libcfg(int flag)
 			rdc_err(NULL, gettext("cfg input error (%d)"), rc);
 
 		if (strcmp(directfile, "ip") == 0)
-			strcpy(directfile, "");
+			(void) strcpy(directfile, "");
 
 		if (strcmp(group, "-") == 0)
-			strcpy(group, "");
+			(void) strcpy(group, "");
 
 		if (strcmp(diskqueue, "-") == 0)
-			strcpy(diskqueue, "");
+			(void) strcpy(diskqueue, "");
 
 		(void) snprintf(key, sizeof (key),
 			"sndr.set%d.options", setnumber);
 
 		if (cfg_get_single_option(cfg, CFG_SEC_CONF, key,
 			lghn, lhost, MAX_RDC_HOST_SIZE) < 0)
-			strcpy(lhost,
+			(void) strcpy(lhost,
 			    get_lghn(cfg, ctag, setnumber, flag));
 
 		if (strcmp(sync, "sync") == 0)
@@ -747,19 +752,19 @@ read_libcfg(int flag)
 			    tohost, tofile);
 		}
 
-		strncpy(pair_list[i].fhost, fromhost,
-			MAX_RDC_HOST_SIZE);
-		strncpy(pair_list[i].ffile, fromfile, NSC_MAXPATH);
-		strncpy(pair_list[i].fbitmap, frombitmap, NSC_MAXPATH);
-		strncpy(pair_list[i].thost, tohost, MAX_RDC_HOST_SIZE);
-		strncpy(pair_list[i].tfile, tofile, NSC_MAXPATH);
-		strncpy(pair_list[i].tbitmap, tobitmap, NSC_MAXPATH);
-		strncpy(pair_list[i].directfile, directfile,
-			NSC_MAXPATH);
-		strncpy(pair_list[i].diskqueue, diskqueue,
-			NSC_MAXPATH);
-		strncpy(pair_list[i].group, group, NSC_MAXPATH);
-		strncpy(pair_list[i].lhost, lhost, MAX_RDC_HOST_SIZE);
+		(void) strncpy(pair_list[i].fhost, fromhost,
+		    MAX_RDC_HOST_SIZE);
+		(void) strncpy(pair_list[i].ffile, fromfile, NSC_MAXPATH);
+		(void) strncpy(pair_list[i].fbitmap, frombitmap, NSC_MAXPATH);
+		(void) strncpy(pair_list[i].thost, tohost, MAX_RDC_HOST_SIZE);
+		(void) strncpy(pair_list[i].tfile, tofile, NSC_MAXPATH);
+		(void) strncpy(pair_list[i].tbitmap, tobitmap, NSC_MAXPATH);
+		(void) strncpy(pair_list[i].directfile, directfile,
+		    NSC_MAXPATH);
+		(void) strncpy(pair_list[i].diskqueue, diskqueue,
+		    NSC_MAXPATH);
+		(void) strncpy(pair_list[i].group, group, NSC_MAXPATH);
+		(void) strncpy(pair_list[i].lhost, lhost, MAX_RDC_HOST_SIZE);
 		pair_list[i].doasync = doasync;
 
 		if (cfg_get_single_option(cfg, CFG_SEC_CONF, key, "setid",

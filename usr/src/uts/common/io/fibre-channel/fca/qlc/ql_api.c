@@ -22,7 +22,7 @@
 /* Copyright 2010 QLogic Corporation */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1455,8 +1455,8 @@ attach_failed:
 			if (ha->fw_module != NULL) {
 				(void) ddi_modclose(ha->fw_module);
 			}
-			ql_el_trace_desc_dtor(ha);
-			ql_nvram_cache_desc_dtor(ha);
+			(void) ql_el_trace_desc_dtor(ha);
+			(void) ql_nvram_cache_desc_dtor(ha);
 
 			ddi_soft_state_free(ql_state, instance);
 			progress &= ~QL_SOFT_STATE_ALLOCED;

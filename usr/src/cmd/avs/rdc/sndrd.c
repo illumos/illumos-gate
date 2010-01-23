@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -481,7 +482,7 @@ read_default(void)
 			}
 		}
 		/* close defaults file */
-		defopen(NULL);
+		(void) defopen(NULL);
 	}
 }
 #ifdef lint
@@ -1655,7 +1656,7 @@ rdcsvc(int fd, struct netbuf addrmask, struct netconfig *nconf)
 
 	nsa.fd = fd;
 	nsa.nthr = (max_conns_allowed < 0 ? 16 : max_conns_allowed);
-	strncpy(nsa.netid, nconf->nc_netid, sizeof (nsa.netid));
+	(void) strncpy(nsa.netid, nconf->nc_netid, sizeof (nsa.netid));
 	nsa.addrmask.len = addrmask.len;
 	nsa.addrmask.maxlen = addrmask.maxlen;
 	nsa.addrmask.buf = addrmask.buf;

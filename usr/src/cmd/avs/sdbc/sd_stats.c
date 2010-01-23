@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -286,11 +287,11 @@ main(int argc, char *argv[])
 	/*
 	 * Set signal handle
 	 */
-	sigset(SIGPIPE, leave);
-	sigset(SIGINT, leave);
-	sigset(SIGQUIT, leave);
-	signal(SIGFPE, leave);
-	signal(SIGSEGV, leave);
+	(void) sigset(SIGPIPE, leave);
+	(void) sigset(SIGINT, leave);
+	(void) sigset(SIGQUIT, leave);
+	(void) signal(SIGFPE, leave);
+	(void) signal(SIGSEGV, leave);
 
 	USEC_INIT();
 	currtime = USEC_READ();
@@ -435,7 +436,7 @@ checkbuf(int c)
 
 	case 'z':
 		if (SDBC_IOCTL(SDBC_ZAP_STATS, 0, 0, 0, 0, 0,
-				&ustats) == SPCS_S_ERROR) {
+		    &ustats) == SPCS_S_ERROR) {
 			if (ustats) {
 				spcs_s_report(ustats, stderr);
 				spcs_s_ufree(&ustats);
@@ -472,8 +473,8 @@ prheading(int count)
 void
 leave(int status)
 {
-	sigignore(SIGPIPE);
-	sigignore(SIGALRM);
+	(void) sigignore(SIGPIPE);
+	(void) sigignore(SIGALRM);
 	/* clear(); */
 	(void) move(LINES, 0);
 	(void) refresh();

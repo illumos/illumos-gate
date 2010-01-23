@@ -522,7 +522,7 @@ zfs_read(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 			ASSERT(offset + n <= blksz);
 			nblk = 1;
 		}
-		dmu_xuio_init(xuio, nblk);
+		(void) dmu_xuio_init(xuio, nblk);
 
 		if (vn_has_cached_data(vp)) {
 			/*
@@ -530,7 +530,7 @@ zfs_read(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 			 * even if we only expect to read a portion of a block.
 			 */
 			while (--nblk >= 0) {
-				dmu_xuio_add(xuio,
+				(void) dmu_xuio_add(xuio,
 				    dmu_request_arcbuf(zp->z_dbuf, blksz),
 				    0, blksz);
 			}
@@ -4701,7 +4701,7 @@ zfs_reqzcbuf(vnode_t *vp, enum uio_rw ioflag, xuio_t *xuio, cred_t *cr,
 		size -= postamble;
 
 		fullblk = size / blksz;
-		dmu_xuio_init(xuio,
+		(void) dmu_xuio_init(xuio,
 		    (preamble != 0) + fullblk + (postamble != 0));
 		DTRACE_PROBE3(zfs_reqzcbuf_align, int, preamble,
 		    int, postamble, int,
@@ -4715,20 +4715,21 @@ zfs_reqzcbuf(vnode_t *vp, enum uio_rw ioflag, xuio_t *xuio, cred_t *cr,
 			/* data begins in the middle of the arc_buf */
 			abuf = dmu_request_arcbuf(zp->z_dbuf, blksz);
 			ASSERT(abuf);
-			dmu_xuio_add(xuio, abuf, blksz - preamble, preamble);
+			(void) dmu_xuio_add(xuio, abuf,
+			    blksz - preamble, preamble);
 		}
 
 		for (i = 0; i < fullblk; i++) {
 			abuf = dmu_request_arcbuf(zp->z_dbuf, blksz);
 			ASSERT(abuf);
-			dmu_xuio_add(xuio, abuf, 0, blksz);
+			(void) dmu_xuio_add(xuio, abuf, 0, blksz);
 		}
 
 		if (postamble) {
 			/* data ends in the middle of the arc_buf */
 			abuf = dmu_request_arcbuf(zp->z_dbuf, blksz);
 			ASSERT(abuf);
-			dmu_xuio_add(xuio, abuf, 0, postamble);
+			(void) dmu_xuio_add(xuio, abuf, 0, postamble);
 		}
 		break;
 	case UIO_READ:

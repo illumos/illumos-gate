@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,14 +90,16 @@ main(int argc, char *argv[])
 
 	if (update_cfg) {
 		if ((cfg = cfg_open(NULL)) == NULL) {
-			fprintf(stderr, gettext("Error opening config\n"));
+			(void) fprintf(stderr,
+			    gettext("Error opening config\n"));
 			exit(1);
 		}
 
 		if (!cfg_lock(cfg, CFG_WRLOCK)) {
 			spcs_log("ii", NULL,
-				"iicpbmp CFG_WRLOCK failed, errno %d", errno);
-			fprintf(stderr, gettext("Error locking config\n"));
+			    "iicpbmp CFG_WRLOCK failed, errno %d", errno);
+			(void) fprintf(stderr,
+			    gettext("Error locking config\n"));
 			exit(1);
 		}
 	}
@@ -113,8 +115,9 @@ main(int argc, char *argv[])
 void
 iicpbmp_usage()
 {
-	fprintf(stderr, gettext("Usage:\n"));
-	fprintf(stderr, gettext("\tiicpbmp [-c] old_bitmap new_bitmap\n"));
+	(void) fprintf(stderr, gettext("Usage:\n"));
+	(void) fprintf(stderr,
+	    gettext("\tiicpbmp [-c] old_bitmap new_bitmap\n"));
 	exit(1);
 }
 
@@ -134,98 +137,101 @@ copybmp(char *old_bitmap, char *new_bitmap)
 		exit(1);
 	}
 	if (*old_bitmap != '/' || *new_bitmap != '/') {
-		fprintf(stderr, gettext(
-		"Both old and new bitmap file names must begin with a /.\n"));
+		(void) fprintf(stderr, gettext("Both old and new bitmap "
+		    "file names must begin with a /.\n"));
 		exit(1);
 	}
 
 	if (strlen(new_bitmap) > DSW_NAMELEN) {
-		fprintf(stderr, gettext("New bitmap name is to long.\n"));
+		(void) fprintf(stderr,
+		    gettext("New bitmap name is too long.\n"));
 		exit(1);
 	}
 
 	if (update_cfg && find_bitmap_cfg(old_bitmap) == 0) {
 		perror(old_bitmap);
-		fprintf(stderr, gettext("Old bitmap not in existing cfg\n"));
+		(void) fprintf(stderr,
+		    gettext("Old bitmap not in existing cfg\n"));
 		exit(1);
 	}
 
-	strncpy(args.shadow_vol, shadow, DSW_NAMELEN);
+	(void) strncpy(args.shadow_vol, shadow, DSW_NAMELEN);
 	args.shadow_vol[DSW_NAMELEN-1] = '\0';
 
 	args.status = spcs_s_ucreate();
 	if (ioctl(dsw_fd, DSWIOC_STAT, &args) != -1) {
-		fprintf(stderr, gettext("Suspend the Point-in-Time Copy "
+		(void) fprintf(stderr, gettext("Suspend the Point-in-Time Copy "
 		    "set first\n"));
-		close(dsw_fd);
+		(void) close(dsw_fd);
 		exit(1);
 	}
 
 	if ((ifp = fopen(old_bitmap, "r")) == NULL) {
 		perror(old_bitmap);
-		fprintf(stderr, gettext("Can't open old bitmap file\n"));
+		(void) fprintf(stderr, gettext("Can't open old bitmap file\n"));
 		exit(1);
 	}
 
 	/* Check old header looks like an Point-in-Time Copy bitmap header */
 
 	if (fread(&header, sizeof (header), 1, ifp) != 1) {
-		fprintf(stderr, gettext("Can't read old bitmap file\n"));
+		(void) fprintf(stderr, gettext("Can't read old bitmap file\n"));
 		exit(1);
 	}
 
 	if (header.ii_magic != DSW_CLEAN && header.ii_magic != DSW_DIRTY) {
-		fprintf(stderr, gettext("%s is not a Point-in-Time Copy "
-				    "bitmap.\n"), old_bitmap);
+		(void) fprintf(stderr, gettext("%s is not a Point-in-Time Copy "
+		    "bitmap.\n"), old_bitmap);
 		exit(1);
 	}
 
 	if (strncmp(header.bitmap_vol, old_bitmap, DSW_NAMELEN) != 0) {
-		fprintf(stderr, gettext(
-		"%s has Point-in-Time Copy bitmap magic number,\n"
-		"but does not contain correct data.\n"), old_bitmap);
+		(void) fprintf(stderr, gettext(
+		    "%s has Point-in-Time Copy bitmap magic number,\n"
+		    "but does not contain correct data.\n"), old_bitmap);
 		exit(1);
 	}
 
 	if ((ofp = fopen(new_bitmap, "w")) == NULL) {
 		perror(new_bitmap);
-		fprintf(stderr, gettext("Can't open new bitmap file\n"));
+		(void) fprintf(stderr, gettext("Can't open new bitmap file\n"));
 		exit(1);
 	}
 
 	/* Set up new header */
 
-	memset(header.bitmap_vol, 0, DSW_NAMELEN);
-	strncpy(header.bitmap_vol, new_bitmap, DSW_NAMELEN);
+	(void) memset(header.bitmap_vol, 0, DSW_NAMELEN);
+	(void) strncpy(header.bitmap_vol, new_bitmap, DSW_NAMELEN);
 
 	if (fwrite(&header, sizeof (header), 1, ofp) != 1) {
 		perror(new_bitmap);
-		fprintf(stderr, gettext("Can't write new bitmap header\n"));
+		(void) fprintf(stderr,
+		    gettext("Can't write new bitmap header\n"));
 		exit(1);
 	}
 
 	/* Copy the bitmap itself */
 
 	while ((i = fread(cp_buffer, sizeof (char), sizeof (cp_buffer), ifp))
-				> 0) {
+	    > 0) {
 		if (fwrite(cp_buffer, sizeof (char), i, ofp) != i) {
 			perror(gettext("Write new bitmap failed"));
 			break;
 		}
 	}
-	fclose(ofp);
-	fclose(ifp);
-	close(dsw_fd);
+	(void) fclose(ofp);
+	(void) fclose(ifp);
+	(void) close(dsw_fd);
 	if (update_cfg) {
-		sprintf(key, "ii.set%d.bitmap", setnumber);
+		(void) sprintf(key, "ii.set%d.bitmap", setnumber);
 		if (cfg_put_cstring(cfg, key, new_bitmap, strlen(new_bitmap))
-						< 0) {
+		    < 0) {
 				perror("cfg_put_cstring");
 		}
-		cfg_commit(cfg);
+		(void) cfg_commit(cfg);
 		spcs_log("ii", NULL,
-			"iicpbmp copy bit map for %s from %s to %s",
-			shadow, old_bitmap, new_bitmap);
+		    "iicpbmp copy bit map for %s from %s to %s",
+		    shadow, old_bitmap, new_bitmap);
 	}
 }
 
@@ -239,13 +245,15 @@ find_bitmap_cfg(char *bitmap)
 {
 	for (setnumber = 1; ; setnumber++) {
 		bzero(buf, CFG_MAX_BUF);
-		snprintf(key, sizeof (key), "ii.set%d.bitmap", setnumber);
+		(void) snprintf(key, sizeof (key), "ii.set%d.bitmap",
+		    setnumber);
+
 		if (cfg_get_cstring(cfg, key, buf, DSW_NAMELEN) < 0)
 			return (0);
 		if (strcmp(buf, bitmap) == 0) {
-			snprintf(key, sizeof (key), "ii.set%d.shadow",
-						setnumber);
-			cfg_get_cstring(cfg, key, shadow, DSW_NAMELEN);
+			(void) snprintf(key, sizeof (key), "ii.set%d.shadow",
+			    setnumber);
+			(void) cfg_get_cstring(cfg, key, shadow, DSW_NAMELEN);
 			return (setnumber);
 		}
 	}

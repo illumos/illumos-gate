@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -243,7 +243,7 @@ ii_update(kstat_ctl_t *kc)
 		/*
 		 * Set kstat
 		 */
-		strncpy(volname, cur->pre_set->ks_name, KSTAT_STRLEN);
+		(void) strncpy(volname, cur->pre_set->ks_name, KSTAT_STRLEN);
 		volname[KSTAT_STRLEN] = '\0';
 
 		ksp = kstat_lookup(kc, II_KSTAT_MODULE, -1, volname);
@@ -357,8 +357,8 @@ ii_report()
 
 	if (padsz) {
 		char fmt[20];
-		sprintf(fmt, "%%%ds", padsz);
-		sprintf(pad, fmt, "");
+		(void) sprintf(fmt, "%%%ds", padsz);
+		(void) sprintf(pad, fmt, "");
 	}
 
 	for (cur = ii_top; cur; /* CSTYLED */) {
@@ -374,21 +374,21 @@ ii_report()
 
 			/* notify user of set being disabled */
 			c = kstat_value(cur->pre_set, DSW_SKSTAT_SETA);
-			strncpy(vol, c, NAMED_LEN);
+			(void) strncpy(vol, c, NAMED_LEN);
 			c = kstat_value(cur->pre_set, DSW_SKSTAT_SETB);
-			strncat(vol, c, NAMED_LEN);
+			(void) strncat(vol, c, NAMED_LEN);
 			c = kstat_value(cur->pre_set, DSW_SKSTAT_SETC);
-			strncat(vol, c, NAMED_LEN);
+			(void) strncat(vol, c, NAMED_LEN);
 			c = kstat_value(cur->pre_set, DSW_SKSTAT_SETD);
-			strncat(vol, c, NAMED_LEN);
+			(void) strncat(vol, c, NAMED_LEN);
 
 			offset = strlen(vol) - NAMED_LEN;
 
 			if (offset < 0)
 				offset = 0;
 
-			printf(DATA_C16, vol + offset);
-			printf(" %s\n", II_DISABLED);
+			(void) printf(DATA_C16, vol + offset);
+			(void) printf(" %s\n", II_DISABLED);
 
 			/* free memory and remove stat from list */
 			next = ii_del_stat(cur);
@@ -419,21 +419,21 @@ ii_report()
 			char vstat[STAT_HDR_SIZE];
 
 			if (*flags & DSW_GOLDEN)
-				strcpy(c, II_INDEPENDENT);
+				(void) strcpy(c, II_INDEPENDENT);
 			else
-				strcpy(c, II_DEPENDENT);
+				(void) strcpy(c, II_DEPENDENT);
 
-			sprintf(vtype, DATA_C2, c);
-			strcat(data, vtype);
+			(void) sprintf(vtype, DATA_C2, c);
+			(void) strcat(data, vtype);
 
 			if (*flags & DSW_COPYINGP)
-				strcpy(c, II_COPYING);
+				(void) strcpy(c, II_COPYING);
 			else
-				strcpy(c, NO_INFO);
+				(void) strcpy(c, NO_INFO);
 
 
-			sprintf(vstat, DATA_C2, c);
-			strcat(data, vstat);
+			(void) sprintf(vstat, DATA_C2, c);
+			(void) strcat(data, vstat);
 		}
 
 		/* Calculate sync needed precentage */
@@ -460,9 +460,9 @@ ii_report()
 
 			pct = ((float)*chkbits / *volsize) * 100.0;
 
-			sprintf(snpct, DATA_F62, pct);
+			(void) sprintf(snpct, DATA_F62, pct);
 
-			strcat(data, snpct);
+			(void) strcat(data, snpct);
 		}
 
 		/* Master statistics */
@@ -472,13 +472,13 @@ ii_report()
 			int offset;
 
 			c = kstat_value(cur->cur_set, DSW_SKSTAT_MSTA);
-			strncat(vol, c, NAMED_LEN);
+			(void) strncat(vol, c, NAMED_LEN);
 			c = kstat_value(cur->cur_set, DSW_SKSTAT_MSTB);
-			strncat(vol, c, NAMED_LEN);
+			(void) strncat(vol, c, NAMED_LEN);
 			c = kstat_value(cur->cur_set, DSW_SKSTAT_MSTC);
-			strncat(vol, c, NAMED_LEN);
+			(void) strncat(vol, c, NAMED_LEN);
 			c = kstat_value(cur->cur_set, DSW_SKSTAT_MSTD);
-			strncat(vol, c, NAMED_LEN);
+			(void) strncat(vol, c, NAMED_LEN);
 
 			offset = strlen(vol) - NAMED_LEN;
 
@@ -486,22 +486,22 @@ ii_report()
 				offset = 0;
 
 			header();
-			printf(DATA_C16, vol + offset);
-			printf("%s", data);
-			printf(ROLE_INF_FMT, II_MASTER);
+			(void) printf(DATA_C16, vol + offset);
+			(void) printf("%s", data);
+			(void) printf(ROLE_INF_FMT, II_MASTER);
 
 			if (*flags & DSW_MSTOFFLINE) {
-				printf(" <<offline>>");
+				(void) printf(" <<offline>>");
 				linesout++;
 			} else {
 				io_report(cur->cur_mst, cur->pre_mst,
 				    sdbc_getstat(vol + offset));
 			}
 
-			printf("\n");
+			(void) printf("\n");
 
 			if (first) {
-				strcpy(data, strlen(pad) > 0 ? pad : "");
+				(void) strcpy(data, strlen(pad) > 0 ? pad : "");
 				first = 0;
 			}
 		}
@@ -513,13 +513,13 @@ ii_report()
 			int offset;
 
 			c = kstat_value(cur->cur_set, DSW_SKSTAT_SETA);
-			strncat(vol, c, NAMED_LEN);
+			(void) strncat(vol, c, NAMED_LEN);
 			c = kstat_value(cur->cur_set, DSW_SKSTAT_SETB);
-			strncat(vol, c, NAMED_LEN);
+			(void) strncat(vol, c, NAMED_LEN);
 			c = kstat_value(cur->cur_set, DSW_SKSTAT_SETC);
-			strncat(vol, c, NAMED_LEN);
+			(void) strncat(vol, c, NAMED_LEN);
 			c = kstat_value(cur->cur_set, DSW_SKSTAT_SETD);
-			strncat(vol, c, NAMED_LEN);
+			(void) strncat(vol, c, NAMED_LEN);
 
 			offset = strlen(vol) - NAMED_LEN;
 
@@ -527,22 +527,22 @@ ii_report()
 				offset = 0;
 
 			header();
-			printf(DATA_C16, vol + offset);
-			printf("%s", data);
-			printf(ROLE_INF_FMT, II_SHADOW);
+			(void) printf(DATA_C16, vol + offset);
+			(void) printf("%s", data);
+			(void) printf(ROLE_INF_FMT, II_SHADOW);
 
 			if (*flags & DSW_SHDOFFLINE) {
-				printf(" <<offline>>");
+				(void) printf(" <<offline>>");
 				linesout++;
 			} else {
 				io_report(cur->cur_shd, cur->pre_shd,
 				    sdbc_getstat(vol + offset));
 			}
 
-			printf("\n");
+			(void) printf("\n");
 
 			if (first) {
-				strcpy(data, strlen(pad) > 0 ? pad : "");
+				(void) strcpy(data, strlen(pad) > 0 ? pad : "");
 				first = 0;
 			}
 		}
@@ -554,13 +554,13 @@ ii_report()
 			int offset;
 
 			c = kstat_value(cur->cur_set, DSW_SKSTAT_BMPA);
-			strncat(vol, c, NAMED_LEN);
+			(void) strncat(vol, c, NAMED_LEN);
 			c = kstat_value(cur->cur_set, DSW_SKSTAT_BMPB);
-			strncat(vol, c, NAMED_LEN);
+			(void) strncat(vol, c, NAMED_LEN);
 			c = kstat_value(cur->cur_set, DSW_SKSTAT_BMPC);
-			strncat(vol, c, NAMED_LEN);
+			(void) strncat(vol, c, NAMED_LEN);
 			c = kstat_value(cur->cur_set, DSW_SKSTAT_BMPD);
-			strncat(vol, c, NAMED_LEN);
+			(void) strncat(vol, c, NAMED_LEN);
 
 			offset = strlen(vol) - NAMED_LEN;
 
@@ -568,21 +568,21 @@ ii_report()
 				offset = 0;
 
 			header();
-			printf(DATA_C16, vol + offset);
-			printf("%s", data);
-			printf(ROLE_INF_FMT, II_BITMAP);
+			(void) printf(DATA_C16, vol + offset);
+			(void) printf("%s", data);
+			(void) printf(ROLE_INF_FMT, II_BITMAP);
 
 			if (*flags & DSW_BMPOFFLINE) {
-				printf(" <<offline>>");
+				(void) printf(" <<offline>>");
 				linesout++;
 			} else {
 				io_report(cur->cur_bmp, cur->pre_bmp,
 				    sdbc_getstat(vol + offset));
 			}
-			printf("\n");
+			(void) printf("\n");
 
 			if (first) {
-				strcpy(data, strlen(pad) > 0 ? pad : "");
+				(void) strcpy(data, strlen(pad) > 0 ? pad : "");
 				first = 0;
 			}
 		}
@@ -595,19 +595,19 @@ ii_report()
 			int offset;
 
 			if (cur->cur_ovr == NULL && cur->pre_ovr != NULL)
-				strcpy(msg, " <<attached>>");
+				(void) strcpy(msg, " <<attached>>");
 
 			if (! (cur->collected & GOT_OVRSTAT))
-				strcpy(msg, " <<not attached>>");
+				(void) strcpy(msg, " <<not attached>>");
 
 			c = kstat_value(cur->cur_set, DSW_SKSTAT_OVRA);
-			strncpy(vol, c, NAMED_LEN);
+			(void) strncpy(vol, c, NAMED_LEN);
 			c = kstat_value(cur->cur_set, DSW_SKSTAT_OVRB);
-			strncat(vol, c, NAMED_LEN);
+			(void) strncat(vol, c, NAMED_LEN);
 			c = kstat_value(cur->cur_set, DSW_SKSTAT_OVRC);
-			strncat(vol, c, NAMED_LEN);
+			(void) strncat(vol, c, NAMED_LEN);
 			c = kstat_value(cur->cur_set, DSW_SKSTAT_OVRD);
-			strncat(vol, c, NAMED_LEN);
+			(void) strncat(vol, c, NAMED_LEN);
 
 			offset = strlen(vol) - NAMED_LEN;
 
@@ -615,28 +615,28 @@ ii_report()
 				offset = 0;
 
 			header();
-			printf(DATA_C16, vol + offset);
-			printf("%s", data);
-			printf(ROLE_INF_FMT, II_OVERFLOW);
+			(void) printf(DATA_C16, vol + offset);
+			(void) printf("%s", data);
+			(void) printf(ROLE_INF_FMT, II_OVERFLOW);
 
 			if (strlen(msg)) {
-				printf("%s\n", msg);
+				(void) printf("%s\n", msg);
 				linesout++;
 				goto next;
 			}
 
 			if (*flags & DSW_OVROFFLINE) {
-				printf(" <<offline>>");
+				(void) printf(" <<offline>>");
 				linesout++;
 			} else {
 				io_report(cur->cur_ovr, cur->pre_ovr,
 				    sdbc_getstat(vol + offset));
 			}
 
-			printf("\n");
+			(void) printf("\n");
 
 			if (first) {
-				strcpy(data, strlen(pad) > 0 ? pad : "");
+				(void) strcpy(data, strlen(pad) > 0 ? pad : "");
 				first = 0;
 			}
 		}

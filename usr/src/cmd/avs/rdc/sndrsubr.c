@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -114,80 +115,80 @@ rdc_decode_flag(int flag, int options)
 	switch (flag) {
 	case (RDC_CMD_COPY):
 		if (options & RDC_OPT_FULL)
-			strcpy(str, "-m");
+			(void) strcpy(str, "-m");
 		else
-			strcpy(str, "-u");
+			(void) strcpy(str, "-u");
 		if (options & RDC_OPT_REVERSE)
-			strcat(str, " -r");
+			(void) strcat(str, " -r");
 		break;
 
 	case (RDC_CMD_DISABLE):
-		strcpy(str, "-d");
+		(void) strcpy(str, "-d");
 		break;
 
 	case (RDC_CMD_ENABLE):
 		if (options & RDC_OPT_SETBMP)
-			strcpy(str, "-e");
+			(void) strcpy(str, "-e");
 		else
-			strcpy(str, "-E");
+			(void) strcpy(str, "-E");
 		break;
 
 	case (RDC_CMD_LOG):
-		strcpy(str, "-l");
+		(void) strcpy(str, "-l");
 		break;
 
 	case (RDC_CMD_HEALTH):
-		strcpy(str, "-H");
+		(void) strcpy(str, "-H");
 		break;
 
 	case (RDC_CMD_WAIT):
-		strcpy(str, "-w");
+		(void) strcpy(str, "-w");
 		break;
 
 	case (RDC_CMD_RECONFIG):
-		strcpy(str, "-R ...");
+		(void) strcpy(str, "-R ...");
 		break;
 
 	case (RDC_CMD_TUNABLE):
-		strcpy(str, "");
+		(void) strcpy(str, "");
 		if (maxqfbas != MAXQFBAS)
-			strcat(str, " -F");
+			(void) strcat(str, " -F");
 		if (maxqitems != MAXQITEMS)
-			strcat(str, " -W");
+			(void) strcat(str, " -W");
 		if (autosync != AUTOSYNC)
-			strcat(str, " -a");
+			(void) strcat(str, " -a");
 		if (asyncthr != ASYNCTHR)
-			strcat(str, " -A");
+			(void) strcat(str, " -A");
 		if (qblock != QBLOCK)
-			strcat(str, " -D");
+			(void) strcat(str, " -D");
 		break;
 
 	case (RDC_CMD_SUSPEND):
-		strcpy(str, "-s");
+		(void) strcpy(str, "-s");
 		break;
 
 	case (RDC_CMD_RESUME):
-		strcpy(str, "-r");
+		(void) strcpy(str, "-r");
 		break;
 
 	case (RDC_CMD_RESET):
-		strcpy(str, "-R");
+		(void) strcpy(str, "-R");
 		break;
 
 	case (RDC_CMD_ADDQ):
-		strcpy(str, "-q a");
+		(void) strcpy(str, "-q a");
 		break;
 
 	case (RDC_CMD_REMQ):
-		strcpy(str, "-q d");
+		(void) strcpy(str, "-q d");
 		break;
 
 	case (RDC_CMD_REPQ):
-		strcpy(str, "-q r");
+		(void) strcpy(str, "-q r");
 		break;
 
 	default:
-		strcpy(str, gettext("unknown"));
+		(void) strcpy(str, gettext("unknown"));
 		break;
 	}
 
@@ -448,7 +449,7 @@ block_sigs(void)
 {
 	sigset_t allsigs;
 
-	sigfillset(&allsigs);
+	(void) sigfillset(&allsigs);
 	if (sigprocmask(SIG_BLOCK, &allsigs, &origmask) < 0)
 		rdc_warn(NULL, gettext("Unable to block signals"));
 }

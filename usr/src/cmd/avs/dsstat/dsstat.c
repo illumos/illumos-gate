@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -311,15 +311,15 @@ set_vol_list(char *list)
 		newvol = (vslist_t *)calloc(1, sizeof (vslist_t));
 
 		newvol->volname = (char *)calloc((strlen(vn) + 1),
-			sizeof (char));
-		strcpy(newvol->volname, vn);
+		    sizeof (char));
+		(void) strcpy(newvol->volname, vn);
 
 		if (vh == NULL)
 			goto save;
 
 		newvol->volhost = (char *)calloc((strlen(vh) + 1),
-			sizeof (char));
-		strcpy(newvol->volhost, vh);
+		    sizeof (char));
+		(void) strcpy(newvol->volhost, vh);
 
 save:
 		/* save record */
@@ -426,7 +426,7 @@ main(int argc, char **argv)
 			if ((user_rflags | SNDR_REP_MASK) != SNDR_REP_MASK) {
 				fail(DSSTAT_EINVAL,
 				    gettext("Invalid report-flags for "
-					    "Remote Mirror\n"));
+				    "Remote Mirror\n"));
 			}
 		}
 
@@ -455,13 +455,13 @@ main(int argc, char **argv)
 			if ((user_dflags | IIMG_DIS_MASK) != IIMG_DIS_MASK) {
 				fail(DSSTAT_EINVAL,
 				    gettext("Invalid display-flags for "
-					    "Point-in-Time Copy\n"));
+				    "Point-in-Time Copy\n"));
 			}
 
 			if ((user_rflags | IIMG_REP_MASK) != IIMG_REP_MASK) {
 				fail(DSSTAT_EINVAL,
 				    gettext("Invalid report-flags for "
-					    "Point-in-Time Copy\n"));
+				    "Point-in-Time Copy\n"));
 			}
 		}
 

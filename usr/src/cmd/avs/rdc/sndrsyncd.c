@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -305,7 +306,7 @@ wait_link_down(void *thehost)
 	spcs_s_info_t ustatus;
 
 	if (host)
-		strncpy(tmphost, host, MAX_RDC_HOST_SIZE);
+		(void) strncpy(tmphost, host, MAX_RDC_HOST_SIZE);
 
 	ustatus = spcs_s_ucreate();
 
@@ -432,7 +433,8 @@ rdc_sync(char *tohost)
 			continue;
 
 		numfound++;
-		strncpy(rdc_set[sets].secondary.intf, buf, MAX_RDC_HOST_SIZE);
+		(void) strncpy(rdc_set[sets].secondary.intf, buf,
+		    MAX_RDC_HOST_SIZE);
 
 		/* Got a matching entry */
 
@@ -440,19 +442,20 @@ rdc_sync(char *tohost)
 		    setnumber);
 		if (cfg_get_cstring(cfg, key, buf, CFG_MAX_BUF) < 0)
 			break;
-		strncpy(rdc_set[sets].primary.intf, buf, MAX_RDC_HOST_SIZE);
+		(void) strncpy(rdc_set[sets].primary.intf, buf,
+		    MAX_RDC_HOST_SIZE);
 
 		(void) snprintf(key, sizeof (key), "sndr.set%d.primary",
 		    setnumber);
 		if (cfg_get_cstring(cfg, key, buf, CFG_MAX_BUF) < 0)
 			break;
-		strncpy(rdc_set[sets].primary.file, buf, NSC_MAXPATH);
+		(void) strncpy(rdc_set[sets].primary.file, buf, NSC_MAXPATH);
 
 		(void) snprintf(key, sizeof (key), "sndr.set%d.secondary",
 		    setnumber);
 		if (cfg_get_cstring(cfg, key, buf, CFG_MAX_BUF) < 0)
 			break;
-		strncpy(rdc_set[sets].secondary.file, buf, NSC_MAXPATH);
+		(void) strncpy(rdc_set[sets].secondary.file, buf, NSC_MAXPATH);
 
 		parms.command = RDC_CMD_STATUS;
 		bcopy((void *)(&rdc_set[sets]), (void *)(&parms.rdc_set[0]),
@@ -822,13 +825,13 @@ sync_start(char *master)
 		    setnumber);
 		if (cfg_get_cstring(cfg, key, buf, CFG_MAX_BUF) < 0)
 			break;
-		strncpy(shadow, buf, NSC_MAXPATH);
+		(void) strncpy(shadow, buf, NSC_MAXPATH);
 
 		(void) snprintf(key, sizeof (key), "ndr_ii.set%d.bitmap",
 		    setnumber);
 		if (cfg_get_cstring(cfg, key, buf, CFG_MAX_BUF) < 0)
 			break;
-		strncpy(bitmap, buf, NSC_MAXPATH);
+		(void) strncpy(bitmap, buf, NSC_MAXPATH);
 
 		(void) snprintf(key, sizeof (key), "ndr_ii.set%d.state",
 		    setnumber);
@@ -1229,26 +1232,26 @@ group_complete(char *group)
 		    "sndr.set%d.primary", setnumber);
 		if (cfg_get_cstring(cfg, key, primary, sizeof (primary)) < 0)
 			break;
-		strcpy(parms.rdc_set->primary.file, primary);
+		(void) strcpy(parms.rdc_set->primary.file, primary);
 
 		(void) snprintf(key, sizeof (key),
 		    "sndr.set%d.phost", setnumber);
 		if (cfg_get_cstring(cfg, key, phost, sizeof (phost)) < 0)
 			break;
-		strcpy(parms.rdc_set->primary.intf, phost);
+		(void) strcpy(parms.rdc_set->primary.intf, phost);
 
 		(void) snprintf(key, sizeof (key),
 		    "sndr.set%d.secondary", setnumber);
 		if (cfg_get_cstring(cfg, key, secondary,
 				sizeof (secondary)) < 0)
 			break;
-		strcpy(parms.rdc_set->secondary.file, secondary);
+		(void) strcpy(parms.rdc_set->secondary.file, secondary);
 
 		(void) snprintf(key, sizeof (key),
 		    "sndr.set%d.shost", setnumber);
 		if (cfg_get_cstring(cfg, key, shost, sizeof (shost)) < 0)
 			break;
-		strcpy(parms.rdc_set->secondary.intf, shost);
+		(void) strcpy(parms.rdc_set->secondary.intf, shost);
 
 		parms.command = RDC_CMD_STATUS;
 		if (RDC_IOCTL(RDC_CONFIG, &parms, NULL, 0, 0, 0, ustatus) < 0) {

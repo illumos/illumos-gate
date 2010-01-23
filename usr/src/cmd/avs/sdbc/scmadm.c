@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -200,7 +201,7 @@ retry:
 
 #ifdef DEBUG
 	(void) printf(gettext("%s: installing default config entry '%s'\n"),
-		progname, default_cfg);
+	    progname, default_cfg);
 #endif
 	if (mode != CFG_WRLOCK) {
 		cfg_unlock(cfg);
@@ -255,8 +256,8 @@ iscluster(void)
 	} else if (rc > 0) {
 		return (TRUE);
 	} else {
-		(void) fprintf(stderr, "%s\n",
-		    (gettext("%s: unable to ascertain environment"), progname));
+		(void) fprintf(stderr,
+		    gettext("%s: unable to ascertain environment\n"), progname);
 		exit(1);
 	}
 
@@ -556,7 +557,7 @@ configure_sdbc(int argc, char *argv[], int optind)
 			if (cfg_get_cstring(cfg, key, buf, sizeof (buf)) < 0) {
 				if (errno == ESRCH) {
 					/* not found */
-					strcpy(buf, "");
+					(void) strcpy(buf, "");
 				} else {
 					(void) fprintf(stderr,
 					    gettext("%s: error reading "
@@ -583,18 +584,19 @@ configure_sdbc(int argc, char *argv[], int optind)
 		convert_config(cfg, CFG_WRLOCK);
 
 		for (/*CSTYLED*/; optind < argc; optind++) {
-			strncpy(option, argv[optind], sizeof (option));
+			(void) strncpy(option, argv[optind], sizeof (option));
 			option[sizeof (option) - 1] = '\0';	/* terminate */
 
 			cp = strchr(option, '=');
 			if (cp != NULL) {
 				*cp = '\0';	/* terminate option */
 				cp++;
-				strncpy(value, cp, sizeof (value));
+				(void) strncpy(value, cp, sizeof (value));
 				value[sizeof (value) - 1] = '\0';
 
 				if (*value == '\0')
-					strncpy(value, "-", sizeof (value));
+					(void) strncpy(value, "-",
+					    sizeof (value));
 			}
 
 			found = 0;
@@ -625,7 +627,7 @@ configure_sdbc(int argc, char *argv[], int optind)
 			}
 
 			if (*buf == '\0')
-				strncpy(buf, "<default>", sizeof (buf));
+				(void) strncpy(buf, "<default>", sizeof (buf));
 
 			if (cp != NULL) {
 				char *tmp;
@@ -638,8 +640,8 @@ configure_sdbc(int argc, char *argv[], int optind)
 					if (strcmp(value, tmp) == 0) {
 						(void) fprintf(stderr,
 						    gettext(
-							"%s: bad value (%s) "
-							"for option %s\n"),
+						    "%s: bad value (%s) "
+						    "for option %s\n"),
 						    progname, value, option);
 						error = 1;
 						goto out;
@@ -867,9 +869,9 @@ save_hint(int cd, int hint, int flag)
 	}
 
 	if (cd == -1)
-		strcpy(device, "system");
+		(void) strcpy(device, "system");
 	else
-		strncpy(device, cd_to_device(cd), NSC_MAXPATH);
+		(void) strncpy(device, cd_to_device(cd), NSC_MAXPATH);
 
 	found = 0;
 	for (setnumber = 1; /*CONSTCOND*/ TRUE; setnumber++) {
@@ -898,13 +900,13 @@ save_hint(int cd, int hint, int flag)
 		else
 			rc = cfg_put_cstring(cfg, key, "1", 1);
 	} else {
-		strncpy(buf, device, CFG_MAX_BUF);
+		(void) strncpy(buf, device, CFG_MAX_BUF);
 		if (flag == 0)
-			strncat(buf, " 0 0", CFG_MAX_BUF);
+			(void) strncat(buf, " 0 0", CFG_MAX_BUF);
 		else if (hint == NSC_WRTHRU)
-			strncat(buf, " 1 0", CFG_MAX_BUF);
+			(void) strncat(buf, " 1 0", CFG_MAX_BUF);
 		else /* NSC_NOCACHE */
-			strncat(buf, " 0 1", CFG_MAX_BUF);
+			(void) strncat(buf, " 0 1", CFG_MAX_BUF);
 		rc = cfg_put_cstring(cfg, "cache_hint", buf, sizeof (buf));
 	}
 
@@ -1014,7 +1016,7 @@ main(int argc, char *argv[])
 			break;
 #endif
 		case 'a':
-			strcpy(alert_file, optarg);
+			(void) strcpy(alert_file, optarg);
 			break;
 		case 'q':
 			qflag++;
@@ -1360,7 +1362,7 @@ usage:
 
 
 #define	addusage(f__)	\
-	strncat(scmadmUsage, f__, sizeof (scmadmUsage));
+	(void) strncat(scmadmUsage, f__, sizeof (scmadmUsage));
 
 #define	addusage1(f__, a__)	\
 	(void) snprintf(fmt, sizeof (fmt), "%s%s", scmadmUsage, f__);	\
@@ -1720,7 +1722,7 @@ loop:
 	cd = SDT_ANY_CD;		/* any device */
 	flag = SD_ALERT_WAIT;	/* block for alert */
 	if ((count = SDBC_IOCTL(SDBC_ADUMP, cd, &tt, buf, size,
-		flag, &ustats)) == SPCS_S_ERROR) {
+	    flag, &ustats)) == SPCS_S_ERROR) {
 		(void) fprintf(stderr, gettext("%s: sd_adump\n"), progname);
 		sdbc_report_error(&ustats);
 		if (errno == EIDRM) {
@@ -1832,12 +1834,12 @@ print_all_options()
 				if ((len =
 				    strlen(cs_cur->st_shared[cd].sh_filename))
 				    > 23) {
-					strcpy(fn, "...");
-					strcat(fn,
+					(void) strcpy(fn, "...");
+					(void) strcat(fn,
 					    cs_cur->st_shared[cd].sh_filename +
 					    len - 20);
 				} else {
-					strcpy(fn,
+					(void) strcpy(fn,
 					    cs_cur->st_shared[cd].sh_filename);
 				}
 
@@ -1890,12 +1892,12 @@ get_cd_all()
 			if (cs_cur->st_shared[cd].sh_alloc) {
 				if ((len = strlen(
 				    cs_cur->st_shared[cd].sh_filename)) > 15) {
-					strcpy(fn, "...");
-					strcat(fn,
+					(void) strcpy(fn, "...");
+					(void) strcat(fn,
 					    cs_cur->st_shared[cd].sh_filename +
 					    len - 12);
 				} else {
-					strcpy(fn,
+					(void) strcpy(fn,
 					    cs_cur->st_shared[cd].sh_filename);
 				}
 				(void) printf(gettext("\t%d\t%s\n"),

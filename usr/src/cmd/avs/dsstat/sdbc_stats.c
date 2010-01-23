@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -126,7 +126,7 @@ sdbc_discover(kstat_ctl_t *kc)
 		/*
 		 * I/O kstat
 		 */
-		sprintf(kname, "%s%d",  SDBC_IOKSTAT_CDSTATS, kinst);
+		(void) sprintf(kname, "%s%d",  SDBC_IOKSTAT_CDSTATS, kinst);
 
 		io_ksp = kstat_lookup(kc, SDBC_KSTAT_MODULE, kinst, kname);
 		sdbcstat->pre_io = kstat_retrieve(kc, io_ksp);
@@ -259,7 +259,7 @@ sdbc_report()
 		char wmode[STAT_HDR_SIZE];
 
 		/* Parse volume name */
-		strncpy(volname, kstat_value(cur->pre_set,
+		(void) strncpy(volname, kstat_value(cur->pre_set,
 		    SDBC_CDKSTAT_VOL_NAME), NAMED_LEN);
 		volname[NAMED_LEN] = '\0';
 
@@ -366,7 +366,7 @@ sdbc_header()
 			hflags |= HEADERS_OUT;
 
 	if (linesout)
-		printf("\n");
+		(void) printf("\n");
 
 	/* first line header */
 	if (! (dflags & SUMMARY) && dflags != FLAGS) {
@@ -683,7 +683,7 @@ sdbc_getvalues(sdbcstat_t *sdbcstat, sdbcvals_t *vals, int flags)
 	vals->total_writes = vals->cache_write + vals->disk_write;
 
 	vals->destaged =
-		FBA_SIZE(sdbc_getdelta(sdbcstat, SDBC_CDKSTAT_DESTAGED));
+	    FBA_SIZE(sdbc_getdelta(sdbcstat, SDBC_CDKSTAT_DESTAGED));
 
 	if (vals->cache_write == 0)
 		vals->write_hit = 0.0;

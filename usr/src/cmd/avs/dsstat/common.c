@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,10 +84,10 @@ kstat_retrieve(kstat_ctl_t *kc, kstat_t *ksp)
 		return (NULL);
 
 	rval = (kstat_t *)calloc(1, sizeof (*ksp));
-	memcpy(rval, ksp, sizeof (*ksp));
+	(void) memcpy(rval, ksp, sizeof (*ksp));
 
 	rval->ks_data = (void *) calloc(1, ksp->ks_data_size);
-	memcpy(rval->ks_data, ksp->ks_data,
+	(void) memcpy(rval->ks_data, ksp->ks_data,
 	    sizeof (kstat_named_t) * ksp->ks_ndata);
 
 	/* special handling for variable length string KSTAT_DATA_STRING */
@@ -101,7 +101,7 @@ kstat_retrieve(kstat_ctl_t *kc, kstat_t *ksp)
 			(void) sigaction(SIGSEGV, NULL, &segv_act);
 			(void) signal(SIGSEGV, sig_handler);
 
-			strncpy(end, KSTAT_NAMED_STR_PTR(knp),
+			(void) strncpy(end, KSTAT_NAMED_STR_PTR(knp),
 			    KSTAT_NAMED_STR_BUFLEN(knp));
 			KSTAT_NAMED_STR_PTR(knp) = end;
 			end += KSTAT_NAMED_STR_BUFLEN(knp);

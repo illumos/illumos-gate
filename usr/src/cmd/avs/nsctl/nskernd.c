@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,7 +92,7 @@ static int delay_time = 30;
 static void
 usage(void)
 {
-	fprintf(stderr, gettext("usage: nskernd\n"));
+	(void) fprintf(stderr, gettext("usage: nskernd\n"));
 	exit(255);
 }
 
@@ -111,14 +112,14 @@ sighand(int sig)
 int
 nthread_inc(void)
 {
-	mutex_lock(&thr_mutex);
+	(void) mutex_lock(&thr_mutex);
 	if (exiting) {
 		/* cannot enter kernel as nskernd is being shutdown - exit */
-		mutex_unlock(&thr_mutex);
+		(void) mutex_unlock(&thr_mutex);
 		return (0);
 	}
 	nthreads++;
-	mutex_unlock(&thr_mutex);
+	(void) mutex_unlock(&thr_mutex);
 	return (1);
 }
 
@@ -126,9 +127,9 @@ nthread_inc(void)
 void
 nthread_dec(void)
 {
-	mutex_lock(&thr_mutex);
+	(void) mutex_lock(&thr_mutex);
 	nthreads--;
-	mutex_unlock(&thr_mutex);
+	(void) mutex_unlock(&thr_mutex);
 }
 
 
@@ -141,19 +142,19 @@ canshutdown(void)
 	int rc = 1;
 	time_t	start_delay;
 
-	mutex_lock(&thr_mutex);
+	(void) mutex_lock(&thr_mutex);
 	if (nthreads > 0) {
 		if (display_msg) {
-			fprintf(stderr,
+			(void) fprintf(stderr,
 			    gettext("nskernd: unable to shutdown: "
 			    "%d kernel threads in use\n"), nthreads);
 		}
 		start_delay = time(0);
 		while (nthreads > 0 && (time(0) - start_delay) < delay_time) {
-			mutex_unlock(&thr_mutex);
-			sleep(1);
-			mutex_lock(&thr_mutex);
-			fprintf(stderr,
+			(void) mutex_unlock(&thr_mutex);
+			(void) sleep(1);
+			(void) mutex_lock(&thr_mutex);
+			(void) fprintf(stderr,
 			    gettext("nskernd:   delay shutdown: "
 			    "%d kernel threads in use\n"), nthreads);
 		}
@@ -166,7 +167,7 @@ canshutdown(void)
 		/* flag shutdown in progress */
 		exiting = 1;
 	}
-	mutex_unlock(&thr_mutex);
+	(void) mutex_unlock(&thr_mutex);
 
 	return (rc);
 }
@@ -194,7 +195,7 @@ shutdown(void)
 	rc = ioctl(nsctl_fd, NSCIOC_NSKERND, &data);
 	if (rc < 0) {
 		if (errno != EINTR || !sigterm) {
-			fprintf(stderr,
+			(void) fprintf(stderr,
 			    gettext("nskernd: NSKERND_STOP failed\n"));
 		}
 	}
@@ -224,13 +225,13 @@ _newlwp(void *arg)
 		/* increase the scheduling priority of this LWP */
 
 		bzero(&pcinfo, sizeof (pcinfo));
-		strcpy(pcinfo.pc_clname, allow_rt ? "RT" : "TS");
+		(void) strcpy(pcinfo.pc_clname, allow_rt ? "RT" : "TS");
 
 		if (priocntl(0, 0, PC_GETCID, (char *)&pcinfo) < 0) {
-			fprintf(stderr,
-				gettext(
-				"nskernd: priocntl(PC_GETCID) failed: %s\n"),
-				strerror(errno));
+			(void) fprintf(stderr,
+			    gettext(
+			    "nskernd: priocntl(PC_GETCID) failed: %s\n"),
+			    strerror(errno));
 			goto pri_done;
 		}
 
@@ -253,10 +254,10 @@ _newlwp(void *arg)
 
 		if (priocntl(P_LWPID, P_MYID,
 		    PC_SETPARMS, (char *)&pcparms) < 0) {
-			fprintf(stderr,
-				gettext(
-				"nskernd: priocntl(PC_SETPARMS) failed: %s\n"),
-				strerror(errno));
+			(void) fprintf(stderr,
+			    gettext(
+			    "nskernd: priocntl(PC_SETPARMS) failed: %s\n"),
+			    strerror(errno));
 		}
 	}
 
@@ -284,8 +285,8 @@ newlwp(struct nskernd *req)
 	nskp = malloc(sizeof (*nskp));
 	if (!nskp) {
 #ifdef DEBUG
-		fprintf(stderr, gettext("nskernd: malloc(%d) failed\n"),
-			sizeof (*nskp));
+		(void) fprintf(stderr, gettext("nskernd: malloc(%d) failed\n"),
+		    sizeof (*nskp));
 #endif
 		req->data1 = (uint64_t)ENOMEM;
 		return;
@@ -300,8 +301,9 @@ newlwp(struct nskernd *req)
 	if (rc != 0) {
 		/* thr_create failed */
 #ifdef DEBUG
-		fprintf(stderr, gettext("nskernd: thr_create failed: %s\n"),
-			strerror(errno));
+		(void) fprintf(stderr,
+		    gettext("nskernd: thr_create failed: %s\n"),
+		    strerror(errno));
 #endif
 		req->data1 = (uint64_t)errno;
 		free(nskp);
@@ -331,47 +333,47 @@ log_iibmp_err(char *set, int flags)
 		return (EINVAL);
 	}
 
-	mutex_lock(&cfg_mutex);
+	(void) mutex_lock(&cfg_mutex);
 	cfg = cfg_open("");
 	if (!cfg) {
-		mutex_unlock(&cfg_mutex);
+		(void) mutex_unlock(&cfg_mutex);
 		return (ENXIO);
 	}
 
 	if (!cfg_lock(cfg, CFG_WRLOCK)) {
 
-		mutex_unlock(&cfg_mutex);
+		(void) mutex_unlock(&cfg_mutex);
 		cfg_close(cfg);
 
 		pid = fork();
 
 		if (pid == -1) {
-			fprintf(stderr, gettext(
+			(void) fprintf(stderr, gettext(
 			    "nskernd: Error forking\n"));
 			return (errno);
 		} else if (pid > 0) {
-			fprintf(stdout, gettext(
+			(void) fprintf(stdout, gettext(
 			    "nskernd: Attempting deferred bitmap error\n"));
 			return (0);
 		}
 
-		mutex_lock(&cfg_mutex);
+		(void) mutex_lock(&cfg_mutex);
 		cfg = cfg_open("");
 		if (!cfg) {
-			mutex_unlock(&cfg_mutex);
-			fprintf(stderr, gettext(
+			(void) mutex_unlock(&cfg_mutex);
+			(void) fprintf(stderr, gettext(
 			    "nskernd: Failed cfg_open, deferred bitmap\n"));
 			return (ENXIO);
 		}
 
 		/* Sooner or later, this lock will be free */
 		while (!cfg_lock(cfg, CFG_WRLOCK))
-			sleep(2);
+			(void) sleep(2);
 	}
 
 	/* find the proper set number */
 	for (setno = 1; !found; setno++) {
-		snprintf(key, CFG_MAX_KEY, "ii.set%d", setno);
+		(void) snprintf(key, CFG_MAX_KEY, "ii.set%d", setno);
 		if (cfg_get_cstring(cfg, key, buf, CFG_MAX_BUF) < 0) {
 			break;
 		}
@@ -393,7 +395,7 @@ log_iibmp_err(char *set, int flags)
 
 	if (found) {
 		/* were there flags in the options field already? */
-		snprintf(newflags, CFG_MAX_BUF, "%s=0x%x",
+		(void) snprintf(newflags, CFG_MAX_BUF, "%s=0x%x",
 		    NSKERN_II_BMP_OPTION, flags);
 		if (opt && strcmp(opt, "-") != 0) {
 			bzero(newflags, CFG_MAX_BUF);
@@ -401,29 +403,29 @@ log_iibmp_err(char *set, int flags)
 			while (opt) {
 				if (strncmp(opt, NSKERN_II_BMP_OPTION,
 				    strlen(NSKERN_II_BMP_OPTION)) != 0) {
-					strcat(newflags, ";");
-					strcat(newflags, opt);
+					(void) strcat(newflags, ";");
+					(void) strcat(newflags, opt);
 				}
 			}
 		}
-		snprintf(key, CFG_MAX_KEY, "ii.set%d", setno);
-		snprintf(outbuf, CFG_MAX_BUF, "%s %s %s %s %s %s %s %s",
-			mst, shd, bmp, mode, ovr, cnode, newflags, grp);
+		(void) snprintf(key, CFG_MAX_KEY, "ii.set%d", setno);
+		(void) snprintf(outbuf, CFG_MAX_BUF, "%s %s %s %s %s %s %s %s",
+		    mst, shd, bmp, mode, ovr, cnode, newflags, grp);
 		if (cfg_put_cstring(cfg, key, outbuf, CFG_MAX_BUF) < 0) {
-			printf("Failed to put [%s]\n", outbuf);
+			(void) printf("Failed to put [%s]\n", outbuf);
 			rc = ENXIO;
 		} else {
-			cfg_commit(cfg);
+			(void) cfg_commit(cfg);
 			rc = 0;
 		}
 	} else {
-		fprintf(stderr, gettext(
-			    "nskernd: Failed deferred bitmap [%s]\n"), set);
+		(void) fprintf(stderr, gettext(
+		    "nskernd: Failed deferred bitmap [%s]\n"), set);
 		rc = EINVAL;
 	}
 	cfg_unlock(cfg);
 	cfg_close(cfg);
-	mutex_unlock(&cfg_mutex);
+	(void) mutex_unlock(&cfg_mutex);
 
 	/*
 	 * if we are the fork'ed client, just exit, if parent just return
@@ -463,11 +465,12 @@ _dolock(void *arg)
 	bcopy(arg, &nsk, sizeof (nsk));
 	free(arg);
 
-	mutex_lock(&cfg_mutex);
+	(void) mutex_lock(&cfg_mutex);
 	cfg = cfg_open("");
 	if (cfg == NULL) {
 #ifdef DEBUG
-		fprintf(stderr, gettext("nskernd: cfg_open failed: %s\n"),
+		(void) fprintf(stderr,
+		    gettext("nskernd: cfg_open failed: %s\n"),
 		    strerror(errno));
 #endif
 		rc = ENXIO;
@@ -485,7 +488,7 @@ _dolock(void *arg)
 			locked = 1;
 		} else {
 #ifdef DEBUG
-			fprintf(stderr,
+			(void) fprintf(stderr,
 			    gettext("nskernd: cfg_lock failed: %s\n"),
 			    strerror(errno));
 #endif
@@ -512,7 +515,7 @@ _dolock(void *arg)
 		cfg_close(cfg);
 		cfg = NULL;
 	}
-	mutex_unlock(&cfg_mutex);
+	(void) mutex_unlock(&cfg_mutex);
 
 	return (NULL);
 }
@@ -535,7 +538,8 @@ dolock(struct nskernd *req)
 	nskp = malloc(sizeof (*nskp));
 	if (!nskp) {
 #ifdef DEBUG
-		fprintf(stderr, gettext("nskernd:dolock: malloc(%d) failed\n"),
+		(void) fprintf(stderr,
+		    gettext("nskernd:dolock: malloc(%d) failed\n"),
 		    sizeof (*nskp));
 #endif
 		req->data1 = (uint64_t)ENOMEM;
@@ -551,7 +555,8 @@ dolock(struct nskernd *req)
 	if (rc != 0) {
 		/* thr_create failed */
 #ifdef DEBUG
-		fprintf(stderr, gettext("nskernd: thr_create failed: %s\n"),
+		(void) fprintf(stderr,
+		    gettext("nskernd: thr_create failed: %s\n"),
 		    strerror(errno));
 #endif
 		req->data1 = (uint64_t)errno;
@@ -655,11 +660,11 @@ get_bsize(uint64_t raw_fd, uint64_t *size, int *partitionp, char *path)
 #endif	/* DKIOCPARTITION */
 		}
 
-		close(fd);
+		(void) close(fd);
 		return;
 	}
 
-	close(fd);
+	(void) close(fd);
 
 	*partitionp = (int)dki_info.dki_partition;
 
@@ -689,7 +694,7 @@ iscluster(void)
 		return (FALSE);
 	}
 
-	fprintf(stderr, "%s\n",
+	(void) fprintf(stderr, "%s\n",
 	    gettext("nskernd: unable to ascertain environment"));
 	exit(1);
 	/* NOTREACHED */
@@ -728,12 +733,12 @@ main(int argc, char *argv[])
 
 	rc = nsc_check_release(BUILD_REV_STR, nskernd_rel_map, &reqd);
 	if (rc < 0) {
-		fprintf(stderr,
+		(void) fprintf(stderr,
 		    gettext("nskernd: unable to determine the current "
 		    "Solaris release: %s\n"), strerror(errno));
 		exit(1);
 	} else if (rc == FALSE) {
-		fprintf(stderr,
+		(void) fprintf(stderr,
 		    gettext("nskernd: incorrect Solaris release "
 		    "(requires %s)\n"), reqd);
 		exit(1);
@@ -767,14 +772,14 @@ main(int argc, char *argv[])
 	}
 
 	if (chroot(dir) < 0) {
-		fprintf(stderr, gettext("nskernd: chroot failed: %s\n"),
-			strerror(errno));
+		(void) fprintf(stderr, gettext("nskernd: chroot failed: %s\n"),
+		    strerror(errno));
 		exit(1);
 	}
 
 	if (chdir(dir) < 0) {
-		fprintf(stderr, gettext("nskernd: chdir failed: %s\n"),
-			strerror(errno));
+		(void) fprintf(stderr, gettext("nskernd: chdir failed: %s\n"),
+		    strerror(errno));
 		exit(1);
 	}
 
@@ -788,7 +793,8 @@ main(int argc, char *argv[])
 	 * child just before it enters its service loop.
 	 */
 	if (pipe(syncpipe) < 0) {
-		fprintf(stderr, gettext("nskernd: cannot create pipe: %s\n"),
+		(void) fprintf(stderr,
+		    gettext("nskernd: cannot create pipe: %s\n"),
 		    strerror(errno));
 		exit(1);
 	}
@@ -810,8 +816,8 @@ main(int argc, char *argv[])
 		n = read(syncpipe[0], &c, 1);
 		exit((n <= 0) ? 1 : 0);
 	} else if (rc < 0) {
-		fprintf(stderr, gettext("nskernd: cannot fork: %s\n"),
-			strerror(errno));
+		(void) fprintf(stderr, gettext("nskernd: cannot fork: %s\n"),
+		    strerror(errno));
 		exit(1);
 	}
 
@@ -830,7 +836,7 @@ main(int argc, char *argv[])
 	(void) dup(0);
 	(void) close(0);
 
-	setpgrp();
+	(void) setpgrp();
 
 	/*
 	 * Ignore all signals apart from SIGTERM.
@@ -848,10 +854,10 @@ main(int argc, char *argv[])
 	rl.rlim_cur = RLIM_INFINITY;
 	rl.rlim_max = RLIM_INFINITY;
 	if (setrlimit(RLIMIT_NOFILE, &rl) < 0) {
-		fprintf(stderr,
+		(void) fprintf(stderr,
 		    gettext("nskernd: could not increase RLIMIT_NOFILE: %s\n"),
 		    strerror(errno));
-		fprintf(stderr,
+		(void) fprintf(stderr,
 		    gettext("nskernd: the maximum number of nsctl open "
 		    "devices may be reduced\n"));
 	}
@@ -862,7 +868,8 @@ main(int argc, char *argv[])
 
 	nsctl_fd = open(rdev, O_RDONLY);
 	if (nsctl_fd < 0) {
-		fprintf(stderr, gettext("nskernd: unable to open %s\n"), rdev);
+		(void) fprintf(stderr, gettext("nskernd: unable to open %s\n"),
+		    rdev);
 		exit(1);
 	}
 
@@ -883,7 +890,7 @@ main(int argc, char *argv[])
 				sigterm = 0;
 			}
 
-			fprintf(stderr,
+			(void) fprintf(stderr,
 			    gettext("nskernd: NSCIOC_NSKERND failed: %s\n"),
 			    strerror(errno));
 			continue;
@@ -922,11 +929,11 @@ main(int argc, char *argv[])
 		switch (data.command) {
 		case NSKERND_START:	/* (re)start completion */
 			if (rc == 1) {
-				fprintf(stderr,
+				(void) fprintf(stderr,
 				    gettext("nskernd: already started\n"));
 				run = 0;
 			} else if (rc == 2) {
-				fprintf(stderr,
+				(void) fprintf(stderr,
 				    gettext("nskernd: stopped by kernel\n"));
 				run = 0;
 			}
@@ -979,7 +986,7 @@ main(int argc, char *argv[])
 			break;
 
 		default:
-			fprintf(stderr,
+			(void) fprintf(stderr,
 				gettext("nskernd: unknown command %d"),
 				data.command);
 			data.command = NSKERND_WAIT;

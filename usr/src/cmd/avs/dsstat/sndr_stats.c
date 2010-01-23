@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -261,7 +261,7 @@ sndr_update(kstat_ctl_t *kc)
 		/*
 		 * Set kstat
 		 */
-		strncpy(kname, cur->pre_set->ks_name, KSTAT_STRLEN);
+		(void) strncpy(kname, cur->pre_set->ks_name, KSTAT_STRLEN);
 		kname[KSTAT_STRLEN] = '\0';
 
 		kinst = cur->pre_set->ks_instance;
@@ -348,8 +348,8 @@ sndr_report()
 
 	if (padsz) {
 		char fmt[20];
-		sprintf(fmt, "%%%ds", padsz);
-		sprintf(pad, fmt, " ");
+		(void) sprintf(fmt, "%%%ds", padsz);
+		(void) sprintf(pad, fmt, " ");
 	}
 
 	for (cur = sndr_top; cur != NULL; ) { /*CSTYLED */
@@ -364,11 +364,11 @@ sndr_report()
 
 			/* notify user of set being disabled */
 			c = kstat_value(cur->pre_set, RDC_IKSTAT_SECFILE);
-			strncpy(vn, c, NSC_MAXPATH);
+			(void) strncpy(vn, c, NSC_MAXPATH);
 			vn[NSC_MAXPATH] = '\0';
 
-			printf(DATA_C16, vn);
-			printf(" %s\n", RDC_DISABLED);
+			(void) printf(DATA_C16, vn);
+			(void) printf(" %s\n", RDC_DISABLED);
 
 			next = sndr_del_stat(cur);
 
@@ -396,12 +396,12 @@ sndr_report()
 			char vstat[STAT_HDR_SIZE];
 
 			getType(cur->cur_set, &c[0]);
-			sprintf(vtype, DATA_C2, c);
-			strcat(data, vtype);
+			(void) sprintf(vtype, DATA_C2, c);
+			(void) strcat(data, vtype);
 
 			getStat(cur->cur_set, &c[0]);
-			sprintf(vstat, DATA_C2, c);
-			strcat(data, vstat);
+			(void) sprintf(vstat, DATA_C2, c);
+			(void) strcat(data, vstat);
 		}
 
 		/* Async. queue statistics */
@@ -410,16 +410,17 @@ sndr_report()
 			char qtype[STAT_HDR_SIZE];
 
 			getQueue(cur->cur_set, &c[0]);
-			sprintf(qtype, DATA_C2, c);
-			strcat(data, qtype);
+			(void) sprintf(qtype, DATA_C2, c);
+			(void) strcat(data, qtype);
 		}
 
 		/* Calculate sync needed percentages */
 		if (dflags & PCTS) {
 			char snpct[10];
 
-			sprintf(snpct, DATA_F62, getSyncNeeded(cur->cur_set));
-			strcat(data, snpct);
+			(void) sprintf(snpct, DATA_F62,
+			    getSyncNeeded(cur->cur_set));
+			(void) strcat(data, snpct);
 		}
 
 		/* Output */
@@ -442,13 +443,13 @@ sndr_report()
 			if (strlen(c) >= NAMED_LEN) {
 				c += strlen(c) - NAMED_LEN;
 			}
-			strncpy(vn, c, NAMED_LEN);
+			(void) strncpy(vn, c, NAMED_LEN);
 			vn[NAMED_LEN] = '\0';
 
 			header();
-			printf(DATA_C16, vn);
-			printf("%s", data);
-			printf(ROLE_INF_FMT, RDC_SECONDARY);
+			(void) printf(DATA_C16, vn);
+			(void) printf("%s", data);
+			(void) printf(ROLE_INF_FMT, RDC_SECONDARY);
 
 			/* Async. queue statistics */
 			if (dflags & ASYNC_QUEUE)
@@ -456,10 +457,10 @@ sndr_report()
 
 			io_report(cur->cur_sec, cur->pre_sec,
 			    sdbc_getstat(vn));
-			printf("\n");
+			(void) printf("\n");
 
 			if (first) {
-				strcpy(data, strlen(pad) > 0 ? pad : "");
+				(void) strcpy(data, strlen(pad) > 0 ? pad : "");
 				first = 0;
 			}
 		}
@@ -474,13 +475,13 @@ sndr_report()
 			if (strlen(c) >= NAMED_LEN) {
 				c += strlen(c) - NAMED_LEN;
 			}
-			strncpy(vn, c, NAMED_LEN);
+			(void) strncpy(vn, c, NAMED_LEN);
 			vn[NAMED_LEN] = '\0';
 
 			header();
-			printf(DATA_C16, vn);
-			printf("%s", data);
-			printf(ROLE_INF_FMT, RDC_BITMAP);
+			(void) printf(DATA_C16, vn);
+			(void) printf("%s", data);
+			(void) printf(ROLE_INF_FMT, RDC_BITMAP);
 
 			/* Async. queue statistics */
 			if (dflags & ASYNC_QUEUE)
@@ -488,10 +489,10 @@ sndr_report()
 
 			io_report(cur->cur_bmp, cur->pre_bmp,
 			    sdbc_getstat(vn));
-			printf("\n");
+			(void) printf("\n");
 
 			if (first) {
-				strcpy(data, strlen(pad) > 0 ? pad : "");
+				(void) strcpy(data, strlen(pad) > 0 ? pad : "");
 				first = 0;
 			}
 		}
@@ -829,23 +830,23 @@ printQueueStats(int first, kstat_t *cur_set)
 
 	if (! first) {
 		/* Filler for async. queue fields */
-		printf(TPS_HDR_FMT, NO_INFO);
-		printf(KPS_HDR_FMT, NO_INFO);
-		printf(TPS_HDR_FMT, NO_INFO);
-		printf(KPS_HDR_FMT, NO_INFO);
+		(void) printf(TPS_HDR_FMT, NO_INFO);
+		(void) printf(KPS_HDR_FMT, NO_INFO);
+		(void) printf(TPS_HDR_FMT, NO_INFO);
+		(void) printf(KPS_HDR_FMT, NO_INFO);
 
 		return;
 	}
 
 	val = (uint32_t *)kstat_value(cur_set, RDC_IKSTAT_ASYNC_ITEMS);
-	printf(TPS_INF_FMT, *val);
+	(void) printf(TPS_INF_FMT, *val);
 
 	val = (uint32_t *)kstat_value(cur_set, RDC_IKSTAT_ASYNC_BLOCKS);
-	printf(KPS_INF_FMT, (float)(*val / 2));
+	(void) printf(KPS_INF_FMT, (float)(*val / 2));
 
 	val = (uint32_t *)kstat_value(cur_set, RDC_IKSTAT_ASYNC_ITEM_HWM);
-	printf(TPS_INF_FMT, *val);
+	(void) printf(TPS_INF_FMT, *val);
 
 	val = (uint32_t *)kstat_value(cur_set, RDC_IKSTAT_ASYNC_BLOCK_HWM);
-	printf(KPS_INF_FMT, (float)(*val / 2));
+	(void) printf(KPS_INF_FMT, (float)(*val / 2));
 }

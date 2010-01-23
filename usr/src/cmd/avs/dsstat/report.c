@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -190,17 +190,19 @@ io_report(kstat_t *cur_kstat, kstat_t *pre_kstat, sdbcstat_t *sdbcstat)
 	if (dflags & SUMMARY) {
 		if ((mode & MULTI) && (mode & SDBC)) {
 			if (sdbcstat) {
-				printf(KPS_INF_FMT, (float)vals.total_cache);
-				printf(KPS_INF_FMT, (float)vals.total_disk);
+				(void) printf(KPS_INF_FMT,
+				    (float)vals.total_cache);
+				(void) printf(KPS_INF_FMT,
+				    (float)vals.total_disk);
 			} else {
-				printf(DATA_C6, NO_INFO);
-				printf(KPS_INF_FMT, rd_kb + wr_kb);
+				(void) printf(DATA_C6, NO_INFO);
+				(void) printf(KPS_INF_FMT, rd_kb + wr_kb);
 			}
 		} else
-			printf(KPS_INF_FMT, rd_kb + wr_kb);
+			(void) printf(KPS_INF_FMT, rd_kb + wr_kb);
 
-		printf(TPS_INF_FMT, (uint32_t)(rd_cnt + wr_cnt));
-		printf(SVT_INF_FMT, rtm);
+		(void) printf(TPS_INF_FMT, (uint32_t)(rd_cnt + wr_cnt));
+		(void) printf(SVT_INF_FMT, rtm);
 
 		goto done;
 	}
@@ -208,37 +210,41 @@ io_report(kstat_t *cur_kstat, kstat_t *pre_kstat, sdbcstat_t *sdbcstat)
 	if (dflags & READ) {
 		if ((mode & MULTI) && (mode & SDBC)) {
 			if (sdbcstat) {
-				printf(KPS_INF_FMT, (float)vals.cache_read);
-				printf(KPS_INF_FMT, (float)vals.disk_read);
+				(void) printf(KPS_INF_FMT,
+				    (float)vals.cache_read);
+				(void) printf(KPS_INF_FMT,
+				    (float)vals.disk_read);
 			} else {
-				printf(DATA_C6, NO_INFO);
-				printf(KPS_INF_FMT, rd_kb);
+				(void) printf(DATA_C6, NO_INFO);
+				(void) printf(KPS_INF_FMT, rd_kb);
 			}
 
 		} else
-			printf(KPS_INF_FMT, rd_kb);
+			(void) printf(KPS_INF_FMT, rd_kb);
 
-		printf(TPS_INF_FMT, (uint32_t)rd_cnt);
+		(void) printf(TPS_INF_FMT, (uint32_t)rd_cnt);
 	}
 
 	if (dflags & WRITE) {
 		if ((mode & MULTI) && (mode & SDBC)) {
 			if (sdbcstat) {
-				printf(KPS_INF_FMT, (float)vals.cache_write);
-				printf(KPS_INF_FMT, (float)vals.disk_write);
+				(void) printf(KPS_INF_FMT,
+				    (float)vals.cache_write);
+				(void) printf(KPS_INF_FMT,
+				    (float)vals.disk_write);
 			} else {
-				printf(DATA_C6, NO_INFO);
-				printf(KPS_INF_FMT, wr_kb);
+				(void) printf(DATA_C6, NO_INFO);
+				(void) printf(KPS_INF_FMT, wr_kb);
 			}
 
 		} else
-			printf(KPS_INF_FMT, wr_kb);
+			(void) printf(KPS_INF_FMT, wr_kb);
 
-		printf(TPS_INF_FMT, (uint32_t)wr_cnt);
+		(void) printf(TPS_INF_FMT, (uint32_t)wr_cnt);
 	}
 
 	if (dflags & TIMING) {
-		printf(SVT_INF_FMT, rtm);
+		(void) printf(SVT_INF_FMT, rtm);
 	}
 
 done:
@@ -275,41 +281,41 @@ cd_report(sdbcstat_t *sdbcstat)
 
 	/* Output */
 	if (rflags & MULTI) {
-		printf(VOL_HDR_FMT, "");
+		(void) printf(VOL_HDR_FMT, "");
 
 		if (dflags & FLAGS) {
-			printf(STAT_HDR_FMT, "");
-			printf(STAT_HDR_FMT, "");
+			(void) printf(STAT_HDR_FMT, "");
+			(void) printf(STAT_HDR_FMT, "");
 		}
 
 		if (dflags & PCTS)
-			printf(PCT_HDR_FMT, "");
+			(void) printf(PCT_HDR_FMT, "");
 
 		if (dflags & SUMMARY) {
-			printf(KPS_INF_FMT, (float)vals.total_cache);
-			printf(DATA_C4, NO_INFO);
-			printf(DATA_C4, NO_INFO);
-			printf("\n");
+			(void) printf(KPS_INF_FMT, (float)vals.total_cache);
+			(void) printf(DATA_C4, NO_INFO);
+			(void) printf(DATA_C4, NO_INFO);
+			(void) printf("\n");
 			linesout++;
 			return;
 		}
 
 		if (dflags & READ) {
-			printf(KPS_INF_FMT, (float)vals.cache_read);
-			printf(DATA_C4, NO_INFO);
+			(void) printf(KPS_INF_FMT, (float)vals.cache_read);
+			(void) printf(DATA_C4, NO_INFO);
 		}
 
 		if (dflags & WRITE) {
-			printf(KPS_INF_FMT, (float)vals.cache_write);
-			printf(DATA_C4, NO_INFO);
+			(void) printf(KPS_INF_FMT, (float)vals.cache_write);
+			(void) printf(DATA_C4, NO_INFO);
 		}
 
 		if (dflags & TIMING) {
-			printf(DATA_C4, NO_INFO);
+			(void) printf(DATA_C4, NO_INFO);
 		}
 
 		linesout++;
-		printf("\n");
+		(void) printf("\n");
 		return;
 	}
 
@@ -319,7 +325,7 @@ cd_report(sdbcstat_t *sdbcstat)
 		(void) printf(HIT_INF_FMT, vals.cache_hit);
 
 		linesout++;
-		printf("\n");
+		(void) printf("\n");
 		return;
 	}
 
@@ -342,7 +348,7 @@ cd_report(sdbcstat_t *sdbcstat)
 		(void) printf(DATA_I32, vals.write_cancellations);
 
 	linesout++;
-	printf("\n");
+	(void) printf("\n");
 }
 
 /*
@@ -370,64 +376,64 @@ header()
 	if (linesout)
 		(void) printf("\n");
 
-	printf(VOL_HDR_FMT, SET_HDR_TXT);
+	(void) printf(VOL_HDR_FMT, SET_HDR_TXT);
 
 	if (dflags & FLAGS) {
-		printf(STAT_HDR_FMT, TYPE_HDR_TXT);
-		printf(STAT_HDR_FMT, STAT_HDR_TXT);
+		(void) printf(STAT_HDR_FMT, TYPE_HDR_TXT);
+		(void) printf(STAT_HDR_FMT, STAT_HDR_TXT);
 	}
 
 	if (dflags & ASYNC_QUEUE)
-		printf(STAT_HDR_FMT, QUEUE_HDR_TXT);
+		(void) printf(STAT_HDR_FMT, QUEUE_HDR_TXT);
 
 	if (dflags & PCTS)
-		printf(PCT_HDR_FMT, PCT_HDR_TXT);
+		(void) printf(PCT_HDR_FMT, PCT_HDR_TXT);
 
-	printf(ROLE_HDR_FMT, ROLE_HDR_TXT);
+	(void) printf(ROLE_HDR_FMT, ROLE_HDR_TXT);
 
 	if (dflags & ASYNC_QUEUE) {
-		printf(TPS_HDR_FMT, QUEUE_ITEMS_TXT);
-		printf(KPS_HDR_FMT, QUEUE_KBYTES_TXT);
-		printf(TPS_HDR_FMT, QUEUE_ITEMS_HW_TXT);
-		printf(KPS_HDR_FMT, QUEUE_KBYTES_HW_TXT);
+		(void) printf(TPS_HDR_FMT, QUEUE_ITEMS_TXT);
+		(void) printf(KPS_HDR_FMT, QUEUE_KBYTES_TXT);
+		(void) printf(TPS_HDR_FMT, QUEUE_ITEMS_HW_TXT);
+		(void) printf(KPS_HDR_FMT, QUEUE_KBYTES_HW_TXT);
 	}
 
 	if (dflags & SUMMARY) {
 		if ((mode & MULTI) && (mode & SDBC)) {
-			printf(KPS_HDR_FMT, CKPS_HDR_TXT);
-			printf(KPS_HDR_FMT, DKPS_HDR_TXT);
+			(void) printf(KPS_HDR_FMT, CKPS_HDR_TXT);
+			(void) printf(KPS_HDR_FMT, DKPS_HDR_TXT);
 		} else
-			printf(KPS_HDR_FMT, KPS_HDR_TXT);
-		printf(TPS_HDR_FMT, TPS_HDR_TXT);
-		printf(SVT_HDR_FMT, SVT_HDR_TXT);
+			(void) printf(KPS_HDR_FMT, KPS_HDR_TXT);
+		(void) printf(TPS_HDR_FMT, TPS_HDR_TXT);
+		(void) printf(SVT_HDR_FMT, SVT_HDR_TXT);
 
-		printf("\n");
+		(void) printf("\n");
 
 		return;
 	}
 
 	if (dflags & READ) {
 		if ((mode & MULTI) && (mode & SDBC)) {
-			printf(KPS_HDR_FMT, CRKPS_HDR_TXT);
-			printf(KPS_HDR_FMT, DRKPS_HDR_TXT);
+			(void) printf(KPS_HDR_FMT, CRKPS_HDR_TXT);
+			(void) printf(KPS_HDR_FMT, DRKPS_HDR_TXT);
 		} else
-			printf(KPS_HDR_FMT, RKPS_HDR_TXT);
+			(void) printf(KPS_HDR_FMT, RKPS_HDR_TXT);
 
-		printf(TPS_HDR_FMT, RTPS_HDR_TXT);
+		(void) printf(TPS_HDR_FMT, RTPS_HDR_TXT);
 	}
 
 	if (dflags & WRITE) {
 		if ((mode & MULTI) && (mode & SDBC)) {
-			printf(KPS_HDR_FMT, CWKPS_HDR_TXT);
-			printf(KPS_HDR_FMT, DWKPS_HDR_TXT);
+			(void) printf(KPS_HDR_FMT, CWKPS_HDR_TXT);
+			(void) printf(KPS_HDR_FMT, DWKPS_HDR_TXT);
 		} else
-			printf(KPS_HDR_FMT, WKPS_HDR_TXT);
+			(void) printf(KPS_HDR_FMT, WKPS_HDR_TXT);
 
-		printf(TPS_HDR_FMT, WTPS_HDR_TXT);
+		(void) printf(TPS_HDR_FMT, WTPS_HDR_TXT);
 	}
 
 	if (dflags & TIMING)
-		printf(SVT_HDR_FMT, SVT_HDR_TXT);
+		(void) printf(SVT_HDR_FMT, SVT_HDR_TXT);
 
 	(void) printf("\n");
 }

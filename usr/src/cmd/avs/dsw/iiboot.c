@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -114,7 +114,7 @@ sigchld(int sig)
 {
 	int wait_loc = 0;
 
-	wait(&wait_loc);
+	(void) wait(&wait_loc);
 	if (WIFEXITED(wait_loc) && (WEXITSTATUS(wait_loc) == 0)) {
 		;
 		/*EMPTY*/
@@ -186,7 +186,8 @@ main(int argc, char *argv[])
 		bzero(&ii_suspend, sizeof (dsw_ioctl_t));
 		ii_suspend.status = spcs_s_ucreate();
 		ii_suspend.flags = CV_IS_CLUSTER;
-		strncpy(ii_suspend.shadow_vol, cfg_cluster_tag, DSW_NAMELEN);
+		(void) strncpy(ii_suspend.shadow_vol, cfg_cluster_tag,
+		    DSW_NAMELEN);
 		rc = ioctl(ioctl_fd, flag, &ii_suspend);
 		if ((rc) && (errno != DSW_ECNOTFOUND)) {
 			spcs_log("ii", &ii_suspend.status,
@@ -242,12 +243,12 @@ main(int argc, char *argv[])
 			}
 			if (i != pairs)
 				continue;
-			memmove(lp, lp + 1, j * sizeof (dsw_config_t));
+			(void) memmove(lp, lp + 1, j * sizeof (dsw_config_t));
 			args.list_used--;
 		}
 	}
 
-	sigset(SIGCHLD, sigchld);
+	(void) sigset(SIGCHLD, sigchld);
 	fork_cnt = fork_rc = 0;
 	for (i = 0; i < pairs; i++) {
 		ustatus = spcs_s_ucreate();
@@ -265,7 +266,7 @@ main(int argc, char *argv[])
 			/* back off on the max processes and try again */
 			--max_processes;
 			if (fork_cnt > 0) {
-				pause();
+				(void) pause();
 			}
 			pid = fork();
 		}
@@ -273,7 +274,7 @@ main(int argc, char *argv[])
 		if (pid > 0) {		/* this is parent process */
 			++fork_cnt;
 			while (fork_cnt > MAX_PROCESSES) {
-				pause();
+				(void) pause();
 			}
 			continue;
 		}
@@ -301,10 +302,10 @@ main(int argc, char *argv[])
 	 * Set rc for success
 	 */
 	while (fork_cnt > 0) {
-		alarm(60);		/* wake up in 60 secs just in case */
-		pause();
+		(void) alarm(60);	/* wake up in 60 secs just in case */
+		(void) pause();
 	}
-	alarm(0);
+	(void) alarm(0);
 
 	/* Disable duplicate shadows that were part of the implicit join */
 	if ((j = args.list_used) != 0) {
@@ -335,9 +336,9 @@ main(int argc, char *argv[])
 
 			/* Sooner or later, this lock will be free */
 			while (!cfg_lock(cfg, CFG_WRLOCK))
-				sleep(2);
+				(void) sleep(2);
 
-			snprintf(key, CFG_MAX_KEY, "ii.set%d", setno);
+			(void) snprintf(key, CFG_MAX_KEY, "ii.set%d", setno);
 			if (cfg_get_cstring(cfg, key, buf, CFG_MAX_BUF) < 0) {
 				cfg_close(cfg);
 				break;
@@ -394,7 +395,7 @@ main(int argc, char *argv[])
 			/*
 			 * Commit the delete
 			 */
-			cfg_commit(cfg);
+			(void) cfg_commit(cfg);
 			cfg_close(cfg);
 
 			/*
@@ -407,16 +408,16 @@ main(int argc, char *argv[])
 
 			/* Sooner or later, this lock will be free */
 			while (!cfg_lock(cfg, CFG_WRLOCK))
-				sleep(2);
+				(void) sleep(2);
 
 			/* Set cluster tag for Shadow volume */
-			cfg_vol_enable(cfg, shd, ctag, "ii");
+			(void) cfg_vol_enable(cfg, shd, ctag, "ii");
 
 
 			/*
 			 * Commit the delete
 			 */
-			cfg_commit(cfg);
+			(void) cfg_commit(cfg);
 			cfg_close(cfg);
 		    }
 		}
@@ -516,11 +517,11 @@ read_resume_cfg()
 			continue;
 		}
 
-		strncpy(p->master_vol, mst, DSW_NAMELEN);
-		strncpy(p->shadow_vol, shd, DSW_NAMELEN);
-		strncpy(p->bitmap_vol, bmp, DSW_NAMELEN);
+		(void) strncpy(p->master_vol, mst, DSW_NAMELEN);
+		(void) strncpy(p->shadow_vol, shd, DSW_NAMELEN);
+		(void) strncpy(p->bitmap_vol, bmp, DSW_NAMELEN);
 		if (ctag)
-			strncpy(p->cluster_tag, ctag, DSW_NAMELEN);
+			(void) strncpy(p->cluster_tag, ctag, DSW_NAMELEN);
 		free(buf);
 		++p;
 		++valid_sets;
