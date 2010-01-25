@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,6 +50,8 @@
 #include "gcpu.h"
 
 extern int x86gentopo_legacy;	/* x86 generic topology support */
+
+static uint_t gcpu_force_addr_in_payload = 0;
 
 /*
  * Clear to log telemetry found at initialization.  While processor docs
@@ -249,10 +251,10 @@ gcpu_disp_match(uint16_t code)
 	return (NULL);
 }
 
-static uint8_t
+static uint16_t
 bit_strip(uint16_t code, uint16_t mask, uint16_t shift)
 {
-	return ((uint8_t)(code & mask) >> shift);
+	return ((code & mask) >> shift);
 }
 
 #define	BIT_STRIP(code, name) \
@@ -353,10 +355,10 @@ enum gcpu_mn_namespace {
 };
 
 static const char *
-gcpu_mnemonic(const struct gcpu_mnexp *tbl, size_t tbl_sz, uint8_t val,
+gcpu_mnemonic(const struct gcpu_mnexp *tbl, size_t tbl_sz, uint16_t val,
     enum gcpu_mn_namespace nspace)
 {
-	if (val >= tbl_sz)
+	if (val >= tbl_sz || val > 0xff)
 		return (GCPU_MNEMONIC_UNDEF);	/* for all namespaces */
 
 	switch (nspace) {
@@ -574,12 +576,16 @@ gcpu_bleat(cmi_hdl_t hdl, gcpu_logout_t *gcl)
 		if (!(status & MSR_MC_STATUS_VAL))
 			continue;
 
+		/* Force ADDRV for AMD Family 0xf and above */
+		if (gcpu_force_addr_in_payload)
+			status = status | MSR_MC_STATUS_ADDRV;
+
 		switch (status & (MSR_MC_STATUS_ADDRV | MSR_MC_STATUS_MISCV)) {
 		case MSR_MC_STATUS_ADDRV | MSR_MC_STATUS_MISCV:
 			cmn_err(CE_WARN, "Bank %d (offset 0x%llx) "
 			    "STAT 0x%016llx ADDR 0x%016llx MISC 0x%016llx",
 			    i, IA32_MSR_MC(i, STATUS),
-			    (u_longlong_t)status,
+			    (u_longlong_t)gbl->gbl_status,
 			    (u_longlong_t)gbl->gbl_addr,
 			    (u_longlong_t)gbl->gbl_misc);
 			break;
@@ -588,7 +594,7 @@ gcpu_bleat(cmi_hdl_t hdl, gcpu_logout_t *gcl)
 			cmn_err(CE_WARN, "Bank %d (offset 0x%llx) "
 			    "STAT 0x%016llx ADDR 0x%016llx",
 			    i, IA32_MSR_MC(i, STATUS),
-			    (u_longlong_t)status,
+			    (u_longlong_t)gbl->gbl_status,
 			    (u_longlong_t)gbl->gbl_addr);
 			break;
 
@@ -596,7 +602,7 @@ gcpu_bleat(cmi_hdl_t hdl, gcpu_logout_t *gcl)
 			cmn_err(CE_WARN, "Bank %d (offset 0x%llx) "
 			    "STAT 0x%016llx MISC 0x%016llx",
 			    i, IA32_MSR_MC(i, STATUS),
-			    (u_longlong_t)status,
+			    (u_longlong_t)gbl->gbl_status,
 			    (u_longlong_t)gbl->gbl_misc);
 			break;
 
@@ -604,7 +610,7 @@ gcpu_bleat(cmi_hdl_t hdl, gcpu_logout_t *gcl)
 			cmn_err(CE_WARN, "Bank %d (offset 0x%llx) "
 			    "STAT 0x%016llx",
 			    i, IA32_MSR_MC(i, STATUS),
-			    (u_longlong_t)status);
+			    (u_longlong_t)gbl->gbl_status);
 			break;
 
 		}
@@ -778,10 +784,13 @@ gcpu_ereport_add_logout(nvlist_t *ereport, const gcpu_logout_t *gcl,
 	}
 
 	/*
-	 * MCi_ADDR info if requested and valid.
+	 * Add MCi_ADDR info if requested and valid. We force addition of
+	 * MCi_ADDR, even if its not valid on AMD family 0xf and above,
+	 * to aid in analysis of ereports, for WatchDog errors.
 	 */
 	if (members & FM_EREPORT_PAYLOAD_FLAG_MC_ADDR &&
-	    bstat & MSR_MC_STATUS_ADDRV) {
+	    ((bstat & MSR_MC_STATUS_ADDRV) ||
+	    gcpu_force_addr_in_payload)) {
 		fm_payload_set(ereport, FM_EREPORT_PAYLOAD_NAME_MC_ADDR,
 		    DATA_TYPE_UINT64, gbl->gbl_addr, NULL);
 	}
@@ -1024,6 +1033,7 @@ gcpu_mca_init(cmi_hdl_t hdl)
 	uint64_t cap;
 	uint_t vendor = cmi_hdl_vendor(hdl);
 	uint_t family = cmi_hdl_family(hdl);
+	uint_t rev = cmi_hdl_chiprev(hdl);
 	gcpu_mca_t *mca = &gcpu->gcpu_mca;
 	int mcg_ctl_present;
 	uint_t nbanks;
@@ -1035,9 +1045,12 @@ gcpu_mca_init(cmi_hdl_t hdl)
 	int mcg_ctl2_present;
 	uint32_t cmci_capable = 0;
 #endif
-
 	if (gcpu == NULL)
 		return;
+
+	/* We add MCi_ADDR always for AMD Family 0xf and above */
+	if (X86_CHIPFAM_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_B))
+		gcpu_force_addr_in_payload = 1;
 
 	/*
 	 * Protect from some silly /etc/system settings.
@@ -1284,9 +1297,11 @@ gcpu_mca_init(cmi_hdl_t hdl)
 		(void) cmi_hdl_rdmsr(hdl, IA32_MSR_MC(i, STATUS),
 		    &bcfgp->bios_bank_status);
 
-		if (bcfgp->bios_bank_status & MSR_MC_STATUS_ADDRV)
+		if ((bcfgp->bios_bank_status & MSR_MC_STATUS_ADDRV) ||
+		    gcpu_force_addr_in_payload) {
 			(void) cmi_hdl_rdmsr(hdl, IA32_MSR_MC(i, ADDR),
 			    &bcfgp->bios_bank_addr);
+		}
 
 		/*
 		 * In some old BIOS the status value after boot can indicate
@@ -1762,7 +1777,8 @@ retry:
 		addr = -1;
 		misc = 0;
 
-		if (status & MSR_MC_STATUS_ADDRV)
+		if ((status & MSR_MC_STATUS_ADDRV) ||
+		    gcpu_force_addr_in_payload)
 			(void) cmi_hdl_rdmsr(hdl, IA32_MSR_MC(i, ADDR), &addr);
 
 		if (status & MSR_MC_STATUS_MISCV)

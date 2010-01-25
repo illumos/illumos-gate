@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -476,7 +476,7 @@ extern "C" {
 	_X86_CHIPREV_FAMILY(x) == _X86_CHIPREV_FAMILY(mask) && \
 	((_X86_CHIPREV_REV(x) & _X86_CHIPREV_REV(mask)) != 0))
 
-/* True if x matches in vendor and family and rev is at least minx */
+/* True if x matches in vendor and family, and rev is at least minx */
 #define	X86_CHIPREV_ATLEAST(x, minx) \
 	(_X86_CHIPREV_VENDOR(x) == _X86_CHIPREV_VENDOR(minx) && \
 	_X86_CHIPREV_FAMILY(x) == _X86_CHIPREV_FAMILY(minx) && \
@@ -485,6 +485,11 @@ extern "C" {
 #define	_X86_CHIPREV_MKREV(vendor, family, rev) \
 	((uint32_t)(vendor) << _X86_CHIPREV_VENDOR_SHIFT | \
 	(family) << _X86_CHIPREV_FAMILY_SHIFT | (rev))
+
+/* True if x matches in vendor, and family is at least minx */
+#define	X86_CHIPFAM_ATLEAST(x, minx) \
+	(_X86_CHIPREV_VENDOR(x) == _X86_CHIPREV_VENDOR(minx) && \
+	_X86_CHIPREV_FAMILY(x) >= _X86_CHIPREV_FAMILY(minx))
 
 /* Revision default */
 #define	X86_CHIPREV_UNKNOWN	0x0
