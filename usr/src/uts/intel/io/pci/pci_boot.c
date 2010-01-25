@@ -237,7 +237,7 @@ pci_process_acpi_device(ACPI_HANDLE hdl, UINT32 level, void *ctx, void **rv)
 		 * may suffer failure as a result of the broken BIOS.
 		 */
 		if ((busnum < 0) || (busnum > pci_bios_maxbus)) {
-			cmn_err(CE_WARN,
+			dcmn_err(CE_NOTE,
 			    "pci_process_acpi_device: invalid _BBN 0x%x\n",
 			    busnum);
 			return (AE_CTRL_DEPTH);
