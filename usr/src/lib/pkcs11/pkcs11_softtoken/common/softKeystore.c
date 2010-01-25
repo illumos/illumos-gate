@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -592,7 +592,13 @@ soft_pack_object_size(soft_object_t *objp)
 			    ROUNDUP(((biginteger_t *)
 			    OBJ_PUB_DSA_VALUE(objp))->big_value_len, 8) +
 			    4 * sizeof (uint64_t));
-
+		case CKK_EC:
+			/*
+			 * ec_point_len + ec_point
+			 */
+			return (ROUNDUP(((biginteger_t *)
+			    OBJ_PUB_EC_POINT(objp))->big_value_len, 8) +
+			    sizeof (uint64_t));
 		case CKK_DH:
 			/*
 			 * prime_len + prime + base_len + base +
@@ -678,6 +684,14 @@ soft_pack_object_size(soft_object_t *objp)
 			    ROUNDUP(((biginteger_t *)
 			    OBJ_PRI_DH_VALUE(objp))->big_value_len, 8) +
 			    4 * sizeof (uint64_t));
+
+		case CKK_EC:
+			/*
+			 * value_len + value
+			 */
+			return (ROUNDUP(((biginteger_t *)
+			    OBJ_PRI_EC_VALUE(objp))->big_value_len, 8) +
+			    sizeof (uint64_t));
 
 		case CKK_X9_42_DH:
 			/*
@@ -834,6 +848,18 @@ soft_pack_object(soft_object_t *objp, uchar_t *buf)
 			    ((biginteger_t *)
 			    OBJ_PUB_DSA_VALUE(objp))->big_value_len);
 
+			break;
+		case CKK_EC:
+			/* point_len + point */
+			tmp_val = SWAP64((uint64_t)((biginteger_t *)
+			    OBJ_PUB_EC_POINT(objp))->big_value_len);
+			(void) memcpy(buf, (char *)&tmp_val, sizeof (uint64_t));
+			buf = buf + sizeof (uint64_t);
+
+			(void) memcpy(buf, (char *)((biginteger_t *)
+			    OBJ_PUB_EC_POINT(objp))->big_value,
+			    ((biginteger_t *)
+			    OBJ_PUB_EC_POINT(objp))->big_value_len);
 			break;
 
 		case CKK_DH:
@@ -1092,6 +1118,18 @@ soft_pack_object(soft_object_t *objp, uchar_t *buf)
 			    ((biginteger_t *)
 			    OBJ_PRI_DSA_VALUE(objp))->big_value_len);
 
+			break;
+		case CKK_EC:
+			/* value_len + value */
+			tmp_val = SWAP64((uint64_t)((biginteger_t *)
+			    OBJ_PRI_EC_VALUE(objp))->big_value_len);
+			(void) memcpy(buf, (char *)&tmp_val, sizeof (uint64_t));
+			buf = buf + sizeof (uint64_t);
+
+			(void) memcpy(buf, (char *)((biginteger_t *)
+			    OBJ_PRI_EC_VALUE(objp))->big_value,
+			    ((biginteger_t *)
+			    OBJ_PRI_EC_VALUE(objp))->big_value_len);
 			break;
 
 		case CKK_DH:
@@ -1423,6 +1461,15 @@ soft_unpack_object(soft_object_t *objp, uchar_t *buf)
 
 			break;
 
+		case CKK_EC:
+			/* ec_point */
+			if ((rv = soft_unpack_obj_attribute(buf, &value,
+			    NULL, &offset, B_FALSE)) != CKR_OK)
+				goto pri_cleanup;
+
+			copy_bigint_attr(&value, KEY_PUB_EC_POINT(pbk));
+			break;
+
 		case CKK_X9_42_DH:
 			/* prime */
 			if ((rv = soft_unpack_obj_attribute(buf, &prime,
@@ -1616,6 +1663,15 @@ soft_unpack_object(soft_object_t *objp, uchar_t *buf)
 
 			copy_bigint_attr(&value, KEY_PRI_DH_VALUE(pvk));
 
+			break;
+
+		case CKK_EC:
+			/* value */
+			if ((rv = soft_unpack_obj_attribute(buf, &value,
+			    NULL, &offset, B_FALSE)) != CKR_OK)
+				goto pri_cleanup;
+
+			copy_bigint_attr(&value, KEY_PRI_EC_VALUE(pvk));
 			break;
 
 		case CKK_X9_42_DH:
