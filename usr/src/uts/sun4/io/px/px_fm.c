@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -791,8 +791,8 @@ int
 px_err_pio_hdl_check(dev_info_t *dip, const void *handle, const void *arg1,
     const void *arg2)
 {
-	dev_info_t		*px_dip = PCIE_DIP2BUS(dip)->bus_rp_dip;
-	px_t			*px_p = INST_TO_STATE(ddi_get_instance(px_dip));
+	dev_info_t		*px_dip;
+	px_t			*px_p;
 	pci_ranges_t		*ranges_p;
 	int			range_len;
 	ddi_acc_handle_t	ap = (ddi_acc_handle_t)handle;
@@ -802,6 +802,19 @@ px_err_pio_hdl_check(dev_info_t *dip, const void *handle, const void *arg1,
 	uint16_t		bdf = *(uint16_t *)arg2;
 	uint64_t		base_addr, range_addr;
 	uint_t			size;
+
+	/*
+	 * Find the correct px dip.  On system with a real Root Port, it's the
+	 * node above the root port.  On systems without a real Root Port the px
+	 * dip is the bus_rp_dip.
+	 */
+	px_dip = PCIE_DIP2BUS(dip)->bus_rp_dip;
+
+	if (!PCIE_IS_RC(PCIE_DIP2BUS(px_dip)))
+		px_dip = ddi_get_parent(px_dip);
+
+	ASSERT(PCIE_IS_RC(PCIE_DIP2BUS(px_dip)));
+	px_p = INST_TO_STATE(ddi_get_instance(px_dip));
 
 	DBG(DBG_ERR_INTR, dip, "Check PIO Hdl: dip 0x%x addr 0x%x bdf=0x%x\n",
 	    dip, fault_addr, bdf);
