@@ -8985,8 +8985,10 @@ tcp_reass_timer(void *arg)
 	if (tcp->tcp_reass_head == NULL)
 		return;
 	ASSERT(tcp->tcp_reass_tail != NULL);
-	tcp_sack_remove(tcp->tcp_sack_list, TCP_REASS_END(tcp->tcp_reass_tail),
-	    &tcp->tcp_num_sack_blk);
+	if (tcp->tcp_snd_sack_ok && tcp->tcp_num_sack_blk > 0) {
+		tcp_sack_remove(tcp->tcp_sack_list,
+		    TCP_REASS_END(tcp->tcp_reass_tail), &tcp->tcp_num_sack_blk);
+	}
 	tcp_close_mpp(&tcp->tcp_reass_head);
 	tcp->tcp_reass_tail = NULL;
 }
