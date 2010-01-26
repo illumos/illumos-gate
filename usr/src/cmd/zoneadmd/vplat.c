@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -815,7 +815,7 @@ static int
 dofsck(zlog_t *zlogp, const char *fstype, const char *rawdev)
 {
 	char cmdbuf[MAXPATHLEN];
-	char *argv[4];
+	char *argv[5];
 	int status;
 
 	/*
@@ -836,9 +836,10 @@ dofsck(zlog_t *zlogp, const char *fstype, const char *rawdev)
 		return (0);
 
 	argv[0] = "fsck";
-	argv[1] = "-m";
-	argv[2] = (char *)rawdev;
-	argv[3] = NULL;
+	argv[1] = "-o";
+	argv[2] = "p";
+	argv[3] = (char *)rawdev;
+	argv[4] = NULL;
 
 	status = forkexec(zlogp, cmdbuf, argv);
 	if (status == 0 || status == -1)
