@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -361,7 +361,7 @@ pfc_dma_map_in(dev_info_t *ap, fco_handle_t rp, fc_ci_t *cp)
 	}
 
 	FC_DEBUG1(9, CE_CONT, "pfc_dma_map_in: returning devaddr %x\n",
-		c.dmac_address);
+	    c.dmac_address);
 
 	cp->nresults = fc_int2cell(1);
 	fc_result(cp, 0) = fc_uint32_t2cell(c.dmac_address);	/* XXX size */
@@ -518,7 +518,7 @@ pfc_dma_cleanup(dev_info_t *ap, fco_handle_t rp, fc_ci_t *cp)
 	while ((ip = next_dma_resource(rp)) != NULL) {
 
 		FC_DEBUG2(9, CE_CONT, "pfc_dma_cleanup: virt %x len %x\n",
-			ip->fc_dma_virt, ip->fc_dma_len);
+		    ip->fc_dma_virt, ip->fc_dma_len);
 
 		/*
 		 * Free the dma handle
@@ -1397,16 +1397,13 @@ pci_alloc_resource(dev_info_t *dip, pci_regspec_t phys_spec)
 		/* allocate memory space from the allocator */
 
 		if (ndi_ra_alloc(ddi_get_parent(dip),
-			&request, &answer, &alen,
-			NDI_RA_TYPE_MEM, NDI_RA_PASS)
-					!= NDI_SUCCESS) {
+		    &request, &answer, &alen, NDI_RA_TYPE_MEM,
+		    NDI_RA_PASS) != NDI_SUCCESS) {
 			pci_unmap_phys(&h, &config);
 			return (1);
 		}
 		FC_DEBUG3(1, CE_CONT, "ROM addr = [0x%x.%x] len [0x%x]\n",
-			HIADDR(answer),
-			LOADDR(answer),
-			alen);
+		    HIADDR(answer), LOADDR(answer), alen);
 
 		/* program the low word */
 
@@ -1435,12 +1432,10 @@ pci_alloc_resource(dev_info_t *dip, pci_regspec_t phys_spec)
 			/* allocate memory space from the allocator */
 
 			if (ndi_ra_alloc(ddi_get_parent(dip),
-				&request, &answer, &alen,
-				NDI_RA_TYPE_MEM, NDI_RA_PASS)
-						!= NDI_SUCCESS) {
+			    &request, &answer, &alen, NDI_RA_TYPE_MEM,
+			    NDI_RA_PASS) != NDI_SUCCESS) {
 				pci_unmap_phys(&h, &config);
-				if (request.ra_flags ==
-				    NDI_RA_ALLOC_SPECIFIED)
+				if (request.ra_flags == NDI_RA_ALLOC_SPECIFIED)
 					cmn_err(CE_WARN, "Unable to allocate "
 					    "non relocatable address 0x%p\n",
 					    (void *) request.ra_addr);
@@ -1467,7 +1462,7 @@ pci_alloc_resource(dev_info_t *dip, pci_regspec_t phys_spec)
 			 * assignments only.
 			 */
 			phys_spec.pci_phys_hi ^= PCI_ADDR_MEM64 ^
-							PCI_ADDR_MEM32;
+			    PCI_ADDR_MEM32;
 
 			break;
 
@@ -1487,12 +1482,10 @@ pci_alloc_resource(dev_info_t *dip, pci_regspec_t phys_spec)
 			/* allocate memory space from the allocator */
 
 			if (ndi_ra_alloc(ddi_get_parent(dip),
-				&request, &answer, &alen,
-				NDI_RA_TYPE_MEM, NDI_RA_PASS)
-						!= NDI_SUCCESS) {
+			    &request, &answer, &alen, NDI_RA_TYPE_MEM,
+			    NDI_RA_PASS) != NDI_SUCCESS) {
 				pci_unmap_phys(&h, &config);
-				if (request.ra_flags ==
-				    NDI_RA_ALLOC_SPECIFIED)
+				if (request.ra_flags == NDI_RA_ALLOC_SPECIFIED)
 					cmn_err(CE_WARN, "Unable to allocate "
 					    "non relocatable address 0x%p\n",
 					    (void *) request.ra_addr);
@@ -1528,9 +1521,8 @@ pci_alloc_resource(dev_info_t *dip, pci_regspec_t phys_spec)
 			/* allocate I/O space from the allocator */
 
 			if (ndi_ra_alloc(ddi_get_parent(dip),
-				&request, &answer, &alen,
-				NDI_RA_TYPE_IO, NDI_RA_PASS)
-						!= NDI_SUCCESS) {
+			    &request, &answer, &alen, NDI_RA_TYPE_IO,
+			    NDI_RA_PASS) != NDI_SUCCESS) {
 				pci_unmap_phys(&h, &config);
 				if (request.ra_flags ==
 				    NDI_RA_ALLOC_SPECIFIED)
@@ -1755,7 +1747,7 @@ pci_unmap_phys(ddi_acc_handle_t *handlep, pci_regspec_t *ph)
 	mr.map_vers = DDI_MAP_VERSION;
 
 	(void) ddi_map(hp->ah_dip, &mr, hp->ah_offset,
-		hp->ah_len, &hp->ah_addr);
+	    hp->ah_len, &hp->ah_addr);
 
 	impl_acc_hdl_free(*handlep);
 
@@ -1772,7 +1764,7 @@ pfc_update_assigned_prop(dev_info_t *dip, pci_regspec_t *newone)
 	uint_t		status;
 
 	status = ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-		"assigned-addresses", (caddr_t)&assigned, &alen);
+	    "assigned-addresses", (caddr_t)&assigned, &alen);
 	switch (status) {
 		case DDI_PROP_SUCCESS:
 		break;
@@ -1780,8 +1772,8 @@ pfc_update_assigned_prop(dev_info_t *dip, pci_regspec_t *newone)
 			return (1);
 		default:
 			(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip,
-			"assigned-addresses", (int *)newone,
-				sizeof (*newone)/sizeof (int));
+			    "assigned-addresses", (int *)newone,
+			    sizeof (*newone)/sizeof (int));
 			return (0);
 	}
 
@@ -1800,10 +1792,11 @@ pfc_update_assigned_prop(dev_info_t *dip, pci_regspec_t *newone)
 	 * Write out the new "assigned-addresses" spec
 	 */
 	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip,
-		"assigned-addresses", (int *)newreg,
-		(alen + sizeof (*newone))/sizeof (int));
+	    "assigned-addresses", (int *)newreg,
+	    (alen + sizeof (*newone))/sizeof (int));
 
 	kmem_free((caddr_t)newreg, alen+sizeof (*newone));
+	kmem_free(assigned, alen);
 
 	return (0);
 }
@@ -1815,7 +1808,7 @@ pfc_remove_assigned_prop(dev_info_t *dip, pci_regspec_t *oldone)
 	uint_t		status;
 
 	status = ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-		"assigned-addresses", (caddr_t)&assigned, &alen);
+	    "assigned-addresses", (caddr_t)&assigned, &alen);
 	switch (status) {
 		case DDI_PROP_SUCCESS:
 		break;
@@ -1860,6 +1853,8 @@ pfc_remove_assigned_prop(dev_info_t *dip, pci_regspec_t *oldone)
 		}
 	}
 
+	kmem_free(assigned, alen);
+
 	return (0);
 }
 /*
@@ -1887,12 +1882,11 @@ fcpci_indirect_map(dev_info_t *dip)
 	int rc = DDI_FAILURE;
 
 	if (ddi_getprop(DDI_DEV_T_ANY, ddi_get_parent(dip), 0,
-			PCICFG_DEV_CONF_MAP_PROP, DDI_FAILURE) != DDI_FAILURE)
+	    PCICFG_DEV_CONF_MAP_PROP, DDI_FAILURE) != DDI_FAILURE)
 		rc = DDI_SUCCESS;
 	else
 		if (ddi_getprop(DDI_DEV_T_ANY, ddi_get_parent(dip),
-				0, PCICFG_BUS_CONF_MAP_PROP,
-				DDI_FAILURE) != DDI_FAILURE)
+		    0, PCICFG_BUS_CONF_MAP_PROP, DDI_FAILURE) != DDI_FAILURE)
 			rc = DDI_SUCCESS;
 
 	return (rc);
