@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <string.h>
 #include <strings.h>
@@ -153,13 +151,13 @@ opl_rc_node_create(topo_mod_t *mp, tnode_t *parent, di_node_t dnode, int inst)
 			topo_mod_dprintf(mp,
 			    "dev:///%s fmri creation failed.\n",
 			    dnpath);
-			topo_mod_seterrno(mp, err);
+			(void) topo_mod_seterrno(mp, err);
 			di_devfs_path_free(dnpath);
 			return (NULL);
 		}
 		if (topo_node_asru_set(rcn, fmri, 0, &err) < 0) {
 			topo_mod_dprintf(mp, "topo_node_asru_set failed\n");
-			topo_mod_seterrno(mp, err);
+			(void) topo_mod_seterrno(mp, err);
 			nvlist_free(fmri);
 			di_devfs_path_free(dnpath);
 			return (NULL);
@@ -177,13 +175,13 @@ opl_rc_node_create(topo_mod_t *mp, tnode_t *parent, di_node_t dnode, int inst)
 	if (topo_pgroup_create(rcn, &io_pgroup, &err) < 0) {
 		topo_mod_dprintf(mp, "topo_pgroup_create failed\n");
 		di_devfs_path_free(dnpath);
-		topo_mod_seterrno(mp, err);
+		(void) topo_mod_seterrno(mp, err);
 		return (NULL);
 	}
 	if (topo_pgroup_create(rcn, &pci_pgroup, &err) < 0) {
 		topo_mod_dprintf(mp, "topo_pgroup_create failed\n");
 		di_devfs_path_free(dnpath);
-		topo_mod_seterrno(mp, err);
+		(void) topo_mod_seterrno(mp, err);
 		return (NULL);
 	}
 	/* Add the devfs path property */
@@ -192,7 +190,7 @@ opl_rc_node_create(topo_mod_t *mp, tnode_t *parent, di_node_t dnode, int inst)
 		    TOPO_PROP_IMMUTABLE, dnpath, &err) != 0) {
 			topo_mod_dprintf(mp, "Failed to set DEV property\n");
 			di_devfs_path_free(dnpath);
-			topo_mod_seterrno(mp, err);
+			(void) topo_mod_seterrno(mp, err);
 		}
 		di_devfs_path_free(dnpath);
 	}
@@ -226,7 +224,7 @@ opl_rc_node_create(topo_mod_t *mp, tnode_t *parent, di_node_t dnode, int inst)
 	}
 
 	/* Make room for children */
-	topo_node_range_create(mp, rcn, PCIEX_BUS, 0, OPL_BUS_MAX);
+	(void) topo_node_range_create(mp, rcn, PCIEX_BUS, 0, OPL_BUS_MAX);
 	return (rcn);
 }
 
@@ -249,7 +247,7 @@ opl_hb_node_create(topo_mod_t *mp, tnode_t *parent, int inst)
 	(void) topo_node_label_set(hbn, NULL, &err);
 
 	/* Make room for children */
-	topo_node_range_create(mp, hbn, PCIEX_ROOT, 0, OPL_RC_MAX);
+	(void) topo_node_range_create(mp, hbn, PCIEX_ROOT, 0, OPL_RC_MAX);
 
 	return (hbn);
 }

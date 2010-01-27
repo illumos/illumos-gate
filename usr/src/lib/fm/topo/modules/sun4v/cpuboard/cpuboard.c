@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -174,7 +174,7 @@ cpuboard_get_pri_info(topo_mod_t *mod, cpuboard_contents_t cpubs[])
 				continue;
 			}
 			if ((id >= CPUBOARD_MAX) || cpubs[id].present) {
-				topo_mod_seterrno(mod, EMOD_NVL_INVAL);
+				(void) topo_mod_seterrno(mod, EMOD_NVL_INVAL);
 				topo_mod_dprintf(mod, "cpuboard_get_pri_info: "
 				    "id %llx out of range. (%d: %s)\n",
 				    id, errno, strerror(errno));

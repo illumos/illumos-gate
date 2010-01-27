@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "availdevs.h"
 #include <libzfs.h>
@@ -58,7 +57,7 @@ set_uint64_prop(xmlNodePtr node, const char *attr, uint64_t value)
 {
 	static char tmp[64];
 	(void) snprintf(tmp, sizeof (tmp), "%llu", value);
-	xmlSetProp(node, (xmlChar *)attr, (xmlChar *)tmp);
+	(void) xmlSetProp(node, (xmlChar *)attr, (xmlChar *)tmp);
 }
 
 static int
@@ -69,19 +68,19 @@ add_disk_to_xml(dmgt_disk_t *dp, void *data)
 
 	xmlNodePtr disk = xmlNewChild(
 	    available, NULL, (xmlChar *)ELEMENT_DISK, NULL);
-	xmlSetProp(disk,
+	(void) xmlSetProp(disk,
 	    (xmlChar *)ATTR_DISK_NAME, (xmlChar *)dp->name);
 
 	set_uint64_prop(disk, ATTR_DISK_SIZE, dp->size);
 
-	xmlSetProp(disk, (xmlChar *)ATTR_DISK_INUSE, (xmlChar *)
+	(void) xmlSetProp(disk, (xmlChar *)ATTR_DISK_INUSE, (xmlChar *)
 	    (dp->in_use ? VAL_ATTR_TRUE : VAL_ATTR_FALSE));
 
 	if (dp->aliases != NULL) {
 		for (i = 0; dp->aliases[i] != NULL; i++) {
 			xmlNodePtr alias = xmlNewChild(
 			    disk, NULL, (xmlChar *)ELEMENT_ALIAS, NULL);
-			xmlSetProp(alias,
+			(void) xmlSetProp(alias,
 			    (xmlChar *)ATTR_ALIAS_NAME,
 			    (xmlChar *)dp->aliases[i]);
 		}
@@ -92,20 +91,21 @@ add_disk_to_xml(dmgt_disk_t *dp, void *data)
 			dmgt_slice_t *sp = dp->slices[i];
 			xmlNodePtr slice = xmlNewChild(
 			    disk, NULL, (xmlChar *)ELEMENT_SLICE, NULL);
-			xmlSetProp(slice,
+			(void) xmlSetProp(slice,
 			    (xmlChar *)ATTR_SLICE_NAME, (xmlChar *)sp->name);
 
 			set_uint64_prop(slice, ATTR_SLICE_SIZE, sp->size);
 			set_uint64_prop(slice, ATTR_SLICE_START, sp->start);
 
 			if (sp->used_name != NULL) {
-				xmlSetProp(slice,
+				(void) xmlSetProp(slice,
 				    (xmlChar *)ATTR_SLICE_USED_NAME,
 				    (xmlChar *)sp->used_name);
 			}
 
 			if (sp->used_by != NULL) {
-				xmlSetProp(slice, (xmlChar *)ATTR_SLICE_USED_BY,
+				(void) xmlSetProp(slice,
+				    (xmlChar *)ATTR_SLICE_USED_BY,
 				    (xmlChar *)sp->used_by);
 			}
 		}
@@ -139,7 +139,7 @@ add_pool_to_xml(nvlist_t *config, void *data)
 	}
 
 	pool = xmlNewChild(importable, NULL, (xmlChar *)ELEMENT_POOL, NULL);
-	xmlSetProp(pool, (xmlChar *)ATTR_POOL_NAME, (xmlChar *)name);
+	(void) xmlSetProp(pool, (xmlChar *)ATTR_POOL_NAME, (xmlChar *)name);
 
 	set_uint64_prop(pool, ATTR_POOL_ID, guid);
 	set_uint64_prop(pool, ATTR_POOL_VERSION, version);
@@ -159,16 +159,16 @@ add_pool_to_xml(nvlist_t *config, void *data)
 	set_uint64_prop(pool, ATTR_POOL_CHECKSUM_ERRORS,
 	    vs->vs_checksum_errors);
 
-	xmlSetProp(pool, (xmlChar *)ATTR_DEVICE_STATE,
+	(void) xmlSetProp(pool, (xmlChar *)ATTR_DEVICE_STATE,
 	    (xmlChar *)zjni_vdev_state_to_str(vs->vs_state));
 
-	xmlSetProp(pool, (xmlChar *)ATTR_DEVICE_STATUS,
+	(void) xmlSetProp(pool, (xmlChar *)ATTR_DEVICE_STATUS,
 	    (xmlChar *)zjni_vdev_aux_to_str(vs->vs_aux));
 
-	xmlSetProp(pool, (xmlChar *)ATTR_POOL_STATE,
+	(void) xmlSetProp(pool, (xmlChar *)ATTR_POOL_STATE,
 	    (xmlChar *)zjni_pool_state_to_str(state));
 
-	xmlSetProp(pool, (xmlChar *)ATTR_POOL_STATUS, (xmlChar *)
+	(void) xmlSetProp(pool, (xmlChar *)ATTR_POOL_STATUS, (xmlChar *)
 	    zjni_pool_status_to_str(zpool_import_status(config, &c)));
 
 	return (0);
@@ -183,7 +183,7 @@ create_doc(void)
 	/* Create the root node */
 	xmlNodePtr root = xmlNewDocNode(
 	    doc, NULL, (xmlChar *)ELEMENT_ROOT, NULL);
-	xmlAddChild((xmlNodePtr) doc, (xmlNodePtr)root);
+	(void) xmlAddChild((xmlNodePtr) doc, (xmlNodePtr)root);
 
 	return (doc);
 }
@@ -251,7 +251,7 @@ main(int argc, char **argv)
 
 		if (!error) {
 			/* Print out XML */
-			xmlDocFormatDump(stdout, doc, 1);
+			(void) xmlDocFormatDump(stdout, doc, 1);
 		}
 
 		xmlFreeDoc(doc);

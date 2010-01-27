@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -254,7 +254,7 @@ pi_enum_update(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 	if (result != 0) {
 		topo_mod_dprintf(mod, "%s node_0x%llx failed to set ASRU\n",
 		    _enum_name, (uint64_t)mde_node);
-		topo_mod_seterrno(mod, err);
+		(void) topo_mod_seterrno(mod, err);
 		goto out;
 	}
 
@@ -266,7 +266,7 @@ pi_enum_update(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 		topo_mod_dprintf(mod, "%s node_0x%llx "
 		    "topo_pgroup_create for io pgroup failed\n",
 		    _enum_name, (uint64_t)mde_node);
-		topo_mod_seterrno(mod, err);
+		(void) topo_mod_seterrno(mod, err);
 		goto out;
 	}
 
@@ -276,7 +276,7 @@ pi_enum_update(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 			topo_mod_dprintf(mod, "%s node_0x%llx "
 			    "topo_pgroup_create for pci pgroup failed\n",
 			    _enum_name, (uint64_t)mde_node);
-			topo_mod_seterrno(mod, err);
+			(void) topo_mod_seterrno(mod, err);
 			goto out;
 		}
 	}
@@ -287,7 +287,7 @@ pi_enum_update(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 		topo_mod_dprintf(mod,
 		    "%s node_0x%llx failed to set DEV property\n",
 		    _enum_name, (uint64_t)mde_node);
-		topo_mod_seterrno(mod, err);
+		(void) topo_mod_seterrno(mod, err);
 		goto out;
 	}
 
@@ -298,7 +298,7 @@ pi_enum_update(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 		topo_mod_dprintf(mod,
 		    "%s node_0x%llx failed to set DEVTYPE property\n",
 		    _enum_name, (uint64_t)mde_node);
-		topo_mod_seterrno(mod, err);
+		(void) topo_mod_seterrno(mod, err);
 		goto out;
 	}
 
@@ -344,7 +344,7 @@ pi_enum_update(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 		topo_mod_dprintf(mod,
 		    "%s node_0x%llx failed to set DRIVER property\n",
 		    _enum_name, (uint64_t)mde_node);
-		topo_mod_seterrno(mod, err);
+		(void) topo_mod_seterrno(mod, err);
 		goto out;
 	}
 
@@ -353,7 +353,7 @@ pi_enum_update(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 		topo_mod_dprintf(mod,
 		    "%s node_0x%llx failed to create module fmri\n",
 		    _enum_name, (uint64_t)mde_node);
-		topo_mod_seterrno(mod, err);
+		(void) topo_mod_seterrno(mod, err);
 		result = -1;
 		goto out;
 	}
@@ -364,7 +364,7 @@ pi_enum_update(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 		topo_mod_dprintf(mod,
 		    "%s node_0x%llx failed to set MODULE property\n",
 		    _enum_name, (uint64_t)mde_node);
-		topo_mod_seterrno(mod, err);
+		(void) topo_mod_seterrno(mod, err);
 		goto out;
 	}
 
@@ -376,7 +376,7 @@ pi_enum_update(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 			topo_mod_dprintf(mod,
 			    "%s node_0x%llx failed to set EXCAP property\n",
 			    _enum_name, (uint64_t)mde_node);
-			topo_mod_seterrno(mod, err);
+			(void) topo_mod_seterrno(mod, err);
 			goto out;
 		}
 
@@ -387,7 +387,7 @@ pi_enum_update(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 			topo_mod_dprintf(mod,
 			    "%s node_0x%llx failed to set BDF property\n",
 			    _enum_name, (uint64_t)mde_node);
-			topo_mod_seterrno(mod, err);
+			(void) topo_mod_seterrno(mod, err);
 			goto out;
 		}
 

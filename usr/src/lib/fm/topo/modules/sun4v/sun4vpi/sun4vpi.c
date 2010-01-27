@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Main entry points for SUN4V Platform Independent topology enumerator
@@ -71,7 +69,7 @@ _topo_init(topo_mod_t *mod, topo_version_t version)
 	topo_mod_dprintf(mod, "sun4vpi module initializing.\n");
 
 	if (version != TOPO_VERSION) {
-		topo_mod_seterrno(mod, EMOD_VER_NEW);
+		(void) topo_mod_seterrno(mod, EMOD_VER_NEW);
 		topo_mod_dprintf(mod, "incompatible topo version %d\n",
 		    version);
 		return;
@@ -136,7 +134,7 @@ pi_enum(topo_mod_t *mod, tnode_t *t_parent, const char *name,
 	/* Initialize the walker */
 	result = pi_walker_init(mod);
 	if (result != 0) {
-		topo_mod_seterrno(mod, EMOD_UKNOWN_ENUM);
+		(void) topo_mod_seterrno(mod, EMOD_UKNOWN_ENUM);
 		return (-1);
 	}
 
@@ -146,7 +144,7 @@ pi_enum(topo_mod_t *mod, tnode_t *t_parent, const char *name,
 	if (result != 0) {
 		pi_walker_fini(mod);
 		topo_mod_dprintf(mod, "could not open LDOM PRI\n");
-		topo_mod_seterrno(mod, EMOD_UKNOWN_ENUM);
+		(void) topo_mod_seterrno(mod, EMOD_UKNOWN_ENUM);
 		return (-1);
 	}
 	pi.mod = mod;
@@ -161,7 +159,7 @@ pi_enum(topo_mod_t *mod, tnode_t *t_parent, const char *name,
 		/* No nodes were found */
 		pi_walker_fini(mod);
 		topo_mod_dprintf(mod, "could not find components in PRI\n");
-		topo_mod_seterrno(mod, EMOD_UKNOWN_ENUM);
+		(void) topo_mod_seterrno(mod, EMOD_UKNOWN_ENUM);
 		return (-1);
 	}
 
@@ -237,7 +235,7 @@ pi_enum_components(pi_enum_t *pip, tnode_t *t_parent, const char *hc_name,
 	if (t_parent == NULL) {
 		topo_mod_dprintf(mod,
 		    "walker failed to create node range with a NULL parent\n");
-		topo_mod_seterrno(mod, EMOD_METHOD_INVAL);
+		(void) topo_mod_seterrno(mod, EMOD_METHOD_INVAL);
 		return (-1);
 	}
 
@@ -248,7 +246,7 @@ pi_enum_components(pi_enum_t *pip, tnode_t *t_parent, const char *hc_name,
 		 * This components node has no children and is not a topo
 		 * node itself, so set partial enumeration and return.
 		 */
-		topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM);
+		(void) topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM);
 		return (0);
 	}
 	topo_mod_dprintf(mod, "node_0x%llx has %d children\n",
@@ -259,7 +257,7 @@ pi_enum_components(pi_enum_t *pip, tnode_t *t_parent, const char *hc_name,
 	arcp = topo_mod_zalloc(mod, arcsize);
 	if (arcp == NULL) {
 		topo_mod_dprintf(mod, "out of memory\n");
-		topo_mod_seterrno(mod, EMOD_NOMEM);
+		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
 		return (-1);
 	}
 	num_arcs = md_get_prop_arcs(mdp, mde_node, MD_STR_FWD, arcp,
@@ -274,7 +272,7 @@ pi_enum_components(pi_enum_t *pip, tnode_t *t_parent, const char *hc_name,
 		result = pi_walker(pip, t_parent, hc_name,
 		    arcp[arcidx], component_cookie, arc_cookie);
 		if (result != 0) {
-			topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM);
+			(void) topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM);
 		}
 	}
 	topo_mod_free(mod, arcp, arcsize);

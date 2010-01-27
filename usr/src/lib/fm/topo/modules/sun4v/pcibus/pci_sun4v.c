@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -255,7 +255,7 @@ platform_pci_fru_cb(topo_mod_t *mod, tnode_t *node, void *private)
 		}
 		if (rc != 0) {
 			result = TOPO_WALK_TERMINATE;
-			topo_mod_seterrno(mod, err);
+			(void) topo_mod_seterrno(mod, err);
 		}
 	}
 	topo_mod_strfree(mod, location);

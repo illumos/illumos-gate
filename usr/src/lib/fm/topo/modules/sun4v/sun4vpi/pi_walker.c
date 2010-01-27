@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -226,7 +226,7 @@ pi_walker(pi_enum_t *pip, tnode_t *t_parent, const char *hc_name,
 	if (result != 0) {
 		pi_walkerlist_destroy(mod);
 		topo_mod_dprintf(mod, "walker could not add to list\n");
-		topo_mod_seterrno(mod, EMOD_UKNOWN_ENUM);
+		(void) topo_mod_seterrno(mod, EMOD_UKNOWN_ENUM);
 		return (result);
 	}
 
@@ -249,7 +249,7 @@ pi_walker(pi_enum_t *pip, tnode_t *t_parent, const char *hc_name,
 			topo_mod_dprintf(mod,
 			    "walker could not register enumerator for type "
 			    "%s\n", hc_name);
-			topo_mod_seterrno(mod, EMOD_UKNOWN_ENUM);
+			(void) topo_mod_seterrno(mod, EMOD_UKNOWN_ENUM);
 			return (-1);
 		}
 		topo_mod_dprintf(mod,
@@ -271,7 +271,7 @@ pi_walker(pi_enum_t *pip, tnode_t *t_parent, const char *hc_name,
 			 * Store that we have a partial enumeration and return
 			 * that we have encountered an error.
 			 */
-			topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM);
+			(void) topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM);
 			result = -1;
 		break;
 
@@ -284,7 +284,7 @@ pi_walker(pi_enum_t *pip, tnode_t *t_parent, const char *hc_name,
 			topo_mod_dprintf(mod,
 			    "walker encountered invalid result: %d. "
 			    "Continuing\n", result);
-			topo_mod_seterrno(mod, EMOD_UKNOWN_ENUM);
+			(void) topo_mod_seterrno(mod, EMOD_UKNOWN_ENUM);
 			result = 0;
 		break;
 	}
@@ -351,7 +351,7 @@ pi_walker_node(md_t *mdp, mde_cookie_t parent_mde_node, mde_cookie_t mde_node,
 		 */
 		topo_mod_dprintf(mod, "walker skipping node_0x%llx: "
 		    "no instance\n", (uint64_t)mde_node);
-		topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM);
+		(void) topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM);
 		return (MDE_WALK_NEXT);
 	}
 
@@ -375,7 +375,7 @@ pi_walker_node(md_t *mdp, mde_cookie_t parent_mde_node, mde_cookie_t mde_node,
 		topo_mod_dprintf(mod, "no topo parent found for node_0x%llx\n",
 		    mde_node);
 		result = pi_walker_node_range(mod, mdp, NULL, mde_node);
-		topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM);
+		(void) topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM);
 
 		return (result);
 	}
@@ -395,7 +395,7 @@ pi_walker_node(md_t *mdp, mde_cookie_t parent_mde_node, mde_cookie_t mde_node,
 		 * node with a topology parent.  This will propgate the
 		 * creation error down this MDE branch.
 		 */
-		topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM);
+		(void) topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM);
 		return (result);
 	}
 
@@ -514,7 +514,7 @@ pi_walker_node_range(topo_mod_t *mod, md_t *mdp, tnode_t *t_parent,
 	arcp = topo_mod_zalloc(mod, arcsize);
 	if (arcp == NULL) {
 		topo_mod_dprintf(mod, "out of memory\n");
-		topo_mod_seterrno(mod, EMOD_NOMEM);
+		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
 		return (MDE_WALK_ERROR);
 	}
 	num_arcs = md_get_prop_arcs(mdp, mde_node, MD_STR_FWD, arcp, arcsize);
@@ -530,7 +530,7 @@ pi_walker_node_range(topo_mod_t *mod, md_t *mdp, tnode_t *t_parent,
 	result = topo_mod_nvalloc(mod, &typelist, NV_UNIQUE_NAME);
 	if (result != 0) {
 		topo_mod_free(mod, arcp, arcsize);
-		topo_mod_seterrno(mod, EMOD_NOMEM);
+		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
 		return (MDE_WALK_ERROR);
 	}
 
@@ -568,7 +568,7 @@ pi_walker_node_range(topo_mod_t *mod, md_t *mdp, tnode_t *t_parent,
 					nvlist_free(typelist);
 					topo_mod_strfree(mod, hc_name);
 					topo_mod_free(mod, arcp, arcsize);
-					topo_mod_seterrno(mod,
+					(void) topo_mod_seterrno(mod,
 					    EMOD_PARTIAL_ENUM);
 					return (MDE_WALK_ERROR);
 				}
@@ -698,7 +698,7 @@ pi_walkerlist_create(topo_mod_t *mod)
 	    sizeof (pi_walkernode_t), offsetof(pi_walkernode_t, walker_node),
 	    pi_walkerlist_compare, NULL);
 	if (walker_pool == NULL) {
-		topo_mod_seterrno(mod, EMOD_NOMEM);
+		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
 		return (-1);
 	}
 	walker_list = uu_list_create(walker_pool, NULL, 0);

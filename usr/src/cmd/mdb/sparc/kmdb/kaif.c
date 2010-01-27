@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The debugger/PROM interface
@@ -334,7 +333,8 @@ kaif_wapt_calc_mask(size_t len)
 	if (len == 8)
 		return (0xff);
 
-	for (pow = 0; len > 1; len /= 256, pow++);
+	for (pow = 0; len > 1; len /= 256, pow++)
+		;
 
 	return (~((1 << pow) - 1));
 }
@@ -878,13 +878,13 @@ kaif_mod_unloading(struct modctl *modp)
 void
 kaif_trap_set_debugger(void)
 {
-	set_tba(kaif_tba);
+	(void) set_tba((void *)kaif_tba);
 }
 
 void
 kaif_trap_set_saved(kaif_cpusave_t *save)
 {
-	set_tba((caddr_t)save->krs_gregs.kregs[KREG_TBA]);
+	(void) set_tba((void *)save->krs_gregs.kregs[KREG_TBA]);
 }
 
 static void
@@ -930,7 +930,7 @@ kaif_kernpanic(int cpuid)
 	 * saved when the debugger was initially entered.  It'll be saved in
 	 * the cpusave area for the current CPU.
 	 */
-	set_tba((caddr_t)kaif_cpusave[cpuid].krs_gregs.kregs[KREG_TBA]);
+	(void) set_tba((void *)kaif_cpusave[cpuid].krs_gregs.kregs[KREG_TBA]);
 
 	kmdb_kdi_kernpanic(&regs, kaif_cb_save.krs_gregs.kregs[KREG_TT]);
 }

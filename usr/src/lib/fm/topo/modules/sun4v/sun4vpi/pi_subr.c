@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,7 +90,7 @@ pi_find_mdenodes(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_start,
 	if (*nodes == NULL) {
 		/* We have no memory.  Set an error code and return failure */
 		*nsize = 0;
-		topo_mod_seterrno(mod, EMOD_NOMEM);
+		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
 		return (-1);
 	}
 
@@ -727,7 +727,7 @@ pi_set_auth(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 		 * We failed to create the property group and it was not
 		 * already defined.  Set the err code and return failure.
 		 */
-		topo_mod_seterrno(mod, err);
+		(void) topo_mod_seterrno(mod, err);
 		return (-1);
 	}
 
@@ -776,7 +776,7 @@ pi_set_auth(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 			    &err);
 			if (result != 0) {
 				/* Preserve the error and continue */
-				topo_mod_seterrno(mod, err);
+				(void) topo_mod_seterrno(mod, err);
 				topo_mod_dprintf(mod, "pi_set_auth: failed to "
 				    "set property %s (%d) : %s\n",
 				    FM_FMRI_AUTH_CHASSIS, err,
@@ -823,7 +823,7 @@ pi_set_auth(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 			    &err);
 			if (result != 0) {
 				/* Preserve the error and continue */
-				topo_mod_seterrno(mod, err);
+				(void) topo_mod_seterrno(mod, err);
 				topo_mod_dprintf(mod, "pi_set_auth: failed to "
 				    "set property %s (%d) : %s\n",
 				    FM_FMRI_AUTH_PRODUCT_SN, err,
@@ -870,7 +870,7 @@ pi_set_auth(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 			    &err);
 			if (result != 0) {
 				/* Preserve the error and continue */
-				topo_mod_seterrno(mod, err);
+				(void) topo_mod_seterrno(mod, err);
 				topo_mod_dprintf(mod, "pi_set_auth: failed to "
 				    "set property %s (%d) : %s\n",
 				    FM_FMRI_AUTH_CHASSIS, err,
@@ -917,7 +917,7 @@ pi_set_auth(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 			    &err);
 			if (result != 0) {
 				/* Preserve the error and continue */
-				topo_mod_seterrno(mod, err);
+				(void) topo_mod_seterrno(mod, err);
 				topo_mod_dprintf(mod, "pi_set_auth: failed to "
 				    "set property %s (%d) : %s\n",
 				    FM_FMRI_AUTH_SERVER, err,
@@ -960,7 +960,7 @@ pi_set_frufmri(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 	result = pi_get_fru(mod, mdp, mde_node, &is_fru);
 	if (result != 0 || is_fru == 0) {
 		/* This node is not a FRU.  Inherit from parent and return */
-		topo_node_fru_set(t_node, NULL, 0, &result);
+		(void) topo_node_fru_set(t_node, NULL, 0, &result);
 		return (0);
 	}
 
@@ -985,7 +985,7 @@ pi_set_frufmri(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 	/* Set the FRU, whether NULL or not */
 	result = topo_node_fru_set(t_node, frufmri, 0, &err);
 	if (result != 0)  {
-		topo_mod_seterrno(mod, err);
+		(void) topo_mod_seterrno(mod, err);
 	}
 	nvlist_free(frufmri);
 
@@ -1013,7 +1013,7 @@ pi_set_label(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node, tnode_t *t_node)
 	result = topo_node_label_set(t_node, label, &err);
 	topo_mod_strfree(mod, label);
 	if (result != 0) {
-		topo_mod_seterrno(mod, err);
+		(void) topo_mod_seterrno(mod, err);
 		topo_mod_dprintf(mod, "pi_set_label: failed with label %s "
 		    "on node_0x%llx: %s\n", (label == NULL ? "NULL" : label),
 		    (uint64_t)mde_node, topo_strerror(err));
@@ -1045,7 +1045,7 @@ pi_set_system(topo_mod_t *mod, tnode_t *t_node)
 		 * We failed to create the property group and it was not
 		 * already defined.  Set the err code and return failure.
 		 */
-		topo_mod_seterrno(mod, err);
+		(void) topo_mod_seterrno(mod, err);
 		return (-1);
 	}
 
@@ -1065,7 +1065,7 @@ pi_set_system(topo_mod_t *mod, tnode_t *t_node)
 			    TOPO_PROP_IMMUTABLE, isa, &err);
 			if (result != 0) {
 				/* Preserve the error and continue */
-				topo_mod_seterrno(mod, err);
+				(void) topo_mod_seterrno(mod, err);
 				topo_mod_dprintf(mod, "pi_set_auth: failed to "
 				    "set property %s (%d) : %s\n",
 				    TOPO_PROP_ISA, err, topo_strerror(err));
@@ -1079,7 +1079,7 @@ pi_set_system(topo_mod_t *mod, tnode_t *t_node)
 		result = uname(&uts);
 		if (result == -1) {
 			/* Preserve the error and continue */
-			topo_mod_seterrno(mod, errno);
+			(void) topo_mod_seterrno(mod, errno);
 			topo_mod_dprintf(mod, "pi_set_system: failed to "
 			    "read uname: %d\n", errno);
 		}
@@ -1089,7 +1089,7 @@ pi_set_system(topo_mod_t *mod, tnode_t *t_node)
 			    TOPO_PROP_IMMUTABLE, uts.machine, &err);
 			if (result != 0) {
 				/* Preserve the error and continue */
-				topo_mod_seterrno(mod, err);
+				(void) topo_mod_seterrno(mod, err);
 				topo_mod_dprintf(mod, "pi_set_auth: failed to "
 				    "set property %s (%d) : %s\n",
 				    TOPO_PROP_MACHINE, err, topo_strerror(err));

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <strings.h>
 #include <sys/fm/protocol.h>
@@ -160,7 +158,7 @@ platform_pciexhostbridge_declare(topo_mod_t *mod, tnode_t *parent,
 	}
 
 	/* Make room for children */
-	topo_node_range_create(mod, hbn, PCIEX_ROOT, 0, MAX_HB_BUSES);
+	(void) topo_node_range_create(mod, hbn, PCIEX_ROOT, 0, MAX_HB_BUSES);
 
 	return (hbn);
 }
@@ -199,7 +197,7 @@ platform_pciexrc_declare(topo_mod_t *mod, tnode_t *parent, int inst,
 	}
 	if (topo_node_asru_set(rcn, fmri, 0, &err) < 0) {
 		topo_mod_dprintf(mod, "topo_node_asru_set failed\n");
-		topo_mod_seterrno(mod, err);
+		(void) topo_mod_seterrno(mod, err);
 		nvlist_free(fmri);
 		return (NULL);
 	}
@@ -212,12 +210,12 @@ platform_pciexrc_declare(topo_mod_t *mod, tnode_t *parent, int inst,
 	/* Add the io and pci property groups */
 	if (topo_pgroup_create(rcn, &io_pgroup, &err) < 0) {
 		topo_mod_dprintf(mod, "topo_pgroup_create(iogrp) failed\n");
-		topo_mod_seterrno(mod, err);
+		(void) topo_mod_seterrno(mod, err);
 		return (NULL);
 	}
 	if (topo_pgroup_create(rcn, &pci_pgroup, &err) < 0) {
 		topo_mod_dprintf(mod, "topo_pgroup_create(pcigrp) failed\n");
-		topo_mod_seterrno(mod, err);
+		(void) topo_mod_seterrno(mod, err);
 		return (NULL);
 	}
 	/* Add the devfs path property */
@@ -225,7 +223,7 @@ platform_pciexrc_declare(topo_mod_t *mod, tnode_t *parent, int inst,
 	    TOPO_PROP_IMMUTABLE, dnpath, &err) != 0) {
 		topo_mod_dprintf(mod, "Failed to set %s property\n",
 		    TOPO_IO_DEV);
-		topo_mod_seterrno(mod, err);
+		(void) topo_mod_seterrno(mod, err);
 		return (NULL);
 	}
 
@@ -258,7 +256,7 @@ platform_pciexrc_declare(topo_mod_t *mod, tnode_t *parent, int inst,
 	}
 
 	/* Make room for children */
-	topo_node_range_create(mod, rcn, PCIEX_BUS, 0, MAX_HB_BUSES);
+	(void) topo_node_range_create(mod, rcn, PCIEX_BUS, 0, MAX_HB_BUSES);
 
 	return (rcn);
 }

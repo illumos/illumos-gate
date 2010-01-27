@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 /*
  * Some topology creation routines may need to defer completing enumeration
@@ -90,7 +89,7 @@ pi_defer_add(topo_mod_t *mod, mde_cookie_t mde_node, tnode_t *t_parent,
 	 */
 	dnp = topo_mod_zalloc(mod, sizeof (pi_defernode_t));
 	if (dnp == NULL) {
-		topo_mod_seterrno(mod, EMOD_NOMEM);
+		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
 		return (-1);
 	}
 	uu_list_node_init(dnp, &(dnp->defer_node), defer_pool);
@@ -157,7 +156,7 @@ pi_defer_exec(topo_mod_t *mod, md_t *mdp)
 			    (uint64_t)mde_node);
 
 			/* Move on to the next node */
-			topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM);
+			(void) topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM);
 			continue;
 		}
 
@@ -169,7 +168,7 @@ pi_defer_exec(topo_mod_t *mod, md_t *mdp)
 			    (uint64_t)mde_node);
 
 			/* Move on to the next node */
-			topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM);
+			(void) topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM);
 			continue;
 		}
 		topo_mod_dprintf(mod,
@@ -183,7 +182,7 @@ pi_defer_exec(topo_mod_t *mod, md_t *mdp)
 			topo_mod_dprintf(mod,
 			    "deferred enumeration for node_0x%llx failed\n",
 			    (uint64_t)mde_node);
-			topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM);
+			(void) topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM);
 		}
 
 		/* Clean up from the deferred call */
@@ -208,14 +207,14 @@ pi_deferlist_create(topo_mod_t *mod)
 	    sizeof (pi_defernode_t), offsetof(pi_defernode_t, defer_node),
 	    pi_deferlist_compare, 0);
 	if (defer_pool == NULL) {
-		topo_mod_seterrno(mod, EMOD_NOMEM);
+		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
 		return (-1);
 	}
 	defer_list = uu_list_create(defer_pool, NULL, 0);
 	if (defer_list == NULL) {
 		uu_list_pool_destroy(defer_pool);
 		defer_pool = NULL;
-		topo_mod_seterrno(mod, EMOD_NOMEM);
+		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
 		return (-1);
 	}
 

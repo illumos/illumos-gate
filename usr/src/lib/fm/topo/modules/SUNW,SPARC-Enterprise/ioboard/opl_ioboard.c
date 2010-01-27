@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * SUNW,OPL-Enterprise platform ioboard topology enumerator
@@ -75,7 +73,7 @@ _topo_init(topo_mod_t *modhdl)
 		topo_mod_setdebug(modhdl);
 	topo_mod_dprintf(modhdl, "initializing ioboard enumerator\n");
 
-	topo_mod_register(modhdl, &IobInfo, TOPO_VERSION);
+	(void) topo_mod_register(modhdl, &IobInfo, TOPO_VERSION);
 }
 
 void
