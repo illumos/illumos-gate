@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -765,6 +765,8 @@ xdrrdma_control(XDR *xdrs, int request, void *info)
 
 		rcip = (rdma_chunkinfo_t *)info;
 
+		DTRACE_PROBE2(krpc__i__xdrrdma__control__add__chunk,
+		    rci_type_t, rcip->rci_type, uint32, rcip->rci_len);
 		switch (rcip->rci_type) {
 		case RCI_WRITE_UIO_CHUNK:
 			xdrp->xp_reply_chunk_len_alt += rcip->rci_len;

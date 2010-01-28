@@ -808,9 +808,11 @@ call_again:
 		    cl_rpcmsg->rb_longbuf.len, 0,
 		    cl_rpcmsg, XDR_ENCODE, conn);
 
-		status = clnt_compose_rpcmsg(h, procnum, &rpcmsg, call_xdrp,
-		    xdr_args, argsp);
+		status = clnt_compose_rpcmsg(h, procnum, &cl_rpcmsg->rb_longbuf,
+		    call_xdrp, xdr_args, argsp);
 
+		DTRACE_PROBE2(krpc__i__clntrdma__callit__longbuf, int, status,
+		    int, msglen);
 		if (status != CLNT_RDMA_SUCCESS) {
 			p->cku_err.re_status = RPC_CANTENCODEARGS;
 			p->cku_err.re_errno = EIO;
@@ -891,6 +893,9 @@ call_again:
 		long_reply_len += 1024;
 
 	status = clnt_setup_long_reply(conn, &cl_long_reply, long_reply_len);
+
+	DTRACE_PROBE2(krpc__i__clntrdma__callit__longreply, int, status,
+	    int, long_reply_len);
 
 	if (status != CLNT_RDMA_SUCCESS) {
 		rdma_buf_free(conn, &clmsg);

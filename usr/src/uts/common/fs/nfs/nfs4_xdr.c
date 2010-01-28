@@ -4116,6 +4116,23 @@ xdr_nfs_argop4(XDR *xdrs, nfs_argop4 *objp)
 		    (uint_t *)&objp->nfs_argop4_u.opputfh.object.nfs_fh4_len,
 		    NFS4_FHSIZE));
 	case OP_GETATTR:
+		/*
+		 * ACLs can become relatively large ( > 8K) and the default
+		 * 8K reply chunk of RDMA may not suffice. Check for
+		 * get ACL bit and if it's RDMA, add a chunk equal the size
+		 * of the transfer size to the reply chunk list.
+		 */
+		if ((xdrs->x_ops == &xdrrdma_ops || xdrs->x_ops == xops) &&
+		    (xdrs->x_op == XDR_ENCODE) &&
+		    (objp->nfs_argop4_u.opgetattr.attr_request &
+		    FATTR4_ACL_MASK)) {
+			rci.rci_type = RCI_REPLY_CHUNK;
+			rci.rci_len = objp->nfs_argop4_u.opgetattr.mi->mi_tsize;
+			XDR_CONTROL(xdrs, XDR_RDMA_ADD_CHUNK, &rci);
+
+			DTRACE_PROBE1(xdr__i__argop4__getattr, int,
+			    rci.rci_len);
+		}
 		return (xdr_bitmap4(xdrs,
 		    &objp->nfs_argop4_u.opgetattr.attr_request));
 	case OP_GETFH:
