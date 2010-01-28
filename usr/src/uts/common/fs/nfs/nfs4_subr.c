@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2093,7 +2093,11 @@ nfs4_make_dotdot(nfs4_sharedfh_t *fhp, hrtime_t t, vnode_t *dvp,
 	 * we need in one operation.
 	 */
 	np = fn_parent(VTOSV(dvp)->sv_name);
-	ASSERT(np != NULL);
+	/* if a parent was not found return an error */
+	if (np == NULL) {
+		e.error = ENOENT;
+		goto out;
+	}
 
 	recov_state.rs_flags = 0;
 	recov_state.rs_num_retry_despite_err = 0;
