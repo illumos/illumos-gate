@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -942,7 +942,28 @@ static void
 consconfig_load_drivers(cons_state_t *sp)
 {
 	/*
-	 * Calling ddi_pathname_to_dev_t causes the drivers to be loaded.
+	 * Calling ddi_pathname_to_dev_t may cause the USB Host Controller
+	 * drivers to be loaded. Here we make sure that EHCI is loaded
+	 * earlier than {U, O}HCI. The order here is important. As
+	 * we have observed many systems on which hangs occur if the
+	 * {U,O}HCI companion controllers take over control from the BIOS
+	 * before EHCI does.  These hangs are also caused by BIOSes leaving
+	 * interrupt-on-port-change enabled in the ehci controller, so that
+	 * when uhci/ohci reset themselves, it induces a port change on
+	 * the ehci companion controller.  Since there's no interrupt handler
+	 * installed at the time, the moment that interrupt is unmasked, an
+	 * interrupt storm will occur.	All this is averted when ehci is
+	 * loaded first.  And now you know..... the REST of the story.
+	 *
+	 * Regardless of platform, ehci needs to initialize first to avoid
+	 * unnecessary connects and disconnects on the companion controller
+	 * when ehci sets up the routing.
+	 */
+	(void) ddi_hold_installed_driver(ddi_name_to_major("ehci"));
+	(void) ddi_hold_installed_driver(ddi_name_to_major("uhci"));
+	(void) ddi_hold_installed_driver(ddi_name_to_major("ohci"));
+
+	/*
 	 * The attaching of the drivers will cause the creation of the
 	 * keyboard and mouse minor nodes, which will in turn trigger the
 	 * dacf framework to call the keyboard and mouse configuration

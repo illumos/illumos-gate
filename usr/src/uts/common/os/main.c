@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -492,8 +492,6 @@ main(void)
 
 	/*
 	 * attach drivers with ddi-forceattach prop
-	 * This must be done after consconfig() to prevent usb key/mouse
-	 * from attaching before the upper console stream is plumbed.
 	 * It must be done early enough to load hotplug drivers (e.g.
 	 * pcmcia nexus) so that devices enumerated via hotplug is
 	 * available before I/O subsystem is fully initialized.

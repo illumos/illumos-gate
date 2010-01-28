@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3282,29 +3282,6 @@ attach_drivers()
 void
 i_ddi_forceattach_drivers()
 {
-	/*
-	 * On i386, the USB drivers need to load and take over from the
-	 * SMM BIOS drivers ASAP after consconfig(), so make sure they
-	 * get loaded right here rather than letting the thread do it.
-	 *
-	 * The order here is important.  EHCI must be loaded first, as
-	 * we have observed many systems on which hangs occur if the
-	 * {U,O}HCI companion controllers take over control from the BIOS
-	 * before EHCI does.  These hangs are also caused by BIOSes leaving
-	 * interrupt-on-port-change enabled in the ehci controller, so that
-	 * when uhci/ohci reset themselves, it induces a port change on
-	 * the ehci companion controller.  Since there's no interrupt handler
-	 * installed at the time, the moment that interrupt is unmasked, an
-	 * interrupt storm will occur.	All this is averted when ehci is
-	 * loaded first.  And now you know..... the REST of the story.
-	 *
-	 * Regardless of platform, ehci needs to initialize first to avoid
-	 * unnecessary connects and disconnects on the companion controller
-	 * when ehci sets up the routing.
-	 */
-	(void) ddi_hold_installed_driver(ddi_name_to_major("ehci"));
-	(void) ddi_hold_installed_driver(ddi_name_to_major("uhci"));
-	(void) ddi_hold_installed_driver(ddi_name_to_major("ohci"));
 
 	/*
 	 * Attach IB VHCI driver before the force-attach thread attaches the
