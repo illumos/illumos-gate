@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1977,6 +1977,7 @@ typedef struct dapls_ib_dbp_page_s {
 	uint32_t			*dbp_page_addr;
 	uint64_t			dbp_mapoffset;
 	struct dapls_ib_dbp_page_s	*next;
+	int				fd;
 } dapls_ib_dbp_page_t;
 
 dapls_ib_dbp_page_t	*dapls_ib_pagelist = NULL;
@@ -1992,7 +1993,8 @@ uint32_t *dapls_ib_get_dbp(uint64_t maplen, int fd, uint64_t mapoffset,
 	/* Check to see if page already mapped for entry */
 	for (cur_page = dapls_ib_pagelist; cur_page != NULL;
 	    cur_page = cur_page->next)
-		if (cur_page->dbp_mapoffset == mapoffset) {
+		if (cur_page->dbp_mapoffset == mapoffset &&
+		    cur_page->fd == fd) {
 			dapl_os_unlock(&dapls_ib_dbp_lock);
 			return ((uint32_t *)
 			    (offset + (uintptr_t)cur_page->dbp_page_addr));
@@ -2013,6 +2015,7 @@ uint32_t *dapls_ib_get_dbp(uint64_t maplen, int fd, uint64_t mapoffset,
 	}
 	new_page->next = dapls_ib_pagelist;
 	new_page->dbp_mapoffset = mapoffset;
+	new_page->fd = fd;
 	dapls_ib_pagelist = new_page;
 	dapl_os_unlock(&dapls_ib_dbp_lock);
 	return ((uint32_t *)(offset + (uintptr_t)new_page->dbp_page_addr));

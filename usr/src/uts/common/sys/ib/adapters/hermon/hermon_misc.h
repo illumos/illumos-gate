@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -290,7 +290,7 @@ struct hermon_udbr_page_s {
 	hermon_udbr_page_t	*upg_link;
 	uint_t			upg_index;
 	uint_t			upg_nfree;
-	uint_t			upg_firstfree;
+	uint64_t		*upg_free;
 	caddr_t			upg_kvaddr;
 	struct buf		*upg_buf;
 	ddi_umem_cookie_t	upg_umemcookie;

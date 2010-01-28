@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,21 +85,19 @@ hermon_dbr_new_user_page(hermon_state_t *state, uint_t index,
 	hermon_udbr_page_t *pagep;
 	ddi_dma_attr_t dma_attr;
 	uint_t cookiecnt;
-	int i, status;
-	uint64_t *p;
+	int status;
 	hermon_umap_db_entry_t *umapdb;
 
 	pagep = kmem_alloc(sizeof (*pagep), KM_SLEEP);
 	pagep->upg_index = page;
 	pagep->upg_nfree = PAGESIZE / sizeof (hermon_dbr_t);
-	pagep->upg_firstfree = 0;
+
+	/* Allocate 1 bit per dbr for free/alloc management (0 => "free") */
+	pagep->upg_free = kmem_zalloc(PAGESIZE / sizeof (hermon_dbr_t) / 8,
+	    KM_SLEEP);
 	pagep->upg_kvaddr = ddi_umem_alloc(PAGESIZE, DDI_UMEM_SLEEP,
 	    &pagep->upg_umemcookie); /* not HERMON_PAGESIZE here */
 
-	/* link free entries */
-	p = (uint64_t *)(void *)pagep->upg_kvaddr;
-	for (i = pagep->upg_firstfree; i < pagep->upg_nfree; i++)
-		p[i] = i + 1;
 	pagep->upg_buf = ddi_umem_iosetup(pagep->upg_umemcookie, 0,
 	    PAGESIZE, B_WRITE, 0, 0, NULL, DDI_UMEM_SLEEP);
 
@@ -140,7 +138,9 @@ hermon_user_dbr_alloc(hermon_state_t *state, uint_t index,
 	hermon_user_dbr_t *udbr;
 	hermon_udbr_page_t *pagep;
 	uint_t next_page;
-	int j;
+	int dbr_index;
+	int i1, i2, i3, last;
+	uint64_t u64, mask;
 
 	mutex_enter(&state->hs_dbr_lock);
 	for (udbr = state->hs_user_dbr; udbr != NULL; udbr = udbr->udbr_link)
@@ -169,14 +169,40 @@ hermon_user_dbr_alloc(hermon_state_t *state, uint_t index,
 		pagep->upg_link = udbr->udbr_pagep;
 		udbr->udbr_pagep = pagep;
 	}
-	j = pagep->upg_firstfree;	/* index within page */
-	pagep->upg_firstfree = ((uint64_t *)(void *)pagep->upg_kvaddr)[j];
+
+	/* Since nfree > 0, we're assured the loops below will succeed */
+
+	/* First, find a 64-bit (not ~0) that has a free dbr */
+	last = PAGESIZE / sizeof (uint64_t) / 64;
+	mask = ~0ull;
+	for (i1 = 0; i1 < last; i1++)
+		if ((pagep->upg_free[i1] & mask) != mask)
+			break;
+	u64 = pagep->upg_free[i1];
+
+	/* Second, find a byte (not 0xff) that has a free dbr */
+	last = sizeof (uint64_t) / sizeof (uint8_t);
+	for (i2 = 0, mask = 0xff; i2 < last; i2++, mask <<= 8)
+		if ((u64 & mask) != mask)
+			break;
+
+	/* Third, find a bit that is free (0) */
+	for (i3 = 0; i3 < sizeof (uint64_t) / sizeof (uint8_t); i3++)
+		if ((u64 & (1ul << (i3 + 8 * i2))) == 0)
+			break;
+
+	/* Mark it as allocated */
+	pagep->upg_free[i1] |= (1ul << (i3 + 8 * i2));
+
+	dbr_index = ((i1 * sizeof (uint64_t)) + i2) * sizeof (uint64_t) + i3;
 	pagep->upg_nfree--;
-	((uint64_t *)(void *)pagep->upg_kvaddr)[j] = 0;	/* clear dbr */
+	((uint64_t *)(void *)pagep->upg_kvaddr)[dbr_index] = 0;	/* clear dbr */
 	*mapoffset = ((HERMON_DBR_KEY(index, pagep->upg_index) <<
 	    MLNX_UMAP_RSRC_TYPE_SHIFT) | MLNX_UMAP_DBRMEM_RSRC) << PAGESHIFT;
-	*vdbr = (hermon_dbr_t *)((uint64_t *)(void *)pagep->upg_kvaddr + j);
-	*pdbr = pagep->upg_dmacookie.dmac_laddress + j * sizeof (uint64_t);
+	*vdbr = (hermon_dbr_t *)((uint64_t *)(void *)pagep->upg_kvaddr +
+	    dbr_index);
+	*pdbr = pagep->upg_dmacookie.dmac_laddress + dbr_index *
+	    sizeof (uint64_t);
 
 	mutex_exit(&state->hs_dbr_lock);
 	return (DDI_SUCCESS);
@@ -190,6 +216,7 @@ hermon_user_dbr_free(hermon_state_t *state, uint_t index, hermon_dbr_t *record)
 	caddr_t			kvaddr;
 	uint_t			dbr_index;
 	uint_t			max_free = PAGESIZE / sizeof (hermon_dbr_t);
+	int			i1, i2;
 
 	dbr_index = (uintptr_t)record & PAGEOFFSET; /* offset (not yet index) */
 	kvaddr = (caddr_t)record - dbr_index;
@@ -222,13 +249,12 @@ hermon_user_dbr_free(hermon_state_t *state, uint_t index, hermon_dbr_t *record)
 		return;
 	}
 	ASSERT(dbr_index < max_free);
-	((uint64_t *)(void *)kvaddr)[dbr_index] = pagep->upg_firstfree;
-	pagep->upg_firstfree = dbr_index;
+	i1 = dbr_index / 64;
+	i2 = dbr_index % 64;
+	ASSERT((pagep->upg_free[i1] & (1ul << i2)) == (1ul << i2));
+	pagep->upg_free[i1] &= ~(1ul << i2);
 	pagep->upg_nfree++;
 	mutex_exit(&state->hs_dbr_lock);
-
-	/* XXX still need to unlink and free struct */
-	/* XXX munmap needs to be managed */
 }
 
 /*
@@ -436,6 +462,8 @@ hermon_dbr_kern_free(hermon_state_t *state)
 			    &value, HERMON_UMAP_DB_REMOVE, &umapdb);
 			if (status == DDI_SUCCESS)
 				hermon_umap_db_free(umapdb);
+			kmem_free(pagep->upg_free,
+			    PAGESIZE / sizeof (hermon_dbr_t) / 8);
 			nextp = pagep->upg_link;
 			kmem_free(pagep, sizeof (*pagep));
 			pagep = nextp;

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,7 +44,7 @@ struct dapls_ib_hca_handle {
 	int		ia_fd;	 /* fd corresponding to the IA */
 	minor_t		ia_rnum; /* Kernel resource number of the IA */
 	int		hca_fd;  /* fd for the HCA ie. tavor */
-	int		ia_bf_toggle; /* toggle between the 2 bf buffers */
+	int		*ia_bf_toggle; /* toggle between the 2 bf buffers */
 	dapls_hw_uar_t	ia_uar;  /* pointer to the HCA UAR page */
 	void		*ia_bf;	 /* pointer to the Hermon Blueflame page */
 };
@@ -191,6 +191,8 @@ struct dapls_ib_hca_state {
 	void	*uarpg_baseaddr; /* base addr of the UAR page */
 	size_t	uarpg_size;	 /* size of the UAR page */
 	void	*bf_pg_baseaddr; /* base addr of the Hermon Blueflame page */
+	int	bf_toggle;
+	char	hca_path[MAXPATHLEN];
 };
 
 DAPL_OS_LOCK	dapls_ib_dbp_lock;

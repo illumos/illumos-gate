@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -320,7 +320,7 @@ dapls_ib_qp_alloc(
 	qp_p->qp_num = mqp->mqp_qpnum;
 	qp_p->qp_iauar = ia_ptr->hca_ptr->ib_hca_handle->ia_uar;
 	qp_p->qp_ia_bf = ia_ptr->hca_ptr->ib_hca_handle->ia_bf;
-	qp_p->qp_ia_bf_toggle = &ia_ptr->hca_ptr->ib_hca_handle->ia_bf_toggle;
+	qp_p->qp_ia_bf_toggle = ia_ptr->hca_ptr->ib_hca_handle->ia_bf_toggle;
 
 	evd_handle = (DAPL_EVD *)ep_ptr->param.request_evd_handle;
 	qp_p->qp_sq_cqhdl = evd_handle->ib_cq_handle;

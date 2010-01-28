@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -158,7 +158,7 @@ dapli_process_tavor_node(di_node_t node, int *hca_idx, int try_blueflame)
 {
 	char		*dev_path;
 	char		path_buf[MAXPATHLEN];
-	int		idx, fd;
+	int		i, idx, fd;
 #ifndef _LP64
 	int		tmpfd;
 #endif
@@ -185,6 +185,14 @@ dapli_process_tavor_node(di_node_t node, int *hca_idx, int try_blueflame)
 	}
 	dev_path = di_devfs_path(node);
 
+	for (i = 0; i < idx; i++) {
+		if (strcmp(dev_path, g_tavor_state[i].hca_path) == 0) {
+			/* no need for a refcnt */
+			idx = i;
+			goto done;
+		}
+	}
+
 	/* Add 16 to accomodate the prefix "/devices" and suffix ":devctl" */
 	if (strlen("/devices") + strlen(dev_path) + strlen(":devctl") + 1 >
 	    MAXPATHLEN) {
@@ -198,6 +206,7 @@ dapli_process_tavor_node(di_node_t node, int *hca_idx, int try_blueflame)
 	(void) dapl_os_strcpy(path_buf, "/devices");
 	(void) dapl_os_strcat(path_buf, dev_path);
 	(void) dapl_os_strcat(path_buf, ":devctl");
+	(void) dapl_os_strcpy(g_tavor_state[idx].hca_path, dev_path);
 	di_devfs_path_free(dev_path);
 
 	pagesize = (size_t)sysconf(_SC_PAGESIZE);
@@ -274,6 +283,7 @@ dapli_process_tavor_node(di_node_t node, int *hca_idx, int try_blueflame)
 		    strerror(errno));
 	} else {
 		g_tavor_state[idx].bf_pg_baseaddr = mapaddr;
+		g_tavor_state[idx].bf_toggle = 0;
 	}
 done:
 	dapl_os_unlock(&g_tavor_state_lock);
@@ -587,7 +597,7 @@ dapls_ib_open_hca(
 	hca_p->hca_fd = g_tavor_state[hca_ptr->tavor_idx].hca_fd;
 	hca_p->ia_uar = g_tavor_state[hca_ptr->tavor_idx].uarpg_baseaddr;
 	hca_p->ia_bf = g_tavor_state[hca_ptr->tavor_idx].bf_pg_baseaddr;
-	hca_p->ia_bf_toggle = 0;
+	hca_p->ia_bf_toggle = &g_tavor_state[hca_ptr->tavor_idx].bf_toggle;
 	*ib_hca_handle_p = hca_p;
 	dapl_dbg_log(DAPL_DBG_TYPE_UTIL,
 	    "open_hca: ia_created, hca_p 0x%p, fd %d, "

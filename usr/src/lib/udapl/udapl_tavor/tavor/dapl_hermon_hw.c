@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1200,9 +1200,15 @@ dapli_hermon_post_send(DAPL_EP *ep, ibt_send_wr_t *wr, boolean_t ns)
 		bf_dest = (uint64_t *)((uintptr_t)qp->qp_ia_bf +
 		    *qp->qp_ia_bf_toggle);
 		*qp->qp_ia_bf_toggle ^= 256;	/* 2 256-byte buffers */
-		for (i = 0; i < desc_sz * 2; i += 2) {
+		for (i = 0; i < desc_sz * 2; i += 8) {
 			bf_dest[i] = src64[i];
 			bf_dest[i + 1] = src64[i + 1];
+			bf_dest[i + 2] = src64[i + 2];
+			bf_dest[i + 3] = src64[i + 3];
+			bf_dest[i + 4] = src64[i + 4];
+			bf_dest[i + 5] = src64[i + 5];
+			bf_dest[i + 6] = src64[i + 6];
+			bf_dest[i + 7] = src64[i + 7];
 		}
 		(void) pthread_spin_unlock(&hermon_bf_lock);
 	} else {
