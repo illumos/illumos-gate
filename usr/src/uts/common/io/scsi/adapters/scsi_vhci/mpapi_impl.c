@@ -4226,44 +4226,33 @@ vhci_mpapi_update_tpg_acc_state_for_lu(struct scsi_vhci *vhci,
 			 * but ignore to update on another one.
 			 */
 			tgt_port = NULL;
-			if ((mdi_prop_lookup_string(path_data->resp,
+			if (path_data->valid == 1 &&
+			    (mdi_prop_lookup_string(path_data->resp,
 			    SCSI_ADDR_PROP_TARGET_PORT,
 			    &tgt_port) == DDI_PROP_SUCCESS) &&
 			    tgt_port != NULL &&
 			    (vhci_mpapi_check_tp_in_tpg(
 			    tpg_data, tgt_port) == 1)) {
-				if (path_data->valid == 1) {
-					VHCI_DEBUG(4, (CE_NOTE, NULL,
-					    "vhci_mpapi_update_tpg_acc_state_"
-					    "for_ lu: Operating on LUN(%s), "
-					    " PATH(%p), TPG(%x: %s)\n",
-					    lu_data->prop.name, path_data->resp,
-					    tpg_data->prop.tpgId,
-					    tpg_data->pclass));
-					if (MDI_PI_IS_ONLINE(path_data->resp)) {
-						tpg_data->prop.accessState =
-						    MP_DRVR_ACCESS_STATE_ACTIVE;
-						break;
-					} else if (MDI_PI_IS_STANDBY(
-					    path_data->resp)) {
+				VHCI_DEBUG(4, (CE_NOTE, NULL,
+				    "vhci_mpapi_update_tpg_acc_state_"
+				    "for_ lu: Operating on LUN(%s), "
+				    " PATH(%p), TPG(%x: %s)\n",
+				    lu_data->prop.name, path_data->resp,
+				    tpg_data->prop.tpgId,
+				    tpg_data->pclass));
+				if (MDI_PI_IS_ONLINE(path_data->resp)) {
+					tpg_data->prop.accessState =
+					    MP_DRVR_ACCESS_STATE_ACTIVE;
+					break;
+				} else if (MDI_PI_IS_STANDBY(path_data->resp)) {
 					tpg_data->prop.accessState =
 					    MP_DRVR_ACCESS_STATE_STANDBY;
-						break;
-					} else {
-					tpg_data->prop.accessState =
-					    MP_DRVR_ACCESS_STATE_UNAVAILABLE;
-					}
+					break;
 				} else {
-					/*
-					 * if path is not valid any more,
-					 * mark the associated tpg as
-					 * unavailable.
-					 */
 					tpg_data->prop.accessState =
 					    MP_DRVR_ACCESS_STATE_UNAVAILABLE;
 				}
 			}
-
 			path_list = path_list->next;
 		}
 		tpg_list = tpg_list->next;
