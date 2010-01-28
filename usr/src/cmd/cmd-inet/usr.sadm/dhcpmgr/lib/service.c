@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <wordexp.h>
 #include <string.h>
@@ -151,7 +148,7 @@ Java_com_sun_dhcpmgr_bridge_Bridge_getDataStore(
 	}
 
 	dsObject = (*env)->NewObject(env, ds_class, ds_cons,
-		jresource, version, avail);
+	    jresource, version, avail);
 
 	free(resource);
 	return (dsObject);
@@ -226,7 +223,7 @@ Java_com_sun_dhcpmgr_bridge_Bridge_getDataStores(
 		}
 
 		jobj = (*env)->NewObject(env, ds_class, ds_cons,
-						jstr, version, avail);
+		    jstr, version, avail);
 		if (jobj == NULL) {
 			/* exception thrown */
 			break;
@@ -255,7 +252,7 @@ Java_com_sun_dhcpmgr_bridge_Bridge_readDefaults(
 	jclass cfg_class;
 	jmethodID cfg_cons;
 	jmethodID cfg_set;
-	jobject cfgobj;
+	jobject cfgobj = NULL;
 	dhcp_confopt_t *cfgs, *tcfgs;
 
 	/* Make sure we have the classes & methods we need */
@@ -405,7 +402,7 @@ Java_com_sun_dhcpmgr_bridge_Bridge_writeDefaults(
 			/* exception thrown */
 			free_dsvc_conf(cfgs);
 			throw_bridge_exception(env,
-				gettext("Error converting key"));
+			    gettext("Error converting key"));
 			return;
 		}
 		cfgs[i].co_key = strdup(tmpstr);
@@ -421,7 +418,7 @@ Java_com_sun_dhcpmgr_bridge_Bridge_writeDefaults(
 		if (tmpstr == NULL) {
 			free_dsvc_conf(cfgs);
 			throw_bridge_exception(env,
-				gettext("Error converting value"));
+			    gettext("Error converting value"));
 			return;
 		}
 		cfgs[i].co_value = strdup(tmpstr);
@@ -545,10 +542,10 @@ Java_com_sun_dhcpmgr_bridge_Bridge_makeLocation(
 
 	/* If the location does not already exist, go create it. */
 	if (status_dd(&datastore) != DSVC_SUCCESS) {
-	    rcode = mklocation_dd(&datastore);
-	    if (rcode != DSVC_SUCCESS) {
-		throw_libdhcpsvc_exception(env, rcode);
-	    }
+		rcode = mklocation_dd(&datastore);
+		if (rcode != DSVC_SUCCESS) {
+			throw_libdhcpsvc_exception(env, rcode);
+		}
 	}
 
 	dd_free_datastore_t(&datastore);
@@ -603,7 +600,7 @@ Java_com_sun_dhcpmgr_bridge_Bridge_getInterfaces(
 	list = dd_get_interfaces();
 	if (list == NULL) {
 		throw_bridge_exception(env,
-			gettext("Error in dd_get_interfaces"));
+		    gettext("Error in dd_get_interfaces"));
 		return (NULL);
 	}
 	/* Compute length of list */
