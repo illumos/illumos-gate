@@ -239,6 +239,10 @@ audiohd_set_chipset_info(audiohd_state_t *statep)
 		name = "ATI HD Audio";
 		vers = "SB600";
 		break;
+	case 0x10029442:
+		name = "ATI HD Audio";
+		vers = "Radeon HD 4850";
+		break;
 	case 0x1002aa38:
 		name = "ATI HD Audio";
 		vers = "Radeon HD 4670";
@@ -557,7 +561,6 @@ audiohd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/*
 	 * Add the h/w interrupt handler and initialise mutexes
 	 */
-
 	if ((intr_types & DDI_INTR_TYPE_MSI) && statep->msi_enable) {
 		if (audiohd_add_intrs(statep, DDI_INTR_TYPE_MSI) ==
 		    DDI_SUCCESS) {
@@ -1969,7 +1972,7 @@ audiohd_set_mongain(void *arg, uint64_t val)
 
 	mutex_enter(&statep->hda_mutex);
 	pc->val = val;
-	audiohd_configure_input(statep);
+	audiohd_set_monitor_gain(statep);
 	mutex_exit(&statep->hda_mutex);
 
 	return (0);
@@ -4347,13 +4350,11 @@ audiohd_finish_input_path(hda_codec_t *codec)
  *
  * Arguments:
  *	hda_codec_t		*codec		where the monitor path exists
- *	audiohd_ostream_t	*ostream	output ostream
  *	wid_t			id		no. of widget being searched
  *	int			mixer		share or not
  */
 static int
-audiohd_find_inpin_for_monitor(hda_codec_t *codec,
-    audiohd_path_t *path, wid_t id, int mixer)
+audiohd_find_inpin_for_monitor(hda_codec_t *codec, wid_t id, int mixer)
 {
 	wid_t 			wid;
 	audiohd_widget_t	*widget;
@@ -4407,7 +4408,6 @@ audiohd_find_inpin_for_monitor(hda_codec_t *codec,
 				    AUDIOHD_PATH_DAC)
 					continue;
 				if (audiohd_find_inpin_for_monitor(codec,
-				    path,
 				    widget->avail_conn[i], mixer) ==
 				    DDI_SUCCESS) {
 					widget->selmon[widget->used++] = i;
@@ -4422,7 +4422,6 @@ audiohd_find_inpin_for_monitor(hda_codec_t *codec,
 				    AUDIOHD_PATH_DAC)
 					continue;
 				if (audiohd_find_inpin_for_monitor(codec,
-				    path,
 				    widget->avail_conn[i],
 				    mixer) ==
 				    DDI_SUCCESS) {
@@ -4507,7 +4506,6 @@ audiohd_build_monitor_path(hda_codec_t *codec)
 					find = 0;
 					if (audiohd_find_inpin_for_monitor(
 					    codec,
-					    path,
 					    widget->avail_conn[k], 0) ==
 					    DDI_SUCCESS) {
 						path->mon_wid[j][l] = wid;
@@ -4519,7 +4517,6 @@ audiohd_build_monitor_path(hda_codec_t *codec)
 					} else if (
 					    audiohd_find_inpin_for_monitor(
 					    codec,
-					    path,
 					    widget->avail_conn[k], 1) ==
 					    DDI_SUCCESS) {
 						path->mon_wid[j][l] = wid;
@@ -4540,7 +4537,7 @@ audiohd_build_monitor_path(hda_codec_t *codec)
 				 * be NULL connection.
 				 */
 				if (!find) {
-					path->mon_wid[i][l] = 0;
+					path->mon_wid[j][l] = 0;
 					widget->path_flags |=
 					    AUDIOHD_PATH_NOMON;
 				}
