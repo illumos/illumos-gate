@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -125,7 +125,7 @@ static ddi_device_acc_attr_t data_accattr = {
 /*
  * Statistics.
  */
-static char *aux_statistics[] = {
+static const char * const aux_statistics[] = {
 	"rx_cksum_deferred",
 	"tx_cksum_no_need",
 	"rx_rsp_notok",
@@ -149,6 +149,8 @@ static char *aux_statistics[] = {
 	"rx_cpoparea_grown",
 	"csum_hardware",
 	"csum_software",
+	"tx_overflow_page",
+	"tx_unexpected_flags",
 };
 
 static int
@@ -190,6 +192,8 @@ xnb_ks_aux_update(kstat_t *ksp, int flag)
 	(knp++)->value.ui64 = xnbp->xnb_stat_rx_cpoparea_grown;
 	(knp++)->value.ui64 = xnbp->xnb_stat_csum_hardware;
 	(knp++)->value.ui64 = xnbp->xnb_stat_csum_software;
+	(knp++)->value.ui64 = xnbp->xnb_stat_tx_overflow_page;
+	(knp++)->value.ui64 = xnbp->xnb_stat_tx_unexpected_flags;
 
 	return (0);
 }
@@ -199,7 +203,7 @@ xnb_ks_init(xnb_t *xnbp)
 {
 	int nstat = sizeof (aux_statistics) /
 	    sizeof (aux_statistics[0]);
-	char **cp = aux_statistics;
+	const char * const *cp = aux_statistics;
 	kstat_named_t *knp;
 
 	/*
@@ -1387,9 +1391,31 @@ finished:
 	n_data_req = 0;
 
 	while (loop < end) {
+		static const uint16_t acceptable_flags =
+		    NETTXF_csum_blank |
+		    NETTXF_data_validated |
+		    NETTXF_extra_info;
+		uint16_t unexpected_flags;
+
 		txreq = RING_GET_REQUEST(&xnbp->xnb_tx_ring, loop);
 
-		if (txreq->flags & NETTXF_extra_info) {
+		unexpected_flags = txreq->flags & ~acceptable_flags;
+		if (unexpected_flags != 0) {
+			/*
+			 * The peer used flag bits that we do not
+			 * recognize.
+			 */
+			cmn_err(CE_WARN, "xnb_from_peer: "
+			    "unexpected flag bits (0x%x) from peer "
+			    "in transmit request",
+			    unexpected_flags);
+			xnbp->xnb_stat_tx_unexpected_flags++;
+
+			/* Mark this entry as failed. */
+			xnb_tx_mark_complete(xnbp, txreq->id, NETIF_RSP_ERROR);
+			need_notify = B_TRUE;
+
+		} else if (txreq->flags & NETTXF_extra_info) {
 			struct netif_extra_info *erp;
 			boolean_t status;
 
@@ -1420,6 +1446,23 @@ finished:
 			xnb_tx_mark_complete(xnbp, txreq->id,
 			    status ? NETIF_RSP_OKAY : NETIF_RSP_ERROR);
 			need_notify = B_TRUE;
+
+		} else if ((txreq->offset > PAGESIZE) ||
+		    (txreq->offset + txreq->size > PAGESIZE)) {
+			/*
+			 * Peer attempted to refer to data beyond the
+			 * end of the granted page.
+			 */
+			cmn_err(CE_WARN, "xnb_from_peer: "
+			    "attempt to refer beyond the end of granted "
+			    "page in txreq (offset %d, size %d).",
+			    txreq->offset, txreq->size);
+			xnbp->xnb_stat_tx_overflow_page++;
+
+			/* Mark this entry as failed. */
+			xnb_tx_mark_complete(xnbp, txreq->id, NETIF_RSP_ERROR);
+			need_notify = B_TRUE;
+
 		} else {
 			xnb_txbuf_t *txp;
 
@@ -1498,7 +1541,7 @@ finished:
 			    "txpp 0x%p failed (%d)",
 			    (void *)*txpp, cop->status);
 #endif /* XNB_DEBUG */
-			xnb_tx_mark_complete(xnbp, txp->xt_id, cop->status);
+			xnb_tx_mark_complete(xnbp, txp->xt_id, NETIF_RSP_ERROR);
 			freemsg(txp->xt_mblk);
 		} else {
 			mblk_t *mp;
@@ -1534,7 +1577,7 @@ finished:
 			xnbp->xnb_stat_opackets++;
 			xnbp->xnb_stat_obytes += txreq->size;
 
-			xnb_tx_mark_complete(xnbp, txp->xt_id, cop->status);
+			xnb_tx_mark_complete(xnbp, txp->xt_id, NETIF_RSP_OKAY);
 		}
 
 		txpp++;

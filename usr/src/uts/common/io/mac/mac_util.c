@@ -201,15 +201,24 @@ mac_fix_cksum(mblk_t *mp_chain)
 				proto = ipha->ipha_protocol;
 				ASSERT(ipha->ipha_version_and_hdr_length ==
 				    IP_SIMPLE_HDR_VERSION);
-				if (proto == IPPROTO_TCP) {
+
+				switch (proto) {
+				case IPPROTO_TCP:
 					/* LINTED: improper alignment cast */
 					up = IPH_TCPH_CHECKSUMP(ipha,
 					    IP_SIMPLE_HDR_LENGTH);
-				} else {
-					ASSERT(proto == IPPROTO_UDP);
+					break;
+
+				case IPPROTO_UDP:
 					/* LINTED: improper alignment cast */
 					up = IPH_UDPH_CHECKSUMP(ipha,
 					    IP_SIMPLE_HDR_LENGTH);
+					break;
+
+				default:
+					cmn_err(CE_WARN, "mac_fix_cksum: "
+					    "unexpected protocol: %d", proto);
+					continue;
 				}
 
 				/*

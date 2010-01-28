@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1130,8 +1130,6 @@ xnf_set_multicast(void *arg, boolean_t add, const uint8_t *mca)
 		return (0);
 
 	txp = kmem_cache_alloc(xnfp->xnf_tx_buf_cache, KM_SLEEP);
-	if (txp == NULL)
-		return (1);
 
 	mutex_enter(&xnfp->xnf_txlock);
 
@@ -1557,8 +1555,6 @@ xnf_send(void *arg, mblk_t *mp)
 		}
 
 		txp = kmem_cache_alloc(xnfp->xnf_tx_buf_cache, KM_SLEEP);
-		if (txp == NULL)
-			break;
 
 		txp->tx_type = TX_DATA;
 
@@ -2380,6 +2376,7 @@ failure_1:
 
 failure:
 
+	ASSERT(kmflag & KM_NOSLEEP); /* Cannot fail for KM_SLEEP. */
 	return (-1);
 }
 
@@ -2472,13 +2469,18 @@ xnf_buf_recycle(xnf_buf_t *bdesc)
 static int
 xnf_tx_buf_constructor(void *buf, void *arg, int kmflag)
 {
-	_NOTE(ARGUNUSED(kmflag));
+	int (*ddiflags)(caddr_t) = DDI_DMA_SLEEP;
 	xnf_txbuf_t *txp = buf;
 	xnf_t *xnfp = arg;
 
+	if (kmflag & KM_NOSLEEP)
+		ddiflags = DDI_DMA_DONTWAIT;
+
 	if (ddi_dma_alloc_handle(xnfp->xnf_devinfo, &buf_dma_attr,
-	    0, 0, &txp->tx_dma_handle) != DDI_SUCCESS)
+	    ddiflags, 0, &txp->tx_dma_handle) != DDI_SUCCESS) {
+		ASSERT(kmflag & KM_NOSLEEP); /* Cannot fail for KM_SLEEP. */
 		return (-1);
+	}
 
 	return (0);
 }

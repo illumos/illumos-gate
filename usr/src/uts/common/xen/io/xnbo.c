@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +30,10 @@
  * A driver that sits above an existing GLDv3/Nemo MAC driver and
  * relays packets to/from that driver from/to a guest domain.
  */
+
+#ifdef DEBUG
+#define	XNBO_DEBUG 1
+#endif /* DEBUG */
 
 #include "xnb.h"
 
@@ -48,6 +52,11 @@
 #include <xen/sys/xendev.h>
 #include <sys/sdt.h>
 #include <sys/note.h>
+
+#ifdef XNBO_DEBUG
+boolean_t xnbo_cksum_offload_to_peer = B_TRUE;
+boolean_t xnbo_cksum_offload_from_peer = B_TRUE;
+#endif /* XNBO_DEBUG */
 
 /* Track multicast addresses. */
 typedef struct xmca {
@@ -112,14 +121,20 @@ xnbo_cksum_from_peer(xnb_t *xnbp, mblk_t *mp, uint16_t flags)
 	ASSERT(mp->b_next == NULL);
 
 	if ((flags & NETTXF_csum_blank) != 0) {
+		uint32_t capab = xnbop->o_hcksum_capab;
+
+#ifdef XNBO_DEBUG
+		if (!xnbo_cksum_offload_from_peer)
+			capab = 0;
+#endif /* XNBO_DEBUG */
+
 		/*
 		 * The checksum in the packet is blank.  Determine
 		 * whether we can do hardware offload and, if so,
 		 * update the flags on the mblk according.  If not,
 		 * calculate and insert the checksum using software.
 		 */
-		mp = xnb_process_cksum_flags(xnbp, mp,
-		    xnbop->o_hcksum_capab);
+		mp = xnb_process_cksum_flags(xnbp, mp, capab);
 	}
 
 	return (mp);
@@ -135,6 +150,11 @@ xnbo_cksum_to_peer(xnb_t *xnbp, mblk_t *mp)
 	_NOTE(ARGUNUSED(xnbp));
 	uint16_t r = 0;
 	uint32_t pflags, csum;
+
+#ifdef XNBO_DEBUG
+	if (!xnbo_cksum_offload_to_peer)
+		return (0);
+#endif /* XNBO_DEBUG */
 
 	/*
 	 * We might also check for HCK_PARTIALCKSUM here and,

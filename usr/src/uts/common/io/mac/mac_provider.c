@@ -870,20 +870,15 @@ mac_unicst_update(mac_handle_t mh, const uint8_t *addr)
 		return;
 
 	i_mac_perim_enter(mip);
-	/*
-	 * If address doesn't change, do nothing.
-	 */
-	if (bcmp(addr, mip->mi_addr, mip->mi_type->mt_addr_length) == 0) {
-		i_mac_perim_exit(mip);
-		return;
-	}
 
 	/*
-	 * Freshen the MAC address value and update all MAC clients that
-	 * share this MAC address.
+	 * If address changes, freshen the MAC address value and update
+	 * all MAC clients that share this MAC address.
 	 */
-	mac_freshen_macaddr(mac_find_macaddr(mip, mip->mi_addr),
-	    (uint8_t *)addr);
+	if (bcmp(addr, mip->mi_addr, mip->mi_type->mt_addr_length) != 0) {
+		mac_freshen_macaddr(mac_find_macaddr(mip, mip->mi_addr),
+		    (uint8_t *)addr);
+	}
 
 	i_mac_perim_exit(mip);
 

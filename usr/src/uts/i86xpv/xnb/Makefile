@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -62,9 +62,9 @@ DEF_BUILDS	= $(DEF_BUILDS64)
 ALL_BUILDS	= $(ALL_BUILDS64)
 
 #
-# Module depends on VNIC.
+# Module depends on mac.
 #
-LDFLAGS		+= -dy -N drv/vnic -N misc/mac
+LDFLAGS		+= -dy -N misc/mac
 
 #
 # use Solaris specific code in xen public header files

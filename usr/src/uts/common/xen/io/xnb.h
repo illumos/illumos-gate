@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * xnb.h - definitions for Xen dom0 network driver
@@ -140,6 +140,8 @@ struct xnb {
 	uint64_t		xnb_stat_rx_allocb_failed;
 	uint64_t		xnb_stat_tx_allocb_failed;
 	uint64_t		xnb_stat_rx_foreign_page;
+	uint64_t		xnb_stat_tx_overflow_page;
+	uint64_t		xnb_stat_tx_unexpected_flags;
 	uint64_t		xnb_stat_mac_full;
 	uint64_t		xnb_stat_spurious_intr;
 	uint64_t		xnb_stat_allocation_success;
