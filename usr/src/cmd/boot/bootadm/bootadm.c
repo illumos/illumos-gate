@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2778,12 +2778,15 @@ update_required(char *root)
 
 	/*
 	 * In certain deployment scenarios, filestat may not
-	 * exist. Ignore it during boot-archive SMF check.
+	 * exist. Do not stop the boot process, but trigger an update
+	 * of the archives (which will recreate filestat.ramdisk).
 	 */
 	if (bam_smf_check) {
 		(void) snprintf(path, sizeof (path), "%s%s", root, FILE_STAT);
-		if (stat(path, &sb) != 0)
+		if (stat(path, &sb) != 0) {
+			(void) creat(NEED_UPDATE_FILE, 0644);
 			return (0);
+		}
 	}
 
 	getoldstat(root);
