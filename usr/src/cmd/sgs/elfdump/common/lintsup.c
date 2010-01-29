@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-/* LINTLIBRARY */
-/* PROTOLIB1 */
 
 /*
  * Supplemental Pseudo-code to get lint to consider these symbols used.
@@ -35,7 +33,9 @@
 #include	<msg.h>
 #include	<_elfdump.h>
 
-void
+#pragma error_messages(off, E_STATIC_UNUSED)
+
+static void
 foo()
 {
 	(void) _elfdump_msg((Msg)&__elfdump_msg[0]);

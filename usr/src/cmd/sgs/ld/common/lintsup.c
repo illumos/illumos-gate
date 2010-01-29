@@ -18,25 +18,23 @@
  *
  * CDDL HEADER END
  */
-/* LINTLIBRARY */
-/* PROTOLIB1 */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Supplimental Pseudo-code to get lint to consider
  * these symbols used.
  */
 
-#include <stdlib.h>
 #include <stdio.h>
 #include "msg.h"
 
-void
+#pragma error_messages(off, E_STATIC_UNUSED)
+
+static void
 exit(int status)
 {
 	(void) printf("%s: %d\n", _ld_msg((Msg)&__ld_msg[0]), status);

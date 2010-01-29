@@ -18,11 +18,9 @@
  *
  * CDDL HEADER END
  */
-/* LINTLIBRARY */
-/* PROTOLIB1 */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,7 +32,9 @@
 #include <debug.h>
 #include "msg.h"
 
-void
+#pragma error_messages(off, E_STATIC_UNUSED)
+
+static void
 foo()
 {
 	dbg_print(0, _pvs_msg((Msg)&__pvs_msg[0]));

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-/* LINTLIBRARY */
-/* PROTOLIB1 */
 
 /*
  * Supplemental Pseudo-code to get lint to consider these symbols used.
@@ -58,8 +56,9 @@ elfedit64_init_obj_state(const char *file, int fd, Elf *elf)
 }
 #endif
 
+#pragma error_messages(off, E_STATIC_UNUSED)
 
-void
+static void
 foo()
 {
 	dbg_print(NULL, NULL, 0);

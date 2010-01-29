@@ -20,13 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-/* LINTLIBRARY */
-/* PROTOLIB1 */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Supplemental Pseudo-code to get lint to consider these symbols used.
@@ -34,7 +30,9 @@
 #include	<msg.h>
 #include	<_elfwrap.h>
 
-void
+#pragma error_messages(off, E_STATIC_UNUSED)
+
+static void
 foo()
 {
 	(void) _elfwrap_msg((Msg)&__elfwrap_msg[0]);

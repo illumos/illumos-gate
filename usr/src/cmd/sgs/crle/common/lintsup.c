@@ -18,11 +18,9 @@
  *
  * CDDL HEADER END
  */
-/* LINTLIBRARY */
-/* PROTOLIB1 */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +30,9 @@
 #include "alist.h"
 #include "msg.h"
 
-void
+#pragma error_messages(off, E_STATIC_UNUSED)
+
+static void
 foo()
 {
 	(void) _crle_msg((Msg)&__crle_msg[0]);
