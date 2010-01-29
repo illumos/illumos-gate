@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -715,6 +715,7 @@ privcmd_HYPERVISOR_memory_op(int cmd, void *arg)
 		struct xen_add_to_physmap xatp;
 		struct xen_memory_map mm;
 		struct xen_foreign_memory_map fmm;
+		struct xen_pod_target pd;
 	} op_arg;
 
 	op_ie = sub_ie = gpfn_ie = mfn_ie = null_ie;
@@ -832,6 +833,13 @@ privcmd_HYPERVISOR_memory_op(int cmd, void *arg)
 		    struct xen_memory_map *, taddr);
 		break;
 	}
+
+	case XENMEM_set_pod_target:
+	case XENMEM_get_pod_target:
+		if (import_buffer(&op_ie, arg, &op_arg, sizeof (op_arg.pd),
+		    IE_IMPEXP) != 0)
+			return (-X_EFAULT);
+		break;
 
 	default:
 #ifdef DEBUG
