@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -899,12 +899,6 @@ lwp_exit(void)
 		stop(PR_SUSPENDED, SUSPEND_NORMAL);
 
 	/*
-	 * Block the process against /proc now that we have really acquired
-	 * p->p_lock (to decrement p_lwpcnt and manipulate p_tlist at least).
-	 */
-	prbarrier(p);
-
-	/*
 	 * Call proc_exit() if this is the last non-daemon lwp in the process.
 	 */
 	if (!(t->t_proc_flag & TP_DAEMON) &&
@@ -922,8 +916,19 @@ lwp_exit(void)
 		 */
 		mutex_enter(&p->p_lock);
 		ASSERT(curproc->p_flag & SEXITLWPS);
-		prbarrier(p);
 	}
+
+	mutex_exit(&p->p_lock);
+
+	lwp_pcb_exit();
+
+	mutex_enter(&p->p_lock);
+
+	/*
+	 * Block the process against /proc now that we have really acquired
+	 * p->p_lock (to decrement p_lwpcnt and manipulate p_tlist at least).
+	 */
+	prbarrier(p);
 
 	DTRACE_PROC(lwp__exit);
 
@@ -1035,8 +1040,6 @@ lwp_exit(void)
 	t->t_prev->t_next = t->t_next;
 	cv_broadcast(&t->t_joincv);	/* wake up anyone in thread_join */
 	mutex_exit(&pidlock);
-
-	lwp_pcb_exit();
 
 	t->t_state = TS_ZOMB;
 	swtch_from_zombie();

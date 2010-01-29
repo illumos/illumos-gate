@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -400,6 +400,8 @@ proc_exit(int why, int what)
 		 */
 		z->zone_proc_initpid = -1;
 	}
+
+	lwp_pcb_exit();
 
 	/*
 	 * Allocate a sigqueue now, before we grab locks.
@@ -869,8 +871,6 @@ proc_exit(int why, int what)
 		kmem_free(ret_tidhash, sizeof (*ret_tidhash));
 		ret_tidhash = next;
 	}
-
-	lwp_pcb_exit();
 
 	thread_exit();
 	/* NOTREACHED */

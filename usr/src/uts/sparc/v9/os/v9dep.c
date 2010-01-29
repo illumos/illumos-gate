@@ -23,7 +23,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1596,6 +1596,7 @@ lwp_pcb_exit(void)
 	klwp_t *lwp = ttolwp(curthread);
 
 	if (lwp->lwp_pcb.pcb_flags & ASYNC_HWERR) {
+		lwp->lwp_pcb.pcb_flags &= ~ASYNC_HWERR;
 		trap_async_hwerr();
 	}
 }
