@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,10 +37,11 @@
 #include "px_obj.h"
 #include "px_err.h"
 
-static void px_err_fill_pf_data(dev_info_t *dip, px_t *px_p, px_rc_err_t *epkt);
+static void px_err_fill_pfd(dev_info_t *dip, pf_data_t *pfd_p,
+    px_rc_err_t *epkt);
 static uint_t px_err_intr(px_fault_t *fault_p, px_rc_err_t *epkt);
 static int  px_err_epkt_severity(px_t *px_p, ddi_fm_error_t *derr,
-    px_rc_err_t *epkt, int caller);
+    px_rc_err_t *epkt, pf_data_t *pfd_p);
 
 static void px_err_log_handle(dev_info_t *dip, px_rc_err_t *epkt,
     boolean_t is_block_pci, char *msg);
@@ -54,13 +55,13 @@ static int px_mmu_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr,
 static int px_intr_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr,
     px_rc_err_t *epkt);
 static int px_port_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr,
-    px_rc_err_t *epkt);
+    px_rc_err_t *epkt, pf_data_t *pfd_p);
 static int px_pcie_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr,
     px_rc_err_t *epkt);
 static int px_intr_handle_errors(dev_info_t *dip, ddi_fm_error_t *derr,
     px_rc_err_t *epkt);
 static int px_port_handle_errors(dev_info_t *dip, ddi_fm_error_t *derr,
-    px_rc_err_t *epkt);
+    px_rc_err_t *epkt, pf_data_t *pfd_p);
 static void px_fix_legacy_epkt(dev_info_t *dip, ddi_fm_error_t *derr,
     px_rc_err_t *epkt);
 static int px_mmu_handle_lookup(dev_info_t *dip, ddi_fm_error_t *derr,
@@ -138,7 +139,7 @@ px_err_cmn_intr(px_t *px_p, ddi_fm_error_t *derr, int caller, int block)
  * fills RC specific fault data
  */
 static void
-px_err_fill_pfd(dev_info_t *dip, px_t *px_p, px_rc_err_t *epkt) {
+px_err_fill_pfd(dev_info_t *dip, pf_data_t *pfd_p, px_rc_err_t *epkt) {
 	pf_pcie_adv_err_regs_t adv_reg;
 	int		sts = DDI_SUCCESS;
 	pcie_req_id_t	fault_bdf = PCIE_INVALID_BDF;
@@ -151,9 +152,13 @@ px_err_fill_pfd(dev_info_t *dip, px_t *px_p, px_rc_err_t *epkt) {
 		s_status = PCI_STAT_S_TARG_AB;
 		fault_addr = NULL;
 
-		if (epkt->rc_descr.H)
+		if (epkt->rc_descr.H) {
 			fault_bdf = (pcie_req_id_t)(epkt->hdr[0] >> 16);
-		else
+			PFD_AFFECTED_DEV(pfd_p)->pe_affected_flags =
+			    PF_AFFECTED_BDF;
+			PFD_AFFECTED_DEV(pfd_p)->pe_affected_bdf =
+			    fault_bdf;
+		} else
 			sts = DDI_FAILURE;
 	} else {
 		px_pec_err_t	*pec_p = (px_pec_err_t *)epkt;
@@ -182,10 +187,34 @@ px_err_fill_pfd(dev_info_t *dip, px_t *px_p, px_rc_err_t *epkt) {
 		sts = pf_tlp_decode(PCIE_DIP2BUS(dip), &adv_reg);
 		fault_bdf = adv_reg.pcie_ue_tgt_bdf;
 		fault_addr = adv_reg.pcie_ue_tgt_addr;
+		/* affected BDF is to be filled in by px_scan_fabric */
 	}
 
-	if (sts == DDI_SUCCESS)
-		px_rp_en_q(px_p, fault_bdf, fault_addr, s_status);
+	if (sts == DDI_SUCCESS) {
+		PCIE_ROOT_FAULT(pfd_p)->scan_bdf = fault_bdf;
+		PCIE_ROOT_FAULT(pfd_p)->scan_addr = (uint64_t)fault_addr;
+		PCI_BDG_ERR_REG(pfd_p)->pci_bdg_sec_stat = s_status;
+	}
+}
+
+/*
+ * Convert error severity from PX internal values to PCIe Fabric values.  Most
+ * are self explanitory, except PX_PROTECTED.  PX_PROTECTED will never be
+ * returned as is if forgivable.
+ */
+static int px_err_to_fab_sev(int rc_err) {
+	int fab_err = 0;
+
+	if (rc_err & (PX_HW_RESET | PX_EXPECTED | PX_NO_PANIC))
+		fab_err |= PF_ERR_NO_PANIC;
+
+	if (rc_err & (PX_PANIC | PX_PROTECTED))
+		fab_err |= PF_ERR_PANIC;
+
+	if (rc_err & PX_NO_ERROR)
+		fab_err |= PF_ERR_NO_ERROR;
+
+	return (fab_err);
 }
 
 /*
@@ -207,9 +236,14 @@ px_err_intr(px_fault_t *fault_p, px_rc_err_t *epkt)
 	dev_info_t	*rpdip = px_p->px_dip;
 	int		rc_err, fab_err, msg;
 	ddi_fm_error_t	derr;
+	pf_data_t	*pfd_p;
 
 	if (px_fm_enter(px_p) != DDI_SUCCESS)
 		goto done;
+
+	pfd_p = px_get_pfd(px_p);
+	PCIE_ROOT_EH_SRC(pfd_p)->intr_type = PF_INTR_TYPE_INTERNAL;
+	PCIE_ROOT_EH_SRC(pfd_p)->intr_data = epkt;
 
 	/* Create the derr */
 	bzero(&derr, sizeof (ddi_fm_error_t));
@@ -221,7 +255,16 @@ px_err_intr(px_fault_t *fault_p, px_rc_err_t *epkt)
 	(void) px_err_cmn_intr(px_p, &derr, PX_INTR_CALL, PX_FM_BLOCK_ALL);
 
 	/* Check the severity of this error */
-	rc_err = px_err_epkt_severity(px_p, &derr, epkt, PX_INTR_CALL);
+	rc_err = px_err_epkt_severity(px_p, &derr, epkt, pfd_p);
+
+	pfd_p->pe_severity_flags = px_err_to_fab_sev(rc_err);
+	/*
+	 * px_err_epkt_severity needs to populate affected dev
+	 * Only MMU errors and PCIe errors need this.
+	 * For MMU we will call pf_handle_lookup, using fault bdf
+	 * - need to call bdf look up..
+	 * For PCIe do not fill in affected..
+	 */
 
 	/* Scan the fabric if the root port is not in drain state. */
 	fab_err = px_scan_fabric(px_p, rpdip, &derr);
@@ -265,7 +308,7 @@ done:
  */
 static int
 px_err_epkt_severity(px_t *px_p, ddi_fm_error_t *derr, px_rc_err_t *epkt,
-    int caller)
+    pf_data_t *pfd_p)
 {
 	px_pec_t 	*pec_p = px_p->px_pec_p;
 	dev_info_t	*dip = px_p->px_dip;
@@ -277,23 +320,13 @@ px_err_epkt_severity(px_t *px_p, ddi_fm_error_t *derr, px_rc_err_t *epkt,
 	/* Cautious access error handling  */
 	switch (derr->fme_flag) {
 	case DDI_FM_ERR_EXPECTED:
-		if (caller == PX_TRAP_CALL) {
-			/*
-			 * for ddi_caut_get treat all events as nonfatal
-			 * The trampoline will set err_ena = 0,
-			 * err_status = NONFATAL.
-			 */
-			derr->fme_status = DDI_FM_NONFATAL;
-			is_safeacc = B_TRUE;
-		} else {
-			/*
-			 * For ddi_caut_put treat all events as nonfatal. Here
-			 * we have the handle and can call ndi_fm_acc_err_set().
-			 */
-			derr->fme_status = DDI_FM_NONFATAL;
-			ndi_fm_acc_err_set(pec_p->pec_acc_hdl, derr);
-			is_safeacc = B_TRUE;
-		}
+		/*
+		 * For ddi_caut_put treat all events as nonfatal. Here
+		 * we have the handle and can call ndi_fm_acc_err_set().
+		 */
+		derr->fme_status = DDI_FM_NONFATAL;
+		ndi_fm_acc_err_set(pec_p->pec_acc_hdl, derr);
+		is_safeacc = B_TRUE;
 		break;
 	case DDI_FM_ERR_PEEK:
 	case DDI_FM_ERR_POKE:
@@ -316,21 +349,23 @@ px_err_epkt_severity(px_t *px_p, ddi_fm_error_t *derr, px_rc_err_t *epkt,
 	switch (epkt->rc_descr.block) {
 	case BLOCK_HOSTBUS:
 		err = px_cb_epkt_severity(dip, derr, epkt);
+		PFD_AFFECTED_DEV(pfd_p)->pe_affected_flags = PF_AFFECTED_SELF;
 		break;
 	case BLOCK_MMU:
 		err = px_mmu_epkt_severity(dip, derr, epkt);
-		px_err_fill_pfd(dip, px_p, epkt);
+		px_err_fill_pfd(dip, pfd_p, epkt);
 		break;
 	case BLOCK_INTR:
 		err = px_intr_epkt_severity(dip, derr, epkt);
+		PFD_AFFECTED_DEV(pfd_p)->pe_affected_flags = PF_AFFECTED_SELF;
 		break;
 	case BLOCK_PORT:
-		err = px_port_epkt_severity(dip, derr, epkt);
+		err = px_port_epkt_severity(dip, derr, epkt, pfd_p);
 		break;
 	case BLOCK_PCIE:
 		is_block_pci = B_TRUE;
 		err = px_pcie_epkt_severity(dip, derr, epkt);
-		px_err_fill_pfd(dip, px_p, epkt);
+		px_err_fill_pfd(dip, pfd_p, epkt);
 		break;
 	default:
 		err = 0;
@@ -599,7 +634,8 @@ px_intr_handle_errors(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt)
 
 /* ARGSUSED */
 static int
-px_port_handle_errors(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt)
+px_port_handle_errors(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt,
+    pf_data_t *pfd_p)
 {
 	pf_pcie_adv_err_regs_t	adv_reg;
 	uint16_t		s_status;
@@ -612,6 +648,7 @@ px_port_handle_errors(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt)
 	if (!((epkt->rc_descr.op == OP_PIO) &&
 	    (epkt->rc_descr.phase == PH_IRR))) {
 		sts = (PX_PANIC);
+		PFD_AFFECTED_DEV(pfd_p)->pe_affected_flags = PF_AFFECTED_SELF;
 		goto done;
 	}
 
@@ -657,8 +694,9 @@ px_port_handle_errors(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt)
 		s_status = PCI_STAT_R_MAST_AB;
 		break;
 	}
-	px_rp_en_q(DIP_TO_STATE(dip), adv_reg.pcie_ue_tgt_bdf,
-	    adv_reg.pcie_ue_tgt_addr, s_status);
+	PCIE_ROOT_FAULT(pfd_p)->scan_bdf = adv_reg.pcie_ue_tgt_bdf;
+	PCIE_ROOT_FAULT(pfd_p)->scan_addr = adv_reg.pcie_ue_tgt_addr;
+	PCI_BDG_ERR_REG(pfd_p)->pci_bdg_sec_stat = s_status;
 
 done:
 	return (sts);

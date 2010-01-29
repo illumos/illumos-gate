@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -288,6 +288,11 @@ int e_ddi_device_retired(char *devpath);
  */
 extern int i_ddi_incr_locked_memory(proc_t *, rctl_qty_t);
 extern void i_ddi_decr_locked_memory(proc_t *, rctl_qty_t);
+
+/*
+ * Direct I/O support functions
+ */
+extern void translate_devid(dev_info_t *dip);
 
 #endif	/* _KERNEL */
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -88,16 +88,20 @@
 typedef struct pf_fab_err_tbl {
 	uint32_t	bit;		/* Error bit */
 	int		(*handler)();	/* Error handling fuction */
+	uint16_t	affected_flags; /* Primary affected flag */
+	/*
+	 * Secondary affected flag, effective when the information
+	 * indicated by the primary flag is not available, eg.
+	 * PF_AFFECTED_AER/SAER/ADDR
+	 */
+	uint16_t	sec_affected_flags;
 } pf_fab_err_tbl_t;
 
 static pcie_bus_t *pf_is_ready(dev_info_t *);
 /* Functions for scanning errors */
 static int pf_default_hdl(dev_info_t *, pf_impl_t *);
 static int pf_dispatch(dev_info_t *, pf_impl_t *, boolean_t);
-static boolean_t pf_in_bus_range(pcie_bus_t *, pcie_req_id_t);
 static boolean_t pf_in_addr_range(pcie_bus_t *, uint64_t);
-
-static int pf_pci_decode(pf_data_t *, uint16_t *);
 
 /* Functions for gathering errors */
 static void pf_pcix_ecc_regs_gather(pf_pcix_ecc_regs_t *pcix_ecc_regs,
@@ -153,9 +157,38 @@ static int pf_log_hdl_lookup(dev_info_t *, ddi_fm_error_t *, pf_data_t *,
 
 static int pf_handler_enter(dev_info_t *, pf_impl_t *);
 static void pf_handler_exit(dev_info_t *);
+static void pf_reset_pfd(pf_data_t *);
 
 boolean_t pcie_full_scan = B_FALSE;	/* Force to always do a full scan */
 int pcie_disable_scan = 0;		/* Disable fabric scan */
+
+/* Inform interested parties that error handling is about to begin. */
+/* ARGSUSED */
+void
+pf_eh_enter(pcie_bus_t *bus_p) {
+}
+
+/* Inform interested parties that error handling has ended. */
+void
+pf_eh_exit(pcie_bus_t *bus_p)
+{
+	pcie_bus_t *rbus_p = PCIE_DIP2BUS(bus_p->bus_rp_dip);
+	pf_data_t *root_pfd_p = PCIE_BUS2PFD(rbus_p);
+	pf_data_t *pfd_p;
+	uint_t intr_type = PCIE_ROOT_EH_SRC(root_pfd_p)->intr_type;
+
+	pciev_eh_exit(root_pfd_p, intr_type);
+
+	/* Clear affected device info and INTR SRC */
+	for (pfd_p = root_pfd_p; pfd_p; pfd_p = pfd_p->pe_next) {
+		PFD_AFFECTED_DEV(pfd_p)->pe_affected_flags = 0;
+		PFD_AFFECTED_DEV(pfd_p)->pe_affected_bdf = PCIE_INVALID_BDF;
+		if (PCIE_IS_ROOT(PCIE_PFD2BUS(pfd_p))) {
+			PCIE_ROOT_EH_SRC(pfd_p)->intr_type = PF_INTR_TYPE_NONE;
+			PCIE_ROOT_EH_SRC(pfd_p)->intr_data = NULL;
+		}
+	}
+}
 
 /*
  * Scan Fabric is the entry point for PCI/PCIe IO fabric errors.  The
@@ -250,10 +283,10 @@ done:
 	pf_send_ereport(derr, &impl);
 
 	/*
-	 * Check if any hardened driver's callback reported a panic or scan
-	 * fabric was unable to gather all the information needed.  If so panic.
+	 * Check if any hardened driver's callback reported a panic.
+	 * If so panic.
 	 */
-	if (scan_flag & (PF_SCAN_CB_FAILURE | PF_SCAN_BAD_RESPONSE))
+	if (scan_flag & PF_SCAN_CB_FAILURE)
 		analyse_flag |= PF_ERR_PANIC;
 
 	/*
@@ -311,15 +344,6 @@ pf_dispatch(dev_info_t *pdip, pf_impl_t *impl, boolean_t full_scan)
 			scan_flag |= hdl_flag;
 
 			/*
-			 * If pf_default_hdl was not able gather error
-			 * information, it means this device wasn't added to the
-			 * error q list.  In that case exit the lock now,
-			 * otherwise it'll be locked forever.
-			 */
-			if (hdl_flag & PF_SCAN_BAD_RESPONSE)
-				pf_handler_exit(dip);
-
-			/*
 			 * A bridge may have detected no errors in which case
 			 * there is no need to scan further down.
 			 */
@@ -372,7 +396,7 @@ pf_dispatch(dev_info_t *pdip, pf_impl_t *impl, boolean_t full_scan)
 }
 
 /* Returns whether the "bdf" is in the bus range of a switch/bridge */
-static boolean_t
+boolean_t
 pf_in_bus_range(pcie_bus_t *bus_p, pcie_req_id_t bdf)
 {
 	pci_bus_range_t *br_p = &bus_p->bus_bus_range;
@@ -388,6 +412,25 @@ pf_in_bus_range(pcie_bus_t *bus_p, pcie_req_id_t bdf)
 }
 
 /*
+ * Return whether the "addr" is in the assigned addr of a device.
+ */
+boolean_t
+pf_in_assigned_addr(pcie_bus_t *bus_p, uint64_t addr)
+{
+	uint_t		i;
+	uint64_t	low, hi;
+	pci_regspec_t	*assign_p = bus_p->bus_assigned_addr;
+
+	for (i = 0; i < bus_p->bus_assigned_entries; i++, assign_p++) {
+		low = assign_p->pci_phys_low;
+		hi = low + assign_p->pci_size_low;
+		if ((addr < hi) && (addr >= low))
+			return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
+/*
  * Returns whether the "addr" is in the addr range of a switch/bridge, or if the
  * "addr" is in the assigned addr of a device.
  */
@@ -397,15 +440,10 @@ pf_in_addr_range(pcie_bus_t *bus_p, uint64_t addr)
 	uint_t		i;
 	uint64_t	low, hi;
 	ppb_ranges_t	*ranges_p = bus_p->bus_addr_ranges;
-	pci_regspec_t	*assign_p = bus_p->bus_assigned_addr;
 
 	/* check if given address belongs to this device */
-	for (i = 0; i < bus_p->bus_assigned_entries; i++, assign_p++) {
-		low = assign_p->pci_phys_low;
-		hi = low + assign_p->pci_size_low;
-		if ((addr < hi) && (addr >= low))
-			return (B_TRUE);
-	}
+	if (pf_in_assigned_addr(bus_p, addr))
+		return (B_TRUE);
 
 	/* check if given address belongs to a child below this device */
 	if (!PCIE_IS_BDG(bus_p))
@@ -853,7 +891,7 @@ pf_pci_find_rp_fault(pf_data_t *pfd_p, pcie_bus_t *bus_p)
  * Returns a scan flag.
  * o PF_SCAN_SUCCESS - Error gathered and cleared sucessfuly, data added to
  *   Fault Q
- * o PF_SCAN_BAD_RESPONSE - Unable to talk to device, item not added to fault Q
+ * o PF_SCAN_BAD_RESPONSE - Unable to talk to device, item added to fault Q
  * o PF_SCAN_CB_FAILURE - A hardened device deemed that the error was fatal.
  * o PF_SCAN_NO_ERR_IN_CHILD - Only applies to bridge to prevent further
  *   unnecessary scanning
@@ -886,6 +924,19 @@ pf_default_hdl(dev_info_t *dip, pf_impl_t *impl)
 		    PCI_ERROR_SUBCLASS, PCI_NR);
 		ddi_fm_ereport_post(dip, buf, fm_ena_generate(0, FM_ENA_FMT1),
 		    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0, NULL);
+
+		/*
+		 * For IOV/Hotplug purposes skip gathering info fo this device,
+		 * but populate affected info and severity.  Clear out any data
+		 * that maybe been saved in the last fabric scan.
+		 */
+		pf_reset_pfd(pfd_p);
+		pfd_p->pe_severity_flags = PF_ERR_PANIC_BAD_RESPONSE;
+		PFD_AFFECTED_DEV(pfd_p)->pe_affected_flags = PF_AFFECTED_SELF;
+
+		/* Add the snapshot to the error q */
+		pf_en_dq(pfd_p, impl);
+		pfd_p->pe_valid = B_TRUE;
 
 		return (PF_SCAN_BAD_RESPONSE);
 	}
@@ -1099,86 +1150,206 @@ pf_en_dq(pf_data_t *pfd_p, pf_impl_t *impl)
  * - SD: as leaves do not have children
  */
 const pf_fab_err_tbl_t pcie_pcie_tbl[] = {
-	PCIE_AER_UCE_DLP,	pf_panic,
-	PCIE_AER_UCE_PTLP,	pf_analyse_ptlp,
-	PCIE_AER_UCE_FCP,	pf_panic,
-	PCIE_AER_UCE_TO,	pf_analyse_to,
-	PCIE_AER_UCE_CA,	pf_analyse_ca_ur,
-	PCIE_AER_UCE_UC,	pf_analyse_uc,
-	PCIE_AER_UCE_RO,	pf_panic,
-	PCIE_AER_UCE_MTLP,	pf_panic,
-	PCIE_AER_UCE_ECRC,	pf_panic,
-	PCIE_AER_UCE_UR,	pf_analyse_ca_ur,
-	NULL,			NULL
+	{PCIE_AER_UCE_DLP,	pf_panic,
+	    PF_AFFECTED_PARENT, 0},
+
+	{PCIE_AER_UCE_PTLP,	pf_analyse_ptlp,
+	    PF_AFFECTED_SELF, 0},
+
+	{PCIE_AER_UCE_FCP,	pf_panic,
+	    PF_AFFECTED_PARENT, 0},
+
+	{PCIE_AER_UCE_TO,	pf_analyse_to,
+	    PF_AFFECTED_SELF, 0},
+
+	{PCIE_AER_UCE_CA,	pf_analyse_ca_ur,
+	    PF_AFFECTED_SELF, 0},
+
+	{PCIE_AER_UCE_UC,	pf_analyse_uc,
+	    0, 0},
+
+	{PCIE_AER_UCE_RO,	pf_panic,
+	    PF_AFFECTED_PARENT, 0},
+
+	{PCIE_AER_UCE_MTLP,	pf_panic,
+	    PF_AFFECTED_PARENT, 0},
+
+	{PCIE_AER_UCE_ECRC,	pf_panic,
+	    PF_AFFECTED_SELF, 0},
+
+	{PCIE_AER_UCE_UR,	pf_analyse_ca_ur,
+	    PF_AFFECTED_SELF, 0},
+
+	{NULL, NULL, NULL, NULL}
 };
 
 const pf_fab_err_tbl_t pcie_rp_tbl[] = {
-	PCIE_AER_UCE_TRAINING,	pf_no_panic,
-	PCIE_AER_UCE_DLP,	pf_panic,
-	PCIE_AER_UCE_SD,	pf_no_panic,
-	PCIE_AER_UCE_PTLP,	pf_analyse_ptlp,
-	PCIE_AER_UCE_FCP,	pf_panic,
-	PCIE_AER_UCE_TO,	pf_panic,
-	PCIE_AER_UCE_CA,	pf_no_panic,
-	PCIE_AER_UCE_UC,	pf_analyse_uc,
-	PCIE_AER_UCE_RO,	pf_panic,
-	PCIE_AER_UCE_MTLP,	pf_panic,
-	PCIE_AER_UCE_ECRC,	pf_panic,
-	PCIE_AER_UCE_UR,	pf_no_panic,
-	NULL,			NULL
+	{PCIE_AER_UCE_TRAINING,	pf_no_panic,
+	    PF_AFFECTED_SELF | PF_AFFECTED_CHILDREN, 0},
+
+	{PCIE_AER_UCE_DLP,	pf_panic,
+	    PF_AFFECTED_SELF | PF_AFFECTED_CHILDREN, 0},
+
+	{PCIE_AER_UCE_SD,	pf_no_panic,
+	    PF_AFFECTED_SELF | PF_AFFECTED_CHILDREN, 0},
+
+	{PCIE_AER_UCE_PTLP,	pf_analyse_ptlp,
+	    PF_AFFECTED_AER, PF_AFFECTED_CHILDREN},
+
+	{PCIE_AER_UCE_FCP,	pf_panic,
+	    PF_AFFECTED_SELF | PF_AFFECTED_CHILDREN, 0},
+
+	{PCIE_AER_UCE_TO,	pf_panic,
+	    PF_AFFECTED_ADDR, PF_AFFECTED_CHILDREN},
+
+	{PCIE_AER_UCE_CA,	pf_no_panic,
+	    PF_AFFECTED_AER, PF_AFFECTED_CHILDREN},
+
+	{PCIE_AER_UCE_UC,	pf_analyse_uc,
+	    0, 0},
+
+	{PCIE_AER_UCE_RO,	pf_panic,
+	    PF_AFFECTED_SELF | PF_AFFECTED_CHILDREN, 0},
+
+	{PCIE_AER_UCE_MTLP,	pf_panic,
+	    PF_AFFECTED_SELF | PF_AFFECTED_AER,
+	    PF_AFFECTED_SELF | PF_AFFECTED_CHILDREN},
+
+	{PCIE_AER_UCE_ECRC,	pf_panic,
+	    PF_AFFECTED_AER, PF_AFFECTED_CHILDREN},
+
+	{PCIE_AER_UCE_UR,	pf_no_panic,
+	    PF_AFFECTED_AER, PF_AFFECTED_CHILDREN},
+
+	{NULL, NULL, NULL, NULL}
 };
 
 const pf_fab_err_tbl_t pcie_sw_tbl[] = {
-	PCIE_AER_UCE_TRAINING,	pf_no_panic,
-	PCIE_AER_UCE_DLP,	pf_panic,
-	PCIE_AER_UCE_SD,	pf_no_panic,
-	PCIE_AER_UCE_PTLP,	pf_analyse_ptlp,
-	PCIE_AER_UCE_FCP,	pf_panic,
-	PCIE_AER_UCE_TO,	pf_analyse_to,
-	PCIE_AER_UCE_CA,	pf_analyse_ca_ur,
-	PCIE_AER_UCE_UC,	pf_analyse_uc,
-	PCIE_AER_UCE_RO,	pf_panic,
-	PCIE_AER_UCE_MTLP,	pf_panic,
-	PCIE_AER_UCE_ECRC,	pf_panic,
-	PCIE_AER_UCE_UR,	pf_analyse_ca_ur,
-	NULL,			NULL
+	{PCIE_AER_UCE_TRAINING,	pf_no_panic,
+	    PF_AFFECTED_SELF | PF_AFFECTED_CHILDREN, 0},
+
+	{PCIE_AER_UCE_DLP,	pf_panic,
+	    PF_AFFECTED_SELF | PF_AFFECTED_CHILDREN, 0},
+
+	{PCIE_AER_UCE_SD,	pf_no_panic,
+	    PF_AFFECTED_SELF | PF_AFFECTED_CHILDREN, 0},
+
+	{PCIE_AER_UCE_PTLP,	pf_analyse_ptlp,
+	    PF_AFFECTED_AER, PF_AFFECTED_SELF | PF_AFFECTED_CHILDREN},
+
+	{PCIE_AER_UCE_FCP,	pf_panic,
+	    PF_AFFECTED_SELF | PF_AFFECTED_CHILDREN, 0},
+
+	{PCIE_AER_UCE_TO,	pf_analyse_to,
+	    PF_AFFECTED_CHILDREN, 0},
+
+	{PCIE_AER_UCE_CA,	pf_analyse_ca_ur,
+	    PF_AFFECTED_AER, PF_AFFECTED_SELF | PF_AFFECTED_CHILDREN},
+
+	{PCIE_AER_UCE_UC,	pf_analyse_uc,
+	    0, 0},
+
+	{PCIE_AER_UCE_RO,	pf_panic,
+	    PF_AFFECTED_SELF | PF_AFFECTED_CHILDREN, 0},
+
+	{PCIE_AER_UCE_MTLP,	pf_panic,
+	    PF_AFFECTED_SELF | PF_AFFECTED_AER,
+	    PF_AFFECTED_SELF | PF_AFFECTED_CHILDREN},
+
+	{PCIE_AER_UCE_ECRC,	pf_panic,
+	    PF_AFFECTED_AER, PF_AFFECTED_SELF | PF_AFFECTED_CHILDREN},
+
+	{PCIE_AER_UCE_UR,	pf_analyse_ca_ur,
+	    PF_AFFECTED_AER, PF_AFFECTED_SELF | PF_AFFECTED_CHILDREN},
+
+	{NULL, NULL, NULL, NULL}
 };
 
 const pf_fab_err_tbl_t pcie_pcie_bdg_tbl[] = {
-	PCIE_AER_SUCE_TA_ON_SC,		pf_analyse_sc,
-	PCIE_AER_SUCE_MA_ON_SC,		pf_analyse_sc,
-	PCIE_AER_SUCE_RCVD_TA,		pf_analyse_ma_ta,
-	PCIE_AER_SUCE_RCVD_MA,		pf_analyse_ma_ta,
-	PCIE_AER_SUCE_USC_ERR,		pf_panic,
-	PCIE_AER_SUCE_USC_MSG_DATA_ERR,	pf_analyse_ma_ta,
-	PCIE_AER_SUCE_UC_DATA_ERR,	pf_analyse_uc_data,
-	PCIE_AER_SUCE_UC_ATTR_ERR,	pf_panic,
-	PCIE_AER_SUCE_UC_ADDR_ERR,	pf_panic,
-	PCIE_AER_SUCE_TIMER_EXPIRED,	pf_panic,
-	PCIE_AER_SUCE_PERR_ASSERT,	pf_analyse_perr_assert,
-	PCIE_AER_SUCE_SERR_ASSERT,	pf_no_panic,
-	PCIE_AER_SUCE_INTERNAL_ERR,	pf_panic,
-	NULL,			NULL
+	{PCIE_AER_SUCE_TA_ON_SC,	pf_analyse_sc,
+	    0, 0},
+
+	{PCIE_AER_SUCE_MA_ON_SC,	pf_analyse_sc,
+	    0, 0},
+
+	{PCIE_AER_SUCE_RCVD_TA,		pf_analyse_ma_ta,
+	    0, 0},
+
+	{PCIE_AER_SUCE_RCVD_MA,		pf_analyse_ma_ta,
+	    0, 0},
+
+	{PCIE_AER_SUCE_USC_ERR,		pf_panic,
+	    PF_AFFECTED_SAER, PF_AFFECTED_CHILDREN},
+
+	{PCIE_AER_SUCE_USC_MSG_DATA_ERR, pf_analyse_ma_ta,
+	    PF_AFFECTED_SAER, PF_AFFECTED_CHILDREN},
+
+	{PCIE_AER_SUCE_UC_DATA_ERR,	pf_analyse_uc_data,
+	    PF_AFFECTED_SAER, PF_AFFECTED_CHILDREN},
+
+	{PCIE_AER_SUCE_UC_ATTR_ERR,	pf_panic,
+	    PF_AFFECTED_CHILDREN, 0},
+
+	{PCIE_AER_SUCE_UC_ADDR_ERR,	pf_panic,
+	    PF_AFFECTED_CHILDREN, 0},
+
+	{PCIE_AER_SUCE_TIMER_EXPIRED,	pf_panic,
+	    PF_AFFECTED_SELF | PF_AFFECTED_CHILDREN, 0},
+
+	{PCIE_AER_SUCE_PERR_ASSERT,	pf_analyse_perr_assert,
+	    0, 0},
+
+	{PCIE_AER_SUCE_SERR_ASSERT,	pf_no_panic,
+	    0, 0},
+
+	{PCIE_AER_SUCE_INTERNAL_ERR,	pf_panic,
+	    PF_AFFECTED_SELF | PF_AFFECTED_CHILDREN, 0},
+
+	{NULL, NULL, NULL, NULL}
 };
 
 const pf_fab_err_tbl_t pcie_pci_bdg_tbl[] = {
-	PCI_STAT_PERROR,	pf_analyse_pci,
-	PCI_STAT_S_PERROR,	pf_analyse_pci,
-	PCI_STAT_S_SYSERR,	pf_panic,
-	PCI_STAT_R_MAST_AB,	pf_analyse_pci,
-	PCI_STAT_R_TARG_AB,	pf_analyse_pci,
-	PCI_STAT_S_TARG_AB,	pf_analyse_pci,
-	NULL,			NULL
+	{PCI_STAT_PERROR,	pf_analyse_pci,
+	    PF_AFFECTED_SELF, 0},
+
+	{PCI_STAT_S_PERROR,	pf_analyse_pci,
+	    PF_AFFECTED_SELF, 0},
+
+	{PCI_STAT_S_SYSERR,	pf_panic,
+	    PF_AFFECTED_SELF, 0},
+
+	{PCI_STAT_R_MAST_AB,	pf_analyse_pci,
+	    PF_AFFECTED_SELF, 0},
+
+	{PCI_STAT_R_TARG_AB,	pf_analyse_pci,
+	    PF_AFFECTED_SELF, 0},
+
+	{PCI_STAT_S_TARG_AB,	pf_analyse_pci,
+	    PF_AFFECTED_SELF, 0},
+
+	{NULL, NULL, NULL, NULL}
 };
 
 const pf_fab_err_tbl_t pcie_pci_tbl[] = {
-	PCI_STAT_PERROR,	pf_analyse_pci,
-	PCI_STAT_S_PERROR,	pf_analyse_pci,
-	PCI_STAT_S_SYSERR,	pf_panic,
-	PCI_STAT_R_MAST_AB,	pf_analyse_pci,
-	PCI_STAT_R_TARG_AB,	pf_analyse_pci,
-	PCI_STAT_S_TARG_AB,	pf_analyse_pci,
-	NULL,			NULL
+	{PCI_STAT_PERROR,	pf_analyse_pci,
+	    PF_AFFECTED_SELF, 0},
+
+	{PCI_STAT_S_PERROR,	pf_analyse_pci,
+	    PF_AFFECTED_SELF, 0},
+
+	{PCI_STAT_S_SYSERR,	pf_panic,
+	    PF_AFFECTED_SELF, 0},
+
+	{PCI_STAT_R_MAST_AB,	pf_analyse_pci,
+	    PF_AFFECTED_SELF, 0},
+
+	{PCI_STAT_R_TARG_AB,	pf_analyse_pci,
+	    PF_AFFECTED_SELF, 0},
+
+	{PCI_STAT_S_TARG_AB,	pf_analyse_pci,
+	    PF_AFFECTED_SELF, 0},
+
+	{NULL, NULL, NULL, NULL}
 };
 
 #define	PF_MASKED_AER_ERR(pfd_p) \
@@ -1200,6 +1371,10 @@ pf_analyse_error(ddi_fm_error_t *derr, pf_impl_t *impl)
 	for (pfd_p = impl->pf_dq_head_p; pfd_p; pfd_p = pfd_p->pe_next) {
 		sts_flags = 0;
 
+		/* skip analysing error when no error info is gathered */
+		if (pfd_p->pe_severity_flags == PF_ERR_PANIC_BAD_RESPONSE)
+			goto done;
+
 		switch (PCIE_PFD2BUS(pfd_p)->bus_dev_type) {
 		case PCIE_PCIECAP_DEV_TYPE_PCIE_DEV:
 		case PCIE_PCIECAP_DEV_TYPE_PCI_DEV:
@@ -1218,6 +1393,8 @@ pf_analyse_error(ddi_fm_error_t *derr, pf_impl_t *impl)
 			break;
 		case PCIE_PCIECAP_DEV_TYPE_RC_PSEUDO:
 			/* no adjust_for_aer for pseudo RC */
+			/* keep the severity passed on from RC if any */
+			sts_flags |= pfd_p->pe_severity_flags;
 			sts_flags |= pf_analyse_error_tbl(derr, impl, pfd_p,
 			    pcie_rp_tbl, PF_MASKED_AER_ERR(pfd_p));
 			break;
@@ -1267,6 +1444,12 @@ pf_analyse_error(ddi_fm_error_t *derr, pf_impl_t *impl)
 		}
 
 		pfd_p->pe_severity_flags = sts_flags;
+
+done:
+		pfd_p->pe_orig_severity_flags = pfd_p->pe_severity_flags;
+		/* Have pciev_eh adjust the severity */
+		pfd_p->pe_severity_flags = pciev_eh(pfd_p, impl);
+
 		error_flags |= pfd_p->pe_severity_flags;
 	}
 
@@ -1275,15 +1458,40 @@ pf_analyse_error(ddi_fm_error_t *derr, pf_impl_t *impl)
 
 static int
 pf_analyse_error_tbl(ddi_fm_error_t *derr, pf_impl_t *impl,
-    pf_data_t *pfd_p, const pf_fab_err_tbl_t *tbl, uint32_t err_reg) {
+    pf_data_t *pfd_p, const pf_fab_err_tbl_t *tbl, uint32_t err_reg)
+{
 	const pf_fab_err_tbl_t *row;
 	int err = 0;
+	uint16_t flags;
+	uint32_t bit;
 
-	for (row = tbl; err_reg && (row->bit != NULL) && !(err & PF_ERR_PANIC);
-	    row++) {
-		if (err_reg & row->bit)
-			err |= row->handler(derr, row->bit, impl->pf_dq_head_p,
-			    pfd_p);
+	for (row = tbl; err_reg && (row->bit != NULL); row++) {
+		bit = row->bit;
+		if (!(err_reg & bit))
+			continue;
+		err |= row->handler(derr, bit, impl->pf_dq_head_p, pfd_p);
+
+		flags = row->affected_flags;
+		/*
+		 * check if the primary flag is valid;
+		 * if not, use the secondary flag
+		 */
+		if (flags & PF_AFFECTED_AER) {
+			if (!HAS_AER_LOGS(pfd_p, bit)) {
+				flags = row->sec_affected_flags;
+			}
+		} else if (flags & PF_AFFECTED_SAER) {
+			if (!HAS_SAER_LOGS(pfd_p, bit)) {
+				flags = row->sec_affected_flags;
+			}
+		} else if (flags & PF_AFFECTED_ADDR) {
+			/* only Root has this flag */
+			if (PCIE_ROOT_FAULT(pfd_p)->scan_addr == 0) {
+				flags = row->sec_affected_flags;
+			}
+		}
+
+		PFD_AFFECTED_DEV(pfd_p)->pe_affected_flags |= flags;
 	}
 
 	if (!err)
@@ -1700,6 +1908,12 @@ pf_analyse_uc(ddi_fm_error_t *derr, uint32_t bit, pf_data_t *dq_head_p,
 	    (PCIE_PFD2BUS(pfd_p)->bus_bdf == (PCIE_ADV_HDR(pfd_p, 2) >> 16)))
 		return (PF_ERR_NO_PANIC);
 
+	/*
+	 * This is a case of mis-routing. Any of the switches above this
+	 * device could be at fault.
+	 */
+	PFD_AFFECTED_DEV(pfd_p)->pe_affected_flags = PF_AFFECTED_ROOT;
+
 	return (PF_ERR_PANIC);
 }
 
@@ -1996,7 +2210,7 @@ pf_pci_find_trans_type(pf_data_t *pfd_p, uint64_t *addr, uint32_t *trans_type,
  * [64:127] Address			(saer_h2-saer_h3)
  */
 /* ARGSUSED */
-static int
+int
 pf_pci_decode(pf_data_t *pfd_p, uint16_t *cmd) {
 	pcix_attr_t	*attr;
 	uint64_t	addr;
@@ -2365,7 +2579,7 @@ pf_tlp_decode(pcie_bus_t *bus_p, pf_pcie_adv_err_regs_t *adv_reg_p) {
 	case PCIE_TLP_TYPE_CPL:
 	case PCIE_TLP_TYPE_CPLLK:
 	{
-		pcie_cpl_t *cpl_tlp = (pcie_cpl_t *)adv_reg_p->pcie_ue_hdr;
+		pcie_cpl_t *cpl_tlp = (pcie_cpl_t *)&adv_reg_p->pcie_ue_hdr[1];
 
 		flt_addr = NULL;
 		flt_bdf = cpl_tlp->rid;
@@ -2696,6 +2910,18 @@ pf_send_ereport(ddi_fm_error_t *derr, pf_impl_t *impl)
 			    NULL);
 		}
 
+		/* IOV related information */
+		if (!PCIE_BDG_IS_UNASSIGNED(PCIE_PFD2BUS(impl->pf_dq_head_p))) {
+			fm_payload_set(ereport,
+			    "pcie_aff_flags", DATA_TYPE_UINT16,
+			    PFD_AFFECTED_DEV(pfd_p)->pe_affected_flags,
+			    "pcie_aff_bdf", DATA_TYPE_UINT16,
+			    PFD_AFFECTED_DEV(pfd_p)->pe_affected_bdf,
+			    "orig_sev", DATA_TYPE_UINT32,
+			    pfd_p->pe_orig_severity_flags,
+			    NULL);
+		}
+
 		/* Misc ereport information */
 		fm_payload_set(ereport,
 		    "remainder", DATA_TYPE_UINT32, total--,
@@ -2793,4 +3019,189 @@ pf_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr)
 		}
 	}
 	return (cb_sts);
+}
+
+static void
+pf_reset_pfd(pf_data_t *pfd_p)
+{
+	pcie_bus_t	*bus_p = PCIE_PFD2BUS(pfd_p);
+
+	pfd_p->pe_severity_flags = 0;
+	pfd_p->pe_orig_severity_flags = 0;
+	/* pe_lock and pe_valid were reset in pf_send_ereport */
+
+	PFD_AFFECTED_DEV(pfd_p)->pe_affected_flags = 0;
+	PFD_AFFECTED_DEV(pfd_p)->pe_affected_bdf = PCIE_INVALID_BDF;
+
+	if (PCIE_IS_ROOT(bus_p)) {
+		PCIE_ROOT_FAULT(pfd_p)->scan_bdf = PCIE_INVALID_BDF;
+		PCIE_ROOT_FAULT(pfd_p)->scan_addr = 0;
+		PCIE_ROOT_FAULT(pfd_p)->full_scan = B_FALSE;
+		PCIE_ROOT_EH_SRC(pfd_p)->intr_type = PF_INTR_TYPE_NONE;
+		PCIE_ROOT_EH_SRC(pfd_p)->intr_data = NULL;
+	}
+
+	if (PCIE_IS_BDG(bus_p)) {
+		bzero(PCI_BDG_ERR_REG(pfd_p), sizeof (pf_pci_bdg_err_regs_t));
+	}
+
+	PCI_ERR_REG(pfd_p)->pci_err_status = 0;
+	PCI_ERR_REG(pfd_p)->pci_cfg_comm = 0;
+
+	if (PCIE_IS_PCIE(bus_p)) {
+		if (PCIE_IS_ROOT(bus_p)) {
+			bzero(PCIE_RP_REG(pfd_p),
+			    sizeof (pf_pcie_rp_err_regs_t));
+			bzero(PCIE_ADV_RP_REG(pfd_p),
+			    sizeof (pf_pcie_adv_rp_err_regs_t));
+			PCIE_ADV_RP_REG(pfd_p)->pcie_rp_ce_src_id =
+			    PCIE_INVALID_BDF;
+			PCIE_ADV_RP_REG(pfd_p)->pcie_rp_ue_src_id =
+			    PCIE_INVALID_BDF;
+		} else if (PCIE_IS_PCIE_BDG(bus_p)) {
+			bzero(PCIE_ADV_BDG_REG(pfd_p),
+			    sizeof (pf_pcie_adv_bdg_err_regs_t));
+			PCIE_ADV_BDG_REG(pfd_p)->pcie_sue_tgt_bdf =
+			    PCIE_INVALID_BDF;
+		}
+
+		if (PCIE_IS_PCIE_BDG(bus_p) && PCIE_IS_PCIX(bus_p)) {
+			if (PCIX_ECC_VERSION_CHECK(bus_p)) {
+				bzero(PCIX_BDG_ECC_REG(pfd_p, 0),
+				    sizeof (pf_pcix_ecc_regs_t));
+				bzero(PCIX_BDG_ECC_REG(pfd_p, 1),
+				    sizeof (pf_pcix_ecc_regs_t));
+			}
+			PCIX_BDG_ERR_REG(pfd_p)->pcix_bdg_sec_stat = 0;
+			PCIX_BDG_ERR_REG(pfd_p)->pcix_bdg_stat = 0;
+		}
+
+		PCIE_ADV_REG(pfd_p)->pcie_adv_ctl = 0;
+		PCIE_ADV_REG(pfd_p)->pcie_ue_status = 0;
+		PCIE_ADV_REG(pfd_p)->pcie_ue_mask = 0;
+		PCIE_ADV_REG(pfd_p)->pcie_ue_sev = 0;
+		PCIE_ADV_HDR(pfd_p, 0) = 0;
+		PCIE_ADV_HDR(pfd_p, 1) = 0;
+		PCIE_ADV_HDR(pfd_p, 2) = 0;
+		PCIE_ADV_HDR(pfd_p, 3) = 0;
+		PCIE_ADV_REG(pfd_p)->pcie_ce_status = 0;
+		PCIE_ADV_REG(pfd_p)->pcie_ce_mask = 0;
+		PCIE_ADV_REG(pfd_p)->pcie_ue_tgt_trans = 0;
+		PCIE_ADV_REG(pfd_p)->pcie_ue_tgt_addr = 0;
+		PCIE_ADV_REG(pfd_p)->pcie_ue_tgt_bdf = PCIE_INVALID_BDF;
+
+		PCIE_ERR_REG(pfd_p)->pcie_err_status = 0;
+		PCIE_ERR_REG(pfd_p)->pcie_err_ctl = 0;
+		PCIE_ERR_REG(pfd_p)->pcie_dev_cap = 0;
+
+	} else if (PCIE_IS_PCIX(bus_p)) {
+		if (PCIE_IS_BDG(bus_p)) {
+			if (PCIX_ECC_VERSION_CHECK(bus_p)) {
+				bzero(PCIX_BDG_ECC_REG(pfd_p, 0),
+				    sizeof (pf_pcix_ecc_regs_t));
+				bzero(PCIX_BDG_ECC_REG(pfd_p, 1),
+				    sizeof (pf_pcix_ecc_regs_t));
+			}
+			PCIX_BDG_ERR_REG(pfd_p)->pcix_bdg_sec_stat = 0;
+			PCIX_BDG_ERR_REG(pfd_p)->pcix_bdg_stat = 0;
+		} else {
+			if (PCIX_ECC_VERSION_CHECK(bus_p)) {
+				bzero(PCIX_ECC_REG(pfd_p),
+				    sizeof (pf_pcix_ecc_regs_t));
+			}
+			PCIX_ERR_REG(pfd_p)->pcix_command = 0;
+			PCIX_ERR_REG(pfd_p)->pcix_status = 0;
+		}
+	}
+
+	pfd_p->pe_prev = NULL;
+	pfd_p->pe_next = NULL;
+	pfd_p->pe_rber_fatal = B_FALSE;
+}
+
+pcie_bus_t *
+pf_find_busp_by_bdf(pf_impl_t *impl, pcie_req_id_t bdf)
+{
+	pcie_bus_t *temp_bus_p;
+	pf_data_t *temp_pfd_p;
+
+	for (temp_pfd_p = impl->pf_dq_head_p;
+	    temp_pfd_p;
+	    temp_pfd_p = temp_pfd_p->pe_next) {
+		temp_bus_p = PCIE_PFD2BUS(temp_pfd_p);
+
+		if (bdf == temp_bus_p->bus_bdf) {
+			return (temp_bus_p);
+		}
+	}
+
+	return (NULL);
+}
+
+pcie_bus_t *
+pf_find_busp_by_addr(pf_impl_t *impl, uint64_t addr)
+{
+	pcie_bus_t *temp_bus_p;
+	pf_data_t *temp_pfd_p;
+
+	for (temp_pfd_p = impl->pf_dq_head_p;
+	    temp_pfd_p;
+	    temp_pfd_p = temp_pfd_p->pe_next) {
+		temp_bus_p = PCIE_PFD2BUS(temp_pfd_p);
+
+		if (pf_in_assigned_addr(temp_bus_p, addr)) {
+			return (temp_bus_p);
+		}
+	}
+
+	return (NULL);
+}
+
+pcie_bus_t *
+pf_find_busp_by_aer(pf_impl_t *impl, pf_data_t *pfd_p)
+{
+	pf_pcie_adv_err_regs_t *reg_p = PCIE_ADV_REG(pfd_p);
+	pcie_bus_t *temp_bus_p = NULL;
+	pcie_req_id_t bdf;
+	uint64_t addr;
+	pcie_tlp_hdr_t *tlp_hdr = (pcie_tlp_hdr_t *)reg_p->pcie_ue_hdr;
+	uint32_t trans_type = reg_p->pcie_ue_tgt_trans;
+
+	if ((tlp_hdr->type == PCIE_TLP_TYPE_CPL) ||
+	    (tlp_hdr->type == PCIE_TLP_TYPE_CPLLK)) {
+		pcie_cpl_t *cpl_tlp = (pcie_cpl_t *)&reg_p->pcie_ue_hdr[1];
+
+		bdf = (cpl_tlp->rid > cpl_tlp->cid) ? cpl_tlp->rid :
+		    cpl_tlp->cid;
+		temp_bus_p = pf_find_busp_by_bdf(impl, bdf);
+	} else if (trans_type == PF_ADDR_PIO) {
+		addr = reg_p->pcie_ue_tgt_addr;
+		temp_bus_p = pf_find_busp_by_addr(impl, addr);
+	} else {
+		/* PF_ADDR_DMA type */
+		bdf = reg_p->pcie_ue_tgt_bdf;
+		temp_bus_p = pf_find_busp_by_bdf(impl, bdf);
+	}
+
+	return (temp_bus_p);
+}
+
+pcie_bus_t *
+pf_find_busp_by_saer(pf_impl_t *impl, pf_data_t *pfd_p)
+{
+	pf_pcie_adv_bdg_err_regs_t *reg_p = PCIE_ADV_BDG_REG(pfd_p);
+	pcie_bus_t *temp_bus_p = NULL;
+	pcie_req_id_t bdf;
+	uint64_t addr;
+
+	addr = reg_p->pcie_sue_tgt_addr;
+	bdf = reg_p->pcie_sue_tgt_bdf;
+
+	if (addr != NULL) {
+		temp_bus_p = pf_find_busp_by_addr(impl, addr);
+	} else if (PCIE_CHECK_VALID_BDF(bdf)) {
+		temp_bus_p = pf_find_busp_by_bdf(impl, bdf);
+	}
+
+	return (temp_bus_p);
 }

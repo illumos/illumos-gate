@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,6 +77,7 @@ typedef struct ldma_agent {
 /* information about existing agents */
 extern ldma_agent_info_t ldma_device_info;
 extern ldma_agent_info_t ldma_system_info;
+extern ldma_agent_info_t ldma_dio_info;
 
 boolean_t ldma_debug = B_FALSE;
 boolean_t ldma_daemon = B_FALSE;
@@ -84,6 +85,7 @@ boolean_t ldma_daemon = B_FALSE;
 static ldma_agent_info_t *ldma_agent_infos[] = {
 	&ldma_device_info,
 	&ldma_system_info,
+	&ldma_dio_info,
 	NULL
 };
 

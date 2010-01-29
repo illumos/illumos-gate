@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -190,6 +190,7 @@ extern int px_err_add_intr(px_fault_t *px_fault_p);
 extern void px_err_rem_intr(px_fault_t *px_fault_p);
 extern int px_cb_add_intr(px_fault_t *);
 extern void px_cb_rem_intr(px_fault_t *);
+extern void px_panic_domain(px_t *px_p, pcie_req_id_t bdf);
 
 /*
  * CPR callback
@@ -214,6 +215,11 @@ extern int px_lib_set_root_complex_mps(px_t *px_p,  dev_info_t *dip, int mps);
  * Config space access
  */
 extern uint64_t px_lib_get_cfgacc_base(dev_info_t *dip);
+
+/*
+ * PCI IOV SDIO functions
+ */
+extern int px_lib_fabric_sync(dev_info_t *dip);
 
 #ifdef	__cplusplus
 }

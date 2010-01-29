@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * sun4u specific DDI implementation
@@ -130,7 +128,7 @@ check_status(int id, char *buf, dev_info_t *parent)
 	 * print the status property information
 	 */
 	cmn_err(CE_WARN, "status '%s' for '%s'%s",
-		status_buf, path, board_buf);
+	    status_buf, path, board_buf);
 	return (retval);
 }
 
@@ -395,4 +393,10 @@ dip_to_cpu_id(dev_info_t *dip, processorid_t *cpu_id)
 		}
 	}
 	return (DDI_FAILURE);
+}
+
+/* ARGSUSED */
+void
+translate_devid(dev_info_t *dip)
+{
 }

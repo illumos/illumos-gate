@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,6 +67,8 @@ px_msi_attach(px_t *px_p)
 		px_msi_detach(px_p);
 		return (DDI_FAILURE);
 	}
+
+	px_p->px_supp_intr_types |= (DDI_INTR_TYPE_MSI | DDI_INTR_TYPE_MSIX);
 
 	msi_state_p->msi_p = kmem_zalloc(msi_state_p->msi_cnt *
 	    sizeof (px_msi_t), KM_SLEEP);

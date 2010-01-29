@@ -20,7 +20,7 @@
 #
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -33,7 +33,9 @@ include ../Makefile.cmd
 SRCS=		ldmad.c			\
 		ldma_log.c		\
 		ldma_device.c		\
-		ldma_system.c
+		ldma_system.c		\
+		ldma_dio.c		\
+		mdesc_lib.c
 
 
 OBJS=		$(SRCS:%.c=%.o)
@@ -42,7 +44,7 @@ ROOTCMDDIR=		$(ROOTLIB)/ldoms
 ROOTMANIFESTDIR=	$(ROOTSVCPLATFORMSUN4V)
 $(ROOTMANIFEST)		:= FILEMODE= 444
 
-LDLIBS +=	-lds -ldladm
+LDLIBS +=	-lds -ldladm -ldevinfo
 INCS +=		-I$(ROOT)/usr/platform/sun4v/include/sys
 CPPFLAGS += 	$(INCS)
 C99MODE =	$(C99_ENABLE)

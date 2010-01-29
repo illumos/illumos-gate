@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,8 @@
 #include <sys/hsvc.h>
 #include <px_obj.h>
 #include <sys/machsystm.h>
+#include <sys/sunndi.h>
+#include <sys/pcie_impl.h>
 #include "px_lib4v.h"
 #include "px_err.h"
 #include <sys/pci_cfgacc.h>
@@ -52,11 +54,34 @@ uint_t px_ranges_phi_mask = ((1 << 28) -1);
  */
 static	uint64_t	px_vpci_min_ver; /* Negotiated VPCI API minor version */
 static	uint_t		px_vpci_users = 0; /* VPCI API users */
-
-static hsvc_info_t px_hsvc = {
+static	hsvc_info_t px_hsvc_vpci = {
 	HSVC_REV_1, NULL, HSVC_GROUP_VPCI, PX_VPCI_MAJOR_VER,
 	PX_VPCI_MINOR_VER, "PX"
 };
+
+/*
+ * Hypervisor SDIO services information for the px nexus driver.
+ */
+static	uint64_t	px_sdio_min_ver; /* Negotiated SDIO API minor version */
+static	uint_t		px_sdio_users = 0; /* SDIO API users */
+static	hsvc_info_t px_hsvc_sdio = {
+	HSVC_REV_1, NULL, HSVC_GROUP_SDIO, PX_SDIO_MAJOR_VER,
+	PX_SDIO_MINOR_VER, "PX"
+};
+
+/*
+ * Hypervisor SDIO ERR services information for the px nexus driver.
+ */
+static	uint64_t	px_sdio_err_min_ver; /* Negotiated SDIO ERR API */
+						/* minor version */
+static	uint_t		px_sdio_err_users = 0; /* SDIO ERR API users */
+static	hsvc_info_t px_hsvc_sdio_err = {
+	HSVC_REV_1, NULL, HSVC_GROUP_SDIO_ERR, PX_SDIO_ERR_MAJOR_VER,
+	PX_SDIO_ERR_MINOR_VER, "PX"
+};
+
+#define	CHILD_LOANED	"child_loaned"
+static int px_lib_count_waiting_dev(dev_info_t *);
 
 int
 px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
@@ -64,7 +89,7 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 	px_nexus_regspec_t	*rp;
 	uint_t			reglen;
 	int			ret;
-
+	px_t			*px_p = DIP_TO_STATE(dip);
 	uint64_t mjrnum;
 	uint64_t mnrnum;
 
@@ -111,23 +136,74 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 	DBG(DBG_ATTACH, dip, "px_lib_dev_init: dev_hdl 0x%llx\n", *dev_hdl);
 
 	/*
-	 * Negotiate the API version for VPCI hypervisor services.
+	 * If a /pci node has a pci-intx-not-supported property, this property
+	 * represents that the fabric doesn't support fixed interrupt.
 	 */
-	if (px_vpci_users++)
-		return (DDI_SUCCESS);
-
-	if ((ret = hsvc_register(&px_hsvc, &px_vpci_min_ver)) != 0) {
-		cmn_err(CE_WARN, "%s: cannot negotiate hypervisor services "
-		    "group: 0x%lx major: 0x%lx minor: 0x%lx errno: %d\n",
-		    px_hsvc.hsvc_modname, px_hsvc.hsvc_group,
-		    px_hsvc.hsvc_major, px_hsvc.hsvc_minor, ret);
-
-		return (DDI_FAILURE);
+	if (!ddi_prop_exists(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "pci-intx-not-supported")) {
+		DBG(DBG_ATTACH, dip, "px_lib_dev_init: "
+		    "pci-intx-not-supported is not found, dip=0x%p\n", dip);
+		px_p->px_supp_intr_types |= DDI_INTR_TYPE_FIXED;
 	}
 
+	/*
+	 * Negotiate the API version for VPCI hypervisor services.
+	 */
+	if ((px_vpci_users == 0) &&
+	    ((ret = hsvc_register(&px_hsvc_vpci, &px_vpci_min_ver)) != 0)) {
+		cmn_err(CE_WARN, "%s: cannot negotiate hypervisor services "
+		    "group: 0x%lx major: 0x%lx minor: 0x%lx errno: %d\n",
+		    px_hsvc_vpci.hsvc_modname, px_hsvc_vpci.hsvc_group,
+		    px_hsvc_vpci.hsvc_major, px_hsvc_vpci.hsvc_minor, ret);
+		return (DDI_FAILURE);
+	}
+	px_vpci_users++;
 	DBG(DBG_ATTACH, dip, "px_lib_dev_init: negotiated VPCI API version, "
-	    "major 0x%lx minor 0x%lx\n", px_hsvc.hsvc_major, px_vpci_min_ver);
+	    "major 0x%lx minor 0x%lx\n", px_hsvc_vpci.hsvc_major,
+	    px_vpci_min_ver);
 
+	/*
+	 * Negotiate the API version for SDIO hypervisor services.
+	 */
+	if ((px_sdio_users == 0) &&
+	    ((ret = hsvc_register(&px_hsvc_sdio, &px_sdio_min_ver)) != 0)) {
+		DBG(DBG_ATTACH, dip, "%s: cannot negotiate hypervisor "
+		    "services group: 0x%lx major: 0x%lx minor: 0x%lx "
+		    "errno: %d\n", px_hsvc_sdio.hsvc_modname,
+		    px_hsvc_sdio.hsvc_group, px_hsvc_sdio.hsvc_major,
+		    px_hsvc_sdio.hsvc_minor, ret);
+	} else {
+		px_sdio_users++;
+		DBG(DBG_ATTACH, dip, "px_lib_dev_init: negotiated SDIO API"
+		    "version, major 0x%lx minor 0x%lx\n",
+		    px_hsvc_sdio.hsvc_major, px_sdio_min_ver);
+	}
+
+	/*
+	 * Negotiate the API version for SDIO ERR hypervisor services.
+	 */
+	if ((px_sdio_err_users == 0) &&
+	    ((ret = hsvc_register(&px_hsvc_sdio_err,
+	    &px_sdio_err_min_ver)) != 0)) {
+		DBG(DBG_ATTACH, dip, "%s: cannot negotiate SDIO ERR hypervisor "
+		    "services group: 0x%lx major: 0x%lx minor: 0x%lx "
+		    "errno: %d\n", px_hsvc_sdio_err.hsvc_modname,
+		    px_hsvc_sdio_err.hsvc_group, px_hsvc_sdio_err.hsvc_major,
+		    px_hsvc_sdio_err.hsvc_minor, ret);
+	} else {
+		px_sdio_err_users++;
+		DBG(DBG_ATTACH, dip, "px_lib_dev_init: negotiated SDIO ERR API "
+		    "version, major 0x%lx minor 0x%lx\n",
+		    px_hsvc_sdio_err.hsvc_major, px_sdio_err_min_ver);
+	}
+
+	/*
+	 * Find out the number of dev we need to wait under this RC
+	 * before we issue fabric sync hypercall
+	 */
+	px_p->px_plat_p = (void *)(uintptr_t)px_lib_count_waiting_dev(dip);
+	DBG(DBG_ATTACH, dip, "Found %d bridges need waiting under RC %p",
+	    (int)(uintptr_t)px_p->px_plat_p, dip);
 	return (DDI_SUCCESS);
 }
 
@@ -142,7 +218,13 @@ px_lib_dev_fini(dev_info_t *dip)
 	    PCI_BUS_CONF_MAP_PROP);
 
 	if (--px_vpci_users == 0)
-		(void) hsvc_unregister(&px_hsvc);
+		(void) hsvc_unregister(&px_hsvc_vpci);
+
+	if (--px_sdio_users == 0)
+		(void) hsvc_unregister(&px_hsvc_sdio);
+
+	if (--px_sdio_err_users == 0)
+		(void) hsvc_unregister(&px_hsvc_sdio_err);
 
 	return (DDI_SUCCESS);
 }
@@ -350,7 +432,7 @@ px_lib_iommu_map(dev_info_t *dip, tsbid_t tsbid, pages_t pages,
 	 * and relaxed ordering attributes. Otherwise, pass only read or write
 	 * attribute.
 	 */
-	if (px_vpci_min_ver == PX_VPCI_MINOR_VER_0)
+	if (px_vpci_min_ver == PX_HSVC_MINOR_VER_0)
 		attr = attr & (PCI_MAP_ATTR_READ | PCI_MAP_ATTR_WRITE);
 
 	while ((ttes_mapped = pfn_p - pfns) < pages) {
@@ -1171,6 +1253,8 @@ px_pci_config_get(ddi_acc_impl_t *handle, uint32_t *addr, int size)
 {
 	px_config_acc_pvt_t *px_pvt = (px_config_acc_pvt_t *)
 	    handle->ahi_common.ah_bus_private;
+	pcie_bus_t *busp = NULL;
+	dev_info_t *cdip = NULL;
 	uint32_t pci_dev_addr = px_pvt->raddr;
 	uint32_t vaddr = px_pvt->vaddr;
 	uint16_t off = (uint16_t)(uintptr_t)(addr - vaddr) & 0xfff;
@@ -1180,6 +1264,22 @@ px_pci_config_get(ddi_acc_impl_t *handle, uint32_t *addr, int size)
 	    size, (pci_cfg_data_t *)&rdata) != DDI_SUCCESS)
 		/* XXX update error kstats */
 		return (0xffffffff);
+
+	if (cdip = pcie_find_dip_by_bdf(px_pvt->dip, pci_dev_addr >> 8))
+		busp = PCIE_DIP2BUS(cdip);
+	/*
+	 * This can be called early, before busp or busp->bus_dom has
+	 * been initialized, so check both before invoking
+	 * PCIE_IS_ASSIGNED.
+	 */
+	if (busp && PCIE_BUS2DOM(busp) && PCIE_IS_ASSIGNED(busp)) {
+		if (off == PCI_CONF_VENID && size == 2)
+			rdata = busp->bus_dev_ven_id & 0xffff;
+		else if (off == PCI_CONF_DEVID && size == 2)
+			rdata = busp->bus_dev_ven_id >> 16;
+		else if (off == PCI_CONF_VENID && size == 4)
+			rdata = busp->bus_dev_ven_id;
+	}
 	return ((uint32_t)rdata);
 }
 
@@ -1515,6 +1615,9 @@ px_lib_log_safeacc_err(px_t *px_p, ddi_acc_handle_t handle, int fme_flag,
 	ddi_acc_impl_t *hp = (ddi_acc_impl_t *)handle;
 	ddi_fm_error_t derr;
 
+	if (px_fm_enter(px_p) != DDI_SUCCESS)
+		return;
+
 	derr.fme_status = DDI_FM_NONFATAL;
 	derr.fme_version = DDI_FME_VERSION;
 	derr.fme_flag = fme_flag;
@@ -1546,12 +1649,9 @@ px_lib_log_safeacc_err(px_t *px_p, ddi_acc_handle_t handle, int fme_flag,
 		}
 	}
 
-	px_rp_en_q(px_p, bdf, addr, NULL);
-
-	if (px_fm_enter(px_p) == DDI_SUCCESS) {
-		(void) px_scan_fabric(px_p, px_p->px_dip, &derr);
-		px_fm_exit(px_p);
-	}
+	(void) px_rp_en_q(px_p, bdf, addr, NULL);
+	(void) px_scan_fabric(px_p, px_p->px_dip, &derr);
+	px_fm_exit(px_p);
 }
 
 
@@ -1944,6 +2044,24 @@ px_lib_get_cfgacc_base(dev_info_t *dip)
 	return (px_p->px_dev_hdl);
 }
 
+void
+px_panic_domain(px_t *px_p, pcie_req_id_t bdf)
+{
+	uint64_t	ret;
+	dev_info_t	*dip = px_p->px_dip;
+
+	DBG(DBG_ERR_INTR, dip, "px_panic_domain: handle 0x%lx, ino %d, "
+	    "bdf<<8 0x%lx\n",
+	    (uint64_t)DIP_TO_HANDLE(dip), px_p->px_cb_fault.px_intr_ino,
+	    (pci_device_t)bdf << 8);
+	if ((ret = pci_error_send(DIP_TO_HANDLE(dip),
+	    px_p->px_cb_fault.px_intr_ino, (pci_device_t)bdf << 8)) != H_EOK) {
+		DBG(DBG_ERR_INTR, dip, "pci_error_send failed, ret 0x%lx\n",
+		    ret);
+	} else
+		DBG(DBG_ERR_INTR, dip, "pci_error_send worked\n");
+}
+
 /*ARGSUSED*/
 int
 px_lib_hotplug_init(dev_info_t *dip, void *arg)
@@ -2016,4 +2134,99 @@ px_lib_set_root_complex_mps(px_t *px_p,  dev_info_t *dip, int mps)
 		return (DDI_SUCCESS);
 	else
 		return (DDI_FAILURE);
+}
+
+static int
+px_lib_do_count_waiting_dev(dev_info_t *dip, void *arg)
+{
+	int *count = (int *)arg;
+	dev_info_t *cdip = ddi_get_child(dip);
+
+	while (cdip != NULL) {
+		/* check if this is an assigned device */
+		if (ddi_prop_exists(DDI_DEV_T_NONE, cdip, DDI_PROP_DONTPASS,
+		    "ddi-assigned")) {
+			DBG(DBG_ATTACH, dip, "px_lib_do_count_waiting_dev: "
+			    "Found an assigned dev %p, under bridge %p",
+			    cdip, dip);
+
+			/*
+			 * Mark this bridge as needing waiting for
+			 * CHILD_LOANED will be removed after bridge reports
+			 * its readyness back to px driver
+			 */
+			if (ddi_prop_update_int(DDI_DEV_T_NONE, dip,
+			    CHILD_LOANED, 1) == DDI_PROP_SUCCESS)
+				(*count)++;
+			break;
+		}
+		cdip = ddi_get_next_sibling(cdip);
+	}
+
+	return (DDI_WALK_CONTINUE);
+}
+
+static int
+px_lib_count_waiting_dev(dev_info_t *dip)
+{
+	int circular_count;
+	int count = 0;
+
+	/* No need to continue if this system is not SDIO capable */
+	if (px_sdio_users == 0)
+		return (0);
+
+	/* see if px iteslf has assigned children */
+	(void) px_lib_do_count_waiting_dev(dip, &count);
+
+	/* scan dev under this px */
+	ndi_devi_enter(dip, &circular_count);
+	ddi_walk_devs(ddi_get_child(dip), px_lib_do_count_waiting_dev, &count);
+	ndi_devi_exit(dip, circular_count);
+	return (count);
+}
+
+/* Called from px/bridge driver directly to report its readyness */
+int
+px_lib_fabric_sync(dev_info_t *dip)
+{
+	px_t *px;
+	dev_info_t *rcdip;
+	int waitdev;
+
+	/* No need to continue if this system is not SDIO capable */
+	if (px_sdio_users == 0)
+		return (DDI_SUCCESS);
+
+	/* a valid bridge w/ assigned dev under it? */
+	if (ddi_prop_remove(DDI_DEV_T_NONE, dip, CHILD_LOANED) !=
+	    DDI_PROP_SUCCESS)
+		return (DDI_FAILURE);
+
+	/* find out RC dip */
+	for (rcdip = dip; rcdip != NULL; rcdip = ddi_get_parent(rcdip)) {
+		if (PCIE_DIP2BUS(rcdip) && PCIE_IS_RC(PCIE_DIP2BUS(rcdip)))
+			break;
+	}
+	if ((rcdip == NULL) || ((px = (px_t *)DIP_TO_STATE(rcdip)) == NULL))
+		return (DDI_FAILURE);
+
+	/* are we ready? */
+	waitdev = (int)(uintptr_t)px->px_plat_p;
+	ASSERT(waitdev);
+	DBG(DBG_CTLOPS, rcdip, "px_lib_fabric_sync: "
+	    "Px/bridge %p is ready, %d left", rcdip, waitdev - 1);
+	--waitdev;
+	px->px_plat_p = (void *)(uintptr_t)waitdev;
+	if (waitdev != 0)
+		return (DDI_SUCCESS);
+
+	/* notify hpyervisor */
+	DBG(DBG_CTLOPS, rcdip, "px_lib_fabric_sync: "
+	    "Notifying HV that RC %p is ready users=%d", rcdip, px_sdio_users);
+
+	if (pci_iov_root_configured(px->px_dev_hdl) != H_EOK)
+		return (DDI_FAILURE);
+
+	return (DDI_SUCCESS);
 }

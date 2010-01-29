@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -281,6 +281,9 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 	*dev_hdl = (devhandle_t)csr_base;
 
 	DBG(DBG_ATTACH, dip, "px_lib_dev_init: dev_hdl 0x%llx\n", *dev_hdl);
+
+	/* Sun4u always support fixed interrupt */
+	px_p->px_supp_intr_types |= DDI_INTR_TYPE_FIXED;
 
 	return (DDI_SUCCESS);
 }
@@ -1295,6 +1298,12 @@ px_lib_msg_setvalid(dev_info_t *dip, pcie_msg_type_t msg_type,
 	return (DDI_SUCCESS);
 }
 
+/*ARGSUSED*/
+void
+px_panic_domain(px_t *px_p, pcie_req_id_t bdf)
+{
+}
+
 /*
  * Suspend/Resume Functions:
  * Currently unsupported by hypervisor
@@ -1540,7 +1549,7 @@ px_lib_clr_errs(px_t *px_p, dev_info_t *rdip, uint64_t addr)
 		}
 	}
 
-	px_rp_en_q(px_p, bdf, addr_low, NULL);
+	(void) px_rp_en_q(px_p, bdf, addr_low, NULL);
 
 	/*
 	 * XXX - Current code scans the fabric for all px_tool accesses.
@@ -1699,8 +1708,10 @@ px_lib_do_peek(dev_info_t *dip, peekpoke_ctlops_t *in_args)
 	on_trap_data_t otd;
 
 	mutex_enter(&pec_p->pec_pokefault_mutex);
-	if (px_fm_enter(px_p) != DDI_SUCCESS)
+	if (px_fm_enter(px_p) != DDI_SUCCESS) {
+		mutex_exit(&pec_p->pec_pokefault_mutex);
 		return (DDI_FAILURE);
+	}
 	pec_p->pec_safeacc_type = DDI_FM_ERR_PEEK;
 	px_fm_exit(px_p);
 
@@ -2704,5 +2715,13 @@ px_lib_set_root_complex_mps(px_t *px_p,  dev_info_t *dip, int mps)
 	val = px_acknak_timer_table[mps][link_width];
 	CSR_XS(csr_base, LPU_TXLINK_FREQUENT_NAK_LATENCY_TIMER_THRESHOLD, val);
 
+	return (DDI_SUCCESS);
+}
+
+/*ARGSUSED*/
+int
+px_lib_fabric_sync(dev_info_t *dip)
+{
+	/* an no-op on sun4u platform */
 	return (DDI_SUCCESS);
 }

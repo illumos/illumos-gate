@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,6 +73,14 @@ extern "C" {
 #define	LDMA_NAME_SYSTEM		"agent-system"
 
 #define	LDMA_MSGSYS_GET_SYSINFO		0x01	/* get system info request */
+
+/*
+ * LDoms Direct IO Agent
+ */
+#define	LDMA_NAME_DIO		"agent-dio"
+
+#define	MSGDIO_PCIDEV_INFO	0x1		/* pci device info request */
+
 
 /*
  * Size of the header of an agent message. This is the minimal size that

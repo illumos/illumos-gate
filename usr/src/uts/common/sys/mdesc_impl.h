@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_MDESC_IMPL_H_
 #define	_MDESC_IMPL_H_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -72,7 +70,7 @@ typedef struct md_header_s md_header_t;
 
 
 
-#if defined(_BIG_ENDIAN) && !defined(lint)
+#if defined(_BIG_ENDIAN)
 #define	mdtoh8(x)	((uint8_t)(x))
 #define	mdtoh16(x)	((uint16_t)(x))
 #define	mdtoh32(x)	((uint32_t)(x))
@@ -83,13 +81,13 @@ typedef struct md_header_s md_header_t;
 #define	htomd64(x)	(x)
 #else
 #define	mdtoh8(x)	((uint8_t)(x))
-extern	uint16_t	mdtoh16(uint16_t);
-extern	uint32_t	mdtoh32(uint32_t);
-extern	uint64_t	mdtoh64(uint64_t);
+#define	mdtoh16(x)	BSWAP_16((uint16_t)(x))
+#define	mdtoh32(x)	BSWAP_32((uint32_t)(x))
+#define	mdtoh64(x)	BSWAP_64((uint64_t)(x))
 #define	htomd8(x)	((uint8_t)(x))
-extern	uint16_t	htomd16(uint16_t);
-extern	uint32_t	htomd32(uint32_t);
-extern	uint64_t	htomd64(uint64_t);
+#define	htomd16(x)	BSWAP_16((uint16_t)(x))
+#define	htomd32(x)	BSWAP_32((uint32_t)(x))
+#define	htomd64(x)	BSWAP_64((uint64_t)(x))
 #endif
 
 

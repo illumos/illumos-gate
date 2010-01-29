@@ -687,6 +687,7 @@ ppb_initchild(dev_info_t *child)
 	if (ppb->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV) {
 		if (pcie_init_cfghdl(child) != DDI_SUCCESS)
 			return (DDI_FAILURE);
+		pcie_init_dom(child);
 	}
 
 	/* transfer select properties from PROM to kernel */
@@ -700,8 +701,10 @@ ppb_initchild(dev_info_t *child)
 	} else
 		ddi_set_parent_data(child, NULL);
 
-	if (pci_config_setup(child, &config_handle) != DDI_SUCCESS)
+	if (pci_config_setup(child, &config_handle) != DDI_SUCCESS) {
+		pcie_fini_dom(child);
 		return (DDI_FAILURE);
+	}
 
 	/*
 	 * Support for the "command-preserve" property.
@@ -726,9 +729,10 @@ ppb_removechild(dev_info_t *dip)
 	ppb = (ppb_devstate_t *)ddi_get_soft_state(ppb_state,
 	    ddi_get_instance(ddi_get_parent(dip)));
 
-	if (ppb->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV)
+	if (ppb->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV) {
+		pcie_fini_dom(dip);
 		pcie_fini_cfghdl(dip);
-	else if ((pdptr = ddi_get_parent_data(dip)) != NULL) {
+	} else if ((pdptr = ddi_get_parent_data(dip)) != NULL) {
 		kmem_free(pdptr, (sizeof (*pdptr) + sizeof (struct intrspec)));
 		ddi_set_parent_data(dip, NULL);
 	}

@@ -493,10 +493,15 @@ pcieb_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 	case DDI_CTLOPS_REPORTDEV:
 		if (rdip == (dev_info_t *)0)
 			return (DDI_FAILURE);
-		cmn_err(CE_CONT, "?PCIE-device: %s@%s, %s%d\n",
-		    ddi_node_name(rdip), ddi_get_name_addr(rdip),
-		    ddi_driver_name(rdip),
-		    ddi_get_instance(rdip));
+
+		if (ddi_get_parent(rdip) == dip) {
+			cmn_err(CE_CONT, "?PCIE-device: %s@%s, %s%d\n",
+			    ddi_node_name(rdip), ddi_get_name_addr(rdip),
+			    ddi_driver_name(rdip), ddi_get_instance(rdip));
+		}
+
+		/* Pass it up for fabric sync */
+		(void) ddi_ctlops(dip, rdip, ctlop, arg, result);
 		return (DDI_SUCCESS);
 
 	case DDI_CTLOPS_INITCHILD:
@@ -785,14 +790,18 @@ pcieb_initchild(dev_info_t *child)
 	    "INITCHILD: config regs setup for %s@%s\n",
 	    ddi_node_name(child), ddi_get_name_addr(child));
 
+	pcie_init_dom(child);
+
 	if (pcie_initchild(child) != DDI_SUCCESS) {
 		result = DDI_FAILURE;
+		pcie_fini_dom(child);
 		goto cleanup;
 	}
 
 #ifdef PX_PLX
 	if (pcieb_init_plx_workarounds(pcieb, child) == DDI_FAILURE) {
 		result = DDI_FAILURE;
+		pcie_fini_dom(child);
 		goto cleanup;
 	}
 #endif /* PX_PLX */
@@ -1318,8 +1327,13 @@ pcieb_intr_handler(caddr_t arg1, caddr_t arg2)
 		mutex_enter(&pcieb_p->pcieb_peek_poke_mutex);
 		mutex_enter(&pcieb_p->pcieb_err_mutex);
 
+		pf_eh_enter(PCIE_DIP2BUS(dip));
+		PCIE_ROOT_EH_SRC(PCIE_DIP2PFD(dip))->intr_type =
+		    PF_INTR_TYPE_AER;
+
 		if ((DEVI(dip)->devi_fmhdl->fh_cap) & DDI_FM_EREPORT_CAPABLE)
 			sts = pf_scan_fabric(dip, &derr, NULL);
+		pf_eh_exit(PCIE_DIP2BUS(dip));
 
 		mutex_exit(&pcieb_p->pcieb_err_mutex);
 		mutex_exit(&pcieb_p->pcieb_peek_poke_mutex);

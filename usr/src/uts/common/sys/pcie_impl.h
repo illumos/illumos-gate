@@ -31,6 +31,7 @@ extern "C" {
 #endif
 
 #include <sys/pcie.h>
+#include <sys/pciev.h>
 
 #define	PCI_GET_BDF(dip)	\
 	PCIE_DIP2BUS(dip)->bus_bdf
@@ -58,6 +59,8 @@ extern "C" {
 #define	PCIE_PFD2DIP(pfd_p) PCIE_PFD2BUS(pfd_p)->bus_dip
 #define	PCIE_BUS2DIP(bus_p) bus_p->bus_dip
 #define	PCIE_BUS2PFD(bus_p) PCIE_DIP2PFD(PCIE_BUS2DIP(bus_p))
+#define	PCIE_BUS2DOM(bus_p) bus_p->bus_dom
+#define	PCIE_DIP2DOM(dip) PCIE_BUS2DOM(PCIE_DIP2BUS(dip))
 
 /*
  * These macros depend on initialization of type related data in bus_p.
@@ -154,6 +157,7 @@ extern "C" {
 #define	PCIE_ERR_REG(pfd_p)	   pfd_p->pe_ext.pe_pcie_regs
 #define	PCIE_RP_REG(pfd_p)	   PCIE_ERR_REG(pfd_p)->pcie_rp_regs
 #define	PCIE_ROOT_FAULT(pfd_p)	   pfd_p->pe_root_fault
+#define	PCIE_ROOT_EH_SRC(pfd_p)    pfd_p->pe_root_eh_src
 #define	PCIE_ADV_REG(pfd_p)	   PCIE_ERR_REG(pfd_p)->pcie_adv_regs
 #define	PCIE_ADV_HDR(pfd_p, n)	   PCIE_ADV_REG(pfd_p)->pcie_ue_hdr[n]
 #define	PCIE_ADV_BDG_REG(pfd_p) \
@@ -161,6 +165,8 @@ extern "C" {
 #define	PCIE_ADV_BDG_HDR(pfd_p, n) PCIE_ADV_BDG_REG(pfd_p)->pcie_sue_hdr[n]
 #define	PCIE_ADV_RP_REG(pfd_p) \
 	PCIE_ADV_REG(pfd_p)->pcie_ext.pcie_adv_rp_regs
+#define	PFD_AFFECTED_DEV(pfd_p)	   pfd_p->pe_affected_dev
+
 #define	PFD_IS_ROOT(pfd_p)	   PCIE_IS_ROOT(PCIE_PFD2BUS(pfd_p))
 #define	PFD_IS_RC(pfd_p)	   PCIE_IS_RC(PCIE_PFD2BUS(pfd_p))
 #define	PFD_IS_RP(pfd_p)	   PCIE_IS_RP(PCIE_PFD2BUS(pfd_p))
@@ -251,6 +257,19 @@ typedef struct pf_pcie_err_regs {
 	pf_pcie_adv_err_regs_t *pcie_adv_regs; /* pcie aer regs */
 } pf_pcie_err_regs_t;
 
+typedef enum {
+	PF_INTR_TYPE_NONE = 0,
+	PF_INTR_TYPE_FABRIC = 1,	/* Fabric Message */
+	PF_INTR_TYPE_DATA,		/* Data Access Failure, failed loads */
+	PF_INTR_TYPE_AER,		/* Root Port AER MSI */
+	PF_INTR_TYPE_INTERNAL		/* Chip specific internal errors */
+} pf_intr_type_t;
+
+typedef struct pf_root_eh_src {
+	pf_intr_type_t	intr_type;
+	void		*intr_data;	/* Interrupt Data */
+} pf_root_eh_src_t;
+
 typedef struct pf_root_fault {
 	pcie_req_id_t	scan_bdf;	/* BDF from error logs */
 	uint64_t	scan_addr;	/* Addr from error logs */
@@ -298,6 +317,7 @@ typedef struct pcie_bus {
 
 	/* Cache of last fault data */
 	pf_data_t	*bus_pfd;
+	pcie_domain_t	*bus_dom;
 
 	int		bus_mps;		/* Maximum Payload Size */
 
@@ -311,12 +331,35 @@ typedef struct pcie_bus {
 	uint64_t	bus_cfgacc_base;	/* config space base address */
 } pcie_bus_t;
 
+/*
+ * Data structure to log what devices are affected in relationship to the
+ * severity after all the errors bits have been analyzed.
+ */
+#define	PF_AFFECTED_ROOT	(1 << 0) /* RP/RC is affected */
+#define	PF_AFFECTED_SELF	(1 << 1) /* Reporting Device is affected */
+#define	PF_AFFECTED_PARENT	(1 << 2) /* Parent device is affected */
+#define	PF_AFFECTED_CHILDREN	(1 << 3) /* All children below are affected */
+#define	PF_AFFECTED_BDF		(1 << 4) /* See affected_bdf */
+#define	PF_AFFECTED_AER		(1 << 5) /* See AER Registers */
+#define	PF_AFFECTED_SAER	(1 << 6) /* See SAER Registers */
+#define	PF_AFFECTED_ADDR	(1 << 7) /* Device targeted by addr */
+
+#define	PF_MAX_AFFECTED_FLAG	PF_AFFECTED_ADDR
+
+typedef struct pf_affected_dev {
+	uint16_t		pe_affected_flags;
+	pcie_req_id_t		pe_affected_bdf;
+} pf_affected_dev_t;
+
 struct pf_data {
 	boolean_t		pe_lock;
 	boolean_t		pe_valid;
 	uint32_t		pe_severity_flags;	/* Severity of error */
+	uint32_t		pe_orig_severity_flags; /* Original severity */
+	pf_affected_dev_t	*pe_affected_dev;
 	pcie_bus_t		*pe_bus_p;
-	pf_root_fault_t		*pe_root_fault;	/* Only valid for RC and RP */
+	pf_root_fault_t		*pe_root_fault; /* Only valid for RC and RP */
+	pf_root_eh_src_t	*pe_root_eh_src; /* Only valid for RC and RP */
 	pf_pci_err_regs_t	*pe_pci_regs;	/* PCI error reg */
 	union {
 		pf_pcix_err_regs_t	*pe_pcix_regs;	/* PCI-X error reg */
@@ -368,8 +411,11 @@ typedef struct pf_impl {
 #define	PF_ERR_MATCHED_PARENT	(1 << 5) /* Error Handled By Parent */
 #define	PF_ERR_PANIC		(1 << 6) /* Error should panic system */
 #define	PF_ERR_PANIC_DEADLOCK	(1 << 7) /* deadlock detected */
+#define	PF_ERR_PANIC_BAD_RESPONSE (1 << 8) /* Device no response */
+#define	PF_ERR_MATCH_DOM	(1 << 9) /* Error Handled By IO domain */
 
-#define	PF_ERR_FATAL_FLAGS	(PF_ERR_PANIC | PF_ERR_PANIC_DEADLOCK)
+#define	PF_ERR_FATAL_FLAGS		\
+	(PF_ERR_PANIC | PF_ERR_PANIC_DEADLOCK | PF_ERR_PANIC_BAD_RESPONSE)
 
 #define	PF_HDL_FOUND		1
 #define	PF_HDL_NOTFOUND		2
@@ -527,6 +573,8 @@ extern int pcie_ari_device(dev_info_t *dip);
 extern int pcie_ari_get_next_function(dev_info_t *dip, int *func);
 
 /* PCIe error handling functions */
+extern void pf_eh_enter(pcie_bus_t *bus_p);
+extern void pf_eh_exit(pcie_bus_t *bus_p);
 extern int pf_scan_fabric(dev_info_t *rpdip, ddi_fm_error_t *derr,
     pf_data_t *root_pfd_p);
 extern void pf_init(dev_info_t *, ddi_iblock_cookie_t, ddi_attach_cmd_t);
@@ -540,6 +588,26 @@ extern void pcie_force_fullscan();
 extern uint_t pcie_debug_flags;
 extern void pcie_dbg(char *fmt, ...);
 #endif	/* DEBUG */
+
+/* PCIe IOV functions */
+extern dev_info_t *pcie_find_dip_by_bdf(dev_info_t *rootp, pcie_req_id_t bdf);
+
+extern boolean_t pf_in_bus_range(pcie_bus_t *, pcie_req_id_t);
+extern boolean_t pf_in_assigned_addr(pcie_bus_t *, uint64_t);
+extern int pf_pci_decode(pf_data_t *, uint16_t *);
+extern pcie_bus_t *pf_find_busp_by_bdf(pf_impl_t *, pcie_req_id_t);
+extern pcie_bus_t *pf_find_busp_by_addr(pf_impl_t *, uint64_t);
+extern pcie_bus_t *pf_find_busp_by_aer(pf_impl_t *, pf_data_t *);
+extern pcie_bus_t *pf_find_busp_by_saer(pf_impl_t *, pf_data_t *);
+
+extern int pciev_eh(pf_data_t *, pf_impl_t *);
+extern pcie_bus_t *pciev_get_affected_dev(pf_impl_t *, pf_data_t *,
+    uint16_t, uint16_t);
+extern void pciev_eh_exit(pf_data_t *, uint_t);
+extern boolean_t pcie_in_domain(pcie_bus_t *, uint_t);
+
+#define	PCIE_ZALLOC(data) kmem_zalloc(sizeof (data), KM_SLEEP)
+
 
 #ifdef	__cplusplus
 }

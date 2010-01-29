@@ -345,6 +345,12 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 */
 		px_cpr_add_callb(px_p);
 
+		/*
+		 * do fabric sync in case we don't need to wait for
+		 * any bridge driver to be ready
+		 */
+		(void) px_lib_fabric_sync(dip);
+
 		ddi_report_dev(dip);
 
 		px_p->px_state = PX_ATTACHED;
@@ -1303,7 +1309,11 @@ px_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		break;
 
 	case DDI_CTLOPS_REPORTDEV:
-		return (px_report_dev(rdip));
+		if (ddi_get_parent(rdip) == dip)
+			return (px_report_dev(rdip));
+
+		(void) px_lib_fabric_sync(rdip);
+		return (DDI_SUCCESS);
 
 	case DDI_CTLOPS_IOMIN:
 		return (DDI_SUCCESS);
@@ -1347,6 +1357,7 @@ px_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
     ddi_intr_handle_impl_t *hdlp, void *result)
 {
 	int	intr_types, ret = DDI_SUCCESS;
+	px_t	*px_p = DIP_TO_STATE(dip);
 
 	DBG(DBG_INTROPS, dip, "px_intr_ops: rdip=%s%d\n",
 	    ddi_driver_name(rdip), ddi_get_instance(rdip));
@@ -1365,7 +1376,8 @@ px_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 			*(int *)result |= intr_types;
 		}
 
-		return (ret);
+		*(int *)result &= px_p->px_supp_intr_types;
+		return (*(int *)result ? DDI_SUCCESS : DDI_FAILURE);
 	}
 
 	/*

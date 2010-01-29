@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_PX_FM_H
 #define	_SYS_PX_FM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -126,8 +124,9 @@ extern int px_err_check_pcie(dev_info_t *dip, ddi_fm_error_t *derr,
 extern int px_fm_enter(px_t *px_p);
 extern void px_fm_exit(px_t *px_p);
 extern void px_err_panic(int err, int msg, int fab_err, boolean_t isTest);
-extern void px_rp_en_q(px_t *px_p, pcie_req_id_t fault_bdf,
+extern pf_data_t *px_rp_en_q(px_t *px_p, pcie_req_id_t fault_bdf,
     uint32_t fault_addr, uint16_t s_status);
+extern pf_data_t *px_get_pfd(px_t *px_p);
 
 /*
  * Sparc specific cfg, pio and dma handle lookup/check functions

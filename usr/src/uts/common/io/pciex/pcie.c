@@ -477,6 +477,7 @@ pcie_initchild(dev_info_t *cdip)
 {
 	uint16_t		tmp16, reg16;
 	pcie_bus_t		*bus_p;
+	uint32_t		devid, venid;
 
 	bus_p = PCIE_DIP2BUS(cdip);
 	if (bus_p == NULL) {
@@ -488,6 +489,29 @@ pcie_initchild(dev_info_t *cdip)
 
 	if (pcie_init_cfghdl(cdip) != DDI_SUCCESS)
 		return (DDI_FAILURE);
+
+	/*
+	 * Update pcie_bus_t with real Vendor Id Device Id.
+	 *
+	 * For assigned devices in IOV environment, the OBP will return
+	 * faked device id/vendor id on configration read and for both
+	 * properties in root domain. translate_devid() function will
+	 * update the properties with real device-id/vendor-id on such
+	 * platforms, so that we can utilize the properties here to get
+	 * real device-id/vendor-id and overwrite the faked ids.
+	 *
+	 * For unassigned devices or devices in non-IOV environment, the
+	 * operation below won't make a difference.
+	 *
+	 * The IOV implementation only supports assignment of PCIE
+	 * endpoint devices. Devices under pci-pci bridges don't need
+	 * operation like this.
+	 */
+	devid = ddi_prop_get_int(DDI_DEV_T_ANY, cdip, DDI_PROP_DONTPASS,
+	    "device-id", -1);
+	venid = ddi_prop_get_int(DDI_DEV_T_ANY, cdip, DDI_PROP_DONTPASS,
+	    "vendor-id", -1);
+	bus_p->bus_dev_ven_id = (devid << 16) | (venid & 0xffff);
 
 	/* Clear the device's status register */
 	reg16 = PCIE_GET(16, bus_p, PCI_CONF_STAT);
@@ -593,7 +617,6 @@ pcie_initchild(dev_info_t *cdip)
 	return (DDI_SUCCESS);
 }
 
-#define	PCIE_ZALLOC(data) kmem_zalloc(sizeof (data), KM_SLEEP)
 static void
 pcie_init_pfd(dev_info_t *dip)
 {
@@ -604,6 +627,7 @@ pcie_init_pfd(dev_info_t *dip)
 
 	pfd_p->pe_bus_p = bus_p;
 	pfd_p->pe_severity_flags = 0;
+	pfd_p->pe_orig_severity_flags = 0;
 	pfd_p->pe_lock = B_FALSE;
 	pfd_p->pe_valid = B_FALSE;
 
@@ -611,9 +635,12 @@ pcie_init_pfd(dev_info_t *dip)
 	if (PCIE_IS_ROOT(bus_p)) {
 		PCIE_ROOT_FAULT(pfd_p) = PCIE_ZALLOC(pf_root_fault_t);
 		PCIE_ROOT_FAULT(pfd_p)->scan_bdf = PCIE_INVALID_BDF;
+		PCIE_ROOT_EH_SRC(pfd_p) = PCIE_ZALLOC(pf_root_eh_src_t);
 	}
 
 	PCI_ERR_REG(pfd_p) = PCIE_ZALLOC(pf_pci_err_regs_t);
+	PFD_AFFECTED_DEV(pfd_p) = PCIE_ZALLOC(pf_affected_dev_t);
+	PFD_AFFECTED_DEV(pfd_p)->pe_affected_bdf = PCIE_INVALID_BDF;
 
 	if (PCIE_IS_BDG(bus_p))
 		PCI_BDG_ERR_REG(pfd_p) = PCIE_ZALLOC(pf_pci_bdg_err_regs_t);
@@ -733,10 +760,13 @@ pcie_fini_pfd(dev_info_t *dip)
 		kmem_free(PCI_BDG_ERR_REG(pfd_p),
 		    sizeof (pf_pci_bdg_err_regs_t));
 
+	kmem_free(PFD_AFFECTED_DEV(pfd_p), sizeof (pf_affected_dev_t));
 	kmem_free(PCI_ERR_REG(pfd_p), sizeof (pf_pci_err_regs_t));
 
-	if (PCIE_IS_ROOT(bus_p))
+	if (PCIE_IS_ROOT(bus_p)) {
 		kmem_free(PCIE_ROOT_FAULT(pfd_p), sizeof (pf_root_fault_t));
+		kmem_free(PCIE_ROOT_EH_SRC(pfd_p), sizeof (pf_root_eh_src_t));
+	}
 
 	kmem_free(PCIE_DIP2PFD(dip), sizeof (pf_data_t));
 
@@ -753,17 +783,23 @@ pcie_rc_init_pfd(dev_info_t *dip, pf_data_t *pfd_p)
 {
 	pfd_p->pe_bus_p = PCIE_DIP2DOWNBUS(dip);
 	pfd_p->pe_severity_flags = 0;
+	pfd_p->pe_orig_severity_flags = 0;
 	pfd_p->pe_lock = B_FALSE;
 	pfd_p->pe_valid = B_FALSE;
 
 	PCIE_ROOT_FAULT(pfd_p) = PCIE_ZALLOC(pf_root_fault_t);
 	PCIE_ROOT_FAULT(pfd_p)->scan_bdf = PCIE_INVALID_BDF;
+	PCIE_ROOT_EH_SRC(pfd_p) = PCIE_ZALLOC(pf_root_eh_src_t);
 	PCI_ERR_REG(pfd_p) = PCIE_ZALLOC(pf_pci_err_regs_t);
+	PFD_AFFECTED_DEV(pfd_p) = PCIE_ZALLOC(pf_affected_dev_t);
+	PFD_AFFECTED_DEV(pfd_p)->pe_affected_bdf = PCIE_INVALID_BDF;
 	PCI_BDG_ERR_REG(pfd_p) = PCIE_ZALLOC(pf_pci_bdg_err_regs_t);
 	PCIE_ERR_REG(pfd_p) = PCIE_ZALLOC(pf_pcie_err_regs_t);
 	PCIE_RP_REG(pfd_p) = PCIE_ZALLOC(pf_pcie_rp_err_regs_t);
 	PCIE_ADV_REG(pfd_p) = PCIE_ZALLOC(pf_pcie_adv_err_regs_t);
 	PCIE_ADV_RP_REG(pfd_p) = PCIE_ZALLOC(pf_pcie_adv_rp_err_regs_t);
+	PCIE_ADV_RP_REG(pfd_p)->pcie_rp_ce_src_id = PCIE_INVALID_BDF;
+	PCIE_ADV_RP_REG(pfd_p)->pcie_rp_ue_src_id = PCIE_INVALID_BDF;
 
 	PCIE_ADV_REG(pfd_p)->pcie_ue_sev = pcie_aer_uce_severity;
 }
@@ -776,8 +812,10 @@ pcie_rc_fini_pfd(pf_data_t *pfd_p)
 	kmem_free(PCIE_RP_REG(pfd_p), sizeof (pf_pcie_rp_err_regs_t));
 	kmem_free(PCIE_ERR_REG(pfd_p), sizeof (pf_pcie_err_regs_t));
 	kmem_free(PCI_BDG_ERR_REG(pfd_p), sizeof (pf_pci_bdg_err_regs_t));
+	kmem_free(PFD_AFFECTED_DEV(pfd_p), sizeof (pf_affected_dev_t));
 	kmem_free(PCI_ERR_REG(pfd_p), sizeof (pf_pci_err_regs_t));
 	kmem_free(PCIE_ROOT_FAULT(pfd_p), sizeof (pf_root_fault_t));
+	kmem_free(PCIE_ROOT_EH_SRC(pfd_p), sizeof (pf_root_eh_src_t));
 }
 
 /*
@@ -807,6 +845,7 @@ pcie_rc_fini_pfd(pf_data_t *pfd_p)
  * pci_regspec_t *	bus_assigned_addr
  * int			bus_assigned_entries
  * pf_data_t *		bus_pfd
+ * pcie_domain_t *	<bus_dom>
  * int			bus_mps
  * uint64_t		bus_cfgacc_base
  * void	*		bus_plat_private
@@ -828,6 +867,8 @@ pcie_rc_init_bus(dev_info_t *dip)
 	bus_p->bus_fm_flags |= PF_FM_READY;
 
 	ndi_set_bus_private(dip, B_FALSE, DEVI_PORT_TYPE_PCI, bus_p);
+
+	PCIE_BUS2DOM(bus_p) = PCIE_ZALLOC(pcie_domain_t);
 }
 
 void
@@ -835,6 +876,7 @@ pcie_rc_fini_bus(dev_info_t *dip)
 {
 	pcie_bus_t *bus_p = PCIE_DIP2DOWNBUS(dip);
 	ndi_set_bus_private(dip, B_FALSE, NULL, NULL);
+	kmem_free(PCIE_BUS2DOM(bus_p), sizeof (pcie_domain_t));
 	kmem_free(bus_p, sizeof (pcie_bus_t));
 }
 
@@ -870,6 +912,7 @@ pcie_rc_fini_bus(dev_info_t *dip)
  * pci_regspec_t *	bus_assigned_addr
  * int			bus_assigned_entries
  * pf_data_t *		bus_pfd
+ * pcie_domain_t *	bus_dom
  * int			bus_mps
  * uint64_t		bus_cfgacc_base
  * void	*		bus_plat_private
@@ -898,6 +941,7 @@ pcie_rc_fini_bus(dev_info_t *dip)
  * pci_regspec_t *	<bus_assigned_addr>
  * int			<bus_assigned_entries>
  * pf_data_t *		<bus_pfd>
+ * pcie_domain_t *	bus_dom
  * int			bus_mps
  * uint64_t		bus_cfgacc_base
  * void	*		<bus_plat_private>
@@ -1195,6 +1239,7 @@ pcie_uninitchild(dev_info_t *cdip)
 {
 	pcie_disable_errors(cdip);
 	pcie_fini_cfghdl(cdip);
+	pcie_fini_dom(cdip);
 }
 
 /*

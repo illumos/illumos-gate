@@ -52,8 +52,6 @@ extern uint_t px_ranges_phi_mask;
  */
 boolean_t px_panicing = B_FALSE;
 
-static pf_data_t *px_get_pfd(px_t *px_p);
-
 static int px_pcie_ptlp(dev_info_t *dip, ddi_fm_error_t *derr,
     px_err_pcie_t *regs);
 
@@ -292,6 +290,7 @@ px_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 	pcie_req_id_t	bdf = PCIE_INVALID_BDF;
 	pci_ranges_t	*ranges_p;
 	int		range_len;
+	pf_data_t	*pfd_p;
 
 	/*
 	 * If the current thread already owns the px_fm_mutex, then we
@@ -303,6 +302,7 @@ px_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 		return (DDI_FM_FATAL);
 
 	i_ddi_fm_handler_exit(pdip);
+
 	if (px_fm_enter(px_p) != DDI_SUCCESS) {
 		i_ddi_fm_handler_enter(pdip);
 		return (DDI_FM_FATAL);
@@ -347,8 +347,17 @@ px_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 	lookup = pf_hdl_lookup(dip, derr->fme_ena, acc_type, (uint64_t)addr,
 	    bdf);
 
-	px_rp_en_q(px_p, bdf, addr,
+	pfd_p = px_rp_en_q(px_p, bdf, addr,
 	    (PCI_STAT_R_MAST_AB | PCI_STAT_R_TARG_AB));
+	PCIE_ROOT_EH_SRC(pfd_p)->intr_type = PF_INTR_TYPE_DATA;
+
+	/* Update affected info, either addr or bdf is not NULL */
+	if (addr) {
+		PFD_AFFECTED_DEV(pfd_p)->pe_affected_flags = PF_AFFECTED_ADDR;
+	} else if (PCIE_CHECK_VALID_BDF(bdf)) {
+		PFD_AFFECTED_DEV(pfd_p)->pe_affected_flags = PF_AFFECTED_BDF;
+		PFD_AFFECTED_DEV(pfd_p)->pe_affected_bdf = bdf;
+	}
 
 	fab_err = px_scan_fabric(px_p, dip, derr);
 
@@ -388,6 +397,7 @@ px_err_fabric_intr(px_t *px_p, msgcode_t msg_code, pcie_req_id_t rid)
 	ddi_fm_error_t	derr;
 	uint32_t	rp_status;
 	uint16_t	ce_source, ue_source;
+	pf_data_t	*pfd_p;
 
 	if (px_fm_enter(px_p) != DDI_SUCCESS)
 		goto done;
@@ -429,7 +439,8 @@ px_err_fabric_intr(px_t *px_p, msgcode_t msg_code, pcie_req_id_t rid)
 	}
 
 	/* Ensure that the rid of the fabric message will get scanned. */
-	px_rp_en_q(px_p, rid, NULL, NULL);
+	pfd_p = px_rp_en_q(px_p, rid, NULL, NULL);
+	PCIE_ROOT_EH_SRC(pfd_p)->intr_type = PF_INTR_TYPE_FABRIC;
 
 	rc_err = px_err_cmn_intr(px_p, &derr, PX_INTR_CALL, PX_FM_BLOCK_PCIE);
 
@@ -448,6 +459,21 @@ done:
  * px_scan_fabric:
  *
  * Check for drain state and if there is anything to scan.
+ *
+ * Note on pfd: Different interrupts will populate the pfd's differently.  The
+ * px driver can have a total of 5 different error sources, so it has a queue of
+ * 5 pfds.  Each valid PDF is linked together and passed to pf_scan_fabric.
+ *
+ * Each error handling will populate the following info in the pfd
+ *
+ *			Root Fault	 Intr Src	 Affected BDF
+ *			----------------+---------------+------------
+ * Callback/CPU Trap	Address/BDF	|DATA		|Lookup Addr
+ * Mondo 62/63 (sun4u)	decode error	|N/A		|N/A
+ * EPKT (sun4v)		decode epkt	|INTERNAL	|decode epkt
+ * Fabric Message	fabric payload	|FABRIC		|NULL
+ * Peek/Poke		Address/BDF	|NULL		|NULL
+ *			----------------+---------------+------------
  */
 int
 px_scan_fabric(px_t *px_p, dev_info_t *rpdip, ddi_fm_error_t *derr) {
@@ -457,7 +483,6 @@ px_scan_fabric(px_t *px_p, dev_info_t *rpdip, ddi_fm_error_t *derr) {
 
 	if (!px_lib_is_in_drain_state(px_p) && px_p->px_pfd_idx) {
 		fab_err = pf_scan_fabric(rpdip, derr, px_p->px_pfd_arr);
-		px_p->px_pfd_idx = 0;
 	}
 
 	return (fab_err);
@@ -692,7 +717,7 @@ done:
  * px_get_pdf automatically allocates a RC pf_data_t and returns a pointer to
  * it.  This function should be used when an error requires a fabric scan.
  */
-static pf_data_t *
+pf_data_t *
 px_get_pfd(px_t *px_p) {
 	int		idx = px_p->px_pfd_idx++;
 	pf_data_t	*pfd_p = &px_p->px_pfd_arr[idx];
@@ -700,6 +725,10 @@ px_get_pfd(px_t *px_p) {
 	/* Clear Old Data */
 	PCIE_ROOT_FAULT(pfd_p)->scan_bdf = PCIE_INVALID_BDF;
 	PCIE_ROOT_FAULT(pfd_p)->scan_addr = 0;
+	PCIE_ROOT_EH_SRC(pfd_p)->intr_type = PF_INTR_TYPE_NONE;
+	PCIE_ROOT_EH_SRC(pfd_p)->intr_data = NULL;
+	PFD_AFFECTED_DEV(pfd_p)->pe_affected_flags = NULL;
+	PFD_AFFECTED_DEV(pfd_p)->pe_affected_bdf = PCIE_INVALID_BDF;
 	PCI_BDG_ERR_REG(pfd_p)->pci_bdg_sec_stat = 0;
 	PCIE_ADV_REG(pfd_p)->pcie_ce_status = 0;
 	PCIE_ADV_REG(pfd_p)->pcie_ue_status = 0;
@@ -713,6 +742,8 @@ px_get_pfd(px_t *px_p) {
 		pfd_p->pe_prev = NULL;
 	}
 
+	pfd_p->pe_severity_flags = 0;
+	pfd_p->pe_orig_severity_flags = 0;
 	pfd_p->pe_valid = B_TRUE;
 
 	return (pfd_p);
@@ -731,20 +762,22 @@ px_get_pfd(px_t *px_p) {
  *	     (ie S-TA/MA, R-TA)
  * Either the scan bdf or addr may be NULL, but not both.
  */
-void
+pf_data_t *
 px_rp_en_q(px_t *px_p, pcie_req_id_t scan_bdf, uint32_t scan_addr,
     uint16_t s_status)
 {
 	pf_data_t	*pfd_p;
 
 	if (!PCIE_CHECK_VALID_BDF(scan_bdf) && !scan_addr)
-		return;
+		return (NULL);
 
 	pfd_p = px_get_pfd(px_p);
 
 	PCIE_ROOT_FAULT(pfd_p)->scan_bdf = scan_bdf;
 	PCIE_ROOT_FAULT(pfd_p)->scan_addr = (uint64_t)scan_addr;
 	PCI_BDG_ERR_REG(pfd_p)->pci_bdg_sec_stat = s_status;
+
+	return (pfd_p);
 }
 
 
@@ -916,12 +949,62 @@ px_fm_enter(px_t *px_p) {
 		px_fm_exit(px_p);
 		return (DDI_FAILURE);
 	}
+
+	/* Signal the PCIe error handling module error handling is starting */
+	pf_eh_enter(PCIE_DIP2BUS(px_p->px_dip));
+
 	return (DDI_SUCCESS);
+}
+
+static void
+px_guest_panic(px_t *px_p)
+{
+	pf_data_t *root_pfd_p = PCIE_DIP2PFD(px_p->px_dip);
+	pf_data_t *pfd_p;
+	pcie_bus_t *bus_p, *root_bus_p;
+	pcie_req_id_list_t *rl;
+
+	/*
+	 * check if all devices under the root device are unassigned.
+	 * this function should quickly return in non-IOV environment.
+	 */
+	root_bus_p = PCIE_PFD2BUS(root_pfd_p);
+	if (PCIE_BDG_IS_UNASSIGNED(root_bus_p))
+		return;
+
+	for (pfd_p = root_pfd_p; pfd_p; pfd_p = pfd_p->pe_next) {
+		bus_p = PCIE_PFD2BUS(pfd_p);
+
+		/* assume all affected devs were in the error Q */
+		if (!PCIE_BUS2DOM(bus_p)->nfma_panic)
+			continue;
+
+		if (PCIE_IS_BDG(bus_p)) {
+			rl = PCIE_BDF_LIST_GET(bus_p);
+			while (rl) {
+				px_panic_domain(px_p, rl->bdf);
+				rl = rl->next;
+			}
+		} else {
+			px_panic_domain(px_p, bus_p->bus_bdf);
+		}
+		/* clear panic flag */
+		PCIE_BUS2DOM(bus_p)->nfma_panic = B_FALSE;
+	}
 }
 
 void
 px_fm_exit(px_t *px_p) {
 	px_p->px_fm_mutex_owner = NULL;
+	if (px_p->px_pfd_idx == 0) {
+		mutex_exit(&px_p->px_fm_mutex);
+		return;
+	}
+	/* panic the affected domains that are non-fma-capable */
+	px_guest_panic(px_p);
+	/* Signal the PCIe error handling module error handling is ending */
+	pf_eh_exit(PCIE_DIP2BUS(px_p->px_dip));
+	px_p->px_pfd_idx = 0;
 	mutex_exit(&px_p->px_fm_mutex);
 }
 

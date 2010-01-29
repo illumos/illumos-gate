@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -950,6 +950,7 @@ npe_initchild(dev_info_t *child)
 		    (rev_id < NVIDIA_CK804_AER_VALID_REVID))
 			bus_p->bus_aer_off = 0;
 
+		pcie_init_dom(child);
 		(void) pcie_initchild(child);
 	}
 

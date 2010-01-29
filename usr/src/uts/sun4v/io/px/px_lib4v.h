@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,6 +69,16 @@ extern "C" {
 #define	HVIO_MSG_GETVALID	0xd2
 #define	HVIO_MSG_SETVALID	0xd3
 
+/*
+ * Fasttrap numbers for SDIO hypervisor functions.
+ */
+#define	PCI_IOV_ROOT_CONFIGURED		0xf8
+
+/*
+ * Fasttrap numbers for SDIO ERR hypervisor functions.
+ */
+#define	PCI_ERROR_SEND			0xff
+
 #ifndef _ASM
 
 /*
@@ -85,16 +95,33 @@ extern "C" {
 	hat_getpfnum(kas.a_hat, ((caddr_t)addr + (MMU_PAGE_SIZE * i))))
 
 /*
- * VPCI API versioning.
- *
- * Currently PX nexus driver supports VPCI API version 1.1
+ * Hypercall service versioning
  */
-#define	PX_VPCI_MAJOR_VER_1	0x1ull
-#define	PX_VPCI_MAJOR_VER	PX_VPCI_MAJOR_VER_1
+#define	PX_HSVC_MAJOR_VER_1	0x1ull
+#define	PX_HSVC_MINOR_VER_0	0x0ull
+#define	PX_HSVC_MINOR_VER_1	0x1ull
+#define	PX_HSVC_MINOR_VER_2	0x2ull
 
-#define	PX_VPCI_MINOR_VER_0	0x0ull
-#define	PX_VPCI_MINOR_VER_1	0x1ull
-#define	PX_VPCI_MINOR_VER	PX_VPCI_MINOR_VER_1
+/*
+ * VPCI API versioning.
+ * Currently PX nexus driver supports VPCI API version 1.2
+ */
+#define	PX_VPCI_MAJOR_VER	PX_HSVC_MAJOR_VER_1
+#define	PX_VPCI_MINOR_VER	PX_HSVC_MINOR_VER_2
+
+/*
+ * SDIO API versioning.
+ * Currently PX nexus driver supports SDIO API version 1.0
+ */
+#define	PX_SDIO_MAJOR_VER	PX_HSVC_MAJOR_VER_1
+#define	PX_SDIO_MINOR_VER	PX_HSVC_MINOR_VER_0
+
+/*
+ * SDIO ERR API versioning.
+ * Currently PX nexus driver supports SDIO ERR API version 1.0
+ */
+#define	PX_SDIO_ERR_MAJOR_VER	PX_HSVC_MAJOR_VER_1
+#define	PX_SDIO_ERR_MINOR_VER	PX_HSVC_MINOR_VER_0
 
 extern uint64_t hvio_iommu_map(devhandle_t dev_hdl, tsbid_t tsbid,
     pages_t pages, io_attributes_t attr, io_page_list_t *io_page_list_p,
@@ -147,6 +174,10 @@ extern uint64_t hvio_msi_getstate(devhandle_t dev_hdl, msinum_t msi_num,
 extern uint64_t hvio_msi_setstate(devhandle_t dev_hdl, msinum_t msi_num,
     pci_msi_state_t msi_state);
 
+
+extern uint64_t pci_error_send(devhandle_t dev_hdl, devino_t devino,
+    pci_device_t bdf);
+
 /*
  * MSG Functions:
  */
@@ -185,6 +216,11 @@ extern uint64_t hv_ra2pa(uint64_t ra);
 extern uint64_t hv_hpriv(void *func, uint64_t arg1, uint64_t arg2,
     uint64_t arg3);
 extern int px_phys_acc_4v(uint64_t dummy, uint64_t from_addr, uint64_t to_addr);
+
+/*
+ * PCI IOV SDIO Funcitons:
+ */
+extern uint64_t pci_iov_root_configured(devhandle_t dev_hdl);
 
 #endif /* _ASM */
 

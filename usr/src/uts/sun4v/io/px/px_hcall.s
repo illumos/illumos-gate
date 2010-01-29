@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -193,6 +193,11 @@ hvio_msg_setvalid(devhandle_t dev_hdl, pcie_msg_type_t msg_type,
     pcie_msg_valid_state_t msg_valid_state)
 { return (0); }
 
+/*ARGSUSED*/
+uint64_t
+pci_error_send(devhandle_t dev_hdl, devino_t devino, pci_device_t bdf)
+{ return (0); }
+
 /*
  * First arg to both of these functions is a dummy, to accomodate how
  * hv_hpriv() works.
@@ -200,6 +205,11 @@ hvio_msg_setvalid(devhandle_t dev_hdl, pcie_msg_type_t msg_type,
 /*ARGSUSED*/
 int
 px_phys_acc_4v(uint64_t dummy, uint64_t from_addr, uint64_t to_addr)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+pci_iov_root_configured(devhandle_t dev_hdl)
 { return (0); }
 
 #else	/* lint || __lint */
@@ -641,6 +651,20 @@ px_phys_acc_4v(uint64_t dummy, uint64_t from_addr, uint64_t to_addr)
 	retl
 	nop
 	SET_SIZE(hvio_msg_setvalid)
+	
+	/*
+	 * arg0 - devhandle
+	 * arg1 - devino
+	 * arg2 - pci_device
+	 *
+	 * ret0 - status
+	 */
+	ENTRY(pci_error_send)
+	mov	PCI_ERROR_SEND, %o5
+	ta	FAST_TRAP
+	retl
+	nop
+	SET_SIZE(pci_error_send)
 
 #define	SHIFT_REGS	mov %o1,%o0; mov %o2,%o1; mov %o3,%o2; mov %o4,%o3
 
@@ -670,5 +694,17 @@ px_phys_acc_4v(uint64_t dummy, uint64_t from_addr, uint64_t to_addr)
 	mov     %g0, %o0
 	done
 	SET_SIZE(px_phys_acc_4v)
+
+	/*
+	 * arg0 - devhandle
+	 *
+	 * ret0 - status
+	 */
+	ENTRY(pci_iov_root_configured)
+	mov	PCI_IOV_ROOT_CONFIGURED, %o5
+	ta	FAST_TRAP
+	retl
+	nop
+	SET_SIZE(pci_iov_root_configured)
 
 #endif	/* lint || __lint */

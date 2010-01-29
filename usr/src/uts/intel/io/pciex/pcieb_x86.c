@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,7 +44,9 @@ int pcieb_intel_workaround_disable = 0;
 
 void
 pcieb_peekpoke_cb(dev_info_t *dip, ddi_fm_error_t *derr) {
+	pf_eh_enter(PCIE_DIP2BUS(dip));
 	(void) pf_scan_fabric(dip, derr, NULL);
+	pf_eh_exit(PCIE_DIP2BUS(dip));
 }
 
 void

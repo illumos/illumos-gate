@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,6 +50,8 @@ extern "C" {
 #define	HSVC_GROUP_RNG			0x0104
 #define	HSVC_GROUP_PBOOT		0x0105
 #define	HSVC_GROUP_TPM			0x0107
+#define	HSVC_GROUP_SDIO			0x0108
+#define	HSVC_GROUP_SDIO_ERR		0x0109
 #define	HSVC_GROUP_REBOOT_DATA		0x0110
 #define	HSVC_GROUP_NIAGARA_CPU		0x0200
 #define	HSVC_GROUP_FIRE_PERF		0x0201

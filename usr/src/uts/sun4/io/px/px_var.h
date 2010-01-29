@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -111,6 +111,9 @@ struct px {
 
 	/* Platform specific information */
 	void		*px_plat_p;
+
+	/* Interrupt types supported by the fabric */
+	int		px_supp_intr_types;
 
 	/* Power Management fields */
 	kmutex_t	px_l23ready_lock; /* used in PME_To_ACK interrupt */

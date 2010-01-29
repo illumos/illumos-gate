@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -967,6 +967,7 @@ ppb_initchild(dev_info_t *child)
 			pci_config_teardown(&config_handle);
 			return (DDI_FAILURE);
 		}
+		pcie_init_dom(child);
 	}
 
 	/*
@@ -996,8 +997,10 @@ ppb_uninitchild(dev_info_t *child)
 	/*
 	 * SG OPL FMA specific
 	 */
-	if (ppb->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV)
+	if (ppb->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV) {
+		pcie_fini_dom(child);
 		pcie_fini_cfghdl(child);
+	}
 
 	ppb_removechild(child);
 }
