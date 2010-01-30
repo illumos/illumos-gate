@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,52 +75,44 @@
 
 	ENTRY(atomic_inc_8_nv)
 	ALTENTRY(atomic_inc_uchar_nv)
-	movb	(%rdi), %al	/ %al = old value
-1:
-	leaq	1(%rax), %rcx	/ %cl = new value
+	xorl	%eax, %eax	/ clear upper bits of %eax return register
+	incb	%al		/ %al = 1
 	lock
-	cmpxchgb %cl, (%rdi)	/ try to stick it in
-	jne	1b
-	movzbl	%cl, %eax	/ return new value
+	  xaddb	%al, (%rdi)	/ %al = old value, (%rdi) = new value
+	incb	%al		/ return new value
 	ret
 	SET_SIZE(atomic_inc_uchar_nv)
 	SET_SIZE(atomic_inc_8_nv)
 
 	ENTRY(atomic_inc_16_nv)
 	ALTENTRY(atomic_inc_ushort_nv)
-	movw	(%rdi), %ax	/ %ax = old value
-1:
-	leaq	1(%rax), %rcx	/ %cx = new value
+	xorl	%eax, %eax	/ clear upper bits of %eax return register
+	incw	%ax		/ %ax = 1
 	lock
-	cmpxchgw %cx, (%rdi)	/ try to stick it in
-	jne	1b
-	movzwl	%cx, %eax	/ return new value
+	  xaddw	%ax, (%rdi)	/ %ax = old value, (%rdi) = new value
+	incw	%ax		/ return new value
 	ret
 	SET_SIZE(atomic_inc_ushort_nv)
 	SET_SIZE(atomic_inc_16_nv)
 
 	ENTRY(atomic_inc_32_nv)
 	ALTENTRY(atomic_inc_uint_nv)
-	movl	(%rdi), %eax	/ %eax = old value
-1:
-	leaq	1(%rax), %rcx	/ %ecx = new value
+	xorl	%eax, %eax	/ %eax = 0
+	incl	%eax		/ %eax = 1
 	lock
-	cmpxchgl %ecx, (%rdi)	/ try to stick it in
-	jne	1b
-	movl	%ecx, %eax	/ return new value
+	  xaddl	%eax, (%rdi)	/ %eax = old value, (%rdi) = new value
+	incl	%eax		/ return new value
 	ret
 	SET_SIZE(atomic_inc_uint_nv)
 	SET_SIZE(atomic_inc_32_nv)
 
 	ENTRY(atomic_inc_64_nv)
 	ALTENTRY(atomic_inc_ulong_nv)
-	movq	(%rdi), %rax	/ %rax = old value
-1:
-	leaq	1(%rax), %rcx	/ %rcx = new value
+	xorq	%rax, %rax	/ %rax = 0
+	incq	%rax		/ %rax = 1
 	lock
-	cmpxchgq %rcx, (%rdi)	/ try to stick it in
-	jne	1b
-	movq	%rcx, %rax	/ return new value
+	  xaddq	%rax, (%rdi)	/ %rax = old value, (%rdi) = new value
+	incq	%rax		/ return new value
 	ret
 	SET_SIZE(atomic_inc_ulong_nv)
 	SET_SIZE(atomic_inc_64_nv)
@@ -159,52 +151,44 @@
 
 	ENTRY(atomic_dec_8_nv)
 	ALTENTRY(atomic_dec_uchar_nv)
-	movb	(%rdi), %al	/ %al = old value
-1:
-	leaq	-1(%rax), %rcx	/ %cl = new value
+	xorl	%eax, %eax	/ clear upper bits of %eax return register
+	decb	%al		/ %al = -1
 	lock
-	cmpxchgb %cl, (%rdi)	/ try to stick it in
-	jne	1b
-	movzbl	%cl, %eax	/ return new value
+	  xaddb	%al, (%rdi)	/ %al = old value, (%rdi) = new value
+	decb	%al		/ return new value
 	ret
 	SET_SIZE(atomic_dec_uchar_nv)
 	SET_SIZE(atomic_dec_8_nv)
 
 	ENTRY(atomic_dec_16_nv)
 	ALTENTRY(atomic_dec_ushort_nv)
-	movw	(%rdi), %ax	/ %ax = old value
-1:
-	leaq	-1(%rax), %rcx	/ %cx = new value
+	xorl	%eax, %eax	/ clear upper bits of %eax return register
+	decw	%ax		/ %ax = -1
 	lock
-	cmpxchgw %cx, (%rdi)	/ try to stick it in
-	jne	1b
-	movzwl	%cx, %eax	/ return new value
+	  xaddw	%ax, (%rdi)	/ %ax = old value, (%rdi) = new value
+	decw	%ax		/ return new value
 	ret
 	SET_SIZE(atomic_dec_ushort_nv)
 	SET_SIZE(atomic_dec_16_nv)
 
 	ENTRY(atomic_dec_32_nv)
 	ALTENTRY(atomic_dec_uint_nv)
-	movl	(%rdi), %eax	/ %eax = old value
-1:
-	leaq	-1(%rax), %rcx	/ %ecx = new value
+	xorl	%eax, %eax	/ %eax = 0
+	decl	%eax		/ %eax = -1
 	lock
-	cmpxchgl %ecx, (%rdi)	/ try to stick it in
-	jne	1b
-	movl	%ecx, %eax	/ return new value
+	  xaddl	%eax, (%rdi)	/ %eax = old value, (%rdi) = new value
+	decl	%eax		/ return new value
 	ret
 	SET_SIZE(atomic_dec_uint_nv)
 	SET_SIZE(atomic_dec_32_nv)
 
 	ENTRY(atomic_dec_64_nv)
 	ALTENTRY(atomic_dec_ulong_nv)
-	movq	(%rdi), %rax	/ %rax = old value
-1:
-	leaq	-1(%rax), %rcx	/ %rcx = new value
+	xorq	%rax, %rax	/ %rax = 0
+	decq	%rax		/ %rax = -1
 	lock
-	cmpxchgq %rcx, (%rdi)	/ try to stick it in
-	jne	1b
-	movq	%rcx, %rax	/ return new value
+	  xaddq	%rax, (%rdi)	/ %rax = old value, (%rdi) = new value
+	decq	%rax		/ return new value
 	ret
 	SET_SIZE(atomic_dec_ulong_nv)
 	SET_SIZE(atomic_dec_64_nv)
@@ -309,42 +293,30 @@
 
 	ENTRY(atomic_add_8_nv)
 	ALTENTRY(atomic_add_char_nv)
-	movb	(%rdi), %al	/ %al = old value
-1:
-	movb	%sil, %cl
-	addb	%al, %cl	/ %cl = new value
+	movzbl	%sil, %eax		/ %al = delta addend, clear upper bits
 	lock
-	cmpxchgb %cl, (%rdi)	/ try to stick it in
-	jne	1b
-	movzbl	%cl, %eax	/ return new value
+	  xaddb	%sil, (%rdi)		/ %sil = old value, (%rdi) = sum
+	addb	%sil, %al		/ new value = original value + delta
 	ret
 	SET_SIZE(atomic_add_char_nv)
 	SET_SIZE(atomic_add_8_nv)
 
 	ENTRY(atomic_add_16_nv)
 	ALTENTRY(atomic_add_short_nv)
-	movw	(%rdi), %ax	/ %ax = old value
-1:
-	movw	%si, %cx
-	addw	%ax, %cx	/ %cx = new value
+	movzwl	%si, %eax		/ %ax = delta addend, clean upper bits
 	lock
-	cmpxchgw %cx, (%rdi)	/ try to stick it in
-	jne	1b
-	movzwl	%cx, %eax	/ return new value
+	  xaddw	%si, (%rdi)		/ %si = old value, (%rdi) = sum
+	addw	%si, %ax		/ new value = original value + delta
 	ret
 	SET_SIZE(atomic_add_short_nv)
 	SET_SIZE(atomic_add_16_nv)
 
 	ENTRY(atomic_add_32_nv)
 	ALTENTRY(atomic_add_int_nv)
-	movl	(%rdi), %eax
-1:
-	movl	%esi, %ecx
-	addl	%eax, %ecx
+	mov	%esi, %eax		/ %eax = delta addend
 	lock
-	cmpxchgl %ecx, (%rdi)
-	jne	1b
-	movl	%ecx, %eax
+	  xaddl	%esi, (%rdi)		/ %esi = old value, (%rdi) = sum
+	add	%esi, %eax		/ new value = original value + delta
 	ret
 	SET_SIZE(atomic_add_int_nv)
 	SET_SIZE(atomic_add_32_nv)
@@ -352,14 +324,10 @@
 	ENTRY(atomic_add_64_nv)
 	ALTENTRY(atomic_add_ptr_nv)
 	ALTENTRY(atomic_add_long_nv)
-	movq	(%rdi), %rax
-1:
-	movq	%rsi, %rcx
-	addq	%rax, %rcx
+	mov	%rsi, %rax		/ %rax = delta addend
 	lock
-	cmpxchgq %rcx, (%rdi)
-	jne	1b
-	movq	%rcx, %rax
+	  xaddq	%rsi, (%rdi)		/ %rsi = old value, (%rdi) = sum
+	addq	%rsi, %rax		/ new value = original value + delta
 	ret
 	SET_SIZE(atomic_add_long_nv)
 	SET_SIZE(atomic_add_ptr_nv)

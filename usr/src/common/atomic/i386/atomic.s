@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,13 +73,11 @@
 	ENTRY(atomic_inc_8_nv)
 	ALTENTRY(atomic_inc_uchar_nv)
 	movl	4(%esp), %edx	/ %edx = target address
-	movb	(%edx), %al	/ %al = old value
-1:
-	leal	1(%eax), %ecx	/ %cl = new value
+	xorl	%eax, %eax	/ clear upper bits of %eax
+	incb	%al		/ %al = 1
 	lock
-	cmpxchgb %cl, (%edx)	/ try to stick it in
-	jne	1b
-	movzbl	%cl, %eax	/ return new value
+	  xaddb	%al, (%edx)	/ %al = old value, inc (%edx)
+	incb	%al	/ return new value
 	ret
 	SET_SIZE(atomic_inc_uchar_nv)
 	SET_SIZE(atomic_inc_8_nv)
@@ -87,13 +85,11 @@
 	ENTRY(atomic_inc_16_nv)
 	ALTENTRY(atomic_inc_ushort_nv)
 	movl	4(%esp), %edx	/ %edx = target address
-	movw	(%edx), %ax	/ %ax = old value
-1:
-	leal	1(%eax), %ecx	/ %cx = new value
+	xorl	%eax, %eax	/ clear upper bits of %eax
+	incw	%ax		/ %ax = 1
 	lock
-	cmpxchgw %cx, (%edx)	/ try to stick it in
-	jne	1b
-	movzwl	%cx, %eax	/ return new value
+	  xaddw	%ax, (%edx)	/ %ax = old value, inc (%edx)
+	incw	%ax		/ return new value
 	ret
 	SET_SIZE(atomic_inc_ushort_nv)
 	SET_SIZE(atomic_inc_16_nv)
@@ -102,13 +98,11 @@
 	ALTENTRY(atomic_inc_uint_nv)
 	ALTENTRY(atomic_inc_ulong_nv)
 	movl	4(%esp), %edx	/ %edx = target address
-	movl	(%edx), %eax	/ %eax = old value
-1:
-	leal	1(%eax), %ecx	/ %ecx = new value
+	xorl	%eax, %eax	/ %eax = 0
+	incl	%eax		/ %eax = 1
 	lock
-	cmpxchgl %ecx, (%edx)	/ try to stick it in
-	jne	1b
-	movl	%ecx, %eax	/ return new value
+	  xaddl	%eax, (%edx)	/ %eax = old value, inc (%edx)
+	incl	%eax		/ return new value
 	ret
 	SET_SIZE(atomic_inc_ulong_nv)
 	SET_SIZE(atomic_inc_uint_nv)
@@ -176,13 +170,11 @@
 	ENTRY(atomic_dec_8_nv)
 	ALTENTRY(atomic_dec_uchar_nv)
 	movl	4(%esp), %edx	/ %edx = target address
-	movb	(%edx), %al	/ %al = old value
-1:
-	leal	-1(%eax), %ecx	/ %cl = new value
+	xorl	%eax, %eax	/ zero upper bits of %eax
+	decb	%al		/ %al = -1
 	lock
-	cmpxchgb %cl, (%edx)	/ try to stick it in
-	jne	1b
-	movzbl	%cl, %eax	/ return new value
+	  xaddb	%al, (%edx)	/ %al = old value, dec (%edx)
+	decb	%al		/ return new value
 	ret
 	SET_SIZE(atomic_dec_uchar_nv)
 	SET_SIZE(atomic_dec_8_nv)
@@ -190,13 +182,11 @@
 	ENTRY(atomic_dec_16_nv)
 	ALTENTRY(atomic_dec_ushort_nv)
 	movl	4(%esp), %edx	/ %edx = target address
-	movw	(%edx), %ax	/ %ax = old value
-1:
-	leal	-1(%eax), %ecx	/ %cx = new value
+	xorl	%eax, %eax	/ zero upper bits of %eax
+	decw	%ax		/ %ax = -1
 	lock
-	cmpxchgw %cx, (%edx)	/ try to stick it in
-	jne	1b
-	movzwl	%cx, %eax	/ return new value
+	  xaddw	%ax, (%edx)	/ %ax = old value, dec (%edx)
+	decw	%ax		/ return new value
 	ret
 	SET_SIZE(atomic_dec_ushort_nv)
 	SET_SIZE(atomic_dec_16_nv)
@@ -205,13 +195,11 @@
 	ALTENTRY(atomic_dec_uint_nv)
 	ALTENTRY(atomic_dec_ulong_nv)
 	movl	4(%esp), %edx	/ %edx = target address
-	movl	(%edx), %eax	/ %eax = old value
-1:
-	leal	-1(%eax), %ecx	/ %ecx = new value
+	xorl	%eax, %eax	/ %eax = 0
+	decl	%eax		/ %eax = -1
 	lock
-	cmpxchgl %ecx, (%edx)	/ try to stick it in
-	jne	1b
-	movl	%ecx, %eax	/ return new value
+	  xaddl	%eax, (%edx)	/ %eax = old value, dec (%edx)
+	decl	%eax		/ return new value
 	ret
 	SET_SIZE(atomic_dec_ulong_nv)
 	SET_SIZE(atomic_dec_uint_nv)
@@ -349,14 +337,11 @@
 	ENTRY(atomic_add_8_nv)
 	ALTENTRY(atomic_add_char_nv)
 	movl	4(%esp), %edx	/ %edx = target address
-	movb	(%edx), %al	/ %al = old value
-1:
-	movl	8(%esp), %ecx	/ %ecx = delta
-	addb	%al, %cl	/ %cl = new value
+	movb	8(%esp), %cl	/ %cl = delta
+	movzbl	%cl, %eax	/ %al = delta, zero extended
 	lock
-	cmpxchgb %cl, (%edx)	/ try to stick it in
-	jne	1b
-	movzbl	%cl, %eax	/ return new value
+	  xaddb	%cl, (%edx)	/ %cl = old value, (%edx) = sum
+	addb	%cl, %al	/ return old value plus delta
 	ret
 	SET_SIZE(atomic_add_char_nv)
 	SET_SIZE(atomic_add_8_nv)
@@ -364,14 +349,11 @@
 	ENTRY(atomic_add_16_nv)
 	ALTENTRY(atomic_add_short_nv)
 	movl	4(%esp), %edx	/ %edx = target address
-	movw	(%edx), %ax	/ %ax = old value
-1:
-	movl	8(%esp), %ecx	/ %ecx = delta
-	addw	%ax, %cx	/ %cx = new value
+	movw	8(%esp), %cx	/ %cx = delta
+	movzwl	%cx, %eax	/ %ax = delta, zero extended
 	lock
-	cmpxchgw %cx, (%edx)	/ try to stick it in
-	jne	1b
-	movzwl	%cx, %eax	/ return new value
+	  xaddw	%cx, (%edx)	/ %cx = old value, (%edx) = sum
+	addw	%cx, %ax	/ return old value plus delta
 	ret
 	SET_SIZE(atomic_add_short_nv)
 	SET_SIZE(atomic_add_16_nv)
@@ -381,14 +363,11 @@
 	ALTENTRY(atomic_add_ptr_nv)
 	ALTENTRY(atomic_add_long_nv)
 	movl	4(%esp), %edx	/ %edx = target address
-	movl	(%edx), %eax	/ %eax = old value
-1:
-	movl	8(%esp), %ecx	/ %ecx = delta
-	addl	%eax, %ecx	/ %ecx = new value
+	movl	8(%esp), %eax	/ %eax = delta
+	movl	%eax, %ecx	/ %ecx = delta
 	lock
-	cmpxchgl %ecx, (%edx)	/ try to stick it in
-	jne	1b
-	movl	%ecx, %eax	/ return new value
+	  xaddl	%eax, (%edx)	/ %eax = old value, (%edx) = sum
+	addl	%ecx, %eax	/ return old value plus delta
 	ret
 	SET_SIZE(atomic_add_long_nv)
 	SET_SIZE(atomic_add_ptr_nv)
