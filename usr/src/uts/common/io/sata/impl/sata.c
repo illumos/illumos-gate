@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -8603,11 +8603,32 @@ sata_txlt_atapi(sata_pkt_txlate_t *spx)
 	 */
 
 	/* Check the size of cdb */
-	cdblen = scsi_cdb_size[GETGROUP(cdbp)];
-	if (cdblen > sdinfo->satadrv_atapi_cdb_len) {
+
+	switch (GETGROUP(cdbp)) {
+	case CDB_GROUPID_3:   /* Reserved, per SPC-4 */
+		/*
+		 * opcodes 0x7e and 0x7f identify variable-length CDBs and
+		 * therefore require special handling.  Return failure, for now.
+		 */
+		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		return (TRAN_BADPKT);
+
+	case CDB_GROUPID_6:   /* Vendor-specific, per SPC-4 */
+	case CDB_GROUPID_7:   /* Vendor-specific, per SPC-4 */
+		/* obtain length from the scsi_pkt */
+		cdblen = scsipkt->pkt_cdblen;
+		break;
+
+	default:
+		/* CDB's length is statically known, per SPC-4 */
+		cdblen = scsi_cdb_size[GETGROUP(cdbp)];
+		break;
+	}
+
+	if (cdblen <= 0 || cdblen > sdinfo->satadrv_atapi_cdb_len) {
 		sata_log(NULL, CE_WARN,
 		    "sata: invalid ATAPI cdb length %d",
-		    scsipkt->pkt_cdblen);
+		    cdblen);
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (TRAN_BADPKT);
 	}
