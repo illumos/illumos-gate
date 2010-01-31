@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -397,6 +397,26 @@ typedef enum {
 #define	DDI_MODEL_LP64		DATAMODEL_LP64
 #define	DDI_MODEL_NATIVE	DATAMODEL_NATIVE
 #define	DDI_MODEL_NONE		DATAMODEL_NONE
+
+/*
+ * Defines for ddi_err().
+ */
+typedef enum ddi_err {
+	DER_INVALID = 0,	/* must be 0 */
+	DER_CONT = 1,
+	DER_CONS,
+	DER_LOG,
+	DER_VERB,
+	DER_NOTE,
+	DER_WARN,
+	DER_PANIC,
+	DER_MODE,
+	DER_DEBUG
+} ddi_err_t;
+
+/* if set to B_TRUE is DER_MODE is equivalent to DERE_PANIC */
+extern boolean_t ddi_err_panic;
+extern void ddi_err(ddi_err_t de, dev_info_t *rdip, const char *fmt, ...);
 
 extern char *ddi_strdup(const char *str, int flag);
 extern char *strdup(const char *str);
@@ -2224,6 +2244,9 @@ int	ddi_cb_register(dev_info_t *dip, ddi_cb_flags_t flags,
 	    ddi_cb_func_t cbfunc, void *arg1, void *arg2,
 	    ddi_cb_handle_t *ret_hdlp);
 int	ddi_cb_unregister(ddi_cb_handle_t hdl);
+
+/* Notify DDI of memory added */
+void ddi_mem_update(uint64_t addr, uint64_t size);
 
 #endif	/* _KERNEL */
 

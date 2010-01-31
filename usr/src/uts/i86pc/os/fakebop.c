@@ -58,7 +58,6 @@
 #endif
 #include <vm/kboot_mmu.h>
 #include <vm/hat_pte.h>
-#include <sys/dmar_acpi.h>
 #include <sys/kobj.h>
 #include <sys/kobj_lex.h>
 #include <sys/pci_cfgspace_impl.h>
@@ -2225,13 +2224,6 @@ process_slit(struct slit *tp)
 	    tp->number * tp->number);
 }
 
-static void
-process_dmar(struct dmar *tp)
-{
-	bsetprop(DMAR_TABLE_PROPNAME, strlen(DMAR_TABLE_PROPNAME),
-	    tp, tp->hdr.len);
-}
-
 #else /* __xpv */
 static void
 enumerate_xen_cpus()
@@ -2274,8 +2266,6 @@ build_firmware_properties(void)
 	if (slit_ptr = (struct slit *)find_fw_table("SLIT"))
 		process_slit(slit_ptr);
 
-	if (tp = find_fw_table("DMAR"))
-		process_dmar((struct dmar *)tp);
 	tp = find_fw_table("MCFG");
 #else /* __xpv */
 	enumerate_xen_cpus();

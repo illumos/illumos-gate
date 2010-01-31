@@ -57,12 +57,12 @@
 #include <sys/sunldi_impl.h>
 #include <sys/bootprops.h>
 
-
-#if defined(__i386) || defined(__amd64)
-#if !defined(__xpv)
+#if defined(__amd64) && !defined(__xpv)
 #include <sys/iommulib.h>
 #endif
-#endif
+
+/* XXX remove before putback */
+boolean_t ddi_err_panic = B_TRUE;
 
 #ifdef DEBUG
 int ddidebug = DDI_AUDIT;
@@ -399,10 +399,6 @@ i_ddi_free_node(dev_info_t *dip)
 {
 	struct dev_info *devi = DEVI(dip);
 	struct devi_nodeid *elem;
-#if defined(__x86) && !defined(__xpv)
-	gfx_entry_t *gfxp;
-	extern void *gfx_devinfo_list;
-#endif
 
 	ASSERT(devi->devi_ref == 0);
 	ASSERT(devi->devi_addr == NULL);
@@ -410,16 +406,6 @@ i_ddi_free_node(dev_info_t *dip)
 	ASSERT(devi->devi_child == NULL);
 	ASSERT(devi->devi_hp_hdlp == NULL);
 
-#if defined(__x86) && !defined(__xpv)
-	for (gfxp = gfx_devinfo_list; gfxp; gfxp = gfxp->g_next) {
-		if (gfxp->g_dip == dip) {
-			gfxp->g_dip = NULL;
-			while (gfxp->g_ref)
-				;
-		}
-	}
-	membar_producer();
-#endif
 	/* free devi_addr_buf allocated by ddi_set_name_addr() */
 	if (devi->devi_addr_buf)
 		kmem_free(devi->devi_addr_buf, 2 * MAXNAMELEN);
@@ -1348,13 +1334,11 @@ detach_node(dev_info_t *dip, uint_t flag)
 	DEVI_CLR_NEED_RESET(dip);
 	mutex_exit(&(DEVI(dip)->devi_lock));
 
-#if defined(__i386) || defined(__amd64)
-#if !defined(__xpv)
+#if defined(__amd64) && !defined(__xpv)
 	/*
 	 * Close any iommulib mediated linkage to an IOMMU
 	 */
 	iommulib_nex_close(dip);
-#endif
 #endif
 
 	/* destroy the taskq */
@@ -8564,4 +8548,111 @@ i_ddi_check_retire(dev_info_t *dip)
 	phci_only = 1;
 	if (MDI_PHCI(dip))
 		mdi_phci_retire_finalize(dip, phci_only);
+}
+
+void
+ddi_err(ddi_err_t ade, dev_info_t *rdip, const char *fmt, ...)
+{
+	va_list ap;
+	char strbuf[256];
+	char *buf;
+	size_t buflen, tlen;
+	int ce;
+	int de;
+	const char *fmtbad = "Invalid arguments to ddi_err()";
+
+	de = DER_CONT;
+	strbuf[1] = '\0';
+
+	switch (ade) {
+	case DER_CONS:
+		strbuf[0] = '^';
+		break;
+	case DER_LOG:
+		strbuf[0] = '!';
+		break;
+	case DER_VERB:
+		strbuf[0] = '?';
+		break;
+	default:
+		strbuf[0] = '\0';
+		de = ade;
+		break;
+	}
+
+	tlen = strlen(strbuf);
+	buf = strbuf + tlen;
+	buflen = sizeof (strbuf) - tlen;
+
+	if (rdip && ddi_get_instance(rdip) == -1) {
+		(void) snprintf(buf, buflen, "%s: ",
+		    ddi_driver_name(rdip));
+	} else if (rdip) {
+		(void) snprintf(buf, buflen, "%s%d: ",
+		    ddi_driver_name(rdip), ddi_get_instance(rdip));
+	}
+
+	tlen = strlen(strbuf);
+	buf = strbuf + tlen;
+	buflen = sizeof (strbuf) - tlen;
+
+	va_start(ap, fmt);
+	switch (de) {
+	case DER_CONT:
+		(void) vsnprintf(buf, buflen, fmt, ap);
+		if (ade != DER_CONT) {
+			(void) strlcat(strbuf, "\n", sizeof (strbuf));
+		}
+		ce = CE_CONT;
+		break;
+	case DER_NOTE:
+		(void) vsnprintf(buf, buflen, fmt, ap);
+		ce = CE_NOTE;
+		break;
+	case DER_WARN:
+		(void) vsnprintf(buf, buflen, fmt, ap);
+		ce = CE_WARN;
+		break;
+	case DER_MODE:
+		(void) vsnprintf(buf, buflen, fmt, ap);
+		if (ddi_err_panic == B_TRUE) {
+			ce = CE_PANIC;
+		} else {
+			ce = CE_WARN;
+		}
+		break;
+	case DER_DEBUG:
+		(void) snprintf(buf, buflen, "DEBUG: ");
+		tlen = strlen("DEBUG: ");
+		(void) vsnprintf(buf + tlen, buflen - tlen, fmt, ap);
+		ce = CE_CONT;
+		break;
+	case DER_PANIC:
+		(void) vsnprintf(buf, buflen, fmt, ap);
+		ce = CE_PANIC;
+		break;
+	case DER_INVALID:
+	default:
+		(void) snprintf(buf, buflen, fmtbad);
+		tlen = strlen(fmtbad);
+		(void) vsnprintf(buf + tlen, buflen - tlen, fmt, ap);
+		ce = CE_PANIC;
+		break;
+	}
+	va_end(ap);
+
+	cmn_err(ce, strbuf);
+}
+
+/*ARGSUSED*/
+void
+ddi_mem_update(uint64_t addr, uint64_t size)
+{
+#if defined(__x86) && !defined(__xpv)
+	extern void immu_physmem_update(uint64_t addr, uint64_t size);
+	immu_physmem_update(addr, size);
+#else
+	/*LINTED*/
+	;
+#endif
 }

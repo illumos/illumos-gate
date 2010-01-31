@@ -562,6 +562,12 @@ mapalloc:
 	if (nlgrps == 1)
 		lgrp_config(LGRP_CONFIG_GEN_UPDATE, 0, 0);
 
+	/*
+	 * Inform DDI of update
+	 */
+	ddi_mem_update((uint64_t)(pt_base) << PAGESHIFT,
+	    (uint64_t)(tpgs) << PAGESHIFT);
+
 	delspan_unreserve(pt_base, tpgs);
 	return (KPHYSM_OK);		/* Successfully added system memory */
 

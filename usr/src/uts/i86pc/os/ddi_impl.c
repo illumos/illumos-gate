@@ -101,6 +101,10 @@ static int peek_mem(peekpoke_ctlops_t *in_args);
 
 static int kmem_override_cache_attrs(caddr_t, size_t, uint_t);
 
+#if defined(__amd64) && !defined(__xpv)
+extern void immu_init(void);
+#endif
+
 #define	CTGENTRIES	15
 
 static struct ctgas {
@@ -201,6 +205,18 @@ FP hardware exhibits Pentium floating point divide problem\n");
 
 	/* reprogram devices not set up by firmware (BIOS) */
 	impl_bus_reprobe();
+
+#if defined(__amd64) && !defined(__xpv)
+	/*
+	 * Setup but don't startup the IOMMU
+	 * Startup happens later via a direct call
+	 * to IOMMU code by boot code.
+	 * At this point, all PCI bus renumbering
+	 * is done, so safe to init the IMMU
+	 * AKA Intel IOMMU.
+	 */
+	immu_init();
+#endif
 
 	/*
 	 * attach the isa nexus to get ACPI resource usage

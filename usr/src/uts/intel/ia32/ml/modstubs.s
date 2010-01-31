@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1373,6 +1373,17 @@ fcnname/**/_info:							\
 	MODULE(iommulib,misc);
 	STUB(iommulib, iommulib_nex_close, nomod_void);
         END_MODULE(iommulib);
+#endif
+
+/*
+ * Stubs for rootnex nexus driver.
+ */
+#ifndef ROOTNEX_MODULE
+	MODULE(rootnex,drv);
+	STUB(rootnex, immu_init, 0);
+	STUB(rootnex, immu_startup, 0);
+	STUB(rootnex, immu_physmem_update, 0);
+	END_MODULE(rootnex);
 #endif
 
 /*

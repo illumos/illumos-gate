@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -257,8 +257,8 @@ struct dev_info  {
 	struct i_ddi_prop_dyn	*devi_prop_dyn_driver;	/* prop_op */
 	struct i_ddi_prop_dyn	*devi_prop_dyn_parent;	/* bus_prop_op */
 
-	/* For intel iommu support */
-	void		*devi_iommu_private;
+	/* For x86 (Intel and AMD) IOMMU support */
+	void		*devi_iommu;
 
 	/* IOMMU handle */
 	iommulib_handle_t	devi_iommulib_handle;
@@ -596,11 +596,15 @@ struct dev_info  {
 #define	DEVI_RETIRING		0x00000200 /* being evaluated for retire */
 #define	DEVI_R_CONSTRAINT	0x00000400 /* constraints have been applied  */
 #define	DEVI_R_BLOCKED		0x00000800 /* constraints block retire  */
-#define	DEVI_CT_NOP		0x00001000 /*  NOP contract event occurred */
+#define	DEVI_CT_NOP		0x00001000 /* NOP contract event occurred */
+#define	DEVI_PCI_DEVICE		0x00002000 /* dip is PCI */
 
 #define	DEVI_BUSY_CHANGING(dip)	(DEVI(dip)->devi_flags & DEVI_BUSY)
 #define	DEVI_BUSY_OWNED(dip)	(DEVI_BUSY_CHANGING(dip) &&	\
 	((DEVI(dip))->devi_busy_thread == curthread))
+
+#define	DEVI_IS_PCI(dip)	(DEVI(dip)->devi_flags & DEVI_PCI_DEVICE)
+#define	DEVI_SET_PCI(dip)	(DEVI(dip)->devi_flags |= (DEVI_PCI_DEVICE))
 
 char	*i_ddi_devi_class(dev_info_t *);
 int	i_ddi_set_devi_class(dev_info_t *, char *, int);

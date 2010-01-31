@@ -3746,6 +3746,8 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus, uint_t device,
 	 */
 	(void) i_ndi_config_node(new_child, DS_LINKED, 0);
 
+	DEVI_SET_PCI(new_child);
+
 	if ((header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_PPB) {
 
 		DEBUG3("--Bridge found bus [0x%x] device[0x%x] func [0x%x]\n",

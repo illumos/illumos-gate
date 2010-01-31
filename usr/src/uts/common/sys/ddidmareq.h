@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_DDIDMAREQ_H
 #define	_SYS_DDIDMAREQ_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -638,6 +636,13 @@ typedef struct ddi_dma_req {
  * A DMA handle is already used for a DMA
  */
 #define	DDI_DMA_INUSE		-9
+
+
+/*
+ * DVMA disabled or not supported. use physical DMA
+ */
+#define	DDI_DMA_USE_PHYSICAL		-10
+
 
 /*
  * In order for the access to a memory object to be consistent

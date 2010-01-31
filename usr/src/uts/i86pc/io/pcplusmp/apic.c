@@ -108,7 +108,7 @@ static void	apic_timer_reprogram(hrtime_t time);
 static void	apic_timer_enable(void);
 static void	apic_timer_disable(void);
 static void	apic_post_cyclic_setup(void *arg);
-static void	apic_intrr_init(int apic_mode);
+static void	apic_intrmap_init(int apic_mode);
 static void	apic_record_ioapic_rdt(apic_irq_t *irq_ptr, ioapic_rdt_t *irdt);
 static void	apic_record_msi(apic_irq_t *irq_ptr, msi_regs_t *mregs);
 
@@ -366,7 +366,7 @@ int		apic_kmdb_on_nmi = 0;		/* 0 - no, 1 - yes enter kmdb */
 uint32_t	apic_divide_reg_init = 0;	/* 0 - divide by 2 */
 
 /* default apic ops without interrupt remapping */
-static apic_intrr_ops_t apic_nointrr_ops = {
+static apic_intrmap_ops_t apic_nointrmap_ops = {
 	(int (*)(int))return_instr,
 	(void (*)(int))return_instr,
 	(void (*)(apic_irq_t *))return_instr,
@@ -376,7 +376,7 @@ static apic_intrr_ops_t apic_nointrr_ops = {
 	apic_record_msi,
 };
 
-apic_intrr_ops_t *apic_vt_ops = &apic_nointrr_ops;
+apic_intrmap_ops_t *apic_vt_ops = &apic_nointrmap_ops;
 
 /*
  *	This is the loadable module wrapper
@@ -759,7 +759,7 @@ apic_picinit(void)
 	 * Initialize and enable interrupt remapping before apic
 	 * hardware initialization
 	 */
-	apic_intrr_init(apic_mode);
+	apic_intrmap_init(apic_mode);
 
 	/*
 	 * On UniSys Model 6520, the BIOS leaves vector 0x20 isr
@@ -2591,7 +2591,7 @@ x2apic_update_psm()
 }
 
 static void
-apic_intrr_init(int apic_mode)
+apic_intrmap_init(int apic_mode)
 {
 	int suppress_brdcst_eoi = 0;
 
@@ -2602,8 +2602,9 @@ apic_intrr_init(int apic_mode)
 		 * documentation (yet)), initialize interrupt remapping
 		 * support before initializing the X2APIC unit.
 		 */
-		if (((apic_intrr_ops_t *)psm_vt_ops)->apic_intrr_init(apic_mode)
-		    == DDI_SUCCESS) {
+		if (((apic_intrmap_ops_t *)psm_vt_ops)->
+		    apic_intrmap_init(apic_mode) == DDI_SUCCESS) {
+
 			apic_vt_ops = psm_vt_ops;
 
 			/*
@@ -2615,7 +2616,7 @@ apic_intrr_init(int apic_mode)
 				suppress_brdcst_eoi = 1;
 			}
 
-			apic_vt_ops->apic_intrr_enable(suppress_brdcst_eoi);
+			apic_vt_ops->apic_intrmap_enable(suppress_brdcst_eoi);
 
 			if (apic_detect_x2apic()) {
 				apic_enable_x2apic();

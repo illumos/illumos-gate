@@ -43,7 +43,6 @@
 #include <sys/hotplug/pci/pciehpc_acpi.h>
 #include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
-#include <sys/intel_iommu.h>
 #include <sys/iommulib.h>
 #include <sys/devcache.h>
 #include <sys/pci_cfgacc_x86.h>
@@ -2100,6 +2099,7 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 		}
 	}
 
+	DEVI_SET_PCI(dip);
 	reprogram = add_reg_props(dip, bus, dev, func, config_op, pciide);
 	(void) ndi_devi_bind_driver(dip, 0);
 

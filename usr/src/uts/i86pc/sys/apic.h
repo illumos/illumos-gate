@@ -486,7 +486,7 @@ typedef struct	apic_irq {
 	uint_t	airq_busy;		/* How frequently did clock find */
 					/* us in this */
 	struct apic_irq *airq_next;	/* chain of intpts sharing a vector */
-	void		*airq_intrr_private; /* intr remap private data */
+	void		*airq_intrmap_private; /* intr remap private data */
 } apic_irq_t;
 
 #define	IRQ_USER_BOUND	0x80000000 /* user requested bind if set in airq_cpu */
@@ -556,15 +556,15 @@ typedef struct msi_regs {
 /*
  * APIC ops to support intel interrupt remapping
  */
-typedef struct apic_intrr_ops {
-	int	(*apic_intrr_init)(int);
-	void	(*apic_intrr_enable)(int);
-	void	(*apic_intrr_alloc_entry)(apic_irq_t *);
-	void	(*apic_intrr_map_entry)(apic_irq_t *, void *);
-	void	(*apic_intrr_free_entry)(apic_irq_t *);
-	void	(*apic_intrr_record_rdt)(apic_irq_t *, ioapic_rdt_t *);
-	void	(*apic_intrr_record_msi)(apic_irq_t *, msi_regs_t *);
-} apic_intrr_ops_t;
+typedef struct apic_intrmap_ops {
+	int	(*apic_intrmap_init)(int);
+	void	(*apic_intrmap_enable)(int);
+	void	(*apic_intrmap_alloc_entry)(apic_irq_t *);
+	void	(*apic_intrmap_map_entry)(apic_irq_t *, void *);
+	void	(*apic_intrmap_free_entry)(apic_irq_t *);
+	void	(*apic_intrmap_record_rdt)(apic_irq_t *, ioapic_rdt_t *);
+	void	(*apic_intrmap_record_msi)(apic_irq_t *, msi_regs_t *);
+} apic_intrmap_ops_t;
 
 /*
  * Various poweroff methods and ports & bits for them
@@ -862,7 +862,7 @@ extern void apic_common_send_ipi(int, int);
 extern void apic_set_directed_EOI_handler();
 extern int apic_directed_EOI_supported();
 
-extern apic_intrr_ops_t *apic_vt_ops;
+extern apic_intrmap_ops_t *apic_vt_ops;
 
 #ifdef	__cplusplus
 }

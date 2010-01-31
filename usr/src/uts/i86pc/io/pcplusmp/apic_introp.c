@@ -94,9 +94,9 @@ apic_pci_msi_enable_vector(apic_irq_t *irq_ptr, int type, int inum, int vector,
 	msi_regs.mr_data = vector;
 	msi_regs.mr_addr = target_apic_id;
 
-	apic_vt_ops->apic_intrr_alloc_entry(irq_ptr);
-	apic_vt_ops->apic_intrr_map_entry(irq_ptr, (void *)&msi_regs);
-	apic_vt_ops->apic_intrr_record_msi(irq_ptr, &msi_regs);
+	apic_vt_ops->apic_intrmap_alloc_entry(irq_ptr);
+	apic_vt_ops->apic_intrmap_map_entry(irq_ptr, (void *)&msi_regs);
+	apic_vt_ops->apic_intrmap_record_msi(irq_ptr, &msi_regs);
 
 	/* MSI Address */
 	msi_addr = msi_regs.mr_addr;

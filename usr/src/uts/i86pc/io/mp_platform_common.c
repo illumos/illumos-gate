@@ -1759,7 +1759,7 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 	}
 
 #if !defined(__xpv)
-	apic_vt_ops->apic_intrr_free_entry(irqptr);
+	apic_vt_ops->apic_intrmap_free_entry(irqptr);
 #endif
 
 	/*
@@ -2966,10 +2966,10 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
 #if !defined(__xpv)
 			irdt.ir_hi = AV_TOALL >> APIC_ID_BIT_OFFSET;
 
-			apic_vt_ops->apic_intrr_alloc_entry(irq_ptr);
-			apic_vt_ops->apic_intrr_map_entry(
+			apic_vt_ops->apic_intrmap_alloc_entry(irq_ptr);
+			apic_vt_ops->apic_intrmap_map_entry(
 			    irq_ptr, (void *)&irdt);
-			apic_vt_ops->apic_intrr_record_rdt(irq_ptr, &irdt);
+			apic_vt_ops->apic_intrmap_record_rdt(irq_ptr, &irdt);
 
 			/* Write the RDT entry -- no specific CPU binding */
 			WRITE_IOAPIC_RDT_ENTRY_HIGH_DWORD(ioapicindex, intin_no,
@@ -3010,9 +3010,9 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
 		irdt.ir_hi = cpu_infop->aci_local_id;
 
 #if !defined(__xpv)
-		apic_vt_ops->apic_intrr_alloc_entry(irq_ptr);
-		apic_vt_ops->apic_intrr_map_entry(irq_ptr, (void *)&irdt);
-		apic_vt_ops->apic_intrr_record_rdt(irq_ptr, &irdt);
+		apic_vt_ops->apic_intrmap_alloc_entry(irq_ptr);
+		apic_vt_ops->apic_intrmap_map_entry(irq_ptr, (void *)&irdt);
+		apic_vt_ops->apic_intrmap_record_rdt(irq_ptr, &irdt);
 
 		/* Write the RDT entry -- bind to a specific CPU: */
 		WRITE_IOAPIC_RDT_ENTRY_HIGH_DWORD(ioapicindex, intin_no,

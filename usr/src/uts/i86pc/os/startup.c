@@ -151,6 +151,10 @@ static char hostid_file[] = "/etc/hostid";
 
 void *gfx_devinfo_list;
 
+#if defined(__amd64) && !defined(__xpv)
+extern void immu_startup(void);
+#endif
+
 /*
  * XXX make declaration below "static" when drivers no longer use this
  * interface.
@@ -170,10 +174,6 @@ static void startup_modules(void);
 static void startup_vm(void);
 static void startup_end(void);
 static void layout_kernel_va(void);
-
-#if !defined(__xpv)
-void (*rootnex_iommu_init)(void) = NULL;
-#endif
 
 /*
  * Declare these as initialized data so we can patch them.
@@ -2137,11 +2137,14 @@ startup_end(void)
 	xs_domu_init();
 #endif
 
-#if !defined(__xpv)
-	if (rootnex_iommu_init != NULL) {
-		rootnex_iommu_init();
-	}
+#if defined(__amd64) && !defined(__xpv)
+	/*
+	 * Intel IOMMU has been setup/initialized in ddi_impl.c
+	 * Start it up now.
+	 */
+	immu_startup();
 #endif
+
 	PRM_POINT("Enabling interrupts");
 	(*picinitf)();
 	sti();

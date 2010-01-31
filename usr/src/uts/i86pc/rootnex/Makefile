@@ -20,7 +20,7 @@
 #
 #
 # uts/i86pc/rootnex/Makefile
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This makefile drives the production of the rootnex driver
@@ -85,7 +85,7 @@ lint:		$(LINT_DEPS)
 
 modlintlib:	$(MODLINTLIB_DEPS)
 
-clean.lint:	$(CLEAN_LINT_DEPS)
+clean.lint: 	$(CLEAN_DEPS)
 
 install:	$(INSTALL_DEPS) $(CONF_INSTALL_DEPS)
 

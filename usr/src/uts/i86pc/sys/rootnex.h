@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -205,6 +205,18 @@ typedef struct rootnex_window_s {
 #endif
 } rootnex_window_t;
 
+typedef struct dvcookie {
+	uint64_t dvck_dvma;
+	uint64_t dvck_npages;
+	uint64_t dvck_sidx;
+	uint64_t dvck_eidx;
+} dvcookie_t;
+
+typedef struct dcookie {
+	paddr_t dck_paddr;
+	uint64_t dck_npages;
+} dcookie_t;
+
 /* per dma handle private state */
 typedef struct rootnex_dma_s {
 	/*
@@ -310,11 +322,16 @@ typedef struct rootnex_dma_s {
 	uchar_t			*dp_prealloc_buffer;
 
 	/*
-	 * intel iommu related state
-	 * dvma_cookies saves the dvma allocated for this handler, it has the
-	 * size of si_max_pages, set when bind handler and freed when unbind
+	 * Intel IOMMU (immu) related state
+	 * dv_cookies saves the dvma allocated for this handler
+	 * max index of dvcookies in dvmax
 	 */
-	void			*dp_dvma_cookies;
+	dvcookie_t		*dp_dvcookies;
+	uint64_t		dp_dvmax;
+	dcookie_t		*dp_dcookies;
+	uint64_t		dp_dmax;
+	uint64_t		dp_max_cookies;
+	uint64_t		dp_max_dcookies;
 
 	/*
 	 * sleep flags set on bind and unset on unbind
@@ -349,7 +366,6 @@ typedef enum {
  *   r_dip - rootnex dip
  *   r_reserved_msg_printed - ctlops reserve message threshold
  *   r_counters - profile/performance counters
- *   r_intel_iommu_enabled - intel iommu enabled
  */
 typedef struct rootnex_state_s {
 	uint_t			r_prealloc_cookies;
@@ -361,10 +377,8 @@ typedef struct rootnex_state_s {
 	ddi_iblock_cookie_t	r_err_ibc;
 	boolean_t		r_reserved_msg_printed;
 	uint64_t		r_counters[ROOTNEX_CNT_LAST];
-	boolean_t		r_intel_iommu_enabled;
 	iommulib_nexhandle_t    r_iommulib_handle;
 } rootnex_state_t;
-
 
 #ifdef	__cplusplus
 }

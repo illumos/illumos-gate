@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This Makefile defines file modules in the directory uts/i86pc
@@ -204,7 +204,9 @@ ACPIDEV_OBJS += acpidev_drv.o \
 	acpidev_resource.o \
 	acpidev_util.o
 
-ROOTNEX_OBJS += rootnex.o iommu_rscs.o dmar_acpi.o intel_iommu.o
+ROOTNEX_OBJS += rootnex.o immu.o immu_dmar.o immu_dvma.o \
+		immu_intrmap.o immu_qinv.o immu_regs.o
+
 TZMON_OBJS	+= tzmon.o
 UPPC_OBJS += uppc.o psm_common.o
 XSVC_OBJS += xsvc.o

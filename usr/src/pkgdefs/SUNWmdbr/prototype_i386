@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -50,7 +50,6 @@ f none kernel/kmdb/amd64/neti 555 root sys
 f none kernel/kmdb/amd64/nfs 555 root sys
 f none kernel/kmdb/amd64/ptm 555 root sys
 f none kernel/kmdb/amd64/random 555 root sys
-f none kernel/kmdb/amd64/rootnex 555 root sys
 f none kernel/kmdb/amd64/s1394 555 root sys
 f none kernel/kmdb/amd64/sata 555 root sys
 f none kernel/kmdb/amd64/scsi_vhci 555 root sys
@@ -86,7 +85,6 @@ f none kernel/kmdb/neti 555 root sys
 f none kernel/kmdb/nfs 555 root sys
 f none kernel/kmdb/ptm 555 root sys
 f none kernel/kmdb/random 555 root sys
-f none kernel/kmdb/rootnex 555 root sys
 f none kernel/kmdb/s1394 555 root sys
 f none kernel/kmdb/sata 555 root sys
 f none kernel/kmdb/scsi_vhci 555 root sys
