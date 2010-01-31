@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -607,7 +607,8 @@ typedef enum {
 
 typedef enum {
 	SCSI_TGT_DEACT_RSN_GONE = 0,
-	SCSI_TGT_DEACT_RSN_CFG_FAIL
+	SCSI_TGT_DEACT_RSN_CFG_FAIL,
+	SCSI_TGT_DEACT_RSN_UNSTBL
 } scsi_tgtmap_deact_rsn_t;
 
 typedef void	(*scsi_tgt_activate_cb_t)(
@@ -615,7 +616,7 @@ typedef void	(*scsi_tgt_activate_cb_t)(
 				char			*tgt_addr,
 				scsi_tgtmap_tgt_type_t	tgt_type,
 				void			**tgt_privp);
-typedef void	(*scsi_tgt_deactivate_cb_t)(
+typedef boolean_t	(*scsi_tgt_deactivate_cb_t)(
 				void			*tgtmap_priv,
 				char			*tgt_addr,
 				scsi_tgtmap_tgt_type_t	tgt_type,

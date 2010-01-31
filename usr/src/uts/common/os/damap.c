@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1462,14 +1462,16 @@ dam_addr_report_release(dam_t *mapp, id_t addrid)
 	/*
 	 * clear the report bit
 	 * if the address has a registered deactivation handler and
-	 * the address has not stabilized, deactivate the address
+	 * we are holding a private data pointer and the address has not
+	 * stabilized, deactivate the address (private data).
 	 */
 	bitset_del(&mapp->dam_report_set, addrid);
-	if (!DAM_IS_STABLE(mapp, addrid) && mapp->dam_deactivate_cb) {
+	if (!DAM_IS_STABLE(mapp, addrid) && mapp->dam_deactivate_cb &&
+	    passp->da_ppriv_rpt) {
 		mutex_exit(&mapp->dam_lock);
 		(*mapp->dam_deactivate_cb)(mapp->dam_activate_arg,
 		    ddi_strid_id2str(mapp->dam_addr_hash, addrid),
-		    addrid, passp->da_ppriv_rpt, DAMAP_DEACT_RSN_GONE);
+		    addrid, passp->da_ppriv_rpt, DAMAP_DEACT_RSN_UNSTBL);
 		mutex_enter(&mapp->dam_lock);
 	}
 	passp->da_ppriv_rpt = NULL;

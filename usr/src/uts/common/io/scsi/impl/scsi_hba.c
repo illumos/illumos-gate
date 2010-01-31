@@ -6356,7 +6356,7 @@ scsi_device_config(dev_info_t *self, char *name, char *addr, scsi_enum_t se,
 	if (sp != SCSIPROBE_EXISTS) {
 		scsi_enumeration_failed(probe, -1, NULL, "probe");
 
-		if (scsi_hba_barrier_timeout) {
+		if ((se != SE_HP) && scsi_hba_barrier_timeout) {
 			/*
 			 * Target does not exist. Mark the barrier probe node
 			 * as DEVICE_REMOVED and schedule an asynchronous
@@ -8179,20 +8179,42 @@ scsi_tgtmap_smp_activate(void *map_priv, char *tgt_addr, int addrid,
 /* ARGSUSED1 */
 static void
 scsi_tgtmap_smp_deactivate(void *map_priv, char *tgt_addr, int addrid,
-    void *tgt_privp, damap_deact_rsn_t deact_rsn)
+    void *tgt_privp, damap_deact_rsn_t damap_rsn)
 {
 	impl_scsi_tgtmap_t	*tgtmap = (impl_scsi_tgtmap_t *)map_priv;
 	dev_info_t		*self = tgtmap->tgtmap_tran->tran_iport_dip;
+	boolean_t		tgtmap_rereport;
+	scsi_tgtmap_deact_rsn_t	tgtmap_rsn;
 
 	if (tgtmap->tgtmap_deactivate_cb) {
-		SCSI_HBA_LOG((_LOGTGT, self, NULL, "%s @%s deactivated",
+		SCSI_HBA_LOG((_LOGTGT, self, NULL, "%s @%s deactivated %d",
 		    damap_name(tgtmap->tgtmap_dam[SCSI_TGT_SMP_DEVICE]),
-		    tgt_addr));
+		    tgt_addr, damap_rsn));
 
-		(*tgtmap->tgtmap_deactivate_cb)(tgtmap->tgtmap_mappriv,
-		    tgt_addr, SCSI_TGT_SMP_DEVICE, tgt_privp,
-		    (deact_rsn == DAMAP_DEACT_RSN_CFG_FAIL) ?
-		    SCSI_TGT_DEACT_RSN_CFG_FAIL : SCSI_TGT_DEACT_RSN_GONE);
+		if (damap_rsn == DAMAP_DEACT_RSN_GONE)
+			tgtmap_rsn = SCSI_TGT_DEACT_RSN_GONE;
+		else if (damap_rsn == DAMAP_DEACT_RSN_CFG_FAIL)
+			tgtmap_rsn = SCSI_TGT_DEACT_RSN_CFG_FAIL;
+		else if (damap_rsn == DAMAP_DEACT_RSN_UNSTBL)
+			tgtmap_rsn = SCSI_TGT_DEACT_RSN_UNSTBL;
+		else {
+			SCSI_HBA_LOG((_LOG(WARN), self, NULL,
+			    "%s @%s deactivated with unknown rsn",
+			    damap_name(tgtmap->tgtmap_dam[SCSI_TGT_SMP_DEVICE]),
+			    tgt_addr));
+			return;
+		}
+
+		tgtmap_rereport = (*tgtmap->tgtmap_deactivate_cb)
+		    (tgtmap->tgtmap_mappriv, tgt_addr,
+		    SCSI_TGT_SMP_DEVICE, tgt_privp, tgtmap_rsn);
+
+		if ((tgtmap_rsn == SCSI_TGT_DEACT_RSN_CFG_FAIL) &&
+		    (tgtmap_rereport == B_FALSE)) {
+			SCSI_HBA_LOG((_LOG(WARN), NULL, self,
+			    "%s enumeration failed, no more retries until "
+			    "config change occurs", tgt_addr));
+		}
 	}
 }
 
@@ -8217,20 +8239,42 @@ scsi_tgtmap_scsi_activate(void *map_priv, char *tgt_addr, int addrid,
 /* ARGSUSED1 */
 static void
 scsi_tgtmap_scsi_deactivate(void *map_priv, char *tgt_addr, int addrid,
-    void *tgt_privp, damap_deact_rsn_t deact_rsn)
+    void *tgt_privp, damap_deact_rsn_t damap_rsn)
 {
 	impl_scsi_tgtmap_t	*tgtmap = (impl_scsi_tgtmap_t *)map_priv;
 	dev_info_t		*self = tgtmap->tgtmap_tran->tran_iport_dip;
+	boolean_t		tgtmap_rereport;
+	scsi_tgtmap_deact_rsn_t	tgtmap_rsn;
 
 	if (tgtmap->tgtmap_deactivate_cb) {
-		SCSI_HBA_LOG((_LOGTGT, self, NULL, "%s @%s deactivated",
+		SCSI_HBA_LOG((_LOGTGT, self, NULL, "%s @%s deactivated %d",
 		    damap_name(tgtmap->tgtmap_dam[SCSI_TGT_SCSI_DEVICE]),
-		    tgt_addr));
+		    tgt_addr, damap_rsn));
 
-		(*tgtmap->tgtmap_deactivate_cb)(tgtmap->tgtmap_mappriv,
-		    tgt_addr, SCSI_TGT_SCSI_DEVICE, tgt_privp,
-		    (deact_rsn == DAMAP_DEACT_RSN_CFG_FAIL) ?
-		    SCSI_TGT_DEACT_RSN_CFG_FAIL : SCSI_TGT_DEACT_RSN_GONE);
+		if (damap_rsn == DAMAP_DEACT_RSN_GONE)
+			tgtmap_rsn = SCSI_TGT_DEACT_RSN_GONE;
+		else if (damap_rsn == DAMAP_DEACT_RSN_CFG_FAIL)
+			tgtmap_rsn = SCSI_TGT_DEACT_RSN_CFG_FAIL;
+		else if (damap_rsn == DAMAP_DEACT_RSN_UNSTBL)
+			tgtmap_rsn = SCSI_TGT_DEACT_RSN_UNSTBL;
+		else {
+			SCSI_HBA_LOG((_LOG(WARN), self, NULL,
+			    "%s @%s deactivated with unknown rsn", damap_name(
+			    tgtmap->tgtmap_dam[SCSI_TGT_SCSI_DEVICE]),
+			    tgt_addr));
+			return;
+		}
+
+		tgtmap_rereport = (*tgtmap->tgtmap_deactivate_cb)
+		    (tgtmap->tgtmap_mappriv, tgt_addr,
+		    SCSI_TGT_SCSI_DEVICE, tgt_privp, tgtmap_rsn);
+
+		if ((tgtmap_rsn == SCSI_TGT_DEACT_RSN_CFG_FAIL) &&
+		    (tgtmap_rereport == B_FALSE)) {
+			SCSI_HBA_LOG((_LOG(WARN), NULL, self,
+			    "%s enumeration failed, no more retries until "
+			    "config change occurs", tgt_addr));
+		}
 	}
 }
 

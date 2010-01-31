@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -313,7 +313,7 @@ void pmcs_start_ssp_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk,
     uint32_t *iomb, size_t amt);
 void pmcs_ssp_event_recovery(pmcs_hw_t *);
 
-pmcs_iport_t *pmcs_get_iport_by_phy(pmcs_hw_t *pwp, pmcs_phy_t *pptr);
+pmcs_iport_t *pmcs_get_iport_by_wwn(pmcs_hw_t *pwp, uint64_t wwn);
 pmcs_phy_t *pmcs_promote_next_phy(pmcs_phy_t *pptr);
 void pmcs_rele_iport(pmcs_iport_t *iport);
 int pmcs_iport_configure_phys(pmcs_iport_t *iport);
@@ -359,6 +359,11 @@ void pmcs_smp_release(pmcs_iport_t *iport);
  * Update attached-port-pm and target-port-pm properties on a PHY
  */
 void pmcs_update_phy_pm_props(pmcs_phy_t *, uint64_t, uint64_t, boolean_t);
+
+/*
+ * Determine whether it's worth retrying enumeration
+ */
+void pmcs_status_disposition(pmcs_phy_t *, uint32_t);
 
 #ifdef	__cplusplus
 }

@@ -65,6 +65,12 @@ static boolean_t pmcs_configure_phy(pmcs_hw_t *, pmcs_phy_t *);
 static void pmcs_reap_dead_phy(pmcs_phy_t *);
 static pmcs_iport_t *pmcs_get_iport_by_ua(pmcs_hw_t *, char *);
 static boolean_t pmcs_phy_target_match(pmcs_phy_t *);
+static void pmcs_iport_active(pmcs_iport_t *);
+static void pmcs_tgtmap_activate_cb(void *, char *, scsi_tgtmap_tgt_type_t,
+    void **);
+static boolean_t pmcs_tgtmap_deactivate_cb(void *, char *,
+    scsi_tgtmap_tgt_type_t, void *, scsi_tgtmap_deact_rsn_t);
+static void pmcs_add_dead_phys(pmcs_hw_t *, pmcs_phy_t *);
 
 /*
  * Often used strings
@@ -720,6 +726,12 @@ pmcs_reset_phy(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint8_t type)
 	} else if ((level == 0) && (pptr->dtype == EXPANDER)) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, pptr->target,
 		    "%s: Not resetting HBA PHY @ %s", __func__, pptr->path);
+		return (0);
+	}
+
+	if (!pptr->iport || !pptr->valid_device_id) {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, pptr->target,
+		    "%s: Can't reach PHY %s", __func__, pptr->path);
 		return (0);
 	}
 
@@ -1924,7 +1936,8 @@ pmcs_iport_tgtmap_create(pmcs_iport_t *iport)
 
 	/* create target map */
 	if (scsi_hba_tgtmap_create(iport->dip, SCSI_TM_FULLSET, tgtmap_usec,
-	    NULL, NULL, NULL, &iport->iss_tgtmap) != DDI_SUCCESS) {
+	    (void *)iport, pmcs_tgtmap_activate_cb, pmcs_tgtmap_deactivate_cb,
+	    &iport->iss_tgtmap) != DDI_SUCCESS) {
 		pmcs_prt(iport->pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: failed to create tgtmap", __func__);
 		return (B_FALSE);
@@ -2077,22 +2090,20 @@ pmcs_get_iport_by_ua(pmcs_hw_t *pwp, char *ua)
  * If an iport is returned, there is a hold that the caller must release.
  */
 pmcs_iport_t *
-pmcs_get_iport_by_phy(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
+pmcs_get_iport_by_wwn(pmcs_hw_t *pwp, uint64_t wwn)
 {
 	pmcs_iport_t	*iport = NULL;
 	char		*ua;
 
-	ua = sas_phymap_lookup_ua(pwp->hss_phymap, pwp->sas_wwns[0],
-	    pmcs_barray2wwn(pptr->sas_address));
+	ua = sas_phymap_lookup_ua(pwp->hss_phymap, pwp->sas_wwns[0], wwn);
 	if (ua) {
 		iport = pmcs_get_iport_by_ua(pwp, ua);
 		if (iport) {
 			mutex_enter(&iport->lock);
-			iport->ua_state = UA_ACTIVE;
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL, "%s: "
-			    "found iport [0x%p] on ua (%s) for phy [0x%p], "
-			    "refcnt (%d)", __func__, (void *)iport, ua,
-			    (void *)pptr, iport->refcnt);
+			pmcs_iport_active(iport);
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL, "%s: "
+			    "found iport [0x%p] on ua (%s), refcnt (%d)",
+			    __func__, (void *)iport, ua, iport->refcnt);
 			mutex_exit(&iport->lock);
 		}
 	}
@@ -2251,7 +2262,7 @@ pmcs_phymap_activate(void *arg, char *ua, void **privp)
 			    "failed to configure phys on iport [0x%p] at "
 			    "unit address (%s)", __func__, (void *)iport, ua);
 		}
-		iport->ua_state = UA_ACTIVE;
+		pmcs_iport_active(iport);
 		pmcs_smhba_add_iport_prop(iport, DATA_TYPE_INT32, PMCS_NUM_PHYS,
 		    &iport->nphy);
 		mutex_exit(&iport->lock);
@@ -2626,16 +2637,18 @@ pmcs_report_observations(pmcs_hw_t *pwp)
 		 * Get the iport for this root PHY, then call the helper
 		 * to report observations for this iport's targets
 		 */
-		iport = pmcs_get_iport_by_phy(pwp, pptr);
+		wwn = pmcs_barray2wwn(pptr->sas_address);
+		pmcs_unlock_phy(pptr);
+		iport = pmcs_get_iport_by_wwn(pwp, wwn);
 		if (iport == NULL) {
 			/* No iport for this tgt */
 			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
 			    "%s: no iport for this target", __func__);
-			pmcs_unlock_phy(pptr);
 			pptr = pptr->sibling;
 			continue;
 		}
 
+		pmcs_lock_phy(pptr);
 		if (!iport->report_skip) {
 			if (pmcs_report_iport_observations(
 			    pwp, iport, pptr) == B_FALSE) {
@@ -2747,7 +2760,7 @@ pmcs_report_iport_observations(pmcs_hw_t *pwp, pmcs_iport_t *iport,
 			break;
 		}
 
-		if (lphyp->dead) {
+		if (lphyp->dead || !lphyp->configured) {
 			goto next_phy;
 		}
 
@@ -2808,6 +2821,7 @@ pmcs_configure_new_devices(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 	int rval = 0;
 	pmcs_iport_t *iport;
 	pmcs_phy_t *pnext, *orig_pptr = pptr, *root_phy, *pchild;
+	uint64_t wwn;
 
 	/*
 	 * First, walk through each PHY at this level
@@ -2832,7 +2846,9 @@ pmcs_configure_new_devices(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 		 * Confirm that this target's iport is configured
 		 */
 		root_phy = pmcs_get_root_phy(pptr);
-		iport = pmcs_get_iport_by_phy(pwp, root_phy);
+		wwn = pmcs_barray2wwn(root_phy->sas_address);
+		pmcs_unlock_phy(pptr);
+		iport = pmcs_get_iport_by_wwn(pwp, wwn);
 		if (iport == NULL) {
 			/* No iport for this tgt, restart */
 			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
@@ -2840,9 +2856,11 @@ pmcs_configure_new_devices(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 			    "retry discovery", __func__);
 			pnext = NULL;
 			rval = -1;
+			pmcs_lock_phy(pptr);
 			goto next_phy;
 		}
 
+		pmcs_lock_phy(pptr);
 		switch (pptr->dtype) {
 		case NOTHING:
 			pptr->changed = 0;
@@ -3051,6 +3069,7 @@ pmcs_clear_phy(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 	pptr->subsidiary = 0;
 	pptr->configured = 0;
 	pptr->deregister_wait = 0;
+	pptr->reenumerate = 0;
 	/* Only mark dead if it's not a root PHY and its dtype isn't NOTHING */
 	/* XXX: What about directly attached disks? */
 	if (!IS_ROOT_PHY(pptr) && (pptr->dtype != NOTHING))
@@ -3446,20 +3465,25 @@ pmcs_configure_expander(pmcs_hw_t *pwp, pmcs_phy_t *pptr, pmcs_iport_t *iport)
 	}
 
 	/*
-	 * Step 9- Install the new list on the next level. There should be
-	 * no children pointer on this PHY.  If there is, we'd need to know
-	 * how it happened (The expander suddenly got more PHYs?).
+	 * Step 9: Install the new list on the next level. There should
+	 * typically be no children pointer on this PHY.  There is one known
+	 * case where this can happen, though.  If a root PHY goes down and
+	 * comes back up before discovery can run, we will fail to remove the
+	 * children from that PHY since it will no longer be marked dead.
+	 * However, in this case, all children should also be marked dead.  If
+	 * we see that, take those children and put them on the dead_phys list.
 	 */
-	ASSERT(pptr->children == NULL);
 	if (pptr->children != NULL) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL, "%s: Already child "
-		    "PHYs attached  to PHY %s: This should never happen",
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
+		    "%s: Expander @ %s still has children: Clean up",
 		    __func__, pptr->path);
-		goto out;
-	} else {
-		pptr->children = clist;
+		pmcs_add_dead_phys(pwp, pptr->children);
 	}
 
+	/*
+	 * Set the new children pointer for this expander
+	 */
+	pptr->children = clist;
 	clist = NULL;
 	pptr->ncphy = nphy;
 	pptr->configured = 1;
@@ -3899,22 +3923,8 @@ pmcs_clear_expander(pmcs_hw_t *pwp, pmcs_phy_t *pptr, int level)
 	/*
 	 * Now snip out the list of children below us and release them
 	 */
-	ctmp = pptr->children;
-	while (ctmp) {
-		pmcs_phy_t *nxt = ctmp->sibling;
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, ctmp, NULL,
-		    "%s: dead PHY 0x%p (%s) (ref_count %d)", __func__,
-		    (void *)ctmp, ctmp->path, ctmp->ref_count);
-		/*
-		 * Put this PHY on the dead PHY list for the watchdog to
-		 * clean up after any outstanding work has completed.
-		 */
-		mutex_enter(&pwp->dead_phylist_lock);
-		ctmp->dead_next = pwp->dead_phys;
-		pwp->dead_phys = ctmp;
-		mutex_exit(&pwp->dead_phylist_lock);
-		pmcs_unlock_phy(ctmp);
-		ctmp = nxt;
+	if (pptr->children) {
+		pmcs_add_dead_phys(pwp, pptr->children);
 	}
 
 	pptr->children = NULL;
@@ -3988,13 +3998,19 @@ pmcs_expander_get_nphy(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 	smp_response_frame_t *srf;
 	smp_report_general_resp_t *srgr;
 	uint32_t msg[PMCS_MSG_SIZE], *ptr, htag, status, ival;
-	int result;
+	int result = 0;
 
 	ival = 0x40001100;
+
 again:
+	if (!pptr->iport || !pptr->valid_device_id) {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, pptr->target,
+		    "%s: Can't reach PHY %s", __func__, pptr->path);
+		goto out;
+	}
+
 	pwrk = pmcs_gwork(pwp, PMCS_TAG_TYPE_WAIT, pptr);
 	if (pwrk == NULL) {
-		result = 0;
 		goto out;
 	}
 	(void) memset(pwp->scratch, 0x77, PMCS_SCRATCH_SIZE);
@@ -4007,7 +4023,6 @@ again:
 		pmcs_prt(pwp, PMCS_PRT_DEBUG2, pptr, NULL,
 		    "%s: GET_IQ_ENTRY failed", __func__);
 		pmcs_pwork(pwp, pwrk);
-		result = 0;
 		goto out;
 	}
 
@@ -4184,6 +4199,10 @@ again:
 		if (ival & 0xff00) {
 			pptr->tolerates_sas2 = 1;
 		}
+		/*
+		 * Save off the REPORT_GENERAL response
+		 */
+		bcopy(srgr, &pptr->rg_resp, sizeof (smp_report_general_resp_t));
 		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
 		    "%s has %d phys and %s SAS2", pptr->path, result,
 		    pptr->tolerates_sas2? "tolerates" : "does not tolerate");
@@ -4213,13 +4232,18 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
 	const uint_t rdoff = 0x100;	/* returned data offset */
 	uint8_t *roff;
 	uint32_t status, *ptr, msg[PMCS_MSG_SIZE], htag;
-	int result;
+	int result = 0;
 	uint8_t	ini_support;
 	uint8_t	tgt_support;
 
+	if (!expander->iport || !expander->valid_device_id) {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, expander, expander->target,
+		    "%s: Can't reach PHY %s", __func__, expander->path);
+		goto out;
+	}
+
 	pwrk = pmcs_gwork(pwp, PMCS_TAG_TYPE_WAIT, expander);
 	if (pwrk == NULL) {
-		result = 0;
 		goto out;
 	}
 	(void) memset(pwp->scratch, 0x77, PMCS_SCRATCH_SIZE);
@@ -4253,7 +4277,6 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
 	ptr = GET_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
 	if (ptr == NULL) {
 		mutex_exit(&pwp->iqp_lock[PMCS_IQ_OTHER]);
-		result = 0;
 		goto out;
 	}
 
@@ -4369,6 +4392,11 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
 		}
 	}
 
+	/*
+	 * Save off the DISCOVER response
+	 */
+	bcopy(sdr, &pptr->disc_resp, sizeof (smp_discover_resp_t));
+
 	ini_support = (sdr->sdr_attached_sata_host |
 	    (sdr->sdr_attached_smp_initiator << 1) |
 	    (sdr->sdr_attached_stp_initiator << 2) |
@@ -4381,6 +4409,11 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
 
 	pmcs_wwn2barray(BE_64(sdr->sdr_sas_addr), sas_address);
 	pmcs_wwn2barray(BE_64(sdr->sdr_attached_sas_addr), att_sas_address);
+
+	/*
+	 * Set the routing attribute regardless of the PHY type.
+	 */
+	pptr->routing_attr = sdr->sdr_routing_attr;
 
 	switch (sdr->sdr_attached_device_type) {
 	case SAS_IF_DTYPE_ENDPOINT:
@@ -4405,6 +4438,17 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
 			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
 			    "%s: %s has tgt support=%x init support=(%x)",
 			    __func__, pptr->path, tgt_support, ini_support);
+		}
+
+		switch (pptr->routing_attr) {
+		case SMP_ROUTING_SUBTRACTIVE:
+		case SMP_ROUTING_TABLE:
+		case SMP_ROUTING_DIRECT:
+			pptr->routing_method = SMP_ROUTING_DIRECT;
+			break;
+		default:
+			pptr->routing_method = 0xff;	/* Invalid method */
+			break;
 		}
 		pmcs_update_phy_pm_props(pptr, (1ULL << pptr->phynum),
 		    (1ULL << sdr->sdr_attached_phy_identifier), B_TRUE);
@@ -4444,6 +4488,11 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
 			    "%s has tgt support=%x init support=(%x)",
 			    pptr->path, tgt_support, ini_support);
 			pptr->dtype = EXPANDER;
+		}
+		if (pptr->routing_attr == SMP_ROUTING_DIRECT) {
+			pptr->routing_method = 0xff;	/* Invalid method */
+		} else {
+			pptr->routing_method = pptr->routing_attr;
 		}
 		pmcs_update_phy_pm_props(pptr, (1ULL << pptr->phynum),
 		    (1ULL << sdr->sdr_attached_phy_identifier), B_TRUE);
@@ -5352,8 +5401,8 @@ pmcs_status_str(uint32_t status)
 		return ("OPEN_CNX_ERROR_STP_RESOURCES_BUSY");
 	case PMCOUT_STATUS_OPEN_CNX_ERROR_WRONG_DESTINATION:
 		return ("OPEN_CNX_ERROR_WRONG_DESTINATION");
-	case PMCOUT_STATUS_OPEN_CNX_ERROR_UNKNOWN_EROOR:
-		return ("OPEN_CNX_ERROR_UNKNOWN_EROOR");
+	case PMCOUT_STATUS_OPEN_CNX_ERROR_UNKNOWN_ERROR:
+		return ("OPEN_CNX_ERROR_UNKNOWN_ERROR");
 	case PMCOUT_STATUS_IO_XFER_ERROR_NAK_RECEIVED:
 		return ("IO_XFER_ERROR_NAK_RECEIVED");
 	case PMCOUT_STATUS_XFER_ERROR_ACK_NAK_TIMEOUT:
@@ -5542,7 +5591,7 @@ pmcs_find_phy_by_devid(pmcs_hw_t *pwp, uint32_t device_id)
 static boolean_t
 pmcs_validate_devid(pmcs_phy_t *parent, pmcs_phy_t *phyp, uint32_t device_id)
 {
-	pmcs_phy_t *pptr;
+	pmcs_phy_t *pptr, *pchild;
 	boolean_t rval;
 
 	pptr = parent;
@@ -5550,6 +5599,44 @@ pmcs_validate_devid(pmcs_phy_t *parent, pmcs_phy_t *phyp, uint32_t device_id)
 	while (pptr) {
 		if (pptr->valid_device_id && (pptr != phyp) &&
 		    (pptr->device_id == device_id)) {
+			/*
+			 * This can still be OK if both of these PHYs actually
+			 * represent the same device (e.g. expander).  It could
+			 * be a case of a new "primary" PHY.  If the SAS address
+			 * is the same and they have the same parent, we'll
+			 * accept this if the PHY to be registered is the
+			 * primary.
+			 */
+			if ((phyp->parent == pptr->parent) &&
+			    (memcmp(phyp->sas_address,
+			    pptr->sas_address, 8) == 0) && (phyp->width > 1)) {
+				/*
+				 * Move children over to the new primary and
+				 * update both PHYs
+				 */
+				pmcs_lock_phy(pptr);
+				phyp->children = pptr->children;
+				pchild = phyp->children;
+				while (pchild) {
+					pchild->parent = phyp;
+					pchild = pchild->sibling;
+				}
+				phyp->subsidiary = 0;
+				phyp->ncphy = pptr->ncphy;
+				/*
+				 * device_id, valid_device_id, and configured
+				 * will be set by the caller
+				 */
+				pptr->children = NULL;
+				pptr->subsidiary = 1;
+				pptr->ncphy = 0;
+				pmcs_unlock_phy(pptr);
+				pmcs_prt(pptr->pwp, PMCS_PRT_DEBUG, pptr, NULL,
+				    "%s: Moving device_id %d from PHY %s to %s",
+				    __func__, device_id, pptr->path,
+				    phyp->path);
+				return (B_TRUE);
+			}
 			pmcs_prt(pptr->pwp, PMCS_PRT_DEBUG, pptr, NULL,
 			    "%s: phy %s already exists as %s with "
 			    "device id 0x%x", __func__, phyp->path,
@@ -6793,7 +6880,7 @@ pmcs_dma_setup(pmcs_hw_t *pwp, ddi_dma_attr_t *dma_attr, ddi_acc_handle_t *acch,
 void
 pmcs_flush_target_queues(pmcs_hw_t *pwp, pmcs_xscsi_t *tgt, uint8_t queues)
 {
-	pmcs_cmd_t	*sp;
+	pmcs_cmd_t	*sp, *sp_next;
 	pmcwork_t	*pwrk;
 
 	ASSERT(pwp != NULL);
@@ -6832,30 +6919,46 @@ pmcs_flush_target_queues(pmcs_hw_t *pwp, pmcs_xscsi_t *tgt, uint8_t queues)
 	 */
 	if (queues & PMCS_TGT_ACTIVE_QUEUE) {
 		mutex_enter(&tgt->aqlock);
-		while ((sp = STAILQ_FIRST(&tgt->aq)) != NULL) {
-			STAILQ_REMOVE(&tgt->aq, sp, pmcs_cmd, cmd_next);
+		sp = STAILQ_FIRST(&tgt->aq);
+		while (sp) {
+			sp_next = STAILQ_NEXT(sp, cmd_next);
 			pwrk = pmcs_tag2wp(pwp, sp->cmd_tag);
+
+			/*
+			 * If we don't find a work structure, it's because
+			 * the command is already complete.  If so, move on
+			 * to the next one.
+			 */
+			if (pwrk == NULL) {
+				pmcs_prt(pwp, PMCS_PRT_DEBUG1, tgt->phy, tgt,
+				    "%s: Not removing cmd 0x%p (htag 0x%x) "
+				    "from aq", __func__, (void *)sp,
+				    sp->cmd_tag);
+				sp = sp_next;
+				continue;
+			}
+
+			STAILQ_REMOVE(&tgt->aq, sp, pmcs_cmd, cmd_next);
+			pmcs_prt(pwp, PMCS_PRT_DEBUG1, tgt->phy, tgt,
+			    "%s: Removing cmd 0x%p (htag 0x%x) from aq for "
+			    "target 0x%p", __func__, (void *)sp, sp->cmd_tag,
+			    (void *)tgt);
 			mutex_exit(&tgt->aqlock);
 			mutex_exit(&tgt->statlock);
 			/*
-			 * If we found a work structure, mark it as dead
-			 * and complete it
+			 * Mark the work structure as dead and complete it
 			 */
-			if (pwrk != NULL) {
-				pwrk->dead = 1;
-				CMD2PKT(sp)->pkt_reason = CMD_DEV_GONE;
-				CMD2PKT(sp)->pkt_state = STATE_GOT_BUS;
-				pmcs_complete_work_impl(pwp, pwrk, NULL, 0);
-			}
-			pmcs_prt(pwp, PMCS_PRT_DEBUG1, NULL, tgt,
-			    "%s: Removing cmd 0x%p from aq for target 0x%p",
-			    __func__, (void *)sp, (void *)tgt);
+			pwrk->dead = 1;
+			CMD2PKT(sp)->pkt_reason = CMD_DEV_GONE;
+			CMD2PKT(sp)->pkt_state = STATE_GOT_BUS;
+			pmcs_complete_work_impl(pwp, pwrk, NULL, 0);
 			pmcs_dma_unload(pwp, sp);
 			mutex_enter(&pwp->cq_lock);
 			STAILQ_INSERT_TAIL(&pwp->cq, sp, cmd_next);
 			mutex_exit(&pwp->cq_lock);
 			mutex_enter(&tgt->aqlock);
 			mutex_enter(&tgt->statlock);
+			sp = sp_next;
 		}
 		mutex_exit(&tgt->aqlock);
 	}
@@ -6863,7 +6966,7 @@ pmcs_flush_target_queues(pmcs_hw_t *pwp, pmcs_xscsi_t *tgt, uint8_t queues)
 	if (queues & PMCS_TGT_SPECIAL_QUEUE) {
 		while ((sp = STAILQ_FIRST(&tgt->sq)) != NULL) {
 			STAILQ_REMOVE(&tgt->sq, sp, pmcs_cmd, cmd_next);
-			pmcs_prt(pwp, PMCS_PRT_DEBUG1, NULL, tgt,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG1, tgt->phy, tgt,
 			    "%s: Removing cmd 0x%p from sq for target 0x%p",
 			    __func__, (void *)sp, (void *)tgt);
 			CMD2PKT(sp)->pkt_reason = CMD_DEV_GONE;
@@ -7163,7 +7266,8 @@ pmcs_unlock_phy(pmcs_phy_t *phyp)
  * pmcs_get_root_phy
  *
  * For a given phy pointer return its root phy.
- * The caller must be holding the lock on every PHY from phyp up to the root.
+ * This function must only be called during discovery in order to ensure that
+ * the chain of PHYs from phyp up to the root PHY doesn't change.
  */
 pmcs_phy_t *
 pmcs_get_root_phy(pmcs_phy_t *phyp)
@@ -7668,9 +7772,13 @@ pmcs_remove_phy_from_iport(pmcs_iport_t *iport, pmcs_phy_t *phyp)
 			next_pptr = list_next(&iport->phys, pptr);
 			mutex_enter(&pptr->phy_lock);
 			pptr->iport = NULL;
+			pmcs_update_phy_pm_props(phyp, phyp->att_port_pm_tmp,
+			    phyp->tgt_port_pm_tmp, B_FALSE);
 			mutex_exit(&pptr->phy_lock);
 			pmcs_rele_iport(iport);
 			list_remove(&iport->phys, pptr);
+			pmcs_smhba_add_iport_prop(iport, DATA_TYPE_INT32,
+			    PMCS_NUM_PHYS, &iport->nphy);
 		}
 		iport->nphy = 0;
 		return;
@@ -7736,11 +7844,7 @@ pmcs_phy_target_match(pmcs_phy_t *phyp)
 void
 pmcs_smp_acquire(pmcs_iport_t *iport)
 {
-	ASSERT(iport);
-
 	if (iport == NULL) {
-		pmcs_prt(iport->pwp, PMCS_PRT_DEBUG_IPORT, NULL, NULL,
-		    "%s: iport is NULL...", __func__);
 		return;
 	}
 
@@ -7753,7 +7857,7 @@ pmcs_smp_acquire(pmcs_iport_t *iport)
 	}
 	iport->smp_active = B_TRUE;
 	iport->smp_active_thread = curthread;
-	pmcs_prt(iport->pwp, PMCS_PRT_DEBUG_IPORT, NULL, NULL,
+	pmcs_prt(iport->pwp, PMCS_PRT_DEBUG3, NULL, NULL,
 	    "%s: SMP acquired by thread 0x%p", __func__,
 	    (void *)iport->smp_active_thread);
 	mutex_exit(&iport->smp_lock);
@@ -7762,8 +7866,6 @@ pmcs_smp_acquire(pmcs_iport_t *iport)
 void
 pmcs_smp_release(pmcs_iport_t *iport)
 {
-	ASSERT(iport);
-
 	if (iport == NULL) {
 		pmcs_prt(iport->pwp, PMCS_PRT_DEBUG_IPORT, NULL, NULL,
 		    "%s: iport is NULL...", __func__);
@@ -7771,7 +7873,7 @@ pmcs_smp_release(pmcs_iport_t *iport)
 	}
 
 	mutex_enter(&iport->smp_lock);
-	pmcs_prt(iport->pwp, PMCS_PRT_DEBUG_IPORT, NULL, NULL,
+	pmcs_prt(iport->pwp, PMCS_PRT_DEBUG3, NULL, NULL,
 	    "%s: SMP released by thread 0x%p", __func__, (void *)curthread);
 	iport->smp_active = B_FALSE;
 	iport->smp_active_thread = NULL;
@@ -7878,4 +7980,190 @@ pmcs_deregister_device_work(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 		}
 		pmcs_unlock_phy(pptr);
 	}
+}
+
+/*
+ * pmcs_iport_active
+ *
+ * Mark this iport as active.  Called with the iport lock held.
+ */
+static void
+pmcs_iport_active(pmcs_iport_t *iport)
+{
+	ASSERT(mutex_owned(&iport->lock));
+
+	iport->ua_state = UA_ACTIVE;
+	iport->smp_active = B_FALSE;
+	iport->smp_active_thread = NULL;
+}
+
+/* ARGSUSED */
+static void
+pmcs_tgtmap_activate_cb(void *tgtmap_priv, char *tgt_addr,
+    scsi_tgtmap_tgt_type_t tgt_type, void **tgt_privp)
+{
+	pmcs_iport_t *iport = (pmcs_iport_t *)tgtmap_priv;
+
+	pmcs_prt(iport->pwp, PMCS_PRT_DEBUG_IPORT, NULL, NULL,
+	    "%s: called for iport%d/%s(%d)", __func__,
+	    ddi_get_instance(iport->dip), tgt_addr, tgt_type);
+
+	/*
+	 * Update config_restart_time so we don't try to restart discovery
+	 * while enumeration is still in progress.
+	 */
+	mutex_enter(&iport->pwp->config_lock);
+	iport->pwp->config_restart_time = ddi_get_lbolt() +
+	    drv_usectohz(PMCS_REDISCOVERY_DELAY);
+	mutex_exit(&iport->pwp->config_lock);
+}
+
+/* ARGSUSED */
+static boolean_t
+pmcs_tgtmap_deactivate_cb(void *tgtmap_priv, char *tgt_addr,
+    scsi_tgtmap_tgt_type_t tgt_type, void *tgt_priv,
+    scsi_tgtmap_deact_rsn_t tgt_deact_rsn)
+{
+	pmcs_iport_t *iport = (pmcs_iport_t *)tgtmap_priv;
+	pmcs_phy_t *phyp;
+	boolean_t rediscover = B_FALSE;
+
+	ASSERT(iport);
+
+	phyp = pmcs_find_phy_by_sas_address(iport->pwp, iport, NULL, tgt_addr);
+	if (phyp == NULL) {
+		pmcs_prt(iport->pwp, PMCS_PRT_DEBUG_IPORT, NULL, NULL,
+		    "%s: Couldn't find PHY at %s", __func__, tgt_addr);
+		return (rediscover);
+	}
+	/* phyp is locked */
+
+	if (!phyp->reenumerate && phyp->configured) {
+		pmcs_prt(iport->pwp, PMCS_PRT_DEBUG_CONFIG, phyp, phyp->target,
+		    "%s: PHY @ %s is configured... re-enumerate", __func__,
+		    tgt_addr);
+		phyp->reenumerate = 1;
+	}
+
+	/*
+	 * Check to see if reenumerate is set, and if so, if we've reached our
+	 * maximum number of retries.
+	 */
+	if (phyp->reenumerate) {
+		if (phyp->enum_attempts == PMCS_MAX_REENUMERATE) {
+			pmcs_prt(iport->pwp, PMCS_PRT_DEBUG_CONFIG, phyp,
+			    phyp->target,
+			    "%s: No more enumeration attempts for %s", __func__,
+			    tgt_addr);
+		} else {
+			pmcs_prt(iport->pwp, PMCS_PRT_DEBUG_CONFIG, phyp,
+			    phyp->target, "%s: Re-attempt enumeration for %s",
+			    __func__, tgt_addr);
+			++phyp->enum_attempts;
+			rediscover = B_TRUE;
+		}
+
+		phyp->reenumerate = 0;
+	}
+
+	pmcs_unlock_phy(phyp);
+
+	mutex_enter(&iport->pwp->config_lock);
+	iport->pwp->config_restart_time = ddi_get_lbolt() +
+	    drv_usectohz(PMCS_REDISCOVERY_DELAY);
+	if (rediscover) {
+		iport->pwp->config_restart = B_TRUE;
+	} else if (iport->pwp->config_restart == B_TRUE) {
+		/*
+		 * If we aren't asking for rediscovery because of this PHY,
+		 * check to see if we're already asking for it on behalf of
+		 * some other PHY.  If so, we'll want to return TRUE, so reset
+		 * "rediscover" here.
+		 */
+		rediscover = B_TRUE;
+	}
+
+	mutex_exit(&iport->pwp->config_lock);
+
+	return (rediscover);
+}
+
+void
+pmcs_status_disposition(pmcs_phy_t *phyp, uint32_t status)
+{
+	ASSERT(phyp);
+	ASSERT(!mutex_owned(&phyp->phy_lock));
+
+	if (phyp == NULL) {
+		return;
+	}
+
+	pmcs_lock_phy(phyp);
+
+	/*
+	 * XXX: Do we need to call this function from an SSP_EVENT?
+	 */
+
+	switch (status) {
+	case PMCOUT_STATUS_NO_DEVICE:
+	case PMCOUT_STATUS_ERROR_HW_TIMEOUT:
+	case PMCOUT_STATUS_XFER_ERR_BREAK:
+	case PMCOUT_STATUS_XFER_ERR_PHY_NOT_READY:
+	case PMCOUT_STATUS_OPEN_CNX_PROTOCOL_NOT_SUPPORTED:
+	case PMCOUT_STATUS_OPEN_CNX_ERROR_ZONE_VIOLATION:
+	case PMCOUT_STATUS_OPEN_CNX_ERROR_BREAK:
+	case PMCOUT_STATUS_OPENCNX_ERROR_BAD_DESTINATION:
+	case PMCOUT_STATUS_OPEN_CNX_ERROR_CONNECTION_RATE_NOT_SUPPORTED:
+	case PMCOUT_STATUS_OPEN_CNX_ERROR_STP_RESOURCES_BUSY:
+	case PMCOUT_STATUS_OPEN_CNX_ERROR_WRONG_DESTINATION:
+	case PMCOUT_STATUS_OPEN_CNX_ERROR_UNKNOWN_ERROR:
+	case PMCOUT_STATUS_IO_XFER_ERROR_NAK_RECEIVED:
+	case PMCOUT_STATUS_XFER_ERROR_RX_FRAME:
+	case PMCOUT_STATUS_IO_XFER_OPEN_RETRY_TIMEOUT:
+	case PMCOUT_STATUS_ERROR_INTERNAL_SMP_RESOURCE:
+	case PMCOUT_STATUS_IO_PORT_IN_RESET:
+	case PMCOUT_STATUS_IO_DS_NON_OPERATIONAL:
+	case PMCOUT_STATUS_IO_DS_IN_RECOVERY:
+	case PMCOUT_STATUS_IO_OPEN_CNX_ERROR_HW_RESOURCE_BUSY:
+		pmcs_prt(phyp->pwp, PMCS_PRT_DEBUG, phyp, phyp->target,
+		    "%s: status = 0x%x for " SAS_ADDR_FMT ", reenumerate",
+		    __func__, status, SAS_ADDR_PRT(phyp->sas_address));
+		phyp->reenumerate = 1;
+		break;
+
+	default:
+		pmcs_prt(phyp->pwp, PMCS_PRT_DEBUG, phyp, phyp->target,
+		    "%s: status = 0x%x for " SAS_ADDR_FMT ", no reenumeration",
+		    __func__, status, SAS_ADDR_PRT(phyp->sas_address));
+		break;
+	}
+
+	pmcs_unlock_phy(phyp);
+}
+
+/*
+ * Add the list of PHYs pointed to by phyp to the dead_phys_list
+ *
+ * Called with all PHYs in the list locked
+ */
+static void
+pmcs_add_dead_phys(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
+{
+	mutex_enter(&pwp->dead_phylist_lock);
+	while (phyp) {
+		pmcs_phy_t *nxt = phyp->sibling;
+		ASSERT(phyp->dead);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, phyp, NULL,
+		    "%s: dead PHY 0x%p (%s) (ref_count %d)", __func__,
+		    (void *)phyp, phyp->path, phyp->ref_count);
+		/*
+		 * Put this PHY on the dead PHY list for the watchdog to
+		 * clean up after any outstanding work has completed.
+		 */
+		phyp->dead_next = pwp->dead_phys;
+		pwp->dead_phys = phyp;
+		pmcs_unlock_phy(phyp);
+		phyp = nxt;
+	}
+	mutex_exit(&pwp->dead_phylist_lock);
 }

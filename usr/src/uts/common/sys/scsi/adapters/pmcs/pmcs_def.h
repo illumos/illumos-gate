@@ -61,6 +61,13 @@ typedef enum {
 #define	PMCS_PHY_INVALID_PORT_ID	0xf
 
 #define	PMCS_PM_MAX_NAMELEN	16
+#define	PMCS_MAX_REENUMERATE	2	/* Maximum re-enumeration attempts */
+
+/*
+ * Number of usecs to wait after last noted activate/deactivate callback
+ * before possibly restarting discovery
+ */
+#define	PMCS_REDISCOVERY_DELAY	(5 * MICROSEC)
 
 struct pmcs_phy {
 	pmcs_phy_t	*sibling;	/* sibling phy */
@@ -96,12 +103,14 @@ struct pmcs_phy {
 		configured	: 1,	/* is configured */
 		dead		: 1,	/* dead */
 		changed		: 1,	/* this phy is changing */
+		reenumerate	: 1,	/* attempt re-enumeration */
 		deregister_wait : 1;	/* phy waiting to get deregistered */
 	clock_t		config_stop;	/* When config attempts will stop */
 	hrtime_t	abort_all_start;
 	kcondvar_t	abort_all_cv;	/* Wait for ABORT_ALL completion */
 	kmutex_t	phy_lock;
 	volatile uint32_t ref_count;	/* Targets & work on this PHY */
+	uint32_t	enum_attempts;	/* # of enumeration attempts */
 	uint8_t 	sas_address[8];	/* SAS address for this PHY */
 	struct {
 	uint32_t
@@ -127,6 +136,10 @@ struct pmcs_phy {
 	uint64_t	tgt_port_pm;		/* tgt port pm for this PHY */
 	uint64_t	tgt_port_pm_tmp;	/* Temp area for wide-ports */
 	char		tgt_port_pm_str[PMCS_PM_MAX_NAMELEN + 1];
+	smp_routing_attr_t routing_attr; /* Routing attr. from discover resp. */
+	smp_routing_attr_t routing_method; /* Actual routing method used. */
+	smp_report_general_resp_t rg_resp;	/* Response to REPORT_GENERAL */
+	smp_discover_resp_t disc_resp;		/* Response to DISCOVER */
 };
 
 /* maximum number of ds recovery retries (ds_recovery_retries) */
@@ -387,12 +400,14 @@ typedef struct {
 #define	PHY_CHANGED(pwp, p)						\
 	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, p, NULL, "%s changed in "  \
 	    "%s line %d", p->path, __func__, __LINE__); 		\
-	p->changed = 1
+	p->changed = 1;							\
+	p->enum_attempts = 0
 
 #define	PHY_CHANGED_AT_LOCATION(pwp, p, func, line)			\
 	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, p, NULL, "%s changed in "  \
 	    "%s line %d", p->path, func, line);				\
-	p->changed = 1
+	p->changed = 1;							\
+	p->enum_attempts = 0
 
 #define	PHY_TYPE(pptr)					\
 	(((pptr)->dtype == NOTHING)?  "NOTHING" :	\

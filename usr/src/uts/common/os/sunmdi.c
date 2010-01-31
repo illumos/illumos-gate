@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3130,7 +3130,7 @@ i_mdi_client_add_path(mdi_client_t *ct, mdi_pathinfo_t *pip)
 int
 mdi_pi_free(mdi_pathinfo_t *pip, int flags)
 {
-	int		rv = MDI_FAILURE;
+	int		rv;
 	mdi_vhci_t	*vh;
 	mdi_phci_t	*ph;
 	mdi_client_t	*ct;
@@ -3245,7 +3245,9 @@ mdi_pi_free(mdi_pathinfo_t *pip, int flags)
 		if (f != NULL) {
 			rv = (*f)(vh->vh_dip, pip, 0);
 		}
-	}
+	} else
+		rv = MDI_SUCCESS;
+
 	/*
 	 * If vo_pi_uninit() completed successfully.
 	 */

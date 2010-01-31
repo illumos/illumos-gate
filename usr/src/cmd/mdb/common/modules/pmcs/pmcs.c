@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -751,8 +751,9 @@ display_one_work(pmcwork_t *wp, int verbose, int idx)
 		    wp->onwire, wp->dead);
 	}
 	if (verbose) {
-		mdb_printf("%08x %10s 0x%016p 0x%016p\n",
-		    wp->last_htag, last_state, wp->last_phy, wp->last_xp);
+		mdb_printf("%08x %10s 0x%016p 0x%016p 0x%016p\n",
+		    wp->last_htag, last_state, wp->last_phy, wp->last_xp,
+		    wp->last_arg);
 	} else {
 		mdb_printf("\n");
 	}
@@ -788,8 +789,9 @@ display_work(struct pmcs_hw m, int verbose)
 			mdb_printf("%8s %10s %20s %8s %8s O D ",
 			    "HTag", "State", "Phy Path", "Target", "Timer");
 			if (verbose) {
-				mdb_printf("%8s %10s %18s %18s\n", "LastHTAG",
-				    "LastState", "LastPHY", "LastTgt");
+				mdb_printf("%8s %10s %18s %18s %18s\n",
+				    "LastHTAG", "LastState", "LastPHY",
+				    "LastTgt", "LastArg");
 			} else {
 				mdb_printf("\n");
 			}
@@ -1011,6 +1013,84 @@ iomb_cat(uint32_t cat)
 		break;
 	default:
 		return ("???");
+	}
+}
+
+static char *
+iomb_event(uint8_t event)
+{
+	switch (event) {
+	case IOP_EVENT_PHY_STOP_STATUS:
+		return ("PHY STOP");
+		break;
+	case IOP_EVENT_SAS_PHY_UP:
+		return ("PHY UP");
+		break;
+	case IOP_EVENT_SATA_PHY_UP:
+		return ("SATA PHY UP");
+		break;
+	case IOP_EVENT_SATA_SPINUP_HOLD:
+		return ("SATA SPINUP HOLD");
+		break;
+	case IOP_EVENT_PHY_DOWN:
+		return ("PHY DOWN");
+		break;
+	case IOP_EVENT_BROADCAST_CHANGE:
+		return ("BROADCAST CHANGE");
+		break;
+	case IOP_EVENT_BROADCAST_SES:
+		return ("BROADCAST SES");
+		break;
+	case IOP_EVENT_PHY_ERR_INBOUND_CRC:
+		return ("INBOUND CRC ERROR");
+		break;
+	case IOP_EVENT_HARD_RESET_RECEIVED:
+		return ("HARD RESET");
+		break;
+	case IOP_EVENT_EVENT_ID_FRAME_TIMO:
+		return ("IDENTIFY FRAME TIMEOUT");
+		break;
+	case IOP_EVENT_BROADCAST_EXP:
+		return ("BROADCAST EXPANDER");
+		break;
+	case IOP_EVENT_PHY_START_STATUS:
+		return ("PHY START");
+		break;
+	case IOP_EVENT_PHY_ERR_INVALID_DWORD:
+		return ("INVALID DWORD");
+		break;
+	case IOP_EVENT_PHY_ERR_DISPARITY_ERROR:
+		return ("DISPARITY ERROR");
+		break;
+	case IOP_EVENT_PHY_ERR_CODE_VIOLATION:
+		return ("CODE VIOLATION");
+		break;
+	case IOP_EVENT_PHY_ERR_LOSS_OF_DWORD_SYN:
+		return ("LOSS OF DWORD SYNC");
+		break;
+	case IOP_EVENT_PHY_ERR_PHY_RESET_FAILD:
+		return ("PHY RESET FAILED");
+		break;
+	case IOP_EVENT_PORT_RECOVERY_TIMER_TMO:
+		return ("PORT RECOVERY TIMEOUT");
+		break;
+	case IOP_EVENT_PORT_RECOVER:
+		return ("PORT RECOVERY");
+		break;
+	case IOP_EVENT_PORT_RESET_TIMER_TMO:
+		return ("PORT RESET TIMEOUT");
+		break;
+	case IOP_EVENT_PORT_RESET_COMPLETE:
+		return ("PORT RESET COMPLETE");
+		break;
+	case IOP_EVENT_BROADCAST_ASYNC_EVENT:
+		return ("BROADCAST ASYNC");
+		break;
+	case IOP_EVENT_IT_NEXUS_LOSS:
+		return ("I/T NEXUS LOSS");
+		break;
+	default:
+		return ("Unknown Event");
 	}
 }
 
@@ -1276,6 +1356,8 @@ dump_one_qentry_outbound(uint32_t *qentryp, int idx)
 {
 	int qeidx;
 	uint32_t word0 = LE_32(*qentryp);
+	uint32_t word1 = LE_32(*(qentryp + 1));
+	uint8_t iop_event;
 
 	mdb_printf("Entry #%02d\n", idx);
 	mdb_inc_indent(2);
@@ -1293,6 +1375,10 @@ dump_one_qentry_outbound(uint32_t *qentryp, int idx)
 	    iomb_cat((word0 & PMCS_IOMB_CAT_MASK) >> PMCS_IOMB_CAT_SHIFT));
 	mdb_printf("OPCODE=%s",
 	    outbound_iomb_opcode(word0 & PMCS_IOMB_OPCODE_MASK));
+	if ((word0 & PMCS_IOMB_OPCODE_MASK) == PMCOUT_SAS_HW_EVENT) {
+		iop_event = IOP_EVENT_EVENT(word1);
+		mdb_printf(" <%s>", iomb_event(iop_event));
+	}
 	mdb_printf(")\n");
 
 	mdb_printf("Remaining Payload:\n");
@@ -1499,8 +1585,13 @@ display_inbound_queues(struct pmcs_hw ss, uint_t verbose)
 	mdb_free(qentryp, PMCS_QENTRY_SIZE);
 }
 
+/*
+ * phy is our copy of the PHY structure.  phyp is the pointer to the actual
+ * kernel PHY data structure
+ */
 static void
-display_phy(struct pmcs_phy phy, int verbose, int totals_only)
+display_phy(struct pmcs_phy phy, struct pmcs_phy *phyp, int verbose,
+    int totals_only)
 {
 	char		*dtype, *speed;
 	char		*yes = "Yes";
@@ -1510,6 +1601,7 @@ display_phy(struct pmcs_phy phy, int verbose, int totals_only)
 	char		*asent = no;
 	char		*dead = no;
 	char		*changed = no;
+	char		route_attr, route_method;
 
 	switch (phy.dtype) {
 	case NOTHING:
@@ -1588,12 +1680,75 @@ display_phy(struct pmcs_phy phy, int verbose, int totals_only)
 				changed = yes;
 			}
 
-			mdb_printf("%-4s %-4s %-4s %-4s %-4s %3d "
-			    "0x%p ", cfgd, apend, asent,
-			    changed, dead, phy.ref_count, phy.phy_lock);
+			switch (phy.routing_attr) {
+			case SMP_ROUTING_DIRECT:
+				route_attr = 'D';
+				break;
+			case SMP_ROUTING_SUBTRACTIVE:
+				route_attr = 'S';
+				break;
+			case SMP_ROUTING_TABLE:
+				route_attr = 'T';
+				break;
+			default:
+				route_attr = '?';
+				break;
+			}
+
+			switch (phy.routing_method) {
+			case SMP_ROUTING_DIRECT:
+				route_method = 'D';
+				break;
+			case SMP_ROUTING_SUBTRACTIVE:
+				route_method = 'S';
+				break;
+			case SMP_ROUTING_TABLE:
+				route_method = 'T';
+				break;
+			default:
+				route_attr = '?';
+				break;
+			}
+
+			mdb_printf("%-4s %-4s %-4s %-4s %-4s %3d %3c/%1c %3d "
+			    "%1d 0x%p ", cfgd, apend, asent, changed, dead,
+			    phy.ref_count, route_attr, route_method,
+			    phy.enum_attempts, phy.reenumerate, phy.phy_lock);
 		}
 
 		mdb_printf("Path: %s\n", phy.path);
+
+		/*
+		 * In verbose mode, on the next line print the drill down
+		 * info to see either the DISCOVER response or the REPORT
+		 * GENERAL response depending on the PHY's dtype
+		 */
+		if (verbose) {
+			uintptr_t tphyp = (uintptr_t)phyp;
+
+			mdb_inc_indent(4);
+			switch (phy.dtype) {
+			case EXPANDER:
+				if (!phy.configured) {
+					break;
+				}
+				mdb_printf("REPORT GENERAL response: %p::"
+				    "print smp_report_general_resp_t\n",
+				    (tphyp + offsetof(struct pmcs_phy,
+				    rg_resp)));
+				break;
+			case SAS:
+			case SATA:
+				mdb_printf("DISCOVER response: %p::"
+				    "print smp_discover_resp_t\n",
+				    (tphyp + offsetof(struct pmcs_phy,
+				    disc_resp)));
+				break;
+			default:
+				break;
+			}
+			mdb_dec_indent(4);
+		}
 	}
 }
 
@@ -1630,7 +1785,8 @@ display_phys(struct pmcs_hw ss, int verbose, struct pmcs_phy *parent, int level,
 		mdb_printf("SAS Address      Hdl Phy#  Speed Type ");
 
 		if (verbose) {
-			mdb_printf("Cfgd AbtP AbtS Chgd Dead Ref Lock\n");
+			mdb_printf("Cfgd AbtP AbtS Chgd Dead Ref RtA/M Enm R "
+			    "Lock\n");
 		} else {
 			mdb_printf("\n");
 		}
@@ -1642,7 +1798,7 @@ display_phys(struct pmcs_hw ss, int verbose, struct pmcs_phy *parent, int level,
 			break;
 		}
 
-		display_phy(phy, verbose, totals_only);
+		display_phy(phy, pphy, verbose, totals_only);
 
 		if (phy.children) {
 			display_phys(ss, verbose, phy.children, level + 1,

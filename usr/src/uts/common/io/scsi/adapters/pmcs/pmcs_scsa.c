@@ -1044,8 +1044,17 @@ pmcs_smp_start(struct smp_pkt *smp_pkt)
 			pmcs_unlock_phy(pptr);
 		}
 		pmcs_release_scratch(pwp);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 		    "%s: could not find phy", __func__);
+		smp_pkt->smp_pkt_reason = ENXIO;
+		return (DDI_FAILURE);
+	}
+
+	if ((pptr->iport == NULL) || !pptr->valid_device_id) {
+		pmcs_unlock_phy(pptr);
+		pmcs_release_scratch(pwp);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, pptr->target,
+		    "%s: Can't reach PHY %s", __func__, pptr->path);
 		smp_pkt->smp_pkt_reason = ENXIO;
 		return (DDI_FAILURE);
 	}
@@ -1105,11 +1114,11 @@ pmcs_smp_start(struct smp_pkt *smp_pkt)
 	if (result) {
 		pmcs_timed_out(pwp, htag, __func__);
 		if (pmcs_abort(pwp, pptr, htag, 0, 0)) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, pptr->target,
 			    "%s: Unable to issue SMP ABORT for htag 0x%08x",
 			    __func__, htag);
 		} else {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, pptr->target,
 			    "%s: Issuing SMP ABORT for htag 0x%08x",
 			    __func__, htag);
 		}
@@ -1126,10 +1135,10 @@ pmcs_smp_start(struct smp_pkt *smp_pkt)
 	if (status != PMCOUT_STATUS_OK) {
 		const char *emsg = pmcs_status_str(status);
 		if (emsg == NULL) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, pptr->target,
 			    "SMP operation failed (0x%x)", status);
 		} else {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, pptr->target,
 			    "SMP operation failed (%s)", emsg);
 		}
 
@@ -1150,8 +1159,8 @@ pmcs_smp_start(struct smp_pkt *smp_pkt)
 			    PMCS_DEVICE_STATE_NON_OPERATIONAL) {
 				xp->dev_state =
 				    PMCS_DEVICE_STATE_NON_OPERATIONAL;
-				pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, xp,
-				    "%s: Got _IT_NEXUS_LOSS SMP status. "
+				pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, xp->phy,
+				    xp, "%s: Got _IT_NEXUS_LOSS SMP status. "
 				    "Tgt(0x%p) dev_state set to "
 				    "_NON_OPERATIONAL", __func__,
 				    (void *)xp);
@@ -1176,6 +1185,9 @@ pmcs_smp_start(struct smp_pkt *smp_pkt)
 		}
 	}
 out:
+	pmcs_prt(pwp, PMCS_PRT_DEBUG1, pptr, pptr->target,
+	    "%s: done for wwn 0x%" PRIx64, __func__, wwn);
+
 	pmcs_unlock_phy(pptr);
 	pmcs_release_scratch(pwp);
 	return (result);
@@ -1364,20 +1376,21 @@ pmcs_smp_free(dev_info_t *self, dev_info_t *child,
 		    "lookup prop ("SCSI_ADDR_PROP_TARGET_PORT")", __func__);
 		return;
 	}
+
 	/* Retrieve softstate using unit-address */
+	mutex_enter(&pwp->lock);
 	tgt = ddi_soft_state_bystr_get(iport->tgt_sstate, tgt_port);
+	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, tgt, "%s: %s (%s)", __func__,
+	    ddi_get_name(child), tgt_port);
 	ddi_prop_free(tgt_port);
 
 	if (tgt == NULL) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: tgt softstate not found", __func__);
+		mutex_exit(&pwp->lock);
 		return;
 	}
 
-	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, tgt, "%s: %s (%s)", __func__,
-	    ddi_get_name(child), tgt_port);
-
-	mutex_enter(&pwp->lock);
 	mutex_enter(&tgt->statlock);
 	if (tgt->phy) {
 		if (!IS_ROOT_PHY(tgt->phy)) {
@@ -1399,9 +1412,11 @@ pmcs_smp_free(dev_info_t *self, dev_info_t *child,
 		tgt->target_num = PMCS_INVALID_TARGET_NUM;
 		tgt->phy->target = NULL;
 		tgt->phy = NULL;
+		pmcs_destroy_target(tgt);
+	} else {
+		mutex_exit(&tgt->statlock);
 	}
 
-	mutex_exit(&tgt->statlock);
 	mutex_exit(&pwp->lock);
 }
 
@@ -2148,12 +2163,31 @@ out:
 	pmcs_pwork(pwp, pwrk);
 	pmcs_dma_unload(pwp, sp);
 
+	/*
+	 * If the status is other than OK, determine if it's something that
+	 * is worth re-attempting enumeration.  If so, mark the PHY.
+	 */
+	if (sts != PMCOUT_STATUS_OK) {
+		pmcs_status_disposition(pptr, sts);
+	}
+
 	mutex_enter(&xp->statlock);
+
+	/*
+	 * If the device is gone, we only put this command on the completion
+	 * queue if the work structure is not marked dead.  If it's marked
+	 * dead, it will already have been put there.
+	 */
 	if (xp->dev_gone) {
 		mutex_exit(&xp->statlock);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG2, pptr, xp,
-		    "%s: Completing command for dead target 0x%p", __func__,
-		    (void *)xp);
+		if (!dead) {
+			mutex_enter(&pwp->cq_lock);
+			STAILQ_INSERT_TAIL(&pwp->cq, sp, cmd_next);
+			mutex_exit(&pwp->cq_lock);
+			pmcs_prt(pwp, PMCS_PRT_DEBUG2, pptr, xp,
+			    "%s: Completing command for dead target 0x%p",
+			    __func__, (void *)xp);
+		}
 		return;
 	}
 
@@ -2179,6 +2213,9 @@ out:
 #else
 		mutex_enter(&xp->aqlock);
 #endif
+		pmcs_prt(pwp, PMCS_PRT_DEBUG1, pptr, xp,
+		    "%s: Removing cmd 0x%p (htag 0x%x) from aq", __func__,
+		    (void *)sp, sp->cmd_tag);
 		STAILQ_REMOVE(&xp->aq, sp, pmcs_cmd, cmd_next);
 		if (aborted) {
 			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, xp,
@@ -2592,14 +2629,27 @@ out:
 	pmcs_pwork(pwp, pwrk);
 	pmcs_dma_unload(pwp, sp);
 
+	/*
+	 * If the status is other than OK, determine if it's something that
+	 * is worth re-attempting enumeration.  If so, mark the PHY.
+	 */
+	if (sts != PMCOUT_STATUS_OK) {
+		pmcs_status_disposition(pptr, sts);
+	}
+
 	mutex_enter(&xp->statlock);
 	xp->tagmap &= ~(1 << sp->cmd_satltag);
 
 	if (xp->dev_gone) {
 		mutex_exit(&xp->statlock);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG2, pptr, xp,
-		    "%s: Completing command for dead target 0x%p", __func__,
-		    (void *)xp);
+		if (!dead) {
+			mutex_enter(&pwp->cq_lock);
+			STAILQ_INSERT_TAIL(&pwp->cq, sp, cmd_next);
+			mutex_exit(&pwp->cq_lock);
+			pmcs_prt(pwp, PMCS_PRT_DEBUG2, pptr, xp,
+			    "%s: Completing command for dead target 0x%p",
+			    __func__, (void *)xp);
+		}
 		return;
 	}
 
@@ -2753,7 +2803,7 @@ pmcs_ioerror(pmcs_hw_t *pwp, pmcs_dtype_t t, pmcwork_t *pwrk, uint32_t *w)
 	}
 
 	if (status != PMCOUT_STATUS_OK) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG2, phyp, NULL,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG1, phyp, NULL,
 		    "%s: device %s tag 0x%x status %s @ %llu", __func__,
 		    phyp->path, pwrk->htag, msg,
 		    (unsigned long long)gethrtime());
@@ -2837,7 +2887,7 @@ pmcs_ioerror(pmcs_hw_t *pwp, pmcs_dtype_t t, pmcwork_t *pwrk, uint32_t *w)
 	case PMCOUT_STATUS_OPEN_CNX_PROTOCOL_NOT_SUPPORTED:
 	case PMCOUT_STATUS_OPEN_CNX_ERROR_ZONE_VIOLATION:
 	case PMCOUT_STATUS_OPEN_CNX_ERROR_CONNECTION_RATE_NOT_SUPPORTED:
-	case PMCOUT_STATUS_OPEN_CNX_ERROR_UNKNOWN_EROOR:
+	case PMCOUT_STATUS_OPEN_CNX_ERROR_UNKNOWN_ERROR:
 		/*
 		 * Need to do rediscovery.
 		 */

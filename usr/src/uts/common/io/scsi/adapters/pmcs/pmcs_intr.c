@@ -330,7 +330,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		};
 		pmcs_phy_t *rp;
 		sas_identify_af_t af;
-		uint64_t phy_id;
+		uint64_t phy_id, wwn;
 
 		/*
 		 * If we're not at running state, don't do anything
@@ -357,6 +357,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 
 		/* Copy the remote address into our phy handle */
 		(void) memcpy(pptr->sas_address, af.sas_address, 8);
+		wwn = pmcs_barray2wwn(pptr->sas_address);
 		phy_id = (uint64_t)af.phy_identifier;
 
 		/*
@@ -391,13 +392,11 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 
 			/* Add this PHY to the phymap */
 			if (sas_phymap_phy_add(pwp->hss_phymap, phynum,
-			    pwp->sas_wwns[0],
-			    pmcs_barray2wwn(pptr->sas_address)) !=
-			    DDI_SUCCESS) {
+			    pwp->sas_wwns[0], wwn) != DDI_SUCCESS) {
 				pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 				    "Unable to add phy %u for 0x%" PRIx64 ".0x%"
 				    PRIx64, phynum, pwp->sas_wwns[rp->phynum],
-				    pmcs_barray2wwn(pptr->sas_address));
+				    wwn);
 			}
 
 			/*
@@ -407,8 +406,8 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 			pmcs_lock_phy(pptr);
 			pmcs_update_phy_pm_props(pptr, (1ULL << phynum),
 			    (1ULL << phy_id), B_TRUE);
-			iport = pmcs_get_iport_by_phy(pwp, pptr);
 			pmcs_unlock_phy(pptr);
+			iport = pmcs_get_iport_by_wwn(pwp, wwn);
 			if (iport) {
 				primary = !pptr->subsidiary;
 
@@ -505,18 +504,14 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 
 		/* Add this PHY to the phymap */
 		if (sas_phymap_phy_add(pwp->hss_phymap, phynum,
-		    pwp->sas_wwns[0],
-		    pmcs_barray2wwn(pptr->sas_address)) != DDI_SUCCESS) {
+		    pwp->sas_wwns[0], wwn) != DDI_SUCCESS) {
 			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 			    "Unable to add phy %u for 0x%" PRIx64 ".0x%"
-			    PRIx64, phynum, pwp->sas_wwns[pptr->phynum],
-			    pmcs_barray2wwn(pptr->sas_address));
+			    PRIx64, phynum, pwp->sas_wwns[pptr->phynum], wwn);
 		}
 
 		/* Get a pointer to our iport and set it up if attached */
-		pmcs_lock_phy(pptr);
-		iport = pmcs_get_iport_by_phy(pwp, pptr);
-		pmcs_unlock_phy(pptr);
+		iport = pmcs_get_iport_by_wwn(pwp, wwn);
 		if (iport) {
 			primary = !pptr->subsidiary;
 
@@ -546,7 +541,8 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 
 		break;
 	}
-	case IOP_EVENT_SATA_PHY_UP:
+	case IOP_EVENT_SATA_PHY_UP: {
+		uint64_t wwn;
 		/*
 		 * If we're not at running state, don't do anything
 		 */
@@ -598,22 +594,20 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		pmcs_prt(pwp, PMCS_PRT_INFO, pptr, NULL,
 		    "PortID 0x%x: PHY 0x%x SATA LINK UP @ %s Gb/s",
 		    pptr->portid, phynum, pmcs_get_rate(pptr->link_rate));
+		wwn = pmcs_barray2wwn(pptr->sas_address);
 		pmcs_unlock_phy(pptr);
 
 		/* Add this PHY to the phymap */
 		if (sas_phymap_phy_add(pwp->hss_phymap, phynum,
-		    pwp->sas_wwns[0],
-		    pmcs_barray2wwn(pptr->sas_address)) != DDI_SUCCESS) {
+		    pwp->sas_wwns[0], wwn) != DDI_SUCCESS) {
 			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 			    "Unable to add phy %u for 0x%" PRIx64 ".0x%"
 			    PRIx64, phynum, pwp->sas_wwns[pptr->phynum],
-			    pmcs_barray2wwn(pptr->sas_address));
+			    wwn);
 		}
 
 		/* Get our iport, if attached, and set it up */
-		pmcs_lock_phy(pptr);
-		iport = pmcs_get_iport_by_phy(pwp, pptr);
-		pmcs_unlock_phy(pptr);
+		iport = pmcs_get_iport_by_wwn(pwp, wwn);
 		if (iport) {
 			mutex_enter(&iport->lock);
 			iport->pptr = pptr;
@@ -638,6 +632,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		mutex_exit(&pwp->lock);
 		RESTART_DISCOVERY(pwp);
 		break;
+	}
 
 	case IOP_EVENT_SATA_SPINUP_HOLD:
 		tphyp = (pmcs_phy_t *)(pwp->root_phys + phynum);
@@ -649,7 +644,9 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		pmcs_spinup_release(pwp, tphyp);
 		mutex_exit(&tphyp->phy_lock);
 		break;
-	case IOP_EVENT_PHY_DOWN:
+	case IOP_EVENT_PHY_DOWN: {
+		uint64_t wwn;
+
 		/*
 		 * If we're not at running state, don't do anything
 		 */
@@ -730,6 +727,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		}
 
 		if (IOP_EVENT_PORT_STATE(w3) == IOP_EVENT_PS_VALID) {
+
 			/*
 			 * This is not the last phy in the port, so if this
 			 * is the primary PHY, promote another PHY to primary.
@@ -788,6 +786,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 			}
 
 			pmcs_lock_phy(subphy);
+			wwn = pmcs_barray2wwn(pptr->sas_address);
 			if (subphy->subsidiary)
 				pmcs_clear_phy(pwp, subphy);
 			pmcs_unlock_phy(subphy);
@@ -798,9 +797,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 				pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 				    "Unable to remove phy %u for 0x%" PRIx64
 				    ".0x%" PRIx64, phynum,
-				    pwp->sas_wwns[pptr->phynum],
-				    pmcs_barray2wwn((pwp->root_phys +
-				    pptr->phynum)-> sas_address));
+				    pwp->sas_wwns[pptr->phynum], wwn);
 			}
 
 			pmcs_prt(pwp, PMCS_PRT_INFO, pptr, NULL,
@@ -822,9 +819,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 			    "Unable to remove phy %u for 0x%" PRIx64
 			    ".0x%" PRIx64, phynum,
-			    pwp->sas_wwns[pptr->phynum],
-			    pmcs_barray2wwn(
-			    (pwp->root_phys + pptr->phynum)->sas_address));
+			    pwp->sas_wwns[pptr->phynum], wwn);
 		}
 
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
@@ -889,6 +884,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		need_ack = 1;
 
 		break;
+	}
 	case IOP_EVENT_BROADCAST_CHANGE:
 		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
 		    "PortID 0x%x: PHY 0x%x Broadcast Change", portid, phynum);

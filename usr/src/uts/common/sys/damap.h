@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -105,7 +105,8 @@ typedef struct __damap_id_list *damap_id_list_t;
  */
 typedef enum {
 	DAMAP_DEACT_RSN_GONE = 0,
-	DAMAP_DEACT_RSN_CFG_FAIL
+	DAMAP_DEACT_RSN_CFG_FAIL,
+	DAMAP_DEACT_RSN_UNSTBL
 } damap_deact_rsn_t;
 
 typedef void (*damap_activate_cb_t)(void *, char *, int, void **);

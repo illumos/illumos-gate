@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #include <sys/scsi/adapters/pmcs/pmcs.h>
@@ -2016,6 +2016,20 @@ pmcs_watchdog(void *arg)
 
 	DTRACE_PROBE2(pmcs__watchdog, ulong_t, pwp->work_flags, boolean_t,
 	    pwp->config_changed);
+
+	/*
+	 * Check to see if we need to kick discovery off again
+	 */
+	mutex_enter(&pwp->config_lock);
+	if (pwp->config_restart &&
+	    (ddi_get_lbolt() >= pwp->config_restart_time)) {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
+		    "%s: Timer expired for re-enumeration: Start discovery",
+		    __func__);
+		pwp->config_restart = B_FALSE;
+		SCHEDULE_WORK(pwp, PMCS_WORK_DISCOVER);
+	}
+	mutex_exit(&pwp->config_lock);
 
 	mutex_enter(&pwp->lock);
 
