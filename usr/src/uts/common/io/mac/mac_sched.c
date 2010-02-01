@@ -448,7 +448,9 @@ mac_srs_fire(void *arg)
  * 'hint' is fanout_hint (type of uint64_t) which is given by the TCP/IP stack,
  * and it is used on the TX path.
  */
-#define	HASH_HINT(hint)	(((hint) << 17) | ((hint) >> 16))
+#define	HASH_HINT(hint) \
+	((hint) ^ ((hint) >> 24) ^ ((hint) >> 16) ^ ((hint) >> 8))
+
 
 /*
  * hash based on the src address and the port information.
