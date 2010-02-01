@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -11232,7 +11232,8 @@ mptsas_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp,
 }
 
 int
-mptsas_restart_ioc(mptsas_t *mpt) {
+mptsas_restart_ioc(mptsas_t *mpt)
+{
 	int		rval = DDI_SUCCESS;
 	mptsas_target_t	*ptgt = NULL;
 
@@ -11293,6 +11294,7 @@ mptsas_restart_ioc(mptsas_t *mpt) {
 	}
 
 	mptsas_doneq_empty(mpt);
+	mptsas_restart_hba(mpt);
 
 	if (rval != DDI_SUCCESS) {
 		mptsas_fm_ereport(mpt, DDI_FM_DEVICE_NO_RESPONSE);
