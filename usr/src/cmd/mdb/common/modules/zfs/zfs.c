@@ -35,6 +35,8 @@
 #include <sys/list.h>
 #include <sys/spa_impl.h>
 #include <sys/vdev_impl.h>
+#include <sys/zap_leaf.h>
+#include <sys/zap_impl.h>
 #include <ctype.h>
 
 #ifndef _KERNEL
@@ -516,6 +518,126 @@ dbuf_stats(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("%u or more		%llu	%llu%%\n",
 		    i, histo2[i], histo2[i]*100/ndbufs);
 
+
+	return (DCMD_OK);
+}
+
+#define	CHAIN_END 0xffff
+/*
+ * ::zap_leaf [-v]
+ *
+ * Print a zap_leaf_phys_t, assumed to be 16k
+ */
+/* ARGSUSED */
+static int
+zap_leaf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	char buf[16*1024];
+	int verbose = B_FALSE;
+	int four = B_FALSE;
+	zap_leaf_t l;
+	zap_leaf_phys_t *zlp = (void *)buf;
+	int i;
+
+	if (mdb_getopts(argc, argv,
+	    'v', MDB_OPT_SETBITS, TRUE, &verbose,
+	    '4', MDB_OPT_SETBITS, TRUE, &four,
+	    NULL) != argc)
+		return (DCMD_USAGE);
+
+	l.l_phys = zlp;
+	l.l_bs = 14; /* assume 16k blocks */
+	if (four)
+		l.l_bs = 12;
+
+	if (!(flags & DCMD_ADDRSPEC)) {
+		return (DCMD_USAGE);
+	}
+
+	if (mdb_vread(buf, sizeof (buf), addr) == -1) {
+		mdb_warn("failed to read zap_leaf_phys_t at %p", addr);
+		return (DCMD_ERR);
+	}
+
+	if (zlp->l_hdr.lh_block_type != ZBT_LEAF ||
+	    zlp->l_hdr.lh_magic != ZAP_LEAF_MAGIC) {
+		mdb_warn("This does not appear to be a zap_leaf_phys_t");
+		return (DCMD_ERR);
+	}
+
+	mdb_printf("zap_leaf_phys_t at %p:\n", addr);
+	mdb_printf("    lh_prefix_len = %u\n", zlp->l_hdr.lh_prefix_len);
+	mdb_printf("    lh_prefix = %llx\n", zlp->l_hdr.lh_prefix);
+	mdb_printf("    lh_nentries = %u\n", zlp->l_hdr.lh_nentries);
+	mdb_printf("    lh_nfree = %u\n", zlp->l_hdr.lh_nfree,
+	    zlp->l_hdr.lh_nfree * 100 / (ZAP_LEAF_NUMCHUNKS(&l)));
+	mdb_printf("    lh_freelist = %u\n", zlp->l_hdr.lh_freelist);
+	mdb_printf("    lh_flags = %x (%s)\n", zlp->l_hdr.lh_flags,
+	    zlp->l_hdr.lh_flags & ZLF_ENTRIES_CDSORTED ?
+	    "ENTRIES_CDSORTED" : "");
+
+	if (verbose) {
+		mdb_printf(" hash table:\n");
+		for (i = 0; i < ZAP_LEAF_HASH_NUMENTRIES(&l); i++) {
+			if (zlp->l_hash[i] != CHAIN_END)
+				mdb_printf("    %u: %u\n", i, zlp->l_hash[i]);
+		}
+	}
+
+	mdb_printf(" chunks:\n");
+	for (i = 0; i < ZAP_LEAF_NUMCHUNKS(&l); i++) {
+		/* LINTED: alignment */
+		zap_leaf_chunk_t *zlc = &ZAP_LEAF_CHUNK(&l, i);
+		switch (zlc->l_entry.le_type) {
+		case ZAP_CHUNK_FREE:
+			if (verbose) {
+				mdb_printf("    %u: free; lf_next = %u\n",
+				    i, zlc->l_free.lf_next);
+			}
+			break;
+		case ZAP_CHUNK_ENTRY:
+			mdb_printf("    %u: entry\n", i);
+			if (verbose) {
+				mdb_printf("        le_next = %u\n",
+				    zlc->l_entry.le_next);
+			}
+			mdb_printf("        le_name_chunk = %u\n",
+			    zlc->l_entry.le_name_chunk);
+			mdb_printf("        le_name_numints = %u\n",
+			    zlc->l_entry.le_name_numints);
+			mdb_printf("        le_value_chunk = %u\n",
+			    zlc->l_entry.le_value_chunk);
+			mdb_printf("        le_value_intlen = %u\n",
+			    zlc->l_entry.le_value_intlen);
+			mdb_printf("        le_value_numints = %u\n",
+			    zlc->l_entry.le_value_numints);
+			mdb_printf("        le_cd = %u\n",
+			    zlc->l_entry.le_cd);
+			mdb_printf("        le_hash = %llx\n",
+			    zlc->l_entry.le_hash);
+			break;
+		case ZAP_CHUNK_ARRAY:
+			mdb_printf("    %u: array \"%s\"\n",
+			    i, zlc->l_array.la_array);
+			if (verbose) {
+				int j;
+				mdb_printf("        ");
+				for (j = 0; j < ZAP_LEAF_ARRAY_BYTES; j++) {
+					mdb_printf("%02x ",
+					    zlc->l_array.la_array[j]);
+				}
+				mdb_printf("\n");
+			}
+			if (zlc->l_array.la_next != CHAIN_END) {
+				mdb_printf("        lf_next = %u\n",
+				    zlc->l_array.la_next);
+			}
+			break;
+		default:
+			mdb_printf("    %u: undefined type %u\n",
+			    zlc->l_entry.le_type);
+		}
+	}
 
 	return (DCMD_OK);
 }
@@ -2206,6 +2328,7 @@ static const mdb_dcmd_t dcmds[] = {
 	    zfs_blkstats },
 	{ "zfs_params", "", "print zfs tunable parameters", zfs_params },
 	{ "refcount", "", "print refcount_t holders", refcount },
+	{ "zap_leaf", "", "print zap_leaf_phys_t", zap_leaf },
 	{ NULL }
 };
 

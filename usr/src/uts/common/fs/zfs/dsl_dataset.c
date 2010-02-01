@@ -2226,15 +2226,13 @@ dsl_snapshot_rename_one(const char *name, void *arg)
 	(void) zfs_unmount_snap(snapname, NULL);
 #endif
 	err = dsl_dataset_hold(snapname, ra->dstg, &ds);
-	if (err != 0) {
-		strfree(snapname);
+	strfree(snapname);
+	if (err != 0)
 		return (err == ENOENT ? 0 : err);
-	}
 
 	dsl_sync_task_create(ra->dstg, dsl_dataset_snapshot_rename_check,
 	    dsl_dataset_snapshot_rename_sync, ds, ra->newsnap, 0);
 
-	strfree(snapname);
 	return (0);
 }
 
