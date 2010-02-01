@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -124,8 +124,8 @@ getsidname(uid_t who, boolean_t user, char **sidp, boolean_t noresolve)
 	idmap_rid_t rid;
 	int error = IDMAP_ERR_NORESULT;
 	int len;
-	char *domain;
-	char *name;
+	char *domain = NULL;
+	char *name = NULL;
 
 	*sidp = NULL;
 
@@ -174,9 +174,12 @@ getsidname(uid_t who, boolean_t user, char **sidp, boolean_t noresolve)
 		len = snprintf(NULL, 0, "%s@%s", name, domain);
 		if (*sidp = malloc(len + 1))
 			(void) snprintf(*sidp, len + 1, "%s@%s", name, domain);
-		free(name);
-		free(domain);
 	}
+
+	if (name)
+		free(name);
+	if (domain)
+		free(domain);
 	return (*sidp ? 0 : 1);
 }
 
@@ -894,6 +897,7 @@ ace_acltotext(acl_t *aceaclp, int flags)
 	int		isdir = (aceaclp->acl_flags & ACL_IS_DIR);
 	dynaclstr_t 	*dstr;
 	char		*aclexport = NULL;
+	char		*rawsidp = NULL;
 
 	if (aclp == NULL)
 		return (NULL);
@@ -925,7 +929,6 @@ ace_acltotext(acl_t *aceaclp, int flags)
 		    ((aclp->a_flags & ACE_TYPE_FLAGS) ==
 		    ACE_IDENTIFIER_GROUP))) {
 			char id[ID_STR_MAX], *idstr;
-			char *rawsidp;
 
 			if (error = str_append(dstr, ":"))
 				break;
@@ -937,9 +940,9 @@ ace_acltotext(acl_t *aceaclp, int flags)
 				error = getsidname(aclp->a_who,
 				    ((aclp->a_flags & ACE_TYPE_FLAGS) == 0) ?
 				    B_TRUE : B_FALSE, &idstr, 1);
+				rawsidp = idstr;
 				if (error)
 					break;
-				rawsidp = idstr;
 			} else if (aclp->a_who > MAXUID &&
 			    !(flags & ACL_NORESOLVE)) {
 				idstr = lltostr(UID_NOBODY,
@@ -950,14 +953,19 @@ ace_acltotext(acl_t *aceaclp, int flags)
 			}
 			if (error = str_append(dstr, idstr))
 				break;
-			if (rawsidp)
+			if (rawsidp) {
 				free(rawsidp);
+				rawsidp = NULL;
+			}
 		}
 		if (i < aclcnt - 1) {
 			if (error = str_append(dstr, ","))
 				break;
 		}
 	}
+
+	if (rawsidp)
+		free(rawsidp);
 	if (error) {
 		if (dstr->d_aclexport)
 			free(dstr->d_aclexport);
