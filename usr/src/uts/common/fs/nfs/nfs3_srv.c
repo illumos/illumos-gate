@@ -991,7 +991,7 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 	struct iovec iov;
 	struct uio uio;
 	u_offset_t offset;
-	mblk_t *mp;
+	mblk_t *mp = NULL;
 	int alloc_err = 0;
 	int in_crit = 0;
 	int need_rwunlock = 0;
@@ -1179,7 +1179,6 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 	 * a mblk.
 	 */
 	if (rdma_used) {
-		mp = NULL;
 		(void) rdma_get_wchunk(req, &iov, args->wlist);
 	} else {
 		/*
