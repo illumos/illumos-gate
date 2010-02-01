@@ -2394,10 +2394,10 @@ idm_so_buf_rx_from_ini(idm_task_t *idt, idm_buf_t *idb)
 
 	pdu = kmem_cache_alloc(idm.idm_sotx_pdu_cache, KM_SLEEP);
 	pdu->isp_ic = idt->idt_ic;
-	pdu->isp_flags = 0;	/* initialize isp_flags */
+	pdu->isp_flags = IDM_PDU_SET_STATSN;
 	bzero(pdu->isp_hdr, sizeof (iscsi_rtt_hdr_t));
 
-	/* iSCSI layer fills the TTT, ITT, StatSN, ExpCmdSN, MaxCmdSN */
+	/* iSCSI layer fills the TTT, ITT, ExpCmdSN, MaxCmdSN */
 	(*idt->idt_ic->ic_conn_ops.icb_build_hdr)(idt, pdu, ISCSI_OP_RTT_RSP);
 
 	/* set the rttsn, rtt.flags, rtt.data_offset and rtt.data_length */

@@ -1017,6 +1017,13 @@ iscsit_update_statsn(idm_task_t *idm_task, idm_pdu_t *pdu)
 			rsp->flags |= ISCSI_FLAG_CMD_UNDERFLOW;
 		}
 		rsp->residual_count = htonl(task->task_resid);
+
+		/*
+		 * Removing the task from the session task list
+		 * just before the status is sent in the last
+		 * Data PDU transfer
+		 */
+		iscsit_task_done(itask);
 	}
 }
 
@@ -1038,9 +1045,6 @@ iscsit_build_hdr(idm_task_t *idm_task, idm_pdu_t *pdu, uint8_t opcode)
 	dh->opcode = opcode;
 	dh->itt = itask->it_itt;
 	dh->ttt = itask->it_ttt;
-	/* Maintain current statsn for RTT responses */
-	dh->statsn = (opcode == ISCSI_OP_RTT_RSP) ?
-	    htonl(itask->it_ict->ict_statsn) : 0;
 
 	dh->expcmdsn = htonl(itask->it_ict->ict_sess->ist_expcmdsn);
 	dh->maxcmdsn = htonl(itask->it_ict->ict_sess->ist_maxcmdsn);
@@ -1473,10 +1477,9 @@ iscsit_buf_xfer_cb(idm_buf_t *idb, idm_status_t status)
 	 */
 	if (idb->idb_task_binding->idt_flags & IDM_TASK_PHASECOLLAPSE_SUCCESS) {
 		/*
-		 * Mark task complete, remove task from the session task
-		 * list and notify COMSTAR that the status has been sent.
+		 * Mark task complete and notify COMSTAR
+		 * that the status has been sent.
 		 */
-		iscsit_task_done(itask);
 		itask->it_idm_task->idt_state = TASK_COMPLETE;
 		stmf_send_status_done(itask->it_stmf_task,
 		    iscsit_idm_to_stmf(status), STMF_IOF_LPORT_DONE);
