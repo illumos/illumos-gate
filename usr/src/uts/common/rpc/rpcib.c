@@ -1397,7 +1397,11 @@ rib_svc_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 			}
 
 			mutex_enter(&plugin_state_lock);
-			if (plugin_state == ACCEPT) {
+			mutex_enter(&conn->c_lock);
+			if ((plugin_state == ACCEPT) &&
+			    (conn->c_state == C_CONNECTED)) {
+				conn->c_ref++;
+				mutex_exit(&conn->c_lock);
 				while ((mp = allocb(sizeof (*rdp), BPRI_LO))
 				    == NULL)
 					(void) strwaitbuf(
@@ -1415,9 +1419,6 @@ rib_svc_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 				rdp->rpcmsg.type = RECV_BUFFER;
 				rdp->rpcmsg.len = wc.wc_bytes_xfer;
 				rdp->status = wc.wc_status;
-				mutex_enter(&conn->c_lock);
-				conn->c_ref++;
-				mutex_exit(&conn->c_lock);
 				mp->b_wptr += sizeof (*rdp);
 				svc_queuereq((queue_t *)rib_stat->q, mp);
 				mutex_exit(&plugin_state_lock);
@@ -1428,6 +1429,7 @@ rib_svc_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 				 * requests for krpc, so don't do anything, just
 				 * free the msg.
 				 */
+				mutex_exit(&conn->c_lock);
 				mutex_exit(&plugin_state_lock);
 				rib_rbuf_free(conn, RECV_BUFFER,
 				    (void *)(uintptr_t)s_recvp->vaddr);
