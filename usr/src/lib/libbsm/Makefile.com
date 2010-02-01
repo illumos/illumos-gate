@@ -86,7 +86,7 @@ ROOTLINT=	$(LINTSRC:%=$(ROOTLINTDIR)/%)
 CLEANFILES +=	$(LINTOUT) $(LINTLIB)
 
 CFLAGS	+=	$(CCVERBOSE)
-LDLIBS +=	-lsocket -lnsl -lmd -lc -ldevinfo -lsecdb -ltsol -linetutil
+LDLIBS +=	-lsocket -lnsl -lmd -lc -lsecdb -ltsol -linetutil
 
 COMDIR=		../common
 

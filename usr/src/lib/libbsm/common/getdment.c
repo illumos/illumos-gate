@@ -28,7 +28,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <limits.h>
-#include <device_info.h>
 #include <bsm/devices.h>
 #include <bsm/devalloc.h>
 
@@ -376,6 +375,120 @@ dmap_matchname(devmap_t *dmap, char *name)
 }
 
 /*
+ * Temporarily duplicated directly from libdevinfo's is_minor_node(),
+ * and renamed, because we cannot link this from libdevinfo.
+ *
+ * To be resolved in a couple of builds.
+ *
+ * The real fix is to move device allocation out of libbsm.
+ *
+ * returns 1 if contents is a minor node in /devices.
+ * If mn_root is not NULL, mn_root is set to:
+ *	if contents is a /dev node, mn_root = contents
+ *			OR
+ *	if contents is a /devices node, mn_root set to the '/'
+ *	following /devices.
+ */
+static int
+dmap_minor_root(const char *contents, const char **mn_root)
+{
+	char *ptr, *prefix;
+
+	prefix = "../devices/";
+
+	if ((ptr = strstr(contents, prefix)) != NULL) {
+
+		/* mn_root should point to the / following /devices */
+		if (mn_root != NULL) {
+			*mn_root = ptr += strlen(prefix) - 1;
+		}
+		return (1);
+	}
+
+	prefix = "/devices/";
+
+	if (strncmp(contents, prefix, strlen(prefix)) == 0) {
+
+		/* mn_root should point to the / following /devices/ */
+		if (mn_root != NULL) {
+			*mn_root = contents + strlen(prefix) - 1;
+		}
+		return (1);
+	}
+
+	if (mn_root != NULL) {
+		*mn_root = contents;
+	}
+	return (0);
+}
+
+/*
+ * Temporarily duplicated directly from libdevinfo's devfs_resolve_link(),
+ * and renamed, because we cannot link this from libdevinfo now, and will
+ * create a sensible solution in the near future.
+ *
+ * returns 0 if resolved, -1 otherwise.
+ * devpath: Absolute path to /dev link
+ * devfs_path: Returns malloced string: /devices path w/out "/devices"
+ */
+static int
+dmap_resolve_link(char *devpath, char **devfs_path)
+{
+	char contents[PATH_MAX + 1];
+	char stage_link[PATH_MAX + 1];
+	char *ptr;
+	int linksize;
+	char *slashdev = "/dev/";
+
+	if (devfs_path) {
+		*devfs_path = NULL;
+	}
+
+	linksize = readlink(devpath, contents, PATH_MAX);
+
+	if (linksize <= 0) {
+		return (-1);
+	} else {
+		contents[linksize] = '\0';
+	}
+
+	/*
+	 * if the link contents is not a minor node assume
+	 * that link contents is really a pointer to another
+	 * link, and if so recurse and read its link contents.
+	 */
+	if (dmap_minor_root((const char *)contents, (const char **)&ptr) !=
+	    1) {
+		if (strncmp(contents, slashdev, strlen(slashdev)) == 0)  {
+			/* absolute path, starting with /dev */
+			(void) strcpy(stage_link, contents);
+		} else {
+			/* relative path, prefix devpath */
+			if ((ptr = strrchr(devpath, '/')) == NULL) {
+				/* invalid link */
+				return (-1);
+			}
+			*ptr = '\0';
+			(void) strcpy(stage_link, devpath);
+			*ptr = '/';
+			(void) strcat(stage_link, "/");
+			(void) strcat(stage_link, contents);
+
+		}
+		return (dmap_resolve_link(stage_link, devfs_path));
+	}
+
+	if (devfs_path) {
+		*devfs_path = strdup(ptr);
+		if (*devfs_path == NULL) {
+			return (-1);
+		}
+	}
+
+	return (0);
+}
+
+/*
  * dmap_physname: path to /devices device
  * Returns:
  *	strdup'd (i.e. malloc'd) real device file if successful
@@ -393,7 +506,7 @@ dmap_physname(devmap_t *dmap)
 
 	(void) strncpy(stage_link, dmap->dmap_devarray[0], sizeof (stage_link));
 
-	if (devfs_resolve_link(stage_link, &oldlink) == 0)
+	if (dmap_resolve_link(stage_link, &oldlink) == 0)
 		return (oldlink);
 	return (NULL);
 }

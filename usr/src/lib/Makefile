@@ -568,7 +568,7 @@ $(CLOSED_BUILD)libc:		$(CLOSED)/lib/libc_i18n
 libast: 	libsocket
 libadutils: 	libldap5 libresolv libsocket libnsl
 nsswitch:	libadutils libidmap
-libbsm:		libtsol	libdevinfo
+libbsm:		libtsol
 libcmd: 	libsum libast libsocket libnsl
 libcmdutils:	libavl
 libcontract:	libnvpair
