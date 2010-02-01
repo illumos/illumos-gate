@@ -46,7 +46,7 @@
 
 static char ident[] = "Intel PRO/1000 Ethernet";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.3.21";
+static char e1000g_version[] = "Driver Ver. 5.3.22";
 
 /*
  * Proto types for DDI entry points
@@ -942,7 +942,8 @@ e1000g_set_bufsize(struct e1000g *Adapter)
 	    ((mac->type == e1000_82545) ||
 	    (mac->type == e1000_82546) ||
 	    (mac->type == e1000_82546_rev_3))) {
-		Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_2K;
+		Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_2K +
+		    E1000G_IPALIGNROOM;
 	} else {
 		rx_size = Adapter->max_frame_size + E1000G_IPALIGNPRESERVEROOM;
 		if ((rx_size > FRAME_SIZE_UPTO_2K) &&
@@ -1156,7 +1157,7 @@ e1000g_get_bar_info(dev_info_t *dip, int bar_offset, bar_info_t *bar_info)
 {
 	pci_regspec_t *regs;
 	uint_t regs_length;
-	int type, rnumber;
+	int type, rnumber, rcount;
 
 	ASSERT((bar_offset >= PCI_CONF_BASE0) &&
 	    (bar_offset <= PCI_CONF_BASE5));
@@ -1170,10 +1171,11 @@ e1000g_get_bar_info(dev_info_t *dip, int bar_offset, bar_info_t *bar_info)
 		return (DDI_FAILURE);
 	}
 
+	rcount = regs_length * sizeof (int) / sizeof (pci_regspec_t);
 	/*
 	 * Check the BAR offset
 	 */
-	for (rnumber = 0; rnumber < regs_length; ++rnumber) {
+	for (rnumber = 0; rnumber < rcount; ++rnumber) {
 		if (PCI_REG_REG_G(regs[rnumber].pci_phys_hi) == bar_offset) {
 			type = regs[rnumber].pci_phys_hi & PCI_ADDR_MASK;
 			break;
@@ -1182,7 +1184,7 @@ e1000g_get_bar_info(dev_info_t *dip, int bar_offset, bar_info_t *bar_info)
 
 	ddi_prop_free(regs);
 
-	if (rnumber >= regs_length)
+	if (rnumber >= rcount)
 		return (DDI_FAILURE);
 
 	switch (type) {
@@ -4249,7 +4251,9 @@ e1000g_local_timer(void *ws)
 	rw_exit(&Adapter->chip_lock);
 
 	if (link_changed) {
-		if (!Adapter->reset_flag)
+		if (!Adapter->reset_flag &&
+		    (Adapter->e1000g_state & E1000G_STARTED) &&
+		    !(Adapter->e1000g_state & E1000G_SUSPENDED))
 			mac_link_update(Adapter->mh, Adapter->link_state);
 		if (Adapter->link_state == LINK_STATE_UP)
 			Adapter->reset_flag = B_FALSE;

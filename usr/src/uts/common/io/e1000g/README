@@ -742,3 +742,10 @@ Notes on packaging:
 ======
   This version has the following fix:
    6909134 e1000g doesn't use ddi_get/ddi_put to access its IO space
+
+5.3.22
+======
+  This version has the following fix:
+   6903292 Running flag not set on IPMP underlying e1000g interfaces
+   6913835 e1000g driver passes bad messages up the stack when jumbograms received
+   6919873 panic: BAD TRAP: type=e (#pf Page fault) in module "e1000g" during ifconfig plumb group ipmp0
