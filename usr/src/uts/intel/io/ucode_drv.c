@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -148,6 +148,7 @@ ucode_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval)
 	case UCODE_GET_VERSION: {
 		int size;
 		uint32_t *revp, *rev_array;
+		size_t bufsz = NCPU * sizeof (*revp);
 		ucode_errno_t rc = EM_OK;
 
 		STRUCT_DECL(ucode_get_rev_struct, h);
@@ -156,17 +157,21 @@ ucode_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval)
 		    STRUCT_BUF(h), STRUCT_SIZE(h), mode))
 			return (EFAULT);
 
-		if ((size = STRUCT_FGET(h, ugv_size)) > NCPU)
+		if ((size = STRUCT_FGET(h, ugv_size)) > NCPU || size < 0)
 			return (EINVAL);
+
+		if (size == 0)
+			return (0);
 
 		if ((rev_array = STRUCT_FGETP(h, ugv_rev)) == NULL)
 			return (EINVAL);
 
 		size *= sizeof (uint32_t);
 
-		revp = kmem_zalloc(size, KM_SLEEP);
+		/* Can't rely on caller for kernel's buffer size. */
+		revp = kmem_zalloc(bufsz, KM_SLEEP);
 		if (ddi_copyin((void *)rev_array, revp, size, mode) != 0) {
-			kmem_free(revp, size);
+			kmem_free(revp, bufsz);
 			return (EINVAL);
 		}
 
@@ -175,11 +180,11 @@ ucode_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval)
 		STRUCT_FSET(h, ugv_errno, rc);
 
 		if (ddi_copyout(revp, (void *)rev_array, size, mode) != 0) {
-			kmem_free(revp, size);
+			kmem_free(revp, bufsz);
 			return (EFAULT);
 		}
 
-		kmem_free(revp, size);
+		kmem_free(revp, bufsz);
 
 		if (ddi_copyout(STRUCT_BUF(h), (void *)arg,
 		    STRUCT_SIZE(h), mode))
