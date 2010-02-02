@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,7 +84,7 @@ typedef struct dsl_pool {
 	blkptr_t dp_meta_rootbp;
 	list_t dp_synced_datasets;
 	hrtime_t dp_read_overhead;
-	uint64_t dp_throughput;
+	uint64_t dp_throughput; /* bytes per millisec */
 	uint64_t dp_write_limit;
 	uint64_t dp_tmp_userrefs_obj;
 

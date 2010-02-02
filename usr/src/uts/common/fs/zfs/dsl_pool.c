@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -431,10 +431,14 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 	 * amount of write traffic allowed into each transaction group.
 	 * Weight the throughput calculation towards the current value:
 	 * 	thru = 3/4 old_thru + 1/4 new_thru
+	 *
+	 * Note: write_time is in nanosecs, so write_time/MICROSEC
+	 * yields millisecs
 	 */
 	ASSERT(zfs_write_limit_min > 0);
-	if (data_written > zfs_write_limit_min / 8 && write_time > 0) {
-		uint64_t throughput = (data_written * NANOSEC) / write_time;
+	if (data_written > zfs_write_limit_min / 8 && write_time > MICROSEC) {
+		uint64_t throughput = data_written / (write_time / MICROSEC);
+
 		if (dp->dp_throughput)
 			dp->dp_throughput = throughput / 4 +
 			    3 * dp->dp_throughput / 4;
@@ -442,7 +446,7 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 			dp->dp_throughput = throughput;
 		dp->dp_write_limit = MIN(zfs_write_limit_inflated,
 		    MAX(zfs_write_limit_min,
-		    dp->dp_throughput * zfs_txg_synctime_ms / MILLISEC));
+		    dp->dp_throughput * zfs_txg_synctime_ms));
 	}
 }
 
