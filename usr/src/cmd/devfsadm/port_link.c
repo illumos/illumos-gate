@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -191,10 +191,12 @@ DEVFSADM_CREATE_INIT_V0(ports_cbt);
  * no cleanup rules for PCMCIA port devices
  */
 static devfsadm_remove_t ports_remove_cbt[] = {
-	{"port", "^term/[0-9]+$", RM_PRE | RM_HOT, ILEVEL_0, rm_dangling_port},
-	{"port", "^cua/[0-9]+$", RM_PRE | RM_HOT, ILEVEL_0, devfsadm_rm_all},
+	{"port", "^term/[0-9]+$", RM_PRE | RM_ALWAYS | RM_HOT, ILEVEL_0,
+	    rm_dangling_port},
+	{"port", "^cua/[0-9]+$", RM_PRE | RM_ALWAYS | RM_HOT, ILEVEL_0,
+	    devfsadm_rm_all},
 	{"port", "^(term|cua)/[a-z]$",
-	    RM_PRE, ILEVEL_0, devfsadm_rm_all},
+	    RM_PRE | RM_ALWAYS, ILEVEL_0, devfsadm_rm_all},
 };
 DEVFSADM_REMOVE_INIT_V0(ports_remove_cbt);
 

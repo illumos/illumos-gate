@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,6 +68,7 @@ static devfsadm_create_t misc_cbt[] = {
 	{ "pseudo", "ddi_pseudo", "smbios",
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_1, smbios,
 	},
+	/* floppies share the same class, but not link regex, as hard disks */
 	{ "disk",  "ddi_block:diskette", NULL,
 	    TYPE_EXACT, ILEVEL_1, diskette
 	},
@@ -152,6 +153,21 @@ static devfsadm_remove_t misc_remove_cbt[] = {
 	},
 	{ "pseudo", "^ucode$", RM_ALWAYS | RM_PRE | RM_HOT,
 		ILEVEL_0, devfsadm_rm_all
+	},
+	{ "mouse", "^kdmouse$", RM_ALWAYS | RM_PRE,
+		ILEVEL_0, devfsadm_rm_all
+	},
+	{ "disk", "^(diskette|rdiskette)([0-9]*)$",
+		RM_ALWAYS | RM_PRE, ILEVEL_1, devfsadm_rm_all
+	},
+	{ "parallel", "^(lp|ecpp)([0-9]+)$", RM_ALWAYS | RM_PRE,
+		ILEVEL_1, devfsadm_rm_all
+	},
+	{ "serial", "^(tty|ttyd)([0-9]+)$", RM_ALWAYS | RM_PRE,
+		ILEVEL_1, devfsadm_rm_all
+	},
+	{ "serial", "^tty[a-z]$", RM_ALWAYS | RM_PRE,
+		ILEVEL_1, devfsadm_rm_all
 	}
 };
 
