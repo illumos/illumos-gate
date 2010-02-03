@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -16,7 +16,6 @@
  * University may not be used to endorse or promote products derived
  * from this software without specific prior written permission.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "defs.h"
 #include <signal.h>
@@ -185,10 +184,10 @@ server()
 			}
 			if (bp == NULL)
 				except = bp = expand(makeblock(NAME, cp),
-						E_VARS);
+				    E_VARS);
 			else
 				bp->b_next = expand(makeblock(NAME, cp),
-						E_VARS);
+				    E_VARS);
 			while (bp->b_next != NULL)
 				bp = bp->b_next;
 			ack();
@@ -577,12 +576,18 @@ savelink(stp, opts)
 		lp->inum = stp->st_ino;
 		lp->devnum = stp->st_dev;
 		lp->count = stp->st_nlink - 1;
-		strcpy(lp->pathname,
-		    opts & WHOLE ?
-		    target : strsub(source, destination, target));
-		if (Tdest)
-			strcpy(lp->target, Tdest);
-		else
+
+		if (strlcpy(lp->pathname,
+		    opts & WHOLE ? target : strsub(source, destination, target),
+		    sizeof (lp->pathname)) >= sizeof (lp->pathname)) {
+			error("%s: target name too long\n", target);
+		}
+
+		if (Tdest) {
+			if (strlcpy(lp->target, Tdest,
+			    sizeof (lp->target)) >= sizeof (lp->target))
+				error("%s: target name too long\n", Tdest);
+		} else
 			*lp->target = 0;
 	}
 	return (NULL);
@@ -892,7 +897,13 @@ recvf(cmd, type)
 		(void) sprintf(new, "/%s", tmpname);
 	else {
 		*cp = '\0';
-		(void) sprintf(new, "%s/%s", target, tmpname);
+
+		/*
+		 * sizeof (target) =  RDIST_BUFSIZ and sizeof (tmpname) = 11
+		 * RDIST_BUFSIZ = 50*1024 is much greater than PATH_MAX that is
+		 * allowed by the kernel, so it's safe to call snprintf() here
+		 */
+		(void) snprintf(new, sizeof (new), "%s/%s", target, tmpname);
 		*cp = '/';
 	}
 
