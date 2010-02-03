@@ -708,6 +708,13 @@ rge_chip_ident(rge_t *rgep)
 	    PCI_CAP_ID_PCI_E, &val16) == DDI_SUCCESS;
 
 	/*
+	 * Workaround for 8101E_C
+	 */
+	if (chip->mac_ver == MAC_VER_8101E_C) {
+		chip->is_pcie = B_FALSE;
+	}
+
+	/*
 	 * Read and record PHY version
 	 */
 	val16 = rge_mii_get16(rgep, PHY_ID_REG_2);
@@ -884,8 +891,7 @@ rge_chip_init(rge_t *rgep)
 	 */
 	if (chip->mac_ver == MAC_VER_8168B_B ||
 	    chip->mac_ver == MAC_VER_8168B_C ||
-	    chip->mac_ver == MAC_VER_8101E ||
-	    chip->mac_ver == MAC_VER_8101E_C) {
+	    chip->mac_ver == MAC_VER_8101E) {
 		rge_ephy_put16(rgep, 0x01, 0x1bd3);
 	}
 

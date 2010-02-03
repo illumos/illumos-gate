@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1640,6 +1640,15 @@ rge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 */
 	err = ddi_regs_map_setup(devinfo, 2, &regs,
 	    0, 0, &rge_reg_accattr, &rgep->io_handle);
+
+	/*
+	 * MMIO map will fail if the assigned address is bigger than 4G
+	 * then choose I/O map
+	 */
+	if (err != DDI_SUCCESS) {
+		err = ddi_regs_map_setup(devinfo, 1, &regs,
+		    0, 0, &rge_reg_accattr, &rgep->io_handle);
+	}
 	if (err != DDI_SUCCESS) {
 		rge_problem(rgep, "ddi_regs_map_setup() failed");
 		goto attach_fail;
