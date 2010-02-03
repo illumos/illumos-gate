@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -745,7 +745,7 @@ struct snaparg {
 	dsl_sync_task_group_t *dstg;
 	char *snapname;
 	char failed[MAXPATHLEN];
-	boolean_t checkperms;
+	boolean_t recursive;
 	nvlist_t *props;
 };
 
@@ -784,26 +784,41 @@ dmu_objset_snapshot_one(const char *name, void *arg)
 	struct snaparg *sn = arg;
 	objset_t *os;
 	int err;
+	char *cp;
+
+	/*
+	 * If the objset starts with a '%', then ignore it unless it was
+	 * explicitly named (ie, not recursive).  These hidden datasets
+	 * are always inconsistent, and by not opening them here, we can
+	 * avoid a race with dsl_dir_destroy_check().
+	 */
+	cp = strrchr(name, '/');
+	if (cp && cp[1] == '%' && sn->recursive)
+		return (0);
 
 	(void) strcpy(sn->failed, name);
 
 	/*
-	 * Check permissions only when requested.  This only applies when
-	 * doing a recursive snapshot.  The permission checks for the starting
-	 * dataset have already been performed in zfs_secpolicy_snapshot()
+	 * Check permissions if we are doing a recursive snapshot.  The
+	 * permission checks for the starting dataset have already been
+	 * performed in zfs_secpolicy_snapshot()
 	 */
-	if (sn->checkperms == B_TRUE &&
-	    (err = zfs_secpolicy_snapshot_perms(name, CRED())))
+	if (sn->recursive && (err = zfs_secpolicy_snapshot_perms(name, CRED())))
 		return (err);
 
 	err = dmu_objset_hold(name, sn, &os);
 	if (err != 0)
 		return (err);
 
-	/* If the objset is in an inconsistent state, return busy */
+	/*
+	 * If the objset is in an inconsistent state (eg, in the process
+	 * of being destroyed), don't snapshot it.  As with %hidden
+	 * datasets, we return EBUSY if this name was explicitly
+	 * requested (ie, not recursive), and otherwise ignore it.
+	 */
 	if (os->os_dsl_dataset->ds_phys->ds_flags & DS_FLAG_INCONSISTENT) {
 		dmu_objset_rele(os, sn);
-		return (EBUSY);
+		return (sn->recursive ? 0 : EBUSY);
 	}
 
 	/*
@@ -840,13 +855,12 @@ dmu_objset_snapshot(char *fsname, char *snapname,
 	sn.dstg = dsl_sync_task_group_create(spa_get_dsl(spa));
 	sn.snapname = snapname;
 	sn.props = props;
+	sn.recursive = recursive;
 
 	if (recursive) {
-		sn.checkperms = B_TRUE;
 		err = dmu_objset_find(fsname,
 		    dmu_objset_snapshot_one, &sn, DS_FIND_CHILDREN);
 	} else {
-		sn.checkperms = B_FALSE;
 		err = dmu_objset_snapshot_one(fsname, &sn);
 	}
 
