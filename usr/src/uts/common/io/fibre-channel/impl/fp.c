@@ -6631,15 +6631,18 @@ fp_adisc_intr(fc_packet_t *pkt)
 				    pkt->pkt_reason, class);
 				cmd_flag = FP_CMD_PLOGI_RETAIN;
 
-				logi_cmd = fp_alloc_pkt(port, sizeof (la_els_logi_t),
+				logi_cmd = fp_alloc_pkt(port,
+				    sizeof (la_els_logi_t),
 				    sizeof (la_els_logi_t), KM_SLEEP, pd);
 				if (logi_cmd == NULL) {
 					fp_iodone(cmd);
 					return;
 				}
 
-				logi_cmd->cmd_pkt.pkt_tran_flags = FC_TRAN_INTR | class;
-				logi_cmd->cmd_pkt.pkt_tran_type = FC_PKT_EXCHANGE;
+				logi_cmd->cmd_pkt.pkt_tran_flags =
+				    FC_TRAN_INTR | class;
+				logi_cmd->cmd_pkt.pkt_tran_type =
+				    FC_PKT_EXCHANGE;
 				logi_cmd->cmd_flags = cmd_flag;
 				logi_cmd->cmd_retry_count = fp_retry_count;
 				logi_cmd->cmd_ulp_pkt = NULL;
@@ -7683,15 +7686,24 @@ fp_fciocmd(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 
 		list = kmem_zalloc(fcio->fcio_olen, KM_SLEEP);
 		list->version = FC_HBA_LIST_VERSION;
-		/* build npiv port list */
-		count = fc_ulp_get_npiv_port_list(port, (char *)list->hbaPaths);
-		if (count < 0) {
-			rval = ENXIO;
-			FP_TRACE(FP_NHEAD1(1, 0), "Build NPIV Port List error");
-			kmem_free(list, fcio->fcio_olen);
-			break;
+
+		count = (fcio->fcio_olen -
+		    (int)sizeof (fc_hba_npiv_port_list_t))/MAXPATHLEN  + 1;
+		if (port->fp_npiv_portnum > count) {
+			list->numAdapters = port->fp_npiv_portnum;
+		} else {
+			/* build npiv port list */
+			count = fc_ulp_get_npiv_port_list(port,
+			    (char *)list->hbaPaths);
+			if (count < 0) {
+				rval = ENXIO;
+				FP_TRACE(FP_NHEAD1(1, 0),
+				    "Build NPIV Port List error");
+				kmem_free(list, fcio->fcio_olen);
+				break;
+			}
+			list->numAdapters = count;
 		}
-		list->numAdapters = count;
 
 		if (fp_copyout((void *)list, (void *)fcio->fcio_obuf,
 		    fcio->fcio_olen, mode) == 0) {

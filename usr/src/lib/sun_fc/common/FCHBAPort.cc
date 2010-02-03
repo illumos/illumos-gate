@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -480,7 +480,7 @@ FCHBAPort::FCHBAPort(string thePath) : HBAPort() {
 	fcio.fcio_xfer = FCIO_XFER_READ;
 	do {
 		retry = false;
-		bufSize = MAXPATHLEN * size + (int) sizeof (fc_hba_npiv_port_list_t) - 1;
+		bufSize = MAXPATHLEN * (size - 1) + (int) sizeof (fc_hba_npiv_port_list_t);
 		pathList = (fc_hba_npiv_port_list_t *) new uchar_t[bufSize];
 		pathList->numAdapters = size;
 		fcio.fcio_olen = bufSize;
