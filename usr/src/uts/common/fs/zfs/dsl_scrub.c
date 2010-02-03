@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -150,11 +150,11 @@ dsl_pool_scrub_setup_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	    DMU_POOL_SCRUB_BOOKMARK, sizeof (uint64_t),
 	    sizeof (dp->dp_scrub_bookmark) / sizeof (uint64_t),
 	    &dp->dp_scrub_bookmark, tx));
-	VERIFY(0 == zap_add(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
+	VERIFY(0 == zap_update(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
 	    DMU_POOL_SCRUB_DDT_BOOKMARK, sizeof (uint64_t),
 	    sizeof (dp->dp_scrub_ddt_bookmark) / sizeof (uint64_t),
 	    &dp->dp_scrub_ddt_bookmark, tx));
-	VERIFY(0 == zap_add(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
+	VERIFY(0 == zap_update(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
 	    DMU_POOL_SCRUB_DDT_CLASS_MAX, sizeof (uint64_t), 1,
 	    &dp->dp_scrub_ddt_class_max, tx));
 	VERIFY(0 == zap_add(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
@@ -847,12 +847,21 @@ enqueue_cb(spa_t *spa, uint64_t dsobj, const char *dsname, void *arg)
  * If there are N references to a deduped block, we don't want to scrub it
  * N times -- ideally, we should scrub it exactly once.
  *
+ * We leverage the fact that the dde's replication class (enum ddt_class)
+ * is ordered from highest replication class (DDT_CLASS_DITTO) to lowest
+ * (DDT_CLASS_UNIQUE) so that we may walk the DDT in that order.
+ *
  * To prevent excess scrubbing, the scrub begins by walking the DDT
  * to find all blocks with refcnt > 1, and scrubs each of these once.
- * Then the top-down scrub begins, only visiting blocks with refcnt == 1.
+ * Since there are two replication classes which contain blocks with
+ * refcnt > 1, we scrub the highest replication class (DDT_CLASS_DITTO) first.
+ * Finally the top-down scrub begins, only visiting blocks with refcnt == 1.
  *
  * There would be nothing more to say if a block's refcnt couldn't change
- * during a scrub, but of course it can.  There are two cases to consider.
+ * during a scrub, but of course it can so we must account for changes
+ * in a block's replication class.
+ *
+ * Here's an example of what can occur:
  *
  * If a block has refcnt > 1 during the DDT scrub phase, but has refcnt == 1
  * when visited during the top-down scrub phase, it will be scrubbed twice.
@@ -861,11 +870,9 @@ enqueue_cb(spa_t *spa, uint64_t dsobj, const char *dsname, void *arg)
  * If a block has refcnt == 1 during the DDT scrub phase, but has refcnt > 1
  * on each visit during the top-down scrub phase, it will never be scrubbed.
  * To catch this, ddt_sync_entry() notifies the scrub code whenever a block's
- * reference count changes; if it transitions from refcnt == 1 to refcnt > 1
+ * reference class transitions to a higher level (i.e DDT_CLASS_UNIQUE to
+ * DDT_CLASS_DUPLICATE); if it transitions from refcnt == 1 to refcnt > 1
  * while a scrub is in progress, it scrubs the block right then.
- *
- * The code does not actually use the refcnt directly, but rather uses the
- * dde's replication class (enum ddt_class), which serves the same purpose.
  */
 static void
 dsl_pool_scrub_ddt(dsl_pool_t *dp)
@@ -1011,12 +1018,6 @@ out:
 	VERIFY(0 == zap_update(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
 	    DMU_POOL_SCRUB_ERRORS, sizeof (uint64_t), 1,
 	    &spa->spa_scrub_errors, tx));
-
-	/* XXX this is scrub-clean specific */
-	mutex_enter(&spa->spa_scrub_lock);
-	while (spa->spa_scrub_inflight > 0)
-		cv_wait(&spa->spa_scrub_io_cv, &spa->spa_scrub_lock);
-	mutex_exit(&spa->spa_scrub_lock);
 }
 
 void

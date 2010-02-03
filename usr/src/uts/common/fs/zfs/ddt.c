@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -968,7 +968,7 @@ ddt_sync_entry(ddt_t *ddt, ddt_entry_t *dde, dmu_tx_t *tx, uint64_t txg)
 		VERIFY(ddt_object_update(ddt, ntype, nclass, dde, tx) == 0);
 
 		if (dp->dp_scrub_func != SCRUB_FUNC_NONE &&
-		    oclass > dp->dp_scrub_ddt_class_max &&
+		    oclass > nclass &&
 		    nclass <= dp->dp_scrub_ddt_class_max)
 			dsl_pool_scrub_ddt_entry(dp, ddt->ddt_checksum, dde);
 	}

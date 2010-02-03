@@ -236,7 +236,7 @@ spa_prop_get(spa_t *spa, nvlist_t **nvp)
 	spa_prop_get_config(spa, nvp);
 
 	/* If no pool property object, no more prop to get. */
-	if (spa->spa_pool_props_object == 0) {
+	if (mos == NULL || spa->spa_pool_props_object == 0) {
 		mutex_exit(&spa->spa_props_lock);
 		return (0);
 	}
@@ -949,6 +949,7 @@ spa_unload(spa_t *spa)
 	if (spa->spa_dsl_pool) {
 		dsl_pool_close(spa->spa_dsl_pool);
 		spa->spa_dsl_pool = NULL;
+		spa->spa_meta_objset = NULL;
 	}
 
 	ddt_unload(spa);
@@ -5269,6 +5270,11 @@ spa_sync(spa_t *spa, uint64_t txg)
 		}
 
 		ddt_sync(spa, txg);
+
+		mutex_enter(&spa->spa_scrub_lock);
+		while (spa->spa_scrub_inflight > 0)
+			cv_wait(&spa->spa_scrub_io_cv, &spa->spa_scrub_lock);
+		mutex_exit(&spa->spa_scrub_lock);
 
 		while (vd = txg_list_remove(&spa->spa_vdev_txg_list, txg))
 			vdev_sync(vd, txg);
