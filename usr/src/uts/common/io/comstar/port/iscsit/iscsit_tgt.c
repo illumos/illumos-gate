@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -154,7 +154,7 @@ static iscsit_portal_t *
 iscsit_portal_create(iscsit_tpg_t *tpg, struct sockaddr_storage *sa);
 
 static void
-iscsit_portal_destroy(iscsit_portal_t *portal);
+iscsit_portal_delete(iscsit_portal_t *portal);
 
 static idm_status_t
 iscsit_portal_online(iscsit_portal_t *portal);
@@ -1613,7 +1613,7 @@ iscsit_tpg_modify(iscsit_tpg_t *tpg, it_tpg_t *cfg_tpg)
 		next_portal = AVL_NEXT(&tpg->tpg_portal_list, portal);
 		if (it_portal_lookup(cfg_tpg, &portal->portal_addr) == NULL) {
 			avl_remove(&tpg->tpg_portal_list, portal);
-			iscsit_portal_destroy(portal);
+			iscsit_portal_delete(portal);
 		}
 	}
 
@@ -1640,7 +1640,7 @@ iscsit_tpg_destroy(iscsit_tpg_t *tpg)
 	    portal = next_portal) {
 		next_portal = AVL_NEXT(&tpg->tpg_portal_list, portal);
 		avl_remove(&tpg->tpg_portal_list, portal);
-		iscsit_portal_destroy(portal);
+		iscsit_portal_delete(portal);
 	}
 
 	idm_refcnt_wait_ref(&tpg->tpg_refcnt);
@@ -1693,7 +1693,7 @@ iscsit_tpg_destroydefault(iscsit_tpg_t *tpg)
 	portal = avl_first(&tpg->tpg_portal_list);
 	ASSERT(portal != NULL);
 	avl_remove(&tpg->tpg_portal_list, portal);
-	iscsit_portal_destroy(portal);
+	iscsit_portal_delete(portal);
 
 	idm_refcnt_wait_ref(&tpg->tpg_refcnt);
 	idm_refcnt_destroy(&tpg->tpg_refcnt);
@@ -1831,11 +1831,17 @@ iscsit_portal_create(iscsit_tpg_t *tpg, struct sockaddr_storage *sa)
 }
 
 void
-iscsit_portal_destroy(iscsit_portal_t *portal)
+iscsit_portal_delete(iscsit_portal_t *portal)
 {
-	ASSERT(portal->portal_svc == NULL);
-	idm_refcnt_destroy(&portal->portal_refcnt);
-	kmem_free(portal, sizeof (*portal));
+	if (portal->portal_online > 0) {
+		iscsit_portal_offline(portal);
+	}
+
+	if (portal->portal_online == 0) {
+		ASSERT(portal->portal_svc == NULL);
+		idm_refcnt_destroy(&portal->portal_refcnt);
+		kmem_free(portal, sizeof (*portal));
+	}
 }
 
 void
