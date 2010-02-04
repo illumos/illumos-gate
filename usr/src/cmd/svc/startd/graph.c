@@ -1732,7 +1732,7 @@ propagate_stop(graph_vertex_t *v, void *arg)
 	case GVT_INST:
 		/* Restarter */
 		if (err > RERR_NONE && inst_running(v)) {
-			if (err == RERR_RESTART) {
+			if (err == RERR_RESTART || err == RERR_REFRESH) {
 				vertex_send_event(v,
 				    RESTARTER_EVENT_TYPE_STOP_RESET);
 			} else {
@@ -1767,7 +1767,7 @@ propagate_stop(graph_vertex_t *v, void *arg)
 		svc = e->ge_vertex;
 
 		if (inst_running(svc)) {
-			if (err == RERR_RESTART) {
+			if (err == RERR_RESTART || err == RERR_REFRESH) {
 				vertex_send_event(svc,
 				    RESTARTER_EVENT_TYPE_STOP_RESET);
 			} else {

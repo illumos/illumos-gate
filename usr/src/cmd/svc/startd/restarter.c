@@ -1087,6 +1087,7 @@ stop_instance(scf_handle_t *local_handle, restarter_inst_t *inst,
 		}
 
 		(void) update_fault_count(inst, FAULT_COUNT_RESET);
+		reset_start_times(inst);
 
 		if (inst->ri_i.i_primary_ctid != 0) {
 			inst->ri_m_inst =
@@ -1602,7 +1603,7 @@ const char *event_names[] = { "INVALID", "ADD_INSTANCE", "REMOVE_INSTANCE",
 	"ENABLE", "DISABLE", "ADMIN_DEGRADED", "ADMIN_REFRESH",
 	"ADMIN_RESTART", "ADMIN_MAINT_OFF", "ADMIN_MAINT_ON",
 	"ADMIN_MAINT_ON_IMMEDIATE", "STOP", "START", "DEPENDENCY_CYCLE",
-	"INVALID_DEPENDENCY", "ADMIN_DISABLE"
+	"INVALID_DEPENDENCY", "ADMIN_DISABLE", "STOP_RESET"
 };
 
 /*
@@ -2000,9 +2001,6 @@ contract_action(scf_handle_t *h, restarter_inst_t *inst, ctid_t id,
 		 * process we're monitoring, then the
 		 * wait_thread will stop the instance.
 		 */
-		if (type == CT_PR_EV_EMPTY)
-			reset_start_times(inst);
-
 		log_framework(LOG_DEBUG,
 		    "%s: ignoring contract event on wait-style service\n",
 		    fmri);

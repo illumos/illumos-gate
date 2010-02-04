@@ -1855,6 +1855,7 @@ handle_restarter_event(instance_t *instance, restarter_event_type_t event,
 			 */
 			instance->maintenance_req = B_TRUE;
 			/* FALLTHROUGH */
+		case RESTARTER_EVENT_TYPE_STOP_RESET:
 		case RESTARTER_EVENT_TYPE_STOP:
 			/*
 			 * Dependencies have become unmet. Close and
