@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -733,7 +733,6 @@ compress()
 			find `find kernel platform -name kmdb\*` | \
 				cpio -pdum $DST 2> /dev/null
 			find kernel/misc/sparcv9/ctf kernel/fs/sparcv9/dcfs \
-			    kernel/misc/ctf kernel/fs/dcfs \
 			    etc/system etc/name_to_major etc/path_to_inst \
 			    etc/name_to_sysnum  etc/driver_aliases \
 			    etc/driver_classes etc/minor_perm | \
