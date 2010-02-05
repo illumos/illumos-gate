@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -798,6 +798,9 @@ srpt_stp_send_status(struct scsi_task *task, uint32_t ioflags)
 	iu = task->task_port_private;
 
 	ASSERT(iu != NULL);
+
+	mutex_enter(&iu->iu_lock);
+
 	ASSERT(iu->iu_ch != NULL);
 
 	SRPT_DPRINTF_L3("stp_send_status, invoked task (%p)"
@@ -819,20 +822,18 @@ srpt_stp_send_status(struct scsi_task *task, uint32_t ioflags)
 	    srp_rsp_t, iu->iu_buf, scsi_task_t, task,
 	    int8_t, task->task_scsi_status);
 
+	if ((iu->iu_flags & (SRPT_IU_STMF_ABORTING |
+	    SRPT_IU_SRP_ABORTING | SRPT_IU_ABORTED)) != 0) {
+		mutex_exit(&iu->iu_lock);
+		return (STMF_FAILURE);
+	}
 
 	/*
 	 * Indicate future aborts can not be initiated (although
 	 * we will handle any that have been requested since the
 	 * last I/O completed and before we are sending status).
 	 */
-	mutex_enter(&iu->iu_lock);
 	iu->iu_flags |= SRPT_IU_RESP_SENT;
-
-	if ((iu->iu_flags & (SRPT_IU_STMF_ABORTING |
-	    SRPT_IU_SRP_ABORTING | SRPT_IU_ABORTED)) != 0) {
-		mutex_exit(&iu->iu_lock);
-		return (STMF_FAILURE);
-	}
 
 	/*
 	 * Send SRP command response or SRP task mgmt response.
@@ -884,6 +885,10 @@ srpt_stp_send_status(struct scsi_task *task, uint32_t ioflags)
 	if (status != IBT_SUCCESS) {
 		SRPT_DPRINTF_L2("stp_send_status, post response err(%d)",
 		    status);
+
+		/* clear the response sent flag since it never went out */
+		iu->iu_flags &= ~SRPT_IU_RESP_SENT;
+
 		mutex_exit(&iu->iu_lock);
 		return (STMF_FAILURE);
 	}
@@ -955,22 +960,23 @@ srpt_stp_abort(struct stmf_local_port *lport, int abort_cmd,
 
 	/*
 	 * If no I/O is outstanding then immediately transition to
-	 * aborted state.  If I/O are in progress, then indicate that an
-	 * STMF abort has been requested and tell STMF we will complete
-	 * it asynchronously.
+	 * aborted state.  If any I/O is in progress OR we've sent the
+	 * completion response, then indicate that an STMF abort has been
+	 * requested and ask STMF to call us back later to complete the abort.
 	 */
-	if (iu->iu_sq_posted_cnt == 0) {
+	if ((iu->iu_flags & SRPT_IU_RESP_SENT) ||
+	    (iu->iu_sq_posted_cnt > 0)) {
+		SRPT_DPRINTF_L3("stp_abort, deferring abort request. "
+		    "%d outstanding I/O for IU %p",
+		    iu->iu_sq_posted_cnt, (void *)iu);
+		iu->iu_flags |= SRPT_IU_STMF_ABORTING;
+		status = STMF_BUSY;
+	} else {
 		SRPT_DPRINTF_L3("stp_abort, no outstanding I/O for %p",
 		    (void *)iu);
 		iu->iu_flags |= SRPT_IU_ABORTED;
 		/* Synchronous abort - STMF will call task_free */
 		status = STMF_ABORT_SUCCESS;
-	} else {
-		SRPT_DPRINTF_L3("stp_abort, %d outstanding I/O for %p",
-		    iu->iu_sq_posted_cnt, (void *)iu);
-		iu->iu_flags |= SRPT_IU_STMF_ABORTING;
-		/* Ask STMF to call us back later */
-		status = STMF_BUSY;
 	}
 
 	mutex_exit(&iu->iu_lock);

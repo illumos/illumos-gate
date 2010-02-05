@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -466,32 +466,25 @@ static void
 srpt_ch_rsp_comp(srpt_channel_t *ch, srpt_iu_t *iu,
 	ibt_wc_status_t wc_status)
 {
+	stmf_status_t	st = STMF_SUCCESS;
+
 	ASSERT(iu->iu_ch == ch);
 
 	/*
-	 * If work completion indicates failure, decrement the
-	 * send posted count.  If it is a flush error, we are
-	 * done; for all other errors start a channel disconnect.
+	 * Process the completion regardless whether it's a failure or
+	 * success.  At this point, we've processed as far as we can and
+	 * just need to complete the associated task.
 	 */
+
 	if (wc_status != IBT_SUCCESS) {
 		SRPT_DPRINTF_L2("ch_rsp_comp, WC status err(%d)",
 		    wc_status);
-		atomic_dec_32(&iu->iu_sq_posted_cnt);
+
+		st = STMF_FAILURE;
 
 		if (wc_status != IBT_WC_WR_FLUSHED_ERR) {
 			srpt_ch_disconnect(ch);
 		}
-
-		mutex_enter(&iu->iu_lock);
-		if (iu->iu_stmf_task == NULL) {
-			srpt_ioc_repost_recv_iu(iu->iu_ioc, iu);
-			mutex_exit(&iu->iu_lock);
-			srpt_ch_release_ref(ch, 0);
-		} else {
-			/* cleanup handled in task_free */
-			mutex_exit(&iu->iu_lock);
-		}
-		return;
 	}
 
 	/*
@@ -510,32 +503,17 @@ srpt_ch_rsp_comp(srpt_channel_t *ch, srpt_iu_t *iu,
 	}
 
 	/*
-	 * If STMF has requested the IU task be aborted, then notify STMF
-	 * the command is now aborted.
-	 */
-	if ((iu->iu_flags & SRPT_IU_STMF_ABORTING) != 0) {
-		scsi_task_t	*abort_task = iu->iu_stmf_task;
-
-		mutex_exit(&iu->iu_lock);
-		stmf_abort(STMF_REQUEUE_TASK_ABORT_LPORT, abort_task,
-		    STMF_ABORTED, NULL);
-		return;
-	}
-
-	/*
 	 * We should not get a SEND completion where the task has already
 	 * completed aborting and STMF has been informed.
 	 */
 	ASSERT((iu->iu_flags & SRPT_IU_ABORTED) == 0);
 
 	/*
-	 * Successful status response completion for SCSI task.
 	 * Let STMF know we are done.
 	 */
 	mutex_exit(&iu->iu_lock);
 
-	stmf_send_status_done(iu->iu_stmf_task, STMF_SUCCESS,
-	    STMF_IOF_LPORT_DONE);
+	stmf_send_status_done(iu->iu_stmf_task, st, STMF_IOF_LPORT_DONE);
 }
 
 /*
