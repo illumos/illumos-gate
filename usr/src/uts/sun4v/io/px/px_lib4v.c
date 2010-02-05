@@ -571,6 +571,13 @@ px_lib_iommu_getbypass(dev_info_t *dip, r_addr_t ra, io_attributes_t attr,
 
 	DBG(DBG_LIB_DMA, dip, "px_lib_iommu_getbypass: dip 0x%p ra 0x%llx "
 	    "attr 0x%llx\n", dip, ra, attr);
+	/*
+	 * If HV VPCI version is 1.1 and higher, pass BDF, phantom function,
+	 * and relaxed ordering attributes. Otherwise, pass only read or write
+	 * attribute.
+	 */
+	if (px_vpci_min_ver == PX_HSVC_MINOR_VER_0)
+		attr &= PCI_MAP_ATTR_READ | PCI_MAP_ATTR_WRITE;
 
 	if ((ret = hvio_iommu_getbypass(DIP_TO_HANDLE(dip), ra,
 	    attr, io_addr_p)) != H_EOK) {
