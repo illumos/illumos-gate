@@ -219,7 +219,6 @@ extern "C" {
 
 #define	IGB_LB_NONE			0
 #define	IGB_LB_EXTERNAL			1
-#define	IGB_LB_INTERNAL_MAC		2
 #define	IGB_LB_INTERNAL_PHY		3
 #define	IGB_LB_INTERNAL_SERDES		4
 

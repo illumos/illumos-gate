@@ -29,7 +29,7 @@
 #include "igb_sw.h"
 
 static char ident[] = "Intel 1Gb Ethernet";
-static char igb_version[] = "igb 1.1.12";
+static char igb_version[] = "igb 1.1.13";
 
 /*
  * Local function protoypes
@@ -85,7 +85,6 @@ static boolean_t is_valid_mac_addr(uint8_t *);
 static boolean_t igb_stall_check(igb_t *);
 static boolean_t igb_set_loopback_mode(igb_t *, uint32_t);
 static void igb_set_external_loopback(igb_t *);
-static void igb_set_internal_mac_loopback(igb_t *);
 static void igb_set_internal_phy_loopback(igb_t *);
 static void igb_set_internal_serdes_loopback(igb_t *);
 static boolean_t igb_find_mac_address(igb_t *);
@@ -3541,8 +3540,6 @@ static lb_property_t lb_normal =
 	{ normal,	"normal",	IGB_LB_NONE		};
 static lb_property_t lb_external =
 	{ external,	"External",	IGB_LB_EXTERNAL		};
-static lb_property_t lb_mac =
-	{ internal,	"MAC",		IGB_LB_INTERNAL_MAC	};
 static lb_property_t lb_phy =
 	{ internal,	"PHY",		IGB_LB_INTERNAL_PHY	};
 static lb_property_t lb_serdes =
@@ -3573,7 +3570,6 @@ igb_loopback_ioctl(igb_t *igb, struct iocblk *iocp, mblk_t *mp)
 			return (IOC_INVAL);
 
 		value = sizeof (lb_normal);
-		value += sizeof (lb_mac);
 		if (hw->phy.media_type == e1000_media_type_copper)
 			value += sizeof (lb_phy);
 		else
@@ -3586,7 +3582,6 @@ igb_loopback_ioctl(igb_t *igb, struct iocblk *iocp, mblk_t *mp)
 
 	case LB_GET_INFO:
 		value = sizeof (lb_normal);
-		value += sizeof (lb_mac);
 		if (hw->phy.media_type == e1000_media_type_copper)
 			value += sizeof (lb_phy);
 		else
@@ -3601,7 +3596,6 @@ igb_loopback_ioctl(igb_t *igb, struct iocblk *iocp, mblk_t *mp)
 		lbpp = (lb_property_t *)(uintptr_t)mp->b_cont->b_rptr;
 
 		lbpp[value++] = lb_normal;
-		lbpp[value++] = lb_mac;
 		if (hw->phy.media_type == e1000_media_type_copper)
 			lbpp[value++] = lb_phy;
 		else
@@ -3675,10 +3669,6 @@ igb_set_loopback_mode(igb_t *igb, uint32_t mode)
 		igb_set_external_loopback(igb);
 		break;
 
-	case IGB_LB_INTERNAL_MAC:
-		igb_set_internal_mac_loopback(igb);
-		break;
-
 	case IGB_LB_INTERNAL_PHY:
 		igb_set_internal_phy_loopback(igb);
 		break;
@@ -3745,52 +3735,6 @@ igb_set_external_loopback(igb_t *igb)
 	(void) e1000_write_phy_reg(hw, 0x9, 0x1b00);
 	(void) e1000_write_phy_reg(hw, 0x12, 0x1610);
 	(void) e1000_write_phy_reg(hw, 0x1f37, 0x3f1c);
-}
-
-/*
- * igb_set_internal_mac_loopback - Set the internal MAC loopback mode
- */
-static void
-igb_set_internal_mac_loopback(igb_t *igb)
-{
-	struct e1000_hw *hw;
-	uint32_t ctrl;
-	uint32_t rctl;
-	uint32_t ctrl_ext;
-	uint16_t phy_ctrl;
-	uint16_t phy_status;
-
-	hw = &igb->hw;
-
-	(void) e1000_read_phy_reg(hw, PHY_CONTROL, &phy_ctrl);
-	phy_ctrl &= ~MII_CR_AUTO_NEG_EN;
-	(void) e1000_write_phy_reg(hw, PHY_CONTROL, phy_ctrl);
-
-	(void) e1000_read_phy_reg(hw, PHY_STATUS, &phy_status);
-
-	/* Set link mode to PHY (00b) in the Extended Control register */
-	ctrl_ext = E1000_READ_REG(hw, E1000_CTRL_EXT);
-	ctrl_ext &= ~E1000_CTRL_EXT_LINK_MODE_MASK;
-	E1000_WRITE_REG(hw, E1000_CTRL_EXT, ctrl_ext);
-
-	/* Set the Device Control register */
-	ctrl = E1000_READ_REG(hw, E1000_CTRL);
-	if (!(phy_status & MII_SR_LINK_STATUS))
-		ctrl |= E1000_CTRL_ILOS; /* Set ILOS when the link is down */
-	ctrl &= ~E1000_CTRL_SPD_SEL;	/* Clear the speed sel bits */
-	ctrl |= (E1000_CTRL_SLU |	/* Force link up */
-	    E1000_CTRL_FRCSPD |		/* Force speed */
-	    E1000_CTRL_FRCDPX |		/* Force duplex */
-	    E1000_CTRL_SPD_1000 |	/* Force speed to 1000 */
-	    E1000_CTRL_FD);		/* Force full duplex */
-
-	E1000_WRITE_REG(hw, E1000_CTRL, ctrl);
-
-	/* Set the Receive Control register */
-	rctl = E1000_READ_REG(hw, E1000_RCTL);
-	rctl &= ~E1000_RCTL_LBM_TCVR;
-	rctl |= E1000_RCTL_LBM_MAC;
-	E1000_WRITE_REG(hw, E1000_RCTL, rctl);
 }
 
 /*
