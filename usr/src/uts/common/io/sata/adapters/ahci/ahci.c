@@ -3526,13 +3526,53 @@ ahci_initialize_port(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 {
 	uint32_t port_sstatus, port_task_file, port_cmd_status;
 	uint8_t port = addrp->aa_port;
-	boolean_t pm_mode = B_TRUE;	/* Power Management mode */
+	boolean_t resuming = B_TRUE;	/*  processing DDI_RESUME */
 	int ret;
 
 	ASSERT(mutex_owned(&ahci_portp->ahciport_mutex));
 
 	/* AHCI_ADDR_PORT: We've no idea of the attached device here.  */
 	ASSERT(AHCI_ADDR_IS_PORT(addrp));
+
+	/*
+	 * At the time being, only probe ports/devices and get the types of
+	 * attached devices during DDI_ATTACH. In fact, the device can be
+	 * changed during power state changes, but at the time being, we
+	 * don't support the situation.
+	 */
+	if (ahci_portp->ahciport_flags & AHCI_PORT_FLAG_HOTPLUG) {
+		resuming = B_FALSE;
+	} else {
+		/* check for DDI_RESUME case */
+		mutex_exit(&ahci_portp->ahciport_mutex);
+		mutex_enter(&ahci_ctlp->ahcictl_mutex);
+		if (ahci_ctlp->ahcictl_flags & AHCI_ATTACH)
+			resuming = B_FALSE;
+		mutex_exit(&ahci_ctlp->ahcictl_mutex);
+		mutex_enter(&ahci_portp->ahciport_mutex);
+	}
+
+	if (resuming) {
+		/*
+		 * During the resume, we need to set the PxCLB, PxCLBU, PxFB
+		 * and PxFBU registers in case these registers were cleared
+		 * during the suspend.
+		 */
+		AHCIDBG(AHCIDBG_PM, ahci_ctlp,
+		    "ahci_initialize_port: port %d "
+		    "set PxCLB, PxCLBU, PxFB and PxFBU "
+		    "during resume", port);
+
+		/* Config Port Received FIS Base Address */
+		ddi_put64(ahci_ctlp->ahcictl_ahci_acc_handle,
+		    (uint64_t *)AHCI_PORT_PxFB(ahci_ctlp, port),
+		    ahci_portp->ahciport_rcvd_fis_dma_cookie.dmac_laddress);
+
+		/* Config Port Command List Base Address */
+		ddi_put64(ahci_ctlp->ahcictl_ahci_acc_handle,
+		    (uint64_t *)AHCI_PORT_PxCLB(ahci_ctlp, port),
+		    ahci_portp->ahciport_cmd_list_dma_cookie.dmac_laddress);
+	}
 
 	port_cmd_status = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
 	    (uint32_t *)AHCI_PORT_PxCMD(ahci_ctlp, port));
@@ -3576,7 +3616,10 @@ ahci_initialize_port(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	    port_task_file & AHCI_TFD_STS_DRQ ||
 
 	    /* Check whether port reset must be executed */
-	    ahci_ctlp->ahcictl_cap & AHCI_CAP_INIT_PORT_RESET) {
+	    ahci_ctlp->ahcictl_cap & AHCI_CAP_INIT_PORT_RESET ||
+
+	    /* Always reset port on RESUME */
+	    resuming != B_FALSE) {
 
 		/* Something went wrong, we need do some reset things */
 		ret = ahci_port_reset(ahci_ctlp, ahci_portp, addrp);
@@ -3602,55 +3645,10 @@ ahci_initialize_port(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	AHCIDBG(AHCIDBG_INIT, ahci_ctlp, "port %d is ready now.", port);
 
 	/*
-	 * At the time being, only probe ports/devices and get the types of
-	 * attached devices during DDI_ATTACH. In fact, the device can be
-	 * changed during power state changes, but at the time being, we
-	 * don't support the situation.
+	 * Try to get the device signature if the port is not empty.
 	 */
-	mutex_exit(&ahci_portp->ahciport_mutex);
-	mutex_enter(&ahci_ctlp->ahcictl_mutex);
-	if (ahci_ctlp->ahcictl_flags & AHCI_ATTACH)
-		pm_mode = B_FALSE;
-	mutex_exit(&ahci_ctlp->ahcictl_mutex);
-	mutex_enter(&ahci_portp->ahciport_mutex);
-
-	if (ahci_portp->ahciport_flags & AHCI_PORT_FLAG_HOTPLUG)
-		pm_mode = B_FALSE;
-
-	if (!pm_mode) {
-		/*
-		 * Try to get the device signature if the port is
-		 * not empty.
-		 */
-		if (ahci_portp->ahciport_device_type != SATA_DTYPE_NONE)
-			ahci_find_dev_signature(ahci_ctlp, ahci_portp, addrp);
-	} else {
-
-		/*
-		 * During the resume, we need to set the PxCLB, PxCLBU, PxFB
-		 * and PxFBU registers in case these registers were cleared
-		 * during the suspend.
-		 */
-		AHCIDBG(AHCIDBG_PM, ahci_ctlp,
-		    "ahci_initialize_port: port %d "
-		    "reset the port during resume", port);
-		(void) ahci_port_reset(ahci_ctlp, ahci_portp, addrp);
-
-		AHCIDBG(AHCIDBG_PM, ahci_ctlp,
-		    "ahci_initialize_port: port %d "
-		    "set PxCLB, PxCLBU, PxFB and PxFBU "
-		    "during resume", port);
-
-		/* Config Port Received FIS Base Address */
-		ddi_put64(ahci_ctlp->ahcictl_ahci_acc_handle,
-		    (uint64_t *)AHCI_PORT_PxFB(ahci_ctlp, port),
-		    ahci_portp->ahciport_rcvd_fis_dma_cookie.dmac_laddress);
-
-		/* Config Port Command List Base Address */
-		ddi_put64(ahci_ctlp->ahcictl_ahci_acc_handle,
-		    (uint64_t *)AHCI_PORT_PxCLB(ahci_ctlp, port),
-		    ahci_portp->ahciport_cmd_list_dma_cookie.dmac_laddress);
-	}
+	if (!resuming && ahci_portp->ahciport_device_type != SATA_DTYPE_NONE)
+		ahci_find_dev_signature(ahci_ctlp, ahci_portp, addrp);
 
 	/* Return directly if no device connected */
 	if (ahci_portp->ahciport_device_type == SATA_DTYPE_NONE) {
