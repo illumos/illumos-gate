@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -535,7 +535,7 @@ static const struct events_table_t *arch_events_table = NULL;
 static uint64_t known_arch_events;
 static uint64_t known_ffc_num;
 
-#define	GENERICEVENTS_FAM6_MOD26					       \
+#define	GENERICEVENTS_FAM6_NHM						       \
 { 0xc4, 0x01, C0|C1|C2|C3, "PAPI_br_cn" },   /* br_inst_retired.conditional */ \
 { 0x1d, 0x01, C0|C1|C2|C3, "PAPI_hw_int" },  /* hw_int.rcx		    */ \
 { 0x17, 0x01, C0|C1|C2|C3, "PAPI_tot_iis" }, /* inst_queue_writes	    */ \
@@ -570,7 +570,7 @@ static uint64_t known_ffc_num;
 { 0x85, 0x01, C0|C1|C2|C3, "PAPI_tlb_im" }   /* itlb_misses.any		    */
 
 
-#define	EVENTS_FAM6_MOD26						\
+#define	EVENTS_FAM6_NHM							\
 									\
 { 0x80, 0x04, C0|C1|C2|C3, "l1i.cycles_stalled" },			\
 { 0x80, 0x01, C0|C1|C2|C3, "l1i.hits" },				\
@@ -1018,9 +1018,9 @@ static uint64_t known_ffc_num;
 
 static const struct events_table_t *events_table = NULL;
 
-const struct events_table_t events_fam6_mod26[] = {
-	GENERICEVENTS_FAM6_MOD26,
-	EVENTS_FAM6_MOD26,
+const struct events_table_t events_fam6_nhm[] = {
+	GENERICEVENTS_FAM6_NHM,
+	EVENTS_FAM6_NHM,
 	{ NT_END, 0, 0, "" }
 };
 
@@ -1131,6 +1131,7 @@ core_pcbe_init(void)
 	uint64_t		j;
 	uint64_t		arch_events_vector_length;
 	size_t			arch_events_string_length;
+	uint_t			model;
 
 	if (cpuid_getvendor(CPU) != X86_VENDOR_Intel)
 		return (-1);
@@ -1317,10 +1318,22 @@ core_pcbe_init(void)
 		}
 
 		/* Non-architectural events list */
-		if (cpuid_getmodel(CPU) == 26) {
-			events_table = events_fam6_mod26;
-		} else if (cpuid_getmodel(CPU) == 28) {
-			events_table = events_fam6_mod28;
+		model = cpuid_getmodel(CPU);
+		switch (model) {
+			/* Nehalem */
+			case 26:
+			case 30:
+			case 31:
+			/* Westmere */
+			case 37:
+			case 44:
+			/* Nehalem-EX */
+			case 46:
+				events_table = events_fam6_nhm;
+				break;
+			case 28:
+				events_table = events_fam6_mod28;
+				break;
 		}
 
 		for (i = 0; i < num_gpc; i++) {

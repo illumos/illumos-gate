@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -36,7 +36,15 @@ MODULE		= pcbe.GenuineIntel.6.15
 OBJECTS		= $(CORE_PCBE_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(CORE_PCBE_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(USR_PCBE_DIR)/$(MODULE)
-SOFTLINKS	= pcbe.GenuineIntel.6.23 pcbe.GenuineIntel.6.26 pcbe.GenuineIntel.6.28 pcbe.GenuineIntel.6.29
+SOFTLINKS	= pcbe.GenuineIntel.6.23 \
+			pcbe.GenuineIntel.6.26 \
+			pcbe.GenuineIntel.6.28 \
+			pcbe.GenuineIntel.6.29 \
+			pcbe.GenuineIntel.6.30 \
+			pcbe.GenuineIntel.6.31 \
+			pcbe.GenuineIntel.6.37 \
+			pcbe.GenuineIntel.6.44 \
+			pcbe.GenuineIntel.6.46
 ROOTSOFTLINKS	= $(SOFTLINKS:%=$(USR_PCBE_DIR)/%)
 
 #
