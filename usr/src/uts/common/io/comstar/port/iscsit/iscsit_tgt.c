@@ -765,6 +765,7 @@ iscsit_config_merge_tgt(it_config_t *cfg)
 {
 	it_tgt_t	*cfg_tgt;
 	iscsit_tgt_t	*tgt, *next_tgt;
+	it_cfg_status_t	itrc = ITCFG_SUCCESS;
 
 
 	/*
@@ -801,7 +802,9 @@ iscsit_config_merge_tgt(it_config_t *cfg)
 				return (ITCFG_TGT_CREATE_ERR);
 			avl_add(&iscsit_global.global_target_list, tgt);
 		} else {
-			(void) iscsit_tgt_modify(tgt, cfg_tgt);
+			if (iscsit_tgt_modify(tgt, cfg_tgt) !=
+			    IDM_STATUS_SUCCESS)
+				itrc = ITCFG_MISC_ERR;
 			iscsit_tgt_rele(tgt);
 		}
 	}
@@ -811,7 +814,7 @@ iscsit_config_merge_tgt(it_config_t *cfg)
 	 * and destroy themselves when their associated state machines reach
 	 * the TS_DELETED state and all references are released.
 	 */
-	return (ITCFG_SUCCESS);
+	return (itrc);
 }
 
 iscsit_tgt_t *
@@ -1268,6 +1271,7 @@ iscsit_tgt_merge_tpgt(iscsit_tgt_t *tgt, it_tgt_t *cfg_tgt,
 {
 	iscsit_tpgt_t	*tpgt, *next_tpgt;
 	it_tpgt_t	*cfg_tpgt;
+	idm_status_t	status = IDM_STATUS_SUCCESS;
 
 	/*
 	 * 1. >> Lock <<
@@ -1291,20 +1295,23 @@ iscsit_tgt_merge_tpgt(iscsit_tgt_t *tgt, it_tgt_t *cfg_tgt,
 		}
 	}
 
-	if (cfg_tgt->tgt_tpgt_list == NULL) {
-		tpgt = iscsit_tpgt_create_default();
-		if (tgt->target_state == TS_STMF_ONLINE) {
-			(void) iscsit_tpg_online(tpgt->tpgt_tpg);
-		}
-		avl_add(&tgt->target_tpgt_list, tpgt);
-	} else {
+	if (cfg_tgt->tgt_tpgt_list != NULL) {
 		/* Add currently defined TPGTs */
 		for (cfg_tpgt = cfg_tgt->tgt_tpgt_list;
 		    cfg_tpgt != NULL;
 		    cfg_tpgt = cfg_tpgt->tpgt_next) {
 			tpgt = iscsit_tpgt_create(cfg_tpgt);
-			if (tpgt == NULL)
-				goto tpgt_merge_error;
+			if (tpgt == NULL) {
+				/*
+				 * There is a problem in the configuration we
+				 * received from the ioctl -- a missing tpg.
+				 * All the unbind operations have already
+				 * taken place.  To leave the system in a
+				 * non-panic'd state, use the default tpgt.
+				 */
+				status = IDM_STATUS_FAIL;
+				continue;
+			}
 			if (tgt->target_state == TS_STMF_ONLINE) {
 				(void) iscsit_tpg_online(tpgt->tpgt_tpg);
 			}
@@ -1312,16 +1319,16 @@ iscsit_tgt_merge_tpgt(iscsit_tgt_t *tgt, it_tgt_t *cfg_tgt,
 		}
 	}
 
-	return (IDM_STATUS_SUCCESS);
+	/* If no TPGTs defined, add the default TPGT */
+	if (avl_numnodes(&tgt->target_tpgt_list) == 0) {
+		tpgt = iscsit_tpgt_create_default();
+		if (tgt->target_state == TS_STMF_ONLINE) {
+			(void) iscsit_tpg_online(tpgt->tpgt_tpg);
+		}
+		avl_add(&tgt->target_tpgt_list, tpgt);
+	}
 
-tpgt_merge_error:
-	/*
-	 * This is a problem in configuration we received so it should never
-	 * happen.  That's good because we're probably no longer in a state
-	 * requested by the user -- all the unbind operations have already
-	 * taken place.
-	 */
-	return (IDM_STATUS_FAIL);
+	return (status);
 }
 
 static iscsit_tpgt_t *
