@@ -1667,14 +1667,6 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 				}
 				goto done;
 			}
-
-			/* check to see if we might need charmap */
-			if (exi->exi_export.ex_flags & EX_CHARMAP) {
-				struct sockaddr *ca;
-				ca =  (struct sockaddr *)
-				    svc_getrpccaller(req->rq_xprt)->buf;
-				(void) nfscmd_charmap(exi, ca);
-			}
 		}
 	} else
 		cr = NULL;

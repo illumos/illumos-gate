@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,7 +76,6 @@ typedef struct nfscmd_res {
 #define	NFSCMD_CONV_OUTBOUND	0
 
 extern int nfscmd_send(nfscmd_arg_t *, nfscmd_res_t *);
-extern int nfscmd_charmap(struct exportinfo *, struct sockaddr *);
 extern struct charset_cache *nfscmd_findmap(struct exportinfo *,
     struct sockaddr *);
 extern char *nfscmd_convname(struct sockaddr *, struct exportinfo *,

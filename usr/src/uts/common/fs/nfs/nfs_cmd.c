@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +48,10 @@
 kmutex_t	nfscmd_lock;
 door_handle_t   nfscmd_dh;
 
+static struct charset_cache *nfscmd_charmap(exportinfo_t *exi,
+    struct sockaddr *sp);
+
+
 void
 nfscmd_args(uint_t did)
 {
@@ -72,11 +76,10 @@ nfscmd_fini(void)
 /*
  * nfscmd_send(arg, result)
  *
- * Send a command to the daemon listening on the door.
- * The result is returned in the result pointer if the function
- * value is zero. If non-zero, it is the error value.
+ * Send a command to the daemon listening on the door. The result is
+ * returned in the result pointer if the function return value is
+ * NFSCMD_ERR_SUCCESS. Otherwise it is the error value.
  */
-
 int
 nfscmd_send(nfscmd_arg_t *arg, nfscmd_res_t *res)
 {
@@ -184,21 +187,41 @@ retry:
 		res->error = NFSCMD_ERR_FAIL;
 		break;
 	}
-	return (0);
+	return (res->error);
 }
 
 /*
  * nfscmd_findmap(export, addr)
  *
- * Find a characterset map, if there is one, for the specified client
- * address.
+ * Find a characterset map for the specified client address.
+ * First try to find a cached entry. If not successful,
+ * ask mountd daemon running in userland.
+ *
+ * For most of the clients this function is NOOP, since
+ * EX_CHARMAP flag won't be set.
  */
 struct charset_cache *
 nfscmd_findmap(struct exportinfo *exi, struct sockaddr *sp)
 {
 	struct charset_cache *charset;
 
+	/*
+	 * In debug kernel we want to know about strayed nulls.
+	 * In non-debug kernel we behave gracefully.
+	 */
+	ASSERT(exi != NULL);
+	ASSERT(sp != NULL);
+
+	if (exi == NULL || sp == NULL)
+		return (NULL);
+
 	mutex_enter(&exi->exi_lock);
+
+	if (!(exi->exi_export.ex_flags & EX_CHARMAP)) {
+		mutex_exit(&exi->exi_lock);
+		return (NULL);
+	}
+
 	for (charset = exi->exi_charset;
 	    charset != NULL;
 	    charset = charset->next) {
@@ -207,6 +230,11 @@ nfscmd_findmap(struct exportinfo *exi, struct sockaddr *sp)
 			break;
 	}
 	mutex_exit(&exi->exi_lock);
+
+	/* the slooow way - ask daemon */
+	if (charset == NULL)
+		charset = nfscmd_charmap(exi, sp);
+
 	return (charset);
 }
 
@@ -244,52 +272,40 @@ nfscmd_insert_charmap(struct exportinfo *exi, struct sockaddr *sp, char *name)
 /*
  * nfscmd_charmap(response, sp, exi)
  *
- * Check to see if this client needs a character set conversion. Note
- * that the majority of clients will never have this set so it is
- * important to not do excessive lookups when there isn't a mapping.
+ * Check to see if this client needs a character set conversion.
  */
-
-int
-nfscmd_charmap(struct exportinfo *exi, struct sockaddr *sp)
+static struct charset_cache *
+nfscmd_charmap(exportinfo_t *exi, struct sockaddr *sp)
 {
 	nfscmd_arg_t req;
-	int ret = NFSCMD_ERR_BADCMD;
-	char *path = NULL;
+	int ret;
+	char *path;
 	nfscmd_res_t res;
-	struct charset_cache *charset = NULL;
+	struct charset_cache *charset;
 
-	if (exi != NULL)
-		path = exi->exi_export.ex_path;
+	path = exi->exi_export.ex_path;
+	if (path == NULL)
+		return (NULL);
 
-	if (path != NULL && sp != NULL) {
-		/*
-		 * First check to see if charset has been cached for
-		 * this client.
-		 */
-		charset = nfscmd_findmap(exi, sp);
-		if (charset == NULL) {
-			/*
-			 * Didn't find one so make the request to the
-			 * daemon. We need to add the entry in either
-			 * case since we want negative as well as
-			 * positive cacheing.
-			 */
-			req.cmd = NFSCMD_CHARMAP_LOOKUP;
-			req.version = NFSCMD_VERSION;
-			req.arg.charmap.addr = *sp;
-			(void) strncpy(req.arg.charmap.path, path, MAXPATHLEN);
-			bzero((caddr_t)&res, sizeof (nfscmd_res_t));
-			ret = nfscmd_send(&req, &res);
-			if (ret == NFSCMD_ERR_SUCCESS)
-				charset = nfscmd_insert_charmap(exi, sp,
-				    res.result.charmap.codeset);
-			else
-				charset = nfscmd_insert_charmap(exi, sp, NULL);
-		}
-		if (charset != NULL)
-			ret = NFSCMD_ERR_SUCCESS;
-	}
-	return (ret);
+	/*
+	 * nfscmd_findmap() did not find one in the cache so make
+	 * the request to the daemon. We need to add the entry in
+	 * either case since we want negative as well as
+	 * positive cacheing.
+	 */
+	req.cmd = NFSCMD_CHARMAP_LOOKUP;
+	req.version = NFSCMD_VERSION;
+	req.arg.charmap.addr = *sp;
+	(void) strncpy(req.arg.charmap.path, path, MAXPATHLEN);
+	bzero((caddr_t)&res, sizeof (nfscmd_res_t));
+	ret = nfscmd_send(&req, &res);
+	if (ret == NFSCMD_ERR_SUCCESS)
+		charset = nfscmd_insert_charmap(exi, sp,
+		    res.result.charmap.codeset);
+	else
+		charset = nfscmd_insert_charmap(exi, sp, NULL);
+
+	return (charset);
 }
 
 /*
@@ -298,6 +314,10 @@ nfscmd_charmap(struct exportinfo *exi, struct sockaddr *sp)
  * Convert the given "name" string to the appropriate character set.
  * If inbound is true, convert from the client character set to UTF-8.
  * If inbound is false, convert from UTF-8 to the client characters set.
+ *
+ * In case of NFS v4 this is used for ill behaved clients, since
+ * according to the standard all file names should be utf-8 encoded
+ * on client-side.
  */
 
 char *
@@ -313,7 +333,9 @@ nfscmd_convname(struct sockaddr *ca, struct exportinfo *exi, char *name,
 	struct charset_cache *charset = NULL;
 
 	charset = nfscmd_findmap(exi, ca);
-	if (charset == NULL)
+	if (charset == NULL ||
+	    (charset->inbound == NULL && inbound) ||
+	    (charset->outbound == NULL && !inbound))
 		return (name);
 
 	/* make sure we have more than enough space */

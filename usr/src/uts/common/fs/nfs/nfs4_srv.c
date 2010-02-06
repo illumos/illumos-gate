@@ -1176,7 +1176,6 @@ rfs4_op_secinfo(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		kmem_free(nm, len);
 		goto out;
 	}
-	/* If necessary, convert to UTF-8 for illbehaved clients */
 
 	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
 	name = nfscmd_convname(ca, cs->exi, nm, NFSCMD_CONV_INBOUND,
@@ -1600,7 +1599,6 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		goto out;
 	}
 
-	/* If necessary, convert to UTF-8 for poorly behaved clients */
 	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
 	name = nfscmd_convname(ca, cs->exi, nm, NFSCMD_CONV_INBOUND,
 	    MAXPATHLEN  + 1);
@@ -2600,8 +2598,7 @@ out:
 
 /* ARGSUSED */
 static nfsstat4
-do_rfs4_op_lookup(char *nm, uint_t buflen, struct svc_req *req,
-    struct compound_state *cs)
+do_rfs4_op_lookup(char *nm, struct svc_req *req, struct compound_state *cs)
 {
 	int error;
 	int different_export = 0;
@@ -2926,8 +2923,6 @@ rfs4_op_lookup(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		goto out;
 	}
 
-	/* If necessary, convert to UTF-8 for illbehaved clients */
-
 	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
 	name = nfscmd_convname(ca, cs->exi, nm, NFSCMD_CONV_INBOUND,
 	    MAXPATHLEN  + 1);
@@ -2938,7 +2933,7 @@ rfs4_op_lookup(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		goto out;
 	}
 
-	*cs->statusp = resp->status = do_rfs4_op_lookup(name, len, req, cs);
+	*cs->statusp = resp->status = do_rfs4_op_lookup(name, req, cs);
 
 	if (name != nm)
 		kmem_free(name, MAXPATHLEN + 1);
@@ -2968,7 +2963,7 @@ rfs4_op_lookupp(nfs_argop4 *args, nfs_resop4 *resop, struct svc_req *req,
 		goto out;
 	}
 
-	*cs->statusp = resp->status = do_rfs4_op_lookup("..", 3, req, cs);
+	*cs->statusp = resp->status = do_rfs4_op_lookup("..", req, cs);
 
 	/*
 	 * From NFSV4 Specification, LOOKUPP should not check for
@@ -4157,8 +4152,6 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		kmem_free(nm, len);
 		goto out;
 	}
-
-	/* If necessary, convert to UTF-8 for illbehaved clients */
 
 	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
 	name = nfscmd_convname(ca, cs->exi, nm, NFSCMD_CONV_INBOUND,
@@ -6072,6 +6065,8 @@ rfs4_lookup(component4 *component, struct svc_req *req,
 	char *nm;
 	uint32_t len;
 	nfsstat4 status;
+	struct sockaddr *ca;
+	char *name;
 
 	if (cs->vp == NULL) {
 		return (NFS4ERR_NOFILEHANDLE);
@@ -6093,7 +6088,19 @@ rfs4_lookup(component4 *component, struct svc_req *req,
 		return (NFS4ERR_NAMETOOLONG);
 	}
 
-	status = do_rfs4_op_lookup(nm, len, req, cs);
+	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
+	name = nfscmd_convname(ca, cs->exi, nm, NFSCMD_CONV_INBOUND,
+	    MAXPATHLEN + 1);
+
+	if (name == NULL) {
+		kmem_free(nm, len);
+		return (NFS4ERR_INVAL);
+	}
+
+	status = do_rfs4_op_lookup(name, req, cs);
+
+	if (name != nm)
+		kmem_free(name, MAXPATHLEN + 1);
 
 	kmem_free(nm, len);
 
@@ -6469,8 +6476,6 @@ rfs4_createfile(OPEN4args *args, struct svc_req *req, struct compound_state *cs,
 		*attrset = FATTR4_TIME_MODIFY_MASK;
 		break;
 	}
-
-	/* If necessary, convert to UTF-8 for illbehaved clients */
 
 	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
 	name = nfscmd_convname(ca, cs->exi, nm, NFSCMD_CONV_INBOUND,

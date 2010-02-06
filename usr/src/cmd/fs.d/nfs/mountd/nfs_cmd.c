@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -157,7 +157,7 @@ charmap_search(struct netbuf *nbuf, char *opts)
 			cp = strchr(name, '=');
 			if (cp != NULL)
 				*cp = '\0';
-			if (in_access_list(nbuf,  hl, val)) {
+			if (in_access_list(NULL, nbuf, &hl, val)) {
 				result = name;
 				break;
 			}
