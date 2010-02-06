@@ -1300,6 +1300,7 @@ f none usr/share/lib/zoneinfo/America/Managua 644 root bin
 f none usr/share/lib/zoneinfo/America/Manaus 644 root bin
 l none usr/share/lib/zoneinfo/America/Marigot=../../../../../usr/share/lib/zoneinfo/America/Guadeloupe
 f none usr/share/lib/zoneinfo/America/Martinique 644 root bin
+f none usr/share/lib/zoneinfo/America/Matamoros 644 root bin
 f none usr/share/lib/zoneinfo/America/Mazatlan 644 root bin
 l none usr/share/lib/zoneinfo/America/Mendoza=../../../../../usr/share/lib/zoneinfo/America/Argentina/Mendoza
 f none usr/share/lib/zoneinfo/America/Menominee 644 root bin
@@ -1319,6 +1320,7 @@ f none usr/share/lib/zoneinfo/America/Noronha 644 root bin
 d none usr/share/lib/zoneinfo/America/North_Dakota 755 root bin
 f none usr/share/lib/zoneinfo/America/North_Dakota/Center 644 root bin
 f none usr/share/lib/zoneinfo/America/North_Dakota/New_Salem 644 root bin
+f none usr/share/lib/zoneinfo/America/Ojinaga 644 root bin
 f none usr/share/lib/zoneinfo/America/Panama 644 root bin
 f none usr/share/lib/zoneinfo/America/Pangnirtung 644 root bin
 f none usr/share/lib/zoneinfo/America/Paramaribo 644 root bin
@@ -1335,6 +1337,7 @@ f none usr/share/lib/zoneinfo/America/Regina 644 root bin
 f none usr/share/lib/zoneinfo/America/Resolute 644 root bin
 f none usr/share/lib/zoneinfo/America/Rio_Branco 644 root bin
 l none usr/share/lib/zoneinfo/America/Rosario=../../../../../usr/share/lib/zoneinfo/America/Argentina/Cordoba
+f none usr/share/lib/zoneinfo/America/Santa_Isabel 644 root bin
 f none usr/share/lib/zoneinfo/America/Santarem 644 root bin
 f none usr/share/lib/zoneinfo/America/Santiago 644 root bin
 f none usr/share/lib/zoneinfo/America/Santo_Domingo 644 root bin
