@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"@(#)smb_cfg.c	1.5	08/07/08 SMI"
 
 /*
  * CIFS configuration management library
@@ -355,6 +353,8 @@ smb_config_getstr(smb_cfg_id_t id, char *cbuf, int bufsz)
 	smb_cfg_param_t *cfg;
 	int rc = SMBD_SMF_OK;
 	char *pg;
+	char protbuf[SMB_ENC_LEN];
+	char *tmp;
 
 	*cbuf = '\0';
 	cfg = smb_config_getent(id);
@@ -365,9 +365,6 @@ smb_config_getstr(smb_cfg_id_t id, char *cbuf, int bufsz)
 		return (SMBD_SMF_SYSTEM_ERR);
 
 	if (cfg->sc_flags & SMB_CF_PROTECTED) {
-		char protbuf[SMB_ENC_LEN];
-		char *tmp;
-
 		if ((rc = smb_smf_create_service_pgroup(handle,
 		    SMBD_PROTECTED_PG_NAME)) != SMBD_SMF_OK)
 			goto error;
@@ -395,11 +392,20 @@ error:
 	return (rc);
 }
 
+/*
+ * Translate the value of an astring SMF property into a binary
+ * IP address. If the value is neither a valid IPv4 nor IPv6
+ * address, attempt to look it up as a hostname using the
+ * configured address type.
+ */
 int
 smb_config_getip(smb_cfg_id_t sc_id, smb_inaddr_t *ipaddr)
 {
-	int rc;
-	char ipstr[INET6_ADDRSTRLEN];
+	int rc, error;
+	int a_family;
+	char ipstr[MAXHOSTNAMELEN];
+	struct hostent *h;
+	smb_cfg_param_t *cfg;
 
 	if (ipaddr == NULL)
 		return (SMBD_SMF_INVALID_ARG);
@@ -407,6 +413,9 @@ smb_config_getip(smb_cfg_id_t sc_id, smb_inaddr_t *ipaddr)
 	bzero(ipaddr, sizeof (smb_inaddr_t));
 	rc = smb_config_getstr(sc_id, ipstr, sizeof (ipstr));
 	if (rc == SMBD_SMF_OK) {
+		if (*ipstr == '\0')
+			return (SMBD_SMF_INVALID_ARG);
+
 		if (inet_pton(AF_INET, ipstr, &ipaddr->a_ipv4) == 1) {
 			ipaddr->a_family = AF_INET;
 			return (SMBD_SMF_OK);
@@ -414,8 +423,28 @@ smb_config_getip(smb_cfg_id_t sc_id, smb_inaddr_t *ipaddr)
 
 		if (inet_pton(AF_INET6, ipstr, &ipaddr->a_ipv6) == 1) {
 			ipaddr->a_family = AF_INET6;
+			return (SMBD_SMF_OK);
+		}
+
+		/*
+		 * The value is neither an IPv4 nor IPv6 address;
+		 * so check if it's a hostname.
+		 */
+		a_family = smb_config_getbool(SMB_CI_IPV6_ENABLE) ?
+		    AF_INET6 : AF_INET;
+		h = getipnodebyname(ipstr, a_family, AI_DEFAULT,
+		    &error);
+		if (h != NULL) {
+			bcopy(*(h->h_addr_list), &ipaddr->a_ip,
+			    h->h_length);
+			ipaddr->a_family = a_family;
+			freehostent(h);
 			rc = SMBD_SMF_OK;
 		} else {
+			cfg = smb_config_getent(sc_id);
+			syslog(LOG_ERR, "smbd/%s: %s unable to get %s "
+			    "address: %d", cfg->sc_name, ipstr,
+			    a_family == AF_INET ?  "IPv4" : "IPv6", error);
 			rc = SMBD_SMF_INVALID_ARG;
 		}
 	}

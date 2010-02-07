@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@
 #include <err.h>
 #include <ctype.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <syslog.h>
 #include <strings.h>
@@ -38,10 +39,17 @@
 #include <getopt.h>
 #include <libintl.h>
 #include <zone.h>
+#include <pwd.h>
 #include <grp.h>
 #include <libgen.h>
 #include <netinet/in.h>
+#include <auth_attr.h>
+#include <locale.h>
 #include <smbsrv/libsmb.h>
+
+#if !defined(TEXT_DOMAIN)
+#define	TEXT_DOMAIN "SYS_TEST"
+#endif
 
 typedef enum {
 	HELP_ADD_MEMBER,
@@ -58,6 +66,7 @@ typedef enum {
 	HELP_USER_ENABLE
 } smbadm_help_t;
 
+#define	SMBADM_CMDF_NONE	0x00
 #define	SMBADM_CMDF_USER	0x01
 #define	SMBADM_CMDF_GROUP	0x02
 #define	SMBADM_CMDF_TYPEMASK	0x0F
@@ -69,10 +78,17 @@ typedef struct smbadm_cmdinfo {
 	int (*func)(int, char **);
 	smbadm_help_t usage;
 	uint32_t flags;
+	char *auth;
 } smbadm_cmdinfo_t;
 
 smbadm_cmdinfo_t *curcmd;
 static char *progname;
+
+#define	SMBADM_ACTION_AUTH	"solaris.smf.manage.smb"
+#define	SMBADM_VALUE_AUTH	"solaris.smf.value.smb"
+#define	SMBADM_BASIC_AUTH	"solaris.network.hosts.read"
+
+static boolean_t smbadm_checkauth(const char *);
 
 static void smbadm_usage(boolean_t);
 static int smbadm_join_workgroup(const char *);
@@ -96,27 +112,29 @@ static int smbadm_user_enable(int, char **);
 static smbadm_cmdinfo_t smbadm_cmdtable[] =
 {
 	{ "add-member",		smbadm_group_addmember,	HELP_ADD_MEMBER,
-	SMBADM_CMDF_GROUP },
+		SMBADM_CMDF_GROUP,	SMBADM_ACTION_AUTH },
 	{ "create",		smbadm_group_create,	HELP_CREATE,
-	SMBADM_CMDF_GROUP },
+		SMBADM_CMDF_GROUP,	SMBADM_ACTION_AUTH },
 	{ "delete",		smbadm_group_delete,	HELP_DELETE,
-	SMBADM_CMDF_GROUP },
+		SMBADM_CMDF_GROUP,	SMBADM_ACTION_AUTH },
 	{ "disable-user",	smbadm_user_disable,	HELP_USER_DISABLE,
-	SMBADM_CMDF_USER },
+		SMBADM_CMDF_USER,	SMBADM_ACTION_AUTH },
 	{ "enable-user",	smbadm_user_enable,	HELP_USER_ENABLE,
-	SMBADM_CMDF_USER },
+		SMBADM_CMDF_USER,	SMBADM_ACTION_AUTH },
 	{ "get",		smbadm_group_getprop,	HELP_GET,
-	SMBADM_CMDF_GROUP },
-	{ "join",		smbadm_join,		HELP_JOIN,	0 },
-	{ "list",		smbadm_list,		HELP_LIST,	0 },
+		SMBADM_CMDF_GROUP,	SMBADM_ACTION_AUTH },
+	{ "join",		smbadm_join,		HELP_JOIN,
+		SMBADM_CMDF_NONE,	SMBADM_VALUE_AUTH },
+	{ "list",		smbadm_list,		HELP_LIST,
+		SMBADM_CMDF_NONE,	SMBADM_BASIC_AUTH },
 	{ "remove-member",	smbadm_group_delmember,	HELP_DEL_MEMBER,
-	SMBADM_CMDF_GROUP },
+		SMBADM_CMDF_GROUP,	SMBADM_ACTION_AUTH },
 	{ "rename",		smbadm_group_rename,	HELP_RENAME,
-	SMBADM_CMDF_GROUP },
+		SMBADM_CMDF_GROUP,	SMBADM_ACTION_AUTH },
 	{ "set",		smbadm_group_setprop,	HELP_SET,
-	SMBADM_CMDF_GROUP },
+		SMBADM_CMDF_GROUP,	SMBADM_ACTION_AUTH },
 	{ "show",		smbadm_group_show,	HELP_SHOW,
-	SMBADM_CMDF_GROUP },
+		SMBADM_CMDF_GROUP,	SMBADM_ACTION_AUTH },
 };
 
 #define	SMBADM_NCMD	(sizeof (smbadm_cmdtable) / sizeof (smbadm_cmdtable[0]))
@@ -741,11 +759,10 @@ smbadm_group_create(int argc, char **argv)
 	status = smb_lgrp_add(gname, desc);
 	if (status != SMB_LGRP_SUCCESS) {
 		(void) fprintf(stderr,
-		    gettext("failed to create the group (%s)\n"),
+		    gettext("failed to create %s (%s)\n"), gname,
 		    smb_lgrp_strerror(status));
 	} else {
-		(void) printf(gettext("'%s' created.\n"),
-		    gname);
+		(void) printf(gettext("%s created\n"), gname);
 	}
 
 	return (status);
@@ -945,7 +962,7 @@ smbadm_group_delete(int argc, char **argv)
 		    gettext("failed to delete %s (%s)\n"), gname,
 		    smb_lgrp_strerror(status));
 	} else {
-		(void) printf(gettext("%s deleted.\n"), gname);
+		(void) printf(gettext("%s deleted\n"), gname);
 	}
 
 	return (status);
@@ -1349,6 +1366,9 @@ main(int argc, char **argv)
 	int ret;
 	int i;
 
+	(void) setlocale(LC_ALL, "");
+	(void) textdomain(TEXT_DOMAIN);
+
 	(void) malloc(0);	/* satisfy libumem dependency */
 
 	progname = basename(argv[0]);
@@ -1387,6 +1407,13 @@ main(int argc, char **argv)
 				    strcmp(argv[2], "--help") == 0 ||
 				    strcmp(argv[2], "-h") == 0)
 					smbadm_usage(B_TRUE);
+			}
+
+			if (!smbadm_checkauth(curcmd->auth)) {
+				(void) fprintf(stderr,
+				    gettext("%s: %s: authorization denied\n"),
+				    progname, curcmd->name);
+				return (1);
 			}
 
 			if ((ret = smbadm_init()) != 0)
@@ -1454,6 +1481,20 @@ smbadm_fini(void)
 	default:
 		break;
 	}
+}
+
+static boolean_t
+smbadm_checkauth(const char *auth)
+{
+	struct passwd *pw;
+
+	if ((pw = getpwuid(getuid())) == NULL)
+		return (B_FALSE);
+
+	if (chkauthattr(auth, pw->pw_name) == 0)
+		return (B_FALSE);
+
+	return (B_TRUE);
 }
 
 static boolean_t

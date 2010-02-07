@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -251,6 +251,8 @@ smb_lgrp_add(char *gname, char *cmnt)
 		smb_lgrp_set_default_privs(&grp);
 	}
 
+	if (smb_lgrp_exists(grp.sg_name))
+		return (SMB_LGRP_EXISTS);
 
 	grp.sg_attr = SE_GROUP_MANDATORY | SE_GROUP_ENABLED_BY_DEFAULT |
 	    SE_GROUP_ENABLED;
@@ -318,6 +320,10 @@ smb_lgrp_delete(char *gname)
 	/* Cannot remove a built-in group */
 	if (smb_wka_lookup_name(gname) != NULL)
 		return (SMB_LGRP_WKSID);
+
+
+	if (!smb_lgrp_exists(gname))
+		return (SMB_LGRP_NOT_FOUND);
 
 	db = smb_lgrp_db_open(SMB_LGRP_DB_ORW);
 	rc = smb_lgrp_gtbl_delete(db, gname);

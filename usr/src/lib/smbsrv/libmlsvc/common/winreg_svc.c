@@ -638,11 +638,12 @@ winreg_s_FlushKey(void *arg, ndr_xa_t *mxa)
 static int
 winreg_s_GetKeySec(void *arg, ndr_xa_t *mxa)
 {
-	struct winreg_GetKeySec *param = arg;
-	struct winreg_value	*sd_buf;
-	smb_sd_t		sd;
-	uint32_t		sd_len;
-	uint32_t		status;
+	static struct winreg_secdesc	error_sd;
+	struct winreg_GetKeySec		*param = arg;
+	struct winreg_value		*sd_buf;
+	smb_sd_t			sd;
+	uint32_t			sd_len;
+	uint32_t			status;
 
 	bzero(&sd, sizeof (smb_sd_t));
 
@@ -650,17 +651,16 @@ winreg_s_GetKeySec(void *arg, ndr_xa_t *mxa)
 		goto winreg_getkeysec_error;
 
 	sd_len = smb_sd_len(&sd, SMB_ALL_SECINFO);
+	sd_buf = NDR_MALLOC(mxa, sd_len + sizeof (struct winreg_value));
 
 	param->sd = NDR_MALLOC(mxa, sizeof (struct winreg_secdesc));
-	if (param->sd == NULL) {
+	if ((param->sd == NULL) || (sd_buf == NULL)) {
 		status = ERROR_NOT_ENOUGH_MEMORY;
 		goto winreg_getkeysec_error;
 	}
 
 	param->sd->sd_len = sd_len;
 	param->sd->sd_size = sd_len;
-
-	sd_buf = NDR_MALLOC(mxa, sd_len + sizeof (struct winreg_value));
 	param->sd->sd_buf = sd_buf;
 
 	sd_buf->vc_first_is = 0;
@@ -673,6 +673,7 @@ winreg_s_GetKeySec(void *arg, ndr_xa_t *mxa)
 winreg_getkeysec_error:
 	smb_sd_term(&sd);
 	bzero(param, sizeof (struct winreg_GetKeySec));
+	param->sd = &error_sd;
 	param->status = status;
 	return (NDR_DRC_OK);
 }

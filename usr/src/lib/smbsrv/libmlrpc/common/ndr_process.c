@@ -695,7 +695,10 @@ ndr_outer_fixed(ndr_ref_t *outer_ref)
 	switch (nds->m_op) {
 	case NDR_M_OP_MARSHALL:
 		valp = outer_ref->datum;
-		assert(valp);
+		if (!valp) {
+			NDR_SET_ERROR(outer_ref, NDR_ERR_OUTER_PARAMS_BAD);
+			return (0);
+		}
 		if (outer_ref->backptr)
 			assert(valp == *outer_ref->backptr);
 		break;
@@ -782,7 +785,10 @@ ndr_outer_fixed_array(ndr_ref_t *outer_ref)
 	switch (nds->m_op) {
 	case NDR_M_OP_MARSHALL:
 		valp = outer_ref->datum;
-		assert(valp);
+		if (!valp) {
+			NDR_SET_ERROR(outer_ref, NDR_ERR_OUTER_PARAMS_BAD);
+			return (0);
+		}
 		if (outer_ref->backptr)
 			assert(valp == *outer_ref->backptr);
 		break;
@@ -877,7 +883,10 @@ ndr_outer_conformant_array(ndr_ref_t *outer_ref)
 			return (0);	/* error already set */
 
 		valp = outer_ref->datum;
-		assert(valp);
+		if (!valp) {
+			NDR_SET_ERROR(outer_ref, NDR_ERR_OUTER_PARAMS_BAD);
+			return (0);
+		}
 		if (outer_ref->backptr)
 			assert(valp == *outer_ref->backptr);
 		n_ptr_offset = 4;
@@ -1006,7 +1015,10 @@ ndr_outer_conformant_construct(ndr_ref_t *outer_ref)
 			return (0);	/* error already set */
 
 		valp = outer_ref->datum;
-		assert(valp);
+		if (!valp) {
+			NDR_SET_ERROR(outer_ref, NDR_ERR_OUTER_PARAMS_BAD);
+			return (0);
+		}
 		if (outer_ref->backptr)
 			assert(valp == *outer_ref->backptr);
 		break;
@@ -1187,7 +1199,10 @@ ndr_outer_string(ndr_ref_t *outer_ref)
 	switch (nds->m_op) {
 	case NDR_M_OP_MARSHALL:
 		valp = outer_ref->datum;
-		assert(valp);
+		if (!valp) {
+			NDR_SET_ERROR(outer_ref, NDR_ERR_OUTER_PARAMS_BAD);
+			return (0);
+		}
 
 		if (outer_ref->backptr)
 			assert(valp == *outer_ref->backptr);

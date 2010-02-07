@@ -78,7 +78,7 @@ static int range_check_validator_zero_ok(int, char *);
 static int string_length_check_validator(int, char *);
 static int true_false_validator(int, char *);
 static int ipv4_validator(int, char *);
-static int ip_validator(int, char *);
+static int hostname_validator(int, char *);
 static int path_validator(int, char *);
 static int cmd_validator(int, char *);
 static int disposition_validator(int, char *);
@@ -93,6 +93,7 @@ static void smb_csc_option(const char *, smb_share_t *);
 static char *smb_csc_name(const smb_share_t *);
 static sa_group_t smb_get_defaultgrp(sa_handle_t);
 static int interface_validator(int, char *);
+static int smb_update_optionset_props(sa_handle_t, sa_resource_t, nvlist_t *);
 
 static struct {
 	char *value;
@@ -899,7 +900,7 @@ struct smb_proto_option_defs {
 	{ SMB_CI_RESTRICT_ANON, 0, 0, true_false_validator,
 	    SMB_REFRESH_REFRESH },
 	{ SMB_CI_DOMAIN_SRV, 0, MAX_VALUE_BUFLEN,
-	    ip_validator, SMB_REFRESH_REFRESH },
+	    hostname_validator, SMB_REFRESH_REFRESH },
 	{ SMB_CI_ADS_SITE, 0, MAX_VALUE_BUFLEN,
 	    string_length_check_validator, SMB_REFRESH_REFRESH },
 	{ SMB_CI_DYNDNS_ENABLE, 0, 0, true_false_validator, 0 },
@@ -1012,22 +1013,70 @@ ipv4_validator(int index, char *value)
 }
 
 /*
- * Check IP v4/v6 address.
+ * Check that the specified name is an IP address (v4 or v6) or a hostname.
+ * Per RFC 1035 and 1123, names may contain alphanumeric characters, hyphens
+ * and dots.  The first and last character of a label must be alphanumeric.
+ * Interior characters may be alphanumeric or hypens.
+ *
+ * Domain names should not contain underscores but we allow them because
+ * Windows names are often in non-compliance with this rule.
  */
 /*ARGSUSED*/
 static int
-ip_validator(int index, char *value)
+hostname_validator(int index, char *value)
 {
-	char sbytes[INET6_ADDRSTRLEN];
+	char		sbytes[INET6_ADDRSTRLEN];
+	boolean_t	new_label = B_TRUE;
+	char		*p;
+	char		label_terminator;
+	int		len;
 
 	if (value == NULL)
 		return (SA_OK);
 
-	if (strlen(value) == 0)
+	if ((len = strlen(value)) == 0)
 		return (SA_OK);
 
-	if (inet_pton(AF_INET, value, (void *)sbytes) != 1 &&
-	    inet_pton(AF_INET6, value, (void *)sbytes) != 1)
+	if (inet_pton(AF_INET, value, (void *)sbytes) == 1)
+		return (SA_OK);
+
+	if (inet_pton(AF_INET6, value, (void *)sbytes) == 1)
+		return (SA_OK);
+
+	if (len >= MAXHOSTNAMELEN)
+		return (SA_BAD_VALUE);
+
+	if (strspn(value, "0123456789.") == len)
+		return (SA_BAD_VALUE);
+
+	label_terminator = *value;
+
+	for (p = value; *p != '\0'; ++p) {
+		if (new_label) {
+			if (!isalnum(*p))
+				return (SA_BAD_VALUE);
+			new_label = B_FALSE;
+			label_terminator = *p;
+			continue;
+		}
+
+		if (*p == '.') {
+			if (!isalnum(label_terminator))
+				return (SA_BAD_VALUE);
+			new_label = B_TRUE;
+			label_terminator = *p;
+			continue;
+		}
+
+		label_terminator = *p;
+
+		if (isalnum(*p) || *p == '-' || *p == '_')
+			continue;
+
+		return (SA_BAD_VALUE);
+	}
+
+	if (!isalnum(label_terminator))
 		return (SA_BAD_VALUE);
 
 	return (SA_OK);
@@ -1525,6 +1574,7 @@ smb_add_transient(sa_handle_t handle, smb_share_t *si)
 	sa_share_t share;
 	sa_group_t group;
 	sa_resource_t resource;
+	nvlist_t *nvl;
 	char *opt;
 
 	if (si == NULL)
@@ -1562,16 +1612,26 @@ smb_add_transient(sa_handle_t handle, smb_share_t *si)
 		(void) sa_set_resource_attr(resource, SHOPT_AD_CONTAINER,
 		    si->shr_container);
 
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0)
+		return (SA_NO_MEMORY);
+
 	if ((opt = smb_csc_name(si)) != NULL)
-		(void) sa_set_resource_attr(resource, SHOPT_CSC, opt);
+		err |= nvlist_add_string(nvl, SHOPT_CSC, opt);
 
 	opt = (si->shr_flags & SMB_SHRF_ABE) ? "true" : "false";
-	(void) sa_set_resource_attr(resource, SHOPT_ABE, opt);
+	err |= nvlist_add_string(nvl, SHOPT_ABE, opt);
 
 	opt = (si->shr_flags & SMB_SHRF_GUEST_OK) ? "true" : "false";
-	(void) sa_set_resource_attr(resource, SHOPT_GUEST, opt);
+	err |= nvlist_add_string(nvl, SHOPT_GUEST, opt);
+	if (err) {
+		nvlist_free(nvl);
+		return (SA_CONFIG_ERR);
+	}
 
-	return (SA_OK);
+	err = smb_update_optionset_props(handle, resource, nvl);
+
+	nvlist_free(nvl);
+	return (err);
 }
 
 /*
@@ -2296,4 +2356,64 @@ disposition_validator(int index, char *value)
 		return (SA_OK);
 
 	return (SA_BAD_VALUE);
+}
+
+/*
+ * Updates the optionset properties of the share resource.
+ * The properties are given as a list of name-value pair.
+ * The name argument should be the optionset property name and the value
+ * should be a valid value for the specified property.
+ */
+static int
+smb_update_optionset_props(sa_handle_t handle, sa_resource_t resource,
+    nvlist_t *nvl)
+{
+	sa_property_t prop;
+	sa_optionset_t opts;
+	int err = SA_OK;
+	nvpair_t *cur;
+	char *name, *val;
+
+	if ((opts = sa_get_optionset(resource, SMB_PROTOCOL_NAME)) == NULL) {
+		opts = sa_create_optionset(resource, SMB_PROTOCOL_NAME);
+		if (opts == NULL)
+			return (SA_CONFIG_ERR);
+	}
+
+	cur = nvlist_next_nvpair(nvl, NULL);
+	while (cur != NULL) {
+		name = nvpair_name(cur);
+		err = nvpair_value_string(cur, &val);
+		if ((err != 0) || (name == NULL) || (val == NULL)) {
+			err = SA_CONFIG_ERR;
+			break;
+		}
+
+		prop = NULL;
+		if ((prop = sa_get_property(opts, name)) == NULL) {
+			prop = sa_create_property(name, val);
+			if (prop != NULL) {
+				err = sa_valid_property(handle, opts,
+				    SMB_PROTOCOL_NAME, prop);
+				if (err != SA_OK) {
+					(void) sa_remove_property(prop);
+					break;
+				}
+			}
+			err = sa_add_property(opts, prop);
+			if (err != SA_OK)
+				break;
+		} else {
+			err = sa_update_property(prop, val);
+			if (err != SA_OK)
+				break;
+		}
+
+		cur = nvlist_next_nvpair(nvl, cur);
+	}
+
+	if (err == SA_OK)
+		err = sa_commit_properties(opts, 0);
+
+	return (err);
 }

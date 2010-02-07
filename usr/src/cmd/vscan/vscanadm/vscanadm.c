@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 #include <stdio.h>
@@ -38,7 +37,12 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <libintl.h>
+#include <locale.h>
 #include <libvscan.h>
+
+#if !defined(TEXT_DOMAIN)
+#define	TEXT_DOMAIN "SYS_TEST"
+#endif
 
 
 /* Property Names */
@@ -238,6 +242,9 @@ main(int argc, char **argv)
 	const vs_adm_cmd_t *cp;
 	const char *p;
 	int i, err;
+
+	(void) setlocale(LC_ALL, "");
+	(void) textdomain(TEXT_DOMAIN);
 
 	/* executable and subcommand names */
 	if ((p = strrchr(argv[0], '/')) == NULL)

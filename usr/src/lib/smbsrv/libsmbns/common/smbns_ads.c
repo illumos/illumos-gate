@@ -52,6 +52,9 @@
 #include <smbns_dyndns.h>
 #include <smbns_krb.h>
 
+#define	SMB_ADS_AF_UNKNOWN(x)	(((x)->ipaddr.a_family != AF_INET) && \
+	((x)->ipaddr.a_family != AF_INET6))
+
 #define	SMB_ADS_MAXBUFLEN 100
 #define	SMB_ADS_DN_MAX	300
 #define	SMB_ADS_MAXMSGLEN 512
@@ -811,6 +814,32 @@ smb_ads_getipnodebyname(smb_ads_host_info_t *hentry)
 }
 
 /*
+ *  Checks the IP address to see if it is zero.  If so, then do a host
+ *  lookup by hostname to get the IP address based on the IP family.
+ *
+ *  If the family is unknown then do a lookup by hostame based on the
+ *  setting of the SMB_CI_IPV6_ENABLE property.
+ */
+static int
+smb_ads_set_ipaddr(smb_ads_host_info_t *hentry)
+{
+	if (smb_inet_iszero(&hentry->ipaddr)) {
+		if (smb_ads_getipnodebyname(hentry) < 0)
+			return (-1);
+	} else if (SMB_ADS_AF_UNKNOWN(hentry)) {
+		hentry->ipaddr.a_family =
+		    smb_config_getbool(SMB_CI_IPV6_ENABLE) ? AF_INET6 : AF_INET;
+
+		if (smb_ads_getipnodebyname(hentry) < 0) {
+			hentry->ipaddr.a_family = 0;
+			return (-1);
+		}
+	}
+
+	return (0);
+}
+
+/*
  * smb_ads_find_host
  *
  * Finds an ADS host in a given domain.
@@ -886,11 +915,8 @@ smb_ads_find_host(char *domain, char *kpasswd_srv)
 		return (NULL);
 
 	for (i = 0, hlistp = hlist->ah_list; i < hlist->ah_cnt; i++) {
-		/* Do a host lookup by hostname to get the IP address */
-		if (smb_inet_iszero(&hlistp[i].ipaddr)) {
-			if (smb_ads_getipnodebyname(&hlistp[i]) < 0)
-				continue;
-		}
+		if (smb_ads_set_ipaddr(&hlistp[i]) < 0)
+			continue;
 
 		if (smb_ads_is_sought_host(&hlistp[i], kpasswd_srv))
 			found_kpasswd_srv = &hlistp[i];
@@ -921,11 +947,8 @@ smb_ads_find_host(char *domain, char *kpasswd_srv)
 			hlist = hlist2;
 			hlistp = hlist->ah_list;
 
-			for (i = 0; i < hlist->ah_cnt; i++) {
-				if (smb_inet_iszero(&hlistp[i].ipaddr) &&
-				    smb_ads_getipnodebyname(&hlistp[i]) < 0)
-						continue;
-			}
+			for (i = 0; i < hlist->ah_cnt; i++)
+				(void) smb_ads_set_ipaddr(&hlistp[i]);
 		}
 	}
 

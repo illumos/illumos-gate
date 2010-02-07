@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -683,6 +683,7 @@ MSGSUBDIRS=		\
 	sgs		\
 	sh		\
 	shcomp		\
+	smbsrv		\
 	sort		\
 	split		\
 	ssh		\
@@ -719,6 +720,7 @@ MSGSUBDIRS=		\
 	volcheck	\
 	volrmmount	\
 	vrrpadm		\
+	vscan		\
 	w		\
 	wbem		\
 	who		\

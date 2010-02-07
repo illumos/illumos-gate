@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -381,6 +381,8 @@ smb_pwd_num(void)
 {
 	if (smb_pwd_ops.pwop_num != NULL)
 		return (smb_pwd_ops.pwop_num());
+
+	smb_lucache_update();
 
 	return (smb_lucache_num());
 }
@@ -777,7 +779,7 @@ smb_pwd_lock(void)
 }
 
 /*
- * smb_pwd_lock
+ * smb_pwd_unlock
  *
  * A wrapper around smb_pwd_fulck() which unlocks
  * smb password file.

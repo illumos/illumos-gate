@@ -19,9 +19,7 @@
 # CDDL HEADER END
 #
 #
-# ident	"@(#)Makefile.com	1.3	08/08/05 SMI"
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -45,7 +43,7 @@ LIBSRCS = $(LIBOBJS:%.o=$(SRCDIR)/%.c)
 lintcheck := SRCS = $(LIBSRCS)
 
 LIBS =		$(DYNLIB)
-LDLIBS +=	-lshare -ldlpi -lnsl -lscf -lumem -lc
+LDLIBS +=	-lshare -ldlpi -lnsl -lnvpair -lscf -lumem -lc
 all install := LDLIBS += -lxml2
 
 CFLAGS +=	$(CCVERBOSE)
@@ -78,10 +76,6 @@ pics/smb_cfg.o:       $(SMBBASE_DIR)/smb_cfg.c
 
 pics/smb_scfutil.o:       $(SMBBASE_DIR)/smb_scfutil.c
 	$(COMPILE.c) -o $@ $(SMBBASE_DIR)/smb_scfutil.c
-	$(POST_PROCESS_O)
-
-pics/smb_share_util.o:       $(SMBMLSVC_DIR)/smb_share_util.c
-	$(COMPILE.c) -o $@ $(SMBMLSVC_DIR)/smb_share_util.c
 	$(POST_PROCESS_O)
 
 include ../../../Makefile.targ

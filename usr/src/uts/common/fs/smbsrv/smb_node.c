@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -338,6 +338,7 @@ smb_node_lookup(
 					node->n_refcnt++;
 					if ((node->n_dnode == NULL) &&
 					    (dnode != NULL) &&
+					    (node != dnode) &&
 					    (strcmp(od_name, "..") != 0) &&
 					    (strcmp(od_name, ".") != 0)) {
 						VALIDATE_DIR_NODE(dnode, node);
