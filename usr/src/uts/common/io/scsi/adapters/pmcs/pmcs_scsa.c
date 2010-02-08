@@ -1672,7 +1672,7 @@ pmcs_scsa_wq_run(pmcs_hw_t *pwp)
 
 	do {
 		xp = pwp->targets[target];
-		if (xp == NULL) {
+		if ((xp == NULL) || (STAILQ_EMPTY(&xp->wq))) {
 			if (++target == pwp->max_dev) {
 				target = 0;
 			}
@@ -1681,11 +1681,12 @@ pmcs_scsa_wq_run(pmcs_hw_t *pwp)
 
 		mutex_exit(&pwp->lock);
 		rval = pmcs_scsa_wq_run_one(pwp, xp);
+		mutex_enter(&pwp->lock);
+
 		if (rval == B_FALSE) {
-			mutex_enter(&pwp->lock);
 			break;
 		}
-		mutex_enter(&pwp->lock);
+
 		if (++target == pwp->max_dev) {
 			target = 0;
 		}
@@ -2181,6 +2182,12 @@ out:
 	if (xp->dev_gone) {
 		mutex_exit(&xp->statlock);
 		if (!dead) {
+			mutex_enter(&xp->aqlock);
+			STAILQ_REMOVE(&xp->aq, sp, pmcs_cmd, cmd_next);
+			mutex_exit(&xp->aqlock);
+			pmcs_prt(pwp, PMCS_PRT_DEBUG1, pptr, xp,
+			    "%s: Removing cmd 0x%p (htag 0x%x) from aq",
+			    __func__, (void *)sp, sp->cmd_tag);
 			mutex_enter(&pwp->cq_lock);
 			STAILQ_INSERT_TAIL(&pwp->cq, sp, cmd_next);
 			mutex_exit(&pwp->cq_lock);
@@ -2643,6 +2650,12 @@ out:
 	if (xp->dev_gone) {
 		mutex_exit(&xp->statlock);
 		if (!dead) {
+			mutex_enter(&xp->aqlock);
+			STAILQ_REMOVE(&xp->aq, sp, pmcs_cmd, cmd_next);
+			mutex_exit(&xp->aqlock);
+			pmcs_prt(pwp, PMCS_PRT_DEBUG1, pptr, xp,
+			    "%s: Removing cmd 0x%p (htag 0x%x) from aq",
+			    __func__, (void *)sp, sp->cmd_tag);
 			mutex_enter(&pwp->cq_lock);
 			STAILQ_INSERT_TAIL(&pwp->cq, sp, cmd_next);
 			mutex_exit(&pwp->cq_lock);
