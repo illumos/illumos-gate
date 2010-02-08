@@ -14439,6 +14439,7 @@ ipif_add_ires_v4(ipif_t *ipif, boolean_t loopback)
 	int		err;
 	ire_t		*ire_local = NULL;	/* LOCAL or LOOPBACK */
 	ire_t		*ire_if = NULL;
+	uchar_t		*gw;
 
 	if ((ipif->ipif_lcl_addr != INADDR_ANY) &&
 	    !(ipif->ipif_flags & IPIF_NOLOCAL)) {
@@ -14459,11 +14460,16 @@ ipif_add_ires_v4(ipif_t *ipif, boolean_t loopback)
 			return (err);
 		}
 
+		if (loopback)
+			gw = (uchar_t *)&ipif->ipif_lcl_addr;
+		else
+			gw = NULL;
+
 		/* If the interface address is set, create the local IRE. */
 		ire_local = ire_create(
 		    (uchar_t *)&ipif->ipif_lcl_addr,	/* dest address */
 		    (uchar_t *)&ip_g_all_ones,		/* mask */
-		    NULL,				/* no gateway */
+		    gw,					/* gateway */
 		    ipif->ipif_ire_type,		/* LOCAL or LOOPBACK */
 		    ipif->ipif_ill,
 		    ipif->ipif_zoneid,

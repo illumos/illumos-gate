@@ -2513,6 +2513,7 @@ ipif_add_ires_v6(ipif_t *ipif, boolean_t loopback)
 	char		buf[INET6_ADDRSTRLEN];
 	ire_t		*ire_local = NULL;	/* LOCAL or LOOPBACK */
 	ire_t		*ire_if = NULL;
+	in6_addr_t	*gw;
 
 	if (!IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6lcl_addr) &&
 	    !(ipif->ipif_flags & IPIF_NOLOCAL)) {
@@ -2531,6 +2532,11 @@ ipif_add_ires_v6(ipif_t *ipif, boolean_t loopback)
 			if (!tsol_check_interface_address(ipif))
 				return (EINVAL);
 		}
+
+		if (loopback)
+			gw = &ipif->ipif_v6lcl_addr;
+		else
+			gw = NULL;
 
 		/* Register the source address for __sin6_src_id */
 		err = ip_srcid_insert(&ipif->ipif_v6lcl_addr,
@@ -2551,7 +2557,7 @@ ipif_add_ires_v6(ipif_t *ipif, boolean_t loopback)
 		ire_local = ire_create_v6(
 		    &ipif->ipif_v6lcl_addr,		/* dest address */
 		    &ipv6_all_ones,			/* mask */
-		    NULL,				/* no gateway */
+		    gw,					/* gateway */
 		    ipif->ipif_ire_type,		/* LOCAL or LOOPBACK */
 		    ipif->ipif_ill,			/* interface */
 		    ipif->ipif_zoneid,

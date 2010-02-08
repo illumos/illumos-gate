@@ -516,8 +516,6 @@ ire_init_v4(ire_t *ire, uchar_t *addr, uchar_t *mask, uchar_t *gateway,
 	/* Make sure we don't have stray values in some fields */
 	switch (type) {
 	case IRE_LOOPBACK:
-		bcopy(&ire->ire_addr, &ire->ire_gateway_addr, IP_ADDR_LEN);
-		/* FALLTHRU */
 	case IRE_HOST:
 	case IRE_BROADCAST:
 	case IRE_LOCAL:

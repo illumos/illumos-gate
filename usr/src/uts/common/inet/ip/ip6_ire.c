@@ -101,8 +101,6 @@ ire_init_v6(ire_t *ire, const in6_addr_t *v6addr, const in6_addr_t *v6mask,
 	/* Make sure we don't have stray values in some fields */
 	switch (type) {
 	case IRE_LOOPBACK:
-		ire->ire_gateway_addr_v6 = ire->ire_addr_v6;
-		/* FALLTHRU */
 	case IRE_HOST:
 	case IRE_LOCAL:
 	case IRE_IF_CLONE:
