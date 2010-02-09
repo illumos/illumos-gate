@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -487,12 +487,14 @@ clock_t
 cv_reltimedwait_sig(kcondvar_t *cvp, kmutex_t *mp, clock_t delta,
     time_res_t res)
 {
-	hrtime_t exp;
+	hrtime_t exp = 0;
 
 	ASSERT(TIME_RES_VALID(res));
 
-	if ((exp = TICK_TO_NSEC(delta)) < 0)
-		exp = CY_INFINITY;
+	if (delta > 0) {
+		if ((exp = TICK_TO_NSEC(delta)) < 0)
+			exp = CY_INFINITY;
+	}
 
 	return (cv_timedwait_sig_hires(cvp, mp, exp, time_res[res], 0));
 }
