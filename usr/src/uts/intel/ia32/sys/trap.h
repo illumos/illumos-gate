@@ -23,14 +23,12 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _IA32_SYS_TRAP_H
 #define	_IA32_SYS_TRAP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -64,7 +62,7 @@ extern "C" {
 #define	T_ENOEXTFLT	0x20	/*	emulated ext not present	*/
 #define	T_FASTTRAP	0xd2	/*	fast system call		*/
 #define	T_SYSCALLINT	0x91	/*	general system call		*/
-#define	T_DTRACE_RET	0x7f	/*	DTrace pid return		*/
+#define	T_DTRACE_RET	0x92	/*	DTrace pid return		*/
 #define	T_INT80		0x80	/*	int80 handler for linux emulation */
 #define	T_SOFTINT	0x50fd	/*	pseudo softint trap type	*/
 

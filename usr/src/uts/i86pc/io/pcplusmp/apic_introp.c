@@ -184,10 +184,10 @@ apic_navail_vector(dev_info_t *dip, int pri)
 		lowest -= APIC_VECTOR_PER_IPL;
 
 	/* It has to be contiguous */
-	for (i = lowest; i < highest; i++) {
+	for (i = lowest; i <= highest; i++) {
 		count = 0;
 		while ((apic_vector_to_irq[i] == APIC_RESV_IRQ) &&
-		    (i < highest)) {
+		    (i <= highest)) {
 			if (APIC_CHECK_RESERVE_VECTORS(i))
 				break;
 			count++;
@@ -230,7 +230,7 @@ apic_find_multi_vectors(int pri, int count)
 	msibits = count - 1;
 
 	/* It has to be contiguous */
-	for (i = lowest; i < highest; i++) {
+	for (i = lowest; i <= highest; i++) {
 		navail = 0;
 
 		/*
@@ -241,7 +241,7 @@ apic_find_multi_vectors(int pri, int count)
 			i = (i + msibits) & ~msibits;
 		start = i;
 		while ((apic_vector_to_irq[i] == APIC_RESV_IRQ) &&
-		    (i < highest)) {
+		    (i <= highest)) {
 			if (APIC_CHECK_RESERVE_VECTORS(i))
 				break;
 			navail++;

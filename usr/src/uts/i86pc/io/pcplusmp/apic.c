@@ -2433,7 +2433,7 @@ apic_allocate_vector(int ipl, int irq, int pri)
 	if (pri == 0)
 		highest -= APIC_HI_PRI_VECTS;
 
-	for (i = lowest; i < highest; i++) {
+	for (i = lowest; i <= highest; i++) {
 		if (APIC_CHECK_RESERVE_VECTORS(i))
 			continue;
 		if (apic_vector_to_irq[i] == APIC_RESV_IRQ) {
