@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,37 +50,12 @@ int agptarget_debug_var = 0;
 #define	INST2NODENUM(inst)	(inst)
 #define	DEV2INST(dev)		(getminor(dev))
 
-static ddi_device_acc_attr_t dev_attr = {
-	DDI_DEVICE_ATTR_V0,
-	DDI_NEVERSWAP_ACC,
-	DDI_STRICTORDER_ACC,
-};
-
-static struct _i9xx_private_compat {
-	uint64_t	physical;	/* physical address */
-	uint_t	size;	/* size of mapping */
-	uint_t	regnum;	/* register number */
-	caddr_t	flush_page;	/* kernel virtual address */
-	ddi_acc_handle_t	handle; /* data access handle */
-	uint_t	ra_alloced;
-} i9xx_private = {0, 0, 0, 0, 0, 0};
-
 #define	I915_IFPADDR	0x60
 #define	I965_IFPADDR	0x70
 
 #define	HIADDR(n)	((uint32_t)(((uint64_t)(n) & \
 			0xFFFFFFFF00000000ULL) >> 32))
 #define	LOADDR(n)	((uint32_t)((uint64_t)(n) & 0x00000000FFFFFFFF))
-
-/*
- * Using for GEM to flush the chipset global
- * write buffers on certain intel chipset
- */
-
-static void
-intel_chipset_flush_setup(dev_info_t *dip,
-		    ddi_acc_handle_t pci_acc_hdl,
-		    int gms_off);
 
 typedef struct agp_target_softstate {
 	dev_info_t		*tsoft_dip;
@@ -537,196 +512,6 @@ intel_br_suspend(agp_target_softstate_t *softstate)
 	return (DDI_SUCCESS);
 }
 
-static void
-intel_chipset_flush_setup(dev_info_t *dip,
-    ddi_acc_handle_t pci_acc_hdl, int gms_off)
-{
-	uint32_t temp_hi, temp_lo;
-	uint64_t phys_base, phys_len;
-	uint32_t phys_hi_mask = 0;
-	pci_regspec_t *old_regs = NULL, *new_regs = NULL;
-	int old_len = 0, new_len = 0;
-	uint32_t old_regnum, new_regnum;
-	int circular = 0, prop_updated = 0;
-	int ret;
-
-	if (i9xx_private.handle)
-		return;
-
-	/* IS_I965 || IS_G33 || IS_G4X */
-	if (gms_off > 11) {
-		temp_hi = pci_config_get32(pci_acc_hdl, I965_IFPADDR + 4);
-		temp_lo = pci_config_get32(pci_acc_hdl, I965_IFPADDR);
-		phys_hi_mask |= PCI_ADDR_MEM64 | I965_IFPADDR;
-	} else {
-		temp_lo = pci_config_get32(pci_acc_hdl, I915_IFPADDR);
-		phys_hi_mask |= PCI_ADDR_MEM32 | I915_IFPADDR;
-	}
-
-	if (!(temp_lo & 0x1)) {
-		ndi_ra_request_t request;
-
-		bzero((caddr_t)&request, sizeof (ndi_ra_request_t));
-		request.ra_flags |= NDI_RA_ALIGN_SIZE | NDI_RA_ALLOC_BOUNDED;
-		request.ra_boundbase = 0;
-		request.ra_boundlen = 0xffffffff;
-		request.ra_len = AGP_PAGE_SIZE;
-
-		/* allocate space from the allocator */
-		ndi_devi_enter(ddi_get_parent(dip), &circular);
-		if (ndi_ra_alloc(ddi_get_parent(dip), &request, &phys_base,
-		    &phys_len, NDI_RA_TYPE_MEM, NDI_RA_PASS) != NDI_SUCCESS) {
-			TARGETDB_PRINT2((CE_WARN,
-			    "intel_chipset_flush_setup: "
-			    "ndi_ra_alloc failed!"));
-			ndi_devi_exit(ddi_get_parent(dip), circular);
-			goto error;
-		}
-		ndi_devi_exit(ddi_get_parent(dip), circular);
-		i9xx_private.ra_alloced = 1;
-
-		TARGETDB_PRINT2((CE_WARN,
-		    "intel_chipset_flush_setup: "
-		    "addr = 0x%x.0x%x len [0x%x]\n",
-		    HIADDR(phys_base), LOADDR(phys_base),
-		    (uint32_t)phys_len));
-
-		if (gms_off > 11) {
-			pci_config_put32(pci_acc_hdl, I965_IFPADDR + 4,
-			    HIADDR(phys_base));
-			pci_config_put32(pci_acc_hdl, I965_IFPADDR,
-			    LOADDR(phys_base) | 0x1);
-		} else {
-			pci_config_put32(pci_acc_hdl, I915_IFPADDR,
-			    LOADDR(phys_base) | 0x1);
-		}
-	} else {
-		temp_lo &= ~0x1;
-		phys_base = ((uint64_t)temp_hi << 32) | temp_lo;
-	}
-
-	temp_hi = pci_config_get32(pci_acc_hdl, I965_IFPADDR + 4);
-	temp_lo = pci_config_get32(pci_acc_hdl, I965_IFPADDR);
-
-	/* set pci props */
-	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    "reg", (caddr_t)&old_regs, &old_len) != DDI_PROP_SUCCESS) {
-		TARGETDB_PRINT2((CE_WARN,
-		    "intel_chipset_flush_setup: "
-		    "ddi_getlongprop(1) failed!"));
-		goto error;
-	}
-
-	old_regnum = old_len / sizeof (pci_regspec_t);
-	TARGETDB_PRINT2((CE_WARN,
-	    "intel_chipset_flush_setup: old_regnum = %d", old_regnum));
-
-	new_regnum = old_regnum + 1;
-	new_len = new_regnum * sizeof (pci_regspec_t);
-	new_regs = kmem_zalloc(new_len, KM_SLEEP);
-	if (memcpy(new_regs, old_regs, (size_t)old_len) == NULL) {
-		TARGETDB_PRINT2((CE_WARN,
-		    "intel_chipset_flush_setup: memcpy failed"));
-		goto error;
-	}
-
-	/* Bus=0, Dev=0, Func=0 0x82001000 */
-	new_regs[old_regnum].pci_phys_hi = PCI_REG_REL_M | phys_hi_mask;
-	new_regs[old_regnum].pci_phys_mid = HIADDR(phys_base);
-	new_regs[old_regnum].pci_phys_low = LOADDR(phys_base);
-	new_regs[old_regnum].pci_size_hi = 0x00000000;
-	new_regs[old_regnum].pci_size_low = AGP_PAGE_SIZE;
-
-	ret = ndi_prop_update_int_array(DDI_DEV_T_NONE, dip,
-	    "reg", (int *)new_regs, (uint_t)5 * new_regnum);
-	if (ret != DDI_PROP_SUCCESS) {
-		TARGETDB_PRINT2((CE_WARN,
-		    "intel_chipset_flush_setup: "
-		    "ndi_prop_update_int_array failed %d", ret));
-		goto error;
-	}
-	kmem_free(new_regs, (size_t)new_len);
-	new_regs = NULL;
-
-	prop_updated = 1;
-
-	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    "reg", (caddr_t)&new_regs, &new_len) != DDI_PROP_SUCCESS) {
-		TARGETDB_PRINT2((CE_WARN,
-		    "intel_chipset_flush_setup: "
-		    "ddi_getlongprop(2) failed"));
-		goto error;
-	}
-	kmem_free(new_regs, (size_t)new_len);
-	new_regs = NULL;
-
-	new_regnum = new_len / sizeof (pci_regspec_t);
-
-	i9xx_private.physical = phys_base;
-	i9xx_private.size = AGP_PAGE_SIZE;
-	i9xx_private.regnum = new_regnum - 1;
-
-	ret = ddi_regs_map_setup(dip, i9xx_private.regnum,
-	    (caddr_t *)&(i9xx_private.flush_page), 0,
-	    i9xx_private.size, &dev_attr, &i9xx_private.handle);
-	if (ret != DDI_SUCCESS) {
-		TARGETDB_PRINT2((CE_WARN,
-		    "intel_chipset_flush_setup: ddi_regs_map_setup failed"));
-		i9xx_private.handle = NULL;
-		goto error;
-	}
-
-	kmem_free(old_regs, (size_t)old_len);
-	return;
-error:
-	if (prop_updated)
-		(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip,
-		    "reg", (int *)old_regs, (uint_t)5 * old_regnum);
-	if (new_regs)
-		kmem_free(new_regs, (size_t)new_len);
-	if (old_regs)
-		kmem_free(old_regs, (size_t)old_len);
-	if (i9xx_private.ra_alloced) {
-		ndi_devi_enter(ddi_get_parent(dip), &circular);
-		(void) ndi_ra_free(ddi_get_parent(dip),
-		    phys_base, phys_len, NDI_RA_TYPE_MEM, NDI_RA_PASS);
-		ndi_devi_exit(ddi_get_parent(dip), circular);
-		i9xx_private.ra_alloced = 0;
-	}
-}
-
-static void
-intel_chipset_flush_free(dev_info_t *dip)
-{
-	pci_regspec_t *regs = NULL;
-	int len = 0, regnum;
-	int circular = 0;
-
-	if (i9xx_private.handle == NULL)
-		return;
-
-	ddi_regs_map_free(&i9xx_private.handle);
-	i9xx_private.handle = NULL;
-
-	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    "reg", (caddr_t)&regs, &len) == DDI_PROP_SUCCESS) {
-		regnum = len / sizeof (pci_regspec_t) - 1;
-		(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip,
-		    "reg", (int *)regs, (uint_t)5 * regnum);
-	}
-	if (regs)
-		kmem_free(regs, (size_t)len);
-
-	if (i9xx_private.ra_alloced) {
-		ndi_devi_enter(ddi_get_parent(dip), &circular);
-		(void) ndi_ra_free(ddi_get_parent(dip),
-		    i9xx_private.physical, i9xx_private.size,
-		    NDI_RA_TYPE_MEM, NDI_RA_PASS);
-		ndi_devi_exit(ddi_get_parent(dip), circular);
-		i9xx_private.ra_alloced = 0;
-	}
-}
-
 static int
 agp_target_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
@@ -1034,24 +819,9 @@ agp_target_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 	}
 
 	case INTEL_CHIPSET_FLUSH_SETUP:
-	{
-		intel_chipset_flush_setup(st->tsoft_dip,
-		    st->tsoft_pcihdl, st->tsoft_gms_off);
-		break;
-	}
 	case INTEL_CHIPSET_FLUSH:
-	{
-		if (i9xx_private.handle != NULL)
-			ddi_put32(i9xx_private.handle,
-			    (uint32_t *)(uintptr_t)i9xx_private.flush_page, 1);
-
-		break;
-	}
 	case INTEL_CHIPSET_FLUSH_FREE:
-	{
-		intel_chipset_flush_free(st->tsoft_dip);
 		break;
-	}
 	default:
 		mutex_exit(&st->tsoft_lock);
 		return (ENXIO);
