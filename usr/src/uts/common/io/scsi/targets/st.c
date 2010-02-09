@@ -12002,6 +12002,8 @@ st_set_state(struct scsi_tape *un, struct buf *bp)
 		case SCMD_READ_ATTRIBUTE:
 		case SCMD_WRITE_ATTRIBUTE:
 		case SCMD_SVC_ACTION_IN_G5:
+		case SCMD_SECURITY_PROTO_IN:
+		case SCMD_SECURITY_PROTO_OUT:
 			new_lastop = ST_OP_CTL;
 			break;
 		case SCMD_READ_POSITION:
