@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1619,7 +1619,6 @@ struct aac_comm_space {
 	struct aac_queue_table qtable;
 	char qt_align_pad[AAC_QUEUE_ALIGN];
 	char adapter_print_buf[AAC_ADAPTER_PRINT_BUFSIZE];
-	struct aac_fib sync_fib;
 };
 
 #ifdef	__cplusplus

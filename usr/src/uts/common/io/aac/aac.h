@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,7 +55,7 @@ extern "C" {
 
 #define	AAC_DRIVER_MAJOR_VERSION	2
 #define	AAC_DRIVER_MINOR_VERSION	2
-#define	AAC_DRIVER_BUGFIX_LEVEL		8
+#define	AAC_DRIVER_BUGFIX_LEVEL		9
 #define	AAC_DRIVER_TYPE			AAC_TYPE_RELEASE
 
 #define	STR(s)				# s
@@ -304,6 +304,7 @@ struct aac_cmd {
 #define	AAC_STATE_RESET		(1 << 1)
 #define	AAC_STATE_QUIESCED	(1 << 2)
 #define	AAC_STATE_DEAD		(1 << 3)
+#define	AAC_STATE_INTR		(1 << 4)
 
 /*
  * Flags for aac firmware
@@ -430,6 +431,7 @@ struct aac_softstate {
 	timeout_id_t timeout_id;	/* for timeout daemon */
 
 	kcondvar_t event;		/* for ioctl_send_fib() and sync IO */
+	kcondvar_t sync_fib_cv;		/* for sync_fib_slot_bind/release */
 
 	int bus_ncmds[AAC_CMDQ_NUM];	/* total outstanding async cmds */
 	int bus_throttle[AAC_CMDQ_NUM];	/* hold IO cmds for the bus */

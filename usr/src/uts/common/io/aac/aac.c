@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -190,9 +190,13 @@
 			PCI_MEM_PUT32(softs, AAC_OIMR, ~AAC_DB_INTR_NEW); \
 		else \
 			PCI_MEM_PUT32(softs, AAC_OIMR, ~AAC_DB_INTR_BITS); \
+		softs->state |= AAC_STATE_INTR; \
 	}
 
-#define	AAC_DISABLE_INTR(softs)		PCI_MEM_PUT32(softs, AAC_OIMR, ~0)
+#define	AAC_DISABLE_INTR(softs)	{ \
+		PCI_MEM_PUT32(softs, AAC_OIMR, ~0); \
+		softs->state &= ~AAC_STATE_INTR; \
+	}
 #define	AAC_STATUS_CLR(softs, mask)	PCI_MEM_PUT32(softs, AAC_ODBR, mask)
 #define	AAC_STATUS_GET(softs)		PCI_MEM_GET32(softs, AAC_ODBR)
 #define	AAC_NOTIFY(softs, val)		PCI_MEM_PUT32(softs, AAC_IDBR, val)
@@ -824,6 +828,7 @@ aac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mutex_init(&softs->q_comp_mutex, NULL,
 	    MUTEX_DRIVER, DDI_INTR_PRI(softs->intr_pri));
 	cv_init(&softs->event, NULL, CV_DRIVER, NULL);
+	cv_init(&softs->sync_fib_cv, NULL, CV_DRIVER, NULL);
 	mutex_init(&softs->aifq_mutex, NULL,
 	    MUTEX_DRIVER, DDI_INTR_PRI(softs->intr_pri));
 	cv_init(&softs->aifv, NULL, CV_DRIVER, NULL);
@@ -910,7 +915,7 @@ aac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	aac_unhold_bus(softs, AAC_IOCMD_SYNC | AAC_IOCMD_ASYNC);
-	softs->state = AAC_STATE_RUN;
+	softs->state |= AAC_STATE_RUN;
 
 	/* Create a thread for command timeout */
 	softs->timeout_id = timeout(aac_daemon, (void *)softs,
@@ -937,6 +942,7 @@ error:
 	if (attach_state & AAC_ATTACH_KMUTEX_INITED) {
 		mutex_destroy(&softs->q_comp_mutex);
 		cv_destroy(&softs->event);
+		cv_destroy(&softs->sync_fib_cv);
 		mutex_destroy(&softs->aifq_mutex);
 		cv_destroy(&softs->aifv);
 		cv_destroy(&softs->drain_cv);
@@ -995,6 +1001,7 @@ aac_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	mutex_destroy(&softs->q_comp_mutex);
 	cv_destroy(&softs->event);
+	cv_destroy(&softs->sync_fib_cv);
 	mutex_destroy(&softs->aifq_mutex);
 	cv_destroy(&softs->aifv);
 	cv_destroy(&softs->drain_cv);
@@ -1018,6 +1025,7 @@ aac_reset(dev_info_t *dip, ddi_reset_cmd_t cmd)
 	DBCALLED(softs, 1);
 
 	mutex_enter(&softs->io_lock);
+	AAC_DISABLE_INTR(softs);
 	(void) aac_shutdown(softs);
 	mutex_exit(&softs->io_lock);
 
@@ -2064,6 +2072,7 @@ aac_synccache_complete(struct aac_softstate *softs, struct aac_cmd *acp)
 		aac_set_arq_data_hwerr(acp);
 }
 
+/*ARGSUSED*/
 static void
 aac_startstop_complete(struct aac_softstate *softs, struct aac_cmd *acp)
 {
@@ -3078,26 +3087,31 @@ aac_sync_fib(struct aac_softstate *softs, uint16_t cmd, uint16_t fibsize)
 {
 	struct aac_cmd *acp = &softs->sync_ac;
 
-	acp->flags = AAC_CMD_NO_CB | AAC_CMD_SYNC | AAC_CMD_IN_SYNC_SLOT;
+	acp->flags = AAC_CMD_SYNC | AAC_CMD_IN_SYNC_SLOT;
+	if (softs->state & AAC_STATE_INTR)
+		acp->flags |= AAC_CMD_NO_CB;
+	else
+		acp->flags |= AAC_CMD_NO_INTR;
+
 	acp->ac_comp = aac_sync_complete;
 	acp->timeout = AAC_SYNC_TIMEOUT;
-
 	acp->fib_size = fibsize;
+
 	/*
 	 * Only need to setup sync fib header, caller should have init
 	 * fib data
 	 */
 	aac_cmd_fib_header(softs, acp, cmd);
 
+	(void) ddi_dma_sync(acp->slotp->fib_dma_handle, 0, fibsize,
+	    DDI_DMA_SYNC_FORDEV);
+
 	aac_start_io(softs, acp);
 
-	/* Check if acp completed in case fib send fail */
-	while (!(acp->flags & (AAC_CMD_CMPLT | AAC_CMD_ABORT)))
-		cv_wait(&softs->event, &softs->io_lock);
-
-	if (acp->flags & AAC_CMD_CMPLT)
-		return (AACOK);
-	return (AACERR);
+	if (softs->state & AAC_STATE_INTR)
+		return (aac_do_sync_io(softs, acp));
+	else
+		return (aac_do_poll_io(softs, acp));
 }
 
 static void
@@ -5802,20 +5816,20 @@ aac_bind_io(struct aac_softstate *softs, struct aac_cmd *acp)
 	struct aac_device *dvp = acp->dvp;
 	int q = AAC_CMDQ(acp);
 
-	if (dvp) {
-		if (dvp->ncmds[q] < dvp->throttle[q]) {
-			if (!(acp->flags & AAC_CMD_NTAG) ||
-			    dvp->ncmds[q] == 0) {
-do_bind:
-				return (aac_cmd_slot_bind(softs, acp));
+	if (softs->bus_ncmds[q] < softs->bus_throttle[q]) {
+		if (dvp) {
+			if (dvp->ncmds[q] < dvp->throttle[q]) {
+				if (!(acp->flags & AAC_CMD_NTAG) ||
+				    dvp->ncmds[q] == 0) {
+					return (aac_cmd_slot_bind(softs, acp));
+				}
+				ASSERT(q == AAC_CMDQ_ASYNC);
+				aac_set_throttle(softs, dvp, AAC_CMDQ_ASYNC,
+				    AAC_THROTTLE_DRAIN);
 			}
-			ASSERT(q == AAC_CMDQ_ASYNC);
-			aac_set_throttle(softs, dvp, AAC_CMDQ_ASYNC,
-			    AAC_THROTTLE_DRAIN);
+		} else {
+			return (aac_cmd_slot_bind(softs, acp));
 		}
-	} else {
-		if (softs->bus_ncmds[q] < softs->bus_throttle[q])
-			goto do_bind;
 	}
 	return (AACERR);
 }
@@ -5824,6 +5838,9 @@ static int
 aac_sync_fib_slot_bind(struct aac_softstate *softs, struct aac_cmd *acp)
 {
 	struct aac_slot *slotp;
+
+	while (softs->sync_ac.slotp)
+		cv_wait(&softs->sync_fib_cv, &softs->io_lock);
 
 	if (slotp = aac_get_slot(softs)) {
 		ASSERT(acp->slotp == NULL);
@@ -5843,6 +5860,8 @@ aac_sync_fib_slot_release(struct aac_softstate *softs, struct aac_cmd *acp)
 	aac_release_slot(softs, acp->slotp);
 	acp->slotp->acp = NULL;
 	acp->slotp = NULL;
+
+	cv_signal(&softs->sync_fib_cv);
 }
 
 static void
