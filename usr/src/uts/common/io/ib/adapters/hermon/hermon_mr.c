@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1656,6 +1656,11 @@ hermon_mr_common_reg(hermon_state_t *state, hermon_pdhdl_t pd,
 	status = hermon_mr_mtt_bind(state, bh, bind_dmahdl, &mtt,
 	    &mtt_pgsize_bits, mpt != NULL);
 	if (status != DDI_SUCCESS) {
+		/*
+		 * When mtt_bind fails, freerbuf has already been done,
+		 * so make sure not to call it again.
+		 */
+		bind->bi_type = bh->bi_type;
 		goto mrcommon_fail5;
 	}
 	mr->mr_logmttpgsz = mtt_pgsize_bits;

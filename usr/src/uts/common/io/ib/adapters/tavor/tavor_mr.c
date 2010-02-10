@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1772,6 +1772,11 @@ tavor_mr_common_reg(tavor_state_t *state, tavor_pdhdl_t pd,
 	if (status != DDI_SUCCESS) {
 		/* Set "status" and "errormsg" and goto failure */
 		TAVOR_TNF_FAIL(status, "failed mtt bind");
+		/*
+		 * When mtt_bind fails, freerbuf has already been done,
+		 * so make sure not to call it again.
+		 */
+		bind->bi_type = bh->bi_type;
 		goto mrcommon_fail5;
 	}
 	mr->mr_logmttpgsz = mtt_pgsize_bits;

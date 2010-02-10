@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -825,6 +825,8 @@ post_many:
 				solicited = 0;
 
 			if (qp->qp_is_special) {
+				/* Ensure correctness, set the ReRead bit */
+				nopcode |= (1 << 6);
 				ah = (hermon_ahhdl_t)
 				    curr_wr->wr.ud.udwr_dest->ud_ah;
 				mutex_enter(&ah->ah_lock);
