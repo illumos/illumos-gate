@@ -244,6 +244,11 @@ typedef enum {
 void *ibd_list;
 
 /*
+ * Driver Global Data
+ */
+ibd_global_state_t ibd_gstate;
+
+/*
  * Logging
  */
 #ifdef IBD_LOGGING
@@ -888,6 +893,13 @@ _init()
 		return (status);
 	}
 
+	mutex_init(&ibd_gstate.ig_mutex, NULL, MUTEX_DRIVER, NULL);
+	mutex_enter(&ibd_gstate.ig_mutex);
+	ibd_gstate.ig_ibt_hdl = NULL;
+	ibd_gstate.ig_ibt_hdl_ref_cnt = 0;
+	ibd_gstate.ig_service_list = NULL;
+	mutex_exit(&ibd_gstate.ig_mutex);
+
 #ifdef IBD_LOGGING
 	ibd_log_init();
 #endif
@@ -911,6 +923,7 @@ _fini()
 
 	mac_fini_ops(&ibd_dev_ops);
 	ddi_soft_state_fini(&ibd_list);
+	mutex_destroy(&ibd_gstate.ig_mutex);
 #ifdef IBD_LOGGING
 	ibd_log_fini();
 #endif
@@ -2370,8 +2383,19 @@ ibd_unattach(ibd_state_t *state, dev_info_t *dip)
 		return (DDI_FAILURE);
 	}
 
+	if (state->rc_srq_rwqe_list.dl_bufs_outstanding != 0) {
+		cmn_err(CE_CONT, "ibd_detach: failed: srq bufs outstanding\n");
+		return (DDI_FAILURE);
+	}
+
 	/* make sure rx resources are freed */
 	ibd_free_rx_rsrcs(state);
+
+	if (progress & IBD_DRV_RC_SRQ_ALLOCD) {
+		ASSERT(state->id_enable_rc);
+		ibd_rc_fini_srq_list(state);
+		state->id_mac_state &= (~IBD_DRV_RC_SRQ_ALLOCD);
+	}
 
 	if (progress & IBD_DRV_MAC_REGISTERED) {
 		(void) mac_unregister(state->id_mh);
@@ -2398,14 +2422,27 @@ ibd_unattach(ibd_state_t *state, dev_info_t *dip)
 		state->id_mac_state &= (~IBD_DRV_HCA_OPENED);
 	}
 
+	mutex_enter(&ibd_gstate.ig_mutex);
 	if (progress & IBD_DRV_IBTL_ATTACH_DONE) {
-		if ((ret = ibt_detach(state->id_ibt_hdl)) != IBT_SUCCESS) {
+		if ((ret = ibt_detach(state->id_ibt_hdl)) !=
+		    IBT_SUCCESS) {
 			ibd_print_warn(state,
 			    "ibt_detach() failed, ret=%d", ret);
 		}
 		state->id_ibt_hdl = NULL;
 		state->id_mac_state &= (~IBD_DRV_IBTL_ATTACH_DONE);
+		ibd_gstate.ig_ibt_hdl_ref_cnt--;
 	}
+	if ((ibd_gstate.ig_ibt_hdl_ref_cnt == 0) &&
+	    (ibd_gstate.ig_ibt_hdl != NULL)) {
+		if ((ret = ibt_detach(ibd_gstate.ig_ibt_hdl)) !=
+		    IBT_SUCCESS) {
+			ibd_print_warn(state, "ibt_detach(): global "
+			    "failed, ret=%d", ret);
+		}
+		ibd_gstate.ig_ibt_hdl = NULL;
+	}
+	mutex_exit(&ibd_gstate.ig_mutex);
 
 	if (progress & IBD_DRV_TXINTR_ADDED) {
 		ddi_remove_softintr(state->id_tx);
@@ -2523,11 +2560,25 @@ ibd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/*
 	 * Attach to IBTL
 	 */
+	mutex_enter(&ibd_gstate.ig_mutex);
+	if (ibd_gstate.ig_ibt_hdl == NULL) {
+		if ((ret = ibt_attach(&ibd_clnt_modinfo, dip, state,
+		    &ibd_gstate.ig_ibt_hdl)) != IBT_SUCCESS) {
+			DPRINT(10, "ibd_attach: global: failed in "
+			    "ibt_attach(), ret=%d", ret);
+			mutex_exit(&ibd_gstate.ig_mutex);
+			goto attach_fail;
+		}
+	}
 	if ((ret = ibt_attach(&ibd_clnt_modinfo, dip, state,
 	    &state->id_ibt_hdl)) != IBT_SUCCESS) {
-		DPRINT(10, "ibd_attach: failed in ibt_attach(), ret=%d", ret);
+		DPRINT(10, "ibd_attach: failed in ibt_attach(), ret=%d",
+		    ret);
+		mutex_exit(&ibd_gstate.ig_mutex);
 		goto attach_fail;
 	}
+	ibd_gstate.ig_ibt_hdl_ref_cnt++;
+	mutex_exit(&ibd_gstate.ig_mutex);
 	state->id_mac_state |= IBD_DRV_IBTL_ATTACH_DONE;
 
 	/*
@@ -3843,7 +3894,13 @@ ibd_init_rxlist(ibd_state_t *state)
 				for (rwqe = WQE_TO_RWQE(list); rwqe != NULL;
 				    rwqe = next) {
 					next = WQE_TO_RWQE(rwqe->rwqe_next);
-					freemsg(rwqe->rwqe_im_mblk);
+					if (rwqe->rwqe_im_mblk) {
+						atomic_inc_32(&state->
+						    id_rx_list.
+						    dl_bufs_outstanding);
+						freemsg(rwqe->rwqe_im_mblk);
+					} else
+						ibd_free_rwqe(state, rwqe);
 				}
 				atomic_inc_32(&state->id_running);
 				return (DDI_FAILURE);
@@ -3888,6 +3945,14 @@ ibd_init_rxlist(ibd_state_t *state)
 				freemsg(rwqe->rwqe_im_mblk);
 			}
 			atomic_inc_32(&state->id_running);
+
+			/* remove reference to free'd rwqes */
+			mutex_enter(&state->id_rx_free_list.dl_mutex);
+			state->id_rx_free_list.dl_head = NULL;
+			state->id_rx_free_list.dl_cnt = 0;
+			mutex_exit(&state->id_rx_free_list.dl_mutex);
+
+			ibd_fini_rxlist(state);
 			return (DDI_FAILURE);
 		}
 
@@ -4473,12 +4538,8 @@ ibd_undo_start(ibd_state_t *state, link_state_t cur_link_state)
 		state->id_mac_state &= (~IBD_DRV_RC_LISTEN);
 	}
 
-	if (state->id_enable_rc) {
-		if (ibd_rc_close_all_chan(state) != DDI_SUCCESS) {
-			(void) ibd_rc_listen(state);
-			state->id_mac_state |= IBD_DRV_RC_LISTEN;
-			return (DDI_FAILURE);
-		}
+	if ((state->id_enable_rc) && (progress & IBD_DRV_ACACHE_INITIALIZED)) {
+		(void) ibd_rc_close_all_chan(state);
 	}
 
 	/*
@@ -4516,8 +4577,13 @@ ibd_undo_start(ibd_state_t *state, link_state_t cur_link_state)
 
 	if (progress & IBD_DRV_RC_SRQ_ALLOCD) {
 		ASSERT(state->id_enable_rc);
-		ibd_rc_fini_srq_list(state);
-		state->id_mac_state &= (~IBD_DRV_RC_SRQ_ALLOCD);
+		if (state->rc_srq_rwqe_list.dl_bufs_outstanding == 0) {
+			ibd_rc_fini_srq_list(state);
+			state->id_mac_state &= (~IBD_DRV_RC_SRQ_ALLOCD);
+		} else {
+			cmn_err(CE_CONT, "ibd_undo_start: srq bufs "
+			    "outstanding\n");
+		}
 	}
 
 	if (progress & IBD_DRV_SM_NOTICES_REGISTERED) {
@@ -4925,15 +4991,27 @@ ibd_start(ibd_state_t *state)
 
 	if (state->id_enable_rc) {
 		if (state->rc_enable_srq) {
-			/* Allocate SRQ resource */
-			if (ibd_rc_init_srq_list(state) != IBT_SUCCESS)
-				goto start_fail;
-			state->id_mac_state |= IBD_DRV_RC_SRQ_ALLOCD;
+			if (state->id_mac_state & IBD_DRV_RC_SRQ_ALLOCD) {
+				if (ibd_rc_repost_srq_free_list(state) !=
+				    IBT_SUCCESS) {
+					err = ENOMEM;
+					goto start_fail;
+				}
+			} else {
+				/* Allocate SRQ resource */
+				if (ibd_rc_init_srq_list(state) !=
+				    IBT_SUCCESS) {
+					err = ENOMEM;
+					goto start_fail;
+				}
+				state->id_mac_state |= IBD_DRV_RC_SRQ_ALLOCD;
+			}
 		}
 
 		if (ibd_rc_init_tx_largebuf_list(state) != IBT_SUCCESS) {
 			DPRINT(10, "ibd_start: ibd_rc_init_tx_largebuf_list() "
 			    "failed");
+			err = ENOMEM;
 			goto start_fail;
 		}
 		state->id_mac_state |= IBD_DRV_RC_LARGEBUF_ALLOCD;
@@ -4941,6 +5019,7 @@ ibd_start(ibd_state_t *state)
 		/* RC: begin to listen only after everything is available */
 		if (ibd_rc_listen(state) != IBT_SUCCESS) {
 			DPRINT(10, "ibd_start: ibd_rc_listen() failed");
+			err = EINVAL;
 			goto start_fail;
 		}
 		state->id_mac_state |= IBD_DRV_RC_LISTEN;

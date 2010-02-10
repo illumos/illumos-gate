@@ -54,6 +54,7 @@
 
 #include <sys/ib/clients/ibd/ibd.h>
 
+extern ibd_global_state_t ibd_gstate;
 
 /* Per-interface tunables (for developers) */
 extern uint_t ibd_rc_tx_copy_thresh;
@@ -168,6 +169,7 @@ static void ibd_rc_poll_rcq(ibd_rc_chan_t *, ibt_cq_hdl_t);
 /* Receive Functions */
 static int ibd_rc_post_srq(ibd_state_t *, ibd_rwqe_t *);
 static void ibd_rc_srq_freemsg_cb(char *);
+static void ibd_rc_srq_free_rwqe(ibd_state_t *, ibd_rwqe_t *);
 
 static int ibd_rc_post_rwqe(ibd_rc_chan_t *, ibd_rwqe_t *);
 static void ibd_rc_freemsg_cb(char *);
@@ -1016,7 +1018,12 @@ ibd_rc_init_srq_list(ibd_state_t *state)
 		    &rwqe->w_freemsg_cb)) == NULL) {
 			DPRINT(40, "ibd_rc_init_srq_list : desballoc() failed");
 			rwqe->rwqe_copybuf.ic_bufaddr = NULL;
+			if (atomic_dec_32_nv(&state->id_running) != 0) {
+				cmn_err(CE_WARN, "ibd_rc_init_srq_list: "
+				    "id_running was not 1\n");
+			}
 			ibd_rc_fini_srq_list(state);
+			atomic_inc_32(&state->id_running);
 			return (DDI_FAILURE);
 		}
 
@@ -1031,6 +1038,11 @@ ibd_rc_init_srq_list(ibd_state_t *state)
 		(void) ibd_rc_post_srq(state, rwqe);
 	}
 
+	mutex_enter(&state->rc_srq_free_list.dl_mutex);
+	state->rc_srq_free_list.dl_head = NULL;
+	state->rc_srq_free_list.dl_cnt = 0;
+	mutex_exit(&state->rc_srq_free_list.dl_mutex);
+
 	return (DDI_SUCCESS);
 }
 
@@ -1044,6 +1056,7 @@ ibd_rc_fini_srq_list(ibd_state_t *state)
 	int i;
 	ibt_status_t ret;
 
+	ASSERT(state->id_running == 0);
 	ret = ibt_free_srq(state->rc_srq_hdl);
 	if (ret != IBT_SUCCESS) {
 		ibd_print_warn(state, "ibd_rc_fini_srq_list: "
@@ -1063,10 +1076,52 @@ ibd_rc_fini_srq_list(ibd_state_t *state)
 	ibd_rc_free_srq_copybufs(state);
 }
 
+/* Repost the elements in state->ib_rc_free_list */
+int
+ibd_rc_repost_srq_free_list(ibd_state_t *state)
+{
+	ibd_rwqe_t *rwqe;
+	ibd_wqe_t *list;
+	uint_t len;
+
+	mutex_enter(&state->rc_srq_free_list.dl_mutex);
+	if (state->rc_srq_free_list.dl_head != NULL) {
+		/* repost them */
+		len = state->rc_mtu + IPOIB_GRH_SIZE;
+		list = state->rc_srq_free_list.dl_head;
+		state->rc_srq_free_list.dl_head = NULL;
+		state->rc_srq_free_list.dl_cnt = 0;
+		mutex_exit(&state->rc_srq_free_list.dl_mutex);
+		while (list != NULL) {
+			rwqe = WQE_TO_RWQE(list);
+			if ((rwqe->rwqe_im_mblk == NULL) &&
+			    ((rwqe->rwqe_im_mblk = desballoc(
+			    rwqe->rwqe_copybuf.ic_bufaddr, len, 0,
+			    &rwqe->w_freemsg_cb)) == NULL)) {
+				DPRINT(40, "ibd_rc_repost_srq_free_list: "
+				    "failed in desballoc()");
+				do {
+					ibd_rc_srq_free_rwqe(state, rwqe);
+					list = list->w_next;
+					rwqe = WQE_TO_RWQE(list);
+				} while (list != NULL);
+				return (DDI_FAILURE);
+			}
+			if (ibd_rc_post_srq(state, rwqe) == DDI_FAILURE) {
+				ibd_rc_srq_free_rwqe(state, rwqe);
+			}
+			list = list->w_next;
+		}
+		return (DDI_SUCCESS);
+	}
+	mutex_exit(&state->rc_srq_free_list.dl_mutex);
+	return (DDI_SUCCESS);
+}
+
 /*
  * Free an allocated recv wqe.
  */
-void
+static void
 ibd_rc_srq_free_rwqe(ibd_state_t *state, ibd_rwqe_t *rwqe)
 {
 	/*
@@ -1094,13 +1149,23 @@ ibd_rc_srq_freemsg_cb(char *arg)
 	ASSERT(state->rc_enable_srq);
 
 	/*
-	 * If the wqe is being destructed, do not attempt recycling.
+	 * If the driver is stopped, just free the rwqe.
 	 */
-	if (rwqe->w_freeing_wqe == B_TRUE) {
+	if (atomic_add_32_nv(&state->id_running, 0) == 0) {
+		if (!rwqe->w_freeing_wqe) {
+			atomic_dec_32(
+			    &state->rc_srq_rwqe_list.dl_bufs_outstanding);
+			DPRINT(6, "ibd_rc_srq_freemsg_cb: wqe being freed");
+			rwqe->rwqe_im_mblk = NULL;
+			ibd_rc_srq_free_rwqe(state, rwqe);
+		}
 		return;
 	}
 
+	atomic_dec_32(&state->rc_srq_rwqe_list.dl_bufs_outstanding);
+
 	ASSERT(state->rc_srq_rwqe_list.dl_cnt < state->rc_srq_size);
+	ASSERT(!rwqe->w_freeing_wqe);
 
 	/*
 	 * Upper layer has released held mblk, so we have
@@ -1116,11 +1181,11 @@ ibd_rc_srq_freemsg_cb(char *arg)
 	}
 
 	if (ibd_rc_post_srq(state, rwqe) == DDI_FAILURE) {
+		ibd_print_warn(state, "ibd_rc_srq_freemsg_cb: ibd_rc_post_srq"
+		    " failed");
 		ibd_rc_srq_free_rwqe(state, rwqe);
 		return;
 	}
-
-	atomic_add_32(&state->rc_srq_rwqe_list.dl_bufs_outstanding, -1);
 }
 
 /*
@@ -2260,6 +2325,65 @@ error_reset_chan:
 	return (DDI_INTR_CLAIMED);
 }
 
+static ibt_status_t
+ibd_register_service(ibt_srv_desc_t *srv, ib_svc_id_t sid,
+    int num_sids, ibt_srv_hdl_t *srv_hdl, ib_svc_id_t *ret_sid)
+{
+	ibd_service_t *p;
+	ibt_status_t status;
+
+	mutex_enter(&ibd_gstate.ig_mutex);
+	for (p = ibd_gstate.ig_service_list; p != NULL; p = p->is_link) {
+		if (p->is_sid == sid) {
+			p->is_ref_cnt++;
+			*srv_hdl = p->is_srv_hdl;
+			*ret_sid = sid;
+			mutex_exit(&ibd_gstate.ig_mutex);
+			return (IBT_SUCCESS);
+		}
+	}
+	status = ibt_register_service(ibd_gstate.ig_ibt_hdl, srv, sid,
+	    num_sids, srv_hdl, ret_sid);
+	if (status == IBT_SUCCESS) {
+		p = kmem_alloc(sizeof (*p), KM_SLEEP);
+		p->is_srv_hdl = *srv_hdl;
+		p->is_sid = sid;
+		p->is_ref_cnt = 1;
+		p->is_link = ibd_gstate.ig_service_list;
+		ibd_gstate.ig_service_list = p;
+	}
+	mutex_exit(&ibd_gstate.ig_mutex);
+	return (status);
+}
+
+static ibt_status_t
+ibd_deregister_service(ibt_srv_hdl_t srv_hdl)
+{
+	ibd_service_t *p, **pp;
+	ibt_status_t status;
+
+	mutex_enter(&ibd_gstate.ig_mutex);
+	for (pp = &ibd_gstate.ig_service_list; *pp != NULL;
+	    pp = &((*pp)->is_link)) {
+		p = *pp;
+		if (p->is_srv_hdl == srv_hdl) {	/* Found it */
+			if (--p->is_ref_cnt == 0) {
+				status = ibt_deregister_service(
+				    ibd_gstate.ig_ibt_hdl, srv_hdl);
+				*pp = p->is_link; /* link prev to next */
+				kmem_free(p, sizeof (*p));
+			} else {
+				status = IBT_SUCCESS;
+			}
+			mutex_exit(&ibd_gstate.ig_mutex);
+			return (status);
+		}
+	}
+	/* Should not ever get here */
+	mutex_exit(&ibd_gstate.ig_mutex);
+	return (IBT_FAILURE);
+}
+
 /* Listen with corresponding service ID */
 ibt_status_t
 ibd_rc_listen(ibd_state_t *state)
@@ -2282,7 +2406,7 @@ ibd_rc_listen(ibd_state_t *state)
 	 * Register the service with service id
 	 * Incoming connection requests should arrive on this service id.
 	 */
-	status = ibt_register_service(state->id_ibt_hdl, &srvdesc,
+	status = ibd_register_service(&srvdesc,
 	    IBD_RC_QPN_TO_SID(state->id_qpnum),
 	    1, &state->rc_listen_hdl, &ret_sid);
 	if (status != IBT_SUCCESS) {
@@ -2299,8 +2423,7 @@ ibd_rc_listen(ibd_state_t *state)
 	if (status != IBT_SUCCESS) {
 		DPRINT(40, "ibd_rc_listen:"
 		    " fail to bind port: <%d>", status);
-		(void) ibt_deregister_service(state->id_ibt_hdl,
-		    state->rc_listen_hdl);
+		(void) ibd_deregister_service(state->rc_listen_hdl);
 		return (status);
 	}
 
@@ -2319,7 +2442,7 @@ ibd_rc_listen(ibd_state_t *state)
 	 * Register the service with service id
 	 * Incoming connection requests should arrive on this service id.
 	 */
-	status = ibt_register_service(state->id_ibt_hdl, &srvdesc,
+	status = ibd_register_service(&srvdesc,
 	    IBD_RC_QPN_TO_SID_OFED_INTEROP(state->id_qpnum),
 	    1, &state->rc_listen_hdl_OFED_interop, &ret_sid);
 	if (status != IBT_SUCCESS) {
@@ -2328,8 +2451,7 @@ ibd_rc_listen(ibd_state_t *state)
 		    "Failed %d", status);
 		(void) ibt_unbind_service(state->rc_listen_hdl,
 		    state->rc_listen_bind);
-		(void) ibt_deregister_service(state->id_ibt_hdl,
-		    state->rc_listen_hdl);
+		(void) ibd_deregister_service(state->rc_listen_hdl);
 		return (status);
 	}
 
@@ -2341,12 +2463,11 @@ ibd_rc_listen(ibd_state_t *state)
 	if (status != IBT_SUCCESS) {
 		DPRINT(40, "ibd_rc_listen: fail to bind port: <%d> for "
 		    "Legacy OFED listener", status);
-		(void) ibt_deregister_service(state->id_ibt_hdl,
+		(void) ibd_deregister_service(
 		    state->rc_listen_hdl_OFED_interop);
 		(void) ibt_unbind_service(state->rc_listen_hdl,
 		    state->rc_listen_bind);
-		(void) ibt_deregister_service(state->id_ibt_hdl,
-		    state->rc_listen_hdl);
+		(void) ibd_deregister_service(state->rc_listen_hdl);
 		return (status);
 	}
 
@@ -2365,11 +2486,10 @@ ibd_rc_stop_listen(ibd_state_t *state)
 			DPRINT(40, "ibd_rc_stop_listen:"
 			    "ibt_unbind_all_services() failed, ret=%d", ret);
 		}
-		ret = ibt_deregister_service(state->id_ibt_hdl,
-		    state->rc_listen_hdl);
+		ret = ibd_deregister_service(state->rc_listen_hdl);
 		if (ret != 0) {
 			DPRINT(40, "ibd_rc_stop_listen:"
-			    "ibt_deregister_service() failed, ret=%d", ret);
+			    "ibd_deregister_service() failed, ret=%d", ret);
 		} else {
 			state->rc_listen_hdl = NULL;
 		}
@@ -2383,21 +2503,20 @@ ibd_rc_stop_listen(ibd_state_t *state)
 			DPRINT(40, "ibd_rc_stop_listen:"
 			    "ibt_unbind_all_services() failed: %d", ret);
 		}
-		ret = ibt_deregister_service(state->id_ibt_hdl,
-		    state->rc_listen_hdl_OFED_interop);
+		ret = ibd_deregister_service(state->rc_listen_hdl_OFED_interop);
 		if (ret != 0) {
 			DPRINT(40, "ibd_rc_stop_listen:"
-			    "ibt_deregister_service() failed: %d", ret);
+			    "ibd_deregister_service() failed: %d", ret);
 		} else {
 			state->rc_listen_hdl_OFED_interop = NULL;
 		}
 	}
 }
 
-int
+void
 ibd_rc_close_all_chan(ibd_state_t *state)
 {
-	ibd_rc_chan_t *rc_chan, *rc_chan1;
+	ibd_rc_chan_t *rc_chan;
 	ibd_ace_t *ace;
 	uint_t attempts;
 
@@ -2411,7 +2530,7 @@ ibd_rc_close_all_chan(ibd_state_t *state)
 	mutex_exit(&state->rc_pass_chan_list.chan_list_mutex);
 
 	if (state->rc_enable_srq) {
-		attempts = 50;
+		attempts = 10;
 		while (state->rc_srq_rwqe_list.dl_bufs_outstanding > 0) {
 			DPRINT(30, "ibd_rc_close_all_chan: outstanding > 0");
 			delay(drv_usectohz(100000));
@@ -2424,19 +2543,7 @@ ibd_rc_close_all_chan(ibd_state_t *state)
 				 * we turned off the notification and
 				 * return failure.
 				 */
-				mutex_enter(
-				    &state->rc_pass_chan_list.chan_list_mutex);
-				rc_chan = state->rc_pass_chan_list.chan_list;
-				while (rc_chan != NULL) {
-					ibd_rc_poll_rcq
-					    (rc_chan, rc_chan->rcq_hdl);
-					ibt_set_cq_handler(rc_chan->rcq_hdl,
-					    ibd_rc_rcq_handler, rc_chan);
-					rc_chan = rc_chan->next;
-				}
-				mutex_exit(
-				    &state->rc_pass_chan_list.chan_list_mutex);
-				return (DDI_FAILURE);
+				break;
 			}
 		}
 	}
@@ -2444,22 +2551,7 @@ ibd_rc_close_all_chan(ibd_state_t *state)
 	/* Close all passive RC channels */
 	rc_chan = ibd_rc_rm_header_chan_list(&state->rc_pass_chan_list);
 	while (rc_chan != NULL) {
-		if (ibd_rc_pas_close(rc_chan) != DDI_SUCCESS) {
-			mutex_enter(&state->rc_pass_chan_list.chan_list_mutex);
-			rc_chan1 = state->rc_pass_chan_list.chan_list;
-			while (rc_chan1 != NULL) {
-				ibd_rc_poll_rcq(rc_chan1, rc_chan1->rcq_hdl);
-				ibt_set_cq_handler(rc_chan1->rcq_hdl,
-				    ibd_rc_rcq_handler, rc_chan1);
-				rc_chan1 = rc_chan1->next;
-			}
-			mutex_exit(&state->rc_pass_chan_list.chan_list_mutex);
-			ibd_rc_add_to_chan_list(&state->rc_pass_chan_list,
-			    rc_chan);
-			DPRINT(40, "ibd_rc_close_all_chan: ibd_rc_pas_close() "
-			    "failed");
-			return (DDI_FAILURE);
-		}
+		(void) ibd_rc_pas_close(rc_chan);
 		rc_chan = ibd_rc_rm_header_chan_list(&state->rc_pass_chan_list);
 	}
 
@@ -2484,7 +2576,6 @@ ibd_rc_close_all_chan(ibd_state_t *state)
 		rc_chan = ibd_rc_rm_header_chan_list(
 		    &state->rc_obs_act_chan_list);
 	}
-	return (DDI_SUCCESS);
 }
 
 void

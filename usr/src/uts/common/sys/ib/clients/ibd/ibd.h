@@ -943,6 +943,25 @@ typedef struct ibd_state_s {
 #endif
 } ibd_state_t;
 
+/*
+ * Structures to track global IBTF data, data that is shared
+ * among the IBD device instances.  This includes the one ibt_hdl
+ * and the list of service registrations.
+ */
+typedef struct ibd_service_s {
+	struct ibd_service_s	*is_link;
+	ibt_srv_hdl_t		is_srv_hdl;
+	ib_svc_id_t		is_sid;
+	uint_t			is_ref_cnt;
+} ibd_service_t;
+
+typedef struct ibd_global_state_s {
+	kmutex_t	ig_mutex;
+	ibt_clnt_hdl_t	ig_ibt_hdl;
+	uint_t		ig_ibt_hdl_ref_cnt;
+	ibd_service_t	*ig_service_list;
+} ibd_global_state_t;
+
 typedef struct ibd_rc_msg_hello_s {
 	uint32_t reserved_qpn;
 	uint32_t rx_mtu;
@@ -1041,11 +1060,12 @@ ibt_status_t ibd_rc_connect(ibd_state_t *, ibd_ace_t *, ibt_path_info_t *,
 void ibd_rc_try_connect(ibd_state_t *, ibd_ace_t *,  ibt_path_info_t *);
 void ibd_rc_signal_act_close(ibd_state_t *, ibd_ace_t *);
 void ibd_rc_signal_ace_recycle(ibd_state_t *, ibd_ace_t *);
-int ibd_rc_close_all_chan(ibd_state_t *);
+void ibd_rc_close_all_chan(ibd_state_t *);
 
 /* Receive Functions */
 int ibd_rc_init_srq_list(ibd_state_t *);
 void ibd_rc_fini_srq_list(ibd_state_t *);
+int ibd_rc_repost_srq_free_list(ibd_state_t *);
 
 /* Send Functions */
 int ibd_rc_init_tx_largebuf_list(ibd_state_t *);
