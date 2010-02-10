@@ -18,11 +18,9 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 # The profile that all logins get before using their own .profile.
 
@@ -44,7 +42,7 @@ fi
 #	-rsh is given its environment in its .profile.
 
 case "$0" in
--sh | -ksh | -ksh93 | -jsh | -bash)
+-sh | -ksh | -ksh93 | -jsh | -bash | -zsh)
 
 	if [ ! -f .hushlogin ]
 	then
