@@ -4229,10 +4229,11 @@ cmlb_dkio_partition(struct cmlb_lun *cl, caddr_t arg, int flag,
 		goto done_error;
 	}
 	partitions = (efi_gpe_t *)buffer;
-
-	cmlb_swap_efi_gpe(nparts, partitions);
-
 	partitions += p64.p_partno % n_gpe_per_blk;
+
+	/* Byte swap only the requested GPE */
+	cmlb_swap_efi_gpe(1, partitions);
+
 	bcopy(&partitions->efi_gpe_PartitionTypeGUID, &p64.p_type,
 	    sizeof (struct uuid));
 	p64.p_start = partitions->efi_gpe_StartingLBA;
