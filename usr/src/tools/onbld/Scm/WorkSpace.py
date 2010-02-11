@@ -14,7 +14,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -319,75 +319,15 @@ class ActiveList(object):
     def comments(self):
         return self._comments
 
-    #
-    # It's not uncommon for a child workspace to itself contain the
-    # merge of several other children, with initial branch points in
-    # the parent (possibly from the cset a project gate was created
-    # from, for instance).
-    #
-    # Immediately after recommit, this leaves us looking like this:
-    #
-    #     *   <- recommitted changeset (real tip)
-    #     |
-    #     | *  <- Local tip
-    #     |/|
-    #     * |  <- parent tip
-    #     | |\
-    #     | | |
-    #     | | |\
-    #     | | | |
-    #     | * | |  <- Base
-    #     |/_/__/
-    #
-    #     [left-most is parent, next is child, right two being
-    #     branches in child, intermediate merges parent->child
-    #     omitted]
-    #
-    # Obviously stripping base (the first child-specific delta on the
-    # main child workspace line) doesn't remove the vestigial branches
-    # from other workspaces (or in-workspace branches, or whatever)
-    #
-    # In reality, what we need to strip in a recommit is any
-    # child-specific branch descended from the parent (rather than
-    # another part of the child).  Note that this by its very nature
-    # includes the branch representing the 'main' child workspace.
-    #
-    # We calculate these by walking from base (which is guaranteed to
-    # be the oldest child-local cset) to localtip searching for
-    # changesets with only one parent cset, and where that cset is not
-    # part of the active list (and is therefore outgoing).
-    #
     def bases(self):
-        '''Find the bases that in combination define the "old"
-        side of a recommitted set of changes, based on AL'''
+        '''Return the list of changesets that are roots of the ActiveList.
 
-        get = util.cachefunc(lambda r: self.ws.repo.changectx(r).changeset())
+        This is the set of active changesets where neither parent
+        changeset is itself active.'''
 
-        # We don't rebuild the AL So the AL local tip is the old tip
-        revrange = "%s:%s" % (self.base.rev(), self.localtip.rev())
-
-        changeiter = cmdutil.walkchangerevs(self.ws.repo.ui, self.ws.repo,
-                                            [], get, {'rev': [revrange]})[0]
-
-        hold = []
-        ret = []
-        alrevs = [x.rev() for x in self.revs]
-        for st, rev, fns in changeiter:
-            n = self.ws.repo.changelog.node(rev)
-            if st == 'add':
-                if rev in alrevs:
-                    hold.append(n)
-            elif st == 'iter':
-                if n not in hold:
-                    continue
-
-                p = self.ws.repo.changelog.parents(n)
-                if p[1] != node.nullid:
-                    continue
-
-                if self.ws.repo.changectx(p[0]).rev() not in alrevs:
-                    ret.append(n)
-        return ret
+        revset = set(self.revs)
+        return filter(lambda ctx: not [p for p in ctx.parents() if p in revset],
+                      self.revs)
 
     def tags(self):
         '''Find tags that refer to a changeset in the ActiveList,
@@ -800,10 +740,9 @@ class WorkSpace(object):
         # the base of any active branch (of which there may be
         # several)
         #
-        bases = active.bases()
         try:
             try:
-                for basenode in bases:
+                for base in active.bases():
                     #
                     # Any cached information about the repository is
                     # likely to be invalid during the strip.  The
@@ -811,7 +750,7 @@ class WorkSpace(object):
                     # problematic.
                     #
                     self.repo.invalidate()
-                    repair.strip(self.ui, self.repo, basenode, backup=False)
+                    repair.strip(self.ui, self.repo, base.node(), backup=False)
             except:
                 #
                 # If this fails, it may leave us in a surprising place in

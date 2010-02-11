@@ -14,7 +14,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -721,25 +721,60 @@ def cdm_pbchk(ui, repo, **opts):
 
 
 def cdm_recommit(ui, repo, **opts):
-    '''compact outgoing deltas into a single, conglomerate, delta'''
+    '''replace outgoing changesets with a single equivalent changeset
+
+    Replace all outgoing changesets with a single changeset containing
+    equivalent changes.  This removes uninteresting changesets created
+    during development that would only serve as noise in the gate.
+
+    Any changed file that is now identical in content to that in the
+    parent workspace (whether identical in history or otherwise) will
+    not be included in the new changeset.  Any merges information will
+    also be removed.
+
+    If no files are changed in comparison to the parent workspace, the
+    outgoing changesets will be removed, but no new changeset created.
+
+    recommit will refuse to run if the workspace contains more than
+    one outgoing head, even if those heads are on the same branch.  To
+    recommit with only one branch containing outgoing changesets, your
+    workspace must be on that branch and at that branch head.
+
+    recommit will prompt you to take a backup if your workspace has
+    been changed since the last backup was taken.  In almost all
+    cases, you should allow it to take one (the default).
+
+    recommit cannot be run if the workspace contains any uncommitted
+    changes, applied Mq patches, or has multiple outgoing heads (or
+    branches).
+    '''
+
+    ws = wslist[repo]
 
     if not os.getcwd().startswith(repo.root):
         raise util.Abort('recommit is not safe to run with -R')
 
-    abort_if_dirty(wslist[repo])
-
-    heads = repo.heads()
-    if len(heads) > 1:
-        ui.warn('Workspace has multiple heads (or branches):\n')
-        for head in heads:
-            ui.warn('\t%d\n' % repo.changelog.rev(head))
-        raise util.Abort('you must merge before recommitting')
+    abort_if_dirty(ws)
 
     wlock = repo.wlock()
     lock = repo.lock()
 
     try:
-        active = wslist[repo].active(opts['parent'])
+        parent = ws.parent(opts['parent'])
+        between = repo.changelog.nodesbetween(ws.findoutgoing(parent))[2]
+        heads = set(between) & set(repo.heads())
+
+        if len(heads) > 1:
+            ui.warn('Workspace has multiple outgoing heads (or branches):\n')
+            for head in sorted(map(repo.changelog.rev, heads), reverse=True):
+                ui.warn('\t%d\n' % head)
+            raise util.Abort('you must merge before recommitting')
+
+        active = ws.active(parent)
+
+        if filter(lambda b: len(b.parents()) > 1, active.bases()):
+            raise util.Abort('Cannot recommit a merge of two non-outgoing '
+                             'changesets')
 
         if len(active.revs) <= 0:
             raise util.Abort("no changes to recommit")
@@ -777,7 +812,7 @@ def cdm_recommit(ui, repo, **opts):
         if not message:
             raise util.Abort('empty commit message')
 
-        bk = CdmBackup(ui, wslist[repo], backup_name(repo.root))
+        bk = CdmBackup(ui, ws, backup_name(repo.root))
         if bk.need_backup():
             if yes_no(ui, 'Do you want to backup files first?', True):
                 bk.backup()
@@ -786,7 +821,7 @@ def cdm_recommit(ui, repo, **opts):
         clearedtags = [(name, nd, repo.changelog.rev(nd), local)
                 for name, nd, local in active.tags()]
 
-        wslist[repo].squishdeltas(active, message, user=user)
+        ws.squishdeltas(active, message, user=user)
     finally:
         lock.release()
         wlock.release()
