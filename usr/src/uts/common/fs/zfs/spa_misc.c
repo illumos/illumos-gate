@@ -476,7 +476,7 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 	    offsetof(spa_config_dirent_t, scd_link));
 
 	dp = kmem_zalloc(sizeof (spa_config_dirent_t), KM_SLEEP);
-	dp->scd_path = spa_strdup(spa_config_path);
+	dp->scd_path = altroot ? NULL : spa_strdup(spa_config_path);
 	list_insert_head(&spa->spa_config_list, dp);
 
 	if (config != NULL)
