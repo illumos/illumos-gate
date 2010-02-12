@@ -1,5 +1,11 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+# With zfs root the active menu.lst file is /<pool>/boot/grub/menu.lst
+# This reference copy of the file is not used.
+
 # default menu entry to boot
 default 0
 #
@@ -9,8 +15,8 @@ timeout 10
 #
 # To enable grub serial console to ttya uncomment the following lines
 # and comment out the splashimage line below
-# WARNING: don't enable grub serial console when BIOS console serial
-#	redirection is active!!!
+# WARNING: do not enable grub serial console when BIOS console serial
+#	redirection is active.
 #   serial --unit=0 --speed=9600
 #   terminal serial
 #
