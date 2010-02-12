@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,7 @@
 #include <tsol/label.h>
 #include <zone.h>
 #include <signal.h>
+#include <sys/resource.h>
 #include "cache.h"
 #include "nscd_log.h"
 #include "nscd_selfcred.h"
@@ -117,6 +118,7 @@ main(int argc, char ** argv)
 	char		*ret_locale;
 	char		*ret_textdomain;
 	char		msg[128];
+	struct		rlimit rl;
 
 	ret_locale = setlocale(LC_ALL, "");
 	if (ret_locale == NULL)
@@ -448,6 +450,14 @@ gettext("%s already running.... no administration option specified\n"),
 			(void) dup(0);
 	}
 
+	/* set NOFILE to unlimited */
+	rl.rlim_cur = rl.rlim_max = RLIM_INFINITY;
+	if (setrlimit(RLIMIT_NOFILE, &rl) < 0) {
+		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)
+		(me, "Cannot set open file limit: %s\n", strerror(errno));
+		exit(1);
+	}
+
 	/* set up door and establish our own server thread pool */
 	if ((_doorfd = _nscd_setup_server(saved_execname, saved_argv)) == -1) {
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)
@@ -542,6 +552,7 @@ detachfromtty(void)
 	default:
 		exit(0);
 	}
+
 	(void) setsid();
 	(void) open("/dev/null", O_RDWR, 0);
 	(void) dup(0);

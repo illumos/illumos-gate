@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,8 +43,6 @@
 #include <procfs.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <limits.h>
-#include <sys/resource.h>
 #include <libscf.h>
 #include "nscd_door.h"
 #include "nscd_config.h"
@@ -1106,8 +1102,6 @@ _nscd_start_forker(
 	char	**argv)
 {
 	pid_t	cid;
-	struct	rlimit rl;
-	char	*me = "_nscd_start_forker";
 
 	/* if self cred is not configured, do nothing */
 	if (!_nscd_is_self_cred_on(1, NULL))
@@ -1132,16 +1126,6 @@ _nscd_start_forker(
 			/* main nscd */
 			/* remember process id of the forker */
 			forker_pid = cid;
-
-			/* set NOFILE to unlimited */
-			rl.rlim_cur = rl.rlim_max = RLIM_INFINITY;
-			if (setrlimit(RLIMIT_NOFILE, &rl) < 0) {
-				_NSCD_LOG(NSCD_LOG_SELF_CRED,
-				    NSCD_LOG_LEVEL_ERROR)
-				(me, "Cannot set open file limit: %s\n",
-				    strerror(errno));
-				exit(1);
-			}
 
 			/* enable child nscd management */
 			(void) _nscd_init_cslots();
