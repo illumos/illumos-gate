@@ -49,18 +49,24 @@ static size_t argv_size = 0;
 #ifdef sun
 #include <priv.h>
 void
-drop_privileges (int keep_auxgroups)
+drop_privileges(int keep_auxgroups)
 {
-	priv_set_t *pPrivSet = NULL;
-	priv_set_t *lPrivSet = NULL;
+	priv_set_t *pPrivSet;
 
 	/*
 	 * Start with the 'basic' privilege set and then remove any
 	 * of the 'basic' privileges that will not be needed.
 	 */
-	if ((pPrivSet = priv_str_to_set("basic", ",", NULL)) == NULL) {
+	if ((pPrivSet = priv_allocset()) == NULL) {
 		return;
 	}
+
+	/*
+	 * Establish the basic set of privileges.
+	 * Note: fork/exec required for libdevinfo devlink
+	 * interfaces are included in the basic set.
+	 */
+	priv_basicset(pPrivSet);
 
 	/* Clear privileges we will not need from the 'basic' set */
 	(void) priv_delset(pPrivSet, PRIV_FILE_LINK_ANY);
@@ -74,22 +80,12 @@ drop_privileges (int keep_auxgroups)
 	(void) priv_addset(pPrivSet, PRIV_PROC_AUDIT);
 
 	/* Set the permitted privilege set. */
-	if (setppriv(PRIV_SET, PRIV_PERMITTED, pPrivSet) != 0) {
-		return;
-	}
+	(void) setppriv(PRIV_SET, PRIV_PERMITTED, pPrivSet);
 
-	/* Clear the limit set. */
-	if ((lPrivSet = priv_allocset()) == NULL) {
-		return;
-	}
+	/* Set the limit privilege set. */
+	(void) setppriv(PRIV_SET, PRIV_LIMIT, pPrivSet);
 
-	priv_emptyset(lPrivSet);
-
-	if (setppriv(PRIV_SET, PRIV_LIMIT, lPrivSet) != 0) {
-		return;
-	}
-
-	priv_freeset(lPrivSet);
+	priv_freeset(pPrivSet);
 }
 #else /* !sun */
 
