@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_DR_H
 #define	_SYS_DR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -375,8 +373,8 @@ extern void		dr_release_sr_handle(dr_sr_handle_t *srh);
 extern int		dr_suspend(dr_sr_handle_t *srh);
 extern void		dr_resume(dr_sr_handle_t *srh);
 extern void		dr_check_devices(dev_info_t *dip, int *refcount,
-					dr_handle_t *handle, uint64_t *arr,
-					int *idx, int len);
+			    dr_handle_t *handle, uint64_t *arr, int *idx,
+			    int len, int *refcount_non_gldv3);
 extern int		dr_pt_test_suspend(dr_handle_t *hp);
 
 /*

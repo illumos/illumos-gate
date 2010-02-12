@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/debug.h>
 #include <sys/types.h>
@@ -268,7 +266,7 @@ sbd_io_status(sbd_handle_t *hp, sbd_devset_t devset, sbd_dev_stat_t *dsp)
 		 * We use a dummy handle in which to collect
 		 * the major numbers of unsafe devices.
 		 */
-		sbdp_check_devices(dip, &refcount, sep);
+		sbdp_check_devices(dip, &refcount, sep, NULL);
 
 		isp->is_referenced = (refcount == 0) ? 0 : 1;
 
@@ -338,18 +336,29 @@ sbd_check_io_refs(sbd_handle_t *hp, sbd_devlist_t devlist[], int devnum)
 	for (i = 0; i < devnum; i++) {
 		dev_info_t	*dip;
 		int		ref;
+		int		refcount_non_gldv3;
 
 		dip = devlist[i].dv_dip;
 		ref = 0;
-		sbdp_check_devices(dip, &ref, sep);
+		refcount_non_gldv3 = 0;
+		sbdp_check_devices(dip, &ref, sep, &refcount_non_gldv3);
+		ASSERT(refcount_non_gldv3 >= 0);
+		ASSERT(ref >= refcount_non_gldv3);
+		/*
+		 * Ignore reference counts of non-gldv3 network devices
+		 * as Crossbow creates reference counts for non-active
+		 * (unplumbed) instances.  Reference count check in
+		 * detach() known to prevent device from detaching
+		 * as necessary.
+		 */
+		ref -= refcount_non_gldv3;
 		if (ref) {
 			if (SBD_GET_ERR(ep) == 0) {
 				SBD_GET_PERR(sep, ep);
 			}
 			SBD_GET_PERR(sep, &devlist[i].dv_error);
 		}
-		PR_IO("%s: dip(%s) ref = %d\n",
-			f, ddi_get_name(dip), ref);
+		PR_IO("%s: dip(%s) ref = %d\n", f, ddi_get_name(dip), ref);
 		reftotal += ref;
 	}
 

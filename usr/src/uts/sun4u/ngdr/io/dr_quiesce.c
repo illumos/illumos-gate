@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -188,7 +188,7 @@ dr_is_real_device(dev_info_t *dip)
 	 * now the general case
 	 */
 	rc = ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS, "reg",
-		(caddr_t)&regbuf, &length);
+	    (caddr_t)&regbuf, &length);
 	ASSERT(rc != DDI_PROP_NO_MEMORY);
 	if (rc != DDI_PROP_SUCCESS) {
 		return (0);
@@ -262,6 +262,7 @@ dr_resolve_devname(dev_info_t *dip, char *buffer, char *alias)
 
 struct dr_ref {
 	int		*refcount;
+	int		*refcount_non_gldv3;
 	uint64_t	*arr;
 	int		*idx;
 	int		len;
@@ -290,14 +291,18 @@ dr_check_dip(dev_info_t *dip, void *arg, uint_t ref)
 		if (ref && rp->refcount) {
 			*rp->refcount += ref;
 			PR_QR("\n  %s (major# %d) is referenced(%u)\n",
-				dname, major, ref);
+			    dname, major, ref);
+		}
+		if (ref && rp->refcount_non_gldv3) {
+			if (NETWORK_PHYSDRV(major) && !GLDV3_DRV(major))
+				*rp->refcount_non_gldv3 += ref;
 		}
 		if (dr_is_unsafe_major(major) && i_ddi_devi_attached(dip)) {
 			PR_QR("\n  %s (major# %d) not hotpluggable\n",
-				dname, major);
+			    dname, major);
 			if (rp->arr != NULL && rp->idx != NULL)
 				*rp->idx = dr_add_int(rp->arr, *rp->idx,
-					rp->len, (uint64_t)major);
+				    rp->len, (uint64_t)major);
 		}
 	}
 	return (DDI_WALK_CONTINUE);
@@ -313,7 +318,7 @@ dr_check_unsafe_major(dev_info_t *dip, void *arg)
 /*ARGSUSED*/
 void
 dr_check_devices(dev_info_t *dip, int *refcount, dr_handle_t *handle,
-    uint64_t *arr, int *idx, int len)
+    uint64_t *arr, int *idx, int len, int *refcount_non_gldv3)
 {
 	struct dr_ref bref = {0};
 
@@ -321,6 +326,7 @@ dr_check_devices(dev_info_t *dip, int *refcount, dr_handle_t *handle,
 		return;
 
 	bref.refcount = refcount;
+	bref.refcount_non_gldv3 = refcount_non_gldv3;
 	bref.arr = arr;
 	bref.idx = idx;
 	bref.len = len;
@@ -364,13 +370,13 @@ dr_suspend_devices(dev_info_t *dip, dr_sr_handle_t *srh)
 
 		if (dr_bypass_device(dname)) {
 			PR_QR(" bypassed suspend of %s (major# %d)\n", dname,
-				major);
+			    major);
 			continue;
 		}
 
 		if (drmach_verify_sr(dip, 1)) {
 			PR_QR(" bypassed suspend of %s (major# %d)\n", dname,
-				major);
+			    major);
 			continue;
 		}
 
@@ -381,10 +387,10 @@ dr_suspend_devices(dev_info_t *dip, dr_sr_handle_t *srh)
 		if (dr_resolve_devname(dip, d_name, d_alias) == 0) {
 			if (d_alias[0] != 0) {
 				prom_printf("\tsuspending %s@%s (aka %s)\n",
-					d_name, d_info, d_alias);
+				    d_name, d_info, d_alias);
 			} else {
 				prom_printf("\tsuspending %s@%s\n",
-					d_name, d_info);
+				    d_name, d_info);
 			}
 		} else {
 			prom_printf("\tsuspending %s@%s\n", dname, d_info);
@@ -392,18 +398,17 @@ dr_suspend_devices(dev_info_t *dip, dr_sr_handle_t *srh)
 
 		if (devi_detach(dip, DDI_SUSPEND) != DDI_SUCCESS) {
 			prom_printf("\tFAILED to suspend %s@%s\n",
-				d_name[0] ? d_name : dname, d_info);
+			    d_name[0] ? d_name : dname, d_info);
 
 			srh->sr_err_idx = dr_add_int(srh->sr_err_ints,
-				srh->sr_err_idx, DR_MAX_ERR_INT,
-				(uint64_t)major);
+			    srh->sr_err_idx, DR_MAX_ERR_INT, (uint64_t)major);
 
 			ndi_hold_devi(dip);
 			srh->sr_failed_dip = dip;
 
 			handle = srh->sr_dr_handlep;
 			dr_op_err(CE_IGNORE, handle, ESBD_SUSPEND, "%s@%s",
-				d_name[0] ? d_name : dname, d_info);
+			    d_name[0] ? d_name : dname, d_info);
 
 			return (DDI_FAILURE);
 		}
@@ -435,8 +440,8 @@ dr_resume_devices(dev_info_t *start, dr_sr_handle_t *srh)
 			/* release hold acquired in dr_suspend_devices() */
 			srh->sr_failed_dip = NULL;
 			ndi_rele_devi(dip);
-		} else if (dr_is_real_device(dip) &&
-				srh->sr_failed_dip == NULL) {
+		} else
+		if (dr_is_real_device(dip) && srh->sr_failed_dip == NULL) {
 
 			if ((bn = ddi_binding_name(dip)) != NULL) {
 				major = ddi_name_to_major(bn);
@@ -444,7 +449,7 @@ dr_resume_devices(dev_info_t *start, dr_sr_handle_t *srh)
 				bn = "<null>";
 			}
 			if (!dr_bypass_device(bn) &&
-				!drmach_verify_sr(dip, 0)) {
+			    !drmach_verify_sr(dip, 0)) {
 				char	d_name[40], d_alias[40], *d_info;
 
 				d_name[0] = 0;
@@ -453,24 +458,22 @@ dr_resume_devices(dev_info_t *start, dr_sr_handle_t *srh)
 					d_info = "<null>";
 
 				if (!dr_resolve_devname(dip, d_name,
-								d_alias)) {
+				    d_alias)) {
 					if (d_alias[0] != 0) {
 						prom_printf("\tresuming "
-							"%s@%s (aka %s)\n",
-							d_name, d_info,
-							d_alias);
+						    "%s@%s (aka %s)\n",
+						    d_name, d_info, d_alias);
 					} else {
 						prom_printf("\tresuming "
-							"%s@%s\n",
-							d_name, d_info);
+						    "%s@%s\n", d_name, d_info);
 					}
 				} else {
 					prom_printf("\tresuming %s@%s\n",
-						bn, d_info);
+					    bn, d_info);
 				}
 
 				if (devi_attach(dip, DDI_RESUME) !=
-							DDI_SUCCESS) {
+				    DDI_SUCCESS) {
 					/*
 					 * Print a console warning,
 					 * set an e_code of ESBD_RESUME,
@@ -481,9 +484,9 @@ dr_resume_devices(dev_info_t *start, dr_sr_handle_t *srh)
 					    d_name[0] ? d_name : bn, d_info);
 
 					srh->sr_err_idx =
-						dr_add_int(srh->sr_err_ints,
-						srh->sr_err_idx, DR_MAX_ERR_INT,
-						(uint64_t)major);
+					    dr_add_int(srh->sr_err_ints,
+					    srh->sr_err_idx, DR_MAX_ERR_INT,
+					    (uint64_t)major);
 
 					handle = srh->sr_dr_handlep;
 
@@ -641,7 +644,7 @@ dr_stop_user_threads(dr_sr_handle_t *srh)
 	/* were we unable to stop all threads after a few tries? */
 	if (bailout) {
 		handle->h_err = drerr_int(ESBD_UTHREAD, srh->sr_err_ints,
-			srh->sr_err_idx, 0);
+		    srh->sr_err_idx, 0);
 		return (ESRCH);
 	}
 
@@ -755,7 +758,7 @@ dr_resume(dr_sr_handle_t *srh)
 		if (srh->sr_flags & (SR_FLAG_WATCHDOG)) {
 			mutex_enter(&tod_lock);
 			tod_ops.tod_set_watchdog_timer(
-				watchdog_timeout_seconds);
+			    watchdog_timeout_seconds);
 			mutex_exit(&tod_lock);
 		}
 
@@ -780,7 +783,7 @@ dr_resume(dr_sr_handle_t *srh)
 
 		if (srh->sr_err_idx && srh->sr_dr_handlep) {
 			(srh->sr_dr_handlep)->h_err = drerr_int(ESBD_RESUME,
-				srh->sr_err_ints, srh->sr_err_idx, 1);
+			    srh->sr_err_ints, srh->sr_err_idx, 1);
 		}
 
 		/*
@@ -866,7 +869,7 @@ dr_suspend(dr_sr_handle_t *srh)
 		ddi_walk_devs(ddi_root_node(), dr_check_unsafe_major, &drc);
 		if (dev_errs_idx) {
 			handle->h_err = drerr_int(ESBD_UNSAFE, dev_errs,
-				dev_errs_idx, 1);
+			    dev_errs_idx, 1);
 			dr_resume(srh);
 			return (DDI_FAILURE);
 		}
@@ -904,7 +907,7 @@ dr_suspend(dr_sr_handle_t *srh)
 	if ((rc = dr_suspend_devices(ddi_root_node(), srh)) != DDI_SUCCESS) {
 		if (srh->sr_err_idx && srh->sr_dr_handlep) {
 			(srh->sr_dr_handlep)->h_err = drerr_int(ESBD_SUSPEND,
-				srh->sr_err_ints, srh->sr_err_idx, 1);
+			    srh->sr_err_ints, srh->sr_err_idx, 1);
 		}
 		dr_resume(srh);
 		return (rc);
@@ -962,7 +965,7 @@ dr_pt_test_suspend(dr_handle_t *hp)
 			switch (psmerr) {
 			case ESBD_RESUME:
 				PR_QR("Couldn't resume devices: %s\n",
-					DR_GET_E_RSC(hp->h_err));
+				    DR_GET_E_RSC(hp->h_err));
 				break;
 
 			case ESBD_KTHREAD:
@@ -970,38 +973,38 @@ dr_pt_test_suspend(dr_handle_t *hp)
 				break;
 			default:
 				PR_ALL("Resume error unknown = %d\n",
-					psmerr);
+				    psmerr);
 				break;
 			}
 		}
 	} else {
 		PR_ALL("%s: dr_suspend() failed, err = 0x%x\n",
-			f, err);
+		    f, err);
 		psmerr = hp->h_err ? hp->h_err->e_code : ESBD_NOERROR;
 		switch (psmerr) {
 		case ESBD_UNSAFE:
 			PR_ALL("Unsafe devices (major #): %s\n",
-				DR_GET_E_RSC(hp->h_err));
+			    DR_GET_E_RSC(hp->h_err));
 			break;
 
 		case ESBD_RTTHREAD:
 			PR_ALL("RT threads (PIDs): %s\n",
-				DR_GET_E_RSC(hp->h_err));
+			    DR_GET_E_RSC(hp->h_err));
 			break;
 
 		case ESBD_UTHREAD:
 			PR_ALL("User threads (PIDs): %s\n",
-				DR_GET_E_RSC(hp->h_err));
+			    DR_GET_E_RSC(hp->h_err));
 			break;
 
 		case ESBD_SUSPEND:
 			PR_ALL("Non-suspendable devices (major #): %s\n",
-				DR_GET_E_RSC(hp->h_err));
+			    DR_GET_E_RSC(hp->h_err));
 			break;
 
 		case ESBD_RESUME:
 			PR_ALL("Could not resume devices (major #): %s\n",
-				DR_GET_E_RSC(hp->h_err));
+			    DR_GET_E_RSC(hp->h_err));
 			break;
 
 		case ESBD_KTHREAD:
@@ -1081,14 +1084,13 @@ drerr_int(int e_code, uint64_t *arr, int idx, int majors)
 			dname = ddi_major_to_name(arr[i]);
 			if (dname) {
 				n = snprintf(&buf[buf_idx], buf_avail,
-					"%s, ", dname);
+				    "%s, ", dname);
 			} else {
 				n = snprintf(&buf[buf_idx], buf_avail,
-					"major %lu, ", arr[i]);
+				    "major %lu, ", arr[i]);
 			}
 		} else {
-			n = snprintf(&buf[buf_idx], buf_avail, "%lu, ",
-				arr[i]);
+			n = snprintf(&buf[buf_idx], buf_avail, "%lu, ", arr[i]);
 		}
 
 		/* An ellipsis gets appended when no more values fit */

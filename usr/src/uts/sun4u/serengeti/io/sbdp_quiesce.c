@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -234,6 +234,7 @@ sbdp_resolve_devname(dev_info_t *dip, char *buffer, char *alias)
 
 typedef struct sbdp_ref {
 	int *refcount;
+	int *refcount_non_gldv3;
 	sbd_error_t *sep;
 } sbdp_ref_t;
 
@@ -268,10 +269,18 @@ sbdp_check_dip(dev_info_t *dip, void *arg, uint_t ref)
 #endif
 
 	if (ref) {
+		major_t	major;
+
 		(*sbrp->refcount)++;
 		SBDP_DBG_QR("\n%s (major# %d) is referenced\n",
 		    dname, ddi_name_to_major(dname));
 		(void) ddi_pathname(dip, sbdp_get_err_buf(sbrp->sep));
+		major = ddi_driver_major(dip);
+		if (sbrp->refcount_non_gldv3 && NETWORK_PHYSDRV(major) &&
+		    !GLDV3_DRV(major)) {
+			(*sbrp->refcount_non_gldv3)++;
+			return (DDI_WALK_CONTINUE);
+		}
 		sbdp_set_err(sbrp->sep, ESBD_BUSY, NULL);
 		return (DDI_WALK_TERMINATE);
 	}
@@ -279,11 +288,13 @@ sbdp_check_dip(dev_info_t *dip, void *arg, uint_t ref)
 }
 
 void
-sbdp_check_devices(dev_info_t *dip, int *refcount, sbd_error_t *sep)
+sbdp_check_devices(dev_info_t *dip, int *refcount, sbd_error_t *sep,
+    int *refcount_non_gldv3)
 {
 	sbdp_ref_t sbr;
 
 	sbr.refcount = refcount;
+	sbr.refcount_non_gldv3 = refcount_non_gldv3;
 	sbr.sep = sep;
 
 	ASSERT(e_ddi_branch_held(dip));

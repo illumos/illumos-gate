@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -167,6 +167,7 @@ dr_check_io_refs(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 		dr_io_unit_t	*ip = (dr_io_unit_t *)devlist[i];
 		dev_info_t	*dip;
 		int		ref;
+		int		refcount_non_gldv3;
 		sbd_error_t	*err;
 
 		err = drmach_get_dip(ip->sbi_cm.sbdev_id, &dip);
@@ -174,8 +175,20 @@ dr_check_io_refs(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 			DRERR_SET_C(&ip->sbi_cm.sbdev_error, &err);
 		else if (dip != NULL) {
 			ref = 0;
+			refcount_non_gldv3 = 0;
 			ASSERT(e_ddi_branch_held(dip));
-			dr_check_devices(dip, &ref, hp, NULL, NULL, 0);
+			dr_check_devices(dip, &ref, hp, NULL, NULL,
+			    0, &refcount_non_gldv3);
+			ASSERT(refcount_non_gldv3 >= 0);
+			ASSERT(ref >= refcount_non_gldv3);
+			/*
+			 * Ignore reference counts of non-gldv3 network devices
+			 * as Crossbow creates reference counts for non-active
+			 * (unplumbed) instances.  Reference count check in
+			 * detach() known to prevent device from detaching
+			 * as necessary.
+			 */
+			ref -= refcount_non_gldv3;
 			hp->h_err = NULL;
 			if (ref) {
 				dr_dev_err(CE_WARN, &ip->sbi_cm, ESBD_BUSY);
@@ -380,7 +393,7 @@ dr_io_status(dr_handle_t *hp, dr_devset_t devset, sbd_dev_stat_t *dsp)
 			/* check reference and unsafe counts on devices */
 			isp->is_unsafe_count = 0;
 			dr_check_devices(dip, &refcount, hp, unsafe_devs,
-			    &idx, SBD_MAX_UNSAFE);
+			    &idx, SBD_MAX_UNSAFE, NULL);
 			while (idx > 0) {
 				isp->is_unsafe_list[idx-1] = unsafe_devs[idx-1];
 				--idx;
