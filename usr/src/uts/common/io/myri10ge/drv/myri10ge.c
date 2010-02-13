@@ -68,7 +68,7 @@ int myri10ge_force_firmware = 0;
 static boolean_t myri10ge_use_lso = B_TRUE;
 static int myri10ge_rss_hash = MXGEFW_RSS_HASH_TYPE_SRC_DST_PORT;
 static int myri10ge_tx_hash = 1;
-static int myri10ge_lro = 1;
+static int myri10ge_lro = 0;
 static int myri10ge_lro_cnt = 8;
 int myri10ge_lro_max_aggr = 2;
 static int myri10ge_lso_copy = 0;
@@ -3059,7 +3059,7 @@ static int
 myri10ge_lso_parse_header(mblk_t *mp, int off)
 {
 	char buf[128];
-	int seglen;
+	int seglen, sum_off;
 	struct ip *ip;
 	struct tcphdr *tcp;
 
@@ -3076,6 +3076,36 @@ myri10ge_lso_parse_header(mblk_t *mp, int off)
 		ip = (struct ip *)(void *)buf;
 	}
 	tcp = (struct tcphdr *)(void *)((char *)ip + (ip->ip_hl << 2));
+
+	/*
+	 * NIC expects ip_sum to be zero.  Recent changes to
+	 * OpenSolaris leave the correct ip checksum there, rather
+	 * than the required zero, so we need to zero it.  Otherwise,
+	 * the NIC will produce bad checksums when sending LSO packets.
+	 */
+	if (ip->ip_sum != 0) {
+		if (((char *)ip) != buf) {
+			/* ip points into mblk, so just zero it */
+			ip->ip_sum = 0;
+		} else {
+			/*
+			 * ip points into a copy, so walk the chain
+			 * to find the ip_csum, then zero it
+			 */
+			sum_off = off + _PTRDIFF(&ip->ip_sum, buf);
+			while (sum_off > (int)(MBLKL(mp) - 1)) {
+				sum_off -= MBLKL(mp);
+				mp = mp->b_cont;
+			}
+			mp->b_rptr[sum_off] = 0;
+			sum_off++;
+			while (sum_off > MBLKL(mp) - 1) {
+				sum_off -= MBLKL(mp);
+				mp = mp->b_cont;
+			}
+			mp->b_rptr[sum_off] = 0;
+		}
+	}
 	return (off + ((ip->ip_hl + tcp->th_off) << 2));
 }
 
