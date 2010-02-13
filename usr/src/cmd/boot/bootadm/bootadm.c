@@ -5602,8 +5602,12 @@ get_pool(char *osdev)
 		return (NULL);
 	}
 
+	/*
+	 * Call the zfs fstyp directly since this is a zpool. This avoids
+	 * potential pcfs conflicts if the first block wasn't cleared.
+	 */
 	(void) snprintf(cmd, sizeof (cmd),
-	    "/usr/sbin/fstyp -a %s 2>/dev/null | /bin/grep '^name:'",
+	    "/usr/lib/fs/zfs/fstyp -a %s 2>/dev/null | /bin/grep '^name:'",
 	    osdev);
 
 	ret = exec_cmd(cmd, &flist);
@@ -5922,9 +5926,9 @@ process_slice_common(char *slice, FILE *tfp, mhash_t *mhp, char *tmpmnt)
 		return (0);
 	}
 
-	/* Check if ufs */
+	/* Check if ufs. Call ufs fstyp directly to avoid pcfs conflicts. */
 	(void) snprintf(cmd, sizeof (cmd),
-	    "/usr/sbin/fstyp /dev/rdsk/%s 2>/dev/null",
+	    "/usr/lib/fs/ufs/fstyp /dev/rdsk/%s 2>/dev/null",
 	    slice);
 
 	if (exec_cmd(cmd, &flist) != 0) {
