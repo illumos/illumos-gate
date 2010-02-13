@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2001,7 +2001,7 @@ px_err_pciex_ue_handle(dev_info_t *rpdip, caddr_t csr_base,
 		regs.ue_reg = (uint32_t)BITMASK(err_bit_descr->bit - 32);
 	}
 
-	err = px_err_check_pcie(rpdip, derr, &regs);
+	err = px_err_check_pcie(rpdip, derr, &regs, PF_INTR_TYPE_INTERNAL);
 
 	if (err & PX_PANIC) {
 		return (px_err_panic_handle(rpdip, csr_base, derr,
@@ -2135,7 +2135,7 @@ px_err_pciex_ce_handle(dev_info_t *rpdip, caddr_t csr_base,
 	else
 		regs.ce_reg = (uint32_t)BITMASK(err_bit_descr->bit - 32);
 
-	err = px_err_check_pcie(rpdip, derr, &regs);
+	err = px_err_check_pcie(rpdip, derr, &regs, PF_INTR_TYPE_INTERNAL);
 
 	if (err & PX_PANIC) {
 		return (px_err_panic_handle(rpdip, csr_base, derr,

@@ -132,7 +132,7 @@ int
 px_err_cmn_intr(px_t *px_p, ddi_fm_error_t *derr, int caller, int block)
 {
 	px_err_safeacc_check(px_p, derr);
-	return (DDI_FM_OK);
+	return (PX_NO_ERROR);
 }
 
 /*
@@ -141,7 +141,6 @@ px_err_cmn_intr(px_t *px_p, ddi_fm_error_t *derr, int caller, int block)
 static void
 px_err_fill_pfd(dev_info_t *dip, pf_data_t *pfd_p, px_rc_err_t *epkt) {
 	pf_pcie_adv_err_regs_t adv_reg;
-	int		sts = DDI_SUCCESS;
 	pcie_req_id_t	fault_bdf = PCIE_INVALID_BDF;
 	uint64_t	fault_addr = 0;
 	uint16_t	s_status = 0;
@@ -158,16 +157,10 @@ px_err_fill_pfd(dev_info_t *dip, pf_data_t *pfd_p, px_rc_err_t *epkt) {
 			    PF_AFFECTED_BDF;
 			PFD_AFFECTED_DEV(pfd_p)->pe_affected_bdf =
 			    fault_bdf;
-		} else
-			sts = DDI_FAILURE;
+		}
 	} else {
 		px_pec_err_t	*pec_p = (px_pec_err_t *)epkt;
 		uint32_t	dir = pec_p->pec_descr.dir;
-
-		adv_reg.pcie_ue_hdr[0] = (uint32_t)(pec_p->hdr[0]);
-		adv_reg.pcie_ue_hdr[1] = (uint32_t)(pec_p->hdr[0] >> 32);
-		adv_reg.pcie_ue_hdr[2] = (uint32_t)(pec_p->hdr[1]);
-		adv_reg.pcie_ue_hdr[3] = (uint32_t)(pec_p->hdr[1] >> 32);
 
 		/* translate RC UR/CA to legacy secondary errors */
 		if ((dir == DIR_READ || dir == DIR_WRITE) &&
@@ -184,17 +177,27 @@ px_err_fill_pfd(dev_info_t *dip, pf_data_t *pfd_p, px_rc_err_t *epkt) {
 		if (pec_p->ue_reg_status & PCIE_AER_UCE_CA)
 			s_status |= PCI_STAT_S_TARG_AB;
 
-		sts = pf_tlp_decode(PCIE_DIP2BUS(dip), &adv_reg);
-		fault_bdf = adv_reg.pcie_ue_tgt_bdf;
-		fault_addr = adv_reg.pcie_ue_tgt_addr;
-		/* affected BDF is to be filled in by px_scan_fabric */
+		if (pec_p->pec_descr.H) {
+			adv_reg.pcie_ue_hdr[0] = (uint32_t)(pec_p->hdr[0] >>32);
+			adv_reg.pcie_ue_hdr[1] = (uint32_t)(pec_p->hdr[0]);
+			adv_reg.pcie_ue_hdr[2] = (uint32_t)(pec_p->hdr[1] >>32);
+			adv_reg.pcie_ue_hdr[3] = (uint32_t)(pec_p->hdr[1]);
+
+			if (pf_tlp_decode(PCIE_DIP2BUS(dip), &adv_reg) ==
+			    DDI_SUCCESS) {
+				fault_bdf = adv_reg.pcie_ue_tgt_bdf;
+				fault_addr = adv_reg.pcie_ue_tgt_addr;
+				/*
+				 * affected BDF is to be filled in by
+				 * px_scan_fabric
+				 */
+			}
+		}
 	}
 
-	if (sts == DDI_SUCCESS) {
-		PCIE_ROOT_FAULT(pfd_p)->scan_bdf = fault_bdf;
-		PCIE_ROOT_FAULT(pfd_p)->scan_addr = (uint64_t)fault_addr;
-		PCI_BDG_ERR_REG(pfd_p)->pci_bdg_sec_stat = s_status;
-	}
+	PCIE_ROOT_FAULT(pfd_p)->scan_bdf = fault_bdf;
+	PCIE_ROOT_FAULT(pfd_p)->scan_addr = (uint64_t)fault_addr;
+	PCI_BDG_ERR_REG(pfd_p)->pci_bdg_sec_stat = s_status;
 }
 
 /*
@@ -661,10 +664,10 @@ px_port_handle_errors(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt,
 		goto done;
 	}
 
-	adv_reg.pcie_ue_hdr[0] = (uint32_t)(epkt->hdr[0]);
-	adv_reg.pcie_ue_hdr[1] = (uint32_t)(epkt->hdr[0] >> 32);
-	adv_reg.pcie_ue_hdr[2] = (uint32_t)(epkt->hdr[1]);
-	adv_reg.pcie_ue_hdr[3] = (uint32_t)(epkt->hdr[1] >> 32);
+	adv_reg.pcie_ue_hdr[0] = (uint32_t)(epkt->hdr[0] >> 32);
+	adv_reg.pcie_ue_hdr[1] = (uint32_t)(epkt->hdr[0]);
+	adv_reg.pcie_ue_hdr[2] = (uint32_t)(epkt->hdr[1] >> 32);
+	adv_reg.pcie_ue_hdr[3] = (uint32_t)(epkt->hdr[1]);
 
 	sts = pf_tlp_decode(PCIE_DIP2BUS(dip), &adv_reg);
 
@@ -716,14 +719,16 @@ px_pcie_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt)
 	 * Check for failed PIO Read/Writes, which are errors that are not
 	 * defined in the PCIe spec.
 	 */
+
 	temp = PCIE_AER_UCE_UR | PCIE_AER_UCE_CA;
 	if (((pec_p->pec_descr.dir == DIR_READ) ||
 	    (pec_p->pec_descr.dir == DIR_WRITE)) &&
 	    pec_p->pec_descr.U && (pec_p->ue_reg_status & temp)) {
-		adv_reg.pcie_ue_hdr[0] = (uint32_t)(pec_p->hdr[0]);
-		adv_reg.pcie_ue_hdr[1] = (uint32_t)(pec_p->hdr[0] >> 32);
-		adv_reg.pcie_ue_hdr[2] = (uint32_t)(pec_p->hdr[1]);
-		adv_reg.pcie_ue_hdr[3] = (uint32_t)(pec_p->hdr[1] >> 32);
+
+		adv_reg.pcie_ue_hdr[0] = (uint32_t)(pec_p->hdr[0] >> 32);
+		adv_reg.pcie_ue_hdr[1] = (uint32_t)(pec_p->hdr[0]);
+		adv_reg.pcie_ue_hdr[2] = (uint32_t)(pec_p->hdr[1] >> 32);
+		adv_reg.pcie_ue_hdr[3] = (uint32_t)(pec_p->hdr[1]);
 
 		sts = pf_tlp_decode(PCIE_DIP2BUS(dip), &adv_reg);
 
@@ -784,7 +789,7 @@ px_pcie_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt)
 		pcie->tx_hdr4 = 0;
 	}
 
-	return (px_err_check_pcie(dip, derr, pcie));
+	return (px_err_check_pcie(dip, derr, pcie, PF_INTR_TYPE_INTERNAL));
 }
 
 static int

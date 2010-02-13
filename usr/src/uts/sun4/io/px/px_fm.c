@@ -574,12 +574,15 @@ px_err_check_eq(dev_info_t *dip)
 
 /* ARGSUSED */
 int
-px_err_check_pcie(dev_info_t *dip, ddi_fm_error_t *derr, px_err_pcie_t *regs)
+px_err_check_pcie(dev_info_t *dip, ddi_fm_error_t *derr, px_err_pcie_t *regs,
+    pf_intr_type_t intr_type)
 {
 	px_t		*px_p = DIP_TO_STATE(dip);
 	pf_data_t	*pfd_p = px_get_pfd(px_p);
 	int		i;
 	pf_pcie_adv_err_regs_t *adv_reg = PCIE_ADV_REG(pfd_p);
+
+	PCIE_ROOT_EH_SRC(pfd_p)->intr_type = intr_type;
 
 	/*
 	 * set RC s_status in PCI term to coordinate with downstream fabric
@@ -732,6 +735,7 @@ px_get_pfd(px_t *px_p) {
 	PCI_BDG_ERR_REG(pfd_p)->pci_bdg_sec_stat = 0;
 	PCIE_ADV_REG(pfd_p)->pcie_ce_status = 0;
 	PCIE_ADV_REG(pfd_p)->pcie_ue_status = 0;
+	PCIE_ADV_REG(pfd_p)->pcie_adv_ctl = 0;
 
 	pfd_p->pe_next = NULL;
 

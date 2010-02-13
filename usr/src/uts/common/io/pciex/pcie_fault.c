@@ -257,6 +257,9 @@ pf_scan_fabric(dev_info_t *rdip, ddi_fm_error_t *derr, pf_data_t *root_pfd_p)
 	    pfd_p = pfd_p->pe_next) {
 		impl.pf_fault = PCIE_ROOT_FAULT(pfd_p);
 
+		if (PFD_IS_RC(pfd_p))
+			impl.pf_total++;
+
 		if (impl.pf_fault->full_scan)
 			full_scan = B_TRUE;
 
@@ -2582,7 +2585,8 @@ pf_tlp_decode(pcie_bus_t *bus_p, pf_pcie_adv_err_regs_t *adv_reg_p) {
 		pcie_cpl_t *cpl_tlp = (pcie_cpl_t *)&adv_reg_p->pcie_ue_hdr[1];
 
 		flt_addr = NULL;
-		flt_bdf = cpl_tlp->rid;
+		flt_bdf = (cpl_tlp->rid > cpl_tlp->cid) ? cpl_tlp->rid :
+		    cpl_tlp->cid;
 
 		/*
 		 * If the cpl bdf < this.bdf, then it means the request is this
@@ -2680,13 +2684,24 @@ pf_send_ereport(ddi_fm_error_t *derr, pf_impl_t *impl)
 		pfd_p->pe_valid = B_FALSE;
 
 		if (derr->fme_flag != DDI_FM_ERR_UNEXPECTED ||
-		    PFD_IS_RC(pfd_p) ||
 		    !DDI_FM_EREPORT_CAP(ddi_fm_capable(PCIE_PFD2DIP(pfd_p))))
 			continue;
 
 		if (pf_ereport_setup(PCIE_BUS2DIP(bus_p), derr->fme_ena,
 		    &ereport, &detector, &eqep) != DDI_SUCCESS)
 			continue;
+
+		if (PFD_IS_RC(pfd_p)) {
+			fm_payload_set(ereport,
+			    "scan_bdf", DATA_TYPE_UINT16,
+			    PCIE_ROOT_FAULT(pfd_p)->scan_bdf,
+			    "scan_addr", DATA_TYPE_UINT64,
+			    PCIE_ROOT_FAULT(pfd_p)->scan_addr,
+			    "intr_src", DATA_TYPE_UINT16,
+			    PCIE_ROOT_EH_SRC(pfd_p)->intr_type,
+			    NULL);
+			goto generic;
+		}
 
 		/* Generic PCI device information */
 		fm_payload_set(ereport,
@@ -2910,6 +2925,7 @@ pf_send_ereport(ddi_fm_error_t *derr, pf_impl_t *impl)
 			    NULL);
 		}
 
+generic:
 		/* IOV related information */
 		if (!PCIE_BDG_IS_UNASSIGNED(PCIE_PFD2BUS(impl->pf_dq_head_p))) {
 			fm_payload_set(ereport,
@@ -2924,7 +2940,7 @@ pf_send_ereport(ddi_fm_error_t *derr, pf_impl_t *impl)
 
 		/* Misc ereport information */
 		fm_payload_set(ereport,
-		    "remainder", DATA_TYPE_UINT32, total--,
+		    "remainder", DATA_TYPE_UINT32, --total,
 		    "severity", DATA_TYPE_UINT32, pfd_p->pe_severity_flags,
 		    NULL);
 

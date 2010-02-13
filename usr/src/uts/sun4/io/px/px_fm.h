@@ -120,7 +120,7 @@ extern int px_scan_fabric(px_t *px_p, dev_info_t *rdip, ddi_fm_error_t *derr);
 extern void px_err_safeacc_check(px_t *px_p, ddi_fm_error_t *derr);
 extern int px_err_check_eq(dev_info_t *dip);
 extern int px_err_check_pcie(dev_info_t *dip, ddi_fm_error_t *derr,
-    px_err_pcie_t *regs);
+    px_err_pcie_t *regs, pf_intr_type_t intr_type);
 extern int px_fm_enter(px_t *px_p);
 extern void px_fm_exit(px_t *px_p);
 extern void px_err_panic(int err, int msg, int fab_err, boolean_t isTest);
