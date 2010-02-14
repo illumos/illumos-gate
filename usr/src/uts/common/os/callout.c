@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1623,6 +1623,7 @@ callout_cyclic_init(callout_table_t *ct)
 	cyc_time_t when;
 	processorid_t seqid;
 	int t;
+	cyclic_id_t cyclic;
 
 	ASSERT(MUTEX_HELD(&ct->ct_mutex));
 
@@ -1662,6 +1663,16 @@ callout_cyclic_init(callout_table_t *ct)
 	ASSERT(ct->ct_heap_num == 0);
 
 	/*
+	 * Drop the mutex before creating the callout cyclics. cyclic_add()
+	 * could potentially expand the cyclic heap. We don't want to be
+	 * holding the callout table mutex in that case. Note that this
+	 * function is called during CPU online. cpu_lock is held at this
+	 * point. So, only one thread can be executing the cyclic add logic
+	 * below at any time.
+	 */
+	mutex_exit(&ct->ct_mutex);
+
+	/*
 	 * Create the callout table cyclics.
 	 *
 	 * The realtime cyclic handler executes at low PIL. The normal cyclic
@@ -1682,7 +1693,10 @@ callout_cyclic_init(callout_table_t *ct)
 	when.cyt_when = CY_INFINITY;
 	when.cyt_interval = CY_INFINITY;
 
-	ct->ct_cyclic = cyclic_add(&hdlr, &when);
+	cyclic = cyclic_add(&hdlr, &when);
+
+	mutex_enter(&ct->ct_mutex);
+	ct->ct_cyclic = cyclic;
 }
 
 void
