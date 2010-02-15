@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -259,7 +259,7 @@ dovmstats(struct snapshot *old, struct snapshot *new)
 	kstat_t *oldvm = NULL;
 	kstat_t *newvm = &new->s_sys.ss_agg_vm;
 	double percent_factor;
-	ulong_t updates;
+	ulong_t sys_updates, vm_updates;
 	int count;
 
 	adj = 0;
@@ -276,7 +276,8 @@ dovmstats(struct snapshot *old, struct snapshot *new)
 	 * If any time has passed, convert etime to seconds per CPU
 	 */
 	etime = etime >= 1.0 ? (etime / nr_active_cpus(new)) / hz : 1.0;
-	updates = denom(DELTA(s_sys.ss_sysinfo.updates));
+	sys_updates = denom(DELTA(s_sys.ss_sysinfo.updates));
+	vm_updates = denom(DELTA(s_sys.ss_vminfo.updates));
 
 	if (timestamp_fmt != NODATE) {
 		print_timestamp(timestamp_fmt);
@@ -290,9 +291,10 @@ dovmstats(struct snapshot *old, struct snapshot *new)
 
 	if (pflag) {
 		adjprintf(" %*u", 6,
-		    pgtok((int)(DELTA(s_sys.ss_vminfo.swap_avail) / updates)));
+		    pgtok((int)(DELTA(s_sys.ss_vminfo.swap_avail)
+		    / vm_updates)));
 		adjprintf(" %*u", 5,
-		    pgtok((int)(DELTA(s_sys.ss_vminfo.freemem) / updates)));
+		    pgtok((int)(DELTA(s_sys.ss_vminfo.freemem) / vm_updates)));
 		adjprintf(" %*.0f", 3, kstat_delta(oldvm, newvm, "pgrec")
 		    / etime);
 		adjprintf(" %*.0f", 3, (kstat_delta(oldvm, newvm, "hat_fault") +
@@ -324,13 +326,13 @@ dovmstats(struct snapshot *old, struct snapshot *new)
 		return;
 	}
 
-	adjprintf(" %*lu", 1, DELTA(s_sys.ss_sysinfo.runque) / updates);
-	adjprintf(" %*lu", 1, DELTA(s_sys.ss_sysinfo.waiting) / updates);
-	adjprintf(" %*lu", 1, DELTA(s_sys.ss_sysinfo.swpque) / updates);
+	adjprintf(" %*lu", 1, DELTA(s_sys.ss_sysinfo.runque) / sys_updates);
+	adjprintf(" %*lu", 1, DELTA(s_sys.ss_sysinfo.waiting) / sys_updates);
+	adjprintf(" %*lu", 1, DELTA(s_sys.ss_sysinfo.swpque) / sys_updates);
 	adjprintf(" %*u", 6, pgtok((int)(DELTA(s_sys.ss_vminfo.swap_avail)
-	    / updates)));
+	    / vm_updates)));
 	adjprintf(" %*u", 5, pgtok((int)(DELTA(s_sys.ss_vminfo.freemem)
-	    / updates)));
+	    / vm_updates)));
 	adjprintf(" %*.0f", 3, swflag?
 	    kstat_delta(oldvm, newvm, "swapin") / etime :
 	    kstat_delta(oldvm, newvm, "pgrec") / etime);

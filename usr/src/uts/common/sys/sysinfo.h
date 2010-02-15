@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -182,6 +182,7 @@ typedef struct vminfo {		/* (update freq) update action		*/
 	uint64_t swap_alloc;	/* (1 sec) += allocated swap in pages	*/
 	uint64_t swap_avail;	/* (1 sec) += unreserved swap in pages	*/
 	uint64_t swap_free;	/* (1 sec) += unallocated swap in pages	*/
+	uint64_t updates;	/* (1 sec) ++				*/
 } vminfo_t;
 
 typedef struct cpu_stat {

@@ -828,7 +828,6 @@ clock(void)
 		 */
 		cv_broadcast(&lbolt_cv);
 
-		sysinfo.updates++;
 		vminfo.freemem += freemem;
 		{
 			pgcnt_t maxswap, resv, free;
@@ -853,6 +852,7 @@ clock(void)
 			vminfo.swap_avail += maxswap - resv;
 			vminfo.swap_free += free;
 		}
+		vminfo.updates++;
 		if (nrunnable) {
 			sysinfo.runque += nrunnable;
 			sysinfo.runocc++;
@@ -862,6 +862,7 @@ clock(void)
 			sysinfo.swpocc++;
 		}
 		sysinfo.waiting += w_io;
+		sysinfo.updates++;
 
 		/*
 		 * Wake up fsflush to write out DELWRI
