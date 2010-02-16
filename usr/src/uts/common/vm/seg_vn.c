@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -648,6 +648,15 @@ segvn_create(struct seg *seg, void *argsp)
 		    seg->s_as != &kas && a->vp->v_type == VREG);
 
 		ASSERT(!trok || !use_rgn);
+	}
+
+	/*
+	 * MAP_NORESERVE mappings don't count towards the VSZ of a process
+	 * until we fault the pages in.
+	 */
+	if ((a->vp == NULL || a->vp->v_type != VREG) &&
+	    a->flags & MAP_NORESERVE) {
+		seg->s_as->a_resvsize -= seg->s_size;
 	}
 
 	/*

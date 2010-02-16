@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1425,6 +1425,7 @@ top:
 		 * We'll handle MAP_NORESERVE cases in segvn_unmap(). (Again,
 		 * we have to do this check here while we have seg.)
 		 */
+		rsize = 0;
 		if (!SEG_IS_DEVNULL_MAPPING(seg) &&
 		    !SEG_IS_PARTIAL_RESV(seg))
 			rsize = ssize;
@@ -1504,7 +1505,8 @@ retry:
 		}
 
 		as->a_size -= ssize;
-		as->a_resvsize -= rsize;
+		if (rsize)
+			as->a_resvsize -= rsize;
 		raddr += ssize;
 	}
 	AS_LOCK_EXIT(as, &as->a_lock);
@@ -1545,12 +1547,7 @@ as_map_segvn_segs(struct as *as, caddr_t addr, size_t size, uint_t szcvec,
 			seg_free(seg);
 		} else {
 			as->a_size += size;
-			/*
-			 * We'll count MAP_NORESERVE mappings as we fault
-			 * pages in.
-			 */
-			if (!SEG_IS_PARTIAL_RESV(seg))
-				as->a_resvsize += size;
+			as->a_resvsize += size;
 		}
 		return (error);
 	}
@@ -1583,14 +1580,7 @@ as_map_segvn_segs(struct as *as, caddr_t addr, size_t size, uint_t szcvec,
 				return (error);
 			}
 			as->a_size += segsize;
-			/*
-			 * We'll count MAP_NORESERVE mappings as we fault
-			 * pages in.  We don't count /dev/null mappings at all.
-			 */
-			if (!SEG_IS_DEVNULL_MAPPING(seg) &&
-			    !SEG_IS_PARTIAL_RESV(seg))
-				as->a_resvsize += segsize;
-
+			as->a_resvsize += segsize;
 			*segcreated = 1;
 			if (do_off) {
 				vn_a->offset += segsize;
@@ -1619,14 +1609,7 @@ as_map_segvn_segs(struct as *as, caddr_t addr, size_t size, uint_t szcvec,
 				return (error);
 			}
 			as->a_size += segsize;
-			/*
-			 * We'll count MAP_NORESERVE mappings as we fault
-			 * pages in.  We don't count /dev/null mappings at all.
-			 */
-			if (!SEG_IS_DEVNULL_MAPPING(seg) &&
-			    !SEG_IS_PARTIAL_RESV(seg))
-				as->a_resvsize += segsize;
-
+			as->a_resvsize += segsize;
 			*segcreated = 1;
 			if (do_off) {
 				vn_a->offset += segsize;
@@ -1677,12 +1660,7 @@ again:
 			seg_free(seg);
 		} else {
 			as->a_size += size;
-			/*
-			 * We'll count MAP_NORESERVE mappings as we fault
-			 * pages in.
-			 */
-			if (!SEG_IS_PARTIAL_RESV(seg))
-				as->a_resvsize += size;
+			as->a_resvsize += size;
 		}
 		return (error);
 	}
@@ -1842,13 +1820,7 @@ as_map_locked(struct as *as, caddr_t addr, size_t size, int (*crfp)(),
 		 * Add size now so as_unmap will work if as_ctl fails.
 		 */
 		as->a_size += rsize;
-		/*
-		 * We'll count MAP_NORESERVE mappings as we fault
-		 * pages in.  We don't count /dev/null mappings at all.
-		 */
-		if (!SEG_IS_DEVNULL_MAPPING(seg) &&
-		    !SEG_IS_PARTIAL_RESV(seg))
-			as->a_resvsize += rsize;
+		as->a_resvsize += rsize;
 	}
 
 	as_setwatch(as);

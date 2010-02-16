@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +36,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * VM - segment of a mapped device.
@@ -428,6 +426,15 @@ segdev_create(struct seg *seg, void *argsp)
 		sdp->devmap_data = NULL;
 		hat_unload(seg->s_as->a_hat, seg->s_base, seg->s_size,
 		    HAT_UNLOAD_UNMAP);
+	} else {
+		/*
+		 * Mappings of /dev/null don't count towards the VSZ of a
+		 * process.  Mappings of /dev/null have no mapping type.
+		 */
+		if ((SEGOP_GETTYPE(seg, (seg)->s_base) & (MAP_SHARED |
+		    MAP_PRIVATE)) == 0) {
+			seg->s_as->a_resvsize -= seg->s_size;
+		}
 	}
 
 	return (error);
