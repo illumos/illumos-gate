@@ -208,8 +208,6 @@ typedef struct rootnex_window_s {
 typedef struct dvcookie {
 	uint64_t dvck_dvma;
 	uint64_t dvck_npages;
-	uint64_t dvck_sidx;
-	uint64_t dvck_eidx;
 } dvcookie_t;
 
 typedef struct dcookie {

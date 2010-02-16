@@ -1005,7 +1005,7 @@ immu_dmar_rmrr_map(void)
 				    rmrr->rm_base + 1)) {
 					ddi_err(DER_WARN, rdip, "RMRR range "
 					    " [0x%" PRIx64 " - 0x%" PRIx64 "]"
-					    " is not in BIOS reserved map",
+					    " not in BIOS reserved map",
 					    rmrr->rm_base, rmrr->rm_limit);
 				}
 

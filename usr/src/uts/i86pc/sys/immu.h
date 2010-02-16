@@ -342,7 +342,7 @@ typedef enum context_inv {
 #define	ADDR_AM_OFFSET(n, m)	((n) & (ADDR_AM_MAX(m) - 1))
 
 /* dmar fault event */
-#define	IMMU_INTR_IPL			(8)
+#define	IMMU_INTR_IPL			(4)
 #define	IMMU_REG_FEVNT_CON_IM_SHIFT	(31)
 
 #define	IMMU_ALLOC_RESOURCE_DELAY    (drv_usectohz(5000))
@@ -521,6 +521,8 @@ typedef struct immu {
 
 	/* IOMMU register related */
 	kmutex_t		immu_regs_lock;
+	kcondvar_t		immu_regs_cv;
+	boolean_t		immu_regs_busy;
 	boolean_t		immu_regs_setup;
 	boolean_t		immu_regs_running;
 	boolean_t		immu_regs_quiesced;
@@ -541,6 +543,8 @@ typedef struct immu {
 	int			immu_dvma_agaw;
 	int			immu_dvma_nlevels;
 	boolean_t		immu_dvma_coherent;
+	boolean_t		immu_TM_reserved;
+	boolean_t		immu_SNP_reserved;
 
 	/* DVMA context related */
 	krwlock_t		immu_ctx_rwlock;
@@ -588,6 +592,8 @@ typedef enum immu_maptype {
 	IMMU_MAPTYPE_XLATE
 } immu_maptype_t;
 
+#define	IMMU_COOKIE_HASHSZ	(512)
+
 /*
  * domain_t
  *
@@ -606,13 +612,12 @@ typedef struct domain {
 	pgtable_t		*dom_pgtable_root;
 	krwlock_t		dom_pgtable_rwlock;
 
-	/* list of pgtables for this domain */
-	list_t			dom_pglist;
-
 	/* list node for list of domains (unity or xlate) */
 	list_node_t		dom_maptype_node;
 	/* list node for list of domains off immu */
 	list_node_t		dom_immu_node;
+
+	mod_hash_t 		*dom_cookie_hash;
 } domain_t;
 
 typedef enum immu_pcib {
@@ -682,6 +687,7 @@ typedef struct immu_arg {
 extern dev_info_t *root_devinfo;
 extern kmutex_t immu_lock;
 extern list_t immu_list;
+extern void *immu_pgtable_cache;
 extern boolean_t immu_setup;
 extern boolean_t immu_running;
 extern kmutex_t ioapic_drhd_lock;
@@ -695,7 +701,6 @@ extern boolean_t immu_dvma_enable;
 extern boolean_t immu_gfxdvma_enable;
 extern boolean_t immu_intrmap_enable;
 extern boolean_t immu_qinv_enable;
-extern boolean_t immu_mmio_safe;
 
 /* various quirks that need working around */
 extern boolean_t immu_quirk_usbpage0;
@@ -705,6 +710,9 @@ extern boolean_t immu_quirk_mobile4;
 
 /* debug messages */
 extern boolean_t immu_dmar_print;
+
+/* tunables */
+extern int64_t immu_flush_gran;
 
 /* ################### Interfaces exported outside IOMMU code ############## */
 void immu_init(void);
@@ -795,7 +803,8 @@ void immu_dvma_free(dvcookie_t *first_dvcookie, void *arg);
 int immu_devi_set(dev_info_t *dip, immu_flags_t immu_flags);
 immu_devi_t *immu_devi_get(dev_info_t *dip);
 immu_t *immu_dvma_get_immu(dev_info_t *dip, immu_flags_t immu_flags);
-
+int pgtable_ctor(void *buf, void *arg, int kmflag);
+void pgtable_dtor(void *buf, void *arg);
 
 /* immu_intrmap.c interfaces */
 void immu_intrmap_setup(list_t *immu_list);

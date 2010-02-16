@@ -31,6 +31,7 @@
 #include <sys/archsystm.h>
 #include <sys/x86_archext.h>
 #include <sys/spl.h>
+#include <sys/sysmacros.h>
 #include <sys/immu.h>
 
 #define	get_reg32(immu, offset)	ddi_get32((immu)->immu_regs_handle, \
@@ -87,8 +88,6 @@ iotlb_flush(immu_t *immu, uint_t domain_id,
 	uint_t iva_offset, iotlb_offset;
 	uint64_t status = 0;
 
-	ASSERT(MUTEX_HELD(&(immu->immu_regs_lock)));
-
 	/* no lock needed since cap and excap fields are RDONLY */
 	iva_offset = IMMU_ECAP_GET_IRO(immu->immu_regs_excap);
 	iotlb_offset = iva_offset + 8;
@@ -110,16 +109,13 @@ iotlb_flush(immu_t *immu, uint_t domain_id,
 	 */
 	switch (type) {
 	case IOTLB_PSI:
-		if (!IMMU_CAP_GET_PSI(immu->immu_regs_cap) ||
-		    (am > IMMU_CAP_GET_MAMV(immu->immu_regs_cap)) ||
-		    (addr & IMMU_PAGEOFFSET)) {
-			goto ignore_psi;
-		}
+		ASSERT(IMMU_CAP_GET_PSI(immu->immu_regs_cap));
+		ASSERT(am <= IMMU_CAP_GET_MAMV(immu->immu_regs_cap));
+		ASSERT(!(addr & IMMU_PAGEOFFSET));
 		command |= TLB_INV_PAGE | TLB_INV_IVT |
 		    TLB_INV_DID(domain_id);
 		iva = addr | am | TLB_IVA_HINT(hint);
 		break;
-ignore_psi:
 	case IOTLB_DSI:
 		command |= TLB_INV_DOMAIN | TLB_INV_IVT |
 		    TLB_INV_DID(domain_id);
@@ -133,9 +129,7 @@ ignore_psi:
 		return;
 	}
 
-	/* verify there is no pending command */
-	wait_completion(immu, iotlb_offset, get_reg64,
-	    (!(status & TLB_INV_IVT)), status);
+	ASSERT(!(status & TLB_INV_IVT));
 	if (iva)
 		put_reg64(immu, iva_offset, iva);
 	put_reg64(immu, iotlb_offset, command);
@@ -148,55 +142,55 @@ ignore_psi:
  *   iotlb page specific invalidation
  */
 static void
-iotlb_psi(immu_t *immu, uint_t domain_id,
-    uint64_t dvma, uint_t count, uint_t hint)
+iotlb_psi(immu_t *immu, uint_t did, uint64_t dvma, uint_t snpages,
+    uint_t hint)
 {
-	uint_t am = 0;
-	uint_t max_am = 0;
-	uint64_t align = 0;
-	uint64_t dvma_pg = 0;
-	uint_t used_count = 0;
+	int dvma_am;
+	int npg_am;
+	int max_am;
+	int am;
+	uint64_t align;
+	int npages_left;
+	int npages;
+	int i;
+
+	ASSERT(IMMU_CAP_GET_PSI(immu->immu_regs_cap));
+	ASSERT(dvma % IMMU_PAGESIZE == 0);
+
+	max_am = IMMU_CAP_GET_MAMV(immu->immu_regs_cap);
 
 	mutex_enter(&(immu->immu_regs_lock));
 
-	/* choose page specified invalidation */
-	if (IMMU_CAP_GET_PSI(immu->immu_regs_cap)) {
-		/* MAMV is valid only if PSI is set */
-		max_am = IMMU_CAP_GET_MAMV(immu->immu_regs_cap);
-		while (count != 0) {
-			/* First calculate alignment of DVMA */
-			dvma_pg = IMMU_BTOP(dvma);
-			ASSERT(dvma_pg != NULL);
-			ASSERT(count >= 1);
-			for (align = 1; (dvma_pg & align) == 0; align <<= 1)
+	npages_left = snpages;
+	for (i = 0; i < immu_flush_gran && npages_left > 0; i++) {
+		/* First calculate alignment of DVMA */
+
+		if (dvma == 0) {
+			dvma_am = max_am;
+		} else {
+			for (align = (1 << 12), dvma_am = 1;
+			    (dvma & align) == 0; align <<= 1, dvma_am++)
 				;
-			/* truncate count to the nearest power of 2 */
-			for (used_count = 1, am = 0; count >> used_count != 0;
-			    used_count <<= 1, am++)
-				;
-			if (am > max_am) {
-				am = max_am;
-				used_count = 1 << am;
-			}
-			if (align >= used_count) {
-				iotlb_flush(immu, domain_id,
-				    dvma, am, hint, IOTLB_PSI);
-			} else {
-				/* align < used_count */
-				used_count = align;
-				for (am = 0; (1 << am) != used_count; am++)
-					;
-				iotlb_flush(immu, domain_id,
-				    dvma, am, hint, IOTLB_PSI);
-			}
-			count -= used_count;
-			dvma = (dvma_pg + used_count) << IMMU_PAGESHIFT;
+			dvma_am--;
 		}
-	} else {
-		/* choose domain invalidation */
-		iotlb_flush(immu, domain_id, dvma, 0, 0, IOTLB_DSI);
+
+		/* Calculate the npg_am */
+		npages = npages_left;
+		for (npg_am = 0, npages >>= 1; npages; npages >>= 1, npg_am++)
+			;
+
+		am = MIN(max_am, MIN(dvma_am, npg_am));
+
+		iotlb_flush(immu, did, dvma, am, hint, IOTLB_PSI);
+
+		npages = (1 << am);
+		npages_left -= npages;
+		dvma += (npages * IMMU_PAGESIZE);
 	}
 
+	if (npages_left) {
+		iotlb_flush(immu, did, 0, 0, 0, IOTLB_DSI);
+	}
 	mutex_exit(&(immu->immu_regs_lock));
 }
 
@@ -385,6 +379,10 @@ setup_regs(immu_t *immu)
 			return (DDI_FAILURE);
 		}
 	}
+
+	/* Setup SNP and TM reserved fields */
+	immu->immu_SNP_reserved = immu_regs_is_SNP_reserved(immu);
+	immu->immu_TM_reserved = immu_regs_is_TM_reserved(immu);
 
 	/*
 	 * Check for Mobile 4 series chipset
@@ -637,15 +635,15 @@ immu_regs_wbf_flush(immu_t *immu)
 void
 immu_regs_cpu_flush(immu_t *immu, caddr_t addr, uint_t size)
 {
-	uint_t i;
+	uint64_t i;
 
 	ASSERT(immu);
 
 	if (immu->immu_dvma_coherent == B_TRUE)
 		return;
 
-	for (i = 0; i < size; i += x86_clflush_size) {
-		clflush_insn(addr+i);
+	for (i = 0; i < size; i += x86_clflush_size, addr += x86_clflush_size) {
+		clflush_insn(addr);
 	}
 
 	mfence_insn();
@@ -657,10 +655,26 @@ immu_regs_iotlb_flush(immu_t *immu, uint_t domainid, uint64_t dvma,
 {
 	ASSERT(immu);
 
+#ifndef TEST
+	if (type == IOTLB_PSI && !IMMU_CAP_GET_PSI(immu->immu_regs_cap)) {
+		dvma = 0;
+		count = 0;
+		hint = 0;
+		type = IOTLB_DSI;
+	}
+#else
+	if (type == IOTLB_PSI) {
+		dvma = 0;
+		count = 0;
+		hint = 0;
+		type = IOTLB_DSI;
+	}
+#endif
+
+
 	switch (type) {
 	case IOTLB_PSI:
 		ASSERT(domainid > 0);
-		ASSERT(dvma > 0);
 		ASSERT(count > 0);
 		iotlb_psi(immu, domainid, dvma, count, hint);
 		break;
@@ -728,9 +742,7 @@ immu_regs_context_flush(immu_t *immu, uint8_t function_mask,
 	}
 
 	mutex_enter(&(immu->immu_regs_lock));
-	/* verify there is no pending command */
-	wait_completion(immu, IMMU_REG_CONTEXT_CMD, get_reg64,
-	    (!(status & CCMD_INV_ICC)), status);
+	ASSERT(!(get_reg64(immu, IMMU_REG_CONTEXT_CMD) & CCMD_INV_ICC));
 	put_reg64(immu, IMMU_REG_CONTEXT_CMD, command);
 	wait_completion(immu, IMMU_REG_CONTEXT_CMD, get_reg64,
 	    (!(status & CCMD_INV_ICC)), status);

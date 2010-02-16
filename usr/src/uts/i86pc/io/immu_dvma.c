@@ -71,11 +71,12 @@ static domain_t *domain_create(immu_t *immu, dev_info_t *ddip,
 static immu_devi_t *create_immu_devi(dev_info_t *rdip, int bus,
     int dev, int func, immu_flags_t immu_flags);
 static void destroy_immu_devi(immu_devi_t *immu_devi);
-static void dvma_map(immu_t *immu, domain_t *domain, uint64_t sdvma,
-    uint64_t spaddr, uint64_t npages, dev_info_t *rdip,
+static boolean_t dvma_map(immu_t *immu, domain_t *domain, uint64_t sdvma,
+    uint64_t nvpages, dcookie_t *dcookies, int dcount, dev_info_t *rdip,
     immu_flags_t immu_flags);
-extern struct memlist  *phys_install;
 
+/* Extern globals */
+extern struct memlist  *phys_install;
 
 
 /* static Globals */
@@ -319,8 +320,7 @@ get_gfx_devinfo(dev_info_t *rdip)
 
 	if (immu_devi == NULL) {
 		ddi_err(DER_WARN, rdip, "IMMU: No GFX device. "
-		    "Cannot redirect agpgart",
-		    ddi_node_name(immu_devi->imd_dip));
+		    "Cannot redirect agpgart");
 		return (NULL);
 	}
 
@@ -345,6 +345,11 @@ dma_to_immu_flags(struct ddi_dma_req *dmareq)
 		flags |= IMMU_FLAGS_NOSLEEP;
 	}
 
+#ifdef BUGGY_DRIVERS
+
+	flags |= (IMMU_FLAGS_READ | IMMU_FLAGS_WRITE);
+
+#else
 	/*
 	 * Read and write flags need to be reversed.
 	 * DMA_READ means read from device and write
@@ -356,7 +361,6 @@ dma_to_immu_flags(struct ddi_dma_req *dmareq)
 	if (dmareq->dmar_flags & DDI_DMA_WRITE)
 		flags |= IMMU_FLAGS_READ;
 
-#ifdef BUGGY_DRIVERS
 	/*
 	 * Some buggy drivers specify neither READ or WRITE
 	 * For such drivers set both read and write permissions
@@ -367,6 +371,84 @@ dma_to_immu_flags(struct ddi_dma_req *dmareq)
 #endif
 
 	return (flags);
+}
+
+int
+pgtable_ctor(void *buf, void *arg, int kmflag)
+{
+	size_t actual_size = 0;
+	pgtable_t *pgtable;
+	int (*dmafp)(caddr_t);
+	caddr_t vaddr;
+	void *next;
+
+	ASSERT(buf);
+	ASSERT(arg == NULL);
+
+	pgtable = (pgtable_t *)buf;
+
+	dmafp = (kmflag & KM_NOSLEEP) ? DDI_DMA_DONTWAIT : DDI_DMA_SLEEP;
+
+	next = kmem_zalloc(IMMU_PAGESIZE, kmflag);
+	if (next == NULL) {
+		return (-1);
+	}
+
+	ASSERT(root_devinfo);
+	if (ddi_dma_alloc_handle(root_devinfo, &immu_dma_attr,
+	    dmafp, NULL, &pgtable->hwpg_dmahdl) != DDI_SUCCESS) {
+		kmem_free(next, IMMU_PAGESIZE);
+		return (-1);
+	}
+
+	if (ddi_dma_mem_alloc(pgtable->hwpg_dmahdl, IMMU_PAGESIZE,
+	    &immu_acc_attr, DDI_DMA_CONSISTENT | IOMEM_DATA_UNCACHED,
+	    dmafp, NULL, &vaddr, &actual_size,
+	    &pgtable->hwpg_memhdl) != DDI_SUCCESS) {
+		ddi_dma_free_handle(&pgtable->hwpg_dmahdl);
+		kmem_free(next, IMMU_PAGESIZE);
+		return (-1);
+	}
+
+	/*
+	 * Memory allocation failure. Maybe a temporary condition
+	 * so return error rather than panic, so we can try again
+	 */
+	if (actual_size < IMMU_PAGESIZE) {
+		ddi_dma_mem_free(&pgtable->hwpg_memhdl);
+		ddi_dma_free_handle(&pgtable->hwpg_dmahdl);
+		kmem_free(next, IMMU_PAGESIZE);
+		return (-1);
+	}
+
+	pgtable->hwpg_paddr = pfn_to_pa(hat_getpfnum(kas.a_hat, vaddr));
+	pgtable->hwpg_vaddr = vaddr;
+	pgtable->swpg_next_array = next;
+
+	rw_init(&(pgtable->swpg_rwlock), NULL, RW_DEFAULT, NULL);
+
+	return (0);
+}
+
+void
+pgtable_dtor(void *buf, void *arg)
+{
+	pgtable_t *pgtable;
+
+	ASSERT(buf);
+	ASSERT(arg == NULL);
+
+	pgtable = (pgtable_t *)buf;
+	ASSERT(pgtable->swpg_next_array);
+
+	/* destroy will panic if lock is held. */
+	rw_destroy(&(pgtable->swpg_rwlock));
+
+	ddi_dma_mem_free(&pgtable->hwpg_memhdl);
+	ddi_dma_free_handle(&pgtable->hwpg_dmahdl);
+	kmem_free(pgtable->swpg_next_array, IMMU_PAGESIZE);
+
+	/* don't zero out hwpg_vaddr and swpg_next_array for debugging */
 }
 
 /*
@@ -382,109 +464,39 @@ dma_to_immu_flags(struct ddi_dma_req *dmareq)
  *        So a simple kmem_alloc suffices
  */
 static pgtable_t *
-pgtable_alloc(immu_t *immu, domain_t *domain, immu_flags_t immu_flags)
+pgtable_alloc(immu_t *immu, immu_flags_t immu_flags)
 {
-	size_t actual_size = 0;
 	pgtable_t *pgtable;
-	int (*dmafp)(caddr_t);
-	caddr_t vaddr;
 	int kmflags;
 
-	/* TO DO cache freed pgtables as it is expensive to create em */
 	ASSERT(immu);
 
-	kmflags = (immu_flags & IMMU_FLAGS_NOSLEEP) ?
-	    KM_NOSLEEP : KM_SLEEP;
+	kmflags = (immu_flags & IMMU_FLAGS_NOSLEEP) ? KM_NOSLEEP : KM_SLEEP;
 
-	dmafp = (immu_flags & IMMU_FLAGS_NOSLEEP) ?
-	    DDI_DMA_DONTWAIT : DDI_DMA_SLEEP;
-
-	pgtable = kmem_zalloc(sizeof (pgtable_t), kmflags);
+	pgtable = kmem_cache_alloc(immu_pgtable_cache, kmflags);
 	if (pgtable == NULL) {
 		return (NULL);
 	}
-
-	pgtable->swpg_next_array = kmem_zalloc(IMMU_PAGESIZE, kmflags);
-	if (pgtable->swpg_next_array == NULL) {
-		kmem_free(pgtable, sizeof (pgtable_t));
-		return (NULL);
-	}
-
-	ASSERT(root_devinfo);
-	if (ddi_dma_alloc_handle(root_devinfo, &immu_dma_attr,
-	    dmafp, NULL, &pgtable->hwpg_dmahdl) != DDI_SUCCESS) {
-		kmem_free(pgtable->swpg_next_array, IMMU_PAGESIZE);
-		kmem_free(pgtable, sizeof (pgtable_t));
-		return (NULL);
-	}
-
-	if (ddi_dma_mem_alloc(pgtable->hwpg_dmahdl, IMMU_PAGESIZE,
-	    &immu_acc_attr, DDI_DMA_CONSISTENT | IOMEM_DATA_UNCACHED,
-	    dmafp, NULL, &vaddr, &actual_size,
-	    &pgtable->hwpg_memhdl) != DDI_SUCCESS) {
-		ddi_dma_free_handle(&pgtable->hwpg_dmahdl);
-		kmem_free((void *)(pgtable->swpg_next_array),
-		    IMMU_PAGESIZE);
-		kmem_free(pgtable, sizeof (pgtable_t));
-		return (NULL);
-	}
-
-	/*
-	 * Memory allocation failure. Maybe a temporary condition
-	 * so return error rather than panic, so we can try again
-	 */
-	if (actual_size < IMMU_PAGESIZE) {
-		ddi_dma_mem_free(&pgtable->hwpg_memhdl);
-		ddi_dma_free_handle(&pgtable->hwpg_dmahdl);
-		kmem_free((void *)(pgtable->swpg_next_array),
-		    IMMU_PAGESIZE);
-		kmem_free(pgtable, sizeof (pgtable_t));
-		return (NULL);
-	}
-
-	pgtable->hwpg_paddr = pfn_to_pa(hat_getpfnum(kas.a_hat, vaddr));
-	pgtable->hwpg_vaddr = vaddr;
-
-	bzero(pgtable->hwpg_vaddr, IMMU_PAGESIZE);
-
-	/* Use immu directly as domain may be NULL, cant use dom_immu field */
-	immu_regs_cpu_flush(immu, pgtable->hwpg_vaddr, IMMU_PAGESIZE);
-
-	rw_init(&(pgtable->swpg_rwlock), NULL, RW_DEFAULT, NULL);
-
-	if (domain) {
-		rw_enter(&(domain->dom_pgtable_rwlock), RW_WRITER);
-		list_insert_head(&(domain->dom_pglist), pgtable);
-		rw_exit(&(domain->dom_pgtable_rwlock));
-	}
-
 	return (pgtable);
 }
 
 static void
-pgtable_free(immu_t *immu, pgtable_t *pgtable, domain_t *domain)
+pgtable_zero(immu_t *immu, pgtable_t *pgtable)
+{
+	bzero(pgtable->hwpg_vaddr, IMMU_PAGESIZE);
+	bzero(pgtable->swpg_next_array, IMMU_PAGESIZE);
+
+	/* Dont need to flush the write we will flush when we use the entry */
+	immu_regs_cpu_flush(immu, pgtable->hwpg_vaddr, IMMU_PAGESIZE);
+}
+
+static void
+pgtable_free(immu_t *immu, pgtable_t *pgtable)
 {
 	ASSERT(immu);
 	ASSERT(pgtable);
 
-	if (domain) {
-		rw_enter(&(domain->dom_pgtable_rwlock), RW_WRITER);
-		list_remove(&(domain->dom_pglist), pgtable);
-		rw_exit(&(domain->dom_pgtable_rwlock));
-	}
-
-	/* destroy will panic if lock is held. */
-	rw_destroy(&(pgtable->swpg_rwlock));
-
-	/* Zero out the HW page being freed to catch errors */
-	bzero(pgtable->hwpg_vaddr, IMMU_PAGESIZE);
-	immu_regs_cpu_flush(immu, pgtable->hwpg_vaddr, IMMU_PAGESIZE);
-	ddi_dma_mem_free(&pgtable->hwpg_memhdl);
-	ddi_dma_free_handle(&pgtable->hwpg_dmahdl);
-	/* don't zero out the soft pages for debugging */
-	if (pgtable->swpg_next_array)
-		kmem_free((void *)(pgtable->swpg_next_array), IMMU_PAGESIZE);
-	kmem_free(pgtable, sizeof (pgtable_t));
+	kmem_cache_free(immu_pgtable_cache, pgtable);
 }
 
 /*
@@ -896,6 +908,7 @@ get_branch_domain(dev_info_t *pdip, void *arg)
 	 * walk upwards until the topmost PCI bridge is found
 	 */
 	return (DDI_WALK_CONTINUE);
+
 }
 
 static void
@@ -904,6 +917,8 @@ map_unity_domain(domain_t *domain)
 	struct memlist *mp;
 	uint64_t start;
 	uint64_t npages;
+	dcookie_t dcookies[1] = {0};
+	int dcount = 0;
 
 	ASSERT(domain);
 	ASSERT(domain->dom_did == IMMU_UNITY_DID);
@@ -924,7 +939,10 @@ map_unity_domain(domain_t *domain)
 	/*
 	 * Dont skip page0. Some broken HW/FW access it.
 	 */
-	dvma_map(domain->dom_immu, domain, 0, 0, 1, NULL,
+	dcookies[0].dck_paddr = 0;
+	dcookies[0].dck_npages = 1;
+	dcount = 1;
+	(void) dvma_map(domain->dom_immu, domain, 0, 1, dcookies, dcount, NULL,
 	    IMMU_FLAGS_READ | IMMU_FLAGS_WRITE | IMMU_FLAGS_PAGE1);
 #endif
 
@@ -940,8 +958,11 @@ map_unity_domain(domain_t *domain)
 	}
 	npages = mp->ml_size/IMMU_PAGESIZE + 1;
 
-	dvma_map(domain->dom_immu, domain, start, start, npages, NULL,
-	    IMMU_FLAGS_READ | IMMU_FLAGS_WRITE);
+	dcookies[0].dck_paddr = start;
+	dcookies[0].dck_npages = npages;
+	dcount = 1;
+	(void) dvma_map(domain->dom_immu, domain, start, npages, dcookies,
+	    dcount, NULL, IMMU_FLAGS_READ | IMMU_FLAGS_WRITE);
 
 	ddi_err(DER_LOG, NULL, "IMMU: mapping PHYS span [0x%" PRIx64
 	    " - 0x%" PRIx64 "]", start, start + mp->ml_size);
@@ -955,9 +976,11 @@ map_unity_domain(domain_t *domain)
 		start = mp->ml_address;
 		npages = mp->ml_size/IMMU_PAGESIZE + 1;
 
-		dvma_map(domain->dom_immu, domain, start, start,
-		    npages, NULL, IMMU_FLAGS_READ | IMMU_FLAGS_WRITE);
-
+		dcookies[0].dck_paddr = start;
+		dcookies[0].dck_npages = npages;
+		dcount = 1;
+		(void) dvma_map(domain->dom_immu, domain, start, npages,
+		    dcookies, dcount, NULL, IMMU_FLAGS_READ | IMMU_FLAGS_WRITE);
 		mp = mp->ml_next;
 	}
 
@@ -970,8 +993,11 @@ map_unity_domain(domain_t *domain)
 		start = mp->ml_address;
 		npages = mp->ml_size/IMMU_PAGESIZE + 1;
 
-		dvma_map(domain->dom_immu, domain, start, start,
-		    npages, NULL, IMMU_FLAGS_READ | IMMU_FLAGS_WRITE);
+		dcookies[0].dck_paddr = start;
+		dcookies[0].dck_npages = npages;
+		dcount = 1;
+		(void) dvma_map(domain->dom_immu, domain, start, npages,
+		    dcookies, dcount, NULL, IMMU_FLAGS_READ | IMMU_FLAGS_WRITE);
 
 		mp = mp->ml_next;
 	}
@@ -1020,47 +1046,51 @@ create_xlate_arena(immu_t *immu, domain_t *domain,
 	 * To ensure we avoid ioapic and PCI MMIO ranges we just
 	 * use the physical memory address range of the system as the
 	 * range
-	 * Implementing above causes graphics device to barf on
-	 * Lenovo X301 hence the toggle switch immu_mmio_safe.
 	 */
 	maxaddr = ((uint64_t)1 << mgaw);
 
-	if (immu_mmio_safe == B_FALSE) {
+	memlist_read_lock();
 
+	mp = phys_install;
+
+	if (mp->ml_address == 0)
 		start = MMU_PAGESIZE;
+	else
+		start = mp->ml_address;
+
+	if (start + mp->ml_size > maxaddr)
 		size = maxaddr - start;
+	else
+		size = mp->ml_size;
 
-		ddi_err(DER_VERB, rdip,
-		    "%s: Creating dvma vmem arena [0x%" PRIx64
-		    " - 0x%" PRIx64 "]", arena_name, start, start + size);
+	ddi_err(DER_VERB, rdip,
+	    "%s: Creating dvma vmem arena [0x%" PRIx64
+	    " - 0x%" PRIx64 "]", arena_name, start, start + size);
 
-		ASSERT(domain->dom_dvma_arena == NULL);
+	ASSERT(domain->dom_dvma_arena == NULL);
 
-		/*
-		 * We always allocate in quanta of IMMU_PAGESIZE
-		 */
-		domain->dom_dvma_arena = vmem_create(arena_name,
-		    (void *)(uintptr_t)start,	/* start addr */
-		    size,			/* size */
-		    IMMU_PAGESIZE,		/* quantum */
-		    NULL,			/* afunc */
-		    NULL,			/* ffunc */
-		    NULL,			/* source */
-		    0,				/* qcache_max */
-		    vmem_flags);
+	/*
+	 * We always allocate in quanta of IMMU_PAGESIZE
+	 */
+	domain->dom_dvma_arena = vmem_create(arena_name,
+	    (void *)(uintptr_t)start,	/* start addr */
+	    size,			/* size */
+	    IMMU_PAGESIZE,		/* quantum */
+	    NULL,			/* afunc */
+	    NULL,			/* ffunc */
+	    NULL,			/* source */
+	    0,				/* qcache_max */
+	    vmem_flags);
 
-		if (domain->dom_dvma_arena == NULL) {
-			ddi_err(DER_PANIC, rdip,
-			    "Failed to allocate DVMA arena(%s) "
-			    "for domain ID (%d)", arena_name, domain->dom_did);
-			/*NOTREACHED*/
-		}
+	if (domain->dom_dvma_arena == NULL) {
+		ddi_err(DER_PANIC, rdip,
+		    "Failed to allocate DVMA arena(%s) "
+		    "for domain ID (%d)", arena_name, domain->dom_did);
+		/*NOTREACHED*/
+	}
 
-	} else {
-
-		memlist_read_lock();
-
-		mp = phys_install;
+	mp = mp->ml_next;
+	while (mp) {
 
 		if (mp->ml_address == 0)
 			start = MMU_PAGESIZE;
@@ -1073,64 +1103,23 @@ create_xlate_arena(immu_t *immu, domain_t *domain,
 			size = mp->ml_size;
 
 		ddi_err(DER_VERB, rdip,
-		    "%s: Creating dvma vmem arena [0x%" PRIx64
-		    " - 0x%" PRIx64 "]", arena_name, start, start + size);
+		    "%s: Adding dvma vmem span [0x%" PRIx64
+		    " - 0x%" PRIx64 "]", arena_name, start,
+		    start + size);
 
-		ASSERT(domain->dom_dvma_arena == NULL);
+		vmem_ret = vmem_add(domain->dom_dvma_arena,
+		    (void *)(uintptr_t)start, size,  vmem_flags);
 
-		/*
-		 * We always allocate in quanta of IMMU_PAGESIZE
-		 */
-		domain->dom_dvma_arena = vmem_create(arena_name,
-		    (void *)(uintptr_t)start,	/* start addr */
-		    size,			/* size */
-		    IMMU_PAGESIZE,		/* quantum */
-		    NULL,			/* afunc */
-		    NULL,			/* ffunc */
-		    NULL,			/* source */
-		    0,				/* qcache_max */
-		    vmem_flags);
-
-		if (domain->dom_dvma_arena == NULL) {
+		if (vmem_ret == NULL) {
 			ddi_err(DER_PANIC, rdip,
 			    "Failed to allocate DVMA arena(%s) "
-			    "for domain ID (%d)", arena_name, domain->dom_did);
+			    "for domain ID (%d)",
+			    arena_name, domain->dom_did);
 			/*NOTREACHED*/
 		}
-
 		mp = mp->ml_next;
-		while (mp) {
-
-			if (mp->ml_address == 0)
-				start = MMU_PAGESIZE;
-			else
-				start = mp->ml_address;
-
-			if (start + mp->ml_size > maxaddr)
-				size = maxaddr - start;
-			else
-				size = mp->ml_size;
-
-			ddi_err(DER_VERB, rdip,
-			    "%s: Adding dvma vmem span [0x%" PRIx64
-			    " - 0x%" PRIx64 "]", arena_name, start,
-			    start + size);
-
-			vmem_ret = vmem_add(domain->dom_dvma_arena,
-			    (void *)(uintptr_t)start, size,  vmem_flags);
-
-			if (vmem_ret == NULL) {
-				ddi_err(DER_PANIC, rdip,
-				    "Failed to allocate DVMA arena(%s) "
-				    "for domain ID (%d)",
-				    arena_name, domain->dom_did);
-				/*NOTREACHED*/
-			}
-
-			mp = mp->ml_next;
-		}
-		memlist_read_unlock();
 	}
+	memlist_read_unlock();
 }
 
 /* ################################### DOMAIN CODE ######################### */
@@ -1191,7 +1180,6 @@ static domain_t *
 device_domain(dev_info_t *rdip, dev_info_t **ddipp, immu_flags_t immu_flags)
 {
 	dev_info_t *ddip; /* topmost dip in domain i.e. domain owner */
-	dev_info_t *edip; /* effective dip used for finding domain */
 	immu_t *immu;
 	domain_t *domain;
 	dvma_arg_t dvarg = {0};
@@ -1220,39 +1208,16 @@ device_domain(dev_info_t *rdip, dev_info_t **ddipp, immu_flags_t immu_flags)
 		 * possible that there is no IOMMU unit for this device
 		 * - BIOS bugs are one example.
 		 */
+		ddi_err(DER_WARN, rdip, "No IMMU unit found for device");
 		return (NULL);
 	}
 
-	/*
-	 * Some devices need to be redirected
-	 */
-	edip = rdip;
-
-	/*
-	 * for isa devices attached under lpc
-	 */
-	if (strcmp(ddi_node_name(ddi_get_parent(rdip)), "isa") == 0) {
-		edip = get_lpc_devinfo(immu, rdip, immu_flags);
-	}
-
-	/*
-	 * for gart, use the real graphic devinfo
-	 */
-	if (strcmp(ddi_node_name(rdip), "agpgart") == 0) {
-		edip = get_gfx_devinfo(rdip);
-	}
-
-	if (edip == NULL) {
-		ddi_err(DER_MODE, rdip, "IMMU redirect failed");
-		return (NULL);
-	}
-
-	dvarg.dva_rdip = edip;
+	dvarg.dva_rdip = rdip;
 	dvarg.dva_ddip = NULL;
 	dvarg.dva_domain = NULL;
 	dvarg.dva_flags = immu_flags;
 	level = 0;
-	if (immu_walk_ancestor(edip, NULL, get_branch_domain,
+	if (immu_walk_ancestor(rdip, NULL, get_branch_domain,
 	    &dvarg, &level, immu_flags) != DDI_SUCCESS) {
 		/*
 		 * maybe low memory. return error,
@@ -1277,9 +1242,7 @@ device_domain(dev_info_t *rdip, dev_info_t **ddipp, immu_flags_t immu_flags)
 	 * be found.
 	 */
 	if (ddip == NULL) {
-		ddi_err(DER_MODE, rdip, "Cannot find domain dip for device. "
-		    "Effective dip (%s%d)", ddi_driver_name(edip),
-		    ddi_get_instance(edip));
+		ddi_err(DER_MODE, rdip, "Cannot find domain dip for device.");
 		return (NULL);
 	}
 
@@ -1305,7 +1268,6 @@ found:
 	 * effective dip.
 	 */
 	set_domain(ddip, ddip, domain);
-	set_domain(edip, ddip, domain);
 	set_domain(rdip, ddip, domain);
 
 	*ddipp = ddip;
@@ -1325,8 +1287,6 @@ create_unity_domain(immu_t *immu)
 	domain = kmem_zalloc(sizeof (domain_t), KM_SLEEP);
 
 	rw_init(&(domain->dom_pgtable_rwlock), NULL, RW_DEFAULT, NULL);
-	list_create(&(domain->dom_pglist), sizeof (pgtable_t),
-	    offsetof(pgtable_t, swpg_domain_node));
 
 	domain->dom_did = IMMU_UNITY_DID;
 	domain->dom_maptype = IMMU_MAPTYPE_UNITY;
@@ -1338,10 +1298,9 @@ create_unity_domain(immu_t *immu)
 	 * Setup the domain's initial page table
 	 * should never fail.
 	 */
-	domain->dom_pgtable_root = pgtable_alloc(immu, domain,
-	    IMMU_FLAGS_SLEEP);
-
+	domain->dom_pgtable_root = pgtable_alloc(immu, IMMU_FLAGS_SLEEP);
 	ASSERT(domain->dom_pgtable_root);
+	pgtable_zero(immu, domain->dom_pgtable_root);
 
 	map_unity_domain(domain);
 
@@ -1368,6 +1327,8 @@ domain_create(immu_t *immu, dev_info_t *ddip, dev_info_t *rdip,
 	char mod_hash_name[128];
 	immu_devi_t *immu_devi;
 	int did;
+	dcookie_t dcookies[1] = {0};
+	int dcount = 0;
 
 	ASSERT(immu);
 	ASSERT(ddip);
@@ -1398,8 +1359,6 @@ domain_create(immu_t *immu, dev_info_t *ddip, dev_info_t *rdip,
 	}
 
 	rw_init(&(domain->dom_pgtable_rwlock), NULL, RW_DEFAULT, NULL);
-	list_create(&(domain->dom_pglist), sizeof (pgtable_t),
-	    offsetof(pgtable_t, swpg_domain_node));
 
 	(void) snprintf(mod_hash_name, sizeof (mod_hash_name),
 	    "immu%s-domain%d-pava-hash", immu->immu_name, did);
@@ -1416,13 +1375,14 @@ domain_create(immu_t *immu, dev_info_t *ddip, dev_info_t *rdip,
 	/*
 	 * Setup the domain's initial page table
 	 */
-	domain->dom_pgtable_root = pgtable_alloc(immu, domain, immu_flags);
+	domain->dom_pgtable_root = pgtable_alloc(immu, immu_flags);
 	if (domain->dom_pgtable_root == NULL) {
 		ddi_err(DER_PANIC, rdip, "Failed to alloc root "
 		    "pgtable for domain (%d). IOMMU unit: %s",
 		    domain->dom_did, immu->immu_name);
 		/*NOTREACHED*/
 	}
+	pgtable_zero(immu, domain->dom_pgtable_root);
 
 	/*
 	 * Since this is a immu unit-specific domain, put it on
@@ -1445,10 +1405,12 @@ domain_create(immu_t *immu, dev_info_t *ddip, dev_info_t *rdip,
 	/*
 	 * Map page0. Some broken HW/FW access it.
 	 */
-	dvma_map(domain->dom_immu, domain, 0, 0, 1, NULL,
+	dcookies[0].dck_paddr = 0;
+	dcookies[0].dck_npages = 1;
+	dcount = 1;
+	(void) dvma_map(domain->dom_immu, domain, 0, 1, dcookies, dcount, NULL,
 	    IMMU_FLAGS_READ | IMMU_FLAGS_WRITE | IMMU_FLAGS_PAGE1);
 #endif
-
 	return (domain);
 }
 
@@ -1508,8 +1470,10 @@ context_set(immu_t *immu, domain_t *domain, pgtable_t *root_table,
 	hw_rce_t *hw_rent;
 	hw_rce_t *hw_cent;
 	hw_rce_t *ctxp;
-
-	ASSERT(rw_write_held(&(immu->immu_ctx_rwlock)));
+	int sid;
+	krw_t rwtype;
+	boolean_t fill_root;
+	boolean_t fill_ctx;
 
 	ASSERT(immu);
 	ASSERT(domain);
@@ -1518,21 +1482,58 @@ context_set(immu_t *immu, domain_t *domain, pgtable_t *root_table,
 	ASSERT(devfunc >= 0);
 	ASSERT(domain->dom_pgtable_root);
 
+	pgtable_root = domain->dom_pgtable_root;
+
 	ctxp = (hw_rce_t *)(root_table->swpg_next_array);
 	context = *(pgtable_t **)(ctxp + bus);
 	hw_rent = (hw_rce_t *)(root_table->hwpg_vaddr) + bus;
+
+	fill_root = B_FALSE;
+	fill_ctx = B_FALSE;
+
+	/* Check the most common case first with reader lock */
+	rw_enter(&(immu->immu_ctx_rwlock), RW_READER);
+	rwtype = RW_READER;
+again:
 	if (ROOT_GET_P(hw_rent)) {
 		ASSERT(ROOT_GET_CONT(hw_rent) == context->hwpg_paddr);
+		hw_cent = (hw_rce_t *)(context->hwpg_vaddr) + devfunc;
+		if (CONT_GET_AVAIL(hw_cent) == IMMU_CONT_INITED) {
+			ASSERT(CONT_GET_P(hw_cent));
+			ASSERT(CONT_GET_DID(hw_cent) == domain->dom_did);
+			ASSERT(CONT_GET_AW(hw_cent) == immu->immu_dvma_agaw);
+			ASSERT(CONT_GET_TTYPE(hw_cent) == TTYPE_XLATE_ONLY);
+			ASSERT(CONT_GET_ASR(hw_cent) ==
+			    pgtable_root->hwpg_paddr);
+			rw_exit(&(immu->immu_ctx_rwlock));
+			return;
+		} else {
+			fill_ctx = B_TRUE;
+		}
 	} else {
+		fill_root = B_TRUE;
+		fill_ctx = B_TRUE;
+	}
+
+	if (rwtype == RW_READER &&
+	    rw_tryupgrade(&(immu->immu_ctx_rwlock)) == 0) {
+		rw_exit(&(immu->immu_ctx_rwlock));
+		rw_enter(&(immu->immu_ctx_rwlock), RW_WRITER);
+		rwtype = RW_WRITER;
+		goto again;
+	}
+	rwtype = RW_WRITER;
+
+	if (fill_root == B_TRUE) {
 		ROOT_SET_CONT(hw_rent, context->hwpg_paddr);
 		ROOT_SET_P(hw_rent);
 		immu_regs_cpu_flush(immu, (caddr_t)hw_rent, sizeof (hw_rce_t));
 	}
-	hw_cent = (hw_rce_t *)(context->hwpg_vaddr) + devfunc;
 
-	pgtable_root = domain->dom_pgtable_root;
-	unity_pgtable_root = immu->immu_unity_domain->dom_pgtable_root;
-	if (CONT_GET_AVAIL(hw_cent) == IMMU_CONT_UNINITED) {
+	if (fill_ctx == B_TRUE) {
+		hw_cent = (hw_rce_t *)(context->hwpg_vaddr) + devfunc;
+		unity_pgtable_root = immu->immu_unity_domain->dom_pgtable_root;
+		ASSERT(CONT_GET_AVAIL(hw_cent) == IMMU_CONT_UNINITED);
 		ASSERT(CONT_GET_P(hw_cent));
 		ASSERT(CONT_GET_DID(hw_cent) ==
 		    immu->immu_unity_domain->dom_did);
@@ -1547,14 +1548,11 @@ context_set(immu_t *immu, domain_t *domain, pgtable_t *root_table,
 		/* flush caches */
 		immu_regs_cpu_flush(immu, (caddr_t)hw_cent, sizeof (hw_rce_t));
 		ASSERT(rw_write_held(&(immu->immu_ctx_rwlock)));
-		immu_regs_context_flush(immu, 0, 0,
-		    immu->immu_unity_domain->dom_did, CONTEXT_DSI);
-		immu_regs_context_flush(immu, 0, 0, domain->dom_did,
-		    CONTEXT_DSI);
-		immu_regs_iotlb_flush(immu, immu->immu_unity_domain->dom_did,
-		    0, 0, TLB_IVA_WHOLE, IOTLB_DSI);
-		immu_regs_iotlb_flush(immu, domain->dom_did, 0, 0,
-		    TLB_IVA_WHOLE, IOTLB_DSI);
+
+		sid = ((bus << 8) | devfunc);
+		immu_regs_context_flush(immu, 0, sid, domain->dom_did,
+		    CONTEXT_FSI);
+
 		immu_regs_wbf_flush(immu);
 
 		CONT_SET_AVAIL(hw_cent, IMMU_CONT_INITED);
@@ -1565,14 +1563,8 @@ context_set(immu_t *immu, domain_t *domain, pgtable_t *root_table,
 		CONT_SET_TTYPE(hw_cent, TTYPE_XLATE_ONLY);
 		CONT_SET_P(hw_cent);
 		immu_regs_cpu_flush(immu, (caddr_t)hw_cent, sizeof (hw_rce_t));
-	} else {
-		ASSERT(CONT_GET_AVAIL(hw_cent) == IMMU_CONT_INITED);
-		ASSERT(CONT_GET_P(hw_cent));
-		ASSERT(CONT_GET_DID(hw_cent) == domain->dom_did);
-		ASSERT(CONT_GET_AW(hw_cent) == immu->immu_dvma_agaw);
-		ASSERT(CONT_GET_TTYPE(hw_cent) == TTYPE_XLATE_ONLY);
-		ASSERT(CONT_GET_ASR(hw_cent) == pgtable_root->hwpg_paddr);
 	}
+	rw_exit(&(immu->immu_ctx_rwlock));
 }
 
 static pgtable_t *
@@ -1588,7 +1580,8 @@ context_create(immu_t *immu)
 	hw_rce_t *hw_cent;
 
 	/* Allocate a zeroed root table (4K 256b entries) */
-	root_table = pgtable_alloc(immu, NULL, IMMU_FLAGS_SLEEP);
+	root_table = pgtable_alloc(immu, IMMU_FLAGS_SLEEP);
+	pgtable_zero(immu, root_table);
 
 	/*
 	 * Setup context tables for all possible root table entries.
@@ -1597,7 +1590,8 @@ context_create(immu_t *immu)
 	ctxp = (hw_rce_t *)(root_table->swpg_next_array);
 	hw_rent = (hw_rce_t *)(root_table->hwpg_vaddr);
 	for (bus = 0; bus < IMMU_ROOT_NUM; bus++, ctxp++, hw_rent++) {
-		context = pgtable_alloc(immu, NULL, IMMU_FLAGS_SLEEP);
+		context = pgtable_alloc(immu, IMMU_FLAGS_SLEEP);
+		pgtable_zero(immu, context);
 		ASSERT(ROOT_GET_P(hw_rent) == 0);
 		ROOT_SET_P(hw_rent);
 		ROOT_SET_CONT(hw_rent, context->hwpg_paddr);
@@ -1723,7 +1717,6 @@ immu_context_update(immu_t *immu, domain_t *domain, dev_info_t *ddip,
 
 	ASSERT(d_bus >= 0);
 
-	rw_enter(&(immu->immu_ctx_rwlock), RW_WRITER);
 	if (rdip == ddip) {
 		ASSERT(d_pcib_type == IMMU_PCIB_ENDPOINT ||
 		    d_pcib_type == IMMU_PCIB_PCIE_PCIE);
@@ -1793,7 +1786,6 @@ immu_context_update(immu_t *immu, domain_t *domain, dev_info_t *ddip,
 		    "set IMMU context.");
 		/*NOTREACHED*/
 	}
-	rw_exit(&(immu->immu_ctx_rwlock));
 
 	/* XXX do we need a membar_producer() here */
 	return (DDI_SUCCESS);
@@ -1830,7 +1822,7 @@ PDTE_check(immu_t *immu, hw_pdte_t pdte, pgtable_t *next, paddr_t paddr,
 	 * TM field should be clear if not reserved.
 	 * non-leaf is always reserved
 	 */
-	if (next == NULL && immu_regs_is_TM_reserved(immu) == B_FALSE) {
+	if (next == NULL && immu->immu_TM_reserved == B_FALSE) {
 		if (PDTE_TM(pdte)) {
 			ddi_err(DER_MODE, rdip, "TM flag set");
 			return (B_FALSE);
@@ -1869,7 +1861,7 @@ PDTE_check(immu_t *immu, hw_pdte_t pdte, pgtable_t *next, paddr_t paddr,
 	 * SNP field should be clear if not reserved.
 	 * non-leaf is always reserved
 	 */
-	if (next == NULL && immu_regs_is_SNP_reserved(immu) == B_FALSE) {
+	if (next == NULL && immu->immu_SNP_reserved == B_FALSE) {
 		if (PDTE_SNP(pdte)) {
 			ddi_err(DER_MODE, rdip, "SNP set");
 			return (B_FALSE);
@@ -1911,46 +1903,64 @@ PDTE_check(immu_t *immu, hw_pdte_t pdte, pgtable_t *next, paddr_t paddr,
 }
 /*ARGSUSED*/
 static void
-PTE_clear_one(immu_t *immu, domain_t *domain, xlate_t *xlate, uint64_t dvma,
-    dev_info_t *rdip)
+PTE_clear_all(immu_t *immu, domain_t *domain, xlate_t *xlate,
+    uint64_t *dvma_ptr, uint64_t *npages_ptr, dev_info_t *rdip)
 {
-	hw_pdte_t *hwp;
+	uint64_t npages;
+	uint64_t dvma;
 	pgtable_t *pgtable;
+	hw_pdte_t *hwp;
+	hw_pdte_t *shwp;
 	int idx;
 	hw_pdte_t pte;
 
 	ASSERT(xlate->xlt_level == 1);
 
-	idx = xlate->xlt_idx;
 	pgtable = xlate->xlt_pgtable;
+	idx = xlate->xlt_idx;
 
-	ASSERT(dvma % IMMU_PAGESIZE == 0);
 	ASSERT(pgtable);
 	ASSERT(idx <= IMMU_PGTABLE_MAXIDX);
 
-	/*
-	 * since we are clearing PTEs, lock the
-	 * page table write mode
-	 */
-	rw_enter(&(pgtable->swpg_rwlock), RW_WRITER);
+	dvma = *dvma_ptr;
+	npages = *npages_ptr;
+
+	ASSERT(dvma);
+	ASSERT(dvma % IMMU_PAGESIZE == 0);
+	ASSERT(npages);
 
 	/*
-	 * We are at the leaf - next level array must be NULL
+	 * since a caller gets a unique dvma for a physical address,
+	 * no other concurrent thread will be writing to the same
+	 * PTE even if it has the same paddr. So no locks needed.
 	 */
-	ASSERT(pgtable->swpg_next_array == NULL);
+	shwp = (hw_pdte_t *)(pgtable->hwpg_vaddr) + idx;
 
-	hwp = (hw_pdte_t *)(pgtable->hwpg_vaddr) + idx;
+	hwp = shwp;
+	for (; npages > 0 && idx <= IMMU_PGTABLE_MAXIDX; idx++, hwp++) {
 
-	pte = *hwp;
-	/* Cannot clear a HW PTE that is aleady clear */
-	ASSERT(PDTE_P(pte));
-	PDTE_CLEAR_P(pte);
-	*hwp = pte;
+		pte = *hwp;
 
-	/* flush writes to HW PTE table */
-	immu_regs_cpu_flush(immu, (caddr_t)hwp, sizeof (hw_pdte_t));
+		/* Cannot clear a HW PTE that is aleady clear */
+		ASSERT(PDTE_P(pte));
+		PDTE_CLEAR_P(pte);
+		*hwp = pte;
 
-	rw_exit(&(xlate->xlt_pgtable->swpg_rwlock));
+		dvma += IMMU_PAGESIZE;
+		npages--;
+	}
+
+
+#ifdef TEST
+	/* dont need to flush write during unmap */
+	immu_regs_cpu_flush(immu, (caddr_t)shwp,
+	    (hwp - shwp) * sizeof (hw_pdte_t));
+#endif
+
+	*dvma_ptr = dvma;
+	*npages_ptr = npages;
+
+	xlate->xlt_idx = idx;
 }
 
 /*ARGSUSED*/
@@ -2041,6 +2051,7 @@ PDE_lookup(immu_t *immu, domain_t *domain, xlate_t *xlate, int nlevels,
 	}
 }
 
+/*ARGSUSED*/
 static void
 PTE_set_one(immu_t *immu, hw_pdte_t *hwp, paddr_t paddr,
     dev_info_t *rdip, immu_flags_t immu_flags)
@@ -2049,24 +2060,39 @@ PTE_set_one(immu_t *immu, hw_pdte_t *hwp, paddr_t paddr,
 
 	pte = *hwp;
 
+#ifndef DEBUG
+	/* Set paddr */
+	ASSERT(paddr % IMMU_PAGESIZE == 0);
+	pte = 0;
+	PDTE_SET_PADDR(pte, paddr);
+	PDTE_SET_READ(pte);
+	PDTE_SET_WRITE(pte);
+	*hwp = pte;
+#else
+
 	if (PDTE_P(pte)) {
 		if (PDTE_PADDR(pte) != paddr) {
 			ddi_err(DER_MODE, rdip, "PTE paddr %lx != paddr %lx",
 			    PDTE_PADDR(pte), paddr);
 		}
+#ifdef BUGGY_DRIVERS
+		return;
+#else
 		goto out;
+#endif
 	}
-
 
 	/* Don't touch SW4. It is the present field */
 
 	/* clear TM field if not reserved */
-	if (immu_regs_is_TM_reserved(immu) == B_FALSE) {
+	if (immu->immu_TM_reserved == B_FALSE) {
 		PDTE_CLEAR_TM(pte);
 	}
 
+#ifdef DEBUG
 	/* Clear 3rd field for system software  - not used */
 	PDTE_CLEAR_SW3(pte);
+#endif
 
 	/* Set paddr */
 	ASSERT(paddr % IMMU_PAGESIZE == 0);
@@ -2074,18 +2100,25 @@ PTE_set_one(immu_t *immu, hw_pdte_t *hwp, paddr_t paddr,
 	PDTE_SET_PADDR(pte, paddr);
 
 	/*  clear SNP field if not reserved. */
-	if (immu_regs_is_SNP_reserved(immu) == B_FALSE) {
+	if (immu->immu_SNP_reserved == B_FALSE) {
 		PDTE_CLEAR_SNP(pte);
 	}
 
+#ifdef DEBUG
 	/* Clear SW2 field available for software */
 	PDTE_CLEAR_SW2(pte);
+#endif
 
+
+#ifdef DEBUG
 	/* SP is don't care for PTEs. Clear it for cleanliness */
 	PDTE_CLEAR_SP(pte);
+#endif
 
+#ifdef DEBUG
 	/* Clear SW1 field available for software */
 	PDTE_CLEAR_SW1(pte);
+#endif
 
 	/*
 	 * Now that we are done writing the PTE
@@ -2101,32 +2134,35 @@ PTE_set_one(immu_t *immu, hw_pdte_t *hwp, paddr_t paddr,
 	PDTE_SET_P(pte);
 
 out:
+#ifdef BUGGY_DRIVERS
+	PDTE_SET_READ(pte);
+	PDTE_SET_WRITE(pte);
+#else
 	if (immu_flags & IMMU_FLAGS_READ)
 		PDTE_SET_READ(pte);
 	if (immu_flags & IMMU_FLAGS_WRITE)
 		PDTE_SET_WRITE(pte);
-
-#ifdef BUGGY_DRIVERS
-	PDTE_SET_READ(pte);
-	PDTE_SET_WRITE(pte);
 #endif
 
 	*hwp = pte;
+#endif
 }
 
 /*ARGSUSED*/
 static void
 PTE_set_all(immu_t *immu, domain_t *domain, xlate_t *xlate,
-    uint64_t *dvma_ptr, paddr_t *paddr_ptr, uint64_t *npages_ptr,
-    dev_info_t *rdip, immu_flags_t immu_flags)
+    uint64_t *dvma_ptr, uint64_t *nvpages_ptr, dcookie_t *dcookies,
+    int dcount, dev_info_t *rdip, immu_flags_t immu_flags)
 {
 	paddr_t paddr;
-	uint64_t npages;
+	uint64_t nvpages;
+	uint64_t nppages;
 	uint64_t dvma;
 	pgtable_t *pgtable;
 	hw_pdte_t *hwp;
 	hw_pdte_t *shwp;
 	int idx;
+	int j;
 
 	ASSERT(xlate->xlt_level == 1);
 
@@ -2137,50 +2173,75 @@ PTE_set_all(immu_t *immu, domain_t *domain, xlate_t *xlate,
 	ASSERT(pgtable);
 
 	dvma = *dvma_ptr;
-	paddr = *paddr_ptr;
-	npages = *npages_ptr;
+	nvpages = *nvpages_ptr;
 
-	ASSERT(paddr || (immu_flags & IMMU_FLAGS_PAGE1));
 	ASSERT(dvma || (immu_flags & IMMU_FLAGS_PAGE1));
-	ASSERT(npages);
+	ASSERT(nvpages);
 
 	/*
-	 * since we are setting PTEs, lock the page table in
-	 * write mode
+	 * since a caller gets a unique dvma for a physical address,
+	 * no other concurrent thread will be writing to the same
+	 * PTE even if it has the same paddr. So no locks needed.
 	 */
-	rw_enter(&(pgtable->swpg_rwlock), RW_WRITER);
-
-	/*
-	 * we are at the leaf pgtable - no further levels.
-	 * The next_array field should be NULL.
-	 */
-	ASSERT(pgtable->swpg_next_array == NULL);
-
 	shwp = (hw_pdte_t *)(pgtable->hwpg_vaddr) + idx;
 
 	hwp = shwp;
-	for (; npages > 0 && idx <= IMMU_PGTABLE_MAXIDX; idx++, hwp++) {
+	for (j = dcount - 1; j >= 0; j--) {
+		if (nvpages <= dcookies[j].dck_npages)
+			break;
+		nvpages -= dcookies[j].dck_npages;
+	}
+
+	ASSERT(j >= 0);
+	ASSERT(nvpages);
+	ASSERT(nvpages <= dcookies[j].dck_npages);
+	nppages = nvpages;
+	paddr = dcookies[j].dck_paddr +
+	    (dcookies[j].dck_npages - nppages) * IMMU_PAGESIZE;
+
+	nvpages = *nvpages_ptr;
+	for (; nvpages > 0 && idx <= IMMU_PGTABLE_MAXIDX; idx++, hwp++) {
+
+		ASSERT(paddr || (immu_flags & IMMU_FLAGS_PAGE1));
 
 		PTE_set_one(immu, hwp, paddr, rdip, immu_flags);
 
 		ASSERT(PDTE_check(immu, *hwp, NULL, paddr, rdip, immu_flags)
 		    == B_TRUE);
-
+		nppages--;
+		nvpages--;
 		paddr += IMMU_PAGESIZE;
 		dvma += IMMU_PAGESIZE;
-		npages--;
+
+		if (nppages == 0) {
+			j++;
+		}
+
+		if (j == dcount) {
+			ASSERT(nvpages == 0);
+			break;
+		}
+
+		ASSERT(nvpages);
+		if (nppages == 0) {
+			nppages = dcookies[j].dck_npages;
+			paddr = dcookies[j].dck_paddr;
+		}
 	}
 
 	/* flush writes to HW PTE table */
 	immu_regs_cpu_flush(immu, (caddr_t)shwp, (hwp - shwp) *
 	    sizeof (hw_pdte_t));
 
-	*dvma_ptr = dvma;
-	*paddr_ptr = paddr;
-	*npages_ptr = npages;
-	xlate->xlt_idx = idx;
+	if (nvpages) {
+		*dvma_ptr = dvma;
+		*nvpages_ptr = nvpages;
+	} else {
+		*dvma_ptr = 0;
+		*nvpages_ptr = 0;
+	}
 
-	rw_exit(&(pgtable->swpg_rwlock));
+	xlate->xlt_idx = idx;
 }
 
 /*ARGSUSED*/
@@ -2195,7 +2256,11 @@ PDE_set_one(immu_t *immu, hw_pdte_t *hwp, pgtable_t *next,
 	/* if PDE is already set, make sure it is correct */
 	if (PDTE_P(pde)) {
 		ASSERT(PDTE_PADDR(pde) == next->hwpg_paddr);
+#ifdef BUGGY_DRIVERS
+		return;
+#else
 		goto out;
+#endif
 	}
 
 	/* Dont touch SW4, it is the present bit */
@@ -2231,16 +2296,16 @@ PDE_set_one(immu_t *immu, hw_pdte_t *hwp, pgtable_t *next,
 	 * The present field in a PDE/PTE is not defined
 	 * by the Vt-d spec
 	 */
-out:
 
+out:
+#ifdef  BUGGY_DRIVERS
+	PDTE_SET_READ(pde);
+	PDTE_SET_WRITE(pde);
+#else
 	if (immu_flags & IMMU_FLAGS_READ)
 		PDTE_SET_READ(pde);
 	if (immu_flags & IMMU_FLAGS_WRITE)
 		PDTE_SET_WRITE(pde);
-
-#ifdef  BUGGY_DRIVERS
-	PDTE_SET_READ(pde);
-	PDTE_SET_WRITE(pde);
 #endif
 
 	PDTE_SET_P(pde);
@@ -2253,7 +2318,7 @@ out:
 /*
  * Used to set PDEs
  */
-static void
+static boolean_t
 PDE_set_all(immu_t *immu, domain_t *domain, xlate_t *xlate, int nlevels,
     dev_info_t *rdip, immu_flags_t immu_flags)
 {
@@ -2263,6 +2328,8 @@ PDE_set_all(immu_t *immu, domain_t *domain, xlate_t *xlate, int nlevels,
 	hw_pdte_t *hwp;
 	int level;
 	uint_t idx;
+	krw_t rwtype;
+	boolean_t set = B_FALSE;
 
 	/* xlate should be at level 0 */
 	ASSERT(xlate->xlt_level == 0);
@@ -2286,16 +2353,16 @@ PDE_set_all(immu_t *immu, domain_t *domain, xlate_t *xlate, int nlevels,
 
 		/* speculative alloc */
 		if (new == NULL) {
-			new = pgtable_alloc(immu, domain, immu_flags);
+			new = pgtable_alloc(immu, immu_flags);
 			if (new == NULL) {
 				ddi_err(DER_PANIC, rdip, "pgtable alloc err");
 			}
-
 		}
 
-		/* Alway lock the pgtable in write mode */
-		rw_enter(&(pgtable->swpg_rwlock), RW_WRITER);
-
+		/* Lock the pgtable in READ mode first */
+		rw_enter(&(pgtable->swpg_rwlock), RW_READER);
+		rwtype = RW_READER;
+again:
 		hwp = (hw_pdte_t *)(pgtable->hwpg_vaddr) + idx;
 
 		ASSERT(pgtable->swpg_next_array);
@@ -2307,26 +2374,38 @@ PDE_set_all(immu_t *immu, domain_t *domain, xlate_t *xlate, int nlevels,
 		 * if yes, verify
 		 */
 		if (next == NULL) {
+			/* Change to a write lock */
+			if (rwtype == RW_READER &&
+			    rw_tryupgrade(&(pgtable->swpg_rwlock)) == 0) {
+				rw_exit(&(pgtable->swpg_rwlock));
+				rw_enter(&(pgtable->swpg_rwlock), RW_WRITER);
+				rwtype = RW_WRITER;
+				goto again;
+			}
+			rwtype = RW_WRITER;
+			pgtable_zero(immu, new);
 			next = new;
 			new = NULL;
-			if (level == 2) {
-				/* leaf cannot have next_array */
-				kmem_free(next->swpg_next_array,
-				    IMMU_PAGESIZE);
-				next->swpg_next_array = NULL;
-			}
 			(pgtable->swpg_next_array)[idx] = next;
 			PDE_set_one(immu, hwp, next, rdip, immu_flags);
+			set = B_TRUE;
+			rw_downgrade(&(pgtable->swpg_rwlock));
+			rwtype = RW_READER;
 		} else {
 			hw_pdte_t pde = *hwp;
 
+#ifndef  BUGGY_DRIVERS
+			/*
+			 * If buggy driver we already set permission
+			 * READ+WRITE so nothing to do for that case
+			 * XXX Check that read writer perms change before
+			 * actually setting perms. Also need to hold lock
+			 */
 			if (immu_flags & IMMU_FLAGS_READ)
 				PDTE_SET_READ(pde);
 			if (immu_flags & IMMU_FLAGS_WRITE)
 				PDTE_SET_WRITE(pde);
 
-#ifdef  BUGGY_DRIVERS
-/* If buggy driver we already set permission READ+WRITE so nothing to do */
 #endif
 
 			*hwp = pde;
@@ -2336,13 +2415,15 @@ PDE_set_all(immu_t *immu, domain_t *domain, xlate_t *xlate, int nlevels,
 		    == B_TRUE);
 
 		(xlate - 1)->xlt_pgtable = next;
-
+		ASSERT(rwtype == RW_READER);
 		rw_exit(&(pgtable->swpg_rwlock));
 	}
 
 	if (new) {
-		pgtable_free(immu, new, domain);
+		pgtable_free(immu, new);
 	}
+
+	return (set);
 }
 
 /*
@@ -2357,35 +2438,38 @@ PDE_set_all(immu_t *immu, domain_t *domain, xlate_t *xlate, int nlevels,
  *     rdip: requesting device
  *     immu_flags: flags
  */
-static void
-dvma_map(immu_t *immu, domain_t *domain, uint64_t sdvma, uint64_t spaddr,
-    uint64_t npages, dev_info_t *rdip, immu_flags_t immu_flags)
+static boolean_t
+dvma_map(immu_t *immu, domain_t *domain, uint64_t sdvma, uint64_t snvpages,
+    dcookie_t *dcookies, int dcount, dev_info_t *rdip, immu_flags_t immu_flags)
 {
 	uint64_t dvma;
-	paddr_t paddr;
 	uint64_t n;
 	int nlevels = immu->immu_dvma_nlevels;
 	xlate_t xlate[IMMU_PGTABLE_MAX_LEVELS + 1] = {0};
+	boolean_t pde_set = B_FALSE;
 
 	ASSERT(nlevels <= IMMU_PGTABLE_MAX_LEVELS);
-	ASSERT(spaddr % IMMU_PAGESIZE == 0);
 	ASSERT(sdvma % IMMU_PAGESIZE == 0);
-	ASSERT(npages);
+	ASSERT(snvpages);
 
-	n = npages;
+	n = snvpages;
 	dvma = sdvma;
-	paddr = spaddr;
 
 	while (n > 0) {
 		xlate_setup(immu, dvma, xlate, nlevels, rdip);
 
 		/* Lookup or allocate PGDIRs and PGTABLEs if necessary */
-		PDE_set_all(immu, domain, xlate, nlevels, rdip, immu_flags);
+		if (PDE_set_all(immu, domain, xlate, nlevels, rdip, immu_flags)
+		    == B_TRUE) {
+			pde_set = B_TRUE;
+		}
 
 		/* set all matching ptes that fit into this leaf pgtable */
-		PTE_set_all(immu, domain, &xlate[1], &dvma, &paddr, &n, rdip,
-		    immu_flags);
+		PTE_set_all(immu, domain, &xlate[1], &dvma, &n, dcookies,
+		    dcount, rdip, immu_flags);
 	}
+
+	return (pde_set);
 }
 
 /*
@@ -2400,30 +2484,34 @@ dvma_map(immu_t *immu, domain_t *domain, uint64_t sdvma, uint64_t spaddr,
  * rdip: requesting device
  */
 static void
-dvma_unmap(immu_t *immu, domain_t *domain, uint64_t dvma, uint64_t snpages,
+dvma_unmap(immu_t *immu, domain_t *domain, uint64_t sdvma, uint64_t snpages,
     dev_info_t *rdip)
 {
 	int nlevels = immu->immu_dvma_nlevels;
 	xlate_t xlate[IMMU_PGTABLE_MAX_LEVELS + 1] = {0};
-	uint64_t npages;
+	uint64_t n;
+	uint64_t dvma;
 
 	ASSERT(nlevels <= IMMU_PGTABLE_MAX_LEVELS);
-	ASSERT(dvma != 0);
-	ASSERT(dvma % IMMU_PAGESIZE == 0);
+	ASSERT(sdvma != 0);
+	ASSERT(sdvma % IMMU_PAGESIZE == 0);
 	ASSERT(snpages);
 
-	for (npages = snpages; npages > 0; npages--) {
+	dvma = sdvma;
+	n = snpages;
+
+	while (n > 0) {
 		/* setup the xlate array */
 		xlate_setup(immu, dvma, xlate, nlevels, rdip);
 
 		/* just lookup existing pgtables. Should never fail */
 		PDE_lookup(immu, domain, xlate, nlevels, rdip);
 
-		/* XXX should be more efficient - batch clear */
-		PTE_clear_one(immu, domain, &xlate[1], dvma, rdip);
-
-		dvma += IMMU_PAGESIZE;
+		/* clear all matching ptes that fit into this leaf pgtable */
+		PTE_clear_all(immu, domain, &xlate[1], &dvma, &n, rdip);
 	}
+
+	/* No need to flush IOTLB after unmap */
 }
 
 static uint64_t
@@ -2431,7 +2519,7 @@ dvma_alloc(ddi_dma_impl_t *hp, domain_t *domain, uint_t npages)
 {
 	ddi_dma_attr_t *dma_attr;
 	uint64_t dvma;
-	size_t xsize, align, nocross;
+	size_t xsize, align;
 	uint64_t minaddr, maxaddr;
 
 	ASSERT(domain->dom_maptype != IMMU_MAPTYPE_UNITY);
@@ -2442,9 +2530,9 @@ dvma_alloc(ddi_dma_impl_t *hp, domain_t *domain, uint_t npages)
 	/* parameters */
 	xsize = npages * IMMU_PAGESIZE;
 	align = MAX((size_t)(dma_attr->dma_attr_align), IMMU_PAGESIZE);
-	nocross = (size_t)(dma_attr->dma_attr_seg + 1);
 	minaddr = dma_attr->dma_attr_addr_lo;
 	maxaddr = dma_attr->dma_attr_addr_hi + 1;
+	/* nocross is checked in cookie_update() */
 
 	/* handle the rollover cases */
 	if (maxaddr < dma_attr->dma_attr_addr_hi) {
@@ -2455,7 +2543,7 @@ dvma_alloc(ddi_dma_impl_t *hp, domain_t *domain, uint_t npages)
 	 * allocate from vmem arena.
 	 */
 	dvma = (uint64_t)(uintptr_t)vmem_xalloc(domain->dom_dvma_arena,
-	    xsize, align, 0, nocross, (void *)(uintptr_t)minaddr,
+	    xsize, align, 0, 0, (void *)(uintptr_t)minaddr,
 	    (void *)(uintptr_t)maxaddr, VM_NOSLEEP);
 
 	ASSERT(dvma);
@@ -2485,25 +2573,31 @@ dvma_free(domain_t *domain, uint64_t dvma, uint64_t npages)
 /*ARGSUSED*/
 static void
 cookie_free(rootnex_dma_t *dma, immu_t *immu, domain_t *domain,
-    dev_info_t *ddip, dev_info_t *rdip)
+    dev_info_t *rdip)
 {
 	int i;
 	uint64_t dvma;
 	uint64_t npages;
 	dvcookie_t  *dvcookies = dma->dp_dvcookies;
-	uint64_t dvmax =  dma->dp_dvmax;
 
 	ASSERT(dma->dp_max_cookies);
 	ASSERT(dma->dp_max_dcookies);
 	ASSERT(dma->dp_dvmax < dma->dp_max_cookies);
 	ASSERT(dma->dp_dmax < dma->dp_max_dcookies);
 
-	for (i = 0; i <= dvmax; i++) {
-		dvma = dvcookies[i].dvck_dvma;
-		npages = dvcookies[i].dvck_npages;
-		dvma_unmap(immu, domain, dvma, npages, rdip);
-		dvma_free(domain, dvma, npages);
+	/*
+	 * we allocated DVMA in a single chunk. Calculate total number
+	 * of pages
+	 */
+	for (i = 0, npages = 0; i <= dma->dp_dvmax; i++) {
+		npages += dvcookies[i].dvck_npages;
 	}
+	dvma = dvcookies[0].dvck_dvma;
+#ifdef DEBUG
+	/* Unmap only in DEBUG mode */
+	dvma_unmap(immu, domain, dvma, npages, rdip);
+#endif
+	dvma_free(domain, dvma, npages);
 
 	kmem_free(dma->dp_dvcookies, sizeof (dvcookie_t) * dma->dp_max_cookies);
 	dma->dp_dvcookies = NULL;
@@ -2579,17 +2673,15 @@ cookie_alloc(rootnex_dma_t *dma, struct ddi_dma_req *dmareq,
 	if (max_cookies > prealloc) {
 		cookies = kmem_zalloc(cookie_size, kmflag);
 		if (cookies == NULL) {
-			kmem_free(dvcookies, sizeof (dvcookie_t) *
-			    max_cookies);
-			kmem_free(dcookies, sizeof (dcookie_t) *
-			    max_dcookies);
+			kmem_free(dvcookies, sizeof (dvcookie_t) * max_cookies);
+			kmem_free(dcookies, sizeof (dcookie_t) * max_dcookies);
 			goto fail;
 		}
 		dma->dp_need_to_free_cookie = B_TRUE;
 	} else {
 		/* the preallocated buffer fits this size */
 		cookies = (ddi_dma_cookie_t *)dma->dp_prealloc_buffer;
-		bzero(cookies, sizeof (ddi_dma_cookie_t) * max_cookies);
+		bzero(cookies, sizeof (ddi_dma_cookie_t)* max_cookies);
 		dma->dp_need_to_free_cookie = B_FALSE;
 	}
 
@@ -2601,7 +2693,6 @@ cookie_alloc(rootnex_dma_t *dma, struct ddi_dma_req *dmareq,
 	dma->dp_max_dcookies = max_dcookies;
 	dma->dp_dvmax = 0;
 	dma->dp_dmax = 0;
-
 	sinfo->si_max_pages = dma->dp_max_cookies;
 
 	return (DDI_SUCCESS);
@@ -2617,13 +2708,14 @@ fail:
 	dma->dp_dmax = 0;
 	dma->dp_need_to_free_cookie = B_FALSE;
 	sinfo->si_max_pages = 0;
+
 	return (DDI_FAILURE);
 }
 
 /*ARGSUSED*/
 static void
 cookie_update(domain_t *domain, rootnex_dma_t *dma, paddr_t paddr,
-    int64_t psize, uint64_t maxseg)
+    int64_t psize, uint64_t maxseg, size_t nocross)
 {
 	dvcookie_t *dvcookies = dma->dp_dvcookies;
 	dcookie_t *dcookies = dma->dp_dcookies;
@@ -2642,34 +2734,40 @@ cookie_update(domain_t *domain, rootnex_dma_t *dma, paddr_t paddr,
 
 	/*
 	 * check to see if this page would put us
-	 * over the max cookie size
+	 * over the max cookie size.
 	 */
 	if (cookies[dvmax].dmac_size + psize > maxseg) {
-		dvcookies[dvmax].dvck_eidx = dmax;
 		dvmax++;    /* use the next dvcookie */
-		dmax++;    /* also mean we use the next dcookie */
-		dvcookies[dvmax].dvck_sidx = dmax;
-
+		dmax++;    /* also means we use the next dcookie */
 		ASSERT(dvmax < dma->dp_max_cookies);
 		ASSERT(dmax < dma->dp_max_dcookies);
 	}
 
 	/*
-	 * If the cookie is mapped or empty
+	 * check to see if this page would make us larger than
+	 * the nocross boundary. If yes, create a new cookie
+	 * otherwise we will fail later with vmem_xalloc()
+	 * due to overconstrained alloc requests
+	 * nocross == 0 implies no nocross constraint.
 	 */
-	if (dvcookies[dvmax].dvck_dvma != 0 ||
-	    dvcookies[dvmax].dvck_npages == 0) {
-		/* if mapped, we need a new empty one */
-		if (dvcookies[dvmax].dvck_dvma != 0) {
-			dvcookies[dvmax].dvck_eidx = dmax;
-			dvmax++;
-			dmax++;
-			dvcookies[dvmax].dvck_sidx = dma->dp_dmax;
+	if (nocross > 0) {
+		ASSERT((dvcookies[dvmax].dvck_npages) * IMMU_PAGESIZE
+		    <= nocross);
+		if ((dvcookies[dvmax].dvck_npages + 1) * IMMU_PAGESIZE
+		    > nocross) {
+			dvmax++;    /* use the next dvcookie */
+			dmax++;    /* also means we use the next dcookie */
 			ASSERT(dvmax < dma->dp_max_cookies);
 			ASSERT(dmax < dma->dp_max_dcookies);
 		}
+		ASSERT((dvcookies[dvmax].dvck_npages) * IMMU_PAGESIZE
+		    <= nocross);
+	}
 
-		/* ok, we have an empty cookie */
+	/*
+	 * If the cookie is empty
+	 */
+	if (dvcookies[dvmax].dvck_npages == 0) {
 		ASSERT(cookies[dvmax].dmac_size == 0);
 		ASSERT(dvcookies[dvmax].dvck_dvma == 0);
 		ASSERT(dvcookies[dvmax].dvck_npages
@@ -2683,7 +2781,7 @@ cookie_update(domain_t *domain, rootnex_dma_t *dma, paddr_t paddr,
 		dcookies[dmax].dck_npages = 1;
 		cookies[dvmax].dmac_size = psize;
 	} else {
-		/* Unmapped cookie but not empty. Add to it */
+		/* Cookie not empty. Add to it */
 		cookies[dma->dp_dvmax].dmac_size += psize;
 		ASSERT(dvcookies[dma->dp_dvmax].dvck_dvma == 0);
 		dvcookies[dma->dp_dvmax].dvck_npages++;
@@ -2712,55 +2810,42 @@ cookie_finalize(ddi_dma_impl_t *hp, immu_t *immu, domain_t *domain,
     dev_info_t *rdip, immu_flags_t immu_flags)
 {
 	int i;
-	int j;
 	rootnex_dma_t *dma = (rootnex_dma_t *)hp->dmai_private;
 	dvcookie_t *dvcookies = dma->dp_dvcookies;
 	dcookie_t *dcookies = dma->dp_dcookies;
 	ddi_dma_cookie_t *cookies = dma->dp_cookies;
-	paddr_t paddr;
 	uint64_t npages;
 	uint64_t dvma;
+	boolean_t pde_set;
 
+	/* First calculate the total number of pages required */
+	for (i = 0, npages = 0; i <= dma->dp_dvmax; i++) {
+		npages += dvcookies[i].dvck_npages;
+	}
+
+	/* Now allocate dvma */
+	dvma = dvma_alloc(hp, domain, npages);
+
+	/* Now map the dvma */
+	pde_set = dvma_map(immu, domain, dvma, npages, dcookies,
+	    dma->dp_dmax + 1, rdip, immu_flags);
+
+	/* Invalidate the IOTLB */
+	immu_regs_iotlb_flush(immu, domain->dom_did, dvma, npages,
+	    pde_set == B_TRUE ? TLB_IVA_WHOLE : TLB_IVA_LEAF, IOTLB_PSI);
+
+	/* Now setup dvcookies and real cookie addresses */
 	for (i = 0; i <= dma->dp_dvmax; i++) {
-		/* Finish up the last cookie */
-		if (i == dma->dp_dvmax) {
-			dvcookies[i].dvck_eidx = dma->dp_dmax;
-		}
-		if ((dvma = dvcookies[i].dvck_dvma) != 0) {
-			cookies[i].dmac_laddress = dvma;
-			ASSERT(cookies[i].dmac_size != 0);
-			cookies[i].dmac_type = 0;
-			for (j = dvcookies[i].dvck_sidx;
-			    j <= dvcookies[i].dvck_eidx; j++) {
-				ASSERT(dcookies[j].dck_paddr != 0);
-				ASSERT(dcookies[j].dck_npages != 0);
-			}
-			continue;
-		}
-
-		dvma = dvma_alloc(hp, domain, dvcookies[i].dvck_npages);
-
 		dvcookies[i].dvck_dvma = dvma;
-
-		/* Set "real" cookies addr, cookie size already set */
 		cookies[i].dmac_laddress = dvma;
 		ASSERT(cookies[i].dmac_size != 0);
 		cookies[i].dmac_type = 0;
-
-		for (j = dvcookies[i].dvck_sidx;
-		    j <= dvcookies[i].dvck_eidx; j++) {
-
-			paddr = dcookies[j].dck_paddr;
-			npages = dcookies[j].dck_npages;
-
-			ASSERT(paddr);
-			ASSERT(npages);
-
-			dvma_map(immu, domain, dvma, paddr, npages,
-			    rdip, immu_flags);
-			dvma += npages * IMMU_PAGESIZE;
-		}
+		dvma += (dvcookies[i].dvck_npages * IMMU_PAGESIZE);
 	}
+
+#ifdef TEST
+	immu_regs_iotlb_flush(immu, domain->dom_did, 0, 0, 0, IOTLB_DSI);
+#endif
 }
 
 /*
@@ -2771,7 +2856,6 @@ cookie_create(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq,
     ddi_dma_attr_t *a, immu_t *immu, domain_t *domain, dev_info_t *rdip,
     uint_t prealloc_count, immu_flags_t immu_flags)
 {
-
 	ddi_dma_atyp_t buftype;
 	uint64_t offset;
 	page_t **pparray;
@@ -2785,6 +2869,7 @@ cookie_create(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq,
 	rootnex_sglinfo_t *sglinfo;
 	ddi_dma_obj_t *dmar_object;
 	rootnex_dma_t *dma;
+	size_t nocross;
 
 	dma = (rootnex_dma_t *)hp->dmai_private;
 	sglinfo = &(dma->dp_sglinfo);
@@ -2794,6 +2879,7 @@ cookie_create(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq,
 	vaddr = dmar_object->dmao_obj.virt_obj.v_addr;
 	buftype = dmar_object->dmao_type;
 	size = dmar_object->dmao_size;
+	nocross = (size_t)(a->dma_attr_seg + 1);
 
 	/*
 	 * Allocate cookie, dvcookie and dcookie
@@ -2842,7 +2928,7 @@ cookie_create(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq,
 	/*
 	 * setup dvcookie and dcookie for [paddr, paddr+psize)
 	 */
-	cookie_update(domain, dma, paddr, psize, maxseg);
+	cookie_update(domain, dma, paddr, psize, maxseg, nocross);
 
 	size -= psize;
 	while (size > 0) {
@@ -2867,7 +2953,7 @@ cookie_create(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq,
 		/*
 		 * set dvcookie and dcookie for [paddr, paddr+psize)
 		 */
-		cookie_update(domain, dma, paddr, psize, maxseg);
+		cookie_update(domain, dma, paddr, psize, maxseg, nocross);
 		size -= psize;
 	}
 
@@ -2955,6 +3041,8 @@ immu_dvma_physmem_update(uint64_t addr, uint64_t size)
 {
 	uint64_t start;
 	uint64_t npages;
+	int dcount;
+	dcookie_t dcookies[1] = {0};
 	domain_t *domain;
 
 	/*
@@ -2974,12 +3062,16 @@ immu_dvma_physmem_update(uint64_t addr, uint64_t size)
 		start = IMMU_ROUNDOWN(addr);
 		npages = (IMMU_ROUNDUP(size) / IMMU_PAGESIZE) + 1;
 
-		dvma_map(domain->dom_immu, domain, start, start,
-		    npages, NULL, IMMU_FLAGS_READ | IMMU_FLAGS_WRITE);
+		dcookies[0].dck_paddr = start;
+		dcookies[0].dck_npages = npages;
+		dcount = 1;
+		(void) dvma_map(domain->dom_immu, domain, start, npages,
+		    dcookies, dcount, NULL, IMMU_FLAGS_READ | IMMU_FLAGS_WRITE);
 
 	}
 	mutex_exit(&immu_domain_lock);
 }
+
 
 int
 immu_dvma_map(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq, memrng_t *mrng,
@@ -2989,6 +3081,9 @@ immu_dvma_map(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq, memrng_t *mrng,
 	dev_info_t *ddip;
 	domain_t *domain;
 	immu_t *immu;
+	dcookie_t dcookies[1] = {0};
+	int dcount = 0;
+	boolean_t pde_set = B_TRUE;
 	int r = DDI_FAILURE;
 
 	ASSERT(immu_enable == B_TRUE);
@@ -3011,6 +3106,42 @@ immu_dvma_map(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq, memrng_t *mrng,
 
 	immu_flags |= dma_to_immu_flags(dmareq);
 
+
+	immu = immu_dvma_get_immu(rdip, immu_flags);
+	if (immu == NULL) {
+		/*
+		 * possible that there is no IOMMU unit for this device
+		 * - BIOS bugs are one example.
+		 */
+		ddi_err(DER_WARN, rdip, "No IMMU unit found for device");
+		return (DDI_DMA_NORESOURCES);
+	}
+
+
+	/*
+	 * redirect isa devices attached under lpc to lpc dip
+	 */
+	if (strcmp(ddi_node_name(ddi_get_parent(rdip)), "isa") == 0) {
+		rdip = get_lpc_devinfo(immu, rdip, immu_flags);
+		if (rdip == NULL) {
+			ddi_err(DER_PANIC, rdip, "IMMU redirect failed");
+			/*NOTREACHED*/
+		}
+	}
+
+	/* Reset immu, as redirection can change IMMU */
+	immu = NULL;
+
+	/*
+	 * for gart, redirect to the real graphic devinfo
+	 */
+	if (strcmp(ddi_node_name(rdip), "agpgart") == 0) {
+		rdip = get_gfx_devinfo(rdip);
+		if (rdip == NULL) {
+			ddi_err(DER_PANIC, rdip, "IMMU redirect failed");
+			/*NOTREACHED*/
+		}
+	}
 
 	/*
 	 * Setup DVMA domain for the device. This does
@@ -3040,7 +3171,6 @@ immu_dvma_map(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq, memrng_t *mrng,
 	ASSERT(immu);
 	if (domain->dom_did == IMMU_UNITY_DID) {
 		ASSERT(domain == immu->immu_unity_domain);
-
 		/* mapping already done. Let rootnex create cookies */
 		r = DDI_DMA_USE_PHYSICAL;
 	} else  if (immu_flags & IMMU_FLAGS_DMAHDL) {
@@ -3055,18 +3185,22 @@ immu_dvma_map(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq, memrng_t *mrng,
 			    "DMA handle (%p): NULL attr", hp);
 			/*NOTREACHED*/
 		}
+
 		if (cookie_create(hp, dmareq, attr, immu, domain, rdip,
 		    prealloc_count, immu_flags) != DDI_SUCCESS) {
 			ddi_err(DER_MODE, rdip, "dvcookie_alloc: failed");
 			return (DDI_DMA_NORESOURCES);
 		}
-
-		/* flush write buffer */
-		immu_regs_wbf_flush(immu);
 		r = DDI_DMA_MAPPED;
 	} else if (immu_flags & IMMU_FLAGS_MEMRNG) {
-		dvma_map(immu, domain, mrng->mrng_start, mrng->mrng_start,
-		    mrng->mrng_npages, rdip, immu_flags);
+		dcookies[0].dck_paddr = mrng->mrng_start;
+		dcookies[0].dck_npages = mrng->mrng_npages;
+		dcount = 1;
+		pde_set = dvma_map(immu, domain, mrng->mrng_start,
+		    mrng->mrng_npages, dcookies, dcount, rdip, immu_flags);
+		immu_regs_iotlb_flush(immu, domain->dom_did, mrng->mrng_start,
+		    mrng->mrng_npages, pde_set == B_TRUE ?
+		    TLB_IVA_WHOLE : TLB_IVA_LEAF, IOTLB_PSI);
 		r = DDI_DMA_MAPPED;
 	} else {
 		ddi_err(DER_PANIC, rdip, "invalid flags for immu_dvma_map()");
@@ -3082,12 +3216,6 @@ immu_dvma_map(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq, memrng_t *mrng,
 		return (DDI_DMA_NORESOURCES);
 	}
 
-	/* flush caches */
-	rw_enter(&(immu->immu_ctx_rwlock), RW_WRITER);
-	immu_regs_context_flush(immu, 0, 0, domain->dom_did, CONTEXT_DSI);
-	rw_exit(&(immu->immu_ctx_rwlock));
-	immu_regs_iotlb_flush(immu, domain->dom_did, 0, 0, TLB_IVA_WHOLE,
-	    IOTLB_DSI);
 	immu_regs_wbf_flush(immu);
 
 	return (r);
@@ -3133,6 +3261,42 @@ immu_dvma_unmap(ddi_dma_impl_t *hp, dev_info_t *rdip)
 	}
 	immu_flags = dma->dp_sleep_flags;
 
+	immu = immu_dvma_get_immu(rdip, immu_flags);
+	if (immu == NULL) {
+		/*
+		 * possible that there is no IOMMU unit for this device
+		 * - BIOS bugs are one example.
+		 */
+		ddi_err(DER_WARN, rdip, "No IMMU unit found for device");
+		return (DDI_DMA_NORESOURCES);
+	}
+
+
+	/*
+	 * redirect isa devices attached under lpc to lpc dip
+	 */
+	if (strcmp(ddi_node_name(ddi_get_parent(rdip)), "isa") == 0) {
+		rdip = get_lpc_devinfo(immu, rdip, immu_flags);
+		if (rdip == NULL) {
+			ddi_err(DER_PANIC, rdip, "IMMU redirect failed");
+			/*NOTREACHED*/
+		}
+	}
+
+	/* Reset immu, as redirection can change IMMU */
+	immu = NULL;
+
+	/*
+	 * for gart, redirect to the real graphic devinfo
+	 */
+	if (strcmp(ddi_node_name(rdip), "agpgart") == 0) {
+		rdip = get_gfx_devinfo(rdip);
+		if (rdip == NULL) {
+			ddi_err(DER_PANIC, rdip, "IMMU redirect failed");
+			/*NOTREACHED*/
+		}
+	}
+
 	ddip = NULL;
 	domain = device_domain(rdip, &ddip, immu_flags);
 	if (domain == NULL || domain->dom_did == 0 || ddip == NULL) {
@@ -3163,15 +3327,9 @@ immu_dvma_unmap(ddi_dma_impl_t *hp, dev_info_t *rdip)
 		/*NOTREACHED*/
 	}
 
-	/* free all cookies */
-	cookie_free(dma, immu, domain, ddip, rdip);
+	cookie_free(dma, immu, domain, rdip);
 
-	/* flush caches */
-	rw_enter(&(immu->immu_ctx_rwlock), RW_WRITER);
-	immu_regs_context_flush(immu, 0, 0, domain->dom_did, CONTEXT_DSI);
-	rw_exit(&(immu->immu_ctx_rwlock));
-	immu_regs_iotlb_flush(immu, domain->dom_did, 0, 0, TLB_IVA_WHOLE,
-	    IOTLB_DSI);
+	/* No invalidation needed for unmap */
 	immu_regs_wbf_flush(immu);
 
 	return (DDI_SUCCESS);
@@ -3181,10 +3339,10 @@ immu_devi_t *
 immu_devi_get(dev_info_t *rdip)
 {
 	immu_devi_t *immu_devi;
+	volatile uintptr_t *vptr = (uintptr_t *)&(DEVI(rdip)->devi_iommu);
 
-	mutex_enter(&DEVI(rdip)->devi_lock);
-	immu_devi = DEVI(rdip)->devi_iommu;
-	mutex_exit(&DEVI(rdip)->devi_lock);
-
+	/* Just want atomic reads. No need for lock */
+	immu_devi = (immu_devi_t *)(uintptr_t)atomic_or_64_nv((uint64_t *)vptr,
+	    0);
 	return (immu_devi);
 }

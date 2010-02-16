@@ -59,7 +59,6 @@
 #include <sys/bootinfo.h>
 #include <sys/atomic.h>
 #include <sys/immu.h>
-
 /* ########################### Globals and tunables ######################## */
 /*
  * Global switches (boolean) that can be toggled either via boot options
@@ -67,7 +66,7 @@
  */
 
 /* Various features */
-boolean_t immu_enable = B_TRUE;
+boolean_t immu_enable = B_FALSE;
 boolean_t immu_dvma_enable = B_TRUE;
 
 /* accessed in other files so not static */
@@ -83,10 +82,11 @@ boolean_t immu_quirk_usbrmrr = B_TRUE;
 boolean_t immu_quirk_usbfullpa;
 boolean_t immu_quirk_mobile4;
 
-boolean_t immu_mmio_safe = B_TRUE;
-
 /* debug messages */
 boolean_t immu_dmar_print;
+
+/* Tunables */
+int64_t immu_flush_gran = 5;
 
 /* ############  END OPTIONS section ################ */
 
@@ -96,6 +96,7 @@ boolean_t immu_dmar_print;
 dev_info_t *root_devinfo;
 kmutex_t immu_lock;
 list_t immu_list;
+void *immu_pgtable_cache;
 boolean_t immu_setup;
 boolean_t immu_running;
 boolean_t immu_quiesced;
@@ -143,22 +144,56 @@ map_bios_rsvd_mem(dev_info_t *dip)
 
 	mp = bios_rsvd;
 	while (mp != NULL) {
-		memrng_t *mrng = {0};
+		memrng_t mrng = {0};
 
 		ddi_err(DER_LOG, dip, "IMMU: Mapping BIOS rsvd range "
 		    "[0x%" PRIx64 " - 0x%"PRIx64 "]\n", mp->ml_address,
 		    mp->ml_address + mp->ml_size);
 
-		mrng->mrng_start = IMMU_ROUNDOWN(mp->ml_address);
-		mrng->mrng_npages = IMMU_ROUNDUP(mp->ml_size) / IMMU_PAGESIZE;
+		mrng.mrng_start = IMMU_ROUNDOWN(mp->ml_address);
+		mrng.mrng_npages = IMMU_ROUNDUP(mp->ml_size) / IMMU_PAGESIZE;
 
-		e = immu_dvma_map(NULL, NULL, mrng, 0, dip, IMMU_FLAGS_MEMRNG);
+		e = immu_dvma_map(NULL, NULL, &mrng, 0, dip, IMMU_FLAGS_MEMRNG);
 		ASSERT(e == DDI_DMA_MAPPED || e == DDI_DMA_USE_PHYSICAL);
 
 		mp = mp->ml_next;
 	}
 
 	memlist_read_unlock();
+}
+
+
+/*
+ * Check if the driver requests physical mapping
+ */
+/*ARGSUSED*/
+static void
+check_physical(dev_info_t *dip, void *arg)
+{
+	char *val;
+
+	/*
+	 * Check for the DVMA unity mapping property on the device
+	 */
+	val = NULL;
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, DDI_DVMA_MAPTYPE_PROP, &val) == DDI_SUCCESS) {
+		ASSERT(val);
+		if (strcmp(val, DDI_DVMA_MAPTYPE_UNITY) != 0) {
+			ddi_err(DER_WARN, dip, "%s value \"%s\" is not valid",
+			    DDI_DVMA_MAPTYPE_PROP, val);
+		} else {
+			int e;
+
+			ddi_err(DER_NOTE, dip,
+			    "Using unity DVMA mapping for device");
+			e = immu_dvma_map(NULL, NULL, NULL, 0, dip,
+			    IMMU_FLAGS_UNITY);
+			/* for unity mode, map will return USE_PHYSICAL */
+			ASSERT(e == DDI_DMA_USE_PHYSICAL);
+		}
+		ddi_prop_free(val);
+	}
 }
 
 /*
@@ -261,6 +296,8 @@ check_pre_startup_quirks(dev_info_t *dip, void *arg)
 
 	check_usb(dip, arg);
 
+	check_physical(dip, arg);
+
 	return (DDI_WALK_CONTINUE);
 }
 
@@ -311,6 +348,45 @@ get_bootopt(char *bopt, boolean_t *kvar)
 }
 
 static void
+get_tunables(char *bopt, int64_t *ivar)
+{
+	int64_t	*iarray;
+	uint_t n;
+
+	/*
+	 * Check the rootnex.conf property
+	 * Fake up a dev_t since searching the global
+	 * property list needs it
+	 */
+	if (ddi_prop_lookup_int64_array(
+	    makedevice(ddi_name_to_major("rootnex"), 0), root_devinfo,
+	    DDI_PROP_DONTPASS | DDI_PROP_ROOTNEX_GLOBAL, bopt,
+	    &iarray, &n) != DDI_PROP_SUCCESS) {
+		return;
+	}
+
+	if (n != 1) {
+		ddi_err(DER_WARN, NULL, "More than one value specified for "
+		    "%s property. Ignoring and using default",
+		    "immu-flush-gran");
+		ddi_prop_free(iarray);
+		return;
+	}
+
+	if (iarray[0] < 0) {
+		ddi_err(DER_WARN, NULL, "Negative value specified for "
+		    "%s property. Inoring and Using default value",
+		    "immu-flush-gran");
+		ddi_prop_free(iarray);
+		return;
+	}
+
+	*ivar = iarray[0];
+
+	ddi_prop_free(iarray);
+}
+
+static void
 read_boot_options(void)
 {
 	/* enable/disable options */
@@ -319,7 +395,6 @@ read_boot_options(void)
 	get_bootopt("immu-gfxdvma-enable", &immu_gfxdvma_enable);
 	get_bootopt("immu-intrmap-enable", &immu_intrmap_enable);
 	get_bootopt("immu-qinv-enable", &immu_qinv_enable);
-	get_bootopt("immu-mmio-safe", &immu_mmio_safe);
 
 	/* workaround switches */
 	get_bootopt("immu-quirk-usbpage0", &immu_quirk_usbpage0);
@@ -328,6 +403,9 @@ read_boot_options(void)
 
 	/* debug printing */
 	get_bootopt("immu-dmar-print", &immu_dmar_print);
+
+	/* get tunables */
+	get_tunables("immu-flush-gran", &immu_flush_gran);
 }
 
 /*
@@ -348,8 +426,8 @@ blacklisted_driver(void)
 		return (B_FALSE);
 	}
 
-	strptr = black_array;
 	for (i = 0; nblacks - i > 1; i++) {
+		strptr = &black_array[i];
 		if (strcmp(*strptr++, "DRIVER") == 0) {
 			if ((maj = ddi_name_to_major(*strptr++))
 			    != DDI_MAJOR_T_NONE) {
@@ -399,8 +477,8 @@ blacklisted_smbios(void)
 	ddi_err(DER_CONT, NULL, "?Product = <%s>\n", product);
 	ddi_err(DER_CONT, NULL, "?Version = <%s>\n", version);
 
-	strptr = black_array;
 	for (i = 0; nblacks - i > 3; i++) {
+		strptr = &black_array[i];
 		if (strcmp(*strptr++, "SMBIOS") == 0) {
 			if (strcmp(*strptr++, mfg) == 0 &&
 			    ((char *)strptr == '\0' ||
@@ -528,6 +606,8 @@ immu_state_alloc(int seg, void *dmar_unit)
 
 	/* IOMMU regs related */
 	mutex_init(&(immu->immu_regs_lock), NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&(immu->immu_regs_cv), NULL, CV_DEFAULT, NULL);
+	immu->immu_regs_busy = B_FALSE;
 
 	/* DVMA related */
 	immu->immu_dvma_coherent = B_FALSE;
@@ -582,6 +662,12 @@ immu_subsystems_setup(void)
 	list_create(&immu_list, sizeof (immu_t), offsetof(immu_t, immu_node));
 
 	mutex_enter(&immu_lock);
+
+	ASSERT(immu_pgtable_cache == NULL);
+
+	immu_pgtable_cache = kmem_cache_create("immu_pgtable_cache",
+	    sizeof (pgtable_t), 0,
+	    pgtable_ctor, pgtable_dtor, NULL, NULL, NULL, 0);
 
 	unit_hdl = NULL;
 	for (seg = 0; seg < IMMU_MAXSEG; seg++) {
@@ -991,11 +1077,14 @@ immu_unquiesce(void)
 		mutex_enter(&(immu->immu_lock));
 
 		/* if immu was not quiesced, i.e was not running before */
-		if (immu->immu_regs_quiesced == B_FALSE)
+		if (immu->immu_regs_quiesced == B_FALSE) {
+			mutex_exit(&(immu->immu_lock));
 			continue;
+		}
 
 		if (immu_regs_resume(immu) != DDI_SUCCESS) {
 			ret = DDI_FAILURE;
+			mutex_exit(&(immu->immu_lock));
 			continue;
 		}
 
