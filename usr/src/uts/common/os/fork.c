@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -258,6 +258,12 @@ cfork(int isvfork, int isfork1, int flags)
 		}
 		cp->p_as = as;
 		cp->p_flag |= SVFORK;
+
+		/*
+		 * Use the parent's shm segment list information for
+		 * the child as it uses its address space till it execs.
+		 */
+		cp->p_segacct = p->p_segacct;
 	} else {
 		/*
 		 * We need to hold P_PR_LOCK until the address space has
@@ -1263,6 +1269,14 @@ try_again:
 		pp->p_brkbase = p->p_brkbase;
 		pp->p_brksize = p->p_brksize;
 		pp->p_stksize = p->p_stksize;
+
+		/*
+		 * Copy back the shm accounting information
+		 * to the parent process.
+		 */
+		pp->p_segacct = p->p_segacct;
+		p->p_segacct = NULL;
+
 		/*
 		 * The parent is no longer waiting for the vfork()d child.
 		 * Restore the parent's watched pages, if any.  This is
