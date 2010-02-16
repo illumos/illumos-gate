@@ -6984,12 +6984,16 @@ ql_flash_nvram_defaults(ql_adapter_state_t *ha)
 			ha->flash_errlog_start = FLASH_8100_ERRLOG_START_ADDR_1;
 			ha->flash_desc_addr = FLASH_8100_DESCRIPTOR_TABLE;
 			ha->flash_fw_addr = FLASH_8100_FIRMWARE_ADDR;
+		} else {
+			EL(ha, "unassigned flash fn1 addr: %x\n",
+			    ha->device_id);
 		}
 	} else {
 		if (CFG_IST(ha, CFG_CTRL_2200)) {
 			ha->flash_nvram_addr = NVRAM_2200_FUNC0_ADDR;
 			ha->flash_fw_addr = FLASH_2200_FIRMWARE_ADDR;
-		} else if (CFG_IST(ha, CFG_CTRL_2300)) {
+		} else if (CFG_IST(ha, CFG_CTRL_2300) ||
+		    (CFG_IST(ha, CFG_CTRL_6322))) {
 			ha->flash_nvram_addr = NVRAM_2300_FUNC0_ADDR;
 			ha->flash_fw_addr = FLASH_2300_FIRMWARE_ADDR;
 		} else if (CFG_IST(ha, CFG_CTRL_2422)) {
@@ -7013,6 +7017,9 @@ ql_flash_nvram_defaults(ql_adapter_state_t *ha)
 			ha->flash_errlog_start = FLASH_8100_ERRLOG_START_ADDR_0;
 			ha->flash_desc_addr = FLASH_8100_DESCRIPTOR_TABLE;
 			ha->flash_fw_addr = FLASH_8100_FIRMWARE_ADDR;
+		} else {
+			EL(ha, "unassigned flash fn1 addr: %x\n",
+			    ha->device_id);
 		}
 	}
 	QL_PRINT_9(CE_CONT, "(%d): done\n", ha->instance);
