@@ -848,7 +848,7 @@ typedef struct send_dump_data {
  */
 static int
 dump_ioctl(zfs_handle_t *zhp, const char *fromsnap, boolean_t fromorigin,
-    int outfd)
+    int outfd, boolean_t enoent_ok, boolean_t *got_enoent)
 {
 	zfs_cmd_t zc = { 0 };
 	libzfs_handle_t *hdl = zhp->zfs_hdl;
@@ -861,6 +861,8 @@ dump_ioctl(zfs_handle_t *zhp, const char *fromsnap, boolean_t fromorigin,
 		(void) strlcpy(zc.zc_value, fromsnap, sizeof (zc.zc_value));
 	zc.zc_cookie = outfd;
 	zc.zc_obj = fromorigin;
+
+	*got_enoent = B_FALSE;
 
 	if (ioctl(zhp->zfs_hdl->libzfs_fd, ZFS_IOC_SEND, &zc) != 0) {
 		char errbuf[1024];
@@ -875,6 +877,10 @@ dump_ioctl(zfs_handle_t *zhp, const char *fromsnap, boolean_t fromorigin,
 			return (zfs_error(hdl, EZFS_CROSSTARGET, errbuf));
 
 		case ENOENT:
+			if (enoent_ok) {
+				*got_enoent = B_TRUE;
+				return (0);
+			}
 			if (zfs_dataset_exists(hdl, zc.zc_name,
 			    ZFS_TYPE_SNAPSHOT)) {
 				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
@@ -911,6 +917,7 @@ dump_snapshot(zfs_handle_t *zhp, void *arg)
 	send_dump_data_t *sdd = arg;
 	const char *thissnap;
 	int err;
+	boolean_t got_enoent;
 
 	thissnap = strchr(zhp->zfs_name, '@') + 1;
 
@@ -956,9 +963,12 @@ dump_snapshot(zfs_handle_t *zhp, void *arg)
 
 	err = dump_ioctl(zhp, sdd->prevsnap,
 	    sdd->prevsnap[0] == '\0' && (sdd->fromorigin || sdd->replicate),
-	    sdd->outfd);
+	    sdd->outfd, B_TRUE, &got_enoent);
 
-	(void) strcpy(sdd->prevsnap, thissnap);
+	if (got_enoent)
+		err = 0;
+	else
+		(void) strcpy(sdd->prevsnap, thissnap);
 	zfs_close(zhp);
 	return (err);
 }
@@ -1038,10 +1048,12 @@ dump_filesystem(zfs_handle_t *zhp, void *arg)
 			if (sdd->filter_cb == NULL ||
 			    sdd->filter_cb(snapzhp, sdd->filter_cb_arg) ==
 			    B_TRUE) {
+				boolean_t got_enoent;
+
 				rv = dump_ioctl(snapzhp,
 				    missingfrom ? NULL : sdd->fromsnap,
 				    sdd->fromorigin || missingfrom,
-				    sdd->outfd);
+				    sdd->outfd, B_FALSE, &got_enoent);
 			}
 			sdd->seento = B_TRUE;
 			zfs_close(snapzhp);
@@ -1267,11 +1279,11 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 			if (err == -1) {
 				fsavl_destroy(fsavl);
 				nvlist_free(fss);
+				err = errno;
 				if (holdsnaps) {
 					(void) zfs_release_range(zhp, fromsnap,
 					    tosnap, holdtag, flags.replicate);
 				}
-				err = errno;
 				goto stderr_out;
 			}
 		}
