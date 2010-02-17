@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -60,8 +60,6 @@
  * Hudson (tjh@cryptsoft.com).
  *
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <kmfapiP.h>
@@ -301,7 +299,7 @@ static mutex_t *lock_cs;
 static long *lock_count;
 
 static void
-/*ARGSUSED*/
+/* ARGSUSED1 */
 locking_cb(int mode, int type, char *file, int line)
 {
 	if (mode & CRYPTO_LOCK) {
@@ -680,6 +678,7 @@ load_certs(KMF_HANDLE *kmfh, char *issuer, char *subject, KMF_BIGINT *serial,
 			rv = KMF_ERR_CERT_NOT_FOUND;
 		return (rv);
 	}
+
 	if (format == KMF_FORMAT_ASN1) {
 		/* load a single certificate */
 		certs = (KMF_DATA *)malloc(sizeof (KMF_DATA));
@@ -692,14 +691,19 @@ load_certs(KMF_HANDLE *kmfh, char *issuer, char *subject, KMF_BIGINT *serial,
 		if (rv == KMF_OK) {
 			*certlist = certs;
 			*numcerts = 1;
+		} else {
+			kmf_free_data(certs);
+			free(certs);
+			certs = NULL;
 		}
 		return (rv);
+
 	} else if (format == KMF_FORMAT_PKCS12) {
 		/* We need a credential to access a PKCS#12 file */
 		rv = KMF_ERR_BAD_CERT_FORMAT;
+
 	} else if (format == KMF_FORMAT_PEM ||
 	    format != KMF_FORMAT_PEM_KEYPAIR) {
-
 		/* This function only works on PEM files */
 		rv = extract_pem(kmfh, issuer, subject, serial, pathname,
 		    (uchar_t *)NULL, 0, NULL, &certs, &nc);
@@ -720,6 +724,7 @@ load_certs(KMF_HANDLE *kmfh, char *issuer, char *subject, KMF_BIGINT *serial,
 			if (rv == KMF_ERR_VALIDITY_PERIOD)
 				rv = KMF_OK;
 		}
+
 		if (rv != KMF_OK) {
 			/* Remove this cert from the list by clearing it. */
 			kmf_free_data(&certs[i]);
@@ -728,9 +733,8 @@ load_certs(KMF_HANDLE *kmfh, char *issuer, char *subject, KMF_BIGINT *serial,
 		}
 		rv = KMF_OK;
 	}
-	if (rv == KMF_OK && hits == 0) {
-		rv = KMF_ERR_CERT_NOT_FOUND;
-	} else if (rv == KMF_OK && hits > 0) {
+
+	if (rv == KMF_OK && hits > 0) {
 		/*
 		 * Sort the list of certs by length to put the cleared ones
 		 * at the end so they don't get accessed by the caller.
@@ -740,7 +744,19 @@ load_certs(KMF_HANDLE *kmfh, char *issuer, char *subject, KMF_BIGINT *serial,
 
 		/* since we sorted the list, just return the number of hits */
 		*numcerts = hits;
+
+	} else {
+		if (rv == KMF_OK && hits == 0) {
+			rv = KMF_ERR_CERT_NOT_FOUND;
+		}
+
+		if (certs != NULL) {
+			kmf_free_data(certs);
+			free(certs);
+			certs = NULL;
+		}
 	}
+
 	return (rv);
 }
 
@@ -1532,7 +1548,7 @@ OpenSSL_CreateKeypair(KMF_HANDLE_T handle, int numattr,
 			if (rsaexp->len > 0 &&
 			    rsaexp->len <= sizeof (eValue) &&
 			    rsaexp->val != NULL) {
-				/*LINTED*/
+				/* LINTED E_BAD_PTR_CAST_ALIGN */
 				eValue = *(uint32_t *)rsaexp->val;
 			} else {
 				rv = KMF_ERR_BAD_PARAMETER;
@@ -2413,8 +2429,8 @@ OpenSSL_CreateOCSPRequest(KMF_HANDLE_T handle,
 
 end:
 	/*
-	 * We don't need to free "id" explicitely, because OCSP_REQUEST_free()
-	 * will deallocate certid's space also.
+	 * We don't need to free "id" explicitly, because OCSP_REQUEST_free()
+	 * will also deallocate certid's space.
 	 */
 	if (req != NULL) {
 		OCSP_REQUEST_free(req);
@@ -2446,7 +2462,7 @@ static X509 *ocsp_find_signer_sk(STACK_OF(X509) *certs, OCSP_RESPID *id)
 	keyhash = id->value.byKey->data;
 	/* Calculate hash of each key and compare */
 	for (i = 0; i < sk_X509_num(certs); i++) {
-		/*LINTED*/
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		X509 *x = sk_X509_value(certs, i);
 		/* Use pubkey_digest to get the key ID value */
 		(void) X509_pubkey_digest(x, EVP_sha1(), tmphash, NULL);
@@ -2457,7 +2473,7 @@ static X509 *ocsp_find_signer_sk(STACK_OF(X509) *certs, OCSP_RESPID *id)
 }
 
 /* ocsp_find_signer() is copied from openssl source */
-/*ARGSUSED*/
+/* ARGSUSED2 */
 static int
 ocsp_find_signer(X509 **psigner, OCSP_BASICRESP *bs, STACK_OF(X509) *certs,
     X509_STORE *st, unsigned long flags)
@@ -3546,7 +3562,7 @@ extract_pem(KMF_HANDLE *kmfh,
 	char *filename, CK_UTF8CHAR *pin,
 	CK_ULONG pinlen, EVP_PKEY **priv_key, KMF_DATA **certs,
 	int *numcerts)
-/* ARGSUSED */
+/* ARGSUSED6 */
 {
 	KMF_RETURN rv = KMF_OK;
 	FILE *fp;
@@ -3580,7 +3596,7 @@ extract_pem(KMF_HANDLE *kmfh,
 	}
 
 	for (i = 0; i < sk_X509_INFO_num(x509_info_stack); i++) {
-		/* LINTED */
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		cert_infos[ncerts] = sk_X509_INFO_value(x509_info_stack, i);
 		ncerts++;
 	}
@@ -3607,7 +3623,7 @@ extract_pem(KMF_HANDLE *kmfh,
 		goto err;
 	}
 
-	certlist = (KMF_DATA *)malloc(ncerts * sizeof (KMF_DATA));
+	certlist = (KMF_DATA *)calloc(ncerts, sizeof (KMF_DATA));
 	if (certlist == NULL) {
 		if (pkey != NULL)
 			EVP_PKEY_free(pkey);
@@ -3633,6 +3649,7 @@ extract_pem(KMF_HANDLE *kmfh,
 			&certlist[matchcerts++]);
 
 		if (rv != KMF_OK) {
+			kmf_free_data(certlist);
 			free(certlist);
 			certlist = NULL;
 			ncerts = matchcerts = 0;
@@ -3641,8 +3658,14 @@ extract_pem(KMF_HANDLE *kmfh,
 
 	if (numcerts != NULL)
 		*numcerts = matchcerts;
-	if (certs != NULL)
+
+	if (certs != NULL) {
 		*certs = certlist;
+	} else if (certlist != NULL) {
+		kmf_free_data(certlist);
+		free(certlist);
+		certlist = NULL;
+	}
 
 	if (priv_key == NULL && pkey != NULL)
 		EVP_PKEY_free(pkey);
@@ -3652,7 +3675,7 @@ extract_pem(KMF_HANDLE *kmfh,
 err:
 	/* Cleanup the stack of X509 info records */
 	for (i = 0; i < sk_X509_INFO_num(x509_info_stack); i++) {
-		/*LINTED*/
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		info = (X509_INFO *)sk_X509_INFO_value(x509_info_stack, i);
 		X509_INFO_free(info);
 	}
@@ -3665,6 +3688,7 @@ err:
 	return (rv);
 }
 
+
 static KMF_RETURN
 openssl_parse_bags(STACK_OF(PKCS12_SAFEBAG) *bags, char *pin,
 	STACK_OF(EVP_PKEY) *keys, STACK_OF(X509) *certs)
@@ -3673,7 +3697,7 @@ openssl_parse_bags(STACK_OF(PKCS12_SAFEBAG) *bags, char *pin,
 	int i;
 
 	for (i = 0; i < sk_PKCS12_SAFEBAG_num(bags); i++) {
-		/*LINTED*/
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		PKCS12_SAFEBAG *bag = sk_PKCS12_SAFEBAG_value(bags, i);
 		ret = openssl_parse_bag(bag, pin, (pin ? strlen(pin) : 0),
 		    keys, certs);
@@ -3704,11 +3728,11 @@ set_pkey_attrib(EVP_PKEY *pkey, ASN1_TYPE *attrib, int nid)
 		X509_ATTRIBUTE *a;
 		for (i = 0;
 		    i < sk_X509_ATTRIBUTE_num(pkey->attributes); i++) {
-			/*LINTED*/
+			/* LINTED E_BAD_PTR_CAST_ALIGN */
 			a = sk_X509_ATTRIBUTE_value(pkey->attributes, i);
 			if (OBJ_obj2nid(a->object) == nid) {
 				X509_ATTRIBUTE_free(a);
-				/*LINTED*/
+				/* LINTED E_BAD_PTR_CAST_ALIGN */
 				sk_X509_ATTRIBUTE_set(pkey->attributes,
 				    i, attr);
 				return (KMF_OK);
@@ -3858,7 +3882,7 @@ openssl_pkcs12_parse(PKCS12 *p12, char *pin,
 	STACK_OF(EVP_PKEY) *keys,
 	STACK_OF(X509) *certs,
 	STACK_OF(X509) *ca)
-/*ARGSUSED*/
+/* ARGSUSED3 */
 {
 	KMF_RETURN ret = KMF_OK;
 	STACK_OF(PKCS7) *asafes = NULL;
@@ -3886,7 +3910,7 @@ openssl_pkcs12_parse(PKCS12 *p12, char *pin,
 
 	for (i = 0; ret == KMF_OK && i < sk_PKCS7_num(asafes); i++) {
 		bags = NULL;
-		/*LINTED*/
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		p7 = sk_PKCS7_value(asafes, i);
 		bagnid = OBJ_obj2nid(p7->type);
 
@@ -3922,7 +3946,7 @@ static KMF_RETURN
 extract_pkcs12(BIO *fbio, CK_UTF8CHAR *pin, CK_ULONG pinlen,
 	STACK_OF(EVP_PKEY) **priv_key, STACK_OF(X509) **certs,
 	STACK_OF(X509) **ca)
-/* ARGSUSED */
+/* ARGSUSED2 */
 {
 	PKCS12			*pk12, *pk12_tmp;
 	STACK_OF(EVP_PKEY)	*pkeylist = NULL;
@@ -4164,7 +4188,7 @@ find_attr(STACK_OF(X509_ATTRIBUTE) *attrs, int nid)
 		return (NULL);
 
 	for (i = 0; i < sk_X509_ATTRIBUTE_num(attrs); i++) {
-		/*LINTED*/
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		a = sk_X509_ATTRIBUTE_value(attrs, i);
 		if (OBJ_obj2nid(a->object) == nid)
 			return (a);
@@ -4205,7 +4229,7 @@ convertToRawKey(EVP_PKEY *pkey, KMF_RAW_KEY_DATA *key)
 		ASN1_TYPE *ty = NULL;
 		int numattr = sk_ASN1_TYPE_num(attr->value.set);
 		if (attr->single == 0 && numattr > 0) {
-			/*LINTED*/
+			/* LINTED E_BAD_PTR_CAST_ALIGN */
 			ty = sk_ASN1_TYPE_value(attr->value.set, 0);
 		}
 		if (ty != NULL) {
@@ -4224,7 +4248,7 @@ convertToRawKey(EVP_PKEY *pkey, KMF_RAW_KEY_DATA *key)
 		ASN1_TYPE *ty = NULL;
 		int numattr = sk_ASN1_TYPE_num(attr->value.set);
 		if (attr->single == 0 && numattr > 0) {
-			/*LINTED*/
+			/* LINTED E_BAD_PTR_CAST_ALIGN */
 			ty = sk_ASN1_TYPE_value(attr->value.set, 0);
 		}
 		key->id.Data = (uchar_t *)malloc(
@@ -4255,7 +4279,7 @@ convertPK12Objects(
 	int i;
 
 	for (i = 0; sslkeys != NULL && i < sk_EVP_PKEY_num(sslkeys); i++) {
-		/*LINTED*/
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		EVP_PKEY *pkey = sk_EVP_PKEY_value(sslkeys, i);
 		rv = convertToRawKey(pkey, &key);
 		if (rv == KMF_OK)
@@ -4267,7 +4291,7 @@ convertPK12Objects(
 
 	/* Now add the certificate to the certlist */
 	for (i = 0; sslcert != NULL && i < sk_X509_num(sslcert); i++) {
-		/*LINTED*/
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		X509 *cert = sk_X509_value(sslcert, i);
 		rv = add_cert_to_list(kmfh, cert, certlist, ncerts);
 		if (rv != KMF_OK)
@@ -5554,7 +5578,7 @@ OpenSSL_FindCertInCRL(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 	}
 
 	for (i = 0; i < sk_X509_REVOKED_num(revoke_stack); i++) {
-		/*LINTED*/
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		revoke = sk_X509_REVOKED_value(revoke_stack, i);
 		if (ASN1_INTEGER_cmp(xcert->cert_info->serialNumber,
 		    revoke->serialNumber) == 0) {
