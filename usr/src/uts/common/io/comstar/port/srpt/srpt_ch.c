@@ -383,20 +383,12 @@ srpt_ch_cleanup(srpt_channel_t *ch)
 	ch->ch_state = SRPT_CHANNEL_DISCONNECTING;
 	rw_exit(&ch->ch_rwlock);
 
-
 	/*
-	 * Generally the IB CQ's will have been drained prior to
-	 * getting to this call; but we check here to make certain.
+	 * Don't accept any further incoming requests, and clean
+	 * up the receive queue.  The send queue is left alone
+	 * so tasks can finish and clean up (whether normally
+	 * or via abort).
 	 */
-	if (ch->ch_scq_hdl) {
-		SRPT_DPRINTF_L4("ch_cleanup, start drain (%d)",
-		    ch->ch_swqe_posted);
-		while ((int)ch->ch_swqe_posted > 0) {
-			delay(drv_usectohz(1000));
-		}
-		ibt_set_cq_handler(ch->ch_scq_hdl, NULL, NULL);
-	}
-
 	if (ch->ch_rcq_hdl) {
 		ibt_set_cq_handler(ch->ch_rcq_hdl, NULL, NULL);
 
@@ -628,11 +620,23 @@ srpt_ch_scq_hdlr(ibt_cq_hdl_t cq_hdl, void *arg)
 	for (;;) {
 		status = ibt_poll_cq(cq_hdl, &wc[0], SRPT_SEND_WC_POLL_SIZE,
 		    &entries);
-		if (status == IBT_CQ_EMPTY) {
+
+		if (status != IBT_SUCCESS) {
+			if (status != IBT_CQ_EMPTY) {
+				/*
+				 * This error should not happen. It indicates
+				 * something abnormal has gone wrong and means
+				 * either a hardware or programming logic error.
+				 */
+				SRPT_DPRINTF_L2(
+				    "ch_scq_hdlr, unexpected CQ err(%d)",
+				    status);
+				srpt_ch_disconnect(ch);
+			}
+
 			/*
-			 * CQ drained, if we have not rearmed the CQ
-			 * do so and poll to eliminate race; otherwise
-			 * we are done.
+			 * If we have not rearmed the CQ do so now and poll to
+			 * eliminate race; otherwise we are done.
 			 */
 			if (cq_rearmed == 0) {
 				(void) ibt_enable_cq_notify(ch->ch_scq_hdl,
@@ -642,16 +646,6 @@ srpt_ch_scq_hdlr(ibt_cq_hdl_t cq_hdl, void *arg)
 			} else {
 				break;
 			}
-		} else if (status != IBT_SUCCESS) {
-			/*
-			 * This error should not happen, it indicates something
-			 * abnormal has gone wrong and represents either a
-			 * hardware or programming logic coding error.
-			 */
-			SRPT_DPRINTF_L2("ch_scq_hdlr, unexpected CQ err(%d)",
-			    status);
-			srpt_ch_disconnect(ch);
-			break;
 		}
 
 		for (wcp = wc, i = 0; i < entries; i++, wcp++) {
@@ -734,11 +728,24 @@ srpt_ch_rcq_hdlr(ibt_cq_hdl_t cq_hdl, void *arg)
 	for (;;) {
 		status = ibt_poll_cq(cq_hdl, &wc[0], SRPT_RECV_WC_POLL_SIZE,
 		    &entries);
-		if (status == IBT_CQ_EMPTY) {
+
+		if (status != IBT_SUCCESS) {
+			if (status != IBT_CQ_EMPTY) {
+				/*
+				 * This error should not happen. It indicates
+				 * something abnormal has gone wrong and means
+				 * either a hardware or programming logic error.
+				 */
+				SRPT_DPRINTF_L2(
+				    "ch_rcq_hdlr, unexpected CQ err(%d)",
+				    status);
+				srpt_ch_disconnect(ch);
+				break;
+			}
+
 			/*
-			 * OK, empty, if we have not rearmed the CQ
-			 * do so, and poll to eliminate race; otherwise
-			 * we are done.
+			 * If we have not rearmed the CQ do so now and poll to
+			 * eliminate race; otherwise we are done.
 			 */
 			if (cq_rearmed == 0) {
 				(void) ibt_enable_cq_notify(ch->ch_rcq_hdl,
@@ -748,16 +755,6 @@ srpt_ch_rcq_hdlr(ibt_cq_hdl_t cq_hdl, void *arg)
 			} else {
 				break;
 			}
-		} else if (status != IBT_SUCCESS) {
-			/*
-			 * This error should not happen, it indicates something
-			 * abnormal has gone wrong and represents either a
-			 * hardware or programming logic coding error.
-			 */
-			SRPT_DPRINTF_L2("ch_rcq_hdlr, unexpected CQ err(%d)",
-			    status);
-			srpt_ch_disconnect(ch);
-			break;
 		}
 
 		for (wcp = wc, i = 0; i < entries; i++, wcp++) {
@@ -773,7 +770,6 @@ srpt_ch_rcq_hdlr(ibt_cq_hdl_t cq_hdl, void *arg)
 					    " wc_status err(%d)",
 					    wcp->wc_status);
 					srpt_ch_disconnect(ch);
-					/* XXX - verify not leaking IUs */
 					goto done;
 				} else {
 					/* skip IUs with errors */
