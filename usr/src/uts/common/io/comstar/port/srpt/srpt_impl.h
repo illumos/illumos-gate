@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,7 +62,14 @@ extern "C" {
 enum {
 	SRPT_DEFAULT_IOC_SRQ_SIZE = 4096,
 	SRPT_DEFAULT_SEND_MSG_DEPTH = 128,
-	SRPT_DEFAULT_SEND_MSG_SIZE = 960,	/* must be multiple of 64 */
+	/*
+	 * SEND_MSG_SIZE must be a multiple of 64 as it is registered
+	 * as memory regions with IB.  To support a scatter/gather table
+	 * size of 32, the size must be at not less than 960.  To support
+	 * the maximum scatter/gather table size of 255, the IU must
+	 * be at least 4160 bytes.
+	 */
+	SRPT_DEFAULT_SEND_MSG_SIZE = 4160,
 	SRPT_DEFAULT_MAX_RDMA_SIZE = 65536,
 	SRPT_MIN_T_I_IU_LEN = 52,
 	SRPT_EUI_ID_LEN = 20,

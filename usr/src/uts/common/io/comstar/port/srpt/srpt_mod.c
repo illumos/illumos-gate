@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,6 +64,15 @@ uint16_t	srpt_send_msg_depth = SRPT_DEFAULT_SEND_MSG_DEPTH;
  * srpt_errlevel -- determine which error conditions are logged
  */
 uint_t		srpt_errlevel = SRPT_LOG_DEFAULT_LEVEL;
+
+/*
+ * srpt_iu_size -- must be a multiple of 64 as it is registered
+ * as memory regions with IB.  To support a scatter/gather table
+ * size of 32, the size must be at not less than 960.  To support
+ * the maximum scatter/gather table size of 255, the IU must
+ * be at least 4160 bytes.
+ */
+uint32_t	srpt_iu_size = SRPT_DEFAULT_SEND_MSG_SIZE;
 
 srpt_ctxt_t	*srpt_ctxt;
 

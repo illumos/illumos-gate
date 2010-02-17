@@ -56,6 +56,7 @@
 #include "srpt_stp.h"
 
 extern srpt_ctxt_t	*srpt_ctxt;
+extern uint32_t		srpt_iu_size;
 
 /*
  * STMF LPort Interface Prototypes
@@ -1395,7 +1396,7 @@ srpt_stp_login(srpt_target_port_t *tgt, srp_login_req_t *login,
 	 */
 	req_it_ui_len = b2h32(login->lreq_req_it_iu_len);
 	SRPT_DPRINTF_L2("stp_login, requested iu size = %d", req_it_ui_len);
-	if (req_it_ui_len > SRPT_DEFAULT_SEND_MSG_SIZE) {
+	if (req_it_ui_len > srpt_iu_size) {
 		SRPT_DPRINTF_L2("stp_login, SRP Login IU size (%d) too large",
 		    req_it_ui_len);
 		reason = SRP_LOGIN_REJ_REQ_IT_IU_LENGTH_TOO_LARGE;

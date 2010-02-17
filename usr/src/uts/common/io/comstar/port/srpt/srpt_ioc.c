@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +51,7 @@
  */
 uint32_t	srpt_ioc_srq_size = SRPT_DEFAULT_IOC_SRQ_SIZE;
 extern uint16_t srpt_send_msg_depth;
+extern uint32_t	srpt_iu_size;
 
 /* IOC profile capabilities mask must be big-endian */
 typedef struct srpt_ioc_opcap_bits_s {
@@ -236,6 +237,7 @@ srpt_ioc_init(ib_guid_t guid)
 	ibt_srq_sizes_t		srq_attr;
 	char			namebuf[32];
 	size_t			iu_offset;
+	uint_t			srq_sz;
 
 	status = ibt_query_hca_byguid(guid, &hca_attr);
 	if (status != IBT_SUCCESS) {
@@ -279,15 +281,16 @@ srpt_ioc_init(ib_guid_t guid)
 	 * reduce channel memory consumption.
 	 */
 	if ((ioc->ioc_attr.hca_flags & IBT_HCA_SRQ) == 0) {
-		SRPT_DPRINTF_L0("ioc_init, no SRQ capability, not supported");
+		SRPT_DPRINTF_L0(
+		    "ioc_init, no SRQ capability, HCA not supported");
 		goto srq_alloc_err;
 	}
 
 	SRPT_DPRINTF_L3("ioc_init, Using shared receive queues, max srq work"
 	    " queue size(%d), def size = %d", ioc->ioc_attr.hca_max_srqs_sz,
 	    srpt_ioc_srq_size);
-	srq_attr.srq_wr_sz = min(srpt_ioc_srq_size,
-	    ioc->ioc_attr.hca_max_srqs_sz);
+	srq_sz = srq_attr.srq_wr_sz = min(srpt_ioc_srq_size,
+	    ioc->ioc_attr.hca_max_srqs_sz) - 1;
 	srq_attr.srq_sgl_sz = 1;
 
 	status = ibt_alloc_srq(ioc->ioc_ibt_hdl, IBT_SRQ_NO_FLAGS,
@@ -298,8 +301,8 @@ srpt_ioc_init(ib_guid_t guid)
 		goto srq_alloc_err;
 	}
 
-	SRPT_DPRINTF_L2("ioc_init, SRQ WR size(%d), SG size(%d)",
-	    ioc->ioc_srq_attr.srq_wr_sz, ioc->ioc_srq_attr.srq_sgl_sz);
+	SRPT_DPRINTF_L2("ioc_init, Using SRQ size(%d), MAX SG size(%d)",
+	    srq_sz, 1);
 
 	ibt_set_srq_private(ioc->ioc_srq_hdl, ioc);
 
@@ -308,13 +311,12 @@ srpt_ioc_init(ib_guid_t guid)
 	 * the I/O Controller SRQ.  We let the SRQ manage the free IU
 	 * messages.
 	 */
-	ioc->ioc_num_iu_entries =
-	    min(srq_attr.srq_wr_sz, srpt_ioc_srq_size) - 1;
+	ioc->ioc_num_iu_entries = srq_sz;
 
 	ioc->ioc_iu_pool = kmem_zalloc(sizeof (srpt_iu_t) *
 	    ioc->ioc_num_iu_entries, KM_SLEEP);
 
-	ioc->ioc_iu_bufs = kmem_alloc(SRPT_DEFAULT_SEND_MSG_SIZE *
+	ioc->ioc_iu_bufs = kmem_alloc(srpt_iu_size *
 	    ioc->ioc_num_iu_entries, KM_SLEEP);
 
 	if ((ioc->ioc_iu_pool == NULL) || (ioc->ioc_iu_bufs == NULL)) {
@@ -323,7 +325,7 @@ srpt_ioc_init(ib_guid_t guid)
 	}
 
 	mr_attr.mr_vaddr = (ib_vaddr_t)(uintptr_t)ioc->ioc_iu_bufs;
-	mr_attr.mr_len   = SRPT_DEFAULT_SEND_MSG_SIZE * ioc->ioc_num_iu_entries;
+	mr_attr.mr_len   = srpt_iu_size * ioc->ioc_num_iu_entries;
 	mr_attr.mr_as    = NULL;
 	mr_attr.mr_flags = IBT_MR_ENABLE_LOCAL_WRITE;
 
@@ -338,14 +340,14 @@ srpt_ioc_init(ib_guid_t guid)
 	for (iu_ndx = 0, iu = ioc->ioc_iu_pool; iu_ndx <
 	    ioc->ioc_num_iu_entries; iu_ndx++, iu++) {
 
-		iu_offset = (iu_ndx * SRPT_DEFAULT_SEND_MSG_SIZE);
+		iu_offset = (iu_ndx * srpt_iu_size);
 		iu->iu_buf = (void *)((uintptr_t)ioc->ioc_iu_bufs + iu_offset);
 
 		mutex_init(&iu->iu_lock, NULL, MUTEX_DRIVER, NULL);
 
 		iu->iu_sge.ds_va  = mr_desc.md_vaddr + iu_offset;
 		iu->iu_sge.ds_key = mr_desc.md_lkey;
-		iu->iu_sge.ds_len = SRPT_DEFAULT_SEND_MSG_SIZE;
+		iu->iu_sge.ds_len = srpt_iu_size;
 		iu->iu_ioc	  = ioc;
 		iu->iu_pool_ndx   = iu_ndx;
 
@@ -406,7 +408,7 @@ srq_iu_post_err:
 
 srq_iu_alloc_err:
 	if (ioc->ioc_iu_bufs != NULL) {
-		kmem_free(ioc->ioc_iu_bufs, SRPT_DEFAULT_SEND_MSG_SIZE *
+		kmem_free(ioc->ioc_iu_bufs, srpt_iu_size *
 		    ioc->ioc_num_iu_entries);
 	}
 	if (ioc->ioc_iu_pool != NULL) {
@@ -481,7 +483,7 @@ srpt_ioc_fini(srpt_ioc_t *ioc)
 		}
 
 		if (ioc->ioc_iu_bufs != NULL) {
-			kmem_free(ioc->ioc_iu_bufs, SRPT_DEFAULT_SEND_MSG_SIZE *
+			kmem_free(ioc->ioc_iu_bufs, srpt_iu_size *
 			    ioc->ioc_num_iu_entries);
 		}
 
@@ -1087,7 +1089,7 @@ srpt_ioc_init_profile(srpt_ioc_t *ioc)
 	ioc->ioc_profile.ioc_send_msg_qdepth = h2b16(srpt_send_msg_depth);
 	ioc->ioc_profile.ioc_rdma_read_qdepth =
 	    ioc->ioc_attr.hca_max_rdma_out_chan;
-	ioc->ioc_profile.ioc_send_msg_sz = h2b32(SRPT_DEFAULT_SEND_MSG_SIZE);
+	ioc->ioc_profile.ioc_send_msg_sz = h2b32(srpt_iu_size);
 	ioc->ioc_profile.ioc_rdma_xfer_sz = h2b32(SRPT_DEFAULT_MAX_RDMA_SIZE);
 
 	capmask.bits.st = 1;	/* Messages can be sent to IOC */
