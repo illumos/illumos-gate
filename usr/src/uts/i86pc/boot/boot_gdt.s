@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,7 +67,7 @@ global_descriptor_table:
 	.value  0xFFFF	/* segment limit 0..15 */
 	.value  0x0000	/* segment base 0..15 */
 	.byte   0x0	/* segment base 16..23 */
-	.byte   0x9E	/* P=1, code, exec, readable */
+	.byte   0x9A	/* P=1, code, exec, readable */
 	.byte   0xCF	/* G=1, D=1, Limit (16..19)=1111 */
 	.byte   0x0	/* segment base 24..32 */
 
@@ -77,7 +77,7 @@ global_descriptor_table:
 	.value  0xFFFF	/* segment limit 0..15 */
 	.value  0x0000	/* segment base 0..15 */
 	.byte   0x0	/* segment base 16..23 */
-	.byte   0x9E	/* P=1, code, exec, readable */
+	.byte   0x9A	/* P=1, code, exec, readable */
 	.byte   0x0F	/* G=0, D=0, Limit (16..19)=1111 */
 	.byte   0x0	/* segment base 24..32 */
 
@@ -95,7 +95,7 @@ global_descriptor_table:
 	.value  0xFFFF	/* segment limit 0..15 */
 	.value  0x0000	/* segment base 0..15 */
 	.byte   0x0	/* segment base 16..23 */
-	.byte   0x9E	/* P=1, code, exec, readable */
+	.byte   0x9A	/* P=1, code, exec, readable */
 	.byte   0xAF	/* G=1, D=0, L=1, Limit (16..19)=1111 */
 	.byte   0x0	/* segment base 24..32 */
 
@@ -119,7 +119,7 @@ fake_cpu_gdt_base_0_15:
 	.globl fake_cpu_gdt_base_16_23
 fake_cpu_gdt_base_16_23:
 	.byte   0x0	/* segment base 16..23 */
-	.byte   0x9E	/* P=1, code, exec, readable */
+	.byte   0x9A	/* P=1, code, exec, readable */
 	.byte   0xC0	/* G=1, D=1, Limit (16..19)=0000 */
 
 	.globl fake_cpu_gdt_base_24_31

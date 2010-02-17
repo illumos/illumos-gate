@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1319,10 +1319,6 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 				fault = FLTTRACE;
 			}
 			pcb->pcb_flags &= ~(NORMAL_STEP|WATCH_STEP);
-		} else {
-			cmn_err(CE_WARN,
-			    "Unexpected INT 1 in user mode, dr6=%lx",
-			    lwp->lwp_pcb.pcb_drstat);
 		}
 		break;
 
