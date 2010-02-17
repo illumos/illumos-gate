@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,7 +94,7 @@ mac_bpf_name(uintptr_t mhandle)
 static int
 mac_bpf_type(uintptr_t mhandle)
 {
-	return (mac_type((mac_handle_t)mhandle));
+	return (mac_nativetype((mac_handle_t)mhandle));
 }
 
 static void
@@ -183,7 +183,7 @@ mac_bpf_getzone(uintptr_t handle, zoneid_t *zip)
 static int
 mac_bpf_getdlt(uintptr_t handle, uint_t *dltp)
 {
-	*dltp = mac_type((mac_handle_t)handle);
+	*dltp = mac_nativetype((mac_handle_t)handle);
 
 	return (0);
 }

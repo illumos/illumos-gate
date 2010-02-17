@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -426,6 +426,12 @@ int
 mac_type(mac_handle_t mh)
 {
 	return (((mac_impl_t *)mh)->mi_type->mt_type);
+}
+
+int
+mac_nativetype(mac_handle_t mh)
+{
+	return (((mac_impl_t *)mh)->mi_type->mt_nativetype);
 }
 
 char *

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -592,6 +592,7 @@ extern void			mac_sdu_get(mac_handle_t, uint_t *, uint_t *);
 extern int			mac_maxsdu_update(mac_handle_t, uint_t);
 extern uint_t			mac_addr_len(mac_handle_t);
 extern int			mac_type(mac_handle_t);
+extern int			mac_nativetype(mac_handle_t);
 
 extern void 			mac_unicst_update(mac_handle_t,
 				    const uint8_t *);
