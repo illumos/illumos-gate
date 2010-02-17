@@ -17,7 +17,7 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,7 +27,7 @@
 /*
  * On-disk version number.
  */
-#define	SPA_VERSION			22ULL
+#define	SPA_VERSION			23ULL
 
 /*
  * The following are configuration names used in the nvlist describing a pool's

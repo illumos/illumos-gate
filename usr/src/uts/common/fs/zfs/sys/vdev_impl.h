@@ -217,8 +217,8 @@ struct vdev {
 #define	VDEV_UBERBLOCK_SIZE(vd)		(1ULL << VDEV_UBERBLOCK_SHIFT(vd))
 
 typedef struct vdev_phys {
-	char		vp_nvlist[VDEV_PHYS_SIZE - sizeof (zio_block_tail_t)];
-	zio_block_tail_t vp_zbt;
+	char		vp_nvlist[VDEV_PHYS_SIZE - sizeof (zio_eck_t)];
+	zio_eck_t	vp_zbt;
 } vdev_phys_t;
 
 typedef struct vdev_label {

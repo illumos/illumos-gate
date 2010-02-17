@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -764,9 +764,9 @@ zio_write_phys(zio_t *pio, vdev_t *vd, uint64_t offset, uint64_t size,
 
 	zio->io_prop.zp_checksum = checksum;
 
-	if (zio_checksum_table[checksum].ci_zbt) {
+	if (zio_checksum_table[checksum].ci_eck) {
 		/*
-		 * zbt checksums are necessarily destructive -- they modify
+		 * zec checksums are necessarily destructive -- they modify
 		 * the end of the write buffer to hold the verifier/checksum.
 		 * Therefore, we must make a local copy in case the data is
 		 * being written to multiple places in parallel.
@@ -847,6 +847,23 @@ zio_flush(zio_t *zio, vdev_t *vd)
 	zio_nowait(zio_ioctl(zio, zio->io_spa, vd, DKIOCFLUSHWRITECACHE,
 	    NULL, NULL, ZIO_PRIORITY_NOW,
 	    ZIO_FLAG_CANFAIL | ZIO_FLAG_DONT_PROPAGATE | ZIO_FLAG_DONT_RETRY));
+}
+
+void
+zio_shrink(zio_t *zio, uint64_t size)
+{
+	ASSERT(zio->io_executor == NULL);
+	ASSERT(zio->io_orig_size == zio->io_size);
+	ASSERT(size <= zio->io_size);
+
+	/*
+	 * We don't shrink for raidz because of problems with the
+	 * reconstruction when reading back less than the block size.
+	 * Note, BP_IS_RAIDZ() assumes no compression.
+	 */
+	ASSERT(BP_GET_COMPRESS(zio->io_bp) == ZIO_COMPRESS_OFF);
+	if (!BP_IS_RAIDZ(zio->io_bp))
+		zio->io_orig_size = zio->io_size = size;
 }
 
 /*
@@ -1524,7 +1541,7 @@ zio_gang_tree_assemble_done(zio_t *zio)
 
 	ASSERT(zio->io_data == gn->gn_gbh);
 	ASSERT(zio->io_size == SPA_GANGBLOCKSIZE);
-	ASSERT(gn->gn_gbh->zg_tail.zbt_magic == ZBT_MAGIC);
+	ASSERT(gn->gn_gbh->zg_tail.zec_magic == ZEC_MAGIC);
 
 	for (int g = 0; g < SPA_GBH_NBLKPTRS; g++) {
 		blkptr_t *gbp = &gn->gn_gbh->zg_blkptr[g];
@@ -1551,7 +1568,7 @@ zio_gang_tree_issue(zio_t *pio, zio_gang_node_t *gn, blkptr_t *bp, void *data)
 	zio = zio_gang_issue_func[gio->io_type](pio, bp, gn, data);
 
 	if (gn != NULL) {
-		ASSERT(gn->gn_gbh->zg_tail.zbt_magic == ZBT_MAGIC);
+		ASSERT(gn->gn_gbh->zg_tail.zec_magic == ZEC_MAGIC);
 
 		for (int g = 0; g < SPA_GBH_NBLKPTRS; g++) {
 			blkptr_t *gbp = &gn->gn_gbh->zg_blkptr[g];
@@ -2178,7 +2195,9 @@ zio_alloc_zil(spa_t *spa, uint64_t txg, blkptr_t *new_bp, blkptr_t *old_bp,
 		BP_SET_LSIZE(new_bp, size);
 		BP_SET_PSIZE(new_bp, size);
 		BP_SET_COMPRESS(new_bp, ZIO_COMPRESS_OFF);
-		BP_SET_CHECKSUM(new_bp, ZIO_CHECKSUM_ZILOG);
+		BP_SET_CHECKSUM(new_bp,
+		    spa_version(spa) >= SPA_VERSION_SLIM_ZIL
+		    ? ZIO_CHECKSUM_ZILOG2 : ZIO_CHECKSUM_ZILOG);
 		BP_SET_TYPE(new_bp, DMU_OT_INTENT_LOG);
 		BP_SET_LEVEL(new_bp, 0);
 		BP_SET_DEDUP(new_bp, 0);

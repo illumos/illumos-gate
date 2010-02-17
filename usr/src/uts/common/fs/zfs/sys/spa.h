@@ -304,6 +304,10 @@ typedef struct blkptr {
 #define	BP_IS_GANG(bp)		DVA_GET_GANG(BP_IDENTITY(bp))
 #define	BP_IS_HOLE(bp)		((bp)->blk_birth == 0)
 
+/* BP_IS_RAIDZ(bp) assumes no block compression */
+#define	BP_IS_RAIDZ(bp)		(DVA_GET_ASIZE(&(bp)->blk_dva[0]) > \
+				BP_GET_PSIZE(bp))
+
 #define	BP_ZERO(bp)				\
 {						\
 	(bp)->blk_dva[0].dva_word[0] = 0;	\

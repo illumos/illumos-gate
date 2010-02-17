@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -271,7 +271,8 @@ traverse_prefetcher(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 		return (EINTR);
 
 	if (bp == NULL || !((pfd->pd_flags & TRAVERSE_PREFETCH_DATA) ||
-	    BP_GET_TYPE(bp) == DMU_OT_DNODE || BP_GET_LEVEL(bp) > 0))
+	    BP_GET_TYPE(bp) == DMU_OT_DNODE || BP_GET_LEVEL(bp) > 0) ||
+	    BP_GET_TYPE(bp) == DMU_OT_INTENT_LOG)
 		return (0);
 
 	mutex_enter(&pfd->pd_mtx);

@@ -324,14 +324,15 @@ typedef enum zfs_cache_type {
 #define	SPA_VERSION_20			20ULL
 #define	SPA_VERSION_21			21ULL
 #define	SPA_VERSION_22			22ULL
+#define	SPA_VERSION_23			23ULL
 /*
  * When bumping up SPA_VERSION, make sure GRUB ZFS understands the on-disk
  * format change. Go to usr/src/grub/grub-0.97/stage2/{zfs-include/, fsys_zfs*},
  * and do the appropriate changes.  Also bump the version number in
  * usr/src/grub/capability.
  */
-#define	SPA_VERSION			SPA_VERSION_22
-#define	SPA_VERSION_STRING		"22"
+#define	SPA_VERSION			SPA_VERSION_23
+#define	SPA_VERSION_STRING		"23"
 
 /*
  * Symbolic names for the changes that caused a SPA_VERSION switch.
@@ -375,6 +376,7 @@ typedef enum zfs_cache_type {
 #define	SPA_VERSION_ZLE_COMPRESSION	SPA_VERSION_20
 #define	SPA_VERSION_DEDUP		SPA_VERSION_21
 #define	SPA_VERSION_RECVD_PROPS		SPA_VERSION_22
+#define	SPA_VERSION_SLIM_ZIL		SPA_VERSION_23
 
 /*
  * ZPL version - rev'd whenever an incompatible on-disk format change

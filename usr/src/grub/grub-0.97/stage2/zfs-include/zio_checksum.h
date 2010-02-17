@@ -17,14 +17,12 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_ZIO_CHECKSUM_H
 #define	_SYS_ZIO_CHECKSUM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Signature for checksum functions.
@@ -37,7 +35,7 @@ typedef void zio_checksum_t(const void *data, uint64_t size, zio_cksum_t *zcp);
 typedef struct zio_checksum_info {
 	zio_checksum_t	*ci_func[2]; /* checksum function for each byteorder */
 	int		ci_correctable;	/* number of correctable bits	*/
-	int		ci_zbt;		/* uses zio block tail?	*/
+	int		ci_eck;		/* uses zio embedded checksum? */
 	char		*ci_name;	/* descriptive name */
 } zio_checksum_info_t;
 

@@ -3888,6 +3888,7 @@ zpool_do_upgrade(int argc, char **argv)
 		    "(zero-length encoding)\n"));
 		(void) printf(gettext(" 21  Deduplication\n"));
 		(void) printf(gettext(" 22  Received properties\n"));
+		(void) printf(gettext(" 23  Slim ZIL\n"));
 		(void) printf(gettext("\nFor more information on a particular "
 		    "version, including supported releases, see:\n\n"));
 		(void) printf("http://www.opensolaris.org/os/community/zfs/"

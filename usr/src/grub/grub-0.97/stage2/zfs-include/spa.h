@@ -17,7 +17,7 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -275,6 +275,10 @@ typedef struct blkptr {
 #define	BP_IDENTITY(bp)		(&(bp)->blk_dva[0])
 #define	BP_IS_GANG(bp)		DVA_GET_GANG(BP_IDENTITY(bp))
 #define	BP_IS_HOLE(bp)		((bp)->blk_birth == 0)
+
+/* BP_IS_RAIDZ(bp) assumes no block compression */
+#define	BP_IS_RAIDZ(bp)		(DVA_GET_ASIZE(&(bp)->blk_dva[0]) > \
+				BP_GET_PSIZE(bp))
 
 #define	BP_ZERO(bp)				\
 {						\

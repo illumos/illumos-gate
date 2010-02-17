@@ -38,12 +38,15 @@
 extern "C" {
 #endif
 
-#define	ZBT_MAGIC	0x210da7ab10c7a11ULL	/* zio data bloc tail */
+/*
+ * Embedded checksum
+ */
+#define	ZEC_MAGIC	0x210da7ab10c7a11ULL
 
-typedef struct zio_block_tail {
-	uint64_t	zbt_magic;	/* for validation, endianness	*/
-	zio_cksum_t	zbt_cksum;	/* 256-bit checksum		*/
-} zio_block_tail_t;
+typedef struct zio_eck {
+	uint64_t	zec_magic;	/* for validation, endianness	*/
+	zio_cksum_t	zec_cksum;	/* 256-bit checksum		*/
+} zio_eck_t;
 
 /*
  * Gang block headers are self-checksumming and contain an array
@@ -51,16 +54,16 @@ typedef struct zio_block_tail {
  */
 #define	SPA_GANGBLOCKSIZE	SPA_MINBLOCKSIZE
 #define	SPA_GBH_NBLKPTRS	((SPA_GANGBLOCKSIZE - \
-	sizeof (zio_block_tail_t)) / sizeof (blkptr_t))
+	sizeof (zio_eck_t)) / sizeof (blkptr_t))
 #define	SPA_GBH_FILLER		((SPA_GANGBLOCKSIZE - \
-	sizeof (zio_block_tail_t) - \
+	sizeof (zio_eck_t) - \
 	(SPA_GBH_NBLKPTRS * sizeof (blkptr_t))) /\
 	sizeof (uint64_t))
 
 typedef struct zio_gbh {
 	blkptr_t		zg_blkptr[SPA_GBH_NBLKPTRS];
 	uint64_t		zg_filler[SPA_GBH_FILLER];
-	zio_block_tail_t	zg_tail;
+	zio_eck_t		zg_tail;
 } zio_gbh_phys_t;
 
 enum zio_checksum {
@@ -73,6 +76,7 @@ enum zio_checksum {
 	ZIO_CHECKSUM_FLETCHER_2,
 	ZIO_CHECKSUM_FLETCHER_4,
 	ZIO_CHECKSUM_SHA256,
+	ZIO_CHECKSUM_ZILOG2,
 	ZIO_CHECKSUM_FUNCTIONS
 };
 
@@ -462,6 +466,7 @@ extern int zio_alloc_zil(spa_t *spa, uint64_t txg, blkptr_t *new_bp,
     blkptr_t *old_bp, uint64_t size, boolean_t use_slog);
 extern void zio_free_zil(spa_t *spa, uint64_t txg, blkptr_t *bp);
 extern void zio_flush(zio_t *zio, vdev_t *vd);
+extern void zio_shrink(zio_t *zio, uint64_t size);
 
 extern int zio_wait(zio_t *zio);
 extern void zio_nowait(zio_t *zio);

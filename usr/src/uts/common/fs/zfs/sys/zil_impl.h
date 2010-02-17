@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,6 +56,8 @@ typedef struct zil_vdev_node {
 	uint64_t	zv_vdev;	/* vdev to be flushed */
 	avl_node_t	zv_node;	/* AVL tree linkage */
 } zil_vdev_node_t;
+
+#define	ZIL_PREV_BLKS 16
 
 /*
  * Stable storage intent log management structure.  One per dataset.
@@ -101,6 +103,8 @@ struct zilog {
 	clock_t		zl_replay_time;	/* lbolt of when replay started */
 	uint64_t	zl_replay_blks;	/* number of log blocks replayed */
 	zil_header_t	zl_old_header;	/* debugging aid */
+	uint_t		zl_prev_blks[ZIL_PREV_BLKS]; /* size - sector rounded */
+	uint_t		zl_prev_rotor;	/* rotor for zl_prev[] */
 };
 
 typedef struct zil_bp_node {
@@ -108,7 +112,7 @@ typedef struct zil_bp_node {
 	avl_node_t	zn_node;
 } zil_bp_node_t;
 
-#define	ZIL_MAX_LOG_DATA (SPA_MAXBLOCKSIZE - sizeof (zil_trailer_t) - \
+#define	ZIL_MAX_LOG_DATA (SPA_MAXBLOCKSIZE - sizeof (zil_chain_t) - \
     sizeof (lr_write_t))
 
 #ifdef	__cplusplus

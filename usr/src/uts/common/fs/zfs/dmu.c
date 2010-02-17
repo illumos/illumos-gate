@@ -1096,7 +1096,7 @@ dmu_sync_late_arrival(zio_t *pio, objset_t *os, dmu_sync_cb_t *done, zgd_t *zgd,
 
 	tx = dmu_tx_create(os);
 	dmu_tx_hold_space(tx, zgd->zgd_db->db_size);
-	if (dmu_tx_assign(tx, TXG_NOWAIT) != 0) {
+	if (dmu_tx_assign(tx, TXG_WAIT) != 0) {
 		dmu_tx_abort(tx);
 		return (EIO);	/* Make zl_get_data do txg_waited_synced() */
 	}
@@ -1304,7 +1304,7 @@ dmu_write_policy(objset_t *os, dnode_t *dn, int level, int wp, zio_prop_t *zp)
 		 * to fletcher4.
 		 */
 		if (zio_checksum_table[checksum].ci_correctable < 1 ||
-		    zio_checksum_table[checksum].ci_zbt)
+		    zio_checksum_table[checksum].ci_eck)
 			checksum = ZIO_CHECKSUM_FLETCHER_4;
 	} else {
 		checksum = zio_checksum_select(dn->dn_checksum, checksum);

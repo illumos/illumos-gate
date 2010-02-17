@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,23 +68,27 @@ typedef struct zil_header {
 #define	ZIL_CLAIM_LR_SEQ_VALID	0x2	/* zh_claim_lr_seq field is valid */
 
 /*
- * Log block trailer - structure at the end of the header and each log block
+ * Log block chaining.
  *
- * The zit_bt contains a zbt_cksum which for the intent log is
+ * Log blocks are chained together. Originally they were chained at the
+ * end of the block. For performance reasons the chain was moved to the
+ * beginning of the block which allows writes for only the data being used.
+ * The older position is supported for backwards compatability.
+ *
+ * The zio_eck_t contains a zec_cksum which for the intent log is
  * the sequence number of this log block. A seq of 0 is invalid.
- * The zbt_cksum is checked by the SPA against the sequence
+ * The zec_cksum is checked by the SPA against the sequence
  * number passed in the blk_cksum field of the blkptr_t
  */
-typedef struct zil_trailer {
-	uint64_t zit_pad;
-	blkptr_t zit_next_blk;	/* next block in chain */
-	uint64_t zit_nused;	/* bytes in log block used */
-	zio_block_tail_t zit_bt; /* block trailer */
-} zil_trailer_t;
+typedef struct zil_chain {
+	uint64_t zc_pad;
+	blkptr_t zc_next_blk;	/* next block in chain */
+	uint64_t zc_nused;	/* bytes in log block used */
+	zio_eck_t zc_eck;	/* block trailer */
+} zil_chain_t;
 
 #define	ZIL_MIN_BLKSZ	4096ULL
 #define	ZIL_MAX_BLKSZ	SPA_MAXBLOCKSIZE
-#define	ZIL_BLK_DATA_SZ(lwb)	((lwb)->lwb_sz - sizeof (zil_trailer_t))
 
 /*
  * The words of a log block checksum.

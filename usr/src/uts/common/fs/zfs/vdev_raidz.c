@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2073,21 +2073,25 @@ vdev_raidz_io_done(zio_t *zio)
 		 * reconstruction.
 		 *
 		 * Start checksum ereports for all children which haven't
-		 * failed.
+		 * failed, and the IO wasn't speculative.
 		 */
 		zio->io_error = ECKSUM;
 
-		for (c = 0; c < rm->rm_cols; c++) {
-			rc = &rm->rm_col[c];
-			if (rc->rc_error == 0) {
-				zio_bad_cksum_t zbc;
-				zbc.zbc_has_cksum = 0;
-				zbc.zbc_injected = rm->rm_ecksuminjected;
+		if (!(zio->io_flags & ZIO_FLAG_SPECULATIVE)) {
+			for (c = 0; c < rm->rm_cols; c++) {
+				rc = &rm->rm_col[c];
+				if (rc->rc_error == 0) {
+					zio_bad_cksum_t zbc;
+					zbc.zbc_has_cksum = 0;
+					zbc.zbc_injected =
+					    rm->rm_ecksuminjected;
 
-				zfs_ereport_start_checksum(
-				    zio->io_spa, vd->vdev_child[rc->rc_devidx],
-				    zio, rc->rc_offset, rc->rc_size,
-				    (void *)(uintptr_t)c, &zbc);
+					zfs_ereport_start_checksum(
+					    zio->io_spa,
+					    vd->vdev_child[rc->rc_devidx],
+					    zio, rc->rc_offset, rc->rc_size,
+					    (void *)(uintptr_t)c, &zbc);
+				}
 			}
 		}
 	}
