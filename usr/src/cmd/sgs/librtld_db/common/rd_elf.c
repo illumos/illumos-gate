@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -127,18 +127,6 @@ validate_rdebug32(struct rd_agent *rap)
 	if (ps_pwrite(php, db_privp, (char *)&db_priv,
 	    sizeof (Rtld_db_priv)) != PS_OK)
 		rap->rd_flags |= RDF_FL_COREFILE;
-
-	/*
-	 * If this *is not* a core file then rtld_db & ld.so.1 are
-	 * considered tightly coupled.  If the versions of our private
-	 * data structures don't match - fail!
-	 */
-	if (((rap->rd_flags & RDF_FL_COREFILE) == 0) &&
-	    (db_priv.rtd_version != R_RTLDDB_VERSION)) {
-		LOG(ps_plog(MSG_ORIG(MSG_DB_BADPVERS),
-		    db_priv.rtd_version, R_RTLDDB_VERSION));
-		return (RD_NOCAPAB);
-	}
 
 	rap->rd_rdebugvers = db_priv.rtd_version;
 	rap->rd_rtlddbpriv = db_privp;

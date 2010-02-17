@@ -1,5 +1,5 @@
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -1543,3 +1543,5 @@ Bugid   Risk Synopsis
 6901895 Failing asserts in ld update_osym() trying to build gcc 4.5 develpment
 	head
 6909523 core dump when run "LD_DEBUG=help ls" in non-English locale
+6903688 mdb(1) can't resolve certain symbols in solaris10-branded processes
+	from the global zone
