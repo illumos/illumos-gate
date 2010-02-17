@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,7 +65,7 @@ char cpu_module_name[] = "SUNW,UltraSPARC-T2";
 #elif defined(VFALLS_IMPL)
 char cpu_module_name[] = "SUNW,UltraSPARC-T2+";
 #elif defined(KT_IMPL)
-char cpu_module_name[] = "SUNW,UltraSPARC-KT";
+char cpu_module_name[] = "SUNW,UltraSPARC-T3";
 #endif
 
 /*

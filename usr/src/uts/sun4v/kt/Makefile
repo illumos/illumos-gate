@@ -20,7 +20,7 @@
 #
 #
 # uts/sun4v/kt/Makefile
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This makefile drives the production of the UltraSPARC-KT cpu module.
@@ -36,7 +36,7 @@ UTSBASE	= ../..
 #
 #	Define the module and object file sets.
 #
-MODULE		= SUNW,UltraSPARC-KT
+MODULE		= SUNW,UltraSPARC-T3
 OBJECTS		= $(NIAGARA2CPU_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(NIAGARA2CPU_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_CPU_DIR)/$(MODULE)

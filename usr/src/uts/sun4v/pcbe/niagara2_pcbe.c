@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -247,8 +247,8 @@ static const char	*cpu_impl_name = "UltraSPARC T2+";
 static const char *cpu_pcbe_ref = "See the \"UltraSPARC T2+ User's Manual\" "
 			"for descriptions of these events." CPU_REF_URL;
 #elif defined(KT_IMPL)
-static const char	*cpu_impl_name = "UltraSPARC KT";
-static const char *cpu_pcbe_ref = "See the \"UltraSPARC KT User's Manual\" "
+static const char	*cpu_impl_name = "UltraSPARC T3";
+static const char *cpu_pcbe_ref = "See the \"UltraSPARC T3 User's Manual\" "
 			"for descriptions of these events." CPU_REF_URL;
 #endif
 
@@ -805,7 +805,7 @@ static struct modlpcbe modlpcbe = {
 #elif defined(VFALLS_IMPL)
 	"UltraSPARC T2+ Performance Counters",
 #elif defined(KT_IMPL)
-	"UltraSPARC KT Performance Counters",
+	"UltraSPARC T3 Performance Counters",
 #endif
 	&ni2_pcbe_ops
 };
