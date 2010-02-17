@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3093,7 +3093,17 @@ ds_loopback_set_svc(ds_svc_t *svc, ds_capability_t *cap, ds_svc_hdl_t *lb_hdlp)
 		    DS_EOL, __func__);
 		return (ENOTSUP);
 	}
-	if (lb_svc->state != DS_SVC_INACTIVE) {
+
+	/*
+	 * If a client service is not inactive, clone it.  If the service is
+	 * not a client service and has a reg req pending (usually from OBP
+	 * in boot state not acking/nacking reg req's), it's OK to ignore that,
+	 * since there are never multiple service clients.  Also reg req pending
+	 * only happens for non-client services, so it's OK to skip
+	 * this block that does client service cloning.
+	 */
+	if (lb_svc->state != DS_SVC_INACTIVE &&
+	    lb_svc->state != DS_SVC_REG_PENDING) {
 		DS_DBG_LOOP(CE_NOTE, "%s: loopback active: hdl: 0x%llx"
 		    DS_EOL, __func__, (u_longlong_t)lb_hdl);
 		if ((lb_svc->flags & DSSF_ISCLIENT) == 0) {
