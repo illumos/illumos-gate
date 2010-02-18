@@ -768,7 +768,7 @@ function build {
 		echo "\n==== Build warnings ($LABEL) ====\n" >>$mail_msg_file
 		egrep -i warning: $SRC/${INSTALLOG}.out \
 			| egrep -v '^tic:' \
-			| egrep -v "symbol \`timezone' has differing types:" \
+			| egrep -v "symbol (\`|')timezone' has differing types:" \
 		        | egrep -v "parameter <PSTAMP> set to" \
 			| egrep -v "Ignoring unknown host" \
 			| egrep -v "redefining segment flags attribute for" \
@@ -804,7 +804,7 @@ function build {
 			| egrep -v 'tsort: INFORM:' \
 			| egrep -v 'stripalign:' \
 			| egrep -v 'chars, width' \
-			| egrep -v "symbol \`timezone' has differing types:" \
+			| egrep -v "symbol (\`|')timezone' has differing types:" \
 			| egrep -v 'PSTAMP' \
 			| egrep -v '|%WHOANDWHERE%|' \
 			| egrep -v '^Manifying' \

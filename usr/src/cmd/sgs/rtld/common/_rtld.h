@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef	__RTLD_H
@@ -535,8 +535,6 @@ extern Fct		aout_fct;	/* a.out (4.x) file class dependent */
 					/*	data */
 #endif
 
-extern const char	*locale;		/* locale environment setting */
-
 extern Config		*config;		/* configuration structure */
 extern const char	*locale;		/* locale environment setting */
 
@@ -591,6 +589,9 @@ extern ulong_t		hwcap;		/* hardware capabilities */
 extern ulong_t		sfcap;		/* software capabilities */
 
 extern avl_tree_t	*nfavl;		/* not-found AVL path name tree */
+
+extern u_longlong_t	cnt_map;	/* Incr. for each object mapped */
+extern u_longlong_t	cnt_unmap;	/* Incr. for each object unmapped */
 
 /*
  * Function declarations.

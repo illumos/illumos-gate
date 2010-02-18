@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2511,7 +2511,8 @@ again:
 				if ((*format == 'l') ||
 				    (*format == 'd') || (*format == 'D') ||
 				    (*format == 'x') || (*format == 'X') ||
-				    (*format == 'o') || (*format == 'O'))
+				    (*format == 'o') || (*format == 'O') ||
+				    (*format == 'u') || (*format == 'U'))
 					goto again;
 				break;
 			case 'o':

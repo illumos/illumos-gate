@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,6 +64,17 @@ extern int	_brk_unlocked(void *);
 /* needed for _brk_unlocked() */
 void *_nd = &_end;
 #endif
+
+/*
+ * Counters that are incremented every time an object is mapped/unmapped.
+ *
+ * Note that exec() will usually map 2 objects before we receive control,
+ * but this can be 1 if ld.so.1 is executed directly. We count one of these
+ * here, and add another as necessary in setup().
+ */
+u_longlong_t	cnt_map = 1;
+u_longlong_t	cnt_unmap = 0;
+
 
 /*
  * Define for the executable's interpreter.
@@ -271,6 +282,9 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 				rtldname = _rtldname;
 		} else
 			rtldname = (char *)MSG_INTL(MSG_STR_UNKNOWN);
+
+		/* exec() brought in two objects for us. Count the second one */
+		cnt_map++;
 	}
 
 	/*

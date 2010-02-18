@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,6 +66,7 @@ extern "C" {
 #define	DBG_C_TLS	0x00100000
 #define	DBG_C_UNUSED	0x00200000
 #define	DBG_C_VERSIONS	0x00400000
+#define	DBG_C_CALLBACK	0x00800000
 
 
 #define	DBG_C_ALL	0xffffffff
@@ -99,6 +100,9 @@ typedef struct {
  * 32-bit or 64-bit values.
  */
 #if	defined(_ELF64)
+
+#define	MSG_CB_IPHDR_ADDR	MSG_CB_IPHDR_ADDR_64
+#define	MSG_CB_IPHDR_PHDR	MSG_CB_IPHDR_PHDR_64
 
 #define	MSG_GOT_TITLE		MSG_GOT_TITLE_64
 #define	MSG_GOT_ENTRY_RE	MSG_GOT_ENTRY_RE_64
@@ -156,6 +160,9 @@ typedef struct {
 #define	MSG_SYM_LDL_TITLE	MSG_SYM_LDL_TITLE_64
 
 #else
+
+#define	MSG_CB_IPHDR_ADDR	MSG_CB_IPHDR_ADDR_32
+#define	MSG_CB_IPHDR_PHDR	MSG_CB_IPHDR_PHDR_32
 
 #define	MSG_GOT_TITLE		MSG_GOT_TITLE_32
 #define	MSG_GOT_ENTRY_RE	MSG_GOT_ENTRY_RE_32

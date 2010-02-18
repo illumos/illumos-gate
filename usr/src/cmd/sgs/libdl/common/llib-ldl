@@ -22,13 +22,12 @@
 /* PROTOLIB1 */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
+#include <link.h>
 #include <dlfcn.h>
 
 void *	dlopen(const char *, int);
@@ -41,3 +40,4 @@ int	dladdr1(void *, Dl_info *, void **, int);
 int	dldump(const char *, const char *, int);
 int	dlinfo(void *, int, void *);
 void	_ld_libc(void *);
+int	dl_iterate_phdr(int (*)(struct dl_phdr_info *, size_t, void *), void *);

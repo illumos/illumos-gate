@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1976,4 +1976,174 @@ dlinfo(void *handle, int request, void *p)
 	if (entry)
 		leave(LIST(clmp), 0);
 	return (error);
+}
+
+
+/*
+ * GNU defined function to iterate through the program headers for all
+ * currently loaded dynamic objects. The caller supplies a callback function
+ * which is called for each object.
+ *
+ * entry:
+ *	callback - Callback function to call. The arguments to the callback
+ *		function are:
+ *		info - Address of dl_phdr_info structure
+ *		size - sizeof (struct dl_phdr_info)
+ *		data - Caller supplied value.
+ *	data - Value supplied by caller, which is passed to callback without
+ *		examination.
+ *
+ * exit:
+ *	callback is called for each dynamic ELF object in the process address
+ *	space, halting when a non-zero value is returned, or when the last
+ *	object has been processed. The return value from the last call
+ *	to callback is returned.
+ *
+ * note:
+ *	The Linux implementation has added additional fields to the
+ *	dl_phdr_info structure over time. The callback function is
+ *	supposed to use the size field to determine which fields are
+ *	present, and to avoid attempts to access non-existent fields.
+ *	We have added those fields that are compatible with Solaris, and
+ *	which are used by GNU C++ (g++) runtime exception handling support.
+ *
+ * note:
+ *	We issue a callback for every ELF object mapped into the process
+ *	address space at the time this routine is entered. These callbacks
+ *	are arbitrary functions that can do anything, including possibly
+ *	causing new objects to be mapped into the process, or unmapped.
+ *	This complicates matters:
+ *
+ *	-	Adding new objects can cause the alists to be reallocated
+ *		or for contents to move. This can happen explicitly via
+ *		dlopen(), or implicitly via lazy loading. One might consider
+ *		simply banning dlopen from a callback, but lazy loading must
+ *		be allowed, in which case there's no reason to ban dlopen().
+ *
+ *	-	Removing objects can leave us holding references to freed
+ *		memory that must not be accessed, and can cause the list
+ *		items to move in a way that would cause us to miss reporting
+ *		one, or double report others.
+ *
+ *	-	We cannot allocate memory to build a separate data structure,
+ *		because the interface to dl_iterate_phdr() does not have a
+ *		way to communicate allocation errors back to the caller.
+ *		Even if we could, it would be difficult to do so efficiently.
+ *
+ *	-	It is possible for dl_iterate_phdr() to be called recursively
+ *		from a callback, and there is no way for us to detect or manage
+ *		this effectively, particularly as the user might use longjmp()
+ *		to skip past us on return. Hence, we must be reentrant
+ *		(stateless), further precluding the option of building a
+ *		separate data structure.
+ *
+ *	Despite these constraints, we are able to traverse the link-map
+ *	lists safely:
+ *
+ *	-	Once interposer (preload) objects have been processed at
+ *		startup, we know that new objects are always placed at the
+ *		end of the list. Hence, if we are reading a list when that
+ *		happens, the new object will not alter the part of the list
+ *		that we've already processed.
+ *
+ *	-	The alist _TRAVERSE macros recalculate the address of the
+ *		current item from scratch on each iteration, rather than
+ *		incrementing a pointer. Hence, alist additions that occur
+ *		in mid-traverse will not cause confusion.
+ *
+ * 	There is one limitation: We cannot continue operation if an object
+ *	is removed from the process from within a callback. We detect when
+ *	this happens and return immediately with a -1 return value.
+ *
+ * note:
+ *	As currently implemented, if a callback causes an object to be loaded,
+ *	that object may or may not be reported by the current invocation of
+ *	dl_iterate_phdr(), based on whether or not we have already processed
+ *	the link-map list that receives it. If we want to prevent this, it
+ *	can be done efficiently by associating the current value of cnt_map
+ *	with each new Rt_map entered into the system. Then this function can
+ *	use that to detect and skip new objects that enter the system in
+ *	mid-iteration. However, the Linux documentation is ambiguous on whether
+ *	this is necessary, and it does not appear to matter in practice.
+ *	We have therefore chosen not to do so at this time.
+ */
+int
+dl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *),
+    void *data)
+{
+	struct dl_phdr_info	info;
+	u_longlong_t		l_cnt_map = cnt_map;
+	u_longlong_t		l_cnt_unmap = cnt_unmap;
+	Lm_list			*lml;
+	Lm_cntl			*lmc;
+	Rt_map			*lmp, *clmp;
+	Aliste			idx1, idx2;
+	Ehdr			*ehdr;
+	int			ret = 0;
+	int			entry;
+
+
+	entry = enter(0);
+	clmp =  _caller(caller(), CL_EXECDEF);
+	DBG_CALL(Dbg_cb_iphdr_enter(LIST(clmp), cnt_map, cnt_unmap));
+
+	/* Issue a callback for each ELF object in the process */
+	for (APLIST_TRAVERSE(dynlm_list, idx1, lml)) {
+		for (ALIST_TRAVERSE(lml->lm_lists, idx2, lmc)) {
+			for (lmp = lmc->lc_head; lmp; lmp = NEXT_RT_MAP(lmp)) {
+#if defined(_sparc) && !defined(_LP64)
+				/*
+				 * On 32-bit sparc, the possibility exists that
+				 * this object is not ELF.
+				 */
+				if (THIS_IS_NOT_ELF(lmp))
+					continue;
+#endif
+
+				/* Prepare the object information structure */
+				ehdr = (Ehdr *) ADDR(lmp);
+				info.dlpi_addr = (ehdr->e_type == ET_EXEC) ?
+				    0 : ADDR(lmp);
+				info.dlpi_name = lmp->rt_pathname;
+				info.dlpi_phdr = (Phdr *)
+				    (ADDR(lmp) + ehdr->e_phoff);
+				info.dlpi_phnum = ehdr->e_phnum;
+				info.dlpi_adds = cnt_map;
+				info.dlpi_subs = cnt_unmap;
+
+				/* Issue the callback */
+				DBG_CALL(Dbg_cb_iphdr_callback(LIST(clmp),
+				    &info));
+				leave(LIST(clmp), thr_flg_reenter);
+				ret = (* callback)(&info, sizeof (info), data);
+				(void) enter(thr_flg_reenter);
+
+				/* Return immediately on non-zero result */
+				if (ret != 0)
+					goto done;
+
+				/* Adapt to object mapping changes */
+				if ((cnt_map != l_cnt_map) ||
+				    (cnt_unmap != l_cnt_unmap)) {
+					DBG_CALL(Dbg_cb_iphdr_mapchange(
+					    LIST(clmp), cnt_map, cnt_unmap));
+
+					/* Stop if an object was unmapped */
+					if (cnt_unmap != l_cnt_unmap) {
+						ret = -1;
+						DBG_CALL(Dbg_cb_iphdr_unmap_ret(
+						    LIST(clmp)));
+						goto done;
+					}
+
+					l_cnt_map = cnt_map;
+				}
+			}
+		}
+	}
+
+done:
+	if (entry)
+		leave(LIST(clmp), 0);
+	return (ret);
 }

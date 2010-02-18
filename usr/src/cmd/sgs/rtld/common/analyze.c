@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1626,6 +1626,7 @@ unmap_obj(mmapobj_result_t *mpp, uint_t mapnum)
 		(void) munmap((void *)(uintptr_t)mpp[num].mr_addr,
 		    mpp[num].mr_msize);
 	}
+	cnt_unmap++;
 }
 
 /*
@@ -1718,6 +1719,7 @@ map_obj(Lm_list *lml, Fdesc *fdp, size_t fsize, const char *name, int fd,
 	 * mmapobj().
 	 */
 	DBG_CALL(Dbg_file_mmapobj(lml, name, smpp, mapnum));
+	cnt_map++;
 
 	for (mnum = 0, mpp = smpp; mnum < mapnum; mnum++, mpp++) {
 		uint_t	flags = (mpp->mr_flags & MR_TYPE_MASK);

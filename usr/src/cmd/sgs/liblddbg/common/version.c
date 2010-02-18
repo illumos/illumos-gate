@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -218,4 +218,16 @@ Elf_ver_line_5(Lm_list *lml, const char *file, const char *version)
 		dbg_print(lml, MSG_INTL(MSG_VER_LINE_5), file, version);
 	else
 		dbg_print(lml, MSG_INTL(MSG_VER_LLINE_5), file, version);
+}
+
+/*
+ * Called after final call to Dbg_ver_need() to inject final newline.
+ */
+void
+Dbg_ver_need_done(Lm_list *lml)
+{
+	if (DBG_NOTCLASS(DBG_C_VERSIONS))
+		return;
+
+	Dbg_util_nl(lml, DBG_NL_STD);
 }

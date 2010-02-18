@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -265,6 +265,11 @@ extern	void		Dbg_help(void);
 #define	Dbg_cap_sec_entry	Dbg64_cap_sec_entry
 #define	Dbg_cap_sec_title	Dbg64_cap_sec_title
 
+#define	Dbg_cb_iphdr_enter	Dbg64_cb_iphdr_enter
+#define	Dbg_cb_iphdr_callback	Dbg64_cb_iphdr_callback
+#define	Dbg_cb_iphdr_mapchange	Dbg64_cb_iphdr_mapchange
+#define	Dbg_cb_iphdr_unmap_ret	Dbg64_cb_iphdr_unmap_ret
+
 #define	Dbg_ent_entry		Dbg64_ent_entry
 #define	Dbg_ent_print		Dbg64_ent_print
 
@@ -274,6 +279,7 @@ extern	void		Dbg_help(void);
 #define	Dbg_file_ar_rescan	Dbg64_file_ar_rescan
 #define	Dbg_file_bind_entry	Dbg64_file_bind_entry
 #define	Dbg_file_bindings	Dbg64_file_bindings
+#define	Dbg_file_bindings_done	Dbg64_file_bindings_done
 #define	Dbg_file_cleanup	Dbg64_file_cleanup
 #define	Dbg_file_cntl		Dbg64_file_cntl
 #define	Dbg_file_config_dis	Dbg64_file_config_dis
@@ -452,6 +458,7 @@ extern	void		Dbg_help(void);
 #define	Dbg_ver_avail_title	Dbg64_ver_avail_title
 #define	Dbg_ver_def_title	Dbg64_ver_def_title
 #define	Dbg_ver_desc_entry	Dbg64_ver_desc_entry
+#define	Dbg_ver_need_done	Dbg64_ver_need_done
 #define	Dbg_ver_need_entry	Dbg64_ver_need_entry
 #define	Dbg_ver_need_title	Dbg64_ver_need_title
 #define	Dbg_ver_nointerface	Dbg64_ver_nointerface
@@ -473,6 +480,11 @@ extern	void		Dbg_help(void);
 #define	Dbg_cap_sec_entry	Dbg32_cap_sec_entry
 #define	Dbg_cap_sec_title	Dbg32_cap_sec_title
 
+#define	Dbg_cb_iphdr_enter	Dbg32_cb_iphdr_enter
+#define	Dbg_cb_iphdr_callback	Dbg32_cb_iphdr_callback
+#define	Dbg_cb_iphdr_mapchange	Dbg32_cb_iphdr_mapchange
+#define	Dbg_cb_iphdr_unmap_ret	Dbg32_cb_iphdr_unmap_ret
+
 #define	Dbg_ent_entry		Dbg32_ent_entry
 #define	Dbg_ent_print		Dbg32_ent_print
 
@@ -482,6 +494,7 @@ extern	void		Dbg_help(void);
 #define	Dbg_file_ar_rescan	Dbg32_file_ar_rescan
 #define	Dbg_file_bind_entry	Dbg32_file_bind_entry
 #define	Dbg_file_bindings	Dbg32_file_bindings
+#define	Dbg_file_bindings_done	Dbg32_file_bindings_done
 #define	Dbg_file_cleanup	Dbg32_file_cleanup
 #define	Dbg_file_cntl		Dbg32_file_cntl
 #define	Dbg_file_config_dis	Dbg32_file_config_dis
@@ -661,6 +674,7 @@ extern	void		Dbg_help(void);
 #define	Dbg_ver_avail_title	Dbg32_ver_avail_title
 #define	Dbg_ver_def_title	Dbg32_ver_def_title
 #define	Dbg_ver_desc_entry	Dbg32_ver_desc_entry
+#define	Dbg_ver_need_done	Dbg32_ver_need_done
 #define	Dbg_ver_need_entry	Dbg32_ver_need_entry
 #define	Dbg_ver_need_title	Dbg32_ver_need_title
 #define	Dbg_ver_nointerface	Dbg32_ver_nointerface
@@ -711,6 +725,11 @@ extern	void	Dbg_cap_sec_entry(Lm_list *, uint_t, Xword, Xword, Half);
 extern	void	Dbg_cap_sec_title(Lm_list *, const char *);
 extern	void	Dbg_cap_val_hw1(Lm_list *, Xword, Half);
 
+extern	void	Dbg_cb_iphdr_enter(Lm_list *, u_longlong_t, u_longlong_t);
+extern	void	Dbg_cb_iphdr_callback(Lm_list *, struct dl_phdr_info *);
+extern	void	Dbg_cb_iphdr_mapchange(Lm_list *, u_longlong_t, u_longlong_t);
+extern	void	Dbg_cb_iphdr_unmap_ret(Lm_list *);
+
 extern	const char *
 		Dbg_demangle_name(const char *);
 
@@ -724,6 +743,7 @@ extern	void	Dbg_file_ar(Lm_list *, const char *, int);
 extern	void	Dbg_file_ar_rescan(Lm_list *, int, int);
 extern	void	Dbg_file_bind_entry(Lm_list *, Bnd_desc *);
 extern	void	Dbg_file_bindings(Rt_map *, int);
+extern	void	Dbg_file_bindings_done(Lm_list *);
 extern	void	Dbg_file_cleanup(Lm_list *, const char *, Aliste);
 extern	void	Dbg_file_cntl(Lm_list *, Aliste, Aliste);
 extern	void	Dbg_file_config_dis(Lm_list *, const char *, int);
@@ -932,6 +952,7 @@ extern	void	Dbg_ver_avail_entry(Lm_list *, Ver_index *, const char *);
 extern	void	Dbg_ver_avail_title(Lm_list *, const char *);
 extern	void	Dbg_ver_def_title(Lm_list *, const char *);
 extern	void	Dbg_ver_desc_entry(Lm_list *, Ver_desc *);
+extern	void	Dbg_ver_need_done(Lm_list *);
 extern	void	Dbg_ver_need_entry(Lm_list *, Half, const char *,
 		    const char *);
 extern	void	Dbg_ver_need_title(Lm_list *, const char *);

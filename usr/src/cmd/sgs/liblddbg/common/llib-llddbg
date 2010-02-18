@@ -22,7 +22,7 @@
 /* PROTOLIB1 */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,6 +86,15 @@ void	Dbg64_cap_sec_title(Lm_list *, const char *);
 void	Dbg32_cap_val_hw1(Lm_list *, Elf32_Word, Elf32_Half);
 void	Dbg64_cap_val_hw1(Lm_list *, Elf64_Xword, Elf64_Half);
 
+void	Dbg32_cb_iphdr_callback(Lm_list *, struct dl_phdr_info *);
+void	Dbg64_cb_iphdr_callback(Lm_list *, struct dl_phdr_info *);
+void	Dbg32_cb_iphdr_enter(Lm_list *, u_longlong_t, u_longlong_t);
+void	Dbg64_cb_iphdr_enter(Lm_list *, u_longlong_t, u_longlong_t);
+void	Dbg32_cb_iphdr_mapchange(Lm_list *, u_longlong_t, u_longlong_t);
+void	Dbg64_cb_iphdr_mapchange(Lm_list *, u_longlong_t, u_longlong_t);
+void	Dbg32_cb_iphdr_unmap_ret(Lm_list *);
+void	Dbg64_cb_iphdr_unmap_ret(Lm_list *);
+
 void	Dbg32_ent_print(Lm_list *, uchar_t, Elf32_Half, Alist *, Boolean);
 void	Dbg64_ent_print(Lm_list *, uchar_t, Elf64_Half, Alist *, Boolean);
 
@@ -101,6 +110,8 @@ void	Dbg32_file_bind_entry(Lm_list *, Bnd_desc *);
 void	Dbg64_file_bind_entry(Lm_list *, Bnd_desc *);
 void	Dbg32_file_bindings(Rt_map *, int);
 void	Dbg64_file_bindings(Rt_map *, int);
+void	Dbg32_file_bindings_done(Lm_list *);
+void	Dbg64_file_bindings_done(Lm_list *);
 void	Dbg32_file_config_dis(Lm_list *, const char *, int);
 void	Dbg64_file_config_dis(Lm_list *, const char *, int);
 void	Dbg32_file_config_obj(Lm_list *, const char *, const char *,
@@ -455,6 +466,8 @@ void	Dbg64_unused_sec(Lm_list *, Is_desc *);
 void	Dbg32_unused_unref(Rt_map *, const char *);
 void	Dbg64_unused_unref(Rt_map *, const char *);
 
+void	Dbg32_ver_need_done(Lm_list *);
+void	Dbg64_ver_need_done(Lm_list *);
 void	Dbg32_ver_need_entry(Lm_list *, Half, const char *, const char *);
 void	Dbg64_ver_need_entry(Lm_list *, Half, const char *, const char *);
 void	Dbg32_ver_need_title(Lm_list *, const char *);

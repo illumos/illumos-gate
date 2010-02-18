@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _LINK_H
 #define	_LINK_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/link.h>
 
@@ -267,8 +265,63 @@ extern uintptr_t	la_symbind32();
 #endif /* __STDC__ */
 
 
-#endif /* _ASM */
+/*
+ * The ElfW() macro is a GNU/Linux feature, provided as support for
+ * the dl_phdr_info structure used by dl_phdr_iterate(), which also
+ * originated under Linux. Given an ELF data type, without the ElfXX_
+ * prefix, it supplies the appropriate prefix (Elf32_ or Elf64_) for
+ * the ELFCLASS of the code being compiled.
+ *
+ * Note that ElfW() is not suitable in situations in which the ELFCLASS
+ * of the code being compiled does not match that of the objects that
+ * code is intended to operate on (e.g. a 32-bit link-editor building
+ * a 64-bit object). The macros defined in <sys/machelf.h> are
+ * recommended in such cases.
+ */
+#ifdef _LP64
+#define	ElfW(type)	Elf64_ ## type
+#else
+#define	ElfW(type)	Elf32_ ## type
+#endif
+
+/*
+ * The callback function to dl_interate_phdr() receives a pointer
+ * to a structure of this type.
+ *
+ * dlpi_addr is defined such that the address of any segment in
+ * the program header array can be calculated as:
+ *
+ *	addr == info->dlpi_addr + info->dlpi_phdr[x].p_vaddr;
+ *
+ * It is therefore 0 for ET_EXEC objects, and the base address at
+ * which the object is mapped otherwise.
+ */
+struct dl_phdr_info {
+	ElfW(Addr)		dlpi_addr;	/* Base address of object */
+	const char		*dlpi_name;	/* Null-terminated obj name */
+	const ElfW(Phdr)	*dlpi_phdr;	/* Ptr to ELF program hdr arr */
+	ElfW(Half)		dlpi_phnum;	/* # of items in dlpi_phdr[] */
+
+	/*
+	 * Note: Following members were introduced after the first version
+	 * of this structure was available.  The dl_iterate_phdr() callback
+	 * function is passed a 'size' argument giving the size of the info
+	 * structure, and must compare that size to the offset of these fields
+	 * before accessing them to ensure that they are present.
+	 */
+
+	/* Incremented when a new object is mapped into the process */
+	u_longlong_t		dlpi_adds;
+	/* Incremented when an object is unmapped from the process */
+	u_longlong_t		dlpi_subs;
+};
+
+extern  int dl_iterate_phdr(int (*)(struct dl_phdr_info *, size_t, void *),
+	    void *);
+
+#endif	/* _ASM */
 #endif /* _KERNEL */
+
 
 #ifdef __cplusplus
 }

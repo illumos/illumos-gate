@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -41,7 +41,7 @@
 # MAPFILE HEADER END
 #
 
-SUNWprivate_4.74 {
+SUNWprivate_4.75 {
 	global:
 		dbg_desc = NODIRECT;	# interposed - ld.so.1(1)
 		dbg_print = NODIRECT;	# interposed - ld(1) and ld.so.1(1)
@@ -94,6 +94,15 @@ SUNWprivate_4.74 {
 		Dbg32_cap_val_hw1;
 		Dbg64_cap_val_hw1;
 
+		Dbg32_cb_iphdr_callback;
+		Dbg64_cb_iphdr_callback;
+		Dbg32_cb_iphdr_enter;
+		Dbg64_cb_iphdr_enter;
+		Dbg32_cb_iphdr_mapchange;
+		Dbg64_cb_iphdr_mapchange;
+		Dbg32_cb_iphdr_unmap_ret;
+		Dbg64_cb_iphdr_unmap_ret;
+
 		Dbg32_demangle_name;
 		Dbg64_demangle_name;
 
@@ -112,6 +121,8 @@ SUNWprivate_4.74 {
 		Dbg64_file_bind_entry;
 		Dbg32_file_bindings;
 		Dbg64_file_bindings;
+		Dbg32_file_bindings_done;
+		Dbg64_file_bindings_done;
 		Dbg32_file_cntl;
 		Dbg64_file_cntl;
 		Dbg32_file_config_dis;
@@ -456,6 +467,8 @@ SUNWprivate_4.74 {
 		Dbg64_ver_def_title;
 		Dbg32_ver_desc_entry;
 		Dbg64_ver_desc_entry;
+		Dbg32_ver_need_done;
+		Dbg64_ver_need_done;
 		Dbg32_ver_need_entry;
 		Dbg64_ver_need_entry;
 		Dbg32_ver_need_title;

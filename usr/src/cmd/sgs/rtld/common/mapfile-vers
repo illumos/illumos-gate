@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Generic interface definition for usr/src/cmd/sgs/rtld.
@@ -109,6 +109,7 @@ SUNWprivate_1.3 {
 		 strtok_r;
 	      ___errno;
 		 qsort;
+		dl_iterate_phdr;
 	local:
 		*;
 };

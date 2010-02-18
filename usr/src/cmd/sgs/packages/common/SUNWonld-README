@@ -1546,3 +1546,5 @@ Bugid   Risk Synopsis
 6903688 mdb(1) can't resolve certain symbols in solaris10-branded processes
 	from the global zone
 6923449 elfdump misinterprets _init/_fini symbols in dynamic section test
+6914728 Add dl_iterate_phdr() function to ld.so.1 (D)
+	PSARC/2010/015 dl_iterate_phdr

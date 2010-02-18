@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -377,6 +377,17 @@ Dbg_file_bindings(Rt_map *lmp, int flag)
 		}
 	}
 	Dbg_util_nl(lml, DBG_NL_STD);
+}
+
+void
+Dbg_file_bindings_done(Lm_list *lml)
+{
+	if (DBG_NOTCLASS(DBG_C_INIT))
+		return;
+	if (DBG_NOTDETAIL())
+		return;
+
+	DBG_CALL(Dbg_util_nl(lml, DBG_NL_STD));
 }
 
 void

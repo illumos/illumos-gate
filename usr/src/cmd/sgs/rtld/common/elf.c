@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -610,7 +610,7 @@ elf_verify_vers(const char *name, Rt_map *clmp, Rt_map *nlmp)
 			}
 		}
 	}
-	DBG_CALL(Dbg_util_nl(lml, DBG_NL_STD));
+	DBG_CALL(Dbg_ver_need_done(lml));
 	return (1);
 }
 

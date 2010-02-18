@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -37,6 +37,18 @@
 #
 # MAPFILE HEADER END
 #
+
+SUNW_1.6 {
+    global:
+	dl_iterate_phdr = FUNCTION;
+} SUNW_1.5;
+
+
+SUNW_1.5 {
+    global:
+	SUNW_1.5;
+} SUNW_1.4;
+
 
 SUNW_1.4 {
     global:

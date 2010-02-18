@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -465,6 +465,8 @@
 #         audit            runtime link-audit processing
 #         bindings         symbol binding; detail flag shows
 #                            absolute:relative addresses
+#         callback         user supplied code executed by ld.so.1
+#                            (i.e. dl_iterate_phdr)
 #         init             init and fini processing
 
 
@@ -480,7 +482,11 @@
 @ MSG_USE_R8_B2	"                           absolute:relative addresses"
 
 # TRANSLATION_NOTE -- do not translate the first token "init".
-@ MSG_USE_R8_C	"        init             init and fini processing"
+@ MSG_USE_R8_C	"        callback         user supplied code executed by ld.so.1"
+@ MSG_USE_R8_C2	"                           (i.e. dl_iterate_phdr)"
+
+# TRANSLATION_NOTE -- do not translate the first token "init".
+@ MSG_USE_R8_D	"        init             init and fini processing"
 
 # TRANSLATION_NOTE - End of reference 8
 
@@ -1376,6 +1382,21 @@
 @ MSG_REL_LDLV_TITLE_64	"         type                               \
 			 offset              value  section / symbol"
 
+# Callback messages
+
+@ MSG_CB_IPHDR_ENTER	"dl_iterate_phdr enter:"
+@ MSG_CB_IPHDR_MAPCNG	"dl_iterate_phdr object map/unmap in callback:"
+@ MSG_CB_IPHDR_UNMAP	"dl_iterate_phdr early return due to object unmap"
+@ MSG_CB_IPHDR_CALLBACK	"dl_iterate_phdr callback:"
+@ MSG_CB_IPHDR_NAME	"    dlpi_name:    %s"
+@ MSG_CB_IPHDR_MAPCNT	"    dlpi_adds:    %-18llu   dlpi_subs:   %-18llu"
+
+@ MSG_CB_IPHDR_ADDR_32	"    dlpi_addr:    %#-10llx"
+@ MSG_CB_IPHDR_PHDR_32	"    dlpi_phdr:    %#-10llx  dlpi_phnum:  %u"
+
+@ MSG_CB_IPHDR_ADDR_64	"    dlpi_addr:    %#-18llx"
+@ MSG_CB_IPHDR_PHDR_64	"    dlpi_phdr:    %#-18llx   dlpi_phnum:  %u"
+
 @ _END_
 
 # Debug enabling tokens (for now these are untranslated)
@@ -1383,6 +1404,7 @@
 @ MSG_TOK_ALL		"all"
 @ MSG_TOK_ARGS		"args"
 @ MSG_TOK_BINDINGS	"bindings"
+@ MSG_TOK_CALLBACK	"callback"
 @ MSG_TOK_CAP		"cap"
 @ MSG_TOK_BASIC		"basic"
 @ MSG_TOK_ENTRY		"entry"

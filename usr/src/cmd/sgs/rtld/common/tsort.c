@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -851,6 +851,6 @@ tsort(Rt_map *lmp, int num, int flag)
 	 * The caller is responsible for freeing the sorted link-map list once
 	 * the associated .init/.fini's have been fired.
 	 */
-	DBG_CALL(Dbg_util_nl(lml, DBG_NL_STD));
+	DBG_CALL(Dbg_file_bindings_done(lml));
 	return (sort.s_lmpa);
 }
