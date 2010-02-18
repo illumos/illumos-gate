@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -313,9 +313,13 @@ FLT_CPU_CE_UNRETIRED(int-mem, strand, strand-nr, 8, 1week);
 /*
  * c2c-link-uc, c2c-prot-uc, c2c-failover errors
  * The detector and sender are faulted immediately.
+ * If ereport does not have a sender, all chips are faulted
  */
 
-#define CONTAINS_CHIP	(payloadprop_contains("sender", asru(chip)))
+#define CONTAINS_SENDER	(payloadprop_contains("sender", asru(chip)))
+#define	HAS_SENDER	(payloadprop_defined("sender"))
+#define	HAS_C2C_FAULT(c)	has_fault(c, "fault.cpu.generic-sparc.c2c")
+#define	CONTAINS_DET	(payloadprop_contains("detector", asru(chip)))
 
 event ereport.cpu.generic-sparc.c2c-link-uc@chip { within(1s) };
 event ereport.cpu.generic-sparc.c2c-prot-uc@chip { within(1s) };
@@ -327,7 +331,7 @@ event upset.cpu.generic-sparc.c2c-uc@chip;
 event upset.cpu.generic-sparc.c2c-failover@chip;
 
 prop fault.cpu.generic-sparc.c2c-uc@chip
-    { DIAGNOSE_ERPT && CONTAINS_CHIP } (0) ->
+    { DIAGNOSE_ERPT && CONTAINS_SENDER } (0) ->
     ereport.cpu.generic-sparc.c2c-link-uc@chip<x>;
 
 prop fault.cpu.generic-sparc.c2c-uc@chip
@@ -335,12 +339,20 @@ prop fault.cpu.generic-sparc.c2c-uc@chip
     ereport.cpu.generic-sparc.c2c-link-uc@chip;
 
 prop fault.cpu.generic-sparc.c2c-uc@chip
-    { DIAGNOSE_ERPT && CONTAINS_CHIP } (0) ->
+    { DIAGNOSE_ERPT && !HAS_SENDER } (0) ->
+    ereport.cpu.generic-sparc.c2c-link-uc@chip<x>;
+
+prop fault.cpu.generic-sparc.c2c-uc@chip
+    { DIAGNOSE_ERPT && CONTAINS_SENDER } (0) ->
     ereport.cpu.generic-sparc.c2c-prot-uc@chip<x>;
 
 prop fault.cpu.generic-sparc.c2c-uc@chip
     { DIAGNOSE_ERPT } (0) ->
     ereport.cpu.generic-sparc.c2c-prot-uc@chip;
+
+prop fault.cpu.generic-sparc.c2c-uc@chip
+    { DIAGNOSE_ERPT && !HAS_SENDER } (0) ->
+    ereport.cpu.generic-sparc.c2c-prot-uc@chip<x>;
 
 prop upset.cpu.generic-sparc.c2c-uc@chip
     { !DIAGNOSE_ERPT } (0) ->
@@ -348,12 +360,16 @@ prop upset.cpu.generic-sparc.c2c-uc@chip
     ereport.cpu.generic-sparc.c2c-link-uc@chip;
 
 prop fault.cpu.generic-sparc.c2c-failover@chip
-    { DIAGNOSE_ERPT && CONTAINS_CHIP } (0) ->
+    { DIAGNOSE_ERPT && CONTAINS_SENDER } (0) ->
     ereport.cpu.generic-sparc.c2c-failover@chip<x>;
 
 prop fault.cpu.generic-sparc.c2c-failover@chip
     { DIAGNOSE_ERPT } (0) ->
     ereport.cpu.generic-sparc.c2c-failover@chip;
+
+prop fault.cpu.generic-sparc.c2c-failover@chip
+    { DIAGNOSE_ERPT && !HAS_SENDER } (0) ->
+    ereport.cpu.generic-sparc.c2c-failover@chip<x>;
 
 prop upset.cpu.generic-sparc.c2c-failover@chip
     { !DIAGNOSE_ERPT } (0) ->
@@ -362,6 +378,8 @@ prop upset.cpu.generic-sparc.c2c-failover@chip
 /*
  * c2c-link, c2c-prot. Errors are serded. When the serd trips,
  * the detector & sender will be faulted.
+ * If ereport does not have a sender, all chips will be faulted
+ * If ereport  sender or detector was faulted, discard ereport
  */
 event ereport.cpu.generic-sparc.c2c-link@chip { within(1s) };
 event ereport.cpu.generic-sparc.c2c-prot@chip { within(1s) };
@@ -372,31 +390,54 @@ event fault.cpu.generic-sparc.c2c@chip, retire=0,
     engine=serd.cpu.generic-sparc.c2c@chip;
 
 event upset.cpu.generic-sparc.c2c-link@chip;
+event upset.cpu.generic-sparc.c2c_discard@chip;
 
 prop fault.cpu.generic-sparc.c2c@chip
-    { DIAGNOSE_ERPT && CONTAINS_CHIP && setserdsuffix("link") &&
+    { DIAGNOSE_ERPT && CONTAINS_SENDER
+    && !HAS_C2C_FAULT(asru(chip)) && !HAS_C2C_FAULT(payloadprop("detector"))
+    && setserdsuffix("link") && SET_SERDN
+    && SET_SERDT && SET_RATIO } (0) ->
+    ereport.cpu.generic-sparc.c2c-link@chip<x>;
+
+prop fault.cpu.generic-sparc.c2c@chip
+    { DIAGNOSE_ERPT && !HAS_C2C_FAULT(asru(chip))
+    && !HAS_C2C_FAULT(payloadprop("sender"))
+    && setserdsuffix("link") && SET_SERDN
+    && SET_SERDT && SET_RATIO } (0) ->
+    ereport.cpu.generic-sparc.c2c-link@chip;
+
+prop fault.cpu.generic-sparc.c2c@chip
+    { DIAGNOSE_ERPT && !HAS_SENDER && setserdsuffix("link") &&
     SET_SERDN && SET_SERDT && SET_RATIO } (0) ->
     ereport.cpu.generic-sparc.c2c-link@chip<x>;
 
 prop fault.cpu.generic-sparc.c2c@chip
-    { DIAGNOSE_ERPT && setserdsuffix("link") && SET_SERDN &&
-    SET_SERDT && SET_RATIO } (0) ->
-    ereport.cpu.generic-sparc.c2c-link@chip;
-
-prop fault.cpu.generic-sparc.c2c@chip
-    { DIAGNOSE_ERPT && CONTAINS_CHIP && setserdsuffix("prot") &&
-    SET_SERDN && SET_SERDT && SET_RATIO } (0) ->
+    { DIAGNOSE_ERPT && CONTAINS_SENDER
+    && !HAS_C2C_FAULT(asru(chip)) && !HAS_C2C_FAULT(payloadprop("detector"))
+    && setserdsuffix("prot") && SET_SERDN
+    && SET_SERDT && SET_RATIO } (0) ->
     ereport.cpu.generic-sparc.c2c-prot@chip<x>;
 
 prop fault.cpu.generic-sparc.c2c@chip
-    { DIAGNOSE_ERPT && setserdsuffix("prot") && SET_SERDN &&
-    SET_SERDT && SET_RATIO } (0) ->
+    { DIAGNOSE_ERPT && !HAS_C2C_FAULT(asru(chip))
+    && !HAS_C2C_FAULT(payloadprop("sender"))
+    && setserdsuffix("prot") && SET_SERDN
+    && SET_SERDT && SET_RATIO } (0) ->
     ereport.cpu.generic-sparc.c2c-prot@chip;
+
+prop fault.cpu.generic-sparc.c2c@chip
+    { DIAGNOSE_ERPT && !HAS_SENDER && setserdsuffix("prot") &&
+    SET_SERDN && SET_SERDT && SET_RATIO } (0) ->
+    ereport.cpu.generic-sparc.c2c-prot@chip<x>;
 
 prop upset.cpu.generic-sparc.c2c-link@chip
     { !DIAGNOSE_ERPT } (0) ->
     ereport.cpu.generic-sparc.c2c-prot@chip,
     ereport.cpu.generic-sparc.c2c-link@chip;
+
+prop upset.cpu.generic-sparc.c2c_discard@chip (0) ->
+    ereport.cpu.generic-sparc.c2c-link@chip,
+    ereport.cpu.generic-sparc.c2c-prot@chip;
 
 /*
  * addr-oob is a firmware error - there is no associated FRU/ASRU
