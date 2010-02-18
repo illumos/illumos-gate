@@ -300,6 +300,7 @@ zvol_free_extents(zvol_state_t *zv)
 static int
 zvol_get_lbas(zvol_state_t *zv)
 {
+	objset_t *os = zv->zv_objset;
 	struct maparg	ma;
 	int		err;
 
@@ -307,7 +308,9 @@ zvol_get_lbas(zvol_state_t *zv)
 	ma.ma_blks = 0;
 	zvol_free_extents(zv);
 
-	err = traverse_dataset(dmu_objset_ds(zv->zv_objset), 0,
+	/* commit any in-flight changes before traversing the dataset */
+	txg_wait_synced(dmu_objset_pool(os), 0);
+	err = traverse_dataset(dmu_objset_ds(os), 0,
 	    TRAVERSE_PRE | TRAVERSE_PREFETCH_METADATA, zvol_map_block, &ma);
 	if (err || ma.ma_blks != (zv->zv_volsize / zv->zv_volblocksize)) {
 		zvol_free_extents(zv);
@@ -1465,6 +1468,7 @@ zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 		(void) strcpy(dki.dki_cname, "zvol");
 		(void) strcpy(dki.dki_dname, "zvol");
 		dki.dki_ctype = DKC_UNKNOWN;
+		dki.dki_unit = getminor(dev);
 		dki.dki_maxtransfer = 1 << (SPA_MAXBLOCKSHIFT - zv->zv_min_bs);
 		mutex_exit(&zvol_state_lock);
 		if (ddi_copyout(&dki, (void *)arg, sizeof (dki), flag))
