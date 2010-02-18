@@ -1545,3 +1545,4 @@ Bugid   Risk Synopsis
 6909523 core dump when run "LD_DEBUG=help ls" in non-English locale
 6903688 mdb(1) can't resolve certain symbols in solaris10-branded processes
 	from the global zone
+6923449 elfdump misinterprets _init/_fini symbols in dynamic section test

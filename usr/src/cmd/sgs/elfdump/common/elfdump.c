@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -365,10 +365,26 @@ stringtbl(Cache *cache, int symtab, Word ndx, Word shnum, const char *file,
 
 /*
  * Lookup a symbol and set Sym accordingly.
+ *
+ * entry:
+ *	name - Name of symbol to lookup
+ *	cache - Cache of all section headers
+ *	shnum - # of sections in cache
+ *	sym - Address of pointer to receive symbol
+ *	target - NULL, or section to which the symbol must be associated.
+ *	symtab - Symbol table to search for symbol
+ *	file - Name of file
+ *
+ * exit:
+ *	If the symbol is found, *sym is set to reference it, and True is
+ *	returned. If target is non-NULL, the symbol must reference the given
+ *	section --- otherwise the section is not checked.
+ *
+ *	If no symbol is found, False is returned.
  */
 static int
 symlookup(const char *name, Cache *cache, Word shnum, Sym **sym,
-    Cache *symtab, const char *file)
+    Cache *target, Cache *symtab, const char *file)
 {
 	Shdr	*shdr;
 	Word	symn, cnt;
@@ -406,18 +422,29 @@ symlookup(const char *name, Cache *cache, Word shnum, Sym **sym,
 	/*
 	 * Loop through the symbol table to find a match.
 	 */
+	*sym = NULL;
 	for (cnt = 0; cnt < symn; syms++, cnt++) {
 		const char	*symname;
 
 		symname = string(symtab, cnt, &cache[shdr->sh_link], file,
 		    syms->st_name);
 
-		if (symname && (strcmp(name, symname) == 0)) {
+		if (symname && (strcmp(name, symname) == 0) &&
+		    ((target == NULL) || (target->c_ndx == syms->st_shndx))) {
+			/*
+			 * It is possible, though rare, for a local and
+			 * global symbol of the same name to exist, each
+			 * contributed by a different input object. If the
+			 * symbol just found is local, remember it, but
+			 * continue looking.
+			 */
 			*sym = syms;
-			return (1);
+			if (ELF_ST_BIND(syms->st_info) != STB_LOCAL)
+				break;
 		}
 	}
-	return (0);
+
+	return (*sym != NULL);
 }
 
 /*
@@ -2300,15 +2327,18 @@ dyn_test(dyn_test_t test_type, Word sh_type, Cache *sec_cache, Dyn *dyn,
  *	dyn - Dyn entry to be tested
  *	symname - Name of symbol that corresponds to dyn
  *	symtab_cache, dynsym_cache, ldynsym_cache - Symbol tables to check
+ *	target_cache - Section the symname section is expected to be
+ *		associated with.
  *	cache - Cache of all section headers
  *	shnum - # of sections in cache
  *	ehdr - ELF header for file
+ *	osabi - OSABI to apply when interpreting object
  *	file - Name of file
  */
 static void
 dyn_symtest(Dyn *dyn, const char *symname, Cache *symtab_cache,
-    Cache *dynsym_cache, Cache *ldynsym_cache, Cache *cache,
-    Word shnum, Ehdr *ehdr, uchar_t osabi, const char *file)
+    Cache *dynsym_cache, Cache *ldynsym_cache, Cache *target_cache,
+    Cache *cache, Word shnum, Ehdr *ehdr, uchar_t osabi, const char *file)
 {
 	Conv_inv_buf_t	buf;
 	int		i;
@@ -2329,8 +2359,8 @@ dyn_symtest(Dyn *dyn, const char *symname, Cache *symtab_cache,
 		}
 
 		if ((_cache != NULL) &&
-		    symlookup(symname, cache, shnum, &sym, _cache, file) &&
-		    (sym->st_value != dyn->d_un.d_val))
+		    symlookup(symname, cache, shnum, &sym, target_cache,
+		    _cache, file) && (sym->st_value != dyn->d_un.d_val))
 			(void) fprintf(stderr, MSG_INTL(MSG_ERR_DYNSYMVAL),
 			    file, _cache->c_name, conv_dyn_tag(dyn->d_tag,
 			    osabi, ehdr->e_machine, 0, &buf),
@@ -2663,7 +2693,7 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, uchar_t osabi, const char *file)
 			case DT_FINI:
 				dyn_symtest(dyn, MSG_ORIG(MSG_SYM_FINI),
 				    sec.symtab, sec.dynsym, sec.sunw_ldynsym,
-				    cache, shnum, ehdr, osabi, file);
+				    sec.fini, cache, shnum, ehdr, osabi, file);
 				TEST_ADDR(SHT_PROGBITS, fini);
 				break;
 
@@ -2682,7 +2712,7 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, uchar_t osabi, const char *file)
 			case DT_INIT:
 				dyn_symtest(dyn, MSG_ORIG(MSG_SYM_INIT),
 				    sec.symtab, sec.dynsym, sec.sunw_ldynsym,
-				    cache, shnum, ehdr, osabi, file);
+				    sec.init, cache, shnum, ehdr, osabi, file);
 				TEST_ADDR(SHT_PROGBITS, init);
 				break;
 
@@ -3794,8 +3824,8 @@ got(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 		}
 	}
 
-	if (symlookup(MSG_ORIG(MSG_SYM_GOT), cache, shnum, &gotsym, symtab,
-	    file))
+	if (symlookup(MSG_ORIG(MSG_SYM_GOT), cache, shnum, &gotsym, NULL,
+	    symtab, file))
 		gotsymaddr = gotsym->st_value;
 	else
 		gotsymaddr = gotbgn;
