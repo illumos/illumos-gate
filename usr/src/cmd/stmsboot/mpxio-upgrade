@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -162,7 +162,17 @@ mpxio_mount_usr()
 	exec < $vfstab; readvfstab "/usr"
 	ret_val=0
 	if [ -n "$mountp" ]; then
-		new_special=`$STMSBOOTUTIL -m $special`
+		case "$special" in
+		/dev/md/*)
+			new_special=$special
+			;;
+		/dev/vx/*)
+			new_special=$special
+			;;
+		*)
+			new_special=`$STMSBOOTUTIL -m $special`
+			;;
+		esac
 		
 		if [ "$fstype" = "cachefs" ]; then
 			# Mount read-only without the cache.
@@ -351,7 +361,13 @@ mpxio_main()
 			cecho ""
 			cecho "stmsboot: vfstab has been updated"
 			
-			update_dumpconf 
+			if update_dumpconf; then
+				# update svm configuration to reflect new names
+				if [ -s /kernel/drv/md.conf ] && \
+				    [ -x $METADEVADM ]; then
+					$METADEVADM -r >/dev/msglog 2>&1
+				fi
+			fi
 			
 			MACH=`$UNAME -p`
 			if [ "$MACH" = "i386" ]; then

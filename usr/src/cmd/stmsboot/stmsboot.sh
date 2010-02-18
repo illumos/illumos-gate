@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -74,8 +74,6 @@ reboot_needed=0
 new_bootpath=""
 CLIENT_TYPE_PHCI=""
 CLIENT_TYPE_VHCI="/scsi_vhci"
-new_rootdev=""
-svm_md_device=""
 
 #
 # Copy all entries (including comments) from source driver.conf
@@ -263,11 +261,9 @@ update_sysfiles()
 			$EEPROM bootpath="$new_bootpath"
 		fi
 
-		if [ "$svm_md_device" != "NOT_MAPPED" ]; then
-			# Enable the mpxio-upgrade service for the reboot
-			$SVCADM disable -t $STMSINSTANCE
-			$SVCCFG -s $STMSINSTANCE "setprop general/enabled=true"
-		fi
+		# Enable the mpxio-upgrade service for the reboot
+		$SVCADM disable -t $STMSINSTANCE
+		$SVCCFG -s $STMSINSTANCE "setprop general/enabled=true"
 	else
 		need_bootscript=0
 	fi
@@ -630,10 +626,6 @@ if [ "$cmd" = "enable" -o "$cmd" = "disable" ]; then
 			    $AWK '{print $1}' | $SED -e"s,rdsk,dsk,g" \
 			    >$BOOTDEVICES
 		fi
-		new_rootdev=`$DF /|$AWK -F":" '{print $1}' | \
-			$AWK -F"(" '{print $2}'| \
-			$SED -e"s,dsk,rdsk," -e"s,[ ]*),,"`
-		svm_md_device=`$STMSBOOTUTIL -m $new_rootdev`
 		update_sysfiles
 	else
 		echo "STMS is already ${cmd}d. No changes or reboots needed"
