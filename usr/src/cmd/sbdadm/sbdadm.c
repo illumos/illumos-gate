@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #include <stdlib.h>
@@ -290,6 +290,7 @@ delete_lu(int operandLen, char *operands[], cmdOptions_t *options,
 	boolean_t viewEntriesRemoved = B_FALSE;
 	boolean_t noLunFound = B_FALSE;
 	boolean_t views = B_FALSE;
+	boolean_t notValidHexNumber = B_FALSE;
 	char sGuid[GUID_INPUT + 1];
 	stmfViewEntryList *viewEntryList = NULL;
 
@@ -311,15 +312,18 @@ delete_lu(int operandLen, char *operands[], cmdOptions_t *options,
 	for (i = 0; i < operandLen; i++) {
 		for (j = 0; j < GUID_INPUT; j++) {
 			if (!isxdigit(operands[i][j])) {
+				notValidHexNumber = B_TRUE;
 				break;
 			}
-			sGuid[j] = tolower(operands[i][j]);
+		sGuid[j] = tolower(operands[i][j]);
 		}
-		if (j != GUID_INPUT) {
+		if ((notValidHexNumber == B_TRUE) ||
+		    (strlen(operands[i]) != GUID_INPUT)) {
 			(void) fprintf(stderr, "%s: %s: %s%d%s\n",
 			    cmdName, operands[i], gettext("must be "),
 			    GUID_INPUT,
 			    gettext(" hexadecimal digits long"));
+			notValidHexNumber = B_FALSE;
 			ret++;
 			continue;
 		}
@@ -369,13 +373,15 @@ delete_lu(int operandLen, char *operands[], cmdOptions_t *options,
 					(void) stmfRemoveViewEntry(&delGuid,
 					    viewEntryList->ve[j].veIndex);
 				}
-				viewEntriesRemoved = B_TRUE;
+				/* check if viewEntryList is empty */
+				if (viewEntryList->cnt != 0)
+					viewEntriesRemoved = B_TRUE;
 				stmfFreeMemory(viewEntryList);
-			} else if (stmfRet != STMF_ERROR_NOT_FOUND) {
+			} else {
 				(void) fprintf(stderr, "%s: %s\n", cmdName,
 				    gettext("unable to remove view entries\n"));
 				ret++;
-			} /* No view entries to remove */
+			}
 		}
 		if (keepViews) {
 			stmfRet = stmfGetViewEntryList(&delGuid,

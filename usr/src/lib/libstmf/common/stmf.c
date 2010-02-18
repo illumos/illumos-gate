@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2141,6 +2141,9 @@ stmfGetLuResource(stmfGuid *luGuid, luResource *hdl)
 	int ret = STMF_STATUS_SUCCESS;
 	stmfLogicalUnitProperties luProps;
 
+	if (hdl == NULL) {
+		return (STMF_ERROR_INVALID_ARG);
+	}
 
 	/* Check logical unit provider name to call correct dtype function */
 	if ((ret = stmfGetLogicalUnitProperties(luGuid, &luProps))
@@ -2824,7 +2827,7 @@ getDiskProp(luResourceImpl *hdl, uint32_t prop, char *propVal, size_t *propLen)
 			}
 			break;
 		default:
-			ret = STMF_ERROR_NO_PROP;
+			ret = STMF_ERROR_INVALID_PROP;
 			break;
 	}
 
@@ -3021,7 +3024,7 @@ setDiskProp(luResourceImpl *hdl, uint32_t resourceProp, const char *propVal)
 			ret = STMF_ERROR_INVALID_PROP;
 			break;
 		default:
-			ret = STMF_ERROR_NO_PROP;
+			ret = STMF_ERROR_INVALID_PROP;
 			break;
 	}
 	return (ret);
@@ -4823,11 +4826,6 @@ stmfGetViewEntryList(stmfGuid *lu, stmfViewEntryList **viewEntryList)
 	}
 
 	if (ret != STMF_STATUS_SUCCESS) {
-		goto done;
-	}
-
-	if (stmfIoctl.stmf_obuf_nentries == 0) {
-		ret = STMF_ERROR_NOT_FOUND;
 		goto done;
 	}
 

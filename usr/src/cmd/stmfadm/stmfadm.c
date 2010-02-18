@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -303,6 +303,7 @@ addHostGroupMemberFunc(int operandLen, char *operands[], cmdOptions_t *options,
 			case STMF_ERROR_PERM:
 				(void) fprintf(stderr, "%s: %s\n", cmdName,
 				    gettext("permission denied"));
+				ret++;
 				break;
 			case STMF_ERROR_BUSY:
 				(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
@@ -390,6 +391,7 @@ addTargetGroupMemberFunc(int operandLen, char *operands[],
 			case STMF_ERROR_PERM:
 				(void) fprintf(stderr, "%s: %s\n", cmdName,
 				    gettext("permission denied"));
+				ret++;
 				break;
 			case STMF_ERROR_BUSY:
 				(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
@@ -1323,6 +1325,7 @@ deleteLuFunc(int operandLen, char *operands[], cmdOptions_t *options,
 	boolean_t viewEntriesRemoved = B_FALSE;
 	boolean_t noLunFound = B_FALSE;
 	boolean_t views = B_FALSE;
+	boolean_t notValidHexNumber = B_FALSE;
 	char sGuid[GUID_INPUT + 1];
 	stmfViewEntryList *viewEntryList = NULL;
 
@@ -1344,15 +1347,19 @@ deleteLuFunc(int operandLen, char *operands[], cmdOptions_t *options,
 	for (i = 0; i < operandLen; i++) {
 		for (j = 0; j < GUID_INPUT; j++) {
 			if (!isxdigit(operands[i][j])) {
+				notValidHexNumber = B_TRUE;
 				break;
 			}
 			sGuid[j] = tolower(operands[i][j]);
 		}
-		if (j != GUID_INPUT) {
+		if ((notValidHexNumber == B_TRUE) ||
+		    (strlen(operands[i]) != GUID_INPUT)) {
 			(void) fprintf(stderr, "%s: %s: %s%d%s\n",
 			    cmdName, operands[i], gettext("must be "),
 			    GUID_INPUT,
 			    gettext(" hexadecimal digits long"));
+			notValidHexNumber = B_FALSE;
+			ret++;
 			continue;
 		}
 
@@ -1401,13 +1408,16 @@ deleteLuFunc(int operandLen, char *operands[], cmdOptions_t *options,
 					(void) stmfRemoveViewEntry(&delGuid,
 					    viewEntryList->ve[j].veIndex);
 				}
-				viewEntriesRemoved = B_TRUE;
+				/* check if viewEntryList is empty */
+				if (viewEntryList->cnt != 0)
+					viewEntriesRemoved = B_TRUE;
 				stmfFreeMemory(viewEntryList);
-			} else if (stmfRet != STMF_ERROR_NOT_FOUND) {
+			} else {
 				(void) fprintf(stderr, "%s: %s\n", cmdName,
 				    gettext("unable to remove view entries\n"));
 				ret++;
-			} /* No view entries to remove */
+			}
+
 		}
 		if (keepViews) {
 			stmfRet = stmfGetViewEntryList(&delGuid,
@@ -2004,9 +2014,6 @@ listLuFunc(int operandLen, char *operands[], cmdOptions_t *options, void *args)
 					if (stmfRet == STMF_STATUS_SUCCESS) {
 						(void) printf("%d",
 						    viewEntryList->cnt);
-					} else if (stmfRet ==
-					    STMF_ERROR_NOT_FOUND) {
-						(void) printf("0");
 					} else {
 						(void) printf("unknown");
 					}
@@ -2722,10 +2729,6 @@ listViewFunc(int operandLen, char *operands[], cmdOptions_t *options,
 				(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
 				    sGuid, gettext("resource busy"));
 				break;
-			case STMF_ERROR_NOT_FOUND:
-				(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
-				    sGuid, gettext("no views found"));
-				break;
 			case STMF_ERROR_SERVICE_NOT_FOUND:
 				(void) fprintf(stderr, "%s: %s\n", cmdName,
 				    gettext("STMF service not found"));
@@ -2743,6 +2746,12 @@ listViewFunc(int operandLen, char *operands[], cmdOptions_t *options,
 				    sGuid, gettext("unknown error"));
 				break;
 		}
+		return (1);
+	}
+
+	if (viewEntryList->cnt == 0) {
+		(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
+		    sGuid, gettext("no views found"));
 		return (1);
 	}
 
@@ -3263,10 +3272,6 @@ removeViewFunc(int operandLen, char *operands[], cmdOptions_t *options,
 				(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
 				    sGuid, gettext("resource busy"));
 				break;
-			case STMF_ERROR_NOT_FOUND:
-				(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
-				    sGuid, gettext("no views found"));
-				break;
 			case STMF_ERROR_SERVICE_NOT_FOUND:
 				(void) fprintf(stderr, "%s: %s\n", cmdName,
 				    gettext("STMF service not found"));
@@ -3284,6 +3289,12 @@ removeViewFunc(int operandLen, char *operands[], cmdOptions_t *options,
 				    sGuid, gettext("unknown error"));
 				break;
 		}
+		return (1);
+	}
+
+	if (viewEntryList->cnt == 0) {
+		(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
+		    sGuid, gettext("no views found"));
 		return (1);
 	}
 
