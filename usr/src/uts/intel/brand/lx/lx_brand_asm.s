@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,11 +30,8 @@
 
 #else	/* __lint */
 
-#include <sys/asm_linkage.h>
-#include <sys/privregs.h>
-#include <sys/segments.h>
-#include "assym.h"
 #include "genassym.h"
+#include "../common/brand_asm.h"
 
 #endif	/* __lint */
 
@@ -48,70 +45,29 @@ lx_brand_int80_callback(void)
 #else	/* __lint */
 
 #if defined(__amd64)
-	/*
-	 * lx brand callback for the int $0x80 trap handler.
-	 *
-	 * We're running on the kernel's %gs.
-	 *
-	 * We return directly to userland, bypassing the _update_sregs logic, so
-	 * this	routine must NOT do anything that could cause a context switch.
-	 *
-	 * %rax - syscall number
-	 * 
-	 * When called, all general registers are as they were when
-	 * the user process made the system call.  The %gs register has the
-	 * kernel value.  The stack looks like this:
-	 *
-	 *  	   --------------------------------------
-	 *      40 | user %gs				|
-	 *      32 | callback pointer			|
-	 *      24 | saved stack pointer		|
-	 *    | 16 | lwp pointer			|
-	 *    v  8 | user return address (*)		|
-	 *       0 | caller's return addr (sys_int80)	|
-	 *         -------------------------------------
-	 */
-	ENTRY(lx_brand_int80_callback)
-	movq	16(%rsp), %r15			/* grab the lwp */
-	movq	LWP_PROCP(%r15), %r15		/* grab the proc pointer */
-	pushq	%r15				/* push the proc pointer */
-	movq	P_ZONE(%r15), %r15		/* grab the zone pointer */
-	movq	ZONE_BRAND_DATA(%r15), %r15	/* grab the zone brand ptr */
-	pushq	%rax				/* save the syscall num */
-	movl	LXZD_MAX_SYSCALL(%r15), %eax	/* load the 'max sysnum' word */
-	xchgq	(%rsp), %rax			/* swap %rax and stack value */
-	movq	32(%rsp), %r15			/* re-load the lwp pointer */
-	movq	LWP_BRAND(%r15), %r15		/* grab the lwp brand data */
-	pushq   %rax				/* save %rax on stack */
-	movq	64(%rsp), %rax			/* get user %gs */
-	mov	%eax, BR_UGS(%r15)		/* save user %gs */
-	popq	%rax				/* restore %rax from stack */
 
+/*
+ * See "64-BIT INTERPOSITION STACK" in brand_asm.h.
+ */
+ENTRY(lx_brand_int80_callback)
+	GET_PROCP(SP_REG, 0, %r15)
+	movq	P_ZONE(%r15), %r15		/* grab the zone pointer */
 	/* grab the 'max syscall num' for this process from 'zone brand data' */
-	cmpq	(%rsp), %rax			/* is 0 <= syscall <= MAX? */
+	movq	ZONE_BRAND_DATA(%r15), %r15	/* grab the zone brand ptr */
+	movl	LXZD_MAX_SYSCALL(%r15), %r15d	/* get the 'max sysnum' word */
+	cmpq	%r15, %rax			/* is 0 <= syscall <= MAX? */
 	jbe	0f				/* yes, syscall is OK */
 	xorl    %eax, %eax			/* no, zero syscall number */
 0:
-	movq	8(%rsp), %r15			/* get the proc pointer */
-	movq	P_BRAND_DATA(%r15), %r15	/* grab the proc brand data */
 
 .lx_brand_int80_patch_point:
 	jmp	.lx_brand_int80_notrace
 
 .lx_brand_int80_notrace:
-	movq	L_HANDLER(%r15), %r15		/* load the base address */
-	
+	CALC_TABLE_ADDR(%r15, L_HANDLER)
 1:
-	/*
-	 * Rather than returning to the instruction after the int 80, we
-	 * transfer control into the brand library's handler table at
-	 * table_addr + (16 * syscall_num) thus encoding the system
-	 * call number in the instruction pointer. The original return address
-	 * is passed in %eax.
-	 */
-	shlq	$4, %rax
-	addq	%r15, %rax
-	movq	40(%rsp), %rsp		/* restore user stack pointer */
+	movq	%r15, %rax
+	GET_V(%rsp, 0, V_SSP, %rsp)	/* restore intr. stack pointer */
 	xchgq	(%rsp), %rax		/* swap %rax and return addr */
 	jmp	sys_sysint_swapgs_iret
 
@@ -120,100 +76,68 @@ lx_brand_int80_callback(void)
 	 * If tracing is active, we vector to an alternate trace-enabling
 	 * handler table instead.
 	 */
-	movq	L_TRACEHANDLER(%r15), %r15	/* load trace handler address */
+	CALC_TABLE_ADDR(%r15, L_TRACEHANDLER)
 	jmp	1b
-	SET_SIZE(lx_brand_int80_callback)
+SET_SIZE(lx_brand_int80_callback)
 
 #define	PATCH_POINT	_CONST(.lx_brand_int80_patch_point + 1)
 #define	PATCH_VAL	_CONST(.lx_brand_int80_trace - .lx_brand_int80_notrace)
 
-	ENTRY(lx_brand_int80_enable)
+ENTRY(lx_brand_int80_enable)
 	movl	$1, lx_systrace_brand_enabled(%rip)
 	movq	$PATCH_POINT, %r8
 	movb	$PATCH_VAL, (%r8)
 	ret
-	SET_SIZE(lx_brand_int80_enable)
+SET_SIZE(lx_brand_int80_enable)
 
-	ENTRY(lx_brand_int80_disable)
+ENTRY(lx_brand_int80_disable)
 	movq	$PATCH_POINT, %r8
 	movb	$0, (%r8)
 	movl	$0, lx_systrace_brand_enabled(%rip)
 	ret
-	SET_SIZE(lx_brand_int80_disable)
+SET_SIZE(lx_brand_int80_disable)
 
 
 #elif defined(__i386)
-	/*
-	 * %eax - syscall number
-	 *
-	 * When called, all general registers are as they were when
-	 * the user process made the system call.  The %gs register has the
-	 * kernel value.  The stack looks like this:
-	 *
-	 *	   --------------------------------------
-	 *    | 44 | user's %ss				|
-	 *    | 40 | user's %esp			|
-	 *    | 36 | EFLAGS register			|
-	 *    | 32 | user's %cs				|
-	 *    | 28 | user's %eip			|
-	 *    | 24 | 'scratch space'			|
-	 *    | 20 | user's %ebx			|
-	 *    | 16 | user's %gs selector		|
-	 *    | 12 | kernel's %gs selector		|
-	 *    |  8 | lwp pointer			|
-	 *    v  4 | user return address		|
-	 *       0 | callback wrapper return addr	|
-	 *         -------------------------------------
-	 */
-	ENTRY(lx_brand_int80_callback)
-	pushl	%ebx				/* save for use as scratch */
-	movl	12(%esp), %ebx			/* grab the lwp pointer */
-	movl	LWP_PROCP(%ebx), %ebx		/* grab the proc pointer */
-	pushl	%ebx				/* push the proc pointer */
-	movl	P_ZONE(%ebx), %ebx		/* grab the zone pointer */
-	movl	ZONE_BRAND_DATA(%ebx), %ebx	/* grab the zone brand data */
-	pushl	LXZD_MAX_SYSCALL(%ebx)		/* push the max sysnum */
-	movl	28(%esp), %ebx			/* grab the the user %gs */
-	movw	%bx, %gs			/* restore the user %gs */
-	movl	20(%esp), %ebx			/* re-load the lwp pointer */
-	movl	LWP_BRAND(%ebx), %ebx		/* grab the lwp brand data */
-	movw	%gs, BR_UGS(%ebx)		/* save user %gs */
 
+/*
+ * See "32-BIT INTERPOSITION STACK" in brand_asm.h.
+ */
+ENTRY(lx_brand_int80_callback)
+	GET_PROCP(SP_REG, 0, %ebx)
+	movl	P_ZONE(%ebx), %ebx		/* grab the zone pointer */
 	/* grab the 'max syscall num' for this process from 'zone brand data' */
-	cmpl	(%esp), %eax 			/* is 0 <= syscall <= MAX? */
+	movl	ZONE_BRAND_DATA(%ebx), %ebx	/* grab the zone brand data */
+	movl	LXZD_MAX_SYSCALL(%ebx), %ebx	/* get the max sysnum */
+
+	cmpl	%ebx, %eax 			/* is 0 <= syscall <= MAX? */
 	jbe	0f				/* yes, syscall is OK */
 	xorl    %eax, %eax		     	/* no, zero syscall number */	
 0:
-	movl	4(%esp), %ebx			/* get the proc pointer */
-	movl	P_BRAND_DATA(%ebx), %ebx	/* grab the proc brand data */
 
 .lx_brand_int80_patch_point:
 	jmp	.lx_brand_int80_notrace
 
 .lx_brand_int80_notrace:
-	movl	L_HANDLER(%ebx), %ebx		/* load the base address */
+	CALC_TABLE_ADDR(%ebx, L_HANDLER)
 
 1:
-	/*
-	 * See the corresponding comment in the amd64 version above.
-	 */
-	shll	$4, %eax
-	addl	%ebx, %eax
-	movl	8(%esp), %ebx			/* restore %ebx */
-	addl	$40, %esp
-	xchgl	(%esp), %eax			/* swap %eax and return addr */
+	movl	%ebx, %eax
+	GET_V(%esp, 0, V_U_EBX, %ebx)		/* restore scratch register */
+	addl	$V_END, %esp		/* restore intr. stack ptr */
+	xchgl	(%esp), %eax		/* swap new and orig. return addrs */
 	jmp	nopop_sys_rtt_syscall
 
 .lx_brand_int80_trace:
-	movl	L_TRACEHANDLER(%ebx), %ebx	/* load trace handler address */
+	CALC_TABLE_ADDR(%ebx, L_TRACEHANDLER)
 	jmp	1b
-	SET_SIZE(lx_brand_int80_callback)
+SET_SIZE(lx_brand_int80_callback)
 
 
 #define	PATCH_POINT	_CONST(.lx_brand_int80_patch_point + 1)
 #define	PATCH_VAL	_CONST(.lx_brand_int80_trace - .lx_brand_int80_notrace)
 
-	ENTRY(lx_brand_int80_enable)
+ENTRY(lx_brand_int80_enable)
 	pushl	%ebx
 	pushl	%eax
 	movl	$1, lx_systrace_brand_enabled
@@ -223,16 +147,16 @@ lx_brand_int80_callback(void)
 	popl	%eax
 	popl	%ebx
 	ret
-	SET_SIZE(lx_brand_int80_enable)
+SET_SIZE(lx_brand_int80_enable)
 
-	ENTRY(lx_brand_int80_disable)
+ENTRY(lx_brand_int80_disable)
 	pushl	%ebx
 	movl	$PATCH_POINT, %ebx
 	movb	$0, (%ebx)
 	movl	$0, lx_systrace_brand_enabled
 	popl	%ebx
 	ret
-	SET_SIZE(lx_brand_int80_disable)
+SET_SIZE(lx_brand_int80_disable)
 
 #endif	/* __i386 */
 #endif	/* __lint */

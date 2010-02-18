@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _LX_BRAND_H
 #define	_LX_BRAND_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef _ASM
 #include <sys/types.h>
@@ -198,12 +196,6 @@ typedef struct lx_lwp_data {
 	 * to pass info into fork()
 	 */
 	void	 *br_clone_args;
-
-	/*
-	 * Space to save off userland Linux %gs pointer so we can restore it
-	 * before calling signal handlers.
-	 */
-	greg_t	br_ugs;
 
 	uint_t	br_ptrace;		/* ptrace is active for this LWP */
 } lx_lwp_data_t;

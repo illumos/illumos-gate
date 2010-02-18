@@ -132,7 +132,6 @@
  * data on the stack:
  *
  * stack:  --------------------------------------
- *      40 | user %gs				|
  *      32 | callback pointer			|
  *    | 24 | user (or interrupt) stack pointer	|
  *    | 16 | lwp pointer			|
@@ -161,6 +160,12 @@
  * BRAND_URET_FROM_REG or BRAND_URET_FROM_INTR_STACK macro.  These macros are
  * used to generate the proper code to get the userland return address for
  * each syscall entry point.
+ *
+ * The interface to the brand callbacks on the 64-bit kernel assumes %r15
+ * is available as a scratch register within the callback.  If the callback
+ * returns within the kernel then this macro will restore %r15.  If the
+ * callback is going to return directly to userland then it should restore
+ * %r15 before returning to userland.
  */
 #define BRAND_URET_FROM_REG(rip_reg)					\
 	pushq	rip_reg			/* push the return address	*/
@@ -178,7 +183,7 @@
 	movq	%r15, %gs:CPU_RTMP_R15	/* save %r15			*/ ;\
 	movq	%gs:CPU_THREAD, %r15	/* load the thread pointer	*/ ;\
 	movq	T_STACK(%r15), %rsp	/* switch to the kernel stack	*/ ;\
-	subq	$24, %rsp		/* save space for 3 pointers	*/ ;\
+	subq	$16, %rsp		/* save space for 2 pointers	*/ ;\
 	pushq	%r14			/* save %r14			*/ ;\
 	movq	%gs:CPU_RTMP_RSP, %r14					   ;\
 	movq	%r14, 8(%rsp)		/* stash the user stack pointer	*/ ;\
@@ -193,11 +198,6 @@
 	je	1f							   ;\
 	movq	%r15, 16(%rsp)		/* save the callback pointer	*/ ;\
 	push_userland_ret		/* push the return address	*/ ;\
-	SWAPGS				/* user gsbase			*/ ;\
-	mov	%gs, %r15		/* get %gs			*/ ;\
-	movq	%r15, 32(%rsp)		/* save %gs on stack		*/ ;\
-	SWAPGS				/* kernel gsbase		*/ ;\
-	movq	%gs:CPU_RTMP_R15, %r15	/* restore %r15			*/ ;\
 	call	*24(%rsp)		/* call callback		*/ ;\
 1:	movq	%gs:CPU_RTMP_R15, %r15	/* restore %r15			*/ ;\
 	movq	%gs:CPU_RTMP_RSP, %rsp	/* restore the stack pointer	*/
@@ -425,18 +425,13 @@ size_t _allsyscalls_size;
 	SWAPGS				/* kernel gsbase */
 	XPV_SYSCALL_PROD
 	BRAND_CALLBACK(BRAND_CB_SYSCALL, BRAND_URET_FROM_REG(%rcx))
-	SWAPGS				/* user gsbase */
-
-#if defined(__xpv)
 	jmp	noprod_sys_syscall
-#endif
-	
+
 	ALTENTRY(sys_syscall)
 	SWAPGS				/* kernel gsbase */
 	XPV_SYSCALL_PROD
 
 noprod_sys_syscall:
-
 	movq	%r15, %gs:CPU_RTMP_R15
 	movq	%rsp, %gs:CPU_RTMP_RSP
 
@@ -702,20 +697,13 @@ sys_syscall32()
 	SWAPGS				/* kernel gsbase */
 	XPV_TRAP_POP
 	BRAND_CALLBACK(BRAND_CB_SYSCALL32, BRAND_URET_FROM_REG(%rcx))
-	SWAPGS				/* user gsbase */
-
-#if defined(__xpv)
 	jmp	nopop_sys_syscall32
-#endif
 
 	ALTENTRY(sys_syscall32)
 	SWAPGS				/* kernel gsbase */
-
-#if defined(__xpv)
 	XPV_TRAP_POP
-nopop_sys_syscall32:
-#endif
 
+nopop_sys_syscall32:
 	movl	%esp, %r10d
 	movq	%gs:CPU_THREAD, %r15
 	movq	T_STACK(%r15), %rsp
@@ -1162,9 +1150,7 @@ sys_int80()
 	XPV_TRAP_POP
 	BRAND_CALLBACK(BRAND_CB_INT80, BRAND_URET_FROM_INTR_STACK())
 	SWAPGS				/* user gsbase */
-#if defined(__xpv)
 	jmp	nopop_int80
-#endif
 
 	ENTRY_NP(sys_int80)
 	/*
@@ -1175,10 +1161,8 @@ sys_int80()
 	 * to undo the XPV_TRAP_POP and push rcx and r11 back on the stack
 	 * because gptrap will pop them again with its own XPV_TRAP_POP.
 	 */
-#if defined(__xpv)
 	XPV_TRAP_POP
 nopop_int80:
-#endif
 	subq	$2, (%rsp)	/* int insn 2-bytes */
 	pushq	$_CONST(_MUL(T_INT80, GATE_DESC_SIZE) + 2)
 #if defined(__xpv)
@@ -1209,20 +1193,13 @@ sys_syscall_int()
 	SWAPGS				/* kernel gsbase */
 	XPV_TRAP_POP
 	BRAND_CALLBACK(BRAND_CB_INT91, BRAND_URET_FROM_INTR_STACK())
-	SWAPGS				/* user gsbase */
-
-#if defined(__xpv)
 	jmp	nopop_syscall_int
-#endif
 
 	ALTENTRY(sys_syscall_int)
 	SWAPGS				/* kernel gsbase */
-
-#if defined(__xpv)
 	XPV_TRAP_POP
-nopop_syscall_int:
-#endif
 
+nopop_syscall_int:
 	movq	%gs:CPU_THREAD, %r15
 	movq	T_STACK(%r15), %rsp
 	movl	%eax, %eax

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,28 +115,35 @@
 
 /*
  * Check if a brand_mach_ops callback is defined for the specified callback_id
- * type.  If so invoke it with the kernel's %gs value loaded and the following
+ * type.  If so invoke it with the user's %gs value loaded and the following
  * data on the stack:
  *	   --------------------------------------
- *         | 'scratch space'			|
- *         | user's %ebx			|
- *         | user's %gs selector		|
- *    |    | kernel's %gs selector		|
- *    |    | lwp pointer			|
- *    v    | user return address		|
+ *         | user's %ss                         |
+ *    |    | user's %esp                        |
+ *    |    | EFLAGS register                    |
+ *    |    | user's %cs                         |
+ *    |    | user's %eip (user return address)  |
+ *    |    | 'scratch space'			|
+ *    |    | user's %ebx			|
+ *    |    | user's %gs selector		|
+ *    v    | lwp pointer			|
  *         | callback wrapper return addr 	|
  *         --------------------------------------
  *
- * The lx brand (at least) uses each of these fields.
  * If the brand code returns, we assume that we are meant to execute the
  * normal system call path.
+ *
+ * The interface to the brand callbacks on the 32-bit kernel assumes %ebx
+ * is available as a scratch register within the callback.  If the callback
+ * returns within the kernel then this macro will restore %ebx.  If the
+ * callback is going to return directly to userland then it should restore
+ * %ebx before returning to userland.
  */
 #define	BRAND_CALLBACK(callback_id)					    \
 	subl	$4, %esp		/* save some scratch space	*/ ;\
 	pushl	%ebx			/* save %ebx to use for scratch	*/ ;\
 	pushl	%gs			/* save the user %gs		*/ ;\
 	movl	$KGS_SEL, %ebx						   ;\
-	pushl	%ebx			/* push kernel's %gs		*/ ;\
 	movw	%bx, %gs		/* switch to the kernel's %gs	*/ ;\
 	movl	%gs:CPU_THREAD, %ebx	/* load the thread pointer	*/ ;\
 	movl	T_LWP(%ebx), %ebx	/* load the lwp pointer		*/ ;\
@@ -147,15 +154,14 @@
 	movl	_CONST(_MUL(callback_id, CPTRSIZE))(%ebx), %ebx		   ;\
 	cmpl	$0, %ebx						   ;\
 	je	1f							   ;\
-	movl	%ebx, 16(%esp)		/* save callback to scratch	*/ ;\
-	movl	12(%esp), %ebx		/* restore %ebx			*/ ;\
-	pushl	20(%esp)		/* push the return address	*/ ;\
-	call	*20(%esp)		/* call callback		*/ ;\
-	addl	$4, %esp		/* get rid of ret addr		*/ ;\
-1:	movl	8(%esp), %ebx		/* grab the the user %gs	*/ ;\
+	movl	%ebx, 12(%esp)		/* save callback to scratch	*/ ;\
+	movl	4(%esp), %ebx		/* grab the user %gs		*/ ;\
 	movw	%bx, %gs		/* restore the user %gs		*/ ;\
-	movl	12(%esp), %ebx		/* restore user's %ebx		*/ ;\
-	addl	$20, %esp		/* restore stack ptr		*/ 
+	call	*12(%esp)		/* call callback in scratch	*/ ;\
+1:	movl	4(%esp), %ebx		/* restore user %gs (re-do if	*/ ;\
+	movw	%bx, %gs		/* branch due to no callback)	*/ ;\
+	movl	8(%esp), %ebx		/* restore user's %ebx		*/ ;\
+	addl	$16, %esp		/* restore stack ptr		*/ 
 
 #define	MSTATE_TRANSITION(from, to)		\
 	pushl	$to;				\

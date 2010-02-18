@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/errno.h>
 #include <sys/systm.h>
@@ -341,23 +339,13 @@ lx_opnotsupp()
 
 /*
  * Brand-specific routine to check if given non-Solaris standard segment
- * register values should be used as-is or if they should be modified to other
- * values.
+ * register values should be modified to other values.
  */
 /*ARGSUSED*/
 greg_t
 lx_fixsegreg(greg_t sr, model_t datamodel)
 {
-	struct lx_lwp_data *lxlwp = ttolxlwp(curthread);
-
-	/*
-	 * If the segreg is the same as the %gs the brand callback was last
-	 * entered with, allow it to be used unmodified.
-	 */
 	ASSERT(sr == (sr & 0xffff));
-
-	if (sr == (lxlwp->br_ugs & 0xffff))
-		return (sr);
 
 	/*
 	 * Force the SR into the LDT in ring 3 for 32-bit processes.
