@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,6 +109,8 @@ static void
 cmd_dimm_free(fmd_hdl_t *hdl, cmd_dimm_t *dimm, int destroy)
 {
 	cmd_case_t *cc = &dimm->dimm_case;
+	int i;
+	cmd_mq_t *q;
 
 #ifdef sun4v
 	cmd_branch_t *branch;
@@ -123,28 +125,6 @@ cmd_dimm_free(fmd_hdl_t *hdl, cmd_dimm_t *dimm, int destroy)
 		}
 	}
 
-	if (dimm->dimm_bank != NULL)
-		cmd_bank_remove_dimm(hdl, dimm->dimm_bank, dimm);
-#ifdef sun4v
-	branch = cmd_branch_lookup_by_unum(hdl, dimm->dimm_unum);
-	if (branch != NULL)
-		cmd_branch_remove_dimm(hdl, branch, dimm);
-#endif
-
-	cmd_fmri_fini(hdl, &dimm->dimm_asru, destroy);
-
-	if (destroy)
-		fmd_buf_destroy(hdl, NULL, dimm->dimm_bufname);
-	cmd_list_delete(&cmd.cmd_dimms, dimm);
-	fmd_hdl_free(hdl, dimm, sizeof (cmd_dimm_t));
-}
-
-void
-cmd_dimm_destroy(fmd_hdl_t *hdl, cmd_dimm_t *dimm)
-{
-	int i;
-	cmd_mq_t *q;
-
 	for (i = 0; i < CMD_MAX_CKWDS; i++) {
 		while ((q = cmd_list_next(&dimm->mq_root[i])) != NULL) {
 			if (q->mq_serdnm != NULL) {
@@ -158,6 +138,28 @@ cmd_dimm_destroy(fmd_hdl_t *hdl, cmd_dimm_t *dimm)
 			fmd_hdl_free(hdl, q, sizeof (cmd_mq_t));
 		}
 	}
+
+	if (dimm->dimm_bank != NULL)
+		cmd_bank_remove_dimm(hdl, dimm->dimm_bank, dimm);
+
+#ifdef sun4v
+	branch = cmd_branch_lookup_by_unum(hdl, dimm->dimm_unum);
+	if (branch != NULL)
+		cmd_branch_remove_dimm(hdl, branch, dimm);
+#endif
+
+	cmd_fmri_fini(hdl, &dimm->dimm_asru, destroy);
+
+	if (destroy)
+		fmd_buf_destroy(hdl, NULL, dimm->dimm_bufname);
+
+	cmd_list_delete(&cmd.cmd_dimms, dimm);
+	fmd_hdl_free(hdl, dimm, sizeof (cmd_dimm_t));
+}
+
+void
+cmd_dimm_destroy(fmd_hdl_t *hdl, cmd_dimm_t *dimm)
+{
 
 	fmd_stat_destroy(hdl, 1, &(dimm->dimm_retstat));
 	cmd_dimm_free(hdl, dimm, FMD_B_TRUE);
