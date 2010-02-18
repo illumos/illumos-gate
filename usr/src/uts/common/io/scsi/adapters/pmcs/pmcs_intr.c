@@ -1534,6 +1534,16 @@ pmcs_check_intr_coal(void *arg)
 		ici->nsecs_between_intrs = 0;
 		ici->num_intrs = 0;
 		ici->num_io_completions = 0;
+
+		/*
+		 * If a firmware event log file is configured, check to see
+		 * if it needs to be written to the file.  We do this here
+		 * because writing to a file from a callout thread (i.e.
+		 * from the watchdog timer) can cause livelocks.
+		 */
+		if (pwp->fwlog_file) {
+			pmcs_gather_fwlog(pwp);
+		}
 	}
 
 	mutex_exit(&pwp->ict_lock);

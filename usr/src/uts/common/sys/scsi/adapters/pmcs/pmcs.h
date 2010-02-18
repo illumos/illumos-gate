@@ -38,6 +38,7 @@ extern "C" {
 #include <sys/modctl.h>
 #include <sys/pci.h>
 #include <sys/pcie.h>
+#include <sys/file.h>
 #include <sys/isa_defs.h>
 #include <sys/sunmdi.h>
 #include <sys/mdi_impldefs.h>
@@ -326,7 +327,8 @@ struct pmcs_hw {
 		resource_limited	: 1,
 		configuring		: 1,
 		ds_err_recovering	: 1,
-		quiesced		: 1;
+		quiesced		: 1,
+		fwlog_file		: 1;
 
 	/*
 	 * This HBA instance's iportmap and list of iport states.
@@ -464,10 +466,42 @@ struct pmcs_hw {
 	volatile uint8_t	scratch_locked;	/* Scratch area ownership */
 
 	/*
-	 * Firmware log pointer
+	 * Firmware info
+	 *
+	 * fwlogp: Pointer to block of memory mapped for the event logs
+	 * fwlogp_aap1: Pointer to the beginning of the AAP1 event log
+	 * fwlogp_iop: Pointer to the beginning of the IOP event log
+	 * fwaddr: The physical address of fwlogp
+	 *
+	 * fwlogfile_aap1/iop: Path to the saved AAP1/IOP event logs
+	 * fwlog_max_entries_aap1/iop: Max # of entries in each log
+	 * fwlog_oldest_idx_aap1/iop: Index of oldest entry in each log
+	 * fwlog_latest_idx_aap1/iop: Index of newest entry in each log
+	 * fwlog_threshold_aap1/iop: % full at which we save the event log
+	 * fwlog_findex_aap1/iop: Suffix to each event log's next filename
+	 *
+	 * Firmware event logs are written out to the filenames specified in
+	 * fwlogp_aap1/iop when the number of entries in the in-memory copy
+	 * reaches or exceeds the threshold value.  The filenames are suffixed
+	 * with .X where X is an integer ranging from 0 to 4.  This allows us
+	 * to save up to 5MB of event log data for each log.
 	 */
 	uint32_t	*fwlogp;
+	pmcs_fw_event_hdr_t *fwlogp_aap1;
+	pmcs_fw_event_hdr_t *fwlogp_iop;
 	uint64_t	fwaddr;
+	char		fwlogfile_aap1[MAXPATHLEN + 1];
+	uint32_t	fwlog_max_entries_aap1;
+	uint32_t	fwlog_oldest_idx_aap1;
+	uint32_t	fwlog_latest_idx_aap1;
+	uint32_t	fwlog_threshold_aap1;
+	uint32_t	fwlog_findex_aap1;
+	char		fwlogfile_iop[MAXPATHLEN + 1];
+	uint32_t	fwlog_max_entries_iop;
+	uint32_t	fwlog_oldest_idx_iop;
+	uint32_t	fwlog_latest_idx_iop;
+	uint32_t	fwlog_threshold_iop;
+	uint32_t	fwlog_findex_iop;
 
 	/*
 	 * Internal register dump region and flash chunk DMA info

@@ -423,6 +423,7 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	pmcs_phy_t *phyp;
 	uint32_t num_threads;
 	char buf[64];
+	char *fwl_file;
 
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -527,6 +528,23 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (pwp->fwlog > PMCS_FWLOG_MAX) {
 		pwp->fwlog = PMCS_FWLOG_MAX;
 	}
+	if ((ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, 0, "pmcs-fwlogfile",
+	    &fwl_file) == DDI_SUCCESS)) {
+		if (snprintf(pwp->fwlogfile_aap1, MAXPATHLEN, "%s%d-aap1.0",
+		    fwl_file, ddi_get_instance(dip)) > MAXPATHLEN) {
+			pwp->fwlogfile_aap1[0] = '\0';
+			pwp->fwlogfile_iop[0] = '\0';
+		} else if (snprintf(pwp->fwlogfile_iop, MAXPATHLEN,
+		    "%s%d-iop.0", fwl_file,
+		    ddi_get_instance(dip)) > MAXPATHLEN) {
+			pwp->fwlogfile_aap1[0] = '\0';
+			pwp->fwlogfile_iop[0] = '\0';
+		}
+		ddi_prop_free(fwl_file);
+	} else {
+		pwp->fwlogfile_aap1[0] = '\0';
+		pwp->fwlogfile_iop[0] = '\0';
+	}
 
 	mutex_enter(&pmcs_trace_lock);
 	if (pmcs_tbuf == NULL) {
@@ -545,6 +563,24 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		pmcs_tbuf_idx = 0;
 	}
 	mutex_exit(&pmcs_trace_lock);
+
+	if (pwp->fwlog && strlen(pwp->fwlogfile_aap1) > 0) {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: firmware event log files: %s, %s", __func__,
+		    pwp->fwlogfile_aap1, pwp->fwlogfile_iop);
+		pwp->fwlog_file = 1;
+	} else {
+		if (pwp->fwlog == 0) {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+			    "%s: No firmware event log will be written "
+			    "(event log disabled)", __func__);
+		} else {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+			    "%s: No firmware event log will be written "
+			    "(no filename configured - too long?)", __func__);
+		}
+		pwp->fwlog_file = 0;
+	}
 
 	disable_msix = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
 	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "pmcs-disable-msix",
@@ -707,6 +743,9 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			pwp->fwlog = 0;
 		} else {
 			bzero(pwp->fwlogp, PMCS_FWLOG_SIZE);
+			pwp->fwlogp_aap1 = (pmcs_fw_event_hdr_t *)pwp->fwlogp;
+			pwp->fwlogp_iop = (pmcs_fw_event_hdr_t *)((void *)
+			    ((caddr_t)pwp->fwlogp + (PMCS_FWLOG_SIZE / 2)));
 		}
 	}
 

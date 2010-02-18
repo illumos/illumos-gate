@@ -61,6 +61,8 @@ extern "C" {
  */
 #define	PMCS_FWLOG_SIZE		(2 << 20)
 #define	PMCS_FWLOG_MAX		5	/* maximum logging level */
+#define	PMCS_FWLOG_THRESH	75	/* Write to file when log this % full */
+
 #define	SATLSIZE		1024
 
 /*

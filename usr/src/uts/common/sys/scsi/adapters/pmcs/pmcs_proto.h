@@ -370,6 +370,11 @@ void pmcs_update_phy_pm_props(pmcs_phy_t *, uint64_t, uint64_t, boolean_t);
  */
 void pmcs_status_disposition(pmcs_phy_t *, uint32_t);
 
+/*
+ * Write out firmware event log (if configured to do so) if it's filled up
+ */
+void pmcs_gather_fwlog(pmcs_hw_t *);
+
 #ifdef	__cplusplus
 }
 #endif

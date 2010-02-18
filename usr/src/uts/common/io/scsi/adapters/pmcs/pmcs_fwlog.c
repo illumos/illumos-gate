@@ -43,6 +43,7 @@ static int pmcs_dump_gsm_addiregs(pmcs_hw_t *, caddr_t, uint32_t);
 static int pmcs_dump_hsst_sregs(pmcs_hw_t *, caddr_t, uint32_t);
 static int pmcs_dump_sspa_sregs(pmcs_hw_t *, caddr_t, uint32_t);
 static int pmcs_dump_fwlog(pmcs_hw_t *, caddr_t, uint32_t);
+static void pmcs_write_fwlog(pmcs_hw_t *, pmcs_fw_event_hdr_t *);
 
 /*
  * Dump internal registers. Used after a firmware crash.
@@ -1155,4 +1156,166 @@ pmcs_dump_feregs(pmcs_hw_t *pwp, uint32_t *addr, uint8_t nvmd,
 		    "%c", ptr[i + offset]);
 	}
 	return (i);
+}
+
+/*
+ * Write out either the AAP1 or IOP event log
+ */
+static void
+pmcs_write_fwlog(pmcs_hw_t *pwp, pmcs_fw_event_hdr_t *fwlogp)
+{
+	struct vnode *vnp;
+	caddr_t fwlogfile, bufp;
+	rlim64_t rlimit;
+	ssize_t resid;
+	offset_t offset = 0;
+	int error;
+	uint32_t data_len;
+
+	if (fwlogp == pwp->fwlogp_aap1) {
+		fwlogfile = pwp->fwlogfile_aap1;
+	} else {
+		fwlogfile = pwp->fwlogfile_iop;
+	}
+
+	if ((error = vn_open(fwlogfile, UIO_SYSSPACE, FCREAT|FWRITE, 0644,
+	    &vnp, CRCREAT, 0)) != 0) {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: Could not create '%s', error %d", __func__,
+		    fwlogfile, error);
+		return;
+	}
+
+	bufp = (caddr_t)fwlogp;
+	data_len = PMCS_FWLOG_SIZE / 2;
+	rlimit = data_len + 1;
+	for (;;) {
+		error = vn_rdwr(UIO_WRITE, vnp, bufp, data_len, offset,
+		    UIO_SYSSPACE, FSYNC, rlimit, CRED(), &resid);
+		if (error) {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+			    "%s: could not write %s, error %d", __func__,
+			    fwlogfile, error);
+			break;
+		}
+		if (resid == data_len) {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+			    "%s: Out of space in %s, error %d", __func__,
+			    fwlogfile, error);
+			error = ENOSPC;
+			break;
+		}
+		if (resid == 0)
+			break;
+		offset += (data_len - resid);
+		data_len = (ssize_t)resid;
+	}
+
+	if (error = VOP_CLOSE(vnp, FWRITE, 1, (offset_t)0, kcred, NULL)) {
+		if (!error) {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+			    "%s: Error on close %s, error %d", __func__,
+			    fwlogfile, error);
+		}
+	}
+
+	VN_RELE(vnp);
+}
+
+/*
+ * Check the in-memory event log.  If it's filled up to or beyond the
+ * threshold, write it out to the configured filename.
+ */
+void
+pmcs_gather_fwlog(pmcs_hw_t *pwp)
+{
+	uint32_t num_entries_aap1, num_entries_iop, fname_suffix;
+
+	ASSERT(!mutex_owned(&pwp->lock));
+
+	/*
+	 * Get our copies of the latest indices
+	 */
+	pwp->fwlog_latest_idx_aap1 = pwp->fwlogp_aap1->fw_el_latest_idx;
+	pwp->fwlog_latest_idx_iop = pwp->fwlogp_iop->fw_el_latest_idx;
+
+	/*
+	 * We need entries in the log before we can know how big they are
+	 */
+	if ((pwp->fwlog_max_entries_aap1 == 0) &&
+	    (pwp->fwlogp_aap1->fw_el_latest_idx != 0)) {
+		pwp->fwlog_max_entries_aap1 =
+		    (PMCS_FWLOG_SIZE / 2) / pwp->fwlogp_aap1->fw_el_entry_size;
+		pwp->fwlog_threshold_aap1 =
+		    (pwp->fwlog_max_entries_aap1 * PMCS_FWLOG_THRESH) / 100;
+	}
+
+	if ((pwp->fwlog_max_entries_iop == 0) &&
+	    (pwp->fwlogp_iop->fw_el_latest_idx != 0)) {
+		pwp->fwlog_max_entries_iop =
+		    (PMCS_FWLOG_SIZE / 2) / pwp->fwlogp_iop->fw_el_entry_size;
+		pwp->fwlog_threshold_iop =
+		    (pwp->fwlog_max_entries_iop * PMCS_FWLOG_THRESH) / 100;
+	}
+
+	/*
+	 * Check if we've reached the threshold in the AAP1 log.  We do this
+	 * by comparing the latest index with our copy of the oldest index
+	 * (not the chip's).
+	 */
+	if (pwp->fwlog_latest_idx_aap1 >= pwp->fwlog_oldest_idx_aap1) {
+		/* Log has not wrapped */
+		num_entries_aap1 =
+		    pwp->fwlog_latest_idx_aap1 - pwp->fwlog_oldest_idx_aap1;
+	} else {
+		/* Log has wrapped */
+		num_entries_aap1 = pwp->fwlog_max_entries_aap1 -
+		    (pwp->fwlog_oldest_idx_aap1 - pwp->fwlog_latest_idx_aap1);
+	}
+
+	/*
+	 * Now check the IOP log
+	 */
+	if (pwp->fwlog_latest_idx_iop >= pwp->fwlog_oldest_idx_iop) {
+		/* Log has not wrapped */
+		num_entries_iop = pwp->fwlog_latest_idx_iop -
+		    pwp->fwlog_oldest_idx_iop;
+	} else {
+		/* Log has wrapped */
+		num_entries_iop = pwp->fwlog_max_entries_iop -
+		    (pwp->fwlog_oldest_idx_iop - pwp->fwlog_latest_idx_iop);
+	}
+
+	if ((num_entries_aap1 < pwp->fwlog_threshold_aap1) &&
+	    (num_entries_iop < pwp->fwlog_threshold_iop)) {
+		return;
+	}
+
+	/*
+	 * Write out the necessary log file(s), update the "oldest" pointers
+	 * and the suffix to the written filenames.
+	 */
+	if (num_entries_aap1 >= pwp->fwlog_threshold_aap1) {
+		pmcs_write_fwlog(pwp, pwp->fwlogp_aap1);
+		pwp->fwlog_oldest_idx_aap1 = pwp->fwlog_latest_idx_aap1;
+
+		fname_suffix = strlen(pwp->fwlogfile_aap1) - 1;
+		if (pwp->fwlogfile_aap1[fname_suffix] == '4') {
+			pwp->fwlogfile_aap1[fname_suffix] = '0';
+		} else {
+			++pwp->fwlogfile_aap1[fname_suffix];
+		}
+	}
+
+	if (num_entries_iop >= pwp->fwlog_threshold_iop) {
+		pmcs_write_fwlog(pwp, pwp->fwlogp_iop);
+		pwp->fwlog_oldest_idx_iop = pwp->fwlog_latest_idx_iop;
+
+		fname_suffix = strlen(pwp->fwlogfile_iop) - 1;
+		if (pwp->fwlogfile_iop[fname_suffix] == '4') {
+			pwp->fwlogfile_iop[fname_suffix] = '0';
+		} else {
+			++pwp->fwlogfile_iop[fname_suffix];
+		}
+	}
 }
