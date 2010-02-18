@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -717,14 +717,20 @@ map_addr_proc(
 		 */
 		align_amount = ELF_386_MAXPGSZ;
 	} else {
-		int l = mmu.umax_page_level;
+		/*
+		 * For 32-bit processes, only those which have specified
+		 * MAP_ALIGN and an addr will be aligned on a larger page size.
+		 * Not doing so can potentially waste up to 1G of process
+		 * address space.
+		 */
+		int lvl = (p->p_model == DATAMODEL_ILP32) ? 1 :
+		    mmu.umax_page_level;
 
-		while (l && len < LEVEL_SIZE(l))
-			--l;
+		while (lvl && len < LEVEL_SIZE(lvl))
+			--lvl;
 
-		align_amount = LEVEL_SIZE(l);
+		align_amount = LEVEL_SIZE(lvl);
 	}
-
 	if ((flags & MAP_ALIGN) && ((uintptr_t)*addrp > align_amount))
 		align_amount = (uintptr_t)*addrp;
 
