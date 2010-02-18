@@ -6162,6 +6162,7 @@ ip_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 	 * connp->conn_cred is crfree()ed in ipcl_conn_destroy()
 	 */
 	connp->conn_cred = credp;
+	connp->conn_cpid = curproc->p_pid;
 	/* Cache things in ixa without an extra refhold */
 	connp->conn_ixa->ixa_cred = connp->conn_cred;
 	connp->conn_ixa->ixa_cpid = connp->conn_cpid;

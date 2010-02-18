@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -1073,15 +1073,15 @@ ixa_cleanup(ip_xmit_attr_t *ixa)
 	if (ixa->ixa_free_flags & IXA_FREE_TSL) {
 		ASSERT(ixa->ixa_tsl != NULL);
 		label_rele(ixa->ixa_tsl);
-		ixa->ixa_tsl = NULL;
 		ixa->ixa_free_flags &= ~IXA_FREE_TSL;
 	}
+	ixa->ixa_tsl = NULL;
 	if (ixa->ixa_free_flags & IXA_FREE_CRED) {
 		ASSERT(ixa->ixa_cred != NULL);
 		crfree(ixa->ixa_cred);
-		ixa->ixa_cred = NULL;
 		ixa->ixa_free_flags &= ~IXA_FREE_CRED;
 	}
+	ixa->ixa_cred = NULL;
 	ixa->ixa_src_preferences = 0;
 	ixa->ixa_ifindex = 0;
 	ixa->ixa_multicast_ifindex = 0;

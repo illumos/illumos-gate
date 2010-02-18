@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -641,6 +641,7 @@ ipcl_conn_destroy(conn_t *connp)
 	if (connp->conn_cred != NULL) {
 		crfree(connp->conn_cred);
 		connp->conn_cred = NULL;
+		/* ixa_cred done in ipcl_conn_cleanup below */
 	}
 
 	if (connp->conn_ht_iphc != NULL) {

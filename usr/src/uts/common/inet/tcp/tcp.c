@@ -2412,6 +2412,7 @@ tcp_accept_swap(tcp_t *listener, tcp_t *acceptor, tcp_t *eager)
 	if (econnp->conn_cred != NULL)
 		crfree(econnp->conn_cred);
 	econnp->conn_cred = aconnp->conn_cred;
+	econnp->conn_ixa->ixa_cred = econnp->conn_cred;
 	aconnp->conn_cred = NULL;
 	econnp->conn_cpid = aconnp->conn_cpid;
 	ASSERT(econnp->conn_netstack == aconnp->conn_netstack);
@@ -6542,6 +6543,7 @@ tcp_reinit(tcp_t *tcp)
 	 */
 	tcp_reinit_values(tcp);
 	ipcl_hash_remove(connp);
+	/* Note that ixa_cred gets cleared in ixa_cleanup */
 	ixa_cleanup(connp->conn_ixa);
 	tcp_ipsec_cleanup(tcp);
 
@@ -7881,6 +7883,10 @@ tcp_create_common(cred_t *credp, boolean_t isv6, boolean_t issocket,
 	connp->conn_cred = credp;
 	connp->conn_cpid = curproc->p_pid;
 	connp->conn_open_time = ddi_get_lbolt64();
+
+	/* Cache things in the ixa without any refhold */
+	connp->conn_ixa->ixa_cred = credp;
+	connp->conn_ixa->ixa_cpid = connp->conn_cpid;
 
 	connp->conn_zoneid = zoneid;
 	/* conn_allzones can not be set this early, hence no IPCL_ZONEID */
