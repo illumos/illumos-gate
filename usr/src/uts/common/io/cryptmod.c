@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * STREAMS Crypto Module
@@ -1760,6 +1760,8 @@ arcfour_hmac_md5_decrypt(queue_t *q, struct tmodinfo *tmi, mblk_t *mp,
 	uchar_t saltdata[CRYPT_ARCFOUR_KEYBYTES];
 	crypto_mechanism_t mech;
 	int usage;
+
+	bzero(&indata, sizeof (indata));
 
 	/* The usage constant is 1026 for all "old" rcmd mode operations */
 	if (tmi->dec_data.option_mask & CRYPTOPT_RCMD_MODE_V1)
