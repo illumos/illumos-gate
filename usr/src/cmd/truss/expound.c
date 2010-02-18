@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -251,7 +251,7 @@ show_utimens(private_t *pri, long offset)
 	else if (utimbuf.mtime.tv_nsec == UTIME_NOW)
 		(void) printf("%s\tmt = UTIME_NOW\n", pri->pname);
 	else
-		prtimestruc(pri, "mt = ", &utimbuf.atime);
+		prtimestruc(pri, "mt = ", &utimbuf.mtime);
 }
 
 void
