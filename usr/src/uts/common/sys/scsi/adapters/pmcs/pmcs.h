@@ -292,8 +292,22 @@ struct pmcs_hw {
 		STATE_PROBING,
 		STATE_RUNNING,
 		STATE_UNPROBING,
+		STATE_IN_RESET,
 		STATE_DEAD
 	} state;
+
+	/*
+	 * Last reason for a soft reset
+	 */
+	enum pwp_last_reset_reason {
+		PMCS_LAST_RST_UNINIT,
+		PMCS_LAST_RST_ATTACH,
+		PMCS_LAST_RST_FW_UPGRADE,
+		PMCS_LAST_RST_FATAL_ERROR,
+		PMCS_LAST_RST_STALL,
+		PMCS_LAST_RST_QUIESCE,
+		PMCS_LAST_RST_DETACH
+	} last_reset_reason;
 
 	uint32_t
 		fw_disable_update	: 1,
@@ -311,7 +325,8 @@ struct pmcs_hw {
 		physpeed		: 3,
 		resource_limited	: 1,
 		configuring		: 1,
-		ds_err_recovering	: 1;
+		ds_err_recovering	: 1,
+		quiesced		: 1;
 
 	/*
 	 * This HBA instance's iportmap and list of iport states.
@@ -406,6 +421,7 @@ struct pmcs_hw {
 	 * memory and update the card as needed.
 	 */
 	uint32_t	shadow_iqpi[PMCS_MAX_IQ];
+	uint32_t	last_iqci[PMCS_MAX_IQ];
 	uint32_t	iqpi_offset[PMCS_MAX_IQ];
 	uint32_t	*iqp[PMCS_MAX_IQ];
 	kmutex_t	iqp_lock[PMCS_NIQ];
@@ -462,6 +478,12 @@ struct pmcs_hw {
 	uint64_t	flash_chunk_addr;
 
 	/*
+	 * Copies of the last read MSGU and IOP heartbeats.
+	 */
+	uint32_t	last_msgu_tick;
+	uint32_t	last_iop_tick;
+
+	/*
 	 * Card information, some determined during MPI setup
 	 */
 	uint32_t	fw;		/* firmware version */
@@ -473,6 +495,12 @@ struct pmcs_hw {
 	uint16_t	max_dev;	/* max number of devices supported */
 	uint16_t	last_wq_dev;	/* last dev whose wq was serviced */
 
+	/*
+	 * Counter for the number of times watchdog fires.  We can use this
+	 * to throttle events which fire off of the watchdog, such as the
+	 * forward progress detection routine.
+	 */
+	uint8_t		watchdog_count;
 
 	/*
 	 * Interrupt Setup stuff.

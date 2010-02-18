@@ -1423,6 +1423,11 @@ pmcs_soft_reset(pmcs_hw_t *pwp, boolean_t no_restart)
 	pwp->blocked = 1;
 
 	/*
+	 * Clear our softstate copies of the MSGU and IOP heartbeats.
+	 */
+	pwp->last_msgu_tick = pwp->last_iop_tick = 0;
+
+	/*
 	 * Step 1
 	 */
 	s2 = pmcs_rd_msgunit(pwp, PMCS_MSGU_SCRATCH2);
@@ -1653,6 +1658,29 @@ pmcs_soft_reset(pmcs_hw_t *pwp, boolean_t no_restart)
 		return (-1);
 	}
 
+	/* Clear the firmware log */
+	if (pwp->fwlogp) {
+		bzero(pwp->fwlogp, PMCS_FWLOG_SIZE);
+	}
+
+	/* Reset our queue indices and entries */
+	bzero(pwp->shadow_iqpi, sizeof (pwp->shadow_iqpi));
+	bzero(pwp->last_iqci, sizeof (pwp->last_iqci));
+	for (i = 0; i < PMCS_NIQ; i++) {
+		if (pwp->iqp[i]) {
+			bzero(pwp->iqp[i], PMCS_QENTRY_SIZE * pwp->ioq_depth);
+			pmcs_wr_iqpi(pwp, i, 0);
+			pmcs_wr_iqci(pwp, i, 0);
+		}
+	}
+	for (i = 0; i < PMCS_NOQ; i++) {
+		if (pwp->oqp[i]) {
+			bzero(pwp->oqp[i], PMCS_QENTRY_SIZE * pwp->ioq_depth);
+			pmcs_wr_oqpi(pwp, i, 0);
+			pmcs_wr_oqci(pwp, i, 0);
+		}
+
+	}
 
 	if (pwp->state == STATE_DEAD || pwp->state == STATE_UNPROBING ||
 	    pwp->state == STATE_PROBING || pwp->locks_initted == 0) {
@@ -1673,18 +1701,8 @@ pmcs_soft_reset(pmcs_hw_t *pwp, boolean_t no_restart)
 	ASSERT(pwp->locks_initted != 0);
 
 	/*
-	 * Clean up various soft state.
+	 * Flush the target queues and clear each target's PHY
 	 */
-	bzero(pwp->ports, sizeof (pwp->ports));
-
-	pmcs_free_all_phys(pwp, pwp->root_phys);
-
-	for (pptr = pwp->root_phys; pptr; pptr = pptr->sibling) {
-		pmcs_lock_phy(pptr);
-		pmcs_clear_phy(pwp, pptr);
-		pmcs_unlock_phy(pptr);
-	}
-
 	if (pwp->targets) {
 		for (i = 0; i < pwp->max_dev; i++) {
 			pmcs_xscsi_t *xp = pwp->targets[i];
@@ -1692,66 +1710,24 @@ pmcs_soft_reset(pmcs_hw_t *pwp, boolean_t no_restart)
 			if (xp == NULL) {
 				continue;
 			}
+
 			mutex_enter(&xp->statlock);
-			pmcs_clear_xp(pwp, xp);
+			pmcs_flush_target_queues(pwp, xp, PMCS_TGT_ALL_QUEUES);
+			xp->phy = NULL;
 			mutex_exit(&xp->statlock);
 		}
 	}
 
-	bzero(pwp->shadow_iqpi, sizeof (pwp->shadow_iqpi));
-	for (i = 0; i < PMCS_NIQ; i++) {
-		if (pwp->iqp[i]) {
-			bzero(pwp->iqp[i], PMCS_QENTRY_SIZE * pwp->ioq_depth);
-			pmcs_wr_iqpi(pwp, i, 0);
-			pmcs_wr_iqci(pwp, i, 0);
-		}
-	}
-	for (i = 0; i < PMCS_NOQ; i++) {
-		if (pwp->oqp[i]) {
-			bzero(pwp->oqp[i], PMCS_QENTRY_SIZE * pwp->ioq_depth);
-			pmcs_wr_oqpi(pwp, i, 0);
-			pmcs_wr_oqci(pwp, i, 0);
-		}
-
-	}
-	if (pwp->fwlogp) {
-		bzero(pwp->fwlogp, PMCS_FWLOG_SIZE);
-	}
-	STAILQ_INIT(&pwp->wf);
-	bzero(pwp->work, sizeof (pmcwork_t) * pwp->max_cmd);
-	for (i = 0; i < pwp->max_cmd - 1; i++) {
-		pmcwork_t *pwrk = &pwp->work[i];
-		STAILQ_INSERT_TAIL(&pwp->wf, pwrk, next);
-	}
-
 	/*
-	 * Clear out any leftover commands sitting in the work list
+	 * Zero out the ports list, free non root phys, clear root phys
 	 */
-	for (i = 0; i < pwp->max_cmd; i++) {
-		pmcwork_t *pwrk = &pwp->work[i];
-		mutex_enter(&pwrk->lock);
-		if (pwrk->state == PMCS_WORK_STATE_ONCHIP) {
-			switch (PMCS_TAG_TYPE(pwrk->htag)) {
-			case PMCS_TAG_TYPE_WAIT:
-				mutex_exit(&pwrk->lock);
-				break;
-			case PMCS_TAG_TYPE_CBACK:
-			case PMCS_TAG_TYPE_NONE:
-				pmcs_pwork(pwp, pwrk);
-				break;
-			default:
-				break;
-			}
-		} else if (pwrk->state == PMCS_WORK_STATE_IOCOMPQ) {
-			pwrk->dead = 1;
-			mutex_exit(&pwrk->lock);
-		} else {
-			/*
-			 * The other states of NIL, READY and INTR
-			 * should not be visible outside of a lock being held.
-			 */
-			pmcs_pwork(pwp, pwrk);
-		}
+	bzero(pwp->ports, sizeof (pwp->ports));
+	pmcs_free_all_phys(pwp, pwp->root_phys);
+	for (pptr = pwp->root_phys; pptr; pptr = pptr->sibling) {
+		pmcs_lock_phy(pptr);
+		pmcs_clear_phy(pwp, pptr);
+		pptr->target = NULL;
+		pmcs_unlock_phy(pptr);
 	}
 
 	/*
@@ -1760,7 +1736,6 @@ pmcs_soft_reset(pmcs_hw_t *pwp, boolean_t no_restart)
 	pmcs_wr_msgunit(pwp, PMCS_MSGU_OBDB_MASK, pwp->intr_mask);
 	pmcs_wr_msgunit(pwp, PMCS_MSGU_OBDB_CLEAR, 0xffffffff);
 
-	pwp->blocked = 0;
 	pwp->mpi_table_setup = 0;
 	mutex_exit(&pwp->lock);
 
@@ -1782,7 +1757,6 @@ pmcs_soft_reset(pmcs_hw_t *pwp, boolean_t no_restart)
 	}
 
 	mutex_enter(&pwp->lock);
-	pwp->blocked = 0;
 	SCHEDULE_WORK(pwp, PMCS_WORK_RUN_QUEUES);
 	mutex_exit(&pwp->lock);
 
@@ -1804,6 +1778,80 @@ fail_restart:
 	pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL,
 	    "%s: Failed: %s", __func__, msg);
 	return (-1);
+}
+
+
+/*
+ * Perform a 'hot' reset, which will soft reset the chip and
+ * restore the state back to pre-reset context. Called with pwp
+ * lock held.
+ */
+int
+pmcs_hot_reset(pmcs_hw_t *pwp)
+{
+	pmcs_iport_t	*iport;
+
+	ASSERT(mutex_owned(&pwp->lock));
+	pwp->state = STATE_IN_RESET;
+
+	/*
+	 * For any iports on this HBA, report empty target sets and
+	 * then tear them down.
+	 */
+	rw_enter(&pwp->iports_lock, RW_READER);
+	for (iport = list_head(&pwp->iports); iport != NULL;
+	    iport = list_next(&pwp->iports, iport)) {
+		mutex_enter(&iport->lock);
+		(void) scsi_hba_tgtmap_set_begin(iport->iss_tgtmap);
+		(void) scsi_hba_tgtmap_set_end(iport->iss_tgtmap, 0);
+		pmcs_iport_teardown_phys(iport);
+		mutex_exit(&iport->lock);
+	}
+	rw_exit(&pwp->iports_lock);
+
+	/* Grab a register dump, in the event that reset fails */
+	pmcs_register_dump_int(pwp);
+	mutex_exit(&pwp->lock);
+
+	/* Issue soft reset and clean up related softstate */
+	if (pmcs_soft_reset(pwp, B_FALSE)) {
+		/*
+		 * Disable interrupts, in case we got far enough along to
+		 * enable them, then fire off ereport and service impact.
+		 */
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: failed soft reset", __func__);
+		pmcs_wr_msgunit(pwp, PMCS_MSGU_OBDB_MASK, 0xffffffff);
+		pmcs_wr_msgunit(pwp, PMCS_MSGU_OBDB_CLEAR, 0xffffffff);
+		pmcs_fm_ereport(pwp, DDI_FM_DEVICE_NO_RESPONSE);
+		ddi_fm_service_impact(pwp->dip, DDI_SERVICE_LOST);
+		mutex_enter(&pwp->lock);
+		pwp->state = STATE_DEAD;
+		return (DDI_FAILURE);
+	}
+
+	mutex_enter(&pwp->lock);
+	pwp->state = STATE_RUNNING;
+	mutex_exit(&pwp->lock);
+
+	/*
+	 * Finally, restart the phys, which will bring the iports back
+	 * up and eventually result in discovery running.
+	 */
+	if (pmcs_start_phys(pwp)) {
+		/* We should be up and running now, so retry */
+		if (pmcs_start_phys(pwp)) {
+			/* Apparently unable to restart PHYs, fail */
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+			    "%s: failed to restart PHYs after soft reset",
+			    __func__);
+			mutex_enter(&pwp->lock);
+			return (DDI_FAILURE);
+		}
+	}
+
+	mutex_enter(&pwp->lock);
+	return (DDI_SUCCESS);
 }
 
 /*
@@ -1961,7 +2009,9 @@ pmcs_iport_tgtmap_destroy(pmcs_iport_t *iport)
 
 /*
  * Remove all phys from an iport's phymap and empty it's phylist.
- * Called when a port has been reset by the host (see pmcs_intr.c).
+ * Called when a port has been reset by the host (see pmcs_intr.c)
+ * or prior to issuing a soft reset if we detect a stall on the chip
+ * (see pmcs_attach.c).
  */
 void
 pmcs_iport_teardown_phys(pmcs_iport_t *iport)
@@ -1985,10 +2035,12 @@ pmcs_iport_teardown_phys(pmcs_iport_t *iport)
 
 	/* Remove all phys from the phymap */
 	phys = sas_phymap_ua2phys(pwp->hss_phymap, iport->ua);
-	while ((phynum = sas_phymap_phys_next(phys)) != -1) {
-		(void) sas_phymap_phy_rem(pwp->hss_phymap, phynum);
+	if (phys) {
+		while ((phynum = sas_phymap_phys_next(phys)) != -1) {
+			(void) sas_phymap_phy_rem(pwp->hss_phymap, phynum);
+		}
+		sas_phymap_phys_free(phys);
 	}
-	sas_phymap_phys_free(phys);
 }
 
 /*
@@ -2020,6 +2072,7 @@ pmcs_iport_configure_phys(pmcs_iport_t *iport)
 	 */
 	ASSERT(list_is_empty(&iport->phys));
 	phys = sas_phymap_ua2phys(pwp->hss_phymap, iport->ua);
+	ASSERT(phys != NULL);
 	while ((phynum = sas_phymap_phys_next(phys)) != -1) {
 		/* Grab the phy pointer from root_phys */
 		pptr = pwp->root_phys + phynum;
@@ -2316,6 +2369,7 @@ pmcs_discover(pmcs_hw_t *pwp)
 {
 	pmcs_phy_t		*pptr;
 	pmcs_phy_t		*root_phy;
+	int			phymap_active;
 
 	DTRACE_PROBE2(pmcs__discover__entry, ulong_t, pwp->work_flags,
 	    boolean_t, pwp->config_changed);
@@ -2335,6 +2389,7 @@ pmcs_discover(pmcs_hw_t *pwp)
 		return;
 	}
 
+	phymap_active = pwp->phymap_active;
 	mutex_exit(&pwp->lock);
 
 	/*
@@ -2346,6 +2401,14 @@ pmcs_discover(pmcs_hw_t *pwp)
 		rw_exit(&pwp->iports_lock);
 		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
 		    "%s: no iports attached, retry discovery", __func__);
+		SCHEDULE_WORK(pwp, PMCS_WORK_DISCOVER);
+		return;
+	}
+	if (pwp->num_iports != phymap_active) {
+		rw_exit(&pwp->iports_lock);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
+		    "%s: phymaps or iport maps not stable; retry discovery",
+		    __func__);
 		SCHEDULE_WORK(pwp, PMCS_WORK_DISCOVER);
 		return;
 	}
@@ -2491,6 +2554,9 @@ out:
 	}
 
 	pmcs_release_scratch(pwp);
+	if (!pwp->quiesced) {
+		pwp->blocked = 0;
+	}
 	pwp->configuring = 0;
 	mutex_exit(&pwp->config_lock);
 
@@ -7772,8 +7838,8 @@ pmcs_remove_phy_from_iport(pmcs_iport_t *iport, pmcs_phy_t *phyp)
 			next_pptr = list_next(&iport->phys, pptr);
 			mutex_enter(&pptr->phy_lock);
 			pptr->iport = NULL;
-			pmcs_update_phy_pm_props(phyp, phyp->att_port_pm_tmp,
-			    phyp->tgt_port_pm_tmp, B_FALSE);
+			pmcs_update_phy_pm_props(pptr, pptr->att_port_pm_tmp,
+			    pptr->tgt_port_pm_tmp, B_FALSE);
 			mutex_exit(&pptr->phy_lock);
 			pmcs_rele_iport(iport);
 			list_remove(&iport->phys, pptr);
@@ -7867,8 +7933,6 @@ void
 pmcs_smp_release(pmcs_iport_t *iport)
 {
 	if (iport == NULL) {
-		pmcs_prt(iport->pwp, PMCS_PRT_DEBUG_IPORT, NULL, NULL,
-		    "%s: iport is NULL...", __func__);
 		return;
 	}
 
@@ -8003,19 +8067,34 @@ pmcs_tgtmap_activate_cb(void *tgtmap_priv, char *tgt_addr,
     scsi_tgtmap_tgt_type_t tgt_type, void **tgt_privp)
 {
 	pmcs_iport_t *iport = (pmcs_iport_t *)tgtmap_priv;
+	pmcs_hw_t *pwp = iport->pwp;
+	pmcs_xscsi_t *target;
 
-	pmcs_prt(iport->pwp, PMCS_PRT_DEBUG_IPORT, NULL, NULL,
-	    "%s: called for iport%d/%s(%d)", __func__,
-	    ddi_get_instance(iport->dip), tgt_addr, tgt_type);
+	/*
+	 * Look up the target.  If there is one, and it doesn't have a PHY
+	 * pointer, re-establish that linkage here.
+	 */
+	mutex_enter(&pwp->lock);
+	target = pmcs_get_target(iport, tgt_addr, B_FALSE);
+	mutex_exit(&pwp->lock);
+
+	/*
+	 * If we got a target, it will now have a PHY pointer and the PHY
+	 * will point to the target.  The PHY will be locked, so we'll need
+	 * to unlock it.
+	 */
+	if (target) {
+		pmcs_unlock_phy(target->phy);
+	}
 
 	/*
 	 * Update config_restart_time so we don't try to restart discovery
 	 * while enumeration is still in progress.
 	 */
-	mutex_enter(&iport->pwp->config_lock);
-	iport->pwp->config_restart_time = ddi_get_lbolt() +
+	mutex_enter(&pwp->config_lock);
+	pwp->config_restart_time = ddi_get_lbolt() +
 	    drv_usectohz(PMCS_REDISCOVERY_DELAY);
-	mutex_exit(&iport->pwp->config_lock);
+	mutex_exit(&pwp->config_lock);
 }
 
 /* ARGSUSED */

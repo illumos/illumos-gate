@@ -225,7 +225,7 @@ pmcs_scsa_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	/*
 	 * See if there's already a target softstate.  If not, allocate one.
 	 */
-	tgt = pmcs_get_target(iport, tgt_port);
+	tgt = pmcs_get_target(iport, tgt_port, B_TRUE);
 
 	if (tgt == NULL) {
 		goto tgt_init_fail;
@@ -435,7 +435,6 @@ pmcs_scsa_tran_tgt_free(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	pwp = ITRAN2PMC(tran);
 	mutex_enter(&pwp->lock);
 	mutex_enter(&target->statlock);
-	ASSERT(target->phy);
 	phyp = target->phy;
 
 	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, phyp, target,
@@ -1239,7 +1238,7 @@ pmcs_smp_init(dev_info_t *self, dev_info_t *child,
 	mutex_enter(&pwp->lock);
 
 	/* Retrieve softstate using unit-address */
-	tgt = pmcs_get_target(iport, tgt_port);
+	tgt = pmcs_get_target(iport, tgt_port, B_TRUE);
 	if (tgt == NULL) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: tgt softstate not found", __func__);
@@ -1410,8 +1409,10 @@ pmcs_smp_free(dev_info_t *self, dev_info_t *child,
 		    (void *)tgt, tgt->target_num);
 		pwp->targets[tgt->target_num] = NULL;
 		tgt->target_num = PMCS_INVALID_TARGET_NUM;
-		tgt->phy->target = NULL;
-		tgt->phy = NULL;
+		if (tgt->phy) {
+			tgt->phy->target = NULL;
+			tgt->phy = NULL;
+		}
 		pmcs_destroy_target(tgt);
 	} else {
 		mutex_exit(&tgt->statlock);
@@ -1442,7 +1443,7 @@ pmcs_scsi_quiesce(dev_info_t *dip)
 	}
 
 	pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL, "%s called", __func__);
-	pwp->blocked = 1;
+	pwp->quiesced = pwp->blocked = 1;
 	while (totactive) {
 		totactive = 0;
 		for (target = 0; target < pwp->max_dev; target++) {
@@ -1502,7 +1503,7 @@ pmcs_scsi_unquiesce(dev_info_t *dip)
 		return (-1);
 	}
 	pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL, "%s called", __func__);
-	pwp->blocked = 0;
+	pwp->blocked = pwp->quiesced = 0;
 	mutex_exit(&pwp->lock);
 
 	/*
@@ -2161,7 +2162,6 @@ pmcs_SAS_done(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *msg)
 	}
 
 out:
-	pmcs_pwork(pwp, pwrk);
 	pmcs_dma_unload(pwp, sp);
 
 	/*
@@ -2175,6 +2175,17 @@ out:
 	mutex_enter(&xp->statlock);
 
 	/*
+	 * If the device no longer has a PHY pointer, clear the PHY pointer
+	 * from the work structure before we free it.  Otherwise, pmcs_pwork
+	 * may decrement the ref_count on a PHY that's been freed.
+	 */
+	if (xp->phy == NULL) {
+		pwrk->phy = NULL;
+	}
+
+	pmcs_pwork(pwp, pwrk);
+
+	/*
 	 * If the device is gone, we only put this command on the completion
 	 * queue if the work structure is not marked dead.  If it's marked
 	 * dead, it will already have been put there.
@@ -2185,7 +2196,7 @@ out:
 			mutex_enter(&xp->aqlock);
 			STAILQ_REMOVE(&xp->aq, sp, pmcs_cmd, cmd_next);
 			mutex_exit(&xp->aqlock);
-			pmcs_prt(pwp, PMCS_PRT_DEBUG1, pptr, xp,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG3, pptr, xp,
 			    "%s: Removing cmd 0x%p (htag 0x%x) from aq",
 			    __func__, (void *)sp, sp->cmd_tag);
 			mutex_enter(&pwp->cq_lock);
@@ -2220,7 +2231,7 @@ out:
 #else
 		mutex_enter(&xp->aqlock);
 #endif
-		pmcs_prt(pwp, PMCS_PRT_DEBUG1, pptr, xp,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG3, pptr, xp,
 		    "%s: Removing cmd 0x%p (htag 0x%x) from aq", __func__,
 		    (void *)sp, sp->cmd_tag);
 		STAILQ_REMOVE(&xp->aq, sp, pmcs_cmd, cmd_next);
@@ -2633,7 +2644,6 @@ pmcs_SATA_done(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *msg)
 	}
 
 out:
-	pmcs_pwork(pwp, pwrk);
 	pmcs_dma_unload(pwp, sp);
 
 	/*
@@ -2647,13 +2657,24 @@ out:
 	mutex_enter(&xp->statlock);
 	xp->tagmap &= ~(1 << sp->cmd_satltag);
 
+	/*
+	 * If the device no longer has a PHY pointer, clear the PHY pointer
+	 * from the work structure before we free it.  Otherwise, pmcs_pwork
+	 * may decrement the ref_count on a PHY that's been freed.
+	 */
+	if (xp->phy == NULL) {
+		pwrk->phy = NULL;
+	}
+
+	pmcs_pwork(pwp, pwrk);
+
 	if (xp->dev_gone) {
 		mutex_exit(&xp->statlock);
 		if (!dead) {
 			mutex_enter(&xp->aqlock);
 			STAILQ_REMOVE(&xp->aq, sp, pmcs_cmd, cmd_next);
 			mutex_exit(&xp->aqlock);
-			pmcs_prt(pwp, PMCS_PRT_DEBUG1, pptr, xp,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG3, pptr, xp,
 			    "%s: Removing cmd 0x%p (htag 0x%x) from aq",
 			    __func__, (void *)sp, sp->cmd_tag);
 			mutex_enter(&pwp->cq_lock);
@@ -3053,10 +3074,11 @@ pmcs_set_resid(struct scsi_pkt *pkt, size_t amt, uint32_t cdbamt)
 /*
  * Return the existing target softstate if there is one.  If there is,
  * the PHY is locked as well and that lock must be freed by the caller
- * after the target/PHY linkage is established.
+ * after the target/PHY linkage is established.  If there isn't one, and
+ * alloc_tgt is TRUE, then allocate one.
  */
 pmcs_xscsi_t *
-pmcs_get_target(pmcs_iport_t *iport, char *tgt_port)
+pmcs_get_target(pmcs_iport_t *iport, char *tgt_port, boolean_t alloc_tgt)
 {
 	pmcs_hw_t *pwp = iport->pwp;
 	pmcs_phy_t *phyp;
@@ -3104,6 +3126,14 @@ pmcs_get_target(pmcs_iport_t *iport, char *tgt_port)
 	if (phyp->iport != iport) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, phyp, NULL,
 		    "%s: No target at %s on this iport", __func__, tgt_port);
+		pmcs_unlock_phy(phyp);
+		return (NULL);
+	}
+
+	/*
+	 * If this was just a lookup (i.e. alloc_tgt is false), return now.
+	 */
+	if (alloc_tgt == B_FALSE) {
 		pmcs_unlock_phy(phyp);
 		return (NULL);
 	}

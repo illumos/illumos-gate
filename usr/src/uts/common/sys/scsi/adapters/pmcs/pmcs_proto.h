@@ -247,6 +247,11 @@ int pmcs_dump_feregs(pmcs_hw_t *, uint32_t *, uint8_t,
 int pmcs_soft_reset(pmcs_hw_t *, boolean_t);
 
 /*
+ * This is a hot reset which will attempt reconfiguration after reset.
+ */
+int pmcs_hot_reset(pmcs_hw_t *);
+
+/*
  * Some more reset functions
  */
 int pmcs_reset_dev(pmcs_hw_t *, pmcs_phy_t *, uint64_t);
@@ -340,7 +345,7 @@ void pmcs_dec_phy_ref_count(pmcs_phy_t *);
 void pmcs_worker(void *);
 
 pmcs_phy_t *pmcs_get_root_phy(pmcs_phy_t *);
-pmcs_xscsi_t *pmcs_get_target(pmcs_iport_t *, char *);
+pmcs_xscsi_t *pmcs_get_target(pmcs_iport_t *, char *, boolean_t);
 
 void pmcs_fatal_handler(pmcs_hw_t *);
 

@@ -895,6 +895,7 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (pmcs_soft_reset(pwp, B_FALSE)) {
 			goto failure;
 		}
+		pwp->last_reset_reason = PMCS_LAST_RST_ATTACH;
 	}
 
 	/*
@@ -1375,6 +1376,7 @@ pmcs_unattach(pmcs_hw_t *pwp)
 		 * Reset chip
 		 */
 		(void) pmcs_soft_reset(pwp, B_FALSE);
+		pwp->last_reset_reason = PMCS_LAST_RST_DETACH;
 	}
 
 	/*
@@ -1611,6 +1613,7 @@ pmcs_quiesce(dev_info_t *dip)
 	/* Stop MPI & Reset chip (no need to re-initialize) */
 	(void) pmcs_stop_mpi(pwp);
 	(void) pmcs_soft_reset(pwp, B_TRUE);
+	pwp->last_reset_reason = PMCS_LAST_RST_QUIESCE;
 
 	return (DDI_SUCCESS);
 }
@@ -1836,6 +1839,74 @@ pmcs_add_more_chunks(pmcs_hw_t *pwp, unsigned long nsize)
 	return (0);
 }
 
+static void
+pmcs_check_forward_progress(pmcs_hw_t *pwp)
+{
+	uint32_t	cur_iqci;
+	uint32_t	cur_msgu_tick;
+	uint32_t	cur_iop_tick;
+	int 		i;
+
+	mutex_enter(&pwp->lock);
+
+	if (pwp->state == STATE_IN_RESET) {
+		mutex_exit(&pwp->lock);
+		return;
+	}
+
+	/* Ensure that inbound work is getting picked up */
+	for (i = 0; i < PMCS_NIQ; i++) {
+		cur_iqci = pmcs_rd_iqci(pwp, i);
+		if (cur_iqci == pwp->shadow_iqpi[i]) {
+			pwp->last_iqci[i] = cur_iqci;
+			continue;
+		}
+		if (cur_iqci == pwp->last_iqci[i]) {
+			pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
+			    "Inbound Queue stall detected, issuing reset");
+			goto hot_reset;
+		}
+		pwp->last_iqci[i] = cur_iqci;
+	}
+
+	/* Check heartbeat on both the MSGU and IOP */
+	cur_msgu_tick = pmcs_rd_gst_tbl(pwp, PMCS_GST_MSGU_TICK);
+	if (cur_msgu_tick == pwp->last_msgu_tick) {
+		pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
+		    "Stall detected on MSGU, issuing reset");
+		goto hot_reset;
+	}
+	pwp->last_msgu_tick = cur_msgu_tick;
+
+	cur_iop_tick  = pmcs_rd_gst_tbl(pwp, PMCS_GST_IOP_TICK);
+	if (cur_iop_tick == pwp->last_iop_tick) {
+		pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
+		    "Stall detected on IOP, issuing reset");
+		goto hot_reset;
+	}
+	pwp->last_iop_tick = cur_iop_tick;
+
+	mutex_exit(&pwp->lock);
+	return;
+
+hot_reset:
+	pwp->state = STATE_DEAD;
+	/*
+	 * We've detected a stall. Attempt to recover service via hot
+	 * reset. In case of failure, pmcs_hot_reset() will handle the
+	 * failure and issue any required FM notifications.
+	 * See pmcs_subr.c for more details.
+	 */
+	if (pmcs_hot_reset(pwp)) {
+		pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL,
+		    "%s: hot reset failure", __func__);
+	} else {
+		pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL,
+		    "%s: hot reset complete", __func__);
+		pwp->last_reset_reason = PMCS_LAST_RST_STALL;
+	}
+	mutex_exit(&pwp->lock);
+}
 
 static void
 pmcs_check_commands(pmcs_hw_t *pwp)
@@ -2018,6 +2089,14 @@ pmcs_watchdog(void *arg)
 	    pwp->config_changed);
 
 	/*
+	 * Check forward progress on the chip
+	 */
+	if (++pwp->watchdog_count == PMCS_FWD_PROG_TRIGGER) {
+		pwp->watchdog_count = 0;
+		pmcs_check_forward_progress(pwp);
+	}
+
+	/*
 	 * Check to see if we need to kick discovery off again
 	 */
 	mutex_enter(&pwp->config_lock);
@@ -2032,7 +2111,6 @@ pmcs_watchdog(void *arg)
 	mutex_exit(&pwp->config_lock);
 
 	mutex_enter(&pwp->lock);
-
 	if (pwp->state != STATE_RUNNING) {
 		mutex_exit(&pwp->lock);
 		return;
@@ -2047,7 +2125,9 @@ pmcs_watchdog(void *arg)
 	}
 	pwp->wdhandle = timeout(pmcs_watchdog, pwp,
 	    drv_usectohz(PMCS_WATCH_INTERVAL));
+
 	mutex_exit(&pwp->lock);
+
 	pmcs_check_commands(pwp);
 	pmcs_handle_dead_phys(pwp);
 }
@@ -2570,18 +2650,24 @@ void
 pmcs_fatal_handler(pmcs_hw_t *pwp)
 {
 	pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL, "Fatal Interrupt caught");
+
 	mutex_enter(&pwp->lock);
 	pwp->state = STATE_DEAD;
-	pmcs_register_dump_int(pwp);
-	pmcs_wr_msgunit(pwp, PMCS_MSGU_OBDB_MASK, 0xffffffff);
-	pmcs_wr_msgunit(pwp, PMCS_MSGU_OBDB_CLEAR, 0xffffffff);
-	mutex_exit(&pwp->lock);
-	pmcs_fm_ereport(pwp, DDI_FM_DEVICE_NO_RESPONSE);
-	ddi_fm_service_impact(pwp->dip, DDI_SERVICE_LOST);
 
-#ifdef	DEBUG
-	cmn_err(CE_PANIC, "PMCS Fatal Firmware Error");
-#endif
+	/*
+	 * Attempt a hot reset. In case of failure, pmcs_hot_reset() will
+	 * handle the failure and issue any required FM notifications.
+	 * See pmcs_subr.c for more details.
+	 */
+	if (pmcs_hot_reset(pwp)) {
+		pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL,
+		    "%s: hot reset failure", __func__);
+	} else {
+		pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL,
+		    "%s: hot reset complete", __func__);
+		pwp->last_reset_reason = PMCS_LAST_RST_FATAL_ERROR;
+	}
+	mutex_exit(&pwp->lock);
 }
 
 /*

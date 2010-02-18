@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -215,6 +215,7 @@ pmcs_firmware_update(pmcs_hw_t *pwp)
 	} else {
 		pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
 		    "%s: Firmware successfully upgraded.", __func__);
+		pwp->last_reset_reason = PMCS_LAST_RST_FW_UPGRADE;
 	}
 	return (0);
 }

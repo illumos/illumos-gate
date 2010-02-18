@@ -2363,6 +2363,9 @@ pmcs_tag(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	case STATE_DEAD:
 		state_str = "Dead";
 		break;
+	case STATE_IN_RESET:
+		state_str = "In Reset";
+		break;
 	}
 
 	mdb_printf("%16p %9s %4d %1d %1d 0x%08x 0x%04x 0x%04x %16p\n", addr,
@@ -2536,6 +2539,9 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		break;
 	case STATE_DEAD:
 		state_str = "Dead";
+		break;
+	case STATE_IN_RESET:
+		state_str = "In Reset";
 		break;
 	}
 
