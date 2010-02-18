@@ -2830,6 +2830,16 @@ pmcs_report_iport_observations(pmcs_hw_t *pwp, pmcs_iport_t *iport,
 			goto next_phy;
 		}
 
+		/*
+		 * Validate the PHY's SAS address
+		 */
+		if (((lphyp->sas_address[0] & 0xf0) >> 4) != NAA_IEEE_REG) {
+			pmcs_prt(pwp, PMCS_PRT_ERR, lphyp, NULL,
+			    "PHY 0x%p (%s) has invalid SAS address; "
+			    "will not enumerate", (void *)lphyp, lphyp->path);
+			goto next_phy;
+		}
+
 		wwn = pmcs_barray2wwn(lphyp->sas_address);
 		ua = scsi_wwn_to_wwnstr(wwn, 1, NULL);
 
@@ -4189,6 +4199,9 @@ again:
 		case PMCOUT_STATUS_IO_XFER_OPEN_RETRY_TIMEOUT:
 			DFM(nag, "Open Retry Timeout");
 			/* FALLTHROUGH */
+		case PMCOUT_STATUS_IO_OPEN_CNX_ERROR_HW_RESOURCE_BUSY:
+			DFM(nag, "HW Resource Busy");
+			/* FALLTHROUGH */
 		case PMCOUT_STATUS_SMP_RESP_CONNECTION_ERROR:
 			DFM(nag, "Response Connection Error");
 			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
@@ -4425,6 +4438,9 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
 		case PMCOUT_STATUS_IO_XFER_OPEN_RETRY_TIMEOUT:
 			DFM(nag, "Open Retry Timeout");
 			/* FALLTHROUGH */
+		case PMCOUT_STATUS_IO_OPEN_CNX_ERROR_HW_RESOURCE_BUSY:
+			DFM(nag, "HW Resource Busy");
+			/* FALLTHROUGH */
 		case PMCOUT_STATUS_SMP_RESP_CONNECTION_ERROR:
 			DFM(nag, "Response Connection Error");
 			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
@@ -4577,7 +4593,7 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
 		 * use that for the SAS Address for this device.
 		 */
 		if (expander->tolerates_sas2 && pptr->dtype == SATA &&
-		    (roff[SAS_ATTACHED_NAME_OFFSET] >> 8) == 0x5) {
+		    (roff[SAS_ATTACHED_NAME_OFFSET] >> 8) == NAA_IEEE_REG) {
 			(void) memcpy(pptr->sas_address,
 			    &roff[SAS_ATTACHED_NAME_OFFSET], 8);
 		} else {
@@ -5521,6 +5537,8 @@ pmcs_status_str(uint32_t status)
 		return ("DEVICE STATE NON-OPERATIONAL");
 	case PMCOUT_STATUS_IO_DS_IN_RECOVERY:
 		return ("DEVICE STATE IN RECOVERY");
+	case PMCOUT_STATUS_IO_OPEN_CNX_ERROR_HW_RESOURCE_BUSY:
+		return ("OPEN CNX ERR HW RESOURCE BUSY");
 	default:
 		return (NULL);
 	}
@@ -5879,8 +5897,8 @@ pmcs_fis_dump(pmcs_hw_t *pwp, fis_t fis)
 		break;
 	default:
 		pmcs_prt(pwp, PMCS_PRT_INFO, NULL, NULL,
-		    "FIS: 0x%08x 0x%08x 0x%08x 0x%08x 0x%08x 0x%08x 0x%08x",
-		    fis[0], fis[1], fis[2], fis[3], fis[4], fis[5], fis[6]);
+		    "FIS: 0x%08x 0x%08x 0x%08x 0x%08x 0x%08x",
+		    fis[0], fis[1], fis[2], fis[3], fis[4]);
 		break;
 	}
 }

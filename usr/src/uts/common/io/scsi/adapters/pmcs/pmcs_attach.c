@@ -263,8 +263,7 @@ pmcs_iport_attach(dev_info_t *dip)
 
 	pwp = ddi_get_soft_state(pmcs_softc_state, hba_inst);
 	if (pwp == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
-		    "%s: iport%d attach invoked with NULL parent (HBA) node)",
+		cmn_err(CE_WARN, "%s: No HBA softstate for instance %d",
 		    __func__, inst);
 		return (DDI_FAILURE);
 	}

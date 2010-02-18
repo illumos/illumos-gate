@@ -3154,6 +3154,7 @@ pmcs_get_target(pmcs_iport_t *iport, char *tgt_port, boolean_t alloc_tgt)
 	}
 
 	tgt = ddi_soft_state_bystr_get(iport->tgt_sstate, unit_address);
+	ASSERT(tgt != NULL);
 	STAILQ_INIT(&tgt->wq);
 	STAILQ_INIT(&tgt->aq);
 	STAILQ_INIT(&tgt->sq);
