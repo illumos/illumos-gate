@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,11 +160,16 @@ extern void fastboot_load_kernel(char *); /* Load a new kernel */
 extern int fastboot_cksum_verify(fastboot_info_t *);
 
 /*
+ * Additional messages explaining why Fast Reboot is not
+ * supported.
+ */
+extern const char *fastreboot_nosup_message(void);
+/*
  * Fast reboot tunables
  */
 
 /* If set, the system is capable of fast reboot */
-extern int fastreboot_capable;
+extern int volatile fastreboot_capable;
 
 /*
  * If set, force fast reboot even if the system has

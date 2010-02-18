@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,7 +91,7 @@
 #include <sys/smp_impldefs.h>
 #include <sys/spl.h>
 
-#include <sys/fastboot.h>
+#include <sys/fastboot_impl.h>
 #include <sys/machelf.h>
 #include <sys/kobj.h>
 #include <sys/multiboot.h>
@@ -116,6 +116,15 @@ static x86pte_t ptp_bits = PT_VALID | PT_REF | PT_USER | PT_WRITABLE;
 static x86pte_t pte_bits =
     PT_VALID | PT_REF | PT_MOD | PT_NOCONSIST | PT_WRITABLE;
 static uint_t fastboot_shift_amt_pae[] = {12, 21, 30, 39};
+
+/* Index into Fast Reboot not supported message array */
+static uint32_t fastreboot_nosup_id = FBNS_DEFAULT;
+
+/* Fast Reboot not supported message array */
+static const char * const fastreboot_nosup_desc[FBNS_END] = {
+#define	fastboot_nosup_msg(id, str)	str,
+#include <sys/fastboot_msg.h>
+};
 
 int fastboot_debug = 0;
 int fastboot_contig = 0;
@@ -1477,11 +1486,12 @@ fastboot_update_config(const char *mdep)
 }
 
 /*
- * This is the interface to be called by other kernel components to
- * disable fastreboot_onpanic.
+ * This is an internal interface to disable Fast Reboot on Panic.
+ * It frees up memory allocated for the backup kernel and sets
+ * fastreboot_onpanic to zero.
  */
-void
-fastreboot_disable()
+static void
+fastreboot_onpanic_disable(void)
 {
 	uint8_t boot_config = (uint8_t)(~UA_FASTREBOOT_ONPANIC);
 	fastboot_update_config((const char *)&boot_config);
@@ -1491,14 +1501,62 @@ fastreboot_disable()
  * This is the interface to be called by fm_panic() in case FMA has diagnosed
  * a terminal machine check exception.  It does not free up memory allocated
  * for the backup kernel.  General disabling fastreboot_onpanic in a
- * non-panicking situation must go through fastboot_update_config().
+ * non-panicking situation must go through fastboot_onpanic_disable().
  */
 void
-fastreboot_disable_highpil()
+fastreboot_disable_highpil(void)
 {
 	fastreboot_onpanic = 0;
 }
 
+/*
+ * This is an internal interface to disable Fast Reboot by Default.
+ * It does not free up memory allocated for the backup kernel.
+ */
+static void
+fastreboot_capable_disable(uint32_t msgid)
+{
+	if (fastreboot_capable != 0) {
+		fastreboot_capable = 0;
+		if (msgid < sizeof (fastreboot_nosup_desc) /
+		    sizeof (fastreboot_nosup_desc[0]))
+			fastreboot_nosup_id = msgid;
+		else
+			fastreboot_nosup_id = FBNS_DEFAULT;
+	}
+}
+
+/*
+ * This is the kernel interface for disabling
+ * Fast Reboot by Default and Fast Reboot on Panic.
+ * Frees up memory allocated for the backup kernel.
+ * General disabling of the Fast Reboot by Default feature should be done
+ * via the userland interface scf_fastreboot_default_set_transient().
+ */
+void
+fastreboot_disable(uint32_t msgid)
+{
+	fastreboot_capable_disable(msgid);
+	fastreboot_onpanic_disable();
+}
+
+/*
+ * Returns Fast Reboot not support message for fastreboot_nosup_id.
+ * If fastreboot_nosup_id contains invalid index, default
+ * Fast Reboot not support message is returned.
+ */
+const char *
+fastreboot_nosup_message(void)
+{
+	uint32_t msgid;
+
+	msgid = fastreboot_nosup_id;
+	if (msgid >= sizeof (fastreboot_nosup_desc) /
+	    sizeof (fastreboot_nosup_desc[0]))
+		msgid = FBNS_DEFAULT;
+
+	return (fastreboot_nosup_desc[msgid]);
+}
 
 /*
  * A simplified interface for uadmin to call to update the configuration
@@ -1513,7 +1571,7 @@ fastboot_update_and_load(int fcn, char *mdep)
 		 * or uadmin(1M) was invoked with other functions,
 		 * don't try to fast reboot after dumping.
 		 */
-		fastreboot_disable();
+		fastreboot_onpanic_disable();
 	}
 
 	mutex_enter(&fastreboot_config_mutex);

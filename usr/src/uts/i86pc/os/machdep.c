@@ -360,7 +360,8 @@ mdpreboot(int cmd, int fcn, char *mdep)
 		cmn_err(CE_WARN, "Fast reboot is not supported on xVM");
 #else
 		cmn_err(CE_WARN,
-		    "Fast reboot is not supported on this platform");
+		    "Fast reboot is not supported on this platform%s",
+		    fastreboot_nosup_message());
 #endif
 	}
 

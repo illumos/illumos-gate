@@ -127,9 +127,9 @@ int force_fastreboot = 0;
 volatile int fastreboot_onpanic = 0;
 int post_fastreboot = 0;
 #ifdef	__xpv
-int fastreboot_capable = 0;
+volatile int fastreboot_capable = 0;
 #else
-int fastreboot_capable = 1;
+volatile int fastreboot_capable = 1;
 #endif
 
 /*
