@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -880,12 +880,18 @@ main(int argc, char **argv)
 		    meta_print_hrtime(0));
 
 		/*
-		 * Does local set exist? If not, exit with 0
-		 * since there's no reason to have this node panic if
-		 * the local set cannot be started.
+		 * With multinode disksets configured we need to
+		 * update all replicas on all cluster nodes to have
+		 * the same status. If local replicas on a cluster
+		 * node are not accessible we need to panic this
+		 * node, otherwise we abort in the reconfig cycle
+		 * and failfast/reboot the "good" cluster node too.
+		 * To avoid a total cluster outage in the above case
+		 * we panic only the failing node via md_exit(.., 1).
 		 */
 		if ((local_sp = load_local_set(ep)) == NULL) {
-			md_exit(local_sp, 0);
+			/* panic the node */
+			md_exit(local_sp, 1);
 		}
 
 		if ((max_sets = get_max_sets(ep)) == 0) {
