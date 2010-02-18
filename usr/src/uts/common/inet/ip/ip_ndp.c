@@ -165,8 +165,8 @@ extern kmem_cache_t *nce_cache;
  * the probe is sent on the ncec_ill (in the non-IPMP case) or the
  * IPMP cast_ill (in the IPMP case).
  *
- * Note that the probe interval is based on ncec->ncec_ill which
- * may be the ipmp_ill.
+ * Note that the probe interval is based on the src_ill for IPv6, and
+ * the ncec_xmit_interval for IPv4.
  */
 static void
 nce_dad(ncec_t *ncec, ill_t *src_ill, boolean_t send_probe)
@@ -180,7 +180,7 @@ nce_dad(ncec_t *ncec, ill_t *src_ill, boolean_t send_probe)
 		dropped = ndp_xmit(src_ill, ND_NEIGHBOR_SOLICIT,
 		    ncec->ncec_lladdr, ncec->ncec_lladdr_length,
 		    &ipv6_all_zeros, &ncec->ncec_addr, NDP_PROBE);
-		probe_interval = ILL_PROBE_INTERVAL(ncec->ncec_ill);
+		probe_interval = ILL_PROBE_INTERVAL(src_ill);
 	} else {
 		/* IPv4 DAD delay the initial probe. */
 		if (send_probe)
@@ -4464,8 +4464,17 @@ nce_add_common(ill_t *ill, uchar_t *hw_addr, uint_t hw_addr_len,
 		 */
 		ASSERT(IN6_IS_ADDR_V4MAPPED(addr));
 		IN6_V4MAPPED_TO_IPADDR(addr, addr4);
-		if (ill->ill_note_link && !IS_IPV4_LL_SPACE(&addr4))
+		if (ill->ill_note_link && !IS_IPV4_LL_SPACE(&addr4)) {
 			fastprobe = B_TRUE;
+		} else if (IS_IPMP(ill) && NCE_PUBLISH(ncec) &&
+		    !IS_IPV4_LL_SPACE(&addr4)) {
+			ill_t *hwaddr_ill;
+
+			hwaddr_ill = ipmp_illgrp_find_ill(ill->ill_grp, hw_addr,
+			    hw_addr_len);
+			if (hwaddr_ill != NULL && hwaddr_ill->ill_note_link)
+				fastprobe = B_TRUE;
+		}
 		if (fastprobe) {
 			ncec->ncec_xmit_interval =
 			    ipst->ips_arp_fastprobe_interval;

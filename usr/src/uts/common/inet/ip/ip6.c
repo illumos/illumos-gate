@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -2004,8 +2004,8 @@ ip_set_destination_v6(in6_addr_t *src_addrp, const in6_addr_t *dst_addr,
 	 * a "hidden" route (i.e., going through a specific under_ill)
 	 * if ixa_ifindex has been specified.
 	 */
-	ire = ip_select_route_v6(firsthop, ixa, &generation, &setsrc, &error,
-	    &multirt);
+	ire = ip_select_route_v6(firsthop, *src_addrp, ixa, &generation,
+	    &setsrc, &error, &multirt);
 	ASSERT(ire != NULL);	/* IRE_NOROUTE if none found */
 	if (error != 0)
 		goto bad_addr;

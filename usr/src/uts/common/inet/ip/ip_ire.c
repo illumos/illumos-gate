@@ -1856,7 +1856,7 @@ ire_match_args(ire_t *ire, ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 
 	ASSERT(ire->ire_ipversion == IPV4_VERSION);
 	ASSERT((ire->ire_addr & ~ire->ire_mask) == 0);
-	ASSERT((!(match_flags & MATCH_IRE_ILL)) ||
+	ASSERT((!(match_flags & (MATCH_IRE_ILL|MATCH_IRE_SRC_ILL))) ||
 	    (ill != NULL && !ill->ill_isv6));
 
 	/*
@@ -1936,7 +1936,7 @@ ire_match_args(ire_t *ire, ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 			}
 		}
 		/*
-		 * For exampe, with
+		 * For example, with
 		 * route add 11.0.0.0 gw1 -ifp bge0
 		 * route add 11.0.0.0 gw2 -ifp bge1
 		 * this code would differentiate based on
@@ -1965,8 +1965,8 @@ ire_match_args(ire_t *ire, ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 	}
 
 matchit:
+	ire_ill = ire->ire_ill;
 	if (match_flags & MATCH_IRE_ILL) {
-		ire_ill = ire->ire_ill;
 
 		/*
 		 * If asked to match an ill, we *must* match
@@ -1988,6 +1988,16 @@ matchit:
 			 * NULL
 			 */
 			if (ire_ill == NULL || !IS_ON_SAME_LAN(ill, ire_ill))
+				return (B_FALSE);
+		}
+	}
+	if (match_flags & MATCH_IRE_SRC_ILL) {
+		if (ire_ill == NULL)
+			return (B_FALSE);
+		if (!IS_ON_SAME_LAN(ill, ire_ill)) {
+			if (ire_ill->ill_usesrc_ifindex == 0 ||
+			    (ire_ill->ill_usesrc_ifindex !=
+			    ill->ill_phyint->phyint_ifindex))
 				return (B_FALSE);
 		}
 	}
@@ -3562,4 +3572,61 @@ ire_pref(ire_t *ire)
 	if (ire->ire_type & (IRE_LOCAL|IRE_LOOPBACK|IRE_BROADCAST))
 		return (5);
 	return (-1); /* unknown ire_type */
+}
+
+/*
+ * In the preferred/strict src multihoming modes, unbound routes (i.e.,
+ * ire_t entries with ire_unbound set to B_TRUE) are bound to an interface
+ * by selecting the first available interface that has an interface route for
+ * the ire_gateway. If that interface is subsequently brought down, ill_downi()
+ * will call ire_rebind() so that the unbound route can be bound to some other
+ * matching interface thereby preserving the intended reachability information
+ * from the original unbound route.
+ */
+void
+ire_rebind(ire_t *ire)
+{
+	ire_t	*gw_ire, *new_ire;
+	int	match_flags = MATCH_IRE_TYPE;
+	ill_t	*gw_ill;
+	boolean_t isv6 = (ire->ire_ipversion == IPV6_VERSION);
+	ip_stack_t *ipst = ire->ire_ipst;
+
+	ASSERT(ire->ire_unbound);
+again:
+	if (isv6) {
+		gw_ire = ire_ftable_lookup_v6(&ire->ire_gateway_addr_v6, 0, 0,
+		    IRE_INTERFACE, NULL, ALL_ZONES, NULL, match_flags, 0,
+		    ipst, NULL);
+	} else {
+		gw_ire = ire_ftable_lookup_v4(ire->ire_gateway_addr, 0, 0,
+		    IRE_INTERFACE, NULL, ALL_ZONES, NULL, match_flags, 0,
+		    ipst, NULL);
+	}
+	if (gw_ire == NULL) {
+		/* see comments in ip_rt_add[_v6]() for IPMP */
+		if (match_flags & MATCH_IRE_TESTHIDDEN)
+			return;
+
+		match_flags |= MATCH_IRE_TESTHIDDEN;
+		goto again;
+	}
+	gw_ill = gw_ire->ire_ill;
+	if (isv6) {
+		new_ire = ire_create_v6(&ire->ire_addr_v6, &ire->ire_mask_v6,
+		    &ire->ire_gateway_addr_v6, ire->ire_type, gw_ill,
+		    ire->ire_zoneid, ire->ire_flags, NULL, ipst);
+	} else {
+		new_ire = ire_create((uchar_t *)&ire->ire_addr,
+		    (uchar_t *)&ire->ire_mask,
+		    (uchar_t *)&ire->ire_gateway_addr, ire->ire_type, gw_ill,
+		    ire->ire_zoneid, ire->ire_flags, NULL, ipst);
+	}
+	ire_refrele(gw_ire);
+	if (new_ire == NULL)
+		return;
+	new_ire->ire_unbound = B_TRUE;
+	new_ire = ire_add(new_ire);
+	if (new_ire != NULL)
+		ire_refrele(new_ire);
 }

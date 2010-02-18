@@ -934,17 +934,15 @@ ipsq_xopq_mp_cleanup(ill_t *ill, conn_t *connp)
 	/*
 	 * Cleanup the ioctl mp's queued in ipsq_xopq_pending_mp if any.
 	 * In the case of ioctl from a conn, there can be only 1 mp
-	 * queued on the ipsq. If an ill is being unplumbed, only messages
-	 * related to this ill are flushed, like M_ERROR or M_HANGUP message.
-	 * ioctls meant for this ill form conn's are not flushed. They will
-	 * be processed during ipsq_exit and will not find the ill and will
-	 * return error.
+	 * queued on the ipsq. If an ill is being unplumbed flush all
+	 * the messages.
 	 */
 	mutex_enter(&ipsq->ipsq_lock);
 	for (prev = NULL, curr = ipsq->ipsq_xopq_mphead; curr != NULL;
 	    curr = next) {
 		next = curr->b_next;
-		if (curr->b_queue == wq || curr->b_queue == rq) {
+		if (connp == NULL ||
+		    (curr->b_queue == wq || curr->b_queue == rq)) {
 			/* Unlink the mblk from the pending mp list */
 			if (prev != NULL) {
 				prev->b_next = curr->b_next;
@@ -1201,7 +1199,7 @@ ill_down(ill_t *ill)
 
 /*
  * ire_walk routine used to delete every IRE that depends on
- * 'ill'.  (Always called as writer.)
+ * 'ill'.  (Always called as writer, and may only be called from ire_walk.)
  *
  * Note: since the routes added by the kernel are deleted separately,
  * this will only be 1) IRE_IF_CLONE and 2) manually added IRE_INTERFACE.
@@ -1223,8 +1221,23 @@ ill_downi(ire_t *ire, char *ill_arg)
 	mutex_exit(&ire->ire_lock);
 	if (nce != NULL)
 		nce_refrele(nce);
-	if (ire->ire_ill == ill)
+	if (ire->ire_ill == ill) {
+		/*
+		 * The existing interface binding for ire must be
+		 * deleted before trying to bind the route to another
+		 * interface. However, since we are using the contents of the
+		 * ire after ire_delete, the caller has to ensure that
+		 * CONDEMNED (deleted) ire's are not removed from the list
+		 * when ire_delete() returns. Currently ill_downi() is
+		 * only called as part of ire_walk*() routines, so that
+		 * the irb_refhold() done by ire_walk*() will ensure that
+		 * ire_delete() does not lead to ire_inactive().
+		 */
+		ASSERT(ire->ire_bucket->irb_refcnt > 0);
 		ire_delete(ire);
+		if (ire->ire_unbound)
+			ire_rebind(ire);
+	}
 }
 
 /* Remove IRE_IF_CLONE on this ill */
@@ -5441,6 +5454,7 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 	tsol_gcgrp_t *gcgrp = NULL;
 	boolean_t gcgrp_xtraref = B_FALSE;
 	boolean_t cgtp_broadcast;
+	boolean_t unbound = B_FALSE;
 
 	ip1dbg(("ip_rt_add:"));
 
@@ -5765,6 +5779,12 @@ again:
 		return (ENETUNREACH);
 	}
 
+	if (ill == NULL && !(flags & RTF_INDIRECT)) {
+		unbound = B_TRUE;
+		if (ipst->ips_ip_strict_src_multihoming > 0)
+			ill = gw_ire->ire_ill;
+	}
+
 	/*
 	 * We create one of three types of IREs as a result of this request
 	 * based on the netmask.  A netmask of all ones (which is automatically
@@ -5862,6 +5882,8 @@ again:
 	/* src address assigned by the caller? */
 	if ((src_addr != INADDR_ANY) && (flags & RTF_SETSRC))
 		ire->ire_setsrc_addr = src_addr;
+
+	ire->ire_unbound = unbound;
 
 	/*
 	 * POLICY: should we allow an RTF_HOST with address INADDR_ANY?
@@ -7601,8 +7623,8 @@ ip_sioctl_get_lifsrcof(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q,
 		}
 		lifr++;
 	}
-	rw_exit(&ipst->ips_ill_g_usesrc_lock);
 	rw_exit(&ipst->ips_ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_usesrc_lock);
 	ipif_refrele(orig_ipif);
 	mp1->b_wptr = (uchar_t *)lifr;
 	STRUCT_FSET(lifs, lifs_len, (int)((uchar_t *)lifr - mp1->b_rptr));
@@ -18477,4 +18499,31 @@ ipif_nce_down(ipif_t *ipif)
 		if (IS_UNDER_IPMP(ill))
 			nce_flush(ill, B_TRUE);
 	}
+}
+
+/*
+ * find the first interface that uses usill for its source address.
+ */
+ill_t *
+ill_lookup_usesrc(ill_t *usill)
+{
+	ip_stack_t *ipst = usill->ill_ipst;
+	ill_t *ill;
+
+	ASSERT(usill != NULL);
+
+	/* ill_g_usesrc_lock protects ill_usesrc_grp_next */
+	rw_enter(&ipst->ips_ill_g_usesrc_lock, RW_WRITER);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	for (ill = usill->ill_usesrc_grp_next; ill != NULL && ill != usill;
+	    ill = ill->ill_usesrc_grp_next) {
+		if (!IS_UNDER_IPMP(ill) && (ill->ill_flags & ILLF_MULTICAST) &&
+		    !ILL_IS_CONDEMNED(ill)) {
+			ill_refhold(ill);
+			break;
+		}
+	}
+	rw_exit(&ipst->ips_ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_usesrc_lock);
+	return (ill);
 }

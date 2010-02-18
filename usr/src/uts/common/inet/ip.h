@@ -2242,8 +2242,9 @@ struct ip_xmit_attr_s {
 /*
  * The normal flags for sending packets e.g., icmp errors
  */
-#define	IXAF_BASIC_SIMPLE_V4	(IXAF_SET_ULP_CKSUM | IXAF_IS_IPV4)
-#define	IXAF_BASIC_SIMPLE_V6	(IXAF_SET_ULP_CKSUM)
+#define	IXAF_BASIC_SIMPLE_V4	\
+	(IXAF_SET_ULP_CKSUM | IXAF_IS_IPV4 | IXAF_VERIFY_SOURCE)
+#define	IXAF_BASIC_SIMPLE_V6	(IXAF_SET_ULP_CKSUM | IXAF_VERIFY_SOURCE)
 
 /*
  * Normally these fields do not have a hold. But in some cases they do, for
@@ -2677,6 +2678,12 @@ struct ire_s {
 	boolean_t	ire_trace_disable;	/* True when alloc fails */
 	ip_stack_t	*ire_ipst;	/* Does not have a netstack_hold */
 	iulp_t		ire_metrics;
+	/*
+	 * default and prefix routes that are added without explicitly
+	 * specifying the interface are termed "unbound" routes, and will
+	 * have ire_unbound set to true.
+	 */
+	boolean_t	ire_unbound;
 };
 
 /* IPv4 compatibility macros */
@@ -3005,6 +3012,8 @@ extern vmem_t *ip_minor_arena_la;
 #define	ips_ipv6_icmp_return_pmtu	ips_param_arr[73].ip_param_value
 #define	ips_ip_arp_publish_count	ips_param_arr[74].ip_param_value
 #define	ips_ip_arp_publish_interval	ips_param_arr[75].ip_param_value
+#define	ips_ip_strict_src_multihoming	ips_param_arr[76].ip_param_value
+#define	ips_ipv6_strict_src_multihoming	ips_param_arr[77].ip_param_value
 
 extern int	dohwcksum;	/* use h/w cksum if supported by the h/w */
 #ifdef ZC_TEST

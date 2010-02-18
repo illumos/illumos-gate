@@ -3113,7 +3113,8 @@ tbf_send_packet(struct vif *vifp, mblk_t *mp)
 			    (ptrdiff_t)(vifp - ipst->ips_vifs));
 		}
 		bzero(&ixas, sizeof (ixas));
-		ixas.ixa_flags = IXAF_IS_IPV4 | IXAF_NO_TTL_CHANGE;
+		ixas.ixa_flags =
+		    IXAF_IS_IPV4 | IXAF_NO_TTL_CHANGE | IXAF_VERIFY_SOURCE;
 		ixas.ixa_ipst = ipst;
 		ixas.ixa_ifindex = 0;
 		ixas.ixa_cred = kcred;

@@ -291,6 +291,7 @@ extern	void	ipif_nce_down(ipif_t *ipif);
 extern	int	ipif_arp_down(ipif_t *ipif);
 extern	void	ipif_mask_reply(ipif_t *);
 extern	int 	ipif_up(ipif_t *, queue_t *, mblk_t *);
+extern	ill_t	*ill_lookup_usesrc(ill_t *);
 
 extern	void	ipsq_current_start(ipsq_t *, ipif_t *, int);
 extern	void	ipsq_current_finish(ipsq_t *);

@@ -690,7 +690,7 @@ ire_match_args_v6(ire_t *ire, const in6_addr_t *addr, const in6_addr_t *mask,
 	ASSERT(addr != NULL);
 	ASSERT(mask != NULL);
 	ASSERT((!(match_flags & MATCH_IRE_GW)) || gateway != NULL);
-	ASSERT((!(match_flags & MATCH_IRE_ILL)) ||
+	ASSERT((!(match_flags & (MATCH_IRE_ILL|MATCH_IRE_SRC_ILL))) ||
 	    (ill != NULL && ill->ill_isv6));
 
 	/*
@@ -771,7 +771,7 @@ ire_match_args_v6(ire_t *ire, const in6_addr_t *addr, const in6_addr_t *mask,
 			}
 		}
 		/*
-		 * For exampe, with
+		 * For example, with
 		 * route add 11.0.0.0 gw1 -ifp bge0
 		 * route add 11.0.0.0 gw2 -ifp bge1
 		 * this code would differentiate based on
@@ -799,13 +799,13 @@ ire_match_args_v6(ire_t *ire, const in6_addr_t *addr, const in6_addr_t *mask,
 	}
 
 matchit:
+	ire_ill = ire->ire_ill;
 	if (match_flags & MATCH_IRE_GW) {
 		mutex_enter(&ire->ire_lock);
 		gw_addr_v6 = ire->ire_gateway_addr_v6;
 		mutex_exit(&ire->ire_lock);
 	}
 	if (match_flags & MATCH_IRE_ILL) {
-		ire_ill = ire->ire_ill;
 
 		/*
 		 * If asked to match an ill, we *must* match
@@ -830,6 +830,17 @@ matchit:
 				return (B_FALSE);
 		}
 	}
+	if (match_flags & MATCH_IRE_SRC_ILL) {
+		if (ire_ill == NULL)
+			return (B_FALSE);
+		if (!IS_ON_SAME_LAN(ill, ire_ill)) {
+			if (ire_ill->ill_usesrc_ifindex == 0 ||
+			    (ire_ill->ill_usesrc_ifindex !=
+			    ill->ill_phyint->phyint_ifindex))
+				return (B_FALSE);
+		}
+	}
+
 	/* No ire_addr_v6 bits set past the mask */
 	ASSERT(V6_MASK_EQ(ire->ire_addr_v6, ire->ire_mask_v6,
 	    ire->ire_addr_v6));
@@ -910,9 +921,9 @@ ire_ftable_lookup_v6(const in6_addr_t *addr, const in6_addr_t *mask,
 
 	/*
 	 * ire_match_args_v6() will dereference ill if MATCH_IRE_ILL
-	 * is set.
+	 * or MATCH_IRE_SRC_ILL is set.
 	 */
-	if ((flags & (MATCH_IRE_ILL)) && (ill == NULL))
+	if ((flags & (MATCH_IRE_ILL|MATCH_IRE_SRC_ILL)) && (ill == NULL))
 		return (NULL);
 
 	rw_enter(&ipst->ips_ip6_ire_head_lock, RW_READER);
@@ -1113,12 +1124,13 @@ ire_ftable_lookup_simple_v6(const in6_addr_t *addr, uint32_t xmit_hint,
 }
 
 ire_t *
-ip_select_route_v6(const in6_addr_t *dst, ip_xmit_attr_t *ixa,
-    uint_t *generationp, in6_addr_t *setsrcp, int *errorp, boolean_t *multirtp)
+ip_select_route_v6(const in6_addr_t *dst, const in6_addr_t src,
+    ip_xmit_attr_t *ixa, uint_t *generationp, in6_addr_t *setsrcp,
+    int *errorp, boolean_t *multirtp)
 {
 	ASSERT(!(ixa->ixa_flags & IXAF_IS_IPV4));
 
-	return (ip_select_route(dst, ixa, generationp, setsrcp, errorp,
+	return (ip_select_route(dst, src, ixa, generationp, setsrcp, errorp,
 	    multirtp));
 }
 
@@ -1126,8 +1138,6 @@ ip_select_route_v6(const in6_addr_t *dst, ip_xmit_attr_t *ixa,
  * Recursively look for a route to the destination. Can also match on
  * the zoneid, ill, and label. Used for the data paths. See also
  * ire_route_recursive_dstonly.
- *
- * If ill is set this means we will match it by adding MATCH_IRE_ILL.
  *
  * If IRR_ALLOCATE is not set then we will only inspect the existing IREs; never
  * create an IRE_IF_CLONE. This is used on the receive side when we are not
@@ -1164,9 +1174,6 @@ ire_route_recursive_impl_v6(ire_t *ire,
 	if (gwattrp != NULL)
 		ASSERT(*gwattrp == NULL);
 
-	if (ill_arg != NULL)
-		match_args |= MATCH_IRE_ILL;
-
 	/*
 	 * We iterate up to three times to resolve a route, even though
 	 * we have four slots in the array. The extra slot is for an
@@ -1177,7 +1184,7 @@ ire_route_recursive_impl_v6(ire_t *ire,
 		/* ire_ftable_lookup handles round-robin/ECMP */
 		if (ire == NULL) {
 			ire = ire_ftable_lookup_v6(&v6nexthop, 0, 0, ire_type,
-			    (ill_arg != NULL ? ill_arg : ill), zoneid, tsl,
+			    (ill != NULL ? ill : ill_arg), zoneid, tsl,
 			    match_args, xmit_hint, ipst, &generation);
 		} else {
 			/* Caller passed it; extra hold since we will rele */
@@ -1322,6 +1329,10 @@ ire_route_recursive_impl_v6(ire_t *ire,
 		 * recursing. The type match is used by some callers
 		 * to exclude certain types (such as IRE_IF_CLONE or
 		 * IRE_LOCAL|IRE_LOOPBACK).
+		 *
+		 * In the MATCH_IRE_SRC_ILL case, ill_arg may be the 'srcof'
+		 * ire->ire_ill, and we want to find the IRE_INTERFACE for
+		 * ire_ill, so we set ill to the ire_ill
 		 */
 		match_args &= MATCH_IRE_TYPE;
 		v6nexthop = ire->ire_gateway_addr_v6;

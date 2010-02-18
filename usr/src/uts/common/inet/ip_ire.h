@@ -93,6 +93,7 @@ extern "C" {
 					/* zones or shared IREs */
 #define	MATCH_IRE_SECATTR	0x0040	/* Match gateway security attributes */
 #define	MATCH_IRE_TESTHIDDEN 	0x0080	/* Match ire_testhidden IREs */
+#define	MATCH_IRE_SRC_ILL	0x0100	/* ire_ill uses a src address on ill */
 
 #define	MAX_IRE_RECURSION	4	/* Max IREs in ire_route_recursive */
 
@@ -321,12 +322,12 @@ extern int	ire_revalidate_nce(ire_t *);
 
 extern ire_t	*ip_select_route_pkt(mblk_t *, ip_xmit_attr_t *,
     uint_t *, int *, boolean_t *);
-extern ire_t	*ip_select_route(const in6_addr_t *, ip_xmit_attr_t *,
-    uint_t *, in6_addr_t *, int *, boolean_t *);
-extern ire_t	*ip_select_route_v4(ipaddr_t, ip_xmit_attr_t *,
+extern ire_t	*ip_select_route(const in6_addr_t *, const in6_addr_t,
+    ip_xmit_attr_t *, uint_t *, in6_addr_t *, int *, boolean_t *);
+extern ire_t	*ip_select_route_v4(ipaddr_t, ipaddr_t, ip_xmit_attr_t *,
     uint_t *, ipaddr_t *, int *, boolean_t *);
-extern ire_t	*ip_select_route_v6(const in6_addr_t *, ip_xmit_attr_t *,
-    uint_t *, in6_addr_t *, int *, boolean_t *);
+extern ire_t	*ip_select_route_v6(const in6_addr_t *, const in6_addr_t,
+    ip_xmit_attr_t *, uint_t *, in6_addr_t *, int *, boolean_t *);
 
 extern	void	ire_walk(pfv_t, void *, ip_stack_t *);
 extern	void	ire_walk_ill(uint_t, uint_t, pfv_t, void *, ill_t *);
@@ -348,6 +349,7 @@ extern  boolean_t	ire_walk_ill_match(uint_t, uint_t, ire_t *, ill_t *,
     zoneid_t, ip_stack_t *);
 extern  void ire_increment_generation(ire_t *);
 extern  void ire_increment_multicast_generation(ip_stack_t *, boolean_t);
+extern	void ire_rebind(ire_t *);
 
 #endif /* _KERNEL */
 

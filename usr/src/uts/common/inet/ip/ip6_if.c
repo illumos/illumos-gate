@@ -405,6 +405,7 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 	tsol_gc_t *gc = NULL;
 	tsol_gcgrp_t *gcgrp = NULL;
 	boolean_t gcgrp_xtraref = B_FALSE;
+	boolean_t unbound = B_FALSE;
 
 	if (ire_arg != NULL)
 		*ire_arg = NULL;
@@ -724,6 +725,11 @@ again:
 			ipif_refrele(ipif);
 		return (ENETUNREACH);
 	}
+	if (ill == NULL && !(flags & RTF_INDIRECT)) {
+		unbound = B_TRUE;
+		if (ipst->ips_ipv6_strict_src_multihoming > 0)
+			ill = gw_ire->ire_ill;
+	}
 
 	/*
 	 * We create one of three types of IREs as a result of this request
@@ -818,6 +824,8 @@ again:
 	/* src address assigned by the caller? */
 	if ((flags & RTF_SETSRC) && !IN6_IS_ADDR_UNSPECIFIED(src_addr))
 		ire->ire_setsrc_addr_v6 = *src_addr;
+
+	ire->ire_unbound = unbound;
 
 	/*
 	 * POLICY: should we allow an RTF_HOST with address INADDR_ANY?

@@ -1841,6 +1841,8 @@ ip_input_broadcast_v4(ire_t *ire, mblk_t *mp, ipha_t *ipha, ip_recv_attr_t *ira)
 	ire_t		*ire1;
 	mblk_t		*mp1;
 	ipha_t		*ipha1;
+	uint_t		ira_pktlen = ira->ira_pktlen;
+	uint16_t	ira_ip_hdr_length = ira->ira_ip_hdr_length;
 
 	irb = ire->ire_bucket;
 
@@ -1883,6 +1885,12 @@ ip_input_broadcast_v4(ire_t *ire, mblk_t *mp, ipha_t *ipha, ip_recv_attr_t *ira)
 		ira->ira_zoneid = ire1->ire_zoneid;
 		ipha1 = (ipha_t *)mp1->b_rptr;
 		ip_fanout_v4(mp1, ipha1, ira);
+		/*
+		 * IPsec might have modified ira_pktlen and ira_ip_hdr_length
+		 * so we restore them for a potential next iteration
+		 */
+		ira->ira_pktlen = ira_pktlen;
+		ira->ira_ip_hdr_length = ira_ip_hdr_length;
 	}
 	irb_refrele(irb);
 	/* Do the main ire */
@@ -1913,6 +1921,8 @@ ip_input_multicast_v4(ire_t *ire, mblk_t *mp, ipha_t *ipha, ip_recv_attr_t *ira)
 	zoneid_t	zoneid;
 	mblk_t		*mp1;
 	ipha_t		*ipha1;
+	uint_t		ira_pktlen = ira->ira_pktlen;
+	uint16_t	ira_ip_hdr_length = ira->ira_ip_hdr_length;
 
 	/* ire_recv_multicast has switched to the upper ill for IPMP */
 	ASSERT(!IS_UNDER_IPMP(ill));
@@ -1972,6 +1982,12 @@ ip_input_multicast_v4(ire_t *ire, mblk_t *mp, ipha_t *ipha, ip_recv_attr_t *ira)
 		}
 		ipha1 = (ipha_t *)mp1->b_rptr;
 		ip_fanout_v4(mp1, ipha1, ira);
+		/*
+		 * IPsec might have modified ira_pktlen and ira_ip_hdr_length
+		 * so we restore them for a potential next iteration
+		 */
+		ira->ira_pktlen = ira_pktlen;
+		ira->ira_ip_hdr_length = ira_ip_hdr_length;
 	}
 
 	/* Do the main ire */

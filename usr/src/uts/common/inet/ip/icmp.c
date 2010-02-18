@@ -3103,6 +3103,16 @@ icmp_output_hdrincl(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid)
 	/* Even for multicast and broadcast we honor the apps ttl */
 	ixa->ixa_flags |= IXAF_NO_TTL_CHANGE;
 
+	/*
+	 * No source verification for non-local addresses
+	 */
+	if (ipha->ipha_src != INADDR_ANY &&
+	    ip_laddr_verify_v4(ipha->ipha_src, ixa->ixa_zoneid,
+	    is->is_netstack->netstack_ip, B_FALSE)
+	    != IPVL_UNICAST_UP) {
+		ixa->ixa_flags &= ~IXAF_VERIFY_SOURCE;
+	}
+
 	if (ipha->ipha_dst == INADDR_ANY)
 		ipha->ipha_dst = htonl(INADDR_LOOPBACK);
 
@@ -3468,6 +3478,26 @@ icmp_output_ancillary(conn_t *connp, sin_t *sin, sin6_t *sin6, mblk_t *mp,
 				v6src = ipp->ipp_addr;
 		}
 	}
+	/*
+	 * Allow source not assigned to the system
+	 * only if it is not a local addresses
+	 */
+	if (!V6_OR_V4_INADDR_ANY(v6src)) {
+		ip_laddr_t laddr_type;
+
+		if (ixa->ixa_flags & IXAF_IS_IPV4) {
+			ipaddr_t v4src;
+
+			IN6_V4MAPPED_TO_IPADDR(&v6src, v4src);
+			laddr_type = ip_laddr_verify_v4(v4src, ixa->ixa_zoneid,
+			    is->is_netstack->netstack_ip, B_FALSE);
+		} else {
+			laddr_type = ip_laddr_verify_v6(&v6src, ixa->ixa_zoneid,
+			    is->is_netstack->netstack_ip, B_FALSE, B_FALSE);
+		}
+		if (laddr_type != IPVL_UNICAST_UP)
+			ixa->ixa_flags &= ~IXAF_VERIFY_SOURCE;
+	}
 
 	ip_attr_nexthop(ipp, ixa, &v6dst, &v6nexthop);
 	error = ip_attr_connect(connp, ixa, &v6src, &v6dst, &v6nexthop, dstport,
@@ -3562,8 +3592,6 @@ icmp_output_ancillary(conn_t *connp, sin_t *sin, sin6_t *sin6, mblk_t *mp,
 	/* We're done.  Pass the packet to ip. */
 	BUMP_MIB(&is->is_rawip_mib, rawipOutDatagrams);
 
-	/* Allow source not assigned to the system? */
-	ixa->ixa_flags &= ~IXAF_VERIFY_SOURCE;
 	error = conn_ip_output(mp, ixa);
 	if (!connp->conn_unspec_src)
 		ixa->ixa_flags |= IXAF_VERIFY_SOURCE;

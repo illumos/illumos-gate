@@ -847,8 +847,8 @@ ip_output_simple_v4(mblk_t *mp, ip_xmit_attr_t *ixa)
 repeat_ire:
 	error = 0;
 	setsrc = INADDR_ANY;
-	ire = ip_select_route_v4(firsthop, ixa, NULL, &setsrc, &error,
-	    &multirt);
+	ire = ip_select_route_v4(firsthop, ipha->ipha_src, ixa, NULL,
+	    &setsrc, &error, &multirt);
 	ASSERT(ire != NULL);	/* IRE_NOROUTE if none found */
 	if (error != 0) {
 		BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsHCOutRequests);
@@ -2295,10 +2295,13 @@ ip_postfrag_multirt_v4(mblk_t *mp, nce_t *nce, iaflags_t ixaflags,
 			 * starting at ire1.
 			 */
 			ire_t *ire2;
+			uint_t	match_flags = MATCH_IRE_DSTONLY;
 
+			if (ire1->ire_ill != NULL)
+				match_flags |= MATCH_IRE_ILL;
 			ire2 = ire_route_recursive_impl_v4(ire1,
 			    ire1->ire_addr, ire1->ire_type, ire1->ire_ill,
-			    ire1->ire_zoneid, NULL, MATCH_IRE_DSTONLY,
+			    ire1->ire_zoneid, NULL, match_flags,
 			    IRR_ALLOCATE, 0, ipst, NULL, NULL, NULL);
 			if (ire2 != NULL)
 				ire_refrele(ire2);

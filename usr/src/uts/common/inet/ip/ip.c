@@ -826,6 +826,10 @@ static ipparam_t	lcl_param_arr[] = {
 	{  0,	99999,	100,	"ip_icmp_err_interval" },
 	{  1,	99999,	10,	"ip_icmp_err_burst" },
 	{  0,	999999999,	1000000, "ip_reass_queue_bytes" },
+	/*
+	 * See comments for ip_strict_src_multihoming for an explanation
+	 * of the semantics of ip_strict_dst_multihoming
+	 */
 	{  0,	1,	0,	"ip_strict_dst_multihoming" },
 	{  1,	MAX_ADDRS_PER_IF,	256,	"ip_addrs_per_if"},
 	{  0,	1,	0,	"ipsec_override_persocket_policy" },
@@ -841,6 +845,10 @@ static ipparam_t	lcl_param_arr[] = {
 	{  0,	1,	1,	"ip6_respond_to_echo_multicast"},
 	{  0,	1,	1,	"ip6_send_redirects"},
 	{  0,	1,	0,	"ip6_ignore_redirect" },
+	/*
+	 * See comments for ip6_strict_src_multihoming for an explanation
+	 * of the semantics of ip6_strict_dst_multihoming
+	 */
 	{  0,	1,	0,	"ip6_strict_dst_multihoming" },
 
 	{  0,	2,	2,	"ip_src_check" },
@@ -907,7 +915,48 @@ static ipparam_t	lcl_param_arr[] = {
 	 * for IPv4, IPv6.
 	 */
 	{  1,	20,	5,	"ip_arp_publish_count" },
-	{  1000, 20000,	2000,	"ip_arp_publish_interval" },
+	{  1000, 20000, 2000,   "ip_arp_publish_interval" },
+	/*
+	 * The ip*strict_src_multihoming and ip*strict_dst_multihoming provide
+	 * a range of choices for setting strong/weak/preferred end-system
+	 * behavior. The semantics for setting these are:
+	 *
+	 * ip*_strict_dst_multihoming = 0
+	 *    weak end system model for managing ip destination addresses.
+	 *    A packet with IP dst D1 that's received on interface I1 will be
+	 *    accepted as long as D1 is one of the local addresses on
+	 *    the machine, even if D1 is not configured on I1.
+	 * ip*strict_dst_multihioming = 1
+	 *    strong end system model for managing ip destination addresses.
+	 *    A packet with IP dst D1 that's received on interface I1 will be
+	 *    accepted if, and only if, D1 is configured on I1.
+	 *
+	 * ip*strict_src_multihoming = 0
+	 *    Source agnostic route selection for outgoing packets: the
+	 *    outgoing interface for a packet will be computed using
+	 *    default algorithms for route selection, where the route
+	 *    with the longest matching prefix is chosen for the output
+	 *    unless other route selection constraints are explicitly
+	 *    specified during routing table lookup.  This may result
+	 *    in packet being sent out on interface I2 with source
+	 *    address S1, even though S1 is not a configured address on I2.
+	 * ip*strict_src_multihoming = 1
+	 *    Preferred source aware route selection for outgoing packets: for
+	 *    a packet with source S2, destination D2, the route selection
+	 *    algorithm will first attempt to find a route for the destination
+	 *    that goes out through an interface where S2 is
+	 *    configured. If such a route cannot be found, then the
+	 *    best-matching route for D2 will be selected.
+	 * ip*strict_src_multihoming = 2
+	 *    Source aware route selection for outgoing packets: a packet will
+	 *    be sent out on an interface I2 only if the src address S2 of the
+	 *    packet is a configured address on I2. In conjunction with
+	 *    the setting 'ip_strict_dst_multihoming == 1', this will result in
+	 *    the implementation of Strong ES as defined in Section 3.3.4.2 of
+	 *    RFC 1122
+	 */
+	{  0,	2,	0,	"ip_strict_src_multihoming" },
+	{  0,	2,	0,	"ip6_strict_src_multihoming" }
 };
 
 /*
@@ -3562,8 +3611,8 @@ ip_set_destination_v4(ipaddr_t *src_addrp, ipaddr_t dst_addr, ipaddr_t firsthop,
 	 * a "hidden" route (i.e., going through a specific under_ill)
 	 * if ixa_ifindex has been specified.
 	 */
-	ire = ip_select_route_v4(firsthop, ixa, &generation, &setsrc, &error,
-	    &multirt);
+	ire = ip_select_route_v4(firsthop, *src_addrp, ixa,
+	    &generation, &setsrc, &error, &multirt);
 	ASSERT(ire != NULL);	/* IRE_NOROUTE if none found */
 	if (error != 0)
 		goto bad_addr;
@@ -6773,6 +6822,85 @@ ip_param_register(IDP *ndp, ipparam_t *ippa, size_t ippa_cnt,
 	return (B_TRUE);
 }
 
+/*
+ * When the src multihoming is changed from weak to [strong, preferred]
+ * ip_ire_rebind_walker is called to walk the list of all ire_t entries
+ * and identify routes that were created by user-applications in the
+ * unbound state (i.e., without RTA_IFP), and for which an ire_ill is not
+ * currently defined. These routes are then 'rebound', i.e., their ire_ill
+ * is selected by finding an interface route for the gateway.
+ */
+/* ARGSUSED */
+static void
+ip_ire_rebind_walker(ire_t *ire, void *notused)
+{
+	if (!ire->ire_unbound || ire->ire_ill != NULL)
+		return;
+	ire_rebind(ire);
+	ire_delete(ire);
+}
+
+/*
+ * When the src multihoming is changed from  [strong, preferred] to weak,
+ * ip_ire_unbind_walker is called to walk the list of all ire_t entries, and
+ * set any entries that were created by user-applications in the unbound state
+ * (i.e., without RTA_IFP) back to having a NULL ire_ill.
+ */
+/* ARGSUSED */
+static void
+ip_ire_unbind_walker(ire_t *ire, void *notused)
+{
+	ire_t *new_ire;
+
+	if (!ire->ire_unbound || ire->ire_ill == NULL)
+		return;
+	if (ire->ire_ipversion == IPV6_VERSION) {
+		new_ire = ire_create_v6(&ire->ire_addr_v6, &ire->ire_mask_v6,
+		    &ire->ire_gateway_addr_v6, ire->ire_type, NULL,
+		    ire->ire_zoneid, ire->ire_flags, NULL, ire->ire_ipst);
+	} else {
+		new_ire = ire_create((uchar_t *)&ire->ire_addr,
+		    (uchar_t *)&ire->ire_mask,
+		    (uchar_t *)&ire->ire_gateway_addr, ire->ire_type, NULL,
+		    ire->ire_zoneid, ire->ire_flags, NULL, ire->ire_ipst);
+	}
+	if (new_ire == NULL)
+		return;
+	new_ire->ire_unbound = B_TRUE;
+	/*
+	 * The bound ire must first be deleted so that we don't return
+	 * the existing one on the attempt to add the unbound new_ire.
+	 */
+	ire_delete(ire);
+	new_ire = ire_add(new_ire);
+	if (new_ire != NULL)
+		ire_refrele(new_ire);
+}
+
+/*
+ * When the settings of ip*_strict_src_multihoming tunables are changed,
+ * all cached routes need to be recomputed. This recomputation needs to be
+ * done when going from weaker to stronger modes so that the cached ire
+ * for the connection does not violate the current ip*_strict_src_multihoming
+ * setting. It also needs to be done when going from stronger to weaker modes,
+ * so that we fall back to matching on the longest-matching-route (as opposed
+ * to a shorter match that may have been selected in the strong mode
+ * to satisfy src_multihoming settings).
+ *
+ * The cached ixa_ire entires for all conn_t entries are marked as
+ * "verify" so that they will be recomputed for the next packet.
+ */
+static void
+conn_ire_revalidate(conn_t *connp, void *arg)
+{
+	boolean_t isv6 = (boolean_t)arg;
+
+	if ((isv6 && connp->conn_ipversion != IPV6_VERSION) ||
+	    (!isv6 && connp->conn_ipversion != IPV4_VERSION))
+		return;
+	connp->conn_ixa->ixa_ire_generation = IRE_GENERATION_VERIFY;
+}
+
 /* Named Dispatch routine to negotiate a new value for one of our parameters. */
 /* ARGSUSED */
 static int
@@ -6780,12 +6908,35 @@ ip_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp, cred_t *ioc_cr)
 {
 	long		new_value;
 	ipparam_t	*ippa = (ipparam_t *)cp;
+	ip_stack_t	*ipst = CONNQ_TO_IPST(q);
+	int		strict_src4, strict_src6;
 
+	strict_src4 = ipst->ips_ip_strict_src_multihoming;
+	strict_src6 = ipst->ips_ipv6_strict_src_multihoming;
 	if (ddi_strtol(value, NULL, 10, &new_value) != 0 ||
 	    new_value < ippa->ip_param_min || new_value > ippa->ip_param_max) {
 		return (EINVAL);
 	}
 	ippa->ip_param_value = new_value;
+	if (ipst->ips_ip_strict_src_multihoming != strict_src4) {
+		if (strict_src4 == 0) {
+			ire_walk_v4(ip_ire_rebind_walker, NULL, ALL_ZONES,
+			    ipst);
+		} else {
+			ire_walk_v4(ip_ire_unbind_walker, NULL, ALL_ZONES,
+			    ipst);
+		}
+		ipcl_walk(conn_ire_revalidate, (void *)B_FALSE, ipst);
+	} else if (ipst->ips_ipv6_strict_src_multihoming != strict_src6) {
+		if (strict_src6 == 0) {
+			ire_walk_v6(ip_ire_rebind_walker, NULL, ALL_ZONES,
+			    ipst);
+		} else {
+			ire_walk_v4(ip_ire_unbind_walker, NULL, ALL_ZONES,
+			    ipst);
+		}
+		ipcl_walk(conn_ire_revalidate, (void *)B_TRUE, ipst);
+	}
 	return (0);
 }
 

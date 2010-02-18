@@ -1539,6 +1539,8 @@ ip_input_multicast_v6(ire_t *ire, mblk_t *mp, ip6_t *ip6h, ip_recv_attr_t *ira)
 	zoneid_t	zoneid;
 	mblk_t		*mp1;
 	ip6_t		*ip6h1;
+	uint_t		ira_pktlen = ira->ira_pktlen;
+	uint16_t	ira_ip_hdr_length = ira->ira_ip_hdr_length;
 
 	/* ire_recv_multicast has switched to the upper ill for IPMP */
 	ASSERT(!IS_UNDER_IPMP(ill));
@@ -1598,6 +1600,12 @@ ip_input_multicast_v6(ire_t *ire, mblk_t *mp, ip6_t *ip6h, ip_recv_attr_t *ira)
 		}
 		ip6h1 = (ip6_t *)mp1->b_rptr;
 		ip_fanout_v6(mp1, ip6h1, ira);
+		/*
+		 * IPsec might have modified ira_pktlen and ira_ip_hdr_length
+		 * so we restore them for a potential next iteration
+		 */
+		ira->ira_pktlen = ira_pktlen;
+		ira->ira_ip_hdr_length = ira_ip_hdr_length;
 	}
 
 	/* Do the main ire */

@@ -2320,7 +2320,7 @@ actually_send_keepalive(void *arg)
 	ixas.ixa_tsl = NULL;
 	ixas.ixa_ipst = ns->netstack_ip;
 	/* No ULP checksum; done by esp_prepare_udp */
-	ixas.ixa_flags = IXAF_IS_IPV4 | IXAF_NO_IPSEC;
+	ixas.ixa_flags = (IXAF_IS_IPV4 | IXAF_NO_IPSEC | IXAF_VERIFY_SOURCE);
 
 	(void) ip_output_simple(mp, &ixas);
 	ixa_cleanup(&ixas);

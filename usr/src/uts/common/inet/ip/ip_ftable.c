@@ -77,6 +77,10 @@
 	(((ire)->ire_type & IRE_DEFAULT) || \
 	    (((ire)->ire_type & IRE_INTERFACE) && ((ire)->ire_addr == 0)))
 
+#define	IP_SRC_MULTIHOMING(isv6, ipst) 			\
+	(isv6 ? ipst->ips_ipv6_strict_src_multihoming :	\
+	ipst->ips_ip_strict_src_multihoming)
+
 static ire_t	*route_to_dst(const struct sockaddr *, zoneid_t, ip_stack_t *);
 static void	ire_del_host_redir(ire_t *, char *);
 static boolean_t ire_find_best_route(struct radix_node *, void *);
@@ -104,7 +108,7 @@ ire_ftable_lookup_v4(ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 	 * ire_match_args() will dereference ill if MATCH_IRE_ILL
 	 * is set.
 	 */
-	if ((flags & MATCH_IRE_ILL) && (ill == NULL))
+	if ((flags & (MATCH_IRE_ILL|MATCH_IRE_SRC_ILL)) && (ill == NULL))
 		return (NULL);
 
 	bzero(&rdst, sizeof (rdst));
@@ -673,7 +677,8 @@ ire_find_best_route(struct radix_node *rn, void *arg)
 	for (ire = irb_ptr->irb_ire; ire != NULL; ire = ire->ire_next) {
 		if (IRE_IS_CONDEMNED(ire))
 			continue;
-		if (margs->ift_flags & (MATCH_IRE_MASK|MATCH_IRE_SHORTERMASK))
+		ASSERT((margs->ift_flags & MATCH_IRE_SHORTERMASK) == 0);
+		if (margs->ift_flags & MATCH_IRE_MASK)
 			match_mask = margs->ift_mask;
 		else
 			match_mask = ire->ire_mask;
@@ -968,24 +973,112 @@ irb_refrele_rn(struct radix_node *rn)
 		irb_refrele_ftable(&((rt_t *)(rn))->rt_irb);
 }
 
+
+/*
+ * ip_select_src_ill() is used by ip_select_route() to find the src_ill
+ * to be used for source-aware routing table lookup. This function will
+ * ignore IPIF_UNNUMBERED interface addresses, and will only return a
+ * numbered interface (ipif_lookup_addr_nondup() will ignore UNNUMBERED
+ * interfaces).
+ */
+static ill_t *
+ip_select_src_ill(const in6_addr_t *v6src, zoneid_t zoneid, ip_stack_t *ipst)
+{
+	ipif_t *ipif;
+	ill_t *ill;
+	boolean_t isv6 = !IN6_IS_ADDR_V4MAPPED(v6src);
+	ipaddr_t v4src;
+
+	if (isv6) {
+		ipif = ipif_lookup_addr_nondup_v6(v6src, NULL, zoneid, ipst);
+	} else {
+		IN6_V4MAPPED_TO_IPADDR(v6src, v4src);
+		ipif = ipif_lookup_addr_nondup(v4src, NULL, zoneid, ipst);
+	}
+	if (ipif == NULL)
+		return (NULL);
+	ill = ipif->ipif_ill;
+	ill_refhold(ill);
+	ipif_refrele(ipif);
+	return (ill);
+}
+
+/*
+ * verify that v6src is configured on ill
+ */
+static boolean_t
+ip_verify_src_on_ill(const in6_addr_t v6src, ill_t *ill, zoneid_t zoneid)
+{
+	ipif_t *ipif;
+	ip_stack_t *ipst;
+	ipaddr_t v4src;
+
+	if (ill == NULL)
+		return (B_FALSE);
+	ipst = ill->ill_ipst;
+
+	if (ill->ill_isv6) {
+		ipif = ipif_lookup_addr_nondup_v6(&v6src, ill, zoneid, ipst);
+	} else {
+		IN6_V4MAPPED_TO_IPADDR(&v6src, v4src);
+		ipif = ipif_lookup_addr_nondup(v4src, ill, zoneid, ipst);
+	}
+
+	if (ipif != NULL) {
+		ipif_refrele(ipif);
+		return (B_TRUE);
+	} else {
+		return (B_FALSE);
+	}
+}
+
 /*
  * Select a route for IPv4 and IPv6. Except for multicast, loopback and reject
  * routes this routine sets up a ire_nce_cache as well. The caller needs to
  * lookup an nce for the multicast case.
+ *
+ * When src_multihoming is set to 2 (strict src multihoming) we use the source
+ * address to select the interface and route. If IP_BOUND_IF etc are
+ * specified, we require that they specify an interface on which the
+ * source address is assigned.
+ *
+ * When src_multihoming is set to 1 (preferred src aware route
+ * selection)  the unicast lookup prefers a matching source
+ * (i.e., that the route points out an ill on which the source is assigned), but
+ * if no such route is found we fallback to not considering the source in the
+ * route lookup.
+ *
+ * We skip the src_multihoming check when the source isn't (yet) set, and
+ * when IXAF_VERIFY_SOURCE is not set. The latter allows RAW sockets to send
+ * with bogus source addresses as allowed by IP_HDRINCL and IPV6_PKTINFO
+ * when secpolicy_net_rawaccess().
  */
 ire_t *
-ip_select_route(const in6_addr_t *v6dst, ip_xmit_attr_t *ixa,
-    uint_t *generationp, in6_addr_t *setsrcp, int *errorp, boolean_t *multirtp)
+ip_select_route(const in6_addr_t *v6dst, const in6_addr_t v6src,
+    ip_xmit_attr_t *ixa, uint_t *generationp, in6_addr_t *setsrcp,
+    int *errorp, boolean_t *multirtp)
 {
 	uint_t		match_args;
 	uint_t		ire_type;
-	ill_t		*ill;
+	ill_t		*ill = NULL;
 	ire_t		*ire;
 	ip_stack_t	*ipst = ixa->ixa_ipst;
 	ipaddr_t	v4dst;
 	in6_addr_t	v6nexthop;
 	iaflags_t	ixaflags = ixa->ixa_flags;
 	nce_t		*nce;
+	boolean_t	preferred_src_aware = B_FALSE;
+	boolean_t	verify_src;
+	boolean_t	isv6 = !(ixa->ixa_flags & IXAF_IS_IPV4);
+	int		src_multihoming = IP_SRC_MULTIHOMING(isv6, ipst);
+
+	/*
+	 * We only verify that the src has been configured on a selected
+	 * interface if the src is not :: or INADDR_ANY, and if the
+	 * IXAF_VERIFY_SOURCE flag is set.
+	 */
+	verify_src = (!V6_OR_V4_INADDR_ANY(v6src) &&
+	    (ixa->ixa_flags & IXAF_VERIFY_SOURCE));
 
 	match_args = MATCH_IRE_SECATTR;
 	IN6_V4MAPPED_TO_IPADDR(v6dst, v4dst);
@@ -999,17 +1092,16 @@ ip_select_route(const in6_addr_t *v6dst, ip_xmit_attr_t *ixa,
 	 * SO_DONTROUTE, IP_BOUND_IF, IP_PKTINFO etc are set
 	 */
 
-	if ((ixaflags & IXAF_IS_IPV4) ? CLASSD(v4dst) :
-	    IN6_IS_ADDR_MULTICAST(v6dst)) {
+	if (isv6 ? IN6_IS_ADDR_MULTICAST(v6dst) : CLASSD(v4dst)) {
 		/* Pick up the IRE_MULTICAST for the ill */
 		if (ixa->ixa_multicast_ifindex != 0) {
 			ill = ill_lookup_on_ifindex(ixa->ixa_multicast_ifindex,
-			    !(ixaflags & IXAF_IS_IPV4), ipst);
+			    isv6, ipst);
 		} else if (ixaflags & IXAF_SCOPEID_SET) {
 			/* sin6_scope_id takes precedence over ixa_ifindex */
 			ASSERT(ixa->ixa_scopeid != 0);
 			ill = ill_lookup_on_ifindex(ixa->ixa_scopeid,
-			    !(ixaflags & IXAF_IS_IPV4), ipst);
+			    isv6, ipst);
 		} else if (ixa->ixa_ifindex != 0) {
 			/*
 			 * In the ipmp case, the ixa_ifindex is set to
@@ -1017,17 +1109,32 @@ ip_select_route(const in6_addr_t *v6dst, ip_xmit_attr_t *ixa,
 			 * ire_multicast() corresponding to that under_ill.
 			 */
 			ill = ill_lookup_on_ifindex(ixa->ixa_ifindex,
-			    !(ixaflags & IXAF_IS_IPV4), ipst);
-		} else if (ixaflags & IXAF_IS_IPV4) {
+			    isv6, ipst);
+		} else if (src_multihoming != 0 && verify_src) {
+			/* Look up the ill based on the source address */
+			ill = ip_select_src_ill(&v6src, ixa->ixa_zoneid, ipst);
+			/*
+			 * Since we looked up the ill from the source there
+			 * is no need to verify that the source is on the ill
+			 * below.
+			 */
+			verify_src = B_FALSE;
+			if (ill != NULL && IS_VNI(ill)) {
+				ill_t *usesrc = ill;
+
+				ill = ill_lookup_usesrc(usesrc);
+				ill_refrele(usesrc);
+			}
+		} else if (!isv6) {
 			ipaddr_t	v4setsrc = INADDR_ANY;
 
-			ill = ill_lookup_group_v4(v4dst, ixa->ixa_zoneid, ipst,
-			    multirtp, &v4setsrc);
+			ill = ill_lookup_group_v4(v4dst, ixa->ixa_zoneid,
+			    ipst, multirtp, &v4setsrc);
 			if (setsrcp != NULL)
 				IN6_IPADDR_TO_V4MAPPED(v4setsrc, setsrcp);
 		} else {
-			ill = ill_lookup_group_v6(v6dst, ixa->ixa_zoneid, ipst,
-			    multirtp, setsrcp);
+			ill = ill_lookup_group_v6(v6dst, ixa->ixa_zoneid,
+			    ipst, multirtp, setsrcp);
 		}
 		if (ill != NULL && IS_VNI(ill)) {
 			ill_refrele(ill);
@@ -1037,7 +1144,7 @@ ip_select_route(const in6_addr_t *v6dst, ip_xmit_attr_t *ixa,
 			if (errorp != NULL)
 				*errorp = ENXIO;
 			/* Get a hold on the IRE_NOROUTE */
-			ire = ire_reject(ipst, !(ixaflags & IXAF_IS_IPV4));
+			ire = ire_reject(ipst, isv6);
 			return (ire);
 		}
 		if (!(ill->ill_flags & ILLF_MULTICAST)) {
@@ -1045,7 +1152,21 @@ ip_select_route(const in6_addr_t *v6dst, ip_xmit_attr_t *ixa,
 			if (errorp != NULL)
 				*errorp = EHOSTUNREACH;
 			/* Get a hold on the IRE_NOROUTE */
-			ire = ire_reject(ipst, !(ixaflags & IXAF_IS_IPV4));
+			ire = ire_reject(ipst, isv6);
+			return (ire);
+		}
+		/*
+		 * If we are doing the strictest src_multihoming, then
+		 * we check that IP_MULTICAST_IF, IP_BOUND_IF, etc specify
+		 * an interface that is consistent with the source address.
+		 */
+		if (verify_src && src_multihoming == 2 &&
+		    !ip_verify_src_on_ill(v6src, ill, ixa->ixa_zoneid)) {
+			if (errorp != NULL)
+				*errorp = EADDRNOTAVAIL;
+			ill_refrele(ill);
+			/* Get a hold on the IRE_NOROUTE */
+			ire = ire_reject(ipst, isv6);
 			return (ire);
 		}
 		/* Get a refcnt on the single IRE_MULTICAST per ill */
@@ -1060,16 +1181,17 @@ ip_select_route(const in6_addr_t *v6dst, ip_xmit_attr_t *ixa,
 		return (ire);
 	}
 
+	/* Now for unicast */
 	if (ixa->ixa_ifindex != 0 || (ixaflags & IXAF_SCOPEID_SET)) {
 		if (ixaflags & IXAF_SCOPEID_SET) {
 			/* sin6_scope_id takes precedence over ixa_ifindex */
 			ASSERT(ixa->ixa_scopeid != 0);
 			ill = ill_lookup_on_ifindex(ixa->ixa_scopeid,
-			    !(ixaflags & IXAF_IS_IPV4), ipst);
+			    isv6, ipst);
 		} else {
 			ASSERT(ixa->ixa_ifindex != 0);
 			ill = ill_lookup_on_ifindex(ixa->ixa_ifindex,
-			    !(ixaflags & IXAF_IS_IPV4), ipst);
+			    isv6, ipst);
 		}
 		if (ill != NULL && IS_VNI(ill)) {
 			ill_refrele(ill);
@@ -1079,9 +1201,12 @@ ip_select_route(const in6_addr_t *v6dst, ip_xmit_attr_t *ixa,
 			if (errorp != NULL)
 				*errorp = ENXIO;
 			/* Get a hold on the IRE_NOROUTE */
-			ire = ire_reject(ipst, !(ixaflags & IXAF_IS_IPV4));
+			ire = ire_reject(ipst, isv6);
 			return (ire);
 		}
+
+		match_args |= MATCH_IRE_ILL;
+
 		/*
 		 * icmp_send_reply_v6 uses scopeid, and mpathd sets IP*_BOUND_IF
 		 * so for both of them we need to be able look for an under
@@ -1089,8 +1214,38 @@ ip_select_route(const in6_addr_t *v6dst, ip_xmit_attr_t *ixa,
 		 */
 		if (IS_UNDER_IPMP(ill))
 			match_args |= MATCH_IRE_TESTHIDDEN;
-	} else {
-		ill = NULL;
+
+		/*
+		 * If we are doing the strictest src_multihoming, then
+		 * we check that IP_BOUND_IF, IP_PKTINFO, etc specify
+		 * an interface that is consistent with the source address.
+		 */
+		if (src_multihoming == 2 &&
+		    !ip_verify_src_on_ill(v6src, ill, ixa->ixa_zoneid)) {
+			if (errorp != NULL)
+				*errorp = EADDRNOTAVAIL;
+			ill_refrele(ill);
+			/* Get a hold on the IRE_NOROUTE */
+			ire = ire_reject(ipst, isv6);
+			return (ire);
+		}
+	} else if (src_multihoming != 0 && verify_src) {
+		/* Look up the ill based on the source address */
+		ill = ip_select_src_ill(&v6src, ixa->ixa_zoneid, ipst);
+		if (ill == NULL) {
+			char addrbuf[INET6_ADDRSTRLEN];
+
+			ip3dbg(("%s not a valid src for unicast",
+			    inet_ntop(AF_INET6, &v6src, addrbuf,
+			    sizeof (addrbuf))));
+			if (errorp != NULL)
+				*errorp = EADDRNOTAVAIL;
+			/* Get a hold on the IRE_NOROUTE */
+			ire = ire_reject(ipst, isv6);
+			return (ire);
+		}
+		match_args |= MATCH_IRE_SRC_ILL;
+		preferred_src_aware = (src_multihoming == 1);
 	}
 
 	if (ixaflags & IXAF_NEXTHOP_SET) {
@@ -1101,7 +1256,6 @@ ip_select_route(const in6_addr_t *v6dst, ip_xmit_attr_t *ixa,
 	}
 
 	ire_type = 0;
-	/* If ill is null then ire_route_recursive will set MATCH_IRE_ILL */
 
 	/*
 	 * If SO_DONTROUTE is set or if IP_NEXTHOP is set, then
@@ -1112,7 +1266,8 @@ ip_select_route(const in6_addr_t *v6dst, ip_xmit_attr_t *ixa,
 		ire_type = IRE_ONLINK;
 	}
 
-	if (ixaflags & IXAF_IS_IPV4) {
+retry:
+	if (!isv6) {
 		ipaddr_t	v4nexthop;
 		ipaddr_t	v4setsrc = INADDR_ANY;
 
@@ -1134,12 +1289,24 @@ ip_select_route(const in6_addr_t *v6dst, ip_xmit_attr_t *ixa,
 		    v4dst, (void *)ire));
 	}
 #endif
-
-	if (ill != NULL)
+	if (ill != NULL) {
 		ill_refrele(ill);
-
+		ill = NULL;
+	}
 	if ((ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) ||
 	    (ire->ire_type & IRE_MULTICAST)) {
+		if (preferred_src_aware) {
+			/*
+			 * "Preferred Source Aware" send mode. If we cannot
+			 * find an ire whose ire_ill had the desired source
+			 * address retry after relaxing the ill matching
+			 * constraint.
+			 */
+			ire_refrele(ire);
+			preferred_src_aware = B_FALSE;
+			match_args &= ~MATCH_IRE_SRC_ILL;
+			goto retry;
+		}
 		/* No ire_nce_cache */
 		return (ire);
 	}
@@ -1169,34 +1336,36 @@ ip_select_route_pkt(mblk_t *mp, ip_xmit_attr_t *ixa, uint_t *generationp,
 {
 	if (ixa->ixa_flags & IXAF_IS_IPV4) {
 		ipha_t		*ipha = (ipha_t *)mp->b_rptr;
-		in6_addr_t	v6dst;
+		in6_addr_t	v6dst, v6src;
 
 		IN6_IPADDR_TO_V4MAPPED(ipha->ipha_dst, &v6dst);
+		IN6_IPADDR_TO_V4MAPPED(ipha->ipha_src, &v6src);
 
-		return (ip_select_route(&v6dst, ixa, generationp,
+		return (ip_select_route(&v6dst, v6src, ixa, generationp,
 		    NULL, errorp, multirtp));
 	} else {
 		ip6_t	*ip6h = (ip6_t *)mp->b_rptr;
 
-		return (ip_select_route(&ip6h->ip6_dst, ixa, generationp,
-		    NULL, errorp, multirtp));
+		return (ip_select_route(&ip6h->ip6_dst, ip6h->ip6_src,
+		    ixa, generationp, NULL, errorp, multirtp));
 	}
 }
 
 ire_t *
-ip_select_route_v4(ipaddr_t dst, ip_xmit_attr_t *ixa, uint_t *generationp,
-    ipaddr_t *v4setsrcp, int *errorp, boolean_t *multirtp)
+ip_select_route_v4(ipaddr_t dst, ipaddr_t src, ip_xmit_attr_t *ixa,
+    uint_t *generationp, ipaddr_t *v4setsrcp, int *errorp, boolean_t *multirtp)
 {
-	in6_addr_t	v6dst;
+	in6_addr_t	v6dst, v6src;
 	ire_t		*ire;
 	in6_addr_t	setsrc;
 
 	ASSERT(ixa->ixa_flags & IXAF_IS_IPV4);
 
 	IN6_IPADDR_TO_V4MAPPED(dst, &v6dst);
+	IN6_IPADDR_TO_V4MAPPED(src, &v6src);
 
 	setsrc = ipv6_all_zeros;
-	ire = ip_select_route(&v6dst, ixa, generationp, &setsrc, errorp,
+	ire = ip_select_route(&v6dst, v6src, ixa, generationp, &setsrc, errorp,
 	    multirtp);
 	if (v4setsrcp != NULL)
 		IN6_V4MAPPED_TO_IPADDR(&setsrc, *v4setsrcp);
@@ -1207,8 +1376,6 @@ ip_select_route_v4(ipaddr_t dst, ip_xmit_attr_t *ixa, uint_t *generationp,
  * Recursively look for a route to the destination. Can also match on
  * the zoneid, ill, and label. Used for the data paths. See also
  * ire_route_recursive.
- *
- * If ill is set this means we will match it by adding MATCH_IRE_ILL.
  *
  * If IRR_ALLOCATE is not set then we will only inspect the existing IREs; never
  * create an IRE_IF_CLONE. This is used on the receive side when we are not
@@ -1244,9 +1411,6 @@ ire_route_recursive_impl_v4(ire_t *ire,
 	if (gwattrp != NULL)
 		ASSERT(*gwattrp == NULL);
 
-	if (ill_arg != NULL)
-		match_args |= MATCH_IRE_ILL;
-
 	/*
 	 * We iterate up to three times to resolve a route, even though
 	 * we have four slots in the array. The extra slot is for an
@@ -1257,7 +1421,7 @@ ire_route_recursive_impl_v4(ire_t *ire,
 		/* ire_ftable_lookup handles round-robin/ECMP */
 		if (ire == NULL) {
 			ire = ire_ftable_lookup_v4(nexthop, 0, 0, ire_type,
-			    (ill_arg != NULL ? ill_arg : ill), zoneid, tsl,
+			    (ill != NULL? ill : ill_arg), zoneid, tsl,
 			    match_args, xmit_hint, ipst, &generation);
 		} else {
 			/* Caller passed it; extra hold since we will rele */
@@ -1403,6 +1567,10 @@ ire_route_recursive_impl_v4(ire_t *ire,
 		 * recursing. The type match is used by some callers
 		 * to exclude certain types (such as IRE_IF_CLONE or
 		 * IRE_LOCAL|IRE_LOOPBACK).
+		 *
+		 * In the MATCH_IRE_SRC_ILL case, ill_arg may be the 'srcof'
+		 * ire->ire_ill, and we want to find the IRE_INTERFACE for
+		 * ire_ill, so we set ill to the ire_ill;
 		 */
 		match_args &= MATCH_IRE_TYPE;
 		nexthop = ire->ire_gateway_addr;
