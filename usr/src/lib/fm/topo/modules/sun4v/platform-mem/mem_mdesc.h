@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _MEM_MDESC_H
 #define	_MEM_MDESC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fm/topo_mod.h>
 #include <sys/fm/ldom.h>
@@ -37,7 +35,6 @@ extern "C" {
 #endif
 
 #define	MEM_DIMM_MAX	8		/* max FB DIMM depth */
-#define	MAX_DIMMS_PER_BANK	4	/* would allow sun4u */
 
 #ifndef	MIN
 #define	MIN(x, y) ((x) < (y) ? (x) : (y))
@@ -55,13 +52,18 @@ typedef struct mem_dimm_map {
 	uint64_t dm_drgen;		/* DR gen count for cached S/N */
 } mem_dimm_map_t;
 
+typedef	struct mem_dimm_list {
+	struct mem_dimm_list *dl_next;
+	mem_dimm_map_t *dl_dimm;
+} mem_dimm_list_t;
+
 typedef struct mem_bank_map {
 	struct mem_bank_map *bm_next;	/* the next bank map overall */
 	struct mem_bank_map *bm_grp;	/* next bank map in group */
 	uint64_t	bm_mask;
 	uint64_t	bm_match;
 	uint16_t	bm_shift;	/* dimms-per-reference shift */
-	mem_dimm_map_t *bm_dimm[MAX_DIMMS_PER_BANK];
+	mem_dimm_list_t *bm_dlist;
 } mem_bank_map_t;
 
 typedef struct mem_grp {

@@ -1,3 +1,4 @@
+
 /*
  * CDDL HEADER START
  *
@@ -20,7 +21,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -282,14 +283,15 @@ uint64_t
 calc_phys_addr(mem_seg_map_t *seg, char *ds, uint64_t offset)
 {
 	mem_bank_map_t *bm;
-	size_t i;
+	mem_dimm_list_t *dl;
 
 	for (bm = seg->sm_grp->mg_bank; bm != NULL; bm = bm->bm_grp) {
-		for (i = 0; i < MAX_DIMMS_PER_BANK &&
-		    bm->bm_dimm[i] != NULL; i++) {
-			if (strcmp(bm->bm_dimm[i]->dm_serid, ds) == 0)
+		dl = bm->bm_dlist;
+		while (dl != NULL) {
+			if (strcmp(dl->dl_dimm->dm_serid, ds) == 0)
 				return (insert_bits(offset<<bm->bm_shift,
 				    bm->bm_mask, bm->bm_match));
+			dl = dl->dl_next;
 		}
 	}
 	return ((uint64_t)-1);

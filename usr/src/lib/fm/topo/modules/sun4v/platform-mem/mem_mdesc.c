@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,6 +59,7 @@ mdesc_init_n1(topo_mod_t *mod, md_t *mdp, mde_cookie_t *listp,
 	char *unum, *serial, *part;
 	mem_seg_map_t *seg;
 	mem_bank_map_t *bm;
+	mem_dimm_list_t *dlp;
 	mem_grp_t *mg;
 	char s[20];
 
@@ -163,8 +164,13 @@ mdesc_init_n1(topo_mod_t *mod, md_t *mdp, mde_cookie_t *listp,
 			(void) sprintf(s, "MB/CMP0/CH%1d/R%1d", chan, rank);
 			idx = 0;
 			for (d = mem->mem_dm; d != NULL; d = d->dm_next) {
-				if (strncmp(s, d->dm_label, strlen(s)) == 0)
-					bm->bm_dimm[idx++] = d;
+				if (strncmp(s, d->dm_label, strlen(s)) == 0) {
+					dlp = topo_mod_zalloc(mod,
+					    sizeof (mem_dimm_list_t));
+					dlp->dl_next = bm->bm_dlist;
+					bm->bm_dlist = dlp;
+					dlp->dl_dimm = d;
+				}
 			}
 		}
 	}
@@ -259,6 +265,7 @@ mdesc_init_n2(topo_mod_t *mod, md_t *mdp, mde_cookie_t *listp,
 	char *unum, *serial, *part, *dash;
 	mem_seg_map_t *smp;
 	mem_bank_map_t *bmp, **banklist;
+	mem_dimm_list_t *dlp;
 	mem_grp_t *gmp;
 	char *type, *sp, *jnum, *nac;
 	size_t ss;
@@ -370,7 +377,10 @@ mdesc_init_n2(topo_mod_t *mod, md_t *mdp, mde_cookie_t *listp,
 				continue;
 			if ((dm = mem_get_dimm_by_sn(serial, mem)) == NULL)
 				continue;
-			bmp->bm_dimm[i] = dm;
+			dlp = topo_mod_zalloc(mod, sizeof (mem_dimm_list_t));
+			dlp->dl_next = bmp->bm_dlist;
+			bmp->bm_dlist = dlp;
+			dlp->dl_dimm = dm;
 		}
 	}
 	topo_mod_free(mod, dl, mdesc_dimm_count * sizeof (mde_cookie_t));
@@ -469,6 +479,7 @@ void
 mem_mdesc_fini(topo_mod_t *mod, md_mem_info_t *mem)
 {
 	mem_dimm_map_t *dm, *next;
+	mem_dimm_list_t *dl, *nl;
 	mem_bank_map_t *bm, *cm;
 	mem_grp_t *gm, *hm;
 	mem_seg_map_t *sm, *snext;
@@ -481,6 +492,10 @@ mem_mdesc_fini(topo_mod_t *mod, md_mem_info_t *mem)
 		topo_mod_free(mod, dm, sizeof (mem_dimm_map_t));
 	}
 	for (bm = mem->mem_bank; bm != NULL; bm = cm) {
+		for (dl = bm->bm_dlist; dl != NULL; dl = nl) {
+			nl = dl->dl_next;
+			topo_mod_free(mod, dl, sizeof (mem_dimm_list_t));
+		}
 		cm = bm->bm_next;
 		topo_mod_free(mod, bm, sizeof (mem_bank_map_t));
 	}
