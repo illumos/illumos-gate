@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1296,9 +1296,9 @@ void
 cmi_read_smbios(cmi_hdl_t ophdl)
 {
 
-	uint_t strand_apicid;
-	uint_t chip_inst;
-	uint16_t smb_id;
+	uint_t strand_apicid = UINT_MAX;
+	uint_t chip_inst = UINT_MAX;
+	uint16_t smb_id = USHRT_MAX;
 	int rc = 0;
 
 	cmi_hdl_impl_t *hdl = IMPLHDL(ophdl);

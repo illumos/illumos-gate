@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -202,23 +202,18 @@ chip_get_smbstruct(topo_mod_t *mod, const smbios_struct_t *sp)
 	smbios_memdevice_t md;
 	smbios_processor_ext_t extp;
 	smbios_memarray_ext_t extma;
+	smbios_memdevice_ext_t extmd;
+	int ext_match = 0;
 
-	/*
-	 * We expect that the first SUN_OEM_EXT_XXX
-	 * that comes after a SMB_TYPE_XXX correspond
-	 * to each other in the SMBIOS ordering of the
-	 * records. And SUN_OEM_EXT_XXX always comes
-	 * after its SMB_TYPE_XXX record.
-	 */
 	switch (sp->smbstr_type) {
 	case SMB_TYPE_BASEBOARD:
 		bb_count++;
 		break;
 	case SMB_TYPE_MEMARRAY:
 		mctsmb[nmct_ids].mct_id = sp->smbstr_id;
+		nmct_ids++;
 		break;
 	case SUN_OEM_EXT_MEMARRAY:
-		mctsmb[nmct_ids].extmct_id = sp->smbstr_id;
 		if (shp != NULL) {
 			if (smbios_info_extmemarray(shp,
 			    sp->smbstr_id, &extma) != 0) {
@@ -229,12 +224,20 @@ chip_get_smbstruct(topo_mod_t *mod, const smbios_struct_t *sp)
 			}
 		} else
 			return (-1);
-		if (extma.smbmae_ma == mctsmb[nmct_ids].mct_id)
-			mctsmb[nmct_ids].p_id = extma.smbmae_comp;
-		else
+		for (int i = 0; i < nmct_ids; i++) {
+			if (extma.smbmae_ma == mctsmb[i].mct_id) {
+				mctsmb[i].extmct_id = sp->smbstr_id;
+				mctsmb[i].p_id = extma.smbmae_comp;
+				ext_match = 1;
+				break;
+			}
+		}
+		if (!ext_match) {
+			topo_mod_dprintf(mod, "chip_get_smbstruct : "
+			    "EXT_MEMARRAY-MEMARRAY records are mismatched\n");
+			ext_match = 0;
 			return (-1);
-
-		nmct_ids++;
+		}
 		break;
 	case SMB_TYPE_MEMDEVICE:
 		dimmsmb[ndimm_ids].dimm_id = sp->smbstr_id;
@@ -245,13 +248,33 @@ chip_get_smbstruct(topo_mod_t *mod, const smbios_struct_t *sp)
 		} else
 			return (-1);
 		dimmsmb[ndimm_ids].bankloc = md.smbmd_bloc;
+		ndimm_ids++;
 		break;
 	/*
 	 * Every SMB_TYPE_MEMDEVICE SHOULD have a
 	 * corresponding SUN_OEM_EXT_MEMDEVICE
 	 */
 	case SUN_OEM_EXT_MEMDEVICE:
-		dimmsmb[ndimm_ids++].extdimm_id = sp->smbstr_id;
+		if (smbios_info_extmemdevice(shp,
+		    sp->smbstr_id, &extmd) != 0) {
+			topo_mod_dprintf(mod, "chip_get_smbstruct : "
+			    "smbios_info_extmemdevice()"
+			    "failed\n");
+			return (-1);
+		}
+		for (int i = 0; i < ndimm_ids; i++) {
+			if (extmd.smbmdeve_md == dimmsmb[i].dimm_id) {
+				dimmsmb[i].extdimm_id = sp->smbstr_id;
+				ext_match = 1;
+				break;
+			}
+		}
+		if (!ext_match) {
+			topo_mod_dprintf(mod, "chip_get_smbstruct : "
+			    "EXT_MEMDEVICE-MEMDEVICE records are mismatched\n");
+			ext_match = 0;
+			return (-1);
+		}
 		break;
 	case SMB_TYPE_PROCESSOR:
 		cpusmb[ncpu_ids].cpu_id = sp->smbstr_id;
@@ -265,6 +288,7 @@ chip_get_smbstruct(topo_mod_t *mod, const smbios_struct_t *sp)
 			}
 		}
 		cpusmb[ncpu_ids].status = p.smbp_status;
+		ncpu_ids++;
 		break;
 	/*
 	 * Every SMB_TYPE_PROCESSOR SHOULD have a
@@ -278,8 +302,19 @@ chip_get_smbstruct(topo_mod_t *mod, const smbios_struct_t *sp)
 			    "failed\n");
 			return (-1);
 		}
-		cpusmb[ncpu_ids].fru = extp.smbpe_fru;
-		ncpu_ids++;
+		for (int i = 0; i < ncpu_ids; i++) {
+			if (extp.smbpe_processor == cpusmb[i].cpu_id) {
+				cpusmb[i].fru = extp.smbpe_fru;
+				ext_match = 1;
+				break;
+			}
+		}
+		if (!ext_match) {
+			topo_mod_dprintf(mod, "chip_get_smbstruct : "
+			    "EXT_PROCESSOR-PROCESSOR records are mismatched\n");
+			ext_match = 0;
+			return (-1);
+		}
 		break;
 	}
 	return (0);
@@ -341,12 +376,10 @@ chip_status_smbios_get(topo_mod_t *mod, id_t smb_id)
 		if (smb_id == cpusmb[i].cpu_id) {
 			if (cpusmb[i].status  == (enabled | populated))
 				return (1);
-			else
-				return (0);
 		}
 	}
 
-	topo_mod_dprintf(mod, "topo_status_smbios_get() failed"
+	topo_mod_dprintf(mod, "chip_status_smbios_get() failed"
 	    " considering that Type 4 ID : %d is disabled", smb_id);
 	return (0);
 }
@@ -369,7 +402,7 @@ chip_fru_smbios_get(topo_mod_t *mod, id_t smb_id)
 		}
 	}
 
-	topo_mod_dprintf(mod, "topo_fru_smbios_get() failed"
+	topo_mod_dprintf(mod, "chip_fru_smbios_get() failed"
 	    " considering that Type 4 ID : %d is not a FRU", smb_id);
 	return (0);
 }
