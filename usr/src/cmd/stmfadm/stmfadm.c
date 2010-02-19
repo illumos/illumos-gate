@@ -105,6 +105,8 @@ static int convertCharToPropId(char *, uint32_t *);
 #define	VIEW_FORMAT		    "    %-13s: "
 #define	LVL3_FORMAT		    "        %s"
 #define	LVL4_FORMAT		    "            %s"
+#define	DELAYED_EXEC_WAIT_INTERVAL  300 * 1000 * 1000	/* in nano sec */
+#define	DELAYED_EXEC_WAIT_MAX	    30	/* Maximum number of interval times */
 
 /* SCSI Name String length definitions */
 #define	SNS_EUI_16		    16
@@ -128,6 +130,9 @@ static int convertCharToPropId(char *, uint32_t *);
 #define	SERIAL_NUMBER		    "SERIAL"
 #define	MGMT_URL		    "MGMT-URL"
 #define	HOST_ID			    "HOST-ID"
+
+#define	STMFADM_SUCCESS		    0
+#define	STMFADM_FAILURE		    1
 
 #define	MODIFY_HELP "\n"\
 "Description: Modify properties of a logical unit. \n" \
@@ -2825,7 +2830,8 @@ onlineOfflineLu(char *lu, int state)
 	stmfGuid inGuid;
 	unsigned int guid[sizeof (stmfGuid)];
 	int i;
-	int ret = 0;
+	int ret = 0, stmfRet;
+	stmfLogicalUnitProperties luProps;
 
 	if (strlen(lu) != GUID_INPUT) {
 		(void) fprintf(stderr, "%s: %s: %s %d %s\n", cmdName, lu,
@@ -2853,6 +2859,8 @@ onlineOfflineLu(char *lu, int state)
 		ret = stmfOnlineLogicalUnit(&inGuid);
 	} else if (state == OFFLINE_LU) {
 		ret = stmfOfflineLogicalUnit(&inGuid);
+	} else {
+		return (STMFADM_FAILURE);
 	}
 	if (ret != STMF_STATUS_SUCCESS) {
 		switch (ret) {
@@ -2863,6 +2871,10 @@ onlineOfflineLu(char *lu, int state)
 			case STMF_ERROR_SERVICE_NOT_FOUND:
 				(void) fprintf(stderr, "%s: %s\n", cmdName,
 				    gettext("STMF service not found"));
+				break;
+			case STMF_ERROR_BUSY:
+				(void) fprintf(stderr, "%s: %s\n", cmdName,
+				    gettext("resource busy"));
 				break;
 			case STMF_ERROR_NOT_FOUND:
 				(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
@@ -2877,8 +2889,45 @@ onlineOfflineLu(char *lu, int state)
 				    gettext("unknown error"));
 				break;
 		}
+	} else {
+		struct timespec	ts = {0};
+		unsigned int	count = 0;
+		uint32_t	ret_state;
+
+		ret_state = (state == ONLINE_LU) ?
+		    STMF_LOGICAL_UNIT_ONLINING : STMF_LOGICAL_UNIT_OFFLINING;
+		ts.tv_nsec = DELAYED_EXEC_WAIT_INTERVAL;
+
+		/* CONSTCOND */
+		while (1) {
+			stmfRet = stmfGetLogicalUnitProperties(&inGuid,
+			    &luProps);
+			if (stmfRet == STMF_STATUS_SUCCESS)
+				ret_state = luProps.status;
+
+			if ((state == ONLINE_LU &&
+			    ret_state == STMF_LOGICAL_UNIT_ONLINE) ||
+			    (state == OFFLINE_LU &&
+			    ret_state == STMF_LOGICAL_UNIT_OFFLINE))
+				return (STMFADM_SUCCESS);
+
+			if ((state == ONLINE_LU &&
+			    ret_state == STMF_LOGICAL_UNIT_OFFLINE) ||
+			    (state == OFFLINE_LU &&
+			    ret_state == STMF_LOGICAL_UNIT_ONLINE))
+				return (STMFADM_FAILURE);
+
+			if (++count ==  DELAYED_EXEC_WAIT_MAX) {
+				(void) fprintf(stderr, "%s: %s\n", cmdName,
+				    gettext("Logical Unit state change request "
+				    "submitted. Waiting for completion "
+				    "timed out"));
+				return (STMFADM_FAILURE);
+			}
+			(void) nanosleep(&ts, NULL);
+		}
 	}
-	return (ret);
+	return (STMFADM_FAILURE);
 }
 
 /*
@@ -2934,8 +2983,9 @@ offlineLuFunc(int operandLen, char *operands[], cmdOptions_t *options,
 static int
 onlineOfflineTarget(char *target, int state)
 {
-	int ret = 0;
+	int ret = 0, stmfRet = 0;
 	stmfDevid devid;
+	stmfTargetProperties targetProps;
 
 	if (parseDevid(target, &devid) != 0) {
 		(void) fprintf(stderr, "%s: %s: %s\n",
@@ -2946,6 +2996,8 @@ onlineOfflineTarget(char *target, int state)
 		ret = stmfOnlineTarget(&devid);
 	} else if (state == OFFLINE_TARGET) {
 		ret = stmfOfflineTarget(&devid);
+	} else {
+		return (STMFADM_FAILURE);
 	}
 	if (ret != STMF_STATUS_SUCCESS) {
 		switch (ret) {
@@ -2956,6 +3008,10 @@ onlineOfflineTarget(char *target, int state)
 			case STMF_ERROR_SERVICE_NOT_FOUND:
 				(void) fprintf(stderr, "%s: %s\n", cmdName,
 				    gettext("STMF service not found"));
+				break;
+			case STMF_ERROR_BUSY:
+				(void) fprintf(stderr, "%s: %s\n", cmdName,
+				    gettext("resource busy"));
 				break;
 			case STMF_ERROR_NOT_FOUND:
 				(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
@@ -2970,8 +3026,46 @@ onlineOfflineTarget(char *target, int state)
 				    gettext("unknown error"));
 				break;
 		}
+	} else {
+		struct timespec  ts = {0};
+		unsigned int count = 0;
+		uint32_t	ret_state;
+
+		ret_state = (state == ONLINE_TARGET) ?
+		    STMF_TARGET_PORT_ONLINING : STMF_TARGET_PORT_OFFLINING;
+		ts.tv_nsec = DELAYED_EXEC_WAIT_INTERVAL;
+
+		/* CONSTCOND */
+		while (1) {
+			stmfRet = stmfGetTargetProperties(&devid, &targetProps);
+			if (stmfRet == STMF_STATUS_SUCCESS)
+				ret_state = targetProps.status;
+
+			if ((state == ONLINE_TARGET &&
+			    ret_state == STMF_TARGET_PORT_ONLINE) ||
+			    (state == OFFLINE_TARGET &&
+			    ret_state == STMF_TARGET_PORT_OFFLINE)) {
+				return (STMFADM_SUCCESS);
+			}
+
+			if ((state == ONLINE_TARGET &&
+			    ret_state == STMF_TARGET_PORT_OFFLINE) ||
+			    (state == OFFLINE_TARGET &&
+			    ret_state == STMF_TARGET_PORT_ONLINE)) {
+				return (STMFADM_FAILURE);
+			}
+
+			if (++count ==  DELAYED_EXEC_WAIT_MAX) {
+				(void) fprintf(stderr, "%s: %s\n", cmdName,
+				    gettext("Target state change request "
+				    "submitted. Waiting for completion "
+				    "timed out."));
+				return (STMFADM_FAILURE);
+			}
+			(void) nanosleep(&ts, NULL);
+		}
 	}
-	return (ret);
+	return (STMFADM_FAILURE);
 }
 
 /*

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef	_STMF_DEFINES_H
@@ -83,6 +83,7 @@ typedef	uint64_t		stmf_status_t;
 #define	STMF_ALREADY		(STMF_FAILURE | STMF_FSC(8))
 #define	STMF_TIMEOUT		(STMF_FAILURE | STMF_FSC(9))
 #define	STMF_NOT_SUPPORTED	(STMF_FAILURE | STMF_FSC(10))
+#define	STMF_BADSTATE		(STMF_FAILURE | STMF_FSC(11))
 
 #define	GET_BYTE_OFFSET(ptr, off)	(((uint8_t *)(ptr)) + (off))
 #define	GET_STRUCT_SIZE(s)		((sizeof (s) + 7) & 0xfffffff8)
