@@ -19,11 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /*
  * Threads:
  *
@@ -766,7 +766,7 @@ qpool_return(plugin_t *p, audit_q_t *node)
 	int	q_size;
 
 #if DEBUG
-	uint32_t	sequence = node->aqq_sequence;
+	uint64_t	sequence = node->aqq_sequence;
 #endif
 	qpool_size = audit_queue_size(&(p->plg_pool));
 	q_size = audit_queue_size(&(p->plg_queue));
@@ -777,7 +777,7 @@ qpool_return(plugin_t *p, audit_q_t *node)
 		audit_enqueue(&(p->plg_pool), node);
 
 	DPRINT((dbfp,
-	    "qpool_return(%d):  seq=%d, q size=%d,"
+	    "qpool_return(%d):  seq=%llu, q size=%d,"
 	    " pool size=%d (total alloc=%d), threshhold=%d\n",
 	    p->plg_tid, sequence, q_size, qpool_size,
 	    q_size + qpool_size, p->plg_q_threshold));
@@ -813,7 +813,7 @@ bpool_return(audit_rec_t *node)
 
 #if DEBUG
 static void
-dump_state(char *src, plugin_t *p, int count, char *msg)
+dump_state(char *src, plugin_t *p, uint64_t count, char *msg)
 {
 	struct sched_param	param;
 	int			policy;
@@ -821,7 +821,7 @@ dump_state(char *src, plugin_t *p, int count, char *msg)
  * count is message sequence
  */
 	(void) pthread_getschedparam(p->plg_tid, &policy, &param);
-	(void) fprintf(dbfp, "%7s(%d/%d) %11s:"
+	(void) fprintf(dbfp, "%7s(%d/%llu) %11s:"
 	    " input_in_wait=%d"
 	    " priority=%d"
 	    " queue size=%d pool size=%d"
@@ -1222,7 +1222,7 @@ process(plugin_t *p)
 #if DEBUG
 		if (q_node->aqq_sequence != p->plg_last_seq_out + 1)
 			(void) fprintf(dbfp,
-			    "process(%d): buffer sequence=%u but prev=%u\n",
+			    "process(%d): buffer sequence=%llu but prev=%llu\n",
 			    p->plg_tid, q_node->aqq_sequence,
 			    p->plg_last_seq_out);
 #endif

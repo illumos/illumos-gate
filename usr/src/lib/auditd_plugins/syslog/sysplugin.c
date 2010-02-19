@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * convert binary audit records to syslog messages and
@@ -333,9 +333,9 @@ gethname(au_tid_addr_t *tid, char *p, size_t max, char *prefix,
 
 	if (tid->at_type == AU_IPv6) {
 		key = tid->at_addr[0] ^
-			tid->at_addr[1] ^
-			tid->at_addr[2] ^
-			tid->at_addr[3];
+		    tid->at_addr[1] ^
+		    tid->at_addr[2] ^
+		    tid->at_addr[3];
 	} else
 		key = (tid->at_addr[0]);
 
@@ -467,7 +467,7 @@ getuname(uid_t uid, gid_t gid, char *p, size_t max, char *prefix,
 			    NULL)
 				gidhash[ix].ht_length =
 				    snprintf(gidhash[ix].ht_value, GIDNAMELEN,
-					"%d", gid);
+				    "%d", gid);
 			else
 				gidhash[ix].ht_length =
 				    strlcpy(gidhash[ix].ht_value,
@@ -497,7 +497,7 @@ getuname(uid_t uid, gid_t gid, char *p, size_t max, char *prefix,
 #define	EVENT_NAME_LEN	32
 
 static auditd_rc_t
-filter(const char *input, uint32_t sequence, char *output,
+filter(const char *input, uint64_t sequence, char *output,
     size_t in_len, size_t out_len)
 {
 	parse_context_t		ctx;
@@ -599,12 +599,12 @@ filter(const char *input, uint32_t sequence, char *output,
 			if (ctx.out.sf_sequence != -1)
 				fprintf(dbfp,
 				    "syslog tossed (event=%hu) record %u "
-				    "/ buffer %u\n",
+				    "/ buffer %llu\n",
 				    ctx.out.sf_eventid, ctx.out.sf_sequence,
 				    sequence);
 			else
 				fprintf(dbfp,
-				    "syslog tossed (event=%hu) buffer %u\n",
+				    "syslog tossed (event=%hu) buffer %llu\n",
 				    ctx.out.sf_eventid, sequence);
 #endif
 
@@ -724,14 +724,14 @@ filter(const char *input, uint32_t sequence, char *output,
 		 */
 		if (ctx.out.sf_sequence != -1) {
 			fprintf(dbfp,
-			    "syslog writing record %u / buffer %u\n",
+			    "syslog writing record %u / buffer %llu\n",
 			    ctx.out.sf_sequence, sequence);
 			used = snprintf(bp, remaining, "  seq %u",
 			    ctx.out.sf_sequence, sequence);
 			remaining -= used;
 			bp += used;
 		} else
-			fprintf(dbfp, "syslog writing buffer %u\n", sequence);
+			fprintf(dbfp, "syslog writing buffer %llu\n", sequence);
 #endif
 		/*
 		 * Long fields that may need truncation go here in
@@ -781,18 +781,18 @@ filter(const char *input, uint32_t sequence, char *output,
 
 /* ARGSUSED */
 auditd_rc_t
-auditd_plugin(const char *input, size_t in_len, uint32_t sequence, char **error)
+auditd_plugin(const char *input, size_t in_len, uint64_t sequence, char **error)
 {
 	char		*outbuf;
 	auditd_rc_t	rc = AUDITD_SUCCESS;
 #if DEBUG
-	static	uint32_t	last_sequence = 0;
-	static	uint32_t	write_count = 0;
-	static	uint32_t	toss_count = 0;
+	static	uint64_t	last_sequence = 0;
+	static	uint64_t	write_count = 0;
+	static	uint64_t	toss_count = 0;
 
 	if ((last_sequence > 0) && (sequence != last_sequence + 1))
-		fprintf(dbfp, "syslog: buffer sequence=%d but prev=%d\n",
-				sequence, last_sequence);
+		fprintf(dbfp, "syslog: buffer sequence=%llu but prev=%llu\n",
+		    sequence, last_sequence);
 	last_sequence = sequence;
 #endif
 
@@ -800,7 +800,7 @@ auditd_plugin(const char *input, size_t in_len, uint32_t sequence, char **error)
 
 	outbuf = malloc(OUTPUT_BUF_SIZE);
 	if (outbuf == NULL) {
-		DPRINT((dbfp, "syslog: out of memory; seq=%u\n",
+		DPRINT((dbfp, "syslog: out of memory; seq=%llu\n",
 		    sequence));
 		rc = AUDITD_NO_MEMORY;
 		*error = strdup(gettext("Can't allocate buffers"));
@@ -810,17 +810,17 @@ auditd_plugin(const char *input, size_t in_len, uint32_t sequence, char **error)
 		if (rc == AUDITD_SUCCESS) {
 			__audit_syslog("audit", LOG_NDELAY,
 			    LOG_AUDIT, LOG_NOTICE, outbuf);
-			DPRINT((dbfp, "syslog: write_count=%u, "
-			    "buffer=%u, tossed=%d\n",
+			DPRINT((dbfp, "syslog: write_count=%llu, "
+			    "buffer=%llu, tossed=%llu\n",
 			    ++write_count, sequence, toss_count));
 		} else if (rc > 0) {	/* -1 == discard it */
-			DPRINT((dbfp, "syslog: parse failed for buffer %u\n",
+			DPRINT((dbfp, "syslog: parse failed for buffer %llu\n",
 			    sequence));
 			*error = strdup(gettext(
 			    "Unable to parse audit record"));
 		} else {
 			DPRINT((dbfp, "syslog: rc = %d (-1 is discard), "
-			    "sequence=%u, toss_count=%d\n",
+			    "sequence=%llu, toss_count=%llu\n",
 			    rc, sequence, ++toss_count));
 			rc = 0;
 		}

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
 
 #ifndef	_PLUGIN_H
 #define	_PLUGIN_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -56,7 +53,7 @@ struct plg {
 
 	char		*plg_path;		/* plugin path */
 	void		*plg_dlptr;		/* dynamic lib pointer */
-	auditd_rc_t	(*plg_fplugin)(const char *, size_t, int, char **);
+	auditd_rc_t	(*plg_fplugin)(const char *, size_t, uint64_t, char **);
 	auditd_rc_t	(*plg_fplugin_open)(const kva_t *, char **, char **);
 	auditd_rc_t	(*plg_fplugin_close)(char **);
 
@@ -64,8 +61,8 @@ struct plg {
 	size_t		plg_qmax;		/* max queue size */
 	size_t		plg_qmin;		/* min queue size */
 
-	uint32_t	plg_sequence;		/* buffer counter */
-	uint32_t	plg_last_seq_out;	/* buffer counter (debug) */
+	uint64_t	plg_sequence;		/* buffer counter */
+	uint64_t	plg_last_seq_out;	/* buffer counter (debug) */
 	uint32_t	plg_tossed;		/* discards (debug) */
 	uint32_t	plg_queued;		/* count buffers queued */
 	uint32_t	plg_output;		/* count of buffers output */

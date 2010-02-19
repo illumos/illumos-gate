@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYSTOKEN_H
 #define	_SYSTOKEN_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,7 +41,7 @@ extern "C" {
 
 struct parse_context {
 	adr_t		adr;	/* input buffer pointers */
-	uint32_t	id;	/* message sequence number */
+	uint64_t	id;	/* message sequence number */
 	tosyslog_t	out;	/* output data */
 };
 typedef struct parse_context parse_context_t;

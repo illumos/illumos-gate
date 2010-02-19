@@ -784,7 +784,7 @@ save_maxsize(char *maxsize) {
  */
 /* ARGSUSED */
 auditd_rc_t
-auditd_plugin(const char *input, size_t in_len, uint32_t sequence, char **error)
+auditd_plugin(const char *input, size_t in_len, uint64_t sequence, char **error)
 {
 	auditd_rc_t	rc = AUDITD_FAIL;
 	int		open_status;
@@ -798,16 +798,15 @@ auditd_plugin(const char *input, size_t in_len, uint32_t sequence, char **error)
 	struct timeval	now;
 #if DEBUG
 	static char	*last_file_written_to = NULL;
-	static uint32_t	last_sequence = 0;
-	static uint32_t	write_count = 0;
+	static uint64_t	last_sequence = 0;
+	static uint64_t	write_count = 0;
 
 	if ((last_sequence > 0) && (sequence != last_sequence + 1))
-		fprintf(dbfp, "binfile: buffer sequence=%d but prev=%d=n",
+		fprintf(dbfp, "binfile: buffer sequence=%llu but prev=%llu=n",
 		    sequence, last_sequence);
 	last_sequence = sequence;
 
-	fprintf(dbfp, "binfile: input seq=%d, len=%d\n",
-	    sequence, in_len);
+	fprintf(dbfp, "binfile: input seq=%llu, len=%d\n", sequence, in_len);
 #endif
 	*error = NULL;
 	/*
@@ -866,7 +865,7 @@ auditd_plugin(const char *input, size_t in_len, uint32_t sequence, char **error)
 
 			if (out_len == in_len) {
 				DPRINT((dbfp,
-				    "binfile: write_count=%u, sequence=%u,"
+				    "binfile: write_count=%llu, sequence=%llu,"
 				    " l=%u\n",
 				    ++write_count, sequence, out_len));
 				allsoftfull_warning = 0;
@@ -876,7 +875,7 @@ auditd_plugin(const char *input, size_t in_len, uint32_t sequence, char **error)
 				break;
 			} else if (!(activeDir->dl_flags & HARD_WARNED)) {
 				DPRINT((dbfp,
-				    "binfile: write failed, sequence=%u, "
+				    "binfile: write failed, sequence=%llu, "
 				    "l=%u\n", sequence, out_len));
 				DPRINT((dbfp, "hard warning sent.\n"));
 				__audit_dowarn("hard", activeDir->dl_dirname,

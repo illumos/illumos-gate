@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * This is an unstable interface; changes may be made without
@@ -29,8 +28,6 @@
 
 #ifndef	_AUDITD_H
 #define	_AUDITD_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <secdb.h>
 #include <sys/types.h>
@@ -61,7 +58,7 @@ typedef enum auditd_rc auditd_rc_t;
  *	arg 4 - optional explanation of error return (use NULL,
  *		not an empty string if not used.)
  */
-auditd_rc_t	auditd_plugin(const char *, size_t, uint32_t, char **);
+auditd_rc_t	auditd_plugin(const char *, size_t, uint64_t, char **);
 /*
  * auditd_plugin_open()
  *	arg 1 - attr/val struct, use with kva_match()

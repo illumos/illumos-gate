@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * send audit records to remote host
@@ -555,7 +555,7 @@ create_notify_pipe(int *notify_pipe, char **error)
  *
  */
 auditd_rc_t
-auditd_plugin(const char *input, size_t in_len, uint32_t sequence, char **error)
+auditd_plugin(const char *input, size_t in_len, uint64_t sequence, char **error)
 {
 	int 		rc = AUDITD_FAIL;
 	int 		send_record_rc = SEND_RECORD_FAIL;
@@ -567,15 +567,15 @@ auditd_plugin(const char *input, size_t in_len, uint32_t sequence, char **error)
 
 #if DEBUG
 	char		*rc_msg;
-	static uint32_t	last_sequence = 0;
+	static uint64_t	last_sequence = 0;
 
 	if ((last_sequence > 0) && (sequence != last_sequence + 1)) {
-		DPRINT((dfile, "audit_remote: buffer sequence=%d but prev=%d\n",
-		    sequence, last_sequence));
+		DPRINT((dfile, "audit_remote: buffer sequence=%llu "
+		    "but prev=%llu\n", sequence, last_sequence));
 	}
 	last_sequence = sequence;
 
-	DPRINT((dfile, "audit_remote: input seq=%d, len=%d\n",
+	DPRINT((dfile, "audit_remote: input seq=%llu, len=%d\n",
 	    sequence, in_len));
 #endif
 
@@ -600,7 +600,7 @@ auditd_plugin(const char *input, size_t in_len, uint32_t sequence, char **error)
 		    current_host->host->h_name, attempts + 1, retries));
 
 		send_record_rc = send_record(current_host, input, in_len,
-		    (uint64_t)sequence, &err_rsn);
+		    sequence, &err_rsn);
 		DPRINT((dfile, "send_record() returned %d - ", send_record_rc));
 
 		switch (send_record_rc) {
