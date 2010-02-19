@@ -20,7 +20,7 @@
  */
 
 /* 
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved. 
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved. 
  * Use is subject to license terms. 
  */ 
  
@@ -404,12 +404,10 @@ prop fault.cpu.intel.nb.ie@motherboard
 prop fault.cpu.intel.nb.ie@motherboard (0)-> EREPORT_BUS_ERROR;
 
 event ereport.cpu.intel.nb.dma@motherboard{within(12s)};
-event fault.cpu.intel.nb.dma@motherboard, retire=0, response=0;
+event upset.cpu.intel.nb.dma@motherboard;
 
-prop fault.cpu.intel.nb.dma@motherboard (1)->
+prop upset.cpu.intel.nb.dma@motherboard (1)->
     ereport.cpu.intel.nb.dma@motherboard;
-
-prop fault.cpu.intel.nb.dma@motherboard (0)-> EREPORT_BUS_ERROR;
 
 event ereport.cpu.intel.nb.esi@motherboard{within(12s)};
 event ereport.cpu.intel.nb.pex@hostbridge{within(12s)};
