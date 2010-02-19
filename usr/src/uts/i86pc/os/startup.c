@@ -1136,15 +1136,14 @@ startup_memlist(void)
 	/*
 	 * The default values of VALLOC_BASE and SEGKPM_BASE should work
 	 * for values of physmax up to 1 Terabyte. They need adjusting when
-	 * memory is at addresses above 1 TB.
+	 * memory is at addresses above 1 TB. When adjusted, segkpm_base must
+	 * be aligned on KERNEL_REDZONE_SIZE boundary (span of top level pte).
 	 */
 	if (physmax + 1 > mmu_btop(TERABYTE)) {
 		uint64_t kpm_resv_amount = mmu_ptob(physmax + 1);
 
-		/* Round to largest possible pagesize for now */
-		kpm_resv_amount = P2ROUNDUP(kpm_resv_amount, ONE_GIG);
-
-		segkpm_base = -(2 * kpm_resv_amount); /* down from top VA */
+		segkpm_base = -(P2ROUNDUP((2 * kpm_resv_amount),
+		    KERNEL_REDZONE_SIZE));	/* down from top VA */
 
 		/* make sure we leave some space for user apps above hole */
 		segkpm_base = MAX(segkpm_base, AMD64_VA_HOLE_END + TERABYTE);
@@ -1152,7 +1151,9 @@ startup_memlist(void)
 			segkpm_base = SEGKPM_BASE;
 		PRM_DEBUG(segkpm_base);
 
-		valloc_base = segkpm_base + kpm_resv_amount;
+		valloc_base = segkpm_base + P2ROUNDUP(kpm_resv_amount, ONE_GIG);
+		if (valloc_base < segkpm_base)
+			panic("not enough kernel VA to support memory size");
 		PRM_DEBUG(valloc_base);
 	}
 #else	/* __i386 */
