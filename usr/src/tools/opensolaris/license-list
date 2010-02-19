@@ -146,6 +146,7 @@ usr/src/uts/common/io/atu/THIRDPARTYLICENSE
 usr/src/uts/common/io/audio/drv/audiosolo/THIRDPARTYLICENSE
 usr/src/uts/common/io/chxge/com/THIRDPARTYLICENSE
 usr/src/uts/common/io/drm/THIRDPARTYLICENSE
+usr/src/uts/common/io/elxl/THIRDPARTYLICENSE
 usr/src/uts/common/io/ib/clients/rds/THIRDPARTYLICENSE
 usr/src/uts/common/io/ipw/THIRDPARTYLICENSE
 usr/src/uts/common/io/ipw/fw-ipw2100/LICENSE

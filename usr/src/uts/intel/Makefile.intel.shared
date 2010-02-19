@@ -375,7 +375,6 @@ DRV_KMODS	+= ii rdc rdcsrv rdcstub
 DRV_KMODS	+= iptun
 
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= bmc
-$(CLOSED_BUILD)CLOSED_DRV_KMODS		+= elxl
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= glm
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= intel_nhmex
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= iprb
@@ -399,6 +398,7 @@ DRV_KMODS	+= atge
 DRV_KMODS	+= bfe
 DRV_KMODS	+= dmfe
 DRV_KMODS	+= e1000g
+DRV_KMODS	+= elxl
 DRV_KMODS	+= hme
 DRV_KMODS	+= mxfe
 DRV_KMODS	+= nge

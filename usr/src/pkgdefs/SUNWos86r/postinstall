@@ -188,11 +188,6 @@ i386)
 		-i '"pci1011,2" "pci1011,9" "pci1011,14" "pci1011,19"
 		"pci1109,1400" "pci1109,2400" "pci10b8,2001" "pci2646,1"' \
 		dnet
-	check_add_drv -b "${BASEDIR}" -i \
-		'"pci10b7,9000" "pci10b7,9001" "pci10b7,9004" "pci10b7,9005"
-		"pci10b7,9006" "pci10b7,9050" "pci10b7,9051" "pci10b7,9055"
-		"pci10b7,9056" "pci10b7,9200" "pci10b7,9800" "pci10b7,9805"' \
-		elxl
 	check_add_drv -b "${BASEDIR}" \
 		-i '"pci1022,2000" "pci103c,104c"' \
 		pcn

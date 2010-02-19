@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -118,6 +118,14 @@ phy_other_probe(phy_handle_t *ph)
 	uint32_t vid = MII_PHY_MFG(ph->phy_id);
 	uint32_t pid = MII_PHY_MODEL(ph->phy_id);
 
+	if ((ph->phy_id == 0) || (ph->phy_id == 0xffffffffU)) {
+		/*
+		 * IDs are technically optional, but all discrete PHYs
+		 * should have them.
+		 */
+		ph->phy_vendor = "Internal";
+		ph->phy_model = "PHY";
+	}
 	for (int i = 0; other_vendors[i].vendor; i++) {
 		if (vid == other_vendors[i].oui) {
 			ph->phy_vendor = other_vendors[i].vendor;

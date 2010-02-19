@@ -1731,6 +1731,8 @@ BGE_OBJS += bge_main2.o bge_chip2.o bge_kstats.o bge_log.o bge_ndd.o \
 
 DMFE_OBJS += dmfe_log.o dmfe_main.o dmfe_mii.o
 
+ELXL_OBJS += elxl.o
+
 HME_OBJS += hme.o
 
 IXGB_OBJS += ixgb.o ixgb_atomic.o ixgb_chip.o ixgb_gld.o ixgb_kstats.o \
