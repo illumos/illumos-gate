@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1263,7 +1263,16 @@ dv_filldir(struct dv_node *ddv)
 	ndi_devi_enter(pdevi, &circ);
 	for (devi = ddi_get_child(pdevi); devi;
 	    devi = ddi_get_next_sibling(devi)) {
-		if (i_ddi_node_state(devi) < DS_INITIALIZED)
+		/*
+		 * While we know enough to create a directory at DS_INITIALIZED,
+		 * the directory will be empty until DS_ATTACHED. The existence
+		 * of an empty directory dv_node will cause a devi_ref, which
+		 * has caused problems for existing code paths doing offline/DR
+		 * type operations - making devfs_clean coordination even more
+		 * sensitive and error prone. Given this, the 'continue' below
+		 * is checking for DS_ATTACHED instead of DS_INITIALIZED.
+		 */
+		if (i_ddi_node_state(devi) < DS_ATTACHED)
 			continue;
 
 		/* skip hidden nodes */
