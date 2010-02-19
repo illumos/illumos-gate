@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * private interfaces for auditd plugins and auditd.
@@ -65,12 +65,8 @@ init_syslog_mutex()
  * the previous, the app_name hasn't changed.
  */
 void
-__audit_syslog(
-	const char *app_name,
-	int flags,
-	int facility,
-	int severity,
-	const char *message)
+__audit_syslog(const char *app_name, int flags, int facility, int severity,
+    const char *message)
 {
 	static pthread_once_t	once_control = PTHREAD_ONCE_INIT;
 	static int		logopen = 0;
@@ -216,43 +212,41 @@ __audit_dowarn2(char *option, char *name, char *error, char *text, int count)
 }
 
 /*
- * logpost - post the new audit log file name to audit_data.
+ * logpost - post the new audit log file name.
  *
- * This is not re-entrant code; it is called from auditd.c when
- * audit_binfile.so is not running and from binfile after auditd
- * is done.
+ *	Entry	name = active audit.log file name
+ *			NULL, if checking writability (auditd),
+ *			changing audit log files, error, or exiting (binfile).
+ *
+ *	Exit	0 = success
+ *		1 = system error -- errno
+ *		    audit_warn called with the specific error
+ *
  */
 int
 __logpost(char *name)
 {
-	char	buffer[MAXPATHLEN];
-	char	empty[] = "";
+	int lerrno;
 
-	static int	first = 1;
-	static char	auditdata[] = AUDITDATAFILE;
-	static int	audit_data_fd; /* file descriptor of audit_data */
+	if (unlink(BINFILE_FILE) != 0 &&
+	    errno != ENOENT) {
 
-	if (first) {
-		first = 0;
-		/*
-		 * Open the audit_data file. Use O_APPEND so that the contents
-		 * are not destroyed if there is another auditd running.
-		 */
-		if ((audit_data_fd = open(auditdata,
-		    O_RDWR | O_APPEND | O_CREAT, 0660)) < 0) {
-			__audit_dowarn("tmpfile", "", 0);
-			return (1);
-		}
+		lerrno = errno;
+		__audit_dowarn("tmpfile", strerror(errno), 0);
+		errno = lerrno;
+		return (1);
 	}
-	if (name == NULL)
-		name = empty;
+	if (name == NULL || *name == '\0') {
+		/* audit_binfile not active, no file pointer */
+		return (0);
+	}
+	if (symlink(name, BINFILE_FILE) != 0) {
 
-	(void) snprintf(buffer, sizeof (buffer), "%d:%s\n",
-	    (int)getpid(), name);
-
-	(void) ftruncate(audit_data_fd, (off_t)0);
-	(void) write(audit_data_fd, buffer, strlen(buffer));
-	(void) fsync(audit_data_fd);
+		lerrno = errno;
+		__audit_dowarn("tmpfile", strerror(errno), 0);
+		errno = lerrno;
+		return (1);
+	}
 
 	return (0);
 }

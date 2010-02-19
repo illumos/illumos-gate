@@ -20,9 +20,7 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -171,14 +169,22 @@ do
 			break
 			;;
 
-	"tmpfile" )	# Check tempfile arg
-			# The tempfile used by the audit daemon could not
-			# be opened even though it was unlinked.
-			# This error will cause the audit daemon to exit.
+	"tmpfile" )	# Check tmpfile arg
+			# The tmpfile used by the audit daemon (binfile) could
+			# not be opened even unlinked or symlinked.
+			# This error will cause the audit daemon to exit at
+			# start.  If it occurs later the audit daemon will
+			# attempt to carry on.
 
+			if [ ! -n "$2" ]
+			then
+				$DEBUG_OUT "$0: Need error string arg with 'tmpfile'!"
+				exit 1
+			else
+				ERROR=$2
+			fi
 			# Set message
-			MESSAGE="The audit daemon can not open audit_tmp.\
-  This implies a serious problem.  The audit daemon has exited!"
+			MESSAGE="The audit daemon is unable to update /var/run, error=$ERROR.\n This implies a serious problem."
 
 			send_msg
 

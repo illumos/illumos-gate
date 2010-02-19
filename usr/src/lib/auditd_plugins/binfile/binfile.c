@@ -18,9 +18,8 @@
  *
  * CDDL HEADER END
  */
-
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * write binary audit records directly to a file.
@@ -68,7 +67,6 @@
 
 #define	AUDIT_DATE_SZ	14
 #define	AUDIT_FNAME_SZ	2 * AUDIT_DATE_SZ + 2 + MAXHOSTNAMELEN
-#define	AUDIT_BAK_SZ	50	/* size of name of audit_data back-up file */
 
 			/* per-directory status */
 #define	SOFT_SPACE	0	/* minfree or less space available	*/
@@ -269,7 +267,7 @@ loadauditlist(char *dirstr, char *minfreestr)
 	    acresult == 2 || acresult == -3) {
 		/*
 		 * loop if the result is 0 (success), 2 (a warning
-		 * that the audit_data file has been rewound),
+		 * that the audit_control file has been rewound),
 		 * or -3 (a directory entry was found, but it
 		 * was badly formatted.
 		 */
@@ -1056,6 +1054,8 @@ auditd_plugin_close(char **error)
 	(void) pthread_mutex_unlock(&log_mutex);
 
 	DPRINT((dbfp, "binfile:  closed\n"));
+
+	(void) __logpost("");
 
 	if (binfile_is_open) {
 		(void) pthread_mutex_destroy(&log_mutex);

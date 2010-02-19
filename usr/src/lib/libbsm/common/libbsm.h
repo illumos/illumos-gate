@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -264,7 +264,6 @@ extern int	setauid(au_id_t *);
 /* system audit files for auditd */
 #define	AUDITCLASSFILE		"/etc/security/audit_class"
 #define	AUDITCONTROLFILE	"/etc/security/audit_control"
-#define	AUDITDATAFILE		"/etc/security/audit_data"
 #define	AUDITEVENTFILE		"/etc/security/audit_event"
 #define	AUDITUSERFILE		"/etc/security/audit_user"
 

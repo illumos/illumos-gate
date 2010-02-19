@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -280,7 +280,7 @@ main(int argc, char *argv[])
 	 */
 	(void) umask(007);
 
-	if (__logpost("")) {	/* Open the audit_data file. */
+	if (__logpost("")) {	/* Cannot unlink pointer to audit.log file. */
 		DPRINT((dbfp, "logpost failed\n"));
 		auditd_exit(4);
 	}
