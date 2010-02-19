@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _MACH_DESCRIP_H
 #define	_MACH_DESCRIP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -85,6 +83,7 @@ extern caddr_t md_get_md_raw(md_t *);
 extern int md_alloc_scan_dag(md_t *, mde_cookie_t, char *, char *,
 	    mde_cookie_t **);
 extern void md_free_scan_dag(md_t *, mde_cookie_t **);
+extern uint64_t md_get_current_gen(void);
 
 #ifdef __cplusplus
 }

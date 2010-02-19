@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1049,4 +1049,245 @@ init_md_broken(md_t *mdp, mde_cookie_t *cpulist)
 		broken_md_flag = 1;
 
 	md_free_scan_dag(mdp, &platlist);
+}
+
+/*
+ * Number of bits forming a valid context for use in a sun4v TTE and the MMU
+ * context registers. Sun4v defines the minimum default value to be 13 if this
+ * property is not specified in a cpu node in machine descriptor graph.
+ */
+#define	MMU_INFO_CTXBITS_MIN		13
+
+/* Convert context bits to number of contexts */
+#define	MMU_INFO_BNCTXS(nbits)		((uint_t)(1u<<(nbits)))
+
+/*
+ * Read machine descriptor and load TLB to CPU mappings.
+ * Returned values: cpuid2pset[NCPU], nctxs[NCPU], md_gen
+ * - cpuid2pset is initialized so it can convert cpuids to processor set of CPUs
+ *   that are shared between TLBs.
+ * - nctxs is initialized to number of contexts for each CPU
+ * - md_gen is set to generation number of machine descriptor from which this
+ *   data was.
+ * Return: zero on success.
+ */
+static int
+load_tlb_cpu_mappings(cpuset_t **cpuid2pset, uint_t *nctxs, uint64_t *md_gen)
+{
+	mde_str_cookie_t cpu_sc, bck_sc;
+	int		tlbs_idx, cp_idx;
+	mde_cookie_t	root;
+	md_t		*mdp = NULL;
+	mde_cookie_t	*tlbs = NULL;
+	mde_cookie_t	*cp = NULL;
+	uint64_t	*cpids = NULL;
+	uint64_t	nbit;
+	int		ntlbs;
+	int		ncp;
+	int		retval = 1;
+	cpuset_t	*ppset;
+
+	/* get MD handle, and string cookies for cpu and back nodes */
+	if ((mdp = md_get_handle()) == NULL ||
+	    (cpu_sc = md_find_name(mdp, "cpu")) == MDE_INVAL_STR_COOKIE ||
+	    (bck_sc = md_find_name(mdp, "back")) == MDE_INVAL_STR_COOKIE)
+		goto cleanup;
+
+	/* set generation number of current MD handle */
+	*md_gen = md_get_gen(mdp);
+
+	/* Find root element, and search for all TLBs in MD */
+	if ((root = md_root_node(mdp)) == MDE_INVAL_ELEM_COOKIE ||
+	    (ntlbs = md_alloc_scan_dag(mdp, root, "tlb", "fwd", &tlbs)) <= 0)
+		goto cleanup;
+
+	cp = kmem_alloc(sizeof (mde_cookie_t) * NCPU, KM_SLEEP);
+	cpids = kmem_alloc(sizeof (uint64_t) * NCPU, KM_SLEEP);
+
+	/*
+	 * Build processor sets, one per possible context domain.  For each tlb,
+	 * search for connected CPUs.  If any CPU is already in a set, then add
+	 * all the TLB's CPUs to that set.  Otherwise, create and populate a new
+	 * pset.  Thus, a single pset is built to represent multiple TLBs if
+	 * they have CPUs in common.
+	 */
+	for (tlbs_idx = 0; tlbs_idx < ntlbs; tlbs_idx++) {
+		ncp = md_scan_dag(mdp, tlbs[tlbs_idx], cpu_sc, bck_sc, cp);
+		if (ncp < 0)
+			goto cleanup;
+		else if (ncp == 0)
+			continue;
+
+		/* Get the id and number of contexts for each cpu */
+		for (cp_idx = 0; cp_idx < ncp; cp_idx++) {
+			mde_cookie_t c = cp[cp_idx];
+
+			if (md_get_prop_val(mdp, c, "id", &cpids[cp_idx]))
+				goto cleanup;
+			if (md_get_prop_val(mdp, c, "mmu-#context-bits", &nbit))
+				nbit = MMU_INFO_CTXBITS_MIN;
+			nctxs[cpids[cp_idx]] = MMU_INFO_BNCTXS(nbit);
+		}
+
+		/*
+		 * If a CPU is already in a set as shown by cpuid2pset[], then
+		 * use that set.
+		 */
+		for (cp_idx = 0; cp_idx < ncp; cp_idx++) {
+			ASSERT(cpids[cp_idx] < NCPU);
+			ppset = cpuid2pset[cpids[cp_idx]];
+			if (ppset != NULL)
+				break;
+		}
+
+		/* No CPU has a set. Create a new one. */
+		if (ppset == NULL) {
+			ppset = kmem_alloc(sizeof (cpuset_t), KM_SLEEP);
+			CPUSET_ZERO(*ppset);
+		}
+
+		/* Add every CPU to the set, and record the set assignment. */
+		for (cp_idx = 0; cp_idx < ncp; cp_idx++) {
+			cpuid2pset[cpids[cp_idx]] = ppset;
+			CPUSET_ADD(*ppset, cpids[cp_idx]);
+		}
+	}
+
+	retval = 0;
+
+cleanup:
+	if (tlbs != NULL)
+		md_free_scan_dag(mdp, &tlbs);
+	if (cp != NULL)
+		kmem_free(cp, sizeof (mde_cookie_t) * NCPU);
+	if (cpids != NULL)
+		kmem_free(cpids, sizeof (uint64_t) * NCPU);
+	if (mdp != NULL)
+		(void) md_fini_handle(mdp);
+
+	return (retval);
+}
+
+/*
+ * Return MMU info based on cpuid.
+ *
+ * Algorithm:
+ * Read machine descriptor and find all CPUs that share the same TLB with CPU
+ * specified by cpuid. Go through found CPUs and see if any one of them already
+ * has MMU index, if so, set index based on that value. If CPU does not share
+ * TLB with any other CPU or if none of those CPUs has mmu_ctx pointer, find the
+ * smallest available MMU index and give it to current CPU. If no available
+ * domain, perform a round robin, and start assigning from the beginning.
+ *
+ * For optimization reasons, this function uses a cache to store all TLB to CPU
+ * mappings, and updates them only when machine descriptor graph is changed.
+ * Because of this, and because we search MMU table for smallest index id, this
+ * function needs to be serialized which is protected by cpu_lock.
+ */
+void
+plat_cpuid_to_mmu_ctx_info(processorid_t cpuid, mmu_ctx_info_t *info)
+{
+	static cpuset_t	**cpuid2pset = NULL;
+	static uint_t	*nctxs;
+	static uint_t	next_domain = 0;
+	static uint64_t	md_gen = MDESC_INVAL_GEN;
+	uint64_t	current_gen;
+	int		idx;
+	cpuset_t	cpuid_pset;
+	processorid_t	id;
+	cpu_t		*cp;
+
+	ASSERT(MUTEX_HELD(&cpu_lock));
+
+	current_gen = md_get_current_gen();
+
+	/*
+	 * Load TLB CPU mappings only if MD generation has changed, FW that do
+	 * not provide generation number, always return MDESC_INVAL_GEN, and as
+	 * result MD is read here only once on such machines: when cpuid2pset is
+	 * NULL
+	 */
+	if (current_gen != md_gen || cpuid2pset == NULL) {
+		if (cpuid2pset == NULL) {
+			cpuid2pset = kmem_zalloc(sizeof (cpuset_t *) * NCPU,
+			    KM_SLEEP);
+			nctxs = kmem_alloc(sizeof (uint_t) * NCPU, KM_SLEEP);
+		} else {
+			/* clean cpuid2pset[NCPU], before loading new values */
+			for (idx = 0; idx < NCPU; idx++) {
+				cpuset_t *pset = cpuid2pset[idx];
+
+				if (pset != NULL) {
+					for (;;) {
+						CPUSET_FIND(*pset, id);
+						if (id == CPUSET_NOTINSET)
+							break;
+						CPUSET_DEL(*pset, id);
+						ASSERT(id < NCPU);
+						cpuid2pset[id] = NULL;
+					}
+					ASSERT(cpuid2pset[idx] == NULL);
+					kmem_free(pset, sizeof (cpuset_t));
+				}
+			}
+		}
+
+		if (load_tlb_cpu_mappings(cpuid2pset, nctxs, &md_gen))
+			goto error_panic;
+	}
+
+	info->mmu_nctxs = nctxs[cpuid];
+
+	if (cpuid2pset[cpuid] == NULL)
+		goto error_panic;
+
+	cpuid_pset = *cpuid2pset[cpuid];
+	CPUSET_DEL(cpuid_pset, cpuid);
+
+	/* Search for a processor in the same TLB pset with MMU context */
+	for (;;) {
+		CPUSET_FIND(cpuid_pset, id);
+
+		if (id == CPUSET_NOTINSET)
+			break;
+
+		ASSERT(id < NCPU);
+		cp = cpu[id];
+		if (cp != NULL && CPU_MMU_CTXP(cp) != NULL) {
+			info->mmu_idx = CPU_MMU_IDX(cp);
+
+			return;
+		}
+		CPUSET_DEL(cpuid_pset, id);
+	}
+
+	/*
+	 * No CPU in the TLB pset has a context domain yet.
+	 * Use next_domain if available, or search for an unused domain, or
+	 * overload next_domain, in that order.  Overloading is necessary when
+	 * the number of TLB psets is greater than max_mmu_ctxdoms.
+	 */
+	idx = next_domain;
+
+	if (mmu_ctxs_tbl[idx] != NULL) {
+		for (idx = 0; idx < max_mmu_ctxdoms; idx++)
+			if (mmu_ctxs_tbl[idx] == NULL)
+				break;
+		if (idx == max_mmu_ctxdoms) {
+			/* overload next_domain */
+			idx = next_domain;
+
+			if (info->mmu_nctxs < sfmmu_ctxdom_nctxs(idx))
+				cmn_err(CE_PANIC, "max_mmu_ctxdoms is too small"
+				    " to support CPUs with different nctxs");
+		}
+	}
+
+	info->mmu_idx = idx;
+	next_domain = (idx + 1) % max_mmu_ctxdoms;
+
+	return;
+
+error_panic:
+	cmn_err(CE_PANIC, "!cpu%d: failed to get MMU CTX domain index", cpuid);
 }

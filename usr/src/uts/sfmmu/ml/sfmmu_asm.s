@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -635,6 +635,13 @@ sfmmu_panic11:
 		
 	! load global mmu_ctxp info
 	ldx	[%o2 + CPU_MMU_CTXP], %o3		! %o3 = mmu_ctx_t ptr
+
+#ifdef sun4v
+	/* During suspend on sun4v, context domains can be temporary removed */
+	brz,a,pn       %o3, 0f
+	  nop
+#endif
+
         lduw	[%o2 + CPU_MMU_IDX], %g2		! %g2 = mmu index
 
 	! load global mmu_ctxp gnum
@@ -687,6 +694,13 @@ sfmmu_panic11:
 	! (invalid HAT cnum) && (allocflag == 1)
 	ba,pt	%icc, 2f
 	  nop
+#ifdef sun4v
+0:
+	set	INVALID_CONTEXT, %o1
+	membar	#LoadStore|#StoreStore
+	ba,pt	%icc, 8f
+	  mov   %g0, %g4                ! %g4 = ret = 0
+#endif
 1:
 	! valid HAT cnum, check gnum
 	cmp	%g5, %o4

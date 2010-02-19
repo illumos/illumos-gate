@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -532,7 +532,7 @@ static pgcnt_t	ism_tsb_entries(sfmmu_t *, int szc);
 extern void	sfmmu_setup_tsbinfo(sfmmu_t *);
 extern void	sfmmu_clear_utsbinfo(void);
 
-static void	sfmmu_ctx_wrap_around(mmu_ctx_t *);
+static void		sfmmu_ctx_wrap_around(mmu_ctx_t *, boolean_t);
 
 extern int vpm_enable;
 
@@ -1112,19 +1112,11 @@ hat_init(void)
 	 * a set_platform_defaults() or does not choose to modify
 	 * max_mmu_ctxdoms, it gets one MMU context domain for every CPU.
 	 *
-	 * For sun4v, there will be one global context domain, this is to
-	 * avoid the ldom cpu substitution problem.
-	 *
 	 * For all platforms that have CPUs sharing MMUs, this
 	 * value must be defined.
 	 */
-	if (max_mmu_ctxdoms == 0) {
-#ifndef sun4v
+	if (max_mmu_ctxdoms == 0)
 		max_mmu_ctxdoms = max_ncpus;
-#else /* sun4v */
-		max_mmu_ctxdoms = 1;
-#endif /* sun4v */
-	}
 
 	size = max_mmu_ctxdoms * sizeof (mmu_ctx_t *);
 	mmu_ctxs_tbl = kmem_zalloc(size, KM_SLEEP);
@@ -1611,26 +1603,16 @@ sfmmu_mmu_kstat_create(mmu_ctx_t *mmu_ctxp)
  * specify that interface, then the function below is used instead to return
  * default information. The defaults are as follows:
  *
- *	- For sun4u systems there's one MMU context domain per CPU.
- *	  This default is used by all sun4u systems except OPL. OPL systems
- *	  provide platform specific interface to map CPU ids to MMU ids
- *	  because on OPL more than 1 CPU shares a single MMU.
- *        Note that on sun4v, there is one global context domain for
- *	  the entire system. This is to avoid running into potential problem
- *	  with ldom physical cpu substitution feature.
  *	- The number of MMU context IDs supported on any CPU in the
  *	  system is 8K.
+ *	- There is one MMU context domain per CPU.
  */
 /*ARGSUSED*/
 static void
 sfmmu_cpuid_to_mmu_ctx_info(processorid_t cpuid, mmu_ctx_info_t *infop)
 {
 	infop->mmu_nctxs = nctxs;
-#ifndef sun4v
 	infop->mmu_idx = cpu[cpuid]->cpu_seqid;
-#else /* sun4v */
-	infop->mmu_idx = 0;
-#endif /* sun4v */
 }
 
 /*
@@ -1676,6 +1658,7 @@ sfmmu_cpu_init(cpu_t *cp)
 		mmu_ctxs_tbl[info.mmu_idx] = mmu_ctxp;
 	} else {
 		ASSERT(mmu_ctxp->mmu_idx == info.mmu_idx);
+		ASSERT(mmu_ctxp->mmu_nctxs <= info.mmu_nctxs);
 	}
 
 	/*
@@ -1691,6 +1674,24 @@ sfmmu_cpu_init(cpu_t *cp)
 	CPU_MMU_CTXP(cp) = mmu_ctxp;
 
 	mutex_exit(&mmu_ctxp->mmu_lock);
+}
+
+static void
+sfmmu_ctxdom_free(mmu_ctx_t *mmu_ctxp)
+{
+	ASSERT(MUTEX_HELD(&cpu_lock));
+	ASSERT(!MUTEX_HELD(&mmu_ctxp->mmu_lock));
+
+	mutex_destroy(&mmu_ctxp->mmu_lock);
+
+	if (mmu_ctxp->mmu_kstat)
+		kstat_delete(mmu_ctxp->mmu_kstat);
+
+	/* mmu_saved_gnum is protected by the cpu_lock. */
+	if (mmu_saved_gnum < mmu_ctxp->mmu_gnum)
+		mmu_saved_gnum = mmu_ctxp->mmu_gnum;
+
+	kmem_cache_free(mmuctxdom_cache, mmu_ctxp);
 }
 
 /*
@@ -1718,22 +1719,164 @@ sfmmu_cpu_cleanup(cpu_t *cp)
 	if (--mmu_ctxp->mmu_ncpus == 0) {
 		mmu_ctxs_tbl[mmu_ctxp->mmu_idx] = NULL;
 		mutex_exit(&mmu_ctxp->mmu_lock);
-		mutex_destroy(&mmu_ctxp->mmu_lock);
-
-		if (mmu_ctxp->mmu_kstat)
-			kstat_delete(mmu_ctxp->mmu_kstat);
-
-		/* mmu_saved_gnum is protected by the cpu_lock. */
-		if (mmu_saved_gnum < mmu_ctxp->mmu_gnum)
-			mmu_saved_gnum = mmu_ctxp->mmu_gnum;
-
-		kmem_cache_free(mmuctxdom_cache, mmu_ctxp);
-
+		sfmmu_ctxdom_free(mmu_ctxp);
 		return;
 	}
 
 	mutex_exit(&mmu_ctxp->mmu_lock);
 }
+
+uint_t
+sfmmu_ctxdom_nctxs(int idx)
+{
+	return (mmu_ctxs_tbl[idx]->mmu_nctxs);
+}
+
+#ifdef sun4v
+/*
+ * sfmmu_ctxdoms_* is an interface provided to help keep context domains
+ * consistant after suspend/resume on system that can resume on a different
+ * hardware than it was suspended.
+ *
+ * sfmmu_ctxdom_lock(void) locks all context domains and prevents new contexts
+ * from being allocated.  It acquires all hat_locks, which blocks most access to
+ * context data, except for a few cases that are handled separately or are
+ * harmless.  It wraps each domain to increment gnum and invalidate on-CPU
+ * contexts, and forces cnum to its max.  As a result of this call all user
+ * threads that are running on CPUs trap and try to perform wrap around but
+ * can't because hat_locks are taken.  Threads that were not on CPUs but started
+ * by scheduler go to sfmmu_alloc_ctx() to aquire context without checking
+ * hat_lock, but fail, because cnum == nctxs, and therefore also trap and block
+ * on hat_lock trying to wrap.  sfmmu_ctxdom_lock() must be called before CPUs
+ * are paused, else it could deadlock acquiring locks held by paused CPUs.
+ *
+ * sfmmu_ctxdoms_remove() removes context domains from every CPUs and records
+ * the CPUs that had them.  It must be called after CPUs have been paused. This
+ * ensures that no threads are in sfmmu_alloc_ctx() accessing domain data,
+ * because pause_cpus sends a mondo interrupt to every CPU, and sfmmu_alloc_ctx
+ * runs with interrupts disabled.  When CPUs are later resumed, they may enter
+ * sfmmu_alloc_ctx, but it will check for CPU_MMU_CTXP = NULL and immediately
+ * return failure.  Or, they will be blocked trying to acquire hat_lock. Thus
+ * after sfmmu_ctxdoms_remove returns, we are guaranteed that no one is
+ * accessing the old context domains.
+ *
+ * sfmmu_ctxdoms_update(void) frees space used by old context domains and
+ * allocates new context domains based on hardware layout.  It initializes
+ * every CPU that had context domain before migration to have one again.
+ * sfmmu_ctxdoms_update must be called after CPUs are resumed, else it
+ * could deadlock acquiring locks held by paused CPUs.
+ *
+ * sfmmu_ctxdoms_unlock(void) releases all hat_locks after which user threads
+ * acquire new context ids and continue execution.
+ *
+ * Therefore functions should be called in the following order:
+ *       suspend_routine()
+ *		sfmmu_ctxdom_lock()
+ *		pause_cpus()
+ *		suspend()
+ *			if (suspend failed)
+ *				sfmmu_ctxdom_unlock()
+ *		...
+ *		sfmmu_ctxdom_remove()
+ *		resume_cpus()
+ *		sfmmu_ctxdom_update()
+ *		sfmmu_ctxdom_unlock()
+ */
+static cpuset_t sfmmu_ctxdoms_pset;
+
+void
+sfmmu_ctxdoms_remove()
+{
+	processorid_t	id;
+	cpu_t		*cp;
+
+	/*
+	 * Record the CPUs that have domains in sfmmu_ctxdoms_pset, so they can
+	 * be restored post-migration. A CPU may be powered off and not have a
+	 * domain, for example.
+	 */
+	CPUSET_ZERO(sfmmu_ctxdoms_pset);
+
+	for (id = 0; id < NCPU; id++) {
+		if ((cp = cpu[id]) != NULL && CPU_MMU_CTXP(cp) != NULL) {
+			CPUSET_ADD(sfmmu_ctxdoms_pset, id);
+			CPU_MMU_CTXP(cp) = NULL;
+		}
+	}
+}
+
+void
+sfmmu_ctxdoms_lock(void)
+{
+	int		idx;
+	mmu_ctx_t	*mmu_ctxp;
+
+	sfmmu_hat_lock_all();
+
+	/*
+	 * At this point, no thread can be in sfmmu_ctx_wrap_around, because
+	 * hat_lock is always taken before calling it.
+	 *
+	 * For each domain, set mmu_cnum to max so no more contexts can be
+	 * allocated, and wrap to flush on-CPU contexts and force threads to
+	 * acquire a new context when we later drop hat_lock after migration.
+	 * Setting mmu_cnum may race with sfmmu_alloc_ctx which also sets cnum,
+	 * but the latter uses CAS and will miscompare and not overwrite it.
+	 */
+	kpreempt_disable(); /* required by sfmmu_ctx_wrap_around */
+	for (idx = 0; idx < max_mmu_ctxdoms; idx++) {
+		if ((mmu_ctxp = mmu_ctxs_tbl[idx]) != NULL) {
+			mutex_enter(&mmu_ctxp->mmu_lock);
+			mmu_ctxp->mmu_cnum = mmu_ctxp->mmu_nctxs;
+			/* make sure updated cnum visible */
+			membar_enter();
+			mutex_exit(&mmu_ctxp->mmu_lock);
+			sfmmu_ctx_wrap_around(mmu_ctxp, B_FALSE);
+		}
+	}
+	kpreempt_enable();
+}
+
+void
+sfmmu_ctxdoms_unlock(void)
+{
+	sfmmu_hat_unlock_all();
+}
+
+void
+sfmmu_ctxdoms_update(void)
+{
+	processorid_t	id;
+	cpu_t		*cp;
+	uint_t		idx;
+	mmu_ctx_t	*mmu_ctxp;
+
+	/*
+	 * Free all context domains.  As side effect, this increases
+	 * mmu_saved_gnum to the maximum gnum over all domains, which is used to
+	 * init gnum in the new domains, which therefore will be larger than the
+	 * sfmmu gnum for any process, guaranteeing that every process will see
+	 * a new generation and allocate a new context regardless of what new
+	 * domain it runs in.
+	 */
+	mutex_enter(&cpu_lock);
+
+	for (idx = 0; idx < max_mmu_ctxdoms; idx++) {
+		if (mmu_ctxs_tbl[idx] != NULL) {
+			mmu_ctxp = mmu_ctxs_tbl[idx];
+			mmu_ctxs_tbl[idx] = NULL;
+			sfmmu_ctxdom_free(mmu_ctxp);
+		}
+	}
+
+	for (id = 0; id < NCPU; id++) {
+		if (CPU_IN_SET(sfmmu_ctxdoms_pset, id) &&
+		    (cp = cpu[id]) != NULL)
+			sfmmu_cpu_init(cp);
+	}
+	mutex_exit(&cpu_lock);
+}
+#endif
 
 /*
  * Hat_setup, makes an address space context the current active one.
@@ -9745,7 +9888,7 @@ sfmmu_get_ctx(sfmmu_t *sfmmup)
 	 * Do a wrap-around if cnum reaches the max # cnum supported by a MMU.
 	 */
 	if (mmu_ctxp->mmu_cnum == mmu_ctxp->mmu_nctxs)
-		sfmmu_ctx_wrap_around(mmu_ctxp);
+		sfmmu_ctx_wrap_around(mmu_ctxp, B_TRUE);
 
 	/*
 	 * Let the MMU set up the page sizes to use for
@@ -9786,7 +9929,7 @@ sfmmu_get_ctx(sfmmu_t *sfmmup)
  * next generation and start from 2.
  */
 static void
-sfmmu_ctx_wrap_around(mmu_ctx_t *mmu_ctxp)
+sfmmu_ctx_wrap_around(mmu_ctx_t *mmu_ctxp, boolean_t reset_cnum)
 {
 
 	/* caller must have disabled the preemption */
@@ -9820,7 +9963,7 @@ sfmmu_ctx_wrap_around(mmu_ctx_t *mmu_ctxp)
 
 		/* xcall to others on the same MMU to invalidate ctx */
 		cpuset = mmu_ctxp->mmu_cpuset;
-		ASSERT(CPU_IN_SET(cpuset, CPU->cpu_id));
+		ASSERT(CPU_IN_SET(cpuset, CPU->cpu_id) || !reset_cnum);
 		CPUSET_DEL(cpuset, CPU->cpu_id);
 		CPUSET_AND(cpuset, cpu_ready_set);
 
@@ -9857,7 +10000,8 @@ sfmmu_ctx_wrap_around(mmu_ctx_t *mmu_ctxp)
 	}
 
 	/* reset mmu cnum, skips cnum 0 and 1 */
-	mmu_ctxp->mmu_cnum = NUM_LOCKED_CTXS;
+	if (reset_cnum == B_TRUE)
+		mmu_ctxp->mmu_cnum = NUM_LOCKED_CTXS;
 
 done:
 	mutex_exit(&mmu_ctxp->mmu_lock);

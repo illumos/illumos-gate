@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Kernel Machine Description (MD)
@@ -860,4 +858,24 @@ md_free_scan_dag(md_t *ptr,
 	md_impl_t *mdp = (md_impl_t *)ptr;
 
 	mdp->freep(*list, sizeof (mde_cookie_t) * mdp->node_count);
+}
+
+/*
+ * Return generation number of current machine descriptor. Can be used for
+ * performance purposes to avoid requesting new md handle just to see if graph
+ * was updated.
+ */
+uint64_t
+md_get_current_gen(void)
+{
+	uint64_t gen = MDESC_INVAL_GEN;
+
+	mutex_enter(&curr_mach_descrip_lock);
+
+	if (curr_mach_descrip != NULL)
+		gen = (curr_mach_descrip->gen);
+
+	mutex_exit(&curr_mach_descrip_lock);
+
+	return (gen);
 }

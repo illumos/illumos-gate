@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -526,4 +526,16 @@ load_mach_drivers(void)
 
 	/* virtual console concentrator */
 	(void) i_ddi_attach_hw_nodes("vcc");
+}
+
+void
+set_platform_defaults(void)
+{
+	/*
+	 * Allow at most one context domain per 8 CPUs, which is ample for
+	 * good performance.  Do not make this too large, because it
+	 * increases the space consumed in the per-process sfmmu structure.
+	 */
+	if (max_mmu_ctxdoms == 0)
+		max_mmu_ctxdoms = (NCPU + 7) / 8;
 }

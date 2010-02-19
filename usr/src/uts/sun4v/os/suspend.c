@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,7 @@
 #include <sys/sunddi.h>
 #include <sys/cpupart.h>
 #include <sys/hsvc.h>
+#include <vm/hat_sfmmu.h>
 
 /*
  * Sun4v OS Suspend
@@ -125,10 +126,9 @@ static int enable_user_tick_stick_emulation = 1;
 boolean_t tick_stick_emulation_active = B_FALSE;
 
 /*
- * Controls whether or not MD information is refreshed after a
- * successful suspend and resume. When non-zero, after a successful
- * suspend and resume, the MD will be downloaded, cpunodes updated,
- * and processor grouping information recalculated.
+ * When non-zero, after a successful suspend and resume, cpunodes, CPU HW
+ * sharing data structures, and processor groups will be updated using
+ * information from the updated MD.
  */
 static int suspend_update_cpu_mappings = 1;
 
@@ -243,14 +243,7 @@ update_cpu_mappings(void)
 	md_t		*mdp;
 	processorid_t	id;
 	cpu_t		*cp;
-	int		rv;
 	cpu_pg_t	*pgps[NCPU];
-
-	/* Download the latest MD */
-	if ((rv = mach_descrip_update()) != 0) {
-		DBG("suspend: mach_descrip_update error: %d", rv);
-		return;
-	}
 
 	if ((mdp = md_get_handle()) == NULL) {
 		DBG("suspend: md_get_handle failed");
@@ -491,6 +484,8 @@ suspend_start(char *error_reason, size_t max_reason_len)
 	ASSERT(suspend_supported());
 	DBG("suspend: %s", __func__);
 
+	sfmmu_ctxdoms_lock();
+
 	mutex_enter(&cpu_lock);
 
 	/* Suspend the watchdog */
@@ -535,6 +530,7 @@ suspend_start(char *error_reason, size_t max_reason_len)
 		start_cpus();
 		watchdog_resume();
 		mutex_exit(&cpu_lock);
+		sfmmu_ctxdoms_unlock();
 		DBG("suspend: failed, rv: %ld\n", rv);
 		return (rv);
 	}
@@ -561,6 +557,8 @@ suspend_start(char *error_reason, size_t max_reason_len)
 		tick_stick_emulation_active = B_TRUE;
 	}
 
+	sfmmu_ctxdoms_remove();
+
 	/* Resume cyclics, unpause CPUs */
 	cyclic_resume();
 	start_cpus();
@@ -574,6 +572,14 @@ suspend_start(char *error_reason, size_t max_reason_len)
 	watchdog_resume();
 
 	mutex_exit(&cpu_lock);
+
+	/* Download the latest MD */
+	if ((rv = mach_descrip_update()) != 0)
+		cmn_err(CE_PANIC, "suspend: mach_descrip_update failed: %ld",
+		    rv);
+
+	sfmmu_ctxdoms_update();
+	sfmmu_ctxdoms_unlock();
 
 	/* Get new MD, update CPU mappings/relationships */
 	if (suspend_update_cpu_mappings)

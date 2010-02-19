@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -554,10 +554,10 @@ typedef enum mmu_ctx_stat_types {
  *	is protected via CAS.
  * mmu_nctxs
  *	The max number of context IDs supported on every CPU in this
- *	MMU context domain. It is 8K except for Rock where it is 64K.
- *      This is needed here in case the system supports mixed type of
- *      processors/MMUs. It also helps to make ctx switch code access
- *      fewer cache lines i.e. no need to retrieve it from some global nctxs.
+ *	MMU context domain. This is needed here in case the system supports
+ *      mixed type of processors/MMUs. It also helps to make ctx switch code
+ *      access fewer cache lines i.e. no need to retrieve it from some global
+ *      nctxs.
  * mmu_lock
  *	The mutex spin lock used to serialize context ID wrap around
  * mmu_idx
@@ -599,6 +599,15 @@ extern mmu_ctx_t	**mmu_ctxs_tbl;
 extern void	sfmmu_cpu_init(cpu_t *);
 extern void	sfmmu_cpu_cleanup(cpu_t *);
 
+extern uint_t	sfmmu_ctxdom_nctxs(int);
+
+#ifdef sun4v
+extern void	sfmmu_ctxdoms_remove(void);
+extern void	sfmmu_ctxdoms_lock(void);
+extern void	sfmmu_ctxdoms_unlock(void);
+extern void	sfmmu_ctxdoms_update(void);
+#endif
+
 /*
  * The following structure is used to get MMU context domain information for
  * a CPU from the platform.
@@ -607,7 +616,6 @@ extern void	sfmmu_cpu_cleanup(cpu_t *);
  *	The MMU context domain index within the global array mmu_ctxs
  * mmu_nctxs
  *	The number of context IDs supported in the MMU context domain
- *	(64K for Rock)
  */
 typedef struct mmu_ctx_info {
 	uint_t		mmu_idx;
@@ -2575,7 +2583,11 @@ struct sfmmu_percpu_stat {
 #define	SFMMU_STAT_ADD(stat, amount)	sfmmu_global_stat.stat += (amount)
 #define	SFMMU_STAT_SET(stat, count)	sfmmu_global_stat.stat = (count)
 
-#define	SFMMU_MMU_STAT(stat)		CPU->cpu_m.cpu_mmu_ctxp->stat++
+#define	SFMMU_MMU_STAT(stat)		{		\
+	mmu_ctx_t *ctx = CPU->cpu_m.cpu_mmu_ctxp;	\
+	if (ctx)					\
+		ctx->stat++;				\
+}
 
 #endif /* !_ASM */
 
