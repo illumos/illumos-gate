@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -128,6 +128,9 @@ papiJobStreamOpen(papi_service_t handle, char *name,
 	/* create the job */
 	if ((s->job = calloc(1, sizeof (*(s->job)))) == NULL)
 		return (PAPI_TEMPORARY_ERROR);
+
+	papiAttributeListAddString(&attributes, PAPI_ATTR_EXCL,
+	    "job-name", "standard input");
 
 	/* process the attribute list */
 	lpd_job_add_attributes(svc, attributes, &metadata, &s->job->attributes);

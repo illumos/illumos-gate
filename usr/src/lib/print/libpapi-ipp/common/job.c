@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -374,6 +374,9 @@ papiJobStreamOpen(papi_service_t handle, char *printer,
 	if (svc->connection == NULL)
 		if ((result = service_connect(svc, printer)) != PAPI_OK)
 			return (result);
+
+	papiAttributeListAddString(&job_attributes, PAPI_ATTR_EXCL,
+	    "job-name", "standard input");
 
 	/* create job request */
 	populate_job_request(svc, &request, job_attributes, printer,
