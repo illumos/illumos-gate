@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1791,6 +1791,9 @@ do_setqbufsz(char *bufsz)
 			exit_error(gettext(
 			    "Could not store configuration value."));
 		}
+		if (qctrl.aq_bufsz == 0) {
+			return;
+		}
 	}
 
 	eauditon(A_GETQCTRL, (caddr_t)&qctrl, 0);
@@ -1815,9 +1818,25 @@ do_setqctrl(char *hiwater, char *lowater, char *bufsz, char *delay)
 	qctrl.aq_delay = (clock_t)atol(delay);
 
 	if (!temporary_set) {
+		struct au_qctrl qctrl_act;
+
 		if (!do_setqctrl_scf(&qctrl)) {
 			exit_error(gettext(
 			    "Could not store configuration values."));
+		}
+
+		eauditon(A_GETQCTRL, (caddr_t)&qctrl_act, 0);
+		if (qctrl.aq_hiwater == 0) {
+			qctrl.aq_hiwater = qctrl_act.aq_hiwater;
+		}
+		if (qctrl.aq_lowater == 0) {
+			qctrl.aq_lowater = qctrl_act.aq_lowater;
+		}
+		if (qctrl.aq_bufsz == 0) {
+			qctrl.aq_bufsz = qctrl_act.aq_bufsz;
+		}
+		if (qctrl.aq_delay == 0) {
+			qctrl.aq_delay = qctrl_act.aq_delay;
 		}
 	}
 
@@ -1839,6 +1858,9 @@ do_setqdelay(char *delay)
 		if (!do_setqdelay_scf(&qctrl.aq_delay)) {
 			exit_error(gettext(
 			    "Could not store configuration value."));
+		}
+		if (qctrl.aq_delay == 0) {
+			return;
 		}
 	}
 
@@ -1864,6 +1886,9 @@ do_setqhiwater(char *hiwater)
 			exit_error(gettext(
 			    "Could not store configuration value."));
 		}
+		if (qctrl.aq_hiwater == 0) {
+			return;
+		}
 	}
 
 	eauditon(A_GETQCTRL, (caddr_t)&qctrl, 0);
@@ -1887,6 +1912,9 @@ do_setqlowater(char *lowater)
 		if (!do_setqlowater_scf(&qctrl.aq_lowater)) {
 			exit_error(gettext(
 			    "Could not store configuration value."));
+		}
+		if (qctrl.aq_lowater == 0) {
+			return;
 		}
 	}
 
