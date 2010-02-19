@@ -54,10 +54,10 @@
 
 #define	STMF_STALE(ret) {\
 	if (ret == STMF_ERROR_PROV_DATA_STALE) {\
-		(void) fprintf(stderr, "%s\n",\
-		    gettext("Configuration changed during processing.  "\
-		    "Check the configuration, then retry this command "\
-		    "if appropriate."));\
+		output_config_error(ret, NULL);\
+	} else if (ret != 0) {\
+		output_config_error(ret,\
+		    gettext("Configuration change failed"));\
 	}\
 }
 
@@ -224,6 +224,8 @@ tag_name_to_num(char *tagname, uint16_t *tagnum);
 extern int
 sockaddr_to_str(struct sockaddr_storage *sa, char **addr);
 
+static void output_config_error(int error_code, char *msg);
+
 int
 main(int argc, char *argv[])
 {
@@ -264,7 +266,7 @@ main(int argc, char *argv[])
 	pwd = getpwuid(getuid());
 	if (pwd == NULL) {
 		(void) fprintf(stderr, "%s\n",
-		    gettext("Could not determine callers user name."));
+		    gettext("Could not determine callers user name"));
 		return (1);
 	}
 
@@ -277,10 +279,7 @@ main(int argc, char *argv[])
 	ret = nvlist_alloc(&proplist, NV_UNIQUE_NAME, 0);
 	if (ret != 0) {
 		ret = errno;
-		(void) fprintf(stderr,
-		    gettext("Could not allocate nvlist, errno = %d"),
-		    ret);
-		(void) fprintf(stderr, "\n");
+		output_config_error(ret, gettext("Could not allocate nvlist"));
 		ret = 1;
 		goto usage_error;
 	}
@@ -412,7 +411,7 @@ main(int argc, char *argv[])
 				break;
 			case ':':
 				(void) fprintf(stderr,
-				    gettext("Option %s requires an operand."),
+				    gettext("Option %s requires an operand"),
 				    newargv[optind-1]);
 				(void) fprintf(stderr, "\n");
 
@@ -650,10 +649,8 @@ create_target(char *tgt, nvlist_t *proplist)
 
 	ret = it_config_load(&cfg);
 	if (ret != 0) {
-		(void) fprintf(stderr,
-		    gettext("Error retrieving iSCSI target configuration: %d"),
-		    ret);
-		(void) fprintf(stderr, "\n");
+		output_config_error(ret,
+		    gettext("Error retrieving iSCSI target configuration"));
 		goto done;
 	}
 
@@ -664,19 +661,22 @@ create_target(char *tgt, nvlist_t *proplist)
 		if (ret == EFAULT) {
 			(void) fprintf(stderr,
 			    gettext("Invalid iSCSI name %s"), tgt);
+			(void) fprintf(stderr, "\n");
 		} else if (ret == EEXIST) {
 			(void) fprintf(stderr,
 			    gettext("iSCSI target %s already configured"),
 			    tgt);
+			(void) fprintf(stderr, "\n");
 		} else if (ret == E2BIG) {
 			(void) fprintf(stderr,
 			    gettext("Maximum of %d iSCSI targets"),
 			    MAX_TARGETS);
+			(void) fprintf(stderr, "\n");
 		} else {
-			(void) fprintf(stderr,
-			    gettext("Error creating target: %d"), ret);
+			output_config_error(ret,
+			    gettext("Error creating target"));
 		}
-		(void) fprintf(stderr, "\n");
+
 		goto done;
 	}
 
@@ -688,9 +688,7 @@ create_target(char *tgt, nvlist_t *proplist)
 		/* none specified.  is this ok? */
 		ret = 0;
 	} else if (ret != 0) {
-		(void) fprintf(stderr,
-		    gettext("internal error: %d"), ret);
-		(void) fprintf(stderr, "\n");
+		output_config_error(ret, gettext("Internal error"));
 		goto done;
 	}
 
@@ -727,10 +725,10 @@ create_target(char *tgt, nvlist_t *proplist)
 
 		ret = it_tpgt_create(cfg, tgtp, &tpgt, tags[i], tagid);
 		if (ret != 0) {
-			(void) fprintf(stderr,
-			    gettext("Could not add target portal group"
-			    "tag %s, error %d"), tags[i], ret);
-			(void) fprintf(stderr, "\n");
+			(void) fprintf(stderr, gettext(
+			    "Could not add target portal group tag %s: "),
+			    tags[i]);
+			output_config_error(ret, NULL);
 			goto done;
 		}
 		tagid++;
@@ -744,7 +742,7 @@ create_target(char *tgt, nvlist_t *proplist)
 	ret = it_tgt_setprop(cfg, tgtp, proplist, &errlist);
 	if (ret != 0) {
 		(void) fprintf(stderr,
-		    gettext("Error setting target properties, %d"), ret);
+		    gettext("Error setting target properties: %d"), ret);
 		(void) fprintf(stderr, "\n");
 		if (errlist) {
 			nvpair_t	*nvp = NULL;
@@ -814,10 +812,8 @@ list_target(char *tgt, boolean_t verbose, boolean_t script)
 
 	ret = it_config_load(&cfg);
 	if (ret != 0) {
-		(void) fprintf(stderr,
-		    gettext("Error retrieving iSCSI target configuration: %d"),
-		    ret);
-		(void) fprintf(stderr, "\n");
+		output_config_error(ret,
+		    gettext("Error retrieving iSCSI target configuration"));
 		return (ret);
 	}
 
@@ -959,7 +955,7 @@ list_target(char *tgt, boolean_t verbose, boolean_t script)
 
 	if (tgt && (!found)) {
 		(void) fprintf(stderr,
-		    gettext("Target %s not found!\n"), tgt);
+		    gettext("Target %s not found!"), tgt);
 		(void) fprintf(stderr, "\n");
 		ret = 1;
 	}
@@ -987,10 +983,8 @@ delete_target(char *tgt, boolean_t force)
 
 	ret = it_config_load(&cfg);
 	if (ret != 0) {
-		(void) fprintf(stderr,
-		    gettext("Error retrieving iSCSI target configuration: %d"),
-		    ret);
-		(void) fprintf(stderr, "\n");
+		output_config_error(ret,
+		    gettext("Error retrieving iSCSI target configuration"));
 		return (ret);
 	}
 
@@ -1017,6 +1011,9 @@ delete_target(char *tgt, boolean_t force)
 				    "Use the -f (force) option, or "
 				    "'stmfadm offline-target %s'"), tgt);
 				(void) fprintf(stderr, "\n");
+			} else {
+				output_config_error(ret, gettext(
+				    "Error deleting target"));
 			}
 		}
 
@@ -1066,10 +1063,8 @@ modify_target(char *tgt, char *newname, nvlist_t *proplist)
 
 	ret = it_config_load(&cfg);
 	if (ret != 0) {
-		(void) fprintf(stderr,
-		    gettext("Error retrieving iSCSI target configuration: %d"),
-		    ret);
-		(void) fprintf(stderr, "\n");
+		output_config_error(ret,
+		    gettext("Error retrieving iSCSI target configuration"));
 		goto done;
 	}
 
@@ -1131,9 +1126,7 @@ modify_target(char *tgt, char *newname, nvlist_t *proplist)
 		/* none specified.  is this ok? */
 		ret = 0;
 	} else if (ret != 0) {
-		(void) fprintf(stderr,
-		    gettext("internal error: %d"), ret);
-		(void) fprintf(stderr, "\n");
+		output_config_error(ret, gettext("Internal error"));
 		goto done;
 	}
 
@@ -1213,8 +1206,8 @@ modify_target(char *tgt, char *newname, nvlist_t *proplist)
 			} else {
 				(void) fprintf(stderr, gettext(
 				    "Could not add target portal group"
-				    " tag %s, error %d"), tags[i], ret);
-				(void) fprintf(stderr, "\n");
+				    " tag %s: "), tags[i]);
+				output_config_error(ret, NULL);
 			}
 			goto done;
 		}
@@ -1232,8 +1225,8 @@ modify_target(char *tgt, char *newname, nvlist_t *proplist)
 		ret = nvlist_add_string(proplist, "oldtargetname",
 		    tgtp->tgt_name);
 		if (ret != 0) {
-			(void) fprintf(stderr, "%s\n",
-			    gettext("Error renaming target."));
+			output_config_error(ret,
+			    gettext("Error renaming target"));
 			goto done;
 		}
 		(void) strlcpy(tgtp->tgt_name, newname,
@@ -1308,7 +1301,7 @@ create_tpg(char *tpg, int addrc, char **addrs)
 	if (strlen(tpg) > (MAX_TPG_NAMELEN - 1)) {
 		(void) fprintf(stderr,
 		    gettext("Target Portal Group name must be no longer "
-		    "than %d characters."), (MAX_TPG_NAMELEN - 1));
+		    "than %d characters"), (MAX_TPG_NAMELEN - 1));
 		(void) fprintf(stderr, "\n");
 		return (EINVAL);
 	}
@@ -1321,10 +1314,8 @@ create_tpg(char *tpg, int addrc, char **addrs)
 
 	ret = it_config_load(&cfg);
 	if (ret != 0) {
-		(void) fprintf(stderr,
-		    gettext("Error retrieving iSCSI target configuration: %d"),
-		    ret);
-		(void) fprintf(stderr, "\n");
+		output_config_error(ret,
+		    gettext("Error retrieving iSCSI target configuration"));
 		return (ret);
 	}
 
@@ -1366,6 +1357,9 @@ create_tpg(char *tpg, int addrc, char **addrs)
 			    gettext("Portal %s already in use"),
 			    addrs[count]);
 			(void) fprintf(stderr, "\n");
+		} else {
+			output_config_error(ret, gettext("Could not create the "
+			    "target portal group"));
 		}
 		it_config_free(cfg);
 		return (ret);
@@ -1388,9 +1382,9 @@ create_tpg(char *tpg, int addrc, char **addrs)
 				(void) fprintf(stderr, "\n");
 			} else {
 				(void) fprintf(stderr,
-				    gettext("Error adding portal %s: %d"),
-				    addrs[count], ret);
-				(void) fprintf(stderr, "\n");
+				    gettext("Error adding portal %s: "),
+				    addrs[count]);
+				output_config_error(ret, NULL);
 				break;
 			}
 		}
@@ -1423,10 +1417,8 @@ list_tpg(char *tpg, boolean_t verbose, boolean_t script)
 
 	ret = it_config_load(&cfg);
 	if (ret != 0) {
-		(void) fprintf(stderr,
-		    gettext("Error retrieving iSCSI target configuration: %d"),
-		    ret);
-		(void) fprintf(stderr, "\n");
+		output_config_error(ret,
+		    gettext("Error retrieving iSCSI target configuration"));
 		return (ret);
 	}
 
@@ -1529,10 +1521,8 @@ delete_tpg(char *tpg, boolean_t force)
 
 	ret = it_config_load(&cfg);
 	if (ret != 0) {
-		(void) fprintf(stderr,
-		    gettext("Error retrieving iSCSI target configuration: %d"),
-		    ret);
-		(void) fprintf(stderr, "\n");
+		output_config_error(ret,
+		    gettext("Error retrieving iSCSI target configuration"));
 		return (ret);
 	}
 
@@ -1545,7 +1535,7 @@ delete_tpg(char *tpg, boolean_t force)
 
 	if (!ptpg) {
 		(void) fprintf(stderr,
-		    gettext("Target portal group %s does not exist."),
+		    gettext("Target portal group %s does not exist"),
 		    tpg);
 		(void) fprintf(stderr, "\n");
 		ret = 1;
@@ -1556,6 +1546,9 @@ delete_tpg(char *tpg, boolean_t force)
 			    gettext(
 			    "Target portal group associated with one or more "
 			    "targets.  Cannot delete."));
+		} else if (ret != 0) {
+			output_config_error(ret, gettext("Could not delete "
+			    "target portal group"));
 		}
 
 		if (ret == 0) {
@@ -1619,10 +1612,8 @@ modify_initiator(char *ini, nvlist_t *proplist, boolean_t create)
 
 	ret = it_config_load(&cfg);
 	if (ret != 0) {
-		(void) fprintf(stderr,
-		    gettext("Error retrieving iSCSI target configuration: %d"),
-		    ret);
-		(void) fprintf(stderr, "\n");
+		output_config_error(ret,
+		    gettext("Error retrieving iSCSI target configuration"));
 		return (ret);
 	}
 
@@ -1649,19 +1640,17 @@ modify_initiator(char *ini, nvlist_t *proplist, boolean_t create)
 					(void) fprintf(stderr,
 					    gettext("Invalid iSCSI name %s"),
 					    ini);
+					(void) fprintf(stderr, "\n");
 				} else {
-					(void) fprintf(stderr,
-					    gettext(
-					    "Error creating initiator: %d"),
-					    ret);
+					output_config_error(ret, gettext(
+					    "Error creating initiator"));
 				}
-				(void) fprintf(stderr, "\n");
 			}
 		}
 	} else if (!inip) {
 		ret = ENOENT;
 		(void) fprintf(stderr,
-		    gettext("Error, initiator %s not found."),
+		    gettext("Error, initiator %s not found"),
 		    ini);
 		(void) fprintf(stderr, "\n");
 	}
@@ -1723,10 +1712,8 @@ list_initiator(char *ini, boolean_t verbose, boolean_t script) /* ARGSUSED */
 
 	ret = it_config_load(&cfg);
 	if (ret != 0) {
-		(void) fprintf(stderr,
-		    gettext("Error retrieving iSCSI target configuration: %d"),
-		    ret);
-		(void) fprintf(stderr, "\n");
+		output_config_error(ret,
+		    gettext("Error retrieving iSCSI target configuration"));
 		return (ret);
 	}
 
@@ -1820,10 +1807,8 @@ delete_initiator(char *ini)
 
 	ret = it_config_load(&cfg);
 	if (ret != 0) {
-		(void) fprintf(stderr,
-		    gettext("Error retrieving iSCSI target configuration: %d"),
-		    ret);
-		(void) fprintf(stderr, "\n");
+		output_config_error(ret,
+		    gettext("Error retrieving iSCSI target configuration"));
 		return (ret);
 	}
 
@@ -1876,10 +1861,8 @@ modify_defaults(nvlist_t *proplist)
 
 	ret = it_config_load(&cfg);
 	if (ret != 0) {
-		(void) fprintf(stderr,
-		    gettext("Error retrieving iSCSI target configuration: %d"),
-		    ret);
-		(void) fprintf(stderr, "\n");
+		output_config_error(ret,
+		    gettext("Error retrieving iSCSI target configuration"));
 		return (ret);
 	}
 
@@ -1942,10 +1925,8 @@ list_defaults(boolean_t script)
 
 	ret = it_config_load(&cfg);
 	if (ret != 0) {
-		(void) fprintf(stderr,
-		    gettext("Error retrieving iSCSI target configuration: %d"),
-		    ret);
-		(void) fprintf(stderr, "\n");
+		output_config_error(ret,
+		    gettext("Error retrieving iSCSI target configuration"));
 		return (ret);
 	}
 
@@ -2031,9 +2012,9 @@ itadm_get_password(nvlist_t *nvl, char *key, char *passfile,
 		if (fd == -1) {
 			ret = errno;
 			(void) fprintf(stderr,
-			    gettext("Could not open secret file %s, %d"),
-			    passfile, ret);
-			(void) fprintf(stderr, "\n");
+			    gettext("Could not open secret file %s: "),
+			    passfile);
+			output_config_error(ret, NULL);
 			return (ret);
 		}
 
@@ -2043,9 +2024,9 @@ itadm_get_password(nvlist_t *nvl, char *key, char *passfile,
 		if (rd != sbuf.st_size) {
 			ret = EIO;
 			(void) fprintf(stderr,
-			    gettext("Could not read secret file %s, %d"),
-			    passfile, ret);
-			(void) fprintf(stderr, "\n");
+			    gettext("Could not read secret file %s: "),
+			    passfile);
+			output_config_error(ret, NULL);
 			return (ret);
 		}
 
@@ -2073,10 +2054,8 @@ itadm_get_password(nvlist_t *nvl, char *key, char *passfile,
 		pass = getpassphrase(phrase);
 		if (!pass) {
 			ret = errno;
-			(void) fprintf(stderr,
-			    gettext("Could not read secret, %d"),
-			    ret);
-			(void) fprintf(stderr, "\n");
+			output_config_error(ret,
+			    gettext("Could not read secret"));
 			return (ret);
 		}
 
@@ -2094,10 +2073,8 @@ itadm_get_password(nvlist_t *nvl, char *key, char *passfile,
 		pass = getpassphrase(gettext("Re-enter secret: "));
 		if (!pass) {
 			ret = errno;
-			(void) fprintf(stderr,
-			    gettext("Could not read secret, %d"),
-			    ret);
-			(void) fprintf(stderr, "\n");
+			output_config_error(ret,
+			    gettext("Could not read secret"));
 			return (ret);
 		}
 
@@ -2180,4 +2157,60 @@ tag_name_to_num(char *tagname, uint16_t *tagnum)
 	if ((id <= UINT16_MAX) && (id > 1)) {
 		*tagnum = (uint16_t)id;
 	}
+}
+
+/*
+ * Print error messages to stderr for errnos and expected stmf errors.
+ * This function should generally not be used for cases where the
+ * calling code can generate a more detailed error message based on
+ * the contextual knowledge of the meaning of specific errors.
+ */
+static void
+output_config_error(int error, char *msg)
+{
+
+	if (msg) {
+		(void) fprintf(stderr, "%s: ", msg);
+	}
+
+	if (error & STMF_STATUS_ERROR) {
+		switch (error) {
+		case STMF_ERROR_PERM:
+			(void) fprintf(stderr, "%s",
+			    gettext("permission denied"));
+			break;
+		case STMF_ERROR_BUSY:
+			(void) fprintf(stderr, "%s",
+			    gettext("resource busy"));
+			break;
+		case STMF_ERROR_NOMEM:
+			(void) fprintf(stderr, "%s",
+			    gettext("out of memory"));
+			break;
+		case STMF_ERROR_SERVICE_NOT_FOUND:
+			(void) fprintf(stderr, "%s",
+			    gettext("STMF service not found"));
+			break;
+		case STMF_ERROR_SERVICE_DATA_VERSION:
+			(void) fprintf(stderr, "%s",
+			    gettext("STMF service version incorrect"));
+			break;
+		case STMF_ERROR_PROV_DATA_STALE:
+			(void) fprintf(stderr, "%s",
+			    gettext("Configuration changed during processing. "
+			    "Check the configuration, then retry this "
+			    "command if appropriate."));
+			break;
+		default:
+			(void) fprintf(stderr, "%s", gettext("unknown error"));
+			break;
+		}
+	} else {
+		char buf[80] = "";
+
+		(void) strerror_r(error, buf, sizeof (buf));
+		(void) fprintf(stderr, "%s", buf);
+	}
+
+	(void) fprintf(stderr, "\n");
 }

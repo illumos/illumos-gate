@@ -346,7 +346,19 @@ it_config_setprop(it_config_t *cfg, nvlist_t *proplist, nvlist_t **errlist)
 		ret = nvlist_alloc(&cprops, NV_UNIQUE_NAME, 0);
 	}
 
-	/* base64 encode the radius secret, if it's changed */
+	if (ret != 0) {
+		return (ret);
+	}
+
+	ret = nvlist_merge(cprops, proplist, 0);
+	if (ret != 0) {
+		nvlist_free(cprops);
+		return (ret);
+	}
+
+	/*
+	 * base64 encode the radius secret, if it's changed.
+	 */
 	val = NULL;
 	(void) nvlist_lookup_string(proplist, PROP_RADIUS_SECRET, &val);
 	if (val) {
@@ -362,14 +374,15 @@ it_config_setprop(it_config_t *cfg, nvlist_t *proplist, nvlist_t **errlist)
 
 			if (ret == 0) {
 				/* replace the value in the nvlist */
-				ret = nvlist_add_string(proplist,
+				ret = nvlist_add_string(cprops,
 				    PROP_RADIUS_SECRET, bsecret);
 			}
 		}
 	}
 
-	if (ret == 0) {
-		ret = nvlist_merge(cprops, proplist, 0);
+	if (ret != 0) {
+		nvlist_free(cprops);
+		return (ret);
 	}
 
 	/* see if we need to remove the radius server setting */
@@ -386,10 +399,7 @@ it_config_setprop(it_config_t *cfg, nvlist_t *proplist, nvlist_t **errlist)
 		(void) nvlist_remove_all(cprops, PROP_ALIAS);
 	}
 
-	if (ret == 0) {
-		ret = it_validate_configprops(cprops, errs);
-	}
-
+	ret = it_validate_configprops(cprops, errs);
 	if (ret != 0) {
 		if (cprops) {
 			nvlist_free(cprops);
@@ -631,8 +641,14 @@ it_tgt_setprop(it_config_t *cfg, it_tgt_t *tgt, nvlist_t *proplist,
 		ret = nvlist_alloc(&tprops, NV_UNIQUE_NAME, 0);
 	}
 
-	if (ret == 0) {
-		ret = nvlist_merge(tprops, proplist, 0);
+	if (ret != 0) {
+		return (ret);
+	}
+
+	ret = nvlist_merge(tprops, proplist, 0);
+	if (ret != 0) {
+		nvlist_free(tprops);
+		return (ret);
 	}
 
 	/* unset chap username or alias if requested */
@@ -1381,8 +1397,14 @@ it_ini_setprop(it_ini_t *ini, nvlist_t *proplist, nvlist_t **errlist)
 		ret = nvlist_alloc(&iprops, NV_UNIQUE_NAME, 0);
 	}
 
-	if (ret == 0) {
-		ret = nvlist_merge(iprops, proplist, 0);
+	if (ret != 0) {
+		return (ret);
+	}
+
+	ret = nvlist_merge(iprops, proplist, 0);
+	if (ret != 0) {
+		nvlist_free(iprops);
+		return (ret);
 	}
 
 	/* unset chap username if requested */
