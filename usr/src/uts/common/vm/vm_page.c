@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -5337,7 +5337,6 @@ page_mark_migrate(struct seg *seg, caddr_t addr, size_t len,
 	struct anon	*ap;
 	vnode_t		*curvp;
 	lgrp_t		*from;
-	pgcnt_t		i;
 	pgcnt_t		nlocked;
 	u_offset_t	off;
 	pfn_t		pfn;
@@ -5345,9 +5344,7 @@ page_mark_migrate(struct seg *seg, caddr_t addr, size_t len,
 	size_t		segpgsz;
 	pgcnt_t		pages;
 	uint_t		pszc;
-	page_t		**ppa;
-	pgcnt_t		ppa_nentries;
-	page_t		*pp;
+	page_t		*pp0, *pp;
 	caddr_t		va;
 	ulong_t		an_idx;
 	anon_sync_obj_t	cookie;
@@ -5368,13 +5365,6 @@ page_mark_migrate(struct seg *seg, caddr_t addr, size_t len,
 	addr = (caddr_t)P2ALIGN((uintptr_t)addr, segpgsz);
 	if (rflag)
 		len = P2ROUNDUP(len, segpgsz);
-
-	/*
-	 * Allocate page array to accommodate largest page size
-	 */
-	pgsz = page_get_pagesize(page_num_pagesizes() - 1);
-	ppa_nentries = btop(pgsz);
-	ppa = kmem_zalloc(ppa_nentries * sizeof (page_t *), KM_SLEEP);
 
 	/*
 	 * Do one (large) page at a time
@@ -5432,10 +5422,10 @@ page_mark_migrate(struct seg *seg, caddr_t addr, size_t len,
 		    pgsz > segpgsz) {
 			pgsz = MIN(pgsz, segpgsz);
 			page_unlock(pp);
-			i = btop(P2END((uintptr_t)va, pgsz) -
+			pages = btop(P2END((uintptr_t)va, pgsz) -
 			    (uintptr_t)va);
 			va = (caddr_t)P2END((uintptr_t)va, pgsz);
-			lgrp_stat_add(from->lgrp_id, LGRP_PMM_FAIL_PGS, i);
+			lgrp_stat_add(from->lgrp_id, LGRP_PMM_FAIL_PGS, pages);
 			continue;
 		}
 
@@ -5450,10 +5440,7 @@ page_mark_migrate(struct seg *seg, caddr_t addr, size_t len,
 			continue;
 		}
 
-		/*
-		 * Remember pages locked exclusively and how many
-		 */
-		ppa[0] = pp;
+		pp0 = pp++;
 		nlocked = 1;
 
 		/*
@@ -5464,8 +5451,7 @@ page_mark_migrate(struct seg *seg, caddr_t addr, size_t len,
 			 * Lock all constituents except root page, since it
 			 * should be locked already.
 			 */
-			for (i = 1; i < pages; i++) {
-				pp++;
+			for (; nlocked < pages; nlocked++) {
 				if (!page_trylock(pp, SE_EXCL)) {
 					break;
 				}
@@ -5478,8 +5464,7 @@ page_mark_migrate(struct seg *seg, caddr_t addr, size_t len,
 					page_unlock(pp);
 					break;
 				}
-				ppa[nlocked] = pp;
-				nlocked++;
+				pp++;
 			}
 		}
 
@@ -5487,9 +5472,10 @@ page_mark_migrate(struct seg *seg, caddr_t addr, size_t len,
 		 * If all constituent pages couldn't be locked,
 		 * unlock pages locked so far and skip to next page.
 		 */
-		if (nlocked != pages) {
-			for (i = 0; i < nlocked; i++)
-				page_unlock(ppa[i]);
+		if (nlocked < pages) {
+			while (pp0 < pp) {
+				page_unlock(pp0++);
+			}
 			va += pgsz;
 			lgrp_stat_add(from->lgrp_id, LGRP_PMM_FAIL_PGS,
 			    btop(pgsz));
@@ -5509,18 +5495,16 @@ page_mark_migrate(struct seg *seg, caddr_t addr, size_t len,
 		 * constituent pages, so a fault will occur on any part of the
 		 * large page
 		 */
-		PP_SETMIGRATE(ppa[0]);
-		for (i = 0; i < nlocked; i++) {
-			pp = ppa[i];
-			(void) hat_pageunload(pp, HAT_FORCE_PGUNLOAD);
-			ASSERT(hat_page_getshare(pp) == 0);
-			page_unlock(pp);
+		PP_SETMIGRATE(pp0);
+		while (pp0 < pp) {
+			(void) hat_pageunload(pp0, HAT_FORCE_PGUNLOAD);
+			ASSERT(hat_page_getshare(pp0) == 0);
+			page_unlock(pp0++);
 		}
 		lgrp_stat_add(from->lgrp_id, LGRP_PMM_PGS, nlocked);
 
 		va += pgsz;
 	}
-	kmem_free(ppa, ppa_nentries * sizeof (page_t *));
 }
 
 /*
