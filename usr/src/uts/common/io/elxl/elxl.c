@@ -333,7 +333,7 @@ elxl_reset_ring(ex_ring_t *r, uint_t dir)
 		r->r_tail = NULL;
 		r->r_avail = 0;
 	}
-	ddi_dma_sync(r->r_dmah, 0, 0, DDI_DMA_SYNC_FORDEV);
+	(void) ddi_dma_sync(r->r_dmah, 0, 0, DDI_DMA_SYNC_FORDEV);
 }
 
 static boolean_t
@@ -1295,7 +1295,7 @@ elxl_recv(elxl_t *sc, ex_desc_t *rxd, uint32_t stat)
 		return (NULL);
 	}
 
-	ddi_dma_sync(rxd->ed_dmah, 0, 0, DDI_DMA_SYNC_FORKERNEL);
+	(void) ddi_dma_sync(rxd->ed_dmah, 0, 0, DDI_DMA_SYNC_FORKERNEL);
 	mp->b_rptr += 14;
 	mp->b_wptr = mp->b_rptr + len;
 	bcopy(rxd->ed_buf, mp->b_rptr, len);
@@ -1759,7 +1759,7 @@ elxl_intr(caddr_t arg, caddr_t dontcare)
 			rxd = r->r_head;
 			pd = rxd->ed_pd;
 
-			ddi_dma_sync(r->r_dmah, rxd->ed_off,
+			(void) ddi_dma_sync(r->r_dmah, rxd->ed_off,
 			    sizeof (ex_pd_t), DDI_DMA_SYNC_FORKERNEL);
 
 			pktstat = GET_PD(r, pd->pd_status);
@@ -1780,7 +1780,7 @@ elxl_intr(caddr_t arg, caddr_t dontcare)
 			PUT_PD(r, pd->pd_status, 0);
 			PUT_PD(r, pd->pd_len, EX_BUFSZ | EX_FR_LAST);
 			PUT_PD(r, pd->pd_addr, rxd->ed_bufaddr);
-			ddi_dma_sync(r->r_dmah, rxd->ed_off,
+			(void) ddi_dma_sync(r->r_dmah, rxd->ed_off,
 			    sizeof (ex_pd_t), DDI_DMA_SYNC_FORDEV);
 		}
 
