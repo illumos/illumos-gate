@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,5 +78,6 @@
 	movq	120(%rax),%r15
 	movq	48(%rax),%rbp
 	movq	56(%rax),%rsp
+	movq	(%rax),%rax
 	jmp	*%r8			/* branch to handler */
 	SET_SIZE(_Unw_jmp)
