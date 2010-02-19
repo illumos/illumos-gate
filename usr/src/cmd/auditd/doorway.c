@@ -71,17 +71,18 @@
 
 #define	DEBUG		0
 
-#if DEBUG
+/* gettext() obfuscation routine for lint */
+#ifdef __lint
+#define	gettext(x)	x
+#endif
 
+#if DEBUG
 static FILE *dbfp;
 #define	DUMP(w, x, y, z) dump_state(w, x, y, z)
-#define	DPRINT(x) {(void) fprintf x; }
-
+#define	DPRINT(x) { (void) fprintf x; }
 #else
-
 #define	DUMP(w, x, y, z)
 #define	DPRINT(x)
-
 #endif
 
 #define	FATAL_MESSAGE_LEN	256
@@ -710,8 +711,8 @@ bpool_withdraw(char *buffer, size_t buff_size, size_t request_size)
 	    new_length, request_size, rc));
 
 	if (rc == 0) {
-		DPRINT((dbfp, "bpool_withdraw node=%X (pool=%d)\n", node,
-		    audit_queue_size(&b_pool)));
+		DPRINT((dbfp, "bpool_withdraw node=%p (pool=%d)\n",
+		    (void *)node, audit_queue_size(&b_pool)));
 
 		if (new_length > node->abq_buf_len) {
 			node = realloc(node, AUDIT_REC_HEADER + new_length);
@@ -741,8 +742,8 @@ bpool_withdraw(char *buffer, size_t buff_size, size_t request_size)
 		(void) pthread_mutex_lock(&b_alloc_lock);
 		b_allocated++;
 		(void) pthread_mutex_unlock(&b_alloc_lock);
-		DPRINT((dbfp, "bpool_withdraw node=%X (alloc=%d, pool=%d)\n",
-		    node, b_allocated, audit_queue_size(&b_pool)));
+		DPRINT((dbfp, "bpool_withdraw node=%p (alloc=%d, pool=%d)\n",
+		    (void *)node, b_allocated, audit_queue_size(&b_pool)));
 	}
 	assert(request_size <= new_length);
 
@@ -797,15 +798,15 @@ bpool_return(audit_rec_t *node)
 	if (node != NULL) {	/* NULL if ref cnt is not zero */
 		audit_enqueue(&b_pool, node);
 		DPRINT((dbfp,
-		    "bpool_return: requeue %X (allocated=%d,"
-		    " pool size=%d)\n", node, b_allocated,
+		    "bpool_return: requeue %p (allocated=%d,"
+		    " pool size=%d)\n", (void *)node, b_allocated,
 		    audit_queue_size(&b_pool)));
 	}
 #if DEBUG
 	else {
 		DPRINT((dbfp,
-		    "bpool_return: decrement count for %X (allocated=%d,"
-		    " pool size=%d)\n", copy, b_allocated,
+		    "bpool_return: decrement count for %p (allocated=%d,"
+		    " pool size=%d)\n", (void *)copy, b_allocated,
 		    audit_queue_size(&b_pool)));
 	}
 #endif
@@ -877,7 +878,7 @@ policy_update(uint32_t newpolicy)
 {
 	plugin_t *p;
 
-	DPRINT((dbfp, "policy change:  %X\n", newpolicy));
+	DPRINT((dbfp, "policy change: %X\n", newpolicy));
 	(void) pthread_mutex_lock(&plugin_mutex);
 	p = plugin_head;
 	while (p != NULL) {

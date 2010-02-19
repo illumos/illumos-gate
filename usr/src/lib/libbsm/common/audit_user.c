@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -240,14 +240,14 @@ print_auuser(au_user_ent_t *ue)
 	int retval;
 
 	if (ue == NULL) {
-		printf("NULL\n");
+		(void) printf("NULL\n");
 		return;
 	}
 
-	printf("name=%s\n", ue->au_name ? ue->au_name : empty);
-	retval = getauditflagschar(always, ue->au_always, 0);
-	printf("always=%s\n", retval == 0 ? always : bad);
-	retval = getauditflagschar(never, ue->au_never, 0);
-	printf("never=%s\n", retval == 0 ? never : bad);
+	(void) printf("name=%s\n", ue->au_name ? ue->au_name : empty);
+	retval = getauditflagschar(always, &(ue->au_always), 0);
+	(void) printf("always=%s\n", retval == 0 ? always : bad);
+	retval = getauditflagschar(never, &(ue->au_never), 0);
+	(void) printf("never=%s\n", retval == 0 ? never : bad);
 }
 #endif	/* DEBUG */

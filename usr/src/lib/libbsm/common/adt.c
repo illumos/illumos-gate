@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,8 +61,8 @@ static void adt_setto_unaudited(adt_internal_state_t *);
 static int adt_get_local_address(int, struct ifaddrlist *);
 
 #ifdef C2_DEBUG
-#define	DPRINTF(x) {printf x; }
-#define	DFLUSH fflush(stdout);
+#define	DPRINTF(x) { (void) printf x; }
+#define	DFLUSH (void) fflush(stdout);
 #else
 #define	DPRINTF(x)
 #define	DFLUSH
@@ -365,8 +365,8 @@ adt_start_session(adt_session_data_t **new_session,
 		state->as_session_model = ADT_PROCESS_MODEL;
 	}
 	state->as_flags = flags;
-	DPRINTF(("(%d) Starting session id = %08X\n",
-	    getpid(), state->as_info.ai_asid));
+	DPRINTF(("(%lld) Starting session id = %08X\n",
+	    (long long) getpid(), state->as_info.ai_asid));
 
 	if (state->as_audit_enabled) {
 		*new_session = (adt_session_data_t *)state;
@@ -1345,7 +1345,7 @@ adt_import(adt_internal_state_t *internal, const adt_export_data_t *external)
 	}
 	internal->as_audit_enabled = local_audit_enabled;
 
-	DPRINTF(("(%d)imported asid = %X %u\n", getpid(),
+	DPRINTF(("(%lld)imported asid = %X %u\n", (long long) getpid(),
 	    internal->as_info.ai_asid,
 	    internal->as_info.ai_asid));
 

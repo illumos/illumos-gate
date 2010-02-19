@@ -28,7 +28,7 @@
 #define	DEBUG   0
 
 #if DEBUG
-#define	DPRINT(x) {fprintf x; }
+#define	DPRINT(x) { (void) fprintf x; }
 #else
 #define	DPRINT(x)
 #endif
@@ -340,11 +340,12 @@ loadauditlist(char *dirstr, char *minfreestr)
 	/* print out directory list */
 
 	if (listhead != NULL) {
-		fprintf(dbfp, "Directory list:\n\t%s\n", listhead->dl_dirname);
+		(void) fprintf(dbfp, "Directory list:\n\t%s\n",
+		    listhead->dl_dirname);
 		thisdir = listhead->dl_next;
 
 		while (thisdir != listhead) {
-			fprintf(dbfp, "\t%s\n", thisdir->dl_dirname);
+			(void) fprintf(dbfp, "\t%s\n", thisdir->dl_dirname);
 			thisdir = thisdir->dl_next;
 		}
 	}
@@ -789,24 +790,25 @@ auditd_plugin(const char *input, size_t in_len, uint64_t sequence, char **error)
 	auditd_rc_t	rc = AUDITD_FAIL;
 	int		open_status;
 	size_t		out_len;
-	/* LINTED */
-	int		statrc;
 	/* avoid excess audit_warnage */
 	static int	allsoftfull_warning = 0;
 	static int	allhard_pause = 0;
 	static struct timeval	next_allhard;
 	struct timeval	now;
 #if DEBUG
+	int		statrc;
 	static char	*last_file_written_to = NULL;
 	static uint64_t	last_sequence = 0;
 	static uint64_t	write_count = 0;
 
 	if ((last_sequence > 0) && (sequence != last_sequence + 1))
-		fprintf(dbfp, "binfile: buffer sequence=%llu but prev=%llu=n",
+		(void) fprintf(dbfp,
+		    "binfile: buffer sequence=%llu but prev=%llu=n",
 		    sequence, last_sequence);
 	last_sequence = sequence;
 
-	fprintf(dbfp, "binfile: input seq=%llu, len=%d\n", sequence, in_len);
+	(void) fprintf(dbfp, "binfile: input seq=%llu, len=%d\n",
+	    sequence, in_len);
 #endif
 	*error = NULL;
 	/*
@@ -837,10 +839,13 @@ auditd_plugin(const char *input, size_t in_len, uint64_t sequence, char **error)
 		 * consider "space ok" return and error return the same;
 		 * a -1 means spacecheck couldn't check for space.
 		 */
+#if !DEBUG
+		if ((open_status == 1) &&
+		    (spacecheck(activeDir, fullness_state, in_len) != 0)) {
+#else
 		if ((open_status == 1) &&
 		    (statrc = spacecheck(activeDir, fullness_state,
-		    in_len)) != 0) {
-#if DEBUG
+		    in_len) != 0)) {
 			DPRINT((dbfp, "binfile: returned from spacecheck\n"));
 			/*
 			 * The last copy of last_file_written_to is
@@ -1059,10 +1064,11 @@ auditd_plugin_close(char **error)
 	if (binfile_is_open) {
 		(void) pthread_mutex_destroy(&log_mutex);
 		binfile_is_open = 0;
-		/* LINTED */
+#if DEBUG
 	} else {
-		DPRINT((dbfp,
-		    "auditd_plugin_close() called when already closed."));
+		(void) fprintf(dbfp,
+		    "auditd_plugin_close() called when already closed.");
+#endif
 	}
 	am_open = 0;
 	return (AUDITD_SUCCESS);

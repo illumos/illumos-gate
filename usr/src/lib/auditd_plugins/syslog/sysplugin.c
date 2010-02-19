@@ -35,7 +35,7 @@
  */
 #define	DEBUG	0
 #if DEBUG
-#define	DPRINT(x) {fprintf x; }
+#define	DPRINT(x) { (void) fprintf x; }
 #else
 #define	DPRINT(x)
 #endif
@@ -67,6 +67,11 @@
 #include "sysplugin.h"
 #include "systoken.h"
 #include <audit_plugin.h>
+
+/* gettext() obfuscation routine for lint */
+#ifdef __lint
+#define	gettext(x)	x
+#endif
 
 #if DEBUG
 static FILE	*dbfp;			/* debug file */
@@ -585,7 +590,10 @@ filter(const char *input, uint64_t sequence, char *output,
 			    " of record type %s%s\n"),
 			    token_count, parse_rc, event_name, sequence_str);
 
-			DPRINT((dbfp, message));
+#if DEBUG
+			/*LINTED*/
+			(void) fprintf(dbfp, message);
+#endif
 
 			__audit_syslog("audit_syslog.so",
 			    LOG_PID | LOG_ODELAY | LOG_CONS,
@@ -597,13 +605,13 @@ filter(const char *input, uint64_t sequence, char *output,
 		if (tossit(ctx.out.sf_eventid, ctx.out.sf_pass)) {
 #if DEBUG
 			if (ctx.out.sf_sequence != -1)
-				fprintf(dbfp,
+				(void) fprintf(dbfp,
 				    "syslog tossed (event=%hu) record %u "
 				    "/ buffer %llu\n",
 				    ctx.out.sf_eventid, ctx.out.sf_sequence,
 				    sequence);
 			else
-				fprintf(dbfp,
+				(void) fprintf(dbfp,
 				    "syslog tossed (event=%hu) buffer %llu\n",
 				    ctx.out.sf_eventid, sequence);
 #endif
@@ -723,7 +731,7 @@ filter(const char *input, uint64_t sequence, char *output,
 		 * intention is to help debug lost data problems
 		 */
 		if (ctx.out.sf_sequence != -1) {
-			fprintf(dbfp,
+			(void) fprintf(dbfp,
 			    "syslog writing record %u / buffer %llu\n",
 			    ctx.out.sf_sequence, sequence);
 			used = snprintf(bp, remaining, "  seq %u",
@@ -731,7 +739,8 @@ filter(const char *input, uint64_t sequence, char *output,
 			remaining -= used;
 			bp += used;
 		} else
-			fprintf(dbfp, "syslog writing buffer %llu\n", sequence);
+			(void) fprintf(dbfp, "syslog writing buffer %llu\n",
+			    sequence);
 #endif
 		/*
 		 * Long fields that may need truncation go here in
@@ -791,7 +800,8 @@ auditd_plugin(const char *input, size_t in_len, uint64_t sequence, char **error)
 	static	uint64_t	toss_count = 0;
 
 	if ((last_sequence > 0) && (sequence != last_sequence + 1))
-		fprintf(dbfp, "syslog: buffer sequence=%llu but prev=%llu\n",
+		(void) fprintf(dbfp,
+		    "syslog: buffer sequence=%llu but prev=%llu\n",
 		    sequence, last_sequence);
 	last_sequence = sequence;
 #endif

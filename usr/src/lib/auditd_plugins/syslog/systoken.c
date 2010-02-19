@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,7 @@
 
 #define	DEBUG	0
 #if DEBUG
-#define	DPRINT(x) {fprintf x; }
+#define	DPRINT(x) { (void) fprintf x; }
 #else
 #define	DPRINT(x)
 #endif

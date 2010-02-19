@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,7 +35,7 @@
 #if DEBUG
 extern FILE *dbfp;
 extern FILE *__auditd_debug_file_open();
-#define	DPRINT(x) {(void) fprintf x; }
+#define	DPRINT(x) { (void) fprintf x; }
 #else
 #define	DPRINT(x)
 #endif
@@ -63,14 +63,15 @@ audit_enqueue(au_queue_t *q,  void *p)
 {
 	(void) pthread_mutex_lock(&q->auq_lock);
 
-	DPRINT((dbfp, "enqueue0(%X): p=%X, head=%X, tail=%X, count=%d\n",
-	    q, p, q->auq_head, q->auq_tail, q->auq_count));
+	DPRINT((dbfp, "enqueue0(%p): p=%p, head=%p, tail=%p, count=%d\n",
+	    (void *)q, (void *)p, (void *)q->auq_head, (void *)q->auq_tail,
+	    q->auq_count));
 
 	if (q->auq_head == NULL)
 		q->auq_head = p;
 	else {
-		DPRINT((dbfp, "\tindirect tail=%X\n",
-		    &(((audit_link_t *)(q->auq_tail))->aln_next)));
+		DPRINT((dbfp, "\tindirect tail=%p\n",
+		    (void *)&(((audit_link_t *)(q->auq_tail))->aln_next)));
 
 		((audit_link_t *)(q->auq_tail))->aln_next = p;
 	}
@@ -78,10 +79,10 @@ audit_enqueue(au_queue_t *q,  void *p)
 	((audit_link_t *)p)->aln_next = NULL;
 	q->auq_count++;
 
-	DPRINT((dbfp, "enqueue1(%X): p=%X, head=%X, tail=%X, "
-	    "count=%d, pnext=%X\n",
-	    q, p, q->auq_head, q->auq_tail, q->auq_count,
-	    ((audit_link_t *)p)->aln_next));
+	DPRINT((dbfp, "enqueue1(%p): p=%p, head=%p, tail=%p, "
+	    "count=%d, pnext=%p\n", (void *)q, (void *)p, (void *)q->auq_head,
+	    (void *)q->auq_tail, q->auq_count,
+	    (void *)((audit_link_t *)p)->aln_next));
 
 	(void) pthread_mutex_unlock(&q->auq_lock);
 }
@@ -96,9 +97,9 @@ audit_dequeue(au_queue_t *q, void **p)
 	(void) pthread_mutex_lock(&q->auq_lock);
 
 	if ((*p = q->auq_head) == NULL) {
-		DPRINT((dbfp, "dequeue1(%X): p=%X, head=%X, "
-		    "tail=%X, count=%d\n",
-		    q, *p, q->auq_head, q->auq_tail, q->auq_count));
+		DPRINT((dbfp, "dequeue1(%p): p=%p, head=%p, "
+		    "tail=%p, count=%d\n", (void *)q, (void *)*p,
+		    (void *)q->auq_head, (void *)q->auq_tail, q->auq_count));
 
 		(void) pthread_mutex_unlock(&q->auq_lock);
 		return (1);
@@ -108,10 +109,10 @@ audit_dequeue(au_queue_t *q, void **p)
 	/* if *p is the last, next is NULL */
 	q->auq_head = ((audit_link_t *)*p)->aln_next;
 
-	DPRINT((dbfp, "dequeue0(%X): p=%X, head=%X, tail=%X, "
-	    "count=%d, pnext=%X\n",
-	    q, *p, q->auq_head, q->auq_tail, q->auq_count,
-	    ((audit_link_t *)*p)->aln_next));
+	DPRINT((dbfp, "dequeue0(%p): p=%p, head=%p, tail=%p, "
+	    "count=%d, pnext=%p\n", (void *)q, (void *)*p, (void *)q->auq_head,
+	    (void *)q->auq_tail, q->auq_count,
+	    (void *)((audit_link_t *)*p)->aln_next));
 
 	(void) pthread_mutex_unlock(&q->auq_lock);
 	return (0);
@@ -125,8 +126,8 @@ audit_incr_ref(pthread_mutex_t *l, audit_rec_t *p)
 {
 	(void) pthread_mutex_lock(l);
 	p->abq_ref_count++;
-	DPRINT((dbfp, "incr_ref: p=%X, count=%d\n",
-	    p, p->abq_ref_count));
+	DPRINT((dbfp, "incr_ref: p=%p, count=%d\n",
+	    (void *)p, p->abq_ref_count));
 	(void) pthread_mutex_unlock(l);
 }
 /*
@@ -140,8 +141,8 @@ audit_release(pthread_mutex_t *l, audit_rec_t *p)
 
 	(void) pthread_mutex_lock(l);
 
-	DPRINT((dbfp, "release: p=%X, count=%d\n",
-	    p, p->abq_ref_count));
+	DPRINT((dbfp, "release: p=%p , count=%d\n",
+	    (void *)p, p->abq_ref_count));
 
 	if (--(p->abq_ref_count) > 0) {
 		(void) pthread_mutex_unlock(l);

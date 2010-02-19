@@ -41,7 +41,7 @@ void __audit_syslog(const char *, int, int, int, const char *);
 void __audit_dowarn(char *, char *, int);
 void __audit_dowarn2(char *, char *, char *, char *, int);
 int __logpost(char *);
-FILE *__auditd_debug_file_open();
+FILE *__auditd_debug_file_open(void);
 
 #ifdef	__cplusplus
 }

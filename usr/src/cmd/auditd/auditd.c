@@ -155,8 +155,6 @@ void
 auditd_exit(int status)
 {
 #if MEM_TEST
-	sigset_t	set;
-
 	DPRINT((dbfp, "mem_test intentional abort (status=%d)\n",
 	    status));
 	abort();
@@ -186,8 +184,9 @@ main(int argc, char *argv[])
 	pid_t			pid;
 
 #if DEBUG
-	/* LINTED */
-	char			*envp;
+#if MEM_TEST
+	char	*envp;
+#endif
 	if (dbfp == NULL) {
 		dbfp = __auditd_debug_file_open();
 	}

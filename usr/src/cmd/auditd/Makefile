@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -38,9 +38,6 @@ AUDITD = $(SRC)/cmd/auditd
 
 CPPFLAGS += -D_REENTRANT
 CPPFLAGS += -I$(LIBBSM) -I$(AUDITCONFIG) -I$(AUDITD)
-
-LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
-LINTFLAGS += -m
 
 LDLIBS += -lbsm -lsecdb -lscf
 

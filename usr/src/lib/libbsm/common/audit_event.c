@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,6 +67,15 @@ static mutex_t mutex_eventcache = DEFAULTMUTEX;
  */
 static int cacheauclass_failure = 0;
 
+#ifdef DEBUG2
+void
+printevent(au_event_ent_t *p_event)
+{
+	(void) printf("%d:%s:%s:%d\n", p_event->ae_number, p_event->ae_name,
+	    p_event->ae_desc, p_event->ae_class);
+	(void) fflush(stdout);
+}
+#endif
 
 void
 setauevent()
@@ -77,7 +86,6 @@ setauevent()
 	}
 	(void) mutex_unlock(&mutex_eventfile);
 }
-
 
 void
 endauevent()
@@ -105,8 +113,7 @@ getauevent()
 }
 
 au_event_ent_t *
-getauevent_r(au_event_entry)
-	au_event_ent_t *au_event_entry;
+getauevent_r(au_event_ent_t *au_event_entry)
 {
 	int	i, error = 0, found = 0;
 	char	*s, input[AU_EVENT_LINE_MAX];
@@ -141,14 +148,14 @@ getauevent_r(au_event_entry)
 			(void) sscanf(s, "%" VAL2STR(AU_EVENT_NAME_MAX) "s",
 			    trim_buf);
 			(void) strncpy(au_event_entry->ae_name, trim_buf,
-				AU_EVENT_NAME_MAX);
+			    AU_EVENT_NAME_MAX);
 			s = &s[i+1];
 
 			/* parse event description */
 			i = strcspn(s, ":");
 			s[i] = '\0';
 			(void) strncpy(au_event_entry->ae_desc, s,
-				AU_EVENT_DESC_MAX);
+			    AU_EVENT_DESC_MAX);
 			s = &s[i+1];
 
 			/* parse class */
@@ -173,7 +180,6 @@ getauevent_r(au_event_entry)
 		return (NULL);
 	}
 }
-
 
 au_event_ent_t *
 getauevnam(char *name)
@@ -259,7 +265,6 @@ getauevnonam(char *event_name)
  *	Return   0, if event number not in cache.
  *	Return   1, if event number is in cache.
  */
-
 int
 cacheauevent(au_event_ent_t **result, au_event_t event_number)
 {
@@ -313,7 +318,7 @@ cacheauevent(au_event_ent_t **result, au_event_t event_number)
 		setauevent();
 		while ((p_event = getauevent()) != NULL) {
 			p_tbl[lines] = (au_event_ent_t *)
-				malloc(sizeof (au_event_ent_t));
+			    malloc(sizeof (au_event_ent_t));
 			if (p_tbl[lines] == NULL) {
 				(void) mutex_unlock(&mutex_eventcache);
 				return (-3);
@@ -336,7 +341,7 @@ cacheauevent(au_event_ent_t **result, au_event_t event_number)
 		endauevent();
 		invalid = lines;
 		p_tbl[invalid] = (au_event_ent_t *)
-			malloc(sizeof (au_event_ent_t));
+		    malloc(sizeof (au_event_ent_t));
 		if (p_tbl[invalid] == NULL) {
 			(void) mutex_unlock(&mutex_eventcache);
 			return (-4);
@@ -348,9 +353,9 @@ cacheauevent(au_event_ent_t **result, au_event_t event_number)
 
 #ifdef DEBUG2
 		for (i = 0; i < size; i++) {
-			printf("%d:%s:%s:%d\n", p_tbl[i]->ae_number,
-				p_tbl[i]->ae_name, p_tbl[i]->ae_desc,
-				p_tbl[i]->ae_class);
+			(void) printf("%d:%s:%s:%d\n", p_tbl[i]->ae_number,
+			    p_tbl[i]->ae_name, p_tbl[i]->ae_desc,
+			    p_tbl[i]->ae_class);
 		}
 #endif
 
@@ -385,7 +390,6 @@ cacheauevent(au_event_ent_t **result, au_event_t event_number)
 	return (hit);
 }
 
-
 static au_class_t
 flagstohex(char *flags)
 {
@@ -406,17 +410,3 @@ flagstohex(char *flags)
 	}
 	return (hex);
 }
-
-
-#ifdef DEBUG2
-void
-printevent(p_event)
-au_event_ent_t *p_event;
-{
-	printf("%d:%s:%s:%d\n", p_event->ae_number, p_event->ae_name,
-		p_event->ae_desc, p_event->ae_class);
-	fflush(stdout);
-}
-
-
-#endif

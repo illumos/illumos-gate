@@ -21,7 +21,7 @@
 /*
  * adt_token.c
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * This file does not provide any user callable functions.  See adt.c
@@ -50,8 +50,8 @@
 #include <tsol/label.h>
 
 #ifdef	C2_DEBUG
-#define	DPRINTF(x) {printf x; }
-#define	DFLUSH fflush(stdout);
+#define	DPRINTF(x) { (void) printf x; }
+#define	DFLUSH (void) fflush(stdout);
 
 /* 0x + Classification + Compartments + end of string */
 #define	HEX_SIZE 2 + 2*2 + 2*32 + 1
@@ -121,8 +121,9 @@ adt_generate_token(struct entry *p_entry, void *p_data,
 	p_func = adt_getTokenFunction(p_entry->en_token_id);
 	assert(p_func != NULL);
 
-	DPRINTF(("p_entry=%08X, p_data=%08X, offset=%X, msgFmt=%X\n",
-	    p_entry, p_data, p_entry->en_offset, p_entry->en_msg_format));
+	DPRINTF(("p_entry=%p, p_data=%p, offset=%llu, msgFmt=%s\n",
+	    (void *)p_entry, p_data, (long long)p_entry->en_offset,
+	    p_entry->en_msg_format));
 	DFLUSH
 
 	(*p_func)(p_entry->en_type_def,

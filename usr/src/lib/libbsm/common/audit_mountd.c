@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <stdio.h>
@@ -43,7 +42,7 @@
 #include <generic.h>
 
 #ifdef C2_DEBUG2
-#define	dprintf(x) { printf x; }
+#define	dprintf(x) { (void) printf x; }
 #else
 #define	dprintf(x)
 #endif

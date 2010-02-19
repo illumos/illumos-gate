@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +41,15 @@ static char	au_class_fname[PATH_MAX] = AUDITCLASSFILE;
 static FILE	*au_class_file = NULL;
 static mutex_t	mutex_classfile = DEFAULTMUTEX;
 static mutex_t	mutex_classcache = DEFAULTMUTEX;
+
+#ifdef DEBUG2
+void
+printclass(au_class_ent_t *p_c)
+{
+	(void) printf("%x:%s:%s\n", p_c->ac_class, p_c->ac_name, p_c->ac_desc);
+	(void) fflush(stdout);
+}
+#endif
 
 void
 setauclass()
@@ -297,13 +306,11 @@ xcacheauclass(au_class_ent_t **result, char *class_name, au_class_t class_no,
 	return (hit);
 }
 
-
 int
 cacheauclass(au_class_ent_t **result, au_class_t class_no)
 {
 	return (xcacheauclass(result, "", class_no, AU_CACHE_NUMBER));
 }
-
 
 int
 cacheauclassnam(au_class_ent_t **result, char *class_name)
@@ -311,16 +318,3 @@ cacheauclassnam(au_class_ent_t **result, char *class_name)
 	return (xcacheauclass(result, class_name, (au_class_t)0,
 	    AU_CACHE_NAME));
 }
-
-
-#ifdef DEBUG2
-void
-printclass(p_c)
-au_class_ent_t *p_c;
-{
-	printf("%x:%s:%s\n", p_c->ac_class, p_c->ac_name, p_c->ac_desc);
-	fflush(stdout);
-}
-
-
-#endif

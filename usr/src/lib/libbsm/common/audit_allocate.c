@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,7 +93,7 @@ audit_allocate_record(status)
 	int		ng;		/* number of groups in process */
 
 #ifdef DEBUG
-	printf(("audit_allocate_record(%d)\n", status));
+	(void) printf("audit_allocate_record(%d)\n", status);
 #endif
 
 	if (cannot_audit(0)) {
