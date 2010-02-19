@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -76,7 +74,7 @@ _nscd_cfg_make_error(
 	ret->rc = rc;
 	if (msg != NULL) {
 		ret->msg = (char *)ret +
-			sizeof (nscd_cfg_error_t);
+		    sizeof (nscd_cfg_error_t);
 		(void) memcpy(ret->msg, msg, msglen);
 	}
 
@@ -168,7 +166,7 @@ _nscd_cfg_get_param_desc_list(
 	nscd_cfg_param_desc_list_t **list)
 {
 	return (_nscd_cfg_get_list((nscd_cfg_list_t **)list,
-		NSCD_CFG_LIST_PARAM));
+	    NSCD_CFG_LIST_PARAM));
 }
 
 /*
@@ -226,7 +224,7 @@ _nscd_cfg_add_index_entry(
 	size = sizeof (int);
 
 	db_entry = _nscd_alloc_db_entry(dbe_type, (const char *)name,
-			size, 1, 1);
+	    size, 1, 1);
 	if (db_entry == NULL)
 		return (NSCD_NO_MEMORY);
 
@@ -235,7 +233,7 @@ _nscd_cfg_add_index_entry(
 
 	(void) rw_wrlock(&cfg_paramDB_rwlock);
 	(void) _nscd_add_db_entry(cfg_paramDB, name, db_entry,
-		NSCD_ADD_DB_ENTRY_FIRST);
+	    NSCD_ADD_DB_ENTRY_FIRST);
 	(void) rw_unlock(&cfg_paramDB_rwlock);
 
 	return (NSCD_SUCCESS);
@@ -270,7 +268,7 @@ _nscd_cfg_get_index(
 		return (-1);
 
 	db_entry = _nscd_get_db_entry(cfg_paramDB, dbe_type,
-		(const char *)name, NSCD_GET_FIRST_DB_ENTRY, 0);
+	    (const char *)name, NSCD_GET_FIRST_DB_ENTRY, 0);
 
 	if (db_entry != NULL)
 		index = *(int *)*(db_entry->data_array);
@@ -290,25 +288,25 @@ _nscd_cfg_verify_group_info(
 
 	if (_nscd_cfg_flag_is_set(gdesc->pflag, NSCD_CFG_PFLAG_GLOBAL)) {
 		vp = (char *)&nscd_cfg_global_default +
-			gdesc->g_offset;
+		    gdesc->g_offset;
 		gi = (nscd_cfg_group_info_t *)vp;
 	} else {
 		vp = (char *)&nscd_cfg_nsw_db_data_default +
-			gdesc->g_offset;
+		    gdesc->g_offset;
 		gi = (nscd_cfg_group_info_t *)vp;
 
 	}
 
 	if (g_info->num_param == gi->num_param &&
-		_nscd_cfg_bitmap_is_equal(g_info->bitmap, gi->bitmap))
+	    _nscd_cfg_bitmap_is_equal(g_info->bitmap, gi->bitmap))
 		return (NSCD_SUCCESS);
 
 	_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 	(me, "ERROR: group (%s) info mismatched: group info "
-	"(%d, %#6.4x) not equal to that of default configuration data "
-	"(%d, %#6.4x)\n", gdesc->id.name, g_info->num_param,
-	_nscd_cfg_bitmap_value(g_info->bitmap), gi->num_param,
-	_nscd_cfg_bitmap_value(gi->bitmap));
+	    "(%d, %#6.4x) not equal to that of default configuration data "
+	    "(%d, %#6.4x)\n", gdesc->id.name, g_info->num_param,
+	    _nscd_cfg_bitmap_value(g_info->bitmap), gi->num_param,
+	    _nscd_cfg_bitmap_value(gi->bitmap));
 
 	return (NSCD_CFG_PARAM_DESC_ERROR);
 
@@ -353,10 +351,10 @@ _nscd_cfg_init_nsw()
 				continue;
 
 			if ((rc = _nscd_cfg_add_index_entry(id->name,
-				idx, type[j])) != NSCD_SUCCESS) {
+			    idx, type[j])) != NSCD_SUCCESS) {
 
 				_NSCD_LOG(NSCD_LOG_CONFIG,
-					NSCD_LOG_LEVEL_ERROR)
+				    NSCD_LOG_LEVEL_ERROR)
 				(me, "unable to add index entry for "
 				"nsswitch entry %s\n", id->name);
 
@@ -398,14 +396,14 @@ _nscd_cfg_init_param()
 		id = (nscd_cfg_id_t *)desc;
 
 		if (_nscd_cfg_flag_is_set(desc->pflag,
-			NSCD_CFG_PFLAG_GROUP)) {
+		    NSCD_CFG_PFLAG_GROUP)) {
 
 			if (gdesc != NULL) {
 				g_info.num_param = fn;
 				gdesc->p_fn = fn;
 
 				if ((rc = _nscd_cfg_verify_group_info(
-					&g_info, gdesc)) != NSCD_SUCCESS)
+				    &g_info, gdesc)) != NSCD_SUCCESS)
 					return (rc);
 			}
 
@@ -423,7 +421,7 @@ _nscd_cfg_init_param()
 			if (i == 0) {
 
 				_NSCD_LOG(NSCD_LOG_CONFIG,
-						NSCD_LOG_LEVEL_ERROR)
+				    NSCD_LOG_LEVEL_ERROR)
 				(me, "ERROR: first parameter "
 				"description is not for a group\n");
 
@@ -445,11 +443,11 @@ _nscd_cfg_init_param()
 			 */
 			if (desc->notify == NSCD_CFG_FUNC_NOTIFY_AS_GROUP) {
 				(void) memcpy(&desc->notify, &nfunc,
-					sizeof (void *));
+				    sizeof (void *));
 			}
 			if (desc->verify == NSCD_CFG_FUNC_VERIFY_AS_GROUP) {
 				(void) memcpy(&desc->verify, &vfunc,
-					sizeof (void *));
+				    sizeof (void *));
 			}
 		}
 
@@ -462,7 +460,7 @@ _nscd_cfg_init_param()
 		id->index = i;
 
 		if ((rc = _nscd_cfg_add_index_entry(id->name,
-			i, type)) != NSCD_SUCCESS) {
+		    i, type)) != NSCD_SUCCESS) {
 
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 			(me, "unable to add index entry for parameter "
@@ -506,29 +504,30 @@ _nscd_cfg_init_stat()
 		id = (nscd_cfg_id_t *)desc;
 
 		if (_nscd_cfg_flag_is_set(desc->sflag,
-			NSCD_CFG_SFLAG_GROUP)) {
+		    NSCD_CFG_SFLAG_GROUP)) {
 
 			if (gdesc != NULL) {
 				g_info.num_param = fn;
 				gdesc->s_fn = fn;
 
 				if (g_info.num_param !=
-					gdesc->gi.num_param ||
-					!_nscd_cfg_bitmap_is_equal(
-					g_info.bitmap, gdesc->gi.bitmap)) {
+				    gdesc->gi.num_param ||
+				    !_nscd_cfg_bitmap_is_equal(
+				    g_info.bitmap, gdesc->gi.bitmap)) {
 
 					_NSCD_LOG(NSCD_LOG_CONFIG,
-						NSCD_LOG_LEVEL_ERROR)
+					    NSCD_LOG_LEVEL_ERROR)
 					(me, "ERROR: group (%s) "
-					"info mismatched: "
-					"group info (%d, %#6.4x) not "
-					"equal to the predefined one "
-					"(%d, %#6.4x)\n", gdesc->id.name,
-					g_info.num_param,
-					_nscd_cfg_bitmap_value(g_info.bitmap),
-					gdesc->gi.num_param,
-					_nscd_cfg_bitmap_value(
-						gdesc->gi.bitmap));
+					    "info mismatched: "
+					    "group info (%d, %#6.4x) not "
+					    "equal to the predefined one "
+					    "(%d, %#6.4x)\n", gdesc->id.name,
+					    g_info.num_param,
+					    _nscd_cfg_bitmap_value(
+					    g_info.bitmap),
+					    gdesc->gi.num_param,
+					    _nscd_cfg_bitmap_value(
+					    gdesc->gi.bitmap));
 
 					exit(1);
 					return (NSCD_CFG_STAT_DESC_ERROR);
@@ -548,9 +547,9 @@ _nscd_cfg_init_stat()
 			if (i == 0) {
 
 				_NSCD_LOG(NSCD_LOG_CONFIG,
-						NSCD_LOG_LEVEL_ERROR)
+				    NSCD_LOG_LEVEL_ERROR)
 				(me, "ERROR: first stat "
-				"description is not for a group\n");
+				    "description is not for a group\n");
 
 				return (NSCD_CFG_STAT_DESC_ERROR);
 			}
@@ -570,7 +569,7 @@ _nscd_cfg_init_stat()
 			 */
 			if (desc->get_stat == NSCD_CFG_FUNC_GET_STAT_AS_GROUP) {
 				(void) memcpy(&desc->get_stat, &gsfunc,
-					sizeof (void *));
+				    sizeof (void *));
 			}
 		}
 
@@ -583,7 +582,7 @@ _nscd_cfg_init_stat()
 		id->index = i;
 
 		if ((rc = _nscd_cfg_add_index_entry(id->name,
-			i, type)) != NSCD_SUCCESS) {
+		    i, type)) != NSCD_SUCCESS) {
 
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 			(me, "unable to add index entry for stat "
@@ -696,16 +695,16 @@ _nscd_cfg_set_vlen_data_int(
 	for (i = 0; i < _nscd_cfg_num_param; i++, desc++) {
 
 		if (global == nscd_true &&
-			_nscd_cfg_flag_is_not_set(desc->pflag,
-				NSCD_CFG_PFLAG_GLOBAL))
+		    _nscd_cfg_flag_is_not_set(desc->pflag,
+		    NSCD_CFG_PFLAG_GLOBAL))
 			continue;
 		else if (global != nscd_true &&
-			_nscd_cfg_flag_is_set(desc->pflag,
-				NSCD_CFG_PFLAG_GLOBAL))
+		    _nscd_cfg_flag_is_set(desc->pflag,
+		    NSCD_CFG_PFLAG_GLOBAL))
 			continue;
 
 		if (_nscd_cfg_flag_is_set(desc->pflag,
-				NSCD_CFG_PFLAG_VLEN_DATA)) {
+		    NSCD_CFG_PFLAG_VLEN_DATA)) {
 
 			offset = desc->g_offset + desc->p_offset;
 
@@ -713,7 +712,7 @@ _nscd_cfg_set_vlen_data_int(
 			cptr = *(char **)s;
 
 			rc = _nscd_cfg_copy_vlen_data(cptr, &new,
-					desc, &dlen, nscd_true);
+			    desc, &dlen, nscd_true);
 			if (rc != NSCD_SUCCESS)
 				return (rc);
 
@@ -848,7 +847,7 @@ _nscd_cfg_locate_cfg_data(
 		if (get_group != nscd_true)
 			offset += desc->p_offset;
 		*cfg_data = (char *)nscd_cfg_nsw_alldb_current +
-			offset;
+		    offset;
 
 		if (cfglock != NULL)
 			(*cfglock)->alldb = nscd_cfg_nsw_alldb_rwlock;
@@ -856,15 +855,15 @@ _nscd_cfg_locate_cfg_data(
 	} else {
 
 		offset = nswdb->index *
-			(sizeof (nscd_cfg_nsw_db_data_t)) + desc->g_offset;
+		    (sizeof (nscd_cfg_nsw_db_data_t)) + desc->g_offset;
 		if (get_group != nscd_true)
 			offset += desc->p_offset;
 		*cfg_data = (char *)nscd_cfg_nsw_db_data_current +
-			offset;
+		    offset;
 
 		if (cfglock != NULL) {
 			(*cfglock)->nswdb =
-			&nscd_cfg_nsw_db_data_rwlock[nswdb->index];
+			    &nscd_cfg_nsw_db_data_rwlock[nswdb->index];
 
 			(*cfglock)->alldb = nscd_cfg_nsw_alldb_rwlock;
 		}
@@ -875,10 +874,10 @@ _nscd_cfg_locate_cfg_data(
 		_nscd_cfg_lock(is_read, *cfglock);
 
 	if (get_group != nscd_true &&
-		_nscd_cfg_flag_is_not_set(desc->pflag,
-			NSCD_CFG_PFLAG_GROUP) &&
-		(_nscd_cfg_flag_is_set(desc->pflag,
-			NSCD_CFG_PFLAG_VLEN_DATA))) {
+	    _nscd_cfg_flag_is_not_set(desc->pflag,
+	    NSCD_CFG_PFLAG_GROUP) &&
+	    (_nscd_cfg_flag_is_set(desc->pflag,
+	    NSCD_CFG_PFLAG_VLEN_DATA))) {
 		if (vlen_data_addr != NULL)
 			*vlen_data_addr = *cfg_data;
 		*cfg_data = _nscd_cfg_locate_vlen_data(*cfg_data, len);
@@ -927,8 +926,8 @@ _nscd_cfg_prelim_check(
 				break;
 
 			(void) snprintf(msg, sizeof (msg),
-			gettext("data must be specified for %s"),
-			desc->id.name);
+			    gettext("data must be specified for %s"),
+			    desc->id.name);
 
 			break;
 		}
@@ -939,14 +938,15 @@ _nscd_cfg_prelim_check(
 		}
 
 		if (sc->maxlen != 0 &&
-			strlen((char *)data) > sc->maxlen) {
+		    strlen((char *)data) > sc->maxlen) {
 
 			if (errorp == NULL)
 				break;
 
 			(void) snprintf(msg, sizeof (msg),
-		gettext("length of data (%s) for %s larger than %d"),
-				(char *)data, desc->id.name, sc->maxlen);
+			    gettext("length of data (%s) for %s larger "
+			    "than %d"),
+			    (char *)data, desc->id.name, sc->maxlen);
 			break;
 		}
 
@@ -958,15 +958,16 @@ _nscd_cfg_prelim_check(
 
 		ic = (nscd_cfg_int_check_t *)desc->p_check;
 		if (*(int *)data > ic->max ||
-			*(int *)data < ic->min) {
+		    *(int *)data < ic->min) {
 
 			if (errorp == NULL)
 				break;
 
 			(void) snprintf(msg, sizeof (msg),
-		gettext("data (%d) for %s out of range (%d - %d)"),
-				*(int *)data, desc->id.name,
-				ic->min, ic->max);
+			    gettext("data (%d) for %s out of range "
+			    "(%d - %d)"),
+			    *(int *)data, desc->id.name,
+			    ic->min, ic->max);
 
 			break;
 		}
@@ -979,17 +980,18 @@ _nscd_cfg_prelim_check(
 
 		bmc = (nscd_cfg_bitmap_check_t *)desc->p_check;
 		if (_nscd_cfg_bitmap_value(*(nscd_cfg_bitmap_t *)data) &
-			~(bmc->valid_bits)) {
+		    ~(bmc->valid_bits)) {
 
 			if (errorp == NULL)
 				break;
 
 			(void) snprintf(msg, sizeof (msg),
-		gettext("data (%#6.4x) for %s contain bit not in 0x%x"),
-				_nscd_cfg_bitmap_value(
-					*(nscd_cfg_bitmap_t *)data),
-				desc->id.name,
-				_nscd_cfg_bitmap_value(bmc->valid_bits));
+			    gettext("data (%#6.4x) for %s contain bit "
+			    "not in 0x%x"),
+			    _nscd_cfg_bitmap_value(
+			    *(nscd_cfg_bitmap_t *)data),
+			    desc->id.name,
+			    _nscd_cfg_bitmap_value(bmc->valid_bits));
 			break;
 		}
 
@@ -1034,12 +1036,12 @@ _nscd_cfg_notify_i(
 	*skip = 0;
 
 	if (_nscd_cfg_flag_is_not_set(desc->pflag,
-		NSCD_CFG_PFLAG_GROUP)) {
+	    NSCD_CFG_PFLAG_GROUP)) {
 
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 		(me, "ERROR: expect parameter description for group, "
-		"but receive parameter description is for %s\n",
-		desc->id.name);
+		    "but receive parameter description is for %s\n",
+		    desc->id.name);
 
 		return (NSCD_CFG_PARAM_DESC_ERROR);
 	}
@@ -1054,13 +1056,13 @@ _nscd_cfg_notify_i(
 	dflag = _nscd_cfg_flag_set(dflag, NSCD_CFG_DFLAG_INIT);
 	dflag = _nscd_cfg_flag_set(dflag, NSCD_CFG_DFLAG_GROUP);
 	if (_nscd_cfg_flag_is_set(desc->pflag,
-		NSCD_CFG_PFLAG_INIT_SET_ALL_DB))
+	    NSCD_CFG_PFLAG_INIT_SET_ALL_DB))
 		dflag = _nscd_cfg_flag_set(dflag,
-			NSCD_CFG_DFLAG_SET_ALL_DB);
+		    NSCD_CFG_DFLAG_SET_ALL_DB);
 
 	/* get to the group data in the config store */
 	rc = _nscd_cfg_locate_cfg_data(&cfg_data, nscd_true,
-			desc, nswdb, nscd_true, NULL, NULL, NULL);
+	    desc, nswdb, nscd_true, NULL, NULL, NULL);
 	if (rc != NSCD_SUCCESS)
 		goto error;
 
@@ -1080,7 +1082,7 @@ _nscd_cfg_notify_i(
 	*skip = desc->p_fn;
 
 	if (_nscd_cfg_flag_is_set(desc->pflag,
-			NSCD_CFG_PFLAG_INIT_SEND_WHOLE_GROUP))
+	    NSCD_CFG_PFLAG_INIT_SEND_WHOLE_GROUP))
 		/* send the entire group just once */
 		num = 1;
 
@@ -1095,7 +1097,7 @@ _nscd_cfg_notify_i(
 		desc++;
 
 		dflag = _nscd_cfg_flag_unset(dflag,
-			NSCD_CFG_DFLAG_GROUP);
+		    NSCD_CFG_DFLAG_GROUP);
 	}
 
 	dflag1 = dflag;
@@ -1104,7 +1106,7 @@ _nscd_cfg_notify_i(
 		dflag = dflag1;
 
 		if (_nscd_cfg_flag_is_set(desc->pflag,
-				NSCD_CFG_PFLAG_SEND_BIT_SELECTED)) {
+		    NSCD_CFG_PFLAG_SEND_BIT_SELECTED)) {
 
 			/* set the bitmap to select just this member */
 			bitmap_s = NSCD_CFG_BITMAP_ZERO;
@@ -1119,9 +1121,9 @@ _nscd_cfg_notify_i(
 			cdata = cfg_data;
 
 			dflag = _nscd_cfg_flag_set(dflag,
-				NSCD_CFG_DFLAG_GROUP);
+			    NSCD_CFG_DFLAG_GROUP);
 			dflag = _nscd_cfg_flag_set(dflag,
-				NSCD_CFG_DFLAG_BIT_SELECTED);
+			    NSCD_CFG_DFLAG_BIT_SELECTED);
 		} else {
 			/*
 			 * send param data or group data:
@@ -1135,25 +1137,25 @@ _nscd_cfg_notify_i(
 			 * to the data (not the address of the pointer)
 			 */
 			if (_nscd_cfg_flag_is_set(desc->pflag,
-				NSCD_CFG_PFLAG_VLEN_DATA))
+			    NSCD_CFG_PFLAG_VLEN_DATA))
 				cdata = *(char **)cdata;
 		}
 
 		if (desc->verify != NULL) {
 			dflag = _nscd_cfg_flag_set(dflag,
-				NSCD_CFG_DFLAG_VERIFY);
+			    NSCD_CFG_DFLAG_VERIFY);
 			rc = desc->verify(cdata, desc, nswdb,
-				dflag, errorp, &cookie);
+			    dflag, errorp, &cookie);
 			if (rc != NSCD_SUCCESS)
 				goto error;
 		}
 
 		if (desc->notify != NULL) {
 			dflag = _nscd_cfg_flag_set(dflag,
-				NSCD_CFG_DFLAG_NOTIFY);
+			    NSCD_CFG_DFLAG_NOTIFY);
 
 			rc = desc->notify(cfg_data, desc, nswdb,
-				dflag, errorp, cookie);
+			    dflag, errorp, cookie);
 			if (rc != NSCD_SUCCESS)
 				goto error;
 		}
@@ -1187,7 +1189,7 @@ _nscd_cfg_notify_init(
 		desc = &_nscd_cfg_param_desc[i];
 
 		if (_nscd_cfg_flag_is_set(desc->pflag,
-			NSCD_CFG_PFLAG_GLOBAL)) { /* global cfg data */
+		    NSCD_CFG_PFLAG_GLOBAL)) { /* global cfg data */
 
 			rc = _nscd_cfg_notify_i(desc, NULL, &skip, errorp);
 		} else {
@@ -1197,12 +1199,12 @@ _nscd_cfg_notify_init(
 			 * send the config data to verify/notify once
 			 */
 			if (_nscd_cfg_flag_is_set(desc->pflag,
-				NSCD_CFG_PFLAG_INIT_SET_ALL_DB)) {
+			    NSCD_CFG_PFLAG_INIT_SET_ALL_DB)) {
 
 				nswdb = &_nscd_cfg_nsw_alldb;
 
 				rc = _nscd_cfg_notify_i(desc, nswdb,
-					&skip, errorp);
+				    &skip, errorp);
 			} else { /* send data once for each nsw db */
 
 				for (j = 0; j < _nscd_cfg_num_nsw_db; j++) {
@@ -1210,7 +1212,7 @@ _nscd_cfg_notify_init(
 					nswdb = &_nscd_cfg_nsw_db[j];
 
 					rc = _nscd_cfg_notify_i(desc,
-						nswdb, &skip, errorp);
+					    nswdb, &skip, errorp);
 
 					if (rc != NSCD_SUCCESS)
 						break;
@@ -1251,17 +1253,17 @@ _nscd_cfg_init(
 		return (rc);
 
 	nscd_cfg_global_current = calloc(1,
-			sizeof (nscd_cfg_global_data_t));
+	    sizeof (nscd_cfg_global_data_t));
 	if (nscd_cfg_global_current == NULL)
 		return (NSCD_NO_MEMORY);
 
 	nscd_cfg_nsw_alldb_current = calloc(1,
-		sizeof (nscd_cfg_nsw_db_data_t));
+	    sizeof (nscd_cfg_nsw_db_data_t));
 	if (nscd_cfg_nsw_alldb_current == NULL)
 		return (NSCD_NO_MEMORY);
 
 	nscd_cfg_nsw_db_data_current = calloc(_nscd_cfg_num_nsw_db,
-		sizeof (nscd_cfg_nsw_db_data_t));
+	    sizeof (nscd_cfg_nsw_db_data_t));
 	if (nscd_cfg_nsw_db_data_current == NULL)
 		return (NSCD_NO_MEMORY);
 
@@ -1273,12 +1275,12 @@ _nscd_cfg_init(
 	*nscd_cfg_global_current = nscd_cfg_global_default;
 
 	rc = _nscd_cfg_set_vlen_data_int(&nscd_cfg_global_default,
-		nscd_cfg_global_current, nscd_true);
+	    nscd_cfg_global_current, nscd_true);
 	if (rc != NSCD_SUCCESS)
 		return (rc);
 
 	nscd_cfg_nsw_db_data_rwlock = calloc(_nscd_cfg_num_nsw_db,
-		sizeof (rwlock_t));
+	    sizeof (rwlock_t));
 	if (nscd_cfg_nsw_db_data_rwlock == NULL)
 		return (NSCD_NO_MEMORY);
 
@@ -1286,10 +1288,10 @@ _nscd_cfg_init(
 	for (i = 0; i < _nscd_cfg_num_nsw_db; i++) {
 
 		nscd_cfg_nsw_db_data_current[i] =
-			nscd_cfg_nsw_db_data_default;
+		    nscd_cfg_nsw_db_data_default;
 
 		(void) rwlock_init(&nscd_cfg_nsw_db_data_rwlock[i],
-			NULL, NULL);
+		    NULL, NULL);
 	}
 
 	/* add db specific defaults */
@@ -1302,7 +1304,7 @@ _nscd_cfg_init(
 			for (j = 0; j < _nscd_cfg_num_nsw_db; j++) {
 
 				if (strcmp(_nscd_cfg_nsw_db[j].name,
-					_nscd_cfg_nsw_spc_default[i].db) != 0)
+				    _nscd_cfg_nsw_spc_default[i].db) != 0)
 					continue;
 
 				dbi = _nscd_cfg_nsw_db[j].index;
@@ -1312,8 +1314,8 @@ _nscd_cfg_init(
 		}
 
 		dest = (char *)&nscd_cfg_nsw_db_data_current[dbi] +
-			_nscd_cfg_nsw_spc_default[i].group_off +
-			_nscd_cfg_nsw_spc_default[i].param_off;
+		    _nscd_cfg_nsw_spc_default[i].group_off +
+		    _nscd_cfg_nsw_spc_default[i].param_off;
 
 		src = _nscd_cfg_nsw_spc_default[i].data;
 		datalen = _nscd_cfg_nsw_spc_default[i].data_len;
@@ -1333,7 +1335,7 @@ _nscd_cfg_init(
 			for (j = 0; j < _nscd_cfg_num_nsw_db; j++) {
 
 				if (strcmp(_nscd_cfg_nsw_db[j].name,
-					_nscd_cfg_nsw_link_default[i].db) != 0)
+				    _nscd_cfg_nsw_link_default[i].db) != 0)
 					continue;
 
 				dbi = _nscd_cfg_nsw_db[j].index;
@@ -1343,14 +1345,14 @@ _nscd_cfg_init(
 		}
 
 		dest = (char *)&nscd_cfg_nsw_db_data_current[dbi] +
-			_nscd_cfg_nsw_link_default[i].group_off +
-			_nscd_cfg_nsw_link_default[i].param_off;
+		    _nscd_cfg_nsw_link_default[i].group_off +
+		    _nscd_cfg_nsw_link_default[i].param_off;
 
 		if (_nscd_cfg_nsw_db[j].name != dbnj) {
 			for (j = 0; j < _nscd_cfg_num_nsw_db; j++) {
 
 				if (strcmp(spc->db,
-					_nscd_cfg_nsw_db[j].name) != 0)
+				    _nscd_cfg_nsw_db[j].name) != 0)
 					continue;
 
 				dbnj = _nscd_cfg_nsw_db[j].name;
@@ -1360,7 +1362,7 @@ _nscd_cfg_init(
 		}
 
 		src = (char *)&nscd_cfg_nsw_db_data_current[dbj] +
-				spc->group_off + spc->param_off;
+		    spc->group_off + spc->param_off;
 		datalen = spc->data_len;
 
 		(void) memcpy(dest, src, datalen);
@@ -1370,8 +1372,8 @@ _nscd_cfg_init(
 	for (i = 0; i < _nscd_cfg_num_nsw_db; i++) {
 
 		rc = _nscd_cfg_set_vlen_data_int(
-			&nscd_cfg_nsw_db_data_current[i],
-			&nscd_cfg_nsw_db_data_current[i], nscd_false);
+		    &nscd_cfg_nsw_db_data_current[i],
+		    &nscd_cfg_nsw_db_data_current[i], nscd_false);
 		if (rc != NSCD_SUCCESS)
 			return (rc);
 	}
@@ -1383,8 +1385,8 @@ _nscd_cfg_init(
 	(void) rwlock_init(nscd_cfg_nsw_alldb_rwlock, NULL, NULL);
 
 	rc = _nscd_cfg_set_vlen_data_int(
-		&nscd_cfg_nsw_db_data_default,
-		nscd_cfg_nsw_alldb_current, nscd_false);
+	    &nscd_cfg_nsw_db_data_default,
+	    nscd_cfg_nsw_alldb_current, nscd_false);
 	if (rc != NSCD_SUCCESS)
 		return (rc);
 
@@ -1420,7 +1422,7 @@ _nscd_cfg_get_handle_common(
 	if (handle == NULL) {
 
 		(void) snprintf(msg, sizeof (msg),
-			gettext("address of handle not specified"));
+		    gettext("address of handle not specified"));
 		if (errorp)
 			*errorp = _nscd_cfg_make_error(rc, msg);
 
@@ -1435,7 +1437,7 @@ _nscd_cfg_get_handle_common(
 	if (name == NULL) {
 
 		(void) snprintf(msg, sizeof (msg),
-			gettext("name not specified"));
+		    gettext("name not specified"));
 		if (errorp)
 			*errorp = _nscd_cfg_make_error(rc, msg);
 
@@ -1466,33 +1468,33 @@ _nscd_cfg_get_handle_common(
 			pdesc = &_nscd_cfg_param_desc[i];
 			(void) memcpy(&h->desc, &pdesc, sizeof (pdesc));
 			is_global = _nscd_cfg_flag_is_set(
-				pdesc->pflag, NSCD_CFG_PFLAG_GLOBAL);
+			    pdesc->pflag, NSCD_CFG_PFLAG_GLOBAL);
 
 			/* hidden params are not exposed */
 			if (_nscd_cfg_flag_is_set(
-				pdesc->pflag, NSCD_CFG_PFLAG_HIDDEN))
+			    pdesc->pflag, NSCD_CFG_PFLAG_HIDDEN))
 				i = -1;
 
 			if (_nscd_cfg_flag_is_set(pdesc->pflag,
-					NSCD_CFG_PFLAG_OBSOLETE)) {
+			    NSCD_CFG_PFLAG_OBSOLETE)) {
 				_NSCD_LOG(NSCD_LOG_CONFIG,
-					NSCD_LOG_LEVEL_WARNING)
-					(me,
-			gettext("%s: %s is obsolete and will be ignored\n"),
-					desc_str, name);
+				    NSCD_LOG_LEVEL_WARNING)
+				(me, gettext("%s: %s is obsolete and "
+				    "will be ignored\n"),
+				    desc_str, name);
 			}
 		} else {
 			sdesc = &_nscd_cfg_stat_desc[i];
 			(void) memcpy(&h->desc, &sdesc, sizeof (sdesc));
 			is_global = _nscd_cfg_flag_is_set(
-				sdesc->sflag, NSCD_CFG_SFLAG_GLOBAL);
+			    sdesc->sflag, NSCD_CFG_SFLAG_GLOBAL);
 		}
 	}
 
 	if (i == -1) {
 
 		(void) snprintf(msg, sizeof (msg),
-			gettext("%s: unknown name \"%s\""), desc_str, name);
+		    gettext("%s: unknown name \"%s\""), desc_str, name);
 		if (errorp)
 			*errorp = _nscd_cfg_make_error(rc, msg);
 
@@ -1512,13 +1514,13 @@ _nscd_cfg_get_handle_common(
 
 			(void) snprintf(msg, sizeof (msg),
 			gettext("%s: switch database name not specified"),
-				desc_str);
+			    desc_str);
 			if (errorp)
 				*errorp = _nscd_cfg_make_error(rc, msg);
 
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 			(me, "%s for non-global param or stat %s\n",
-			msg, name);
+			    msg, name);
 
 			free(h);
 			return (rc);
@@ -1528,8 +1530,8 @@ _nscd_cfg_get_handle_common(
 		if (nswdb_name != NULL) {
 
 			(void) snprintf(msg, sizeof (msg),
-	gettext("%s: switch database specified for global data"),
-				desc_str);
+			    gettext("%s: switch database specified for "
+			    "global data"), desc_str);
 			if (errorp)
 				*errorp = _nscd_cfg_make_error(rc, msg);
 
@@ -1555,12 +1557,12 @@ _nscd_cfg_get_handle_common(
 
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_DEBUG)
 		(me, "%s: index of %s is %d\n",
-			desc_str, nswdb_name, i);
+		    desc_str, nswdb_name, i);
 	} else {
 
 		(void) snprintf(msg, sizeof (msg),
-			gettext("%s: unknown switch database name \"%s\""),
-			desc_str, nswdb_name);
+		    gettext("%s: unknown switch database name \"%s\""),
+		    desc_str, nswdb_name);
 		if (errorp)
 			*errorp = _nscd_cfg_make_error(rc, msg);
 
@@ -1585,7 +1587,7 @@ _nscd_cfg_get_handle(
 {
 
 	return (_nscd_cfg_get_handle_common(NSCD_CFG_LIST_PARAM,
-		param_name, nswdb_name, handle, errorp));
+	    param_name, nswdb_name, handle, errorp));
 }
 
 nscd_rc_t
@@ -1597,7 +1599,7 @@ _nscd_cfg_get_stat_handle(
 {
 
 	return (_nscd_cfg_get_handle_common(NSCD_CFG_LIST_STAT,
-		stat_name, nswdb_name, handle, errorp));
+	    stat_name, nswdb_name, handle, errorp));
 }
 
 void
@@ -1629,7 +1631,7 @@ _nscd_cfg_free_vlen_data_group(
 
 		/* skip fixed length data */
 		if (_nscd_cfg_flag_is_not_set(desc->pflag,
-				NSCD_CFG_PFLAG_VLEN_DATA))
+		    NSCD_CFG_PFLAG_VLEN_DATA))
 			continue;
 
 		dest = (char *)group_data + desc->p_offset;
@@ -1709,7 +1711,7 @@ _nscd_cfg_copy_param_data(
 
 	/* fixed length data */
 	if (_nscd_cfg_flag_is_not_set(desc->pflag,
-			NSCD_CFG_PFLAG_VLEN_DATA)) {
+	    NSCD_CFG_PFLAG_VLEN_DATA)) {
 		(void) memcpy(dest, pdata, desc->p_size);
 		goto done;
 	}
@@ -1777,7 +1779,7 @@ _nscd_cfg_copy_group_data_in(
 		 * with the new
 		 */
 		if (_nscd_cfg_flag_is_set(desc->pflag,
-				NSCD_CFG_PFLAG_VLEN_DATA)) {
+		    NSCD_CFG_PFLAG_VLEN_DATA)) {
 			_nscd_cfg_free_vlen_data_int(*(char **)dest);
 			*(char **)dest = *(char **)src;
 			*(char **)src = NULL;
@@ -1829,7 +1831,7 @@ _nscd_cfg_copy_group_data_out(
 		 * address and length of the data
 		 */
 		if (_nscd_cfg_flag_is_set(desc->pflag,
-				NSCD_CFG_PFLAG_VLEN_DATA)) {
+		    NSCD_CFG_PFLAG_VLEN_DATA)) {
 			src = _nscd_cfg_locate_vlen_data(src, &dlen);
 			if (dlen == NULL)
 				continue;
@@ -1841,14 +1843,14 @@ _nscd_cfg_copy_group_data_out(
 		 * than copying the data content
 		 */
 		rc = _nscd_cfg_copy_param_data(desc, dest, src,
-			nscd_false, nscd_true);
+		    nscd_false, nscd_true);
 		if (rc != NSCD_SUCCESS) {
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 			(me, "unable to copy param data for %s\n",
-				desc->id.name);
+			    desc->id.name);
 
 			_nscd_cfg_free_vlen_data_group(gdesc,
-				group_dest, nscd_false);
+			    group_dest, nscd_false);
 
 			free(group_dest);
 
@@ -1860,7 +1862,7 @@ _nscd_cfg_copy_group_data_out(
 	 * set group bitmap
 	 */
 	(void) memcpy(group_dest, group_src,
-		sizeof (nscd_cfg_group_info_t));
+	    sizeof (nscd_cfg_group_info_t));
 
 	return (rc);
 }
@@ -1932,7 +1934,7 @@ _nscd_cfg_copy_group_data_merge(
 		 * get the member data in group_cfg
 		 */
 		if (_nscd_cfg_bitmap_is_not_set(gi->bitmap, i++) ||
-				group_src == NULL) {
+		    group_src == NULL) {
 			src = (char *)group_cfg + desc->p_offset;
 		} else
 			src = (char *)group_src + desc->p_offset;
@@ -1949,8 +1951,8 @@ _nscd_cfg_copy_group_data_merge(
 		 * instead of pointer to the data
 		 */
 		if (_nscd_cfg_flag_is_set(desc->pflag,
-			NSCD_CFG_PFLAG_VLEN_DATA))
-				src = *(char **)src;
+		    NSCD_CFG_PFLAG_VLEN_DATA))
+			src = *(char **)src;
 
 		/*
 		 * nscd_true asks _nscd_cfg_copy_param_data to
@@ -1958,14 +1960,14 @@ _nscd_cfg_copy_group_data_merge(
 		 * than copying the data content
 		 */
 		rc = _nscd_cfg_copy_param_data(desc, dest, src,
-			nscd_true, nscd_true);
+		    nscd_true, nscd_true);
 		if (rc != NSCD_SUCCESS) {
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 			(me, "unable to copy param data for %s\n",
-				desc->id.name);
+			    desc->id.name);
 
 			_nscd_cfg_free_vlen_data_group(gdesc,
-				tmp_dest, nscd_true);
+			    tmp_dest, nscd_true);
 
 			free(tmp_dest);
 
@@ -1982,7 +1984,7 @@ _nscd_cfg_copy_group_data_merge(
 	 */
 	if (group_src != NULL)
 		(void) memcpy(*group_dest, group_src,
-			sizeof (nscd_cfg_group_info_t));
+		    sizeof (nscd_cfg_group_info_t));
 	else {
 		gi = _nscd_cfg_get_gi(*group_dest);
 		_nscd_cfg_bitmap_set(&gi->bitmap, bitmap);
@@ -2037,7 +2039,7 @@ _nscd_cfg_get(
 	 * and lock the config data for reading
 	 */
 	rc = _nscd_cfg_locate_cfg_data(&cfg_data, nscd_true, desc,
-		nswdb, get_group, NULL, &dlen, &lock);
+	    nswdb, get_group, NULL, &dlen, &lock);
 	if (rc != NSCD_SUCCESS) {
 
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
@@ -2070,7 +2072,7 @@ _nscd_cfg_get(
 		 * the addr of the vlen data in 'ptr'
 		 */
 		rc = _nscd_cfg_copy_param_data(desc, ptr, cfg_data,
-			out, nscd_false);
+		    out, nscd_false);
 
 		if (rc != NSCD_SUCCESS) {
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
@@ -2142,9 +2144,9 @@ _nscd_cfg_notify_s(
 		is_group = 1;
 	}
 	if (nswdb != NULL &&
-		strcmp(NSCD_CFG_NSW_ALLDB, nswdb->name) == 0)
+	    strcmp(NSCD_CFG_NSW_ALLDB, nswdb->name) == 0)
 		dflag = _nscd_cfg_flag_set(dflag,
-				NSCD_CFG_DFLAG_SET_ALL_DB);
+		    NSCD_CFG_DFLAG_SET_ALL_DB);
 
 	/*
 	 * the bitmap in the input data may be replaced before
@@ -2157,7 +2159,7 @@ _nscd_cfg_notify_s(
 		bitmap_addr = &(gi->bitmap);
 
 		if (_nscd_cfg_flag_is_set(desc->pflag,
-			NSCD_CFG_PFLAG_INIT_SEND_WHOLE_GROUP))
+		    NSCD_CFG_PFLAG_INIT_SEND_WHOLE_GROUP))
 			/* send the entire group just once */
 			num = 1;
 
@@ -2172,7 +2174,7 @@ _nscd_cfg_notify_s(
 			desc++;
 
 			dflag = _nscd_cfg_flag_unset(dflag,
-				NSCD_CFG_DFLAG_GROUP);
+			    NSCD_CFG_DFLAG_GROUP);
 		}
 	} else {
 		/* not group data, send the member once */
@@ -2190,7 +2192,7 @@ _nscd_cfg_notify_s(
 		}
 
 		if (_nscd_cfg_flag_is_set(desc->pflag,
-				NSCD_CFG_PFLAG_SEND_BIT_SELECTED)) {
+		    NSCD_CFG_PFLAG_SEND_BIT_SELECTED)) {
 
 			/* set the bitmap to select just this member */
 			bitmap_s = NSCD_CFG_BITMAP_ZERO;
@@ -2205,9 +2207,9 @@ _nscd_cfg_notify_s(
 			cdata = data;
 
 			dflag = _nscd_cfg_flag_set(dflag,
-				NSCD_CFG_DFLAG_GROUP);
+			    NSCD_CFG_DFLAG_GROUP);
 			dflag = _nscd_cfg_flag_set(dflag,
-				NSCD_CFG_DFLAG_BIT_SELECTED);
+			    NSCD_CFG_DFLAG_BIT_SELECTED);
 		} else {
 			/*
 			 * send param data or group data:
@@ -2221,7 +2223,7 @@ _nscd_cfg_notify_s(
 			 * to the data (not the address of the pointer)
 			 */
 			if (_nscd_cfg_flag_is_set(desc->pflag,
-				NSCD_CFG_PFLAG_VLEN_DATA))
+			    NSCD_CFG_PFLAG_VLEN_DATA))
 				cdata = *(char **)cdata;
 		}
 
@@ -2229,19 +2231,19 @@ _nscd_cfg_notify_s(
 
 		if (desc->verify != NULL) {
 			dflag = _nscd_cfg_flag_set(dflag,
-				NSCD_CFG_DFLAG_VERIFY);
+			    NSCD_CFG_DFLAG_VERIFY);
 			rc = desc->verify(cdata, desc, nswdb,
-				dflag, errorp, &cookie);
+			    dflag, errorp, &cookie);
 			if (rc != NSCD_SUCCESS)
 				goto error_exit;
 		}
 
 		if (desc->notify != NULL) {
 			dflag = _nscd_cfg_flag_set(dflag,
-				NSCD_CFG_DFLAG_NOTIFY);
+			    NSCD_CFG_DFLAG_NOTIFY);
 
 			rc = desc->notify(data, desc, nswdb,
-				dflag, errorp, cookie);
+			    dflag, errorp, cookie);
 			if (rc != NSCD_SUCCESS)
 				goto error_exit;
 		}
@@ -2283,8 +2285,8 @@ _nscd_cfg_str_to_data(
 	if (desc == NULL || str == NULL || data == NULL) {
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 		(me, "ERROR: one of the following is NULL "
-		"desc = %p, str = %p, data = %p, data_p = %p\n",
-		desc, str, data, data_p);
+		    "desc = %p, str = %p, data = %p, data_p = %p\n",
+		    desc, str, data, data_p);
 
 		return (NSCD_INVALID_ARGUMENT);
 	}
@@ -2298,7 +2300,7 @@ _nscd_cfg_str_to_data(
 
 		if (errorp != NULL)
 			*errorp = _nscd_cfg_make_error(NSCD_INVALID_ARGUMENT,
-				msg);
+			    msg);
 
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 		(me, "ERROR: %s)\n", msg);
@@ -2331,7 +2333,7 @@ _nscd_cfg_str_to_data(
 
 		if (errorp != NULL)
 			*errorp = _nscd_cfg_make_error(NSCD_INVALID_ARGUMENT,
-				msg);
+			    msg);
 
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 		(me, "ERROR: %s\n", msg);
@@ -2352,11 +2354,11 @@ _nscd_cfg_str_to_data(
 
 		(void) snprintf(msg, sizeof (msg),
 		gettext("data (%s) must be 'yes' or 'no' for %s"),
-				str, desc->id.name);
+		    str, desc->id.name);
 
 		if (errorp != NULL)
 			*errorp = _nscd_cfg_make_error(NSCD_INVALID_ARGUMENT,
-				msg);
+			    msg);
 
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 			(me, "ERROR: %s\n", msg);
@@ -2374,7 +2376,7 @@ _nscd_cfg_str_to_data(
 
 			(void) snprintf(msg, sizeof (msg),
 			gettext("unable to convert data (%s) for %s"),
-				str, desc->id.name);
+			    str, desc->id.name);
 
 			if (errorp != NULL)
 				*errorp = _nscd_cfg_make_error(rc, msg);
@@ -2395,7 +2397,7 @@ _nscd_cfg_str_to_data(
 
 			(void) snprintf(msg, sizeof (msg),
 			gettext("unable to convert data (%s) for %s"),
-				str, desc->id.name);
+			    str, desc->id.name);
 
 			if (errorp != NULL)
 				*errorp = _nscd_cfg_make_error(rc, msg);
@@ -2450,15 +2452,15 @@ _nscd_cfg_set(
 	param_name = desc->id.name;
 
 	if (data == NULL && _nscd_cfg_flag_is_not_set(desc->pflag,
-			NSCD_CFG_PFLAG_VLEN_DATA)) {
+	    NSCD_CFG_PFLAG_VLEN_DATA)) {
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 		(me, "data == NULL\n");
 		return (NSCD_INVALID_ARGUMENT);
 	}
 
 	if (_nscd_cfg_flag_is_set(desc->pflag,
-			NSCD_CFG_PFLAG_UPDATE_SEND_WHOLE_GROUP) ||
-		_nscd_cfg_flag_is_set(desc->pflag, NSCD_CFG_PFLAG_GROUP))
+	    NSCD_CFG_PFLAG_UPDATE_SEND_WHOLE_GROUP) ||
+	    _nscd_cfg_flag_is_set(desc->pflag, NSCD_CFG_PFLAG_GROUP))
 		get_group = nscd_true;
 
 	/*
@@ -2466,7 +2468,7 @@ _nscd_cfg_set(
 	 * and lock the config data for writing
 	 */
 	rc = _nscd_cfg_locate_cfg_data(&cfg_data, nscd_false, desc,
-		nswdb, get_group, &vdata_addr, &dlen, &lock);
+	    nswdb, get_group, &vdata_addr, &dlen, &lock);
 	if (rc != NSCD_SUCCESS) {
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 		(me, "unable to locate config data (rc = %d)\n", rc);
@@ -2474,16 +2476,16 @@ _nscd_cfg_set(
 	}
 
 	if (_nscd_cfg_flag_is_set(desc->pflag, NSCD_CFG_PFLAG_GROUP) &&
-		((nscd_cfg_group_info_t *)cfg_data)->num_param !=
-		((nscd_cfg_group_info_t *)data)->num_param) {
+	    ((nscd_cfg_group_info_t *)cfg_data)->num_param !=
+	    ((nscd_cfg_group_info_t *)data)->num_param) {
 
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 		(me, "number of parameters in group <%s : %s> not equal: "
-		"%d in input data, should be %d\n",
-		NSCD_STR_OR_GLOBAL(nswdb_name),
-		NSCD_STR_OR_NULL(param_name),
-		((nscd_cfg_group_info_t *)data)->num_param,
-		((nscd_cfg_group_info_t *)cfg_data)->num_param);
+		    "%d in input data, should be %d\n",
+		    NSCD_STR_OR_GLOBAL(nswdb_name),
+		    NSCD_STR_OR_NULL(param_name),
+		    ((nscd_cfg_group_info_t *)data)->num_param,
+		    ((nscd_cfg_group_info_t *)cfg_data)->num_param);
 
 		rc = NSCD_INVALID_ARGUMENT;
 		goto error_exit;
@@ -2506,33 +2508,33 @@ _nscd_cfg_set(
 			gdesc = &_nscd_cfg_param_desc[desc->g_index];
 
 			rc = _nscd_cfg_copy_group_data_merge(
-				gdesc, &pdata, data, cfg_data,
-				desc->id.index, data);
+			    gdesc, &pdata, data, cfg_data,
+			    desc->id.index, data);
 
 			if (rc != NSCD_SUCCESS) {
 				_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 				(me, "unable to copy group data <%s : %s>\n",
-				NSCD_STR_OR_GLOBAL(nswdb_name),
-				NSCD_STR_OR_NULL(param_name));
+				    NSCD_STR_OR_GLOBAL(nswdb_name),
+				    NSCD_STR_OR_NULL(param_name));
 
 				goto error_exit;
 			}
 
 			rc = _nscd_cfg_notify_s(gdesc, nswdb,
-				pdata, errorp);
+			    pdata, errorp);
 
 		} else
 			rc = _nscd_cfg_notify_s(desc, nswdb, data,
-				errorp);
+			    errorp);
 
 		if (rc != NSCD_SUCCESS) {
 
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 			(me, "verifying/notifying  of new configuration "
-			"parameter <%s : %s> failed. %s\n",
-			NSCD_STR_OR_GLOBAL(nswdb_name),
-			param_name, (*errorp && (*errorp)->msg) ?
-			(*errorp)->msg : "");
+			    "parameter <%s : %s> failed. %s\n",
+			    NSCD_STR_OR_GLOBAL(nswdb_name),
+			    param_name, (*errorp && (*errorp)->msg) ?
+			    (*errorp)->msg : "");
 
 			goto error_exit;
 		}
@@ -2542,10 +2544,10 @@ _nscd_cfg_set(
 	 */
 	rc = NSCD_CFG_SET_PARAM_FAILED;
 	if (_nscd_cfg_flag_is_set(desc->pflag,
-			NSCD_CFG_PFLAG_GROUP)) {
+	    NSCD_CFG_PFLAG_GROUP)) {
 		gi = _nscd_cfg_get_gi(pdata);
 		rc = _nscd_cfg_copy_group_data_in(gdesc, gi,
-			cfg_data, pdata);
+		    cfg_data, pdata);
 	} else {
 		/*
 		 * nscd_true asks _nscd_cfg_copy_param_data to
@@ -2554,18 +2556,18 @@ _nscd_cfg_set(
 		 */
 		if (pdata != NULL)
 			_nscd_cfg_free_vlen_data_group(gdesc,
-				pdata, in);
+			    pdata, in);
 
 		rc = _nscd_cfg_copy_param_data(desc,
-			cfg_data, data, in, nscd_true);
+		    cfg_data, data, in, nscd_true);
 	}
 
 	if (rc != NSCD_SUCCESS) {
 
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 		(me, "unable to make new param data <%s : %s> current\n",
-		NSCD_STR_OR_GLOBAL(nswdb_name),
-		NSCD_STR_OR_NULL(param_name));
+		    NSCD_STR_OR_GLOBAL(nswdb_name),
+		    NSCD_STR_OR_NULL(param_name));
 	}
 
 	error_exit:
@@ -2605,9 +2607,9 @@ _nscd_cfg_set_linked(
 	 * if a global param, or a group, or not a linked param
 	 */
 	if (nswdb == NULL || _nscd_cfg_flag_is_set(desc->pflag,
-			NSCD_CFG_PFLAG_GROUP) ||
-			_nscd_cfg_flag_is_not_set(desc->pflag,
-			NSCD_CFG_PFLAG_LINKED))
+	    NSCD_CFG_PFLAG_GROUP) ||
+	    _nscd_cfg_flag_is_not_set(desc->pflag,
+	    NSCD_CFG_PFLAG_LINKED))
 		return (_nscd_cfg_set(handle, data, errorp));
 	else
 		nswdb_name = nswdb->name;
@@ -2623,17 +2625,18 @@ _nscd_cfg_set_linked(
 			continue;
 
 		if (strcmp(_nscd_cfg_nsw_link_default[i].db,
-				nswdb_name) == 0 &&
-			_nscd_cfg_nsw_link_default[i].group_off ==
-				desc->g_offset &&
-			_nscd_cfg_nsw_link_default[i].param_off ==
-				desc->p_offset) {
+		    nswdb_name) == 0 &&
+		    _nscd_cfg_nsw_link_default[i].group_off ==
+		    desc->g_offset &&
+		    _nscd_cfg_nsw_link_default[i].param_off ==
+		    desc->p_offset) {
 
 			rc = NSCD_CFG_READ_ONLY;
 
 			(void) snprintf(msg, sizeof (msg),
-gettext("vaule of \'%s\' not changeable, change that of \'%s\' instead"),
-				nswdb->name, "passwd");
+			    gettext("value of \'%s\' not changeable, "
+			    "change that of \'%s\' instead"),
+			    nswdb->name, "passwd");
 
 			if (errorp != NULL)
 				*errorp = _nscd_cfg_make_error(rc, msg);
@@ -2657,8 +2660,8 @@ gettext("vaule of \'%s\' not changeable, change that of \'%s\' instead"),
 		spc = _nscd_cfg_nsw_link_default[i].data;
 
 		if (strcmp(spc->db, nswdb_name) == 0 &&
-			spc->group_off == desc->g_offset &&
-			spc->param_off == desc->p_offset) {
+		    spc->group_off == desc->g_offset &&
+		    spc->param_off == desc->p_offset) {
 
 			rc = _nscd_cfg_set(handle, data, errorp);
 			if (rc != NSCD_SUCCESS)
@@ -2678,17 +2681,17 @@ gettext("vaule of \'%s\' not changeable, change that of \'%s\' instead"),
 		spc = _nscd_cfg_nsw_link_default[i].data;
 
 		if (strcmp(spc->db, nswdb_name) == 0 &&
-			spc->group_off == desc->g_offset &&
-			spc->param_off == desc->p_offset &&
-			_nscd_cfg_nsw_link_default[i].group_off ==
-				desc->g_offset &&
-			_nscd_cfg_nsw_link_default[i].param_off ==
-				desc->p_offset) {
+		    spc->group_off == desc->g_offset &&
+		    spc->param_off == desc->p_offset &&
+		    _nscd_cfg_nsw_link_default[i].group_off ==
+		    desc->g_offset &&
+		    _nscd_cfg_nsw_link_default[i].param_off ==
+		    desc->p_offset) {
 
 			dbl = _nscd_cfg_nsw_link_default[i].db;
 
 			rc = _nscd_cfg_get_handle(param_name, dbl,
-				&hl, errorp);
+			    &hl, errorp);
 			if (rc != NSCD_SUCCESS)
 				return (rc);
 			rc = _nscd_cfg_set(hl, data, errorp);
@@ -2702,15 +2705,29 @@ gettext("vaule of \'%s\' not changeable, change that of \'%s\' instead"),
 }
 
 /*
- * Return a list of space-separated database names that
- * have at least one of the input sources appeared in the
- * configured nsswitch policy string of the databases.
- * The return string should be freed by the caller.
+ * Return a list of comma-separated database names that
+ * have at least one of the input sources (the srcs array)
+ * appears in their configured nsswitch policy string.
+ * That is, if srcs contains "ldap" and "passwd: files ldap"
+ * "group: files ldap" are in /etc/nsswitch.conf, then
+ * "passwd,group" will be returned. The return string
+ * should be freed by the caller.
  *
- * For compat sources (compat_group and compat_passwd),
- * "group" will be returned, if the policy string for
- * compat_group contains one of the input sources. Same
- * for compat_passwd and passwd.
+ * For compat nsswitch configuration, "group" and/or
+ * "passwd,user_attr,shadow,audit_user" (not "group_compat"
+ * or "passwd_compat") will be returned. Note that the
+ * user_attr, shadow, and audit_user databases share the
+ * same policy with the passwd database.
+ *
+ * For example, if srcs has "ldap" and in /etc/nsswitch.conf,
+ * there are:
+ *   passwd:		compat
+ *   passwd_compat:	ldap
+ *   group:		compat
+ *   group_compat:	ldap
+ *   netgroup:		ldap
+ * then "netgroup,passwd,group,user_attr,shadow,audit_user"
+ * will be returned.
  */
 char *
 _nscd_srcs_in_db_nsw_policy(
@@ -2732,7 +2749,7 @@ _nscd_srcs_in_db_nsw_policy(
 		return (NULL);
 
 	db_compat = (uint8_t *)calloc(_nscd_cfg_num_nsw_db,
-		sizeof (uint8_t));
+	    sizeof (uint8_t));
 	if (db_compat == NULL) {
 		free(db);
 		return (NULL);
@@ -2744,17 +2761,19 @@ _nscd_srcs_in_db_nsw_policy(
 
 		dbcfg = &nscd_cfg_nsw_db_data_current[i];
 		sw = &dbcfg->sw;
-		if (sw->nsw_config_string == NULL)
+		if (sw->nsw_config_string == NULL) {
+			(void) rw_unlock(&nscd_cfg_nsw_db_data_rwlock[i]);
 			continue;
+		}
 
 		dbname = _nscd_cfg_nsw_db[i].name;
 		for (j = 0; j < num_src; j++) {
 			if (strstr(sw->nsw_config_string, srcs[j]) !=
-				NULL) {
+			    NULL) {
 				db[n++] = i;
 				dlen += strlen(dbname) + 1;
 			} else if (strcmp(sw->nsw_config_string,
-					"compat") == 0) {
+			    "compat") == 0) {
 				if (strcmp(dbname, "passwd") == 0) {
 					compat_pwd = 1;
 					dlen += 7;
@@ -2763,7 +2782,7 @@ _nscd_srcs_in_db_nsw_policy(
 					dlen += 6;
 				} else {
 					db_compat[nc++] = i;
-				dlen += strlen(dbname) + 1;
+					dlen += strlen(dbname) + 1;
 
 				}
 			}
@@ -2771,7 +2790,7 @@ _nscd_srcs_in_db_nsw_policy(
 		(void) rw_unlock(&nscd_cfg_nsw_db_data_rwlock[i]);
 	}
 
-	if (dlen != NULL)
+	if (dlen != 0)
 		outstr = (char *)calloc(1, dlen);
 	if (outstr == NULL) {
 		free(db_compat);
@@ -2801,9 +2820,14 @@ _nscd_srcs_in_db_nsw_policy(
 		dbname = _nscd_cfg_nsw_db[db_compat[j]].name;
 		if (compat_pwd == 1) {
 			(void) strlcat(outstr, dbname, dlen);
-			(void) strlcat(outstr, " ", dlen);
+			(void) strlcat(outstr, ",", dlen);
 		}
 	}
+
+	/* remove the last comma */
+	i = strlen(outstr) - 1;
+	if (outstr[i] == ',')
+		outstr[i] = '\0';
 
 	free(db);
 	free(db_compat);
