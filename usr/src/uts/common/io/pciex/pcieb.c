@@ -1360,7 +1360,7 @@ pcieb_dma_allochdl(dev_info_t *dip, dev_info_t *rdip,
 	ddi_dma_handle_t *handlep)
 {
 	int		ret;
-#ifdef	BCM_SW_WORKAROUNDS
+#ifdef	PCIEB_BCM
 	uint64_t	lim;
 
 	/*
@@ -1373,7 +1373,7 @@ pcieb_dma_allochdl(dev_info_t *dip, dev_info_t *rdip,
 	lim = attr_p->dma_attr_addr_hi;
 	attr_p->dma_attr_addr_hi = MIN(lim, PCIEB_ADDR_LIMIT_HI);
 
-#endif	/* BCM_SW_WORKAROUNDS */
+#endif	/* PCIEB_BCM */
 
 	/*
 	 * This is a software workaround to fix the Broadcom 5714/5715 PCIe-PCI
@@ -1386,9 +1386,9 @@ pcieb_dma_allochdl(dev_info_t *dip, dev_info_t *rdip,
 	if ((ret = ddi_dma_allochdl(dip, rdip, attr_p, waitfp, arg,
 	    handlep)) == DDI_SUCCESS) {
 		ddi_dma_impl_t	*mp = (ddi_dma_impl_t *)*handlep;
-#ifdef	BCM_SW_WORKAROUNDS
+#ifdef	PCIEB_BCM
 		mp->dmai_inuse |= PX_DMAI_FLAGS_MAP_BUFZONE;
-#endif	/* BCM_SW_WORKAROUNDS */
+#endif	/* PCIEB_BCM */
 		/*
 		 * For a given rdip, update mp->dmai_bdf with the bdf value
 		 * of pcieb's immediate child or secondary bus-id of the
@@ -1413,10 +1413,10 @@ pcieb_dma_mctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 {
 	int	ret;
 
-#ifdef	BCM_SW_WORKAROUNDS
+#ifdef	PCIEB_BCM
 	if (cmd == DDI_DMA_RESERVE)
 		return (DDI_FAILURE);
-#endif	/* BCM_SW_WORKAROUNDS */
+#endif	/* PCIEB_BCM */
 
 	if (((ret = ddi_dma_mctl(dip, rdip, handle, cmd, offp, lenp, objp,
 	    cache_flags)) == DDI_SUCCESS) && (cmd == DDI_DMA_RESERVE)) {
