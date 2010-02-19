@@ -21,23 +21,22 @@
 
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 TABLEDIR = ../praudit
 
-PROG= auditreduce
-SRCS= main.c option.c proc.c time.c token.c regex2.c $(TABLEDIR)/toktable.c
-OBJS= main.o option.o proc.o time.o token.o regex2.o toktable.o
+PROG = auditreduce
+SRCS = main.c option.c proc.c time.c token.c regex2.c $(TABLEDIR)/toktable.c
+OBJS = main.o option.o proc.o time.o token.o regex2.o toktable.o
 
-include ../Makefile.cmd
+include $(SRC)/cmd/Makefile.cmd
 
-TEXT_DOMAIN=SUNW_OST_OSCMD
-POFILE=auditreduce.po
-POFILES=main.po option.po proc.po time.po token.po
+TEXT_DOMAIN = SUNW_OST_OSCMD
+POFILE = $(PROG).po
+MSGFILES = $(SRCS)
 
 CPPFLAGS += -I$(TABLEDIR) -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 LDLIBS += -lnsl -lbsm -lscf -ltsol
@@ -55,13 +54,15 @@ $(PROG): $(OBJS)
 toktable.o:	$(TABLEDIR)/toktable.c
 	$(COMPILE.c) $(TABLEDIR)/toktable.c
 
-$(POFILE): $(POFILES)
-	$(RM) -f $@
-	$(CAT) $(POFILES) > $@
+$(POFILE): $(MSGFILES)
+	$(BUILDPO.msgfiles)
+
+_msg: $(MSGDOMAINPOFILE)
 
 lint: lint_SRCS
 
 clean:
-	$(RM) -f $(OBJS) $(PROG) $(POFILES) $(POFILE)
+	$(RM) $(OBJS)
 
-include ../Makefile.targ
+include $(SRC)/cmd/Makefile.targ
+include $(SRC)/Makefile.msg.targ

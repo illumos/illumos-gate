@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/audit_warn/Makefile
@@ -28,7 +28,7 @@
 PROG = audit_warn
 SRCS = audit_warn.sh
 
-include ../Makefile.cmd
+include $(SRC)/cmd/Makefile.cmd
 
 ETCSECURITYFILES =	audit_warn
 ROOTETCSECURITY =	$(ROOT)/etc/security
@@ -49,10 +49,7 @@ $(ROOTETCSECURITY)/%:%
 	$(INS.file)
 
 clean:
-	$(RM) -f $(PROG)
-
-clobber: clean
 
 lint:
 
-include ../Makefile.targ
+include $(SRC)/cmd/Makefile.targ

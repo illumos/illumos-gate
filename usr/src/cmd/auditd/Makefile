@@ -44,9 +44,8 @@ LDLIBS += -lbsm -lsecdb -lscf
 OBJS = audit_scf_shared.o auditd.o doorway.o queue.o
 SRCS = $(AUDITCONFIG)/audit_scf_shared.c auditd.c doorway.c queue.c
 
-POFILE =	auditd.po
+POFILE =	$(PROG).po
 MSGFILES =	$(SRCS)
-
 
 .KEEP_STATE:
 
@@ -67,7 +66,7 @@ lint:		lint_SRCS
 $(POFILE): $(MSGFILES)
 		$(BUILDPO.msgfiles)
 
-#_msg: $(MSGDOMAINPOFILE)
+_msg: $(MSGDOMAINPOFILE)
 
 clean:
 		$(RM) $(OBJS)
@@ -75,12 +74,4 @@ clean:
 check:		$(CHKMANIFEST)
 
 include $(SRC)/cmd/Makefile.targ
-#include $(SRC)/Makefile.msg.targ
-BUILDPO.msgfiles = \
-	$(RM) messages.po $(TEXT_DOMAIN).po; \
-	$(TOUCH) $(TEXT_DOMAIN).po; \
-	$(XGETTEXT) $(XGETFLAGS) $(MSGFILES); \
-	$(SED) -e '/^\# msgid/,/^\# msgstr/d' -e '/^domain/d' \
-	-e '/^\#$$/d' -e '/^\#, /d' \
-	messages.po $(TEXT_DOMAIN).po > $(POFILE); \
-	$(RM) messages.po $(TEXT_DOMAIN).po
+include $(SRC)/Makefile.msg.targ

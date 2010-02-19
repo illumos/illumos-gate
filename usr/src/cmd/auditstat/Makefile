@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -27,8 +27,7 @@ PROG= auditstat
 OBJS = auditstat.o
 SRCS = $(OBJS:%.o=%.c)
 
-include ../Makefile.cmd
-include ../Makefile.cmd.bsm
+include $(SRC)/cmd/Makefile.cmd
 
 STATCOMMONDIR = $(SRC)/cmd/stat/common
 
@@ -36,12 +35,17 @@ STAT_COMMON_OBJS = timestamp.o
 STAT_COMMON_SRCS = $(STAT_COMMON_OBJS:%.o=$(STATCOMMONDIR)/%.c)
 SRCS += $(STAT_COMMON_SRCS)
 
+MSGFILES = $(SRCS)
+POFILE = $(PROG).po
+
 LDLIBS += -lbsm
 CPPFLAGS += -I$(STATCOMMONDIR)
 
 .KEEP_STATE:
 
 all: $(PROG)
+
+install: all $(ROOTUSRSBINPROG)
 
 $(PROG): $(OBJS) $(STAT_COMMON_OBJS)
 	$(LINK.c) -o $(PROG) $(OBJS) $(STAT_COMMON_OBJS) $(LDLIBS)
@@ -52,8 +56,14 @@ $(PROG): $(OBJS) $(STAT_COMMON_OBJS)
 	$(POST_PROCESS_O)
 
 clean:
-	-$(RM) $(OBJS) $(STAT_COMMON_OBJS)
+	$(RM) $(OBJS) $(STAT_COMMON_OBJS)
+
+$(POFILE): $(MSGFILES)
+	$(BUILDPO.msgfiles)
+
+_msg: $(MSGDOMAINPOFILE)
 
 lint:	lint_SRCS
 
-include ../Makefile.targ
+include $(SRC)/cmd/Makefile.targ
+include $(SRC)/Makefile.msg.targ

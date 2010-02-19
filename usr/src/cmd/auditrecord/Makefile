@@ -19,11 +19,11 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-include ../Makefile.cmd
+include $(SRC)/cmd/Makefile.cmd
 
 ATTR =			audit_record_attr
 ROOTAUDITDIR =		$(ROOT)/usr/lib/audit
@@ -36,7 +36,7 @@ PROG		= auditrecord
 AGETTEXT	= mkmsg
 STRIPTEXT	= filter_txt
 ATTRPROC	= audit_record_xml
-LIBBSMDIR	= ../../lib/libbsm
+LIBBSMDIR	= $(SRC)/lib/libbsm
 ADTXMLFILE	= $(LIBBSMDIR)/common/adt.xml
 
 .KEEP_STATE:
@@ -56,7 +56,7 @@ $(ROOTAUDITDIR):
 _msg: $(PROG).po
 
 clean:
-	$(RM) $(PROG) $(TEXT_DOMAIN).po $(ATTR) $(STRIPTEXT) $(AGETTEXT)
+	$(RM) $(ATTR) $(STRIPTEXT) $(AGETTEXT)
 
 $(ATTR): $(STRIPTEXT) $(ATTRPROC) $(ADTXMLFILE) $(ATTR).txt
 	./$(STRIPTEXT) < $(ATTR).txt > $(ATTR)
@@ -72,4 +72,4 @@ $(PROG).po: $(PROG) $(ATTR) $(AGETTEXT)
 
 lint:
 
-include ../Makefile.targ
+include $(SRC)/cmd/Makefile.targ

@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -27,9 +27,6 @@
 PROG = auditconfig
 
 include $(SRC)/cmd/Makefile.cmd
-
-POFILE = auditconfig.po
-MSGFILES = $(SRCS)
 
 LIBBSM = $(SRC)/lib/libbsm/common
 AUDITCONFIG = $(SRC)/cmd/auditconfig
@@ -40,22 +37,25 @@ LDLIBS += -lnsl -lbsm -lscf
 OBJS = audit_scf.o audit_scf_shared.o auditconfig.o 
 SRCS = $(OBJS:%.o=%.c)
 
+POFILE = $(PROG).po
+MSGFILES = $(SRCS)
+
 CPPFLAGS += -I$(LIBBSM) -I$(AUDITD) -I$(AUDITCONFIG) 
 
 .KEEP_STATE:
 
-install: all $(ROOTUSRSBINPROG)
 all: $(PROG)
+
+install: all $(ROOTUSRSBINPROG)
 
 $(PROG): $(SRCS) $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
-
 $(POFILE): $(MSGFILES)
 	$(BUILDPO.msgfiles)
 
-#_msg: $(MSGDOMAINPOFILE)
+_msg: $(MSGDOMAINPOFILE)
 
 clean:
 	$(RM) $(OBJS)
@@ -63,12 +63,4 @@ clean:
 lint:	lint_SRCS
 
 include $(SRC)/cmd/Makefile.targ
-#include $(SRC)/Makefile.msg.targ
-BUILDPO.msgfiles = \
-	$(RM) messages.po $(TEXT_DOMAIN).po; \
-	$(TOUCH) $(TEXT_DOMAIN).po; \
-	$(XGETTEXT) $(XGETFLAGS) $(MSGFILES); \
-	$(SED) -e '/^\# msgid/,/^\# msgstr/d' -e '/^domain/d' \
-	-e '/^\#$$/d' -e '/^\#, /d' \
-	messages.po $(TEXT_DOMAIN).po > $(POFILE); \
-	$(RM) messages.po $(TEXT_DOMAIN).po
+include $(SRC)/Makefile.msg.targ

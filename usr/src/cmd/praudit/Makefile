@@ -21,10 +21,9 @@
 
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 XLATEDIR = $(SRC)/lib/libbsm/common
@@ -33,14 +32,14 @@ PROG = praudit
 SRCS = format.c main.c token.c toktable.c printaudit.c prio.c $(XLATEDIR)/adt_xlate.c
 OBJS = format.o main.o token.o toktable.o printaudit.o prio.o adt_xlate.o
 
-include ../Makefile.cmd
+include $(SRC)/cmd/Makefile.cmd
 
 TEXT_DOMAIN=SUNW_OST_OSCMD
-POFILE = praudit.po
+POFILE = $(PROG).po
 POFILES = $(OBJS:.o=.po)
 XGETFLAGS += -a -x praudit.xcl
 
-CPPFLAGS += -D_PRAUDIT -I$(SRC)/lib/libbsm/common
+CPPFLAGS += -D_PRAUDIT -I$(XLATEDIR)
 CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
 LDLIBS += -lbsm -lnsl -lpam -ltsol
@@ -58,20 +57,21 @@ $(PROG): $(OBJS)
 adt_xlate.o: $(XLATEDIR)/adt_xlate.c
 	$(COMPILE.c) $(XLATEDIR)/adt_xlate.c
 
-$(POFILE):	$(POFILES)
-	$(RM) -f $@
-	$(CAT) $(POFILES) > $@
+$(POFILE): $(POFILES)
+	$(BUILDPO.pofiles)
 
-# has strings but doesn't use gettext
 adt_xlate.po: $(XLATEDIR)/adt_xlate.c
 	$(RM) adt_xlate.po
 	$(XGETTEXT) $(XGETFLAGS) $(XLATEDIR)/adt_xlate.c
 	$(SED) "/^domain/d" < messages.po > adt_xlate.po
 	$(RM) messages.po
 
+_msg:	$(MSGDOMAINPOFILE)
+
 lint:	lint_SRCS
 
 clean:
-	$(RM) -f $(OBJS) $(PROG) $(POFILES) $(POFILE)
+	$(RM) $(OBJS)
 
-include ../Makefile.targ
+include $(SRC)/cmd/Makefile.targ
+include $(SRC)/Makefile.msg.targ
