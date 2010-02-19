@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -262,7 +262,6 @@ typedef au_id_t auid_t;
 #define	AUDIT_ARGV	0x0004	/* include argv with execv system call events */
 #define	AUDIT_ARGE	0x0008	/* include arge with execv system call events */
 #define	AUDIT_SEQ	0x0010	/* include sequence attribute */
-#define	AUDIT_WINDATA	0x0020	/* include interwindow moved data */
 #define	AUDIT_GROUP	0x0040	/* include group attribute with each record */
 #define	AUDIT_TRAIL	0x0080	/* include trailer token */
 #define	AUDIT_PATH	0x0100	/* allow multiple paths per event */
@@ -279,8 +278,7 @@ typedef au_id_t auid_t;
  */
 #define	AUDIT_GLOBAL	(AUDIT_AHLT | AUDIT_PERZONE)
 #define	AUDIT_LOCAL	(AUDIT_CNT | AUDIT_ARGV | AUDIT_ARGE |\
-			AUDIT_SEQ | AUDIT_WINDATA |\
-			AUDIT_GROUP | AUDIT_TRAIL | AUDIT_PATH |\
+			AUDIT_SEQ | AUDIT_GROUP | AUDIT_TRAIL | AUDIT_PATH |\
 			AUDIT_PUBLIC | AUDIT_SCNT | AUDIT_ZONENAME |\
 			AUDIT_WINDATA_DOWN | AUDIT_WINDATA_UP)
 

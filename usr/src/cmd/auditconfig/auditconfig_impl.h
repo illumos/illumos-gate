@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +38,6 @@ extern "C" {
 			AUDIT_ARGV|\
 			AUDIT_CNT|\
 			AUDIT_GROUP|\
-			AUDIT_WINDATA|\
 			AUDIT_SEQ|\
 			AUDIT_TRAIL|\
 			AUDIT_PATH|\
