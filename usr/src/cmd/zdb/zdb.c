@@ -488,13 +488,11 @@ dump_metaslab(metaslab_t *msp)
 	if (dump_opt['m'] > 1 && !dump_opt['L']) {
 		mutex_enter(&msp->ms_lock);
 		space_map_load_wait(sm);
-		if (!sm->sm_loaded &&
-		    (smo->smo_object != 0 || dump_opt['m'] > 2)) {
+		if (!sm->sm_loaded)
 			VERIFY(space_map_load(sm, zfs_metaslab_ops,
 			    SM_FREE, smo, spa->spa_meta_objset) == 0);
-			dump_metaslab_stats(msp);
-			space_map_unload(sm);
-		}
+		dump_metaslab_stats(msp);
+		space_map_unload(sm);
 		mutex_exit(&msp->ms_lock);
 	}
 
