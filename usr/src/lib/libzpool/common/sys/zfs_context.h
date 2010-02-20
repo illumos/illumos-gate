@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,21 +106,27 @@ extern void vpanic(const char *, __va_list);
 
 #define	fm_panic	panic
 
+extern int aok;
+
 /* This definition is copied from assert.h. */
 #if defined(__STDC__)
 #if __STDC_VERSION__ - 0 >= 199901L
-#define	verify(EX) (void)((EX) || \
+#define	zverify(EX) (void)((EX) || (aok) || \
 	(__assert_c99(#EX, __FILE__, __LINE__, __func__), 0))
 #else
-#define	verify(EX) (void)((EX) || (__assert(#EX, __FILE__, __LINE__), 0))
+#define	zverify(EX) (void)((EX) || (aok) || \
+	(__assert(#EX, __FILE__, __LINE__), 0))
 #endif /* __STDC_VERSION__ - 0 >= 199901L */
 #else
-#define	verify(EX) (void)((EX) || (_assert("EX", __FILE__, __LINE__), 0))
+#define	zverify(EX) (void)((EX) || (aok) || \
+	(_assert("EX", __FILE__, __LINE__), 0))
 #endif	/* __STDC__ */
 
 
-#define	VERIFY	verify
-#define	ASSERT	assert
+#define	VERIFY	zverify
+#define	ASSERT	zverify
+#undef	assert
+#define	assert	zverify
 
 extern void __assert(const char *, const char *, int);
 
@@ -131,7 +137,7 @@ extern void __assert(const char *, const char *, int);
 #define	VERIFY3_IMPL(LEFT, OP, RIGHT, TYPE) do { \
 	const TYPE __left = (TYPE)(LEFT); \
 	const TYPE __right = (TYPE)(RIGHT); \
-	if (!(__left OP __right)) { \
+	if (!(__left OP __right) && (!aok)) { \
 		char *__buf = alloca(256); \
 		(void) snprintf(__buf, 256, "%s %s %s (0x%llx %s 0x%llx)", \
 			#LEFT, #OP, #RIGHT, \

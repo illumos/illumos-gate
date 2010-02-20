@@ -49,6 +49,10 @@
 #define	ZFS_OBJ_NAME	"libzpool.so.1"
 #endif
 
+#ifndef _KERNEL
+int aok;
+#endif
+
 static int
 getmember(uintptr_t addr, const char *type, mdb_ctf_id_t *idp,
     const char *member, int len, void *buf)

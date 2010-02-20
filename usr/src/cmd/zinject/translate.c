@@ -19,13 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include <libzfs.h>
-
-#undef verify	/* both libzfs.h and zfs_context.h want to define this */
 
 #include <sys/zfs_context.h>
 

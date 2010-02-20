@@ -64,6 +64,12 @@
     dmu_ot[(idx)].ot_name : "UNKNOWN")
 #define	ZDB_OT_TYPE(idx) ((idx) < DMU_OT_NUMTYPES ? (idx) : DMU_OT_NUMTYPES)
 
+#ifndef lint
+extern int zfs_recover;
+#else
+int zfs_recover;
+#endif
+
 const char cmdname[] = "zdb";
 uint8_t dump_opt[256];
 
@@ -94,8 +100,7 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr,
-	    "Usage: %s [-CumdibcsvhL] "
-	    "poolname [object...]\n"
+	    "Usage: %s [-CumdibcsvhL] poolname [object...]\n"
 	    "       %s [-div] dataset [object...]\n"
 	    "       %s -m [-L] poolname [vdev [metaslab...]]\n"
 	    "       %s -R poolname vdev:offset:size[:flags]\n"
@@ -130,6 +135,8 @@ usage(void)
 	    "device\n\n");
 	(void) fprintf(stderr, "    Below options are intended for use "
 	    "with other options (except -l):\n");
+	(void) fprintf(stderr, "        -A ignore assertions (-A), enable "
+	    "panic recovery (-AA) or both (-AAA)\n");
 	(void) fprintf(stderr, "        -U <cachefile_path> -- use alternate "
 	    "cachefile\n");
 	(void) fprintf(stderr, "        -e pool is exported/destroyed/"
@@ -2729,7 +2736,7 @@ main(int argc, char **argv)
 
 	dprintf_setup(&argc, argv);
 
-	while ((c = getopt(argc, argv, "bcdhilmsuCDRSLevp:t:U:")) != -1) {
+	while ((c = getopt(argc, argv, "bcdhilmsuCDRSALevp:t:U:")) != -1) {
 		switch (c) {
 		case 'b':
 		case 'c':
@@ -2747,6 +2754,7 @@ main(int argc, char **argv)
 			dump_opt[c]++;
 			dump_all = 0;
 			break;
+		case 'A':
 		case 'L':
 		case 'e':
 			dump_opt[c]++;
@@ -2799,11 +2807,14 @@ main(int argc, char **argv)
 		verbose = MAX(verbose, 1);
 
 	for (c = 0; c < 256; c++) {
-		if (dump_all && !strchr("elLRS", c))
+		if (dump_all && !strchr("elALRS", c))
 			dump_opt[c] = 1;
 		if (dump_opt[c])
 			dump_opt[c] += verbose;
 	}
+
+	aok = (dump_opt['A'] == 1) || (dump_opt['A'] > 2);
+	zfs_recover = (dump_opt['A'] > 1);
 
 	argc -= optind;
 	argv += optind;
