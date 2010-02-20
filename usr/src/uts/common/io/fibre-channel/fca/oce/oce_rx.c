@@ -34,6 +34,8 @@
 static void rx_pool_free(char *arg);
 static inline mblk_t *oce_rx(struct oce_dev *dev, struct oce_rq *rq,
     struct oce_nic_rx_cqe *cqe);
+static inline mblk_t *oce_rx_bcopy(struct oce_dev *dev,
+	struct oce_rq *rq, struct oce_nic_rx_cqe *cqe);
 static int oce_rq_charge(struct oce_dev *dev, struct oce_rq *rq,
     uint32_t nbufs);
 static oce_rq_bdesc_t *oce_rqb_alloc(struct oce_rq *rq);
@@ -41,6 +43,11 @@ static void oce_rqb_free(struct oce_rq *rq, oce_rq_bdesc_t *rqbd);
 static void oce_rqb_dtor(oce_rq_bdesc_t *rqbd);
 static int oce_rqb_ctor(oce_rq_bdesc_t *rqbd, struct oce_rq *rq,
     size_t size, int flags);
+static void oce_rx_insert_tag(mblk_t *mp, uint16_t vtag);
+static void oce_set_rx_oflags(mblk_t *mp, struct oce_nic_rx_cqe *cqe);
+static inline void oce_rx_drop_pkt(struct oce_rq *rq,
+    struct oce_nic_rx_cqe *cqe);
+
 
 /*
  * function to create a DMA buffer pool for RQ
@@ -214,57 +221,35 @@ oce_rq_charge(struct oce_dev *dev,
 	uint32_t cnt;
 
 	shadow_rq = rq->shadow_ring;
-	mutex_enter(&rq->lock);
-
 	/* check number of slots free and recharge */
 	nbufs = ((rq->buf_avail + nbufs) > rq->cfg.q_len) ?
 	    (rq->cfg.q_len - rq->buf_avail) : nbufs;
-
 	for (cnt = 0; cnt < nbufs; cnt++) {
-
-		int i = 0;
-		const int retries = 1000;
-
-		do {
-			rqbd = oce_rqb_alloc(rq);
-			if (rqbd != NULL) {
-				break;
-			}
-		} while ((++i) < retries);
-
+		rqbd = oce_rqb_alloc(rq);
 		if (rqbd == NULL) {
 			oce_log(dev, CE_NOTE, MOD_RX, "%s %x",
 			    "rqb pool empty @ ticks",
 			    (uint32_t)ddi_get_lbolt());
-
 			break;
 		}
-
-		i = 0;
-
 		if (rqbd->mp == NULL) {
+			rqbd->mp = desballoc((uchar_t *)(rqbd->rqb->base),
+			    rqbd->rqb->size, 0, &rqbd->fr_rtn);
+			if (rqbd->mp != NULL) {
+				rqbd->mp->b_rptr =
+				    (uchar_t *)rqbd->rqb->base +
+				    OCE_RQE_BUF_HEADROOM;
+			}
 
-			do {
-				rqbd->mp =
-				    desballoc((uchar_t *)(rqbd->rqb->base),
-				    rqbd->rqb->size, 0, &rqbd->fr_rtn);
-				if (rqbd->mp != NULL) {
-					rqbd->mp->b_rptr =
-					    (uchar_t *)rqbd->rqb->base +
-					    OCE_RQE_BUF_HEADROOM;
-					break;
-				}
-			} while ((++i) < retries);
-		}
+			/*
+			 * Failed again put back the buffer and continue
+			 * loops for nbufs so its a finite loop
+			 */
 
-		/*
-		 * Failed again put back the buffer and continue
-		 * loops for nbufs so its a finite loop
-		 */
-
-		if (rqbd->mp == NULL) {
-			oce_rqb_free(rq, rqbd);
-			continue;
+			if (rqbd->mp == NULL) {
+				oce_rqb_free(rq, rqbd);
+				continue;
+			}
 		}
 
 		/* fill the rqes */
@@ -295,7 +280,6 @@ oce_rq_charge(struct oce_dev *dev,
 		rxdb_reg.bits.qid = rq->rq_id & DB_RQ_ID_MASK;
 		OCE_DB_WRITE32(dev, PD_RXULP_DB, rxdb_reg.dw0);
 	}
-	mutex_exit(&rq->lock);
 	atomic_add_32(&rq->buf_avail, total_bufs);
 	return (total_bufs);
 } /* oce_rq_charge */
@@ -314,8 +298,6 @@ oce_rq_discharge(struct oce_rq *rq)
 	struct rq_shadow_entry *shadow_rq;
 
 	shadow_rq = rq->shadow_ring;
-	mutex_enter(&rq->lock);
-
 	/* Free the posted buffer since RQ is destroyed already */
 	while ((int32_t)rq->buf_avail > 0) {
 		rqbd = shadow_rq[rq->ring->cidx].rqbd;
@@ -323,7 +305,6 @@ oce_rq_discharge(struct oce_rq *rq)
 		RING_GET(rq->ring, 1);
 		rq->buf_avail--;
 	}
-	mutex_exit(&rq->lock);
 }
 /*
  * function to process a single packet
@@ -338,9 +319,7 @@ static inline mblk_t *
 oce_rx(struct oce_dev *dev, struct oce_rq *rq, struct oce_nic_rx_cqe *cqe)
 {
 	mblk_t *mp;
-	uint32_t csum_flags = 0;
 	int pkt_len;
-	uint16_t vtag;
 	int32_t frag_cnt = 0;
 	mblk_t *mblk_prev = NULL;
 	mblk_t	*mblk_head = NULL;
@@ -348,40 +327,10 @@ oce_rx(struct oce_dev *dev, struct oce_rq *rq, struct oce_nic_rx_cqe *cqe)
 	struct rq_shadow_entry *shadow_rq;
 	struct rq_shadow_entry *shadow_rqe;
 	oce_rq_bdesc_t *rqbd;
-	struct ether_vlan_header *ehp;
 
 	/* Get the relevant Queue pointers */
 	shadow_rq = rq->shadow_ring;
 	pkt_len = cqe->u0.s.pkt_size;
-
-	/* Hardware always Strips Vlan tag so insert it back */
-	if (cqe->u0.s.vlan_tag_present) {
-		shadow_rqe = &shadow_rq[rq->ring->cidx];
-		/* retrive the Rx buffer from the shadow ring */
-		rqbd = shadow_rqe->rqbd;
-		mp = rqbd->mp;
-		if (mp == NULL)
-			return (NULL);
-		vtag = cqe->u0.s.vlan_tag;
-		(void) memmove(mp->b_rptr - VLAN_TAGSZ,
-		    mp->b_rptr, 2 * ETHERADDRL);
-		mp->b_rptr -= VLAN_TAGSZ;
-		ehp = (struct ether_vlan_header *)voidptr(mp->b_rptr);
-		ehp->ether_tpid = htons(ETHERTYPE_VLAN);
-		ehp->ether_tci = LE_16(vtag);
-
-		frag_size = (pkt_len > rq->cfg.frag_size) ?
-		    rq->cfg.frag_size : pkt_len;
-		mp->b_wptr =  mp->b_rptr + frag_size + VLAN_TAGSZ;
-		mblk_head = mblk_prev = mp;
-		/* Move the pointers */
-		RING_GET(rq->ring, 1);
-		frag_cnt++;
-		pkt_len -= frag_size;
-		(void) ddi_dma_sync(rqbd->rqb->dma_handle, 0, frag_size,
-		    DDI_DMA_SYNC_FORKERNEL);
-	}
-
 	for (; frag_cnt < cqe->u0.s.num_fragments; frag_cnt++) {
 		shadow_rqe = &shadow_rq[rq->ring->cidx];
 		rqbd = shadow_rqe->rqbd;
@@ -408,16 +357,66 @@ oce_rx(struct oce_dev *dev, struct oce_rq *rq, struct oce_nic_rx_cqe *cqe)
 		oce_log(dev, CE_WARN, MOD_RX, "%s", "oce_rx:no frags?");
 		return (NULL);
 	}
+	atomic_add_32(&rq->pending, (cqe->u0.s.num_fragments & 0x7));
+	mblk_head->b_next = NULL;
+	return (mblk_head);
+} /* oce_rx */
 
-	atomic_add_32(&rq->buf_avail, -frag_cnt);
-	(void) oce_rq_charge(dev, rq, frag_cnt);
+/* ARGSUSED */
+static inline mblk_t *
+oce_rx_bcopy(struct oce_dev *dev, struct oce_rq *rq, struct oce_nic_rx_cqe *cqe)
+{
+	mblk_t *mp;
+	int pkt_len;
+	int alloc_len;
+	int32_t frag_cnt = 0;
+	int frag_size;
+	struct rq_shadow_entry *shadow_rq;
+	struct rq_shadow_entry *shadow_rqe;
+	oce_rq_bdesc_t *rqbd;
+	boolean_t tag_present =  B_FALSE;
+	unsigned char  *rptr;
 
-	/* check dma handle */
-	if (oce_fm_check_dma_handle(dev, rqbd->rqb->dma_handle) !=
-	    DDI_FM_OK) {
-		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
-		return (NULL);
+	shadow_rq = rq->shadow_ring;
+	pkt_len = cqe->u0.s.pkt_size;
+	alloc_len = pkt_len;
+
+	/* Hardware always Strips Vlan tag so insert it back */
+	if (cqe->u0.s.vlan_tag_present) {
+		alloc_len += VLAN_TAGSZ;
+		tag_present = B_TRUE;
 	}
+	mp = allocb(alloc_len, BPRI_HI);
+	if (mp == NULL)
+		return (NULL);
+	if (tag_present) {
+		/* offset the read pointer by 4 bytes to insert tag */
+		mp->b_rptr += VLAN_TAGSZ;
+	}
+	rptr = mp->b_rptr;
+	mp->b_wptr = mp->b_wptr + alloc_len;
+
+	for (frag_cnt = 0; frag_cnt < cqe->u0.s.num_fragments; frag_cnt++) {
+		shadow_rqe = &shadow_rq[rq->ring->cidx];
+		rqbd = shadow_rqe->rqbd;
+		frag_size  = (pkt_len > rq->cfg.frag_size) ?
+		    rq->cfg.frag_size : pkt_len;
+		(void) ddi_dma_sync(rqbd->rqb->dma_handle, 0, frag_size,
+		    DDI_DMA_SYNC_FORKERNEL);
+		bcopy(rqbd->rqb->base + OCE_RQE_BUF_HEADROOM,
+		    rptr, frag_size);
+		rptr += frag_size;
+		pkt_len   -= frag_size;
+		oce_rqb_free(rq, rqbd);
+		RING_GET(rq->ring, 1);
+	}
+	return (mp);
+}
+
+static inline void
+oce_set_rx_oflags(mblk_t *mp, struct oce_nic_rx_cqe *cqe)
+{
+	int csum_flags = 0;
 
 	/* set flags */
 	if (cqe->u0.s.ip_cksum_pass) {
@@ -429,12 +428,24 @@ oce_rx(struct oce_dev *dev, struct oce_rq *rq, struct oce_nic_rx_cqe *cqe)
 	}
 
 	if (csum_flags) {
-		(void) hcksum_assoc(mblk_head, NULL, NULL, 0, 0, 0, 0,
+		(void) hcksum_assoc(mp, NULL, NULL, 0, 0, 0, 0,
 		    csum_flags, 0);
 	}
-	mblk_head->b_next = NULL;
-	return (mblk_head);
-} /* oce_rx */
+}
+
+static inline void
+oce_rx_insert_tag(mblk_t *mp, uint16_t vtag)
+{
+	struct ether_vlan_header *ehp;
+
+	(void) memmove(mp->b_rptr - VLAN_TAGSZ,
+	    mp->b_rptr, 2 * ETHERADDRL);
+	mp->b_rptr -= VLAN_TAGSZ;
+	ehp = (struct ether_vlan_header *)voidptr(mp->b_rptr);
+	ehp->ether_tpid = htons(ETHERTYPE_VLAN);
+	ehp->ether_tci = LE_16(vtag);
+}
+
 
 
 /*
@@ -455,7 +466,6 @@ oce_drain_rq_cq(void *arg)
 	uint16_t num_cqe = 0;
 	struct oce_cq  *cq;
 	struct oce_dev *dev;
-	int32_t buf_used = 0;
 
 	if (arg == NULL)
 		return (0);
@@ -463,36 +473,44 @@ oce_drain_rq_cq(void *arg)
 	rq = (struct oce_rq *)arg;
 	dev = rq->parent;
 	cq = rq->cq;
-
-	if (dev == NULL || cq == NULL)
-		return (0);
-
-	mutex_enter(&cq->lock);
+	mutex_enter(&rq->rx_lock);
 	cqe = RING_GET_CONSUMER_ITEM_VA(cq->ring, struct oce_nic_rx_cqe);
 
 	/* dequeue till you reach an invalid cqe */
 	while (RQ_CQE_VALID(cqe) && (num_cqe < rq->cfg.q_len)) {
 		DW_SWAP(u32ptr(cqe), sizeof (struct oce_nic_rx_cqe));
-		ASSERT(rq->ring->cidx != cqe->u0.s.frag_index);
-		mp = oce_rx(dev, rq, cqe);
+		/* if insufficient buffers to charge then do copy */
+		if (cqe->u0.s.pkt_size < dev->rx_bcopy_limit ||
+		    OCE_LIST_SIZE(&rq->rq_buf_list) < cqe->u0.s.num_fragments) {
+			mp = oce_rx_bcopy(dev, rq, cqe);
+		} else {
+			mp = oce_rx(dev, rq, cqe);
+		}
 		if (mp != NULL) {
+			if (cqe->u0.s.vlan_tag_present) {
+				oce_rx_insert_tag(mp, cqe->u0.s.vlan_tag);
+			}
+			oce_set_rx_oflags(mp, cqe);
 			if (mblk_head == NULL) {
 				mblk_head = mblk_prev  = mp;
 			} else {
 				mblk_prev->b_next = mp;
 				mblk_prev = mp;
 			}
+
+		} else {
+			oce_rx_drop_pkt(rq, cqe);
 		}
-		buf_used +=  (cqe->u0.s.num_fragments & 0x7);
+		atomic_add_32(&rq->buf_avail, -(cqe->u0.s.num_fragments & 0x7));
+		(void) oce_rq_charge(dev, rq,
+		    (cqe->u0.s.num_fragments & 0x7));
 		RQ_CQE_INVALIDATE(cqe);
 		RING_GET(cq->ring, 1);
 		cqe = RING_GET_CONSUMER_ITEM_VA(cq->ring,
 		    struct oce_nic_rx_cqe);
 		num_cqe++;
 	} /* for all valid CQEs */
-
-	atomic_add_32(&rq->pending, buf_used);
-	mutex_exit(&cq->lock);
+	mutex_exit(&rq->rx_lock);
 	if (mblk_head) {
 		mac_rx(dev->mac_handle, NULL, mblk_head);
 	}
@@ -512,9 +530,6 @@ rx_pool_free(char *arg)
 {
 	oce_rq_bdesc_t *rqbd;
 	struct oce_rq  *rq;
-	struct oce_dev *dev;
-	int i = 0;
-	const int retries = 1000;
 
 	/* During destroy, arg will be NULL */
 	if (arg == NULL) {
@@ -524,32 +539,15 @@ rx_pool_free(char *arg)
 	/* retrieve the pointers from arg */
 	rqbd = (oce_rq_bdesc_t *)(void *)arg;
 	rq = rqbd->rq;
-	dev = rq->parent;
 
-	if ((dev->state & STATE_MAC_STARTED) == 0) {
-		return;
+	rqbd->mp = desballoc((uchar_t *)(rqbd->rqb->base),
+	    rqbd->rqb->size, 0, &rqbd->fr_rtn);
+	if (rqbd->mp != NULL) {
+		rqbd->mp->b_rptr = (uchar_t *)rqbd->rqb->base +
+		    OCE_RQE_BUF_HEADROOM;
 	}
-
-	do {
-		rqbd->mp = desballoc((uchar_t *)(rqbd->rqb->base),
-		    rqbd->rqb->size, 0, &rqbd->fr_rtn);
-		if (rqbd->mp != NULL) {
-			rqbd->mp->b_rptr = (uchar_t *)rqbd->rqb->base +
-			    OCE_RQE_BUF_HEADROOM;
-			break;
-		}
-	} while ((++i) < retries);
-
 	oce_rqb_free(rq, rqbd);
 	(void) atomic_add_32(&rq->pending, -1);
-	if (atomic_add_32_nv(&rq->buf_avail, 0) == 0 &&
-	    OCE_LIST_SIZE(&rq->rq_buf_list) > 16) {
-		/*
-		 * Rx has stalled because of lack of buffers
-		 * So try to charge fully
-		 */
-		(void) oce_rq_charge(dev, rq, rq->cfg.q_len);
-	}
 } /* rx_pool_free */
 
 /*
@@ -560,19 +558,43 @@ rx_pool_free(char *arg)
  * return none
  */
 void
-oce_stop_rq(struct oce_rq *rq)
+oce_clean_rq(struct oce_rq *rq)
 {
-	/*
-	 * Wait for Packets sent up to be freed
-	 */
-	while (rq->pending > 0) {
-		drv_usecwait(10 * 1000);
-	}
+	uint16_t num_cqe = 0;
+	struct oce_cq  *cq;
+	struct oce_dev *dev;
+	struct oce_nic_rx_cqe *cqe;
+	int32_t ti = 0;
 
-	rq->pending = 0;
+	dev = rq->parent;
+	cq = rq->cq;
+	cqe = RING_GET_CONSUMER_ITEM_VA(cq->ring, struct oce_nic_rx_cqe);
+	/* dequeue till you reach an invalid cqe */
+	for (ti = 0; ti < DEFAULT_DRAIN_TIME; ti++) {
+
+		while (RQ_CQE_VALID(cqe)) {
+			DW_SWAP(u32ptr(cqe), sizeof (struct oce_nic_rx_cqe));
+			oce_rx_drop_pkt(rq, cqe);
+			atomic_add_32(&rq->buf_avail,
+			    -(cqe->u0.s.num_fragments & 0x7));
+			oce_arm_cq(dev, cq->cq_id, 1, B_TRUE);
+			RQ_CQE_INVALIDATE(cqe);
+			RING_GET(cq->ring, 1);
+			cqe = RING_GET_CONSUMER_ITEM_VA(cq->ring,
+			    struct oce_nic_rx_cqe);
+			num_cqe++;
+		}
+		OCE_MSDELAY(1);
+	}
+#if 0
+	if (num_cqe) {
+		oce_arm_cq(dev, cq->cq_id, num_cqe, B_FALSE);
+	}
 	/* Drain the Event queue now */
 	oce_drain_eq(rq->cq->eq);
-} /* oce_stop_rq */
+	return (num_cqe);
+#endif
+} /* oce_clean_rq */
 
 /*
  * function to start  the RX
@@ -587,7 +609,39 @@ oce_start_rq(struct oce_rq *rq)
 	int ret = 0;
 	struct oce_dev *dev = rq->parent;
 
+	(void) oce_rq_charge(dev, rq, rq->cfg.q_len);
 	oce_arm_cq(dev, rq->cq->cq_id, 0, B_TRUE);
-	ret = oce_rq_charge(dev, rq, rq->cfg.q_len);
 	return (ret);
 } /* oce_start_rq */
+
+/* Checks for pending rx buffers with Stack */
+int
+oce_rx_pending(struct oce_dev *dev)
+{
+	int ti;
+
+	for (ti = 0; ti < 200; ti++) {
+		if (dev->rq[0]->pending > 0) {
+			OCE_MSDELAY(1);
+			continue;
+		} else {
+			dev->rq[0]->pending = 0;
+			break;
+		}
+	}
+	return (dev->rq[0]->pending);
+}
+
+static inline void
+oce_rx_drop_pkt(struct oce_rq *rq, struct oce_nic_rx_cqe *cqe)
+{
+	int frag_cnt;
+	oce_rq_bdesc_t *rqbd;
+	struct rq_shadow_entry *shadow_rq;
+	shadow_rq = rq->shadow_ring;
+	for (frag_cnt = 0; frag_cnt < cqe->u0.s.num_fragments; frag_cnt++) {
+		rqbd = shadow_rq[rq->ring->cidx].rqbd;
+		oce_rqb_free(rq, rqbd);
+		RING_GET(rq->ring, 1);
+	}
+}

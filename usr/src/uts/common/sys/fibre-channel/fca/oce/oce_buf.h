@@ -44,9 +44,10 @@ extern "C" {
 	: (((_START) + (_STEP)) - (_END)))
 
 #define	OCE_MAX_TX_HDL		8
-#define	OCE_MAX_TXDMA_COOKIES	5
+#define	OCE_MAX_TXDMA_COOKIES	16
 #define	OCE_TXMAP_ALIGN		1
 #define	OCE_TX_MAX_FRAGS	(OCE_MAX_TX_HDL * OCE_MAX_TXDMA_COOKIES)
+#define	OCE_TX_LO_WM		OCE_TX_MAX_FRAGS
 
 /* helper structure to access OS addresses */
 typedef union  oce_addr_s {

@@ -38,7 +38,7 @@ extern "C" {
 #define	OCE_MAJOR_VERSION	"1"
 #define	OCE_MINOR_VERSION	"1"
 #define	OCE_RELEASE_NUM		"0"
-#define	OCE_PROTO_LEVEL		"c"
+#define	OCE_PROTO_LEVEL		"e"
 
 #define	OCE_VERSION		OCE_MAJOR_VERSION "." \
 				OCE_MINOR_VERSION \

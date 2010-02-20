@@ -54,7 +54,7 @@ oce_drain_mq_cq(void *arg)
 	mq = (struct oce_mq *)arg;
 	cq = mq->cq;
 	dev = mq->parent;
-	mutex_enter(&cq->lock);
+	mutex_enter(&mq->lock);
 	cqe = RING_GET_CONSUMER_ITEM_VA(cq->ring, struct oce_mq_cqe);
 	while (cqe->u0.dw[3]) {
 		DW_SWAP(u32ptr(cqe), sizeof (struct oce_mq_cqe));
@@ -72,17 +72,39 @@ oce_drain_mq_cq(void *arg)
 		cqe = RING_GET_CONSUMER_ITEM_VA(cq->ring, struct oce_mq_cqe);
 		num_cqe++;
 	} /* for all valid CQE */
-	mutex_exit(&cq->lock);
+	mutex_exit(&mq->lock);
 	oce_arm_cq(dev, cq->cq_id, num_cqe, B_TRUE);
 	return (num_cqe);
 } /* oce_drain_mq_cq */
 
-void
-oce_stop_mq(struct oce_mq *mq)
+int
+oce_start_mq(struct oce_mq *mq)
 {
-	while (oce_drain_mq_cq(mq) != 0) {
-	}
+	oce_arm_cq(mq->parent, mq->cq->cq_id, 0, B_TRUE);
+	return (0);
+}
 
+
+void
+oce_clean_mq(struct oce_mq *mq)
+{
+	struct oce_cq  *cq;
+	struct oce_dev *dev;
+	uint16_t num_cqe = 0;
+	struct oce_mq_cqe *cqe = NULL;
+
+	cq = mq->cq;
+	dev = mq->parent;
+	cqe = RING_GET_CONSUMER_ITEM_VA(cq->ring, struct oce_mq_cqe);
+	while (cqe->u0.dw[3]) {
+		DW_SWAP(u32ptr(cqe), sizeof (struct oce_mq_cqe));
+		cqe->u0.dw[3] = 0;
+		RING_GET(cq->ring, 1);
+		cqe = RING_GET_CONSUMER_ITEM_VA(cq->ring, struct oce_mq_cqe);
+		num_cqe++;
+	} /* for all valid CQE */
+	if (num_cqe)
+		oce_arm_cq(dev, cq->cq_id, num_cqe, B_FALSE);
 	/* Drain the Event queue now */
 	oce_drain_eq(mq->cq->eq);
 }

@@ -74,11 +74,14 @@ oce_alloc_dma_buffer(struct oce_dev *dev,
 
 	ASSERT(size > 0);
 
-	dbuf = kmem_zalloc(sizeof (oce_dma_buf_t), KM_SLEEP);
+	dbuf = kmem_zalloc(sizeof (oce_dma_buf_t), KM_NOSLEEP);
+	if (dbuf == NULL) {
+		return (NULL);
+	}
 
 	/* allocate dma handle */
 	ret = ddi_dma_alloc_handle(dev->dip, &oce_dma_buf_attr,
-	    DDI_DMA_SLEEP, NULL, &dbuf->dma_handle);
+	    DDI_DMA_DONTWAIT, NULL, &dbuf->dma_handle);
 	if (ret != DDI_SUCCESS) {
 		oce_log(dev, CE_WARN, MOD_CONFIG, "%s",
 		    "Failed to allocate DMA handle");
@@ -86,7 +89,7 @@ oce_alloc_dma_buffer(struct oce_dev *dev,
 	}
 	/* allocate the DMA-able memory */
 	ret = ddi_dma_mem_alloc(dbuf->dma_handle, size, &oce_dma_buf_accattr,
-	    flags, DDI_DMA_SLEEP, NULL, &dbuf->base,
+	    flags, DDI_DMA_DONTWAIT, NULL, &dbuf->base,
 	    &actual_len, &dbuf->acc_handle);
 	if (ret != DDI_SUCCESS) {
 		oce_log(dev, CE_WARN, MOD_CONFIG, "%s",
@@ -98,7 +101,7 @@ oce_alloc_dma_buffer(struct oce_dev *dev,
 	ret = ddi_dma_addr_bind_handle(dbuf->dma_handle,
 	    (struct as *)0, dbuf->base, actual_len,
 	    DDI_DMA_RDWR | flags,
-	    DDI_DMA_SLEEP, NULL, &cookie, &count);
+	    DDI_DMA_DONTWAIT, NULL, &cookie, &count);
 	if (ret != DDI_DMA_MAPPED) {
 		oce_log(dev, CE_WARN, MOD_CONFIG, "%s",
 		    "Failed to bind dma handle");
@@ -162,7 +165,10 @@ create_ring_buffer(struct oce_dev *dev,
 	uint32_t size;
 
 	/* allocate the ring buffer */
-	ring = kmem_zalloc(sizeof (oce_ring_buffer_t), KM_SLEEP);
+	ring = kmem_zalloc(sizeof (oce_ring_buffer_t), KM_NOSLEEP);
+	if (ring == NULL) {
+		return (NULL);
+	}
 
 	/* get the dbuf defining the ring */
 	size = num_items * item_size;

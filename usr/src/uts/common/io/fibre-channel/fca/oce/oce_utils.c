@@ -31,16 +31,6 @@
 
 #include <oce_impl.h>
 
-/*
- * inline function to get a list of pages from a dbuf
- *
- * dbuf - memory map from which to get the pa
- * pa_list - physical address array to fill
- * list_size - size of the array
- *
- * return none
- */
-
 static void oce_list_del_node(OCE_LIST_NODE_T *prev_node,
     OCE_LIST_NODE_T *next_node);
 static void oce_list_remove(OCE_LIST_NODE_T *list_node);

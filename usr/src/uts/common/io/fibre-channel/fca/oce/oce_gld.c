@@ -36,6 +36,7 @@
 mac_priv_prop_t oce_priv_props[] = {
 	{"_tx_ring_size", MAC_PROP_PERM_READ},
 	{"_tx_bcopy_limit", MAC_PROP_PERM_RW},
+	{"_rx_bcopy_limit", MAC_PROP_PERM_RW},
 	{"_rx_ring_size", MAC_PROP_PERM_READ},
 };
 uint32_t oce_num_props = sizeof (oce_priv_props) / sizeof (mac_priv_prop_t);
@@ -95,8 +96,6 @@ oce_m_start(void *arg)
 	dev->state |= STATE_MAC_STARTED;
 	mutex_exit(&dev->dev_lock);
 
-	/* enable interrupts */
-	oce_ei(dev);
 
 	return (DDI_SUCCESS);
 }
@@ -107,32 +106,16 @@ oce_start(struct oce_dev *dev)
 	int qidx = 0;
 	int ret;
 
-	ret = oce_hw_init(dev);
-	if (ret != DDI_SUCCESS) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Hardware initialization failed with %d", ret);
-		return (ret);
-	}
-
-	ret = oce_chip_hw_init(dev);
-	if (ret != DDI_SUCCESS) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Chip initialization failed: %d", ret);
-		oce_hw_fini(dev);
-		return (ret);
-	}
+	ret = oce_alloc_intr(dev);
+	if (ret != DDI_SUCCESS)
+		goto  start_fail;
 	ret = oce_setup_handlers(dev);
 	if (ret != DDI_SUCCESS) {
 		oce_log(dev, CE_WARN, MOD_CONFIG,
 		    "Interrupt handler setup failed with %d", ret);
-		oce_chip_hw_fini(dev);
-		oce_hw_fini(dev);
-		return (ret);
+		(void) oce_teardown_intr(dev);
+		goto  start_fail;
 	}
-
-	(void) oce_start_wq(dev->wq[0]);
-	(void) oce_start_rq(dev->rq[0]);
-
 	/* get link status */
 	(void) oce_get_link_status(dev, &dev->link);
 
@@ -147,6 +130,12 @@ oce_start(struct oce_dev *dev)
 		    dev->link.mac_duplex, dev->link.physical_port);
 		mac_link_update(dev->mac_handle, LINK_STATE_UP);
 	}
+
+	(void) oce_start_wq(dev->wq[0]);
+	(void) oce_start_rq(dev->rq[0]);
+	(void) oce_start_mq(dev->mq);
+	/* enable interrupts */
+	oce_ei(dev);
 	/* arm the eqs */
 	for (qidx = 0; qidx < dev->neqs; qidx++) {
 		oce_arm_eq(dev, dev->eq[qidx]->eq_id, 0, B_TRUE, B_FALSE);
@@ -154,6 +143,8 @@ oce_start(struct oce_dev *dev)
 
 	/* update state */
 	return (DDI_SUCCESS);
+start_fail:
+	return (DDI_FAILURE);
 } /* oce_start */
 
 
@@ -163,40 +154,34 @@ oce_m_stop(void *arg)
 	struct oce_dev *dev = arg;
 
 	/* disable interrupts */
-	oce_di(dev);
 
 	mutex_enter(&dev->dev_lock);
-
-	dev->state |= STATE_MAC_STOPPING;
-
 	if (dev->suspended) {
 		mutex_exit(&dev->dev_lock);
 		return;
 	}
-
+	dev->state |= STATE_MAC_STOPPING;
 	oce_stop(dev);
-
 	dev->state &= ~(STATE_MAC_STOPPING | STATE_MAC_STARTED);
-
 	mutex_exit(&dev->dev_lock);
 }
-
+/* called with Tx/Rx comp locks held */
 void
 oce_stop(struct oce_dev *dev)
 {
-	/* complete the pending Tx */
-	oce_stop_wq(dev->wq[0]);
-
-	oce_chip_hw_fini(dev);
-
-	OCE_MSDELAY(200);
-	oce_stop_mq(dev->mq);
-	oce_stop_rq(dev->rq[0]);
-
-	/* remove interrupt handlers */
+	/* disable interrupts */
+	oce_di(dev);
 	oce_remove_handler(dev);
-	/* release hw resources */
-	oce_hw_fini(dev);
+	(void) oce_teardown_intr(dev);
+	mutex_enter(&dev->wq[0]->tx_lock);
+	mutex_enter(&dev->rq[0]->rx_lock);
+	mutex_enter(&dev->mq->lock);
+	/* complete the pending Tx */
+	oce_clean_wq(dev->wq[0]);
+	/* Release all the locks */
+	mutex_exit(&dev->mq->lock);
+	mutex_exit(&dev->rq[0]->rx_lock);
+	mutex_exit(&dev->wq[0]->tx_lock);
 
 } /* oce_stop */
 
@@ -206,8 +191,8 @@ oce_m_multicast(void *arg, boolean_t add, const uint8_t *mca)
 
 	struct oce_dev *dev = (struct oce_dev *)arg;
 	struct ether_addr  *mca_drv_list;
-	struct ether_addr  *mca_hw_list;
-	int new_mcnt = 0;
+	struct ether_addr  mca_hw_list[OCE_MAX_MCA];
+	uint16_t new_mcnt = 0;
 	int ret;
 	int i;
 
@@ -215,31 +200,25 @@ oce_m_multicast(void *arg, boolean_t add, const uint8_t *mca)
 	if ((mca[0] & 0x1) == 0) {
 		return (EINVAL);
 	}
-
 	/* Allocate the local array for holding the addresses temporarily */
-	mca_hw_list = kmem_zalloc(OCE_MAX_MCA * sizeof (struct ether_addr),
-	    KM_NOSLEEP);
-
-	if (mca_hw_list == NULL)
-		return (ENOMEM);
-
+	bzero(&mca_hw_list, sizeof (&mca_hw_list));
 	mca_drv_list = &dev->multi_cast[0];
+
+	DEV_LOCK(dev);
 	if (add) {
 		/* check if we exceeded hw max  supported */
-		if (dev->num_mca >= OCE_MAX_MCA) {
-			return (ENOENT);
+		if (dev->num_mca <= OCE_MAX_MCA) {
+			/* copy entire dev mca to the mbx */
+			bcopy((void*)mca_drv_list,
+			    (void*)mca_hw_list,
+			    (dev->num_mca * sizeof (struct ether_addr)));
+			/* Append the new one to local list */
+			bcopy(mca, &mca_hw_list[dev->num_mca],
+			    sizeof (struct ether_addr));
 		}
-		/* copy entire dev mca to the mbx */
-		bcopy((void*)mca_drv_list,
-		    (void *)mca_hw_list,
-		    (dev->num_mca * sizeof (struct ether_addr)));
-		/* Append the new one to local list */
-		bcopy(mca, &mca_hw_list[dev->num_mca],
-		    sizeof (struct ether_addr));
 		new_mcnt = dev->num_mca + 1;
-
 	} else {
-		struct ether_addr *hwlistp = mca_hw_list;
+		struct ether_addr *hwlistp = &mca_hw_list[0];
 		for (i = 0; i < dev->num_mca; i++) {
 			/* copy only if it does not match */
 			if (bcmp((mca_drv_list + i), mca, ETHERADDRL)) {
@@ -251,27 +230,29 @@ oce_m_multicast(void *arg, boolean_t add, const uint8_t *mca)
 		new_mcnt = dev->num_mca - 1;
 	}
 
-	mutex_enter(&dev->dev_lock);
 	if (dev->suspended) {
-		mutex_exit(&dev->dev_lock);
 		goto finish;
 	}
-	mutex_exit(&dev->dev_lock);
-
-	ret = oce_set_multicast_table(dev, mca_hw_list, new_mcnt, B_FALSE);
+	if (new_mcnt == 0 || new_mcnt > OCE_MAX_MCA) {
+		ret = oce_set_multicast_table(dev, dev->if_id, NULL, 0, B_TRUE);
+	} else {
+		ret = oce_set_multicast_table(dev, dev->if_id,
+		    &mca_hw_list[0], new_mcnt, B_FALSE);
+	}
 	if (ret != 0) {
-		kmem_free(mca_hw_list,
-		    OCE_MAX_MCA * sizeof (struct ether_addr));
+		DEV_UNLOCK(dev);
 		return (EIO);
 	}
 	/*
 	 *  Copy the local structure to dev structure
 	 */
 finish:
-	bcopy(mca_hw_list, mca_drv_list,
-	    new_mcnt * sizeof (struct ether_addr));
+	if (new_mcnt && new_mcnt <= OCE_MAX_MCA) {
+		bcopy(mca_hw_list, mca_drv_list,
+		    new_mcnt * sizeof (struct ether_addr));
+	}
 	dev->num_mca = (uint16_t)new_mcnt;
-	kmem_free(mca_hw_list, OCE_MAX_MCA * sizeof (struct ether_addr));
+	DEV_UNLOCK(dev);
 	return (0);
 } /* oce_m_multicast */
 
@@ -287,19 +268,21 @@ oce_m_unicast(void *arg, const uint8_t *uca)
 		DEV_UNLOCK(dev);
 		return (DDI_SUCCESS);
 	}
-	DEV_UNLOCK(dev);
 
 	/* Delete previous one and add new one */
-	ret = oce_del_mac(dev, &dev->pmac_id);
+	ret = oce_del_mac(dev, dev->if_id, &dev->pmac_id);
 	if (ret != DDI_SUCCESS) {
+		DEV_UNLOCK(dev);
 		return (EIO);
 	}
 
 	/* Set the New MAC addr earlier is no longer valid */
-	ret = oce_add_mac(dev, uca, &dev->pmac_id);
+	ret = oce_add_mac(dev, dev->if_id, uca, &dev->pmac_id);
 	if (ret != DDI_SUCCESS) {
+		DEV_UNLOCK(dev);
 		return (EIO);
 	}
+	DEV_UNLOCK(dev);
 	return (ret);
 } /* oce_m_unicast */
 
@@ -309,22 +292,27 @@ oce_m_send(void *arg, mblk_t *mp)
 	struct oce_dev *dev = arg;
 	mblk_t *nxt_pkt;
 	mblk_t *rmp = NULL;
+	struct oce_wq *wq;
 
 	DEV_LOCK(dev);
-	if (dev->suspended) {
+	if (dev->suspended || !(dev->state & STATE_MAC_STARTED)) {
 		DEV_UNLOCK(dev);
 		freemsg(mp);
 		return (NULL);
 	}
 	DEV_UNLOCK(dev);
+	wq = dev->wq[0];
 
 	while (mp != NULL) {
 		/* Save the Pointer since mp will be freed in case of copy */
 		nxt_pkt = mp->b_next;
 		mp->b_next = NULL;
 		/* Hardcode wq since we have only one */
-		rmp = oce_send_packet(dev->wq[0], mp);
+		rmp = oce_send_packet(wq, mp);
 		if (rmp != NULL) {
+			/* reschedule Tx */
+			wq->resched = B_TRUE;
+			oce_arm_cq(dev, wq->cq->cq_id, 0, B_TRUE);
 			/* restore the chain */
 			rmp->b_next = nxt_pkt;
 			break;
@@ -372,6 +360,7 @@ oce_m_setprop(void *arg, const char *name, mac_prop_id_t id,
 	struct oce_dev *dev = arg;
 	int ret = 0;
 
+	DEV_LOCK(dev);
 	switch (id) {
 	case MAC_PROP_MTU: {
 		uint32_t mtu;
@@ -451,6 +440,7 @@ oce_m_setprop(void *arg, const char *name, mac_prop_id_t id,
 		break;
 	} /* switch id */
 
+	DEV_UNLOCK(dev);
 	return (ret);
 } /* oce_m_setprop */
 
@@ -460,6 +450,8 @@ oce_m_getprop(void *arg, const char *name, mac_prop_id_t id,
 {
 	struct oce_dev *dev = arg;
 	uint32_t ret = 0;
+
+	*perm = MAC_PROP_PERM_READ;
 
 	switch (id) {
 	case MAC_PROP_AUTONEG:
@@ -478,14 +470,16 @@ oce_m_getprop(void *arg, const char *name, mac_prop_id_t id,
 	case MAC_PROP_EN_10HDX_CAP:
 	case MAC_PROP_ADV_100T4_CAP:
 	case MAC_PROP_EN_100T4_CAP: {
-		*perm = MAC_PROP_PERM_READ;
 		*(uint8_t *)val = 0x0;
 		break;
 	}
 
-	case MAC_PROP_ADV_10GFDX_CAP:
+	case MAC_PROP_ADV_10GFDX_CAP: {
+		*(uint8_t *)val = 0x01;
+		break;
+	}
+
 	case MAC_PROP_EN_10GFDX_CAP: {
-		*perm = MAC_PROP_PERM_READ;
 		*(uint8_t *)val = 0x01;
 		break;
 	}
@@ -566,6 +560,7 @@ oce_m_getprop(void *arg, const char *name, mac_prop_id_t id,
 		break;
 	}
 	default:
+		ret = ENOTSUP;
 		break;
 	} /* switch id */
 	return (ret);
@@ -625,17 +620,18 @@ oce_m_promiscuous(void *arg, boolean_t enable)
 		DEV_UNLOCK(dev);
 		return (ret);
 	}
-	dev->promisc = enable;
 
 	if (dev->suspended) {
+		/* remember the setting */
+		dev->promisc = enable;
 		DEV_UNLOCK(dev);
 		return (ret);
 	}
 
-	DEV_UNLOCK(dev);
-
 	ret = oce_set_promiscuous(dev, enable);
-
+	if (ret == DDI_SUCCESS)
+		dev->promisc = enable;
+	DEV_UNLOCK(dev);
 	return (ret);
 } /* oce_m_promiscuous */
 
@@ -679,8 +675,18 @@ oce_set_priv_prop(struct oce_dev *dev, const char *name,
 	if (strcmp(name, "_tx_bcopy_limit") == 0) {
 		(void) ddi_strtol(val, (char **)NULL, 0, &result);
 		if (result <= OCE_WQ_BUF_SIZE) {
-			if (result != dev->bcopy_limit)
-				dev->bcopy_limit = (uint32_t)result;
+			if (result != dev->tx_bcopy_limit)
+				dev->tx_bcopy_limit = (uint32_t)result;
+			ret = 0;
+		} else {
+			ret = EINVAL;
+		}
+	}
+	if (strcmp(name, "_rx_bcopy_limit") == 0) {
+		(void) ddi_strtol(val, (char **)NULL, 0, &result);
+		if (result <= OCE_RQ_BUF_SIZE) {
+			if (result != dev->rx_bcopy_limit)
+				dev->rx_bcopy_limit = (uint32_t)result;
 			ret = 0;
 		} else {
 			ret = EINVAL;
@@ -722,7 +728,13 @@ oce_get_priv_prop(struct oce_dev *dev, const char *name,
 	}
 
 	if (strcmp(name, "_tx_bcopy_limit") == 0) {
-		value = dev->bcopy_limit;
+		value = dev->tx_bcopy_limit;
+		ret = 0;
+		goto done;
+	}
+
+	if (strcmp(name, "_rx_bcopy_limit") == 0) {
+		value = dev->rx_bcopy_limit;
 		ret = 0;
 		goto done;
 	}
@@ -735,7 +747,7 @@ oce_get_priv_prop(struct oce_dev *dev, const char *name,
 	}
 
 done:
-	if (ret != 0) {
+	if (ret == 0) {
 		(void) snprintf(val, size, "%d", value);
 	}
 	return (ret);

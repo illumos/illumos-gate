@@ -47,8 +47,6 @@ oce_update_stats(kstat_t *ksp, int rw)
 	struct oce_dev *dev;
 	struct oce_stat *stats;
 	struct rx_port_stats *port_stats;
-	clock_t new;
-	boolean_t is_update_stats = B_FALSE;
 	int ret;
 
 	if (rw == KSTAT_WRITE) {
@@ -64,33 +62,12 @@ oce_update_stats(kstat_t *ksp, int rw)
 		mutex_exit(&dev->dev_lock);
 		return (EIO);
 	}
-
-	/*
-	 * allow stats update only if enough
-	 * time has elapsed since last update
-	 */
-	new = ddi_get_lbolt();
-	if ((new - dev->stat_ticks) >= drv_usectohz(STAT_TIMEOUT)) {
-		dev->stat_ticks = new;
-		is_update_stats = B_TRUE;
-	}
-
-	mutex_exit(&dev->dev_lock);
-
-	/* fetch the latest stats from the adapter */
-	if (is_update_stats) {
-		if (dev->in_stats) {
-			return (EIO);
-		} else {
-			atomic_add_32(&dev->in_stats, 1);
-			ret = oce_get_hw_stats(dev);
-			atomic_add_32(&dev->in_stats, -1);
-			if (ret != DDI_SUCCESS) {
-				oce_log(dev, CE_WARN, MOD_CONFIG,
-				    "Failed to get stats:%d", ret);
-				return (EIO);
-			}
-		}
+	ret = oce_get_hw_stats(dev);
+	if (ret != DDI_SUCCESS) {
+		oce_log(dev, CE_WARN, MOD_CONFIG,
+		    "Failed to get stats:%d", ret);
+		mutex_exit(&dev->dev_lock);
+		return (EIO);
 	}
 
 	/* update the stats */
@@ -167,6 +144,7 @@ oce_update_stats(kstat_t *ksp, int rw)
 	    port_stats->tx_pause_frames;
 	stats->tx_control_frames.value.ul =
 	    port_stats->tx_control_frames;
+	mutex_exit(&dev->dev_lock);
 	return (DDI_SUCCESS);
 } /* oce_update_stats */
 
@@ -302,8 +280,6 @@ oce_m_stat(void *arg, uint_t stat, uint64_t *val)
 	struct oce_dev *dev = arg;
 	struct oce_stat *stats;
 	struct rx_port_stats *port_stats;
-	boolean_t is_update_stats = B_FALSE;
-	clock_t new;
 
 	stats = (struct oce_stat *)dev->oce_kstats->ks_data;
 	port_stats = &dev->hw_stats->params.rsp.rx.port[dev->port_id];
@@ -315,26 +291,6 @@ oce_m_stat(void *arg, uint_t stat, uint64_t *val)
 	    !(dev->state & STATE_MAC_STARTED)) {
 		mutex_exit(&dev->dev_lock);
 		return (EIO);
-	}
-
-	/*
-	 * allow stats update only if enough
-	 * time has elapsed since last update
-	 */
-	new = ddi_get_lbolt();
-	if ((new - dev->stat_ticks) >= drv_usectohz(STAT_TIMEOUT)) {
-		dev->stat_ticks = new;
-		is_update_stats = B_TRUE;
-	}
-	mutex_exit(&dev->dev_lock);
-
-	/* update hw stats. Required for netstat */
-	if (is_update_stats) {
-		if (dev->in_stats == 0) {
-			atomic_add_32(&dev->in_stats, 1);
-			(void) oce_get_hw_stats(dev);
-			atomic_add_32(&dev->in_stats, -1);
-		}
 	}
 
 	switch (stat) {
@@ -479,7 +435,9 @@ oce_m_stat(void *arg, uint_t stat, uint64_t *val)
 	break;
 
 	default:
+		mutex_exit(&dev->dev_lock);
 		return (ENOTSUP);
 	}
+	mutex_exit(&dev->dev_lock);
 	return (0);
 } /* oce_m_stat */

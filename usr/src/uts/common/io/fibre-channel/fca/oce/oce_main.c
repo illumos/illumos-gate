@@ -35,12 +35,11 @@
 
 #define	ATTACH_DEV_INIT 	0x1
 #define	ATTACH_FM_INIT		0x2
-#define	ATTACH_SETUP_INTR	0x4
-#define	ATTACH_LOCK_INIT	0x8
-#define	ATTACH_PCI_INIT 	0x10
-#define	ATTACH_BOOTSTRAP_INIT	0x20
-#define	ATTACH_HW_INIT		0x40
-#define	ATTACH_ADD_HANDLERS	0x80
+#define	ATTACH_LOCK_INIT	0x4
+#define	ATTACH_PCI_INIT 	0x8
+#define	ATTACH_HW_INIT		0x10
+#define	ATTACH_SETUP_TXRX 	0x20
+#define	ATTACH_SETUP_ADAP	0x40
 #define	ATTACH_STAT_INIT	0x100
 #define	ATTACH_MAC_REG		0x200
 
@@ -54,7 +53,8 @@ char oce_version[] = OCE_REVISION;
 /* driver properties */
 static const char mtu_prop_name[] = "oce_default_mtu";
 static const char tx_ring_size_name[] = "oce_tx_ring_size";
-static const char bcopy_limit_name[] = "oce_bcopy_limit";
+static const char tx_bcopy_limit_name[] = "oce_tx_bcopy_limit";
+static const char rx_bcopy_limit_name[] = "oce_rx_bcopy_limit";
 static const char fm_cap_name[] = "oce_fm_capability";
 static const char log_level_name[] = "oce_log_level";
 static const char lso_capable_name[] = "oce_lso_capable";
@@ -69,7 +69,6 @@ static void oce_unconfigure(struct oce_dev *dev);
 static void oce_init_locks(struct oce_dev *dev);
 static void oce_destroy_locks(struct oce_dev *dev);
 static void oce_get_params(struct oce_dev *dev);
-int oce_reset_fun(struct oce_dev *dev);
 
 static struct cb_ops oce_cb_ops = {
 	nulldev,		/* cb_open */
@@ -182,10 +181,8 @@ static int
 oce_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	int ret = 0;
-	int intr_types;
 	struct oce_dev *dev = NULL;
 	mac_register_t *mac;
-	struct mac_address_format mac_addr;
 
 	switch (cmd) {
 	case DDI_RESUME:
@@ -199,22 +196,12 @@ oce_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	oce_log(dev, CE_CONT, MOD_CONFIG, "!%s, %s",
 	    oce_desc_string, oce_version);
 
-
-	/* get supported intr types */
-	ret = ddi_intr_get_supported_types(dip, &intr_types);
-	if (ret != DDI_SUCCESS) {
-		oce_log(dev, CE_WARN, MOD_CONFIG, "%s",
-		    "Failed to retrieve intr types ");
-		return (DDI_FAILURE);
-	}
-
 	/* allocate dev */
 	dev = kmem_zalloc(sizeof (struct oce_dev), KM_SLEEP);
 
 	/* populate the dev structure */
 	dev->dip = dip;
 	dev->dev_id = ddi_get_instance(dip);
-	dev->intr_types = intr_types;
 	dev->suspended = B_FALSE;
 
 	/* get the parameters */
@@ -230,14 +217,13 @@ oce_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	oce_fm_init(dev);
 	dev->attach_state |= ATTACH_FM_INIT;
-
 	ret = oce_setup_intr(dev);
 	if (ret != DDI_SUCCESS) {
 		oce_log(dev, CE_WARN, MOD_CONFIG,
 		    "Interrupt setup failed with %d", ret);
 		goto attach_fail;
+
 	}
-	dev->attach_state |= ATTACH_SETUP_INTR;
 
 	/* initialize locks */
 	oce_init_locks(dev);
@@ -252,60 +238,31 @@ oce_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 	dev->attach_state |= ATTACH_PCI_INIT;
 
-	/* check if reset if required */
-	if (oce_is_reset_pci(dev)) {
-		ret = oce_pci_soft_reset(dev);
-		if (ret) {
-			oce_log(dev, CE_WARN, MOD_CONFIG,
-			    "Device Reset failed: %d", ret);
-			goto attach_fail;
-		}
-	}
-
-	/* create bootstrap mailbox */
-	dev->bmbx = oce_alloc_dma_buffer(dev,
-	    sizeof (struct oce_bmbx), DDI_DMA_CONSISTENT);
-	if (dev->bmbx == NULL) {
+	/* HW init */
+	ret = oce_hw_init(dev);
+	if (ret != DDI_SUCCESS) {
 		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Failed to allocate bmbx: size = %u",
-		    (uint32_t)sizeof (struct oce_bmbx));
+		    "HW initialization failed with %d", ret);
 		goto attach_fail;
 	}
-	dev->attach_state |= ATTACH_BOOTSTRAP_INIT;
+	dev->attach_state |= ATTACH_HW_INIT;
 
-	/* initialize the BMBX */
-	ret = oce_mbox_init(dev);
-	if (ret != 0) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Mailbox initialization Failed with %d", ret);
+	ret = oce_init_txrx(dev);
+	if (ret  != DDI_SUCCESS) {
+		oce_log(dev, CE_WARN, MOD_CONFIG, "%s",
+		    "Failed to init rings");
 		goto attach_fail;
 	}
+	dev->attach_state |= ATTACH_SETUP_TXRX;
 
-	/* read the firmware version */
-	ret = oce_get_fw_version(dev);
-	if (ret != 0) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Firmaware version read failed with %d", ret);
+	ret = oce_setup_adapter(dev);
+	if (ret != DDI_SUCCESS) {
+		oce_log(dev, CE_WARN, MOD_CONFIG, "%s",
+		    "Failed to setup adapter");
 		goto attach_fail;
 	}
+	dev->attach_state |=  ATTACH_SETUP_ADAP;
 
-	/* read the fw config */
-	ret = oce_get_fw_config(dev);
-	if (ret != 0) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Firmware configuration read failed with %d", ret);
-		goto attach_fail;
-	}
-
-	/* read the MAC address */
-	ret = oce_read_mac_addr(dev, dev->if_id, 1,
-	    MAC_ADDRESS_TYPE_NETWORK, &mac_addr);
-	if (ret != 0) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "MAC address read failed with %d", ret);
-		goto attach_fail;
-	}
-	bcopy(&mac_addr.mac_addr[0], &dev->mac_addr[0], ETHERADDRL);
 
 	ret = oce_stat_init(dev);
 	if (ret != DDI_SUCCESS) {
@@ -371,24 +328,52 @@ attach_fail:
 static int
 oce_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
-	struct oce_dev *dev = ddi_get_driver_private(dip);
+	struct oce_dev *dev;
+	int pcnt = 0;
 
-	ASSERT(dev != NULL);
-
+	dev = ddi_get_driver_private(dip);
+	if (dev == NULL) {
+		return (DDI_FAILURE);
+	}
 	oce_log(dev, CE_NOTE, MOD_CONFIG,
 	    "Detaching driver: cmd = 0x%x", cmd);
 
 	switch (cmd) {
-	case DDI_DETACH:
-		oce_unconfigure(dev);
-		break;
-
-	case DDI_SUSPEND:
-		return (oce_suspend(dip));
-
 	default:
 		return (DDI_FAILURE);
+	case DDI_SUSPEND:
+		return (oce_suspend(dip));
+	case DDI_DETACH:
+		break;
 	} /* switch cmd */
+
+	/* Fail detach if MAC unregister is unsuccessfule */
+	if (mac_unregister(dev->mac_handle) != 0) {
+		oce_log(dev, CE_WARN, MOD_CONFIG, "%s",
+		    "Failed to unregister MAC ");
+		return (DDI_FAILURE);
+	}
+	dev->attach_state &= ~ATTACH_MAC_REG;
+
+	/* check if the detach is called with out stopping */
+	DEV_LOCK(dev);
+	if (dev->state & STATE_MAC_STARTED) {
+		dev->state &= ~STATE_MAC_STARTED;
+		oce_stop(dev);
+		DEV_UNLOCK(dev);
+	} else
+		DEV_UNLOCK(dev);
+
+	/*
+	 * Wait for Packets sent up to be freed
+	 */
+	if ((pcnt = oce_rx_pending(dev)) != 0) {
+		oce_log(dev, CE_WARN, MOD_CONFIG,
+		    "%d Pending Buffers Detach failed", pcnt);
+		return (DDI_FAILURE);
+	}
+	oce_unconfigure(dev);
+
 	return (DDI_SUCCESS);
 } /* oce_detach */
 
@@ -405,7 +390,7 @@ oce_quiesce(dev_info_t *dip)
 		return (DDI_SUCCESS);
 	}
 
-	oce_di(dev);
+	oce_chip_di(dev);
 
 	ret = oce_reset_fun(dev);
 
@@ -423,6 +408,7 @@ oce_suspend(dev_info_t *dip)
 	/* stop the adapter */
 	if (dev->state & STATE_MAC_STARTED) {
 		oce_stop(dev);
+		oce_unsetup_adapter(dev);
 	}
 	dev->state &= ~STATE_MAC_STARTED;
 	mutex_exit(&dev->dev_lock);
@@ -443,6 +429,11 @@ oce_resume(dev_info_t *dip)
 		return (DDI_SUCCESS);
 	}
 	if (dev->state & STATE_MAC_STARTED) {
+		ret = oce_setup_adapter(dev);
+		if (ret != DDI_SUCCESS) {
+			mutex_exit(&dev->dev_lock);
+			return (DDI_FAILURE);
+		}
 		ret = oce_start(dev);
 		if (ret != DDI_SUCCESS) {
 			mutex_exit(&dev->dev_lock);
@@ -483,17 +474,22 @@ oce_unconfigure(struct oce_dev *dev)
 	if (state & ATTACH_STAT_INIT) {
 		oce_stat_fini(dev);
 	}
-	if (state & ATTACH_BOOTSTRAP_INIT) {
-		oce_free_dma_buffer(dev, dev->bmbx);
+	if (state & ATTACH_SETUP_ADAP) {
+		oce_unsetup_adapter(dev);
+	}
+
+	if (state & ATTACH_SETUP_TXRX) {
+		oce_fini_txrx(dev);
+	}
+
+	if (state & ATTACH_HW_INIT) {
+		oce_hw_fini(dev);
 	}
 	if (state & ATTACH_PCI_INIT) {
 		oce_pci_fini(dev);
 	}
 	if (state & ATTACH_LOCK_INIT) {
 		oce_destroy_locks(dev);
-	}
-	if (state & ATTACH_SETUP_INTR) {
-		(void) oce_teardown_intr(dev);
 	}
 	if (state & ATTACH_FM_INIT) {
 		oce_fm_fini(dev);
@@ -527,12 +523,15 @@ oce_get_params(struct oce_dev *dev)
 	    DDI_PROP_DONTPASS, (char *)tx_ring_size_name,
 	    OCE_DEFAULT_TX_RING_SIZE);
 
-	dev->bcopy_limit = ddi_prop_get_int(DDI_DEV_T_ANY, dev->dip,
-	    DDI_PROP_DONTPASS, (char *)bcopy_limit_name,
-	    OCE_DEFAULT_BCOPY_LIMIT);
+	dev->tx_bcopy_limit = ddi_prop_get_int(DDI_DEV_T_ANY, dev->dip,
+	    DDI_PROP_DONTPASS, (char *)tx_bcopy_limit_name,
+	    OCE_DEFAULT_TX_BCOPY_LIMIT);
+	dev->rx_bcopy_limit = ddi_prop_get_int(DDI_DEV_T_ANY, dev->dip,
+	    DDI_PROP_DONTPASS, (char *)rx_bcopy_limit_name,
+	    OCE_DEFAULT_RX_BCOPY_LIMIT);
 
 	dev->lso_capable = (boolean_t)ddi_prop_get_int(DDI_DEV_T_ANY, dev->dip,
-	    DDI_PROP_DONTPASS, (char *)lso_capable_name, 0);
+	    DDI_PROP_DONTPASS, (char *)lso_capable_name, 1);
 
 	dev->fm_caps = ddi_prop_get_int(DDI_DEV_T_ANY, dev->dip,
 	    DDI_PROP_DONTPASS, (char *)fm_cap_name, OCE_FM_CAPABILITY);

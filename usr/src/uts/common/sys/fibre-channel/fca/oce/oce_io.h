@@ -45,6 +45,7 @@ extern "C" {
 #include <oce_buf.h>
 
 #define	DEFAULT_MQ_MBOX_TIMEOUT	(5 * 1000 * 1000) /* 5 sec (in usec) */
+#define	DEFAULT_DRAIN_TIME 200	/* Default Drain Time */
 #define	MBX_TIMEOUT_SEC		5
 #define	STAT_TIMEOUT		2000000 /* update stats every 2 sec */
 
@@ -62,6 +63,20 @@ enum eqe_size {
 	EQE_SIZE_4 = 4,
 	EQE_SIZE_16 = 16
 };
+
+enum qtype {
+	QTYPE_EQ,
+	QTYPE_MQ,
+	QTYPE_WQ,
+	QTYPE_RQ,
+	QTYPE_CQ,
+	QTYPE_RSS
+};
+
+typedef enum qstate_e {
+	QDELETED = 0x0,
+	QCREATED = 0x1
+}qstate_t;
 
 struct eq_config {
 	/* number of entries in the eq */
@@ -93,6 +108,8 @@ struct oce_eq {
 	uint32_t ref_count;
 	/* ring buffer for this eq */
 	oce_ring_buffer_t *ring;
+	/* Queue state */
+	qstate_t qstate;
 	/* Lock for this queue */
 	kmutex_t lock;
 };
@@ -108,10 +125,12 @@ struct cq_config {
 	enum cq_len q_len;
 	/* size of each item */
 	uint32_t item_size;
+	/* is eventable */
+	boolean_t is_eventable;
 	/* solicited eventable? */
-	uint8_t sol_eventable;
+	boolean_t sol_eventable;
 	/* no delay? */
-	uint8_t nodelay;
+	boolean_t nodelay;
 	/* dma coalescing */
 	uint16_t dma_coalescing;
 };
@@ -134,6 +153,8 @@ struct oce_cq {
 	void *cb_arg;
 	/* ring buffer for this cq */
 	oce_ring_buffer_t *ring;
+	/* Queue state */
+	qstate_t qstate;
 	/* lock */
 	kmutex_t lock;
 };
@@ -158,16 +179,12 @@ struct oce_mq {
 	struct oce_cq *async_cq;
 	/* free entries in Queue */
 	uint32_t mq_free;
+	/* Queue state */
+	qstate_t qstate;
+	/* lock for the mq */
+	kmutex_t lock;
 };
 
-enum qtype {
-	QTYPE_EQ,
-	QTYPE_MQ,
-	QTYPE_WQ,
-	QTYPE_RQ,
-	QTYPE_CQ,
-	QTYPE_RSS
-};
 
 /*
  * utility structure that handles context of mbx
@@ -210,7 +227,11 @@ struct oce_wq {
 	uint32_t	wq_free; /* Wqe free */
 	uint32_t	tx_deferd; /* Wqe free */
 	uint32_t	pkt_drops; /* drops */
-	kmutex_t lock; /* lock for the WQ */
+	/* Queue state */
+	qstate_t qstate;
+	kmutex_t tx_lock; /* lock for the WQ */
+	kmutex_t txc_lock; /* tx compl lock */
+	kmutex_t resched_lock; /* tx compl lock */
 };
 
 struct rq_config {
@@ -248,8 +269,11 @@ struct oce_rq {
 	OCE_LIST_T rq_buf_list; /* Free list */
 	uint32_t buf_avail; /* buffer avaialable with hw */
 	uint32_t pending; /* Buffers sent up */
+	/* Queue state */
+	qstate_t qstate;
 	/* rq lock */
-	kmutex_t lock;
+	kmutex_t rx_lock;
+	kmutex_t rc_lock;
 };
 
 struct link_status {
@@ -274,10 +298,6 @@ oce_ring_buffer_t *create_ring_buffer(struct oce_dev *dev,
 void destroy_ring_buffer(struct oce_dev *dev, oce_ring_buffer_t *ring);
 
 /* Queues */
-struct oce_eq *oce_eq_create(struct oce_dev *dev, uint32_t q_len,
-    uint32_t item_size, uint32_t eq_delay);
-
-int oce_eq_del(struct oce_dev *dev, struct oce_eq *eq);
 int oce_set_eq_delay(struct oce_dev *dev, uint32_t *eq_arr,
     uint32_t eq_cnt, uint32_t eq_delay);
 void oce_arm_eq(struct oce_dev *dev, int16_t qid, int npopped,
@@ -301,38 +321,37 @@ int oce_pci_soft_reset(struct oce_dev *dev);
 int oce_POST(struct oce_dev *dev);
 int oce_pci_init(struct oce_dev *dev);
 void oce_pci_fini(struct oce_dev *dev);
+int oce_init_txrx(struct oce_dev *dev);
+void oce_fini_txrx(struct oce_dev *dev);
+int oce_create_queues(struct oce_dev *dev);
+void oce_delete_queues(struct oce_dev *dev);
+void oce_delete_nw_interface(struct oce_dev *dev);
+int oce_create_nw_interface(struct oce_dev *dev);
+int oce_reset_fun(struct oce_dev *dev);
 
 /* Transmit */
-struct oce_wq *oce_wq_create(struct oce_dev *dev, struct oce_eq *eq,
-    uint32_t q_len, int wq_type);
-
-int oce_wq_del(struct oce_dev *dev, struct oce_wq *wq);
 struct oce_wq *oce_get_wq(struct oce_dev *dev, mblk_t *pkt);
 uint16_t  oce_drain_wq_cq(void *arg);
 mblk_t *oce_send_packet(struct oce_wq *wq, mblk_t *mp);
 int oce_start_wq(struct oce_wq *wq);
-void oce_stop_wq(struct oce_wq *wq);
+void oce_clean_wq(struct oce_wq *wq);
+
 
 /* Recieve */
 uint16_t oce_drain_rq_cq(void *arg);
-struct oce_rq *oce_rq_create(struct oce_dev *dev, struct oce_eq *eq,
-    uint32_t q_len, uint32_t frag_size, uint32_t mtu,
-    int16_t if_id, boolean_t rss);
-int oce_rq_del(struct oce_dev *dev, struct oce_rq *rq);
 int oce_start_rq(struct oce_rq *rq);
-void oce_stop_rq(struct oce_rq *rq);
+void oce_clean_rq(struct oce_rq *rq);
+void oce_rq_discharge(struct oce_rq *rq);
+int oce_rx_pending(struct oce_dev *dev);
 
 /* event handling */
-struct oce_mq *oce_mq_create(struct oce_dev *dev,
-    struct oce_eq *eq, uint32_t q_len);
-int oce_mq_del(struct oce_dev *dev, struct oce_mq *mq);
 uint16_t oce_drain_mq_cq(void *arg);
-
 int oce_mq_mbox_post(struct  oce_dev *dev, struct  oce_mbx *mbx,
     struct oce_mbx_ctx *mbxctx);
 struct oce_mbx *oce_mq_get_mbx(struct oce_dev *dev);
-void oce_stop_mq(struct oce_mq *mq);
-void oce_rq_discharge(struct oce_rq *rq);
+void oce_clean_mq(struct oce_mq *mq);
+int oce_start_mq(struct oce_mq *mq);
+
 
 /* mbx functions */
 void mbx_common_req_hdr_init(struct mbx_hdr *hdr, uint8_t dom,
@@ -341,7 +360,7 @@ void mbx_common_req_hdr_init(struct mbx_hdr *hdr, uint8_t dom,
 void mbx_nic_req_hdr_init(struct mbx_hdr *hdr, uint8_t dom, uint8_t port,
     uint8_t opcode, uint32_t timeout, uint32_t pyld_len);
 int oce_get_fw_version(struct oce_dev *dev);
-int oce_read_mac_addr(struct oce_dev *dev, uint16_t if_id, uint8_t perm,
+int oce_read_mac_addr(struct oce_dev *dev, uint32_t if_id, uint8_t perm,
     uint8_t type, struct mac_address_format *mac);
 int oce_if_create(struct oce_dev *dev, uint32_t cap_flags, uint32_t en_flags,
     uint16_t vlan_tag, uint8_t *mac_addr, uint32_t *if_id);
@@ -351,25 +370,21 @@ int oce_num_intr_vectors_set(struct oce_dev *dev, uint32_t num_vectors);
 int oce_get_link_status(struct oce_dev *dev, struct link_status *link);
 int oce_set_rx_filter(struct oce_dev *dev,
     struct mbx_set_common_ntwk_rx_filter *filter);
-int oce_set_multicast_table(struct oce_dev *dev, struct ether_addr *mca_table,
-    uint8_t mca_cnt, boolean_t enable_promisc);
+int oce_set_multicast_table(struct oce_dev *dev, uint32_t if_id,
+	struct ether_addr *mca_table, uint16_t mca_cnt, boolean_t promisc);
 int oce_get_fw_config(struct oce_dev *dev);
 int oce_get_hw_stats(struct oce_dev *dev);
 int oce_set_flow_control(struct oce_dev *dev, uint32_t flow_control);
 int oce_get_flow_control(struct oce_dev *dev, uint32_t *flow_control);
 int oce_set_promiscuous(struct oce_dev *dev, boolean_t enable);
-int oce_add_mac(struct oce_dev *dev, const uint8_t *mac, uint32_t *pmac_id);
-int oce_del_mac(struct oce_dev *dev, uint32_t *pmac_id);
-int oce_config_vlan(struct oce_dev *dev, uint8_t if_id,
+int oce_add_mac(struct oce_dev *dev, uint32_t if_id,
+			const uint8_t *mac, uint32_t *pmac_id);
+int oce_del_mac(struct oce_dev *dev, uint32_t if_id, uint32_t *pmac_id);
+int oce_config_vlan(struct oce_dev *dev, uint32_t if_id,
     struct normal_vlan *vtag_arr,
     uint8_t vtag_cnt,  boolean_t untagged,
     boolean_t enable_promisc);
 int oce_config_link(struct oce_dev *dev, boolean_t enable);
-
-int oce_hw_init(struct oce_dev *dev);
-void oce_hw_fini(struct oce_dev *dev);
-int oce_chip_hw_init(struct oce_dev *dev);
-void oce_chip_hw_fini(struct oce_dev *dev);
 
 int oce_issue_mbox(struct oce_dev *dev, queue_t *wq, mblk_t *mp,
     uint32_t *payload_length);

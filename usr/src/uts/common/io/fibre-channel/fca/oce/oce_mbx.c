@@ -129,10 +129,12 @@ oce_mbox_init(struct oce_dev *dev)
 int
 oce_mbox_wait(struct oce_dev *dev, uint32_t tmo_sec)
 {
-	clock_t tmo = (tmo_sec > 0) ? drv_usectohz(tmo_sec * 1000000) :
-	    drv_usectohz(DEFAULT_MQ_MBOX_TIMEOUT);
+	clock_t tmo;
 	clock_t now, tstamp;
 	pd_mpu_mbox_db_t mbox_db;
+
+	tmo = (tmo_sec > 0) ? drv_usectohz(tmo_sec * 1000000) :
+	    drv_usectohz(DEFAULT_MQ_MBOX_TIMEOUT);
 
 	tstamp = ddi_get_lbolt();
 	do {
@@ -167,6 +169,7 @@ oce_mbox_dispatch(struct oce_dev *dev, uint32_t tmo_sec)
 
 	/* write 30 bits of address hi dword */
 	pa = (uint32_t)(DBUF_PA(dev->bmbx) >> 34);
+	bzero(&mbox_db, sizeof (pd_mpu_mbox_db_t));
 	mbox_db.bits.ready = 0;
 	mbox_db.bits.hi = 1;
 	mbox_db.bits.address = pa;
@@ -183,6 +186,11 @@ oce_mbox_dispatch(struct oce_dev *dev, uint32_t tmo_sec)
 	/* wait for mbox ready */
 	ret = oce_mbox_wait(dev, tmo_sec);
 	if (ret != 0) {
+		oce_log(dev, CE_NOTE, MOD_CONFIG,
+		    "BMBX TIMED OUT PROGRAMMING HI ADDR: %d", ret);
+		/* if mbx times out, hw is in invalid state */
+		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
+		oce_fm_ereport(dev, DDI_FM_DEVICE_INVAL_STATE);
 		return (ret);
 	}
 
@@ -199,7 +207,7 @@ oce_mbox_dispatch(struct oce_dev *dev, uint32_t tmo_sec)
 	ret = oce_mbox_wait(dev, tmo_sec);
 	if (ret != 0) {
 		oce_log(dev, CE_NOTE, MOD_CONFIG,
-		    "bmbx timed out: %d", ret);
+		    "BMBX TIMED OUT PROGRAMMING LO ADDR: %d", ret);
 		/* if mbx times out, hw is in invalid state */
 		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
 		oce_fm_ereport(dev, DDI_FM_DEVICE_INVAL_STATE);
@@ -335,15 +343,7 @@ oce_get_fw_version(struct oce_dev *dev)
 	/* now post the command */
 	ret = oce_mbox_post(dev, &mbx, NULL);
 
-	if ((ret != 0) || OCE_MBX_STATUS(&fwcmd->hdr) != 0 ||
-	    OCE_MBX_ADDL_STATUS(&fwcmd->hdr) != 0) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Failed to get firmware version:"
-		    "CMD COMPLETION STATUS:(%d)"
-		    "MBX COMMAND  COMPLETION STATUS:(%d)"
-		    "MBX COMMAND  COMPLETION ADDL STATUS:(%d)",
-		    ret, OCE_MBX_STATUS(&fwcmd->hdr),
-		    OCE_MBX_ADDL_STATUS(&fwcmd->hdr));
+	if (ret != 0) {
 		return (ret);
 	}
 	bcopy(fwcmd->params.rsp.fw_ver_str, dev->fw_version, 32);
@@ -385,7 +385,7 @@ oce_reset_fun(struct oce_dev *dev)
 	/* fill rest of mbx */
 	mbx->u0.s.embedded = 1;
 	mbx->payload_length = sizeof (struct ioctl_common_function_reset);
-	DW_SWAP(u32ptr(&mbx), mbx->payload_length + OCE_BMBX_RHDR_SZ);
+	DW_SWAP(u32ptr(mbx), mbx->payload_length + OCE_BMBX_RHDR_SZ);
 
 	return (oce_mbox_dispatch(dev, 0));
 } /* oce_reset_fun */
@@ -404,7 +404,7 @@ oce_reset_fun(struct oce_dev *dev)
  * return 0 on success, EIO on failure
  */
 int
-oce_read_mac_addr(struct oce_dev *dev, uint16_t if_id, uint8_t perm,
+oce_read_mac_addr(struct oce_dev *dev, uint32_t if_id, uint8_t perm,
     uint8_t type, struct mac_address_format *mac)
 {
 	struct oce_mbx mbx;
@@ -423,7 +423,7 @@ oce_read_mac_addr(struct oce_dev *dev, uint16_t if_id, uint8_t perm,
 	/* fill the command */
 	fwcmd->params.req.permanent = perm;
 	if (perm)
-		fwcmd->params.req.if_id = if_id;
+		fwcmd->params.req.if_id = (uint16_t)if_id;
 	else
 		fwcmd->params.req.if_id = 0;
 	fwcmd->params.req.type = type;
@@ -435,15 +435,7 @@ oce_read_mac_addr(struct oce_dev *dev, uint16_t if_id, uint8_t perm,
 
 	/* now post the command */
 	ret = oce_mbox_post(dev, &mbx, NULL);
-	if ((ret != 0) || OCE_MBX_STATUS(&fwcmd->hdr) != 0 ||
-	    OCE_MBX_ADDL_STATUS(&fwcmd->hdr) != 0) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Failed to read MAC:"
-		    "CMD COMPLETION STATUS:(%d)"
-		    "MBX COMMAND  COMPLETION STATUS:(%d)"
-		    "MBX COMMAND  COMPLETION ADDL STATUS:(%d)",
-		    ret, OCE_MBX_STATUS(&fwcmd->hdr),
-		    OCE_MBX_ADDL_STATUS(&fwcmd->hdr));
+	if (ret != 0) {
 		return (ret);
 	}
 
@@ -522,17 +514,11 @@ oce_if_create(struct oce_dev *dev, uint32_t cap_flags, uint32_t en_flags,
 
 	/* now post the command */
 	ret = oce_mbox_post(dev, &mbx, NULL);
-	if ((ret != 0) || OCE_MBX_STATUS(&fwcmd->hdr) != 0 ||
-	    OCE_MBX_ADDL_STATUS(&fwcmd->hdr) != 0) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Failed to create interface:"
-		    "CMD COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION ADDL STATUS(%d)",
-		    ret, OCE_MBX_STATUS(&fwcmd->hdr),
-		    OCE_MBX_ADDL_STATUS(&fwcmd->hdr));
+	if (ret != 0) {
 		return (ret);
 	}
+
+
 
 	/* get response */
 	*if_id = LE_32(fwcmd->params.rsp.if_id);
@@ -582,18 +568,7 @@ oce_if_del(struct oce_dev *dev, uint32_t if_id)
 
 	/* post the command */
 	ret = oce_mbox_post(dev, &mbx, NULL);
-	if ((ret != 0) || OCE_MBX_STATUS(&fwcmd->hdr) != 0 ||
-	    OCE_MBX_ADDL_STATUS(&fwcmd->hdr) != 0) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Failed to delete the interface:"
-		    "CMD COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION ADDL STATUS(%d)",
-		    ret, OCE_MBX_STATUS(&fwcmd->hdr),
-		    OCE_MBX_ADDL_STATUS(&fwcmd->hdr));
-		return (ret);
-	}
-	return (0);
+	return (ret);
 } /* oce_if_del */
 
 /*
@@ -628,15 +603,8 @@ oce_get_link_status(struct oce_dev *dev, struct link_status *link)
 
 	/* post the command */
 	ret = oce_mbox_post(dev, &mbx, NULL);
-	if ((ret != 0) || OCE_MBX_STATUS(&fwcmd->hdr) != 0 ||
-	    OCE_MBX_ADDL_STATUS(&fwcmd->hdr) != 0) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Failed to get the link status:"
-		    "CMD COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION ADDL STATUS(%d)",
-		    ret, OCE_MBX_STATUS(&fwcmd->hdr),
-		    OCE_MBX_ADDL_STATUS(&fwcmd->hdr));
+
+	if (ret != 0) {
 		return (ret);
 	}
 
@@ -680,19 +648,8 @@ oce_set_rx_filter(struct oce_dev *dev,
 
 	/* post the command */
 	ret = oce_mbox_post(dev, &mbx, NULL);
-	if ((ret != 0) || OCE_MBX_STATUS(&fwcmd->hdr) != 0 ||
-	    OCE_MBX_ADDL_STATUS(&fwcmd->hdr) != 0) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Failed to set rx filter:"
-		    "CMD COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION ADDL STATUS(%d)",
-		    ret, OCE_MBX_STATUS(&fwcmd->hdr),
-		    OCE_MBX_ADDL_STATUS(&fwcmd->hdr));
-		return (ret);
-	}
 
-	return (0);
+	return (ret);
 } /* oce_set_rx_filter */
 
 /*
@@ -706,8 +663,8 @@ oce_set_rx_filter(struct oce_dev *dev,
  * return 0 on success, EIO on failure
  */
 int
-oce_set_multicast_table(struct oce_dev *dev, struct ether_addr *mca_table,
-    uint8_t mca_cnt, boolean_t enable_promisc)
+oce_set_multicast_table(struct oce_dev *dev, uint32_t if_id,
+struct ether_addr *mca_table, uint16_t mca_cnt, boolean_t promisc)
 {
 	struct oce_mbx mbx;
 	struct  mbx_set_common_iface_multicast *fwcmd;
@@ -724,10 +681,13 @@ oce_set_multicast_table(struct oce_dev *dev, struct ether_addr *mca_table,
 	    sizeof (struct mbx_set_common_iface_multicast));
 
 	/* fill the command */
-	bcopy(mca_table, &fwcmd->params.req.mac[0], mca_cnt * ETHERADDRL);
-	fwcmd->params.req.if_id = (uint8_t)dev->if_id;
+	fwcmd->params.req.if_id = (uint8_t)if_id;
+	if (mca_table != NULL) {
+		bcopy(mca_table, &fwcmd->params.req.mac[0],
+		    mca_cnt * ETHERADDRL);
+	}
 	fwcmd->params.req.num_mac = LE_16(mca_cnt);
-	fwcmd->params.req.promiscuous = (uint8_t)enable_promisc;
+	fwcmd->params.req.promiscuous = (uint8_t)promisc;
 
 	/* fill rest of mbx */
 	mbx.u0.s.embedded = B_TRUE;
@@ -737,19 +697,8 @@ oce_set_multicast_table(struct oce_dev *dev, struct ether_addr *mca_table,
 
 	/* post the command */
 	ret = oce_mbox_post(dev, &mbx, NULL);
-	/* Check command req and mbx status */
-	if ((ret != 0) || OCE_MBX_STATUS(&fwcmd->hdr) != 0 ||
-	    OCE_MBX_ADDL_STATUS(&fwcmd->hdr) != 0) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Failed to set multicast table:"
-		    "CMD COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION ADDL STATUS(%d)",
-		    ret, OCE_MBX_STATUS(&fwcmd->hdr),
-		    OCE_MBX_ADDL_STATUS(&fwcmd->hdr));
-		return (ret);
-	}
-	return (0);
+
+	return (ret);
 } /* oce_set_multicast_table */
 
 /*
@@ -782,16 +731,8 @@ oce_get_fw_config(struct oce_dev *dev)
 
 	/* now post the command */
 	ret = oce_mbox_post(dev, &mbx, NULL);
-	/* Check the mailbox return status and mbx command response status */
-	if ((ret != 0) || OCE_MBX_STATUS(&fwcmd->hdr) != 0 ||
-	    OCE_MBX_ADDL_STATUS(&fwcmd->hdr) != 0) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Failed to get firmware configuration:"
-		    "CMD COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION ADDL STATUS(%d)",
-		    ret, OCE_MBX_STATUS(&fwcmd->hdr),
-		    OCE_MBX_ADDL_STATUS(&fwcmd->hdr));
+
+	if (ret != 0) {
 		return (ret);
 	}
 
@@ -843,15 +784,7 @@ oce_get_hw_stats(struct oce_dev *dev)
 	/* now post the command */
 	ret = oce_mbox_post(dev, &mbx, NULL);
 	/* Check the mailbox status and command completion status */
-	if ((ret != 0) || OCE_MBX_STATUS(&fwcmd->hdr) != 0 ||
-	    OCE_MBX_ADDL_STATUS(&fwcmd->hdr) != 0) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Failed to get hardware status:"
-		    "CMD COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION ADDL STATUS(%d)",
-		    ret, OCE_MBX_STATUS(&fwcmd->hdr),
-		    OCE_MBX_ADDL_STATUS(&fwcmd->hdr));
+	if (ret != 0) {
 		return (ret);
 	}
 
@@ -894,20 +827,8 @@ oce_num_intr_vectors_set(struct oce_dev *dev, uint32_t num_vectors)
 
 	/* post the command */
 	ret = oce_mbox_post(dev, &mbx, NULL);
-	/* Check the mailbox status and command completion status */
-	if ((ret != 0) || OCE_MBX_STATUS(&fwcmd->hdr) != 0 ||
-	    OCE_MBX_ADDL_STATUS(&fwcmd->hdr) != 0) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Failed to set interrupt vectors:"
-		    "CMD COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION ADDL STATUS(%d)",
-		    ret, OCE_MBX_STATUS(&fwcmd->hdr),
-		    OCE_MBX_ADDL_STATUS(&fwcmd->hdr));
-		return (ret);
-	}
 
-	return (0);
+	return (ret);
 } /* oce_num_intr_vectors_set */
 
 /*
@@ -949,20 +870,7 @@ oce_set_flow_control(struct oce_dev *dev, uint32_t flow_control)
 	/* post the command */
 	ret = oce_mbox_post(dev, &mbx, NULL);
 
-	/* Check the command completion and mbx response status */
-	if ((ret != 0) || OCE_MBX_STATUS(&fwcmd->hdr) != 0 ||
-	    OCE_MBX_ADDL_STATUS(&fwcmd->hdr) != 0) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Failed to set flow control:"
-		    "CMD COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION ADDL STATUS(%d)",
-		    ret, OCE_MBX_STATUS(&fwcmd->hdr),
-		    OCE_MBX_ADDL_STATUS(&fwcmd->hdr));
-		return (ret);
-	}
-
-	return (0);
+	return (ret);
 } /* oce_set_flow_control */
 
 /*
@@ -1006,16 +914,7 @@ oce_get_flow_control(struct oce_dev *dev, uint32_t *flow_control)
 	/* post the command */
 	ret = oce_mbox_post(dev, &mbx, NULL);
 
-	/* Check the command completion and mbx response status */
-	if ((ret != 0) || OCE_MBX_STATUS(&fwcmd->hdr) != 0 ||
-	    OCE_MBX_ADDL_STATUS(&fwcmd->hdr) != 0) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Failed to get flow control value:"
-		    "CMD COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION ADDL STATUS(%d)",
-		    ret, OCE_MBX_STATUS(&fwcmd->hdr),
-		    OCE_MBX_ADDL_STATUS(&fwcmd->hdr));
+	if (ret != 0) {
 		return (ret);
 	}
 
@@ -1072,19 +971,7 @@ oce_set_promiscuous(struct oce_dev *dev, boolean_t enable)
 	/* post the command */
 	ret = oce_mbox_post(dev, &mbx, NULL);
 
-	/* Check the command completion and mbx response status */
-	if ((ret != 0) || OCE_MBX_STATUS(&fwcmd->hdr) != 0 ||
-	    OCE_MBX_ADDL_STATUS(&fwcmd->hdr) != 0) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Failed to change promiscuous setting:"
-		    "CMD COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION ADDL STATUS(%d)",
-		    ret, OCE_MBX_STATUS(&fwcmd->hdr),
-		    OCE_MBX_ADDL_STATUS(&fwcmd->hdr));
-		return (ret);
-	}
-	return (0);
+	return (ret);
 }
 
 /*
@@ -1096,7 +983,8 @@ oce_set_promiscuous(struct oce_dev *dev, boolean_t enable)
  * return 0 on success, EIO on failure
  */
 int
-oce_add_mac(struct oce_dev *dev, const uint8_t *mac, uint32_t *pmac_id)
+oce_add_mac(struct oce_dev *dev, uint32_t if_id,
+			const uint8_t *mac, uint32_t *pmac_id)
 {
 	struct oce_mbx mbx;
 	struct mbx_add_common_iface_mac *fwcmd;
@@ -1104,7 +992,7 @@ oce_add_mac(struct oce_dev *dev, const uint8_t *mac, uint32_t *pmac_id)
 
 	bzero(&mbx, sizeof (struct oce_mbx));
 	fwcmd = (struct mbx_add_common_iface_mac *)&mbx.payload;
-	fwcmd->params.req.if_id = LE_32(dev->if_id);
+	fwcmd->params.req.if_id = LE_32(if_id);
 	bcopy(mac, &fwcmd->params.req.mac_address[0], ETHERADDRL);
 
 	/* initialize the ioctl header */
@@ -1122,18 +1010,10 @@ oce_add_mac(struct oce_dev *dev, const uint8_t *mac, uint32_t *pmac_id)
 	/* post the command */
 	ret = oce_mbox_post(dev, &mbx, NULL);
 
-	/* Check the command completion and mbx response status */
-	if ((ret != 0) || OCE_MBX_STATUS(&fwcmd->hdr) != 0 ||
-	    OCE_MBX_ADDL_STATUS(&fwcmd->hdr) != 0) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Failed to add MAC:"
-		    "CMD COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION ADDL STATUS(%d)",
-		    ret, OCE_MBX_STATUS(&fwcmd->hdr),
-		    OCE_MBX_ADDL_STATUS(&fwcmd->hdr));
+	if (ret != 0) {
 		return (ret);
 	}
+
 	*pmac_id = LE_32(fwcmd->params.rsp.pmac_id);
 	return (0);
 }
@@ -1147,7 +1027,7 @@ oce_add_mac(struct oce_dev *dev, const uint8_t *mac, uint32_t *pmac_id)
  * return 0 on success, EIO on failure
  */
 int
-oce_del_mac(struct oce_dev *dev,  uint32_t *pmac_id)
+oce_del_mac(struct oce_dev *dev,  uint32_t if_id, uint32_t *pmac_id)
 {
 	struct oce_mbx mbx;
 	struct mbx_del_common_iface_mac *fwcmd;
@@ -1155,7 +1035,7 @@ oce_del_mac(struct oce_dev *dev,  uint32_t *pmac_id)
 
 	bzero(&mbx, sizeof (struct oce_mbx));
 	fwcmd = (struct mbx_del_common_iface_mac *)&mbx.payload;
-	fwcmd->params.req.if_id = dev->if_id;
+	fwcmd->params.req.if_id = if_id;
 	fwcmd->params.req.pmac_id = *pmac_id;
 
 	/* initialize the ioctl header */
@@ -1173,20 +1053,7 @@ oce_del_mac(struct oce_dev *dev,  uint32_t *pmac_id)
 	/* post the command */
 	ret = oce_mbox_post(dev, &mbx, NULL);
 
-	/* Check the command completion and mbx response status */
-	if ((ret != 0) || OCE_MBX_STATUS(&fwcmd->hdr) != 0 ||
-	    OCE_MBX_ADDL_STATUS(&fwcmd->hdr) != 0) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Failed to delete MAC:"
-		    "CMD COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION ADDL STATUS(%d)",
-		    ret, OCE_MBX_STATUS(&fwcmd->hdr),
-		    OCE_MBX_ADDL_STATUS(&fwcmd->hdr));
-		return (ret);
-	}
-
-	return (0);
+	return (ret);
 }
 
 
@@ -1202,7 +1069,7 @@ oce_del_mac(struct oce_dev *dev,  uint32_t *pmac_id)
  * return 0 on success, EIO on failure
  */
 int
-oce_config_vlan(struct oce_dev *dev, uint8_t if_id,
+oce_config_vlan(struct oce_dev *dev, uint32_t if_id,
     struct normal_vlan *vtag_arr, uint8_t vtag_cnt,
     boolean_t untagged, boolean_t enable_promisc)
 {
@@ -1220,7 +1087,7 @@ oce_config_vlan(struct oce_dev *dev, uint8_t if_id,
 	    MBX_TIMEOUT_SEC,
 	    sizeof (struct mbx_common_config_vlan));
 
-	fwcmd->params.req.if_id	= if_id;
+	fwcmd->params.req.if_id	= (uint8_t)if_id;
 	fwcmd->params.req.promisc = (uint8_t)enable_promisc;
 	fwcmd->params.req.untagged = (uint8_t)untagged;
 	fwcmd->params.req.num_vlans = vtag_cnt;
@@ -1239,19 +1106,7 @@ oce_config_vlan(struct oce_dev *dev, uint8_t if_id,
 	/* post the command */
 	ret = oce_mbox_post(dev, &mbx, NULL);
 
-	/* Check command req and mbx status */
-	if ((ret != 0) || OCE_MBX_STATUS(&fwcmd->hdr) != 0 ||
-	    OCE_MBX_ADDL_STATUS(&fwcmd->hdr) != 0) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Failed to configure VLAN:"
-		    "CMD COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION ADDL STATUS(%d)",
-		    ret, OCE_MBX_STATUS(&fwcmd->hdr),
-		    OCE_MBX_ADDL_STATUS(&fwcmd->hdr));
-		return (ret);
-	}
-	return (0);
+	return (ret);
 } /* oce_config_vlan */
 
 
@@ -1292,19 +1147,7 @@ oce_config_link(struct oce_dev *dev, boolean_t enable)
 	/* post the command */
 	ret = oce_mbox_post(dev, &mbx, NULL);
 
-	/* Check command req and mbx status */
-	if ((ret != 0) || OCE_MBX_STATUS(&fwcmd->hdr) != 0 ||
-	    OCE_MBX_ADDL_STATUS(&fwcmd->hdr) != 0) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Failed to configure the link:"
-		    "CMD COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION STATUS(%d)"
-		    "MBX COMMAND  COMPLETION ADDL STATUS(%d)",
-		    ret, OCE_MBX_STATUS(&fwcmd->hdr),
-		    OCE_MBX_ADDL_STATUS(&fwcmd->hdr));
-		return (ret);
-	}
-	return (0);
+	return (ret);
 } /* oce_config_link */
 
 

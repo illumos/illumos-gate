@@ -81,7 +81,8 @@ extern "C" {
 #define	OCE_WQ_NUM_BUFFERS	2048
 #define	OCE_WQ_BUF_SIZE	2048
 #define	OCE_LSO_MAX_SIZE (32 * 1024)
-#define	OCE_DEFAULT_BCOPY_LIMIT	1024
+#define	OCE_DEFAULT_TX_BCOPY_LIMIT	1024
+#define	OCE_DEFAULT_RX_BCOPY_LIMIT	128
 #define	OCE_DEFAULT_WQ_EQD	16
 
 #define	OCE_MAX_RQ		8
@@ -92,7 +93,7 @@ extern "C" {
 #define	OCE_NUM_USED_VECTORS    2
 #define	OCE_DMA_ALIGNMENT   0x1000ull
 
-#define	OCE_DEFAULT_TX_RING_SIZE    256
+#define	OCE_DEFAULT_TX_RING_SIZE    2048
 #define	OCE_DEFAULT_RX_RING_SIZE    1024
 
 #define	OCE_INVAL_IF_ID			-1
@@ -161,9 +162,9 @@ extern "C" {
 	((OCE_CFG_READ32(dev, PCICFG_INTR_CTRL) \
 	    >> HOSTINTR_PFUNC_SHIFT) & HOSTINTR_PFUNC_MASK)
 
-#define	DEV_LOCK(dev)	{ oce_chip_di(dev); mutex_enter(&dev->dev_lock); }
+#define	DEV_LOCK(dev)	mutex_enter(&dev->dev_lock)
 
-#define	DEV_UNLOCK(dev)	{ mutex_exit(&dev->dev_lock); oce_chip_ei(dev); }
+#define	DEV_UNLOCK(dev)	mutex_exit(&dev->dev_lock)
 
 enum oce_ring_size {
 	RING_SIZE_256  = 256,
@@ -194,7 +195,8 @@ struct oce_dev {
 	struct oce_rq *rq[OCE_MAX_RQ];	/* RXQ Array */
 	struct oce_cq *cq[OCE_MAX_CQ];	/* Completion Queues */
 	struct oce_eq *eq[OCE_MAX_EQ];	/* Event Queues	*/
-	uint32_t bcopy_limit;		/* BCOPY Limit */
+	uint32_t tx_bcopy_limit;	/* TX BCOPY Limit */
+	uint32_t rx_bcopy_limit;	/* RX BCOPY Limit */
 
 	uint32_t cookie;
 
@@ -202,8 +204,9 @@ struct oce_dev {
 	uint32_t in_stats;
 
 	/* Add implementation specific stuff here */
+	ddi_acc_handle_t pci_cfg_handle; /* Config space handle */
 	int num_bars;
-	ddi_acc_handle_t cfg_handle;	/* PCI Config Space Regs */
+	ddi_acc_handle_t cfg_handle;	/* MMIO PCI Config Space Regs */
 	caddr_t csr_addr;
 	ddi_acc_handle_t csr_handle;	/* MMIO Control Status Regs */
 	caddr_t db_addr;
@@ -262,6 +265,7 @@ struct oce_dev {
 	uint32_t  neqs;	/* No of event queues */
 	uint32_t  nwqs;	/* No of Work Queues */
 	uint32_t  nrqs;	/* No of Receive Queues */
+	uint32_t  nifs; /* No of interfaces created */
 
 	/* fw config: only relevant fields */
 	uint32_t    config_number;
@@ -303,6 +307,7 @@ int  oce_fm_check_dma_handle(struct oce_dev *dev,
 
 /* Interrupt handling */
 int oce_setup_intr(struct oce_dev *dev);
+int oce_alloc_intr(struct oce_dev *dev);
 int oce_teardown_intr(struct oce_dev *dev);
 int oce_setup_handlers(struct oce_dev *dev);
 void oce_remove_handler(struct oce_dev *dev);
@@ -310,6 +315,12 @@ void oce_ei(struct oce_dev *dev);
 void oce_di(struct oce_dev *dev);
 void oce_chip_ei(struct oce_dev *dev);
 void oce_chip_di(struct oce_dev *dev);
+
+/* HW initialisation */
+int oce_hw_init(struct oce_dev *dev);
+void oce_hw_fini(struct oce_dev *dev);
+int oce_setup_adapter(struct oce_dev *dev);
+void oce_unsetup_adapter(struct oce_dev *dev);
 
 #ifdef __cplusplus
 }

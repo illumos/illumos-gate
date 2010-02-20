@@ -53,17 +53,38 @@ int
 oce_setup_intr(struct oce_dev *dev)
 {
 	int ret;
+	int intr_types = 0;
 
-	if (dev->intr_types & DDI_INTR_TYPE_MSIX) {
-		ret = oce_setup_msix(dev);
-		if (ret == 0)
-			return (ret);
+	/* get supported intr types */
+	ret = ddi_intr_get_supported_types(dev->dip, &intr_types);
+	if (ret != DDI_SUCCESS) {
+		oce_log(dev, CE_WARN, MOD_CONFIG, "%s",
+		    "Failed to retrieve intr types ");
+		return (DDI_FAILURE);
 	}
 
-	if (dev->intr_types & DDI_INTR_TYPE_FIXED) {
-		ret = oce_setup_intx(dev);
-		if (ret == 0)
-			return (ret);
+	if (intr_types & DDI_INTR_TYPE_MSIX) {
+		dev->intr_types = DDI_INTR_TYPE_MSIX;
+		dev->num_vectors = 2;
+		return (DDI_SUCCESS);
+	}
+
+	if (intr_types & DDI_INTR_TYPE_FIXED) {
+		dev->intr_types = DDI_INTR_TYPE_FIXED;
+		dev->num_vectors = 1;
+		return (DDI_SUCCESS);
+	}
+	return (DDI_FAILURE);
+}
+
+int
+oce_alloc_intr(struct oce_dev *dev)
+{
+	if (dev->intr_types == DDI_INTR_TYPE_MSIX) {
+		return (oce_setup_msix(dev));
+	}
+	if (dev->intr_types == DDI_INTR_TYPE_FIXED) {
+		return (oce_setup_intx(dev));
 	}
 
 	return (DDI_FAILURE);
@@ -192,8 +213,6 @@ oce_di(struct oce_dev *dev)
 	int i;
 	int ret;
 
-	oce_chip_di(dev);
-
 	if (dev->intr_cap & DDI_INTR_FLAG_BLOCK) {
 		(void) ddi_intr_block_disable(dev->htable, dev->num_vectors);
 	} else {
@@ -205,6 +224,7 @@ oce_di(struct oce_dev *dev)
 			}
 		}
 	}
+	oce_chip_di(dev);
 } /* oce_di */
 
 /*
@@ -237,21 +257,21 @@ oce_setup_msix(struct oce_dev *dev)
 		return (DDI_FAILURE);
 	}
 
-	if (navail < OCE_NUM_USED_VECTORS)
+	if (navail < dev->num_vectors)
 		return (DDI_FAILURE);
-
-	dev->num_vectors = OCE_NUM_USED_VECTORS;
-	dev->intr_types = DDI_INTR_TYPE_MSIX;
 
 	/* allocate htable */
 	dev->htable = kmem_zalloc(dev->num_vectors *
-	    sizeof (ddi_intr_handle_t), KM_SLEEP);
+	    sizeof (ddi_intr_handle_t), KM_NOSLEEP);
+
+	if (dev->htable == NULL)
+		return (DDI_FAILURE);
 
 	/* allocate interrupt handlers */
 	ret = ddi_intr_alloc(dev->dip, dev->htable, DDI_INTR_TYPE_MSIX,
 	    0, dev->num_vectors, &navail, DDI_INTR_ALLOC_NORMAL);
 
-	if (ret != DDI_SUCCESS || navail < OCE_NUM_USED_VECTORS) {
+	if (ret != DDI_SUCCESS || navail < dev->num_vectors) {
 		oce_log(dev, CE_WARN, MOD_CONFIG,
 		    "Alloc intr failed: %d %d",
 		    navail, ret);
@@ -324,9 +344,6 @@ oce_add_msix_handlers(struct oce_dev *dev)
 	int ret;
 	int i;
 
-	if (!(dev->intr_types & DDI_INTR_TYPE_MSIX)) {
-		return (DDI_FAILURE);
-	}
 	for (i = 0; i < dev->neqs; i++) {
 		ret = ddi_intr_add_handler(dev->htable[i], oce_isr,
 		    (caddr_t)dev->eq[i], NULL);
@@ -355,7 +372,7 @@ oce_del_msix_handlers(struct oce_dev *dev)
 {
 	int nvec;
 
-	for (nvec = 0; nvec < dev->neqs; nvec++) {
+	for (nvec = 0; nvec < dev->num_vectors; nvec++) {
 		(void) ddi_intr_remove_handler(dev->htable[nvec]);
 	}
 } /* oce_del_msix_handlers */
@@ -460,7 +477,6 @@ oce_setup_intx(struct oce_dev *dev)
 		return (DDI_FAILURE);
 
 	dev->num_vectors = navail;
-	dev->intr_types = DDI_INTR_TYPE_FIXED;
 
 	/* allocate htable */
 	dev->htable = kmem_zalloc(sizeof (ddi_intr_handle_t), KM_SLEEP);

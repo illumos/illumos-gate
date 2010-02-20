@@ -50,6 +50,8 @@ static void oce_wqm_dtor(struct oce_wq *wq, oce_wq_mdesc_t *wqmd);
 static void oce_fill_ring_descs(struct oce_wq *wq, oce_wqe_desc_t *wqed);
 static void oce_remove_vtag(mblk_t *mp);
 static void oce_insert_vtag(mblk_t  *mp, uint16_t vlan_tag);
+static inline int oce_process_tx_compl(struct oce_wq *wq, boolean_t rearm);
+
 
 static ddi_dma_attr_t tx_map_dma_attr = {
 	DMA_ATTR_V0,			/* version number */
@@ -57,7 +59,7 @@ static ddi_dma_attr_t tx_map_dma_attr = {
 	0xFFFFFFFFFFFFFFFFull,	/* high address */
 	0x0000000000010000ull,	/* dma counter max */
 	OCE_TXMAP_ALIGN,	/* alignment */
-	0x1,			/* burst sizes */
+	0x7FF,			/* burst sizes */
 	0x00000001,		/* minimum transfer size */
 	0x00000000FFFFFFFFull,	/* maximum transfer size */
 	0xFFFFFFFFFFFFFFFFull,	/* maximum segment size */
@@ -550,32 +552,19 @@ map_fail:
 	return (ret);
 } /* oce_map_wqe */
 
-/*
- * function to drain a TxCQ and process its CQEs
- *
- * dev - software handle to the device
- * cq - pointer to the cq to drain
- *
- * return the number of CQEs processed
- */
-uint16_t
-oce_drain_wq_cq(void *arg)
+static inline int
+oce_process_tx_compl(struct oce_wq *wq, boolean_t rearm)
 {
 	struct oce_nic_tx_cqe *cqe;
 	uint16_t num_cqe = 0;
-	struct oce_dev *dev;
-	struct oce_wq *wq;
 	struct oce_cq *cq;
 	oce_wqe_desc_t *wqed;
 	int wqe_freed = 0;
-	boolean_t is_update = B_FALSE;
+	struct oce_dev *dev;
 
-	wq = (struct oce_wq *)arg;
 	cq  = wq->cq;
 	dev = wq->parent;
-
-	/* do while we do not reach a cqe that is not valid */
-	mutex_enter(&cq->lock);
+	mutex_enter(&wq->txc_lock);
 	cqe = RING_GET_CONSUMER_ITEM_VA(cq->ring, struct oce_nic_tx_cqe);
 	while (WQ_CQE_VALID(cqe)) {
 
@@ -600,26 +589,38 @@ oce_drain_wq_cq(void *arg)
 		    struct oce_nic_tx_cqe);
 		num_cqe++;
 	} /* for all valid CQE */
+	mutex_exit(&wq->txc_lock);
+	if (num_cqe)
+		oce_arm_cq(wq->parent, cq->cq_id, num_cqe, rearm);
+	return (num_cqe);
+} /* oce_process_tx_completion */
 
-	if (wq->resched && num_cqe) {
-		wq->resched = B_FALSE;
-		is_update = B_TRUE;
-	}
+/*
+ * function to drain a TxCQ and process its CQEs
+ *
+ * dev - software handle to the device
+ * cq - pointer to the cq to drain
+ *
+ * return the number of CQEs processed
+ */
+uint16_t
+oce_drain_wq_cq(void *arg)
+{
+	uint16_t num_cqe = 0;
+	struct oce_dev *dev;
+	struct oce_wq *wq;
 
-	mutex_exit(&cq->lock);
+	wq = (struct oce_wq *)arg;
+	dev = wq->parent;
 
-	oce_arm_cq(dev, cq->cq_id, num_cqe, B_TRUE);
+	/* do while we do not reach a cqe that is not valid */
+	num_cqe = oce_process_tx_compl(wq, B_FALSE);
 
 	/* check if we need to restart Tx */
-	mutex_enter(&wq->lock);
 	if (wq->resched && num_cqe) {
 		wq->resched = B_FALSE;
-		is_update = B_TRUE;
-	}
-	mutex_exit(&wq->lock);
-
-	if (is_update)
 		mac_tx_update(dev->mac_handle);
+	}
 
 	return (num_cqe);
 } /* oce_process_wq_cqe */
@@ -679,7 +680,7 @@ oce_send_packet(struct oce_wq *wq, mblk_t *mp)
 	int32_t num_wqes;
 	uint16_t etype;
 	uint32_t ip_offset;
-	uint32_t csum_flags;
+	uint32_t csum_flags = 0;
 	boolean_t use_copy = B_FALSE;
 	boolean_t tagged   = B_FALSE;
 	uint16_t  vlan_tag;
@@ -690,21 +691,35 @@ oce_send_packet(struct oce_wq *wq, mblk_t *mp)
 	uint32_t pkt_len = 0;
 	int num_mblks = 0;
 	int ret = 0;
+	uint32_t flags = 0;
+	uint32_t mss = 0;
 
 	/* retrieve the adap priv struct ptr */
 	dev = wq->parent;
+
+	/* check if we have enough free slots */
+	if (wq->wq_free < wq->cfg.q_len/2) {
+		(void) oce_process_tx_compl(wq, B_FALSE);
+	}
+	if (wq->wq_free < OCE_MAX_TX_HDL) {
+		return (mp);
+	}
 
 	/* check if we should copy */
 	for (tmp = mp; tmp != NULL; tmp = tmp->b_cont) {
 		pkt_len += MBLKL(tmp);
 		num_mblks++;
 	}
+
+	/* Retrieve LSO info */
+	lso_info_get(mp, &mss, &flags);
+
 	/* get the offload flags */
 	hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL,
 	    NULL, &csum_flags);
 
 	/* Limit should be always less than Tx Buffer Size */
-	if (pkt_len < dev->bcopy_limit) {
+	if (pkt_len < dev->tx_bcopy_limit) {
 		use_copy = B_TRUE;
 	} else {
 		/* restrict the mapped segment to wat we support */
@@ -767,11 +782,10 @@ oce_send_packet(struct oce_wq *wq, mblk_t *mp)
 	wqeh = (struct oce_nic_hdr_wqe *)&wqed->frag[0];
 
 	/* fill rest of wqe header fields based on packet */
-	if (DB_CKSUMFLAGS(mp) & HW_LSO) {
+	if (flags & HW_LSO) {
 		wqeh->u0.s.lso = B_TRUE;
-		wqeh->u0.s.lso_mss = DB_LSOMSS(mp);
+		wqeh->u0.s.lso_mss = mss;
 	}
-
 	if (csum_flags & HCK_FULLCKSUM) {
 		uint8_t *proto;
 		if (etype == ETHERTYPE_IP) {
@@ -798,6 +812,7 @@ oce_send_packet(struct oce_wq *wq, mblk_t *mp)
 	wqeh->u0.s.crc = B_TRUE;
 	wqeh->u0.s.total_length = pkt_len;
 
+	/* frag count +  header wqe */
 	num_wqes = wqed->frag_cnt;
 
 	/* h/w expects even no. of WQEs */
@@ -807,11 +822,10 @@ oce_send_packet(struct oce_wq *wq, mblk_t *mp)
 	wqeh->u0.s.num_wqe = num_wqes;
 	DW_SWAP(u32ptr(&wqed->frag[0]), (wqed->wqe_cnt * NIC_WQE_SIZE));
 
-	mutex_enter(&wq->lock);
+	mutex_enter(&wq->tx_lock);
 	if (num_wqes > wq->wq_free) {
 		atomic_inc_32(&wq->tx_deferd);
-		wq->resched = B_TRUE;
-		mutex_exit(&wq->lock);
+		mutex_exit(&wq->tx_lock);
 		goto wqe_fail;
 	}
 	atomic_add_32(&wq->wq_free, -num_wqes);
@@ -827,7 +841,7 @@ oce_send_packet(struct oce_wq *wq, mblk_t *mp)
 	reg_value = (num_wqes << 16) | wq->wq_id;
 	/* Ring the door bell  */
 	OCE_DB_WRITE32(dev, PD_TXULP_DB, reg_value);
-	mutex_exit(&wq->lock);
+	mutex_exit(&wq->tx_lock);
 
 	/* free mp if copied or packet chain collapsed */
 	if (use_copy == B_TRUE) {
@@ -885,7 +899,7 @@ oce_free_wqed(struct oce_wq *wq, oce_wqe_desc_t *wqed)
 int
 oce_start_wq(struct oce_wq *wq)
 {
-	oce_arm_cq(wq->parent, wq->cq->cq_id, 0, B_TRUE);
+	_NOTE(ARGUNUSED(wq));
 	return (DDI_SUCCESS);
 } /* oce_start_wq */
 
@@ -897,18 +911,16 @@ oce_start_wq(struct oce_wq *wq)
  * return none
  */
 void
-oce_stop_wq(struct oce_wq *wq)
+oce_clean_wq(struct oce_wq *wq)
 {
 	oce_wqe_desc_t *wqed;
-
-	/* Max time for already posted TX to complete */
-	drv_usecwait(150 * 1000); /* 150 mSec */
+	int ti;
 
 	/* Wait for already posted Tx to complete */
-	while ((OCE_LIST_EMPTY(&wq->wqe_desc_list) == B_FALSE)	||
-	    (OCE_LIST_SIZE(&wq->wq_buf_list) != wq->cfg.nbufs) ||
-	    (OCE_LIST_SIZE(&wq->wq_mdesc_list) != wq->cfg.nhdl)) {
-		(void) oce_drain_wq_cq(wq);
+
+	for (ti = 0; ti < DEFAULT_DRAIN_TIME; ti++) {
+		(void) oce_process_tx_compl(wq, B_FALSE);
+		OCE_MSDELAY(1);
 	}
 
 	/* Free the remaining descriptors */
