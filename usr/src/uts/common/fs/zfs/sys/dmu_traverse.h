@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,6 +46,7 @@ typedef int (blkptr_cb_t)(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 #define	TRAVERSE_PREFETCH_METADATA	(1<<2)
 #define	TRAVERSE_PREFETCH_DATA		(1<<3)
 #define	TRAVERSE_PREFETCH (TRAVERSE_PREFETCH_METADATA | TRAVERSE_PREFETCH_DATA)
+#define	TRAVERSE_HARD			(1<<4)
 
 int traverse_dataset(struct dsl_dataset *ds,
     uint64_t txg_start, int flags, blkptr_cb_t func, void *arg);

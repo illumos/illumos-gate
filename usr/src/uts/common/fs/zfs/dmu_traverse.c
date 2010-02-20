@@ -132,9 +132,10 @@ traverse_visitbp(struct traverse_data *td, const dnode_phys_t *dnp,
     arc_buf_t *pbuf, blkptr_t *bp, const zbookmark_t *zb)
 {
 	zbookmark_t czb;
-	int err = 0;
+	int err = 0, lasterr = 0;
 	arc_buf_t *buf = NULL;
 	struct prefetch_data *pd = td->td_pfd;
+	boolean_t hard = td->td_flags & TRAVERSE_HARD;
 
 	if (bp->blk_birth == 0) {
 		err = td->td_func(td->td_spa, NULL, NULL, zb, dnp, td->td_arg);
@@ -181,8 +182,11 @@ traverse_visitbp(struct traverse_data *td, const dnode_phys_t *dnp,
 			    zb->zb_level - 1,
 			    zb->zb_blkid * epb + i);
 			err = traverse_visitbp(td, dnp, buf, cbp, &czb);
-			if (err)
-				break;
+			if (err) {
+				if (!hard)
+					break;
+				lasterr = err;
+			}
 		}
 	} else if (BP_GET_TYPE(bp) == DMU_OT_DNODE) {
 		uint32_t flags = ARC_WAIT;
@@ -197,11 +201,14 @@ traverse_visitbp(struct traverse_data *td, const dnode_phys_t *dnp,
 
 		/* recursively visitbp() blocks below this */
 		dnp = buf->b_data;
-		for (i = 0; i < epb && err == 0; i++, dnp++) {
+		for (i = 0; i < epb; i++, dnp++) {
 			err = traverse_dnode(td, dnp, buf, zb->zb_objset,
 			    zb->zb_blkid * epb + i);
-			if (err)
-				break;
+			if (err) {
+				if (!hard)
+					break;
+				lasterr = err;
+			}
 		}
 	} else if (BP_GET_TYPE(bp) == DMU_OT_OBJSET) {
 		uint32_t flags = ARC_WAIT;
@@ -220,10 +227,18 @@ traverse_visitbp(struct traverse_data *td, const dnode_phys_t *dnp,
 		dnp = &osp->os_meta_dnode;
 		err = traverse_dnode(td, dnp, buf, zb->zb_objset,
 		    DMU_META_DNODE_OBJECT);
+		if (err && hard) {
+			lasterr = err;
+			err = 0;
+		}
 		if (err == 0 && arc_buf_size(buf) >= sizeof (objset_phys_t)) {
 			dnp = &osp->os_userused_dnode;
 			err = traverse_dnode(td, dnp, buf, zb->zb_objset,
 			    DMU_USERUSED_OBJECT);
+		}
+		if (err && hard) {
+			lasterr = err;
+			err = 0;
 		}
 		if (err == 0 && arc_buf_size(buf) >= sizeof (objset_phys_t)) {
 			dnp = &osp->os_groupused_dnode;
@@ -235,27 +250,31 @@ traverse_visitbp(struct traverse_data *td, const dnode_phys_t *dnp,
 	if (buf)
 		(void) arc_buf_remove_ref(buf, &buf);
 
-	if (err == 0 && (td->td_flags & TRAVERSE_POST))
+	if (err == 0 && lasterr == 0 && (td->td_flags & TRAVERSE_POST))
 		err = td->td_func(td->td_spa, NULL, bp, zb, dnp, td->td_arg);
 
-	return (err);
+	return (err != 0 ? err : lasterr);
 }
 
 static int
 traverse_dnode(struct traverse_data *td, const dnode_phys_t *dnp,
     arc_buf_t *buf, uint64_t objset, uint64_t object)
 {
-	int j, err = 0;
+	int j, err = 0, lasterr = 0;
 	zbookmark_t czb;
+	boolean_t hard = (td->td_flags & TRAVERSE_HARD);
 
 	for (j = 0; j < dnp->dn_nblkptr; j++) {
 		SET_BOOKMARK(&czb, objset, object, dnp->dn_nlevels - 1, j);
 		err = traverse_visitbp(td, dnp, buf,
 		    (blkptr_t *)&dnp->dn_blkptr[j], &czb);
-		if (err)
-			break;
+		if (err) {
+			if (!hard)
+				break;
+			lasterr = err;
+		}
 	}
-	return (err);
+	return (err != 0 ? err : lasterr);
 }
 
 /* ARGSUSED */
@@ -379,10 +398,11 @@ int
 traverse_pool(spa_t *spa, uint64_t txg_start, int flags,
     blkptr_cb_t func, void *arg)
 {
-	int err;
+	int err, lasterr = 0;
 	uint64_t obj;
 	dsl_pool_t *dp = spa_get_dsl(spa);
 	objset_t *mos = dp->dp_meta_objset;
+	boolean_t hard = (flags & TRAVERSE_HARD);
 
 	/* visit the MOS */
 	err = traverse_impl(spa, 0, spa_get_rootblkptr(spa),
@@ -391,13 +411,17 @@ traverse_pool(spa_t *spa, uint64_t txg_start, int flags,
 		return (err);
 
 	/* visit each dataset */
-	for (obj = 1; err == 0; err = dmu_object_next(mos, &obj, FALSE,
-	    txg_start)) {
+	for (obj = 1; err == 0 || (err != ESRCH && hard);
+	    err = dmu_object_next(mos, &obj, FALSE, txg_start)) {
 		dmu_object_info_t doi;
 
 		err = dmu_object_info(mos, obj, &doi);
-		if (err)
-			return (err);
+		if (err) {
+			if (!hard)
+				return (err);
+			lasterr = err;
+			continue;
+		}
 
 		if (doi.doi_type == DMU_OT_DSL_DATASET) {
 			dsl_dataset_t *ds;
@@ -406,17 +430,24 @@ traverse_pool(spa_t *spa, uint64_t txg_start, int flags,
 			rw_enter(&dp->dp_config_rwlock, RW_READER);
 			err = dsl_dataset_hold_obj(dp, obj, FTAG, &ds);
 			rw_exit(&dp->dp_config_rwlock);
-			if (err)
-				return (err);
+			if (err) {
+				if (!hard)
+					return (err);
+				lasterr = err;
+				continue;
+			}
 			if (ds->ds_phys->ds_prev_snap_txg > txg)
 				txg = ds->ds_phys->ds_prev_snap_txg;
 			err = traverse_dataset(ds, txg, flags, func, arg);
 			dsl_dataset_rele(ds, FTAG);
-			if (err)
-				return (err);
+			if (err) {
+				if (!hard)
+					return (err);
+				lasterr = err;
+			}
 		}
 	}
 	if (err == ESRCH)
 		err = 0;
-	return (err);
+	return (err != 0 ? err : lasterr);
 }

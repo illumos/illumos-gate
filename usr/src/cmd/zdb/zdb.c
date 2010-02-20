@@ -1904,7 +1904,7 @@ dump_block_stats(spa_t *spa)
 	zdb_cb_t zcb = { 0 };
 	zdb_blkstats_t *zb, *tzb;
 	uint64_t norm_alloc, norm_space, total_alloc, total_found;
-	int flags = TRAVERSE_PRE | TRAVERSE_PREFETCH_METADATA;
+	int flags = TRAVERSE_PRE | TRAVERSE_PREFETCH_METADATA | TRAVERSE_HARD;
 	int leaks = 0;
 
 	(void) printf("\nTraversing all blocks %s%s%s%s%s...\n",
