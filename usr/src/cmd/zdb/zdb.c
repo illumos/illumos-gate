@@ -100,7 +100,7 @@ usage(void)
 	    "       %s -m [-L] poolname [vdev [metaslab...]]\n"
 	    "       %s -R poolname vdev:offset:size[:flags]\n"
 	    "       %s -S poolname\n"
-	    "       %s -l device\n"
+	    "       %s -l [-u] device\n"
 	    "       %s -C\n\n",
 	    cmdname, cmdname, cmdname, cmdname, cmdname, cmdname, cmdname);
 
@@ -1468,11 +1468,11 @@ dump_dir(objset_t *os)
 }
 
 static void
-dump_uberblock(uberblock_t *ub)
+dump_uberblock(uberblock_t *ub, const char *header, const char *footer)
 {
 	time_t timestamp = ub->ub_timestamp;
 
-	(void) printf("\nUberblock:\n");
+	(void) printf(header ? header : "");
 	(void) printf("\tmagic = %016llx\n", (u_longlong_t)ub->ub_magic);
 	(void) printf("\tversion = %llu\n", (u_longlong_t)ub->ub_version);
 	(void) printf("\ttxg = %llu\n", (u_longlong_t)ub->ub_txg);
@@ -1484,7 +1484,7 @@ dump_uberblock(uberblock_t *ub)
 		sprintf_blkptr(blkbuf, &ub->ub_rootbp);
 		(void) printf("\trootbp = %s\n", blkbuf);
 	}
-	(void) printf("\n");
+	(void) printf(footer ? footer : "");
 }
 
 static void
@@ -1557,6 +1557,30 @@ dump_cachefile(const char *cachefile)
 	nvlist_free(config);
 }
 
+#define	ZDB_MAX_UB_HEADER_SIZE 32
+
+static void
+dump_label_uberblocks(vdev_label_t *lbl, uint64_t ashift)
+{
+	vdev_t vd;
+	vdev_t *vdp = &vd;
+	char header[ZDB_MAX_UB_HEADER_SIZE];
+
+	vd.vdev_ashift = ashift;
+	vdp->vdev_top = vdp;
+
+	for (int i = 0; i < VDEV_UBERBLOCK_COUNT(vdp); i++) {
+		uint64_t uoff = VDEV_UBERBLOCK_OFFSET(vdp, i);
+		uberblock_t *ub = (void *)((char *)lbl + uoff);
+
+		if (uberblock_verify(ub))
+			continue;
+		(void) snprintf(header, ZDB_MAX_UB_HEADER_SIZE,
+		    "Uberblock[%d]\n", i);
+		dump_uberblock(ub, header, "");
+	}
+}
+
 static void
 dump_label(const char *dev)
 {
@@ -1565,8 +1589,7 @@ dump_label(const char *dev)
 	char *buf = label.vl_vdev_phys.vp_nvlist;
 	size_t buflen = sizeof (label.vl_vdev_phys.vp_nvlist);
 	struct stat64 statbuf;
-	uint64_t psize;
-	int l;
+	uint64_t psize, ashift;
 
 	if ((fd = open64(dev, O_RDONLY)) < 0) {
 		(void) printf("cannot open '%s': %s\n", dev, strerror(errno));
@@ -1576,14 +1599,12 @@ dump_label(const char *dev)
 	if (fstat64(fd, &statbuf) != 0) {
 		(void) printf("failed to stat '%s': %s\n", dev,
 		    strerror(errno));
-		exit(1);
 	}
 
 	psize = statbuf.st_size;
 	psize = P2ALIGN(psize, (uint64_t)sizeof (vdev_label_t));
 
-	for (l = 0; l < VDEV_LABELS; l++) {
-
+	for (int l = 0; l < VDEV_LABELS; l++) {
 		nvlist_t *config = NULL;
 
 		(void) printf("--------------------------------------------\n");
@@ -1598,10 +1619,20 @@ dump_label(const char *dev)
 
 		if (nvlist_unpack(buf, buflen, &config, 0) != 0) {
 			(void) printf("failed to unpack label %d\n", l);
-			continue;
+			ashift = SPA_MINBLOCKSHIFT;
+		} else {
+			nvlist_t *vdev_tree = NULL;
+
+			dump_nvlist(config, 4);
+			if ((nvlist_lookup_nvlist(config,
+			    ZPOOL_CONFIG_VDEV_TREE, &vdev_tree) != 0) ||
+			    (nvlist_lookup_uint64(vdev_tree,
+			    ZPOOL_CONFIG_ASHIFT, &ashift) != 0))
+				ashift = SPA_MINBLOCKSHIFT;
+			nvlist_free(config);
 		}
-		dump_nvlist(config, 4);
-		nvlist_free(config);
+		if (dump_opt['u'])
+			dump_label_uberblocks(&label, ashift);
 	}
 }
 
@@ -2213,7 +2244,7 @@ dump_zpool(spa_t *spa)
 		dump_config(spa);
 
 	if (dump_opt['u'])
-		dump_uberblock(&spa->spa_uberblock);
+		dump_uberblock(&spa->spa_uberblock, "\nUberblock:\n", "\n");
 
 	if (dump_opt['D'])
 		dump_all_ddts(spa);
