@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,7 +75,7 @@ zpool_get_rewind_policy(nvlist_t *nvl, zpool_rewind_policy_t *zrpp)
 	/* Defaults */
 	zrpp->zrp_request = ZPOOL_NO_REWIND;
 	zrpp->zrp_maxmeta = 0;
-	zrpp->zrp_maxdata = UINT32_MAX;
+	zrpp->zrp_maxdata = UINT64_MAX;
 	zrpp->zrp_txg = UINT64_MAX;
 
 	if (nvl == NULL)
@@ -89,16 +89,17 @@ zpool_get_rewind_policy(nvlist_t *nvl, zpool_rewind_policy_t *zrpp)
 				zpool_get_rewind_policy(policy, zrpp);
 			return;
 		} else if (strcmp(nm, ZPOOL_REWIND_REQUEST) == 0) {
-			if (nvpair_value_uint32(elem,
-			    &zrpp->zrp_request) == 0)
-				if (zrpp->zrp_request & ~ZPOOL_REWIND_MASK)
+			if (nvpair_value_uint32(elem, &zrpp->zrp_request) == 0)
+				if (zrpp->zrp_request & ~ZPOOL_REWIND_POLICIES)
 					zrpp->zrp_request = ZPOOL_NO_REWIND;
 		} else if (strcmp(nm, ZPOOL_REWIND_REQUEST_TXG) == 0) {
 			(void) nvpair_value_uint64(elem, &zrpp->zrp_txg);
 		} else if (strcmp(nm, ZPOOL_REWIND_META_THRESH) == 0) {
-			(void) nvpair_value_uint32(elem, &zrpp->zrp_maxmeta);
+			(void) nvpair_value_uint64(elem, &zrpp->zrp_maxmeta);
 		} else if (strcmp(nm, ZPOOL_REWIND_DATA_THRESH) == 0) {
-			(void) nvpair_value_uint32(elem, &zrpp->zrp_maxdata);
+			(void) nvpair_value_uint64(elem, &zrpp->zrp_maxdata);
 		}
 	}
+	if (zrpp->zrp_request == 0)
+		zrpp->zrp_request = ZPOOL_NO_REWIND;
 }

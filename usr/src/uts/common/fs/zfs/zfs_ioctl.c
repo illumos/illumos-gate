@@ -3735,7 +3735,7 @@ zfs_ioc_clear(zfs_cmd_t *zc)
 	spa->spa_last_open_failed = 0;
 	mutex_exit(&spa_namespace_lock);
 
-	if (zc->zc_cookie == ZPOOL_NO_REWIND) {
+	if (zc->zc_cookie & ZPOOL_NO_REWIND) {
 		error = spa_open(zc->zc_name, &spa, FTAG);
 	} else {
 		nvlist_t *policy;

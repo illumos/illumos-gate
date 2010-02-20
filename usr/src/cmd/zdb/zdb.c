@@ -137,8 +137,12 @@ usage(void)
 	    "with other options (except -l):\n");
 	(void) fprintf(stderr, "        -A ignore assertions (-A), enable "
 	    "panic recovery (-AA) or both (-AAA)\n");
+	(void) fprintf(stderr, "        -F attempt automatic rewind within "
+	    "safe range of transaction groups\n");
 	(void) fprintf(stderr, "        -U <cachefile_path> -- use alternate "
 	    "cachefile\n");
+	(void) fprintf(stderr, "        -X attempt extreme rewind (does not "
+	    "work with dataset)\n");
 	(void) fprintf(stderr, "        -e pool is exported/destroyed/"
 	    "has altroot/not in a cachefile\n");
 	(void) fprintf(stderr, "        -p <path> -- use one or more with "
@@ -2724,19 +2728,20 @@ main(int argc, char **argv)
 	objset_t *os = NULL;
 	int dump_all = 1;
 	int verbose = 0;
-	int error;
+	int error = 0;
 	char **searchdirs = NULL;
 	int nsearch = 0;
 	char *target;
 	nvlist_t *policy = NULL;
 	uint64_t max_txg = UINT64_MAX;
+	int rewind = ZPOOL_NEVER_REWIND;
 
 	(void) setrlimit(RLIMIT_NOFILE, &rl);
 	(void) enable_extended_FILE_stdio(-1, -1);
 
 	dprintf_setup(&argc, argv);
 
-	while ((c = getopt(argc, argv, "bcdhilmsuCDRSALevp:t:U:")) != -1) {
+	while ((c = getopt(argc, argv, "bcdhilmsuCDRSAFLXevp:t:U:")) != -1) {
 		switch (c) {
 		case 'b':
 		case 'c':
@@ -2755,7 +2760,9 @@ main(int argc, char **argv)
 			dump_all = 0;
 			break;
 		case 'A':
+		case 'F':
 		case 'L':
+		case 'X':
 		case 'e':
 			dump_opt[c]++;
 			break;
@@ -2807,7 +2814,7 @@ main(int argc, char **argv)
 		verbose = MAX(verbose, 1);
 
 	for (c = 0; c < 256; c++) {
-		if (dump_all && !strchr("elALRS", c))
+		if (dump_all && !strchr("elAFLRSX", c))
 			dump_opt[c] = 1;
 		if (dump_opt[c])
 			dump_opt[c] += verbose;
@@ -2834,10 +2841,17 @@ main(int argc, char **argv)
 		return (0);
 	}
 
+	if (dump_opt['X'] || dump_opt['F'])
+		rewind = ZPOOL_DO_REWIND |
+		    (dump_opt['X'] ? ZPOOL_EXTREME_REWIND : 0);
+
+	if (nvlist_alloc(&policy, NV_UNIQUE_NAME_TYPE, 0) != 0 ||
+	    nvlist_add_uint64(policy, ZPOOL_REWIND_REQUEST_TXG, max_txg) != 0 ||
+	    nvlist_add_uint32(policy, ZPOOL_REWIND_REQUEST, rewind) != 0)
+		fatal("internal error: %s", strerror(ENOMEM));
+
 	error = 0;
 	target = argv[0];
-
-	VERIFY(nvlist_alloc(&policy, NV_UNIQUE_NAME, 0) == 0);
 
 	if (dump_opt['e']) {
 		nvlist_t *cfg = NULL;
@@ -2849,9 +2863,7 @@ main(int argc, char **argv)
 				(void) printf("\nConfiguration for import:\n");
 				dump_nvlist(cfg, 8);
 			}
-			if (nvlist_add_uint64(policy,
-			    ZPOOL_REWIND_REQUEST_TXG, max_txg) != 0 ||
-			    nvlist_add_nvlist(cfg,
+			if (nvlist_add_nvlist(cfg,
 			    ZPOOL_REWIND_POLICY, policy) != 0) {
 				fatal("can't open '%s': %s",
 				    target, strerror(ENOMEM));
@@ -2859,9 +2871,6 @@ main(int argc, char **argv)
 			if ((error = spa_import(name, cfg, NULL)) != 0)
 				error = spa_import_verbatim(name, cfg, NULL);
 		}
-	} else {
-		VERIFY(nvlist_add_uint64(policy, ZPOOL_REWIND_META_THRESH,
-		    UINT64_MAX) == 0);
 	}
 
 	if (error == 0) {

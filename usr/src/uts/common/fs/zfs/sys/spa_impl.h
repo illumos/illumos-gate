@@ -165,7 +165,6 @@ struct spa {
 	char		*spa_root;		/* alternate root directory */
 	uint64_t	spa_ena;		/* spa-wide ereport ENA */
 	int		spa_last_open_failed;	/* error if last open failed */
-	nvlist_t	*spa_failed_open_cfg;	/* cached config nvlist */
 	uint64_t	spa_last_ubsync_txg;	/* "best" uberblock txg */
 	uint64_t	spa_last_ubsync_txg_ts;	/* timestamp from that ub */
 	uint64_t	spa_load_txg;		/* ub txg that loaded */

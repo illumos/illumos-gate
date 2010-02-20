@@ -401,16 +401,18 @@ typedef enum zfs_cache_type {
 #define	ZPL_VERSION_USERSPACE		ZPL_VERSION_4
 
 /* Rewind request information */
-#define	ZPOOL_NO_REWIND		0
-#define	ZPOOL_TRY_REWIND	1 /* Search for best txg, but do not rewind */
-#define	ZPOOL_DO_REWIND		2 /* Rewind to best txg w/in deferred frees */
-#define	ZPOOL_EXTREME_REWIND	4 /* Allow extreme measures to find best txg */
-#define	ZPOOL_REWIND_MASK	7 /* All the possible policy bits */
+#define	ZPOOL_NO_REWIND		1  /* No policy - default behavior */
+#define	ZPOOL_NEVER_REWIND	2  /* Do not search for best txg or rewind */
+#define	ZPOOL_TRY_REWIND	4  /* Search for best txg, but do not rewind */
+#define	ZPOOL_DO_REWIND		8  /* Rewind to best txg w/in deferred frees */
+#define	ZPOOL_EXTREME_REWIND	16 /* Allow extreme measures to find best txg */
+#define	ZPOOL_REWIND_MASK	28 /* All the possible rewind bits */
+#define	ZPOOL_REWIND_POLICIES	31 /* All the possible policy bits */
 
 typedef struct zpool_rewind_policy {
 	uint32_t	zrp_request;	/* rewind behavior requested */
-	uint32_t	zrp_maxmeta;	/* max acceptable meta-data errors */
-	uint32_t	zrp_maxdata;	/* max acceptable data errors */
+	uint64_t	zrp_maxmeta;	/* max acceptable meta-data errors */
+	uint64_t	zrp_maxdata;	/* max acceptable data errors */
 	uint64_t	zrp_txg;	/* specific txg to load */
 } zpool_rewind_policy_t;
 
