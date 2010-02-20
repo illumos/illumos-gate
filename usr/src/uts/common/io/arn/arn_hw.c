@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1855,7 +1855,6 @@ ath9k_hw_check_chan(struct ath_hal *ah, struct ath9k_channel *chan)
 
 		return (NULL);
 	}
-
 	return (ath9k_regd_check_channel(ah, chan));
 }
 
@@ -3517,14 +3516,11 @@ ath9k_hw_fill_cap_info(struct ath_hal *ah)
 	pCap->hw_caps |= ATH9K_HW_CAP_MIC_AESCCM;
 
 	pCap->hw_caps |= ATH9K_HW_CAP_CHAN_SPREAD;
-#ifdef ARN_11N_SUPPORT
+
 	if (ah->ah_config.ht_enable)
 		pCap->hw_caps |= ATH9K_HW_CAP_HT;
 	else
 		pCap->hw_caps &= ~ATH9K_HW_CAP_HT;
-#else
-	pCap->hw_caps &= ~ATH9K_HW_CAP_HT;
-#endif
 
 	pCap->hw_caps |= ATH9K_HW_CAP_GTT;
 	pCap->hw_caps |= ATH9K_HW_CAP_VEOL;

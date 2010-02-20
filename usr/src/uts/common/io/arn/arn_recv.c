@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -22,6 +22,44 @@
 #include <sys/byteorder.h>
 
 #include "arn_core.h"
+
+/*
+ * Setup and link descriptors.
+ *
+ * 11N: we can no longer afford to self link the last descriptor.
+ * MAC acknowledges BA status as long as it copies frames to host
+ * buffer (or rx fifo). This can incorrectly acknowledge packets
+ * to a sender if last desc is self-linked.
+ */
+void
+arn_rx_buf_link(struct arn_softc *sc, struct ath_buf *bf)
+{
+	struct ath_desc *ds;
+
+	ds = bf->bf_desc;
+	ds->ds_link = 0;
+	ds->ds_data = bf->bf_dma.cookie.dmac_address;
+
+	/* virtual addr of the beginning of the buffer. */
+	ds->ds_vdata = bf->bf_dma.mem_va;
+
+	/*
+	 * setup rx descriptors. The bf_dma.alength here tells the H/W
+	 * how much data it can DMA to us and that we are prepared
+	 * to process
+	 */
+	(void) ath9k_hw_setuprxdesc(sc->sc_ah, ds,
+	    bf->bf_dma.alength, /* buffer size */
+	    0);
+
+	if (sc->sc_rxlink == NULL)
+		ath9k_hw_putrxbuf(sc->sc_ah, bf->bf_daddr);
+	else
+		*sc->sc_rxlink = bf->bf_daddr;
+
+	sc->sc_rxlink = &ds->ds_link;
+	ath9k_hw_rxena(sc->sc_ah);
+}
 
 void
 arn_setdefantenna(struct arn_softc *sc, uint32_t antenna)
@@ -47,6 +85,66 @@ arn_extend_tsf(struct arn_softc *sc, uint32_t rstamp)
 		tsf -= 0x8000;
 	return ((tsf & ~0x7fff) | rstamp);
 }
+
+static int
+arn_rx_prepare(struct ath_desc *ds, struct arn_softc *sc)
+{
+	uint8_t phyerr;
+
+	if (ds->ds_rxstat.rs_more) {
+		/*
+		 * Frame spans multiple descriptors; this cannot happen yet
+		 * as we don't support jumbograms. If not in monitor mode,
+		 * discard the frame. Enable this if you want to see
+		 * error frames in Monitor mode.
+		 */
+		if (sc->sc_ah->ah_opmode != ATH9K_M_MONITOR)
+			goto rx_next;
+	} else if (ds->ds_rxstat.rs_status != 0) {
+		if (ds->ds_rxstat.rs_status & ATH9K_RXERR_CRC) {
+			sc->sc_stats.ast_rx_crcerr++;
+			goto rx_next; /* should ignore? */
+		}
+
+		if (ds->ds_rxstat.rs_status & ATH9K_RXERR_FIFO) {
+				sc->sc_stats.ast_rx_fifoerr++;
+		}
+
+		if (ds->ds_rxstat.rs_status & ATH9K_RXERR_PHY) {
+				sc->sc_stats.ast_rx_phyerr++;
+				phyerr = ds->ds_rxstat.rs_phyerr & 0x1f;
+				sc->sc_stats.ast_rx_phy[phyerr]++;
+			goto rx_next;
+		}
+
+		if (ds->ds_rxstat.rs_status & ATH9K_RXERR_DECRYPT) {
+			sc->sc_stats.ast_rx_badcrypt++;
+		}
+
+		/*
+		 * Reject error frames with the exception of
+		 * decryption and MIC failures. For monitor mode,
+		 * we also ignore the CRC error.
+		 */
+		if (sc->sc_ah->ah_opmode == ATH9K_M_MONITOR) {
+			if (ds->ds_rxstat.rs_status &
+			    ~(ATH9K_RXERR_DECRYPT |
+			    ATH9K_RXERR_MIC |
+			    ATH9K_RXERR_CRC))
+				goto rx_next;
+		} else {
+			if (ds->ds_rxstat.rs_status &
+			    ~(ATH9K_RXERR_DECRYPT | ATH9K_RXERR_MIC)) {
+				goto rx_next;
+			}
+		}
+	}
+
+	return (1);
+rx_next:
+	return (0);
+}
+
 
 static void
 arn_opmode_init(struct arn_softc *sc)
@@ -141,27 +239,69 @@ arn_calcrxfilter(struct arn_softc *sc)
 #undef RX_FILTER_PRESERVE
 }
 
+/*
+ * When block ACK agreement has been set up between station and AP,
+ * Net80211 module will call this function to inform hardware about
+ * informations of this BA agreement.
+ * When AP wants to delete BA agreement that was originated by it,
+ * Net80211 modele will call this function to clean up relevant
+ * information in hardware.
+ */
+
+void
+arn_ampdu_recv_action(struct ieee80211_node *in,
+    const uint8_t *frm,
+    const uint8_t *efrm)
+{
+	struct ieee80211com *ic;
+	struct arn_softc *sc;
+
+	if ((in == NULL) || (frm == NULL) || (ic = in->in_ic) == NULL) {
+		ARN_DBG((ARN_DBG_FATAL,
+		    "Unknown AMPDU action or NULL node index\n"));
+		return;
+	}
+
+	sc = (struct arn_softc *)ic;
+
+	if (!(sc->sc_flags & SC_OP_RXAGGR))
+		return;
+	else
+		sc->sc_recv_action(in, frm, efrm);
+}
+
 int
 arn_startrecv(struct arn_softc *sc)
 {
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_buf *bf;
 
+	/* rx descriptor link set up */
+	mutex_enter(&sc->sc_rxbuflock);
+	if (list_empty(&sc->sc_rxbuf_list))
+		goto start_recv;
+
 	/* clean up rx link firstly */
 	sc->sc_rxlink = NULL;
 
-	/* rx descriptor link set up */
 	bf = list_head(&sc->sc_rxbuf_list);
 	while (bf != NULL) {
 		arn_rx_buf_link(sc, bf);
 		bf = list_next(&sc->sc_rxbuf_list, bf);
 	}
 
+
+	/* We could have deleted elements so the list may be empty now */
+	if (list_empty(&sc->sc_rxbuf_list))
+		goto start_recv;
+
 	bf = list_head(&sc->sc_rxbuf_list);
 
 	ath9k_hw_putrxbuf(ah, bf->bf_daddr);
 	ath9k_hw_rxena(ah);
 
+start_recv:
+	mutex_exit(&sc->sc_rxbuflock);
 	arn_opmode_init(sc);
 	ath9k_hw_startpcureceive(ah);
 
@@ -286,33 +426,29 @@ arn_rx_handler(struct arn_softc *sc)
 	struct ath_rx_status *rs;
 	mblk_t *rx_mp;
 	struct ieee80211_frame *wh;
-	int32_t len, ngood, loop = 1;
-	uint8_t phyerr;
+	int32_t len, ngood = 0, loop = 1;
+	uint32_t subtype;
 	int status;
+	int last_rssi = ATH_RSSI_DUMMY_MARKER;
+	struct ath_node *an;
 	struct ieee80211_node *in;
 	uint32_t cur_signal;
-	uint32_t subtype;
+#ifdef ARN_DBG_AMSDU
+	uint8_t qos;
+#endif
 
-	ngood = 0;
 	do {
 		mutex_enter(&sc->sc_rxbuflock);
 		bf = list_head(&sc->sc_rxbuf_list);
 		if (bf == NULL) {
 			ARN_DBG((ARN_DBG_RECV, "arn: arn_rx_handler(): "
 			    "no buffer\n"));
+			sc->sc_rxlink = NULL;
 			mutex_exit(&sc->sc_rxbuflock);
 			break;
 		}
 		ASSERT(bf->bf_dma.cookie.dmac_address != NULL);
 		ds = bf->bf_desc;
-		if (ds->ds_link == bf->bf_daddr) {
-			/*
-			 * Never process the self-linked entry at the end,
-			 * this may be met at heavy load.
-			 */
-			mutex_exit(&sc->sc_rxbuflock);
-			break;
-		}
 
 		/*
 		 * Must provide the virtual address of the current
@@ -329,39 +465,60 @@ arn_rx_handler(struct arn_softc *sc)
 		    bf->bf_daddr,
 		    PA2DESC(sc, ds->ds_link), 0);
 		if (status == EINPROGRESS) {
-			mutex_exit(&sc->sc_rxbuflock);
-			break;
+			struct ath_buf *tbf;
+			struct ath_desc *tds;
+
+			if (list_is_last(&bf->bf_node, &sc->sc_rxbuf_list)) {
+				ARN_DBG((ARN_DBG_RECV, "arn: arn_rx_handler(): "
+				    "List is in last! \n"));
+				sc->sc_rxlink = NULL;
+				break;
+			}
+
+			tbf = list_object(&sc->sc_rxbuf_list,
+			    bf->bf_node.list_next);
+
+			/*
+			 * On some hardware the descriptor status words could
+			 * get corrupted, including the done bit. Because of
+			 * this, check if the next descriptor's done bit is
+			 * set or not.
+			 *
+			 * If the next descriptor's done bit is set, the current
+			 * descriptor has been corrupted. Force s/w to discard
+			 * this descriptor and continue...
+			 */
+
+			tds = tbf->bf_desc;
+			status = ath9k_hw_rxprocdesc(ah, tds, tbf->bf_daddr,
+			    PA2DESC(sc, tds->ds_link), 0);
+			if (status == EINPROGRESS) {
+				mutex_exit(&sc->sc_rxbuflock);
+				break;
+			}
 		}
 		list_remove(&sc->sc_rxbuf_list, bf);
 		mutex_exit(&sc->sc_rxbuflock);
 
 		rs = &ds->ds_rxstat;
-		if (rs->rs_status != 0) {
-			if (rs->rs_status & ATH9K_RXERR_CRC) {
-				sc->sc_stats.ast_rx_crcerr++;
-			}
-			if (rs->rs_status & ATH9K_RXERR_FIFO) {
-				sc->sc_stats.ast_rx_fifoerr++;
-			}
-			if (rs->rs_status & ATH9K_RXERR_DECRYPT) {
-				sc->sc_stats.ast_rx_badcrypt++;
-			}
-			if (rs->rs_status & ATH9K_RXERR_PHY) {
-				sc->sc_stats.ast_rx_phyerr++;
-				phyerr = rs->rs_phyerr & 0x1f;
-				sc->sc_stats.ast_rx_phy[phyerr]++;
-			}
-			goto rx_next;
-		}
 		len = rs->rs_datalen;
 
 		/* less than sizeof(struct ieee80211_frame) */
 		if (len < 20) {
 			sc->sc_stats.ast_rx_tooshort++;
-			goto rx_next;
+			goto requeue;
 		}
 
-		if ((rx_mp = allocb(sc->sc_dmabuf_size, BPRI_MED)) == NULL) {
+		/* The status portion of the descriptor could get corrupted. */
+		if (sc->rx_dmabuf_size < rs->rs_datalen) {
+			arn_problem("Requeued because of wrong rs_datalen\n");
+			goto requeue;
+		}
+
+		if (!arn_rx_prepare(ds, sc))
+			goto requeue;
+
+		if ((rx_mp = allocb(sc->rx_dmabuf_size, BPRI_MED)) == NULL) {
 			arn_problem("arn: arn_rx_handler(): "
 			    "allocing mblk buffer failed.\n");
 			return;
@@ -379,11 +536,30 @@ arn_rx_handler(struct arn_softc *sc)
 			 * Ignore control frame received in promisc mode.
 			 */
 			freemsg(rx_mp);
-			goto rx_next;
+			goto requeue;
 		}
-
 		/* Remove the CRC at the end of IEEE80211 frame */
 		rx_mp->b_wptr -= IEEE80211_CRC_LEN;
+
+#ifdef DEBUG
+		arn_printrxbuf(bf, status == 0);
+#endif
+
+#ifdef ARN_DBG_AMSDU
+		if (IEEE80211_IS_DATA_QOS(wh)) {
+			if ((wh->i_fc[1] & IEEE80211_FC1_DIR_MASK) ==
+			    IEEE80211_FC1_DIR_DSTODS)
+				qos = ((struct ieee80211_qosframe_addr4 *)
+				    wh)->i_qos[0];
+			else
+				qos =
+				    ((struct ieee80211_qosframe *)wh)->i_qos[0];
+
+			if (qos & IEEE80211_QOS_AMSDU)
+				arn_dump_pkg((unsigned char *)bf->bf_dma.mem_va,
+				    len, 1, 1);
+		}
+#endif /* ARN_DBG_AMSDU */
 
 		/*
 		 * Locate the node for sender, track state, and then
@@ -391,6 +567,42 @@ arn_rx_handler(struct arn_softc *sc)
 		 * for its use.
 		 */
 		in = ieee80211_find_rxnode(ic, wh);
+		an = ATH_NODE(in);
+
+		/*
+		 * Theory for reporting quality:
+		 *
+		 * At a hardware RSSI of 45 you will be able to use
+		 * MCS 7 reliably.
+		 * At a hardware RSSI of 45 you will be able to use
+		 * MCS 15 reliably.
+		 * At a hardware RSSI of 35 you should be able use
+		 * 54 Mbps reliably.
+		 *
+		 * MCS 7  is the highets MCS index usable by a 1-stream device.
+		 * MCS 15 is the highest MCS index usable by a 2-stream device.
+		 *
+		 * All ath9k devices are either 1-stream or 2-stream.
+		 *
+		 * How many bars you see is derived from the qual reporting.
+		 *
+		 * A more elaborate scheme can be used here but it requires
+		 * tables of SNR/throughput for each possible mode used. For
+		 * the MCS table you can refer to the wireless wiki:
+		 *
+		 * http://wireless.kernel.org/en/developers/Documentation/
+		 * ieee80211/802.11n
+		 */
+		if (ds->ds_rxstat.rs_rssi != ATH9K_RSSI_BAD &&
+		    !ds->ds_rxstat.rs_moreaggr) {
+		    /* LINTED: E_CONSTANT_CONDITION */
+			ATH_RSSI_LPF(an->last_rssi, ds->ds_rxstat.rs_rssi);
+		}
+		last_rssi = an->last_rssi;
+
+		if (last_rssi != ATH_RSSI_DUMMY_MARKER)
+			ds->ds_rxstat.rs_rssi = ATH_EP_RND(last_rssi,
+			    ATH_RSSI_EP_MULTIPLIER);
 
 		if (ds->ds_rxstat.rs_rssi < 0)
 			ds->ds_rxstat.rs_rssi = 0;
@@ -398,22 +610,17 @@ arn_rx_handler(struct arn_softc *sc)
 		if ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) ==
 		    IEEE80211_FC0_TYPE_MGT) {
 			subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
-			/* Update Beacon RSSI, this is used by ANI. */
 			if (subtype == IEEE80211_FC0_SUBTYPE_BEACON)
 				sc->sc_halstats.ns_avgbrssi =
 				    ds->ds_rxstat.rs_rssi;
 		}
 
-#ifdef DEBUG
-		arn_printrxbuf(bf, status == 0);
-#endif
-
 		/*
-		 * signal 13-15 DLADM_WLAN_STRENGTH_EXCELLENT
-		 * signal 10-12 DLADM_WLAN_STRENGTH_VERY_GOOD
-		 * signal 6-9   DLADM_WLAN_STRENGTH_GOOD
-		 * signal 3-5   DLADM_WLAN_STRENGTH_WEAK
-		 * signal 0-2   DLADM_WLAN_STRENGTH_VERY_WEAK
+		 * signal (13-15) DLADM_WLAN_STRENGTH_EXCELLENT
+		 * signal (10-12) DLADM_WLAN_STRENGTH_VERY_GOOD
+		 * signal (6-9)    DLADM_WLAN_STRENGTH_GOOD
+		 * signal (3-5)    DLADM_WLAN_STRENGTH_WEAK
+		 * signal (0-2)    DLADM_WLAN_STRENGTH_VERY_WEAK
 		 */
 		if (rs->rs_rssi == 0)
 			cur_signal = 0;
@@ -425,12 +632,13 @@ arn_rx_handler(struct arn_softc *sc)
 		/*
 		 * Send the frame to net80211 for processing
 		 */
-		if (cur_signal <= 2 && ic->ic_state == IEEE80211_S_RUN)
+		if (cur_signal <= 2 && ic->ic_state == IEEE80211_S_RUN) {
 			(void) ieee80211_input(ic, rx_mp, in,
 			    (rs->rs_rssi + 10), rs->rs_tstamp);
+		}
 		else
-			(void) ieee80211_input(ic, rx_mp, in,
-			    rs->rs_rssi, rs->rs_tstamp);
+			(void) ieee80211_input(ic, rx_mp, in, rs->rs_rssi,
+			    rs->rs_tstamp);
 
 		/* release node */
 		ieee80211_free_node(in);
@@ -460,7 +668,7 @@ arn_rx_handler(struct arn_softc *sc)
 			sc->sc_rxotherant = 0;
 		}
 
-rx_next:
+requeue:
 		mutex_enter(&sc->sc_rxbuflock);
 		list_insert_tail(&sc->sc_rxbuf_list, bf);
 		mutex_exit(&sc->sc_rxbuflock);

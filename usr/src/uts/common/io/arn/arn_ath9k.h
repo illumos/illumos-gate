@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -643,6 +643,7 @@ struct ath9k_country_entry {
 #define	ATH_AMPDU_LIMIT_MAX	(64 * 1024 - 1)
 #define	ATH_AMPDU_LIMIT_DEFAULT	ATH_AMPDU_LIMIT_MAX
 
+#define	FCS_LEN	4
 #define	IEEE80211_WEP_IVLEN	3
 #define	IEEE80211_WEP_KIDLEN	1
 #define	IEEE80211_WEP_CRCLEN	4
@@ -711,20 +712,6 @@ enum ath9k_ani_cmd {
 	ATH9K_ANI_MODE = 0x40,
 	ATH9K_ANI_PHYERR_RESET = 0x80,
 	ATH9K_ANI_ALL = 0xff
-};
-
-enum {
-	WLAN_RC_PHY_OFDM,
-	WLAN_RC_PHY_CCK,
-	WLAN_RC_PHY_HT_20_SS,
-	WLAN_RC_PHY_HT_20_DS,
-	WLAN_RC_PHY_HT_40_SS,
-	WLAN_RC_PHY_HT_40_DS,
-	WLAN_RC_PHY_HT_20_SS_HGI,
-	WLAN_RC_PHY_HT_20_DS_HGI,
-	WLAN_RC_PHY_HT_40_SS_HGI,
-	WLAN_RC_PHY_HT_40_DS_HGI,
-	WLAN_RC_PHY_MAX
 };
 
 enum ath9k_tp_scale {
@@ -836,9 +823,7 @@ struct ath_hal {
 	uint32_t ah_rfkill_gpio;
 	uint32_t ah_rfkill_polarity;
 
-#ifndef ARN_NF_PER_CHAN
 	struct ath9k_nfcal_hist nfCalHist[NUM_NF_READINGS];
-#endif
 };
 
 struct chan_centers {

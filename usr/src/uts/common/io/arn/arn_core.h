@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,6 +68,44 @@ enum ath9k_key_len {
 				(area).offset, (area).alength, (flag)))
 
 #define	list_empty(a) ((a)->list_head.list_next == &(a)->list_head)
+#define	list_d2l(a, obj) ((list_node_t *)(((char *)obj) + (a)->list_offset))
+#define	list_object(a, node) ((void *)(((char *)node) - (a)->list_offset))
+#define	list_entry(ptr, type, member)	\
+	((type *)((char *)(ptr)-(unsigned long)(&((type *)0)->member)))
+#define	list_is_last(node, list)	\
+	((node)->list_next == &(list)->list_head)
+
+#define	list_for_each_entry_safe(object, temp, list_t)	\
+	for (object = list_head(list_t),	\
+	temp = list_object((list_t), ((list_d2l(list_t, object))->list_next));\
+	((list_d2l(list_t, temp))->list_next) != &((list_t)->list_head);\
+	object = temp,	\
+	temp = list_object((list_t), (list_d2l(list_t, temp))->list_next))
+
+/*
+ *  Insert src list after dst list. reinitialize src list thereafter.
+ */
+static __inline__ void
+/* LINTED E_STATIC_UNUSED */
+list_splice_tail_init(list_t *dst, list_t *src)
+{
+	list_node_t *dstnode = &dst->list_head;
+	list_node_t *srcnode = &src->list_head;
+
+	ASSERT(dst->list_size == src->list_size);
+	ASSERT(dst->list_offset == src->list_offset);
+
+	if (list_empty(src))
+		return;
+
+	dstnode->list_prev->list_next = srcnode->list_next;
+	srcnode->list_next->list_prev = dstnode->list_prev;
+	dstnode->list_prev = srcnode->list_prev;
+	srcnode->list_prev->list_next = dstnode;
+
+	/* reinitialize src list */
+	srcnode->list_next = srcnode->list_prev = srcnode;
+}
 
 #define	ARN_LE_READ_16(p)						\
 	((uint16_t)							\
@@ -125,7 +163,42 @@ enum ath9k_key_len {
 
 #define	ARN_TXQ_SETUP(sc, i)	((sc)->sc_txqsetup & (1<<i))
 
-// static const uint8_t ath_bcast_mac[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+#define	IEEE80211_IS_CHAN_HTA(_c) \
+	(IEEE80211_IS_CHAN_5GHZ(_c) && \
+	((_c)->ich_flags & IEEE80211_CHAN_HT))
+
+#define	IEEE80211_IS_CHAN_HTG(_c) \
+	(IEEE80211_IS_CHAN_2GHZ(_c) && \
+	((_c)->ich_flags & IEEE80211_CHAN_HT))
+
+#define	IEEE80211_IS_DATA(_wh) \
+	(((_wh)->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == \
+	IEEE80211_FC0_TYPE_DATA)
+
+#define	IEEE80211_IS_DATA_QOS(_wh) \
+	(((_wh)->i_fc[0] & (IEEE80211_FC0_TYPE_MASK | \
+	IEEE80211_FC0_SUBTYPE_QOS)) == \
+	(IEEE80211_FC0_TYPE_DATA | IEEE80211_FC0_SUBTYPE_QOS))
+
+#define	IEEE80211_IS_MGMT(_wh) \
+	(((_wh)->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == \
+	IEEE80211_FC0_TYPE_MGT)
+
+#define	IEEE80211_IS_CTL(_wh) \
+	(((_wh)->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == \
+	IEEE80211_FC0_TYPE_CTL)
+
+#define	IEEE80211_IS_PSPOLL(_wh) \
+	(((_wh)->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == \
+	IEEE80211_FC0_SUBTYPE_PS_POLL)
+
+#define	IEEE80211_IS_BACK_REQ(_wh) \
+	(((_wh)->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK) == \
+	IEEE80211_FC0_SUBTYPE_BAR)
+
+#define	IEEE80211_HAS_MOREFRAGS(_wh) \
+	(((_wh)->i_fc[1] & IEEE80211_FC1_MORE_FRAG) == \
+	IEEE80211_FC1_MORE_FRAG)
 
 /* Debugging */
 enum ARN_DEBUG {
@@ -246,6 +319,8 @@ struct ath_config {
 		(_bf)->bf_next = NULL;		\
 		memset(&((_bf)->bf_state), 0,	\
 		sizeof (struct ath_buf_state));	\
+		memset(&((_bf)->tx_info_priv), 0,	\
+		sizeof (struct ath_tx_info_priv));	\
 	} while (0)
 
 enum buffer_type {
@@ -313,7 +388,11 @@ struct ath_buf {
 	uint16_t bf_flags;		/* tx descriptor flags */
 	struct ath_buf_state bf_state;	/* buffer state */
 
-	/* we're in list of sc->sc_txbuf_list or asc->asc_rxbuf_list */
+	/* Temp workground for rc */
+	struct ath9k_tx_rate rates[4];
+	struct ath_tx_info_priv tx_info_priv;
+
+	/* we're in list of sc->sc_txbuf_list or sc->sc_rxbuf_list */
 	list_node_t bf_node;
 };
 
@@ -378,18 +457,28 @@ void arn_setdefantenna(struct arn_softc *sc, uint32_t antenna);
  */
 
 struct ath_txq {
-	uint_t		axq_qnum; /* hardware q number */
+	uint32_t	axq_qnum; /* hardware q number */
 	uint32_t	*axq_link; /* link ptr in last TX desc */
 	list_t		axq_list; /* transmit queue */
 	kmutex_t	axq_lock; /* lock on q and link */
 	unsigned long	axq_lockflags; /* intr state when must cli */
-	uint_t		axq_depth; /* queue depth (stat only) */
+	uint32_t		axq_depth; /* queue depth (stat only) */
 	uint8_t 	axq_aggr_depth; /* aggregates queued */
 	uint32_t 	axq_totalqueued; /* total ever queued */
+	boolean_t	stopped;
 	struct ath_buf	*axq_linkbuf; /* virtual addr of last buffer */
 	/* first desc of the last descriptor that contains CTS */
 	struct ath_desc *axq_lastdsWithCTS;
-	uint_t		axq_intrcnt; /* interrupt count */
+
+	/*
+	 * final desc of the gating desc that determines whether
+	 * lastdsWithCTS has been DMA'ed or not
+	 */
+	struct ath_desc *axq_gatingds;
+
+	list_t axq_acq;
+
+	uint32_t	axq_intrcnt; /* interrupt count */
 };
 
 
@@ -400,7 +489,7 @@ struct ath_txq {
 /* per TID aggregate tx state for a destination */
 struct ath_atx_tid {
 	list_node_t list;
-	list_node_t buf_q;
+	list_t buf_q;
 	struct ath_node *an;
 	struct ath_atx_ac *ac;
 	struct ath_buf *tx_buf[ATH_TID_MAX_BUFS]; /* active tx frames */
@@ -421,7 +510,7 @@ struct ath_atx_ac {
 	int sched; /* dest-ac is scheduled */
 	int qnum; /* H/W queue number associated with this AC */
 	list_node_t		list;
-	list_node_t		tid_q;
+	list_t		tid_q;
 };
 
 /* per dest tx state */
@@ -461,11 +550,14 @@ struct ath_tx_stat {
 	uint32_t airtime; /* time on air per final tx rate */
 };
 
+void arn_tx_node_init(struct arn_softc *sc, struct ath_node *an);
+void arn_tx_node_cleanup(struct arn_softc *sc, struct ieee80211_node *in);
 struct ath_txq *arn_txq_setup(struct arn_softc *sc, int qtype, int subtype);
 void arn_tx_cleanupq(struct arn_softc *sc, struct ath_txq *txq);
 int arn_tx_setup(struct arn_softc *sc, int haltype);
 void arn_draintxq(struct arn_softc *sc, boolean_t retry_tx);
 void arn_tx_draintxq(struct arn_softc *sc, struct ath_txq *txq);
+void arn_txq_schedule(struct arn_softc *sc, struct ath_txq *txq);
 int arn_tx(ieee80211com_t *ic, mblk_t *mp, uint8_t type);
 int arn_txq_update(struct arn_softc *sc, int qnum,
     struct ath9k_tx_queue_info *qinfo);
@@ -507,14 +599,16 @@ void arn_tx_int_proc(void *arg);
 #define	ATH_DS_BA_SEQ(_ds)		((_ds)->ds_us.tx.ts_seqnum)
 #define	ATH_DS_BA_BITMAP(_ds)		(&(_ds)->ds_us.tx.ba_low)
 #define	ATH_DS_TX_BA(_ds)		((_ds)->ds_us.tx.ts_flags & ATH9K_TX_BA)
-#define	ATH_AN_2_TID(_an, _tidno)	(&(_an)->an_aggr.tx.tid[(_tidno)])
+#define	ATH_AN_2_TID(_an, _tidno)	(&(_an)->tid[(_tidno)])
+
+#define	ATH_TX_ERROR	0x01
+#define	ATH_TX_XRETRY	0x02
+#define	ATH_TX_BAR	0x04
 
 enum ATH_AGGR_STATUS {
 	ATH_AGGR_DONE,
 	ATH_AGGR_BAW_CLOSED,
 	ATH_AGGR_LIMITED,
-	ATH_AGGR_SHORTPKT,
-	ATH_AGGR_8K_LIMITED,
 };
 
 struct aggr_rifs_param {
@@ -524,6 +618,29 @@ struct aggr_rifs_param {
 	int param_al;
 	struct ath_rc_series *param_rcs;
 };
+
+/* RSSI correction */
+void ath9k_init_nfcal_hist_buffer(struct ath_hal *ah);
+
+#define	AR_PHY_CCA_MAX_AR5416_GOOD_VALUE	-85
+#define	AR_PHY_CCA_MAX_AR9280_GOOD_VALUE	-112
+#define	AR_PHY_CCA_MAX_AR9285_GOOD_VALUE	-118
+
+#define	ATH_RSSI_LPF_LEN		10
+#define	RSSI_LPF_THRESHOLD		-20
+#define	ATH9K_RSSI_BAD			-128
+#define	ATH_RSSI_EP_MULTIPLIER		(1<<7)
+#define	ATH_EP_MUL(x, mul)		((x) * (mul))
+#define	ATH_RSSI_IN(x)		(ATH_EP_MUL((x), ATH_RSSI_EP_MULTIPLIER))
+#define	ATH_LPF_RSSI(x, y, len)	\
+	((x != ATH_RSSI_DUMMY_MARKER) ? \
+	(((x) * ((len) - 1) + (y)) / (len)) : (y))
+#define	ATH_RSSI_LPF(x, y)	do { \
+    if ((y) >= RSSI_LPF_THRESHOLD)   \
+	x = ATH_LPF_RSSI((x), ATH_RSSI_IN((y)), ATH_RSSI_LPF_LEN);  \
+} while (0)
+#define	ATH_EP_RND(x, mul)	\
+	((((x)%(mul)) >= ((mul)/2)) ? ((x) + ((mul) - 1)) / (mul) : (x)/(mul))
 
 /* driver-specific node state */
 struct ath_node {
@@ -546,12 +663,12 @@ struct ath_node {
 	uint8_t		an_tx_rate1sp;	/* series 1 short preamble h/w rate */
 	uint8_t		an_tx_rate2sp;	/* series 2 short preamble h/w rate */
 	uint8_t		an_tx_rate3sp;	/* series 3 short preamble h/w rate */
-	struct arn_softc *an_sc;
-#ifdef ARN_11N
-	struct ath_node_aggr an_aggr;
-#endif
+	struct ath_rate_priv rate_priv;
+	struct ath_atx_tid tid[WME_NUM_TID];
+	struct ath_atx_ac ac[WME_NUM_AC];
 	uint16_t maxampdu;
 	uint8_t mpdudensity;
+	int	last_rssi;
 };
 #define	ATH_NODE(_n)	((struct ath_node *)(_n))
 
@@ -702,6 +819,26 @@ enum PROT_MODE {
 #define	SC_OP_RFKILL_SW_BLOCKED	BIT(12)
 #define	SC_OP_RFKILL_HW_BLOCKED	BIT(13)
 
+/* HT  */
+typedef	struct ht_conf {
+	boolean_t		ht_supported;
+	uint16_t		cap;
+	uint8_t			ampdu_factor;
+	uint8_t			ampdu_density;
+	uint8_t			rx_mcs_mask[10];
+} arn_ht_conf;
+
+uint8_t parse_mpdudensity(uint8_t mpdudensity);
+
+void arn_ampdu_recv_action(struct ieee80211_node *in,
+    const uint8_t *frm, const uint8_t *efrm);
+int arn_ampdu_send_action(struct ieee80211_node *in,
+    int category, int action, uint16_t args[4]);
+void arn_dump_line(unsigned char *p, uint32_t len, boolean_t isaddress,
+    uint32_t group);
+void arn_dump_pkg(unsigned char *p, uint32_t len, boolean_t isaddress,
+    uint32_t group);
+
 struct arn_softc {
 	ieee80211com_t sc_isc;	/* IEEE 802.11 common */
 	dev_info_t *sc_dev;    /* back pointer to dev_info_t */
@@ -721,6 +858,13 @@ struct arn_softc {
 	ddi_iblock_cookie_t	sc_iblock;
 	ddi_softintr_t		sc_softint_id;
 
+	/* 802.11n/HT capabilities */
+	arn_ht_conf		sc_ht_conf;
+	void			(*sc_recv_action)(ieee80211_node_t *,
+				    const uint8_t *, const uint8_t *);
+	int			(*sc_send_action)(ieee80211_node_t *,
+				    int, int, uint16_t[4]);
+
 	/* TX/RX descriptors */
 	struct ath_desc *sc_desc;
 	/* descriptor structure */
@@ -730,7 +874,8 @@ struct arn_softc {
 	/* length of all allocated "struct ath_buf" */
 	uint32_t sc_vbuflen;
 	/* size of one DMA TX/RX buffer based on 802.11 MTU */
-	int32_t sc_dmabuf_size;
+	uint32_t tx_dmabuf_size;
+	uint32_t rx_dmabuf_size;
 
 	uint8_t sc_curbssid[6];
 	uint8_t sc_myaddr[6];
@@ -852,6 +997,8 @@ int arn_reset(ieee80211com_t *ic);
 int arn_get_hal_qnum(uint16_t queue, struct arn_softc *sc);
 
 int ath_cabq_update(struct arn_softc *);
+
+void arn_update_chainmask(struct arn_softc *sc);
 
 /*
  * Read and write, they both share the same lock. We do this to serialize

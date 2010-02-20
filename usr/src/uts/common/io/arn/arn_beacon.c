@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,7 @@
  * the operating mode of the station (AP or AdHoc).  Parameters are AIFS
  * settings and channel width min/max
  */
+
 static int
 /* LINTED E_STATIC_UNUSED */
 arn_beaconq_config(struct arn_softc *sc)
@@ -68,7 +69,7 @@ arn_beaconq_config(struct arn_softc *sc)
  * up all required antenna switch parameters, rate codes, and channel flags.
  * Beacons are always sent out at the lowest rate, and are not retried.
  */
-
+#ifdef ARN_IBSS
 static void
 arn_beacon_setup(struct arn_softc *sc, struct ath_buf *bf)
 {
@@ -142,13 +143,14 @@ arn_beacon_setup(struct arn_softc *sc, struct ath_buf *bf)
 	    ctsrate, ctsduration, series, 4, 0);
 #undef	USE_SHPREAMBLE
 }
+#endif
 
 /*
  * Startup beacon transmission for adhoc mode when they are sent entirely
  * by the hardware using the self-linked descriptor + veol trick.
  */
+#ifdef ARN_IBSS
 static void
-/* LINTED E_STATIC_UNUSED */
 arn_beacon_start_adhoc(struct arn_softc *sc)
 
 {
@@ -184,6 +186,7 @@ arn_beacon_start_adhoc(struct arn_softc *sc)
 	    "TXDP%u = %llx (%p)\n", sc->sc_beaconq,
 	    ito64(bf->bf_daddr), bf->bf_desc));
 }
+#endif /* ARN_IBSS */
 
 uint32_t
 arn_beaconq_setup(struct ath_hal *ah)
@@ -254,11 +257,13 @@ arn_beacon_return(struct arn_softc *sc)
 
 void
 arn_beacon_config(struct arn_softc *sc)
+
 {
 	struct ath_beacon_config conf;
 	ieee80211com_t *ic = (ieee80211com_t *)sc;
 	struct ieee80211_node *in = ic->ic_bss;
 
+	/* New added */
 	struct ath9k_beacon_state bs;
 	int dtimperiod, dtimcount, sleepduration;
 	int cfpperiod, cfpcount;
@@ -270,6 +275,8 @@ arn_beacon_config(struct arn_softc *sc)
 	/* XXX fix me */
 	conf.beacon_interval = in->in_intval ?
 	    in->in_intval : ATH_DEFAULT_BINTVAL;
+	ARN_DBG((ARN_DBG_BEACON, "arn: arn_beacon_config():"
+	    "conf.beacon_interval = %d\n", conf.beacon_interval));
 	conf.listen_interval = 1;
 	conf.dtim_period = conf.beacon_interval;
 	conf.dtim_count = 1;
@@ -321,12 +328,12 @@ arn_beacon_config(struct arn_softc *sc)
 	/*
 	 * Calculate the number of consecutive beacons to miss* before taking
 	 * a BMISS interrupt. The configuration is specified in TU so we only
-	 * need calculate based on the beacon interval.  Note that we clamp the
+	 * need calculate based	on the beacon interval.  Note that we clamp the
 	 * result to at most 15 beacons.
 	 */
 	if (sleepduration > intval) {
 		bs.bs_bmissthreshold = conf.listen_interval *
-		    ATH_DEFAULT_BMISS_LIMIT / 2;
+			ATH_DEFAULT_BMISS_LIMIT / 2;
 	} else {
 		bs.bs_bmissthreshold = DIV_ROUND_UP(conf.bmiss_timeout, intval);
 		if (bs.bs_bmissthreshold > 15)
@@ -352,11 +359,29 @@ arn_beacon_config(struct arn_softc *sc)
 	bs.bs_tsfoor_threshold = ATH9K_TSFOOR_THRESHOLD;
 
 	ARN_DBG((ARN_DBG_BEACON, "arn: arn_beacon_config(): "
-	    "tsf: %llu tsftu: %u\n", tsf, tsftu));
-	ARN_DBG((ARN_DBG_BEACON, "arn: arn_beacon_config(): "
-	    "bmiss: %u sleep: %u cfp-period: %u maxdur: %u next: %u\n",
-	    bs.bs_bmissthreshold, bs.bs_sleepduration,
-	    bs.bs_cfpperiod, bs.bs_cfpmaxduration, bs.bs_cfpnext));
+	    "tsf %llu "
+	    "tsf:tu %u "
+	    "intval %u "
+	    "nexttbtt %u "
+	    "dtim %u "
+	    "nextdtim %u "
+	    "bmiss %u "
+	    "sleep %u "
+	    "cfp:period %u "
+	    "maxdur %u "
+	    "next %u "
+	    "timoffset %u\n",
+	    (unsigned long long)tsf, tsftu,
+	    bs.bs_intval,
+	    bs.bs_nexttbtt,
+	    bs.bs_dtimperiod,
+	    bs.bs_nextdtim,
+	    bs.bs_bmissthreshold,
+	    bs.bs_sleepduration,
+	    bs.bs_cfpperiod,
+	    bs.bs_cfpmaxduration,
+	    bs.bs_cfpnext,
+	    bs.bs_timoffset));
 
 	/* Set the computed STA beacon timers */
 
@@ -402,6 +427,6 @@ arn_bmiss_proc(void *arg)
 	ARN_UNLOCK(sc);
 
 	/* temp workaround */
-	if (tsf - lastrx > bmisstimeout)
+	if ((tsf - lastrx) > bmisstimeout)
 		ieee80211_beacon_miss(ic);
 }

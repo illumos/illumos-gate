@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2817,6 +2817,9 @@ ath9k_hw_get_eeprom_4k(struct ath_hal *ah,
 		return (pBase->txMask);
 	case EEP_RX_MASK:
 		return (pBase->rxMask);
+	/* 2.6.30 */
+	case EEP_FRAC_N_5G:
+		return (0);
 	default:
 		return (0);
 	}
@@ -2869,6 +2872,27 @@ ath9k_hw_get_eeprom_def(struct ath_hal *ah, enum eeprom_param param)
 		return (pBase->rxGainType);
 	case EEP_TXGAIN_TYPE:
 		return (pBase->txGainType);
+	/* 2.6.30 */
+	case EEP_OL_PWRCTRL:
+		if (AR5416_VER_MASK >= AR5416_EEP_MINOR_VER_19)
+			return (pBase->openLoopPwrCntl ? B_TRUE: B_FALSE);
+		else
+			return (B_FALSE);
+	case EEP_RC_CHAIN_MASK:
+		if (AR5416_VER_MASK >= AR5416_EEP_MINOR_VER_19)
+			return (pBase->rcChainMask);
+		else
+			return (0);
+	case EEP_DAC_HPWR_5G:
+		if (AR5416_VER_MASK >= AR5416_EEP_MINOR_VER_20)
+			return (pBase->dacHiPwrMode_5G);
+		else
+			return (0);
+	case EEP_FRAC_N_5G:
+		if (AR5416_VER_MASK >= AR5416_EEP_MINOR_VER_22)
+			return (pBase->frac_n_5g);
+		else
+			return (0);
 
 	default:
 		return (0);

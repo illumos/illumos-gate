@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,6 +52,10 @@
 #include <inet/mi.h>
 #include <inet/wifi_ioctl.h>
 #include <sys/mac_wifi.h>
+#include <sys/net80211.h>
+#include <sys/net80211_proto.h>
+#include <sys/net80211_ht.h>
+
 
 #include "arn_ath9k.h"
 #include "arn_core.h"
@@ -61,12 +65,18 @@
 #define	ARN_MAX_RSSI	45	/* max rssi */
 
 /*
+ * Default 11n reates supported by this station.
+ */
+extern struct ieee80211_htrateset ieee80211_rateset_11n;
+
+/*
  * PIO access attributes for registers
  */
 static ddi_device_acc_attr_t arn_reg_accattr = {
 	DDI_DEVICE_ATTR_V0,
 	DDI_STRUCTURE_LE_ACC,
-	DDI_STRICTORDER_ACC
+	DDI_STRICTORDER_ACC,
+	DDI_DEFAULT_ACC
 };
 
 /*
@@ -75,7 +85,8 @@ static ddi_device_acc_attr_t arn_reg_accattr = {
 static ddi_device_acc_attr_t arn_desc_accattr = {
 	DDI_DEVICE_ATTR_V0,
 	DDI_STRUCTURE_LE_ACC,
-	DDI_STRICTORDER_ACC
+	DDI_STRICTORDER_ACC,
+	DDI_DEFAULT_ACC
 };
 
 /*
@@ -115,8 +126,7 @@ static ddi_dma_attr_t arn_desc_dma_attr = {
 
 static kmutex_t arn_loglock;
 static void *arn_soft_state_p = NULL;
-/* scan interval, ms? */
-static int arn_dwelltime = 200; /* 150 */
+static int arn_dwelltime = 200; /* scan interval */
 
 static int	arn_m_stat(void *,  uint_t, uint64_t *);
 static int	arn_m_start(void *);
@@ -264,31 +274,6 @@ arn_ioread32(struct ath_hal *ah, uint32_t reg_offset)
 	return (val);
 }
 
-void
-arn_rx_buf_link(struct arn_softc *sc, struct ath_buf *bf)
-{
-	struct ath_desc *ds;
-
-	ds = bf->bf_desc;
-	ds->ds_link = bf->bf_daddr;
-	ds->ds_data = bf->bf_dma.cookie.dmac_address;
-	/* virtual addr of the beginning of the buffer. */
-	ds->ds_vdata = bf->bf_dma.mem_va;
-
-	/*
-	 * setup rx descriptors. The bf_dma.alength here tells the H/W
-	 * how much data it can DMA to us and that we are prepared
-	 * to process
-	 */
-	(void) ath9k_hw_setuprxdesc(sc->sc_ah, ds,
-	    bf->bf_dma.alength, /* buffer size */
-	    0);
-
-	if (sc->sc_rxlink != NULL)
-		*sc->sc_rxlink = bf->bf_daddr;
-	sc->sc_rxlink = &ds->ds_link;
-}
-
 /*
  * Allocate an area of memory and a DMA handle for accessing it
  */
@@ -355,8 +340,14 @@ arn_free_dma_mem(dma_area_t *dma_p)
  * each buffer.
  */
 static int
-arn_buflist_setup(dev_info_t *devinfo, struct arn_softc *sc, list_t *bflist,
-    struct ath_buf **pbf, struct ath_desc **pds, int nbuf, uint_t dmabflags)
+arn_buflist_setup(dev_info_t *devinfo,
+    struct arn_softc *sc,
+    list_t *bflist,
+    struct ath_buf **pbf,
+    struct ath_desc **pds,
+    int nbuf,
+    uint_t dmabflags,
+    uint32_t buflen)
 {
 	int i, err;
 	struct ath_buf *bf = *pbf;
@@ -372,7 +363,7 @@ arn_buflist_setup(dev_info_t *devinfo, struct arn_softc *sc, list_t *bflist,
 
 		/* alloc DMA memory */
 		err = arn_alloc_dma_mem(devinfo, &arn_dma_attr,
-		    sc->sc_dmabuf_size, &arn_desc_accattr, DDI_DMA_STREAMING,
+		    buflen, &arn_desc_accattr, DDI_DMA_STREAMING,
 		    dmabflags, &bf->bf_dma);
 		if (err != DDI_SUCCESS)
 			return (err);
@@ -466,14 +457,20 @@ arn_desc_alloc(dev_info_t *devinfo, struct arn_softc *sc)
 	sc->sc_vbufptr = bf;
 
 	/* DMA buffer size for each TX/RX packet */
-	sc->sc_dmabuf_size = roundup(1000 + sizeof (struct ieee80211_frame) +
-	    IEEE80211_MTU + IEEE80211_CRC_LEN +
-	    (IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN +
-	    IEEE80211_WEP_CRCLEN), sc->sc_cachelsz);
+#ifdef ARN_TX_AGGREGRATION
+	sc->tx_dmabuf_size =
+	    roundup((IEEE80211_MAX_MPDU_LEN + 3840 * 2),
+	    min(sc->sc_cachelsz, (uint16_t)64));
+#else
+	sc->tx_dmabuf_size =
+	    roundup(IEEE80211_MAX_MPDU_LEN, min(sc->sc_cachelsz, (uint16_t)64));
+#endif
+	sc->rx_dmabuf_size =
+	    roundup(IEEE80211_MAX_MPDU_LEN, min(sc->sc_cachelsz, (uint16_t)64));
 
 	/* create RX buffer list */
 	err = arn_buflist_setup(devinfo, sc, &sc->sc_rxbuf_list, &bf, &ds,
-	    ATH_RXBUF, DDI_DMA_READ | DDI_DMA_STREAMING);
+	    ATH_RXBUF, DDI_DMA_READ | DDI_DMA_STREAMING, sc->rx_dmabuf_size);
 	if (err != DDI_SUCCESS) {
 		arn_desc_free(sc);
 		return (err);
@@ -481,7 +478,7 @@ arn_desc_alloc(dev_info_t *devinfo, struct arn_softc *sc)
 
 	/* create TX buffer list */
 	err = arn_buflist_setup(devinfo, sc, &sc->sc_txbuf_list, &bf, &ds,
-	    ATH_TXBUF, DDI_DMA_STREAMING);
+	    ATH_TXBUF, DDI_DMA_STREAMING, sc->tx_dmabuf_size);
 	if (err != DDI_SUCCESS) {
 		arn_desc_free(sc);
 		return (err);
@@ -612,6 +609,44 @@ arn_update_txpow(struct arn_softc *sc)
 	}
 }
 
+uint8_t
+parse_mpdudensity(uint8_t mpdudensity)
+{
+	/*
+	 * 802.11n D2.0 defined values for "Minimum MPDU Start Spacing":
+	 *   0 for no restriction
+	 *   1 for 1/4 us
+	 *   2 for 1/2 us
+	 *   3 for 1 us
+	 *   4 for 2 us
+	 *   5 for 4 us
+	 *   6 for 8 us
+	 *   7 for 16 us
+	 */
+	switch (mpdudensity) {
+	case 0:
+		return (0);
+	case 1:
+	case 2:
+	case 3:
+		/*
+		 * Our lower layer calculations limit our
+		 * precision to 1 microsecond
+		 */
+		return (1);
+	case 4:
+		return (2);
+	case 5:
+		return (4);
+	case 6:
+		return (8);
+	case 7:
+		return (16);
+	default:
+		return (0);
+	}
+}
+
 static void
 arn_setup_rates(struct arn_softc *sc, uint32_t mode)
 {
@@ -705,7 +740,7 @@ arn_setup_channels(struct arn_softc *sc)
 
 	for (i = 0; i < nchan; i++) {
 		c = &ah->ah_channels[i];
-		uint16_t flags;
+		uint32_t flags;
 		index = ath9k_hw_mhz2ieee(ah, c->channel, c->channelFlags);
 
 		if (index > IEEE80211_CHAN_MAX) {
@@ -758,16 +793,46 @@ arn_setup_channels(struct arn_softc *sc)
 uint32_t
 arn_chan2flags(ieee80211com_t *isc, struct ieee80211_channel *chan)
 {
-	static const uint32_t modeflags[] = {
-	    0,				/* IEEE80211_MODE_AUTO */
-	    CHANNEL_A,			/* IEEE80211_MODE_11A */
-	    CHANNEL_B,			/* IEEE80211_MODE_11B */
-	    CHANNEL_G,		/* IEEE80211_MODE_11G */
-	    0,				/*  */
-	    0,		/*  */
-	    0		/*  */
-	};
-	return (modeflags[ieee80211_chan2mode(isc, chan)]);
+	uint32_t channel_mode;
+	switch (ieee80211_chan2mode(isc, chan)) {
+	case IEEE80211_MODE_11NA:
+		if (chan->ich_flags & IEEE80211_CHAN_HT40U)
+			channel_mode = CHANNEL_A_HT40PLUS;
+		else if (chan->ich_flags & IEEE80211_CHAN_HT40D)
+			channel_mode = CHANNEL_A_HT40MINUS;
+		else
+			channel_mode = CHANNEL_A_HT20;
+		break;
+	case IEEE80211_MODE_11NG:
+		if (chan->ich_flags & IEEE80211_CHAN_HT40U)
+			channel_mode = CHANNEL_G_HT40PLUS;
+		else if (chan->ich_flags & IEEE80211_CHAN_HT40D)
+			channel_mode = CHANNEL_G_HT40MINUS;
+		else
+			channel_mode = CHANNEL_G_HT20;
+		break;
+	case IEEE80211_MODE_TURBO_G:
+	case IEEE80211_MODE_STURBO_A:
+	case IEEE80211_MODE_TURBO_A:
+		channel_mode = 0;
+		break;
+	case IEEE80211_MODE_11A:
+		channel_mode = CHANNEL_A;
+		break;
+	case IEEE80211_MODE_11G:
+		channel_mode = CHANNEL_B;
+		break;
+	case IEEE80211_MODE_11B:
+		channel_mode = CHANNEL_G;
+		break;
+	case IEEE80211_MODE_FH:
+		channel_mode = 0;
+		break;
+	default:
+		break;
+	}
+
+	return (channel_mode);
 }
 
 /*
@@ -1156,7 +1221,7 @@ arn_isr(caddr_t arg)
 		if (status & ATH9K_INT_BMISS) {
 			ARN_DBG((ARN_DBG_INTERRUPT, "arn: arn_isr(): "
 			    "ATH9K_INT_BMISS\n"));
-#ifdef HW_BEACON_MISS_HANDLE
+#ifdef ARN_HW_BEACON_MISS_HANDLE
 			ARN_DBG((ARN_DBG_INTERRUPT, "arn: arn_isr(): "
 			    "handle beacon mmiss by H/W mechanism\n"));
 			if (ddi_taskq_dispatch(sc->sc_tq, arn_bmiss_proc,
@@ -1167,7 +1232,7 @@ arn_isr(caddr_t arg)
 #else
 			ARN_DBG((ARN_DBG_INTERRUPT, "arn: arn_isr(): "
 			    "handle beacon mmiss by S/W mechanism\n"));
-#endif /* HW_BEACON_MISS_HANDLE */
+#endif /* ARN_HW_BEACON_MISS_HANDLE */
 		}
 
 		ARN_UNLOCK(sc);
@@ -1422,7 +1487,13 @@ arn_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 		ARN_UNLOCK(sc);
 		goto bad;
 	}
-	sc->tx_chan_width = ATH9K_HT_MACMODE_20;
+
+	if (in->in_htcap & IEEE80211_HTCAP_CHWIDTH40) {
+		arn_update_chainmask(sc);
+		sc->tx_chan_width = ATH9K_HT_MACMODE_2040;
+	} else
+		sc->tx_chan_width = ATH9K_HT_MACMODE_20;
+
 	sc->sc_ah->ah_channels[pos].chanmode =
 	    arn_chan2flags(ic, ic->ic_curchan);
 	channel = &sc->sc_ah->ah_channels[pos];
@@ -1508,8 +1579,7 @@ arn_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 #else
 				/* Configure the beacon and sleep timers. */
 				arn_beacon_config(sc);
-
-				/* reset rssi stats */
+				/* Reset rssi stats */
 				sc->sc_halstats.ns_avgbrssi =
 				    ATH_RSSI_DUMMY_MARKER;
 				sc->sc_halstats.ns_avgrssi =
@@ -1518,6 +1588,8 @@ arn_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 				    ATH_RSSI_DUMMY_MARKER;
 				sc->sc_halstats.ns_avgtxrate =
 				    ATH_RATE_DUMMY_MARKER;
+/* end */
+
 #endif /* ARN_IBSS */
 			}
 			break;
@@ -1583,6 +1655,7 @@ arn_watchdog(void *arg)
 		 * Start the background rate control thread if we
 		 * are not configured to use a fixed xmit rate.
 		 */
+#ifdef ARN_LEGACY_RC
 		if (ic->ic_fixed_rate == IEEE80211_FIXED_RATE_NONE) {
 			sc->sc_stats.ast_rate_calls ++;
 			if (ic->ic_opmode == IEEE80211_M_STA)
@@ -1591,20 +1664,21 @@ arn_watchdog(void *arg)
 				ieee80211_iterate_nodes(&ic->ic_sta,
 				    arn_rate_ctl, sc);
 		}
+#endif /* ARN_LEGACY_RC */
 
-#ifdef HW_BEACON_MISS_HANDLE
-		/* nothing to do here */
+#ifdef ARN_HW_BEACON_MISS_HANDLE
+	/* nothing to do here */
 #else
-		/* currently set 10 seconds as beacon miss threshold */
-		if (ic->ic_beaconmiss++ > 100) {
-			ARN_DBG((ARN_DBG_BEACON, "arn_watchdog():"
-			    "Beacon missed for 10 seconds, run"
-			    "ieee80211_new_state(ic, IEEE80211_S_INIT, -1)\n"));
-			ARN_UNLOCK(sc);
-			(void) ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
-			return;
-		}
-#endif /* HW_BEACON_MISS_HANDLE */
+	/* currently set 10 seconds as beacon miss threshold */
+	if (ic->ic_beaconmiss++ > 100) {
+		ARN_DBG((ARN_DBG_BEACON, "arn_watchdog():"
+		    "Beacon missed for 10 seconds, run"
+		    "ieee80211_new_state(ic, IEEE80211_S_INIT, -1)\n"));
+		ARN_UNLOCK(sc);
+		(void) ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
+		return;
+	}
+#endif /* ARN_HW_BEACON_MISS_HANDLE */
 
 		ntimer = 1;
 	}
@@ -1615,14 +1689,29 @@ arn_watchdog(void *arg)
 		ieee80211_start_watchdog(ic, ntimer);
 }
 
+/* ARGSUSED */
 static struct ieee80211_node *
 arn_node_alloc(ieee80211com_t *ic)
 {
 	struct ath_node *an;
+#ifdef ARN_TX_AGGREGATION
 	struct arn_softc *sc = (struct arn_softc *)ic;
+#endif
 
 	an = kmem_zalloc(sizeof (struct ath_node), KM_SLEEP);
+
+	/* legacy rate control */
+#ifdef ARN_LEGACY_RC
 	arn_rate_update(sc, &an->an_node, 0);
+#endif
+
+#ifdef ARN_TX_AGGREGATION
+	if (sc->sc_flags & SC_OP_TXAGGR) {
+		arn_tx_node_init(sc, an);
+	}
+#endif /* ARN_TX_AGGREGATION */
+
+	an->last_rssi = ATH_RSSI_DUMMY_MARKER;
 
 	return ((an != NULL) ? &an->an_node : NULL);
 }
@@ -1635,6 +1724,11 @@ arn_node_free(struct ieee80211_node *in)
 	struct ath_buf *bf;
 	struct ath_txq *txq;
 	int32_t i;
+
+#ifdef ARN_TX_AGGREGATION
+	if (sc->sc_flags & SC_OP_TXAGGR)
+		arn_tx_node_cleanup(sc, in);
+#endif /* TX_AGGREGATION */
 
 	for (i = 0; i < ATH9K_NUM_TX_QUEUES; i++) {
 		if (ARN_TXQ_SETUP(sc, i)) {
@@ -2514,6 +2608,191 @@ arn_get_hw_encap(struct arn_softc *sc)
 		ic->ic_caps |= IEEE80211_C_TKIPMIC;
 }
 
+static void
+arn_setup_ht_cap(struct arn_softc *sc)
+{
+#define	ATH9K_HT_CAP_MAXRXAMPDU_65536 0x3	/* 2 ^ 16 */
+#define	ATH9K_HT_CAP_MPDUDENSITY_8 0x6		/* 8 usec */
+
+	/* LINTED E_FUNC_SET_NOT_USED */
+	uint8_t tx_streams;
+	uint8_t rx_streams;
+
+	arn_ht_conf *ht_info = &sc->sc_ht_conf;
+
+	ht_info->ht_supported = B_TRUE;
+
+	/* Todo: IEEE80211_HTCAP_SMPS */
+	ht_info->cap = IEEE80211_HTCAP_CHWIDTH40|
+	    IEEE80211_HTCAP_SHORTGI40 |
+	    IEEE80211_HTCAP_DSSSCCK40;
+
+	ht_info->ampdu_factor = ATH9K_HT_CAP_MAXRXAMPDU_65536;
+	ht_info->ampdu_density = ATH9K_HT_CAP_MPDUDENSITY_8;
+
+	/* set up supported mcs set */
+	(void) memset(&ht_info->rx_mcs_mask, 0, sizeof (ht_info->rx_mcs_mask));
+	tx_streams =
+	    !(sc->sc_ah->ah_caps.tx_chainmask &
+	    (sc->sc_ah->ah_caps.tx_chainmask - 1)) ? 1 : 2;
+	rx_streams =
+	    !(sc->sc_ah->ah_caps.rx_chainmask &
+	    (sc->sc_ah->ah_caps.rx_chainmask - 1)) ? 1 : 2;
+
+	ht_info->rx_mcs_mask[0] = 0xff;
+	if (rx_streams >= 2)
+		ht_info->rx_mcs_mask[1] = 0xff;
+}
+
+/* xxx should be used for ht rate set negotiating ? */
+static void
+arn_overwrite_11n_rateset(struct arn_softc *sc)
+{
+	uint8_t *ht_rs = sc->sc_ht_conf.rx_mcs_mask;
+	int mcs_idx, mcs_count = 0;
+	int i, j;
+
+	(void) memset(&ieee80211_rateset_11n, 0,
+	    sizeof (ieee80211_rateset_11n));
+	for (i = 0; i < 10; i++) {
+		for (j = 0; j < 8; j++) {
+			if (ht_rs[i] & (1 << j)) {
+				mcs_idx = i * 8 + j;
+				if (mcs_idx >= IEEE80211_HTRATE_MAXSIZE) {
+					break;
+				}
+
+				ieee80211_rateset_11n.rs_rates[mcs_idx] =
+				    (uint8_t)mcs_idx;
+				mcs_count++;
+			}
+		}
+	}
+
+	ieee80211_rateset_11n.rs_nrates = (uint8_t)mcs_count;
+
+	ARN_DBG((ARN_DBG_RATE, "arn_overwrite_11n_rateset(): "
+	    "MCS rate set supported by this station is as follows:\n"));
+
+	for (i = 0; i < ieee80211_rateset_11n.rs_nrates; i++) {
+		ARN_DBG((ARN_DBG_RATE, "MCS rate %d is %d\n",
+		    i, ieee80211_rateset_11n.rs_rates[i]));
+	}
+
+}
+
+/*
+ * Update WME parameters for a transmit queue.
+ */
+static int
+arn_tx_queue_update(struct arn_softc *sc, int ac)
+{
+#define	ATH_EXPONENT_TO_VALUE(v)	((1<<v)-1)
+#define	ATH_TXOP_TO_US(v)		(v<<5)
+	ieee80211com_t *ic = (ieee80211com_t *)sc;
+	struct ath_txq *txq;
+	struct wmeParams *wmep = &ic->ic_wme.wme_chanParams.cap_wmeParams[ac];
+	struct ath_hal *ah = sc->sc_ah;
+	struct ath9k_tx_queue_info qi;
+
+	txq = &sc->sc_txq[arn_get_hal_qnum(ac, sc)];
+	(void) ath9k_hw_get_txq_props(ah, txq->axq_qnum, &qi);
+
+	/*
+	 * TXQ_FLAG_TXOKINT_ENABLE = 0x0001
+	 * TXQ_FLAG_TXERRINT_ENABLE = 0x0001
+	 * TXQ_FLAG_TXDESCINT_ENABLE = 0x0002
+	 * TXQ_FLAG_TXEOLINT_ENABLE = 0x0004
+	 * TXQ_FLAG_TXURNINT_ENABLE = 0x0008
+	 * TXQ_FLAG_BACKOFF_DISABLE = 0x0010
+	 * TXQ_FLAG_COMPRESSION_ENABLE = 0x0020
+	 * TXQ_FLAG_RDYTIME_EXP_POLICY_ENABLE = 0x0040
+	 * TXQ_FLAG_FRAG_BURST_BACKOFF_ENABLE = 0x0080
+	 */
+
+	/* xxx should update these flags here? */
+#if 0
+	qi.tqi_qflags = TXQ_FLAG_TXOKINT_ENABLE |
+	    TXQ_FLAG_TXERRINT_ENABLE |
+	    TXQ_FLAG_TXDESCINT_ENABLE |
+	    TXQ_FLAG_TXURNINT_ENABLE;
+#endif
+
+	qi.tqi_aifs = wmep->wmep_aifsn;
+	qi.tqi_cwmin = ATH_EXPONENT_TO_VALUE(wmep->wmep_logcwmin);
+	qi.tqi_cwmax = ATH_EXPONENT_TO_VALUE(wmep->wmep_logcwmax);
+	qi.tqi_readyTime = 0;
+	qi.tqi_burstTime = ATH_TXOP_TO_US(wmep->wmep_txopLimit);
+
+	ARN_DBG((ARN_DBG_INIT,
+	    "%s:"
+	    "Q%u"
+	    "qflags 0x%x"
+	    "aifs %u"
+	    "cwmin %u"
+	    "cwmax %u"
+	    "burstTime %u\n",
+	    __func__,
+	    txq->axq_qnum,
+	    qi.tqi_qflags,
+	    qi.tqi_aifs,
+	    qi.tqi_cwmin,
+	    qi.tqi_cwmax,
+	    qi.tqi_burstTime));
+
+	if (!ath9k_hw_set_txq_props(ah, txq->axq_qnum, &qi)) {
+		arn_problem("unable to update hardware queue "
+		    "parameters for %s traffic!\n",
+		    ieee80211_wme_acnames[ac]);
+		return (0);
+	} else {
+		/* push to H/W */
+		(void) ath9k_hw_resettxqueue(ah, txq->axq_qnum);
+		return (1);
+	}
+
+#undef ATH_TXOP_TO_US
+#undef ATH_EXPONENT_TO_VALUE
+}
+
+/* Update WME parameters */
+static int
+arn_wme_update(ieee80211com_t *ic)
+{
+	struct arn_softc *sc = (struct arn_softc *)ic;
+
+	/* updateing */
+	return (!arn_tx_queue_update(sc, WME_AC_BE) ||
+	    !arn_tx_queue_update(sc, WME_AC_BK) ||
+	    !arn_tx_queue_update(sc, WME_AC_VI) ||
+	    !arn_tx_queue_update(sc, WME_AC_VO) ? EIO : 0);
+}
+
+/*
+ * Update tx/rx chainmask. For legacy association,
+ * hard code chainmask to 1x1, for 11n association, use
+ * the chainmask configuration.
+ */
+void
+arn_update_chainmask(struct arn_softc *sc)
+{
+	boolean_t is_ht = B_FALSE;
+	sc->sc_flags |= SC_OP_CHAINMASK_UPDATE;
+
+	is_ht = sc->sc_ht_conf.ht_supported;
+	if (is_ht) {
+		sc->sc_tx_chainmask = sc->sc_ah->ah_caps.tx_chainmask;
+		sc->sc_rx_chainmask = sc->sc_ah->ah_caps.rx_chainmask;
+	} else {
+		sc->sc_tx_chainmask = 1;
+		sc->sc_rx_chainmask = 1;
+	}
+
+	ARN_DBG((ARN_DBG_ATTACH, "arn: arn_attach(): "
+	    "tx_chainmask = %d, rx_chainmask = %d\n",
+	    sc->sc_tx_chainmask, sc->sc_rx_chainmask));
+}
+
 static int
 arn_resume(dev_info_t *devinfo)
 {
@@ -2693,8 +2972,9 @@ arn_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		ic->ic_caps |= IEEE80211_C_SHPREAMBLE |
 		    IEEE80211_C_SHSLOT;		/* short slot time */
 
-	/* temp workaround */
+	/* Temp workaround */
 	sc->sc_mrretry = 1;
+	sc->sc_config.ath_aggr_prot = 0;
 
 	/* Setup tx/rx descriptors */
 	err = arn_desc_alloc(devinfo, sc);
@@ -2808,24 +3088,21 @@ arn_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	sc->sc_config.txpowlimit = ATH_TXPOWER_MAX;
 	sc->sc_config.txpowlimit_override = 0;
 
-#ifdef ARN_11N
 	/* 11n Capabilities */
 	if (ah->ah_caps.hw_caps & ATH9K_HW_CAP_HT) {
 		sc->sc_flags |= SC_OP_TXAGGR;
 		sc->sc_flags |= SC_OP_RXAGGR;
+		arn_setup_ht_cap(sc);
+		arn_overwrite_11n_rateset(sc);
 	}
-#endif
 
-#ifdef ARN_11N
-	sc->sc_tx_chainmask = ah->ah_caps.tx_chainmask;
-	sc->sc_rx_chainmask = ah->ah_caps.rx_chainmask;
-#else
 	sc->sc_tx_chainmask = 1;
 	sc->sc_rx_chainmask = 1;
-#endif
 	ARN_DBG((ARN_DBG_ATTACH, "arn: arn_attach(): "
 	    "tx_chainmask = %d, rx_chainmask = %d\n",
 	    sc->sc_tx_chainmask, sc->sc_rx_chainmask));
+
+	/* arn_update_chainmask(sc); */
 
 	(void) ath9k_hw_setcapability(ah, ATH9K_CAP_DIVERSITY, 1, B_TRUE, NULL);
 	sc->sc_defant = ath9k_hw_getdefantenna(ah);
@@ -2845,12 +3122,38 @@ arn_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	for (i = 0; i < ARRAY_SIZE(sc->sc_bslot); i++)
 		sc->sc_bslot[i] = ATH_IF_ID_ANY;
 
-	/* save MISC configurations */
+	/* Save MISC configurations */
 	sc->sc_config.swBeaconProcess = 1;
 
+	/* Support QoS/WME */
+	ic->ic_caps |= IEEE80211_C_WME;
+	ic->ic_wme.wme_update = arn_wme_update;
 
-	ic->ic_caps |= IEEE80211_C_WPA;	/* Support WPA/WPA2 */
-	ic->ic_phytype = IEEE80211_T_OFDM;
+	/* Support 802.11n/HT */
+	if (sc->sc_ht_conf.ht_supported) {
+		ic->ic_htcaps =
+		    IEEE80211_HTCAP_CHWIDTH40 |
+		    IEEE80211_HTCAP_SHORTGI40 |
+		    IEEE80211_HTCAP_DSSSCCK40 |
+		    IEEE80211_HTCAP_MAXAMSDU_7935 |
+		    IEEE80211_HTC_HT |
+		    IEEE80211_HTC_AMSDU |
+		    IEEE80211_HTCAP_RXSTBC_2STREAM;
+
+#ifdef ARN_TX_AGGREGATION
+	ic->ic_htcaps |= IEEE80211_HTC_AMPDU;
+#endif
+	}
+
+	/* Header padding requested by driver */
+	ic->ic_flags |= IEEE80211_F_DATAPAD;
+	/* Support WPA/WPA2 */
+	ic->ic_caps |= IEEE80211_C_WPA;
+#if 0
+	ic->ic_caps |= IEEE80211_C_TXFRAG; /* handle tx frags */
+	ic->ic_caps |= IEEE80211_C_BGSCAN; /* capable of bg scanning */
+#endif
+	ic->ic_phytype = IEEE80211_T_HT;
 	ic->ic_opmode = IEEE80211_M_STA;
 	ic->ic_state = IEEE80211_S_INIT;
 	ic->ic_maxrssi = ARN_MAX_RSSI;
@@ -2866,8 +3169,18 @@ arn_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	    ddi_driver_name(devinfo),
 	    ddi_get_instance(devinfo));
 
+	if (sc->sc_ht_conf.ht_supported) {
+		sc->sc_recv_action = ic->ic_recv_action;
+		ic->ic_recv_action = arn_ampdu_recv_action;
+		// sc->sc_send_action = ic->ic_send_action;
+		// ic->ic_send_action = arn_ampdu_send_action;
+
+		ic->ic_ampdu_rxmax = sc->sc_ht_conf.ampdu_factor;
+		ic->ic_ampdu_density = sc->sc_ht_conf.ampdu_density;
+		ic->ic_ampdu_limit = ic->ic_ampdu_rxmax;
+	}
+
 	/* Override 80211 default routines */
-	ic->ic_reset = arn_reset;
 	sc->sc_newstate = ic->ic_newstate;
 	ic->ic_newstate = arn_newstate;
 #ifdef ARN_IBSS
@@ -2959,6 +3272,7 @@ arn_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		ARN_DBG((ARN_DBG_ATTACH, "WARN: arn: arn_attach(): "
 		    "Create minor node failed - %d\n", err));
 
+	/* Notify link is down now */
 	mac_link_update(ic->ic_mach, LINK_STATE_DOWN);
 
 	sc->sc_promisc = B_FALSE;
@@ -3177,7 +3491,7 @@ DDI_DEFINE_STREAM_OPS(arn_dev_ops, nulldev, nulldev, arn_attach, arn_detach,
 
 static struct modldrv arn_modldrv = {
 	&mod_driverops, /* Type of module.  This one is a driver */
-	"arn-Atheros 9000 series driver:vertion 1.1", /* short description */
+	"arn-Atheros 9000 series driver:2.0", /* short description */
 	&arn_dev_ops /* driver specific ops */
 };
 

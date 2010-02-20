@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -426,6 +426,9 @@ struct ar5416Stats {
 #define	AR5416_EEP_MINOR_VER_16		0x10
 #define	AR5416_EEP_MINOR_VER_17		0x11
 #define	AR5416_EEP_MINOR_VER_19		0x13
+/* 2.6.30 */
+#define	AR5416_EEP_MINOR_VER_20		0x14
+#define	AR5416_EEP_MINOR_VER_22		0x16
 
 #define	AR5416_NUM_5G_CAL_PIERS		8
 #define	AR5416_NUM_2G_CAL_PIERS		4
@@ -488,6 +491,10 @@ enum eeprom_param {
 	EEP_RX_MASK,
 	EEP_RXGAIN_TYPE,
 	EEP_TXGAIN_TYPE,
+	EEP_OL_PWRCTRL,
+	EEP_RC_CHAIN_MASK,
+	EEP_DAC_HPWR_5G,
+	EEP_FRAC_N_5G
 };
 
 enum ar5416_rates {
@@ -509,6 +516,7 @@ enum ath9k_hal_freq_band {
 };
 
 #pragma pack(1)
+/* 2.6.30 */
 struct base_eep_header {
 	uint16_t length;
 	uint16_t checksum;
@@ -527,9 +535,15 @@ struct base_eep_header {
 	uint8_t pwdclkind;
 	uint8_t futureBase_1[2];
 	uint8_t rxGainType;
-	uint8_t futureBase_2[3];
+	uint8_t dacHiPwrMode_5G;
+	uint8_t openLoopPwrCntl;
+	uint8_t dacLpMode;
 	uint8_t txGainType;
-	uint8_t futureBase_3[25];
+	uint8_t rcChainMask;
+	uint8_t desiredScaleCCK;
+	uint8_t power_table_offset;
+	uint8_t frac_n_5g;
+	uint8_t futureBase_3[21];
 };
 
 struct base_eep_header_4k {
@@ -955,6 +969,10 @@ struct ath_hal_5416 {
 #define	ath9k_hw_use_flash(_ah)	\
 	(!(_ah->ah_flags & AH_USE_EEPROM))
 
+/* 2.6.30 */
+#define	AR5416_VER_MASK	(eep->baseEepHeader.version & AR5416_EEP_VER_MINOR_MASK)
+#define	OLC_FOR_AR9280_20_LATER	(AR_SREV_9280_20_OR_LATER(ah) && \
+	ath9k_hw_get_eeprom(ah, EEP_OL_PWRCTRL))
 
 #define	DO_DELAY(x) do {			\
 		if ((++(x) % 64) == 0)          \
@@ -1082,8 +1100,8 @@ struct ath_hal_5416 {
 uint32_t ath9k_hw_get_eeprom(struct ath_hal *ah,
     enum eeprom_param param);
 
-#ifdef __cplusplus
+#ifdef	__cplusplus
 }
 #endif
 
-#endif /* _ARN_HW_H */
+#endif	/* _ARN_HW_H */

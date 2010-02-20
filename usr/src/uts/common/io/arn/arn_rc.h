@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@ extern "C" {
 #include "arn_ath9k.h"
 
 struct arn_softc;
+struct ath_buf;
 
 #define	ATH_RATE_MAX		30
 #define	RATE_TABLE_SIZE		64
@@ -49,6 +50,20 @@ struct arn_softc;
 #define	VALID_40	0x4
 #define	VALID_2040	(VALID_20|VALID_40)
 #define	VALID_ALL	(VALID_2040|VALID)
+
+enum {
+	WLAN_RC_PHY_OFDM,
+	WLAN_RC_PHY_CCK,
+	WLAN_RC_PHY_HT_20_SS,
+	WLAN_RC_PHY_HT_20_DS,
+	WLAN_RC_PHY_HT_40_SS,
+	WLAN_RC_PHY_HT_40_DS,
+	WLAN_RC_PHY_HT_20_SS_HGI,
+	WLAN_RC_PHY_HT_20_DS_HGI,
+	WLAN_RC_PHY_HT_40_SS_HGI,
+	WLAN_RC_PHY_HT_40_DS_HGI,
+	WLAN_RC_PHY_MAX
+};
 
 #define	WLAN_RC_PHY_DS(_phy)	((_phy == WLAN_RC_PHY_HT_20_DS)		|| \
 				(_phy == WLAN_RC_PHY_HT_40_DS)		|| \
@@ -195,20 +210,51 @@ struct ath_rate_priv {
 	struct ath_rateset neg_ht_rates;
 };
 
+enum ath9k_internal_frame_type {
+	ATH9K_NOT_INTERNAL,
+	ATH9K_INT_PAUSE,
+	ATH9K_INT_UNPAUSE
+};
+
 struct ath_tx_info_priv {
 	struct ath_tx_status tx;
 	int n_frames;
 	int n_bad_frames;
 	boolean_t update_rc;
+	enum ath9k_internal_frame_type frame_type;
 };
 
 #define	ATH_TX_INFO_PRIV(tx_info)	\
 	((struct ath_tx_info_priv *)((tx_info)->rate_driver_data[0]))
 
+/* Temp private definitions for RC */
+struct ath9k_tx_rate {
+	int8_t idx;
+	uint8_t count;
+	uint8_t flags;
+};
+
+enum ath9k_rate_control_flags {
+	ATH9K_TX_RC_USE_RTS_CTS		= BIT(0),
+	ATH9K_TX_RC_USE_CTS_PROTECT		= BIT(1),
+	ATH9K_TX_RC_USE_SHORT_PREAMBLE	= BIT(2),
+	ATH9K_TX_RC_MCS			= BIT(3),
+	ATH9K_TX_RC_GREEN_FIELD		= BIT(4),
+	ATH9K_TX_RC_40_MHZ_WIDTH		= BIT(5),
+	ATH9K_TX_RC_DUP_DATA		= BIT(6),
+	ATH9K_TX_RC_SHORT_GI		= BIT(7),
+};
+
 /* RATE */
+void arn_tx_status(struct arn_softc *sc, struct ath_buf *bf, boolean_t is_data);
+void arn_get_rate(struct arn_softc *sc, struct ath_buf *bf,
+    struct ieee80211_frame *wh);
+void arn_rate_init(struct arn_softc *sc, struct ieee80211_node *in);
+
+
 void arn_rate_attach(struct arn_softc *sc);
-void arn_rate_update(struct arn_softc *sc, struct ieee80211_node *in,
-    int32_t rate);
+void arn_rate_update(struct arn_softc *sc,
+    struct ieee80211_node *in, int32_t rate);
 void arn_rate_ctl_start(struct arn_softc *sc, struct ieee80211_node *in);
 void arn_rate_cb(void *arg, struct ieee80211_node *in);
 void arn_rate_ctl_reset(struct arn_softc *sc, enum ieee80211_state state);
