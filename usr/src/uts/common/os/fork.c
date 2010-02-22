@@ -974,6 +974,28 @@ getproc(proc_t **cpp, pid_t pid, uint_t flags)
 		goto bad;
 	}
 
+	mutex_enter(&pp->p_lock);
+	cp->p_exec = pp->p_exec;
+	cp->p_execdir = pp->p_execdir;
+	mutex_exit(&pp->p_lock);
+
+	if (cp->p_exec) {
+		VN_HOLD(cp->p_exec);
+		/*
+		 * Each VOP_OPEN() must be paired with a corresponding
+		 * VOP_CLOSE(). In this case, the executable will be
+		 * closed for the child in either proc_exit() or gexec().
+		 */
+		if (VOP_OPEN(&cp->p_exec, FREAD, CRED(), NULL) != 0) {
+			VN_RELE(cp->p_exec);
+			cp->p_exec = NULLVP;
+			cp->p_execdir = NULLVP;
+			goto bad;
+		}
+	}
+	if (cp->p_execdir)
+		VN_HOLD(cp->p_execdir);
+
 	/*
 	 * If not privileged make sure that this user hasn't exceeded
 	 * v.v_maxup processes, and that users collectively haven't
@@ -1011,12 +1033,9 @@ getproc(proc_t **cpp, pid_t pid, uint_t flags)
 	cp->p_flag = pp->p_flag & (SJCTL|SNOWAIT|SNOCD);
 	cp->p_sessp = pp->p_sessp;
 	sess_hold(pp);
-	cp->p_exec = pp->p_exec;
-	cp->p_execdir = pp->p_execdir;
 	cp->p_brand = pp->p_brand;
 	if (PROC_IS_BRANDED(pp))
 		BROP(pp)->b_copy_procdata(cp, pp);
-
 	cp->p_bssbase = pp->p_bssbase;
 	cp->p_brkbase = pp->p_brkbase;
 	cp->p_brksize = pp->p_brksize;
@@ -1164,10 +1183,6 @@ getproc(proc_t **cpp, pid_t pid, uint_t flags)
 	 */
 	cp->p_fixalignment = pp->p_fixalignment;
 
-	if (cp->p_exec)
-		VN_HOLD(cp->p_exec);
-	if (cp->p_execdir)
-		VN_HOLD(cp->p_execdir);
 	*cpp = cp;
 	return (0);
 

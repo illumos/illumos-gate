@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,7 +27,7 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" /* from S5R4 1.6 */
+/* from S5R4 1.6 */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -227,6 +227,14 @@ intpexec(
 
 	error = gexec(&nvp, uap, args, &idata, ++level, execsz, exec_file, cred,
 	    EBA_NONE);
+
+	if (!error) {
+		/*
+		 * Close this executable as the interpreter
+		 * will open and close it later on.
+		 */
+		(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, cred, NULL);
+	}
 done:
 	VN_RELE(nvp);
 	args->pathname = opath;

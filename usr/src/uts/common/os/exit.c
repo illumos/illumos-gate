@@ -538,10 +538,6 @@ proc_exit(int why, int what)
 	p->p_exec = NULLVP;
 	p->p_execdir = NULLVP;
 	mutex_exit(&p->p_lock);
-	if (exec_vp)
-		VN_RELE(exec_vp);
-	if (execdir_vp)
-		VN_RELE(execdir_vp);
 
 	pr_free_watched_pages(p);
 
@@ -576,6 +572,17 @@ proc_exit(int why, int what)
 	 * Free address space.
 	 */
 	relvm();
+
+	if (exec_vp) {
+		/*
+		 * Close this executable which has been opened when the process
+		 * was created by getproc().
+		 */
+		(void) VOP_CLOSE(exec_vp, FREAD, 1, (offset_t)0, CRED(), NULL);
+		VN_RELE(exec_vp);
+	}
+	if (execdir_vp)
+		VN_RELE(execdir_vp);
 
 	/*
 	 * Release held contracts.

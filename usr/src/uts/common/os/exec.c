@@ -523,7 +523,7 @@ gexec(
 	struct cred *cred,
 	int brand_action)
 {
-	struct vnode *vp;
+	struct vnode *vp, *execvp = NULL;
 	proc_t *pp = ttoproc(curthread);
 	struct execsw *eswp;
 	int error = 0;
@@ -549,11 +549,11 @@ gexec(
 	}
 
 	if ((error = execpermissions(*vpp, &vattr, args)) != 0)
-		goto bad;
+		goto bad_noclose;
 
-	/* need to open vnode for stateful file systems like rfs */
+	/* need to open vnode for stateful file systems */
 	if ((error = VOP_OPEN(vpp, FREAD, CRED(), NULL)) != 0)
-		goto bad;
+		goto bad_noclose;
 	vp = *vpp;
 
 	/*
@@ -704,16 +704,31 @@ gexec(
 	if (setid & PRIV_INCREASE)
 		setidfl |= EXECSETID_PRIVS;
 
+	execvp = pp->p_exec;
+	if (execvp)
+		VN_HOLD(execvp);
+
 	error = (*eswp->exec_func)(vp, uap, args, idatap, level, execsz,
 	    setidfl, exec_file, cred, brand_action);
 	rw_exit(eswp->exec_lock);
 	if (error != 0) {
 		if (newcred != NULL)
 			crfree(newcred);
+		if (execvp)
+			VN_RELE(execvp);
 		goto bad;
 	}
 
 	if (level == 0) {
+		if (execvp != NULL) {
+			/*
+			 * Close the previous executable only if we are
+			 * at level 0.
+			 */
+			(void) VOP_CLOSE(execvp, FREAD, 1, (offset_t)0,
+			    cred, NULL);
+		}
+
 		mutex_enter(&pp->p_crlock);
 		if (newcred != NULL) {
 			/*
@@ -783,9 +798,14 @@ gexec(
 		if (args->traceinval)
 			prinvalidate(&pp->p_user);
 	}
-
+	if (execvp)
+		VN_RELE(execvp);
 	return (0);
+
 bad:
+	(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, cred, NULL);
+
+bad_noclose:
 	if (error == 0)
 		error = ENOEXEC;
 

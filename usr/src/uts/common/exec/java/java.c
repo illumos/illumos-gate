@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Launch Java executables via exec(2).
@@ -163,6 +161,15 @@ javaexec(vnode_t *vp, struct execa *uap, struct uarg *args,
 	pn_free(&lookpn);
 	error = gexec(&nvp, uap, args, &idata, level + 1, execsz, execfile,
 	    cred, EBA_NONE);
+
+	if (!error) {
+		/*
+		 * Close this Java executable as the interpreter
+		 * will open and close it later on.
+		 */
+		(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, cred, NULL);
+	}
+
 	VN_RELE(nvp);
 	args->pathname = opath;
 	pn_free(&resolvepn);
