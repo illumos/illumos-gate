@@ -1111,11 +1111,17 @@ zvol_dumpio(zvol_state_t *zv, void *addr, uint64_t offset, uint64_t size,
 		offset -= ze->ze_nblks * zv->zv_volblocksize;
 		ze = list_next(&zv->zv_extents, ze);
 	}
-	spa_config_enter(spa, SCL_STATE, FTAG, RW_READER);
+
+	if (!ddi_in_panic())
+		spa_config_enter(spa, SCL_STATE, FTAG, RW_READER);
+
 	vd = vdev_lookup_top(spa, DVA_GET_VDEV(&ze->ze_dva));
 	offset += DVA_GET_OFFSET(&ze->ze_dva);
 	error = zvol_dumpio_vdev(vd, addr, offset, size, doread, isdump);
-	spa_config_exit(spa, SCL_STATE, FTAG);
+
+	if (!ddi_in_panic())
+		spa_config_exit(spa, SCL_STATE, FTAG);
+
 	return (error);
 }
 
