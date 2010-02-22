@@ -6524,8 +6524,6 @@ stmf_abort_target_reset(scsi_task_t *task)
 	stmf_i_lu_t *ilu;
 	int i;
 
-	ASSERT(iss->iss_flags & ISS_RESET_ACTIVE);
-
 	rw_enter(iss->iss_lockp, RW_READER);
 	lm = iss->iss_sm;
 	for (i = 0; i < lm->lm_nentries; i++) {
