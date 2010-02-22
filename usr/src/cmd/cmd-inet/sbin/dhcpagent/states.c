@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * This module contains core functions for managing DHCP state machine
@@ -1038,6 +1038,7 @@ get_smach_cid(dhcp_smach_t *dsmp)
 			dsmp->dsm_cid = malloc(client_id_len);
 			if (dsmp->dsm_cid == NULL)
 				goto alloc_failure;
+			dsmp->dsm_cidlen = client_id_len;
 			(void) memcpy(dsmp->dsm_cid, value, client_id_len);
 			return (DHCP_IPC_SUCCESS);
 		}
