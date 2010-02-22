@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* LINTLIBRARY */
@@ -136,9 +136,13 @@ const char	*conv_ehdr_type(uchar_t, Half, Conv_fmt_flags_t,
 		    Conv_inv_buf_t *);
 const char	*conv_ehdr_vers(Word, Conv_fmt_flags_t, Conv_inv_buf_t *);
 const char	*conv_elfdata_type(Elf_Type, Conv_inv_buf_t *);
+const char	*conv_ent_flags(ec_flags_t, Conv_ent_flags_buf_t *);
+const char	*conv_ent_filcmp(Word, Conv_fmt_flags_t, Conv_inv_buf_t *);
 const char	*conv_grphdl_flags(uint_t, Conv_grphdl_flags_buf_t *);
 const char	*conv_grpdesc_flags(uint_t, Conv_grpdesc_flags_buf_t *);
 Isa_desc	*conv_isalist(void);
+const char	*conv_mapfile_version(Word, Conv_fmt_flags_t,
+		    Conv_inv_buf_t *);
 const char	*conv_phdr_flags(uchar_t, Word, Conv_fmt_flags_t,
 		    Conv_phdr_flags_buf_t *);
 const char	*conv_phdr_type(uchar_t, Half, Word, Conv_fmt_flags_t,

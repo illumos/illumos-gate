@@ -134,7 +134,7 @@ process_options(const char *name, Boolean set, Dbg_desc *dbp,
 void
 Dbg_help(void)
 {
-	Dbg_util_nl(0, DBG_NL_FRC);
+	Dbg_util_nl(0, DBG_NL_STD);
 	dbg_print(0, MSG_INTL(MSG_USE_R1_A));
 	dbg_print(0, MSG_INTL(MSG_USE_R1_B));
 	dbg_print(0, MSG_INTL(MSG_USE_R1_C));
@@ -279,6 +279,17 @@ Dbg_help(void)
 	dbg_print(0, MSG_INTL(MSG_USE_R9_I));
 
 	Dbg_util_nl(0, DBG_NL_FRC);
+}
+
+/*
+ * Provide a debugging message showing the version of the linker package
+ */
+void
+Dbg_version(void)
+{
+	Dbg_util_nl(0, DBG_NL_STD);
+	dbg_print(0, MSG_ORIG(MSG_STR_LDVER), link_ver_string);
+	Dbg_util_nl(0, DBG_NL_STD);
 }
 
 /*
@@ -534,4 +545,32 @@ dbg_print(Lm_list *lml, const char *format, ...)
 	(void) vprintf(format, ap);
 	(void) printf(MSG_ORIG(MSG_STR_NL));
 	va_end(ap);
+}
+
+/*
+ * Return an internationalized state transition string. These are used by
+ * various debugging output.
+ */
+const char *
+Dbg_state_str(dbg_state_t type)
+{
+	static const Msg state[DBG_STATE_NUM] = {
+		MSG_STR_ADD,		/* MSG_INTL(MSG_STR_ADD)  */
+		MSG_STR_CURRENT,	/* MSG_INTL(MSG_STR_CURRENT) */
+		MSG_STR_EXCLUDE,	/* MSG_INTL(MSG_STR_EXCLUDE) */
+		MSG_STR_IGNORE,		/* MSG_INTL(MSG_STR_IGNORE) */
+		MSG_STR_MOD_BEFORE,	/* MSG_INTL(MSG_STR_MOD_BEFORE) */
+		MSG_STR_MOD_AFTER,	/* MSG_INTL(MSG_STR_MOD_AFTER) */
+		MSG_STR_NEW,		/* MSG_INTL(MSG_STR_NEW) */
+		MSG_STR_NEW_IMPLICIT,	/* MSG_INTL(MSG_STR_NEW_IMPLICIT) */
+		MSG_STR_OUT,		/* MSG_INTL(MSG_STR_OUT) */
+		MSG_STR_RESET,		/* MSG_INTL(MSG_STR_RESET) */
+		MSG_STR_RESOLVED,	/* MSG_INTL(MSG_STR_RESOLVED) */
+	};
+#if DBG_STATE_NUM != (DBG_STATE_RESOLVED + 1)
+#error DBG_SEG_NUM has changed. Update segtype[]
+#endif
+
+	assert(type < DBG_STATE_NUM);
+	return (MSG_INTL(state[type]));
 }

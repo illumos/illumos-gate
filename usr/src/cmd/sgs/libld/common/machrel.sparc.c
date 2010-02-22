@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2168,6 +2168,7 @@ ld_targ_init_sparc(void)
 			M_SEGM_ORIGIN,		/* m_segm_origin */
 			M_SEGM_AORIGIN,		/* m_segm_aorigin */
 			M_DATASEG_PERM,		/* m_dataseg_perm */
+			M_STACK_PERM,		/* m_stack_perm */
 			M_WORD_ALIGN,		/* m_word_align */
 						/* m_def_interp */
 #if	defined(_ELF64)

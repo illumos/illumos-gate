@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -50,10 +50,15 @@ C99_DISABLE =	$(C99_ENABLE)
 CFLAGS +=	$(CCVERBOSE) $(DEBUG) $(XFFLAG)
 CFLAGS64 +=	$(CCVERBOSE) $(DEBUG) $(XFFLAG)
 
+#
+# Location of the shared elfcap code
+#
+ELFCAP=		$(SRC)/common/elfcap
+
 # Reassign CPPFLAGS so that local search paths are used before any parent
 # $ROOT paths.
 CPPFLAGS =	-I. -I../common -I../../include -I../../include/$(MACH) \
-		$(VAR_CPPFLAGS) $(CPPFLAGS.master)
+		$(VAR_CPPFLAGS) $(CPPFLAGS.master) -I$(ELFCAP)
 
 # PICS64 is unique to our environment
 $(PICS64) :=	sparc_CFLAGS += -xregs=no%appl -K pic
@@ -90,6 +95,7 @@ ELFLIBDIR64 =	-L$(SGSHOME)/libelf/$(MACH64)
 
 LDDBGLIBDIR =	-L$(SGSHOME)/liblddbg/$(MACH)
 LDDBGLIBDIR64 =	-L$(SGSHOME)/liblddbg/$(MACH64)
+
 
 # The cmd/Makefile.com and lib/Makefile.com define TEXT_DOMAIN.  We don't need
 # this definition as the sgs utilities obtain their domain via sgsmsg(1l).

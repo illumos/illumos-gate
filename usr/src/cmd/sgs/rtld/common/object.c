@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -217,6 +217,7 @@ elf_obj_fini(Lm_list *lml, Rt_map *lmp, int *in_nfavl)
 	Fdesc			fd = { 0 };
 	Grp_hdl			*ghp;
 	Rej_desc		rej = { 0 };
+	elfcap_mask_t		cap_value;
 
 	DBG_CALL(Dbg_util_nl(lml, DBG_NL_STD));
 
@@ -230,7 +231,8 @@ elf_obj_fini(Lm_list *lml, Rt_map *lmp, int *in_nfavl)
 	 * hardware or software capabilities have been established, ensure that
 	 * they are appropriate for this platform.
 	 */
-	if ((ofl->ofl_hwcap_1) && (hwcap_check(ofl->ofl_hwcap_1, &rej) == 0)) {
+	cap_value = CAPMASK_VALUE(&ofl->ofl_ocapset.c_hw_1);
+	if (cap_value && (hwcap_check(cap_value, &rej) == 0)) {
 		if ((lml_main.lm_flags & LML_FLG_TRC_LDDSTUB) && lmp &&
 		    (FLAGS1(lmp) & FL1_RT_LDDSTUB) && (NEXT(lmp) == NULL)) {
 			(void) printf(MSG_INTL(MSG_LDD_GEN_HWCAP_1),
@@ -239,7 +241,8 @@ elf_obj_fini(Lm_list *lml, Rt_map *lmp, int *in_nfavl)
 		return (NULL);
 	}
 
-	if ((ofl->ofl_sfcap_1) && (sfcap_check(ofl->ofl_sfcap_1, &rej) == 0)) {
+	cap_value = CAPMASK_VALUE(&ofl->ofl_ocapset.c_sf_1);
+	if (cap_value && (sfcap_check(cap_value, &rej) == 0)) {
 		if ((lml_main.lm_flags & LML_FLG_TRC_LDDSTUB) && lmp &&
 		    (FLAGS1(lmp) & FL1_RT_LDDSTUB) && (NEXT(lmp) == NULL)) {
 			(void) printf(MSG_INTL(MSG_LDD_GEN_SFCAP_1),

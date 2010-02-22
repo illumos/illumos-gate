@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -125,7 +125,7 @@
 
 # Versioning diagnostics.
 
-@ MSG_VER_NFOUND	"%s: version `%s' not found (required by file %s)"
+@ MSG_VER_NFOUND	"%s: version '%s' not found (required by file %s)"
 
 
 # Diagnostics generated under the control of ldd(1).

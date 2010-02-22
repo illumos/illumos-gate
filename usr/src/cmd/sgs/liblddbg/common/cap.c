@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,26 +64,9 @@ Dbg_cap_val_hw1(Lm_list *lml, Xword val, Half mach)
 	Dbg_util_nl(lml, DBG_NL_FRC);
 }
 
-static const Msg captype[] = {
-	MSG_STR_INITIAL,		/* MSG_INTL(MSG_STR_INITIAL) */
-	MSG_STR_IGNORE,			/* MSG_INTL(MSG_STR_IGNORE) */
-	MSG_STR_OLD,			/* MSG_INTL(MSG_STR_OLD) */
-	MSG_STR_NEW,			/* MSG_INTL(MSG_STR_NEW) */
-	MSG_STR_RESOLVED		/* MSG_INTL(MSG_STR_RESOLVED) */
-};
-
 void
-Dbg_cap_mapfile(Lm_list *lml, Xword tag, Xword val, Half mach)
-{
-	if (DBG_NOTCLASS(DBG_C_MAP | DBG_C_CAP))
-		return;
-
-	dbg_print(lml, MSG_INTL(MSG_MAP_CAP));
-	Dbg_cap_sec_entry(lml, DBG_CAP_INITIAL, tag, val, mach);
-}
-
-void
-Dbg_cap_sec_entry(Lm_list *lml, uint_t type, Xword tag, Xword val, Half mach)
+Dbg_cap_entry(Lm_list *lml, dbg_state_t dbg_state, Xword tag, Xword val,
+    Half mach)
 {
 	Conv_inv_buf_t		inv_buf;
 	Conv_cap_val_buf_t	cap_val_buf;
@@ -91,9 +74,38 @@ Dbg_cap_sec_entry(Lm_list *lml, uint_t type, Xword tag, Xword val, Half mach)
 	if (DBG_NOTCLASS(DBG_C_CAP))
 		return;
 
-	dbg_print(lml, MSG_INTL(MSG_CAP_SEC_ENTRY), MSG_INTL(captype[type]),
+	dbg_print(lml, MSG_INTL(MSG_CAP_ENTRY), Dbg_state_str(dbg_state),
 	    conv_cap_tag(tag, 0, &inv_buf), conv_cap_val(tag, val, mach,
 	    &cap_val_buf));
+}
+
+/*
+ * This version takes a pointer to a CapMask, and will report the exclusion
+ * bits if they exist.
+ */
+void
+Dbg_cap_entry2(Lm_list *lml, dbg_state_t dbg_state, Xword tag, CapMask *cmp,
+    Half mach)
+{
+	Conv_inv_buf_t		inv_buf;
+	Conv_cap_val_buf_t	cap_val_buf1, cap_val_buf2;
+
+	if (DBG_NOTCLASS(DBG_C_CAP))
+		return;
+
+	/* If there is no exclusion mask, use the simpler format */
+	if (cmp->cm_exclude == 0) {
+		dbg_print(lml, MSG_INTL(MSG_CAP_ENTRY),
+		    Dbg_state_str(dbg_state), conv_cap_tag(tag, 0, &inv_buf),
+		    conv_cap_val(tag, cmp->cm_value, mach, &cap_val_buf1));
+		return;
+	}
+
+
+	dbg_print(lml, MSG_INTL(MSG_CAP_ENTRY_EXC), Dbg_state_str(dbg_state),
+	    conv_cap_tag(tag, 0, &inv_buf),
+	    conv_cap_val(tag, cmp->cm_value, mach, &cap_val_buf1),
+	    conv_cap_val(tag, cmp->cm_exclude, mach, &cap_val_buf2));
 }
 
 void
@@ -104,6 +116,25 @@ Dbg_cap_sec_title(Lm_list *lml, const char *name)
 
 	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_INTL(MSG_CAP_SEC_TITLE), name);
+}
+
+void
+Dbg_cap_out_title(Lm_list *lml)
+{
+	if (DBG_NOTCLASS(DBG_C_CAP))
+		return;
+
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_CAP_OUT_TITLE));
+}
+
+void
+Dbg_cap_mapfile_title(Lm_list *lml, Lineno lineno)
+{
+	if (DBG_NOTCLASS(DBG_C_MAP | DBG_C_CAP))
+		return;
+
+	dbg_print(lml, MSG_INTL(MSG_MAP_CAP), EC_LINENO(lineno));
 }
 
 void

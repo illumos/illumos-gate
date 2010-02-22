@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3215,7 +3215,7 @@ ld_update_outfile(Ofl_desc *ofl)
 	 */
 	if (ofl->ofl_flags & FLG_OF_EXEC) {
 #if	defined(_ELF64)
-		if (ofl->ofl_sfcap_1 & SF1_SUNW_ADDR32)
+		if (ofl->ofl_ocapset.c_sf_1.cm_value & SF1_SUNW_ADDR32)
 			vaddr = ld_targ.t_m.m_segm_aorigin;
 		else
 #endif
@@ -3228,9 +3228,10 @@ ld_update_outfile(Ofl_desc *ofl)
 	 */
 	DBG_CALL(Dbg_seg_title(ofl->ofl_lml));
 	for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp)) {
-		Phdr	*phdr = &(sgp->sg_phdr);
-		Xword 	p_align;
-		Aliste	idx2;
+		Phdr		*phdr = &(sgp->sg_phdr);
+		Xword 		p_align;
+		Aliste		idx2;
+		Sym_desc	*sdp;
 
 		segndx++;
 
@@ -3337,6 +3338,17 @@ ld_update_outfile(Ofl_desc *ofl)
 			phdr->p_align = shdr->sh_addralign;
 			phdr->p_paddr = 0;
 			ofl->ofl_phdr[phdrndx++] = *phdr;
+			continue;
+		}
+
+		/*
+		 * The sunwstack program is used to convey non-default
+		 * flags for the process stack. Only emit it if it would
+		 * change the default.
+		 */
+		if (phdr->p_type == PT_SUNWSTACK) {
+			if ((sgp->sg_flags & FLG_SG_DISABLED) == 0)
+				ofl->ofl_phdr[phdrndx++] = *phdr;
 			continue;
 		}
 
@@ -3506,11 +3518,11 @@ ld_update_outfile(Ofl_desc *ofl)
 		}
 
 		/*
-		 * If a segment size symbol is required (specified via a
-		 * mapfile) update its value.
+		 * If segment size symbols are required (specified via a
+		 * mapfile) update their value.
 		 */
-		if (sgp->sg_sizesym != NULL)
-			sgp->sg_sizesym->sd_sym->st_value = phdr->p_memsz;
+		for (APLIST_TRAVERSE(sgp->sg_sizesym, idx2, sdp))
+			sdp->sd_sym->st_value = phdr->p_memsz;
 
 		/*
 		 * If no file content has been assigned to this segment (it
@@ -3522,11 +3534,11 @@ ld_update_outfile(Ofl_desc *ofl)
 
 		/*
 		 * If a virtual address has been specified for this segment
-		 * (presumably from a mapfile) use it and make sure the
-		 * previous segment does not run into this segment.
+		 * from a mapfile use it and make sure the previous segment
+		 * does not run into this segment.
 		 */
 		if (phdr->p_type == PT_LOAD) {
-			if ((sgp->sg_flags & FLG_SG_VADDR)) {
+			if ((sgp->sg_flags & FLG_SG_P_VADDR)) {
 				if (_phdr && (vaddr > phdr->p_vaddr) &&
 				    (phdr->p_type == PT_LOAD))
 					eprintf(ofl->ofl_lml, ERR_WARNING,
@@ -3545,7 +3557,7 @@ ld_update_outfile(Ofl_desc *ofl)
 		/*
 		 * Adjust the address offset and p_align if needed.
 		 */
-		if (((sgp->sg_flags & FLG_SG_VADDR) == 0) &&
+		if (((sgp->sg_flags & FLG_SG_P_VADDR) == 0) &&
 		    ((ofl->ofl_dtflags_1 & DF_1_NOHDR) == 0)) {
 			if (phdr->p_align != 0)
 				vaddr += phdr->p_offset % phdr->p_align;

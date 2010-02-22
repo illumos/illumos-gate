@@ -1548,3 +1548,5 @@ Bugid   Risk Synopsis
 6923449 elfdump misinterprets _init/_fini symbols in dynamic section test
 6914728 Add dl_iterate_phdr() function to ld.so.1 (D)
 	PSARC/2010/015 dl_iterate_phdr
+6916788 ld version 2 mapfile syntax (D)
+	PSARC/2009/688 Human readable and extensible ld mapfile syntax

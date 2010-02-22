@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,13 +36,16 @@
 const conv_ds_t **
 conv_cap_tag_strings(Conv_fmt_flags_t fmt_flags)
 {
+#if	(CA_SUNW_NUM != (CA_SUNW_HW_2 + 1))
+#error	"CA_SUNW_NUM has grown"
+#endif
 	static const Msg	tags_cf[] = {
 		MSG_CA_SUNW_NULL_CF,	MSG_CA_SUNW_HW_1_CF,
-		MSG_CA_SUNW_SF_1_CF
+		MSG_CA_SUNW_SF_1_CF,	MSG_CA_SUNW_HW_2_CF
 	};
 	static const Msg	tags_nf[] = {
 		MSG_CA_SUNW_NULL_NF,	MSG_CA_SUNW_HW_1_NF,
-		MSG_CA_SUNW_SF_1_NF
+		MSG_CA_SUNW_SF_1_NF,	MSG_CA_SUNW_HW_2_NF,
 	};
 	static const conv_ds_msg_t ds_tags_cf = {
 	    CONV_DS_MSG_INIT(ELFCLASSNONE, tags_cf) };

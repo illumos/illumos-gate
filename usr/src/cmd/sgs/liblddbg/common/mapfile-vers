@@ -41,7 +41,7 @@
 # MAPFILE HEADER END
 #
 
-SUNWprivate_4.75 {
+SUNWprivate_4.76 {
 	global:
 		dbg_desc = NODIRECT;	# interposed - ld.so.1(1)
 		dbg_print = NODIRECT;	# interposed - ld(1) and ld.so.1(1)
@@ -69,6 +69,8 @@ SUNWprivate_4.75 {
 
 		Dbg_help;
 		Dbg_setup;
+		Dbg_state_str;
+		Dbg_version;
 
 		Dbg32_bind_global;
 		Dbg64_bind_global;
@@ -85,10 +87,14 @@ SUNWprivate_4.75 {
 		Dbg64_cap_hw_candidate;
 		Dbg32_cap_hw_filter;
 		Dbg64_cap_hw_filter;
-		Dbg32_cap_mapfile;
-		Dbg64_cap_mapfile;
-		Dbg32_cap_sec_entry;
-		Dbg64_cap_sec_entry;
+		Dbg32_cap_mapfile_title;
+		Dbg64_cap_mapfile_title;
+		Dbg32_cap_entry;
+		Dbg64_cap_entry;
+		Dbg32_cap_entry2;
+		Dbg64_cap_entry2;
+		Dbg32_cap_out_title;
+		Dbg64_cap_out_title;
 		Dbg32_cap_sec_title;
 		Dbg64_cap_sec_title;
 		Dbg32_cap_val_hw1;
@@ -208,28 +214,38 @@ SUNWprivate_4.75 {
 		Dbg32_libs_ylu;
 		Dbg64_libs_ylu;
 
-		Dbg32_map_dash;
-		Dbg64_map_dash;
+		Dbg32_map_cexp_id;
+		Dbg64_map_cexp_id;
+		Dbg32_map_dv;
+		Dbg64_map_dv;
+		Dbg32_map_dv_entry;
+		Dbg64_map_dv_entry;
 		Dbg32_map_ent;
 		Dbg64_map_ent;
+		Dbg32_map_ent_ord_title;
+		Dbg64_map_ent_ord_title;
+		Dbg32_map_hdr_noalloc;
+		Dbg64_map_hdr_noalloc;
 		Dbg32_map_parse;
 		Dbg64_map_parse;
-		Dbg32_map_pipe;
-		Dbg64_map_pipe;
-		Dbg32_map_set_atsign;
-		Dbg64_map_set_atsign;
+		Dbg32_map_pass;
+		Dbg64_map_pass;
+		Dbg32_map_post_title;
+		Dbg64_map_post_title;
 		Dbg32_map_seg;
 		Dbg64_map_seg;
-		Dbg32_map_set_equal;
-		Dbg64_map_set_equal;
+		Dbg32_map_seg_order;
+		Dbg64_map_seg_order;
+		Dbg32_map_seg_os_order;
+		Dbg64_map_seg_os_order;
 		Dbg32_map_size_new;
 		Dbg64_map_size_new;
 		Dbg32_map_size_old;
 		Dbg64_map_size_old;
-		Dbg32_map_sort;
-		Dbg64_map_sort;
 		Dbg32_map_sort_seg;
 		Dbg64_map_sort_seg;
+		Dbg32_map_sort_title;
+		Dbg64_map_sort_title;
 		Dbg32_map_symbol;
 		Dbg64_map_symbol;
 		Dbg32_map_version;

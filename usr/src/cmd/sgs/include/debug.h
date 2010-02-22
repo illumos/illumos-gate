@@ -134,12 +134,6 @@ extern "C" {
 #define	DBG_BINFO_REF_MSK	0xf000
 
 
-#define	DBG_CAP_INITIAL		0
-#define	DBG_CAP_IGNORE		1
-#define	DBG_CAP_OLD		2
-#define	DBG_CAP_NEW		3
-#define	DBG_CAP_RESOLVED	4
-
 #define	DBG_REL_START		1
 #define	DBG_REL_FINISH		2
 #define	DBG_REL_NONE		3
@@ -152,6 +146,26 @@ extern "C" {
 #define	DBG_BNDREJ_SINGLE	2	/* bind rejected, singleton without */
 					/*    default search model */
 #define	DBG_BNDREJ_NUM		DBG_BNDREJ_SINGLE
+
+/*
+ * Dbg_state_str() is used to obtain commonly used "state transition"
+ * strings used in various debugging output.
+ */
+#define	DBG_STATE_ADD		0	/* add */
+#define	DBG_STATE_CURRENT	1	/* current */
+#define	DBG_STATE_EXCLUDE	2	/* exclude */
+#define	DBG_STATE_IGNORED	3	/* ignored */
+#define	DBG_STATE_MOD_BEFORE	4	/* modify (before) */
+#define	DBG_STATE_MOD_AFTER	5	/* modify (after) */
+#define	DBG_STATE_NEW 		6	/* new */
+#define	DBG_STATE_NEW_IMPLICIT	7	/* new (implicit) */
+#define	DBG_STATE_OUT		8	/* out */
+#define	DBG_STATE_RESET		9	/* reset */
+#define	DBG_STATE_RESOLVED	10	/* resolved */
+
+#define	DBG_STATE_NUM		11
+typedef uint_t dbg_state_t;
+extern	const char *Dbg_state_str(dbg_state_t);
 
 /*
  * Define a debug descriptor, and a user macro that inspects the descriptor as
@@ -169,6 +183,11 @@ typedef struct {
 
 extern	Dbg_desc	*dbg_desc;
 
+/*
+ * Macros used to avoid calls to liblddbg unless debugging is enabled.
+ * liblddbg is lazy loaded --- this prevents it from happening unless
+ * it will actually be used.
+ */
 #define	DBG_ENABLED	(dbg_desc->d_class)
 #define	DBG_CALL(func)	if (DBG_ENABLED) func
 
@@ -241,6 +260,9 @@ typedef enum { DBG_CALLER_LD, DBG_CALLER_RTLD } dbg_setup_caller_t;
 extern	int		Dbg_setup(dbg_setup_caller_t, const char *,
 			    Dbg_desc *, const char **);
 
+/* Call dbg_print() to produce linker version output */
+extern void		Dbg_version(void);
+
 /* Call dbg_print() to produce help output */
 extern	void		Dbg_help(void);
 
@@ -258,11 +280,13 @@ extern	void		Dbg_help(void);
 #define	Dbg_bind_reject		Dbg64_bind_reject
 #define	Dbg_bind_weak		Dbg64_bind_weak
 
+#define	Dbg_cap_entry		Dbg64_cap_entry
+#define	Dbg_cap_entry2		Dbg64_cap_entry2
 #define	Dbg_cap_val_hw1		Dbg64_cap_val_hw1
 #define	Dbg_cap_hw_candidate	Dbg64_cap_hw_candidate
 #define	Dbg_cap_hw_filter	Dbg64_cap_hw_filter
-#define	Dbg_cap_mapfile		Dbg64_cap_mapfile
-#define	Dbg_cap_sec_entry	Dbg64_cap_sec_entry
+#define	Dbg_cap_mapfile_title	Dbg64_cap_mapfile_title
+#define	Dbg_cap_out_title	Dbg64_cap_out_title
 #define	Dbg_cap_sec_title	Dbg64_cap_sec_title
 
 #define	Dbg_cb_iphdr_enter	Dbg64_cb_iphdr_enter
@@ -324,17 +348,22 @@ extern	void		Dbg_help(void);
 #define	Dbg_libs_yp		Dbg64_libs_yp
 #define	Dbg_libs_ylu		Dbg64_libs_ylu
 
-#define	Dbg_map_dash		Dbg64_map_dash
+#define	Dbg_map_cexp_id		Dbg64_map_cexp_id
+#define	Dbg_map_dv		Dbg64_map_dv
+#define	Dbg_map_dv_entry	Dbg64_map_dv_entry
 #define	Dbg_map_ent		Dbg64_map_ent
+#define	Dbg_map_ent_ord_title	Dbg64_map_ent_ord_title
+#define	Dbg_map_hdr_noalloc	Dbg64_map_hdr_noalloc
 #define	Dbg_map_parse		Dbg64_map_parse
-#define	Dbg_map_pipe		Dbg64_map_pipe
+#define	Dbg_map_pass		Dbg64_map_pass
+#define	Dbg_map_post_title	Dbg64_map_post_title
 #define	Dbg_map_seg		Dbg64_map_seg
-#define	Dbg_map_set_atsign	Dbg64_map_set_atsign
-#define	Dbg_map_set_equal	Dbg64_map_set_equal
+#define	Dbg_map_seg_order	Dbg64_map_seg_order
+#define	Dbg_map_seg_os_order	Dbg64_map_seg_os_order
 #define	Dbg_map_size_new	Dbg64_map_size_new
 #define	Dbg_map_size_old	Dbg64_map_size_old
-#define	Dbg_map_sort		Dbg64_map_sort
 #define	Dbg_map_sort_seg	Dbg64_map_sort_seg
+#define	Dbg_map_sort_title	Dbg64_map_sort_title
 #define	Dbg_map_symbol		Dbg64_map_symbol
 #define	Dbg_map_version		Dbg64_map_version
 
@@ -473,11 +502,13 @@ extern	void		Dbg_help(void);
 #define	Dbg_bind_reject		Dbg32_bind_reject
 #define	Dbg_bind_weak		Dbg32_bind_weak
 
+#define	Dbg_cap_entry		Dbg32_cap_entry
+#define	Dbg_cap_entry2		Dbg32_cap_entry2
 #define	Dbg_cap_val_hw1		Dbg32_cap_val_hw1
 #define	Dbg_cap_hw_candidate	Dbg32_cap_hw_candidate
 #define	Dbg_cap_hw_filter	Dbg32_cap_hw_filter
-#define	Dbg_cap_mapfile		Dbg32_cap_mapfile
-#define	Dbg_cap_sec_entry	Dbg32_cap_sec_entry
+#define	Dbg_cap_mapfile_title	Dbg32_cap_mapfile_title
+#define	Dbg_cap_out_title	Dbg32_cap_out_title
 #define	Dbg_cap_sec_title	Dbg32_cap_sec_title
 
 #define	Dbg_cb_iphdr_enter	Dbg32_cb_iphdr_enter
@@ -539,17 +570,22 @@ extern	void		Dbg_help(void);
 #define	Dbg_libs_yp		Dbg32_libs_yp
 #define	Dbg_libs_ylu		Dbg32_libs_ylu
 
-#define	Dbg_map_dash		Dbg32_map_dash
+#define	Dbg_map_cexp_id		Dbg32_map_cexp_id
+#define	Dbg_map_dv		Dbg32_map_dv
+#define	Dbg_map_dv_entry	Dbg32_map_dv_entry
 #define	Dbg_map_ent		Dbg32_map_ent
+#define	Dbg_map_ent_ord_title	Dbg32_map_ent_ord_title
+#define	Dbg_map_hdr_noalloc	Dbg32_map_hdr_noalloc
 #define	Dbg_map_parse		Dbg32_map_parse
-#define	Dbg_map_pipe		Dbg32_map_pipe
+#define	Dbg_map_pass		Dbg32_map_pass
+#define	Dbg_map_post_title	Dbg32_map_post_title
 #define	Dbg_map_seg		Dbg32_map_seg
-#define	Dbg_map_set_atsign	Dbg32_map_set_atsign
-#define	Dbg_map_set_equal	Dbg32_map_set_equal
+#define	Dbg_map_seg_order	Dbg32_map_seg_order
+#define	Dbg_map_seg_os_order	Dbg32_map_seg_os_order
 #define	Dbg_map_size_new	Dbg32_map_size_new
 #define	Dbg_map_size_old	Dbg32_map_size_old
-#define	Dbg_map_sort		Dbg32_map_sort
 #define	Dbg_map_sort_seg	Dbg32_map_sort_seg
+#define	Dbg_map_sort_title	Dbg32_map_sort_title
 #define	Dbg_map_symbol		Dbg32_map_symbol
 #define	Dbg_map_version		Dbg32_map_version
 
@@ -718,10 +754,12 @@ extern	void	Dbg_bind_pltpad_to(Rt_map *, Addr, const char *, const char *);
 extern	void	Dbg_bind_reject(Rt_map *, Rt_map *, const char *, int);
 extern	void	Dbg_bind_weak(Rt_map *, Addr, Addr, const char *);
 
+extern	void	Dbg_cap_entry(Lm_list *, dbg_state_t, Xword, Xword, Half);
+extern	void	Dbg_cap_entry2(Lm_list *, dbg_state_t, Xword, CapMask *, Half);
 extern	void	Dbg_cap_hw_candidate(Lm_list *, const char *);
 extern	void	Dbg_cap_hw_filter(Lm_list *, const char *, Rt_map *);
-extern	void	Dbg_cap_mapfile(Lm_list *, Xword, Xword, Half);
-extern	void	Dbg_cap_sec_entry(Lm_list *, uint_t, Xword, Xword, Half);
+extern	void	Dbg_cap_mapfile_title(Lm_list *, Lineno);
+extern	void	Dbg_cap_out_title(Lm_list *);
 extern	void	Dbg_cap_sec_title(Lm_list *, const char *);
 extern	void	Dbg_cap_val_hw1(Lm_list *, Xword, Half);
 
@@ -734,7 +772,7 @@ extern	const char *
 		Dbg_demangle_name(const char *);
 
 extern	void	Dbg_ent_entry(Lm_list *, uchar_t, Half, Ent_desc *);
-extern	void	Dbg_ent_print(Lm_list *, uchar_t, Half, Alist *, Boolean);
+extern	void	Dbg_ent_print(Lm_list *, uchar_t, Half, APlist *);
 
 extern	void	Dbg_file_analyze(Rt_map *);
 extern	void	Dbg_file_aout(Lm_list *, const char *, Addr, size_t,
@@ -794,17 +832,26 @@ extern	void	Dbg_libs_update(Lm_list *, APlist *, APlist *);
 extern	void	Dbg_libs_yp(Lm_list *, const char *);
 extern	void	Dbg_libs_ylu(Lm_list *, const char *, const char *, int);
 
-extern	void	Dbg_map_dash(Lm_list *, const char *);
-extern	void	Dbg_map_ent(Lm_list *, Boolean, Ent_desc *, Ofl_desc *);
-extern	void	Dbg_map_parse(Lm_list *, const char *);
-extern	void	Dbg_map_pipe(Lm_list *, Sg_desc *, const char *, const Word);
-extern	void	Dbg_map_seg(Ofl_desc *, int, Sg_desc *);
-extern	void	Dbg_map_set_atsign(Boolean);
-extern	void	Dbg_map_set_equal(Boolean);
-extern	void	Dbg_map_size_new(Lm_list *, const char *);
-extern	void	Dbg_map_size_old(Ofl_desc *, Sym_desc *);
-extern	void	Dbg_map_sort(Lm_list *);
-extern	void	Dbg_map_sort_seg(Lm_list *, Sg_desc *, int);
+extern	void	Dbg_map_cexp_id(Lm_list *, Boolean, const char *, Lineno,
+		    const char *);
+extern	void	Dbg_map_dv(Lm_list *, const char *, Lineno);
+extern	void	Dbg_map_dv_entry(Lm_list *, Lineno, int, const char *);
+extern	void	Dbg_map_ent(Lm_list *, Ent_desc *, Ofl_desc *, Lineno);
+extern	void	Dbg_map_ent_ord_title(Lm_list *, const char *);
+extern	void	Dbg_map_hdr_noalloc(Lm_list *, Lineno);
+extern	void	Dbg_map_parse(Lm_list *, const char *, int);
+extern	void	Dbg_map_pass(Lm_list *, Boolean, const char *, Lineno,
+		    const char *);
+extern	void	Dbg_map_post_title(Lm_list *);
+extern	void	Dbg_map_seg(Ofl_desc *, dbg_state_t, int, Sg_desc *, Lineno);
+extern	void	Dbg_map_seg_order(Ofl_desc *, uchar_t, Half, dbg_state_t,
+		    Lineno);
+extern	void	Dbg_map_seg_os_order(Lm_list *, Sg_desc *, const char *,
+		    Word, Lineno);
+extern	void	Dbg_map_size_new(Lm_list *, const char *, const char *, Lineno);
+extern	void	Dbg_map_size_old(Ofl_desc *, Sym_desc *, const char *, Lineno);
+extern	void	Dbg_map_sort_title(Lm_list *, Boolean);
+extern	void	Dbg_map_sort_seg(Lm_list *, uchar_t, Half, Sg_desc *);
 extern	void	Dbg_map_symbol(Ofl_desc *, Sym_desc *);
 extern	void	Dbg_map_version(Lm_list *, const char *, const char *, int);
 
@@ -859,7 +906,8 @@ extern	void	Dbg_sec_redirected(Lm_list *, Is_desc *, const char *);
 extern	void	Dbg_sec_strtab(Lm_list *, Os_desc *, Str_tbl *);
 extern	void	Dbg_sec_unsup_strmerge(Lm_list *, Is_desc *);
 
-extern	void	Dbg_seg_desc_entry(Lm_list *, uchar_t, Half, int, Sg_desc *);
+extern	void	Dbg_seg_desc_entry(Lm_list *, uchar_t, Half, int, Sg_desc *,
+		    Boolean);
 extern	void	Dbg_seg_entry(Ofl_desc *, int, Sg_desc *);
 extern	void	Dbg_seg_list(Lm_list *, uchar_t, Half, APlist *);
 extern	void	Dbg_seg_os(Ofl_desc *, Os_desc *, int);

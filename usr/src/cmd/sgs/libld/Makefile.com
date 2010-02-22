@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -30,17 +30,19 @@ COMOBJS =	debug.o		globals.o	util.o
 
 COMOBJS32 =	args32.o	entry32.o	exit32.o	groups32.o \
 		ldentry32.o	ldlibs32.o	ldmachdep32.o	ldmain32.o \
-		libs32.o	files32.o	map32.o		order32.o \
-		outfile32.o	place32.o	relocate32.o	resolve32.o \
-		sections32.o	sunwmove32.o	support32.o	syms32.o \
-		update32.o	unwind32.o	version32.o	wrap32.o
+		libs32.o	files32.o	map32.o		map_core32.o \
+		map_support32.o	map_v232.o	order32.o	outfile32.o \
+		place32.o	relocate32.o	resolve32.o	sections32.o \
+		sunwmove32.o	support32.o	syms32.o	update32.o \
+		unwind32.o	version32.o	wrap32.o
 
 COMOBJS64 =	args64.o	entry64.o	exit64.o	groups64.o \
 		ldentry64.o	ldlibs64.o	ldmachdep64.o	ldmain64.o \
-		libs64.o	files64.o	map64.o		order64.o \
-		outfile64.o 	place64.o	relocate64.o	resolve64.o \
-		sections64.o	sunwmove64.o	support64.o	syms64.o \
-		update64.o	unwind64.o	version64.o	wrap64.o
+		libs64.o	files64.o	map64.o		map_core64.o \
+		map_support64.o	map_v264.o	order64.o	outfile64.o \
+ 		place64.o	relocate64.o	resolve64.o	sections64.o \
+		sunwmove64.o	support64.o	syms64.o	update64.o \
+		unwind64.o	version64.o	wrap64.o
 
 TOOLOBJS =	alist.o		assfail.o	findprime.o	string_table.o \
 		strhash.o
@@ -83,7 +85,6 @@ include 	$(SRC)/lib/Makefile.lib
 include 	$(SRC)/cmd/sgs/Makefile.com
 
 SRCDIR =	../common
-ELFCAP=		$(SRC)/common/elfcap
 
 
 # Location of the shared relocation engines maintained under usr/src/uts.
@@ -94,8 +95,7 @@ KRTLD_SPARC = $(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld
 
 
 CPPFLAGS +=	-DUSE_LIBLD_MALLOC -I$(SRCBASE)/lib/libc/inc \
-		    -I$(SRCBASE)/uts/common/krtld -I$(ELFCAP) \
-		    -I$(SRCBASE)/uts/sparc \
+		    -I$(SRCBASE)/uts/common/krtld -I$(SRCBASE)/uts/sparc \
 		    $(VAR_LIBLD_CPPFLAGS)
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(LDDBGLIBDIR) $(LDDBG_LIB) \
 		    $(ELFLIBDIR) -lelf $(DLLIB) -lc

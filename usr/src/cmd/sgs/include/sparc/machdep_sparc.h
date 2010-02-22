@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Global include file for all sgs SPARC machine dependent macros, constants
@@ -186,9 +186,15 @@ extern "C" {
 #define	M_PLT_SHF_FLAGS	(SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR)
 
 /*
- * Make data segment information transparent to the common code.
+ * Make default data segment and stack flags transparent to the common code.
  */
 #define	M_DATASEG_PERM	(PF_R | PF_W | PF_X)
+#ifdef _ELF64
+#define	M_STACK_PERM	(PF_R | PF_W)
+#else
+#define	M_STACK_PERM	(PF_R | PF_W | PF_X)
+#endif
+
 
 /*
  * Define a set of identifies for special sections.  These allow the sections

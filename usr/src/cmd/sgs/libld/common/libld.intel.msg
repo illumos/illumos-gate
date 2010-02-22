@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 @ _START_
@@ -35,7 +33,7 @@
 			 instruction sequence"
 
 @ MSG_PLT_PLT0FAIL	"creation of PLT entry plt0 failed"
-@ MSG_PLT_PLTNFAIL	"creation of PLT[%d] for symbol `%s' failed"
+@ MSG_PLT_PLTNFAIL	"creation of PLT[%d] for symbol '%s' failed"
 
 @ MSG_UNW_BADCIEVERS	"unwind table: file %s: section %s: \
 			 bad cie version %d: offset 0x%llx\n"

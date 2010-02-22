@@ -24,7 +24,7 @@
  *	  All Rights Reserved
  *
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Global include file for all sgs.
@@ -129,6 +129,14 @@ typedef enum {
 	ERR_ELF,
 	ERR_NUM				/* Must be last */
 } Error;
+
+/*
+ * Type used to represent line numbers within files, and a corresponding
+ * printing macro for it.
+ */
+typedef ulong_t Lineno;
+#define	EC_LINENO(_x) EC_XWORD(_x)			/* "llu" */
+
 
 #if defined(_LP64) && !defined(_ELF64)
 #define	S_ERROR		(~(uint_t)0)

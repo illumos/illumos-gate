@@ -22,7 +22,7 @@
 /* PROTOLIB1 */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,9 +66,11 @@
 #include "dwarf_msg.h"
 #include "dynamic_msg.h"
 #include "elf_msg.h"
+#include "entry_msg.h"
 #include "globals_msg.h"
 #include "group_msg.h"
 #include "lddstub_msg.h"
+#include "map_msg.h"
 #include "phdr_msg.h"
 #include "relocate_amd64_msg.h"
 #include "relocate_i386_msg.h"
@@ -99,9 +101,11 @@ foo()
 	USE(_sgs_msg_libconv_dwarf);
 	USE(_sgs_msg_libconv_dynamic);
 	USE(_sgs_msg_libconv_elf);
+	USE(_sgs_msg_libconv_entry);
 	USE(_sgs_msg_libconv_globals);
 	USE(_sgs_msg_libconv_group);
 	USE(_sgs_msg_libconv_lddstub);
+	USE(_sgs_msg_libconv_map);
 	USE(_sgs_msg_libconv_phdr);
 	USE(_sgs_msg_libconv_relocate_amd64);
 	USE(_sgs_msg_libconv_relocate_i386);

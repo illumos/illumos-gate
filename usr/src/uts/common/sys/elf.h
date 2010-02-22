@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -720,6 +720,8 @@ typedef struct {
 #define	CA_SUNW_NULL	0
 #define	CA_SUNW_HW_1	1		/* first hardware capabilities entry */
 #define	CA_SUNW_SF_1	2		/* first software capabilities entry */
+#define	CA_SUNW_HW_2	3		/* second hardware capabilities entry */
+#define	CA_SUNW_NUM	4
 
 /*
  * Define software capabilities (CA_SUNW_SF_1 values).  Note, hardware

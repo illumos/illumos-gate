@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -636,46 +636,20 @@ check_flags(Ofl_desc * ofl, int argc)
 		return (S_ERROR);
 
 	/*
-	 * Process any mapfiles after establishing the entrance criteria as
-	 * the user may be redefining or adding sections/segments.
+	 * Process mapfiles. Mapfile can redefine or add sections/segments,
+	 * so this must come after the default entrance criteria are established
+	 * (above).
 	 */
 	if (ofl->ofl_maps) {
 		const char	*name;
 		Aliste		idx;
-		Is_desc		*isp;
 
 		for (APLIST_TRAVERSE(ofl->ofl_maps, idx, name))
-			if (ld_map_parse(name, ofl) == S_ERROR)
+			if (!ld_map_parse(name, ofl))
 				return (S_ERROR);
 
-		if (ofl->ofl_flags & FLG_OF_SEGSORT)
-			if (ld_sort_seg_list(ofl) == S_ERROR)
-				return (S_ERROR);
-
-		/*
-		 * Mapfiles may have been used to create symbol definitions
-		 * with backing storage.  Although the backing storage is
-		 * associated with an input section, the association of the
-		 * section to an output section (and segment) is initially
-		 * deferred.  Now that all mapfile processing is complete, any
-		 * entrance criteria requirements have been processed, and
-		 * these backing storage sections can be associated with the
-		 * appropriate output section (and segment).
-		 */
-		if (ofl->ofl_maptext || ofl->ofl_mapdata)
-			DBG_CALL(Dbg_sec_backing(ofl->ofl_lml));
-
-		for (APLIST_TRAVERSE(ofl->ofl_maptext, idx, isp)) {
-			if (ld_place_section(ofl, isp,
-			    ld_targ.t_id.id_text, NULL) == (Os_desc *)S_ERROR)
-				return (S_ERROR);
-		}
-
-		for (APLIST_TRAVERSE(ofl->ofl_mapdata, idx, isp)) {
-			if (ld_place_section(ofl, isp,
-			    ld_targ.t_id.id_data, NULL) == (Os_desc *)S_ERROR)
-				return (S_ERROR);
-		}
+		if (!ld_map_post_process(ofl))
+			return (S_ERROR);
 	}
 
 	/*
@@ -1934,10 +1908,10 @@ ld_process_files(Ofl_desc *ofl, int argc, char **argv)
 			return (S_ERROR);
 
 	/*
-	 * If segment ordering was specified (using mapfile) verify things
-	 * are ok.
+	 * If input section ordering was specified within some segment
+	 * using a mapfile, verify that the expected sections were seen.
 	 */
-	if (ofl->ofl_flags & FLG_OF_SEGORDER)
+	if (ofl->ofl_flags & FLG_OF_IS_ORDER)
 		ld_ent_check(ofl);
 
 	return (1);

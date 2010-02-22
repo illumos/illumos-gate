@@ -19,9 +19,7 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/sgs/gprof/Makefile.com
@@ -41,7 +39,7 @@ SRCS=		$(COMOBJS:%.o=../common/%.c)
 
 INCLIST=	-I../common -I../../include -I../../include/$(MACH)
 DEFLIST=	-DELF_OBJ -DELF
-CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
+CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master) -I$(ELFCAP)
 CFLAGS +=	$(CCVERBOSE)
 C99MODE=	$(C99_ENABLE)
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf

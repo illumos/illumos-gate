@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,13 +34,26 @@ extern "C" {
 #endif
 
 /*
+ * Type used to represent capability bitmasks. This 32-bit type cannot be
+ * widened without breaking the ability to use them in ELFCLASS32 objects.
+ */
+typedef uint32_t elfcap_mask_t;
+
+/*
  * The elfcap code handles mappings to and from several string styles.
  * The caller uses elfcap_style_t to specify the style to use.
+ *
+ * The bottom 16 bits are used to represent styles, and the upper 16
+ * bits are used for flags to modify default behavior.
  */
+#define	ELFCAP_STYLE_MASK(_style) (_style & 0xff)
+
 typedef enum {
 	ELFCAP_STYLE_FULL =	1,	/* Full formal name (e.g. AV_386_SSE) */
 	ELFCAP_STYLE_UC = 	2,	/* Informal upper case (e.g. SSE) */
-	ELFCAP_STYLE_LC = 	3	/* Informal lower case (e.g. sse) */
+	ELFCAP_STYLE_LC = 	3,	/* Informal lower case (e.g. sse) */
+
+	ELFCAP_STYLE_F_ICMP =	0x0100	 /* Use case insensitive strcmp */
 } elfcap_style_t;
 
 /*
@@ -64,7 +77,7 @@ typedef	struct {
  * and are intended to be ignored by the processing code.
  */
 typedef	struct {
-	uint64_t	c_val;		/* Bit value */
+	elfcap_mask_t	c_val;		/* Bit value */
 	elfcap_str_t	c_full;		/* ELFCAP_STYLE_FULL */
 	elfcap_str_t	c_uc;		/* ELFCAP_STYLE_UC */
 	elfcap_str_t	c_lc;		/* ELFCAP_STYLE_LC */
@@ -98,11 +111,6 @@ typedef enum {
 /*
  * # of each type of capability known to the system. These values
  * must be kept in sync with the arrays found in elfcap.c.
- *
- * In ELFCLASS32, capability words are 32-bit, while ELFCLASS64 has
- * 64-bit words. For simplicity of code and documentation, our policy
- * is to limit each mask word to no more than 32 capabilities regardless of
- * the ELFCLASS.
  */
 #define	ELFCAP_NUM_SF1			3
 #define	ELFCAP_NUM_HW1_SPARC		17
@@ -114,26 +122,35 @@ typedef enum {
  * "to str" function to generate the string description.
  */
 extern elfcap_err_t elfcap_tag_to_str(elfcap_style_t, uint64_t,
-    uint64_t, char *, size_t, elfcap_fmt_t, ushort_t);
+    elfcap_mask_t, char *, size_t, elfcap_fmt_t, ushort_t);
 
 /*
  * The functions that convert from a specific capability value to
  * a string representation all use the same common prototype.
  */
-typedef elfcap_err_t elfcap_to_str_func_t(elfcap_style_t, uint64_t, char *,
+typedef elfcap_err_t elfcap_to_str_func_t(elfcap_style_t, elfcap_mask_t, char *,
     size_t, elfcap_fmt_t, ushort_t);
 
 extern elfcap_to_str_func_t elfcap_hw1_to_str;
+extern elfcap_to_str_func_t elfcap_hw2_to_str;
 extern elfcap_to_str_func_t elfcap_sf1_to_str;
 
 /*
  * The reverse mapping: Given a string representation, turn it back into
  * integer form.
  */
-typedef uint64_t elfcap_from_str_func_t(elfcap_style_t,
+typedef elfcap_mask_t elfcap_from_str_func_t(elfcap_style_t,
     const char *, ushort_t mach);
 
+/*
+ * Given a capability section tag and string, call the proper underlying
+ * "from str" function to generate the numeric value.
+ */
+extern elfcap_mask_t elfcap_tag_from_str(elfcap_style_t, uint64_t,
+    const char *, ushort_t);
+
 extern elfcap_from_str_func_t elfcap_hw1_from_str;
+extern elfcap_from_str_func_t elfcap_hw2_from_str;
 extern elfcap_from_str_func_t elfcap_sf1_from_str;
 
 /*

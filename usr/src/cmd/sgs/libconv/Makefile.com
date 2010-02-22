@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -40,12 +40,13 @@ COMOBJS=	arch.o			c_literal.o \
 		deftag.o 		demangle.o \
 		dl.o			dwarf.o \
 		dwarf_ehe.o 		dynamic.o \
-		elf.o			globals.o \
-		group.o 		lddstub.o \
+		elf.o			entry.o \
+		globals.o		group.o \
+ 		lddstub.o		map.o \
 		phdr.o			relocate.o \
- 		relocate_i386.o 	relocate_amd64.o \
- 		relocate_sparc.o 	sections.o \
-   		segments.o    		strproc.o \
+ 		relocate_i386.o		relocate_amd64.o \
+		relocate_sparc.o	sections.o \
+		segments.o    		strproc.o \
 		symbols.o  		syminfo.o \
   		tokens.o  		time.o \
 		version.o
@@ -60,10 +61,11 @@ BLTOBJS=	arch_msg.o		c_literal_msg.o \
 		deftag_msg.o		demangle_msg.o \
 		dl_msg.o		dwarf_msg.o \
 		dwarf_ehe_msg.o 	dynamic_msg.o \
-		elf_msg.o 		globals_msg.o \
-		group_msg.o 		lddstub_msg.o \
+		elf_msg.o 		entry_msg.o \
+		globals_msg.o		group_msg.o \
+ 		map_msg.o		lddstub_msg.o \
 		phdr_msg.o 		relocate_amd64_msg.o \
-		relocate_i386_msg.o 	relocate_sparc_msg.o \
+		relocate_i386_msg.o	relocate_sparc_msg.o \
 		sections_msg.o 		segments_msg.o \
 		symbols_msg.o 		symbols_sparc_msg.o \
 		syminfo_msg.o 		time_msg.o \
@@ -72,8 +74,6 @@ BLTOBJS=	arch_msg.o		c_literal_msg.o \
 
 OBJECTS =	$(COMOBJS) $(COMOBJS32) $(COMOBJS64) $(ELFCAP_OBJS) \
 		$(ASOBJS) $(BLTOBJS)
-
-ELFCAP=		$(SRC)/common/elfcap
 
 #
 # This library is unusual since it's a static archive of PIC objects.

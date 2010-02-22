@@ -20,10 +20,9 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 @ _START_
 
@@ -45,22 +44,22 @@
 @ MSG_REL_BADGOTFIX	"relocation error: %s: file %s: symbol %s: \
 			 internal gotop_fixups error"
 @ MSG_REL_ASSIGNGOT	"internal error: assign_got() invalid got index \
-			 0x%llx for symbol `%s'"
-@ MSG_REL_SMALLGOT	"too many symbols require `small' PIC references:\n\
+			 0x%llx for symbol '%s'"
+@ MSG_REL_SMALLGOT	"too many symbols require 'small' PIC references:\n\
 			 \thave %d, maximum %d -- recompile some \
 			 modules -K PIC."
 @ MSG_REL_MIXEDGOT	"too many symbols require mixed mode \
-			 (both `small' and `large') PIC references:\n\
+			 (both 'small' and 'large') PIC references:\n\
 			 \thave %d, maximum %d -- recompile some \
 			 modules -K PIC."
 
 @ MSG_SYM_INCOMPREG1	"register %s symbol used incompatibly:\n\
-			 \t(file %s symbol `%s', file %s symbol `%s');"
-@ MSG_SYM_INCOMPREG2	"register symbol `%s' used incompatibly:\n\
+			 \t(file %s symbol '%s', file %s symbol '%s');"
+@ MSG_SYM_INCOMPREG2	"register symbol '%s' used incompatibly:\n\
 			 \t(file %s value=%s, file %s value=%s);"
 @ MSG_SYM_INCOMPREG3	"register %s local symbol visibility incompatible:\n\
-			 \t(file %s symbol `%s', file %s symbol `%s');"
-@ MSG_SYM_MULTINIREG	"register %s symbol `%s' multiply-initialized:\n\
+			 \t(file %s symbol '%s', file %s symbol '%s');"
+@ MSG_SYM_MULTINIREG	"register %s symbol '%s' multiply-initialized:\n\
 			 \t(file %s shndx=ABS, file %s shndx=ABS);"
 
 @ MSG_SYM_BADSCRATCH	"file %s: section %s: symbol[%d]: %s: malformed \

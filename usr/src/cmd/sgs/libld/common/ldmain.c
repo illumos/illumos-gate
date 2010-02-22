@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -212,7 +212,7 @@ ld_main(int argc, char **argv, Half mach)
 
 	DBG_CALL(Dbg_ent_print(ofl->ofl_lml,
 	    ofl->ofl_dehdr->e_ident[EI_OSABI], ofl->ofl_dehdr->e_machine,
-	    ofl->ofl_ents, (ofl->ofl_flags & FLG_OF_DYNAMIC) != 0));
+	    ofl->ofl_ents));
 	DBG_CALL(Dbg_seg_list(ofl->ofl_lml,
 	    ofl->ofl_dehdr->e_ident[EI_OSABI], ofl->ofl_dehdr->e_machine,
 	    ofl->ofl_segs));
@@ -332,7 +332,7 @@ ld_main(int argc, char **argv, Half mach)
 	 * for any directives that have not been matched.
 	 * Also, if SHF_ORDERED sections exist, set up sort key values.
 	 */
-	if (ofl->ofl_flags & (FLG_OF_SECORDER | FLG_OF_KEY))
+	if (ofl->ofl_flags & (FLG_OF_OS_ORDER | FLG_OF_KEY))
 		ld_sec_validate(ofl);
 
 	/*

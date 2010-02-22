@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -240,15 +240,17 @@ process_section(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 static void
 sf1_cap(Ofl_desc *ofl, Xword val, Ifl_desc *ifl, Is_desc *cisp)
 {
+#define	FP_FLAGS	(SF1_SUNW_FPKNWN | SF1_SUNW_FPUSED)
+
 	Xword	badval;
 
 	/*
 	 * If a mapfile has established definitions to override any input
 	 * capabilities, ignore any new input capabilities.
 	 */
-	if (ofl->ofl_flags1 & FLG_OF1_OVSFCAP) {
-		Dbg_cap_sec_entry(ofl->ofl_lml, DBG_CAP_IGNORE, CA_SUNW_SF_1,
-		    val, ld_targ.t_m.m_mach);
+	if (ofl->ofl_flags1 & FLG_OF1_OVSFCAP1) {
+		DBG_CALL(Dbg_cap_entry(ofl->ofl_lml, DBG_STATE_IGNORED,
+		    CA_SUNW_SF_1, val, ld_targ.t_m.m_mach));
 		return;
 	}
 
@@ -284,7 +286,7 @@ sf1_cap(Ofl_desc *ofl, Xword val, Ifl_desc *ifl, Is_desc *cisp)
 		    EC_XWORD(badval));
 		val &= SF1_SUNW_MASK;
 	}
-	if ((val & (SF1_SUNW_FPKNWN | SF1_SUNW_FPUSED)) == SF1_SUNW_FPUSED) {
+	if ((val & FP_FLAGS) == SF1_SUNW_FPUSED) {
 		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_FIL_BADSF1),
 		    ifl->ifl_name, EC_WORD(cisp->is_scnndx), cisp->is_name,
 		    EC_XWORD(val));
@@ -307,7 +309,8 @@ sf1_cap(Ofl_desc *ofl, Xword val, Ifl_desc *ifl, Is_desc *cisp)
 		 * The runtime linker will refuse to use this dependency.
 		 */
 		if ((val & SF1_SUNW_ADDR32) && (ofl->ofl_flags & FLG_OF_EXEC) &&
-		    ((ofl->ofl_sfcap_1 & SF1_SUNW_ADDR32) == 0)) {
+		    ((ofl->ofl_ocapset.c_sf_1.cm_value &
+		    SF1_SUNW_ADDR32) == 0)) {
 			eprintf(ofl->ofl_lml, ERR_WARNING,
 			    MSG_INTL(MSG_FIL_EXADDR32SF1), ifl->ifl_name,
 			    EC_WORD(cisp->is_scnndx), cisp->is_name);
@@ -316,35 +319,49 @@ sf1_cap(Ofl_desc *ofl, Xword val, Ifl_desc *ifl, Is_desc *cisp)
 		return;
 	}
 
-	Dbg_cap_sec_entry(ofl->ofl_lml, DBG_CAP_OLD, CA_SUNW_SF_1,
-	    ofl->ofl_sfcap_1, ld_targ.t_m.m_mach);
-	Dbg_cap_sec_entry(ofl->ofl_lml, DBG_CAP_NEW, CA_SUNW_SF_1,
-	    val, ld_targ.t_m.m_mach);
+	if (DBG_ENABLED) {
+		Dbg_cap_entry2(ofl->ofl_lml, DBG_STATE_CURRENT, CA_SUNW_SF_1,
+		    &ofl->ofl_ocapset.c_sf_1, ld_targ.t_m.m_mach);
+		Dbg_cap_entry(ofl->ofl_lml, DBG_STATE_NEW, CA_SUNW_SF_1,
+		    val, ld_targ.t_m.m_mach);
+	}
 
 	/*
 	 * Determine the resolution of the present frame pointer and the
 	 * new input relocatable objects frame pointer.
 	 */
-	if ((ofl->ofl_sfcap_1 & (SF1_SUNW_FPKNWN | SF1_SUNW_FPUSED)) ==
-	    (SF1_SUNW_FPKNWN | SF1_SUNW_FPUSED)) {
+	if ((ofl->ofl_ocapset.c_sf_1.cm_value & FP_FLAGS) == FP_FLAGS) {
 		/*
 		 * If the new relocatable object isn't using a frame pointer,
 		 * reduce the present state to unused.
 		 */
-		if ((val & (SF1_SUNW_FPKNWN | SF1_SUNW_FPUSED)) !=
-		    (SF1_SUNW_FPKNWN | SF1_SUNW_FPUSED))
-			ofl->ofl_sfcap_1 &= ~SF1_SUNW_FPUSED;
+		if ((val & FP_FLAGS) != FP_FLAGS)
+			ofl->ofl_ocapset.c_sf_1.cm_value &= ~SF1_SUNW_FPUSED;
 
-	} else if ((ofl->ofl_sfcap_1 & SF1_SUNW_FPKNWN) == 0) {
 		/*
-		 * If the present state is unknown, take the new relocatable
-		 * object frame pointer usage.
+		 * Having processed the frame pointer bits, remove them from
+		 * the value so they don't get OR'd in below.
 		 */
-		ofl->ofl_sfcap_1 = val;
+		val &= ~FP_FLAGS;
+
+	} else if ((ofl->ofl_ocapset.c_sf_1.cm_value & SF1_SUNW_FPKNWN) == 0) {
+		/*
+		 * If the present frame pointer state is unknown, mask it out
+		 * and allow the values from the new relocatable object
+		 * to overwrite them.
+		 */
+		ofl->ofl_ocapset.c_sf_1.cm_value &= ~FP_FLAGS;
+	} else {
+		/* Do not take the frame pointer flags from the object */
+		val &= ~FP_FLAGS;
 	}
 
-	Dbg_cap_sec_entry(ofl->ofl_lml, DBG_CAP_RESOLVED, CA_SUNW_SF_1,
-	    ofl->ofl_sfcap_1, ld_targ.t_m.m_mach);
+	ofl->ofl_ocapset.c_sf_1.cm_value |= val;
+
+	DBG_CALL(Dbg_cap_entry2(ofl->ofl_lml, DBG_STATE_RESOLVED, CA_SUNW_SF_1,
+	    &ofl->ofl_ocapset.c_sf_1, ld_targ.t_m.m_mach));
+
+#undef FP_FLAGS
 }
 
 /*
@@ -360,9 +377,9 @@ hw1_cap(Ofl_desc *ofl, Xword val)
 	 * If a mapfile has established definitions to override any input
 	 * capabilities, ignore any new input capabilities.
 	 */
-	if (ofl->ofl_flags1 & FLG_OF1_OVHWCAP) {
-		Dbg_cap_sec_entry(ofl->ofl_lml, DBG_CAP_IGNORE, CA_SUNW_HW_1,
-		    val, ld_targ.t_m.m_mach);
+	if (ofl->ofl_flags1 & FLG_OF1_OVHWCAP1) {
+		DBG_CALL(Dbg_cap_entry(ofl->ofl_lml, DBG_STATE_IGNORED,
+		    CA_SUNW_HW_1, val, ld_targ.t_m.m_mach));
 		return;
 	}
 
@@ -373,15 +390,17 @@ hw1_cap(Ofl_desc *ofl, Xword val)
 	if (val == 0)
 		return;
 
-	Dbg_cap_sec_entry(ofl->ofl_lml, DBG_CAP_OLD, CA_SUNW_HW_1,
-	    ofl->ofl_hwcap_1, ld_targ.t_m.m_mach);
-	Dbg_cap_sec_entry(ofl->ofl_lml, DBG_CAP_NEW, CA_SUNW_HW_1, val,
-	    ld_targ.t_m.m_mach);
+	if (DBG_ENABLED) {
+		Dbg_cap_entry2(ofl->ofl_lml, DBG_STATE_CURRENT, CA_SUNW_HW_1,
+		    &ofl->ofl_ocapset.c_hw_1, ld_targ.t_m.m_mach);
+		Dbg_cap_entry(ofl->ofl_lml, DBG_STATE_NEW, CA_SUNW_HW_1, val,
+		    ld_targ.t_m.m_mach);
+	}
 
-	ofl->ofl_hwcap_1 |= val;
+	ofl->ofl_ocapset.c_hw_1.cm_value |= val;
 
-	Dbg_cap_sec_entry(ofl->ofl_lml, DBG_CAP_RESOLVED, CA_SUNW_HW_1,
-	    ofl->ofl_hwcap_1, ld_targ.t_m.m_mach);
+	DBG_CALL(Dbg_cap_entry2(ofl->ofl_lml, DBG_STATE_RESOLVED, CA_SUNW_HW_1,
+	    &ofl->ofl_ocapset.c_hw_1, ld_targ.t_m.m_mach));
 }
 
 /*
@@ -1608,6 +1627,14 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 	uintptr_t	error;
 	Is_desc		*vdfisp, *vndisp, *vsyisp, *sifisp, *capisp;
 	Sdf_desc	*sdf;
+	Place_path_info	path_info_buf, *path_info;
+
+	/*
+	 * Path information buffer used by ld_place_section() and related
+	 * routines. This information is used to evaluate entrance criteria
+	 * with non-empty file matching lists (ec_files).
+	 */
+	path_info = ld_place_path_info_init(ofl, ifl, &path_info_buf);
 
 	/*
 	 * First process the .shstrtab section so that later sections can
@@ -1895,7 +1922,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 		 * output section.
 		 */
 		if ((isp->is_flags & FLG_IS_ORDERED) == 0) {
-			if (ld_place_section(ofl, isp,
+			if (ld_place_section(ofl, isp, path_info,
 			    isp->is_keyident, NULL) == (Os_desc *)S_ERROR)
 				return (S_ERROR);
 			continue;
@@ -1926,7 +1953,8 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 				continue;
 
 			/* ld_process_ordered() calls ld_place_section() */
-			if (ld_process_ordered(ifl, ofl, ndx) == S_ERROR)
+			if (ld_process_ordered(ofl, ifl, path_info, ndx) ==
+			    S_ERROR)
 				return (S_ERROR);
 
 			/* If we've done them all, stop searching */

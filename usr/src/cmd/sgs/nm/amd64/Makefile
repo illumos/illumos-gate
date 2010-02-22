@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -39,7 +39,7 @@ SRCS=		$(COMOBJS:%.o=../common/%.c)
 LDFLAGS +=	'-R$$ORIGIN/../../../lib/$(MACH64)'
 INCLIST=	-I../../include -I../../include/i386 \
 		-I$(SRCBASE)/uts/$(ARCH)/sys
-CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
+CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master) -I$(ELFCAP)
 LDLIBS +=	$(CONVLIBDIR64) $(CONV_LIB) $(ELFLIBDIR) -lelf
 LINTFLAGS64 +=	-x $(LDLIBS) -m64
 LINTSRCS=	$(SRCS)

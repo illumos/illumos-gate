@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,11 +40,11 @@
  * Each time a section is placed, the function set_addralign()
  * is called.  This function performs:
  *
- *  .	if the section is from an external file, check if this is empty or not.
+ * -	if the section is from an external file, check if this is empty or not.
  *	If not, we know the segment this section will belong needs a program
  *	header. (Of course, the program is needed only if this section falls
  *	into a loadable segment.)
- *  .	compute the Least Common Multiplier for setting the segment alignment.
+ * -	compute the Least Common Multiplier for setting the segment alignment.
  */
 static void
 set_addralign(Ofl_desc *ofl, Os_desc *osp, Is_desc *isp)
@@ -67,8 +67,8 @@ set_addralign(Ofl_desc *ofl, Os_desc *osp, Is_desc *isp)
 	    (osp->os_sgdesc->sg_phdr).p_type != PT_LOAD)
 		return;
 
-	osp->os_sgdesc->sg_addralign =
-	    ld_lcm(osp->os_sgdesc->sg_addralign, shdr->sh_addralign);
+	osp->os_sgdesc->sg_align =
+	    ld_lcm(osp->os_sgdesc->sg_align, shdr->sh_addralign);
 }
 
 /*
@@ -418,12 +418,160 @@ gnu_linkonce_sec(const char *ostr)
 #undef	NSTR_CH2
 #undef	NSTR_CH3
 
+
+/*
+ * Initialize a path info buffer for use with ld_place_section().
+ *
+ * entry:
+ *	ofl - Output descriptor
+ *	ifl - Descriptor for input file, or NULL if there is none.
+ *	info - Address of buffer to be initialized.
+ *
+ * exit:
+ *	If this is an input file, and if the entrance criteria list
+ *	contains at least one criteria that has a non-empty file string
+ *	match list (ec_files), then the block pointed at by info is
+ *	initialized, and info is returned.
+ *
+ *	If there is no input file, and/or no entrance criteria containing
+ *	a non-empty ec_files list, then NULL is returned. This is not
+ *	an error --- the NULL is simply an optimization, understood by
+ *	ld_place_path(), that allows it to skip unnecessary work.
+ */
+Place_path_info *
+ld_place_path_info_init(Ofl_desc *ofl, Ifl_desc *ifl, Place_path_info *info)
+{
+	/*
+	 * Return NULL if there is no input file (internally generated section)
+	 * or if the entrance criteria list does not contain any items that will
+	 * need to be compared to the path (all the ec_files lists are empty).
+	 */
+	if ((ifl == NULL) || !(ofl->ofl_flags & FLG_OF_EC_FILES))
+		return (NULL);
+
+	info->ppi_path = ifl->ifl_name;
+	info->ppi_path_len = strlen(info->ppi_path);
+	info->ppi_isar = (ifl->ifl_flags & FLG_IF_EXTRACT) != 0;
+
+	/*
+	 * The basename is the final segment of the path, equivalent to
+	 * the path itself if there are no '/' delimiters.
+	 */
+	info->ppi_bname = strrchr(info->ppi_path, '/');
+	if (info->ppi_bname == NULL)
+		info->ppi_bname = info->ppi_path;
+	else
+		info->ppi_bname++;	/* Skip leading '/' */
+	info->ppi_bname_len =
+	    info->ppi_path_len - (info->ppi_bname - info->ppi_path);
+
+	/*
+	 * For an archive, the object name is the member name, which is
+	 * enclosed in () at the end of the name string. Otherwise, it is
+	 * the same as the basename.
+	 */
+	if (info->ppi_isar) {
+		info->ppi_oname = strrchr(info->ppi_bname, '(');
+		/* There must be an archive member suffix delimited by parens */
+		assert((info->ppi_bname[info->ppi_bname_len - 1] == ')') &&
+		    (info->ppi_oname != NULL));
+		info->ppi_oname++;	/* skip leading '(' */
+		info->ppi_oname_len = info->ppi_bname_len -
+		    (info->ppi_oname - info->ppi_bname + 1);
+	} else {
+		info->ppi_oname = info->ppi_bname;
+		info->ppi_oname_len = info->ppi_bname_len;
+	}
+
+	return (info);
+}
+
+/*
+ * Compare an input section path to the file comparison list the given
+ * entrance criteria.
+ *
+ * entry:
+ *	path_info - A non-NULL Place_path_info block for the file
+ *		containing the input section, initialized by
+ *		ld_place_path_info_init()
+ *	enp - Entrance criteria with a non-empty ec_files list of file
+ *		comparisons to be carried out.
+ *
+ * exit:
+ *	Return TRUE if a match is seen, and FALSE otherwise.
+ */
+static Boolean
+eval_ec_files(Place_path_info *path_info, Ent_desc *enp)
+{
+	Aliste		idx;
+	Ent_desc_file	*edfp;
+	size_t		cmp_len;
+	const char	*cmp_str;
+
+	for (ALIST_TRAVERSE(enp->ec_files, idx, edfp)) {
+		Word	type = edfp->edf_flags & TYP_ECF_MASK;
+
+		/*
+		 * Determine the starting character, and # of characters,
+		 * from the file path to compare against this entrance criteria
+		 * file string.
+		 */
+		if (type == TYP_ECF_OBJNAME) {
+			cmp_str = path_info->ppi_oname;
+			cmp_len = path_info->ppi_oname_len;
+		} else {
+			int ar_stat_diff = path_info->ppi_isar !=
+			    ((edfp->edf_flags & FLG_ECF_ARMEMBER) != 0);
+
+			/*
+			 * If the entrance criteria specifies an archive member
+			 * and the file does not, then there can be no match.
+			 */
+
+			if (ar_stat_diff && !path_info->ppi_isar)
+				continue;
+
+			if (type == TYP_ECF_PATH) {
+				cmp_str = path_info->ppi_path;
+				cmp_len = path_info->ppi_path_len;
+			} else {	/* TYP_ECF_BASENAME */
+				cmp_str = path_info->ppi_bname;
+				cmp_len = path_info->ppi_bname_len;
+			}
+
+			/*
+			 * If the entrance criteria does not specify an archive
+			 * member and the file does, then a match just requires
+			 * the paths (without the archive member) to match.
+			 * Reduce the length to not include the ar member or
+			 * the '(' that precedes it.
+			 */
+			if (ar_stat_diff && path_info->ppi_isar)
+				cmp_len = path_info->ppi_oname - cmp_str - 1;
+		}
+
+		/*
+		 * Compare the resulting string to the one from the
+		 * entrance criteria.
+		 */
+		if ((cmp_len == edfp->edf_name_len) &&
+		    (strncmp(edfp->edf_name, cmp_str, cmp_len) == 0))
+			return (TRUE);
+	}
+
+	return (FALSE);
+}
+
 /*
  * Place a section into the appropriate segment and output section.
  *
  * entry:
  *	ofl - File descriptor
  *	isp - Input section descriptor of section to be placed.
+ *	path_info - NULL, or pointer to Place_path_info buffer initialized
+ *		by ld_place_path_info_init() for the file associated to isp,
+ *		for use in processing entrance criteria with non-empty
+ *		file matching string list (ec_files)
  *	ident - Section identifier, used to order sections relative to
  *		others within the output segment.
  *	alt_os_name - If non-NULL, the name of the output section to place
@@ -431,8 +579,8 @@ gnu_linkonce_sec(const char *ostr)
  *		with the same name as the input section.
  */
 Os_desc *
-ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident,
-    const char *alt_os_name)
+ld_place_section(Ofl_desc *ofl, Is_desc *isp, Place_path_info *path_info,
+    int ident, const char *alt_os_name)
 {
 	Ent_desc	*enp;
 	Sg_desc		*sgp;
@@ -523,10 +671,32 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident,
 	 * finding a segment, then sgp will be NULL.
 	 */
 	sgp = NULL;
-	for (ALIST_TRAVERSE(ofl->ofl_ents, idx1, enp)) {
-		if (enp->ec_segment &&
-		    (enp->ec_segment->sg_flags & FLG_SG_DISABLED))
+	for (APLIST_TRAVERSE(ofl->ofl_ents, idx1, enp)) {
+
+		/* Disabled segments are not available for assignment */
+		if (enp->ec_segment->sg_flags & FLG_SG_DISABLED)
 			continue;
+
+		/*
+		 * If an entrance criteria doesn't have any of its fields
+		 * set, it will match any section it is tested against.
+		 * We set the FLG_EC_CATCHALL flag on these, primarily because
+		 * it helps readers of our debug output to understand what
+		 * the criteria means --- otherwise the user would just see
+		 * that every field is 0, but might not understand the
+		 * significance of that.
+		 *
+		 * Given that we set this flag, we can use it here as an
+		 * optimization to short circuit all of the tests in this
+		 * loop. Note however, that if we did not do this, the end
+		 * result would be the same --- the empty criteria will sail
+		 * past the following tests and reach the end of the loop.
+		 */
+		if (enp->ec_flags & FLG_EC_CATCHALL) {
+			sgp = enp->ec_segment;
+			break;
+		}
+
 		if (enp->ec_type && (enp->ec_type != shdr->sh_type))
 			continue;
 		if (enp->ec_attrmask &&
@@ -534,52 +704,41 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident,
 		    (enp->ec_attrmask & enp->ec_attrbits) !=
 		    (enp->ec_attrmask & shflags))
 			continue;
-		if (((enp->ec_flags & FLG_EC_BUILTIN) == 0) &&
-		    enp->ec_name && (strcmp(enp->ec_name, isp->is_name) != 0))
+		if (enp->ec_is_name &&
+		    (strcmp(enp->ec_is_name, isp->is_name) != 0))
 			continue;
-		if (enp->ec_files) {
-			Aliste	idx2;
-			char	*file;
-			int	found = 0;
 
-			if (isp->is_file == NULL)
-				continue;
+		if ((alist_nitems(enp->ec_files) > 0) &&
+		    ((path_info == NULL) || !eval_ec_files(path_info, enp)))
+			continue;
 
-			for (APLIST_TRAVERSE(enp->ec_files, idx2, file)) {
-				const char	*name = isp->is_file->ifl_name;
-
-				if (file[0] == '*') {
-					const char	*basename;
-
-					basename = strrchr(name, '/');
-					if (basename == NULL)
-						basename = name;
-					else if (basename[1] != '\0')
-						basename++;
-
-					if (strcmp(&file[1], basename) == 0) {
-						found++;
-						break;
-					}
-				} else {
-					if (strcmp(file, name) == 0) {
-						found++;
-						break;
-					}
-				}
-			}
-			if (!found)
-				continue;
-		}
+		/* All entrance criteria tests passed */
 		sgp = enp->ec_segment;
 		break;
 	}
 
-	if (sgp == NULL) {
-		enp = alist_item(ofl->ofl_ents,
-		    alist_nitems(ofl->ofl_ents) - 1);
-		sgp = enp->ec_segment;
-	}
+	/*
+	 * The final entrance criteria record is a FLG_EC_CATCHALL that points
+	 * at the final predefined segment "extra", and this final segment is
+	 * tagged FLG_SG_NODISABLE. Therefore, the above loop must always find
+	 * a segment.
+	 */
+	assert(sgp != NULL);
+
+	/*
+	 * Transfer the input section sorting key from the entrance criteria
+	 * to the input section. A non-zero value means that the section
+	 * will be sorted on this key amoung the other sections that have a
+	 * non-zero key. These sorted sections are collectively placed at the
+	 * head of the output section.
+	 *
+	 * If the sort key is 0, the section is placed after the sorted
+	 * sections in the order they are encountered.
+	 */
+	isp->is_ordndx = enp->ec_ordndx;
+
+	/* Remember that this entrance criteria has placed a section */
+	enp->ec_flags |= FLG_EC_USED;
 
 	/*
 	 * If our caller has supplied an alternative name for the output
@@ -605,13 +764,13 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident,
 	 * This convention has also been followed for COMDAT and sections
 	 * identified though SHT_GROUP data.
 	 *
-	 * Strip out the % from the section name in all cases except:
-	 *
-	 *    i.	when '-r' is used without '-M', and
-	 *    ii.	when '-r' is used with '-M' but without the ?O flag.
+	 * Strip out the % from the section name for:
+	 *	- Non-relocatable objects
+	 *	- Relocatable objects if input section sorting is
+	 *	  in force for the segment in question.
 	 */
 	if (((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) ||
-	    (sgp->sg_flags & FLG_SG_ORDER)) {
+	    (sgp->sg_flags & FLG_SG_IS_ORDER)) {
 		if ((sname = strchr(isp->is_name, '%')) != NULL) {
 			size_t	size = sname - isp->is_name;
 
@@ -621,7 +780,6 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident,
 			oname[size] = '\0';
 			DBG_CALL(Dbg_sec_redirected(ofl->ofl_lml, isp, oname));
 		}
-		isp->is_ordndx = enp->ec_ordndx;
 	}
 
 	/*
@@ -654,8 +812,8 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident,
 		isp->is_flags |= FLG_IS_COMDAT;
 		if ((ofl->ofl_flags1 & FLG_OF1_NRLXREL) == 0)
 			ofl->ofl_flags1 |= FLG_OF1_RLXREL;
-		Dbg_sec_gnu_comdat(ofl->ofl_lml, isp, TRUE,
-		    (ofl->ofl_flags1 & FLG_OF1_RLXREL) != 0);
+		DBG_CALL(Dbg_sec_gnu_comdat(ofl->ofl_lml, isp, TRUE,
+		    (ofl->ofl_flags1 & FLG_OF1_RLXREL) != 0));
 	}
 
 	/*
@@ -685,7 +843,8 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident,
 		 */
 		if ((ofl->ofl_flags1 & FLG_OF1_NRLXREL) == 0) {
 			ofl->ofl_flags1 |= FLG_OF1_RLXREL;
-			Dbg_sec_gnu_comdat(ofl->ofl_lml, isp, FALSE, TRUE);
+			DBG_CALL(Dbg_sec_gnu_comdat(ofl->ofl_lml, isp,
+			    FALSE, TRUE));
 		}
 	}
 
@@ -695,23 +854,25 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident,
 	 */
 	onamehash = sgs_str_hash(oname);
 
-	if (sgp->sg_flags & FLG_SG_ORDER)
-		enp->ec_flags |= FLG_EC_USED;
-
 	/*
-	 * Determine if section ordering is turned on. If so, return the
-	 * appropriate ordering index for the section. This information
-	 * is derived from the Sg_desc->sg_segorder list that was built
+	 * Determine if output section ordering is turned on. If so, return
+	 * the appropriate ordering index for the section. This information
+	 * is derived from the Sg_desc->sg_os_order list that was built
 	 * up from the Mapfile.
+	 *
+	 * A value of 0 for os_ndx means that the section is not sorted
+	 * (i.e. is not found in the sg_os_order). The items in sg_os_order
+	 * are in the desired sort order, so adding 1 to their alist index
+	 * gives a suitable index for sorting.
 	 */
 	os_ndx = 0;
-	if (sgp->sg_secorder) {
+	if (alist_nitems(sgp->sg_os_order) > 0) {
 		Sec_order	*scop;
 
-		for (APLIST_TRAVERSE(sgp->sg_secorder, idx1, scop)) {
+		for (ALIST_TRAVERSE(sgp->sg_os_order, idx1, scop)) {
 			if (strcmp(scop->sco_secname, oname) == 0) {
 				scop->sco_flags |= FLG_SGO_USED;
-				os_ndx = scop->sco_index;
+				os_ndx = idx1 + 1;
 				break;
 			}
 		}
@@ -782,7 +943,7 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident,
 			 */
 
 			if (os_attach_isp(ofl, osp, isp,
-			    (sgp->sg_flags & FLG_SG_ORDER) != 0) == 0)
+			    (sgp->sg_flags & FLG_SG_IS_ORDER) != 0) == 0)
 				return ((Os_desc *)S_ERROR);
 
 			/*
@@ -952,7 +1113,7 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident,
 	if ((sgp->sg_phdr.p_type == PT_LOAD) &&
 	    ((osp->os_shdr->sh_flags & SHF_ALLOC) == 0)) {
 		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_SCN_NONALLOC),
-		    ofl->ofl_name, osp->os_name);
+		    ofl->ofl_name, osp->os_name, sgp->sg_name);
 		osp->os_shdr->sh_flags |= SHF_ALLOC;
 	}
 

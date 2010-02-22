@@ -20,10 +20,11 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
+#include	<stdio.h>
 #include	"msg.h"
 #include	"_debug.h"
 #include	"libld.h"
@@ -33,39 +34,62 @@
  */
 void
 Dbg_seg_desc_entry(Lm_list *lml, uchar_t osabi, Half mach, int ndx,
-    Sg_desc *sgp)
+    Sg_desc *sgp, Boolean space_nl)
 {
 	Conv_seg_flags_buf_t	seg_flags_buf;
-	const char		*str;
+	Aliste			idx;
+	Sym_desc		*sdp;
 
-	if (sgp->sg_name && *sgp->sg_name)
-		str = sgp->sg_name;
-	else
-		str = MSG_INTL(MSG_STR_NULL);
+	if (space_nl)
+		Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_ORIG(MSG_SEG_DESC), ndx);
+	if (sgp->sg_name)
+		dbg_print(lml, MSG_ORIG(MSG_SEG_NAME), sgp->sg_name);
 
-	Dbg_util_nl(lml, DBG_NL_STD);
-	dbg_print(lml, MSG_ORIG(MSG_SEG_NAME), ndx, str);
-
-	Elf_phdr(lml, osabi, mach, &sgp->sg_phdr);
-
-	dbg_print(lml, MSG_ORIG(MSG_SEG_LENGTH), EC_ADDR(sgp->sg_length));
 	dbg_print(lml, MSG_ORIG(MSG_SEG_FLAGS),
 	    conv_seg_flags(sgp->sg_flags, &seg_flags_buf));
 
-	if (sgp->sg_sizesym && sgp->sg_sizesym->sd_name)
-		dbg_print(lml, MSG_ORIG(MSG_SEG_SIZESYM),
-		    Dbg_demangle_name(sgp->sg_sizesym->sd_name));
+	Elf_phdr(lml, osabi, mach, &sgp->sg_phdr);
 
-	if (sgp->sg_secorder) {
+	if (sgp->sg_flags & FLG_SG_P_ALIGN)
+		dbg_print(lml, MSG_ORIG(MSG_SEG_ALIGN),
+		    EC_ADDR(sgp->sg_align));
+
+	if (sgp->sg_flags & FLG_SG_LENGTH)
+		dbg_print(lml, MSG_ORIG(MSG_SEG_LENGTH),
+		    EC_ADDR(sgp->sg_length));
+
+	if (sgp->sg_flags & FLG_SG_ROUND)
+		dbg_print(lml, MSG_ORIG(MSG_SEG_ROUND),
+		    EC_ADDR(sgp->sg_round));
+
+	if (aplist_nitems(sgp->sg_sizesym) > 0) {
+		dbg_print(lml, MSG_ORIG(MSG_SEG_SIZESYM_TITLE));
+		for (APLIST_TRAVERSE(sgp->sg_sizesym, idx, sdp))
+			if (sdp->sd_name)
+				dbg_print(lml, MSG_ORIG(MSG_SEG_SIZESYM),
+				    Dbg_demangle_name(sdp->sd_name));
+	}
+	if (aplist_nitems(sgp->sg_is_order) > 0) {
+		Aliste		idx;
+		Ent_desc	*enp;
+
+		dbg_print(lml, MSG_ORIG(MSG_SEG_IS_ORDER_TITLE));
+		for (APLIST_TRAVERSE(sgp->sg_is_order, idx, enp))
+			dbg_print(lml, MSG_ORIG(MSG_SEG_LIST_ITEM),
+			    enp->ec_name);
+	}
+	if (alist_nitems(sgp->sg_os_order) > 0) {
 		Aliste		idx;
 		Sec_order	*scop;
 
-		dbg_print(lml, MSG_ORIG(MSG_SEG_ORDER));
-		for (APLIST_TRAVERSE(sgp->sg_secorder, idx, scop))
-			dbg_print(lml, MSG_ORIG(MSG_SEG_SECTION),
-			    scop->sco_secname, EC_WORD(scop->sco_index));
+		dbg_print(lml, MSG_ORIG(MSG_SEG_OS_ORDER_TITLE));
+		for (ALIST_TRAVERSE(sgp->sg_os_order, idx, scop))
+			dbg_print(lml, MSG_ORIG(MSG_SEG_LIST_ITEM),
+			    scop->sco_secname);
 	}
-	Dbg_util_nl(lml, DBG_NL_STD);
+	if (space_nl)
+		Dbg_util_nl(lml, DBG_NL_STD);
 }
 
 void
@@ -85,7 +109,7 @@ Dbg_seg_entry(Ofl_desc *ofl, int ndx, Sg_desc *sgp)
 		return;
 
 	Dbg_seg_desc_entry(ofl->ofl_lml, ofl->ofl_dehdr->e_ident[EI_OSABI],
-	    ofl->ofl_dehdr->e_machine, ndx, sgp);
+	    ofl->ofl_dehdr->e_machine, ndx, sgp, TRUE);
 }
 
 /*
@@ -104,7 +128,7 @@ Dbg_seg_list(Lm_list *lml, uchar_t osabi, Half mach, APlist *apl)
 	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_INTL(MSG_SEG_DESC_AVAIL));
 	for (APLIST_TRAVERSE(apl, idx, sgp))
-		Dbg_seg_desc_entry(lml, osabi, mach, ndx++, sgp);
+		Dbg_seg_desc_entry(lml, osabi, mach, ndx++, sgp, TRUE);
 }
 
 /*

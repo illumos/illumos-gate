@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -363,7 +363,7 @@ ld_unwind_make_hdr(Ofl_desc *ofl)
 	isp->is_shdr = shdr;
 	isp->is_indata = elfdata;
 
-	if ((ofl->ofl_unwindhdr = ld_place_section(ofl, isp,
+	if ((ofl->ofl_unwindhdr = ld_place_section(ofl, isp, NULL,
 	    ld_targ.t_id.id_unwindhdr, NULL)) == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 

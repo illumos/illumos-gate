@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Link Analysis of Runtime Interfaces.
@@ -584,10 +584,14 @@ sub ProcBindings {
 				}
 				$Offset++;
 			}
-			# The symbol being bound, "... symbol `.*' ...".
+			# The symbol being bound. Over the years, we have used
+			# a ` quoting style, and more recently a ' style.
+			# Match either of:
+			#	"... symbol `.*' ...".
+			#	"... symbol '.*' ...".
 			while ($Fields[$Offset]) {
-				if ($Fields[$Offset] =~ /^\`(.*)\'$/) {
-					$SymName = $1;
+				if ($Fields[$Offset] =~ /^(\`|\')(.*)\'$/) {
+					$SymName = $2;
 					$Offset++;
 					last;
 				}

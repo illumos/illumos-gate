@@ -23,166 +23,26 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
- * Map file parsing.
+ * Map file parsing (Original SysV syntax).
  */
-#include	<fcntl.h>
 #include	<string.h>
+#include	<strings.h>
 #include	<stdio.h>
 #include	<unistd.h>
-#include	<sys/stat.h>
 #include	<errno.h>
 #include	<limits.h>
-#include	<dirent.h>
 #include	<ctype.h>
 #include	<elfcap.h>
 #include	<debug.h>
 #include	"msg.h"
 #include	"_libld.h"
+#include	"_map.h"
 
-#if	defined(_ELF64)
-#define	STRTOADDR	strtoull
-#define	XWORD_MAX	ULLONG_MAX
-#else	/* Elf32 */
-#define	STRTOADDR	strtoul
-#define	XWORD_MAX	UINT_MAX
-#endif	/* _ELF64 */
-
-/* Possible return values from gettoken */
-typedef enum {
-	TK_ERROR =	-1,	/* Error in lexical analysis */
-	TK_STRING =	0,
-	TK_COLON =	1,
-	TK_SEMICOLON =	2,
-	TK_EQUAL =	3,
-	TK_ATSIGN =	4,
-	TK_DASH =	5,
-	TK_LEFTBKT =	6,
-	TK_RIGHTBKT =	7,
-	TK_PIPE =	8,
-	TK_EOF =	9
-} Token;
-
-
-static char	*Mapspace;	/* Malloc space holding mapfile. */
-static ulong_t	Line_num;	/* Current mapfile line number. */
-static char	*Start_tok;	/* First character of current token. */
-static char	*nextchr;	/* Next char in mapfile to examine. */
-
-/*
- * Convert a string to lowercase.
- */
-static void
-lowercase(char *str)
-{
-	while (*str = tolower(*str))
-		str++;
-}
-
-/*
- * Get a token from the mapfile.
- *
- * entry:
- *	ofl - Output file descriptor
- *	mapfile - Name of mapfile
- *	eof_ok - If False, end of file causes a premature EOF error to be
- *		issued. If True, TK_EOF is returned quietly.
- */
-static Token
-gettoken(Ofl_desc *ofl, const char *mapfile, int eof_ok)
-{
-	static char	oldchr = '\0';	/* Char at end of current token. */
-	char		*end;		/* End of the current token. */
-
-	/* Cycle through the characters looking for tokens. */
-	for (;;) {
-		if (oldchr != '\0') {
-			*nextchr = oldchr;
-			oldchr = '\0';
-		}
-		if (!isascii(*nextchr) ||
-		    (!isprint(*nextchr) && !isspace(*nextchr) &&
-		    (*nextchr != '\0'))) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_MAP_ILLCHAR), mapfile,
-			    EC_XWORD(Line_num), *((uchar_t *)nextchr));
-			return (TK_ERROR);
-		}
-		switch (*nextchr) {
-		case '\0':	/* End of file. */
-			if (!eof_ok)
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_PREMEOF), mapfile,
-				    EC_XWORD(Line_num));
-			return (TK_EOF);
-
-		case ' ':	/* White space. */
-		case '\t':
-			nextchr++;
-			break;
-		case '\n':	/* White space too, but bump line number. */
-			nextchr++;
-			Line_num++;
-			break;
-		case '#':	/* Comment. */
-			while (*nextchr != '\n' && *nextchr != '\0')
-				nextchr++;
-			break;
-		case ':':
-			nextchr++;
-			return (TK_COLON);
-		case ';':
-			nextchr++;
-			return (TK_SEMICOLON);
-		case '=':
-			nextchr++;
-			return (TK_EQUAL);
-		case '@':
-			nextchr++;
-			return (TK_ATSIGN);
-		case '-':
-			nextchr++;
-			return (TK_DASH);
-		case '|':
-			nextchr++;
-			return (TK_PIPE);
-		case '{':
-			nextchr++;
-			return (TK_LEFTBKT);
-		case '}':
-			nextchr++;
-			return (TK_RIGHTBKT);
-		case '"':
-			Start_tok = ++nextchr;
-			if (((end = strpbrk(nextchr,
-			    MSG_ORIG(MSG_MAP_TOK_1))) == NULL) ||
-			    (*end != '"')) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_NOTERM), mapfile,
-				    EC_XWORD(Line_num));
-				return (TK_ERROR);
-			}
-			*end = '\0';
-			nextchr = end + 1;
-			return (TK_STRING);
-		default:	/* string. */
-			Start_tok = nextchr;		/* CSTYLED */
-			end = strpbrk(nextchr, MSG_ORIG(MSG_MAP_TOK_2));
-			if (end == NULL)
-				nextchr = Start_tok + strlen(Start_tok);
-			else {
-				nextchr = end;
-				oldchr = *nextchr;
-				*nextchr = '\0';
-			}
-			return (TK_STRING);
-		}
-	}
-}
 
 /*
  * Process a hardware/software capabilities segment declaration definition.
@@ -205,88 +65,60 @@ gettoken(Ofl_desc *ofl, const char *mapfile, int eof_ok)
  *
  * effectively removes any capabilities information from the final image.
  */
-static uintptr_t
-map_cap(const char *mapfile, Word type, Ofl_desc *ofl)
+static Boolean
+map_cap(Mapfile *mf, Word type, CapMask *capmask)
 {
-	Token	tok;			/* Current token. */
-	Xword	number;
-	int	used = 0;
+	Token		tok;		/* Current token. */
+	Xword		number;
+	int		used = 0;
+	Ofl_desc	*ofl = mf->mf_ofl;
+	ld_map_tkval_t	tkv;		/* Value of token */
+	elfcap_mask_t	value = 0;
 
-	while ((tok = gettoken(ofl, mapfile, 0)) != TK_SEMICOLON) {
+	if (DBG_ENABLED) {
+		Dbg_cap_mapfile_title(ofl->ofl_lml, mf->mf_lineno);
+		Dbg_cap_entry2(ofl->ofl_lml, DBG_STATE_CURRENT, CA_SUNW_HW_1,
+		    capmask, ld_targ.t_m.m_mach);
+	}
+
+	while ((tok = ld_map_gettoken(mf, TK_F_STRLC, &tkv)) !=
+	    TK_SEMICOLON) {
 		if (tok != TK_STRING) {
 			if (tok != TK_ERROR)
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_EXPSEGATT), mapfile,
-				    EC_XWORD(Line_num));
-			return (S_ERROR);
+				mf_fatal0(mf, MSG_INTL(MSG_MAP_EXPSEGATT));
+			return (FALSE);
 		}
-
-		lowercase(Start_tok);
 
 		/*
 		 * First, determine if the token represents the reserved
 		 * OVERRIDE keyword.
 		 */
-		if (strncmp(Start_tok, MSG_ORIG(MSG_MAP_OVERRIDE),
+		if (strncmp(tkv.tkv_str, MSG_ORIG(MSG_MAP_OVERRIDE),
 		    MSG_MAP_OVERRIDE_SIZE) == 0) {
-			if (type == CA_SUNW_HW_1)
-				ofl->ofl_flags1 |= FLG_OF1_OVHWCAP;
-			else
-				ofl->ofl_flags1 |= FLG_OF1_OVSFCAP;
+			ld_map_cap_set_ovflag(mf, type);
+			used++;
+			continue;
+		}
+
+		/* Is the token a symbolic capability name? */
+		if ((number = (Xword)elfcap_tag_from_str(ELFCAP_STYLE_LC,
+		    type, tkv.tkv_str, ld_targ.t_m.m_mach)) != 0) {
+			value |= number;
 			used++;
 			continue;
 		}
 
 		/*
-		 * Next, determine if the token represents a machine specific
-		 * hardware capability, or a generic software capability.
+		 * Is the token a numeric value?
 		 */
-		if (type == CA_SUNW_HW_1) {
-			if ((number = (Xword)elfcap_hw1_from_str(
-			    ELFCAP_STYLE_LC, Start_tok,
-			    ld_targ.t_m.m_mach)) != 0) {
-				ofl->ofl_hwcap_1 |= number;
-				used++;
-				continue;
+		if (tkv.tkv_str[0] == 'v') {
+			if (ld_map_strtoxword(&tkv.tkv_str[1], NULL,
+			    &number) != STRTOXWORD_OK) {
+				mf_fatal(mf, MSG_INTL(MSG_MAP_BADCAPVAL),
+				    tkv.tkv_str);
+				return (FALSE);
 			}
-		} else {
-			if ((number = (Xword)elfcap_sf1_from_str(
-			    ELFCAP_STYLE_LC, Start_tok,
-			    ld_targ.t_m.m_mach)) != 0) {
-				ofl->ofl_sfcap_1 |= number;
-				used++;
-				continue;
-			}
-		}
-
-		/*
-		 * Next, determine if the token represents a numeric value.
-		 */
-		if (Start_tok[0] == 'v') {
-			char		*end_tok;
-
-			errno = 0;
-			number = (Xword)strtoul(&Start_tok[1], &end_tok, 0);
-			if (errno) {
-				int	err = errno;
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_BADCAPVAL),
-				    mapfile, EC_XWORD(Line_num), Start_tok,
-				    strerror(err));
-				return (S_ERROR);
-			}
-			if (end_tok != strchr(Start_tok, '\0')) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_BADCAPVAL), mapfile,
-				    EC_XWORD(Line_num), Start_tok,
-				    MSG_INTL(MSG_MAP_NOBADFRM));
-				return (S_ERROR);
-			}
-
-			if (type == CA_SUNW_HW_1)
-				ofl->ofl_hwcap_1 |= number;
-			else
-				ofl->ofl_sfcap_1 |= number;
+			value |= number;
 			used++;
 			continue;
 		}
@@ -295,78 +127,161 @@ map_cap(const char *mapfile, Word type, Ofl_desc *ofl)
 		 * We have an unknown token.
 		 */
 		used++;
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_MAP_UNKCAPATTR),
-		    mapfile, EC_XWORD(Line_num), Start_tok);
-		return (S_ERROR);
+		mf_fatal(mf, MSG_INTL(MSG_MAP_UNKCAPATTR), tkv.tkv_str);
+		return (FALSE);
 	}
 
-	/*
-	 * Catch any empty declarations, and indicate any software capabilities
-	 * have been initialized if necessary.
-	 */
+	/* Catch empty declarations */
 	if (used == 0) {
-		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_MAP_EMPTYCAP),
-		    mapfile, EC_XWORD(Line_num));
-	} else if (type == CA_SUNW_SF_1) {
-		Lword	badsf1;
-
-		/*
-		 * Note, hardware capabilities, beyond the tokens that are
-		 * presently known, can be accepted using the V0xXXX notation,
-		 * and as these simply get or'd into the output image, we allow
-		 * any values to be supplied.  Software capability tokens
-		 * however, have an algorithm of acceptance and update (see
-		 * sf1_cap() in files.c).  Therefore only allow software
-		 * capabilities that are known.
-		 */
-		if ((badsf1 = (ofl->ofl_sfcap_1 & ~SF1_SUNW_MASK)) != 0) {
-			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(MSG_MAP_BADSF1), mapfile,
-			    EC_XWORD(Line_num), EC_LWORD(badsf1));
-			ofl->ofl_sfcap_1 &= SF1_SUNW_MASK;
-		}
-		if ((ofl->ofl_sfcap_1 &
-		    (SF1_SUNW_FPKNWN | SF1_SUNW_FPUSED)) == SF1_SUNW_FPUSED) {
-			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(MSG_MAPFIL_BADSF1), mapfile,
-			    EC_XWORD(Line_num), EC_LWORD(SF1_SUNW_FPUSED));
-			ofl->ofl_sfcap_1 &= ~SF1_SUNW_FPUSED;
-		}
-#if	!defined(_ELF64)
-		/*
-		 * The SF1_SUNW_ADDR32 software capability is only meaningful
-		 * when building a 64-bit object.  Warn the user, and remove the
-		 * setting, if we're building a 32-bit object.
-		 */
-		if (ofl->ofl_sfcap_1 & SF1_SUNW_ADDR32) {
-			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(MSG_MAP_INADDR32SF1), mapfile,
-			    EC_XWORD(Line_num));
-			ofl->ofl_sfcap_1 &= ~SF1_SUNW_ADDR32;
-		}
-#endif
+		mf_warn0(mf, MSG_INTL(MSG_MAP_EMPTYCAP));
+		return (TRUE);
 	}
-	return (1);
+
+	Dbg_cap_entry(ofl->ofl_lml, DBG_STATE_NEW, type, value,
+	    ld_targ.t_m.m_mach);
+	capmask->cm_value |= value;
+
+	/* Sanity check the resulting bits */
+	if (!ld_map_cap_sanitize(mf, type, capmask))
+		return (FALSE);
+
+	DBG_CALL(Dbg_cap_entry2(ofl->ofl_lml, DBG_STATE_RESOLVED, type,
+	    capmask, ld_targ.t_m.m_mach));
+
+	return (TRUE);
 }
 
 /*
- * Common segment error checking.
+ * Parse the flags for a segment definition. Called by map_equal().
+ *
+ * entry:
+ *	mf - Mapfile descriptor
+ *	sgp - Segment being defined
+ *	b_flags - Address of b_flags variable from map_equal().
+ *		*bflags is TRUE if flags have already been seen in, the
+ *		current segment definition directive, and FALSE otherwise.
+ *	flag_tok - Flags string, starting with the '?' character.
+ *
+ * exit:
+ *	On success, the flags have been parsed and the segment updated,
+ *	*b_flags is set to TRUE, and TRUE is returned. On error, FALSE
+ *	is returned.
  */
 static Boolean
-seg_check(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl, Boolean b_type,
-    Word p_type)
+map_equal_flags(Mapfile *mf, Sg_desc *sgp, Boolean *b_flags,
+    const char *flag_tok)
 {
-	if (b_type) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_MAP_MOREONCE),
-		    mapfile, EC_XWORD(Line_num), MSG_INTL(MSG_MAP_SEGTYP));
+	Word	tmp_flags = 0;
+
+	if (*b_flags) {
+		mf_fatal(mf, MSG_INTL(MSG_MAP_MOREONCE),
+		    MSG_INTL(MSG_MAP_SEGFLAG));
 		return (FALSE);
 	}
-	if ((sgp->sg_flags & FLG_SG_TYPE) && (sgp->sg_phdr.p_type != p_type)) {
-		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_MAP_REDEFATT),
-		    mapfile, EC_XWORD(Line_num), MSG_INTL(MSG_MAP_SEGTYP),
-		    sgp->sg_name);
+
+	/* Skip over the leading '?' character */
+	flag_tok++;
+
+	/*
+	 * If ? has nothing following leave the flags cleared,
+	 * otherwise OR in any flags specified.
+	 */
+	while (*flag_tok) {
+		switch (*flag_tok) {
+		case 'r':
+			tmp_flags |= PF_R;
+			break;
+		case 'w':
+			tmp_flags |= PF_W;
+			break;
+		case 'x':
+			tmp_flags |= PF_X;
+			break;
+		case 'e':
+			sgp->sg_flags |= FLG_SG_EMPTY;
+			break;
+		case 'o':
+			/*
+			 * The version 1 ?O option is incompatible with
+			 * the version 2 SEGMENT IS_ORDER attribute.
+			 */
+			if (aplist_nitems(sgp->sg_is_order) > 0) {
+				mf_fatal(mf, MSG_INTL(MSG_MAP_ISORDVER),
+				    sgp->sg_name);
+				return (FALSE);
+			}
+
+			/*
+			 * Set FLG_SG_IS_ORDER to indicate that segment has
+			 * had the ?O flag set by a version 1 mapfile.
+			 */
+			sgp->sg_flags |= FLG_SG_IS_ORDER;
+			break;
+		case 'n':
+			/*
+			 * If segment ends up as the first loadable segment,
+			 * it will not include the the ELF and program headers.
+			 */
+			sgp->sg_flags |= FLG_SG_NOHDR;
+			break;
+		default:
+			mf_fatal(mf, MSG_INTL(MSG_MAP_UNKSEGFLG), *flag_tok);
+			return (FALSE);
+		}
+		flag_tok++;
 	}
+
+	/*
+	 * Warn when changing flags except when we're adding or removing "X"
+	 * from a RW PT_LOAD segment.
+	 */
+	if ((sgp->sg_flags & FLG_SG_P_FLAGS) &&
+	    (sgp->sg_phdr.p_flags != tmp_flags) &&
+	    !(sgp->sg_phdr.p_type == PT_LOAD &&
+	    (tmp_flags & (PF_R|PF_W)) == (PF_R|PF_W) &&
+	    (tmp_flags ^ sgp->sg_phdr.p_flags) == PF_X))
+		mf_warn(mf, MSG_INTL(MSG_MAP_REDEFATT),
+		    MSG_INTL(MSG_MAP_SEGFLAG), sgp->sg_name);
+
+	sgp->sg_flags |= FLG_SG_P_FLAGS;
+	sgp->sg_phdr.p_flags = tmp_flags;
+	*b_flags = TRUE;
+
 	return (TRUE);
+}
+
+/*
+ * Read an address (value) or size Xword from a TK_STRING token value
+ * where the first letter of the string is a letter ('v', 'l', 's', ...)
+ * followed by the numeric value.
+ *
+ * entry:
+ *	mf - Mapfile descriptor
+ *	tkv - TK_STRING token to parse
+ *	value - Address of variable to receive the resulting value.
+ *
+ * exit:
+ *	Returns TRUE for success. On failure, issues an error message
+ *	and returns FALSE.
+ */
+static Boolean
+valuetoxword(Mapfile *mf, ld_map_tkval_t *tkv, Xword *value)
+{
+	switch (ld_map_strtoxword(&tkv->tkv_str[1], NULL, value)) {
+	case STRTOXWORD_OK:
+		return (TRUE);
+
+	case STRTOXWORD_TOOBIG:
+		mf_fatal(mf, MSG_INTL(MSG_MAP_SEGADDR), tkv->tkv_str,
+		    MSG_INTL(MSG_MAP_EXCLIMIT));
+		break;
+	default:
+		mf_fatal(mf, MSG_INTL(MSG_MAP_SEGADDR), tkv->tkv_str,
+		    MSG_INTL(MSG_MAP_NOBADFRM));
+		break;
+	}
+
+	return (FALSE);
 }
 
 /*
@@ -375,10 +290,35 @@ seg_check(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl, Boolean b_type,
  * 	segment_attribute : segment_type  segment_flags  virtual_addr
  *			    physical_addr  length alignment
  */
-static uintptr_t
-map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
+static Boolean
+map_equal(Mapfile *mf, Sg_desc *sgp)
 {
+	/*
+	 * Segment type.  Users are permitted to define PT_LOAD,
+	 * PT_NOTE, PT_SUNWSTACK and PT_NULL segments.  Other segment
+	 * types are only defined in seg_desc[].
+	 */
+	typedef struct {
+		const char	*name;	/* Name for segment type  */
+		Word		p_type;	/* PT_ constant corresponding to name */
+		sg_flags_t	sg_flags; /* Seg descriptor flags to apply */
+	} seg_types_t;
+
+	static seg_types_t seg_type_arr[] = {
+		{ MSG_ORIG(MSG_MAP_LOAD),	PT_LOAD,	FLG_SG_P_TYPE },
+		{ MSG_ORIG(MSG_MAP_STACK),	PT_SUNWSTACK,
+		    FLG_SG_P_TYPE | FLG_SG_EMPTY },
+		{ MSG_ORIG(MSG_MAP_NULL),	PT_NULL,	FLG_SG_P_TYPE },
+		{ MSG_ORIG(MSG_MAP_NOTE),	PT_NOTE,	FLG_SG_P_TYPE },
+
+		/* Array must be NULL terminated */
+		{ NULL }
+	};
+
+
+	seg_types_t	*seg_type;
 	Token	tok;			/* Current token. */
+	ld_map_tkval_t	tkv;		/* Value of token */
 	Boolean	b_type  = FALSE;	/* True if seg types found. */
 	Boolean	b_flags = FALSE;	/* True if seg flags found. */
 	Boolean	b_len   = FALSE;	/* True if seg length found. */
@@ -387,166 +327,69 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 	Boolean	b_paddr = FALSE;	/* True if seg physical addr found. */
 	Boolean	b_align = FALSE;	/* True if seg alignment found. */
 
-	while ((tok = gettoken(ofl, mapfile, 0)) != TK_SEMICOLON) {
+	while ((tok = ld_map_gettoken(mf, TK_F_STRLC, &tkv)) !=
+	    TK_SEMICOLON) {
 		if (tok != TK_STRING) {
 			if (tok != TK_ERROR)
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_EXPSEGATT), mapfile,
-				    EC_XWORD(Line_num));
-			return (S_ERROR);
+				mf_fatal0(mf, MSG_INTL(MSG_MAP_EXPSEGATT));
+			return (FALSE);
 		}
-
-		lowercase(Start_tok);
 
 		/*
-		 * Segment type.  Users are permitted to define PT_LOAD,
-		 * PT_NOTE, PT_STACK and PT_NULL segments.  Other segment types
-		 * are only defined in seg_desc[].
+		 * If it is the name of a segment type, set the type
+		 * and flags fields in the descriptor.
 		 */
-		if (strcmp(Start_tok, MSG_ORIG(MSG_MAP_LOAD)) == 0) {
-			if ((b_type = seg_check(mapfile, sgp, ofl, b_type,
-			    PT_LOAD)) == FALSE)
-				return (S_ERROR);
-
-			sgp->sg_phdr.p_type = PT_LOAD;
-			sgp->sg_flags |= FLG_SG_TYPE;
-
-		} else if (strcmp(Start_tok, MSG_ORIG(MSG_MAP_STACK)) == 0) {
-			if ((b_type = seg_check(mapfile, sgp, ofl, b_type,
-			    PT_SUNWSTACK)) == FALSE)
-				return (S_ERROR);
-
-			sgp->sg_phdr.p_type = PT_SUNWSTACK;
-			sgp->sg_flags |= (FLG_SG_TYPE | FLG_SG_EMPTY);
-
-		} else if (strcmp(Start_tok, MSG_ORIG(MSG_MAP_NULL)) == 0) {
-			if ((b_type = seg_check(mapfile, sgp, ofl, b_type,
-			    PT_NULL)) == FALSE)
-				return (S_ERROR);
-
-			sgp->sg_phdr.p_type = PT_NULL;
-			sgp->sg_flags |= FLG_SG_TYPE;
-
-		} else if (strcmp(Start_tok, MSG_ORIG(MSG_MAP_NOTE)) == 0) {
-			if ((b_type = seg_check(mapfile, sgp, ofl, b_type,
-			    PT_NOTE)) == FALSE)
-				return (S_ERROR);
-
-			sgp->sg_phdr.p_type = PT_NOTE;
-			sgp->sg_flags |= FLG_SG_TYPE;
-		}
-
-		/* Segment Flags. */
-
-		else if (*Start_tok == '?') {
-			Word	tmp_flags = 0;
-			char	*flag_tok = Start_tok + 1;
-
-			if (b_flags) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_MOREONCE), mapfile,
-				    EC_XWORD(Line_num),
-				    MSG_INTL(MSG_MAP_SEGFLAG));
-				return (S_ERROR);
-			}
-
-			/*
-			 * If ? has nothing following leave the flags cleared,
-			 * otherwise or in any flags specified.
-			 */
-			if (*flag_tok) {
-				while (*flag_tok) {
-					switch (*flag_tok) {
-					case 'r':
-						tmp_flags |= PF_R;
-						break;
-					case 'w':
-						tmp_flags |= PF_W;
-						break;
-					case 'x':
-						tmp_flags |= PF_X;
-						break;
-					case 'e':
-						sgp->sg_flags |= FLG_SG_EMPTY;
-						break;
-					case 'o':
-						sgp->sg_flags |= FLG_SG_ORDER;
-						ofl->ofl_flags |=
-						    FLG_OF_SEGORDER;
-						break;
-					case 'n':
-						sgp->sg_flags |= FLG_SG_NOHDR;
-						break;
-					default:
-						eprintf(ofl->ofl_lml, ERR_FATAL,
-						    MSG_INTL(MSG_MAP_UNKSEGFLG),
-						    mapfile, EC_XWORD(Line_num),
-						    *flag_tok);
-						return (S_ERROR);
-					}
-					flag_tok++;
+		for (seg_type = seg_type_arr; seg_type->name; seg_type++) {
+			if (strcmp(tkv.tkv_str, seg_type->name) == 0) {
+				if (b_type) {
+					mf_fatal(mf, MSG_INTL(MSG_MAP_MOREONCE),
+					    MSG_INTL(MSG_MAP_SEGTYP));
+					return (FALSE);
 				}
+				if ((sgp->sg_flags & FLG_SG_P_TYPE) &&
+				    (sgp->sg_phdr.p_type != seg_type->p_type)) {
+					mf_warn(mf, MSG_INTL(MSG_MAP_REDEFATT),
+					    MSG_INTL(MSG_MAP_SEGTYP),
+					    sgp->sg_name);
+				}
+
+				sgp->sg_phdr.p_type = seg_type->p_type;
+				sgp->sg_flags |= seg_type->sg_flags;
+				break;
 			}
-			/*
-			 * Warn when changing flags except when we're
-			 * adding or removing "X" from a RW PT_LOAD
-			 * segment.
-			 */
-			if ((sgp->sg_flags & FLG_SG_FLAGS) &&
-			    (sgp->sg_phdr.p_flags != tmp_flags) &&
-			    !(sgp->sg_phdr.p_type == PT_LOAD &&
-			    (tmp_flags & (PF_R|PF_W)) == (PF_R|PF_W) &&
-			    (tmp_flags ^ sgp->sg_phdr.p_flags) == PF_X)) {
-				eprintf(ofl->ofl_lml, ERR_WARNING,
-				    MSG_INTL(MSG_MAP_REDEFATT), mapfile,
-				    EC_XWORD(Line_num),
-				    MSG_INTL(MSG_MAP_SEGFLAG), sgp->sg_name);
-			}
-			sgp->sg_flags |= FLG_SG_FLAGS;
-			sgp->sg_phdr.p_flags = tmp_flags;
-			b_flags = TRUE;
+		}
+		if (seg_type->name != NULL)	/* Matched segment type */
+			continue;		/* next token */
+
+		/* Segment Flags */
+		if (*tkv.tkv_str == '?') {
+			if (!map_equal_flags(mf, sgp, &b_flags, tkv.tkv_str))
+				return (FALSE);
+			continue;		/* next token */
 		}
 
 
-		/* Segment address, length, alignment or rounding number. */
+		/* Segment address, length, alignment or rounding number */
+		if ((tkv.tkv_str[0] == 'l') || (tkv.tkv_str[0] == 'v') ||
+		    (tkv.tkv_str[0] == 'a') || (tkv.tkv_str[0] == 'p') ||
+		    (tkv.tkv_str[0] == 'r')) {
+			Xword	number;
 
-		else if ((Start_tok[0] == 'l') || (Start_tok[0] == 'v') ||
-		    (Start_tok[0] == 'a') || (Start_tok[0] == 'p') ||
-		    (Start_tok[0] == 'r')) {
-			char		*end_tok;
-			Xword		number;
+			if (!valuetoxword(mf, &tkv, &number))
+				return (FALSE);
 
-			if ((number = (Xword)STRTOADDR(&Start_tok[1], &end_tok,
-			    0))	>= XWORD_MAX) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_SEGADDR), mapfile,
-				    EC_XWORD(Line_num), Start_tok,
-				    MSG_INTL(MSG_MAP_EXCLIMIT));
-				return (S_ERROR);
-			}
-
-			if (end_tok != strchr(Start_tok, '\0')) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_SEGADDR), mapfile,
-				    EC_XWORD(Line_num), Start_tok,
-				    MSG_INTL(MSG_MAP_NOBADFRM));
-				return (S_ERROR);
-			}
-
-			switch (*Start_tok) {
+			switch (*tkv.tkv_str) {
 			case 'l':
 				if (b_len) {
-					eprintf(ofl->ofl_lml, ERR_FATAL,
+					mf_fatal(mf,
 					    MSG_INTL(MSG_MAP_MOREONCE),
-					    mapfile, EC_XWORD(Line_num),
 					    MSG_INTL(MSG_MAP_SEGLEN));
-					return (S_ERROR);
+					return (FALSE);
 				}
 				if ((sgp->sg_flags & FLG_SG_LENGTH) &&
 				    (sgp->sg_length != number))
-					eprintf(ofl->ofl_lml, ERR_WARNING,
+					mf_warn(mf,
 					    MSG_INTL(MSG_MAP_REDEFATT),
-					    mapfile, EC_XWORD(Line_num),
 					    MSG_INTL(MSG_MAP_SEGLEN),
 					    sgp->sg_name);
 				sgp->sg_length = number;
@@ -555,17 +398,15 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 				break;
 			case 'r':
 				if (b_round) {
-					eprintf(ofl->ofl_lml, ERR_FATAL,
+					mf_fatal(mf,
 					    MSG_INTL(MSG_MAP_MOREONCE),
-					    mapfile, EC_XWORD(Line_num),
 					    MSG_INTL(MSG_MAP_SEGROUND));
-					return (S_ERROR);
+					return (FALSE);
 				}
 				if ((sgp->sg_flags & FLG_SG_ROUND) &&
 				    (sgp->sg_round != number))
-					eprintf(ofl->ofl_lml, ERR_WARNING,
+					mf_warn(mf,
 					    MSG_INTL(MSG_MAP_REDEFATT),
-					    mapfile, EC_XWORD(Line_num),
 					    MSG_INTL(MSG_MAP_SEGROUND),
 					    sgp->sg_name);
 				sgp->sg_round = number;
@@ -574,73 +415,69 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 				break;
 			case 'v':
 				if (b_vaddr) {
-					eprintf(ofl->ofl_lml, ERR_FATAL,
+					mf_fatal(mf,
 					    MSG_INTL(MSG_MAP_MOREONCE),
-					    mapfile, EC_XWORD(Line_num),
 					    MSG_INTL(MSG_MAP_SEGVADDR));
-					return (S_ERROR);
+					return (FALSE);
 				}
-				if ((sgp->sg_flags & FLG_SG_VADDR) &&
+				if ((sgp->sg_flags & FLG_SG_P_VADDR) &&
 				    (sgp->sg_phdr.p_vaddr != number))
-					eprintf(ofl->ofl_lml, ERR_WARNING,
+					mf_warn(mf,
 					    MSG_INTL(MSG_MAP_REDEFATT),
-					    mapfile, EC_XWORD(Line_num),
 					    MSG_INTL(MSG_MAP_SEGVADDR),
 					    sgp->sg_name);
 				/* LINTED */
 				sgp->sg_phdr.p_vaddr = (Addr)number;
-				sgp->sg_flags |= FLG_SG_VADDR;
-				ofl->ofl_flags1 |= FLG_OF1_VADDR;
-				ofl->ofl_flags |= FLG_OF_SEGSORT;
+				sgp->sg_flags |= FLG_SG_P_VADDR;
 				b_vaddr = TRUE;
 				break;
 			case 'p':
 				if (b_paddr) {
-					eprintf(ofl->ofl_lml, ERR_FATAL,
+					mf_fatal(mf,
 					    MSG_INTL(MSG_MAP_MOREONCE),
-					    mapfile, EC_XWORD(Line_num),
 					    MSG_INTL(MSG_MAP_SEGPHYS));
-					return (S_ERROR);
+					return (FALSE);
 				}
-				if ((sgp->sg_flags & FLG_SG_PADDR) &&
+				if ((sgp->sg_flags & FLG_SG_P_PADDR) &&
 				    (sgp->sg_phdr.p_paddr != number))
-					eprintf(ofl->ofl_lml, ERR_WARNING,
+					mf_warn(mf,
 					    MSG_INTL(MSG_MAP_REDEFATT),
-					    mapfile, EC_XWORD(Line_num),
 					    MSG_INTL(MSG_MAP_SEGPHYS),
 					    sgp->sg_name);
 				/* LINTED */
 				sgp->sg_phdr.p_paddr = (Addr)number;
-				sgp->sg_flags |= FLG_SG_PADDR;
+				sgp->sg_flags |= FLG_SG_P_PADDR;
 				b_paddr = TRUE;
 				break;
 			case 'a':
 				if (b_align) {
-					eprintf(ofl->ofl_lml, ERR_FATAL,
+					mf_fatal(mf,
 					    MSG_INTL(MSG_MAP_MOREONCE),
-					    mapfile, EC_XWORD(Line_num),
 					    MSG_INTL(MSG_MAP_SEGALIGN));
-					return (S_ERROR);
+					return (FALSE);
 				}
-				if ((sgp->sg_flags & FLG_SG_ALIGN) &&
+				if ((sgp->sg_flags & FLG_SG_P_ALIGN) &&
 				    (sgp->sg_phdr.p_align != number))
-					eprintf(ofl->ofl_lml, ERR_WARNING,
+					mf_warn(mf,
 					    MSG_INTL(MSG_MAP_REDEFATT),
-					    mapfile, EC_XWORD(Line_num),
 					    MSG_INTL(MSG_MAP_SEGALIGN),
 					    sgp->sg_name);
 				/* LINTED */
 				sgp->sg_phdr.p_align = (Xword)number;
-				sgp->sg_flags |= FLG_SG_ALIGN;
+				sgp->sg_flags |= FLG_SG_P_ALIGN;
 				b_align = TRUE;
 				break;
 			}
-		} else {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_MAP_UNKSEGATT), mapfile,
-			    EC_XWORD(Line_num), Start_tok);
-			return (S_ERROR);
+
+			continue;		/* next token */
 		}
+
+		/*
+		 * If we reach the bottom of this loop, we have an
+		 * unrecognized token.
+		 */
+		mf_fatal(mf, MSG_INTL(MSG_MAP_UNKSEGATT), tkv.tkv_str);
+		return (FALSE);
 	}
 
 	/*
@@ -650,7 +487,8 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 	 * PT_LOAD reservations are only allowed within executables, as the
 	 * reservation must be established through exec() as part of initial
 	 * process loading.  In addition, PT_LOAD reservations must have an
-	 * associated address and size.
+	 * associated address and size. Note: This is an obsolete feature,
+	 * not supported by the newer mapfile syntax.
 	 *
 	 * PT_NULL program headers are established for later use by applications
 	 * such as the post-optimizer.  PT_NULL headers should have no other
@@ -663,40 +501,32 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 		 * Any style of empty segment should have no permissions.
 		 */
 		if (sgp->sg_phdr.p_flags != 0) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_MAP_SEGEMNOPERM), mapfile,
-			    EC_XWORD(Line_num),
+			mf_fatal(mf, MSG_INTL(MSG_MAP_SEGEMNOPERM),
 			    EC_WORD(sgp->sg_phdr.p_flags));
-			return (S_ERROR);
+			return (FALSE);
 		}
 
 		if (sgp->sg_phdr.p_type == PT_LOAD) {
-			if ((ofl->ofl_flags & FLG_OF_EXEC) == 0) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_SEGEMPEXE), mapfile,
-				    EC_XWORD(Line_num));
-				return (S_ERROR);
+			if ((mf->mf_ofl->ofl_flags & FLG_OF_EXEC) == 0) {
+				mf_fatal0(mf, MSG_INTL(MSG_MAP_SEGEMPEXE));
+				return (FALSE);
 			}
-			if ((sgp->sg_flags & (FLG_SG_LENGTH | FLG_SG_VADDR)) !=
-			    (FLG_SG_LENGTH | FLG_SG_VADDR)) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_SEGEMPATT), mapfile,
-				    EC_XWORD(Line_num));
-				return (S_ERROR);
+			if ((sgp->sg_flags &
+			    (FLG_SG_LENGTH | FLG_SG_P_VADDR)) !=
+			    (FLG_SG_LENGTH | FLG_SG_P_VADDR)) {
+				mf_fatal0(mf, MSG_INTL(MSG_MAP_SEGEMPATT));
+				return (FALSE);
 			}
 		} else if (sgp->sg_phdr.p_type == PT_NULL) {
-			if ((sgp->sg_flags & (FLG_SG_LENGTH | FLG_SG_VADDR)) &&
+			if ((sgp->sg_flags &
+			    (FLG_SG_LENGTH | FLG_SG_P_VADDR)) &&
 			    ((sgp->sg_length != 0) ||
 			    (sgp->sg_phdr.p_vaddr != 0))) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_SEGEMPNOATT), mapfile,
-				    EC_XWORD(Line_num));
-				return (S_ERROR);
+				mf_fatal0(mf, MSG_INTL(MSG_MAP_SEGEMPNOATT));
+				return (FALSE);
 			}
 		} else {
-			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(MSG_MAP_SEGEMPLOAD), mapfile,
-			    EC_XWORD(Line_num));
+			mf_warn0(mf, MSG_INTL(MSG_MAP_SEGEMPLOAD));
 			sgp->sg_phdr.p_type = PT_LOAD;
 		}
 	}
@@ -705,9 +535,9 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 	 * All segment attributes have now been scanned.  Certain flags do not
 	 * make sense if this is not a loadable segment, fix if necessary.
 	 * Note, if the segment is of type PT_NULL it must be new, and any
-	 * defaults will be applied back in ld_map_parse().
-	 * When clearing an attribute leave the flag set as an indicator for
-	 * later entries re-specifying the same segment.
+	 * defaults will be applied by ld_map_seg_insert(). When clearing an
+	 * attribute leave the flag set as an indicator for later entries
+	 * re-specifying the same segment.
 	 */
 	if ((sgp->sg_phdr.p_type != PT_NULL) &&
 	    (sgp->sg_phdr.p_type != PT_LOAD)) {
@@ -718,125 +548,128 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 		else
 			fmt = MSG_INTL(MSG_MAP_NONLOAD);
 
-		if ((sgp->sg_flags & FLG_SG_FLAGS) &&
+		if ((sgp->sg_flags & FLG_SG_P_FLAGS) &&
 		    (sgp->sg_phdr.p_type != PT_SUNWSTACK)) {
 			if (sgp->sg_phdr.p_flags != 0) {
-				eprintf(ofl->ofl_lml, ERR_WARNING,
-				    MSG_INTL(MSG_MAP_NONLOAD), mapfile,
-				    EC_XWORD(Line_num),
+				mf_warn(mf, MSG_INTL(MSG_MAP_NONLOAD),
 				    MSG_INTL(MSG_MAP_SEGFLAG));
 				sgp->sg_phdr.p_flags = 0;
 			}
 		}
 		if (sgp->sg_flags & FLG_SG_LENGTH)
 			if (sgp->sg_length != 0) {
-				eprintf(ofl->ofl_lml, ERR_WARNING,
-				    fmt, mapfile, EC_XWORD(Line_num),
-				    MSG_INTL(MSG_MAP_SEGLEN));
+				mf_warn(mf, fmt, MSG_INTL(MSG_MAP_SEGLEN));
 				sgp->sg_length = 0;
 			}
 		if (sgp->sg_flags & FLG_SG_ROUND)
 			if (sgp->sg_round != 0) {
-				eprintf(ofl->ofl_lml, ERR_WARNING,
-				    fmt, mapfile, EC_XWORD(Line_num),
-				    MSG_INTL(MSG_MAP_SEGROUND));
+				mf_warn(mf, fmt, MSG_INTL(MSG_MAP_SEGROUND));
 				sgp->sg_round = 0;
 			}
-		if (sgp->sg_flags & FLG_SG_VADDR) {
+		if (sgp->sg_flags & FLG_SG_P_VADDR) {
 			if (sgp->sg_phdr.p_vaddr != 0) {
-				eprintf(ofl->ofl_lml, ERR_WARNING,
-				    fmt, mapfile, EC_XWORD(Line_num),
-				    MSG_INTL(MSG_MAP_SEGVADDR));
+				mf_warn(mf, fmt, MSG_INTL(MSG_MAP_SEGVADDR));
 				sgp->sg_phdr.p_vaddr = 0;
 			}
 		}
-		if (sgp->sg_flags & FLG_SG_PADDR)
+		if (sgp->sg_flags & FLG_SG_P_PADDR)
 			if (sgp->sg_phdr.p_paddr != 0) {
-				eprintf(ofl->ofl_lml, ERR_WARNING,
-				    fmt, mapfile, EC_XWORD(Line_num),
-				    MSG_INTL(MSG_MAP_SEGPHYS));
+				mf_warn(mf, fmt, MSG_INTL(MSG_MAP_SEGPHYS));
 				sgp->sg_phdr.p_paddr = 0;
 			}
-		if (sgp->sg_flags & FLG_SG_ALIGN)
+		if (sgp->sg_flags & FLG_SG_P_ALIGN)
 			if (sgp->sg_phdr.p_align != 0) {
-				eprintf(ofl->ofl_lml, ERR_WARNING,
-				    fmt, mapfile, EC_XWORD(Line_num),
-				    MSG_INTL(MSG_MAP_SEGALIGN));
+				mf_warn(mf, fmt, MSG_INTL(MSG_MAP_SEGALIGN));
 				sgp->sg_phdr.p_align = 0;
 			}
 	}
-	return (1);
+	return (TRUE);
 }
 
 
 /*
  * Process a mapfile mapping directives definition.
+ *
  * 	segment_name : section_attribute [ : file_name ]
- * 	segment_attribute : section_name section_type section_flags;
+ *
+ * Where segment_attribute is one of: section_name section_type section_flags;
  */
-static uintptr_t
-map_colon(Ofl_desc *ofl, const char *mapfile, Ent_desc *enp)
+static Boolean
+map_colon(Mapfile *mf, Ent_desc *enp)
 {
-	Token		tok;		/* Current token. */
-
+	Token		tok;
+	ld_map_tkval_t	tkv;
 	Boolean		b_name = FALSE;
 	Boolean		b_type = FALSE;
 	Boolean		b_attr = FALSE;
 	Boolean		b_bang = FALSE;
-	static	Xword	index = 0;
 
 
-	while (((tok = gettoken(ofl, mapfile, 0)) != TK_COLON) &&
+	/*
+	 * Start out assuming that this entrance criteria will be empty,
+	 * and therefore match anything. We clear the CATCHALL flag below
+	 * if this turns out not to be the case.
+	 */
+	enp->ec_flags |= FLG_EC_CATCHALL;
+
+	while (((tok = ld_map_gettoken(mf, 0, &tkv)) != TK_COLON) &&
 	    (tok != TK_SEMICOLON)) {
-		if ((tok == TK_ERROR) || (tok == TK_EOF))
-			return (S_ERROR);
+		if (tok == TK_ERROR)
+			return (FALSE);
+		if (tok != TK_STRING) {
+			mf_fatal0(mf, MSG_INTL(MSG_MAP_MALFORM));
+			return (FALSE);
+		}
 
 		/* Segment type. */
 
-		if (*Start_tok == '$') {
+		if (*tkv.tkv_str == '$') {
 			if (b_type) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_MOREONCE), mapfile,
-				    EC_XWORD(Line_num),
+				mf_fatal(mf, MSG_INTL(MSG_MAP_MOREONCE),
 				    MSG_INTL(MSG_MAP_SECTYP));
-				return (S_ERROR);
+				return (FALSE);
 			}
 			b_type = TRUE;
-			Start_tok++;
-			lowercase(Start_tok);
-			if (strcmp(Start_tok, MSG_ORIG(MSG_STR_PROGBITS)) == 0)
+			tkv.tkv_str++;
+			ld_map_lowercase(tkv.tkv_str);
+			if (strcmp(tkv.tkv_str, MSG_ORIG(MSG_STR_PROGBITS)) ==
+			    0)
 				enp->ec_type = SHT_PROGBITS;
-			else if (strcmp(Start_tok,
+			else if (strcmp(tkv.tkv_str,
 			    MSG_ORIG(MSG_STR_SYMTAB)) == 0)
 				enp->ec_type = SHT_SYMTAB;
-			else if (strcmp(Start_tok,
+			else if (strcmp(tkv.tkv_str,
 			    MSG_ORIG(MSG_STR_DYNSYM)) == 0)
 				enp->ec_type = SHT_DYNSYM;
-			else if (strcmp(Start_tok,
+			else if (strcmp(tkv.tkv_str,
 			    MSG_ORIG(MSG_STR_STRTAB)) == 0)
 				enp->ec_type = SHT_STRTAB;
-			else if ((strcmp(Start_tok,
+			else if ((strcmp(tkv.tkv_str,
 			    MSG_ORIG(MSG_STR_REL)) == 0) ||
-			    (strcmp(Start_tok, MSG_ORIG(MSG_STR_RELA)) == 0))
+			    (strcmp(tkv.tkv_str, MSG_ORIG(MSG_STR_RELA)) == 0))
 				enp->ec_type = ld_targ.t_m.m_rel_sht_type;
-			else if (strcmp(Start_tok, MSG_ORIG(MSG_STR_HASH)) == 0)
+			else if (strcmp(tkv.tkv_str, MSG_ORIG(MSG_STR_HASH)) ==
+			    0)
 				enp->ec_type = SHT_HASH;
-			else if (strcmp(Start_tok, MSG_ORIG(MSG_STR_LIB)) == 0)
+			else if (strcmp(tkv.tkv_str, MSG_ORIG(MSG_STR_LIB)) ==
+			    0)
 				enp->ec_type = SHT_SHLIB;
-			else if (strcmp(Start_tok,
+			else if (strcmp(tkv.tkv_str,
 			    MSG_ORIG(MSG_STR_LD_DYNAMIC)) == 0)
 				enp->ec_type = SHT_DYNAMIC;
-			else if (strcmp(Start_tok, MSG_ORIG(MSG_STR_NOTE)) == 0)
+			else if (strcmp(tkv.tkv_str, MSG_ORIG(MSG_STR_NOTE)) ==
+			    0)
 				enp->ec_type = SHT_NOTE;
-			else if (strcmp(Start_tok,
+			else if (strcmp(tkv.tkv_str,
 			    MSG_ORIG(MSG_STR_NOBITS)) == 0)
 				enp->ec_type = SHT_NOBITS;
 			else {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_UNKSECTYP), mapfile,
-				    EC_XWORD(Line_num), Start_tok);
-				return (S_ERROR);
+				mf_fatal(mf, MSG_INTL(MSG_MAP_UNKSECTYP),
+				    tkv.tkv_str);
+				return (FALSE);
 			}
+
+			enp->ec_flags &= ~FLG_EC_CATCHALL;
 
 		/*
 		 * Segment flags.
@@ -846,37 +679,33 @@ map_colon(Ofl_desc *ofl, const char *mapfile, Ent_desc *enp)
 		 * ie.	for  ?A the attrmask is set and the attrbit is set,
 		 *	for ?!A the attrmask is set and the attrbit is clear.
 		 */
-		} else if (*Start_tok == '?') {
+		} else if (*tkv.tkv_str == '?') {
 			if (b_attr) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_MOREONCE), mapfile,
-				    EC_XWORD(Line_num),
+				mf_fatal(mf, MSG_INTL(MSG_MAP_MOREONCE),
 				    MSG_INTL(MSG_MAP_SECFLAG));
-				return (S_ERROR);
+				return (FALSE);
 			}
 			b_attr = TRUE;
 			b_bang = FALSE;
-			Start_tok++;
-			lowercase(Start_tok);
-			for (; *Start_tok != '\0'; Start_tok++)
-				switch (*Start_tok) {
+			tkv.tkv_str++;
+			ld_map_lowercase(tkv.tkv_str);
+			for (; *tkv.tkv_str != '\0'; tkv.tkv_str++)
+				switch (*tkv.tkv_str) {
 				case '!':
 					if (b_bang) {
-						eprintf(ofl->ofl_lml, ERR_FATAL,
+						mf_fatal(mf,
 						    MSG_INTL(MSG_MAP_BADFLAG),
-						    mapfile, EC_XWORD(Line_num),
-						    Start_tok);
-						return (S_ERROR);
+						    tkv.tkv_str);
+						return (FALSE);
 					}
 					b_bang = TRUE;
 					break;
 				case 'a':
 					if (enp->ec_attrmask & SHF_ALLOC) {
-						eprintf(ofl->ofl_lml, ERR_FATAL,
+						mf_fatal(mf,
 						    MSG_INTL(MSG_MAP_BADFLAG),
-						    mapfile, EC_XWORD(Line_num),
-						    Start_tok);
-						return (S_ERROR);
+						    tkv.tkv_str);
+						return (FALSE);
 					}
 					enp->ec_attrmask |= SHF_ALLOC;
 					if (!b_bang)
@@ -885,11 +714,10 @@ map_colon(Ofl_desc *ofl, const char *mapfile, Ent_desc *enp)
 					break;
 				case 'w':
 					if (enp->ec_attrmask & SHF_WRITE) {
-						eprintf(ofl->ofl_lml, ERR_FATAL,
+						mf_fatal(mf,
 						    MSG_INTL(MSG_MAP_BADFLAG),
-						    mapfile, EC_XWORD(Line_num),
-						    Start_tok);
-						return (S_ERROR);
+						    tkv.tkv_str);
+						return (FALSE);
 					}
 					enp->ec_attrmask |= SHF_WRITE;
 					if (!b_bang)
@@ -898,11 +726,10 @@ map_colon(Ofl_desc *ofl, const char *mapfile, Ent_desc *enp)
 					break;
 				case 'x':
 					if (enp->ec_attrmask & SHF_EXECINSTR) {
-						eprintf(ofl->ofl_lml, ERR_FATAL,
+						mf_fatal(mf,
 						    MSG_INTL(MSG_MAP_BADFLAG),
-						    mapfile, EC_XWORD(Line_num),
-						    Start_tok);
-						return (S_ERROR);
+						    tkv.tkv_str);
+						return (FALSE);
 					}
 					enp->ec_attrmask |= SHF_EXECINSTR;
 					if (!b_bang)
@@ -911,236 +738,115 @@ map_colon(Ofl_desc *ofl, const char *mapfile, Ent_desc *enp)
 					b_bang = FALSE;
 					break;
 				default:
-					eprintf(ofl->ofl_lml, ERR_FATAL,
+					mf_fatal(mf,
 					    MSG_INTL(MSG_MAP_BADFLAG),
-					    mapfile, EC_XWORD(Line_num),
-					    Start_tok);
-					return (S_ERROR);
+					    tkv.tkv_str);
+					return (FALSE);
 				}
+			if (enp->ec_attrmask != 0)
+				enp->ec_flags &= ~FLG_EC_CATCHALL;
+
 		/*
 		 * Section name.
 		 */
 		} else {
 			if (b_name) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_MOREONCE), mapfile,
-				    EC_XWORD(Line_num),
+				mf_fatal(mf, MSG_INTL(MSG_MAP_MOREONCE),
 				    MSG_INTL(MSG_MAP_SECNAME));
-				return (S_ERROR);
+				return (FALSE);
 			}
 			b_name = TRUE;
-			if ((enp->ec_name =
-			    libld_malloc(strlen(Start_tok) + 1)) == NULL)
-				return (S_ERROR);
-			(void) strcpy((char *)enp->ec_name, Start_tok);
-			/*
-			 * Set the index for text reordering.
-			 */
-			enp->ec_ordndx = ++index;
+			enp->ec_is_name = tkv.tkv_str;
+			enp->ec_flags &= ~FLG_EC_CATCHALL;
 		}
 	}
 	if (tok == TK_COLON) {
 		/*
 		 * File names.
 		 */
-		while ((tok = gettoken(ofl, mapfile, 0)) != TK_SEMICOLON) {
-			char	*file;
+		while ((tok = ld_map_gettoken(mf, 0, &tkv)) != TK_SEMICOLON) {
+			Word	ecf_type;
 
 			if (tok != TK_STRING) {
 				if (tok != TK_ERROR)
-					eprintf(ofl->ofl_lml, ERR_FATAL,
-					    MSG_INTL(MSG_MAP_MALFORM), mapfile,
-					    EC_XWORD(Line_num));
-				return (S_ERROR);
+					mf_fatal0(mf,
+					    MSG_INTL(MSG_MAP_MALFORM));
+				return (FALSE);
 			}
-			if ((file =
-			    libld_malloc(strlen(Start_tok) + 1)) == NULL)
-				return (S_ERROR);
-			(void) strcpy(file, Start_tok);
 
-			if (aplist_append(&(enp->ec_files), file,
-			    AL_CNT_EC_FILES) == NULL)
-				return (S_ERROR);
+			/*
+			 * A leading '*' means that this should be a basename
+			 * comparison rather than a full path. It's not a glob
+			 * wildcard, although it looks like one.
+			 */
+			if (tkv.tkv_str[0] == '*') {
+				ecf_type = TYP_ECF_BASENAME;
+				tkv.tkv_str++;
+			} else {
+				ecf_type = TYP_ECF_PATH;
+			}
+			if (!ld_map_seg_ent_files(mf, enp, ecf_type,
+			    tkv.tkv_str))
+				return (FALSE);
+			enp->ec_flags &= ~FLG_EC_CATCHALL;
 		}
 	}
-	return (1);
-}
-
-/*
- * Obtain a pseudo input file descriptor to assign to a mapfile.  This is
- * required any time a symbol is generated.  Traverse the input file
- * descriptors looking for a match.  As all mapfile processing occurs before
- * any real input file processing this list is going to be small and we don't
- * need to do any filename clash checking.
- */
-static Ifl_desc *
-map_ifl(const char *mapfile, Ofl_desc *ofl)
-{
-	Ifl_desc	*ifl;
-	Aliste		idx;
-
-	for (APLIST_TRAVERSE(ofl->ofl_objs, idx, ifl))
-		if (strcmp(ifl->ifl_name, mapfile) == 0)
-			return (ifl);
-
-	if ((ifl = libld_calloc(sizeof (Ifl_desc), 1)) == NULL)
-		return ((Ifl_desc *)S_ERROR);
-	ifl->ifl_name = mapfile;
-	ifl->ifl_flags = (FLG_IF_MAPFILE | FLG_IF_NEEDED | FLG_IF_FILEREF);
-	if ((ifl->ifl_ehdr = libld_calloc(sizeof (Ehdr), 1)) == NULL)
-		return ((Ifl_desc *)S_ERROR);
-	ifl->ifl_ehdr->e_type = ET_REL;
-
-	if (aplist_append(&ofl->ofl_objs, ifl, AL_CNT_OFL_OBJS) == NULL)
-		return ((Ifl_desc *)S_ERROR);
-	else
-		return (ifl);
+	return (TRUE);
 }
 
 /*
  * Process a mapfile size symbol definition.
  * 	segment_name @ symbol_name;
  */
-static uintptr_t
-map_atsign(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
+static Boolean
+map_atsign(Mapfile *mf, Sg_desc *sgp)
 {
-	Sym		*sym;		/* New symbol pointer */
-	Sym_desc	*sdp;		/* New symbol node pointer */
-	Ifl_desc	*ifl;		/* Dummy input file structure */
 	Token		tok;		/* Current token. */
-	avl_index_t	where;
+	ld_map_tkval_t	tkv;		/* Value of token */
 
-	if ((tok = gettoken(ofl, mapfile, 0)) != TK_STRING) {
+	if ((tok = ld_map_gettoken(mf, 0, &tkv)) != TK_STRING) {
 		if (tok != TK_ERROR)
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_MAP_EXPSYM_1), mapfile,
-			    EC_XWORD(Line_num));
-		return (S_ERROR);
+			mf_fatal0(mf, MSG_INTL(MSG_MAP_EXPSYM_1));
+		return (FALSE);
 	}
 
-	if (sgp->sg_sizesym != NULL) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_MAP_SEGSIZE),
-		    mapfile, EC_XWORD(Line_num), sgp->sg_name);
-		return (S_ERROR);
-	}
+	/* Add the symbol to the segment */
+	if (!ld_map_seg_size_symbol(mf, sgp, TK_PLUSEQ, tkv.tkv_str))
+		return (FALSE);
 
-	/*
-	 * Make sure we have a pseudo file descriptor to associate to the
-	 * symbol.
-	 */
-	if ((ifl = map_ifl(mapfile, ofl)) == (Ifl_desc *)S_ERROR)
-		return (S_ERROR);
 
-	/*
-	 * Make sure the symbol doesn't already exist.  It is possible that the
-	 * symbol has been scoped or versioned, in which case it does exist
-	 * but we can freely update it here.
-	 */
-	if ((sdp = ld_sym_find(Start_tok, SYM_NOHASH, &where, ofl)) == NULL) {
-		char	*name;
-		Word hval;
-
-		if ((name = libld_malloc(strlen(Start_tok) + 1)) == NULL)
-			return (S_ERROR);
-		(void) strcpy(name, Start_tok);
-
-		if ((sym = libld_calloc(sizeof (Sym), 1)) == NULL)
-			return (S_ERROR);
-		sym->st_shndx = SHN_ABS;
-		sym->st_size = 0;
-		sym->st_info = ELF_ST_INFO(STB_GLOBAL, STT_OBJECT);
-
-		DBG_CALL(Dbg_map_size_new(ofl->ofl_lml, name));
-		/* LINTED */
-		hval = (Word)elf_hash(name);
-		if ((sdp = ld_sym_enter(name, sym, hval, ifl, ofl, 0, SHN_ABS,
-		    (FLG_SY_SPECSEC | FLG_SY_GLOBREF), &where)) ==
-		    (Sym_desc *)S_ERROR)
-			return (S_ERROR);
-		sdp->sd_flags &= ~FLG_SY_CLEAN;
-		DBG_CALL(Dbg_map_symbol(ofl, sdp));
-	} else {
-		sym = sdp->sd_sym;
-
-		if (sym->st_shndx == SHN_UNDEF) {
-			sdp->sd_shndx = sym->st_shndx = SHN_ABS;
-			sdp->sd_flags |= FLG_SY_SPECSEC;
-			sym->st_size = 0;
-			sym->st_info = ELF_ST_INFO(STB_GLOBAL, STT_OBJECT);
-
-			sdp->sd_flags &= ~FLG_SY_MAPREF;
-
-			DBG_CALL(Dbg_map_size_old(ofl, sdp));
-		} else {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_MAP_SYMDEF1), mapfile,
-			    EC_XWORD(Line_num), demangle(sdp->sd_name),
-			    sdp->sd_file->ifl_name,
-			    MSG_INTL(MSG_MAP_DIFF_SYMMUL));
-			return (S_ERROR);
-		}
-	}
-
-	/*
-	 * Assign the symbol to the segment.
-	 */
-	sgp->sg_sizesym = sdp;
-
-	if (gettoken(ofl, mapfile, 0) != TK_SEMICOLON) {
+	if (ld_map_gettoken(mf, 0, &tkv) != TK_SEMICOLON) {
 		if (tok != TK_ERROR)
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_MAP_EXPSCOL), mapfile,
-			    EC_XWORD(Line_num));
-		return (S_ERROR);
+			mf_fatal0(mf, MSG_INTL(MSG_MAP_EXPSCOL));
+		return (FALSE);
 	}
 
-	return (1);
+	return (TRUE);
 }
 
 
-static uintptr_t
-map_pipe(Ofl_desc *ofl, const char *mapfile, Sg_desc *sgp)
+static Boolean
+map_pipe(Mapfile *mf, Sg_desc *sgp)
 {
-	char		*sec_name;	/* section name */
 	Token		tok;		/* current token. */
-	Sec_order	*sc_order;
-	static Word	index = 0;	/* used to maintain a increasing */
-					/* 	index for section ordering. */
+	ld_map_tkval_t	tkv;		/* Value of token */
 
-	if ((tok = gettoken(ofl, mapfile, 0)) != TK_STRING) {
+	if ((tok = ld_map_gettoken(mf, 0, &tkv)) != TK_STRING) {
 		if (tok != TK_ERROR)
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_MAP_EXPSEC), mapfile,
-			    EC_XWORD(Line_num));
-		return (S_ERROR);
+			mf_fatal0(mf, MSG_INTL(MSG_MAP_EXPSEC));
+		return (FALSE);
 	}
 
-	if ((sec_name = libld_malloc(strlen(Start_tok) + 1)) == NULL)
-		return (S_ERROR);
-	(void) strcpy(sec_name, Start_tok);
+	if (!ld_map_seg_os_order_add(mf, sgp, tkv.tkv_str))
+		return (FALSE);
 
-	if ((sc_order = libld_malloc(sizeof (Sec_order))) == NULL)
-		return (S_ERROR);
-
-	sc_order->sco_secname = sec_name;
-	sc_order->sco_index = ++index;
-
-	if (aplist_append(&sgp->sg_secorder, sc_order,
-	    AL_CNT_SG_SECORDER) == NULL)
-		return (S_ERROR);
-
-	ofl->ofl_flags |= FLG_OF_SECORDER;
-	DBG_CALL(Dbg_map_pipe(ofl->ofl_lml, sgp, sec_name, index));
-
-	if ((tok = gettoken(ofl, mapfile, 0)) != TK_SEMICOLON) {
+	if ((tok = ld_map_gettoken(mf, 0, &tkv)) != TK_SEMICOLON) {
 		if (tok != TK_ERROR)
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_MAP_EXPSCOL), mapfile,
-			    EC_XWORD(Line_num));
-		return (S_ERROR);
+			mf_fatal0(mf, MSG_INTL(MSG_MAP_EXPSCOL));
+		return (FALSE);
 	}
 
-	return (1);
+	return (TRUE);
 }
 
 /*
@@ -1149,40 +855,29 @@ map_pipe(Ofl_desc *ofl, const char *mapfile, Sg_desc *sgp)
  *	shared object definition : [ shared object type [ = SONAME ]]
  *					[ versions ];
  */
-static uintptr_t
-map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
+static Boolean
+map_dash(Mapfile *mf, char *name)
 {
-	char		*version;
 	Token		tok;
 	Sdf_desc	*sdf;
-	Sdv_desc	sdv;
+	ld_map_tkval_t	tkv;		/* Value of token */
 	enum {
 	    MD_NONE = 0,
 	    MD_ADDVERS,
 	}		dolkey = MD_NONE;
 
-
-	/*
-	 * If a shared object definition for this file already exists use it,
-	 * otherwise allocate a new descriptor.
-	 */
-	if ((sdf = sdf_find(name, ofl->ofl_socntl)) == NULL) {
-		if ((sdf = sdf_add(name, &ofl->ofl_socntl)) ==
-		    (Sdf_desc *)S_ERROR)
-			return (S_ERROR);
-		sdf->sdf_rfile = mapfile;
-	}
+	/* Get descriptor for dependency */
+	if ((sdf = ld_map_dv(mf, name)) == NULL)
+		return (FALSE);
 
 	/*
 	 * Get the shared object descriptor string.
 	 */
-	while ((tok = gettoken(ofl, mapfile, 0)) != TK_SEMICOLON) {
+	while ((tok = ld_map_gettoken(mf, 0, &tkv)) != TK_SEMICOLON) {
 		if ((tok != TK_STRING) && (tok != TK_EQUAL)) {
 			if (tok != TK_ERROR)
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_EXPSO), mapfile,
-				    EC_XWORD(Line_num));
-			return (S_ERROR);
+				mf_fatal0(mf, MSG_INTL(MSG_MAP_EXPSO));
+			return (FALSE);
 		}
 
 		/*
@@ -1190,36 +885,22 @@ map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
 		 * definition.
 		 */
 		if (tok == TK_EQUAL) {
-			if ((tok = gettoken(ofl, mapfile, 0)) != TK_STRING) {
+			if ((tok = ld_map_gettoken(mf, 0, &tkv)) !=
+			    TK_STRING) {
 				if (tok != TK_ERROR)
-					eprintf(ofl->ofl_lml, ERR_FATAL,
-					    MSG_INTL(MSG_MAP_EXPSO), mapfile,
-					    EC_XWORD(Line_num));
-				return (S_ERROR);
+					mf_fatal0(mf,
+					    MSG_INTL(MSG_MAP_EXPSO));
+				return (FALSE);
 			}
 			switch (dolkey) {
 			case MD_ADDVERS:
-				sdf->sdf_flags |= FLG_SDF_ADDVER;
-
-				if ((version = libld_malloc(
-				    strlen(Start_tok) + 1)) == NULL)
-					return (S_ERROR);
-				(void) strcpy(version, Start_tok);
-
-				sdv.sdv_name = version;
-				sdv.sdv_ref = mapfile;
-				sdv.sdv_flags = 0;
-
-				if (alist_append(&sdf->sdf_verneed, &sdv,
-				    sizeof (Sdv_desc),
-				    AL_CNT_SDF_VERSIONS) == NULL)
-					return (S_ERROR);
+				if (!ld_map_dv_entry(mf, sdf, TRUE,
+				    tkv.tkv_str))
+					return (FALSE);
 				break;
 			case MD_NONE:
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_UNEXTOK), mapfile,
-				    EC_XWORD(Line_num), '=');
-				return (S_ERROR);
+				mf_fatal(mf, MSG_INTL(MSG_MAP_UNEXTOK), '=');
+				return (FALSE);
 			}
 			dolkey = MD_NONE;
 			continue;
@@ -1229,23 +910,20 @@ map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
 		 * A shared object type has been specified.  This may also be
 		 * accompanied by an SONAME redefinition (see above).
 		 */
-		if (*Start_tok == '$') {
+		if (*tkv.tkv_str == '$') {
 			if (dolkey != MD_NONE) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_UNEXTOK), mapfile,
-				    EC_XWORD(Line_num), '$');
-				return (S_ERROR);
+				mf_fatal(mf, MSG_INTL(MSG_MAP_UNEXTOK), '$');
+				return (FALSE);
 			}
-			Start_tok++;
-			lowercase(Start_tok);
-			if (strcmp(Start_tok,
-			    MSG_ORIG(MSG_MAP_ADDVERS)) == 0)
+			tkv.tkv_str++;
+			ld_map_lowercase(tkv.tkv_str);
+			if (strcmp(tkv.tkv_str, MSG_ORIG(MSG_MAP_ADDVERS)) ==
+			    0) {
 				dolkey = MD_ADDVERS;
-			else {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_UNKSOTYP), mapfile,
-				    EC_XWORD(Line_num), Start_tok);
-				return (S_ERROR);
+			} else {
+				mf_fatal(mf, MSG_INTL(MSG_MAP_UNKSOTYP),
+				    tkv.tkv_str);
+				return (FALSE);
 			}
 			continue;
 		}
@@ -1253,23 +931,11 @@ map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
 		/*
 		 * shared object version requirement.
 		 */
-		if ((version = libld_malloc(strlen(Start_tok) + 1)) == NULL)
-			return (S_ERROR);
-		(void) strcpy(version, Start_tok);
-
-		sdf->sdf_flags |= FLG_SDF_SELECT;
-
-		sdv.sdv_name = version;
-		sdv.sdv_ref = mapfile;
-		sdv.sdv_flags = 0;
-
-		if (alist_append(&sdf->sdf_vers, &sdv, sizeof (Sdv_desc),
-		    AL_CNT_SDF_VERSIONS) == NULL)
-			return (S_ERROR);
+		if (!ld_map_dv_entry(mf, sdf, FALSE, tkv.tkv_str))
+			return (FALSE);
 	}
 
-	DBG_CALL(Dbg_map_dash(ofl->ofl_lml, name));
-	return (1);
+	return (TRUE);
 }
 
 
@@ -1285,126 +951,42 @@ map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
  * } [ dependency ];
  *
  */
-#define	FLG_SCOPE_HIDD	0		/* symbol defined hidden/local */
-#define	FLG_SCOPE_DFLT	1		/* symbol defined default/global */
-#define	FLG_SCOPE_PROT	2		/* symbol defined protected/symbolic */
-#define	FLG_SCOPE_EXPT	3		/* symbol defined exported */
-#define	FLG_SCOPE_SNGL	4		/* symbol defined singleton */
-#define	FLG_SCOPE_ELIM	5		/* symbol defined eliminate */
-
-static uintptr_t
-map_version(const char *mapfile, char *name, Ofl_desc *ofl)
+static Boolean
+map_version(Mapfile *mf, char *name)
 {
 	Token		tok;
-	Sym		*sym;
-	int		scope = FLG_SCOPE_DFLT, errcnt = 0;
-	Ver_desc	*vdp;
-	Word		hash;
-	Ifl_desc	*ifl;
-	avl_index_t	where;
+	ld_map_tkval_t	tkv;		/* Value of token */
+	ld_map_ver_t	mv;
+	ld_map_sym_t	ms;
+	Ofl_desc	*ofl = mf->mf_ofl;
 
-	/*
-	 * If we're generating segments within the image then any symbol
-	 * reductions will be processed (ie. applied to relocations and symbol
-	 * table entries).  Otherwise (when creating a relocatable object) any
-	 * versioning information is simply recorded for use in a later
-	 * (segment generating) link-edit.
-	 */
-	if (ofl->ofl_flags & FLG_OF_RELOBJ)
-		ofl->ofl_flags |= FLG_OF_VERDEF;
-
-	/*
-	 * If this is a new mapfile reference generate an input file descriptor
-	 * to represent it.  Otherwise this must simply be a new version within
-	 * the mapfile we've previously been processing, in this case continue
-	 * to use the original input file descriptor.
-	 */
-	if ((ifl = map_ifl(mapfile, ofl)) == (Ifl_desc *)S_ERROR)
-		return (S_ERROR);
-
-	/*
-	 * If no version descriptors have yet been set up, initialize a base
-	 * version to represent the output file itself.  This `base' version
-	 * catches any internally generated symbols (_end, _etext, etc.) and
-	 * serves to initialize the output version descriptor count.
-	 */
-	if (ofl->ofl_vercnt == 0) {
-		if (ld_vers_base(ofl) == (Ver_desc *)S_ERROR)
-			return (S_ERROR);
-	}
-
-	/*
-	 * If this definition has an associated version name then generate a
-	 * new version descriptor and an associated version symbol index table.
-	 */
-	if (name) {
-		ofl->ofl_flags |= FLG_OF_VERDEF;
-
-		/*
-		 * Traverse the present version descriptor list to see if there
-		 * is already one of the same name, otherwise create a new one.
-		 */
-		/* LINTED */
-		hash = (Word)elf_hash(name);
-		if (((vdp = ld_vers_find(name, hash,
-		    ofl->ofl_verdesc)) == NULL) &&
-		    ((vdp = ld_vers_desc(name, hash,
-		    &ofl->ofl_verdesc)) == (Ver_desc *)S_ERROR))
-			return (S_ERROR);
-
-		/*
-		 * Initialize any new version with an index, the file from which
-		 * it was first referenced, and a WEAK flag (indicates that
-		 * there are no symbols assigned to it yet).
-		 */
-		if (vdp->vd_ndx == 0) {
-			/* LINTED */
-			vdp->vd_ndx = (Half)++ofl->ofl_vercnt;
-			vdp->vd_file = ifl;
-			vdp->vd_flags = VER_FLG_WEAK;
-		}
-	} else {
-		/*
-		 * If a version definition hasn't been specified assign any
-		 * symbols to the base version.
-		 */
-		vdp = (Ver_desc *)ofl->ofl_verdesc->apl_data[0];
-	}
+	/* Establish the version descriptor and related data */
+	if (!ld_map_sym_ver_init(mf, name, &mv))
+		return (FALSE);
 
 	/*
 	 * Scan the mapfile entry picking out scoping and symbol definitions.
 	 */
-	while ((tok = gettoken(ofl, mapfile, 0)) != TK_RIGHTBKT) {
-		Sym_desc	*sdp;
-		Word		shndx = SHN_UNDEF;
-		uchar_t 	type = STT_NOTYPE;
-		Addr		value = 0, size = 0;
-		char		*_name, *filtee = NULL;
-		sd_flag_t	sdflags = 0;
-		uint_t		filter = 0, novalue = 1, dftflag;
-		const char	*conflict;
+	while ((tok = ld_map_gettoken(mf, 0, &tkv)) != TK_RIGHTBKT) {
+		uint_t		filter = 0;
 
-		if ((tok != TK_STRING) && (tok != TK_COLON)) {
-			if (tok == TK_ERROR)
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_EXPSYM_2), mapfile,
-				    EC_XWORD(Line_num));
-			if ((tok == TK_ERROR) || (tok == TK_EOF))
-				return (S_ERROR);
-			errcnt++;
+		if (tok != TK_STRING) {
+			if (tok == TK_ERROR) {
+				mf_fatal0(mf, MSG_INTL(MSG_MAP_EXPSYM_2));
+				return (FALSE);
+			}
+			mv.mv_errcnt++;
 			continue;
 		}
 
-		if ((_name = libld_malloc(strlen(Start_tok) + 1)) == NULL)
-			return (S_ERROR);
-		(void) strcpy(_name, Start_tok);
+		/* The default value for all the symbol attributes is 0 */
+		(void) memset(&ms, 0, sizeof (ms));
+		ms.ms_name = tkv.tkv_str;
 
-		if (tok != TK_COLON) {
-			tok = gettoken(ofl, mapfile, 0);
-			if ((tok == TK_ERROR) || (tok == TK_EOF)) {
-				errcnt++;
-				continue;
-			}
+		tok = ld_map_gettoken(mf, 0, &tkv);
+		if (tok == TK_ERROR) {
+			mv.mv_errcnt++;
+			continue;
 		}
 
 		/*
@@ -1417,56 +999,11 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 		 * will a user get a weak version (which is how we document the
 		 * creation of weak versions).
 		 */
-		vdp->vd_flags &= ~VER_FLG_WEAK;
+		mv.mv_vdp->vd_flags &= ~VER_FLG_WEAK;
 
 		switch (tok) {
 		case TK_COLON:
-			/*
-			 * Establish a new scope.  All symbols added by this
-			 * mapfile are actually global entries, and are assigned
-			 * the scope that is presently in effect.
-			 *
-			 * If a protected/symbolic scope is detected, remember
-			 * this.  If a protected/symbolic scope is the only
-			 * scope defined in this (or any other mapfiles), then
-			 * the mode -Bsymbolic is established.
-			 */
-			if ((strcmp(MSG_ORIG(MSG_MAP_DEFAULT), _name) == 0) ||
-			    (strcmp(MSG_ORIG(MSG_MAP_GLOBAL), _name) == 0)) {
-				scope = FLG_SCOPE_DFLT;
-				ofl->ofl_flags |= FLG_OF_MAPGLOB;
-
-			} else if ((strcmp(MSG_ORIG(MSG_MAP_HIDDEN),
-			    _name) == 0) ||
-			    (strcmp(MSG_ORIG(MSG_STR_LOCAL), _name) == 0)) {
-				scope = FLG_SCOPE_HIDD;
-
-			} else if ((strcmp(MSG_ORIG(MSG_MAP_PROTECTED),
-			    _name) == 0) ||
-			    (strcmp(MSG_ORIG(MSG_STR_SYMBOLIC), _name) == 0)) {
-				scope = FLG_SCOPE_PROT;
-				ofl->ofl_flags |= FLG_OF_MAPSYMB;
-
-			} else if (strcmp(MSG_ORIG(MSG_STR_EXPORTED),
-			    _name) == 0) {
-				scope = FLG_SCOPE_EXPT;
-
-			} else if (strcmp(MSG_ORIG(MSG_STR_SINGLETON),
-			    _name) == 0) {
-				scope = FLG_SCOPE_SNGL;
-				ofl->ofl_flags |= FLG_OF_MAPGLOB;
-
-			} else if (strcmp(MSG_ORIG(MSG_STR_ELIMINATE),
-			    _name) == 0) {
-				scope = FLG_SCOPE_ELIM;
-
-			} else {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_UNKSYMSCO), mapfile,
-				    EC_XWORD(Line_num), _name);
-				errcnt++;
-				break;
-			}
+			ld_map_sym_scope(mf, ms.ms_name, &mv);
 			continue;
 
 		case TK_EQUAL:
@@ -1476,29 +1013,24 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 			 * alignment specified and then fall through to process
 			 * the entire symbols information.
 			 */
-			while ((tok = gettoken(ofl, mapfile, 0)) !=
+			while ((tok = ld_map_gettoken(mf, 0, &tkv)) !=
 			    TK_SEMICOLON) {
-				if ((tok == TK_ERROR) || (tok == TK_EOF))
-					return (S_ERROR);
+				if (tok == TK_ERROR)
+					return (FALSE);
+				if (tok != TK_STRING) {
+					mf_fatal0(mf,
+					    MSG_INTL(MSG_MAP_MALFORM));
+					return (FALSE);
+				}
+
 				/*
-				 * If we had previously seen a filter or
-				 * auxiliary filter requirement, the next string
-				 * is the filtee itself.
+				 * If we had previously seen AUX or FILTER,
+				 * the next string is the filtee itself.
+				 * Add it, and clear the filter flag.
 				 */
 				if (filter) {
-					if (filtee) {
-					    /* BEGIN CSTYLED */
-					    eprintf(ofl->ofl_lml, ERR_FATAL,
-						MSG_INTL(MSG_MAP_MULTFILTEE),
-						mapfile, EC_XWORD(Line_num));
-					    errcnt++;
-					    continue;
-					    /* END CSTYLED */
-					}
-					if ((filtee = libld_malloc(
-					    strlen(Start_tok) + 1)) == NULL)
-						return (S_ERROR);
-					(void) strcpy(filtee, Start_tok);
+					ld_map_sym_filtee(mf, &mv, &ms,
+					    filter, tkv.tkv_str);
 					filter = 0;
 					continue;
 				}
@@ -1506,190 +1038,139 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 				/*
 				 * Determine any Value or Size attributes.
 				 */
-				lowercase(Start_tok);
+				ld_map_lowercase(tkv.tkv_str);
 
-				if (Start_tok[0] == 'v' ||
-				    Start_tok[0] == 's') {
-					char		*end_tok;
-					Lword		number;
+				if (tkv.tkv_str[0] == 'v' ||
+				    tkv.tkv_str[0] == 's') {
+					Xword	number;
 
-					if ((number = (Lword)STRTOADDR(
-					    &Start_tok[1], &end_tok, 0)) ==
-					    XWORD_MAX) {
-						eprintf(ofl->ofl_lml, ERR_FATAL,
-						    MSG_INTL(MSG_MAP_SEGADDR),
-						    mapfile, EC_XWORD(Line_num),
-						    Start_tok,
-						    MSG_INTL(MSG_MAP_EXCLIMIT));
-						errcnt++;
-						continue;
+					if (!valuetoxword(mf, &tkv, &number)) {
+						mv.mv_errcnt++;
+						return (FALSE);
 					}
 
-					if (end_tok !=
-					    strchr(Start_tok, '\0')) {
-						eprintf(ofl->ofl_lml, ERR_FATAL,
-						    MSG_INTL(MSG_MAP_SEGADDR),
-						    mapfile, EC_XWORD(Line_num),
-						    Start_tok,
-						    MSG_INTL(MSG_MAP_NOBADFRM));
-						errcnt++;
-						continue;
-					}
-
-					switch (*Start_tok) {
+					switch (*tkv.tkv_str) {
 					case 'v':
 					    /* BEGIN CSTYLED */
-					    if (value) {
-						eprintf(ofl->ofl_lml, ERR_FATAL,
+					    if (ms.ms_value) {
+						mf_fatal(mf,
 						    MSG_INTL(MSG_MAP_MOREONCE),
-						    mapfile, EC_XWORD(Line_num),
 						    MSG_INTL(MSG_MAP_SYMVAL));
-						errcnt++;
+						mv.mv_errcnt++;
 						continue;
 					    }
 					    /* LINTED */
-					    value = (Addr)number;
-					    novalue = 0;
+					    ms.ms_value = (Addr)number;
+					    ms.ms_value_set = TRUE;
 					    break;
 					    /* END CSTYLED */
 					case 's':
 					    /* BEGIN CSTYLED */
-					    if (size) {
-						eprintf(ofl->ofl_lml, ERR_FATAL,
+					    if (ms.ms_size) {
+						mf_fatal(mf,
 						    MSG_INTL(MSG_MAP_MOREONCE),
-						    mapfile, EC_XWORD(Line_num),
 						    MSG_INTL(MSG_MAP_SYMSIZE));
-						errcnt++;
+						mv.mv_errcnt++;
 						continue;
 					    }
 					    /* LINTED */
-					    size = (Addr)number;
+					    ms.ms_size = (Addr)number;
 					    break;
 					    /* END CSTYLED */
 					}
 
-				} else if (strcmp(Start_tok,
+				} else if (strcmp(tkv.tkv_str,
 				    MSG_ORIG(MSG_MAP_FUNCTION)) == 0) {
-					shndx = SHN_ABS;
-					sdflags |= FLG_SY_SPECSEC;
-					type = STT_FUNC;
-				} else if (strcmp(Start_tok,
+					ms.ms_shndx = SHN_ABS;
+					ms.ms_sdflags |= FLG_SY_SPECSEC;
+					ms.ms_type = STT_FUNC;
+				} else if (strcmp(tkv.tkv_str,
 				    MSG_ORIG(MSG_MAP_DATA)) == 0) {
-					shndx = SHN_ABS;
-					sdflags |= FLG_SY_SPECSEC;
-					type = STT_OBJECT;
-				} else if (strcmp(Start_tok,
+					ms.ms_shndx = SHN_ABS;
+					ms.ms_sdflags |= FLG_SY_SPECSEC;
+					ms.ms_type = STT_OBJECT;
+				} else if (strcmp(tkv.tkv_str,
 				    MSG_ORIG(MSG_MAP_COMMON)) == 0) {
-					shndx = SHN_COMMON;
-					sdflags |= FLG_SY_SPECSEC;
-					type = STT_OBJECT;
-				} else if (strcmp(Start_tok,
+					ms.ms_shndx = SHN_COMMON;
+					ms.ms_sdflags |= FLG_SY_SPECSEC;
+					ms.ms_type = STT_OBJECT;
+				} else if (strcmp(tkv.tkv_str,
 				    MSG_ORIG(MSG_MAP_PARENT)) == 0) {
-					sdflags |= FLG_SY_PARENT;
+					ms.ms_sdflags |= FLG_SY_PARENT;
 					ofl->ofl_flags |= FLG_OF_SYMINFO;
-				} else if (strcmp(Start_tok,
+				} else if (strcmp(tkv.tkv_str,
 				    MSG_ORIG(MSG_MAP_EXTERN)) == 0) {
-					sdflags |= FLG_SY_EXTERN;
+					ms.ms_sdflags |= FLG_SY_EXTERN;
 					ofl->ofl_flags |= FLG_OF_SYMINFO;
-				} else if (strcmp(Start_tok,
+				} else if (strcmp(tkv.tkv_str,
 				    MSG_ORIG(MSG_MAP_DIRECT)) == 0) {
-					sdflags |= FLG_SY_DIR;
+					ms.ms_sdflags |= FLG_SY_DIR;
 					ofl->ofl_flags |= FLG_OF_SYMINFO;
-				} else if (strcmp(Start_tok,
+				} else if (strcmp(tkv.tkv_str,
 				    MSG_ORIG(MSG_MAP_NODIRECT)) == 0) {
-					sdflags |= FLG_SY_NDIR;
+					ms.ms_sdflags |= FLG_SY_NDIR;
 					ofl->ofl_flags |= FLG_OF_SYMINFO;
 					ofl->ofl_flags1 |=
 					    (FLG_OF1_NDIRECT | FLG_OF1_NGLBDIR);
-				} else if (strcmp(Start_tok,
+				} else if (strcmp(tkv.tkv_str,
 				    MSG_ORIG(MSG_MAP_FILTER)) == 0) {
-					/* BEGIN CSTYLED */
-					if (!(ofl->ofl_flags &
-					    FLG_OF_SHAROBJ)) {
-					    eprintf(ofl->ofl_lml, ERR_FATAL,
-						MSG_INTL(MSG_MAP_FLTR_ONLYAVL),
-						mapfile, EC_XWORD(Line_num));
-					    errcnt++;
-					    break;
-					}
-					/* END CSTYLED */
-					dftflag = filter = FLG_SY_STDFLTR;
-					sdflags |= FLG_SY_STDFLTR;
-					ofl->ofl_flags |= FLG_OF_SYMINFO;
+					/* Next token is the filtee */
+					filter = FLG_SY_STDFLTR;
 					continue;
-				} else if (strcmp(Start_tok,
+				} else if (strcmp(tkv.tkv_str,
 				    MSG_ORIG(MSG_MAP_AUXILIARY)) == 0) {
-					/* BEGIN CSTYLED */
-					if (!(ofl->ofl_flags &
-					    FLG_OF_SHAROBJ)) {
-					    eprintf(ofl->ofl_lml, ERR_FATAL,
-						MSG_INTL(MSG_MAP_FLTR_ONLYAVL),
-						mapfile, EC_XWORD(Line_num));
-					    errcnt++;
-					    break;
-					}
-					/* END CSTYLED */
-					dftflag = filter = FLG_SY_AUXFLTR;
-					sdflags |= FLG_SY_AUXFLTR;
-					ofl->ofl_flags |= FLG_OF_SYMINFO;
+					/* Next token is the filtee */
+					filter = FLG_SY_AUXFLTR;
 					continue;
-				} else if (strcmp(Start_tok,
+				} else if (strcmp(tkv.tkv_str,
 				    MSG_ORIG(MSG_MAP_INTERPOSE)) == 0) {
 					/* BEGIN CSTYLED */
 					if (!(ofl->ofl_flags & FLG_OF_EXEC)) {
-					    eprintf(ofl->ofl_lml, ERR_FATAL,
-						MSG_INTL(MSG_MAP_NOINTPOSE),
-						mapfile, EC_XWORD(Line_num));
-					    errcnt++;
+					    mf_fatal0(mf,
+						MSG_INTL(MSG_MAP_NOINTPOSE));
+					    mv.mv_errcnt++;
 					    break;
 					}
 					/* END CSTYLED */
-					sdflags |= FLG_SY_INTPOSE;
+					ms.ms_sdflags |= FLG_SY_INTPOSE;
 					ofl->ofl_flags |= FLG_OF_SYMINFO;
 					ofl->ofl_dtflags_1 |= DF_1_SYMINTPOSE;
 					continue;
-				} else if (strcmp(Start_tok,
+				} else if (strcmp(tkv.tkv_str,
 				    MSG_ORIG(MSG_MAP_DYNSORT)) == 0) {
-					sdflags |= FLG_SY_DYNSORT;
-					sdflags &= ~FLG_SY_NODYNSORT;
+					ms.ms_sdflags |= FLG_SY_DYNSORT;
+					ms.ms_sdflags &= ~FLG_SY_NODYNSORT;
 					continue;
-				} else if (strcmp(Start_tok,
+				} else if (strcmp(tkv.tkv_str,
 				    MSG_ORIG(MSG_MAP_NODYNSORT)) == 0) {
-					sdflags &= ~FLG_SY_DYNSORT;
-					sdflags |= FLG_SY_NODYNSORT;
+					ms.ms_sdflags &= ~FLG_SY_DYNSORT;
+					ms.ms_sdflags |= FLG_SY_NODYNSORT;
 					continue;
 				} else {
-					eprintf(ofl->ofl_lml, ERR_FATAL,
+					mf_fatal(mf,
 					    MSG_INTL(MSG_MAP_UNKSYMDEF),
-					    mapfile, EC_XWORD(Line_num),
-					    Start_tok);
-					errcnt++;
+					    tkv.tkv_str);
+					mv.mv_errcnt++;
 					continue;
 				}
 			}
 			/* FALLTHROUGH */
 
 		case TK_SEMICOLON:
+			/* Auto-reduction directive ('*')? */
+			if (*ms.ms_name == '*') {
+				ld_map_sym_autoreduce(mf, &mv);
+				continue;
+			}
+
 			/*
-			 * The special auto-reduction directive `*' can be
-			 * specified in hidden/local, and eliminate scope.  This
-			 * directive indicates that all symbols processed that
-			 * are not explicitly defined to be global are to be
-			 * reduced to hidden/local scope in, or eliminated from,
-			 * the output image.
-			 *
-			 * An auto-reduction directive also implies that a
-			 * version definition be created, as the user has
-			 * effectively defined an interface.
+			 * Catch the error where the AUX or FILTER keyword
+			 * was used, but the filtee wasn't supplied.
 			 */
-			if (*_name == '*') {
-				if (scope == FLG_SCOPE_HIDD)
-					ofl->ofl_flags |=
-					    (FLG_OF_VERDEF | FLG_OF_AUTOLCL);
-				else if (scope == FLG_SCOPE_ELIM) {
-					ofl->ofl_flags |=
-					    (FLG_OF_VERDEF | FLG_OF_AUTOELM);
-				}
+			if (filter && (ms.ms_filtee == NULL)) {
+				mf_fatal(mf, MSG_INTL(MSG_MAP_NOFILTER),
+				    ms.ms_name);
+				mv.mv_errcnt++;
 				continue;
 			}
 
@@ -1700,767 +1181,100 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 			 * resolution process.  Symbols defined as locals will
 			 * be reduced in scope after all input file processing.
 			 */
-			/* LINTED */
-			hash = (Word)elf_hash(_name);
-			DBG_CALL(Dbg_map_version(ofl->ofl_lml, name, _name,
-			    scope));
-			if ((sdp = ld_sym_find(_name, hash, &where,
-			    ofl)) == NULL) {
-				if ((sym =
-				    libld_calloc(sizeof (Sym), 1)) == NULL)
-					return (S_ERROR);
-
-				/*
-				 * Make sure any parent or external declarations
-				 * fall back to references.
-				 */
-				if (sdflags & (FLG_SY_PARENT | FLG_SY_EXTERN)) {
-					/*
-					 * Turn it into a reference by setting
-					 * the section index to UNDEF.
-					 */
-					sym->st_shndx = shndx = SHN_UNDEF;
-
-					/*
-					 * It is wrong to to specify size
-					 * or value for an external symbol.
-					 */
-					if ((novalue == 0) || (size != 0)) {
-						eprintf(ofl->ofl_lml, ERR_FATAL,
-						    MSG_INTL(MSG_MAP_NOEXVLSZ),
-						    mapfile,
-						    EC_XWORD(Line_num));
-						errcnt++;
-						continue;
-					}
-				} else {
-					sym->st_shndx = (Half)shndx;
-				}
-
-				sym->st_value = value;
-				sym->st_size = size;
-				sym->st_info = ELF_ST_INFO(STB_GLOBAL, type);
-
-				if ((sdp = ld_sym_enter(_name, sym, hash,
-				    ifl, ofl, 0, shndx, sdflags,
-				    &where)) == (Sym_desc *)S_ERROR)
-					return (S_ERROR);
-
-				sdp->sd_flags &= ~FLG_SY_CLEAN;
-
-				/*
-				 * Identify any references.  FLG_SY_MAPREF is
-				 * turned off once a relocatable object with
-				 * the same symbol is found, thus the existence
-				 * of FLG_SY_MAPREF at symbol validation is
-				 * used to flag undefined/misspelled entries.
-				 */
-				if (sym->st_shndx == SHN_UNDEF)
-					sdp->sd_flags |=
-					    (FLG_SY_MAPREF | FLG_SY_GLOBREF);
-
-			} else {
-				conflict = NULL;
-				sym = sdp->sd_sym;
-
-				/*
-				 * If this symbol already exists, make sure this
-				 * definition doesn't conflict with the former.
-				 * Provided it doesn't, multiple definitions
-				 * from different mapfiles can augment each
-				 * other.
-				 */
-				/* BEGIN CSTYLED */
-				if (sym->st_value) {
-				    if (value && (sym->st_value != value))
-					conflict =
-					    MSG_INTL(MSG_MAP_DIFF_SYMVAL);
-				} else {
-					sym->st_value = value;
-				}
-				if (sym->st_size) {
-				    if (size && (sym->st_size != size))
-					conflict = MSG_INTL(MSG_MAP_DIFF_SYMSZ);
-				} else {
-					sym->st_size = size;
-				}
-				if (ELF_ST_TYPE(sym->st_info) != STT_NOTYPE) {
-				    if ((type != STT_NOTYPE) &&
-					(ELF_ST_TYPE(sym->st_info) != type))
-					    conflict =
-						MSG_INTL(MSG_MAP_DIFF_SYMTYP);
-				} else {
-					sym->st_info =
-					    ELF_ST_INFO(STB_GLOBAL, type);
-				}
-				if (sym->st_shndx != SHN_UNDEF) {
-				    if ((shndx != SHN_UNDEF) &&
-					(sym->st_shndx != shndx))
-					    conflict =
-						MSG_INTL(MSG_MAP_DIFF_SYMNDX);
-				} else {
-					sym->st_shndx = sdp->sd_shndx = shndx;
-				}
-				/* END CSTYLED */
-
-				if ((sdp->sd_flags & MSK_SY_GLOBAL) &&
-				    (sdp->sd_aux->sa_overndx !=
-				    VER_NDX_GLOBAL) &&
-				    (vdp->vd_ndx != VER_NDX_GLOBAL) &&
-				    (sdp->sd_aux->sa_overndx != vdp->vd_ndx)) {
-					conflict =
-					    MSG_INTL(MSG_MAP_DIFF_SYMVER);
-				}
-
-				if (conflict) {
-					eprintf(ofl->ofl_lml, ERR_FATAL,
-					    MSG_INTL(MSG_MAP_SYMDEF1), mapfile,
-					    EC_XWORD(Line_num), demangle(_name),
-					    sdp->sd_file->ifl_name, conflict);
-					errcnt++;
-					continue;
-				}
-
-				/*
-				 * If this mapfile entry supplies a definition,
-				 * indicate that the symbol is now used.
-				 */
-				if (shndx != SHN_UNDEF)
-					sdp->sd_flags |= FLG_SY_MAPUSED;
-			}
-
-			/*
-			 * A symbol declaration that defines a size but no
-			 * value is processed as a request to create an
-			 * associated backing section.  The intent behind this
-			 * functionality is to provide OBJT definitions within
-			 * filters that are not ABS.  ABS symbols don't allow
-			 * copy-relocations to be established to filter OBJT
-			 * definitions.
-			 */
-			if ((shndx == SHN_ABS) && size && novalue) {
-				/* Create backing section if not there */
-				if (sdp->sd_isc == NULL) {
-					Is_desc	*isp;
-
-					if (type == STT_OBJECT) {
-						if ((isp = ld_make_data(ofl,
-						    size)) ==
-						    (Is_desc *)S_ERROR)
-							return (S_ERROR);
-					} else {
-						if ((isp = ld_make_text(ofl,
-						    size)) ==
-						    (Is_desc *)S_ERROR)
-							return (S_ERROR);
-					}
-
-					sdp->sd_isc = isp;
-					isp->is_file = ifl;
-				}
-
-				/*
-				 * Now that backing storage has been created,
-				 * associate the symbol descriptor.  Remove the
-				 * symbols special section tag so that it will
-				 * be assigned the correct section index as part
-				 * of update symbol processing.
-				 */
-				sdp->sd_flags &= ~FLG_SY_SPECSEC;
-				sdflags &= ~FLG_SY_SPECSEC;
-			}
-
-			/*
-			 * Indicate the new symbols scope.  Although the
-			 * symbols st_other field will eventually be updated as
-			 * part of writing out the final symbol, update the
-			 * st_other field here to trigger better diagnostics
-			 * during symbol validation (for example, undefined
-			 * references that are defined symbolic in a mapfile).
-			 */
-			if (scope == FLG_SCOPE_HIDD) {
-				/*
-				 * This symbol needs to be reduced to local.
-				 */
-				if (ofl->ofl_flags & FLG_OF_REDLSYM) {
-					sdp->sd_flags |=
-					    (FLG_SY_HIDDEN | FLG_SY_ELIM);
-					sdp->sd_sym->st_other = STV_ELIMINATE;
-				} else {
-					sdp->sd_flags |= FLG_SY_HIDDEN;
-					sdp->sd_sym->st_other = STV_HIDDEN;
-				}
-			} else if (scope == FLG_SCOPE_ELIM) {
-				/*
-				 * This symbol needs to be eliminated.  Note,
-				 * the symbol is also tagged as local to trigger
-				 * any necessary relocation processing prior
-				 * to the symbol being eliminated.
-				 */
-				sdp->sd_flags |= (FLG_SY_HIDDEN | FLG_SY_ELIM);
-				sdp->sd_sym->st_other = STV_ELIMINATE;
-
-			} else {
-				/*
-				 * This symbol is explicitly defined to remain
-				 * global.
-				 */
-				sdp->sd_flags |= sdflags;
-
-				/*
-				 * Qualify any global scope.
-				 */
-				if (scope == FLG_SCOPE_SNGL) {
-					sdp->sd_flags |=
-					    (FLG_SY_SINGLE | FLG_SY_NDIR);
-					sdp->sd_sym->st_other = STV_SINGLETON;
-				} else if (scope == FLG_SCOPE_PROT) {
-					sdp->sd_flags |= FLG_SY_PROTECT;
-					sdp->sd_sym->st_other = STV_PROTECTED;
-				} else if (scope == FLG_SCOPE_EXPT) {
-					sdp->sd_flags |= FLG_SY_EXPORT;
-					sdp->sd_sym->st_other = STV_EXPORTED;
-				} else
-					sdp->sd_flags |= FLG_SY_DEFAULT;
-
-				/*
-				 * Record the present version index for later
-				 * potential versioning.
-				 */
-				if ((sdp->sd_aux->sa_overndx == 0) ||
-				    (sdp->sd_aux->sa_overndx == VER_NDX_GLOBAL))
-					sdp->sd_aux->sa_overndx = vdp->vd_ndx;
-				vdp->vd_flags |= FLG_VER_REFER;
-			}
-
-			conflict = NULL;
-
-			/*
-			 * Carry out some validity checks to ensure incompatible
-			 * symbol characteristics have not been defined.
-			 * These checks are carried out after symbols are added
-			 * or resolved, to catch single instance, and
-			 * multi-instance definition inconsistencies.
-			 */
-			if ((sdp->sd_flags & (FLG_SY_HIDDEN | FLG_SY_ELIM)) &&
-			    ((scope != FLG_SCOPE_HIDD) &&
-			    (scope != FLG_SCOPE_ELIM))) {
-				conflict = MSG_INTL(MSG_MAP_DIFF_SYMLCL);
-
-			} else if ((sdp->sd_flags &
-			    (FLG_SY_SINGLE | FLG_SY_EXPORT)) &&
-			    ((scope != FLG_SCOPE_DFLT) &&
-			    (scope != FLG_SCOPE_EXPT) &&
-			    (scope != FLG_SCOPE_SNGL))) {
-				conflict = MSG_INTL(MSG_MAP_DIFF_SYMGLOB);
-
-			} else if ((sdp->sd_flags & FLG_SY_PROTECT) &&
-			    ((scope != FLG_SCOPE_DFLT) &&
-			    (scope != FLG_SCOPE_PROT))) {
-				conflict = MSG_INTL(MSG_MAP_DIFF_SYMPROT);
-
-			} else if ((sdp->sd_flags & FLG_SY_NDIR) &&
-			    (scope == FLG_SCOPE_PROT)) {
-				conflict = MSG_INTL(MSG_MAP_DIFF_PROTNDIR);
-
-			} else if ((sdp->sd_flags & FLG_SY_DIR) &&
-			    (scope == FLG_SCOPE_SNGL)) {
-				conflict = MSG_INTL(MSG_MAP_DIFF_SNGLDIR);
-			}
-
-			if (conflict) {
-				/*
-				 * Select the conflict message from either a
-				 * single instance or multi-instance definition.
-				 */
-				if (sdp->sd_file->ifl_name == mapfile) {
-					eprintf(ofl->ofl_lml, ERR_FATAL,
-					    MSG_INTL(MSG_MAP_SYMDEF2), mapfile,
-					    EC_XWORD(Line_num), demangle(_name),
-					    conflict);
-				} else {
-					eprintf(ofl->ofl_lml, ERR_FATAL,
-					    MSG_INTL(MSG_MAP_SYMDEF1), mapfile,
-					    EC_XWORD(Line_num), demangle(_name),
-					    sdp->sd_file->ifl_name, conflict);
-				}
-				errcnt++;
-				continue;
-			}
-
-			/*
-			 * Indicate that this symbol has been explicitly
-			 * contributed from a mapfile.
-			 */
-			sdp->sd_flags |= (FLG_SY_MAPFILE | FLG_SY_EXPDEF);
-
-			/*
-			 * If we've encountered a symbol definition simulate
-			 * that an input file has been processed - this allows
-			 * things like filters to be created purely from a
-			 * mapfile.
-			 */
-			if (type != STT_NOTYPE)
-				ofl->ofl_objscnt++;
-			DBG_CALL(Dbg_map_symbol(ofl, sdp));
-
-			/*
-			 * If this symbol has an associated filtee, record the
-			 * filtee string and associate the string index with the
-			 * symbol.  This is used later to associate the syminfo
-			 * information with the necessary .dynamic entry.
-			 */
-			if (filter && (filtee == NULL)) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_NOFILTER), mapfile,
-				    EC_XWORD(Line_num), _name);
-				errcnt++;
-				continue;
-			}
-
-			if (filtee) {
-				Dfltr_desc *	dftp;
-				Sfltr_desc	sft;
-				Aliste		idx, _idx, nitems;
-
-				/*
-				 * Make sure we don't duplicate any filtee
-				 * strings, and create a new descriptor if
-				 * necessary.
-				 */
-				idx = nitems = alist_nitems(ofl->ofl_dtsfltrs);
-				for (ALIST_TRAVERSE(ofl->ofl_dtsfltrs, _idx,
-				    dftp)) {
-					if ((dftflag != dftp->dft_flag) ||
-					    (strcmp(dftp->dft_str, filtee)))
-						continue;
-					idx = _idx;
-					break;
-				}
-				if (idx == nitems) {
-					Dfltr_desc	dft;
-
-					dft.dft_str = filtee;
-					dft.dft_flag = dftflag;
-					dft.dft_ndx = 0;
-
-					/*
-					 * The following append puts the new
-					 * item at the offset contained in
-					 * idx, because we know idx contains
-					 * the index of the next available slot.
-					 */
-					if (alist_append(&ofl->ofl_dtsfltrs,
-					    &dft, sizeof (Dfltr_desc),
-					    AL_CNT_OFL_DTSFLTRS) == NULL)
-						return (S_ERROR);
-				}
-
-				/*
-				 * Create a new filter descriptor for this
-				 * symbol.
-				 */
-				sft.sft_sdp = sdp;
-				sft.sft_idx = idx;
-
-				if (alist_append(&ofl->ofl_symfltrs,
-				    &sft, sizeof (Sfltr_desc),
-				    AL_CNT_OFL_SYMFLTRS) == NULL)
-					return (S_ERROR);
-			}
+			if (!ld_map_sym_enter(mf, &mv, &ms))
+				return (FALSE);
 			break;
 
 		default:
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_MAP_EXPSCOL), mapfile,
-			    EC_XWORD(Line_num));
-			errcnt++;
+			mf_fatal0(mf, MSG_INTL(MSG_MAP_EXPSCOL));
+			mv.mv_errcnt++;
 			continue;
 		}
 	}
 
-	if (errcnt)
-		return (S_ERROR);
+	if (mv.mv_errcnt)
+		return (FALSE);
 
 	/*
 	 * Determine if any version references are provided after the close
-	 * bracket.
+	 * bracket, parsing up to the terminating ';'.
 	 */
-	while ((tok = gettoken(ofl, mapfile, 0)) != TK_SEMICOLON) {
-		Ver_desc	*_vdp;
-		char		*_name;
+	if (!ld_map_sym_ver_fini(mf, &mv))
+		return (FALSE);
 
-		if (tok != TK_STRING) {
-			if (tok != TK_ERROR)
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_EXPVERS), mapfile,
-				    EC_XWORD(Line_num));
-			return (S_ERROR);
-		}
-
-		name = Start_tok;
-		if (vdp->vd_ndx == VER_NDX_GLOBAL) {
-			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(MSG_MAP_UNEXDEP), mapfile,
-			    EC_XWORD(Line_num), name);
-			continue;
-		}
-
-		/*
-		 * Generate a new version descriptor if it doesn't already
-		 * exist.
-		 */
-		/* LINTED */
-		hash = (Word)elf_hash(name);
-		if ((_vdp = ld_vers_find(name, hash,
-		    ofl->ofl_verdesc)) == NULL) {
-			if ((_name = libld_malloc(strlen(name) + 1)) == NULL)
-				return (S_ERROR);
-			(void) strcpy(_name, name);
-
-			if ((_vdp = ld_vers_desc(_name, hash,
-			    &ofl->ofl_verdesc)) == (Ver_desc *)S_ERROR)
-				return (S_ERROR);
-		}
-
-		/*
-		 * Add the new version descriptor to the parent version
-		 * descriptors reference list.  Indicate the version descriptors
-		 * first reference (used for error disgnostics if undefined
-		 * version dependencies remain).
-		 */
-		if (ld_vers_find(name, hash, vdp->vd_deps) == NULL)
-			if (aplist_append(&vdp->vd_deps, _vdp,
-			    AL_CNT_VERDESCS) == NULL)
-				return (S_ERROR);
-
-		if (_vdp->vd_ref == NULL)
-			_vdp->vd_ref = vdp;
-	}
-	return (1);
+	return (TRUE);
 }
 
 /*
- * If a user has provided segment definitions via a mapfile, and these segments
- * have been assigned virtual addresses, sort the associated segments by
- * increasing virtual address.
- *
- * Only PT_LOAD segments can be assigned a virtual address.  These segments can
- * be one of two types:
- *
- *  -	Standard segments for text, data or bss.  These segments will have been
- *	inserted before the default text (first PT_LOAD) segment.
- *
- *  -	Empty (reservation) segments.  These segment will have been inserted at
- *	the end of any default PT_LOAD segments.
- *
- * Any standard segments that are assigned a virtual address will be sorted,
- * and as their definitions precede any default PT_LOAD segments, these segments
- * will be assigned sections before any defaults.
- *
- * Any reservation segments are also sorted amoung themselves, as these segments
- * must still follow the standard default segments.
+ * Parse the mapfile --- Sysv syntax
  */
-uintptr_t
-ld_sort_seg_list(Ofl_desc *ofl)
+Boolean
+ld_map_parse_v1(Mapfile *mf)
 {
-	APlist	*seg1 = NULL, *seg2 = NULL;
-	Sg_desc	*sgp1;
-	Aliste	idx1;
-
-#define	FIRST_SEGMENT(type) \
-	((type == PT_PHDR) || (type == PT_INTERP) || (type == PT_SUNWCAP))
-
-	/*
-	 * Add the .phdr and .interp segments to our list.  These segments must
-	 * occur before any PT_LOAD segments (refer exec/elf/elf.c).  Also add
-	 * the capabilities segment.  This isn't essential, but the capabilities
-	 * section is one of the first in an object.
-	 */
-	for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp1)) {
-		Word	type = sgp1->sg_phdr.p_type;
-
-		if (FIRST_SEGMENT(type)) {
-			if (aplist_append(&seg1, sgp1, AL_CNT_SEGMENTS) == NULL)
-				return (S_ERROR);
-		}
-	}
-
-	/*
-	 * Add the loadable segments to another list in sorted order.
-	 */
-	DBG_CALL(Dbg_map_sort(ofl->ofl_lml));
-	for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp1)) {
-		DBG_CALL(Dbg_map_sort_seg(ofl->ofl_lml, sgp1, 1));
-
-		if (sgp1->sg_phdr.p_type != PT_LOAD)
-			continue;
-
-		/*
-		 * If the loadable segment does not contain a vaddr, simply
-		 * append it to the new list.
-		 */
-		if ((sgp1->sg_flags & FLG_SG_VADDR) == 0) {
-			if (aplist_append(&seg2, sgp1, AL_CNT_SEGMENTS) == NULL)
-				return (S_ERROR);
-
-		} else {
-			Aliste		idx2;
-			Sg_desc		*sgp2;
-			int		inserted = 0;
-
-			/*
-			 * Traverse the segment list we are creating, looking
-			 * for a segment that defines a vaddr.
-			 */
-			for (APLIST_TRAVERSE(seg2, idx2, sgp2)) {
-				/*
-				 * Any real segments that contain vaddr's need
-				 * to be sorted.  Any reservation segments also
-				 * need to be sorted.  However, any reservation
-				 * segments should be placed after any real
-				 * segments.
-				 */
-				if (((sgp2->sg_flags &
-				    (FLG_SG_VADDR | FLG_SG_EMPTY)) == 0) &&
-				    (sgp1->sg_flags & FLG_SG_EMPTY))
-					continue;
-
-				if ((sgp2->sg_flags & FLG_SG_VADDR) &&
-				    ((sgp2->sg_flags & FLG_SG_EMPTY) ==
-				    (sgp1->sg_flags & FLG_SG_EMPTY))) {
-					if (sgp1->sg_phdr.p_vaddr ==
-					    sgp2->sg_phdr.p_vaddr) {
-						eprintf(ofl->ofl_lml, ERR_FATAL,
-						    MSG_INTL(MSG_MAP_SEGSAME),
-						    sgp1->sg_name,
-						    sgp2->sg_name);
-						return (S_ERROR);
-					}
-
-					if (sgp1->sg_phdr.p_vaddr >
-					    sgp2->sg_phdr.p_vaddr)
-						continue;
-				}
-
-				/*
-				 * Insert this segment before the segment on
-				 * the seg2 list.
-				 */
-				if (aplist_insert(&seg2, sgp1, AL_CNT_SEGMENTS,
-				    idx2) == NULL)
-					return (S_ERROR);
-				inserted = 1;
-				break;
-			}
-
-			/*
-			 * If the segment being inspected has not been inserted
-			 * in the segment list, simply append it to the list.
-			 */
-			if ((inserted == 0) && (aplist_append(&seg2,
-			    sgp1, AL_CNT_SEGMENTS) == NULL))
-				return (S_ERROR);
-		}
-	}
-
-	/*
-	 * Add the sorted loadable segments to our initial segment list.
-	 */
-	for (APLIST_TRAVERSE(seg2, idx1, sgp1)) {
-		if (aplist_append(&seg1, sgp1, AL_CNT_SEGMENTS) == NULL)
-			return (S_ERROR);
-	}
-
-	/*
-	 * Add all other segments to our list.
-	 */
-	for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp1)) {
-		Word	type = sgp1->sg_phdr.p_type;
-
-		if (!FIRST_SEGMENT(type) && (type != PT_LOAD)) {
-			if (aplist_append(&seg1, sgp1, AL_CNT_SEGMENTS) == NULL)
-				return (S_ERROR);
-		}
-	}
-	free((void *)ofl->ofl_segs);
-	ofl->ofl_segs = NULL;
-
-	/*
-	 * Now rebuild the original list and process all of the
-	 * segment/section ordering information if present.
-	 */
-	for (APLIST_TRAVERSE(seg1, idx1, sgp1)) {
-		DBG_CALL(Dbg_map_sort_seg(ofl->ofl_lml, sgp1, 0));
-		if (aplist_append(&ofl->ofl_segs, sgp1,
-		    AL_CNT_SEGMENTS) == NULL)
-			return (S_ERROR);
-	}
-
-#undef	FIRST_SEGMENT
-
-	return (1);
-}
-
-/*
- * Parse the mapfile.
- */
-uintptr_t
-ld_map_parse(const char *mapfile, Ofl_desc *ofl)
-{
-	struct stat	stat_buf;	/* stat of mapfile */
-	int		mapfile_fd;	/* descriptor for mapfile */
 	Sg_desc		*sgp1;		/* seg descriptor being manipulated */
-	Sg_desc		*sgp2;		/* temp segment descriptor pointer */
-	Ent_desc	*enp;		/* Segment entrance criteria. */
+	Ent_desc	*enp;		/* segment entrance criteria. */
 	Token		tok;		/* current token. */
-	Aliste		endx = 0;	/* next place for entrance criterion */
-	Boolean		new_segment;	/* If true, defines new segment. */
+	Boolean		new_segment;	/* If true, defines new segment */
 	char		*name;
-	static	int	num_stack = 0;	/* number of stack segment */
-	int		err;
-
-	DBG_CALL(Dbg_map_parse(ofl->ofl_lml, mapfile));
-
-	/*
-	 * Determine if we're dealing with a file or a directory.
-	 */
-	if (stat(mapfile, &stat_buf) == -1) {
-		err = errno;
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_SYS_STAT),
-		    mapfile, strerror(err));
-		return (S_ERROR);
-	}
-	if (S_ISDIR(stat_buf.st_mode)) {
-		DIR		*dirp;
-		struct dirent	*denp;
-
-		/*
-		 * Open the directory and interpret each visible file as a
-		 * mapfile.
-		 */
-		if ((dirp = opendir(mapfile)) == NULL)
-			return (1);
-
-		while ((denp = readdir(dirp)) != NULL) {
-			char	path[PATH_MAX];
-
-			/*
-			 * Ignore any hidden filenames.  Construct the full
-			 * pathname to the new mapfile.
-			 */
-			if (*denp->d_name == '.')
-				continue;
-			(void) snprintf(path, PATH_MAX, MSG_ORIG(MSG_STR_PATH),
-			    mapfile, denp->d_name);
-			if (ld_map_parse(path, ofl) == S_ERROR)
-				return (S_ERROR);
-		}
-		(void) closedir(dirp);
-		return (1);
-	} else if (!S_ISREG(stat_buf.st_mode)) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_SYS_NOTREG),
-		    mapfile);
-		return (S_ERROR);
-	}
-
-	/*
-	 * We read the entire mapfile into memory.
-	 */
-	if ((Mapspace = libld_malloc(stat_buf.st_size + 1)) == NULL)
-		return (S_ERROR);
-	if ((mapfile_fd = open(mapfile, O_RDONLY)) == -1) {
-		err = errno;
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN),
-		    mapfile, strerror(err));
-		return (S_ERROR);
-	}
-
-	if (read(mapfile_fd, Mapspace, stat_buf.st_size) != stat_buf.st_size) {
-		err = errno;
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_SYS_READ),
-		    mapfile, strerror(err));
-		return (S_ERROR);
-	}
-	Mapspace[stat_buf.st_size] = '\0';
-	nextchr = Mapspace;
-
-	/*
-	 * Set up any global variables, the line number counter and file name.
-	 */
-	Line_num = 1;
+	Ofl_desc	*ofl = mf->mf_ofl;
+	ld_map_tkval_t	tkv;		/* Value of token */
+	avl_index_t 	where;
 
 	/*
 	 * We now parse the mapfile until the gettoken routine returns EOF.
 	 */
-	while ((tok = gettoken(ofl, mapfile, 1)) != TK_EOF) {
-		Aliste	idx;
-		int	ndx;
-
-		/*
-		 * Don't know which segment yet.
-		 */
-		sgp1 = NULL;
+	while ((tok = ld_map_gettoken(mf, TK_F_EOFOK, &tkv)) != TK_EOF) {
+		Xword	ndx;
 
 		/*
 		 * At this point we are at the beginning of a line, and the
-		 * variable `Start_tok' points to the first string on the line.
+		 * variable tkv.tkv_str points to the first string on the line.
 		 * All mapfile entries start with some string token except it
 		 * is possible for a scoping definition to start with `{'.
 		 */
 		if (tok == TK_LEFTBKT) {
-			if (map_version(mapfile, (char *)0, ofl) == S_ERROR)
-				return (S_ERROR);
+			if (!map_version(mf, NULL))
+				return (FALSE);
 			continue;
 		}
 		if (tok != TK_STRING) {
 			if (tok != TK_ERROR)
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_EXPSEGNAM), mapfile,
-				    EC_XWORD(Line_num));
-			return (S_ERROR);
+				mf_fatal0(mf, MSG_INTL(MSG_MAP_EXPSEGNAM));
+			return (FALSE);
 		}
 
 		/*
 		 * Save the initial token.
 		 */
-		if ((name = libld_malloc(strlen(Start_tok) + 1)) == NULL)
-			return (S_ERROR);
-		(void) strcpy(name, Start_tok);
+		name = tkv.tkv_str;
 
 		/*
 		 * Now check the second character on the line.  The special `-'
 		 * and `{' characters do not involve any segment manipulation so
 		 * we handle them first.
 		 */
-		tok = gettoken(ofl, mapfile, 0);
-		if ((tok == TK_ERROR) || (tok == TK_EOF))
-			return (S_ERROR);
+		tok = ld_map_gettoken(mf, 0, &tkv);
+		if (tok == TK_ERROR)
+			return (FALSE);
 		if (tok == TK_DASH) {
-			if (map_dash(mapfile, name, ofl) == S_ERROR)
-				return (S_ERROR);
+			if (!map_dash(mf, name))
+				return (FALSE);
 			continue;
 		}
 		if (tok == TK_LEFTBKT) {
-			if (map_version(mapfile, name, ofl) == S_ERROR)
-				return (S_ERROR);
+			if (!map_version(mf, name))
+				return (FALSE);
 			continue;
 		}
 
 		/*
 		 * If we're here we need to interpret the first string as a
-		 * segment name.  Find the segment named in the token.
+		 * segment name.  Is this an already known segment?
 		 */
-		ndx = 0;
-		for (APLIST_TRAVERSE(ofl->ofl_segs, idx, sgp2)) {
-			if (strcmp(sgp2->sg_name, name) == 0) {
-				sgp1 = sgp2;
-				sgp2->sg_flags &= ~FLG_SG_DISABLED;
-				new_segment = FALSE;
-				break;
-			}
-			ndx++;
-		}
+		sgp1 = ld_seg_lookup(mf->mf_ofl, name, &where);
+		new_segment = sgp1 == NULL;
+		if (!new_segment)
+			sgp1->sg_flags &= ~FLG_SG_DISABLED;
 
 		/*
 		 * If the second token is a '|' then we had better have found a
@@ -2469,229 +1283,181 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 		 */
 		if (tok == TK_PIPE) {
 			if (sgp1 == NULL) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_SECINSEG), mapfile,
-				    EC_XWORD(Line_num), name);
-				return (S_ERROR);
-			} else {
-				if (map_pipe(ofl, mapfile, sgp1) == S_ERROR)
-					return (S_ERROR);
-				continue;
+				mf_fatal(mf, MSG_INTL(MSG_MAP_SECINSEG),
+				    name);
+				return (FALSE);
 			}
+			if (!map_pipe(mf, sgp1))
+				return (FALSE);
+			continue;
 		}
 
 		/*
-		 * If segment is still NULL then it does not exist.  Create a
-		 * new segment, and leave its values as 0 so that map_equal()
-		 * can detect changing attributes.
+		 * If segment does not exist, allocate a descriptor with
+		 * its values set to 0 so that map_equal() can detect
+		 * changing attributes.
 		 */
-		if (sgp1 == NULL) {
-			if ((sgp1 =
-			    libld_calloc(sizeof (Sg_desc), 1)) == NULL)
-				return (S_ERROR);
-			sgp1->sg_phdr.p_type = PT_NULL;
-			sgp1->sg_name = name;
-			new_segment = TRUE;
-		}
-
-		if ((strcmp(sgp1->sg_name, MSG_ORIG(MSG_STR_INTERP)) == 0) ||
-		    (strcmp(sgp1->sg_name, MSG_ORIG(MSG_STR_LD_DYNAMIC)) ==
-		    0)) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_MAP_SEGRESV), mapfile,
-			    EC_XWORD(Line_num));
-			return (S_ERROR);
-		}
+		if (new_segment &&
+		    ((sgp1 = ld_map_seg_alloc(name, PT_NULL, 0)) == NULL))
+			return (FALSE);
 
 		/*
 		 * Now check the second token from the input line.
 		 */
-		if (tok == TK_EQUAL) {
+		switch (tok) {
+		case TK_EQUAL:		/* Create/modify segment */
+			/*
+			 * We use the same syntax for hardware/software
+			 * capabilities as we do for segments. If the
+			 * "segment name" matches one of these, then
+			 * process the capabilities instead of treating it
+			 * as a segment. Note that no dynamic memory has
+			 * been allocated for the segment descriptor yet,
+			 * so we can bail without leaking memory.
+			 */
 			if (strcmp(sgp1->sg_name,
 			    MSG_ORIG(MSG_STR_HWCAP_1)) == 0) {
-				if (map_cap(mapfile, CA_SUNW_HW_1,
-				    ofl) == S_ERROR)
-					return (S_ERROR);
-				DBG_CALL(Dbg_cap_mapfile(ofl->ofl_lml,
-				    CA_SUNW_HW_1, ofl->ofl_hwcap_1,
-				    ld_targ.t_m.m_mach));
+				if (!map_cap(mf, CA_SUNW_HW_1,
+				    &ofl->ofl_ocapset.c_hw_1))
+					return (FALSE);
 				continue;
 
-			} else if (strcmp(sgp1->sg_name,
+			}
+			if (strcmp(sgp1->sg_name,
 			    MSG_ORIG(MSG_STR_SFCAP_1)) == 0) {
-				if (map_cap(mapfile, CA_SUNW_SF_1,
-				    ofl) == S_ERROR)
-					return (S_ERROR);
-				DBG_CALL(Dbg_cap_mapfile(ofl->ofl_lml,
-				    CA_SUNW_SF_1, ofl->ofl_sfcap_1,
-				    ld_targ.t_m.m_mach));
+				if (!map_cap(mf, CA_SUNW_SF_1,
+				    &ofl->ofl_ocapset.c_sf_1))
+					return (FALSE);
 				continue;
 
+			}
+
+			/*
+			 * If not a new segment, show the initial value
+			 * before modifying it.
+			 */
+			if (!new_segment && DBG_ENABLED) {
+				ndx = ld_map_seg_index(mf, sgp1);
+				Dbg_map_seg(ofl, DBG_STATE_MOD_BEFORE,
+				    ndx, sgp1, mf->mf_lineno);
+			}
+
+			/* Process the segment */
+			if (!map_equal(mf, sgp1))
+				return (FALSE);
+
+			/*
+			 * Special case for STACK "segments":
+			 *
+			 * The ability to modify the stack flags was added
+			 * long after this sysv syntax was designed. It was
+			 * fit into the existing syntax by treating it as a
+			 * segment. However, there can only be one stack program
+			 * header, while segment syntax requires user to supply
+			 * a name. This is confusing, and it allows the user to
+			 * attempt to create more than one stack segment. The
+			 * original implementation had a test to catch this.
+			 *
+			 * If this is a stack segment, locate the real stack
+			 * descriptor and transfer the flags to it. We then
+			 * free the allocated descriptor without inserting it.
+			 * The end result is that all stack segments simply
+			 * alter the one stack descriptor, and the segment
+			 * name is ignored.
+			 */
+			if (sgp1->sg_phdr.p_type == PT_SUNWSTACK) {
+				Sg_desc	*stack = ld_map_seg_stack(mf);
+
+				if (sgp1->sg_flags & FLG_SG_P_FLAGS)
+					stack->sg_phdr.p_flags =
+					    sgp1->sg_phdr.p_flags;
+				free(sgp1);
+
+				DBG_CALL(Dbg_map_seg(ofl,
+				    DBG_STATE_MOD_AFTER, ndx, sgp1,
+				    mf->mf_lineno));
+				break;
+			}
+
+			/*
+			 * If this is a new segment, finish its initialization
+			 * and insert it into the segment list.
+			 */
+			if (new_segment) {
+				switch (ld_map_seg_insert(mf, DBG_STATE_NEW,
+				    sgp1, where)) {
+				case SEG_INS_SKIP:
+					continue;
+				case SEG_INS_FAIL:
+					return (FALSE);
+				}
 			} else {
-				if (map_equal(mapfile, sgp1, ofl) == S_ERROR)
-					return (S_ERROR);
-				DBG_CALL(Dbg_map_set_equal(new_segment));
+				/* Not new. Show what's changed */
+				DBG_CALL(Dbg_map_seg(ofl,
+				    DBG_STATE_MOD_AFTER, ndx, sgp1,
+				    mf->mf_lineno));
 			}
-		} else if (tok == TK_COLON) {
+			break;
+
+		case TK_COLON:		/* Section to segment mapping */
 			/*
-			 * If this is an existing segment reservation, sections
-			 * can't be assigned to it.
-			 */
-			if ((new_segment == FALSE) &&
-			    (sgp1->sg_flags & FLG_SG_EMPTY)) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_SEGEMPSEC), mapfile,
-				    EC_XWORD(Line_num));
-				return (S_ERROR);
-			}
-
-			/*
-			 * We are looking at a new entrance criteria line.
-			 * Note that entrance criteria are added in the order
-			 * they are found in the mapfile, but are placed before
-			 * any default criteria.
-			 */
-			if ((enp = alist_insert(&(ofl->ofl_ents), NULL,
-			    sizeof (Ent_desc), AL_CNT_OFL_ENTRANCE,
-			    endx)) == NULL)
-				return (S_ERROR);
-
-			enp->ec_segment = sgp1;
-			endx++;
-
-			if (map_colon(ofl, mapfile, enp) == S_ERROR)
-				return (S_ERROR);
-			DBG_CALL(Dbg_map_ent(ofl->ofl_lml, new_segment,
-			    enp, ofl));
-		} else if (tok == TK_ATSIGN) {
-			if (map_atsign(mapfile, sgp1, ofl) == S_ERROR)
-				return (S_ERROR);
-			DBG_CALL(Dbg_map_set_atsign(new_segment));
-		} else if (tok != TK_ERROR) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_MAP_EXPEQU), mapfile,
-			    EC_XWORD(Line_num));
-			return (S_ERROR);
-		}
-
-		/*
-		 * Having completed parsing an entry in the mapfile determine
-		 * if the segment to which it applies is new.
-		 */
-		if (new_segment) {
-			/*
-			 * If specific fields have not been supplied via
-			 * map_equal(), make sure defaults are supplied.
-			 */
-			if (((sgp1->sg_flags & FLG_SG_TYPE) == 0) &&
-			    (sgp1->sg_phdr.p_type == PT_NULL)) {
-				/*
-				 * Default to a loadable segment.
-				 */
-				sgp1->sg_phdr.p_type = PT_LOAD;
-				sgp1->sg_flags |= FLG_SG_TYPE;
-			}
-			if (sgp1->sg_phdr.p_type == PT_LOAD) {
-				if ((sgp1->sg_flags & FLG_SG_FLAGS) == 0) {
-					/*
-					 * Default to read/write and execute.
-					 */
-					sgp1->sg_phdr.p_flags =
-					    PF_R + PF_W + PF_X;
-					sgp1->sg_flags |= FLG_SG_FLAGS;
-				}
-				if ((sgp1->sg_flags & FLG_SG_ALIGN) == 0) {
-					/*
-					 * Default to segment alignment
-					 */
-					sgp1->sg_phdr.p_align =
-					    ld_targ.t_m.m_segm_align;
-					sgp1->sg_flags |= FLG_SG_ALIGN;
-				}
-			}
-
-			/*
-			 * Determine where the new item should be inserted in
-			 * the segment descriptor list.  Presently the user can
-			 * only add the following:
+			 * If this is a new segment, finish its initialization
+			 * and insert it into the segment list.
 			 *
-			 *  PT_LOAD	added before the text segment.
-			 *  PT_NULL/empty PT_LOAD
-			 *		added after the data/bss segments, thus
-			 *		we add before the dynamic segment.
-			 *  PT_SUNWSTACK
-			 *		added before the final note segment.
-			 *  PT_NOTE	added before the final note segment.
-			 *
-			 * Note that any new segments must always be added
-			 * after any PT_PHDR and PT_INTERP (refer Generic ABI,
-			 * Page 5-4).
+			 * If it is not a new segment, ensure that it is
+			 * not an empty segment reservation, as sections
+			 * cannot be assigned to those.
 			 */
-			switch (sgp1->sg_phdr.p_type) {
-			case PT_LOAD:
-			case PT_NULL:
-				if (sgp1->sg_flags & FLG_SG_EMPTY)
-					sgp1->sg_id = LD_DYN;
-				else
-					sgp1->sg_id = LD_TEXT;
-				break;
-			case PT_SUNWSTACK:
-				sgp1->sg_id = LD_NOTE;
-				if (++num_stack >= 2) {
-					/*
-					 * Currently the number of sunw_stack
-					 * segment is limited to 1.
-					 */
-					eprintf(ofl->ofl_lml, ERR_WARNING,
-					    MSG_INTL(MSG_MAP_NOSTACK2),
-					    mapfile, EC_XWORD(Line_num));
+			if (new_segment) {
+				switch (ld_map_seg_insert(mf,
+				    DBG_STATE_NEW_IMPLICIT, sgp1, where)) {
+				case SEG_INS_SKIP:
 					continue;
+				case SEG_INS_FAIL:
+					return (FALSE);
 				}
-				break;
-			case PT_NOTE:
-				sgp1->sg_id = LD_NOTE;
-				break;
-			default:
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_UNKSEGTYP), mapfile,
-				    EC_XWORD(Line_num),
-				    EC_WORD(sgp1->sg_phdr.p_type));
-				return (S_ERROR);
+			} else if (sgp1->sg_flags & FLG_SG_EMPTY) {
+				mf_fatal0(mf, MSG_INTL(MSG_MAP_SEGEMPSEC));
+				return (FALSE);
 			}
 
-			ndx = 0;
-			for (APLIST_TRAVERSE(ofl->ofl_segs, idx, sgp2)) {
-				if (sgp1->sg_id > sgp2->sg_id) {
-					ndx++;
-					continue;
-				}
+			/*
+			 * Create new entrance criteria descriptor, and
+			 * process the mapping directive.
+			 */
+			enp = ld_map_seg_ent_add(mf, sgp1, NULL);
+			if ((enp == NULL) || !map_colon(mf, enp))
+				return (FALSE);
+			DBG_CALL(Dbg_map_ent(ofl->ofl_lml, enp, ofl,
+			    mf->mf_lineno));
+			break;
 
-				if (aplist_insert(&ofl->ofl_segs, sgp1,
-				    AL_CNT_SEGMENTS, idx) == NULL)
-					return (S_ERROR);
-				break;
+		case TK_ATSIGN:		/* Section size symbol */
+			/*
+			 * If this is a new segment, finish its initialization
+			 * and insert it into the segment list.
+			 */
+			if (new_segment) {
+				switch (ld_map_seg_insert(mf,
+				    DBG_STATE_NEW_IMPLICIT, sgp1, where)) {
+				case SEG_INS_SKIP:
+					continue;
+				case SEG_INS_FAIL:
+					return (FALSE);
+				}
 			}
+			if (!map_atsign(mf, sgp1))
+				return (FALSE);
+			break;
+
+		case TK_ERROR:
+			return (FALSE);		/* Error was already issued */
+
+		default:
+			mf_fatal0(mf, MSG_INTL(MSG_MAP_EXPEQU));
+			return (FALSE);
 		}
-		DBG_CALL(Dbg_map_seg(ofl, ndx, sgp1));
 	}
 
-	/*
-	 * If the output file is a static file without an interpreter, and
-	 * if any virtual address is specified, then set the ?N flag for
-	 * backward compatibility.
-	 */
-	if (!(ofl->ofl_flags & FLG_OF_DYNAMIC) &&
-	    !(ofl->ofl_flags & FLG_OF_RELOBJ) &&
-	    !(ofl->ofl_osinterp) &&
-	    (ofl->ofl_flags1 & FLG_OF1_VADDR))
-		ofl->ofl_dtflags_1 |= DF_1_NOHDR;
-
-	/*
-	 * If the output file is a relocatable file, then ?N has no effect.
-	 * Make sure this flag isn't set.
-	 */
-	if (ofl->ofl_flags & FLG_OF_RELOBJ)
-		ofl->ofl_dtflags_1 &= ~DF_1_NOHDR;
-
-	return (1);
+	return (TRUE);
 }

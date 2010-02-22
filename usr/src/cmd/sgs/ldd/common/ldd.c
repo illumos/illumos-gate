@@ -22,7 +22,7 @@
  *	  All Rights Reserved
  *
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -532,8 +532,9 @@ elf_check(int nfile, char *fname, char *cname, Elf *elf, int fflag)
 
 	/*
 	 * If there is a dynamic section, then check for the DF_1_NOHDR
-	 * flag, and bail if it is present. Those objects are created using
-	 * the ?N mapfile option: The ELF header and program headers are
+	 * flag, and bail if it is present. Such objects are created using
+	 * a mapfile option (?N in the version 1 syntax, or HDR_NOALLOC
+	 * otherwise). The ELF header and program headers are
 	 * not mapped as part of the first segment, and virtual addresses
 	 * are computed without them. If ldd tries to interpret such
 	 * a file, it will become confused and generate bad output or

@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,6 +68,7 @@ typedef struct {
 	Xword		m_segm_origin;	/* Default 1st segment origin */
 	Xword		m_segm_aorigin;	/* Alternative 1st segment origin */
 	Word		m_dataseg_perm;	/* data segment permission mask */
+	Word		m_stack_perm;	/* ABI default stack permission mask */
 	Word		m_word_align;	/* alignment to use for Word sections */
 	const char	*m_def_interp;	/* Def. interpreter for dyn objects */
 
@@ -314,7 +315,7 @@ struct _ld_heap {
  * strings that will be created in the .dynstr, with .dynamic entries.
  */
 typedef struct {
-	char		*dft_str;	/* dynstr string */
+	const char	*dft_str;	/* dynstr string */
 	Word		dft_flag;	/* auxiliary/filtee type */
 	Half		dft_ndx;	/* eventual ndx into .dynamic */
 } Dfltr_desc;
@@ -359,8 +360,10 @@ typedef struct {
 #define	AL_CNT_OS_ISDESCS_BA	4	/* os_isdesc: BEFORE|AFTER */
 #define	AL_CNT_OS_ISDESCS	60	/* os_isdesc: ORDERED|DEFAULT */
 
+#define	AL_CNT_SG_IS_ORDER	40	/* sg_is_order */
 #define	AL_CNT_SG_OSDESC	40	/* sg_osdescs */
 #define	AL_CNT_SG_SECORDER	40	/* sg_secorder */
+#define	AL_CNT_SG_SIZESYM	1	/* sg_sizesym */
 
 #define	AL_CNT_SDP_GOT		1	/* sd_GOTndxs */
 #define	AL_CNT_SDP_MOVE		1	/* sd_move */
@@ -533,6 +536,34 @@ typedef struct {
 } Isd_node;
 
 /*
+ * Type used to break down an input file path into its component parts,
+ * as used by ld_place_section() to compare an input file path to
+ * entrance criteria ec_files file strings.
+ *
+ * We define a path in the usual Unix '/' separated manner, augmented
+ * with an optional archive member suffix enclosed in parenthesis:
+ *
+ *	/dir/.../dir/basename(armember)
+ *
+ * The basename is the final path component, and includes the archive
+ * member, if present. The meaning of "object name" depends on whether or
+ * not the file comes from an archive or not. If not an archive, it is the
+ * same as the basename. If an archive, it is the name of the archive member
+ * from within the file.
+ *
+ * Variables of this type are initialized with ld_place_path_info_init().
+ */
+typedef struct {
+	const char	*ppi_path;	/* Full path */
+	const char	*ppi_bname;	/* basename(ppi_path) */
+	const char	*ppi_oname;	/* object name: Not NULL terminated */
+	Boolean		ppi_isar;	/* TRUE if path has archive member */
+	size_t		ppi_path_len;	/* strlen(ppi_path) */
+	size_t		ppi_bname_len;	/* strlen(ppi_bname) */
+	size_t		ppi_oname_len;	/* strlen(ppi_oname) */
+} Place_path_info;
+
+/*
  * Local data items.
  */
 extern char		*Plibpath;
@@ -577,6 +608,7 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_bswap_Xword		ld64_bswap_Xword
 #define	ld_disp_errmsg		ld64_disp_errmsg
 #define	ld_ent_check		ld64_ent_check
+#define	ld_ent_lookup		ld64_ent_lookup
 #define	ld_exit			ld64_exit
 #define	ld_find_library		ld64_find_library
 #define	ld_finish_libs		ld64_finish_libs
@@ -593,8 +625,10 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_make_text		ld64_make_text
 #define	ld_map_out		ld64_map_out
 #define	ld_map_parse		ld64_map_parse
+#define	ld_map_post_process	ld64_map_post_process
 #define	ld_open_outfile		ld64_open_outfile
 #define	ld_os_first_isdesc	ld64_os_first_isdesc
+#define	ld_place_path_info_init	ld64_place_path_info_init
 #define	ld_place_section	ld64_place_section
 #define	ld_process_archive	ld64_process_archive
 #define	ld_process_files	ld64_process_files
@@ -610,8 +644,8 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_reloc_targval_get	ld64_reloc_targval_get
 #define	ld_reloc_targval_set	ld64_reloc_targval_set
 #define	ld_sec_validate		ld64_sec_validate
+#define	ld_seg_lookup		ld64_seg_lookup
 #define	ld_sort_ordered		ld64_sort_ordered
-#define	ld_sort_seg_list	ld64_sort_seg_list
 #define	ld_stt_section_sym_name	ld64_stt_section_sym_name
 #define	ld_sunw_ldmach		ld64_sunw_ldmach
 #define	ld_sup_atexit		ld64_sup_atexit
@@ -665,6 +699,7 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_bswap_Xword		ld32_bswap_Xword
 #define	ld_disp_errmsg		ld32_disp_errmsg
 #define	ld_ent_check		ld32_ent_check
+#define	ld_ent_lookup		ld32_ent_lookup
 #define	ld_exit			ld32_exit
 #define	ld_find_library		ld32_find_library
 #define	ld_finish_libs		ld32_finish_libs
@@ -681,8 +716,10 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_make_text		ld32_make_text
 #define	ld_map_out		ld32_map_out
 #define	ld_map_parse		ld32_map_parse
+#define	ld_map_post_process	ld32_map_post_process
 #define	ld_open_outfile		ld32_open_outfile
 #define	ld_os_first_isdesc	ld32_os_first_isdesc
+#define	ld_place_path_info_init	ld32_place_path_info_init
 #define	ld_place_section	ld32_place_section
 #define	ld_process_archive	ld32_process_archive
 #define	ld_process_files	ld32_process_files
@@ -698,8 +735,8 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_reloc_targval_get	ld32_reloc_targval_get
 #define	ld_reloc_targval_set	ld32_reloc_targval_set
 #define	ld_sec_validate		ld32_sec_validate
+#define	ld_seg_lookup		ld32_seg_lookup
 #define	ld_sort_ordered		ld32_sort_ordered
-#define	ld_sort_seg_list	ld32_sort_seg_list
 #define	ld_stt_section_sym_name	ld32_stt_section_sym_name
 #define	ld_sunw_ldmach		ld32_sunw_ldmach
 #define	ld_sup_atexit		ld32_sup_atexit
@@ -763,6 +800,8 @@ extern Xword		ld_bswap_Xword(Xword);
 extern void		ld_disp_errmsg(const char *, Rel_desc *, Ofl_desc *);
 
 extern void		ld_ent_check(Ofl_desc *);
+extern Ent_desc		*ld_ent_lookup(Ofl_desc *, const char *name,
+			    avl_index_t *where);
 extern int		ld_exit(Ofl_desc *);
 
 extern uintptr_t	ld_find_library(const char *, Ofl_desc *);
@@ -786,13 +825,16 @@ extern uintptr_t	ld_make_parexpn_data(Ofl_desc *, size_t, Xword);
 extern uintptr_t	ld_make_sunwmove(Ofl_desc *, int);
 extern Is_desc		*ld_make_text(Ofl_desc *, size_t);
 extern void		ld_map_out(Ofl_desc *);
-extern uintptr_t	ld_map_parse(const char *, Ofl_desc *);
+extern Boolean		ld_map_parse(const char *, Ofl_desc *);
+extern Boolean		ld_map_post_process(Ofl_desc *);
 
 extern uintptr_t	ld_open_outfile(Ofl_desc *);
 
 extern Is_desc		*ld_os_first_isdesc(Os_desc *);
-extern Os_desc		*ld_place_section(Ofl_desc *, Is_desc *, int,
-			    const char *);
+extern Place_path_info	*ld_place_path_info_init(Ofl_desc *, Ifl_desc *,
+			    Place_path_info *);
+extern Os_desc		*ld_place_section(Ofl_desc *, Is_desc *,
+			    Place_path_info *path_info,  int, const char *);
 extern uintptr_t	ld_process_archive(const char *, int, Ar_desc *,
 			    Ofl_desc *);
 extern uintptr_t	ld_process_files(Ofl_desc *, int, char **);
@@ -802,7 +844,8 @@ extern Ifl_desc		*ld_process_ifl(const char *, const char *, int, Elf *,
 extern uintptr_t	ld_process_move(Ofl_desc *);
 extern Ifl_desc		*ld_process_open(const char *, const char *, int *,
 			    Ofl_desc *, Word, Rej_desc *);
-extern uintptr_t	ld_process_ordered(Ifl_desc *, Ofl_desc *, Word);
+extern uintptr_t	ld_process_ordered(Ofl_desc *, Ifl_desc *,
+			    Place_path_info *path_info,  Word);
 extern uintptr_t	ld_process_sym_reloc(Ofl_desc *, Rel_desc *, Rel *,
 			    Is_desc *, const char *, Word);
 
@@ -815,9 +858,10 @@ extern int		ld_reloc_targval_get(Ofl_desc *, Rel_desc *,
 extern int		ld_reloc_targval_set(Ofl_desc *, Rel_desc *,
 			    uchar_t *, Xword);
 
+extern Sg_desc		*ld_seg_lookup(Ofl_desc *, const char *,
+			    avl_index_t *where);
 extern void		ld_sec_validate(Ofl_desc *);
 extern uintptr_t	ld_sort_ordered(Ofl_desc *);
-extern uintptr_t	ld_sort_seg_list(Ofl_desc *);
 extern Half		ld_sunw_ldmach();
 extern void		ld_sup_atexit(Ofl_desc *, int);
 extern void		ld_sup_open(Ofl_desc *, const char **, const char **,

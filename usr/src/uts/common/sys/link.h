@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -282,7 +282,7 @@ typedef struct {
 #define	DF_1_IGNMULDEF	0x00040000	/* internal: krtld ignore muldefs */
 #define	DF_1_NOKSYMS	0x00080000	/* internal: don't export object's */
 					/*	symbols via /dev/ksyms */
-#define	DF_1_NOHDR	0x00100000	/* mapfile ?N:1st segment mapping */
+#define	DF_1_NOHDR	0x00100000	/* mapfile: 1st segment mapping */
 					/*	omits ELF & program headers */
 #define	DF_1_EDITED	0x00200000	/* object has been modified since */
 					/*	being built by 'ld' */

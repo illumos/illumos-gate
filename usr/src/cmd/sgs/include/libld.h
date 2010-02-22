@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,7 @@
 #include <string_table.h>
 #include <sys/avl.h>
 #include <alist.h>
+#include <elfcap.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -164,6 +165,29 @@ typedef struct wrap_sym_node {
 
 
 /*
+ * Bitmasks for a single capability. Capabilities come from input objects,
+ * augmented or replaced by mapfile directives. In addition, mapfile directives
+ * can be used to exclude bits that would otherwise be set in the output object.
+ */
+typedef struct {
+	elfcap_mask_t	cm_value;	/* Bitmask value */
+	elfcap_mask_t	cm_exclude;	/* Bits to remove from final object */
+} CapMask;
+
+/*
+ * Combine the bitmask in a CapMask with the exclusion mask and
+ * return the resulting final value.
+ */
+#define	CAPMASK_VALUE(_cbmp) ((_cbmp)->cm_value & ~(_cbmp)->cm_exclude)
+
+typedef struct {
+	CapMask		c_hw_1;		/* CA_SUNW_HW_1 capabilities */
+	CapMask		c_sf_1;		/* CA_SUNW_SF_1 capabilities */
+	CapMask		c_hw_2;		/* CA_SUNW_HW_2 capabilities */
+} Outcapset;
+
+
+/*
  * Output file processing structure
  */
 typedef Lword ofl_flag_t;
@@ -180,7 +204,10 @@ struct ofl_desc {
 	size_t		ofl_size;	/* image size */
 	APlist		*ofl_maps;	/* list of input mapfiles */
 	APlist		*ofl_segs;	/* list of segments */
-	Alist		*ofl_ents;	/* list of entrance descriptors */
+	APlist		*ofl_segs_order; /* SEGMENT_ORDER segments */
+	avl_tree_t	ofl_segs_avl;	/* O(log N) access to named segments */
+	APlist		*ofl_ents;	/* list of entrance descriptors */
+	avl_tree_t	ofl_ents_avl;	/* O(log N) access to named ent. desc */
 	APlist		*ofl_objs;	/* relocatable object file list */
 	Word		ofl_objscnt;	/* 	and count */
 	APlist		*ofl_ars;	/* archive library list */
@@ -310,8 +337,7 @@ struct ofl_desc {
 	char		*ofl_audit;	/* object auditing required (-p) */
 	Alist		*ofl_symfltrs;	/* per-symbol filtees and their */
 	Alist		*ofl_dtsfltrs;	/*	associated .dynamic/.dynstrs */
-	Xword		ofl_hwcap_1;	/* hardware capabilities */
-	Xword		ofl_sfcap_1;	/* software capabilities */
+	Outcapset	ofl_ocapset;	/* object capabilities */
 	Lm_list		*ofl_lml;	/* runtime link-map list */
 	Gottable	*ofl_gottable;	/* debugging got information */
 	Rlxrel_cache	ofl_sr_cache;	/* Cache last result from */
@@ -337,8 +363,9 @@ struct ofl_desc {
 #define	FLG_OF_SYMBOLIC	0x00002000	/* bind global symbols: -Bsymbolic */
 #define	FLG_OF_ADDVERS	0x00004000	/* add version stamp: -Qy */
 #define	FLG_OF_NOLDYNSYM 0x00008000	/* -znoldynsym set */
-#define	FLG_OF_SEGORDER	0x00010000	/* segment ordering is required */
-#define	FLG_OF_SEGSORT	0x00020000	/* segment sorting is required */
+#define	FLG_OF_IS_ORDER	0x00010000	/* input section ordering within a */
+					/*	segment is required */
+#define	FLG_OF_EC_FILES	0x00020000	/* Ent_desc exist w/non-NULL ec_files */
 #define	FLG_OF_TEXTREL	0x00040000	/* text relocations have been found */
 #define	FLG_OF_MULDEFS	0x00080000	/* multiple symbols are allowed */
 #define	FLG_OF_TLSPHDR	0x00100000	/* a TLS program header is required */
@@ -366,7 +393,7 @@ struct ofl_desc {
 #define	FLG_OF_AUTOELM	0x002000000000	/* automatically eliminate */
 					/*	unspecified global symbols */
 #define	FLG_OF_REDLSYM	0x004000000000	/* reduce local symbols */
-#define	FLG_OF_SECORDER	0x008000000000	/* section ordering is required */
+#define	FLG_OF_OS_ORDER	0x008000000000	/* output section ordering required */
 #define	FLG_OF_OSABI	0x010000000000	/* tag object as ELFOSABI_SOLARIS */
 #define	FLG_OF_ADJOSCNT	0x020000000000	/* ajust ofl_shdrcnt to accommodate */
 					/*	discarded sections */
@@ -377,49 +404,51 @@ struct ofl_desc {
  * archive descriptor so that they may be reset should the archive require a
  * rescan to try and resolve undefined symbols.
  */
-#define	FLG_OF1_ALLEXRT	0x00000001	/* extract all members from an */
+#define	FLG_OF1_ALLEXRT	0x0000000001	/* extract all members from an */
 					/*	archive file */
-#define	FLG_OF1_WEAKEXT	0x00000002	/* allow archive extraction to */
+#define	FLG_OF1_WEAKEXT	0x0000000002	/* allow archive extraction to */
 					/*	resolve weak references */
-#define	MSK_OF1_ARCHIVE	0x00000003	/* archive flags mask */
+#define	MSK_OF1_ARCHIVE	0x0000000003	/* archive flags mask */
 
-#define	FLG_OF1_NOINTRP	0x00000008	/* -z nointerp flag set */
-#define	FLG_OF1_ZDIRECT	0x00000010	/* -z direct flag set */
-#define	FLG_OF1_NDIRECT	0x00000020	/* no-direct bindings specified */
-#define	FLG_OF1_OVHWCAP	0x00000040	/* override any input hardware or */
-#define	FLG_OF1_OVSFCAP	0x00000080	/*	software capabilities */
-#define	FLG_OF1_RELDYN	0x00000100	/* process .dynamic in rel obj */
-#define	FLG_OF1_NRLXREL	0x00000200	/* -z norelaxreloc flag set */
-#define	FLG_OF1_RLXREL	0x00000400	/* -z relaxreloc flag set */
-#define	FLG_OF1_IGNORE	0x00000800	/* ignore unused dependencies */
+#define	FLG_OF1_NOINTRP	0x0000000008	/* -z nointerp flag set */
+#define	FLG_OF1_ZDIRECT	0x0000000010	/* -z direct flag set */
+#define	FLG_OF1_NDIRECT	0x0000000020	/* no-direct bindings specified */
 
-#define	FLG_OF1_NOSGHND	0x00001000	/* -z nosighandler flag set */
-#define	FLG_OF1_TEXTOFF 0x00002000	/* text relocations are ok */
-#define	FLG_OF1_ABSEXEC	0x00004000	/* -zabsexec set */
-#define	FLG_OF1_LAZYLD	0x00008000	/* lazy loading of objects enabled */
-#define	FLG_OF1_GRPPRM	0x00010000	/* dependencies are to have */
+#define	FLG_OF1_RELDYN	0x0000000100	/* process .dynamic in rel obj */
+#define	FLG_OF1_NRLXREL	0x0000000200	/* -z norelaxreloc flag set */
+#define	FLG_OF1_RLXREL	0x0000000400	/* -z relaxreloc flag set */
+#define	FLG_OF1_IGNORE	0x0000000800	/* ignore unused dependencies */
+
+#define	FLG_OF1_NOSGHND	0x0000001000	/* -z nosighandler flag set */
+#define	FLG_OF1_TEXTOFF 0x0000002000	/* text relocations are ok */
+#define	FLG_OF1_ABSEXEC	0x0000004000	/* -zabsexec set */
+#define	FLG_OF1_LAZYLD	0x0000008000	/* lazy loading of objects enabled */
+#define	FLG_OF1_GRPPRM	0x0000010000	/* dependencies are to have */
 					/*	GROUPPERM enabled */
-#define	FLG_OF1_OVRFLW	0x00020000	/* size exceeds 32-bit limitation */
+#define	FLG_OF1_OVRFLW	0x0000020000	/* size exceeds 32-bit limitation */
 					/*	of 32-bit libld */
-#define	FLG_OF1_NOPARTI	0x00040000	/* -znopartial set */
-#define	FLG_OF1_BSSOREL	0x00080000	/* output relocation against bss */
+#define	FLG_OF1_NOPARTI	0x0000040000	/* -znopartial set */
+#define	FLG_OF1_BSSOREL	0x0000080000	/* output relocation against bss */
 					/*	section */
-#define	FLG_OF1_TLSOREL	0x00100000	/* output relocation against .tlsbss */
+#define	FLG_OF1_TLSOREL	0x0000100000	/* output relocation against .tlsbss */
 					/*	section */
-#define	FLG_OF1_MEMORY	0x00200000	/* produce a memory model */
-#define	FLG_OF1_NGLBDIR	0x00400000	/* no DT_1_DIRECT flag allowed */
-#define	FLG_OF1_ENCDIFF	0x00800000	/* Host running linker has different */
+#define	FLG_OF1_MEMORY	0x0000200000	/* produce a memory model */
+#define	FLG_OF1_NGLBDIR	0x0000400000	/* no DT_1_DIRECT flag allowed */
+#define	FLG_OF1_ENCDIFF	0x0000800000	/* Host running linker has different */
 					/*	byte order than output object */
-#define	FLG_OF1_VADDR	0x01000000	/* user segment defines a vaddr */
-#define	FLG_OF1_EXTRACT	0x02000000	/* archive member has been extracted */
-#define	FLG_OF1_RESCAN	0x04000000	/* any archives should be rescanned */
-#define	FLG_OF1_IGNPRC	0x08000000	/* ignore processing required */
-#define	FLG_OF1_NCSTTAB	0x10000000	/* -znocompstrtab set */
-#define	FLG_OF1_DONE	0x20000000	/* link-editor processing complete */
-#define	FLG_OF1_NONREG	0x40000000	/* non-regular file specified as */
+#define	FLG_OF1_VADDR	0x0001000000	/* a segment defines explicit vaddr */
+#define	FLG_OF1_EXTRACT	0x0002000000	/* archive member has been extracted */
+#define	FLG_OF1_RESCAN	0x0004000000	/* any archives should be rescanned */
+#define	FLG_OF1_IGNPRC	0x0008000000	/* ignore processing required */
+#define	FLG_OF1_NCSTTAB	0x0010000000	/* -znocompstrtab set */
+#define	FLG_OF1_DONE	0x0020000000	/* link-editor processing complete */
+#define	FLG_OF1_NONREG	0x0040000000	/* non-regular file specified as */
 					/*	the output file */
-#define	FLG_OF1_ALNODIR	0x80000000	/* establish NODIRECT for all */
+#define	FLG_OF1_ALNODIR	0x0080000000	/* establish NODIRECT for all */
 					/*	exported interfaces. */
+#define	FLG_OF1_OVHWCAP1 0x0100000000	/* override CA_SUNW_HW_1 capabilities */
+#define	FLG_OF1_OVSFCAP1 0x0200000000	/* override CA_SUNW_SF_1 capabilities */
+#define	FLG_OF1_OVHWCAP2 0x0400000000	/* override CA_SUNW_HW_2 capabilities */
 
 /*
  * Test to see if the output file would allow the presence of
@@ -665,7 +694,7 @@ struct is_desc {			/* input section descriptor */
 #define	FLG_IS_RELUPD	0x0008		/* symbol defined here may have moved */
 #define	FLG_IS_SECTREF	0x0010		/* section has been referenced */
 #define	FLG_IS_GDATADEF	0x0020		/* section contains global data sym */
-#define	FLG_IS_EXTERNAL	0x0040		/* isp from an user file */
+#define	FLG_IS_EXTERNAL	0x0040		/* isp from a user file */
 #define	FLG_IS_INSTRMRG	0x0080		/* Usable SHF_MERGE|SHF_STRINGS sec */
 #define	FLG_IS_GNSTRMRG	0x0100		/* Generated mergeable string section */
 #define	FLG_IS_GROUPS	0x0200		/* section has groups to process */
@@ -733,76 +762,99 @@ struct os_desc {			/* Output section descriptor */
 #define	FLG_OS_SECTREF		0x04	/* isps are not affected by -zignore */
 
 /*
- * Types of segment index.
+ * The sg_id field of the segment descriptor is used to establish the default
+ * order for program headers and segments in the output object. Segments are
+ * ordered according to the following SGID values that classify them based on
+ * their attributes. The initial set of built in segments are in this order,
+ * and new mapfile defined segments are inserted into these groups. Within a
+ * given SGID group, the position of new segments depends on the syntax
+ * version of the mapfile that creates them. Version 1 (original sysv)
+ * mapfiles place the new segment at the head of their group (reverse creation
+ * order). The newer syntax places them at the end, following the others
+ * (creation order).
+ *
+ * Note that any new segments must always be added after PT_PHDR and
+ * PT_INTERP (refer Generic ABI, Page 5-4).
  */
-typedef enum {
-	LD_PHDR,
-	LD_INTERP,
-	LD_SUNWCAP,
-	LD_TEXT,
-	LD_DATA,
-	LD_BSS,
+#define	SGID_PHDR	0	/* PT_PHDR */
+#define	SGID_INTERP	1	/* PT_INTERP */
+#define	SGID_SUNWCAP	2	/* PT_SUNWCAP */
+#define	SGID_TEXT	3	/* PT_LOAD */
+#define	SGID_DATA	4	/* PT_LOAD */
+#define	SGID_BSS	5	/* PT_LOAD */
 #if	defined(_ELF64)
-	LD_LRODATA,		/* (amd64-only) */
-	LD_LDATA,		/* (amd64-only) */
+#define	SGID_LRODATA	6	/* PT_LOAD (amd64-only) */
+#define	SGID_LDATA	7	/* PT_LOAD (amd64-only) */
 #endif
-	LD_DYN,
-	LD_DTRACE,
-	LD_TLS,
-	LD_UNWIND,
-	LD_NOTE,
-	LD_EXTRA,
-	LD_NUM
-} Segment_id;
+#define	SGID_TEXT_EMPTY	8	/* PT_LOAD, reserved (?E in version 1 syntax) */
+#define	SGID_NULL_EMPTY	9	/* PT_NULL, reserved (?E in version 1 syntax) */
+#define	SGID_DYN	10	/* PT_DYNAMIC */
+#define	SGID_DTRACE	11	/* PT_SUNWDTRACE */
+#define	SGID_TLS	12	/* PT_TLS */
+#define	SGID_UNWIND	13	/* PT_SUNW_UNWIND */
+#define	SGID_SUNWSTACK	14	/* PT_SUNWSTACK */
+#define	SGID_NOTE	15	/* PT_NOTE */
+#define	SGID_NULL	16	/* PT_NULL,  mapfile defined empty phdr slots */
+				/*	for use by post processors */
+#define	SGID_EXTRA	17	/* PT_NULL (final catchall) */
 
+typedef Half sg_flags_t;
 struct sg_desc {			/* output segment descriptor */
-	Segment_id	sg_id;		/* segment identifier (for sorting) */
+	Word		sg_id;		/* segment identifier (for sorting) */
 	Phdr		sg_phdr;	/* segment header for output file */
-	const char	*sg_name;	/* segment name */
+	const char	*sg_name;	/* segment name for PT_LOAD, PT_NOTE, */
+					/*	and PT_NULL, otherwise NULL */
 	Xword		sg_round;	/* data rounding required (mapfile) */
 	Xword		sg_length;	/* maximum segment length; if 0 */
 					/*	segment is not specified */
 	APlist		*sg_osdescs;	/* list of output section descriptors */
-	APlist		*sg_secorder;	/* list specifying section ordering */
-					/*	for the segment */
-	Half		sg_flags;
-	Sym_desc	*sg_sizesym;	/* size symbol for this segment */
-	Xword		sg_addralign;	/* LCM of sh_addralign */
+	APlist		*sg_is_order;	/* list of entry criteria */
+					/*	giving input section order */
+	Alist		*sg_os_order;	/* list specifying output section */
+					/*	ordering for the segment */
+	sg_flags_t	sg_flags;
+	APlist		*sg_sizesym;	/* size symbols for this segment */
+	Xword		sg_align;	/* LCM of sh_addralign */
 	Elf_Scn		*sg_fscn;	/* the SCN of the first section. */
+	avl_node_t	sg_avlnode;	/* AVL book-keeping */
 };
 
-#define	FLG_SG_VADDR	0x0001		/* vaddr segment attribute set */
-#define	FLG_SG_PADDR	0x0002		/* paddr segment attribute set */
-#define	FLG_SG_LENGTH	0x0004		/* length segment attribute set */
-#define	FLG_SG_ALIGN	0x0008		/* align segment attribute set */
-#define	FLG_SG_ROUND	0x0010		/* round segment attribute set */
-#define	FLG_SG_FLAGS	0x0020		/* flags segment attribute set */
-#define	FLG_SG_TYPE	0x0040		/* type segment attribute set */
-#define	FLG_SG_ORDER	0x0080		/* has ordering been turned on for */
-					/* 	this segment. */
-					/*	i.e. ?[O] option in mapfile */
-#define	FLG_SG_NOHDR	0x0100		/* don't map ELF or phdrs into */
-					/* 	this segment */
-#define	FLG_SG_EMPTY	0x0200		/* an empty segment specification */
+#define	FLG_SG_P_VADDR		0x0001	/* p_vaddr segment attribute set */
+#define	FLG_SG_P_PADDR		0x0002	/* p_paddr segment attribute set */
+#define	FLG_SG_LENGTH		0x0004	/* length segment attribute set */
+#define	FLG_SG_P_ALIGN		0x0008	/* p_align segment attribute set */
+#define	FLG_SG_ROUND		0x0010	/* round segment attribute set */
+#define	FLG_SG_P_FLAGS		0x0020	/* p_flags segment attribute set */
+#define	FLG_SG_P_TYPE		0x0040	/* p_type segment attribute set */
+#define	FLG_SG_IS_ORDER		0x0080	/* input section ordering is required */
+					/* 	for this segment. */
+#define	FLG_SG_NOHDR		0x0100	/* don't map ELF or phdrs into */
+					/*	this segment */
+#define	FLG_SG_EMPTY		0x0200	/* an empty segment specification */
 					/*	no input sections will be */
 					/*	associated to this section */
-#define	FLG_SG_KEY	0x0400		/* segment requires sort keys */
-#define	FLG_SG_DISABLED	0x0800		/* this segment is disabled */
-#define	FLG_SG_PHREQ	0x1000		/* this segment requires a program */
+#define	FLG_SG_KEY		0x0400	/* segment requires sort keys */
+#define	FLG_SG_NODISABLE	0x0800	/* FLG_SG_DISABLED is not allowed on */
+					/*	this segment */
+#define	FLG_SG_DISABLED		0x1000	/* this segment is disabled */
+#define	FLG_SG_PHREQ		0x2000	/* this segment requires a program */
 					/* header */
+#define	FLG_SG_ORDERED		0x4000	/* SEGMENT_ORDER segment */
 
 struct sec_order {
 	const char	*sco_secname;	/* section name to be ordered */
-	Word		sco_index;	/* ordering index for section */
 	Half		sco_flags;
 };
 
 #define	FLG_SGO_USED	0x0001		/* was ordering used? */
 
+typedef Half ec_flags_t;
 struct ent_desc {			/* input section entrance criteria */
-	APlist		*ec_files;	/* files from which to accept */
+	const char	*ec_name;	/* entrace criteria name, or NULL */
+	Alist		*ec_files;	/* files from which to accept */
 					/*	sections */
-	const char	*ec_name;	/* name to match (NULL if none) */
+	const char	*ec_is_name;	/* input section name to match */
+					/*	(NULL if none) */
 	Word		ec_type;	/* section type */
 	Word		ec_attrmask;	/* section attribute mask (AWX) */
 	Word		ec_attrbits;	/* sections attribute bits */
@@ -811,11 +863,35 @@ struct ent_desc {			/* input section entrance criteria */
 					/*	meeting this criteria should */
 					/*	inserted. Used for reordering */
 					/*	of sections. */
-	Half		ec_flags;
+	ec_flags_t	ec_flags;
+	avl_node_t	ec_avlnode;	/* AVL book-keeping */
 };
 
 #define	FLG_EC_BUILTIN	0x0001		/* built in descriptor */
 #define	FLG_EC_USED	0x0002		/* entrance criteria met? */
+#define	FLG_EC_CATCHALL	0x0004		/* Catches any section */
+
+/*
+ * Ent_desc_file is the type of element maintained in the ec_files Alist
+ * of an entrance criteria descriptor. Each item maintains one file
+ * path, and a set of flags that specify the type of comparison it implies,
+ * and other information about it. The comparison type is maintained in
+ * the bottom byte of the flags.
+ */
+#define	TYP_ECF_MASK		0x00ff  /* Comparison type mask */
+#define	TYP_ECF_PATH		0	/* Compare to file path */
+#define	TYP_ECF_BASENAME	1	/* Compare to file basename */
+#define	TYP_ECF_OBJNAME		2	/* Compare to regular file basename, */
+					/*	 or to archive member name */
+#define	TYP_ECF_NUM		3
+
+#define	FLG_ECF_ARMEMBER	0x0100	/* name includes archive member */
+
+typedef struct {
+	Word		edf_flags;	/* Type of comparison */
+	const char	*edf_name;	/* String to compare to */
+	size_t		edf_name_len;	/* strlen(edf_name) */
+} Ent_desc_file;
 
 /*
  * One structure is allocated for a move entry, and associated to the symbol
@@ -1177,6 +1253,13 @@ typedef struct ar_desc {
  * the same entry (see MSK_OF1_ARCHIVE).
  */
 #define	FLG_ARD_EXTRACT	0x00010000	/* archive member has been extracted */
+
+/* Mapfile versions supported by libld */
+#define	MFV_NONE	0	/* Not a valid version */
+#define	MFV_SYSV	1	/* Original System V syntax */
+#define	MFV_SOLARIS	2	/* Solaris mapfile syntax */
+#define	MFV_NUM		3	/* # of mapfile versions */
+
 
 /*
  * Function Declarations.

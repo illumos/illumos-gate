@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #include	<stdio.h>
@@ -231,33 +231,21 @@ Dbg_sec_in(Lm_list *lml, Is_desc *isp)
 void
 Dbg_sec_added(Lm_list *lml, Os_desc *osp, Sg_desc *sgp)
 {
-	const char	*str;
-
 	if (DBG_NOTCLASS(DBG_C_SECTIONS))
 		return;
 
-	if (sgp->sg_name && *sgp->sg_name)
-		str = sgp->sg_name;
-	else
-		str = MSG_INTL(MSG_STR_NULL);
-
-	dbg_print(lml, MSG_INTL(MSG_SEC_ADDED), osp->os_name, str);
+	dbg_print(lml, MSG_INTL(MSG_SEC_ADDED), osp->os_name,
+	    (sgp->sg_name ? sgp->sg_name : MSG_INTL(MSG_STR_NULL)));
 }
 
 void
 Dbg_sec_created(Lm_list *lml, Os_desc *osp, Sg_desc *sgp)
 {
-	const char	*str;
-
 	if (DBG_NOTCLASS(DBG_C_SECTIONS))
 		return;
 
-	if (sgp->sg_name && *sgp->sg_name)
-		str = sgp->sg_name;
-	else
-		str = MSG_INTL(MSG_STR_NULL);
-
-	dbg_print(lml, MSG_INTL(MSG_SEC_CREATED), osp->os_name, str);
+	dbg_print(lml, MSG_INTL(MSG_SEC_CREATED), osp->os_name,
+	    (sgp->sg_name ? sgp->sg_name : MSG_INTL(MSG_STR_NULL)));
 }
 
 void

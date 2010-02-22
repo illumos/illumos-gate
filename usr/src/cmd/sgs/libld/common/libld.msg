@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -52,7 +52,7 @@
 #	usage: ld [-6:abc:.....] file(s)
 #        	[-a]            create an absolute file
 #        	[-b]            do not do special PIC relocations in a.out
-#        	[-c file]       record configuration `file'
+#        	[-c file]       record configuration 'file'
 #
 @ MSG_ARG_USAGE		"usage: ld [-%s] file(s)\n"
 @ MSG_ARG_DETAIL_3	"\t[-32]\t\tenforce a 32-bit link-edit\n"
@@ -74,12 +74,12 @@
 @ MSG_ARG_DETAIL_CBS	"\t[-B symbolic]\tbind external references to \
 			 definitions when creating\n\
 			 \t\t\tshared objects\n"
-@ MSG_ARG_DETAIL_C	"\t[-c name]\trecord configuration file `name'\n"
+@ MSG_ARG_DETAIL_C	"\t[-c name]\trecord configuration file 'name'\n"
 @ MSG_ARG_DETAIL_CC	"\t[-C]\t\tdemangle C++ symbol name diagnostics\n"
 @ MSG_ARG_DETAIL_D	"\t[-d y | n]\toperate in dynamic|static mode\n"
 @ MSG_ARG_DETAIL_CD	"\t[-D token,...]\tprint diagnostic messages\n"
 @ MSG_ARG_DETAIL_E	"\t[-e epsym], [--entry epsym]\n\
-			 \t\t\tuse `epsym' as entry point address\n"
+			 \t\t\tuse 'epsym' as entry point address\n"
 @ MSG_ARG_DETAIL_F	"\t[-f name], [--auxiliary name]\n\
 			 \t\t\tspecify library for which this file is an \
 			 auxiliary\n\t\t\tfilter\n"
@@ -88,20 +88,20 @@
 @ MSG_ARG_DETAIL_CG	"\t[-G], [-shared]\n\
 			 \t\t\tcreate a shared object\n"
 @ MSG_ARG_DETAIL_H	"\t[-h name], [--soname name]\n\
-			 \t\t\tuse `name' as internal shared object identifier\n"
+			 \t\t\tuse 'name' as internal shared object identifier\n"
 @ MSG_ARG_DETAIL_I	"\t[-i]\t\tignore LD_LIBRARY_PATH setting\n"
-@ MSG_ARG_DETAIL_CI	"\t[-I name]\tuse `name' as path of interpreter\n"
+@ MSG_ARG_DETAIL_CI	"\t[-I name]\tuse 'name' as path of interpreter\n"
 @ MSG_ARG_DETAIL_L	"\t[-l x], [--library x]\n\
 			 \t\t\tsearch for libx.so or libx.a\n"
 @ MSG_ARG_DETAIL_CL	"\t[-L path], [--library-path path]\n\
-			 \t\t\tsearch for libraries in directory `path'\n"
+			 \t\t\tsearch for libraries in directory 'path'\n"
 @ MSG_ARG_DETAIL_M	"\t[-m]\t\tprint memory map\n"
 @ MSG_ARG_DETAIL_CM	"\t[-M mapfile]\tuse processing directives contained \
-			 in `mapfile'\n"
+			 in 'mapfile'\n"
 @ MSG_ARG_DETAIL_CN	"\t[-N string]\tcreate a dynamic dependency for \
-			 `string'\n"
+			 'string'\n"
 @ MSG_ARG_DETAIL_O	"\t[-o outfile], [--output outfile]\n\
-			 \t\t\tname the output file `outfile'\n"
+			 \t\t\tname the output file 'outfile'\n"
 @ MSG_ARG_DETAIL_P	"\t[-p auditlib]\tidentify audit library to accompany \
 			 this object\n"
 @ MSG_ARG_DETAIL_CP	"\t[-P auditlib]\tidentify audit library for \
@@ -121,10 +121,10 @@
 @ MSG_ARG_DETAIL_T	"\t[-t]\t\tdo not warn of multiply-defined symbols \
 			 that have\n\t\t\tdifferent sizes or alignments\n"
 @ MSG_ARG_DETAIL_U	"\t[-u symname], [--undefined symname]\n\
-			 \t\t\tcreate an undefined symbol `symname'\n"
+			 \t\t\tcreate an undefined symbol 'symname'\n"
 @ MSG_ARG_DETAIL_CV	"\t[-V], [--version]\n\
 			 \t\t\tprint version information\n"
-@ MSG_ARG_DETAIL_CY	"\t[-Y P,dirlist]\tuse `dirlist' as a default path \
+@ MSG_ARG_DETAIL_CY	"\t[-Y P,dirlist]\tuse 'dirlist' as a default path \
 			 when searching for\n\
 			 \t\t\tlibraries\n"
 @ MSG_ARG_DETAIL_ZA	"\t[-z absexec]\twhen building an executable absolute \
@@ -170,7 +170,7 @@
 			 \t\t\tbe executed before the .init section of any \
 			 other\n\t\t\tobjects\n"
 @ MSG_ARG_DETAIL_ZINT	"\t[-z interpose]\
-			 \tdynamic object is to be an `interposer' on direct\n\
+			 \tdynamic object is to be an 'interposer' on direct\n\
 			 \t\t\tbindings\n"
 @ MSG_ARG_DETAIL_ZLAZY	"\t[-z lazyload | nolazyload]\n\
 			 \t\t\tenable|disable delayed loading of shared \
@@ -273,7 +273,7 @@
 @ MSG_REL_UNSUPSZ	"relocation error: %s: file %s: symbol %s: \
 			 offset size (%d bytes) is not supported"
 @ MSG_REL_INVALOFFSET	"relocation error: %s: file %s section [%u]%s: \
-			 invalid offset symbol `%s': offset 0x%llx"
+			 invalid offset symbol '%s': offset 0x%llx"
 @ MSG_REL_INVALRELT	"relocation error: file %s: section [%u]%s: \
 			 invalid relocation type: 0x%x"
 @ MSG_REL_EMPTYSEC	"relocation error: %s: file %s: symbol %s: \
@@ -376,12 +376,12 @@
 @ MSG_FIL_MULINC_1	"file %s: attempted multiple inclusion of file"
 @ MSG_FIL_MULINC_2	"file %s: linked to %s: attempted multiple inclusion \
 			 of file"
-@ MSG_FIL_SOINSTAT	"input of shared object `%s' in static mode"
+@ MSG_FIL_SOINSTAT	"input of shared object '%s' in static mode"
 @ MSG_FIL_INVALSEC	"file %s: section [%u]%s has invalid type %s"
 @ MSG_FIL_NOTFOUND	"file %s: required by %s, not found"
 @ MSG_FIL_MALSTR	"file %s: section [%u]%s: malformed string table, \
 			 initial or final byte"
-@ MSG_FIL_PTHTOLONG	"`%s/%s' pathname too long"
+@ MSG_FIL_PTHTOLONG	"'%s/%s' pathname too long"
 @ MSG_FIL_EXCLUDE	"file %s: section [%u]%s contains both SHF_EXCLUDE and \
 			 SHF_ALLOC flags: SHF_EXCLUDE ignored"
 @ MSG_FIL_INTERRUPT	"file %s: creation interrupted: %s"
@@ -400,8 +400,6 @@
 @ MSG_FIL_UNKCAP	"file %s: section [%u]%s: unknown capability tag: %d"
 @ MSG_FIL_BADSF1	"file %s: section [%u]%s: unknown software \
 			 capabilities: 0x%llx; ignored"
-@ MSG_MAPFIL_BADSF1	"file %s: line %llu: unknown software \
-			 capabilities: 0x%llx; ignored"
 @ MSG_FIL_INADDR32SF1	"file %s: section [%u]%s: software capability ADDR32: is \
 			 ineffective when building 32-bit object; ignored"
 @ MSG_FIL_EXADDR32SF1	"file %s: section [%u]%s: software capability ADDR32: \
@@ -413,9 +411,9 @@
 
 # Recording name conflicts
 
-@ MSG_REC_OPTCNFLT	"recording name conflict: file `%s' and %s provide \
+@ MSG_REC_OPTCNFLT	"recording name conflict: file '%s' and %s provide \
 			 identical dependency names: %s"
-@ MSG_REC_OBJCNFLT	"recording name conflict: file `%s' and file `%s' \
+@ MSG_REC_OBJCNFLT	"recording name conflict: file '%s' and file '%s' \
 			 provide identical dependency names: %s  %s"
 @ MSG_REC_CNFLTHINT	"(possible multiple inclusion of the same file)"
 
@@ -447,26 +445,26 @@
 
 # Section processing errors
 
-@ MSG_SCN_NONALLOC	"%s: non-allocatable section `%s' directed to a \
-			 loadable segment"
+@ MSG_SCN_NONALLOC	"%s: non-allocatable section '%s' directed to a \
+			 loadable segment: %s"
 
 # Symbol processing errors
 
-@ MSG_SYM_NOSECDEF	"symbol `%s' in file %s has no section definition"
-@ MSG_SYM_INVSEC	"symbol `%s' in file %s associated with invalid \
+@ MSG_SYM_NOSECDEF	"symbol '%s' in file %s has no section definition"
+@ MSG_SYM_INVSEC	"symbol '%s' in file %s associated with invalid \
 			 section[%lld]"
-@ MSG_SYM_TLS		"symbol `%s' in file %s (STT_TLS), is defined \
+@ MSG_SYM_TLS		"symbol '%s' in file %s (STT_TLS), is defined \
 			 in a non-SHF_TLS section"
-@ MSG_SYM_BADADDR	"symbol `%s' in file %s: section [%u]%s: size %#llx: \
+@ MSG_SYM_BADADDR	"symbol '%s' in file %s: section [%u]%s: size %#llx: \
 			 symbol (address %#llx, size %#llx) lies outside \
 			 of containing section"
-@ MSG_SYM_BADADDR_ROTXT	"symbol `%s' in file %s: readonly text section \
+@ MSG_SYM_BADADDR_ROTXT	"symbol '%s' in file %s: readonly text section \
 			 [%u]%s: size %#llx: symbol (address %#llx, \
 			 size %#llx) lies outside of containing section"
-@ MSG_SYM_MULDEF	"symbol `%s' is multiply-defined:"
-@ MSG_SYM_CONFVIS	"symbol `%s' has conflicting visibilities:"
-@ MSG_SYM_DIFFTYPE	"symbol `%s' has differing types:"
-@ MSG_SYM_DIFFATTR	"symbol `%s' has differing %s:\n\
+@ MSG_SYM_MULDEF	"symbol '%s' is multiply-defined:"
+@ MSG_SYM_CONFVIS	"symbol '%s' has conflicting visibilities:"
+@ MSG_SYM_DIFFTYPE	"symbol '%s' has differing types:"
+@ MSG_SYM_DIFFATTR	"symbol '%s' has differing %s:\n\
 			 \t(file %s value=0x%llx; file %s value=0x%llx);"
 @ MSG_SYM_FILETYPES	"\t(file %s type=%s; file %s type=%s);"
 @ MSG_SYM_VISTYPES	"\t(file %s visibility=%s; file %s visibility=%s);"
@@ -480,10 +478,10 @@
 			 ignored:\n\t(file %s value=%s);"
 @ MSG_SYM_NONGLOB	"global symbol %s has non-global binding:\n\
 			 \t(file %s value=%s);"
-@ MSG_SYM_RESERVE	"reserved symbol `%s' already defined in file %s"
-@ MSG_SYM_NOTNULL	"undefined symbol `%s' with non-zero value encountered \
+@ MSG_SYM_RESERVE	"reserved symbol '%s' already defined in file %s"
+@ MSG_SYM_NOTNULL	"undefined symbol '%s' with non-zero value encountered \
 			 from file %s"
-@ MSG_SYM_DUPSORTADDR	"section %s: symbol `%s' and symbol `%s' have the \
+@ MSG_SYM_DUPSORTADDR	"section %s: symbol '%s' and symbol '%s' have the \
 			 same address: %#llx: remove duplicate with \
 			 NOSORTSYM mapfile directive"
 
@@ -497,7 +495,7 @@
 			 associated symbol size is unknown %s"
 @ MSG_PSYM_NOSTATIC	"and partial initialization cannot be deferred to \
 			 a static object"
-@ MSG_MOVE_OVERLAP	"file %s: section [%u]%s: symbol `%s' overlapping move \
+@ MSG_MOVE_OVERLAP	"file %s: section [%u]%s: symbol '%s' overlapping move \
 			 initialization: start=0x%llx, length=0x%llx: \
 			 start=0x%llx, length=0x%llx"
 @ MSG_PSYM_EXPREASON1	"output file is static object"
@@ -551,42 +549,43 @@
 @ MSG_SYM_UND_BNDLOCAL	"%-35s %s  (symbol scope specifies local binding)"
 
 @ MSG_SYM_ENTRY		"entry point"
-@ MSG_SYM_UNDEF		"%s symbol `%s' is undefined"
-@ MSG_SYM_EXTERN	"%s symbol `%s' is undefined  (symbol belongs to \
+@ MSG_SYM_UNDEF		"%s symbol '%s' is undefined"
+@ MSG_SYM_EXTERN	"%s symbol '%s' is undefined  (symbol belongs to \
 			 dependency %s)"
-@ MSG_SYM_NOCRT		"symbol `%s' not found, but %s section exists - \
+@ MSG_SYM_NOCRT		"symbol '%s' not found, but %s section exists - \
 			 possible link-edit without using the compiler driver"
 
 # Output file update messages
 
-@ MSG_UPD_NOREADSEG	"No read-only segments found.  Setting `_etext' to 0"
-@ MSG_UPD_NORDWRSEG	"No read-write segments found.  Setting `_edata' to 0"
-@ MSG_UPD_NOSEG		"Setting `end' and `_end' to 0"
+@ MSG_UPD_NOREADSEG	"No read-only segments found.  Setting '_etext' to 0"
+@ MSG_UPD_NORDWRSEG	"No read-write segments found.  Setting '_edata' to 0"
+@ MSG_UPD_NOSEG		"Setting 'end' and '_end' to 0"
 
 @ MSG_UPD_SEGOVERLAP	"%s: segment address overlap;\n\
 			 \tprevious segment ending at address 0x%llx overlaps\n\
-			 \tuser defined segment `%s' starting at address 0x%llx"
+			 \tuser defined segment '%s' starting at address 0x%llx"
 @ MSG_UPD_LARGSIZE	"%s: segment %s calculated size 0x%llx\n\
 			 \tis larger than user-defined size 0x%llx"
 
 @ MSG_UPD_NOBITS	"NOBITS section found before end of initialized data"
+@ MSG_SEG_FIRNOTLOAD	"First segment has type %s, PT_LOAD required: %s"
 
 
 # Version processing messages
 
 @ MSG_VER_HIGHER	"file %s: version revision %d is higher than \
 			 expected %d"
-@ MSG_VER_NOEXIST	"file %s: version `%s' does not exist:\n\
+@ MSG_VER_NOEXIST	"file %s: version '%s' does not exist:\n\
 			 \trequired by file %s"
-@ MSG_VER_UNDEF		"version `%s' undefined, referenced by version `%s':\n\
+@ MSG_VER_UNDEF		"version '%s' undefined, referenced by version '%s':\n\
 			 \trequired by file %s"
-@ MSG_VER_UNAVAIL	"file %s: version `%s' is unavailable:\n\
+@ MSG_VER_UNAVAIL	"file %s: version '%s' is unavailable:\n\
 			 \trequired by file %s"
-@ MSG_VER_DEFINED	"version symbol `%s' already defined in file %s"
-@ MSG_VER_INVALNDX	"version symbol `%s' from file %s has an invalid \
+@ MSG_VER_DEFINED	"version symbol '%s' already defined in file %s"
+@ MSG_VER_INVALNDX	"version symbol '%s' from file %s has an invalid \
 			 version index (%d)"
-@ MSG_VER_ADDVERS	"unused $ADDVERS specification from file `%s' \
-			 for object `%s'\nversion(s):"
+@ MSG_VER_ADDVERS	"unused $ADDVERS specification from file '%s' \
+			 for object '%s'\nversion(s):"
 @ MSG_VER_ADDVER	"\t%s"
 @ MSG_VER_CYCLIC	"following versions generate cyclic dependency:"
 
@@ -638,14 +637,29 @@
 @ MSG_REJ_UNKFILE	"file %s: unknown file type"
 @ MSG_REJ_HWCAP_1	"file %s: hardware capability unsupported: %s"
 
+
 @ _END_
 
 
 # The following strings represent reserved names.  Reference to these strings
 # is via the MSG_ORIG() macro, and thus translations are not required.
 
+@ MSG_STR_EOF		"<eof>"
+@ MSG_STR_ERROR		"<error>"
 @ MSG_STR_EMPTY		""
+@ MSG_QSTR_BANG		"'!'"
 @ MSG_STR_COLON		":"
+@ MSG_QSTR_COLON	"':'"
+@ MSG_QSTR_SEMICOLON	"';'"
+@ MSG_QSTR_EQUAL	"'='"
+@ MSG_QSTR_PLUSEQ	"'+='"
+@ MSG_QSTR_MINUSEQ	"'-='"
+@ MSG_QSTR_ATSIGN	"'@'"
+@ MSG_QSTR_DASH		"'-'"
+@ MSG_QSTR_LEFTBKT	"'{'"
+@ MSG_QSTR_RIGHTBKT	"'}'"
+@ MSG_QSTR_PIPE		"'|'"
+@ MSG_QSTR_STAR		"'*'"
 @ MSG_STR_DOT		"."
 @ MSG_STR_SLASH		"/"
 @ MSG_STR_DYNAMIC	"(.dynamic)"
@@ -656,10 +670,25 @@
 @ MSG_STR_OSREL		"$OSREL"
 @ MSG_STR_UU_REAL_U	"__real_"
 @ MSG_STR_UU_WRAP_U	"__wrap_"
+@ MSG_STR_UELF32	"_ELF32"
+@ MSG_STR_UELF64	"_ELF64"
+@ MSG_STR_USPARC	"_sparc"
+@ MSG_STR_UX86		"_x86"
+@ MSG_STR_TRUE		"true"
+
+@ MSG_STR_CDIR_ADD	"$add"
+@ MSG_STR_CDIR_CLEAR	"$clear"
+@ MSG_STR_CDIR_ERROR	"$error"
+@ MSG_STR_CDIR_MFVER	"$mapfile_version"
+@ MSG_STR_CDIR_IF	"$if"
+@ MSG_STR_CDIR_ELIF	"$elif"
+@ MSG_STR_CDIR_ELSE	"$else"
+@ MSG_STR_CDIR_ENDIF	"$endif"
+
 
 @ MSG_FMT_ARMEM		"%s(%s)"
 @ MSG_FMT_COLPATH	"%s:%s"
-@ MSG_FMT_SYMNAM	"`%s'"
+@ MSG_FMT_SYMNAM	"'%s'"
 @ MSG_FMT_NULLSYMNAM	"%s[%d]"
 @ MSG_FMT_STRCAT	"%s%s"
 
@@ -738,24 +767,15 @@
 @ MSG_SCN_GCC_X_TBL	".gcc_except_table"
 @ MSG_SCN_JCR		".jcr"
 
-# Entry criteria strings (segment names)
+# Segment names for segments referenced by entrance criteria
 
 @ MSG_ENT_BSS		"bss"
 @ MSG_ENT_DATA		"data"
-@ MSG_ENT_DTRACE	"dtrace"
-@ MSG_ENT_DYNAMIC	"dynamic"
 @ MSG_ENT_EXTRA		"extra"
-@ MSG_ENT_INTERP	"interp"
-@ MSG_ENT_LBSS		"lbss"
 @ MSG_ENT_LDATA		"ldata"
 @ MSG_ENT_LRODATA	"lrodata"
 @ MSG_ENT_NOTE		"note"
-@ MSG_ENT_PHDR		"phdr"
 @ MSG_ENT_TEXT		"text"
-@ MSG_ENT_TLS		"tls"
-@ MSG_ENT_UNWIND	"unwind"
-
-@ MSG_ENT_SUNWCAP	"SUNW_cap"
 
 # Symbol names
 
@@ -830,7 +850,7 @@
 @ MSG_MARG_INCOMP	"%s and %s are incompatible"
 @ MSG_ARG_MTONCE	"option %s appears more than once, first setting taken"
 @ MSG_MARG_MTONCE	"%s appears more than once, first setting taken"
-@ MSG_ARG_ILLEGAL	"option %s has illegal argument `%s'"
+@ MSG_ARG_ILLEGAL	"option %s has illegal argument '%s'"
 @ MSG_ARG_YP		"option -YP and -Y%c may not be specified concurrently"
 @ MSG_ARG_STRIP		"%s specified with %s; only debugging \
 			 information stripped"
@@ -838,7 +858,7 @@
 @ MSG_ARG_NOFLTR	"option %s is only meaningful when building a filter"
 @ MSG_ARG_NODEFLIB	"the default library search path has been suppressed, \
 			 but no runpaths have been specified via %s"
-@ MSG_ARG_NOENTRY	"entry point symbol `%s' is undefined"
+@ MSG_ARG_NOENTRY	"entry point symbol '%s' is undefined"
 @ MSG_ARG_UNSUPPORTED	"option %s is no longer supported; ignored"
 
 @ MSG_ARG_FLAGS		"flags processing errors"
@@ -934,9 +954,9 @@
 #
 @ MSG_ENT_MUL_ENTRY_2	"\t\t\t\t\t\t\t%s\n"
 
-@ MSG_ENT_NOSEC_1	"mapfile: %s segment: section `%s' does not appear \
-			 in file `%s'"
-@ MSG_ENT_NOSEC_2	"mapfile: %s segment: section `%s' does not appear \
+@ MSG_ENT_NOSEC_1	"mapfile: %s segment: section '%s' does not appear \
+			 in mapfile specified input file(s)"
+@ MSG_ENT_NOSEC_2	"mapfile: %s segment: section '%s' does not appear \
 			 in any input file"
 
 # Library messages
@@ -948,80 +968,95 @@
 
 # Mapfile processing messages
 
-@ MSG_MAP_BADFLAG	"%s: %lld: badly formed section flags `%s'"
-@ MSG_MAP_REDEFATT	"%s: %lld: redefining %s attribute for `%s'"
-@ MSG_MAP_PREMEOF	"%s: %lld: premature EOF"
-@ MSG_MAP_ILLCHAR	"%s: %lld: illegal character `\\%03o'"
-@ MSG_MAP_MALFORM	"%s: %lld: malformed entry"
-@ MSG_MAP_NONLOAD	"%s: %lld: %s not allowed on non-LOAD segments"
-@ MSG_MAP_NOSTACK1	"%s: %lld: %s not allowed on STACK segment"
-@ MSG_MAP_NOSTACK2	"%s: %lld: multiple STACK segments are not allowed"
-@ MSG_MAP_MOREONCE	"%s: %lld: %s set more than once on same line"
-@ MSG_MAP_NOTERM	"%s: %lld: string does not terminate with a `\"'"
-@ MSG_MAP_SECINSEG	"%s: %lld: section within segment ordering done on \
-			 a non-existent segment `%s'"
-@ MSG_MAP_UNEXDEP	"%s: %lld: dependency `%s' unexpected; ignored"
-@ MSG_MAP_UNEXTOK	"%s: %lld: unexpected occurrence of `%c' token"
+@ MSG_MAP_BADAUTORED	"%s: %llu: auto-reduction ('*') can only be used in \
+			 hidden/local, or eliminate scope"
+@ MSG_MAP_BADFLAG	"%s: %llu: badly formed section flags '%s'"
+@ MSG_MAP_BADBNAME	"%s: %llu: basename cannot contain path \
+			 separator ('/'): %s"
+@ MSG_MAP_BADONAME	"%s: %llu: object name cannot contain path \
+			 separator ('/'): %s"
+@ MSG_MAP_REDEFATT	"%s: %llu: redefining %s attribute for '%s'"
+@ MSG_MAP_PREMEOF	"%s: %llu: premature EOF"
+@ MSG_MAP_ILLCHAR	"%s: %llu: illegal character '\\%03o'"
+@ MSG_MAP_MALFORM	"%s: %llu: malformed entry"
+@ MSG_MAP_NONLOAD	"%s: %llu: %s not allowed on non-LOAD segments"
+@ MSG_MAP_NOSTACK1	"%s: %llu: %s not allowed on STACK segment"
+@ MSG_MAP_MOREONCE	"%s: %llu: %s set more than once on same line"
+@ MSG_MAP_NOTERM	"%s: %llu: unterminated quoted string: %s"
+@ MSG_MAP_SECINSEG	"%s: %llu: section within segment ordering done on \
+			 a non-existent segment '%s'"
+@ MSG_MAP_UNEXINHERIT	"%s: %llu: unnamed version cannot inherit from other \
+			 versions: %s"
+@ MSG_MAP_UNEXTOK	"%s: %llu: unexpected occurrence of '%c' token"
 
-@ MSG_MAP_SEGEMPLOAD	"%s: %lld: empty segment must be of type LOAD or NULL"
-@ MSG_MAP_SEGEMPEXE	"%s: %lld: a LOAD empty segment definition is only \
+@ MSG_MAP_SEGEMPLOAD	"%s: %llu: empty segment must be of type LOAD or NULL"
+@ MSG_MAP_SEGEMPEXE	"%s: %llu: a LOAD empty segment definition is only \
 			 allowed when creating a dynamic executable"
-@ MSG_MAP_SEGEMPATT	"%s: %lld: a LOAD empty segment must have an address \
+@ MSG_MAP_SEGEMPATT	"%s: %llu: a LOAD empty segment must have an address \
 			 and size"
-@ MSG_MAP_SEGEMPNOATT	"%s: %lld: a NULL empty segment must not have an address \
-			 or size"
-@ MSG_MAP_SEGEMPSEC	"%s: %lld: empty segment can not have sections \
+@ MSG_MAP_SEGEMPNOATT	"%s: %llu: a NULL empty segment must not have an \
+			 address or size"
+@ MSG_MAP_SEGEMPSEC	"%s: %llu: empty segment can not have sections \
 			 assigned to it"
-@ MSG_MAP_SEGEMNOPERM	"%s: %lld: empty segment must not have \
+@ MSG_MAP_SEGEMNOPERM	"%s: %llu: empty segment must not have \
 			 p_flags set: 0x%x"
 
-@ MSG_MAP_UNKSYMSCO	"%s: %lld: unknown symbol scope definition `%s'"
-@ MSG_MAP_UNKSYMDEF	"%s: %lld: unknown symbol definition `%s'"
-@ MSG_MAP_UNKSEGTYP	"%s: %lld: unknown internal segment type %d"
-@ MSG_MAP_UNKSOTYP	"%s: %lld: unknown shared object type `%s'"
-@ MSG_MAP_UNKSEGATT	"%s: %lld: unknown segment attribute `%s'"
-@ MSG_MAP_UNKSEGFLG	"%s: %lld: unknown segment flag `?%c'"
-@ MSG_MAP_UNKSECTYP	"%s: %lld: unknown section type `%s'"
+@ MSG_MAP_CNTADDRORDER	"%s: %llu: segment cannot have an explicit address \
+			 and also be in the SEGMENT_ORDER list: %s"
+@ MSG_MAP_CNTDISSEG	"%s: %llu: segment cannot be disabled: %s"
+@ MSG_MAP_DUPNAMENT	"%s: %llu: cannot redefine entrance criteria: %s"
+@ MSG_MAP_DUPORDSEG	"%s: %llu: segment is already in %s list: %s"
+@ MSG_MAP_DUP_OS_ORD	"%s: %llu: section is already in OS_ORDER list: %s"
+@ MSG_MAP_DUP_IS_ORD	"%s: %llu: entrance criteria is already in \
+			 IS_ORDER list: %s"
+@ MSG_MAP_UNKENT	"%s: %llu: unknown entrance criteria \
+			 (ASSIGN_SECTION): %s"
+@ MSG_MAP_UNKSEG	"%s: %llu: unknown segment: %s"
+@ MSG_MAP_UNKSYMDEF	"%s: %llu: unknown symbol definition: %s"
+@ MSG_MAP_UNKSEGTYP	"%s: %llu: unknown internal segment type %d"
+@ MSG_MAP_UNKSOTYP	"%s: %llu: unknown shared object type: %s"
+@ MSG_MAP_UNKSEGATT	"%s: %llu: unknown segment attribute: %s"
+@ MSG_MAP_UNKSEGFLG	"%s: %llu: unknown segment flag: ?%c"
+@ MSG_MAP_UNKSECTYP	"%s: %llu: unknown section type: %s"
 
-@ MSG_MAP_SEGSIZE	"%s: %lld: segment `%s' already has a size symbol"
-@ MSG_MAP_SEGADDR	"%s: %lld: segment address or length `%s' %s"
-@ MSG_MAP_BADCAPVAL	"%s: %lld: bad capability value `%s': %s"
-@ MSG_MAP_UNKCAPATTR	"%s: %lld: unknown capability attribute `%s'"
-@ MSG_MAP_EMPTYCAP	"%s: %lld: empty capability definition; ignored"
-@ MSG_MAP_SEGRESV	"%s: %lld: segments `interp' or `dynamic' may not be \
-			 changed"
+@ MSG_MAP_SEGSIZE	"%s: %lld: existing segment size symbols cannot \
+			 be reset: %s"
+@ MSG_MAP_SEGADDR	"%s: %llu: segment address or length '%s' %s"
+@ MSG_MAP_BADCAPVAL	"%s: %llu: bad capability value: %s"
+@ MSG_MAP_UNKCAPATTR	"%s: %llu: unknown capability attribute '%s'"
+@ MSG_MAP_EMPTYCAP	"%s: %llu: empty capability definition; ignored"
 
-@ MSG_MAP_SYMDEF1	"%s: %lld: symbol `%s' is already defined in file: \
+@ MSG_MAP_SYMDEF1	"%s: %llu: symbol '%s' is already defined in file: \
 			 %s: %s"
-@ MSG_MAP_SYMDEF2	"%s: %lld: symbol `%s': %s"
+@ MSG_MAP_SYMDEF2	"%s: %llu: symbol '%s': %s"
 
-@ MSG_MAP_EXPSCOL	"%s: %lld: expected a `;'"
-@ MSG_MAP_EXPEQU	"%s: %lld: expected a `=', `:', `|', or `@'"
-@ MSG_MAP_EXPSEGATT	"%s: %lld: expected one or more segment attributes \
-			 after an `='"
-@ MSG_MAP_EXPSEGNAM	"%s: %lld: expected a segment name at the beginning \
+@ MSG_MAP_EXPSCOL	"%s: %llu: expected a ';'"
+@ MSG_MAP_EXPEQU	"%s: %llu: expected a '=', ':', '|', or '@'"
+@ MSG_MAP_EXPSEGATT	"%s: %llu: expected one or more segment attributes \
+			 after an '='"
+@ MSG_MAP_EXPSEGNAM	"%s: %llu: expected a segment name at the beginning \
 			 of a line"
-@ MSG_MAP_EXPSYM_1	"%s: %lld: expected a symbol name after `@'"
-@ MSG_MAP_EXPSYM_2	"%s: %lld: expected a symbol name after `{'"
-@ MSG_MAP_EXPSEC	"%s: %lld: expected a section name after `|'"
-@ MSG_MAP_EXPSO		"%s: %lld: expected a shared object definition \
-			 after `-'"
-@ MSG_MAP_EXPVERS	"%s: %lld: expected a `;' or version reference \
-			 after `}'"
-@ MSG_MAP_MULTFILTEE	"%s: %lld: multiple filtee definitions are unsupported"
-@ MSG_MAP_NOFILTER	"%s: %lld: filtee definition required"
-@ MSG_MAP_BADSF1	"%s: %lld: unknown software capabilities: 0x%llx; \
+@ MSG_MAP_EXPSEGTYPE	"%s: %llu: %s segment cannot be used with %s \
+			 directive: %s"
+@ MSG_MAP_EXPSYM_1	"%s: %llu: expected a symbol name after '@'"
+@ MSG_MAP_EXPSYM_2	"%s: %llu: expected a symbol name after '{'"
+@ MSG_MAP_EXPSEC	"%s: %llu: expected a section name after '|'"
+@ MSG_MAP_EXPSO		"%s: %llu: expected a shared object definition \
+			 after '-'"
+@ MSG_MAP_MULTFILTEE	"%s: %llu: multiple filtee definitions are unsupported"
+@ MSG_MAP_NOFILTER	"%s: %llu: filtee definition required"
+@ MSG_MAP_BADSF1	"%s: %llu: unknown software capabilities: 0x%llx; \
 			 ignored"
-@ MSG_MAP_INADDR32SF1	"%s: %lld: software capability ADDR32: is ineffective \
+@ MSG_MAP_INADDR32SF1	"%s: %llu: software capability ADDR32: is ineffective \
 			 when building 32-bit object: ignored"
-@ MSG_MAP_NOINTPOSE	"%s: %lld: interposition symbols can only be defined \
+@ MSG_MAP_NOINTPOSE	"%s: %llu: interposition symbols can only be defined \
 			 when building a dynamic executable"
-@ MSG_MAP_NOEXVLSZ	"%s: %lld: value and size attributes are incompatible \
+@ MSG_MAP_NOEXVLSZ	"%s: %llu: value and size attributes are incompatible \
 			 with extern or parent symbols"
-@ MSG_MAP_FLTR_ONLYAVL	"%s: %lld: symbol filtering is only available when \
+@ MSG_MAP_FLTR_ONLYAVL	"%s: %llu: symbol filtering is only available when \
 			 building a shared object"
 
-@ MSG_MAP_SEGSAME	"segments `%s' and `%s' have the same assigned \
+@ MSG_MAP_SEGSAME	"segments '%s' and '%s' have the same assigned \
 			 virtual address"
 @ MSG_MAP_EXCLIMIT	"exceeds internal limit"
 @ MSG_MAP_NOBADFRM	"number is badly formed"
@@ -1058,6 +1093,98 @@
 
 @ MSG_MAP_SECORDER	"section ordering requested, but no matching section \
 			 found: segment: %s section: %s"
+
+
+# Mapfile Directives
+
+@ MSG_MAP_EXP_ATTR	"%s: %llu: expected attribute name (%s), or \
+			 terminator (';', '}'): %s"
+@ MSG_MAP_EXP_CAPMASK	"%s: %llu: expected capability name, integer value, or \
+			 terminator (';', '}'): %s"
+@ MSG_MAP_EXP_CAPNAME	"%s: %llu: expected name, or terminator (';', '}'): %s"
+@ MSG_MAP_EXP_CAPID	"%s: %llu: expected name, or '{' following %s: %s"
+@ MSG_MAP_EXP_CAPHW	"%s: %llu: expected hardware capability, or \
+			 terminator (';', '}'): %s"
+@ MSG_MAP_EXP_CAPSF	"%s: %llu: expected software capability, or \
+			 terminator (';', '}'): %s"
+@ MSG_MAP_EXP_EQ	"%s: %llu: expected '=' following %s: %s"
+@ MSG_MAP_EXP_EQ_ALL	"%s: %llu: expected '=', '+=', or '-=' following %s: %s"
+@ MSG_MAP_EXP_EQ_PEQ	"%s: %llu: expected '=' following %s: %s"
+@ MSG_MAP_EXP_DIR	"%s: %llu: expected mapfile directive (%s): %s"
+@ MSG_MAP_SFLG_EXBANG	"%s: %llu: '!' appears without corresponding flag"
+@ MSG_MAP_EXP_FILNAM	"%s: %llu: expected file name following %s: %s"
+@ MSG_MAP_EXP_FILPATH	"%s: %llu: expected file path following %s: %s"
+@ MSG_MAP_EXP_INT	"%s: %llu: expected integer value following %s: %s"
+@ MSG_MAP_EXP_LBKT	"%s: %llu: expected '{' following %s: %s"
+@ MSG_MAP_EXP_OBJNAM	"%s: %llu: expected object name following %s: %s"
+@ MSG_MAP_SFLG_ONEBANG	"%s: %llu: '!' can only be specified once per flag"
+@ MSG_MAP_EXP_SECFLAG	"%s: %llu: expected section flag (%s), '!', or \
+			 terminator (';', '}'): %s"
+@ MSG_MAP_EXP_SECNAM	"%s: %llu: expected section name following %s: %s"
+@ MSG_MAP_EXP_SEGFLAG	"%s: %llu: expected segment flag (%s), or \
+			 terminator (';', '}'): %s"
+@ MSG_MAP_EXP_ECNAM	"%s: %llu: expected entrance criteria (ASSIGN_SECTION) \
+			 name, or terminator (';', '}'): %s"
+@ MSG_MAP_EXP_SEGNAM	"%s: %llu: expected segment name following %s: %s"
+@ MSG_MAP_EXP_SEM	"%s: %llu: expected ';' to terminate %s: %s"
+@ MSG_MAP_EXP_SEMLBKT	"%s: %llu: expected ';' or '{' following %s: %s"
+@ MSG_MAP_EXP_SEMRBKT	"%s: %llu: expected ';' or '}' to terminate %s: %s"
+@ MSG_MAP_EXP_SHTYPE	"%s: %llu: expected section type: %s"
+@ MSG_MAP_EXP_SYM	"%s: %llu: expected symbol name, symbol scope, \
+			 or '*': %s"
+@ MSG_MAP_EXP_SYMEND	"%s: %llu: expected inherited version name, or \
+			 terminator (';'): %s"
+@ MSG_MAP_EXP_SYMDELIM	"%s: %llu: expected one of ':', ';', or '{': %s"
+@ MSG_MAP_EXP_SYMFLAG	"%s: %llu: expected symbol flag (%s), or \
+			 terminator (';', '}'): %s"
+@ MSG_MAP_EXP_SYMNAM	"%s: %llu: expected symbol name following %s: %s"
+@ MSG_MAP_EXP_SYMSCOPE	"%s: %llu: expected symbol scope (%s): %s"
+@ MSG_MAP_EXP_SYMTYPE	"%s: %llu: expected symbol type (%s): %s"
+@ MSG_MAP_EXP_VERSION	"%s: %llu: expected version name following %s: %s"
+@ MSG_MAP_BADEXTRA	"%s: %llu: unexpected text found following %s directive"
+@ MSG_MAP_VALUELIMIT	"%s: %llu: numeric value exceeds word size: %s"
+@ MSG_MAP_MALVALUE	"%s: %llu: malformed numeric value: %s"
+@ MSG_MAP_BADVALUETAIL	"%s: %llu: unexpected characters following numeric \
+			 constant: %s"
+@ MSG_MAP_WSNEEDED	"%s: %llu: whitespace needed before token: %s"
+@ MSG_MAP_BADCHAR	"%s: %llu: unexpected text: %s"
+@ MSG_MAP_BADKWQUOTE	"%s: %llu: mapfile keywords should not be quoted: %s"
+@ MSG_MAP_CDIR_NOTBOL	"%s: %llu: mapfile control directive not at start of \
+			 line: %s"
+@ MSG_MAP_NOATTR	"%s: %llu: %s specified no attributes (empty {})"
+@ MSG_MAP_NOVALUES	"%s: %llu: %s specified without values"
+@ MSG_MAP_INTERR	"<internal error>"
+@ MSG_MAP_ISORDVER	"%s: %llu: version 0 mapfile ?O flag and version 1 \
+			 segment IS_ORDER attribute are mutually exclusive: %s"
+@ MSG_MAP_SYMATTR	"symbol attributes";
+
+# Mapfile Control Directives
+
+@ MSG_MAP_CDIR_BADVDIR	"%s: %llu: $mapfile_version directive must specify \
+			 version 2 or higher: %d"
+@ MSG_MAP_CDIR_BADVER	"%s: %llu: unknown mapfile version: %d"
+@ MSG_MAP_CDIR_REPVER	"%s: %llu: $mapfile_version must be first directive \
+			 in file"
+@ MSG_MAP_CDIR_REQARG	"%s: %llu: %s directive requires an argument"
+@ MSG_MAP_CDIR_REQNOARG	"%s: %llu: %s directive does not accept arguments"
+@ MSG_MAP_CDIR_BAD	"%s: %llu: unrecognized mapfile control directive"
+@ MSG_MAP_CDIR_NOIF	"%s: %llu: %s directive used without opening $if"
+@ MSG_MAP_CDIR_ELSE	"%s: %llu: %s directive preceded by $else on line %d"
+@ MSG_MAP_CDIR_NOEND	"%s: %llu: EOF encountered without closing $endif \
+			 for $if on line %d"
+@ MSG_MAP_CDIR_ERROR	"%s: %llu: error: %s"
+
+
+# Mapfile Conditional Expressions
+
+@ MSG_MAP_CEXP_TOKERR	"%s: %llu: syntax error in conditional expression at: %s"
+@ MSG_MAP_CEXP_SEMERR	"%s: %llu: malformed conditional expression"
+@ MSG_MAP_CEXP_BADOPUSE	"%s: %llu: invalid operator use in conditional \
+			 expression"
+@ MSG_MAP_CEXP_UNBALPAR	"%s: %llu: unbalanced parenthesis in conditional \
+			 expression"
+@ MSG_MAP_BADCESC	"%s: %llu: unrecognized escape in double quoted \
+			 token: \\%c\n"
 
 # Generic error diagnostic labels
 
@@ -1096,13 +1223,10 @@
 @ MSG_STR_STRNL		"%s\n"
 @ MSG_STR_NL		"\n"
 
-@ MSG_STR_INTERP	"interp"
 @ MSG_STR_LD_DYNAMIC	"dynamic"
 @ MSG_STR_SYMBOLIC	"symbolic"
 @ MSG_STR_ELIMINATE	"eliminate"
 @ MSG_STR_LOCAL		"local"
-@ MSG_STR_EXPORTED	"exported"
-@ MSG_STR_SINGLETON	"singleton"
 @ MSG_STR_PROGBITS	"progbits"
 @ MSG_STR_SYMTAB	"symtab"
 @ MSG_STR_DYNSYM	"dynsym"
@@ -1276,14 +1400,11 @@
 
 # Mapfile tokens
 
-@ MSG_MAP_TOK_1		"\"\n"
-@ MSG_MAP_TOK_2		" \"\t\n:;=#"
 @ MSG_MAP_LOAD		"load"
 @ MSG_MAP_NOTE		"note"
 @ MSG_MAP_NULL		"null"
 @ MSG_MAP_STACK		"stack"
 @ MSG_MAP_ADDVERS	"addvers"
-@ MSG_MAP_GLOBAL	"global"
 @ MSG_MAP_FUNCTION	"function"
 @ MSG_MAP_DATA		"data"
 @ MSG_MAP_COMMON	"common"
@@ -1291,9 +1412,6 @@
 @ MSG_MAP_EXTERN	"extern"
 @ MSG_MAP_DIRECT	"direct"
 @ MSG_MAP_NODIRECT	"nodirect"
-@ MSG_MAP_DEFAULT	"default"
-@ MSG_MAP_PROTECTED	"protected"
-@ MSG_MAP_HIDDEN	"hidden"
 @ MSG_MAP_FILTER	"filter"
 @ MSG_MAP_AUXILIARY	"auxiliary"
 @ MSG_MAP_OVERRIDE	"override"
@@ -1301,5 +1419,71 @@
 @ MSG_MAP_DYNSORT	"dynsort"
 @ MSG_MAP_NODYNSORT	"nodynsort"
 
-@ MSG_STR_DTRACE	"PT_SUNWDTRACE"
+@ MSG_MAPKW_ALIGN		"ALIGN"
+@ MSG_MAPKW_ALLOC		"ALLOC"
+@ MSG_MAPKW_ALLOW		"ALLOW"
+@ MSG_MAPKW_AMD64_LARGE		"AMD64_LARGE"
+@ MSG_MAPKW_ASSIGN_SECTION	"ASSIGN_SECTION"
+@ MSG_MAPKW_AUX			"AUXILIARY"
+@ MSG_MAPKW_CAPABILITY		"CAPABILITY"
+@ MSG_MAPKW_COMMON		"COMMON"
+@ MSG_MAPKW_DATA		"DATA"
+@ MSG_MAPKW_DEFAULT		"DEFAULT"
+@ MSG_MAPKW_DEPEND_VERSIONS	"DEPEND_VERSIONS"
+@ MSG_MAPKW_DIRECT		"DIRECT"
+@ MSG_MAPKW_DISABLE		"DISABLE"
+@ MSG_MAPKW_DYNSORT		"DYNSORT"
+@ MSG_MAPKW_ELIMINATE		"ELIMINATE"
+@ MSG_MAPKW_EXECUTE		"EXECUTE"
+@ MSG_MAPKW_EXPORTED		"EXPORTED"
+@ MSG_MAPKW_EXTERN		"EXTERN"
+@ MSG_MAPKW_FILTER		"FILTER"
+@ MSG_MAPKW_FILE_BASENAME	"FILE_BASENAME"
+@ MSG_MAPKW_FILE_PATH		"FILE_PATH"
+@ MSG_MAPKW_FILE_OBJNAME	"FILE_OBJNAME"
+@ MSG_MAPKW_FUNCTION		"FUNCTION"
+@ MSG_MAPKW_FLAGS		"FLAGS"
+@ MSG_MAPKW_GLOBAL		"GLOBAL"
+@ MSG_MAPKW_INTERPOSE		"INTERPOSE"
+@ MSG_MAPKW_HIDDEN		"HIDDEN"
+@ MSG_MAPKW_HDR_NOALLOC		"HDR_NOALLOC"
+@ MSG_MAPKW_HW			"HW"
+@ MSG_MAPKW_HW_1		"HW_1"
+@ MSG_MAPKW_HW_2		"HW_2"
+@ MSG_MAPKW_IS_NAME		"IS_NAME"
+@ MSG_MAPKW_IS_ORDER		"IS_ORDER"
+@ MSG_MAPKW_LOAD_SEGMENT	"LOAD_SEGMENT"
+@ MSG_MAPKW_LOCAL		"LOCAL"
+@ MSG_MAPKW_MACHINE		"MACHINE"
+@ MSG_MAPKW_MAX_SIZE		"MAX_SIZE"
+@ MSG_MAPKW_NOHDR		"NOHDR"
+@ MSG_MAPKW_NODIRECT		"NODIRECT"
+@ MSG_MAPKW_NODYNSORT		"NODYNSORT"
+@ MSG_MAPKW_NOTE_SEGMENT	"NOTE_SEGMENT"
+@ MSG_MAPKW_NULL_SEGMENT	"NULL_SEGMENT"
+@ MSG_MAPKW_OS_ORDER		"OS_ORDER"
+@ MSG_MAPKW_PADDR		"PADDR"
+@ MSG_MAPKW_PARENT		"PARENT"
+@ MSG_MAPKW_PHDR_ADD_NULL	"PHDR_ADD_NULL"
+@ MSG_MAPKW_PLATFORM		"PLATFORM"
+@ MSG_MAPKW_PROTECTED		"PROTECTED"
+@ MSG_MAPKW_READ		"READ"
+@ MSG_MAPKW_ROUND		"ROUND"
+@ MSG_MAPKW_REQUIRE		"REQUIRE"
+@ MSG_MAPKW_SEGMENT_ORDER	"SEGMENT_ORDER"
+@ MSG_MAPKW_SF			"SF"
+@ MSG_MAPKW_SF_1		"SF_1"
+@ MSG_MAPKW_SINGLETON		"SINGLETON"
+@ MSG_MAPKW_SIZE		"SIZE"
+@ MSG_MAPKW_SIZE_SYMBOL		"SIZE_SYMBOL"
+@ MSG_MAPKW_STACK		"STACK"
+@ MSG_MAPKW_SYMBOL_SCOPE	"SYMBOL_SCOPE"
+@ MSG_MAPKW_SYMBOL_VERSION	"SYMBOL_VERSION"
+@ MSG_MAPKW_SYMBOLIC		"SYMBOLIC"
+@ MSG_MAPKW_TYPE		"TYPE"
+@ MSG_MAPKW_VADDR		"VADDR"
+@ MSG_MAPKW_VALUE		"VALUE"
+@ MSG_MAPKW_WRITE		"WRITE"
 
+
+@ MSG_STR_DTRACE	"PT_SUNWDTRACE"

@@ -1,5 +1,5 @@
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -30,6 +30,8 @@
 @ MSG_CA_SUNW_HW_1_NF			"hw_1"
 @ MSG_CA_SUNW_SF_1_CF		"CA_SUNW_SF_1"			# 2
 @ MSG_CA_SUNW_SF_1_NF			"sf_1"
+@ MSG_CA_SUNW_HW_2_CF		"CA_SUNW_HW_2"			# 3
+@ MSG_CA_SUNW_HW_2_NF			"hw_2"
 
 @ MSG_GBL_ZERO		"0"
 @ MSG_GBL_OSQBRKT	"0x%llx  [ "

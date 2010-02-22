@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -356,7 +356,7 @@ typedef elfedit_cmdret_t elfedit64_cmd_func_t(elfedit64_obj_state_t *state,
  *	cpldata - Completion data, to be passed to elfedit_cpl_match()
  *		or the helper functions built on it to register alternative
  *		strings.
- *	argc, argv - The tokens from the start of the line throught
+ *	argc, argv - The tokens from the start of the line through
  *		the one needing completion, which will always
  *		be cmdcpl_argv[cmdcpl_argc - 1].
  *	num_opt - A count of the optional arguments (those starting with

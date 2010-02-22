@@ -24,7 +24,7 @@
  *	  All Rights Reserved
  *
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -958,10 +958,6 @@ ld_sym_adjust_vis(Sym_desc *sdp, Ofl_desc *ofl)
 		 * non-versioned global symbols.  This routine is called either
 		 * from any initial relocation processing that references this
 		 * symbol, or from the symbol validation processing.
-		 *
-		 * This routine is called either from any initial relocation
-		 * processing that references this symbol, or from the symbol
-		 * validation processing.
 		 *
 		 * A symbol is a candidate for auto-reduction/elimination if:
 		 *

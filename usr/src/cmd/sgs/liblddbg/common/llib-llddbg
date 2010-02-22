@@ -31,6 +31,8 @@
 #include <debug.h>
 
 int	Dbg_setup(dbg_setup_caller_t, const char *, Dbg_desc *, const char **);
+void	Dbg_help(void);
+void	Dbg_version(void);
 const char *
 	Dbg_demangle_name(const char *);
 
@@ -71,16 +73,24 @@ void	Dbg64_bind_reject(Rt_map *, Rt_map *, const char *, int);
 void	Dbg32_bind_weak(Rt_map *, Elf32_Addr, Elf32_Addr, const char *);
 void	Dbg64_bind_weak(Rt_map *, Elf64_Addr, Elf64_Addr, const char *);
 
+void	Dbg32_cap_entry(Lm_list *, uint_t, Elf32_Word, Elf32_Word,
+	    Elf32_Half);
+void	Dbg64_cap_entry(Lm_list *, uint_t, Elf64_Xword, Elf64_Xword,
+	    Elf64_Half);
+void	Dbg32_cap_entry2(Lm_list *, uint_t, Elf32_Word, CapMask *,
+	    Elf32_Half);
+void	Dbg64_cap_entry2(Lm_list *, uint_t, Elf64_Xword, CapMask *,
+	    Elf64_Half);
+void	Dbg32_cap_out_title(Lm_list *);
+void	Dbg64_cap_out_title(Lm_list *);
 void	Dbg32_cap_hw_candidate(Lm_list *, const char *);
 void	Dbg64_cap_hw_candidate(Lm_list *, const char *);
 void	Dbg32_cap_hw_filter(Lm_list *, const char *, Rt_map *);
 void	Dbg64_cap_hw_filter(Lm_list *, const char *, Rt_map *);
-void	Dbg32_cap_mapfile(Lm_list *, Elf32_Word, Elf32_Word, Elf32_Half);
-void	Dbg64_cap_mapfile(Lm_list *, Elf64_Xword, Elf64_Xword, Elf64_Half);
-void	Dbg32_cap_sec_entry(Lm_list *, uint_t, Elf32_Word, Elf32_Word,
-	    Elf32_Half);
-void	Dbg64_cap_sec_entry(Lm_list *, uint_t, Elf64_Xword, Elf64_Xword,
-	    Elf64_Half);
+void	Dbg32_cap_mapfile_title(Lm_list *, Lineno);
+void	Dbg64_cap_mapfile_title(Lm_list *, Lineno);
+void	Dbg32_cap_out_title(Lm_list *);
+void	Dbg64_cap_out_title(Lm_list *);
 void	Dbg32_cap_sec_title(Lm_list *, const char *);
 void	Dbg64_cap_sec_title(Lm_list *, const char *);
 void	Dbg32_cap_val_hw1(Lm_list *, Elf32_Word, Elf32_Half);
@@ -95,8 +105,8 @@ void	Dbg64_cb_iphdr_mapchange(Lm_list *, u_longlong_t, u_longlong_t);
 void	Dbg32_cb_iphdr_unmap_ret(Lm_list *);
 void	Dbg64_cb_iphdr_unmap_ret(Lm_list *);
 
-void	Dbg32_ent_print(Lm_list *, uchar_t, Elf32_Half, Alist *, Boolean);
-void	Dbg64_ent_print(Lm_list *, uchar_t, Elf64_Half, Alist *, Boolean);
+void	Dbg32_ent_print(Lm_list *, uchar_t, Elf32_Half, APlist *);
+void	Dbg64_ent_print(Lm_list *, uchar_t, Elf64_Half, APlist *);
 
 void	Dbg32_file_analyze(Rt_map *);
 void	Dbg64_file_analyze64(Rt_map *);
@@ -203,28 +213,40 @@ void	Dbg64_libs_yp(Lm_list *, const char *);
 void	Dbg32_libs_ylu(Lm_list *, const char *, const char *, int);
 void	Dbg64_libs_ylu(Lm_list *, const char *, const char *, int);
 
-void	Dbg32_map_dash(Lm_list *, const char *);
-void	Dbg64_map_dash(Lm_list *, const char *);
-void	Dbg32_map_ent(Lm_list *, Boolean, Ent_desc *, Ofl_desc *);
-void	Dbg64_map_ent(Lm_list *, Boolean, Ent_desc *, Ofl_desc *);
-void	Dbg32_map_parse(Lm_list *, const char *);
-void	Dbg64_map_parse(Lm_list *, const char *);
-void	Dbg32_map_pipe(Lm_list *, Sg_desc *, const char *, Elf32_Word);
-void	Dbg64_map_pipe(Lm_list *, Sg_desc *, const char *, Elf64_Word);
-void	Dbg32_map_set_atsign(Boolean);
-void	Dbg64_map_set_atsign(Boolean);
-void	Dbg32_map_seg(Ofl_desc *, int, Sg_desc *);
-void	Dbg64_map_seg(Ofl_desc *, int, Sg_desc *);
-void	Dbg32_map_set_equal(Boolean);
-void	Dbg64_map_set_equal(Boolean);
-void	Dbg32_map_size_new(Lm_list *, const char *);
-void	Dbg64_map_size_new(Lm_list *, const char *);
-void	Dbg32_map_size_old(Ofl_desc *, Sym_desc *);
-void	Dbg64_map_size_old(Ofl_desc *, Sym_desc *);
-void	Dbg32_map_sort(Lm_list *);
-void	Dbg64_map_sort(Lm_list *);
-void	Dbg32_map_sort_seg(Lm_list *, Sg_desc *, int);
-void	Dbg64_map_sort_seg(Lm_list *, Sg_desc *, int);
+void	Dbg32_map_cexp_id(Lm_list *, Boolean, const char *, ulong_t,
+	    const char *);
+void	Dbg64_map_cexp_id(Lm_list *, Boolean, const char *, ulong_t,
+	    const char *);
+void	Dbg32_map_dv(Lm_list *, const char *, Lineno);
+void	Dbg64_map_dv(Lm_list *, const char *, Lineno);
+void	Dbg32_map_dv_entry(Lm_list *, Lineno, int, const char *);
+void	Dbg64_map_dv_entry(Lm_list *, Lineno, int, const char *);
+void	Dbg32_map_ent(Lm_list *, Ent_desc *, Ofl_desc *, Lineno);
+void	Dbg64_map_ent(Lm_list *, Ent_desc *, Ofl_desc *, Lineno);
+void	Dbg32_map_ent_ord_title(Lm_list *, const char *);
+void	Dbg64_map_ent_ord_title(Lm_list *, const char *);
+void	Dbg32_map_hdr_noalloc(Lm_list *, Lineno);
+void	Dbg64_map_hdr_noalloc(Lm_list *, Lineno);
+void	Dbg32_map_parse(Lm_list *, const char *, int);
+void	Dbg64_map_parse(Lm_list *, const char *, int);
+void	Dbg32_map_pass(Lm_list *, Boolean, const char *, ulong_t, const char *);
+void	Dbg64_map_pass(Lm_list *, Boolean, const char *, ulong_t, const char *);
+void	Dbg32_map_post_title(Lm_list *);
+void	Dbg64_map_post_title(Lm_list *);
+void	Dbg32_map_seg_os_order(Lm_list *, Sg_desc *, const char *,
+	    Elf32_Word, Lineno);
+void	Dbg64_map_seg_os_order(Lm_list *, Sg_desc *, const char *,
+	    Elf64_Word, Lineno);
+void	Dbg32_map_seg(Ofl_desc *, uint_t, int, Sg_desc *, Lineno);
+void	Dbg64_map_seg(Ofl_desc *, uint_t, int, Sg_desc *, Lineno);
+void	Dbg32_map_size_new(Lm_list *, const char *, const char *, Lineno);
+void	Dbg64_map_size_new(Lm_list *, const char *, const char *, Lineno);
+void	Dbg32_map_size_old(Ofl_desc *, Sym_desc *, const char *, Lineno);
+void	Dbg64_map_size_old(Ofl_desc *, Sym_desc *, const char *, Lineno);
+void	Dbg32_map_sort_title(Lm_list *, Boolean);
+void	Dbg64_map_sort_title(Lm_list *, Boolean);
+void	Dbg32_map_sort_seg(Lm_list *, uchar_t, Elf32_Half, Sg_desc *);
+void	Dbg64_map_sort_seg(Lm_list *, uchar_t, Elf64_Half, Sg_desc *);
 void	Dbg32_map_symbol(Ofl_desc *, Sym_desc *);
 void	Dbg64_map_symbol(Ofl_desc *, Sym_desc *);
 void	Dbg32_map_version(Lm_list *, const char *, const char *, int);
@@ -325,8 +347,10 @@ void	Dbg64_sec_redirected(Lm_list *, Is_desc *, const char *);
 void	Dbg32_sec_strtab(Lm_list *, Os_desc *, Str_tbl *);
 void	Dbg64_sec_strtab(Lm_list *, Os_desc *, Str_tbl *);
 
-void	Dbg32_seg_desc_entry(Lm_list *, uchar_t, Elf32_Half, int, Sg_desc *);
-void	Dbg64_seg_desc_entry(Lm_list *, uchar_t, Elf64_Half, int, Sg_desc *);
+void	Dbg32_seg_desc_entry(Lm_list *, uchar_t, Elf32_Half, int, Sg_desc *,
+	    Boolean);
+void	Dbg64_seg_desc_entry(Lm_list *, uchar_t, Elf64_Half, int, Sg_desc *,
+	    Boolean);
 void	Dbg32_seg_entry(Ofl_desc *, int, Sg_desc *);
 void	Dbg64_seg_entry(Ofl_desc *, int, Sg_desc *);
 void	Dbg32_seg_list(Lm_list *, uchar_t, Elf32_Half, APlist *);

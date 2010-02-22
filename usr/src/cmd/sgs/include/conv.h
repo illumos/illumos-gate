@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -200,7 +200,7 @@ typedef union {
 } Conv_grpdesc_flags_buf_t;
 
 /* conv_seg_flags() */
-#define	CONV_SEG_FLAGS_BUFSIZE		196
+#define	CONV_SEG_FLAGS_BUFSIZE		241
 typedef union {
 	Conv_inv_buf_t			inv_buf;
 	char				buf[CONV_SEG_FLAGS_BUFSIZE];
@@ -353,6 +353,20 @@ typedef union {
 	Conv_inv_buf_t			inv_buf;
 	char				buf[CONV_VER_FLAGS_BUFSIZE];
 } Conv_ver_flags_buf_t;
+
+/* conv_ent_flags() */
+#define	CONV_ENT_FLAGS_BUFSIZE		69
+typedef union {
+	Conv_inv_buf_t			inv_buf;
+	char				buf[CONV_ENT_FLAGS_BUFSIZE];
+} Conv_ent_flags_buf_t;
+
+/* conv_ent_files_flags() */
+#define	CONV_ENT_FILES_FLAGS_BUFSIZE		89
+typedef union {
+	Conv_inv_buf_t			inv_buf;
+	char				buf[CONV_ENT_FILES_FLAGS_BUFSIZE];
+} Conv_ent_files_flags_buf_t;
 
 /*
  * conv_time()
@@ -718,6 +732,7 @@ extern	char		*conv_strproc_trim(char *);
 extern	Boolean		conv_strproc_extract_value(char *, size_t, int,
 			    const char **);
 extern	int		conv_sys_eclass(void);
+extern	int		conv_translate_c_esc(char **);
 
 /*
  * Generic core formatting and iteration functionality
@@ -824,9 +839,14 @@ extern	const char	*conv_ehdr_type(uchar_t, Half, Conv_fmt_flags_t,
 extern	const char	*conv_ehdr_vers(Word, Conv_fmt_flags_t,
 			    Conv_inv_buf_t *);
 extern	const char	*conv_elfdata_type(Elf_Type, Conv_inv_buf_t *);
+extern	const char	*conv_ent_flags(ec_flags_t, Conv_ent_flags_buf_t *);
+extern	const char	*conv_ent_files_flags(Word,  Conv_fmt_flags_t fmt_flags,
+			    Conv_ent_files_flags_buf_t *);
 extern	const char	*conv_grphdl_flags(uint_t, Conv_grphdl_flags_buf_t *);
 extern	const char	*conv_grpdesc_flags(uint_t, Conv_grpdesc_flags_buf_t *);
 extern	Isa_desc	*conv_isalist(void);
+extern	const char	*conv_mapfile_version(Word, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
 extern	const char	*conv_phdr_flags(uchar_t, Word, Conv_fmt_flags_t,
 			    Conv_phdr_flags_buf_t *);
 extern	const char	*conv_phdr_type(uchar_t, Half, Word, Conv_fmt_flags_t,
@@ -844,7 +864,7 @@ extern	const char	*conv_reloc_SPARC_type(Word, Conv_fmt_flags_t,
 			    Conv_inv_buf_t *);
 extern	const char	*conv_sec_type(uchar_t, Half, Word, Conv_fmt_flags_t,
 			    Conv_inv_buf_t *);
-extern	const char	*conv_seg_flags(Half, Conv_seg_flags_buf_t *);
+extern	const char	*conv_seg_flags(sg_flags_t, Conv_seg_flags_buf_t *);
 extern	void		conv_str_to_c_literal(const char *buf, size_t n,
 			    Conv_str_to_c_literal_func_t *cb_func,
 			    void *uvalue);

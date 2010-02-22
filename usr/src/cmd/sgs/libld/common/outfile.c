@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -381,7 +381,7 @@ ld_create_outfile(Ofl_desc *ofl)
 	DBG_CALL(Dbg_basic_create(ofl->ofl_lml));
 
 	/*
-	 * If DF_1_NOHDR was set in map_parse() or FLG_OF1_VADDR was set,
+	 * If DF_1_NOHDR or FLG_OF1_VADDR were set,
 	 * we need to do alignment adjustment.
 	 */
 	if ((flags1 & FLG_OF1_VADDR) ||
@@ -476,6 +476,9 @@ ld_create_outfile(Ofl_desc *ofl)
 			} else if (ptype == PT_SUNWCAP) {
 				if (ofl->ofl_oscap)
 					nseg++;
+			} else if (ptype == PT_SUNWSTACK) {
+				if ((sgp->sg_flags & FLG_SG_DISABLED) == 0)
+					nseg++;
 			} else if (sgp->sg_flags & FLG_SG_EMPTY) {
 					nseg++;
 			} else if (sgp->sg_osdescs != NULL) {
@@ -499,14 +502,13 @@ ld_create_outfile(Ofl_desc *ofl)
 			ptloadidx++;
 
 			/*
-			 * If the first loadable segment has the ?N flag then
-			 * alignments of following segments need to be fixed,
+			 * If the first loadable segment is not supposed to
+			 * include the ELF or program headers,  alignments
+			 * of the following segments need to be fixed,
 			 * plus a .dynamic FLAGS1 setting is required.
 			 */
-			if (sgp->sg_flags & FLG_SG_NOHDR) {
+			if (ofl->ofl_dtflags_1 & DF_1_NOHDR)
 				fixalign = TRUE;
-				ofl->ofl_dtflags_1 |= DF_1_NOHDR;
-			}
 		}
 
 		shidx = 0;
@@ -606,7 +608,7 @@ ld_create_outfile(Ofl_desc *ofl)
 
 				if ((fixalign == TRUE) && (ptype == PT_LOAD) &&
 				    (shidx == 1) && (dataidx == 1))
-					data->d_align = sgp->sg_addralign;
+					data->d_align = sgp->sg_align;
 
 				/*
 				 * Save the first TLS data buffer, as this is

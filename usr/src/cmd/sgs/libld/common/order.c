@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -269,11 +269,11 @@ validate_shf_ordered_dest(Ofl_desc *ofl, Ifl_desc *ifl, Word ndx,
  * unsorted section.
  */
 static uintptr_t
-place_unordered(Ofl_desc *ofl, Is_desc *isp)
+place_unordered(Ofl_desc *ofl, Is_desc *isp, Place_path_info *path_info)
 {
 	isp->is_flags &= ~FLG_IS_ORDERED;
 	if (isp->is_osdesc == NULL)
-		return ((uintptr_t)ld_place_section(ofl, isp,
+		return ((uintptr_t)ld_place_section(ofl, isp, path_info,
 		    isp->is_keyident, NULL));
 	return ((uintptr_t)isp->is_osdesc);
 }
@@ -290,7 +290,8 @@ place_unordered(Ofl_desc *ofl, Is_desc *isp)
  * exit:
  */
 uintptr_t
-ld_process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx)
+ld_process_ordered(Ofl_desc *ofl, Ifl_desc *ifl, Place_path_info *path_info,
+    Word ndx)
 {
 	Is_desc		*isp2, *isp = ifl->ifl_isdesc[ndx];
 	Xword		shflags = isp->is_shdr->sh_flags;
@@ -315,7 +316,7 @@ ld_process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx)
 	 */
 	if ((error = is_keyshndx_ok(ifl, keyshndx)) != 0) {
 		DBG_CALL(Dbg_sec_order_error(ofl->ofl_lml, ifl, ndx, error));
-		return (place_unordered(ofl, isp));
+		return (place_unordered(ofl, isp, path_info));
 	}
 
 	/*
@@ -325,7 +326,7 @@ ld_process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx)
 	 */
 	if ((shflags & SHF_ORDERED) &&
 	    (validate_shf_ordered_dest(ofl, ifl, ndx, &alt_os_name) == FALSE))
-		return (place_unordered(ofl, isp));
+		return (place_unordered(ofl, isp, path_info));
 
 	/*
 	 * Place the section into its output section. It's possible that this
@@ -333,7 +334,8 @@ ld_process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx)
 	 * which case we're done.
 	 */
 	if ((osp = isp->is_osdesc) == NULL) {
-		osp = ld_place_section(ofl, isp, isp->is_keyident, alt_os_name);
+		osp = ld_place_section(ofl, isp, path_info, isp->is_keyident,
+		    alt_os_name);
 		if ((osp == (Os_desc *)S_ERROR) || (osp == NULL))
 			return ((uintptr_t)osp);
 	}
@@ -396,7 +398,7 @@ ld_sec_validate(Ofl_desc *ofl)
 		Os_desc		*osp;
 		Aliste		idx2;
 
-		for (APLIST_TRAVERSE(sgp->sg_secorder, idx2, scop)) {
+		for (ALIST_TRAVERSE(sgp->sg_os_order, idx2, scop)) {
 			if ((scop->sco_flags & FLG_SGO_USED) == 0) {
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_MAP_SECORDER),

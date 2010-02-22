@@ -496,7 +496,7 @@
 #         args             input arguments
 #         entry            entrance criteria descriptors
 #         got              GOT symbol information
-#         map              map file processing
+#         map              mapfile processing
 #         sections         input sections
 #         segments         output segments and address/offset processing;
 #                            detail flag shows associated sections
@@ -518,7 +518,7 @@
 @ MSG_USE_R9_C	"        got              GOT symbol information"
 
 # TRANSLATION_NOTE -- do not translate the first token "map".
-@ MSG_USE_R9_D	"        map              map file processing"
+@ MSG_USE_R9_D	"        map              mapfile processing"
 
 # TRANSLATION_NOTE -- do not translate the first token "sections".
 @ MSG_USE_R9_E	"        sections         input sections"
@@ -567,20 +567,20 @@
 # Bindings messages
 # NOTE: these are used by appcert(1) and lari(1), use care when changing.
 
-@ MSG_BND_BASIC		"binding file=%s to file=%s: symbol `%s'"
+@ MSG_BND_BASIC		"binding file=%s to file=%s: symbol '%s'"
 @ MSG_BND_PLT		"binding file=%s (%#llx:%#llx) at plt[%lld]:%s to \
-			 file=%s (%#llx:%#llx): symbol `%s'%s"
+			 file=%s (%#llx:%#llx): symbol '%s'%s"
 @ MSG_BND_DLSYM		"binding file=%s (dlsym) to file=%s \
-			 (%#llx:%#llx): symbol `%s'%s"
+			 (%#llx:%#llx): symbol '%s'%s"
 @ MSG_BND_DEFAULT	"binding file=%s (%#llx:%#llx) to file=%s \
-			 (%#llx:%#llx): symbol `%s'%s"
-@ MSG_BND_WEAK_1	"binding file=%s to 0x0 (undefined weak): symbol `%s'"
+			 (%#llx:%#llx): symbol '%s'%s"
+@ MSG_BND_WEAK_1	"binding file=%s to 0x0 (undefined weak): symbol '%s'"
 @ MSG_BND_WEAK_2	"binding file=%s (%#llx:%#llx) to 0x0 \
-			 (undefined weak): symbol `%s'"
+			 (undefined weak): symbol '%s'"
 
 # NOTE: the rejected message is used by lari(1), use care when changing.  This
 # message is formatted to conform to the pattern used by the MSG_BINFO messages.
-@ MSG_BND_REJECT	"binding file=%s to file=%s: symbol `%s'  \
+@ MSG_BND_REJECT	"binding file=%s to file=%s: symbol '%s'  \
 			 (rejected: %s)"
 @ MSG_BNDREJ_DIRECT	"attempt to directly bind to a NODIRECT definition"
 @ MSG_BNDREJ_GROUP	"attempt to bind within a group to a NODIRECT \
@@ -589,8 +589,8 @@
 			 following default search model"
 
 @ MSG_BND_PLTPAD_TO	"   pltpad: %#llx: file=%s bound to file=%s: \
-			 symbol `%s'"
-@ MSG_BND_PLTPAD_FROM	"   pltpad: %#llx: bound from file=%s: symbol `%s'"
+			 symbol '%s'"
+@ MSG_BND_PLTPAD_FROM	"   pltpad: %#llx: bound from file=%s: symbol '%s'"
 
 @ MSG_BND_PSUM_SPARCV9	"Summary of PLT types bound: 21d=%d, 24d=%d, u32=%d, \
 			 u44=%d, full=%d, far=%d, Total=%d"
@@ -618,16 +618,14 @@
 			 offset=0x%llx; symbol=%s; transitioned to: %s"
 @ MSG_REL_DISCARDED	"relocation against discarded section=%s from file=%s; \
 			 relocation type=%s offset=0x%llx; relocation discarded"
-@ MSG_REL_COPY		"copy data from file=%s to file=%s: symbol `%s'%s"
+@ MSG_REL_COPY		"copy data from file=%s to file=%s: symbol '%s'%s"
 @ MSG_REL_SLOPPYCOMDAT	"the following relocation references a discarded \
 			 section; relocation redirected to section %s in \
 			 file %s"
 
 # Entrance criteria messages
 
-@ MSG_ECR_TITLE		"%s Entrance Descriptor List (available)"
-@ MSG_ECR_DYNAMIC	"Dynamic"
-@ MSG_ECR_STATIC	"Static"
+@ MSG_ECR_TITLE		"Segment Entrance Criteria Descriptor List"
 @ MSG_ECR_DESC		"entrance descriptor[%u]"
 
 
@@ -776,31 +774,36 @@
 
 # Mapfile messages
 
-@ MSG_MAP_MAPFILE	"map file=%s"
+@ MSG_MAP_MAPFILE	"mapfile=%s; version=%d (%s)"
+@ MSG_MAP_SEG		"segment directive; line=%llu; %s"
+@ MSG_MAP_SEG_ORDER	"segment order directive; line=%llu; list_cnt=%lld; %s"
+@ MSG_MAP_CAP		"capability directive; line=%llu"
+@ MSG_MAP_EC		"entrance criteria; line=%llu; added"
+@ MSG_MAP_OS_ORDER	"output section ordering; line=%llu; segment=%s \
+			 section=%s; index=%d"
+@ MSG_MAP_HDR_NOALLOC	"header noalloc directive; line=%llu; first loadable \
+			 segment will not contain ELF and program headers"
 
-@ MSG_MAP_SEG_DECL_1	"segment declaration (=), segment added:"
-@ MSG_MAP_SEG_DECL_2	"segment declaration (=), segment updated:"
-@ MSG_MAP_SEG_DECL_3	"implicit segment declaration (:), segment added:"
-@ MSG_MAP_SEG_DECL_4	"implicit segment declaration (@), segment added:"
-@ MSG_MAP_SEG_DECL_5	"size-symbol declaration (@), segment updated:"
-
-@ MSG_MAP_CAP		"hardware/software declaration (=), capabilities added:"
-
-@ MSG_MAP_MAP_DIR	"mapping directive (:), entrance criteria added:"
-
-@ MSG_MAP_SEC_ORDER	"map section ordering, segment: %s section: \
-			 %s index: %d"
-
-@ MSG_MAP_SYM_SCOPE	"symbol scope definition ({})"
-@ MSG_MAP_SYM_SIZE	"size-symbol declaration (@), symbol=%s; %s"
+@ MSG_MAP_SYM_SCOPE	"symbol scope definition"
+@ MSG_MAP_SYM_SIZE	"size-symbol directive; line=%llu; segment=%s; \
+			 symbol=%s; %s"
 @ MSG_MAP_SYM_VER_1	"%s, %s; symbol=%s  (%s)"
 @ MSG_MAP_SYM_VER_2	"%s; symbol=%s  (%s)"
 
-@ MSG_MAP_CNT_DEF	"library control definition (-), %s; needed"
+@ MSG_MAP_DV		"depend versions directive; line=%llu, object=%s"
+@ MSG_MAP_DV_ENTRY	"%12.12s  %s; line=%llu"
 
-@ MSG_MAP_SORT_TITLE	"map file additions: segment sorting required (vaddr):" 
-@ MSG_MAP_SORT_ORIG	"  original=%s"
-@ MSG_MAP_SORT_FINAL	"    sorted=%s"
+@ MSG_MAP_SORT_TITLE	"mapfile additions: segment sorting required" 
+@ MSG_MAP_SORT_TITLE_O	"before:" 
+@ MSG_MAP_SORT_TITLE_S	"after:" 
+@ MSG_MAP_POST_TITLE	"mapfile post processing"
+@ MSG_MAP_ENT_ORD_TITLE	"set entrance criteria input section sort keys \
+			 (ec_ordndx); segment=%s"
+
+@ MSG_MAP_ID_ADD	"%s: %lld: enter conditional expression id: %s"
+@ MSG_MAP_ID_CLEAR	"%s: %lld: delete conditional expression id: %s"
+@ MSG_MAP_PASS		"%s: %lld: input enabled by %s"
+@ MSG_MAP_NOPASS	"%s: %lld: input disabled by %s"
 
 # Move messages
 
@@ -841,7 +844,7 @@
 
 # Section messages
 
-@ MSG_SEC_BACKING	"map file symbol definitions: create backing storage:"
+@ MSG_SEC_BACKING	"mapfile symbol definitions: create backing storage:"
 
 @ MSG_SEC_INPUT		"section=%s; input from file=%s"
 @ MSG_SEC_INPUT_GEN	"section=%s"
@@ -903,8 +906,8 @@
 
 # Segment messages
 
-@ MSG_SEG_DESC_INUSE	"Segment Descriptor List (in use)"
-@ MSG_SEG_DESC_AVAIL	"Segment Descriptor List (available)"
+@ MSG_SEG_DESC_INUSE	"Program Header / Segment Descriptor List (in use)"
+@ MSG_SEG_DESC_AVAIL	"Program Header / Segment Descriptor List (available)"
 
 
 # Support messages
@@ -969,7 +972,7 @@
 
 @ MSG_SYM_LAZY_RESCAN	"rescanning for lazy dependencies for symbol: %s"
 
-@ MSG_SYM_DUPSORTADDR	"section %s: symbol `%s' and symbol `%s' have the \
+@ MSG_SYM_DUPSORTADDR	"section %s: symbol '%s' and symbol '%s' have the \
 			 same address: %#llx"
 
 @ MSG_SYM_IGNGNUVER	"symbol=%s;  hash index=%d;  version=%d;  skipping \
@@ -1062,16 +1065,24 @@
 
 @ MSG_STR_IGNORE	"ignored"
 @ MSG_STR_ENTERED	"entered"
-@ MSG_STR_INITIAL	"initialized"
+@ MSG_STR_EXCLUDE	"exclude"
+@ MSG_STR_RESET		"reset"
 @ MSG_STR_IN		" in"
 @ MSG_STR_OUT		"out"
 @ MSG_STR_ACT		"act"
+@ MSG_STR_CURRENT	"current"
+@ MSG_STR_ADD		"add"
 @ MSG_STR_OLD		"old"
 @ MSG_STR_NEW		"new"
+@ MSG_STR_NEW_IMPLICIT	"new (implicit)"
 @ MSG_STR_RESOLVED	"resolved"
-@ MSG_STR_ADD		"adding"
+@ MSG_STR_ADDING	"adding"
 @ MSG_STR_UP_1		"updating"
 @ MSG_STR_UP_2		"updated"
+@ MSG_STR_ALLOW		"allow"
+@ MSG_STR_REQUIRE	"require"
+@ MSG_STR_MOD_BEFORE	"modify (before)"
+@ MSG_STR_MOD_AFTER	"modify (after)"
 
 @ MSG_STR_UNKNOWN	"<unknown>"
 @ MSG_STR_ORPHAN	"<orphan>"
@@ -1115,8 +1126,10 @@
 
 @ MSG_CAP_VAL_HW1	"hardware capabilities - %s"
 
-@ MSG_CAP_SEC_TITLE	"hardware/software capabilities; input file=%s"
-@ MSG_CAP_SEC_ENTRY	"%12.12s  %-15.15s  %s"
+@ MSG_CAP_SEC_TITLE	"capabilities; input file=%s"
+@ MSG_CAP_OUT_TITLE	"output capabilities"
+@ MSG_CAP_ENTRY	"%12.12s  %-15.15s  %s"
+@ MSG_CAP_ENTRY_EXC	"%12.12s  %-15.15s  %s, exclude %s"
 
 @ MSG_CAP_HW_CANDIDATE	"obj=%s;  hardware capabilities candidate"
 
@@ -1478,11 +1491,18 @@
 
 # Entrance criteria messages
 
-@ MSG_ECR_NAME		"  ec_name:       %-8s  ec_attrmask:  %s"
+@ MSG_ECR_NAME		"  ec_name:       %s"
+@ MSG_ECR_FLAGS		"  ec_flags:      %s"
+@ MSG_ECR_IS_NAME	"  ec_is_name:    %-8s  ec_attrmask:  %s"
 @ MSG_ECR_SEGMENT	"  ec_segment:    %-8s  ec_attrbits:  %s"
-@ MSG_ECR_NDX		"  ec_ndx:        %-8d  ec_type:      %s"
+@ MSG_ECR_NDX		"  ec_ordndx:     %-8d  ec_type:      %s"
 @ MSG_ECR_FILES		"  ec_files:"
-@ MSG_ECR_FILE		"    %s"
+@ MSG_ECR_FILE		"    %-21s  %s"
+
+@ MSG_MAP_SORT_SEG	"    %s"
+@ MSG_MAP_SORT_SEG_NAME	"    %-20s  %s"
+@ MSG_MAP_SORT_SEG_V	"    %-20s  %-20s  p_vaddr=0x%llx"
+@ MSG_MAP_SORT_SEG_O	"    %-20s  %-20s  order=%d"
 
 # Libs messages
 
@@ -1499,12 +1519,17 @@
 
 # Segment messages
 
-@ MSG_SEG_NAME		"segment[%d] sg_name:  %s"
+@ MSG_SEG_DESC		"segment[%d]"
+@ MSG_SEG_NAME		"    sg_name:      %s"
 @ MSG_SEG_LENGTH	"    sg_length:    %#llx"
+@ MSG_SEG_ROUND		"    sg_round:     %#llx"
+@ MSG_SEG_ALIGN		"    sg_align:     %#llx"
 @ MSG_SEG_FLAGS		"    sg_flags:     %s"
-@ MSG_SEG_SIZESYM	"    sg_sizesym:   %s"
-@ MSG_SEG_ORDER		"    sec_order:"
-@ MSG_SEG_SECTION	"       sec_name:    %-8s  sec_index:   %u"
+@ MSG_SEG_SIZESYM_TITLE	"    sg_sizesym:"
+@ MSG_SEG_SIZESYM	"        %s"
+@ MSG_SEG_IS_ORDER_TITLE "    sg_is_order:"
+@ MSG_SEG_OS_ORDER_TITLE "    sg_os_order:"
+@ MSG_SEG_LIST_ITEM	"        %s"
 
 # Section messages (used when expanding segment information)
 
@@ -1563,6 +1588,7 @@
 @ MSG_CNTL_ENTRY	"   [0x%llx]  %s"
 
 @ MSG_STR_NL		"\n"
+@ MSG_STR_LDVER		"Solaris Linkers: %s"
 
 @ MSG_FMT_INDEX		" [%d]"
 @ MSG_FMT_ISEC_NAME	"[%u]%s"

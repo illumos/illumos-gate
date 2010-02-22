@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG=		elfwrap
@@ -50,7 +48,7 @@ OBJS=		$(BLTOBJ) $(COMOBJ) $(MACHOBJ) $(COMOBJ32) $(COMOBJ64) \
 MAPFILES =	$(MAPFILE.NGB)
 MAPOPTS =	$(MAPFILES:%=-M%)
 
-CPPFLAGS =	-I. -I../common -I../../include $(CPPFLAGS.master)
+CPPFLAGS =	-I. -I../common -I../../include $(CPPFLAGS.master) -I$(ELFCAP)
 LLDFLAGS =
 LLDFLAGS64 =
 LDFLAGS +=	$(VERSREF) $(USE_PROTO) $(MAPOPTS) $(LLDFLAGS)

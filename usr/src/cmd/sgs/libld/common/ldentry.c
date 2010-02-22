@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -197,23 +197,27 @@ ld_ent_check(Ofl_desc * ofl)
 	 *  one for criterias where a filename is used and the other
 	 *  for those without a filename.
 	 */
-	for (ALIST_TRAVERSE(ofl->ofl_ents, ndx, enp)) {
-		const char	*file;
-
-		if (((enp->ec_segment->sg_flags & FLG_SG_ORDER) == 0) ||
+	for (APLIST_TRAVERSE(ofl->ofl_ents, ndx, enp)) {
+		/*
+		 * No warning if any of the following hold:
+		 * -	The segment has no entrance criteria requiring
+		 *	input section sorting (FLG_SG_IS_ORDER not set).
+		 * -	The entrance criteria was used to place a section.
+		 * -	The specific entrance criteria does not require sorting
+		 */
+		if (((enp->ec_segment->sg_flags & FLG_SG_IS_ORDER) == 0) ||
 		    (enp->ec_flags & FLG_EC_USED) || (enp->ec_ordndx == 0))
 			continue;
 
 
-		if (enp->ec_files &&
-		    ((file = enp->ec_files->apl_data[0]) != NULL)) {
+		if (alist_nitems(enp->ec_files) > 0) {
 			eprintf(ofl->ofl_lml, ERR_WARNING,
 			    MSG_INTL(MSG_ENT_NOSEC_1), enp->ec_segment->sg_name,
-			    enp->ec_name, file);
+			    enp->ec_is_name);
 		} else {
 			eprintf(ofl->ofl_lml, ERR_WARNING,
 			    MSG_INTL(MSG_ENT_NOSEC_2), enp->ec_segment->sg_name,
-			    enp->ec_name);
+			    enp->ec_is_name);
 		}
 	}
 }

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -122,9 +122,11 @@ dbg_setup(Ofl_desc *ofl, const char *options, int phase)
 	}
 
 	/*
-	 * Now that the output file is established, generate help
-	 * output if the user specified the debug help token.
+	 * Now that the output file is established, identify the linker
+	 * package, and generate help output if the user specified the
+	 * debug help token.
 	 */
+	Dbg_version();
 	if (dbg_desc->d_extra & DBG_E_HELP)
 		Dbg_help();
 

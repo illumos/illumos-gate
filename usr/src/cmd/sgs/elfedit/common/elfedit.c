@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2224,90 +2224,6 @@ dispatch_user_cmds()
 
 
 /*
- * Given the pointer to the character following a '\' character in
- * a C style literal, return the ASCII character code it represents,
- * and advance the string pointer to the character following the last
- * character in the escape sequence.
- *
- * entry:
- *	str - Address of string pointer to first character following
- *		the backslash.
- *
- * exit:
- *	If the character is not valid, an error is thrown and this routine
- *	does not return to its caller. Otherwise, it returns the ASCII
- *	code for the translated character, and *str has been advanced.
- */
-static int
-translate_c_esc(char **str)
-{
-	char *s = *str;
-	int	ch;
-	int	i;
-
-	ch = *s++;
-	switch (ch) {
-	case 'a':
-		ch = '\a';
-		break;
-	case 'b':
-		ch = '\b';
-		break;
-	case 'f':
-		ch = '\f';
-		break;
-	case 'n':
-		ch = '\n';
-		break;
-	case 'r':
-		ch = '\r';
-		break;
-	case 't':
-		ch = '\t';
-		break;
-	case 'v':
-		ch = '\v';
-		break;
-
-	case '0':
-	case '1':
-	case '2':
-	case '3':
-	case '4':
-	case '5':
-	case '6':
-	case '7':
-		/* Octal constant: There can be up to 3 digits */
-		ch -= '0';
-		for (i = 0; i < 2; i++) {
-			if ((*s < '0') || (*s > '7'))
-				break;
-			ch = (ch << 3) + (*s++ - '0');
-		}
-		break;
-
-	/*
-	 * There are some cases where ch already has the desired value.
-	 * These cases exist simply to remove the special meaning that
-	 * character would otherwise have. We need to match them to
-	 * prevent them from falling into the default error case.
-	 */
-	case '\\':
-	case '\'':
-	case '"':
-		break;
-
-	default:
-		elfedit_msg(ELFEDIT_MSG_ERR, MSG_INTL(MSG_ERR_BADCESC), ch);
-		break;
-	}
-
-	*str = s;
-	return (ch);
-}
-
-
-/*
  * Prepare a GETTOK_STATE struct for gettok().
  *
  * entry:
@@ -2430,7 +2346,12 @@ gettok(GETTOK_STATE *gettok_state)
 			}
 
 			if (quote_ch == '"') {
-				*str++ = translate_c_esc(&look);
+				int ch = conv_translate_c_esc(&look);
+
+				if (ch == -1)
+					elfedit_msg(ELFEDIT_MSG_ERR,
+					    MSG_INTL(MSG_ERR_BADCESC), *look);
+				*str++ = ch;
 				look--;		/* for() will advance by 1 */
 				continue;
 			}

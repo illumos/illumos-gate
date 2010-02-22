@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,9 +86,6 @@ static const elfcap_str_t format[] = {
  * Order the capabilities by their numeric value. See SF1_SUNW_
  * values in sys/elf.h.
  */
-#if (ELFCAP_NUM_SF1 > 32)
-#error ELFCAP_NUM_SF1 is limited to no more than 32 items
-#endif
 static const elfcap_desc_t sf1[ELFCAP_NUM_SF1] = {
 	{						/* 0x00000001 */
 		SF1_SUNW_FPKNWN, STRDESC("SF1_SUNW_FPKNWN"),
@@ -110,9 +107,6 @@ static const elfcap_desc_t sf1[ELFCAP_NUM_SF1] = {
  * Order the SPARC hardware capabilities to match their numeric value.  See
  * AV_SPARC_ values in sys/auxv_SPARC.h.
  */
-#if (ELFCAP_NUM_HW1_SPARC > 32)
-#error ELFCAP_NUM_HW1_SPARC is limited to no more than 32 items
-#endif
 static const elfcap_desc_t hw1_sparc[ELFCAP_NUM_HW1_SPARC] = {
 	{						/* 0x00000001 */
 		AV_SPARC_MUL32, STRDESC("AV_SPARC_MUL32"),
@@ -188,9 +182,6 @@ static const elfcap_desc_t hw1_sparc[ELFCAP_NUM_HW1_SPARC] = {
  * Order the Intel hardware capabilities to match their numeric value.  See
  * AV_386_ values in sys/auxv_386.h.
  */
-#if (ELFCAP_NUM_HW1_386 > 32)
-#error ELFCAP_NUM_HW1_386 is limited to no more than 32 items
-#endif
 static const elfcap_desc_t hw1_386[ELFCAP_NUM_HW1_386] = {
 	{						/* 0x00000001 */
 		AV_386_FPU, STRDESC("AV_386_FPU"),
@@ -327,7 +318,7 @@ static elfcap_err_t
 get_str_desc(elfcap_style_t style, const elfcap_desc_t *cdp,
     const elfcap_str_t **ret_str)
 {
-	switch (style) {
+	switch (ELFCAP_STYLE_MASK(style)) {
 	case ELFCAP_STYLE_FULL:
 		*ret_str = &cdp->c_full;
 		break;
@@ -350,7 +341,7 @@ get_str_desc(elfcap_style_t style, const elfcap_desc_t *cdp,
  * capabilities descriptor.
  */
 static elfcap_err_t
-expand(elfcap_style_t style, uint64_t val, const elfcap_desc_t *cdp,
+expand(elfcap_style_t style, elfcap_mask_t val, const elfcap_desc_t *cdp,
     uint_t cnum, char *str, size_t slen, elfcap_fmt_t fmt)
 {
 	uint_t			cnt;
@@ -386,7 +377,7 @@ expand(elfcap_style_t style, uint64_t val, const elfcap_desc_t *cdp,
 		    ELFCAP_ERR_NONE))
 			return (err);
 
-		(void) snprintf(str, slen, "0x%llx", val);
+		(void) snprintf(str, slen, "0x%x", val);
 	}
 	return (ELFCAP_ERR_NONE);
 }
@@ -395,7 +386,7 @@ expand(elfcap_style_t style, uint64_t val, const elfcap_desc_t *cdp,
  * Expand a CA_SUNW_HW_1 value.
  */
 elfcap_err_t
-elfcap_hw1_to_str(elfcap_style_t style, uint64_t val, char *str,
+elfcap_hw1_to_str(elfcap_style_t style, elfcap_mask_t val, char *str,
     size_t len, elfcap_fmt_t fmt, ushort_t mach)
 {
 	/*
@@ -418,6 +409,25 @@ elfcap_hw1_to_str(elfcap_style_t style, uint64_t val, char *str,
 }
 
 /*
+ * Expand a CA_SUNW_HW_2 value.  Presently, there are no values, this routine
+ * is simply a place holder for future development.
+ */
+elfcap_err_t
+/* ARGSUSED0 */
+elfcap_hw2_to_str(elfcap_style_t style, elfcap_mask_t val, char *str,
+    size_t len, elfcap_fmt_t fmt, ushort_t mach)
+{
+	/*
+	 * Initialize the string buffer, and validate the format request.
+	 */
+	*str = '\0';
+	if ((fmt < 0) || (fmt >= FORMAT_NELTS))
+		return (ELFCAP_ERR_INVFMT);
+
+	return (expand(style, val, NULL, 0, str, len, fmt));
+}
+
+/*
  * Expand a CA_SUNW_SF_1 value.  Note, that at present these capabilities are
  * common across all platforms.  The use of "mach" is therefore redundant, but
  * is retained for compatibility with the interface of elfcap_hw1_to_str(), and
@@ -425,7 +435,7 @@ elfcap_hw1_to_str(elfcap_style_t style, uint64_t val, char *str,
  */
 elfcap_err_t
 /* ARGSUSED4 */
-elfcap_sf1_to_str(elfcap_style_t style, uint64_t val, char *str,
+elfcap_sf1_to_str(elfcap_style_t style, elfcap_mask_t val, char *str,
     size_t len, elfcap_fmt_t fmt, ushort_t mach)
 {
 	/*
@@ -442,13 +452,20 @@ elfcap_sf1_to_str(elfcap_style_t style, uint64_t val, char *str,
  * Given a capability tag type and value, map it to a string representation.
  */
 elfcap_err_t
-elfcap_tag_to_str(elfcap_style_t style, uint64_t tag, uint64_t val,
+elfcap_tag_to_str(elfcap_style_t style, uint64_t tag, elfcap_mask_t val,
     char *str, size_t len, elfcap_fmt_t fmt, ushort_t mach)
 {
-	if (tag == CA_SUNW_HW_1)
+	switch (tag) {
+	case CA_SUNW_HW_1:
 		return (elfcap_hw1_to_str(style, val, str, len, fmt, mach));
-	if (tag == CA_SUNW_SF_1)
+
+	case CA_SUNW_SF_1:
 		return (elfcap_sf1_to_str(style, val, str, len, fmt, mach));
+
+	case CA_SUNW_HW_2:
+		return (elfcap_hw2_to_str(style, val, str, len, fmt, mach));
+
+	}
 
 	return (ELFCAP_ERR_UNKTAG);
 }
@@ -456,7 +473,7 @@ elfcap_tag_to_str(elfcap_style_t style, uint64_t tag, uint64_t val,
 /*
  * Determine a capabilities value from a capabilities string.
  */
-static uint64_t
+static elfcap_mask_t
 value(elfcap_style_t style, const char *str, const elfcap_desc_t *cdp,
     uint_t cnum)
 {
@@ -474,19 +491,25 @@ value(elfcap_style_t style, const char *str, const elfcap_desc_t *cdp,
 
 		if ((err = get_str_desc(style, &cdp[num], &nstr)) != 0)
 			return (err);
-		if (strcmp(str, nstr->s_str) == 0)
-			return (cdp[num].c_val);
+		if (style & ELFCAP_STYLE_F_ICMP) {
+			if (strcasecmp(str, nstr->s_str) == 0)
+				return (cdp[num].c_val);
+		} else {
+			if (strcmp(str, nstr->s_str) == 0)
+				return (cdp[num].c_val);
+		}
 	}
+
 	return (0);
 }
 
-uint64_t
+elfcap_mask_t
 elfcap_sf1_from_str(elfcap_style_t style, const char *str, ushort_t mach)
 {
 	return (value(style, str, &sf1[0], ELFCAP_NUM_SF1));
 }
 
-uint64_t
+elfcap_mask_t
 elfcap_hw1_from_str(elfcap_style_t style, const char *str, ushort_t mach)
 {
 	if ((mach == EM_386) || (mach == EM_IA_64) || (mach == EM_AMD64))
@@ -495,6 +518,34 @@ elfcap_hw1_from_str(elfcap_style_t style, const char *str, ushort_t mach)
 	if ((mach == EM_SPARC) || (mach == EM_SPARC32PLUS) ||
 	    (mach == EM_SPARCV9))
 		return (value(style, str, hw1_sparc, ELFCAP_NUM_HW1_SPARC));
+
+	return (0);
+}
+elfcap_mask_t
+/* ARGSUSED0 */
+elfcap_hw2_from_str(elfcap_style_t style, const char *str, ushort_t mach)
+{
+	return (0);
+}
+
+/*
+ * Given a capability tag type and value, return the capabilities values
+ * contained in the string.
+ */
+elfcap_mask_t
+elfcap_tag_from_str(elfcap_style_t style, uint64_t tag, const char *str,
+    ushort_t mach)
+{
+	switch (tag) {
+	case CA_SUNW_HW_1:
+		return (elfcap_hw1_from_str(style, str, mach));
+
+	case CA_SUNW_SF_1:
+		return (elfcap_sf1_from_str(style, str, mach));
+
+	case CA_SUNW_HW_2:
+		return (elfcap_hw2_from_str(style, str, mach));
+	}
 
 	return (0);
 }

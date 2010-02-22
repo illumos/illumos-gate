@@ -19,9 +19,7 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/sgs/nm/sparc/Makefile
@@ -46,7 +44,7 @@ LLDFLAGS=	'-R$$ORIGIN/../../lib'
 INCLIST=	-I../../include -I../../include/sparc \
 		-I$(SRCBASE)/uts/$(ARCH)/sys
 DEFLIST=	-DTARGET=SPARC -DSPARC=1 -D$(ARFORMAT) -DELF
-CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
+CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)  -I$(ELFCAP)
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf
 LINTFLAGS=	-x $(LDLIBS)
 LINTSRCS=	$(SRCS)
