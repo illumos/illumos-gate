@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -215,6 +215,7 @@ function rsync_upload
 function remote_mkdirs
 {
 	typeset -r dir_spec=$1
+	typeset -r host_spec=$2
 
 	#
 	# If the supplied path is absolute we assume all directories are
@@ -304,7 +305,7 @@ function ssh_upload
 	# Create remote directories. Any error reporting will be done
 	# in remote_mkdirs function.
 	#
-	remote_mkdirs ${dir_spec}
+	remote_mkdirs ${dir_spec} ${host_spec}
 	if (( $? != 0 )); then
 		return 1
 	fi
@@ -2224,7 +2225,8 @@ do
 	O)	Oflag=1;;
 
 	o)	oflag=1
-		WDIR=$OPTARG;;
+		# Strip the trailing slash to correctly form remote target.
+		WDIR=${OPTARG%/};;
 
 	p)	pflag=1
 		codemgr_parent=$OPTARG;;

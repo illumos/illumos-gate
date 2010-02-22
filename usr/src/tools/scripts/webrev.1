@@ -18,11 +18,11 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.\" Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+.\" Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 .\" Use is subject to license terms.
 .\"
 .\"
-.TH webrev 1 "24 Mar 2009"
+.TH webrev 1 "22 Feb 2010"
 .SH NAME
 webrev \- Generate HTML codereview materials
 .SH SYNOPSIS
@@ -432,6 +432,27 @@ for example:
   Hostname cr.opensolaris.org
   User vkotal
 .fi
+
+.SH DELETING WEBREVS
+When deleting a webrev directory on remote site which has a different name
+than the basename of local repository it is necessary to specify the output
+option:
+.IP
+.nf
+\f(CW$ webrev -Do webrev-foo.onnv
+.fi
+.PP
+Otherwise \fBwebrev\fR will attempt to remove remote directory with the same
+name as basename of the local repository.
+.PP
+For the nested directory case it is necessary to specify the full target:
+.IP
+.nf
+\f(CW$ webrev -D -t \\
+	ssh://user@cr.opensolaris.org:foo/bar/bugfix.onnv
+.fi
+.PP
+This will remove just the \fIbugfix.onnv\fR directory.
 
 .SH SEE ALSO
 .BR putback "(1),"
