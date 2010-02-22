@@ -20,7 +20,7 @@
  */
 /*
  * Copyright 2000 by Cisco Systems, Inc.  All rights reserved.
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * iSCSI Software Initiator
@@ -1277,7 +1277,12 @@ iscsi_tran_bus_unconfig(dev_info_t *parent, uint_t flag,
 	}
 
 	if (iscsi_client_request_service(ihp) == B_FALSE) {
-		return (NDI_FAILURE);
+		rw_enter(&ihp->hba_sess_list_rwlock, RW_READER);
+		if (ihp->hba_sess_list != NULL) {
+			rval = NDI_FAILURE;
+		}
+		rw_exit(&ihp->hba_sess_list_rwlock);
+		return (rval);
 	}
 
 	rval = ndi_busop_bus_unconfig(parent, flag, op, arg);
@@ -4049,14 +4054,15 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		}
 
 		rval = iscsid_stop(ihp);
+		iscsi_door_unbind();
 
-		if (rval == B_TRUE) {
-			iscsi_exit_service_zone(ihp, ISCSI_SERVICE_DISABLED);
-			iscsi_door_unbind();
-		} else {
-			iscsi_exit_service_zone(ihp, ISCSI_SERVICE_ENABLED);
+		iscsi_exit_service_zone(ihp, ISCSI_SERVICE_DISABLED);
+
+		if (ddi_copyout((void *)&rval, (caddr_t)arg,
+		    sizeof (boolean_t), mode) != 0) {
 			rtn = EFAULT;
 		}
+
 		break;
 
 	case ISCSI_SMF_GET:

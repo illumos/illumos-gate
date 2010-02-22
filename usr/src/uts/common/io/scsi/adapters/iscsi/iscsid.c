@@ -336,19 +336,15 @@ iscsid_start(iscsi_hba_t *ihp) {
 /*
  * iscsid_stop -- stop the iscsi initiator daemon, by disabling
  * all the discovery methods first, and then try to stop all
- * related threads
+ * related threads. This is a try-best effort, leave any 'busy' device
+ * (and therefore session) there and just return.
  */
 boolean_t
 iscsid_stop(iscsi_hba_t *ihp) {
 	boolean_t		rval = B_FALSE;
 	iscsi_sess_t		*isp = NULL;
 
-	if (iscsid_disable_discovery(ihp,
-	    ISCSI_ALL_DISCOVERY_METHODS) == B_FALSE) {
-		(void) iscsid_enable_discovery(ihp,
-		    ISCSI_ALL_DISCOVERY_METHODS, B_TRUE);
-		return (rval);
-	}
+	(void) iscsid_disable_discovery(ihp, ISCSI_ALL_DISCOVERY_METHODS);
 
 	/* final check */
 	rw_enter(&ihp->hba_sess_list_rwlock, RW_READER);
@@ -357,7 +353,7 @@ iscsid_stop(iscsi_hba_t *ihp) {
 	} else {
 		/*
 		 * If only boot session is left, that is OK.
-		 * Otherwise, we should consider stop failed.
+		 * Otherwise, we should report that some sessions are left.
 		 */
 		rval = B_TRUE;
 		for (isp = ihp->hba_sess_list; isp != NULL;
@@ -369,12 +365,6 @@ iscsid_stop(iscsi_hba_t *ihp) {
 		}
 	}
 	rw_exit(&ihp->hba_sess_list_rwlock);
-
-	if (rval == B_FALSE) {
-		(void) iscsid_enable_discovery(ihp,
-		    ISCSI_ALL_DISCOVERY_METHODS, B_TRUE);
-		return (rval);
-	}
 
 	return (rval);
 }
