@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1727,15 +1727,6 @@ kadmin_parse_policy_args(argc, argv, policy, mask, caller)
 			    argv[i]);
 		    return -1;
 		}
-
-				if (date <= now) {
-					fprintf(stderr,
-						gettext("Date specified is "
-							"in the past "
-							"\"%s\".\n"),
-						argv[i]);
-					return (-1);
-				}
 		policy->pw_max_life = date - now;
 		*mask |= KADM5_PW_MAX_LIFE;
 		continue;
@@ -1751,15 +1742,6 @@ kadmin_parse_policy_args(argc, argv, policy, mask, caller)
 			    argv[i]);
 		    return -1;
 		}
-
-				if (date <= now) {
-					fprintf(stderr,
-						gettext("Date specified is "
-							"in the past "
-							"\"%s\".\n"),
-						argv[i]);
-					return (-1);
-				}
 		policy->pw_min_life = date - now;
 		*mask |= KADM5_PW_MIN_LIFE;
 		continue;
