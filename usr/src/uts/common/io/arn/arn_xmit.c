@@ -1242,7 +1242,6 @@ ath_tx_setup_buffer(struct arn_softc *sc, struct ath_buf *bf,
 	int i;
 
 	/* Buf reset */
-	/* LINTED E_CONSTANT_CONDITION */
 	ATH_TXBUF_RESET(bf);
 	for (i = 0; i < 4; i++) {
 		bf->rates[i].idx = -1;

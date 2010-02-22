@@ -317,10 +317,11 @@ struct ath_config {
 		(_bf)->bf_lastbf = NULL;	\
 		(_bf)->bf_lastfrm = NULL;	\
 		(_bf)->bf_next = NULL;		\
-		memset(&((_bf)->bf_state), 0,	\
+		(void) memset(&((_bf)->bf_state), 0,	\
 		sizeof (struct ath_buf_state));	\
-		memset(&((_bf)->tx_info_priv), 0,	\
+		(void) memset(&((_bf)->tx_info_priv), 0,	\
 		sizeof (struct ath_tx_info_priv));	\
+		_NOTE(CONSTCOND) \
 	} while (0)
 
 enum buffer_type {
