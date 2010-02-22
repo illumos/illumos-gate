@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * PICL plug-in to create environment tree nodes.
@@ -55,8 +52,6 @@
 #include <psvc_objects.h>
 #include <psvc_objects_class.h>
 
-int init_done;
-
 #define	BUFSZ	512
 
 typedef struct {
@@ -64,6 +59,7 @@ typedef struct {
 } EName_t;
 
 typedef struct {
+	void *hdl;
 	int32_t (*funcp)(void *, char *);
 	int32_t	num_objects;
 	EName_t *obj_list;
@@ -71,10 +67,11 @@ typedef struct {
 } ETask_t;
 
 typedef struct interval_info {
-	int32_t   interval;
+	volatile int32_t   interval;
 	int32_t	  num_tasks;
 	ETask_t   *task_list;
 	pthread_t thread;
+	int32_t   has_thread;
 	struct interval_info *next;
 } EInterval_t;
 
@@ -83,8 +80,8 @@ static EInterval_t *first_interval;
 static psvc_opaque_t hdlp;
 
 sem_t timer_sem;
-pthread_mutex_t timer_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t timer_cond = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t timer_mutex;
+pthread_cond_t timer_cond;
 pthread_t timer_thread_id;
 
 extern int ptree_get_node_by_path(const char *, picl_nodehdl_t *);
@@ -94,6 +91,7 @@ extern int ptree_get_node_by_path(const char *, picl_nodehdl_t *);
 #define	READY		1
 #define	HAVE_REQUEST	2
 #define	ACTIVE		3
+#define	TIMER_SHUTDOWN	4
 
 int timer_state = NOT_READY;
 
@@ -158,7 +156,7 @@ psvc_name_t *psvc_paths;
 picl_nodehdl_t system_node;
 static picl_nodehdl_t lock_node;
 static char env_lock_state[LOCK_STRING_MAX] = PSVC_LOCK_ENABLED;
-static pthread_mutex_t env_lock_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t env_lock_mutex;
 
 static char *class_name[] = {
 "temperature-sensor",
@@ -351,7 +349,7 @@ psvcplugin_add_children(char *parent_path)
 		if (strcmp(parent_path, psvc_paths[i].parent_path) == 0) {
 			ptree_get_node_by_path(parent_path, &parent_node);
 			ptree_add_node(parent_node, psvc_paths[i].child_node);
-			snprintf(next_path, sizeof (next_path), "%s/%s",
+			(void) snprintf(next_path, sizeof (next_path), "%s/%s",
 			    parent_path, psvc_paths[i].child_name);
 			psvcplugin_add_children(next_path);
 		}
@@ -365,14 +363,14 @@ psvcplugin_lookup(char *name, char *parent, picl_nodehdl_t *node)
 
 	for (i = 0; i < psvc_picl_nodes; ++i) {
 		if (strcmp(name, psvc_paths[i].child_name) == 0) {
-			strcpy(parent, psvc_paths[i].parent_path);
+			(void) strcpy(parent, psvc_paths[i].parent_path);
 			*node = psvc_paths[i].child_node;
 		}
 	}
 }
 
 void
-timer_thread()
+timer_thread(void)
 {
 	struct timespec timeout;
 	int status;
@@ -390,6 +388,11 @@ timer_thread()
 			status = pthread_cond_wait(&timer_cond, &timer_mutex);
 		} while (timer_state == READY && status == 0);
 
+		if (timer_state == TIMER_SHUTDOWN) {
+			pthread_exit(NULL);
+			/* not reached */
+		}
+
 		if (status != 0) {
 			syslog(LOG_ERR, CV_WAIT_FAILED_MSG, strerror(status));
 		}
@@ -398,27 +401,27 @@ timer_thread()
 		 * Will get signalled after semaphore acquired,
 		 * or when timeout occurs.
 		 */
-		clock_gettime(CLOCK_REALTIME, &timeout);
+		(void) clock_gettime(CLOCK_REALTIME, &timeout);
 		timeout.tv_sec += app_timeout;
 
 		if (timer_state == HAVE_REQUEST) {
 			timer_state = ACTIVE;
 			do {
 				status = pthread_cond_timedwait(&timer_cond,
-					&timer_mutex, &timeout);
+				    &timer_mutex, &timeout);
 			} while (timer_state == ACTIVE && status == 0);
 		}
 
 		if (status != 0) {
 			if (status == ETIMEDOUT) {
 				syslog(LOG_ERR, PSVC_APP_DEATH_MSG);
-				pthread_mutex_lock(&env_lock_mutex);
-				strlcpy(env_lock_state, PSVC_LOCK_ENABLED,
-				    LOCK_STRING_MAX);
-				pthread_mutex_unlock(&env_lock_mutex);
+				(void) pthread_mutex_lock(&env_lock_mutex);
+				(void) strlcpy(env_lock_state,
+				    PSVC_LOCK_ENABLED, LOCK_STRING_MAX);
+				(void) pthread_mutex_unlock(&env_lock_mutex);
 			} else {
 				syslog(LOG_ERR, CV_TWAIT_FAILED_MSG,
-					strerror(status));
+				    strerror(status));
 			}
 		}
 	}
@@ -427,13 +430,13 @@ timer_thread()
 static int
 lock_state_loop(char *set_lock_state)
 {
-	pthread_mutex_lock(&env_lock_mutex);
+	(void) pthread_mutex_lock(&env_lock_mutex);
 	if (strcmp(env_lock_state, PSVC_LOCK_ENABLED) == 0) {
-		strlcpy(env_lock_state, set_lock_state, LOCK_STRING_MAX);
-		pthread_mutex_unlock(&env_lock_mutex);
+		(void) strlcpy(env_lock_state, set_lock_state, LOCK_STRING_MAX);
+		(void) pthread_mutex_unlock(&env_lock_mutex);
 		return (STATE_NOT_CHANGED);
 	}
-	pthread_mutex_unlock(&env_lock_mutex);
+	(void) pthread_mutex_unlock(&env_lock_mutex);
 	return (STATE_CHANGED);
 }
 
@@ -449,29 +452,29 @@ static int timed_lock_wait(char *set_lock_state)
 		return (status);
 
 	while (timer_state != READY)
-		sched_yield();
-	pthread_mutex_lock(&timer_mutex);
+		(void) sched_yield();
+	(void) pthread_mutex_lock(&timer_mutex);
 	timer_state = HAVE_REQUEST;
-	pthread_cond_signal(&timer_cond);	/* start timer */
-	pthread_mutex_unlock(&timer_mutex);
+	(void) pthread_cond_signal(&timer_cond);	/* start timer */
+	(void) pthread_mutex_unlock(&timer_mutex);
 
 	/*
 	 * We now spin checking the state env_lock_state for it to change to
 	 * enabled.
 	 */
 	while (lock_state_loop(set_lock_state))
-		sleep(1);
+		(void) sleep(1);
 
-	pthread_mutex_lock(&timer_mutex);
+	(void) pthread_mutex_lock(&timer_mutex);
 	if (timer_state == ACTIVE) {
 		timer_state = NOT_READY;
-		pthread_cond_signal(&timer_cond);	/* stop timer */
+		(void) pthread_cond_signal(&timer_cond);	/* stop timer */
 	}
 	if (timer_state == HAVE_REQUEST) {		/* cancel request */
 		timer_state = NOT_READY;
 	}
-	pthread_mutex_unlock(&timer_mutex);
-	sem_post(&timer_sem);
+	(void) pthread_mutex_unlock(&timer_mutex);
+	(void) sem_post(&timer_sem);
 	return (0);
 }
 
@@ -480,7 +483,7 @@ static void lock_and_run(ETask_t *tp, int32_t obj_num)
 	int32_t status;
 
 	/* Grab mutex to stop the env_lock from being changed. */
-	pthread_mutex_lock(&env_lock_mutex);
+	(void) pthread_mutex_lock(&env_lock_mutex);
 	/*
 	 * Check to see if the lock is anything but Enabled. If so, we then
 	 * goto our timer routine to wait for it to become enabled.
@@ -488,16 +491,16 @@ static void lock_and_run(ETask_t *tp, int32_t obj_num)
 	 */
 	if (strcmp(env_lock_state, PSVC_LOCK_ENABLED) != 0) {
 		/* drop mutex and goto timer */
-		pthread_mutex_unlock(&env_lock_mutex);
+		(void) pthread_mutex_unlock(&env_lock_mutex);
 		status = timed_lock_wait(PSVC_LOCK_RUNNING);
 		if (status == -1) {
 			syslog(LOG_ERR, SEM_WAIT_FAILED_MSG);
 		}
 	} else {
-		strlcpy(env_lock_state, PSVC_LOCK_RUNNING, LOCK_STRING_MAX);
-		pthread_mutex_unlock(&env_lock_mutex);
+		(void) strlcpy(env_lock_state, PSVC_LOCK_RUNNING,
+		    LOCK_STRING_MAX);
+		(void) pthread_mutex_unlock(&env_lock_mutex);
 	}
-
 	status = (*tp->funcp)(hdlp, (tp->obj_list + obj_num)->name);
 	if (status == PSVC_FAILURE && errno != ENODEV) {
 		char dev_name[32];
@@ -506,13 +509,13 @@ static void lock_and_run(ETask_t *tp, int32_t obj_num)
 		    PSVC_LABEL_ATTR, dev_name);
 		syslog(LOG_ERR, POLICY_FAILED_MSG, tp->routine, dev_name,
 		    (tp->obj_list + obj_num)->name);
-		syslog(LOG_ERR, strerror(errno));
+		syslog(LOG_ERR, "%s", strerror(errno));
 	}
 
 	/* The policy is done so set the lock back to ENABLED. */
-	pthread_mutex_lock(&env_lock_mutex);
-	strlcpy(env_lock_state, PSVC_LOCK_ENABLED, LOCK_STRING_MAX);
-	pthread_mutex_unlock(&env_lock_mutex);
+	(void) pthread_mutex_lock(&env_lock_mutex);
+	(void) strlcpy(env_lock_state, PSVC_LOCK_ENABLED, LOCK_STRING_MAX);
+	(void) pthread_mutex_unlock(&env_lock_mutex);
 }
 
 static void run_policies(EInterval_t *ip)
@@ -524,14 +527,22 @@ static void run_policies(EInterval_t *ip)
 		if (ip->interval) {
 			int remaining = ip->interval;
 			do {
+				/* check to see if we've been told to exit */
+				if (ip->has_thread && (ip->interval == 0))
+					break;
 				remaining = sleep(remaining);
 			} while (remaining > 0);
 		}
 		for (i = 0; i < ip->num_tasks; ++i) {
 			tp = &ip->task_list[i];
 			for (j = 0; j < tp->num_objects; ++j) {
+				/* check to see if we've been told to exit */
+				if (ip->has_thread && (ip->interval == 0))
+					break;
 				lock_and_run(tp, j);
 			}
+			if (ip->has_thread && (ip->interval == 0))
+				break;
 		}
 	} while (ip->interval);
 }
@@ -541,39 +552,33 @@ static void thread_setup(EInterval_t *ip)
 	int32_t status;
 
 	status = pthread_create(&ip->thread, NULL, (void *(*)())run_policies,
-		ip);
+	    ip);
 	if (status != 0) {
 		if (debug_flag)
-			syslog(LOG_ERR, strerror(errno));
+			syslog(LOG_ERR, "%s", strerror(errno));
 		exit(-1);
 	}
+	ip->has_thread = 1;
 }
 
-
-static int32_t load_policy(const char *library, const char *policy,
-	int32_t (**addr)(void *, char *))
+static int32_t load_policy(const char *library, ETask_t *tp)
 {
-	void *hp;
-
-	hp = dlopen(library, RTLD_NODELETE | RTLD_NOW | RTLD_GLOBAL);
-	if (hp == NULL) {
+	tp->hdl = dlopen(library, RTLD_NOW | RTLD_GLOBAL);
+	if (tp->hdl == NULL) {
 		if (debug_flag) {
 			char *errstr = dlerror();
-			syslog(LOG_ERR, errstr);
+			syslog(LOG_ERR, "%s", errstr);
 		}
 		exit(1);
 	}
-
-	*addr = (int32_t (*)(void *, char *))dlsym(hp, policy);
-	if (*addr == NULL) {
+	tp->funcp = (int32_t (*)(void *, char *))dlsym(tp->hdl, tp->routine);
+	if (tp->funcp == NULL) {
 		if (debug_flag) {
 			char *errstr = dlerror();
-			syslog(LOG_ERR, errstr);
+			syslog(LOG_ERR, "%s", errstr);
 		}
 		exit(1);
 	}
-
-	(void) dlclose(hp);
 	return (0);
 }
 
@@ -590,7 +595,7 @@ static int32_t get_timeout(FILE *fp, int *timeout)
 			return (1);
 		while (isspace(*cp))
 			++cp;
-		sscanf(buf, "%s %d", name, timeout);
+		(void) sscanf(buf, "%31s %d", name, timeout);
 	} while (*cp == 0 || *cp == '\n' || strcmp(name, "TIMEOUT") != 0);
 
 	if (strcmp(name, "TIMEOUT") != 0) {
@@ -621,7 +626,7 @@ static int32_t load_interval(FILE *fp, EInterval_t **ipp)
 		while (isspace(*cp))
 			++cp;
 	} while (*cp == 0 || *cp == '\n');
-	found = sscanf(buf, "%s %d %d", name, &interval, &tasks);
+	found = sscanf(buf, "%31s %d %d", name, &interval, &tasks);
 	if (found != 3) {
 		errno = EINVAL;
 		return (-1);
@@ -638,6 +643,7 @@ static int32_t load_interval(FILE *fp, EInterval_t **ipp)
 	ip->num_tasks = tasks;
 	ip->interval = interval;
 	ip->next = NULL;
+	ip->has_thread = 0;
 
 	/* allocate and load table */
 	ip->task_list = (ETask_t *)malloc(ip->num_tasks * sizeof (ETask_t));
@@ -647,13 +653,14 @@ static int32_t load_interval(FILE *fp, EInterval_t **ipp)
 		tp = &ip->task_list[i];
 
 		(void) fgets(buf, BUFSZ, fp);
-		found = sscanf(buf, "%s %s %s", name, library, tp->routine);
+		found = sscanf(buf, "%31s %1023s %63s",
+		    name, library, tp->routine);
 		if (found != 3) {
 			errno = EINVAL;
 			return (-1);
 		}
 
-		status = load_policy(library, tp->routine, &tp->funcp);
+		status = load_policy(library, tp);
 		if (status == -1)
 			return (-1);
 		found = fscanf(fp, "%d", &tp->num_objects);
@@ -664,12 +671,12 @@ static int32_t load_interval(FILE *fp, EInterval_t **ipp)
 			return (-1);
 		}
 		tp->obj_list =
-			(EName_t *)malloc(tp->num_objects * sizeof (EName_t));
+		    (EName_t *)malloc(tp->num_objects * sizeof (EName_t));
 		if (tp->obj_list == NULL)
 			return (-1);
 
 		for (j = 0; j < tp->num_objects; ++j) {
-			found = fscanf(fp, "%s", tp->obj_list + j);
+			found = fscanf(fp, "%31s", (char *)(tp->obj_list + j));
 			if (found != 1) {
 				if (debug_flag)
 					syslog(LOG_ERR,
@@ -683,7 +690,7 @@ static int32_t load_interval(FILE *fp, EInterval_t **ipp)
 		if (strncmp(buf, "TASK_END", 8) != 0) {
 			if (debug_flag)
 				syslog(LOG_ERR, "Expected TASK_END, task %s",
-					tp->routine);
+				    tp->routine);
 			errno = EINVAL;
 			return (-1);
 		}
@@ -701,6 +708,39 @@ static int32_t load_interval(FILE *fp, EInterval_t **ipp)
 	return (0);
 }
 
+void
+fini_daemon(void)
+{
+	EInterval_t *ip;
+
+	/* shut down the threads running the policies */
+	for (ip = first_interval; ip != NULL; ip = ip->next) {
+		if (ip->has_thread) {
+			/*
+			 * there is a thread for this interval; tell it to stop
+			 * by clearing the interval
+			 */
+			ip->interval = 0;
+		}
+	}
+	for (ip = first_interval; ip != NULL; ip = ip->next) {
+		if (ip->has_thread) {
+			(void) pthread_join(ip->thread, NULL);
+		}
+	}
+	/* shut down the timer thread */
+	while (timer_state != READY)
+		(void) sched_yield();
+	(void) pthread_mutex_lock(&timer_mutex);
+	timer_state = TIMER_SHUTDOWN;
+	(void) pthread_cond_signal(&timer_cond);
+	(void) pthread_mutex_unlock(&timer_mutex);
+	(void) pthread_join(timer_thread_id, NULL);
+	(void) pthread_mutex_destroy(&env_lock_mutex);
+	(void) pthread_mutex_destroy(&timer_mutex);
+	(void) pthread_cond_destroy(&timer_cond);
+	(void) sem_destroy(&timer_sem);
+}
 
 void
 init_daemon(void)
@@ -715,43 +755,49 @@ init_daemon(void)
 
 	if (sysinfo(SI_PLATFORM, platform, sizeof (platform)) == -1) {
 		if (debug_flag)
-			syslog(LOG_ERR, strerror(errno));
+			syslog(LOG_ERR, "%s", strerror(errno));
 		return;
 	}
 
-	(void) sprintf(filename, "/usr/platform/%s/lib/platsvcd.conf",
-		platform);
+	(void) snprintf(filename, sizeof (filename),
+	    "/usr/platform/%s/lib/platsvcd.conf", platform);
 	if ((fp = fopen(filename, "r")) == NULL) {
 		if (debug_flag)
-			syslog(LOG_ERR, strerror(errno));
+			syslog(LOG_ERR, "%s", strerror(errno));
 		return;
 	}
 
 	status = get_timeout(fp, &app_timeout);
 	if (status != 0) {
 		if (debug_flag)
-			syslog(LOG_ERR, strerror(errno));
+			syslog(LOG_ERR, "%s", strerror(errno));
 		return;
 	}
 
 	status = sem_init(&timer_sem, 0, 1);
 	if (status == -1) {
 		if (debug_flag)
-			syslog(LOG_ERR, strerror(errno));
+			syslog(LOG_ERR, "%s", strerror(errno));
 		return;
 	}
 
+	(void) strlcpy(env_lock_state, PSVC_LOCK_ENABLED, LOCK_STRING_MAX);
+	(void) pthread_mutex_init(&env_lock_mutex, NULL);
+	(void) pthread_mutex_init(&timer_mutex, NULL);
+	(void) pthread_cond_init(&timer_cond, NULL);
+
+	timer_state = NOT_READY;
 	status = pthread_create(&timer_thread_id, NULL,
-		(void *(*)())timer_thread, 0);
+	    (void *(*)())timer_thread, 0);
 	if (status != 0) {
 		if (debug_flag)
-			syslog(LOG_ERR, strerror(errno));
+			syslog(LOG_ERR, "%s", strerror(errno));
 		return;
 	}
 
 	/* get timer thread running */
 	while (timer_state != READY)
-		sched_yield();
+		(void) sched_yield();
 
 	for (;;) {
 		status = load_interval(fp, &ip);
@@ -783,12 +829,9 @@ init_daemon(void)
 
 	if (status == -1) {
 		if (debug_flag)
-			syslog(LOG_ERR, strerror(errno));
+			syslog(LOG_ERR, "%s", strerror(errno));
 		return;
 	}
-
-	return;
-
 }
 
 
@@ -812,7 +855,7 @@ static int32_t count_records(FILE *fp, char *end, uint32_t *countp)
 		return (-1);
 	}
 
-	fseek(fp, first_record, SEEK_SET);
+	(void) fseek(fp, first_record, SEEK_SET);
 	*countp = count;
 	return (0);
 }
@@ -830,7 +873,7 @@ find_file_section(FILE *fd, char *start)
 	char name[32];
 	int found;
 
-	fseek(fd, 0, SEEK_SET);
+	(void) fseek(fd, 0, SEEK_SET);
 	while ((ret = fgets(buf, BUFSZ, fd)) != NULL) {
 		if (strncmp(start, buf, strlen(start)) == 0)
 			break;
@@ -841,7 +884,7 @@ find_file_section(FILE *fd, char *start)
 		return (-1);
 	}
 
-	found = sscanf(buf, "%s", name);
+	found = sscanf(buf, "%31s", name);
 	if (found != 1) {
 		errno = EINVAL;
 		return (-1);
@@ -886,7 +929,7 @@ static int32_t node_property(picl_nodehdl_t node,
 	propinfo.piclinfo.type = type;
 	propinfo.piclinfo.accessmode = accessmode;
 	propinfo.piclinfo.size = size;
-	strcpy(propinfo.piclinfo.name, name);
+	(void) strcpy(propinfo.piclinfo.name, name);
 
 	err = ptree_create_prop(&propinfo, value, &prophdl);
 	if (err != 0) {
@@ -900,12 +943,12 @@ static int32_t node_property(picl_nodehdl_t node,
 	return (0);
 }
 
-static void init_err(char *fmt, char *arg1, char *arg2)
+static void init_err(const char *fmt, char *arg1, char *arg2)
 {
 	char msg[256];
 
-	sprintf(msg, fmt, arg1, arg2);
-	syslog(LOG_ERR, msg);
+	(void) snprintf(msg, sizeof (msg), fmt, arg1, arg2);
+	syslog(LOG_ERR, "%s", msg);
 }
 
 static int
@@ -940,7 +983,7 @@ projected_read(ptree_rarg_t *rarg, void *buf)
 	if (err != 0)
 		return (err);
 	err = ptree_get_propval_by_name(dstinfo->dst_node,
-		dstinfo->name, buf, propinfo.piclinfo.size);
+	    dstinfo->name, buf, propinfo.piclinfo.size);
 	if (err != 0)
 		return (err);
 	return (PICL_SUCCESS);
@@ -962,7 +1005,7 @@ projected_write(ptree_warg_t *warg, const void *buf)
 	if (err != 0)
 		return (err);
 	err = ptree_update_propval_by_name(dstinfo->dst_node,
-		dstinfo->name, buf, propinfo.piclinfo.size);
+	    dstinfo->name, buf, propinfo.piclinfo.size);
 	if (err != 0)
 		return (err);
 	return (PICL_SUCCESS);
@@ -978,13 +1021,13 @@ psvc_read_volatile(ptree_rarg_t *rarg, void *buf)
 	int32_t use_attr_num = 0;
 
 	err = ptree_get_propval_by_name(rarg->nodeh, "name", name,
-		sizeof (name));
+	    sizeof (name));
 	if (err != 0) {
 		return (err);
 	}
 
 	err = ptree_get_propval_by_name(rarg->nodeh, "_class", class,
-		sizeof (class));
+	    sizeof (class));
 	if (err != 0) {
 		return (err);
 	}
@@ -997,7 +1040,7 @@ psvc_read_volatile(ptree_rarg_t *rarg, void *buf)
 	for (i = 0; i < PICL_PROP_TRANS_COUNT; i++) {
 		if ((strcmp(class, picl_prop_trans[i].picl_class) == 0) &&
 		    (strcmp(propinfo.piclinfo.name,
-			picl_prop_trans[i].picl_prop) == 0)) {
+		    picl_prop_trans[i].picl_prop) == 0)) {
 			attr_num = i;
 			break;
 		}
@@ -1006,7 +1049,7 @@ psvc_read_volatile(ptree_rarg_t *rarg, void *buf)
 	if (attr_num == -1)
 		for (i = 0; i < ATTR_STR_TAB_SIZE; i++) {
 			if (strcmp(propinfo.piclinfo.name,
-				attr_str_tab[i]) == 0) {
+			    attr_str_tab[i]) == 0) {
 				attr_num = i;
 				use_attr_num = 1;
 				break;
@@ -1039,13 +1082,13 @@ psvc_write_volatile(ptree_warg_t *warg, const void *buf)
 		return (PICL_PERMDENIED);
 
 	err = ptree_get_propval_by_name(warg->nodeh, "name", name,
-		sizeof (name));
+	    sizeof (name));
 	if (err != 0) {
 		return (err);
 	}
 
 	err = ptree_get_propval_by_name(warg->nodeh, "_class", class,
-		sizeof (class));
+	    sizeof (class));
 	if (err != 0) {
 		return (err);
 	}
@@ -1058,7 +1101,7 @@ psvc_write_volatile(ptree_warg_t *warg, const void *buf)
 	for (i = 0; i < PICL_PROP_TRANS_COUNT; i++) {
 		if ((strcmp(class, picl_prop_trans[i].picl_class) == 0) &&
 		    (strcmp(propinfo.piclinfo.name,
-			picl_prop_trans[i].picl_prop) == 0)) {
+		    picl_prop_trans[i].picl_prop) == 0)) {
 			attr_num = i;
 			break;
 		}
@@ -1067,7 +1110,7 @@ psvc_write_volatile(ptree_warg_t *warg, const void *buf)
 	if (attr_num == -1)
 		for (i = 0; i < ATTR_STR_TAB_SIZE; i++) {
 			if (strcmp(propinfo.piclinfo.name,
-				attr_str_tab[i]) == 0) {
+			    attr_str_tab[i]) == 0) {
 			attr_num = i;
 			use_attr_num = 1;
 			break;
@@ -1105,19 +1148,19 @@ void create_reference_properties(struct assoc_pair *assoc_tbl, int32_t count,
 	for (i = 0; i < count; ++i) {
 		/* antecedent */
 		aobjp = (picl_psvc_t *)bsearch(assoc_tbl[i].antecedent,
-			psvc_hdl.objects, psvc_hdl.obj_count,
-			sizeof (picl_psvc_t),
-			(int (*)(const void *, const void *))
-			name_compare_bsearch);
+		    psvc_hdl.objects, psvc_hdl.obj_count,
+		    sizeof (picl_psvc_t),
+		    (int (*)(const void *, const void *))
+		    name_compare_bsearch);
 		if (aobjp == NULL) {
 			init_err(ID_NOT_FOUND_MSG,
-				funcname, assoc_tbl[i].antecedent);
+			    funcname, assoc_tbl[i].antecedent);
 			return;
 		}
 
 		/* skip if table already created */
 		if (ptree_get_propval_by_name(aobjp->node, assoc_name,
-			&tbl_hdl, sizeof (tbl_hdl)) == 0) {
+		    &tbl_hdl, sizeof (tbl_hdl)) == 0) {
 			continue;
 		}
 
@@ -1125,16 +1168,16 @@ void create_reference_properties(struct assoc_pair *assoc_tbl, int32_t count,
 		err = ptree_create_table(&tbl_hdl);
 		if (err != 0) {
 			init_err(PTREE_CREATE_TABLE_FAILED_MSG,
-				funcname, picl_strerror(err));
+			    funcname, picl_strerror(err));
 			return;
 		}
 
 		err = node_property(aobjp->node, NULL, NULL,
-			PICL_PTYPE_TABLE, sizeof (tbl_hdl), PICL_READ,
-			assoc_name, &tbl_hdl);
+		    PICL_PTYPE_TABLE, sizeof (tbl_hdl), PICL_READ,
+		    assoc_name, &tbl_hdl);
 		if (err != 0) {
 			init_err(CREATE_PROP_FAILED_MSG, funcname,
-				picl_strerror(err));
+			    picl_strerror(err));
 			return;
 		}
 
@@ -1158,13 +1201,13 @@ void create_reference_properties(struct assoc_pair *assoc_tbl, int32_t count,
 				continue;
 
 			dobjp = (picl_psvc_t *)bsearch(assoc_tbl[j].dependent,
-				psvc_hdl.objects,
-				psvc_hdl.obj_count, sizeof (picl_psvc_t),
-				(int (*)(const void *, const void *))
-				name_compare_bsearch);
+			    psvc_hdl.objects,
+			    psvc_hdl.obj_count, sizeof (picl_psvc_t),
+			    (int (*)(const void *, const void *))
+			    name_compare_bsearch);
 			if (dobjp == NULL) {
 				init_err(ID_NOT_FOUND_MSG,
-					funcname, assoc_tbl[j].dependent);
+				    funcname, assoc_tbl[j].dependent);
 				return;
 			}
 
@@ -1173,14 +1216,14 @@ void create_reference_properties(struct assoc_pair *assoc_tbl, int32_t count,
 			 * _classname_propertyname
 			 */
 			err = ptree_get_propval_by_name(dobjp->node,
-				"_class", class, sizeof (class));
+			    "_class", class, sizeof (class));
 			if (err != 0) {
 				init_err(CLASS_NOT_FOUND_MSG, funcname,
-					assoc_tbl[j].dependent);
+				    assoc_tbl[j].dependent);
 				return;
 			}
-
-			sprintf(name, "_%s_%s", class, "subclass");
+			(void) snprintf(name, sizeof (name), "_%s_subclass",
+			    class);
 
 			propinfo.version = PSVC_PLUGIN_VERSION;
 			propinfo.read = NULL;
@@ -1188,13 +1231,13 @@ void create_reference_properties(struct assoc_pair *assoc_tbl, int32_t count,
 			propinfo.piclinfo.type = PICL_PTYPE_REFERENCE;
 			propinfo.piclinfo.accessmode = PICL_READ;
 			propinfo.piclinfo.size = sizeof (picl_nodehdl_t);
-			strcpy(propinfo.piclinfo.name, name);
+			(void) strcpy(propinfo.piclinfo.name, name);
 
 			err = ptree_create_prop(&propinfo, &dobjp->node,
-				dep_list + offset);
+			    dep_list + offset);
 			if (err != 0) {
 				init_err(PTREE_CREATE_PROP_FAILED_MSG,
-					name, picl_strerror(err));
+				    name, picl_strerror(err));
 				return;
 			}
 
@@ -1205,7 +1248,7 @@ void create_reference_properties(struct assoc_pair *assoc_tbl, int32_t count,
 		err = ptree_add_row_to_table(tbl_hdl, dependents, dep_list);
 		if (err != 0) {
 			init_err(PTREE_ADD_ROW_FAILED_MSG, funcname,
-				picl_strerror(err));
+			    picl_strerror(err));
 			return;
 		}
 
@@ -1234,22 +1277,23 @@ load_projected_properties(FILE *fp)
 		return;
 
 	if (count_records(fp, "PROJECTED_PROPERTIES_END", &proj_prop_count) !=
-		0) {
+	    0) {
 		init_err(INVALID_FILE_FORMAT_MSG, funcname, 0);
 		return;
 	}
 
 	prop_list = (struct proj_prop *)malloc(sizeof (struct proj_prop)
-		* proj_prop_count);
+	    * proj_prop_count);
 	if (prop_list == NULL) {
 		init_err(MALLOC_FAILED_MSG, funcname, strerror(errno));
 		return;
 	}
 
 	for (i = 0; i < proj_prop_count; ++i) {
-		fgets(buf, BUFSZ, fp);
-		found = sscanf(buf, "%s %s %s %s", src, src_prop, dst,
-			dst_prop);
+		buf[0] = '\0';
+		(void) fgets(buf, BUFSZ, fp);
+		found = sscanf(buf, "%31s %31s %255s %31s", src, src_prop, dst,
+		    dst_prop);
 		if (found != 4) {
 			init_err(INVALID_FILE_FORMAT_MSG, funcname, 0);
 			return;
@@ -1265,9 +1309,9 @@ load_projected_properties(FILE *fp)
 			}
 		} else {
 			srcobjp = (picl_psvc_t *)bsearch(src, psvc_hdl.objects,
-				psvc_hdl.obj_count, sizeof (picl_psvc_t),
-				(int (*)(const void *, const void *))
-				name_compare_bsearch);
+			    psvc_hdl.obj_count, sizeof (picl_psvc_t),
+			    (int (*)(const void *, const void *))
+			    name_compare_bsearch);
 			if (srcobjp == NULL) {
 				init_err(ID_NOT_FOUND_MSG, funcname, src);
 				return;
@@ -1286,9 +1330,9 @@ load_projected_properties(FILE *fp)
 			prop_list[i].dst_node = dst_node;
 		} else {
 			dstobjp = (picl_psvc_t *)bsearch(dst, psvc_hdl.objects,
-				psvc_hdl.obj_count, sizeof (picl_psvc_t),
-				(int (*)(const void *, const void *))
-				name_compare_bsearch);
+			    psvc_hdl.obj_count, sizeof (picl_psvc_t),
+			    (int (*)(const void *, const void *))
+			    name_compare_bsearch);
 			if (dstobjp == NULL) {
 				init_err(ID_NOT_FOUND_MSG, funcname, dst);
 				return;
@@ -1317,26 +1361,26 @@ load_projected_properties(FILE *fp)
 		propinfo.write = projected_write;
 		propinfo.piclinfo.type = dstinfo.piclinfo.type;
 		propinfo.piclinfo.accessmode =
-			PICL_READ | PICL_WRITE | PICL_VOLATILE;
+		    PICL_READ | PICL_WRITE | PICL_VOLATILE;
 		propinfo.piclinfo.size = dstinfo.piclinfo.size;
-		strcpy(propinfo.piclinfo.name, src_prop);
+		(void) strcpy(propinfo.piclinfo.name, src_prop);
 
 		err = ptree_create_prop(&propinfo, 0, &src_prophdl);
 		if (err != 0) {
 			init_err(PTREE_CREATE_PROP_FAILED_MSG, funcname,
-				picl_strerror(err));
+			    picl_strerror(err));
 			return;
 		}
 
 		err = ptree_add_prop(src_node, src_prophdl);
 		if (err != 0) {
 			init_err(PTREE_ADD_PROP_FAILED_MSG, funcname,
-				picl_strerror(err));
+			    picl_strerror(err));
 			return;
 		}
 
 		prop_list[i].handle = src_prophdl;
-		strcpy(prop_list[i].name, dst_prop);
+		(void) strcpy(prop_list[i].name, dst_prop);
 
 	}
 }
@@ -1361,9 +1405,10 @@ static void load_associations(FILE *fp)
 	if (find_file_section(fp, "ASSOCIATIONS") != 0)
 		return;
 
-	fgets(buf, BUFSZ, fp);
+	buf[0] = '\0';
+	(void) fgets(buf, BUFSZ, fp);
 	while (strncmp("ASSOCIATIONS_END", buf, 16) != 0) {
-		found = sscanf(buf, "%s %s", name1, assoc_name);
+		found = sscanf(buf, "%31s %31s", name1, assoc_name);
 		if (found != 2) {
 			init_err(INVALID_FILE_FORMAT_MSG, funcname, 0);
 			return;
@@ -1375,25 +1420,26 @@ static void load_associations(FILE *fp)
 		}
 
 		assoc_tbl = (struct assoc_pair *)malloc(
-			sizeof (struct assoc_pair) * count);
+		    sizeof (struct assoc_pair) * count);
 		if (assoc_tbl == NULL) {
 			init_err(MALLOC_FAILED_MSG, funcname, strerror(errno));
 			return;
 		}
 
 		for (j = 0; j < count; ++j) {
-			fgets(buf, BUFSZ, fp);
-			found = sscanf(buf, "%s %s", assoc_tbl[j].antecedent,
-				assoc_tbl[j].dependent);
+			buf[0] = '\0';
+			(void) fgets(buf, BUFSZ, fp);
+			found = sscanf(buf, "%31s %31s",
+			    assoc_tbl[j].antecedent, assoc_tbl[j].dependent);
 			if (found != 2) {
 				init_err(INVALID_FILE_FORMAT_MSG, funcname,
-					0);
+				    0);
 				return;
 			}
 
 		}
-
-		fgets(buf, BUFSZ, fp);
+		buf[0] = '\0';
+		(void) fgets(buf, BUFSZ, fp);
 		if (strncmp(buf, "ASSOCIATION_END", 15) != 0) {
 			init_err(INVALID_FILE_FORMAT_MSG, funcname, 0);
 			return;
@@ -1402,24 +1448,26 @@ static void load_associations(FILE *fp)
 		/* Create separate list of dependents for each antecedent */
 		if (strcmp(assoc_name, "PSVC_TABLE") != 0) {
 			create_reference_properties(assoc_tbl, count,
-				assoc_name);
+			    assoc_name);
 		}
 
 		free(assoc_tbl);
-
-		fgets(buf, BUFSZ, fp);
+		buf[0] = '\0';
+		(void) fgets(buf, BUFSZ, fp);
 	}
 
 }
 
 /* Enviornmental Lock Object's Read and Write routine */
+/* ARGSUSED */
 static int
 env_lock_read(ptree_rarg_t *rarg, void *buf)
 {
-	strlcpy((char *)buf, env_lock_state, LOCK_STRING_MAX);
+	(void) strlcpy((char *)buf, env_lock_state, LOCK_STRING_MAX);
 	return (PSVC_SUCCESS);
 }
 
+/* ARGSUSED */
 static int
 env_lock_write(ptree_warg_t *warg, const void *buf)
 {
@@ -1436,14 +1484,14 @@ env_lock_write(ptree_warg_t *warg, const void *buf)
 		return (PSVC_FAILURE);
 	}
 
-	pthread_mutex_lock(&env_lock_mutex);
+	(void) pthread_mutex_lock(&env_lock_mutex);
 
 	/*
 	 * If the state is already Enabled we can set the state to Disabled
 	 * to stop the policies.
 	 */
 	if (strcmp(env_lock_state, PSVC_LOCK_ENABLED) == 0) {
-		pthread_mutex_unlock(&env_lock_mutex);
+		(void) pthread_mutex_unlock(&env_lock_mutex);
 		status = timed_lock_wait(PSVC_LOCK_DISABLED);
 		if (status == -1) {
 			syslog(LOG_ERR, SEM_WAIT_FAILED_MSG);
@@ -1456,7 +1504,7 @@ env_lock_write(ptree_warg_t *warg, const void *buf)
 	 * the env_lock.
 	 */
 	if (strcmp(env_lock_state, PSVC_LOCK_RUNNING) == 0) {
-		pthread_mutex_unlock(&env_lock_mutex);
+		(void) pthread_mutex_unlock(&env_lock_mutex);
 		status = timed_lock_wait(PSVC_LOCK_DISABLED);
 		if (status == -1) {
 			syslog(LOG_ERR, SEM_WAIT_FAILED_MSG);
@@ -1473,26 +1521,26 @@ env_lock_write(ptree_warg_t *warg, const void *buf)
 	 */
 	if (strcmp(env_lock_state, PSVC_LOCK_DISABLED) == 0) {
 		if (strcmp(var, PSVC_LOCK_DISABLED) == 0) {
-			pthread_mutex_lock(&timer_mutex);
+			(void) pthread_mutex_lock(&timer_mutex);
 			if (timer_state == ACTIVE) {
 				timer_state = NOT_READY;
 				/* stop timer */
-				pthread_cond_signal(&timer_cond);
-				pthread_mutex_unlock(&timer_mutex);
+				(void) pthread_cond_signal(&timer_cond);
+				(void) pthread_mutex_unlock(&timer_mutex);
 				/* wait for timer to reset */
 				while (timer_state != READY)
-					sched_yield();
-				pthread_mutex_lock(&timer_mutex);
+					(void) sched_yield();
+				(void) pthread_mutex_lock(&timer_mutex);
 				timer_state = HAVE_REQUEST;
 				/* restart timer */
-				pthread_cond_signal(&timer_cond);
+				(void) pthread_cond_signal(&timer_cond);
 			}
-			pthread_mutex_unlock(&timer_mutex);
+			(void) pthread_mutex_unlock(&timer_mutex);
 		} else {
-			strlcpy(env_lock_state, var, LOCK_STRING_MAX);
+			(void) strlcpy(env_lock_state, var, LOCK_STRING_MAX);
 		}
 	}
-	pthread_mutex_unlock(&env_lock_mutex);
+	(void) pthread_mutex_unlock(&env_lock_mutex);
 	return (PSVC_SUCCESS);
 }
 
@@ -1513,7 +1561,7 @@ init_env_lock_node(picl_nodehdl_t root_node)
 
 	err = ptree_init_propinfo(&propinfo, PTREE_PROPINFO_VERSION_1,
 	    PICL_PTYPE_CHARSTRING, PICL_READ | PICL_WRITE | PICL_VOLATILE,
-		32, "State", env_lock_read, env_lock_write);
+	    32, "State", env_lock_read, env_lock_write);
 	if (err != PICL_SUCCESS) {
 		init_err(NODE_PROP_FAILED_MSG, funcname, picl_strerror(err));
 		return (err);
@@ -1570,7 +1618,8 @@ psvc_plugin_init(void)
 		return;
 	}
 
-	sprintf(filename, "/usr/platform/%s/lib/psvcobj.conf", platform);
+	(void) snprintf(filename, sizeof (filename),
+	    "/usr/platform/%s/lib/psvcobj.conf", platform);
 	if ((psvc_hdl.fp = fopen(filename, "r")) == NULL) {
 		init_err(FILE_OPEN_FAILED_MSG, funcname, filename);
 		return;
@@ -1587,22 +1636,23 @@ psvc_plugin_init(void)
 		return;
 	}
 	if ((psvc_hdl.objects = (picl_psvc_t *)malloc(sizeof (picl_psvc_t) *
-		psvc_hdl.obj_count)) == NULL) {
+	    psvc_hdl.obj_count)) == NULL) {
 		init_err(MALLOC_FAILED_MSG, funcname, strerror(errno));
 		return;
 	}
-	memset(psvc_hdl.objects, 0, sizeof (picl_psvc_t) * psvc_hdl.obj_count);
+	(void) memset(psvc_hdl.objects, 0,
+	    sizeof (picl_psvc_t) * psvc_hdl.obj_count);
 
 	err = ptree_get_root(&root_node);
 	if (err != 0) {
 		init_err(PTREE_GET_ROOT_FAILED_MSG, funcname,
-			picl_strerror(err));
+		    picl_strerror(err));
 		return;
 	}
 
 	/* Following array is  accessed directly by the psvc policies. */
 	psvc_paths = (psvc_name_t *)malloc(sizeof (psvc_name_t) *
-		psvc_hdl.obj_count);
+	    psvc_hdl.obj_count);
 	psvc_picl_nodes = psvc_hdl.obj_count;
 	if (psvc_paths == NULL) {
 		init_err(MALLOC_FAILED_MSG, funcname, strerror(errno));
@@ -1614,21 +1664,21 @@ psvc_plugin_init(void)
 		int32_t subclass;
 		int32_t	cp_count;
 		picl_psvc_t *objp = &psvc_hdl.objects[i];
-
-		fgets(buf, BUFSZ, psvc_hdl.fp);
+		buf[0] = '\0';
+		(void) fgets(buf, BUFSZ, psvc_hdl.fp);
 		if (strncmp(buf, "OBJECT_INFO_END", 15) == 0)
 			break;
 
 		start = strrchr(buf, '/');
 		if (start == NULL) {
 			init_err(INVALID_FILE_FORMAT1_MSG, funcname,
-				filename);
+			    filename);
 			return;
 		}
-		found = sscanf(start + 1, "%s",  objp->name);
+		found = sscanf(start + 1, "%31s",  objp->name);
 		if (found != 1) {
 			init_err(INVALID_FILE_FORMAT1_MSG, funcname,
-				filename);
+			    filename);
 			return;
 		}
 
@@ -1644,17 +1694,17 @@ psvc_plugin_init(void)
 		}
 
 		err = psvc_get_attr(hdlp, objp->name, PSVC_SUBCLASS_ATTR,
-			&subclass);
+		    &subclass);
 		if (err != PSVC_SUCCESS) {
 			init_err(SUBCLASS_NOT_FOUND_MSG, funcname, objp->name);
 			return;
 		}
 
 		err = ptree_create_node(objp->name, class_name[class],
-			&objp->node);
+		    &objp->node);
 		if (err != 0) {
 			init_err(PTREE_CREATE_NODE_FAILED_MSG, funcname,
-				picl_strerror(err));
+			    picl_strerror(err));
 			return;
 		}
 		if (strcmp(objp->name, PSVC_CHASSIS) == 0)
@@ -1671,7 +1721,7 @@ psvc_plugin_init(void)
 			    common[j].access, common[j].name, 0);
 			if (err != PSVC_SUCCESS) {
 				init_err(NODE_PROP_FAILED_MSG, funcname,
-					picl_strerror(err));
+				    picl_strerror(err));
 				return;
 			}
 		}
@@ -1685,12 +1735,12 @@ psvc_plugin_init(void)
 
 		for (j = 0; j < cp_count; ++j) {
 			err = node_property(objp->node, psvc_read_volatile,
-				psvc_write_volatile, cp->props[j].type,
-				cp->props[j].size,
-				cp->props[j].access, cp->props[j].name, 0);
+			    psvc_write_volatile, cp->props[j].type,
+			    cp->props[j].size,
+			    cp->props[j].access, cp->props[j].name, 0);
 			if (err != PSVC_SUCCESS) {
 				init_err(NODE_PROP_FAILED_MSG, funcname,
-					picl_strerror(err));
+				    picl_strerror(err));
 				return;
 			}
 		}
@@ -1710,16 +1760,16 @@ psvc_plugin_init(void)
 		err = ptree_add_node(parent_node, objp->node);
 		if (err != PICL_SUCCESS) {
 			init_err(PTREE_ADD_NODE_FAILED_MSG, funcname,
-				picl_strerror(err));
+			    picl_strerror(err));
 			return;
 		}
-		strcpy(psvc_paths[i].parent_path, buf);
-		strcpy(psvc_paths[i].child_name, objp->name);
+		(void) strcpy(psvc_paths[i].parent_path, buf);
+		(void) strcpy(psvc_paths[i].child_name, objp->name);
 		psvc_paths[i].child_node = objp->node;
 	}
 
 	qsort(psvc_hdl.objects, psvc_hdl.obj_count, sizeof (picl_psvc_t),
-		(int (*)(const void *, const void *))name_compare_qsort);
+	    (int (*)(const void *, const void *))name_compare_qsort);
 
 	load_associations(psvc_hdl.fp);
 	load_projected_properties(psvc_hdl.fp);
@@ -1728,9 +1778,6 @@ psvc_plugin_init(void)
 		return;
 
 	init_daemon();
-
-	init_done = 1;
-
 }
 
 void
@@ -1739,27 +1786,21 @@ psvc_plugin_fini(void)
 	int32_t i;
 	EInterval_t *ip, *next;
 
-/* Fix memory leaks */
-	free(prop_list);
-	free(psvc_paths);
+	fini_daemon();
 	for (ip = first_interval; ip != 0; ip = next) {
-		/*
-		 * We don't check return types.
-		 * If this call fails, it's because we did not
-		 * run thread_setup() on this particular ip
-		 *
-		 * Please refer to init_daemon() for thread
-		 * assignments
-		 */
-		pthread_cancel(ip->thread);
-		for (i = 0; i < ip->num_tasks; ++i)
+		for (i = 0; i < ip->num_tasks; ++i) {
+			(void) dlclose(ip->task_list[i].hdl);
 			free(ip->task_list[i].obj_list);
+		}
 		free(ip->task_list);
-
 		next = ip->next;
 		free(ip);
 	}
-
+	free(prop_list);
+	free(psvc_paths);
+	free(psvc_hdl.objects);
+	if (psvc_hdl.fp != NULL)
+		(void) fclose(psvc_hdl.fp);
 	psvc_fini(hdlp);
 }
 
