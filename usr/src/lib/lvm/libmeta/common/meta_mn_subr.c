@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -389,23 +389,22 @@ meta_read_nodelist(
 		/* retrieve info about our host */
 		if ((hp = gethostbyname(buf)) == NULL) {
 			err = EADDRNOTAVAIL;
-		} else {
+		} else if (hp->h_addrtype != AF_INET) {
 			/* We only do IPv4 addresses, for now */
-			if (hp->h_addrtype != AF_INET) {
-				err = EPFNOSUPPORT;
-			}
+			err = EPFNOSUPPORT;
+		} else if (*hp->h_addr_list == NULL) {
+			/* No addresses in the list */
+			err = EADDRNOTAVAIL;
+		} else {
 			/* We take the first address only */
-			if (*hp->h_addr_list) {
-				struct in_addr in;
+			struct in_addr in;
 
-				(void) memcpy(&in.s_addr, *hp->h_addr_list,
-				    sizeof (struct in_addr));
-				(void) strncpy(nlp->msl_node_addr,
-				    inet_ntoa(in), MD_MAX_NODENAME);
-			} else {
-				err = EADDRNOTAVAIL;
-			}
+			(void) memcpy(&in.s_addr, *hp->h_addr_list,
+			    sizeof (struct in_addr));
+			(void) strncpy(nlp->msl_node_addr,
+			    inet_ntoa(in), MD_MAX_NODENAME);
 		}
+
 		if (err) {
 			meta_free_nodelist(*nl);
 			return (mdsyserror(ep, err, buf));
