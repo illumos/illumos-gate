@@ -259,6 +259,11 @@ vhci_tpgs_inquiry(struct scsi_address *ap, struct buf *bp, int *mode)
 
 	pkt = scsi_init_pkt(ap, NULL, bp, CDB_GROUP0,
 	    sizeof (struct scsi_arq_status), 0, 0, SLEEP_FUNC, NULL);
+	if (pkt == NULL) {
+		VHCI_DEBUG(1, (CE_WARN, NULL,
+		    "!vhci_tpgs_inquiry: Failure returned from scsi_init_pkt"));
+		return (1);
+	}
 	pkt->pkt_cdbp[0] = SCMD_INQUIRY;
 	pkt->pkt_cdbp[4] = sizeof (inq);
 	pkt->pkt_time = 60;
