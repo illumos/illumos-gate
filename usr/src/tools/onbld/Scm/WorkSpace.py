@@ -435,9 +435,9 @@ class activectx(context.memctx):
         return [entry.name for entry in self.__active if entry.is_added()]
 
     def removed(self):
-        ret = [entry.name for entry in self.__active if entry.is_removed()]
-        ret.extend([x.parentname for x in self.__active if x.is_renamed()])
-        return ret
+        ret = set(entry.name for entry in self.__active if entry.is_removed())
+        ret.update(set(x.parentname for x in self.__active if x.is_renamed()))
+        return list(ret)
 
     def files(self):
         return self.__active.files()
