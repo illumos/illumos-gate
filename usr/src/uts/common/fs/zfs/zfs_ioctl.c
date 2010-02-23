@@ -3520,11 +3520,8 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 			 * likely also fail, and clean up after itself.
 			 */
 			end_err = dmu_recv_end(&drc);
-			if (error == 0) {
-				int resume_err =
-				    zfs_resume_fs(zfsvfs, tofs);
-				error = error ? error : resume_err;
-			}
+			if (error == 0)
+				error = zfs_resume_fs(zfsvfs, tofs);
 			error = error ? error : end_err;
 			VFS_RELE(zfsvfs->z_vfs);
 		} else {
