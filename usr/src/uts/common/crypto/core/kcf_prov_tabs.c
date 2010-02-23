@@ -884,7 +884,9 @@ verify_unverified_providers()
 	kcf_provider_desc_t *pd;
 	boolean_t need_verify;
 
-	ASSERT(kcf_dh != NULL);
+	if (kcf_dh == NULL)
+		return;
+
 	mutex_enter(&prov_tab_mutex);
 
 	for (i = 0; i < KCF_MAX_PROVIDERS; i++) {

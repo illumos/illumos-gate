@@ -87,6 +87,7 @@ static struct modlinkage modlinkage = {
 };
 
 static int rngtimer_started;
+extern int sys_shutdown;
 
 int
 _init()
@@ -685,9 +686,9 @@ kcf_verify_signature(void *arg)
 		if (rkda != kda)
 			kmem_free(rkda, darg.rsize);
 
-	} else {
-		cmn_err(CE_WARN, "Module verification door upcall failed "
-		    "for %s. errno = %d", filename, rv);
+	} else if (sys_shutdown == 0) {
+		cmn_err(CE_WARN, "Unable to use door to kcfd during module "
+		    "verification of %s. (errno: 0x%x)", filename, rv);
 	}
 
 	kmem_free(kda, sizeof (kcf_door_arg_t) + mp->sigsize);
@@ -721,8 +722,12 @@ out:
 int
 crypto_load_door(uint_t did)
 {
+	door_handle_t dh;
+
 	mutex_enter(&kcf_dh_lock);
-	kcf_dh = door_ki_lookup(did);
+	dh = door_ki_lookup(did);
+	if (dh != NULL)
+		kcf_dh = dh;
 	mutex_exit(&kcf_dh_lock);
 
 	verify_unverified_providers();

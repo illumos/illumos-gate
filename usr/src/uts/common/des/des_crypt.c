@@ -20,7 +20,7 @@
  *
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -269,15 +269,12 @@ _init(void)
 		return (ret);
 
 	/*
-	 * Register with KCF. If the registration fails, log an
+	 * Register with KCF. If the registration fails, kcf will log an
 	 * error but do not uninstall the module, since the functionality
 	 * provided by misc/des should still be available.
+	 *
 	 */
-	if ((ret = crypto_register_provider(&des_prov_info,
-	    &des_prov_handle)) != CRYPTO_SUCCESS) {
-		cmn_err(CE_WARN, "des _init: crypto_register_provider() "
-		    "failed (0x%x)", ret);
-	}
+	(void) crypto_register_provider(&des_prov_info, &des_prov_handle);
 
 	return (0);
 }

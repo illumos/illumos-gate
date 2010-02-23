@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -248,50 +248,26 @@ _init(void)
 {
 	int ret;
 
-	/*
-	 * Register with KCF. If the registration fails, return error.
-	 */
-	if ((ret = crypto_register_provider(&ecc_prov_info,
-	    &ecc_prov_handle)) != CRYPTO_SUCCESS) {
-		cmn_err(CE_WARN, "ecc _init: crypto_register_provider()"
-		    "failed (0x%x)", ret);
+	if ((ret = mod_install(&modlinkage)) != 0)
+		return (ret);
+
+	/* Register with KCF.  If the registration fails, remove the module. */
+	if (crypto_register_provider(&ecc_prov_info, &ecc_prov_handle)) {
+		(void) mod_remove(&modlinkage);
 		return (EACCES);
 	}
 
-	if ((ret = mod_install(&modlinkage)) != 0) {
-		int rv;
-
-		ASSERT(ecc_prov_handle != NULL);
-		/* We should not return if the unregister returns busy. */
-		while ((rv = crypto_unregister_provider(ecc_prov_handle))
-		    == CRYPTO_BUSY) {
-			cmn_err(CE_WARN, "ecc _init: "
-			    "crypto_unregister_provider() "
-			    "failed (0x%x). Retrying.", rv);
-			/* wait 10 seconds and try again. */
-			delay(10 * drv_usectohz(1000000));
-		}
-	}
-
-	return (ret);
+	return (0);
 }
 
 int
 _fini(void)
 {
-	int ret;
-
-	/*
-	 * Unregister from KCF if previous registration succeeded.
-	 */
+	/* Unregister from KCF if module is registered */
 	if (ecc_prov_handle != NULL) {
-		if ((ret = crypto_unregister_provider(ecc_prov_handle)) !=
-		    CRYPTO_SUCCESS) {
-			cmn_err(CE_WARN, "ecc _fini: "
-			    "crypto_unregister_provider() "
-			    "failed (0x%x)", ret);
+		if (crypto_unregister_provider(ecc_prov_handle))
 			return (EBUSY);
-		}
+
 		ecc_prov_handle = NULL;
 	}
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,6 +69,8 @@ static kcf_prov_stats_t kcf_stats_ks_data_template = {
 
 #define	KCF_SPI_COPY_OPS(src, dst, ops) if ((src)->ops != NULL) \
 	*((dst)->ops) = *((src)->ops);
+
+extern int sys_shutdown;
 
 /*
  * Copy an ops vector from src to dst. Used during provider registration
@@ -134,8 +136,10 @@ crypto_register_provider(crypto_provider_info_t *info,
 	kcf_provider_desc_t *prov_desc = NULL;
 	int ret = CRYPTO_ARGUMENTS_BAD;
 
-	if (info->pi_interface_version > CRYPTO_SPI_VERSION_4)
-		return (CRYPTO_VERSION_MISMATCH);
+	if (info->pi_interface_version > CRYPTO_SPI_VERSION_4) {
+		ret = CRYPTO_VERSION_MISMATCH;
+		goto errormsg;
+	}
 
 	/*
 	 * Check provider type, must be software, hardware, or logical.
@@ -143,7 +147,7 @@ crypto_register_provider(crypto_provider_info_t *info,
 	if (info->pi_provider_type != CRYPTO_HW_PROVIDER &&
 	    info->pi_provider_type != CRYPTO_SW_PROVIDER &&
 	    info->pi_provider_type != CRYPTO_LOGICAL_PROVIDER)
-		return (CRYPTO_ARGUMENTS_BAD);
+		goto errormsg;
 
 	/*
 	 * Allocate and initialize a new provider descriptor. We also
@@ -415,6 +419,49 @@ undo_then_bail:
 	ret = CRYPTO_FAILED;
 bail:
 	KCF_PROV_REFRELE(prov_desc);
+
+errormsg:
+	if (ret != CRYPTO_SUCCESS && sys_shutdown == 0) {
+		switch (ret) {
+		case CRYPTO_FAILED:
+			cmn_err(CE_WARN, "%s failed when registering with the "
+			    "Cryptographic Framework.",
+			    info->pi_provider_description);
+			break;
+
+		case CRYPTO_MODVERIFICATION_FAILED:
+			cmn_err(CE_WARN, "%s failed module verification when "
+			    "registering with the Cryptographic Framework.",
+			    info->pi_provider_description);
+			break;
+
+		case CRYPTO_ARGUMENTS_BAD:
+			cmn_err(CE_WARN, "%s provided bad arguments and was "
+			    "not registered with the Cryptographic Framework.",
+			    info->pi_provider_description);
+			break;
+
+		case CRYPTO_VERSION_MISMATCH:
+			cmn_err(CE_WARN, "%s was not registered with the "
+			    "Cryptographic Framework as there is a SPI version "
+			    "mismatch (%d) error.",
+			    info->pi_provider_description,
+			    info->pi_interface_version);
+			break;
+
+		case CRYPTO_FIPS140_ERROR:
+			cmn_err(CE_WARN, "%s was not registered with the "
+			    "Cryptographic Framework as there was a FIPS 140 "
+			    "validation error.", info->pi_provider_description);
+			break;
+
+		default:
+			cmn_err(CE_WARN, "%s did not register with the "
+			    "Cryptographic Framework. (0x%x)",
+			    info->pi_provider_description, ret);
+		};
+	}
+
 	return (ret);
 }
 
@@ -450,10 +497,14 @@ crypto_unregister_provider(crypto_kcf_provider_handle_t handle)
 	uint_t mech_idx;
 	kcf_provider_desc_t *desc;
 	kcf_prov_state_t saved_state;
+	int ret = CRYPTO_SUCCESS;
 
 	/* lookup provider descriptor */
-	if ((desc = kcf_prov_tab_lookup((crypto_provider_id_t)handle)) == NULL)
-		return (CRYPTO_UNKNOWN_PROVIDER);
+	if ((desc = kcf_prov_tab_lookup((crypto_provider_id_t)handle)) ==
+	    NULL) {
+		ret = CRYPTO_UNKNOWN_PROVIDER;
+		goto errormsg;
+	}
 
 	mutex_enter(&desc->pd_lock);
 	/*
@@ -464,7 +515,8 @@ crypto_unregister_provider(crypto_kcf_provider_handle_t handle)
 		mutex_exit(&desc->pd_lock);
 		/* Release reference held by kcf_prov_tab_lookup(). */
 		KCF_PROV_REFRELE(desc);
-		return (CRYPTO_BUSY);
+		ret = CRYPTO_BUSY;
+		goto errormsg;
 	}
 
 	saved_state = desc->pd_state;
@@ -498,7 +550,8 @@ crypto_unregister_provider(crypto_kcf_provider_handle_t handle)
 	    CRYPTO_SUCCESS) {
 		/* Release reference held by kcf_prov_tab_lookup(). */
 		KCF_PROV_REFRELE(desc);
-		return (CRYPTO_UNKNOWN_PROVIDER);
+		ret = CRYPTO_UNKNOWN_PROVIDER;
+		goto errormsg;
 	}
 
 	delete_kstat(desc);
@@ -560,7 +613,29 @@ crypto_unregister_provider(crypto_kcf_provider_handle_t handle)
 		mutex_exit(&prov_tab_mutex);
 	}
 
-	return (CRYPTO_SUCCESS);
+errormsg:
+	if (ret != CRYPTO_SUCCESS && sys_shutdown == 0) {
+		switch (ret) {
+		case CRYPTO_UNKNOWN_PROVIDER:
+			cmn_err(CE_WARN, "Unknown provider \"%s\" was "
+			    "requested to unregister from the cryptographic "
+			    "framework.", desc->pd_description);
+			break;
+
+		case CRYPTO_BUSY:
+			cmn_err(CE_WARN, "%s could not be unregistered from "
+			    "the Cryptographic Framework as it is busy.",
+			    desc->pd_description);
+			break;
+
+		default:
+			cmn_err(CE_WARN, "%s did not unregister with the "
+			    "Cryptographic Framework. (0x%x)",
+			    desc->pd_description, ret);
+		};
+	}
+
+	return (ret);
 }
 
 /*

@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * In kernel module, the md4 module is created with one modlinkage,
@@ -165,16 +164,10 @@ _init(void)
 	if ((ret = mod_install(&modlinkage)) != 0)
 		return (ret);
 
-	/*
-	 * Register with KCF. If the registration fails, log an
-	 * error and uninstall the module.
-	 */
-	if ((ret = crypto_register_provider(&md4_prov_info,
-	    &md4_prov_handle)) != CRYPTO_SUCCESS) {
-		cmn_err(CE_WARN, "md4 _init: "
-		    "crypto_register_provider() failed (0x%x)", ret);
+	/* Register with KCF.  If the registration fails, remove the module. */
+	if (crypto_register_provider(&md4_prov_info, &md4_prov_handle)) {
 		(void) mod_remove(&modlinkage);
-		return (ret);
+		return (EACCES);
 	}
 
 	return (0);
@@ -183,18 +176,11 @@ _init(void)
 int
 _fini(void)
 {
-	int ret;
-
-	/*
-	 * Unregister from KCF if previous registration succeeded.
-	 */
+	/* Unregister from KCF if module is registered */
 	if (md4_prov_handle != NULL) {
-		if ((ret = crypto_unregister_provider(md4_prov_handle)) !=
-		    CRYPTO_SUCCESS) {
-			cmn_err(CE_WARN, "md4 _fini: "
-			    "crypto_unregister_provider() failed (0x%x)", ret);
+		if (crypto_unregister_provider(md4_prov_handle))
 			return (EBUSY);
-		}
+
 		md4_prov_handle = NULL;
 	}
 

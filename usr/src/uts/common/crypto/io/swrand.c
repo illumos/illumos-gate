@@ -206,16 +206,6 @@ _init(void)
 	hrtime_t ts;
 	time_t now;
 
-	/*
-	 * Register with KCF. If the registration fails, return error.
-	 */
-	if ((ret = crypto_register_provider(&swrand_prov_info,
-	    &swrand_prov_handle)) != CRYPTO_SUCCESS) {
-		cmn_err(CE_WARN, "swrand : Kernel Random Number Provider "
-		    "disabled for /dev/random use");
-		return (EACCES);
-	}
-
 	mutex_init(&srndpool_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&buffer_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&srndpool_read_cv, NULL, CV_DEFAULT, NULL);
@@ -243,21 +233,12 @@ _init(void)
 	ASSERT(ret == 0);
 
 	if (physmem_ent_init(&entsrc) != 0) {
-		mutex_destroy(&srndpool_lock);
-		mutex_destroy(&buffer_lock);
-		cv_destroy(&srndpool_read_cv);
-		(void) crypto_unregister_provider(swrand_prov_handle);
-		return (ENOMEM);
+		ret = ENOMEM;
+		goto exit1;
 	}
 
-	if ((ret = mod_install(&modlinkage)) != 0) {
-		mutex_destroy(&srndpool_lock);
-		mutex_destroy(&buffer_lock);
-		cv_destroy(&srndpool_read_cv);
-		physmem_ent_fini(&entsrc);
-		(void) crypto_unregister_provider(swrand_prov_handle);
-		return (ret);
-	}
+	if ((ret = mod_install(&modlinkage)) != 0)
+		goto exit2;
 
 	/* Schedule periodic mixing of the pool. */
 	mutex_enter(&srndpool_lock);
@@ -266,7 +247,22 @@ _init(void)
 	(void) swrand_get_entropy((uint8_t *)swrand_XKEY, HASHSIZE, B_TRUE);
 	bcopy(swrand_XKEY, previous_bytes, HASHSIZE);
 
+	/* Register with KCF. If the registration fails, return error. */
+	if (crypto_register_provider(&swrand_prov_info, &swrand_prov_handle)) {
+		(void) mod_remove(&modlinkage);
+		ret = EACCES;
+		goto exit2;
+	}
+
 	return (0);
+
+exit2:
+	physmem_ent_fini(&entsrc);
+exit1:
+	mutex_destroy(&srndpool_lock);
+	mutex_destroy(&buffer_lock);
+	cv_destroy(&srndpool_read_cv);
+	return (ret);
 }
 
 int

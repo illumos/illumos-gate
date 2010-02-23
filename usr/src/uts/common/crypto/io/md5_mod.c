@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -244,14 +244,11 @@ _init(void)
 		return (ret);
 
 	/*
-	 * Register with KCF. If the registration fails, log an
-	 * error but do not uninstall the module, since the functionality
-	 * provided by misc/md5 should still be available.
+	 * Register with KCF.  If the registration fails, do not uninstall the
+	 * module, since the functionality provided by misc/md5 should still be
+	 * available.
 	 */
-	if ((ret = crypto_register_provider(&md5_prov_info,
-	    &md5_prov_handle)) != CRYPTO_SUCCESS)
-		cmn_err(CE_WARN, "md5 _init: "
-		    "crypto_register_provider() failed (0x%x)", ret);
+	(void) crypto_register_provider(&md5_prov_info, &md5_prov_handle);
 
 	return (0);
 }
@@ -266,11 +263,9 @@ _fini(void)
 	 */
 	if (md5_prov_handle != NULL) {
 		if ((ret = crypto_unregister_provider(md5_prov_handle)) !=
-		    CRYPTO_SUCCESS) {
-			cmn_err(CE_WARN, "md5 _fini: "
-			    "crypto_unregister_provider() failed (0x%x)", ret);
-			return (EBUSY);
-		}
+		    CRYPTO_SUCCESS)
+			return (ret);
+
 		md5_prov_handle = NULL;
 	}
 

@@ -152,29 +152,13 @@ _init(void)
 {
 	int ret;
 
-	/*
-	 * Register with KCF. If the registration fails, log an error
-	 * and uninstall the module.
-	 */
-	if ((ret = crypto_register_provider(&rc4_prov_info,
-	    &rc4_prov_handle)) != CRYPTO_SUCCESS) {
-		cmn_err(CE_WARN, "_init: crypto_register_provider(%s)"
-		    "failed (0x%x)", "arcfour", ret);
+	if ((ret = mod_install(&modlinkage)) != 0)
+		return (ret);
+
+	/* Register with KCF.  If the registration fails, remove the module. */
+	if (crypto_register_provider(&rc4_prov_info, &rc4_prov_handle)) {
+		(void) mod_remove(&modlinkage);
 		return (EACCES);
-	}
-
-	if ((ret = mod_install(&modlinkage)) != 0) {
-		int rv;
-
-		ASSERT(rc4_prov_handle != NULL);
-		/* We should not return if the unregister returns busy. */
-		while ((rv = crypto_unregister_provider(rc4_prov_handle))
-		    == CRYPTO_BUSY) {
-			cmn_err(CE_WARN, "_init: crypto_unregister_provider(%s)"
-			    " failed (0x%x). Retrying.", "arcfour", rv);
-			/* wait 10 seconds and try again. */
-			delay(10 * drv_usectohz(1000000));
-		}
 	}
 
 	return (0);
@@ -183,18 +167,11 @@ _init(void)
 int
 _fini(void)
 {
-	int ret;
-
-	/*
-	 * Unregister from KCF if previous registration succeeded.
-	 */
+	/* Unregister from KCF if module is registered */
 	if (rc4_prov_handle != NULL) {
-		if ((ret = crypto_unregister_provider(rc4_prov_handle)) !=
-		    CRYPTO_SUCCESS) {
-			cmn_err(CE_WARN, "_fini: crypto_unregister_provider(%s)"
-			    " failed (0x%x)", "arcfour", ret);
+		if (crypto_unregister_provider(rc4_prov_handle))
 			return (EBUSY);
-		}
+
 		rc4_prov_handle = NULL;
 	}
 
