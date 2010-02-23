@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -538,11 +538,17 @@ extern	kmutex_t	pidlock;	/* global process lock */
 /*
  * thread_free_lock is used by the tick accounting thread to keep a thread
  * from being freed while it is being examined.
+ *
+ * Thread structures are 32-byte aligned structures. That is why we use the
+ * following formula.
  */
-#define	THREAD_FREE_NUM		1024
+#define	THREAD_FREE_BITS	10
+#define	THREAD_FREE_NUM		(1 << THREAD_FREE_BITS)
 #define	THREAD_FREE_MASK	(THREAD_FREE_NUM - 1)
-#define	THREAD_FREE_SHIFT_BITS	5
-#define	THREAD_FREE_SHIFT(t)	((uintptr_t)t >> THREAD_FREE_SHIFT_BITS)
+#define	THREAD_FREE_1		PTR24_LSB
+#define	THREAD_FREE_2		(PTR24_LSB + THREAD_FREE_BITS)
+#define	THREAD_FREE_SHIFT(t)	\
+	(((ulong_t)(t) >> THREAD_FREE_1) ^ ((ulong_t)(t) >> THREAD_FREE_2))
 #define	THREAD_FREE_HASH(t)	(THREAD_FREE_SHIFT(t) & THREAD_FREE_MASK)
 
 typedef struct thread_free_lock {
