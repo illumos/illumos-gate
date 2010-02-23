@@ -4720,11 +4720,12 @@ ztest_run_zdb(char *pool)
 	isa = strdup(isa);
 	/* LINTED */
 	(void) sprintf(bin,
-	    "/usr/sbin%.*s/zdb -bcc%s%s -U /tmp/zpool.cache %s",
+	    "/usr/sbin%.*s/zdb -bcc%s%s -U %s %s",
 	    isalen,
 	    isa,
 	    zopt_verbose >= 3 ? "s" : "",
 	    zopt_verbose >= 4 ? "v" : "",
+	    spa_config_path,
 	    pool);
 	free(isa);
 
@@ -5388,18 +5389,18 @@ main(int argc, char **argv)
 
 	(void) setvbuf(stdout, NULL, _IOLBF, 0);
 
-	/* Override location of zpool.cache */
-	spa_config_path = "/tmp/zpool.cache";
-
 	ztest_random_fd = open("/dev/urandom", O_RDONLY);
 
 	process_options(argc, argv);
+
+	/* Override location of zpool.cache */
+	(void) asprintf((char **)&spa_config_path, "%s/zpool.cache", zopt_dir);
 
 	/*
 	 * Blow away any existing copy of zpool.cache
 	 */
 	if (zopt_init != 0)
-		(void) remove("/tmp/zpool.cache");
+		(void) remove(spa_config_path);
 
 	shared_size = sizeof (*zs) + zopt_datasets * sizeof (ztest_ds_t);
 

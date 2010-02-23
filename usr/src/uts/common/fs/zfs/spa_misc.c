@@ -1138,9 +1138,15 @@ spa_generate_guid(spa_t *spa)
 void
 sprintf_blkptr(char *buf, const blkptr_t *bp)
 {
-	char *type = dmu_ot[BP_GET_TYPE(bp)].ot_name;
-	char *checksum = zio_checksum_table[BP_GET_CHECKSUM(bp)].ci_name;
-	char *compress = zio_compress_table[BP_GET_COMPRESS(bp)].ci_name;
+	char *type = NULL;
+	char *checksum = NULL;
+	char *compress = NULL;
+
+	if (bp != NULL) {
+		type = dmu_ot[BP_GET_TYPE(bp)].ot_name;
+		checksum = zio_checksum_table[BP_GET_CHECKSUM(bp)].ci_name;
+		compress = zio_compress_table[BP_GET_COMPRESS(bp)].ci_name;
+	}
 
 	SPRINTF_BLKPTR(snprintf, ' ', buf, bp, type, checksum, compress);
 }
