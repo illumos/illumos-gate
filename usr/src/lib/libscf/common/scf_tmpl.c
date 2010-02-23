@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -994,8 +994,7 @@ _get_restarter_inst(scf_handle_t *h, scf_service_t *svc,
 	if ((ri = scf_instance_create(h)) == NULL ||
 	    (pg = scf_pg_create(h)) == NULL) {
 		assert(scf_error() != SCF_ERROR_INVALID_ARGUMENT);
-		scf_instance_destroy(ri);
-		return (NULL);
+		goto _get_restarter_inst_fail;
 	}
 
 	if (inst != NULL)
@@ -1066,13 +1065,11 @@ _get_restarter_inst(scf_handle_t *h, scf_service_t *svc,
 	if (scf_handle_decode_fmri(h, restarter, NULL, NULL, ri, NULL, NULL,
 	    SCF_DECODE_FMRI_EXACT|SCF_DECODE_FMRI_REQUIRE_INSTANCE) != 0) {
 		if (ismember(scf_error(), errors_server)) {
-			uu_free(restarter);
 			goto _get_restarter_inst_fail;
 		} else switch (scf_error()) {
 		case SCF_ERROR_CONSTRAINT_VIOLATED:
 		case SCF_ERROR_INVALID_ARGUMENT:
 		case SCF_ERROR_NOT_FOUND:
-			free(restarter);
 			goto _get_restarter_inst_fail;
 
 		case SCF_ERROR_HANDLE_MISMATCH:
@@ -1088,6 +1085,7 @@ _get_restarter_inst(scf_handle_t *h, scf_service_t *svc,
 	return (ri);
 
 _get_restarter_inst_fail:
+	free(restarter);
 	scf_instance_destroy(ri);
 	scf_pg_destroy(pg);
 	return (NULL);
@@ -1155,6 +1153,12 @@ _get_global_inst(scf_handle_t *h)
  * The function is only expected to return SCF_WALK_DONE if it has
  * found a property group match in the current entity, and has
  * populated p->pw_pg with the matching property group.
+ *
+ * The caller of _walk_template_instances() MUST check if the passed parameters
+ * inst and svc match the fields pw_inst and pw_svc in the resulting
+ * pg_tmpl_walk_t and call the destructor for the unmatching objects. The walker
+ * may silently drop them if the template definition is in the restarter or in
+ * the global instance.
  */
 static void
 _walk_template_instances(scf_service_t *svc, scf_instance_t *inst,
@@ -1711,7 +1715,7 @@ int
 scf_tmpl_get_by_pg(scf_propertygroup_t *pg, scf_pg_tmpl_t *pg_tmpl, int flags)
 {
 	char *fmribuf = NULL, *snapbuf = NULL, *pg_name = NULL, *pg_type = NULL;
-	int ret = 0;
+	int ret;
 	ssize_t fbufsz = scf_limit(SCF_LIMIT_MAX_FMRI_LENGTH) + 1;
 	ssize_t nbufsz = scf_limit(SCF_LIMIT_MAX_NAME_LENGTH) + 1;
 	ssize_t tbufsz = scf_limit(SCF_LIMIT_MAX_PG_TYPE_LENGTH) + 1;
@@ -1720,7 +1724,7 @@ scf_tmpl_get_by_pg(scf_propertygroup_t *pg, scf_pg_tmpl_t *pg_tmpl, int flags)
 	scf_service_t *svc = NULL;
 	scf_handle_t *h;
 	scf_snapshot_t *snap = NULL;
-	pg_tmpl_walk_t *p;
+	pg_tmpl_walk_t *p = NULL;
 
 	assert(fbufsz != 0 && nbufsz != 0 && tbufsz != 0);
 
@@ -1732,32 +1736,22 @@ scf_tmpl_get_by_pg(scf_propertygroup_t *pg, scf_pg_tmpl_t *pg_tmpl, int flags)
 	if ((inst = scf_instance_create(h)) == NULL ||
 	    (svc = scf_service_create(h)) == NULL ||
 	    (snaplvl = scf_snaplevel_create(h)) == NULL) {
-		scf_instance_destroy(inst);
-		scf_service_destroy(svc);
-		return (-1);
+		goto fail;
 	}
 
 	if ((fmribuf = malloc(fbufsz)) == NULL ||
 	    (pg_name = malloc(nbufsz)) == NULL ||
 	    (pg_type = malloc(tbufsz)) == NULL ||
 	    (p = calloc(1, sizeof (pg_tmpl_walk_t))) == NULL) {
-		free(fmribuf);
-		free(pg_name);
-		free(pg_type);
-		scf_instance_destroy(inst);
-		scf_service_destroy(svc);
-		scf_snaplevel_destroy(snaplvl);
 		(void) scf_set_error(SCF_ERROR_NO_MEMORY);
-		return (-1);
+		goto fail;
 	}
 
 	if (scf_pg_get_name(pg, pg_name, nbufsz) < 0) {
-		ret = -1;
 		goto fail;
 	}
 
 	if (scf_pg_get_type(pg, pg_type, tbufsz) < 0) {
-		ret = -1;
 		goto fail;
 	}
 	p->pw_pgname = pg_name;
@@ -1790,14 +1784,12 @@ scf_tmpl_get_by_pg(scf_propertygroup_t *pg, scf_pg_tmpl_t *pg_tmpl, int flags)
 
 	} else {
 		if ((snap = scf_snapshot_create(h)) == NULL) {
-			ret = -1;
 			goto fail;
 		}
 
 		ret = scf_snaplevel_get_parent(snaplvl, snap);
 		if (ret == -1) {
 			if (ismember(scf_error(), errors_server)) {
-				ret = -1;
 				goto fail;
 			} else {
 				assert(0);
@@ -1808,12 +1800,10 @@ scf_tmpl_get_by_pg(scf_propertygroup_t *pg, scf_pg_tmpl_t *pg_tmpl, int flags)
 		/* Grab snapshot name while we're here. */
 		if ((snapbuf = malloc(nbufsz)) == NULL) {
 			(void) scf_set_error(SCF_ERROR_NO_MEMORY);
-			ret = -1;
 			goto fail;
 		}
 		if (scf_snapshot_get_name(snap, snapbuf, nbufsz) < 0) {
 			if (ismember(scf_error(), errors_server)) {
-				ret = -1;
 				goto fail;
 			} else {
 				assert(0);
@@ -1825,7 +1815,6 @@ scf_tmpl_get_by_pg(scf_propertygroup_t *pg, scf_pg_tmpl_t *pg_tmpl, int flags)
 		ret = scf_snapshot_get_parent(snap, inst);
 		if (ret == -1) {
 			if (ismember(scf_error(), errors_server)) {
-				ret = -1;
 				goto fail;
 			} else {
 				assert(0);
@@ -1865,7 +1854,6 @@ scf_tmpl_get_by_pg(scf_propertygroup_t *pg, scf_pg_tmpl_t *pg_tmpl, int flags)
 				case SCF_ERROR_HANDLE_MISMATCH:
 				case SCF_ERROR_NOT_BOUND:
 				case SCF_ERROR_NOT_SET:
-					ret = -1;
 					goto fail;
 
 				default:
@@ -1874,7 +1862,6 @@ scf_tmpl_get_by_pg(scf_propertygroup_t *pg, scf_pg_tmpl_t *pg_tmpl, int flags)
 				}
 			}
 		} else {
-			ret = -1;
 			goto fail;
 		}
 	}
@@ -1883,22 +1870,28 @@ scf_tmpl_get_by_pg(scf_propertygroup_t *pg, scf_pg_tmpl_t *pg_tmpl, int flags)
 		pg_tmpl->pt_h = h;
 		pg_tmpl->pt_pg = p->pw_pg;
 		pg_tmpl->pt_inst = p->pw_inst;
+		/* we may get a different instance back */
+		if (p->pw_inst != inst)
+			scf_instance_destroy(inst);
 		pg_tmpl->pt_snap = p->pw_snap;
 		pg_tmpl->pt_svc = p->pw_svc;
+		/* we may get a different service back */
+		if (p->pw_svc != svc)
+			scf_service_destroy(svc);
 		pg_tmpl->pt_populated = 1;
 		free(p->pw_tmpl_pgname);
 		ret = 0;
 		goto done;
 	}
 
-	ret = -1;
 	(void) scf_set_error(SCF_ERROR_NOT_FOUND);
 
 fail:
+	ret = -1;
 	scf_instance_destroy(inst);
 	scf_service_destroy(svc);
-	scf_snapshot_destroy(snap);
 done:
+	scf_snapshot_destroy(snap);
 	free(snapbuf);
 	free(fmribuf);
 	free(pg_name);
@@ -1944,7 +1937,7 @@ scf_tmpl_get_by_pg_name(const char *fmri, const char *snapshot,
 	scf_instance_t *inst = NULL;
 	scf_service_t *svc = NULL;
 	scf_snapshot_t *snap = NULL;
-	pg_tmpl_walk_t *p;
+	pg_tmpl_walk_t *p = NULL;
 	scf_handle_t *h;
 	int ret;
 
@@ -1956,14 +1949,13 @@ scf_tmpl_get_by_pg_name(const char *fmri, const char *snapshot,
 
 	if ((inst = scf_instance_create(h)) == NULL ||
 	    (svc = scf_service_create(h)) == NULL) {
-		scf_instance_destroy(inst);
-		return (-1);
+		goto fail;
 	}
 
 	p = calloc(1, sizeof (pg_tmpl_walk_t));
 	if (p == NULL) {
 		(void) scf_set_error(SCF_ERROR_NO_MEMORY);
-		goto fail_zalloc;
+		goto fail;
 	}
 
 	ret = scf_handle_decode_fmri(h, fmri, NULL, NULL, inst, NULL,
@@ -2003,6 +1995,7 @@ scf_tmpl_get_by_pg_name(const char *fmri, const char *snapshot,
 	assert(svc == NULL || inst == NULL);
 	assert(svc != NULL || inst != NULL);
 
+	/* If we have a service fmri, snapshot is ignored. */
 	if (inst != NULL) {
 		if (snapshot == NULL || strcmp(snapshot, "running") == 0 ||
 		    (flags & SCF_PG_TMPL_FLAG_CURRENT) ==
@@ -2016,10 +2009,6 @@ scf_tmpl_get_by_pg_name(const char *fmri, const char *snapshot,
 				goto fail;
 			}
 		}
-	} else {
-		/* If we have a service fmri, snapshot is ignored. */
-		scf_snapshot_destroy(snap);
-		snap = NULL;
 	}
 
 	p->pw_snapname = snapshot;
@@ -2040,9 +2029,16 @@ scf_tmpl_get_by_pg_name(const char *fmri, const char *snapshot,
 		pg_tmpl->pt_h = h;
 		pg_tmpl->pt_pg = p->pw_pg;
 		pg_tmpl->pt_inst = p->pw_inst;
+		/* we may get a different instance back */
+		if (p->pw_inst != inst)
+			scf_instance_destroy(inst);
 		pg_tmpl->pt_snap = p->pw_snap;
 		pg_tmpl->pt_svc = p->pw_svc;
+		/* we may get a different service back */
+		if (p->pw_svc != svc)
+			scf_service_destroy(svc);
 		pg_tmpl->pt_populated = 1;
+		scf_snapshot_destroy(snap);
 		free(p->pw_tmpl_pgname);
 		free(p);
 		return (0);
@@ -2051,7 +2047,6 @@ scf_tmpl_get_by_pg_name(const char *fmri, const char *snapshot,
 	(void) scf_set_error(SCF_ERROR_NOT_FOUND);
 fail:
 	free(p);
-fail_zalloc:
 	scf_instance_destroy(inst);
 	scf_service_destroy(svc);
 	scf_snapshot_destroy(snap);
@@ -2126,12 +2121,19 @@ _get_next_iterator(scf_handle_t *h, scf_pg_tmpl_t *t, const char *snapshot,
 	 * Check what level we last iterated on: none, service,
 	 * restarter, or global.  Make sure that if one in the middle
 	 * doesn't exist, we move on to the next entity.
+	 *
+	 * Before we drop any references to pt_inst or pt_svc we must
+	 * destroy them so we don't leak them.
 	 */
 	do {
 		switch (t->pt_iter_last) {
 		case SCF__TMPL_ITER_NONE:
 			t->pt_iter_last = SCF__TMPL_ITER_INST;
+			if (t->pt_inst != t->pt_orig_inst)
+				scf_instance_destroy(t->pt_inst);
 			t->pt_inst = t->pt_orig_inst;
+			if (t->pt_svc != t->pt_orig_svc)
+				scf_service_destroy(t->pt_svc);
 			t->pt_svc = t->pt_orig_svc;
 			break;
 
@@ -2145,14 +2147,20 @@ _get_next_iterator(scf_handle_t *h, scf_pg_tmpl_t *t, const char *snapshot,
 				goto fail;
 			}
 			t->pt_iter_last = SCF__TMPL_ITER_RESTARTER;
+			if (t->pt_inst != t->pt_orig_inst)
+				scf_instance_destroy(t->pt_inst);
 			t->pt_inst = _get_restarter_inst(h, t->pt_orig_svc,
 			    t->pt_orig_inst, t->pt_snap);
+			scf_service_destroy(t->pt_svc);
 			t->pt_svc = NULL;
 			break;
 
 		case SCF__TMPL_ITER_RESTARTER:
 			t->pt_iter_last = SCF__TMPL_ITER_GLOBAL;
+			if (t->pt_inst != t->pt_orig_inst)
+				scf_instance_destroy(t->pt_inst);
 			t->pt_inst = _get_global_inst(h);
+			scf_service_destroy(t->pt_svc);
 			t->pt_svc = NULL;
 			break;
 
@@ -6436,12 +6444,16 @@ _scf_tmpl_check_pg_redef(scf_handle_t *h, const char *fmri,
 					goto cleanup;
 				free(pg_name_r);
 				pg_name_r = NULL;
+				free(pg_type_r);
+				pg_type_r = NULL;
 				free(target);
 				target = NULL;
 				break;
 			}
 			free(pg_name_r);
 			pg_name_r = NULL;
+			free(pg_type_r);
+			pg_type_r = NULL;
 			free(target);
 			target = NULL;
 		}
