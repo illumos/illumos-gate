@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -256,7 +256,7 @@ create_admin_file()
 # 2) Build the list of files to remove.
 # Similar structure to get_ed_cp_list() but we're processing the NGZ contents
 # file.
-# Entries in the rmlist file will be in format filepath:class:pkgname
+# Entries in the rmlist file will be in format filepath|class|pkgname
 # class and pkgname are used in remove_files() if requires to run any class
 # action script.
 get_rm_list()
@@ -314,7 +314,7 @@ get_rm_list()
 		}
 
 		if (rm == 1)
-			printf("/a%s:%s:%s\n", nm, cls, pname) >>"/tmp/rmlist";
+			printf("/a%s|%s|%s\n", nm, cls, pname) >>"/tmp/rmlist";
 		else
 			printf("/a%s\n", nm) >>"/tmp/ngz_ed_list";
 
@@ -367,16 +367,20 @@ get_rm_list()
 	# sorted and we wrote the files as we processed the contents file,
 	# these files are already sorted.
 	comm -13 /tmp/gz_ed_list /tmp/ngz_ed_list | \
-	    sed -e 's,$,::,' >>/tmp/rmlist || fatal "get_rm_list"
+	    sed -e 's,$,||,' >>/tmp/rmlist || fatal "get_rm_list"
 }
 
 remove_files()
 {
 	for line in `cat /tmp/rmlist`
 	do
-		path=`echo $line | cut -d':' -f1`
-		class=`echo $line | cut -d':' -f2`
-		PKGINST=`echo $line | cut -d':' -f3`
+		OLDIFS=$IFS
+		IFS="|"
+		set -A arr $line
+		path=${arr[0]}
+		class=${arr[1]}
+		PKGINST=${arr[2]}
+		IFS=$OLDIFS
 
 		if [ "$path" != "" ] ; then
 			if [ "$class" = "none" -o "$class" = "" ] ; then
@@ -390,16 +394,32 @@ remove_files()
 					rm -f $path || fatal "remove_files"
 				fi
 			else
-				cas1=/a/var/sadm/pkg/$PKGINST/install/r\.$class
-				cas2=/a/usr/sadm/install/scripts/r\.$class
-				if [ -f $cas1 ]; then
-					echo $path | PKG_INSTALL_ROOT=/a \
-					    PKGINST=$PKGINST /bin/sh $cas1
-				elif [ -f $cas2 ]; then
-					echo $path | PKG_INSTALL_ROOT=/a \
-					    PKGINST=$PKGINST /bin/sh $cas2
-				else
-					rm -f $path || fatal "remove_files"
+				rm=0
+				rpath=`echo $path | sed -e 's,^/a,,'`
+
+				# Run the class action script for only those files
+				# which are not getting reinstalled in zone.
+				check=`grep -w "$rpath" /tmp/gz_cp_list /tmp/gz_ed_list`
+				if [ "$check" = "" -a -f $path ]; then
+					cas1=/a/var/sadm/pkg/$PKGINST/install/r\.$class
+					cas2=/a/usr/sadm/install/scripts/r\.$class
+					if [ -f $cas1 ]; then
+						echo $path | PKG_INSTALL_ROOT=/a \
+						    PKGINST=$PKGINST /bin/sh $cas1
+						rm=1
+					elif [ -f $cas2 ]; then
+						echo $path | PKG_INSTALL_ROOT=/a \
+						    PKGINST=$PKGINST /bin/sh $cas2
+						rm=1
+					fi
+				fi
+				
+				if [ "$rm" = "0" ]; then
+					if [ -d $path ]; then
+						rmdir $path >/dev/null 2>&1
+					else
+						rm -f $path || fatal "remove_files"
+					fi	
 				fi
 			fi
 		fi
