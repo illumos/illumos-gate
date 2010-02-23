@@ -2280,7 +2280,13 @@ compute_chs_values(diskaddr_t total_capacity, diskaddr_t usable_capacity,
 {
 
 	/* Unlabeled SCSI floppy device */
-	if (total_capacity <= 0x1000) {
+	if (total_capacity < 160) {
+		/* Less than 80K */
+		*nheadp = 1;
+		*pcylp = total_capacity;
+		*nsectp = 1;
+		return;
+	} else if (total_capacity <= 0x1000) {
 		*nheadp = 2;
 		*pcylp = 80;
 		*nsectp = total_capacity / (80 * 2);

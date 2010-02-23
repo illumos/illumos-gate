@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,7 +75,7 @@ extern "C" {
 
 #define	CMLB_MUTEX(cl)		(&((cl)->cl_mutex))
 #define	CMLB_DEVINFO(cl)	((cl)->cl_devi)
-#define	CMLB_LABEL(cl)		(DEVI(((cl)->cl_devi))->devi_binding_name)
+#define	CMLB_LABEL(cl)		(ddi_driver_name((cl->cl_devi)))
 
 
 #define	ISREMOVABLE(cl)		(cl->cl_is_removable)
