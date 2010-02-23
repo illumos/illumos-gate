@@ -86,6 +86,7 @@ enum {
 	EZFS_SHARENFSFAILED,	/* share(1M) failed */
 	EZFS_PERM,		/* permission denied */
 	EZFS_NOSPC,		/* out of space */
+	EZFS_FAULT,		/* bad address */
 	EZFS_IO,		/* I/O error */
 	EZFS_INTR,		/* signal received */
 	EZFS_ISSPARE,		/* device is a hot spare */

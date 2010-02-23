@@ -144,6 +144,8 @@ libzfs_error_description(libzfs_handle_t *hdl)
 		return (dgettext(TEXT_DOMAIN, "permission denied"));
 	case EZFS_NOSPC:
 		return (dgettext(TEXT_DOMAIN, "out of space"));
+	case EZFS_FAULT:
+		return (dgettext(TEXT_DOMAIN, "bad address"));
 	case EZFS_IO:
 		return (dgettext(TEXT_DOMAIN, "I/O error"));
 	case EZFS_INTR:
@@ -309,6 +311,10 @@ zfs_common_error(libzfs_handle_t *hdl, int error, const char *fmt,
 
 	case EIO:
 		zfs_verror(hdl, EZFS_IO, fmt, ap);
+		return (-1);
+
+	case EFAULT:
+		zfs_verror(hdl, EZFS_FAULT, fmt, ap);
 		return (-1);
 
 	case EINTR:
