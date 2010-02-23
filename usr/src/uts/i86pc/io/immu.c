@@ -66,7 +66,7 @@
  */
 
 /* Various features */
-boolean_t immu_enable = B_FALSE;
+boolean_t immu_enable = B_TRUE;
 boolean_t immu_dvma_enable = B_TRUE;
 
 /* accessed in other files so not static */
@@ -316,6 +316,42 @@ pre_startup_quirks(void)
 }
 
 /*
+ * get_conf_opt()
+ * 	get a rootnex.conf setting  (always a boolean)
+ */
+static void
+get_conf_opt(char *bopt, boolean_t *kvar)
+{
+	char *val = NULL;
+
+	ASSERT(bopt);
+	ASSERT(kvar);
+
+	/*
+	 * Check the rootnex.conf property
+	 * Fake up a dev_t since searching the global
+	 * property list needs it
+	 */
+	if (ddi_prop_lookup_string(makedevice(ddi_name_to_major("rootnex"), 0),
+	    root_devinfo, DDI_PROP_DONTPASS | DDI_PROP_ROOTNEX_GLOBAL,
+	    bopt, &val) != DDI_PROP_SUCCESS) {
+		return;
+	}
+
+	ASSERT(val);
+	if (strcmp(val, "true") == 0) {
+		*kvar = B_TRUE;
+	} else if (strcmp(val, "false") == 0) {
+		*kvar = B_FALSE;
+	} else {
+		ddi_err(DER_WARN, NULL, "rootnex.conf switch %s=\"%s\" ",
+		    "is not set to true or false. Ignoring option.",
+		    bopt, val);
+	}
+	ddi_prop_free(val);
+}
+
+/*
  * get_bootopt()
  * 	check a boot option  (always a boolean)
  */
@@ -348,7 +384,7 @@ get_bootopt(char *bopt, boolean_t *kvar)
 }
 
 static void
-get_tunables(char *bopt, int64_t *ivar)
+get_conf_tunables(char *bopt, int64_t *ivar)
 {
 	int64_t	*iarray;
 	uint_t n;
@@ -387,6 +423,28 @@ get_tunables(char *bopt, int64_t *ivar)
 }
 
 static void
+read_conf_options(void)
+{
+	/* enable/disable options */
+	get_conf_opt("immu-enable", &immu_enable);
+	get_conf_opt("immu-dvma-enable", &immu_dvma_enable);
+	get_conf_opt("immu-gfxdvma-enable", &immu_gfxdvma_enable);
+	get_conf_opt("immu-intrmap-enable", &immu_intrmap_enable);
+	get_conf_opt("immu-qinv-enable", &immu_qinv_enable);
+
+	/* workaround switches */
+	get_conf_opt("immu-quirk-usbpage0", &immu_quirk_usbpage0);
+	get_conf_opt("immu-quirk-usbfullpa", &immu_quirk_usbfullpa);
+	get_conf_opt("immu-quirk-usbrmrr", &immu_quirk_usbrmrr);
+
+	/* debug printing */
+	get_conf_opt("immu-dmar-print", &immu_dmar_print);
+
+	/* get tunables */
+	get_conf_tunables("immu-flush-gran", &immu_flush_gran);
+}
+
+static void
 read_boot_options(void)
 {
 	/* enable/disable options */
@@ -403,9 +461,6 @@ read_boot_options(void)
 
 	/* debug printing */
 	get_bootopt("immu-dmar-print", &immu_dmar_print);
-
-	/* get tunables */
-	get_tunables("immu-flush-gran", &immu_flush_gran);
 }
 
 /*
@@ -813,6 +868,12 @@ immu_init(void)
 		immu_enable = B_FALSE;
 		return;
 	}
+
+	/*
+	 * Read rootnex.conf options. Do this before
+	 * boot options so boot options can override .conf options.
+	 */
+	read_conf_options();
 
 	/*
 	 * retrieve the Intel IOMMU boot options.
