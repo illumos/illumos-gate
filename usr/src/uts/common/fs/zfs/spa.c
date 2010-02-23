@@ -1656,7 +1656,7 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
     char **ereport)
 {
 	int error = 0;
-	nvlist_t *nvconfig, *nvroot = NULL;
+	nvlist_t *nvroot = NULL;
 	vdev_t *rvd;
 	uberblock_t *ub = &spa->spa_uberblock;
 	uint64_t config_cache_txg = spa->spa_config_txg;
@@ -1790,12 +1790,12 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 	if (spa_dir_prop(spa, DMU_POOL_CONFIG, &spa->spa_config_object) != 0)
 		return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, EIO));
 
-	if (load_nvlist(spa, spa->spa_config_object, &nvconfig) != 0)
-		return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, EIO));
-
 	if (!mosconfig) {
 		uint64_t hostid;
-		nvlist_t *policy = NULL;
+		nvlist_t *policy = NULL, *nvconfig;
+
+		if (load_nvlist(spa, spa->spa_config_object, &nvconfig) != 0)
+			return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, EIO));
 
 		if (!spa_is_root(spa) && nvlist_lookup_uint64(nvconfig,
 		    ZPOOL_CONFIG_HOSTID, &hostid) == 0) {
@@ -1816,6 +1816,7 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 #endif	/* _KERNEL */
 			if (hostid != 0 && myhostid != 0 &&
 			    hostid != myhostid) {
+				nvlist_free(nvconfig);
 				cmn_err(CE_WARN, "pool '%s' could not be "
 				    "loaded as it was last accessed by "
 				    "another system (host: %s hostid: 0x%lx). "
@@ -1997,6 +1998,11 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 	 * assembling a pool from a split, the log is not transferred over.
 	 */
 	if (type != SPA_IMPORT_ASSEMBLE) {
+		nvlist_t *nvconfig;
+
+		if (load_nvlist(spa, spa->spa_config_object, &nvconfig) != 0)
+			return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, EIO));
+
 		VERIFY(nvlist_lookup_nvlist(nvconfig, ZPOOL_CONFIG_VDEV_TREE,
 		    &nvroot) == 0);
 		spa_load_log_state(spa, nvroot);
