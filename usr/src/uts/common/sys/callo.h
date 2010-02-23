@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -138,9 +138,9 @@ typedef struct callout {
  *    This bit represents the callout (table) type. Each CPU has one realtime
  *    and one normal callout table.
  */
-#define	CALLOUT_FREE		0x8000000000000000ULL
+#define	CALLOUT_ID_FREE		0x8000000000000000ULL
 #define	CALLOUT_EXECUTING	0x4000000000000000ULL
-#define	CALLOUT_ID_FLAGS	(CALLOUT_FREE | CALLOUT_EXECUTING)
+#define	CALLOUT_ID_FLAGS	(CALLOUT_ID_FREE | CALLOUT_EXECUTING)
 #define	CALLOUT_ID_MASK		~CALLOUT_ID_FLAGS
 #define	CALLOUT_GENERATION_LOW	0x100000000ULL
 #define	CALLOUT_LONGTERM	0x80000000
@@ -151,7 +151,6 @@ typedef struct callout {
 #define	CALLOUT_COUNTER_SHIFT	callout_table_bits
 #define	CALLOUT_TABLE(t, f)	(((f) << CALLOUT_TYPE_BITS) | (t))
 #define	CALLOUT_TABLE_NUM(ct)	((ct) - callout_table)
-#define	CALLOUT_TABLE_TYPE(ct)	(CALLOUT_TABLE_NUM(ct) & CALLOUT_TYPE_MASK)
 #define	CALLOUT_TABLE_SEQID(ct)	(CALLOUT_TABLE_NUM(ct) >> CALLOUT_TYPE_BITS)
 
 /*
@@ -227,11 +226,17 @@ typedef struct callout_hash {
  *	Callout list contains hrestime timers.
  * CALLOUT_LIST_FLAG_NANO
  *	Callout list contains 1-nanosecond resolution callouts.
+ * CALLOUT_LIST_FLAG_HEAPED
+ *	Callout list is present in the callout heap.
+ * CALLOUT_LIST_FLAG_QUEUED
+ *	Callout list is present in the callout queue.
  */
 #define	CALLOUT_LIST_FLAG_FREE			0x1
 #define	CALLOUT_LIST_FLAG_ABSOLUTE		0x2
 #define	CALLOUT_LIST_FLAG_HRESTIME		0x4
 #define	CALLOUT_LIST_FLAG_NANO			0x8
+#define	CALLOUT_LIST_FLAG_HEAPED		0x10
+#define	CALLOUT_LIST_FLAG_QUEUED		0x20
 
 struct callout_list {
 	callout_list_t	*cl_next;	/* next in clhash */
@@ -248,6 +253,9 @@ struct callout_list {
  * callout list pointer in the heap element, we have to always remove
  * a heap element and its callout list together. We cannot remove one
  * without the other.
+ *
+ * This structure's size must be a power of two because we want an
+ * integral number of these to fit into a page.
  */
 typedef struct callout_heap {
 	hrtime_t	ch_expiration;
@@ -362,11 +370,16 @@ typedef struct callout_table {
 	taskq_t		*ct_taskq;	/* taskq to execute normal callouts */
 	kstat_t		*ct_kstats;	/* callout kstats */
 	int		ct_nreap;	/* # heap entries that need reaping */
-#ifdef _LP64
-	char		ct_pad[28];	/* cache alignment */
-#else
-	char		ct_pad[24];	/* cache alignment */
+	cyclic_id_t	ct_qcyclic;	/* cyclic for the callout queue */
+	callout_hash_t	ct_queue;	/* overflow queue of callouts */
+#ifndef _LP64
+	char		ct_pad[12];	/* cache alignment */
 #endif
+	/*
+	 * This structure should be aligned to a 64-byte (cache-line)
+	 * boundary. Make sure the padding is right for 32-bit as well
+	 * as 64-bit kernels.
+	 */
 } callout_table_t;
 
 /*
@@ -389,14 +402,27 @@ typedef struct callout_table {
 #define	ct_cleanups							\
 		ct_kstat_data[CALLOUT_CLEANUPS].value.ui64
 
-#define	CALLOUT_CHUNK	128
+/*
+ * CALLOUT_CHUNK is the minimum initial size of each heap, and the amount
+ * by which a full heap is expanded to make room for new entries.
+ */
+#define	CALLOUT_CHUNK		(PAGESIZE / sizeof (callout_heap_t))
+
+/*
+ * CALLOUT_MIN_HEAP_SIZE defines the minimum size for the callout heap for
+ * the whole system.
+ */
+#define	CALLOUT_MIN_HEAP_SIZE	(64 * 1024 * sizeof (callout_heap_t))
+
+/*
+ * CALLOUT_MEM_FRACTION defines the fraction of available physical memory that
+ * can be allocated towards the callout heap for the whole system.
+ */
+#define	CALLOUT_MEM_FRACTION	4096
 
 #define	CALLOUT_HEAP_PARENT(index)	(((index) - 1) >> 1)
 #define	CALLOUT_HEAP_RIGHT(index)	(((index) + 1) << 1)
 #define	CALLOUT_HEAP_LEFT(index)	((((index) + 1) << 1) - 1)
-
-#define	CALLOUT_CYCLIC_HANDLER(t)					\
-	((t == CALLOUT_REALTIME) ? callout_realtime : callout_normal)
 
 #define	CALLOUT_TCP_RESOLUTION		10000000ULL
 

@@ -42,6 +42,7 @@
  */
 static int callout_threads;			/* callout normal threads */
 static hrtime_t callout_debug_hrtime;		/* debugger entry time */
+static int callout_chunk;			/* callout heap chunk size */
 static int callout_min_reap;			/* callout minimum reap count */
 static int callout_tolerance;			/* callout hires tolerance */
 static callout_table_t *callout_boot_ct;	/* Boot CPU's callout tables */
@@ -170,6 +171,15 @@ static hrtime_t	callout_heap_process(callout_table_t *, hrtime_t, int);
 #define	CALLOUT_LIST_DELETE(hash, cl)				\
 	CALLOUT_HASH_DELETE(hash, cl, cl_next, cl_prev)
 
+#define	CALLOUT_LIST_BEFORE(cl, nextcl)			\
+{							\
+	(cl)->cl_prev = (nextcl)->cl_prev;		\
+	(cl)->cl_next = (nextcl);			\
+	(nextcl)->cl_prev = (cl);			\
+	if (cl->cl_prev != NULL)			\
+		cl->cl_prev->cl_next = cl;		\
+}
+
 /*
  * For normal callouts, there is a deadlock scenario if two callouts that
  * have an inter-dependency end up on the same callout list. To break the
@@ -179,7 +189,7 @@ static hrtime_t	callout_heap_process(callout_table_t *, hrtime_t, int);
  * necessary (sigh).
  */
 #define	CALLOUT_THRESHOLD	100000000
-#define	CALLOUT_EXEC_COMPUTE(ct, exec)					\
+#define	CALLOUT_EXEC_COMPUTE(ct, nextexp, exec)				\
 {									\
 	callout_list_t *cl;						\
 									\
@@ -197,14 +207,10 @@ static hrtime_t	callout_heap_process(callout_table_t *, hrtime_t, int);
 		 * only one callout, there is no need for two threads.	\
 		 */							\
 		exec = 1;						\
-	} else if ((ct->ct_heap_num == 0) ||				\
-	    (ct->ct_heap[0].ch_expiration > gethrtime() + CALLOUT_THRESHOLD)) {\
+	} else if ((nextexp) > (gethrtime() + CALLOUT_THRESHOLD)) {	\
 		/*							\
-		 * If the heap has become empty, we need two threads as	\
-		 * there is no one to kick off the second thread in the	\
-		 * future. If the heap is not empty and the top of the	\
-		 * heap does not expire in the near future, we need two	\
-		 * threads.						\
+		 * If the next expiration of the cyclic is way out into	\
+		 * the future, we need two threads.			\
 		 */							\
 		exec = 2;						\
 	} else {							\
@@ -237,6 +243,16 @@ static hrtime_t	callout_heap_process(callout_table_t *, hrtime_t, int);
 	cl->cl_next = ct->ct_lfree;			\
 	ct->ct_lfree = cl;				\
 	cl->cl_flags |= CALLOUT_LIST_FLAG_FREE;		\
+}
+
+/*
+ * Macro to free a callout.
+ */
+#define	CALLOUT_FREE(ct, cl)			\
+{						\
+	cp->c_idnext = ct->ct_free;		\
+	ct->ct_free = cp;			\
+	cp->c_xid |= CALLOUT_ID_FREE;		\
 }
 
 /*
@@ -333,6 +349,164 @@ callout_list_get(callout_table_t *ct, hrtime_t expiration, int flags, int hash)
 }
 
 /*
+ * Add a new callout list into a callout table's queue in sorted order by
+ * expiration.
+ */
+static int
+callout_queue_add(callout_table_t *ct, callout_list_t *cl)
+{
+	callout_list_t *nextcl;
+	hrtime_t expiration;
+
+	expiration = cl->cl_expiration;
+	nextcl = ct->ct_queue.ch_head;
+	if ((nextcl == NULL) || (expiration < nextcl->cl_expiration)) {
+		CALLOUT_LIST_INSERT(ct->ct_queue, cl);
+		return (1);
+	}
+
+	while (nextcl != NULL) {
+		if (expiration < nextcl->cl_expiration) {
+			CALLOUT_LIST_BEFORE(cl, nextcl);
+			return (0);
+		}
+		nextcl = nextcl->cl_next;
+	}
+	CALLOUT_LIST_APPEND(ct->ct_queue, cl);
+
+	return (0);
+}
+
+/*
+ * Insert a callout list into a callout table's queue and reprogram the queue
+ * cyclic if needed.
+ */
+static void
+callout_queue_insert(callout_table_t *ct, callout_list_t *cl)
+{
+	cl->cl_flags |= CALLOUT_LIST_FLAG_QUEUED;
+
+	/*
+	 * Add the callout to the callout queue. If it ends up at the head,
+	 * the cyclic needs to be reprogrammed as we have an earlier
+	 * expiration.
+	 *
+	 * Also, during the CPR suspend phase, do not reprogram the cyclic.
+	 * We don't want any callout activity. When the CPR resume phase is
+	 * entered, the cyclic will be programmed for the earliest expiration
+	 * in the queue.
+	 */
+	if (callout_queue_add(ct, cl) && (ct->ct_suspend == 0))
+		(void) cyclic_reprogram(ct->ct_qcyclic, cl->cl_expiration);
+}
+
+/*
+ * Delete and handle all past expirations in a callout table's queue.
+ */
+static hrtime_t
+callout_queue_delete(callout_table_t *ct)
+{
+	callout_list_t *cl;
+	hrtime_t now;
+
+	ASSERT(MUTEX_HELD(&ct->ct_mutex));
+
+	now = gethrtime();
+	while ((cl = ct->ct_queue.ch_head) != NULL) {
+		if (cl->cl_expiration > now)
+			break;
+		cl->cl_flags &= ~CALLOUT_LIST_FLAG_QUEUED;
+		CALLOUT_LIST_DELETE(ct->ct_queue, cl);
+		CALLOUT_LIST_APPEND(ct->ct_expired, cl);
+	}
+
+	/*
+	 * If this callout queue is empty or callouts have been suspended,
+	 * just return.
+	 */
+	if ((cl == NULL) || (ct->ct_suspend > 0))
+		return (CY_INFINITY);
+
+	(void) cyclic_reprogram(ct->ct_qcyclic, cl->cl_expiration);
+
+	return (cl->cl_expiration);
+}
+
+static hrtime_t
+callout_queue_process(callout_table_t *ct, hrtime_t delta, int timechange)
+{
+	callout_list_t *firstcl, *cl;
+	hrtime_t expiration, now;
+	int clflags;
+	callout_hash_t temp;
+
+	ASSERT(MUTEX_HELD(&ct->ct_mutex));
+
+	firstcl = ct->ct_queue.ch_head;
+	if (firstcl == NULL)
+		return (CY_INFINITY);
+
+	/*
+	 * We walk the callout queue. If we encounter a hrestime entry that
+	 * must be removed, we clean it out. Otherwise, we apply any
+	 * adjustments needed to it. Because of the latter, we need to
+	 * recreate the list as we go along.
+	 */
+	temp = ct->ct_queue;
+	ct->ct_queue.ch_head = NULL;
+	ct->ct_queue.ch_tail = NULL;
+
+	clflags = (CALLOUT_LIST_FLAG_HRESTIME | CALLOUT_LIST_FLAG_ABSOLUTE);
+	now = gethrtime();
+	while ((cl = temp.ch_head) != NULL) {
+		CALLOUT_LIST_DELETE(temp, cl);
+
+		/*
+		 * Delete the callout and expire it, if one of the following
+		 * is true:
+		 *	- the callout has expired
+		 *	- the callout is an absolute hrestime one and
+		 *	  there has been a system time change
+		 */
+		if ((cl->cl_expiration <= now) ||
+		    (timechange && ((cl->cl_flags & clflags) == clflags))) {
+			cl->cl_flags &= ~CALLOUT_LIST_FLAG_QUEUED;
+			CALLOUT_LIST_APPEND(ct->ct_expired, cl);
+			continue;
+		}
+
+		/*
+		 * Apply adjustments, if any. Adjustments are applied after
+		 * the system returns from KMDB or OBP. They are only applied
+		 * to relative callout lists.
+		 */
+		if (delta && !(cl->cl_flags & CALLOUT_LIST_FLAG_ABSOLUTE)) {
+			expiration = cl->cl_expiration + delta;
+			if (expiration <= 0)
+				expiration = CY_INFINITY;
+			cl->cl_expiration = expiration;
+		}
+
+		(void) callout_queue_add(ct, cl);
+	}
+
+	/*
+	 * We need to return the expiration to help program the cyclic.
+	 * If there are expired callouts, the cyclic needs to go off
+	 * immediately. If the queue has become empty, then we return infinity.
+	 * Else, we return the expiration of the earliest callout in the queue.
+	 */
+	if (ct->ct_expired.ch_head != NULL)
+		return (gethrtime());
+
+	cl = ct->ct_queue.ch_head;
+	if (cl == NULL)
+		return (CY_INFINITY);
+
+	return (cl->cl_expiration);
+}
+
+/*
  * Initialize a callout table's heap, if necessary. Preallocate some free
  * entries so we don't have to check for NULL elsewhere.
  */
@@ -345,17 +519,16 @@ callout_heap_init(callout_table_t *ct)
 	ASSERT(ct->ct_heap == NULL);
 
 	ct->ct_heap_num = 0;
-	ct->ct_heap_max = CALLOUT_CHUNK;
-	size = sizeof (callout_heap_t) * CALLOUT_CHUNK;
+	ct->ct_heap_max = callout_chunk;
+	size = sizeof (callout_heap_t) * callout_chunk;
 	ct->ct_heap = kmem_alloc(size, KM_SLEEP);
 }
 
 /*
- * Reallocate the heap. We try quite hard because we can't sleep, and if
- * we can't do the allocation, we're toast. Failing all, we try a KM_PANIC
- * allocation. Note that the heap only expands, it never contracts.
+ * Reallocate the heap. Return 0 if the heap is still full at the end of it.
+ * Return 1 otherwise. Note that the heap only expands, it never contracts.
  */
-static void
+static int
 callout_heap_expand(callout_table_t *ct)
 {
 	size_t max, size, osize;
@@ -369,10 +542,25 @@ callout_heap_expand(callout_table_t *ct)
 		mutex_exit(&ct->ct_mutex);
 
 		osize = sizeof (callout_heap_t) * max;
-		size = sizeof (callout_heap_t) * (max + CALLOUT_CHUNK);
-		heap = kmem_alloc_tryhard(size, &size, KM_NOSLEEP | KM_PANIC);
+		size = sizeof (callout_heap_t) * (max + callout_chunk);
+		heap = kmem_alloc(size, KM_NOSLEEP);
 
 		mutex_enter(&ct->ct_mutex);
+		if (heap == NULL) {
+			/*
+			 * We could not allocate memory. If we can free up
+			 * some entries, that would be great.
+			 */
+			if (ct->ct_nreap > 0)
+				(void) callout_heap_process(ct, 0, 0);
+			/*
+			 * If we still have no space in the heap, inform the
+			 * caller.
+			 */
+			if (ct->ct_heap_num == ct->ct_heap_max)
+				return (0);
+			return (1);
+		}
 		if (max < ct->ct_heap_max) {
 			/*
 			 * Someone beat us to the allocation. Free what we
@@ -387,6 +575,8 @@ callout_heap_expand(callout_table_t *ct)
 		ct->ct_heap = heap;
 		ct->ct_heap_max = size / sizeof (callout_heap_t);
 	}
+
+	return (1);
 }
 
 /*
@@ -448,6 +638,7 @@ callout_heap_insert(callout_table_t *ct, callout_list_t *cl)
 	ASSERT(MUTEX_HELD(&ct->ct_mutex));
 	ASSERT(ct->ct_heap_num < ct->ct_heap_max);
 
+	cl->cl_flags |= CALLOUT_LIST_FLAG_HEAPED;
 	/*
 	 * First, copy the expiration and callout list pointer to the bottom
 	 * of the heap.
@@ -553,7 +744,7 @@ comp_left:
 /*
  * Delete and handle all past expirations in a callout table's heap.
  */
-static void
+static hrtime_t
 callout_heap_delete(callout_table_t *ct)
 {
 	hrtime_t now, expiration, next;
@@ -601,6 +792,7 @@ callout_heap_delete(callout_table_t *ct)
 			 * list of expired callout lists. It will be processed
 			 * by the callout executor.
 			 */
+			cl->cl_flags &= ~CALLOUT_LIST_FLAG_HEAPED;
 			CALLOUT_LIST_DELETE(ct->ct_clhash[hash], cl);
 			CALLOUT_LIST_APPEND(ct->ct_expired, cl);
 		}
@@ -622,7 +814,7 @@ callout_heap_delete(callout_table_t *ct)
 	 * infinity by the cyclic subsystem.
 	 */
 	if ((ct->ct_heap_num == 0) || (ct->ct_suspend > 0))
-		return;
+		return (CY_INFINITY);
 
 	/*
 	 * If the top expirations are within callout_tolerance of each other,
@@ -638,6 +830,8 @@ callout_heap_delete(callout_table_t *ct)
 	}
 
 	(void) cyclic_reprogram(ct->ct_cyclic, expiration);
+
+	return (expiration);
 }
 
 /*
@@ -664,21 +858,20 @@ static hrtime_t
 callout_heap_process(callout_table_t *ct, hrtime_t delta, int timechange)
 {
 	callout_heap_t *heap;
-	callout_list_t *cl, *rootcl;
+	callout_list_t *cl;
 	hrtime_t expiration, now;
-	int i, hash, clflags, expired;
+	int i, hash, clflags;
 	ulong_t num;
 
 	ASSERT(MUTEX_HELD(&ct->ct_mutex));
 
 	if (ct->ct_heap_num == 0)
-		return (0);
+		return (CY_INFINITY);
 
 	if (ct->ct_nreap > 0)
 		ct->ct_cleanups++;
 
 	heap = ct->ct_heap;
-	rootcl = heap->ch_list;
 
 	/*
 	 * We walk the heap from the top to the bottom. If we encounter
@@ -700,7 +893,6 @@ callout_heap_process(callout_table_t *ct, hrtime_t delta, int timechange)
 	ct->ct_heap_num = 0;
 	clflags = (CALLOUT_LIST_FLAG_HRESTIME | CALLOUT_LIST_FLAG_ABSOLUTE);
 	now = gethrtime();
-	expired = 0;
 	for (i = 0; i < num; i++) {
 		cl = heap[i].ch_list;
 		/*
@@ -724,9 +916,9 @@ callout_heap_process(callout_table_t *ct, hrtime_t delta, int timechange)
 		if ((cl->cl_expiration <= now) ||
 		    (timechange && ((cl->cl_flags & clflags) == clflags))) {
 			hash = CALLOUT_CLHASH(cl->cl_expiration);
+			cl->cl_flags &= ~CALLOUT_LIST_FLAG_HEAPED;
 			CALLOUT_LIST_DELETE(ct->ct_clhash[hash], cl);
 			CALLOUT_LIST_APPEND(ct->ct_expired, cl);
-			expired = 1;
 			continue;
 		}
 
@@ -758,16 +950,19 @@ callout_heap_process(callout_table_t *ct, hrtime_t delta, int timechange)
 
 	ct->ct_nreap = 0;
 
-	if (expired)
-		expiration = gethrtime();
-	else if (ct->ct_heap_num == 0)
-		expiration = CY_INFINITY;
-	else if (rootcl != heap->ch_list)
-		expiration = heap->ch_expiration;
-	else
-		expiration = 0;
+	/*
+	 * We need to return the expiration to help program the cyclic.
+	 * If there are expired callouts, the cyclic needs to go off
+	 * immediately. If the heap has become empty, then we return infinity.
+	 * Else, return the expiration of the earliest callout in the heap.
+	 */
+	if (ct->ct_expired.ch_head != NULL)
+		return (gethrtime());
 
-	return (expiration);
+	if (ct->ct_heap_num == 0)
+		return (CY_INFINITY);
+
+	return (heap->ch_expiration);
 }
 
 /*
@@ -788,7 +983,7 @@ timeout_generic(int type, void (*func)(void *), void *arg,
 	callout_t *cp;
 	callout_id_t id;
 	callout_list_t *cl;
-	hrtime_t now, interval, rexpiration;
+	hrtime_t now, interval;
 	int hash, clflags;
 
 	ASSERT(resolution > 0);
@@ -829,11 +1024,11 @@ timeout_generic(int type, void (*func)(void *), void *arg,
 	if (CALLOUT_CLEANUP(ct)) {
 		/*
 		 * There are too many heap elements pointing to empty callout
-		 * lists. Clean them out.
+		 * lists. Clean them out. Since cleanup is only done once
+		 * in a while, no need to reprogram the cyclic if the root
+		 * of the heap gets cleaned out.
 		 */
-		rexpiration = callout_heap_process(ct, 0, 0);
-		if ((rexpiration != 0) && (ct->ct_suspend == 0))
-			(void) cyclic_reprogram(ct->ct_cyclic, rexpiration);
+		(void) callout_heap_process(ct, 0, 0);
 	}
 
 	if ((cp = ct->ct_free) == NULL)
@@ -911,23 +1106,6 @@ again:
 	cl = callout_list_get(ct, expiration, clflags, hash);
 	if (cl == NULL) {
 		/*
-		 * Check if we have enough space in the heap to insert one
-		 * expiration. If not, expand the heap.
-		 */
-		if (ct->ct_heap_num == ct->ct_heap_max) {
-			callout_heap_expand(ct);
-			/*
-			 * In the above call, we drop the lock, allocate and
-			 * reacquire the lock. So, we could have been away
-			 * for a while. In the meantime, someone could have
-			 * inserted a callout list with the same expiration.
-			 * So, the best course is to repeat the steps. This
-			 * should be an infrequent event.
-			 */
-			goto again;
-		}
-
-		/*
 		 * Check the free list. If we don't find one, we have to
 		 * take the slow path and allocate from kmem.
 		 */
@@ -947,6 +1125,30 @@ again:
 		ct->ct_lfree = cl->cl_next;
 		cl->cl_expiration = expiration;
 		cl->cl_flags = clflags;
+
+		/*
+		 * Check if we have enough space in the heap to insert one
+		 * expiration. If not, expand the heap.
+		 */
+		if (ct->ct_heap_num == ct->ct_heap_max) {
+			if (callout_heap_expand(ct) == 0) {
+				/*
+				 * Could not expand the heap. Just queue it.
+				 */
+				callout_queue_insert(ct, cl);
+				goto out;
+			}
+
+			/*
+			 * In the above call, we drop the lock, allocate and
+			 * reacquire the lock. So, we could have been away
+			 * for a while. In the meantime, someone could have
+			 * inserted a callout list with the same expiration.
+			 * But we will not go back and check for it as this
+			 * should be a really infrequent event. There is no
+			 * point.
+			 */
+		}
 
 		if (clflags & CALLOUT_LIST_FLAG_NANO) {
 			CALLOUT_LIST_APPEND(ct->ct_clhash[hash], cl);
@@ -969,6 +1171,7 @@ again:
 		if (cl->cl_callouts.ch_head == NULL)
 			ct->ct_nreap--;
 	}
+out:
 	cp->c_list = cl;
 	CALLOUT_APPEND(ct, cp);
 
@@ -1077,7 +1280,7 @@ untimeout_generic(callout_id_t id, int nowait)
 	callout_t *cp;
 	callout_id_t xid;
 	callout_list_t *cl;
-	int hash;
+	int hash, flags;
 	callout_id_t bogus;
 
 	ct = &callout_table[CALLOUT_ID_TO_TABLE(id)];
@@ -1113,19 +1316,30 @@ untimeout_generic(callout_id_t id, int nowait)
 			cl = cp->c_list;
 			expiration = cl->cl_expiration;
 			CALLOUT_DELETE(ct, cp);
-			cp->c_idnext = ct->ct_free;
-			ct->ct_free = cp;
-			cp->c_xid |= CALLOUT_FREE;
+			CALLOUT_FREE(ct, cp);
 			ct->ct_untimeouts_unexpired++;
 			ct->ct_timeouts_pending--;
 
 			/*
-			 * If the callout list has become empty, it needs
-			 * to be cleaned along with its heap entry. Increment
-			 * a reap count.
+			 * If the callout list has become empty, there are 3
+			 * possibilities. If it is present:
+			 *	- in the heap, it needs to be cleaned along
+			 *	  with its heap entry. Increment a reap count.
+			 *	- in the callout queue, free it.
+			 *	- in the expired list, free it.
 			 */
-			if (cl->cl_callouts.ch_head == NULL)
-				ct->ct_nreap++;
+			if (cl->cl_callouts.ch_head == NULL) {
+				flags = cl->cl_flags;
+				if (flags & CALLOUT_LIST_FLAG_HEAPED) {
+					ct->ct_nreap++;
+				} else if (flags & CALLOUT_LIST_FLAG_QUEUED) {
+					CALLOUT_LIST_DELETE(ct->ct_queue, cl);
+					CALLOUT_LIST_FREE(ct, cl);
+				} else {
+					CALLOUT_LIST_DELETE(ct->ct_expired, cl);
+					CALLOUT_LIST_FREE(ct, cl);
+				}
+			}
 			mutex_exit(&ct->ct_mutex);
 
 			expiration -= gethrtime();
@@ -1282,9 +1496,7 @@ callout_list_expire(callout_table_t *ct, callout_list_t *cl)
 		 * cares that we're done.
 		 */
 		CALLOUT_DELETE(ct, cp);
-		cp->c_idnext = ct->ct_free;
-		ct->ct_free = cp;
-		cp->c_xid |= CALLOUT_FREE;
+		CALLOUT_FREE(ct, cp);
 
 		if (cp->c_waiting) {
 			cp->c_waiting = 0;
@@ -1339,13 +1551,22 @@ callout_expire(callout_table_t *ct)
  */
 
 /*
- * Realtime callout cyclic handler.
+ * Realtime callout cyclic handlers.
  */
 void
 callout_realtime(callout_table_t *ct)
 {
 	mutex_enter(&ct->ct_mutex);
-	callout_heap_delete(ct);
+	(void) callout_heap_delete(ct);
+	callout_expire(ct);
+	mutex_exit(&ct->ct_mutex);
+}
+
+void
+callout_queue_realtime(callout_table_t *ct)
+{
+	mutex_enter(&ct->ct_mutex);
+	(void) callout_queue_delete(ct);
 	callout_expire(ct);
 	mutex_exit(&ct->ct_mutex);
 }
@@ -1359,16 +1580,35 @@ callout_execute(callout_table_t *ct)
 }
 
 /*
- * Normal callout cyclic handler.
+ * Normal callout cyclic handlers.
  */
 void
 callout_normal(callout_table_t *ct)
 {
 	int i, exec;
+	hrtime_t exp;
 
 	mutex_enter(&ct->ct_mutex);
-	callout_heap_delete(ct);
-	CALLOUT_EXEC_COMPUTE(ct, exec);
+	exp = callout_heap_delete(ct);
+	CALLOUT_EXEC_COMPUTE(ct, exp, exec);
+	mutex_exit(&ct->ct_mutex);
+
+	for (i = 0; i < exec; i++) {
+		ASSERT(ct->ct_taskq != NULL);
+		(void) taskq_dispatch(ct->ct_taskq,
+		    (task_func_t *)callout_execute, ct, TQ_NOSLEEP);
+	}
+}
+
+void
+callout_queue_normal(callout_table_t *ct)
+{
+	int i, exec;
+	hrtime_t exp;
+
+	mutex_enter(&ct->ct_mutex);
+	exp = callout_queue_delete(ct);
+	CALLOUT_EXEC_COMPUTE(ct, exp, exec);
 	mutex_exit(&ct->ct_mutex);
 
 	for (i = 0; i < exec; i++) {
@@ -1405,9 +1645,12 @@ callout_suspend(void)
 				mutex_exit(&ct->ct_mutex);
 				continue;
 			}
-			if (ct->ct_suspend == 1)
+			if (ct->ct_suspend == 1) {
 				(void) cyclic_reprogram(ct->ct_cyclic,
 				    CY_INFINITY);
+				(void) cyclic_reprogram(ct->ct_qcyclic,
+				    CY_INFINITY);
+			}
 			mutex_exit(&ct->ct_mutex);
 		}
 	}
@@ -1419,7 +1662,7 @@ callout_suspend(void)
 static void
 callout_resume(hrtime_t delta, int timechange)
 {
-	hrtime_t exp;
+	hrtime_t hexp, qexp;
 	int t, f;
 	callout_table_t *ct;
 
@@ -1446,24 +1689,13 @@ callout_resume(hrtime_t delta, int timechange)
 			 * out any empty callout lists that might happen to
 			 * be there.
 			 */
-			(void) callout_heap_process(ct, delta, timechange);
+			hexp = callout_heap_process(ct, delta, timechange);
+			qexp = callout_queue_process(ct, delta, timechange);
 
 			ct->ct_suspend--;
 			if (ct->ct_suspend == 0) {
-				/*
-				 * If the expired list is non-empty, then have
-				 * the cyclic expire immediately. Else, program
-				 * the cyclic based on the heap.
-				 */
-				if (ct->ct_expired.ch_head != NULL)
-					exp = gethrtime();
-				else if (ct->ct_heap_num > 0)
-					exp = ct->ct_heap[0].ch_expiration;
-				else
-					exp = 0;
-				if (exp != 0)
-					(void) cyclic_reprogram(ct->ct_cyclic,
-					    exp);
+				(void) cyclic_reprogram(ct->ct_cyclic, hexp);
+				(void) cyclic_reprogram(ct->ct_qcyclic, qexp);
 			}
 
 			mutex_exit(&ct->ct_mutex);
@@ -1524,10 +1756,10 @@ callout_debug_callb(void *arg, int code)
 static void
 callout_hrestime_one(callout_table_t *ct)
 {
-	hrtime_t expiration;
+	hrtime_t hexp, qexp;
 
 	mutex_enter(&ct->ct_mutex);
-	if (ct->ct_heap_num == 0) {
+	if (ct->ct_cyclic == CYCLIC_NONE) {
 		mutex_exit(&ct->ct_mutex);
 		return;
 	}
@@ -1535,10 +1767,13 @@ callout_hrestime_one(callout_table_t *ct)
 	/*
 	 * Walk the heap and process all the absolute hrestime entries.
 	 */
-	expiration = callout_heap_process(ct, 0, 1);
+	hexp = callout_heap_process(ct, 0, 1);
+	qexp = callout_queue_process(ct, 0, 1);
 
-	if ((expiration != 0) && (ct->ct_suspend == 0))
-		(void) cyclic_reprogram(ct->ct_cyclic, expiration);
+	if (ct->ct_suspend == 0) {
+		(void) cyclic_reprogram(ct->ct_cyclic, hexp);
+		(void) cyclic_reprogram(ct->ct_qcyclic, qexp);
+	}
 
 	mutex_exit(&ct->ct_mutex);
 }
@@ -1623,11 +1858,11 @@ callout_cyclic_init(callout_table_t *ct)
 	cyc_time_t when;
 	processorid_t seqid;
 	int t;
-	cyclic_id_t cyclic;
+	cyclic_id_t cyclic, qcyclic;
 
 	ASSERT(MUTEX_HELD(&ct->ct_mutex));
 
-	t = CALLOUT_TABLE_TYPE(ct);
+	t = ct->ct_type;
 	seqid = CALLOUT_TABLE_SEQID(ct);
 
 	/*
@@ -1684,19 +1919,29 @@ callout_cyclic_init(callout_table_t *ct)
 	 */
 	ASSERT(ct->ct_cyclic == CYCLIC_NONE);
 
-	hdlr.cyh_func = (cyc_func_t)CALLOUT_CYCLIC_HANDLER(t);
-	if (ct->ct_type == CALLOUT_REALTIME)
+	if (t == CALLOUT_REALTIME) {
 		hdlr.cyh_level = callout_realtime_level;
-	else
+		hdlr.cyh_func = (cyc_func_t)callout_realtime;
+	} else {
 		hdlr.cyh_level = callout_normal_level;
+		hdlr.cyh_func = (cyc_func_t)callout_normal;
+	}
 	hdlr.cyh_arg = ct;
 	when.cyt_when = CY_INFINITY;
 	when.cyt_interval = CY_INFINITY;
 
 	cyclic = cyclic_add(&hdlr, &when);
 
+	if (t == CALLOUT_REALTIME)
+		hdlr.cyh_func = (cyc_func_t)callout_queue_realtime;
+	else
+		hdlr.cyh_func = (cyc_func_t)callout_queue_normal;
+
+	qcyclic = cyclic_add(&hdlr, &when);
+
 	mutex_enter(&ct->ct_mutex);
 	ct->ct_cyclic = cyclic;
+	ct->ct_qcyclic = qcyclic;
 }
 
 void
@@ -1768,9 +2013,10 @@ callout_cpu_online(cpu_t *cp)
 		mutex_exit(&ct->ct_mutex);
 
 		/*
-		 * Move the cyclic to this CPU by doing a bind.
+		 * Move the cyclics to this CPU by doing a bind.
 		 */
 		cyclic_bind(ct->ct_cyclic, cp, NULL);
+		cyclic_bind(ct->ct_qcyclic, cp, NULL);
 	}
 }
 
@@ -1789,10 +2035,11 @@ callout_cpu_offline(cpu_t *cp)
 		ct = &callout_table[CALLOUT_TABLE(t, seqid)];
 
 		/*
-		 * Unbind the cyclic. This will allow the cyclic subsystem
-		 * to juggle the cyclic during CPU offline.
+		 * Unbind the cyclics. This will allow the cyclic subsystem
+		 * to juggle the cyclics during CPU offline.
 		 */
 		cyclic_bind(ct->ct_cyclic, NULL, NULL);
+		cyclic_bind(ct->ct_qcyclic, NULL, NULL);
 	}
 }
 
@@ -1804,6 +2051,22 @@ void
 callout_mp_init(void)
 {
 	cpu_t *cp;
+	size_t min, max;
+
+	if (callout_chunk == CALLOUT_CHUNK) {
+		/*
+		 * No one has specified a chunk in /etc/system. We need to
+		 * compute it here based on the number of online CPUs and
+		 * available physical memory.
+		 */
+		min = CALLOUT_MIN_HEAP_SIZE;
+		max = ptob(physmem) / CALLOUT_MEM_FRACTION;
+		if (min > max)
+			min = max;
+		callout_chunk = min / sizeof (callout_heap_t);
+		callout_chunk /= ncpus_online;
+		callout_chunk = P2ROUNDUP(callout_chunk, CALLOUT_CHUNK);
+	}
 
 	mutex_enter(&cpu_lock);
 
@@ -1846,6 +2109,10 @@ callout_init(void)
 		callout_tolerance = CALLOUT_TOLERANCE;
 	if (callout_threads <= 0)
 		callout_threads = CALLOUT_THREADS;
+	if (callout_chunk <= 0)
+		callout_chunk = CALLOUT_CHUNK;
+	else
+		callout_chunk = P2ROUNDUP(callout_chunk, CALLOUT_CHUNK);
 
 	/*
 	 * Allocate all the callout tables based on max_ncpus. We have chosen
@@ -1893,12 +2160,13 @@ callout_init(void)
 			 */
 			ct->ct_gen_id = CALLOUT_SHORT_ID(table_id);
 			/*
-			 * Initialize the cyclic as NONE. This will get set
+			 * Initialize the cyclics as NONE. This will get set
 			 * during CPU online. This is so that partially
 			 * populated systems will only have the required
 			 * number of cyclics, not more.
 			 */
 			ct->ct_cyclic = CYCLIC_NONE;
+			ct->ct_qcyclic = CYCLIC_NONE;
 			ct->ct_kstat_data = kmem_zalloc(size, KM_SLEEP);
 		}
 	}

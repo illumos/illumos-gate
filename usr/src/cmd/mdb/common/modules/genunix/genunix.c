@@ -651,33 +651,35 @@ static const char *co_typenames[] = { "R", "N" };
 #define	TABLE_TO_SEQID(x)	((x) >> CALLOUT_TYPE_BITS)
 
 /* callout flags, in no particular order */
-#define	COF_REAL	0x0000001
-#define	COF_NORM	0x0000002
-#define	COF_LONG	0x0000004
-#define	COF_SHORT	0x0000008
-#define	COF_EMPTY	0x0000010
-#define	COF_TIME	0x0000020
-#define	COF_BEFORE	0x0000040
-#define	COF_AFTER	0x0000080
-#define	COF_SEQID	0x0000100
-#define	COF_FUNC	0x0000200
-#define	COF_ADDR	0x0000400
-#define	COF_EXEC	0x0000800
-#define	COF_HIRES	0x0001000
-#define	COF_ABS		0x0002000
-#define	COF_TABLE	0x0004000
-#define	COF_BYIDH	0x0008000
-#define	COF_FREE	0x0010000
-#define	COF_LIST	0x0020000
-#define	COF_EXPREL	0x0040000
-#define	COF_HDR		0x0080000
-#define	COF_VERBOSE	0x0100000
-#define	COF_LONGLIST	0x0200000
-#define	COF_THDR	0x0400000
-#define	COF_LHDR	0x0800000
-#define	COF_CHDR	0x1000000
-#define	COF_PARAM	0x2000000
-#define	COF_DECODE	0x4000000
+#define	COF_REAL	0x00000001
+#define	COF_NORM	0x00000002
+#define	COF_LONG	0x00000004
+#define	COF_SHORT	0x00000008
+#define	COF_EMPTY	0x00000010
+#define	COF_TIME	0x00000020
+#define	COF_BEFORE	0x00000040
+#define	COF_AFTER	0x00000080
+#define	COF_SEQID	0x00000100
+#define	COF_FUNC	0x00000200
+#define	COF_ADDR	0x00000400
+#define	COF_EXEC	0x00000800
+#define	COF_HIRES	0x00001000
+#define	COF_ABS		0x00002000
+#define	COF_TABLE	0x00004000
+#define	COF_BYIDH	0x00008000
+#define	COF_FREE	0x00010000
+#define	COF_LIST	0x00020000
+#define	COF_EXPREL	0x00040000
+#define	COF_HDR		0x00080000
+#define	COF_VERBOSE	0x00100000
+#define	COF_LONGLIST	0x00200000
+#define	COF_THDR	0x00400000
+#define	COF_LHDR	0x00800000
+#define	COF_CHDR	0x01000000
+#define	COF_PARAM	0x02000000
+#define	COF_DECODE	0x04000000
+#define	COF_HEAP	0x08000000
+#define	COF_QUEUE	0x10000000
 
 /* show real and normal, short and long, expired and unexpired. */
 #define	COF_DEFAULT	(COF_REAL | COF_NORM | COF_LONG | COF_SHORT)
@@ -719,14 +721,14 @@ callouts_cb(uintptr_t addr, const void *data, void *priv)
 		return (WALK_ERR);
 	}
 
-	if ((coargs->flags & COF_FREE) && !(co->c_xid & CALLOUT_FREE)) {
+	if ((coargs->flags & COF_FREE) && !(co->c_xid & CALLOUT_ID_FREE)) {
 		/*
 		 * The callout must have been reallocated. No point in
 		 * walking any more.
 		 */
 		return (WALK_DONE);
 	}
-	if (!(coargs->flags & COF_FREE) && (co->c_xid & CALLOUT_FREE)) {
+	if (!(coargs->flags & COF_FREE) && (co->c_xid & CALLOUT_ID_FREE)) {
 		/*
 		 * The callout must have been freed. No point in
 		 * walking any more.
@@ -805,6 +807,21 @@ callouts_cb(uintptr_t addr, const void *data, void *priv)
 			    !(list_flags & CALLOUT_LIST_FLAG_ABSOLUTE)) {
 				return (WALK_NEXT);
 			}
+		}
+		/*
+		 * We do the checks for COF_HEAP and COF_QUEUE here only if we
+		 * are traversing BYIDH. If the traversal is by callout list,
+		 * we do this check in callout_list_cb() to be more
+		 * efficient.
+		 */
+		if ((coargs->flags & COF_HEAP) &&
+		    !(list_flags & CALLOUT_LIST_FLAG_HEAPED)) {
+			return (WALK_NEXT);
+		}
+
+		if ((coargs->flags & COF_QUEUE) &&
+		    !(list_flags & CALLOUT_LIST_FLAG_QUEUED)) {
+			return (WALK_NEXT);
 		}
 	}
 
@@ -937,6 +954,16 @@ callout_list_cb(uintptr_t addr, const void *data, void *priv)
 		}
 	}
 
+	if ((coargs->flags & COF_HEAP) &&
+	    !(coargs->list_flags & CALLOUT_LIST_FLAG_HEAPED)) {
+		return (WALK_NEXT);
+	}
+
+	if ((coargs->flags & COF_QUEUE) &&
+	    !(coargs->list_flags & CALLOUT_LIST_FLAG_QUEUED)) {
+		return (WALK_NEXT);
+	}
+
 	if ((coargs->flags & COF_LHDR) && !(coargs->flags & COF_ADDR) &&
 	    (coargs->flags & (COF_LIST | COF_VERBOSE))) {
 		if (!(coargs->flags & COF_VERBOSE)) {
@@ -1063,9 +1090,9 @@ callout_t_cb(uintptr_t addr, const void *data, void *priv)
 		coargs->flags |= (COF_LHDR | COF_CHDR);
 		if (coargs->flags & COF_LONGLIST) {
 			/* more info! */
-			mdb_printf("%<u> %-T%-7s %-7s %-?s %-?s"
+			mdb_printf("%<u> %-T%-7s %-7s %-?s %-?s %-?s"
 			    " %-?s %-?s %-?s%</u>",
-			    "HEAPNUM", "HEAPMAX", "TASKQ", "EXPQ",
+			    "HEAPNUM", "HEAPMAX", "TASKQ", "EXPQ", "QUE",
 			    "PEND", "FREE", "LOCK");
 		}
 		mdb_printf("\n");
@@ -1078,10 +1105,11 @@ callout_t_cb(uintptr_t addr, const void *data, void *priv)
 			    ct->ct_heap);
 			if (coargs->flags & COF_LONGLIST)  {
 				/* more info! */
-				mdb_printf(" %-7d %-7d %-?p %-?p"
+				mdb_printf(" %-7d %-7d %-?p %-?p %-?p"
 				    " %-?lld %-?lld %-?p",
 				    ct->ct_heap_num,  ct->ct_heap_max,
 				    ct->ct_taskq, ct->ct_expired.ch_head,
+				    ct->ct_queue.ch_head,
 				    cotwd->ct_timeouts_pending,
 				    cotwd->ct_allocations -
 				    cotwd->ct_timeouts_pending,
@@ -1119,6 +1147,17 @@ callout_t_cb(uintptr_t addr, const void *data, void *priv)
 		} else {
 			/* first print the expired list. */
 			clptr = (callout_list_t *)ct->ct_expired.ch_head;
+			if (clptr != NULL) {
+				coargs->bucket = -1;
+				if (mdb_pwalk("callout_list", callout_list_cb,
+				    coargs, (uintptr_t)clptr) == -1) {
+					mdb_warn("cannot walk callout_list"
+					    " at %p", clptr);
+					return (WALK_ERR);
+				}
+			}
+			/* then, print the callout queue */
+			clptr = (callout_list_t *)ct->ct_queue.ch_head;
 			if (clptr != NULL) {
 				coargs->bucket = -1;
 				if (mdb_pwalk("callout_list", callout_list_cb,
@@ -1272,6 +1311,8 @@ callout(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    'v', MDB_OPT_SETBITS, COF_LONGLIST, &coargs.flags,
 	    'i', MDB_OPT_SETBITS, COF_BYIDH, &coargs.flags,
 	    'F', MDB_OPT_SETBITS, COF_FREE, &coargs.flags,
+	    'H', MDB_OPT_SETBITS, COF_HEAP, &coargs.flags,
+	    'Q', MDB_OPT_SETBITS, COF_QUEUE, &coargs.flags,
 	    'A', MDB_OPT_SETBITS, COF_ADDR, &coargs.flags,
 	    NULL) != argc) {
 		return (DCMD_USAGE);
@@ -1344,6 +1385,11 @@ callout(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if ((aflag && bflag) && (coargs.btime <= coargs.atime)) {
 		mdb_printf("value for -a must be earlier than the value"
 		    " for -b.\n");
+		return (DCMD_USAGE);
+	}
+
+	if ((coargs.flags & COF_HEAP) && (coargs.flags & COF_QUEUE)) {
+		mdb_printf("-H and -Q are mutually exclusive\n");
 		return (DCMD_USAGE);
 	}
 
@@ -1552,6 +1598,8 @@ callout_help(void)
 	    " -F : walk free callout list (free list with -i) instead\n"
 	    " -v : display more info for each item\n"
 	    " -V : show details of each level of info as it is traversed\n"
+	    " -H : limit display to callouts in the callout heap\n"
+	    " -Q : limit display to callouts in the callout queue\n"
 	    " -A : show only addresses. Useful for pipelines.\n");
 }
 
