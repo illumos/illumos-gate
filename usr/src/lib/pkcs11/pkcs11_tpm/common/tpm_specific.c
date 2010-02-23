@@ -19,7 +19,7 @@
  * http://www.opensource.org/licenses/cpl1.0.php.
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -637,6 +637,8 @@ open_tss_context(TSS_HCONTEXT *pContext)
 	if ((result = Tspi_Context_Connect(*pContext, NULL))) {
 		stlogit("Tspi_Context_Connect: 0x%0x - %s",
 		    result, Trspi_Error_String(result));
+		Tspi_Context_Close(*pContext);
+		*pContext = 0;
 		return (CKR_FUNCTION_FAILED);
 	}
 	return (result);
