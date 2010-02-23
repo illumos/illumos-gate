@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _NSCD_H
 #define	_NSCD_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This is a private header file.  Applications should not directly include
@@ -83,7 +81,7 @@ extern "C" {
 /*
  * other internal constants
  */
-#define	_NSC_MAX_DB		2
+#define	_NSC_MAX_DB		3
 #define	_NSC_PUBLIC_ACCESS	-1
 #define	_NSC_FILE_CHECK_TIME	0	/* check always for backwards compat */
 
@@ -290,7 +288,7 @@ typedef struct nsc_ctx {
 	off_t		file_size;		/* file size at last check */
 	ino_t		file_ino;		/* file inode at last check */
 	const char 	*file_name;		/* filename for check_files */
-	int		db_count;		/* number of caches */
+	int		db_count;	/* number of caches, max _NSC_MAX_DB */
 	nsc_db_t 	*nsc_db[_NSC_MAX_DB];	/* caches */
 	sema_t		throttle_sema;		/* throttle lookups */
 	sema_t		revalidate_sema;	/* revalidation threads */
