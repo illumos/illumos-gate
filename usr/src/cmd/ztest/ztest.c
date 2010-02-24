@@ -125,6 +125,7 @@ static int zopt_verbose = 0;
 static int zopt_init = 1;
 static char *zopt_dir = "/tmp";
 static uint64_t zopt_time = 300;	/* 5 minutes */
+static uint64_t zopt_maxloops = 50;	/* max loops during spa_freeze() */
 
 #define	BT_MAGIC	0x123456789abcdefULL
 #define	MAXFAULTS() (MAX(zs->zs_mirrors, 1) * (zopt_raidz_parity + 1) - 1)
@@ -466,21 +467,22 @@ usage(boolean_t requested)
 	(void) fprintf(fp, "Usage: %s\n"
 	    "\t[-v vdevs (default: %llu)]\n"
 	    "\t[-s size_of_each_vdev (default: %s)]\n"
-	    "\t[-a alignment_shift (default: %d) (use 0 for random)]\n"
+	    "\t[-a alignment_shift (default: %d)] use 0 for random\n"
 	    "\t[-m mirror_copies (default: %d)]\n"
 	    "\t[-r raidz_disks (default: %d)]\n"
 	    "\t[-R raidz_parity (default: %d)]\n"
 	    "\t[-d datasets (default: %d)]\n"
 	    "\t[-t threads (default: %d)]\n"
 	    "\t[-g gang_block_threshold (default: %s)]\n"
-	    "\t[-i initialize pool i times (default: %d)]\n"
-	    "\t[-k kill percentage (default: %llu%%)]\n"
+	    "\t[-i init_count (default: %d)] initialize pool i times\n"
+	    "\t[-k kill_percentage (default: %llu%%)]\n"
 	    "\t[-p pool_name (default: %s)]\n"
-	    "\t[-f file directory for vdev files (default: %s)]\n"
-	    "\t[-V(erbose)] (use multiple times for ever more blather)\n"
-	    "\t[-E(xisting)] (use existing pool instead of creating new one)\n"
-	    "\t[-T time] total run time (default: %llu sec)\n"
-	    "\t[-P passtime] time per pass (default: %llu sec)\n"
+	    "\t[-f dir (default: %s)] file directory for vdev files\n"
+	    "\t[-V] verbose (use multiple times for ever more blather)\n"
+	    "\t[-E] use existing pool instead of creating new one\n"
+	    "\t[-T time (default: %llu sec)] total run time\n"
+	    "\t[-F freezeloops (default: %llu)] max loops in spa_freeze()\n"
+	    "\t[-P passtime (default: %llu sec)] time per pass\n"
 	    "\t[-h] (print help)\n"
 	    "",
 	    cmdname,
@@ -498,6 +500,7 @@ usage(boolean_t requested)
 	    zopt_pool,					/* -p */
 	    zopt_dir,					/* -f */
 	    (u_longlong_t)zopt_time,			/* -T */
+	    (u_longlong_t)zopt_maxloops,		/* -F */
 	    (u_longlong_t)zopt_passtime);		/* -P */
 	exit(requested ? 0 : 1);
 }
@@ -512,7 +515,7 @@ process_options(int argc, char **argv)
 	metaslab_gang_bang = 32 << 10;
 
 	while ((opt = getopt(argc, argv,
-	    "v:s:a:m:r:R:d:t:g:i:k:p:f:VET:P:h")) != EOF) {
+	    "v:s:a:m:r:R:d:t:g:i:k:p:f:VET:P:hF:")) != EOF) {
 		value = 0;
 		switch (opt) {
 		case 'v':
@@ -528,6 +531,7 @@ process_options(int argc, char **argv)
 		case 'k':
 		case 'T':
 		case 'P':
+		case 'F':
 			value = nicenumtoull(optarg);
 		}
 		switch (opt) {
@@ -581,6 +585,9 @@ process_options(int argc, char **argv)
 			break;
 		case 'P':
 			zopt_passtime = MAX(1, value);
+			break;
+		case 'F':
+			zopt_maxloops = MAX(1, value);
 			break;
 		case 'h':
 			usage(B_TRUE);
@@ -5222,6 +5229,7 @@ ztest_freeze(ztest_shared_t *zs)
 {
 	ztest_ds_t *zd = &zs->zs_zd[0];
 	spa_t *spa;
+	int numloops = 0;
 
 	if (zopt_verbose >= 3)
 		(void) printf("testing spa_freeze()...\n");
@@ -5255,7 +5263,7 @@ ztest_freeze(ztest_shared_t *zs)
 	 * to increase well beyond the last synced value in the uberblock.
 	 * The ZIL should be OK with that.
 	 */
-	while (ztest_random(20) != 0) {
+	while (ztest_random(10) != 0 && numloops++ < zopt_maxloops) {
 		ztest_dmu_write_parallel(zd, 0);
 		ztest_dmu_object_alloc_free(zd, 0);
 		txg_wait_synced(spa_get_dsl(spa), 0);
