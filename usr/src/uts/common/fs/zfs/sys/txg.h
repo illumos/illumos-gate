@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -117,6 +117,7 @@ extern void txg_list_create(txg_list_t *tl, size_t offset);
 extern void txg_list_destroy(txg_list_t *tl);
 extern int txg_list_empty(txg_list_t *tl, uint64_t txg);
 extern int txg_list_add(txg_list_t *tl, void *p, uint64_t txg);
+extern int txg_list_add_tail(txg_list_t *tl, void *p, uint64_t txg);
 extern void *txg_list_remove(txg_list_t *tl, uint64_t txg);
 extern void *txg_list_remove_this(txg_list_t *tl, void *p, uint64_t txg);
 extern int txg_list_member(txg_list_t *tl, void *p, uint64_t txg);

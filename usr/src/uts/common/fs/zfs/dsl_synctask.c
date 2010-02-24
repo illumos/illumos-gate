@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,7 +110,12 @@ top:
 		return (dstg->dstg_err);
 	}
 
-	VERIFY(0 == txg_list_add(&dstg->dstg_pool->dp_sync_tasks, dstg, txg));
+	/*
+	 * We don't generally have many sync tasks, so pay the price of
+	 * add_tail to get the tasks executed in the right order.
+	 */
+	VERIFY(0 == txg_list_add_tail(&dstg->dstg_pool->dp_sync_tasks,
+	    dstg, txg));
 
 	dmu_tx_commit(tx);
 
@@ -131,7 +136,12 @@ dsl_sync_task_group_nowait(dsl_sync_task_group_t *dstg, dmu_tx_t *tx)
 
 	dstg->dstg_nowaiter = B_TRUE;
 	txg = dmu_tx_get_txg(tx);
-	VERIFY(0 == txg_list_add(&dstg->dstg_pool->dp_sync_tasks, dstg, txg));
+	/*
+	 * We don't generally have many sync tasks, so pay the price of
+	 * add_tail to get the tasks executed in the right order.
+	 */
+	VERIFY(0 == txg_list_add_tail(&dstg->dstg_pool->dp_sync_tasks,
+	    dstg, txg));
 }
 
 void

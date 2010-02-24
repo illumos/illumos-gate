@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -611,6 +611,34 @@ txg_list_add(txg_list_t *tl, void *p, uint64_t txg)
 		tn->tn_member[t] = 1;
 		tn->tn_next[t] = tl->tl_head[t];
 		tl->tl_head[t] = tn;
+	}
+	mutex_exit(&tl->tl_lock);
+
+	return (already_on_list);
+}
+
+/*
+ * Add an entry to the end of the list (walks list to find end).
+ * Returns 0 if it's a new entry, 1 if it's already there.
+ */
+int
+txg_list_add_tail(txg_list_t *tl, void *p, uint64_t txg)
+{
+	int t = txg & TXG_MASK;
+	txg_node_t *tn = (txg_node_t *)((char *)p + tl->tl_offset);
+	int already_on_list;
+
+	mutex_enter(&tl->tl_lock);
+	already_on_list = tn->tn_member[t];
+	if (!already_on_list) {
+		txg_node_t **tp;
+
+		for (tp = &tl->tl_head[t]; *tp != NULL; tp = &(*tp)->tn_next[t])
+			continue;
+
+		tn->tn_member[t] = 1;
+		tn->tn_next[t] = NULL;
+		*tp = tn;
 	}
 	mutex_exit(&tl->tl_lock);
 

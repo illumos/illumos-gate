@@ -618,10 +618,11 @@ typedef enum history_log_type {
 } history_log_type_t;
 
 typedef struct history_arg {
-	const char *ha_history_str;
+	char *ha_history_str;
 	history_log_type_t ha_log_type;
 	history_internal_events_t ha_event;
-	char ha_zone[MAXPATHLEN];
+	char *ha_zone;
+	uid_t ha_uid;
 } history_arg_t;
 
 extern char *spa_his_ievent_table[];
