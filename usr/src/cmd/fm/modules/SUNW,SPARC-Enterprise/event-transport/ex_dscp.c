@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -232,7 +232,7 @@ exs_prep_client(exs_hdl_t *hp)
 			fmd_hdl_debug(hp->h_hdl, "xport - dscp link for %s "
 			    "is down", hp->h_endpt_id);
 		} else {
-			fmd_hdl_error(hp->h_hdl, "dscpBind on the client "
+			fmd_hdl_debug(hp->h_hdl, "dscpBind on the client "
 			    "socket failed : rv = %d\n", rv);
 		}
 		EXS_CLOSE_CLR(hp->h_client);
@@ -445,7 +445,7 @@ exs_prep_accept(fmd_hdl_t *hdl, int dom)
 			fmd_hdl_debug(hdl, "xport - dscp link for domain %d "
 			    "is down", dom);
 		} else {
-			fmd_hdl_error(hdl, "dscpBind on the accept socket "
+			fmd_hdl_debug(hdl, "dscpBind on the accept socket "
 			    "failed : rv = %d\n", rv);
 		}
 		EXS_CLOSE_CLR(Acc);
