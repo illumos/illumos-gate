@@ -263,6 +263,7 @@ tcp_g_t_info_ack
 tcp_g_t_info_ack_v6
 tcp_icmp_source_quench
 tcp_init_wnd_shft
+tcp_max_init_cwnd
 tcp_max_optsize
 tcp_min_conn_listener
 tcp_opt_arr

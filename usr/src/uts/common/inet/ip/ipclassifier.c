@@ -317,7 +317,6 @@ typedef union itc_s {
 struct kmem_cache  *tcp_conn_cache;
 struct kmem_cache  *ip_conn_cache;
 extern struct kmem_cache  *sctp_conn_cache;
-extern struct kmem_cache  *tcp_sack_info_cache;
 struct kmem_cache  *udp_conn_cache;
 struct kmem_cache  *rawip_conn_cache;
 struct kmem_cache  *rts_conn_cache;

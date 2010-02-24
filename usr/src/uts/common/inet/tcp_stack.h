@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,97 +30,13 @@
 #include <sys/netstack.h>
 #include <inet/ip.h>
 #include <inet/ipdrop.h>
+#include <inet/tcp_stats.h>
 #include <sys/sunddi.h>
 #include <sys/sunldi.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
-/* Kstats */
-typedef struct tcp_stat {
-	kstat_named_t	tcp_time_wait;
-	kstat_named_t	tcp_time_wait_syn;
-	kstat_named_t	tcp_time_wait_syn_success;
-	kstat_named_t	tcp_detach_non_time_wait;
-	kstat_named_t	tcp_detach_time_wait;
-	kstat_named_t	tcp_time_wait_reap;
-	kstat_named_t	tcp_clean_death_nondetached;
-	kstat_named_t	tcp_reinit_calls;
-	kstat_named_t	tcp_eager_err1;
-	kstat_named_t	tcp_eager_err2;
-	kstat_named_t	tcp_eager_blowoff_calls;
-	kstat_named_t	tcp_eager_blowoff_q;
-	kstat_named_t	tcp_eager_blowoff_q0;
-	kstat_named_t	tcp_not_hard_bound;
-	kstat_named_t	tcp_no_listener;
-	kstat_named_t	tcp_found_eager;
-	kstat_named_t	tcp_wrong_queue;
-	kstat_named_t	tcp_found_eager_binding1;
-	kstat_named_t	tcp_found_eager_bound1;
-	kstat_named_t	tcp_eager_has_listener1;
-	kstat_named_t	tcp_open_alloc;
-	kstat_named_t	tcp_open_detached_alloc;
-	kstat_named_t	tcp_rput_time_wait;
-	kstat_named_t	tcp_listendrop;
-	kstat_named_t	tcp_listendropq0;
-	kstat_named_t	tcp_wrong_rq;
-	kstat_named_t	tcp_rsrv_calls;
-	kstat_named_t	tcp_eagerfree2;
-	kstat_named_t	tcp_eagerfree3;
-	kstat_named_t	tcp_eagerfree4;
-	kstat_named_t	tcp_eagerfree5;
-	kstat_named_t	tcp_timewait_syn_fail;
-	kstat_named_t	tcp_listen_badflags;
-	kstat_named_t	tcp_timeout_calls;
-	kstat_named_t	tcp_timeout_cached_alloc;
-	kstat_named_t	tcp_timeout_cancel_reqs;
-	kstat_named_t	tcp_timeout_canceled;
-	kstat_named_t	tcp_timermp_freed;
-	kstat_named_t	tcp_push_timer_cnt;
-	kstat_named_t	tcp_ack_timer_cnt;
-	kstat_named_t   tcp_wsrv_called;
-	kstat_named_t   tcp_flwctl_on;
-	kstat_named_t	tcp_timer_fire_early;
-	kstat_named_t	tcp_timer_fire_miss;
-	kstat_named_t	tcp_rput_v6_error;
-	kstat_named_t	tcp_zcopy_on;
-	kstat_named_t	tcp_zcopy_off;
-	kstat_named_t	tcp_zcopy_backoff;
-	kstat_named_t	tcp_fusion_flowctl;
-	kstat_named_t	tcp_fusion_backenabled;
-	kstat_named_t	tcp_fusion_urg;
-	kstat_named_t	tcp_fusion_putnext;
-	kstat_named_t	tcp_fusion_unfusable;
-	kstat_named_t	tcp_fusion_aborted;
-	kstat_named_t	tcp_fusion_unqualified;
-	kstat_named_t	tcp_fusion_rrw_busy;
-	kstat_named_t	tcp_fusion_rrw_msgcnt;
-	kstat_named_t	tcp_fusion_rrw_plugged;
-	kstat_named_t	tcp_in_ack_unsent_drop;
-	kstat_named_t	tcp_sock_fallback;
-	kstat_named_t	tcp_lso_enabled;
-	kstat_named_t	tcp_lso_disabled;
-	kstat_named_t	tcp_lso_times;
-	kstat_named_t	tcp_lso_pkt_out;
-	kstat_named_t	tcp_listen_cnt_drop;
-	kstat_named_t	tcp_listen_mem_drop;
-	kstat_named_t	tcp_zwin_ack_syn;
-	kstat_named_t	tcp_rst_unsent;
-} tcp_stat_t;
-
-#define	TCP_STAT(tcps, x)	((tcps)->tcps_statistics.x.value.ui64++)
-#define	TCP_STAT_UPDATE(tcps, x, n)	\
-	((tcps)->tcps_statistics.x.value.ui64 += (n))
-#define	TCP_STAT_SET(tcps, x, n)	\
-	((tcps)->tcps_statistics.x.value.ui64 = (n))
-
-typedef struct tcp_g_stat {
-	kstat_named_t	tcp_timermp_alloced;
-	kstat_named_t	tcp_timermp_allocfail;
-	kstat_named_t	tcp_timermp_allocdblfail;
-	kstat_named_t	tcp_freelist_cleanup;
-} tcp_g_stat_t;
 
 #ifdef _KERNEL
 
@@ -129,8 +45,6 @@ typedef struct tcp_g_stat {
  */
 struct tcp_stack {
 	netstack_t	*tcps_netstack;	/* Common netstack */
-
-	mib2_tcp_t	tcps_mib;
 
 	/*
 	 * Extra privileged ports. In host byte order.
@@ -167,7 +81,6 @@ struct tcp_stack {
 	 */
 	kstat_t		*tcps_mibkp;	/* kstat exporting tcp_mib data */
 	kstat_t		*tcps_kstat;
-	tcp_stat_t	tcps_statistics;
 
 	uint32_t	tcps_iss_incr_extra;
 				/* Incremented for each connection */
@@ -202,7 +115,18 @@ struct tcp_stack {
 	/* Listener connection limit configuration. */
 	kmutex_t	tcps_listener_conf_lock;
 	list_t		tcps_listener_conf;
+
+	/*
+	 * Per CPU stats
+	 *
+	 * tcps_sc: array of pointer to per CPU stats.  The i-th element in the
+	 *    array represents the stats of the CPU with cpu_seqid.
+	 * tcps_sc_cnt: number of CPU stats in the tcps_sc array.
+	 */
+	tcp_stats_cpu_t	**tcps_sc;
+	int		tcps_sc_cnt;
 };
+
 typedef struct tcp_stack tcp_stack_t;
 
 #endif /* _KERNEL */

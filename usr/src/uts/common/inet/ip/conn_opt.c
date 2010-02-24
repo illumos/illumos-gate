@@ -101,9 +101,6 @@
 #include <sys/tsol/label.h>
 #include <sys/tsol/tnet.h>
 
-static	sin_t	sin_null;	/* Zero address for quick clears */
-static	sin6_t	sin6_null;	/* Zero address for quick clears */
-
 /*
  * Return how much size is needed for the different ancillary data items
  */

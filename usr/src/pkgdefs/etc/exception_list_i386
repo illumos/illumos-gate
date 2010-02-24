@@ -369,6 +369,7 @@ usr/lib/amd64/llib-lipsecutil.ln	i386
 usr/include/inet/rawip_impl.h		i386
 usr/include/inet/udp_impl.h		i386
 usr/include/inet/tcp_impl.h		i386
+usr/include/inet/tcp_stats.h		i386
 usr/include/inet/ip_impl.h		i386
 usr/include/inet/ip_ndp.h		i386
 usr/include/inet/ip2mac.h		i386

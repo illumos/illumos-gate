@@ -203,9 +203,6 @@ struct streamtab icmpinfov6 = {
 	&icmprinitv6, &icmpwinit
 };
 
-static sin_t	sin_null;	/* Zero address for quick clears */
-static sin6_t	sin6_null;	/* Zero address for quick clears */
-
 /* Default structure copied into T_INFO_ACK messages */
 static struct T_info_ack icmp_g_t_info_ack = {
 	T_INFO_ACK,

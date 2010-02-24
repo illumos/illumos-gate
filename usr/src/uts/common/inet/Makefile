@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/common/inet/Makefile
@@ -34,7 +34,7 @@ HDRS=	arp.h common.h ipclassifier.h ip.h ip6.h ipdrop.h ipnet.h \
 	led.h mi.h mib2.h nd.h optcom.h sadb.h sctp_itf.h snmpcom.h tcp.h \
 	tcp_sack.h tcp_stack.h udp_impl.h rawip_impl.h ipp_common.h \
 	ip_ftable.h ip_impl.h ip_stack.h ip_arp.h tcp_impl.h wifi_ioctl.h \
-	ip2mac.h ip2mac_impl.h
+	ip2mac.h ip2mac_impl.h tcp_stats.h
 
 ROOTDIRS= $(ROOT)/usr/include/inet
 

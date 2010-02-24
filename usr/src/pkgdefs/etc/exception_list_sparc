@@ -358,6 +358,7 @@ usr/share/lib/locale/com/sun/dhcpmgr/cli/pntadm/ResourceBundle.properties	sparc
 usr/include/inet/rawip_impl.h		sparc
 usr/include/inet/udp_impl.h		sparc
 usr/include/inet/tcp_impl.h		sparc
+usr/include/inet/tcp_stats.h		sparc
 usr/include/inet/ip_impl.h		sparc
 usr/include/inet/ip_ndp.h		sparc
 usr/include/inet/ip2mac.h		sparc

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -340,8 +340,12 @@ zone_to_ips(const char *zone_name)
 	return (zi_cb.ipst);
 }
 
+/*
+ * Generic network stack walker initialization function.  It is used by all
+ * other netwrok stack walkers.
+ */
 int
-ip_stacks_walk_init(mdb_walk_state_t *wsp)
+ns_walk_init(mdb_walk_state_t *wsp)
 {
 	if (mdb_layered_walk("netstack", wsp) == -1) {
 		mdb_warn("can't walk 'netstack'");
@@ -350,8 +354,13 @@ ip_stacks_walk_init(mdb_walk_state_t *wsp)
 	return (WALK_NEXT);
 }
 
+/*
+ * Generic network stack walker stepping function.  It is used by all other
+ * network stack walkers.  The which parameter differentiates the different
+ * walkers.
+ */
 int
-ip_stacks_walk_step(mdb_walk_state_t *wsp)
+ns_walk_step(mdb_walk_state_t *wsp, int which)
 {
 	uintptr_t kaddr;
 	netstack_t nss;
@@ -360,9 +369,106 @@ ip_stacks_walk_step(mdb_walk_state_t *wsp)
 		mdb_warn("can't read netstack at %p", wsp->walk_addr);
 		return (WALK_ERR);
 	}
-	kaddr = (uintptr_t)nss.netstack_modules[NS_IP];
+	kaddr = (uintptr_t)nss.netstack_modules[which];
 
 	return (wsp->walk_callback(kaddr, wsp->walk_layer, wsp->walk_cbdata));
+}
+
+/*
+ * IP network stack walker stepping function.
+ */
+int
+ip_stacks_walk_step(mdb_walk_state_t *wsp)
+{
+	return (ns_walk_step(wsp, NS_IP));
+}
+
+/*
+ * TCP network stack walker stepping function.
+ */
+int
+tcp_stacks_walk_step(mdb_walk_state_t *wsp)
+{
+	return (ns_walk_step(wsp, NS_TCP));
+}
+
+/*
+ * SCTP network stack walker stepping function.
+ */
+int
+sctp_stacks_walk_step(mdb_walk_state_t *wsp)
+{
+	return (ns_walk_step(wsp, NS_SCTP));
+}
+
+/*
+ * UDP network stack walker stepping function.
+ */
+int
+udp_stacks_walk_step(mdb_walk_state_t *wsp)
+{
+	return (ns_walk_step(wsp, NS_UDP));
+}
+
+/*
+ * Initialization function for the per CPU TCP stats counter walker of a given
+ * TCP stack.
+ */
+int
+tcps_sc_walk_init(mdb_walk_state_t *wsp)
+{
+	tcp_stack_t tcps;
+
+	if (wsp->walk_addr == NULL)
+		return (WALK_ERR);
+
+	if (mdb_vread(&tcps, sizeof (tcps), wsp->walk_addr) == -1) {
+		mdb_warn("failed to read tcp_stack_t at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+	if (tcps.tcps_sc_cnt == 0)
+		return (WALK_DONE);
+
+	/*
+	 * Store the tcp_stack_t pointer in walk_data.  The stepping function
+	 * used it to calculate if the end of the counter has reached.
+	 */
+	wsp->walk_data = (void *)wsp->walk_addr;
+	wsp->walk_addr = (uintptr_t)tcps.tcps_sc;
+	return (WALK_NEXT);
+}
+
+/*
+ * Stepping function for the per CPU TCP stats counterwalker.
+ */
+int
+tcps_sc_walk_step(mdb_walk_state_t *wsp)
+{
+	int status;
+	tcp_stack_t tcps;
+	tcp_stats_cpu_t *stats;
+	char *next, *end;
+
+	if (mdb_vread(&tcps, sizeof (tcps), (uintptr_t)wsp->walk_data) == -1) {
+		mdb_warn("failed to read tcp_stack_t at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+	if (mdb_vread(&stats, sizeof (stats), wsp->walk_addr) == -1) {
+		mdb_warn("failed ot read tcp_stats_cpu_t at %p",
+		    wsp->walk_addr);
+		return (WALK_ERR);
+	}
+	status = wsp->walk_callback((uintptr_t)stats, &stats, wsp->walk_cbdata);
+	if (status != WALK_NEXT)
+		return (status);
+
+	next = (char *)wsp->walk_addr + sizeof (tcp_stats_cpu_t *);
+	end = (char *)tcps.tcps_sc + tcps.tcps_sc_cnt *
+	    sizeof (tcp_stats_cpu_t *);
+	if (next >= end)
+		return (WALK_DONE);
+	wsp->walk_addr = (uintptr_t)next;
+	return (WALK_NEXT);
 }
 
 int
@@ -1710,7 +1816,13 @@ static const mdb_walker_t walkers[] = {
 	{ "dce", "walk active dce_t structures",
 		dce_walk_init, dce_walk_step, NULL },
 	{ "ip_stacks", "walk all the ip_stack_t",
-		ip_stacks_walk_init, ip_stacks_walk_step, NULL },
+		ns_walk_init, ip_stacks_walk_step, NULL },
+	{ "tcp_stacks", "walk all the tcp_stack_t",
+		ns_walk_init, tcp_stacks_walk_step, NULL },
+	{ "sctp_stacks", "walk all the sctp_stack_t",
+		ns_walk_init, sctp_stacks_walk_step, NULL },
+	{ "udp_stacks", "walk all the udp_stack_t",
+		ns_walk_init, udp_stacks_walk_step, NULL },
 	{ "th_hash", "walk all the th_hash_t entries",
 		th_hash_walk_init, th_hash_walk_step, NULL },
 	{ "ncec", "walk list of ncec structures for all stacks",
@@ -1735,8 +1847,8 @@ static const mdb_walker_t walkers[] = {
 	    "ips_ipcl_proto_fanout_v6",
 		ipcl_hash_walk_init, ipcl_hash_walk_step,
 		ipcl_hash_walk_fini, &proto_v6_hash_arg},
-	{ "ilb_stacks", "walk ilb_stack_t",
-		ip_stacks_walk_init, ilb_stacks_walk_step, NULL },
+	{ "ilb_stacks", "walk all ilb_stack_t",
+		ns_walk_init, ilb_stacks_walk_step, NULL },
 	{ "ilb_rules", "walk ilb rules in a given ilb_stack_t",
 		ilb_rules_walk_init, ilb_rules_walk_step, NULL },
 	{ "ilb_servers", "walk server in a given ilb_rule_t",
@@ -1749,6 +1861,8 @@ static const mdb_walker_t walkers[] = {
 	{ "ilb_stickys", "walk sticky table of a given ilb_stack_t",
 		ilb_sticky_walk_init, ilb_sticky_walk_step,
 		ilb_common_walk_fini },
+	{ "tcps_sc", "walk all the per CPU stats counters of a tcp_stack_t",
+		tcps_sc_walk_init, tcps_sc_walk_step, NULL },
 	{ NULL }
 };
 
@@ -2918,16 +3032,7 @@ srcid_status(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static int
 ilb_stacks_walk_step(mdb_walk_state_t *wsp)
 {
-	uintptr_t kaddr;
-	netstack_t nss;
-
-	if (mdb_vread(&nss, sizeof (nss), wsp->walk_addr) == -1) {
-		mdb_warn("can't read netstack at %p", wsp->walk_addr);
-		return (WALK_ERR);
-	}
-	kaddr = (uintptr_t)nss.netstack_modules[NS_ILB];
-
-	return (wsp->walk_callback(kaddr, wsp->walk_layer, wsp->walk_cbdata));
+	return (ns_walk_step(wsp, NS_ILB));
 }
 
 static int

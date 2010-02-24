@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,8 +66,6 @@ static void	tcp_kssl_input_asynch(void *, mblk_t *, void *,
 
 extern void	tcp_output(void *, mblk_t *, void *, ip_recv_attr_t *);
 extern void	tcp_send_conn_ind(void *, mblk_t *, void *);
-
-extern int tcp_squeue_flag;
 
 /*
  * tcp_input_data() calls this routine for all packet destined to a

@@ -277,8 +277,10 @@ static ill_t	ill_null;		/* Empty ILL for init. */
 char	ipif_loopback_name[] = "lo0";
 static char *ipv4_forward_suffix = ":ip_forwarding";
 static char *ipv6_forward_suffix = ":ip6_forwarding";
-static	sin6_t	sin6_null;	/* Zero address for quick clears */
-static	sin_t	sin_null;	/* Zero address for quick clears */
+
+/* These are used by all IP network modules. */
+sin6_t	sin6_null;	/* Zero address for quick clears */
+sin_t	sin_null;	/* Zero address for quick clears */
 
 /* When set search for unused ipif_seqid */
 static ipif_t	ipif_zero;

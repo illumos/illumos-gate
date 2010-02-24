@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -401,7 +401,7 @@ tcp_fuse_output_urg(tcp_t *tcp, mblk_t *mp)
 	mp->b_wptr = (uchar_t *)&tei[1];
 
 	TCP_STAT(tcps, tcp_fusion_urg);
-	BUMP_MIB(&tcps->tcps_mib, tcpOutUrg);
+	TCPS_BUMP_MIB(tcps, tcpOutUrg);
 
 	head = peer_tcp->tcp_rcv_list;
 	while (head != NULL) {
@@ -645,12 +645,12 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	peer_tcp->tcp_rnxt += recv_size;
 	peer_tcp->tcp_rack = peer_tcp->tcp_rnxt;
 
-	BUMP_MIB(&tcps->tcps_mib, tcpOutDataSegs);
-	UPDATE_MIB(&tcps->tcps_mib, tcpOutDataBytes, send_size);
+	TCPS_BUMP_MIB(tcps, tcpOutDataSegs);
+	TCPS_UPDATE_MIB(tcps, tcpOutDataBytes, send_size);
 
-	BUMP_MIB(&tcps->tcps_mib, tcpInSegs);
-	BUMP_MIB(&tcps->tcps_mib, tcpInDataInorderSegs);
-	UPDATE_MIB(&tcps->tcps_mib, tcpInDataInorderBytes, send_size);
+	TCPS_BUMP_MIB(tcps, tcpHCInSegs);
+	TCPS_BUMP_MIB(tcps, tcpInDataInorderSegs);
+	TCPS_UPDATE_MIB(tcps, tcpInDataInorderBytes, send_size);
 
 	BUMP_LOCAL(tcp->tcp_obsegs);
 	BUMP_LOCAL(peer_tcp->tcp_ibsegs);

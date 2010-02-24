@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -142,15 +142,14 @@ struct tcp_listen_cnt_s;
 #if (defined(_KERNEL) || defined(_KMEMUSER))
 
 typedef struct tcp_s {
-				/* Pointer to previous bind hash next. */
 	struct tcp_s	*tcp_time_wait_next;
 				/* Pointer to next T/W block */
 	struct tcp_s	*tcp_time_wait_prev;
 				/* Pointer to previous T/W next */
 	clock_t		tcp_time_wait_expire;
 
-	struct conn_s	*tcp_connp;
-	tcp_stack_t	*tcp_tcps;	/* Shortcut via conn_netstack */
+	struct conn_s	*tcp_connp;	/* back pointer to conn_t */
+	tcp_stack_t	*tcp_tcps;	/* back pointer to tcp_stack_t */
 
 	int32_t	tcp_state;
 	int32_t	tcp_rcv_ws;		/* My window scale power */
@@ -169,9 +168,9 @@ typedef struct tcp_s {
 	uint32_t tcp_rwnd;
 
 	/* Fields arranged in approximate access order along main paths */
-	mblk_t	*tcp_xmit_head;		/* Head of rexmit list */
-	mblk_t	*tcp_xmit_last;		/* last valid data seen by tcp_wput */
-	mblk_t	*tcp_xmit_tail;		/* Last rexmit data sent */
+	mblk_t	*tcp_xmit_head;		/* Head of xmit/rexmit list */
+	mblk_t	*tcp_xmit_last;		/* Last valid data seen by tcp_wput */
+	mblk_t	*tcp_xmit_tail;		/* Last data sent */
 	uint32_t tcp_unsent;		/* # of bytes in hand that are unsent */
 	uint32_t tcp_xmit_tail_unsent;	/* # of unsent bytes in xmit_tail */
 
@@ -376,7 +375,6 @@ typedef struct tcp_s {
 	kcondvar_t	tcp_closecv;
 	uint8_t		tcp_closed;
 	uint8_t		tcp_closeflags;
-	uint8_t		tcp_cleandeathtag;
 	mblk_t		tcp_closemp;
 	timeout_id_t	tcp_linger_tid;	/* Linger timer ID */
 
@@ -495,35 +493,28 @@ extern void	tcp_conn_reclaim(void *);
 extern void 	tcp_free(tcp_t *tcp);
 extern void	tcp_ddi_g_init(void);
 extern void	tcp_ddi_g_destroy(void);
-extern void	tcp_xmit_listeners_reset(mblk_t *, ip_recv_attr_t *,
-    ip_stack_t *, conn_t *);
-extern void	tcp_input_listener(void *arg, mblk_t *mp, void *arg2,
-    ip_recv_attr_t *);
-extern void	tcp_input_listener_unbound(void *arg, mblk_t *mp, void *arg2,
-    ip_recv_attr_t *);
-extern void	tcp_input_data(void *arg, mblk_t *mp, void *arg2,
-    ip_recv_attr_t *);
 extern void 	*tcp_get_conn(void *arg, tcp_stack_t *);
-extern void	tcp_time_wait_collector(void *arg);
 extern mblk_t	*tcp_snmp_get(queue_t *, mblk_t *);
 extern int	tcp_snmp_set(queue_t *, int, int, uchar_t *, int len);
-extern mblk_t	*tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send,
-		    int32_t *offset, mblk_t **end_mp, uint32_t seq,
-		    boolean_t sendall, uint32_t *seg_len, boolean_t rexmit);
 
 /*
- * The TCP Fanout structure.
- * The hash tables and their linkage (tcp_*_hash_next, tcp_ptp*hn) are
- * protected by the per-bucket tf_lock. Each tcp_t
+ * The TCP Fanout structure for bind and acceptor hashes.
+ * The hash tables and their linkage (tcp_*_hash, tcp_ptp*hn) are
+ * protected by the per-bucket tf_lock.  Each tcp_t
  * inserted in the list points back at this lock using tcp_*_lockp.
  *
- * The listener and acceptor hash queues are lists of tcp_t.
+ * The bind and acceptor hash queues are lists of tcp_t.
  */
 /* listener hash and acceptor hash queue head */
 typedef struct tf_s {
 	tcp_t		*tf_tcp;
 	kmutex_t	tf_lock;
 } tf_t;
+
+
+/* Also used in ipclassifier.c */
+extern struct kmem_cache  *tcp_sack_info_cache;
+
 #endif	/* (defined(_KERNEL) || defined(_KMEMUSER)) */
 
 /* Contract private interface between TCP and Clustering. */

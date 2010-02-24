@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,8 +40,6 @@
 #include <sys/sunddi.h>
 #include <sys/ib/clients/rds/rds.h>
 #include <sys/ib/clients/rds/rds_transport.h>
-
-static	sin_t	sin_null;	/* Zero address for quick clears */
 
 /*
  * Just pass the ioctl to IP and the result to the caller.

@@ -303,9 +303,6 @@ struct streamtab udpinfov6 = {
 	&udp_rinitv6, &udp_winit, &udp_lrinit, &udp_lwinit
 };
 
-static	sin_t	sin_null;	/* Zero address for quick clears */
-static	sin6_t	sin6_null;	/* Zero address for quick clears */
-
 #define	UDP_MAXPACKET_IPV4 (IP_MAXPACKET - UDPH_SIZE - IP_SIMPLE_HDR_LENGTH)
 
 /* Default structure copied into T_INFO_ACK messages */
