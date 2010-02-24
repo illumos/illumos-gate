@@ -1198,7 +1198,8 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 			    ".send-%d-%llu", getpid(), (u_longlong_t)holdseq);
 			++holdseq;
 			err = zfs_hold_range(zhp, fromsnap, tosnap,
-			    holdtag, flags.replicate, B_TRUE);
+			    holdtag, flags.replicate, B_TRUE, filter_func,
+			    cb_arg);
 			if (err)
 				goto err_out;
 		}

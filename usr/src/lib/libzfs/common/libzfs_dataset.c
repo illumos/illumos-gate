@@ -4018,6 +4018,8 @@ struct hold_range_arg {
 	boolean_t	seenfrom;
 	boolean_t	holding;
 	boolean_t	recursive;
+	snapfilter_cb_t	*filter_cb;
+	void		*filter_cb_arg;
 };
 
 static int
@@ -4039,6 +4041,15 @@ zfs_hold_range_one(zfs_handle_t *zhp, void *arg)
 		return (0);
 	}
 
+	if (!hra->seento && strcmp(hra->tosnap, thissnap) == 0)
+		hra->seento = B_TRUE;
+
+	if (hra->filter_cb != NULL &&
+	    hra->filter_cb(zhp, hra->filter_cb_arg) == B_FALSE) {
+		zfs_close(zhp);
+		return (0);
+	}
+
 	if (hra->holding) {
 		/* We could be racing with destroy, so ignore ENOENT. */
 		error = zfs_hold(hra->origin, thissnap, hra->tag,
@@ -4052,9 +4063,6 @@ zfs_hold_range_one(zfs_handle_t *zhp, void *arg)
 		    hra->recursive);
 	}
 
-	if (!hra->seento && strcmp(hra->tosnap, thissnap) == 0)
-		hra->seento = B_TRUE;
-
 	zfs_close(zhp);
 	return (error);
 }
@@ -4066,7 +4074,8 @@ zfs_hold_range_one(zfs_handle_t *zhp, void *arg)
  */
 int
 zfs_hold_range(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
-    const char *tag, boolean_t recursive, boolean_t temphold)
+    const char *tag, boolean_t recursive, boolean_t temphold,
+    snapfilter_cb_t filter_cb, void *cbarg)
 {
 	struct hold_range_arg arg = { 0 };
 	int error;
@@ -4079,6 +4088,8 @@ zfs_hold_range(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 	arg.holding = B_TRUE;
 	arg.recursive = recursive;
 	arg.seenfrom = (fromsnap == NULL);
+	arg.filter_cb = filter_cb;
+	arg.filter_cb_arg = cbarg;
 
 	error = zfs_iter_snapshots_sorted(zhp, zfs_hold_range_one, &arg);
 

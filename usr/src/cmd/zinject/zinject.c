@@ -302,6 +302,12 @@ iter_handlers(int (*func)(int, const char *, zinject_record_t *, void *),
 		    &zc.zc_inject_record, data)) != 0)
 			return (ret);
 
+	if (errno != ENOENT) {
+		(void) fprintf(stderr, "Unable to list handlers: %s\n",
+		    strerror(errno));
+		return (-1);
+	}
+
 	return (0);
 }
 
@@ -426,7 +432,8 @@ cancel_all_handlers(void)
 {
 	int ret = iter_handlers(cancel_one_handler, NULL);
 
-	(void) printf("removed all registered handlers\n");
+	if (ret == 0)
+		(void) printf("removed all registered handlers\n");
 
 	return (ret);
 }

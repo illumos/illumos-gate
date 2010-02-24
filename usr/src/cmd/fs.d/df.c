@@ -235,7 +235,7 @@ static void do_df(int, char **)	__NORETURN;
 static void parse_options(int, char **);
 static char *basename(char *);
 
-static libzfs_handle_t *(*_libzfs_init)(boolean_t);
+static libzfs_handle_t *(*_libzfs_init)(void);
 static zfs_handle_t *(*_zfs_open)(libzfs_handle_t *, const char *, int);
 static void (*_zfs_close)(zfs_handle_t *);
 static uint64_t (*_zfs_prop_get_int)(zfs_handle_t *, zfs_prop_t);
@@ -255,7 +255,7 @@ load_libzfs(void)
 		return (g_zfs != NULL);
 
 	if ((hdl = dlopen("libzfs.so", RTLD_LAZY)) != NULL) {
-		_libzfs_init = (libzfs_handle_t *(*)(boolean_t))dlsym(hdl,
+		_libzfs_init = (libzfs_handle_t *(*)(void))dlsym(hdl,
 		    "libzfs_init");
 		_zfs_open = (zfs_handle_t *(*)())dlsym(hdl, "zfs_open");
 		_zfs_close = (void (*)())dlsym(hdl, "zfs_close");
@@ -267,7 +267,7 @@ load_libzfs(void)
 			assert(_zfs_close != NULL);
 			assert(_zfs_prop_get_int != NULL);
 
-			g_zfs = _libzfs_init(B_FALSE);
+			g_zfs = _libzfs_init();
 		}
 	}
 

@@ -1513,6 +1513,12 @@ zpool_import_props(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 			(void) zfs_error(hdl, EZFS_INVALCONFIG, desc);
 			break;
 
+		case EROFS:
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "one or more devices is read only"));
+			(void) zfs_error(hdl, EZFS_BADDEV, desc);
+			break;
+
 		default:
 			(void) zcmd_read_dst_nvlist(hdl, &zc, &nvi);
 			(void) zpool_standard_error(hdl, errno, desc);

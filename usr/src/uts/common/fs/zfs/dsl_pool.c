@@ -241,6 +241,7 @@ dsl_pool_close(dsl_pool_t *dp)
 		dmu_objset_evict(dp->dp_meta_objset);
 
 	txg_list_destroy(&dp->dp_dirty_datasets);
+	txg_list_destroy(&dp->dp_sync_tasks);
 	txg_list_destroy(&dp->dp_dirty_dirs);
 	list_destroy(&dp->dp_synced_datasets);
 
