@@ -197,7 +197,6 @@ dsl_pool_scrub_cancel_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 		    &dp->dp_spa->spa_scrub_lock);
 	}
 	mutex_exit(&dp->dp_spa->spa_scrub_lock);
-	dp->dp_spa->spa_scrub_started = B_FALSE;
 	dp->dp_spa->spa_scrub_active = B_FALSE;
 
 	dp->dp_scrub_func = SCRUB_FUNC_NONE;
@@ -237,6 +236,7 @@ dsl_pool_scrub_cancel_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	 */
 	vdev_dtl_reassess(dp->dp_spa->spa_root_vdev, tx->tx_txg,
 	    *completep ? dp->dp_scrub_max_txg : 0, B_TRUE);
+	dp->dp_spa->spa_scrub_started = B_FALSE;
 	if (*completep)
 		spa_event_notify(dp->dp_spa, NULL, dp->dp_scrub_min_txg ?
 		    ESC_ZFS_RESILVER_FINISH : ESC_ZFS_SCRUB_FINISH);

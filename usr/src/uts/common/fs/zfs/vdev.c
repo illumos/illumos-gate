@@ -1518,7 +1518,7 @@ vdev_dirty(vdev_t *vd, int flags, void *arg, uint64_t txg)
  * DTLs.
  *
  * A vdev's DTL (dirty time log) is the set of transaction groups for which
- * the vdev has less than perfect replication.  There are three kinds of DTL:
+ * the vdev has less than perfect replication.  There are four kinds of DTL:
  *
  * DTL_MISSING: txgs for which the vdev has no valid copies of the data
  *
@@ -1619,7 +1619,6 @@ vdev_dtl_reassess(vdev_t *vd, uint64_t txg, uint64_t scrub_txg, int scrub_done)
 		mutex_enter(&vd->vdev_dtl_lock);
 		if (scrub_txg != 0 &&
 		    (spa->spa_scrub_started || spa->spa_scrub_errors == 0)) {
-			/* XXX should check scrub_done? */
 			/*
 			 * We completed a scrub up to scrub_txg.  If we
 			 * did it without rebooting, then the scrub dtl
