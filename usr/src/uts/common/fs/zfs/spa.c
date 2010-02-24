@@ -2190,8 +2190,6 @@ spa_open_common(const char *pool, spa_t **spapp, void *tag, nvlist_t *nvpolicy,
     nvlist_t **config)
 {
 	spa_t *spa;
-	zpool_rewind_policy_t policy;
-	spa_load_state_t state = SPA_LOAD_OPEN;
 	int error;
 	int locked = B_FALSE;
 
@@ -2214,11 +2212,14 @@ spa_open_common(const char *pool, spa_t **spapp, void *tag, nvlist_t *nvpolicy,
 		return (ENOENT);
 	}
 
-	zpool_get_rewind_policy(nvpolicy ? nvpolicy : spa->spa_config, &policy);
-	if (policy.zrp_request & ZPOOL_DO_REWIND)
-		state = SPA_LOAD_RECOVER;
-
 	if (spa->spa_state == POOL_STATE_UNINITIALIZED) {
+		spa_load_state_t state = SPA_LOAD_OPEN;
+		zpool_rewind_policy_t policy;
+
+		zpool_get_rewind_policy(nvpolicy ? nvpolicy : spa->spa_config,
+		    &policy);
+		if (policy.zrp_request & ZPOOL_DO_REWIND)
+			state = SPA_LOAD_RECOVER;
 
 		spa_activate(spa, spa_mode_global);
 
