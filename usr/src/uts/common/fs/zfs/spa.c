@@ -4634,6 +4634,7 @@ spa_vdev_set_common(spa_t *spa, uint64_t guid, const char *value,
     boolean_t ispath)
 {
 	vdev_t *vd;
+	boolean_t sync = B_FALSE;
 
 	spa_vdev_state_enter(spa, SCL_ALL);
 
@@ -4644,15 +4645,23 @@ spa_vdev_set_common(spa_t *spa, uint64_t guid, const char *value,
 		return (spa_vdev_state_exit(spa, NULL, ENOTSUP));
 
 	if (ispath) {
-		spa_strfree(vd->vdev_path);
-		vd->vdev_path = spa_strdup(value);
+		if (strcmp(value, vd->vdev_path) != 0) {
+			spa_strfree(vd->vdev_path);
+			vd->vdev_path = spa_strdup(value);
+			sync = B_TRUE;
+		}
 	} else {
-		if (vd->vdev_fru != NULL)
+		if (vd->vdev_fru == NULL) {
+			vd->vdev_fru = spa_strdup(value);
+			sync = B_TRUE;
+		} else if (strcmp(value, vd->vdev_fru) != 0) {
 			spa_strfree(vd->vdev_fru);
-		vd->vdev_fru = spa_strdup(value);
+			vd->vdev_fru = spa_strdup(value);
+			sync = B_TRUE;
+		}
 	}
 
-	return (spa_vdev_state_exit(spa, vd, 0));
+	return (spa_vdev_state_exit(spa, sync ? vd : NULL, 0));
 }
 
 int
