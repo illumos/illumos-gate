@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,7 +46,6 @@ extern "C" {
 
 #define	XAUI_VERSION		TOPO_VERSION
 #define	XFP_MAX			1	/* max number of xfp per xaui card */
-#define	MAX_PCIADDR_DEPTH	3	/* Bus/Dev/Func */
 
 static int xaui_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
 		    topo_instance_t, void *, void *);
@@ -175,21 +174,41 @@ xaui_topo_free(void *data, size_t size)
 }
 
 
+/*
+ * Remove the 3 character device name (pci/niu) from devfs path.
+ */
+static char *
+xaui_trans_str(topo_mod_t *mod, char *dn, char *p, size_t buf_len)
+{
+	int i = 0;
+	int j = 0;
+	char buf[MAXPATHLEN];
+
+	topo_mod_dprintf(mod, "xaui_trans_str: dev path(%s) dev name(%s)\n",
+	    dn, p);
+	do {
+		/* strip out either "pci" or "niu" */
+		if (dn[i] == p[0] && dn[i + 1] == p[1] && dn[i + 2] == p[2])
+			i += 3;
+		else
+			buf[j++] = dn[i++];
+	} while (i < buf_len);
+
+	topo_mod_dprintf(mod, "xaui_trans_str: return(%s)\n", buf);
+	return (topo_mod_strdup(mod, (char *)buf));
+}
+
+
 static char *
 xaui_get_path(topo_mod_t *mod, void *priv, topo_instance_t inst)
 {
-	int i = 0;
-	int rv;
 	di_node_t dnode;
 	char *devfs_path;
 	char *path;
 	char *buf = NULL;
-	char *freebuf;
-	char *addr[MAX_PCIADDR_DEPTH] = { NULL };
-	char *token;
-	char *lastp;
 	size_t buf_len;
-	size_t path_len = 0;
+	size_t dev_path_len;
+	size_t path_len;
 
 	/*
 	 * There are two ways to get here:
@@ -204,14 +223,10 @@ xaui_get_path(topo_mod_t *mod, void *priv, topo_instance_t inst)
 	 *    PRI path looks like:    /@500/@0/@8/@0
 	 *
 	 *    PRI path for pciex is /@Bus/@Dev/@Func/@Instance
-	 *
-	 *    The parent topo_node for xaui is pciexfn; check to see if the
-	 *    private data is a topo_node by looking for the "pciexfn" name.
 	 */
 	if (ispci == 1) {
 		/* coming from pcibus */
 		topo_mod_dprintf(mod, "from pcibus\n");
-		/* PCI Func tnode */
 		dnode = topo_node_getspecific((tnode_t *)priv);
 	} else {
 		/* coming from niu */
@@ -229,77 +244,34 @@ xaui_get_path(topo_mod_t *mod, void *priv, topo_instance_t inst)
 		topo_mod_dprintf(mod, "NULL devfs_path\n");
 		return (NULL);
 	}
-
-	/* alloc enough space to hold the path */
 	topo_mod_dprintf(mod, "devfs_path (%s)\n", devfs_path);
-	buf_len = strlen(devfs_path) + 1;
-	buf = (char *)xaui_topo_alloc(buf_len);
-	if (buf == NULL) {
-		return (NULL);
-	}
-	freebuf = buf; /* strtok_r is destructive */
-	(void) strcpy(buf, devfs_path);
+	dev_path_len = strlen(devfs_path) + 1;
 
+	/* remove device name from path */
 	if (ispci == 1) {
-		/*
-		 * devfs path for pciexfn looks like
-		 * /pci@BUS/pci@DEV/pci@FUNC
-		 *
-		 * Strip "/pci@" chars from path and add /@Instance
-		 */
 		topo_mod_dprintf(mod, "ispci\n");
-		if ((token = strtok_r(buf, "/pci@", &lastp)) != NULL) {
-			addr[i] = topo_mod_strdup(mod, token);
-			path_len = strlen(token);
-			while ((token = strtok_r(NULL, "/pci@", &lastp)) !=
-			    NULL) {
-				if (++i < MAX_PCIADDR_DEPTH) {
-					addr[i] = topo_mod_strdup(mod, token);
-					path_len += strlen(token);
-				} else {
-					xaui_topo_free(freebuf, buf_len);
-					return (NULL);
-				}
-			}
-		} else {
-			xaui_topo_free(freebuf, buf_len);
-			return (NULL);
-		}
-		xaui_topo_free(freebuf, buf_len);
-
-		/* path: addresses + '/@' + '/@instance' (0/1)  + '\0' */
-		path_len += ((MAX_PCIADDR_DEPTH * 2) + 3 + 1);
-		path = (char *)xaui_topo_alloc(path_len);
-		rv = snprintf(path, path_len, "/@%s/@%s/@%s/@%d",
-		    addr[0], addr[1], addr[2], inst);
-		if (rv < 0) {
-			return (NULL);
-		}
+		buf = xaui_trans_str(mod, devfs_path, "pci", dev_path_len);
+		buf_len = strlen(buf) + 1;
 	} else {
-		/* need to strip "/niu@" chars from path and add /@Instance */
-		token = strtok_r(buf, "/niu@", &lastp);
-		addr[0] = topo_mod_strdup(mod, token);
-		path_len = strlen(token);
-		xaui_topo_free(freebuf, buf_len);
-
-		/* path: address + '/@' + '/@instance' (0/1) + '\0' */
-		path_len += (2 + 3 +1);
-		path = (char *)xaui_topo_alloc(path_len);
-		rv = snprintf(path, path_len, "/@%s/@%d", addr[0], inst);
-		if (rv < 0) {
-			return (NULL);
-		}
+		buf = xaui_trans_str(mod, devfs_path, "niu", dev_path_len);
+		buf_len = strlen(buf) + 1;
 	}
-	topo_mod_dprintf(mod, "xaui_get_path: path (%s)\n", path);
+	di_devfs_path_free(devfs_path);
 
-	/* cleanup */
-	for (i = 0; i < MAX_PCIADDR_DEPTH; i++) {
-		if (addr[i] != NULL) {
-			xaui_topo_free(addr[i], strlen(addr[i]) + 1);
-		}
+	/* lop off "/network@" */
+	buf[(strstr(buf, "/network@") - buf)] = '\0';
+
+	/* path: transposed address + '/@instance' (0/1) + '\0' */
+	path_len = strlen(buf) + 3 + 1;
+	path = (char *)xaui_topo_alloc(path_len);
+	if (snprintf(path, path_len, "%s/@%d", buf, inst) < 0) {
+		topo_mod_dprintf(mod, "snprintf failed\n");
+		path = NULL;
 	}
+	xaui_topo_free(buf, buf_len);
 
 	/* should return something like /@500/@0/@8/@0 or /@80/@0 */
+	topo_mod_dprintf(mod, "xaui_get_path: path(%s)\n", path);
 	return (path);
 }
 
