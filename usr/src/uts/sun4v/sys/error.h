@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,10 +82,11 @@ extern "C" {
 /*
  * For SP (Service Processor) state change
  */
-#define	ERRH_SP_MASK		0x00000200
+#define	ERRH_SP_MASK		0x00000600
 #define	ERRH_SP_SHIFT		9
-#define	ERRH_SP_UNAVAILABLE	0
+#define	ERRH_SP_FAULTED		0	/* Physically present but faulted SP */
 #define	ERRH_SP_AVAILABLE	1
+#define	ERRH_SP_NOT_PRESENT	2	/* SP is not physically present */
 
 /*
  * ASR register number

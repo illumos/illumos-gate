@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -909,15 +909,7 @@ errh_handle_sp(errh_er_t *errh_erp)
 
 	sp_state = (errh_erp->attr & ERRH_SP_MASK) >> ERRH_SP_SHIFT;
 
-	/*
-	 * Only the SP is unavailable state change is currently valid.
-	 */
-	if (sp_state == ERRH_SP_UNAVAILABLE) {
-		sp_ereport_post(sp_state);
-	} else {
-		cmn_err(CE_WARN, "Invalid SP state 0x%x in SP state change "
-		    "handler.\n", sp_state);
-	}
+	sp_ereport_post(sp_state);
 }
 
 /*
@@ -965,12 +957,39 @@ static void
 sp_ereport_post(uint8_t sp_state)
 {
 	nvlist_t	*ereport, *detector;
+	char		*str = NULL;
 
-	/*
-	 * Currently an ereport is only sent when the state of the SP
-	 * changes to unavailable.
-	 */
-	ASSERT(sp_state == ERRH_SP_UNAVAILABLE);
+	switch (sp_state) {
+	case ERRH_SP_FAULTED:
+		str = "chassis.sp.unavailable";
+		break;
+
+	case ERRH_SP_NOT_PRESENT:
+		/*
+		 * It is expected that removal of the SP will be undertaken
+		 * in response to an existing service action.  Diagnosing
+		 * a fault in response to notification that the SP is
+		 * missing is therefore undesired.  In the future the fault
+		 * management architecture may be updated to support more
+		 * appropriate alert events.  When that happens this code
+		 * should be revisited.
+		 */
+		return;
+
+	case ERRH_SP_AVAILABLE:
+		/*
+		 * Hypervisor does not send an epkt for this case
+		 * so this should never happen.
+		 */
+		cmn_err(CE_WARN, "Received unexpected notification "
+		    "that the SP is available.");
+		return;
+
+	default:
+		cmn_err(CE_WARN, "Invalid SP state 0x%x. No ereport posted.\n",
+		    sp_state);
+		return;
+	}
 
 	ereport = fm_nvlist_create(NULL);
 	detector = fm_nvlist_create(NULL);
@@ -981,7 +1000,7 @@ sp_ereport_post(uint8_t sp_state)
 	fm_fmri_hc_set(detector, FM_HC_SCHEME_VERSION, NULL, NULL, 1,
 	    "chassis", 0);
 
-	fm_ereport_set(ereport, FM_EREPORT_VERSION, "chassis.sp.unavailable",
+	fm_ereport_set(ereport, FM_EREPORT_VERSION, str,
 	    fm_ena_generate(0, FM_ENA_FMT1), detector, NULL);
 
 	(void) fm_ereport_post(ereport, EVCH_TRYHARD);
