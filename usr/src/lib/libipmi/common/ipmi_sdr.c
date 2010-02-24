@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -187,18 +187,21 @@ ipmi_sdr_refresh(ipmi_handle_t *ihp)
 	uint8_t type;
 	char *name;
 	ipmi_sdr_info_t *sip;
+	uint32_t isi_add_ts, isi_erase_ts;
 
 	if ((sip = ipmi_sdr_get_info(ihp)) == NULL)
 		return (-1);
 
-	if (sip->isi_add_ts <= ihp->ih_sdr_ts &&
-	    sip->isi_erase_ts <= ihp->ih_sdr_ts &&
+	(void) memcpy(&isi_add_ts, &sip->isi_add_ts, sizeof (uint32_t));
+	(void) memcpy(&isi_erase_ts, &sip->isi_erase_ts, sizeof (uint32_t));
+	if (isi_add_ts <= ihp->ih_sdr_ts &&
+	    isi_erase_ts <= ihp->ih_sdr_ts &&
 	    ipmi_hash_first(ihp->ih_sdr_cache) != NULL)
 		return (0);
 
 	ipmi_sdr_clear(ihp);
 	ipmi_entity_clear(ihp);
-	ihp->ih_sdr_ts = MAX(sip->isi_add_ts, sip->isi_erase_ts);
+	ihp->ih_sdr_ts = MAX(isi_add_ts, isi_erase_ts);
 
 	/*
 	 * Iterate over all existing SDRs and add them to the cache.

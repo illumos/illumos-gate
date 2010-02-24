@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,7 +72,7 @@ boolean_t
 ipmi_is_sun_ilom(ipmi_deviceid_t *dp)
 {
 	return (ipmi_devid_manufacturer(dp) == IPMI_OEM_SUN &&
-	    dp->id_product == IPMI_PROD_SUN_ILOM);
+	    ipmi_devid_product(dp) == IPMI_PROD_SUN_ILOM);
 }
 
 static int

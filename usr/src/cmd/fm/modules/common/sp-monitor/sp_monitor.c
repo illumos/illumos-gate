@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * /dev/bmc IPMI monitor
@@ -147,7 +145,8 @@ _fmd_init(fmd_hdl_t *hdl)
 	smp = fmd_hdl_zalloc(hdl, sizeof (sp_monitor_t), FMD_SLEEP);
 	fmd_hdl_setspecific(hdl, smp);
 
-	if ((smp->sm_hdl = ipmi_open(&error, &msg)) == NULL) {
+	if ((smp->sm_hdl = ipmi_open(&error, &msg, IPMI_TRANSPORT_BMC, NULL))
+	    == NULL) {
 		/*
 		 * If /dev/bmc doesn't exist on the system, then unload the
 		 * module without doing anything.

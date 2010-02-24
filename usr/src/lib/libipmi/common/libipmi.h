@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,6 +28,7 @@
 
 #include <sys/bmc_intf.h>
 #include <sys/byteorder.h>
+#include <sys/nvpair.h>
 #include <sys/sysmacros.h>
 
 /*
@@ -86,7 +87,13 @@ typedef enum {
 	EIPMI_ACCESS,			/* insufficient privileges */
 	EIPMI_BADPARAM,			/* parameter is not supported */
 	EIPMI_READONLY,			/* attempt to write read-only param */
-	EIPMI_WRITEONLY			/* attempt to read write-only param */
+	EIPMI_WRITEONLY,		/* attempt to read write-only param */
+	EIPMI_LAN_OPEN_FAILED,		/* failed to open socket */
+	EIPMI_LAN_PING_FAILED,		/* RMCP Ping message failed */
+	EIPMI_LAN_PASSWD_NOTSUP, /* password authentication not supported */
+	EIPMI_LAN_CHALLENGE,		/* failure getting challenge */
+	EIPMI_LAN_SESSION,		/* failure activating session */
+	EIPMI_LAN_SETPRIV		/* failure setting session privs */
 } ipmi_errno_t;
 
 /*
@@ -102,7 +109,35 @@ typedef enum {
  * response is only valid until the next command is issued.  The caller is
  * responsible for making a copy of the response if it is needed.
  */
-extern ipmi_handle_t *ipmi_open(int *, char **);
+extern ipmi_handle_t *ipmi_open(int *, char **, uint_t xport_type, nvlist_t *);
+
+/*
+ * Constants for nvpair names for the params nvlist that is passed to
+ * ipmi_open().  If the IPMI_TRANSPORT_BMC is desired, then it is sufficient
+ * to just specify NULL for the params nvlist.
+ *
+ * For IPMI_TRANSPORT_LAN, the params nvlist must contain the following
+ * nvpairs:
+ *
+ * IPMI_LAN_HOST, IPMI_LAN_USER, IPMI_LAN_PASSWD
+ *
+ * IPMI_LAN_PORT is optional and will default to 623
+ * IPMI_LAN_PRIVLVL is optional and will default to admin
+ * IPMI_LAN_TIMEOUT is optional and will default to 3 seconds
+ * IPMI_LAN_NUM_RETIES is optional and will default to 5
+ */
+#define	IPMI_TRANSPORT_TYPE	"transport-type"
+#define	IPMI_TRANSPORT_BMC	0x01
+#define	IPMI_TRANSPORT_LAN	0x02
+
+#define	IPMI_LAN_HOST		"lan-host"
+#define	IPMI_LAN_PORT		"lan-port"
+#define	IPMI_LAN_USER		"lan-user"
+#define	IPMI_LAN_PASSWD		"lan-passwd"
+#define	IPMI_LAN_PRIVLVL	"lan-privlvl"
+#define	IPMI_LAN_TIMEOUT	"lan-timeout"
+#define	IPMI_LAN_NUM_RETRIES	"lan-num-retries"
+
 extern void ipmi_close(ipmi_handle_t *);
 
 extern int ipmi_errno(ipmi_handle_t *);
@@ -140,7 +175,7 @@ typedef struct ipmi_deviceid {
 	uint8_t		id_ipmi_rev;
 	uint8_t		id_dev_support;
 	uint8_t		id_manufacturer[3];
-	uint16_t	id_product;
+	uint8_t		id_product[2];
 } ipmi_deviceid_t;
 
 #define	IPMI_OEM_SUN		0x2a
@@ -153,7 +188,35 @@ ipmi_deviceid_t *ipmi_get_deviceid(ipmi_handle_t *);
 	((dp)->id_manufacturer[1] << 8) |	\
 	((dp)->id_manufacturer[2] << 16))
 
+#define	ipmi_devid_product(dp)		\
+	((dp)->id_product[0] |		\
+	((dp)->id_product[1] << 8))
+
 const char *ipmi_firmware_version(ipmi_handle_t *);
+
+/*
+ * Get Channel Auth Caps.  See section 22.13.
+ */
+typedef struct ipmi_channel_auth_caps {
+	uint8_t cap_channel;
+	DECL_BITFIELD3(
+	    cap_authtype	:6,
+	    __reserved1		:1,
+	    cap_ipmirev2	:1);
+	DECL_BITFIELD5(
+	    cap_anon		:3,
+	    cap_peruser		:1,
+	    cap_permesg		:1,
+	    cap_kgstatus	:1,
+	    __reserved2		:2);
+	uint8_t cap_ext;
+	uint8_t cap_oemid[3];
+	uint8_t cap_oemaux;
+} ipmi_channel_auth_caps_t;
+
+#define	IPMI_CMD_GET_CHANNEL_AUTH_CAPS	0x38
+extern ipmi_channel_auth_caps_t *ipmi_get_channel_auth_caps(ipmi_handle_t *,
+    uint8_t, uint8_t);
 
 /*
  * Get Channel Info.  See section 22.24.
@@ -1710,6 +1773,7 @@ extern int ipmi_user_set_password(ipmi_handle_t *, uint8_t, const char *);
  * device ID, and will return EIPMI_NOT_SUPPORTED if attempted for non-Sun
  * devices.
  */
+boolean_t ipmi_is_sun_ilom(ipmi_deviceid_t *);
 
 /*
  * Sun OEM LED requests.

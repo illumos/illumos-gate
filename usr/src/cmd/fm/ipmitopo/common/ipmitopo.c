@@ -19,13 +19,24 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include <libipmi.h>
 #include <stdio.h>
 #include <string.h>
+
+static const char *pname;
+static const char optstr[] = "h:p:u:t:";
+
+static void
+usage()
+{
+	(void) fprintf(stderr,
+	    "Usage: %s [-t <bmc|lan>] [-h hostname] [-u username] "
+	    "[-p password]\n", pname);
+}
 
 /*ARGSUSED*/
 static int
@@ -116,15 +127,64 @@ entity_print(ipmi_handle_t *ihp, ipmi_entity_t *ep, void *data)
 	return (0);
 }
 
-/*ARGSUSED*/
 int
 main(int argc, char **argv)
 {
 	ipmi_handle_t *ihp;
 	char *errmsg;
+	uint_t xport_type;
+	char c, *host = NULL, *user = NULL, *passwd = NULL;
 	int err;
+	nvlist_t *params = NULL;
 
-	if ((ihp = ipmi_open(&err, &errmsg)) == NULL) {
+	pname = argv[0];
+	while (optind < argc) {
+		while ((c = getopt(argc, argv, optstr)) != -1)
+			switch (c) {
+			case 'h':
+				host = optarg;
+				break;
+			case 'p':
+				passwd = optarg;
+				break;
+			case 't':
+				if (strcmp(optarg, "bmc") == 0)
+					xport_type = IPMI_TRANSPORT_BMC;
+				else if (strcmp(optarg, "lan") == 0)
+					xport_type = IPMI_TRANSPORT_LAN;
+				else {
+					(void) fprintf(stderr,
+					    "ABORT: Invalid transport type\n");
+					usage();
+				}
+				break;
+			case 'u':
+				user = optarg;
+				break;
+			default:
+				usage();
+				return (1);
+			}
+	}
+
+	if (xport_type == IPMI_TRANSPORT_LAN &&
+	    (host == NULL || passwd == NULL || user == NULL)) {
+		(void) fprintf(stderr, "-h/-u/-p must all be specified for "
+		    "transport type \"lan\"\n");
+		usage();
+		return (1);
+	}
+	if (xport_type == IPMI_TRANSPORT_LAN) {
+		if (nvlist_alloc(&params, NV_UNIQUE_NAME, 0) ||
+		    nvlist_add_string(params, IPMI_LAN_HOST, host) ||
+		    nvlist_add_string(params, IPMI_LAN_USER, user) ||
+		    nvlist_add_string(params, IPMI_LAN_PASSWD, passwd)) {
+			(void) fprintf(stderr,
+			    "ABORT: nvlist construction failed\n");
+			return (1);
+		}
+	}
+	if ((ihp = ipmi_open(&err, &errmsg, xport_type, params)) == NULL) {
 		(void) fprintf(stderr, "failed to open libipmi: %s\n",
 		    errmsg);
 		return (1);

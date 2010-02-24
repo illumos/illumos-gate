@@ -21,10 +21,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # Construct translation tables for defines in libipmi.h to translate to readable
@@ -46,11 +45,9 @@ fi
 
 echo "\
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	\"%Z%%M%	%I%	%E% SMI\"
 
 #include <libipmi.h>
 #include <ipmi_impl.h>"

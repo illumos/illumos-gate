@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,13 +49,6 @@
 #define	OEM_DATA_LENGTH 3
 #define	VERSION 0x10
 #define	HOST_CAPABILITY 2
-
-static boolean_t
-ipmi_is_sun_ilom(ipmi_deviceid_t *dp)
-{
-	return (ipmi_devid_manufacturer(dp) == IPMI_OEM_SUN &&
-	    dp->id_product == IPMI_PROD_SUN_ILOM);
-}
 
 static int
 check_sunoem(ipmi_handle_t *ipmi_hdl)
@@ -128,7 +121,8 @@ _fmd_init(fmd_hdl_t *hdl)
 	if (fmd_hdl_register(hdl, FMD_API_VERSION, &fmd_info) != 0)
 		return;
 
-	if ((ipmi_hdl = ipmi_open(&error, &msg)) == NULL) {
+	if ((ipmi_hdl = ipmi_open(&error, &msg, IPMI_TRANSPORT_BMC, NULL))
+	    == NULL) {
 		/*
 		 * If /dev/bmc doesn't exist on the system, then unload the
 		 * module without doing anything.

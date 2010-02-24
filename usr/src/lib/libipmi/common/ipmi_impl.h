@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,6 +27,7 @@
 #define	_IPMI_IMPL_H
 
 #include <stdlib.h>
+#include <sys/nvpair.h>
 #include <libipmi.h>
 
 #ifdef	__cplusplus
@@ -56,7 +57,7 @@ typedef struct ipmi_hash {
 } ipmi_hash_t;
 
 typedef struct ipmi_transport {
-	void *		(*it_open)(struct ipmi_handle *);
+	void *		(*it_open)(struct ipmi_handle *, nvlist_t *);
 	void		(*it_close)(void *);
 	int 		(*it_send)(void *, struct ipmi_cmd *, struct ipmi_cmd *,
 			    int *);
@@ -99,6 +100,7 @@ extern char *ipmi_strdup(ipmi_handle_t *, const char *);
  * Supported transports
  */
 extern ipmi_transport_t ipmi_transport_bmc;
+extern ipmi_transport_t ipmi_transport_lan;
 
 /*
  * Primitives for converting

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -117,6 +117,51 @@ ipmi_firmware_version(ipmi_handle_t *ihp)
 		return (NULL);
 
 	return (ihp->ih_firmware_rev);
+}
+
+/*
+ * IPMI Get Channel Authentication Capabilities Command
+ * See Section 22.13
+ *
+ * Caller is responsible for free'ing returned ipmi_channel_auth_caps_t
+ */
+ipmi_channel_auth_caps_t *
+ipmi_get_channel_auth_caps(ipmi_handle_t *ihp, uint8_t channel, uint8_t priv)
+{
+	ipmi_cmd_t cmd, *resp;
+	uint8_t msg_data[2];
+	ipmi_channel_auth_caps_t *caps;
+
+	if (channel > 0xF) {
+		(void) ipmi_set_error(ihp, EIPMI_INVALID_REQUEST, NULL);
+		return (NULL);
+	}
+
+	msg_data[0] = channel;
+	msg_data[1] = priv;
+
+	cmd.ic_netfn = IPMI_NETFN_APP;
+	cmd.ic_cmd = IPMI_CMD_GET_CHANNEL_AUTH_CAPS;
+	cmd.ic_data = msg_data;
+	cmd.ic_dlen = sizeof (msg_data);
+	cmd.ic_lun = 0;
+
+	if ((resp = ipmi_send(ihp, &cmd)) == NULL)
+		return (NULL);
+
+	if (resp->ic_dlen < sizeof (ipmi_channel_auth_caps_t)) {
+		(void) ipmi_set_error(ihp, EIPMI_BAD_RESPONSE_LENGTH, NULL);
+		return (NULL);
+	}
+
+	if ((caps = ipmi_alloc(ihp, sizeof (ipmi_channel_auth_caps_t)))
+	    == NULL)
+		/* ipmi errno set */
+		return (NULL);
+
+	(void) memcpy(caps, resp->ic_data, sizeof (ipmi_channel_auth_caps_t));
+
+	return (caps);
 }
 
 ipmi_channel_info_t *

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <ctype.h>
 #include <libipmi.h>
@@ -451,7 +449,8 @@ dm_platform_init(void)
 	int err;
 	char *msg;
 
-	if ((g_ipmi_hdl = ipmi_open(&err, &msg)) == NULL) {
+	if ((g_ipmi_hdl = ipmi_open(&err, &msg, IPMI_TRANSPORT_BMC, NULL))
+	    == NULL) {
 		log_warn("Failed to load libipmi: %s\n", msg);
 		return (-1);
 	}

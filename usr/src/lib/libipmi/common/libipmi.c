@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,7 +31,7 @@
 #include "ipmi_impl.h"
 
 ipmi_handle_t *
-ipmi_open(int *errp, char **msg)
+ipmi_open(int *errp, char **msg, uint_t xport_type, nvlist_t *params)
 {
 	ipmi_handle_t *ihp;
 	static char errmsg[48];
@@ -46,12 +46,21 @@ ipmi_open(int *errp, char **msg)
 		return (NULL);
 	}
 
-	/* /dev/bmc is the only currently available transport */
-	ihp->ih_transport = &ipmi_transport_bmc;
+	switch (xport_type) {
+	case IPMI_TRANSPORT_BMC:
+		ihp->ih_transport = &ipmi_transport_bmc;
+		break;
+	case IPMI_TRANSPORT_LAN:
+		ihp->ih_transport = &ipmi_transport_lan;
+		break;
+	default:
+		*msg = "invalid transport type specified";
+		return (NULL);
+	}
 
 	ihp->ih_retries = 3;
 
-	if ((ihp->ih_tdata = ihp->ih_transport->it_open(ihp)) == NULL ||
+	if ((ihp->ih_tdata = ihp->ih_transport->it_open(ihp, params)) == NULL ||
 	    ipmi_sdr_init(ihp) != 0 || ipmi_entity_init(ihp) != 0) {
 		*errp = ihp->ih_errno;
 		if (msg) {

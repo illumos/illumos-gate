@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -625,7 +625,8 @@ topo_mod_ipmi_hold(topo_mod_t *mod)
 
 	(void) pthread_mutex_lock(&thp->th_ipmi_lock);
 	if (thp->th_ipmi == NULL) {
-		if ((thp->th_ipmi = ipmi_open(&err, &errmsg)) == NULL) {
+		if ((thp->th_ipmi = ipmi_open(&err, &errmsg, IPMI_TRANSPORT_BMC,
+		    NULL)) == NULL) {
 			topo_dprintf(mod->tm_hdl, TOPO_DBG_ERR,
 			    "ipmi_open() failed: %s (ipmi errno=%d)", errmsg,
 			    err);
