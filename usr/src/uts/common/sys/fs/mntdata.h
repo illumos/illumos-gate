@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,12 +62,12 @@ typedef struct mntsnap {
 } mntsnap_t;
 
 typedef struct mntnode {
-	krwlock_t mnt_contents;	/* protects mnt_read, mnt_ioctl, mnt_offset */
-	uint_t mnt_flags;	/* flags; see below */
-	vnode_t *mnt_mountvp;	/* vnode mounted on */
 	vnode_t *mnt_vnode;	/* vnode for this mntnode */
-	mntsnap_t mnt_read;	/* Data for read() */
-	mntsnap_t mnt_ioctl;	/* Data for ioctl() */
+	vnode_t *mnt_mountvp;	/* vnode mounted on */
+	krwlock_t mnt_contents;	/* protects mnt_flags, mnt_read & mnt_ioctl */
+	uint_t mnt_flags;	/* flags; see below */
+	mntsnap_t mnt_read;	/* data for read() */
+	mntsnap_t mnt_ioctl;	/* data for ioctl() */
 } mntnode_t;
 
 struct zone;
@@ -75,7 +75,10 @@ struct zone;
 typedef struct mntdata {
 	struct zone *mnt_zone;		/* zone for mount point */
 	uint_t mnt_nopen;		/* count of vnodes open */
-	size_t mnt_size;		/* latest snapshot size for mount */
+	size_t mnt_size;		/* size of last normal snapshot */
+	size_t mnt_hidden_size;		/* size of last hidden snapshot */
+	timespec_t mnt_mtime;		/* mtime at last normal snapshot */
+	timespec_t mnt_hidden_mtime;	/* mtime at last hidden snapshot */
 	struct mntnode mnt_node;	/* embedded mntnode */
 } mntdata_t;
 

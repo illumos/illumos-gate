@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -96,6 +96,10 @@ extern void vfs_mnttab_readop(void);
  * that getmntent() and read() must be able to operate without interaction on
  * the same file descriptor; this is accomplished by the use of separate
  * mntsnap_ts for both read() and ioctl().
+ *
+ * mntfs observes the following lock-ordering:
+ *
+ *	mnp->mnt_contents -> vfslist -> zonep->zone_mntfs_db_lock
  *
  * NOTE: The following variable enables the generation of the "dev=xxx"
  * in the option string for a mounted file system.  Really this should
@@ -496,7 +500,8 @@ mntfs_is_same_element(mntelem_t *a, mntelem_t *b)
 static void
 mntfs_snapshot(mntnode_t *mnp, mntsnap_t *snapp)
 {
-	zone_t		*zonep = MTOD(mnp)->mnt_zone;
+	mntdata_t	*mnd = MTOD(mnp);
+	zone_t		*zonep = mnd->mnt_zone;
 	int		is_global_zone = (zonep == global_zone);
 	int		show_hidden = mnp->mnt_flags & MNT_SHOWHIDDEN;
 	vfs_t		*vfsp, *firstvfsp, *lastvfsp;
@@ -511,7 +516,8 @@ mntfs_snapshot(mntnode_t *mnp, mntsnap_t *snapp)
 	mntelem_t	*newp;
 	mntelem_t	*firstp = NULL;
 	size_t		nmnts = 0;
-	size_t		text_size = 0;
+	size_t		total_text_size = 0;
+	size_t		normal_text_size = 0;
 	int		insert_before;
 	timespec_t	last_mtime;
 	size_t		entry_length, new_entry_length;
@@ -742,7 +748,9 @@ mntfs_snapshot(mntnode_t *mnp, mntsnap_t *snapp)
 			 * snapshot.
 			 */
 			nmnts++;
-			text_size += elemp->mnte_text_size;
+			total_text_size += elemp->mnte_text_size;
+			if (!elemp->mnte_hidden)
+				normal_text_size += elemp->mnte_text_size;
 			if (!firstp)
 				firstp = elemp;
 
@@ -771,8 +779,19 @@ mntfs_snapshot(mntnode_t *mnp, mntsnap_t *snapp)
 	snapp->mnts_first = snapp->mnts_next = firstp;
 	snapp->mnts_flags = show_hidden ? MNTS_SHOWHIDDEN : 0;
 	snapp->mnts_nmnts = nmnts;
-	snapp->mnts_text_size = MTOD(mnp)->mnt_size = text_size;
+	snapp->mnts_text_size = total_text_size;
 	snapp->mnts_foffset = snapp->mnts_ieoffset = 0;
+
+	/*
+	 * Record /etc/mnttab's current size and mtime for possible future use
+	 * by mntgetattr().
+	 */
+	mnd->mnt_size = normal_text_size;
+	mnd->mnt_mtime = last_mtime;
+	if (show_hidden) {
+		mnd->mnt_hidden_size = total_text_size;
+		mnd->mnt_hidden_mtime = last_mtime;
+	}
 
 	/* Clean up. */
 	rw_exit(dblockp);
@@ -974,69 +993,121 @@ static int
 mntgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	caller_context_t *ct)
 {
-	mntnode_t *mnp = VTOM(vp);
+	int mask = vap->va_mask;
 	int error;
-	vnode_t *rvp;
-	extern timespec_t vfs_mnttab_ctime;
+	mntnode_t *mnp = VTOM(vp);
+	timespec_t mtime, old_mtime;
+	size_t size, old_size;
 	mntdata_t *mntdata = MTOD(VTOM(vp));
-	mntsnap_t *snap;
+	mntsnap_t *rsnapp, *isnapp;
+	extern timespec_t vfs_mnttab_ctime;
 
-	rw_enter(&mnp->mnt_contents, RW_READER);
-	snap = mnp->mnt_read.mnts_nmnts ? &mnp->mnt_read : &mnp->mnt_ioctl;
-	/*
-	 * Return all the attributes.  Should be refined
-	 * so that it returns only those asked for.
-	 * Most of this is complete fakery anyway.
-	 */
-	rvp = mnp->mnt_mountvp;
-	/*
-	 * Attributes are same as underlying file with modifications
-	 */
-	if (error = VOP_GETATTR(rvp, vap, flags, cr, ct)) {
-		rw_exit(&mnp->mnt_contents);
-		return (error);
+
+	/* AT_MODE, AT_UID and AT_GID are derived from the underlying file. */
+	if (mask & AT_MODE|AT_UID|AT_GID) {
+		if (error = VOP_GETATTR(mnp->mnt_mountvp, vap, flags, cr, ct))
+			return (error);
 	}
 
 	/*
-	 * We always look like a regular file
+	 * There are some minor subtleties in the determination of
+	 * /etc/mnttab's size and mtime. We wish to avoid any condition in
+	 * which, in the vicinity of a change to the in-kernel mnttab, we
+	 * return an old value for one but a new value for the other. We cannot
+	 * simply hold vfslist for the entire calculation because we might need
+	 * to call mntfs_snapshot(), which calls vfs_list_read_lock().
 	 */
-	vap->va_type = VREG;
-	/*
-	 * mode should basically be read only
-	 */
-	vap->va_mode &= 07444;
-	vap->va_fsid = vp->v_vfsp->vfs_dev;
-	vap->va_blksize = DEV_BSIZE;
-	vap->va_rdev = 0;
-	vap->va_seq = 0;
+	if (mask & AT_SIZE|AT_NBLOCKS) {
+		rw_enter(&mnp->mnt_contents, RW_WRITER);
+
+		vfs_list_read_lock();
+		vfs_mnttab_modtime(&mtime);
+		if (mnp->mnt_flags & MNT_SHOWHIDDEN) {
+			old_mtime = mntdata->mnt_hidden_mtime;
+			old_size = mntdata->mnt_hidden_size;
+		} else {
+			old_mtime = mntdata->mnt_mtime;
+			old_size = mntdata->mnt_size;
+		}
+		vfs_list_unlock();
+
+		rsnapp = &mnp->mnt_read;
+		isnapp = &mnp->mnt_ioctl;
+		if (rsnapp->mnts_nmnts || isnapp->mnts_nmnts) {
+			/*
+			 * The mntnode already has at least one snapshot from
+			 * which to take the size; the user will understand from
+			 * mnttab(4) that the current size of the in-kernel
+			 * mnttab is irrelevant.
+			 */
+			size = rsnapp->mnts_nmnts ? rsnapp->mnts_text_size :
+			    isnapp->mnts_text_size;
+		} else if (mntfs_newest(&mtime, &old_mtime) == MNTFS_NEITHER) {
+			/*
+			 * There is no existing valid snapshot but the in-kernel
+			 * mnttab has not changed since the time that the last
+			 * one was generated. Use the old file size; note that
+			 * it is guaranteed to be consistent with mtime, which
+			 * may be returned to the user later.
+			 */
+			size = old_size;
+		} else {
+			/*
+			 * There is no snapshot and the in-kernel mnttab has
+			 * changed since the last one was created. We generate a
+			 * new snapshot which we use for not only the size but
+			 * also the mtime, thereby ensuring that the two are
+			 * consistent.
+			 */
+			mntfs_snapshot(mnp, rsnapp);
+			size = rsnapp->mnts_text_size;
+			mtime = rsnapp->mnts_last_mtime;
+			mntfs_freesnap(mnp, rsnapp);
+		}
+
+		rw_exit(&mnp->mnt_contents);
+	} else if (mask & AT_ATIME|AT_MTIME) {
+		vfs_list_read_lock();
+		vfs_mnttab_modtime(&mtime);
+		vfs_list_unlock();
+	}
+
+	/* Always look like a regular file. */
+	if (mask & AT_TYPE)
+		vap->va_type = VREG;
+	/* Mode should basically be read only. */
+	if (mask & AT_MODE)
+		vap->va_mode &= 07444;
+	if (mask & AT_FSID)
+		vap->va_fsid = vp->v_vfsp->vfs_dev;
+	/* Nodeid is always ROOTINO. */
+	if (mask & AT_NODEID)
+		vap->va_nodeid = (ino64_t)MNTROOTINO;
 	/*
 	 * Set nlink to the number of open vnodes for mnttab info
 	 * plus one for existing.
 	 */
-	vap->va_nlink = mntdata->mnt_nopen + 1;
-	/*
-	 * If we haven't taken a snapshot yet, set the
-	 * size to the size of the latest snapshot.
-	 */
-	vap->va_size = snap->mnts_text_size ? snap->mnts_text_size :
-	    mntdata->mnt_size;
-	rw_exit(&mnp->mnt_contents);
-	/*
-	 * Fetch mtime from the vfs mnttab timestamp
-	 */
-	vap->va_ctime = vfs_mnttab_ctime;
-	vfs_list_read_lock();
-	vfs_mnttab_modtime(&vap->va_mtime);
-	vap->va_atime = vap->va_mtime;
-	vfs_list_unlock();
-	/*
-	 * Nodeid is always ROOTINO;
-	 */
-	vap->va_nodeid = (ino64_t)MNTROOTINO;
-	vap->va_nblocks = btod(vap->va_size);
+	if (mask & AT_NLINK)
+		vap->va_nlink = mntdata->mnt_nopen + 1;
+	if (mask & AT_SIZE)
+		vap->va_size = size;
+	if (mask & AT_ATIME)
+		vap->va_atime = mtime;
+	if (mask & AT_MTIME)
+		vap->va_mtime = mtime;
+	if (mask & AT_CTIME)
+		vap->va_ctime = vfs_mnttab_ctime;
+	if (mask & AT_RDEV)
+		vap->va_rdev = 0;
+	if (mask & AT_BLKSIZE)
+		vap->va_blksize = DEV_BSIZE;
+	if (mask & AT_NBLOCKS)
+		vap->va_nblocks = btod(size);
+	if (mask & AT_SEQ)
+		vap->va_seq = 0;
+
 	return (0);
 }
-
 
 static int
 mntaccess(vnode_t *vp, int mode, int flags, cred_t *cr,
@@ -1109,13 +1180,12 @@ mntinactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 }
 
 /*
- * lseek(2) is supported only to rewind the file. Rewinding has a special
- * meaning for /etc/mnttab: it forces mntfs to refresh the snapshot at the next
- * read() or ioctl().
+ * lseek(2) is supported only to rewind the file by resetmnttab(3C). Rewinding
+ * has a special meaning for /etc/mnttab: it forces mntfs to refresh the
+ * snapshot at the next ioctl().
  *
- * The generic lseek() code will have already changed the file offset. Therefore
- * mntread() can detect a rewind simply by looking for a zero offset. For the
- * benefit of mntioctl() we advertise a rewind with a specific flag.
+ * mnttab(4) explains that "the snapshot...is taken any time a read(2) is
+ * performed at offset 0". We therefore ignore the read snapshot here.
  */
 /* ARGSUSED */
 static int
@@ -1524,9 +1594,9 @@ mntioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
 
 	case MNTIOC_SHOWHIDDEN:
 	{
-		mutex_enter(&vp->v_lock);
+		rw_enter(&mnp->mnt_contents, RW_WRITER);
 		mnp->mnt_flags |= MNT_SHOWHIDDEN;
-		mutex_exit(&vp->v_lock);
+		rw_exit(&mnp->mnt_contents);
 		break;
 	}
 
@@ -1608,7 +1678,7 @@ mntioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
 		/*
 		 * If the user specifies a mounted resource that is a special
 		 * device then we capture its mode and major and minor numbers;
-		 * c.f. the block comment below.
+		 * cf. the block comment below.
 		 */
 		type = mntfs_special_info_string(preftab.mnt_special,
 		    &preftab.mnt_major, &preftab.mnt_minor, cr);
@@ -1787,6 +1857,17 @@ mntioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
 }
 
 /*
+ * mntfs provides a new vnode for each open(2). Two vnodes will represent the
+ * same instance of /etc/mnttab if they share the same (zone-specific) vfs.
+ */
+/* ARGSUSED */
+int
+mntcmp(vnode_t *vp1, vnode_t *vp2, caller_context_t *ct)
+{
+	return (vp1 != NULL && vp2 != NULL && vp1->v_vfsp == vp2->v_vfsp);
+}
+
+/*
  * /mntfs vnode operations vector
  */
 const fs_operation_def_t mnt_vnodeops_template[] = {
@@ -1800,6 +1881,7 @@ const fs_operation_def_t mnt_vnodeops_template[] = {
 	VOPNAME_INACTIVE,	{ .vop_inactive = mntinactive },
 	VOPNAME_SEEK,		{ .vop_seek = mntseek },
 	VOPNAME_POLL,		{ .vop_poll = mntpoll },
+	VOPNAME_CMP,		{ .vop_cmp = mntcmp },
 	VOPNAME_DISPOSE,	{ .error = fs_error },
 	VOPNAME_SHRLOCK,	{ .error = fs_error },
 	NULL,			NULL

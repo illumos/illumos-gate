@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -206,7 +204,7 @@ mntmount(struct vfs *vfsp, struct vnode *mvp,
 	 */
 	vfs_setresource(vfsp, "mnttab");
 
-	mnt = kmem_alloc(sizeof (*mnt), KM_SLEEP);
+	mnt = kmem_zalloc(sizeof (*mnt), KM_SLEEP);
 	mutex_enter(&mvp->v_lock);
 	if ((uap->flags & MS_OVERLAY) == 0 &&
 	    (mvp->v_count > 1 || (mvp->v_flag & VROOT))) {
@@ -216,8 +214,6 @@ mntmount(struct vfs *vfsp, struct vnode *mvp,
 	}
 	mutex_exit(&mvp->v_lock);
 
-	mnt->mnt_nopen = 0;
-	mnt->mnt_size = 0;
 	zone_hold(mnt->mnt_zone = zone);
 	mnp = &mnt->mnt_node;
 
