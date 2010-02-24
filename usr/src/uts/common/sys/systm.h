@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -134,8 +134,14 @@ enum tod_fault_type {
 	TOD_NOFAULT
 };
 
+#define	TOD_GET_FAILED		0x1	/* TOD could not be read */
+#define	TOD_SET_DONE		0x2	/* TOD has been modified */
+#define	TOD_CPR_RESUME_DONE	0x4	/* CPR resume has occurred */
+#define	TOD_DR_RESUME_DONE	0x8	/* DR resume has occurred */
+
 extern time_t tod_validate(time_t);
-extern void tod_fault_reset(void);
+extern void tod_status_set(int);
+extern void tod_status_clear(int);
 extern void plat_tod_fault(enum tod_fault_type);
 
 #ifndef _LP64

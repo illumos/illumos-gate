@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -386,7 +386,7 @@ todds1337_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 /*
  * Read the current time from the DS1337 chip and convert to UNIX form.
- * Should be called with tod_clock held.
+ * Should be called with tod_lock held.
  */
 
 static timestruc_t
@@ -402,7 +402,7 @@ todds1337_get(void)
 		(void) todds1337_read_rtc(&soft_rtc);
 		sync_clock_once = 0;
 	} else {
-		tod_fault_reset();
+		tod_status_set(TOD_GET_FAILED);
 		return (hrestime);
 	}
 
@@ -421,6 +421,9 @@ todds1337_get(void)
 	tod.tod_hour	= rtc.rtc_hrs;
 	tod.tod_min	= rtc.rtc_min;
 	tod.tod_sec	= rtc.rtc_sec;
+
+	/* read was successful so ensure failure flag is clear */
+	tod_status_clear(TOD_GET_FAILED);
 
 	ts.tv_sec = tod_to_utc(tod);
 	ts.tv_nsec = 0;

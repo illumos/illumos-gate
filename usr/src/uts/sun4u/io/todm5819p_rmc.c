@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -129,16 +129,8 @@ _info(struct modinfo *modinfop)
 
 
 /*
- * todm5819p_rmc is normally called once a second, from the clock thread.
- * It may also be infrequently called from other contexts (eg. ddi framework),
- * in which case our counting to NBAD_READ_LIMIT may be a few seconds short
- * of the desired 15-minute timeframe; this slight inaccuracy is acceptable.
- */
-#define	NBAD_READ_LIMIT	(900)   /* 15 minutes, in seconds */
-/*
  * Read the current time from the clock chip and convert to UNIX form.
- * Checks the century, but otherwise assumes that the values in the clock
- * chip are valid.
+ * Assumes that the year in the clock chip is valid.
  * Must be called with tod_lock held.
  */
 static timestruc_t
@@ -148,7 +140,6 @@ todm5819p_rmc_get(void)
 	int s;
 	timestruc_t ts;
 	struct rtc_t rtc;
-	static int nbad_reads = 0;
 
 	ASSERT(MUTEX_HELD(&tod_lock));
 
@@ -185,26 +176,12 @@ todm5819p_rmc_get(void)
 		/*
 		 * tod is inaccessible: just return current software time
 		 */
-		tod_fault_reset();
+		tod_status_set(TOD_GET_FAILED);
 		return (hrestime);
 	}
 
-	DPRINTF("todm5819p_rmc_get: century=%d year=%d dom=%d hrs=%d\n",
-	    (int)rtc.rtc_century, (int)rtc.rtc_year, (int)rtc.rtc_dom,
-	    (int)rtc.rtc_hrs);
-
-	/* detect and correct invalid century register data */
-	if (rtc.rtc_century < 19) {
-		DPRINTF(
-		    "todm5819p_rmc_get: century invalid (%d), returning 20\n",
-		    (int)rtc.rtc_century);
-		rtc.rtc_century = 20;
-		if (++nbad_reads == NBAD_READ_LIMIT) {
-			nbad_reads = 0;
-			cmn_err(CE_WARN, "todm5819p: realtime clock century "
-			    "register appears to be defective.");
-		}
-	}
+	/* read was successful so ensure failure flag is clear */
+	tod_status_clear(TOD_GET_FAILED);
 
 	ts.tv_sec = tod_to_utc(rtc_to_tod(&rtc));
 	ts.tv_nsec = 0;
@@ -288,10 +265,6 @@ todm5819p_rmc_set(timestruc_t ts)
 	rtc.rtc_min	= (uint8_t)tod.tod_min;
 	rtc.rtc_sec	= (uint8_t)tod.tod_sec;
 
-	DPRINTF("todm5819p_rmc_set: century=%d year=%d dom=%d hrs=%d\n",
-	    (int)rtc.rtc_century, (int)rtc.rtc_year, (int)rtc.rtc_dom,
-	    (int)rtc.rtc_hrs);
-
 	write_rtc_time(&rtc);
 
 	set_time_msg.year	= year - 1900;
@@ -312,6 +285,7 @@ void
 write_rtc_time(struct rtc_t *rtc)
 {
 	uint8_t	regb;
+	int	i;
 
 	/*
 	 * Freeze
@@ -320,22 +294,45 @@ write_rtc_time(struct rtc_t *rtc)
 	regb = M5819P_DATA_REG;
 	M5819P_DATA_REG = (regb | RTC_SET);
 
-	M5819P_ADDR_REG = RTC_SEC;
-	M5819P_DATA_REG = rtc->rtc_sec;
-	M5819P_ADDR_REG = RTC_MIN;
-	M5819P_DATA_REG = rtc->rtc_min;
-	M5819P_ADDR_REG = RTC_HRS;
-	M5819P_DATA_REG = rtc->rtc_hrs;
-	M5819P_ADDR_REG = RTC_DOW;
-	M5819P_DATA_REG = rtc->rtc_dow;
-	M5819P_ADDR_REG = RTC_DOM;
-	M5819P_DATA_REG = rtc->rtc_dom;
-	M5819P_ADDR_REG = RTC_MON;
-	M5819P_DATA_REG = rtc->rtc_mon;
-	M5819P_ADDR_REG = RTC_YEAR;
-	M5819P_DATA_REG = rtc->rtc_year;
-	M5819P_ADDR_REG = RTC_CENTURY;
-	M5819P_DATA_REG = rtc->rtc_century;
+	/*
+	 * If an update cycle is in progress wait for the UIP flag to
+	 * clear.  If we write whilst UIP is still set there is a slight
+	 * but real possibility of corrupting the RTC date and time
+	 * registers.
+	 *
+	 * The expected wait is one internal cycle of the chip.  We could
+	 * simply spin but this may hang a CPU if we were to have a broken
+	 * RTC chip where UIP is stuck, so we use a retry loop instead.
+	 * No critical section is needed here as the UIP flag will not be
+	 * re-asserted until we clear RTC_SET.
+	 */
+	M5819P_ADDR_REG = RTC_A;
+	for (i = 0; i < TODM5819_UIP_RETRY_THRESH; i++) {
+		if (!(M5819P_DATA_REG & RTC_UIP)) {
+			break;
+		}
+		drv_usecwait(TODM5819_UIP_WAIT_USEC);
+	}
+	if (i < TODM5819_UIP_RETRY_THRESH) {
+		M5819P_ADDR_REG = RTC_SEC;
+		M5819P_DATA_REG = rtc->rtc_sec;
+		M5819P_ADDR_REG = RTC_MIN;
+		M5819P_DATA_REG = rtc->rtc_min;
+		M5819P_ADDR_REG = RTC_HRS;
+		M5819P_DATA_REG = rtc->rtc_hrs;
+		M5819P_ADDR_REG = RTC_DOW;
+		M5819P_DATA_REG = rtc->rtc_dow;
+		M5819P_ADDR_REG = RTC_DOM;
+		M5819P_DATA_REG = rtc->rtc_dom;
+		M5819P_ADDR_REG = RTC_MON;
+		M5819P_DATA_REG = rtc->rtc_mon;
+		M5819P_ADDR_REG = RTC_YEAR;
+		M5819P_DATA_REG = rtc->rtc_year;
+		M5819P_ADDR_REG = RTC_CENTURY;
+		M5819P_DATA_REG = rtc->rtc_century;
+	} else {
+		cmn_err(CE_WARN, "todm5819p_rmc: Could not write the RTC\n");
+	}
 
 	/*
 	 * Unfreeze

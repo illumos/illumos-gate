@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,27 +99,26 @@ _init(void)
 		 * Set the string to pass to OBP
 		 */
 		(void) sprintf(obp_string,
-			"h# %p \" unix-get-tod\" $find if execute else "
-			"3drop then",
-			(void *)&ssc_time);
+		    "h# %p \" unix-get-tod\" $find if execute else 3drop then",
+		    (void *)&ssc_time);
 
 		prom_interpret(obp_string, 0, 0, 0, 0, 0);
 
 		if (ssc_time == (time_t)0) {
 			cmn_err(CE_WARN, "Initial date is invalid. "
-				"This can be caused by older firmware.");
+			    "This can be caused by older firmware.");
 			cmn_err(CE_CONT, "Please flashupdate the System "
-				"Controller firmware to the latest version.\n");
+			    "Controller firmware to the latest version.\n");
 			cmn_err(CE_CONT, "Attempting to set the date and time "
-				"based on the last shutdown.\n");
+			    "based on the last shutdown.\n");
 			cmn_err(CE_CONT, "Please inspect the date and time and "
-				"correct if necessary.\n");
+			    "correct if necessary.\n");
 		}
 
 		hrestime.tv_sec = ssc_time;
 
 		DCMNERR(CE_NOTE, "todsg: _init(): time from OBP 0x%lX",
-				ssc_time);
+		    ssc_time);
 		/*
 		 * Verify whether the received date/clock has overflowed
 		 * an integer(32bit), so that we capture any corrupted
@@ -128,9 +127,9 @@ _init(void)
 		if (TIMESPEC_OVERFLOW(&hrestime)) {
 			cmn_err(CE_WARN, "Date overflow detected.");
 			cmn_err(CE_CONT, "Attempting to set the date and time "
-				"based on the last shutdown.\n");
+			    "based on the last shutdown.\n");
 			cmn_err(CE_CONT, "Please inspect the date and time and "
-				"correct if necessary.\n");
+			    "correct if necessary.\n");
 
 			/*
 			 * By setting hrestime.tv_sec to zero
@@ -187,7 +186,7 @@ update_heartbeat(void)
 	else
 		i_am_alive++;
 	if (iosram_write(SBBC_TOD_KEY, OFFSET(tod_buf, tod_i_am_alive),
-			(char *)&i_am_alive, sizeof (uint32_t))) {
+	    (char *)&i_am_alive, sizeof (uint32_t))) {
 		complained++;
 		cmn_err(CE_WARN, "update_heartbeat(): write heartbeat failed");
 	}
@@ -208,16 +207,16 @@ verify_sc_tod_version(void)
 	 */
 	if (!sc_tod_version || is_sc_down >= SC_DOWN_COUNT_THRESHOLD) {
 		if (iosram_read(SBBC_TOD_KEY, OFFSET(tod_buf, tod_magic),
-			(char *)&magic, sizeof (uint32_t)) ||
-				magic != TODSG_MAGIC) {
+		    (char *)&magic, sizeof (uint32_t)) ||
+		    magic != TODSG_MAGIC) {
 			cmn_err(CE_WARN, "get_sc_tod_version(): "
-						"TOD SRAM magic error");
+			    "TOD SRAM magic error");
 			return (FALSE);
 		}
 		if (iosram_read(SBBC_TOD_KEY, OFFSET(tod_buf, tod_version),
-			(char *)&sc_tod_version, sizeof (uint32_t))) {
+		    (char *)&sc_tod_version, sizeof (uint32_t))) {
 			cmn_err(CE_WARN, "get_sc_tod_version(): "
-				"read tod version failed");
+			    "read tod version failed");
 			sc_tod_version = 0;
 			return (FALSE);
 		}
@@ -226,10 +225,9 @@ verify_sc_tod_version(void)
 		return (TRUE);
 	} else {
 		todsg_use_sc = 0;
-		cmn_err(CE_WARN,
-			"todsg_get(): incorrect firmware version, "
-			"(%d): expected version >= %d.",
-			sc_tod_version, SC_TOD_MIN_REV);
+		cmn_err(CE_WARN, "todsg_get(): incorrect firmware version, "
+		    "(%d): expected version >= %d.", sc_tod_version,
+		    SC_TOD_MIN_REV);
 	}
 	return (FALSE);
 }
@@ -244,26 +242,25 @@ update_tod_skew(time_t skew)
 	DCMNERR(CE_NOTE, "update_tod_skew(): skew  0x%lX", skew);
 
 	if (iosram_read(SBBC_TOD_KEY, OFFSET(tod_buf, tod_domain_skew),
-			(char *)&domain_skew, sizeof (time_t))) {
+	    (char *)&domain_skew, sizeof (time_t))) {
 		complained++;
-		cmn_err(CE_WARN, "update_tod_skew(): "
-				"read tod domain skew failed");
+		cmn_err(CE_WARN,
+		    "update_tod_skew(): read tod domain skew failed");
 	}
 	domain_skew += skew;
 	/* we shall update the skew_adjust too now */
 	domain_skew += skew_adjust;
 	if (!complained && iosram_write(SBBC_TOD_KEY,
-			OFFSET(tod_buf, tod_domain_skew),
-				(char *)&domain_skew, sizeof (time_t))) {
+	    OFFSET(tod_buf, tod_domain_skew), (char *)&domain_skew,
+	    sizeof (time_t))) {
 		complained++;
-		cmn_err(CE_WARN, "update_tod_skew(): "
-				"write domain skew failed");
+		cmn_err(CE_WARN,
+		    "update_tod_skew(): write domain skew failed");
 	}
 	if (!complained)
 		skew_adjust = 0;
 	return (complained);
 }
-
 
 /*
  * Return time value read from IOSRAM.
@@ -287,8 +284,8 @@ todsg_get(void)
 	if (watchdog_activated != 0 || watchdog_enable != 0)
 		complained = update_heartbeat();
 	if (!complained && (iosram_read(SBBC_TOD_KEY,
-			OFFSET(tod_buf, tod_get_value),
-			(char *)&seconds, sizeof (time_t)))) {
+	    OFFSET(tod_buf, tod_get_value), (char *)&seconds,
+	    sizeof (time_t)))) {
 		complained++;
 		cmn_err(CE_WARN, "todsg_get(): read 64-bit tod value failed");
 	}
@@ -300,8 +297,8 @@ todsg_get(void)
 		complained = update_tod_skew(0);
 	}
 	if (!complained && iosram_read(SBBC_TOD_KEY,
-			OFFSET(tod_buf, tod_domain_skew),
-			(char *)&domain_skew, sizeof (time_t))) {
+	    OFFSET(tod_buf, tod_domain_skew), (char *)&domain_skew,
+	    sizeof (time_t))) {
 		complained++;
 		cmn_err(CE_WARN, "todsg_get(): read tod domain skew failed");
 	}
@@ -326,11 +323,11 @@ todsg_get(void)
 			skew_adjust = hrestime.tv_sec - (seconds + domain_skew);
 			complained = update_tod_skew(0);
 			if (!complained && (iosram_read(SBBC_TOD_KEY,
-				OFFSET(tod_buf, tod_domain_skew),
-				(char *)&domain_skew, sizeof (time_t)))) {
+			    OFFSET(tod_buf, tod_domain_skew),
+			    (char *)&domain_skew, sizeof (time_t)))) {
 				complained++;
 				cmn_err(CE_WARN, "todsg_get(): "
-					"read tod domain skew failed");
+				    "read tod domain skew failed");
 			}
 		}
 		is_sc_down = 0;
@@ -341,6 +338,11 @@ todsg_get(void)
 		 * Hand back hrestime instead.
 		 */
 		if (!complained) {
+			/*
+			 * The read was successful so ensure the failure
+			 * flag is clear.
+			 */
+			tod_status_clear(TOD_GET_FAILED);
 			timestruc_t ts = {0, 0};
 			ts.tv_sec = seconds + domain_skew;
 			return (ts);
@@ -357,11 +359,11 @@ todsg_get(void)
 
 return_hrestime:
 	/*
-	 * We need to inform the tod_validate code to stop checking till
-	 * SC come back up again. Note that we will return hrestime below
-	 * which can be different that the previous TOD value we returned
+	 * We need to inform the tod_validate() code to stop checking until
+	 * the SC comes back up again.  Note we will return hrestime below
+	 * which may be different to the previous TOD value we returned.
 	 */
-	tod_fault_reset();
+	tod_status_set(TOD_GET_FAILED);
 	return (hrestime);
 }
 
@@ -404,15 +406,15 @@ todsg_set(timestruc_t ts)
 	 * to update the skew.
 	 */
 	if (!complained && (iosram_read(SBBC_TOD_KEY,
-			OFFSET(tod_buf, tod_get_value),
-			(char *)&seconds, sizeof (time_t)))) {
+	    OFFSET(tod_buf, tod_get_value), (char *)&seconds,
+	    sizeof (time_t)))) {
 		complained++;
 		cmn_err(CE_WARN, "todsg_set(): read 64-bit tod value failed");
 	}
 
 	if (!complained && iosram_read(SBBC_TOD_KEY,
-			OFFSET(tod_buf, tod_domain_skew),
-			(char *)&domain_skew, sizeof (time_t))) {
+	    OFFSET(tod_buf, tod_domain_skew), (char *)&domain_skew,
+	    sizeof (time_t))) {
 		complained++;
 		cmn_err(CE_WARN, "todsg_set(): read tod domain skew failed");
 	}
@@ -426,8 +428,7 @@ todsg_set(timestruc_t ts)
 		complained = update_tod_skew(ts.tv_sec - hwtod);
 
 		DCMNERR(CE_NOTE, "todsg_set(): set time %lX (%lX)%s",
-			ts.tv_sec, hwtod, complained ? " failed" : "");
-
+		    ts.tv_sec, hwtod, complained ? " failed" : "");
 	}
 
 	if (complained) {
@@ -445,16 +446,16 @@ todsg_set_watchdog_timer(uint32_t timeoutval)
 
 	if (!verify_sc_tod_version()) {
 		DCMNERR(CE_NOTE, "todsg_set_watchdog_timer(): "
-			"verify_sc_tod_version failed");
+		    "verify_sc_tod_version failed");
 		return (0);
 	}
 	DCMNERR(CE_NOTE, "todsg_set_watchdog_timer(): "
-		"set watchdog timer value = %d", timeoutval);
+	    "set watchdog timer value = %d", timeoutval);
 
 	if (iosram_write(SBBC_TOD_KEY, OFFSET(tod_buf, tod_timeout_period),
-			(char *)&timeoutval, sizeof (uint32_t))) {
+	    (char *)&timeoutval, sizeof (uint32_t))) {
 		DCMNERR(CE_NOTE, "todsg_set_watchdog_timer(): "
-			"write new timeout value failed");
+		    "write new timeout value failed");
 		return (0);
 	}
 	watchdog_activated = 1;
@@ -472,23 +473,23 @@ todsg_clear_watchdog_timer(void)
 
 	if ((watchdog_activated == 0) || !verify_sc_tod_version()) {
 		DCMNERR(CE_NOTE, "todsg_set_watchdog_timer(): "
-			"either watchdog not activated or "
-			"verify_sc_tod_version failed");
+		    "either watchdog not activated or "
+		    "verify_sc_tod_version failed");
 		return (0);
 	}
 	if (iosram_read(SBBC_TOD_KEY, OFFSET(tod_buf, tod_timeout_period),
-			(char *)&r_timeout_period, sizeof (uint32_t))) {
+	    (char *)&r_timeout_period, sizeof (uint32_t))) {
 		DCMNERR(CE_NOTE, "todsg_clear_watchdog_timer(): "
-			"read timeout value failed");
+		    "read timeout value failed");
 		return (0);
 	}
 	DCMNERR(CE_NOTE, "todsg_clear_watchdog_timer(): "
-		"clear watchdog timer (old value=%d)", r_timeout_period);
+	    "clear watchdog timer (old value=%d)", r_timeout_period);
 	w_timeout_period = 0;
 	if (iosram_write(SBBC_TOD_KEY, OFFSET(tod_buf, tod_timeout_period),
-			(char *)&w_timeout_period, sizeof (uint32_t))) {
+	    (char *)&w_timeout_period, sizeof (uint32_t))) {
 		DCMNERR(CE_NOTE, "todsg_clear_watchdog_timer(): "
-			"write zero timeout value failed");
+		    "write zero timeout value failed");
 		return (0);
 	}
 	watchdog_activated = 0;
@@ -522,7 +523,7 @@ todsg_get_cpufrequency(void)
 {
 
 	DCMNERR(CE_NOTE, "todsg_get_cpufrequency(): frequency=%ldMHz",
-		cpunodes[CPU->cpu_id].clock_freq/1000000);
+	    cpunodes[CPU->cpu_id].clock_freq/1000000);
 
 	return (cpunodes[CPU->cpu_id].clock_freq);
 }

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This workaround inhibits prom_printf after the cpus are grabbed.
@@ -124,10 +122,9 @@ sysctrl_grab_cpus(void)
 	others = cpu_ready_set;
 	CPUSET_DEL(others, CPU->cpu_id);
 	xt_some(others, (xcfunc_t *)sysctrl_freeze, (uint64_t)sysctrl_gate,
-		(uint64_t)(&sysctrl_gate[CPU->cpu_id]));
+	    (uint64_t)(&sysctrl_gate[CPU->cpu_id]));
 
-	sysc_tick_limit =
-		((uint64_t)sys_tick_freq * SYSC_CPU_LOOP_MSEC) / 1000;
+	sysc_tick_limit = ((uint64_t)sys_tick_freq * SYSC_CPU_LOOP_MSEC) / 1000;
 
 	/* wait for each cpu to check in */
 	for (i = 0; i < NCPU; i++) {
@@ -148,8 +145,8 @@ sysctrl_grab_cpus(void)
 			/* Panic the system if cpu not responsed by deadline */
 			sysc_current_tick = gettick();
 			if (sysc_current_tick >= sysc_tick_deadline) {
-			    cmn_err(CE_PANIC, "sysctrl: cpu %d not "
-				"responding to quiesce command", i);
+				cmn_err(CE_PANIC, "sysctrl: cpu %d not "
+				    "responding to quiesce command", i);
 			}
 		}
 	}
@@ -204,7 +201,7 @@ sysctrl_is_real_device(dev_info_t *dip)
 	 * now the general case
 	 */
 	rc = ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS, "reg",
-		(caddr_t)&regbuf, &length);
+	    (caddr_t)&regbuf, &length);
 	ASSERT(rc != DDI_PROP_NO_MEMORY);
 	if (rc != DDI_PROP_SUCCESS) {
 		return (FALSE);
@@ -247,10 +244,10 @@ sysctrl_suspend_devices(dev_info_t *dip, sysc_cfga_pkt_t *pkt)
 		DEBUGP(errp(" suspending device %s\n", device_path));
 		if (devi_detach(dip, DDI_SUSPEND) != DDI_SUCCESS) {
 			DEBUGP(errp("  unable to suspend device %s\n",
-				device_path));
+			    device_path));
 
 			(void) strncpy(pkt->errbuf, device_path,
-				SYSC_OUTPUT_LEN);
+			    SYSC_OUTPUT_LEN);
 			SYSC_ERR_SET(pkt, SYSC_ERR_SUSPEND);
 			ndi_hold_devi(dip);
 			failed_driver = dip;
@@ -297,7 +294,7 @@ sysctrl_resume_devices(dev_info_t *start, sysc_cfga_pkt_t *pkt)
 				 * cfgadm platform library.
 				 */
 				cmn_err(CE_PANIC, "Unable to resume device %s",
-					device_path);
+				    device_path);
 			}
 		}
 		ndi_devi_enter(dip, &circ);
@@ -415,7 +412,7 @@ sysctrl_stop_user_threads(sysc_cfga_pkt_t *pkt)
 
 				/* nope, cache the details for later */
 				bcopy(p->p_user.u_psargs, cache_psargs,
-					sizeof (cache_psargs));
+				    sizeof (cache_psargs));
 				cache_tp = tp;
 				cache_t_state = tp->t_state;
 				bailout = 1;
@@ -433,9 +430,8 @@ sysctrl_stop_user_threads(sysc_cfga_pkt_t *pkt)
 	/* were we unable to stop all threads after a few tries? */
 	if (bailout) {
 		(void) sprintf(pkt->errbuf, "process: %s id: %d state: %x"
-		    " thread descriptor: %p",
-		    cache_psargs, (int)pid, cache_t_state,
-			(void *)cache_tp);
+		    " thread descriptor: %p", cache_psargs, (int)pid,
+		    cache_t_state, (void *)cache_tp);
 
 		SYSC_ERR_SET(pkt, SYSC_ERR_UTHREAD);
 
@@ -568,7 +564,7 @@ sysctrl_resume(sysc_cfga_pkt_t *pkt)
 		 * value change between suspend and resume
 		 */
 		mutex_enter(&tod_lock);
-		tod_fault_reset();
+		tod_status_set(TOD_DR_RESUME_DONE);
 		mutex_exit(&tod_lock);
 
 		sysctrl_release_cpus();
@@ -581,7 +577,7 @@ sysctrl_resume(sysc_cfga_pkt_t *pkt)
 		if (sysc_watchdog_suspended) {
 			mutex_enter(&tod_lock);
 			tod_ops.tod_set_watchdog_timer(
-				watchdog_timeout_seconds);
+			    watchdog_timeout_seconds);
 			mutex_exit(&tod_lock);
 		}
 
@@ -590,7 +586,7 @@ sysctrl_resume(sysc_cfga_pkt_t *pkt)
 		 */
 		(void) callb_execute_class(CB_CL_CPR_RPC, CB_CODE_CPR_RESUME);
 		(void) callb_execute_class(CB_CL_CPR_CALLOUT,
-			CB_CODE_CPR_RESUME);
+		    CB_CODE_CPR_RESUME);
 		sysctrl_enable_intr();
 		/* FALLTHROUGH */
 
@@ -616,7 +612,7 @@ sysctrl_resume(sysc_cfga_pkt_t *pkt)
 		if (!sysctrl_skip_kernel_threads) {
 			DEBUGP(errp("starting kernel daemons..."));
 			(void) callb_execute_class(CB_CL_CPR_DAEMON,
-				CB_CODE_CPR_RESUME);
+			    CB_CODE_CPR_RESUME);
 			callb_unlock_table();
 		}
 		DEBUGP(errp("done\n"));

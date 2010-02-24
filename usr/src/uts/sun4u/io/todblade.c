@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,10 +93,8 @@ _init(void)
 
 		tod_ops.tod_get = todbl_get;
 		tod_ops.tod_set = todbl_set;
-		tod_ops.tod_set_watchdog_timer =
-			todbl_set_watchdog_timer;
-		tod_ops.tod_clear_watchdog_timer =
-			todbl_clear_watchdog_timer;
+		tod_ops.tod_set_watchdog_timer = todbl_set_watchdog_timer;
+		tod_ops.tod_clear_watchdog_timer = todbl_clear_watchdog_timer;
 		tod_ops.tod_set_power_alarm = todbl_set_power_alarm;
 		tod_ops.tod_clear_power_alarm = todbl_clear_power_alarm;
 		tod_ops.tod_get_cpufrequency = todbl_get_cpufrequency;
@@ -155,8 +153,7 @@ todbl_get(void)
 		} else if (!watchdog_activated && watchdog_enable) {
 			(void) configure_wdog(WDOG_ON);
 		} else if (watchdog_activated &&
-			    (ddi_get_lbolt() - last_pat_lbt) >=
-			    SEC_TO_TICK(1)) {
+		    (ddi_get_lbolt() - last_pat_lbt) >= SEC_TO_TICK(1)) {
 			/*
 			 * PAT THE WATCHDOG!!
 			 * We dont want to accelerate the pat frequency
@@ -184,14 +181,17 @@ todbl_get(void)
 	}
 	if (i == TODM5819_UIP_RETRY_THRESH) {
 		/*
-		 * We couldnt read from the tod
+		 * We couldn't read from the TOD.
 		 */
-		tod_fault_reset();
+		tod_status_set(TOD_GET_FAILED);
 		return (hrestime);
 	}
 
 	DPRINTF("todbl_get: century=%d year=%d dom=%d hrs=%d\n",
 	    rtc.rtc_century, rtc.rtc_year, rtc.rtc_dom, rtc.rtc_hrs);
+
+	/* read was successful so ensure failure flag is clear */
+	tod_status_clear(TOD_GET_FAILED);
 
 	ts.tv_sec = tod_to_utc(rtc_to_tod(&rtc));
 	ts.tv_nsec = 0;
@@ -314,6 +314,7 @@ static void
 write_rtc_time(struct rtc_t *rtc)
 {
 	uint8_t	regb;
+	int	i;
 
 	/*
 	 * Freeze
@@ -321,19 +322,40 @@ write_rtc_time(struct rtc_t *rtc)
 	regb = RTC_GET8(RTC_B);
 	RTC_PUT8(RTC_B, (regb | RTC_SET));
 
-	RTC_PUT8(RTC_SEC, (rtc->rtc_sec));
-	RTC_PUT8(RTC_ASEC, (rtc->rtc_asec));
-	RTC_PUT8(RTC_MIN, (rtc->rtc_min));
-	RTC_PUT8(RTC_AMIN, (rtc->rtc_amin));
+	/*
+	 * If an update is in progress wait for the UIP flag to clear.
+	 * If we write whilst UIP is still set there is a slight but real
+	 * possibility of corrupting the RTC date and time registers.
+	 *
+	 * The expected wait is one internal cycle of the chip.  We could
+	 * simply spin but this may hang a CPU if we were to have a broken
+	 * RTC chip where UIP is stuck, so we use a retry loop instead.
+	 * No critical section is needed here as the UIP flag will not be
+	 * re-asserted until we clear RTC_SET.
+	 */
+	for (i = 0; i < TODM5819_UIP_RETRY_THRESH; i++) {
+		if (!(RTC_GET8(RTC_A) & RTC_UIP)) {
+			break;
+		}
+		drv_usecwait(TODM5819_UIP_WAIT_USEC);
+	}
+	if (i < TODM5819_UIP_RETRY_THRESH) {
+		RTC_PUT8(RTC_SEC, (rtc->rtc_sec));
+		RTC_PUT8(RTC_ASEC, (rtc->rtc_asec));
+		RTC_PUT8(RTC_MIN, (rtc->rtc_min));
+		RTC_PUT8(RTC_AMIN, (rtc->rtc_amin));
 
-	RTC_PUT8(RTC_HRS, (rtc->rtc_hrs));
-	RTC_PUT8(RTC_AHRS, (rtc->rtc_ahrs));
-	RTC_PUT8(RTC_DOW, (rtc->rtc_dow));
-	RTC_PUT8(RTC_DOM, (rtc->rtc_dom));
+		RTC_PUT8(RTC_HRS, (rtc->rtc_hrs));
+		RTC_PUT8(RTC_AHRS, (rtc->rtc_ahrs));
+		RTC_PUT8(RTC_DOW, (rtc->rtc_dow));
+		RTC_PUT8(RTC_DOM, (rtc->rtc_dom));
 
-	RTC_PUT8(RTC_MON, (rtc->rtc_mon));
-	RTC_PUT8(RTC_YEAR, (rtc->rtc_year));
-	RTC_PUT8(RTC_CENTURY, (rtc->rtc_century));
+		RTC_PUT8(RTC_MON, (rtc->rtc_mon));
+		RTC_PUT8(RTC_YEAR, (rtc->rtc_year));
+		RTC_PUT8(RTC_CENTURY, (rtc->rtc_century));
+	} else {
+		cmn_err(CE_WARN, "todblade: Could not write the RTC\n");
+	}
 
 	/*
 	 * Unfreeze

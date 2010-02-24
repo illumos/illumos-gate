@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,13 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*
  */
 
 #include <sys/types.h>
@@ -86,15 +80,14 @@ int
 _init(void)
 {
 	if (strcmp(tod_module_name, "todm5819") == 0 ||
-		strcmp(tod_module_name, "m5819") == 0) {
+	    strcmp(tod_module_name, "m5819") == 0) {
 		RTC_PUT8(RTC_B, (RTC_DM | RTC_HM));
 
 		tod_ops.tod_get = todm5819_get;
 		tod_ops.tod_set = todm5819_set;
-		tod_ops.tod_set_watchdog_timer =
-			todm5819_set_watchdog_timer;
+		tod_ops.tod_set_watchdog_timer = todm5819_set_watchdog_timer;
 		tod_ops.tod_clear_watchdog_timer =
-			todm5819_clear_watchdog_timer;
+		    todm5819_clear_watchdog_timer;
 		tod_ops.tod_set_power_alarm = todm5819_set_power_alarm;
 		tod_ops.tod_clear_power_alarm = todm5819_clear_power_alarm;
 		tod_ops.tod_get_cpufrequency = todm5819_get_cpufrequency;
@@ -121,7 +114,7 @@ int
 _fini(void)
 {
 	if (strcmp(tod_module_name, "m5819") == 0 ||
-		strcmp(tod_module_name, "todm5819") == 0) {
+	    strcmp(tod_module_name, "todm5819") == 0) {
 		return (EBUSY);
 	} else {
 		return (mod_remove(&modlinkage));
@@ -163,14 +156,17 @@ todm5819_get(void)
 	}
 	if (i == TODM5819_UIP_RETRY_THRESH) {
 		/*
-		 * We couldnt read from the tod
+		 * We couldn't read from the TOD.
 		 */
-		tod_fault_reset();
+		tod_status_set(TOD_GET_FAILED);
 		return (hrestime);
 	}
 
 	DPRINTF("todm5819_get: century=%d year=%d dom=%d hrs=%d\n",
-		rtc.rtc_century, rtc.rtc_year, rtc.rtc_dom, rtc.rtc_hrs);
+	    rtc.rtc_century, rtc.rtc_year, rtc.rtc_dom, rtc.rtc_hrs);
+
+	/* read was successful so ensure failure flag is clear */
+	tod_status_clear(TOD_GET_FAILED);
 
 	ts.tv_sec = tod_to_utc(rtc_to_tod(&rtc));
 	ts.tv_nsec = 0;
@@ -272,6 +268,7 @@ void
 write_rtc_time(struct rtc_t *rtc)
 {
 	uint8_t	regb;
+	int	i;
 
 	/*
 	 * Freeze
@@ -279,19 +276,40 @@ write_rtc_time(struct rtc_t *rtc)
 	regb = RTC_GET8(RTC_B);
 	RTC_PUT8(RTC_B, (regb | RTC_SET));
 
-	RTC_PUT8(RTC_SEC, (rtc->rtc_sec));
-	RTC_PUT8(RTC_ASEC, (rtc->rtc_asec));
-	RTC_PUT8(RTC_MIN, (rtc->rtc_min));
-	RTC_PUT8(RTC_AMIN, (rtc->rtc_amin));
+	/*
+	 * If an update is in progress wait for the UIP flag to clear.
+	 * If we write whilst UIP is still set there is a slight but real
+	 * possibility of corrupting the RTC date and time registers.
+	 *
+	 * The expected wait is one internal cycle of the chip.  We could
+	 * simply spin but this may hang a CPU if we were to have a broken
+	 * RTC chip where UIP is stuck, so we use a retry loop instead.
+	 * No critical section is needed here as the UIP flag will not be
+	 * re-asserted until we clear RTC_SET.
+	 */
+	for (i = 0; i < TODM5819_UIP_RETRY_THRESH; i++) {
+		if (!(RTC_GET8(RTC_A) & RTC_UIP)) {
+			break;
+		}
+		drv_usecwait(TODM5819_UIP_WAIT_USEC);
+	}
+	if (i < TODM5819_UIP_RETRY_THRESH) {
+		RTC_PUT8(RTC_SEC, (rtc->rtc_sec));
+		RTC_PUT8(RTC_ASEC, (rtc->rtc_asec));
+		RTC_PUT8(RTC_MIN, (rtc->rtc_min));
+		RTC_PUT8(RTC_AMIN, (rtc->rtc_amin));
 
-	RTC_PUT8(RTC_HRS, (rtc->rtc_hrs));
-	RTC_PUT8(RTC_AHRS, (rtc->rtc_ahrs));
-	RTC_PUT8(RTC_DOW, (rtc->rtc_dow));
-	RTC_PUT8(RTC_DOM, (rtc->rtc_dom));
+		RTC_PUT8(RTC_HRS, (rtc->rtc_hrs));
+		RTC_PUT8(RTC_AHRS, (rtc->rtc_ahrs));
+		RTC_PUT8(RTC_DOW, (rtc->rtc_dow));
+		RTC_PUT8(RTC_DOM, (rtc->rtc_dom));
 
-	RTC_PUT8(RTC_MON, (rtc->rtc_mon));
-	RTC_PUT8(RTC_YEAR, (rtc->rtc_year));
-	RTC_PUT8(RTC_CENTURY, (rtc->rtc_century));
+		RTC_PUT8(RTC_MON, (rtc->rtc_mon));
+		RTC_PUT8(RTC_YEAR, (rtc->rtc_year));
+		RTC_PUT8(RTC_CENTURY, (rtc->rtc_century));
+	} else {
+		cmn_err(CE_WARN, "todm5819: Could not write the RTC\n");
+	}
 
 	/*
 	 * Unfreeze

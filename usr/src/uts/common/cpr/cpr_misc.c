@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/errno.h>
@@ -851,10 +849,10 @@ cpr_tod_get(cpr_time_t *ctp)
 }
 
 void
-cpr_tod_fault_reset(void)
+cpr_tod_status_set(int tod_flag)
 {
 	mutex_enter(&tod_lock);
-	tod_fault_reset();
+	tod_status_set(tod_flag);
 	mutex_exit(&tod_lock);
 }
 

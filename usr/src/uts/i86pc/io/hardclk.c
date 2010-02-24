@@ -20,15 +20,13 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989, 1990 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/time.h>
@@ -49,6 +47,8 @@
 
 char *tod_module_name;		/* Settable in /etc/system */
 
+extern void tod_set_prev(timestruc_t);
+
 /*
  * Write the specified time into the clock chip.
  * Must be called with tod_lock held.
@@ -58,11 +58,9 @@ tod_set(timestruc_t ts)
 {
 	ASSERT(MUTEX_HELD(&tod_lock));
 
-	/*
-	 * Prevent false alarm in tod_validate() due to tod value change.
-	 */
-	tod_fault_reset();
+	tod_set_prev(ts);		/* for tod_validate() */
 	TODOP_SET(tod_ops, ts);
+	tod_status_set(TOD_SET_DONE);	/* TOD was modified */
 }
 
 /*

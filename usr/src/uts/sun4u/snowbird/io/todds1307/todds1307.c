@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -380,7 +380,7 @@ todds1307_get(void)
 		(void) todds1307_read_rtc(&soft_rtc);
 		sync_clock_once = 0;
 	} else {
-		tod_fault_reset();
+		tod_status_set(TOD_GET_FAILED);
 		return (hrestime);
 	}
 
@@ -399,6 +399,9 @@ todds1307_get(void)
 	tod.tod_hour	= rtc.rtc_hrs;
 	tod.tod_min	= rtc.rtc_min;
 	tod.tod_sec	= rtc.rtc_sec;
+
+	/* read was successful so ensure failure flag is clear */
+	tod_status_clear(TOD_GET_FAILED);
 
 	ts.tv_sec = tod_to_utc(tod);
 	ts.tv_nsec = 0;

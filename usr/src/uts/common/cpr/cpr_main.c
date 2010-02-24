@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This module contains the guts of checkpoint-resume mechanism.
@@ -1044,7 +1042,7 @@ rb_mp_paused:
 		 * Prevent false alarm in tod_validate() due to tod
 		 * value change between suspend and resume
 		 */
-		cpr_tod_fault_reset();
+		cpr_tod_status_set(TOD_CPR_RESUME_DONE);
 
 		cpr_convert_promtime(&pwron_tv);
 

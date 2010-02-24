@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1374,6 +1374,12 @@ utc_to_tod(time_t utc)
 
 	ASSERT(MUTEX_HELD(&tod_lock));
 
+	/*
+	 * Note that tod_set_prev() assumes utc will be set to zero in
+	 * the case of it being negative.  Consequently, any change made
+	 * to this behavior would have to be reflected in that function
+	 * as well.
+	 */
 	if (utc < 0)			/* should never happen */
 		utc = 0;
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -178,7 +178,7 @@ todpc_get(tod_ops_t *top)
 	if (todpc_rtcget((unsigned char *)&rtc)) {
 		ts.tv_sec = 0;
 		ts.tv_nsec = 0;
-		tod_fault_reset();
+		tod_status_set(TOD_GET_FAILED);
 		return (ts);
 	}
 
@@ -213,6 +213,9 @@ todpc_get(tod_ops_t *top)
 	tod.tod_hour	= BCD_TO_BYTE(rtc.rtc_hr);
 	tod.tod_min	= BCD_TO_BYTE(rtc.rtc_min);
 	tod.tod_sec	= BCD_TO_BYTE(rtc.rtc_sec);
+
+	/* read was successful so ensure failure flag is clear */
+	tod_status_clear(TOD_GET_FAILED);
 
 	ts.tv_sec = tod_to_utc(tod) + ggmtl();
 	ts.tv_nsec = 0;

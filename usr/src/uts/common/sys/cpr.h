@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_CPR_H
 #define	_SYS_CPR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -651,7 +649,7 @@ extern void cpr_stat_event_print(void);
 extern void cpr_stat_event_start(char *, cpr_time_t *);
 extern void cpr_stat_record_events(void);
 extern void cpr_tod_get(cpr_time_t *ctp);
-extern void cpr_tod_fault_reset(void);
+extern void cpr_tod_status_set(int);
 extern void i_cpr_bitmap_cleanup(void);
 extern void i_cpr_stop_other_cpus(void);
 extern void i_cpr_alloc_cpus(void);

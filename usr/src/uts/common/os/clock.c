@@ -330,7 +330,11 @@ static int lgrp_ticks;		/* counter to schedule lgrp load calcs */
 #define	TOD_FILTER_N		4
 #define	TOD_FILTER_SETTLE	(4 * TOD_FILTER_N)
 static int tod_faulted = TOD_NOFAULT;
-static int tod_fault_reset_flag = 0;
+
+static int tod_status_flag = 0;		/* used by tod_validate() */
+
+static hrtime_t prev_set_tick = 0;	/* gethrtime() prior to tod_set() */
+static time_t prev_set_tod = 0;		/* tv_sec value passed to tod_set() */
 
 /* patchable via /etc/system */
 int tod_validate_enable = 1;
@@ -2110,12 +2114,46 @@ tod_fault(enum tod_fault_type ftype, int off)
 	return (tod_faulted);
 }
 
+/*
+ * Two functions that allow tod_status_flag to be manipulated by functions
+ * external to this file.
+ */
+
 void
-tod_fault_reset()
+tod_status_set(int tod_flag)
 {
-	tod_fault_reset_flag = 1;
+	tod_status_flag |= tod_flag;
 }
 
+void
+tod_status_clear(int tod_flag)
+{
+	tod_status_flag &= ~tod_flag;
+}
+
+/*
+ * Record a timestamp and the value passed to tod_set().  The next call to
+ * tod_validate() can use these values, prev_set_tick and prev_set_tod,
+ * when checking the timestruc_t returned by tod_get().  Ordinarily,
+ * tod_validate() will use prev_tick and prev_tod for this task but these
+ * become obsolete, and will be re-assigned with the prev_set_* values,
+ * in the case when the TOD is re-written.
+ */
+void
+tod_set_prev(timestruc_t ts)
+{
+	if ((tod_validate_enable == 0) || (tod_faulted != TOD_NOFAULT) ||
+	    tod_validate_deferred) {
+		return;
+	}
+	prev_set_tick = gethrtime();
+	/*
+	 * A negative value will be set to zero in utc_to_tod() so we fake
+	 * a zero here in such a case.  This would need to change if the
+	 * behavior of utc_to_tod() changes.
+	 */
+	prev_set_tod = ts.tv_sec < 0 ? 0 : ts.tv_sec;
+}
 
 /*
  * tod_validate() is used for checking values returned by tod_get().
@@ -2144,6 +2182,9 @@ tod_validate(time_t tod)
 	static hrtime_t prev_tick = 0;
 	static long dtick_avg = TOD_REF_FREQ;
 
+	int cpr_resume_done = 0;
+	int dr_resume_done = 0;
+
 	hrtime_t tick = gethrtime();
 
 	ASSERT(MUTEX_HELD(&tod_lock));
@@ -2159,7 +2200,9 @@ tod_validate(time_t tod)
 	}
 
 	/*
-	 * Update prev_tod and prev_tick values for first run
+	 * If this is the first time through, we just need to save the tod
+	 * we were called with and hrtime so we can use them next time to
+	 * validate tod_get().
 	 */
 	if (firsttime) {
 		firsttime = 0;
@@ -2169,21 +2212,66 @@ tod_validate(time_t tod)
 	}
 
 	/*
-	 * For either of these conditions, we need to reset ourself
-	 * and start validation from zero since each condition
-	 * indicates that the TOD will be updated with new value
-	 * Also, note that tod_needsync will be reset in clock()
+	 * Handle any flags that have been turned on by tod_status_set().
+	 * In the case where a tod_set() is done and then a subsequent
+	 * tod_get() fails (ie, both TOD_SET_DONE and TOD_GET_FAILED are
+	 * true), we treat the TOD_GET_FAILED with precedence by switching
+	 * off the flag, returning tod and leaving TOD_SET_DONE asserted
+	 * until such time as tod_get() completes successfully.
 	 */
-	if (tod_needsync || tod_fault_reset_flag) {
-		firsttime = 1;
-		prev_tod = 0;
-		prev_tick = 0;
-		dtick_avg = TOD_REF_FREQ;
-
-		if (tod_fault_reset_flag)
-			tod_fault_reset_flag = 0;
-
+	if (tod_status_flag & TOD_GET_FAILED) {
+		/*
+		 * tod_get() has encountered an issue, possibly transitory,
+		 * when reading TOD.  We'll just return the incoming tod
+		 * value (which is actually hrestime.tv_sec in this case)
+		 * and when we get a genuine tod, following a successful
+		 * tod_get(), we can validate using prev_tod and prev_tick.
+		 */
+		tod_status_flag &= ~TOD_GET_FAILED;
 		return (tod);
+	} else if (tod_status_flag & TOD_SET_DONE) {
+		/*
+		 * TOD has been modified.  Just before the TOD was written,
+		 * tod_set_prev() saved tod and hrtime; we can now use
+		 * those values, prev_set_tod and prev_set_tick, to validate
+		 * the incoming tod that's just been read.
+		 */
+		prev_tod = prev_set_tod;
+		prev_tick = prev_set_tick;
+		dtick_avg = TOD_REF_FREQ;
+		tod_status_flag &= ~TOD_SET_DONE;
+		/*
+		 * If a tod_set() preceded a cpr_suspend() without an
+		 * intervening tod_validate(), we need to ensure that a
+		 * TOD_JUMPED condition is ignored.
+		 * Note this isn't a concern in the case of DR as we've
+		 * just reassigned dtick_avg, above.
+		 */
+		if (tod_status_flag & TOD_CPR_RESUME_DONE) {
+			cpr_resume_done = 1;
+			tod_status_flag &= ~TOD_CPR_RESUME_DONE;
+		}
+	} else if (tod_status_flag & TOD_CPR_RESUME_DONE) {
+		/*
+		 * The system's coming back from a checkpoint resume.
+		 */
+		cpr_resume_done = 1;
+		tod_status_flag &= ~TOD_CPR_RESUME_DONE;
+		/*
+		 * We need to handle the possibility of a CPR suspend
+		 * operation having been initiated whilst a DR event was
+		 * in-flight.
+		 */
+		if (tod_status_flag & TOD_DR_RESUME_DONE) {
+			dr_resume_done = 1;
+			tod_status_flag &= ~TOD_DR_RESUME_DONE;
+		}
+	} else if (tod_status_flag & TOD_DR_RESUME_DONE) {
+		/*
+		 * A Dynamic Reconfiguration event has taken place.
+		 */
+		dr_resume_done = 1;
+		tod_status_flag &= ~TOD_DR_RESUME_DONE;
 	}
 
 	/* test hook */
@@ -2254,12 +2342,34 @@ tod_validate(time_t tod)
 		 */
 		if (diff_tod > 4) {
 			if (dtick < TOD_JUMP_THRESHOLD) {
-				/* ERROR - tod jumped */
-				tod_bad = TOD_JUMPED;
-				off = (int)diff_tod;
-			} else if (dtick_delta) {
-				/* ERROR - change in clock rate */
-				tod_bad = TOD_RATECHANGED;
+				/*
+				 * If we've just done a CPR resume, we detect
+				 * a jump in the TOD but, actually, what's
+				 * happened is that the TOD has been increasing
+				 * whilst the system was suspended and the tick
+				 * count hasn't kept up.  We consider the first
+				 * occurrence of this after a resume as normal
+				 * and ignore it; otherwise, in a non-resume
+				 * case, we regard it as a TOD problem.
+				 */
+				if (!cpr_resume_done) {
+					/* ERROR - tod jumped */
+					tod_bad = TOD_JUMPED;
+					off = (int)diff_tod;
+				}
+			}
+			if (dtick_delta) {
+				/*
+				 * If we've just done a DR resume, dtick_avg
+				 * can go a bit askew so we reset it and carry
+				 * on; otherwise, the TOD is in error.
+				 */
+				if (dr_resume_done) {
+					dtick_avg = TOD_REF_FREQ;
+				} else {
+					/* ERROR - change in clock rate */
+					tod_bad = TOD_RATECHANGED;
+				}
 			}
 		}
 	}

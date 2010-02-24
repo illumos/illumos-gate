@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/time.h>
@@ -182,7 +180,7 @@ tod_get(void)
 			/*
 			 * We timed out
 			 */
-			tod_fault_reset();
+			tod_status_set(TOD_GET_FAILED);
 			ts.tv_sec = tod_validate(hrestime.tv_sec);
 			break;
 
@@ -197,6 +195,8 @@ tod_get(void)
 	return (ts);
 }
 
+extern void tod_set_prev(timestruc_t);
+
 /*ARGSUSED*/
 void
 tod_set(timestruc_t ts)
@@ -204,16 +204,22 @@ tod_set(timestruc_t ts)
 	int i;
 	uint64_t ret;
 
-	tod_fault_reset();
+	/* for tod_validate() */
+	tod_set_prev(ts);
+
 	for (i = 0; i <= HV_TOD_RETRY_THRESH; i++) {
 		ret = hv_tod_set(ts.tv_sec);
 		if (ret != H_EWOULDBLOCK)
 			break;
 		drv_usecwait(HV_TOD_WAIT_USEC);
 	}
+
 	if (ret != H_EOK && ret != H_ENOTSUPPORTED && ret != H_EWOULDBLOCK)
 		cmn_err(CE_WARN,
 		    "tod_set: Unknown error from hv_tod_set, err %lx", ret);
+	else
+		/* TOD was modified */
+		tod_status_set(TOD_SET_DONE);
 }
 
 /*

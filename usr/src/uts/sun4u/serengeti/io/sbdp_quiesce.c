@@ -694,7 +694,7 @@ sbdp_resume(sbdp_sr_handle_t *srh)
 		 * value change between suspend and resume
 		 */
 		mutex_enter(&tod_lock);
-		tod_fault_reset();
+		tod_status_set(TOD_DR_RESUME_DONE);
 		mutex_exit(&tod_lock);
 
 		sbdp_enable_intr(); 	/* enable intr & clock */
