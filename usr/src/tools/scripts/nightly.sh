@@ -1815,19 +1815,30 @@ if [ "${SUNWSPRO}" != "" ]; then
 	export PATH
 fi
 
-hostname=`uname -n`
-if [ ! -f $HOME/.make.machines ]; then
-	DMAKE_MAX_JOBS=4
-else
-	DMAKE_MAX_JOBS="`grep $hostname $HOME/.make.machines | \
-	    tail -1 | awk -F= '{print $ 2;}'`"
-	if [ "$DMAKE_MAX_JOBS" = "" ]; then
-		DMAKE_MAX_JOBS=4
+hostname=$(uname -n)
+if [[ $DMAKE_MAX_JOBS != +([0-9]) || $DMAKE_MAX_JOBS -eq 0 ]]
+then
+	maxjobs=
+	if [[ -f $HOME/.make.machines ]]
+	then
+		# Note: there is a hard tab and space character in the []s
+		# below.
+		egrep -i "^[ 	]*$hostname[ 	\.]" \
+			$HOME/.make.machines | read host jobs
+		maxjobs=${jobs##*=}
 	fi
+
+	if [[ $maxjobs != +([0-9]) || $maxjobs -eq 0 ]]
+	then
+		# default
+		maxjobs=4
+	fi
+
+	export DMAKE_MAX_JOBS=$maxjobs
 fi
+
 DMAKE_MODE=parallel;
 export DMAKE_MODE
-export DMAKE_MAX_JOBS
 
 if [ -z "${ROOT}" ]; then
 	echo "ROOT must be set."
