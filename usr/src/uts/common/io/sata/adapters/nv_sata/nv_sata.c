@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -446,7 +446,7 @@ static struct nv_sgp_cbp2cmn nv_sgp_cbp2cmn[NV_MAX_CBPS];
 #endif
 
 /* We still have problems in 40-bit DMA support, so disable it by default */
-int nv_sata_40bit_dma = B_FALSE;
+int nv_sata_40bit_dma = B_TRUE;
 
 static sata_tran_hotplug_ops_t nv_hotplug_ops = {
 	SATA_TRAN_HOTPLUG_OPS_REV_1,	/* structure version */
@@ -2370,14 +2370,27 @@ mcp5x_reg_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 		if (nv_sata_40bit_dma == B_TRUE) {
 			uint32_t reg32;
 			NVLOG((NVDBG_INIT, nvp->nvp_ctlp, nvp,
-			    "rev id is %X and"
-			    " is capable of 40-bit DMA addressing",
-			    nvc->nvc_revid));
+			    "rev id is %X.  40-bit DMA addressing"
+			    " enabled", nvc->nvc_revid));
 			nvc->dma_40bit = B_TRUE;
+
 			reg32 = pci_config_get32(pci_conf_handle,
 			    NV_SATA_CFG_20);
 			pci_config_put32(pci_conf_handle, NV_SATA_CFG_20,
 			    reg32 | NV_40BIT_PRD);
+
+			/*
+			 * CFG_23 bits 0-7 contain the top 8 bits (of 40
+			 * bits) for the primary PRD table, and bits 8-15
+			 * contain the top 8 bits for the secondary.  Set
+			 * to zero because the DMA attribute table for PRD
+			 * allocation forces it into 32 bit address space
+			 * anyway.
+			 */
+			reg32 = pci_config_get32(pci_conf_handle,
+			    NV_SATA_CFG_23);
+			pci_config_put32(pci_conf_handle, NV_SATA_CFG_23,
+			    reg32 & 0xffff0000);
 		} else {
 			NVLOG((NVDBG_INIT, nvp->nvp_ctlp, nvp,
 			    "40-bit DMA disabled by nv_sata_40bit_dma"));

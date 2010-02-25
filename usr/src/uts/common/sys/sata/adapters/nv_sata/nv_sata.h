@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -414,6 +414,8 @@ struct nv_sgp_cbp2cmn {
 #define	NV_SATA_CFG_20		0x50
 #define	NV_BAR5_SPACE_EN	0x04
 #define	NV_40BIT_PRD		0x20
+
+#define	NV_SATA_CFG_23		0x60
 
 /*
  * ck804 interrupt status register
