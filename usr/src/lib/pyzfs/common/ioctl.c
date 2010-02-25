@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,11 +29,8 @@
 #include <strings.h>
 #include <unistd.h>
 #include <libnvpair.h>
-#include <idmap.h>
-#include <zone.h>
 #include <libintl.h>
 #include <libzfs.h>
-#include <directory.h>
 #include "zfs_prop.h"
 
 static PyObject *ZFSError;
@@ -44,8 +41,6 @@ static int zfsdevfd;
 #endif
 
 #define	_(s) dgettext(TEXT_DOMAIN, s)
-
-extern int sid_to_id(char *sid, boolean_t user, uid_t *id);
 
 /*PRINTFLIKE1*/
 static void
@@ -456,75 +451,6 @@ py_userspace_upgrade(PyObject *self, PyObject *args)
 }
 
 static PyObject *
-py_sid_to_id(PyObject *self, PyObject *args)
-{
-	char *sid;
-	int err, isuser;
-	uid_t id;
-
-	if (!PyArg_ParseTuple(args, "si", &sid, &isuser))
-		return (NULL);
-
-	err = sid_to_id(sid, isuser, &id);
-	if (err) {
-		PyErr_SetString(PyExc_KeyError, sid);
-		return (NULL);
-	}
-
-	return (Py_BuildValue("I", id));
-}
-
-/*
- * Translate the sid string ("S-1-...") to the user@domain name, if
- * possible.
- */
-static PyObject *
-py_sid_to_name(PyObject *self, PyObject *args)
-{
-	int isuser;
-	char *name, *sid;
-	directory_error_t e;
-	uint64_t classes;
-	PyObject *ret;
-
-	if (!PyArg_ParseTuple(args, "si", &sid, &isuser))
-		return (NULL);
-	e = directory_name_from_sid(NULL, sid, &name, &classes);
-	if (e != NULL) {
-		directory_error_free(e);
-		PyErr_SetString(PyExc_KeyError, sid);
-		return (NULL);
-	}
-	if (name == NULL) {
-		PyErr_SetString(PyExc_KeyError, sid);
-		return (NULL);
-	}
-	if (isuser) {
-		if (!(classes & DIRECTORY_CLASS_USER)) {
-			free(name);
-			PyErr_SetString(PyExc_KeyError, sid);
-			return (NULL);
-		}
-	} else {
-		if (!(classes & DIRECTORY_CLASS_GROUP)) {
-			free(name);
-			PyErr_SetString(PyExc_KeyError, sid);
-			return (NULL);
-		}
-	}
-
-	ret = PyString_FromString(name);
-	free(name);
-	return (ret);
-}
-
-static PyObject *
-py_isglobalzone(PyObject *self, PyObject *args)
-{
-	return (Py_BuildValue("i", getzoneid() == GLOBAL_ZONEID));
-}
-
-static PyObject *
 py_set_cmdstr(PyObject *self, PyObject *args)
 {
 	char *str;
@@ -595,12 +521,6 @@ static PyMethodDef zfsmethods[] = {
 	    "Get dataset properties."},
 	{"get_proptable", py_get_proptable, METH_NOARGS,
 	    "Get property table."},
-	/* Below are not really zfs-specific: */
-	{"sid_to_id", py_sid_to_id, METH_VARARGS, "Map SID to UID/GID."},
-	{"sid_to_name", py_sid_to_name, METH_VARARGS,
-	    "Map SID to name@domain."},
-	{"isglobalzone", py_isglobalzone, METH_NOARGS,
-	    "Determine if this is the global zone."},
 	{"get_holds", py_get_holds, METH_VARARGS, "Get user holds."},
 	{NULL, NULL, 0, NULL}
 };

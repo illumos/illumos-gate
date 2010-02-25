@@ -241,6 +241,7 @@ SUBDIRS += \
 	libzfs		\
 	libzfs_jni	\
 	pyzfs		\
+	pysolaris	\
 	libmapid	\
 	brand		\
 	policykit	\
@@ -365,6 +366,7 @@ MSGSUBDIRS=		\
 	mpss		\
 	pam_modules	\
 	pyzfs		\
+	pysolaris	\
 	rpcsec_gss	\
 	libreparse
 MSGSUBDIRS += \
@@ -654,7 +656,8 @@ sun_fc:		libdevinfo libsysevent libnvpair
 libsun_ima:	libdevinfo libsysevent libnsl
 sun_sas:	libdevinfo libsysevent libnvpair libkstat libdevid
 libgrubmgmt:	libdevinfo libzfs libfstyp
-pyzfs:		libnvpair libsec libidmap libzfs
+pyzfs:		libnvpair libzfs
+pysolaris:	libsec libidmap
 libreparse:	libnvpair
 libhotplug:	libnvpair
 cfgadm_plugins:	libhotplug

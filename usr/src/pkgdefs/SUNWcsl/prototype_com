@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -384,3 +384,9 @@ d none usr/xpg4/lib 755 root bin
 s none usr/xpg4/lib/libcurses.so=./libcurses.so.2
 f none usr/xpg4/lib/libcurses.so.1 755 root bin
 f none usr/xpg4/lib/libcurses.so.2 755 root bin
+d none usr/lib/python2.4 755 root bin
+d none usr/lib/python2.4/vendor-packages 755 root bin
+d none usr/lib/python2.4/vendor-packages/solaris 755 root bin
+f none usr/lib/python2.4/vendor-packages/solaris/misc.so 755 root bin
+f none usr/lib/python2.4/vendor-packages/solaris/__init__.py 644 root bin
+f none usr/lib/python2.4/vendor-packages/solaris/__init__.pyc 644 root bin

@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -36,13 +36,17 @@ try:
 	import zfs.ioctl
 	import sys
 	import errno
+	import solaris.misc
 
 	"""This is the main script for doing zfs subcommands.  It doesn't know
 	what subcommands there are, it just looks for a module zfs.<subcommand>
 	that implements that subcommand."""
 
-	_ = gettext.translation("SUNW_OST_OSCMD", "/usr/lib/locale",
-	    fallback=True).gettext
+	try:
+		_ = gettext.translation("SUNW_OST_OSCMD", "/usr/lib/locale",
+		    fallback=True).gettext
+	except:
+		_ = solaris.misc.gettext
 
 	if len(sys.argv) < 2:
 		sys.exit(_("missing subcommand argument"))

@@ -23,43 +23,32 @@
 # Use is subject to license terms.
 #
 
-LIBRARY =	ioctl.a
-VERS =
-OBJECTS =	ioctl.o
+include	../Makefile.lib
 
-PYSRCS=		__init__.py util.py dataset.py \
-	allow.py unallow.py \
-	userspace.py groupspace.py holds.py table.py
+SUBDIRS=	$(MACH)
+XGETTEXT=	$(GNUXGETTEXT)
+XGETFLAGS=	$(GNUXGETFLAGS)
 
+all :=		TARGET= all
+install :=	TARGET= install
+clean :=	TARGET= clean
+clobber :=	TARGET= clobber
+lint :=		TARGET= lint
 
-include ../../Makefile.lib
-
-LIBLINKS = 
-SRCDIR =	../common
-ROOTLIBDIR=	$(ROOT)/usr/lib/python2.4/vendor-packages/zfs
-PYOBJS=		$(PYSRCS:%.py=$(SRCDIR)/%.pyc)
-PYFILES=	$(PYSRCS) $(PYSRCS:%.py=%.pyc)
-ROOTPYZFSFILES= $(PYFILES:%=$(ROOTLIBDIR)/%)
-
-C99MODE=        -xc99=%all
-C99LMODE=       -Xc99=%all
-
-LIBS =		$(DYNLIB)
-LDLIBS +=	-lc -lnvpair -lpython2.4 -lzfs
-CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-I/usr/include/python2.4
-CPPFLAGS +=	-I../../../uts/common/fs/zfs
-CPPFLAGS +=	-I../../../common/zfs
+MSGFILES =	`$(FIND) . -name '*.py' -o -name '*.c'`
+POFILE =	pysolaris.po
 
 .KEEP_STATE:
 
-all: $(PYOBJS) $(LIBS)
+all install clean clobber lint: $(SUBDIRS)
 
-install: all $(ROOTPYZFSFILES)
+$(POFILE):	pofile_MSGFILES
 
-$(ROOTLIBDIR)/%: %
-	$(INS.pyfile)
+_msg: $(MSGDOMAINPOFILE)
 
-lint: lintcheck
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
-include ../../Makefile.targ
+FRC:
+
+include ../../Makefile.msg.targ

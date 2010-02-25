@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -31,6 +31,7 @@ import sys
 import pwd
 import grp
 import errno
+import solaris.misc
 import zfs.util
 import zfs.ioctl
 import zfs.dataset
@@ -68,9 +69,9 @@ def new_entry(options, isgroup, domain, rid):
 		idstr = "%u" % rid
 
 	(typename, mapfunc) = {
-	    (1, 1): ("SMB Group",   lambda id: zfs.ioctl.sid_to_name(id, 0)),
+	    (1, 1): ("SMB Group",   lambda id: solaris.misc.sid_to_name(id, 0)),
 	    (1, 0): ("POSIX Group", lambda id: grp.getgrgid(int(id)).gr_name),
-	    (0, 1): ("SMB User",    lambda id: zfs.ioctl.sid_to_name(id, 1)),
+	    (0, 1): ("SMB User",    lambda id: solaris.misc.sid_to_name(id, 1)),
 	    (0, 0): ("POSIX User",  lambda id: pwd.getpwuid(int(id)).pw_name)
 	}[isgroup, bool(domain)]
 
@@ -109,7 +110,7 @@ def process_one_raw(acct, options, prop, elem):
 
 	if options.translate and domain:
 		try:
-			rid = zfs.ioctl.sid_to_id("%s-%u" % (domain, rid),
+			rid = solaris.misc.sid_to_id("%s-%u" % (domain, rid),
 			    not isgroup)
 			domain = None
 		except KeyError:
@@ -203,7 +204,7 @@ def do_userspace():
 
 	ds = zfs.dataset.Dataset(dsname, types=("filesystem"))
 
-	if ds.getprop("zoned") and zfs.ioctl.isglobalzone():
+	if ds.getprop("zoned") and solaris.misc.isglobalzone():
 		options.noname = True
 
 	if not ds.getprop("useraccounting"):

@@ -19,7 +19,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -255,6 +255,7 @@ DIRS= \
 	/usr/lib/pool \
 	/usr/lib/python2.4 \
 	/usr/lib/python2.4/vendor-packages \
+	/usr/lib/python2.4/vendor-packages/solaris \
 	/usr/lib/python2.4/vendor-packages/zfs \
 	/usr/lib/rcap \
 	/usr/lib/rcap/$(MACH32) \

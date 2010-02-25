@@ -23,39 +23,34 @@
 # Use is subject to license terms.
 #
 
-LIBRARY =	ioctl.a
+LIBRARY =	misc.a
 VERS =
-OBJECTS =	ioctl.o
+OBJECTS =	misc.o
 
-PYSRCS=		__init__.py util.py dataset.py \
-	allow.py unallow.py \
-	userspace.py groupspace.py holds.py table.py
-
+PYSRCS=		__init__.py
 
 include ../../Makefile.lib
 
 LIBLINKS = 
 SRCDIR =	../common
-ROOTLIBDIR=	$(ROOT)/usr/lib/python2.4/vendor-packages/zfs
+ROOTLIBDIR=	$(ROOT)/usr/lib/python2.4/vendor-packages/solaris
 PYOBJS=		$(PYSRCS:%.py=$(SRCDIR)/%.pyc)
 PYFILES=	$(PYSRCS) $(PYSRCS:%.py=%.pyc)
-ROOTPYZFSFILES= $(PYFILES:%=$(ROOTLIBDIR)/%)
+ROOTPYSOLFILES= $(PYFILES:%=$(ROOTLIBDIR)/%)
 
 C99MODE=        -xc99=%all
 C99LMODE=       -Xc99=%all
 
 LIBS =		$(DYNLIB)
-LDLIBS +=	-lc -lnvpair -lpython2.4 -lzfs
+LDLIBS +=	-lc -lsec -lidmap -lpython2.4
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I/usr/include/python2.4
-CPPFLAGS +=	-I../../../uts/common/fs/zfs
-CPPFLAGS +=	-I../../../common/zfs
 
 .KEEP_STATE:
 
 all: $(PYOBJS) $(LIBS)
 
-install: all $(ROOTPYZFSFILES)
+install: all $(ROOTPYSOLFILES)
 
 $(ROOTLIBDIR)/%: %
 	$(INS.pyfile)
