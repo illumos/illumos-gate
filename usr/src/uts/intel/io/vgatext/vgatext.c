@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -325,6 +325,33 @@ static struct fbgattr vgatext_attr =  {
 
 #define	STREQ(a, b)	(strcmp((a), (b)) == 0)
 
+/*
+ * NOTE: this function is duplicated here and in gfx_private/vgatext while
+ *       we work on a set of commitable interfaces to sunpci.c.
+ *
+ * Use the class code to determine if the device is a PCI-to-PCI bridge.
+ * Returns:  B_TRUE  if the device is a bridge.
+ *           B_FALSE if the device is not a bridge or the property cannot be
+ *		     retrieved.
+ */
+static boolean_t
+is_pci_bridge(dev_info_t *dip)
+{
+	uint32_t class_code;
+
+	class_code = (uint32_t)ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, "class-code", 0xffffffff);
+
+	if (class_code == 0xffffffff || class_code == DDI_PROP_NOT_FOUND)
+		return (B_FALSE);
+
+	class_code &= 0x00ffff00;
+	if (class_code == ((PCI_CLASS_BRIDGE << 16) | (PCI_BRIDGE_PCI << 8)))
+		return (B_TRUE);
+
+	return (B_FALSE);
+}
+
 static void
 vgatext_check_for_console(dev_info_t *devi, struct vgatext_softc *softc,
 	int pci_pcie_bus)
@@ -363,8 +390,8 @@ vgatext_check_for_console(dev_info_t *devi, struct vgatext_softc *softc,
 	 * this cannot be the boot console.
 	 */
 
-	pdevi = ddi_get_parent(devi);
-	while (pdevi) {
+	pdevi = devi;
+	while (pdevi = ddi_get_parent(pdevi)) {
 		int	error;
 		ddi_acc_handle_t ppci_conf;
 		char	*parent_type = NULL;
@@ -385,10 +412,12 @@ vgatext_check_for_console(dev_info_t *devi, struct vgatext_softc *softc,
 		ddi_prop_free(parent_type);
 		parent_type = NULL;
 
-		if (pci_config_setup(pdevi, &ppci_conf) != DDI_SUCCESS) {
-			/* No registers on root node, done with check */
-			return;
-		}
+		/* VGAEnable is set only for PCI-to-PCI bridges. */
+		if (is_pci_bridge(pdevi) == B_FALSE)
+			continue;
+
+		if (pci_config_setup(pdevi, &ppci_conf) != DDI_SUCCESS)
+			continue;
 
 		data16 = pci_config_get16(ppci_conf, PCI_BCNF_BCNTRL);
 		pci_config_teardown(&ppci_conf);
@@ -397,8 +426,6 @@ vgatext_check_for_console(dev_info_t *devi, struct vgatext_softc *softc,
 			softc->flags &= ~VGATEXT_FLAG_CONSOLE;
 			return;
 		}
-
-		pdevi = ddi_get_parent(pdevi);
 	}
 }
 

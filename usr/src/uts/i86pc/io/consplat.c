@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -191,6 +191,33 @@ plat_kbdpath(void)
 	return (kbpath);
 }
 
+/*
+ * NOTE: this function is duplicated here and in gfx_private/vgatext while
+ *       we work on a set of commitable interfaces to sunpci.c.
+ *
+ * Use the class code to determine if the device is a PCI-to-PCI bridge.
+ * Returns:  B_TRUE  if the device is a bridge.
+ *           B_FALSE if the device is not a bridge or the property cannot be
+ *		     retrieved.
+ */
+static boolean_t
+is_pci_bridge(dev_info_t *dip)
+{
+	uint32_t class_code;
+
+	class_code = (uint32_t)ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, "class-code", 0xffffffff);
+
+	if (class_code == 0xffffffff || class_code == DDI_PROP_NOT_FOUND)
+		return (B_FALSE);
+
+	class_code &= 0x00ffff00;
+	if (class_code == ((PCI_CLASS_BRIDGE << 16) | (PCI_BRIDGE_PCI << 8)))
+		return (B_TRUE);
+
+	return (B_FALSE);
+}
+
 static int
 find_fb_dev(dev_info_t *dip, void *found_dip)
 {
@@ -220,9 +247,14 @@ find_fb_dev(dev_info_t *dip, void *found_dip)
 
 		nodename = ddi_node_name(dip);
 
+		/*
+		 * If the node is not a PCI-to-PCI bridge, continue traversing
+		 * (it could be the root node), otherwise, check for the
+		 * VGAEnable bit to be set in the Bridge Control Register.
+		 */
 		if (strcmp(nodename, "pci") == 0) {
-			/* pci root dip */
-			return (DDI_WALK_CONTINUE);
+			if (is_pci_bridge(dip) == B_FALSE)
+				return (DDI_WALK_CONTINUE);
 		}
 
 		if (i_ddi_attach_node_hierarchy(dip) != DDI_SUCCESS)
