@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -83,8 +83,6 @@ do_otherservices()
 	cat >> $ROOT_PATH/var/svc/profile/upgrade <<\__ENABLE_OTHERS
 		/usr/sbin/svcadm enable -s svc:/network/tnd:default
 		/usr/sbin/svcadm enable -s svc:/system/tsol-zones:default
-		/usr/sbin/svccfg -s svc:/application/x11/x11-server \
-		    setprop options/tcp_listen = true
 		/usr/sbin/svcadm enable svc:/network/rpc/rstat:default
 __ENABLE_OTHERS
 
