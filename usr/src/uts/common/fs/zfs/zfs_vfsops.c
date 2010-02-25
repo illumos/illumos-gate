@@ -1533,8 +1533,7 @@ zfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	 */
 	error = secpolicy_fs_mount(cr, mvp, vfsp);
 	if (error) {
-		error = dsl_deleg_access(osname, ZFS_DELEG_PERM_MOUNT, cr);
-		if (error == 0) {
+		if (dsl_deleg_access(osname, ZFS_DELEG_PERM_MOUNT, cr) == 0) {
 			vattr_t		vattr;
 
 			/*
@@ -1544,16 +1543,14 @@ zfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 
 			vattr.va_mask = AT_UID;
 
-			if (error = VOP_GETATTR(mvp, &vattr, 0, cr, NULL)) {
+			if (VOP_GETATTR(mvp, &vattr, 0, cr, NULL)) {
 				goto out;
 			}
 
 			if (secpolicy_vnode_owner(cr, vattr.va_uid) != 0 &&
 			    VOP_ACCESS(mvp, VWRITE, 0, cr, NULL) != 0) {
-				error = EPERM;
 				goto out;
 			}
-
 			secpolicy_fs_mount_clearopts(cr, vfsp);
 		} else {
 			goto out;
@@ -1786,9 +1783,8 @@ zfs_umount(vfs_t *vfsp, int fflag, cred_t *cr)
 
 	ret = secpolicy_fs_unmount(cr, vfsp);
 	if (ret) {
-		ret = dsl_deleg_access((char *)refstr_value(vfsp->vfs_resource),
-		    ZFS_DELEG_PERM_MOUNT, cr);
-		if (ret)
+		if (dsl_deleg_access((char *)refstr_value(vfsp->vfs_resource),
+		    ZFS_DELEG_PERM_MOUNT, cr))
 			return (ret);
 	}
 
