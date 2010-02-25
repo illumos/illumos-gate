@@ -52,7 +52,6 @@ sbusmem 69
 ramdisk 70
 zsh 71
 ksyms 72
-bpp 73
 iommu 76
 winlock 81
 md 85

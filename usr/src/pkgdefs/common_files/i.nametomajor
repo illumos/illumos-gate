@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -107,6 +107,7 @@ obsolete_sparc()
 		obs["px_pci"] = 1;
 		obs["pxb_bcm"] = 1;
 		obs["pxb_plx"] = 1;
+		obs["bpp"] = 1;
 	} !($1 in obs) { print $0 }'
 }
 

@@ -28,8 +28,7 @@ include ../../../Makefile.master
 
 HDRS=  \
 avintr.h \
-bootconf.h		bpp_reg.h \
-bpp_var.h \
+bootconf.h \
 dkmpio.h		dmaga.h	\
 fdreg.h			fdvar.h \
 obpdefs.h		\

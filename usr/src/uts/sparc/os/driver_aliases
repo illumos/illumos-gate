@@ -1,4 +1,3 @@
-bpp SUNW,bpp
 rootnex cpu-unit
 rootnex io-unit
 rootnex mem-unit

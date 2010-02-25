@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -70,7 +70,6 @@ d none kernel/drv/sparcv9 755 root sys
 f none kernel/drv/sparcv9/aggr 755 root sys
 f none kernel/drv/sparcv9/arp 755 root sys
 f none kernel/drv/sparcv9/bl 755 root sys
-f none kernel/drv/sparcv9/bpp 755 root sys
 f none kernel/drv/sparcv9/bridge 755 root sys
 f none kernel/drv/sparcv9/clone 755 root sys
 f none kernel/drv/sparcv9/cn 755 root sys
