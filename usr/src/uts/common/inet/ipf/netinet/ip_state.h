@@ -6,7 +6,7 @@
  * @(#)ip_state.h	1.3 1/12/96 (C) 1995 Darren Reed
  * $Id: ip_state.h,v 2.68.2.5 2005/08/11 19:58:04 darrenr Exp $
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -25,7 +25,7 @@ struct ipscan;
 # define	IPSTATE_SIZE	5737
 #endif
 #ifndef	IPSTATE_MAX
-# define	IPSTATE_MAX	4013	/* Maximum number of states held */
+# define	IPSTATE_MAX	50000	/* Maximum number of states held */
 #endif
 
 #define	PAIRS(s1,d1,s2,d2)	((((s1) == (s2)) && ((d1) == (d2))) ||\
