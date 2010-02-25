@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1251,8 +1251,14 @@ dsl_dir_rename_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	int err;
 	uint64_t val;
 
-	/* There should be 2 references: the open and the dirty */
-	if (dmu_buf_refcount(dd->dd_dbuf) > 2)
+	/*
+	 * There should only be one reference, from dmu_objset_rename().
+	 * Fleeting holds are also possible (eg, from "zfs list" getting
+	 * stats), but any that are present in open context will likely
+	 * be gone by syncing context, so only fail from syncing
+	 * context.
+	 */
+	if (dmu_tx_is_syncing(tx) && dmu_buf_refcount(dd->dd_dbuf) > 1)
 		return (EBUSY);
 
 	/* check for existing name */

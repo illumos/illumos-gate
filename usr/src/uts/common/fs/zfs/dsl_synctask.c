@@ -169,7 +169,7 @@ dsl_sync_task_group_sync(dsl_sync_task_group_t *dstg, dmu_tx_t *tx)
 
 	/*
 	 * Check for sufficient space.  We just check against what's
-	 * on-disk; we don't wany any in-flight accounting to get in our
+	 * on-disk; we don't want any in-flight accounting to get in our
 	 * way, because open context may have already used up various
 	 * in-core limits (arc_tempreserve, dsl_pool_tempreserve).
 	 */
