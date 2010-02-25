@@ -4569,6 +4569,7 @@ spa_vdev_resilver_done_hunt(vdev_t *vd)
 		newvd = vd->vdev_child[1];
 
 		if (vdev_dtl_empty(newvd, DTL_MISSING) &&
+		    vdev_dtl_empty(newvd, DTL_OUTAGE) &&
 		    !vdev_dtl_required(oldvd))
 			return (oldvd);
 	}
@@ -4582,6 +4583,7 @@ spa_vdev_resilver_done_hunt(vdev_t *vd)
 
 		if (newvd->vdev_unspare &&
 		    vdev_dtl_empty(newvd, DTL_MISSING) &&
+		    vdev_dtl_empty(newvd, DTL_OUTAGE) &&
 		    !vdev_dtl_required(oldvd)) {
 			newvd->vdev_unspare = 0;
 			return (oldvd);
