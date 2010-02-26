@@ -37,11 +37,11 @@
 #include "cryptoadm.h"
 
 static int err; /* To store errno which may be overwritten by gettext() */
-static int build_entrylist(entry_t *, entrylist_t **);
-static entry_t *dup_entry(entry_t *);
-static mechlist_t *dup_mechlist(mechlist_t *);
-static entry_t *getent(char *, entrylist_t *);
-static int interpret(char *, entry_t **);
+static int build_entrylist(entry_t *pent, entrylist_t **pplist);
+static entry_t *dup_entry(entry_t *pent1);
+static mechlist_t *dup_mechlist(mechlist_t *plist);
+static entry_t *getent(char *provname, entrylist_t *entrylist);
+static int interpret(char *buf, entry_t **ppent);
 static int parse_sup_dis_list(const char *buf, entry_t *pent);
 
 
@@ -432,9 +432,9 @@ free_entrylist(entrylist_t *entrylist)
 
 
 /*
- * Convert an entry to a string.  This routine builds a string for the entry
- * to be inserted in the kcf.conf file.  Based on the content of each entry,
- * the result string can be one of these 7 forms:
+ * Convert an entry_t to a kcf.conf line string.  Build a string to insert
+ * as a line in file kcf.conf.  Based on the content of an entry_t,
+ * the result string is one of these 8 forms:
  *  - name:supportedlist=m1,m2,...,mj
  *  - name:disabledlist=m1,m2,...,mj
  *  - name:supportedlist=m1,...,mj;disabledlist=m1,m2,...,mk
@@ -443,6 +443,12 @@ free_entrylist(entrylist_t *entrylist)
  *  - name:unload;supportedlist=m1,m2,...,mj
  *  - name:unload;disabledlist=m1,m2,...,mj
  *  - name:unload;supportedlist=m1,...,mj;disabledlist=m1,m2,...,mk
+ *
+ *  - (NUL character or 0-length string)
+ *
+ * Return a 0-length empty string if no keyword is present (that is,
+ * supportedlist, disabledlist, or unload).  A kcf.conf line with just the
+ * provider name with no keyword is invalid.
  *
  * Note that the caller is responsible for freeing the returned string
  * (with free_entry()).
@@ -454,8 +460,7 @@ ent2str(entry_t *pent)
 {
 	char		*buf;
 	mechlist_t	*pcur = NULL;
-	boolean_t	semicolon_separator = B_FALSE;
-
+	boolean_t	keyword_already_present = B_FALSE;
 
 	if (pent == NULL) {
 		return (NULL);
@@ -482,14 +487,14 @@ ent2str(entry_t *pent)
 			return (NULL);
 		}
 
-		semicolon_separator = B_TRUE;
+		keyword_already_present = B_TRUE;
 	}
 
 	/* convert the supported list if any */
 	pcur = pent->suplist;
 	if (pcur != NULL) {
 		if (strlcat(buf,
-		    semicolon_separator ? SEP_SEMICOLON : SEP_COLON,
+		    keyword_already_present ? SEP_SEMICOLON : SEP_COLON,
 		    BUFSIZ) >= BUFSIZ) {
 			free(buf);
 			return (NULL);
@@ -515,14 +520,14 @@ ent2str(entry_t *pent)
 				}
 			}
 		}
-		semicolon_separator = B_TRUE;
+		keyword_already_present = B_TRUE;
 	}
 
 	/* convert the disabled list if any */
 	pcur = pent->dislist;
 	if (pcur != NULL) {
 		if (strlcat(buf,
-		    semicolon_separator ? SEP_SEMICOLON : SEP_COLON,
+		    keyword_already_present ? SEP_SEMICOLON : SEP_COLON,
 		    BUFSIZ) >= BUFSIZ) {
 			free(buf);
 			return (NULL);
@@ -548,7 +553,7 @@ ent2str(entry_t *pent)
 				}
 			}
 		}
-		semicolon_separator = B_TRUE;
+		keyword_already_present = B_TRUE;
 	}
 
 	if (strlcat(buf, "\n", BUFSIZ) >= BUFSIZ) {
@@ -556,6 +561,10 @@ ent2str(entry_t *pent)
 		return (NULL);
 	}
 
+	if (!keyword_already_present) {
+		/* Only the provider name, without a keyword, is on the line */
+		buf[0] = '\0';
+	}
 	return (buf);
 }
 
@@ -964,6 +973,10 @@ update_kcfconf(entry_t *pent, int update_mode)
 		/* Convert the entry a string to add to kcf.conf  */
 		if ((new_str = ent2str(pent)) == NULL) {
 			return (FAILURE);
+		}
+		if (strlen(new_str) == 0) {
+			free(new_str);
+			delete_it = B_TRUE;
 		}
 		break;
 	case DELETE_MODE:
