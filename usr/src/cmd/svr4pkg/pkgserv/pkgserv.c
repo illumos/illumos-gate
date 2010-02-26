@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -871,8 +871,7 @@ parse_log(void)
 		return (1);
 	}
 
-	/* We're making sure that we end with a NUL or more for strstr() */
-	map = mmap(0, stb.st_size + getpagesize(), PROT_READ, MAP_PRIVATE,
+	map = mmap(0, stb.st_size, PROT_READ|PROT_WRITE, MAP_PRIVATE,
 	    logfd, 0);
 	(void) close(logfd);
 	if (map == (char *)-1) {
@@ -888,6 +887,7 @@ parse_log(void)
 	if (memcmp(map + realend - mlen, marker, mlen) != 0) {
 		progerr(gettext(PKGLOG" is not complete"));
 
+		map[stb.st_size - 1] = '\0'; /* for strstr() */
 		realend = 0;
 		for (p = map; q = strstr(p, marker); ) {
 			if (q == map || q[-1] == '\n')
@@ -1178,13 +1178,18 @@ thr_pkgfilter(void *v)
 	if (cnts == NULL)
 		goto free;
 
-	/* Remove wild card: don't care about extra matches */
+	/*
+	 * Remove wild card: don't care about extra matches; make sure
+	 * we remove both the "*" and the "." in front of it.
+	 */
 	if (pf->len > 0) {
 		char *p;
 
 		for (p = pf->buf; *p; p++) {
 			if (*p == '*') {
 				*p = 0;
+				if (p > pf->buf && p[-1] == '.')
+					p[-1] = 0;
 				break;
 			}
 		}

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +42,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <libintl.h>
+#include <sys/mnttab.h>
+#include <sys/mkdev.h>
 
 #define	PKGADD_MAX	(512 * 1024)
 
@@ -53,6 +55,7 @@
 #define	ERR_OPEN_DOOR		"cannot open pkgserv door"
 #define	ERR_START_SERVER	"cannot start pkgserv daemon: %s"
 #define	ERR_START_FILTER	"cannot enumerate database entries"
+#define	ERR_FIND_SADM		"cannot find sadm directory"
 
 struct pkg_server {
 	FILE		*fp;
@@ -80,6 +83,160 @@ pkgfilename(char path[PATH_MAX], const char *root, const char *sadmdir,
 }
 
 static void
+free_xmnt(struct extmnttab *xmnt)
+{
+	free(xmnt->mnt_special);
+	free(xmnt->mnt_mountp);
+	free(xmnt->mnt_fstype);
+}
+
+static void
+copy_xmnt(const struct extmnttab *xmnt, struct extmnttab *saved)
+{
+
+	free_xmnt(saved);
+
+	/*
+	 * Copy everything and then strdup the strings we later use and NULL
+	 * the ones we don't.
+	 */
+	*saved = *xmnt;
+
+	if (saved->mnt_special != NULL)
+		saved->mnt_special = strdup(saved->mnt_special);
+	if (saved->mnt_mountp != NULL)
+		saved->mnt_mountp = strdup(saved->mnt_mountp);
+	if (saved->mnt_fstype != NULL)
+		saved->mnt_fstype = strdup(saved->mnt_fstype);
+
+	saved->mnt_mntopts = NULL;
+	saved->mnt_time = NULL;
+}
+
+static int
+testdoor(char *path)
+{
+	int dir;
+	int fd;
+	struct door_info di;
+	int res;
+
+	dir = open(path, O_RDONLY);
+
+	if (dir == -1)
+		return (-1);
+
+	fd = openat(dir, PKGDOOR, O_RDWR);
+	(void) close(dir);
+	if (fd == -1)
+		return (-1);
+
+	res = door_info(fd, &di);
+	(void) close(fd);
+	return (res);
+}
+
+/*
+ * We need to make sure that we can locate the pkgserv and the door;
+ * lofs mounts makes this more difficult: "nosub" mounts don't propagate
+ * the door and doors created in lofs mounts are not propagated back to
+ * the original filesystem.
+ * Here we peel off the lofs mount points until we're
+ *	at /var/sadm/install or
+ *	we find a working door or
+ *	there's nothing more to peel off.
+ * The fullpath parameter is used to return the result (stored in *sadmdir),
+ * root is used but returned in the computed sadmdir and so the caller should
+ * not use "root" any longer or set it to NULL.
+ */
+static void
+pkgfindrealsadmdir(char fullpath[PATH_MAX], const char *root,
+    const char **sadmdir)
+{
+	struct stat buf;
+	struct extmnttab xmnt;
+	FILE *mnttab = NULL;
+	char temp[PATH_MAX];
+	struct extmnttab saved = {NULL, NULL, NULL, NULL, NULL, 0, 0};
+
+	if (snprintf(temp, PATH_MAX, "%s%s",
+	    root == NULL ? "" : root,
+	    *sadmdir == NULL ? SADM_DIR : *sadmdir) >= PATH_MAX) {
+		progerr(gettext(ERR_PATH_TOO_BIG));
+		exit(99);
+	}
+
+	if (stat(temp, &buf) != 0) {
+		progerr(gettext(ERR_FIND_SADM));
+		exit(99);
+	}
+
+	/*
+	 * To find the underlying mount point, you will need to
+	 * search the mnttab and find our mountpoint and the underlying
+	 * filesystem.
+	 * To find the mount point: use the longest prefix but limit
+	 * us to the filesystems with the same major/minor numbers.
+	 * To find the underlying mount point: find a non-lofs file
+	 * system or a <mnt> <mnt> entry (fake mountpoint for zones).
+	 */
+	for (;;) {
+		size_t max = 0;
+
+		if (realpath(temp, fullpath) == NULL) {
+			progerr(gettext(ERR_FIND_SADM));
+			exit(99);
+		}
+
+		if (strcmp(fullpath, SADM_DIR) == 0)
+			break;
+
+		if (testdoor(fullpath) == 0)
+			break;
+
+		if (mnttab == NULL)
+			mnttab = fopen(MNTTAB, "r");
+		else
+			resetmnttab(mnttab);
+
+		while (getextmntent(mnttab, &xmnt, 0) == 0) {
+			size_t len;
+
+			if (major(buf.st_dev) != xmnt.mnt_major ||
+			    minor(buf.st_dev) != xmnt.mnt_minor)
+				continue;
+
+			len = strlen(xmnt.mnt_mountp);
+			if (len < max)
+				continue;
+
+			if (strncmp(xmnt.mnt_mountp, fullpath, len) == 0 &&
+			    (len == 1 || fullpath[len] == '/' ||
+			    fullpath[len] == '\0')) {
+				max = len;
+				copy_xmnt(&xmnt, &saved);
+			}
+		}
+		if (strcmp(saved.mnt_fstype, "lofs") != 0 ||
+		    strcmp(saved.mnt_mountp, saved.mnt_special) == 0) {
+			break;
+		}
+		/* Create a new path in the underlying filesystem. */
+		if (snprintf(temp, PATH_MAX, "%s%s", saved.mnt_special,
+		    &fullpath[max]) >= PATH_MAX) {
+			progerr(gettext(ERR_PATH_TOO_BIG));
+			exit(99);
+		}
+	}
+
+	if (mnttab != NULL) {
+		free_xmnt(&saved);
+		(void) fclose(mnttab);
+	}
+	*sadmdir = fullpath;
+}
+
+static void
 pkgexit_close(void)
 {
 	if (current_server != NULL)
@@ -98,6 +255,7 @@ pkgopenserver_i(const char *root, const char *sadmdir, boolean_t readonly,
 	char *cmd[16];
 	int args;
 	char pkgdoor[PATH_MAX];
+	char realsadmdir[PATH_MAX];
 	extern char **environ;
 	char *prog;
 	char pidbuf[12];
@@ -119,6 +277,8 @@ pkgopenserver_i(const char *root, const char *sadmdir, boolean_t readonly,
 		}
 		(void) close(fd);
 	} else {
+		pkgfindrealsadmdir(realsadmdir, root, &sadmdir);
+		root = NULL;
 		pkgfilename(pkgdoor, root, sadmdir, PKGDOOR);
 	}
 
