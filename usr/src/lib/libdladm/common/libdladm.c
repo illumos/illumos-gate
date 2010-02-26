@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -724,15 +724,19 @@ i_dladm_rw_db(dladm_handle_t handle, const char *db_file, mode_t db_perms,
 	if (!writeop || status != DLADM_STATUS_OK)
 		goto done;
 
+	/* Set permissions on file to db_perms */
+	if (fchmod(nfd, db_perms) < 0) {
+		status = dladm_errno2status(errno);
+		goto done;
+	}
+
 	/*
-	 * Configuration files need to be owned by the 'dladm' user.
-	 * If we are invoked by root, the file ownership needs to be fixed.
+	 * Configuration files need to be owned by the 'dladm' user and
+	 * 'netadm' group.
 	 */
-	if (getuid() == 0 || geteuid() == 0) {
-		if (fchown(nfd, UID_DLADM, GID_SYS) < 0) {
-			status = dladm_errno2status(errno);
-			goto done;
-		}
+	if (fchown(nfd, UID_DLADM, GID_NETADM) < 0) {
+		status = dladm_errno2status(errno);
+		goto done;
 	}
 
 	if (fflush(nfp) == EOF) {

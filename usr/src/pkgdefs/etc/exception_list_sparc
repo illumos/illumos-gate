@@ -1361,3 +1361,6 @@ usr/lib/llib-lvrrpadm.ln		sparc
 usr/lib/sparcv9/libvrrpadm.so		sparc
 usr/lib/sparcv9/llib-lvrrpadm.ln	sparc
 usr/lib/llib-lvrrpadm			sparc
+
+# Private/Internal NWAM header file. Do not ship.
+usr/include/libnwam_priv.h		sparc

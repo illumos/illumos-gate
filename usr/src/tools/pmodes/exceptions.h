@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * $Id: exceptions.h,v 1.11 2000/01/13 14:12:58 casper Exp $
@@ -28,8 +28,6 @@
  * May need to be updated for each OS release
  *
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 	"/etc/dumpdates",
 	"/etc/lp",
@@ -58,6 +56,12 @@
 
 	/* CUPS */
 	"/var/cache/cups",
+
+	/*
+	 * NWAM Phase 1 -- nwamd running as netadm:netadm must be able to
+	 * modify secobj.conf, which has ownership dladm:netadm.
+	 */
+	"/etc/dladm/secobj.conf",
 
 	/* another strange logfile */
 	"/usr/oasys/tmp/TERRLOG",

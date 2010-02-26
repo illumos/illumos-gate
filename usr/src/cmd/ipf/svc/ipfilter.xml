@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -73,7 +73,7 @@
 	</dependency>
 
 	<dependent
-	    name='network'
+	    name='ipf_network'
 	    grouping='optional_all'
 	    restart_on='restart'>
 		<service_fmri value='svc:/milestone/network' />
@@ -120,6 +120,16 @@
 			<propval name='value_authorization' type='astring'
 				value='solaris.smf.value.firewall.config' />
 		</property_group>
+
+		<property_group name='config' type='application'>
+			<propval name='ipf6_config_file' type='astring'
+				value='/etc/ipf/ipf6.conf' />
+			<propval name='ipnat_config_file' type='astring'
+				value='/etc/ipf/ipnat.conf' />
+			<propval name='ippool_config_file' type='astring'
+				value='/etc/ipf/ippool.conf' />
+		</property_group>
+
 	</instance>
 
 	<stability value='Unstable' />

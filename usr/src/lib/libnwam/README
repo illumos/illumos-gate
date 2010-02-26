@@ -1,0 +1,536 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# lib/libnwam/README
+#
+
+NAME
+	libnwam - Network Auto-Magic (NWAM) configuration and event
+	management library
+
+DESCRIPTION
+
+The libnwam library is provided so that the various consumers of
+Network Auto-Magic (NWAM) configuration information - i.e. the NWAM
+GUI, the nwamcfg CLI and the NWAM daemon - have a consistent interface
+for retrieving and updating NWAM-related configuration data, abstracted
+from the actual manner in which the data is persistently stored. It
+provides functionality to interact with the key components of NWAM
+configuration, as described below.  Additionally the library provides
+functionality for system events to flow from the NWAM daemon to a
+client (like the GUI panel applet).
+
+Each of these configuration components is referred to as an 'entity'.
+
+Network Configuration Units (NCUs): units that specify either link or
+interface (IP) configuration. An NCP consists of a set of NCUs, one for
+each datalink (physical, tunnel, aggregation etc), and one for each IP
+interface.
+
+Network Configuration Profiles (NCPs): A network configuration profile (NCP)
+comprises of a set of NCUs specifying configuration preferences to be applied
+when that profile is active.
+
+Locations: A location consists of additional configuration preferences
+to be applied when basic IP configuration is complete.  Information
+such as name service specification, proxies, etc. can be specified.
+
+External Network Modifiers (ENMs): units that specify an external service
+or executable that modifies the network configuration.  Properties of an
+ENM include an FMRI or Start and Stop exec strings, an optional environment
+which will be activated when the ENM is started, an activation type specifying
+when the ENM should be started (e.g. on user input, dependent on an NCU--
+either requiring or excluding a particular NCU, or always-on).  Each ENM
+also has a read-only state property, which indicates whether or not the
+ENM has been activated by nwam.
+
+Known WiFi Networks (known WLANs): units that specify configuration
+data associated with known WiFi access points that the user visits.  If
+a WLAN found by scanning is one of the known WLANs, NWAM will automatically
+connect.  Priorities associated with known WLANs can also be manipulated
+allowing users to prioritize particular WLANs.
+
+Events
+
+The event interface allows a client of NWAM (usu. the GUI) to subscribe
+to a stream of system events such as link and interface up/down,
+wireless scans, and times when NWAM needs the user to be queried.
+
+Events types are in libnwam.h as NWAM_EVENTS_* and the actual bodies of
+the events are in nwam_events_msg_t.  The semantics of the events have
+been simplified so that none require response.  They are all
+notification.
+
+NWAM_EVENTS_SOURCE_{DEAD,BACK} provide notification that the nwam
+daemon has died or has reappeared.  These are synthetic events in that
+they come from the library and not from nwamd.
+
+NWAM_EVENTS_NO_MAGIC provides notification that nwam couldn't make a
+determination of what to do without user guidance.  This event provides
+information that can be used to ask the user if he wants to pick a
+wireless lan although in some cases nwam might have no idea what is
+intended.
+
+NWAM_EVENTS_IF_{STATE,REMOVED} provide information about changes in
+interface state or the removal of an interface.
+
+NWAM_EVENTS_LINK_{STATE, REMOVED} provides information about changes in
+link state or the removal of a link.
+
+NWAM_EVENTS_SCAN_REPORT is used to communicate information about
+wireless networks encountered.
+
+Persistent configuration state of entities is stored in project-private
+/etc/nwam configuration files, and the details of storage are hidden
+from libnwam consumers.
+
+Access to entities is attained via an entity-specific handle. These
+handles can be obtained via calls to nwam_<entity>_create() or
+nwam_<entity>_read(), and freed (in memory) via calls to nwam_<entity>_free().
+nwam_<entity>_create() will create an in-memory representation of the
+entity, but that entity will not be stored until nwam_<entity>_commit() is
+called.  Persistently stored entitites are retrieved via nwam_<entity>_read(),
+can be modified in-memory, and later persistently committed to storage
+via nwam_<entity>_commit().  Entities can also be copied with
+nwam_<entity>_copy().
+
+All changes made after binding a handle to an entity, and prior to calling 
+nwam_<entity>_commit() are carried out on the in-memory representation of that
+entity. nwam_<entity>_commit() updates persistent storage in an all-or-none
+transactional manner, applying the (possibly changed) in-memory representation
+to persistent storage atomically.
+
+To destroy an entity in persistent storage, nwam_<entity>_destroy() is
+used. This is distinct from nwam_<entity>_free(), which simply frees 
+the in-memory representation - destroy both removes the object from
+persistent storage, and frees it in memory.
+
+To summarize, the pattern of interactions with an entity is
+ - nwam_<entity>_read(), nwam_<entity>_create() or nwam_<entity>_copy()
+ - possibly modify entity properties
+ - nwam_<entity>_commit() or nwam_<entity>_destroy()
+ - nwam_<entity>_handle_free()
+
+Unless otherwise stated functions in libnwam are MT-safe.  The
+atomicity of _commit() and _read() operations is guaranteed - i.e.
+_commit() is guaranteed to deliver all property changes to persistent
+storage, while _read() is guaranteed to read a consistent view of the
+entity (i.e. _read() cannot collide with another entity _commit()ting
+changes). However, it is possible that a _read() will retrieve an
+outdated view of an entity, if after the _read() completes, another
+entity _commit()s changes. In other words, lost updates are possible.
+These are permitted given the nature of the entities changing NWAM
+configuration (the CLI and GUI) - it seems intuitive that the most
+recent update best captures user intent.
+
+Entity validation on an in-memory representation can be explicitly requested
+via a call to nwam_<entity>_validate(), and individual property values
+can be validated via nwam_<entity>_validate_prop().
+
+Storage and retrieval of properties is done via nwam_<entity>_set_prop_value()
+and nwam_<entity>_get_prop_value().  These functions require an nwam_value_t as
+a parameter,  which is created via the nwam_value_create_<type>() family
+of functions.  Data can be retrieved from the nwam_value_t via the
+nwam_value_get_<type>() family of functions.  Once a property has been
+set, the associated nwam_value_t can be immediately freed.  For retrieval,
+the nwam_value_t should be freed when the value(s) are no longer needed.
+A property can also be delete with nwam_<entity>_delete_prop().
+
+Implicit validation occurs as part of the nwam_<entity>_set_prop_value()
+and nwam_<entity>_commit() functions.
+
+INTERFACES
+
+For error handling:
+
+const char *nwam_strerror(nwam_error_t error);
+
+For values:
+
+Values can be any of the following types:
+
+	NWAM_VALUE_TYPE_BOOLEAN
+	NWAM_VALUE_TYPE_UINT64
+	NWAM_VALUE_TYPE_INT64
+        NWAM_VALUE_TYPE_STRING
+
+and are possibly multi-valued. An nwam_value_t must be created in order
+to set property values in libnwam, this is done via the follwing functions:
+
+nwam_error_t nwam_value_create_boolean(boolean_t, nwam_value_t *);
+nwam_error_t nwam_value_create_boolean_array(boolean_t *, uint_t,
+    nwam_value_t *);
+nwam_error_t nwam_value_create_uint64(uint64_t, nwam_value_t *);
+nwam_error_t nwam_value_create_uint64_array(uint64_t *, uint_t, nwam_value_t *);
+nwam_error_t nwam_value_create_int64(int64_t, nwam_value_t *);
+nwam_error_t nwam_value_create_int64_array(int64_t *, uint_t, nwam_value_t *);
+nwam_error_t nwam_value_create_string(char *, nwam_value_t *);
+nwam_error_t nwam_value_create_string_array(char **, uint_t, nwam_value_t *);
+
+Values are returned from the _get_prop_value() functions, and the data
+contained in them can be retrieved via the following functions:
+
+nwam_error_t nwam_value_get_boolean(nwam_value_t, boolean_t *);
+nwam_error_t nwam_value_get_boolean_array(nwam_value_t, boolean_t **, uint_t *);
+nwam_error_t nwam_value_get_uint64(nwam_value_t, uint64_t *);
+nwam_error_t nwam_value_get_uint64_array(nwam_value_t, uint64_t **, uint_t *);
+nwam_error_t nwam_value_get_int64(nwam_value_t, int64_t *);
+nwam_error_t nwam_value_get_int64_array(nwam_value_t, int64_t **, uint_t *);
+nwam_error_t nwam_value_get_string(nwam_value_t, char **);
+nwam_error_t nwam_value_get_string_array(nwam_value_t, char ***, uint_t *);
+
+Type and number of value can be retrieved via:
+
+nwam_error_t nwam_value_get_type(nwam_value_t, nwam_value_type_t *);
+nwam_error_t nwam_value_get_numvalues(nwam_value_t, uint_t *);
+
+and a value is freed using:
+
+void nwam_value_free(nwam_value_t);
+
+For property setting,  a typical set of events is to create the value,
+call the appropriate set_prop_value() function, then free the value (values
+can be safely freed prior to commit).  For retrieval, the type and
+number of values usually need to be tested before calling the appropriate
+retrieval function.  In this case, the value should not be freed until
+the associated data is no longer needed.
+
+NCUs,  locations and ENMs can all specify conditional activation conditions.
+Interfaces are provided to convert a conditional activation predicate into
+a string,  or from a string to a parsed set of variables that comprise the
+condition.  Additionally a function is provided to rate the specificity of
+the activation condition, used to compare location conditions to choose
+the most specific condition to activate in the case where the activation
+conditions of multiple locations are specified.
+
+nwam_error_t nwam_condition_to_condition_string(nwam_condition_object_type_t,
+    nwam_condition_t, const char *, char **);
+nwam_error_t nwam_condition_string_to_condition(const char *,
+    nwam_condition_object_type_t *, nwam_condition_t *, char **);
+nwam_error_t nwam_condition_rate(nwam_condition_object_type_t,
+    nwam_condition_t, uint64_t *);
+
+For NCP entities:
+
+nwam_error_t nwam_ncp_create(const char *name, uint64_t flags,
+    nwam_ncp_handle_t *ncp);
+nwam_error_t nwam_ncp_read(const char *name, uint64_t flags,
+    nwam_ncp_handle_t *ncp);
+nwam_error_t nwam_ncp_copy(nwam_ncp_handle_t ncp, const char *newname,
+    nwam_ncp_handle_t *newncp);
+nwam_error_t nwam_ncp_walk_ncus(nwam_ncp_handle_t ncp,
+    int(*cb)(nwam_ncu_handle_t, void *), void *data, uint64_t flags, int *ret);
+nwam_error_t nwam_ncp_get_name(nwam_ncp_handle_t ncp, char **name);
+nwam_error_t nwam_ncp_activate(nwam_ncp_handle_t ncp);
+nwam_error_t nwam_ncp_deactivate(nwam_ncp_handle_t ncp);
+nwam_error_t nwam_ncp_destroy(nwam_ncp_handle_t ncp, uint64_t flags);
+void nwam_ncp_free(nwam_ncp_handle_t ncp);
+
+Since the NCP simply consists of the NCUs that comprise it, there is
+no NCP-specific commit() function - we simply read the NCP, walk the
+constituent NCUs, reading, changing or committing them in turn.  The
+walk can be modified via the flags option to only select specific NCU types
+and classes.
+
+Each NCP has a set of NCUs associated with it, each of which is created/modifed
+using the functions below.
+
+For NCU entities:
+
+nwam_error_t nwam_ncu_create(nwam_ncp_handle_t ncp, const char *name,
+    nwam_ncu_type_t type, nwam_ncu_class_t class, nwam_ncu_handle_t *ncu);
+nwam_error_t nwam_ncu_read(nwam_ncp_handle_t ncp, const char *name,
+    nwam_ncu_type_t type, uint64_t flags, nwam_ncu_handle_t *ncu);
+nwam_error_t nwam_ncu_copy(nwam_ncu_handle_t ncu, const char *newname,
+    nwam_ncu_handle_t *newncu);
+nwam_error_t nwam_ncu_commit(nwam_ncu_handle_t ncu, uint64_t flags);
+nwam_error_t nwam_ncu_destroy(nwam_ncu_handle_t ncu, uint64_t flags);
+nwam_error_t nwam_ncu_free(nwam_ncu_handle_t ncu);
+nwam_error_t nwam_ncu_validate(nwam_ncu_handle_t ncu, const char **errprop);
+nwam_error_t nwam_ncu_get_prop_value(nwam_ncu_handle_t ncu, const char *prop,
+    nwam_value_t *value);
+nwam_error_t nwam_ncu_get_prop_description(const char *prop,
+    const char **description);
+nwam_error_t nwam_ncu_delete_prop(nwam_ncu_handle_t ncu, const char *prop);
+nwam_error_t nwam_ncu_set_prop_value(nwam_ncu_handle_t ncu, const char *prop,
+    nwam_value_t value);
+nwam_error_t nwam_ncu_get_name(nwam_ncu_handle_t ncu, char **name);
+nwam_error_t nwam_ncu_set_name(nwam_ncu_handle_t ncu, const char *name);
+nwam_error_t nwam_ncu_get_read_only(nwam_ncu_handle_t ncu, boolean_t *readp);
+nwam_error_t nwam_ncu_validate_prop(nwam_ncu_handle_t ncu, const char *prop,
+    nwam_value_t value);
+nwam_error_t nwam_ncu_walk_props(nwam_ncu_handle_t ncu,
+    int (*func)(void *, const char *, nwam_value_t), void *data,
+    uint64_t flags, int *ret);
+nwam_error_t nwam_ncu_prop_get_type(const char *prop,
+    nwam_value_type_t *value_type);
+nwam_error_t nwam_ncu_get_ncp(nwam_ncu_handle_t ncu, nwam_ncp_handle_t *ncp);
+
+NCUs are manipulated via an nwam_ncu_handle_t.
+ 
+Each NCU has a set of properties associated with it. Each property can
+have mutiple values associated with it, which are set or retrieved via an
+nwam_value_t.  The approach is similar to that used for Locations,   with
+the difference that read/commit/destroy must specify an NCP.  Only two
+NCPs are supported at present, the automatic and user NCPs. Modification
+of the former is restricted to nwamd itself,  and attempts to modify
+the automatic NCP's consituent NCUs will result in an NWAM_ENTITY_READ_ONLY
+error.
+
+For Location entities:
+
+nwam_error_t nwam_loc_create(const char *name, nwam_loc_handle_t *loc);
+nwam_error_t nwam_loc_read(const char *name, uint64_t flags,
+    nwam_loc_handle_t *loc);
+nwam_error_t nwam_loc_copy(nwam_loc_handle_t loc, const char *newname,
+    nwam_loc_handle_t *newloc);
+nwam_error_t nwam_walk_locs(int (*cb)(nwam_loc_handle_t loc, void *arg),
+    void *arg, uint64_t flags, int *cbretp);
+nwam_error_t nwam_loc_commit(nwam_loc_handle_t loc, uint64_t flags);
+nwam_error_t nwam_loc_destroy(nwam_loc_handle_t loc, uint64_t flags);
+void nwam_loc_free(nwam_loc_handle_t loc);
+nwam_error_t nwam_loc_validate(nwam_loc_handle_t loc, const char *errprop);
+nwam_error_t nwam_loc_walk_props(nwam_loc_handle_t loc,
+    int (*cb)(const char *, nwam_value_t **, void *),
+    void *arg, uint64_t flags, int *cbret);
+nwam_error_t nwam_loc_validate_prop(nwam_loc_handle_t loc,
+    const char *prop, nwam_value_t value);
+nwam_error_t nwam_loc_prop_get_type(const char *prop,
+    nwam_value_type_t *value_type);
+nwam_error_t nwam_loc_get_prop_value(nwam_loc_handle_t loc, const char *prop,
+    nwam_value_t *value);
+nwam_error_t nwam_loc_get_prop_description(const char *prop,
+    const char **description);
+nwam_error_t nwam_loc_delete_prop(nwam_loc_handle_t loc, const char *prop);
+nwam_error_t nwam_loc_set_prop_value(nwam_loc_handle_t loc, const char *prop,
+    nwam_value_t value);
+nwam_error_t nwam_loc_get_name(nwam_loc_handle_t loc, char **name);
+nwam_error_t nwam_loc_set_name(nwam_loc_handle_t loc, const char *name);
+nwam_error_t nwam_loc_activate(nwam_loc_handle_t loc);
+nwam_error_t nwam_loc_deactivate(nwam_loc_handle_t loc);
+
+Locations are manipulated via an nwam_loc_handle_t.
+
+A loc handle maps to an in-memory representation of a location; operations via
+this interface manipulate the in-memory data.  In-memory data is read from
+persistant storage via the nwam_loc_read() or nwam_walk_locs() functions, and
+written out to persistent storage via the nwam_loc_commit() function.  A loc
+may be permanently removed from persistent storage with the nwam_loc_destroy()
+function.  Interactions with persistent storage will be nonblocking by default;
+this behavior can be changed by passing the NWAM_FLAG_BLOCKING in the flags
+parameter.
+
+A typical sequence would be to allocate a loc handle, either by creating a
+new loc (nwam_loc_create()) or by reading one from persistent storage (nwam_
+loc_read() or nwam_walk_locs()).  The various set/get/walk/validate/(de)activate
+functions may then be used to manipulate the loc; any changes made may then be
+committed to persistent storage via nwam_loc_commit().  A call to nwam_loc_
+free() is required to release in-memory resources associated with the handle.
+
+The flags parameter in the walk functions allows filtering of the locs that
+will be examined, depending on the state of each loc.  Passing in
+NWAM_FLAG_STATE_ALL will examine all locs; specific state flags are defined
+in <libnwam.h>.
+
+Like NCUs, each loc has a set of properties associated with it. Loc properties
+are stored in nwam_value_t structures; see the Values section for how to store/
+retrieve using these.
+
+For ENM entities:
+
+nwam_error_t nwam_enm_create(const char *name, const char *fmri,
+    nwam_enm_handle_t *enm);
+nwam_error_t nwam_enm_read(const char *name, uint64_t flags,
+    nwam_enm_handle_t *enm);
+nwam_error_t nwam_enm_copy(nwam_enm_handle_t enm, const char *newname,
+    nwam_enm_handle_t *newenm);
+nwam_error_t nwam_walk_enms(int (*cb)(nwam_enm_handle_t enm, void *arg),
+    void *arg, uint64_t flags, int *cbretp);
+nwam_error_t nwam_enm_commit(nwam_enm_handle_t enm, uint64_t flags);
+nwam_error_t nwam_enm_destroy(nwam_enm_handle_t enm, uint64_t flags);
+void nwam_enm_free(nwam_enm_handle_t enm);
+nwam_error_t nwam_enm_validate(nwam_enm_handle_t enm, const char *errprop);
+nwam_error_t nwam_enm_walk_props(nwam_enm_handle_t enm,
+    int (*cb)(const char *, nwam_value_t **, void *),
+    void *arg, uint64_t flags, int *cbret);
+nwam_error_t nwam_enm_validate_prop(nwam_enm_handle_t enm,
+    const char *prop, nwam_value_t value);
+nwam_error_t nwam_enm_prop_get_type(const char *prop,
+    nwam_value_type_t *value_type);
+nwam_error_t nwam_enm_get_prop_value(nwam_enm_handle_t enm, const char *prop,
+    nwam_value_t *value);
+nwam_error_t nwam_enm_get_prop_description(const char *prop,
+    const char **description);
+nwam_error_t nwam_enm_delete_prop(nwam_enm_handle_t enm, const char *prop);
+nwam_error_t nwam_enm_set_prop_value(nwam_enm_handle_t enm, const char *prop,
+    nwam_value_t value);
+nwam_error_t nwam_enm_get_name(nwam_enm_handle_t enm, char **name);
+nwam_error_t nwam_enm_set_name(nwam_enm_handle_t enm, const char *name);
+nwam_error_t nwam_enm_activate(nwam_enm_handle_t enm);
+nwam_error_t nwam_enm_deactivate(nwam_enm_handle_t enm);
+
+ENMs are manipulated via an nwam_enm_handle_t, in a similar manner to
+NCUs and locations.
+
+The flags parameter in the walk functions allows filtering of the ENMs that
+will be examined, depending on the state of each ENM.  Passing in
+NWAM_FLAG_STATE_ALL will examine all ENMs; specific state flags are defined
+in <libnwam.h>.
+
+Like NCUs, each ENM has a set of properties associated with it. ENM properties
+are all single valued, though the interface is aligned with the NCU interface,
+which allows for multi-valued properties.  ENM properties are stored in
+nwam_value_t structures; see the Values section for how to store/retrieve
+using these.
+
+For known WLAN entities:
+
+nwam_error_t nwam_known_wlan_create(const char *name,
+    nwam_known_wlan_handle_t *kwhp);
+nwam_error_t nwam_known_wlan_read(const char *name, uint64_t flags,
+    nwam_known_wlan_handle_t *kwhp);
+nwam_error_t nwam_known_wlan_copy(nwam_known_wlan_handle_t kwh,
+    const char *newname, nwam_known_wlan_handle_t *newkwh);
+nwam_error_t nwam_walk_known_wlans(int (*cb)(nwam_known_wlan_handle_t, void *),
+    void *arg, uint64_t flags, int *cbretp);
+nwam_error_t nwam_known_wlan_commit(nwam_known_wlan_handle_t kwh,
+    uint64_t flags);
+nwam_error_t nwam_known_wlan_destroy(nwam_known_wlan_handle_t kwh,
+    uint64_t flags);
+void nwam_known_wlan_free(nwam_known_wlan_handle_t kwh);
+nwam_error_t nwam_known_wlan_validate(nwam_known_wlan_handle_t kwh,
+    const char *errprop);
+nwam_error_t nwam_known_wlan_walk_props(nwam_known_wlan_handle_t kwh, 
+    int (*cb)(const char *, nwam_value_t **, void *),
+    void *arg, uint64_t flags, int *cbret);
+nwam_error_t nwam_known_wlan_validate_prop(nwam_known_wlan_handle_t kwh,
+    const char *prop, nwam_value_t value);
+nwam_error_t nwam_known_wlan_prop_get_type(const char *prop,
+    nwam_value_type_t *value_type);
+nwam_error_t nwam_known_wlan_get_prop_value(nwam_known_wlan_handle_t kwh,
+    const char *prop, nwam_value_t *value);
+nwam_error_t nwam_known_wlan_get_prop_description(const char *prop,
+    const char **description);
+nwam_error_t nwam_known_wlan_delete_prop(nwam_known_wlan_handle_t kwh,
+    const char *prop);
+nwam_error_t nwam_known_wlan_set_prop_value(nwam_known_wlan_handle_t kwh,
+    const char *prop, nwam_value_t value);
+nwam_error_t nwam_known_wlan_get_name(nwam_known_wlan_handle_t kwh,
+    char **name);
+nwam_error_t nwam_known_wlan_set_name(nwam_known_wlan_handle_t kwh,
+    const char *name);
+nwam_error_t nwam_known_wlan_add_to_known_wlan(const char *essid,
+    const char *bssid);
+nwam_error_t nwam_known_wlan_remove_from_known_wlan(const char *essid,
+    const char *bssid);
+
+Known WLANs are manipulated via an nwam_known_wlan_handle_t, in a similar
+manner to NCUs, locations and ENMs.
+
+Like ENMs, each known WLAN has a set of properties associated with it.
+Known WLAN properties are stored in nwam_value_t structures; see the Values
+section for how to store/retrieve using these.
+
+For WLANs, we define a set of functions to ask nwamd to initiate a scan,
+select a WLAN (and possibly add it to the known WLAN list) or set a WLAN
+key:
+
+
+extern nwam_error_t nwam_wlan_scan(const char *linkname);
+extern nwam_error_t nwam_wlan_get_scan_results(const char *linkname,
+    uint_t *num_resultsp, nwam_wlan_t **wlansp);
+extern nwam_error_t nwam_wlan_select(const char *linkname,
+    const char *essid, const char *bssid, boolean_t add_to_known_wlans);
+extern nwam_error_t nwam_wlan_set_key(const char *linkname, const char *essid,
+    const char *bssid, uint32_t security_mode, uint_t keyslot, const char *key);
+
+For Events:
+
+typedef struct nwam_event {
+	uint32_t type;
+
+	union {
+		struct {
+			nwam_object_type_t object_type;
+			char name[NWAM_MAX_NAME_LEN];
+			nwam_action_t action;
+		} object_action;
+
+
+		... and so on for each message ...
+
+	} data;
+
+} *nwam_event_t;
+
+type comes from the set of constants NWAM_EVENT_TYPE_*.
+
+Registration and cancellation of registration are done via
+_init and _fini functions:
+
+extern nwam_error_t nwam_events_init(void);
+extern void nwam_events_fini(void);
+
+Events can then be recieved by calling nwam_event_wait():
+
+extern nwam_error_t nwam_event_wait(nwam_event_t *);
+
+The event can then be processed, and free via nwam_event_free();
+
+RETURN VALUES
+
+All functions return an nwam_error_t if they return an error. Possible
+errors are:
+
+	NWAM_SUCCESS			No error occured
+	NWAM_LIST_END			End of list
+	NWAM_INVALID_HANDLE		Entity handle is invalid
+	NWAM_HANDLE_UNBOUND		Handle not bound to entity
+	NWAM_INVALID_ARG		Argument is invalid
+	NWAM_PERMISSION_DENIED		Insufficient privileges for action
+	NWAM_NO_MEMORY			Out of memory
+	NWAM_ENTITY_EXISTS		Entity already exists
+	NWAM_ENTITY_IN_USE		Another user is interacting with entity
+	NWAM_ENTITY_COMMITTED		Entity already committed
+	NWAM_ENTITY_NOT_FOUND		Entity not found
+	NWAM_ENTITY_TYPE_MISMATCH	Entity value-type mismatch
+	NWAM_ENTITY_INVALID		Validation of entity failed
+	NWAM_ENTITY_INVALID_MEMBER	Entity member invalid
+	NWAM_ENTITY_INVALID_VALUE	Validation of entity value failed
+	NWAM_ENTITY_NO_VALUE		No value associated with entity   
+	NWAM_ENTITY_MULTIPLE_VALUES,	Multiple values for entity
+	NWAM_ENTITY_READ_ONLY,		Entity is marked read only
+	NWAM_WALK_HALTED,		Callback function returned nonzero
+	NWAM_ERROR_BIND,		Could not bind to backend
+	NWAM_ERROR_BACKEND_INIT,	Could not initialize backend
+	NWAM_ERROR_INTERNAL		Internal error
+
+FILES
+	/lib/libnwam.so.1	shared object
+
+ATTRIBUTES
+
+
+SEE ALSO
+	nwamd(1M), nwamcfg(1M), nwamadm(1M)

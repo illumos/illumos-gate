@@ -180,13 +180,17 @@ do
 		#
 		# Add the 'dladm' user if it doesn't exist.
 		#
-		DLADM_LIN="dladm:x:15:3:Datalink Admin:/:"
+		DLADM_LIN="dladm:x:15:65:Datalink Admin:/:"
+		OLD_DLADM_LIN="dladm:x:15:3:Datalink Admin:/:"
 		cur_name=`awk -F: '$3 == 15 { print $1 }' $dest`
 		if [ ! -z "$cur_name" -a "$cur_name" != "dladm" ]; then
 			echo "ERROR: Reserved UID 15 already assigned" \
 				"to '$cur_name'" >> /tmp/CLEANUP
 		elif grep "$DLADM_LIN" $dest > /dev/null 2>&1; then
 			:
+		elif grep "$OLD_DLADM_LIN" $dest > /dev/null 2>&1; then
+			sed '/^dladm:/s/:3:/:65:/' $dest > $TEMPF
+			mv -f $TEMPF $dest
 		else
 			sed '/^nuucp:x/ a\
 '"$DLADM_LIN"'' $dest > $TEMPF
@@ -290,6 +294,34 @@ do
 			sed '/^svctag:x/ a\
 '"$UNKNOWN_LIN"'' $dest > $TEMPF
 			mv -f $TEMPF $dest
+		fi
+		# Add the 'netadm' user if it doesn't exist.
+		#
+		NETADM_LIN="netadm:x:16:65:Network Admin:/:"
+		cur_name=`awk -F: '$3 == 16 { print $1 }' $dest`
+		if [ ! -z "$cur_name" -a "$cur_name" != "netadm" ]; then
+			echo "ERROR: Reserved UID 16 already assigned" \
+				"to '$cur_name'" >> /tmp/CLEANUP
+		elif grep "$NETADM_LIN" $dest 2>&1 >/dev/null; then
+			:
+		else
+			printf '/^dladm:x\na\n%s\n.\nw\nq\n' \
+				"$NETADM_LIN" | ed -s $dest > /dev/null
+		fi
+
+		#
+		# Add the 'netcfg' user if it doesn't exist.
+		#
+		NETCFG_LIN="netcfg:x:17:65:Network Configuration Admin:/:"
+		cur_name=`awk -F: '$3 == 17 { print $1 }' $dest`
+		if [ ! -z "$cur_name" -a "$cur_name" != "netcfg" ]; then
+			echo "ERROR: Reserved UID 17 already assigned" \
+				"to '$cur_name'" >> /tmp/CLEANUP
+		elif grep "$NETCFG_LIN" $dest 2>&1 >/dev/null; then
+			:
+		else
+			printf '/^netadm:x\na\n%s\n.\nw\nq\n' \
+				"$NETCFG_LIN" | ed -s $dest > /dev/null
 		fi
 	fi
 done

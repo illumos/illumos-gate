@@ -1724,6 +1724,24 @@ smf_cleanup_dlmgmtd() {
 )
 }
 
+smf_cleanup_nwam() {
+(
+	#
+	# Delete NWAM phase 1-specific components, which comprise the
+	# netcfg, location and ipqos services and associated scripts/binaries.
+	#
+	smf_delete_manifest "var/svc/manifest/network/network-netcfg.xml"
+	smf_delete_manifest "var/svc/manifest/network/network-location.xml"
+	smf_delete_manifest "var/svc/manifest/network/network-ipqos.xml"
+	cd $root
+	rm -f lib/svc/method/net-loc
+	rm -f lib/inet/netcfgd
+	rm -f lib/svc/method/net-ipqos
+	rm -f usr/sbin/nwamcfg
+	rm -f usr/sbin/nwamadm
+)
+}
+
 smf_cleanup_vt() {
 	(
 		smf_delete_manifest var/src/manifest/system/vtdaemon.xml
@@ -2071,6 +2089,9 @@ smf_apply_conf () {
 		smf_cleanup_dlmgmtd
 	fi
 
+	if [[ $nwam_status = cleanup ]]; then
+		smf_cleanup_nwam
+	fi
 	#
 	# When doing backwards BFU, if the target does not contain
 	# vtdaemon manifest, delete it and delete all the additional
@@ -2346,10 +2367,29 @@ EOFA
 	smf_import_service system/name-service-cache.xml
 
 	#
-	# Import the datalink-management service.
+	# Import the datalink-management service.  If datalink-managment
+	# service exists, there is no need to ensure that the service is
+	# enabled only after reboot.  This enabling after reboot is
+	# achieved by passing the service FMRI as the second argument to
+	# smf_import_service().
 	#
-	smf_import_service network/dlmgmt.xml \
-	    svc:/network/datalink-management:default
+	/usr/bin/svcs svc:/network/datalink-management:default \
+	    >/dev/null 2>/dev/null
+	if [ $? -eq 0 ]; then
+		smf_import_service network/dlmgmt.xml
+	else
+		smf_import_service network/dlmgmt.xml \
+		    svc:/network/datalink-management:default
+	fi
+
+	#
+	# Import nwam service if backbfu'ing past NWAM phase 1.  This
+	# is needed prior to reboot to ensure that the nwam service (if active)
+	# does not end up in maintenance state.
+	#
+	if [[ $nwam_status = cleanup ]]; then
+		smf_import_service network/network-physical.xml
+	fi
 
 	#
 	# Import the ldap/client service. This is to get the service
@@ -2933,6 +2973,22 @@ if [[ -f $datalink_file ]]; then
 	elif [[ -f $root/kernel/drv/iptun.conf ]] && ! $iptun_exists; then
 	    	datalink_action=restore
 	fi
+fi
+
+#
+# Check whether the archives have a netcfgd service; this is later used to
+# determine whether we need to remove the netcfg and location services as
+# part of a backbfu using a pre-NWAM phase 1 archive.
+#
+if archive_file_exists generic.lib "lib/inet/netcfgd"; then
+	netcfgd_exists=true
+else
+	netcfgd_exists=false
+fi
+
+nwam_status=none
+if [[ -f $root/lib/inet/netcfgd ]] && ! $netcfgd_exists ; then
+	nwam_status=cleanup
 fi
 
 #

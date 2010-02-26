@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -47,6 +47,20 @@
 
 	<instance name='default' enabled='true'>
 
+	<!--
+		physical:default and physical:nwam are mutually exclusive.
+		Use a one-way dependency for now since two-way exclude_all
+		does not work; enforcement of single_instance in the future
+		will fix this.
+	-->
+	<dependency
+		name='physical_nwam'
+		grouping='exclude_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/network/physical:nwam' />
+	</dependency>
+
 	<exec_method
 		type='method'
 		name='start'
@@ -66,7 +80,7 @@
 	<template>
 		<common_name>
 			<loctext xml:lang='C'>
-				physical network interfaces			
+				physical network interfaces
 			</loctext>
 		</common_name>
 		<documentation>
@@ -83,19 +97,34 @@
 		type='method'
 		name='start'
 		exec='/lib/svc/method/net-nwam start'
-		timeout_seconds='600' />
+		timeout_seconds='120' >
+		<method_context>
+			<method_credential user='netadm' group='netadm'
+				supp_groups='netadm' privileges='zone' />
+		</method_context>
+	</exec_method>
 
 	<exec_method
 		type='method'
 		name='stop'
 		exec='/lib/svc/method/net-nwam stop'
-		timeout_seconds='60' />
+		timeout_seconds='60' >
+		<method_context>
+			<method_credential user='netadm' group='netadm'
+				supp_groups='netadm' privileges='zone' />
+		</method_context>
+	</exec_method>
 
 	<exec_method
 		type='method'
 		name='refresh'
 		exec='/lib/svc/method/net-nwam refresh'
-		timeout_seconds='60' />
+		timeout_seconds='60' >
+		<method_context>
+			<method_credential user='netadm' group='netadm'
+				supp_groups='netadm' privileges='zone' />
+		</method_context>
+	</exec_method>
 
 	<property_group name='general' type='framework'>
 		<!-- to start/stop NWAM services -->
@@ -108,12 +137,14 @@
 	<property_group name='nwamd' type='application'>
 		<stability value='Unstable' />
 		<propval name='debug' type='boolean' value='false' />
-		<propval name='use_net_svc' type='boolean' value='true' />
 		<propval name='autoconf' type='boolean' value='false' />
-		<propval name='dhcp_wait_time' type='count' value='60' />
+		<propval name='ncu_wait_time' type='count' value='60' />
+		<propval name='condition_check_interval' type='count'
+			value='120' />
 		<propval name='scan_interval' type='count' value='120' />
-		<propval name='idle_time' type='count' value='10' />
+		<propval name='scan_level' type='astring' value='weak' />
 		<propval name='strict_bssid' type='boolean' value='false' />
+		<propval name='active_ncp' type='astring' value='Automatic' />
 		<propval name='value_authorization' type='astring'
 			value='solaris.smf.value.nwam' />
 	</property_group>
@@ -128,12 +159,8 @@
 			<manpage title='nwamd' section='1M'
 				manpath='/usr/share/man' />
 			<doc_link
-			   name='Network Auto-Magic OpenSolaris Project Page'
-			   uri='http://opensolaris.org/os/projects/nwam/'
-				/>
-			<doc_link
-			   name='Network Auto-Magic Operational Details'
-			   uri='http://opensolaris.org/os/projects/nwam/picea/'
+			    name='Network Auto-Magic OpenSolaris Project Page'
+				uri='http://hub.opensolaris.org/bin/view/Project+nwam/'
 				/>
 		</documentation>
 	</template>

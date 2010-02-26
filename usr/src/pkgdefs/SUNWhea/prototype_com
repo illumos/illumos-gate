@@ -312,6 +312,7 @@ f none usr/include/libgen.h 644 root bin
 f none usr/include/libgrubmgmt.h 644 root bin
 f none usr/include/libintl.h 644 root bin
 f none usr/include/libipmi.h 644 root bin
+f none usr/include/libnwam.h 644 root bin
 f none usr/include/libnvpair.h 644 root bin
 f none usr/include/libipp.h 644 root bin
 d none usr/include/libpolkit 755 root bin

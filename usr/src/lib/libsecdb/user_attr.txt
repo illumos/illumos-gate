@@ -1,5 +1,5 @@
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -31,4 +31,6 @@ lp::::profiles=Printer Management
 adm::::profiles=Log Management
 dladm::::auths=solaris.smf.manage.wpa,solaris.smf.modify
 daemon::::auths=solaris.smf.manage.ilb,solaris.smf.modify.application
+netadm::::type=role;project=default;profiles=Network Autoconf Admin,Network Management,Service Management
+netcfg::::type=role;project=default;profiles=Network Autoconf User;auths=solaris.network.autoconf.write
 zfssnap::::type=role;auths=solaris.smf.manage.zfs-auto-snapshot;profiles=ZFS File System Management

@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
@@ -709,4 +709,114 @@ update_pvid()
 			}
 		}
 	    }'
+}
+
+#
+# service_exists fmri
+#
+# returns success (0) if the service exists, 1 otherwise.
+#
+service_exists()
+{
+	/usr/sbin/svccfg -s $1 listpg > /dev/null 2>&1
+	if [ $? -eq 0 ]; then
+		return 0;
+	fi
+	return 1;
+}
+
+#
+# service_is_enabled fmri
+#
+# returns success (0) if the service is enabled (permanently or
+# temporarily), 1 otherwise.
+#
+service_is_enabled()
+{
+	#
+	# The -c option must be specified to use the composed view
+	# because the general/enabled property takes immediate effect.
+	# See Example 2 in svcprop(1).
+	#
+	# Look at the general_ovr/enabled (if it is present) first to
+	# determine the temporarily enabled state.
+	#
+	tstate=`/usr/bin/svcprop -c -p general_ovr/enabled $1 2>/dev/null`
+	if [ $? -eq 0 ]; then
+		[ "$tstate" = "true" ] && return 0
+		return 1
+	fi
+
+        state=`/usr/bin/svcprop -c -p general/enabled $1 2>/dev/null`
+	[ "$state" = "true" ] && return 0
+	return 1
+}
+
+#
+# is_valid_v4addr addr
+#
+# Returns 0 if a valid IPv4 address is given, 1 otherwise.
+#
+is_valid_v4addr()
+{ 
+	echo $1 | /usr/xpg4/bin/awk 'NF != 1 { exit 1 } \
+	$1 !~ /^((25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\.){3}\
+	(25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])$/ \
+	{ exit 1 }'
+	return $?
+}
+
+#
+# is_valid_v6addr addr
+#
+# Returns 0 if a valid IPv6 address is given, 1 otherwise.
+#
+is_valid_v6addr()
+{
+	echo $1 | /usr/xpg4/bin/awk 'NF != 1 { exit 1 } \
+	# 1:2:3:4:5:6:7:8
+	$1 !~ /^([a-fA-F0-9]{1,4}:){7}[a-fA-F0-9]{1,4}$/ &&
+	# 1:2:3::6:7:8
+	$1 !~ /^([a-fA-F0-9]{1,4}:){0,6}:([a-fA-F0-9]{1,4}:){0,6}\
+	[a-fA-F0-9]{1,4}$/ && 
+	# 1:2:3::
+	$1 !~ /^([a-fA-F0-9]{1,4}:){0,7}:$/ &&
+	# ::7:8
+	$1 !~ /^:(:[a-fA-F0-9]{1,4}){0,6}:[a-fA-F0-9]{1,4}$/ && 
+	# ::f:1.2.3.4
+	$1 !~ /^:(:[a-fA-F0-9]{1,4}){0,5}:\
+	((25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\.){3}\
+	(25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])$/ &&
+	# a:b:c:d:e:f:1.2.3.4
+	$1 !~ /^([a-fA-F0-9]{1,4}:){6}\
+	((25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\.){3}\
+	(25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])$/ \
+	{ exit 1 }'
+	return $?
+}
+
+#
+# is_valid_addr addr
+#
+# Returns 0 if a valid IPv4 or IPv6 address is given, 1 otherwise.
+#
+is_valid_addr()
+{
+	is_valid_v4addr $1 || is_valid_v6addr $1
+}
+
+#
+# nwam_get_loc_prop location property
+#
+# echoes the value of the property for the given location
+# return:
+#	0 => property is set
+#	1 => property is not set
+#
+nwam_get_loc_prop()
+{
+	value=`/usr/sbin/nwamcfg "select loc $1; get -V $2" 2>/dev/null`
+	rtn=$?
+	echo $value
+	return $rtn
 }

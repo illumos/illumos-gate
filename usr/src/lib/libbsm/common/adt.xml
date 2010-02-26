@@ -20,7 +20,7 @@
 
  CDDL HEADER END
 
-Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 Use is subject to license terms.
 
 -->
@@ -1861,34 +1861,6 @@ Use is subject to license terms.
 	</entry>
     </event>
 
-<!-- NWAM events -->
-
-    <event id="AUE_nwam_attach" header="0" idNo="97" omit="JNI">
-	<title>Network Autoconfig Client</title>
-	<program>nwamd</program>
-	<see>nwamd(1M)</see>
-	<entry id="subject">
-	    <internal token="subject"/>
-	    <external opt="none"/>
-	</entry>
-	<entry id="auth_used">
-	    <internal token="uauth"/>
-	    <external opt="required" type="char *"/>
-	    <comment>authorization used</comment>
-	</entry>
-	<entry id="return">
-	    <internal token="return"/>
-	    <external opt="none"/>
-	</entry>
-    </event>
-
-    <event id="AUE_nwam_detach" instance_of="AUE_generic_basic" header="0"
-	idNo="98" omit="JNI">
-	<title>Network Autoconfig Client</title>
-	<program>nwamd</program>
-	<see>nwamd(1M)</see>
-    </event>
-
 <!-- TPM events recorded by tcsd(8) -->
 
     <event id="AUE_generic_tpm" type="generic" omit="always">
@@ -2533,8 +2505,92 @@ Use is subject to license terms.
         </entry>
     </event> 
 
+    <event id="AUE_nwam_enable" header="0" idNo="132" omit="JNI">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="profile_type">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>Type of profile being enabled</comment>
+	</entry>
+	<entry id="profile_name">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>Name of profile being enabled</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_nwam_disable" header="0" idNo="133" omit="JNI">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="profile_type">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>Type of profile being disabled</comment>
+	</entry>
+	<entry id="profile_name">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>Name of profile being disabled</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_netcfg_update" header="0" idNo="134" omit="JNI">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="parent_file">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>Back-end data file being updated</comment>
+	</entry>
+	<entry id="object_name">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>Name of object being updated</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_netcfg_remove" header="0" idNo="135" omit="JNI">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="parent_file">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>Back-end data file being modified</comment>
+	</entry>
+	<entry id="object_name">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>Name of object being removed</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
 <!-- add new events here with the next higher idNo -->
-<!-- Highest idNo is 131, so next is 132, then fix this comment -->
+<!-- Highest idNo is 135, so next is 136, then fix this comment -->
 <!-- end of C Only events -->
 
 <!--

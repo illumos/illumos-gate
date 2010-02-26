@@ -1,0 +1,246 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+	NOTE:  This service manifest is not editable; its contents will
+	be overwritten by package or patch operations, including
+	operating system upgrade.  Make customizations in a different
+	file.
+-->
+
+<service_bundle type='manifest' name='SUNWcsr:network-location'>
+
+<!--
+  network/location is used as a medium to refresh and restart SMF
+  services dependent on network/location whenever nwamd(1M) changes
+  locations.  nwamd(1M) updates the different configuration files
+  according to the location being (de)activated and refreshes
+  network/location.  This causes the services dependent on network/location
+  to restart and read in the updated configuration files.
+
+  The following services are dependent on network/location with a
+  "restart_on refresh" dependency:
+
+	svc:/network/dns/client:default
+	svc:/network/nis/client:default
+	svc:/network/ldap/client:default
+	svc:/system/name-service-cache:default
+	svc:/network/nfs/mapid:default
+
+  The following dependents will be refreshed (rather than restarted) and,
+  thus, have a "restart_on none" dependency:
+
+	svc:/network/ipfilter:default
+	svc:/network/ipsec/ike:default
+	svc:/network/ipsec/policy:default
+
+  The name of the location to be activated is set in the location/selected
+  property by nwamd.  If this property group/property does not exist, the
+  NoNet location will be activated as a fallback.
+
+-->
+
+<service
+	name='network/location'
+	type='service'
+	version='1'>
+
+	<instance name='default' enabled='false'>
+
+	<!--
+		nwamd(1M) refreshes network/location when a new location is
+		activated, thus the "restart_on none" dependency.
+	-->
+	<dependency
+		name='network-physical'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/network/physical' />
+	</dependency>
+
+	<dependency
+		name='location_netcfg'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/network/netcfg:default' />
+	</dependency>
+
+	<dependency
+		name='filesystem'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/system/filesystem/usr' />
+	</dependency>
+
+	<!-- 
+		This dependency on system/manifest-import is just for the
+		case of the boot after upgrade.  We don't want
+		network/location starting up until network/netcfg has been
+		imported by manifest-import and enabled.  On top of that,
+		we also want the new manifest for network/ipfilter to be
+		imported before network/location has started.
+	-->
+	<dependency
+		name='manifest-import'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/system/manifest-import:default' />
+	</dependency>
+
+	<!-- The following services are dependent on network/location. -->
+
+	<dependent
+		name='location_dns-client'
+		grouping='optional_all'
+		restart_on='refresh'>
+		<service_fmri value='svc:/network/dns/client' />
+	</dependent>
+
+	<dependent
+		name='location_nis-client'
+		grouping='optional_all'
+		restart_on='refresh'>
+		<service_fmri value='svc:/network/nis/client' />
+	</dependent>
+
+	<dependent
+		name='location_ldap-client'
+		grouping='optional_all'
+		restart_on='refresh'>
+		<service_fmri value='svc:/network/ldap/client' />
+	</dependent>
+
+	<dependent
+		name='location_name-service-cache'
+		grouping='optional_all'
+		restart_on='refresh'>
+		<service_fmri value='svc:/system/name-service-cache' />
+	</dependent>
+
+	<dependent
+		name='location_nfs-mapid'
+		grouping='optional_all'
+		restart_on='refresh'>
+		<service_fmri value='svc:/network/nfs/mapid' />
+	</dependent>
+
+	<dependent
+		name='location_identity-domain'
+		grouping='optional_all'
+		restart_on='refresh'>
+		<service_fmri value='svc:/system/identity:domain' />
+	</dependent>
+
+	<!--
+		The following three dependents will be refreshed by 
+		/lib/svc/method/net-loc, rather than restarted,
+		when network/location is refreshed.
+	-->
+
+	<dependent
+		name='location_ipfilter'
+		grouping='optional_all'
+		restart_on='none'>
+		<service_fmri value='svc:/network/ipfilter' />
+	</dependent>
+
+	<dependent
+		name='location_ipsec-ike'
+		grouping='optional_all'
+		restart_on='none'>
+		<service_fmri value='svc:/network/ipsec/ike' />
+	</dependent>
+
+	<dependent
+		name='location_ipsec-policy'
+		grouping='optional_all'
+		restart_on='none'>
+		<service_fmri value='svc:/network/ipsec/policy' />
+	</dependent>
+
+	<exec_method
+		type='method'
+		name='start'
+		exec='/lib/svc/method/net-loc start'
+		timeout_seconds='60' >
+		<method_context>
+			<method_credential user='netadm' group='netadm'
+				supp_groups='netadm' privileges='zone' />
+		</method_context>
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='refresh'
+		exec='/lib/svc/method/net-loc refresh'
+		timeout_seconds='60' >
+		<method_context>
+			<method_credential user='netadm' group='netadm'
+				supp_groups='netadm' privileges='zone' />
+		</method_context>
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec=':true'
+		timeout_seconds='60' >
+		<method_context>
+			<method_credential user='netadm' group='netadm'
+				supp_groups='netadm' privileges='zone' />
+		</method_context>
+	</exec_method>
+
+	<property_group name='general' type='framework'>
+		<propval name='action_authorization' type='astring'
+			value='solaris.smf.manage.location' />
+	</property_group>
+
+	<property_group name='startd' type='framework'>
+		<propval name='duration' type='astring' value='transient' />
+	</property_group>
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+				network interface configuration
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='nwamd' section='1M'
+				manpath='/usr/share/man' />
+		</documentation>
+	</template>
+
+	</instance>
+
+	<stability value='Unstable' />
+
+</service>
+
+</service_bundle>

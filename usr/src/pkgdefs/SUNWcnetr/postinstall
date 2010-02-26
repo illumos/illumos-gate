@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -191,4 +191,15 @@ for file in `ls ${PKG_INSTALL_ROOT}/etc/inet/ike/crls/* \
 	    chmod 644 $file
 	fi
 done
+
+#
+# Change group and permissions of /etc/dladm/*.conf config files.
+# secobj.conf changes permissions and group.  The rest only change the group.
+#
+DLADM_PATH="${PKG_INSTALL_ROOT}/etc/dladm"
+DLADM_FILES="${DLADM_PATH}/datalink.conf ${DLADM_PATH}/flowadm.conf \
+    ${DLADM_PATH}/flowprop.conf ${DLADM_PATH}/secobj.conf"
+chgrp netadm ${DLADM_FILES}
+chmod 660 ${DLADM_PATH}/secobj.conf
+
 exit 0

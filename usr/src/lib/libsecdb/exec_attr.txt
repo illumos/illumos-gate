@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # /etc/security/exec_attr
@@ -170,9 +170,9 @@ Network Management:solaris:cmd:::/sbin/ifconfig:uid=0
 Network Management:solaris:cmd:::/sbin/route:privs=sys_ip_config
 Network Management:solaris:cmd:::/sbin/routeadm:euid=0;\
 	privs=proc_chroot,proc_owner,sys_ip_config
-Network Management:solaris:cmd:::/sbin/dladm:euid=dladm;egid=sys;\
+Network Management:solaris:cmd:::/sbin/dladm:euid=dladm;egid=netadm;\
 	privs=sys_dl_config,net_rawaccess,proc_audit
-Network Management:solaris:cmd:::/sbin/flowadm:euid=dladm;egid=sys;\
+Network Management:solaris:cmd:::/sbin/flowadm:euid=dladm;egid=netadm;\
 	privs=sys_dl_config,net_rawaccess,proc_audit
 Network Management:suser:cmd:::/usr/bin/netstat:uid=0
 Network Management:suser:cmd:::/usr/bin/rup:euid=0

@@ -77,6 +77,7 @@ HTMLENTS = \
 	SmfILBStates.html \
 	SmfInetdStates.html \
 	SmfIPsecStates.html \
+	SmfLocationStates.html \
 	SmfManageHeader.html \
 	SmfManageHotplug.html \
 	SmfMDNSStates.html \
@@ -121,7 +122,10 @@ HTMLENTS = \
 	SmfValueVt.html	\
 	SmfVRRPStates.html \
 	SmfWpaStates.html \
-	NetworkAutoconf.html \
+	NetworkAutoconfRead.html \
+	NetworkAutoconfSelect.html \
+	NetworkAutoconfWlan.html \
+	NetworkAutoconfWrite.html \
 	NetworkILBconf.html \
 	NetworkILBenable.html \
 	NetworkHeader.html \
@@ -160,6 +164,8 @@ HTMLENTS = \
 	SysPowerMgmtSuspendtoRAM.html \
 	SysPowerMgmtBrightness.html \
 	SysCpuPowerMgmt.html \
+	SysSyseventRead.html \
+	SysSyseventWrite.html \
 	SmfManageZFSSnap.html \
 	MMSHeader.html \
 	AuthMMSDeviceLog.html \

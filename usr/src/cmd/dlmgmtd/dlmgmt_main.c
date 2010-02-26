@@ -145,7 +145,7 @@ dlmgmt_door_attach(zoneid_t zoneid, char *rootdir)
 		return (err);
 	}
 	(void) close(fd);
-	if (chown(doorpath, UID_DLADM, GID_SYS) == -1)
+	if (chown(doorpath, UID_DLADM, GID_NETADM) == -1)
 		return (errno);
 
 	/*
@@ -199,7 +199,7 @@ dlmgmt_zone_init(zoneid_t zoneid)
 	}
 
 	if ((chmod(tmpfsdir, 0755) < 0) ||
-	    (chown(tmpfsdir, UID_DLADM, GID_SYS) < 0)) {
+	    (chown(tmpfsdir, UID_DLADM, GID_NETADM) < 0)) {
 		return (EPERM);
 	}
 
@@ -428,7 +428,7 @@ dlmgmt_set_privileges(void)
 	int err;
 
 	(void) setgroups(0, NULL);
-	if (setegid(GID_SYS) == -1 || seteuid(UID_DLADM) == -1)
+	if (setegid(GID_NETADM) == -1 || seteuid(UID_DLADM) == -1)
 		err = errno;
 	else
 		err = dlmgmt_drop_privileges();

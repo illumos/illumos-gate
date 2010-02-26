@@ -19,34 +19,42 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-LIBRARY =	libnwam.a
-VERS =		.1
-OBJECTS =	door.o
+LIBRARY=	libnwam.a
+VERS=		.1
+OBJECTS=	libnwam_audit.o \
+		libnwam_backend.o \
+		libnwam_enm.o \
+		libnwam_events.o \
+		libnwam_error.o \
+		libnwam_files.o \
+		libnwam_known_wlan.o \
+		libnwam_loc.o \
+		libnwam_ncp.o \
+		libnwam_object.o \
+		libnwam_util.o \
+		libnwam_values.o \
+		libnwam_wlan.o
 
 include ../../Makefile.lib
 include ../../Makefile.rootfs
 
 LIBS =		$(DYNLIB) $(LINTLIB)
+LDLIBS +=	-lbsm -lc -ldladm -lnsl -lnvpair -lscf -lsecdb -lsocket
 
-NWAMDIR=	$(SRC)/cmd/cmd-inet/lib/nwamd
 SRCDIR =	../common
-SRCS =		$(OBJECTS:%.o=$(SRCDIR)/%.c)
+$(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 
-$(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
-
-LDLIBS +=	-ldladm -lc
-
-CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-I$(SRCDIR) -I$(NWAMDIR)
+CFLAGS +=       $(CCVERBOSE)
+CPPFLAGS +=	-I$(SRCDIR) -D_REENTRANT
 
 .KEEP_STATE:
 
-all: $(LIBS)
+all:	$(LIBS)
 
-lint: lintcheck
+lint:	lintcheck
 
-include ../../Makefile.targ
+include  $(SRC)/lib/Makefile.targ

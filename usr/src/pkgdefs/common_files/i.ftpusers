@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This is similar to i.preserve, except we also check if there is a file with
@@ -59,7 +59,7 @@ while read src dest; do
 			fi
 		fi
 	fi
-	for user in dladm smmsp gdm webservd mysql openldap xvm
+	for user in dladm netadm netcfg smmsp gdm webservd mysql openldap xvm
 	do
 		egrep "^$user$|^#[ 	]*$user$" $dest >/dev/null 2>&1 || \
 			echo $user >> $dest

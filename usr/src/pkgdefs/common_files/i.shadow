@@ -211,6 +211,28 @@ do
 		fi
 
 		#
+		# Add the 'netadm' reserved user if it doesn't exist.
+		#
+		NETADM_LINE="netadm:*LK*:::::::"
+		if grep "^netadm:" $dest 2>&1 >/dev/null; then
+			:
+		else
+			printf '/^dladm:\*LK\*\na\n%s\n.\nw\nq\n' \
+				"$NETADM_LINE" | ed -s $dest > /dev/null
+		fi
+
+		#
+		# Add the 'netcfg' reserved user if it doesn't exist.
+		#
+		NETCFG_LINE="netcfg:*LK*:::::::"
+		if grep "^netcfg:" $dest 2>&1 >/dev/null; then
+			:
+		else
+			printf '/^netadm:\*LK\*\na\n%s\n.\nw\nq\n' \
+				"$NETCFG_LINE" | ed -s $dest > /dev/null
+		fi
+
+		#
 		# Warn the user if an empty password is found and
 		# PASSREQ is set to yes.
 		#
@@ -220,7 +242,6 @@ do
 				warn_nopass=0;
 			fi
 		fi
-
 	fi
 done
 

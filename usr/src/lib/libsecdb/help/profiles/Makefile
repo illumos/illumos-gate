@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # lib/libsecdb/help/profiles/Makefile
@@ -59,7 +59,8 @@ HTMLENTS = \
 	RtNDMPMngmnt.html \
 	RtNameServiceAdmin.html \
 	RtNameServiceSecure.html \
-	RtNetAutoconf.html \
+	RtNetAutoconfAdmin.html \
+	RtNetAutoconfUser.html \
 	RtNetILB.html \
 	RtNetIPsec.html \
 	RtNetMngmnt.html \

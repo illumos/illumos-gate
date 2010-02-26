@@ -1,0 +1,441 @@
+CDDL HEADER START
+
+The contents of this file are subject to the terms of the
+Common Development and Distribution License (the "License").
+You may not use this file except in compliance with the License.
+
+You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+or http://www.opensolaris.org/os/licensing.
+See the License for the specific language governing permissions
+and limitations under the License.
+
+When distributing Covered Code, include this CDDL HEADER in each
+file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+If applicable, add the following below this CDDL HEADER, with the
+fields enclosed by brackets "[]" replaced with your own identifying
+information: Portions Copyright [yyyy] [name of copyright owner]
+
+CDDL HEADER END
+
+Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+Use is subject to license terms.
+
+Implementation Overview for the NetWork AutoMagic daemon
+John Beck, Renee Danson, Michael Hunter, Alan Maguire, Kacheong Poon,
+Garima Tripathi, Jan Xie, Anurag Maskey
+[Structure and some content shamelessly stolen from Peter Memishian's
+dhcpagent architecture overview.]
+
+INTRODUCTION
+============
+
+Details about the NWAM requirements, architecture, and design are
+available via the NWAM opensolaris project at
+http://opensolaris.org/os/project/nwam.  The point of this document is
+to place details relevant to somebody attempting to understand the
+implementation close to the source code.
+
+THE BASICS
+==========
+
+SOURCE FILE ORGANIZATION
+=======================
+event sources:
+	dlpi_events.c
+	routing_events.c
+	sysevent_events.c
+  
+object-specific event handlers:
+	enm.c
+	known_wlans.c
+	loc.c
+	ncp.c
+	ncu_ip.c
+	ncu_phys.c
+
+legacy config upgrade
+	llp.c
+
+generic code:
+	objects.c
+	events.c
+	conditions.c
+	logging.c
+	util.c
+
+nwam door requests:
+	door_if.c
+
+entry point:
+	main.c
+
+OVERVIEW
+========
+
+Here we discuss the essential objects and subtle aspects of the NWAM
+daemon implementation.  Note that there is of course much more that is
+not discussed here, but after this overview you should be able to fend
+for yourself in the source code.
+
+Events and Objects
+==================
+
+Events come to NWAM from a variety of different sources asyncronously.
+
+o	routing socket
+o	dlpi
+o	sysevents
+o	doors
+
+Routing sockets and dlpi (DL_NOTE_LINK_UP|DOWN events) are handled by
+dedicated threads.  Sysevents and doors are both seen as callbacks into
+the process proper and will often post their results to the main event
+queue.  All event sources post events onto the main event queue.  In
+addition state changes of objects and door requests (requesting current
+state or a change of state, specification of a WiFi key etc) can
+lead to additional events.  We have daemon-internal events (object
+initialization, periodic state checks) which are simply enqueued
+on the event queue, and external events which are both enqueued on
+the event queue and sent to registered listeners (via nwam_event_send()).
+
+So the structure of the daemon is a set of threads that drive event
+generation.  Events are posted either directly onto the event queue
+or are delayed by posting onto the pending event queue.  SIGALARMs
+are set for the event delay,  and when the SIGALARM is received
+pending events that have expired are moved onto the event queue
+proper.  Delayed enqueueing is useful for periodic checks.
+
+Decisions to change conditions based upon object state changes are
+delayed until after bursts of events.  This is achieved by marking a
+flag when it is deemed checking is necessary and then the next time the
+queue is empty performing those checks.  A typical event profile will
+be one event (e.g. a link down) causing a flurry of other events (e.g.
+related interface down).  By waiting until all the consequences of the
+initial event have been carried out to make higher level decisions we
+implicitly debounce those higher level decisions.
+
+At the moment queue quiet actually means that the queue has been quiet
+for some short period of time (.1s).  Typically the flurry of events we
+want to work through are internally generated and are back to back in
+the queue.  We wait a bit longer in case there are reprucussions from
+what we do that cause external events to be posted on us.  We are not
+interested in waiting for longer term things to happen but merely to
+catch immediate changes.
+
+When running, the daemon will consist of a number of threads:
+
+o	the event handling thread: a thread blocking until events appear on the
+	event queue, processing each event in order.  Events that require
+	time-consuming processing are spawned in worker threads (e.g. WiFi
+	connect, DHCP requests etc).
+o	door request threads: the door infrastructure manages server threads
+	which process synchronous NWAM client requests (e.g. get state of an
+	object, connect to a specific WLAN, initiate a scan on a link etc).
+o	various wifi/IP threads: threads which do asynchronous work such as
+	DHCP requests, WLAN scans etc that cannot hold up event processing in
+	the main event handling thread.
+o	routing socket threads: process routing socket messages of interest
+	(address additons/deletions) and package them as NWAM messages.
+o	dlpi threads: used to monitor for DL_NOTE_LINK messages on links
+
+The daemon is structured around a set of objects representing NCPs[1],
+NCUs[2], ENMs[3] and known WLANs and a set of state machines which
+consume events which act on those objects.  Object lists are maintained
+for each object type, and these contain both a libnwam handle (to allow
+reading the object directly) and an optional object data pointer which
+can point to state information used to configure the object.
+
+Events can be associated with specific objects (e.g. link up), or associated
+with no object in particular (e.g. shutdown).
+
+Each object type registers a set of event handler functions with the event
+framework such that when an event occurs, the appropriate handler for the
+object type is used.  The event handlers are usually called
+nwamd_handle_*_event().
+
+[1] NCP Network Configuration Profile; the set of link- and IP-layer
+configuration units which collectively specify how a system should be
+connected to the network
+
+[2] NCU Network Configuration Unit; the individual components of an NCP
+
+[3] ENM External Network Modifiers; user executable scripts often used
+to configure a VPN
+
+Doors and External Events
+=========================
+
+The command interface to nwamd is thread a door at NWAM_DOOR
+(/etc/svc/volatile/nwam/nwam_door).  This door allows external program to send
+messages to nwamd.  The way doors work is to provide a mechanism for
+another process to execute code in your process space.  This looks like
+a CSPish send/receive/reply in that the receiving process provide a
+syncronization point (via door_create(3C)), the calling process uses
+that syncronization point to rendezvous with and provide arguments (via
+door_call(3C), and then the receive process reply (via
+door_return(3C))) passing back data as required.  The OS makes it such
+that the memory used to pass data via door_call(3C) is mapped into the
+receiving process which can write back into it and then transparently
+have it mapped back to the calling process.
+
+As well as handling internal events of interest, the daemon also needs
+to send events of interest (link up/down, WLAN scan/connect results etc)
+to (possibly) multiple NWAM client listeners.  This is done via
+System V message queues. On registering for events via a libnwam door
+request into the daemon (nwam_events_register()), a per-client
+(identified by pid) message queue file is created.  The
+daemon sends messages to all listeners by examining the list of
+message queue files (allowing registration to be robust across
+daemon restarts) and sending events to each listener.  This is done
+via the libnwam function nwam_event_send() which hides the IPC
+mechanism from the daemon.
+
+Objects
+=======
+Four object lists are maintained within the daemon - one each for
+the configuration objects libnwam manages. i.e.:
+
+o	ENMs
+o	locations
+o	known WLANs
+o	NCUs of the current active NCP
+
+Objects have an associated libnwam handle and an optional data
+field (which is used for NCUs only).
+
+Locking is straightforward - nwamd_object_init() will initialize
+an object of a particular type in the appropriate object list,
+returning it with the object lock held. When it is no longer  needed,
+nwamd_object_unlock() should be called on the object.
+
+To retrieve an existing object, nwamd_object_find() should be
+called - again this returns the object in a locked state.
+
+nwamd_object_lock() is deliberately not exposed outside of objects.c,
+since object locking is implicit in the above creation/retrieval
+functions.
+
+An object is removed from the object list (with handle destroyed)
+via nwamd_object_fini() - the object data (if any) is returned
+from this call to allow deallocation.
+
+Object state
+============
+nwamd deals with 3 broad types of object that need to maintain
+internal state: NCUs, ENMs and locations (known WLANs are configuration
+objects but don't have a state beyond simply being present).
+NWAM objects all share a basic set of states:
+
+State		Description
+=====		===========
+uninitialized	object representation not present on system or in nwamd
+initialized	object representation present in system and in nwamd
+disabled	disabled manually
+offline		external conditions are not satisfied
+offline*	external conditions are satisfied, trying to move online
+online*		external conditions no longer satisfied, trying to move offline
+online		conditions satisfied and configured
+maintenance	error occurred in applying configuration
+
+These deliberately mimic SMF states.
+
+The states of interest are offline, offline* and online. 
+
+An object (link/interface NCU, ENM or location) should only move online 
+when its conditions are satisfied _and_ its configuration has been successfully
+applied. This occurs when an ENM method has run or a link is up, or an
+interface has at least one address assigned.
+
+To understand the distinction between offline and offline*, consider the case 
+where a link is of prioritized activation, and either is a lower priority
+group - and hence inactive (due to cable being unplugged  or inability to
+connect to wifi) - or a higher priority group - and hence active. In general,
+we want to distinguish between two cases:
+
+1) when we are actively configuring the link with a view to moving online
+(offline*), as would be the case when the link's priority group is 
+active. 
+2) when external policy-based conditions prevent a link from being active. 
+offline should be used for such cases. Links in priority groups above and 
+below the currently-active group will be offline, since policy precludes them 
+from activating (as less-prioritized links).
+
+So we see that offline and offline* can thus be used to distinguish between 
+cases that have the potentiality to move online (offline*) from a policy 
+perspective - i.e. conditions on the location allow it, or link prioritization 
+allows it - and cases where external conditions dictate that it should not 
+(offline).
+
+Once an object reaches offline*, its configuration processes should kick in.
+This is where auxiliary state is useful, as it allows us to distinguish between
+various states in that configuration process. For example, a link can be
+waiting for WLAN selection or key data, or an interface can be waiting for 
+DHCP response. This auxiliary state can then also be used diagnostically by
+libnwam consumers to determine the current status of a link, interface, ENM
+etc.
+
+WiFi links present a problem however. On the one hand, we want them
+to be inactive when they are not part of the current priority grouping,
+while on the other we want to watch out for new WLANs appearing in
+scan data if the WiFi link is of a higher priority than the currently-selected
+group. The reason we watch out for these is they represent the potential
+to change priority grouping to a more preferred group.  To accommodate this,
+WiFi links of the same or lower (more preferred) priority group will always
+be trying to connect (and thus be offline* if they cannot).
+
+It might appear unnecessary to have a separate state value/machine for 
+auxiliary state - why can't we simply add the auxiliary state machine to the
+global object state machine? Part of the answer is that there are times we 
+need to run through the same configuration state machine when the global
+object state is different - in paticular either offline* or online. Consider
+WiFi - we want to do periodic scans to find a "better" WLAN - we can easily
+do this by running back through the link state machine of auxiliary
+states, but we want to stay online while we do it, since we are still
+connected (if the WLAN disconnects of course we go to LINK_DOWN and offline).
+
+Another reason we wish to separate the more general states (offline, online
+etc) from the more specific ones (WIFI_NEED_SELECTION etc) is to ensure
+that the representation of configuration objects closely matches the way
+SMF works.
+
+For an NCU physical link, the following link-specific auxiliary states are
+used:
+
+Auxiliary state			Description
+===============			===========
+
+LINK_WIFI_SCANNING		Scan in progress
+LINK_WIFI_NEED_SELECTION	Need user to specify WLAN
+LINK_WIFI_NEED_KEY		Need user to specify a WLAN key for selection
+LINK_WIFI_CONNECTING		Connecting to current selection
+
+A WiFI link differs from a wired one in that it always has the 
+potential to be available - it just depends if visited WLANs are in range. 
+So such links - if they are higher in the priority grouping than the 
+currently-active priority group - should always be able to scan, as they 
+are always "trying" to be activated.
+
+Wired links that do not support  DL_NOTE_LINK_UP/DOWN are problematic,
+since we have to simply assume a cable is plugged in.  If an IP NCU
+is activated above such a link, and that NCU uses DHCP, a timeout
+will be triggered eventually (user-configurable via the nwamd/ncu_wait_time
+SMF property of the network/physical:nwam instance) which will cause
+us to give up on the link.
+
+For an IP interface NCU, the following auxiliary states are suggested.
+
+Auxiliary state				Description
+===============				===========
+
+NWAM_AUX_STATE_IF_WAITING_FOR_ADDR	Waiting for an address to be assigned
+NWAM_AUX_STATE_IF_DHCP_TIMED_OUT	DHCP timed out on interface
+
+A link can have multiple logical interfaces plumbed on it consisting
+of a mix of static and DHCP-acquired addresses. This means that
+we need to decide how to aggregate the state of these logical
+interfaces into the NCU state. The concept of "up" we use here
+does not correspond to IFF_UP or IFF_RUNNING, but rather
+when we get (via getting RTM_NEWADDR events with non-zero
+addresses) at least one address assigned to the link.
+
+We use this concept of up as it represents the potential for
+network communication - e.g. after assigning a static
+address, if the location specifies nameserver etc, it
+is possible to communicate over the network. One important
+edge case here is that when DHCP information comes
+in, we need to reassess location activation conditions and
+possibly change or reapply the current location. The problem
+is that if we have a static/DHCP mix, and if we rely on
+the IP interface's notion of "up" to trigger location activation,
+we will likely first apply the location when the static address
+has been assigned and before the DHCP information has
+been returned (which may include nameserver info). So
+the solution is that on getting an RTM_NEWADDR, we 
+check if the (logical) interface associated is DHCP, and
+even if the interface NCU is already up, we reassess
+location activation. This will lead to a reapplication of
+the current location or possibly a location switch.
+
+In order to move through the various states, a generic
+API is supplied
+
+nwam_error_t
+nwamd_object_set_state(nwamd_object_t obj, nwamd_state_t state,
+    nwamd_aux_state_t aux_state);
+
+This function creates an OBJECT_STATE event containing
+the new state/aux_state and enqueues it in the event
+queue. Each object registers its own handler for this
+event, and in response to the current state/aux state and
+desired aux state it responds appropriately in the event
+handling thread, spawning other threads to carry out
+actions as appropriate. The object state event is
+then sent to any registered listeners. 
+
+So for NCUs, we define a handle_object_state() function
+to run the state machine for the NCU object.
+
+Link state and NCP policy
+=========================
+
+NCPs can be either:
+
+o	prioritized: where the constituent link NCUs specify priority group
+	numbers (where lower are more favoured) and grouping types.  These
+	are used to allow link NCUs to be either grouped separately (exclusive)
+	or together (shared or all).
+o	manual: their activation is governed by the value of their enabled
+	property.
+o	a combination of the above.
+
+IP interface NCUs interit their activation from the links below them,
+so an IP interface NCU will be active if its underlying link is (assuming
+it hasn't been disabled).
+
+At startup, and at regular intervals (often triggered by NWAM
+events), the NCP policy needs to be reassessed. There
+are a number of causes for NCP policy to be reassessed -
+
+o	a periodic check of link state that occurs every N seconds
+o	a link goes from offline(*) to online (cable plug/wifi connect)
+o	a link goes from online to offline (cable unplug/wifi disconnect).
+
+Any of these should cause the link selecton algorithm to rerun.
+
+The link selection algorithm works as follows:
+
+Starting from the lowest priority grouping value, assess all links 
+in that priority group.
+
+The current priority-group is considered failed if:
+
+o	"exclusive" NCUs exist and none are offline*/online,
+o	"shared" NCUs exist and none are offline*/online,
+o	"all" NCUs exist and all are not offline*/online,
+o	no NCUs are offline*/online.
+
+We do not invalidate a link that is offline* since its configuration
+is in progress. This has the unfortunate side-effect that
+wired links that do not do DL_NOTE_LINK_UP/DOWN will never
+fail. If such links wish to be skipped, their priority group value
+should be increased (prioritizing wireless links).
+
+One a priority group has been selected, all links in groups above
+_and_ below it need to be moved offline.
+
+Location Activation
+===================
+A basic set of system-supplied locations are supplied - NoNet and
+Automatic.  nwamd will apply the NoNet location until such a time
+as an interface NCU is online, at which point it will switch
+to the Automatic location.  If a user-supplied location is supplied,
+and it is either manually enabled or its conditions are satisfied, it
+will be preferred and activated instead.  Only one location can be
+active at once since each location has its own specification of nameservices
+etc.
+
+ENM Activation
+==============
+ENMs are either manual or conditional in activation and will be
+activated if they are enabled (manual) or if the conditions
+are met (conditional).  Multiple ENMs can be active at once.

@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -60,6 +60,7 @@ COMMON_DESCRIPTIONS = \
 	../milestone/name-services.xml \
 	../milestone/network-initial.xml \
 	../milestone/network-loopback.xml \
+	../milestone/network-netcfg.xml \
 	../milestone/network-physical.xml \
 	../milestone/restarter.xml \
 	../milestone/root-fs.xml \

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,8 @@ const struct stdlist usernames[] = {
 	{ "uucp", 5 },
 	{ "nuucp", 9 },
 	{ "dladm", 15 },
+	{ "netadm", 16 },
+	{ "netcfg", 17 },
 	{ "smmsp", 25 },
 	{ "listen", 37 },
 	{ "gdm", 50 },
@@ -68,6 +70,7 @@ const struct stdlist groupnames[] = {
 	{ "games", 20 },
 	{ "smmsp", 25 },
 	{ "gdm", 50 },
+	{ "netadm", 65 },
 	{ "mysql", 70 },
 	{ "openldap", 75 },
 	{ "webservd", 80 },

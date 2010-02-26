@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1835,7 +1835,6 @@ sysevent_open_channel(const char *channel)
 	while (getextmntent(fp, &m, sizeof (struct extmnttab)) == 0) {
 		if (strcmp(m.mnt_mountp, "/var/run") == 0 &&
 		    strcmp(m.mnt_fstype, "tmpfs") == 0) {
-			(void) fclose(fp);
 			var_run_mounted = 1;
 			break;
 		}

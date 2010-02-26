@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -68,6 +68,8 @@ COMMON_SUBDIRS = \
 	cmd/clinfo \
 	cmd/cmd-crypto \
 	cmd/cmd-inet/lib \
+	cmd/cmd-inet/lib/netcfgd \
+	cmd/cmd-inet/lib/nwamd \
 	cmd/cmd-inet/sbin \
 	cmd/cmd-inet/usr.bin \
 	cmd/cmd-inet/usr.lib/bridged \
@@ -85,6 +87,8 @@ COMMON_SUBDIRS = \
 	cmd/cmd-inet/usr.sadm \
 	cmd/cmd-inet/usr.sbin \
 	cmd/cmd-inet/usr.sbin/ilbadm \
+	cmd/cmd-inet/usr.sbin/nwamadm \
+	cmd/cmd-inet/usr.sbin/nwamcfg \
 	cmd/col \
 	cmd/compress \
 	cmd/consadm \

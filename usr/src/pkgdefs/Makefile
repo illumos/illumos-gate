@@ -370,8 +370,6 @@ COMMON_SUBDIRS= \
 	SUNWnfscu \
 	SUNWnisr  \
 	SUNWnisu  \
-	SUNWnwamintr \
-	SUNWnwamintu \
 	SUNWonfmes \
 	SUNWonzfsr \
 	SUNWonzfs \

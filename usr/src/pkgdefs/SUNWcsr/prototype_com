@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -331,6 +331,7 @@ d none lib/crypto 755 root bin
 f none lib/crypto/kcfd 555 root bin
 d none lib/inet 755 root bin
 f none lib/inet/in.mpathd 555 root bin
+f none lib/inet/netcfgd 555 root bin
 f none lib/inet/nwamd 555 root bin
 d none lib/svc 0755 root bin
 d none lib/svc/bin 0755 root bin
@@ -361,8 +362,11 @@ f none lib/svc/method/ldap-client 0555 root bin
 f none lib/svc/method/manifest-import 0555 root bin
 f none lib/svc/method/mpxio-upgrade 0555 root bin
 f none lib/svc/method/net-init 0555 root bin
+f none lib/svc/method/net-ipqos 0555 root bin
 f none lib/svc/method/net-iptun 0555 root bin
+f none lib/svc/method/net-loc 0555 root bin
 f none lib/svc/method/net-loopback 0555 root bin
+f none lib/svc/method/net-netmask 0555 root bin
 f none lib/svc/method/net-nwam	0555 root bin
 f none lib/svc/method/net-physical 0555 root bin
 f none lib/svc/method/net-routing-setup 0555 root bin
@@ -508,8 +512,12 @@ f manifest var/svc/manifest/network/inetd.xml 0444 root sys
 f manifest var/svc/manifest/network/inetd-upgrade.xml 0444 root sys
 f seedmanifest var/svc/manifest/network/dlmgmt.xml 0444 root sys
 f manifest var/svc/manifest/network/network-initial.xml 0444 root sys
+f manifest var/svc/manifest/network/network-ipqos.xml 0444 root sys
 f manifest var/svc/manifest/network/network-iptun.xml 0444 root sys
+f manifest var/svc/manifest/network/network-location.xml 0444 root sys
 f manifest var/svc/manifest/network/network-loopback.xml 0444 root sys
+f manifest var/svc/manifest/network/network-netcfg.xml 0444 root sys
+f manifest var/svc/manifest/network/network-netmask.xml 0444 root sys
 f manifest var/svc/manifest/network/network-physical.xml 0444 root sys
 f manifest var/svc/manifest/network/network-routing-setup.xml 0444 root sys
 f manifest var/svc/manifest/network/network-service.xml 0444 root sys

@@ -1,5 +1,5 @@
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -508,8 +508,8 @@
 #
 # nwamd(1M) events
 #
-6300:AUE_nwam_attach:attach nwam user:ss
-6301:AUE_nwam_detach:detach nwam user:ss
+6300:AUE_nwam_enable:enable nwam profile object:ss
+6301:AUE_nwam_disable:disable nwam profile object:ss
 #
 # ilbd(1M) events
 #
@@ -525,6 +525,11 @@
 6319:AUE_ilb_remove_server:remove ILB server:as
 6320:AUE_ilb_create_servergroup:create ILB server group:as
 6321:AUE_ilb_delete_servergroup:delete ILB server group:as
+#
+# netcfgd(1M) events
+#
+6330:AUE_netcfg_update:create or modify configuration object:ss
+6331:AUE_netcfg_remove:remove configuration object from repository:ss
 #
 # TCSD(8) events
 #

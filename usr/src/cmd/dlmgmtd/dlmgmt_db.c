@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -296,7 +296,7 @@ dlmgmt_zopen_cb(zfarg_t *zfarg)
 		if ((fd = open(filename, oflags, mode)) == -1)
 			return (errno);
 		if (newfile) {
-			if (chown(filename, UID_DLADM, GID_SYS) == -1) {
+			if (chown(filename, UID_DLADM, GID_NETADM) == -1) {
 				err = errno;
 				(void) close(fd);
 				return (err);

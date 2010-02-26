@@ -20,7 +20,7 @@
  */
 /*
  * selfcheck.c
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,7 +52,13 @@ self_check(char *hostname)
 	struct sockaddr_in6 ipv6addr;
 
 	family = AF_INET6;
-	flags = AI_DEFAULT;
+	/*
+	 * We cannot specify AI_DEFAULT since it includes AI_ADDRCONFIG.
+	 * Localhost name resolution will fail if no IP interfaces other than
+	 * loopback are plumbed and AI_ADDRCONFIG is specified, and this
+	 * causes localhost mounts to fail.
+	 */
+	flags = AI_V4MAPPED;
 
 	if ((s = socket(family, SOCK_DGRAM, 0)) < 0) {
 		syslog(LOG_ERR, "self_check: socket: %m");

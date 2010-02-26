@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-
 #
 # MAPFILE HEADER START
 #
@@ -39,6 +38,7 @@
 
 SUNWprivate_1.1 {
     global:
+	icfg_add_addr;
 	icfg_close;
 	icfg_errmsg;
 	icfg_free_if_list;
@@ -54,9 +54,12 @@ SUNWprivate_1.1 {
 	icfg_get_netmask;
 	icfg_get_subnet;
 	icfg_get_token;
+	icfg_if_name;
 	icfg_is_logical;
 	icfg_iterate_if;
 	icfg_open;
+	icfg_plumb;
+	icfg_remove_addr;
 	icfg_set_addr;
 	icfg_set_broadcast;
 	icfg_set_dest_addr;
@@ -70,6 +73,7 @@ SUNWprivate_1.1 {
 	icfg_set_token;
 	icfg_sockaddr_to_str;
 	icfg_str_to_sockaddr;
+	icfg_unplumb;
     local:
 	*;
 };

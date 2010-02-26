@@ -19,15 +19,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include $(SRC)/lib/Makefile.lib
 
 HDRS =		inetcfg.h
+SRCS =		inetcfg.c
 HDRDIR =	common
 SUBDIRS =	$(MACH)
 POFILE =	libinetcfg.po

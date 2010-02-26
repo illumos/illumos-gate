@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -41,7 +41,12 @@ FSMANIFESTS= $(FSSVCS:%=$(ROOTSVCSYSTEMFILESYSTEM)/%)
 NETSVCS= \
 	network-initial.xml \
 	network-iptun.xml \
+	network-ipqos.xml \
+	network-location.xml \
 	network-loopback.xml \
+	network-netcfg.xml \
+	network-netmask.xml \
+	network-netcfg.xml \
 	network-physical.xml \
 	network-routing-setup.xml \
 	network-service.xml
@@ -103,9 +108,12 @@ SVCMETHOD=\
 	identity-domain \
 	identity-node \
 	manifest-import \
+	net-loc \
 	net-loopback \
 	net-init \
 	net-iptun \
+	net-ipqos \
+	net-netmask \
 	net-nwam \
 	net-physical \
 	net-routing-setup \

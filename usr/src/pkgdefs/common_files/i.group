@@ -313,6 +313,23 @@ do
 '"$UNKNOWNGROUP_LINE"'' $dest > $TEMPF
 			mv -f $TEMPF $dest
                 fi
+		# Add the 'netadm' group if it doesn't already exist.
+                #
+		NETADMGROUP_LINE="netadm::65:"
+                cur_name=`awk -F: '$3 == 65 {print $1}' $dest`
+                cur_id=`awk -F: '$1 == "netadm" {print $3}' $dest`
+                if [ ! -z "$cur_name" -a "$cur_name" != "netadm" ]; then
+                        echo "ERROR: Reserved GID 65 already assigned" \
+                            "to '$cur_name'" >> /tmp/CLEANUP
+                elif [ ! -z "$cur_id" -a "$cur_id" != "65" ]; then
+                        echo "NOTE: netadm group already assigned" \
+                            "to id '$cur_id'" >> /tmp/CLEANUP
+                elif grep "$NETADMGROUP_LINE" $dest 2>&1 >/dev/null; then
+                        :
+                else
+                        printf '/^xvm::60:\na\n%s\n.\nw\nq\n' \
+                            "$NETADMGROUP_LINE" | ed -s $dest > /dev/null
+                fi
 	fi
 done
 exit 0

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -543,8 +543,9 @@ process_secobj_db(dladm_handle_t handle, void *arg, FILE *fp, FILE *nfp)
 	return (status);
 }
 
-#define	SECOBJ_RW_DB(handle, statep, writeop)				\
-	(i_dladm_rw_db(handle, "/etc/dladm/secobj.conf", S_IRUSR | S_IWUSR, \
+#define	SECOBJ_RW_DB(handle, statep, writeop)			\
+	(i_dladm_rw_db(handle, "/etc/dladm/secobj.conf",	\
+	S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP,			\
 	process_secobj_db, (statep), (writeop)))
 
 static dladm_status_t

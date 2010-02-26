@@ -19,15 +19,24 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-include $(SRC)/lib/Makefile.lib
+include		$(SRC)/lib/Makefile.lib
 
-HDRS =		libnwam.h
+HDRS =		libnwam.h libnwam_priv.h
+SRCS =		libnwam_audit.c libnwam_backend.c libnwam_enm.c \
+		libnwam_events.c libnwam_error.c libnwam_files.c \
+		libnwam_known_wlan.c libnwam_loc.c libnwam_ncp.c \
+		libnwam_object.c libnwam_util.c libnwam_values.c \
+		libnwam_wlan.c
 HDRDIR =	common
-SUBDIRS =	$(MACH)
+SUBDIRS=	$(MACH)
+POFILE =	libnwam.po
+MSGFILES =	common/*.c
+
+XGETFLAGS =     -a -x libnwam.xcl
 
 all :=		TARGET = all
 clean :=	TARGET = clean
@@ -41,7 +50,11 @@ all clean clobber install lint: $(SUBDIRS)
 
 install_h:	$(ROOTHDRS)
 
-check:
+check:		$(CHECKHDRS)
+
+$(POFILE):      pofile_MSGFILES
+
+_msg:           $(MSGDOMAINPOFILE)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

@@ -19,13 +19,11 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-SUBDIRS=	nwamd
+SUBDIRS=	nwamd netcfgd
 MSGSUBDIRS=	nwamd
 
 include 	../../Makefile.cmd

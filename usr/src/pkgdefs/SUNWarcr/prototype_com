@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -96,6 +96,8 @@ f none lib/llib-lnsl 644 root bin
 f none lib/llib-lnsl.ln 644 root bin
 f none lib/llib-lnvpair 644 root bin
 f none lib/llib-lnvpair.ln 644 root bin
+f none lib/llib-lnwam 644 root bin
+f none lib/llib-lnwam.ln 644 root bin
 f none lib/llib-lpam 644 root bin
 f none lib/llib-lpam.ln 644 root bin
 s none lib/llib-lposix4=./llib-lrt

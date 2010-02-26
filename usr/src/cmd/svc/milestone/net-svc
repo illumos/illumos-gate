@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -31,6 +31,9 @@
 #
 
 . /lib/svc/share/smf_include.sh
+. /lib/svc/share/net_include.sh
+
+NWAM_FMRI="svc:/network/physical:nwam"
 
 case "$1" in
 'start')
@@ -40,11 +43,17 @@ case "$1" in
 	# service failing if we try to do it), so just bail out. 
 	# In the global zone and exclusive-IP zones we proceed.
 	#
-	smf_configure_ip || exit 0
-	;; # Fall through -- rest of script is the initialization code
+	smf_configure_ip || exit $SMF_EXIT_OK
+
+	#
+	# If nwam is enabled, the nwam service will handle the tasks performed
+	# by this service, so just bail out.
+	#
+	service_is_enabled $NWAM_FMRI && exit $SMF_EXIT_OK
+	;; # fall through -- rest of script is the initialization code
 
 'stop')
-	exit 0
+	exit $SMF_EXIT_OK
 	;;
 
 *)
@@ -53,67 +62,10 @@ case "$1" in
 	;;
 esac
 
-NWAM_FMRI="svc:/network/physical:nwam"
-NETSVC_FMRI="svc:/network/service:default"
-
 interface=$2
 
 # If boot variables are not set, set variables we use
 [ -z "$_INIT_UTS_NODENAME" ] && _INIT_UTS_NODENAME=`/usr/bin/uname -n`
-
-#
-# This function removes the instance portion of the passed-in FMRI; for
-# example, 'svc:/network/service:default' becomes 'svc:/network/service'.
-#
-remove_fmri_inst () {
-	echo $1 | awk -F: ' { printf "%s:%s", $1, $2 } '
-}
-
-#
-# This function returns true if this script was *not* invoked
-# by an instance of svc:/network/service.
-#
-fmri_is_not_netsvc () {
-	FMRI_1=`remove_fmri_inst $SMF_FMRI`
-	FMRI_2=`remove_fmri_inst $NETSVC_FMRI`
-	[ "$FMRI_1" = "$FMRI_2" ] && return 1
-	return 0
-}
-
-#
-# This function returns true if this script was *not* invoked
-# by the nwam instance of the network/physical service.
-#
-fmri_is_not_nwam () {
-	[ "&SMF_FMRI" = "$NWAM_FMRI" ] && return 1
-	return 0
-}
-
-#
-# This function returns true if the nwam service is not running, false
-# if it is.  "running" is defined as "current state is online or next
-# state is online".
-#
-nwam_is_not_running() {
-	state=`/usr/bin/svcprop -p restarter/state $NWAM_FMRI`
-	nstate=`/usr/bin/svcprop -p restarter/next_state $NWAM_FMRI`
-
-	[ "$state" = "online" -o "$nextstate" = "online" ] && return 1
-	return 0
-}
-
-#
-# wait_nis
-# Wait up to 5 seconds for ypbind to obtain a binding.
-#
-wait_nis ()
-{
-	for i in 1 2 3 4 5; do
-		server=`/usr/bin/ypwhich 2>/dev/null`
-		[ $? -eq 0 -a -n "$server" ] && return 0 || sleep 1
-	done
-	return 1
-}
 
 #
 # This function takes two file names and the file mode as input. The two
@@ -208,7 +160,7 @@ update_resolv ()
 }
 
 #
-# update_nss
+# update_nss()
 # This routine takes as a parameter, the name of the respective policy 
 # to change in the nsswitch.conf (hosts or ipnodes) to update with dns.
 #
@@ -277,70 +229,37 @@ cleanup_hosts ()
 }
 
 #
-# We now need to reset the netmask and broadcast address for our network
-# interfaces.  Since this may result in a name service lookup, we want to
-# now wait for NIS to come up if we previously started it.
-#
-# Only do this in the non-nwam case.
-#
-if fmri_is_not_nwam; then
-	domain=`/usr/bin/domainname 2>/dev/null`
-
-	[ -z "$domain" ] || [ ! -d /var/yp/binding/$domain ] || wait_nis || \
-    		echo "WARNING: Timed out waiting for NIS to come up" >& 2
-
-	#
-	# Re-set the netmask and broadcast addr for all IP interfaces.  This
-	# ifconfig is run here, after waiting for name services, so that
-	# "netmask +" will find the netmask if it lives in a NIS map. The 'D'
-	# in -auD tells ifconfig NOT to mess with the interface if it is
-	# under DHCP control
-	#
-	/usr/sbin/ifconfig -auD4 netmask + broadcast +
-fi
-
-# Uncomment these lines to print complete network interface configuration
-# echo "network interface configuration:"
-# /usr/sbin/ifconfig -a
-
-#
 # If our network configuration strategy is DHCP, check for DNS
 # configuration parameters obtained from the DHCP server.
 #
-# If NWAM is enabled, it will invoke this script to do this configuration
-# whenever a DHCP lease is obtained; in that case, this configuration
-# should *not* happen when svc:network/service is starting, as it will
-# interfere with the configuration performed by NWAM.
+# Script execution starts here.
 #
-if nwam_is_not_running || fmri_is_not_netsvc; then
+smf_netstrategy
 
-	smf_netstrategy
+if [ "$_INIT_NET_STRATEGY" = "dhcp" ]; then
+	dnsservers=`get_dhcp_var DNSserv`
+	dnsdomain=`get_dhcp_var DNSdmain`
+else
+	dnsservers=""
+	dnsdomain=""
+fi
 
-	if [ "$_INIT_NET_STRATEGY" = "dhcp" ]; then
-		dnsservers=`get_dhcp_var DNSserv`
-		dnsdomain=`get_dhcp_var DNSdmain`
-	else
-		dnsservers=""
-		dnsdomain=""
-	fi
+if [ -n "$dnsservers" ]; then
+	#
+	# add settings retrieved from dhcp server to /etc/resolv.conf
+	#
+	update_resolv "$dnsservers" "$dnsdomain"
 
-	if [ -n "$dnsservers" ]; then
-		#
-		# add settings retrieved from dhcp server to /etc/resolv.conf
-		#
-		update_resolv "$dnsservers" "$dnsdomain"
+	#
+	# Add dns to the nsswitch file, if it isn't already there.
+	#
+	update_nss hosts
+	update_nss ipnodes
 
-		#
-		# Add dns to the nsswitch file, if it isn't already there.
-		#
-		update_nss hosts
-		update_nss ipnodes
-
-	elif dhcp_edits /etc/nsswitch.conf; then
-		# If we added DNS to the hosts and ipnodes
-		# policy in the nsswitch, remove it.
-		cleanup_nss
-	fi
+elif dhcp_edits /etc/nsswitch.conf; then
+	# If we added DNS to the hosts and ipnodes
+	# policy in the nsswitch, remove it.
+	cleanup_nss
 fi
 
 if dhcp_edits /etc/inet/hosts; then
@@ -349,19 +268,3 @@ if dhcp_edits /etc/inet/hosts; then
 	cleanup_hosts
 fi
 
-#
-# If we were invoked by NWAM, can exit now (skipping the ipqos config)
-#
-if [ -z "$SMF_FMRI" ] || [ "$SMF_FMRI" = "$NWAM_FMRI" ]; then
-        exit 0
-fi
-
-#
-# Load the IPQoS configuration.
-# This is backgrounded so that any remote hostname lookups it performs
-# don't unduely delay startup. Any messages go via syslog.
-#
-
-if [ -f /usr/sbin/ipqosconf -a -f /etc/inet/ipqosinit.conf ]; then
-        /usr/sbin/ipqosconf -s -a /etc/inet/ipqosinit.conf &
-fi

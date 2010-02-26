@@ -81,8 +81,9 @@ extern "C" {
 #define	GID_NOBODY	UID_NOBODY
 #define	UID_UNKNOWN	96
 #define	GID_UNKNOWN	UID_UNKNOWN
-#define	GID_SYS		3
 #define	UID_DLADM	15
+#define	UID_NETADM	16
+#define	GID_NETADM	65
 #define	UID_NOACCESS	60002	/* user ID no access */
 
 #ifdef _KERNEL

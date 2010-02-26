@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # usr/src/cmd/cmd-inet/lib/nwamd/Makefile
@@ -30,20 +30,41 @@
 include		../../../../lib/Makefile.lib
 
 PROG=		nwamd
-OBJS=		door.o events.o interface.o llp.o main.o \
-		state_machine.o util.o wireless.o
+OBJS=		conditions.o dlpi_events.o door_if.o enm.o\
+		events.o known_wlans.o llp.o loc.o logging.o\
+		main.o ncp.o ncu.o ncu_phys.o ncu_ip.o objects.o\
+		routing_events.o sysevent_events.o util.o
 SRCS=		$(OBJS:%.o=%.c)
-HEADERS=	defines.h functions.h structures.h variables.h
+HEADERS=	conditions.h events.h known_wlans.h llp.h ncp.h ncu.h\
+		objects.h
+LOCFILES=	create_loc_auto create_loc_nonet
+NONETLOCFILES=	ipf.conf.dfl ipf6.conf.dfl
+
+ROOTCFGDIR=	$(ROOTETC)/nwam
+ROOTLOCDIR=	$(ROOTCFGDIR)/loc
+NONETLOCDIR=	$(ROOTLOCDIR)/NoNet
+LOCDIRS=	$(NONETLOCDIR)
+ROOTCFGFILES=	$(LOCFILES:%=$(ROOTLOCDIR)/%) \
+		$(NONETLOCFILES:%=$(NONETLOCDIR)/%)
 
 include		../../../Makefile.cmd
 
+$(ROOTCFGFILES) := FILEMODE= 644
+
 POFILE=		$(PROG).po
-POFILES=	interface.po wireless.po
 
 ROOTCMDDIR=	$(ROOTFS_LIBDIR)/inet
 
-LDLIBS +=	-lsocket -lnsl -linetcfg -linetutil -lumem -lscf -ldladm \
-		-lgen -lsecdb -lbsm -lsysevent -lnvpair
+LDLIBS +=	-ldhcpagent -ldhcputil -ldladm -ldlpi -lgen \
+		-linetcfg -linetutil -lkstat -lnsl -lnvpair -lnwam \
+		-lsecdb -lscf -lsocket -lsysevent -lumem -luutil
+
+#
+# Instrument with CTF data to ease debugging.
+#
+CTFCONVERT_HOOK = && $(CTFCONVERT_O)
+CTFMERGE_HOOK = && $(CTFMERGE) -L VERSION -o $@ $(OBJS)
+$(OBJS) := CFLAGS += $(CTF_FLAGS)
 
 .KEEP_STATE:
 
@@ -52,20 +73,35 @@ LDLIBS +=	-lsocket -lnsl -linetcfg -linetutil -lumem -lscf -ldladm \
 all: $(PROG)
 
 $(PROG): $(OBJS)
-	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+	$(LINK.c) $(OBJS) -o $@ $(LDLIBS) $(CTFMERGE_HOOK)
 	$(POST_PROCESS)
 
-install: $(ROOTCMD)
+install: $(ROOTCMD) $(ROOTLOCDIR) $(ROOTCFGFILES)
 
 check:  $(SRCS) $(HEADERS)
 	$(CSTYLE) -cpP $(SRCS) $(HEADERS)
 
-$(ROOTCMD): $(PROG)
+$(ROOTCMD): all
 
 clean:
 	$(RM) $(OBJS)
 
 lint:	lint_SRCS
+
+$(ROOTCFGDIR):
+	$(INS.dir)
+
+$(ROOTLOCDIR): $(ROOTCFGDIR)
+	$(INS.dir)
+
+$(LOCDIRS): $(ROOTLOCDIR)
+	$(INS.dir) 
+
+$(ROOTLOCDIR)/%: $(ROOTLOCDIR) %
+	$(INS.file)
+
+$(NONETLOCDIR)/%: $(NONETLOCDIR) %
+	$(INS.file)
 
 include		../../../Makefile.targ
 include		../../Makefile.msg

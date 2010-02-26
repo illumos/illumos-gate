@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -40,7 +40,7 @@ LDLIBS += $(ZLAZYLOAD) -lrstp $(ZNOLAZYLOAD)
 # For headers from librstp.
 LINTFLAGS +=	-erroff=E_TRAILING_COMMA_IN_ENUM
 
-$(ROOTCFGDIR)/secobj.conf := FILEMODE= 600
+$(ROOTCFGDIR)/secobj.conf := FILEMODE= 660
 
 lint :=	ZLAZYLOAD=
 lint :=	ZNOLAZYLOAD=

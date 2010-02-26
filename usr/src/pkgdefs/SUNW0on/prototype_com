@@ -256,6 +256,7 @@ f none usr/lib/help/auths/locale/SmfModifyFramework.html 444 root bin
 f none usr/lib/help/auths/locale/SmfModifyHeader.html 444 root bin
 f none usr/lib/help/auths/locale/SmfModifyMethod.html 444 root bin
 f none usr/lib/help/auths/locale/SmfIPsecStates.html 444 root bin
+f none usr/lib/help/auths/locale/SmfLocationStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfNscdStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfNADDStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfNWAMStates.html 444 root bin
@@ -291,7 +292,10 @@ f none usr/lib/help/auths/locale/AuthReadSMB.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueVscan.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueVt.html 444 root bin
 f none usr/lib/help/auths/locale/SmfWpaStates.html 444 root bin
-f none usr/lib/help/auths/locale/NetworkAutoconf.html 444 root bin
+f none usr/lib/help/auths/locale/NetworkAutoconfRead.html 444 root bin
+f none usr/lib/help/auths/locale/NetworkAutoconfSelect.html 444 root bin
+f none usr/lib/help/auths/locale/NetworkAutoconfWlan.html 444 root bin
+f none usr/lib/help/auths/locale/NetworkAutoconfWrite.html 444 root bin
 f none usr/lib/help/auths/locale/NetworkHeader.html 444 root bin
 f none usr/lib/help/auths/locale/NetworkILBconf.html 444 root bin
 f none usr/lib/help/auths/locale/NetworkILBenable.html 444 root bin
@@ -335,6 +339,8 @@ f none usr/lib/help/auths/locale/SysPowerMgmtSuspendtoDisk.html 444 root bin
 f none usr/lib/help/auths/locale/SysPowerMgmtSuspendtoRAM.html 444 root bin
 f none usr/lib/help/auths/locale/SysPowerMgmtBrightness.html 444 root bin
 f none usr/lib/help/auths/locale/SysCpuPowerMgmt.html 444 root bin
+f none usr/lib/help/auths/locale/SysSyseventRead.html 444 root bin
+f none usr/lib/help/auths/locale/SysSyseventWrite.html 444 root bin
 f none usr/lib/help/auths/locale/SmfManageZFSSnap.html 444 root bin
 f none usr/lib/help/auths/locale/MMSHeader.html 0444 root bin
 f none usr/lib/help/auths/locale/AuthMMSMedia.html 0444 root bin
@@ -378,7 +384,8 @@ f none usr/lib/help/profiles/locale/RtMediaCtlg.html 444 root bin
 f none usr/lib/help/profiles/locale/RtMediaRestore.html 444 root bin
 f none usr/lib/help/profiles/locale/RtNameServiceAdmin.html 444 root bin
 f none usr/lib/help/profiles/locale/RtNameServiceSecure.html 444 root bin
-f none usr/lib/help/profiles/locale/RtNetAutoconf.html 444 root bin
+f none usr/lib/help/profiles/locale/RtNetAutoconfAdmin.html 444 root bin
+f none usr/lib/help/profiles/locale/RtNetAutoconfUser.html 444 root bin
 f none usr/lib/help/profiles/locale/RtNetILB.html 444 root bin
 f none usr/lib/help/profiles/locale/RtNetIPsec.html 444 root bin
 f none usr/lib/help/profiles/locale/RtNetMngmnt.html 444 root bin

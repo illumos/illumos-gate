@@ -16,6 +16,7 @@ smmsp::25:
 gdm::50:
 upnp::52:
 xvm::60:
+netadm::65:
 mysql::70:
 openldap::75:
 webservd::80:

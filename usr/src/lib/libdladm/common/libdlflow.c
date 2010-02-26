@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,7 +57,7 @@
 
 #define	DLADM_FLOW_DB_PERMS	S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH
 #define	DLADM_FLOW_DB_OWNER	UID_DLADM
-#define	DLADM_FLOW_DB_GROUP	GID_SYS
+#define	DLADM_FLOW_DB_GROUP	GID_NETADM
 
 #define	BLANK_LINE(s)	((s[0] == '\0') || (s[0] == '#') || (s[0] == '\n'))
 #define	MAXLINELEN	1024

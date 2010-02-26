@@ -334,6 +334,7 @@ MSGSUBDIRS=		\
 	libinetutil	\
 	libinstzones	\
 	libnsl		\
+	libnwam		\
 	libpam		\
 	libpicl		\
 	libpool		\
@@ -593,7 +594,6 @@ libiscsit:	libc libnvpair libstmf libuuid libnsl
 libkmf:		libcryptoutil pkcs11
 libnsl:		libmd5 libscf
 libmapid:	libresolv
-libnwam:	libdoor
 librdc:		libsocket libnsl libnsctl libunistat libdscfg
 libuuid:	libdlpi
 $(CLOSED_BUILD)libike:	libipsecutil libxnet libcryptoutil
@@ -601,6 +601,7 @@ libinetutil:	libsocket
 libipsecutil:	libtecla libsocket
 libinstzones:	libzonecfg libcontract
 libpkg:		libwanboot libscf libadm
+libnwam:	libscf
 libsecdb:	libnsl
 libsasl:	libgss libsocket pkcs11 libmd
 sasl_plugins:	pkcs11 libgss libsocket libsasl
@@ -611,6 +612,7 @@ libsmbfs:	libsocket libnsl libkrb5
 libsocket:	libnsl
 libstmfproxy: 	libstmf libsocket libnsl libpthread
 libsum: 	libast
+libsysevent:	libsecdb
 libldap5:	libsasl libsocket libnsl libmd
 libsldap:	libldap5 libtsol libnsl libc libscf libresolv
 libpool:	libnvpair libexacct

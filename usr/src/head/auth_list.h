@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * This is an internal header file. Not to be shipped.
@@ -37,6 +37,10 @@ extern "C" {
  * Names of authorizations currently in use in the system
  */
 
+#define	AUTOCONF_READ_AUTH	"solaris.network.autoconf.read"
+#define	AUTOCONF_SELECT_AUTH	"solaris.network.autoconf.select"
+#define	AUTOCONF_WLAN_AUTH	"solaris.network.autoconf.wlan"
+#define	AUTOCONF_WRITE_AUTH	"solaris.network.autoconf.write"
 #define	CDRW_AUTH		"solaris.device.cdrw"
 #define	CRONADMIN_AUTH		"solaris.jobs.admin"
 #define	CRONUSER_AUTH		"solaris.jobs.user"
@@ -44,7 +48,6 @@ extern "C" {
 #define	DEVICE_REVOKE_AUTH	"solaris.device.revoke"
 #define	LINK_SEC_AUTH		"solaris.network.link.security"
 #define	MAILQ_AUTH		"solaris.mail.mailq"
-#define	NET_AUTOCONF_AUTH	"solaris.network.autoconf"
 #define	NET_ILB_CONFIG_AUTH	"solaris.network.ilb.config"
 #define	NET_ILB_ENABLE_AUTH	"solaris.network.ilb.enable"
 #define	SET_DATE_AUTH		"solaris.system.date"
@@ -71,6 +74,8 @@ extern "C" {
 #define	PRINT_UNLABELED_AUTH	"solaris.print.unlabeled"
 #define	SHUTDOWN_AUTH		"solaris.system.shutdown"
 #define	SYS_ACCRED_SET_AUTH	"solaris.label.range"
+#define	SYSEVENT_READ_AUTH	"solaris.system.sysevent.read"
+#define	SYSEVENT_WRITE_AUTH	"solaris.system.sysevent.write"
 #define	WIN_DOWNGRADE_SL_AUTH	"solaris.label.win.downgrade"
 #define	WIN_UPGRADE_SL_AUTH	"solaris.label.win.upgrade"
 

@@ -1271,3 +1271,6 @@ usr/lib/llib-lvrrpadm.ln		i386
 usr/lib/amd64/libvrrpadm.so		i386
 usr/lib/amd64/llib-lvrrpadm.ln		i386
 usr/lib/llib-lvrrpadm			i386
+
+# Private/Internal NWAM header file.  Do not ship.
+usr/include/libnwam_priv.h		i386

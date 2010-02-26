@@ -20,14 +20,27 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
+IPFILTER_FMRI="svc:/network/ipfilter:default"
 ETC_IPF_DIR=/etc/ipf
-IP6FILCONF=$ETC_IPF_DIR/ipf6.conf
-IPNATCONF=$ETC_IPF_DIR/ipnat.conf
-IPPOOLCONF=$ETC_IPF_DIR/ippool.conf
+IP6FILCONF=`/usr/bin/svcprop -p config/ipf6_config_file $IPFILTER_FMRI \
+    2>/dev/null`
+if [ $? -eq 1 ]; then
+	IP6FILCONF=$ETC_IPF_DIR/ipf6.conf
+fi
+IPNATCONF=`/usr/bin/svcprop -p config/ipnat_config_file $IPFILTER_FMRI \
+    2>/dev/null`
+if [ $? -eq 1 ]; then
+	IPNATCONF=$ETC_IPF_DIR/ipnat.conf
+fi
+IPPOOLCONF=`/usr/bin/svcprop -p config/ippool_config_file $IPFILTER_FMRI \
+    2>/dev/null`
+if [ $? -eq 1 ]; then
+	IPPOOLCONF=$ETC_IPF_DIR/ippool.conf
+fi
 VAR_IPF_DIR=/var/run/ipf
 IPFILCONF=$VAR_IPF_DIR/ipf.conf
 IPFILOVRCONF=$VAR_IPF_DIR/ipf_ovr.conf

@@ -19,9 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -48,11 +47,11 @@ i i.dhcpagent
 # SUNWcnetr
 #
 d none etc 755 root sys
-d none etc/dladm 755 dladm sys
-e preserve etc/dladm/secobj.conf 600 dladm sys
-e preserve etc/dladm/datalink.conf 644 dladm sys
-e preserve etc/dladm/flowadm.conf 644 dladm sys
-e preserve etc/dladm/flowprop.conf 644 dladm sys
+d none etc/dladm 755 dladm netadm
+e preserve etc/dladm/secobj.conf 660 dladm netadm
+e preserve etc/dladm/datalink.conf 644 dladm netadm
+e preserve etc/dladm/flowadm.conf 644 dladm netadm
+e preserve etc/dladm/flowprop.conf 644 dladm netadm
 d none etc/default 755 root sys
 e dhcpagent etc/default/dhcpagent 644 root sys
 e preserve etc/default/inetinit 644 root sys
@@ -71,6 +70,13 @@ e preserve etc/inet/secret/ike.preshared 600 root sys
 d none etc/inet/secret/ike.privatekeys 700 root sys
 f none etc/inet/secret/ipseckeys.sample 600 root sys
 e sock2path etc/inet/sock2path 644 root sys
+d none etc/nwam 755 netadm netadm
+d none etc/nwam/loc 755 netadm netadm
+e preserve etc/nwam/loc/create_loc_auto 644 netadm netadm
+e preserve etc/nwam/loc/create_loc_nonet 644 netadm netadm
+d none etc/nwam/loc/NoNet 755 netadm netadm
+e preserve etc/nwam/loc/NoNet/ipf.conf.dfl 644 netadm netadm
+e preserve etc/nwam/loc/NoNet/ipf6.conf.dfl 644 netadm netadm
 s none etc/sock2path=./inet/sock2path
 d none sbin 755 root sys
 f none sbin/dladm 555 root bin

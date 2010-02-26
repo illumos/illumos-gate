@@ -1,0 +1,40 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+# Start by blocking everything.
+block in log all
+block out log all
+
+# Allow loopback traffic
+pass in quick on lo0
+pass out quick on lo0
+
+# Allow DHCP: in to client port, out to server port
+pass in quick proto udp from any to any port = 546
+pass out quick proto udp from any to any port = 547
+
+# Allow ICMP for IPv6 for Neighbor advertisements
+pass in quick proto ipv6-icmp from any to any
+pass out quick proto ipv6-icmp from any to any

@@ -27,20 +27,486 @@
 . /lib/svc/share/smf_include.sh
 . /lib/svc/share/net_include.sh
 
+# FMRI constants
+IPSEC_IKE_FMRI="svc:/network/ipsec/ike"
+IPSEC_POLICY_FMRI="svc:/network/ipsec/policy"
+IPFILTER_FMRI="svc:/network/ipfilter:default"
+NIS_CLIENT_FMRI="svc:/network/nis/client:default"
+NET_PHYS_FMRI="svc:/network/physical:default"
+NET_NWAM_FMRI="svc:/network/physical:nwam"
+NET_LOC_FMRI="svc:/network/location:default"
+
 #
-# In a shared-IP zone we need this service to be up, but all of the work
-# it tries to do is irrelevant (and will actually lead to the service
-# failing if we try to do it), so just bail out.
-# In the global zone and exclusive-IP zones we proceed.
+# Default *.conf files
+# Set appropriate config SMF property to these files when NWAM is stopped
+# and corresponding config properties in the Legacy location are emtpy
 #
-smf_configure_ip || exit $SMF_EXIT_OK
+IPF6_DEFAULT_CONFIG_FILE=/etc/ipf/ipf6.conf
+IPNAT_DEFAULT_CONFIG_FILE=/etc/ipf/ipnat.conf
+IPPOOL_DEFAULT_CONFIG_FILE=/etc/ipf/ippool.conf
+IPSEC_IKE_DEFAULT_CONFIG_FILE=/etc/inet/ike/config
+IPSEC_POLICY_DEFAULT_CONFIG_FILE=/etc/inet/ipsecinit.conf
+
+# commands
+BASENAME=/usr/bin/basename
+CAT=/usr/bin/cat
+CP=/usr/bin/cp
+DOMAINNAME=/usr/bin/domainname
+GREP=/usr/bin/grep
+LDAPCLIENT=/usr/sbin/ldapclient
+MKDIR=/usr/bin/mkdir
+MKFIFO=/usr/bin/mkfifo
+NAWK=/usr/bin/nawk
+NWAMCFG=/usr/sbin/nwamcfg
+RM=/usr/bin/rm
+SVCADM=/usr/sbin/svcadm
+SVCCFG=/usr/sbin/svccfg
+SVCPROP=/usr/bin/svcprop
+
+# Path to directories
+# We don't have a writable file system so we write to /etc/svc/volatile and
+# then later copy anything interesting to /etc/nwam.
+LEGACY_PATH=/etc/svc/volatile/nwam/Legacy
+NIS_BIND_PATH=/var/yp/binding
+
+#
+# copy_to_legacy_loc <file>
+#
+# Copies the file to the Legacy location directory
+#
+copy_to_legacy_loc() {
+	$MKDIR -p $LEGACY_PATH
+	if [ -f "$1" ]; then
+		$CP -p $1 $LEGACY_PATH
+	fi
+}
+
+#
+# copy_from_legacy_loc <destination file>
+#
+# Copies file with the same name from Legacy location to the given
+# destination file
+#
+copy_from_legacy_loc () {
+	DEST_DIR=`/usr/bin/dirname $1`
+	SRC_FILE="$LEGACY_PATH/`$BASENAME $1`"
+
+	# Make destination directory if needed
+	if [ ! -d "$DEST_DIR" ]; then
+		$MKDIR -p $DEST_DIR
+	fi
+
+	if [ -f "$SRC_FILE" ]; then
+		$CP -p $SRC_FILE $DEST_DIR
+	fi
+}
+
+#
+# write_loc_prop <property> <value> <file>
+#
+# Appends to <file> a nwamcfg command to set <property> to <value> if non-empty
+#
+write_loc_prop () {
+	prop=$1
+	val=$2
+	file=$3
+
+	if [ -n "$val" -a -n "$file" ]; then
+		echo "set $prop=$val" >> $file
+	fi
+}
+
+#
+# set_smf_prop <fmri> <property name> <property value>
+#
+set_smf_prop () {
+	$SVCCFG -s $1 setprop $2 = astring: "$3" && return
+}
+
+#
+# get_smf_prop <fmri> <property name>
+#
+get_smf_prop () {
+	$SVCPROP -p $2 $1
+}
+
+#
+# Creates Legacy location from the current configuration
+#
+create_legacy_loc () {
+	CREATE_LOC_LEGACY_FILE=/etc/svc/volatile/nwam/create_loc_legacy
+
+	#
+	# Write nwamcfg commands to create Legacy location to
+	# $CREATE_LOC_LEGACY_FILE as values for properties are determined
+	# Note that some of the *_CONFIG_FILE variables point at copies of
+	# files we've made and others indicate where those copies should be
+	# if we are enabling the location.
+	#
+	echo "create loc Legacy" > $CREATE_LOC_LEGACY_FILE
+	write_loc_prop "activation-mode" "system" $CREATE_LOC_LEGACY_FILE
+
+	NAMESERVICES=""
+	NAMESERVICES_CONFIG_FILE=""
+	DNS_NAMESERVICE_CONFIGSRC=""
+	DNS_NAMESERVICE_DOMAIN=""
+	DNS_NAMESERVICE_SERVERS=""
+	DNS_NAMESERVICE_SEARCH=""
+	NIS_NAMESERVICE_CONFIGSRC=""
+	NIS_NAMESERVICE_SERVERS=""
+	LDAP_NAMESERVICE_CONFIGSRC=""
+	LDAP_NAMESERVICE_SERVERS=""
+	DEFAULT_DOMAIN=""
+
+	# Copy /etc/nsswitch.conf file
+	copy_to_legacy_loc /etc/nsswitch.conf
+	NAMESERVICES_CONFIG_FILE="$LEGACY_PATH/nsswitch.conf"
+	
+	# Gather DNS info from resolv.conf if present.
+	if [ -f /etc/resolv.conf ]; then
+		NAMESERVICES="dns,"
+		$GREP -i "added by dhcp" /etc/nsswitch.conf >/dev/null
+		if [ $? -eq 0 ]; then
+			DNS_NAMESERVICE_CONFIGSRC="dhcp"
+		else
+			DNS_NAMESERVICE_CONFIGSRC="manual"
+			DNS_NAMESERVICE_DOMAIN=`$NAWK '$1 == "domain" {\
+			    print $2 }' < /etc/resolv.conf`
+			DNS_NAMESERVICE_SERVERS=`$NAWK '$1 == "nameserver" \
+			    { printf "%s,", $2 }' < /etc/resolv.conf`
+			DNS_NAMESERVICE_SEARCH=`$NAWK '$1 == "search" \
+			    { printf "%s,", $2 }' < /etc/resolv.conf`
+			copy_to_legacy_loc /etc/resolv.conf
+		fi
+	fi
+
+	# Gather NIS info from appropriate file if present.
+	if service_is_enabled $NIS_CLIENT_FMRI; then
+		NAMESERVICES="${NAMESERVICES}nis,"
+		NIS_NAMESERVICE_CONFIGSRC="manual"
+		DEFAULT_DOMAIN=`$CAT /etc/defaultdomain`
+
+		yp_servers=`$NAWK '{ printf "%s ", $1 }' \
+		    < $NIS_BIND_PATH/$DEFAULT_DOMAIN/ypservers`
+		for serv in $yp_servers; do
+			if is_valid_addr $serv; then
+				addr="$serv,"
+			else
+				addr=`$GREP -iw $serv /etc/inet/hosts | \
+				    $NAWK '{ printf "%s,", $1 }'`
+			fi
+			NIS_NAMESERVICE_SERVERS="${NIS_NAMESERVICE_SERVERS}$addr"
+		done
+	fi
+
+	# Gather LDAP info via ldapclient(1M).
+	if [ -f /var/ldap/ldap_client_file ]; then
+		copy_to_legacy /var/ldap/ldap_client_file
+		NAMESERVICES="${NAMESERVICES}ldap,"
+		LDAP_NAMESERVICE_CONFIGSRC="manual"
+		LDAP_NAMESERVICE_SERVERS=`$LDAPCLIENT list 2>/dev/null | \
+		    $NAWK '$1 == "preferredServerList:" { print $2 }'`
+		DEFAULT_DOMAIN=`$CAT /etc/defaultdomain`
+	fi
+
+	# Now, write nwamcfg commands for nameservices
+	write_loc_prop "nameservices" $NAMESERVICES $CREATE_LOC_LEGACY_FILE
+ 	write_loc_prop "nameservices-config-file" $NAMESERVICES_CONFIG_FILE \
+ 	    $CREATE_LOC_LEGACY_FILE
+	write_loc_prop "dns-nameservice-configsrc" $DNS_NAMESERVICE_CONFIGSRC \
+	    $CREATE_LOC_LEGACY_FILE
+	write_loc_prop "dns-nameservice-domain" $DNS_NAMESERVICE_DOMAIN \
+ 	    $CREATE_LOC_LEGACY_FILE
+	write_loc_prop "dns-nameservice-servers" $DNS_NAMESERVICE_SERVERS \
+	    $CREATE_LOC_LEGACY_FILE
+	write_loc_prop "dns-nameservice-search" $DNS_NAMESERVICE_SEARCH \
+	    $CREATE_LOC_LEGACY_FILE
+	write_loc_prop "nis-nameservice-configsrc" $NIS_NAMESERVICE_CONFIGSRC \
+	    $CREATE_LOC_LEGACY_FILE
+	write_loc_prop "nis-nameservice-servers" $NIS_NAMESERVICE_SERVERS \
+	    $CREATE_LOC_LEGACY_FILE
+	write_loc_prop "ldap-nameservice-configsrc" $LDAP_NAMESERVICE_CONFIGSRC\
+	    $CREATE_LOC_LEGACY_FILE
+	write_loc_prop "ldap-nameservice-servers" $LDAP_NAMESERVICE_SERVERS \
+	    $CREATE_LOC_LEGACY_FILE
+	write_loc_prop "default-domain" $DEFAULT_DOMAIN $CREATE_LOC_LEGACY_FILE
+
+	# Retrieve NFSv4 domain.
+	if [ -f /etc/default/nfs ]; then
+		copy_to_legacy_loc /etc/default/nfs
+		NFS_DOMAIN=`$NAWK '/^NFSMAPID_DOMAIN.*/ { FS="=" ; print $2 }' \
+		    < /etc/default/nfs`
+		write_loc_prop "nfsv4-domain" \
+		    $NFS_DOMAIN $CREATE_LOC_LEGACY_FILE
+	fi
+
+	IPF_CONFIG_FILE=""
+	IPF6_CONFIG_FILE=""
+	IPNAT_CONFIG_FILE=""
+	IPPOOL_CONFIG_FILE=""
+	IKE_CONFIG_FILE=""
+	IPSEC_POLICY_CONFIG_FILE=""
+
+	#
+	# IPFilter
+	#
+	# If the firewall policy is "custom", simply copy the
+	# custom_policy_file.  If the firewall policy is "none", "allow" or
+	# "deny", save the value as "/<value>".  When reverting back to the
+	# Legacy location, these values will have to be treated as special.
+	#
+	# For all configuration files, copy them to the Legacy directory.
+	# Use the respective properties to remember the original locations
+	# of the files so that they can be copied back there when NWAM is
+	# stopped.
+	#
+	if service_is_enabled $IPFILTER_FMRI; then
+		FIREWALL_POLICY=`get_smf_prop $IPFILTER_FMRI \
+		    firewall_config_default/policy`
+		if [ "$FIREWALL_POLICY" = "custom" ]; then
+			IPF_CONFIG_FILE=`get_smf_prop $IPFILTER_FMRI \
+			    firewall_config_default/custom_policy_file`
+			copy_to_legacy_loc $IPF_CONFIG_FILE
+		else
+			# save value as /none, /allow, or /deny
+			IPF_CONFIG_FILE="/$FIREWALL_POLICY"
+		fi
+		IPF6_CONFIG_FILE=`get_smf_prop $IPFILTER_FMRI \
+		    config/ipf6_config_file`
+		copy_to_legacy_loc $IPF6_CONFIG_FILE
+
+		IPNAT_CONFIG_FILE=`get_smf_prop $IPFILTER_FMRI \
+		    config/ipnat_config_file`
+		copy_to_legacy_loc $IPNAT_CONFIG_FILE
+
+		IPPOOL_CONFIG_FILE=`get_smf_prop $IPFILTER_FMRI \
+		    config/ippool_config_file`
+		copy_to_legacy_loc $IPPOOL_CONFIG_FILE
+	fi
+
+	# IKE
+	if service_is_enabled $IPSEC_IKE_FMRI:default; then
+		IKE_CONFIG_FILE=`get_smf_prop $IPSEC_IKE_FMRI config/config_file`
+		copy_to_legacy_loc $IKE_CONFIG_FILE
+	fi
+
+	# IPsec
+	if service_is_enabled $IPSEC_POLICY_FMRI:default; then
+		IPSEC_POLICY_CONFIG_FILE=`get_smf_prop $IPSEC_POLICY_FMRI \
+		    config/config_file`
+		copy_to_legacy_loc $IPSEC_POLICY_CONFIG_FILE
+	fi
+
+	if [ -n "$IPF_CONFIG_FILE" -a \( "$IPF_CONFIG_FILE" = "/allow" \
+	    -o "$IPF_CONFIG_FILE" = "/deny" -o "$IPF_CONFIG_FILE" = "/none" \
+	    -o -f "$IPF_CONFIG_FILE" \) ]; then
+		write_loc_prop "ipfilter-config-file" $IPF_CONFIG_FILE \
+		    $CREATE_LOC_LEGACY_FILE
+	fi
+	if [ -n "$IPF6_CONFIG_FILE" -a -f "$IPF6_CONFIG_FILE" ]; then
+		write_loc_prop "ipfilter-v6-config-file" $IPF6_CONFIG_FILE \
+		    $CREATE_LOC_LEGACY_FILE
+	fi
+	if [ -n "$IPNAT_CONFIG_FILE" -a -f "$IPNAT_CONFIG_FILE" ]; then
+		write_loc_prop "ipnat-config-file" $IPNAT_CONFIG_FILE \
+		    $CREATE_LOC_LEGACY_FILE
+	fi   
+	if [ -n "$IPPOOL_CONFIG_FILE" -a -f "$IPPOOL_CONFIG_FILE" ]; then
+		write_loc_prop "ippool-config-file" $IPPOOL_CONFIG_FILE \
+		    $CREATE_LOC_LEGACY_FILE
+	fi
+	if [ -n "$IKE_CONFIG_FILE" -a -f "$IKE_CONFIG_FILE" ]; then
+		write_loc_prop "ike-config-file" $IKE_CONFIG_FILE \
+		    $CREATE_LOC_LEGACY_FILE
+	fi
+	if [ -n "$IPSEC_POLICY_CONFIG_FILE" -a -f "$IPSEC_POLICY_CONFIG_FILE" ]
+	then
+		write_loc_prop "ipsecpolicy-config-file" \
+		    $IPSEC_POLICY_CONFIG_FILE $CREATE_LOC_LEGACY_FILE
+	fi
+
+	# End
+	echo "end" >> $CREATE_LOC_LEGACY_FILE
+	# network/location will create the Legacy location with these commands.
+}
+
+#
+# Undoes the effects of the Legacy location creation
+#
+revert_to_legacy_loc () {
+	$SVCADM disable dns/client
+	$SVCADM disable nis/client
+	$SVCADM disable ldap/client
+
+	# copy nsswitch.conf to /etc/nsswitch.conf
+	copy_from_legacy_loc /etc/nsswitch.conf
+
+	# DNS - copy resolv.conf to /etc/resolv.conf
+	if [ -f "$LEGACY_PATH/resolv.conf" ]; then
+		copy_from_legacy_loc /etc/resolv.conf
+	        $SVCADM enable dns/client
+	fi
+
+	# set /etc/defaultdomain and domainname(1M)
+	DEFAULT_DOMAIN=`nwam_get_loc_prop Legacy default-domain`
+	if [ -n "$DEFAULT_DOMAIN" ]; then
+		$DOMAINNAME $DEFAULT_DOMAIN
+		$DOMAINNAME > /etc/defaultdomain
+	fi
+
+	# NIS - directory and ypserver in /var/yp/binding/
+	NIS_CONFIGSRC=`nwam_get_loc_prop Legacy nis-nameservice-configsrc`
+	NIS_SERVERS=`nwam_get_loc_prop Legacy nis-nameservice-servers`
+	if [ -n "$NIS_CONFIGSRC" ]; then
+		if [ ! -d "$NIS_BIND_PATH/$DEFAULT_DOMAIN" ]; then
+			$MKDIR -p $NIS_BIND_PATH/$DEFAULT_DOMAIN
+		fi
+		if [ -n "$NIS_SERVERS" ]; then
+			echo "$NIS_SERVERS" | $NAWK \
+			    'FS="," { for (i = 1; i <= NF; i++) print $i }' \
+			    > $NIS_BIND_PATH/$DEFAULT_DOMAIN/ypservers
+		fi
+		$SVCADM enable nis/client
+	fi
+
+	# LDAP - copy ldap_client_file to /var/ldap/ldap_client_file
+	if [ -f "$LEGACY_PATH/ldap_client_file" ]; then
+		copy_from_legacy_loc /var/ldap/ldap_client_file
+		$SVCADM enable ldap/client
+	fi
+
+	# Copy back nfs file
+        copy_from_legacy_loc /etc/default/nfs
+
+	# IPFilter, IPsec, and IKE
+	ipf_file=`nwam_get_loc_prop Legacy ipfilter-config-file`
+	ipf6_file=`nwam_get_loc_prop Legacy ipfilter-v6-config-file`
+	ipnat_file=`nwam_get_loc_prop Legacy ipnat-config-file`
+	ippool_file=`nwam_get_loc_prop Legacy ippool-config-file`
+	ike_file=`nwam_get_loc_prop Legacy ike-config-file`
+	pol_file=`nwam_get_loc_prop Legacy ipsecpolicy-config-file`
+
+	if [ -n "$ike_file" ]; then
+		copy_from_legacy_loc $ike_file
+		set_smf_prop $IPSEC_IKE_FMRI config/config_file $ike_file
+		$SVCADM refresh $IPSEC_IKE_FMRI
+		$SVCADM enable $IPSEC_IKE_FMRI
+	else
+		set_smf_prop $IPSEC_IKE_FMRI config/config_file \
+		    $IPSEC_IKE_DEFAULT_CONFIG_FILE
+		$SVCADM disable $IPSEC_IKE_FMRI
+	fi
+	if [ -n "$pol_file" ]; then
+		copy_from_legacy_loc $pol_file
+		set_smf_prop $IPSEC_POLICY_FMRI config/config_file $pol_file
+		$SVCADM refresh $IPSEC_POLICY_FMRI
+		$SVCADM enable $IPSEC_POLICY_FMRI
+	else
+		set_smf_prop $IPSEC_POLICY_FMRI config/config_file \
+		    $IPSEC_POLICY_DEFAULT_CONFIG_FILE
+		$SVCADM disable $IPSEC_POLICY_FMRI
+	fi
+
+	refresh_ipf=false
+	if [ -n "$ipf_file" ]; then
+		# change /none, /allow, and /deny to firewall policy
+		if [ "$ipf_file" = "/none" -o "$ipf_file" = "/allow" \
+		    -o "$ipf_file" = "/deny" ]; then
+			policy=`echo "$ipf_file" | $NAWK 'FS="/" { print $2 }'`
+			set_smf_prop $IPFILTER_FMRI \
+			    firewall_config_default/policy $policy
+			# no need to clear custom_policy_file as it isn't "custom"
+		else
+			copy_from_legacy_loc $ipf_file
+			set_smf_prop $IPFILTER_FMRI \
+			    firewall_config_default/policy "custom"
+			set_smf_prop $IPFILTER_FMRI \
+			    firewall_config_default/custom_policy_file $ipf_file
+		fi
+		refresh_ipf=true
+	fi
+	if [ -n "$ipf6_file" ]; then
+		copy_from_legacy_loc $ipf6_file
+		set_smf_prop $IPFILTER_FMRI config/ipf6_config_file $ipf6_file
+		refresh_ipf=true
+	else
+		set_smf_prop $IPFILTER_FMRI config/ipf6_config_file \
+		    $IPF6_DEFAULT_CONFIG_FILE
+	fi
+	if [ -n "$ipnat_file" ]; then
+		copy_from_legacy_loc $ipnat_file
+		set_smf_prop $IPFILTER_FMRI config/ipnat_config_file $ipnat_file
+		refresh_ipf=true
+	else
+		set_smf_prop $IPFILTER_FMRI config/ipnat_config_file \
+		    $IPNAT_DEFAULT_CONFIG_FILE
+	fi
+	if [ -n "$ippool_file" ]; then
+		copy_from_legacy_loc $ippool_file
+		set_smf_prop $IPFILTER_FMRI config/ippool_config_file \
+		    $ippool_file
+		refresh_ipf=true
+	else
+		set_smf_prop $IPFILTER_FMRI config/ippool_config_file \
+		    $IPPOOL_DEFAULT_CONFIG_FILE
+	fi
+
+	$SVCADM refresh $IPFILTER_FMRI
+	if [ "$refresh_ipf" = "true" ]; then
+		$SVCADM enable $IPFILTER_FMRI
+	else
+		$SVCADM disable $IPFILTER_FMRI
+	fi
+
+	# Remove the Legacy directory and location
+	$RM -rf $LEGACY_PATH
+	$NWAMCFG destroy loc Legacy
+}
+
+#
+# Script entry point
+#
+# Arguments to net-nwam are
+#       method ( start | refresh | stop | -u | -c )
+#
+
+#
+# Create nwam directory in /etc/svc/volatile
+#
+if [ ! -d /etc/svc/volatile/nwam ]; then
+	$MKDIR -m 0755 /etc/svc/volatile/nwam
+fi
 
 case "$1" in
 'refresh')
 	/usr/bin/pkill -HUP -z `smf_zonename` nwamd
+	#
+	# Enable network/location.  Needed on first boot post-install as
+	# network/location will not exist until after manifest-import runs.
+	#
+	if service_exists $NET_LOC_FMRI ; then
+		$SVCADM enable -t $NET_LOC_FMRI
+	fi
 	;;
 
 'start')
+	# The real daemon is not started in a shared stack zone. But we need to
+	# create a dummy background process to preserve contract lifetime.
+	smf_configure_ip
+	if [ $? = "1" ] ; then 
+		$RM -f /etc/svc/volatile/nwam/nwam_blocked
+		$MKFIFO /etc/svc/volatile/nwam/nwam_blocked
+		($CAT </etc/svc/volatile/nwam/nwam_blocked >/dev/null) &
+		exit $SMF_EXIT_OK
+	fi
+
+	#
+	# Enable network/location.
+	#
+	if service_exists $NET_LOC_FMRI ; then
+		$SVCADM enable -t $NET_LOC_FMRI
+	fi
+
 	if smf_is_globalzone; then
 		net_reconfigure || exit $SMF_EXIT_ERR_CONFIG
 
@@ -64,11 +530,37 @@ case "$1" in
 		# Initialize security objects.
 		/sbin/dladm init-secobj
 
-		# Bring up VNICs, VLANs and flows
+		#
+		# Initialize VNICs, VLANs and flows.  Though they are brought
+		# up here, NWAM will not automatically manage VNICs and VLANs.
+		#
 		/sbin/dladm up-vnic
 		/sbin/dladm up-vlan
+		/sbin/dladm up-aggr
 		/sbin/flowadm init-flow
 	fi
+
+	#
+	# Ensure that the network/netcfg service is running since
+	# manifest-import has not yet run for the first boot after upgrade.
+	# We wouldn't need to do that if manifest-import ran earlier in
+	# boot, since there is an explicit dependency between
+	# network/netcfg and network/physical:nwam.  This is similar to
+	# what network/physical does with network/datalink-management in
+	# net_reconfigure().
+	#
+	$SVCADM enable -ts svc:/network/netcfg:default
+
+	#
+	# We also need to create the Legacy location, which is used
+	# to restore non-NWAM settings that are overwritten when
+	# NWAM is enabled (e.g. resolv.conf, nsswitch.conf, etc.).
+	#
+	$NWAMCFG list loc Legacy >/dev/null 2>&1
+	if [ $? -eq 1 ]; then
+		create_legacy_loc
+	fi
+
 	# start nwamd in foreground; it will daemonize itself
 	if /lib/inet/nwamd ; then
 		exit $SMF_EXIT_OK
@@ -78,7 +570,26 @@ case "$1" in
 	;;
 
 'stop')
+	# We need to make the dummy process we created above stop.
+	smf_configure_ip
+	if [ $? = "1" ] ; then 
+		echo "stop" > /etc/svc/volatile/nwam/nwam_blocked
+		exit $SMF_EXIT_OK
+	fi
+
 	/usr/bin/pkill -z `smf_zonename` nwamd
+
+	#
+	# Restore the non-NWAM settings.
+	#
+	$NWAMCFG list loc Legacy >/dev/null 2>&1
+	if [ $? -eq 1 ]; then
+		echo "No Legacy location to revert to!"
+		exit $SMF_EXIT_OK
+	fi
+	revert_to_legacy_loc
+	# remove the location property group 
+	$SVCCFG -s $NET_LOC_FMRI delpg location
 	;;
 
 '-u')
@@ -87,27 +598,22 @@ case "$1" in
 	# network/physical:nwam will be disabled.
 	# There are various other parts of the system (nscd, nfs) that
 	# depend on continuing to have a working network.  For this
-	# reason we don't change the network configuration immediately.
-	
-	SVCADM=/usr/sbin/svcadm
-	SVCCFG=/usr/sbin/svccfg
-	net_phys=svc:/network/physical:default
-	net_nwam=svc:/network/physical:nwam
-
+	# reason we don't change the network configuration immediately.	
+	#
 	# Disable network/physical temporarily and make sure that will
 	# be enabled on reboot.
-	$SVCADM disable -st $net_phys
-	$SVCCFG -s $net_phys setprop general/enabled=true
+	$SVCADM disable -st $NET_PHYS_FMRI
+	$SVCCFG -s $NET_PHYS_FMRI setprop general/enabled=true
 
 	# If nwam is online then make sure that it's temporarily enabled.
-	nwam_online=`/usr/bin/svcprop -t -p restarter/state $net_nwam`	
+	nwam_online=`$SVCPROP -t -p restarter/state $NET_NWAM_FMRI`	
 	if [ $? -eq 0 ]; then
 		set -- $nwam_online
-		[ $3 = "online" ] && $SVCADM enable -st $net_nwam
+		[ $3 = "online" ] && $SVCADM enable -st $NET_NWAM_FMRI
 	fi
 
 	# Set nwam so that it won't be enabled upon reboot.
-	$SVCCFG -s $net_nwam setprop general/enabled=false
+	$SVCCFG -s $NET_NWAM_FMRI setprop general/enabled=false
 	exit 0
 	;;
 

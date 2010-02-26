@@ -24,85 +24,70 @@
  * Use is subject to license terms.
  */
 
+#include <errno.h>
+#include <fcntl.h>
+#include <inetcfg.h>
+#include <libdllink.h>
+#include <libintl.h>
+#include <libnwam.h>
+#include <locale.h>
+#include <priv.h>
+#include <pthread.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+#include <libnwam.h>
+#include "conditions.h"
+#include "events.h"
+#include "llp.h"
+#include "ncp.h"
+#include "objects.h"
+#include "util.h"
+
 /*
  * nwamd - NetWork Auto-Magic Daemon
  */
 
-#include <fcntl.h>
-#include <priv.h>
-#include <pthread.h>
-#include <pwd.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <signal.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <syslog.h>
-#include <unistd.h>
-#include <locale.h>
-#include <libintl.h>
-#include <errno.h>
-
-#include "defines.h"
-#include "structures.h"
-#include "functions.h"
-#include "variables.h"
-
-#define	TIMESPECGT(x, y)	((x.tv_sec > y.tv_sec) || \
-	    ((x.tv_sec == y.tv_sec) && (x.tv_nsec > y.tv_nsec)))
-
-const char *OUR_FMRI = "svc:/network/physical:nwam";
-const char *OUR_PG = "nwamd";
-
 boolean_t fg = B_FALSE;
-boolean_t shutting_down;
+dladm_handle_t dld_handle = NULL;
+boolean_t shutting_down = B_FALSE;
+
 sigset_t original_sigmask;
 static sigset_t sigwaitset;
-char zonename[ZONENAME_MAX];
-pthread_mutex_t machine_lock = PTHREAD_MUTEX_INITIALIZER;
-dladm_handle_t dld_handle = NULL;
+
+static void nwamd_refresh(void);
+static void graceful_shutdown(void);
 
 /*
  * nwamd
  *
  * This is the Network Auto-Magic daemon.  For further high level information
  * see the Network Auto-Magic project and the Approachability communities
- * on opensolaris.org, and nwamd(1M).
+ * on opensolaris.org, nwamd(1M), and the README in the source directory.
  *
- * The general structure of the code is as a set of threads collecting
- * system events which are fed into a state machine which alters system
- * state based on configuration.
+ * The general structure of the code is as a set of event source threads
+ * which feed events into the event handling thread. Some of these events
+ * are internal-only (e.g UPGRADE), but some also involve propogation
+ * to external listeners (who register via a door call into the daemon).
  *
  * signal management
  * Due to being threaded, a simple set of signal handlers would not work
- * very well for nwamd.  Instead nwamd blocks signals at startup and
- * then starts a thread which sits in sigwait(2) waiting for signals.
- * When a signal is received the signal handling thread dispatches it.
- * It handles:
- * - shutting down, done by creating an event which is passed through the
- *   system allowing the various subsystems to do any necessary cleanup.
- * - SIGALRM for timers.
- * - SIGHUP for instance refresh, which tells us to look up various
- *   properties from SMF(5).
+ * very well for nwamd.  Instead nwamd blocks signals in all but the
+ * signal handling thread at startup.
  *
- * subprocess management
- * nwamd starts several different subprocesses to manage the system.  Some
- * of those start other processes (e.g. `ifconfig <if> dhcp` ends up starting
- * dhcpagent if necessary).  Due to the way we manage signals if we started
- * those up without doing anything special their signal mask would mostly
- * block signals.  So we restore the signal mask when we start subprocesses.
- * This is especially important with respect to DHCP as later when we exit
- * we need to kill the dhcpagent process which we started; for details, see
- * the block comment in state_machine.c in its cleanup() function.
  */
 
 /*
  * In this file there are several utility functions which might otherwise
  * belong in util.c, but since they are only called from main(), they can
  * live here as static functions:
- * - syslog set-up
+ * - nlog set-up
  * - daemonizing
  * - looking up SMF(5) properties
  * - signal handling
@@ -127,23 +112,17 @@ daemonize(void)
 	 * setsid again, we make certain that we are not the session
 	 * group leader and can never reacquire a controlling terminal.
 	 */
-	if ((pid = fork()) == (pid_t)-1) {
-		syslog(LOG_ERR, "fork 1 failed");
-		exit(EXIT_FAILURE);
-	}
+	if ((pid = fork()) == (pid_t)-1)
+		pfail("fork 1 failed");
 	if (pid != 0) {
 		(void) wait(NULL);
-		dprintf("child %ld exited, daemonizing", pid);
+		nlog(LOG_DEBUG, "child %ld exited, daemonizing", pid);
 		_exit(0);
 	}
-	if (setsid() == (pid_t)-1) {
-		syslog(LOG_ERR, "setsid");
-		exit(EXIT_FAILURE);
-	}
-	if ((pid = fork()) == (pid_t)-1) {
-		syslog(LOG_ERR, "fork 2 failed");
-		exit(EXIT_FAILURE);
-	}
+	if (setsid() == (pid_t)-1)
+		pfail("setsid");
+	if ((pid = fork()) == (pid_t)-1)
+		pfail("fork 2 failed");
 	if (pid != 0) {
 		_exit(0);
 	}
@@ -151,112 +130,89 @@ daemonize(void)
 	(void) umask(022);
 }
 
-/*
- * Look up nwamd property values and set daemon variables appropriately.
- * This function will be called on startup and via the signal handling
- * thread on receiving a HUP (which occurs when the nwam service is
- * refreshed).
- */
-static void
-lookup_daemon_properties(void)
-{
-	boolean_t debug_set;
-	uint64_t scan_interval;
-	uint64_t idle_time;
-	boolean_t strict_bssid_set;
-
-	if (lookup_boolean_property(OUR_PG, "debug", &debug_set) == 0)
-		debug = debug_set;
-	if (lookup_count_property(OUR_PG, "scan_interval", &scan_interval) == 0)
-		wlan_scan_interval = scan_interval;
-	if (lookup_count_property(OUR_PG, "idle_time", &idle_time) == 0)
-		door_idle_time = idle_time;
-	if (lookup_boolean_property(OUR_PG, "strict_bssid",
-	    &strict_bssid_set) == 0)
-		strict_bssid = strict_bssid_set;
-	dprintf("Read daemon configuration properties.");
-}
-
 /* ARGSUSED */
 static void *
 sighandler(void *arg)
 {
-	int sig, err;
-	uint32_t now;
+	uint64_t propval;
+	int sig;
+	uid_t uid = getuid();
 
 	while (!shutting_down) {
 		sig = sigwait(&sigwaitset);
-		dprintf("signal %d caught", sig);
+		nlog(LOG_DEBUG, "signal %s caught", strsignal(sig));
+
+		/*
+		 * Signal handling is different if the Phase 1 manifest
+		 * have not been yet been imported.  The two if-statements
+		 * below highlight this.  Signals must be handled
+		 * differently because there is no event handling thread
+		 * and event queue.
+		 *
+		 * When manifest-import imports the Phase 1 manifest, it
+		 * refreshes NWAM.  The NWAM Phase 1 properties must be
+		 * available.  If not, NWAM receveid a signal too soon.
+		 * "ncu_wait_time" is a Phase 1 SMF property that did not
+		 * exist in Phase 0/0.5.
+		 */
+		if (uid == 0 &&
+		    nwamd_lookup_count_property(OUR_FMRI, OUR_PG,
+		    OUR_NCU_WAIT_TIME_PROP_NAME, &propval) != 0) {
+			nlog(LOG_ERR, "WARN: Phase 1 properties not available. "
+			    "Ignoring signal ...");
+			continue;
+		}
+
+		/*
+		 *  The Phase 1 manifest has been imported.  If the
+		 *  "version" property exists (it is added by nwamd upon
+		 *  upgrade to Phase 1), then it means that we have already
+		 *  successfully run nwam before.  If it doesn't, then we
+		 *  arrived here just after the new manifest was imported.
+		 *  manifest-import refreshes nwam after the import.  Exit
+		 *  nwamd so that svc.startd(1M) can start nwamd correctly
+		 *  as specified in the imported manifest.
+		 */
+		if (uid == 0 &&
+		    nwamd_lookup_count_property(OUR_FMRI, OUR_PG,
+		    OUR_VERSION_PROP_NAME, &propval) != 0) {
+			if (sig == SIGHUP) {
+				pfail("WARN: Phase 1 properties available, "
+				    "but NWAM has not been upgraded.  "
+				    "Exiting to let svc.startd restart NWAM");
+			} else {
+				nlog(LOG_ERR, "WARN: Ignoring signal as NWAM "
+				    "has not been upgraded yet");
+				continue;
+			}
+		}
+
 		switch (sig) {
-		case SIGALRM:
-			/*
-			 * We may have multiple interfaces with
-			 * scheduled timers; walk the list and
-			 * create a timer event for each one.
-			 */
-			timer_expire = TIMER_INFINITY;
-			now = NSEC_TO_SEC(gethrtime());
-			check_interface_timers(now);
-			check_door_life(now);
-			break;
+		case SIGTHAW:
 		case SIGHUP:
 			/*
-			 * Refresh action - reread configuration properties.
+			 * Resumed from suspend or refresh.  Clear up all
+			 * objects so their states start from scratch;
+			 * then refresh().
 			 */
-			lookup_daemon_properties();
-			/*
-			 * Check if user restarted scanning.
-			 */
-			if (scan == 0 && wlan_scan_interval != 0) {
-				err = pthread_create(&scan, NULL,
-				    periodic_wireless_scan, NULL);
-				if (err != 0) {
-					syslog(LOG_NOTICE,
-					    "pthread_create wireless scan: %s",
-					    strerror(err));
-				} else {
-					dprintf("wireless scan thread: %d",
-					    scan);
-				}
-			}
+			nwamd_fini_enms();
+			nwamd_fini_ncus();
+			nwamd_fini_locs();
+			nwamd_refresh();
 			break;
-		case SIGINT:
+		case SIGUSR1:
 			/*
-			 * Undocumented "print debug status" signal.
+			 * Undocumented "log ncu list" signal.
 			 */
-			print_llp_status();
-			print_interface_status();
-			print_wireless_status();
-			break;
-		case SIGTHAW:
-			/*
-			 * It seems unlikely that this is helpful, but it can't
-			 * hurt: when waking up from a sleep, check if the
-			 * wireless interface is still viable.  There've been
-			 * bugs in this area.
-			 */
-			if (pthread_mutex_lock(&machine_lock) == 0) {
-				if (link_layer_profile != NULL &&
-				    link_layer_profile->llp_type ==
-				    IF_WIRELESS) {
-					wireless_verify(
-					    link_layer_profile->llp_lname);
-				}
-				(void) pthread_mutex_unlock(&machine_lock);
-			}
+			nwamd_log_ncus();
 			break;
 		case SIGTERM:
-			syslog(LOG_NOTICE, "%s received, shutting down",
+			nlog(LOG_DEBUG, "%s received, shutting down",
 			    strsignal(sig));
-			shutting_down = B_TRUE;
-			if (!np_queue_add_event(EV_SHUTDOWN, NULL)) {
-				dprintf("could not allocate shutdown event");
-				cleanup();
-				exit(EXIT_FAILURE);
-			}
+			graceful_shutdown();
 			break;
 		default:
-			syslog(LOG_NOTICE, "unexpected signal %s received; "
+			nlog(LOG_DEBUG, "unexpected signal %s received, "
 			    "ignoring", strsignal(sig));
 			break;
 		}
@@ -271,136 +227,195 @@ init_signalhandling(void)
 	pthread_t sighand;
 	int err;
 
-	/*
-	 * Construct the set of signals that we explicitly want
-	 * to deal with.  These will be blocked now, while we're
-	 * still single-threaded; this block will be inherited by
-	 * all the threads we create.  The signal handling thread
-	 * will then sigwait() this same set of signals, and will
-	 * thus receive and process any that are sent to the process.
-	 */
-	(void) sigemptyset(&sigwaitset);
-	(void) sigaddset(&sigwaitset, SIGHUP);
-	(void) sigaddset(&sigwaitset, SIGINT);
-	(void) sigaddset(&sigwaitset, SIGALRM);
-	(void) sigaddset(&sigwaitset, SIGTERM);
-	(void) sigaddset(&sigwaitset, SIGTHAW);
-	(void) pthread_sigmask(SIG_BLOCK, &sigwaitset, &original_sigmask);
-
-	/*
-	 * now start the signal handling thread...
-	 */
 	(void) pthread_attr_init(&attr);
 	(void) pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 	if (err = pthread_create(&sighand, &attr, sighandler, NULL)) {
-		syslog(LOG_ERR, "pthread_create system: %s", strerror(err));
+		nlog(LOG_ERR, "pthread_create system: %s", strerror(err));
 		exit(EXIT_FAILURE);
 	} else {
-		dprintf("signal handler thread: %d", sighand);
+		nlog(LOG_DEBUG, "signal handler thread: %d", sighand);
 	}
 	(void) pthread_attr_destroy(&attr);
 }
 
+/*
+ * Construct the set of signals that we explicitly want to deal with.
+ * We block these while we're still single-threaded; this block will
+ * be inherited by all the threads we create.  When we are ready to
+ * start handling signals, we will start the signal handling thread,
+ * which will sigwait() this same set of signals, and will thus receive
+ * and handle any that are sent to the process.
+ */
 static void
-change_user_set_privs(void)
+block_signals(void)
 {
-	priv_set_t *priv_set;
+	(void) sigemptyset(&sigwaitset);
+	(void) sigaddset(&sigwaitset, SIGHUP);
+	(void) sigaddset(&sigwaitset, SIGUSR1);
+	(void) sigaddset(&sigwaitset, SIGUSR2);
+	(void) sigaddset(&sigwaitset, SIGTERM);
+	(void) sigaddset(&sigwaitset, SIGTHAW);
+	(void) pthread_sigmask(SIG_BLOCK, &sigwaitset, &original_sigmask);
+}
 
-	priv_set = priv_allocset();
-	if (getppriv(PRIV_PERMITTED, priv_set) == -1) {
-		dprintf("getppriv %s", strerror(errno));
+/*
+ * Look up nwamd property values and set daemon variables appropriately.
+ * This function will be called on startup and via the signal handling
+ * thread on receiving a HUP (which occurs when the nwam service is
+ * refreshed).
+ */
+static void
+lookup_daemon_properties(void)
+{
+	char *active_ncp_tmp;
+	char *scan_level_tmp;
+
+	(void) nwamd_lookup_boolean_property(OUR_FMRI, OUR_PG,
+	    OUR_DEBUG_PROP_NAME, &debug);
+	(void) nwamd_lookup_boolean_property(OUR_FMRI, OUR_PG,
+	    OUR_AUTOCONF_PROP_NAME, &wireless_autoconf);
+	(void) nwamd_lookup_boolean_property(OUR_FMRI, OUR_PG,
+	    OUR_STRICT_BSSID_PROP_NAME, &wireless_strict_bssid);
+
+	(void) pthread_mutex_lock(&active_ncp_mutex);
+	if ((active_ncp_tmp = malloc(NWAM_MAX_NAME_LEN)) == NULL ||
+	    nwamd_lookup_string_property(OUR_FMRI, OUR_PG,
+	    OUR_ACTIVE_NCP_PROP_NAME, active_ncp_tmp, NWAM_MAX_NAME_LEN) != 0) {
+		(void) strlcpy(active_ncp, NWAM_NCP_NAME_AUTOMATIC,
+		    NWAM_MAX_NAME_LEN);
 	} else {
-		char *p;
-
-		p = priv_set_to_str(priv_set, ',', 0);
-		dprintf("started with privs %s", p != NULL ? p : "Unknown");
-		free(p);
+		(void) strlcpy(active_ncp, active_ncp_tmp, NWAM_MAX_NAME_LEN);
 	}
+	(void) pthread_mutex_unlock(&active_ncp_mutex);
+	free(active_ncp_tmp);
 
-	/* always start with the basic set */
-	priv_basicset(priv_set);
-	(void) priv_addset(priv_set, PRIV_FILE_CHOWN_SELF);
-	(void) priv_addset(priv_set, PRIV_FILE_DAC_READ);
-	(void) priv_addset(priv_set, PRIV_FILE_DAC_WRITE);
-	(void) priv_addset(priv_set, PRIV_NET_PRIVADDR);
-	(void) priv_addset(priv_set, PRIV_NET_RAWACCESS);
-	(void) priv_addset(priv_set, PRIV_PROC_AUDIT);
-	(void) priv_addset(priv_set, PRIV_PROC_OWNER);
-	(void) priv_addset(priv_set, PRIV_PROC_SETID);
-	(void) priv_addset(priv_set, PRIV_SYS_CONFIG);
-	(void) priv_addset(priv_set, PRIV_SYS_IP_CONFIG);
-	(void) priv_addset(priv_set, PRIV_SYS_IPC_CONFIG);
-	(void) priv_addset(priv_set, PRIV_SYS_NET_CONFIG);
-	(void) priv_addset(priv_set, PRIV_SYS_RES_CONFIG);
-	(void) priv_addset(priv_set, PRIV_SYS_RESOURCE);
+	if (nwamd_lookup_count_property(OUR_FMRI, OUR_PG,
+	    OUR_CONDITION_CHECK_INTERVAL_PROP_NAME,
+	    &condition_check_interval) != 0)
+		condition_check_interval = CONDITION_CHECK_INTERVAL_DEFAULT;
 
-	if (setppriv(PRIV_SET, PRIV_INHERITABLE, priv_set) == -1) {
-		syslog(LOG_ERR, "setppriv inheritable: %m");
-		priv_freeset(priv_set);
-		exit(EXIT_FAILURE);
+	if ((scan_level_tmp = malloc(NWAM_MAX_NAME_LEN)) == NULL ||
+	    nwamd_lookup_string_property(OUR_FMRI, OUR_PG,
+	    OUR_WIRELESS_SCAN_LEVEL_PROP_NAME, scan_level_tmp,
+	    NWAM_MAX_NAME_LEN) != 0) {
+		wireless_scan_level = WIRELESS_SCAN_LEVEL_DEFAULT;
+	} else {
+		if (dladm_wlan_str2strength(scan_level_tmp,
+		    &wireless_scan_level) != DLADM_STATUS_OK)
+			wireless_scan_level = DLADM_WLAN_STRENGTH_VERY_WEAK;
 	}
+	free(scan_level_tmp);
 
-	if (setppriv(PRIV_SET, PRIV_PERMITTED, priv_set) == -1) {
-		syslog(LOG_ERR, "setppriv permitted: %m");
-		priv_freeset(priv_set);
-		exit(EXIT_FAILURE);
-	}
+	if (nwamd_lookup_count_property(OUR_FMRI, OUR_PG,
+	    OUR_WIRELESS_SCAN_INTERVAL_PROP_NAME, &wireless_scan_interval) != 0)
+		wireless_scan_interval = WIRELESS_SCAN_INTERVAL_DEFAULT;
 
-	if (setppriv(PRIV_SET, PRIV_EFFECTIVE, priv_set) == -1) {
-		syslog(LOG_ERR, "setppriv effective: %m");
-		priv_freeset(priv_set);
-		exit(EXIT_FAILURE);
-	}
+	if (nwamd_lookup_count_property(OUR_FMRI, OUR_PG,
+	    OUR_NCU_WAIT_TIME_PROP_NAME, &ncu_wait_time) != 0)
+		ncu_wait_time = NCU_WAIT_TIME_DEFAULT;
 
-	priv_freeset(priv_set);
+	nlog(LOG_DEBUG, "Read daemon configuration properties.");
+}
+
+/*
+ * Re-read the SMF properties.
+ * Reset ncu priority group (since the NCUs will have to walk
+ *   through their state machines again) and schedule a check
+ * Re-read objects from libnwam.
+ * Also, run condition checking for locations and ENMs.
+ */
+static void
+nwamd_refresh(void)
+{
+	lookup_daemon_properties();
+
+	(void) pthread_mutex_lock(&active_ncp_mutex);
+	current_ncu_priority_group = INVALID_PRIORITY_GROUP;
+	(void) pthread_mutex_unlock(&active_ncp_mutex);
+
+	nwamd_init_ncus();
+	nwamd_init_enms();
+	nwamd_init_locs();
+
+	nwamd_create_ncu_check_event(0);
+	nwamd_create_triggered_condition_check_event(0);
 }
 
 static void
-init_machine_mutex(void)
+graceful_shutdown(void)
 {
-	pthread_mutexattr_t attrs;
+	nwamd_event_t event;
 
-	(void) pthread_mutexattr_init(&attrs);
-	(void) pthread_mutexattr_settype(&attrs, PTHREAD_MUTEX_ERRORCHECK);
-	if (pthread_mutex_init(&machine_lock, &attrs) != 0) {
-		syslog(LOG_ERR, "unable to set up machine lock");
-		exit(EXIT_FAILURE);
-	}
-	(void) pthread_mutexattr_destroy(&attrs);
+	shutting_down = B_TRUE;
+	nwamd_event_sources_fini();
+	nwamd_door_fini();
+	nwamd_fini_enms();
+	nwamd_fini_ncus();
+	nwamd_fini_locs();
+
+	event = nwamd_event_init_shutdown();
+	if (event == NULL)
+		pfail("nwamd could not create shutdown event, exiting");
+	nwamd_event_enqueue(event);
 }
 
 int
 main(int argc, char *argv[])
 {
 	int c;
-	int scan_lev;
-	struct np_event *e;
-	enum np_event_type etype;
+	uint64_t version;
+	nwamd_event_t event;
+	dladm_status_t rc;
+	uid_t uid = getuid();
+
+	/*
+	 * Block the signals we care about (and which might cause us to
+	 * exit based on default disposition) until we're ready to start
+	 * handling them properly...see init_signalhandling() below.
+	 */
+	block_signals();
+
+	/*
+	 * In the first boot after upgrade, manifest-import hasn't run yet.
+	 * Thus, the NWAM Phase 1 SMF properties are not available yet.  In
+	 * Phase 0/0.5, nwamd ran as root.  Thus in this case, just
+	 * daemonize() nwamd.  When manifest-import imports the Phase 1
+	 * manifest, NWAM is refreshed.  Also, setup signal handling to
+	 * catch the refresh signal.  Kill nwamd then and let svc.startd(1M)
+	 * start nwamd again (this time correctly as netadm).
+	 */
+	if (uid == 0) {
+		nlog(LOG_ERR, "Warning: Phase 1 properties not available yet");
+
+		daemonize();
+		init_signalhandling();
+		(void) pause();
+
+		return (EXIT_SUCCESS);
+	}
+
+	if (uid != UID_NETADM) {
+		/*
+		 * This shouldn't happen normally.  On upgrade the service might
+		 * need reloading.
+		 */
+		pfail("nwamd should run as uid %d, not uid %d\n", UID_NETADM,
+		    uid);
+	}
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	shutting_down = B_FALSE;
 	start_logging();
-	syslog(LOG_INFO, "nwamd pid %d started", getpid());
+	nlog(LOG_INFO, "nwamd pid %d started", getpid());
 
 	while ((c = getopt(argc, argv, "fs:")) != -1) {
 		switch (c) {
 			case 'f':
 				fg = B_TRUE;
 				break;
-			case 's':
-				scan_lev = atoi(optarg);
-				if (scan_lev >= DLADM_WLAN_STRENGTH_VERY_WEAK &&
-				    scan_lev <= DLADM_WLAN_STRENGTH_EXCELLENT) {
-					wireless_scan_level = scan_lev;
-				} else {
-					syslog(LOG_ERR, "invalid signal "
-					    "strength: %s", optarg);
-				}
-				break;
 			default:
-				syslog(LOG_ERR, "unrecognized option %c",
+				nlog(LOG_ERR, "unrecognized option %c",
 				    optopt);
 				break;
 		}
@@ -408,65 +423,101 @@ main(int argc, char *argv[])
 
 	lookup_daemon_properties();
 
-	/*
-	 * The dladm handle *must* be opened before privileges are dropped
-	 * by nwamd.  The device privilege requirements from
-	 * /etc/security/device_policy may not be loaded yet.  These are
-	 * loaded by svc:/system/filesystem/root, which comes online after
-	 * svc:/network/physical.
-	 */
-	if (dladm_open(&dld_handle) != DLADM_STATUS_OK) {
-		syslog(LOG_ERR, "failed to open dladm handle");
-		exit(EXIT_FAILURE);
-	}
-
-	change_user_set_privs();
-
 	if (!fg)
 		daemonize();
 
-	initialize_llp();
+	/*
+	 * The dladm handle *must* be opened before privileges are dropped.
+	 * The device privilege requirements, which are stored in
+	 * /etc/security/device_policy, may not be loaded yet, as that's
+	 * done by svc:/system/filesystem/root.  If they are not loaded,
+	 * then one must have *all* privs in order to open /dev/dld, which
+	 * is one of the steps performed in dladm_open().
+	 */
+	rc = dladm_open(&dld_handle);
+	if (rc != DLADM_STATUS_OK) {
+		char status_str[DLADM_STRSIZE];
+		(void) dladm_status2str(rc, status_str);
+		pfail("failed to open dladm handle: %s", status_str);
+	}
+
+	/*
+	 * Handle upgrade of legacy config.  Absence of version property
+	 * (which did not exist in phase 0 or 0.5) is the indication that
+	 * we need to upgrade to phase 1 (version 1).
+	 */
+	if (nwamd_lookup_count_property(OUR_FMRI, OUR_PG, OUR_VERSION_PROP_NAME,
+	    &version) != 0)
+		nwamd_handle_upgrade(NULL);
+
+	/*
+	 * Initialize lists handling internal representations of objects.
+	 */
+	nwamd_object_lists_init();
+
+	/*
+	 * Start the event handling thread before starting event sources,
+	 * including signal handling, so we are ready to handle incoming
+	 * events.
+	 */
+	nwamd_event_queue_init();
 
 	init_signalhandling();
 
-	initialize_wireless();
+	/* Enqueue init event */
+	event = nwamd_event_init_init();
+	if (event == NULL)
+		pfail("nwamd could not create init event, exiting");
+	nwamd_event_enqueue(event);
+	/*
+	 * Collect initial user configuration.
+	 */
 
-	lookup_zonename(zonename, sizeof (zonename));
+	/*
+	 * Walk the physical interfaces and update the Automatic NCP to
+	 * contain the IP and link NCUs for the interfaces that exist in
+	 * the system.
+	 */
+	nwamd_walk_physical_configuration();
 
-	init_machine_mutex();
+	/*
+	 * We should initialize the door at the point that we can respond to
+	 * user requests about the system but before we start actually process
+	 * state changes or effecting the system.
+	 */
+	nwamd_door_init();
 
-	initialize_interfaces();
+	/*
+	 * Initialize data objects.
+	 *
+	 * Enabling an NCP involves refreshing nwam, which initializes the
+	 * objects (ncu, enm, loc, known wlan).  Thus, no need to
+	 * explicitly initialize these objects here.  The refresh also
+	 * enqueues and NCU activation checking event.  Location and ENM
+	 * condition checking are triggered by changes in NCU states.
+	 */
+	(void) pthread_mutex_lock(&active_ncp_mutex);
+	if (nwamd_ncp_action(active_ncp, NWAM_ACTION_ENABLE) != 0)
+		pfail("Initial enable failed for active NCP %s", active_ncp);
+	(void) pthread_mutex_unlock(&active_ncp_mutex);
 
-	llp_parse_config();
+	/*
+	 * Enqueue an event to start periodic checking of activation conditions.
+	 */
+	nwamd_create_timed_condition_check_event();
 
-	initialize_door();
+	nwamd_drop_unneeded_privs();
+	/*
+	 * Start the various agents (hooks on fds, threads) which collect events
+	 */
+	nwamd_event_sources_init();
 
-	(void) start_event_collection();
+	/*
+	 * nwamd_event_handler() only returns on shutdown.
+	 */
+	nwamd_event_handler();
 
-	while ((e = np_queue_get_event()) != NULL) {
-
-		etype = e->npe_type;
-		syslog(LOG_INFO, "got event type %s", npe_type_str(etype));
-		if (etype == EV_SHUTDOWN)
-			terminate_door();
-		if (pthread_mutex_lock(&machine_lock) != 0) {
-			syslog(LOG_ERR, "mutex lock");
-			exit(EXIT_FAILURE);
-		}
-		state_machine(e);
-		(void) pthread_mutex_unlock(&machine_lock);
-		free_event(e);
-		if (etype == EV_SHUTDOWN)
-			break;
-	}
-	syslog(LOG_DEBUG, "terminating routing and scanning threads");
-	(void) pthread_cancel(routing);
-	(void) pthread_join(routing, NULL);
-	if (scan != 0) {
-		(void) pthread_cancel(scan);
-		(void) pthread_join(scan, NULL);
-	}
 	dladm_close(dld_handle);
-	syslog(LOG_INFO, "nwamd shutting down");
+
 	return (EXIT_SUCCESS);
 }

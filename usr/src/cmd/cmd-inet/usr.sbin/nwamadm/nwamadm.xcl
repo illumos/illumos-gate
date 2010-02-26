@@ -1,0 +1,95 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#
+
+msgid  ""
+msgid  "\t%s\n"
+msgid  "\t\t%s\n\n"
+msgid  "\n"
+msgid  " %s '%s'"
+msgid  " %s '%s'\n"
+msgid  "%-*s %-*s %-*s%s\n"
+msgid  "%-*s %-*s\n"
+msgid  "%-*s \n"
+msgid  "%d"
+msgid  "%d:"
+msgid  "%d: ESSID %s BSSID %s"
+msgid  "%d: ESSID %s BSSID %s\n"
+msgid  "%s %s"
+msgid  "%s -> action %s"
+msgid  "%s -> state %s"
+msgid  "%s"
+msgid  "%s, %s"
+msgid  "%s:"
+msgid  "%s: "
+msgid  "%s: %s\n"
+msgid  "%s:%s"
+msgid  "'%s %s'"
+msgid  "'%s'"
+msgid  "(%d) flags %x"
+msgid  ","
+msgid  "-"
+msgid  "-c"
+msgid  "-p"
+msgid  "-x"
+msgid  "?"
+msgid  "?p:c:x"
+msgid  "AUXILLARY STATE"
+msgid  "BSSID"
+msgid  "DESCRIPTION"
+msgid  "ESSID"
+msgid  "EVENT"
+msgid  "PROFILE"
+msgid  "STATE"
+msgid  "TYPE"
+msgid  "WEP"
+msgid  "WLAN"
+msgid  "WPA"
+msgid  "WiFi"
+msgid  "activation-mode"
+msgid  "disable"
+msgid  "enable"
+msgid  "enm"
+msgid  "help"
+msgid  "index %d flags 0x%x address %s"
+msgid  "interface"
+msgid  "ip"
+msgid  "key slot"
+msgid  "link"
+msgid  "linkname"
+msgid  "list"
+msgid  "loc"
+msgid  "manual"
+msgid  "ncp"
+msgid  "ncu"
+msgid  "ncu-class"
+msgid  "object-name"
+msgid  "ofmt_open"
+msgid  "phys"
+msgid  "print_list_cb"
+msgid  "priority-group: %d"
+msgid  "profile-type"
+msgid  "scan-wifi"
+msgid  "select-wifi"
+msgid  "show-events"
