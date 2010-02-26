@@ -28,6 +28,11 @@
  * SUCH DAMAGES.
  */
 
+/*
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #ifndef _PKINIT_CRYPTO_OPENSSL_H
 #define _PKINIT_CRYPTO_OPENSSL_H
 
@@ -83,6 +88,8 @@ struct _pkinit_identity_crypto_context {
     CK_BYTE_PTR cert_id;
     int cert_id_len;
     CK_MECHANISM_TYPE mech;
+    /* Solaris Kerberos: need to keep some state */
+    uint_t p11flags;
     /*
      * Solaris Kerberos:
      * If PKCS#11 is already being used by the process then C_Finalize should
@@ -93,6 +100,9 @@ struct _pkinit_identity_crypto_context {
     krb5_boolean finalize_pkcs11;
 #endif
 };
+
+/* Solaris Kerberos: need to know if login was done */
+#define	C_LOGIN_DONE 0x1 /* The session is logged in. */
 
 struct _pkinit_plg_crypto_context {
     DH *dh_1024;

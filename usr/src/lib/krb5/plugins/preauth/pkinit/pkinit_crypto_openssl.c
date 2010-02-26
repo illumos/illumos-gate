@@ -757,6 +757,7 @@ pkinit_init_pkcs11(pkinit_identity_crypto_context ctx)
     ctx->cert_label = NULL;
     ctx->session = CK_INVALID_HANDLE;
     ctx->p11 = NULL;
+    ctx->p11flags = 0; /* Solaris Kerberos */
 #endif
     ctx->pkcs11_method = 0;
 
@@ -3392,7 +3393,10 @@ pkinit_login(krb5_context context,
 		gettext("failed to log into token: %s"),
 		pkinit_pkcs11_code_to_text(r));
 	    r = KRB5KDC_ERR_PREAUTH_FAILED;
-	}
+	} else {
+	    /* Solaris Kerberos: only need to login once */
+            id_cryptoctx->p11flags |= C_LOGIN_DONE;
+        }
     }
     if (rdat.data)
 	free(rdat.data);
@@ -3488,7 +3492,8 @@ pkinit_open_session(krb5_context context,
 	     i + 1, (int) count);
 
     /* Login if needed */
-    if (tinfo.flags & CKF_LOGIN_REQUIRED)
+    /* Solaris Kerberos: added cctx->p11flags check */
+    if (tinfo.flags & CKF_LOGIN_REQUIRED && ! (cctx->p11flags & C_LOGIN_DONE))
 	r = pkinit_login(context, cctx, &tinfo);
 
     return r;
@@ -3707,7 +3712,19 @@ pkinit_decode_data_pkcs11(krb5_context context,
 	return KRB5KDC_ERR_PREAUTH_FAILED;
     }
 
-    /* Solaris Kerberos */
+    /* Solaris Kerberos: Login, if needed, to access private object */
+    if (!(id_cryptoctx->p11flags & C_LOGIN_DONE)) {
+        CK_TOKEN_INFO tinfo;
+
+        r = id_cryptoctx->p11->C_GetTokenInfo(id_cryptoctx->slotid, &tinfo);
+        if (r != 0)
+            return r;
+
+        r = pkinit_login(context, id_cryptoctx, &tinfo);
+        if (r != 0)
+            return r;
+    }
+
     r = pkinit_find_private_key(id_cryptoctx, CKA_DECRYPT, &obj);
     if (r != 0)
 	return r;
@@ -3808,7 +3825,19 @@ pkinit_sign_data_pkcs11(krb5_context context,
 	return KRB5KDC_ERR_PREAUTH_FAILED;
     }
 
-    /* Solaris Kerberos */
+    /* Solaris Kerberos: Login, if needed, to access private object */
+    if (!(id_cryptoctx->p11flags & C_LOGIN_DONE)) {
+        CK_TOKEN_INFO tinfo;
+
+        r = id_cryptoctx->p11->C_GetTokenInfo(id_cryptoctx->slotid, &tinfo);
+        if (r != 0)
+            return r;
+
+        r = pkinit_login(context, id_cryptoctx, &tinfo);
+        if (r != 0)
+            return r;
+    }
+
     r = pkinit_find_private_key(id_cryptoctx, CKA_SIGN, &obj);
     if (r != 0 )
 	return r;
