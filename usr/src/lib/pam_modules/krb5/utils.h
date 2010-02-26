@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,10 @@ extern "C" {
 #define	KRB5_DATA	"SUNW-KRB5-AUTH-DATA"
 #define	ROOT_UNAME	"root"
 
+enum preauth_types {
+	KRB_PASSWD,
+	KRB_PKINIT };
+
 typedef struct {
 	char		*user;
 	int		debug;
@@ -52,6 +56,8 @@ typedef struct {
 	char		*password;
 	int		age_status;
 	krb5_timestamp	expiration;
+	int		auth_calls;
+	enum preauth_types preauth_type;
 } krb5_module_data_t;
 
 int get_pw_uid(char *, uid_t *);

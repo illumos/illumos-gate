@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,8 +40,8 @@
 #include "utils.h"
 #include "krb5_repository.h"
 
-extern int attempt_krb5_auth(krb5_module_data_t *, char *, char **,
-			boolean_t);
+extern int attempt_krb5_auth(pam_handle_t *, krb5_module_data_t *, char *,
+	char **, boolean_t);
 extern int krb5_verifypw(char *, char *, int);
 
 static void display_msg(pam_handle_t *, int, char *);
@@ -121,7 +121,7 @@ get_set_creds(
 	 * pwchange verified user sufficiently, so don't request strict
 	 * tgt verification (will cause rcache perm issues possibly anyways)
 	 */
-	login_result = attempt_krb5_auth(kmd, user, &newpass, 0);
+	login_result = attempt_krb5_auth(pamh, kmd, user, &newpass, 0);
 	if (debug)
 		__pam_log(LOG_AUTH | LOG_DEBUG,
 		    "PAM-KRB5 (password): get_set_creds: login_result= %d",
@@ -258,13 +258,22 @@ pam_sm_chauthtok(
 
 	(void) pam_get_item(pamh, PAM_AUTHTOK, (void **)&newpass);
 
+	/*
+	 * If the preauth type done didn't use a passwd just ignore the error.
+	 */
 	if (newpass == NULL)
-		return (PAM_SYSTEM_ERR);
+		if (kmd && kmd->preauth_type == KRB_PKINIT)
+			return (PAM_IGNORE);
+		else
+			return (PAM_SYSTEM_ERR);
 
 	(void) pam_get_item(pamh, PAM_OLDAUTHTOK, (void **)&oldpass);
 
 	if (oldpass == NULL)
-		return (PAM_SYSTEM_ERR);
+		if (kmd && kmd->preauth_type == KRB_PKINIT)
+			return (PAM_IGNORE);
+		else
+			return (PAM_SYSTEM_ERR);
 
 	result = krb5_verifypw(user, oldpass, debug);
 	if (debug)
@@ -275,12 +284,23 @@ pam_sm_chauthtok(
 	 * If it's a bad password or general failure, we are done.
 	 */
 	if (result != 0) {
+		/*
+		 * if the preauth type done didn't use a passwd just ignore the
+		 * error.
+		 */
+		if (kmd && kmd->preauth_type == KRB_PKINIT)
+			return (PAM_IGNORE);
+
 		if (result == 2)
 			display_msg(pamh, PAM_ERROR_MSG, dgettext(TEXT_DOMAIN,
 				"Old Kerberos password incorrect\n"));
 		return (PAM_AUTHTOK_ERR);
 	}
 
+	/*
+	 * If the old password verifies try to change it regardless of the
+	 * preauth type and do not ignore the error.
+	 */
 	result = krb5_changepw(pamh, user, oldpass, newpass, debug);
 	if (result == PAM_SUCCESS) {
 		display_msg(pamh, PAM_TEXT_INFO, dgettext(TEXT_DOMAIN,

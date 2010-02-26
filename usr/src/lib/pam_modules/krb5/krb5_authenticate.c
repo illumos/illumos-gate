@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,7 +67,8 @@ char *appdef[] = { "appdefaults", "kinit", NULL };
 
 #define	krb_realm (*(realmdef + 1))
 
-int	attempt_krb5_auth(krb5_module_data_t *, char *, char **, boolean_t);
+int	attempt_krb5_auth(pam_handle_t *, krb5_module_data_t *, char *,
+	char **, boolean_t);
 void	krb5_cleanup(pam_handle_t *, void *, int);
 
 extern errcode_t profile_get_options_boolean();
@@ -105,6 +106,7 @@ pam_sm_authenticate(
 	krb5_module_data_t	*kmd = NULL;
 	krb5_repository_data_t  *krb5_data = NULL;
 	pam_repository_t	*rep_data = NULL;
+	boolean_t		do_pkinit = FALSE;
 
 	for (i = 0; i < argc; i++) {
 		if (strcmp(argv[i], "debug") == 0) {
@@ -113,10 +115,11 @@ pam_sm_authenticate(
 			warn = 0;
 		} else if (strcmp(argv[i], "err_on_exp") == 0) {
 			err_on_exp = 1;
+		} else if (strcmp(argv[i], "pkinit") == 0) {
+			do_pkinit = TRUE;
 		} else {
 			__pam_log(LOG_AUTH | LOG_ERR,
-				"PAM-KRB5 (auth) unrecognized option %s",
-				argv[i]);
+			    "PAM-KRB5 (auth) unrecognized option %s", argv[i]);
 		}
 	}
 	if (flags & PAM_SILENT) warn = 0;
@@ -126,19 +129,6 @@ pam_sm_authenticate(
 		    "PAM-KRB5 (auth): pam_sm_authenticate flags=%d",
 		    flags);
 
-	(void) pam_get_item(pamh, PAM_USER, (void**) &user);
-
-	if (user == NULL || *user == '\0') {
-		if (debug)
-			__pam_log(LOG_AUTH | LOG_DEBUG,
-				"PAM-KRB5 (auth): user empty or null");
-		return (PAM_USER_UNKNOWN);
-	}
-
-	/* make sure a password entry exists for this user */
-	if (!get_pw_uid(user, &pw_uid))
-		return (PAM_USER_UNKNOWN);
-
 	/*
 	 * pam_get_data could fail if we are being called for the first time
 	 * or if the module is not found, PAM_NO_MODULE_DATA is not an error
@@ -146,6 +136,78 @@ pam_sm_authenticate(
 	err = pam_get_data(pamh, KRB5_DATA, (const void**)&kmd);
 	if (!(err == PAM_SUCCESS || err == PAM_NO_MODULE_DATA))
 		return (PAM_SYSTEM_ERR);
+
+	/*
+	 * If pam_krb5 was stacked higher in the auth stack and did PKINIT
+	 * preauth sucessfully then this instance is a fallback to password
+	 * based preauth and should just return PAM_IGNORE.
+	 *
+	 * The else clause is handled further down.
+	 */
+	if (kmd != NULL) {
+		if (++(kmd->auth_calls) > 2) {
+			/*
+			 * pam_krb5 has been stacked > 2 times in the auth
+			 * stack.  Clear out the current kmd and proceed as if
+			 * this is the first time pam_krb5 auth has been called.
+			 */
+			if (debug) {
+				__pam_log(LOG_AUTH | LOG_DEBUG,
+				    "PAM-KRB5 (auth): stacked more than"
+				    " two times, clearing kmd");
+			}
+			/* clear out/free current kmd */
+			err = pam_set_data(pamh, KRB5_DATA, NULL, NULL);
+			if (err != PAM_SUCCESS) {
+				krb5_cleanup(pamh, kmd, err);
+				result = err;
+				goto out;
+			}
+			kmd = NULL;
+		} else if (kmd->auth_calls == 2 &&
+		    kmd->auth_status == PAM_SUCCESS) {
+			/*
+			 * The previous instance of pam_krb5 succeeded and this
+			 * instance was a fall back in case it didn't succeed so
+			 * return ignore.
+			 */
+			if (debug) {
+				__pam_log(LOG_AUTH | LOG_DEBUG,
+				    "PAM-KRB5 (auth): PKINIT succeeded "
+				    "earlier so returning PAM_IGNORE");
+			}
+			return (PAM_IGNORE);
+		}
+	}
+
+	(void) pam_get_item(pamh, PAM_USER, (void**) &user);
+
+	if (user == NULL || *user == '\0') {
+		if (do_pkinit) {
+			/*
+			 * If doing PKINIT it is okay to prompt for the user
+			 * name.
+			 */
+			if ((err = pam_get_user(pamh, &user, NULL)) !=
+			    PAM_SUCCESS) {
+				if (debug) {
+					__pam_log(LOG_AUTH | LOG_DEBUG,
+					    "PAM-KRB5 (auth): get user failed: "
+					    "%s", pam_strerror(pamh, err));
+				}
+				return (err);
+			}
+		} else {
+			if (debug)
+				__pam_log(LOG_AUTH | LOG_DEBUG,
+				    "PAM-KRB5 (auth): user empty or null");
+			return (PAM_USER_UNKNOWN);
+		}
+	}
+
+	/* make sure a password entry exists for this user */
+	if (!get_pw_uid(user, &pw_uid))
+		return (PAM_USER_UNKNOWN);
 
 	if (kmd == NULL) {
 		kmd = calloc(1, sizeof (krb5_module_data_t));
@@ -201,6 +263,8 @@ pam_sm_authenticate(
 	kmd->password = NULL;
 	kmd->age_status = PAM_SUCCESS;
 	(void) memset((char *)&kmd->initcreds, 0, sizeof (krb5_creds));
+	kmd->auth_calls = 1;
+	kmd->preauth_type = do_pkinit ? KRB_PKINIT : KRB_PASSWD;
 
 	/*
 	 * For apps that already did krb5 auth exchange...
@@ -257,7 +321,7 @@ pam_sm_authenticate(
 
 	(void) pam_get_item(pamh, PAM_AUTHTOK, (void **)&password);
 
-	result = attempt_krb5_auth(kmd, user, &password, 1);
+	result = attempt_krb5_auth(pamh, kmd, user, &password, 1);
 
 out:
 	if (kmd) {
@@ -307,8 +371,114 @@ out:
 	return (result);
 }
 
+static krb5_error_code
+pam_krb5_prompter(
+	krb5_context ctx,
+	void *data,
+	/* ARGSUSED1 */
+	const char *name,
+	const char *banner,
+	int num_prompts,
+	krb5_prompt prompts[])
+{
+	krb5_error_code rc;
+	pam_handle_t *pamh = (pam_handle_t *)data;
+	struct pam_conv	*pam_convp;
+	struct pam_message *msgs;
+	struct pam_response *ret_respp;
+	int i;
+	krb5_prompt_type *prompt_type = krb5_get_prompt_types(ctx);
+	char tmpbuf[PAM_MAX_MSG_SIZE];
+
+	/*
+	 * Because this function should never be used for password prompts,
+	 * disallow password prompts.
+	 */
+	for (i = 0; i < num_prompts; i++) {
+		if (prompt_type[i] == KRB5_PROMPT_TYPE_PASSWORD)
+			return (KRB5_LIBOS_CANTREADPWD);
+	}
+
+	if (num_prompts == 0) {
+		if (prompts) {
+			/* This shouldn't happen */
+			return (PAM_SYSTEM_ERR);
+		} else {
+			/* no prompts so return */
+			return (0);
+		}
+	}
+	if ((rc = pam_get_item(pamh, PAM_CONV, (void **)&pam_convp))
+	    != PAM_SUCCESS) {
+		return (rc);
+	}
+	if (pam_convp == NULL) {
+		return (PAM_SYSTEM_ERR);
+	}
+
+	msgs = (struct pam_message *)calloc(num_prompts,
+	    sizeof (struct pam_message));
+	if (msgs == NULL) {
+		return (PAM_BUF_ERR);
+	}
+	(void) memset(msgs, 0, sizeof (struct pam_message) * num_prompts);
+
+	for (i = 0; i < num_prompts; i++) {
+		/* convert krb prompt style to PAM style */
+		if (prompts[i].hidden) {
+			msgs[i].msg_style = PAM_PROMPT_ECHO_OFF;
+		} else {
+			msgs[i].msg_style = PAM_PROMPT_ECHO_ON;
+		}
+		/*
+		 * krb expects the prompting function to append ": " to the
+		 * prompt string.
+		 */
+		if (snprintf(tmpbuf, sizeof (tmpbuf), "%s: ",
+		    prompts[i].prompt) < 0) {
+			rc = PAM_BUF_ERR;
+			goto cleanup;
+		}
+		msgs[i].msg = strdup(tmpbuf);
+		if (msgs[i].msg == NULL) {
+			rc = PAM_BUF_ERR;
+			goto cleanup;
+		}
+	}
+
+	/*
+	 * Call PAM conv function to display the prompt.
+	 */
+	rc = (pam_convp->conv)(num_prompts, &msgs, &ret_respp,
+	    pam_convp->appdata_ptr);
+
+	if (rc == PAM_SUCCESS) {
+		for (i = 0; i < num_prompts; i++) {
+			/* convert PAM response to krb prompt reply format */
+			prompts[i].reply->length = strlen(ret_respp[i].resp) +
+			    1; /* adding 1 for NULL terminator */
+			prompts[i].reply->data = ret_respp[i].resp;
+		}
+		/*
+		 * Note, just free ret_respp, not the resp data since that is
+		 * being referenced by the krb prompt reply data pointer.
+		 */
+		free(ret_respp);
+	}
+
+cleanup:
+	for (i = 0; i < num_prompts; i++) {
+		if (msgs[i].msg) {
+			free(msgs[i].msg);
+		}
+	}
+	free(msgs);
+	return (rc);
+}
+
 int
 attempt_krb5_auth(
+	pam_handle_t *pamh,
 	krb5_module_data_t	*kmd,
 	char		*user,
 	char		**krb5_pass,
@@ -494,30 +664,88 @@ attempt_krb5_auth(
 	}
 
 	/*
-	 * mech_krb5 interprets empty passwords as NULL passwords
-	 * and tries to read a password from stdin. Since we are in
-	 * pam this is bad and should not be allowed.
+	 * mech_krb5 interprets empty passwords as NULL passwords and tries to
+	 * read a password from stdin. Since we are in pam this is bad and
+	 * should not be allowed.
+	 *
+	 * Note, the logic now is that if the preauth_type is PKINIT then
+	 * provide a proper PAMcentric prompt function that the underlying
+	 * PKINIT preauth plugin will use to prompt for the PIN.
 	 */
-	if (*krb5_pass == NULL || strlen(*krb5_pass) == 0) {
-		code = KRB5KRB_AP_ERR_BAD_INTEGRITY;
-	} else {
-
+	if (kmd->preauth_type == KRB_PKINIT) {
 		/*
-		 * We call our own private version of gic_pwd, because we need
-		 * more information, such as password/account expiration, that
-		 * is found in the as_reply.  The "prompter" interface is not
-		 * granular enough for PAM to make use of.
+		 * Do PKINIT preauth
+		 *
+		 * Note: we want to limit preauth types to just those for PKINIT
+		 * but krb5_get_init_creds() doesn't support that at this point.
+		 * Instead we rely on pam_krb5_prompter() to limit prompts to
+		 * non-password types.  So all we can do here is set the preauth
+		 * list so krb5_get_init_creds() will try that first.
 		 */
-		code = __krb5_get_init_creds_password(kmd->kcontext,
-				my_creds,
-				me,
-				*krb5_pass,	/* clear text passwd */
-				NULL,		/* prompter */
-				NULL,		/* data */
-				0,		/* start time */
-				NULL,		/* defaults to krbtgt@REALM */
-				&opts,
-				&as_reply);
+		krb5_preauthtype pk_pa_list[] = {
+			KRB5_PADATA_PK_AS_REQ,
+			KRB5_PADATA_PK_AS_REQ_OLD
+		};
+		krb5_get_init_creds_opt_set_preauth_list(&opts, pk_pa_list, 2);
+
+		if (*krb5_pass == NULL) {
+			/* let preauth plugin prompt for PIN */
+			code = __krb5_get_init_creds_password(kmd->kcontext,
+			    my_creds,
+			    me,
+			    NULL, /* clear text passwd */
+			    pam_krb5_prompter, /* prompter */
+			    pamh, /* prompter data */
+			    0, /* start time */
+			    NULL, /* defaults to krbtgt@REALM */
+			    &opts,
+			    &as_reply);
+		} else {
+			/*
+			 * krb pkinit does not support setting the PIN so we
+			 * punt on trying to use krb5_pass as the PIN for now.
+			 * Note that once this is supported by pkinit the code
+			 * should make sure krb5_pass isn't empty and if it is
+			 * then that's an error.
+			 */
+			code = KRB5KRB_AP_ERR_BAD_INTEGRITY;
+		}
+	} else {
+		/*
+		 * Do password based preauths
+		 *
+		 * See earlier PKINIT comment.  We are doing something similar
+		 * here but we do not pass in a prompter (we assume
+		 * pam_authtok_get has already prompted for that).
+		 */
+		if (*krb5_pass == NULL || strlen(*krb5_pass) == 0) {
+			code = KRB5KRB_AP_ERR_BAD_INTEGRITY;
+		} else {
+			krb5_preauthtype pk_pa_list[] = {
+				KRB5_PADATA_ENC_TIMESTAMP
+			};
+
+			krb5_get_init_creds_opt_set_preauth_list(&opts,
+			    pk_pa_list, 1);
+
+			/*
+			 * We call our own private version of gic_pwd, because
+			 * we need more information, such as password/account
+			 * expiration, that is found in the as_reply.  The
+			 * "prompter" interface is not granular enough for PAM
+			 * to make use of.
+			 */
+			code = __krb5_get_init_creds_password(kmd->kcontext,
+			    my_creds,
+			    me,
+			    *krb5_pass,	/* clear text passwd */
+			    NULL,	/* prompter */
+			    NULL,	/* data */
+			    0,		/* start time */
+			    NULL,	/* defaults to krbtgt@REALM */
+			    &opts,
+			    &as_reply);
+		}
 	}
 
 	if (kmd->debug)
@@ -628,20 +856,30 @@ attempt_krb5_auth(
 	case KRB5KDC_ERR_KEY_EXP:
 		if (!kmd->err_on_exp) {
 			/*
-			 * Request a tik for changepw service
-			 * and it will tell us if pw is good or not.
+			 * Request a tik for changepw service and it will tell
+			 * us if pw is good or not. If PKINIT is being done it
+			 * is possible that *krb5_pass may be NULL so check for
+			 * that.  If that is the case this function will return
+			 * an error.
 			 */
-			code = krb5_verifypw(kuser, *krb5_pass, kmd->debug);
-
-			if (kmd->debug)
-				__pam_log(LOG_AUTH | LOG_DEBUG,
-				    "PAM-KRB5 (auth): attempt_krb5_auth: "
-				    "verifypw %d", code);
-
-			if (code == 0) {
-				/* pw is good, set age status for acct_mgmt */
-				kmd->age_status = PAM_NEW_AUTHTOK_REQD;
+			if (*krb5_pass != NULL) {
+				code = krb5_verifypw(kuser, *krb5_pass,
+				    kmd->debug);
+				if (kmd->debug) {
+					__pam_log(LOG_AUTH | LOG_DEBUG,
+					    "PAM-KRB5 (auth): "
+					    "attempt_krb5_auth: "
+					    "verifypw %d", code);
+				}
+				if (code == 0) {
+					/*
+					 * pw is good, set age status for
+					 * acct_mgmt.
+					 */
+					kmd->age_status = PAM_NEW_AUTHTOK_REQD;
+				}
 			}
+
 		}
 		break;
 
@@ -656,18 +894,22 @@ attempt_krb5_auth(
 
 	if (code == 0) {
 		/*
-		 * success for the entered pw
+		 * success for the entered pw or PKINIT succeeded.
 		 *
 		 * we can't rely on the pw in PAM_AUTHTOK
 		 * to be the (correct) krb5 one so
 		 * store krb5 pw in module data for
-		 * use in acct_mgmt
+		 * use in acct_mgmt.  Note that *krb5_pass may be NULL if we're
+		 * doing PKINIT.
 		 */
-		if (!(kmd->password = strdup(*krb5_pass))) {
-			__pam_log(LOG_AUTH | LOG_ERR, "Cannot strdup password");
+		if (*krb5_pass != NULL &&
+		    !(kmd->password = strdup(*krb5_pass))) {
+			__pam_log(LOG_AUTH | LOG_ERR,
+				  "Cannot strdup password");
 			result = PAM_BUF_ERR;
 			goto out_err;
 		}
+
 		result = PAM_SUCCESS;
 		goto out;
 	}
