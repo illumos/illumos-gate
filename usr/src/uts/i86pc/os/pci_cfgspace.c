@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,8 +91,11 @@ static int pci_check_bios(void);
 static int pci_get_cfg_type(void);
 #endif
 
-/* all config-space access routines share this one... */
+/* for legacy io-based config space access */
 kmutex_t pcicfg_mutex;
+
+/* for mmio-based config space access */
+kmutex_t pcicfg_mmio_mutex;
 
 /* ..except Orion and Neptune, which have to have their own */
 kmutex_t pcicfg_chipset_mutex;
@@ -102,10 +105,13 @@ pci_cfgspace_init(void)
 {
 	mutex_init(&pcicfg_mutex, NULL, MUTEX_SPIN,
 	    (ddi_iblock_cookie_t)ipltospl(15));
+	mutex_init(&pcicfg_mmio_mutex, NULL, MUTEX_SPIN,
+	    (ddi_iblock_cookie_t)ipltospl(DISP_LEVEL));
 	mutex_init(&pcicfg_chipset_mutex, NULL, MUTEX_SPIN,
 	    (ddi_iblock_cookie_t)ipltospl(15));
 	if (!pci_check()) {
 		mutex_destroy(&pcicfg_mutex);
+		mutex_destroy(&pcicfg_mmio_mutex);
 		mutex_destroy(&pcicfg_chipset_mutex);
 	}
 }

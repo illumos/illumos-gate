@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,9 +101,10 @@ extern uint8_t mcfg_bus_start;
 extern uint8_t mcfg_bus_end;
 
 /*
- * Mutex for all pci config space routines to share
+ * Mutexes for pci config space routines
  */
 extern kmutex_t pcicfg_mutex;
+extern kmutex_t pcicfg_mmio_mutex;
 
 /*
  * Orion/Neptune cfg access wraps mech1 cfg access, so needs a separate mutex

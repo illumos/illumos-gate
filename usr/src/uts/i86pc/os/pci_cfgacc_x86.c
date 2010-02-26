@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -158,9 +158,9 @@ pci_cfgacc_mmio(pci_cfgacc_req_t *req)
 	paddr = (paddr_t)req->bdf << 12;
 	paddr += mcfg_mem_base + req->offset;
 
-	mutex_enter(&pcicfg_mutex);
+	mutex_enter(&pcicfg_mmio_mutex);
 	if ((vaddr = pci_cfgacc_map(paddr)) == NULL) {
-		mutex_exit(&pcicfg_mutex);
+		mutex_exit(&pcicfg_mmio_mutex);
 		return (DDI_FAILURE);
 	}
 
@@ -193,7 +193,7 @@ pci_cfgacc_mmio(pci_cfgacc_req_t *req)
 		rval = DDI_FAILURE;
 	}
 	pci_cfgacc_unmap();
-	mutex_exit(&pcicfg_mutex);
+	mutex_exit(&pcicfg_mmio_mutex);
 
 	return (rval);
 }
