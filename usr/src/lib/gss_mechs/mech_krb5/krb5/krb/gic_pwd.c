@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -169,7 +169,6 @@ __krb5_get_init_creds_password(
    krb5_kdc_rep *as_reply;
    int tries;
    krb5_creds chpw_creds;
-   krb5_get_init_creds_opt *chpw_opts = NULL;
    krb5_data pw0, pw1;
    char banner[1024], pw0array[1024], pw1array[1024];
    krb5_prompt prompt[2];
@@ -487,6 +486,8 @@ cleanup:
 
    free(cpw_service);
    free(princ_str);
+   if (opte && krb5_gic_opt_is_shadowed(opte))
+      krb5_get_init_creds_opt_free(context, (krb5_get_init_creds_opt *)opte);
    memset(pw0array, 0, sizeof(pw0array));
    memset(pw1array, 0, sizeof(pw1array));
    krb5_free_cred_contents(context, &chpw_creds);
