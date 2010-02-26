@@ -3354,11 +3354,21 @@ pkinit_login(krb5_context context,
 	rdat.data = NULL;
 	rdat.length = 0;
     } else {
+        unsigned char *lastnonwspc, *iterp; /* Solaris Kerberos - trim token label */
+        int count;
 	/* Solaris Kerberos - Changes for gettext() */
         prompt_len = sizeof (tip->label) + 256;
 	if ((prompt = (char *) malloc(prompt_len)) == NULL)
 	    return ENOMEM;
-	(void) snprintf(prompt, prompt_len, gettext("%.*s PIN"), sizeof (tip->label), tip->label);
+
+	/* Solaris Kerberos - trim token label which can be padded with space */
+        for (count = 0, iterp = tip->label; count < sizeof (tip->label);
+             count++, iterp++) {
+            if ((char) *iterp != ' ')
+                lastnonwspc = iterp;
+        }
+	(void) snprintf(prompt, prompt_len, gettext("%.*s PIN"),
+                        (int) (lastnonwspc - tip->label) + 1, tip->label);
 	/* Solaris Kerberos */
 	if (tip->flags & CKF_USER_PIN_LOCKED)
 	    (void) strlcat(prompt, gettext(" (Warning: PIN locked)"), prompt_len);
