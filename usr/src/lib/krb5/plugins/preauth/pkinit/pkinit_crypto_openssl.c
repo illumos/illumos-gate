@@ -3356,6 +3356,14 @@ pkinit_login(krb5_context context,
     } else {
         unsigned char *lastnonwspc, *iterp; /* Solaris Kerberos - trim token label */
         int count;
+
+	if (!id_cryptoctx->prompter) {
+	    pkiDebug("pkinit_login: id_cryptoctx->prompter is NULL\n");
+	    /* Solaris Kerberos: Improved error messages */
+	    krb5_set_error_message(context, KRB5KDC_ERR_PREAUTH_FAILED,
+		gettext("failed to log into token: prompter function is NULL"));
+	    return (KRB5KDC_ERR_PREAUTH_FAILED);
+	}
 	/* Solaris Kerberos - Changes for gettext() */
         prompt_len = sizeof (tip->label) + 256;
 	if ((prompt = (char *) malloc(prompt_len)) == NULL)
