@@ -4946,6 +4946,8 @@ ibd_start(ibd_state_t *state)
 		ibd_h2n_mac(&state->id_macaddr,
 		    IBD_MAC_ADDR_RC + state->id_qpnum,
 		    state->id_sgid.gid_prefix, state->id_sgid.gid_guid);
+		ibd_h2n_mac(&state->rc_macaddr_loopback, state->id_qpnum,
+		    state->id_sgid.gid_prefix, state->id_sgid.gid_guid);
 	} else {
 		ibd_h2n_mac(&state->id_macaddr, state->id_qpnum,
 		    state->id_sgid.gid_prefix, state->id_sgid.gid_guid);
@@ -6867,10 +6869,19 @@ ibd_process_rx(ibd_state_t *state, ibd_rwqe_t *rwqe, ibt_wc_t *wc)
 		phdr->ib_grh.ipoib_sqpn = htonl(wc->wc_qpn);
 
 		/* if it is loop back packet, just drop it. */
-		if (bcmp(&phdr->ib_grh.ipoib_sqpn, &state->id_macaddr,
-		    IPOIB_ADDRL) == 0) {
-			freemsg(mp);
-			return (NULL);
+		if (state->id_enable_rc) {
+			if (bcmp(&phdr->ib_grh.ipoib_sqpn,
+			    &state->rc_macaddr_loopback,
+			    IPOIB_ADDRL) == 0) {
+				freemsg(mp);
+				return (NULL);
+			}
+		} else {
+			if (bcmp(&phdr->ib_grh.ipoib_sqpn, &state->id_macaddr,
+			    IPOIB_ADDRL) == 0) {
+				freemsg(mp);
+				return (NULL);
+			}
 		}
 
 		ovbcopy(&phdr->ib_grh.ipoib_sqpn, &phdr->ib_src,

@@ -818,6 +818,18 @@ typedef struct ibd_state_s {
 
 	int			rc_mtu;
 	uint32_t		rc_tx_max_sqseg;
+	/*
+	 * In IPoIB over Reliable Connected mode, its mac address is added
+	 * an "IBD_MAC_ADDR_RC" prefix. But for loopback filter in function
+	 * ibd_process_rx(), the input mac address should not include the
+	 * "IBD_MAC_ADDR_RC" prefix.
+	 *
+	 * So, we introduce the rc_macaddr_loopback for the loopback filter in
+	 * IPoIB over Reliable Connected mode.
+	 *
+	 * rc_macaddr_loopback = id_macaddr excludes "IBD_MAC_ADDR_RC" prefix.
+	 */
+	ipoib_mac_t		rc_macaddr_loopback;
 
 	ibt_srv_hdl_t		rc_listen_hdl;
 	ibt_sbind_hdl_t		rc_listen_bind;
