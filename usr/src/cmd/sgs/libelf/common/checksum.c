@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,7 +30,6 @@
 /*	Copyright (c) 1987, 1988 Microsoft Corporation	*/
 /*	  All Rights Reserved	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 #include <libelf.h>
@@ -72,17 +71,43 @@ sumepi(long sum)
 	return ((ushort_t)(LSW(_sum) + MSW(_sum)));
 }
 
+/*
+ * This module is compiled twice, the second time having
+ * -D_ELF64 defined.  The following set of macros represent
+ * the differences between the two compilations.  Be
+ * careful *not* to add any class dependent code (anything
+ * that has elf32 or elf64 in the name) to this code
+ * without hiding it behind a switchable macro like these.
+ */
+#if	defined(_ELF64)
+
+#define	elf_checksum		elf64_checksum
+#define	Elf_Ehdr		Elf64_Ehdr
+#define	Elf_Shdr		Elf64_Shdr
+#define	getehdr			elf64_getehdr
+#define	getshdr			elf64_getshdr
+
+#else	/* else ELF32 */
+
+#define	elf_checksum		elf32_checksum
+#define	Elf_Ehdr		Elf32_Ehdr
+#define	Elf_Shdr		Elf32_Shdr
+#define	getehdr			elf32_getehdr
+#define	getshdr			elf32_getshdr
+
+#endif	/* ELF64 */
+
 long
-elf32_checksum(Elf * elf)
+elf_checksum(Elf * elf)
 {
 	long		sum = 0;
-	Elf32_Ehdr *	ehdr;
-	Elf32_Shdr *	shdr;
+	Elf_Ehdr *	ehdr;
+	Elf_Shdr *	shdr;
 	Elf_Scn *	scn;
 	Elf_Data *	data, * (* getdata)(Elf_Scn *, Elf_Data *);
 	size_t		shnum;
 
-	if ((ehdr = elf32_getehdr(elf)) == 0)
+	if ((ehdr = getehdr(elf)) == 0)
 		return (0);
 
 	/*
@@ -107,41 +132,7 @@ elf32_checksum(Elf * elf)
 	for (shnum = 1; shnum < ehdr->e_shnum; shnum++) {
 		if ((scn = elf_getscn(elf, shnum)) == 0)
 			return (0);
-		if ((shdr = elf32_getshdr(scn)) == 0)
-			return (0);
-
-		if (!(shdr->sh_flags & SHF_ALLOC))
-			continue;
-
-		if ((shdr->sh_type == SHT_DYNSYM) ||
-		    (shdr->sh_type == SHT_DYNAMIC))
-			continue;
-
-		data = 0;
-		while ((data = (*getdata)(scn, data)) != 0)
-			sum = sumupd(sum, data->d_buf, data->d_size);
-
-	}
-	return (sumepi(sum));
-}
-
-long
-elf64_checksum(Elf * elf)
-{
-	long		sum = 0;
-	Elf64_Ehdr *	ehdr;
-	Elf64_Shdr *	shdr;
-	Elf_Scn *	scn;
-	Elf_Data *	data;
-	size_t		shnum;
-
-	if ((ehdr = elf64_getehdr(elf)) == 0)
-		return (0);
-
-	for (shnum = 1; shnum < ehdr->e_shnum; shnum++) {
-		if ((scn = elf_getscn(elf, shnum)) == 0)
-			return (0);
-		if ((shdr = elf64_getshdr(scn)) == 0)
+		if ((shdr = getshdr(scn)) == 0)
 			return (0);
 
 		/* Exclude strippable sections */
@@ -154,13 +145,17 @@ elf64_checksum(Elf * elf)
 		 *		that strip might remove.
 		 *	- The .dynamic section is modified by the setting of
 		 *		this checksum value.
+		 *	- The .SUNW_dof section uses ftok(3C), which returns
+		 *		different values, to define a key for the
+		 *		objects in that section.
 		 */
 		if ((shdr->sh_type == SHT_DYNSYM) ||
-		    (shdr->sh_type == SHT_DYNAMIC))
+		    (shdr->sh_type == SHT_DYNAMIC) ||
+		    (shdr->sh_type == SHT_SUNW_dof))
 			continue;
 
 		data = 0;
-		while ((data = elf_getdata(scn, data)) != 0)
+		while ((data = (*getdata)(scn, data)) != 0)
 			sum = sumupd(sum, data->d_buf, data->d_size);
 
 	}

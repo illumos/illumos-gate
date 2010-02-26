@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY=	libelf.a
@@ -42,7 +40,8 @@ COMOBJS=	ar.o		begin.o		cntl.o		cook.o \
 		rand.o		rawdata.o	rawfile.o	rawput.o \
 		strptr.o	update.o	error.o		gelf.o \
 		clscook.o	checksum.o
-CLASSOBJS=	clscook64.o	newehdr64.o	newphdr64.o	update64.o
+CLASSOBJS=	clscook64.o	newehdr64.o	newphdr64.o	update64.o \
+		checksum64.o
 BLTOBJS=	msg.o		xlate.o		xlate64.o
 MISCOBJS=	String.o	args.o		demangle.o	nlist.o \
 		nplist.o
