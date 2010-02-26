@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -270,10 +270,10 @@ typedef struct sbd_lu {
 #define	SL_OP_MODIFY_LU				4
 #define	SL_OP_LU_PROPS				5
 
-sbd_status_t sbd_data_read(sbd_lu_t *sl, uint64_t offset, uint64_t size,
-    uint8_t *buf);
-sbd_status_t sbd_data_write(sbd_lu_t *sl, uint64_t offset, uint64_t size,
-    uint8_t *buf);
+sbd_status_t sbd_data_read(sbd_lu_t *sl, scsi_task_t *task,
+    uint64_t offset, uint64_t size, uint8_t *buf);
+sbd_status_t sbd_data_write(sbd_lu_t *sl, scsi_task_t *task,
+    uint64_t offset, uint64_t size, uint8_t *buf);
 stmf_status_t sbd_task_alloc(struct scsi_task *task);
 void sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf);
 void sbd_dbuf_xfer_done(struct scsi_task *task, struct stmf_data_buf *dbuf);

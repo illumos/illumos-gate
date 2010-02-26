@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef	_STMF_H
@@ -73,6 +73,7 @@ typedef struct stmf_data_buf {
 	uint16_t	db_flags;	/* Direction, auto status etc */
 	stmf_status_t	db_xfer_status;
 	uint8_t		db_handle;	/* To track parallel buffers */
+	hrtime_t	db_xfer_start_timestamp;
 	struct stmf_sglist_ent {
 		uint32_t	seg_length;
 		uint8_t		*seg_addr;
@@ -201,6 +202,7 @@ typedef struct scsi_task {
  */
 #define	STMF_IOF_LU_DONE		0x0001
 #define	STMF_IOF_LPORT_DONE		0x0002
+#define	STMF_IOF_STATS_ONLY		0x0004
 
 /*
  * struct allocation flags

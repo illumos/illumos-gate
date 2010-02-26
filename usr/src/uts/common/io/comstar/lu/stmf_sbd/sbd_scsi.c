@@ -138,7 +138,7 @@ sbd_do_read_xfer(struct scsi_task *task, sbd_cmd_t *scmd,
 		iolen = min(len - buflen, dbuf->db_sglist[ndx].seg_length);
 		if (iolen == 0)
 			break;
-		if (sbd_data_read(sl, laddr, (uint64_t)iolen,
+		if (sbd_data_read(sl, task, laddr, (uint64_t)iolen,
 		    dbuf->db_sglist[ndx].seg_addr) != STMF_SUCCESS) {
 			scmd->flags |= SBD_SCSI_CMD_XFER_FAIL;
 			/* Do not need to do xfer anymore, just complete it */
@@ -306,7 +306,7 @@ sbd_handle_read(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 
 	if ((dbuf->db_buf_size >= len) && fast_path &&
 	    (dbuf->db_sglist_length == 1)) {
-		if (sbd_data_read(sl, laddr, (uint64_t)len,
+		if (sbd_data_read(sl, task, laddr, (uint64_t)len,
 		    dbuf->db_sglist[0].seg_addr) == STMF_SUCCESS) {
 			dbuf->db_relative_offset = 0;
 			dbuf->db_data_size = len;
@@ -447,7 +447,7 @@ sbd_handle_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 		    dbuf->db_sglist[ndx].seg_length);
 		if (iolen == 0)
 			break;
-		if (sbd_data_write(sl, laddr, (uint64_t)iolen,
+		if (sbd_data_write(sl, task, laddr, (uint64_t)iolen,
 		    dbuf->db_sglist[ndx].seg_addr) != STMF_SUCCESS) {
 			scmd->flags |= SBD_SCSI_CMD_XFER_FAIL;
 			break;
@@ -560,6 +560,10 @@ sbd_handle_write(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	scmd->current_ro = 0;
 
 	if (do_immediate_data) {
+		/*
+		 * Accout for data passed in this write command
+		 */
+		(void) stmf_xfer_data(task, dbuf, STMF_IOF_STATS_ONLY);
 		scmd->len -= dbuf->db_data_size;
 		scmd->current_ro += dbuf->db_data_size;
 		dbuf->db_xfer_status = STMF_SUCCESS;

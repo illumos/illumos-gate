@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef _STMF_IMPL_H
@@ -119,6 +119,8 @@ typedef struct stmf_i_port_provider {
 	struct stmf_pp_data	*ipp_ppd;
 } stmf_i_port_provider_t;
 
+#define	MAX_ILPORT			0x10000
+
 typedef struct stmf_i_local_port {
 	stmf_local_port_t	*ilport_lport;
 	uint32_t		ilport_alloc_size;
@@ -146,10 +148,34 @@ typedef struct stmf_i_local_port {
 	char			ilport_kstat_tgt_name[STMF_TGT_NAME_LEN];
 	/* which target group this port belongs to in stmf_state.stmf_tg_list */
 	void			*ilport_tg;
+	id_t			ilport_instance;
 	/* XXX Need something to track all the remote ports also */
 } stmf_i_local_port_t;
 
 #define	STMF_AVG_ONLINE_INTERVAL	(30 * drv_usectohz(1000000))
+
+#define	MAX_IRPORT			0x10000
+
+typedef struct stmf_i_remote_port {
+	struct scsi_devid_desc	*irport_id;
+	kmutex_t		irport_mutex;
+	int			irport_refcnt;
+	id_t			irport_instance;
+	avl_node_t		irport_ln;
+} stmf_i_remote_port_t;
+
+typedef struct stmf_i_itl_kstat {
+	char			iitl_kstat_nm[KSTAT_STRLEN];
+	char			iitl_kstat_lport[STMF_TGT_NAME_LEN];
+	char			iitl_kstat_guid[STMF_GUID_INPUT + 1];
+	char			*iitl_kstat_strbuf;
+	int			iitl_kstat_strbuflen;
+	kstat_t			*iitl_kstat_info;
+	kstat_t			*iitl_kstat_taskq;
+	kstat_t			*iitl_kstat_lu_xfer;
+	kstat_t			*iitl_kstat_lport_xfer;
+	avl_node_t		iitl_kstat_ln;
+} stmf_i_itl_kstat_t;
 
 /*
  * ilport flags
@@ -161,6 +187,7 @@ typedef struct stmf_i_scsi_session {
 	stmf_scsi_session_t	*iss_ss;
 	uint32_t		iss_alloc_size;
 	uint32_t		iss_flags;
+	stmf_i_remote_port_t	*iss_irport;
 	struct stmf_i_scsi_session *iss_next;
 	/*
 	 * Ideally we should maintain 2 maps. One would indicate a new map
@@ -211,6 +238,18 @@ typedef struct stmf_i_scsi_task {
 	uint8_t			itask_ncmds;
 	uint8_t			itask_allocated_buf_map;
 	uint16_t		itask_cdb_buf_size;
+
+	/* Task profile data */
+	hrtime_t		itask_start_timestamp;
+	hrtime_t		itask_done_timestamp;
+	hrtime_t		itask_waitq_enter_timestamp;
+	hrtime_t		itask_waitq_time;
+	hrtime_t		itask_lu_read_time;
+	hrtime_t		itask_lu_write_time;
+	hrtime_t		itask_lport_read_time;
+	hrtime_t		itask_lport_write_time;
+	uint64_t		itask_read_xfer;
+	uint64_t		itask_write_xfer;
 } stmf_i_scsi_task_t;
 
 #define	ITASK_DEFAULT_ABORT_TIMEOUT	5
@@ -255,7 +294,14 @@ typedef struct stmf_itl_data {
 	uint8_t				itl_flags;
 	uint8_t				itl_hdlrm_reason;
 	uint16_t			itl_lun;
+	char				*itl_kstat_strbuf;
+	int				itl_kstat_strbuflen;
+	kstat_t				*itl_kstat_info;
+	kstat_t				*itl_kstat_taskq;
+	kstat_t				*itl_kstat_lu_xfer;
+	kstat_t				*itl_kstat_lport_xfer;
 	void				*itl_handle;
+	struct stmf_i_lu		*itl_ilu;
 	struct stmf_i_scsi_session	*itl_session;
 	struct stmf_itl_data		*itl_next;
 } stmf_itl_data_t;
@@ -293,6 +339,7 @@ typedef struct stmf_worker {
 	uint32_t		worker_max_qdepth_pu;	/* maxqd / unit time */
 	uint32_t		worker_max_sys_qdepth_pu; /* for all workers */
 	uint32_t		worker_ref_count;	/* # IOs referencing */
+	hrtime_t		worker_signal_timestamp;
 } stmf_worker_t;
 
 /*

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2926,10 +2926,12 @@ sbd_delete_lu(sbd_delete_lu_t *dlu, int struct_sz, uint32_t *err_ret)
 }
 
 sbd_status_t
-sbd_data_read(sbd_lu_t *sl, uint64_t offset, uint64_t size, uint8_t *buf)
+sbd_data_read(sbd_lu_t *sl, struct scsi_task *task,
+    uint64_t offset, uint64_t size, uint8_t *buf)
 {
 	int ret;
 	long resid;
+	hrtime_t xfer_start, xfer_done;
 
 	if ((offset + size) > sl->sl_lu_size) {
 		return (SBD_IO_PAST_EOF);
@@ -2948,8 +2950,11 @@ sbd_data_read(sbd_lu_t *sl, uint64_t offset, uint64_t size, uint8_t *buf)
 		size = store_end;
 	}
 
-	DTRACE_PROBE4(backing__store__read__start, sbd_lu_t *, sl,
-	    uint8_t *, buf, uint64_t, size, uint64_t, offset);
+	xfer_start = gethrtime();
+	stmf_lu_xfer_start(task);
+	DTRACE_PROBE5(backing__store__read__start, sbd_lu_t *, sl,
+	    uint8_t *, buf, uint64_t, size, uint64_t, offset,
+	    scsi_task_t *, task);
 
 	/*
 	 * Don't proceed if the device has been closed
@@ -2967,9 +2972,11 @@ sbd_data_read(sbd_lu_t *sl, uint64_t offset, uint64_t size, uint8_t *buf)
 	    &resid);
 	rw_exit(&sl->sl_access_state_lock);
 
-	DTRACE_PROBE5(backing__store__read__end, sbd_lu_t *, sl,
+	xfer_done = gethrtime() - xfer_start;
+	stmf_lu_xfer_done(task, B_TRUE /* read */, size, xfer_done);
+	DTRACE_PROBE6(backing__store__read__end, sbd_lu_t *, sl,
 	    uint8_t *, buf, uint64_t, size, uint64_t, offset,
-	    int, ret);
+	    int, ret, scsi_task_t *, task);
 
 over_sl_data_read:
 	if (ret || resid) {
@@ -2982,12 +2989,14 @@ over_sl_data_read:
 }
 
 sbd_status_t
-sbd_data_write(sbd_lu_t *sl, uint64_t offset, uint64_t size, uint8_t *buf)
+sbd_data_write(sbd_lu_t *sl, struct scsi_task *task,
+    uint64_t offset, uint64_t size, uint8_t *buf)
 {
 	int ret;
 	long resid;
 	sbd_status_t sret = SBD_SUCCESS;
 	int ioflag;
+	hrtime_t xfer_start, xfer_done;
 
 	if ((offset + size) > sl->sl_lu_size) {
 		return (SBD_IO_PAST_EOF);
@@ -3002,8 +3011,11 @@ sbd_data_write(sbd_lu_t *sl, uint64_t offset, uint64_t size, uint8_t *buf)
 		ioflag = 0;
 	}
 
-	DTRACE_PROBE4(backing__store__write__start, sbd_lu_t *, sl,
-	    uint8_t *, buf, uint64_t, size, uint64_t, offset);
+	xfer_start = gethrtime();
+	stmf_lu_xfer_start(task);
+	DTRACE_PROBE5(backing__store__write__start, sbd_lu_t *, sl,
+	    uint8_t *, buf, uint64_t, size, uint64_t, offset,
+	    scsi_task_t *, task);
 
 	/*
 	 * Don't proceed if the device has been closed
@@ -3021,9 +3033,11 @@ sbd_data_write(sbd_lu_t *sl, uint64_t offset, uint64_t size, uint8_t *buf)
 	    &resid);
 	rw_exit(&sl->sl_access_state_lock);
 
-	DTRACE_PROBE5(backing__store__write__end, sbd_lu_t *, sl,
+	xfer_done = gethrtime() - xfer_start;
+	stmf_lu_xfer_done(task, B_FALSE /* write */, size, xfer_done);
+	DTRACE_PROBE6(backing__store__write__end, sbd_lu_t *, sl,
 	    uint8_t *, buf, uint64_t, size, uint64_t, offset,
-	    int, ret);
+	    int, ret, scsi_task_t *, task);
 
 	if ((ret == 0) && (resid == 0) &&
 	    (sl->sl_flags & SL_WRITEBACK_CACHE_DISABLE) &&

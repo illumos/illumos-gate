@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef	_STMF_STATE_H
@@ -37,6 +37,10 @@ typedef struct stmf_state {
 	stmf_i_port_provider_t	*stmf_ipplist;
 	stmf_i_lu_t		*stmf_ilulist;
 	stmf_i_local_port_t	*stmf_ilportlist;
+	id_space_t		*stmf_ilport_inst_space;
+	avl_tree_t		stmf_irportlist;
+	id_space_t		*stmf_irport_inst_space;
+	avl_tree_t		stmf_itl_kstat_list;
 	int			stmf_nlps;
 	int			stmf_npps;
 	int			stmf_nlus;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef	_LPIF_H
@@ -130,6 +130,9 @@ stmf_status_t stmf_deregister_lu(stmf_lu_t *lup);
 stmf_status_t stmf_set_lu_access(stmf_lu_t *lup, uint8_t access_state);
 stmf_status_t stmf_proxy_scsi_cmd(scsi_task_t *, stmf_data_buf_t *dbuf);
 int stmf_is_standby_port(scsi_task_t *);
+void stmf_lu_xfer_start(struct scsi_task *task);
+void stmf_lu_xfer_done(struct scsi_task *task, boolean_t read,
+    uint64_t xfer_bytes, hrtime_t elapsed_time);
 
 #ifdef	__cplusplus
 }
