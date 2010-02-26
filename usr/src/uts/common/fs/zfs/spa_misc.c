@@ -966,12 +966,15 @@ spa_vdev_state_enter(spa_t *spa, int oplocks)
 int
 spa_vdev_state_exit(spa_t *spa, vdev_t *vd, int error)
 {
+	boolean_t config_changed = B_FALSE;
+
 	if (vd != NULL || error == 0)
 		vdev_dtl_reassess(vd ? vd->vdev_top : spa->spa_root_vdev,
 		    0, 0, B_FALSE);
 
 	if (vd != NULL) {
 		vdev_state_dirty(vd->vdev_top);
+		config_changed = B_TRUE;
 		spa->spa_config_generation++;
 	}
 
@@ -986,6 +989,15 @@ spa_vdev_state_exit(spa_t *spa, vdev_t *vd, int error)
 	 */
 	if (vd != NULL)
 		txg_wait_synced(spa->spa_dsl_pool, 0);
+
+	/*
+	 * If the config changed, update the config cache.
+	 */
+	if (config_changed) {
+		mutex_enter(&spa_namespace_lock);
+		spa_config_sync(spa, B_FALSE, B_TRUE);
+		mutex_exit(&spa_namespace_lock);
+	}
 
 	return (error);
 }

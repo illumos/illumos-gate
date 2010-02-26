@@ -1596,19 +1596,40 @@ dump_label(const char *dev)
 {
 	int fd;
 	vdev_label_t label;
-	char *buf = label.vl_vdev_phys.vp_nvlist;
+	char *path, *buf = label.vl_vdev_phys.vp_nvlist;
 	size_t buflen = sizeof (label.vl_vdev_phys.vp_nvlist);
 	struct stat64 statbuf;
 	uint64_t psize, ashift;
+	int len = strlen(dev) + 1;
 
-	if ((fd = open64(dev, O_RDONLY)) < 0) {
-		(void) printf("cannot open '%s': %s\n", dev, strerror(errno));
+	if (strncmp(dev, "/dev/dsk/", 9) == 0) {
+		len++;
+		path = malloc(len);
+		(void) snprintf(path, len, "%s%s", "/dev/rdsk/", dev + 9);
+	} else {
+		path = strdup(dev);
+	}
+
+	if ((fd = open64(path, O_RDONLY)) < 0) {
+		(void) printf("cannot open '%s': %s\n", path, strerror(errno));
+		free(path);
 		exit(1);
 	}
 
 	if (fstat64(fd, &statbuf) != 0) {
-		(void) printf("failed to stat '%s': %s\n", dev,
+		(void) printf("failed to stat '%s': %s\n", path,
 		    strerror(errno));
+		free(path);
+		(void) close(fd);
+		exit(1);
+	}
+
+	if (S_ISBLK(statbuf.st_mode)) {
+		(void) printf("cannot use '%s': character device required\n",
+		    path);
+		free(path);
+		(void) close(fd);
+		exit(1);
 	}
 
 	psize = statbuf.st_size;
@@ -1644,6 +1665,9 @@ dump_label(const char *dev)
 		if (dump_opt['u'])
 			dump_label_uberblocks(&label, ashift);
 	}
+
+	free(path);
+	(void) close(fd);
 }
 
 /*ARGSUSED*/
