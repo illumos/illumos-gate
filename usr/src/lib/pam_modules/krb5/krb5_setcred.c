@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -565,7 +565,12 @@ error:
 			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (setcred): delete/add warning");
 
-		(void) kwarn_del_warning(client_name);
+		if (kwarn_del_warning(client_name) != 0) {
+			__pam_log(LOG_AUTH | LOG_NOTICE,
+			    "PAM-KRB5 (setcred): kwarn_del_warning"
+			    " failed: ktkt_warnd(1M) down?");
+		}
+
 		if (kwarn_add_warning(client_name, endtime) != 0) {
 			__pam_log(LOG_AUTH | LOG_NOTICE,
 			    "PAM-KRB5 (setcred): kwarn_add_warning"

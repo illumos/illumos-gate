@@ -228,8 +228,8 @@ pam_sm_authenticate(
 		char buffer[512];
 
 		if (snprintf(buffer, sizeof (buffer),
-			    "%s=FILE:/tmp/krb5cc_%d",
-			    KRB5_ENV_CCNAME, (int)pw_uid) >= sizeof (buffer)) {
+		    "%s=FILE:/tmp/krb5cc_%d",
+		    KRB5_ENV_CCNAME, (int)pw_uid) >= sizeof (buffer)) {
 			result = PAM_SYSTEM_ERR;
 			goto out;
 		}
@@ -279,23 +279,23 @@ pam_sm_authenticate(
 		if (strcmp(rep_data->type, KRB5_REPOSITORY_NAME) != 0) {
 			if (debug)
 				__pam_log(LOG_AUTH | LOG_DEBUG,
-					"PAM-KRB5 (auth): wrong"
-					"repository found (%s), returning "
-					"PAM_IGNORE", rep_data->type);
+				    "PAM-KRB5 (auth): wrong"
+				    "repository found (%s), returning "
+				    "PAM_IGNORE", rep_data->type);
 			return (PAM_IGNORE);
 		}
 		if (rep_data->scope_len == sizeof (krb5_repository_data_t)) {
 			krb5_data = (krb5_repository_data_t *)rep_data->scope;
 
 			if (krb5_data->flags ==
-				SUNW_PAM_KRB5_ALREADY_AUTHENTICATED &&
-				krb5_data->principal != NULL &&
-				strlen(krb5_data->principal)) {
+			    SUNW_PAM_KRB5_ALREADY_AUTHENTICATED &&
+			    krb5_data->principal != NULL &&
+			    strlen(krb5_data->principal)) {
 				if (debug)
 					__pam_log(LOG_AUTH | LOG_DEBUG,
-						"PAM-KRB5 (auth): Principal "
-						"%s already authenticated",
-						krb5_data->principal);
+					    "PAM-KRB5 (auth): Principal "
+					    "%s already authenticated",
+					    krb5_data->principal);
 				kmd->auth_status = PAM_SUCCESS;
 				return (PAM_SUCCESS);
 			}
@@ -335,7 +335,7 @@ out:
 
 		if (kmd->env &&
 		    !(kmd->age_status == PAM_NEW_AUTHTOK_REQD &&
-			    kmd->auth_status == PAM_SUCCESS)) {
+		    kmd->auth_status == PAM_SUCCESS)) {
 
 
 			if (result == PAM_SUCCESS) {
@@ -520,14 +520,14 @@ attempt_krb5_auth(
 	/* need to free context with krb5_free_context */
 	if (code = krb5_init_secure_context(&kmd->kcontext)) {
 		__pam_log(LOG_AUTH | LOG_ERR,
-			"PAM-KRB5 (auth): Error initializing "
-			"krb5: %s",
-			error_message(code));
+		    "PAM-KRB5 (auth): Error initializing "
+		    "krb5: %s",
+		    error_message(code));
 		return (PAM_SYSTEM_ERR);
 	}
 
 	if ((code = get_kmd_kuser(kmd->kcontext, (const char *)user, kuser,
-		2*MAXHOSTNAMELEN)) != 0) {
+	    2*MAXHOSTNAMELEN)) != 0) {
 		/* get_kmd_kuser returns proper PAM error statuses */
 		return (code);
 	}
@@ -549,21 +549,21 @@ attempt_krb5_auth(
 	clientp = my_creds->client;
 
 	if (code = krb5_build_principal_ext(kmd->kcontext, &server,
-			    krb5_princ_realm(kmd->kcontext, me)->length,
-			    krb5_princ_realm(kmd->kcontext, me)->data,
-			    tgtname.length, tgtname.data,
-			    krb5_princ_realm(kmd->kcontext, me)->length,
-			    krb5_princ_realm(kmd->kcontext, me)->data, 0)) {
+	    krb5_princ_realm(kmd->kcontext, me)->length,
+	    krb5_princ_realm(kmd->kcontext, me)->data,
+	    tgtname.length, tgtname.data,
+	    krb5_princ_realm(kmd->kcontext, me)->length,
+	    krb5_princ_realm(kmd->kcontext, me)->data, 0)) {
 		__pam_log(LOG_AUTH | LOG_ERR,
-			"PAM-KRB5 (auth): attempt_krb5_auth: "
-			"krb5_build_princ_ext failed: %s",
-			error_message(code));
+		    "PAM-KRB5 (auth): attempt_krb5_auth: "
+		    "krb5_build_princ_ext failed: %s",
+		    error_message(code));
 		result = PAM_SYSTEM_ERR;
 		goto out;
 	}
 
 	if (code = krb5_copy_principal(kmd->kcontext, server,
-				&my_creds->server)) {
+	    &my_creds->server)) {
 		result = PAM_SYSTEM_ERR;
 		goto out_err;
 	}
@@ -571,9 +571,9 @@ attempt_krb5_auth(
 
 	if (code = krb5_timeofday(kmd->kcontext, &now)) {
 		__pam_log(LOG_AUTH | LOG_ERR,
-			"PAM-KRB5 (auth): attempt_krb5_auth: "
-			"krb5_timeofday failed: %s",
-			error_message(code));
+		    "PAM-KRB5 (auth): attempt_krb5_auth: "
+		    "krb5_timeofday failed: %s",
+		    error_message(code));
 		result = PAM_SYSTEM_ERR;
 		goto out;
 	}
@@ -593,20 +593,20 @@ attempt_krb5_auth(
 
 	krb_realm = krb5_princ_realm(kmd->kcontext, me)->data;
 	profile_get_options_boolean(kmd->kcontext->profile,
-				    realmdef, config_option);
+	    realmdef, config_option);
 	profile_get_options_boolean(kmd->kcontext->profile,
-				    appdef, config_option);
+	    appdef, config_option);
 	profile_get_options_string(kmd->kcontext->profile,
-				realmdef, config_times);
+	    realmdef, config_times);
 	profile_get_options_string(kmd->kcontext->profile,
-				appdef, config_times);
+	    appdef, config_times);
 
 	if (renew_timeval) {
 		code = krb5_string_to_deltat(renew_timeval, &rlife);
 		if (code != 0 || rlife == 0 || rlife > krb5_max_duration) {
 			__pam_log(LOG_AUTH | LOG_ERR,
-				    "PAM-KRB5 (auth): Bad max_renewable_life "
-				    " value '%s' in Kerberos config file",
+			    "PAM-KRB5 (auth): Bad max_renewable_life "
+			    " value '%s' in Kerberos config file",
 			    renew_timeval);
 			result = PAM_SYSTEM_ERR;
 			goto out;
@@ -617,7 +617,7 @@ attempt_krb5_auth(
 		if (code != 0 || lifetime == 0 ||
 		    lifetime > krb5_max_duration) {
 			__pam_log(LOG_AUTH | LOG_ERR,
-				"lifetime value '%s' in Kerberos config file",
+			    "lifetime value '%s' in Kerberos config file",
 			    life_timeval);
 			result = PAM_SYSTEM_ERR;
 			goto out;
@@ -637,29 +637,29 @@ attempt_krb5_auth(
 	if (proxiable_flag) { 		/* Set in config file */
 		if (kmd->debug)
 			__pam_log(LOG_AUTH | LOG_DEBUG,
-				"PAM-KRB5 (auth): Proxiable tickets "
-				"requested");
+			    "PAM-KRB5 (auth): Proxiable tickets "
+			    "requested");
 		krb5_get_init_creds_opt_set_proxiable(&opts, TRUE);
 	}
 	if (forwardable_flag) {
 		if (kmd->debug)
 			__pam_log(LOG_AUTH | LOG_DEBUG,
-				"PAM-KRB5 (auth): Forwardable tickets "
-				"requested");
+			    "PAM-KRB5 (auth): Forwardable tickets "
+			    "requested");
 		krb5_get_init_creds_opt_set_forwardable(&opts, TRUE);
 	}
 	if (renewable_flag) {
 		if (kmd->debug)
 			__pam_log(LOG_AUTH | LOG_DEBUG,
-				"PAM-KRB5 (auth): Renewable tickets "
-				"requested");
+			    "PAM-KRB5 (auth): Renewable tickets "
+			    "requested");
 		krb5_get_init_creds_opt_set_renew_life(&opts, rlife);
 	}
 	if (no_address_flag) {
 		if (kmd->debug)
 			__pam_log(LOG_AUTH | LOG_DEBUG,
-				"PAM-KRB5 (auth): Addressless tickets "
-				"requested");
+			    "PAM-KRB5 (auth): Addressless tickets "
+			    "requested");
 		krb5_get_init_creds_opt_set_address_list(&opts, NULL);
 	}
 
@@ -767,11 +767,11 @@ attempt_krb5_auth(
 			krb5_verify_init_creds_opt_init(&vopts);
 
 			code = krb5_verify_init_creds(kmd->kcontext,
-				my_creds,
-				NULL,	/* defaults to host/localhost@REALM */
-				NULL,
-				NULL,
-				&vopts);
+			    my_creds,
+			    NULL,	/* defaults to host/localhost@REALM */
+			    NULL,
+			    NULL,
+			    &vopts);
 
 			if (code) {
 				result = PAM_SYSTEM_ERR;
@@ -782,40 +782,40 @@ attempt_krb5_auth(
 				 * file cannot be found.
 				 */
 				if (krb5_sname_to_principal(kmd->kcontext, NULL,
-						NULL, KRB5_NT_SRV_HST, &sp))
+				    NULL, KRB5_NT_SRV_HST, &sp))
 					fqdn = "<fqdn>";
 				else
 					fqdn = sp->data[1].data;
 
 				if (krb5_kt_default_name(kmd->kcontext, kt_name,
-							sizeof (kt_name)))
-					(void) strncpy(kt_name,
-						"default keytab",
-						sizeof (kt_name));
+				    sizeof (kt_name)))
+					(void) strlcpy(kt_name,
+					    "default keytab",
+					    sizeof (kt_name));
 
 				switch (code) {
 				case KRB5_KT_NOTFOUND:
 					__pam_log(LOG_AUTH | LOG_ERR,
-						"PAM-KRB5 (auth): "
-						"krb5_verify_init_creds failed:"
-						" Key table entry \"host/%s\""
-						" not found in %s",
-						fqdn, kt_name);
+					    "PAM-KRB5 (auth): "
+					    "krb5_verify_init_creds failed:"
+					    " Key table entry \"host/%s\""
+					    " not found in %s",
+					    fqdn, kt_name);
 					break;
 				case ENOENT:
 					__pam_log(LOG_AUTH | LOG_ERR,
-						"PAM-KRB5 (auth): "
-						"krb5_verify_init_creds failed:"
-						" Keytab file \"%s\""
-						" does not exist.\n",
-						kt_name);
+					    "PAM-KRB5 (auth): "
+					    "krb5_verify_init_creds failed:"
+					    " Keytab file \"%s\""
+					    " does not exist.\n",
+					    kt_name);
 					break;
 				default:
 					__pam_log(LOG_AUTH | LOG_ERR,
-						"PAM-KRB5 (auth): "
-						"krb5_verify_init_creds failed:"
-						" %s",
-						error_message(code));
+					    "PAM-KRB5 (auth): "
+					    "krb5_verify_init_creds failed:"
+					    " %s",
+					    error_message(code));
 					break;
 				}
 
@@ -838,9 +838,9 @@ attempt_krb5_auth(
 
 		if (kmd->debug)
 			__pam_log(LOG_AUTH | LOG_DEBUG,
-				"PAM-KRB5 (auth): attempt_krb5_auth:"
-				" User is not part of the local Kerberos"
-				" realm: %s", error_message(code));
+			    "PAM-KRB5 (auth): attempt_krb5_auth:"
+			    " User is not part of the local Kerberos"
+			    " realm: %s", error_message(code));
 		break;
 
 	case KRB5KDC_ERR_PREAUTH_FAILED:
@@ -887,8 +887,8 @@ attempt_krb5_auth(
 		result = PAM_SYSTEM_ERR;
 		if (kmd->debug)
 			__pam_log(LOG_AUTH | LOG_DEBUG,
-				"PAM-KRB5 (auth): error %d - %s",
-				code, error_message(code));
+			    "PAM-KRB5 (auth): error %d - %s",
+			    code, error_message(code));
 		break;
 	}
 
@@ -905,7 +905,7 @@ attempt_krb5_auth(
 		if (*krb5_pass != NULL &&
 		    !(kmd->password = strdup(*krb5_pass))) {
 			__pam_log(LOG_AUTH | LOG_ERR,
-				  "Cannot strdup password");
+			    "Cannot strdup password");
 			result = PAM_BUF_ERR;
 			goto out_err;
 		}
@@ -971,7 +971,7 @@ krb5_cleanup(pam_handle_t *pamh, void *data, int pam_status)
 
 	if (kmd->debug) {
 		__pam_log(LOG_AUTH | LOG_DEBUG,
-			    "PAM-KRB5 (auth): krb5_cleanup auth_status = %d",
+		    "PAM-KRB5 (auth): krb5_cleanup auth_status = %d",
 		    kmd->auth_status);
 	}
 

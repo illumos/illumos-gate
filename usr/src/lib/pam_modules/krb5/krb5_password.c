@@ -81,8 +81,8 @@ set_ccname(
 			    != PAM_SUCCESS) {
 				/* should not happen but... */
 				__pam_log(LOG_AUTH | LOG_ERR,
-					    "PAM-KRB5 (password):"
-					    " pam_putenv failed: result: %d",
+				    "PAM-KRB5 (password):"
+				    " pam_putenv failed: result: %d",
 				    result);
 				goto cleanupccname;
 			}
@@ -132,11 +132,11 @@ get_set_creds(
 	 */
 	if (login_result != PAM_SUCCESS) {
 		display_msg(pamh, PAM_TEXT_INFO,
-			    dgettext(TEXT_DOMAIN,
-				    "Warning: "
-				    "Could not cache Kerberos"
-				    " credentials, please run "
-				    "kinit(1) or re-login\n"));
+		    dgettext(TEXT_DOMAIN,
+		    "Warning: "
+		    "Could not cache Kerberos"
+		    " credentials, please run "
+		    "kinit(1) or re-login\n"));
 	}
 	set_ccname(pamh, kmd, login_result, debug);
 }
@@ -168,7 +168,7 @@ pam_sm_chauthtok(
 			debug = 1;
 		else
 			__pam_log(LOG_AUTH | LOG_ERR,
-				    "PAM-KRB5 (password): illegal option %s",
+			    "PAM-KRB5 (password): illegal option %s",
 			    argv[i]);
 	}
 
@@ -183,9 +183,9 @@ pam_sm_chauthtok(
 		if (strcmp(rep_data->type, KRB5_REPOSITORY_NAME) != 0) {
 			if (debug)
 				__pam_log(LOG_AUTH | LOG_DEBUG,
-					"PAM-KRB5 (auth): wrong"
-					"repository found (%s), returning "
-					"PAM_IGNORE", rep_data->type);
+				    "PAM-KRB5 (auth): wrong"
+				    "repository found (%s), returning "
+				    "PAM_IGNORE", rep_data->type);
 			return (PAM_IGNORE);
 		}
 	}
@@ -201,8 +201,8 @@ pam_sm_chauthtok(
 	/* make sure PAM framework is telling us to update passwords */
 	if (!(flags & PAM_UPDATE_AUTHTOK)) {
 		__pam_log(LOG_AUTH | LOG_ERR,
-			"PAM-KRB5 (password): bad flags: %d",
-			flags);
+		    "PAM-KRB5 (password): bad flags: %d",
+		    flags);
 		return (PAM_SYSTEM_ERR);
 	}
 
@@ -232,7 +232,7 @@ pam_sm_chauthtok(
 
 	if (user == NULL || *user == '\0') {
 		__pam_log(LOG_AUTH | LOG_ERR,
-			"PAM-KRB5 (password): username is empty");
+		    "PAM-KRB5 (password): username is empty");
 		return (PAM_USER_UNKNOWN);
 	}
 
@@ -278,7 +278,7 @@ pam_sm_chauthtok(
 	result = krb5_verifypw(user, oldpass, debug);
 	if (debug)
 		__pam_log(LOG_AUTH | LOG_DEBUG,
-			"PAM-KRB5 (password): verifypw %d", result);
+		    "PAM-KRB5 (password): verifypw %d", result);
 
 	/*
 	 * If it's a bad password or general failure, we are done.
@@ -293,7 +293,7 @@ pam_sm_chauthtok(
 
 		if (result == 2)
 			display_msg(pamh, PAM_ERROR_MSG, dgettext(TEXT_DOMAIN,
-				"Old Kerberos password incorrect\n"));
+			    "Old Kerberos password incorrect\n"));
 		return (PAM_AUTHTOK_ERR);
 	}
 
@@ -312,7 +312,7 @@ pam_sm_chauthtok(
 out:
 	if (debug)
 		__pam_log(LOG_AUTH | LOG_DEBUG,
-			"PAM-KRB5 (password): out: returns %d",
+		    "PAM-KRB5 (password): out: returns %d",
 		    result);
 
 	return (result);
@@ -340,7 +340,7 @@ krb5_verifypw(
 	}
 
 	if ((code = get_kmd_kuser(context, (const char *)princ_str, kprinc,
-		2*MAXHOSTNAMELEN)) != 0) {
+	    2*MAXHOSTNAMELEN)) != 0) {
 		return (code);
 	}
 
@@ -357,8 +357,8 @@ krb5_verifypw(
 	}
 
 	(void) strlcpy(admin_realm,
-		    krb5_princ_realm(context, princ)->data,
-		    sizeof (admin_realm));
+	    krb5_princ_realm(context, princ)->data,
+	    sizeof (admin_realm));
 
 	params.mask |= KADM5_CONFIG_REALM;
 	params.realm = admin_realm;
@@ -366,17 +366,17 @@ krb5_verifypw(
 
 	if (kadm5_get_cpw_host_srv_name(context, admin_realm, &cpw_service)) {
 		__pam_log(LOG_AUTH | LOG_ERR,
-			"PAM-KRB5 (password): unable to get host based "
-			"service name for realm %s\n",
-			admin_realm);
+		    "PAM-KRB5 (password): unable to get host based "
+		    "service name for realm %s\n",
+		    admin_realm);
 		krb5_free_principal(context, princ);
 		return (3);
 	}
 
 	code = kadm5_init_with_password(kprinc, old_password, cpw_service,
-					&params, KADM5_STRUCT_VERSION,
-					KADM5_API_VERSION_2, NULL,
-					&server_handle);
+	    &params, KADM5_STRUCT_VERSION,
+	    KADM5_API_VERSION_2, NULL,
+	    &server_handle);
 	if (code != 0) {
 		if (debug)
 			__pam_log(LOG_AUTH | LOG_DEBUG,
@@ -439,7 +439,7 @@ krb5_changepw(
 		return (PAM_SYSTEM_ERR);
 
 	if ((code = get_kmd_kuser(context, (const char *)princ_str, kprinc,
-		2*MAXHOSTNAMELEN)) != 0) {
+	    2*MAXHOSTNAMELEN)) != 0) {
 		return (code);
 	}
 
@@ -455,23 +455,23 @@ krb5_changepw(
 	}
 
 	(void) snprintf(admin_realm, sizeof (admin_realm), "%s",
-		krb5_princ_realm(context, princ)->data);
+	    krb5_princ_realm(context, princ)->data);
 	params.mask |= KADM5_CONFIG_REALM;
 	params.realm = admin_realm;
 
 
 	if (kadm5_get_cpw_host_srv_name(context, admin_realm, &cpw_service)) {
 		__pam_log(LOG_AUTH | LOG_ERR,
-				"PAM-KRB5 (password):unable to get host based "
-				"service name for realm %s\n",
-			admin_realm);
+		    "PAM-KRB5 (password):unable to get host based "
+		    "service name for realm %s\n",
+		    admin_realm);
 		return (PAM_SYSTEM_ERR);
 	}
 
 	code = kadm5_init_with_password(kprinc, old_password, cpw_service,
-					&params, KADM5_STRUCT_VERSION,
-					KADM5_API_VERSION_2, NULL,
-					&server_handle);
+	    &params, KADM5_STRUCT_VERSION,
+	    KADM5_API_VERSION_2, NULL,
+	    &server_handle);
 	free(cpw_service);
 	if (code != 0) {
 		if (debug)
@@ -480,21 +480,21 @@ krb5_changepw(
 			    "init_with_pw failed:  (%s)", error_message(code));
 		krb5_free_principal(context, princ);
 		return ((code == KADM5_BAD_PASSWORD) ?
-			PAM_AUTHTOK_ERR : PAM_SYSTEM_ERR);
+		    PAM_AUTHTOK_ERR : PAM_SYSTEM_ERR);
 	}
 
 	code = kadm5_chpass_principal_util(server_handle, princ,
-					new_password,
-					NULL /* don't need pw back */,
-					msg_ret,
-					sizeof (msg_ret));
+	    new_password,
+	    NULL /* don't need pw back */,
+	    msg_ret,
+	    sizeof (msg_ret));
 
 	if (code) {
 		char msgs[2][PAM_MAX_MSG_SIZE];
 
 		(void) snprintf(msgs[0], PAM_MAX_MSG_SIZE, "%s",
-			dgettext(TEXT_DOMAIN,
-				"Kerberos password not changed: "));
+		    dgettext(TEXT_DOMAIN,
+		    "Kerberos password not changed: "));
 		(void) snprintf(msgs[1], PAM_MAX_MSG_SIZE, "%s", msg_ret);
 
 		display_msgs(pamh, PAM_ERROR_MSG, 2, msgs);
