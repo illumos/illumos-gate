@@ -328,7 +328,16 @@ struct kmem_cache *ciputctrl_cache = NULL;
 static linkinfo_t *linkinfo_list;
 
 /* Global esballoc throttling queue */
-static esb_queue_t	system_esbq;
+static esb_queue_t system_esbq;
+
+/* Array of esballoc throttling queues, of length esbq_nelem */
+static esb_queue_t *volatile system_esbq_array;
+static int esbq_nelem;
+static kmutex_t esbq_lock;
+static int esbq_log2_cpus_per_q = 0;
+
+/* Scale the system_esbq length by setting number of CPUs per queue. */
+uint_t esbq_cpus_per_q = 1;
 
 /*
  * esballoc tunable parameters.
@@ -3904,14 +3913,34 @@ sqenable(syncq_t *sq)
  * closing pipes it can avoid stack overflow in case of daisy-chained
  * pipes, and also avoid deadlock in case of fifonode_t pairs (which
  * share the same fifolock_t).
+ *
+ * No need to kpreempt_disable to access cpu_seqid.  If we migrate and
+ * the esb queue does not match the new CPU, that is OK.
  */
-
 void
 freebs_enqueue(mblk_t *mp, dblk_t *dbp)
 {
-	esb_queue_t *eqp = &system_esbq;
+	int qindex = CPU->cpu_seqid >> esbq_log2_cpus_per_q;
+	esb_queue_t *eqp;
 
 	ASSERT(dbp->db_mblk == mp);
+	ASSERT(qindex < esbq_nelem);
+
+	eqp = system_esbq_array;
+	if (eqp != NULL) {
+		eqp += qindex;
+	} else {
+		mutex_enter(&esbq_lock);
+		if (kmem_ready && system_esbq_array == NULL)
+			system_esbq_array = (esb_queue_t *)kmem_zalloc(
+			    esbq_nelem * sizeof (esb_queue_t), KM_NOSLEEP);
+		mutex_exit(&esbq_lock);
+		eqp = system_esbq_array;
+		if (eqp != NULL)
+			eqp += qindex;
+		else
+			eqp = &system_esbq;
+	}
 
 	/*
 	 * Check data sanity. The dblock should have non-empty free function.
@@ -4037,9 +4066,17 @@ esballoc_set_timer(esb_queue_t *eqp, clock_t eq_timeout)
 	}
 }
 
+/*
+ * Setup esbq array length based upon NCPU scaled by CPUs per
+ * queue. Use static system_esbq until kmem_ready and we can
+ * create an array in freebs_enqueue().
+ */
 void
 esballoc_queue_init(void)
 {
+	esbq_log2_cpus_per_q = highbit(esbq_cpus_per_q - 1);
+	esbq_cpus_per_q = 1 << esbq_log2_cpus_per_q;
+	esbq_nelem = howmany(NCPU, esbq_cpus_per_q);
 	system_esbq.eq_len = 0;
 	system_esbq.eq_head = system_esbq.eq_tail = NULL;
 	system_esbq.eq_flags = 0;
