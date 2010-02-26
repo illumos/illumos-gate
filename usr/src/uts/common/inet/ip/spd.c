@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,7 +79,7 @@ static mblk_t *ipsec_check_ipsecin_policy(mblk_t *, ipsec_policy_t *,
     ipha_t *, ip6_t *, uint64_t, ip_recv_attr_t *, netstack_t *);
 static void ipsec_action_free_table(ipsec_action_t *);
 static void ipsec_action_reclaim(void *);
-static void ipsec_action_reclaim_stack(netstack_t *);
+static void ipsec_action_reclaim_stack(ipsec_stack_t *);
 static void ipsid_init(netstack_t *);
 static void ipsid_fini(netstack_t *);
 
@@ -1092,7 +1092,7 @@ ipsec_config_flush(netstack_t *ns)
 	ipsec_polhead_flush(&ipss->ipsec_system_policy, ns);
 	ipss->ipsec_next_policy_index = 1;
 	rw_exit(&ipss->ipsec_system_policy.iph_lock);
-	ipsec_action_reclaim_stack(ns);
+	ipsec_action_reclaim_stack(ipss);
 }
 
 /*
@@ -3303,10 +3303,19 @@ ipsec_action_reclaim(void *arg)
 {
 	netstack_handle_t nh;
 	netstack_t *ns;
+	ipsec_stack_t *ipss;
 
 	netstack_next_init(&nh);
 	while ((ns = netstack_next(&nh)) != NULL) {
-		ipsec_action_reclaim_stack(ns);
+		/*
+		 * netstack_next() can return a netstack_t with a NULL
+		 * netstack_ipsec at boot time.
+		 */
+		if ((ipss = ns->netstack_ipsec) == NULL) {
+			netstack_rele(ns);
+			continue;
+		}
+		ipsec_action_reclaim_stack(ipss);
 		netstack_rele(ns);
 	}
 	netstack_next_fini(&nh);
@@ -3324,10 +3333,9 @@ ipsec_action_reclaim(void *arg)
  * "stale" actions.
  */
 static void
-ipsec_action_reclaim_stack(netstack_t *ns)
+ipsec_action_reclaim_stack(ipsec_stack_t *ipss)
 {
 	int i;
-	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	for (i = 0; i < IPSEC_ACTION_HASH_SIZE; i++) {
 		ipsec_action_t *ap, *np;

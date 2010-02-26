@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -185,10 +185,19 @@ ip_dce_reclaim(void *args)
 {
 	netstack_handle_t nh;
 	netstack_t *ns;
+	ip_stack_t *ipst;
 
 	netstack_next_init(&nh);
 	while ((ns = netstack_next(&nh)) != NULL) {
-		ip_dce_reclaim_stack(ns->netstack_ip);
+		/*
+		 * netstack_next() can return a netstack_t with a NULL
+		 * netstack_ip at boot time.
+		 */
+		if ((ipst = ns->netstack_ip) == NULL) {
+			netstack_rele(ns);
+			continue;
+		}
+		ip_dce_reclaim_stack(ipst);
 		netstack_rele(ns);
 	}
 	netstack_next_fini(&nh);

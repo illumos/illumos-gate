@@ -564,7 +564,24 @@ tcp_conn_reclaim(void *arg)
 		int i;
 		int64_t tot_conn = 0;
 
-		tcps = ns->netstack_tcp;
+		/*
+		 * During boot time, the first netstack_t is created and
+		 * initialized before TCP has registered with the netstack
+		 * framework.  If this reclaim function is called before TCP
+		 * has finished its initialization, netstack_next() will
+		 * return the first netstack_t (since its netstack_flags is
+		 * not NSF_UNINIT).  And its netstack_tcp will be NULL.  We
+		 * need to catch it.
+		 *
+		 * All subsequent netstack_t creation will not have this
+		 * problem since the initialization is not finished until TCP
+		 * has finished its own tcp_stack_t initialization.  Hence
+		 * netstack_next() will not return one with NULL netstack_tcp.
+		 */
+		if ((tcps = ns->netstack_tcp) == NULL) {
+			netstack_rele(ns);
+			continue;
+		}
 
 		/*
 		 * Even if the system is under memory pressure, the reason may

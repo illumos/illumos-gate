@@ -2216,10 +2216,19 @@ ip_ire_reclaim(void *args)
 {
 	netstack_handle_t nh;
 	netstack_t *ns;
+	ip_stack_t *ipst;
 
 	netstack_next_init(&nh);
 	while ((ns = netstack_next(&nh)) != NULL) {
-		ip_ire_reclaim_stack(ns->netstack_ip);
+		/*
+		 * netstack_next() can return a netstack_t with a NULL
+		 * netstack_ip at boot time.
+		 */
+		if ((ipst = ns->netstack_ip) == NULL) {
+			netstack_rele(ns);
+			continue;
+		}
+		ip_ire_reclaim_stack(ipst);
 		netstack_rele(ns);
 	}
 	netstack_next_fini(&nh);
