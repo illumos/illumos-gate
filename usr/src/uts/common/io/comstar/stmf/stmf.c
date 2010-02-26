@@ -6939,6 +6939,7 @@ stmf_svc_loop:
 			int port_level;
 			for (ilport = stmf_state.stmf_ilportlist; ilport;
 			    ilport = next_ilport) {
+				int ilport_lock_held;
 				next_ilport = ilport->ilport_next;
 				if ((ilport->ilport_flags &
 				    ILPORT_SS_GOT_INITIAL_LUNS) == 0) {
@@ -6946,6 +6947,7 @@ stmf_svc_loop:
 				}
 				port_level = 0;
 				rw_enter(&ilport->ilport_lock, RW_READER);
+				ilport_lock_held = 1;
 				for (iss = ilport->ilport_ss_list; iss;
 				    iss = iss->iss_next) {
 					if ((iss->iss_flags &
@@ -6959,6 +6961,7 @@ stmf_svc_loop:
 					atomic_or_32(&iss->iss_flags,
 					    ISS_EVENT_ACTIVE);
 					rw_exit(&ilport->ilport_lock);
+					ilport_lock_held = 0;
 					mutex_exit(&stmf_state.stmf_lock);
 					stmf_generate_lport_event(ilport,
 					    LPORT_EVENT_INITIAL_LUN_MAPPED,
@@ -6979,7 +6982,7 @@ stmf_svc_loop:
 					    ~ILPORT_SS_GOT_INITIAL_LUNS);
 				}
 				/* drop the lock if we are holding it. */
-				if (rw_lock_held(&ilport->ilport_lock))
+				if (ilport_lock_held == 1)
 					rw_exit(&ilport->ilport_lock);
 
 				/* Max 4 session at a time */
