@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -135,9 +135,6 @@ ilb_nat_src_init(ilb_stack_t *ilbs)
 {
 	int i;
 
-	ilbs->ilbs_nat_src_tid = timeout(ilb_nat_src_timer, ilbs,
-	    SEC_TO_TICK(ILB_NAT_SRC_TIMEOUT +
-	    gethrtime() % ILB_NAT_SRC_TIMEOUT_JITTER));
 	ilbs->ilbs_nat_src = kmem_zalloc(sizeof (ilb_nat_src_hash_t) *
 	    ilbs->ilbs_nat_src_hash_size, KM_SLEEP);
 	for (i = 0; i < ilbs->ilbs_nat_src_hash_size; i++) {
@@ -147,6 +144,9 @@ ilb_nat_src_init(ilb_stack_t *ilbs)
 		mutex_init(&ilbs->ilbs_nat_src[i].nsh_lock, NULL,
 		    MUTEX_DEFAULT, NULL);
 	}
+	ilbs->ilbs_nat_src_tid = timeout(ilb_nat_src_timer, ilbs,
+	    SEC_TO_TICK(ILB_NAT_SRC_TIMEOUT +
+	    gethrtime() % ILB_NAT_SRC_TIMEOUT_JITTER));
 }
 
 /*

@@ -180,7 +180,7 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 			    tcp_snmp_state(tcp);
 			if (tce.tcpConnState == MIB2_TCP_established ||
 			    tce.tcpConnState == MIB2_TCP_closeWait)
-				TCPS_BUMP_MIB(tcps, tcpCurrEstab);
+				BUMP_MIB(&tcp_mib, tcpCurrEstab);
 
 			needattr = B_FALSE;
 			bzero(&mlp, sizeof (mlp));
@@ -346,15 +346,16 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 		}
 	}
 
-	/* fixed length structure for IPv4 and IPv6 counters */
-	SET_MIB(tcp_mib.tcpConnTableSize, sizeof (mib2_tcpConnEntry_t));
-	SET_MIB(tcp_mib.tcp6ConnTableSize, sizeof (mib2_tcp6ConnEntry_t));
+	tcp_sum_mib(tcps, &tcp_mib);
 
-	/* synchronize 32- and 64-bit counters */
+	/*
+	 * Synchronize 32- and 64-bit counters.  Note that tcpInSegs and
+	 * tcpOutSegs are not updated anywhere in TCP.  The new 64 bits
+	 * counters are used.  Hence the old counters' values in tcp_sc_mib
+	 * are always 0.
+	 */
 	SYNC32_MIB(&tcp_mib, tcpInSegs, tcpHCInSegs);
 	SYNC32_MIB(&tcp_mib, tcpOutSegs, tcpHCOutSegs);
-
-	tcp_sum_mib(tcps, &tcp_mib);
 
 	optp = (struct opthdr *)&mpctl->b_rptr[sizeof (struct T_optmgmt_ack)];
 	optp->level = MIB2_TCP;
@@ -855,6 +856,10 @@ tcp_sum_mib(tcp_stack_t *tcps, mib2_tcp_t *tcp_mib)
 	cnt = tcps->tcps_sc_cnt;
 	for (i = 0; i < cnt; i++)
 		tcp_cp_mib(&tcps->tcps_sc[i]->tcp_sc_mib, tcp_mib);
+
+	/* Fixed length structure for IPv4 and IPv6 counters */
+	SET_MIB(tcp_mib->tcpConnTableSize, sizeof (mib2_tcpConnEntry_t));
+	SET_MIB(tcp_mib->tcp6ConnTableSize, sizeof (mib2_tcp6ConnEntry_t));
 }
 
 /*
