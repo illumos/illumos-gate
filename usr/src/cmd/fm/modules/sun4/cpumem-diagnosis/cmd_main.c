@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,6 +82,27 @@ cmd_nop(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 {
 	return (CMD_EVD_UNUSED);
 }
+
+#ifdef sun4u
+/*
+ * It used to be that cmd_opluecpu_detio() was called directly, with a
+ * 'class' argument of ereport.io.oberon.xxx.  But the code underlying
+ * cmd_opluecpu_detio() assumed that the class would always be of the form
+ * ereport.cpu.<cputype>.<subclass>.
+ *
+ * Rather than generalizing the underlying code, the following adjusts the
+ * input to cmd_opluecpu_detio() so that it conforms to the above expectation.
+ */
+
+/*ARGSUSED*/
+cmd_evdisp_t
+opl_opluecpu_detio(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
+    const char *class, cmd_errcl_t clcode)
+{
+	return (cmd_opluecpu_detio(hdl, ep, nvl,
+	    "ereport.cpu.SPARC64-VI.", clcode));
+}
+#endif	/* sun4u */
 
 static cmd_subscriber_t cmd_subscribers[] = {
 #ifdef sun4u
@@ -199,23 +220,23 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	{ "ereport.cpu.*.uge",				cmd_opluge },
 	{ "ereport.io.oberon.ubc.dmarduea-mem",		cmd_opl_io_mem },
 	{ "ereport.io.oberon.ubc.dmarduea-channel",	cmd_nop },
-	{ "ereport.io.oberon.ubc.dmarduea-cpu",		cmd_opluecpu_detio },
+	{ "ereport.io.oberon.ubc.dmarduea-cpu",		opl_opluecpu_detio },
 	{ "ereport.io.oberon.ubc.dmarduea-path",	cmd_nop },
 	{ "ereport.io.oberon.ubc.dmardueb-mem",		cmd_opl_io_mem },
 	{ "ereport.io.oberon.ubc.dmardueb-channel",	cmd_nop },
-	{ "ereport.io.oberon.ubc.dmardueb-cpu",		cmd_opluecpu_detio },
+	{ "ereport.io.oberon.ubc.dmardueb-cpu",		opl_opluecpu_detio },
 	{ "ereport.io.oberon.ubc.dmardueb-path",	cmd_nop },
 	{ "ereport.io.oberon.ubc.piowtue-mem",		cmd_opl_io_mem },
 	{ "ereport.io.oberon.ubc.piowtue-channel",	cmd_nop },
-	{ "ereport.io.oberon.ubc.piowtue-cpu",		cmd_opluecpu_detio },
+	{ "ereport.io.oberon.ubc.piowtue-cpu",		opl_opluecpu_detio },
 	{ "ereport.io.oberon.ubc.piowtue-path",		cmd_nop },
 	{ "ereport.io.oberon.ubc.piowbeue-mem",		cmd_opl_io_mem },
 	{ "ereport.io.oberon.ubc.piowbeue-channel",	cmd_nop },
-	{ "ereport.io.oberon.ubc.piowbeue-cpu",		cmd_opluecpu_detio },
+	{ "ereport.io.oberon.ubc.piowbeue-cpu",		opl_opluecpu_detio },
 	{ "ereport.io.oberon.ubc.piowbeue-path",	cmd_nop },
 	{ "ereport.io.oberon.ubc.piorbeue-mem",		cmd_opl_io_mem },
 	{ "ereport.io.oberon.ubc.piorbeue-channel",	cmd_nop },
-	{ "ereport.io.oberon.ubc.piorbeue-cpu",		cmd_opluecpu_detio },
+	{ "ereport.io.oberon.ubc.piorbeue-cpu",		opl_opluecpu_detio },
 	{ "ereport.io.oberon.ubc.piorbeue-path",	cmd_nop },
 	{ "ereport.cpu.*.fpu.fpscrub",	cmd_fps },
 #else /* i.e. sun4v */
