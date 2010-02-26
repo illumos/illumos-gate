@@ -280,14 +280,15 @@ have_valid_ku(char *zonename)
 	char		*lastp;
 	char		*pstr;
 	char		*patchlist = NULL;
-	int		i;
 	char		zonepath[MAXPATHLEN];
 	char		sanity_skip[MAXPATHLEN];
 	struct stat64	buf;
+	boolean_t	is_xpv = B_FALSE;
+	char		platform[80];
+	char		*xpv_vers = "142910";
 	char 		*vers_table[] = {
 			    "141444-09",
-			    "141445-09",
-			    NULL};
+			    "141445-09"};
 
 	if (zone_get_zonepath(zonename, zonepath, sizeof (zonepath)) != Z_OK)
 		s10_err(gettext("error getting zone's path"));
@@ -306,14 +307,32 @@ have_valid_ku(char *zonename)
 	if (get_ku_patchlist(zonepath, &patchlist) != 0 || patchlist == NULL)
 		return (B_FALSE);
 
+	/*
+	 * Check if we're running on the i86xpv platform.  If so, the zone
+	 * needs a different ku patch to work properly.
+	 */
+	if (sysinfo(SI_PLATFORM, platform, sizeof (platform)) != -1 &&
+	    strcmp(platform, "i86xpv") == 0)
+		is_xpv = B_TRUE;
+
 	pstr = patchlist;
 	while ((p = strtok_r(pstr, " ", &lastp)) != NULL) {
-		for (i = 0; vers_table[i] != NULL; i++)
-			if (strcmp(p, vers_table[i]) == 0)
+		if (is_xpv) {
+			if (strncmp(p, xpv_vers, 6) == 0)
 				return (B_TRUE);
+		} else {
+			if (strcmp(p, vers_table[0]) == 0 ||
+			    strcmp(p, vers_table[1]) == 0)
+				return (B_TRUE);
+		}
 
 		pstr = NULL;
 	}
+
+	if (is_xpv)
+		s10_err(gettext("the zone must have patch 142910 installed "
+		    "when running in a paravirtualized domain"));
+
 
 	return (B_FALSE);
 }
@@ -404,17 +423,6 @@ set_zone_emul_bitmap(char *zonename)
 		s10_err(gettext("error setting zone's emulation bitmap"));
 }
 
-static void
-fail_xvm()
-{
-	char buf[80];
-
-	if (sysinfo(SI_PLATFORM, buf, sizeof (buf)) != -1 &&
-	    strcmp(buf, "i86xpv") == 0 && !override)
-		s10_err(gettext("running the solaris10 brand "
-		    "in a paravirtualized\ndomain is currently not supported"));
-}
-
 static int
 s10_boot(char *zonename)
 {
@@ -423,8 +431,6 @@ s10_boot(char *zonename)
 		    "not supported"));
 
 	set_zone_emul_bitmap(zonename);
-
-	fail_xvm();
 
 	return (0);
 }

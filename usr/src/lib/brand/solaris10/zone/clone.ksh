@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -133,5 +133,8 @@ if [[ ! -f $ZONEROOT/etc/.UNCONFIGURED ]]; then
 
 	/usr/sbin/zoneadm -z $ZONENAME halt
 fi
+
+# Add a service tag for this zone.
+add_svc_tag "$ZONENAME" "clone $sourcezone"
 
 exit $ZONE_SUBPROC_OK

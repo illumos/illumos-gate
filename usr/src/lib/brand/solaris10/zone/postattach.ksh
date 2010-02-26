@@ -24,45 +24,56 @@
 # Use is subject to license terms.
 #
 
+#
+# This postattach hook adds the service tag for the zone.
+# We need this in a postattach hook since the zone doesn't have
+# a UUID when the attach hook is run.
+#
+
 . /usr/lib/brand/solaris10/common.ksh
 
-m_usage=$(gettext  "solaris10 brand usage: detach [-n].")
-
-EXIT_CODE=$ZONE_SUBPROC_USAGE
+install_media="-"
 
 # If we weren't passed at least two arguments, exit now.
-(( $# < 2 )) && exit $ZONE_SUBPROC_USAGE
+(( $# < 2 )) && exit $ZONE_SUBPROC_OK
 
 ZONENAME="$1"
 ZONEPATH="$2"
-# XXX shared/common script currently uses lower case zonename & zonepath
-zonename="$ZONENAME"
-zonepath="$ZONEPATH"
 
-shift; shift	# remove ZONENAME and ZONEPATH from arguments array
+shift 2
 
 noexecute=0
+unset inst_type
 
-# Other brand attach options are invalid for this brand.
-while getopts "n" opt; do
+#
+# This hook will see the same options as the attach hook, so make sure
+# we accept all of these.
+#
+while getopts "a:d:nr:" opt; do
 	case $opt in
+		a)
+		 	inst_type="archive"
+			install_media="$OPTARG"
+			;;
+		d)
+		 	inst_type="directory"
+			install_media="$OPTARG"
+			;;
 		n)	noexecute=1 ;;
-		?)	printf "$m_usage\n"
-			exit $ZONE_SUBPROC_USAGE;;
-		*)	printf "$m_usage\n"
-			exit $ZONE_SUBPROC_USAGE;;
+		r)
+		 	inst_type="stdin"
+			install_media="$OPTARG"
+			;;
+		?)	exit $ZONE_SUBPROC_OK;;
+		*)	exit $ZONE_SUBPROC_OK;;
 	esac
 done
 shift $((OPTIND-1))
 
-if [[ $noexecute == 1 ]]; then
-	cat /etc/zones/$ZONENAME.xml
-	exit $ZONE_SUBPROC_OK
-fi
+[ $noexecute -eq 1 ] && exit $ZONE_SUBPROC_OK
+[[ -z "$inst_type" ]] && inst_type="directory"
 
-cp /etc/zones/$ZONENAME.xml $ZONEPATH/SUNWdetached.xml
-
-# Remove the service tag for this zone.
-del_svc_tag "$ZONENAME"
+# Add a service tag for this zone.
+add_svc_tag "$ZONENAME" "attach $inst_type `basename $install_media`"
 
 exit $ZONE_SUBPROC_OK

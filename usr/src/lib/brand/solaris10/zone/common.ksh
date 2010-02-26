@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -31,6 +31,12 @@ export PATH
 
 # Use the ipkg-brand ZFS property for denoting the zone root's active dataset.
 PROP_ACTIVE="org.opensolaris.libbe:active"
+
+# Values for service tags.
+STCLIENT=/usr/bin/stclient
+ST_PRODUCT_NAME="Solaris 10 Containers"
+ST_PRODUCT_REV="1.0"
+ST_PRODUCT_UUID="urn:uuid:2f459121-dec7-11de-9af7-080020a9ed93"
 
 w_sanity_detail=$(gettext "       WARNING: Skipping image sanity checks.")
 f_sanity_detail=$(gettext  "Missing %s at %s")
@@ -55,6 +61,12 @@ e_badboot=$(gettext "Zone boot failed")
 e_nosingleuser=$(gettext "ERROR: zone did not finish booting to single-user.")
 e_unconfig=$(gettext "sys-unconfig failed")
 v_unconfig=$(gettext "Performing zone sys-unconfig")
+
+v_no_tags=$(gettext "Service tags facility not present.")
+e_bad_uuid=$(gettext "Failed to get zone UUID")
+v_addtag=$(gettext "Adding service tag: %s")
+v_deltag=$(gettext "Removing service tag: %s")
+e_addtag_fail=$(gettext "Adding service tag failed (error: %s)")
 
 sanity_check()
 {
@@ -340,5 +352,77 @@ sysunconfig_zone() {
 		return 1
 	fi
 
+	return 0
+}
+
+#
+# Get zone's uuid for service tag.
+#
+get_inst_uuid()
+{
+        typeset ZONENAME="$1"
+
+	ZONEUUID=`zoneadm -z $ZONENAME list -p | nawk -F: '{print $5}'`
+	[[ $? -ne 0 || -z $ZONEUUID ]] && return 1
+
+	INSTANCE_UUID="urn:st:${ZONEUUID}"
+	return 0
+}
+
+#
+# Add a service tag for a given zone.  We use two UUIDs-- the first,
+# the Product UUID, comes from the Sun swoRDFish ontology.  The second
+# is the UUID of the zone itself, which forms the instance UUID.
+#
+add_svc_tag()
+{
+        typeset ZONENAME="$1"
+        typeset SOURCE="$2"
+
+	if [ ! -x $STCLIENT ]; then
+		vlog "$v_no_tags"
+		return 0
+	fi
+
+	get_inst_uuid "$ZONENAME" || (error "$e_bad_uuid"; return 1)
+
+	vlog "$v_addtag" "$INSTANCE_UUID"
+	$STCLIENT -a \
+	    -p "$ST_PRODUCT_NAME" \
+	    -e "$ST_PRODUCT_REV" \
+	    -t "$ST_PRODUCT_UUID" \
+	    -i "$INSTANCE_UUID" \
+	    -P "none" \
+	    -m "Sun" \
+	    -A `uname -p` \
+	    -z "$ZONENAME" \
+	    -S "$SOURCE" >/dev/null 2>&1
+
+	err=$?
+
+	# 226 means "duplicate record," which we can ignore.
+	if [[ $err -ne 0 && $err -ne 226 ]]; then
+		error "$e_addtag_fail" "$err" 
+		return 1
+	fi
+	return 0
+}
+
+#
+# Remove a service tag for a given zone.
+#
+del_svc_tag()
+{
+        typeset ZONENAME="$1"
+
+	if [ ! -x $STCLIENT ]; then
+		vlog "$v_no_tags"
+		return 0
+	fi
+
+	get_inst_uuid "$ZONENAME" || (error "$e_bad_uuid"; return 1)
+
+	vlog "$v_deltag" "$INSTANCE_UUID"
+        $STCLIENT -d -i "$INSTANCE_UUID" >/dev/null 2>&1
 	return 0
 }

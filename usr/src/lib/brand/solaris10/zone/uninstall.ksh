@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -33,16 +33,12 @@
 #
 # options processing
 #
+# If we weren't passed at least two arguments, exit now.
+(( $# < 2 )) && exit $ZONE_SUBPROC_USAGE
+
 zonename=$1
-if [ -z "$zonename" ]; then
-	printf "$f_abort\n" >&2
-	exit $ZONE_SUBPROC_FATAL
-fi
 zonepath=$2
-if [ -z "$zonepath" ]; then
-	printf "$f_abort" >&2
-	exit $ZONE_SUBPROC_FATAL
-fi
+
 shift 2
 
 options="FhHnv"

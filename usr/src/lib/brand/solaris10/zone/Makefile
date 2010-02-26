@@ -20,12 +20,12 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-PROGS =		attach clone detach image_install p2v poststate prestate \
-		s10_boot uninstall
+PROGS =		attach clone detach image_install p2v postattach poststate \
+		prestate preuninstall s10_boot uninstall
 XMLDOCS=	config.xml platform.xml smf_disable.lst pkgrm.lst common.ksh \
 		version
 USERFILES=	smf_disable.conf pkgrm.conf

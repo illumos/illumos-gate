@@ -244,6 +244,9 @@ else
 	exit $ZONE_SUBPROC_FATAL
 fi
 
+# Add a service tag for this zone.
+add_svc_tag "$ZONENAME" "install $inst_type `basename $install_media`"
+
 log ""
 log "$install_good" "$ZONENAME"
 

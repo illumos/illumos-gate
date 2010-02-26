@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -42,8 +42,10 @@ f none usr/lib/brand/solaris10/image_install 755 root bin
 f none usr/lib/brand/solaris10/p2v 755 root bin
 f none usr/lib/brand/solaris10/pkgrm.lst 444 root bin
 f none usr/lib/brand/solaris10/platform.xml 444 root bin
+f none usr/lib/brand/solaris10/postattach 755 root bin
 f none usr/lib/brand/solaris10/poststate 755 root bin
 f none usr/lib/brand/solaris10/prestate 755 root bin
+f none usr/lib/brand/solaris10/preuninstall 755 root bin
 f none usr/lib/brand/solaris10/s10_automount 755 root bin
 f none usr/lib/brand/solaris10/s10_automountd 755 root bin
 f none usr/lib/brand/solaris10/s10_boot 755 root bin

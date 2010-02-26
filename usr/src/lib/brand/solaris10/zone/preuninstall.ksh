@@ -24,45 +24,49 @@
 # Use is subject to license terms.
 #
 
+#
+# This preuninstall hook removes the service tag for the zone.
+# We need this in a preuninstall hook since once the zone state is
+# changed to 'incomplete' (which happens before we run the uninstall hook)
+# then the zone gets a new UUID and we can no longer figure out which
+# service tag instance to delete.
+#
+
+#
+# common shell script functions
+#
 . /usr/lib/brand/solaris10/common.ksh
-
-m_usage=$(gettext  "solaris10 brand usage: detach [-n].")
-
-EXIT_CODE=$ZONE_SUBPROC_USAGE
 
 # If we weren't passed at least two arguments, exit now.
 (( $# < 2 )) && exit $ZONE_SUBPROC_USAGE
 
-ZONENAME="$1"
-ZONEPATH="$2"
-# XXX shared/common script currently uses lower case zonename & zonepath
-zonename="$ZONENAME"
-zonepath="$ZONEPATH"
+ZONENAME=$1
+ZONEPATH=$2
 
-shift; shift	# remove ZONENAME and ZONEPATH from arguments array
+shift 2
 
-noexecute=0
+#
+# This hook will see the same options as the uninstall hook, so make sure
+# we accept these even though all but -n are ignored.
+#
+options="FhHnv"
+nop=""
 
-# Other brand attach options are invalid for this brand.
-while getopts "n" opt; do
-	case $opt in
-		n)	noexecute=1 ;;
-		?)	printf "$m_usage\n"
-			exit $ZONE_SUBPROC_USAGE;;
-		*)	printf "$m_usage\n"
-			exit $ZONE_SUBPROC_USAGE;;
-	esac
+# process options
+OPTIND=1
+while getopts :$options OPT ; do
+case $OPT in
+	F ) ;;
+	h|H ) exit $ZONE_SUBPROC_OK ;;
+	n ) nop="echo" ;;
+	v ) ;;
+esac
 done
-shift $((OPTIND-1))
+shift `expr $OPTIND - 1`
 
-if [[ $noexecute == 1 ]]; then
-	cat /etc/zones/$ZONENAME.xml
-	exit $ZONE_SUBPROC_OK
-fi
-
-cp /etc/zones/$ZONENAME.xml $ZONEPATH/SUNWdetached.xml
+[ $# -gt 0 ] && exit $ZONE_SUBPROC_OK
 
 # Remove the service tag for this zone.
-del_svc_tag "$ZONENAME"
+$nop del_svc_tag "$ZONENAME"
 
 exit $ZONE_SUBPROC_OK

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -5017,7 +5017,7 @@ uninstall_func(int argc, char *argv[])
 
 	/* If we have a brand preuninstall hook, run it. */
 	if (!brand_help && precmdbuf[0] != '\0') {
-		status = do_subproc(cmdbuf);
+		status = do_subproc(precmdbuf);
 		if (subproc_status(gettext("brand-specific preuninstall"),
 		    status, B_FALSE) != ZONE_SUBPROC_OK) {
 			zonecfg_release_lock_file(target_zone, lockfd);
