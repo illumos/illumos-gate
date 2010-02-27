@@ -39,12 +39,29 @@
 #pragma D option zdefs
 
 #if defined(ENABLE_SCHED)
+#if defined(TRACE_PID)
+#define TRACE_FILTER    / pid == 0 || pid == TRACE_PID /
+#define TRACE_FILTER_COND(a)    / (pid == 0 || pid == TRACE_PID) && (a) /
+#elif defined(TRACE_PGID)
+#define TRACE_FILTER    / pid == 0 || curpsinfo->pr_pgid == TRACE_PGID /
+#define TRACE_FILTER_COND(a)
+    / (pid == 0 || curpsinfo->pr_pgid == TRACE_PGID) && (a) /
+#else
 #define TRACE_FILTER
 #define TRACE_FILTER_COND(a)	/ (a) /
+#endif
+#else	/* ENABLE_SCHED */
+#if defined(TRACE_PID)
+#define TRACE_FILTER    / pid == TRACE_PID /
+#define TRACE_FILTER_COND(a)    / (pid == TRACE_PID) && (a) /
+#elif defined(TRACE_PGID)
+#define TRACE_FILTER    / curpsinfo->pr_pgid == TRACE_PGID /
+#define TRACE_FILTER_COND(a)    / (curpsinfo->pr_pgid == TRACE_PGID) && (a) /
 #else
 #define TRACE_FILTER	/ pid != 0 /
-#define TRACE_FILTER_COND(a)	/ pid != 0 && (a) /
+#define TRACE_FILTER_COND(a)    / (pid != 0) && (a) /
 #endif
+#endif /* ENABLE_SCHED */
 
 /* Threshold to filter WAKEABLE latencies. */
 #define FILTER_THRESHOLD	5000000

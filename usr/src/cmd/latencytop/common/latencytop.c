@@ -53,7 +53,8 @@ typedef enum {
 	LT_CMDOPT_F_SCHED,
 	LT_CMDOPT_F_SOBJ,
 	LT_CMDOPT_F_LOW,
-	LT_CMDOPT__LAST	/* Must be last one */
+	LT_CMDOPT_SELECT,
+	LT_CMDOPT__LAST	/* Must be the last one */
 } lt_cmd_option_id_t;
 
 /*
@@ -77,6 +78,7 @@ check_opt_dup(lt_cmd_option_id_t id, uint64_t value) {
 		"-f [no]sched is set more than once with different values.",
 		"-f [no]sobj is set more than once with different values.",
 		"-f [no]low is set more than once with different values.",
+		"-s is set more than once with different values."
 	};
 
 	g_assert(sizeof (errmsg)/sizeof (errmsg[0]) == (int)LT_CMDOPT__LAST);
@@ -142,7 +144,10 @@ print_usage(const char *execname, int long_help)
 	    "        [no]low:\n"
 	    "        Lower overhead by sampling small latencies.\n"
 	    "    -l, --log-period TIME\n"
-	    "        Write and restart log every TIME seconds, TIME >= 60\n");
+	    "        Write and restart log every TIME seconds, TIME >= 60\n"
+	    "    -s --select [ pid=<pid> | pgid=<pgid> ]\n"
+	    "        Monitor only the given process or processes in the "
+	    "given process group.\n");
 }
 
 /*
@@ -185,7 +190,7 @@ to_int(const char *str, int *result)
 int
 main(int argc, char *argv[])
 {
-	const char *opt_string = "t:o:k:hf:l:c:";
+	const char *opt_string = "t:o:k:hf:l:c:s:";
 	struct option const longopts[] = {
 		{"interval", required_argument, NULL, 't'},
 		{"output-log-file", required_argument, NULL, 'o'},
@@ -194,6 +199,7 @@ main(int argc, char *argv[])
 		{"feature", required_argument, NULL, 'f'},
 		{"log-period", required_argument, NULL, 'l'},
 		{"config", required_argument, NULL, 'c'},
+		{"select", required_argument, NULL, 's'},
 		{NULL, 0, NULL, 0}
 	};
 
@@ -213,6 +219,9 @@ main(int argc, char *argv[])
 	uint64_t current_time;
 	uint64_t delta_time;
 	char logfile[PATH_MAX] = "";
+	int select_id;
+	int select_value;
+	char *select_str;
 	boolean_t no_dtrace_cleanup = B_TRUE;
 
 	lt_gpipe_init();
@@ -224,6 +233,8 @@ main(int argc, char *argv[])
 	g_config.lt_cfg_trace_sched = 0;
 	g_config.lt_cfg_trace_syncobj = 1;
 	g_config.lt_cfg_low_overhead_mode = 0;
+	g_config.lt_cfg_trace_pid = 0;
+	g_config.lt_cfg_trace_pgid = 0;
 	/* dtrace snapshot every 1 second */
 	g_config.lt_cfg_snap_interval = 1000;
 #ifdef EMBED_CONFIGS
@@ -354,6 +365,47 @@ main(int argc, char *argv[])
 			}
 
 			break;
+		case 's':
+			if (strncmp(optarg, "pid=", 4) == 0) {
+				select_id = 0;
+				select_str = &optarg[4];
+			} else if (strncmp(optarg, "pgid=", 5) == 0) {
+				select_id = 1;
+				select_str = &optarg[5];
+			} else {
+				lt_display_error(
+				    "Invalid select option: %s\n", optarg);
+				unknown_option = TRUE;
+				break;
+			}
+
+			if (to_int(select_str, &select_value) != 0) {
+				lt_display_error(
+				    "Invalid select option: %s\n", optarg);
+				unknown_option = TRUE;
+				break;
+			}
+
+			if (select_value <= 0) {
+				lt_display_error(
+				    "Process/process group ID must be "
+				    "greater than 0: %s\n", optarg);
+				unknown_option = TRUE;
+				break;
+			}
+
+			if (check_opt_dup(LT_CMDOPT_SELECT,
+			    (((uint64_t)select_id) << 32) | select_value)) {
+				unknown_option = TRUE;
+				break;
+			}
+
+			if (select_id == 0) {
+				g_config.lt_cfg_trace_pid = select_value;
+			} else {
+				g_config.lt_cfg_trace_pgid = select_value;
+			}
+			break;
 		default:
 			unknown_option = TRUE;
 			break;
@@ -429,7 +481,7 @@ main(int argc, char *argv[])
 		}
 
 		/*
-		 * Interval when we call dtrace_status() and collect	
+		 * Interval when we call dtrace_status() and collect
 		 * aggregated data.
 		 */
 		if (tsleep > g_config.lt_cfg_snap_interval) {

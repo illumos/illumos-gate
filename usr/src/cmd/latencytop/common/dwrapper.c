@@ -402,6 +402,7 @@ lt_dtrace_init(void)
 	dtrace_proginfo_t info;
 	int err;
 	FILE *fp_script = NULL;
+	char tmp[64];
 
 	pid_self = getpid();
 
@@ -439,7 +440,27 @@ lt_dtrace_init(void)
 		if ((err = dtrace_setopt(g_dtp, "define",
 		    "ENABLE_SCHED")) != 0) {
 			lt_display_error(
-			    "Failed to set option ENABLE_SYNCOBJ.\n");
+			    "Failed to set option ENABLE_SCHED.\n");
+			return (err);
+		}
+	}
+
+	if (g_config.lt_cfg_trace_pid != 0) {
+		(void) snprintf(tmp, sizeof (tmp), "TRACE_PID=%u",
+		    g_config.lt_cfg_trace_pid);
+		if ((err = dtrace_setopt(g_dtp, "define", tmp)) != 0) {
+			lt_display_error(
+			    "Failed to set option TRACE_PID.\n");
+			return (err);
+		}
+	}
+
+	if (g_config.lt_cfg_trace_pgid != 0) {
+		(void) snprintf(tmp, sizeof (tmp), "TRACE_PGID=%u",
+		    g_config.lt_cfg_trace_pgid);
+		if ((err = dtrace_setopt(g_dtp, "define", tmp)) != 0) {
+			lt_display_error(
+			    "Failed to set option TRACE_PGID.\n");
 			return (err);
 		}
 	}
@@ -448,7 +469,7 @@ lt_dtrace_init(void)
 		if ((err = dtrace_setopt(g_dtp, "define",
 		    "ENABLE_LOW_OVERHEAD")) != 0) {
 			lt_display_error(
-			    "Failed to set option ENABLE_SYNCOBJ.\n");
+			    "Failed to set option ENABLE_LOW_OVERHEAD.\n");
 			return (err);
 		}
 	}

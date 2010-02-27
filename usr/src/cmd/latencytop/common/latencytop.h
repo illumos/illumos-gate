@@ -148,6 +148,8 @@ typedef struct {
 	int lt_cfg_low_overhead_mode;
 	int lt_cfg_snap_interval;
 	char *lt_cfg_config_name;
+	unsigned int lt_cfg_trace_pid;
+	unsigned int lt_cfg_trace_pgid;
 } lt_config_t;
 
 extern lt_config_t g_config;	/* The global settings */

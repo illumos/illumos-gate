@@ -272,6 +272,31 @@ print_current_mode()
 }
 
 /*
+ * Print process window bar when the list is empty.
+ */
+static void
+print_empty_process_bar()
+{
+	char header[256];
+
+	if (!display_initialized) {
+		return;
+	}
+
+	(void) werase(process_window);
+	(void) wattron(process_window, A_REVERSE);
+	(void) snprintf(header, sizeof (header),
+	    "No process/thread data is available");
+	fill_space_right(header, screen_width, sizeof (header));
+	(void) mvwprintw(process_window, 0, 0, "%s", header);
+
+	print_current_mode();
+	(void) wattroff(process_window, A_REVERSE);
+
+	(void) wrefresh(process_window);
+}
+
+/*
  * Print per-process statistics in process pane.
  * This is called when mode of operation is process.
  */
@@ -521,7 +546,7 @@ print_hint(const char *hint)
 		"Press 'r' to refresh immediately.",
 		"Press 't' to toggle Process/Thread display mode.",
 		"Press 'h' for help.",
-		"Use 'c', 'a', 'm', 'p' to change sort criteria."
+		"Use 'c', 'a', 'm', 'p' to change sort criteria.",
 		"Use '1', '2', '3' to switch between windows."
 	};
 	const uint64_t update_interval = 5000; /* 5 seconds */
@@ -565,7 +590,6 @@ get_plist(pid_t **plist, id_t **tlist, int *list_len, int *list_index)
 	if (!thread_mode) {
 		/* Per-process mode */
 		*list_len = lt_stat_proc_list_create(plist, NULL);
-
 		/* Search for previously selected PID */
 		for (*list_index = 0; *list_index < *list_len &&
 		    (*plist)[*list_index] != selected_pid;
@@ -785,16 +809,20 @@ lt_display_loop(int duration)
 	get_plist(&plist, &tlist, &list_len, &list_index);
 
 	for (;;) {
-		if (list_len != 0 && need_refresh && !show_help) {
-			if (!thread_mode) {
-				print_taskbar_process(plist, list_len,
-				    list_index);
-				print_process(plist[list_index]);
+		if (need_refresh && !show_help) {
+			if (list_len != 0) {
+				if (!thread_mode) {
+					print_taskbar_process(plist, list_len,
+					    list_index);
+					print_process(plist[list_index]);
+				} else {
+					print_taskbar_thread(plist, tlist,
+					    list_len, list_index);
+					print_thread(plist[list_index],
+					    tlist[list_index]);
+				}
 			} else {
-				print_taskbar_thread(plist, tlist,
-				    list_len, list_index);
-				print_thread(plist[list_index],
-				    tlist[list_index]);
+				print_empty_process_bar();
 			}
 		}
 
