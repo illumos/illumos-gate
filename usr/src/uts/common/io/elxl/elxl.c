@@ -2168,8 +2168,8 @@ elxl_ddi_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		if (mac_disable(sc->ex_mach) != 0) {
 			return (DDI_FAILURE);
 		}
-		elxl_detach(sc);
 		(void) mac_unregister(sc->ex_mach);
+		elxl_detach(sc);
 		return (DDI_SUCCESS);
 
 	case DDI_SUSPEND:
