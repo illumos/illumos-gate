@@ -390,6 +390,15 @@ typedef struct ddi_dma_lim {
  */
 #define	DDI_DMA_RELAXED_ORDERING	0x400
 
+
+/*
+ * Consolidation private x86 only flag which will cause a bounce buffer
+ * (paddr < dma_attr_seg) to be used if the buffer passed to the bind
+ * operation contains pages both above and below dma_attr_seg. If this flag
+ * is set, dma_attr_seg must be <= dma_attr_addr_hi.
+ */
+#define	_DDI_DMA_BOUNCE_ON_SEG		0x8000
+
 #define	DMA_ATTR_V0		0
 #define	DMA_ATTR_VERSION	DMA_ATTR_V0
 

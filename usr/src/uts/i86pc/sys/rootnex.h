@@ -91,6 +91,7 @@ typedef struct rootnex_sglinfo_s {
 	 * si_max_cookie_size - the maximum size of a physically contiguous
 	 *    piece of memory that we can handle in a sgl.
 	 * si_segmask - segment mask to determine if we cross a segment boundary
+	 * si_flags - dma_attr_flags
 	 * si_max_pages - max number of pages this sgl could occupy (which
 	 *    is also the maximum number of cookies we might see.
 	 */
@@ -98,11 +99,14 @@ typedef struct rootnex_sglinfo_s {
 	uint64_t	si_max_addr;
 	uint64_t	si_max_cookie_size;
 	uint64_t	si_segmask;
+	uint_t		si_flags;
 	uint_t		si_max_pages;
 
 	/*
 	 * these are returned by rootnex_get_sgl()
 	 *
+	 * si_bounce_on_seg - if we need to use bounce buffer for pages above
+	 *    ddi_dma_seg
 	 * si_copybuf_req - amount of copy buffer needed by the buffer.
 	 * si_buf_offset - The initial offset into the first page of the buffer.
 	 *    It's set in get sgl and used in the bind slow path to help
@@ -112,6 +116,7 @@ typedef struct rootnex_sglinfo_s {
 	 * si_sgl_size - The actual number of cookies in the sgl. This does
 	 *    not reflect and sharing that we might do on window boundaries.
 	 */
+	boolean_t	si_bounce_on_seg;
 	size_t		si_copybuf_req;
 	off_t		si_buf_offset;
 	struct as	*si_asp;

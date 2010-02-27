@@ -392,6 +392,8 @@ static int rootnex_valid_sync_parms(ddi_dma_impl_t *hp, rootnex_window_t *win,
 static int rootnex_verify_buffer(rootnex_dma_t *dma);
 static int rootnex_dma_check(dev_info_t *dip, const void *handle,
     const void *comp_addr, const void *not_used);
+static boolean_t rootnex_need_bounce_seg(ddi_dma_obj_t *dmar_object,
+    rootnex_sglinfo_t *sglinfo);
 
 /*
  * _init()
@@ -1714,6 +1716,7 @@ rootnex_coredma_allochdl(dev_info_t *dip, dev_info_t *rdip,
 	}
 	dma->dp_sglinfo.si_max_cookie_size = maxsegmentsize;
 	dma->dp_sglinfo.si_segmask = attr->dma_attr_seg;
+	dma->dp_sglinfo.si_flags = attr->dma_attr_flags;
 
 	/* check the ddi_dma_attr arg to make sure it makes a little sense */
 	if (rootnex_alloc_check_parms) {
@@ -2477,6 +2480,11 @@ rootnex_valid_alloc_parms(ddi_dma_attr_t *attr, uint_t maxsegmentsize)
 		return (DDI_DMA_BADATTR);
 	}
 
+	/* if we're bouncing on seg, seg must be <= addr_hi */
+	if ((attr->dma_attr_flags & _DDI_DMA_BOUNCE_ON_SEG) &&
+	    (attr->dma_attr_seg > attr->dma_attr_addr_hi)) {
+		return (DDI_DMA_BADATTR);
+	}
 	return (DDI_SUCCESS);
 }
 
@@ -2499,6 +2507,147 @@ rootnex_valid_bind_parms(ddi_dma_req_t *dmareq, ddi_dma_attr_t *attr)
 #endif
 
 	return (DDI_SUCCESS);
+}
+
+
+/*
+ * rootnex_need_bounce_seg()
+ *    check to see if the buffer lives on both side of the seg.
+ */
+static boolean_t
+rootnex_need_bounce_seg(ddi_dma_obj_t *dmar_object, rootnex_sglinfo_t *sglinfo)
+{
+	ddi_dma_atyp_t buftype;
+	rootnex_addr_t raddr;
+	boolean_t lower_addr;
+	boolean_t upper_addr;
+	uint64_t offset;
+	page_t **pplist;
+	uint64_t paddr;
+	uint32_t psize;
+	uint32_t size;
+	caddr_t vaddr;
+	uint_t pcnt;
+	page_t *pp;
+
+
+	/* shortcuts */
+	pplist = dmar_object->dmao_obj.virt_obj.v_priv;
+	vaddr = dmar_object->dmao_obj.virt_obj.v_addr;
+	buftype = dmar_object->dmao_type;
+	size = dmar_object->dmao_size;
+
+	lower_addr = B_FALSE;
+	upper_addr = B_FALSE;
+	pcnt = 0;
+
+	/*
+	 * Process the first page to handle the initial offset of the buffer.
+	 * We'll use the base address we get later when we loop through all
+	 * the pages.
+	 */
+	if (buftype == DMA_OTYP_PAGES) {
+		pp = dmar_object->dmao_obj.pp_obj.pp_pp;
+		offset =  dmar_object->dmao_obj.pp_obj.pp_offset &
+		    MMU_PAGEOFFSET;
+		paddr = pfn_to_pa(pp->p_pagenum) + offset;
+		psize = MIN(size, (MMU_PAGESIZE - offset));
+		pp = pp->p_next;
+		sglinfo->si_asp = NULL;
+	} else if (pplist != NULL) {
+		offset = (uintptr_t)vaddr & MMU_PAGEOFFSET;
+		sglinfo->si_asp = dmar_object->dmao_obj.virt_obj.v_as;
+		if (sglinfo->si_asp == NULL) {
+			sglinfo->si_asp = &kas;
+		}
+		paddr = pfn_to_pa(pplist[pcnt]->p_pagenum);
+		paddr += offset;
+		psize = MIN(size, (MMU_PAGESIZE - offset));
+		pcnt++;
+	} else {
+		offset = (uintptr_t)vaddr & MMU_PAGEOFFSET;
+		sglinfo->si_asp = dmar_object->dmao_obj.virt_obj.v_as;
+		if (sglinfo->si_asp == NULL) {
+			sglinfo->si_asp = &kas;
+		}
+		paddr = pfn_to_pa(hat_getpfnum(sglinfo->si_asp->a_hat, vaddr));
+		paddr += offset;
+		psize = MIN(size, (MMU_PAGESIZE - offset));
+		vaddr += psize;
+	}
+
+#ifdef __xpv
+	/*
+	 * If we're dom0, we're using a real device so we need to load
+	 * the cookies with MFNs instead of PFNs.
+	 */
+	raddr = ROOTNEX_PADDR_TO_RBASE(xen_info, paddr);
+#else
+	raddr = paddr;
+#endif
+
+	if ((raddr + psize) > sglinfo->si_segmask) {
+		upper_addr = B_TRUE;
+	} else {
+		lower_addr = B_TRUE;
+	}
+	size -= psize;
+
+	/*
+	 * Walk through the rest of the pages in the buffer. Track to see
+	 * if we have pages on both sides of the segment boundary.
+	 */
+	while (size > 0) {
+		/* partial or full page */
+		psize = MIN(size, MMU_PAGESIZE);
+
+		if (buftype == DMA_OTYP_PAGES) {
+			/* get the paddr from the page_t */
+			ASSERT(!PP_ISFREE(pp) && PAGE_LOCKED(pp));
+			paddr = pfn_to_pa(pp->p_pagenum);
+			pp = pp->p_next;
+		} else if (pplist != NULL) {
+			/* index into the array of page_t's to get the paddr */
+			ASSERT(!PP_ISFREE(pplist[pcnt]));
+			paddr = pfn_to_pa(pplist[pcnt]->p_pagenum);
+			pcnt++;
+		} else {
+			/* call into the VM to get the paddr */
+			paddr =  pfn_to_pa(hat_getpfnum(sglinfo->si_asp->a_hat,
+			    vaddr));
+			vaddr += psize;
+		}
+
+#ifdef __xpv
+		/*
+		 * If we're dom0, we're using a real device so we need to load
+		 * the cookies with MFNs instead of PFNs.
+		 */
+		raddr = ROOTNEX_PADDR_TO_RBASE(xen_info, paddr);
+#else
+		raddr = paddr;
+#endif
+
+		if ((raddr + psize) > sglinfo->si_segmask) {
+			upper_addr = B_TRUE;
+		} else {
+			lower_addr = B_TRUE;
+		}
+		/*
+		 * if the buffer lives both above and below the segment
+		 * boundary, or the current page is the page immediately
+		 * after the segment, we will use a copy/bounce buffer for
+		 * all pages > seg.
+		 */
+		if ((lower_addr && upper_addr) ||
+		    (raddr == (sglinfo->si_segmask + 1))) {
+			return (B_TRUE);
+		}
+
+		size -= psize;
+	}
+
+	return (B_FALSE);
 }
 
 
@@ -2539,6 +2688,17 @@ rootnex_get_sgl(ddi_dma_obj_t *dmar_object, ddi_dma_cookie_t *sgl,
 
 	pcnt = 0;
 	cnt = 0;
+
+
+	/*
+	 * check to see if we need to use the copy buffer for pages over
+	 * the segment attr.
+	 */
+	sglinfo->si_bounce_on_seg = B_FALSE;
+	if (sglinfo->si_flags & _DDI_DMA_BOUNCE_ON_SEG) {
+		sglinfo->si_bounce_on_seg = rootnex_need_bounce_seg(
+		    dmar_object, sglinfo);
+	}
 
 	/*
 	 * if we were passed down a linked list of pages, i.e. pointer to
@@ -2622,15 +2782,22 @@ rootnex_get_sgl(ddi_dma_obj_t *dmar_object, ddi_dma_cookie_t *sgl,
 	sglinfo->si_buf_offset = offset;
 
 	/*
-	 * If the DMA engine can't reach the physical address, increase how
-	 * much copy buffer we need. We always increase by pagesize so we don't
-	 * have to worry about converting offsets. Set a flag in the cookies
-	 * dmac_type to indicate that it uses the copy buffer. If this isn't the
-	 * last cookie, go to the next cookie (since we separate each page which
-	 * uses the copy buffer in case the copy buffer is not physically
-	 * contiguous.
+	 * If we are using the copy buffer for anything over the segment
+	 * boundary, and this page is over the segment boundary.
+	 *   OR
+	 * if the DMA engine can't reach the physical address.
 	 */
-	if ((raddr < addrlo) || ((raddr + psize) > addrhi)) {
+	if (((sglinfo->si_bounce_on_seg) &&
+	    ((raddr + psize) > sglinfo->si_segmask)) ||
+	    ((raddr < addrlo) || ((raddr + psize) > addrhi))) {
+		/*
+		 * Increase how much copy buffer we use. We always increase by
+		 * pagesize so we don't have to worry about converting offsets.
+		 * Set a flag in the cookies dmac_type to indicate that it uses
+		 * the copy buffer. If this isn't the last cookie, go to the
+		 * next cookie (since we separate each page which uses the copy
+		 * buffer in case the copy buffer is not physically contiguous.
+		 */
 		sglinfo->si_copybuf_req += MMU_PAGESIZE;
 		sgl[cnt].dmac_type = ROOTNEX_USES_COPYBUF;
 		if ((cnt + 1) < sglinfo->si_max_pages) {
@@ -2679,8 +2846,18 @@ rootnex_get_sgl(ddi_dma_obj_t *dmar_object, ddi_dma_cookie_t *sgl,
 #else
 		raddr = paddr;
 #endif
-		/* check to see if this page needs the copy buffer */
-		if ((raddr < addrlo) || ((raddr + psize) > addrhi)) {
+
+		/*
+		 * If we are using the copy buffer for anything over the
+		 * segment boundary, and this page is over the segment
+		 * boundary.
+		 *   OR
+		 * if the DMA engine can't reach the physical address.
+		 */
+		if (((sglinfo->si_bounce_on_seg) &&
+		    ((raddr + psize) > sglinfo->si_segmask)) ||
+		    ((raddr < addrlo) || ((raddr + psize) > addrhi))) {
+
 			sglinfo->si_copybuf_req += MMU_PAGESIZE;
 
 			/*
@@ -3073,6 +3250,13 @@ rootnex_setup_copybuf(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq,
 	 * the rootnex, we'll set it to the maximum positive int.
 	 */
 	lattr.dma_attr_sgllen = 0x7fffffff;
+	/*
+	 * if we're using the copy buffer because of seg, use that for our
+	 * upper address limit.
+	 */
+	if (sinfo->si_bounce_on_seg) {
+		lattr.dma_attr_addr_hi = lattr.dma_attr_seg;
+	}
 	e = i_ddi_mem_alloc(dma->dp_dip, &lattr, dma->dp_copybuf_size, cansleep,
 	    0, NULL, &dma->dp_cbaddr, &dma->dp_cbsize, NULL);
 	if (e != DDI_SUCCESS) {
