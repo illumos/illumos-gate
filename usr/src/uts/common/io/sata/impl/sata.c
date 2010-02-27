@@ -13149,7 +13149,7 @@ sata_set_dma_mode(sata_hba_inst_t *sata_hba_inst, sata_drive_info_t *sdinfo)
 	spkt = sata_pkt_alloc(spx, SLEEP_FUNC);
 	if (spkt == NULL) {
 		SATA_LOG_D((sata_hba_inst, CE_WARN,
-		    "sata_set_dma_mode: could not set DMA mode %", mode));
+		    "sata_set_dma_mode: could not set DMA mode %d", mode));
 		rval = SATA_FAILURE;
 		goto done;
 	}
