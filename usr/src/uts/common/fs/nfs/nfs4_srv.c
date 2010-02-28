@@ -1630,7 +1630,7 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	}
 
 	/* Get "before" change value */
-	bva.va_mask = AT_CTIME|AT_SEQ;
+	bva.va_mask = AT_CTIME|AT_SEQ|AT_MODE;
 	error = VOP_GETATTR(dvp, &bva, 0, cr, NULL);
 	if (error) {
 		*cs->statusp = resp->status = puterrno4(error);
@@ -1644,14 +1644,15 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	vap = sarg.vap;
 
 	/*
-	 * Set default initial values for attributes when not specified
-	 * in createattrs.
+	 * Set the default initial values for attributes when the parent
+	 * directory does not have the VSUID/VSGID bit set and they have
+	 * not been specified in createattrs.
 	 */
-	if ((vap->va_mask & AT_UID) == 0) {
+	if (!(bva.va_mode & VSUID) && (vap->va_mask & AT_UID) == 0) {
 		vap->va_uid = crgetuid(cr);
 		vap->va_mask |= AT_UID;
 	}
-	if ((vap->va_mask & AT_GID) == 0) {
+	if (!(bva.va_mode & VSGID) && (vap->va_mask & AT_GID) == 0) {
 		vap->va_gid = crgetgid(cr);
 		vap->va_mask |= AT_GID;
 	}
