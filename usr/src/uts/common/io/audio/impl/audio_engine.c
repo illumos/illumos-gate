@@ -21,7 +21,7 @@
 /*
  * Copyright (C) 4Front Technologies 1996-2008.
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1235,4 +1235,23 @@ audio_dump_dwords(const uint32_t *w, int dcount)
 	if ((i % wrap) != 0) {
 		cmn_err(CE_NOTE, "%08x:%s", i - (i % wrap), line);
 	}
+}
+
+/*
+ * The following two functions are a temporary workaround for CR6924018
+ * in usb audio, and are not to be used for anything else, they WILL be
+ * removed in the future.
+ */
+void
+audio_engine_lock(audio_engine_t *e)
+{
+	mutex_enter(&e->e_lock);
+
+}
+
+void
+audio_engine_unlock(audio_engine_t *e)
+{
+	mutex_exit(&e->e_lock);
+
 }

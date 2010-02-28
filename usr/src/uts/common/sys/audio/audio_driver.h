@@ -21,7 +21,7 @@
 /*
  * Copyright (C) 4Front Technologies 1996-2008.
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -157,6 +157,8 @@ void audio_dump_dwords(const uint32_t *w, int dcount);
 void audio_engine_consume(audio_engine_t *);
 void audio_engine_produce(audio_engine_t *);
 void audio_engine_reset(audio_engine_t *);
+void audio_engine_lock(audio_engine_t *);
+void audio_engine_unlock(audio_engine_t *);
 
 /* Engine flags */
 #define	ENGINE_OUTPUT_CAP	(1U << 2)

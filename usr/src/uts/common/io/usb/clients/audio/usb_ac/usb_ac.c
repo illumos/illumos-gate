@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4584,6 +4584,9 @@ usb_ac_rem_eng(usb_ac_state_t *statep, usb_audio_eng_t *engp)
 	engp->af_engp = NULL;
 	engp->streams = NULL;
 	mutex_exit(&engp->lock);
+
+	mutex_destroy(&engp->lock);
+	cv_destroy(&engp->usb_audio_cv);
 }
 
 
@@ -4606,6 +4609,8 @@ usb_ac_add_eng(usb_ac_state_t *uacp, usb_ac_streams_info_t  *asinfo)
 	} else {
 		engp = &(uacp->engines[1]);
 	}
+
+	cv_init(&engp->usb_audio_cv, NULL, CV_DRIVER, NULL);
 
 	mutex_init(&engp->lock, NULL, MUTEX_DRIVER, NULL);
 
@@ -5338,9 +5343,14 @@ usb_ac_get_audio(void *handle, void *buf, int samples)
 	int bufcnt = 0;
 	caddr_t bp = buf;
 
+	mutex_enter(&engp->lock);
 	if (!engp->started) {
+		mutex_exit(&engp->lock);
+
 		return (0);
 	}
+	engp->busy = B_TRUE;
+	mutex_exit(&engp->lock);
 
 	/* break requests from the driver into fragment sized chunks */
 	for (i = 0; i < reqframes; i += frames) {
@@ -5365,6 +5375,8 @@ usb_ac_get_audio(void *handle, void *buf, int samples)
 
 	mutex_enter(&engp->lock);
 	engp->io_count++;
+	engp->busy = B_FALSE;
+	cv_signal(&engp->usb_audio_cv);
 	mutex_exit(&engp->lock);
 
 	return (samples);
@@ -5391,6 +5403,7 @@ usb_ac_send_audio(void *handle, void *buf, int samples)
 		mutex_exit(&engp->lock);
 		return;
 	}
+	engp->busy = B_TRUE;
 	mutex_exit(&engp->lock);
 
 	/* break requests from the driver into fragment sized chunks */
@@ -5416,6 +5429,8 @@ usb_ac_send_audio(void *handle, void *buf, int samples)
 
 	mutex_enter(&engp->lock);
 	engp->io_count++;
+	engp->busy = B_FALSE;
+	cv_signal(&engp->usb_audio_cv);
 	mutex_exit(&engp->lock);
 }
 
@@ -5486,6 +5501,8 @@ usb_engine_open(void *arg, int flag,
 	engp->frames = 0;
 	engp->io_count = 0;
 	engp->bufio_count = 0;
+	engp->started = B_FALSE;
+	engp->busy = B_FALSE;
 
 	*fragfrp = engp->fragfr;
 	*nfragsp = engp->nfrags;
@@ -5521,6 +5538,15 @@ usb_engine_close(void *arg)
 {
 	usb_audio_eng_t *engp = (usb_audio_eng_t *)arg;
 	usb_ac_state_t *statep = engp->statep;
+
+	audio_engine_unlock(engp->af_engp);
+	mutex_enter(&engp->lock);
+	while (engp->busy) {
+		cv_wait(&engp->usb_audio_cv, &engp->lock);
+	}
+
+	mutex_exit(&engp->lock);
+	audio_engine_lock(engp->af_engp);
 
 	if (statep->flags & AD_SETUP) {
 		usb_ac_teardown(statep, engp);

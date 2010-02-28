@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -157,6 +157,9 @@ typedef struct usb_audio_eng {
 	uint64_t	bufio_count;	/* i/o requests to the framework */
 
 	boolean_t	started;
+	boolean_t	busy;
+
+	kcondvar_t	usb_audio_cv;
 
 	kmutex_t	lock;
 } usb_audio_eng_t;
