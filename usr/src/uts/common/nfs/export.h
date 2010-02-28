@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -301,11 +301,15 @@ struct svc_req;
 
 /*
  * Treenodes are used to build tree representing every node which is part
- * of nfs server pseudo namespace.
- * This tree is interconnected with both exportinfo and exp_visible struct.
- * When there is a need to walk the namespace (either starting in
- * exportinfo or in exp_visible) we first make a step aside (to the left),
- * walk up or down as needed, and then we step back (to the right).
+ * of nfs server pseudo namespace. They are connected with both exportinfo
+ * and exp_visible struct. They were introduced to avoid lookup of ".."
+ * in the underlying file system during unshare, which was failing if the
+ * file system was forcibly unmounted or if the directory was removed.
+ * One exp_visible_t can be shared via several treenode_t, i.e.
+ * different tree_vis can point to the same exp_visible_t.
+ * This will happen if some directory is on two different shared paths:
+ * E.g. after share /tmp/a/b1 and share /tmp/a/b2 there will be two treenodes
+ * corresponding to /tmp/a and both will have same value in tree_vis.
  *
  *
  *
@@ -349,9 +353,9 @@ struct svc_req;
  *
  *
  * Bi-directional interconnect:
- *
  * treenode_t::tree_exi ---------  exportinfo_t::exi_tree
- * treenode_t::tree_vis ......... exp_visible_t::vis_tree
+ * One-way direction connection:
+ * treenode_t::tree_vis .........> exp_visible_t
  */
 /* Access to treenode_t is under protection of exported_lock RW_LOCK */
 typedef struct treenode {
@@ -457,7 +461,6 @@ struct exp_visible {
 	int			vis_count;
 	int			vis_exported;
 	struct exp_visible	*vis_next;
-	struct treenode		*vis_tree;
 	struct secinfo		*vis_secinfo;
 	int			vis_seccnt;
 };
@@ -523,7 +526,7 @@ extern char    *build_symlink(vnode_t *, cred_t *, size_t *);
 /*
  * Functions that handle the NFSv4 server namespace
  */
-extern exportinfo_t *vis2exi(struct exp_visible *);
+extern exportinfo_t *vis2exi(treenode_t *);
 extern int	treeclimb_export(struct exportinfo *);
 extern void	treeclimb_unexport(struct exportinfo *);
 extern int	nfs_visible(struct exportinfo *, vnode_t *, int *);
