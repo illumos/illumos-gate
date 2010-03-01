@@ -41,7 +41,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1415,16 +1415,16 @@ main(int ac, char **av)
 						break;
 					}
 
+					/* Parent.  Stay in the loop. */
+					if (pid < 0)
+						error("fork: %.100s", strerror(errno));
+					else
+						debug("Forked child %ld.", (long)pid);
+
 #ifdef HAVE_SOLARIS_CONTRACTS
 					contracts_post_fork_parent((pid > 0));
 #endif /* HAVE_SOLARIS_CONTRACTS */
 				}
-
-				/* Parent.  Stay in the loop. */
-				if (pid < 0)
-					error("fork: %.100s", strerror(errno));
-				else
-					debug("Forked child %ld.", (long)pid);
 
 				(void) close(startup_p[1]);
 

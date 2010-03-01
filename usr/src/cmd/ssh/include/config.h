@@ -2,7 +2,7 @@
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 /* $Id: acconfig.h,v 1.145 2002/09/26 00:38:48 tim Exp $ */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -620,12 +620,6 @@ extern "C" {
 
 /* Define to 1 if you have the <limits.h> header file. */
 #define	HAVE_LIMITS_H 1
-
-/* Define to 1 if you have the <login_cap.h> header file. */
-/* #undef HAVE_LOGIN_CAP_H */
-
-/* Define to 1 if you have the `login_getcapbool' function. */
-/* #undef HAVE_LOGIN_GETCAPBOOL */
 
 /* Define to 1 if you have the <login.h> header file. */
 /* #undef HAVE_LOGIN_H */

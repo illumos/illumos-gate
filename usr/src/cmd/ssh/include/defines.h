@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -396,10 +396,6 @@ typedef unsigned long int fd_mask;
 #endif
 
 /* Macros */
-
-#if defined(HAVE_LOGIN_GETCAPBOOL) && defined(HAVE_LOGIN_CAP_H)
-#define	HAVE_LOGIN_CAP
-#endif
 
 #ifndef MAX
 #define	MAX(a, b) (((a) > (b)) ? (a) : (b))

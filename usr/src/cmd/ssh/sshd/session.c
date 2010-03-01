@@ -32,7 +32,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1233,29 +1233,29 @@ do_rc_files(Session *s, const char *shell)
 	}
 }
 
+/* Disallow logins if /etc/nologin exists. This does not apply to root. */
 static void
 do_nologin(struct passwd *pw)
 {
 	FILE *f = NULL;
 	char buf[1024];
+	struct stat sb;
 
-#ifdef HAVE_LOGIN_CAP
-	if (!login_getcapbool(lc, "ignorenologin", 0) && pw->pw_uid)
-		f = fopen(login_getcapstr(lc, "nologin", _PATH_NOLOGIN,
-		    _PATH_NOLOGIN), "r");
-#else
-	if (pw->pw_uid)
-		f = fopen(_PATH_NOLOGIN, "r");
-#endif
-	if (f) {
-		/* /etc/nologin exists.  Print its contents and exit. */
-		log("User %.100s not allowed because %s exists",
-		    pw->pw_name, _PATH_NOLOGIN);
+	if (pw->pw_uid == 0)
+		return;
+
+	if (stat(_PATH_NOLOGIN, &sb) == -1)
+	       return;
+
+	/* /etc/nologin exists.  Print its contents if we can and exit. */
+	log("User %.100s not allowed because %s exists.", pw->pw_name,
+	    _PATH_NOLOGIN);
+	if ((f = fopen(_PATH_NOLOGIN, "r")) != NULL) {
 		while (fgets(buf, sizeof(buf), f))
 			fputs(buf, stderr);
 		fclose(f);
-		exit(254);
 	}
+	exit(254);
 }
 
 /* Chroot into ChrootDirectory if the option is set. */
