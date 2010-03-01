@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * log.c - debugging and logging functions
@@ -672,8 +670,8 @@ log_init()
 	st->st_log_prefix = dir;
 
 	(void) umask(fmask);
-	if ((logfd = openat(dirfd, STARTD_DEFAULT_LOG, O_CREAT | O_RDWR,
-	    0644)) == -1) {
+	if ((logfd = openat(dirfd, STARTD_DEFAULT_LOG,
+	    O_CREAT | O_RDWR | O_APPEND, 0644)) == -1) {
 		(void) close(dirfd);
 		(void) umask(dmask);
 		return;

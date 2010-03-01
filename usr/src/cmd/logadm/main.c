@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * logadm/main.c -- main routines for logadm
@@ -27,19 +27,19 @@
  * this program is 90% argument processing, 10% actions...
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <strings.h>
 #include <libintl.h>
 #include <locale.h>
+#include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/filio.h>
 #include <time.h>
+#include <utime.h>
 #include "err.h"
 #include "lut.h"
 #include "fn.h"
@@ -61,6 +61,8 @@ static void expirefiles(struct fn *fnp, struct opts *opts);
 static void dorm(struct opts *opts, const char *msg, struct fn *fnp);
 static void docmd(struct opts *opts, const char *msg, const char *cmd,
     const char *arg1, const char *arg2, const char *arg3);
+static void docopytruncate(struct opts *opts, const char *file,
+    const char *file_copy);
 
 /* our configuration file, unless otherwise specified by -f */
 static char *Default_conffile = "/etc/logadm.conf";
@@ -68,7 +70,6 @@ static char *Default_conffile = "/etc/logadm.conf";
 /* default pathnames to the commands we invoke */
 static char *Sh = "/bin/sh";
 static char *Mv = "/bin/mv";
-static char *Cp = "/bin/cp";
 static char *Rm = "/bin/rm";
 static char *Touch = "/bin/touch";
 static char *Chmod = "/bin/chmod";
@@ -226,8 +227,6 @@ main(int argc, char *argv[])
 		Sh = val;
 	if (val = getenv("_LOGADM_MV"))
 		Mv = val;
-	if (val = getenv("_LOGADM_CP"))
-		Cp = val;
 	if (val = getenv("_LOGADM_RM"))
 		Rm = val;
 	if (val = getenv("_LOGADM_TOUCH"))
@@ -455,7 +454,7 @@ do_delayed_gzip(const char *lhs, void *rhs, void *arg)
 	if (rhs == NULL) {
 		if (Debug) {
 			(void) fprintf(stderr, "do_delayed_gzip: not gzipping "
-				"expired file <%s>\n", lhs);
+			    "expired file <%s>\n", lhs);
 		}
 		return;
 	}
@@ -851,11 +850,8 @@ rotateto(struct fn *fnp, struct opts *opts, int n, struct fn *recentlog,
 	fn_free(dirname);
 
 	/* do the rename */
-	if (opts_count(opts, "c")) {
-		docmd(opts, "rotate log file via copy (-c flag)",
-		    Cp, "-fp", fn_s(fnp), fn_s(newfile));
-		docmd(opts, "truncate log file (-c flag)",
-		    Cp, "-f", "/dev/null", fn_s(fnp));
+	if (opts_count(opts, "c") != NULL) {
+		docopytruncate(opts, fn_s(fnp), fn_s(newfile));
 	} else if (n == 0 && opts_count(opts, "M")) {
 		struct fn *rawcmd = fn_new(opts_optarg(opts, "M"));
 		struct fn *cmd = fn_new(NULL);
@@ -990,7 +986,7 @@ expirefiles(struct fn *fnp, struct opts *opts)
 					    fn_s(nextfnp), fcount);
 				}
 				Gzipnames = lut_add(Gzipnames,
-						fn_s(nextfnp), "1");
+				    fn_s(nextfnp), "1");
 			}
 			fn_free(nextfnp);
 			fcount--;
@@ -1080,36 +1076,36 @@ docmd(struct opts *opts, const char *msg, const char *cmd,
 		/* check for stderr output */
 		if (ioctl(errpipe[0], FIONREAD, &count) >= 0 && count) {
 			err(EF_WARN, "command failed: %s%s%s%s%s%s%s",
-				cmd,
-				(arg1) ? " " : "",
-				(arg1) ? arg1 : "",
-				(arg2) ? " " : "",
-				(arg2) ? arg2 : "",
-				(arg3) ? " " : "",
-				(arg3) ? arg3 : "");
+			    cmd,
+			    (arg1) ? " " : "",
+			    (arg1) ? arg1 : "",
+			    (arg2) ? " " : "",
+			    (arg2) ? arg2 : "",
+			    (arg3) ? " " : "",
+			    (arg3) ? arg3 : "");
 			err_fromfd(errpipe[0]);
 		} else if (WIFSIGNALED(wstat))
 			err(EF_WARN,
 			    "command died, signal %d: %s%s%s%s%s%s%s",
-				WTERMSIG(wstat),
-				cmd,
-				(arg1) ? " " : "",
-				(arg1) ? arg1 : "",
-				(arg2) ? " " : "",
-				(arg2) ? arg2 : "",
-				(arg3) ? " " : "",
-				(arg3) ? arg3 : "");
+			    WTERMSIG(wstat),
+			    cmd,
+			    (arg1) ? " " : "",
+			    (arg1) ? arg1 : "",
+			    (arg2) ? " " : "",
+			    (arg2) ? arg2 : "",
+			    (arg3) ? " " : "",
+			    (arg3) ? arg3 : "");
 		else if (WIFEXITED(wstat) && WEXITSTATUS(wstat))
 			err(EF_WARN,
 			    "command error, exit %d: %s%s%s%s%s%s%s",
-				WEXITSTATUS(wstat),
-				cmd,
-				(arg1) ? " " : "",
-				(arg1) ? arg1 : "",
-				(arg2) ? " " : "",
-				(arg2) ? arg2 : "",
-				(arg3) ? " " : "",
-				(arg3) ? arg3 : "");
+			    WEXITSTATUS(wstat),
+			    cmd,
+			    (arg1) ? " " : "",
+			    (arg1) ? arg1 : "",
+			    (arg2) ? " " : "",
+			    (arg2) ? arg2 : "",
+			    (arg3) ? " " : "",
+			    (arg3) ? arg3 : "");
 
 		(void) close(errpipe[0]);
 	} else {
@@ -1120,4 +1116,82 @@ docmd(struct opts *opts, const char *msg, const char *cmd,
 		perror(cmd);
 		_exit(1);
 	}
+}
+
+/* do internal atomic file copy and truncation */
+static void
+docopytruncate(struct opts *opts, const char *file, const char *file_copy)
+{
+	int fi, fo, len;
+	char buf[4096];
+	struct stat s;
+	struct utimbuf times;
+
+	/* print info if necessary */
+	if (opts_count(opts, "vn") != NULL) {
+		(void) out("# log rotation via atomic copy and truncation"
+		    " (-c flag):\n");
+		(void) out("# copy %s to %s\n", file, file_copy);
+		(void) out("# truncate %s\n", file);
+	}
+
+	if (opts_count(opts, "n"))
+		return;		/* -n means don't really do it */
+
+	/* open log file to be rotated and remember its chmod mask */
+	if ((fi = open(file, O_RDWR)) < 0) {
+		err(EF_SYS, "cannot open file %s", file);
+		return;
+	}
+
+	if (fstat(fi, &s) < 0) {
+		err(EF_SYS, "cannot access: %s", file);
+		(void) close(fi);
+		return;
+	}
+
+	/* create new file for copy destination with correct attributes */
+	if ((fo = open(file_copy, O_CREAT|O_APPEND|O_WRONLY, s.st_mode)) < 0) {
+		err(EF_SYS, "cannot create file: %s", file_copy);
+		(void) close(fi);
+		return;
+	}
+
+	(void) fchown(fo, s.st_uid, s.st_gid);
+
+	/* lock log file so that nobody can write into it before we are done */
+	if (fchmod(fi, s.st_mode|S_ISGID) < 0)
+		err(EF_SYS, "cannot set mandatory lock bit for: %s", file);
+
+	if (lockf(fi, F_LOCK, 0) == -1)
+		err(EF_SYS, "cannot lock file %s", file);
+
+	/* do atomic copy and truncation */
+	while ((len = read(fi, buf, sizeof (buf))) > 0)
+		if (write(fo, buf, len) != len) {
+			err(EF_SYS, "cannot write into file %s", file_copy);
+			(void) lockf(fi, F_ULOCK, 0);
+			(void) fchmod(fi, s.st_mode);
+			(void) close(fi);
+			(void) close(fo);
+			(void) remove(file_copy);
+			return;
+		}
+
+	(void) ftruncate(fi, 0);
+
+	/* unlock log file */
+	if (lockf(fi, F_ULOCK, 0) == -1)
+		err(EF_SYS, "cannot unlock file %s", file);
+
+	if (fchmod(fi, s.st_mode) < 0)
+		err(EF_SYS, "cannot reset mandatory lock bit for: %s", file);
+
+	(void) close(fi);
+	(void) close(fo);
+
+	/* keep times from original file */
+	times.actime = s.st_atime;
+	times.modtime = s.st_mtime;
+	(void) utime(file_copy, &times);
 }
