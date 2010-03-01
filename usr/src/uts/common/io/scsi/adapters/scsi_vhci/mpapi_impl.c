@@ -940,7 +940,7 @@ vhci_get_path_list_for_mp_lu(struct scsi_vhci *vhci, mp_iocdata_t *mpioc,
 	while (mplu_path_list != NULL) {
 		mppathp  = (mpapi_path_data_t *)(mplu_path_list->item->idata);
 		/* skip a path that should be hidden. */
-		if (!(mppathp->hide)) {
+		if (!(mppathp->hide) && (mppathp->valid != 0)) {
 			pip = (mdi_pathinfo_t *)mppathp->resp;
 			mdi_hold_path(pip);
 			/*
