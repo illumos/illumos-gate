@@ -1567,4 +1567,5 @@ Bugid   Risk Synopsis
 6929607 ld generates incorrect VERDEF entries for ET_REL output objects
 6924224 linker should ignore SUNW_dof when calculating the elf checksum
 6918143 symbol capabilities (D)
+	PSARC/2010/022 Linker-editors: Symbol Capabilities
 6910387 .tdata and .tbss separation invalidates TLS program header information
