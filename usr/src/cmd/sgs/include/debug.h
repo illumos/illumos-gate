@@ -133,6 +133,18 @@ extern "C" {
 #define	DBG_BINFO_REF_PARENT	0x2000	/* reference to PARENT */
 #define	DBG_BINFO_REF_MSK	0xf000
 
+/*
+ * ld.so.1(1) symbol capabilities processing.
+ */
+#define	DBG_CAP_DEFAULT		0
+#define	DBG_CAP_USED		1
+#define	DBG_CAP_CANDIDATE	2
+#define	DBG_CAP_REJECTED	3
+#define	DBG_CAP_HW_1		4
+#define	DBG_CAP_SF_1		5
+#define	DBG_CAP_HW_2		6
+#define	DBG_CAP_PLAT		7
+#define	DBG_CAP_MACH		8
 
 #define	DBG_REL_START		1
 #define	DBG_REL_FINISH		2
@@ -159,8 +171,8 @@ extern "C" {
 #define	DBG_STATE_MOD_AFTER	5	/* modify (after) */
 #define	DBG_STATE_NEW 		6	/* new */
 #define	DBG_STATE_NEW_IMPLICIT	7	/* new (implicit) */
-#define	DBG_STATE_OUT		8	/* out */
-#define	DBG_STATE_RESET		9	/* reset */
+#define	DBG_STATE_RESET		8	/* reset */
+#define	DBG_STATE_ORIGINAL	9	/* original */
 #define	DBG_STATE_RESOLVED	10	/* resolved */
 
 #define	DBG_STATE_NUM		11
@@ -280,14 +292,15 @@ extern	void		Dbg_help(void);
 #define	Dbg_bind_reject		Dbg64_bind_reject
 #define	Dbg_bind_weak		Dbg64_bind_weak
 
-#define	Dbg_cap_entry		Dbg64_cap_entry
-#define	Dbg_cap_entry2		Dbg64_cap_entry2
-#define	Dbg_cap_val_hw1		Dbg64_cap_val_hw1
-#define	Dbg_cap_hw_candidate	Dbg64_cap_hw_candidate
-#define	Dbg_cap_hw_filter	Dbg64_cap_hw_filter
+#define	Dbg_cap_candidate	Dbg64_cap_candidate
+#define	Dbg_cap_filter		Dbg64_cap_filter
+#define	Dbg_cap_id		Dbg64_cap_id
 #define	Dbg_cap_mapfile_title	Dbg64_cap_mapfile_title
-#define	Dbg_cap_out_title	Dbg64_cap_out_title
+#define	Dbg_cap_post_title	Dbg64_cap_post_title
 #define	Dbg_cap_sec_title	Dbg64_cap_sec_title
+#define	Dbg_cap_val		Dbg64_cap_val
+#define	Dbg_cap_ptr_entry	Dbg64_cap_ptr_entry
+#define	Dbg_cap_val_entry	Dbg64_cap_val_entry
 
 #define	Dbg_cb_iphdr_enter	Dbg64_cb_iphdr_enter
 #define	Dbg_cb_iphdr_callback	Dbg64_cb_iphdr_callback
@@ -435,6 +448,10 @@ extern	void		Dbg_help(void);
 #define	Dbg_syms_ar_entry	Dbg64_syms_ar_entry
 #define	Dbg_syms_ar_resolve	Dbg64_syms_ar_resolve
 #define	Dbg_syms_ar_title	Dbg64_syms_ar_title
+#define	Dbg_syms_cap_convert	Dbg64_syms_cap_convert
+#define	Dbg_syms_cap_local	Dbg64_syms_cap_local
+#define	Dbg_syms_cap_lookup	Dbg64_syms_cap_lookup
+#define	Dbg_syms_cap_title	Dbg64_syms_cap_title
 #define	Dbg_syms_created	Dbg64_syms_created
 #define	Dbg_syms_discarded	Dbg64_syms_discarded
 #define	Dbg_syms_dlsym		Dbg64_syms_dlsym
@@ -502,14 +519,15 @@ extern	void		Dbg_help(void);
 #define	Dbg_bind_reject		Dbg32_bind_reject
 #define	Dbg_bind_weak		Dbg32_bind_weak
 
-#define	Dbg_cap_entry		Dbg32_cap_entry
-#define	Dbg_cap_entry2		Dbg32_cap_entry2
-#define	Dbg_cap_val_hw1		Dbg32_cap_val_hw1
-#define	Dbg_cap_hw_candidate	Dbg32_cap_hw_candidate
-#define	Dbg_cap_hw_filter	Dbg32_cap_hw_filter
+#define	Dbg_cap_candidate	Dbg32_cap_candidate
+#define	Dbg_cap_filter		Dbg32_cap_filter
+#define	Dbg_cap_id		Dbg32_cap_id
 #define	Dbg_cap_mapfile_title	Dbg32_cap_mapfile_title
-#define	Dbg_cap_out_title	Dbg32_cap_out_title
+#define	Dbg_cap_post_title	Dbg32_cap_post_title
 #define	Dbg_cap_sec_title	Dbg32_cap_sec_title
+#define	Dbg_cap_val		Dbg32_cap_val
+#define	Dbg_cap_ptr_entry	Dbg32_cap_ptr_entry
+#define	Dbg_cap_val_entry	Dbg32_cap_val_entry
 
 #define	Dbg_cb_iphdr_enter	Dbg32_cb_iphdr_enter
 #define	Dbg_cb_iphdr_callback	Dbg32_cb_iphdr_callback
@@ -657,6 +675,10 @@ extern	void		Dbg_help(void);
 #define	Dbg_syms_ar_entry	Dbg32_syms_ar_entry
 #define	Dbg_syms_ar_resolve	Dbg32_syms_ar_resolve
 #define	Dbg_syms_ar_title	Dbg32_syms_ar_title
+#define	Dbg_syms_cap_convert	Dbg32_syms_cap_convert
+#define	Dbg_syms_cap_local	Dbg32_syms_cap_local
+#define	Dbg_syms_cap_lookup	Dbg32_syms_cap_lookup
+#define	Dbg_syms_cap_title	Dbg32_syms_cap_title
 #define	Dbg_syms_created	Dbg32_syms_created
 #define	Dbg_syms_discarded	Dbg32_syms_discarded
 #define	Dbg_syms_dlsym		Dbg32_syms_dlsym
@@ -754,14 +776,15 @@ extern	void	Dbg_bind_pltpad_to(Rt_map *, Addr, const char *, const char *);
 extern	void	Dbg_bind_reject(Rt_map *, Rt_map *, const char *, int);
 extern	void	Dbg_bind_weak(Rt_map *, Addr, Addr, const char *);
 
-extern	void	Dbg_cap_entry(Lm_list *, dbg_state_t, Xword, Xword, Half);
-extern	void	Dbg_cap_entry2(Lm_list *, dbg_state_t, Xword, CapMask *, Half);
-extern	void	Dbg_cap_hw_candidate(Lm_list *, const char *);
-extern	void	Dbg_cap_hw_filter(Lm_list *, const char *, Rt_map *);
+extern	void	Dbg_cap_candidate(Lm_list *, const char *);
+extern	void	Dbg_cap_filter(Lm_list *, const char *, Rt_map *);
+extern	void	Dbg_cap_id(Lm_list *, Lineno, const char *, const char *);
 extern	void	Dbg_cap_mapfile_title(Lm_list *, Lineno);
-extern	void	Dbg_cap_out_title(Lm_list *);
+extern	void	Dbg_cap_post_title(Lm_list *, int *);
 extern	void	Dbg_cap_sec_title(Lm_list *, const char *);
-extern	void	Dbg_cap_val_hw1(Lm_list *, Xword, Half);
+extern	void	Dbg_cap_val(Lm_list *, Syscapset *, Syscapset *, Half);
+extern	void	Dbg_cap_ptr_entry(Lm_list *, dbg_state_t, Xword, const char *);
+extern	void	Dbg_cap_val_entry(Lm_list *, dbg_state_t, Xword, Xword, Half);
 
 extern	void	Dbg_cb_iphdr_enter(Lm_list *, u_longlong_t, u_longlong_t);
 extern	void	Dbg_cb_iphdr_callback(Lm_list *, struct dl_phdr_info *);
@@ -935,6 +958,12 @@ extern	void	Dbg_syms_ar_entry(Lm_list *, Xword, Elf_Arsym *);
 extern	void	Dbg_syms_ar_resolve(Lm_list *, Xword, Elf_Arsym *,
 		    const char *, int);
 extern	void	Dbg_syms_ar_title(Lm_list *, const char *, int);
+extern	void	Dbg_syms_cap_convert(Ofl_desc *, Word, const char *, Sym *);
+extern	void	Dbg_syms_cap_local(Ofl_desc *, Word, const char *, Sym *,
+		    Sym_desc *);
+extern	void	Dbg_syms_cap_lookup(Rt_map *, uint_t, const char *, uint_t,
+		    Half, Syscapset *);
+extern	void	Dbg_syms_cap_title(Ofl_desc *);
 extern	void	Dbg_syms_created(Lm_list *, const char *);
 extern	void	Dbg_syms_discarded(Lm_list *, Sym_desc *);
 extern	void	Dbg_syms_dlsym(Rt_map *, const char *, int *, const char *,
@@ -1099,7 +1128,8 @@ extern	void Elf_syminfo_title(Lm_list *);
 
 #endif
 
-extern	void	Elf_cap_entry(Lm_list *, Cap *, int, Half);
+extern	void	Elf_cap_entry(Lm_list *, Cap *, int, const char *, size_t,
+		    Half);
 extern	void	Elf_cap_title(Lm_list *);
 
 extern	const char \

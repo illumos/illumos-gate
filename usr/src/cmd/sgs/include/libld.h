@@ -163,6 +163,50 @@ typedef struct wrap_sym_node {
 	const char	*wsn_wrapname;	/* Wrap symbol name: __wrap_XXX */
 } WrapSymNode;
 
+/*
+ * Capabilities structures, used to maintain a capabilities set.
+ *
+ * Capabilities can be defined within input relocatable objects, and can be
+ * augmented or replaced by mapfile directives.  In addition, mapfile directives
+ * can be used to exclude capabilities that would otherwise be carried over to
+ * the output object.
+ *
+ * CA_SUNW_HW_1, CA_SUNW_SF_1 and CA_SUNW_HW_2 values are bitmasks.  A current
+ * value, and an exclude value are maintained for each capability.
+ *
+ * There can be multiple CA_SUNW_PLAT and CA_SUNW_MACH entries and thus Alists
+ * are used to collect these entries.  A current list for each capability is
+ * maintained as Capstr entries, which provide for maintaining the strings
+ * eventual index into a string table.  An exclude list is maintained as a
+ * list of string pointers.
+ */
+typedef struct {
+	elfcap_mask_t	cm_val;		/* bitmask value */
+	elfcap_mask_t	cm_exc;		/* bits to exclude from final object */
+} Capmask;
+
+typedef struct {
+	Alist		*cl_val;	/* string (Capstr) value */
+	APlist		*cl_exc;	/* strings to exclude from final */
+} Caplist;				/*	object */
+
+typedef	struct {
+	char		*cs_str;	/* platform or machine name */
+	Word		cs_ndx;		/* the entries output Cap index */
+} Capstr;
+
+typedef	uint_t		oc_flag_t;
+typedef	struct {
+	Capmask		oc_hw_1;	/* CA_SUNW_HW_1 capabilities */
+	Capmask		oc_sf_1;	/* CA_SUNW_SF_1 capabilities */
+	Capmask		oc_hw_2;	/* CA_SUNW_HW_2 capabilities */
+	Caplist		oc_plat;	/* CA_SUNW_PLAT capabilities */
+	Caplist		oc_mach;	/* CA_SUNW_MACH capabilities */
+	Capstr		oc_id;		/* CA_SUNW_ID capability */
+	oc_flag_t	oc_flags;
+} Objcapset;
+
+#define	FLG_OCS_USRDEFID	0x1	/* user defined CA_SUNW_ID */
 
 /*
  * Bitmasks for a single capability. Capabilities come from input objects,
@@ -277,6 +321,12 @@ struct ofl_desc {
 	Word		ofl_dyntlssortcnt; /* no. ndx in .SUNW_dyntlssort */
 	Word		ofl_dynshdrcnt;	/* no. of output section in .dynsym */
 	Word		ofl_shdrcnt;	/* no. of output sections */
+	Word		ofl_caploclcnt;	/* no. of local capabilities symbols */
+	Word		ofl_capsymcnt;	/* no. of symbol capabilities entries */
+					/*	required */
+	Word		ofl_capchaincnt; /* no. of Capchain symbols */
+	APlist		*ofl_capgroups;	/* list of capabilities groups */
+	avl_tree_t	*ofl_capfamilies; /* capability family AVL tree */
 	Str_tbl		*ofl_shdrsttab;	/* Str_tbl for shdr strtab */
 	Str_tbl		*ofl_strtab;	/* Str_tbl for symtab strtab */
 	Str_tbl		*ofl_dynstrtab;	/* Str_tbl for dymsym strtab */
@@ -313,6 +363,8 @@ struct ofl_desc {
 	Os_desc		*ofl_ospreinitarray; /* .preinitarray output section */
 	Os_desc		*ofl_osinterp;	/* .interp output section */
 	Os_desc		*ofl_oscap;	/* .SUNW_cap output section */
+	Os_desc		*ofl_oscapinfo;	/* .SUNW_capinfo output section */
+	Os_desc		*ofl_oscapchain; /* .SUNW_capchain output section */
 	Os_desc		*ofl_osplt;	/* .plt output section */
 	Os_desc		*ofl_osmove;	/* .SUNW_move output section */
 	Os_desc		*ofl_osrelhead;	/* first relocation section */
@@ -337,7 +389,7 @@ struct ofl_desc {
 	char		*ofl_audit;	/* object auditing required (-p) */
 	Alist		*ofl_symfltrs;	/* per-symbol filtees and their */
 	Alist		*ofl_dtsfltrs;	/*	associated .dynamic/.dynstrs */
-	Outcapset	ofl_ocapset;	/* object capabilities */
+	Objcapset	ofl_ocapset;	/* object capabilities */
 	Lm_list		*ofl_lml;	/* runtime link-map list */
 	Gottable	*ofl_gottable;	/* debugging got information */
 	Rlxrel_cache	ofl_sr_cache;	/* Cache last result from */
@@ -395,8 +447,12 @@ struct ofl_desc {
 #define	FLG_OF_REDLSYM	0x004000000000	/* reduce local symbols */
 #define	FLG_OF_OS_ORDER	0x008000000000	/* output section ordering required */
 #define	FLG_OF_OSABI	0x010000000000	/* tag object as ELFOSABI_SOLARIS */
-#define	FLG_OF_ADJOSCNT	0x020000000000	/* ajust ofl_shdrcnt to accommodate */
+#define	FLG_OF_ADJOSCNT	0x020000000000	/* adjust ofl_shdrcnt to accommodate */
 					/*	discarded sections */
+#define	FLG_OF_OTOSCAP	0x040000000000	/* convert object capabilities to */
+					/*	symbol capabilities */
+#define	FLG_OF_PTCAP	0x080000000000	/* PT_SUNWCAP required */
+#define	FLG_OF_CAPSTRS	0x100000000000	/* capability strings are required */
 
 /*
  * In the flags1 arena, establish any options that are applicable to archive
@@ -418,7 +474,6 @@ struct ofl_desc {
 #define	FLG_OF1_NRLXREL	0x0000000200	/* -z norelaxreloc flag set */
 #define	FLG_OF1_RLXREL	0x0000000400	/* -z relaxreloc flag set */
 #define	FLG_OF1_IGNORE	0x0000000800	/* ignore unused dependencies */
-
 #define	FLG_OF1_NOSGHND	0x0000001000	/* -z nosighandler flag set */
 #define	FLG_OF1_TEXTOFF 0x0000002000	/* text relocations are ok */
 #define	FLG_OF1_ABSEXEC	0x0000004000	/* -zabsexec set */
@@ -434,7 +489,7 @@ struct ofl_desc {
 					/*	section */
 #define	FLG_OF1_MEMORY	0x0000200000	/* produce a memory model */
 #define	FLG_OF1_NGLBDIR	0x0000400000	/* no DT_1_DIRECT flag allowed */
-#define	FLG_OF1_ENCDIFF	0x0000800000	/* Host running linker has different */
+#define	FLG_OF1_ENCDIFF	0x0000800000	/* host running linker has different */
 					/*	byte order than output object */
 #define	FLG_OF1_VADDR	0x0001000000	/* a segment defines explicit vaddr */
 #define	FLG_OF1_EXTRACT	0x0002000000	/* archive member has been extracted */
@@ -449,6 +504,9 @@ struct ofl_desc {
 #define	FLG_OF1_OVHWCAP1 0x0100000000	/* override CA_SUNW_HW_1 capabilities */
 #define	FLG_OF1_OVSFCAP1 0x0200000000	/* override CA_SUNW_SF_1 capabilities */
 #define	FLG_OF1_OVHWCAP2 0x0400000000	/* override CA_SUNW_HW_2 capabilities */
+#define	FLG_OF1_OVMACHCAP 0x0800000000	/* override CA_SUNW_MACH capability */
+#define	FLG_OF1_OVPLATCAP 0x1000000000	/* override CA_SUNW_PLAT capability */
+#define	FLG_OF1_OVIDCAP	0x2000000000	/* override CA_SUNW_ID capability */
 
 /*
  * Test to see if the output file would allow the presence of
@@ -497,6 +555,7 @@ struct ofl_desc {
 #define	SYMTAB_LOC_CNT(_ofl)		/* local .symtab entries */	\
 	(2 +				/*    NULL and STT_FILE */	\
 	(_ofl)->ofl_shdrcnt +		/*    section symbol */		\
+	(_ofl)->ofl_caploclcnt +	/*    local capabilities */	\
 	(_ofl)->ofl_scopecnt +		/*    scoped symbols */		\
 	(_ofl)->ofl_locscnt)		/*    standard locals */
 #define	SYMTAB_ALL_CNT(_ofl)		/* all .symtab entries */	\
@@ -506,6 +565,7 @@ struct ofl_desc {
 #define	DYNSYM_LOC_CNT(_ofl)		/* local .dynsym entries */	\
 	(1 +				/*    NULL */			\
 	(_ofl)->ofl_dynshdrcnt +	/*    section symbols */	\
+	(_ofl)->ofl_caploclcnt +	/*    local capabilities */	\
 	(_ofl)->ofl_lregsymcnt)		/*    local register symbols */
 #define	DYNSYM_ALL_CNT(_ofl)		/* all .dynsym entries */	\
 	(DYNSYM_LOC_CNT(_ofl) +		/*    .dynsym locals */		\
@@ -598,7 +658,7 @@ struct rel_cache {
  * Symbol value descriptor.  For relocatable objects, each symbols value is
  * its offset within its associated section.  Therefore, to uniquely define
  * each symbol within a reloctable object, record and sort the sh_offset and
- * symbol value.  This information is used to seach for displacement
+ * symbol value.  This information is used to search for displacement
  * relocations as part of copy relocation validation.
  */
 typedef struct {
@@ -634,6 +694,7 @@ struct ifl_desc {			/* input file descriptor */
 	APlist		*ifl_verdesc;	/* version descriptor list */
 	APlist		*ifl_relsect;	/* relocation section list */
 	Alist		*ifl_groups;	/* SHT_GROUP section list */
+	Cap_desc	*ifl_caps;	/* capabilities descriptor */
 };
 
 #define	FLG_IF_CMDLINE	0x00000001	/* full filename specified from the */
@@ -667,6 +728,8 @@ struct ifl_desc {			/* input file descriptor */
 #define	FLG_IF_GNUVER	0x00010000	/* file used GNU-style versioning */
 #define	FLG_IF_ORDERED	0x00020000	/* ordered section processing */
 					/*	required */
+#define	FLG_IF_OTOSCAP	0x00040000	/* convert object capabilities to */
+					/*	symbol capabilities */
 
 struct is_desc {			/* input section descriptor */
 	const char	*is_name;	/* original section name */
@@ -679,7 +742,7 @@ struct is_desc {			/* input section descriptor */
 	Is_desc		*is_comdatkeep;	/* If COMDAT section is discarded, */
 					/* 	this is section that was kept */
 	Word		is_scnndx;	/* original section index in file */
-	Word		is_ordndx;	/* Index for section.  Used to decide */
+	Word		is_ordndx;	/* index for section.  Used to decide */
 					/*	where to insert section when */
 					/* 	reordering sections */
 	Word		is_keyident;	/* key for SHF_{ORDERED|LINK_ORDER} */
@@ -993,7 +1056,6 @@ struct sym_avlnode {
 #define	FLG_SY_VERSPROM	0x00000080	/* version definition has been */
 					/*	promoted to output file */
 #define	FLG_SY_PROT	0x00000100	/* stv_protected visibility seen */
-
 #define	FLG_SY_MAPREF	0x00000200	/* symbol reference generated by user */
 					/*	from mapfile */
 #define	FLG_SY_REFRSD	0x00000400	/* symbols sd_ref has been raised */
@@ -1068,6 +1130,14 @@ struct sym_avlnode {
 #define	FLG_SY_DIR	0x0020000000000	/* global symbol, direct bindings */
 #define	FLG_SY_NDIR	0x0040000000000	/* global symbol, nondirect bindings */
 #define	FLG_SY_OVERLAP	0x0080000000000	/* move entry overlap detected */
+#define	FLG_SY_CAP	0x0100000000000	/* symbol is associated with */
+					/*    capabilities */
+
+/*
+ * A symbol can only be truly hidden if it is not a capabilities symbol.
+ */
+#define	SYM_IS_HIDDEN(_sdp) \
+	(((_sdp)->sd_flags & (FLG_SY_HIDDEN | FLG_SY_CAP)) == FLG_SY_HIDDEN)
 
 /*
  * Create a mask for (sym.st_other & visibility) since the gABI does not yet
@@ -1142,7 +1212,7 @@ struct	ver_desc {
 struct	ver_index {
 	const char	*vi_name;	/* dependency version name */
 	Half		vi_flags;	/* communicates availability */
-	Half		vi_overndx;	/* Index asssigned to this version in */
+	Half		vi_overndx;	/* index assigned to this version in */
 					/*	output object Verneed section */
 	Ver_desc	*vi_desc;	/* cross reference to descriptor */
 };

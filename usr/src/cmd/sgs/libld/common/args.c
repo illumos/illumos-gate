@@ -208,6 +208,7 @@ usage_mesg(Boolean detail)
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZRS));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZRSN));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZRSGRP));
+	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZSCAP));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZTARG));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZT));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZTO));
@@ -304,6 +305,18 @@ check_flags(Ofl_desc * ofl, int argc)
 		}
 		ofl->ofl_flags |= FLG_OF_RELOBJ;
 	} else {
+		/*
+		 * Translating object capabilities to symbol capabilities is
+		 * only meaningful when creating a relocatable object.
+		 */
+		if (ofl->ofl_flags & FLG_OF_OTOSCAP) {
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_MARG_ONLY),
+			    MSG_ORIG(MSG_ARG_ZSYMBOLCAP),
+			    MSG_INTL(MSG_MARG_REL));
+			ofl->ofl_flags |= FLG_OF_FATAL;
+		}
+
 		/*
 		 * If the user hasn't explicitly requested that relocations
 		 * not be combined, combine them by default.
@@ -1249,6 +1262,9 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			} else if (strcmp(optarg,
 			    MSG_ORIG(MSG_ARG_NOSIGHANDLER)) == 0) {
 				ofl->ofl_flags1 |= FLG_OF1_NOSGHND;
+			} else if (strcmp(optarg,
+			    MSG_ORIG(MSG_ARG_SYMBOLCAP)) == 0) {
+				ofl->ofl_flags |= FLG_OF_OTOSCAP;
 
 			/*
 			 * Check archive group usage

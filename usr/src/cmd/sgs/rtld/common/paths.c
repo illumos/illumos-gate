@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +38,6 @@
 #include	<limits.h>
 #include	<fcntl.h>
 #include	<string.h>
-#include	<sys/systeminfo.h>
 #include	<debug.h>
 #include	<conv.h>
 #include	"_rtld.h"
@@ -173,7 +172,7 @@ get_dir_list(uchar_t rules, Rt_map *lmp, uint_t flags)
 				 */
 				(void) expand_paths(lmp, rpl_libpath,
 				    &rpl_libdirs, AL_CNT_SEARCH, mode,
-				    PD_TKN_HWCAP);
+				    PD_TKN_CAP);
 			}
 			dalpp = &rpl_libdirs;
 		}
@@ -214,7 +213,7 @@ get_dir_list(uchar_t rules, Rt_map *lmp, uint_t flags)
 				 */
 				(void) expand_paths(lmp, prm_libpath,
 				    &prm_libdirs, AL_CNT_SEARCH, mode,
-				    PD_TKN_HWCAP);
+				    PD_TKN_CAP);
 			}
 			dalpp = &prm_libdirs;
 		}
@@ -251,7 +250,7 @@ get_dir_list(uchar_t rules, Rt_map *lmp, uint_t flags)
 				 */
 				(void) expand_paths(lmp, RPATH(lmp),
 				    &RLIST(lmp), AL_CNT_SEARCH, LA_SER_RUNPATH,
-				    PD_TKN_HWCAP);
+				    PD_TKN_CAP);
 			}
 			dalpp = &RLIST(lmp);
 		}
@@ -278,7 +277,7 @@ get_dir_list(uchar_t rules, Rt_map *lmp, uint_t flags)
 }
 
 /*
- * Get the next directory in the search rules path.  The seach path "cookie"
+ * Get the next directory in the search rules path.  The search path "cookie"
  * provided by the caller (sdp) maintains the state of a search in progress.
  *
  * Typically, a search consists of a series of rules that govern the order of
@@ -418,34 +417,70 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 
 		} else if (strncmp(optr, MSG_ORIG(MSG_TKN_PLATFORM),
 		    MSG_TKN_PLATFORM_SIZE) == 0) {
+			Syscapset	*scapset;
+
+			if (FLAGS1(lmp) & FL1_RT_ALTCAP)
+				scapset = alt_scapset;
+			else
+				scapset = org_scapset;
+
 			token = (char *)MSG_ORIG(MSG_TKN_PLATFORM);
 
 			/*
-			 * $PLATFORM expansion required.  This would have been
-			 * established from the AT_SUN_PLATFORM aux vector, but
-			 * if not attempt to get it from sysconf().
+			 * $PLATFORM expansion required.
 			 */
 			if (((omit & PD_TKN_PLATFORM) == 0) &&
-			    ((platform == 0) && (platform_sz == 0))) {
-				char	_info[SYS_NMLN];
-				long	_size;
+			    ((scapset->sc_plat == NULL) &&
+			    (scapset->sc_platsz == 0)))
+				platform_name(scapset);
 
-				_size = sysinfo(SI_PLATFORM, _info, SYS_NMLN);
-				if ((_size != -1) && ((platform =
-				    malloc((size_t)_size)) != NULL)) {
-					(void) strcpy(platform, _info);
-					platform_sz = (size_t)_size - 1;
-				}
-			}
 			if (((omit & PD_TKN_PLATFORM) == 0) &&
-			    (platform != 0)) {
-				if ((nlen += platform_sz) < PATH_MAX) {
-					(void) strncpy(nptr, platform,
-					    platform_sz);
-					nptr = nptr + platform_sz;
+			    scapset->sc_plat) {
+				nlen += scapset->sc_platsz;
+				if (nlen < PATH_MAX) {
+					(void) strncpy(nptr, scapset->sc_plat,
+					    scapset->sc_platsz);
+					nptr = nptr + scapset->sc_platsz;
 					olen += MSG_TKN_PLATFORM_SIZE;
 					optr += MSG_TKN_PLATFORM_SIZE;
 					_flags |= PD_TKN_PLATFORM;
+				} else {
+					eprintf(lml, ERR_FATAL,
+					    MSG_INTL(MSG_ERR_EXPAND1),
+					    NAME(lmp), oname);
+					return (0);
+				}
+			}
+
+		} else if (strncmp(optr, MSG_ORIG(MSG_TKN_MACHINE),
+		    MSG_TKN_MACHINE_SIZE) == 0) {
+			Syscapset	*scapset;
+
+			if (FLAGS1(lmp) & FL1_RT_ALTCAP)
+				scapset = alt_scapset;
+			else
+				scapset = org_scapset;
+
+			token = (char *)MSG_ORIG(MSG_TKN_MACHINE);
+
+			/*
+			 * $MACHINE expansion required.
+			 */
+			if (((omit & PD_TKN_MACHINE) == 0) &&
+			    ((scapset->sc_mach == NULL) &&
+			    (scapset->sc_machsz == 0)))
+				machine_name(scapset);
+
+			if (((omit & PD_TKN_MACHINE) == 0) &&
+			    scapset->sc_mach) {
+				nlen += scapset->sc_machsz;
+				if (nlen < PATH_MAX) {
+					(void) strncpy(nptr, scapset->sc_mach,
+					    scapset->sc_machsz);
+					nptr = nptr + scapset->sc_machsz;
+					olen += MSG_TKN_MACHINE_SIZE;
+					optr += MSG_TKN_MACHINE_SIZE;
+					_flags |= PD_TKN_MACHINE;
 				} else {
 					eprintf(lml, ERR_FATAL,
 					    MSG_INTL(MSG_ERR_EXPAND1),
@@ -581,6 +616,32 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 				}
 			}
 
+		} else if (strncmp(optr, MSG_ORIG(MSG_TKN_CAPABILITY),
+		    MSG_TKN_CAPABILITY_SIZE) == 0) {
+			char	*bptr = nptr - 1;
+			char	*eptr = optr + MSG_TKN_CAPABILITY_SIZE;
+			token = (char *)MSG_ORIG(MSG_TKN_CAPABILITY);
+
+			/*
+			 * $CAPABILITY expansion required.  Expansion is only
+			 * allowed for non-simple path names (must contain a
+			 * '/'), with the token itself being the last element
+			 * of the path.  Therefore, all we need do is test the
+			 * existence of the string "/$CAPABILITY\0".
+			 */
+			if (((omit & PD_TKN_CAP) == 0) &&
+			    ((bptr > _name) && (*bptr == '/') &&
+			    ((*eptr == '\0') || (*eptr == ':')))) {
+				/*
+				 * Decrement the present pointer so that the
+				 * directories trailing "/" gets nuked later.
+				 */
+				nptr--, nlen--;
+				olen += MSG_TKN_CAPABILITY_SIZE;
+				optr += MSG_TKN_CAPABILITY_SIZE;
+				_flags |= PD_TKN_CAP;
+			}
+
 		} else if (strncmp(optr, MSG_ORIG(MSG_TKN_HWCAP),
 		    MSG_TKN_HWCAP_SIZE) == 0) {
 			char	*bptr = nptr - 1;
@@ -588,7 +649,8 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 			token = (char *)MSG_ORIG(MSG_TKN_HWCAP);
 
 			/*
-			 * $HWCAP expansion required.  For compatibility with
+			 * $HWCAP expansion required.  This token has been
+			 * superseeded by $CAPABILITY.  For compatibility with
 			 * older environments, only expand this token when hard-
 			 * ware capability information is available.   This
 			 * expansion is only allowed for non-simple path names
@@ -596,7 +658,7 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 			 * last element of the path.  Therefore, all we need do
 			 * is test the existence of the string "/$HWCAP\0".
 			 */
-			if (((omit & PD_TKN_HWCAP) == 0) &&
+			if (((omit & PD_TKN_CAP) == 0) &&
 			    (rtld_flags2 & RT_FL2_HWCAP) &&
 			    ((bptr > _name) && (*bptr == '/') &&
 			    ((*eptr == '\0') || (*eptr == ':')))) {
@@ -607,7 +669,7 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 				nptr--, nlen--;
 				olen += MSG_TKN_HWCAP_SIZE;
 				optr += MSG_TKN_HWCAP_SIZE;
-				_flags |= PD_TKN_HWCAP;
+				_flags |= PD_TKN_CAP;
 			}
 
 		} else {
@@ -820,7 +882,7 @@ is_path_secure(char *opath, Rt_map *clmp, uint_t info, uint_t flags)
 			 * other dependencies, to be used.
 			 */
 			if ((flags & PD_TKN_ORIGIN) &&
-			    spavl_recorded(npath, 0)) {
+			    pnavl_recorded(&spavl, npath, 0, NULL)) {
 				DBG_CALL(Dbg_libs_insecure(lml, npath, 1));
 				return (1);
 			}
@@ -850,7 +912,7 @@ is_path_secure(char *opath, Rt_map *clmp, uint_t info, uint_t flags)
 			if ((lml->lm_flags & LML_FLG_RTLDLM) &&
 			    is_rtld_setuid())
 				return (1);
-			else if (spavl_recorded(opath, 0)) {
+			else if (pnavl_recorded(&spavl, opath, 0, NULL)) {
 				DBG_CALL(Dbg_libs_insecure(lml, opath, 1));
 				return (1);
 			}

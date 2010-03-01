@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef	__ELF_DOT_H
@@ -31,6 +31,7 @@
 
 #include <sys/types.h>
 #include <sys/mman.h>
+#include <sgs.h>
 #include <elf.h>
 #include <_rtld.h>
 
@@ -50,11 +51,11 @@ extern	int	elf_copy_gen(Rt_map *);
 #endif
 extern	int	elf_copy_reloc(char *, Sym *, Rt_map *, void *, Sym *,
 		    Rt_map *, const void *);
-extern	Sym	*elf_find_sym(Slookup *, Rt_map **, uint_t *, int *);
-extern	Sym	*elf_lazy_find_sym(Slookup *, Rt_map **, uint_t *, int *);
+extern	int	elf_find_sym(Slookup *, Sresult *, uint_t *, int *);
+extern	int	elf_lazy_find_sym(Slookup *, Sresult *, uint_t *, int *);
 extern	Rt_map	*elf_lazy_load(Rt_map *, Slookup *, uint_t, const char *,
 		    uint_t, Grp_hdl **, int *);
-extern	Sym	*elf_lookup_filtee(Slookup *, Rt_map **, uint_t *, uint_t,
+extern	int	elf_lookup_filtee(Slookup *, Sresult *, uint_t *, uint_t,
 		    int *);
 extern	int	elf_mach_flags_check(Rej_desc *, Ehdr *);
 extern	Rt_map	*elf_new_lmp(Lm_list *, Aliste, Fdesc *, Addr, size_t, void *,
@@ -126,6 +127,10 @@ typedef struct _rt_elf_private {
 	ulong_t		e_syminent;	/* syminfo entry size */
 	void		*e_pltpad;	/* PLTpad table */
 	void		*e_pltpadend;	/* end of PLTpad table */
+	Syscapset	e_capset;	/* capabilities set */
+	Capinfo		*e_capinfo;	/* symbol capabilities information */
+	uint_t		e_capchainent;	/* size of capabilities chain entry */
+	uint_t		e_capchainsz;	/* size of capabilities chain data */
 } Rt_elfp;
 
 /*
@@ -161,6 +166,10 @@ typedef struct _rt_elf_private {
 #define	SUNWSORTENT(X)		(((Rt_elfp *)(X)->rt_priv)->e_sunwsortent)
 #define	SUNWSYMSORT(X)		(((Rt_elfp *)(X)->rt_priv)->e_sunwsymsort)
 #define	SUNWSYMSORTSZ(X)	(((Rt_elfp *)(X)->rt_priv)->e_sunwsymsortsz)
+#define	CAPSET(X)		(((Rt_elfp *)(X)->rt_priv)->e_capset)
+#define	CAPINFO(X)		(((Rt_elfp *)(X)->rt_priv)->e_capinfo)
+#define	CAPCHAINENT(X)		(((Rt_elfp *)(X)->rt_priv)->e_capchainent)
+#define	CAPCHAINSZ(X)		(((Rt_elfp *)(X)->rt_priv)->e_capchainsz)
 
 /*
  * Most of the above macros are used from ELF specific routines, however there

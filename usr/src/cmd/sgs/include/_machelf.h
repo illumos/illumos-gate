@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Wrapper around the <sys/machelf.h> header that adds
@@ -29,8 +29,6 @@
 
 #ifndef	_MACHELF_H
 #define	_MACHELF_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/machelf.h>
 #include <string.h>		/* memcpy() */
@@ -61,6 +59,9 @@
 #define	ELF_M_SYM			ELF64_M_SYM
 #define	ELF_M_SIZE			ELF64_M_SIZE
 #define	ELF_M_INFO			ELF64_M_INFO
+#define	ELF_C_SYM			ELF64_C_SYM
+#define	ELF_C_GROUP			ELF64_C_GROUP
+#define	ELF_C_INFO			ELF64_C_INFO
 #define	elf_checksum			elf64_checksum
 #define	elf_fsize			elf64_fsize
 #define	elf_getehdr			elf64_getehdr
@@ -84,6 +85,9 @@
 #define	ELF_M_SYM			ELF32_M_SYM
 #define	ELF_M_SIZE			ELF32_M_SIZE
 #define	ELF_M_INFO			ELF32_M_INFO
+#define	ELF_C_SYM			ELF32_C_SYM
+#define	ELF_C_GROUP			ELF32_C_GROUP
+#define	ELF_C_INFO			ELF32_C_INFO
 #define	elf_checksum			elf32_checksum
 #define	elf_fsize			elf32_fsize
 #define	elf_getehdr			elf32_getehdr

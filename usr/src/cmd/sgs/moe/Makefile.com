@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG=		moe
@@ -39,7 +37,7 @@ OBJS=		$(BLTOBJ) $(COMOBJ)
 MAPFILE=	$(MAPFILE.NGB)
 MAPOPT=		$(MAPFILE:%=-M%)
 
-LDFLAGS +=	-Wl,$(VERSREF) $(USE_PROTO) $(MAPOPT)
+LDFLAGS +=	-Wl,$(VERSREF) $(CC_USE_PROTO) $(MAPOPT)
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB)
 
 LINTFLAGS +=	-x

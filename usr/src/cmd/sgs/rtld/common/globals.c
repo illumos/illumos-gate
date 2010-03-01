@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,10 +81,7 @@ APlist		*dynlm_list = NULL;	/* dynamic list of link-maps */
  * END: Exposed to rtld_db
  */
 
-Reglist		*reglist = NULL;		/* list of register symbols */
-
-ulong_t		hwcap = 0;			/* hardware capabilities */
-ulong_t		sfcap = 0;			/* software capabilities */
+Reglist		*reglist = NULL;	/* list of register symbols */
 
 /*
  * Set of integers to track how many of what type of PLT's have been bound.
@@ -98,9 +95,11 @@ uint32_t	pltcntfull = 0;
 uint32_t	pltcntfar = 0;
 
 /*
- * Provide for recording not-found path names.
+ * AVL tree pointers.
  */
-avl_tree_t	*nfavl = NULL;
+avl_tree_t	*capavl = NULL;		/* capabilities files */
+avl_tree_t	*nfavl = NULL;		/* not-found path names */
+avl_tree_t	*spavl = NULL;		/* secure path names */
 
 /*
  * Various other global data.
@@ -119,8 +118,6 @@ Interp		*interp = NULL;		/* ELF interpreter info */
 APlist		*hdl_alp[HDLIST_SZ+2];	/* dlopen() handle list */
 size_t		syspagsz = 0;		/* system page size */
 ulong_t		at_flags = 0;		/* machine specific file flags */
-char		*platform = NULL;	/* platform name from AT_SUN_PLATFORM */
-size_t		platform_sz = 0;	/* platform string length */
 Uts_desc	*uts = NULL; 		/* utsname descriptor */
 Isa_desc	*isa = NULL;		/* isalist descriptor */
 
@@ -146,6 +143,30 @@ uint_t		env_info = 0;		/* information regarding environment */
 					/*	variables */
 int		killsig = SIGKILL;	/* signal sent on fatal exit */
 APlist		*free_alp = NULL;	/* defragmentation list */
+
+/*
+ * Capabilities are provided by the system.  However, users can define an
+ * alternative set of system capabilities, where they can add, subtract, or
+ * override the system capabilities for testing purposes.  Furthermore, these
+ * alternative capabilities can be specified such that they only apply to
+ * specified files rather than to all objects.
+ */
+static Syscapset	scapset = { 0 };
+Syscapset	*org_scapset = &scapset;	/* original system and */
+Syscapset	*alt_scapset = &scapset;	/* alternative system */
+						/*	capabilities */
+
+const char	*rpl_hwcap = NULL;	/* replaceable hwcap str */
+const char	*rpl_sfcap = NULL;	/* replaceable sfcap str */
+const char	*rpl_machcap = NULL;	/* replaceable machcap str */
+const char	*rpl_platcap = NULL;	/* replaceable platcap str */
+const char	*rpl_cap_files = NULL;	/* associated files */
+
+const char	*prm_hwcap = NULL;	/* permanent hwcap str */
+const char	*prm_sfcap = NULL;	/* permanent sfcap str */
+const char	*prm_machcap = NULL;	/* permanent machcap str */
+const char	*prm_platcap = NULL;	/* permanent platcap str */
+const char	*prm_cap_files = NULL;	/* associated files */
 
 /*
  * Note, the debugging descriptor interposes on the default definition provided
@@ -200,8 +221,12 @@ ldd_reject[] = {
 		MSG_LDD_REJ_US3,	/* MSG_INTL(MSG_LDD_REJ_US3) */
 		MSG_LDD_REJ_STR,	/* MSG_INTL(MSG_LDD_REJ_STR) */
 		MSG_LDD_REJ_UNKFILE,	/* MSG_INTL(MSG_LDD_REJ_UNKFILE) */
+		MSG_LDD_REJ_UNKCAP,	/* MSG_INTL(MSG_LDD_REJ_UNKCAP) */
 		MSG_LDD_REJ_HWCAP_1,	/* MSG_INTL(MSG_LDD_REJ_HWCAP_1) */
 		MSG_LDD_REJ_SFCAP_1,	/* MSG_INTL(MSG_LDD_REJ_SFCAP_1) */
+		MSG_LDD_REJ_MACHCAP,	/* MSG_INTL(MSG_LDD_REJ_MACHCAP) */
+		MSG_LDD_REJ_PLATCAP,	/* MSG_INTL(MSG_LDD_REJ_PLATCAP) */
+		MSG_LDD_REJ_HWCAP_2	/* MSG_INTL(MSG_LDD_REJ_HWCAP_2) */
 	};
 
 const Msg
@@ -218,6 +243,32 @@ err_reject[] = {
 		MSG_ERR_REJ_US3,	/* MSG_INTL(MSG_ERR_REJ_US3) */
 		MSG_ERR_REJ_STR,	/* MSG_INTL(MSG_ERR_REJ_STR) */
 		MSG_ERR_REJ_UNKFILE,	/* MSG_INTL(MSG_ERR_REJ_UNKFILE) */
+		MSG_ERR_REJ_UNKCAP,	/* MSG_INTL(MSG_ERR_REJ_UNKCAP) */
 		MSG_ERR_REJ_HWCAP_1,	/* MSG_INTL(MSG_ERR_REJ_HWCAP_1) */
 		MSG_ERR_REJ_SFCAP_1,	/* MSG_INTL(MSG_ERR_REJ_SFCAP_1) */
+		MSG_ERR_REJ_MACHCAP,	/* MSG_INTL(MSG_ERR_REJ_MACHCAP) */
+		MSG_ERR_REJ_PLATCAP,	/* MSG_INTL(MSG_ERR_REJ_PLATCAP) */
+		MSG_ERR_REJ_HWCAP_2	/* MSG_INTL(MSG_ERR_REJ_HWCAP_2) */
+	};
+
+const Msg
+ldd_warn[] = {
+		MSG_STR_EMPTY,
+		MSG_STR_EMPTY,
+		MSG_STR_EMPTY,
+		MSG_STR_EMPTY,
+		MSG_STR_EMPTY,
+		MSG_STR_EMPTY,
+		MSG_STR_EMPTY,
+		MSG_STR_EMPTY,
+		MSG_STR_EMPTY,
+		MSG_STR_EMPTY,
+		MSG_STR_EMPTY,
+		MSG_STR_EMPTY,
+		MSG_LDD_WARN_UNKCAP,	/* MSG_INTL(MSG_LDD_WARN_UNKCAP) */
+		MSG_LDD_WARN_HWCAP_1,	/* MSG_INTL(MSG_LDD_WARN_HWCAP_1) */
+		MSG_LDD_WARN_SFCAP_1,	/* MSG_INTL(MSG_LDD_WARN_SFCAP_1) */
+		MSG_LDD_WARN_MACHCAP,	/* MSG_INTL(MSG_LDD_WARN_MACHCAP) */
+		MSG_LDD_WARN_PLATCAP,	/* MSG_INTL(MSG_LDD_WARN_PLATCAP) */
+		MSG_LDD_WARN_HWCAP_2	/* MSG_INTL(MSG_LDD_WARN_HWCAP_2) */
 	};

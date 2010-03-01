@@ -67,16 +67,24 @@ load_filtees(Rt_map *lmp, int *in_nfavl)
 		Slookup		sl;
 
 		/*
-		 * Initialize the symbol lookup data structure.
+		 * Initialize the symbol lookup data structure.  Note, no symbol
+		 * name is supplied.  This NULL name causes filters to be loaded
+		 * but no symbol to be searched for.
 		 */
 		SLOOKUP_INIT(sl, 0, lmp, lmp, ld_entry_cnt, 0, 0, 0, 0, 0);
 
 		for (cnt = 0; cnt < max; cnt++, dip++) {
+			uint_t	binfo;
+			Sresult	sr;
+
+			SRESULT_INIT(sr, NULL);
+
 			if (((dip->di_flags & MSK_DI_FILTER) == 0) ||
 			    ((dip->di_flags & FLG_DI_AUXFLTR) &&
 			    (rtld_flags & RT_FL_NOAUXFLTR)))
 				continue;
-			(void) elf_lookup_filtee(&sl, 0, 0, cnt, in_nfavl);
+			(void) elf_lookup_filtee(&sl, &sr, &binfo, cnt,
+			    in_nfavl);
 		}
 	}
 }
@@ -490,8 +498,8 @@ relocate_lmc(Lm_list *lml, Aliste nlmco, Rt_map *clmp, Rt_map *nlmp,
 	 * may be involved.  Under the first pass, RTLD_CONFGEN is set.  Under
 	 * this pass, crle() loads objects into the process address space.  No
 	 * relocation is necessary at this point, we simply need to analyze the
-	 * objects to insure any directly bound dependencies, filtees, etc.
-	 * get loaded. Although we skip the relocation, fall through to insure
+	 * objects to ensure any directly bound dependencies, filtees, etc.
+	 * get loaded.  Although we skip the relocation, fall through to ensure
 	 * any control lists are maintained appropriately.
 	 *
 	 * If objects are to be dldump(3c)'ed, crle(1) makes a second pass,
@@ -761,7 +769,7 @@ is_so_matched(Rt_map *lmp, const char *name, int path)
  *
  * A traversal through the callers link-map list is carried out, and from each
  * link-map, a comparison is made against all of the various names by which the
- * object has been referenced.  is_so_matched() is used to compares the link-map
+ * object has been referenced.  is_so_matched() is used to compare the link-map
  * names against the name being searched for.  Whether the search name is a full
  * path name or a simple file name, governs what comparisons are made.
  *
@@ -791,7 +799,7 @@ is_so_loaded(Lm_list *lml, const char *name, int *in_nfavl)
 		    ((FLAGS(lmp) & (FLG_RT_OBJECT | FLG_RT_DELETE)) == 0))
 			return (lmp);
 
-		if (nfavl_recorded(name, hash, 0)) {
+		if (pnavl_recorded(&nfavl, name, hash, NULL)) {
 			/*
 			 * For dlopen() and dlsym() fall backs, indicate that
 			 * a registered not-found path has indicated that this
@@ -827,7 +835,7 @@ is_so_loaded(Lm_list *lml, const char *name, int *in_nfavl)
 /*
  * Tracing is enabled by the LD_TRACE_LOADED_OPTIONS environment variable which
  * is normally set from ldd(1).  For each link map we load, print the load name
- * and the full pathname of the shared object.
+ * and the full pathname of the associated object.
  */
 /* ARGSUSED4 */
 static void
@@ -891,7 +899,6 @@ trace_so(Rt_map *clmp, Rej_desc *rej, const char *name, const char *path,
 		(void) printf(MSG_ORIG(MSG_LDD_FIL_EQUIV), name, path, str,
 		    reject);
 }
-
 
 /*
  * Establish a link-map mode, initializing it if it has just been loaded, or
@@ -1158,14 +1165,14 @@ file_open(int err, Lm_list *lml, Rt_map *clmp, uint_t flags, Fdesc *fdp,
 			fdp->fd_lmp = nlmp;
 			return (1);
 		}
-		if (nfavl_recorded(nname, hash, &nfavlwhere)) {
+		if (pnavl_recorded(&nfavl, nname, hash, &nfavlwhere)) {
 			/*
 			 * For dlopen() and dlsym() fall backs, indicate that
 			 * a registered not-found path has indicated that this
 			 * object does not exist.  If this path has been
-			 * constructed as part of expanding a HWCAP directory,
-			 * this is a silent failure, where no rejection message
-			 * is created.
+			 * constructed as part of expanding a CAPABILITY
+			 * directory, this is a silent failure, where no
+			 * rejection message is created.
 			 */
 			if (in_nfavl)
 				(*in_nfavl)++;
@@ -1179,12 +1186,12 @@ file_open(int err, Lm_list *lml, Rt_map *clmp, uint_t flags, Fdesc *fdp,
 
 		/*
 		 * If this path has been constructed as part of expanding a
-		 * HWCAP directory, ignore any subdirectories.  As this is a
-		 * silent failure, no rejection message is created.  For any
-		 * other reference that expands to a directory, fall through
-		 * to construct a meaningful rejection message.
+		 * CAPABILITY directory, ignore any subdirectories.  As this
+		 * is a silent failure, no rejection message is created.  For
+		 * any other reference that expands to a directory, fall
+		 * through to construct a meaningful rejection message.
 		 */
-		if ((flags & FLG_RT_HWCAP) &&
+		if ((flags & FLG_RT_CAP) &&
 		    ((status.st_mode & S_IFMT) == S_IFDIR))
 			return (0);
 
@@ -1305,14 +1312,6 @@ file_open(int err, Lm_list *lml, Rt_map *clmp, uint_t flags, Fdesc *fdp,
 			if (fdp->fd_ftp != NULL) {
 				fdp->fd_dev = status.st_dev;
 				fdp->fd_ino = status.st_ino;
-
-				/*
-				 * Trace that this open has succeeded.
-				 */
-				if (lml->lm_flags & LML_FLG_TRC_ENABLE) {
-					trace_so(clmp, 0, oname, nname,
-					    (fdp->fd_flags & FLG_FD_ALTER), 0);
-				}
 				return (1);
 			}
 		}
@@ -1977,12 +1976,12 @@ load_so(Lm_list *lml, Aliste lmco, Rt_map *clmp, uint_t flags,
 		clmp = lml_rtld.lm_head;
 
 	/*
-	 * If this path resulted from a $HWCAP specification, then the best
-	 * hardware capability object has already been establish, and is
-	 * available in the calling file descriptor.  Perform some minor book-
-	 * keeping so that we can fall through into common code.
+	 * If this path resulted from a $CAPABILITY specification, then the
+	 * best capability object has already been establish, and is available
+	 * in the calling file descriptor.  Perform some minor book-keeping so
+	 * that we can fall through into common code.
 	 */
-	if (flags & FLG_RT_HWCAP) {
+	if (flags & FLG_RT_CAP) {
 		/*
 		 * If this object is already loaded, we're done.
 		 */
@@ -2086,12 +2085,19 @@ load_so(Lm_list *lml, Aliste lmco, Rt_map *clmp, uint_t flags,
 	}
 
 	/*
-	 * Finish mapping the file and return the link-map descriptor.  Note,
-	 * if this request originated from a HWCAP request, re-establish the
-	 * fdesc information.  For single paged objects, such as filters, the
-	 * original mapping may have been sufficient to capture the file, thus
-	 * this mapping needs to be reset to insure it doesn't mistakenly get
-	 * unmapped as part of HWCAP cleanup.
+	 * Trace that this successfully opened file is about to be processed.
+	 * Note, as part of processing a family of hardware capabilities filtees
+	 * a number of candidates may have been opened and mapped to determine
+	 * their capability requirements.  At this point we've decided which
+	 * of the candidates to use.
+	 */
+	if (lml->lm_flags & LML_FLG_TRC_ENABLE) {
+		trace_so(clmp, 0, fdp->fd_oname, fdp->fd_nname,
+		    (fdp->fd_flags & FLG_FD_ALTER), 0);
+	}
+
+	/*
+	 * Finish mapping the file and return the link-map descriptor.
 	 */
 	return (load_file(lml, lmco, fdp, in_nfavl));
 }
@@ -2430,7 +2436,7 @@ load_path(Lm_list *lml, Aliste lmco, Rt_map *clmp, int nmode, uint_t flags,
 		 * If this file has been found, reset the not-found load count.
 		 * Although a search for this file might have inspected a number
 		 * of non-existent path names, the file has been found so there
-		 * is no need to to accumulate a non-found count, as this may
+		 * is no need to accumulate a non-found count, as this may
 		 * trigger unnecessary fall back (retry) processing.
 		 */
 		if (in_nfavl)
@@ -2530,8 +2536,8 @@ load_path(Lm_list *lml, Aliste lmco, Rt_map *clmp, int nmode, uint_t flags,
 /*
  * Load one object from a possible list of objects.  Typically, for requests
  * such as NEEDED's, only one object is specified.  However, this object could
- * be specified using $ISALIST or $HWCAP, in which case only the first object
- * that can be loaded is used (ie. the best).
+ * be specified using $ISALIST or $CAPABILITY, in which case only the first
+ * object that can be loaded is used (ie. the best).
  */
 Rt_map *
 load_one(Lm_list *lml, Aliste lmco, Alist *palp, Rt_map *clmp, int mode,
@@ -2546,12 +2552,12 @@ load_one(Lm_list *lml, Aliste lmco, Alist *palp, Rt_map *clmp, int mode,
 		Rt_map	*lmp = NULL;
 
 		/*
-		 * A Hardware capabilities requirement can itself expand into
-		 * a number of candidates.
+		 * A $CAPABILITY/$HWCAP requirement can expand into a number of
+		 * candidates.
 		 */
-		if (pdp->pd_flags & PD_TKN_HWCAP) {
-			lmp = load_hwcap(lml, lmco, pdp->pd_pname, clmp,
-			    mode, (flags | FLG_RT_HWCAP), hdl, &rej, in_nfavl);
+		if (pdp->pd_flags & PD_TKN_CAP) {
+			lmp = load_cap(lml, lmco, pdp->pd_pname, clmp,
+			    mode, (flags | FLG_RT_CAP), hdl, &rej, in_nfavl);
 		} else {
 			Fdesc	fd = { 0 };
 
@@ -2612,11 +2618,11 @@ is_sym_interposer(Rt_map *lmp, Sym *sym)
  * which we've bound can be interposed upon.  In this context, copy relocations
  * are a form of interposition.
  */
-static Sym *
-lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Sym *osym,
-    int *in_nfavl)
+static int
+lookup_sym_interpose(Slookup *slp, Sresult *srp, uint_t *binfo, int *in_nfavl)
 {
-	Rt_map		*lmp, *clmp;
+	Rt_map		*lmp, *clmp, *dlmp = srp->sr_dmap;
+	Sym		*osym = srp->sr_sym;
 	Slookup		sl;
 	Lm_list		*lml;
 
@@ -2625,17 +2631,18 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Sym *osym,
 	 * this binding to the original copy reference.  Fabricate an inter-
 	 * position diagnostic, as this is a legitimate form of interposition.
 	 */
-	if (osym && (FLAGS1(*dlmp) & FL1_RT_COPYTOOK)) {
+	if (osym && (FLAGS1(dlmp) & FL1_RT_COPYTOOK)) {
 		Rel_copy	*rcp;
 		Aliste		idx;
 
-		for (ALIST_TRAVERSE(COPY_R(*dlmp), idx, rcp)) {
+		for (ALIST_TRAVERSE(COPY_R(dlmp), idx, rcp)) {
 			if ((osym == rcp->r_dsym) || (osym->st_value &&
 			    (osym->st_value == rcp->r_dsym->st_value))) {
-				*dlmp = rcp->r_rlmp;
+				srp->sr_dmap = rcp->r_rlmp;
+				srp->sr_sym = rcp->r_rsym;
 				*binfo |=
 				    (DBG_BINFO_INTERPOSE | DBG_BINFO_COPYREF);
-				return (rcp->r_rsym);
+				return (1);
 			}
 		}
 	}
@@ -2646,7 +2653,7 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Sym *osym,
 	 * original caller.
 	 */
 	if (osym)
-		clmp = *dlmp;
+		clmp = dlmp;
 	else
 		clmp = slp->sl_cmap;
 
@@ -2676,10 +2683,16 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Sym *osym,
 	if (osym && ((FLAGS1(lmp) & FL1_RT_DTFLAGS) == 0) &&
 	    (FCT(lmp) == &elf_fct) &&
 	    (ELF_ST_TYPE(osym->st_info) != STT_FUNC) &&
-	    are_bits_zero(*dlmp, osym, 0)) {
-		Rt_map	*ilmp;
-		Sym	*isym;
+	    are_bits_zero(dlmp, osym, 0)) {
+		Sresult	sr;
 
+		/*
+		 * Initialize a local symbol result descriptor, using the
+		 * original symbol name.  Initialize a local symbol lookup
+		 * descriptor, using the original lookup information, and a
+		 * new initial link-map.
+		 */
+		SRESULT_INIT(sr, slp->sl_name);
 		sl = *slp;
 		sl.sl_imap = lmp;
 
@@ -2688,13 +2701,17 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Sym *osym,
 		 * executable, that the size and type of symbol are the same,
 		 * and that the symbol is also associated with .bss.
 		 */
-		if (((isym = SYMINTP(lmp)(&sl, &ilmp, binfo,
-		    in_nfavl)) != NULL) && (isym->st_size == osym->st_size) &&
-		    (isym->st_info == osym->st_info) &&
-		    are_bits_zero(lmp, isym, 1)) {
-			*dlmp = lmp;
-			*binfo |= (DBG_BINFO_INTERPOSE | DBG_BINFO_COPYREF);
-			return (isym);
+		if (SYMINTP(lmp)(&sl, &sr, binfo, in_nfavl)) {
+			Sym	*isym = sr.sr_sym;
+
+			if ((isym->st_size == osym->st_size) &&
+			    (isym->st_info == osym->st_info) &&
+			    are_bits_zero(lmp, isym, 1)) {
+				*srp = sr;
+				*binfo |=
+				    (DBG_BINFO_INTERPOSE | DBG_BINFO_COPYREF);
+				return (1);
+			}
 		}
 	}
 
@@ -2724,7 +2741,7 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Sym *osym,
 		 * If we had already bound to this object, there's no point in
 		 * searching it again, we're done.
 		 */
-		if (lmp == *dlmp)
+		if (lmp == dlmp)
 			break;
 
 		/*
@@ -2732,11 +2749,21 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Sym *osym,
 		 * the symbol within the interposer.
 		 */
 		if (callable(clmp, lmp, 0, sl.sl_flags)) {
-			Rt_map	*ilmp;
-			Sym	*isym;
+			Sresult		sr;
 
+			/*
+			 * Initialize a local symbol result descriptor, using
+			 * the original symbol name.  Initialize a local symbol
+			 * lookup descriptor, using the original lookup
+			 * information, and a new initial link-map.
+			 */
+			SRESULT_INIT(sr, slp->sl_name);
 			sl.sl_imap = lmp;
-			if (isym = SYMINTP(lmp)(&sl, &ilmp, binfo, in_nfavl)) {
+
+			if (SYMINTP(lmp)(&sl, &sr, binfo, in_nfavl)) {
+				Sym	*isym = sr.sr_sym;
+				Rt_map	*ilmp = sr.sr_dmap;
+
 				/*
 				 * If this object provides individual symbol
 				 * interposers, make sure that the symbol we
@@ -2750,13 +2777,13 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Sym *osym,
 				 * Indicate this binding has occurred to an
 				 * interposer, and return the symbol.
 				 */
+				*srp = sr;
 				*binfo |= DBG_BINFO_INTERPOSE;
-				*dlmp = ilmp;
-				return (isym);
+				return (1);
 			}
 		}
 	}
-	return (NULL);
+	return (0);
 }
 
 /*
@@ -2764,12 +2791,12 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Sym *osym,
  * describing where each binding was established during link-editing, and the
  * object was built -Bdirect), then look for the symbol in the specific object.
  */
-static Sym *
-lookup_sym_direct(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Syminfo *sip,
+static int
+lookup_sym_direct(Slookup *slp, Sresult *srp, uint_t *binfo, Syminfo *sip,
     Rt_map *lmp, int *in_nfavl)
 {
-	Rt_map	*clmp = slp->sl_cmap;
-	Sym	*sym;
+	Rt_map	*dlmp, *clmp = slp->sl_cmap;
+	int	ret;
 	Slookup	sl;
 
 	/*
@@ -2789,11 +2816,11 @@ lookup_sym_direct(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Syminfo *sip,
 	 */
 	if (((slp->sl_flags & LKUP_COPY) == 0) &&
 	    (sip->si_flags & SYMINFO_FLG_COPY)) {
-
 		slp->sl_imap = LIST(clmp)->lm_head;
-		if (sym = SYMINTP(clmp)(slp, dlmp, binfo, in_nfavl))
+
+		if (ret = SYMINTP(clmp)(slp, srp, binfo, in_nfavl))
 			*binfo |= (DBG_BINFO_DIRECT | DBG_BINFO_COPYREF);
-		return (sym);
+		return (ret);
 	}
 
 	/*
@@ -2802,7 +2829,7 @@ lookup_sym_direct(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Syminfo *sip,
 	 */
 	sl = *slp;
 	sl.sl_flags |= LKUP_DIRECT;
-	sym = NULL;
+	ret = 0;
 
 	if (sip->si_boundto == SYMINFO_BT_PARENT) {
 		Aliste		idx1;
@@ -2815,8 +2842,7 @@ lookup_sym_direct(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Syminfo *sip,
 		 */
 		for (APLIST_TRAVERSE(CALLERS(clmp), idx1, bdp)) {
 			sl.sl_imap = lmp = bdp->b_caller;
-			if ((sym = SYMINTP(lmp)(&sl, dlmp, binfo,
-			    in_nfavl)) != NULL)
+			if (ret = SYMINTP(lmp)(&sl, srp, binfo, in_nfavl))
 				goto found;
 		}
 
@@ -2835,8 +2861,8 @@ lookup_sym_direct(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Syminfo *sip,
 				if ((gdp->gd_flags & GPD_PARENT) == 0)
 					continue;
 				sl.sl_imap = lmp = gdp->gd_depend;
-				if ((sym = SYMINTP(lmp)(&sl, dlmp,
-				    binfo, in_nfavl)) != NULL)
+				if (ret = SYMINTP(lmp)(&sl, srp, binfo,
+				    in_nfavl))
 					goto found;
 			}
 		}
@@ -2851,10 +2877,10 @@ lookup_sym_direct(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Syminfo *sip,
 			sl.sl_imap = lmp;
 
 		if (lmp)
-			sym = SYMINTP(lmp)(&sl, dlmp, binfo, in_nfavl);
+			ret = SYMINTP(lmp)(&sl, srp, binfo, in_nfavl);
 	}
 found:
-	if (sym)
+	if (ret)
 		*binfo |= DBG_BINFO_DIRECT;
 
 	/*
@@ -2863,20 +2889,18 @@ found:
 	 * a reference to a directly bound symbol is satisfied, then determine
 	 * whether that object can be interposed upon for this symbol.
 	 */
-	if ((sym == NULL) || ((LIST(*dlmp)->lm_head != *dlmp) &&
-	    (LIST(*dlmp) == LIST(clmp)))) {
-		Sym	*isym;
-
-		if ((isym = lookup_sym_interpose(slp, dlmp, binfo, sym,
-		    in_nfavl)) != 0)
-			return (isym);
+	dlmp = srp->sr_dmap;
+	if ((ret == 0) || (dlmp && (LIST(dlmp)->lm_head != dlmp) &&
+	    (LIST(dlmp) == LIST(clmp)))) {
+		if (lookup_sym_interpose(slp, srp, binfo, in_nfavl))
+			return (1);
 	}
 
-	return (sym);
+	return (ret);
 }
 
-static Sym *
-core_lookup_sym(Rt_map *ilmp, Slookup *slp, Rt_map **dlmp, uint_t *binfo,
+static int
+core_lookup_sym(Rt_map *ilmp, Slookup *slp, Sresult *srp, uint_t *binfo,
     Aliste off, int *in_nfavl)
 {
 	Rt_map	*lmp;
@@ -2892,20 +2916,18 @@ core_lookup_sym(Rt_map *ilmp, Slookup *slp, Rt_map **dlmp, uint_t *binfo,
 
 	for (; lmp; lmp = NEXT_RT_MAP(lmp)) {
 		if (callable(slp->sl_cmap, lmp, 0, slp->sl_flags)) {
-			Sym	*sym;
 
 			slp->sl_imap = lmp;
-			if (((sym = SYMINTP(lmp)(slp, dlmp, binfo,
-			    in_nfavl)) != NULL) ||
+			if ((SYMINTP(lmp)(slp, srp, binfo, in_nfavl)) ||
 			    (*binfo & BINFO_MSK_TRYAGAIN))
-				return (sym);
+				return (1);
 		}
 	}
-	return (NULL);
+	return (0);
 }
 
-static Sym *
-rescan_lazy_find_sym(Rt_map *ilmp, Slookup *slp, Rt_map **dlmp, uint_t *binfo,
+static int
+rescan_lazy_find_sym(Rt_map *ilmp, Slookup *slp, Sresult *srp, uint_t *binfo,
     int *in_nfavl)
 {
 	Rt_map	*lmp;
@@ -2914,26 +2936,24 @@ rescan_lazy_find_sym(Rt_map *ilmp, Slookup *slp, Rt_map **dlmp, uint_t *binfo,
 		if (LAZY(lmp) == 0)
 			continue;
 		if (callable(slp->sl_cmap, lmp, 0, slp->sl_flags)) {
-			Sym	*sym;
 
 			slp->sl_imap = lmp;
-			if ((sym = elf_lazy_find_sym(slp, dlmp, binfo,
-			    in_nfavl)) != 0)
-				return (sym);
+			if (elf_lazy_find_sym(slp, srp, binfo, in_nfavl))
+				return (1);
 		}
 	}
-	return (NULL);
+	return (0);
 }
 
-static Sym *
-_lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
+static int
+_lookup_sym(Slookup *slp, Sresult *srp, uint_t *binfo, int *in_nfavl)
 {
 	const char	*name = slp->sl_name;
 	Rt_map		*clmp = slp->sl_cmap;
 	Lm_list		*lml = LIST(clmp);
 	Rt_map		*ilmp = slp->sl_imap, *lmp;
 	ulong_t		rsymndx;
-	Sym		*sym;
+	int		ret;
 	Syminfo		*sip;
 	Slookup		sl;
 
@@ -2944,7 +2964,7 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 	 * the link map).
 	 */
 	if (slp->sl_flags & LKUP_FIRST)
-		return (SYMINTP(ilmp)(slp, dlmp, binfo, in_nfavl));
+		return (SYMINTP(ilmp)(slp, srp, binfo, in_nfavl));
 
 	/*
 	 * Determine whether this lookup can be satisfied by an objects direct,
@@ -3004,7 +3024,7 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 			    ((slp->sl_flags & LKUP_SINGLETON) == 0))) &&
 			    ((FLAGS1(clmp) & FL1_RT_DIRECT) ||
 			    (sip->si_flags & SYMINFO_FLG_DIRECTBIND))) {
-				sym = lookup_sym_direct(slp, dlmp, binfo,
+				ret = lookup_sym_direct(slp, srp, binfo,
 				    sip, lmp, in_nfavl);
 
 				/*
@@ -3023,7 +3043,7 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 				 */
 				if (((*binfo & BINFO_MSK_REJECTED) == 0) ||
 				    (*binfo & BINFO_MSK_TRYAGAIN))
-					return (sym);
+					return (ret);
 
 				*binfo &= ~BINFO_MSK_REJECTED;
 			}
@@ -3043,21 +3063,23 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 	 */
 	if ((FLAGS1(clmp) & FL1_RT_SYMBOLIC) &&
 	    ((sl.sl_flags & LKUP_SINGLETON) == 0)) {
+
 		sl.sl_imap = clmp;
-		if (sym = SYMINTP(clmp)(&sl, dlmp, binfo, in_nfavl)) {
-			ulong_t	dsymndx = (((ulong_t)sym -
-			    (ulong_t)SYMTAB(*dlmp)) / SYMENT(*dlmp));
+		if (SYMINTP(clmp)(&sl, srp, binfo, in_nfavl)) {
+			Rt_map	*dlmp = srp->sr_dmap;
+			ulong_t	dsymndx = (((ulong_t)srp->sr_sym -
+			    (ulong_t)SYMTAB(dlmp)) / SYMENT(dlmp));
 
 			/*
 			 * Make sure this symbol hasn't explicitly been defined
 			 * as nodirect.
 			 */
-			if (((sip = SYMINFO(*dlmp)) == 0) ||
+			if (((sip = SYMINFO(dlmp)) == 0) ||
 			    /* LINTED */
 			    ((sip = (Syminfo *)((char *)sip +
-			    (dsymndx * SYMINENT(*dlmp)))) == 0) ||
+			    (dsymndx * SYMINENT(dlmp)))) == 0) ||
 			    ((sip->si_flags & SYMINFO_FLG_NOEXTDIRECT) == 0))
-				return (sym);
+				return (1);
 		}
 	}
 
@@ -3073,16 +3095,16 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 		Aliste	off;
 		Lm_cntl	*lmc;
 
-		sym = NULL;
+		ret = 0;
 
 		for (ALIST_TRAVERSE_BY_OFFSET(lml->lm_lists, off, lmc)) {
-			if (((sym = core_lookup_sym(lmc->lc_head, &sl, dlmp,
-			    binfo, off, in_nfavl)) != NULL) ||
+			if (((ret = core_lookup_sym(lmc->lc_head, &sl, srp,
+			    binfo, off, in_nfavl)) != 0) ||
 			    (*binfo & BINFO_MSK_TRYAGAIN))
 				break;
 		}
 	} else
-		sym = core_lookup_sym(ilmp, &sl, dlmp, binfo, ALIST_OFF_DATA,
+		ret = core_lookup_sym(ilmp, &sl, srp, binfo, ALIST_OFF_DATA,
 		    in_nfavl);
 
 	/*
@@ -3090,7 +3112,7 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 	 * be repeated.
 	 */
 	if (*binfo & BINFO_MSK_TRYAGAIN)
-		return (sym);
+		return (0);
 
 	/*
 	 * To allow transitioning into a world of lazy loading dependencies see
@@ -3100,7 +3122,7 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 	 * the reference can be satisfied.  Use of dlsym(RTLD_PROBE) sets the
 	 * LKUP_NOFALLBACK flag, and this flag disables this fall back.
 	 */
-	if ((sym == NULL) && ((sl.sl_flags & LKUP_NOFALLBACK) == 0)) {
+	if ((ret == 0) && ((sl.sl_flags & LKUP_NOFALLBACK) == 0)) {
 		if ((lmp = ilmp) == 0)
 			lmp = LIST(clmp)->lm_head;
 
@@ -3116,7 +3138,7 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 		 * initial link-map.
 		 */
 		if (sl.sl_flags & LKUP_NEXT)
-			sym = rescan_lazy_find_sym(clmp, &sl, dlmp, binfo,
+			ret = rescan_lazy_find_sym(clmp, &sl, srp, binfo,
 			    in_nfavl);
 		else {
 			Aliste	idx;
@@ -3124,13 +3146,13 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 
 			for (ALIST_TRAVERSE(lml->lm_lists, idx, lmc)) {
 				sl.sl_flags |= LKUP_NOFALLBACK;
-				if ((sym = rescan_lazy_find_sym(lmc->lc_head,
-				    &sl, dlmp, binfo, in_nfavl)) != NULL)
+				if (ret = rescan_lazy_find_sym(lmc->lc_head,
+				    &sl, srp, binfo, in_nfavl))
 					break;
 			}
 		}
 	}
-	return (sym);
+	return (ret);
 }
 
 /*
@@ -3139,31 +3161,53 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
  * pointer to the link map of the enclosing object, and information relating
  * to the type of binding.  Else return a null pointer.
  *
- * To improve elf performance, we first compute the elf hash value and pass
- * it to each find_sym() routine.  The elf function will use this value to
+ * To improve ELF performance, we first compute the ELF hash value and pass
+ * it to each _lookup_sym() routine.  The ELF function will use this value to
  * locate the symbol, the a.out function will simply ignore it.
  */
-Sym *
-lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
+int
+lookup_sym(Slookup *slp, Sresult *srp, uint_t *binfo, int *in_nfavl)
 {
 	Rt_map		*clmp = slp->sl_cmap;
-	Sym		*rsym = slp->sl_rsym, *sym = NULL;
-	uchar_t		rtype = slp->sl_rtype;
-	int		mode;
+	Sym		*rsym = slp->sl_rsym;
+	uchar_t		rtype = slp->sl_rtype, vis;
+	int		ret, mode;
 
 	if (slp->sl_hash == 0)
 		slp->sl_hash = elf_hash(slp->sl_name);
 	*binfo = 0;
 
-	/*
-	 * Establish any state that might be associated with a symbol reference.
-	 */
 	if (rsym) {
+		vis = ELF_ST_VISIBILITY(rsym->st_other);
+
+		/*
+		 * Symbols that are defined as protected, or hidden, within an
+		 * object usually have any relocation references from within
+		 * the same object bound at link-edit time.  Therefore, ld.so.1
+		 * is not involved.  However, if a reference is to a
+		 * capabilities symbol, this reference must be resolved at
+		 * runtime.  In this case look directly within the calling
+		 * object, and only within the calling object, for these
+		 * symbols.  Note, an object may still use dlsym() to search
+		 * externally for a symbol which is defined as protected within
+		 * the same object.
+		 */
+		if ((rsym->st_shndx != SHN_UNDEF) &&
+		    ((slp->sl_flags & LKUP_DLSYM) == 0) &&
+		    ((vis == STV_PROTECTED) || (vis == STV_HIDDEN))) {
+			slp->sl_imap = clmp;
+			return (SYMINTP(clmp)(slp, srp, binfo, in_nfavl));
+		}
+
+		/*
+		 * Establish any state that might be associated with a symbol
+		 * reference.
+		 */
 		if ((slp->sl_flags & LKUP_STDRELOC) &&
 		    (ELF_ST_BIND(rsym->st_info) == STB_WEAK))
 			slp->sl_flags |= LKUP_WEAK;
 
-		if (ELF_ST_VISIBILITY(rsym->st_other) == STV_SINGLETON)
+		if (vis == STV_SINGLETON)
 			slp->sl_flags |= LKUP_SINGLETON;
 	}
 
@@ -3200,7 +3244,7 @@ lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 	 * Carry out an initial symbol search.  This search takes into account
 	 * all the modes of the requested search.
 	 */
-	if (((sym = _lookup_sym(slp, dlmp, binfo, in_nfavl)) == NULL) &&
+	if (((ret = _lookup_sym(slp, srp, binfo, in_nfavl)) == 0) &&
 	    (*binfo & BINFO_MSK_TRYAGAIN)) {
 		Slookup	sl = *slp;
 
@@ -3226,7 +3270,7 @@ lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 		}
 		*binfo &= ~BINFO_MSK_REJECTED;
 
-		sym = _lookup_sym(&sl, dlmp, binfo, in_nfavl);
+		ret = _lookup_sym(&sl, srp, binfo, in_nfavl);
 	}
 
 	/*
@@ -3234,14 +3278,11 @@ lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 	 * determine if it is necessary to follow a binding from outside of
 	 * the group.
 	 */
-	if ((mode & (RTLD_GROUP | RTLD_WORLD)) == RTLD_GROUP) {
-		Sym	*isym;
+	if (((mode & (RTLD_GROUP | RTLD_WORLD)) == RTLD_GROUP) &&
+	    (lookup_sym_interpose(slp, srp, binfo, in_nfavl)))
+		return (1);
 
-		if ((isym = lookup_sym_interpose(slp, dlmp, binfo, sym,
-		    in_nfavl)) != NULL)
-			return (isym);
-	}
-	return (sym);
+	return (ret);
 }
 
 /*

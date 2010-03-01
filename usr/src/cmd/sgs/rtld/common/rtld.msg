@@ -72,9 +72,6 @@
 @ MSG_GEN_ALTER		"%s: alternate file in use"
 @ MSG_GEN_NOSYM		"%s: can't find symbol"
 @ MSG_GEN_NODUMP	"%s: DF_1_NODUMP tagged object may not be dldump()'ed"
-@ MSG_GEN_BADHWCAP_1	"hardware capability unsupported: %s"
-@ MSG_GEN_BADSFCAP_1	"software capability unsupported: %s"
-
 
 # Move related messages
 
@@ -151,7 +148,7 @@
 @ MSG_LDD_FIL_ILLEGAL	"\t%s =>\t (illegal insecure pathname)\n"
 @ MSG_LDD_FIL_ALTER	"  (alternate)"
 
-@ MSG_LDD_HWCAP_NFOUND	"\t%s =>\t (no hardware capability objects found)\n"
+@ MSG_LDD_CAP_NFOUND	"\t%s =>\t (no capability objects found)\n"
 
 @ MSG_LDD_SEC_NFOUND	"\t%s =>\t (file not found in secure directories)\n"
 
@@ -191,11 +188,24 @@
 @ MSG_LDD_REJ_US3	"  - Sun UltraSPARC III extensions required"
 @ MSG_LDD_REJ_STR	"  - %s"
 @ MSG_LDD_REJ_UNKFILE	"  - unknown file type"
-@ MSG_LDD_REJ_HWCAP_1	"  - hardware capability unsupported: %s"
-@ MSG_LDD_REJ_SFCAP_1	"  - software capability unsupported: %s"
+@ MSG_LDD_REJ_UNKCAP	"  - unknown capability: %d"
+@ MSG_LDD_REJ_HWCAP_1	"  - hardware capability (CA_SUNW_HW_1) unsupported: %s"
+@ MSG_LDD_REJ_SFCAP_1	"  - software capability (CA_SUNW_SF_1) unsupported: %s"
+@ MSG_LDD_REJ_MACHCAP	"  - machine capability (CA_SUNW_MACH) unsupported: %s"
+@ MSG_LDD_REJ_PLATCAP	"  - platform capability (CA_SUNW_PLAT) unsupported: %s"
+@ MSG_LDD_REJ_HWCAP_2	"  - hardware capability (CA_SUNW_HW_2) unsupported: %s"
 
-@ MSG_LDD_GEN_HWCAP_1	"%s: warning: hardware capability unsupported: %s\n"
-@ MSG_LDD_GEN_SFCAP_1	"%s: warning: hardware capability unsupported: %s\n"
+@ MSG_LDD_WARN_UNKCAP	"%s: unknown capability: %d"
+@ MSG_LDD_WARN_HWCAP_1	"%s: warning: hardware capability (CA_SUNW_HW_1) \
+			 unsupported: %s\n"
+@ MSG_LDD_WARN_SFCAP_1	"%s: warning: software capability (CA_SUNW_SF_1) \
+			 unsupported: %s\n"
+@ MSG_LDD_WARN_MACHCAP	"%s: warning: machine capability (CA_SUNW_MACH) \
+			 unsupported: %s\n"
+@ MSG_LDD_WARN_PLATCAP	"%s: warning: platform capability (CA_SUNW_PLAT) \
+			 unsupported: %s\n"
+@ MSG_LDD_WARN_HWCAP_2	"%s: warning: hardware capability (CA_SUNW_HW_2) \
+			 unsupported: %s\n"
 
 # Error rejection messages.
 
@@ -210,8 +220,12 @@
 @ MSG_ERR_REJ_US3	"%s: Sun UltraSPARC III extensions required"
 @ MSG_ERR_REJ_STR	"%s: %s"
 @ MSG_ERR_REJ_UNKFILE	"%s: unknown file type"
-@ MSG_ERR_REJ_HWCAP_1	"%s: hardware capability unsupported: %s"
-@ MSG_ERR_REJ_SFCAP_1	"%s: software capability unsupported: %s"
+@ MSG_ERR_REJ_UNKCAP	"%s: unknown capability: %d"
+@ MSG_ERR_REJ_HWCAP_1	"%s: hardware capability (CA_SUNW_HW_1) unsupported: %s"
+@ MSG_ERR_REJ_SFCAP_1	"%s: software capability (CA_SUNW_SF_1) unsupported: %s"
+@ MSG_ERR_REJ_MACHCAP	"%s: machine capability (CA_SUNW_MACH) unsupported: %s"
+@ MSG_ERR_REJ_PLATCAP	"%s: platform capability (CA_SUNW_PLAT) unsupported: %s"
+@ MSG_ERR_REJ_HWCAP_2	"%s: hardware capability (CA_SUNW_HW_2) unsupported: %s"
 
 # Error TLS failures
 
@@ -253,17 +267,16 @@
 
 @ _END_
 
+# The following strings represent reserved words, files, pathnames and symbols.
+# Reference to this strings is via the MSG_ORIG() macro, and thus no message
+# translation is required.
+
 @ MSG_LDD_FIL_PATH	"\t%s%s%s\n"
 @ MSG_LDD_FIL_EQUIV	"\t%s =>\t %s%s%s\n"
 @ MSG_LDD_FMT_PATH1	"%s"
 @ MSG_LDD_FMT_PATHN	":%s"
 @ MSG_LDD_INIT_FMT_FILE	"\t%s\n"
 @ MSG_LDD_VER_FOUND	"\t%s (%s) =>\t %s\n"
-
-
-# The following strings represent reserved words, files, pathnames and symbols.
-# Reference to this strings is via the MSG_ORIG() macro, and thus no message
-# translation is required.
 
 @ MSG_STR_EMPTY		""
 @ MSG_STR_NEGATE	"-"
@@ -277,9 +290,13 @@
 @ MSG_STR_SLASH		"/"
 @ MSG_STR_DELIMIT	": "
 
+@ MSG_CAP_DELIMIT	","
+
 @ MSG_SUNW_OST_SGS	"SUNW_OST_SGS"
 @ MSG_SUNW_OST_OSLIB	"SUNW_OST_OSLIB"
 
+@ MSG_TKN_CAPABILITY	"CAPABILITY"
+@ MSG_TKN_MACHINE	"MACHINE"
 @ MSG_TKN_PLATFORM	"PLATFORM"
 @ MSG_TKN_ORIGIN	"ORIGIN"
 @ MSG_TKN_ISALIST	"ISALIST"
@@ -335,15 +352,18 @@
 @ MSG_LD_BIND_NOT	"BIND_NOT"
 @ MSG_LD_BINDINGS	"BINDINGS"
 @ MSG_LD_CONFGEN	"CONFGEN"
+@ MSG_LD_CAP_FILES	"CAP_FILES"
 @ MSG_LD_CONFIG		"CONFIG"
 @ MSG_LD_DEBUG		"DEBUG"
 @ MSG_LD_DEBUG_OUTPUT	"DEBUG_OUTPUT"
 @ MSG_LD_DEMANGLE	"DEMANGLE"
 @ MSG_LD_FLAGS		"FLAGS"
+@ MSG_LD_HWCAP		"HWCAP"
 @ MSG_LD_INIT		"INIT"
 @ MSG_LD_LIBPATH	"LIBRARY_PATH"
 @ MSG_LD_LOADAVAIL	"LOADAVAIL"
 @ MSG_LD_LOADFLTR	"LOADFLTR"
+@ MSG_LD_MACHCAP	"MACHCAP"
 @ MSG_LD_NOAUDIT	"NOAUDIT"
 @ MSG_LD_NOAUXFLTR	"NOAUXFLTR"
 @ MSG_LD_NOBAPLT	"NOBAPLT"
@@ -357,9 +377,11 @@
 @ MSG_LD_NOPAREXT	"NOPAREXT"
 @ MSG_LD_NOUNRESWEAK	"NOUNRESWEAK"
 @ MSG_LD_NOVERSION	"NOVERSION"
+@ MSG_LD_PLATCAP	"PLATCAP"
 @ MSG_LD_PRELOAD	"PRELOAD"
 @ MSG_LD_PROFILE	"PROFILE"
 @ MSG_LD_PROFILE_OUTPUT	"PROFILE_OUTPUT"
+@ MSG_LD_SFCAP		"SFCAP"
 @ MSG_LD_SIGNAL		"SIGNAL"
 @ MSG_LD_TRACE_OBJS	"TRACE_LOADED_OBJECTS"
 @ MSG_LD_TRACE_OBJS_E	"TRACE_LOADED_OBJECTS_E"

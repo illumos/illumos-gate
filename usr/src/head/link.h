@@ -264,7 +264,7 @@ extern uintptr_t	la_symbind32();
 #endif /* _LP64 */
 #endif /* __STDC__ */
 
-
+#ifdef	__STDC__
 /*
  * The ElfW() macro is a GNU/Linux feature, provided as support for
  * the dl_phdr_info structure used by dl_phdr_iterate(), which also
@@ -318,6 +318,7 @@ struct dl_phdr_info {
 
 extern  int dl_iterate_phdr(int (*)(struct dl_phdr_info *, size_t, void *),
 	    void *);
+#endif /* __STDC__ */
 
 #endif	/* _ASM */
 #endif /* _KERNEL */

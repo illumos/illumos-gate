@@ -18,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -59,16 +60,8 @@ LINTFLAGS +=	-u -D_REENTRANT
 LINTFLAGS64 +=	-u -D_REENTRANT
 
 CPPFLAGS +=	-I$(SRCBASE)/lib/libc/inc $(VAR_LIBLDDBG_CPPFLAGS)
-DYNFLAGS +=	$(VERSREF) '-R$$ORIGIN'
+DYNFLAGS +=	$(VERSREF) $(CC_USE_PROTO) '-R$$ORIGIN'
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) -lc
-
-# A bug in pmake causes redundancy when '+=' is conditionally assigned, so
-# '=' is used with extra variables.
-# $(DYNLIB) :=  DYNFLAGS += $(USE_PROTO)
-#
-XXXFLAGS=
-$(DYNLIB) :=	XXXFLAGS= $(USE_PROTO)
-DYNFLAGS +=     $(XXXFLAGS)
 
 native :=	DYNFLAGS	+= $(CONVLIBDIR)
 

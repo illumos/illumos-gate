@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<libelf.h>
 #include	<dlfcn.h>
@@ -101,6 +100,7 @@ count_reloc(Cache *cache, Cache *_cache, Rt_map *lmp, int flags, Addr addr,
 		int		_bound, _weak;
 		ulong_t		rsymndx = ELF_R_SYM(rel->r_info);
 		Slookup		sl;
+		Sresult		sr;
 		uint_t		binfo;
 		Sym		*_sym, *sym = (syms + rsymndx);
 
@@ -275,14 +275,19 @@ count_reloc(Cache *cache, Cache *_cache, Rt_map *lmp, int flags, Addr addr,
 		 * users might be encouraged to set LD_FLAGS=loadavail (crle(1)
 		 * does this for them).
 		 *
-		 * Initialize the symbol lookup data structure.
+		 * Initialize the symbol lookup, and symbol result, data
+		 * structures.
 		 */
 		SLOOKUP_INIT(sl, name, lmp, LIST(lmp)->lm_head, ld_entry_cnt,
 		    0, rsymndx, sym, type, LKUP_STDRELOC);
+		SRESULT_INIT(sr, name);
 
 		_bound = _weak = 0;
 		_sym = sym;
-		if ((sym = lookup_sym(&sl, &_lmp, &binfo, NULL)) != 0) {
+		if (lookup_sym(&sl, &sr, &binfo, NULL)) {
+			_lmp = sr.sr_dmap;
+			sym = sr.sr_sym;
+
 			/*
 			 * Determine from the various relocation requirements
 			 * whether this binding is appropriate.  If we're called

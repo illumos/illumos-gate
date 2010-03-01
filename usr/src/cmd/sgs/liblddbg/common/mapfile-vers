@@ -41,7 +41,7 @@
 # MAPFILE HEADER END
 #
 
-SUNWprivate_4.76 {
+SUNWprivate_4.77 {
 	global:
 		dbg_desc = NODIRECT;	# interposed - ld.so.1(1)
 		dbg_print = NODIRECT;	# interposed - ld(1) and ld.so.1(1)
@@ -83,22 +83,24 @@ SUNWprivate_4.76 {
 		Dbg32_bind_weak;
 		Dbg64_bind_weak;
 
-		Dbg32_cap_hw_candidate;
-		Dbg64_cap_hw_candidate;
-		Dbg32_cap_hw_filter;
-		Dbg64_cap_hw_filter;
+		Dbg32_cap_candidate;
+		Dbg64_cap_candidate;
+		Dbg32_cap_filter;
+		Dbg64_cap_filter;
+		Dbg32_cap_id;
+		Dbg64_cap_id;
 		Dbg32_cap_mapfile_title;
 		Dbg64_cap_mapfile_title;
-		Dbg32_cap_entry;
-		Dbg64_cap_entry;
-		Dbg32_cap_entry2;
-		Dbg64_cap_entry2;
-		Dbg32_cap_out_title;
-		Dbg64_cap_out_title;
+		Dbg32_cap_post_title;
+		Dbg64_cap_post_title;
+		Dbg32_cap_ptr_entry;
+		Dbg64_cap_ptr_entry;
 		Dbg32_cap_sec_title;
 		Dbg64_cap_sec_title;
-		Dbg32_cap_val_hw1;
-		Dbg64_cap_val_hw1;
+		Dbg32_cap_val;
+		Dbg64_cap_val;
+		Dbg32_cap_val_entry;
+		Dbg64_cap_val_entry;
 
 		Dbg32_cb_iphdr_callback;
 		Dbg64_cb_iphdr_callback;
@@ -377,6 +379,14 @@ SUNWprivate_4.76 {
 		Dbg64_syms_ar_resolve;
 		Dbg32_syms_ar_title;
 		Dbg64_syms_ar_title;
+		Dbg32_syms_cap_convert;
+		Dbg64_syms_cap_convert;
+		Dbg32_syms_cap_local;
+		Dbg64_syms_cap_local;
+		Dbg32_syms_cap_lookup;
+		Dbg64_syms_cap_lookup;
+		Dbg32_syms_cap_title;
+		Dbg64_syms_cap_title;
 		Dbg32_syms_created;
 		Dbg64_syms_created;
 		Dbg32_syms_discarded;

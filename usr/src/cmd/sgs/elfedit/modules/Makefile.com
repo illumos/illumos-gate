@@ -18,11 +18,10 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include		../../../../../lib/Makefile.lib
@@ -94,7 +93,7 @@ CPPFLAGS +=	-I../../../include -I../../../include/$(MACH) \
 		-I../$(SRCBASE)/lib/libc/inc  -D_REENTRANT
 LLDFLAGS =	'-R$$ORIGIN/../../../lib'
 LLDFLAGS64 =	'-R$$ORIGIN/../../../../lib/$(MACH64)'
-LDFLAGS +=	$(USE_PROTO) $(LLDFLAGS)
+LDFLAGS +=	$(CC_USE_PROTO) $(LLDFLAGS)
 DYNFLAGS +=	$(VERSREF)
 
 LINTFLAGS +=	-uaxs $(LDLIBS)

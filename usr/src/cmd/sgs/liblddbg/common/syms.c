@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,6 +53,54 @@ Dbg_syms_lookup(Rt_map *lmp, const char *name, const char *type)
 
 	dbg_print(lml, MSG_INTL(MSG_SYM_LOOKUP), Dbg_demangle_name(name),
 	    NAME(lmp), type);
+}
+
+static	const Msg captype[DBG_CAP_MACH + 1] = {
+	MSG_CAP_SYM_DEFAULT,		/* MSG_INTL(MSG_CAP_SYM_DEFAULT) */
+	MSG_CAP_SYM_USED,		/* MSG_INTL(MSG_CAP_SYM_USED) */
+	MSG_CAP_SYM_CANDIDATE,		/* MSG_INTL(MSG_CAP_SYM_CANDIDATE) */
+	MSG_CAP_SYM_REJECTED,		/* MSG_INTL(MSG_CAP_SYM_REJECTED) */
+	MSG_CAP_SYM_HW_1,		/* MSG_INTL(MSG_CAP_SYM_HW_1) */
+	MSG_CAP_SYM_SF_1,		/* MSG_INTL(MSG_CAP_SYM_SF_1) */
+	MSG_CAP_SYM_HW_2,		/* MSG_INTL(MSG_CAP_SYM_HW_2) */
+	MSG_CAP_SYM_PLAT,		/* MSG_INTL(MSG_CAP_SYM_PLAT) */
+	MSG_CAP_SYM_MACH		/* MSG_INTL(MSG_CAP_SYM_MACH) */
+};
+
+void
+Dbg_syms_cap_lookup(Rt_map *lmp, uint_t type, const char *name, uint_t ndx,
+    Half mach, Syscapset *scapset)
+{
+	Lm_list			*lml = LIST(lmp);
+	const char		*str = NULL;
+	Conv_cap_val_buf_t	cap_val_buf;
+
+	if (DBG_NOTCLASS(DBG_C_CAP | DBG_C_SYMBOLS))
+		return;
+
+	switch (type) {
+	case DBG_CAP_HW_1:
+		str = conv_cap_val_hw1(scapset->sc_hw_1, mach, 0,
+		    &cap_val_buf.cap_val_hw1_buf);
+		break;
+	case DBG_CAP_SF_1:
+		str = conv_cap_val_sf1(scapset->sc_sf_1, mach, 0,
+		    &cap_val_buf.cap_val_sf1_buf);
+		break;
+	case DBG_CAP_HW_2:
+		str = conv_cap_val_hw2(scapset->sc_hw_2, mach, 0,
+		    &cap_val_buf.cap_val_hw2_buf);
+		break;
+	case DBG_CAP_MACH:
+		str = scapset->sc_mach;
+		break;
+	case DBG_CAP_PLAT:
+		str = scapset->sc_plat;
+		break;
+	}
+
+	dbg_print(lml, MSG_INTL(captype[type]), Dbg_demangle_name(name),
+	    ndx, str);
 }
 
 void
@@ -281,6 +329,46 @@ Dbg_syms_global(Lm_list *lml, Word ndx, const char *name)
 
 	dbg_print(lml, MSG_INTL(MSG_SYM_ADDING), EC_WORD(ndx),
 	    Dbg_demangle_name(name));
+}
+
+void
+Dbg_syms_cap_convert(Ofl_desc *ofl, Word ndx, const char *name, Sym *sym)
+{
+	if (DBG_NOTCLASS(DBG_C_CAP | DBG_C_SYMBOLS))
+		return;
+
+	dbg_print(ofl->ofl_lml, MSG_INTL(MSG_SYM_CAP_ORIG), EC_WORD(ndx),
+	    Dbg_demangle_name(name));
+
+	if (DBG_NOTDETAIL())
+		return;
+
+	Elf_syms_table_entry(ofl->ofl_lml, ELF_DBG_LD,
+	    MSG_INTL(MSG_STR_ORIGINAL), ofl->ofl_dehdr->e_ident[EI_OSABI],
+	    ofl->ofl_dehdr->e_machine, sym, 0, 0, NULL,
+	    MSG_ORIG(MSG_STR_EMPTY));
+}
+
+void
+Dbg_syms_cap_local(Ofl_desc *ofl, Word ndx, const char *name, Sym *sym,
+    Sym_desc *sdp)
+{
+	Conv_inv_buf_t	inv_buf;
+
+	if (DBG_NOTCLASS(DBG_C_CAP | DBG_C_SYMBOLS))
+		return;
+
+	dbg_print(ofl->ofl_lml, MSG_INTL(MSG_SYM_CAP_LOCAL), EC_WORD(ndx),
+	    Dbg_demangle_name(name));
+
+	if (DBG_NOTDETAIL())
+		return;
+
+	Elf_syms_table_entry(ofl->ofl_lml, ELF_DBG_LD,
+	    MSG_INTL(MSG_STR_ENTERED), ofl->ofl_dehdr->e_ident[EI_OSABI],
+	    ofl->ofl_dehdr->e_machine, sym,
+	    sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0, 0, NULL,
+	    conv_def_tag(sdp->sd_ref, &inv_buf));
 }
 
 void
@@ -616,4 +704,19 @@ Elf_syms_table_entry(Lm_list *lml, int caller, const char *prestr,
 		    conv_ver_index(verndx, gnuver, &inv_buf5),
 		    sec, Elf_demangle_name(poststr));
 	}
+}
+
+void
+Dbg_syms_cap_title(Ofl_desc *ofl)
+{
+	Lm_list	*lml = ofl->ofl_lml;
+
+	if (DBG_NOTCLASS(DBG_C_SYMBOLS))
+		return;
+	if (DBG_NOTDETAIL())
+		return;
+
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_SYM_CAPABILITIES));
+	Elf_syms_table_title(lml, ELF_DBG_LD);
 }

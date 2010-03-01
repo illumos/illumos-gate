@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"@(#)amd64_elf.c	1.25	08/07/30 SMI"
 
 /*
  * amd64 machine dependent and ELF file class dependent functions.
@@ -219,6 +217,7 @@ elf_bndr(Rt_map *lmp, ulong_t pltndx, caddr_t from)
 	Sym		*rsym, *nsym;
 	uint_t		binfo, sb_flags = 0, dbg_class;
 	Slookup		sl;
+	Sresult		sr;
 	int		entry, lmflags;
 	Lm_list		*lml;
 
@@ -268,19 +267,25 @@ elf_bndr(Rt_map *lmp, ulong_t pltndx, caddr_t from)
 	llmp = lml->lm_tail;
 
 	/*
-	 * Find definition for symbol.  Initialize the symbol lookup data
-	 * structure.
+	 * Find definition for symbol.  Initialize the symbol lookup, and
+	 * symbol result, data structures.
 	 */
 	SLOOKUP_INIT(sl, name, lmp, lml->lm_head, ld_entry_cnt, 0,
 	    rsymndx, rsym, 0, LKUP_DEFT);
+	SRESULT_INIT(sr, name);
 
-	if ((nsym = lookup_sym(&sl, &nlmp, &binfo, NULL)) == 0) {
+	if (lookup_sym(&sl, &sr, &binfo, NULL) == 0) {
 		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_NOSYM), NAME(lmp),
 		    demangle(name));
 		rtldexit(lml, 1);
 	}
 
+	name = (char *)sr.sr_name;
+	nlmp = sr.sr_dmap;
+	nsym = sr.sr_sym;
+
 	symval = nsym->st_value;
+
 	if (!(FLAGS(nlmp) & FLG_RT_FIXED) &&
 	    (nsym->st_shndx != SHN_ABS))
 		symval += ADDR(nlmp);
@@ -431,6 +436,7 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 	 */
 	if (plt) {
 		Slookup	sl;
+		Sresult	sr;
 
 		relbgn = pltbgn;
 		relend = pltend;
@@ -438,14 +444,17 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 			return (1);
 
 		/*
-		 * Initialize the symbol lookup data structure.
+		 * Initialize the symbol lookup, and symbol result, data
+		 * structures.
 		 */
 		SLOOKUP_INIT(sl, MSG_ORIG(MSG_SYM_PLT), lmp, lmp, ld_entry_cnt,
 		    elf_hash(MSG_ORIG(MSG_SYM_PLT)), 0, 0, 0, LKUP_DEFT);
+		SRESULT_INIT(sr, MSG_ORIG(MSG_SYM_PLT));
 
-		if ((symdef = elf_find_sym(&sl, &_lmp, &binfo, NULL)) == 0)
+		if (elf_find_sym(&sl, &sr, &binfo, NULL) == 0)
 			return (1);
 
+		symdef = sr.sr_sym;
 		_pltbgn = symdef->st_value;
 		if (!(FLAGS(lmp) & FLG_RT_FIXED) &&
 		    (symdef->st_shndx != SHN_ABS))
@@ -622,7 +631,7 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 			 */
 			if (ELF_ST_BIND(symref->st_info) == STB_LOCAL) {
 				value = basebgn;
-				name = (char *)0;
+				name = NULL;
 
 				/*
 				 * Special case TLS relocations.
@@ -684,11 +693,12 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 					}
 				} else {
 					Slookup		sl;
+					Sresult		sr;
 
 					/*
 					 * Lookup the symbol definition.
-					 * Initialize the symbol lookup data
-					 * structure.
+					 * Initialize the symbol lookup, and
+					 * symbol result, data structure.
 					 */
 					name = (char *)(STRTAB(lmp) +
 					    symref->st_name);
@@ -696,9 +706,15 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 					SLOOKUP_INIT(sl, name, lmp, 0,
 					    ld_entry_cnt, 0, rsymndx, symref,
 					    rtype, LKUP_STDRELOC);
+					SRESULT_INIT(sr, name);
+					symdef = NULL;
 
-					symdef = lookup_sym(&sl, &_lmp,
-					    &binfo, in_nfavl);
+					if (lookup_sym(&sl, &sr, &binfo,
+					    in_nfavl)) {
+						name = (char *)sr.sr_name;
+						_lmp = sr.sr_dmap;
+						symdef = sr.sr_sym;
+					}
 
 					/*
 					 * If the symbol is not found and the
@@ -822,7 +838,8 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 				value = TLSMODID(lmp);
 			} else
 				value = basebgn;
-			name = (char *)0;
+
+			name = NULL;
 		}
 
 		DBG_CALL(Dbg_reloc_in(LIST(lmp), ELF_DBG_RTLD, M_MACH,

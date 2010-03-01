@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -216,8 +216,8 @@ ld_sup_open(Ofl_desc *ofl, const char **opath, const char **ofile, int *ofd,
 		 * hasn't nulled out data ld(1) will try and dereference.
 		 */
 		if ((npath != *opath) || (nfd != *ofd) || (nelf != *oelf)) {
-			Dbg_file_modified(ofl->ofl_lml, flp->fl_obj, *opath,
-			    npath, *ofd, nfd, *oelf, nelf);
+			DBG_CALL(Dbg_file_modified(ofl->ofl_lml, flp->fl_obj,
+			    *opath, npath, *ofd, nfd, *oelf, nelf));
 			if (npath)
 				*opath = npath;
 			if (nfile)
@@ -289,10 +289,11 @@ ld_sup_input_section(Ofl_desc *ofl, Ifl_desc *ifl, const char *sname,
 		 * difference and return the new section header.
 		 */
 		if (nshdr != *oshdr) {
-			Dbg_shdr_modified(ofl->ofl_lml, flp->fl_obj,
-			    ifl->ifl_ehdr->e_ident[EI_OSABI],
-			    ifl->ifl_ehdr->e_machine, ndx, *oshdr, nshdr,
-			    sname);
+			Ehdr	*ehdr = ifl->ifl_ehdr;
+
+			DBG_CALL(Dbg_shdr_modified(ofl->ofl_lml, flp->fl_obj,
+			    ehdr->e_ident[EI_OSABI], ehdr->e_machine, ndx,
+			    *oshdr, nshdr, sname));
 			*oshdr = nshdr;
 		}
 	}

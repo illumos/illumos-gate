@@ -18,8 +18,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -44,7 +45,7 @@ LINTFLAGS +=	-u
 LINTFLAGS64 +=	-u
 
 CPPFLAGS +=	-I$(SRCBASE)/lib/libc/inc -I$(SRC)/common/sgsrtcid
-DYNFLAGS +=	$(VERSREF) $(CONVLIBDIR) -lconv $(USE_PROTO)
+DYNFLAGS +=	$(VERSREF) $(CONVLIBDIR) -lconv $(CC_USE_PROTO)
 
 
 BLTDEFS=	msg.h

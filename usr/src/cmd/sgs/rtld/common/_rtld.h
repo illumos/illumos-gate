@@ -85,7 +85,7 @@ struct fct {
 	int	(*fct_needed)(Lm_list *, Aliste, Rt_map *, int *);
 
 	/* Look up a symbol for the object. */
-	Sym	*(*fct_lookup_sym)(Slookup *, Rt_map **, uint_t *, int *);
+	int	(*fct_lookup_sym)(Slookup *, Sresult *, uint_t *, int *);
 
 	/* Relocate the object. */
 	int	(*fct_reloc)(Rt_map *, uint_t, int *, APlist **);
@@ -107,8 +107,7 @@ struct fct {
 	void	(*fct_dladdr)(ulong_t, Rt_map *, Dl_info *, void **, int);
 
 	/* Process a dlsym(3c) request within the object. */
-	Sym	*(*fct_dlsym)(Grp_hdl *, Slookup *, Rt_map **, uint_t *,
-		    int *);
+	int	(*fct_dlsym)(Grp_hdl *, Slookup *, Sresult *, uint_t *, int *);
 };
 
 /*
@@ -157,7 +156,7 @@ struct fct {
 #define	AL_CNT_FILTEES	2		/* filtee path */
 #define	AL_CNT_HANDLES	1		/* hdl_list[] */
 #define	AL_CNT_FREELIST	80		/* free_alp */
-#define	AL_CNT_HWCAP	10		/* hwcap candidate */
+#define	AL_CNT_CAP	10		/* capabilities candidate */
 #define	AL_CNT_SPATH	4		/* search path */
 #define	AL_CNT_DYNLIST	2		/* dynlm_list */
 #define	AL_CNT_PENDING	2		/* pending tsort list (INITFIRST) */
@@ -237,7 +236,7 @@ struct fdesc {
 	rtld_ino_t	fd_ino;		/* file inode number */
 	uint_t		fd_flags;
 	avl_index_t	fd_avlwhere;	/* avl tree insertion index */
-	Xword		fd_hwcap;	/* hardware capabilities value */
+	Syscapset	fd_scapset;	/* capabilities */
 	mmapobj_result_t *fd_mapp;	/* mapping pointer */
 	uint_t		fd_mapn;	/* mapping number */
 };
@@ -245,6 +244,10 @@ struct fdesc {
 #define	FLG_FD_ALTER	0x0001		/* file is an alternate */
 #define	FLG_FD_SLASH	0x0002		/* file contains a "/" */
 #define	FLG_FD_RESOLVED	0x0004		/* fd_nname has been resolved */
+#define	FLG_FD_ALTCHECK	0x0008		/* alternative system capabilities */
+					/*	checked */
+#define	FLG_FD_ALTCAP	0x0010		/* alternative system capabilities */
+					/*	should be used */
 
 /*
  * File descriptor availability flag.
@@ -389,8 +392,10 @@ struct pdesc {
 #define	PD_TKN_OSNAME	0x00004000	/* $OSNAME expansion has occurred */
 #define	PD_TKN_OSREL	0x00008000	/* $OSREL expansion has occurred */
 #define	PD_TKN_ISALIST	0x00010000	/* $ISALIST expansion has occurred */
-#define	PD_TKN_HWCAP	0x00020000	/* $HWCAP expansion has occurred */
-#define	PD_TKN_RESOLVED	0x00040000	/* resolvepath() expansion has */
+#define	PD_TKN_CAP	0x00020000	/* $CAPABILITY/$HWCAP expansion has */
+					/*	occurred */
+#define	PD_TKN_MACHINE	0x00040000	/* $MACHINE expansion has occurred */
+#define	PD_TKN_RESOLVED	0x00080000	/* resolvepath() expansion has */
 					/*	occurred */
 #define	PD_MSK_EXPAND	0x000ff000	/* mask for all expansions */
 
@@ -514,8 +519,6 @@ extern Interp		*interp;	/* ELF executable interpreter info */
 extern const char	*rtldname;	/* name of the dynamic linker */
 extern APlist		*hdl_alp[];	/* dlopen() handle list */
 extern size_t		syspagsz;	/* system page size */
-extern char		*platform; 	/* platform name */
-extern size_t		platform_sz; 	/* platform name string size */
 extern Isa_desc		*isa;		/* isalist descriptor */
 extern Uts_desc		*uts;		/* utsname descriptor */
 extern uint_t		rtld_flags;	/* status flags for RTLD */
@@ -573,6 +576,7 @@ extern Reglist		*reglist;	/* list of register symbols */
 
 extern const Msg	err_reject[];	/* rejection error message tables */
 extern const Msg	ldd_reject[];
+extern const Msg	ldd_warn[];
 
 extern const char	*profile_name;	/* object being profiled */
 extern const char	*profile_out;	/* profile output file */
@@ -585,10 +589,24 @@ extern const char	*err_strs[ERR_NUM];
 					/* diagnostic error string headers */
 extern const char	*nosym_str;	/* MSG_GEN_NOSYM message cache */
 
-extern ulong_t		hwcap;		/* hardware capabilities */
-extern ulong_t		sfcap;		/* software capabilities */
+extern Syscapset	*org_scapset;	/* original system capabilities */
+extern Syscapset	*alt_scapset;	/* alternative system capabilities */
 
-extern avl_tree_t	*nfavl;		/* not-found AVL path name tree */
+extern const char	*rpl_hwcap;	/* replaceable hwcap str */
+extern const char	*rpl_sfcap;	/* replaceable sfcap str */
+extern const char	*rpl_machcap;	/* replaceable machcap str */
+extern const char	*rpl_platcap;	/* replaceable platcap str */
+extern const char	*rpl_cap_files;	/* associated files */
+
+extern const char	*prm_hwcap;	/* permanent hwcap str */
+extern const char	*prm_sfcap;	/* permanent sfcap str */
+extern const char	*prm_machcap;	/* permanent machcap str */
+extern const char	*prm_platcap;	/* permanent platcap str */
+extern const char	*prm_cap_files;	/* associated files */
+
+extern avl_tree_t	*capavl;	/* capabilities files */
+extern avl_tree_t	*nfavl;		/* not-found path names */
+extern avl_tree_t	*spavl;		/* secure path names */
 
 extern u_longlong_t	cnt_map;	/* Incr. for each object mapped */
 extern u_longlong_t	cnt_unmap;	/* Incr. for each object unmapped */
@@ -609,7 +627,12 @@ extern int		callable(Rt_map *, Rt_map *, Grp_hdl *, uint_t);
 extern Rt_map		*_caller(caddr_t, int);
 extern caddr_t		caller(void);
 extern void		*calloc(size_t, size_t);
-extern void		cap_assign(Cap *, Rt_map *);
+extern int		cap_alternative(void);
+extern int		cap_check_fdesc(Fdesc *, Cap *, char *, Rej_desc *);
+extern int		cap_check_lmp(Rt_map *, Rej_desc *);
+extern int 		cap_filtees(Alist **, Aliste, const char *, Aliste,
+			    Rt_map *, const char *, int, uint_t, int *);
+extern int		cap_match(Sresult *, uint_t, Sym *, char *);
 extern const char	*_conv_reloc_type(uint_t rel);
 extern Aliste		create_cntl(Lm_list *, int);
 extern void		defrag(void);
@@ -617,8 +640,8 @@ extern int		dbg_setup(const char *, Dbg_desc *);
 extern const char	*demangle(const char *);
 extern int		dlclose_intn(Grp_hdl *, Rt_map *);
 extern int		dlclose_core(Grp_hdl *, Rt_map *, Lm_list *);
-extern Sym		*dlsym_handle(Grp_hdl *, Slookup *, Rt_map **,
-			    uint_t *, int *);
+extern int		dlsym_handle(Grp_hdl *, Slookup *, Sresult *, uint_t *,
+			    int *);
 extern void		*dlsym_intn(void *, const char *, Rt_map *, Rt_map **);
 extern Grp_hdl		*dlmopen_intn(Lm_list *, const char *, int, Rt_map *,
 			    uint_t, uint_t);
@@ -647,9 +670,8 @@ extern Grp_desc		*hdl_add(Grp_hdl *, Rt_map *, uint_t, int *);
 extern Grp_hdl		*hdl_create(Lm_list *, Rt_map *, Rt_map *, uint_t,
 			    uint_t, uint_t);
 extern int		hdl_initialize(Grp_hdl *, Rt_map *, int, int);
-extern int		hwcap_check(Xword, Rej_desc *);
-extern int 		hwcap_filtees(Alist **, Aliste, const char *, Aliste,
-			    Rt_map *, const char *, int, uint_t, int *);
+extern int		hwcap1_check(Syscapset *, Xword, Rej_desc *);
+extern int		hwcap2_check(Syscapset *, Xword, Rej_desc *);
 extern void		is_dep_init(Rt_map *, Rt_map *);
 extern int		is_move_data(caddr_t);
 extern int		is_path_secure(char *, Rt_map *, uint_t, uint_t);
@@ -661,22 +683,27 @@ extern void		lm_append(Lm_list *, Aliste, Rt_map *);
 extern void		lm_delete(Lm_list *, Rt_map *);
 extern void		lm_move(Lm_list *, Aliste, Aliste, Lm_cntl *,
 			    Lm_cntl *);
+extern Rt_map 		*load_cap(Lm_list *, Aliste, const char *, Rt_map *,
+			    uint_t, uint_t, Grp_hdl **, Rej_desc *, int *);
 extern void		load_completion(Rt_map *);
 extern Rt_map		*load_file(Lm_list *, Aliste, Fdesc *, int *);
-extern Rt_map 		*load_hwcap(Lm_list *, Aliste, const char *, Rt_map *,
-			    uint_t, uint_t, Grp_hdl **, Rej_desc *, int *);
 extern Rt_map		*load_path(Lm_list *, Aliste, Rt_map *, int, uint_t,
 			    Grp_hdl **, Fdesc *, Rej_desc *, int *);
 extern Rt_map		*load_one(Lm_list *, Aliste, Alist *, Rt_map *, int,
 			    uint_t, Grp_hdl **, int *);
 extern const char	*load_trace(Lm_list *, Pdesc *, Rt_map *, Fdesc *);
 extern void		nfavl_insert(const char *, avl_index_t);
-extern int		nfavl_recorded(const char *, uint_t, avl_index_t *);
 extern void		*nu_map(Lm_list *, caddr_t, size_t, int, int);
 extern Fct		*map_obj(Lm_list *, Fdesc *, size_t, const char *, int,
 			    Rej_desc *);
 extern void		*malloc(size_t);
+extern int		machcap_check(Syscapset *, const char *, Rej_desc *);
+extern void		machine_name(Syscapset *);
 extern int		move_data(Rt_map *, APlist **);
+extern int		platcap_check(Syscapset *, const char *, Rej_desc *);
+extern void		platform_name(Syscapset *);
+extern int		pnavl_recorded(avl_tree_t **, const char *, uint_t,
+			    avl_index_t *);
 extern void		rd_event(Lm_list *, rd_event_e, r_state_e);
 extern int		readenv_user(const char **, Word *, Word *, int);
 extern int		readenv_config(Rtc_env *, Addr, int);
@@ -718,8 +745,7 @@ extern Rt_map		*setup(char **, auxv_t *, Word, char *, int, char *,
 			    uid_t, uid_t, gid_t, gid_t, void *, int, uint_t);
 extern const char	*stravl_insert(const char *, uint_t, size_t, int);
 extern void		spavl_insert(const char *);
-extern int		spavl_recorded(const char *, avl_index_t *);
-extern int		sfcap_check(Xword, Rej_desc *);
+extern int		sfcap1_check(Syscapset *, Xword, Rej_desc *);
 extern int		tls_assign(Lm_list *, Rt_map *, Phdr *);
 extern void		tls_modaddrem(Rt_map *, uint_t);
 extern int		tls_statmod(Lm_list *, Rt_map *);

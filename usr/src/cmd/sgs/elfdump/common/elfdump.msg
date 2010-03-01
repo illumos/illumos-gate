@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -42,8 +42,7 @@
 @ MSG_USAGE_DETAIL5	"\t[-g]\t\tdump the contents of the .group sections\n"
 @ MSG_USAGE_DETAIL6	"\t[-G]\t\tdump the contents of the .got section\n"
 @ MSG_USAGE_DETAIL7	"\t[-h]\t\tdump the contents of the .hash section\n"
-@ MSG_USAGE_DETAIL8	"\t[-H]\t\tdump the contents of the .SUNW_hwcap \
-			 section\n"
+@ MSG_USAGE_DETAIL8	"\t[-H]\t\tdump the contents of the .SUNW_cap section\n"
 @ MSG_USAGE_DETAIL9	"\t[-i]\t\tdump the contents of the .interp section\n"
 @ MSG_USAGE_DETAIL10	"\t[-I index]\tqualify an option with an index\n"
 @ MSG_USAGE_DETAIL11	"\t[-l]\t\tdump with no truncated section names\n"
@@ -75,7 +74,8 @@
 # Errors
 
 @ MSG_ERR_BADFILE	"%s: invalid file type\n"
-@ MSG_ERR_BADREL1       "%s: bad relocation entry: %s: relocation requires symbol\n"
+@ MSG_ERR_BADREL1	"%s: bad relocation entry: %s: relocation requires \
+			 symbol\n"
 @ MSG_ERR_NOSHDR	"%s: section headers are not present: synthesizing \
 			 from program headers (-P option)\n"
 @ MSG_ERR_PNEEDSPH	"%s: file without program headers is incompatible \
@@ -92,21 +92,21 @@
 @ MSG_ERR_BADSHINFO	"%s: %s: invalid sh_info: %d\n"
 @ MSG_ERR_BADSHTYPE	"%s: %s: invalid sh_type: %d\n"
 @ MSG_ERR_BADALIGN	"%s: %s: bad sh_offset alignment\n"
-@ MSG_ERR_BADSYM2	"%s: %s: index[%d]: bad symbol entry: %s: must be SHN_COMMON or \
-			 defined in SHT_NOBITS section\n"
-@ MSG_ERR_BADSYM3	"%s: %s: index[%d]: bad symbol entry: %s: must be defined in \
-			 a SHF_TLS section\n"
-@ MSG_ERR_BADSYM4	"%s: %s: index[%d]: bad symbol entry: %s: must be defined in \
-			 a non-SHF_TLS section\n"
+@ MSG_ERR_BADSYM2	"%s: %s: index[%d]: bad symbol entry: %s: must be \
+			 SHN_COMMON or defined in SHT_NOBITS section\n"
+@ MSG_ERR_BADSYM3	"%s: %s: index[%d]: bad symbol entry: %s: must be \
+			 defined in a SHF_TLS section\n"
+@ MSG_ERR_BADSYM4	"%s: %s: index[%d]: bad symbol entry: %s: must be \
+			 defined in a non-SHF_TLS section\n"
 @ MSG_ERR_BADSYM5	"%s: %s: index[%d]: bad symbol entry: %s: \
 			 invalid shndx: %d\n"
 @ MSG_ERR_BADSYM6	"%s: %s: index[%d]: bad symbol entry: %s: section[%d] \
 			 size: %#llx: symbol (address %#llx, size %#llx) \
 			 lies outside of containing section\n"
-@ MSG_ERR_BADSYM7	"%s: %s: index[%d]: suspicious global symbol entry: %s: lies \
-			 within local symbol range (index < %lld)\n"
-@ MSG_ERR_BADSYM8	"%s: %s: index[%d]: suspicious local symbol entry: %s: lies \
-			 within global symbol range (index >= %lld)\n"
+@ MSG_ERR_BADSYM7	"%s: %s: index[%d]: suspicious global symbol entry: \
+			 %s: lies within local symbol range (index < %lld)\n"
+@ MSG_ERR_BADSYM8	"%s: %s: index[%d]: suspicious local symbol entry: \
+			 %s: lies within global symbol range (index >= %lld)\n"
 
 @ MSG_ERR_RELBADSYMNDX	"%s: bad symbol reference %d: from relocation \
 			 entry: %d\n"
@@ -127,7 +127,7 @@
 @ MSG_ERR_NODYNSYM	"%s: %s: associated SHT_DYNSYM section not found\n"
 @ MSG_ERR_BADNDXSEC	"%s: %s: unexpected section type associated with \
 			 index section: %s\n"
-@ MSG_ERR_BADSORTNDX	"%s: %s: sort section has bad symbol index: %d\n"
+@ MSG_ERR_BADSYMNDX	"%s: %s: bad symbol index: %d\n"
 @ MSG_ERR_BADVER	"%s: %s: index[%d]: version %d is out of range: \
 			 version definitions available: 0-%d\n"
 @ MSG_ERR_NOTSTRTAB	"%s: section[%d] is not a string table as expected \
@@ -150,9 +150,10 @@
 			 shdr[%d: %s].sh_entsize (%#llx)\n"
 @ MSG_ERR_DYNSYMVAL	"%s: %s: symbol value does not match \
 			 DT_%s entry: %s: value: %#llx\n"
-@ MSG_ERR_MALSTR	"%s: %s: malformed string table, initial or final byte\n"
+@ MSG_ERR_MALSTR	"%s: %s: malformed string table, initial or final \
+			 byte\n"
 @ MSG_ERR_MULTEHFRMHDR	"%s: [%d: %s] multiple .eh_frame_hdr sections seen \
-			(1 expected)\n"
+			 (1 expected)\n"
 @ MSG_ERR_BADEHFRMPTR	"%s: section[%d: %s] FramePtr (%#llx) does not match \
 			 shdr[%d: %s].sh_addr (%#llx)\n"
 @ MSG_ERR_BADSORT	"%s: %s: index[%d]: invalid sort order\n"
@@ -162,10 +163,12 @@
 @ MSG_WARN_INVINTERP2	"%s: interp section: %s: and PT_INTERP program \
 			 header have conflicting size or offsets\n"
 @ MSG_WARN_INVCAP1	"%s: PT_SUNWCAP header has no associated section\n"
-@ MSG_WARN_INVCAP2	"%s: capabilities section: %s: requires PT_CAP program \
-			 header\n"
-@ MSG_WARN_INVCAP3	"%s: capabilities section: %s: and PT_CAP program \
+@ MSG_WARN_INVCAP2	"%s: capabilities section[%d]: %s: requires PT_CAP \
+			 program header\n"
+@ MSG_WARN_INVCAP3	"%s: capabilities section[%d]: %s: and PT_CAP program \
 			 header have conflicting size or offsets\n"
+@ MSG_WARN_INVCAP4	"%s: capabilities section[%d]: %s: requires string \
+			 table: invalid sh_info: %d\n";
 @ MSG_WARN_INADDR32SF1	"%s: capabilities section %s: software capability \
 			 ADDR32: is ineffective within a 32-bit object\n"
 @ MSG_WARN_MULTEHFRM	"%s: section[%d: %s]: %s object has multiple \
@@ -193,7 +196,8 @@
 @ MSG_ELF_SHDR		"Section Header[%d]:  sh_name: %s"
 @ MSG_ELF_PHDR		"Program Header[%d]:"
 
-@ MSG_ELF_SCN_CAP	"Hardware/Software Capabilities Section:  %s"
+@ MSG_ELF_SCN_CAP	"Capabilities Section:  %s"
+@ MSG_ELF_SCN_CAPCHAIN	"Capabilities Chain Section:  %s"
 @ MSG_ELF_SCN_INTERP	"Interpreter Section:  %s"
 @ MSG_ELF_SCN_VERDEF	"Version Definition Section:  %s"
 @ MSG_ELF_SCN_VERNEED	"Version Needed Section:  %s"
@@ -209,6 +213,23 @@
 @ MSG_ELF_SCN_MOVE	"Move Section:  %s"
 @ MSG_ELF_SCN_SYMSORT1	"Symbol Sort Section:  %s (%s)"
 @ MSG_ELF_SCN_SYMSORT2	"Symbol Sort Section:  %s (%s / %s)"
+
+@ MSG_OBJ_CAP_TITLE	" Object Capabilities:"
+@ MSG_SYM_CAP_TITLE	" Symbol Capabilities:"
+@ MSG_CAPINFO_ENTRIES	"  Symbols:"
+@ MSG_CAPCHAIN_TITLE	" Capabilities family: %s"
+@ MSG_CAPCHAIN_ENTRY	"  chainndx  symndx      name"
+@ MSG_ERR_INVCAP	"%s: capabilities section: %s: contains symbol \
+			 capabilities groups, but no capabilities information \
+			 section is defined: invalid sh_link: %d\n"
+@ MSG_ERR_INVCAPINFO1	"%s: capabilities information section: %s: no symbol \
+			 table is defined: invalid sh_link: %d\n"
+@ MSG_ERR_INVCAPINFO2	"%s: capabilities information section: %s: no \
+			 capabilities chain is defined: invalid sh_info: %d\n"
+@ MSG_ERR_INVCAPINFO3	"%s: capabilities information section: %s: index %d: \
+			 bad capabilities chain index defined: %d\n"
+@ MSG_ERR_CHBADSYMNDX	"%s: bad symbol reference %d: from capability chain: \
+			 %s entry: %d\n"
 
 @ MSG_ELF_HASH_BKTS1	"%10.10s  buckets contain %8d symbols"
 @ MSG_ELF_HASH_BKTS2	"%10.10s  buckets         %8d symbols (globals)"
@@ -274,7 +295,7 @@
 			 offset: 0x%x datasize: 0x%x\n"
 @ MSG_NOTE_BADCOREARCH	"%s: elfdump core file note support not available for \
 			 architecture: %s\n"
-@ MSG_NOTE_BADCOREDATA	"%s: elfdump core file note data trunctated or \
+@ MSG_NOTE_BADCOREDATA	"%s: elfdump core file note data truncated or \
 			 otherwise malformed\n"
 
 @ _END_
@@ -331,6 +352,7 @@
 @ MSG_FMT_INDEXRNG	"[%d-%d]"
 @ MSG_FMT_INTEGER	" %d"
 @ MSG_FMT_HASH_INFO	"%10.10s  %-10s  %s"
+@ MSG_FMT_CHAIN_INFO	"%10.10s  %-10s  %s"
 @ MSG_FMT_ARSYM1	"%10.10s  0x%8.8x  (%s):%s"
 @ MSG_FMT_ARSYM2	"%10.10s  0x%8.8x"
 @ MSG_FMT_ARNAME	"%s(%s)"
@@ -384,7 +406,7 @@
 @ MSG_UNW_FDECFI	"   CallFrameInstructions:"
 
 # Unwind section Call Frame Instructions. These all start with a leading
-# "%*s%s", used to insert leading whitespace and the opcode name.
+# "%*s%s", used to insert leading white space and the opcode name.
 
 @ MSG_CFA_ADV_LOC	"%*s%s: %s + %llu => %#llx"
 @ MSG_CFA_CFAOFF	"%*s%s: %s, cfa%+lld"
@@ -590,6 +612,8 @@
 
 # Names of fake sections generated from program header data
 @ MSG_PHDRNAM_CAP		".SUNW_cap(phdr)"
+@ MSG_PHDRNAM_CAPINFO		".SUNW_capinfo(phdr)"
+@ MSG_PHDRNAM_CAPCHAIN		".SUNW_capchain(phdr)"
 @ MSG_PHDRNAM_DYN		".dynamic(phdr)"
 @ MSG_PHDRNAM_DYNSTR		".dynstr(phdr)"
 @ MSG_PHDRNAM_DYNSYM		".dynsym(phdr)"

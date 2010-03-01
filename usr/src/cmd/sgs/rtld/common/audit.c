@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Audit interfaces.  Auditing can be enabled in two ways:
@@ -885,22 +885,23 @@ static const Aud_info aud_info[] = {
 static Addr
 audit_symget(Audit_list *alp, int info, int *in_nfavl)
 {
-	Rt_map		*_lmp, *lmp = alp->al_lmp;
+	Rt_map		*lmp = alp->al_lmp;
 	const char	*sname = MSG_ORIG(aud_info[info].sname);
 	uint_t		alflag = aud_info[info].alflag;
 	uint_t		auflag = aud_info[info].auflag;
 	uint_t		binfo;
-	Sym		*sym;
 	Slookup		sl;
+	Sresult		sr;
 
 	/*
-	 * Initialize the symbol lookup data structure.
+	 * Initialize the symbol lookup, and symbol result, data structures.
 	 */
 	SLOOKUP_INIT(sl, sname, lml_rtld.lm_head, lmp, ld_entry_cnt,
-	    0, 0, 0, 0, LKUP_FIRST);
+	    0, 0, 0, 0, (LKUP_FIRST | LKUP_DLSYM));
+	SRESULT_INIT(sr, sname);
 
-	if (sym = LM_LOOKUP_SYM(lmp)(&sl, &_lmp, &binfo, in_nfavl)) {
-		Addr	addr = sym->st_value;
+	if (LM_LOOKUP_SYM(lmp)(&sl, &sr, &binfo, in_nfavl)) {
+		Addr	addr = sr.sr_sym->st_value;
 
 		if (!(FLAGS(lmp) & FLG_RT_FIXED))
 			addr += ADDR(lmp);
@@ -911,10 +912,10 @@ audit_symget(Audit_list *alp, int info, int *in_nfavl)
 			audit_flags |= auflag;
 
 		DBG_CALL(Dbg_audit_interface(LIST(alp->al_lmp),
-		    alp->al_libname, sname));
+		    alp->al_libname, sr.sr_name));
 		return (addr);
-	} else
-		return (0);
+	}
+	return (0);
 }
 
 /*

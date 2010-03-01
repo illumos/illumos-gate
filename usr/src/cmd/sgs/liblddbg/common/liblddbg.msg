@@ -393,7 +393,7 @@
 #
 #         all              display information for all categories
 #         basic            basic trace information/warnings
-#         cap              hardware/software capabilities
+#         cap              platform/machine/hardware/software capabilities
 #         files            input file processing (files and libraries)
 #         help             this help message
 #         libs             library search paths; detail flag shows
@@ -419,7 +419,8 @@
 @ MSG_USE_R7_B	"        basic            basic trace information/warnings"
 
 # TRANSLATION_NOTE -- do not translate the first token "cap".
-@ MSG_USE_R7_C	"        cap              hardware/software capabilities"
+@ MSG_USE_R7_C	"        cap              platform/machine/hardware/software \
+					  capabilities"
 
 # TRANSLATION_NOTE -- do not translate the first token "files".
 @ MSG_USE_R7_D	"        files            input file processing (files \
@@ -745,8 +746,17 @@
 			 required"
 @ MSG_REJ_STR		"obj=%s;  rejected: %s"
 @ MSG_REJ_UNKFILE	"obj=%s;  rejected: unknown file type"
-@ MSG_REJ_HWCAP_1	"obj=%s;  rejected: hardware capability unsupported: \
-			 %s"
+@ MSG_REJ_UNKCAP	"obj=%s;  rejected: unknown capability: %d"
+@ MSG_REJ_HWCAP_1	"obj=%s;  rejected: hardware capability (CA_SUNW_HW_1) \
+			 unsupported: %s"
+@ MSG_REJ_SFCAP_1	"obj=%s;  rejected: software capability (CA_SUNW_SF_1) \
+			 unsupported: %s"
+@ MSG_REJ_MACHCAP	"obj=%s;  rejected: machine capability (CA_SUNW_MACH) \
+			 unsupported: %s"
+@ MSG_REJ_PLATCAP	"obj=%s;  rejected: platform capability (CA_SUNW_PLAT) \
+			 unsupported: %s"
+@ MSG_REJ_HWCAP_2	"obj=%s;  rejected: hardware capability (CA_SUNW_HW_2) \
+			 unsupported: %s"
 
 # Libs messages
 
@@ -797,8 +807,8 @@
 @ MSG_MAP_SORT_TITLE_O	"before:" 
 @ MSG_MAP_SORT_TITLE_S	"after:" 
 @ MSG_MAP_POST_TITLE	"mapfile post processing"
-@ MSG_MAP_ENT_ORD_TITLE	"set entrance criteria input section sort keys \
-			 (ec_ordndx); segment=%s"
+@ MSG_MAP_ENT_ORD_TITLE	"set entrance criteria input section sort keys; \
+			 segment=%s"
 
 @ MSG_MAP_ID_ADD	"%s: %lld: enter conditional expression id: %s"
 @ MSG_MAP_ID_CLEAR	"%s: %lld: delete conditional expression id: %s"
@@ -945,6 +955,8 @@
 @ MSG_SYM_REDUCED	"symbol table processing; reducing global symbols"
 @ MSG_SYM_RETAINING	"symbol table processing; retaining local symbols"
 @ MSG_SYM_VERSION	"symbol table processing; adding version symbols"
+@ MSG_SYM_CAPABILITIES	"symbol table processing; adding local capabilities \
+			 symbols"
 
 @ MSG_SYM_BASIC		"symbol[%d]=%s"
 @ MSG_SYM_ADDING	"symbol[%d]=%s  (global); adding"
@@ -962,13 +974,32 @@
 			 discarded file=%s"
 @ MSG_SYM_DISCARD_DUP	"symbol[%d]=%s;  discarded duplicate: originates from \
 			 file=%s"
-@ MSG_SYM_WRAP		"symbol[%d]=%s renamed to %s (-z wrap)"
+@ MSG_SYM_WRAP		"symbol[%d]=%s  renamed to %s (-z wrap)"
+@ MSG_SYM_CAP_ORIG	"symbol[%d]=%s  converting to symbol capability \
+			 (-z symbolcap)"
+@ MSG_SYM_CAP_LOCAL	"symbol[%d]=%s  creating local capability \
+			 (-z symbolcap)"
 
 @ MSG_SYM_AOUT		"symbol=%s;  (original AOUT name)"
 @ MSG_SYM_LOOKUP	"symbol=%s;  lookup in file=%s  [ %s ]"
 @ MSG_SYM_DLSYM_1 	"symbol=%s;  dlsym() called from file=%s %s %s"
 @ MSG_SYM_DLSYM_2	"symbol=%s;  dlsym() called from file=%s; starting \
 			 at file=%s %s %s"
+
+@ MSG_CAP_SYM_DEFAULT	"  symbol=%s[%u]:  capability family default"
+@ MSG_CAP_SYM_USED	"  symbol=%s[%u]:  used"
+@ MSG_CAP_SYM_CANDIDATE	"  symbol=%s[%u]:  capability candidate"
+@ MSG_CAP_SYM_REJECTED	"  symbol=%s[%u]:  capability rejected"
+@ MSG_CAP_SYM_HW_1	"  symbol=%s[%u]:  capability specific \
+			 (CA_SUNW_HW_1):  [ %s ]"
+@ MSG_CAP_SYM_SF_1	"  symbol=%s[%u]:  capability specific \
+			 (CA_SUNW_SF_1):  [ %s ]"
+@ MSG_CAP_SYM_MACH	"  symbol=%s[%u]:  capability specific \
+			 (CA_SUNW_MACH):  [ %s ]"
+@ MSG_CAP_SYM_PLAT	"  symbol=%s[%u]:  capability specific \
+			 (CA_SUNW_PLAT):  [ %s ]"
+@ MSG_CAP_SYM_HW_2	"  symbol=%s[%u]:  capability specific \
+			 (CA_SUNW_HW_2):  [ %s ]"
 
 @ MSG_SYM_LAZY_RESCAN	"rescanning for lazy dependencies for symbol: %s"
 
@@ -1065,6 +1096,7 @@
 
 @ MSG_STR_IGNORE	"ignored"
 @ MSG_STR_ENTERED	"entered"
+@ MSG_STR_ORIGINAL	"original"
 @ MSG_STR_EXCLUDE	"exclude"
 @ MSG_STR_RESET		"reset"
 @ MSG_STR_IN		" in"
@@ -1122,20 +1154,28 @@
 @ MSG_STATS_RELOCS_OUT	"  Relocations output: records=%lld"
 @ MSG_STATS_RELOCS_IN	"  Relocations  input: records=%-10lld applied=%lld"
 
-# Hardware/Software capabilities messages
+# Capabilities messages
 
-@ MSG_CAP_VAL_HW1	"hardware capabilities - %s"
+@ MSG_CAP_SYS_HW_1	"hardware capabilities (CA_SUNW_HW_1) - %s"
+@ MSG_CAP_SYS_SF_1	"software capabilities (CA_SUNW_SF_1) - %s"
+@ MSG_CAP_SYS_MACH	"machine capability (CA_SUNW_MACH) - %s"
+@ MSG_CAP_SYS_PLAT	"platform capability (CA_SUNW_PLAT) - %s"
+@ MSG_CAP_SYS_HW_2	"hardware capabilities (CA_SUNW_HW_2) - %s"
+
+@ MSG_CAP_ALT_HW_1	"alternative hardware capabilities (CA_SUNW_HW_1) - %s"
+@ MSG_CAP_ALT_SF_1	"alternative software capabilities (CA_SUNW_SF_1) - %s"
+@ MSG_CAP_ALT_MACH	"alternative machine capability (CA_SUNW_MACH) - %s"
+@ MSG_CAP_ALT_PLAT	"alternative platform capability (CA_SUNW_PLAT) - %s"
+@ MSG_CAP_ALT_HW_2	"alternative hardware capabilities (CA_SUNW_HW_2) - %s"
 
 @ MSG_CAP_SEC_TITLE	"capabilities; input file=%s"
-@ MSG_CAP_OUT_TITLE	"output capabilities"
-@ MSG_CAP_ENTRY	"%12.12s  %-15.15s  %s"
-@ MSG_CAP_ENTRY_EXC	"%12.12s  %-15.15s  %s, exclude %s"
+@ MSG_CAP_SEC_ENTRY     "%12.12s  %-15.15s  %s"
 
-@ MSG_CAP_HW_CANDIDATE	"obj=%s;  hardware capabilities candidate"
+@ MSG_CAP_CANDIDATE	"obj=%s;  capabilities candidate"
+@ MSG_CAP_POST_TITLE	"capabilities post processing"
 
-@ MSG_CAP_HWFILTR_1	"dir=%s;  hardware capability directory filtered by %s"
-@ MSG_CAP_HWFILTR_2	"dir=%s;  no hardware capability objects found"
-
+@ MSG_CAP_FILTER_1	"dir=%s;  capability directory filtered by %s"
+@ MSG_CAP_FILTER_2	"dir=%s;  no capability objects found"
 
 @ MSG_ELF_HEADER	"ELF Header"
 
@@ -1146,14 +1186,12 @@
 @ MSG_CAP_ELF_TITLE	"     index  tag               value"
 @ MSG_CAP_ELF_ENTRY	"%10.10s  %-15.15s  %s"
 
-
 # Dynamic entries.
 # TRANSLATION_NOTE - the following two entries provide for a series of one or
 # more dynamic table entries that align with the initial title.
 
 @ MSG_DYN_TITLE		"     index  tag                value"
 @ MSG_DYN_ENTRY		"%10.10s  %-16.16s  %-#16llx    %s"
-
 
 # Symbol table entries.
 # TRANSLATION_NOTE - the following entries provide for a series of one or more
@@ -1205,6 +1243,7 @@
 			 bound to                 symbol"
 @ MSG_SYMINFO_ENTRY	"%10.10s  %-8s %7s %-24s %s"
 
+@ MSG_SYMINFO_CAP	"<symbol capabilities>"
 @ MSG_SYMINFO_SELF	"<self>"
 @ MSG_SYMINFO_PARENT	"<parent>"
 @ MSG_SYMINFO_EXTERN	"<extern>"

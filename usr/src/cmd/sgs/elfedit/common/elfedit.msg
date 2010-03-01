@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -86,7 +86,8 @@
 @ MSG_DEBUG_UNLINKFILE	"unlink unsaved output file: %s\n";
 @ MSG_DEBUG_VERSION	"%d-bit version\n"
 @ MSG_DEBUG_READONLY	"session is readonly\n";
-@ MSG_DEBUG_NOFILE	"no ELF object specified. Limited functionalty is available\n";
+@ MSG_DEBUG_NOFILE	"no ELF object specified. Limited functionality is \
+			 available\n";
 @ MSG_DEBUG_DIRTYEXIT	"discarding unsaved edits\n";
 @ MSG_DEBUG_FNDSEC	"[%d: %s]: section\n"
 @ MSG_DEBUG_FNDCAP	"[%d: %s]: capabilities section\n"
@@ -244,7 +245,7 @@
 @ MSG_HLPFMT_INFILERO	"Input File:  %s (readonly)\n"
 @ MSG_HLPFMT_INFILENONE	"Input File: <not present>\n"
 @ MSG_HLPFMT_OUTFILE	"Output File: %s\n"
-@ MSG_HLPFMT_CNGPENDING	"    (changes pending)\n"   
+@ MSG_HLPFMT_CNGPENDING	"    (changes pending)\n"
 @ MSG_HLPFMT_VARHDR	"\nOptions:\n"
 @ MSG_HLPFMT_AFLG	"    a (Autoprint):    %s\n"
 @ MSG_HLPFMT_DFLG	"    d (Debug):        %s\n"
@@ -424,9 +425,6 @@
    about the available modules and commands and how they can be used\n\
    to edit ELF files.\n"
 
-
-   
-
 @ MSG_SYS_HELP_HELP	"   \
    The sys:help command provides information on elfedit modules\n\
    and commands:\n\
@@ -478,7 +476,7 @@
 @ MSG_SYS_HELP_SET	"\
    Set options that control how elfedit works.\n\
    \n\
-   Most variables accept boolen (true/false) values. The sys:set\n\
+   Most variables accept boolean (true/false) values. The sys:set\n\
    command accepts any of the following as a boolean value:\n\
    0/1, true/false, t/f, yes/no, y/n, on/off.\n\
    \n\

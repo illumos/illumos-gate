@@ -113,6 +113,8 @@ typedef struct {
 	Word		id_array;
 	Word		id_bss;
 	Word		id_cap;
+	Word		id_capinfo;
+	Word		id_capchain;
 	Word		id_data;
 	Word		id_dynamic;
 	Word		id_dynsort;
@@ -168,11 +170,11 @@ typedef struct {
  * target architecture, it may be desirable to instead fill with executable
  * NOP instructions. There are two reasons to do this:
  *
- * -	So that .init/.fini sections will not contain unexecutable gaps
+ *  -	So that .init/.fini sections will not contain unexecutable gaps
  *	that cause the executing program to trap and die.
  *
- * -	To eliminate confusing garbage instructions between sections containing
- *	executable code when viewed with a dissassembler.
+ *  -	To eliminate confusing garbage instructions between sections containing
+ *	executable code when viewed with a disassembler.
  *
  * The ff_execfill function is allowed to be NULL if the underlying target
  * does not require a special fill for executable sections.
@@ -330,10 +332,87 @@ typedef struct {
 } Sfltr_desc;
 
 /*
+ * Capabilities descriptor, and capabilities group descriptor, used to track
+ * the symbol capabilities of any input files and the output file.
+ *
+ * A relocatable object input file may contain one or more symbol capabilities
+ * groups.  The Cap_desc structures keep track of all unique groups that are
+ * collected for the output file.  Relocatable objects that contain an object
+ * capabilities group, and the -z symbolcap option is in effect, have their
+ * object group translated to a symbol capabilities group.
+ *
+ * Individual capabilities groups are maintained with the Cap_group descriptor.
+ * A group can consist of one or more capabilities definitions.  One or more
+ * symbols can be associated with each group.
+ *
+ * For the output file, capabilities families are used to track the symbols of
+ * a given family, each symbol being associated with a different group.  This
+ * collection of data is used to create the final Capinfo structure, and for
+ * dynamic objects, the Capchain structure.
+ *
+ * For example, an object may contain two capabilities groups:
+ *
+ *	CA_SUNW_MACH - sun4u		CA_SUNW_MACH - sun4v
+ *
+ * Two symbols can be associated with each group:
+ *
+ *	foo%sun4u			foo%sun4v
+ *	bar%sun4u			bar%sun4v
+ *
+ * Two families are maintained, and include the generic, or lead, instance of
+ * the capabilities members:
+ *
+ *	foo,  foo%sun4u,  foo%sun4v
+ *	bar,  bar%sun4u,  bar%sun4v
+ */
+struct cap_desc {
+	APlist		*ca_groups;	/* capabilities groups (Cap_group) */
+	APlist		*ca_syms;	/* copies of symbols that are being */
+					/*	translated from object to */
+};					/*	symbol capabilities */
+
+typedef struct {
+	Objcapset	cg_set;		/* unpacked SHT_SUNW_cap elements */
+	APlist		*cg_secs;	/* sections, and hence files, that */
+					/*	use this descriptor */
+	Word		cg_num;		/* number of comparable elements in */
+					/*	the group */
+	Word		cg_ndx;		/* final capability group index */
+} Cap_group;
+
+/*
+ * A Capabilities family node, extends a symbol node, and provides for tracking
+ * capabilities families.  A family is defined by its lead symbol (for example,
+ * a generic, non-capabilities aware foo()), and one or more capabilities
+ * members (for example, capabilities instances foo%sun4u(), foo%sun4v(), etc.).
+ *
+ * Each member associates a symbol with its group using a Cap_sym structure.
+ */
+typedef struct {
+	Sym_avlnode	cn_symavlnode;
+	APlist		*cn_members;
+	APlist		*cn_aliases;
+} Cap_avlnode;
+
+typedef struct {
+	Sym_desc	*cs_sdp;	/* capabilities symbol descriptor */
+	Cap_group	*cs_group;	/* associated capabilities group */
+} Cap_sym;
+
+/*
  * Define Alist initialization sizes.
  */
 #define	AL_CNT_IFL_GROUPS	20	/* ifl_groups */
 #define	AL_CNT_IFL_RELSECS	6	/* ifl_relsect */
+
+#define	AL_CNT_CAP_DESCS	4	/* symbol capabilities descriptors */
+#define	AL_CNT_CAP_SYMS		20	/* capabilities symbols */
+#define	AL_CNT_CAP_SECS		10	/* capabilities sections */
+#define	AL_CNT_CAP_NAMES	10	/* Objcapset platform and machine */
+					/*	names */
+#define	AL_CNT_CAP_MEMS		10	/* capability family members */
+#define	AL_CNT_CAP_PAIRS	10	/* capability symbol pairs */
+#define	AL_CNT_CAP_ALIASES	2	/* capability lead symbol aliases */
 
 #define	AL_CNT_OFL_DTSFLTRS	4	/* ofl_dtsfltrs */
 #define	AL_CNT_OFL_SYMFLTRS	20	/* ofl_symfltrs */
@@ -582,6 +661,7 @@ extern const int	dynsymsort_symtype[];
  */
 extern char		*add_string(char *, char *);
 extern const char	*demangle(const char *);
+extern int		cap_names_match(Alist *, Alist *);
 
 extern void		lds_atexit(Ofl_desc *, int);
 
@@ -606,6 +686,8 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_assign_got_TLS	ld64_assign_got_TLS
 #define	ld_bswap_Word		ld64_bswap_Word
 #define	ld_bswap_Xword		ld64_bswap_Xword
+#define	ld_cap_add_family	ld64_cap_add_family
+#define	ld_cap_move_symtoobj	ld64_cap_move_symtoobj
 #define	ld_disp_errmsg		ld64_disp_errmsg
 #define	ld_ent_check		ld64_ent_check
 #define	ld_ent_lookup		ld64_ent_lookup
@@ -697,6 +779,8 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_assign_got_TLS	ld32_assign_got_TLS
 #define	ld_bswap_Word		ld32_bswap_Word
 #define	ld_bswap_Xword		ld32_bswap_Xword
+#define	ld_cap_add_family	ld32_cap_add_family
+#define	ld_cap_move_symtoobj	ld32_cap_move_symtoobj
 #define	ld_disp_errmsg		ld32_disp_errmsg
 #define	ld_ent_check		ld32_ent_check
 #define	ld_ent_lookup		ld32_ent_lookup
@@ -796,6 +880,10 @@ extern uintptr_t	ld_assign_got_TLS(Boolean, Rel_desc *, Ofl_desc *,
 
 extern Word		ld_bswap_Word(Word);
 extern Xword		ld_bswap_Xword(Xword);
+
+extern uintptr_t	ld_cap_add_family(Ofl_desc *, Sym_desc *, Sym_desc *,
+			    Cap_group *, APlist **);
+extern void		ld_cap_move_symtoobj(Ofl_desc *);
 
 extern void		ld_disp_errmsg(const char *, Rel_desc *, Ofl_desc *);
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,7 +35,7 @@
 #include	"_conv.h"
 
 static int
-conv_cap_1(Xword val, char *str, size_t len, Half mach,
+conv_cap(Xword val, char *str, size_t len, Half mach,
     Conv_fmt_flags_t fmt_flags, elfcap_to_str_func_t *fptr)
 {
 	size_t	_len;
@@ -75,10 +75,23 @@ conv_cap_val_hw1(Xword val, Half mach, Conv_fmt_flags_t fmt_flags,
 	if (val == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
-	if (conv_cap_1(val, cap_val_hw1_buf->buf, sizeof (cap_val_hw1_buf->buf),
+	if (conv_cap(val, cap_val_hw1_buf->buf, sizeof (cap_val_hw1_buf->buf),
 	    mach, fmt_flags, elfcap_hw1_to_str) == 0)
 		return (conv_invalid_val(&cap_val_hw1_buf->inv_buf, val, 0));
 	return ((const char *)cap_val_hw1_buf->buf);
+}
+
+const char *
+conv_cap_val_hw2(Xword val, Half mach, Conv_fmt_flags_t fmt_flags,
+    Conv_cap_val_hw2_buf_t *cap_val_hw2_buf)
+{
+	if (val == 0)
+		return (MSG_ORIG(MSG_GBL_ZERO));
+
+	if (conv_cap(val, cap_val_hw2_buf->buf, sizeof (cap_val_hw2_buf->buf),
+	    mach, fmt_flags, elfcap_hw2_to_str) == 0)
+		return (conv_invalid_val(&cap_val_hw2_buf->inv_buf, val, 0));
+	return ((const char *)cap_val_hw2_buf->buf);
 }
 
 const char *
@@ -88,7 +101,7 @@ conv_cap_val_sf1(Xword val, Half mach, Conv_fmt_flags_t fmt_flags,
 	if (val == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
-	if (conv_cap_1(val, cap_val_sf1_buf->buf, sizeof (cap_val_sf1_buf->buf),
+	if (conv_cap(val, cap_val_sf1_buf->buf, sizeof (cap_val_sf1_buf->buf),
 	    mach, fmt_flags, elfcap_sf1_to_str) == 0)
 		return (conv_invalid_val(&cap_val_sf1_buf->inv_buf, val, 0));
 	return ((const char *)cap_val_sf1_buf->buf);
@@ -115,14 +128,23 @@ conv_cap_tag(Xword tag, Conv_fmt_flags_t fmt_flags, Conv_inv_buf_t *inv_buf)
 }
 
 const char *
-conv_cap_val(Xword tag, Xword val, Half mach, Conv_cap_val_buf_t *cap_val_buf)
+conv_cap_val(Xword tag, Xword val, Half mach, Conv_fmt_flags_t fmt_flags,
+    Conv_cap_val_buf_t *cap_val_buf)
 {
-	if (tag == CA_SUNW_HW_1)
-		return (conv_cap_val_hw1(val, mach, 0,
+	switch (tag) {
+	case CA_SUNW_HW_1:
+		return (conv_cap_val_hw1(val, mach, fmt_flags,
 		    &cap_val_buf->cap_val_hw1_buf));
-	else if (tag == CA_SUNW_SF_1)
-		return (conv_cap_val_sf1(val, mach, 0,
+
+	case CA_SUNW_SF_1:
+		return (conv_cap_val_sf1(val, mach, fmt_flags,
 		    &cap_val_buf->cap_val_sf1_buf));
-	else
+
+	case CA_SUNW_HW_2:
+		return (conv_cap_val_hw2(val, mach, fmt_flags,
+		    &cap_val_buf->cap_val_hw2_buf));
+
+	default:
 		return (conv_invalid_val(&cap_val_buf->inv_buf, val, 0));
+	}
 }

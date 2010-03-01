@@ -20,12 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <memory.h>
 #include <libelf.h>
 #include <link.h>
@@ -34,7 +31,6 @@
 #include <decl.h>
 #include <msg.h>
 #include <sgs.h>
-
 
 /*
  * fmsize:  Array used to determine what size the the structures
@@ -779,6 +775,10 @@ _elf64_mtype(Elf * elf, Elf64_Word shtype, unsigned ver)
 		return (ELF_T_BYTE);
 	case SHT_SUNW_cap:
 		return (ELF_T_CAP);
+	case SHT_SUNW_capchain:
+		return (ELF_T_WORD);
+	case SHT_SUNW_capinfo:
+		return (ELF_T_XWORD);
 	case SHT_SUNW_SIGNATURE:
 		return (ELF_T_BYTE);
 	case SHT_SUNW_ANNOTATE:

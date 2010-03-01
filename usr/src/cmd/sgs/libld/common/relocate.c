@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -282,7 +282,7 @@ disp_scansyms(Ifl_desc * ifl, Rel_desc *rld, Boolean rlocal, int inspect,
 		 * either symbol.  Note, this test is very similar to the test
 		 * used in ld_sym_adjust_vis().
 		 */
-		if ((rlocal == TRUE) && ((tsdp->sd_flags & FLG_SY_HIDDEN) ||
+		if ((rlocal == TRUE) && (SYM_IS_HIDDEN(tsdp) ||
 		    (ELF_ST_BIND(tsdp->sd_sym->st_info) != STB_GLOBAL) ||
 		    ((ofl->ofl_flags & (FLG_OF_AUTOLCL | FLG_OF_AUTOELM)) &&
 		    ((tsdp->sd_flags & MSK_SY_NOAUTO) == 0))))
@@ -1201,7 +1201,7 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 	    ((ELF_ST_BIND(sdp->sd_sym->st_info) == STB_WEAK) ||
 	    (sdp->sd_flags & FLG_SY_WEAKDEF)) &&
 	    (!(sdp->sd_flags & FLG_SY_MVTOCOMM))) {
-		Sym_desc *	_sdp;
+		Sym_desc	*_sdp;
 
 		_sdp = sdp->sd_file->ifl_oldndx[sap->sa_linkndx];
 		if (_sdp->sd_ref != REF_DYN_SEEN)
@@ -1247,7 +1247,8 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 		} else if (!(flags & FLG_OF_RELOBJ) &&
 		    (IS_LOCALBND(rtype) || IS_SEG_RELATIVE(rtype))) {
 			local = TRUE;
-		} else if (sdp->sd_ref == REF_REL_NEED) {
+		} else if ((sdp->sd_ref == REF_REL_NEED) &&
+		    ((sdp->sd_flags & FLG_SY_CAP) == 0)) {
 			/*
 			 * Global symbols may have been individually reduced in
 			 * scope.  If the whole object is to be self contained,
@@ -1350,7 +1351,9 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 	if (local)
 		return ((*ld_targ.t_mr.mr_reloc_local)(reld, ofl));
 
-	if (IS_PLT(rtype) && ((flags & FLG_OF_BFLAG) == 0))
+	if ((IS_PLT(rtype) || ((sdp->sd_flags & FLG_SY_CAP) &&
+	    (ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_FUNC))) &&
+	    ((flags & FLG_OF_BFLAG) == 0))
 		return (ld_reloc_plt(reld, ofl));
 
 	if ((sdp->sd_ref == REF_REL_NEED) ||

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -553,7 +553,7 @@ print_dyn(DYN_CMD_T cmd, int autoprint, ARGSTATE *argstate,
 				elfedit_printf(MSG_ORIG(MSG_FMT_STRNL), name);
 			} else {
 				elfedit_printf(MSG_ORIG(MSG_FMT_HEXXWORDNL),
-				    dyn->d_un.d_val);
+				    EC_XWORD(dyn->d_un.d_val));
 			}
 		}
 		printed = 1;

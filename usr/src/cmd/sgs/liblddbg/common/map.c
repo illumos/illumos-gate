@@ -319,7 +319,6 @@ Dbg_map_post_title(Lm_list *lml)
 	dbg_print(lml, MSG_INTL(MSG_MAP_POST_TITLE));
 }
 
-
 void
 Dbg_map_hdr_noalloc(Lm_list *lml, Lineno lineno)
 {

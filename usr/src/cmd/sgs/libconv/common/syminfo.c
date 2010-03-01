@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,6 +73,7 @@ conv_syminfo_flags_strings(Conv_fmt_flags_t fmt_flags)
 		{ SYMINFO_FLG_NOEXTDIRECT, MSG_SYMINFO_FLG_NOEXTDIRECT_CF },
 		{ SYMINFO_FLG_AUXILIARY, MSG_SYMINFO_FLG_AUXILIARY_CF },
 		{ SYMINFO_FLG_INTERPOSE, MSG_SYMINFO_FLG_INTERPOSE_CF },
+		{ SYMINFO_FLG_CAP,	MSG_SYMINFO_FLG_CAP_CF },
 		{ 0 }
 	};
 	static const Val_desc vda_cfnp[] = {
@@ -84,6 +85,7 @@ conv_syminfo_flags_strings(Conv_fmt_flags_t fmt_flags)
 		{ SYMINFO_FLG_NOEXTDIRECT, MSG_SYMINFO_FLG_NOEXTDIRECT_CFNP },
 		{ SYMINFO_FLG_AUXILIARY, MSG_SYMINFO_FLG_AUXILIARY_CFNP },
 		{ SYMINFO_FLG_INTERPOSE, MSG_SYMINFO_FLG_INTERPOSE_CFNP },
+		{ SYMINFO_FLG_CAP,	MSG_SYMINFO_FLG_CAP_CFNP },
 		{ 0 }
 	};
 	static const Val_desc vda_nf[] = {
@@ -95,6 +97,7 @@ conv_syminfo_flags_strings(Conv_fmt_flags_t fmt_flags)
 		{ SYMINFO_FLG_NOEXTDIRECT, MSG_SYMINFO_FLG_NOEXTDIRECT_NF },
 		{ SYMINFO_FLG_AUXILIARY, MSG_SYMINFO_FLG_AUXILIARY_NF },
 		{ SYMINFO_FLG_INTERPOSE, MSG_SYMINFO_FLG_INTERPOSE_NF },
+		{ SYMINFO_FLG_CAP,	MSG_SYMINFO_FLG_CAP_NF },
 		{ 0 }
 	};
 

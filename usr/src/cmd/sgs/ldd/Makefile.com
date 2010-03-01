@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -43,7 +43,7 @@ CPPFLAGS +=	-I. -I../../include -I../../include/$(MACH) \
 		$(CPPFLAGS.master)
 LLDFLAGS =	'-R$$ORIGIN/../../lib'
 LLDFLAGS64 =	'-R$$ORIGIN/../../../lib/$(MACH64)'
-LDFLAGS +=	$(VERSREF) $(USE_PROTO) $(MAPOPTS) $(LLDFLAGS)
+LDFLAGS +=	$(VERSREF) $(CC_USE_PROTO) $(MAPOPTS) $(LLDFLAGS)
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) -lelf $(DLLIB)
 LINTFLAGS +=	-x
 LINTFLAGS64 +=	-x

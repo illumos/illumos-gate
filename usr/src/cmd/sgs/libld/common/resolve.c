@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -414,13 +414,26 @@ sym_override(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 
 		if (nsym->st_shndx == SHN_UNDEF) {
 			/*
-			 * If this is an undefined symbol it must be a
-			 * relocatable object overriding a shared object.  In
-			 * this case also override the reference name so that
-			 * any undefined symbol diagnostics will refer to the
-			 * relocatable object name.
+			 * If this is an undefined symbol, then we can only be
+			 * attempting to override an existing undefined symbol.
+			 * The original symbol is either:
+			 *
+			 *  -	a mapfile definition
+			 *  -	a previous relocatable object whose visibility
+			 *	or type should be overridden by this new symbol
+			 *  -	a previous shared object
+			 *
+			 * If the original undefined symbol stems from a mapfile
+			 * then don't alter the reference file name.  Should we
+			 * end up with some form of 'undefined' symbol error,
+			 * the characteristics of that error are most likely to
+			 * have originated from a mapfile.
+			 *
+			 * Otherwise, update the reference file name to indicate
+			 * this symbol.
 			 */
-			sdp->sd_aux->sa_rfile = ifl->ifl_name;
+			if ((sdp->sd_flags & FLG_SY_MAPREF) == 0)
+				sdp->sd_aux->sa_rfile = ifl->ifl_name;
 		} else {
 			/*
 			 * Under -Bnodirect, all exported interfaces that have
@@ -513,7 +526,9 @@ sym_twoundefs(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 {
 	Sym	*osym = sdp->sd_sym;
 	uchar_t	obind = ELF_ST_BIND(osym->st_info);
+	uchar_t	otype = ELF_ST_TYPE(osym->st_info);
 	uchar_t	nbind = ELF_ST_BIND(nsym->st_info);
+	uchar_t	ntype = ELF_ST_TYPE(nsym->st_info);
 
 	/*
 	 * If two relocatable objects define a weak and non-weak undefined
@@ -525,7 +540,7 @@ sym_twoundefs(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	 * take the other.
 	 */
 	if (((obind == STB_WEAK) && (nbind != STB_WEAK)) ||
-	    (obind == STT_NOTYPE) && (nbind != STT_NOTYPE)) {
+	    (otype == STT_NOTYPE) && (ntype != STT_NOTYPE)) {
 		sym_override(sdp, nsym, ifl, ofl, ndx, nshndx, nsdflags);
 		return;
 	}
@@ -1079,6 +1094,7 @@ ld_sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
 {
 	int		row, column;		/* State table coordinates */
 	Sym		*osym = sdp->sd_sym;
+	sd_flag_t	osdflags = sdp->sd_flags;
 	Is_desc		*isp;
 	Half		vis = 0, nfile = ifl->ifl_ehdr->e_type;
 	Half		oref = sdp->sd_ref;
@@ -1086,7 +1102,7 @@ ld_sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
 	/*
 	 * Determine the original symbols definition (defines row in Action[]).
 	 */
-	if (sdp->sd_flags & FLG_SY_TENTSYM)
+	if (osdflags & FLG_SY_TENTSYM)
 		row = SYM_TENTATIVE;
 	else if ((sdp->sd_sym->st_shndx == SHN_UNDEF) ||
 	    (sdp->sd_sym->st_shndx == SHN_SUNW_IGNORE))
@@ -1242,6 +1258,12 @@ ld_sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
 		    (sdp->sd_ref == REF_REL_NEED)))
 			sdp->sd_flags |= FLG_SY_MAPUSED;
 	}
+
+	/*
+	 * Make sure any special symbol requirements are carried over.
+	 */
+	if ((osdflags & FLG_SY_CAP) || (nsdflags & FLG_SY_CAP))
+		sdp->sd_flags |= FLG_SY_CAP;
 
 	DBG_CALL(Dbg_syms_resolved(ofl, sdp));
 

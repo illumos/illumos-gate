@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,15 +69,14 @@ Alist	*aout_sec_dirs = NULL;
  * Defines for local functions.
  */
 static void	aout_dladdr(ulong_t, Rt_map *, Dl_info *, void **, int);
-static Sym	*aout_dlsym_handle(Grp_hdl *, Slookup *, Rt_map **, uint_t *,
-		    int *l);
+static int	aout_dlsym_handle(Grp_hdl *, Slookup *, Sresult *, uint_t *,
+		    int *);
 static Addr	aout_entry_point(void);
-static Sym	*aout_find_sym(Slookup *, Rt_map **, uint_t *, int *);
+static int	aout_find_sym(Slookup *, Sresult *, uint_t *, int *);
 static int	aout_fix_name(const char *, Rt_map *, Alist **, Aliste, uint_t);
 static Alist	**aout_get_def_dirs(void);
 static Alist	**aout_get_sec_dirs(void);
 static char	*aout_get_so(const char *, const char *, size_t, size_t);
-extern Sym	*aout_lookup_sym(Slookup *, Rt_map **, uint_t *, int *);
 static int	aout_needed(Lm_list *, Aliste, Rt_map *, int *);
 
 /*
@@ -441,8 +440,8 @@ aout_findsb(const char *aname, Rt_map *lmp, int flag)
  * ii.	   .bar		->	   .bar		(LKUP_LDOT)
  * iii.	    nuts	->	   .nuts
  */
-Sym *
-aout_lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
+int
+aout_lookup_sym(Slookup *slp, Sresult *srp, uint_t *binfo, int *in_nfavl)
 {
 	char	name[PATH_MAX];
 	Slookup	sl = *slp;
@@ -463,15 +462,15 @@ aout_lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 	 * Call the generic lookup routine to cycle through the specified
 	 * link maps.
 	 */
-	return (lookup_sym(&sl, dlmp, binfo, in_nfavl));
+	return (lookup_sym(&sl, srp, binfo, in_nfavl));
 }
 
 /*
  * Symbol lookup for an a.out format module.
  */
 /* ARGSUSED3 */
-static Sym *
-aout_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
+static int
+aout_find_sym(Slookup *slp, Sresult *srp, uint_t *binfo, int *in_nfavl)
 {
 	const char	*name = slp->sl_name;
 	Rt_map		*ilmp = slp->sl_imap;
@@ -486,14 +485,15 @@ aout_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 			 */
 			if (sp->n_type == (N_EXT + N_UNDF)) {
 				if ((sp = aout_find_com(sp, name)) == 0)
-					return (NULL);
+					return (0);
 			}
-			*dlmp = ilmp;
+			srp->sr_dmap = ilmp;
+			srp->sr_sym = aout_symconvert(sp);
 			*binfo |= DBG_BINFO_FOUND;
-			return (aout_symconvert(sp));
+			return (1);
 		}
 	}
-	return (NULL);
+	return (0);
 }
 
 /*
@@ -677,19 +677,15 @@ aout_dladdr(ulong_t addr, Rt_map *lmp, Dl_info *dlip, void **info,
  * individual link-maps we don't need to supply a starting link-map to the
  * lookup routine (see lookup_sym():analyze.c).
  */
-static Sym *
-aout_dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo,
+static int
+aout_dlsym_handle(Grp_hdl *ghp, Slookup *slp, Sresult *srp, uint_t *binfo,
     int *in_nfavl)
 {
-	Sym	*sym;
 	char	buffer[PATH_MAX];
 	Slookup	sl;
 
-	buffer[0] = '_';
-	(void) strcpy(&buffer[1], slp->sl_name);
-
-	if ((sym = dlsym_handle(ghp, slp, _lmp, binfo, in_nfavl)) != 0)
-		return (sym);
+	if (dlsym_handle(ghp, slp, srp, binfo, in_nfavl))
+		return (1);
 
 	/*
 	 * Symbol not found as supplied.  However, most of our symbols will
@@ -697,10 +693,13 @@ aout_dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo,
 	 * to the symbol as it emits it.  Therefore, attempt to find the
 	 * symbol with the "_" prepend.
 	 */
+	buffer[0] = '_';
+	(void) strcpy(&buffer[1], slp->sl_name);
+
 	sl = *slp;
 	sl.sl_name = (const char *)buffer;
 
-	return (dlsym_handle(ghp, &sl, _lmp, binfo, in_nfavl));
+	return (dlsym_handle(ghp, &sl, srp, binfo, in_nfavl));
 }
 
 /*

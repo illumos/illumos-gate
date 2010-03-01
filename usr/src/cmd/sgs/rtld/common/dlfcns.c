@@ -1035,17 +1035,16 @@ dlmopen(Lmid_t lmid, const char *path, int mode)
 /*
  * Handle processing for dlsym.
  */
-Sym *
-dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo,
+int
+dlsym_handle(Grp_hdl *ghp, Slookup *slp, Sresult *srp, uint_t *binfo,
     int *in_nfavl)
 {
 	Rt_map		*nlmp, * lmp = ghp->gh_ownlmp;
 	Rt_map		*clmp = slp->sl_cmap;
 	const char	*name = slp->sl_name;
-	Sym		*sym = NULL;
 	Slookup		sl = *slp;
 
-	sl.sl_flags = (LKUP_FIRST | LKUP_SPEC);
+	sl.sl_flags = (LKUP_FIRST | LKUP_DLSYM | LKUP_SPEC);
 
 	/*
 	 * Continue processing a dlsym request.  Lookup the required symbol in
@@ -1077,7 +1076,7 @@ dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo,
 			 * first object check whether we're done.
 			 */
 			if ((nlmp != lmp) && (ghp->gh_flags & GPH_FIRST))
-				return (NULL);
+				return (0);
 
 			if (!(MODE(nlmp) & RTLD_GLOBAL))
 				continue;
@@ -1086,9 +1085,8 @@ dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo,
 				continue;
 
 			sl.sl_imap = nlmp;
-			if (sym = LM_LOOKUP_SYM(clmp)(&sl, _lmp, binfo,
-			    in_nfavl))
-				return (sym);
+			if (LM_LOOKUP_SYM(clmp)(&sl, srp, binfo, in_nfavl))
+				return (1);
 
 			/*
 			 * Keep track of any global pending lazy loads.
@@ -1118,9 +1116,9 @@ dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo,
 					continue;
 
 				sl.sl_imap = nlmp;
-				if (sym = elf_lazy_find_sym(&sl, _lmp, binfo,
+				if (elf_lazy_find_sym(&sl, srp, binfo,
 				    in_nfavl))
-					return (sym);
+					return (1);
 			}
 		}
 	} else {
@@ -1139,12 +1137,11 @@ dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo,
 				continue;
 
 			sl.sl_imap = nlmp;
-			if (sym = LM_LOOKUP_SYM(clmp)(&sl, _lmp, binfo,
-			    in_nfavl))
-				return (sym);
+			if (LM_LOOKUP_SYM(clmp)(&sl, srp, binfo, in_nfavl))
+				return (1);
 
 			if (ghp->gh_flags & GPH_FIRST)
-				return (NULL);
+				return (0);
 
 			/*
 			 * Keep track of any pending lazy loads associated
@@ -1169,25 +1166,27 @@ dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo,
 					continue;
 
 				sl.sl_imap = nlmp;
-				if (sym = elf_lazy_find_sym(&sl, _lmp,
-				    binfo, in_nfavl))
-					return (sym);
+				if (elf_lazy_find_sym(&sl, srp, binfo,
+				    in_nfavl))
+					return (1);
 			}
 		}
 	}
-	return (NULL);
+	return (0);
 }
 
 /*
  * Core dlsym activity.  Selects symbol lookup method from handle.
  */
-void *
+static void *
 dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
     int *in_nfavl)
 {
 	Sym		*sym = NULL;
+	int		ret = 0;
 	Syminfo		*sip;
 	Slookup		sl;
+	Sresult		sr;
 	uint_t		binfo;
 
 	/*
@@ -1207,13 +1206,17 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
 	 */
 	SLOOKUP_INIT(sl, name, clmp, clmp, ld_entry_cnt, elf_hash(name),
 	    0, 0, 0, LKUP_SYMNDX);
+	SRESULT_INIT(sr, name);
 
-	if (THIS_IS_ELF(clmp) &&
-	    ((sym = SYMINTP(clmp)(&sl, 0, 0, NULL)) != NULL)) {
+	if (THIS_IS_ELF(clmp) && SYMINTP(clmp)(&sl, &sr, &binfo, NULL)) {
+		sym = sr.sr_sym;
+
 		sl.sl_rsymndx = (((ulong_t)sym -
 		    (ulong_t)SYMTAB(clmp)) / SYMENT(clmp));
 		sl.sl_rsym = sym;
 	}
+
+	SRESULT_INIT(sr, name);
 
 	if (sym && (ELF_ST_VISIBILITY(sym->st_other) == STV_SINGLETON)) {
 		Rt_map	*hlmp = LIST(clmp)->lm_head;
@@ -1230,7 +1233,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
 		sl.sl_flags = LKUP_SPEC;
 		if (handle == RTLD_PROBE)
 			sl.sl_flags |= LKUP_NOFALLBACK;
-		sym = LM_LOOKUP_SYM(clmp)(&sl, dlmp, &binfo, in_nfavl);
+		ret = LM_LOOKUP_SYM(clmp)(&sl, &sr, &binfo, in_nfavl);
 
 	} else if (handle == RTLD_NEXT) {
 		Rt_map	*nlmp;
@@ -1277,7 +1280,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
 			return (0);
 
 		sl.sl_flags = LKUP_NEXT;
-		sym = LM_LOOKUP_SYM(clmp)(&sl, dlmp, &binfo, in_nfavl);
+		ret = LM_LOOKUP_SYM(clmp)(&sl, &sr, &binfo, in_nfavl);
 
 	} else if (handle == RTLD_SELF) {
 		/*
@@ -1288,7 +1291,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
 
 		sl.sl_imap = clmp;
 		sl.sl_flags = (LKUP_SPEC | LKUP_SELF);
-		sym = LM_LOOKUP_SYM(clmp)(&sl, dlmp, &binfo, in_nfavl);
+		ret = LM_LOOKUP_SYM(clmp)(&sl, &sr, &binfo, in_nfavl);
 
 	} else if (handle == RTLD_DEFAULT) {
 		Rt_map	*hlmp = LIST(clmp)->lm_head;
@@ -1302,7 +1305,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
 
 		sl.sl_imap = hlmp;
 		sl.sl_flags = LKUP_SPEC;
-		sym = LM_LOOKUP_SYM(clmp)(&sl, dlmp, &binfo, in_nfavl);
+		ret = LM_LOOKUP_SYM(clmp)(&sl, &sr, &binfo, in_nfavl);
 
 	} else if (handle == RTLD_PROBE) {
 		Rt_map	*hlmp = LIST(clmp)->lm_head;
@@ -1321,7 +1324,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
 
 		sl.sl_imap = hlmp;
 		sl.sl_flags = (LKUP_SPEC | LKUP_NOFALLBACK);
-		sym = LM_LOOKUP_SYM(clmp)(&sl, dlmp, &binfo, in_nfavl);
+		ret = LM_LOOKUP_SYM(clmp)(&sl, &sr, &binfo, in_nfavl);
 
 	} else {
 		Grp_hdl *ghp = (Grp_hdl *)handle;
@@ -1333,13 +1336,14 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
 		DBG_CALL(Dbg_syms_dlsym(clmp, name, in_nfavl,
 		    NAME(ghp->gh_ownlmp), DBG_DLSYM_DEF));
 
-		sym = LM_DLSYM(clmp)(ghp, &sl, dlmp, &binfo, in_nfavl);
+		ret = LM_DLSYM(clmp)(ghp, &sl, &sr, &binfo, in_nfavl);
 	}
 
-	if (sym) {
+	if (ret && ((sym = sr.sr_sym) != NULL)) {
 		Lm_list	*lml = LIST(clmp);
 		Addr	addr = sym->st_value;
 
+		*dlmp = sr.sr_dmap;
 		if (!(FLAGS(*dlmp) & FLG_RT_FIXED))
 			addr += ADDR(*dlmp);
 
@@ -1350,7 +1354,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
 			FLAGS1(*dlmp) |= FL1_RT_USED;
 
 		DBG_CALL(Dbg_bind_global(clmp, 0, 0, (Xword)-1, PLT_T_NONE,
-		    *dlmp, addr, sym->st_value, name, binfo));
+		    *dlmp, addr, sym->st_value, sr.sr_name, binfo));
 
 		if ((lml->lm_tflags | AFLAGS(clmp)) & LML_TFLG_AUD_SYMBIND) {
 			uint_t	sb_flags = LA_SYMB_DLSYM;
@@ -1361,8 +1365,9 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
 			    &sb_flags);
 		}
 		return ((void *)addr);
-	} else
-		return (0);
+	}
+
+	return (NULL);
 }
 
 /*

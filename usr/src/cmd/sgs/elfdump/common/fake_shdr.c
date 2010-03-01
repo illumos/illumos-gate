@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -120,16 +120,18 @@ typedef enum {
 	SINFO_T_VERSYM =	11,
 	SINFO_T_INTERP =	12,
 	SINFO_T_CAP =		13,
-	SINFO_T_UNWIND =	14,
-	SINFO_T_MOVE =		15,
-	SINFO_T_REL =		16,
-	SINFO_T_RELA =		17,
-	SINFO_T_PREINITARR =	18,
-	SINFO_T_INITARR =	19,
-	SINFO_T_FINIARR =	20,
-	SINFO_T_NOTE =		21,
+	SINFO_T_CAPINFO =	14,
+	SINFO_T_CAPCHAIN =	15,
+	SINFO_T_UNWIND =	16,
+	SINFO_T_MOVE =		17,
+	SINFO_T_REL =		18,
+	SINFO_T_RELA =		19,
+	SINFO_T_PREINITARR =	20,
+	SINFO_T_INITARR =	21,
+	SINFO_T_FINIARR =	22,
+	SINFO_T_NOTE =		23,
 
-	SINFO_T_NUM =		22 /* Count of items. Must come last */
+	SINFO_T_NUM =		24 /* Count of items. Must come last */
 } SINFO_TYPE;
 
 
@@ -225,13 +227,21 @@ static SINFO_DATA sinfo_data[SINFO_T_NUM] = {
 	{ MSG_ORIG(MSG_PHDRNAM_CAP), SHT_SUNW_cap, SHF_ALLOC,
 	    sizeof (Addr), sizeof (Cap), ELF_T_CAP },
 
+	/* SINFO_T_CAPINFO */
+	{ MSG_ORIG(MSG_PHDRNAM_CAPINFO), SHT_SUNW_capinfo, SHF_ALLOC,
+	    FAKE_M_WORD_ALIGN, sizeof (Capinfo), ELF_T_WORD },
+
+	/* SINFO_T_CAPCHAIN */
+	{ MSG_ORIG(MSG_PHDRNAM_CAPCHAIN), SHT_SUNW_capchain, SHF_ALLOC,
+	    FAKE_M_WORD_ALIGN, sizeof (Capchain), ELF_T_WORD },
+
 	/* SINFO_T_UNWIND */
 	{ MSG_ORIG(MSG_PHDRNAM_UNWIND), SHT_AMD64_UNWIND, SHF_ALLOC,
 	    sizeof (Addr), 0, ELF_T_BYTE },
 
 	/* SINFO_T_MOVE */
 	{ MSG_ORIG(MSG_PHDRNAM_MOVE), SHT_SUNW_move, SHF_ALLOC,
-	    sizeof (Lword), sizeof (Move),  ELF_T_MOVE },
+	    sizeof (Lword), sizeof (Move), ELF_T_MOVE },
 
 	/* SINFO_T_REL */
 	{ MSG_ORIG(MSG_PHDRNAM_REL), SHT_REL, SHF_ALLOC,
@@ -1091,6 +1101,8 @@ fake_shdr_cache(const char *file, int fd, Elf *elf, Ehdr *ehdr,
 		SINFO	versym;
 		SINFO	interp;
 		SINFO	cap;
+		SINFO	capinfo;
+		SINFO	capchain;
 		SINFO	unwind;
 		SINFO	move;
 		SINFO	rel;
@@ -1265,6 +1277,16 @@ fake_shdr_cache(const char *file, int fd, Elf *elf, Ehdr *ehdr,
 
 			case DT_PREINIT_ARRAYSZ:
 				sec.preinitarr.size = dyn->d_un.d_val;
+				break;
+
+			case DT_SUNW_CAPINFO:
+				sec.capinfo.type = SINFO_T_CAPINFO;
+				sec.capinfo.vaddr = dyn->d_un.d_ptr;
+				break;
+
+			case DT_SUNW_CAPCHAIN:
+				sec.capchain.type = SINFO_T_CAPCHAIN;
+				sec.capchain.vaddr = dyn->d_un.d_ptr;
 				break;
 
 			case DT_SUNW_SYMTAB:

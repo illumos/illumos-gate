@@ -829,6 +829,13 @@ All the above changes are incorporated in the following patches:
 	Solaris/SunOS 5.8_sparc		patch T109147-29
 	Solaris/SunOS 5.8_x86		patch T109148-29
 --------------------------------------------------------------------------------
+All the above changes plus:
+	6850124 dlopen reports "No such file or directory" in spite of ENOMEM
+		when mmap fails in anon_map()
+are incorporated in the following patches:
+	Solaris/SunOS 5.9_sparc		patch TXXXXXX-XX
+	Solaris/SunOS 5.9_x86		patch TXXXXXX-XX
+--------------------------------------------------------------------------------
 
 ----------
 Solaris 10
@@ -1275,8 +1282,15 @@ NOTE: The fix for 6826410 is also available for s9 in the following patches:
 6786744 32-bit dbx failed with unknown rtld_db.so error on snv_104
 --------------------------------------------------------------------------------
 All the above changes are incorporated in the following patches:
-	Solaris/SunOS 5.10_sparc	patch TXXXXXX-XX
-	Solaris/SunOS 5.10_x86		patch TXXXXXX-XX
+	Solaris/SunOS 5.10_sparc	patch T141444-06
+	Solaris/SunOS 5.10_x86		patch T141445-06
+--------------------------------------------------------------------------------
+All the above changes plus:
+	6850124 dlopen reports "No such file or directory" in spite of ENOMEM
+		when mmap fails in anon_map()
+are incorporated in the following patches:
+	Solaris/SunOS 5.10_sparc	patch T143895-01
+	Solaris/SunOS 5.10_x86		patch T143896-01
 --------------------------------------------------------------------------------
 
 --------------------------------------------
@@ -1436,7 +1450,7 @@ Bugid   Risk Synopsis
 6724311 dldump() mishandles R_AMD64_JUMP_SLOT relocations
 6724774 elfdump -n doesn't print siginfo structure
 6728555 Fix for amd64 aw (6617475) breaks pure gcc builds
-6734598 ld(1) archive processing failure due to mismatched file descriptors
+6734598 ld(1) archive processing failure due to mismatched file descriptors (D)
 6684577 ld should propagate SHF_LINK_ORDER flag to ET_REL objects
 6735939 ld(1) discarded symbol relocations errors (Studio and GNU).
 6354160 Solaris linker includes more than one copy of code in binary when
@@ -1522,8 +1536,8 @@ Bugid   Risk Synopsis
 6851224 elf_getshnum() and elf_getshstrndx() incompatible with 2002 ELF gABI
 	agreement (D)
 	PSARC/2009/363 replace elf_getphnum, elf_getshnum, and elf_getshstrndx
-6853809	ld.so.1: rescan fallback optimization is invalid
-6854158	ld.so.1: interposition can be skipped because of incorrect
+6853809 ld.so.1: rescan fallback optimization is invalid
+6854158 ld.so.1: interposition can be skipped because of incorrect
 	caller/destination validation
 6862967 rd_loadobj_iter() failing for core files
 6856173 streams core dumps when compiled in 64bit with a very large static
@@ -1551,3 +1565,6 @@ Bugid   Risk Synopsis
 6916788 ld version 2 mapfile syntax (D)
 	PSARC/2009/688 Human readable and extensible ld mapfile syntax
 6929607 ld generates incorrect VERDEF entries for ET_REL output objects
+6924224 linker should ignore SUNW_dof when calculating the elf checksum
+6918143 symbol capabilities (D)
+6910387 .tdata and .tbss separation invalidates TLS program header information

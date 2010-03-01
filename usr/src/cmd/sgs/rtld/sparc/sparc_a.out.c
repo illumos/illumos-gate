@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,6 +74,7 @@ aout_bndr(caddr_t pc)
 	int 		rndx, entry;
 	ulong_t		symval;
 	Slookup		sl;
+	Sresult		sr;
 	uint_t		binfo;
 	Lm_list		*lml;
 
@@ -116,14 +117,20 @@ aout_bndr(caddr_t pc)
 	 */
 	SLOOKUP_INIT(sl, name, lmp, lml->lm_head, ld_entry_cnt, 0, 0, 0, 0,
 	    LKUP_DEFT);
+	SRESULT_INIT(sr, name);
 
-	if ((sym = aout_lookup_sym(&sl, &nlmp, &binfo, NULL)) == 0) {
+	if (aout_lookup_sym(&sl, &sr, &binfo, NULL) == 0) {
 		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_NOSYM), NAME(lmp),
 		    demangle(name));
 		rtldexit(lml, 1);
 	}
 
+	name = (char *)sr.sr_name;
+	nlmp = sr.sr_dmap;
+	sym = sr.sr_sym;
+
 	symval = sym->st_value;
+
 	if (!(FLAGS(nlmp) & FLG_RT_FIXED) &&
 	    (sym->st_shndx != SHN_ABS))
 		symval += (int)(ADDR(nlmp));
@@ -259,10 +266,11 @@ aout_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 		 * Perform the relocation.
 		 */
 		if (rp->r_extern == 0) {
-			name = (char *)0;
+			name = NULL;
 			value = ADDR(lmp);
 		} else {
 			Slookup		sl;
+			Sresult		sr;
 			uint_t		binfo;
 
 			if (rp->r_type == RELOC_JMP_SLOT)
@@ -276,9 +284,9 @@ aout_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 			 */
 			SLOOKUP_INIT(sl, name, lmp, 0, ld_entry_cnt,
 			    0, 0, 0, 0, LKUP_STDRELOC);
+			SRESULT_INIT(sr, name);
 
-			if ((sym = aout_lookup_sym(&sl, &_lmp,
-			    &binfo, in_nfavl)) == 0) {
+			if (aout_lookup_sym(&sl, &sr, &binfo, in_nfavl) == 0) {
 				if (lml->lm_flags & LML_FLG_TRC_WARN) {
 					(void)
 					    printf(MSG_INTL(MSG_LDD_SYM_NFOUND),
@@ -297,6 +305,10 @@ aout_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 			 * If symbol was found in an object other than the
 			 * referencing object then record the binding.
 			 */
+			name = (char *)sr.sr_name;
+			_lmp = sr.sr_dmap;
+			sym = sr.sr_sym;
+
 			if ((lmp != _lmp) &&
 			    ((FLAGS1(_lmp) & FL1_RT_NOINIFIN) == 0)) {
 				if (aplist_test(&bound, _lmp,

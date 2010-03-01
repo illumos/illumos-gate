@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -221,7 +221,7 @@ remove_lml(Lm_list *lml)
 void
 remove_so(Lm_list *lml, Rt_map *lmp)
 {
-	Dyninfo *dip;
+	Dyninfo	*dip;
 
 	if (lmp == NULL)
 		return;
@@ -376,6 +376,9 @@ remove_so(Lm_list *lml, Rt_map *lmp)
 	 */
 	if (FLAGS(lmp) & FLG_RT_IMGALLOC)
 		free((void *)ADDR(lmp));
+
+	if (CAPCHAIN(lmp))
+		free((void *)CAPCHAIN(lmp));
 
 	if (MMAPS(lmp)) {
 		if ((FLAGS(lmp) & FLG_RT_IMGALLOC) == 0)

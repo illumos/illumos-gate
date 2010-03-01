@@ -193,38 +193,61 @@ static predef_seg_t sg_desc = {
  * As with the segment descriptors, the EC_DESC_INIT macro is used
  * to reduce boilerplate clutter.
  */
-#define	EC_DESC_INIT(ec_type, ec_attrmask, ec_attrbits, _seg_field, ec_flags) \
-	{ NULL, NULL, NULL, ec_type, ec_attrmask, ec_attrbits, \
+#define	EC_DESC_INIT(ec_is_name, ec_type, ec_attrmask, ec_attrbits, \
+    _seg_field, ec_flags) \
+	{ NULL, NULL, ec_is_name, ec_type, ec_attrmask, ec_attrbits, \
 	    &sg_desc.psg_ ## _seg_field, 0, FLG_EC_BUILTIN | ec_flags }
 
 static const Ent_desc	ent_desc[] = {
-	EC_DESC_INIT(SHT_NOTE, 0, 0, note, 0),
-
+	EC_DESC_INIT(NULL, SHT_NOTE, 0, 0, note, 0),
 
 #if	defined(_ELF64)		/* (amd64-only) */
-	EC_DESC_INIT(0, SHF_ALLOC + SHF_WRITE + SHF_AMD64_LARGE,
+	EC_DESC_INIT(NULL, 0, SHF_ALLOC + SHF_WRITE + SHF_AMD64_LARGE,
 	    SHF_ALLOC + SHF_AMD64_LARGE, lrodata, 0),
 #endif
-	EC_DESC_INIT(0, SHF_ALLOC + SHF_WRITE, SHF_ALLOC, text, 0),
+	EC_DESC_INIT(NULL, 0, SHF_ALLOC + SHF_WRITE, SHF_ALLOC, text, 0),
 
-	EC_DESC_INIT(SHT_NOBITS, SHF_ALLOC + SHF_WRITE, SHF_ALLOC + SHF_WRITE,
-	    bss, 0),
+	/*
+	 * Explicitly assign the .tdata section to bss.  The design of TLS
+	 * provides for initialized data being assigned to a .tdata section,
+	 * and uninitialized data being assigned to a .tbss section.  These
+	 * sections should be laid out adjacent to each other, with little or
+	 * no gap between them.  A PT_TLS program header is created that
+	 * defines the address range of the two sections.  This header is
+	 * passed to libc to instantiate the appropriate thread allocation.
+	 *
+	 * By default a separate bss segment is disabled, however users can
+	 * trigger the creation of a bss segment with a mapfile.  By default,
+	 * all bss sections are assigned to the data segment, and the section
+	 * identifiers of .tdata and .tbss ensure that these two sections are
+	 * adjacent to each other.
+	 *
+	 * However, if a bss segment is enabled, the adjacency of the .tdata
+	 * and .tbss sections can only be retained by having an explicit .tdata
+	 * entrance criteria.
+	 */
+	EC_DESC_INIT(MSG_ORIG(MSG_SCN_TDATA), 0, SHF_ALLOC + SHF_WRITE,
+	    SHF_ALLOC + SHF_WRITE, bss, 0),
+
+	EC_DESC_INIT(NULL, SHT_NOBITS, SHF_ALLOC + SHF_WRITE,
+	    SHF_ALLOC + SHF_WRITE, bss, 0),
 
 #if	defined(_ELF64)		/* (amd64-only) */
-	EC_DESC_INIT(SHT_NOBITS, SHF_ALLOC + SHF_WRITE + SHF_AMD64_LARGE,
+	EC_DESC_INIT(NULL, SHT_NOBITS, SHF_ALLOC + SHF_WRITE + SHF_AMD64_LARGE,
 	    SHF_ALLOC + SHF_WRITE + SHF_AMD64_LARGE, data, 0),
 
-	EC_DESC_INIT(0, SHF_ALLOC + SHF_WRITE + SHF_AMD64_LARGE,
+	EC_DESC_INIT(NULL, 0, SHF_ALLOC + SHF_WRITE + SHF_AMD64_LARGE,
 	    SHF_ALLOC + SHF_WRITE + SHF_AMD64_LARGE, ldata, 0),
 #endif
-	EC_DESC_INIT(0, SHF_ALLOC + SHF_WRITE, SHF_ALLOC + SHF_WRITE, data, 0),
+	EC_DESC_INIT(NULL, 0, SHF_ALLOC + SHF_WRITE, SHF_ALLOC + SHF_WRITE,
+	    data, 0),
 
 	/*
 	 * Final catchall rule sends remaining sections to "extra"
 	 * NULL segment, which has been tagged as FLG_SG_NODISABLE,
 	 * and which will therefore always accept them.
 	 */
-	EC_DESC_INIT(0, 0, 0, extra, FLG_EC_CATCHALL)
+	EC_DESC_INIT(NULL, 0, 0, 0, extra, FLG_EC_CATCHALL)
 };
 #undef EC_DESC_INIT
 
@@ -375,7 +398,7 @@ ld_ent_setup(Ofl_desc *ofl, Xword segalign)
 	/*
 	 * The data segment and stack permissions can differ:
 	 *
-	 *	- Architecural/ABI per-platform differences
+	 *	- Architectural/ABI per-platform differences
 	 *	- Whether the object is built statically or dynamically
 	 *
 	 * Those segments so affected have their program header flags

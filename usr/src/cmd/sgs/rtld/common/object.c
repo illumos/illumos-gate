@@ -197,6 +197,35 @@ elf_obj_file(Lm_list *lml, Aliste lmco, const char *name,
 }
 
 /*
+ * Ensure any platform or machine capability names are valid.
+ */
+inline static int
+check_plat_names(Syscapset *scapset, Alist *caps, Rej_desc *rej)
+{
+	Capstr	*capstr;
+	Aliste	idx;
+
+	for (ALIST_TRAVERSE(caps, idx, capstr)) {
+		if (platcap_check(scapset, capstr->cs_str, rej) == 1)
+			return (1);
+	}
+	return (0);
+}
+
+inline static int
+check_mach_names(Syscapset *scapset, Alist *caps, Rej_desc *rej)
+{
+	Capstr	*capstr;
+	Aliste	idx;
+
+	for (ALIST_TRAVERSE(caps, idx, capstr)) {
+		if (machcap_check(scapset, capstr->cs_str, rej) == 1)
+			return (1);
+	}
+	return (0);
+}
+
+/*
  * Finish relocatable object processing.  Having already initially processed one
  * or more objects, complete the generation of a shared object image by calling
  * the appropriate link-edit functionality (refer to sgs/ld/common/main.c).
@@ -217,7 +246,9 @@ elf_obj_fini(Lm_list *lml, Rt_map *lmp, int *in_nfavl)
 	Fdesc			fd = { 0 };
 	Grp_hdl			*ghp;
 	Rej_desc		rej = { 0 };
-	elfcap_mask_t		cap_value;
+	Syscapset		*scapset;
+	elfcap_mask_t		omsk;
+	Alist			*oalp;
 
 	DBG_CALL(Dbg_util_nl(lml, DBG_NL_STD));
 
@@ -228,24 +259,28 @@ elf_obj_fini(Lm_list *lml, Rt_map *lmp, int *in_nfavl)
 
 	/*
 	 * At this point, all input section processing is complete.  If any
-	 * hardware or software capabilities have been established, ensure that
-	 * they are appropriate for this platform.
+	 * capabilities have been established, ensure that they are appropriate
+	 * for this system.
 	 */
-	cap_value = CAPMASK_VALUE(&ofl->ofl_ocapset.c_hw_1);
-	if (cap_value && (hwcap_check(cap_value, &rej) == 0)) {
-		if ((lml_main.lm_flags & LML_FLG_TRC_LDDSTUB) && lmp &&
-		    (FLAGS1(lmp) & FL1_RT_LDDSTUB) && (NEXT(lmp) == NULL)) {
-			(void) printf(MSG_INTL(MSG_LDD_GEN_HWCAP_1),
-			    ofl->ofl_name, rej.rej_str);
-		}
-		return (NULL);
-	}
+	if (pnavl_recorded(&capavl, ofl->ofl_name, NULL, NULL))
+		scapset = alt_scapset;
+	else
+		scapset = org_scapset;
 
-	cap_value = CAPMASK_VALUE(&ofl->ofl_ocapset.c_sf_1);
-	if (cap_value && (sfcap_check(cap_value, &rej) == 0)) {
+	if ((((omsk = ofl->ofl_ocapset.oc_hw_1.cm_val) != 0) &&
+	    (hwcap1_check(scapset, omsk, &rej) == 0)) ||
+	    (((omsk = ofl->ofl_ocapset.oc_sf_1.cm_val) != 0) &&
+	    (sfcap1_check(scapset, omsk, &rej) == 0)) ||
+	    (((omsk = ofl->ofl_ocapset.oc_hw_2.cm_val) != 0) &&
+	    (hwcap2_check(scapset, omsk, &rej) == 0)) ||
+	    (((oalp = ofl->ofl_ocapset.oc_plat.cl_val) != NULL) &&
+	    (check_plat_names(scapset, oalp, &rej) == 0)) ||
+	    (((oalp = ofl->ofl_ocapset.oc_mach.cl_val) != NULL) &&
+	    (check_mach_names(scapset, oalp, &rej) == 0))) {
 		if ((lml_main.lm_flags & LML_FLG_TRC_LDDSTUB) && lmp &&
 		    (FLAGS1(lmp) & FL1_RT_LDDSTUB) && (NEXT(lmp) == NULL)) {
-			(void) printf(MSG_INTL(MSG_LDD_GEN_SFCAP_1),
+			/* LINTED */
+			(void) printf(MSG_INTL(ldd_reject[rej.rej_type]),
 			    ofl->ofl_name, rej.rej_str);
 		}
 		return (NULL);

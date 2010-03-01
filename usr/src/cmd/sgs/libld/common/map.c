@@ -43,11 +43,13 @@
 #include	"_libld.h"
 #include	"_map.h"
 
-
 /*
  * Process a hardware/software capabilities segment declaration definition.
  *	hwcap_1	= val,... [ OVERRIDE ]
  *	sfcap_1	= val,... [ OVERRIDE ]
+ *	hwcap_2	= val,... [ OVERRIDE ]
+ *	platcap	= name,... [ OVERRIDE ]
+ *	machcap	= name,... [ OVERRIDE ]
  *
  * The values can be defined as a list of machine specify tokens, or numerics.
  * Tokens are representations of the sys/auxv_$MACH.h capabilities, for example:
@@ -58,15 +60,15 @@
  * Or, the above two capabilities could be represented as V0x3.  Note, the
  * OVERRIDE flag is used to ensure that only those values provided via this
  * mapfile entry are recorded in the final image, ie. this overrides any
- * hardware capabilities that may be defined in the objects read as part of this
- * link-edit.  Specifying:
+ * hardware capabilities that may be defined in the objects read as part of
+ * this link-edit.  Specifying:
  *
  *	V0x0 OVERRIDE
  *
  * effectively removes any capabilities information from the final image.
  */
 static Boolean
-map_cap(Mapfile *mf, Word type, CapMask *capmask)
+map_cap(Mapfile *mf, Word type, Capmask *capmask)
 {
 	Token		tok;		/* Current token. */
 	Xword		number;
@@ -77,8 +79,8 @@ map_cap(Mapfile *mf, Word type, CapMask *capmask)
 
 	if (DBG_ENABLED) {
 		Dbg_cap_mapfile_title(ofl->ofl_lml, mf->mf_lineno);
-		Dbg_cap_entry2(ofl->ofl_lml, DBG_STATE_CURRENT, CA_SUNW_HW_1,
-		    capmask, ld_targ.t_m.m_mach);
+		Dbg_cap_val_entry(ofl->ofl_lml, DBG_STATE_CURRENT, CA_SUNW_HW_1,
+		    capmask->cm_val, ld_targ.t_m.m_mach);
 	}
 
 	while ((tok = ld_map_gettoken(mf, TK_F_STRLC, &tkv)) !=
@@ -137,16 +139,13 @@ map_cap(Mapfile *mf, Word type, CapMask *capmask)
 		return (TRUE);
 	}
 
-	Dbg_cap_entry(ofl->ofl_lml, DBG_STATE_NEW, type, value,
-	    ld_targ.t_m.m_mach);
-	capmask->cm_value |= value;
+	DBG_CALL(Dbg_cap_val_entry(ofl->ofl_lml, DBG_STATE_NEW, type, value,
+	    ld_targ.t_m.m_mach));
+	capmask->cm_val |= value;
 
 	/* Sanity check the resulting bits */
 	if (!ld_map_cap_sanitize(mf, type, capmask))
 		return (FALSE);
-
-	DBG_CALL(Dbg_cap_entry2(ofl->ofl_lml, DBG_STATE_RESOLVED, type,
-	    capmask, ld_targ.t_m.m_mach));
 
 	return (TRUE);
 }
@@ -1318,18 +1317,16 @@ ld_map_parse_v1(Mapfile *mf)
 			if (strcmp(sgp1->sg_name,
 			    MSG_ORIG(MSG_STR_HWCAP_1)) == 0) {
 				if (!map_cap(mf, CA_SUNW_HW_1,
-				    &ofl->ofl_ocapset.c_hw_1))
+				    &ofl->ofl_ocapset.oc_hw_1))
 					return (FALSE);
 				continue;
-
 			}
 			if (strcmp(sgp1->sg_name,
 			    MSG_ORIG(MSG_STR_SFCAP_1)) == 0) {
 				if (!map_cap(mf, CA_SUNW_SF_1,
-				    &ofl->ofl_ocapset.c_sf_1))
+				    &ofl->ofl_ocapset.oc_sf_1))
 					return (FALSE);
 				continue;
-
 			}
 
 			/*

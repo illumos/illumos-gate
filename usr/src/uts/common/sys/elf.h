@@ -421,7 +421,9 @@ typedef struct {
 
 /* Solaris ABI specific values */
 #define	SHT_LOOS		0x60000000	/* OS specific range */
-#define	SHT_LOSUNW		0x6ffffff1
+#define	SHT_LOSUNW		0x6fffffef
+#define	SHT_SUNW_capchain	0x6fffffef
+#define	SHT_SUNW_capinfo	0x6ffffff0
 #define	SHT_SUNW_symsort	0x6ffffff1
 #define	SHT_SUNW_tlssort	0x6ffffff2
 #define	SHT_SUNW_LDYNSYM	0x6ffffff3
@@ -519,7 +521,7 @@ typedef struct {
 #define	STN_UNDEF	0
 
 /*
- *	The macros compose and decompose values for S.st_info
+ *	Macros to compose and decompose values for S.st_info
  *
  *	bind = ELF32_ST_BIND(S.st_info)
  *	type = ELF32_ST_TYPE(S.st_info)
@@ -557,7 +559,7 @@ typedef struct {
 #define	STT_HIPROC	15
 
 /*
- *	The macros decompose values for S.st_other
+ *	Macros to decompose values for S.st_other
  *
  *	visibility = ELF32_ST_VISIBILITY(S.st_other)
  */
@@ -604,7 +606,7 @@ typedef struct {
 
 
 /*
- *	The macros compose and decompose values for Rel.r_info, Rela.f_info
+ *	Macros to compose and decompose values for Rel.r_info, Rela.f_info
  *
  *	sym = ELF32_R_SYM(R.r_info)
  *	type = ELF32_R_TYPE(R.r_info)
@@ -670,7 +672,7 @@ typedef struct {
 } Elf32_Move;
 
 /*
- *	The macros compose and decompose values for Move.r_info
+ *	Macros to compose and decompose values for Move.r_info
  *
  *	sym = ELF32_M_SYM(M.m_info)
  *	size = ELF32_M_SIZE(M.m_info)
@@ -695,7 +697,7 @@ typedef struct {
 
 
 /*
- *	Hardware/Software capabilities entry
+ *	Capabilities entry, Capabilities info and Capabilities chain.
  */
 #ifndef	_ASM
 typedef struct {
@@ -706,6 +708,21 @@ typedef struct {
 	} c_un;
 } Elf32_Cap;
 
+typedef	Elf32_Word	Elf32_Capinfo;
+typedef	Elf32_Word	Elf32_Capchain;
+
+/*
+ *	Macros to compose and decompose values for capabilities info.
+ *
+ *	sym = ELF32_C_SYM(info)
+ *	grp = ELF32_C_GROUP(info)
+ *	info = ELF32_C_INFO(sym, grp)
+ */
+#define	ELF32_C_SYM(info)	((info)>>8)
+#define	ELF32_C_GROUP(info)	((unsigned char)(info))
+#define	ELF32_C_INFO(sym, grp)	(((sym)<<8)+(unsigned char)(grp))
+
+
 #if defined(_LP64) || defined(_LONGLONG_TYPE)
 typedef struct {
 	Elf64_Xword	c_tag;		/* how to interpret value */
@@ -714,14 +731,55 @@ typedef struct {
 		Elf64_Addr	c_ptr;
 	} c_un;
 } Elf64_Cap;
+
+typedef	Elf64_Xword	Elf64_Capinfo;
+typedef	Elf64_Word	Elf64_Capchain;
+
+/*
+ *	Macros to compose and decompose values for capabilities info.
+ *
+ *	sym = ELF64_C_SYM(info)
+ *	grp = ELF64_C_GROUP(info)
+ *	info = ELF64_C_INFO(sym, grp)
+ */
+#define	ELF64_C_SYM(info)	((info)>>32)
+#define	ELF64_C_GROUP(info)    	((Elf64_Word)(info))
+#define	ELF64_C_INFO(sym, grp)	(((Elf64_Xword)(sym)<<32)+(Elf64_Xword)(grp))
+
 #endif	/* defined(_LP64) || defined(_LONGLONG_TYPE) */
 #endif
 
+/*
+ * Version numbers for SHT_SUNW_capinfo and SHT_SUNW_capchain.
+ */
+#define	CAPINFO_NONE		0
+#define	CAPINFO_CURRENT		1
+#define	CAPINFO_NUM		2
+
+#define	CAPCHAIN_NONE		0
+#define	CAPCHAIN_CURRENT	1
+#define	CAPCHAIN_NUM		2
+
+/*
+ * A SHT_SUNW_capinfo table mirrors a symbol table.  A capabilities symbol has
+ * a SHT_SUNW_capinfo table entry that provides an index into the associated
+ * SHT_SUNW_cap capabilities group, and the symbol index of the associated lead
+ * symbol.  A capabilities symbol is a local symbol.  A global lead capabilities
+ * symbol is tagged with a group CAPINFO_SUNW_GLOB.
+ */
+#define	CAPINFO_SUNW_GLOB	0xff
+
+/*
+ * Capabilities values.
+ */
 #define	CA_SUNW_NULL	0
 #define	CA_SUNW_HW_1	1		/* first hardware capabilities entry */
 #define	CA_SUNW_SF_1	2		/* first software capabilities entry */
 #define	CA_SUNW_HW_2	3		/* second hardware capabilities entry */
-#define	CA_SUNW_NUM	4
+#define	CA_SUNW_PLAT	4		/* platform capability entry */
+#define	CA_SUNW_MACH	5		/* machine capability entry */
+#define	CA_SUNW_ID	6		/* capability identifier */
+#define	CA_SUNW_NUM	7
 
 /*
  * Define software capabilities (CA_SUNW_SF_1 values).  Note, hardware
@@ -735,7 +793,6 @@ typedef struct {
 /*
  *	Known values for note entry types (e_type == ET_CORE)
  */
-
 #define	NT_PRSTATUS	1	/* prstatus_t	<sys/old_procfs.h>	*/
 #define	NT_PRFPREG	2	/* prfpregset_t	<sys/old_procfs.h>	*/
 #define	NT_PRPSINFO	3	/* prpsinfo_t	<sys/old_procfs.h>	*/

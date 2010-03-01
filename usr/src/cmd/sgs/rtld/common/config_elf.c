@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -230,7 +230,7 @@ elf_config(Rt_map *lmp, int aout)
 		 * Expand any configuration string.
 		 */
 		if ((tkns = expand(&estr, &size, 0, 0,
-		    (PD_TKN_ISALIST | PD_TKN_HWCAP), lmp)) == 0)
+		    (PD_TKN_ISALIST | PD_TKN_CAP), lmp)) == 0)
 			return (0);
 
 		/*
@@ -332,7 +332,7 @@ elf_config(Rt_map *lmp, int aout)
 		}
 #endif
 		if (expand_paths(lmp, str, &elf_def_dirs, AL_CNT_SEARCH,
-		    (LA_SER_DEFAULT | LA_SER_CONFIG), PD_TKN_HWCAP) != NULL)
+		    (LA_SER_DEFAULT | LA_SER_CONFIG), PD_TKN_CAP) != NULL)
 			features |= CONF_EDLIBPATH;
 	}
 	if (head->ch_eslibpath) {
@@ -350,20 +350,20 @@ elf_config(Rt_map *lmp, int aout)
 		}
 #endif
 		if (expand_paths(lmp, str, &elf_sec_dirs, AL_CNT_SEARCH,
-		    (LA_SER_SECURE | LA_SER_CONFIG), PD_TKN_HWCAP) != NULL)
+		    (LA_SER_SECURE | LA_SER_CONFIG), PD_TKN_CAP) != NULL)
 			features |= CONF_ESLIBPATH;
 	}
 #if	defined(__sparc) && !defined(_ELF64)
 	if (head->ch_adlibpath) {
 		str = (const char *)(head->ch_adlibpath + addr);
 		if (expand_paths(lmp, str, &aout_def_dirs, AL_CNT_SEARCH,
-		    (LA_SER_DEFAULT | LA_SER_CONFIG), PD_TKN_HWCAP) != NULL)
+		    (LA_SER_DEFAULT | LA_SER_CONFIG), PD_TKN_CAP) != NULL)
 			features |= CONF_ADLIBPATH;
 	}
 	if (head->ch_aslibpath) {
 		str = (const char *)(head->ch_aslibpath + addr);
 		if (expand_paths(lmp, str, &aout_sec_dirs, AL_CNT_SEARCH,
-		    (LA_SER_SECURE | LA_SER_CONFIG), PD_TKN_HWCAP) != NULL)
+		    (LA_SER_SECURE | LA_SER_CONFIG), PD_TKN_CAP) != NULL)
 			features |= CONF_ASLIBPATH;
 	}
 #endif

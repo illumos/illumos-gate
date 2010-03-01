@@ -145,6 +145,18 @@ typedef ulong_t Lineno;
 #endif
 
 /*
+ * CTF currently does not handle automatic array variables sized via function
+ * arguments (VLA arrays) properly, when the code is compiled with gcc.
+ * Adding 1 to the size is a workaround.  VLA_SIZE, and its use, should be
+ * pulled when CTF is fixed or replaced.
+ */
+#ifdef __GNUC__
+#define	VLA_SIZE(_arg)	((_arg) + 1)
+#else
+#define	VLA_SIZE(_arg)	(_arg)
+#endif
+
+/*
  * Structure to maintain rejected files elf information.  Files that are not
  * applicable to the present link-edit are rejected and a search for an
  * appropriate file may be resumed.  The first rejected files information is
@@ -173,8 +185,12 @@ typedef struct {
 					/*	required */
 #define	SGS_REJ_STR		10	/* generic error - info is a string */
 #define	SGS_REJ_UNKFILE		11	/* unknown file type */
-#define	SGS_REJ_HWCAP_1		12	/* hardware capabilities mismatch */
-#define	SGS_REJ_SFCAP_1		13	/* software capabilities mismatch */
+#define	SGS_REJ_UNKCAP		12	/* unknown capabilities */
+#define	SGS_REJ_HWCAP_1		13	/* hardware capabilities mismatch */
+#define	SGS_REJ_SFCAP_1		14	/* software capabilities mismatch */
+#define	SGS_REJ_MACHCAP		15	/* machine capability mismatch */
+#define	SGS_REJ_PLATCAP		16	/* platform capability mismatch */
+#define	SGS_REJ_HWCAP_2		17	/* hardware capabilities mismatch */
 
 #define	FLG_REJ_ALTER		0x01	/* object name is an alternative */
 
@@ -199,29 +215,30 @@ extern void			*libld_realloc(void *, size_t);
 /*
  * Data structures (defined in libld.h).
  */
+typedef	struct audit_desc	Audit_desc;
+typedef	struct audit_info	Audit_info;
+typedef	struct audit_list	Audit_list;
+typedef struct cap_desc		Cap_desc;
 typedef struct ent_desc		Ent_desc;
 typedef	struct group_desc	Group_desc;
 typedef struct ifl_desc		Ifl_desc;
 typedef struct is_desc		Is_desc;
 typedef struct isa_desc		Isa_desc;
 typedef struct isa_opt		Isa_opt;
-typedef struct ofl_desc		Ofl_desc;
 typedef struct os_desc		Os_desc;
+typedef struct ofl_desc		Ofl_desc;
 typedef	struct rel_cache	Rel_cache;
 typedef	struct sdf_desc		Sdf_desc;
 typedef	struct sdv_desc		Sdv_desc;
+typedef struct sec_order	Sec_order;
 typedef struct sg_desc		Sg_desc;
 typedef struct sort_desc	Sort_desc;
-typedef struct sec_order	Sec_order;
-typedef struct sym_desc		Sym_desc;
-typedef struct sym_aux		Sym_aux;
 typedef	struct sym_avlnode	Sym_avlnode;
+typedef struct sym_aux		Sym_aux;
+typedef struct sym_desc		Sym_desc;
 typedef	struct uts_desc		Uts_desc;
 typedef struct ver_desc		Ver_desc;
 typedef struct ver_index	Ver_index;
-typedef	struct audit_desc	Audit_desc;
-typedef	struct audit_info	Audit_info;
-typedef	struct audit_list	Audit_list;
 
 /*
  * Data structures defined in machrel.h.

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef	_RTLD_H
@@ -38,6 +38,7 @@
 #include <sys/avl.h>
 #include <alist.h>
 #include <libc_int.h>
+#include <elfcap.h>
 
 #ifdef	_SYSCALL32
 #include <inttypes.h>
@@ -59,6 +60,7 @@ typedef ino64_t		rtld_ino_t;
 
 typedef struct rt_map	Rt_map;
 typedef struct slookup	Slookup;
+typedef struct sresult	Sresult;
 
 /*
  * A binding descriptor.  Establishes the binding relationship between two
@@ -666,7 +668,7 @@ struct rt_map {
 	 * END: Exposed to rtld_db - don't move, don't delete
 	 */
 	APlist		*rt_alias;	/* list of linked file names */
-	APlist		*rt_fpnode;	/* list of FullpathNode AVL nodes */
+	APlist		*rt_fpnode;	/* list of FullPathNode AVL nodes */
 	char		*rt_runpath;	/* LD_RUN_PATH and its equivalent */
 	Alist		*rt_runlist;	/*	Pdesc structures */
 	APlist		*rt_depends;	/* list of dependencies */
@@ -707,8 +709,8 @@ struct rt_map {
 	uint_t		rt_idx;		/* hold index within linkmap list */
 	uint_t		rt_lazy;	/* number of lazy dependencies */
 					/*	pending */
-	Xword		rt_hwcap;	/* hardware capabilities */
-	Xword		rt_sfcap;	/* software capabilities */
+	Cap		*rt_cap;	/* capabilities data */
+	Capchain	*rt_capchain;	/* capabilities chain data */
 	uint_t		rt_cntl;	/* link-map control list we belong to */
 	uint_t		rt_aflags;	/* auditor flags, see LML_TFLG_AUD_ */
 					/* address of _init */
@@ -716,7 +718,7 @@ struct rt_map {
 					/* address of _fini */
 	void		(*rt_fini)(void);
 					/* link map symbol interpreter */
-	Sym		*(*rt_symintp)(Slookup *, Rt_map **, uint_t *, int *);
+	int		(*rt_symintp)(Slookup *, Sresult *, uint_t *, int *);
 };
 
 #ifdef _SYSCALL32
@@ -781,8 +783,8 @@ typedef struct rt_map32 {
 	uint32_t	rt_relacount;
 	uint32_t	rt_idx;
 	uint32_t	rt_lazy;
-	uint32_t	rt_hwcap;
-	uint32_t	rt_sfcap;
+	uint32_t	rt_cap;
+	uint32_t	rt_capchain;
 	uint32_t	rt_cntl;
 	uint32_t	rt_aflags;
 	uint32_t 	rt_init;
@@ -808,7 +810,7 @@ typedef struct rt_map32 {
  * END: Exposed to rtld_db - don't move, don't delete
  */
 #define	FLG_RT_SETGROUP	0x00000008	/* group establishment required */
-#define	FLG_RT_HWCAP	0x00000010	/* process $HWCAP expansion */
+#define	FLG_RT_CAP	0x00000010	/* process $CAPABILITY expansion */
 #define	FLG_RT_OBJECT	0x00000020	/* object processing (ie. .o's) */
 #define	FLG_RT_NEWLOAD	0x00000040	/* object is newly loaded */
 #define	FLG_RT_NODUMP	0x00000080	/* object can't be dldump(3x)'ed */
@@ -839,13 +841,15 @@ typedef struct rt_map32 {
 #define	FLG_RT_PRIHDL	0x40000000	/*	either public or private */
 
 #define	FL1_RT_COPYTOOK	0x00000001	/* copy relocation taken */
-
-#define	FL1_RT_CONFSET	0x00000004	/* object was loaded by crle(1) */
-#define	FL1_RT_NODEFLIB	0x00000008	/* ignore default library search */
-#define	FL1_RT_ENDFILTE	0x00000010	/* filtee terminates filters search */
-#define	FL1_RT_DISPREL	0x00000020	/* object has *disp* relocation */
-#define	FL1_RT_DTFLAGS	0x00000040	/* DT_FLAGS element exists */
-
+#define	FL1_RT_ALTCHECK	0x00000002	/* alternative system capabilities */
+					/*	checked */
+#define	FL1_RT_ALTCAP	0x00000004	/* alternative system capabilities */
+					/*	should be used */
+#define	FL1_RT_CONFSET	0x00000008	/* object was loaded by crle(1) */
+#define	FL1_RT_NODEFLIB	0x00000010	/* ignore default library search */
+#define	FL1_RT_ENDFILTE	0x00000020	/* filtee terminates filters search */
+#define	FL1_RT_DISPREL	0x00000040	/* object has *disp* relocation */
+#define	FL1_RT_DTFLAGS	0x00000080	/* DT_FLAGS element exists */
 #define	FL1_RT_LDDSTUB	0x00000100	/* identify lddstub */
 #define	FL1_RT_NOINIFIN	0x00000200	/* no .init or .fini exists */
 #define	FL1_RT_USED	0x00000400	/* symbol referenced from this object */
@@ -965,8 +969,8 @@ typedef struct rt_map32 {
 #define	IDX(X)		((X)->rt_idx)
 #define	LAZY(X)		((X)->rt_lazy)
 #define	CNTL(X)		((X)->rt_cntl)
-#define	HWCAP(X)	((X)->rt_hwcap)
-#define	SFCAP(X)	((X)->rt_sfcap)
+#define	CAP(X)		((X)->rt_cap)
+#define	CAPCHAIN(X)	((X)->rt_capchain)
 
 /*
  * Flags for tsorting.
@@ -1004,6 +1008,7 @@ typedef struct rt_map32 {
 #define	LKUP_STANDARD	0x2000		/* standard lookup - originated from */
 					/* 	head link-map element */
 #define	LKUP_WORLD	0x4000		/* ensure world lookup */
+#define	LKUP_DLSYM	0x8000		/* lookup stems from dlsym() request */
 
 /*
  * For the runtime linker to perform a symbol search, a number of data items
@@ -1064,6 +1069,49 @@ struct slookup {
 	    sl.sl_flags = (flags))
 
 /*
+ * After a symbol lookup has been resolved, the runtime linker needs to retain
+ * information regarding the bound definition.  An Sresult data structure is
+ * used to provide this information.
+ *
+ * The symbol name (sr_name) may differ from the original referenced symbol if
+ * a symbol capabilities family member has resolved the binding.  The defining
+ * object (sr_dmap) indicates the object in which the definition has been found.
+ * The symbol table entry (sr_sym) defines the bound symbol definition.
+ *
+ * Note, a symbol lookup may start with one Sresult buffer, but underlying
+ * routines (for example, those that probe filters) might employ their own
+ * Sresult buffer.  If a binding is allowed, the latter buffer may get inherited
+ * by the former.  Along with this chain of requests, binding info (binfo) and
+ * not-found information (in_nfavl), may be passed between all the associated
+ * functions.  Hence, the binfo and in_nfavl data is not maintained as part of
+ * a Sresult structure.
+ */
+struct sresult {
+	const char	*sr_name;	/* symbol definition name */
+	Rt_map		*sr_dmap;	/* defining objects link-map */
+	Sym		*sr_sym;	/* symbol table pointer */
+};
+
+#define	SRESULT_INIT(sr, name) \
+	(void) (sr.sr_name = (name), sr.sr_dmap = NULL, sr.sr_sym = NULL)
+
+/*
+ * Define a system capabilities structure for maintaining the various
+ * capabilities of the system.  This structure follows the Objcapset definition
+ * from libld.h, however the system can only have one platform or machine
+ * hardware name, thus this structure is a little simpler.
+ */
+typedef	struct {
+	elfcap_mask_t	sc_hw_1;	/* CA_SUNW_HW_1 capabilities */
+	elfcap_mask_t	sc_sf_1;	/* CA_SUNW_SF_1 capabilities */
+	elfcap_mask_t	sc_hw_2;	/* CA_SUNW_HW_2 capabilities */
+	char		*sc_plat;	/* CA_SUNW_PLAT capability */
+	size_t		sc_platsz;	/*	and size */
+	char		*sc_mach;	/* CA_SUNW_MACH capability */
+	size_t		sc_machsz;	/*	and size */
+} Syscapset;
+
+/*
  * Define a number of .plt lookup outcomes, for use in binding diagnostics.
  */
 typedef	enum {
@@ -1089,7 +1137,7 @@ extern Lm_list		*lml_list[];
 extern Pltbindtype	elf_plt_write(uintptr_t, uintptr_t, void *, uintptr_t,
 			    Xword);
 extern Rt_map		*is_so_loaded(Lm_list *, const char *, int *);
-extern Sym		*lookup_sym(Slookup *, Rt_map **, uint_t *, int *);
+extern int		lookup_sym(Slookup *, Sresult *, uint_t *, int *);
 extern int		rt_dldump(Rt_map *, const char *, int, Addr);
 
 #ifdef	__cplusplus

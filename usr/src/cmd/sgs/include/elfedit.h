@@ -736,10 +736,11 @@ typedef enum {
 	ELFEDIT_CONST_SYMINFO_BT =	30,	/* Syminfo boundto */
 	ELFEDIT_CONST_SYMINFO_FLG =	31,	/* Syminfo flags */
 	ELFEDIT_CONST_CA =		32,	/* Capabilities tags */
-	ELFEDIT_CONST_AV =		33,	/* hardware capabilities */
+	ELFEDIT_CONST_HW1_SUNW =	33,	/* hardware capabilities */
 	ELFEDIT_CONST_SF1_SUNW =	34,	/* software capabilities */
+	ELFEDIT_CONST_HW2_SUNW =	35,	/* hardware capabilities */
 
-	ELFEDIT_CONST_NUM =		35,	/* # of constant types */
+	ELFEDIT_CONST_NUM =		36,	/* # of constant types */
 } elfedit_const_t;
 
 /*

@@ -198,12 +198,14 @@ ld_map_cap_set_ovflag(Mapfile *mf, Word type)
 		0, 			/* CA_SUNW_NULL */
 		FLG_OF1_OVHWCAP1,	/* CA_SUNW_HW_1 */
 		FLG_OF1_OVSFCAP1,	/* CA_SUNW_SF_1 */
-		FLG_OF1_OVHWCAP2	/* CA_SUNW_HW_2 */
+		FLG_OF1_OVHWCAP2,	/* CA_SUNW_HW_2 */
+		FLG_OF1_OVPLATCAP,	/* CA_SUNW_PLAT */
+		FLG_OF1_OVMACHCAP,	/* CA_SUNW_MACH */
+		FLG_OF1_OVIDCAP		/* CA_SUNW_ID */
 	};
-#if CA_SUNW_NUM != (CA_SUNW_HW_2 + 1)
+#if CA_SUNW_NUM != (CA_SUNW_ID + 1)
 #error "CA_SUNW_NUM has grown"
 #endif
-
 	mf->mf_ofl->ofl_flags1 |= override_flag[type];
 }
 
@@ -211,7 +213,7 @@ ld_map_cap_set_ovflag(Mapfile *mf, Word type)
  * Sanity check the given capability bitmask.
  */
 Boolean
-ld_map_cap_sanitize(Mapfile *mf, Word type, CapMask *capmask)
+ld_map_cap_sanitize(Mapfile *mf, Word type, Capmask *capmask)
 {
 	elfcap_mask_t	mask;
 
@@ -224,16 +226,16 @@ ld_map_cap_sanitize(Mapfile *mf, Word type, CapMask *capmask)
 		 * as the bits can affect each others meaning (see sf1_cap()
 		 * in files.c).
 		 */
-		if ((mask = (capmask->cm_value & ~SF1_SUNW_MASK)) != 0) {
+		if ((mask = (capmask->cm_val & ~SF1_SUNW_MASK)) != 0) {
 			mf_warn(mf, MSG_INTL(MSG_MAP_BADSF1),
 			    EC_XWORD(mask));
-			capmask->cm_value &= SF1_SUNW_MASK;
+			capmask->cm_val &= SF1_SUNW_MASK;
 		}
-		if ((capmask->cm_value &
+		if ((capmask->cm_val &
 		    (SF1_SUNW_FPKNWN | SF1_SUNW_FPUSED)) == SF1_SUNW_FPUSED) {
 			mf_warn(mf, MSG_INTL(MSG_MAP_BADSF1),
 			    EC_XWORD(SF1_SUNW_FPUSED));
-			capmask->cm_value &= ~SF1_SUNW_FPUSED;
+			capmask->cm_val &= ~SF1_SUNW_FPUSED;
 		}
 #if	!defined(_ELF64)
 		/*
@@ -241,9 +243,9 @@ ld_map_cap_sanitize(Mapfile *mf, Word type, CapMask *capmask)
 		 * when building a 64-bit object.  Warn the user, and remove the
 		 * setting, if we're building a 32-bit object.
 		 */
-		if (capmask->cm_value & SF1_SUNW_ADDR32) {
+		if (capmask->cm_val & SF1_SUNW_ADDR32) {
 			mf_warn0(mf, MSG_INTL(MSG_MAP_INADDR32SF1));
-			capmask->cm_value &= ~SF1_SUNW_ADDR32;
+			capmask->cm_val &= ~SF1_SUNW_ADDR32;
 		}
 #endif
 	}
@@ -946,7 +948,7 @@ ld_map_sym_scope(Mapfile *mf, const char *scope_name, ld_map_ver_t *mv)
 	scope = ld_map_kwfind(scope_name, scope_list,
 	    SGSOFFSETOF(scope_t, name), sizeof (scope_list[0]));
 	if (scope == NULL) {
-		char buf[scope_list_bufsize];
+		char buf[VLA_SIZE(scope_list_bufsize)];
 
 		mf_fatal(mf, MSG_INTL(MSG_MAP_EXP_SYMSCOPE),
 		    ld_map_kwnames(scope_list, SGSOFFSETOF(scope_t, name),

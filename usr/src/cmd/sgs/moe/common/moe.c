@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -120,21 +120,23 @@ openlib(const char *prog, const char *name, int class, int silent, int verbose)
 	 */
 	if ((handle = dlmopen(LM_ID_NEWLM, name,
 	    (RTLD_FIRST | RTLD_CONFGEN | RTLD_LAZY))) == 0) {
-		if (verbose)
+		if (verbose) {
 			(void) fprintf(stderr, MSG_ORIG(MSG_FMT_VERBOSE), prog,
 			    modestr, trim_msg(dlerror()));
 			(void) fflush(stderr);
+		}
 		return (1);
 	}
 	if (silent == 0) {
 		Link_map	*lmp;
 
 		if (dlinfo(handle, RTLD_DI_LINKMAP, &lmp) == -1) {
-			if (verbose)
+			if (verbose) {
 				(void) fprintf(stderr,
 				    MSG_ORIG(MSG_FMT_VERBOSE), prog, modestr,
 				    trim_msg(dlerror()));
 				(void) fflush(stderr);
+			}
 			return (1);
 		}
 

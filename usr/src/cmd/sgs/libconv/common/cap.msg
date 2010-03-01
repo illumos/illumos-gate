@@ -32,6 +32,12 @@
 @ MSG_CA_SUNW_SF_1_NF			"sf_1"
 @ MSG_CA_SUNW_HW_2_CF		"CA_SUNW_HW_2"			# 3
 @ MSG_CA_SUNW_HW_2_NF			"hw_2"
+@ MSG_CA_SUNW_PLAT_CF		"CA_SUNW_PLAT"			# 4
+@ MSG_CA_SUNW_PLAT_NF			"plat"
+@ MSG_CA_SUNW_MACH_CF		"CA_SUNW_MACH"			# 5
+@ MSG_CA_SUNW_MACH_NF			"mach"
+@ MSG_CA_SUNW_ID_CF		  "CA_SUNW_ID"			# 6
+@ MSG_CA_SUNW_ID_NF			  "id"
 
 @ MSG_GBL_ZERO		"0"
 @ MSG_GBL_OSQBRKT	"0x%llx  [ "

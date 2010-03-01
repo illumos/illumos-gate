@@ -551,10 +551,10 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 	 * The `sa_dfiles' list is used to maintain the list of files that
 	 * define the same symbol.  This list can be used for two reasons:
 	 *
-	 *   -	To save the first definition of a symbol that is not available
+	 *  -	To save the first definition of a symbol that is not available
 	 *	for this link-edit.
 	 *
-	 *   -	To save all definitions of a symbol when the -m option is in
+	 *  -	To save all definitions of a symbol when the -m option is in
 	 *	effect.  This is optional as it is used to list multiple
 	 *	(interposed) definitions of a symbol (refer to ldmap_out()),
 	 *	and can be quite expensive.
@@ -674,7 +674,7 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
 			 * should be defined protected, whereas all other
 			 * special symbols are tagged as no-direct.
 			 */
-			if (((usdp->sd_flags & FLG_SY_HIDDEN) == 0) &&
+			if (!SYM_IS_HIDDEN(usdp) &&
 			    (sdflags & FLG_SY_DEFAULT)) {
 				usdp->sd_aux->sa_overndx = VER_NDX_GLOBAL;
 				if (sdaux_id == SDAUX_ID_GOT) {
@@ -764,7 +764,7 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
 		 * automatic scoping).  The GOT should be defined protected,
 		 * whereas all other special symbols are tagged as no-direct.
 		 */
-		if (((sdp->sd_flags & FLG_SY_HIDDEN) == 0) &&
+		if (!SYM_IS_HIDDEN(sdp) &&
 		    (sdflags & FLG_SY_DEFAULT)) {
 			sdp->sd_aux->sa_overndx = VER_NDX_GLOBAL;
 			if (sdaux_id == SDAUX_ID_GOT) {
@@ -941,6 +941,68 @@ ld_sym_spec(Ofl_desc *ofl)
 }
 
 /*
+ * Determine a potential capability symbol's visibility.
+ *
+ * The -z symbolcap option transforms an object capabilities relocatable object
+ * into a symbol capabilities relocatable object.  Any global function symbols,
+ * or initialized global data symbols are candidates for transforming into local
+ * symbol capabilities definitions.  However, if a user indicates that a symbol
+ * should be demoted to local using a mapfile, then there is no need to
+ * transform the associated global symbol.
+ *
+ * Normally, a symbol's visibility is determined after the symbol resolution
+ * process, after all symbol state has been gathered and resolved.  However,
+ * for -z symbolcap, this determination is too late.  When a global symbol is
+ * read from an input file we need to determine it's visibility so as to decide
+ * whether to create a local or not.
+ *
+ * If a user has explicitly defined this symbol as having local scope within a
+ * mapfile, then a symbol of the same name already exists.  However, explicit
+ * local definitions are uncommon, as most mapfiles define the global symbol
+ * requirements together with an auto-reduction directive '*'.  If this state
+ * has been defined, then we must make sure that the new symbol isn't a type
+ * that can not be demoted to local.
+ */
+static int
+sym_cap_vis(const char *name, Word hash, Sym *sym, Ofl_desc *ofl)
+{
+	Sym_desc	*sdp;
+	uchar_t		vis;
+	avl_index_t	where;
+	sd_flag_t	sdflags = 0;
+
+	/*
+	 * Determine the visibility of the new symbol.
+	 */
+	vis = ELF_ST_VISIBILITY(sym->st_other);
+	switch (vis) {
+	case STV_EXPORTED:
+		sdflags |= FLG_SY_EXPORT;
+		break;
+	case STV_SINGLETON:
+		sdflags |= FLG_SY_SINGLE;
+		break;
+	}
+
+	/*
+	 * Determine whether a symbol definition already exists, and if so
+	 * obtain the visibility.
+	 */
+	if ((sdp = ld_sym_find(name, hash, &where, ofl)) != NULL)
+		sdflags |= sdp->sd_flags;
+
+	/*
+	 * Determine whether the symbol flags indicate this symbol should be
+	 * hidden.
+	 */
+	if ((ofl->ofl_flags & (FLG_OF_AUTOLCL | FLG_OF_AUTOELM)) &&
+	    ((sdflags & MSK_SY_NOAUTO) == 0))
+		sdflags |= FLG_SY_HIDDEN;
+
+	return ((sdflags & FLG_SY_HIDDEN) == 0);
+}
+
+/*
  * This routine checks to see if a symbols visibility needs to be reduced to
  * either SYMBOLIC or LOCAL.  This routine can be called from either
  * reloc_init() or sym_validate().
@@ -955,10 +1017,7 @@ ld_sym_adjust_vis(Sym_desc *sdp, Ofl_desc *ofl)
 	    (sdp->sd_sym->st_shndx != SHN_UNDEF)) {
 		/*
 		 * If auto-reduction/elimination is enabled, reduce any
-		 * non-versioned global symbols.  This routine is called either
-		 * from any initial relocation processing that references this
-		 * symbol, or from the symbol validation processing.
-		 *
+		 * non-versioned, and non-local capabilities global symbols.
 		 * A symbol is a candidate for auto-reduction/elimination if:
 		 *
 		 *  -	the symbol wasn't explicitly defined within a mapfile
@@ -1066,17 +1125,17 @@ ensure_array_local(Ofl_desc *ofl, APlist *apl, const char *str)
  * counting has been carried out (ie. no more symbols will be read, generated,
  * or modified), validate and count the relevant entries:
  *
- *	-	check and print any undefined symbols remaining.  Note that
- *		if a symbol has been defined by virtue of the inclusion of
- *		an implicit shared library, it is still classed as undefined.
+ *  -	check and print any undefined symbols remaining.  Note that if a symbol
+ *	has been defined by virtue of the inclusion of 	an implicit shared
+ *	library, it is still classed as undefined.
  *
- * 	-	count the number of global needed symbols together with the
- *		size of their associated name strings (if scoping has been
- *		indicated these symbols may be reduced to locals).
+ *  -	count the number of global needed symbols together with the size of
+ *	their associated name strings (if scoping has been indicated these
+ *	symbols may be reduced to locals).
  *
- *	-	establish the size and alignment requirements for the global
- *		.bss section (the alignment of this section is based on the
- *		first symbol that it will contain).
+ *  -	establish the size and alignment requirements for the global .bss
+ *	section (the alignment of this section is based on the 	first symbol
+ *	that it will contain).
  */
 uintptr_t
 ld_sym_validate(Ofl_desc *ofl)
@@ -1093,8 +1152,7 @@ ld_sym_validate(Ofl_desc *ofl)
 	Xword		lbssalign = 0, lbsssize = 0;
 	Boolean		need_lbss;
 #endif
-	int		ret;
-	int		allow_ldynsym;
+	int		ret, allow_ldynsym;
 	uchar_t		type;
 
 	DBG_CALL(Dbg_basic_validate(ofl->ofl_lml));
@@ -1406,8 +1464,7 @@ ld_sym_validate(Ofl_desc *ofl)
 				if (sdp->sd_aux && sdp->sd_aux->sa_overndx)
 					sdp->sd_aux->sa_overndx = 0;
 			} else {
-				if ((!(sdp->sd_flags & FLG_SY_HIDDEN)) &&
-				    sdp->sd_aux &&
+				if (!SYM_IS_HIDDEN(sdp) && sdp->sd_aux &&
 				    (sdp->sd_aux->sa_overndx == 0)) {
 					sym_undef_entry(ofl, sdp, NOVERSION);
 					ofl->ofl_flags |= verdesc;
@@ -1438,8 +1495,7 @@ ld_sym_validate(Ofl_desc *ofl)
 		 */
 		if ((sym->st_shndx == SHN_COMMON) &&
 		    (((oflags & FLG_OF_RELOBJ) == 0) ||
-		    ((sdp->sd_flags & FLG_SY_HIDDEN) &&
-		    (oflags & FLG_OF_PROCRED)))) {
+		    (SYM_IS_HIDDEN(sdp) && (oflags & FLG_OF_PROCRED)))) {
 			if ((sdp->sd_move == NULL) ||
 			    ((sdp->sd_flags & FLG_SY_PAREXPN) == 0)) {
 				if (type != STT_TLS) {
@@ -1473,7 +1529,6 @@ ld_sym_validate(Ofl_desc *ofl)
 				lbssalign = sym->st_value;
 		}
 #endif
-
 		/*
 		 * If a symbol was referenced via the command line
 		 * (ld -u <>, ...), then this counts as a reference against the
@@ -1487,9 +1542,12 @@ ld_sym_validate(Ofl_desc *ofl)
 
 		/*
 		 * Update the symbol count and the associated name string size.
+		 * Note, a capabilities symbol must remain as visible as a
+		 * global symbol.  However, the runtime linker recognizes the
+		 * hidden requirement and ensures the symbol isn't made globally
+		 * available at runtime.
 		 */
-		if ((sdp->sd_flags & FLG_SY_HIDDEN) &&
-		    (oflags & FLG_OF_PROCRED)) {
+		if (SYM_IS_HIDDEN(sdp) && (oflags & FLG_OF_PROCRED)) {
 			/*
 			 * If any reductions are being processed, keep a count
 			 * of eliminated symbols, and if the symbol is being
@@ -1590,7 +1648,7 @@ ld_sym_validate(Ofl_desc *ofl)
 			if (sdp->sd_sym->st_name == 0)
 				sdp->sd_name = MSG_ORIG(MSG_STR_EMPTY);
 
-			if ((sdp->sd_flags & FLG_SY_HIDDEN) ||
+			if (SYM_IS_HIDDEN(sdp) ||
 			    (ELF_ST_BIND(sdp->sd_sym->st_info) == STB_LOCAL))
 				ofl->ofl_lregsymcnt++;
 		}
@@ -1787,18 +1845,30 @@ issue_badaddr_msg(Ifl_desc *ifl, Ofl_desc *ofl, Sym_desc *sdp,
 	ofl->ofl_flags |= flag;
 }
 
+/*
+ * Global symbols that are candidates for translation to local capability
+ * symbols under -z symbolcap, are maintained on a local symbol list.  Once
+ * all symbols of a file are processed, this list is traversed to cull any
+ * unnecessary weak symbol aliases.
+ */
+typedef struct {
+	Sym_desc	*c_nsdp;	/* new lead symbol */
+	Sym_desc	*c_osdp;	/* original symbol */
+	Cap_group	*c_group;	/* symbol capability group */
+	Word		c_ndx;		/* symbol index */
+} Cap_pair;
 
 /*
  * Process the symbol table for the specified input file.  At this point all
  * input sections from this input file have been assigned an input section
  * descriptor which is saved in the `ifl_isdesc' array.
  *
- *	-	local symbols are saved (as is) if the input file is a
- *		relocatable object
+ *  -	local symbols are saved (as is) if the input file is a 	relocatable
+ *	object
  *
- *	-	global symbols are added to the linkers internal symbol
- *		table if they are not already present, otherwise a symbol
- *		resolution function is called upon to resolve the conflict.
+ *  -	global symbols are added to the linkers internal symbol table if they
+ *	are not already present, otherwise a symbol resolution function is
+ *	called upon to resolve the conflict.
  */
 uintptr_t
 ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
@@ -1850,6 +1920,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	Word		symsecndx;
 	avl_index_t	where;
 	int		test_gnu_hidden_bit, weak;
+	Cap_desc	*cdp = NULL;
+	Alist		*cappairs = NULL;
 
 	/*
 	 * Its possible that a file may contain more that one symbol table,
@@ -2240,6 +2312,15 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	    (ifl->ifl_versym != NULL);
 
 	/*
+	 * Determine whether object capabilities for this file are being
+	 * converted into symbol capabilities.  If so, global function symbols,
+	 * and initialized global data symbols, need special translation and
+	 * processing.
+	 */
+	if ((etype == ET_REL) && (ifl->ifl_flags & FLG_IF_OTOSCAP))
+		cdp = ifl->ifl_caps;
+
+	/*
 	 * Now scan the global symbols entering them in the internal symbol
 	 * table or resolving them as necessary.
 	 */
@@ -2253,6 +2334,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		Word		shndx;
 		int		shndx_bad = 0;
 		Sym		*nsym = sym;
+		Cap_pair	*cpp = NULL;
+		uchar_t		ntype;
 
 		/*
 		 * Determine and validate the associated section index.
@@ -2276,8 +2359,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		}
 
 		/*
-		 * Now that we have the name, if the section index
-		 * was bad, report it.
+		 * Now that we have the name, report an erroneous section index.
 		 */
 		if (shndx_bad) {
 			eprintf(ofl->ofl_lml, ERR_WARNING,
@@ -2288,7 +2370,6 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			    CONV_FMT_DECIMAL, &inv_buf));
 			continue;
 		}
-
 
 		/*
 		 * Test for the GNU hidden bit, and ignore symbols that
@@ -2323,8 +2404,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		 * The '-z wrap=XXX' option emulates the GNU ld --wrap=XXX
 		 * option. When XXX is the symbol to be wrapped:
 		 *
-		 * -	An undefined reference to XXX is converted to __wrap_XXX
-		 * -	An undefined reference to __real_XXX is converted to XXX
+		 *  -	An undefined reference to XXX is converted to __wrap_XXX
+		 *  -	An undefined reference to __real_XXX is converted to XXX
 		 *
 		 * The idea is that the user can supply a wrapper function
 		 * __wrap_XXX that does some work, and then uses the name
@@ -2424,13 +2505,107 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		}
 
 		/*
+		 * If object capabilities for this file are being converted
+		 * into symbol capabilities, then:
+		 *
+		 *  -	Any global function, or initialized global data symbol
+		 *	definitions (ie., those that are not associated with
+		 *	special symbol types, ie., ABS, COMMON, etc.), and which
+		 *	have not been reduced to locals, are converted to symbol
+		 *	references (UNDEF).  This ensures that any reference to
+		 *	the original symbol, for example from a relocation, get
+		 *	associated to a capabilities family lead symbol, ie., a
+		 *	generic instance.
+		 *
+		 *  -	For each global function, or object symbol definition,
+		 *	a new local symbol is created.  The function or object
+		 *	is renamed using the capabilities CA_SUNW_ID definition
+		 *	(which might have been fabricated for this purpose -
+		 *	see get_cap_group()).  The new symbol name is:
+		 *
+		 *	    <original name>%<capability group identifier>
+		 *
+		 *	This symbol is associated to the same location, and
+		 *	becomes a capabilities family member.
+		 */
+		/* LINTED */
+		hash = (Word)elf_hash(name);
+
+		ntype = ELF_ST_TYPE(nsym->st_info);
+		if (cdp && (nsym->st_shndx != SHN_UNDEF) &&
+		    ((sdflags & FLG_SY_SPECSEC) == 0) &&
+		    ((ntype == STT_FUNC) || (ntype == STT_OBJECT))) {
+			/*
+			 * Determine this symbol's visibility.  If a mapfile has
+			 * indicated this symbol should be local, then there's
+			 * no point in transforming this global symbol to a
+			 * capabilities symbol.  Otherwise, create a symbol
+			 * capability pair descriptor to record this symbol as
+			 * a candidate for translation.
+			 */
+			if (sym_cap_vis(name, hash, sym, ofl) &&
+			    ((cpp = alist_append(&cappairs, NULL,
+			    sizeof (Cap_pair), AL_CNT_CAP_PAIRS)) == NULL))
+				return (S_ERROR);
+		}
+
+		if (cpp) {
+			Sym	*rsym;
+
+			DBG_CALL(Dbg_syms_cap_convert(ofl, ndx, name, nsym));
+
+			/*
+			 * Allocate a new symbol descriptor to represent the
+			 * transformed global symbol.  The descriptor points
+			 * to the original symbol information (which might
+			 * indicate a global or weak visibility).  The symbol
+			 * information will be transformed into a local symbol
+			 * later, after any weak aliases are culled.
+			 */
+			if ((cpp->c_osdp =
+			    libld_malloc(sizeof (Sym_desc))) == NULL)
+				return (S_ERROR);
+
+			cpp->c_osdp->sd_name = name;
+			cpp->c_osdp->sd_sym = nsym;
+			cpp->c_osdp->sd_shndx = shndx;
+			cpp->c_osdp->sd_file = ifl;
+			cpp->c_osdp->sd_isc = ifl->ifl_isdesc[shndx];
+			cpp->c_osdp->sd_ref = REF_REL_NEED;
+
+			/*
+			 * Save the capabilities group this symbol belongs to,
+			 * and the original symbol index.
+			 */
+			cpp->c_group = cdp->ca_groups->apl_data[0];
+			cpp->c_ndx = ndx;
+
+			/*
+			 * Replace the original symbol definition with a symbol
+			 * reference.  Make sure this reference isn't left as a
+			 * weak.
+			 */
+			if ((rsym = libld_malloc(sizeof (Sym))) == NULL)
+				return (S_ERROR);
+
+			*rsym = *nsym;
+
+			rsym->st_info = ELF_ST_INFO(STB_GLOBAL, ntype);
+			rsym->st_shndx = shndx = SHN_UNDEF;
+			rsym->st_value = 0;
+			rsym->st_size = 0;
+
+			sdflags |= FLG_SY_CAP;
+
+			nsym = rsym;
+		}
+
+		/*
 		 * If the symbol does not already exist in the internal symbol
 		 * table add it, otherwise resolve the conflict.  If the symbol
 		 * from this file is kept, retain its symbol table index for
 		 * possible use in associating a global alias.
 		 */
-		/* LINTED */
-		hash = (Word)elf_hash((const char *)name);
 		if ((sdp = ld_sym_find(name, hash, &where, ofl)) == NULL) {
 			DBG_CALL(Dbg_syms_global(ofl->ofl_lml, ndx, name));
 			if ((sdp = ld_sym_enter(name, nsym, hash, ifl, ofl, ndx,
@@ -2440,6 +2615,13 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		} else if (ld_sym_resolve(sdp, nsym, ifl, ofl, ndx, shndx,
 		    sdflags) == S_ERROR)
 			return (S_ERROR);
+
+		/*
+		 * Now that we have a symbol descriptor, retain the descriptor
+		 * for later use by symbol capabilities processing.
+		 */
+		if (cpp)
+			cpp->c_nsdp = sdp;
 
 		/*
 		 * After we've compared a defined symbol in one shared
@@ -2504,7 +2686,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 
 	/*
 	 * Associate weak (alias) symbols to their non-weak counterparts by
-	 * scaning the global symbols one more time.
+	 * scanning the global symbols one more time.
 	 *
 	 * This association is needed when processing the symbols from a shared
 	 * object dependency when a a weak definition satisfies a reference:
@@ -2650,6 +2832,155 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			}
 		}
 	}
+
+	/*
+	 * Having processed all symbols, under -z symbolcap, reprocess any
+	 * symbols that are being translated from global to locals.  The symbol
+	 * pair that has been collected defines the original symbol (c_osdp),
+	 * which will become a local, and the new symbol (c_nsdp), which will
+	 * become a reference (UNDEF) for the original.
+	 *
+	 * Scan these symbol pairs looking for weak symbols, which have non-weak
+	 * aliases.  There is no need to translate both of these symbols to
+	 * locals, only the global is necessary.
+	 */
+	if (cappairs) {
+		Aliste		idx1;
+		Cap_pair	*cpp1;
+
+		for (ALIST_TRAVERSE(cappairs, idx1, cpp1)) {
+			Sym_desc	*sdp1 = cpp1->c_osdp;
+			Sym		*sym1 = sdp1->sd_sym;
+			uchar_t		bind1 = ELF_ST_BIND(sym1->st_info);
+			Aliste		idx2;
+			Cap_pair	*cpp2;
+
+			/*
+			 * If this symbol isn't weak, it's capability member is
+			 * retained for the creation of a local symbol.
+			 */
+			if (bind1 != STB_WEAK)
+				continue;
+
+			/*
+			 * If this is a weak symbol, traverse the capabilities
+			 * list again to determine if a corresponding non-weak
+			 * symbol exists.
+			 */
+			for (ALIST_TRAVERSE(cappairs, idx2, cpp2)) {
+				Sym_desc	*sdp2 = cpp2->c_osdp;
+				Sym		*sym2 = sdp2->sd_sym;
+				uchar_t		bind2 =
+				    ELF_ST_BIND(sym2->st_info);
+
+				if ((cpp1 == cpp2) ||
+				    (cpp1->c_group != cpp2->c_group) ||
+				    (sym1->st_value != sym2->st_value) ||
+				    (bind2 == STB_WEAK))
+					continue;
+
+				/*
+				 * The weak symbol (sym1) has a non-weak (sym2)
+				 * counterpart.  There's no point in translating
+				 * both of these equivalent symbols to locals.
+				 * Add this symbol capability alias to the
+				 * capabilities family information, and remove
+				 * the weak symbol.
+				 */
+				if (ld_cap_add_family(ofl, cpp2->c_nsdp,
+				    cpp1->c_nsdp, NULL, NULL) == S_ERROR)
+					return (S_ERROR);
+
+				free((void *)cpp1->c_osdp);
+				(void) alist_delete(cappairs, &idx1);
+			}
+		}
+
+		DBG_CALL(Dbg_util_nl(ofl->ofl_lml, DBG_NL_STD));
+
+		/*
+		 * The capability pairs information now represents all the
+		 * global symbols that need transforming to locals.  These
+		 * local symbols are renamed using their group identifiers.
+		 */
+		for (ALIST_TRAVERSE(cappairs, idx1, cpp1)) {
+			Sym_desc	*osdp = cpp1->c_osdp;
+			Objcapset	*capset;
+			size_t		nsize, tsize;
+			const char	*oname;
+			char		*cname, *idstr;
+			Sym		*csym;
+
+			/*
+			 * If the local symbol has not yet been translated
+			 * convert it to a local symbol with a name.
+			 */
+			if ((osdp->sd_flags & FLG_SY_CAP) != 0)
+				continue;
+
+			/*
+			 * As we're converting object capabilities to symbol
+			 * capabilities, obtain the capabilities set for this
+			 * object, so as to retrieve the CA_SUNW_ID value.
+			 */
+			capset = &cpp1->c_group->cg_set;
+
+			/*
+			 * Create a new name from the existing symbol and the
+			 * capabilities group identifier.  Note, the delimiter
+			 * between the symbol name and identifier name is hard-
+			 * coded here (%), so that we establish a convention
+			 * for transformed symbol names.
+			 */
+			oname = osdp->sd_name;
+
+			idstr = capset->oc_id.cs_str;
+			nsize = strlen(oname);
+			tsize = nsize + 1 + strlen(idstr) + 1;
+			if ((cname = libld_malloc(tsize)) == 0)
+				return (S_ERROR);
+
+			(void) strcpy(cname, oname);
+			cname[nsize++] = '%';
+			(void) strcpy(&cname[nsize], idstr);
+
+			/*
+			 * Allocate a new symbol table entry, transform this
+			 * symbol to a local, and assign the new name.
+			 */
+			if ((csym = libld_malloc(sizeof (Sym))) == NULL)
+				return (S_ERROR);
+
+			*csym = *osdp->sd_sym;
+			csym->st_info = ELF_ST_INFO(STB_LOCAL,
+			    ELF_ST_TYPE(osdp->sd_sym->st_info));
+
+			osdp->sd_name = cname;
+			osdp->sd_sym = csym;
+			osdp->sd_flags = FLG_SY_CAP;
+
+			/*
+			 * Keep track of this new local symbol.  As -z symbolcap
+			 * can only be used to create a relocatable object, a
+			 * dynamic symbol table can't exist.  Ensure there is
+			 * space reserved in the string table.
+			 */
+			ofl->ofl_caploclcnt++;
+			if (st_insert(ofl->ofl_strtab, cname) == -1)
+				return (S_ERROR);
+
+			DBG_CALL(Dbg_syms_cap_local(ofl, cpp1->c_ndx,
+			    cname, csym, osdp));
+
+			/*
+			 * Establish this capability pair as a family.
+			 */
+			if (ld_cap_add_family(ofl, cpp1->c_nsdp, osdp,
+			    cpp1->c_group, &ifl->ifl_caps->ca_syms) == S_ERROR)
+				return (S_ERROR);
+		}
+	}
+
 	return (1);
 
 #undef SYM_LOC_BADADDR
@@ -2657,7 +2988,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 
 /*
  * Add an undefined symbol to the symbol table.  The reference originates from
- * the location identifed by the message id (mid).  These references can
+ * the location identified by the message id (mid).  These references can
  * originate from command line options such as -e, -u, -initarray, etc.
  * (identified with MSG_INTL(MSG_STR_COMMAND)), or from internally generated
  * TLS relocation references (identified with MSG_INTL(MSG_STR_TLSREL)).
@@ -2754,7 +3085,7 @@ ld_sym_add_u(const char *name, Ofl_desc *ofl, Msg mid)
  * intervenes, we will reuse the string.
  *
  * entry:
- *	isc - Input section assocated with the symbol.
+ *	isc - Input section associated with the symbol.
  *	fmt - NULL, or format string to use.
  *
  * exit:

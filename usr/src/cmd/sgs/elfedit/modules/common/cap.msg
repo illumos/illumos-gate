@@ -20,10 +20,9 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 @ _START_
 
@@ -40,20 +39,32 @@
 @ MSG_DEBUG_BSB_CHG	"[%d: %s][%d]: change from [%s] to [%s]\n"
 @ MSG_DEBUG_X_OK	"[%d: %s][%d]: value unchanged: %#llx\n"
 @ MSG_DEBUG_X_CHG	"[%d: %s][%d]: change from %#llx to %#llx\n"
-@ MSG_DEBUG_CA2NDX	"[%d: %s][%d]: Capability entry for tag: %s\n"
-
+@ MSG_DEBUG_CA2NDX	"[%d: %s][%d]: capability entry for tag: %s\n"
+@ MSG_DEBUG_CAPGRP	"[%d: %s][%u-%u: %s]: capability group\n"
+@ MSG_DEBUG_CONVNULL	"[%d: %s][%d]: no existing %s to modify, converting \
+			 extra CA_SUNW_NULL\n"
 
 # Errors
 
-@ MSG_ERR_NOCAELT	"[%d: %s]: Capabilities section does not contain \
-			 tag: %s\n"
-
+@ MSG_ERR_NOCAELT	"[%d: %s][%u-%u: %s]: capabilities group does not \
+			 contain tag: %s\n"
+@ MSG_ERR_NOSTRTAB	"[%d: %s]: capabilities section does not have an \
+			 associated string table\n"
+@ MSG_ERR_BADCAPID	"[%d: %s]: capabilities section does not contain \
+			 specified id: %s\n"
+@ MSG_ERR_GRPARRBNDS	"%s[%u-%u: %s]: attempt to access elements outside \
+			 of capabilities group\n"
 
 # Module description
 
 @ MSG_MOD_DESC		"Capabilities Section"
 
+# Strings
+@ MSG_STR_OBJECT	"<object>"
+@ MSG_STR_NONAME	"<noname>"
 
+# Format strings
+@ MSG_FMT_CAPGRP	"   Group[%u-%u]: %s\n"
 
 # 1-line description strings
 
@@ -62,15 +73,29 @@
 @ MSG_DESC_VALUE	"Change element value"
 @ MSG_DESC_DELETE	"Delete elements"
 @ MSG_DESC_MOVE		"Move elements"
-@ MSG_DESC_HW1		"Hardware capabilities bit values"
-@ MSG_DESC_SF1		"Software capabilities bit values"
+@ MSG_DESC_HW1		"Hardware capabilities (CA_SUNW_HW_1) bit values"
+@ MSG_DESC_SF1		"Software capabilities (CA_SUNW_SF_1) bit values"
+@ MSG_DESC_HW2		"Hardware capabilities (CA_SUNW_HW_2) bit values"
 
 
-# Commmand option description strings
+# Command option description strings
 
 @ MSG_OPTDESC_CAPNDX		"\
    Interpret the elt argument as a direct index into the\n\
    capabilities section, rather than as a CA_ tag value.\n"
+
+@ MSG_OPTDESC_CAPID		"\
+   Restrict the elt argument to the capability elements belonging\n\
+   to the capabilities group with a CA_SUNW_ID entry matching the\n\
+   specified id name.\n"
+
+@ MSG_OPTDESC_S		"\
+   Interpret the value argument as a string rather than an\n\
+   integer. If the specified string already exists in the\n\
+   string table, the offset of that string is stored in the\n\
+   capability entry. If the string does not exist in the string\n\
+   table, but there is room to add it, the new string is added\n\
+   and then the offset is placed in the capability entry.\n"
 
 
 # Command argument description strings
@@ -98,7 +123,9 @@
    can be specified using the well known CA_ symbolic constants\n\
    from /usr/include/sys/elf.h, or as integers. If the -capndx\n\
    option is specified, then elt is instead interpreted as a\n\
-   direct numeric index into the capabilities section.\n"
+   direct numeric index into the capabilities section. If the\n\
+   -capid option is specified, the search is limited to elements\n\
+   within the named capabilities group.\n"
 
 @ MSG_A2_VALUE_VALUE	"\
    Value to set for specified capabilities section element.\n\
@@ -107,30 +134,34 @@
 @ MSG_A2_DELETE_COUNT	"\
    Number of capabilities elements to delete, starting at the\n\
    specified position. This value cannot exceed the number\n\
-   of slots remaining in the table below the specified position.\n\
-   If count is not supplied, a single element is deleted.\n"
+   of slots remaining in the capabilities group below the specified\n\
+   position. If count is not supplied, a single element is deleted.\n"
 
 @ MSG_A2_MOVE_DST_INDEX	"\
    Numeric index within capabilities section to which the element(s)\n\
-   should be moved.\n"
+   should be moved. The destination index must lie within the same\n\
+   capabilities group as elt.\n"
 
 @ MSG_A3_MOVE_COUNT	"\
    Number of capabilities elements to move. This value cannot\n\
-   exceed the number of slots remaining in the table below\n\
-   the specified position. If count is not supplied, a\n\
+   exceed the number of slots remaining in the capabilities group\n\
+   below the specified position. If count is not supplied, a\n\
    single element is moved.\n"
 
 @ MSG_A1_HW1_VALUE	"\
-   Hardware capability values. This can be an integer value,\n\
-   any of the AV_386_ symbolic constants defined in\n\
+   Hardware capability (CA_SUNW_HW_1) values. This can be an integer\n\
+   value, any of the AV_386_ symbolic constants defined in\n\
    /usr/include/sys/auxv_386.h, or the AV_SPARC symbolic\n\
-   constants defined in /usr/include/sys/auxv_SPARC.h\n"
+   constants defined in /usr/include/sys/auxv_SPARC.h.\n"
 
 @ MSG_A1_SF1_VALUE	"\
-   Software capability values. This can be an integer value,\n\
-   any of the SF1_SUNW_ symbolic constants defined in\n\
-   /usr/include/sys/elf.h\n"
+   Software capability (CA_SUNW_SF_1) values. This can be an integer\n\
+   value, any of the SF1_SUNW_ symbolic constants defined in\n\
+   /usr/include/sys/elf.h.\n"
 
+@ MSG_A1_HW2_VALUE	"\
+   Hardware capability (CA_SUNW_HW_2) values. This is available for\n\
+   future expansion.\n"
 
 
 # Help strings
@@ -165,14 +196,16 @@
 
 @ MSG_HELP_DELETE	"   \
    The cap:delete command is used to delete one or more elements\n\
-   in the capabilities section. The elements following the deleted\n\
-   items move up, and new CA_NULL elements are inserted at the\n\
-   end of the capabilities section to fill the vacated space.\n"
+   from a capabilities group within the capabilities section. The\n\
+   elements following the deleted items move up, and new CA_NULL\n\
+   elements are inserted at the end of the capabilities group to\n\
+   fill the vacated space.\n"
 
 @ MSG_HELP_MOVE	"   \
    The cap:move command is used to move the position of one\n\
-   or more elements in the capabilities section. The specified\n\
-   number of elements are moved from elt to dst_index.\n"
+   or more elements in a capabilities group within in the\n\
+   capabilities section. The specified number of elements are\n\
+   moved from elt to dst_index.\n"
 
 @ MSG_HELP_HW1	"   \
    The cap:hw1 command is used to display or alter the\n\
@@ -214,6 +247,25 @@
    \tvalue. If neither -and or -or are specified, the new value\n\
    replaces the existing value.\n"
 
+@ MSG_HELP_HW2	"   \
+   The cap:hw2 command is used to display or alter the\n\
+   value of the hardware capabilities element (CA_SUNW_HW_2).\n\
+   \n\
+   If cap:hw2 is called without arguments, the current\n\
+   value is shown. If one or more value arguments are present,\n\
+   the following steps are taken:\n\
+   \n   \
+   o\tAll the value arguments are OR'd together.\n\
+   \n   \
+   o\tIf the -cmp option has been specified, the new value\n\
+   \tis complemented.\n\
+   \n   \
+   o\tThe CA_SUNW_HW_2 element of the capabilities section is\n\
+   \tupdated with the new value. If -and is specified, the new\n\
+   \tvalue is AND'd against the existing value. If -or is\n\
+   \tspecified, the new value is OR'd against the existing\n\
+   \tvalue. If neither -and or -or are specified, the new value\n\
+   \treplaces the existing value.\n"
 @ _END_
 
 
@@ -227,12 +279,16 @@
 @ MSG_STR_COUNT		"count"
 @ MSG_STR_ELT		"elt"
 @ MSG_STR_DST_INDEX	"dst_index"
+@ MSG_STR_MINUS_CAPID	"-capid"
 @ MSG_STR_MINUS_CAPNDX	"-capndx"
+@ MSG_STR_MINUS_S	"-s"
 @ MSG_STR_VALUE		"value"
+@ MSG_STR_IDNAME	"id_name"
 
 # Format strings
 @ MSG_FMT_STRNL		"%s\n"
 @ MSG_FMT_HEXXWORDNL	"%#llx\n"
+@ MSG_FMT_WORDVALNL	"%u\n"
 
 
 # Module name
@@ -249,3 +305,4 @@
 @ MSG_CMD_MOVE		"move"
 @ MSG_CMD_HW1		"hw1"
 @ MSG_CMD_SF1		"sf1"
+@ MSG_CMD_HW2		"hw2"

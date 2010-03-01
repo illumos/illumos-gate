@@ -330,7 +330,7 @@ extern const char	*ld_map_tokenstr(Token, ld_map_tkval_t *,
  * Support code shared between the different mapfile parsing code, used to
  * provide a common implementation manipulating link-editor state.
  */
-extern Boolean		ld_map_cap_sanitize(Mapfile *, Word, CapMask *);
+extern Boolean		ld_map_cap_sanitize(Mapfile *, Word, Capmask *);
 extern void		ld_map_cap_set_ovflag(Mapfile *, Word);
 extern void		*ld_map_kwfind(const char *, void *, size_t, size_t);
 extern char		*ld_map_kwnames(void *, size_t, size_t, char *, size_t);

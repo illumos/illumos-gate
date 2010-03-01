@@ -130,7 +130,6 @@ dynsort_dupwarn(Ofl_desc *ofl, Sym *ldynsym, const char *str,
 	}
 }
 
-
 /*
  * Build and update any output symbol tables.  Here we work on all the symbol
  * tables at once to reduce the duplication of symbol and string manipulation.
@@ -168,9 +167,8 @@ update_osym(Ofl_desc *ofl)
 			_dynsort_arr = NULL; \
 		} \
 		if ((_dynsort_arr != NULL) && DYNSORT_TEST_ATTR(_sdp, _sym)) \
-			_dynsort_arr[(*_dynsort_ndx)++] = _sym_ndx; \
+		    _dynsort_arr[(*_dynsort_ndx)++] = _sym_ndx; \
 	}
-
 
 	Sym_desc	*sdp;
 	Sym_avlnode	*sav;
@@ -218,7 +216,6 @@ update_osym(Ofl_desc *ofl)
 	Word		*hashtab;	/* hash table pointer */
 	Word		*hashbkt;	/* hash table bucket pointer */
 	Word		*hashchain;	/* hash table chain pointer */
-	Word		hashval;	/* value of hash function */
 	Wk_desc		*wkp;
 	Alist		*weak = NULL;
 	ofl_flag_t	flags = ofl->ofl_flags;
@@ -373,7 +370,7 @@ update_osym(Ofl_desc *ofl)
 	if (DBG_ENABLED) {
 		if ((ofl->ofl_gottable = gottable =
 		    libld_calloc(ofl->ofl_gotcnt, sizeof (Gottable))) == NULL)
-		return ((Addr)S_ERROR);
+			return ((Addr)S_ERROR);
 	}
 
 	/*
@@ -485,7 +482,7 @@ update_osym(Ofl_desc *ofl)
 			if ((rsdp = ofl->ofl_regsyms[ndx]) == NULL)
 				continue;
 
-			if (((rsdp->sd_flags & FLG_SY_HIDDEN) == 0) &&
+			if (!SYM_IS_HIDDEN(rsdp) &&
 			    (ELF_ST_BIND(rsdp->sd_sym->st_info) != STB_LOCAL))
 				continue;
 
@@ -630,7 +627,8 @@ update_osym(Ofl_desc *ofl)
 	 * assigning a new virtual address or displacement (value).
 	 */
 	for (APLIST_TRAVERSE(ofl->ofl_objs, idx1, ifl)) {
-		Xword	lndx, local = ifl->ifl_locscnt;
+		Xword		lndx, local = ifl->ifl_locscnt;
+		Cap_desc	*cdp = ifl->ifl_caps;
 
 		for (lndx = 1; lndx < local; lndx++) {
 			Gotndx		*gnp;
@@ -697,7 +695,6 @@ update_osym(Ofl_desc *ofl)
 			if (ifl != sdp->sd_file)
 				continue;
 
-
 			/*
 			 * Generate an output symbol to represent this input
 			 * symbol.  Even if the symbol table is to be stripped
@@ -716,6 +713,7 @@ update_osym(Ofl_desc *ofl)
 				if (!dynsym)
 					sdp->sd_symndx = *symndx;
 				symtab[symtab_ndx] = *sym;
+
 				/*
 				 * Provided this isn't an unnamed register
 				 * symbol, update its name.
@@ -798,7 +796,7 @@ update_osym(Ofl_desc *ofl)
 			 * If this isn't an UNDEF symbol (ie. an input section
 			 * is associated), update the symbols value and index.
 			 */
-			if (((isc = sdp->sd_isc) != 0) && !update_done) {
+			if (((isc = sdp->sd_isc) != NULL) && !update_done) {
 				Word	sectndx;
 
 				osp = isc->is_osdesc;
@@ -852,7 +850,53 @@ update_osym(Ofl_desc *ofl)
 				ldynsym_ndx++;
 			}
 		}
+
+		/*
+		 * If this input file has undergone object to symbol
+		 * capabilities conversion, supply any new capabilities symbols.
+		 * These symbols are copies of the original global symbols, and
+		 * follow the existing local symbols that are supplied from this
+		 * input file (which are identified with a preceding STT_FILE).
+		 */
+		if (symtab && cdp && cdp->ca_syms) {
+			Aliste		idx2;
+			Cap_sym		*csp;
+
+			for (APLIST_TRAVERSE(cdp->ca_syms, idx2, csp)) {
+				Is_desc	*isp;
+
+				sdp = csp->cs_sdp;
+				sym = sdp->sd_sym;
+
+				if ((isp = sdp->sd_isc) != NULL) {
+					Os_desc	*osp = isp->is_osdesc;
+
+					/*
+					 * Update the symbols value.
+					 */
+					/* LINTED */
+					sym->st_value +=
+					    (Off)_elf_getxoff(isp->is_indata);
+					if ((flags & FLG_OF_RELOBJ) == 0)
+						sym->st_value +=
+						    osp->os_shdr->sh_addr;
+
+					/*
+					 * Update the symbols section index.
+					 */
+					sdp->sd_shndx = sym->st_shndx =
+					    elf_ndxscn(osp->os_scn);
+				}
+
+				symtab[symtab_ndx] = *sym;
+				(void) st_setstring(strtab, sdp->sd_name,
+				    &stoff);
+				symtab[symtab_ndx].st_name = stoff;
+				sdp->sd_symndx = symtab_ndx++;
+			}
+		}
 	}
+
 	symtab_gbl_bndx = symtab_ndx;	/* .symtab index of 1st global entry */
 
 	/*
@@ -921,7 +965,6 @@ update_osym(Ofl_desc *ofl)
 		lbssndx = elf_ndxscn(osp->os_scn);
 	}
 #endif
-
 	/*
 	 * Assign .tlsbss information for use with updating COMMON symbols.
 	 */
@@ -972,7 +1015,7 @@ update_osym(Ofl_desc *ofl)
 		if (sdp->sd_ref == REF_DYN_SEEN)
 			continue;
 
-		if ((sdp->sd_flags & FLG_SY_HIDDEN) && (flags & FLG_OF_PROCRED))
+		if (SYM_IS_HIDDEN(sdp) && (flags & FLG_OF_PROCRED))
 			local = 1;
 		else
 			local = 0;
@@ -1082,6 +1125,52 @@ update_osym(Ofl_desc *ofl)
 		}
 	}
 
+	/*
+	 * If this is a dynamic object then add any local capabilities symbols.
+	 */
+	if (dynsym && ofl->ofl_capfamilies) {
+		Cap_avlnode	*cav;
+
+		for (cav = avl_first(ofl->ofl_capfamilies); cav;
+		    cav = AVL_NEXT(ofl->ofl_capfamilies, cav)) {
+			Cap_sym		*csp;
+			Aliste		idx;
+
+			for (APLIST_TRAVERSE(cav->cn_members, idx, csp)) {
+				sdp = csp->cs_sdp;
+
+				DBG_CALL(Dbg_syms_created(ofl->ofl_lml,
+				    sdp->sd_name));
+				DBG_CALL(Dbg_syms_entered(ofl, sdp->sd_sym,
+				    sdp));
+
+				dynsym[dynsym_ndx] = *sdp->sd_sym;
+
+				(void) st_setstring(dynstr, sdp->sd_name,
+				    &stoff);
+				dynsym[dynsym_ndx].st_name = stoff;
+
+				sdp->sd_sym = &dynsym[dynsym_ndx];
+				sdp->sd_symndx = dynsym_ndx;
+
+				/*
+				 * Indicate that this is a capabilities symbol.
+				 * Note, that this identification only provides
+				 * information regarding the symbol that is
+				 * visible from elfdump(1) -y.  The association
+				 * of a symbol to its capabilities is derived
+				 * from a .SUNW_capinfo entry.
+				 */
+				if (syminfo) {
+					syminfo[dynsym_ndx].si_flags |=
+					    SYMINFO_FLG_CAP;
+				}
+
+				dynsym_ndx++;
+			}
+		}
+	}
+
 	if (ofl->ofl_hashbkts) {
 		qsort(sorted_syms + ofl->ofl_scopecnt + ofl->ofl_elimcnt,
 		    ofl->ofl_globcnt, sizeof (Sym_s_list),
@@ -1131,15 +1220,13 @@ update_osym(Ofl_desc *ofl)
 			}
 		}
 
-
 		/*
 		 * If this symbol has been marked as being reduced to local
 		 * scope then it will have to be placed in the scoped portion
 		 * of the .symtab.  Retain the appropriate index for use in
 		 * version symbol indexing and relocation.
 		 */
-		if ((sdp->sd_flags & FLG_SY_HIDDEN) &&
-		    (flags & FLG_OF_PROCRED)) {
+		if (SYM_IS_HIDDEN(sdp) && (flags & FLG_OF_PROCRED)) {
 			local = 1;
 			if (!(sdp->sd_flags & FLG_SY_ELIM) && !dynsym)
 				sdp->sd_symndx = scopesym_ndx;
@@ -1177,12 +1264,11 @@ update_osym(Ofl_desc *ofl)
 			if (sdp->sd_flags & FLG_SY_MVTOCOMM) {
 				vndx = VER_NDX_GLOBAL;
 			} else if (sdp->sd_ref == REF_REL_NEED) {
-				sd_flag_t	sdflags = sdp->sd_flags;
-
 				vndx = sap->sa_overndx;
+
 				if ((vndx == 0) &&
 				    (sdp->sd_sym->st_shndx != SHN_UNDEF)) {
-					if (sdflags & FLG_SY_HIDDEN)
+					if (SYM_IS_HIDDEN(sdp))
 						vndx = VER_NDX_LOCAL;
 					else
 						vndx = VER_NDX_GLOBAL;
@@ -1293,7 +1379,7 @@ update_osym(Ofl_desc *ofl)
 				 * An auxiliary filter definition.  By nature,
 				 * this definition is direct, in that should the
 				 * filtee lookup fail, we'll fall back to this
-				 * object.  It may still be necesssary to
+				 * object.  It may still be necessary to
 				 * prevent external direct bindings.
 				 */
 				syminfo[ndx].si_flags |= SYMINFO_FLG_AUXILIARY;
@@ -1348,6 +1434,20 @@ update_osym(Ofl_desc *ofl)
 					syminfo[ndx].si_boundto =
 					    SYMINFO_BT_SELF;
 				}
+
+				/*
+				 * Indicate that this is a capabilities symbol.
+				 * Note, that this identification only provides
+				 * information regarding the symbol that is
+				 * visible from elfdump(1) -y.  The association
+				 * of a symbol to its capabilities is derived
+				 * from a .SUNW_capinfo entry.
+				 */
+				if ((sdp->sd_flags & FLG_SY_CAP) &&
+				    ofl->ofl_oscapinfo) {
+					syminfo[ndx].si_flags |=
+					    SYMINFO_FLG_CAP;
+				}
 			}
 		}
 
@@ -1397,7 +1497,7 @@ update_osym(Ofl_desc *ofl)
 				dynsym[dynsym_ndx].st_name = stoff;
 
 				if (stoff) {
-					Word _hashndx;
+					Word	hashval, _hashndx;
 
 					hashval =
 					    sap->sa_hash % ofl->ofl_hashbkts;
@@ -1428,13 +1528,13 @@ update_osym(Ofl_desc *ofl)
 			ADD_TO_DYNSORT(sdp, sym, ELF_ST_TYPE(sym->st_info),
 			    ldynsym_cnt + dynsym_ndx);
 		}
+
 		if (!enter_in_symtab && (!dynsym || (local && !dynlocal))) {
 			if (!(sdp->sd_flags & FLG_SY_UPREQD))
 				continue;
 			sym = sdp->sd_sym;
 		} else
 			sdp->sd_flags &= ~FLG_SY_CLEAN;
-
 
 		/*
 		 * If we have a weak data symbol for which we need the real
@@ -1775,7 +1875,7 @@ update_osym(Ofl_desc *ofl)
 		 * be local, otherwise if it's from a shared object then we need
 		 * to maintain the binding of the original reference.
 		 */
-		if (sdp->sd_flags & FLG_SY_HIDDEN) {
+		if (SYM_IS_HIDDEN(sdp)) {
 			if (flags & FLG_OF_PROCRED)
 				bind = STB_LOCAL;
 			else
@@ -2357,14 +2457,14 @@ update_odynamic(Ofl_desc *ofl)
 		if (ofl->ofl_osmove) {
 			shdr = ofl->ofl_osmove->os_shdr;
 
-			dyn->d_tag = DT_MOVEENT;
-			dyn->d_un.d_val = shdr->sh_entsize;
+			dyn->d_tag = DT_MOVETAB;
+			dyn->d_un.d_val = shdr->sh_addr;
 			dyn++;
 			dyn->d_tag = DT_MOVESZ;
 			dyn->d_un.d_val = shdr->sh_size;
 			dyn++;
-			dyn->d_tag = DT_MOVETAB;
-			dyn->d_un.d_val = shdr->sh_addr;
+			dyn->d_tag = DT_MOVEENT;
+			dyn->d_un.d_val = shdr->sh_entsize;
 			dyn++;
 		}
 		if (ofl->ofl_regsymcnt) {
@@ -2407,7 +2507,24 @@ update_odynamic(Ofl_desc *ofl)
 			dyn->d_un.d_val = ofl->ofl_oscap->os_shdr->sh_addr;
 			dyn++;
 		}
+		if (ofl->ofl_oscapinfo) {
+			dyn->d_tag = DT_SUNW_CAPINFO;
+			dyn->d_un.d_val = ofl->ofl_oscapinfo->os_shdr->sh_addr;
+			dyn++;
+		}
+		if (ofl->ofl_oscapchain) {
+			shdr = ofl->ofl_oscapchain->os_shdr;
 
+			dyn->d_tag = DT_SUNW_CAPCHAIN;
+			dyn->d_un.d_val = shdr->sh_addr;
+			dyn++;
+			dyn->d_tag = DT_SUNW_CAPCHAINSZ;
+			dyn->d_un.d_val = shdr->sh_size;
+			dyn++;
+			dyn->d_tag = DT_SUNW_CAPCHAINENT;
+			dyn->d_un.d_val = shdr->sh_entsize;
+			dyn++;
+		}
 		if (flags & FLG_OF_SYMBOLIC) {
 			dyn->d_tag = DT_SYMBOLIC;
 			dyn->d_un.d_val = 0;
@@ -3118,6 +3235,281 @@ update_ostrtab(Os_desc *osp, Str_tbl *stp, uint_t extra)
 }
 
 /*
+ * Update capabilities information.
+ *
+ * If string table capabilities exist, then the associated string must be
+ * translated into an offset into the string table.
+ */
+static void
+update_oscap(Ofl_desc *ofl)
+{
+	Os_desc		*strosp, *cosp;
+	Cap		*cap;
+	Str_tbl		*strtbl;
+	Capstr		*capstr;
+	size_t		stoff;
+	Aliste		idx1;
+
+	/*
+	 * Determine which symbol table or string table is appropriate.
+	 */
+	if (OFL_IS_STATIC_OBJ(ofl)) {
+		strosp = ofl->ofl_osstrtab;
+		strtbl = ofl->ofl_strtab;
+	} else {
+		strosp = ofl->ofl_osdynstr;
+		strtbl = ofl->ofl_dynstrtab;
+	}
+
+	/*
+	 * If symbol capabilities exist, set the sh_link field of the .SUNW_cap
+	 * section to the .SUNW_capinfo section.
+	 */
+	if (ofl->ofl_oscapinfo) {
+		cosp = ofl->ofl_oscap;
+		cosp->os_shdr->sh_link =
+		    (Word)elf_ndxscn(ofl->ofl_oscapinfo->os_scn);
+	}
+
+	/*
+	 * If there are capability strings to process, set the sh_info
+	 * field of the .SUNW_cap section to the associated string table, and
+	 * proceed to process any CA_SUNW_PLAT entries.
+	 */
+	if ((ofl->ofl_flags & FLG_OF_CAPSTRS) == 0)
+		return;
+
+	cosp = ofl->ofl_oscap;
+	cosp->os_shdr->sh_info = (Word)elf_ndxscn(strosp->os_scn);
+
+	cap = ofl->ofl_oscap->os_outdata->d_buf;
+
+	/*
+	 * Determine whether an object capability identifier, or object
+	 * machine/platform capabilities exists.
+	 */
+	capstr = &ofl->ofl_ocapset.oc_id;
+	if (capstr->cs_str) {
+		(void) st_setstring(strtbl, capstr->cs_str, &stoff);
+		cap[capstr->cs_ndx].c_un.c_ptr = stoff;
+	}
+	for (ALIST_TRAVERSE(ofl->ofl_ocapset.oc_plat.cl_val, idx1, capstr)) {
+		(void) st_setstring(strtbl, capstr->cs_str, &stoff);
+		cap[capstr->cs_ndx].c_un.c_ptr = stoff;
+	}
+	for (ALIST_TRAVERSE(ofl->ofl_ocapset.oc_mach.cl_val, idx1, capstr)) {
+		(void) st_setstring(strtbl, capstr->cs_str, &stoff);
+		cap[capstr->cs_ndx].c_un.c_ptr = stoff;
+	}
+
+	/*
+	 * Determine any symbol capability identifiers, or machine/platform
+	 * capabilities.
+	 */
+	if (ofl->ofl_capgroups) {
+		Cap_group	*cgp;
+
+		for (APLIST_TRAVERSE(ofl->ofl_capgroups, idx1, cgp)) {
+			Objcapset	*ocapset = &cgp->cg_set;
+			Aliste		idx2;
+
+			capstr = &ocapset->oc_id;
+			if (capstr->cs_str) {
+				(void) st_setstring(strtbl, capstr->cs_str,
+				    &stoff);
+				cap[capstr->cs_ndx].c_un.c_ptr = stoff;
+			}
+			for (ALIST_TRAVERSE(ocapset->oc_plat.cl_val, idx2,
+			    capstr)) {
+				(void) st_setstring(strtbl, capstr->cs_str,
+				    &stoff);
+				cap[capstr->cs_ndx].c_un.c_ptr = stoff;
+			}
+			for (ALIST_TRAVERSE(ocapset->oc_mach.cl_val, idx2,
+			    capstr)) {
+				(void) st_setstring(strtbl, capstr->cs_str,
+				    &stoff);
+				cap[capstr->cs_ndx].c_un.c_ptr = stoff;
+			}
+		}
+	}
+}
+
+/*
+ * Update the .SUNW_capinfo, and possibly the .SUNW_capchain sections.
+ */
+static void
+update_oscapinfo(Ofl_desc *ofl)
+{
+	Os_desc		*symosp, *ciosp, *ccosp = NULL;
+	Capinfo		*ocapinfo;
+	Capchain	*ocapchain;
+	Cap_avlnode	*cav;
+	Word		chainndx = 0;
+
+	/*
+	 * Determine which symbol table is appropriate.
+	 */
+	if (OFL_IS_STATIC_OBJ(ofl))
+		symosp = ofl->ofl_ossymtab;
+	else
+		symosp = ofl->ofl_osdynsym;
+
+	/*
+	 * Update the .SUNW_capinfo sh_link to point to the appropriate symbol
+	 * table section.  If we're creating a dynamic object, the
+	 * .SUNW_capinfo sh_info is updated to point to the .SUNW_capchain
+	 * section.
+	 */
+	ciosp = ofl->ofl_oscapinfo;
+	ciosp->os_shdr->sh_link = (Word)elf_ndxscn(symosp->os_scn);
+
+	if (OFL_IS_STATIC_OBJ(ofl) == 0) {
+		ccosp = ofl->ofl_oscapchain;
+		ciosp->os_shdr->sh_info = (Word)elf_ndxscn(ccosp->os_scn);
+	}
+
+	/*
+	 * Establish the data for each section.  The first element of each
+	 * section defines the section's version number.
+	 */
+	ocapinfo = ciosp->os_outdata->d_buf;
+	ocapinfo[0] = CAPINFO_CURRENT;
+	if (ccosp) {
+		ocapchain = ccosp->os_outdata->d_buf;
+		ocapchain[chainndx++] = CAPCHAIN_CURRENT;
+	}
+
+	/*
+	 * Traverse all capabilities families.  Each member has a .SUNW_capinfo
+	 * assignment.  The .SUNW_capinfo entry differs for relocatable objects
+	 * and dynamic objects.
+	 *
+	 * Relocatable objects:
+	 *			ELF_C_GROUP		ELF_C_SYM
+	 *
+	 * Family lead:		CAPINFO_SUNW_GLOB	lead symbol index
+	 * Family lead alias:	CAPINFO_SUNW_GLOB	lead symbol index
+	 * Family member:	.SUNW_cap index		lead symbol index
+	 *
+	 * Dynamic objects:
+	 *			ELF_C_GROUP		ELF_C_SYM
+	 *
+	 * Family lead:		CAPINFO_SUNW_GLOB	.SUNW_capchain index
+	 * Family lead alias:	CAPINFO_SUNW_GLOB	.SUNW_capchain index
+	 * Family member:	.SUNW_cap index		lead symbol index
+	 *
+	 * The ELF_C_GROUP field identifies a capabilities symbol.  Lead
+	 * capability symbols, and lead capability aliases are identified by
+	 * a CAPINFO_SUNW_GLOB group identifier.  For family members, the
+	 * ELF_C_GROUP provides an index to the associate capabilities group
+	 * (i.e, an index into the SUNW_cap section that defines a group).
+	 *
+	 * For relocatable objects, the ELF_C_SYM field identifies the lead
+	 * capability symbol.  For the lead symbol itself, the .SUNW_capinfo
+	 * index is the same as the ELF_C_SYM value.  For lead alias symbols,
+	 * the .SUNW_capinfo index differs from the ELF_C_SYM value.  This
+	 * differentiation of CAPINFO_SUNW_GLOB symbols allows ld(1) to
+	 * identify, and propagate lead alias symbols.  For example, the lead
+	 * capability symbol memcpy() would have the ELF_C_SYM for memcpy(),
+	 * and the lead alias _memcpy() would also have the ELF_C_SYM for
+	 * memcpy().
+	 *
+	 * For dynamic objects, both a lead capability symbol, and alias symbol
+	 * would have a ELF_C_SYM value that represents the same capability
+	 * chain index.  The capability chain allows ld.so.1 to traverse a
+	 * family chain for a given lead symbol, and select the most appropriate
+	 * family member.  The .SUNW_capchain array contains a series of symbol
+	 * indexes for each family member:
+	 *
+	 *    chaincap[n]  chaincap[n + 1]  chaincap[n + 2]  chaincap[n + x]
+	 *	foo() ndx    foo%x() ndx	foo%y() ndx	0
+	 *
+	 * For family members, the ELF_C_SYM value associates the capability
+	 * members with their family lead symbol.  This association, although
+	 * unused within a dynamic object, allows ld(1) to identify, and
+	 * propagate family members when processing relocatable objects.
+	 */
+	for (cav = avl_first(ofl->ofl_capfamilies); cav;
+	    cav = AVL_NEXT(ofl->ofl_capfamilies, cav)) {
+		Cap_sym		*csp;
+		Aliste		idx;
+		Sym_desc	*asdp, *lsdp = cav->cn_symavlnode.sav_sdp;
+
+		if (ccosp) {
+			/*
+			 * For a dynamic object, identify this lead symbol, and
+			 * point it to the head of a capability chain.  Set the
+			 * head of the capability chain to the same lead symbol.
+			 */
+			ocapinfo[lsdp->sd_symndx] =
+			    ELF_C_INFO(chainndx, CAPINFO_SUNW_GLOB);
+			ocapchain[chainndx] = lsdp->sd_symndx;
+		} else {
+			/*
+			 * For a relocatable object, identify this lead symbol,
+			 * and set the lead symbol index to itself.
+			 */
+			ocapinfo[lsdp->sd_symndx] =
+			    ELF_C_INFO(lsdp->sd_symndx, CAPINFO_SUNW_GLOB);
+		}
+
+		/*
+		 * Gather any lead symbol aliases.
+		 */
+		for (APLIST_TRAVERSE(cav->cn_aliases, idx, asdp)) {
+			if (ccosp) {
+				/*
+				 * For a dynamic object, identify this lead
+				 * alias symbol, and point it to the same
+				 * capability chain index as the lead symbol.
+				 */
+				ocapinfo[asdp->sd_symndx] =
+				    ELF_C_INFO(chainndx, CAPINFO_SUNW_GLOB);
+			} else {
+				/*
+				 * For a relocatable object, identify this lead
+				 * alias symbol, and set the lead symbol index
+				 * to the lead symbol.
+				 */
+				ocapinfo[asdp->sd_symndx] =
+				    ELF_C_INFO(lsdp->sd_symndx,
+				    CAPINFO_SUNW_GLOB);
+			}
+		}
+
+		chainndx++;
+
+		/*
+		 * Gather the family members.
+		 */
+		for (APLIST_TRAVERSE(cav->cn_members, idx, csp)) {
+			Sym_desc	*msdp = csp->cs_sdp;
+
+			/*
+			 * Identify the members capability group, and the lead
+			 * symbol of the family this symbol is a member of.
+			 */
+			ocapinfo[msdp->sd_symndx] =
+			    ELF_C_INFO(lsdp->sd_symndx, csp->cs_group->cg_ndx);
+			if (ccosp) {
+				/*
+				 * For a dynamic object, set the next capability
+				 * chain to point to this family member.
+				 */
+				ocapchain[chainndx++] = msdp->sd_symndx;
+			}
+		}
+
+		/*
+		 * Any chain of family members is terminated with a 0 element.
+		 */
+		if (ccosp)
+			ocapchain[chainndx++] = 0;
+	}
+}
+
+/*
  * Translate the shdr->sh_{link, info} from its input section value to that
  * of the corresponding shdr->sh_{link, info} output section value.
  */
@@ -3215,7 +3607,7 @@ ld_update_outfile(Ofl_desc *ofl)
 	 */
 	if (ofl->ofl_flags & FLG_OF_EXEC) {
 #if	defined(_ELF64)
-		if (ofl->ofl_ocapset.c_sf_1.cm_value & SF1_SUNW_ADDR32)
+		if (ofl->ofl_ocapset.oc_sf_1.cm_val & SF1_SUNW_ADDR32)
 			vaddr = ld_targ.t_m.m_segm_aorigin;
 		else
 #endif
@@ -3287,7 +3679,8 @@ ld_update_outfile(Ofl_desc *ofl)
 		 * virtual address.  This is updated later.
 		 */
 		if (phdr->p_type == PT_SUNWCAP) {
-			if (ofl->ofl_oscap) {
+			if (ofl->ofl_oscap && (ofl->ofl_flags & FLG_OF_PTCAP) &&
+			    ((flags & FLG_OF_RELOBJ) == 0)) {
 				capsgp = sgp;
 				capsndx = segndx;
 				cappndx = phdrndx++;
@@ -3360,19 +3753,20 @@ ld_update_outfile(Ofl_desc *ofl)
 		 */
 		if (phdr->p_type == PT_TLS) {
 			Os_desc		*tlsosp;
-			Shdr		*firstshdr = NULL, *lastfileshdr = NULL;
-			Shdr		*lastshdr;
+			Shdr		*lastfileshdr = NULL;
+			Shdr		*firstshdr = NULL, *lastshdr;
 			Aliste		idx;
 
 			if (ofl->ofl_ostlsseg == NULL)
 				continue;
 
 			/*
-			 * Scan through the sections that have contributed TLS.
+			 * Scan the output sections that have contributed TLS.
 			 * Remember the first and last so as to determine the
 			 * TLS memory size requirement.  Remember the last
-			 * non-nobits section to determine the TLS data
-			 * contribution, which determines the TLS file size.
+			 * progbits section to determine the TLS data
+			 * contribution, which determines the TLS program
+			 * header filesz.
 			 */
 			for (APLIST_TRAVERSE(ofl->ofl_ostlsseg, idx, tlsosp)) {
 				Shdr	*tlsshdr = tlsosp->os_shdr;
@@ -3389,14 +3783,26 @@ ld_update_outfile(Ofl_desc *ofl)
 			phdr->p_offset = firstshdr->sh_offset;
 			phdr->p_align = firstshdr->sh_addralign;
 
+			/*
+			 * Determine the initialized TLS data size.  This
+			 * address range is from the start of the TLS segment
+			 * to the end of the last piece of initialized data.
+			 */
 			if (lastfileshdr)
 				phdr->p_filesz = lastfileshdr->sh_offset +
 				    lastfileshdr->sh_size - phdr->p_offset;
 			else
 				phdr->p_filesz = 0;
 
-			phdr->p_memsz = lastshdr->sh_offset +
-			    lastshdr->sh_size - phdr->p_offset;
+			/*
+			 * Determine the total TLS memory size.  This includes
+			 * all TLS data and TLS uninitialized data.  This
+			 * address range is from the start of the TLS segment
+			 * to the memory address of the last piece of
+			 * uninitialized data.
+			 */
+			phdr->p_memsz = lastshdr->sh_addr +
+			    lastshdr->sh_size - phdr->p_vaddr;
 
 			DBG_CALL(Dbg_seg_entry(ofl, segndx, sgp));
 			ofl->ofl_phdr[phdrndx] = *phdr;
@@ -3407,7 +3813,7 @@ ld_update_outfile(Ofl_desc *ofl)
 		/*
 		 * If this is an empty segment declaration, it will occur after
 		 * all other loadable segments.  As empty segments can be
-		 * defind with fixed addresses, make sure that no loadable
+		 * defined with fixed addresses, make sure that no loadable
 		 * segments overlap.  This might occur as the object evolves
 		 * and the loadable segments grow, thus encroaching upon an
 		 * existing segment reservation.
@@ -3737,7 +4143,8 @@ ld_update_outfile(Ofl_desc *ofl)
 		phdr->p_memsz = sdp->sd_sym->st_size;
 
 		/*
-		 * Take permisions of the segment the symbol is associated with.
+		 * Take permissions from the segment that the symbol is
+		 * associated with.
 		 */
 		aphdr = &sdp->sd_isc->is_osdesc->os_sgdesc->sg_phdr;
 		assert(aphdr);
@@ -3800,6 +4207,14 @@ ld_update_outfile(Ofl_desc *ofl)
 		if (update_osyminfo(ofl) == S_ERROR)
 			return (S_ERROR);
 	}
+
+	/*
+	 * Update capabilities information if required.
+	 */
+	if (ofl->ofl_oscap)
+		update_oscap(ofl);
+	if (ofl->ofl_oscapinfo)
+		update_oscapinfo(ofl);
 
 	/*
 	 * Sanity test: the first and last data byte of a string table

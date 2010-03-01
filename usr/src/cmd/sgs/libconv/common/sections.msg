@@ -1,5 +1,5 @@
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -100,6 +100,14 @@
 @ MSG_SHT_SYMTAB_SHNDX_CF		"SHT_SYMTAB_SHNDX"
 @ MSG_SHT_SYMTAB_SHNDX_NF		"symtab_shndx"
 
+@ MSG_SHT_SUNW_CAPCHAIN		"[ SHT_SUNW_capchain ]"		# 0x6fffffef
+@ MSG_SHT_SUNW_CAPCHAIN_DMP		"CAPCHAIN "
+@ MSG_SHT_SUNW_CAPCHAIN_CF		"SHT_SUNW_capchain"
+@ MSG_SHT_SUNW_CAPCHAIN_NF		"sunw_capchain"
+@ MSG_SHT_SUNW_CAPINFO		"[ SHT_SUNW_capinfo ]"		# 0x6ffffff0
+@ MSG_SHT_SUNW_CAPINFO_DMP		"CAPINFO "
+@ MSG_SHT_SUNW_CAPINFO_CF		"SHT_SUNW_capinfo"
+@ MSG_SHT_SUNW_CAPINFO_NF		"sunw_capinfo"
 @ MSG_SHT_SUNW_SYMSORT		"[ SHT_SUNW_symsort ]"		# 0x6ffffff1
 @ MSG_SHT_SUNW_SYMSORT_DMP		"SSRT"
 @ MSG_SHT_SUNW_SYMSORT_CF		"SHT_SUNW_symsort"

@@ -18,8 +18,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -61,8 +62,12 @@ pics/%.o:	$(SRCBASE)/uts/$(PLAT)/krtld/%.c
 		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
+pics/elfcap.o:	$(ELFCAP)/elfcap.c
+		$(COMPILE.c) -o $@ $(ELFCAP)/elfcap.c
+		$(POST_PROCESS_O)
+
 $(RTLD):	pics $(PICS) $(CRTS)
-		$(SGSPROTO)/ld -o $@ -dy -G $(DYNFLAGS) $(CRTI) $(PICS) \
+		$(LD_USE_PROTO)ld -o $@ -dy -G $(DYNFLAGS) $(CRTI) $(PICS) \
 		    $(LDLIBS) $(CRTN)
 		$(POST_PROCESS_SO)
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -358,6 +358,7 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 	Xword		pltndx;
 	uint_t		binfo, sb_flags = 0, dbg_class;
 	Slookup		sl;
+	Sresult		sr;
 	Pltbindtype	pbtype;
 	int		entry, lmflags;
 	Lm_list		*lml;
@@ -419,19 +420,25 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 	llmp = lml->lm_tail;
 
 	/*
-	 * Find definition for symbol.  Initialize the symbol lookup data
-	 * structure.
+	 * Find definition for symbol.  Initialize the symbol lookup, and
+	 * symbol result, data structures.
 	 */
 	SLOOKUP_INIT(sl, name, lmp, lml->lm_head, ld_entry_cnt, 0,
 	    rsymndx, rsym, 0, LKUP_DEFT);
+	SRESULT_INIT(sr, name);
 
-	if ((nsym = lookup_sym(&sl, &nlmp, &binfo, NULL)) == 0) {
+	if (lookup_sym(&sl, &sr, &binfo, NULL) == 0) {
 		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_NOSYM), NAME(lmp),
 		    demangle(name));
 		rtldexit(lml, 1);
 	}
 
+	name = (char *)sr.sr_name;
+	nlmp = sr.sr_dmap;
+	nsym = sr.sr_sym;
+
 	symval = nsym->st_value;
+
 	if (!(FLAGS(nlmp) & FLG_RT_FIXED) &&
 	    (nsym->st_shndx != SHN_ABS))
 		symval += ADDR(nlmp);
@@ -590,11 +597,11 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 		 * of this table.  There are two different interpretations of
 		 * the ABI at this point:
 		 *
-		 *   o	The REL table and its associated RELSZ indicate the
+		 *  -	The REL table and its associated RELSZ indicate the
 		 *	concatenation of *all* relocation sections (this is the
 		 *	model our link-editor constructs).
 		 *
-		 *   o	The REL table and its associated RELSZ indicate the
+		 *  -	The REL table and its associated RELSZ indicate the
 		 *	concatenation of all *but* the .plt relocations.  These
 		 *	relocations are specified individually by the JMPREL and
 		 *	PLTRELSZ entries.
@@ -741,7 +748,7 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 			 */
 			if (ELF_ST_BIND(symref->st_info) == STB_LOCAL) {
 				value = basebgn;
-				name = (char *)0;
+				name = NULL;
 
 				/*
 				 * Special case TLS relocations.
@@ -801,11 +808,12 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 					}
 				} else {
 					Slookup		sl;
+					Sresult		sr;
 
 					/*
 					 * Lookup the symbol definition.
-					 * Initialize the symbol lookup data
-					 * structure.
+					 * Initialize the symbol lookup, and
+					 * symbol result, data structures.
 					 */
 					name = (char *)(STRTAB(lmp) +
 					    symref->st_name);
@@ -813,9 +821,15 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 					SLOOKUP_INIT(sl, name, lmp, 0,
 					    ld_entry_cnt, 0, rsymndx, symref,
 					    rtype, LKUP_STDRELOC);
+					SRESULT_INIT(sr, name);
+					symdef = NULL;
 
-					symdef = lookup_sym(&sl, &_lmp,
-					    &binfo, in_nfavl);
+					if (lookup_sym(&sl, &sr, &binfo,
+					    in_nfavl)) {
+						name = (char *)sr.sr_name;
+						_lmp = sr.sr_dmap;
+						symdef = sr.sr_sym;
+					}
 
 					/*
 					 * If the symbol is not found and the
@@ -947,7 +961,8 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 				value = TLSMODID(lmp);
 			} else
 				value = basebgn;
-			name = (char *)0;
+
+			name = NULL;
 		}
 
 		DBG_CALL(Dbg_reloc_in(LIST(lmp), ELF_DBG_RTLD, M_MACH,

@@ -780,12 +780,19 @@ ld_do_activerelocs(Ofl_desc *ofl)
 				 * Size relocations require the symbols size.
 				 */
 				value = sdp->sd_sym->st_size;
-			} else {
+
+			} else if ((sdp->sd_flags & FLG_SY_CAP) &&
+			    sdp->sd_aux && sdp->sd_aux->sa_PLTndx) {
 				/*
-				 * Else the value is the symbols value.
+				 * If this relocation is against a capabilities
+				 * symbol, then we need to jump to an associated
+				 * PLT, so that at runtime ld.so.1 is involved
+				 * to determine the best binding choice.
+				 * Otherwise, the value is the symbols value.
 				 */
+				value = ld_calc_plt_addr(sdp, ofl);
+			} else
 				value = sdp->sd_sym->st_value;
-			}
 
 			/*
 			 * Relocation against the GLOBAL_OFFSET_TABLE.
@@ -1097,9 +1104,11 @@ ld_add_outrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
 			else
 				ofl->ofl_flags1 |= FLG_OF1_TLSOREL;
 		} else {
-			Os_desc	*osp = sdp->sd_isc->is_osdesc;
+			Os_desc *osp;
+			Is_desc *isp = sdp->sd_isc;
 
-			if (osp && ((osp->os_flags & FLG_OS_OUTREL) == 0)) {
+			if (isp && ((osp = isp->is_osdesc) != NULL) &&
+			    ((osp->os_flags & FLG_OS_OUTREL) == 0)) {
 				ofl->ofl_dynshdrcnt++;
 				osp->os_flags |= FLG_OS_OUTREL;
 			}
@@ -1580,6 +1589,8 @@ ld_targ_init_x86(void)
 			M_ID_ARRAY,		/* id_array */
 			M_ID_BSS,		/* id_bss */
 			M_ID_CAP,		/* id_cap */
+			M_ID_CAPINFO,		/* id_capinfo */
+			M_ID_CAPCHAIN,		/* id_capchain */
 			M_ID_DATA,		/* id_data */
 			M_ID_DYNAMIC,		/* id_dynamic */
 			M_ID_DYNSORT,		/* id_dynsort */

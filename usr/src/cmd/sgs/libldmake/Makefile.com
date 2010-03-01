@@ -18,11 +18,10 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY=	libldmake.a
@@ -39,7 +38,7 @@ SGSPROTO=	../../proto/$(MACH)
 
 SRCDIR =	../common
 
-DYNFLAGS +=	$(USE_PROTO)
+DYNFLAGS +=	$(CC_USE_PROTO)
 
 CFLAGS +=	$(C_PICFLAGS)
 CFLAGS64 +=	$(C_PICFLAGS64)

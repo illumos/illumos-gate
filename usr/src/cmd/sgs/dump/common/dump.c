@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1154,6 +1154,8 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 			case DT_PREINIT_ARRAYSZ:
 			case DT_SUNW_RTLDINF:
 			case DT_SUNW_CAP:
+			case DT_SUNW_CAPINFO:
+			case DT_SUNW_CAPCHAIN:
 			case DT_SUNW_SYMTAB:
 			case DT_SUNW_SYMSORT:
 			case DT_SUNW_TLSSORT:
@@ -1222,6 +1224,8 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 			case DT_SUNW_SYMSORTSZ:
 			case DT_SUNW_TLSSORTSZ:
 			case DT_SUNW_STRPAD:
+			case DT_SUNW_CAPCHAINENT:
+			case DT_SUNW_CAPCHAINSZ:
 				(void) printf(pdyn_Fmtptr,
 				    EC_XWORD(p_dyn.d_un.d_val));
 				break;

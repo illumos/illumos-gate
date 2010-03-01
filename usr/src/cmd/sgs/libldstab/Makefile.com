@@ -18,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -40,7 +41,7 @@ SRCBASE=	../../../..
 CPPFLAGS +=	-I$(ELFCAP)
 
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf -lc
-DYNFLAGS +=	$(VERSREF)
+DYNFLAGS +=	$(VERSREF) $(CC_USE_PROTO)
 
 LINTFLAGS +=	-erroff=E_NAME_DECL_NOT_USED_DEF2 \
 		-erroff=E_NAME_DEF_NOT_USED2 \
@@ -48,15 +49,6 @@ LINTFLAGS +=	-erroff=E_NAME_DECL_NOT_USED_DEF2 \
 LINTFLAGS64 +=	-erroff=E_NAME_DECL_NOT_USED_DEF2 \
 		-erroff=E_NAME_DEF_NOT_USED2 \
 		-erroff=E_NAME_USED_NOT_DEF2
-
-
-# A bug in pmake causes redundancy when '+=' is conditionally assigned, so
-# '=' is used with extra variables.
-# $(DYNLIB) :=	DYNFLAGS += -Yl,$(SGSPROTO)
-#
-XXXFLAGS=
-$(DYNLIB) :=	XXXFLAGS= $(USE_PROTO)
-DYNFLAGS +=	$(XXXFLAGS)
 
 SRCS=		$(COMOBJS:%.o=../common/%.c)
 LINTSRCS=	$(SRCS)

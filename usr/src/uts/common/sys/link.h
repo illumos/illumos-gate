@@ -150,11 +150,14 @@ typedef struct {
 #define	DT_SUNW_SYMSORTSZ	0x60000015	/* size of SUNW_SYMSORT */
 #define	DT_SUNW_TLSSORT		0x60000016	/* tls sym ndx sort by offset */
 #define	DT_SUNW_TLSSORTSZ	0x60000017	/* size of SUNW_TLSSORT */
-
+#define	DT_SUNW_CAPINFO		0x60000018	/* capabilities symbols */
 #define	DT_SUNW_STRPAD		0x60000019	/* # of unused bytes at the */
 						/*	end of dynstr */
+#define	DT_SUNW_CAPCHAIN	0x6000001a	/* capabilities chain info */
 #define	DT_SUNW_LDMACH		0x6000001b	/* EM_ machine code of linker */
 						/*	that produced object */
+#define	DT_SUNW_CAPCHAINENT	0x6000001d	/* capabilities chain entry */
+#define	DT_SUNW_CAPCHAINSZ	0x6000001f	/* capabilities chain size */
 
 /*
  * DT_* encoding rules do not apply between DT_HIOS and DT_LOPROC
@@ -468,6 +471,7 @@ typedef struct {
 #define	SYMINFO_FLG_AUXILIARY	0x0040	/* symbol ref is associated to a */
 					/* 	auxiliary filter */
 #define	SYMINFO_FLG_INTERPOSE	0x0080	/* symbol defines an interposer */
+#define	SYMINFO_FLG_CAP		0x0100	/* symbol is capabilities specific */
 
 /*
  * Syminfo.si_boundto values.

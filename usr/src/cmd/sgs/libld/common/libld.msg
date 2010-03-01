@@ -220,6 +220,8 @@
 			 \t\t\trescan specified archive group upon reaching\n\
 			 \t\t\tthe end of the group, until no further\n\
 			 \t\t\tmember extraction occurs\n"
+@ MSG_ARG_DETAIL_ZSCAP	"\t[-z symbolcap]\tconvert object capabilities to \
+			 symbol capabilities\n"
 @ MSG_ARG_DETAIL_ZTARG	"\t[-z target=platform]\n\
 			 \t\t\ttarget machine for cross linking\n"
 @ MSG_ARG_DETAIL_ZT	"\t[-z text]\tdisallow output relocations against \
@@ -425,6 +427,7 @@
 
 
 # Messages related to platform support
+
 @ MSG_TARG_UNSUPPORTED	"unsupported ELF machine type: %s"
 
 
@@ -589,6 +592,17 @@
 @ MSG_VER_ADDVER	"\t%s"
 @ MSG_VER_CYCLIC	"following versions generate cyclic dependency:"
 
+# Capabilities messages
+
+@ MSG_CAP_MULDEF	"capabilities symbol '%s' has multiply-defined members:"
+@ MSG_CAP_MULDEFSYMS	"\t(file %s symbol '%s'; file %s symbol '%s');"
+@ MSG_CAP_REDUNDANT	"file %s: section [%u]%s: symbol capabilities \
+			 redundant, as object capabilities are more restrictive"
+
+@ MSG_CAPINFO_INVALSYM	"file %s: capabilities info section [%u]%s: index %d: \
+			 family member symbol '%s': invalid"
+@ MSG_CAPINFO_INVALLEAD	"file %s: capabilities info section [%u]%s: index %d: \
+			 family lead symbol '%s': invalid symbol index %d"
 
 # Basic strings
 
@@ -635,7 +649,17 @@
 @ MSG_REJ_US3		"file %s: Sun UltraSPARC III extensions required"
 @ MSG_REJ_STR		"file %s: %s"
 @ MSG_REJ_UNKFILE	"file %s: unknown file type"
-@ MSG_REJ_HWCAP_1	"file %s: hardware capability unsupported: %s"
+@ MSG_REJ_UNKCAP	"file=%s; unknown capability: %d"
+@ MSG_REJ_HWCAP_1	"file %s: hardware capability (CA_SUNW_HW_1) \
+			 unsupported: %s"
+@ MSG_REJ_SFCAP_1	"file %s: software capability (CA_SUNW_SF_1) \
+			 unsupported: %s"
+@ MSG_REJ_MACHCAP	"file %s: machine capability (CA_SUNW_MACH) \
+			 unsupported: %s"
+@ MSG_REJ_PLATCAP	"file %s: platform capability (CA_SUNW_PLAT) \
+			 unsupported: %s"
+@ MSG_REJ_HWCAP_2	"file %s: hardware capability (CA_SUNW_HW_2) \
+			 unsupported: %s"
 
 
 @ _END_
@@ -664,6 +688,7 @@
 @ MSG_STR_SLASH		"/"
 @ MSG_STR_DYNAMIC	"(.dynamic)"
 @ MSG_STR_ORIGIN	"$ORIGIN"
+@ MSG_STR_MACHINE	"$MACHINE"
 @ MSG_STR_PLATFORM	"$PLATFORM"
 @ MSG_STR_ISALIST	"$ISALIST"
 @ MSG_STR_OSNAME	"$OSNAME"
@@ -747,6 +772,8 @@
 @ MSG_SCN_SUNWVERSION	".SUNW_version"
 @ MSG_SCN_SUNWVERSYM	".SUNW_versym"
 @ MSG_SCN_SUNWCAP	".SUNW_cap"
+@ MSG_SCN_SUNWCAPINFO	".SUNW_capinfo"
+@ MSG_SCN_SUNWCAPCHAIN	".SUNW_capchain"
 @ MSG_SCN_SYMTAB	".symtab"
 @ MSG_SCN_SYMTAB_SHNDX	".symtab_shndx"
 @ MSG_SCN_TBSS		".tbss"
@@ -860,6 +887,7 @@
 			 but no runpaths have been specified via %s"
 @ MSG_ARG_NOENTRY	"entry point symbol '%s' is undefined"
 @ MSG_ARG_UNSUPPORTED	"option %s is no longer supported; ignored"
+@ MSG_MARG_ONLY		"option %s can only be used with a %s"
 
 @ MSG_ARG_FLAGS		"flags processing errors"
 @ MSG_ARG_FILES		"file processing errors. No output written to %s"
@@ -1199,7 +1227,7 @@
 
 
 # Software identification.  Note, the SGU strings is historic, and has
-# little relevence.  It is preserved as applications have used this
+# little relevance.  It is preserved as applications have used this
 # string to identify the Solaris link-editor.
 
 @ MSG_SGS_ID		"ld: Software Generation Utilities - \
@@ -1222,6 +1250,7 @@
 @ MSG_STR_PATH		"%s/%s"
 @ MSG_STR_STRNL		"%s\n"
 @ MSG_STR_NL		"\n"
+@ MSG_STR_CAPGROUPID 	"CAP_GROUP_%d"
 
 @ MSG_STR_LD_DYNAMIC	"dynamic"
 @ MSG_STR_SYMBOLIC	"symbolic"
@@ -1242,7 +1271,6 @@
 
 @ MSG_STR_OPTIONS	"3:6:abc:d:e:f:h:il:mo:p:rstu:z:B:CD:F:GI:L:M:N:P:Q:R:\
 			 S:VW:Y:?"
-
 
 # Argument processing strings
 
@@ -1283,6 +1311,7 @@
 @ MSG_ARG_ZTEXTALL	"-z[text|textwarn|textoff]"
 @ MSG_ARG_ZLOADFLTR	"-zloadfltr"
 @ MSG_ARG_ZCOMBRELOC	"-zcombreloc"
+@ MSG_ARG_ZSYMBOLCAP	"-zsymbolcap"
 
 @ MSG_ARG_ABSEXEC	"absexec"
 @ MSG_ARG_ALTEXEC64	"altexec64"
@@ -1345,6 +1374,7 @@
 @ MSG_ARG_GROUP		"group"
 @ MSG_ARG_REDUCE	"reduce"
 @ MSG_ARG_STATIC	"static"
+@ MSG_ARG_SYMBOLCAP	"symbolcap"
 
 @ MSG_ARG_LCOM		"L,"
 @ MSG_ARG_PCOM		"P,"

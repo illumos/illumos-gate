@@ -574,6 +574,9 @@ Dbg_file_config_dis(Lm_list *lml, const char *config, int features)
 	Conv_config_feat_buf_t	config_feat_buf;
 	const char		*str;
 
+	if (features == 0)
+		return;
+
 	switch (features & ~CONF_FEATMSK) {
 	case DBG_CONF_IGNORE:
 		str = MSG_INTL(MSG_FIL_CONFIG_ERR_1);
@@ -732,7 +735,12 @@ reject[] = {
 	MSG_REJ_US3,		/* MSG_INTL(MSG_REJ_US3) */
 	MSG_REJ_STR,		/* MSG_INTL(MSG_REJ_STR) */
 	MSG_REJ_UNKFILE,	/* MSG_INTL(MSG_REJ_UNKFILE) */
+	MSG_REJ_UNKCAP,		/* MSG_INTL(MSG_REJ_UNKCAP) */
 	MSG_REJ_HWCAP_1,	/* MSG_INTL(MSG_REJ_HWCAP_1) */
+	MSG_REJ_SFCAP_1,	/* MSG_INTL(MSG_REJ_SFCAP_1) */
+	MSG_REJ_MACHCAP,	/* MSG_INTL(MSG_REJ_MACHCAP) */
+	MSG_REJ_PLATCAP,	/* MSG_INTL(MSG_REJ_PLATCAP) */
+	MSG_REJ_HWCAP_2		/* MSG_INTL(MSG_REJ_HWCAP_2) */
 };
 
 void

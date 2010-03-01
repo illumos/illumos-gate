@@ -163,50 +163,62 @@ elf_fix_name(const char *name, Rt_map *clmp, Alist **alpp, Aliste alni,
 }
 
 /*
- * Determine whether this object requires any hardware or software capabilities.
+ * Determine whether this object requires capabilities.
  */
-static int
+inline static int
 elf_cap_check(Fdesc *fdp, Ehdr *ehdr, Rej_desc *rej)
 {
 	Phdr	*phdr;
+	Cap	*cap = NULL;
+	Dyn	*dyn = NULL;
+	char	*str = NULL;
+	Addr	base;
 	int	cnt;
+
+	/*
+	 * If this is a shared object, the base address of the shared object is
+	 * added to all address values defined within the object.  Otherwise, if
+	 * this is an executable, all object addresses are used as is.
+	 */
+	if (ehdr->e_type == ET_EXEC)
+		base = 0;
+	else
+		base = (Addr)ehdr;
 
 	/* LINTED */
 	phdr = (Phdr *)((char *)ehdr + ehdr->e_phoff);
 	for (cnt = 0; cnt < ehdr->e_phnum; cnt++, phdr++) {
-		Cap	*cptr;
-
-		if (phdr->p_type != PT_SUNWCAP)
-			continue;
-
-		/* LINTED */
-		cptr = (Cap *)((char *)ehdr + phdr->p_offset);
-		while (cptr->c_tag != CA_SUNW_NULL) {
-			if (cptr->c_tag == CA_SUNW_HW_1) {
-				/*
-				 * Verify the hardware capabilities.
-				 */
-				if (hwcap_check(cptr->c_un.c_val, rej) == 0)
-					return (0);
-
-				/*
-				 * Retain this hardware capabilities value for
-				 * possible later inspection should this object
-				 * be processed as a filtee.
-				 */
-				fdp->fd_hwcap = cptr->c_un.c_val;
-			}
-			if (cptr->c_tag == CA_SUNW_SF_1) {
-				/*
-				 * Verify the software capabilities.
-				 */
-				if (sfcap_check(cptr->c_un.c_val, rej) == 0)
-					return (0);
-			}
-			cptr++;
+		if (phdr->p_type == PT_DYNAMIC) {
+			/* LINTED */
+			dyn = (Dyn *)((uintptr_t)phdr->p_vaddr + base);
+		} else if (phdr->p_type == PT_SUNWCAP) {
+			/* LINTED */
+			cap = (Cap *)((uintptr_t)phdr->p_vaddr + base);
 		}
 	}
-	return (1);
+
+	if (cap) {
+		/*
+		 * From the .dynamic section, determine the associated string
+		 * table.  Required for CA_SUNW_MACH and CA_SUNW_PLAT
+		 * processing.
+		 */
+		while (dyn) {
+			if (dyn->d_tag == DT_NULL) {
+				break;
+			} else if (dyn->d_tag == DT_STRTAB) {
+				str = (char *)(dyn->d_un.d_ptr + base);
+				break;
+			}
+			dyn++;
+		}
+	}
+
+	/*
+	 * Establish any alternative capabilities, and validate this object
+	 * if it defines it's own capabilities information.
+	 */
+	return (cap_check_fdesc(fdp, cap, str, rej));
 }
 
 /*
@@ -272,23 +284,19 @@ elf_verify(caddr_t addr, size_t size, Fdesc *fdp, const char *name,
 		return (NULL);
 
 	/*
-	 * Verify any hardware/software capability requirements.  Note, if this
-	 * object is an explicitly defined shared object under inspection by
-	 * ldd(1), and contains an incompatible hardware capabilities
-	 * requirement, then inform the user, but continue processing.
+	 * Verify any capability requirements.  Note, if this object is a shared
+	 * object that is explicitly defined on the ldd(1) command line, and it
+	 * contains an incompatible capabilities requirement, then inform the
+	 * user, but continue processing.
 	 */
 	if (elf_cap_check(fdp, ehdr, rej) == 0) {
 		Rt_map	*lmp = lml_main.lm_head;
 
 		if ((lml_main.lm_flags & LML_FLG_TRC_LDDSTUB) && lmp &&
 		    (FLAGS1(lmp) & FL1_RT_LDDSTUB) && (NEXT(lmp) == NULL)) {
-			const char	*fmt;
-
-			if (rej->rej_type == SGS_REJ_HWCAP_1)
-				fmt = MSG_INTL(MSG_LDD_GEN_HWCAP_1);
-			else
-				fmt = MSG_INTL(MSG_LDD_GEN_SFCAP_1);
-			(void) printf(fmt, name, rej->rej_str);
+			/* LINTED */
+			(void) printf(MSG_INTL(ldd_warn[rej->rej_type]), name,
+			    rej->rej_str);
 			return (&elf_fct);
 		}
 		return (NULL);
@@ -542,7 +550,7 @@ elf_verify_vers(const char *name, Rt_map *clmp, Rt_map *nlmp)
 			 *
 			 * Such versions are recorded in the object for the
 			 * benefit of VERSYM entries that refer to them. This
-			 * provides a purely diagnositic benefit.
+			 * provides a purely diagnostic benefit.
 			 */
 			if (vnap->vna_flags & VER_FLG_INFO)
 				continue;
@@ -783,10 +791,10 @@ elf_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp, int *in_nfavl)
  * A null symbol interpretor.  Used if a filter has no associated filtees.
  */
 /* ARGSUSED0 */
-static Sym *
-elf_null_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
+static int
+elf_null_find_sym(Slookup *slp, Sresult *srp, uint_t *binfo, int *in_nfavl)
 {
-	return (NULL);
+	return (0);
 }
 
 /*
@@ -833,8 +841,8 @@ elf_disable_filtee(Rt_map *lmp, Dyninfo *dip)
  *
  * A symbol name of 0 is used to trigger filtee loading.
  */
-static Sym *
-_elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
+static int
+_elf_lookup_filtee(Slookup *slp, Sresult *srp, uint_t *binfo, uint_t ndx,
     int *in_nfavl)
 {
 	const char	*name = slp->sl_name, *filtees;
@@ -883,10 +891,10 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 	 */
 	filtees = (char *)STRTAB(ilmp) + DYN(ilmp)[ndx].d_un.d_val;
 	if (dip->di_info == NULL) {
-		if (rtld_flags2 & RT_FL2_FLTCFG)
+		if (rtld_flags2 & RT_FL2_FLTCFG) {
 			elf_config_flt(lml, PATHNAME(ilmp), filtees,
 			    (Alist **)&dip->di_info, AL_CNT_FILTEES);
-
+		}
 		if (dip->di_info == NULL) {
 			DBG_CALL(Dbg_file_filter(lml, NAME(ilmp), filtees, 0));
 			if ((lml->lm_flags &
@@ -898,7 +906,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 			if (expand_paths(ilmp, filtees, (Alist **)&dip->di_info,
 			    AL_CNT_FILTEES, 0, 0) == 0) {
 				elf_disable_filtee(ilmp, dip);
-				return (NULL);
+				return (0);
 			}
 		}
 	}
@@ -934,11 +942,10 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 			mode |= RTLD_PARENT;
 
 		/*
-		 * Process any hardware capability directory.  Establish a new
-		 * link-map control list from which to analyze any newly added
-		 * objects.
+		 * Process any capability directory.  Establish a new link-map
+		 * control list from which to analyze any newly added objects.
 		 */
-		if ((pdp->pd_info == NULL) && (pdp->pd_flags & PD_TKN_HWCAP)) {
+		if ((pdp->pd_info == NULL) && (pdp->pd_flags & PD_TKN_CAP)) {
 			const char	*dir = pdp->pd_pname;
 			Aliste		lmco;
 
@@ -949,40 +956,38 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 				return (NULL);
 
 			/*
-			 * Determine the hardware capability filtees.  If none
-			 * can be found, provide suitable diagnostics.
+			 * Determine the capability filtees.  If none can be
+			 * found, provide suitable diagnostics.
 			 */
-			DBG_CALL(Dbg_cap_hw_filter(lml, dir, ilmp));
-			if (hwcap_filtees((Alist **)&dip->di_info, idx, dir,
+			DBG_CALL(Dbg_cap_filter(lml, dir, ilmp));
+			if (cap_filtees((Alist **)&dip->di_info, idx, dir,
 			    lmco, ilmp, filtees, mode,
-			    (FLG_RT_PUBHDL | FLG_RT_HWCAP), in_nfavl) == 0) {
+			    (FLG_RT_PUBHDL | FLG_RT_CAP), in_nfavl) == 0) {
 				if ((lml->lm_flags & LML_FLG_TRC_ENABLE) &&
 				    (dip->di_flags & FLG_DI_AUXFLTR) &&
 				    (rtld_flags & RT_FL_WARNFLTR)) {
 					(void) printf(
-					    MSG_INTL(MSG_LDD_HWCAP_NFOUND),
-					    dir);
+					    MSG_INTL(MSG_LDD_CAP_NFOUND), dir);
 				}
-				DBG_CALL(Dbg_cap_hw_filter(lml, dir, 0));
+				DBG_CALL(Dbg_cap_filter(lml, dir, 0));
 			}
 
 			/*
-			 * Re-establish the originating path name descriptor, as
-			 * the expansion of hardware capabilities filtees may
-			 * have re-allocated the controlling Alist.  Mark this
+			 * Re-establish the originating path name descriptor,
+			 * as the expansion of capabilities filtees may have
+			 * re-allocated the controlling Alist.  Mark this
 			 * original pathname descriptor as unused so that the
 			 * descriptor isn't revisited for processing.  Any real
-			 * hardware capabilities filtees have been added as new
-			 * pathname descriptors following this descriptor.
+			 * capabilities filtees have been added as new pathname
+			 * descriptors following this descriptor.
 			 */
 			pdp = alist_item((Alist *)dip->di_info, idx);
-			pdp->pd_flags &= ~PD_TKN_HWCAP;
+			pdp->pd_flags &= ~PD_TKN_CAP;
 			pdp->pd_plen = 0;
 
 			/*
-			 * Now that any hardware capability objects have been
-			 * processed, remove any temporary link-map control
-			 * list.
+			 * Now that any capability objects have been processed,
+			 * remove any temporary link-map control list.
 			 */
 			if (lmco != ALIST_OFF_DATA)
 				remove_cntl(lml, lmco);
@@ -1199,16 +1204,17 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 		ghp = (Grp_hdl *)pdp->pd_info;
 
 		/*
-		 * If we're just here to trigger filtee loading skip the symbol
-		 * lookup so we'll continue looking for additional filtees.
+		 * If name is NULL, we're here to trigger filtee loading.
+		 * Skip the symbol lookup so that we'll continue looking for
+		 * additional filtees.
 		 */
 		if (name) {
 			Grp_desc	*gdp;
-			Sym		*sym = NULL;
+			int		ret = 0;
 			Aliste		idx;
 			Slookup		sl = *slp;
 
-			sl.sl_flags |= LKUP_FIRST;
+			sl.sl_flags |= (LKUP_FIRST | LKUP_DLSYM);
 			any++;
 
 			/*
@@ -1231,8 +1237,8 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 				if ((sl.sl_imap = gdp->gd_depend) == ilmp)
 					continue;
 
-				if (((sym = SYMINTP(sl.sl_imap)(&sl, dlmp,
-				    binfo, in_nfavl)) != NULL) ||
+				if (((ret = SYMINTP(sl.sl_imap)(&sl, srp, binfo,
+				    in_nfavl)) != 0) ||
 				    (ghp->gh_flags & GPH_FIRST))
 					break;
 			}
@@ -1241,9 +1247,9 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 			 * If a symbol has been found, indicate the binding
 			 * and return the symbol.
 			 */
-			if (sym) {
+			if (ret) {
 				*binfo |= DBG_BINFO_FILTEE;
-				return (sym);
+				return (1);
 			}
 		}
 
@@ -1259,7 +1265,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 	 * If we're just here to trigger filtee loading then we're done.
 	 */
 	if (name == NULL)
-		return (NULL);
+		return (0);
 
 	/*
 	 * If no filtees have been found for a filter, clean up any path name
@@ -1271,10 +1277,9 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 	if (any == 0) {
 		remove_plist((Alist **)&(dip->di_info), 1);
 		elf_disable_filtee(ilmp, dip);
-		return (NULL);
 	}
 
-	return (NULL);
+	return (0);
 }
 
 /*
@@ -1282,8 +1287,8 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
  * auxiliary filter allows for filtee use, but provides a fallback should a
  * filtee not exist (or fail to load), any errors generated as a consequence of
  * trying to load the filtees are typically suppressed.  Setting RT_FL_SILENCERR
- * suppresses errors generated by eprint(), but insures a debug diagnostic is
- * produced.  ldd(1) employs printf(), and here, the selection of whether to
+ * suppresses errors generated by eprintf(), but ensures a debug diagnostic is
+ * produced.  ldd(1) employs printf(), and here the selection of whether to
  * print a diagnostic in regards to auxiliary filters is a little more complex.
  *
  *   -	The determination of whether to produce an ldd message, or a fatal
@@ -1291,21 +1296,18 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
  *   -	More detailed ldd messages may also be driven off of LML_FLG_TRC_WARN,
  *	(ldd -d/-r), LML_FLG_TRC_VERBOSE (ldd -v), LML_FLG_TRC_SEARCH (ldd -s),
  *	and LML_FLG_TRC_UNREF/LML_FLG_TRC_UNUSED (ldd -U/-u).
- *
  *   -	If the calling object is lddstub, then several classes of message are
  *	suppressed.  The user isn't trying to diagnose lddstub, this is simply
  *	a stub executable employed to preload a user specified library against.
- *
  *   -	If RT_FL_SILENCERR is in effect then any generic ldd() messages should
  *	be suppressed.  All detailed ldd messages should still be produced.
  */
-Sym *
-elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
+int
+elf_lookup_filtee(Slookup *slp, Sresult *srp, uint_t *binfo, uint_t ndx,
     int *in_nfavl)
 {
-	Sym	*sym;
 	Dyninfo	*dip = &DYNINFO(slp->sl_imap)[ndx];
-	int	silent = 0;
+	int	ret, silent = 0;
 
 	/*
 	 * Make sure this entry is still acting as a filter.  We may have tried
@@ -1314,7 +1316,7 @@ elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 	 * that are yet to be completed.
 	 */
 	if (dip->di_flags == 0)
-		return (NULL);
+		return (0);
 
 	/*
 	 * Indicate whether an error message is required should this filtee not
@@ -1326,12 +1328,12 @@ elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 		silent = 1;
 	}
 
-	sym = _elf_lookup_filtee(slp, dlmp, binfo, ndx, in_nfavl);
+	ret = _elf_lookup_filtee(slp, srp, binfo, ndx, in_nfavl);
 
 	if (silent)
 		rtld_flags &= ~RT_FL_SILENCERR;
 
-	return (sym);
+	return (ret);
 }
 
 /*
@@ -1364,20 +1366,17 @@ elf_hash(const char *name)
 }
 
 /*
- * If flag argument has LKUP_SPEC set, we treat undefined symbols of type
- * function specially in the executable - if they have a value, even though
- * undefined, we use that value.  This allows us to associate all references
- * to a function's address to a single place in the process: the plt entry
- * for that function in the executable.  Calls to lookup from plt binding
- * routines do NOT set LKUP_SPEC in the flag.
+ * Look up a symbol.  The callers lookup information is passed in the Slookup
+ * structure, and any resultant binding information is returned in the Sresult
+ * structure.
  */
-Sym *
-elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
+int
+elf_find_sym(Slookup *slp, Sresult *srp, uint_t *binfo, int *in_nfavl)
 {
 	const char	*name = slp->sl_name;
 	Rt_map		*ilmp = slp->sl_imap;
 	ulong_t		hash = slp->sl_hash;
-	uint_t		ndx, htmp, buckets, *chainptr;
+	uint_t		ndx, hashoff, buckets, *chainptr;
 	Sym		*sym, *symtabptr;
 	char		*strtabptr, *strtabname;
 	uint_t		flags1;
@@ -1391,18 +1390,18 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 		DBG_CALL(Dbg_syms_lookup(ilmp, name, MSG_ORIG(MSG_STR_ELF)));
 
 	if (HASH(ilmp) == NULL)
-		return (NULL);
+		return (0);
 
 	buckets = HASH(ilmp)[0];
 	/* LINTED */
-	htmp = (uint_t)hash % buckets;
+	hashoff = ((uint_t)hash % buckets) + 2;
 
 	/*
-	 * Get the first symbol on hash chain and initialize the string
+	 * Get the first symbol from the hash chain and initialize the string
 	 * and symbol table pointers.
 	 */
-	if ((ndx = HASH(ilmp)[htmp + 2]) == 0)
-		return (NULL);
+	if ((ndx = HASH(ilmp)[hashoff]) == 0)
+		return (0);
 
 	chainptr = HASH(ilmp) + 2 + buckets;
 	strtabptr = STRTAB(ilmp);
@@ -1417,10 +1416,24 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 		 * names don't match continue with the next hash entry.
 		 */
 		if ((*strtabname++ != *name) || strcmp(strtabname, &name[1])) {
+			hashoff = ndx + buckets + 2;
 			if ((ndx = chainptr[ndx]) != 0)
 				continue;
-			return (NULL);
+			return (0);
 		}
+
+		/*
+		 * Symbols that are defined as hidden within an object usually
+		 * have any references from within the same object bound at
+		 * link-edit time, thus ld.so.1 is not involved.  However, if
+		 * these are capabilities symbols, then references to them must
+		 * be resolved at runtime.  A hidden symbol can only be bound
+		 * to by the object that defines the symbol.
+		 */
+		if ((sym->st_shndx != SHN_UNDEF) &&
+		    (ELF_ST_VISIBILITY(sym->st_other) == STV_HIDDEN) &&
+		    (slp->sl_cmap != ilmp))
+			return (0);
 
 		/*
 		 * The Solaris ld does not put DT_VERSYM in the dynamic
@@ -1436,28 +1449,30 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 		 * it allows, but we honor the hidden bit in GNU ld
 		 * produced objects in order to interoperate with them.
 		 */
-		if ((VERSYM(ilmp) != NULL) &&
-		    ((VERSYM(ilmp)[ndx] & 0x8000) != 0)) {
+		if (VERSYM(ilmp) && (VERSYM(ilmp)[ndx] & 0x8000)) {
 			DBG_CALL(Dbg_syms_ignore_gnuver(ilmp, name,
 			    ndx, VERSYM(ilmp)[ndx]));
-			if ((ndx = chainptr[ndx]) != 0)
-				continue;
-			return (NULL);
+			return (0);
 		}
 
 		/*
-		 * If we're only here to establish a symbols index, we're done.
+		 * If we're only here to establish a symbol's index, we're done.
 		 */
-		if (slp->sl_flags & LKUP_SYMNDX)
-			return (sym);
+		if (slp->sl_flags & LKUP_SYMNDX) {
+			srp->sr_dmap = ilmp;
+			srp->sr_sym = sym;
+			return (1);
+		}
 
 		/*
-		 * If we find a match and the symbol is defined, return the
+		 * If we find a match and the symbol is defined, capture the
 		 * symbol pointer and the link map in which it was found.
 		 */
 		if (sym->st_shndx != SHN_UNDEF) {
-			*dlmp = ilmp;
+			srp->sr_dmap = ilmp;
+			srp->sr_sym = sym;
 			*binfo |= DBG_BINFO_FOUND;
+
 			if ((FLAGS(ilmp) & FLG_RT_OBJINTPO) ||
 			    ((FLAGS(ilmp) & FLG_RT_SYMINTPO) &&
 			    is_sym_interposer(ilmp, sym)))
@@ -1475,19 +1490,21 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 		} else if ((slp->sl_flags & LKUP_SPEC) &&
 		    (FLAGS(ilmp) & FLG_RT_ISMAIN) && (sym->st_value != 0) &&
 		    (ELF_ST_TYPE(sym->st_info) == STT_FUNC)) {
-			*dlmp = ilmp;
+			srp->sr_dmap = ilmp;
+			srp->sr_sym = sym;
 			*binfo |= (DBG_BINFO_FOUND | DBG_BINFO_PLTADDR);
+
 			if ((FLAGS(ilmp) & FLG_RT_OBJINTPO) ||
 			    ((FLAGS(ilmp) & FLG_RT_SYMINTPO) &&
 			    is_sym_interposer(ilmp, sym)))
 				*binfo |= DBG_BINFO_INTERPOSE;
-			return (sym);
+			return (1);
 		}
 
 		/*
 		 * Undefined symbol.
 		 */
-		return (NULL);
+		return (0);
 	}
 
 	/*
@@ -1512,7 +1529,7 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 		    DBG_BNDREJ_SINGLE));
 		*binfo |= BINFO_REJSINGLE;
 		*binfo &= ~DBG_BINFO_MSK;
-		return (NULL);
+		return (0);
 	}
 
 	/*
@@ -1528,7 +1545,7 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 		    DBG_BNDREJ_DIRECT));
 		*binfo |= BINFO_REJDIRECT;
 		*binfo &= ~DBG_BINFO_MSK;
-		return (NULL);
+		return (0);
 	}
 
 	/*
@@ -1557,14 +1574,24 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 		    DBG_BNDREJ_GROUP));
 		*binfo |= BINFO_REJGROUP;
 		*binfo &= ~DBG_BINFO_MSK;
-		return (NULL);
+		return (0);
 	}
+
+	/*
+	 * If this symbol is associated with capabilities, then each of the
+	 * capabilities instances needs to be compared against the system
+	 * capabilities.  The best instance will be chosen to satisfy this
+	 * binding.
+	 */
+	if (CAP(ilmp) && CAPINFO(ilmp) && ELF_C_GROUP(CAPINFO(ilmp)[ndx]) &&
+	    (cap_match(srp, ndx, symtabptr, strtabptr) == 0))
+		return (0);
 
 	/*
 	 * Determine whether this object is acting as a filter.
 	 */
 	if (((flags1 = FLAGS1(ilmp)) & MSK_RT_FILTER) == 0)
-		return (sym);
+		return (1);
 
 	/*
 	 * Determine if this object offers per-symbol filtering, and if so,
@@ -1579,12 +1606,18 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 		 */
 		if ((sip->si_flags & SYMINFO_FLG_FILTER) &&
 		    (SYMSFLTRCNT(ilmp) == 0))
-			return (NULL);
+			return (0);
 
 		if ((sip->si_flags & SYMINFO_FLG_FILTER) ||
 		    ((sip->si_flags & SYMINFO_FLG_AUXILIARY) &&
 		    SYMAFLTRCNT(ilmp))) {
-			Sym	*fsym;
+			Sresult	sr;
+
+			/*
+			 * Initialize a local symbol result descriptor, using
+			 * the original symbol name.
+			 */
+			SRESULT_INIT(sr, slp->sl_name);
 
 			/*
 			 * This symbol has an associated filtee.  Lookup the
@@ -1593,11 +1626,13 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 			 * filter, return an error, otherwise fall through to
 			 * catch any object filtering that may be available.
 			 */
-			if ((fsym = elf_lookup_filtee(slp, dlmp, binfo,
-			    sip->si_boundto, in_nfavl)) != NULL)
-				return (fsym);
+			if (elf_lookup_filtee(slp, &sr, binfo, sip->si_boundto,
+			    in_nfavl)) {
+				*srp = sr;
+				return (1);
+			}
 			if (sip->si_flags & SYMINFO_FLG_FILTER)
-				return (NULL);
+				return (0);
 		}
 	}
 
@@ -1605,9 +1640,15 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 	 * Determine if this object provides global filtering.
 	 */
 	if (flags1 & (FL1_RT_OBJSFLTR | FL1_RT_OBJAFLTR)) {
-		Sym	*fsym;
-
 		if (OBJFLTRNDX(ilmp) != FLTR_DISABLED) {
+			Sresult	sr;
+
+			/*
+			 * Initialize a local symbol result descriptor, using
+			 * the original symbol name.
+			 */
+			SRESULT_INIT(sr, slp->sl_name);
+
 			/*
 			 * This object has an associated filtee.  Lookup the
 			 * symbol in the filtee, and if it is found return it.
@@ -1615,15 +1656,17 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 			 * filter, return and error, otherwise return the symbol
 			 * within the filter itself.
 			 */
-			if ((fsym = elf_lookup_filtee(slp, dlmp, binfo,
-			    OBJFLTRNDX(ilmp), in_nfavl)) != NULL)
-				return (fsym);
+			if (elf_lookup_filtee(slp, &sr, binfo, OBJFLTRNDX(ilmp),
+			    in_nfavl)) {
+				*srp = sr;
+				return (1);
+			}
 		}
 
 		if (flags1 & FL1_RT_OBJSFLTR)
-			return (NULL);
+			return (0);
 	}
-	return (sym);
+	return (1);
 }
 
 /*
@@ -1983,7 +2026,7 @@ elf_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
 				 * Global auditing is only meaningful when
 				 * specified by the initiating object of the
 				 * process - typically the dynamic executable.
-				 * If this is the initiaiting object, its link-
+				 * If this is the initiating object, its link-
 				 * map will not yet have been added to the
 				 * link-map list, and consequently the link-map
 				 * list is empty.  (see setup()).
@@ -2063,6 +2106,22 @@ elf_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
 			case DT_DEPRECATED_SPARC_REGISTER:
 			case M_DT_REGISTER:
 				FLAGS(lmp) |= FLG_RT_REGSYMS;
+				break;
+			case DT_SUNW_CAP:
+				CAP(lmp) = (void *)(dyn->d_un.d_ptr + base);
+				break;
+			case DT_SUNW_CAPINFO:
+				CAPINFO(lmp) = (void *)(dyn->d_un.d_ptr + base);
+				break;
+			case DT_SUNW_CAPCHAIN:
+				CAPCHAIN(lmp) = (void *)(dyn->d_un.d_ptr +
+				    base);
+				break;
+			case DT_SUNW_CAPCHAINENT:
+				CAPCHAINENT(lmp) = dyn->d_un.d_val;
+				break;
+			case DT_SUNW_CAPCHAINSZ:
+				CAPCHAINSZ(lmp) = dyn->d_un.d_val;
 				break;
 			}
 		}
@@ -2171,8 +2230,80 @@ elf_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
 		return (NULL);
 	}
 
-	if (cap)
-		cap_assign(cap, lmp);
+	/*
+	 * A capabilities section should be identified by a DT_SUNW_CAP entry,
+	 * and if non-empty object capabilities are included, a PT_SUNWCAP
+	 * header should reference the section.  Make sure CAP() is set
+	 * regardless.
+	 */
+	if ((CAP(lmp) == NULL) && cap)
+		CAP(lmp) = cap;
+
+	/*
+	 * Make sure any capabilities information or chain can be handled.
+	 */
+	if (CAPINFO(lmp) && (CAPINFO(lmp)[0] > CAPINFO_CURRENT))
+		CAPINFO(lmp) = NULL;
+	if (CAPCHAIN(lmp) && (CAPCHAIN(lmp)[0] > CAPCHAIN_CURRENT))
+		CAPCHAIN(lmp) = NULL;
+
+	/*
+	 * As part of processing dependencies, a file descriptor is populated
+	 * with capabilities information following validation.
+	 */
+	if (fdp->fd_flags & FLG_FD_ALTCHECK) {
+		FLAGS1(lmp) |= FL1_RT_ALTCHECK;
+		CAPSET(lmp) = fdp->fd_scapset;
+
+		if (fdp->fd_flags & FLG_FD_ALTCAP)
+			FLAGS1(lmp) |= FL1_RT_ALTCAP;
+
+	} else if ((cap = CAP(lmp)) != NULL) {
+		/*
+		 * Processing of the a.out and ld.so.1 does not involve a file
+		 * descriptor as exec() did all the work, so capture the
+		 * capabilities for these cases.
+		 */
+		while (cap->c_tag != CA_SUNW_NULL) {
+			switch (cap->c_tag) {
+			case CA_SUNW_HW_1:
+				CAPSET(lmp).sc_hw_1 = cap->c_un.c_val;
+				break;
+			case CA_SUNW_SF_1:
+				CAPSET(lmp).sc_sf_1 = cap->c_un.c_val;
+				break;
+			case CA_SUNW_HW_2:
+				CAPSET(lmp).sc_hw_2 = cap->c_un.c_val;
+				break;
+			case CA_SUNW_PLAT:
+				CAPSET(lmp).sc_plat = STRTAB(lmp) +
+				    cap->c_un.c_ptr;
+				break;
+			case CA_SUNW_MACH:
+				CAPSET(lmp).sc_mach = STRTAB(lmp) +
+				    cap->c_un.c_ptr;
+				break;
+			}
+			cap++;
+		}
+	}
+
+	/*
+	 * If a capabilities chain table exists, duplicate it.  The chain table
+	 * is inspected for each initial call to a capabilities family lead
+	 * symbol.  From this chain, each family member is inspected to
+	 * determine the 'best' family member.  The chain table is then updated
+	 * so that the best member is immediately selected for any further
+	 * family searches.
+	 */
+	if (CAPCHAIN(lmp)) {
+		Capchain	*capchain;
+
+		if ((capchain = calloc(CAPCHAINSZ(lmp), 1)) == NULL)
+			return (NULL);
+		(void) memcpy(capchain, CAPCHAIN(lmp), CAPCHAINSZ(lmp));
+		CAPCHAIN(lmp) = capchain;
+	}
 
 	/*
 	 * Add the mapped object to the end of the link map list.
@@ -2188,24 +2319,6 @@ elf_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
 		    MADV_WILLNEED);
 	}
 	return (lmp);
-}
-
-/*
- * Assign hardware/software capabilities.
- */
-void
-cap_assign(Cap *cap, Rt_map *lmp)
-{
-	while (cap->c_tag != CA_SUNW_NULL) {
-		switch (cap->c_tag) {
-		case CA_SUNW_HW_1:
-			HWCAP(lmp) = cap->c_un.c_val;
-			break;
-		case CA_SUNW_SF_1:
-			SFCAP(lmp) = cap->c_un.c_val;
-		}
-		cap++;
-	}
 }
 
 /*
@@ -2512,10 +2625,9 @@ elf_dladdr(ulong_t addr, Rt_map *lmp, Dl_info *dlip, void **info, int flags)
  * pending, this routine loads the dependencies in an attempt to locate the
  * symbol.
  */
-Sym *
-elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo, int *in_nfavl)
+int
+elf_lazy_find_sym(Slookup *slp, Sresult *srp, uint_t *binfo, int *in_nfavl)
 {
-	Sym		*sym = NULL;
 	static APlist	*alist = NULL;
 	Aliste		idx1;
 	Rt_map		*lmp1, *lmp = slp->sl_imap, *clmp = slp->sl_cmap;
@@ -2571,6 +2683,7 @@ elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo, int *in_nfavl)
 			Grp_desc	*gdp;
 			Rt_map		*nlmp, *llmp;
 			Slookup		sl2;
+			Sresult		sr;
 			Aliste		idx2;
 
 			if (((dip->di_flags & FLG_DI_LAZY) == 0) ||
@@ -2641,9 +2754,16 @@ elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo, int *in_nfavl)
 				sl1.sl_imap = NEXT_RT_MAP(llmp);
 				sl1.sl_flags &= ~LKUP_STDRELOC;
 
-				if ((sym = lookup_sym(&sl1, _lmp, binfo,
-				    in_nfavl)) != NULL)
-					return (sym);
+				/*
+				 * Initialize a local symbol result descriptor,
+				 * using the original symbol name.
+				 */
+				SRESULT_INIT(sr, slp->sl_name);
+
+				if (lookup_sym(&sl1, &sr, binfo, in_nfavl)) {
+					*srp = sr;
+					return (1);
+				}
 			}
 
 			/*
@@ -2661,9 +2781,18 @@ elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo, int *in_nfavl)
 					sl2.sl_imap = gdp->gd_depend;
 					sl2.sl_flags |= LKUP_FIRST;
 
-					if ((sym = lookup_sym(&sl2, _lmp, binfo,
-					    in_nfavl)) != NULL)
-						return (sym);
+					/*
+					 * Initialize a local symbol result
+					 * descriptor, using the original
+					 * symbol name.
+					 */
+					SRESULT_INIT(sr, slp->sl_name);
+
+					if (lookup_sym(&sl2, &sr, binfo,
+					    in_nfavl)) {
+						*srp = sr;
+						return (1);
+					}
 				}
 			}
 
@@ -2676,11 +2805,11 @@ elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo, int *in_nfavl)
 				continue;
 
 			if (aplist_test(&alist, nlmp, AL_CNT_LAZYFIND) == NULL)
-				return (NULL);
+				return (0);
 		}
 	}
 
-	return (NULL);
+	return (0);
 }
 
 /*

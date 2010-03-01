@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	<sgs.h>
 #include	<stdio.h>
 #include	<debug.h>
@@ -43,19 +41,26 @@ void
 Elf_syminfo_entry(Lm_list *lml, Word ndx, Syminfo *sip, const char *name,
     const char *needed)
 {
-	const char	*bndstr, *str;
+	const char	*bndstr = NULL, *str;
 	char		flagstr[FLAGSZ], sndxstr[NDXSZ], dndxstr[NDXSZ];
 	int		flgndx = 0;
 	Half		flags = sip->si_flags;
 
-	if (flags & SYMINFO_FLG_DIRECT) {
-		if (sip->si_boundto == SYMINFO_BT_SELF)
-			bndstr = MSG_INTL(MSG_SYMINFO_SELF);
-		else if (sip->si_boundto == SYMINFO_BT_PARENT)
-			bndstr = MSG_INTL(MSG_SYMINFO_PARENT);
-		else
-			bndstr = needed;
+	if (flags & SYMINFO_FLG_CAP) {
+		bndstr = MSG_INTL(MSG_SYMINFO_CAP);
+		flagstr[flgndx++] = 'S';
+		flags &= ~SYMINFO_FLG_CAP;
+	}
 
+	if (flags & SYMINFO_FLG_DIRECT) {
+		if (bndstr == NULL) {
+			if (sip->si_boundto == SYMINFO_BT_SELF)
+				bndstr = MSG_INTL(MSG_SYMINFO_SELF);
+			else if (sip->si_boundto == SYMINFO_BT_PARENT)
+				bndstr = MSG_INTL(MSG_SYMINFO_PARENT);
+			else
+				bndstr = needed;
+		}
 		flagstr[flgndx++] = 'D';
 		flags &= ~SYMINFO_FLG_DIRECT;
 
@@ -71,7 +76,7 @@ Elf_syminfo_entry(Lm_list *lml, Word ndx, Syminfo *sip, const char *name,
 
 	} else if (sip->si_boundto == SYMINFO_BT_EXTERN)
 		bndstr = MSG_INTL(MSG_SYMINFO_EXTERN);
-	else
+	else if (bndstr == NULL)
 		bndstr = MSG_ORIG(MSG_STR_EMPTY);
 
 	if (flags & SYMINFO_FLG_DIRECTBIND) {

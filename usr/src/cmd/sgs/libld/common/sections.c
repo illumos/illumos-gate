@@ -129,7 +129,7 @@ ignore_sym(Ofl_desc *ofl, Ifl_desc *ifl, Sym_desc *sdp, int allow_ldynsym)
 		 * Global symbols can only be eliminated when the interfaces of
 		 * an object have been defined via versioning/scoping.
 		 */
-		if ((sdp->sd_flags & FLG_SY_HIDDEN) == 0)
+		if (!SYM_IS_HIDDEN(sdp))
 			return;
 
 		/*
@@ -568,13 +568,25 @@ new_section(Ofl_desc *ofl, Word shtype, const char *shname, Xword entcnt,
 		SET_SEC_INFO_WORD_ALIGN(ELF_T_CAP, SHF_ALLOC, sizeof (Cap));
 		break;
 
+	case SHT_SUNW_capchain:
+		ofl->ofl_flags |= FLG_OF_OSABI;
+		SET_SEC_INFO_WORD_ALIGN(ELF_T_WORD, SHF_ALLOC,
+		    sizeof (Capchain));
+		break;
+
+	case SHT_SUNW_capinfo:
+		ofl->ofl_flags |= FLG_OF_OSABI;
+#if	_ELF64
+		SET_SEC_INFO(ELF_T_XWORD, sizeof (Xword), SHF_ALLOC,
+		    sizeof (Capinfo));
+#else
+		SET_SEC_INFO(ELF_T_WORD, sizeof (Word), SHF_ALLOC,
+		    sizeof (Capinfo));
+#endif
+		break;
+
 	case SHT_SUNW_move:
 		ofl->ofl_flags |= FLG_OF_OSABI;
-		/*
-		 * The sh_info field of the SHT_*_syminfo section points
-		 * to the header index of the associated .dynamic section,
-		 * so we also set SHF_INFO_LINK.
-		 */
 		SET_SEC_INFO(ELF_T_BYTE, sizeof (Lword),
 		    SHF_ALLOC | SHF_WRITE, sizeof (Move));
 		break;
@@ -1215,10 +1227,25 @@ make_dynamic(Ofl_desc *ofl)
 		}
 
 		/*
-		 * Any hardware/software capabilities?
+		 * Capabilities require a .dynamic entry for the .SUNW_cap
+		 * section.
 		 */
 		if (ofl->ofl_oscap)
 			cnt++;			/* SUNW_CAP */
+
+		/*
+		 * Symbol capabilities require a .dynamic entry for the
+		 * .SUNW_capinfo section.
+		 */
+		if (ofl->ofl_oscapinfo)
+			cnt++;			/* SUNW_CAPINFO */
+
+		/*
+		 * Capabilities chain information requires a .SUNW_capchain
+		 * entry, an entry size, and total size.
+		 */
+		if (ofl->ofl_oscapchain)
+			cnt += 3;		/* SUNW_CAPCHAIN/ENT/SZ */
 
 		if (flags & FLG_OF_SYMBOLIC)
 			cnt++;			/* SYMBOLIC */
@@ -1349,97 +1376,502 @@ make_interp(Ofl_desc *ofl)
 }
 
 /*
- * Output debugging information for the given capability mask.
+ * Common function used to build the SHT_SUNW_versym section, SHT_SUNW_syminfo
+ * section, and SHT_SUNW_capinfo section.  Each of these sections provide
+ * additional symbol information, and their size parallels the associated
+ * symbol table.
  */
-static void
-dbg_capmask(Ofl_desc *ofl, Word type, CapMask *capmask)
-{
-	/*
-	 * If this capability has excluded bits, then show the current
-	 * internal state. Otherwise, don't bother, because it's identical
-	 * to the final output value.
-	 */
-	if (capmask->cm_exclude)
-		Dbg_cap_entry2(ofl->ofl_lml, DBG_STATE_CURRENT, type,
-		    capmask, ld_targ.t_m.m_mach);
-
-	Dbg_cap_entry(ofl->ofl_lml, DBG_STATE_OUT, type,
-	    CAPMASK_VALUE(capmask), ld_targ.t_m.m_mach);
-}
-
-/*
- * Build a hardware/software capabilities section.
- */
-static uintptr_t
-make_cap(Ofl_desc *ofl)
+static Os_desc *
+make_sym_sec(Ofl_desc *ofl, const char *sectname, Word stype, int ident)
 {
 	Shdr		*shdr;
 	Elf_Data	*data;
 	Is_desc		*isec;
-	Os_desc		*osec;
-	Cap		*cap;
-	size_t		size = 0;
-	elfcap_mask_t	hw_1, sf_1;
-
-	/* Final capability masks with excluded bits removed */
-	hw_1 = CAPMASK_VALUE(&ofl->ofl_ocapset.c_hw_1);
-	sf_1 = CAPMASK_VALUE(&ofl->ofl_ocapset.c_sf_1);
 
 	/*
-	 * Determine how many entries are required.
+	 * We don't know the size of this section yet, so set it to 0.  The
+	 * size gets filled in after the associated symbol table is sized.
 	 */
-	if (hw_1)
-		size++;
-	if (sf_1)
-		size++;
-	if (size == 0)
+	if (new_section(ofl, stype, sectname, 0, &isec, &shdr, &data) ==
+	    S_ERROR)
+		return ((Os_desc *)S_ERROR);
+
+	return (ld_place_section(ofl, isec, NULL, ident, NULL));
+}
+
+/*
+ * Determine whether a symbol capability is redundant because the object
+ * capabilities are more restrictive.
+ */
+inline static int
+is_cap_redundant(Objcapset *ocapset, Objcapset *scapset)
+{
+	Alist		*oalp, *salp;
+	elfcap_mask_t	omsk, smsk;
+
+	/*
+	 * Inspect any platform capabilities.  If the object defines platform
+	 * capabilities, then the object will only be loaded for those
+	 * platforms.  A symbol capability set that doesn't define the same
+	 * platforms is redundant, and a symbol capability that does not provide
+	 * at least one platform name that matches a platform name in the object
+	 * capabilities will never execute (as the object wouldn't have been
+	 * loaded).
+	 */
+	oalp = ocapset->oc_plat.cl_val;
+	salp = scapset->oc_plat.cl_val;
+	if (oalp && ((salp == NULL) || cap_names_match(oalp, salp)))
 		return (1);
-	size++;				/* Add CA_SUNW_NULL */
 
-	if (DBG_ENABLED) {
-		Dbg_cap_out_title(ofl->ofl_lml);
+	/*
+	 * If the symbol capability set defines platforms, and the object
+	 * doesn't, then the symbol set is more restrictive.
+	 */
+	if (salp && (oalp == NULL))
+		return (0);
 
-		if (hw_1)
-			dbg_capmask(ofl, CA_SUNW_HW_1,
-			    &ofl->ofl_ocapset.c_hw_1);
+	/*
+	 * Next, inspect any machine name capabilities.  If the object defines
+	 * machine name capabilities, then the object will only be loaded for
+	 * those machines.  A symbol capability set that doesn't define the same
+	 * machine names is redundant, and a symbol capability that does not
+	 * provide at least one machine name that matches a machine name in the
+	 * object capabilities will never execute (as the object wouldn't have
+	 * been loaded).
+	 */
+	oalp = ocapset->oc_plat.cl_val;
+	salp = scapset->oc_plat.cl_val;
+	if (oalp && ((salp == NULL) || cap_names_match(oalp, salp)))
+		return (1);
 
-		if (sf_1)
-			dbg_capmask(ofl, CA_SUNW_SF_1,
-			    &ofl->ofl_ocapset.c_sf_1);
+	/*
+	 * If the symbol capability set defines machine names, and the object
+	 * doesn't, then the symbol set is more restrictive.
+	 */
+	if (salp && (oalp == NULL))
+		return (0);
+
+	/*
+	 * Next, inspect any hardware capabilities.  If the objects hardware
+	 * capabilities are greater than or equal to that of the symbols
+	 * capabilities, then the symbol capability set is redundant.  If the
+	 * symbols hardware capabilities are greater that the objects, then the
+	 * symbol set is more restrictive.
+	 *
+	 * Note that this is a somewhat arbitrary definition, as each capability
+	 * bit is independent of the others, and some of the higher order bits
+	 * could be considered to be less important than lower ones.  However,
+	 * this is the only reasonable non-subjective definition.
+	 */
+	omsk = ocapset->oc_hw_2.cm_val;
+	smsk = scapset->oc_hw_2.cm_val;
+	if ((omsk > smsk) || (omsk && (omsk == smsk)))
+		return (1);
+	if (omsk < smsk)
+		return (0);
+
+	/*
+	 * Finally, inspect the remaining hardware capabilities.
+	 */
+	omsk = ocapset->oc_hw_1.cm_val;
+	smsk = scapset->oc_hw_1.cm_val;
+	if ((omsk > smsk) || (omsk && (omsk == smsk)))
+		return (1);
+
+	return (0);
+}
+
+/*
+ * Capabilities values might have been assigned excluded values.  These
+ * excluded values should be removed before calculating any capabilities
+ * sections size.
+ */
+static void
+capmask_value(Lm_list *lml, Word type, Capmask *capmask, int *title)
+{
+	/*
+	 * First determine whether any bits should be excluded.
+	 */
+	if ((capmask->cm_val & capmask->cm_exc) == 0)
+		return;
+
+	DBG_CALL(Dbg_cap_post_title(lml, title));
+
+	DBG_CALL(Dbg_cap_val_entry(lml, DBG_STATE_CURRENT, type,
+	    capmask->cm_val, ld_targ.t_m.m_mach));
+	DBG_CALL(Dbg_cap_val_entry(lml, DBG_STATE_EXCLUDE, type,
+	    capmask->cm_exc, ld_targ.t_m.m_mach));
+
+	capmask->cm_val &= ~capmask->cm_exc;
+
+	DBG_CALL(Dbg_cap_val_entry(lml, DBG_STATE_RESOLVED, type,
+	    capmask->cm_val, ld_targ.t_m.m_mach));
+}
+
+static void
+capstr_value(Lm_list *lml, Word type, Caplist *caplist, int *title)
+{
+	Aliste	idx1, idx2;
+	char	*estr;
+	Capstr	*capstr;
+	Boolean	found = FALSE;
+
+	/*
+	 * First determine whether any strings should be excluded.
+	 */
+	for (APLIST_TRAVERSE(caplist->cl_exc, idx1, estr)) {
+		for (ALIST_TRAVERSE(caplist->cl_val, idx2, capstr)) {
+			if (strcmp(estr, capstr->cs_str) == 0) {
+				found = TRUE;
+				break;
+			}
+		}
 	}
 
+	if (found == FALSE)
+		return;
 
-	if (new_section(ofl, SHT_SUNW_cap, MSG_ORIG(MSG_SCN_SUNWCAP), size,
-	    &isec, &shdr, &data) == S_ERROR)
+	/*
+	 * Traverse the current strings, then delete the excluded strings,
+	 * and finally display the resolved strings.
+	 */
+	if (DBG_ENABLED) {
+		Dbg_cap_post_title(lml, title);
+		for (ALIST_TRAVERSE(caplist->cl_val, idx2, capstr)) {
+			Dbg_cap_ptr_entry(lml, DBG_STATE_CURRENT, type,
+			    capstr->cs_str);
+		}
+	}
+	for (APLIST_TRAVERSE(caplist->cl_exc, idx1, estr)) {
+		for (ALIST_TRAVERSE(caplist->cl_val, idx2, capstr)) {
+			if (strcmp(estr, capstr->cs_str) == 0) {
+				DBG_CALL(Dbg_cap_ptr_entry(lml,
+				    DBG_STATE_EXCLUDE, type, capstr->cs_str));
+				alist_delete(caplist->cl_val, &idx2);
+				break;
+			}
+		}
+	}
+	if (DBG_ENABLED) {
+		for (ALIST_TRAVERSE(caplist->cl_val, idx2, capstr)) {
+			Dbg_cap_ptr_entry(lml, DBG_STATE_RESOLVED, type,
+			    capstr->cs_str);
+		}
+	}
+}
+
+/*
+ * Build a capabilities section.
+ */
+#define	CAP_UPDATE(cap, capndx, tag, val)	\
+	cap->c_tag = tag; \
+	cap->c_un.c_val = val; \
+	cap++, capndx++;
+
+static uintptr_t
+make_cap(Ofl_desc *ofl, Word shtype, const char *shname, int ident)
+{
+	Shdr		*shdr;
+	Elf_Data	*data;
+	Is_desc		*isec;
+	Cap		*cap;
+	size_t		size = 0;
+	Word		capndx = 0;
+	Str_tbl		*strtbl;
+	Objcapset	*ocapset = &ofl->ofl_ocapset;
+	Aliste		idx1;
+	Capstr		*capstr;
+	int		title = 0;
+
+	/*
+	 * Determine which string table to use for any CA_SUNW_MACH,
+	 * CA_SUNW_PLAT, or CA_SUNW_ID strings.
+	 */
+	if (OFL_IS_STATIC_OBJ(ofl))
+		strtbl = ofl->ofl_strtab;
+	else
+		strtbl = ofl->ofl_dynstrtab;
+
+	/*
+	 * If symbol capabilities have been collected, but no symbols are left
+	 * referencing these capabilities, promote the capability groups back
+	 * to an object capability definition.
+	 */
+	if ((ofl->ofl_flags & FLG_OF_OTOSCAP) && ofl->ofl_capsymcnt &&
+	    (ofl->ofl_capfamilies == NULL)) {
+		ld_cap_move_symtoobj(ofl);
+		ofl->ofl_capsymcnt = 0;
+		ofl->ofl_capgroups = NULL;
+	}
+
+	/*
+	 * Remove any excluded capabilities.
+	 */
+	capstr_value(ofl->ofl_lml, CA_SUNW_PLAT, &ocapset->oc_plat, &title);
+	capstr_value(ofl->ofl_lml, CA_SUNW_MACH, &ocapset->oc_mach, &title);
+	capmask_value(ofl->ofl_lml, CA_SUNW_HW_2, &ocapset->oc_hw_2, &title);
+	capmask_value(ofl->ofl_lml, CA_SUNW_HW_1, &ocapset->oc_hw_1, &title);
+	capmask_value(ofl->ofl_lml, CA_SUNW_SF_1, &ocapset->oc_sf_1, &title);
+
+	/*
+	 * Determine how many entries are required for any object capabilities.
+	 */
+	size += alist_nitems(ocapset->oc_plat.cl_val);
+	size += alist_nitems(ocapset->oc_mach.cl_val);
+	if (ocapset->oc_hw_2.cm_val)
+		size++;
+	if (ocapset->oc_hw_1.cm_val)
+		size++;
+	if (ocapset->oc_sf_1.cm_val)
+		size++;
+
+	/*
+	 * Only identify a capabilities group if the group has content.  If a
+	 * capabilities identifier exists, and no other capabilities have been
+	 * supplied, remove the identifier.  This scenario could exist if a
+	 * user mistakenly defined a lone identifier, or if an identified group
+	 * was overridden so as to clear the existing capabilities and the
+	 * identifier was not also cleared.
+	 */
+	if (ocapset->oc_id.cs_str) {
+		if (size)
+			size++;
+		else
+			ocapset->oc_id.cs_str = NULL;
+	}
+	if (size)
+		size++;			/* Add CA_SUNW_NULL */
+
+	/*
+	 * Determine how many entries are required for any symbol capabilities.
+	 */
+	if (ofl->ofl_capsymcnt) {
+		/*
+		 * If there are no object capabilities, a CA_SUNW_NULL entry
+		 * is required before any symbol capabilities.
+		 */
+		if (size == 0)
+			size++;
+		size += ofl->ofl_capsymcnt;
+	}
+
+	if (size == 0)
+		return (NULL);
+
+	if (new_section(ofl, shtype, shname, size, &isec,
+	    &shdr, &data) == S_ERROR)
 		return (S_ERROR);
 
 	if ((data->d_buf = libld_malloc(shdr->sh_size)) == NULL)
 		return (S_ERROR);
 
 	cap = (Cap *)data->d_buf;
-	if (hw_1) {
-		cap->c_tag = CA_SUNW_HW_1;
-		cap->c_un.c_val = hw_1;
-		cap++;
-	}
-	if (sf_1) {
-		cap->c_tag = CA_SUNW_SF_1;
-		cap->c_un.c_val = sf_1;
-		cap++;
-	}
-	cap->c_tag = CA_SUNW_NULL;
-	cap->c_un.c_val = 0;
 
 	/*
-	 * If we're not creating a relocatable object, save the output section
-	 * to trigger the creation of an associated program header.
+	 * Fill in any object capabilities.  If there is an identifier, then the
+	 * identifier comes first.  The remaining items follow in precedence
+	 * order, although the order isn't important for runtime verification.
 	 */
-	osec = ld_place_section(ofl, isec, NULL, ld_targ.t_id.id_cap, NULL);
-	if ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0)
-		ofl->ofl_oscap = osec;
+	if (ocapset->oc_id.cs_str) {
+		ofl->ofl_flags |= FLG_OF_CAPSTRS;
+		if (st_insert(strtbl, ocapset->oc_id.cs_str) == -1)
+			return (S_ERROR);
+		ocapset->oc_id.cs_ndx = capndx;
+		CAP_UPDATE(cap, capndx, CA_SUNW_ID, 0);
+	}
+	if (ocapset->oc_plat.cl_val) {
+		ofl->ofl_flags |= (FLG_OF_PTCAP | FLG_OF_CAPSTRS);
 
-	return ((uintptr_t)osec);
+		/*
+		 * Insert any platform name strings in the appropriate string
+		 * table.  The capability value can't be filled in yet, as the
+		 * final offset of the strings isn't known until later.
+		 */
+		for (ALIST_TRAVERSE(ocapset->oc_plat.cl_val, idx1, capstr)) {
+			if (st_insert(strtbl, capstr->cs_str) == -1)
+				return (S_ERROR);
+			capstr->cs_ndx = capndx;
+			CAP_UPDATE(cap, capndx, CA_SUNW_PLAT, 0);
+		}
+	}
+	if (ocapset->oc_mach.cl_val) {
+		ofl->ofl_flags |= (FLG_OF_PTCAP | FLG_OF_CAPSTRS);
+
+		/*
+		 * Insert the machine name strings in the appropriate string
+		 * table.  The capability value can't be filled in yet, as the
+		 * final offset of the strings isn't known until later.
+		 */
+		for (ALIST_TRAVERSE(ocapset->oc_mach.cl_val, idx1, capstr)) {
+			if (st_insert(strtbl, capstr->cs_str) == -1)
+				return (S_ERROR);
+			capstr->cs_ndx = capndx;
+			CAP_UPDATE(cap, capndx, CA_SUNW_MACH, 0);
+		}
+	}
+	if (ocapset->oc_hw_2.cm_val) {
+		ofl->ofl_flags |= FLG_OF_PTCAP;
+		CAP_UPDATE(cap, capndx, CA_SUNW_HW_2, ocapset->oc_hw_2.cm_val);
+	}
+	if (ocapset->oc_hw_1.cm_val) {
+		ofl->ofl_flags |= FLG_OF_PTCAP;
+		CAP_UPDATE(cap, capndx, CA_SUNW_HW_1, ocapset->oc_hw_1.cm_val);
+	}
+	if (ocapset->oc_sf_1.cm_val) {
+		ofl->ofl_flags |= FLG_OF_PTCAP;
+		CAP_UPDATE(cap, capndx, CA_SUNW_SF_1, ocapset->oc_sf_1.cm_val);
+	}
+	CAP_UPDATE(cap, capndx, CA_SUNW_NULL, 0);
+
+	/*
+	 * Fill in any symbol capabilities.
+	 */
+	if (ofl->ofl_capgroups) {
+		Cap_group	*cgp;
+
+		for (APLIST_TRAVERSE(ofl->ofl_capgroups, idx1, cgp)) {
+			Objcapset	*scapset = &cgp->cg_set;
+			Aliste		idx2;
+			Is_desc		*isp;
+
+			cgp->cg_ndx = capndx;
+
+			if (scapset->oc_id.cs_str) {
+				ofl->ofl_flags |= FLG_OF_CAPSTRS;
+				/*
+				 * Insert the identifier string in the
+				 * appropriate string table.  The capability
+				 * value can't be filled in yet, as the final
+				 * offset of the string isn't known until later.
+				 */
+				if (st_insert(strtbl,
+				    scapset->oc_id.cs_str) == -1)
+					return (S_ERROR);
+				scapset->oc_id.cs_ndx = capndx;
+				CAP_UPDATE(cap, capndx, CA_SUNW_ID, 0);
+			}
+
+			if (scapset->oc_plat.cl_val) {
+				ofl->ofl_flags |= FLG_OF_CAPSTRS;
+
+				/*
+				 * Insert the platform name string in the
+				 * appropriate string table.  The capability
+				 * value can't be filled in yet, as the final
+				 * offset of the string isn't known until later.
+				 */
+				for (ALIST_TRAVERSE(scapset->oc_plat.cl_val,
+				    idx2, capstr)) {
+					if (st_insert(strtbl,
+					    capstr->cs_str) == -1)
+						return (S_ERROR);
+					capstr->cs_ndx = capndx;
+					CAP_UPDATE(cap, capndx,
+					    CA_SUNW_PLAT, 0);
+				}
+			}
+			if (scapset->oc_mach.cl_val) {
+				ofl->ofl_flags |= FLG_OF_CAPSTRS;
+
+				/*
+				 * Insert the machine name string in the
+				 * appropriate string table.  The capability
+				 * value can't be filled in yet, as the final
+				 * offset of the string isn't known until later.
+				 */
+				for (ALIST_TRAVERSE(scapset->oc_mach.cl_val,
+				    idx2, capstr)) {
+					if (st_insert(strtbl,
+					    capstr->cs_str) == -1)
+						return (S_ERROR);
+					capstr->cs_ndx = capndx;
+					CAP_UPDATE(cap, capndx,
+					    CA_SUNW_MACH, 0);
+				}
+			}
+			if (scapset->oc_hw_2.cm_val) {
+				CAP_UPDATE(cap, capndx, CA_SUNW_HW_2,
+				    scapset->oc_hw_2.cm_val);
+			}
+			if (scapset->oc_hw_1.cm_val) {
+				CAP_UPDATE(cap, capndx, CA_SUNW_HW_1,
+				    scapset->oc_hw_1.cm_val);
+			}
+			if (scapset->oc_sf_1.cm_val) {
+				CAP_UPDATE(cap, capndx, CA_SUNW_SF_1,
+				    scapset->oc_sf_1.cm_val);
+			}
+			CAP_UPDATE(cap, capndx, CA_SUNW_NULL, 0);
+
+			/*
+			 * If any object capabilities are available, determine
+			 * whether these symbol capabilities are less
+			 * restrictive, and hence redundant.
+			 */
+			if (((ofl->ofl_flags & FLG_OF_PTCAP) == 0) ||
+			    (is_cap_redundant(ocapset, scapset) == 0))
+				continue;
+
+			/*
+			 * Indicate any files that provide redundant symbol
+			 * capabilities.
+			 */
+			for (APLIST_TRAVERSE(cgp->cg_secs, idx2, isp)) {
+				eprintf(ofl->ofl_lml, ERR_WARNING,
+				    MSG_INTL(MSG_CAP_REDUNDANT),
+				    isp->is_file->ifl_name,
+				    EC_WORD(isp->is_scnndx), isp->is_name);
+			}
+		}
+	}
+
+	/*
+	 * If capabilities strings are required, the sh_info field of the
+	 * section header will be set to the associated string table.
+	 */
+	if (ofl->ofl_flags & FLG_OF_CAPSTRS)
+		shdr->sh_flags |= SHF_INFO_LINK;
+
+	/*
+	 * Place these capabilities in the output file.
+	 */
+	if ((ofl->ofl_oscap = ld_place_section(ofl, isec,
+	    NULL, ident, NULL)) == (Os_desc *)S_ERROR)
+		return (S_ERROR);
+
+	/*
+	 * If symbol capabilities are required, then a .SUNW_capinfo section is
+	 * also created.  This table will eventually be sized to match the
+	 * associated symbol table.
+	 */
+	if (ofl->ofl_capfamilies) {
+		if ((ofl->ofl_oscapinfo = make_sym_sec(ofl,
+		    MSG_ORIG(MSG_SCN_SUNWCAPINFO), SHT_SUNW_capinfo,
+		    ld_targ.t_id.id_capinfo)) == (Os_desc *)S_ERROR)
+			return (S_ERROR);
+
+		/*
+		 * If we're generating a dynamic object, capabilities family
+		 * members are maintained in a .SUNW_capchain section.
+		 */
+		if (ofl->ofl_capchaincnt &&
+		    ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0)) {
+			if (new_section(ofl, SHT_SUNW_capchain,
+			    MSG_ORIG(MSG_SCN_SUNWCAPCHAIN),
+			    ofl->ofl_capchaincnt, &isec, &shdr,
+			    &data) == S_ERROR)
+				return (S_ERROR);
+
+			ofl->ofl_oscapchain = ld_place_section(ofl, isec,
+			    NULL, ld_targ.t_id.id_capchain, NULL);
+			if (ofl->ofl_oscapchain == (Os_desc *)S_ERROR)
+				return (S_ERROR);
+
+		}
+	}
+	return (1);
 }
+#undef	CAP_UPDATE
 
 /*
  * Build the PLT section and its associated relocation entries.
@@ -1616,7 +2048,6 @@ make_symtab(Ofl_desc *ofl)
 
 	return (1);
 }
-
 
 /*
  * Build a dynamic symbol table. These tables reside in the text
@@ -1893,7 +2324,6 @@ make_dynstr(Ofl_desc *ofl)
 		ofl->ofl_dynscopecnt++;
 	}
 
-
 	/*
 	 * Account for any local, named register symbols.  These locals are
 	 * required for reference from DT_REGISTER .dynamic entries.
@@ -1907,7 +2337,7 @@ make_dynstr(Ofl_desc *ofl)
 			if ((sdp = ofl->ofl_regsyms[ndx]) == NULL)
 				continue;
 
-			if (((sdp->sd_flags & FLG_SY_HIDDEN) == 0) &&
+			if (!SYM_IS_HIDDEN(sdp) &&
 			    (ELF_ST_BIND(sdp->sd_sym->st_info) != STB_LOCAL))
 				continue;
 
@@ -2145,29 +2575,6 @@ make_verdef(Ofl_desc *ofl)
 }
 
 /*
- * Common function used to build both the SHT_SUNW_versym
- * section and the SHT_SUNW_syminfo section.  Each of these sections
- * provides additional symbol information.
- */
-static Os_desc *
-make_sym_sec(Ofl_desc *ofl, const char *sectname, Word stype, int ident)
-{
-	Shdr		*shdr;
-	Elf_Data	*data;
-	Is_desc		*isec;
-
-	/*
-	 * We don't know the size of this section yet, so set it to 0.
-	 * It gets filled in after the dynsym is sized.
-	 */
-	if (new_section(ofl, stype, sectname, 0, &isec, &shdr, &data) ==
-	    S_ERROR)
-		return ((Os_desc *)S_ERROR);
-
-	return (ld_place_section(ofl, isec, NULL, ident, NULL));
-}
-
-/*
  * This routine is called when -z nopartial is in effect.
  */
 uintptr_t
@@ -2314,7 +2721,7 @@ strmerge_get_reloc_str(Ofl_desc *ofl, Rel_desc *rsp)
  *
  * exit:
  *	On success, rel_alpp and sym_alpp are updated, and
- *	any strings in the mergable input sections referenced by
+ *	any strings in the mergeable input sections referenced by
  *	a relocation has been entered into mstrtab. True (1) is returned.
  *
  *	On failure, False (0) is returned.
@@ -2446,7 +2853,7 @@ ld_make_strmerge(Ofl_desc *ofl, Os_desc *osp, APlist **rel_alpp,
 	 * This routine has to make 3 passes:
 	 *
 	 *	1) Examine all relocations, insert strings from relocations
-	 *		to the mergable input sections into the string table.
+	 *		to the mergeable input sections into the string table.
 	 *	2) Modify the relocation values to be correct for the
 	 *		new merged section.
 	 *	3) Modify the symbols used by the relocations to reference
@@ -2691,9 +3098,16 @@ ld_make_sections(Ofl_desc *ofl)
 	if (make_interp(ofl) == S_ERROR)
 		return (S_ERROR);
 
-	if (make_cap(ofl) == S_ERROR)
+	/*
+	 * Create a capabilities section if required.
+	 */
+	if (make_cap(ofl, SHT_SUNW_cap, MSG_ORIG(MSG_SCN_SUNWCAP),
+	    ld_targ.t_id.id_cap) == S_ERROR)
 		return (S_ERROR);
 
+	/*
+	 * Create any init/fini array sections.
+	 */
 	if (make_array(ofl, SHT_INIT_ARRAY, MSG_ORIG(MSG_SCN_INITARRAY),
 	    ofl->ofl_initarray) == S_ERROR)
 		return (S_ERROR);
@@ -2935,6 +3349,27 @@ ld_make_sections(Ofl_desc *ofl)
 			update_data_size(ofl->ofl_ossyminfo, cnt);
 	}
 
+	/*
+	 * Now that we've created all output sections, adjust the size of the
+	 * SHT_SUNW_capinfo, which is dependent on the associated symbol table
+	 * size.
+	 */
+	if (ofl->ofl_oscapinfo) {
+		ulong_t	cnt;
+
+		/*
+		 * Symbol capabilities symbols are placed directly after the
+		 * STT_FILE symbol, section symbols, and any register symbols.
+		 * Effectively these are the first of any series of demoted
+		 * (scoped) symbols.
+		 */
+		if (OFL_IS_STATIC_OBJ(ofl))
+			cnt = SYMTAB_ALL_CNT(ofl);
+		else
+			cnt = DYNSYM_ALL_CNT(ofl);
+
+		update_data_size(ofl->ofl_oscapinfo, cnt);
+	}
 	return (1);
 }
 

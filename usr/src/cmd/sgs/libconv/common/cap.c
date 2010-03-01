@@ -36,16 +36,20 @@
 const conv_ds_t **
 conv_cap_tag_strings(Conv_fmt_flags_t fmt_flags)
 {
-#if	(CA_SUNW_NUM != (CA_SUNW_HW_2 + 1))
+#if	(CA_SUNW_NUM != (CA_SUNW_ID + 1))
 #error	"CA_SUNW_NUM has grown"
 #endif
 	static const Msg	tags_cf[] = {
 		MSG_CA_SUNW_NULL_CF,	MSG_CA_SUNW_HW_1_CF,
-		MSG_CA_SUNW_SF_1_CF,	MSG_CA_SUNW_HW_2_CF
+		MSG_CA_SUNW_SF_1_CF,	MSG_CA_SUNW_HW_2_CF,
+		MSG_CA_SUNW_PLAT_CF,	MSG_CA_SUNW_MACH_CF,
+		MSG_CA_SUNW_ID_CF
 	};
 	static const Msg	tags_nf[] = {
 		MSG_CA_SUNW_NULL_NF,	MSG_CA_SUNW_HW_1_NF,
 		MSG_CA_SUNW_SF_1_NF,	MSG_CA_SUNW_HW_2_NF,
+		MSG_CA_SUNW_PLAT_NF,	MSG_CA_SUNW_MACH_NF,
+		MSG_CA_SUNW_ID_NF
 	};
 	static const conv_ds_msg_t ds_tags_cf = {
 	    CONV_DS_MSG_INIT(ELFCLASSNONE, tags_cf) };
@@ -108,7 +112,7 @@ conv_iter_elfcap(const elfcap_desc_t *cdp, uint_t cnum,
 }
 
 /*
- * Iterate the strings for CA_SUNW_HW1
+ * Iterate the strings for CA_SUNW_HW.
  */
 conv_iter_ret_t
 conv_iter_cap_val_hw1(Half mach, Conv_fmt_flags_t fmt_flags,
@@ -129,6 +133,14 @@ conv_iter_cap_val_hw1(Half mach, Conv_fmt_flags_t fmt_flags,
 			return (CONV_ITER_DONE);
 
 	return (CONV_ITER_CONT);
+}
+
+conv_iter_ret_t
+/* ARGSUSED0 */
+conv_iter_cap_val_hw2(Half mach, Conv_fmt_flags_t fmt_flags,
+    conv_iter_cb_t func, void *uvalue)
+{
+	return (CONV_ITER_DONE);
 }
 
 /*

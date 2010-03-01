@@ -245,17 +245,17 @@ sf1_cap(Ofl_desc *ofl, Xword val, Ifl_desc *ifl, Is_desc *cisp)
 	Xword	badval;
 
 	/*
-	 * If a mapfile has established definitions to override any input
-	 * capabilities, ignore any new input capabilities.
+	 * If a mapfile has established definitions to override any object
+	 * capabilities, ignore any new object capabilities.
 	 */
 	if (ofl->ofl_flags1 & FLG_OF1_OVSFCAP1) {
-		DBG_CALL(Dbg_cap_entry(ofl->ofl_lml, DBG_STATE_IGNORED,
+		DBG_CALL(Dbg_cap_val_entry(ofl->ofl_lml, DBG_STATE_IGNORED,
 		    CA_SUNW_SF_1, val, ld_targ.t_m.m_mach));
 		return;
 	}
 
 #if	!defined(_ELF64)
-	if (ifl->ifl_ehdr->e_type == ET_REL) {
+	if (ifl && (ifl->ifl_ehdr->e_type == ET_REL)) {
 		/*
 		 * The SF1_SUNW_ADDR32 is only meaningful when building a 64-bit
 		 * object.  Warn the user, and remove the setting, if we're
@@ -309,7 +309,7 @@ sf1_cap(Ofl_desc *ofl, Xword val, Ifl_desc *ifl, Is_desc *cisp)
 		 * The runtime linker will refuse to use this dependency.
 		 */
 		if ((val & SF1_SUNW_ADDR32) && (ofl->ofl_flags & FLG_OF_EXEC) &&
-		    ((ofl->ofl_ocapset.c_sf_1.cm_value &
+		    ((ofl->ofl_ocapset.oc_sf_1.cm_val &
 		    SF1_SUNW_ADDR32) == 0)) {
 			eprintf(ofl->ofl_lml, ERR_WARNING,
 			    MSG_INTL(MSG_FIL_EXADDR32SF1), ifl->ifl_name,
@@ -320,9 +320,9 @@ sf1_cap(Ofl_desc *ofl, Xword val, Ifl_desc *ifl, Is_desc *cisp)
 	}
 
 	if (DBG_ENABLED) {
-		Dbg_cap_entry2(ofl->ofl_lml, DBG_STATE_CURRENT, CA_SUNW_SF_1,
-		    &ofl->ofl_ocapset.c_sf_1, ld_targ.t_m.m_mach);
-		Dbg_cap_entry(ofl->ofl_lml, DBG_STATE_NEW, CA_SUNW_SF_1,
+		Dbg_cap_val_entry(ofl->ofl_lml, DBG_STATE_CURRENT, CA_SUNW_SF_1,
+		    ofl->ofl_ocapset.oc_sf_1.cm_val, ld_targ.t_m.m_mach);
+		Dbg_cap_val_entry(ofl->ofl_lml, DBG_STATE_NEW, CA_SUNW_SF_1,
 		    val, ld_targ.t_m.m_mach);
 	}
 
@@ -330,13 +330,13 @@ sf1_cap(Ofl_desc *ofl, Xword val, Ifl_desc *ifl, Is_desc *cisp)
 	 * Determine the resolution of the present frame pointer and the
 	 * new input relocatable objects frame pointer.
 	 */
-	if ((ofl->ofl_ocapset.c_sf_1.cm_value & FP_FLAGS) == FP_FLAGS) {
+	if ((ofl->ofl_ocapset.oc_sf_1.cm_val & FP_FLAGS) == FP_FLAGS) {
 		/*
 		 * If the new relocatable object isn't using a frame pointer,
 		 * reduce the present state to unused.
 		 */
 		if ((val & FP_FLAGS) != FP_FLAGS)
-			ofl->ofl_ocapset.c_sf_1.cm_value &= ~SF1_SUNW_FPUSED;
+			ofl->ofl_ocapset.oc_sf_1.cm_val &= ~SF1_SUNW_FPUSED;
 
 		/*
 		 * Having processed the frame pointer bits, remove them from
@@ -344,22 +344,22 @@ sf1_cap(Ofl_desc *ofl, Xword val, Ifl_desc *ifl, Is_desc *cisp)
 		 */
 		val &= ~FP_FLAGS;
 
-	} else if ((ofl->ofl_ocapset.c_sf_1.cm_value & SF1_SUNW_FPKNWN) == 0) {
+	} else if ((ofl->ofl_ocapset.oc_sf_1.cm_val & SF1_SUNW_FPKNWN) == 0) {
 		/*
 		 * If the present frame pointer state is unknown, mask it out
 		 * and allow the values from the new relocatable object
 		 * to overwrite them.
 		 */
-		ofl->ofl_ocapset.c_sf_1.cm_value &= ~FP_FLAGS;
+		ofl->ofl_ocapset.oc_sf_1.cm_val &= ~FP_FLAGS;
 	} else {
 		/* Do not take the frame pointer flags from the object */
 		val &= ~FP_FLAGS;
 	}
 
-	ofl->ofl_ocapset.c_sf_1.cm_value |= val;
+	ofl->ofl_ocapset.oc_sf_1.cm_val |= val;
 
-	DBG_CALL(Dbg_cap_entry2(ofl->ofl_lml, DBG_STATE_RESOLVED, CA_SUNW_SF_1,
-	    &ofl->ofl_ocapset.c_sf_1, ld_targ.t_m.m_mach));
+	DBG_CALL(Dbg_cap_val_entry(ofl->ofl_lml, DBG_STATE_RESOLVED,
+	    CA_SUNW_SF_1, ofl->ofl_ocapset.oc_sf_1.cm_val, ld_targ.t_m.m_mach));
 
 #undef FP_FLAGS
 }
@@ -371,15 +371,26 @@ sf1_cap(Ofl_desc *ofl, Xword val, Ifl_desc *ifl, Is_desc *cisp)
  * additive.
  */
 static void
-hw1_cap(Ofl_desc *ofl, Xword val)
+hw_cap(Ofl_desc *ofl, Xword tag, Xword val)
 {
+	elfcap_mask_t	*hwcap;
+	ofl_flag_t	flags1;
+
+	if (tag == CA_SUNW_HW_1) {
+		hwcap = &ofl->ofl_ocapset.oc_hw_1.cm_val;
+		flags1 = FLG_OF1_OVHWCAP1;
+	} else {
+		hwcap = &ofl->ofl_ocapset.oc_hw_2.cm_val;
+		flags1 = FLG_OF1_OVHWCAP2;
+	}
+
 	/*
-	 * If a mapfile has established definitions to override any input
-	 * capabilities, ignore any new input capabilities.
+	 * If a mapfile has established definitions to override any object
+	 * capabilities, ignore any new object capabilities.
 	 */
-	if (ofl->ofl_flags1 & FLG_OF1_OVHWCAP1) {
-		DBG_CALL(Dbg_cap_entry(ofl->ofl_lml, DBG_STATE_IGNORED,
-		    CA_SUNW_HW_1, val, ld_targ.t_m.m_mach));
+	if (ofl->ofl_flags1 & flags1) {
+		DBG_CALL(Dbg_cap_val_entry(ofl->ofl_lml, DBG_STATE_IGNORED,
+		    tag, val, ld_targ.t_m.m_mach));
 		return;
 	}
 
@@ -391,70 +402,878 @@ hw1_cap(Ofl_desc *ofl, Xword val)
 		return;
 
 	if (DBG_ENABLED) {
-		Dbg_cap_entry2(ofl->ofl_lml, DBG_STATE_CURRENT, CA_SUNW_HW_1,
-		    &ofl->ofl_ocapset.c_hw_1, ld_targ.t_m.m_mach);
-		Dbg_cap_entry(ofl->ofl_lml, DBG_STATE_NEW, CA_SUNW_HW_1, val,
-		    ld_targ.t_m.m_mach);
+		Dbg_cap_val_entry(ofl->ofl_lml, DBG_STATE_CURRENT, CA_SUNW_HW_1,
+		    ofl->ofl_ocapset.oc_hw_1.cm_val, ld_targ.t_m.m_mach);
+		Dbg_cap_val_entry(ofl->ofl_lml, DBG_STATE_NEW, CA_SUNW_HW_1,
+		    val, ld_targ.t_m.m_mach);
 	}
 
-	ofl->ofl_ocapset.c_hw_1.cm_value |= val;
+	*hwcap |= val;
 
-	DBG_CALL(Dbg_cap_entry2(ofl->ofl_lml, DBG_STATE_RESOLVED, CA_SUNW_HW_1,
-	    &ofl->ofl_ocapset.c_hw_1, ld_targ.t_m.m_mach));
+	DBG_CALL(Dbg_cap_val_entry(ofl->ofl_lml, DBG_STATE_RESOLVED, tag,
+	    *hwcap, ld_targ.t_m.m_mach));
 }
 
 /*
- * Process a hardware/software capabilities section.  Traverse the section
- * updating the global capabilities variables as necessary.
+ * Promote a machine capability or platform capability to the output file.
+ * Multiple instances of these names can be defined.
  */
 static void
-process_cap(Ifl_desc *ifl, Is_desc *cisp, Ofl_desc *ofl)
+str_cap(Ofl_desc *ofl, char *pstr, ofl_flag_t flags, Xword tag, Caplist *list)
 {
-	Cap	*cdata;
-	Word	ndx, cnum;
-
-	DBG_CALL(Dbg_cap_sec_title(ofl->ofl_lml, ifl->ifl_name));
+	Capstr		*capstr;
+	Aliste		idx;
+	Boolean		found = FALSE;
 
 	/*
-	 * The capabilities are supposed to be terminated with a CA_SUNW_NULL
-	 * entry.  However, the compilers have been known to not follow this
-	 * convention.  Use the section information to determine the number
-	 * of capabilities, and skip any CA_SUNW_NULL entries.
+	 * If a mapfile has established definitions to override this capability,
+	 * ignore any new capability.
+	 */
+	if (ofl->ofl_flags1 & flags) {
+		DBG_CALL(Dbg_cap_ptr_entry(ofl->ofl_lml, DBG_STATE_IGNORED,
+		    tag, pstr));
+		return;
+	}
+
+	for (ALIST_TRAVERSE(list->cl_val, idx, capstr)) {
+		DBG_CALL(Dbg_cap_ptr_entry(ofl->ofl_lml,
+		    DBG_STATE_CURRENT, tag, capstr->cs_str));
+		if (strcmp(capstr->cs_str, pstr) == 0)
+			found = TRUE;
+	}
+
+	DBG_CALL(Dbg_cap_ptr_entry(ofl->ofl_lml, DBG_STATE_NEW, tag, pstr));
+
+	if (found == FALSE) {
+		if ((capstr = alist_append(&list->cl_val, NULL,
+		    sizeof (Capstr), AL_CNT_CAP_NAMES)) == NULL) {
+			ofl->ofl_flags |= FLG_OF_FATAL;
+			return;
+		}
+		capstr->cs_str = pstr;
+	}
+
+	if (DBG_ENABLED) {
+		for (ALIST_TRAVERSE(list->cl_val, idx, capstr)) {
+			DBG_CALL(Dbg_cap_ptr_entry(ofl->ofl_lml,
+			    DBG_STATE_RESOLVED, tag, capstr->cs_str));
+		}
+	}
+}
+
+/*
+ * Promote a capability identifier to the output file.  A capability group can
+ * only have one identifier, and thus only the first identifier seen from any
+ * input relocatable objects is retained.  An explicit user defined identifier,
+ * rather than an an identifier fabricated by ld(1) with -z symbcap processing,
+ * takes precedence.  Note, a user may have defined an identifier via a mapfile,
+ * in which case the mapfile identifier is retained.
+ */
+static void
+id_cap(Ofl_desc *ofl, char *pstr, oc_flag_t flags)
+{
+	Objcapset	*ocapset = &ofl->ofl_ocapset;
+
+	if (ocapset->oc_id.cs_str) {
+		DBG_CALL(Dbg_cap_ptr_entry(ofl->ofl_lml, DBG_STATE_CURRENT,
+		    CA_SUNW_ID, ocapset->oc_id.cs_str));
+
+		if ((ocapset->oc_flags & FLG_OCS_USRDEFID) ||
+		    ((flags & FLG_OCS_USRDEFID) == 0)) {
+			DBG_CALL(Dbg_cap_ptr_entry(ofl->ofl_lml,
+			    DBG_STATE_IGNORED, CA_SUNW_ID, pstr));
+			return;
+		}
+	}
+
+	DBG_CALL(Dbg_cap_ptr_entry(ofl->ofl_lml, DBG_STATE_NEW,
+	    CA_SUNW_ID, pstr));
+
+	ocapset->oc_id.cs_str = pstr;
+	ocapset->oc_flags |= flags;
+
+	DBG_CALL(Dbg_cap_ptr_entry(ofl->ofl_lml, DBG_STATE_RESOLVED,
+	    CA_SUNW_ID, pstr));
+}
+
+/*
+ * Promote a capabilities group to the object capabilities.  This catches a
+ * corner case.  An object capabilities file can be converted to symbol
+ * capabilities with -z symbolcap.  However, if the user has indicated that all
+ * the symbols should be demoted, we'd be left with a symbol capabilities file,
+ * with no associated symbols.  Catch this case by promoting the symbol
+ * capabilities back to object capabilities.
+ */
+void
+ld_cap_move_symtoobj(Ofl_desc *ofl)
+{
+	Cap_group	*cgp;
+	Aliste		idx1;
+
+	for (APLIST_TRAVERSE(ofl->ofl_capgroups, idx1, cgp)) {
+		Objcapset	*scapset = &cgp->cg_set;
+		Capstr		*capstr;
+		Aliste		idx2;
+
+		if (scapset->oc_id.cs_str) {
+			if (scapset->oc_flags & FLG_OCS_USRDEFID)
+				id_cap(ofl, scapset->oc_id.cs_str,
+				    scapset->oc_flags);
+		}
+		if (scapset->oc_plat.cl_val) {
+			for (ALIST_TRAVERSE(scapset->oc_plat.cl_val, idx2,
+			    capstr)) {
+				str_cap(ofl, capstr->cs_str, FLG_OF1_OVPLATCAP,
+				    CA_SUNW_PLAT, &ofl->ofl_ocapset.oc_plat);
+			}
+		}
+		if (scapset->oc_mach.cl_val) {
+			for (ALIST_TRAVERSE(scapset->oc_mach.cl_val, idx2,
+			    capstr)) {
+				str_cap(ofl, capstr->cs_str, FLG_OF1_OVMACHCAP,
+				    CA_SUNW_MACH, &ofl->ofl_ocapset.oc_mach);
+			}
+		}
+		if (scapset->oc_hw_2.cm_val)
+			hw_cap(ofl, CA_SUNW_HW_2, scapset->oc_hw_2.cm_val);
+
+		if (scapset->oc_hw_1.cm_val)
+			hw_cap(ofl, CA_SUNW_HW_1, scapset->oc_hw_1.cm_val);
+
+		if (scapset->oc_sf_1.cm_val)
+			sf1_cap(ofl, scapset->oc_sf_1.cm_val, NULL, NULL);
+	}
+}
+
+/*
+ * Determine whether a capabilities group already exists that describes this
+ * new capabilities group.
+ *
+ * Note, a capability group identifier, CA_SUNW_ID, isn't used as part of the
+ * comparison.  This attribute simply assigns a diagnostic name to the group,
+ * and in the case of multiple identifiers, the first will be taken.
+ */
+static Cap_group *
+get_cap_group(Objcapset *ocapset, Word cnum, Ofl_desc *ofl, Is_desc *isp)
+{
+	Aliste		idx;
+	Cap_group	*cgp;
+	Word		ccnum = cnum;
+
+	/*
+	 * If the new capabilities contains a CA_SUNW_ID, drop the count of the
+	 * number of comparable items.
+	 */
+	if (ocapset->oc_id.cs_str)
+		ccnum--;
+
+	/*
+	 * Traverse the existing symbols capabilities groups.
+	 */
+	for (APLIST_TRAVERSE(ofl->ofl_capgroups, idx, cgp)) {
+		Word	onum = cgp->cg_num;
+		Alist	*calp, *oalp;
+
+		if (cgp->cg_set.oc_id.cs_str)
+			onum--;
+
+		if (onum != ccnum)
+			continue;
+
+		if (cgp->cg_set.oc_hw_1.cm_val != ocapset->oc_hw_1.cm_val)
+			continue;
+		if (cgp->cg_set.oc_sf_1.cm_val != ocapset->oc_sf_1.cm_val)
+			continue;
+		if (cgp->cg_set.oc_hw_2.cm_val != ocapset->oc_hw_2.cm_val)
+			continue;
+
+		calp = cgp->cg_set.oc_plat.cl_val;
+		oalp = ocapset->oc_plat.cl_val;
+		if ((calp == NULL) && oalp)
+			continue;
+		if (calp && ((oalp == NULL) || cap_names_match(calp, oalp)))
+			continue;
+
+		calp = cgp->cg_set.oc_mach.cl_val;
+		oalp = ocapset->oc_mach.cl_val;
+		if ((calp == NULL) && oalp)
+			continue;
+		if (calp && ((oalp == NULL) || cap_names_match(calp, oalp)))
+			continue;
+
+		/*
+		 * If a matching group is found, then this new group has
+		 * already been supplied by a previous file, and hence the
+		 * existing group can be used.  Record this new input section,
+		 * from which we can also derive the input file name, on the
+		 * existing groups input sections.
+		 */
+		if (aplist_append(&(cgp->cg_secs), isp,
+		    AL_CNT_CAP_SECS) == NULL)
+			return (NULL);
+		return (cgp);
+	}
+
+	/*
+	 * If a capabilities group is not found, create a new one.
+	 */
+	if (((cgp = libld_calloc(sizeof (Cap_group), 1)) == NULL) ||
+	    (aplist_append(&(ofl->ofl_capgroups), cgp,
+	    AL_CNT_CAP_DESCS) == NULL))
+		return (NULL);
+
+	/*
+	 * If we're converting object capabilities to symbol capabilities and
+	 * no CA_SUNW_ID is defined, fabricate one.  This identifier is appended
+	 * to all symbol names that are converted into capabilities symbols,
+	 * see ld_sym_process().
+	 */
+	if ((isp->is_file->ifl_flags & FLG_IF_OTOSCAP) &&
+	    (ocapset->oc_id.cs_str == NULL)) {
+		size_t	len;
+
+		/*
+		 * Create an identifier using the group number together with a
+		 * default template.  We allocate a buffer large enough for any
+		 * possible number of items (way more than we need).
+		 */
+		len = MSG_STR_CAPGROUPID_SIZE + CONV_INV_BUFSIZE;
+		if ((ocapset->oc_id.cs_str = libld_malloc(len)) == NULL)
+			return (NULL);
+
+		(void) snprintf(ocapset->oc_id.cs_str, len,
+		    MSG_ORIG(MSG_STR_CAPGROUPID),
+		    aplist_nitems(ofl->ofl_capgroups));
+		cnum++;
+	}
+
+	cgp->cg_set = *ocapset;
+	cgp->cg_num = cnum;
+
+	/*
+	 * Null the callers alist's as they've effectively been transferred
+	 * to this new Cap_group.
+	 */
+	ocapset->oc_plat.cl_val = ocapset->oc_mach.cl_val = NULL;
+
+	/*
+	 * Keep track of which input section, and hence input file, established
+	 * this group.
+	 */
+	if (aplist_append(&(cgp->cg_secs), isp, AL_CNT_CAP_SECS) == NULL)
+		return (NULL);
+
+	/*
+	 * Keep track of the number of symbol capabilities entries that will be
+	 * required in the output file.  Each group requires a terminating
+	 * CA_SUNW_NULL.
+	 */
+	ofl->ofl_capsymcnt += (cnum + 1);
+	return (cgp);
+}
+
+/*
+ * Capture symbol capability family information.  This data structure is focal
+ * in maintaining all symbol capability relationships, and provides for the
+ * eventual creation of a capabilities information section, and possibly a
+ * capabilities chain section.
+ *
+ * Capabilities families are lead by a CAPINFO_SUNW_GLOB symbol.  This symbol
+ * provides the visible global symbol that is referenced by all external
+ * callers.  This symbol may have aliases.  For example, a weak/global symbol
+ * pair, such as memcpy()/_memcpy() may lead the same capabilities family.
+ * Each family contains one or more local symbol members.  These members provide
+ * the capabilities specific functions, and are associated to a capabilities
+ * group.  For example, the capability members memcpy%sun4u and memcpy%sun4v
+ * might be associated with the memcpy() capability family.
+ *
+ * This routine is called when a relocatable object that provides object
+ * capabilities is transformed into a symbol capabilities object, using the
+ * -z symbolcap option.
+ *
+ * This routine is also called to collect the SUNW_capinfo section information
+ * of a relocatable object that contains symbol capability definitions.
+ */
+uintptr_t
+ld_cap_add_family(Ofl_desc *ofl, Sym_desc *lsdp, Sym_desc *csdp, Cap_group *cgp,
+    APlist **csyms)
+{
+	Cap_avlnode	qcav, *cav;
+	avl_tree_t	*avlt;
+	avl_index_t	where = 0;
+	Cap_sym		*mcsp;
+	Aliste		idx;
+
+	/*
+	 * Make sure the capability families have an initialized AVL tree.
+	 */
+	if ((avlt = ofl->ofl_capfamilies) == NULL) {
+		if ((avlt = libld_calloc(sizeof (avl_tree_t), 1)) == NULL)
+			return (S_ERROR);
+		avl_create(avlt, &ld_sym_avl_comp, sizeof (Cap_avlnode),
+		    SGSOFFSETOF(Cap_avlnode, cn_symavlnode.sav_node));
+		ofl->ofl_capfamilies = avlt;
+
+		/*
+		 * When creating a dynamic object, capability family members
+		 * are maintained in a .SUNW_capchain, the first entry of
+		 * which is the version number of the chain.
+		 */
+		ofl->ofl_capchaincnt = 1;
+	}
+
+	/*
+	 * Determine whether a family already exists, and if not, create one
+	 * using the lead family symbol.
+	 */
+	qcav.cn_symavlnode.sav_hash = (Word)elf_hash(lsdp->sd_name);
+	qcav.cn_symavlnode.sav_name = lsdp->sd_name;
+
+	if ((cav = avl_find(avlt, &qcav, &where)) == NULL) {
+		if ((cav = libld_calloc(sizeof (Cap_avlnode), 1)) == NULL)
+			return (S_ERROR);
+		cav->cn_symavlnode.sav_hash = qcav.cn_symavlnode.sav_hash;
+		cav->cn_symavlnode.sav_name = qcav.cn_symavlnode.sav_name;
+		cav->cn_symavlnode.sav_sdp = lsdp;
+
+		avl_insert(avlt, cav, where);
+
+		/*
+		 * When creating a dynamic object, capability family members
+		 * are maintained in a .SUNW_capchain, each family starts with
+		 * this lead symbol, and is terminated with a 0 element.
+		 */
+		ofl->ofl_capchaincnt += 2;
+	}
+
+	/*
+	 * If no group information is provided then this request is to add a
+	 * lead capability symbol, or lead symbol alias.  If this is the lead
+	 * symbol there's nothing more to do.  Otherwise save the alias.
+	 */
+	if (cgp == NULL) {
+		if ((lsdp != csdp) && (aplist_append(&cav->cn_aliases, csdp,
+		    AL_CNT_CAP_ALIASES) == NULL))
+			return (S_ERROR);
+
+		return (0);
+	}
+
+	/*
+	 * Determine whether a member of the same group as this new member is
+	 * already defined within this family.  If so, we have a multiply
+	 * defined symbol.
+	 */
+	for (APLIST_TRAVERSE(cav->cn_members, idx, mcsp)) {
+		Sym_desc	*msdp;
+
+		if (cgp != mcsp->cs_group)
+			continue;
+
+		/*
+		 * Diagnose that a multiple symbol definition exists.
+		 */
+		msdp = mcsp->cs_sdp;
+
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_CAP_MULDEF),
+		    demangle(lsdp->sd_name));
+		eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_CAP_MULDEFSYMS),
+		    msdp->sd_file->ifl_name, msdp->sd_name,
+		    csdp->sd_file->ifl_name, csdp->sd_name);
+		ofl->ofl_flags |= FLG_OF_FATAL;
+	}
+
+	/*
+	 * Add this capabilities symbol member to the family.
+	 */
+	if (((mcsp = libld_malloc(sizeof (Cap_sym))) == NULL) ||
+	    (aplist_append(&cav->cn_members, mcsp, AL_CNT_CAP_MEMS) == NULL))
+		return (S_ERROR);
+
+	mcsp->cs_sdp = csdp;
+	mcsp->cs_group = cgp;
+
+	/*
+	 * When creating a dynamic object, capability family members are
+	 * maintained in a .SUNW_capchain.  Account for this family member.
+	 */
+	ofl->ofl_capchaincnt++;
+
+	/*
+	 * If this input file is undergoing object capabilities to symbol
+	 * capabilities conversion, then this member is a new local symbol
+	 * that has been generated from an original global symbol.  Keep track
+	 * of this symbol so that the output file symbol table can be populated
+	 * with these new symbol entries.
+	 */
+	if (csyms && (aplist_append(csyms, mcsp, AL_CNT_CAP_SYMS) == NULL))
+		return (S_ERROR);
+
+	return (0);
+}
+
+/*
+ * Process a SHT_SUNW_cap capabilities section.
+ */
+static uintptr_t
+process_cap(Ofl_desc *ofl, Ifl_desc *ifl, Is_desc *cisp)
+{
+	Objcapset	ocapset = { 0 };
+	Cap_desc	*cdp;
+	Cap		*data, *cdata;
+	char		*strs;
+	Word		ndx, cnum;
+	int		objcapndx, descapndx, symcapndx;
+	int		nulls, capstrs = 0;
+
+	/*
+	 * Determine the capabilities data and size.
 	 */
 	cdata = (Cap *)cisp->is_indata->d_buf;
 	cnum = (Word)(cisp->is_shdr->sh_size / cisp->is_shdr->sh_entsize);
 
-	for (ndx = 0; ndx < cnum; cdata++, ndx++) {
-		switch (cdata->c_tag) {
-			case CA_SUNW_HW_1:
-				/*
-				 * Only the hardware capabilities that are
-				 * defined in a relocatable object become part
-				 * of the hardware capabilities in the output
-				 * file.
-				 */
-				if (ifl->ifl_ehdr->e_type == ET_REL)
-					hw1_cap(ofl, cdata->c_un.c_val);
-				break;
-			case CA_SUNW_SF_1:
-				/*
-				 * Only the software capabilities that are
-				 * defined in a relocatable object become part
-				 * of the software capabilities in the output
-				 * file.  However, check the validity of the
-				 * software capabilities of any dependencies.
-				 */
-				sf1_cap(ofl, cdata->c_un.c_val, ifl, cisp);
-				break;
-			case CA_SUNW_NULL:
-				break;
-			default:
-				eprintf(ofl->ofl_lml, ERR_WARNING,
-				    MSG_INTL(MSG_FIL_UNKCAP), ifl->ifl_name,
-				    EC_WORD(cisp->is_scnndx), cisp->is_name,
-				    cdata->c_tag);
+	if ((cdata == NULL) || (cnum == 0))
+		return (0);
+
+	DBG_CALL(Dbg_cap_sec_title(ofl->ofl_lml, ifl->ifl_name));
+
+	/*
+	 * Traverse the section to determine what capabilities groups are
+	 * available.
+	 *
+	 * A capabilities section can contain one or more, CA_SUNW_NULL
+	 * terminated groups.
+	 *
+	 *  -	The first group defines the object capabilities.
+	 *  -	Additional groups define symbol capabilities.
+	 *  -	Since the initial group is always reserved for object
+	 *	capabilities, any object with symbol capabilities must also
+	 *	have an object capabilities group.  If the object has no object
+	 *	capabilities, an empty object group is defined, consisting of a
+	 *	CA_SUNW_NULL element in index [0].
+	 *  -	If any capabilities require references to a named string, then
+	 *	the section header sh_info points to the associated string
+	 *	table.
+	 *  -	If an object contains symbol capability groups, then the
+	 *	section header sh_link points to the associated capinfo table.
+	 */
+	objcapndx = 0;
+	descapndx = symcapndx = -1;
+	nulls = 0;
+
+	for (ndx = 0, data = cdata; ndx < cnum; ndx++, data++) {
+		switch (data->c_tag) {
+		case CA_SUNW_NULL:
+			/*
+			 * If this is the first CA_SUNW_NULL entry, and no
+			 * capabilities group has been found, then this object
+			 * does not define any object capabilities.
+			 */
+			if (nulls++ == 0) {
+				if (ndx == 0)
+					objcapndx = -1;
+			} else if ((symcapndx == -1) && (descapndx != -1))
+				symcapndx = descapndx;
+
+			break;
+
+		case CA_SUNW_PLAT:
+		case CA_SUNW_MACH:
+		case CA_SUNW_ID:
+			capstrs++;
+			/* FALLTHROUGH */
+
+		case CA_SUNW_HW_1:
+		case CA_SUNW_SF_1:
+		case CA_SUNW_HW_2:
+			/*
+			 * If this is the start of a new group, save it.
+			 */
+			if (descapndx == -1)
+				descapndx = ndx;
+			break;
+
+		default:
+			eprintf(ofl->ofl_lml, ERR_WARNING,
+			    MSG_INTL(MSG_FIL_UNKCAP), ifl->ifl_name,
+			    EC_WORD(cisp->is_scnndx), cisp->is_name,
+			    data->c_tag);
 		}
 	}
+
+	/*
+	 * If a string capabilities entry has been found, the capabilities
+	 * section must reference the associated string table.
+	 */
+	if (capstrs) {
+		Word	info = cisp->is_shdr->sh_info;
+
+		if ((info == 0) || (info > ifl->ifl_shnum)) {
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_FIL_INVSHINFO), ifl->ifl_name,
+			    EC_WORD(cisp->is_scnndx), cisp->is_name,
+			    EC_XWORD(info));
+			ofl->ofl_flags |= FLG_OF_FATAL;
+			return (S_ERROR);
+		}
+		strs = (char *)ifl->ifl_isdesc[info]->is_indata->d_buf;
+	}
+
+	/*
+	 * The processing of capabilities groups is as follows:
+	 *
+	 *  -	if a relocatable object provides only object capabilities, and
+	 *	the -z symbolcap option is in effect, then the object
+	 *	capabilities are transformed into symbol capabilities and the
+	 *	symbol capabilities are carried over to the output file.
+	 *  -	in all other cases, any capabilities present in an input
+	 *	relocatable object are carried from the input object to the
+	 *	output without any transformation or conversion.
+	 *
+	 * Capture any object capabilities that are to be carried over to the
+	 * output file.
+	 */
+	if ((objcapndx == 0) &&
+	    ((symcapndx != -1) || ((ofl->ofl_flags & FLG_OF_OTOSCAP) == 0))) {
+		for (ndx = 0, data = cdata; ndx < cnum; ndx++, data++) {
+			/*
+			 * Object capabilities end at the first null.
+			 */
+			if (data->c_tag == CA_SUNW_NULL)
+				break;
+
+			/*
+			 * Only the object software capabilities that are
+			 * defined in a relocatable object become part of the
+			 * object software capabilities in the output file.
+			 * However, check the validity of any object software
+			 * capabilities of any dependencies.
+			 */
+			if (data->c_tag == CA_SUNW_SF_1) {
+				sf1_cap(ofl, data->c_un.c_val, ifl, cisp);
+				continue;
+			}
+
+			/*
+			 * The remaining capability types must come from a
+			 * relocatable object in order to contribute to the
+			 * output.
+			 */
+			if (ifl->ifl_ehdr->e_type != ET_REL)
+				continue;
+
+			switch (data->c_tag) {
+			case CA_SUNW_HW_1:
+			case CA_SUNW_HW_2:
+				hw_cap(ofl, data->c_tag, data->c_un.c_val);
+				break;
+
+			case CA_SUNW_PLAT:
+				str_cap(ofl, strs + data->c_un.c_ptr,
+				    FLG_OF1_OVPLATCAP, CA_SUNW_PLAT,
+				    &ofl->ofl_ocapset.oc_plat);
+				break;
+
+			case CA_SUNW_MACH:
+				str_cap(ofl, strs + data->c_un.c_ptr,
+				    FLG_OF1_OVMACHCAP, CA_SUNW_MACH,
+				    &ofl->ofl_ocapset.oc_mach);
+				break;
+
+			case CA_SUNW_ID:
+				id_cap(ofl, strs + data->c_un.c_ptr,
+				    FLG_OCS_USRDEFID);
+				break;
+
+			default:
+				assert(0);	/* Unknown capability type */
+			}
+		}
+
+		/*
+		 * If there are no symbol capabilities, or this objects
+		 * capabilities aren't being transformed into a symbol
+		 * capabilities, then we're done.
+		 */
+		if ((symcapndx == -1) &&
+		    ((ofl->ofl_flags & FLG_OF_OTOSCAP) == 0))
+			return (1);
+	}
+
+	/*
+	 * If these capabilities don't originate from a relocatable object
+	 * there's no further processing required.
+	 */
+	if (ifl->ifl_ehdr->e_type != ET_REL)
+		return (1);
+
+	/*
+	 * If this object only defines an object capabilities group, and the
+	 * -z symbolcap option is in effect, then all global function symbols
+	 * and initialized global data symbols are renamed and assigned to the
+	 * transformed symbol capabilities group.
+	 */
+	if ((objcapndx == 0) &&
+	    (symcapndx == -1) && (ofl->ofl_flags & FLG_OF_OTOSCAP))
+		ifl->ifl_flags |= FLG_IF_OTOSCAP;
+
+	/*
+	 * Allocate a capabilities descriptor to collect the capabilities data
+	 * for this input file.  Allocate a mirror of the raw capabilities data
+	 * that points to the individual symbol capabilities groups.  An APlist
+	 * is used, although it will be sparsely populated, as the list provides
+	 * a convenient mechanism for traversal later.
+	 */
+	if (((cdp = libld_calloc(sizeof (Cap_desc), 1)) == NULL) ||
+	    (aplist_append(&(cdp->ca_groups), NULL, cnum) == NULL))
+		return (S_ERROR);
+
+	/*
+	 * Clear the allocated APlist data array, and assign the number of
+	 * items as the total number of array items.
+	 */
+	(void) memset(&cdp->ca_groups->apl_data[0], 0,
+	    (cnum * sizeof (void *)));
+	cdp->ca_groups->apl_nitems = cnum;
+
+	ifl->ifl_caps = cdp;
+
+	/*
+	 * Traverse the capabilities data, unpacking the data into a
+	 * capabilities set.  Process each capabilities set as a unique group.
+	 */
+	descapndx = -1;
+	nulls = 0;
+
+	for (ndx = 0, data = cdata; ndx < cnum; ndx++, data++) {
+		Capstr	*capstr;
+
+		switch (data->c_tag) {
+		case CA_SUNW_NULL:
+			nulls++;
+
+			/*
+			 * Process the capabilities group that this null entry
+			 * terminates.  The capabilities group that is returned
+			 * will either point to this file's data, or to a
+			 * matching capabilities group that has already been
+			 * processed.
+			 *
+			 * Note, if this object defines object capabilities,
+			 * the first group descriptor points to these object
+			 * capabilities.  It is only necessary to save this
+			 * descriptor when object capabilities are being
+			 * transformed into symbol capabilities (-z symbolcap).
+			 */
+			if (descapndx != -1) {
+				if ((nulls > 1) ||
+				    (ifl->ifl_flags & FLG_IF_OTOSCAP)) {
+					APlist	*alp = cdp->ca_groups;
+
+					if ((alp->apl_data[descapndx] =
+					    get_cap_group(&ocapset,
+					    (ndx - descapndx), ofl,
+					    cisp)) == NULL)
+						return (S_ERROR);
+				}
+
+				/*
+				 * Clean up the capabilities data in preparation
+				 * for processing additional groups.  If the
+				 * collected capabilities strings were used to
+				 * establish a new output group, they will have
+				 * been saved in get_cap_group().  If these
+				 * descriptors still exist, then an existing
+				 * descriptor has been used to associate with
+				 * this file, and these string descriptors can
+				 * be freed.
+				 */
+				ocapset.oc_hw_1.cm_val =
+				    ocapset.oc_sf_1.cm_val =
+				    ocapset.oc_hw_2.cm_val = 0;
+				if (ocapset.oc_plat.cl_val) {
+					free((void *)ocapset.oc_plat.cl_val);
+					ocapset.oc_plat.cl_val = NULL;
+				}
+				if (ocapset.oc_mach.cl_val) {
+					free((void *)ocapset.oc_mach.cl_val);
+					ocapset.oc_mach.cl_val = NULL;
+				}
+				descapndx = -1;
+			}
+			continue;
+
+		case CA_SUNW_HW_1:
+			ocapset.oc_hw_1.cm_val = data->c_un.c_val;
+			DBG_CALL(Dbg_cap_val_entry(ofl->ofl_lml,
+			    DBG_STATE_ORIGINAL, CA_SUNW_HW_1,
+			    ocapset.oc_hw_1.cm_val, ld_targ.t_m.m_mach));
+			break;
+
+		case CA_SUNW_SF_1:
+			ocapset.oc_sf_1.cm_val = data->c_un.c_val;
+			DBG_CALL(Dbg_cap_val_entry(ofl->ofl_lml,
+			    DBG_STATE_ORIGINAL, CA_SUNW_SF_1,
+			    ocapset.oc_sf_1.cm_val, ld_targ.t_m.m_mach));
+			break;
+
+		case CA_SUNW_HW_2:
+			ocapset.oc_hw_2.cm_val = data->c_un.c_val;
+			DBG_CALL(Dbg_cap_val_entry(ofl->ofl_lml,
+			    DBG_STATE_ORIGINAL, CA_SUNW_HW_2,
+			    ocapset.oc_hw_2.cm_val, ld_targ.t_m.m_mach));
+			break;
+
+		case CA_SUNW_PLAT:
+			if ((capstr = alist_append(&ocapset.oc_plat.cl_val,
+			    NULL, sizeof (Capstr), AL_CNT_CAP_NAMES)) == NULL)
+				return (S_ERROR);
+			capstr->cs_str = strs + data->c_un.c_ptr;
+			DBG_CALL(Dbg_cap_ptr_entry(ofl->ofl_lml,
+			    DBG_STATE_ORIGINAL, CA_SUNW_PLAT, capstr->cs_str));
+			break;
+
+		case CA_SUNW_MACH:
+			if ((capstr = alist_append(&ocapset.oc_mach.cl_val,
+			    NULL, sizeof (Capstr), AL_CNT_CAP_NAMES)) == NULL)
+				return (S_ERROR);
+			capstr->cs_str = strs + data->c_un.c_ptr;
+			DBG_CALL(Dbg_cap_ptr_entry(ofl->ofl_lml,
+			    DBG_STATE_ORIGINAL, CA_SUNW_MACH, capstr->cs_str));
+			break;
+
+		case CA_SUNW_ID:
+			ocapset.oc_id.cs_str = strs + data->c_un.c_ptr;
+			DBG_CALL(Dbg_cap_ptr_entry(ofl->ofl_lml,
+			    DBG_STATE_ORIGINAL, CA_SUNW_ID,
+			    ocapset.oc_id.cs_str));
+			break;
+		}
+
+		/*
+		 * Save the start of this new group.
+		 */
+		if (descapndx == -1)
+			descapndx = ndx;
+	}
+	return (1);
+}
+
+/*
+ * Capture any symbol capabilities symbols.  An object file that contains symbol
+ * capabilities has an associated .SUNW_capinfo section.  This section
+ * identifies which symbols are associated to which capabilities, together with
+ * their associated lead symbol.  Each of these symbol pairs are recorded for
+ * processing later.
+ */
+static uintptr_t
+process_capinfo(Ofl_desc *ofl, Ifl_desc *ifl, Is_desc *isp)
+{
+	Cap_desc	*cdp = ifl->ifl_caps;
+	Capinfo		*capinfo = isp->is_indata->d_buf;
+	Shdr		*shdr = isp->is_shdr;
+	Word		cndx, capinfonum;
+
+	capinfonum = (Word)(shdr->sh_size / shdr->sh_entsize);
+
+	if ((cdp == NULL) || (capinfo == NULL) || (capinfonum == 0))
+		return (0);
+
+	for (cndx = 1, capinfo++; cndx < capinfonum; cndx++, capinfo++) {
+		Sym_desc	*sdp, *lsdp;
+		Word		lndx;
+		uchar_t		gndx;
+
+		if ((gndx = (uchar_t)ELF_C_GROUP(*capinfo)) == 0)
+			continue;
+		lndx = (Word)ELF_C_SYM(*capinfo);
+
+		/*
+		 * Catch any anomalies.  A capabilities symbol should be valid,
+		 * and the capabilities lead symbol should also be global.
+		 * Note, ld(1) -z symbolcap would create local capabilities
+		 * symbols, but we don't enforce this so as to give the
+		 * compilation environment a little more freedom.
+		 */
+		if ((sdp = ifl->ifl_oldndx[cndx]) == NULL) {
+			eprintf(ofl->ofl_lml, ERR_WARNING,
+			    MSG_INTL(MSG_CAPINFO_INVALSYM), ifl->ifl_name,
+			    EC_WORD(isp->is_scnndx), isp->is_name, cndx,
+			    MSG_INTL(MSG_STR_UNKNOWN));
+			continue;
+		}
+		if ((lndx == 0) || (lndx >= ifl->ifl_symscnt) ||
+		    ((lsdp = ifl->ifl_oldndx[lndx]) == NULL) ||
+		    (ELF_ST_BIND(lsdp->sd_sym->st_info) != STB_GLOBAL)) {
+			eprintf(ofl->ofl_lml, ERR_WARNING,
+			    MSG_INTL(MSG_CAPINFO_INVALLEAD), ifl->ifl_name,
+			    EC_WORD(isp->is_scnndx), isp->is_name, cndx, lsdp ?
+			    demangle(lsdp->sd_name) : MSG_INTL(MSG_STR_UNKNOWN),
+			    lndx);
+			continue;
+		}
+
+		/*
+		 * Indicate that this is a capabilities symbol.
+		 */
+		sdp->sd_flags |= FLG_SY_CAP;
+
+		/*
+		 * Save any global capability symbols.  Global capability
+		 * symbols are identified with a CAPINFO_SUNW_GLOB group id.
+		 * The lead symbol for this global capability symbol is either
+		 * the symbol itself, or an alias.
+		 */
+		if (gndx == CAPINFO_SUNW_GLOB) {
+			if (ld_cap_add_family(ofl, lsdp, sdp,
+			    NULL, NULL) == S_ERROR)
+				return (S_ERROR);
+			continue;
+		}
+
+		/*
+		 * Track the number of non-global capabilities symbols, as these
+		 * are used to size any symbol tables.  If we're generating a
+		 * dynamic object, this symbol will be added to the dynamic
+		 * symbol table, therefore ensure there is space in the dynamic
+		 * string table.
+		 */
+		ofl->ofl_caploclcnt++;
+		if (((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) &&
+		    (st_insert(ofl->ofl_dynstrtab, sdp->sd_name) == -1))
+			return (S_ERROR);
+
+		/*
+		 * As we're tracking this local symbol as a capabilities symbol,
+		 * reduce the local symbol count to compensate.
+		 */
+		ofl->ofl_locscnt--;
+
+		/*
+		 * Determine whether the associated lead symbol indicates
+		 * NODYNSORT.  If so, remove this local entry from the
+		 * SUNW_dynsort section too.  NODYNSORT tagging can only be
+		 * obtained from a mapfile symbol definition, and thus any
+		 * global definition that has this tagging has already been
+		 * instantiated and this instance resolved to it.
+		 */
+		if (lsdp->sd_flags & FLG_SY_NODYNSORT) {
+			Sym	*lsym = lsdp->sd_sym;
+			uchar_t ltype = ELF_ST_TYPE(lsym->st_info);
+
+			DYNSORT_COUNT(lsdp, lsym, ltype, --);
+			lsdp->sd_flags |= FLG_SY_NODYNSORT;
+		}
+
+		/*
+		 * Track this family member, together with its associated group.
+		 */
+		if (ld_cap_add_family(ofl, lsdp, sdp,
+		    cdp->ca_groups->apl_data[gndx], NULL) == S_ERROR)
+			return (S_ERROR);
+	}
+
+	return (0);
 }
 
 /*
@@ -499,7 +1318,6 @@ process_reloc(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	}
 	return (1);
 }
-
 
 /*
  * Process a string table section.  A valid section contains an initial and
@@ -949,8 +1767,9 @@ process_rel_dynamic(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 
 /*
  * Expand implicit references.  Dependencies can be specified in terms of the
- * $ORIGIN, $PLATFORM, $OSREL and $OSNAME tokens, either from their needed name,
- * or via a runpath.  In addition runpaths may also specify the $ISALIST token.
+ * $ORIGIN, $MACHINE, $PLATFORM, $OSREL and $OSNAME tokens, either from their
+ * needed name, or via a runpath.  In addition runpaths may also specify the
+ * $ISALIST token.
  *
  * Probably the most common reference to explicit dependencies (via -L) will be
  * sufficient to find any associated implicit dependencies, but just in case we
@@ -960,6 +1779,8 @@ process_rel_dynamic(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
  *
  * This code is remarkably similar to expand() in rtld/common/paths.c.
  */
+static char		*machine = NULL;
+static size_t		machine_sz = 0;
 static char		*platform = NULL;
 static size_t		platform_sz = 0;
 static Isa_desc		*isa = NULL;
@@ -1013,6 +1834,35 @@ expand(const char *parent, const char *name, char **next)
 			}
 			optr += MSG_STR_ORIGIN_SIZE;
 			expanded = _expanded = 1;
+
+		} else if (strncmp(optr, MSG_ORIG(MSG_STR_MACHINE),
+		    MSG_STR_MACHINE_SIZE) == 0) {
+			/*
+			 * Establish the machine from sysconf - like uname -i.
+			 */
+			if ((machine == NULL) && (machine_sz == 0)) {
+				char	info[SYS_NMLN];
+				long	size;
+
+				size = sysinfo(SI_MACHINE, info, SYS_NMLN);
+				if ((size != -1) &&
+				    (machine = libld_malloc((size_t)size))) {
+					(void) strcpy(machine, info);
+					machine_sz = (size_t)size - 1;
+				} else
+					machine_sz = 1;
+			}
+			if (machine) {
+				if (machine_sz >= nrem)
+					return ((char *)name);
+
+				(void) strncpy(nptr, machine, machine_sz);
+				nptr = nptr + machine_sz;
+				nrem -= machine_sz;
+
+				optr += MSG_STR_MACHINE_SIZE;
+				expanded = _expanded = 1;
+			}
 
 		} else if (strncmp(optr, MSG_ORIG(MSG_STR_PLATFORM),
 		    MSG_STR_PLATFORM_SIZE) == 0) {
@@ -1625,7 +2475,8 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 	Word		row, column;
 	int		ident;
 	uintptr_t	error;
-	Is_desc		*vdfisp, *vndisp, *vsyisp, *sifisp, *capisp;
+	Is_desc		*vdfisp, *vndisp, *vsyisp, *sifisp;
+	Is_desc		*capinfoisp, *capisp;
 	Sdf_desc	*sdf;
 	Place_path_info	path_info_buf, *path_info;
 
@@ -1700,7 +2551,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 
 	DBG_CALL(Dbg_file_generic(ofl->ofl_lml, ifl));
 	ndx = 0;
-	vdfisp = vndisp = vsyisp = sifisp = capisp = NULL;
+	vdfisp = vndisp = vsyisp = sifisp = capinfoisp = capisp = NULL;
 	scn = NULL;
 	while (scn = elf_nextscn(elf, scn)) {
 		ndx++;
@@ -1785,6 +2636,12 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 				    ld_targ.t_id.id_null, ofl) == S_ERROR)
 					return (S_ERROR);
 				capisp = ifl->ifl_isdesc[ndx];
+				break;
+			case SHT_SUNW_capinfo:
+				if (process_section(name, ifl, shdr, scn, ndx,
+				    ld_targ.t_id.id_null, ofl) == S_ERROR)
+					return (S_ERROR);
+				capinfoisp = ifl->ifl_isdesc[ndx];
 				break;
 			case SHT_SUNW_DEBUGSTR:
 			case SHT_SUNW_DEBUG:
@@ -1991,13 +2848,14 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 	}
 
 	/*
-	 * Process any hardware/software capabilities sections.  Only the
-	 * capabilities for input relocatable objects are propagated.  If the
-	 * relocatable objects don't contain any capabilities, any capability
-	 * state that has already been gathered will prevail.
+	 * Before symbol processing, process any capabilities.  Capabilities
+	 * can reference a string table, which is why this processing is
+	 * carried out after the initial section processing.  Capabilities,
+	 * together with -z symbolcap, can require the conversion of global
+	 * symbols to local symbols.
 	 */
-	if (capisp)
-		process_cap(ifl, capisp, ofl);
+	if (capisp && (process_cap(ofl, ifl, capisp) == S_ERROR))
+		return (S_ERROR);
 
 	/*
 	 * Process any version dependencies.  These will establish shared object
@@ -2073,6 +2931,16 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 #endif
 		}
 	}
+
+	/*
+	 * Following symbol processing, if this relocatable object input file
+	 * provides symbol capabilities, tag the associated symbols so that
+	 * the symbols can be re-assigned to the new capabilities symbol
+	 * section that will be created for the output file.
+	 */
+	if (capinfoisp && (ifl->ifl_ehdr->e_type == ET_REL) &&
+	    (process_capinfo(ofl, ifl, capinfoisp) == S_ERROR))
+		return (S_ERROR);
 
 	/*
 	 * After processing any symbol resolution, and if this dependency

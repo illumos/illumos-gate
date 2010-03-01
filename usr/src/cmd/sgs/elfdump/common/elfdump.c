@@ -812,9 +812,8 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, uchar_t osabi,
 	 * We match these sections by name, rather than section type,
 	 * because they can come in as either SHT_AMD64_UNWIND, or as
 	 * SHT_PROGBITS, and because the type isn't enough to determine
-	 * how they should be interprteted.
+	 * how they should be interpreted.
 	 */
-
 	/* Find the program header for .eh_frame_hdr if present */
 	if (phnum)
 		uphdr = getphdr(phnum, phdr_types,
@@ -822,7 +821,7 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, uchar_t osabi,
 
 	/*
 	 * eh_state is used to retain data used by unwind_eh_frame()
-	 * accross calls.
+	 * across calls.
 	 */
 	bzero(&eh_state, sizeof (eh_state));
 
@@ -882,12 +881,739 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, uchar_t osabi,
 }
 
 /*
- * Print the hardware/software capabilities.  For executables and shared objects
- * this should be accompanied with a program header.
+ * Initialize a symbol table state structure
+ *
+ * entry:
+ *	state - State structure to be initialized
+ *	cache - Cache of all section headers
+ *	shnum - # of sections in cache
+ *	secndx - Index of symbol table section
+ *	ehdr - ELF header for file
+ *	versym - Information about versym section
+ *	file - Name of file
+ *	flags - Command line option flags
+ */
+static int
+init_symtbl_state(SYMTBL_STATE *state, Cache *cache, Word shnum, Word secndx,
+    Ehdr *ehdr, uchar_t osabi, VERSYM_STATE *versym, const char *file,
+    uint_t flags)
+{
+	Shdr *shdr;
+
+	state->file = file;
+	state->ehdr = ehdr;
+	state->cache = cache;
+	state->osabi = osabi;
+	state->shnum = shnum;
+	state->seccache = &cache[secndx];
+	state->secndx = secndx;
+	state->secname = state->seccache->c_name;
+	state->flags = flags;
+	state->shxndx.checked = 0;
+	state->shxndx.data = NULL;
+	state->shxndx.n = 0;
+
+	shdr = state->seccache->c_shdr;
+
+	/*
+	 * Check the symbol data and per-item size.
+	 */
+	if ((shdr->sh_entsize == 0) || (shdr->sh_size == 0)) {
+		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
+		    file, state->secname);
+		return (0);
+	}
+	if (state->seccache->c_data == NULL)
+		return (0);
+
+	/* LINTED */
+	state->symn = (Word)(shdr->sh_size / shdr->sh_entsize);
+	state->sym = (Sym *)state->seccache->c_data->d_buf;
+
+	/*
+	 * Check associated string table section.
+	 */
+	if ((shdr->sh_link == 0) || (shdr->sh_link >= shnum)) {
+		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSHLINK),
+		    file, state->secname, EC_WORD(shdr->sh_link));
+		return (0);
+	}
+
+	/*
+	 * Determine if there is a associated Versym section
+	 * with this Symbol Table.
+	 */
+	if (versym && versym->cache &&
+	    (versym->cache->c_shdr->sh_link == state->secndx))
+		state->versym = versym;
+	else
+		state->versym = NULL;
+
+
+	return (1);
+}
+
+/*
+ * Determine the extended section index used for symbol tables entries.
+ */
+static void
+symbols_getxindex(SYMTBL_STATE *state)
+{
+	uint_t	symn;
+	Word	symcnt;
+
+	state->shxndx.checked = 1;   /* Note that we've been called */
+	for (symcnt = 1; symcnt < state->shnum; symcnt++) {
+		Cache	*_cache = &state->cache[symcnt];
+		Shdr	*shdr = _cache->c_shdr;
+
+		if ((shdr->sh_type != SHT_SYMTAB_SHNDX) ||
+		    (shdr->sh_link != state->secndx))
+			continue;
+
+		if ((shdr->sh_entsize) &&
+		    /* LINTED */
+		    ((symn = (uint_t)(shdr->sh_size / shdr->sh_entsize)) == 0))
+			continue;
+
+		if (_cache->c_data == NULL)
+			continue;
+
+		state->shxndx.data = _cache->c_data->d_buf;
+		state->shxndx.n = symn;
+		return;
+	}
+}
+
+/*
+ * Produce a line of output for the given symbol
+ *
+ * entry:
+ *	state - Symbol table state
+ *	symndx - Index of symbol within the table
+ *	info - Value of st_info (indicates local/global range)
+ *	symndx_disp - Index to display. This may not be the same
+ *		as symndx if the display is relative to the logical
+ *		combination of the SUNW_ldynsym/dynsym tables.
+ *	sym - Symbol to display
+ */
+static void
+output_symbol(SYMTBL_STATE *state, Word symndx, Word info, Word disp_symndx,
+    Sym *sym)
+{
+	/*
+	 * Symbol types for which we check that the specified
+	 * address/size land inside the target section.
+	 */
+	static const int addr_symtype[] = {
+		0,			/* STT_NOTYPE */
+		1,			/* STT_OBJECT */
+		1,			/* STT_FUNC */
+		0,			/* STT_SECTION */
+		0,			/* STT_FILE */
+		1,			/* STT_COMMON */
+		0,			/* STT_TLS */
+		0,			/* 7 */
+		0,			/* 8 */
+		0,			/* 9 */
+		0,			/* 10 */
+		0,			/* 11 */
+		0,			/* 12 */
+		0,			/* STT_SPARC_REGISTER */
+		0,			/* 14 */
+		0,			/* 15 */
+	};
+#if STT_NUM != (STT_TLS + 1)
+#error "STT_NUM has grown. Update addr_symtype[]"
+#endif
+
+	char		index[MAXNDXSIZE];
+	const char	*symname, *sec;
+	Versym		verndx;
+	int		gnuver;
+	uchar_t		type;
+	Shdr		*tshdr;
+	Word		shndx;
+	Conv_inv_buf_t	inv_buf;
+
+	/* Ensure symbol index is in range */
+	if (symndx >= state->symn) {
+		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSYMNDX),
+		    state->file, state->secname, EC_WORD(symndx));
+		return;
+	}
+
+	/*
+	 * If we are using extended symbol indexes, find the
+	 * corresponding SHN_SYMTAB_SHNDX table.
+	 */
+	if ((sym->st_shndx == SHN_XINDEX) && (state->shxndx.checked == 0))
+		symbols_getxindex(state);
+
+	/* LINTED */
+	symname = string(state->seccache, symndx,
+	    &state->cache[state->seccache->c_shdr->sh_link], state->file,
+	    sym->st_name);
+
+	tshdr = NULL;
+	sec = NULL;
+
+	if (state->ehdr->e_type == ET_CORE) {
+		sec = (char *)MSG_INTL(MSG_STR_UNKNOWN);
+	} else if (state->flags & FLG_CTL_FAKESHDR) {
+		/*
+		 * If we are using fake section headers derived from
+		 * the program headers, then the section indexes
+		 * in the symbols do not correspond to these headers.
+		 * The section names are not available, so all we can
+		 * do is to display them in numeric form.
+		 */
+		sec = conv_sym_shndx(state->osabi, state->ehdr->e_machine,
+		    sym->st_shndx, CONV_FMT_DECIMAL, &inv_buf);
+	} else if ((sym->st_shndx < SHN_LORESERVE) &&
+	    (sym->st_shndx < state->shnum)) {
+		shndx = sym->st_shndx;
+		tshdr = state->cache[shndx].c_shdr;
+		sec = state->cache[shndx].c_name;
+	} else if (sym->st_shndx == SHN_XINDEX) {
+		if (state->shxndx.data) {
+			Word	_shxndx;
+
+			if (symndx > state->shxndx.n) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_BADSYMXINDEX1),
+				    state->file, state->secname,
+				    EC_WORD(symndx));
+			} else if ((_shxndx =
+			    state->shxndx.data[symndx]) > state->shnum) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_BADSYMXINDEX2),
+				    state->file, state->secname,
+				    EC_WORD(symndx), EC_WORD(_shxndx));
+			} else {
+				shndx = _shxndx;
+				tshdr = state->cache[shndx].c_shdr;
+				sec = state->cache[shndx].c_name;
+			}
+		} else {
+			(void) fprintf(stderr,
+			    MSG_INTL(MSG_ERR_BADSYMXINDEX3),
+			    state->file, state->secname, EC_WORD(symndx));
+		}
+	} else if ((sym->st_shndx < SHN_LORESERVE) &&
+	    (sym->st_shndx >= state->shnum)) {
+		(void) fprintf(stderr,
+		    MSG_INTL(MSG_ERR_BADSYM5), state->file,
+		    state->secname, EC_WORD(symndx),
+		    demangle(symname, state->flags), sym->st_shndx);
+	}
+
+	/*
+	 * If versioning is available display the
+	 * version index. If not, then use 0.
+	 */
+	if (state->versym) {
+		Versym test_verndx;
+
+		verndx = test_verndx = state->versym->data[symndx];
+		gnuver = state->versym->gnu_full;
+
+		/*
+		 * Check to see if this is a defined symbol with a
+		 * version index that is outside the valid range for
+		 * the file. The interpretation of this depends on
+		 * the style of versioning used by the object.
+		 *
+		 * Versions >= VER_NDX_LORESERVE have special meanings,
+		 * and are exempt from this checking.
+		 *
+		 * GNU style version indexes use the top bit of the
+		 * 16-bit index value (0x8000) as the "hidden bit".
+		 * We must mask off this bit in order to compare
+		 * the version against the maximum value.
+		 */
+		if (gnuver)
+			test_verndx &= ~0x8000;
+
+		if ((test_verndx > state->versym->max_verndx) &&
+		    (verndx < VER_NDX_LORESERVE))
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADVER),
+			    state->file, state->secname, EC_WORD(symndx),
+			    EC_HALF(test_verndx), state->versym->max_verndx);
+	} else {
+		verndx = 0;
+		gnuver = 0;
+	}
+
+	/*
+	 * Error checking for TLS.
+	 */
+	type = ELF_ST_TYPE(sym->st_info);
+	if (type == STT_TLS) {
+		if (tshdr &&
+		    (sym->st_shndx != SHN_UNDEF) &&
+		    ((tshdr->sh_flags & SHF_TLS) == 0)) {
+			(void) fprintf(stderr,
+			    MSG_INTL(MSG_ERR_BADSYM3), state->file,
+			    state->secname, EC_WORD(symndx),
+			    demangle(symname, state->flags));
+		}
+	} else if ((type != STT_SECTION) && sym->st_size &&
+	    tshdr && (tshdr->sh_flags & SHF_TLS)) {
+		(void) fprintf(stderr,
+		    MSG_INTL(MSG_ERR_BADSYM4), state->file,
+		    state->secname, EC_WORD(symndx),
+		    demangle(symname, state->flags));
+	}
+
+	/*
+	 * If a symbol with non-zero size has a type that
+	 * specifies an address, then make sure the location
+	 * it references is actually contained within the
+	 * section.  UNDEF symbols don't count in this case,
+	 * so we ignore them.
+	 *
+	 * The meaning of the st_value field in a symbol
+	 * depends on the type of object. For a relocatable
+	 * object, it is the offset within the section.
+	 * For sharable objects, it is the offset relative to
+	 * the base of the object, and for other types, it is
+	 * the virtual address. To get an offset within the
+	 * section for non-ET_REL files, we subtract the
+	 * base address of the section.
+	 */
+	if (addr_symtype[type] && (sym->st_size > 0) &&
+	    (sym->st_shndx != SHN_UNDEF) && ((sym->st_shndx < SHN_LORESERVE) ||
+	    (sym->st_shndx == SHN_XINDEX)) && (tshdr != NULL)) {
+		Word v = sym->st_value;
+			if (state->ehdr->e_type != ET_REL)
+				v -= tshdr->sh_addr;
+		if (((v + sym->st_size) > tshdr->sh_size)) {
+			(void) fprintf(stderr,
+			    MSG_INTL(MSG_ERR_BADSYM6), state->file,
+			    state->secname, EC_WORD(symndx),
+			    demangle(symname, state->flags),
+			    EC_WORD(shndx), EC_XWORD(tshdr->sh_size),
+			    EC_XWORD(sym->st_value), EC_XWORD(sym->st_size));
+		}
+	}
+
+	/*
+	 * A typical symbol table uses the sh_info field to indicate one greater
+	 * than the symbol table index of the last local symbol, STB_LOCAL.
+	 * Therefore, symbol indexes less than sh_info should have local
+	 * binding.  Symbol indexes greater than, or equal to sh_info, should
+	 * have global binding.  Note, we exclude UNDEF/NOTY symbols with zero
+	 * value and size, as these symbols may be the result of an mcs(1)
+	 * section deletion.
+	 */
+	if (info) {
+		uchar_t	bind = ELF_ST_BIND(sym->st_info);
+
+		if ((symndx < info) && (bind != STB_LOCAL)) {
+			(void) fprintf(stderr,
+			    MSG_INTL(MSG_ERR_BADSYM7), state->file,
+			    state->secname, EC_WORD(symndx),
+			    demangle(symname, state->flags), EC_XWORD(info));
+
+		} else if ((symndx >= info) && (bind == STB_LOCAL) &&
+		    ((sym->st_shndx != SHN_UNDEF) ||
+		    (ELF_ST_TYPE(sym->st_info) != STT_NOTYPE) ||
+		    (sym->st_size != 0) || (sym->st_value != 0))) {
+			(void) fprintf(stderr,
+			    MSG_INTL(MSG_ERR_BADSYM8), state->file,
+			    state->secname, EC_WORD(symndx),
+			    demangle(symname, state->flags), EC_XWORD(info));
+		}
+	}
+
+	(void) snprintf(index, MAXNDXSIZE,
+	    MSG_ORIG(MSG_FMT_INDEX), EC_XWORD(disp_symndx));
+	Elf_syms_table_entry(0, ELF_DBG_ELFDUMP, index, state->osabi,
+	    state->ehdr->e_machine, sym, verndx, gnuver, sec, symname);
+}
+
+/*
+ * Process a SHT_SUNW_cap capabilities section.
+ */
+static int
+cap_section(const char *file, Cache *cache, Word shnum, Cache *ccache,
+    uchar_t osabi, Ehdr *ehdr, uint_t flags)
+{
+	SYMTBL_STATE	state;
+	Word		cnum, capnum, nulls, symcaps;
+	int		descapndx, objcap, title;
+	Cap		*cap = (Cap *)ccache->c_data->d_buf;
+	Shdr		*cishdr, *cshdr = ccache->c_shdr;
+	Cache		*cicache, *strcache;
+	Capinfo		*capinfo = NULL;
+	Word		capinfonum;
+	const char	*strs = NULL;
+	size_t		strs_size;
+
+	if ((cshdr->sh_entsize == 0) || (cshdr->sh_size == 0)) {
+		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
+		    file, ccache->c_name);
+		return (0);
+	}
+
+	/*
+	 * If this capabilities section is associated with symbols, then the
+	 * sh_link field points to the associated capabilities information
+	 * section.  The sh_link field of the capabilities information section
+	 * points to the associated symbol table.
+	 */
+	if (cshdr->sh_link) {
+		Cache	*scache;
+		Shdr	*sshdr;
+
+		/*
+		 * Validate that the sh_link field points to a capabilities
+		 * information section.
+		 */
+		if (cshdr->sh_link >= shnum) {
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSHLINK),
+			    file, ccache->c_name, EC_WORD(cshdr->sh_link));
+			return (0);
+		}
+
+		cicache = &cache[cshdr->sh_link];
+		cishdr = cicache->c_shdr;
+
+		if (cishdr->sh_type != SHT_SUNW_capinfo) {
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_INVCAP),
+			    file, ccache->c_name, EC_WORD(cshdr->sh_link));
+			return (0);
+		}
+
+		capinfo = cicache->c_data->d_buf;
+		capinfonum = (Word)(cishdr->sh_size / cishdr->sh_entsize);
+
+		/*
+		 * Validate that the sh_link field of the capabilities
+		 * information section points to a valid symbol table.
+		 */
+		if ((cishdr->sh_link == 0) || (cishdr->sh_link >= shnum)) {
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSHLINK),
+			    file, cicache->c_name, EC_WORD(cishdr->sh_link));
+			return (0);
+		}
+		scache = &cache[cishdr->sh_link];
+		sshdr = scache->c_shdr;
+
+		if ((sshdr->sh_type != SHT_SYMTAB) &&
+		    (sshdr->sh_type != SHT_DYNSYM)) {
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_INVCAPINFO1),
+			    file, cicache->c_name, EC_WORD(cishdr->sh_link));
+			return (0);
+		}
+
+		if (!init_symtbl_state(&state, cache, shnum,
+		    cishdr->sh_link, ehdr, osabi, NULL, file, flags))
+			return (0);
+	}
+
+	/*
+	 * If this capabilities section contains capability string entries,
+	 * then determine the associated string table.  Capabilities entries
+	 * that define names require that the capability section indicate
+	 * which string table to use via sh_info.
+	 */
+	if (cshdr->sh_info) {
+		Shdr	*strshdr;
+
+		/*
+		 * Validate that the sh_info field points to a string table.
+		 */
+		if (cshdr->sh_info >= shnum) {
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSHLINK),
+			    file, ccache->c_name, EC_WORD(cshdr->sh_info));
+			return (0);
+		}
+
+		strcache = &cache[cshdr->sh_info];
+		strshdr = strcache->c_shdr;
+
+		if (strshdr->sh_type != SHT_STRTAB) {
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_INVCAP),
+			    file, ccache->c_name, EC_WORD(cshdr->sh_info));
+			return (0);
+		}
+		strs = (const char *)strcache->c_data->d_buf;
+		strs_size = strcache->c_data->d_size;
+	}
+
+	dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
+	dbg_print(0, MSG_INTL(MSG_ELF_SCN_CAP), ccache->c_name);
+
+	capnum = (Word)(cshdr->sh_size / cshdr->sh_entsize);
+
+	nulls = symcaps = 0;
+	objcap = title = 1;
+	descapndx = -1;
+
+	/*
+	 * Traverse the capabilities section printing each capability group.
+	 * The first capabilities group defines any object capabilities.  Any
+	 * following groups define symbol capabilities.  In the case where no
+	 * object capabilities exist, but symbol capabilities do, a single
+	 * CA_SUNW_NULL terminator for the object capabilities exists.
+	 */
+	for (cnum = 0; cnum < capnum; cap++, cnum++) {
+		if (cap->c_tag == CA_SUNW_NULL) {
+			/*
+			 * A CA_SUNW_NULL tag terminates a capabilities group.
+			 * If the first capabilities tag is CA_SUNW_NULL, then
+			 * no object capabilities exist.
+			 */
+			if ((nulls++ == 0) && (cnum == 0))
+				objcap = 0;
+			title = 1;
+		} else {
+			if (title) {
+				if (nulls == 0) {
+					/*
+					 * If this capabilities group represents
+					 * the object capabilities (i.e., no
+					 * CA_SUNW_NULL tag has been processed
+					 * yet), then display an object
+					 * capabilities title.
+					 */
+					dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
+					dbg_print(0,
+					    MSG_INTL(MSG_OBJ_CAP_TITLE));
+				} else {
+					/*
+					 * If this is a symbols capabilities
+					 * group (i.e., a CA_SUNW_NULL tag has
+					 * already be found that terminates
+					 * the object capabilities group), then
+					 * display a symbol capabilities title,
+					 * and retain this capabilities index
+					 * for later processing.
+					 */
+					dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
+					dbg_print(0,
+					    MSG_INTL(MSG_SYM_CAP_TITLE));
+					descapndx = cnum;
+				}
+				Elf_cap_title(0);
+				title = 0;
+			}
+
+			/*
+			 * Print the capabilities data.
+			 *
+			 * Note that CA_SUNW_PLAT, CA_SUNW_MACH and CA_SUNW_ID
+			 * entries require a string table, which should have
+			 * already been established.
+			 */
+			if ((strs == NULL) && ((cap->c_tag == CA_SUNW_PLAT) ||
+			    (cap->c_tag == CA_SUNW_MACH) ||
+			    (cap->c_tag == CA_SUNW_ID))) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_WARN_INVCAP4), file,
+				    EC_WORD(elf_ndxscn(ccache->c_scn)),
+				    ccache->c_name, EC_WORD(cshdr->sh_info));
+			}
+			Elf_cap_entry(0, cap, cnum, strs, strs_size,
+			    ehdr->e_machine);
+		}
+
+		/*
+		 * If this CA_SUNW_NULL tag terminates a symbol capabilities
+		 * group, determine the associated symbols.
+		 */
+		if ((cap->c_tag == CA_SUNW_NULL) && (nulls > 1) &&
+		    (descapndx != -1)) {
+			Capinfo	*cip;
+			Word	inum;
+
+			symcaps++;
+
+			/*
+			 * Make sure we've discovered a SHT_SUNW_capinfo table.
+			 */
+			if ((cip = capinfo) == NULL) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_INVCAP), file,
+				    ccache->c_name, EC_WORD(cshdr->sh_link));
+				return (0);
+			}
+
+			/*
+			 * Determine what symbols reference this capabilities
+			 * group.
+			 */
+			dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
+			dbg_print(0, MSG_INTL(MSG_CAPINFO_ENTRIES));
+			Elf_syms_table_title(0, ELF_DBG_ELFDUMP);
+
+			for (inum = 1, cip++; inum < capinfonum;
+			    inum++, cip++) {
+				Word	gndx = (Word)ELF_C_GROUP(*cip);
+
+				if (gndx && (gndx == descapndx)) {
+					output_symbol(&state, inum, 0,
+					    inum, state.sym + inum);
+				}
+			}
+			descapndx = -1;
+			continue;
+		}
+
+		/*
+		 * An SF1_SUNW_ADDR32 software capability tag in a 32-bit
+		 * object is suspicious as it has no effect.
+		 */
+		if ((cap->c_tag == CA_SUNW_SF_1) &&
+		    (ehdr->e_ident[EI_CLASS] == ELFCLASS32) &&
+		    (cap->c_un.c_val & SF1_SUNW_ADDR32)) {
+			(void) fprintf(stderr, MSG_INTL(MSG_WARN_INADDR32SF1),
+			    file, ccache->c_name);
+		}
+	}
+
+	/*
+	 * If this is a dynamic object, with symbol capabilities, then a
+	 * .SUNW_capchain section should exist.  This section contains a chain
+	 * of symbol indexes for each capabilities family.  This is the list
+	 * that is searched by ld.so.1 to determine the best capabilities
+	 * candidate.
+	 *
+	 * Note, more than one capabilities lead symbol can point to the same
+	 * family chain.  For example, a weak/global pair of symbols can both
+	 * represent the same family of capabilities symbols.  Therefore, to
+	 * display all possible families we traverse the capabilities
+	 * information section looking for CAPINFO_SUNW_GLOB lead symbols.
+	 * From these we determine the associated capabilities chain to inspect.
+	 */
+	if (symcaps &&
+	    ((ehdr->e_type == ET_EXEC) || (ehdr->e_type == ET_DYN))) {
+		Capinfo		*cip;
+		Capchain	*chain;
+		Cache   	*chcache;
+		Shdr		*chshdr;
+		Word		chainnum, inum;
+
+		/*
+		 * Validate that the sh_info field of the capabilities
+		 * information section points to a capabilities chain section.
+		 */
+		if (cishdr->sh_info >= shnum) {
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSHLINK),
+			    file, cicache->c_name, EC_WORD(cishdr->sh_info));
+			return (0);
+		}
+
+		chcache = &cache[cishdr->sh_info];
+		chshdr = chcache->c_shdr;
+
+		if (chshdr->sh_type != SHT_SUNW_capchain) {
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_INVCAPINFO2),
+			    file, cicache->c_name, EC_WORD(cishdr->sh_info));
+			return (0);
+		}
+
+		chainnum = (Word)(chshdr->sh_size / chshdr->sh_entsize);
+		chain = (Capchain *)chcache->c_data->d_buf;
+
+		dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
+		dbg_print(0, MSG_INTL(MSG_ELF_SCN_CAPCHAIN), chcache->c_name);
+
+		/*
+		 * Traverse the capabilities information section looking for
+		 * CAPINFO_SUNW_GLOB lead capabilities symbols.
+		 */
+		cip = capinfo;
+		for (inum = 1, cip++; inum < capinfonum; inum++, cip++) {
+			const char	*name;
+			Sym		*sym;
+			Word		sndx, cndx;
+			Word		gndx = (Word)ELF_C_GROUP(*cip);
+
+			if ((gndx == 0) || (gndx != CAPINFO_SUNW_GLOB))
+				continue;
+
+			/*
+			 * Determine the symbol that is associated with this
+			 * capability information entry, and use this to
+			 * identify this capability family.
+			 */
+			sym = (Sym *)(state.sym + inum);
+			name = string(cicache, inum, strcache, file,
+			    sym->st_name);
+
+			dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
+			dbg_print(0, MSG_INTL(MSG_CAPCHAIN_TITLE), name);
+			dbg_print(0, MSG_INTL(MSG_CAPCHAIN_ENTRY));
+
+			cndx = (Word)ELF_C_SYM(*cip);
+
+			/*
+			 * Traverse this families chain and identify each
+			 * family member.
+			 */
+			for (;;) {
+				char	_chain[MAXNDXSIZE], _symndx[MAXNDXSIZE];
+
+				if (cndx >= chainnum) {
+					(void) fprintf(stderr,
+					    MSG_INTL(MSG_ERR_INVCAPINFO3), file,
+					    cicache->c_name, EC_WORD(inum),
+					    EC_WORD(cndx));
+					break;
+				}
+				if ((sndx = chain[cndx]) == 0)
+					break;
+
+				/*
+				 * Determine this entries symbol reference.
+				 */
+				if (sndx > state.symn) {
+					(void) fprintf(stderr,
+					    MSG_INTL(MSG_ERR_CHBADSYMNDX), file,
+					    EC_WORD(sndx), chcache->c_name,
+					    EC_WORD(cndx));
+					name = MSG_INTL(MSG_STR_UNKNOWN);
+				} else {
+					sym = (Sym *)(state.sym + sndx);
+					name = string(chcache, sndx,
+					    strcache, file, sym->st_name);
+				}
+
+				/*
+				 * Display the family member.
+				 */
+				(void) snprintf(_chain, MAXNDXSIZE,
+				    MSG_ORIG(MSG_FMT_INTEGER), cndx);
+				(void) snprintf(_symndx, MAXNDXSIZE,
+				    MSG_ORIG(MSG_FMT_INDEX2), EC_WORD(sndx));
+				dbg_print(0, MSG_ORIG(MSG_FMT_CHAIN_INFO),
+				    _chain, _symndx, demangle(name, flags));
+
+				cndx++;
+			}
+		}
+	}
+	return (objcap);
+}
+
+/*
+ * Print the capabilities.
+ *
+ * A .SUNW_cap section can contain one or more, CA_SUNW_NULL terminated,
+ * capabilities groups.  The first group defines the object capabilities.
+ * This group defines the minimum capability requirements of the entire
+ * object file.  If this is a dynamic object, this group should be associated
+ * with a PT_SUNWCAP program header.
+ *
+ * Additional capabilities groups define the association of individual symbols
+ * to specific capabilities.
  */
 static void
 cap(const char *file, Cache *cache, Word shnum, Word phnum, Ehdr *ehdr,
-    Elf *elf)
+    uchar_t osabi, Elf *elf, uint_t flags)
 {
 	Word		cnt;
 	Shdr		*cshdr = NULL;
@@ -896,7 +1622,7 @@ cap(const char *file, Cache *cache, Word shnum, Word phnum, Ehdr *ehdr,
 	Xword		cphdr_sz;
 
 	/*
-	 * Determine if a hardware/software capabilities header exists.
+	 * Determine if a global capabilities header exists.
 	 */
 	if (phnum) {
 		Phdr	*phdr;
@@ -916,84 +1642,52 @@ cap(const char *file, Cache *cache, Word shnum, Word phnum, Ehdr *ehdr,
 	}
 
 	/*
-	 * Determine if a hardware/software capabilities section exists.
+	 * Determine if a capabilities section exists.
 	 */
 	for (cnt = 1; cnt < shnum; cnt++) {
 		Cache	*_cache = &cache[cnt];
 		Shdr	*shdr = _cache->c_shdr;
 
-		if (shdr->sh_type != SHT_SUNW_cap)
+		/*
+		 * Process any capabilities information.
+		 */
+		if (shdr->sh_type == SHT_SUNW_cap) {
+			if (cap_section(file, cache, shnum, _cache, osabi,
+			    ehdr, flags)) {
+				/*
+				 * If this section defined an object capability
+				 * group, retain the section information for
+				 * program header validation.
+				 */
+				ccache = _cache;
+				cshdr = shdr;
+			}
 			continue;
-
-		if (cphdr_off && ((cphdr_off < shdr->sh_offset) ||
-		    (cphdr_off + cphdr_sz) > (shdr->sh_offset + shdr->sh_size)))
-			continue;
-
-		if (_cache->c_data == NULL)
-			continue;
-
-		ccache = _cache;
-		cshdr = shdr;
-		break;
+		}
 	}
 
 	if ((cshdr == NULL) && (cphdr_off == 0))
 		return;
 
-	/*
-	 * Print the hardware/software capabilities section.
-	 */
-	if (cshdr) {
-		Word	ndx, capn;
-		Cap	*cap = (Cap *)ccache->c_data->d_buf;
-
-		if ((cshdr->sh_entsize == 0) || (cshdr->sh_size == 0)) {
-			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
-			    file, ccache->c_name);
-			return;
-		}
-
-		dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
-		dbg_print(0, MSG_INTL(MSG_ELF_SCN_CAP), ccache->c_name);
-
-		Elf_cap_title(0);
-
-		capn = (Word)(cshdr->sh_size / cshdr->sh_entsize);
-
-		for (ndx = 0; ndx < capn; cap++, ndx++) {
-			if (cap->c_tag == CA_SUNW_NULL)
-				continue;
-
-			Elf_cap_entry(0, cap, ndx, ehdr->e_machine);
-
-			/*
-			 * An SF1_SUNW_ADDR32 software capability in a 32-bit
-			 * object is suspicious as it has no effect.
-			 */
-			if ((cap->c_tag == CA_SUNW_SF_1) &&
-			    (ehdr->e_ident[EI_CLASS] == ELFCLASS32) &&
-			    (cap->c_un.c_val & SF1_SUNW_ADDR32)) {
-				(void) fprintf(stderr,
-				    MSG_INTL(MSG_WARN_INADDR32SF1),
-				    file, ccache->c_name);
-			}
-		}
-	} else
+	if (cphdr_off && (cshdr == NULL))
 		(void) fprintf(stderr, MSG_INTL(MSG_WARN_INVCAP1), file);
 
 	/*
-	 * If this object is an executable or shared object, then the
-	 * hardware/software capabilities section should have an accompanying
-	 * program header.
+	 * If this object is an executable or shared object, and it provided
+	 * an object capabilities group, then the group should have an
+	 * accompanying PT_SUNWCAP program header.
 	 */
 	if (cshdr && ((ehdr->e_type == ET_EXEC) || (ehdr->e_type == ET_DYN))) {
-		if (cphdr_off == 0)
+		if (cphdr_off == 0) {
 			(void) fprintf(stderr, MSG_INTL(MSG_WARN_INVCAP2),
-			    file, ccache->c_name);
-		else if ((cphdr_off != cshdr->sh_offset) ||
-		    (cphdr_sz != cshdr->sh_size))
+			    file, EC_WORD(elf_ndxscn(ccache->c_scn)),
+			    ccache->c_name);
+		} else if ((cphdr_off != cshdr->sh_offset) ||
+		    (cphdr_sz != cshdr->sh_size)) {
 			(void) fprintf(stderr, MSG_INTL(MSG_WARN_INVCAP3),
-			    file, ccache->c_name);
+			    file, EC_WORD(elf_ndxscn(ccache->c_scn)),
+			    ccache->c_name);
+		}
 	}
 }
 
@@ -1532,359 +2226,6 @@ versions(Cache *cache, Word shnum, const char *file, uint_t flags,
 }
 
 /*
- * Initialize a symbol table state structure
- *
- * entry:
- *	state - State structure to be initialized
- *	cache - Cache of all section headers
- *	shnum - # of sections in cache
- *	secndx - Index of symbol table section
- *	ehdr - ELF header for file
- *	versym - Information about versym section
- *	file - Name of file
- *	flags - Command line option flags
- */
-static int
-init_symtbl_state(SYMTBL_STATE *state, Cache *cache, Word shnum, Word secndx,
-    Ehdr *ehdr, uchar_t osabi, VERSYM_STATE *versym, const char *file,
-    uint_t flags)
-{
-	Shdr *shdr;
-
-	state->file = file;
-	state->ehdr = ehdr;
-	state->cache = cache;
-	state->osabi = osabi;
-	state->shnum = shnum;
-	state->seccache = &cache[secndx];
-	state->secndx = secndx;
-	state->secname = state->seccache->c_name;
-	state->flags = flags;
-	state->shxndx.checked = 0;
-	state->shxndx.data = NULL;
-	state->shxndx.n = 0;
-
-	shdr = state->seccache->c_shdr;
-
-	/*
-	 * Check the symbol data and per-item size.
-	 */
-	if ((shdr->sh_entsize == 0) || (shdr->sh_size == 0)) {
-		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
-		    file, state->secname);
-		return (0);
-	}
-	if (state->seccache->c_data == NULL)
-		return (0);
-
-	/* LINTED */
-	state->symn = (Word)(shdr->sh_size / shdr->sh_entsize);
-	state->sym = (Sym *)state->seccache->c_data->d_buf;
-
-	/*
-	 * Check associated string table section.
-	 */
-	if ((shdr->sh_link == 0) || (shdr->sh_link >= shnum)) {
-		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSHLINK),
-		    file, state->secname, EC_WORD(shdr->sh_link));
-		return (0);
-	}
-
-	/*
-	 * Determine if there is a associated Versym section
-	 * with this Symbol Table.
-	 */
-	if (versym->cache &&
-	    (versym->cache->c_shdr->sh_link == state->secndx))
-		state->versym = versym;
-	else
-		state->versym = NULL;
-
-
-	return (1);
-}
-
-/*
- * Determine the extended section index used for symbol tables entries.
- */
-static void
-symbols_getxindex(SYMTBL_STATE *state)
-{
-	uint_t	symn;
-	Word	symcnt;
-
-	state->shxndx.checked = 1;   /* Note that we've been called */
-	for (symcnt = 1; symcnt < state->shnum; symcnt++) {
-		Cache	*_cache = &state->cache[symcnt];
-		Shdr	*shdr = _cache->c_shdr;
-
-		if ((shdr->sh_type != SHT_SYMTAB_SHNDX) ||
-		    (shdr->sh_link != state->secndx))
-			continue;
-
-		if ((shdr->sh_entsize) &&
-		    /* LINTED */
-		    ((symn = (uint_t)(shdr->sh_size / shdr->sh_entsize)) == 0))
-			continue;
-
-		if (_cache->c_data == NULL)
-			continue;
-
-		state->shxndx.data = _cache->c_data->d_buf;
-		state->shxndx.n = symn;
-		return;
-	}
-}
-
-/*
- * Produce a line of output for the given symbol
- *
- * entry:
- *	state - Symbol table state
- *	symndx - Index of symbol within the table
- *	info - Value of st_info (indicates local/global range)
- *	symndx_disp - Index to display. This may not be the same
- *		as symndx if the display is relative to the logical
- *		combination of the SUNW_ldynsym/dynsym tables.
- *	sym - Symbol to display
- */
-static void
-output_symbol(SYMTBL_STATE *state, Word symndx, Word info, Word disp_symndx,
-    Sym *sym)
-{
-	/*
-	 * Symbol types for which we check that the specified
-	 * address/size land inside the target section.
-	 */
-	static const int addr_symtype[] = {
-		0,			/* STT_NOTYPE */
-		1,			/* STT_OBJECT */
-		1,			/* STT_FUNC */
-		0,			/* STT_SECTION */
-		0,			/* STT_FILE */
-		1,			/* STT_COMMON */
-		0,			/* STT_TLS */
-		0,			/* 7 */
-		0,			/* 8 */
-		0,			/* 9 */
-		0,			/* 10 */
-		0,			/* 11 */
-		0,			/* 12 */
-		0,			/* STT_SPARC_REGISTER */
-		0,			/* 14 */
-		0,			/* 15 */
-	};
-#if STT_NUM != (STT_TLS + 1)
-#error "STT_NUM has grown. Update addr_symtype[]"
-#endif
-
-	char		index[MAXNDXSIZE];
-	const char	*symname, *sec;
-	Versym		verndx;
-	int		gnuver;
-	uchar_t		type;
-	Shdr		*tshdr;
-	Word		shndx;
-	Conv_inv_buf_t	inv_buf;
-
-	/* Ensure symbol index is in range */
-	if (symndx >= state->symn) {
-		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSORTNDX),
-		    state->file, state->secname, EC_WORD(symndx));
-		return;
-	}
-
-	/*
-	 * If we are using extended symbol indexes, find the
-	 * corresponding SHN_SYMTAB_SHNDX table.
-	 */
-	if ((sym->st_shndx == SHN_XINDEX) && (state->shxndx.checked == 0))
-		symbols_getxindex(state);
-
-	/* LINTED */
-	symname = string(state->seccache, symndx,
-	    &state->cache[state->seccache->c_shdr->sh_link], state->file,
-	    sym->st_name);
-
-	tshdr = NULL;
-	sec = NULL;
-
-	if (state->ehdr->e_type == ET_CORE) {
-		sec = (char *)MSG_INTL(MSG_STR_UNKNOWN);
-	} else if (state->flags & FLG_CTL_FAKESHDR) {
-		/*
-		 * If we are using fake section headers derived from
-		 * the program headers, then the section indexes
-		 * in the symbols do not correspond to these headers.
-		 * The section names are not available, so all we can
-		 * do is to display them in numeric form.
-		 */
-		sec = conv_sym_shndx(state->osabi, state->ehdr->e_machine,
-		    sym->st_shndx, CONV_FMT_DECIMAL, &inv_buf);
-	} else if ((sym->st_shndx < SHN_LORESERVE) &&
-	    (sym->st_shndx < state->shnum)) {
-		shndx = sym->st_shndx;
-		tshdr = state->cache[shndx].c_shdr;
-		sec = state->cache[shndx].c_name;
-	} else if (sym->st_shndx == SHN_XINDEX) {
-		if (state->shxndx.data) {
-			Word	_shxndx;
-
-			if (symndx > state->shxndx.n) {
-				(void) fprintf(stderr,
-				    MSG_INTL(MSG_ERR_BADSYMXINDEX1),
-				    state->file, state->secname,
-				    EC_WORD(symndx));
-			} else if ((_shxndx =
-			    state->shxndx.data[symndx]) > state->shnum) {
-				(void) fprintf(stderr,
-				    MSG_INTL(MSG_ERR_BADSYMXINDEX2),
-				    state->file, state->secname,
-				    EC_WORD(symndx), EC_WORD(_shxndx));
-			} else {
-				shndx = _shxndx;
-				tshdr = state->cache[shndx].c_shdr;
-				sec = state->cache[shndx].c_name;
-			}
-		} else {
-			(void) fprintf(stderr,
-			    MSG_INTL(MSG_ERR_BADSYMXINDEX3),
-			    state->file, state->secname, EC_WORD(symndx));
-		}
-	} else if ((sym->st_shndx < SHN_LORESERVE) &&
-	    (sym->st_shndx >= state->shnum)) {
-		(void) fprintf(stderr,
-		    MSG_INTL(MSG_ERR_BADSYM5), state->file,
-		    state->secname, EC_WORD(symndx),
-		    demangle(symname, state->flags), sym->st_shndx);
-	}
-
-	/*
-	 * If versioning is available display the
-	 * version index. If not, then use 0.
-	 */
-	if (state->versym) {
-		Versym test_verndx;
-
-		verndx = test_verndx = state->versym->data[symndx];
-		gnuver = state->versym->gnu_full;
-
-		/*
-		 * Check to see if this is a defined symbol with a
-		 * version index that is outside the valid range for
-		 * the file. The interpretation of this depends on
-		 * the style of versioning used by the object.
-		 *
-		 * Versions >= VER_NDX_LORESERVE have special meanings,
-		 * and are exempt from this checking.
-		 *
-		 * GNU style version indexes use the top bit of the
-		 * 16-bit index value (0x8000) as the "hidden bit".
-		 * We must mask off this bit in order to compare
-		 * the version against the maximum value.
-		 */
-		if (gnuver)
-			test_verndx &= ~0x8000;
-
-		if ((test_verndx > state->versym->max_verndx) &&
-		    (verndx < VER_NDX_LORESERVE))
-			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADVER),
-			    state->file, state->secname, EC_WORD(symndx),
-			    EC_HALF(test_verndx), state->versym->max_verndx);
-	} else {
-		verndx = 0;
-		gnuver = 0;
-	}
-
-	/*
-	 * Error checking for TLS.
-	 */
-	type = ELF_ST_TYPE(sym->st_info);
-	if (type == STT_TLS) {
-		if (tshdr &&
-		    (sym->st_shndx != SHN_UNDEF) &&
-		    ((tshdr->sh_flags & SHF_TLS) == 0)) {
-			(void) fprintf(stderr,
-			    MSG_INTL(MSG_ERR_BADSYM3), state->file,
-			    state->secname, EC_WORD(symndx),
-			    demangle(symname, state->flags));
-		}
-	} else if ((type != STT_SECTION) && sym->st_size &&
-	    tshdr && (tshdr->sh_flags & SHF_TLS)) {
-		(void) fprintf(stderr,
-		    MSG_INTL(MSG_ERR_BADSYM4), state->file,
-		    state->secname, EC_WORD(symndx),
-		    demangle(symname, state->flags));
-	}
-
-	/*
-	 * If a symbol with non-zero size has a type that
-	 * specifies an address, then make sure the location
-	 * it references is actually contained within the
-	 * section.  UNDEF symbols don't count in this case,
-	 * so we ignore them.
-	 *
-	 * The meaning of the st_value field in a symbol
-	 * depends on the type of object. For a relocatable
-	 * object, it is the offset within the section.
-	 * For sharable objects, it is the offset relative to
-	 * the base of the object, and for other types, it is
-	 * the virtual address. To get an offset within the
-	 * section for non-ET_REL files, we subtract the
-	 * base address of the section.
-	 */
-	if (addr_symtype[type] && (sym->st_size > 0) &&
-	    (sym->st_shndx != SHN_UNDEF) && ((sym->st_shndx < SHN_LORESERVE) ||
-	    (sym->st_shndx == SHN_XINDEX)) && (tshdr != NULL)) {
-		Word v = sym->st_value;
-			if (state->ehdr->e_type != ET_REL)
-				v -= tshdr->sh_addr;
-		if (((v + sym->st_size) > tshdr->sh_size)) {
-			(void) fprintf(stderr,
-			    MSG_INTL(MSG_ERR_BADSYM6), state->file,
-			    state->secname, EC_WORD(symndx),
-			    demangle(symname, state->flags),
-			    EC_WORD(shndx), EC_XWORD(tshdr->sh_size),
-			    EC_XWORD(sym->st_value), EC_XWORD(sym->st_size));
-		}
-	}
-
-	/*
-	 * A typical symbol table uses the sh_info field to indicate one greater
-	 * than the symbol table index of the last local symbol, STB_LOCAL.
-	 * Therefore, symbol indexes less than sh_info should have local
-	 * binding.  Symbol indexes greater than, or equal to sh_info, should
-	 * have global binding.  Note, we exclude UNDEF/NOTY symbols with zero
-	 * value and size, as these symbols may be the result of an mcs(1)
-	 * section deletion.
-	 */
-	if (info) {
-		uchar_t	bind = ELF_ST_BIND(sym->st_info);
-
-		if ((symndx < info) && (bind != STB_LOCAL)) {
-			(void) fprintf(stderr,
-			    MSG_INTL(MSG_ERR_BADSYM7), state->file,
-			    state->secname, EC_WORD(symndx),
-			    demangle(symname, state->flags), EC_XWORD(info));
-
-		} else if ((symndx >= info) && (bind == STB_LOCAL) &&
-		    ((sym->st_shndx != SHN_UNDEF) ||
-		    (ELF_ST_TYPE(sym->st_info) != STT_NOTYPE) ||
-		    (sym->st_size != 0) || (sym->st_value != 0))) {
-			(void) fprintf(stderr,
-			    MSG_INTL(MSG_ERR_BADSYM8), state->file,
-			    state->secname, EC_WORD(symndx),
-			    demangle(symname, state->flags), EC_XWORD(info));
-		}
-	}
-
-	(void) snprintf(index, MAXNDXSIZE,
-	    MSG_ORIG(MSG_FMT_INDEX), EC_XWORD(disp_symndx));
-	Elf_syms_table_entry(0, ELF_DBG_ELFDUMP, index, state->osabi,
-	    state->ehdr->e_machine, sym, verndx, gnuver, sec, symname);
-}
-
-/*
  * Search for and process any symbol tables.
  */
 void
@@ -2039,7 +2380,7 @@ sunw_sort(Cache *cache, Word shnum, Ehdr *ehdr, uchar_t osabi,
 		}
 		Elf_syms_table_title(0, ELF_DBG_ELFDUMP);
 
-		/* If not first one, insert a line of whitespace */
+		/* If not first one, insert a line of white space */
 		if (output_cnt++ > 0)
 			dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
 
@@ -2315,7 +2656,6 @@ dyn_test(dyn_test_t test_type, Word sh_type, Cache *sec_cache, Dyn *dyn,
 	}
 }
 
-
 /*
  * There are some DT_ entries that have corresponding symbols
  * (e.g. DT_INIT and _init). It is expected that these items will
@@ -2368,7 +2708,6 @@ dyn_symtest(Dyn *dyn, const char *symname, Cache *symtab_cache,
 	}
 }
 
-
 /*
  * Search for and process a .dynamic section.
  */
@@ -2388,6 +2727,8 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, uchar_t osabi, const char *file)
 		Cache	*rel;
 		Cache	*rela;
 		Cache	*sunw_cap;
+		Cache	*sunw_capinfo;
+		Cache	*sunw_capchain;
 		Cache	*sunw_ldynsym;
 		Cache	*sunw_move;
 		Cache	*sunw_syminfo;
@@ -2484,6 +2825,8 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, uchar_t osabi, const char *file)
 		GRAB(SHT_SUNW_move,	sunw_move);
 		GRAB(SHT_PREINIT_ARRAY,	preinit_array);
 		GRAB(SHT_SUNW_cap,	sunw_cap);
+		GRAB(SHT_SUNW_capinfo,	sunw_capinfo);
+		GRAB(SHT_SUNW_capchain,	sunw_capchain);
 		GRAB(SHT_SUNW_LDYNSYM,	sunw_ldynsym);
 		GRAB(SHT_SUNW_syminfo,	sunw_syminfo);
 		GRAB(SHT_SUNW_symsort,	sunw_symsort);
@@ -2674,7 +3017,7 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, uchar_t osabi, const char *file)
 			/*
 			 * Cases below this point are strictly sanity checking,
 			 * and do not generate a name string. The TEST_ macros
-			 * are used to hide the boilerplate arguments neeeded
+			 * are used to hide the boiler plate arguments neeeded
 			 * by dyn_test().
 			 */
 #define	TEST_ADDR(_sh_type, _sec_field) \
@@ -2772,6 +3115,14 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, uchar_t osabi, const char *file)
 
 			case DT_SUNW_CAP:
 				TEST_ADDR(SHT_SUNW_cap, sunw_cap);
+				break;
+
+			case DT_SUNW_CAPINFO:
+				TEST_ADDR(SHT_SUNW_capinfo, sunw_capinfo);
+				break;
+
+			case DT_SUNW_CAPCHAIN:
+				TEST_ADDR(SHT_SUNW_capchain, sunw_capchain);
 				break;
 
 			case DT_SUNW_SYMTAB:
@@ -4657,7 +5008,7 @@ regular(const char *file, int fd, Elf *elf, uint_t flags,
 		checksum(elf);
 
 	if ((flags & FLG_SHOW_CAP) && (osabi == ELFOSABI_SOLARIS))
-		cap(file, cache, shnum, phnum, ehdr, elf);
+		cap(file, cache, shnum, phnum, ehdr, osabi, elf, flags);
 
 	if ((flags & FLG_SHOW_UNWIND) &&
 	    ((osabi == ELFOSABI_SOLARIS) || (osabi == ELFOSABI_LINUX)))

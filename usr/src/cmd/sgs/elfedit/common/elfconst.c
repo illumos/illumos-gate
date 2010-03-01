@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -408,8 +408,9 @@ init_libconv_strings(conv_iter_osabi_t *osabi, Half *mach)
 	LC(ELFEDIT_CONST_SYMINFO_BT,		conv_iter_syminfo_boundto);
 	LC(ELFEDIT_CONST_SYMINFO_FLG,		conv_iter_syminfo_flags);
 	LC(ELFEDIT_CONST_CA,			conv_iter_cap_tags);
-	LC_MACH(ELFEDIT_CONST_AV,		conv_iter_cap_val_hw1);
+	LC_MACH(ELFEDIT_CONST_HW1_SUNW,		conv_iter_cap_val_hw1);
 	LC(ELFEDIT_CONST_SF1_SUNW,		conv_iter_cap_val_sf1);
+	LC_MACH(ELFEDIT_CONST_HW2_SUNW,		conv_iter_cap_val_hw2);
 
 #undef LC
 #undef LC_OS

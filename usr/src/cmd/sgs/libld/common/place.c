@@ -595,7 +595,7 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, Place_path_info *path_info,
 
 	/*
 	 * Define any sections that must be thought of as referenced.  These
-	 * sections may not be referenced externaly in a manner ld(1) can
+	 * sections may not be referenced externally in a manner ld(1) can
 	 * discover, but they must be retained (ie. not removed by -zignore).
 	 */
 	static const Msg RefSecs[] = {
@@ -614,7 +614,7 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, Place_path_info *path_info,
 	DBG_CALL(Dbg_sec_in(ofl->ofl_lml, isp));
 
 	/*
-	 * If this section identfies group members, or this section indicates
+	 * If this section identifies group members, or this section indicates
 	 * that it is a member of a group, determine whether the section is
 	 * still required.
 	 */

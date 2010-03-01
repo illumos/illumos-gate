@@ -18,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -38,7 +39,7 @@ SGSPROTO=	../../proto/$(MACH)
 
 MAPFILES =	mapfile-vers
 
-DYNFLAGS +=	$(USE_PROTO)
+DYNFLAGS +=	$(CC_USE_PROTO)
 CPPFLAGS=	-I. -I../common -I../../include \
 		-I../../rtld/common \
 		-I../../include/$(MACH) \

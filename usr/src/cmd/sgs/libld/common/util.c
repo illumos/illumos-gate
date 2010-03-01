@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -703,4 +703,37 @@ demangle(const char *name)
 		return (Elf_demangle_name(name));
 	else
 		return (name);
+}
+
+/*
+ * Compare a series of platform or machine hardware names.
+ */
+int
+cap_names_match(Alist *alp1, Alist *alp2)
+{
+	Capstr		*capstr1;
+	Aliste		idx1;
+	int		match = 0;
+	Word		nitems;
+
+	if ((nitems = alist_nitems(alp1)) != alist_nitems(alp2))
+		return (1);
+
+	for (ALIST_TRAVERSE(alp1, idx1, capstr1)) {
+		Capstr		*capstr2;
+		Aliste 		idx2;
+
+		for (ALIST_TRAVERSE(alp2, idx2, capstr2)) {
+			if (strcmp(capstr1->cs_str, capstr2->cs_str))
+				continue;
+
+			match++;
+			break;
+		}
+	}
+
+	if (nitems == match)
+		return (0);
+
+	return (1);
 }

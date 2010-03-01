@@ -919,7 +919,7 @@ ld_vers_promote(Sym_desc *sdp, Word ndx, Ifl_desc *ifl, Ofl_desc *ofl)
 	}
 
 	if (vndx == VER_NDX_GLOBAL) {
-		if ((sdp->sd_flags & FLG_SY_HIDDEN) == 0)
+		if (!SYM_IS_HIDDEN(sdp))
 			sdp->sd_flags |= (FLG_SY_DEFAULT | FLG_SY_EXPDEF);
 		if (sdp->sd_aux->sa_overndx <= VER_NDX_GLOBAL)
 			sdp->sd_aux->sa_overndx = VER_NDX_GLOBAL;
@@ -937,7 +937,7 @@ ld_vers_promote(Sym_desc *sdp, Word ndx, Ifl_desc *ifl, Ofl_desc *ofl)
 		return;
 	}
 
-	if ((sdp->sd_flags & FLG_SY_HIDDEN) == 0)
+	if (!SYM_IS_HIDDEN(sdp))
 		sdp->sd_flags |= (FLG_SY_DEFAULT | FLG_SY_EXPDEF);
 
 	/*

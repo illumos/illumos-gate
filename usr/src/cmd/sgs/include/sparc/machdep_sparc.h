@@ -229,18 +229,20 @@ extern "C" {
 
 #define	M_ID_INTERP	0x02			/* SHF_ALLOC */
 #define	M_ID_CAP	0x03
+
 #define	M_ID_UNWINDHDR	0x06
 #define	M_ID_UNWIND	0x07
-
-#define	M_ID_SYMINFO	0x08
-#define	M_ID_HASH	0x09
-#define	M_ID_LDYNSYM	0x0a			/* always right before DYNSYM */
-#define	M_ID_DYNSYM	0x0b
-#define	M_ID_DYNSTR	0x0c
-#define	M_ID_VERSION	0x0d
-#define	M_ID_DYNSORT	0x0e
-#define	M_ID_REL	0x0f
-#define	M_ID_TEXT	0x10			/* SHF_ALLOC + SHF_EXECINSTR */
+#define	M_ID_CAPINFO 	0x08
+#define	M_ID_CAPCHAIN 	0x09
+#define	M_ID_SYMINFO	0x0a
+#define	M_ID_HASH	0x0b
+#define	M_ID_LDYNSYM	0x0c			/* always right before DYNSYM */
+#define	M_ID_DYNSYM	0x0d
+#define	M_ID_DYNSTR	0x0e
+#define	M_ID_VERSION	0x0f
+#define	M_ID_DYNSORT	0x10
+#define	M_ID_REL	0x11
+#define	M_ID_TEXT	0x12			/* SHF_ALLOC + SHF_EXECINSTR */
 #define	M_ID_DATA	0x20
 
 /*	M_ID_USER	0x01			dual entry - listed above */

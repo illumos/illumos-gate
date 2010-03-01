@@ -127,10 +127,10 @@ typedef union {
 } Conv_reject_desc_buf_t;
 
 /*
- * conv_cap_val_hw1()
+ * conv_cap_val_hw/sf()
  *
- * This size is based on the maximum number of hardware capabilities
- * that exist.  See common/elfcap.
+ * These sizes are based on the maximum number of capabilities that exist.
+ * See common/elfcap.
  */
 #define	CONV_CAP_VAL_HW1_BUFSIZE	195
 typedef union {
@@ -138,12 +138,12 @@ typedef union {
 	char				buf[CONV_CAP_VAL_HW1_BUFSIZE];
 } Conv_cap_val_hw1_buf_t;
 
-/*
- * conv_cap_val_sf1()
- *
- * This size is based on the maximum number of software capabilities
- * that exist.  See common/elfcap.
- */
+#define	CONV_CAP_VAL_HW2_BUFSIZE	CONV_INV_BUFSIZE	/* for now */
+typedef union {
+	Conv_inv_buf_t			inv_buf;
+	char				buf[CONV_CAP_VAL_HW2_BUFSIZE];
+} Conv_cap_val_hw2_buf_t;
+
 #define	CONV_CAP_VAL_SF1_BUFSIZE	45
 typedef union {
 	Conv_inv_buf_t			inv_buf;
@@ -155,6 +155,7 @@ typedef union {
 	Conv_inv_buf_t			inv_buf;
 	Conv_cap_val_hw1_buf_t		cap_val_hw1_buf;
 	Conv_cap_val_sf1_buf_t		cap_val_sf1_buf;
+	Conv_cap_val_hw2_buf_t		cap_val_hw2_buf;
 } Conv_cap_val_buf_t;
 
 /* conv_config_feat() */
@@ -362,7 +363,7 @@ typedef union {
 } Conv_ent_flags_buf_t;
 
 /* conv_ent_files_flags() */
-#define	CONV_ENT_FILES_FLAGS_BUFSIZE		89
+#define	CONV_ENT_FILES_FLAGS_BUFSIZE	89
 typedef union {
 	Conv_inv_buf_t			inv_buf;
 	char				buf[CONV_ENT_FILES_FLAGS_BUFSIZE];
@@ -896,6 +897,8 @@ extern	conv_iter_ret_t	conv_iter_cap_tags(Conv_fmt_flags_t, conv_iter_cb_t,
 			    void *);
 extern	conv_iter_ret_t	conv_iter_cap_val_hw1(Half, Conv_fmt_flags_t,
 			    conv_iter_cb_t, void *);
+extern	conv_iter_ret_t	conv_iter_cap_val_hw2(Half, Conv_fmt_flags_t,
+			    conv_iter_cb_t, void *);
 extern	conv_iter_ret_t	conv_iter_cap_val_sf1(Conv_fmt_flags_t, conv_iter_cb_t,
 			    void *);
 
@@ -962,6 +965,7 @@ extern	conv_iter_ret_t	conv_iter_syminfo_flags(Conv_fmt_flags_t,
 #define	conv_cap_tag		conv64_cap_tag
 #define	conv_cap_val		conv64_cap_val
 #define	conv_cap_val_hw1	conv64_cap_val_hw1
+#define	conv_cap_val_hw2	conv64_cap_val_hw2
 #define	conv_cap_val_sf1	conv64_cap_val_sf1
 #define	conv_dyn_feature1	conv64_dyn_feature1
 #define	conv_dyn_flag1		conv64_dyn_flag1
@@ -979,6 +983,7 @@ extern	conv_iter_ret_t	conv_iter_syminfo_flags(Conv_fmt_flags_t,
 #define	conv_cap_tag		conv32_cap_tag
 #define	conv_cap_val		conv32_cap_val
 #define	conv_cap_val_hw1	conv32_cap_val_hw1
+#define	conv_cap_val_hw2	conv32_cap_val_hw2
 #define	conv_cap_val_sf1	conv32_cap_val_sf1
 #define	conv_dyn_feature1	conv32_dyn_feature1
 #define	conv_dyn_flag1		conv32_dyn_flag1
@@ -1010,9 +1015,12 @@ extern	const char	*conv_invalid_val(Conv_inv_buf_t *, Xword,
  */
 extern	const char	*conv_cap_tag(Xword, Conv_fmt_flags_t,
 			    Conv_inv_buf_t *);
-extern	const char	*conv_cap_val(Xword, Xword, Half, Conv_cap_val_buf_t *);
+extern	const char	*conv_cap_val(Xword, Xword, Half, Conv_fmt_flags_t,
+			    Conv_cap_val_buf_t *);
 extern	const char	*conv_cap_val_hw1(Xword, Half, Conv_fmt_flags_t,
 			    Conv_cap_val_hw1_buf_t *);
+extern	const char	*conv_cap_val_hw2(Xword, Half, Conv_fmt_flags_t,
+			    Conv_cap_val_hw2_buf_t *);
 extern	const char	*conv_cap_val_sf1(Xword, Half, Conv_fmt_flags_t,
 			    Conv_cap_val_sf1_buf_t *);
 extern	const char	*conv_dyn_flag1(Xword, Conv_fmt_flags_t,

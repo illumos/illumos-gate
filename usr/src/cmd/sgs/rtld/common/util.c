@@ -33,6 +33,7 @@
  * Utility routines for run-time linker.  some are duplicated here from libc
  * (with different names) to avoid name space collisions.
  */
+#include	<sys/systeminfo.h>
 #include	<stdio.h>
 #include	<sys/time.h>
 #include	<sys/types.h>
@@ -382,6 +383,32 @@ pnavl_create(size_t size)
 }
 
 /*
+ * Determine whether a PathNode is recorded.
+ */
+int
+pnavl_recorded(avl_tree_t **pnavl, const char *name, uint_t hash,
+    avl_index_t *where)
+{
+	PathNode	pn;
+
+	/*
+	 * Create the avl tree if required.
+	 */
+	if ((*pnavl == NULL) &&
+	    ((*pnavl = pnavl_create(sizeof (PathNode))) == NULL))
+		return (0);
+
+	pn.pn_name = name;
+	if ((pn.pn_hash = hash) == 0)
+		pn.pn_hash = sgs_str_hash(name);
+
+	if (avl_find(*pnavl, &pn, where) == NULL)
+		return (0);
+
+	return (1);
+}
+
+/*
  * Determine if a pathname has already been recorded on the full path name
  * AVL tree.  This tree maintains a node for each path name that ld.so.1 has
  * successfully loaded.  If the path name does not exist in this AVL tree, then
@@ -473,37 +500,13 @@ fpavl_remove(Rt_map *lmp)
 }
 
 /*
- * Determine if a pathname has already been recorded on the not-found AVL tree.
+ * Insert a path name into the not-found AVL tree.
+ *
  * This tree maintains a node for each path name that ld.so.1 has explicitly
  * inspected, but has failed to load during a single ld.so.1 operation.  If the
  * path name does not exist in this AVL tree, then the next insertion point is
  * deposited in "where".  This value can be used by nfavl_insert() to expedite
  * the insertion.
- */
-int
-nfavl_recorded(const char *name, uint_t hash, avl_index_t *where)
-{
-	PathNode	pn;
-
-	/*
-	 * Create the avl tree if required.
-	 */
-	if ((nfavl == NULL) &&
-	    ((nfavl = pnavl_create(sizeof (PathNode))) == NULL))
-		return (NULL);
-
-	pn.pn_name = name;
-	if ((pn.pn_hash = hash) == 0)
-		pn.pn_hash = sgs_str_hash(name);
-
-	if (avl_find(nfavl, &pn, where) == NULL)
-		return (0);
-
-	return (1);
-}
-
-/*
- * Insert a name into the not-found AVL tree.
  */
 void
 nfavl_insert(const char *name, avl_index_t where)
@@ -513,7 +516,7 @@ nfavl_insert(const char *name, avl_index_t where)
 
 	if (where == 0) {
 		/* LINTED */
-		int	in_nfavl = nfavl_recorded(name, hash, &where);
+		int	in_nfavl = pnavl_recorded(&nfavl, name, hash, &where);
 
 		/*
 		 * We better not get a hit now, we do not want duplicates in
@@ -532,39 +535,14 @@ nfavl_insert(const char *name, avl_index_t where)
 	}
 }
 
-static avl_tree_t	*spavl = NULL;
-
 /*
- * Search for a path name within the secure path AVL tree.  This tree is used
- * to maintain a list of directories in which the dependencies of a secure
- * process have been found.  This list provides a fall-back in the case that a
- * $ORIGIN expansion is deemed insecure, when the expansion results in a path
- * name that has already provided dependencies.
- */
-int
-spavl_recorded(const char *name, avl_index_t *where)
-{
-	PathNode	pn;
-
-	/*
-	 * Create the avl tree if required.
-	 */
-	if ((spavl == NULL) &&
-	    ((spavl = pnavl_create(sizeof (PathNode))) == NULL))
-		return (0);
-
-	pn.pn_name = name;
-	pn.pn_hash = sgs_str_hash(name);
-
-	if (avl_find(spavl, &pn, where) == NULL)
-		return (0);
-
-	return (1);
-}
-
-/*
- * Insert the directory name, of a full path name,  into the secure path AVL
+ * Insert the directory name, of a full path name, into the secure path AVL
  * tree.
+ *
+ * This tree is used to maintain a list of directories in which the dependencies
+ * of a secure process have been found.  This list provides a fall-back in the
+ * case that a $ORIGIN expansion is deemed insecure, when the expansion results
+ * in a path name that has already provided dependencies.
  */
 void
 spavl_insert(const char *name)
@@ -573,6 +551,7 @@ spavl_insert(const char *name)
 	size_t		size;
 	avl_index_t	where;
 	PathNode	*pnp;
+	uint_t		hash;
 
 	/*
 	 * Separate the directory name from the path name.
@@ -584,12 +563,13 @@ spavl_insert(const char *name)
 
 	(void) strncpy(buffer, name, size);
 	buffer[size] = '\0';
+	hash = sgs_str_hash(buffer);
 
 	/*
 	 * Determine whether this directory name is already recorded, or if
 	 * not, 'where" will provide the insertion point for the new string.
 	 */
-	if (spavl_recorded(buffer, &where))
+	if (pnavl_recorded(&spavl, buffer, hash, &where))
 		return;
 
 	/*
@@ -597,7 +577,7 @@ spavl_insert(const char *name)
 	 */
 	if ((pnp = calloc(sizeof (PathNode), 1)) != NULL) {
 		pnp->pn_name = strdup(buffer);
-		pnp->pn_hash = sgs_str_hash(buffer);
+		pnp->pn_hash = hash;
 		avl_insert(spavl, pnp, where);
 	}
 }
@@ -1444,46 +1424,50 @@ static	u_longlong_t		prmisa;		/* permanent ISA specific */
 /*
  * Identify all environment variables.
  */
-#define	ENV_FLG_AUDIT		0x0000000001ULL
-#define	ENV_FLG_AUDIT_ARGS	0x0000000002ULL
-#define	ENV_FLG_BIND_NOW	0x0000000004ULL
-#define	ENV_FLG_BIND_NOT	0x0000000008ULL
-#define	ENV_FLG_BINDINGS	0x0000000010ULL
-
-#define	ENV_FLG_CONFGEN		0x0000000040ULL
-#define	ENV_FLG_CONFIG		0x0000000080ULL
-#define	ENV_FLG_DEBUG		0x0000000100ULL
-#define	ENV_FLG_DEBUG_OUTPUT	0x0000000200ULL
-#define	ENV_FLG_DEMANGLE	0x0000000400ULL
-#define	ENV_FLG_FLAGS		0x0000000800ULL
-#define	ENV_FLG_INIT		0x0000001000ULL
-#define	ENV_FLG_LIBPATH		0x0000002000ULL
-#define	ENV_FLG_LOADAVAIL	0x0000004000ULL
-#define	ENV_FLG_LOADFLTR	0x0000008000ULL
-#define	ENV_FLG_NOAUDIT		0x0000010000ULL
-#define	ENV_FLG_NOAUXFLTR	0x0000020000ULL
-#define	ENV_FLG_NOBAPLT		0x0000040000ULL
-#define	ENV_FLG_NOCONFIG	0x0000080000ULL
-#define	ENV_FLG_NODIRCONFIG	0x0000100000ULL
-#define	ENV_FLG_NODIRECT	0x0000200000ULL
-#define	ENV_FLG_NOENVCONFIG	0x0000400000ULL
-#define	ENV_FLG_NOLAZY		0x0000800000ULL
-#define	ENV_FLG_NOOBJALTER	0x0001000000ULL
-#define	ENV_FLG_NOVERSION	0x0002000000ULL
-#define	ENV_FLG_PRELOAD		0x0004000000ULL
-#define	ENV_FLG_PROFILE		0x0008000000ULL
-#define	ENV_FLG_PROFILE_OUTPUT	0x0010000000ULL
-#define	ENV_FLG_SIGNAL		0x0020000000ULL
-#define	ENV_FLG_TRACE_OBJS	0x0040000000ULL
-#define	ENV_FLG_TRACE_PTHS	0x0080000000ULL
-#define	ENV_FLG_UNREF		0x0100000000ULL
-#define	ENV_FLG_UNUSED		0x0200000000ULL
-#define	ENV_FLG_VERBOSE		0x0400000000ULL
-#define	ENV_FLG_WARN		0x0800000000ULL
-#define	ENV_FLG_NOFLTCONFIG	0x1000000000ULL
-#define	ENV_FLG_BIND_LAZY	0x2000000000ULL
-#define	ENV_FLG_NOUNRESWEAK	0x4000000000ULL
-#define	ENV_FLG_NOPAREXT	0x8000000000ULL
+#define	ENV_FLG_AUDIT		0x0000000000001ULL
+#define	ENV_FLG_AUDIT_ARGS	0x0000000000002ULL
+#define	ENV_FLG_BIND_NOW	0x0000000000004ULL
+#define	ENV_FLG_BIND_NOT	0x0000000000008ULL
+#define	ENV_FLG_BINDINGS	0x0000000000010ULL
+#define	ENV_FLG_CONFGEN		0x0000000000020ULL
+#define	ENV_FLG_CONFIG		0x0000000000040ULL
+#define	ENV_FLG_DEBUG		0x0000000000080ULL
+#define	ENV_FLG_DEBUG_OUTPUT	0x0000000000100ULL
+#define	ENV_FLG_DEMANGLE	0x0000000000200ULL
+#define	ENV_FLG_FLAGS		0x0000000000400ULL
+#define	ENV_FLG_INIT		0x0000000000800ULL
+#define	ENV_FLG_LIBPATH		0x0000000001000ULL
+#define	ENV_FLG_LOADAVAIL	0x0000000002000ULL
+#define	ENV_FLG_LOADFLTR	0x0000000004000ULL
+#define	ENV_FLG_NOAUDIT		0x0000000008000ULL
+#define	ENV_FLG_NOAUXFLTR	0x0000000010000ULL
+#define	ENV_FLG_NOBAPLT		0x0000000020000ULL
+#define	ENV_FLG_NOCONFIG	0x0000000040000ULL
+#define	ENV_FLG_NODIRCONFIG	0x0000000080000ULL
+#define	ENV_FLG_NODIRECT	0x0000000100000ULL
+#define	ENV_FLG_NOENVCONFIG	0x0000000200000ULL
+#define	ENV_FLG_NOLAZY		0x0000000400000ULL
+#define	ENV_FLG_NOOBJALTER	0x0000000800000ULL
+#define	ENV_FLG_NOVERSION	0x0000001000000ULL
+#define	ENV_FLG_PRELOAD		0x0000002000000ULL
+#define	ENV_FLG_PROFILE		0x0000004000000ULL
+#define	ENV_FLG_PROFILE_OUTPUT	0x0000008000000ULL
+#define	ENV_FLG_SIGNAL		0x0000010000000ULL
+#define	ENV_FLG_TRACE_OBJS	0x0000020000000ULL
+#define	ENV_FLG_TRACE_PTHS	0x0000040000000ULL
+#define	ENV_FLG_UNREF		0x0000080000000ULL
+#define	ENV_FLG_UNUSED		0x0000100000000ULL
+#define	ENV_FLG_VERBOSE		0x0000200000000ULL
+#define	ENV_FLG_WARN		0x0000400000000ULL
+#define	ENV_FLG_NOFLTCONFIG	0x0000800000000ULL
+#define	ENV_FLG_BIND_LAZY	0x0001000000000ULL
+#define	ENV_FLG_NOUNRESWEAK	0x0002000000000ULL
+#define	ENV_FLG_NOPAREXT	0x0004000000000ULL
+#define	ENV_FLG_HWCAP		0x0008000000000ULL
+#define	ENV_FLG_SFCAP		0x0010000000000ULL
+#define	ENV_FLG_MACHCAP		0x0020000000000ULL
+#define	ENV_FLG_PLATCAP		0x0040000000000ULL
+#define	ENV_FLG_CAP_FILES	0x0080000000000ULL
 
 #define	SEL_REPLACE		0x0001
 #define	SEL_PERMANT		0x0002
@@ -1585,10 +1569,16 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		}
 	}
 	/*
-	 * LD_CONFIG family.
+	 * LD_CAP_FILES and LD_CONFIG family.
 	 */
 	else if (*s1 == 'C') {
-		if ((len == MSG_LD_CONFGEN_SIZE) && (strncmp(s1,
+		if ((len == MSG_LD_CAP_FILES_SIZE) && (strncmp(s1,
+		    MSG_ORIG(MSG_LD_CAP_FILES), MSG_LD_CAP_FILES_SIZE) == 0)) {
+			select |= SEL_ACT_STR;
+			str = (select & SEL_REPLACE) ?
+			    &rpl_cap_files : &prm_cap_files;
+			variable = ENV_FLG_CAP_FILES;
+		} else if ((len == MSG_LD_CONFGEN_SIZE) && (strncmp(s1,
 		    MSG_ORIG(MSG_LD_CONFGEN), MSG_LD_CONFGEN_SIZE) == 0)) {
 			/*
 			 * Set by crle(1) to indicate it's building a
@@ -1649,6 +1639,18 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		}
 	}
 	/*
+	 * LD_HWCAP.
+	 */
+	else if (*s1 == 'H') {
+		if ((len == MSG_LD_HWCAP_SIZE) && (strncmp(s1,
+		    MSG_ORIG(MSG_LD_HWCAP), MSG_LD_HWCAP_SIZE) == 0)) {
+			select |= SEL_ACT_STR;
+			str = (select & SEL_REPLACE) ?
+			    &rpl_hwcap : &prm_hwcap;
+			variable = ENV_FLG_HWCAP;
+		}
+	}
+	/*
 	 * LD_INIT (internal, used by ldd(1)).
 	 */
 	else if (*s1 == 'I') {
@@ -1682,6 +1684,18 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		    MSG_ORIG(MSG_LD_LOADFLTR), MSG_LD_LOADFLTR_SIZE) == 0)) {
 			select |= SEL_ACT_SPEC_2;
 			variable = ENV_FLG_LOADFLTR;
+		}
+	}
+	/*
+	 * LD_MACHCAP.
+	 */
+	else if (*s1 == 'M') {
+		if ((len == MSG_LD_MACHCAP_SIZE) && (strncmp(s1,
+		    MSG_ORIG(MSG_LD_MACHCAP), MSG_LD_MACHCAP_SIZE) == 0)) {
+			select |= SEL_ACT_STR;
+			str = (select & SEL_REPLACE) ?
+			    &rpl_machcap : &prm_machcap;
+			variable = ENV_FLG_MACHCAP;
 		}
 	}
 	/*
@@ -1764,10 +1778,16 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		}
 	}
 	/*
-	 * LD_PRELOAD and LD_PROFILE family.
+	 * LD_PLATCAP, LD_PRELOAD and LD_PROFILE family.
 	 */
 	else if (*s1 == 'P') {
-		if ((len == MSG_LD_PRELOAD_SIZE) && (strncmp(s1,
+		if ((len == MSG_LD_PLATCAP_SIZE) && (strncmp(s1,
+		    MSG_ORIG(MSG_LD_PLATCAP), MSG_LD_PLATCAP_SIZE) == 0)) {
+			select |= SEL_ACT_STR;
+			str = (select & SEL_REPLACE) ?
+			    &rpl_platcap : &prm_platcap;
+			variable = ENV_FLG_PLATCAP;
+		} else if ((len == MSG_LD_PRELOAD_SIZE) && (strncmp(s1,
 		    MSG_ORIG(MSG_LD_PRELOAD), MSG_LD_PRELOAD_SIZE) == 0)) {
 			select |= SEL_ACT_STR;
 			str = (select & SEL_REPLACE) ? &rpl_preload :
@@ -1792,14 +1812,19 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		}
 	}
 	/*
-	 * LD_SIGNAL.
+	 * LD_SFCAP and LD_SIGNAL.
 	 */
 	else if (*s1 == 'S') {
-		if (rtld_flags & RT_FL_SECURE)
-			return;
-		if ((len == MSG_LD_SIGNAL_SIZE) &&
+		if ((len == MSG_LD_SFCAP_SIZE) && (strncmp(s1,
+		    MSG_ORIG(MSG_LD_SFCAP), MSG_LD_SFCAP_SIZE) == 0)) {
+			select |= SEL_ACT_STR;
+			str = (select & SEL_REPLACE) ?
+			    &rpl_sfcap : &prm_sfcap;
+			variable = ENV_FLG_SFCAP;
+		} else if ((len == MSG_LD_SIGNAL_SIZE) &&
 		    (strncmp(s1, MSG_ORIG(MSG_LD_SIGNAL),
-		    MSG_LD_SIGNAL_SIZE) == 0)) {
+		    MSG_LD_SIGNAL_SIZE) == 0) &&
+		    ((rtld_flags & RT_FL_SECURE) == 0)) {
 			select |= SEL_ACT_SPEC_2;
 			variable = ENV_FLG_SIGNAL;
 		}
@@ -3420,19 +3445,21 @@ callable(Rt_map *clmp, Rt_map *dlmp, Grp_hdl *ghp, uint_t slflags)
 void
 set_environ(Lm_list *lml)
 {
-	Rt_map		*dlmp;
-	Sym		*sym;
 	Slookup		sl;
+	Sresult		sr;
 	uint_t		binfo;
 
 	/*
-	 * Initialize the symbol lookup data structure.
+	 * Initialize the symbol lookup, and symbol result, data structures.
 	 */
 	SLOOKUP_INIT(sl, MSG_ORIG(MSG_SYM_ENVIRON), lml->lm_head, lml->lm_head,
 	    ld_entry_cnt, 0, 0, 0, 0, LKUP_WEAK);
+	SRESULT_INIT(sr, MSG_ORIG(MSG_SYM_ENVIRON));
 
-	if (sym = LM_LOOKUP_SYM(lml->lm_head)(&sl, &dlmp, &binfo, 0)) {
-		lml->lm_environ = (char ***)sym->st_value;
+	if (LM_LOOKUP_SYM(lml->lm_head)(&sl, &sr, &binfo, 0)) {
+		Rt_map	*dlmp = sr.sr_dmap;
+
+		lml->lm_environ = (char ***)sr.sr_sym->st_value;
 
 		if (!(FLAGS(dlmp) & FLG_RT_FIXED))
 			lml->lm_environ =
@@ -3499,6 +3526,50 @@ is_rtld_setuid()
 		return (1);
 	}
 	return (0);
+}
+
+/*
+ * Determine that systems platform name.  Normally, this name is provided from
+ * the AT_SUN_PLATFORM aux vector from the kernel.  This routine provides a
+ * fall back.
+ */
+void
+platform_name(Syscapset *scapset)
+{
+	char	info[SYS_NMLN];
+	size_t	size;
+
+	if ((scapset->sc_platsz = size =
+	    sysinfo(SI_PLATFORM, info, SYS_NMLN)) == (size_t)-1)
+		return;
+
+	if ((scapset->sc_plat = malloc(size)) == NULL) {
+		scapset->sc_platsz = (size_t)-1;
+		return;
+	}
+	(void) strcpy(scapset->sc_plat, info);
+}
+
+/*
+ * Determine that systems machine name.  Normally, this name is provided from
+ * the AT_SUN_MACHINE aux vector from the kernel.  This routine provides a
+ * fall back.
+ */
+void
+machine_name(Syscapset *scapset)
+{
+	char	info[SYS_NMLN];
+	size_t	size;
+
+	if ((scapset->sc_machsz = size =
+	    sysinfo(SI_MACHINE, info, SYS_NMLN)) == (size_t)-1)
+		return;
+
+	if ((scapset->sc_mach = malloc(size)) == NULL) {
+		scapset->sc_machsz = (size_t)-1;
+		return;
+	}
+	(void) strcpy(scapset->sc_mach, info);
 }
 
 /*

@@ -219,11 +219,11 @@ setflags_eq(Word *dst, Token eq_tok, Word value)
 }
 
 /*
- * Apply one of the three equal tokens to a capabilities CapMask.
+ * Apply one of the three equal tokens to a capabilities Capmask.
  *
  * entry:
  *	mf - Mapfile descriptor
- *	capmask - Address of CapMask variable to alter
+ *	capmask - Address of Capmask variable to alter
  *	eq_tok - One of TK_EQUAL, TK_PLUSEQ, TK_MINUSEQ, representing
  *		the operation to carry out.
  *	type - Capability type (CA_SUNW_*)
@@ -234,34 +234,35 @@ setflags_eq(Word *dst, Token eq_tok, Word value)
  *	On success, returns TRUE (1), otherwise FALSE (0)
  */
 static Boolean
-set_capmask(Mapfile *mf, CapMask *capmask, Token eq_tok,
+set_capmask(Mapfile *mf, Capmask *capmask, Token eq_tok,
     Word type, elfcap_mask_t value, Boolean title)
 {
 	if (title)
 		DBG_CALL(Dbg_cap_mapfile_title(mf->mf_ofl->ofl_lml,
 		    mf->mf_lineno));
-	DBG_CALL(Dbg_cap_entry2(mf->mf_ofl->ofl_lml, DBG_STATE_CURRENT,
-	    type, capmask, ld_targ.t_m.m_mach));
+	DBG_CALL(Dbg_cap_val_entry(mf->mf_ofl->ofl_lml, DBG_STATE_CURRENT,
+	    type, capmask->cm_val, ld_targ.t_m.m_mach));
 
 	switch (eq_tok) {
 	case TK_EQUAL:
-		capmask->cm_value = value;
-		capmask->cm_exclude = 0;
+		capmask->cm_val = value;
+		capmask->cm_exc = 0;
 		ld_map_cap_set_ovflag(mf, type);
-		DBG_CALL(Dbg_cap_entry2(mf->mf_ofl->ofl_lml,
-		    DBG_STATE_RESET, type, capmask, ld_targ.t_m.m_mach));
+		DBG_CALL(Dbg_cap_val_entry(mf->mf_ofl->ofl_lml,
+		    DBG_STATE_RESET, type, capmask->cm_val,
+		    ld_targ.t_m.m_mach));
 		break;
 	case TK_PLUSEQ:
-		DBG_CALL(Dbg_cap_entry(mf->mf_ofl->ofl_lml, DBG_STATE_ADD,
-		    type, value, ld_targ.t_m.m_mach));
-		capmask->cm_value |= value;
-		capmask->cm_exclude &= ~value;
+		DBG_CALL(Dbg_cap_val_entry(mf->mf_ofl->ofl_lml,
+		    DBG_STATE_ADD, type, value, ld_targ.t_m.m_mach));
+		capmask->cm_val |= value;
+		capmask->cm_exc &= ~value;
 		break;
 	case TK_MINUSEQ:
-		DBG_CALL(Dbg_cap_entry(mf->mf_ofl->ofl_lml, DBG_STATE_EXCLUDE,
-		    type, value, ld_targ.t_m.m_mach));
-		capmask->cm_value &= ~value;
-		capmask->cm_exclude |= value;
+		DBG_CALL(Dbg_cap_val_entry(mf->mf_ofl->ofl_lml,
+		    DBG_STATE_EXCLUDE, type, value, ld_targ.t_m.m_mach));
+		capmask->cm_val &= ~value;
+		capmask->cm_exc |= value;
 		break;
 	default:
 		/*NOTREACHED*/
@@ -273,8 +274,159 @@ set_capmask(Mapfile *mf, CapMask *capmask, Token eq_tok,
 		return (FALSE);
 
 	/* Report the final configuration */
-	DBG_CALL(Dbg_cap_entry2(mf->mf_ofl->ofl_lml,
-	    DBG_STATE_RESOLVED, type, capmask, ld_targ.t_m.m_mach));
+	DBG_CALL(Dbg_cap_val_entry(mf->mf_ofl->ofl_lml,
+	    DBG_STATE_RESOLVED, type, capmask->cm_val, ld_targ.t_m.m_mach));
+
+	return (TRUE);
+}
+
+/*
+ * Apply one of the three equal tokens to a capabilities Caplist.
+ *
+ * entry:
+ *	mf - Mapfile descriptor
+ *	caplist - Address of Caplist variable to alter
+ *	eq_tok - One of TK_EQUAL, TK_PLUSEQ, TK_MINUSEQ, representing
+ *		the operation to carry out.
+ *	type - Capability type (CA_SUNW_*)
+ *	str - String for right hand side
+ *	title - True if a title is needed, False otherwise.
+ *
+ * exit:
+ *	On success, returns TRUE (1), otherwise FALSE (0)
+ */
+static Boolean
+set_capstr(Mapfile *mf, Caplist *caplist, Token eq_tok,
+    Word type, APlist *strs)
+{
+	Capstr		*capstr;
+	Aliste		idx1;
+	char		*str;
+
+	DBG_CALL(Dbg_cap_mapfile_title(mf->mf_ofl->ofl_lml, mf->mf_lineno));
+
+	if ((caplist->cl_val == NULL) || (alist_nitems(caplist->cl_val) == 0)) {
+		DBG_CALL(Dbg_cap_ptr_entry(mf->mf_ofl->ofl_lml,
+		    DBG_STATE_CURRENT, type, NULL));
+	} else {
+		for (ALIST_TRAVERSE(caplist->cl_val, idx1, capstr)) {
+			DBG_CALL(Dbg_cap_ptr_entry(mf->mf_ofl->ofl_lml,
+			    DBG_STATE_CURRENT, type, capstr->cs_str));
+		}
+	}
+
+	switch (eq_tok) {
+	case TK_EQUAL:
+		if (caplist->cl_val) {
+			(void) free(caplist->cl_val);
+			caplist->cl_val = NULL;
+		}
+		if (caplist->cl_exc) {
+			(void) free(caplist->cl_exc);
+			caplist->cl_exc = NULL;
+		}
+		if (strs) {
+			for (APLIST_TRAVERSE(strs, idx1, str)) {
+				if ((capstr = alist_append(&caplist->cl_val,
+				    NULL, sizeof (Capstr),
+				    AL_CNT_CAP_NAMES)) == NULL)
+					return (FALSE);
+				capstr->cs_str = str;
+				DBG_CALL(Dbg_cap_ptr_entry(mf->mf_ofl->ofl_lml,
+				    DBG_STATE_RESET, type, capstr->cs_str));
+			}
+		} else {
+			DBG_CALL(Dbg_cap_ptr_entry(mf->mf_ofl->ofl_lml,
+			    DBG_STATE_RESET, type, NULL));
+		}
+		ld_map_cap_set_ovflag(mf, type);
+		break;
+	case TK_PLUSEQ:
+		for (APLIST_TRAVERSE(strs, idx1, str)) {
+			Aliste		idx2;
+			const char	*ostr;
+			int		found = 0;
+
+			/*
+			 * Add this name to the list of names, provided the
+			 * name doesn't already exist.
+			 */
+			for (ALIST_TRAVERSE(caplist->cl_val, idx2, capstr)) {
+				if (strcmp(str, capstr->cs_str) == 0) {
+					found++;
+					break;
+				}
+			}
+			if ((found == 0) && ((capstr =
+			    (Capstr *)alist_append(&caplist->cl_val, NULL,
+			    sizeof (Capstr), AL_CNT_CAP_NAMES)) == NULL))
+				return (FALSE);
+			capstr->cs_str = str;
+
+			/*
+			 * Remove this name from the list of excluded names,
+			 * provided the name already exists.
+			 */
+			for (APLIST_TRAVERSE(caplist->cl_exc, idx2, ostr)) {
+				if (strcmp(str, ostr) == 0) {
+					aplist_delete(caplist->cl_exc, &idx2);
+					break;
+				}
+			}
+			DBG_CALL(Dbg_cap_ptr_entry(mf->mf_ofl->ofl_lml,
+			    DBG_STATE_ADD, type, str));
+		}
+		break;
+	case TK_MINUSEQ:
+		for (APLIST_TRAVERSE(strs, idx1, str)) {
+			Aliste		idx2;
+			const char	*ostr;
+			int		found = 0;
+
+			/*
+			 * Delete this name from the list of names, provided
+			 * the name already exists.
+			 */
+			for (ALIST_TRAVERSE(caplist->cl_val, idx2, capstr)) {
+				if (strcmp(str, capstr->cs_str) == 0) {
+					alist_delete(caplist->cl_val, &idx2);
+					break;
+				}
+			}
+
+			/*
+			 * Add this name to the list of excluded names,
+			 * provided the name already exists.
+			 */
+			for (APLIST_TRAVERSE(caplist->cl_exc, idx2, ostr)) {
+				if (strcmp(str, ostr) == 0) {
+					found++;
+					break;
+				}
+			}
+			if ((found == 0) && (aplist_append(&caplist->cl_exc,
+			    str, AL_CNT_CAP_NAMES) == NULL))
+				return (FALSE);
+
+			DBG_CALL(Dbg_cap_ptr_entry(mf->mf_ofl->ofl_lml,
+			    DBG_STATE_EXCLUDE, type, str));
+		}
+		break;
+	default:
+		/*NOTREACHED*/
+		assert(0);
+	}
+
+	/* Report the final configuration */
+	if ((caplist->cl_val == NULL) || (alist_nitems(caplist->cl_val) == 0)) {
+		DBG_CALL(Dbg_cap_ptr_entry(mf->mf_ofl->ofl_lml,
+		    DBG_STATE_RESOLVED, type, NULL));
+	} else {
+		for (ALIST_TRAVERSE(caplist->cl_val, idx1, capstr)) {
+			DBG_CALL(Dbg_cap_ptr_entry(mf->mf_ofl->ofl_lml,
+			    DBG_STATE_RESOLVED, type, capstr->cs_str));
+		}
+	}
 
 	return (TRUE);
 }
@@ -555,7 +707,7 @@ parse_attributes(Mapfile *mf, const char *item_name, attr_t *attr_list,
 		default:
 		bad_attr:
 			{
-				char buf[attr_list_bufsize];
+				char buf[VLA_SIZE(attr_list_bufsize)];
 
 				mf_fatal(mf, MSG_INTL(MSG_MAP_EXP_ATTR),
 				    ld_map_kwnames(attr_list,
@@ -679,7 +831,7 @@ parse_segment_flags(Mapfile *mf, Xword *flags)
 		default:
 		bad_flag:
 			{
-				char buf[flag_list_bufsize];
+				char buf[VLA_SIZE(flag_list_bufsize)];
 
 				mf_fatal(mf, MSG_INTL(MSG_MAP_EXP_SEGFLAG),
 				    ld_map_kwnames(flag_list,
@@ -704,10 +856,9 @@ parse_segment_flags(Mapfile *mf, Xword *flags)
 #undef PF_STACK
 }
 
-
 /*
- * Parse one of the capabilities attributes that corresponds directly
- * to a capabilities bitmask value (HW_xxx, SF_xxx). Values can be
+ * Parse one of the capabilities attributes that corresponds directly to a
+ * capabilities bitmask value (CA_SUNW_HW_x, CA_SUNW_SF_xx).  Values can be
  * integers, or symbolic names that correspond to the capabilities mask
  * in question.
  *
@@ -715,7 +866,7 @@ parse_segment_flags(Mapfile *mf, Xword *flags)
  *	mf - Mapfile descriptor
  *	eq_tok - One of TK_EQUAL, TK_PLUSEQ, TK_MINUSEQ, representing
  *		the operation to carry out.
- *	capmask - CapMask from output descriptor for capability being processed.
+ *	capmask - Capmask from output descriptor for capability being processed.
  *	type - Capability type (CA_SUNW_*)
  *	elfcap_from_str_func - pointer to elfcap-string-to-value function
  *		for capability being processed.
@@ -724,7 +875,7 @@ parse_segment_flags(Mapfile *mf, Xword *flags)
  *	Returns TK_SEMICOLON or TK_RIGHTBKT for success, and TK_ERROR otherwise.
  */
 static Token
-parse_cap_mask(Mapfile *mf, Token eq_tok, CapMask *capmask,
+parse_cap_mask(Mapfile *mf, Token eq_tok, Capmask *capmask,
     Word type, elfcap_from_str_func_t *elfcap_from_str_func)
 {
 	int		done;
@@ -770,56 +921,51 @@ parse_cap_mask(Mapfile *mf, Token eq_tok, CapMask *capmask,
 }
 
 /*
- * XXXRIEXXX
- *
- * This routine is the name version of parse_cap_mask. You need to
- * add the argument that corresponds to capmask. Also, remove the
- * ARGSUSED lint comment.
- */
-/*
  * Parse one of the capabilities attributes that manages lists of names
- * (CA_SUNW_PLATFORM, CA_SUNW_MACHINE).
+ * (CA_SUNW_PLAT and CA_SUNW_MACH).  Values are symbolic names that correspond
+ * to the capabilities mask in question.
  *
  * entry:
  *	mf - Mapfile descriptor
  *	eq_tok - One of TK_EQUAL, TK_PLUSEQ, TK_MINUSEQ, representing
  *		the operation to carry out.
+ *	caplist - Caplist from output descriptor for capability being processed.
  *	type - Capability type (CA_SUNW_*)
  *
  * exit:
  *	Returns TK_SEMICOLON or TK_RIGHTBKT for success, and TK_ERROR otherwise.
  */
-/*ARGSUSED*/
 static Token
-parse_cap_list(Mapfile *mf, Token eq_tok, Word type)
+parse_cap_list(Mapfile *mf, Token eq_tok, Caplist *caplist,
+    Word type)
 {
-	int		done;
+	int		done, found;
 	Token		tok;
 	ld_map_tkval_t	tkv;
 	Conv_inv_buf_t	inv_buf;
+	APlist		*strs = NULL;
+	Aliste		idx;
+	const char	*str;
 
-	/*
-	 * XXXRIEXXX
-	 *
-	 * If eq_tok is TK_EQUAL, you must clear the value and exclude lists,
-	 * and set the 'override' bit so that the capability from the input
-	 * objects is ignored. See set_capmask() for the logic used for
-	 * bitmasks.
-	 */
-	for (done = 0; done == 0; ) {
+	for (done = 0, found = 0; done == 0; found = 0) {
 		switch (tok = ld_map_gettoken(mf, 0, &tkv)) {
 		case TK_ERROR:
 			return (TK_ERROR);
 
 		case TK_STRING:
 			/*
-			 * XXXRIEXXX
-			 *
-			 * The name is in tkv.tkv_str. If eq_tok is TK_MINUSEQ,
-			 * you add the name to the exclude list, and remove it
-			 * from the value list. Otherwise, you add it to the
-			 * value list and remove it from the exclude list.
+			 * The name is in tkv.tkv_str.  Save this string for
+			 * set_capstr() processing, but remove any duplicates.
 			 */
+			for (APLIST_TRAVERSE(strs, idx, str)) {
+				if (strcmp(str, tkv.tkv_str) == 0) {
+					found++;
+					break;
+				}
+			}
+			if ((found == 0) && (aplist_append(&strs, tkv.tkv_str,
+			    AL_CNT_CAP_NAMES) == NULL))
+				return (TK_ERROR);
 			break;
 
 		case TK_SEMICOLON:
@@ -834,6 +980,8 @@ parse_cap_list(Mapfile *mf, Token eq_tok, Word type)
 		}
 	}
 
+	if (!set_capstr(mf, caplist, eq_tok, type, strs))
+		return (TK_ERROR);
 	return (tok);
 }
 
@@ -883,10 +1031,10 @@ at_cap_hw(Mapfile *mf, Token eq_tok, void *uvalue)
 		}
 	}
 
-	if (!set_capmask(mf, &mf->mf_ofl->ofl_ocapset.c_hw_1, eq_tok,
+	if (!set_capmask(mf, &mf->mf_ofl->ofl_ocapset.oc_hw_1, eq_tok,
 	    CA_SUNW_HW_1, hw1, TRUE))
 		return (TK_ERROR);
-	if (!set_capmask(mf, &mf->mf_ofl->ofl_ocapset.c_hw_2, eq_tok,
+	if (!set_capmask(mf, &mf->mf_ofl->ofl_ocapset.oc_hw_2, eq_tok,
 	    CA_SUNW_HW_2, hw2, FALSE))
 		return (TK_ERROR);
 	return (tok);
@@ -900,7 +1048,7 @@ at_cap_hw(Mapfile *mf, Token eq_tok, void *uvalue)
 static Token
 at_cap_hw_1(Mapfile *mf, Token eq_tok, void *uvalue)
 {
-	return (parse_cap_mask(mf, eq_tok, &mf->mf_ofl->ofl_ocapset.c_hw_1,
+	return (parse_cap_mask(mf, eq_tok, &mf->mf_ofl->ofl_ocapset.oc_hw_1,
 	    CA_SUNW_HW_1, elfcap_hw1_from_str));
 }
 
@@ -912,7 +1060,7 @@ at_cap_hw_1(Mapfile *mf, Token eq_tok, void *uvalue)
 static Token
 at_cap_hw_2(Mapfile *mf, Token eq_tok, void *uvalue)
 {
-	return (parse_cap_mask(mf, eq_tok, &mf->mf_ofl->ofl_ocapset.c_hw_2,
+	return (parse_cap_mask(mf, eq_tok, &mf->mf_ofl->ofl_ocapset.oc_hw_2,
 	    CA_SUNW_HW_2, elfcap_hw2_from_str));
 }
 
@@ -957,7 +1105,7 @@ at_cap_sf(Mapfile *mf, Token eq_tok, void *uvalue)
 		}
 	}
 
-	if (!set_capmask(mf, &mf->mf_ofl->ofl_ocapset.c_sf_1, eq_tok,
+	if (!set_capmask(mf, &mf->mf_ofl->ofl_ocapset.oc_sf_1, eq_tok,
 	    CA_SUNW_SF_1, sf1, TRUE))
 		return (TK_ERROR);
 
@@ -972,7 +1120,7 @@ at_cap_sf(Mapfile *mf, Token eq_tok, void *uvalue)
 static Token
 at_cap_sf_1(Mapfile *mf, Token eq_tok, void *uvalue)
 {
-	return (parse_cap_mask(mf, eq_tok, &mf->mf_ofl->ofl_ocapset.c_sf_1,
+	return (parse_cap_mask(mf, eq_tok, &mf->mf_ofl->ofl_ocapset.oc_sf_1,
 	    CA_SUNW_SF_1, elfcap_sf1_from_str));
 }
 
@@ -984,14 +1132,8 @@ at_cap_sf_1(Mapfile *mf, Token eq_tok, void *uvalue)
 static Token
 at_cap_mach(Mapfile *mf, Token eq_tok, void *uvalue)
 {
-	/*
-	 * XXXRIEXXX
-	 *
-	 * Add the missing argument, and replace the 0 with
-	 * CA_SUNW_MACH.
-	 */
-	return (parse_cap_list(mf, eq_tok, /* cap-list-goes-here, */
-	    /* CA_SUNW_MACH */0));
+	return (parse_cap_list(mf, eq_tok, &mf->mf_ofl->ofl_ocapset.oc_mach,
+	    CA_SUNW_MACH));
 }
 
 /*
@@ -1002,14 +1144,8 @@ at_cap_mach(Mapfile *mf, Token eq_tok, void *uvalue)
 static Token
 at_cap_plat(Mapfile *mf, Token eq_tok, void *uvalue)
 {
-	/*
-	 * XXXRIEXXX
-	 *
-	 * Add the missing argument, and replace the 0 with
-	 * CA_SUNW_PLAT.
-	 */
-	return (parse_cap_list(mf, eq_tok, /* cap-list-goes-here, */
-	    /* CA_SUNW_PLAT */0));
+	return (parse_cap_list(mf, eq_tok, &mf->mf_ofl->ofl_ocapset.oc_plat,
+	    CA_SUNW_PLAT));
 }
 
 /*
@@ -1032,6 +1168,7 @@ dir_capability(Mapfile *mf)
 
 		{ MSG_ORIG(MSG_MAPKW_SF),	at_cap_sf, ATTR_FMT_EQ_ALL },
 		{ MSG_ORIG(MSG_MAPKW_SF_1),	at_cap_sf_1, ATTR_FMT_EQ_ALL },
+
 		/* List must be null terminated */
 		{ 0 }
 	};
@@ -1049,7 +1186,7 @@ dir_capability(Mapfile *mf)
 	    KW_NAME_SIZE(MSG_MAPKW_SF) +
 	    KW_NAME_SIZE(MSG_MAPKW_SF_1);
 
-	const char	*capid = NULL;
+	Capstr		*capstr;
 	Token		tok;
 	ld_map_tkval_t	tkv;
 	Conv_inv_buf_t	inv_buf;
@@ -1066,19 +1203,24 @@ dir_capability(Mapfile *mf)
 		return (TK_ERROR);
 
 	case TK_STRING:
+		capstr = &mf->mf_ofl->ofl_ocapset.oc_id;
+
 		/*
-		 * XXXRIEXXX
-		 *
-		 * The ID name is in tkv.tkv_str. It needs to be saved,
-		 * and eventually converted into a CA_SUNW_ID entry.
+		 * The ID name is in tkv.tkv_str.  Save this name in the output
+		 * capabilities structure.  Note, should multiple ID entries
+		 * be encounterd, the last entry wins.
 		 */
-		capid = tkv.tkv_str;
+		DBG_CALL(Dbg_cap_id(mf->mf_ofl->ofl_lml, mf->mf_lineno,
+		    capstr->cs_str, tkv.tkv_str));
+
+		capstr->cs_str = tkv.tkv_str;
+		mf->mf_ofl->ofl_ocapset.oc_flags |= FLG_OCS_USRDEFID;
 
 		/*
 		 * The name can be followed by an opening '{', or a
 		 * terminating ';'
 		 */
-		switch (tok = gettoken_optattr(mf, capid)) {
+		switch (tok = gettoken_optattr(mf, capstr->cs_str)) {
 		case TK_SEMICOLON:
 			return (TK_SEMICOLON);
 		case TK_LEFTBKT:
@@ -1497,7 +1639,7 @@ at_seg_assign_flags(Mapfile *mf, Token eq_tok, void *uvalue)
 		default:
 		bad_flag:
 			{
-				char buf[flag_list_bufsize];
+				char buf[VLA_SIZE(flag_list_bufsize)];
 
 				mf_fatal(mf, MSG_INTL(MSG_MAP_EXP_SECFLAG),
 				    ld_map_kwnames(flag_list,
@@ -2687,7 +2829,7 @@ at_sym_flags(Mapfile *mf, Token eq_tok, void *uvalue)
 		default:
 		bad_flag:
 			{
-				char buf[symflag_list_bufsize];
+				char buf[VLA_SIZE(symflag_list_bufsize)];
 
 				mf_fatal(mf, MSG_INTL(MSG_MAP_EXP_SYMFLAG),
 				    ld_map_kwnames(symflag_list,
@@ -2762,7 +2904,7 @@ static void
 gts_efunc_at_sym_type(Mapfile *mf, Token tok, ld_map_tkval_t *tkv)
 {
 	Conv_inv_buf_t	inv_buf;
-	char		buf[at_sym_type_list_bufsize];
+	char		buf[VLA_SIZE(at_sym_type_list_bufsize)];
 
 	mf_fatal(mf, MSG_INTL(MSG_MAP_EXP_SYMTYPE),
 	    ld_map_kwnames(at_sym_type_list, SGSOFFSETOF(at_sym_type_t, name),
@@ -3165,7 +3307,7 @@ ld_map_parse_v2(Mapfile *mf)
 		default:
 		bad_dirtok:
 			{
-				char buf[dirlist_bufsize];
+				char buf[VLA_SIZE(dirlist_bufsize)];
 
 				mf_fatal(mf, MSG_INTL(MSG_MAP_EXP_DIR),
 				    ld_map_kwnames(dirlist,

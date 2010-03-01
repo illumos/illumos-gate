@@ -18,11 +18,10 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 RTLD=		ld.so.1
@@ -31,10 +30,12 @@ AVLOBJ=		avl.o
 DTROBJ=		dtrace_data.o
 TOOLOBJS=	alist.o strhash.o
 BLTOBJ=		msg.o
+ELFCAPOBJ=	elfcap.o
 OBJECTS=	$(BLTOBJ) \
 		$(AVLOBJ) \
 		$(DTROBJ) \
 		$(TOOLOBJS) \
+		$(ELFCAPOBJ) \
 		$(P_ASOBJS)   $(P_COMOBJS)   $(P_MACHOBJS)   $(G_MACHOBJS)  \
 		$(S_ASOBJS)   $(S_COMOBJS)   $(S_MACHOBJS)   $(CP_MACHOBJS)
 
@@ -47,6 +48,7 @@ include		$(SRC)/lib/Makefile.lib
 include		$(SRC)/cmd/sgs/Makefile.com
 
 SRCDIR =	../common
+ELFCAP =	$(SRC)/common/elfcap
 PLAT =		$(VAR_PLAT_$(BASEPLAT))
 
 # DTrace needs an executable data segment.
@@ -79,6 +81,7 @@ CPPFLAGS +=	-I$(SRCBASE)/lib/libc/inc \
 		-I$(SRCBASE)/uts/$(PLAT) \
 		-I$(SRCBASE)/uts/$(PLAT)/krtld \
 		-I$(SRC)/common/sgsrtcid \
+		-I$(ELFCAP) \
 		 $(CPPFEATUREMACROS)
 
 ASFLAGS=	-P -D_ASM $(CPPFLAGS)

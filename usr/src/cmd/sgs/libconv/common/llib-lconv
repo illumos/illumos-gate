@@ -187,6 +187,8 @@ const char	*conv_ver_index(Versym, int, Conv_inv_buf_t *);
 conv_iter_ret_t	conv_iter_cap_tags(Conv_fmt_flags_t, conv_iter_cb_t, void *);
 conv_iter_ret_t	conv_iter_cap_val_hw1(Half, Conv_fmt_flags_t,
 		    conv_iter_cb_t, void *);
+conv_iter_ret_t	conv_iter_cap_val_hw2(Half, Conv_fmt_flags_t,
+		    conv_iter_cb_t, void *);
 conv_iter_ret_t	conv_iter_cap_val_sf1(Conv_fmt_flags_t, conv_iter_cb_t, void *);
 
 conv_iter_ret_t	conv_iter_dyn_feature1(Conv_fmt_flags_t,
@@ -256,13 +258,17 @@ const char	*conv32_cap_tag(Elf32_Word, Conv_fmt_flags_t,
 const char	*conv64_cap_tag(Elf64_Xword, Conv_fmt_flags_t,
 		    Conv_inv_buf_t *);
 const char	*conv32_cap_val(Elf32_Word, Elf32_Word, Half,
-		    Conv_cap_val_buf_t *);
+		    Conv_fmt_flags_t, Conv_cap_val_buf_t *);
 const char	*conv64_cap_val(Elf64_Xword, Elf64_Xword, Half,
-		    Conv_cap_val_buf_t *);
+		    Conv_fmt_flags_t, Conv_cap_val_buf_t *);
 const char	*conv32_cap_val_hw1(Elf32_Word, Half, Conv_fmt_flags_t,
 		    Conv_cap_val_hw1_buf_t *);
+const char	*conv32_cap_val_hw2(Elf32_Word, Half, Conv_fmt_flags_t,
+		    Conv_cap_val_hw2_buf_t *);
 const char	*conv64_cap_val_hw1(Elf64_Xword, Half, Conv_fmt_flags_t,
 		    Conv_cap_val_hw1_buf_t *);
+const char	*conv64_cap_val_hw2(Elf64_Xword, Half, Conv_fmt_flags_t,
+		    Conv_cap_val_hw2_buf_t *);
 const char	*conv32_cap_val_sf1(Elf32_Word, Half, Conv_fmt_flags_t,
 		    Conv_cap_val_sf1_buf_t *);
 const char	*conv64_cap_val_sf1(Elf64_Xword, Half, Conv_fmt_flags_t,

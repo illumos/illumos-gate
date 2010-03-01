@@ -42,7 +42,6 @@
 #include	<sys/stat.h>
 #include	<sys/mman.h>
 #include	<string.h>
-#include	<stdio.h>
 #include	<unistd.h>
 #include	<dlfcn.h>
 #include	<sys/sysconfig.h>
@@ -291,7 +290,14 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	 * Initialize any global variables.
 	 */
 	at_flags = _flags;
-	platform = _platform;
+
+	if ((org_scapset->sc_plat = _platform) != NULL)
+		org_scapset->sc_platsz = strlen(_platform);
+
+	if (org_scapset->sc_plat == NULL)
+		platform_name(org_scapset);
+	if (org_scapset->sc_mach == NULL)
+		machine_name(org_scapset);
 
 	/*
 	 * If pagesize is unspecified find its value.
@@ -338,20 +344,24 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	security(uid, euid, gid, egid, auxflags);
 
 	/*
-	 * Initialize a hardware capability descriptor for use in comparing
-	 * each loaded object.
-	 */
-	if (auxflags & AF_SUN_HWCAPVERIFY) {
-		rtld_flags2 |= RT_FL2_HWCAP;
-		hwcap = (ulong_t)hwcap_1;
-	}
-
-	/*
 	 * Look for environment strings (allows things like LD_NOAUDIT to be
 	 * established, although debugging isn't enabled until later).
 	 */
 	if ((readenv_user((const char **)envp, &(lml_main.lm_flags),
 	    &(lml_main.lm_tflags), (aoutdyn != 0))) == 1)
+		return (0);
+
+	/*
+	 * Initialize a hardware capability descriptor for use in comparing
+	 * each loaded object.  The aux vector must provide AF_SUN_HWCAPVERIFY,
+	 * as prior to this setting any hardware capabilities that were found
+	 * could not be relied upon.  Set any alternative system capabilities.
+	 */
+	if (auxflags & AF_SUN_HWCAPVERIFY) {
+		rtld_flags2 |= RT_FL2_HWCAP;
+		org_scapset->sc_hw_1 = (Xword)hwcap_1;
+	}
+	if (cap_alternative() == 0)
 		return (0);
 
 	/*
@@ -676,7 +686,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		size_t	len = strlen(interp->i_name);
 
 		if (expand(&interp->i_name, &len, 0, 0,
-		    (PD_TKN_ISALIST | PD_TKN_HWCAP), rlmp) & PD_TKN_RESOLVED)
+		    (PD_TKN_ISALIST | PD_TKN_CAP), rlmp) & PD_TKN_RESOLVED)
 			fdr.fd_flags |= FLG_FD_RESOLVED;
 	}
 	fdr.fd_pname = interp->i_name;
@@ -721,36 +731,23 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	 * that are restricted to a 32-bit address space can only be loaded if
 	 * the executable has established this requirement.
 	 */
-	if (SFCAP(mlmp) & SF1_SUNW_ADDR32)
+	if (CAPSET(mlmp).sc_sf_1 & SF1_SUNW_ADDR32)
 		rtld_flags2 |= RT_FL2_ADDR32;
 #endif
 	/*
-	 * Validate any hardware capabilities information.
+	 * Establish any alternative capabilities, and validate this object
+	 * if it defines it's own capabilities information.
 	 */
-	if (HWCAP(mlmp) && (hwcap_check(HWCAP(mlmp), &rej) == 0)) {
+	if (cap_check_lmp(mlmp, &rej) == 0) {
 		if (lml_main.lm_flags & LML_FLG_TRC_ENABLE) {
-			(void) printf(MSG_INTL(MSG_LDD_GEN_HWCAP_1),
+			/* LINTED */
+			(void) printf(MSG_INTL(ldd_warn[rej.rej_type]),
 			    NAME(mlmp), rej.rej_str);
 		} else {
+			/* LINTED */
 			eprintf(&lml_main, ERR_FATAL,
-			    MSG_INTL(MSG_GEN_BADHWCAP_1), rej.rej_str);
-			return (0);
-		}
-	}
-
-	/*
-	 * Validate any software capabilities information, other than
-	 * SF1_SUNW_ADDR32.  Only dependencies need check their SF1_SUNW_ADDR32
-	 * use against the application enabling a 32-bit address space.
-	 */
-	if ((SFCAP(mlmp) & ~SF1_SUNW_ADDR32) &&
-	    (sfcap_check(SFCAP(mlmp), &rej) == 0)) {
-		if (lml_main.lm_flags & LML_FLG_TRC_ENABLE) {
-			(void) printf(MSG_INTL(MSG_LDD_GEN_SFCAP_1),
+			    MSG_INTL(err_reject[rej.rej_type]),
 			    NAME(mlmp), rej.rej_str);
-		} else {
-			eprintf(&lml_main, ERR_FATAL,
-			    MSG_INTL(MSG_GEN_BADSFCAP_1), rej.rej_str);
 			return (0);
 		}
 	}
@@ -813,9 +810,6 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	r_debug.rtd_rdebug.r_ldbase = r_debug.rtd_rdebug.r_ldsomap->l_addr;
 	r_debug.rtd_dynlmlst = &dynlm_list;
 
-	if (platform)
-		platform_sz = strlen(platform);
-
 	/*
 	 * Determine the dev/inode information for the executable to complete
 	 * load_so() checking for those who might dlopen(a.out).
@@ -830,6 +824,9 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	 */
 	if (!(rtld_flags & RT_FL_NOCFG)) {
 		if ((features = elf_config(mlmp, (aoutdyn != 0))) == -1)
+			return (0);
+
+		if (cap_alternative() == 0)
 			return (0);
 	}
 
@@ -900,13 +897,12 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	 * Now that debugging is enabled generate any diagnostics from any
 	 * previous events.
 	 */
-	if (hwcap)
-		DBG_CALL(Dbg_cap_val_hw1(&lml_main, hwcap, M_MACH));
-	if (features)
+	if (DBG_ENABLED) {
+		DBG_CALL(Dbg_cap_val(&lml_main, org_scapset, alt_scapset,
+		    M_MACH));
 		DBG_CALL(Dbg_file_config_dis(&lml_main, config->c_name,
 		    features));
 
-	if (DBG_ENABLED) {
 		DBG_CALL(Dbg_file_ldso(rlmp, envp, auxv,
 		    LIST(rlmp)->lm_lmidstr, ALIST_OFF_DATA));
 
@@ -1137,14 +1133,14 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	 * Without this flag we only support one copy of the linker in a
 	 * process because by default the linker will always try to
 	 * initialize at one primary link map  The copy of libc which is
-	 * initialized on a primary link map will initalize global TLS
+	 * initialized on a primary link map will initialize global TLS
 	 * data which can be shared with other copies of libc in the
 	 * process.  The problem is that if there is more than one copy
 	 * of the linker, only one copy should link libc onto a primary
 	 * link map, otherwise libc will attempt to re-initialize global
 	 * TLS data.  So when a copy of the linker is loaded with this
 	 * flag set, it will not initialize any primary link maps since
-	 * persumably another copy of the linker will do this.
+	 * presumably another copy of the linker will do this.
 	 *
 	 * Note that this flag only allows multiple copies of the -same-
 	 * -version- of the linker (and libc) to coexist.  This approach

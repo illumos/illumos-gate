@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,6 +90,8 @@ typedef	Elf64_Vernaux	Vernaux;
 typedef	Elf64_Versym	Versym;
 typedef	Elf64_Move	Move;
 typedef	Elf64_Cap	Cap;
+typedef	Elf64_Capinfo	Capinfo;
+typedef	Elf64_Capchain	Capchain;
 #endif	/* _ASM */
 
 #else	/* _ILP32 */
@@ -135,6 +137,8 @@ typedef	Elf32_Vernaux	Vernaux;
 typedef	Elf32_Versym	Versym;
 typedef	Elf32_Move	Move;
 typedef	Elf32_Cap	Cap;
+typedef	Elf32_Capinfo	Capinfo;
+typedef	Elf32_Capchain	Capchain;
 #endif	/* _ASM */
 
 #endif	/* _ILP32 */
