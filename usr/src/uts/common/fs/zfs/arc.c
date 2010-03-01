@@ -2759,10 +2759,13 @@ top:
 			buf->b_private = NULL;
 			buf->b_next = NULL;
 			hdr->b_buf = buf;
-			arc_get_data_buf(buf);
 			ASSERT(hdr->b_datacnt == 0);
 			hdr->b_datacnt = 1;
+			arc_access(hdr, hash_lock);
+			arc_get_data_buf(buf);
 		}
+
+		ASSERT(!GHOST_STATE(hdr->b_state));
 
 		acb = kmem_zalloc(sizeof (arc_callback_t), KM_SLEEP);
 		acb->acb_done = done;
@@ -2771,17 +2774,6 @@ top:
 		ASSERT(hdr->b_acb == NULL);
 		hdr->b_acb = acb;
 		hdr->b_flags |= ARC_IO_IN_PROGRESS;
-
-		/*
-		 * If the buffer has been evicted, migrate it to a present state
-		 * before issuing the I/O.  Once we drop the hash-table lock,
-		 * the header will be marked as I/O in progress and have an
-		 * attached buffer.  At this point, anybody who finds this
-		 * buffer ought to notice that it's legit but has a pending I/O.
-		 */
-
-		if (GHOST_STATE(hdr->b_state))
-			arc_access(hdr, hash_lock);
 
 		if (HDR_L2CACHE(hdr) && hdr->b_l2hdr != NULL &&
 		    (vd = hdr->b_l2hdr->b_dev->l2ad_vdev) != NULL) {
