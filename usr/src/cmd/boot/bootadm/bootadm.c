@@ -3698,7 +3698,9 @@ synchronize_BE_menu(void)
 	char		*curr_cksum_str;
 	char		*curr_size_str;
 	char		*curr_file;
-	char		*pool;
+	char		*pool = NULL;
+	char		*mntpt = NULL;
+	zfs_mnted_t	mnted;
 	FILE		*cfp;
 	int		found;
 	int		ret;
@@ -3753,11 +3755,24 @@ synchronize_BE_menu(void)
 
 	/* Get checksum of current menu */
 	pool = find_root_pool();
-	(void) snprintf(cmdline, sizeof (cmdline), "%s %s%s%s",
-	    CKSUM, pool == NULL ? "" : "/", pool == NULL ? "" : pool,
-	    GRUB_MENU);
-	free(pool);
+	if (pool) {
+		mntpt = mount_top_dataset(pool, &mnted);
+		if (mntpt == NULL) {
+			bam_error(FAIL_MNT_TOP_DATASET, pool);
+			free(pool);
+			return (BAM_ERROR);
+		}
+		(void) snprintf(cmdline, sizeof (cmdline), "%s %s%s",
+		    CKSUM, mntpt, GRUB_MENU);
+	} else {
+		(void) snprintf(cmdline, sizeof (cmdline), "%s %s",
+		    CKSUM, GRUB_MENU);
+	}
 	ret = exec_cmd(cmdline, &flist);
+	if (pool) {
+		(void) umount_top_dataset(pool, mnted, mntpt);
+		free(pool);
+	}
 	INJECT_ERROR1("GET_CURR_CKSUM", ret = 1);
 	if (ret != 0) {
 		bam_error(MENU_CKSUM_FAIL);
