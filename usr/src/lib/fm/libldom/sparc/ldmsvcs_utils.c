@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,7 @@
 
 #include "ldmsvcs_utils.h"
 #include "ldom_alloc.h"
+#include "ldom_utils.h"
 
 #define	ASSERT(cnd) \
 	((void) ((cnd) || ((void) fprintf(stderr, \
@@ -103,6 +104,7 @@ static struct poller_s {
 	pthread_mutex_t mt;
 	pthread_cond_t cv;
 	pthread_t polling_tid;
+	int polling_thr_sig;
 	int doreset;
 	int doexit;
 	int nclients;
@@ -113,6 +115,7 @@ static struct poller_s {
 	PTHREAD_MUTEX_INITIALIZER,
 	PTHREAD_COND_INITIALIZER,
 	0,
+	SIGTERM,
 	1,
 	0,
 	0,
@@ -425,7 +428,8 @@ poller_shutdown(boolean_t wait)
 
 	if (wait == B_TRUE) {
 		/* stop the poller thread  and wait for it to end */
-		(void) pthread_kill(pollbase.polling_tid, SIGTERM);
+		(void) pthread_kill(pollbase.polling_tid,
+		    pollbase.polling_thr_sig);
 		(void) pthread_join(pollbase.polling_tid, NULL);
 	}
 }
@@ -513,7 +517,10 @@ poller_init(struct ldmsvcs_info *lsp)
 
 		/*
 		 * create a joinable polling thread for receiving messages
+		 * The polling_thr_sig stores the signal number that is not
+		 * currently masked. it is used to stop the poller thread.
 		 */
+		pollbase.polling_thr_sig = ldom_find_thr_sig();
 		if (pthread_create(&pollbase.polling_tid, attr,
 		    poller_loop, lsp) != 0)
 			rc = 1;

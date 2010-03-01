@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,7 @@
 
 #include "ldom_xmpp_client.h"
 #include "ldom_alloc.h"
+#include "ldom_utils.h"
 
 #include <stdio.h>
 #include <signal.h>
@@ -80,6 +81,7 @@ static void handle_ldm_resp(xmpp_conn_t *conn, char *buf, size_t buf_size);
 static void handle_ldm_event(xmpp_conn_t *conn, char *buf, size_t buf_size);
 
 static int xmpp_enable = 0;
+static int xmpp_thr_sig = SIGTERM;
 static pthread_t xmpp_tid = 0;
 static pthread_mutex_t xmpp_tid_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -343,10 +345,9 @@ xmpp_client_thr(void *data)
 	char buf[XMPP_BUF_SIZE];
 	xmpp_conn_t conn;
 
-	/* initialize the conn struct */
-	bzero(&conn, sizeof (xmpp_conn_t));
-
 	while (xmpp_enable) {
+		/* clear the conn struct */
+		bzero(&conn, sizeof (xmpp_conn_t));
 
 		/* keep making a connection until successfully */
 		do {
@@ -357,6 +358,11 @@ xmpp_client_thr(void *data)
 		/* write the stream node */
 		cnt = iowrite(&conn, (char *)STREAM_START,
 		    strlen((char *)STREAM_START));
+		if (cnt != strlen((char *)STREAM_START)) {
+			xmpp_close(&conn);
+			(void) sleep(XMPP_SLEEP);
+			continue;
+		}
 
 		/* process input */
 		while ((conn.state != CONN_STATE_FAILURE) &&
@@ -511,7 +517,7 @@ xmpp_stop(void)
 	(void) pthread_mutex_lock(&xmpp_tid_lock);
 	xmpp_enable = 0;
 	if (xmpp_tid) {
-		(void) pthread_kill(xmpp_tid, SIGTERM);
+		(void) pthread_kill(xmpp_tid, xmpp_thr_sig);
 		(void) pthread_join(xmpp_tid, NULL);
 		xmpp_tid = 0;
 	}
@@ -545,7 +551,10 @@ xmpp_start(void)
 
 	/*
 	 * create xmpp client thread for receiving domain events
+	 * xmpp_thr_sig stores the signal number that is not currently masked.
+	 * It is used to stop the client thread.
 	 */
+	xmpp_thr_sig = ldom_find_thr_sig();
 	(void) pthread_create(&xmpp_tid, NULL, xmpp_client_thr, NULL);
 
 	(void) pthread_mutex_unlock(&xmpp_tid_lock);

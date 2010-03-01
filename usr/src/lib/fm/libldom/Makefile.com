@@ -19,14 +19,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 LIBRARY = libldom.a
 VERS = .1
 
-LIBSRCS = ldom.c ldom_alloc.c ldmsvcs_utils.c ldom_xmpp_client.c
+LIBSRCS = ldom.c ldom_alloc.c ldmsvcs_utils.c ldom_xmpp_client.c ldom_utils.c
 OBJECTS = $(LIBSRCS:%.c=%.o)
 
 include ../../../Makefile.lib

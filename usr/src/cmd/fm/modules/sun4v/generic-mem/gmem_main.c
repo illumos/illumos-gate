@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,7 +37,6 @@
 #include <fm/libtopo.h>
 #include <sys/fm/protocol.h>
 #include <sys/async.h>
-#include <sys/fm/ldom.h>
 
 gmem_t gmem;
 
