@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,11 @@
  *
  * CDDL HEADER END
  */
-/*
- *	Copyright (c) 2000 by Sun Microsystems, Inc.
- *	All rights reserved.
- */
 
-#ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 	.file	"_rtboot.s"
 
@@ -78,8 +76,8 @@
 	.global	__rtboot
 	.local	__rtld
 	.local	s.LDSO, s.ZERO
-	.local	f.PANIC, f.OPEN, f.MMAP, f.FSTAT, f.SYSCONFIG, f.CLOSE, f.EXIT
-	.local	f.MUNMAP
+	.local	f.PANIC, f.OPENAT, f.MMAP, f.FSTATAT, f.SYSCONFIG
+	.local	f.CLOSE, f.EXIT, f.MUNMAP
 	.type	__rtboot, #function
 	.align	4
 
@@ -138,9 +136,9 @@ __rtboot:
 	SI(ZERO)
 	SI(EMPTY)
 	FI(PANIC)
-	FI(OPEN)
+	FI(OPENAT)
 	FI(MMAP)
-	FI(FSTAT)
+	FI(FSTATAT)
 	FI(SYSCONFIG)
 	FI(CLOSE)
 	FI(MUNMAP)
@@ -179,9 +177,9 @@ f.PANIC:
 	ba	f.EXIT			! leave
 	nop
 
-f.OPEN:
+f.OPENAT:
 	ba	__syscall
-	mov	SYS_open, %g1
+	mov	SYS_openat, %g1
 
 f.MMAP:
 	sethi	%hi(0x80000000), %g1	! MAP_NEW
@@ -209,9 +207,9 @@ f.CLOSE:
 	ba	__syscall
 	mov	SYS_close, %g1
 
-f.FSTAT:
+f.FSTATAT:
 	ba	__syscall
-	mov	SYS_fstat, %g1
+	mov	SYS_fstatat, %g1
 
 f.SYSCONFIG:
 	ba	__syscall

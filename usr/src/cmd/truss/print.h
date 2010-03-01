@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,7 +56,7 @@ extern "C" {
 #define	SEF	16		/* print semsys flags */
 #define	SHC	17		/* print shmsys command */
 #define	SHF	18		/* print shmsys flags */
-#define	PLK	19		/* print plock code */
+/* Number 19 now available for reuse */
 #define	SFS	20		/* print sysfs code */
 #define	RST	21		/* print string returned by sys call */
 #define	SMF	22		/* print streams message flags */

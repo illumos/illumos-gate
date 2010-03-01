@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lint.h"
 #include <sys/mkdev.h>
@@ -37,72 +35,71 @@
 #include <strings.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <sys/fcntl.h>
 #include <sys/stropts.h>
 #include <sys/stream.h>
 #include <sys/ptms.h>
+#include <sys/syscall.h>
 #include "libc.h"
 
-#if !defined(_LP64)
-extern int __open64_syscall(const char *fname, int oflag, mode_t mode);
-#endif
-
-extern int __open_syscall(const char *fname, int oflag, mode_t mode);
-
+static int xpg4_fixup(int fd);
 static void push_module(int fd);
 static int isptsfd(int fd);
 static void itoa(int i, char *ptr);
 
 int
-__open(const char *fname, int oflag, ...)
+__openat(int dfd, const char *path, int oflag, mode_t mode)
 {
-	mode_t mode;
-	int fd;
-	va_list ap;
+	int fd = syscall(SYS_openat, dfd, path, oflag, mode);
+	return (xpg4_fixup(fd));
+}
 
-	va_start(ap, oflag);
-	mode = va_arg(ap, mode_t);
-	va_end(ap);
-
-	/*
-	 * XPG4v2 requires that open of a slave pseudo terminal device
-	 * provides the process with an interface that is identical to
-	 * the terminal interface. For a more detailed discussion,
-	 * see bugid 4025044.
-	 */
-	fd = __open_syscall(fname, oflag, mode);
-	if (libc__xpg4 != 0 && fd >= 0 && isptsfd(fd))
-		push_module(fd);
-	return (fd);
+int
+__open(const char *path, int oflag, mode_t mode)
+{
+#if defined(_RETAIN_OLD_SYSCALLS)
+	int fd = syscall(SYS_open, path, oflag, mode);
+	return (xpg4_fixup(fd));
+#else
+	return (__openat(AT_FDCWD, path, oflag, mode));
+#endif
 }
 
 #if !defined(_LP64)
-/*
- * The 32-bit APIs to large files require this interposition.
- * The 64-bit APIs just fall back to __open() above.
- */
+
 int
-__open64(const char *fname, int oflag, ...)
+__openat64(int dfd, const char *path, int oflag, mode_t mode)
 {
-	mode_t mode;
-	int fd;
-	va_list ap;
+	int fd = syscall(SYS_openat64, dfd, path, oflag, mode);
+	return (xpg4_fixup(fd));
+}
 
-	va_start(ap, oflag);
-	mode = va_arg(ap, mode_t);
-	va_end(ap);
+int
+__open64(const char *path, int oflag, mode_t mode)
+{
+#if defined(_RETAIN_OLD_SYSCALLS)
+	int fd = syscall(SYS_open64, path, oflag, mode);
+	return (xpg4_fixup(fd));
+#else
+	return (__openat64(AT_FDCWD, path, oflag, mode));
+#endif
+}
 
-	/*
-	 * XPG4v2 requires that open of a slave pseudo terminal device
-	 * provides the process with an interface that is identical to
-	 * the terminal interface. For a more detailed discussion,
-	 * see bugid 4025044.
-	 */
-	fd = __open64_syscall(fname, oflag, mode);
+#endif	/* !_LP64 */
+
+/*
+ * XPG4v2 requires that open of a slave pseudo terminal device
+ * provides the process with an interface that is identical to
+ * the terminal interface. For a more detailed discussion,
+ * see bugid 4025044.
+ */
+static int
+xpg4_fixup(int fd)
+{
 	if (libc__xpg4 != 0 && fd >= 0 && isptsfd(fd))
 		push_module(fd);
 	return (fd);
 }
-#endif	/* !_LP64 */
 
 /*
  * Check if the file matches an entry in the /dev/pts directory.

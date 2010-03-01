@@ -93,16 +93,10 @@ int fork_fail_pending;
 extern struct kmem_cache *process_cache;
 
 /*
- * forkall system call.
- */
-int64_t
-forkall(void)
-{
-	return (cfork(0, 0, 0));
-}
-
-/*
- * The parent is stopped until the child invokes relvm().
+ * The vfork() system call trap is no longer invoked by libc.
+ * It is retained only for the benefit of applications running
+ * within a solaris10 branded zone.  It should be eliminated
+ * when we no longer support solaris10 branded zones.
  */
 int64_t
 vfork(void)
@@ -112,24 +106,8 @@ vfork(void)
 }
 
 /*
- * fork system call, aka fork1.
- */
-int64_t
-fork1(void)
-{
-	return (cfork(0, 1, 0));
-}
-
-/*
- * The forkall(), vfork(), and fork1() system calls are no longer
- * invoked by libc.  They are retained only for the benefit of
- * old statically-linked applications.  They should be eliminated
- * when we no longer care about such old and broken applications.
- */
-
-/*
- * forksys system call - forkx, forkallx, vforkx.
- * This is the interface now invoked by libc.
+ * forksys system call - forkx, forkallx, vforkx.  This is the
+ * interface invoked by libc for fork1(), forkall(), and vfork()
  */
 int64_t
 forksys(int subcode, int flags)

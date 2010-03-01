@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,10 +100,44 @@ enum s10_emulated_features {
 #define	AT_SUN_BRAND_S10_LDDATA		AT_SUN_BRAND_AUX1
 
 /*
- * S10 system call codes for S10 traps that have been removed or
- * re-assigned.
+ * S10 system call codes for S10 traps that have been removed or reassigned,
+ * or that are to be removed or reassigned after the dtrace syscall provider
+ * has been reengineered to deal properly with syscall::open (for example).
  */
+#define	S10_SYS_forkall		2
+#define	S10_SYS_open		5
+#define	S10_SYS_wait		7
+#define	S10_SYS_creat		8
+#define	S10_SYS_unlink		10
+#define	S10_SYS_exec		11
+#define	S10_SYS_chown		16
+#define	S10_SYS_stat		18
+#define	S10_SYS_umount		22
+#define	S10_SYS_fstat		28
+#define	S10_SYS_utime		30
+#define	S10_SYS_access		33
+#define	S10_SYS_dup		41
 #define	S10_SYS_issetugid	75
+#define	S10_SYS_fsat		76
+#define	S10_SYS_rmdir		79
+#define	S10_SYS_poll		87
+#define	S10_SYS_lstat		88
+#define	S10_SYS_fchown		94
+#define	S10_SYS_xstat		123
+#define	S10_SYS_lxstat		124
+#define	S10_SYS_fxstat		125
+#define	S10_SYS_xmknod		126
+#define	S10_SYS_lchown		130
+#define	S10_SYS_rename		134
+#define	S10_SYS_fork1		143
+#define	S10_SYS_lwp_sema_wait	147
+#define	S10_SYS_utimes		154
+#define	S10_SYS_lwp_mutex_lock	169
+#define	S10_SYS_stat64		215
+#define	S10_SYS_lstat64		216
+#define	S10_SYS_fstat64		217
+#define	S10_SYS_creat64		224
+#define	S10_SYS_open64		225
 
 /*
  * solaris10-brand-specific attributes

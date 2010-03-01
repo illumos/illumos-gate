@@ -20,18 +20,27 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-	.file	"fcntl.s"
+/*	Copyright (c) 1988 AT&T	*/
+/*	  All Rights Reserved  	*/
 
-/*
- * int __fcntl_syscall(int fildes, int cmd [, arg])
- */
+#include 	"lint.h"
+#include 	<sys/types.h>
+#include	<fcntl.h>
 
-#include "SYS.h"
+#pragma weak _dup = dup
+int
+dup(int fildes)
+{
+	return (fcntl(fildes, F_DUPFD, 0));
+}
 
-	SYSCALL2_RESTART_RVAL1(__fcntl_syscall,fcntl)
-	RET
-	SET_SIZE(__fcntl_syscall)
+#pragma weak _dup2 = dup2
+int
+dup2(int fildes, int fildes2)
+{
+	return (fcntl(fildes, F_DUP2FD, fildes2));
+}

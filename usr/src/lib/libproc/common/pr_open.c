@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,11 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright (c) 1997-2001 by Sun Microsystems, Inc.
- * All rights reserved.
- */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #include <stdlib.h>
 #include <unistd.h>
@@ -39,15 +37,22 @@
 int
 pr_open(struct ps_prochandle *Pr, const char *filename, int flags, mode_t mode)
 {
-	sysret_t rval;			/* return value from open() */
-	argdes_t argd[3];		/* arg descriptors for open() */
+	sysret_t rval;			/* return value from openat() */
+	argdes_t argd[4];		/* arg descriptors for openat() */
 	argdes_t *adp;
 	int error;
 
 	if (Pr == NULL)		/* no subject process */
 		return (open(filename, flags, mode));
 
-	adp = &argd[0];		/* filename argument */
+	adp = &argd[0];		/* AT_FDCWD argument */
+	adp->arg_value = AT_FDCWD;
+	adp->arg_object = NULL;
+	adp->arg_type = AT_BYVAL;
+	adp->arg_inout = AI_INPUT;
+	adp->arg_size = 0;
+
+	adp++;			/* filename argument */
 	adp->arg_value = 0;
 	adp->arg_object = (void *)filename;
 	adp->arg_type = AT_BYREF;
@@ -68,7 +73,7 @@ pr_open(struct ps_prochandle *Pr, const char *filename, int flags, mode_t mode)
 	adp->arg_inout = AI_INPUT;
 	adp->arg_size = 0;
 
-	error = Psyscall(Pr, &rval, SYS_open, 3, &argd[0]);
+	error = Psyscall(Pr, &rval, SYS_openat, 4, &argd[0]);
 
 	if (error) {
 		errno = (error > 0)? error : ENOSYS;
@@ -83,20 +88,34 @@ pr_open(struct ps_prochandle *Pr, const char *filename, int flags, mode_t mode)
 int
 pr_creat(struct ps_prochandle *Pr, const char *filename, mode_t mode)
 {
-	sysret_t rval;			/* return value from creat() */
-	argdes_t argd[2];		/* arg descriptors for creat() */
+	sysret_t rval;			/* return value from openat() */
+	argdes_t argd[4];		/* arg descriptors for openat() */
 	argdes_t *adp;
 	int error;
 
 	if (Pr == NULL)		/* no subject process */
 		return (creat(filename, mode));
 
-	adp = &argd[0];		/* filename argument */
+	adp = &argd[0];		/* AT_FDCWD argument */
+	adp->arg_value = AT_FDCWD;
+	adp->arg_object = NULL;
+	adp->arg_type = AT_BYVAL;
+	adp->arg_inout = AI_INPUT;
+	adp->arg_size = 0;
+
+	adp++;			/* filename argument */
 	adp->arg_value = 0;
 	adp->arg_object = (void *)filename;
 	adp->arg_type = AT_BYREF;
 	adp->arg_inout = AI_INPUT;
 	adp->arg_size = strlen(filename)+1;
+
+	adp++;			/* flags argument */
+	adp->arg_value = (O_WRONLY | O_CREAT | O_TRUNC);
+	adp->arg_object = NULL;
+	adp->arg_type = AT_BYVAL;
+	adp->arg_inout = AI_INPUT;
+	adp->arg_size = 0;
 
 	adp++;			/* mode argument */
 	adp->arg_value = (long)mode;
@@ -105,7 +124,7 @@ pr_creat(struct ps_prochandle *Pr, const char *filename, mode_t mode)
 	adp->arg_inout = AI_INPUT;
 	adp->arg_size = 0;
 
-	error = Psyscall(Pr, &rval, SYS_creat, 2, &argd[0]);
+	error = Psyscall(Pr, &rval, SYS_openat, 4, &argd[0]);
 
 	if (error) {
 		errno = (error > 0)? error : ENOSYS;
@@ -151,14 +170,21 @@ int
 pr_access(struct ps_prochandle *Pr, const char *path, int amode)
 {
 	sysret_t rval;			/* return from access() */
-	argdes_t argd[2];		/* arg descriptors for access() */
+	argdes_t argd[4];		/* arg descriptors for access() */
 	argdes_t *adp;
 	int err;
 
 	if (Pr == NULL)		/* no subject process */
 		return (access(path, amode));
 
-	adp = &argd[0];		/* path argument */
+	adp = &argd[0];		/* directory fd argument */
+	adp->arg_value = AT_FDCWD;
+	adp->arg_object = NULL;
+	adp->arg_type = AT_BYVAL;
+	adp->arg_inout = AI_INPUT;
+	adp->arg_size = 0;
+
+	adp++;			/* path argument */
 	adp->arg_value = 0;
 	adp->arg_object = (void *)path;
 	adp->arg_type = AT_BYREF;
@@ -172,7 +198,14 @@ pr_access(struct ps_prochandle *Pr, const char *path, int amode)
 	adp->arg_inout = AI_INPUT;
 	adp->arg_size = 0;
 
-	err = Psyscall(Pr, &rval, SYS_access, 2, &argd[0]);
+	adp++;			/* flag argument */
+	adp->arg_value = 0;
+	adp->arg_object = NULL;
+	adp->arg_type = AT_BYVAL;
+	adp->arg_inout = AI_INPUT;
+	adp->arg_size = 0;
+
+	err = Psyscall(Pr, &rval, SYS_faccessat, 4, &argd[0]);
 
 	if (err) {
 		errno = (err > 0) ? err : ENOSYS;

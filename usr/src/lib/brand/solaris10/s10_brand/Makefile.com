@@ -19,13 +19,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 LIBRARY =	s10_brand.a
 VERS =		.1
-COBJS =		s10_brand.o
+COBJS =		s10_brand.o s10_deleted.o
 ASOBJS =	s10_crt.o s10_handler.o s10_runexe.o
 OFFSETS_SRC =	../common/offsets.in
 OFFSETS_H =	assym.h

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,14 +81,16 @@
 
 char	_depends_on[] = "fs/sockfs";
 
+static au_event_t	aui_fchownat(au_event_t);
 static au_event_t	aui_open(au_event_t);
-static au_event_t	aui_fsat(au_event_t);
+static au_event_t	aui_openat(au_event_t);
+static au_event_t	aui_unlinkat(au_event_t);
+static au_event_t	aui_fstatat(au_event_t);
 static au_event_t	aui_msgsys(au_event_t);
 static au_event_t	aui_shmsys(au_event_t);
 static au_event_t	aui_semsys(au_event_t);
 static au_event_t	aui_utssys(au_event_t);
 static au_event_t	aui_fcntl(au_event_t);
-static au_event_t	aui_execv(au_event_t);
 static au_event_t	aui_execve(au_event_t);
 static au_event_t	aui_memcntl(au_event_t);
 static au_event_t	aui_sysinfo(au_event_t);
@@ -103,20 +105,20 @@ static au_event_t	aui_labelsys(au_event_t);
 static au_event_t	aui_setpgrp(au_event_t);
 
 static void	aus_open(struct t_audit_data *);
+static void	aus_openat(struct t_audit_data *);
 static void	aus_acl(struct t_audit_data *);
 static void	aus_acct(struct t_audit_data *);
 static void	aus_chown(struct t_audit_data *);
 static void	aus_fchown(struct t_audit_data *);
 static void	aus_lchown(struct t_audit_data *);
+static void	aus_fchownat(struct t_audit_data *);
 static void	aus_chmod(struct t_audit_data *);
 static void	aus_facl(struct t_audit_data *);
 static void	aus_fchmod(struct t_audit_data *);
 static void	aus_fcntl(struct t_audit_data *);
-static void	aus_fsat(struct t_audit_data *);
 static void	aus_mkdir(struct t_audit_data *);
 static void	aus_mknod(struct t_audit_data *);
 static void	aus_mount(struct t_audit_data *);
-static void	aus_umount(struct t_audit_data *);
 static void	aus_umount2(struct t_audit_data *);
 static void	aus_msgsys(struct t_audit_data *);
 static void	aus_semsys(struct t_audit_data *);
@@ -143,7 +145,6 @@ static void	aus_auditsys(struct t_audit_data *);
 static void	aus_sysinfo(struct t_audit_data *);
 static void	aus_modctl(struct t_audit_data *);
 static void	aus_kill(struct t_audit_data *);
-static void	aus_xmknod(struct t_audit_data *);
 static void	aus_setregid(struct t_audit_data *);
 static void	aus_setreuid(struct t_audit_data *);
 static void	aus_labelsys(struct t_audit_data *);
@@ -152,7 +153,6 @@ static void	auf_mknod(struct t_audit_data *, int, rval_t *);
 static void	auf_msgsys(struct t_audit_data *, int, rval_t *);
 static void	auf_semsys(struct t_audit_data *, int, rval_t *);
 static void	auf_shmsys(struct t_audit_data *, int, rval_t *);
-static void	auf_xmknod(struct t_audit_data *, int, rval_t *);
 static void	auf_read(struct t_audit_data *, int, rval_t *);
 static void	auf_write(struct t_audit_data *, int, rval_t *);
 
@@ -201,7 +201,7 @@ aui_null,	AUE_NULL,	aus_null,	/* 0 unused (indirect) */
 		auf_null,	0,
 aui_null,	AUE_EXIT,	aus_null,	/* 1 exit */
 		auf_null,	S2E_NPT,
-aui_null,	AUE_FORKALL,	aus_null,	/* 2 forkall */
+aui_null,	AUE_NULL,	aus_null,	/* 2 (loadable) was forkall */
 		auf_null,	0,
 aui_null,	AUE_READ,	aus_null,	/* 3 read */
 		auf_read,	S2E_PUB,
@@ -211,16 +211,16 @@ aui_open,	AUE_OPEN,	aus_open,	/* 5 open */
 		auf_null,	S2E_SP,
 aui_null,	AUE_CLOSE,	aus_close,	/* 6 close */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 7 wait */
+aui_null,	AUE_NULL,	aus_null,	/* 7 (loadable) was wait */
 		auf_null,	0,
-aui_null,	AUE_CREAT,	aus_null,	/* 8 create */
-		auf_null,	S2E_SP,
+aui_null,	AUE_NULL,	aus_null,	/* 8 (loadable) was creat */
+		auf_null,	0,
 aui_null,	AUE_LINK,	aus_null,	/* 9 link */
 		auf_null,	0,
 aui_null,	AUE_UNLINK,	aus_null,	/* 10 unlink */
 		auf_null,	0,
-aui_execv,	AUE_EXEC,	aus_null,	/* 11 exec */
-		auf_null,	S2E_MLD,
+aui_null,	AUE_NULL,	aus_null,	/* 11 (loadable) was exec */
+		auf_null,	0,
 aui_null,	AUE_CHDIR,	aus_null,	/* 12 chdir */
 		auf_null,	S2E_SP,
 aui_null,	AUE_NULL,	aus_null,	/* 13 time */
@@ -241,7 +241,7 @@ aui_null,	AUE_NULL,	aus_null,	/* 20 getpid */
 		auf_null,	0,
 aui_null,	AUE_MOUNT,	aus_mount,	/* 21 mount */
 		auf_null,	S2E_MLD,
-aui_null,	AUE_UMOUNT,	aus_umount,	/* 22 umount */
+aui_null,	AUE_NULL,	aus_null,	/* 22 (loadable) was umount */
 		auf_null,	0,
 aui_null,	AUE_SETUID,	aus_setuid,	/* 23 setuid */
 		auf_null,	0,
@@ -249,7 +249,7 @@ aui_null,	AUE_NULL,	aus_null,	/* 24 getuid */
 		auf_null,	0,
 aui_null,	AUE_STIME,	aus_null,	/* 25 stime */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 26 (loadable) was ptrace */
+aui_null,	AUE_NULL,	aus_null,	/* 26 pcsample */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 27 alarm */
 		auf_null,	0,
@@ -257,7 +257,7 @@ aui_null,	AUE_NULL,	aus_null,	/* 28 fstat */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 29 pause */
 		auf_null,	0,
-aui_null,	AUE_UTIME,	aus_null,	/* 30 utime */
+aui_null,	AUE_NULL,	aus_null,	/* 30 (loadable) was utime */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 31 stty (TIOCSETP-audit?) */
 		auf_null,	0,
@@ -279,24 +279,23 @@ aui_setpgrp,	AUE_SETPGRP,	aus_setpgrp,	/* 39 setpgrp */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 40 uucopystr */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 41 dup */
+aui_null,	AUE_NULL,	aus_null,	/* 41 (loadable) was dup */
 		auf_null,	0,
-aui_null,	AUE_PIPE,	aus_null,	/* 42 pipe */
+aui_null,	AUE_PIPE,	aus_null,	/* 42 (loadable) pipe */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 43 times */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 44 profil */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 45 (loadable) */
-						/*	was proc lock */
-		auf_null,	0,
+aui_null,	AUE_ACCESS,	aus_null,	/* 45 faccessat */
+		auf_null,	S2E_PUB | S2E_ATC,
 aui_null,	AUE_SETGID,	aus_setgid,	/* 46 setgid */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 47 getgid */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 48 sig */
+aui_null,	AUE_NULL,	aus_null,	/* 48 (loadable) was ssig */
 		auf_null,	0,
-aui_msgsys,	AUE_MSGSYS,	aus_msgsys,	/* 49 (loadable) was msgsys */
+aui_msgsys,	AUE_MSGSYS,	aus_msgsys,	/* 49 (loadable) msgsys */
 		auf_msgsys,	0,
 #if defined(__x86)
 aui_null,	AUE_NULL,	aus_null,	/* 50 sysi86 */
@@ -305,18 +304,18 @@ aui_null,	AUE_NULL,	aus_null,	/* 50 sysi86 */
 aui_null,	AUE_NULL,	aus_null,	/* 50 (loadable) was sys3b */
 		auf_null,	0,
 #endif /* __x86 */
-aui_null,	AUE_ACCT,	aus_acct,	/* 51 acct */
+aui_null,	AUE_ACCT,	aus_acct,	/* 51 (loadable) sysacct */
 		auf_null,	0,
-aui_shmsys,	AUE_SHMSYS,	aus_shmsys,	/* 52 shared memory */
+aui_shmsys,	AUE_SHMSYS,	aus_shmsys,	/* 52 (loadable) shmsys */
 		auf_shmsys,	0,
-aui_semsys,	AUE_SEMSYS,	aus_semsys,	/* 53 IPC semaphores */
+aui_semsys,	AUE_SEMSYS,	aus_semsys,	/* 53 (loadable) semsys */
 		auf_semsys,	0,
 aui_null,	AUE_IOCTL,	aus_ioctl,	/* 54 ioctl */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 55 uadmin */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 56 (loadable) was uexch */
-		auf_null,	0,
+aui_fchownat,	AUE_NULL,	aus_fchownat,	/* 56 fchownat */
+		auf_null,	S2E_ATC,
 aui_utssys,	AUE_FUSERS,	aus_null,	/* 57 utssys */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 58 fsync */
@@ -331,38 +330,35 @@ aui_fcntl,	AUE_FCNTL,	aus_fcntl,	/* 62 fcntl */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 63 ulimit */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 64 (loadable) */
+aui_null,	AUE_RENAME,	aus_null,	/* 64 renameat */
+		auf_null,	S2E_ATC,
+aui_unlinkat,	AUE_NULL,	aus_null,	/* 65 unlinkat */
+		auf_null,	S2E_ATC,
+aui_fstatat,	AUE_NULL,	aus_null,	/* 66 fstatat */
+		auf_null,	S2E_PUB | S2E_ATC,
+aui_fstatat,	AUE_NULL,	aus_null,	/* 67 fstatat64 */
+		auf_null,	S2E_PUB | S2E_ATC,
+aui_openat,	AUE_OPEN,	aus_openat,	/* 68 openat */
+		auf_null,	S2E_SP | S2E_ATC,
+aui_openat,	AUE_OPEN,	aus_openat,	/* 69 openat64 */
+		auf_null,	S2E_SP | S2E_ATC,
+aui_null,	AUE_NULL,	aus_null,	/* 70 tasksys */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 65 (loadable) */
+aui_null,	AUE_NULL,	aus_null,	/* 71 (loadable) acctctl */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 66 (loadable) */
+aui_null,	AUE_NULL,	aus_null,	/* 72 (loadable) exacct */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 67 (loadable) */
-						/*	file locking call */
+aui_null,	AUE_NULL,	aus_null,	/* 73 getpagesizes */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 68 (loadable) */
-						/*	local system calls */
-		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 69 (loadable) inode open */
-		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 70 (loadable) was advfs */
-		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 71 (loadable) was unadvfs */
-		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 72 (loadable) was notused */
-		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 73 (loadable) was notused */
-		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 74 (loadable) was notused */
+aui_null,	AUE_NULL,	aus_null,	/* 74 rctlsys */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 75 sidsys */
-						/*	was sigret (SunOS) */
 		auf_null,	0,
-aui_fsat,	AUE_FSAT,	aus_fsat,	/* 76 fsat */
+aui_null,	AUE_NULL,	aus_null,	/* 76 (loadable) was fsat */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 77 (loadable) was rfstop */
+aui_null,	AUE_NULL,	aus_null,	/* 77 syslwp_park */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 78 (loadable) was rfssys */
+aui_null,	AUE_NULL,	aus_null,	/* 78 sendfilev */
 		auf_null,	0,
 aui_null,	AUE_RMDIR,	aus_null,	/* 79 rmdir */
 		auf_null,	0,
@@ -371,10 +367,8 @@ aui_null,	AUE_MKDIR,	aus_mkdir,	/* 80 mkdir */
 aui_null,	AUE_NULL,	aus_null,	/* 81 getdents */
 		auf_null,	0,
 aui_privsys,	AUE_NULL,	aus_null,	/* 82 privsys */
-						/*	was libattach */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 83 (loadable) */
-						/*	was libdetach */
+aui_null,	AUE_NULL,	aus_null,	/* 83 ucredsys */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 84 sysfs */
 		auf_null,	0,
@@ -382,7 +376,7 @@ aui_null,	AUE_GETMSG,	aus_getmsg,	/* 85 getmsg */
 		auf_null,	0,
 aui_null,	AUE_PUTMSG,	aus_putmsg,	/* 86 putmsg */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 87 poll */
+aui_null,	AUE_NULL,	aus_null,	/* 87 (loadable) was poll */
 		auf_null,	0,
 aui_null,	AUE_LSTAT,	aus_null,	/* 88 lstat */
 		auf_null,	S2E_PUB,
@@ -410,22 +404,21 @@ aui_null,	AUE_NULL,	aus_null,	/* 99 sigpending */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 100 setcontext */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 101 (loadable) was evsys */
+aui_null,	AUE_NULL,	aus_null,	/* 101 (loadable) */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 102 (loadable) */
-						/*	was evtrapret */
 		auf_null,	0,
 aui_null,	AUE_STATVFS,	aus_null,	/* 103 statvfs */
 		auf_null,	S2E_PUB,
 aui_null,	AUE_NULL,	aus_null,	/* 104 fstatvfs */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 105 (loadable) */
+aui_null,	AUE_NULL,	aus_null,	/* 105 getloadavg */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 106 nfssys */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 107 waitset */
+aui_null,	AUE_NULL,	aus_null,	/* 107 waitsys */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 108 sigsendset */
+aui_null,	AUE_NULL,	aus_null,	/* 108 sigsendsys */
 		auf_null,	0,
 #if defined(__x86)
 aui_null,	AUE_NULL,	aus_null,	/* 109 hrtsys */
@@ -434,12 +427,12 @@ aui_null,	AUE_NULL,	aus_null,	/* 109 hrtsys */
 aui_null,	AUE_NULL,	aus_null,	/* 109 (loadable) */
 		auf_null,	0,
 #endif /* __x86 */
-aui_null,	AUE_NULL,	aus_null,	/* 110 (loadable) was acancel */
+aui_null,	AUE_UTIMES,	aus_null,	/* 110 utimesys */
+		auf_null,	S2E_ATC,
+aui_null,	AUE_NULL,	aus_null,	/* 111 sigresend */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 111 (loadable) was async */
+aui_null,	AUE_PRIOCNTLSYS, aus_priocntlsys, /* 112 priocntlsys */
 		auf_null,	0,
-aui_null,	AUE_PRIOCNTLSYS,	aus_priocntlsys,
-		auf_null,	0,		/* 112 priocntlsys */
 aui_null,	AUE_PATHCONF,	aus_null,	/* 113 pathconf */
 		auf_null,	S2E_PUB,
 aui_null,	AUE_NULL,	aus_null,	/* 114 mincore */
@@ -460,15 +453,15 @@ aui_null,	AUE_READ,	aus_null,	/* 121 readv */
 		auf_read,	S2E_PUB,
 aui_null,	AUE_WRITE,	aus_null,	/* 122 writev */
 		auf_write,	0,
-aui_null,	AUE_STAT,	aus_null,	/* 123 xstat (x86) */
-		auf_null,	S2E_PUB,
-aui_null,	AUE_LSTAT,	aus_null,	/* 124 lxstat (x86) */
-		auf_null,	S2E_PUB,
-aui_null,	AUE_NULL,	aus_null,	/* 125 fxstat (x86) */
+aui_null,	AUE_NULL,	aus_null,	/* 123 (loadable) was xstat */
 		auf_null,	0,
-aui_null,	AUE_MKNOD,	aus_xmknod,	/* 126 xmknod (x86) */
-		auf_xmknod,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 127 (loadable) was clocal */
+aui_null,	AUE_NULL,	aus_null,	/* 124 (loadable) was lxstat */
+		auf_null,	0,
+aui_null,	AUE_NULL,	aus_null,	/* 125 (loadable) was fxstat */
+		auf_null,	0,
+aui_null,	AUE_NULL,	aus_null,	/* 126 (loadable) was xmknod */
+		auf_null,	0,
+aui_null,	AUE_NULL,	aus_null,	/* 127 mmapobj */
 		auf_null,	0,
 aui_null,	AUE_SETRLIMIT,	aus_null,	/* 128 setrlimit */
 		auf_null,	0,
@@ -494,13 +487,13 @@ aui_null,	AUE_ADJTIME,	aus_null,	/* 138 adjtime */
 		auf_null,	0,
 aui_sysinfo,	AUE_SYSINFO,	aus_sysinfo,	/* 139 systeminfo */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 140 reserved */
+aui_null,	AUE_NULL,	aus_null,	/* 140 (loadable) sharefs */
 		auf_null,	0,
 aui_null,	AUE_SETEUID,	aus_seteuid,	/* 141 seteuid */
 		auf_null,	0,
 aui_forksys,	AUE_NULL,	aus_null,	/* 142 forksys */
 		auf_null,	0,
-aui_null,	AUE_FORK1,	aus_null,	/* 143 fork1 */
+aui_null,	AUE_NULL,	aus_null,	/* 143 (loadable) was fork1 */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 144 sigwait */
 		auf_null,	0,
@@ -508,21 +501,22 @@ aui_null,	AUE_NULL,	aus_null,	/* 145 lwp_info */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 146 yield */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 147 lwp_sema_wait */
+aui_null,	AUE_NULL,	aus_null,	/* 147 (loadable) */
+						/*	was lwp_sema_wait */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 148 lwp_sema_post */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 149 lwp_sema_trywait */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 150 (loadable reserved) */
+aui_null,	AUE_NULL,	aus_null,	/* 150 lwp_detach */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 151 (loadable reserved) */
+aui_null,	AUE_NULL,	aus_null,	/* 151 corectl */
 		auf_null,	0,
 aui_modctl,	AUE_MODCTL,	aus_modctl,	/* 152 modctl */
 		auf_null,	0,
 aui_null,	AUE_FCHROOT,	aus_null,	/* 153 fchroot */
 		auf_null,	0,
-aui_null,	AUE_UTIMES,	aus_null,	/* 154 utimes */
+aui_null,	AUE_NULL,	aus_null,	/* 154 (loadable) was utimes */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 155 vhangup */
 		auf_null,	0,
@@ -544,17 +538,16 @@ aui_null,	AUE_NULL,	aus_null,	/* 163 lwp_kill */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 164 lwp_self */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 165 (loadable) */
-						/*	was lwp_setprivate */
+aui_null,	AUE_NULL,	aus_null,	/* 165 lwp_sigmask */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 166 (loadable) */
-						/*	was lwp_getprivate */
+aui_null,	AUE_NULL,	aus_null,	/* 166 lwp_private */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 167 lwp_wait */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 168 lwp_mutex_wakeup  */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 169 lwp_mutex_lock */
+aui_null,	AUE_NULL,	aus_null,	/* 169 (loadable) */
+						/*	was lwp_mutex_lock */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 170 lwp_cond_wait */
 		auf_null,	0,
@@ -568,22 +561,21 @@ aui_null,	AUE_WRITE,	aus_null,	/* 174 pwrite */
 		auf_write,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 175 llseek */
 		auf_null,	0,
-aui_null,	AUE_INST_SYNC,	aus_inst_sync,  /* 176 (loadable) */
-						/* aus_inst_sync */
+aui_null,	AUE_INST_SYNC,	aus_inst_sync,  /* 176 (loadable) inst_sync */
 		auf_null,	0,
 aui_null,	AUE_BRANDSYS,	aus_brandsys,	/* 177 brandsys */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 178 (loadable) */
+aui_null,	AUE_NULL,	aus_null,	/* 178 (loadable) kaio */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 179 (loadable) */
+aui_null,	AUE_NULL,	aus_null,	/* 179 (loadable) cpc */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 180 (loadable) kaio */
+aui_null,	AUE_NULL,	aus_null,	/* 180 lgrpsys */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 181 (loadable) */
+aui_null,	AUE_NULL,	aus_null,	/* 181 rusagesys */
 		auf_null,	0,
 aui_portfs,	AUE_PORTFS,	aus_null,	/* 182 (loadable) portfs */
 		auf_null,	S2E_MLD,
-aui_null,	AUE_NULL,	aus_null,	/* 183 (loadable) */
+aui_null,	AUE_NULL,	aus_null,	/* 183 pollsys */
 		auf_null,	0,
 aui_labelsys,	AUE_NULL,	aus_labelsys,	/* 184 labelsys */
 		auf_null,	0,
@@ -591,8 +583,8 @@ aui_acl,	AUE_ACLSET,	aus_acl,	/* 185 acl */
 		auf_null,	0,
 aui_auditsys,	AUE_AUDITSYS,	aus_auditsys,	/* 186 auditsys  */
 		auf_null,	0,
-aui_null,	AUE_PROCESSOR_BIND,	aus_processor_bind,
-		auf_null,	0,		/* 187 processor_bind */
+aui_null,	AUE_PROCESSOR_BIND, aus_processor_bind, /* 187 processor_bind */
+		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 188 processor_info */
 		auf_null,	0,
 aui_null,	AUE_P_ONLINE,	aus_p_online,	/* 189 p_online */
@@ -633,7 +625,7 @@ aui_null,	AUE_NULL,	aus_null,	/* 206 schedctl */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 207 (loadable) pset */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 208 (loadable) */
+aui_null,	AUE_NULL,	aus_null,	/* 208 sparc_utrap_install */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 209 resolvepath */
 		auf_null,	0,
@@ -643,7 +635,7 @@ aui_null,	AUE_NULL,	aus_null,	/* 211 lwp_sema_timedwait */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 212 lwp_rwlock_sys */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 213 getdents64 (__ppc) */
+aui_null,	AUE_NULL,	aus_null,	/* 213 getdents64 */
 		auf_null,	0,
 aui_null,	AUE_MMAP,	aus_mmap,	/* 214 mmap64 */
 		auf_null,	0,
@@ -665,17 +657,17 @@ aui_null,	AUE_READ,	aus_null,	/* 222 pread64  */
 		auf_read,	S2E_PUB,
 aui_null,	AUE_WRITE,	aus_null,	/* 223 pwrite64 */
 		auf_write,	0,
-aui_null,	AUE_CREAT,	aus_null,	/* 224 creat64 */
-		auf_null,	S2E_SP,
+aui_null,	AUE_NULL,	aus_null,	/* 224 (loadable) was creat64 */
+		auf_null,	0,
 aui_open,	AUE_OPEN,	aus_open,	/* 225 open64 */
 		auf_null,	S2E_SP,
 aui_null,	AUE_NULL,	aus_null,	/* 226 (loadable) rpcsys */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 227 (loadable) */
+aui_null,	AUE_NULL,	aus_null,	/* 227 zone */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 228 (loadable) */
+aui_null,	AUE_NULL,	aus_null,	/* 228 (loadable) autofssys */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 229 (loadable) */
+aui_null,	AUE_NULL,	aus_null,	/* 229 getcwd */
 		auf_null,	0,
 aui_null,	AUE_SOCKET,	aus_socket,	/* 230 so_socket */
 		auf_null,	0,
@@ -715,7 +707,7 @@ aui_null,	AUE_SOCKCONFIG,	aus_sockconfig,	/* 247 sockconfig */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 248 ntp_gettime */
 		auf_null,	0,
-aui_null,	AUE_NTP_ADJTIME,	aus_null,	/* 249 ntp_adjtime */
+aui_null,	AUE_NTP_ADJTIME, aus_null,	/* 249 ntp_adjtime */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 250 lwp_mutex_unlock */
 		auf_null,	0,
@@ -840,6 +832,51 @@ aus_lchown(struct t_audit_data *tad)
 	au_uwrite(au_to_arg32(3, "new file gid", gid));
 }
 
+static au_event_t
+aui_fchownat(au_event_t e)
+{
+	klwp_t *clwp = ttolwp(curthread);
+
+	struct a {
+		long	fd;
+		long	fname;		/* char * */
+		long	uid;
+		long	gid;
+		long	flags;
+	} *uap = (struct a *)clwp->lwp_ap;
+
+	if (uap->fname == NULL)
+		e = AUE_FCHOWN;
+	else if (uap->flags & AT_SYMLINK_NOFOLLOW)
+		e = AUE_LCHOWN;
+	else
+		e = AUE_CHOWN;
+
+	return (e);
+}
+
+/*ARGSUSED*/
+static void
+aus_fchownat(struct t_audit_data *tad)
+{
+	klwp_t *clwp = ttolwp(curthread);
+	uint32_t uid, gid;
+
+	struct a {
+		long	fd;
+		long	fname;		/* char * */
+		long	uid;
+		long	gid;
+		long	flags;
+	} *uap = (struct a *)clwp->lwp_ap;
+
+	uid = (uint32_t)uap->uid;
+	gid = (uint32_t)uap->gid;
+
+	au_uwrite(au_to_arg32(3, "new file uid", uid));
+	au_uwrite(au_to_arg32(4, "new file gid", gid));
+}
+
 /* chmod start function */
 /*ARGSUSED*/
 static void
@@ -901,11 +938,64 @@ aus_fchmod(struct t_audit_data *tad)
 	releasef(fd);
 }
 
+/*
+ * convert open mode to appropriate open event
+ */
+au_event_t
+open_event(uint_t fm)
+{
+	au_event_t e;
 
-/* convert open to appropriate event */
+	switch (fm & (O_RDONLY|O_WRONLY|O_RDWR|O_CREAT|O_TRUNC)) {
+	case O_RDONLY:
+		e = AUE_OPEN_R;
+		break;
+	case O_RDONLY | O_CREAT:
+		e = AUE_OPEN_RC;
+		break;
+	case O_RDONLY | O_TRUNC:
+		e = AUE_OPEN_RT;
+		break;
+	case O_RDONLY | O_TRUNC | O_CREAT:
+		e = AUE_OPEN_RTC;
+		break;
+	case O_WRONLY:
+		e = AUE_OPEN_W;
+		break;
+	case O_WRONLY | O_CREAT:
+		e = AUE_OPEN_WC;
+		break;
+	case O_WRONLY | O_TRUNC:
+		e = AUE_OPEN_WT;
+		break;
+	case O_WRONLY | O_TRUNC | O_CREAT:
+		e = AUE_OPEN_WTC;
+		break;
+	case O_RDWR:
+		e = AUE_OPEN_RW;
+		break;
+	case O_RDWR | O_CREAT:
+		e = AUE_OPEN_RWC;
+		break;
+	case O_RDWR | O_TRUNC:
+		e = AUE_OPEN_RWT;
+		break;
+	case O_RDWR | O_TRUNC | O_CREAT:
+		e = AUE_OPEN_RWTC;
+		break;
+	default:
+		e = AUE_NULL;
+		break;
+	}
+
+	return (e);
+}
+
+/* ARGSUSED */
 static au_event_t
 aui_open(au_event_t e)
 {
+	t_audit_data_t *tad = T2A(curthread);
 	klwp_t *clwp = ttolwp(curthread);
 	uint_t fm;
 
@@ -917,22 +1007,13 @@ aui_open(au_event_t e)
 
 	fm = (uint_t)uap->fmode;
 
-	if (fm & O_WRONLY)
-		e = AUE_OPEN_W;
-	else if (fm & O_RDWR)
-		e = AUE_OPEN_RW;
-	else
-		e = AUE_OPEN_R;
+	/* convert to appropriate au_ctrl */
+	if (fm & (FXATTR | FXATTRDIROPEN))
+		tad->tad_ctrl |= PAD_ATTPATH;
 
-	if (fm & O_CREAT)
-		e += 1;
-	if (fm & O_TRUNC)
-		e += 2;
-
-	return (e);
+	return (open_event(fm));
 }
 
-/*ARGSUSED*/
 static void
 aus_open(struct t_audit_data *tad)
 {
@@ -948,130 +1029,93 @@ aus_open(struct t_audit_data *tad)
 	fm = (uint_t)uap->fmode;
 
 	/* If no write, create, or trunc modes, mark as a public op */
-	if (!(fm & (O_WRONLY|O_RDWR|O_CREAT|O_TRUNC)))
+	if ((fm & (O_RDONLY|O_WRONLY|O_RDWR|O_CREAT|O_TRUNC)) == O_RDONLY)
 		tad->tad_ctrl |= PAD_PUBLIC_EV;
 }
 
-/* convert openat(2) to appropriate event */
+/* ARGSUSED */
 static au_event_t
-aui_fsat(au_event_t e)
+aui_openat(au_event_t e)
 {
-	t_audit_data_t	*tad = U2A(u);
+	t_audit_data_t *tad = T2A(curthread);
 	klwp_t *clwp = ttolwp(curthread);
-	uint_t fmcode, fm;
+	uint_t fm;
+
 	struct a {
-		long id;
-		long arg1;
-		long arg2;
-		long arg3;
-		long arg4;
-		long arg5;
+		long	filedes;
+		long	fnamep;		/* char	* */
+		long	fmode;
+		long	cmode;
 	} *uap = (struct a *)clwp->lwp_ap;
 
-	fmcode  = (uint_t)uap->id;
+	fm = (uint_t)uap->fmode;
 
-	switch (fmcode) {
+	/* convert to appropriate au_ctrl */
+	if (fm & (FXATTR | FXATTRDIROPEN))
+		tad->tad_ctrl |= PAD_ATTPATH;
 
-	case 0: /* openat */
-	case 1: /* openat64 */
-		fm = (uint_t)uap->arg3;
-		if (fm & O_WRONLY)
-			e = AUE_OPENAT_W;
-		else if (fm & O_RDWR)
-			e = AUE_OPENAT_RW;
-		else
-			e = AUE_OPENAT_R;
+	return (open_event(fm));
+}
 
-		/*
-		 * openat modes are defined in the following order:
-		 * Read only
-		 * Read|Create
-		 * Read|Trunc
-		 * Read|Create|Trunc
-		 * Write Only
-		 * Write|Create
-		 * Write|Trunc
-		 * Write|Create|Trunc * RW Only
-		 * RW|Create
-		 * RW|Trunc
-		 * RW|Create|Trunc
-		 */
-		if (fm & O_CREAT)
-			e += 1;		/* increment to include CREAT in mode */
-		if (fm & O_TRUNC)
-			e += 2;		/* increment to include TRUNC in mode */
+static void
+aus_openat(struct t_audit_data *tad)
+{
+	klwp_t *clwp = ttolwp(curthread);
+	uint_t fm;
 
-		/* convert to appropriate au_ctrl */
-		tad->tad_ctrl |= PAD_SAVPATH;
-		if (fm & FXATTR)
-			tad->tad_ctrl |= PAD_ATPATH;
+	struct a {
+		long	filedes;
+		long	fnamep;		/* char	* */
+		long	fmode;
+		long	cmode;
+	} *uap = (struct a *)clwp->lwp_ap;
 
+	fm = (uint_t)uap->fmode;
 
-		break;
-	case 2: /* fstatat64 */
-	case 3: /* fstatat */
-		e = AUE_FSTATAT;
-		break;
-	case 4: /* fchownat */
-		e = AUE_FCHOWNAT;
-		break;
-	case 5: /* unlinkat */
-		e = AUE_UNLINKAT;
-		break;
-	case 6: /* futimesat */
-		e = AUE_FUTIMESAT;
-		break;
-	case 7: /* renameat */
-		e = AUE_RENAMEAT;
-		break;
-	case 8: /* faccessat */
-		e = AUE_FACCESSAT;
-		break;
-	case 9: /* __openattrdirat */
-		tad->tad_ctrl |= PAD_SAVPATH;
-		/*FALLTHROUGH*/
-	default:
-		e = AUE_NULL;
-		break;
-	}
+	/* If no write, create, or trunc modes, mark as a public op */
+	if ((fm & (O_RDONLY|O_WRONLY|O_RDWR|O_CREAT|O_TRUNC)) == O_RDONLY)
+		tad->tad_ctrl |= PAD_PUBLIC_EV;
+}
+
+static au_event_t
+aui_unlinkat(au_event_t e)
+{
+	klwp_t *clwp = ttolwp(curthread);
+
+	struct a {
+		long	filedes;
+		long	fnamep;		/* char	* */
+		long	flags;
+	} *uap = (struct a *)clwp->lwp_ap;
+
+	if (uap->flags & AT_REMOVEDIR)
+		e = AUE_RMDIR;
+	else
+		e = AUE_UNLINK;
 
 	return (e);
 }
 
-/*ARGSUSED*/
-static void
-aus_fsat(struct t_audit_data *tad)
+static au_event_t
+aui_fstatat(au_event_t e)
 {
 	klwp_t *clwp = ttolwp(curthread);
-	uint_t fmcode, fm;
+
 	struct a {
-		long id;
-		long arg1;
-		long arg2;
-		long arg3;
-		long arg4;
-		long arg5;
+		long	filedes;
+		long	fnamep;		/* char	* */
+		long	statb;
+		long	flags;
 	} *uap = (struct a *)clwp->lwp_ap;
 
-	fmcode  = (uint_t)uap->id;
+	if (uap->fnamep == NULL)
+		e = AUE_FSTAT;
+	else if (uap->flags & AT_SYMLINK_NOFOLLOW)
+		e = AUE_LSTAT;
+	else
+		e = AUE_STAT;
 
-	switch (fmcode) {
-
-	case 0: /* openat */
-	case 1: /* openat64 */
-		fm = (uint_t)uap->arg3;
-		/* If no write, create, or trunc modes, mark as a public op */
-		if (!(fm & (O_WRONLY|O_RDWR|O_CREAT|O_TRUNC)))
-			tad->tad_ctrl |= PAD_PUBLIC_EV;
-
-		break;
-	case 2: /* fstatat64 */
-	case 3: /* fstatat */
-		tad->tad_ctrl |= PAD_PUBLIC_EV;
-		break;
-	default:
-		break;
-	}
+	return (e);
 }
 
 /* msgsys */
@@ -1314,13 +1358,6 @@ aui_fcntl(au_event_t e)
 
 /* null function for now */
 static au_event_t
-aui_execv(au_event_t e)
-{
-	return (e);
-}
-
-/* null function for now */
-static au_event_t
 aui_execve(au_event_t e)
 {
 	return (e);
@@ -1474,32 +1511,6 @@ aus_mknod(struct t_audit_data *tad)
 
 /*ARGSUSED*/
 static void
-aus_xmknod(struct t_audit_data *tad)
-{
-	klwp_t *clwp = ttolwp(curthread);
-	uint32_t fmode;
-	dev_t dev;
-
-	struct a {
-		long	version;	/* version */
-		long	pnamep;		/* char * */
-		long	fmode;
-		long	dev;
-	} *uap = (struct a *)clwp->lwp_ap;
-
-	fmode = (uint32_t)uap->fmode;
-	dev   = (dev_t)uap->dev;
-
-	au_uwrite(au_to_arg32(2, "mode", fmode));
-#ifdef _LP64
-	au_uwrite(au_to_arg64(3, "dev", dev));
-#else
-	au_uwrite(au_to_arg32(3, "dev", dev));
-#endif
-}
-
-/*ARGSUSED*/
-static void
 auf_mknod(struct t_audit_data *tad, int error, rval_t *rval)
 {
 	klwp_t *clwp = ttolwp(curthread);
@@ -1511,38 +1522,6 @@ auf_mknod(struct t_audit_data *tad, int error, rval_t *rval)
 		long	fmode;
 		long	dev;
 	} *uap = (struct a *)clwp->lwp_ap;
-
-	/* no error, then already path token in audit record */
-	if (error != EPERM)
-		return;
-
-	/* not auditing this event, nothing then to do */
-	if (tad->tad_flag == 0)
-		return;
-
-	/* do the lookup to force generation of path token */
-	pnamep = (caddr_t)uap->pnamep;
-	tad->tad_ctrl |= PAD_NOATTRB;
-	error = lookupname(pnamep, UIO_USERSPACE, NO_FOLLOW, &dvp, NULLVPP);
-	if (error == 0)
-		VN_RELE(dvp);
-}
-
-/*ARGSUSED*/
-static void
-auf_xmknod(struct t_audit_data *tad, int error, rval_t *rval)
-{
-	klwp_t *clwp = ttolwp(curthread);
-	vnode_t	*dvp;
-	caddr_t pnamep;
-
-	struct a {
-		long	version;	/* version */
-		long	pnamep;		/* char * */
-		long	fmode;
-		long	dev;
-	} *uap = (struct a *)clwp->lwp_arg;
-
 
 	/* no error, then already path token in audit record */
 	if (error != EPERM)
@@ -1652,23 +1631,6 @@ aus_umount_path(caddr_t umount_dir)
 umount2_free_dir:
 	kmem_free(dir_path, MAXPATHLEN);
 	kmem_free(path, path_len);
-}
-
-/*
- * the umount syscall is implemented as a call to umount2, but the args
- * are different...
- */
-
-/*ARGSUSED*/
-static void
-aus_umount(struct t_audit_data *tad)
-{
-	klwp_t			*clwp = ttolwp(curthread);
-	struct a {
-		long	dir;		/* char    * */
-	} *uap = (struct a *)clwp->lwp_ap;
-
-	aus_umount_path((caddr_t)uap->dir);
 }
 
 /*ARGSUSED*/

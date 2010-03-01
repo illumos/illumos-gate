@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,8 +31,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -192,14 +191,4 @@ umount2(char *pathp, int flag)
 	pn_free(&pn);
 
 	return (umount2_engine(vfsp, flag, CRED(), 1));
-}
-
-/*
- * Old umount() system call for compatibility.
- * Changes due to support for forced unmount.
- */
-int
-umount(char *pathp)
-{
-	return (umount2(pathp, 0));
 }

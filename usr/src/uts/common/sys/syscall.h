@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,16 +49,12 @@ extern "C" {
 
 #define	SYS_syscall	0
 #define	SYS_exit	1
-#define	SYS_forkall	2
 #define	SYS_read	3
 #define	SYS_write	4
 #define	SYS_open	5
 #define	SYS_close	6
-#define	SYS_wait	7
-#define	SYS_creat	8
 #define	SYS_link	9
 #define	SYS_unlink	10
-#define	SYS_exec	11
 #define	SYS_chdir	12
 #define	SYS_time	13
 #define	SYS_mknod	14
@@ -69,7 +65,6 @@ extern "C" {
 #define	SYS_lseek	19
 #define	SYS_getpid	20
 #define	SYS_mount	21
-#define	SYS_umount	22
 #define	SYS_setuid	23
 #define	SYS_getuid	24
 #define	SYS_stime	25
@@ -77,7 +72,6 @@ extern "C" {
 #define	SYS_alarm	27
 #define	SYS_fstat	28
 #define	SYS_pause	29
-#define	SYS_utime	30
 #define	SYS_stty	31
 #define	SYS_gtty	32
 #define	SYS_access	33
@@ -97,11 +91,10 @@ extern "C" {
 	 *	setpgid(pid,pgid) :: syscall(39,5,pid,pgid)
 	 */
 #define	SYS_uucopystr	40
-#define	SYS_dup		41
 #define	SYS_pipe	42
 #define	SYS_times	43
 #define	SYS_profil	44
-#define	SYS_plock	45
+#define	SYS_faccessat	45
 #define	SYS_setgid	46
 #define	SYS_getgid	47
 #define	SYS_msgsys	49
@@ -143,6 +136,7 @@ extern "C" {
 	 */
 #define	SYS_ioctl	54
 #define	SYS_uadmin	55
+#define	SYS_fchownat	56
 #define	SYS_utssys	57
 	/*
 	 * subcodes (third argument):
@@ -158,12 +152,12 @@ extern "C" {
 #define	SYS_chroot	61
 #define	SYS_fcntl	62
 #define	SYS_ulimit	63
-#define	SYS_reserved_64	64	/* 64 reserved */
-#define	SYS_reserved_65	65	/* 65 reserved */
-#define	SYS_reserved_66	66	/* 66 reserved */
-#define	SYS_reserved_67	67	/* 67 reserved */
-#define	SYS_reserved_68	68	/* 68 reserved */
-#define	SYS_reserved_69	69	/* 69 reserved */
+#define	SYS_renameat	64
+#define	SYS_unlinkat	65
+#define	SYS_fstatat	66
+#define	SYS_fstatat64	67
+#define	SYS_openat	68
+#define	SYS_openat64	69
 #define	SYS_tasksys	70
 	/*
 	 * subcodes:
@@ -199,20 +193,6 @@ extern "C" {
 	 * 	allocids(...)		:: sidsys(0, ...)
 	 * 	idmap_reg(...)		:: sidsys(1, ...)
 	 * 	idmap_unreg(...)	:: sidsys(2, ...)
-	 */
-#define	SYS_fsat	76
-	/*
-	 * subcodes:
-	 *	openat(...)		:: fsat(0, ...)
-	 *	openat64(...)		:: fsat(1, ...)
-	 *	fstatat64(...)		:: fsat(2, ...)
-	 *	fstatat(...)		:: fsat(3, ...)
-	 *	fchownat(...)		:: fsat(4, ...)
-	 *	unlinkat(...)		:: fsat(5, ...)
-	 *	futimesat(...)		:: fsat(6, ...)
-	 *	renameat(...)		:: fsat(7, ...)
-	 *	faccessat(...)		:: fsat(8, ...)
-	 *	openattrdirat(...)	:: fsat(9, ...)
 	 */
 #define	SYS_lwp_park	77
 	/*
@@ -256,8 +236,6 @@ extern "C" {
 	 */
 #define	SYS_getmsg	85
 #define	SYS_putmsg	86
-#define	SYS_poll	87
-
 #define	SYS_lstat	88
 #define	SYS_symlink	89
 #define	SYS_readlink	90
@@ -282,8 +260,6 @@ extern "C" {
 	 *	getcontext(...) :: syscall(100, 0, ...)
 	 *	setcontext(...) :: syscall(100, 1, ...)
 	 */
-#define	SYS_evsys	101
-#define	SYS_evtrapret	102
 #define	SYS_statvfs	103
 #define	SYS_fstatvfs	104
 #define	SYS_getloadavg	105
@@ -310,10 +286,6 @@ extern "C" {
 #define	SYS_fchdir	120
 #define	SYS_readv	121
 #define	SYS_writev	122
-#define	SYS_xstat	123
-#define	SYS_lxstat	124
-#define	SYS_fxstat	125
-#define	SYS_xmknod	126
 #define	SYS_mmapobj	127
 #define	SYS_setrlimit	128
 #define	SYS_getrlimit	129
@@ -336,18 +308,15 @@ extern "C" {
 	 *	forkallx(flags) :: forksys(1, flags)
 	 *	vforkx(flags)   :: forksys(2, flags)
 	 */
-#define	SYS_fork1	143
 #define	SYS_sigtimedwait	144
 #define	SYS_lwp_info	145
 #define	SYS_yield	146
-#define	SYS_lwp_sema_wait	147
 #define	SYS_lwp_sema_post	148
 #define	SYS_lwp_sema_trywait	149
 #define	SYS_lwp_detach	150
 #define	SYS_corectl	151
 #define	SYS_modctl	152
 #define	SYS_fchroot	153
-#define	SYS_utimes	154
 #define	SYS_vhangup	155
 #define	SYS_gettimeofday	156
 #define	SYS_getitimer		157
@@ -362,7 +331,6 @@ extern "C" {
 #define	SYS_lwp_private		166
 #define	SYS_lwp_wait		167
 #define	SYS_lwp_mutex_wakeup	168
-#define	SYS_lwp_mutex_lock	169
 #define	SYS_lwp_cond_wait	170
 #define	SYS_lwp_cond_signal	171
 #define	SYS_lwp_cond_broadcast	172
@@ -467,7 +435,6 @@ extern "C" {
 #define	SYS_getrlimit64		221
 #define	SYS_pread64		222
 #define	SYS_pwrite64		223
-#define	SYS_creat64		224
 #define	SYS_open64		225
 #define	SYS_rpcsys		226
 #define	SYS_zone		227
@@ -519,7 +486,6 @@ extern "C" {
 #define	SYS_cladm		253
 #define	SYS_uucopy		254
 #define	SYS_umount2		255
-
 
 #ifndef	_ASM
 

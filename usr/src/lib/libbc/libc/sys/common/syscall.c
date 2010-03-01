@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 #include <stdio.h>
@@ -37,22 +35,22 @@
  * to their SVR4/5.0 equivalents before trapping into the kernel.
  */
 
-int syscallnum[190] = {	SYS_syscall,	SYS_exit,	SYS_fork1,
-	SYS_read,	SYS_write,	SYS_open,	SYS_close,
-        -1,		SYS_creat,	SYS_link,	SYS_unlink,
+int syscallnum[190] = {	SYS_syscall,	SYS_exit,	-1 /*fork1*/,
+	SYS_read,	SYS_write,	-1 /*open*/,	SYS_close,
+        -1,		-1 /*creat*/,	SYS_link,	-1 /*unlink*/,
 	-1,		SYS_chdir,	0,		SYS_mknod,
-        SYS_chmod,	SYS_lchown,	0,		0,
+        SYS_chmod,	-1 /*lchown*/,	0,		0,
         SYS_lseek,	SYS_getpid,	0,		0,
 	0,		SYS_getuid,	0,		0,
 	0,		0,		0,		0,
-	0,		0,		SYS_access, 	0,
-	0,		SYS_sync,	SYS_kill,	SYS_stat,
-	0,		SYS_lstat,	SYS_dup,	SYS_pipe,
+	0,		0,		-1 /*access*/, 	0,
+	0,		SYS_sync,	SYS_kill,	-1 /*stat*/,
+	0,		-1 /*lstat*/,	-1 /*dup*/,	SYS_pipe,
 	0,		SYS_profil,	0,		0,
 	SYS_getgid,	0,		0,		0,
 	SYS_acct,	0,		-1,		SYS_ioctl,
 	-1 /*reboot*/,	0,		SYS_symlink,	SYS_readlink,
-	SYS_execve,	SYS_umask,	SYS_chroot,	SYS_fstat,
+	SYS_execve,	SYS_umask,	SYS_chroot,	-1 /*fstat*/,
 	0,		-1/*getpagesize*/,-1,		0,
 	0,		0,		-1,		-1,
 	SYS_mmap,	-1,		SYS_munmap,	SYS_mprotect,
@@ -68,16 +66,16 @@ int syscallnum[190] = {	SYS_syscall,	SYS_exit,	SYS_fork1,
 	-1 /*sigpause*/, -1 /*sigstack*/, -1 /*recvmsg*/, -1 /*sendmsg*/,
 	-1 /*vtrace*/,	SYS_gettimeofday, -1 /*getrusage*/, -1 /*getsockopt*/,
 	0,		SYS_readv,	SYS_writev,	-1 /*settimeofday*/,
-	SYS_fchown,	SYS_fchmod,	-1 /*recvfrom*/, -1 /*setreuid*/,
-	-1 /*getregid*/, SYS_rename,	-1 /*truncate*/, -1 /*ftruncate*/,
+	-1 /*fchown*/,	SYS_fchmod,	-1 /*recvfrom*/, -1 /*setreuid*/,
+	-1 /*getregid*/, -1 /*rename*/,	-1 /*truncate*/, -1 /*ftruncate*/,
 	-1 /*flock*/,	0,		-1 /*sendto*/,	-1 /*shutdown*/,
-	-1 /*socketpair*/,SYS_mkdir,	SYS_rmdir,	SYS_utimes,
+	-1 /*socketpair*/,SYS_mkdir,	-1 /*rmdir*/,	-1 /*utimes*/,
 	0,		SYS_adjtime,	-1 /*getpeername*/,-1 /*gethostid*/,
 	0,		SYS_getrlimit,	SYS_setrlimit,	-1 /*killpg*/,
 	0,		0,		0,		-1/*getsockname*/,
-	SYS_getmsg,	SYS_putmsg,	SYS_poll,	0,
+	SYS_getmsg,	SYS_putmsg,	-1 /*poll*/,	0,
 	-1/*nfssvc*/,	-1 /*getdirentries*/, SYS_statfs, SYS_fstatfs,
-	SYS_umount,	-1 /*async_daemmon*/ -1 /*getfh*/, -1/*getdomain*/,
+	-1/*SYS_umount*/, -1 /*async_daemmon*/ -1 /*getfh*/, -1/*getdomain*/,
 	-1/*setdomain*/, 0,		-1 /*quotactl*/, -1 /*exportfs*/,
 	SYS_mount,	-1/*ustat*/,	SYS_semsys,	SYS_msgsys,
 	SYS_shmsys,	-1 /*auditsys*/, -1 /*rfsys*/,	SYS_getdents,
@@ -258,7 +256,7 @@ syscall(int sysnum, ...)
 			i1 = va_arg(ap, int);
 			i2 = va_arg(ap, int);
 			va_end(ap);
-			return (dup(i1, i2));
+			return (dup2(i1, i2));
 		case XSYS_pipe:
 			c1 = (char *)va_arg(ap, int *);
 			va_end(ap);
@@ -465,6 +463,26 @@ syscall(int sysnum, ...)
 			i2 = va_arg(ap, int);
 			va_end(ap);
 			return (flock(i1, i2));
+		case XSYS_utimes:
+			c1 = va_arg(ap, char *);
+			c2 = va_arg(ap, char *);
+			va_end(ap);
+			return (utimes(c1, c2));
+		case XSYS_poll:
+			c1 = va_arg(ap, char *);
+			i2 = va_arg(ap, int);
+			i3 = va_arg(ap, int);
+			va_end(ap);
+			return (poll(c1, i2, i3));
+		case XSYS_fchown:
+			i1 = va_arg(ap, int);
+			i2 = va_arg(ap, int);
+			i3 = va_arg(ap, int);
+			va_end(ap);
+			return (fchown(i1, i2, i3));
+		case XSYS_fork:
+			va_end(ap);
+			return (fork1());
 
 		/* the following system calls are now implemented in
 		 * libsocket */
@@ -599,9 +617,7 @@ syscall(int sysnum, ...)
 		case XSYS_exit:
 		case XSYS_fchdir:
 		case XSYS_fchmod:
-		case XSYS_fchown:
 		case XSYS_fchroot:
-		case XSYS_fork:
 		case XSYS_getgid:
 		case XSYS_getitimer:
 		case XSYS_getmsg:
@@ -611,12 +627,10 @@ syscall(int sysnum, ...)
 		case XSYS_mprotect:
 		case XSYS_munmap:
 		case XSYS_putmsg:
-		case XSYS_poll:
 		case XSYS_profil:
 		case XSYS_setitimer:
 		case XSYS_sync:
 		case XSYS_umask:
-		case XSYS_utimes:
 		case XSYS_semsys:
 		case XSYS_msgsys:
 		case XSYS_shmsys:

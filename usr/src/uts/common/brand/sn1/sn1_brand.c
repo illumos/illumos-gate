@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -772,7 +772,6 @@ _init(void)
 	sn1_emulation_table = kmem_zalloc(NSYSCALL, KM_SLEEP);
 	sn1_emulation_table[SYS_read] = 1;			/*   3 */
 	sn1_emulation_table[SYS_write] = 1;			/*   4 */
-	sn1_emulation_table[SYS_wait] = 1;			/*   7 */
 	sn1_emulation_table[SYS_time] = 1;			/*  13 */
 	sn1_emulation_table[SYS_getpid] = 1;			/*  20 */
 	sn1_emulation_table[SYS_mount] = 1;			/*  21 */
@@ -781,6 +780,7 @@ _init(void)
 	sn1_emulation_table[SYS_getgid] = 1;			/*  47 */
 	sn1_emulation_table[SYS_utssys] = 1;			/*  57 */
 	sn1_emulation_table[SYS_readlink] = 1;			/*  90 */
+	sn1_emulation_table[SYS_waitid] = 1;			/* 107 */
 	sn1_emulation_table[SYS_uname] = 1;			/* 135 */
 
 	err = mod_install(&modlinkage);

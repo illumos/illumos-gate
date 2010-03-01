@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -479,7 +480,6 @@ sn1_##name(sysret_t *rv,						\
  */
 IN_KERNEL_SYSCALL(read,		SYS_read)		/*   3 */
 IN_KERNEL_SYSCALL(write,	SYS_write)		/*   4 */
-IN_KERNEL_SYSCALL(wait,		SYS_wait)		/*   7 */
 IN_KERNEL_SYSCALL(time,		SYS_time)		/*  13 */
 IN_KERNEL_SYSCALL(getpid,	SYS_getpid)		/*  20 */
 IN_KERNEL_SYSCALL(mount,	SYS_mount)		/*  21 */
@@ -488,6 +488,7 @@ IN_KERNEL_SYSCALL(times,	SYS_times)		/*  43 */
 IN_KERNEL_SYSCALL(getgid,	SYS_getgid)		/*  47 */
 IN_KERNEL_SYSCALL(utssys,	SYS_utssys)		/*  57 */
 IN_KERNEL_SYSCALL(readlink,	SYS_readlink)		/*  90 */
+IN_KERNEL_SYSCALL(waitid,	SYS_waitid)		/* 107 */
 
 /*
  * This table must have at least NSYSCALL entries in it.
@@ -510,7 +511,7 @@ sn1_sysent_table_t sn1_sysent_table[] = {
 	EMULATE(sn1_write, 3 | RV_DEFAULT),	/*   4 */
 	NOSYS,					/*   5 */
 	NOSYS,					/*   6 */
-	EMULATE(sn1_wait, 0 | RV_32RVAL2),	/*   7 */
+	NOSYS,					/*   7 */
 	NOSYS,					/*   8 */
 	NOSYS,					/*   9 */
 	NOSYS,					/*  10 */
@@ -610,7 +611,7 @@ sn1_sysent_table_t sn1_sysent_table[] = {
 	NOSYS,					/* 104 */
 	NOSYS,					/* 105 */
 	NOSYS,					/* 106 */
-	NOSYS,					/* 107 */
+	EMULATE(sn1_waitid, 4 | RV_DEFAULT),	/* 107 */
 	NOSYS,					/* 108 */
 	NOSYS,					/* 109 */
 	NOSYS,					/* 110 */

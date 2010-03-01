@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,7 +59,6 @@
 #include <sys/termio.h>
 #include <sys/stermio.h>
 #include <sys/ttold.h>
-#include <sys/lock.h>
 #include <sys/mount.h>
 #include <sys/utssys.h>
 #include <sys/sysconfig.h>
@@ -162,16 +161,6 @@ const char *const SYSFSname[] = {
 	"GETFSIND",
 	"GETFSTYP",
 	"GETNFSTYP"
-};
-
-#define	PLOCKMIN	UNLOCK
-#define	PLOCKMAX	DATLOCK
-const char *const PLOCKname[] = {
-	"UNLOCK",
-	"PROCLOCK",
-	"TXTLOCK",
-	NULL,
-	"DATLOCK"
 };
 
 #define	SCONFMIN	_CONFIG_NGROUPS
@@ -1727,16 +1716,6 @@ sfsname(int code)
 	return (str);
 }
 
-const char *
-plockname(int code)
-{
-	const char *str = NULL;
-
-	if (code >= PLOCKMIN && code <= PLOCKMAX)
-		str = PLOCKname[code-PLOCKMIN];
-	return (str);
-}
-
 /* ARGSUSED */
 const char *
 si86name(int code)
@@ -1909,7 +1888,8 @@ pathconfname(int code)
 
 #define	ALL_O_FLAGS \
 	(O_NDELAY|O_APPEND|O_SYNC|O_DSYNC|O_NONBLOCK|O_CREAT|O_TRUNC\
-	|O_EXCL|O_NOCTTY|O_LARGEFILE|O_RSYNC|O_XATTR|O_NOFOLLOW|O_NOLINKS)
+	|O_EXCL|O_NOCTTY|O_LARGEFILE|O_RSYNC|O_XATTR|O_NOFOLLOW|O_NOLINKS\
+	|FXATTRDIROPEN)
 
 const char *
 openarg(private_t *pri, int arg)
@@ -1958,6 +1938,8 @@ openarg(private_t *pri, int arg)
 		(void) strlcat(str, "|O_NOFOLLOW", sizeof (pri->code_buf));
 	if (arg & O_NOLINKS)
 		(void) strlcat(str, "|O_NOLINKS", sizeof (pri->code_buf));
+	if (arg & FXATTRDIROPEN)
+		(void) strlcat(str, "|FXATTRDIROPEN", sizeof (pri->code_buf));
 
 	return ((const char *)str);
 }

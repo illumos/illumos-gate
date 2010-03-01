@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,7 +76,6 @@ extern	int	__sigaction(int, const struct sigaction *, struct sigaction *);
 #define	getdents64	getdents
 #define	dirent64_t	dirent_t
 #else
-extern int __open64(const char *, int, ...);
 extern int getdents64(int, dirent64_t *, size_t);
 #endif
 
@@ -198,8 +197,7 @@ perform_file_actions(file_attr_t *fap, void *dirbuf)
 	do {
 		switch (fap->fa_type) {
 		case FA_OPEN:
-			fd = __open(fap->fa_path,
-			    fap->fa_oflag, fap->fa_mode);
+			fd = __open(fap->fa_path, fap->fa_oflag, fap->fa_mode);
 			if (fd < 0)
 				return (errno);
 			if (fd != fap->fa_filedes) {

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Redirection ld.so.  Based on the 4.x binary compatibility ld.so, used
@@ -56,10 +54,10 @@
 #define	LDSO	strings[LDSO_S]
 #define	ZERO	strings[ZERO_S]
 #define	CLOSE	(*(funcs[CLOSE_F]))
-#define	FSTAT	(*(funcs[FSTAT_F]))
+#define	FSTATAT	(*(funcs[FSTATAT_F]))
 #define	MMAP	(*(funcs[MMAP_F]))
 #define	MUNMAP	(*(funcs[MUNMAP_F]))
-#define	OPEN	(*(funcs[OPEN_F]))
+#define	OPENAT	(*(funcs[OPENAT_F]))
 #define	PANIC	(*(funcs[PANIC_F]))
 #define	SYSCONFIG (*(funcs[SYSCONFIG_F]))
 
@@ -133,9 +131,9 @@ __rtld(Elf32_Boot *ebp, const char *strings[], int (*funcs[])())
 	 * data structures.  Further mappings will actually establish the
 	 * program in the address space.
 	 */
-	if ((ldfd = OPEN(LDSO, O_RDONLY)) == -1)
+	if ((ldfd = OPENAT(AT_FDCWD, LDSO, O_RDONLY)) == -1)
 		PANIC(program_name);
-	if (FSTAT(ldfd, &sb) == -1)
+	if (FSTATAT(ldfd, NULL, &sb, 0) == -1)
 		PANIC(program_name);
 	ehdr = (Elf32_Ehdr *)MMAP(0, sb.st_size, PROT_READ | PROT_EXEC,
 	    MAP_SHARED, ldfd, 0);
@@ -291,7 +289,7 @@ __rtld(Elf32_Boot *ebp, const char *strings[], int (*funcs[])())
 			j = (faddr + pptr->p_vaddr + pptr->p_memsz) - zaddr;
 			if (j > 0) {
 				if (dzfd == 0) {
-					dzfd = OPEN(ZERO, O_RDWR);
+					dzfd = OPENAT(AT_FDCWD, ZERO, O_RDWR);
 					if (dzfd == -1)
 						PANIC(program_name);
 				}

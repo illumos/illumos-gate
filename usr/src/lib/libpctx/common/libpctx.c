@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -316,16 +316,12 @@ pctx_set_events(pctx_t *pctx, ...)
 		pctx->lwp_exit = (pctx_sysc_lwp_exitfn_t *)default_int;
 
 	if (pctx->fork != (pctx_sysc_forkfn_t *)default_void) {
-		(void) Psysexit(pctx->Pr, SYS_forkall, 1);
 		(void) Psysexit(pctx->Pr, SYS_vfork, 1);
-		(void) Psysexit(pctx->Pr, SYS_fork1, 1);
 		(void) Psysexit(pctx->Pr, SYS_forksys, 1);
 		if (Psetflags(pctx->Pr, PR_FORK) == -1)
 			error = -1;
 	} else {
-		(void) Psysexit(pctx->Pr, SYS_forkall, 0);
 		(void) Psysexit(pctx->Pr, SYS_vfork, 0);
-		(void) Psysexit(pctx->Pr, SYS_fork1, 0);
 		(void) Psysexit(pctx->Pr, SYS_forksys, 0);
 		if (Punsetflags(pctx->Pr, PR_FORK) == -1)
 			error = -1;
@@ -338,14 +334,10 @@ pctx_set_events(pctx_t *pctx, ...)
 	if (pctx->exec != (pctx_sysc_execfn_t *)default_int ||
 	    pctx->fini_lwp != (pctx_fini_lwpfn_t *)default_int ||
 	    pctx->init_lwp != (pctx_init_lwpfn_t *)default_int) {
-		(void) Psysexit(pctx->Pr, SYS_exec, 1);
 		(void) Psysexit(pctx->Pr, SYS_execve, 1);
-		(void) Psysentry(pctx->Pr, SYS_exec, 1);
 		(void) Psysentry(pctx->Pr, SYS_execve, 1);
 	} else {
-		(void) Psysexit(pctx->Pr, SYS_exec, 0);
 		(void) Psysexit(pctx->Pr, SYS_execve, 0);
-		(void) Psysentry(pctx->Pr, SYS_exec, 0);
 		(void) Psysentry(pctx->Pr, SYS_execve, 0);
 	}
 
@@ -704,7 +696,6 @@ checkstate:
 				if (running == 1)
 					running = 0;
 				break;
-			case SYS_exec:
 			case SYS_execve:
 				(void) pctx_lwpiterate(pctx, pctx->fini_lwp);
 				break;
@@ -717,7 +708,6 @@ checkstate:
 			break;
 		case PR_SYSEXIT:
 			switch (pstatus->pr_lwp.pr_what) {
-			case SYS_exec:
 			case SYS_execve:
 				if (pstatus->pr_lwp.pr_errno) {
 					/*
@@ -762,9 +752,7 @@ checkstate:
 					running = -1;
 				pctx_end_syscalls(pctx);
 				break;
-			case SYS_forkall:
 			case SYS_vfork:
-			case SYS_fork1:
 			case SYS_forksys:
 				if (pstatus->pr_lwp.pr_errno)
 					break;

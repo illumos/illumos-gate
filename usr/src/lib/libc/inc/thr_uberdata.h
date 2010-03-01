@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1354,7 +1354,10 @@ extern	void	_thrp_unwind(void *);
 
 extern	pid_t	__forkx(int);
 extern	pid_t	__forkallx(int);
-extern	int	__open(const char *, int, ...);
+extern	int	__open(const char *, int, mode_t);
+extern	int	__open64(const char *, int, mode_t);
+extern	int	__openat(int, const char *, int, mode_t);
+extern	int	__openat64(int, const char *, int, mode_t);
 extern	int	__close(int);
 extern	ssize_t	__read(int, void *, size_t);
 extern	ssize_t	__write(int, const void *, size_t);

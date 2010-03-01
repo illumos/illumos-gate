@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1358,20 +1358,6 @@ out:
 	return (0);
 }
 
-/*
- * Obsolete lwp_mutex_lock() interface, no longer called from libc.
- * libc now calls lwp_mutex_timedlock(lp, NULL, NULL).
- * This system call trap continues to exist solely for the benefit
- * of old statically-linked binaries from Solaris 9 and before.
- * It should be removed from the system when we no longer care
- * about such applications.
- */
-int
-lwp_mutex_lock(lwp_mutex_t *lp)
-{
-	return (lwp_mutex_timedlock(lp, NULL, NULL));
-}
-
 static int
 iswanted(kthread_t *t, lwpchan_t *lwpchan)
 {
@@ -2163,19 +2149,6 @@ out:
 	if (error)
 		return (set_errno(error));
 	return (0);
-}
-
-/*
- * Obsolete lwp_sema_wait() interface, no longer called from libc.
- * libc now calls lwp_sema_timedwait().
- * This system call trap exists solely for the benefit of old
- * statically linked applications from Solaris 9 and before.
- * It should be removed when we no longer care about such applications.
- */
-int
-lwp_sema_wait(lwp_sema_t *sp)
-{
-	return (lwp_sema_timedwait(sp, NULL, 0));
 }
 
 int

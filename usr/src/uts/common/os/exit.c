@@ -1133,25 +1133,6 @@ waitid(idtype_t idtype, id_t id, k_siginfo_t *ip, int options)
 	return (ECHILD);
 }
 
-/*
- * The wait() system call trap is no longer invoked by libc.
- * It is retained only for the benefit of statically linked applications.
- * Delete this when we no longer care about these old and broken applications.
- */
-int64_t
-wait(void)
-{
-	int error;
-	k_siginfo_t info;
-	rval_t	r;
-
-	if (error =  waitid(P_ALL, (id_t)0, &info, WEXITED|WTRAPPED))
-		return (set_errno(error));
-	r.r_val1 = info.si_pid;
-	r.r_val2 = wstat(info.si_code, info.si_status);
-	return (r.r_vals);
-}
-
 int
 waitsys(idtype_t idtype, id_t id, siginfo_t *infop, int options)
 {

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -300,11 +300,11 @@ audit_savepath(
 	 */
 
 	if (tad->tad_flag) {
-		if (flag && (tad->tad_scid == SYS_open ||
+		if (flag &&
+		    (tad->tad_scid == SYS_open ||
 		    tad->tad_scid == SYS_open64 ||
-		    tad->tad_scid == SYS_creat ||
-		    tad->tad_scid == SYS_creat64 ||
-		    tad->tad_scid == SYS_fsat)) {
+		    tad->tad_scid == SYS_openat ||
+		    tad->tad_scid == SYS_openat64)) {
 			tad->tad_ctrl |= PAD_TRUE_CREATE;
 		}
 
@@ -328,7 +328,7 @@ audit_savepath(
 		}
 	}
 
-	/* free up space if we're not going to save path (open, crate) */
+	/* free up space if we're not going to save path (open, creat) */
 	if ((tad->tad_ctrl & PAD_SAVPATH) == 0) {
 		if (tad->tad_aupath != NULL) {
 			au_pathrele(tad->tad_aupath);
@@ -366,7 +366,7 @@ audit_pathbuild(struct pathname *pnp)
 	mutex_enter(&pad->pad_lock);
 	if (tad->tad_aupath != NULL) {
 		pfxapp = tad->tad_aupath;
-	} else if (tad->tad_scid == SYS_fsat && pnp->pn_buf[0] != '/') {
+	} else if ((tad->tad_ctrl & PAD_ATCALL) && pnp->pn_buf[0] != '/') {
 		ASSERT(tad->tad_atpath != NULL);
 		pfxapp = tad->tad_atpath;
 	} else if (tad->tad_ctrl & PAD_ABSPATH) {
@@ -378,7 +378,7 @@ audit_pathbuild(struct pathname *pnp)
 	mutex_exit(&pad->pad_lock);
 
 	/* get an expanded buffer to hold the anchored path */
-	newsect = tad->tad_ctrl & PAD_ATPATH;
+	newsect = tad->tad_ctrl & PAD_ATTPATH;
 	newapp = au_pathdup(pfxapp, newsect, len);
 	au_pathrele(pfxapp);
 
@@ -400,7 +400,7 @@ audit_pathbuild(struct pathname *pnp)
 	tad->tad_aupath = newapp;
 
 	/* for case where multiple lookups in one syscall (rename) */
-	tad->tad_ctrl &= ~(PAD_ABSPATH | PAD_ATPATH);
+	tad->tad_ctrl &= ~(PAD_ABSPATH | PAD_ATTPATH);
 }
 
 
@@ -1120,9 +1120,10 @@ audit_setf(file_t *fp, int fd)
 	tad = T2A(curthread);
 	fad = F2A(fp);
 
-	if (!(tad->tad_scid == SYS_open || tad->tad_scid == SYS_creat ||
-	    tad->tad_scid == SYS_open64 || tad->tad_scid == SYS_creat64 ||
-	    tad->tad_scid == SYS_fsat))
+	if (!(tad->tad_scid == SYS_open ||
+	    tad->tad_scid == SYS_open64 ||
+	    tad->tad_scid == SYS_openat ||
+	    tad->tad_scid == SYS_openat64))
 		return;
 
 	/* no path */
@@ -1138,7 +1139,7 @@ audit_setf(file_t *fp, int fd)
 	tad->tad_vn = NULL;
 
 	if (!(tad->tad_ctrl & PAD_TRUE_CREATE)) {
-	/* adjust event type */
+		/* adjust event type by dropping the 'creat' part */
 		switch (tad->tad_event) {
 		case AUE_OPEN_RC:
 			tad->tad_event = AUE_OPEN_R;
@@ -1293,57 +1294,43 @@ audit_setfsat_path(int argnum)
 	struct f_audit_data *fad;
 	p_audit_data_t *pad;	/* current process */
 	struct a {
-		long id;
 		long arg1;
 		long arg2;
 		long arg3;
 		long arg4;
 		long arg5;
 	} *uap;
-	struct b {
-		long arg1;
-		long arg2;
-		long arg3;
-		long arg4;
-		long arg5;
-	} *uap1;
 
 	if (clwp == NULL)
 		return;
-	uap1 = (struct b *)&clwp->lwp_ap[1];
 	uap = (struct a *)clwp->lwp_ap;
 
 	tad = U2A(u);
-
 	ASSERT(tad != NULL);
 
-	if (tad->tad_scid != SYS_fsat)
-		return;
-
-	switch (argnum) {
-	case 1:
-		fd = (uint32_t)uap1->arg1;
+	switch (tad->tad_scid) {
+	case SYS_faccessat:
+	case SYS_fchownat:
+	case SYS_fstatat:
+	case SYS_fstatat64:
+	case SYS_openat:
+	case SYS_openat64:
+	case SYS_unlinkat:
+		fd = uap->arg1;
 		break;
-	case 2:
-		fd = (uint32_t)uap1->arg2;
+	case SYS_renameat:
+		if (argnum == 3)
+			fd = uap->arg3;
+		else
+			fd = uap->arg1;
 		break;
-	case 3:
-		fd = (uint32_t)uap1->arg3;
-		break;
-	case 4:
-		fd = (uint32_t)uap1->arg4;
-		break;
-	case 5:
-		fd = (uint32_t)uap1->arg5;
+	case SYS_utimesys:
+		fd = uap->arg2;
 		break;
 	default:
 		return;
 	}
 
-	if (uap->id == 9 && tad->tad_atpath != NULL) { /* openattrdir */
-		tad->tad_ctrl |= PAD_ATPATH;
-		return;
-	}
 	if (tad->tad_atpath != NULL) {
 		au_pathrele(tad->tad_atpath);
 		tad->tad_atpath = NULL;
@@ -1353,7 +1340,6 @@ audit_setfsat_path(int argnum)
 			tad->tad_ctrl |= PAD_NOPATH;
 			return;
 		}
-
 		fad = F2A(fp);
 		ASSERT(fad);
 		if (fad->fad_aupath == NULL) {
@@ -1678,8 +1664,11 @@ audit_getf(int fd)
 
 	tad = T2A(curthread);
 
-	if (!(tad->tad_scid == SYS_open || tad->tad_scid == SYS_creat))
-		return;
+	if (!(tad->tad_scid == SYS_openat ||
+	    tad->tad_scid == SYS_openat64 ||
+	    tad->tad_scid == SYS_open ||
+	    tad->tad_scid == SYS_open64))
+		return (0);
 #endif
 	return (0);
 }

@@ -20,37 +20,40 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#if !defined(_LP64) && _FILE_OFFSET_BITS == 64
-#pragma weak _fstatat64 = fstatat64
-#else
-#pragma weak _fstatat = fstatat
-#endif
-
 #include "lint.h"
-#include <sys/types.h>
+#include <unistd.h>
 #include <sys/syscall.h>
-#include <sys/stat.h>
+#include <sys/fcntl.h>
 
-#if !defined(_LP64) && _FILE_OFFSET_BITS == 64
-
+#pragma weak _unlinkat = unlinkat
 int
-fstatat64(int fd, const char *name, struct stat64 *sb, int flags)
+unlinkat(int fd, const char *name, int flags)
 {
-	return (syscall(SYS_fsat, 2, fd, name, sb, flags));
+	return (syscall(SYS_unlinkat, fd, name, flags));
 }
 
+#pragma weak _unlink = unlink
+int
+unlink(const char *name)
+{
+#if defined(_RETAIN_OLD_SYSCALLS)
+	return (syscall(SYS_unlink, name));
 #else
-
-int
-fstatat(int fd, const char *name, struct stat *sb, int flags)
-{
-	return (syscall(SYS_fsat, 3, fd, name, sb, flags));
+	return (unlinkat(AT_FDCWD, name, 0));
+#endif
 }
 
+#pragma weak _rmdir = rmdir
+int
+rmdir(const char *name)
+{
+#if defined(_RETAIN_OLD_SYSCALLS)
+	return (syscall(SYS_rmdir, name));
+#else
+	return (unlinkat(AT_FDCWD, name, AT_REMOVEDIR));
 #endif
+}

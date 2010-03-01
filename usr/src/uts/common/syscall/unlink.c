@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,8 +31,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/isa_defs.h>
@@ -45,19 +44,6 @@
 #include <sys/file.h>
 #include <sys/fcntl.h>
 #include <c2/audit.h>
-
-/*
- * Unlink (i.e. delete) a file.
- */
-int
-unlink(char *fname)
-{
-	int	error;
-
-	if (error = vn_remove(fname, UIO_USERSPACE, RMFILE))
-		return (set_errno(error));
-	return (0);
-}
 
 /*
  * Unlink a file from a directory
@@ -105,4 +91,16 @@ unlinkat(int fd, char *name, int flags)
 	if (error != NULL)
 		return (set_errno(error));
 	return (0);
+}
+
+int
+unlink(char *name)
+{
+	return (unlinkat(AT_FDCWD, name, 0));
+}
+
+int
+rmdir(char *name)
+{
+	return (unlinkat(AT_FDCWD, name, AT_REMOVEDIR));
 }

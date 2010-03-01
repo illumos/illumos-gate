@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,8 +31,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -139,11 +137,7 @@ _s_netconfig_path(int family, int type, int protocol,
 		*prototype = protocol;
 
 retry:
-#if defined(i386)
-	if (_xstat(_STAT_VER, net->nc_device, &stats) < 0) {
-#else
 	if (stat(net->nc_device, &stats) < 0) {
-#endif
 		switch (errno) {
 		case EINTR:
 			goto retry;

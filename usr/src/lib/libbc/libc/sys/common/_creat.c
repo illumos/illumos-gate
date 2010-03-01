@@ -20,17 +20,18 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/syscall.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <errno.h>
 #include <sys/param.h>
 #include "compat.h"	/* for UTMPX_MAGIC_FLAG */
+
+#define	CREATFLAGS	(O_WRONLY | O_CREAT | O_TRUNC)
 
 int
 creat_com(char *path, int mode)
@@ -43,15 +44,17 @@ creat_com(char *path, int mode)
 		return (-1);
 	}
 	if (strcmp(path, "/var/adm/wtmp") == 0) {
-		if ((fd = _syscall(SYS_creat, "/var/adm/wtmpx", mode)) >= 0)
+		if ((fd = _syscall(SYS_openat, AT_FDCWD,
+		    "/var/adm/wtmpx", CREATFLAGS, mode)) >= 0)
 			fd_add(fd, UTMPX_MAGIC_FLAG);
 		return (fd);
 	}
 	if (strcmp(path, "/etc/utmp") == 0 ||
 	    strcmp(path, "/var/adm/utmp") == 0) {
-		if ((fd = _syscall(SYS_creat, "/var/adm/utmpx", mode)) >= 0)
+		if ((fd = _syscall(SYS_openat, AT_FDCWD,
+		    "/var/adm/utmpx", CREATFLAGS, mode)) >= 0)
 			fd_add(fd, UTMPX_MAGIC_FLAG);
 		return (fd);
 	}
-	return (_syscall(SYS_creat, path, mode));
+	return (_syscall(SYS_openat, AT_FDCWD, path, CREATFLAGS, mode));
 }

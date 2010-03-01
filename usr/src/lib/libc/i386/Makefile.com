@@ -145,19 +145,14 @@ GENOBJS=			\
 
 # sysobjs that contain large-file interfaces
 COMSYSOBJS64=			\
-	creat64.o		\
-	fstat64.o		\
 	fstatvfs64.o		\
 	getdents64.o		\
 	getrlimit64.o		\
 	lseek64.o		\
-	lstat64.o		\
 	mmap64.o		\
-	open64.o		\
 	pread64.o		\
 	pwrite64.o		\
 	setrlimit64.o		\
-	stat64.o		\
 	statvfs64.o
 
 SYSOBJS64=
@@ -194,7 +189,6 @@ COMSYSOBJS=			\
 	_so_socket.o		\
 	_so_socketpair.o	\
 	_sockconfig.o		\
-	access.o		\
 	acct.o			\
 	acl.o			\
 	adjtime.o		\
@@ -202,23 +196,17 @@ COMSYSOBJS=			\
 	brk.o			\
 	chdir.o			\
 	chmod.o			\
-	chown.o			\
 	chroot.o		\
 	cladm.o			\
 	close.o			\
-	creat.o			\
-	dup.o			\
 	execve.o		\
 	exit.o			\
 	facl.o			\
 	fchdir.o		\
 	fchmod.o		\
-	fchown.o		\
 	fchroot.o		\
-	fcntl.o			\
 	fdsync.o		\
 	fpathconf.o		\
-	fstat.o			\
 	fstatfs.o		\
 	fstatvfs.o		\
 	getcpuid.o		\
@@ -240,11 +228,9 @@ COMSYSOBJS=			\
 	ioctl.o			\
 	kaio.o			\
 	kill.o			\
-	lchown.o		\
 	link.o			\
 	llseek.o		\
 	lseek.o			\
-	lstat.o			\
 	mmapobjsys.o		\
 	memcntl.o		\
 	mincore.o		\
@@ -258,7 +244,6 @@ COMSYSOBJS=			\
 	nice.o			\
 	ntp_adjtime.o		\
 	ntp_gettime.o		\
-	open.o			\
 	p_online.o		\
 	pathconf.o		\
 	pause.o			\
@@ -275,9 +260,7 @@ COMSYSOBJS=			\
 	read.o			\
 	readlink.o		\
 	readv.o			\
-	rename.o		\
 	resolvepath.o		\
-	rmdir.o			\
 	seteguid.o		\
 	setgid.o		\
 	setgroups.o		\
@@ -289,7 +272,6 @@ COMSYSOBJS=			\
 	sigprocmsk.o		\
 	sigsendset.o		\
 	sigsuspend.o		\
-	stat.o			\
 	statfs.o		\
 	statvfs.o		\
 	stty.o			\
@@ -303,7 +285,6 @@ COMSYSOBJS=			\
 	ulimit.o		\
 	umask.o			\
 	umount2.o		\
-	unlink.o		\
 	utssys.o		\
 	uucopy.o		\
 	vhangup.o		\
@@ -321,11 +302,9 @@ SYSOBJS=			\
 	door.o			\
 	forkx.o			\
 	forkallx.o		\
-	fxstat.o		\
 	getcontext.o		\
 	gettimeofday.o		\
 	lwp_private.o		\
-	lxstat.o		\
 	nuname.o		\
 	pipe.o			\
 	ptrace.o		\
@@ -336,7 +315,6 @@ SYSOBJS=			\
 	umount.o		\
 	uname.o			\
 	vforkx.o		\
-	xmknod.o		\
 	xstat.o
 
 # objects under ../port which contain transitional large file interfaces
@@ -418,7 +396,7 @@ PORTGEN=			\
 	dirname.o		\
 	div.o			\
 	drand48.o		\
-	dup2.o			\
+	dup.o			\
 	env_data.o		\
 	err.o			\
 	errno.o			\
@@ -822,29 +800,27 @@ UNWINDASMOBJS=			\
 
 # objects that implement the transitional large file API
 PORTSYS64=			\
-	fstatat64.o		\
 	lockf64.o		\
-	openat64.o
+	stat64.o
 
 PORTSYS=			\
 	_autofssys.o		\
+	access.o		\
 	acctctl.o		\
 	bsd_signal.o		\
+	chown.o			\
 	corectl.o		\
 	exacctsys.o		\
 	execl.o			\
 	execle.o		\
 	execv.o			\
-	fsmisc.o		\
-	fstatat.o		\
+	fcntl.o			\
 	getpagesizes.o		\
 	getpeerucred.o		\
 	inst_sync.o		\
 	issetugid.o		\
 	label.o			\
-	libc_fcntl.o		\
 	libc_link.o		\
-	libc_open.o		\
 	lockf.o			\
 	lwp.o			\
 	lwp_cond.o		\
@@ -853,12 +829,13 @@ PORTSYS=			\
 	meminfosys.o		\
 	msgsys.o		\
 	nfssys.o		\
-	openat.o		\
+	open.o			\
 	pgrpsys.o		\
 	posix_sigwait.o		\
 	ppriv.o			\
 	psetsys.o		\
 	rctlsys.o		\
+	rename.o		\
 	sbrk.o			\
 	semsys.o		\
 	set_errno.o		\
@@ -869,10 +846,12 @@ PORTSYS=			\
 	signal.o		\
 	sigpending.o		\
 	sigstack.o		\
+	stat.o			\
 	tasksys.o		\
 	time.o			\
 	time_util.o		\
 	ucontext.o		\
+	unlink.o		\
 	ustat.o			\
 	utimesys.o		\
 	zone.o
@@ -984,6 +963,11 @@ CFLAGS +=	$(EXTN_CFLAGS)
 CPPFLAGS=	-D_REENTRANT -Di386 $(EXTN_CPPFLAGS) $(THREAD_DEBUG) \
 		-I$(LIBCBASE)/inc -I../inc $(CPPFLAGS.master)
 ASFLAGS=	$(AS_PICFLAGS) -P -D__STDC__ -D_ASM $(CPPFLAGS) $(i386_AS_XARCH)
+
+# As a favor to the dtrace syscall provider, libc still calls the
+# old syscall traps that have been obsoleted by the *at() interfaces.
+# Delete this to compile libc using only the new *at() system call traps
+CPPFLAGS += -D_RETAIN_OLD_SYSCALLS
 
 # Conditionally add support for making |wordexp()| check whether
 # /usr/bin/ksh is ksh93 or not

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,6 +84,7 @@ extern "C" {
 #define	S2E_MLD PAD_MLD		/* only one lookup per system call */
 #define	S2E_NPT PAD_NOPATH	/* force no path in audit record */
 #define	S2E_PUB PAD_PUBLIC_EV	/* syscall is defined as a public op */
+#define	S2E_ATC	PAD_ATCALL	/* syscall is one of the *at() family */
 
 /*
  * At present, we are using the audit classes imbedded with in the kernel. Each
@@ -169,14 +170,15 @@ typedef struct p_audit_data p_audit_data_t;
 extern kmem_cache_t *au_pad_cache;
 
 /*
- * Defines for pad_ctrl
+ * Defines for tad_ctrl
  */
 #define	PAD_SAVPATH 	0x00000001	/* save path for further processing */
 #define	PAD_MLD		0x00000002	/* system call involves MLD */
 #define	PAD_NOPATH  	0x00000004	/* force no paths in audit record */
 #define	PAD_ABSPATH 	0x00000008	/* path from lookup is absolute */
 #define	PAD_NOATTRB 	0x00000010	/* do not automatically add attribute */
-					/* 0x20, 0x40 unused */
+					/* 0x20 unused */
+#define	PAD_ATCALL	0x00000040	/* *at() syscall, like openat() */
 #define	PAD_LFLOAT  	0x00000080	/* Label float */
 #define	PAD_NOAUDIT 	0x00000100	/* discard audit record */
 #define	PAD_PATHFND 	0x00000200	/* found path, don't retry lookup */
@@ -185,7 +187,7 @@ extern kmem_cache_t *au_pad_cache;
 #define	PAD_SMAC    	0x00001000	/* succ mac use. extra audit_finish */
 #define	PAD_FMAC    	0x00002000	/* fail mac use. extra audit_finish */
 #define	PAD_AUDITME 	0x00004000	/* audit me because of NFS operation */
-#define	PAD_ATPATH  	0x00008000	/* attribute file lookup */
+#define	PAD_ATTPATH  	0x00008000	/* attribute file lookup */
 #define	PAD_TRUE_CREATE 0x00010000	/* true create, file not found */
 #define	PAD_CORE	0x00020000	/* save attribute during core dump */
 #define	PAD_ERRJMP	0x00040000	/* abort record generation on error */

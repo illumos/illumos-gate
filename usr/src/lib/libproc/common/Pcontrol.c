@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Portions Copyright 2007 Chad Mynhier
@@ -335,7 +335,6 @@ Pxcreate(const char *file,	/* executable file name */
 	 * it again on entry to exec() or exit().
 	 */
 	(void) Psysentry(P, SYS_exit, 1);
-	(void) Psysentry(P, SYS_exec, 1);
 	(void) Psysentry(P, SYS_execve, 1);
 	if (Psetrun(P, 0, PRSABORT) == -1) {
 		dprintf("Pcreate: Psetrun failed: %s\n", strerror(errno));
@@ -353,13 +352,11 @@ Pxcreate(const char *file,	/* executable file name */
 	 * Move the process through instances of failed exec()s
 	 * to reach the point of stopped on successful exec().
 	 */
-	(void) Psysexit(P, SYS_exec, TRUE);
 	(void) Psysexit(P, SYS_execve, TRUE);
 
 	while (P->state == PS_STOP &&
 	    P->status.pr_lwp.pr_why == PR_SYSENTRY &&
-	    (P->status.pr_lwp.pr_what == SYS_execve ||
-	    P->status.pr_lwp.pr_what == SYS_exec)) {
+	    P->status.pr_lwp.pr_what == SYS_execve) {
 		/*
 		 * Fetch the exec path name now, before we complete
 		 * the exec().  We may lose the process and be unable
@@ -388,8 +385,7 @@ Pxcreate(const char *file,	/* executable file name */
 		 */
 		if (P->state == PS_STOP &&
 		    P->status.pr_lwp.pr_why == PR_SYSEXIT &&
-		    (P->status.pr_lwp.pr_what == SYS_execve ||
-		    P->status.pr_lwp.pr_what == SYS_exec) &&
+		    P->status.pr_lwp.pr_what == SYS_execve &&
 		    (lasterrno = P->status.pr_lwp.pr_errno) != 0) {
 			/*
 			 * The exec() failed.  Set the process running and
@@ -405,8 +401,7 @@ Pxcreate(const char *file,	/* executable file name */
 
 	if (P->state == PS_STOP &&
 	    P->status.pr_lwp.pr_why == PR_SYSEXIT &&
-	    (P->status.pr_lwp.pr_what == SYS_execve ||
-	    P->status.pr_lwp.pr_what == SYS_exec) &&
+	    P->status.pr_lwp.pr_what == SYS_execve &&
 	    P->status.pr_lwp.pr_errno == 0) {
 		/*
 		 * The process is stopped on successful exec() or execve().
@@ -1371,8 +1366,7 @@ Preopen(struct ps_prochandle *P)
 	if (P->state == PS_STOP &&
 	    (P->status.pr_lwp.pr_why == PR_REQUESTED ||
 	    (P->status.pr_lwp.pr_why == PR_SYSEXIT &&
-	    (P->status.pr_lwp.pr_what == SYS_exec ||
-	    P->status.pr_lwp.pr_what == SYS_execve)))) {
+	    P->status.pr_lwp.pr_what == SYS_execve))) {
 		/* fake up stop-on-exit-from-execve */
 		if (P->status.pr_lwp.pr_why == PR_REQUESTED) {
 			P->status.pr_lwp.pr_why = PR_SYSEXIT;

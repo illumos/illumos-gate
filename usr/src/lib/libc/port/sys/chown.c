@@ -20,44 +20,53 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma weak _fchownat = fchownat
-#pragma weak _unlinkat = unlinkat
-
 #include "lint.h"
+#include <stdio.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/syscall.h>
-#include <sys/stat.h>
+#include <sys/fcntl.h>
 
+#pragma weak _fchownat = fchownat
 int
 fchownat(int fd, const char *name, uid_t uid, gid_t gid, int flags)
 {
-	return (syscall(SYS_fsat, 4, fd, name, uid, gid, flags));
+	return (syscall(SYS_fchownat, fd, name, uid, gid, flags));
 }
 
+#pragma weak _chown = chown
 int
-unlinkat(int fd, const char *name, int flags)
+chown(const char *name, uid_t uid, gid_t gid)
 {
-	return (syscall(SYS_fsat, 5, fd, name, flags));
+#if defined(_RETAIN_OLD_SYSCALLS)
+	return (syscall(SYS_chown, name, uid, gid));
+#else
+	return (fchownat(AT_FDCWD, name, uid, gid, 0));
+#endif
 }
 
+#pragma weak _lchown = lchown
 int
-renameat(int fromfd, const char *fromname, int tofd, const char *toname)
+lchown(const char *name, uid_t uid, gid_t gid)
 {
-	return (syscall(SYS_fsat, 7, fromfd, fromname, tofd, toname));
+#if defined(_RETAIN_OLD_SYSCALLS)
+	return (syscall(SYS_lchown, name, uid, gid));
+#else
+	return (fchownat(AT_FDCWD, name, uid, gid, AT_SYMLINK_NOFOLLOW));
+#endif
 }
 
+#pragma weak _fchown = fchown
 int
-faccessat(int fd, const char *fname, int amode, int flag)
+fchown(int filedes, uid_t uid, gid_t gid)
 {
-	return (syscall(SYS_fsat, 8, fd, fname, amode, flag));
-}
-
-int
-__openattrdirat(int fd, const char *name)
-{
-	return (syscall(SYS_fsat, 9, fd, name));
+#if defined(_RETAIN_OLD_SYSCALLS)
+	return (syscall(SYS_fchown, filedes, uid, gid));
+#else
+	return (fchownat(filedes, NULL, uid, gid, 0));
+#endif
 }

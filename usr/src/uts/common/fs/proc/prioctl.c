@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1466,8 +1466,7 @@ oprgetstatus32(kthread_t *t, prstatus32_t *sp, zone_t *zp)
 		sp->pr_syscall = get_syscall32_args(lwp,
 		    (int *)sp->pr_sysarg, &i);
 		sp->pr_nsysarg = (short)i;
-		if (t->t_whystop == PR_SYSEXIT &&
-		    (t->t_sysnum == SYS_exec || t->t_sysnum == SYS_execve)) {
+		if (t->t_whystop == PR_SYSEXIT && t->t_sysnum == SYS_execve) {
 			sp->pr_sysarg[0] = 0;
 			sp->pr_sysarg[1] = (caddr32_t)up->u_argv;
 			sp->pr_sysarg[2] = (caddr32_t)up->u_envp;
@@ -3303,8 +3302,7 @@ oprgetstatus(kthread_t *t, prstatus_t *sp, zone_t *zp)
 		sp->pr_syscall = get_syscall_args(lwp,
 		    (long *)sp->pr_sysarg, &i);
 		sp->pr_nsysarg = (short)i;
-		if (t->t_whystop == PR_SYSEXIT &&
-		    (t->t_sysnum == SYS_exec || t->t_sysnum == SYS_execve)) {
+		if (t->t_whystop == PR_SYSEXIT && t->t_sysnum == SYS_execve) {
 			sp->pr_sysarg[0] = 0;
 			sp->pr_sysarg[1] = (uintptr_t)up->u_argv;
 			sp->pr_sysarg[2] = (uintptr_t)up->u_envp;

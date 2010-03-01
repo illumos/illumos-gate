@@ -533,7 +533,7 @@ smf_import_service() {
 	if [[ $zone = global && -f $rootprefix/var/svc/manifest/$1 ]]; then
 		if [[ -n $rootprefix && -x /usr/sbin/svccfg ]]; then
 			SVCCFG_REPOSITORY=$rootprefix/etc/svc/repository.db \
-			/usr/sbin/svccfg import $rootprefix/var/svc/manifest/$1
+			svccfg import $rootprefix/var/svc/manifest/$1
 		elif [[ -n $rootprefix ]]; then
 			echo "Warning: This system does not have SMF, so I"
 			echo "cannot ensure the pre-import of $1. If it does"
@@ -818,16 +818,15 @@ update_etc_inet_sock2path()
 	# unloaded from the kernel, after which applications will fail.
 	#
 	sockfile=$rootprefix/etc/inet/sock2path
-	xgrep=/usr/xpg4/bin/grep
 
 	${ZCAT} ${cpiodir}/generic.usr$ZFIX | cpio -it 2>/dev/null |
-	    ${xgrep} -q sockpfp
+	    xpg4grep -q sockpfp
 	if [ $? -eq 1 ] ; then
-		${xgrep} -v -E '^	32	[14]	0	sockpfp' \
+		xpg4grep -v -E '^	32	[14]	0	sockpfp' \
 		    ${sockfile} > /tmp/sock2path.tmp.$$
 		cp /tmp/sock2path.tmp.$$ ${sockfile}
 	else
-		if ! ${xgrep} -q -E \
+		if ! xpg4grep -q -E \
 		    '^	31	[14]	0	sockpfp' ${sockfile}; then
 			echo '' >> ${sockfile}
 			echo '	32	1	0	sockpfp' >> ${sockfile}
@@ -2373,7 +2372,7 @@ EOFA
 	# achieved by passing the service FMRI as the second argument to
 	# smf_import_service().
 	#
-	/usr/bin/svcs svc:/network/datalink-management:default \
+	svcs svc:/network/datalink-management:default \
 	    >/dev/null 2>/dev/null
 	if [ $? -eq 0 ]; then
 		smf_import_service network/dlmgmt.xml
@@ -2558,6 +2557,8 @@ extraction_error() {
 # Make a local copy of bfu in /tmp and execute that instead.
 # This makes us immune to loss of networking and/or changes
 # to the original copy that might occur during execution.
+# While we're doing this, set ACR to the instance of acr in
+# the same directory as bfu (we hope they are a  matched pair).
 #
 cd .
 abspath=`[[ $0 = /* ]] && print $0 || print $PWD/$0`
@@ -2566,6 +2567,12 @@ if [[ $abspath != /tmp/* ]]; then
 	print "Copying $abspath to $localpath"
 	cp $abspath $localpath
 	chmod +x $localpath
+	if [ -z "$ACR" ] ; then
+		acr=`dirname $abspath`/acr
+		if [ -x "$acr" ] ; then
+			export ACR="$acr"
+		fi
+	fi
 	print "Executing $localpath $*\n"
 	exec $localpath $*
 fi
@@ -3052,9 +3059,11 @@ bfucmd="
 	/usr/bin/more
 	/usr/bin/mv
 	/usr/bin/nawk
+	/usr/bin/od
 	/usr/bin/pgrep
 	/usr/bin/pkginfo
 	/usr/bin/pkill
+	/usr/bin/plabel
 	/usr/bin/printf
 	/usr/bin/ps
 	/usr/bin/ptree
@@ -3081,11 +3090,14 @@ bfucmd="
 	/usr/bin/wc
 	/usr/bin/xargs
 	/usr/bin/zcat
+	/lib/svc/bin/mfstscan
 	/usr/sbin/add_drv
 	/usr/sbin/chroot
+	/usr/sbin/fstyp
 	/usr/sbin/halt
 	/usr/sbin/lockfs
 	/usr/sbin/lofiadm
+	/usr/sbin/logadm
 	/usr/sbin/mkfile
 	/usr/sbin/mkfs
 	/usr/sbin/mknod
@@ -3101,17 +3113,30 @@ bfucmd="
 	/usr/sbin/umount
 	/usr/sbin/update_drv
 	/usr/sbin/wall
+	/usr/sbin/zfs
+	/usr/sbin/zpool
 	/usr/sbin/zonecfg
 	${FASTFS-$GATE/public/bin/$bfu_isa/fastfs}
 	${GZIPBIN-$GATE/public/bin/$bfu_isa/gzip}
 "
+
+#
+# Add /usr/xpg4/bin/grep to the bfucmd list as xpg4grep
+#
+rm -rf /tmp/xpg4grep
+cp /usr/xpg4/bin/grep /tmp/xpg4grep
+bfucmd="${bfucmd} /tmp/xpg4grep"
+
 #
 # Scripts needed by BFU. These must be modified to use the interpreters in
 # /tmp/bfubin. The interpreters in /usr/bin may not be compatible with the
 # libraries in the archives being extracted.
 #
+if [ -z "$ACR" ] ; then
+	ACR=${GATE}/public/bin/acr
+fi
 bfuscr="
-	${ACR-${GATE}/public/bin/acr}
+	${ACR}
 "
 
 #
@@ -3120,46 +3145,47 @@ bfuscr="
 # This does not handle compiled shell scripts yet.
 #
 bfuchameleons="
-        /usr/bin/basename
-        /usr/bin/bg
-        /usr/bin/cd
-        /usr/bin/cksum
-        /usr/bin/cmp
-        /usr/bin/comm
-        /usr/bin/command
-        /usr/bin/dirname
-        /usr/bin/cut
-        /usr/bin/fc
-        /usr/bin/fg
-        /usr/bin/getopts
-        /usr/bin/hash
-        /usr/bin/jobs
-        /usr/bin/join
-        /usr/bin/kill
-        /usr/bin/logname
-        /usr/bin/paste
-        /usr/bin/print
-        /usr/bin/read
-        /usr/bin/rev
-        /usr/bin/sleep
-        /usr/bin/sum
-        /usr/bin/tee
-        /usr/bin/test
-        /usr/bin/type
-        /usr/bin/ulimit
-        /usr/bin/umask
-        /usr/bin/unalias
-        /usr/bin/uniq
-        /usr/bin/wait
-        /usr/bin/wc
+	/usr/bin/basename
+	/usr/bin/bg
+	/usr/bin/cd
+	/usr/bin/cksum
+	/usr/bin/cmp
+	/usr/bin/comm
+	/usr/bin/command
+	/usr/bin/dirname
+	/usr/bin/cut
+	/usr/bin/fc
+	/usr/bin/fg
+	/usr/bin/gconftool-2
+	/usr/bin/getopts
+	/usr/bin/hash
+	/usr/bin/jobs
+	/usr/bin/join
+	/usr/bin/kill
+	/usr/bin/logname
+	/usr/bin/paste
+	/usr/bin/print
+	/usr/bin/read
+	/usr/bin/rev
+	/usr/bin/sleep
+	/usr/bin/sum
+	/usr/bin/tee
+	/usr/bin/test
+	/usr/bin/type
+	/usr/bin/ulimit
+	/usr/bin/umask
+	/usr/bin/unalias
+	/usr/bin/uniq
+	/usr/bin/wait
+	/usr/bin/wc
 "
 
 for chameleon in ${bfuchameleons} ; do
-        if [[ "$(file "${chameleon}")" == *ELF* ]] ; then
-                bfucmd="${bfucmd} ${chameleon}"
-        else
-                bfuscr="${bfuscr} ${chameleon}"
-        fi
+	if [[ "$(file "${chameleon}")" == *ELF* ]] ; then
+		bfucmd="${bfucmd} ${chameleon}"
+	else
+		bfuscr="${bfuscr} ${chameleon}"
+	fi
 done
 
 rm -rf /tmp/bfubin
@@ -3425,51 +3451,74 @@ ${BFULD-$GATE/public/bin/$bfu_isa/bfuld} /tmp/bfubin/* || fail "bfuld failed"
 
 for x in $bfuscr
 do
-	sed -e 's/\/usr\/bin\//\/tmp\/bfubin\//g' \
-	    -e 's/\/bin\//\/tmp\/bfubin\//g' < $x > /tmp/bfubin/`basename $x`
+	if [ "$x" = "$ACR" ] ; then	# ACR is special
+		sed -e 's/^#!\/usr\/bin\//#!\/tmp\/bfubin\//' \
+		    -e 's/^#!\/bin\//#!\/tmp\/bfubin\//' \
+		    < $x > /tmp/bfubin/`basename $x`
+	else
+		sed -e 's/\/usr\/bin\//\/tmp\/bfubin\//g' \
+		    -e 's/\/bin\//\/tmp\/bfubin\//g' \
+		    < $x > /tmp/bfubin/`basename $x`
+	fi
 	chmod +x /tmp/bfubin/`basename $x`
 done
 
 #
 # scripts used together with multiboot
 #
-multiboot_scr="
-	/boot/solaris/bin/create_ramdisk
-	/boot/solaris/bin/create_diskmap
-	/boot/solaris/bin/root_archive
-"
+if [ $target_isa = sparc -a $diskless = no ] ; then
+	multiboot_scr="
+		/boot/solaris/bin/create_ramdisk
+	"
+else
+	multiboot_scr="
+		/boot/solaris/bin/create_ramdisk
+		/boot/solaris/bin/create_diskmap
+		/boot/solaris/bin/root_archive
+	"
+fi
 
-if [ $multi_or_direct = yes ]; then
-	for cmd in $multiboot_scr
-	do
-		file=`basename $cmd`
-		if [ -f $cmd ]; then
-			cp $cmd /tmp/bfubin
-		else
-			if [ ! -d $MULTIBOOT_BIN_DIR ]; then
-				echo "$MULTIBOOT_BIN_DIR: not found"
-				fail ""
-			fi
-
-			if [ ! -f $MULTIBOOT_BIN_DIR/$file ]; then
-				echo "$MULTIBOOT_BIN_DIR/$file: not found"
-				fail ""
-			fi
-			echo "copying $file from $MULTIBOOT_BIN_DIR"
-			cp $MULTIBOOT_BIN_DIR/$file /tmp/bfubin
+for cmd in $multiboot_scr
+do
+	file=`basename $cmd`
+	if [ -f $cmd ]; then
+		cp $cmd /tmp/bfubin
+	else
+		if [ ! -d $MULTIBOOT_BIN_DIR ]; then
+			echo "$MULTIBOOT_BIN_DIR: not found"
+			fail ""
 		fi
 
-		#
-		# We do two substitutions here to replace references to
-		# both /usr/bin/ and /bin/ with /tmp/bfubin/
-		#
-		mv /tmp/bfubin/${file} /tmp/bfubin/${file}-
-		sed -e 's/\/usr\/bin\//\/tmp\/bfubin\//g' \
-		    -e 's/\/bin\//\/tmp\/bfubin\//g' \
-		    < /tmp/bfubin/${file}- > /tmp/bfubin/${file}
-		chmod +x /tmp/bfubin/${file}
-	done
-fi
+		if [ ! -f $MULTIBOOT_BIN_DIR/$file ]; then
+			echo "$MULTIBOOT_BIN_DIR/$file: not found"
+			fail ""
+		fi
+		echo "copying $file from $MULTIBOOT_BIN_DIR"
+		cp $MULTIBOOT_BIN_DIR/$file /tmp/bfubin
+	fi
+
+	#
+	# These files need special editing to be used
+	# inside the bfu protected environment.
+	#
+	mv /tmp/bfubin/${file} /tmp/bfubin/${file}-
+	sed -e 's/boot\/solaris\/bin/BOOT_SOLARIS_BIN/g' \
+	    -e 's/usr\/sbin\/install/USR_SBIN_INSTALL/g' \
+	    -e 's/usr\/openwin\/bin/USR_OPENWIN_BIN/g' \
+	    -e 's/ usr\/bin\// USR_BIN/g' \
+	    -e 's/\/usr\/bin\//\/tmp\/bfubin\//g' \
+	    -e 's/\/usr\/sbin\//\/tmp\/bfubin\//g' \
+	    -e 's/\/bin\//\/tmp\/bfubin\//g' \
+	    -e 's/\/sbin\//\/tmp\/bfubin\//g' \
+	    -e 's/ USR_BIN/ usr\/bin\//g' \
+	    -e 's/USR_OPENWIN_BIN/usr\/openwin\/bin/g' \
+	    -e 's/USR_SBIN_INSTALL/usr\/sbin\/install/g' \
+	    -e 's/BOOT_SOLARIS_BIN/boot\/solaris\/bin/g' \
+	    -e 's/\$(\$EXTRACT_FILELIST/\$(ksh \$EXTRACT_FILELIST/' \
+	    < /tmp/bfubin/${file}- > /tmp/bfubin/${file}
+	chmod +x /tmp/bfubin/${file}
+	rm /tmp/bfubin/${file}-
+done
 
 #
 # For directboot archives, /boot/platform/i86pc/kernel/unix will be
@@ -5903,8 +5952,15 @@ build_boot_archive()
 	#PATH=/tmp/bfubin /tmp/bfubin/bootadm update $bootadm_args
 
 	cr_args=${rootprefix:+ -R $rootprefix}
-	LD_LIBRARY_PATH=/tmp/bfulib PATH=/tmp/bfubin \
-	    /tmp/bfubin/ksh $rootprefix/boot/solaris/bin/create_ramdisk $cr_args
+	if [ -x /tmp/bfubin/create_ramdisk ] ; then
+		LD_LIBRARY_PATH=/tmp/bfulib PATH=/tmp/bfubin \
+		    /tmp/bfubin/ksh \
+		    /tmp/bfubin/create_ramdisk $cr_args
+	else
+		LD_LIBRARY_PATH=/tmp/bfulib PATH=/tmp/bfubin \
+		    /tmp/bfubin/ksh \
+		    $rootprefix/boot/solaris/bin/create_ramdisk $cr_args
+	fi
 
 	#
 	# Disable the boot-archive service on the first boot
@@ -8506,7 +8562,7 @@ mondo_loop() {
 	#
 	for file in `ls $rootprefix/etc/inet/ike/crls/* \
 	    $rootprefix/etc/inet/ike/publickeys/* 2>/dev/null`; do
-		if /bin/od -tx1 -N3 < $file | grep '30 82' >/dev/null 2>&1
+		if od -tx1 -N3 < $file | grep '30 82' >/dev/null 2>&1
 		then
 			chmod 644 $file
 		fi

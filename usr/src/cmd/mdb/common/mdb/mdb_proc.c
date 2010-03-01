@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -407,8 +408,7 @@ pt_post_attach(mdb_tgt_t *t)
 	 * far the process has proceeded through linker initialization.
 	 */
 	if ((psp->pr_flags & PR_ISTOP) && psp->pr_why == PR_SYSEXIT &&
-	    psp->pr_errno == 0 && (psp->pr_what == SYS_exec ||
-	    psp->pr_what == SYS_execve)) {
+	    psp->pr_errno == 0 && psp->pr_what == SYS_execve) {
 		if (mdb.m_target == NULL) {
 			warn("target performed exec of %s\n",
 			    IOP_NAME(pt->p_fio));
@@ -443,11 +443,8 @@ pt_post_attach(mdb_tgt_t *t)
 	/*
 	 * Install event specifiers to track fork and exec activities:
 	 */
-	(void) mdb_tgt_add_sysexit(t, SYS_forkall, hflag, pt_fork, NULL);
-	(void) mdb_tgt_add_sysexit(t, SYS_fork1, hflag, pt_fork, NULL);
 	(void) mdb_tgt_add_sysexit(t, SYS_vfork, hflag, pt_fork, NULL);
 	(void) mdb_tgt_add_sysexit(t, SYS_forksys, hflag, pt_fork, NULL);
-	(void) mdb_tgt_add_sysexit(t, SYS_exec, hflag, pt_exec, NULL);
 	(void) mdb_tgt_add_sysexit(t, SYS_execve, hflag, pt_exec, NULL);
 
 	/*
@@ -667,10 +664,7 @@ pt_fork(mdb_tgt_t *t, int vid, void *private)
 	csp = &Pstatus(C)->pr_lwp;
 
 	if (csp->pr_why != PR_SYSEXIT ||
-	    (csp->pr_what != SYS_forkall &&
-	    csp->pr_what != SYS_fork1 &&
-	    csp->pr_what != SYS_vfork &&
-	    csp->pr_what != SYS_forksys)) {
+	    (csp->pr_what != SYS_vfork && csp->pr_what != SYS_forksys)) {
 		warn("forked child process %ld did not stop on exit from "
 		    "fork as expected\n", psp->pr_rval1);
 	}
@@ -720,7 +714,6 @@ pt_fork(mdb_tgt_t *t, int vid, void *private)
 			mdb_tgt_sespec_idle_all(t, EBUSY, FALSE);
 			t->t_pshandle = C;
 
-			(void) Psysexit(C, SYS_exec, TRUE);
 			(void) Psysexit(C, SYS_execve, TRUE);
 
 			(void) Punsetflags(C, PR_FORK | PR_KLC);
@@ -733,8 +726,7 @@ pt_fork(mdb_tgt_t *t, int vid, void *private)
 					break; /* failure or process died */
 
 			} while (csp->pr_why != PR_SYSEXIT ||
-			    csp->pr_errno != 0 || (csp->pr_what != SYS_exec &&
-			    csp->pr_what != SYS_execve));
+			    csp->pr_errno != 0 || csp->pr_what != SYS_execve);
 		} else
 			t->t_pshandle = C;
 	}
@@ -3588,7 +3580,7 @@ pt_setrun(mdb_tgt_t *t, mdb_tgt_status_t *tsp, int flags)
 	switch (Pstate(P)) {
 	case PS_STOP:
 		if (psp->pr_why == PR_SYSEXIT && psp->pr_errno == 0 &&
-		    (psp->pr_what == SYS_exec || psp->pr_what == SYS_execve))
+		    psp->pr_what == SYS_execve)
 			pt_release_parents(t);
 		else
 			Pupdate_maps(P);
@@ -4027,8 +4019,8 @@ pt_brkpt_disarm(mdb_tgt_t *t, mdb_sespec_t *sep)
 	const lwpstatus_t *psp = &Pstatus(t->t_pshandle)->pr_lwp;
 	pt_brkpt_t *ptb = sep->se_data;
 
-	if ((psp->pr_why == PR_SYSEXIT && psp->pr_errno == 0) &&
-	    (psp->pr_what == SYS_exec || psp->pr_what == SYS_execve))
+	if (psp->pr_why == PR_SYSEXIT && psp->pr_errno == 0 &&
+	    psp->pr_what == SYS_execve)
 		return (0); /* do not restore saved instruction */
 
 	return (Pdelbkpt(t->t_pshandle, ptb->ptb_addr, ptb->ptb_instr));

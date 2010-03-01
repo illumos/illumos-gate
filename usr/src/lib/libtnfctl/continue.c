@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * interface to continue a target process (DIRECT_MODE) and helper
@@ -237,7 +235,6 @@ again:
 	} else
 	    if (state.ps_issysentry) {
 		switch (state.ps_syscallnum) {
-		case SYS_exec:
 		case SYS_execve:
 		    *evt = TNFCTL_EVENT_EXEC;
 		    ret_prexstat = TNFCTL_ERR_INTERNAL;
@@ -250,9 +247,7 @@ again:
 		}
 	    } else if (state.ps_issysexit) {
 		    switch (state.ps_syscallnum) {
-		    case SYS_forkall:
 		    case SYS_vfork:
-		    case SYS_fork1:
 		    case SYS_forksys:
 			*evt = TNFCTL_EVENT_FORK;
 			break;
@@ -287,24 +282,13 @@ enable_target_state(tnfctl_handle_t *hndl, boolean_t watch_forks)
 	prbstat = prb_proc_entry(proc_p, SYS_execve, PRB_SYS_ADD);
 	if (prbstat)
 		return (_tnfctl_map_to_errcode(prbstat));
-	prbstat = prb_proc_entry(proc_p, SYS_exec, PRB_SYS_ADD);
-	if (prbstat)
-		return (_tnfctl_map_to_errcode(prbstat));
 	/* trace exit */
 	prbstat = prb_proc_entry(proc_p, SYS_exit, PRB_SYS_ADD);
 	if (prbstat)
 		return (_tnfctl_map_to_errcode(prbstat));
 	/* trace fork if the caller requests */
 	if (watch_forks) {
-		prbstat = prb_proc_exit(proc_p, SYS_forkall, PRB_SYS_ADD);
-		if (prbstat)
-			return (_tnfctl_map_to_errcode(prbstat));
-
 		prbstat = prb_proc_exit(proc_p, SYS_vfork, PRB_SYS_ADD);
-		if (prbstat)
-			return (_tnfctl_map_to_errcode(prbstat));
-
-		prbstat = prb_proc_exit(proc_p, SYS_fork1, PRB_SYS_ADD);
 		if (prbstat)
 			return (_tnfctl_map_to_errcode(prbstat));
 
@@ -346,19 +330,10 @@ disable_target_state(tnfctl_handle_t *hndl)
 	prbstat = prb_proc_entry(proc_p, SYS_execve, PRB_SYS_DEL);
 	if (prbstat)
 		return (_tnfctl_map_to_errcode(prbstat));
-	prbstat = prb_proc_entry(proc_p, SYS_exec, PRB_SYS_DEL);
-	if (prbstat)
-		return (_tnfctl_map_to_errcode(prbstat));
 	prbstat = prb_proc_entry(proc_p, SYS_exit, PRB_SYS_DEL);
 	if (prbstat)
 		return (_tnfctl_map_to_errcode(prbstat));
-	prbstat = prb_proc_exit(proc_p, SYS_forkall, PRB_SYS_DEL);
-	if (prbstat)
-	    return (_tnfctl_map_to_errcode(prbstat));
 	prbstat = prb_proc_exit(proc_p, SYS_vfork, PRB_SYS_DEL);
-	if (prbstat)
-	    return (_tnfctl_map_to_errcode(prbstat));
-	prbstat = prb_proc_exit(proc_p, SYS_fork1, PRB_SYS_DEL);
 	if (prbstat)
 	    return (_tnfctl_map_to_errcode(prbstat));
 	prbstat = prb_proc_exit(proc_p, SYS_forksys, PRB_SYS_DEL);

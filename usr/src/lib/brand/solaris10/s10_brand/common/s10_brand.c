@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -254,7 +255,7 @@ _s10_abort(int err, const char *msg, const char *file, int line)
 	(void) __systemcall(&rval, SYS_lwp_kill + 1024, _lwp_self(), SIGKILL);
 }
 
-static int
+int
 s10_uucopy(const void *from, void *to, size_t size)
 {
 	sysret_t rval;
@@ -267,7 +268,7 @@ s10_uucopy(const void *from, void *to, size_t size)
 /*
  * ATTENTION: uucopystr() does NOT ensure that string are null terminated!
  */
-static int
+int
 s10_uucopystr(const void *from, void *to, size_t size)
 {
 	sysret_t rval;
@@ -488,13 +489,13 @@ mntfs_ioctl(sysret_t *rval, int fdes, int cmd, intptr_t arg)
 	struct mntentbuf *embufp;
 	static size_t bufsize = MNT_LINE_MAX;
 
-
 	/* Do not emulate mntfs commands from up-to-date clients. */
 	if (S10_FEATURE_IS_PRESENT(S10_FEATURE_ALTERED_MNTFS_IOCTL))
 		return (__systemcall(rval, SYS_ioctl + 1024, fdes, cmd, arg));
 
 	/* Do not emulate mntfs commands directed at other file systems. */
-	if ((err = __systemcall(rval, SYS_fstat + 1024, fdes, &statbuf)) != 0)
+	if ((err = __systemcall(rval, SYS_fstatat + 1024,
+	    fdes, NULL, &statbuf, 0)) != 0)
 		return (err);
 	if (strcmp(statbuf.st_fstype, MNTTYPE_MNTFS) != 0)
 		return (__systemcall(rval, SYS_ioctl + 1024, fdes, cmd, arg));
@@ -651,12 +652,13 @@ crypto_ioctl(sysret_t *rval, int fdes, int cmd, intptr_t arg)
 	struct stat			sbuf;
 
 	if (crypto_dev == (dev_t)-1) {
-		if ((err = __systemcall(rval, SYS_stat + 1024, "/dev/crypto",
-		    &sbuf)) != 0)
+		if ((err = __systemcall(rval, SYS_fstatat + 1024,
+		    AT_FDCWD, "/dev/crypto", &sbuf, 0)) != 0)
 			goto nonemuioctl;
 		crypto_dev = major(sbuf.st_rdev);
 	}
-	if ((err = __systemcall(rval, SYS_fstat + 1024, fdes, &sbuf)) != 0)
+	if ((err = __systemcall(rval, SYS_fstatat + 1024,
+	    fdes, NULL, &sbuf, 0)) != 0)
 		return (err);
 	/* Each open fd of /dev/crypto gets a new minor device. */
 	if (major(sbuf.st_rdev) != crypto_dev)
@@ -785,7 +787,8 @@ ctfs_ioctl(sysret_t *rval, int fdes, int cmd, intptr_t arg)
 	ct_param_t param;
 	struct stat statbuf;
 
-	if ((err = __systemcall(rval, SYS_fstat + 1024, fdes, &statbuf)) != 0)
+	if ((err = __systemcall(rval, SYS_fstatat + 1024,
+	    fdes, NULL, &statbuf, 0)) != 0)
 		return (err);
 	if (strcmp(statbuf.st_fstype, MNTTYPE_CTFS) != 0)
 		return (__systemcall(rval, SYS_ioctl + 1024, fdes, cmd, arg));
@@ -845,12 +848,13 @@ zfs_ioctl(sysret_t *rval, int fdes, int cmd, intptr_t arg)
 	struct stat			sbuf;
 
 	if (zfs_dev == (dev_t)-1) {
-		if ((err = __systemcall(rval, SYS_stat + 1024, "/dev/zfs",
-		    &sbuf)) != 0)
+		if ((err = __systemcall(rval, SYS_fstatat + 1024,
+		    AT_FDCWD, "/dev/zfs", &sbuf, 0) != 0) != 0)
 			goto nonemuioctl;
 		zfs_dev = major(sbuf.st_rdev);
 	}
-	if ((err = __systemcall(rval, SYS_fstat + 1024, fdes, &sbuf)) != 0)
+	if ((err = __systemcall(rval, SYS_fstatat + 1024,
+	    fdes, NULL, &sbuf, 0)) != 0)
 		return (err);
 	if (major(sbuf.st_rdev) != zfs_dev)
 		goto nonemuioctl;
@@ -969,7 +973,7 @@ s10_pwrite(sysret_t *rval, int fd, const void *bufferp, size_t num_bytes,
 	    offset));
 }
 
-#ifndef	_LP64
+#if !defined(_LP64)
 /*
  * This is the large file version of the pwrite() system call for 32-bit
  * processes.  This exists for the same reason that s10_pwrite() exists; see
@@ -1324,7 +1328,7 @@ s10_exec(sysret_t *rval, const char *fname, const char **argp)
 		return (err);
 
 	/* If an exec call succeeds, it never returns */
-	err = __systemcall(rval, SYS_exec + 1024, fname, argp);
+	err = __systemcall(rval, SYS_execve + 1024, fname, argp, NULL);
 	s10_assert(err != 0);
 	return (err);
 }
@@ -1437,8 +1441,8 @@ s10_sysinfo(sysret_t *rv, int command, char *buf, long count)
 	return (0);
 }
 
-#ifdef	__x86
-#ifdef	__amd64
+#if defined(__x86)
+#if defined(__amd64)
 /*
  * 64-bit x86 LWPs created by SYS_lwp_create start here if they need to set
  * their %fs registers to the legacy Solaris 10 selector value.
@@ -1539,6 +1543,7 @@ s10_lwp_create_correct_fs(sysret_t *rval, ucontext_t *ucp, int flags,
 	 */
 	if (s10_uucopy(ucp, &s10_uc, sizeof (s10_uc)) != 0)
 		return (EFAULT);
+
 	s10_uc.uc_mcontext.gregs[REG_R14] = s10_uc.uc_mcontext.gregs[REG_RIP];
 	s10_uc.uc_mcontext.gregs[REG_RIP] = (greg_t)s10_lwp_create_entry_point;
 
@@ -1575,7 +1580,7 @@ s10_lwp_create(sysret_t *rval, ucontext_t *ucp, int flags, id_t *new_lwp)
 static int
 s10_lwp_private(sysret_t *rval, int cmd, int which, uintptr_t base)
 {
-#ifdef	__amd64
+#if defined(__amd64)
 	int err;
 
 	/*
@@ -1962,42 +1967,42 @@ s10_init(int argc, char *argv[], char *envp[])
 s10_sysent_table_t s10_sysent_table[] = {
 #if defined(__sparc) && !defined(__sparcv9)
 	EMULATE(s10_indir, 9 | RV_64RVAL),	/*  0 */
-#else /* !__sparc || __sparcv9 */
+#else
 	NOSYS,					/*  0 */
-#endif /* !__sparc || __sparcv9 */
+#endif
 	NOSYS,					/*   1 */
-	NOSYS,					/*   2 */
+	EMULATE(s10_forkall, 0 | RV_32RVAL2),	/*   2 */
 	NOSYS,					/*   3 */
 	NOSYS,					/*   4 */
-	NOSYS,					/*   5 */
+	EMULATE(s10_open, 3 | RV_DEFAULT),	/*   5 */
 	NOSYS,					/*   6 */
-	NOSYS,					/*   7 */
-	NOSYS,					/*   8 */
+	EMULATE(s10_wait, 0 | RV_32RVAL2),	/*   7 */
+	EMULATE(s10_creat, 2 | RV_DEFAULT),	/*   8 */
 	NOSYS,					/*   9 */
-	NOSYS,					/*  10 */
+	EMULATE(s10_unlink, 1 | RV_DEFAULT),	/*  10 */
 	EMULATE(s10_exec, 2 | RV_DEFAULT),	/*  11 */
 	NOSYS,					/*  12 */
 	NOSYS,					/*  13 */
 	NOSYS,					/*  14 */
 	NOSYS,					/*  15 */
-	NOSYS,					/*  16 */
+	EMULATE(s10_chown, 3 | RV_DEFAULT),	/*  16 */
 	NOSYS,					/*  17 */
-	NOSYS,					/*  18 */
+	EMULATE(s10_stat, 2 | RV_DEFAULT),	/*  18 */
 	NOSYS,					/*  19 */
 	NOSYS,					/*  20 */
 	NOSYS,					/*  21 */
-	NOSYS,					/*  22 */
+	EMULATE(s10_umount, 1 | RV_DEFAULT),	/*  22 */
 	NOSYS,					/*  23 */
 	NOSYS,					/*  24 */
 	NOSYS,					/*  25 */
 	NOSYS,					/*  26 */
 	NOSYS,					/*  27 */
-	NOSYS,					/*  28 */
+	EMULATE(s10_fstat, 2 | RV_DEFAULT),	/*  28 */
 	NOSYS,					/*  29 */
-	NOSYS,					/*  30 */
+	EMULATE(s10_utime, 2 | RV_DEFAULT),	/*  30 */
 	NOSYS,					/*  31 */
 	NOSYS,					/*  32 */
-	NOSYS,					/*  33 */
+	EMULATE(s10_access, 2 | RV_DEFAULT),	/*  33 */
 	NOSYS,					/*  34 */
 	NOSYS,					/*  35 */
 	NOSYS,					/*  36 */
@@ -2005,7 +2010,7 @@ s10_sysent_table_t s10_sysent_table[] = {
 	NOSYS,					/*  38 */
 	NOSYS,					/*  39 */
 	NOSYS,					/*  40 */
-	NOSYS,					/*  41 */
+	EMULATE(s10_dup, 1 | RV_DEFAULT),	/*  41 */
 	NOSYS,					/*  42 */
 	NOSYS,					/*  43 */
 	NOSYS,					/*  44 */
@@ -2040,10 +2045,10 @@ s10_sysent_table_t s10_sysent_table[] = {
 	NOSYS,					/*  73 */
 	NOSYS,					/*  74 */
 	EMULATE(s10_issetugid, 0 | RV_DEFAULT),	/*  75 */
-	NOSYS,					/*  76 */
+	EMULATE(s10_fsat, 6 | RV_DEFAULT),	/*  76 */
 	NOSYS,					/*  77 */
 	NOSYS,					/*  78 */
-	NOSYS,					/*  79 */
+	EMULATE(s10_rmdir, 1 | RV_DEFAULT),	/*  79 */
 	NOSYS,					/*  80 */
 	EMULATE(s10_getdents, 3 | RV_DEFAULT),	/*  81 */
 	NOSYS,					/*  82 */
@@ -2051,14 +2056,14 @@ s10_sysent_table_t s10_sysent_table[] = {
 	NOSYS,					/*  84 */
 	NOSYS,					/*  85 */
 	NOSYS,					/*  86 */
-	NOSYS,					/*  87 */
-	NOSYS,					/*  88 */
+	EMULATE(s10_poll, 3 | RV_DEFAULT),	/*  87 */
+	EMULATE(s10_lstat, 2 | RV_DEFAULT),	/*  88 */
 	NOSYS,					/*  89 */
 	NOSYS,					/*  90 */
 	NOSYS,					/*  91 */
 	NOSYS,					/*  92 */
 	NOSYS,					/*  93 */
-	NOSYS,					/*  94 */
+	EMULATE(s10_fchown, 3 | RV_DEFAULT),	/*  94 */
 	NOSYS,					/*  95 */
 	NOSYS,					/*  96 */
 	NOSYS,					/*  97 */
@@ -2087,18 +2092,25 @@ s10_sysent_table_t s10_sysent_table[] = {
 	NOSYS,					/* 120 */
 	NOSYS,					/* 121 */
 	NOSYS,					/* 122 */
+#if defined(__x86)
+	EMULATE(s10_xstat, 3 | RV_DEFAULT),	/* 123 */
+	EMULATE(s10_lxstat, 3 | RV_DEFAULT),	/* 124 */
+	EMULATE(s10_fxstat, 3 | RV_DEFAULT),	/* 125 */
+	EMULATE(s10_xmknod, 4 | RV_DEFAULT),	/* 126 */
+#else
 	NOSYS,					/* 123 */
 	NOSYS,					/* 124 */
 	NOSYS,					/* 125 */
 	NOSYS,					/* 126 */
+#endif
 	NOSYS,					/* 127 */
 	NOSYS,					/* 128 */
 	NOSYS,					/* 129 */
-	NOSYS,					/* 130 */
+	EMULATE(s10_lchown, 3 | RV_DEFAULT),	/* 130 */
 	NOSYS,					/* 131 */
 	NOSYS,					/* 132 */
 	NOSYS,					/* 133 */
-	NOSYS,					/* 134 */
+	EMULATE(s10_rename, 2 | RV_DEFAULT),	/* 134 */
 	EMULATE(s10_uname, 1 | RV_DEFAULT),	/* 135 */
 	NOSYS,					/* 136 */
 	NOSYS,					/* 137 */
@@ -2107,18 +2119,18 @@ s10_sysent_table_t s10_sysent_table[] = {
 	NOSYS,					/* 140 */
 	NOSYS,					/* 141 */
 	NOSYS,					/* 142 */
-	NOSYS,					/* 143 */
+	EMULATE(s10_fork1, 0 | RV_32RVAL2),	/* 143 */
 	NOSYS,					/* 144 */
 	NOSYS,					/* 145 */
 	NOSYS,					/* 146 */
-	NOSYS,					/* 147 */
+	EMULATE(s10_lwp_sema_wait, 1 | RV_DEFAULT), /* 147 */
 	NOSYS,					/* 148 */
 	NOSYS,					/* 149 */
 	NOSYS,					/* 150 */
 	NOSYS,					/* 151 */
 	NOSYS,					/* 152 */
 	NOSYS,					/* 153 */
-	NOSYS,					/* 154 */
+	EMULATE(s10_utimes, 2 | RV_DEFAULT),	/* 154 */
 	NOSYS,					/* 155 */
 	NOSYS,					/* 156 */
 	NOSYS,					/* 157 */
@@ -2134,14 +2146,14 @@ s10_sysent_table_t s10_sysent_table[] = {
 	NOSYS,					/* 163 */
 	NOSYS,					/* 164 */
 	NOSYS,					/* 165 */
-#ifdef	__x86
+#if defined(__x86)
 	EMULATE(s10_lwp_private, 3 | RV_DEFAULT), /* 166 */
-#else	/* !__x86 */
+#else
 	NOSYS,					/* 166 */
-#endif	/* !__x86 */
+#endif
 	NOSYS,					/* 167 */
 	NOSYS,					/* 168 */
-	NOSYS,					/* 169 */
+	EMULATE(s10_lwp_mutex_lock, 1 | RV_DEFAULT), /* 169 */
 	NOSYS,					/* 170 */
 	NOSYS,					/* 171 */
 	NOSYS,					/* 172 */
@@ -2182,30 +2194,38 @@ s10_sysent_table_t s10_sysent_table[] = {
 	NOSYS,					/* 207 */
 	NOSYS,					/* 208 */
 	NOSYS,					/* 209 */
-	EMULATE(s10_lwp_mutex_timedlock, 2 | RV_DEFAULT),	/* 210 */
+	EMULATE(s10_lwp_mutex_timedlock, 2 | RV_DEFAULT), /* 210 */
 	NOSYS,					/* 211 */
 	NOSYS,					/* 212 */
-#ifdef	_LP64
+#if defined(_LP64)
 	NOSYS,					/* 213 */
-#else	/* !_LP64 */
+#else
 	EMULATE(s10_getdents64, 3 | RV_DEFAULT), /* 213 */
-#endif	/* !_LP64 */
+#endif
 	NOSYS,					/* 214 */
+#if defined(_LP64)
 	NOSYS,					/* 215 */
 	NOSYS,					/* 216 */
 	NOSYS,					/* 217 */
+#else
+	EMULATE(s10_stat64, 2 | RV_DEFAULT),	/* 215 */
+	EMULATE(s10_lstat64, 2 | RV_DEFAULT),	/* 216 */
+	EMULATE(s10_fstat64, 2 | RV_DEFAULT),	/* 217 */
+#endif
 	NOSYS,					/* 218 */
 	NOSYS,					/* 219 */
 	NOSYS,					/* 220 */
 	NOSYS,					/* 221 */
 	NOSYS,					/* 222 */
-#ifdef	_LP64
+#if defined(_LP64)
 	NOSYS,					/* 223 */
-#else	/* !_LP64 */
-	EMULATE(s10_pwrite64, 5 | RV_DEFAULT),	/* 223 */
-#endif	/* !_LP64 */
 	NOSYS,					/* 224 */
 	NOSYS,					/* 225 */
+#else
+	EMULATE(s10_pwrite64, 5 | RV_DEFAULT),	/* 223 */
+	EMULATE(s10_creat64, 2 | RV_DEFAULT),	/* 224 */
+	EMULATE(s10_open64, 3 | RV_DEFAULT),	/* 225 */
+#endif
 	NOSYS,					/* 226 */
 	EMULATE(s10_zone, 5 | RV_DEFAULT),	/* 227 */
 	NOSYS,					/* 228 */
@@ -2231,7 +2251,7 @@ s10_sysent_table_t s10_sysent_table[] = {
 	NOSYS,					/* 248 */
 	NOSYS,					/* 249 */
 	NOSYS,					/* 250 */
-	EMULATE(s10_lwp_mutex_trylock, 1 | RV_DEFAULT),		/* 251 */
+	EMULATE(s10_lwp_mutex_trylock, 1 | RV_DEFAULT), /* 251 */
 	NOSYS,					/* 252 */
 	NOSYS,					/* 253 */
 	NOSYS,					/* 254 */

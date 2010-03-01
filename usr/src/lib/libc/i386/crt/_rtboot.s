@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -112,11 +113,11 @@ __rtboot:
 	pushl	%eax
 	leal	f.SYSCONFIG - .L01(%ebx),%eax
 	pushl	%eax
-	leal	f.FSTAT - .L01(%ebx),%eax
+	leal	f.FSTATAT - .L01(%ebx),%eax
 	pushl	%eax
 	leal	f.MMAP - .L01(%ebx),%eax
 	pushl	%eax
-	leal	f.OPEN - .L01(%ebx),%eax
+	leal	f.OPENAT - .L01(%ebx),%eax
 	pushl	%eax
 	leal	f.PANIC - .L01(%ebx),%eax
 	pushl	%eax
@@ -151,8 +152,8 @@ f.PANIC:
 	jmp	f.EXIT
 / Not reached
 	
-f.OPEN:
-	movl	$SYS_open,%eax
+f.OPENAT:
+	movl	$SYS_openat,%eax
 	jmp	__syscall
 f.MMAP:
 	movl	$SYS_mmap,%eax
@@ -172,8 +173,8 @@ f.LSEEK:
 f.CLOSE:
 	movl	$SYS_close,%eax
 	jmp	__syscall
-f.FSTAT:
-	movl	$SYS_fxstat,%eax	/ NEEDSWORK: temp kludge for G6
+f.FSTATAT:
+	movl	$SYS_fstatat,%eax
 	jmp	__syscall
 f.SYSCONFIG:
 	movl	$SYS_sysconfig,%eax

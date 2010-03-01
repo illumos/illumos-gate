@@ -20,13 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/syscall.h>
+#include <sys/fcntl.h>
 
 int
 rename(char *path1, char *path2)
@@ -46,5 +45,5 @@ rename(char *path1, char *path2)
 		path2 = buf2;
 	}
 
-	return (_syscall(SYS_rename, path1, path2));
+	return (_syscall(SYS_renameat, AT_FDCWD, path1, AT_FDCWD, path2));
 }

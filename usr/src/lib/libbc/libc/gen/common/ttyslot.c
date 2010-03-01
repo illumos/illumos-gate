@@ -1,5 +1,26 @@
 /*
- * Copyright 1991 Sun Microsystems, Inc.  All rights reserved.
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -8,8 +29,6 @@
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Return the number of the slot in the utmp file
@@ -39,23 +58,24 @@ ttyslot(void)
 	if ((tp = ttyname(0)) == NULL &&
 	    (tp = ttyname(1)) == NULL &&
 	    (tp = ttyname(2)) == NULL)
-		return(0);
+		return (0);
 	if ((p = rindex(tp, '/')) == NULL)
 		p = tp;
 	else
 		p++;
 
-	if ((fd = _syscall(SYS_open, "/etc/utmpx", O_RDONLY)) == -1) {
+	if ((fd = _syscall(SYS_openat,
+	    AT_FDCWD, "/etc/utmpx", O_RDONLY)) == -1) {
 		perror("ttyslot: open of /etc/utmpx failed:");
-		return(0);
+		return (0);
 	}
 
 	s = 0;
-	while (_read(fd, &utx, sizeof(struct utmpx)) > 0) {
+	while (_read(fd, &utx, sizeof (struct utmpx)) > 0) {
 		s++;
-		if (strncmp(utx.ut_line, p, sizeof(utx.ut_line)) == 0) {
+		if (strncmp(utx.ut_line, p, sizeof (utx.ut_line)) == 0) {
 			_syscall(SYS_close, fd);
-			return(s);
+			return (s);
 		}
 	}
 	_syscall(SYS_close, fd);

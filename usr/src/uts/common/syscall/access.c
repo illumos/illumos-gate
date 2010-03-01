@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -118,12 +118,6 @@ lookup:
 }
 
 int
-access(char *fname, int fmode)
-{
-	return (caccess(fname, fmode, NULL));
-}
-
-int
 faccessat(int fd, char *fname, int fmode, int flag)
 {
 	file_t *dirfp;
@@ -171,4 +165,10 @@ faccessat(int fd, char *fname, int fmode, int flag)
 		VN_RELE(dirvp);
 
 	return (error);
+}
+
+int
+access(char *fname, int fmode)
+{
+	return (faccessat(AT_FDCWD, fname, fmode, 0));
 }

@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -128,15 +126,15 @@ sprintf.o   vfprintf.o  vprintf.o   vsprintf.o
 
 SYSCOM=\
 _access.o acct.o  adjtime.o close.o _creat.o dup.o dup2.o \
-fchdir.o fchmod.o fchown.o fchroot.o \
+fchdir.o fchmod.o fchroot.o \
 fdlist.o flock.o  fpathconf.o fsync.o ftruncate.o getdents.o \
 getdtablesize.o getgid.o  getitimer.o getpid.o gettimeofday.o \
 getuid.o ioctl.o kill.o lseek.o mincore.o mprotect.o munmap.o\
-_open.o poll.o profil.o setitimer.o \
+_open.o profil.o setitimer.o \
 rlimit.o _statfs.o  sync.o umask.o uname.o\
 execl.o execle.o execv.o mkfifo.o msgsys.o\
 pathconf.o semsys.o shmsys.o unmount.o wait.o setuid.o\
-setgid.o _stat.o seteuid.o setegid.o signalmap.o utimes.o syscall.o \
+setgid.o _stat.o seteuid.o setegid.o signalmap.o syscall.o \
 maperror.o sigsetjmp.o accept.o bind.o connect.o getpeername.o \
 getsockname.o getsockopt.o listen.o recv.o send.o \
 setsockopt.o shutdown.o socket.o socketpair.o setsid.o sigaction.o
@@ -185,13 +183,12 @@ YP= yp_bind.o
 
 YP= yp_bind.o
 PSEUDO_SRCS= adjtime.s fchdir.s \
-fchmod.s   fchown.s    fchroot.s      \
+fchmod.s   fchroot.s      \
 fpathconf.s getitimer.s    getpid.s    \
 mincore.s   mprotect.s munmap.s    \
 profil.s    setitimer.s \
 sync.s     sysconf.s   umask.s         ustat.s \
-acct.s    stime.s      \
-utimes.s poll.s
+acct.s    stime.s
 
 #
 # libbc build rules

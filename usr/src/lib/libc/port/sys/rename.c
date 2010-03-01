@@ -18,26 +18,31 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved	*/
-
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-	.file	"fchown.s"
+#include "lint.h"
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/syscall.h>
+#include <sys/fcntl.h>
 
-/* C library -- fchown						*/
-/* int fchown(int fildes, uid_t owner, gid_t group)		*/
+int
+renameat(int oldfd, const char *oldname, int newfd, const char *newname)
+{
+	return (syscall(SYS_renameat, oldfd, oldname, newfd, newname));
+}
 
-#include <sys/asm_linkage.h>
-
-	ANSI_PRAGMA_WEAK(fchown,function)
-
-#include "SYS.h"
-
-	SYSCALL_RVAL1(fchown)
-	RETC
-	SET_SIZE(fchown)
+#pragma weak _rename = rename
+int
+rename(const char *oldname, const char *newname)
+{
+#if defined(_RETAIN_OLD_SYSCALLS)
+	return (syscall(SYS_rename, oldname, newname));
+#else
+	return (renameat(AT_FDCWD, oldname, AT_FDCWD, newname));
+#endif
+}

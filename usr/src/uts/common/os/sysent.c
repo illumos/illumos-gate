@@ -21,7 +21,7 @@
 
 /* ONC_PLUS EXTRACT START */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,17 +57,13 @@ int	chown();
 int	chroot();
 int	cladm();
 int	close();
-int	creat();
-int	dup();
-int	exec();
 int	exece();
+int	faccessat();
+int	fchownat();
 int	fcntl();
-int64_t	forkall();
 int64_t	vfork();
 int64_t	forksys();
-int64_t	fork1();
 int	fstat();
-int	fsat32();
 int	fdsync();
 int64_t	getgid();
 int	ucredsys();
@@ -94,6 +90,7 @@ int	mount();
 int	nice();
 int	nullsys();
 int	open();
+int	openat();
 int	pause();
 long	pcsample();
 int	privsys();
@@ -102,6 +99,7 @@ ssize_t	pread();
 ssize_t	pwrite();
 ssize_t	read();
 int	rename();
+int	renameat();
 void	rexit();
 int	semsys();
 int	setgid();
@@ -118,6 +116,7 @@ int	sigresend();
 int	sigtimedwait();
 int	getsetcontext();
 int	stat();
+int	fstatat();
 int	stime();
 int	stty();
 int	syssync();
@@ -127,16 +126,14 @@ long	ulimit();
 int	getrlimit32();
 int	setrlimit32();
 int	umask();
-int	umount();
 int	umount2();
 int	unlink();
-int	utime();
+int	unlinkat();
 int	utimesys();
 int64_t	utssys32();
 int64_t	utssys64();
 int	uucopy();
 ssize_t	uucopystr();
-int64_t	wait();
 ssize_t	write();
 ssize_t	readv();
 ssize_t	writev();
@@ -148,7 +145,6 @@ int	statfs32();
 int	fstatfs32();
 int	sysfs();
 int	getmsg();
-int	poll();
 int	pollsys();
 int	putmsg();
 int	uadmin();
@@ -181,12 +177,6 @@ caddr_t smmap32();
 int	smmaplf32();
 int	mprotect();
 int	munmap();
-#if (defined(__i386) && !defined(__amd64)) || defined(__i386_COMPAT)
-int	xstat();
-int	lxstat();
-int	fxstat();
-int	xmknod();
-#endif
 int	uname();
 int	lchown();
 int	getpmsg();
@@ -217,7 +207,6 @@ int	lwp_self();
 int64_t	lwp_sigmask();
 int	yield();
 int	lwp_wait();
-int	lwp_mutex_lock();
 int	lwp_mutex_timedlock();
 int	lwp_mutex_wakeup();
 int	lwp_mutex_unlock();
@@ -225,7 +214,6 @@ int	lwp_mutex_trylock();
 int	lwp_mutex_register();
 int	lwp_rwlock_sys();
 int	lwp_sema_post();
-int	lwp_sema_wait();
 int	lwp_sema_timedwait();
 int	lwp_sema_trywait();
 int	lwp_cond_wait();
@@ -256,7 +244,6 @@ int	signotify();
 
 int	getdents64();
 int	stat64();
-int	fsat64();
 int	lstat64();
 int	fstatat64();
 int	fstat64();
@@ -266,8 +253,8 @@ int	setrlimit64();
 int	getrlimit64();
 int	pread64();
 int	pwrite64();
-int	creat64();
 int	open64();
+int	openat64();
 
 /*
  * NTP syscalls
@@ -281,11 +268,10 @@ int ntp_adjtime();
  *	++  SunOS4.1 Buyback  ++
  *	++++++++++++++++++++++++
  *
- *	fchroot, utimes, vhangup, gettimeofday
+ *	fchroot, vhangup, gettimeofday
  */
 
 int	fchroot();
-int	utimes();
 int	vhangup();
 int	gettimeofday();
 int	getitimer();
@@ -433,16 +419,16 @@ struct sysent sysent[NSYSCALL] =
 			SYSENT_NOSYS(),
 			SYSENT_C("indir",	indir,		1)),
 	/*  1 */ SYSENT_CI("exit",		rexit,		1),
-	/*  2 */ SYSENT_2CI("forkall",		forkall,	0),
+	/*  2 */ SYSENT_LOADABLE(),			/* (was forkall) */
 	/*  3 */ SYSENT_CL("read",		read,		3),
 	/*  4 */ SYSENT_CL("write",		write,		3),
 	/*  5 */ SYSENT_CI("open",		open,		3),
 	/*  6 */ SYSENT_CI("close",		close,		1),
-	/*  7 */ SYSENT_2CI("wait",		wait,		0),
-	/*  8 */ SYSENT_CI("creat",		creat,		2),
+	/*  7 */ SYSENT_LOADABLE(),			/* (was wait) */
+	/*  8 */ SYSENT_LOADABLE(),			/* (was creat) */
 	/*  9 */ SYSENT_CI("link",		link,		2),
 	/* 10 */ SYSENT_CI("unlink",		unlink,		1),
-	/* 11 */ SYSENT_CI("exec",		exec,		2),
+	/* 11 */ SYSENT_LOADABLE(),			/* (was exec) */
 	/* 12 */ SYSENT_CI("chdir",		chdir,		1),
 	/* 13 */ SYSENT_CL("time",		gtime,		0),
 	/* 14 */ SYSENT_CI("mknod",		mknod,		3),
@@ -455,7 +441,7 @@ struct sysent sysent[NSYSCALL] =
 			SYSENT_CL("lseek",	lseek32,	3)),
 	/* 20 */ SYSENT_2CI("getpid",		getpid,		0),
 	/* 21 */ SYSENT_AP("mount",		mount,		8),
-	/* 22 */ SYSENT_CI("umount",		umount,		1),
+	/* 22 */ SYSENT_LOADABLE(),			/* (was umount) */
 	/* 23 */ SYSENT_CI("setuid",		setuid,		1),
 	/* 24 */ SYSENT_2CI("getuid",		getuid,		0),
 	/* 25 */ SYSENT_CI("stime",		stime,		1),
@@ -463,7 +449,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 27 */ SYSENT_CI("alarm",		alarm,		1),
 	/* 28 */ SYSENT_CI("fstat",		fstat,		2),
 	/* 29 */ SYSENT_CI("pause",		pause,		0),
-	/* 30 */ SYSENT_CI("utime",		utime,		2),
+	/* 30 */ SYSENT_LOADABLE(),			/* (was utime) */
 	/* 31 */ SYSENT_CI("stty",		stty,		2),
 	/* 32 */ SYSENT_CI("gtty",		gtty,		2),
 	/* 33 */ SYSENT_CI("access",		access,		2),
@@ -478,11 +464,11 @@ struct sysent sysent[NSYSCALL] =
 			SYSENT_CI("fstatfs",	fstatfs32,	4)),
 	/* 39 */ SYSENT_CI("setpgrp",		setpgrp,	3),
 	/* 40 */ SYSENT_CI("uucopystr",		uucopystr,	3),
-	/* 41 */ SYSENT_CI("dup",		dup,		1),
+	/* 41 */ SYSENT_LOADABLE(),			/* (was dup) */
 	/* 42 */ SYSENT_LOADABLE(),			/* pipe */
 	/* 43 */ SYSENT_CL("times",		times,		1),
 	/* 44 */ SYSENT_CI("prof",		profil,		4),
-	/* 45 */ SYSENT_LOADABLE(),			/* (was proc lock) */
+	/* 45 */ SYSENT_CI("faccessat",		faccessat,	4),
 	/* 46 */ SYSENT_CI("setgid",		setgid,		1),
 	/* 47 */ SYSENT_2CI("getgid",		getgid,		0),
 	/* 48 */ SYSENT_LOADABLE(),			/* (was ssig) */
@@ -495,7 +481,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 53 */ SYSENT_LOADABLE(),			/* semsys */
 	/* 54 */ SYSENT_CI("ioctl",		ioctl,		3),
 	/* 55 */ SYSENT_CI("uadmin",		uadmin,		3),
-	/* 56 */ SYSENT_LOADABLE(),
+	/* 56 */ SYSENT_CI("fchownat",		fchownat,	5),
 	/* 57 */ IF_LP64(
 			SYSENT_2CI("utssys",	utssys64,	4),
 			SYSENT_2CI("utssys",	utssys32,	4)),
@@ -505,26 +491,23 @@ struct sysent sysent[NSYSCALL] =
 	/* 61 */ SYSENT_CI("chroot",		chroot,		1),
 	/* 62 */ SYSENT_CI("fcntl",		fcntl,		3),
 	/* 63 */ SYSENT_CI("ulimit",		ulimit,		2),
-
-	/*
-	 * The following 6 entries were reserved for the UNIX PC.
-	 */
-	/* 64 */ SYSENT_LOADABLE(),
-	/* 65 */ SYSENT_LOADABLE(),
-	/* 66 */ SYSENT_LOADABLE(),
-	/* 67 */ SYSENT_LOADABLE(),		/* file locking call */
-	/* 68 */ SYSENT_LOADABLE(),		/* local system calls */
-	/* 69 */ SYSENT_LOADABLE(),		/* inode open */
-
+	/* 64 */ SYSENT_CI("renameat",		renameat,	4),
+	/* 65 */ SYSENT_CI("unlinkat",		unlinkat,	3),
+	/* 66 */ SYSENT_CI("fstatat",		fstatat,	4),
+	/* 67 */ IF_LP64(
+			SYSENT_NOSYS(),
+			SYSENT_CI("fstatat64",	fstatat64, 	4)),
+	/* 68 */ SYSENT_CI("openat",		openat,		4),
+	/* 69 */ IF_LP64(
+			SYSENT_NOSYS(),
+			SYSENT_CI("openat64",	openat64,	4)),
 	/* 70 */ SYSENT_CI("tasksys",		tasksys,	5),
 	/* 71 */ SYSENT_LOADABLE(),		/* acctctl */
 	/* 72 */ SYSENT_LOADABLE(),		/* exacct */
 	/* 73 */ SYSENT_CI("getpagesizes",	getpagesizes,	3),
 	/* 74 */ SYSENT_CI("rctlsys",		rctlsys,	6),
 	/* 75 */ SYSENT_2CI("sidsys",		sidsys,		4),
-	/* 76 */ IF_LP64(
-			SYSENT_CI("fsat",	fsat64,		6),
-			SYSENT_CI("fsat",	fsat32,		6)),
+	/* 76 */ SYSENT_LOADABLE(),			/* (was fsat) */
 	/* 77 */ SYSENT_CI("lwp_park",		syslwp_park,	3),
 	/* 78 */ SYSENT_CL("sendfilev",		sendfilev,	5),
 	/* 79 */ SYSENT_CI("rmdir",		rmdir,		1),
@@ -537,7 +520,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 84 */ SYSENT_CI("sysfs",		sysfs,		3),
 	/* 85 */ SYSENT_CI("getmsg",		getmsg,		4),
 	/* 86 */ SYSENT_CI("putmsg",		putmsg,		4),
-	/* 87 */ SYSENT_CI("poll",		poll,		3),
+	/* 87 */ SYSENT_LOADABLE(),			/* (was poll) */
 	/* 88 */ SYSENT_CI("lstat",		lstat,		2),
 	/* 89 */ SYSENT_CI("symlink",		symlink,	2),
 	/* 90 */ SYSENT_CL("readlink",		readlink,	3),
@@ -550,10 +533,9 @@ struct sysent sysent[NSYSCALL] =
 	/* 97 */ SYSENT_CI("sigaltstack",	sigaltstack,	2),
 	/* 98 */ SYSENT_CI("sigaction",		sigaction,	3),
 	/* 99 */ SYSENT_CI("sigpending",	sigpending,	2),
-
 	/* 100 */ SYSENT_CI("getsetcontext",	getsetcontext,	2),
-	/* 101 */ SYSENT_LOADABLE(),		/* (was evsys) */
-	/* 102 */ SYSENT_LOADABLE(),		/* (was evtrapret) */
+	/* 101 */ SYSENT_LOADABLE(),
+	/* 102 */ SYSENT_LOADABLE(),
 	/* 103 */ SYSENT_CI("statvfs",		statvfs,	2),
 	/* 104 */ SYSENT_CI("fstatvfs",		fstatvfs,	2),
 	/* 105 */ SYSENT_CI("getloadavg",	getloadavg,	2),
@@ -580,26 +562,10 @@ struct sysent sysent[NSYSCALL] =
 	/* 120 */ SYSENT_CI("fchdir",		fchdir,		1),
 	/* 121 */ SYSENT_CL("readv",		readv,		3),
 	/* 122 */ SYSENT_CL("writev",		writev,		3),
-	/* 123 */ IF_LP64(
-			SYSENT_NOSYS(),
-			IF_i386(
-				SYSENT_CI("xstat",	xstat,	3),
-				SYSENT_NOSYS())),
-	/* 124 */ IF_LP64(
-			SYSENT_NOSYS(),
-			IF_i386(
-				SYSENT_CI("lxstat",	lxstat,	3),
-				SYSENT_NOSYS())),
-	/* 125 */ IF_LP64(
-			SYSENT_NOSYS(),
-			IF_i386(
-				SYSENT_CI("fxstat",	fxstat,	3),
-				SYSENT_NOSYS())),
-	/* 126 */ IF_LP64(
-			SYSENT_NOSYS(),
-			IF_i386(
-				SYSENT_CI("xmknod",	xmknod,	4),
-				SYSENT_NOSYS())),
+	/* 123 */ SYSENT_LOADABLE(),			/* (was xstat) */
+	/* 124 */ SYSENT_LOADABLE(),			/* (was lxstat) */
+	/* 125 */ SYSENT_LOADABLE(),			/* (was fxstat) */
+	/* 126 */ SYSENT_LOADABLE(),			/* (was xmknod) */
 	/* 127 */ SYSENT_CI("mmapobj",		mmapobjsys,	5),
 	/* 128 */ IF_LP64(
 			SYSENT_CI("setrlimit",	setrlimit64,	2),
@@ -620,18 +586,18 @@ struct sysent sysent[NSYSCALL] =
 	/* 140 */ SYSENT_LOADABLE(),		/* sharefs */
 	/* 141 */ SYSENT_CI("seteuid",		seteuid,	1),
 	/* 142 */ SYSENT_2CI("forksys",		forksys,	2),
-	/* 143 */ SYSENT_2CI("fork1",		fork1,		0),
+	/* 143 */ SYSENT_LOADABLE(),			/* (was fork1) */
 	/* 144 */ SYSENT_CI("sigtimedwait",	sigtimedwait,	3),
 	/* 145 */ SYSENT_CI("lwp_info",		lwp_info,	1),
 	/* 146 */ SYSENT_CI("yield",		yield,		0),
-	/* 147 */ SYSENT_CI("lwp_sema_wait",	lwp_sema_wait,	1),
+	/* 147 */ SYSENT_LOADABLE(),		/* (was lwp_sema_wait) */
 	/* 148 */ SYSENT_CI("lwp_sema_post",	lwp_sema_post,	1),
 	/* 149 */ SYSENT_CI("lwp_sema_trywait",	lwp_sema_trywait, 1),
 	/* 150 */ SYSENT_CI("lwp_detach",	lwp_detach,	1),
 	/* 151 */ SYSENT_CI("corectl",		corectl,	4),
 	/* 152 */ SYSENT_CI("modctl",		modctl,		6),
 	/* 153 */ SYSENT_CI("fchroot",		fchroot,	1),
-	/* 154 */ SYSENT_CI("utimes",		utimes,		2),
+	/* 154 */ SYSENT_LOADABLE(),			/* (was utimes) */
 	/* 155 */ SYSENT_CI("vhangup",		vhangup,	0),
 	/* 156 */ SYSENT_CI("gettimeofday",	gettimeofday,	1),
 	/* 157 */ SYSENT_CI("getitimer",	getitimer,	2),
@@ -648,7 +614,7 @@ struct sysent sysent[NSYSCALL] =
 			SYSENT_NOSYS()),
 	/* 167 */ SYSENT_CI("lwp_wait",		lwp_wait,	2),
 	/* 168 */ SYSENT_CI("lwp_mutex_wakeup",	lwp_mutex_wakeup,	2),
-	/* 169 */ SYSENT_CI("lwp_mutex_lock",	lwp_mutex_lock,		1),
+	/* 169 */ SYSENT_LOADABLE(),		    /* (was lwp_mutex_lock) */
 	/* 170 */ SYSENT_CI("lwp_cond_wait",	lwp_cond_wait,		4),
 	/* 171 */ SYSENT_CI("lwp_cond_signal",	lwp_cond_signal,	1),
 	/* 172 */ SYSENT_CI("lwp_cond_broadcast", lwp_cond_broadcast,	1),
@@ -740,9 +706,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 223 */ IF_LP64(
 			SYSENT_NOSYS(),
 			SYSENT_CI("pwrite64", 	pwrite64, 	5)),
-	/* 224 */ IF_LP64(
-			SYSENT_NOSYS(),
-			SYSENT_CI("creat64",	creat64,	2)),
+	/* 224 */ SYSENT_LOADABLE(),			/* (was creat64) */
 	/* 225 */ IF_LP64(
 			SYSENT_NOSYS(),
 			SYSENT_CI("open64",	open64,		3)),
@@ -792,12 +756,7 @@ extern ssize_t readv32();
 extern ssize_t writev32();
 extern ssize_t readlink32();
 extern int open32();
-extern int creat32();
-#if (defined(__i386) && !defined(__amd64)) || defined(__i386_COMPAT)
-extern int xstat32();
-extern int lxstat32();
-extern int fxstat32();
-#endif
+extern int openat32();
 extern int stat32();
 extern int fstatat32();
 extern int lstat32();
@@ -842,16 +801,16 @@ struct sysent sysent32[NSYSCALL] =
 /* ONC_PLUS EXTRACT END */
 	/*  0 */ SYSENT_C("indir",		indir,		1),
 	/*  1 */ SYSENT_CI("exit",	(int (*)())rexit,	1),
-	/*  2 */ SYSENT_2CI("forkall",		forkall,	0),
+	/*  2 */ SYSENT_LOADABLE32(),			/* (was forkall) */
 	/*  3 */ SYSENT_CI("read",		read32,		3),
 	/*  4 */ SYSENT_CI("write",		write32,	3),
 	/*  5 */ SYSENT_CI("open",		open32,		3),
 	/*  6 */ SYSENT_CI("close",		close,		1),
-	/*  7 */ SYSENT_2CI("wait",		wait,		0),
-	/*  8 */ SYSENT_CI("creat",		creat32,	2),
+	/*  7 */ SYSENT_LOADABLE32(),			/* (was wait) */
+	/*  8 */ SYSENT_LOADABLE32(),			/* (was creat32) */
 	/*  9 */ SYSENT_CI("link",		link,		2),
 	/* 10 */ SYSENT_CI("unlink",		unlink,		1),
-	/* 11 */ SYSENT_CI("exec",		exec,		2),
+	/* 11 */ SYSENT_LOADABLE32(),			/* (was exec) */
 	/* 12 */ SYSENT_CI("chdir",		chdir,		1),
 	/* 13 */ SYSENT_CI("time",		gtime,		0),
 	/* 14 */ SYSENT_CI("mknod",		mknod,		3),
@@ -862,7 +821,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 19 */ SYSENT_CI("lseek",		lseek32,	3),
 	/* 20 */ SYSENT_2CI("getpid",		getpid,		0),
 	/* 21 */ SYSENT_AP("mount",		mount,		8),
-	/* 22 */ SYSENT_CI("umount",		umount,		1),
+	/* 22 */ SYSENT_LOADABLE32(),			/* (was umount) */
 	/* 23 */ SYSENT_CI("setuid",		setuid,		1),
 	/* 24 */ SYSENT_2CI("getuid",		getuid,		0),
 	/* 25 */ SYSENT_CI("stime",		stime32,	1),
@@ -870,7 +829,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 27 */ SYSENT_CI("alarm",		alarm,		1),
 	/* 28 */ SYSENT_CI("fstat",		fstat32,	2),
 	/* 29 */ SYSENT_CI("pause",		pause,		0),
-	/* 30 */ SYSENT_CI("utime",		utime,		2),
+	/* 30 */ SYSENT_LOADABLE32(),			/* (was utime) */
 	/* 31 */ SYSENT_CI("stty",		stty,		2),
 	/* 32 */ SYSENT_CI("gtty",		gtty,		2),
 	/* 33 */ SYSENT_CI("access",		access,		2),
@@ -881,24 +840,24 @@ struct sysent sysent32[NSYSCALL] =
 	/* 38 */ SYSENT_CI("fstatfs",		fstatfs32,	4),
 	/* 39 */ SYSENT_CI("setpgrp",		setpgrp,	3),
 	/* 40 */ SYSENT_CI("uucopystr",		uucopystr,	3),
-	/* 41 */ SYSENT_CI("dup",		dup,		1),
+	/* 41 */ SYSENT_LOADABLE32(),			/* (was dup) */
 	/* 42 */ SYSENT_LOADABLE32(),			/* pipe */
 	/* 43 */ SYSENT_CI("times",		times32,	1),
 	/* 44 */ SYSENT_CI("prof",		profil,		4),
-	/* 45 */ SYSENT_LOADABLE32(),			/* (was proc lock) */
+	/* 45 */ SYSENT_CI("faccessat",		faccessat,	4),
 	/* 46 */ SYSENT_CI("setgid",		setgid,		1),
 	/* 47 */ SYSENT_2CI("getgid",		getgid,		0),
 	/* 48 */ SYSENT_LOADABLE32(),			/* (was ssig) */
 	/* 49 */ SYSENT_LOADABLE32(),			/* msgsys */
 	/* 50 */ IF_386_ABI(
 			SYSENT_CI("sysi86",	sysi86,		4),
-			SYSENT_LOADABLE()),		/* (was sys3b) */
+			SYSENT_LOADABLE32()),		/* (was sys3b) */
 	/* 51 */ SYSENT_LOADABLE32(),			/* sysacct */
 	/* 52 */ SYSENT_LOADABLE32(),			/* shmsys */
 	/* 53 */ SYSENT_LOADABLE32(),			/* semsys */
 	/* 54 */ SYSENT_CI("ioctl",		ioctl,		3),
 	/* 55 */ SYSENT_CI("uadmin",		uadmin,		3),
-	/* 56 */ SYSENT_LOADABLE32(),
+	/* 56 */ SYSENT_CI("fchownat",		fchownat,	5),
 	/* 57 */ SYSENT_2CI("utssys",		utssys32,	4),
 	/* 58 */ SYSENT_CI("fdsync",		fdsync,		2),
 	/* 59 */ SYSENT_CI("exece",		exece,		3),
@@ -906,24 +865,19 @@ struct sysent sysent32[NSYSCALL] =
 	/* 61 */ SYSENT_CI("chroot",		chroot,		1),
 	/* 62 */ SYSENT_CI("fcntl",		fcntl,		3),
 	/* 63 */ SYSENT_CI("ulimit",		ulimit32,	2),
-
-	/*
-	 * The following 6 entries were reserved for the UNIX PC.
-	 */
-	/* 64 */ SYSENT_LOADABLE32(),
-	/* 65 */ SYSENT_LOADABLE32(),
-	/* 66 */ SYSENT_LOADABLE32(),
-	/* 67 */ SYSENT_LOADABLE32(),		/* file locking call */
-	/* 68 */ SYSENT_LOADABLE32(),		/* local system calls */
-	/* 69 */ SYSENT_LOADABLE32(),		/* inode open */
-
+	/* 64 */ SYSENT_CI("renameat",		renameat,	4),
+	/* 65 */ SYSENT_CI("unlinkat",		unlinkat,	3),
+	/* 66 */ SYSENT_CI("fstatat",		fstatat32,	4),
+	/* 67 */ SYSENT_CI("fstatat64", 	fstatat64_32, 	4),
+	/* 68 */ SYSENT_CI("openat",		openat32,	4),
+	/* 69 */ SYSENT_CI("openat64",		openat64,	4),
 	/* 70 */ SYSENT_CI("tasksys",		tasksys,	5),
 	/* 71 */ SYSENT_LOADABLE32(),		/* acctctl */
 	/* 72 */ SYSENT_LOADABLE32(),		/* exacct */
 	/* 73 */ SYSENT_CI("getpagesizes",	getpagesizes32,	3),
 	/* 74 */ SYSENT_CI("rctlsys",		rctlsys,	6),
 	/* 75 */ SYSENT_2CI("sidsys",		sidsys,		4),
-	/* 76 */ SYSENT_CI("fsat",		fsat32,		6),
+	/* 76 */ SYSENT_LOADABLE32(),			/* (was fsat) */
 	/* 77 */ SYSENT_CI("lwp_park",		syslwp_park,	3),
 	/* 78 */ SYSENT_CI("sendfilev",		sendfilev,	5),
 	/* 79 */ SYSENT_CI("rmdir",		rmdir,		1),
@@ -934,7 +888,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 84 */ SYSENT_CI("sysfs",		sysfs,		3),
 	/* 85 */ SYSENT_CI("getmsg",		getmsg32,	4),
 	/* 86 */ SYSENT_CI("putmsg",		putmsg32,	4),
-	/* 87 */ SYSENT_CI("poll",		poll,		3),
+	/* 87 */ SYSENT_LOADABLE32(),			/* (was poll) */
 	/* 88 */ SYSENT_CI("lstat",		lstat32,	2),
 	/* 89 */ SYSENT_CI("symlink",		symlink,	2),
 	/* 90 */ SYSENT_CI("readlink",		readlink32,	3),
@@ -947,10 +901,9 @@ struct sysent sysent32[NSYSCALL] =
 	/* 97 */ SYSENT_CI("sigaltstack",	sigaltstack32,	2),
 	/* 98 */ SYSENT_CI("sigaction",		sigaction32,	3),
 	/* 99 */ SYSENT_CI("sigpending",	sigpending,	2),
-
 	/* 100 */ SYSENT_CI("getsetcontext",	getsetcontext32, 2),
-	/* 101 */ SYSENT_LOADABLE32(),		/* (was evsys) */
-	/* 102 */ SYSENT_LOADABLE32(),		/* (was evtrapret) */
+	/* 101 */ SYSENT_LOADABLE32(),
+	/* 102 */ SYSENT_LOADABLE32(),
 	/* 103 */ SYSENT_CI("statvfs",		statvfs32,	2),
 	/* 104 */ SYSENT_CI("fstatvfs",		fstatvfs32,	2),
 	/* 105 */ SYSENT_CI("getloadavg",	getloadavg,	2),
@@ -975,18 +928,10 @@ struct sysent sysent32[NSYSCALL] =
 	/* 120 */ SYSENT_CI("fchdir",		fchdir,		1),
 	/* 121 */ SYSENT_CI("readv",		readv32,	3),
 	/* 122 */ SYSENT_CI("writev",		writev32,	3),
-	/* 123 */ IF_386_ABI(
-			SYSENT_CI("xstat",	xstat32,	3),
-			SYSENT_NOSYS()),
-	/* 124 */ IF_386_ABI(
-			SYSENT_CI("lxstat",	lxstat32,	3),
-			SYSENT_NOSYS()),
-	/* 125 */ IF_386_ABI(
-			SYSENT_CI("fxstat",	fxstat32,	3),
-			SYSENT_NOSYS()),
-	/* 126 */ IF_386_ABI(
-			SYSENT_CI("xmknod",	xmknod,		4),
-			SYSENT_NOSYS()),
+	/* 123 */ SYSENT_LOADABLE32(),		/*	was xstat32	*/
+	/* 124 */ SYSENT_LOADABLE32(),		/*	was lxstat32	*/
+	/* 125 */ SYSENT_LOADABLE32(),		/*	was fxstat32	*/
+	/* 126 */ SYSENT_LOADABLE32(),		/*	was xmknod	*/
 	/* 127 */ SYSENT_CI("mmapobj",		mmapobjsys,	5),
 	/* 128 */ SYSENT_CI("setrlimit",	setrlimit32,	2),
 	/* 129 */ SYSENT_CI("getrlimit",	getrlimit32,	2),
@@ -995,7 +940,6 @@ struct sysent sysent32[NSYSCALL] =
 	/* 132 */ SYSENT_CI("getpmsg",		getpmsg32,	5),
 	/* 133 */ SYSENT_CI("putpmsg",		putpmsg32,	5),
 	/* 134 */ SYSENT_CI("rename",		rename,		2),
-
 	/* 135 */ SYSENT_CI("uname",		uname,		1),
 	/* 136 */ SYSENT_CI("setegid",		setegid,	1),
 	/* 137 */ SYSENT_CI("sysconfig",	sysconfig,	1),
@@ -1004,18 +948,18 @@ struct sysent sysent32[NSYSCALL] =
 	/* 140 */ SYSENT_LOADABLE32(),		/* sharefs */
 	/* 141 */ SYSENT_CI("seteuid",		seteuid,	1),
 	/* 142 */ SYSENT_2CI("forksys",		forksys,	2),
-	/* 143 */ SYSENT_2CI("fork1",		fork1,		0),
+	/* 143 */ SYSENT_LOADABLE32(),			/* (was fork1) */
 	/* 144 */ SYSENT_CI("sigtimedwait",	sigtimedwait,	3),
 	/* 145 */ SYSENT_CI("lwp_info",		lwp_info,	1),
 	/* 146 */ SYSENT_CI("yield",		yield,		0),
-	/* 147 */ SYSENT_CI("lwp_sema_wait",	lwp_sema_wait,	1),
+	/* 147 */ SYSENT_LOADABLE32(),		/* (was lwp_sema_wait) */
 	/* 148 */ SYSENT_CI("lwp_sema_post",	lwp_sema_post,	1),
 	/* 149 */ SYSENT_CI("lwp_sema_trywait",	lwp_sema_trywait, 1),
 	/* 150 */ SYSENT_CI("lwp_detach",	lwp_detach,	1),
 	/* 151 */ SYSENT_CI("corectl",		corectl,	4),
 	/* 152 */ SYSENT_CI("modctl",		modctl,		6),
 	/* 153 */ SYSENT_CI("fchroot",		fchroot,	1),
-	/* 154 */ SYSENT_CI("utimes",		utimes,		2),
+	/* 154 */ SYSENT_LOADABLE32(),			/* (was utimes) */
 	/* 155 */ SYSENT_CI("vhangup",		vhangup,	0),
 	/* 156 */ SYSENT_CI("gettimeofday",	gettimeofday,	1),
 	/* 157 */ SYSENT_CI("getitimer",	getitimer,	2),
@@ -1032,7 +976,7 @@ struct sysent sysent32[NSYSCALL] =
 			SYSENT_NOSYS()),
 	/* 167 */ SYSENT_CI("lwp_wait",		lwp_wait,	2),
 	/* 168 */ SYSENT_CI("lwp_mutex_wakeup",	lwp_mutex_wakeup,	2),
-	/* 169 */ SYSENT_CI("lwp_mutex_lock",	lwp_mutex_lock,		1),
+	/* 169 */ SYSENT_LOADABLE32(),		/* (was lwp_mutex_lock) */
 	/* 170 */ SYSENT_CI("lwp_cond_wait",	lwp_cond_wait,		4),
 	/* 171 */ SYSENT_CI("lwp_cond_signal",	lwp_cond_signal,	1),
 	/* 172 */ SYSENT_CI("lwp_cond_broadcast", lwp_cond_broadcast,	1),
@@ -1090,7 +1034,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 221 */ SYSENT_CI("getrlimit64", 	getrlimit64, 	2),
 	/* 222 */ SYSENT_CI("pread64", 		pread64, 	5),
 	/* 223 */ SYSENT_CI("pwrite64", 	pwrite64, 	5),
-	/* 224 */ SYSENT_CI("creat64",		creat64,	2),
+	/* 224 */ SYSENT_LOADABLE32(),			/* (was creat64) */
 	/* 225 */ SYSENT_CI("open64",		open64,		3),
 	/* 226 */ SYSENT_LOADABLE32(),		/* rpcsys */
 	/* 227 */ SYSENT_CI("zone",		zone,		6),

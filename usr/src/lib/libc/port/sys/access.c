@@ -20,43 +20,28 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
-#include <stdarg.h>
-#include <sys/types.h>
+#include <unistd.h>
 #include <sys/syscall.h>
-
-#if !defined(_LP64) && _FILE_OFFSET_BITS == 64
+#include <sys/fcntl.h>
 
 int
-__openat64(int fd, const char *name, int oflag, ...)
+faccessat(int fd, const char *fname, int amode, int flag)
 {
-	va_list ap;
-	mode_t mode;
-
-	va_start(ap, oflag);
-	mode = va_arg(ap, mode_t);
-	va_end(ap);
-	return (syscall(SYS_fsat, 1, fd, name, oflag, mode));
+	return (syscall(SYS_faccessat, fd, fname, amode, flag));
 }
 
+#pragma weak _access = access
+int
+access(const char *fname, int amode)
+{
+#if defined(_RETAIN_OLD_SYSCALLS)
+	return (syscall(SYS_access, fname, amode));
 #else
-
-int
-__openat(int fd, const char *name, int oflag, ...)
-{
-	va_list ap;
-	mode_t mode;
-
-	va_start(ap, oflag);
-	mode = va_arg(ap, mode_t);
-	va_end(ap);
-	return (syscall(SYS_fsat, 0, fd, name, oflag, mode));
-}
-
+	return (faccessat(AT_FDCWD, fname, amode, 0));
 #endif
+}

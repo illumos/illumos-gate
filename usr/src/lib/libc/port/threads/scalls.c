@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -727,26 +727,6 @@ close(int fildes)
 }
 
 int
-creat(const char *path, mode_t mode)
-{
-	extern int __creat(const char *, mode_t);
-	int rv;
-
-	PERFORM(__creat(path, mode))
-}
-
-#if !defined(_LP64)
-int
-creat64(const char *path, mode_t mode)
-{
-	extern int __creat64(const char *, mode_t);
-	int rv;
-
-	PERFORM(__creat64(path, mode))
-}
-#endif	/* !_LP64 */
-
-int
 door_call(int d, door_arg_t *params)
 {
 	extern int __door_call(int, door_arg_t *);
@@ -837,9 +817,21 @@ msync(caddr_t addr, size_t len, int flags)
 }
 
 int
+openat(int fd, const char *path, int oflag, ...)
+{
+	mode_t mode;
+	int rv;
+	va_list ap;
+
+	va_start(ap, oflag);
+	mode = va_arg(ap, mode_t);
+	va_end(ap);
+	PERFORM(__openat(fd, path, oflag, mode))
+}
+
+int
 open(const char *path, int oflag, ...)
 {
-	extern int __open(const char *, int, ...);
 	mode_t mode;
 	int rv;
 	va_list ap;
@@ -851,9 +843,15 @@ open(const char *path, int oflag, ...)
 }
 
 int
-openat(int fd, const char *path, int oflag, ...)
+creat(const char *path, mode_t mode)
 {
-	extern int __openat(int, const char *, int, ...);
+	return (open(path, O_WRONLY | O_CREAT | O_TRUNC, mode));
+}
+
+#if !defined(_LP64)
+int
+openat64(int fd, const char *path, int oflag, ...)
+{
 	mode_t mode;
 	int rv;
 	va_list ap;
@@ -861,14 +859,12 @@ openat(int fd, const char *path, int oflag, ...)
 	va_start(ap, oflag);
 	mode = va_arg(ap, mode_t);
 	va_end(ap);
-	PERFORM(__openat(fd, path, oflag, mode))
+	PERFORM(__openat64(fd, path, oflag, mode))
 }
 
-#if !defined(_LP64)
 int
 open64(const char *path, int oflag, ...)
 {
-	extern int __open64(const char *, int, ...);
 	mode_t mode;
 	int rv;
 	va_list ap;
@@ -880,17 +876,9 @@ open64(const char *path, int oflag, ...)
 }
 
 int
-openat64(int fd, const char *path, int oflag, ...)
+creat64(const char *path, mode_t mode)
 {
-	extern int __openat64(int, const char *, int, ...);
-	mode_t mode;
-	int rv;
-	va_list ap;
-
-	va_start(ap, oflag);
-	mode = va_arg(ap, mode_t);
-	va_end(ap);
-	PERFORM(__openat64(fd, path, oflag, mode))
+	return (open64(path, O_WRONLY | O_CREAT | O_TRUNC, mode));
 }
 #endif	/* !_LP64 */
 

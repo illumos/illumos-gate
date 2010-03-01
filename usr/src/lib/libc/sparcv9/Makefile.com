@@ -186,7 +186,6 @@ COMSYSOBJS=			\
 	_so_socket.o		\
 	_so_socketpair.o	\
 	_sockconfig.o		\
-	access.o		\
 	acct.o			\
 	acl.o			\
 	adjtime.o		\
@@ -194,23 +193,17 @@ COMSYSOBJS=			\
 	brk.o			\
 	chdir.o			\
 	chmod.o			\
-	chown.o			\
 	chroot.o		\
 	cladm.o			\
 	close.o			\
-	creat.o			\
-	dup.o			\
 	execve.o		\
 	exit.o			\
 	facl.o			\
 	fchdir.o		\
 	fchmod.o		\
-	fchown.o		\
 	fchroot.o		\
-	fcntl.o			\
 	fdsync.o		\
 	fpathconf.o		\
-	fstat.o			\
 	fstatfs.o		\
 	fstatvfs.o		\
 	getcpuid.o		\
@@ -232,11 +225,9 @@ COMSYSOBJS=			\
 	ioctl.o			\
 	kaio.o			\
 	kill.o			\
-	lchown.o		\
 	link.o			\
 	llseek.o		\
 	lseek.o			\
-	lstat.o			\
 	memcntl.o		\
 	mincore.o		\
 	mkdir.o			\
@@ -250,7 +241,6 @@ COMSYSOBJS=			\
 	nice.o			\
 	ntp_adjtime.o		\
 	ntp_gettime.o		\
-	open.o			\
 	p_online.o		\
 	pathconf.o		\
 	pause.o			\
@@ -267,9 +257,7 @@ COMSYSOBJS=			\
 	read.o			\
 	readlink.o		\
 	readv.o			\
-	rename.o		\
 	resolvepath.o		\
-	rmdir.o			\
 	seteguid.o		\
 	setgid.o		\
 	setgroups.o		\
@@ -281,7 +269,6 @@ COMSYSOBJS=			\
 	sigprocmsk.o		\
 	sigsendset.o		\
 	sigsuspend.o		\
-	stat.o			\
 	statfs.o		\
 	statvfs.o		\
 	stty.o			\
@@ -295,7 +282,6 @@ COMSYSOBJS=			\
 	ulimit.o		\
 	umask.o			\
 	umount2.o		\
-	unlink.o		\
 	utssys.o		\
 	uucopy.o		\
 	vhangup.o		\
@@ -396,7 +382,7 @@ PORTGEN=			\
 	dirname.o		\
 	div.o			\
 	drand48.o		\
-	dup2.o			\
+	dup.o			\
 	env_data.o		\
 	err.o			\
 	errno.o			\
@@ -791,23 +777,22 @@ PORTSYS64=
 
 PORTSYS=			\
 	_autofssys.o		\
+	access.o		\
 	acctctl.o		\
 	bsd_signal.o		\
+	chown.o			\
 	corectl.o		\
 	exacctsys.o		\
 	execl.o			\
 	execle.o		\
 	execv.o			\
-	fsmisc.o		\
-	fstatat.o		\
+	fcntl.o			\
 	getpagesizes.o		\
 	getpeerucred.o		\
 	inst_sync.o		\
 	issetugid.o		\
 	label.o			\
-	libc_fcntl.o		\
 	libc_link.o		\
-	libc_open.o		\
 	lockf.o			\
 	lwp.o			\
 	lwp_cond.o		\
@@ -816,12 +801,13 @@ PORTSYS=			\
 	meminfosys.o		\
 	msgsys.o		\
 	nfssys.o		\
-	openat.o		\
+	open.o			\
 	pgrpsys.o		\
 	posix_sigwait.o		\
 	ppriv.o			\
 	psetsys.o		\
 	rctlsys.o		\
+	rename.o		\
 	sbrk.o			\
 	semsys.o		\
 	set_errno.o		\
@@ -832,10 +818,12 @@ PORTSYS=			\
 	signal.o		\
 	sigpending.o		\
 	sigstack.o		\
+	stat.o			\
 	tasksys.o		\
 	time.o			\
 	time_util.o		\
 	ucontext.o		\
+	unlink.o		\
 	ustat.o			\
 	utimesys.o		\
 	zone.o
@@ -946,6 +934,11 @@ CPPFLAGS=	-D_REENTRANT -Dsparc $(EXTN_CPPFLAGS) $(THREAD_DEBUG) \
 		-I$(LIBCBASE)/inc -I$(LIBCDIR)/inc $(CPPFLAGS.master)
 ASFLAGS=	$(EXTN_ASFLAGS) -K PIC -P -D__STDC__ -D_ASM -D__sparcv9 $(CPPFLAGS) \
 		$(sparcv9_AS_XARCH)
+
+# As a favor to the dtrace syscall provider, libc still calls the
+# old syscall traps that have been obsoleted by the *at() interfaces.
+# Delete this to compile libc using only the new *at() system call traps
+CPPFLAGS += -D_RETAIN_OLD_SYSCALLS
 
 # Conditionally add support for making |wordexp()| check whether
 # /usr/bin/ksh is ksh93 or not

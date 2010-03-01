@@ -2,7 +2,7 @@
 # Two "#" are comments that are copied to audit_record_attr
 # other comments are removed.
 ##
-## Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+## Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 ## Use is subject to license terms.
 ##
 ## CDDL HEADER START
@@ -604,6 +604,7 @@ label=AUE_CORE
 # see uts/common/c2/audit.c
 
 label=AUE_CREAT
+# obsolete - see open(2)
   format=path:[attr]
 # does not match old BSM manual
 #	header,151,2,creat(2),,Mon May 15 09:21:59 2000, + 509998810 msec
@@ -681,6 +682,7 @@ label=AUE_ENTERPROM
 #	return,success,0
 
 label=AUE_EXEC
+# obsolete - see execve(2)
   format=path:[attr]1:[exec_args]2:[exec_env]3
     comment=omitted on error:
     comment=output if argv policy is set:
@@ -719,8 +721,9 @@ label=AUE_EXPORTFS
   skip=Not used.
 
 label=AUE_FACCESSAT
+# obsolete
   see=access(2)
-  format=path:[path_attr]:[attr]
+  format=path:[attr]
 
 label=AUE_FACLSET
   syscall=facl
@@ -796,9 +799,10 @@ label=AUE_FCHOWN
        comment=1, file descriptor, "no path fd"
 
 label=AUE_FCHOWNAT
+# obsolete
   see=openat(2)
   case=With a valid absolute/relative file path 
-    format=path:[path_attr]:[attr]
+    format=path:[attr]
   case=With an file path eq. NULL and valid file descriptor
     format=kernel
 
@@ -833,22 +837,15 @@ label=AUE_FORK1
 # see audit.c
 
 label=AUE_FSAT
+# obsolete
   skip=Not used.  (Placeholder for AUE_*AT records)
-#openat		AUE_OPENAT_{W,RW,R}  appended with CT as needed
-#openat64	AUE_OPENAT_{W,RW,R}  appended with CT as needed
-#fstatat64	AUE_FSTATAT
-#fstat		AUE_FSTATAT
-#chownat	AUE_FCHOWNAT
-#unlinkat	AUE_UNLINKAT
-#futimesat	AUE_FUTIMESAT
-#renameat	AUE_RENAMEAT
-#faccessat	AUE_FACCESSAT
 
 label=AUE_FSTAT
   skip=Not used.
 
 label=AUE_FSTATAT
-  format=path:[path_attr]:[attr]
+# obsolete
+  format=path:[attr]
 
 label=AUE_FSTATFS
   case=With a valid file descriptor
@@ -864,10 +861,9 @@ label=AUE_FUSERS
   syscall=utssys: UTS_FUSERS
   format=path:attr
 
-
 label=AUE_FUTIMESAT
-  syscall=utimes(2)
-  format=[path]:[path_attr]:[attr]
+# obsolete
+  format=[path]:[attr]
 
 label=AUE_GETAUDIT
   format=kernel
@@ -986,8 +982,8 @@ label=AUE_LSTAT
   format=path:[attr]
 
 label=AUE_LXSTAT
+# obsolete
   skip=Not used.
-# AUE_LXSTAT now maps to AUE_LSTAT 
 
 label=AUE_MCTL
   skip=Not used.
@@ -1188,78 +1184,80 @@ label=AUE_OPEN
   skip=Not used.  (placeholder for AUE_OPEN_*).
 
 label=AUE_OPEN_R
-  format=path:[attr]
+  format=path:[path_attr]:[attr]
   see=open(2) - read
 
 label=AUE_OPENAT_R
+# obsolete
   format=path:[path_attr]:[attr]
   see=openat(2)
 
 label=AUE_OPEN_RC
-  format=path:[attr]
+  format=path:[path_attr]:[attr]
   see=open(2) - read,creat
 
 label=AUE_OPENAT_RC
+# obsolete
   see=openat(2)
   format=path:[path_attr]:[attr]
-# aui_fsat(): fm & O_CREAT mangling
 
 label=AUE_OPEN_RT
-  format=path:[attr]
+  format=path:[path_attr]:[attr]
   see=open(2) - read,trunc
 
 label=AUE_OPENAT_RT
+# obsolete
   see=openat(2)
   format=path:[path_attr]:[attr]
-# aui_fsat(): fm & O_TRUNC mangling
 
 label=AUE_OPEN_RTC
-  format=path:[attr]
+  format=path:[path_attr]:[attr]
   see=open(2) - read,trunc,creat
 
 label=AUE_OPENAT_RTC
+# obsolete
   see=openat(2)
   format=path:[path_attr]:[attr]
-# aui_fsat(): fm & O_TRUNC mangling, fm & O_CREAT mangling
 
 label=AUE_OPEN_RW
-  format=path:[attr]
+  format=path:[path_attr]:[attr]
   see=open(2) - read,write
 
 label=AUE_OPENAT_RW
+# obsolete
   see=openat(2)
   format=path:[path_attr]:[attr]
 # aui_fsat(): fm & O_RDWR 
 
 label=AUE_OPEN_RWC
-  format=path:[attr]
+  format=path:[path_attr]:[attr]
   see=open(2) - read,write,creat
 
 label=AUE_OPENAT_RWC
+# obsolete
   see=openat(2)
   format=path:[path_attr]:[attr]
-# aui_fsat(): fm & O_RDWR, fm & O_CREAT mangling
 
 label=AUE_OPEN_RWT
-  format=path:[attr]
+  format=path:[path_attr]:[attr]
   see=open(2) - read,write,trunc
 
 label=AUE_OPENAT_RWT
+# obsolete
   see=openat(2)
   format=path:[path_attr]:[attr]
-# aui_fsat(): fm & O_RDWR, fm & O_TRUNC mangling
 
 label=AUE_OPEN_RWTC
-  format=path:[attr]
+  format=path:[path_attr]:[attr]
   see=open(2) - read,write,trunc,creat
 
 label=AUE_OPENAT_RWTC
+# obsolete
   see=openat(2)
   format=path:[path_attr]:[attr]
-# aui_fsat(): fm & O_RDWR, fm & O_TRUNC mangling, fm & O_CREAT mangling
 
 label=AUE_OPEN_W
-  format=path:[attr]
+  format=path:[path_attr]:[attr]
   see=open(2) - write
 
 label=AUE_OPENAT_W
@@ -1267,36 +1265,34 @@ label=AUE_OPENAT_W
   format=path:[path_attr]:[attr]
 
 label=AUE_OPEN_WC
-  format=path:[attr]
+  format=path:[path_attr]:[attr]
   see=open(2) - write,creat
 
 label=AUE_OPENAT_WC
   see=openat(2)
   format=path:[path_attr]:[attr]
-# aui_fsat(): fm & O_WRONLY, fm & O_CREAT mangling
 
 label=AUE_OPEN_WT
-  format=path:[attr]
+  format=path:[path_attr]:[attr]
   see=open(2) - write,trunc
 
 label=AUE_OPENAT_WT
   see=openat(2)
   format=path:[path_attr]:[attr]
-# aui_fsat(): fm & O_WRONLY, fm & O_TRUNC mangling
 
 label=AUE_OPEN_WTC
-  format=path:[attr]
+  format=path:[path_attr]:[attr]
   see=open(2) - write,trunc,creat
 
 label=AUE_OPENAT_WTC
   see=openat(2)
   format=path:[path_attr]:[attr]
-# aui_fsat(): fm & O_WRONLY, fm & O_TRUNC mangling, fm & O_CREAT mangling
 
 label=AUE_OSETPGRP
   skip=Not used.
 
 label=AUE_OSTAT
+# obsolete
   skip=Not used.
 
 label=AUE_PATHCONF
@@ -1441,8 +1437,8 @@ label=AUE_RENAME
   comment=to name
 
 label=AUE_RENAMEAT
-# see openat(2)
-  format=path1:[path_attr]:[attr]1:[path]2:[path_attr]
+# obsolete
+  format=path1:[attr]1:[path]2
   comment=from name:
   comment=to name
 
@@ -1982,16 +1978,19 @@ label=AUE_UNLINK
   format=path:[attr]
 
 label=AUE_UNLINKAT
+# obsolete
   see=openat(2)
-  format=path:[path_attr]:[attr]
+  format=path:[attr]
 
 label=AUE_UNMOUNT
   skip=Not used.
 
 label=AUE_UTIME
+# obsolete
   format=path:[attr]
 
 label=AUE_UTIMES
+  see=futimens(2)
   format=path:[attr]
 
 label=AUE_VFORK
@@ -2015,10 +2014,12 @@ label=AUE_WRITEV
   skip=Not used. (obsolete)
 
 label=AUE_XMKNOD
-  skip=Not used.  xmknod() generates AUE_MKNOD
+# obsolete
+  skip=Not used.
 
 label=AUE_XSTAT
-  skip=Not Used.  xstat() generates AUE_STAT.
+# obsolete
+  skip=Not Used.
 
 label=AUE_PF_POLICY_ADDRULE
   title=Add IPsec policy rule

@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -118,28 +116,34 @@ syslist(char *str,			/* string of syscall names */
 		}
 		if (sys > 0 && sys <= PRMAXSYS) {
 			switch (sys) {
-			case SYS_xstat:		/* set all if any */
-			case SYS_stat:
+			case SYS_fstatat:	/* set both if either */
+			case SYS_fstatat64:
+				sys = SYS_fstatat;
+				sys64 = SYS_fstatat64;
+				goto def;
+
+			case SYS_stat:		/* set all if either */
 			case SYS_stat64:
 				sys = SYS_stat;
-				sysx = SYS_xstat;
 				sys64 = SYS_stat64;
+				sysx = SYS_fstatat;
+				sysxx = SYS_fstatat64;
 				goto def;
 
-			case SYS_lxstat:	/* set all if any */
-			case SYS_lstat:
+			case SYS_lstat:		/* set all if either */
 			case SYS_lstat64:
 				sys = SYS_lstat;
-				sysx = SYS_lxstat;
 				sys64 = SYS_lstat64;
+				sysx = SYS_fstatat;
+				sysxx = SYS_fstatat64;
 				goto def;
 
-			case SYS_fxstat:	/* set all if any */
-			case SYS_fstat:
+			case SYS_fstat:		/* set all if either */
 			case SYS_fstat64:
 				sys = SYS_fstat;
-				sysx = SYS_fxstat;
 				sys64 = SYS_fstat64;
+				sysx = SYS_fstatat;
+				sysxx = SYS_fstatat64;
 				goto def;
 
 			case SYS_getdents:	/* set both if either */
@@ -190,44 +194,20 @@ syslist(char *str,			/* string of syscall names */
 				sys64 = SYS_pwrite64;
 				goto def;
 
-			case SYS_creat:		/* set both if either */
-			case SYS_creat64:
-				sys = SYS_creat;
-				sys64 = SYS_creat64;
-				goto def;
-
-			case SYS_open:		/* set both if either */
+			case SYS_openat:	/* set all if any */
+			case SYS_openat64:
+			case SYS_open:
 			case SYS_open64:
-				sys = SYS_open;
-				sys64 = SYS_open64;
+				sys = SYS_openat;
+				sys64 = SYS_openat64;
+				sysx = SYS_open;
+				sysxx = SYS_open64;
 				goto def;
 
-			case SYS_xmknod:	/* set both if either */
-			case SYS_mknod:
-				sysx = SYS_xmknod;
-				sys = SYS_mknod;
-				goto def;
-
-			case SYS_forkall:	/* set all if any */
-			case SYS_fork1:
+			case SYS_forksys:	/* set both if either */
 			case SYS_vfork:
-			case SYS_forksys:
-				sys = SYS_forkall;
-				sysx = SYS_fork1;
-				sys64 = SYS_vfork;
-				sysxx = SYS_forksys;
-				goto def;
-
-			case SYS_exec:		/* set both if either */
-			case SYS_execve:
-				sysx = SYS_exec;
-				sys = SYS_execve;
-				goto def;
-
-			case SYS_poll:		/* set both if either */
-			case SYS_pollsys:
-				sysx = SYS_poll;
-				sys = SYS_pollsys;
+				sysx = SYS_forksys;
+				sys = SYS_vfork;
 				goto def;
 
 			case SYS_sigprocmask:	/* set both if either */
@@ -236,28 +216,38 @@ syslist(char *str,			/* string of syscall names */
 				sys = SYS_lwp_sigmask;
 				goto def;
 
-			case SYS_wait:		/* set both if either */
-			case SYS_waitid:
-				sysx = SYS_wait;
-				sys = SYS_waitid;
-				goto def;
-
 			case SYS_lseek:		/* set both if either */
 			case SYS_llseek:
 				sysx = SYS_lseek;
 				sys = SYS_llseek;
 				goto def;
 
-			case SYS_lwp_mutex_lock: /* set both if either */
-			case SYS_lwp_mutex_timedlock:
-				sysx = SYS_lwp_mutex_lock;
-				sys = SYS_lwp_mutex_timedlock;
+			case SYS_rename:	/* set both */
+				sysx = SYS_renameat;
 				goto def;
 
-			case SYS_lwp_sema_wait: /* set both if either */
-			case SYS_lwp_sema_timedwait:
-				sysx = SYS_lwp_sema_wait;
-				sys = SYS_lwp_sema_timedwait;
+			case SYS_unlink:	/* set both */
+				sysx = SYS_unlinkat;
+				goto def;
+
+			case SYS_rmdir:		/* set both */
+				sysx = SYS_unlinkat;
+				goto def;
+
+			case SYS_chown:		/* set both */
+				sysx = SYS_fchownat;
+				goto def;
+
+			case SYS_lchown:	/* set both */
+				sysx = SYS_fchownat;
+				goto def;
+
+			case SYS_fchown:	/* set both */
+				sysx = SYS_fchownat;
+				goto def;
+
+			case SYS_access:	/* set both */
+				sysx = SYS_faccessat;
 				goto def;
 
 			default:

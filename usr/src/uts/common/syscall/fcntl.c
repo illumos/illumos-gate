@@ -21,7 +21,7 @@
 
 /* ONC_PLUS EXTRACT START */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* ONC_PLUS EXTRACT END */
 
 #include <sys/param.h>
@@ -685,12 +684,6 @@ out:
 	if (error)
 		return (set_errno(error));
 	return (retval);
-}
-
-int
-dup(int fd)
-{
-	return (fcntl(fd, F_DUPFD, 0));
 }
 
 /* ONC_PLUS EXTRACT START */

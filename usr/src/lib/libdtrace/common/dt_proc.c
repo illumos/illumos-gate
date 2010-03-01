@@ -87,9 +87,8 @@
 #include <dt_pid.h>
 #include <dt_impl.h>
 
-#define	IS_SYS_EXEC(w)	(w == SYS_exec || w == SYS_execve)
-#define	IS_SYS_FORK(w)	(w == SYS_vfork || w == SYS_fork1 ||	\
-			w == SYS_forkall || w == SYS_forksys)
+#define	IS_SYS_EXEC(w)	(w == SYS_execve)
+#define	IS_SYS_FORK(w)	(w == SYS_vfork || w == SYS_forksys)
 
 static dt_bkpt_t *
 dt_proc_bpcreate(dt_proc_t *dpr, uintptr_t addr, dt_bkpt_f *func, void *data)
@@ -496,7 +495,6 @@ dt_proc_control(void *arg)
 	 * We must trace exit from exec() system calls so that if the exec is
 	 * successful, we can reset our breakpoints and re-initialize libproc.
 	 */
-	(void) Psysexit(P, SYS_exec, B_TRUE);
 	(void) Psysexit(P, SYS_execve, B_TRUE);
 
 	/*
@@ -507,10 +505,6 @@ dt_proc_control(void *arg)
 	 */
 	(void) Psysentry(P, SYS_vfork, B_TRUE);
 	(void) Psysexit(P, SYS_vfork, B_TRUE);
-	(void) Psysentry(P, SYS_fork1, B_TRUE);
-	(void) Psysexit(P, SYS_fork1, B_TRUE);
-	(void) Psysentry(P, SYS_forkall, B_TRUE);
-	(void) Psysexit(P, SYS_forkall, B_TRUE);
 	(void) Psysentry(P, SYS_forksys, B_TRUE);
 	(void) Psysexit(P, SYS_forksys, B_TRUE);
 

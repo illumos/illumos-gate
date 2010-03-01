@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,16 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -259,7 +256,7 @@ checkproc(private_t *pri)
 	const pstatus_t *Psp = Pstatus(Proc);
 	struct ps_lwphandle *Lwp = pri->Lwp;
 	const lwpstatus_t *Lsp = pri->lwpstat;
-	int what = Lsp->pr_what;	/* SYS_open or SYS_open64 */
+	int what = Lsp->pr_what;	/* one of the SYS_open* syscalls */
 	int err = Lsp->pr_errno;
 	int pid;
 	int i;

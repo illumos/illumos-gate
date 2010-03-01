@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,11 +18,11 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright (c) 1994, by Sun Microsytems, Inc.
- */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 /*
  * Interfaces that return a tnfctl handle back to client (except for
@@ -62,7 +61,7 @@ tnfctl_exec_open(const char *pgm_name, char * const *args,  char * const *envp,
 	tnfctl_errcode_t	prexstat;
 
 	prbstat = prb_child_create(pgm_name, args, ld_preload, libtnfprobe_path,
-					envp, &proc_p);
+	    envp, &proc_p);
 	if (prbstat) {
 		return (_tnfctl_map_to_errcode(prbstat));
 	}
@@ -244,8 +243,8 @@ tnfctl_indirect_open(void *prochandle, tnfctl_ind_config_t *config,
 	/* set state in target indicating we're tracing externally */
 	prexstat = _tnfctl_external_getlock(hdl);
 	if (prexstat) {
-	    free(hdl);
-	    return (prexstat);
+		free(hdl);
+		return (prexstat);
 	}
 	*ret_val = hdl;
 	return (TNFCTL_ERR_NONE);
@@ -277,7 +276,7 @@ tnfctl_kernel_open(tnfctl_handle_t **ret_val)
 
 	/* initialize function pointers that can be stuffed into a probe */
 	_tnfctl_prbk_get_other_funcs(&hdl->allocfunc, &hdl->commitfunc,
-		&hdl->rollbackfunc, &hdl->endfunc);
+	    &hdl->rollbackfunc, &hdl->endfunc);
 	_tnfctl_prbk_test_func(&hdl->testfunc);
 
 	/* find the probes in the kernel */
@@ -343,7 +342,7 @@ tnfctl_buffer_alloc(tnfctl_handle_t *hdl, const char *trace_file_name,
 	}
 
 	prexstat = _tnfctl_create_tracefile(hdl, trace_file_name,
-						trace_file_size);
+	    trace_file_size);
 	if (prexstat) {
 		return (prexstat);
 	}
@@ -436,15 +435,13 @@ step_to_end_of_exec(tnfctl_handle_t *hndl)
 	prbstat = prb_proc_state(proc_p, &pstate);
 	if (prbstat)
 		return (_tnfctl_map_to_errcode(prbstat));
-	if (!(pstate.ps_issysentry && (pstate.ps_syscallnum == SYS_exec ||
-			pstate.ps_syscallnum == SYS_execve))) {
+	if (!(pstate.ps_issysentry && pstate.ps_syscallnum == SYS_execve)) {
 		/* not stopped at beginning of exec system call */
 		return (TNFCTL_ERR_NONE);
 	}
 
 	/* we are stopped at beginning of exec system call */
 
-	/* REMIND: do we have to wait on SYS_exec also ? */
 	prbstat = prb_proc_exit(proc_p, SYS_execve, PRB_SYS_ADD);
 	if (prbstat)
 		return (_tnfctl_map_to_errcode(prbstat));
@@ -482,7 +479,7 @@ step_to_end_of_exec(tnfctl_handle_t *hndl)
 	if (prbstat)
 		return (_tnfctl_map_to_errcode(prbstat));
 
-	if (!(pstate.ps_issysexit && (pstate.ps_syscallnum == SYS_execve))) {
+	if (!(pstate.ps_issysexit && pstate.ps_syscallnum == SYS_execve)) {
 		/* unexpected condition */
 		return (tnfctl_status_map(ENOENT));
 	}
@@ -505,13 +502,13 @@ _tnfctl_external_getlock(tnfctl_handle_t *hdl)
 	int			internal_tracing_on;
 
 	prexstat = _tnfctl_sym_find(hdl, TNFCTL_INTERNAL_TRACEFLAG,
-	&targ_symbol_ptr);
+	    &targ_symbol_ptr);
 	if (prexstat) {
 	/* no libtnfctl in target: success */
 	return (TNFCTL_ERR_NONE);
 	}
 	prbstat = hdl->p_read(hdl->proc_p, targ_symbol_ptr,
-	&internal_tracing_on, sizeof (internal_tracing_on));
+	    &internal_tracing_on, sizeof (internal_tracing_on));
 
 	if (prbstat) {
 	prexstat = _tnfctl_map_to_errcode(prbstat);
@@ -523,20 +520,20 @@ _tnfctl_external_getlock(tnfctl_handle_t *hdl)
 	goto failure_ret;
 	}
 	prexstat = _tnfctl_sym_find(hdl, TNFCTL_EXTERNAL_TRACEDPID,
-	&targ_symbol_ptr);
+	    &targ_symbol_ptr);
 	if (prexstat) {
 	/* this shouldn't happen. we know we have libtnfctl */
 	goto failure_ret;
 	}
 	prbstat = hdl->p_write(hdl->proc_p, targ_symbol_ptr,
-	&(hdl->targ_pid), sizeof (hdl->targ_pid));
+	    &(hdl->targ_pid), sizeof (hdl->targ_pid));
 	if (prbstat) {
 	prexstat = _tnfctl_map_to_errcode(prbstat);
 	goto failure_ret;
 	}
 	/* success */
 	DBG((void) fprintf(stderr, "_tnfctl_external_getlock: ok to trace %d\n",
-	hdl->targ_pid));
+	    hdl->targ_pid));
 	return (TNFCTL_ERR_NONE);
 
 failure_ret:

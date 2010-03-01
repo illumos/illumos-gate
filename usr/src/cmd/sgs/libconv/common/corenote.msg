@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 @ MSG_NT_PRSTATUS		"[ NT_PRSTATUS ]"
@@ -581,8 +579,7 @@
 
 @ MSG_SYS_EXIT				"[ exit ]"			# 1
 @ MSG_SYS_EXIT_ALT			"exit"
-@ MSG_SYS_FORKALL			"[ forkall ]"			# 2
-@ MSG_SYS_FORKALL_ALT			"forkall"
+@ MSG_SYS_2				"2"				# 2 (u)
 @ MSG_SYS_READ				"[ read ]"			# 3
 @ MSG_SYS_READ_ALT			"read"
 @ MSG_SYS_WRITE				"[ write ]"			# 4
@@ -591,16 +588,13 @@
 @ MSG_SYS_OPEN_ALT			"open"
 @ MSG_SYS_CLOSE				"[ close ]"			# 6
 @ MSG_SYS_CLOSE_ALT			"close"
-@ MSG_SYS_WAIT				"[ wait ]"			# 7
-@ MSG_SYS_WAIT_ALT			"wait"
-@ MSG_SYS_CREAT				"[ creat ]"			# 8
-@ MSG_SYS_CREAT_ALT			"creat"
+@ MSG_SYS_7				"7"				# 7 (u)
+@ MSG_SYS_8				"8"				# 8 (u)
 @ MSG_SYS_LINK				"[ link ]"			# 9
 @ MSG_SYS_LINK_ALT			"link"
 @ MSG_SYS_UNLINK			"[ unlink ]"			# 10
 @ MSG_SYS_UNLINK_ALT			"unlink"
-@ MSG_SYS_EXEC				"[ exec ]"			# 11
-@ MSG_SYS_EXEC_ALT			"exec"
+@ MSG_SYS_11				"11"				# 11 (u)
 @ MSG_SYS_CHDIR				"[ chdir ]"			# 12
 @ MSG_SYS_CHDIR_ALT			"chdir"
 @ MSG_SYS_TIME				"[ time ]"			# 13
@@ -621,8 +615,7 @@
 @ MSG_SYS_GETPID_ALT			"getpid"
 @ MSG_SYS_MOUNT				"[ mount ]"			# 21
 @ MSG_SYS_MOUNT_ALT			"mount"
-@ MSG_SYS_UMOUNT			"[ umount ]"			# 22
-@ MSG_SYS_UMOUNT_ALT			"umount"
+@ MSG_SYS_22				"22"				# 22 (u)
 @ MSG_SYS_SETUID			"[ setuid ]"			# 23
 @ MSG_SYS_SETUID_ALT			"setuid"
 @ MSG_SYS_GETUID			"[ getuid ]"			# 24
@@ -637,8 +630,7 @@
 @ MSG_SYS_FSTAT_ALT			"fstat"
 @ MSG_SYS_PAUSE				"[ pause ]"			# 29
 @ MSG_SYS_PAUSE_ALT			"pause"
-@ MSG_SYS_UTIME				"[ utime ]"			# 30
-@ MSG_SYS_UTIME_ALT			"utime"
+@ MSG_SYS_30				"30"				# 30 (u)
 @ MSG_SYS_STTY				"[ stty ]"			# 31
 @ MSG_SYS_STTY_ALT			"stty"
 @ MSG_SYS_GTTY				"[ gtty ]"			# 32
@@ -659,22 +651,20 @@
 @ MSG_SYS_PGRPSYS_ALT			"pgrpsys"
 @ MSG_SYS_UUCOPYSTR			"[ uucopystr ]"			# 40
 @ MSG_SYS_UUCOPYSTR_ALT			"uucopystr"
-@ MSG_SYS_DUP				"[ dup ]"			# 41
-@ MSG_SYS_DUP_ALT			"dup"
+@ MSG_SYS_41				"41"				# 41 (u)
 @ MSG_SYS_PIPE				"[ pipe ]"			# 42
 @ MSG_SYS_PIPE_ALT			"pipe"
 @ MSG_SYS_TIMES				"[ times ]"			# 43
 @ MSG_SYS_TIMES_ALT			"times"
 @ MSG_SYS_PROFIL			"[ profil ]"			# 44
 @ MSG_SYS_PROFIL_ALT			"profil"
-@ MSG_SYS_PLOCK				"[ plock ]"			# 45
-@ MSG_SYS_PLOCK_ALT			"plock"
+@ MSG_SYS_FACCESSAT			"[ faccessat ]"			# 45
+@ MSG_SYS_FACCESSAT_ALT			"faccessat"
 @ MSG_SYS_SETGID			"[ setgid ]"			# 46
 @ MSG_SYS_SETGID_ALT			"setgid"
 @ MSG_SYS_GETGID			"[ getgid ]"			# 47
 @ MSG_SYS_GETGID_ALT			"getgid"
-@ MSG_SYS_SIGNAL			"[ signal ]"			# 48
-@ MSG_SYS_SIGNAL_ALT			"signal"
+@ MSG_SYS_48				"48"				# 48 (u)
 @ MSG_SYS_MSGSYS			"[ msgsys ]"			# 49
 @ MSG_SYS_MSGSYS_ALT			"msgsys"
 @ MSG_SYS_SYSI86			"[ sysi86 ]"			# 50
@@ -689,7 +679,8 @@
 @ MSG_SYS_IOCTL_ALT			"ioctl"
 @ MSG_SYS_UADMIN			"[ uadmin ]"			# 55
 @ MSG_SYS_UADMIN_ALT			"uadmin"
-@ MSG_SYS_56				"56"				# 56 (u)
+@ MSG_SYS_FCHOWNAT			"[ fchownat ]"			# 56
+@ MSG_SYS_FCHOWNAT_ALT			"fchownat"
 @ MSG_SYS_UTSSYS			"[ utssys ]"			# 57
 @ MSG_SYS_UTSSYS_ALT			"utssys"
 @ MSG_SYS_FDSYNC			"[ fdsync ]"			# 58
@@ -704,12 +695,18 @@
 @ MSG_SYS_FCNTL_ALT			"fcntl"
 @ MSG_SYS_ULIMIT			"[ ulimit ]"			# 63
 @ MSG_SYS_ULIMIT_ALT			"ulimit"	
-@ MSG_SYS_64				"64"				# 64 (r)
-@ MSG_SYS_65				"65"				# 65 (r)
-@ MSG_SYS_66				"66"				# 66 (r)
-@ MSG_SYS_67				"67"				# 67 (r)
-@ MSG_SYS_68				"68"				# 68 (r)
-@ MSG_SYS_69				"69"				# 69 (r)
+@ MSG_SYS_RENAMEAT			"[ renameat ]"			# 64
+@ MSG_SYS_RENAMEAT_ALT			"renameat"
+@ MSG_SYS_UNLINKAT			"[ unlinkat ]"			# 65
+@ MSG_SYS_UNLINKAT_ALT			"unlinkat"
+@ MSG_SYS_FSTATAT			"[ fstatat ]"			# 66
+@ MSG_SYS_FSTATAT_ALT			"fstatat"
+@ MSG_SYS_FSTATAT64			"[ fstatat64 ]"			# 67
+@ MSG_SYS_FSTATAT64_ALT			"fstatat64"
+@ MSG_SYS_OPENAT			"[ openat ]"			# 68
+@ MSG_SYS_OPENAT_ALT			"openat"
+@ MSG_SYS_OPENAT64			"[ openat64 ]"			# 69
+@ MSG_SYS_OPENAT64_ALT			"openat64"
 @ MSG_SYS_TASKSYS			"[ tasksys ]"			# 70
 @ MSG_SYS_TASKSYS_ALT			"tasksys	"
 @ MSG_SYS_ACCTCTL			"[ acctctl ]"			# 71
@@ -722,8 +719,7 @@
 @ MSG_SYS_RCTLSYS_ALT			"rctlsys	"
 @ MSG_SYS_SIDSYS			"[ sidsys ]"			# 75
 @ MSG_SYS_SIDSYS_ALT			"sidsys"	
-@ MSG_SYS_FSAT				"[ fsat ]"			# 76
-@ MSG_SYS_FSAT_ALT			"fsat"
+@ MSG_SYS_76				"76"				# 76 (u)
 @ MSG_SYS_LWP_PARK			"[ lwp_park ]"			# 77
 @ MSG_SYS_LWP_PARK_ALT			"lwp_park"
 @ MSG_SYS_SENDFILEV			"[ sendfilev ]"			# 78
@@ -744,8 +740,7 @@
 @ MSG_SYS_GETMSG_ALT			"getmsg"
 @ MSG_SYS_PUTMSG			"[ putmsg ]"			# 86
 @ MSG_SYS_PUTMSG_ALT			"putmsg"
-@ MSG_SYS_POLL				"[ poll ]"			# 87
-@ MSG_SYS_POLL_ALT			"poll"
+@ MSG_SYS_87				"87"				# 87 (u)
 @ MSG_SYS_LSTAT				"[ lstat ]"			# 88
 @ MSG_SYS_LSTAT_ALT			"lstat"
 @ MSG_SYS_SYMLINK			"[ symlink ]"			# 89
@@ -772,10 +767,8 @@
 @ MSG_SYS_SIGPENDING_ALT		"sigpending"
 @ MSG_SYS_CONTEXT			"[ context ]"			# 100
 @ MSG_SYS_CONTEXT_ALT			"context"
-@ MSG_SYS_EVSYS				"[ evsys ]"			# 101
-@ MSG_SYS_EVSYS_ALT			"evsys"
-@ MSG_SYS_EVTRAPRET			"[ evtrapret ]"			# 102
-@ MSG_SYS_EVTRAPRET_ALT			"evtrapret"
+@ MSG_SYS_101				"101"				# 101(u)
+@ MSG_SYS_102				"102"				# 102(u)
 @ MSG_SYS_STATVFS			"[ statvfs ]"			# 103
 @ MSG_SYS_STATVFS_ALT			"statvfs"
 @ MSG_SYS_FSTATVFS			"[ fstatvfs ]"			# 104
@@ -790,7 +783,8 @@
 @ MSG_SYS_SIGSENDSYS_ALT		"sigsendsys"
 @ MSG_SYS_HRTSYS			"[ hrtsys ]"			# 109
 @ MSG_SYS_HRTSYS_ALT			"hrtsys"
-@ MSG_SYS_110				"110"				# 110(u)
+@ MSG_SYS_UTIMESYS			"[ utimesys ]"			# 110
+@ MSG_SYS_UTIMESYS_ALT			"utimesys"
 @ MSG_SYS_SIGRESEND			"[ sigresend ]"			# 111
 @ MSG_SYS_SIGRESEND_ALT			"sigresend"
 @ MSG_SYS_PRIOCNTLSYS			"[ priocntlsys ]"		# 112
@@ -815,15 +809,12 @@
 @ MSG_SYS_READV_ALT			"readv"
 @ MSG_SYS_WRITEV			"[ writev ]"			# 122
 @ MSG_SYS_WRITEV_ALT			"writev"
-@ MSG_SYS_XSTAT				"[ xstat ]"			# 123
-@ MSG_SYS_XSTAT_ALT			"xstat"
-@ MSG_SYS_LXSTAT			"[ lxstat ]"			# 124
-@ MSG_SYS_LXSTAT_ALT			"lxstat"
-@ MSG_SYS_FXSTAT			"[ fxstat ]"			# 125
-@ MSG_SYS_FXSTAT_ALT			"fxstat"
-@ MSG_SYS_XMKNOD			"[ xmknod ]"			# 126
-@ MSG_SYS_XMKNOD_ALT			"xmknod"
-@ MSG_SYS_127				"127"				# 127(u)
+@ MSG_SYS_123				"123"				# 123(u)
+@ MSG_SYS_124				"124"				# 124(u)
+@ MSG_SYS_125				"125"				# 125(u)
+@ MSG_SYS_126				"126"				# 126(u)
+@ MSG_SYS_MMAPOBJ			"[ mmapobj ]"			# 127
+@ MSG_SYS_MMAPOBJ_ALT			"mmapobj"
 @ MSG_SYS_SETRLIMIT			"[ setrlimit ]"			# 128
 @ MSG_SYS_SETRLIMIT_ALT			"setrlimit"
 @ MSG_SYS_GETRLIMIT			"[ getrlimit ]"			# 129
@@ -854,16 +845,14 @@
 @ MSG_SYS_SETEUID_ALT			"seteuid"
 @ MSG_SYS_FORKSYS			"[ forksys ]"			# 142
 @ MSG_SYS_FORKSYS_ALT			"forksys"
-@ MSG_SYS_FORK1				"[ fork1 ]"			# 143
-@ MSG_SYS_FORK1_ALT			"fork1"
+@ MSG_SYS_143				"143"				# 143(u)
 @ MSG_SYS_SIGTIMEDWAIT			"[ sigtimedwait ]"		# 144
 @ MSG_SYS_SIGTIMEDWAIT_ALT		"sigtimedwait"
 @ MSG_SYS_LWP_INFO			"[ lwp_info ]"			# 145
 @ MSG_SYS_LWP_INFO_ALT			"lwp_info"
 @ MSG_SYS_YIELD				"[ yield ]"			# 146
 @ MSG_SYS_YIELD_ALT			"yield"
-@ MSG_SYS_LWP_SEMA_WAIT			"[ lwp_sema_wait ]"		# 147
-@ MSG_SYS_LWP_SEMA_WAIT_ALT		"lwp_sema_wait"
+@ MSG_SYS_147				"147"				# 147(u)
 @ MSG_SYS_LWP_SEMA_POST			"[ lwp_sema_post ]"		# 148
 @ MSG_SYS_LWP_SEMA_POST_ALT		"lwp_sema_post"
 @ MSG_SYS_LWP_SEMA_TRYWAIT		"[ lwp_sema_trywait ]"		# 149
@@ -876,8 +865,7 @@
 @ MSG_SYS_MODCTL_ALT			"modctl"
 @ MSG_SYS_FCHROOT			"[ fchroot ]"			# 153
 @ MSG_SYS_FCHROOT_ALT			"fchroot"
-@ MSG_SYS_UTIMES			"[ utimes ]"			# 154
-@ MSG_SYS_UTIMES_ALT			"utimes"
+@ MSG_SYS_154				"154"				# 154(u)
 @ MSG_SYS_VHANGUP			"[ vhangup ]"			# 155
 @ MSG_SYS_VHANGUP_ALT			"vhangup"
 @ MSG_SYS_GETTIMEOFDAY			"[ gettimeofday ]"		# 156
@@ -906,8 +894,7 @@
 @ MSG_SYS_LWP_WAIT_ALT			"lwp_wait"
 @ MSG_SYS_LWP_MUTEX_WAKEUP		"[ lwp_mutex_wakeup ]"		# 168
 @ MSG_SYS_LWP_MUTEX_WAKEUP_ALT		"lwp_mutex_wakeup"
-@ MSG_SYS_LWP_MUTEX_LOCK		"[ lwp_mutex_lock ]"		# 169
-@ MSG_SYS_LWP_MUTEX_LOCK_ALT		"lwp_mutex_lock"
+@ MSG_SYS_169				"169"				# 169(u)
 @ MSG_SYS_LWP_COND_WAIT			"[ lwp_cond_wait ]"		# 170
 @ MSG_SYS_LWP_COND_WAIT_ALT		"lwp_cond_wait"
 @ MSG_SYS_LWP_COND_SIGNAL		"[ lwp_cond_signal ]"		# 171
@@ -1016,8 +1003,7 @@
 @ MSG_SYS_PREAD64_ALT			"pread64"
 @ MSG_SYS_PWRITE64			"[ pwrite64 ]"			# 223
 @ MSG_SYS_PWRITE64_ALT			"pwrite64"
-@ MSG_SYS_CREAT64			"[ creat64 ]"			# 224
-@ MSG_SYS_CREAT64_ALT			"creat64"
+@ MSG_SYS_224				"224"				# 224(u)
 @ MSG_SYS_OPEN64			"[ open64 ]"			# 225
 @ MSG_SYS_OPEN64_ALT			"open64"
 @ MSG_SYS_RPCSYS			"[ rpcsys ]"			# 226

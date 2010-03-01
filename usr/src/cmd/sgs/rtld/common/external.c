@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -617,7 +617,7 @@ fcntl(int fildes, int cmd, ...)
 int
 open(const char *path, int oflag, ...)
 {
-	extern int __open(const char *, int, ...);
+	extern int __open(const char *, int, mode_t);
 	mode_t mode;
 	va_list ap;
 
@@ -630,7 +630,7 @@ open(const char *path, int oflag, ...)
 int
 openat(int fd, const char *path, int oflag, ...)
 {
-	extern int __openat(int, const char *, int, ...);
+	extern int __openat(int, const char *, int, mode_t);
 	mode_t mode;
 	va_list ap;
 

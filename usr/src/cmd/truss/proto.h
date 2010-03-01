@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,7 +66,6 @@ extern	const char *ioctlname(private_t *, uint_t);
 extern	const char *ioctldatastruct(uint_t);
 extern	const char *fcntlname(int);
 extern	const char *sfsname(int);
-extern	const char *plockname(int);
 extern	const char *si86name(int);
 extern	const char *utscode(int);
 extern	const char *openarg(private_t *, int);
@@ -135,8 +134,6 @@ extern	int	maxsyscalls(void);
 extern	int	nsubcodes(int);
 
 extern	void	show_stat(private_t *, long);
-extern	void	show_statat(private_t *, long);
-extern	void	show_xstat(private_t *, int, long);
 extern	void	show_stat64_32(private_t *, long);
 
 extern	void	establish_breakpoints(void);

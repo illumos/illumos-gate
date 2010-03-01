@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1991 Sun Microsystems, Inc.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_ALIAS_BOOT_H
 #define	_ALIAS_BOOT_H
-
-#ident	"%W%	%E% SMI"
 
 /*
  * Offsets for string constants used in alias bootstrap.
@@ -40,9 +39,9 @@
  * Offsets for function pointers used in alias bootstrap.
  */
 #define	PANIC_F		0		/* panic() */
-#define	OPEN_F		1		/* open() */
+#define	OPENAT_F	1		/* openat() */
 #define	MMAP_F		2		/* mmap() */
-#define	FSTAT_F		3		/* fstat() */
+#define	FSTATAT_F	3		/* fstatat() */
 #define	SYSCONFIG_F	4		/* sysconfig() */
 #define	CLOSE_F		5		/* close() */
 #define	MUNMAP_F	6		/* munmap() */

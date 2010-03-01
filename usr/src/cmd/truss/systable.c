@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -219,16 +219,16 @@ errname(int err)	/* return the error code name (NULL if none) */
 const struct systable systable[] = {
 { NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
 {"_exit",	1, DEC, NOV, DEC},				/*   1 */
-{"forkall",	0, DEC, NOV},					/*   2 */
+{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
 {"read",	3, DEC, NOV, DEC, IOB, UNS},			/*   3 */
 {"write",	3, DEC, NOV, DEC, IOB, UNS},			/*   4 */
 {"open",	3, DEC, NOV, STG, OPN, OCT},			/*   5 */
 {"close",	1, DEC, NOV, DEC},				/*   6 */
-{"wait",	0, DEC, HHX},					/*   7 */
-{"creat",	2, DEC, NOV, STG, OCT},				/*   8 */
+{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
+{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
 {"link",	2, DEC, NOV, STG, STG},				/*   9 */
 {"unlink",	1, DEC, NOV, STG},				/*  10 */
-{"exec",	2, DEC, NOV, STG, DEC},				/*  11 */
+{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
 {"chdir",	1, DEC, NOV, STG},				/*  12 */
 {"time",	0, DEC, NOV},					/*  13 */
 {"mknod",	3, DEC, NOV, STG, OCT, HEX},			/*  14 */
@@ -238,8 +238,8 @@ const struct systable systable[] = {
 {"stat",	2, DEC, NOV, STG, HEX},				/*  18 */
 {"lseek",	3, DEC, NOV, DEC, DEX, WHN},			/*  19 */
 {"getpid",	0, DEC, DEC},					/*  20 */
-{"mount",	8, DEC, NOV, STG, STG, MTF, MFT, HEX, DEC, HEX, DEC},	/* 21 */
-{"umount",	1, DEC, NOV, STG},				/*  22 */
+{"mount",	8, DEC, NOV, STG, STG, MTF, MFT, HEX, DEC, HEX, DEC}, /* 21 */
+{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
 {"setuid",	1, DEC, NOV, UNS},				/*  23 */
 {"getuid",	0, UNS, UNS},					/*  24 */
 {"stime",	1, DEC, NOV, DEC},				/*  25 */
@@ -247,7 +247,7 @@ const struct systable systable[] = {
 {"alarm",	1, DEC, NOV, UNS},				/*  27 */
 {"fstat",	2, DEC, NOV, DEC, HEX},				/*  28 */
 {"pause",	0, DEC, NOV},					/*  29 */
-{"utime",	2, DEC, NOV, STG, HEX},				/*  30 */
+{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
 {"stty",	2, DEC, NOV, DEC, DEC},				/*  31 */
 {"gtty",	2, DEC, NOV, DEC, DEC},				/*  32 */
 {"access",	2, DEC, NOV, STG, ACC},				/*  33 */
@@ -258,11 +258,11 @@ const struct systable systable[] = {
 {"fstatfs",	4, DEC, NOV, DEC, HEX, DEC, DEC},		/*  38 */
 {"pgrpsys",	3, DEC, NOV, DEC, DEC, DEC},			/*  39 */
 {"uucopystr",	3, DEC, NOV, STG, RST, UNS},			/*  40 */
-{"dup",		1, DEC, NOV, DEC},				/*  41 */
+{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
 {"pipe",	0, DEC, DEC},					/*  42 */
 {"times",	1, DEC, NOV, HEX},				/*  43 */
 {"profil",	4, DEC, NOV, HEX, UNS, HEX, OCT},		/*  44 */
-{"plock",	1, DEC, NOV, PLK},				/*  45 */
+{"faccessat",	4, DEC, NOV, ATC, STG, ACC, DEC},		/*  45 */
 {"setgid",	1, DEC, NOV, UNS},				/*  46 */
 {"getgid",	0, UNS, UNS},					/*  47 */
 { NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
@@ -273,7 +273,7 @@ const struct systable systable[] = {
 {"semsys",	5, DEC, NOV, DEC, HEX, HEX, HEX, HEX},		/*  53 */
 {"ioctl",	3, DEC, NOV, DEC, IOC, IOA},			/*  54 */
 {"uadmin",	3, DEC, NOV, DEC, DEC, DEC},			/*  55 */
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
+{"fchownat",	5, DEC, NOV, ATC, STG, DEC, DEC, UTF},		/*  56 */
 {"utssys",	4, DEC, NOV, HEX, DEC, UTS, HEX},		/*  57 */
 {"fdsync",	2, DEC, NOV, DEC, FFG},				/*  58 */
 {"execve",	3, DEC, NOV, STG, HEX, HEX},			/*  59 */
@@ -281,22 +281,19 @@ const struct systable systable[] = {
 {"chroot",	1, DEC, NOV, STG},				/*  61 */
 {"fcntl",	3, DEC, NOV, DEC, FCN, HEX},			/*  62 */
 {"ulimit",	2, DEX, NOV, ULM, DEC},				/*  63 */
-
-/*  The following 6 entries were reserved for the UNIX PC */
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
-
+{"renameat",	4, DEC, NOV, ATC, STG, ATC, STG},		/*  64 */
+{"unlinkat",	3, DEC, NOV, ATC, STG, DEC},			/*  65 */
+{"fstatat",	4, DEC, NOV, ATC, STG, HEX, UTF},		/*  66 */
+{"fstatat64",	4, DEC, NOV, ATC, STG, HEX, UTF},		/*  67 */
+{"openat",	4, DEC, NOV, ATC, STG, OPN, OCT},		/*  68 */
+{"openat64",	4, DEC, NOV, ATC, STG, OPN, OCT},		/*  69 */
 {"tasksys",	5, DEC, NOV, DEC, DEC, DEC, HEX, DEC},		/*  70 */
 {"acctctl",	3, DEC, NOV, HEX, HEX, UNS},			/*  71 */
 {"exacctsys",	6, DEC, NOV, DEC, IDT, DEC, HEX, DEC, HEX},	/*  72 */
 {"getpagesizes", 2, DEC, NOV, HEX, DEC},			/*  73 */
 {"rctlsys",	6, DEC, NOV, RSC, STG, HEX, HEX, DEC, DEC},	/*  74 */
 {"sidsys",	4, UNS, UNS, DEC, DEC, DEC, DEC},		/*  75 */
-{"fsat",	6, DEC, NOV, HEX, HEX, HEX, HEX, HEX, HEX},	/*  76 */
+{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
 {"lwp_park",	3, DEC, NOV, DEC, HEX, DEC},			/*  77 */
 {"sendfilev",	5, DEC, NOV, DEC, DEC, HEX, DEC, HEX},		/*  78 */
 {"rmdir",	1, DEC, NOV, STG},				/*  79 */
@@ -307,7 +304,7 @@ const struct systable systable[] = {
 {"sysfs",	3, DEC, NOV, SFS, DEX, DEX},			/*  84 */
 {"getmsg",	4, DEC, NOV, DEC, HEX, HEX, HEX},		/*  85 */
 {"putmsg",	4, DEC, NOV, DEC, HEX, HEX, SMF},		/*  86 */
-{"poll",	3, DEC, NOV, HEX, DEC, DEC},			/*  87 */
+{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
 {"lstat",	2, DEC, NOV, STG, HEX},				/*  88 */
 {"symlink",	2, DEC, NOV, STG, STG},				/*  89 */
 {"readlink",	3, DEC, NOV, STG, RLK, UNS},			/*  90 */
@@ -321,8 +318,8 @@ const struct systable systable[] = {
 {"sigaction",	3, DEC, NOV, SIG, HEX, HEX},			/*  98 */
 {"sigpendsys",	2, DEC, NOV, DEC, HEX},				/*  99 */
 {"context",	2, DEC, NOV, DEC, HEX},				/* 100 */
-{"evsys",	3, DEC, NOV, DEC, DEC, HEX},			/* 101 */
-{"evtrapret",	0, DEC, NOV},					/* 102 */
+{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
+{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
 {"statvfs",	2, DEC, NOV, STG, HEX},				/* 103 */
 {"fstatvfs",	2, DEC, NOV, DEC, HEX},				/* 104 */
 {"getloadavg",	2, DEC, NOV, HEX, DEC},				/* 105 */
@@ -343,10 +340,10 @@ const struct systable systable[] = {
 {"fchdir",	1, DEC, NOV, DEC},				/* 120 */
 {"readv",	3, DEC, NOV, DEC, HEX, DEC},			/* 121 */
 {"writev",	3, DEC, NOV, DEC, HEX, DEC},			/* 122 */
-{"xstat",	3, DEC, NOV, DEC, STG, HEX},			/* 123 */
-{"lxstat",	3, DEC, NOV, DEC, STG, HEX},			/* 124 */
-{"fxstat",	3, DEC, NOV, DEC, DEC, HEX},			/* 125 */
-{"xmknod",	4, DEC, NOV, DEC, STG, OCT, HEX},		/* 126 */
+{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
+{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
+{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
+{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
 {"mmapobj",	5, DEC, NOV, DEC, MOB, HEX, HEX, HEX},		/* 127 */
 {"setrlimit",	2, DEC, NOV, RLM, HEX},				/* 128 */
 {"getrlimit",	2, DEC, NOV, RLM, HEX},				/* 129 */
@@ -363,18 +360,18 @@ const struct systable systable[] = {
 {"sharefs",	3, DEC, NOV, DEC, HEX, DEC},			/* 140 */
 {"seteuid",	1, DEC, NOV, UNS},				/* 141 */
 {"forksys",	2, DEC, NOV, DEC, HHX},				/* 142 */
-{"fork1",	0, DEC, NOV},					/* 143 */
+{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
 {"sigtimedwait", 3, DEC, NOV, HEX, HEX, HEX},			/* 144 */
 {"lwp_info",	1, DEC, NOV, HEX},				/* 145 */
 {"yield",	0, DEC, NOV},					/* 146 */
-{"lwp_sema_wait", 1, DEC, NOV, HEX},				/* 147 */
+{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
 {"lwp_sema_post", 1, DEC, NOV, HEX},				/* 148 */
 {"lwp_sema_trywait", 1, DEC, NOV, HEX},				/* 149 */
 {"lwp_detach",	1, DEC, NOV, DEC},				/* 150 */
 {"corectl",	4, DEC, NOV, DEC, HEX, HEX, HEX},		/* 151 */
 {"modctl",	5, DEC, NOV, MOD, HEX, HEX, HEX, HEX},		/* 152 */
 {"fchroot",	1, DEC, NOV, DEC},				/* 153 */
-{"utimes",	2, DEC, NOV, STG, HEX},				/* 154 */
+{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
 {"vhangup",	0, DEC, NOV},					/* 155 */
 {"gettimeofday", 1, DEC, NOV, HEX},				/* 156 */
 {"getitimer",	2, DEC, NOV, ITM, HEX},				/* 157 */
@@ -389,7 +386,7 @@ const struct systable systable[] = {
 {"lwp_private",	3, HEX, NOV, DEC, DEC, HEX},			/* 166 */
 {"lwp_wait",	2, DEC, NOV, DEC, HEX},				/* 167 */
 {"lwp_mutex_wakeup", 2, DEC, NOV, HEX, DEC},			/* 168 */
-{"lwp_mutex_lock", 1, DEC, NOV, HEX},				/* 169 */
+{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
 {"lwp_cond_wait", 4, DEC, NOV, HEX, HEX, HEX, DEC},		/* 170 */
 {"lwp_cond_signal", 1, DEC, NOV, HEX},				/* 171 */
 {"lwp_cond_broadcast", 1, DEC, NOV, HEX},			/* 172 */
@@ -444,7 +441,7 @@ const struct systable systable[] = {
 {"getrlimit64",	2, DEC, NOV, RLM, HEX},				/* 221 */
 {"pread64",	5, DEC, NOV, DEC, IOB, UNS, LLO, HID},		/* 222 */
 {"pwrite64",	5, DEC, NOV, DEC, IOB, UNS, LLO, HID},		/* 223 */
-{"creat64",	2, DEC, NOV, STG, OCT},				/* 224 */
+{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
 {"open64",	3, DEC, NOV, STG, OPN, OCT},			/* 225 */
 {"rpcmod",	3, DEC, NOV, DEC, HEX},				/* 226 */
 {"zone",	5, DEC, NOV, DEC, HEX, HEX, HEX, HEX},		/* 227 */
@@ -486,6 +483,65 @@ const struct systable systable[] = {
 /*
  * The following are for interpreting syscalls with sub-codes.
  */
+
+const	struct systable	faccessattable[] = {
+{"faccessat",	4, DEC, NOV, ATC, STG, ACC, DEC},		/*  0 */
+{"access",	3, DEC, NOV, HID, STG, ACC},			/*  1 */
+};
+#define	NACCESSCODE	(sizeof (faccessattable) / sizeof (struct systable))
+
+const	struct systable	fchownattable[] = {
+{"fchownat",	5, DEC, NOV, ATC, STG, DEC, DEC, UTF},		/*  0 */
+{"chown",	4, DEC, NOV, HID, STG, DEC, DEC},		/*  1 */
+{"lchown",	4, DEC, NOV, HID, STG, DEC, DEC},		/*  2 */
+{"fchown",	4, DEC, NOV, DEC, HID, DEC, DEC},		/*  3 */
+};
+#define	NCHOWNCODE	(sizeof (fchownattable) / sizeof (struct systable))
+
+const	struct systable	renameattable[] = {
+{"renameat",	4, DEC, NOV, ATC, STG, ATC, STG},		/*  0 */
+{"rename",	4, DEC, NOV, HID, STG, HID, STG},		/*  1 */
+};
+#define	NRENAMECODE	(sizeof (renameattable) / sizeof (struct systable))
+
+const	struct systable	unlinkattable[] = {
+{"unlinkat",	3, DEC, NOV, ATC, STG, DEC},			/*  0 */
+{"unlink",	2, DEC, NOV, HID, STG},				/*  1 */
+{"rmdir",	2, DEC, NOV, HID, STG},				/*  2 */
+};
+#define	NUNLINKCODE	(sizeof (unlinkattable) / sizeof (struct systable))
+
+const	struct systable	fstatattable[] = {
+{"fstatat",	4, DEC, NOV, ATC, STG, HEX, UTF},		/*  0 */
+{"stat",	3, DEC, NOV, HID, STG, HEX},			/*  1 */
+{"lstat",	3, DEC, NOV, HID, STG, HEX},			/*  2 */
+{"fstat",	3, DEC, NOV, DEC, HID, HEX},			/*  3 */
+};
+#define	NSTATCODE	(sizeof (fstatattable) / sizeof (struct systable))
+
+const	struct systable	fstatat64table[] = {
+{"fstatat64",	4, DEC, NOV, ATC, STG, HEX, UTF},		/*  0 */
+{"stat64",	3, DEC, NOV, HID, STG, HEX},			/*  1 */
+{"lstat64",	3, DEC, NOV, HID, STG, HEX},			/*  2 */
+{"fstat64",	3, DEC, NOV, DEC, HID, HEX},			/*  3 */
+};
+#define	NSTAT64CODE	(sizeof (fstatat64table) / sizeof (struct systable))
+
+const	struct systable openattable[] = {
+{"openat",	3, DEC, NOV, ATC, STG, OPN},			/* 0 */
+{"openat",	4, DEC, NOV, ATC, STG, OPN, OCT},		/* 1 */
+{"open",	3, DEC, NOV, HID, STG, OPN},			/* 2 */
+{"open",	4, DEC, NOV, HID, STG, OPN, OCT},		/* 3 */
+};
+#define	NOPENATCODE	(sizeof (openattable) / sizeof (struct systable))
+
+const	struct systable openat64table[] = {
+{"openat64",	3, DEC, NOV, ATC, STG, OPN},			/* 0 */
+{"openat64",	4, DEC, NOV, ATC, STG, OPN, OCT},		/* 1 */
+{"open64",	3, DEC, NOV, HID, STG, OPN},			/* 2 */
+{"open64",	4, DEC, NOV, HID, STG, OPN, OCT},		/* 3 */
+};
+#define	NOPENAT64CODE	(sizeof (openat64table) / sizeof (struct systable))
 
 const	struct systable opentable[] = {
 {"open",	2, DEC, NOV, STG, OPN},				/* 0 */
@@ -698,22 +754,6 @@ static	const	struct systable exacctsystable[] = {
 };
 #define	NEXACCTSYSCODE	(sizeof (exacctsystable) / sizeof (struct systable))
 
-static const	struct systable fsatsystable[] = {
-{"openat",	5, DEC, NOV, HID, ATC, STG, OPN, OCT},		/* 0 */
-{"openat64",	5, DEC, NOV, HID, ATC, STG, OPN, OCT},		/* 1 */
-{"fstatat64",	5, DEC, NOV, HID, ATC, STG, HEX, HEX},		/* 2 */
-{"fstatat",	5, DEC, NOV, HID, ATC, STG, HEX, HEX},		/* 3 */
-{"fchownat",	6, DEC, NOV, HID, ATC, STG, HEX, HEX, HEX},	/* 4 */
-{"unlinkat",	4, DEC, NOV, HID, ATC, STG, HEX},		/* 5 */
-{"futimesat",	4, DEC, NOV, HID, ATC, STG, HEX},		/* 6 */
-{"renameat",	5, DEC, NOV, HID, ATC, STG, DEC, STG},		/* 7 */
-{"faccessat",	5, DEC, NOV, HID, ATC, STG, ACC, ACC},		/* 8 */
-{"__openattrdirat", 3, DEC, NOV, HID, ATC, STG},		/* 9 */
-{"openat",	4, DEC, NOV, HID, ATC, STG, OPN},		/* N - 2 */
-{"openat64",	4, DEC, NOV, HID, ATC, STG, OPN},		/* N - 1 */
-};
-#define	NFSATSYSCODE	(sizeof (fsatsystable) / sizeof (struct systable))
-
 static	const	struct systable lwpparktable[] = {
 {"lwp_park",	3, DEC, NOV, HID, HEX, DEC},			/* 0 */
 {"lwp_unpark",	2, DEC, NOV, HID, DEC},				/* 1 */
@@ -836,6 +876,8 @@ const	struct systable utimesystable[] = {
 const	struct sysalias sysalias[] = {
 	{ "exit",	SYS_exit	},
 	{ "fork",	SYS_forksys	},
+	{ "fork1",	SYS_forksys	},
+	{ "forkall",	SYS_forksys	},
 	{ "forkx",	SYS_forksys	},
 	{ "forkallx",	SYS_forksys	},
 	{ "vforkx",	SYS_forksys	},
@@ -927,6 +969,7 @@ const	struct sysalias sysalias[] = {
 	{ "putacct",		SYS_exacctsys	},
 	{ "wracct",		SYS_exacctsys	},
 	{ "lwp_cond_timedwait",	SYS_lwp_cond_wait },
+	{ "lwp_sema_wait",	SYS_lwp_sema_timedwait },
 	{ "lwp_park",		SYS_lwp_park	},
 	{ "lwp_unpark",		SYS_lwp_park	},
 	{ "lwp_unpark_all",	SYS_lwp_park	},
@@ -935,17 +978,11 @@ const	struct sysalias sysalias[] = {
 	{ "lwp_rwlock_tryrdlock", SYS_lwp_rwlock_sys },
 	{ "lwp_rwlock_trywrlock", SYS_lwp_rwlock_sys },
 	{ "lwp_rwlock_unlock",	SYS_lwp_rwlock_sys },
+	{ "lwp_mutex_lock",	SYS_lwp_mutex_timedlock },
 	{ "sendfilev64",	SYS_sendfilev	},
-	{ "openat",		SYS_fsat	},
-	{ "openat64",		SYS_fsat	},
-	{ "fstatat64",		SYS_fsat	},
-	{ "fstatat",		SYS_fsat	},
-	{ "fchownat",		SYS_fsat	},
-	{ "unlinkat",		SYS_fsat	},
-	{ "futimesat",		SYS_fsat	},
-	{ "renameat",		SYS_fsat	},
-	{ "faccessat",		SYS_fsat	},
-	{ "__openattrdirat",	SYS_fsat	},
+	{ "creat",		SYS_open	},
+	{ "creat64",		SYS_open64	},
+	{ "openattrdirat",	SYS_openat	},
 	{ "lgrpsys",		SYS_lgrpsys	},
 	{ "getrusage",		SYS_rusagesys	},
 	{ "getrusage_chld",	SYS_rusagesys	},
@@ -987,6 +1024,9 @@ const	struct sysalias sysalias[] = {
 	{ "allocids",		SYS_sidsys	},
 	{ "futimens",		SYS_utimesys	},
 	{ "utimensat",		SYS_utimesys	},
+	{ "poll",		SYS_pollsys	},
+	{ "umount",		SYS_umount2	},
+	{ "wait",		SYS_waitid	},
 	{  NULL,	0	}	/* end-of-list */
 };
 
@@ -1000,6 +1040,38 @@ subsys(int syscall, int subcode)
 
 	if (subcode != -1) {
 		switch (syscall) {
+		case SYS_faccessat:
+			if ((unsigned)subcode < NACCESSCODE)
+				stp = &faccessattable[subcode];
+			break;
+		case SYS_fchownat:
+			if ((unsigned)subcode < NCHOWNCODE)
+				stp = &fchownattable[subcode];
+			break;
+		case SYS_renameat:
+			if ((unsigned)subcode < NRENAMECODE)
+				stp = &renameattable[subcode];
+			break;
+		case SYS_unlinkat:
+			if ((unsigned)subcode < NUNLINKCODE)
+				stp = &unlinkattable[subcode];
+			break;
+		case SYS_fstatat:
+			if ((unsigned)subcode < NSTATCODE)
+				stp = &fstatattable[subcode];
+			break;
+		case SYS_fstatat64:
+			if ((unsigned)subcode < NSTAT64CODE)
+				stp = &fstatat64table[subcode];
+			break;
+		case SYS_openat:
+			if ((unsigned)subcode < NOPENATCODE)
+				stp = &openattable[subcode];
+			break;
+		case SYS_openat64:
+			if ((unsigned)subcode < NOPENAT64CODE)
+				stp = &openat64table[subcode];
+			break;
 		case SYS_open:
 			if ((unsigned)subcode < NOPENCODE)
 				stp = &opentable[subcode];
@@ -1071,10 +1143,6 @@ subsys(int syscall, int subcode)
 		case SYS_exacctsys:	/* exacct */
 			if ((unsigned)subcode < NEXACCTSYSCODE)
 				stp = &exacctsystable[subcode];
-			break;
-		case SYS_fsat:
-			if ((unsigned)subcode < NFSATSYSCODE)
-				stp = &fsatsystable[subcode];
 			break;
 		case SYS_privsys:	/* privileges */
 			if ((unsigned)subcode < NPRIVSYSCODE)
@@ -1208,42 +1276,70 @@ getsubcode(private_t *pri)
 	int subcode = -1;
 	int arg0;
 
-	if (syscall > 0 && nsysarg > 0) {
+	if (syscall > 0 && nsysarg > 0 && !prismember(&rawout, syscall)) {
 		arg0 = Lsp->pr_sysarg[0];
 		switch (syscall) {
 		case SYS_utssys:	/* utssys() */
 			if (nsysarg > 2)
 				subcode = Lsp->pr_sysarg[2];
 			break;
+		case SYS_faccessat:
+			if (nsysarg > 3)
+				subcode = ((int)Lsp->pr_sysarg[0] == AT_FDCWD &&
+				    Lsp->pr_sysarg[3] == 0)? 1 : 0;
+			break;
+		case SYS_fchownat:
+			if (nsysarg > 1 && Lsp->pr_sysarg[1] == NULL) {
+				subcode = 3;
+				break;
+			}
+			if (nsysarg > 0 && (int)Lsp->pr_sysarg[0] != AT_FDCWD) {
+				subcode = 0;
+				break;
+			}
+			if (nsysarg > 4)
+				subcode = (Lsp->pr_sysarg[4] == 0)? 1 :
+				    (Lsp->pr_sysarg[4] == AT_SYMLINK_NOFOLLOW)?
+				    2 : 0;
+			break;
+		case SYS_renameat:
+			if (nsysarg > 2)
+				subcode = ((int)Lsp->pr_sysarg[0] == AT_FDCWD &&
+				    (int)Lsp->pr_sysarg[2] == AT_FDCWD)? 1 : 0;
+			break;
+		case SYS_unlinkat:
+			if (nsysarg > 2)
+				subcode =
+				    ((int)Lsp->pr_sysarg[0] != AT_FDCWD)? 0 :
+				    (Lsp->pr_sysarg[2] == AT_REMOVEDIR)? 2 :
+				    (Lsp->pr_sysarg[2] == 0)? 1 : 0;
+			break;
+		case SYS_fstatat:
+		case SYS_fstatat64:
+			if (nsysarg > 1 && Lsp->pr_sysarg[1] == NULL) {
+				subcode = 3;
+				break;
+			}
+			if (nsysarg > 0 && (int)Lsp->pr_sysarg[0] != AT_FDCWD) {
+				subcode = 0;
+				break;
+			}
+			if (nsysarg > 3)
+				subcode = (Lsp->pr_sysarg[3] == 0)? 1 :
+				    (Lsp->pr_sysarg[3] == AT_SYMLINK_NOFOLLOW)?
+				    2 : 0;
+			break;
+		case SYS_openat:	/* openat() w/ and w/o AT_FDCWD */
+		case SYS_openat64:	/* and with and w/o O_CREAT */
+			if (nsysarg > 2)
+				subcode = ((int)Lsp->pr_sysarg[0] == AT_FDCWD)?
+				    ((Lsp->pr_sysarg[2] & O_CREAT)? 3 : 2) :
+				    ((Lsp->pr_sysarg[2] & O_CREAT)? 1 : 0);
+			break;
 		case SYS_open:		/* open() w/ and w/o O_CREAT */
 		case SYS_open64:
 			if (nsysarg > 1)
 				subcode = (Lsp->pr_sysarg[1] & O_CREAT)? 1 : 0;
-			break;
-		case SYS_fsat:
-			switch (arg0) {
-			case 0:  /* openat */
-				if (nsysarg > 3)
-					subcode =
-					    (Lsp->pr_sysarg[3] & O_CREAT) ?
-					    0 : NFSATSYSCODE - 2;
-				break;
-			case 1: /* openat64 */
-				if (nsysarg > 3)
-					subcode =
-					    (Lsp->pr_sysarg[3] & O_CREAT) ?
-					    1 : NFSATSYSCODE - 1;
-				break;
-			case 2:
-			case 3:
-			case 4:
-			case 5:
-			case 6:
-			case 7:
-			case 8:
-			case 9:
-				subcode = arg0;
-			}
 			break;
 		case SYS_kaio:		/* kaio() */
 			subcode = arg0 & ~AIO_POLL_BIT;
@@ -1317,6 +1413,14 @@ int
 maxsyscalls()
 {
 	return (PRMAXSYS + 1
+	    + NACCESSCODE - 1
+	    + NCHOWNCODE - 1
+	    + NRENAMECODE - 1
+	    + NUNLINKCODE - 1
+	    + NSTATCODE - 1
+	    + NSTAT64CODE - 1
+	    + NOPENATCODE - 1
+	    + NOPENAT64CODE - 1
 	    + NOPENCODE - 1
 	    + NOPEN64CODE - 1
 	    + NMSGCODE - 1
@@ -1335,7 +1439,6 @@ maxsyscalls()
 	    + NLWPCREATECODE - 1
 	    + NTASKSYSCODE - 1
 	    + NEXACCTSYSCODE - 1
-	    + NFSATSYSCODE - 1
 	    + NLWPPARKCODE - 1
 	    + NLWPRWLOCKCODE - 1
 	    + NSENDFILESYSCODE - 1
@@ -1360,53 +1463,67 @@ int
 nsubcodes(int syscall)
 {
 	switch (syscall) {
+	case SYS_faccessat:
+		return (NACCESSCODE);
+	case SYS_fchownat:
+		return (NCHOWNCODE);
+	case SYS_renameat:
+		return (NRENAMECODE);
+	case SYS_unlinkat:
+		return (NUNLINKCODE);
+	case SYS_fstatat:
+		return (NSTATCODE);
+	case SYS_fstatat64:
+		return (NSTAT64CODE);
+	case SYS_openat:
+		return (NOPENATCODE);
+	case SYS_openat64:
+		return (NOPENAT64CODE);
 	case SYS_open:
 		return (NOPENCODE);
 	case SYS_open64:
 		return (NOPEN64CODE);
-	case SYS_msgsys:	/* msgsys() */
+	case SYS_msgsys:
 		return (NMSGCODE);
-	case SYS_semsys:	/* semsys() */
+	case SYS_semsys:
 		return (NSEMCODE);
-	case SYS_shmsys:	/* shmsys() */
+	case SYS_shmsys:
 		return (NSHMCODE);
-	case SYS_pgrpsys:	/* pgrpsys() */
+	case SYS_pgrpsys:
 		return (NPIDCODE);
-	case SYS_utssys:	/* utssys() */
+	case SYS_utssys:
 		return (NUTSCODE);
-	case SYS_sysfs:		/* sysfs() */
+	case SYS_sysfs:
 		return (NSFSCODE);
-	case SYS_sigpending:	/* sigpending()/sigfillset() */
+	case SYS_sigpending:
 		return (NSGPCODE);
-	case SYS_context:	/* [get|set]context() */
+	case SYS_context:
 		return (NCTXCODE);
-	case SYS_hrtsys:	/* hrtsys() */
+	case SYS_hrtsys:
 		return (NHRTCODE);
-	case SYS_corectl:	/* corectl() */
+	case SYS_corectl:
 		return (NCORCODE);
-	case SYS_kaio:		/* kaio() */
+	case SYS_kaio:
 		return (NAIOCODE);
-	case SYS_door:		/* doors */
+	case SYS_door:
 		return (NDOORCODE);
-	case SYS_pset:		/* pset() */
+	case SYS_pset:
 		return (NPSETCODE);
-	case SYS_lwp_create:	/* lwp_create() */
+	case SYS_lwp_create:
 		return (NLWPCREATECODE);
-	case SYS_tasksys:	/* tasks */
+	case SYS_tasksys:
 		return (NTASKSYSCODE);
-	case SYS_exacctsys:	/* exacct */
+	case SYS_exacctsys:
 		return (NEXACCTSYSCODE);
-	case SYS_fsat:
-		return (NFSATSYSCODE);
-	case SYS_privsys:	/* privileges */
+	case SYS_privsys:
 		return (NPRIVSYSCODE);
-	case SYS_lwp_park:	/* lwp_park */
+	case SYS_lwp_park:
 		return (NLWPPARKCODE);
 	case SYS_lwp_rwlock_sys:
 		return (NLWPRWLOCKCODE);
-	case SYS_sendfilev:	/* sendfilev */
+	case SYS_sendfilev:
 		return (NSENDFILESYSCODE);
-	case SYS_lgrpsys:	/* lgrpsys */
+	case SYS_lgrpsys:
 		return (NLGRPSYSCODE);
 	case SYS_rusagesys:
 		return (NRUSAGESYSCODE);
@@ -1416,7 +1533,7 @@ nsubcodes(int syscall)
 		return (NUCREDSYSCODE);
 	case SYS_port:
 		return (NPORTCODE);
-	case SYS_zone:		/* zone */
+	case SYS_zone:
 		return (NZONECODE);
 	case SYS_labelsys:
 		return (NLABELCODE);

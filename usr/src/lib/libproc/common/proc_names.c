@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,16 +116,16 @@ proc_signame(int sig, char *buf, size_t bufsz)
 static const char *const systable[] = {
 	NULL,			/*  0 */
 	"_exit",		/*  1 */
-	"forkall",		/*  2 */
+	NULL,			/*  2 */
 	"read",			/*  3 */
 	"write",		/*  4 */
 	"open",			/*  5 */
 	"close",		/*  6 */
-	"wait",			/*  7 */
-	"creat",		/*  8 */
+	NULL,			/*  7 */
+	NULL,			/*  8 */
 	"link",			/*  9 */
 	"unlink",		/* 10 */
-	"exec",			/* 11 */
+	NULL,			/* 11 */
 	"chdir",		/* 12 */
 	"time",			/* 13 */
 	"mknod",		/* 14 */
@@ -135,7 +136,7 @@ static const char *const systable[] = {
 	"lseek",		/* 19 */
 	"getpid",		/* 20 */
 	"mount",		/* 21 */
-	"umount",		/* 22 */
+	NULL,			/* 22 */
 	"setuid",		/* 23 */
 	"getuid",		/* 24 */
 	"stime",		/* 25 */
@@ -143,7 +144,7 @@ static const char *const systable[] = {
 	"alarm",		/* 27 */
 	"fstat",		/* 28 */
 	"pause",		/* 29 */
-	"utime",		/* 30 */
+	NULL,			/* 30 */
 	"stty",			/* 31 */
 	"gtty",			/* 32 */
 	"access",		/* 33 */
@@ -154,11 +155,11 @@ static const char *const systable[] = {
 	"fstatfs",		/* 38 */
 	"pgrpsys",		/* 39 */
 	"uucopystr",		/* 40 */
-	"dup",			/* 41 */
+	NULL,			/* 41 */
 	"pipe",			/* 42 */
 	"times",		/* 43 */
 	"profil",		/* 44 */
-	"plock",		/* 45 */
+	"faccessat",		/* 45 */
 	"setgid",		/* 46 */
 	"getgid",		/* 47 */
 	"signal",		/* 48 */
@@ -169,7 +170,7 @@ static const char *const systable[] = {
 	"semsys",		/* 53 */
 	"ioctl",		/* 54 */
 	"uadmin",		/* 55 */
-	NULL,			/* 56 */
+	"fchownat",		/* 56 */
 	"utssys",		/* 57 */
 	"fdsync",		/* 58 */
 	"execve",		/* 59 */
@@ -177,15 +178,12 @@ static const char *const systable[] = {
 	"chroot",		/* 61 */
 	"fcntl",		/* 62 */
 	"ulimit",		/* 63 */
-
-	/* The following 6 entries were reserved for the UNIX PC */
-	NULL,			/* 64 */
-	NULL,			/* 65 */
-	NULL,			/* 66 */
-	NULL,			/* 67 */
-	NULL,			/* 68 */
-	NULL,			/* 69 */
-
+	"renameat",		/* 64 */
+	"unlinkat",		/* 65 */
+	"fstatat",		/* 66 */
+	"fstatat64",		/* 67 */
+	"openat",		/* 68 */
+	"openat64",		/* 69 */
 	"tasksys",		/* 70 */
 	"acctctl",		/* 71 */
 	"exacctsys",		/* 72 */
@@ -203,7 +201,7 @@ static const char *const systable[] = {
 	"sysfs",		/* 84 */
 	"getmsg",		/* 85 */
 	"putmsg",		/* 86 */
-	"poll",			/* 87 */
+	NULL,			/* 87 */
 	"lstat",		/* 88 */
 	"symlink",		/* 89 */
 	"readlink",		/* 90 */
@@ -217,8 +215,8 @@ static const char *const systable[] = {
 	"sigaction",		/* 98 */
 	"sigpending",		/* 99 */
 	"context",		/* 100 */
-	"evsys",		/* 101 */
-	"evtrapret",		/* 102 */
+	NULL,			/* 101 */
+	NULL,			/* 102 */
 	"statvfs",		/* 103 */
 	"fstatvfs",		/* 104 */
 	"getloadavg",		/* 105 */
@@ -239,10 +237,10 @@ static const char *const systable[] = {
 	"fchdir",		/* 120 */
 	"readv",		/* 121 */
 	"writev",		/* 122 */
-	"xstat",		/* 123 */
-	"lxstat",		/* 124 */
-	"fxstat",		/* 125 */
-	"xmknod",		/* 126 */
+	NULL,			/* 123 */
+	NULL,			/* 124 */
+	NULL,			/* 125 */
+	NULL,			/* 126 */
 	"mmapobj",		/* 127 */
 	"setrlimit",		/* 128 */
 	"getrlimit",		/* 129 */
@@ -259,18 +257,18 @@ static const char *const systable[] = {
 	"sharefs",		/* 140 */
 	"seteuid",		/* 141 */
 	"forksys",		/* 142 */
-	"fork1",		/* 143 */
+	NULL,			/* 143 */
 	"sigtimedwait",		/* 144 */
 	"lwp_info",		/* 145 */
 	"yield",		/* 146 */
-	"lwp_sema_wait",	/* 147 */
+	NULL,			/* 147 */
 	"lwp_sema_post",	/* 148 */
 	"lwp_sema_trywait",	/* 149 */
 	"lwp_detatch",		/* 150 */
 	"corectl",		/* 151 */
 	"modctl",		/* 152 */
 	"fchroot",		/* 153 */
-	"utimes",		/* 154 */
+	NULL,			/* 154 */
 	"vhangup",		/* 155 */
 	"gettimeofday",		/* 156 */
 	"getitimer",		/* 157 */
@@ -285,7 +283,7 @@ static const char *const systable[] = {
 	"lwp_private",		/* 166 */
 	"lwp_wait",		/* 167 */
 	"lwp_mutex_wakeup",	/* 168 */
-	"lwp_mutex_lock",	/* 169 */
+	NULL,			/* 169 */
 	"lwp_cond_wait",	/* 170 */
 	"lwp_cond_signal",	/* 171 */
 	"lwp_cond_broadcast",	/* 172 */
@@ -300,7 +298,7 @@ static const char *const systable[] = {
 	"rusagesys",		/* 181 */
 	"portfs",		/* 182 */
 	"pollsys",		/* 183 */
-	NULL,			/* 184 */
+	"labelsys",		/* 184 */
 	"acl",			/* 185 */
 	"auditsys",		/* 186 */
 	"processor_bind",	/* 187 */
@@ -340,7 +338,7 @@ static const char *const systable[] = {
 	"getrlimit64",		/* 221 */
 	"pread64",		/* 222 */
 	"pwrite64",		/* 223 */
-	"creat64",		/* 224 */
+	NULL,			/* 224 */
 	"open64",		/* 225 */
 	"rpcmod",		/* 226 */
 	"zone",			/* 227 */

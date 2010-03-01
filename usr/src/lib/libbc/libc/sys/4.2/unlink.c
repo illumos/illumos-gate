@@ -20,17 +20,16 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "chkpath.h"
 #include <sys/syscall.h>
+#include <sys/fcntl.h>
 
 int
-unlink(char *path)
+unlink(const char *path)
 {
 	CHKNULL(path);
 
@@ -40,5 +39,5 @@ unlink(char *path)
 	else if (strcmp(path, "/var/adm/wtmp") == 0)
 		path = "/var/adm/wtmpx";
 
-	return (_syscall(SYS_unlink, path));
+	return (_syscall(SYS_unlinkat, AT_FDCWD, path, 0));
 }

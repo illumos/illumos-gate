@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,8 +51,8 @@
 #include <sys/cmn_err.h>
 
 /*
- * Common code for open()/openat() and creat().  Check permissions, allocate
- * an open file structure, and call the device open routine (if any).
+ * Common code for openat().  Check permissions, allocate an open
+ * file structure, and call the device open routine (if any).
  */
 
 static int
@@ -100,8 +101,8 @@ copen(int startfd, char *fname, int filemode, int createmode)
 	 * Handle openattrdirat request
 	 */
 	if (filemode & FXATTRDIROPEN) {
-			if (audit_active)
-				audit_setfsat_path(1);
+		if (audit_active)
+			audit_setfsat_path(1);
 
 		if (error = lookupnameat(fname, seg, FOLLOW,
 		    NULLVPP, &vp, startvp))
@@ -254,95 +255,61 @@ out:
 }
 
 #define	OPENMODE32(fmode)	((int)((fmode)-FOPEN))
-#define	CREATMODE32		(FWRITE|FCREAT|FTRUNC)
 #define	OPENMODE64(fmode)	(OPENMODE32(fmode) | FOFFMAX)
 #define	OPENMODEATTRDIR		FXATTRDIROPEN
-#define	CREATMODE64		(CREATMODE32 | FOFFMAX)
 #ifdef _LP64
 #define	OPENMODE(fmode)		OPENMODE64(fmode)
-#define	CREATMODE		CREATMODE64
 #else
 #define	OPENMODE		OPENMODE32
-#define	CREATMODE		CREATMODE32
 #endif
 
 /*
  * Open a file.
  */
 int
-open(char *fname, int fmode, int cmode)
-{
-	return (copen(AT_FDCWD, fname, OPENMODE(fmode), cmode));
-}
-
-/*
- * Create a file.
- */
-int
-creat(char *fname, int cmode)
-{
-	return (copen(AT_FDCWD, fname, CREATMODE, cmode));
-}
-
-int
 openat(int fd, char *path, int fmode, int cmode)
 {
 	return (copen(fd, path, OPENMODE(fmode), cmode));
 }
 
+int
+open(char *path, int fmode, int cmode)
+{
+	return (openat(AT_FDCWD, path, fmode, cmode));
+}
+
 #if defined(_ILP32) || defined(_SYSCALL32_IMPL)
 /*
- * Open and Creat for large files in 32-bit environment. Sets the FOFFMAX flag.
+ * Open for large files in 32-bit environment. Sets the FOFFMAX flag.
  */
-int
-open64(char *fname, int fmode, int cmode)
-{
-	return (copen(AT_FDCWD, fname, OPENMODE64(fmode), cmode));
-}
-
-int
-creat64(char *fname, int cmode)
-{
-	return (copen(AT_FDCWD, fname, CREATMODE64, cmode));
-}
-
 int
 openat64(int fd, char *path, int fmode, int cmode)
 {
 	return (copen(fd, path, OPENMODE64(fmode), cmode));
 }
 
+int
+open64(char *path, int fmode, int cmode)
+{
+	return (openat64(AT_FDCWD, path, fmode, cmode));
+}
+
 #endif	/* _ILP32 || _SYSCALL32_IMPL */
 
 #ifdef _SYSCALL32_IMPL
 /*
- * Open and Creat for 32-bit compatibility on 64-bit kernel
+ * Open for 32-bit compatibility on 64-bit kernel
  */
-int
-open32(char *fname, int fmode, int cmode)
-{
-	return (copen(AT_FDCWD, fname, OPENMODE32(fmode), cmode));
-}
-
-int
-creat32(char *fname, int cmode)
-{
-	return (copen(AT_FDCWD, fname, CREATMODE32, cmode));
-}
-
 int
 openat32(int fd, char *path, int fmode, int cmode)
 {
 	return (copen(fd, path, OPENMODE32(fmode), cmode));
 }
 
-#endif	/* _SYSCALL32_IMPL */
-
-/*
- * Special interface to open hidden attribute directory.
- */
 int
-openattrdirat(int fd, char *fname)
+open32(char *path, int fmode, int cmode)
 {
-	return (copen(fd, fname, OPENMODEATTRDIR, 0));
+	return (openat32(AT_FDCWD, path, fmode, cmode));
 }
+
+#endif	/* _SYSCALL32_IMPL */

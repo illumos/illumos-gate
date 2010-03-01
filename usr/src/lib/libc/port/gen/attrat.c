@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +34,7 @@
 #include <sys/types.h>
 #include <sys/syscall.h>
 #include <sys/stat.h>
-#include <sys/filio.h>
+#include <sys/file.h>
 #include <unistd.h>
 #include <dlfcn.h>
 #include <stdio.h>
@@ -47,12 +48,17 @@ static int (*nvlookupint64)(nvlist_t *, const char *, uint64_t *);
 
 static mutex_t attrlock = DEFAULTMUTEX;
 static int initialized;
-extern int __openattrdirat(int basefd, const char *name);
 
 static char *xattr_view_name[XATTR_VIEW_LAST] = {
 	VIEW_READONLY,
 	VIEW_READWRITE
 };
+
+int
+__openattrdirat(int fd, const char *name)
+{
+	return (syscall(SYS_openat, fd, name, FXATTRDIROPEN, 0));
+}
 
 static int
 attrat_init()

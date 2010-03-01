@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 #include <sys/types.h>
@@ -444,8 +442,7 @@ getregs(pid_t pid, lwpid_t lwpid, lx_user_regs_t *rp)
 		 * had called execve (respectively).
 		 */
 		if (status.pr_why == PR_SYSEXIT &&
-		    (status.pr_what == SYS_exec ||
-		    status.pr_what == SYS_execve)) {
+		    status.pr_what == SYS_execve) {
 			rp->lxur_eax = 0;
 			rp->lxur_orig_eax = LX_SYS_execve;
 		}
@@ -1529,7 +1526,6 @@ ptrace_attach_common(int fd, pid_t lxpid, pid_t pid, lwpid_t lwpid, int run)
 	sysp = (sysset_t *)ctlp;
 	ctlp += sizeof (sysset_t) / sizeof (long);
 	premptyset(sysp);
-	praddset(sysp, SYS_exec);
 	praddset(sysp, SYS_execve);
 	if (run) {
 		*ctlp++ = PCRUN;
@@ -1800,8 +1796,7 @@ ptrace_catch_fork(pid_t pid, int monitor)
 	sysp = (sysset_t *)ctlp;
 	ctlp += sizeof (sysset_t) / sizeof (long);
 	premptyset(sysp);
-	praddset(sysp, SYS_fork1);	/* for old libc */
-	praddset(sysp, SYS_forksys);	/* new libc: fork1() is forksys(0, 0) */
+	praddset(sysp, SYS_forksys);	/* fork1() is forksys(0, 0) */
 	*ctlp++ = PCRUN;
 	*ctlp++ = 0;
 	*ctlp++ = PCWSTOP;
@@ -1815,10 +1810,8 @@ ptrace_catch_fork(pid_t pid, int monitor)
 	sysp = (sysset_t *)ctlp;
 	ctlp += sizeof (sysset_t) / sizeof (long);
 	premptyset(sysp);
-	if (monitor) {
-		praddset(sysp, SYS_exec);
+	if (monitor)
 		praddset(sysp, SYS_execve);
-	}
 
 	size = (char *)ctlp - (char *)&ctl[0];
 	assert(size <= sizeof (ctl));
@@ -2097,8 +2090,7 @@ found:
 		 * in that state as though it had reached the ptrace trace
 		 * point.
 		 */
-		if (status.pr_lwp.pr_what == SYS_exec ||
-		    status.pr_lwp.pr_what == SYS_execve) {
+		if (status.pr_lwp.pr_what == SYS_execve) {
 			infop->si_code = CLD_TRAPPED;
 			infop->si_status = SIGTRAP;
 			break;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,10 +47,10 @@ extern "C" {
 #define	AUE_EXIT		1	/* =ps exit(2) */
 #define	AUE_FORKALL		2	/* =ps forkall(2) */
 #define	AUE_OPEN		3	/* =no open(2): place holder */
-#define	AUE_CREAT		4	/* =fc create(2) */
+#define	AUE_CREAT		4	/* =no obsolete */
 #define	AUE_LINK		5	/* =fc link(2) */
 #define	AUE_UNLINK		6	/* =fd unlink(2) */
-#define	AUE_EXEC		7	/* =ps,ex exec(2) */
+#define	AUE_EXEC		7	/* =no obsolete */
 #define	AUE_CHDIR		8	/* =pm chdir(2) */
 #define	AUE_MKNOD		9	/* =fc mknod(2) */
 #define	AUE_CHMOD		10	/* =fm chmod(2) */
@@ -92,7 +92,7 @@ extern "C" {
 #define	AUE_SHUTDOWN		46	/* =nt shutdown(2) */
 #define	AUE_MKDIR		47	/* =fc mkdir(2) */
 #define	AUE_RMDIR		48	/* =fd rmdir(2) */
-#define	AUE_UTIMES		49	/* =fm utimes(2) */
+#define	AUE_UTIMES		49	/* =fm futimens(2), utimensat(2) */
 #define	AUE_ADJTIME		50	/* =as adjtime(2) */
 #define	AUE_SETRLIMIT		51	/* =ua setrlimit(2) */
 #define	AUE_KILLPG		52	/* =no killpg(2) */
@@ -113,7 +113,7 @@ extern "C" {
 #define	AUE_RFSSYS		67	/* =no rfssys(2): place holder */
 #define	AUE_FCHDIR		68	/* =pm fchdir(2) */
 #define	AUE_FCHROOT		69	/* =pm fchroot(2) */
-#define	AUE_VPIXSYS		70	/* =no vpixsys(2): obsolete */
+#define	AUE_VPIXSYS		70	/* =no obsolete */
 #define	AUE_PATHCONF		71	/* =fa pathconf(2) */
 #define	AUE_OPEN_R		72	/* =fr open(2): read */
 #define	AUE_OPEN_RC		73	/* =fc,fr open(2): read,creat */
@@ -169,7 +169,7 @@ extern "C" {
 #define	AUE_SETAUDIT		133	/* =aa setaudit(2) */
 /*				134	    OBSOLETE */
 /*				135	    OBSOLETE */
-#define	AUE_AUDITSVC		136	/* =no auditsvc(2): obsolete */
+#define	AUE_AUDITSVC		136	/* =no obsolete */
 /*				137	    OBSOLETE */
 #define	AUE_AUDITON		138	/* =no auditon(2) */
 #define	AUE_AUDITON_GTERMID	139	/* =no auditctl(2): GETTERMID */
@@ -232,17 +232,17 @@ extern "C" {
 #define	AUE_WRITEV		196	/* =no writev(2) */
 #define	AUE_NFS			197	/* =no NFS server */
 #define	AUE_READV		198	/* =no readv(2) */
-#define	AUE_OSTAT		199	/* =no old stat(2) */
+#define	AUE_OSTAT		199	/* =no obsolete */
 #define	AUE_SETUID		200	/* =pm old setuid(2) */
 #define	AUE_STIME		201	/* =as old stime(2) */
-#define	AUE_UTIME		202	/* =fm old utime(2) */
+#define	AUE_UTIME		202	/* =no obsolete */
 #define	AUE_NICE		203	/* =pm old nice(2) */
 #define	AUE_OSETPGRP		204	/* =no old setpgrp(2) */
 #define	AUE_SETGID		205	/* =pm old setgid(2) */
 #define	AUE_READL		206	/* =no readl(2) */
 #define	AUE_READVL		207	/* =no readvl(2) */
 #define	AUE_FSTAT		208	/* =no fstat(2) */
-#define	AUE_DUP2		209	/* =no dup2(2) u-o-p */
+#define	AUE_DUP2		209	/* =no obsolete */
 #define	AUE_MMAP		210	/* =no mmap(2) u-o-p */
 #define	AUE_AUDIT		211	/* =no audit(2) u-o-p */
 #define	AUE_PRIOCNTLSYS		212	/* =pm priocntlsys */
@@ -268,12 +268,12 @@ extern "C" {
 #define	AUE_AUDITON_SETCLASS	232	/* =as */
 #define	AUE_FUSERS		233	/* =fa */
 #define	AUE_STATVFS		234	/* =fa */
-#define	AUE_XSTAT		235	/* =no */
-#define	AUE_LXSTAT		236	/* =no */
+#define	AUE_XSTAT		235	/* =no obsolete */
+#define	AUE_LXSTAT		236	/* =no obsolete */
 #define	AUE_LCHOWN		237	/* =fm */
 #define	AUE_MEMCNTL		238	/* =ot */
 #define	AUE_SYSINFO		239	/* =as */
-#define	AUE_XMKNOD		240	/* =no */
+#define	AUE_XMKNOD		240	/* =no obsolete */
 #define	AUE_FORK1		241	/* =ps */
 #define	AUE_MODCTL		242	/* =no */
 #define	AUE_MODLOAD		243	/* =as */
@@ -301,25 +301,25 @@ extern "C" {
 #define	AUE_SOCKCONFIG		265	/* =nt */
 #define	AUE_SETAUDIT_ADDR	266	/* =aa setaudit_addr(2) */
 #define	AUE_GETAUDIT_ADDR	267	/* =aa getaudit_addr(2) */
-#define	AUE_UMOUNT2		268	/* =as umount(2) */
-#define	AUE_FSAT		269	/* =no openat(2): place holder */
-#define	AUE_OPENAT_R		270	/* =fr openat(2): read */
-#define	AUE_OPENAT_RC		271	/* =fc,fr openat(2): read,creat */
-#define	AUE_OPENAT_RT		272	/* =fd,fr openat(2): read,trunc */
-#define	AUE_OPENAT_RTC		273	/* =fc,fd,fr openat(2): rd,cr,tr */
-#define	AUE_OPENAT_W		274	/* =fw openat(2): write */
-#define	AUE_OPENAT_WC		275	/* =fc,fw openat(2): write,creat */
-#define	AUE_OPENAT_WT		276	/* =fd,fw openat(2): write,trunc */
-#define	AUE_OPENAT_WTC		277	/* =fc,fd,fw openat(2): wr,cr,tr */
-#define	AUE_OPENAT_RW		278	/* =fr,fw openat(2): read,write */
-#define	AUE_OPENAT_RWC		279	/* =fc,fw,fr openat(2): rd,wr,cr */
-#define	AUE_OPENAT_RWT		280	/* =fd,fr,fw openat(2): rd,wr,tr */
-#define	AUE_OPENAT_RWTC		281 /* =fc,fd,fw,fr openat(2): rd,wr,cr,tr */
-#define	AUE_RENAMEAT		282	/* =fc,fd renameat(2) */
-#define	AUE_FSTATAT		283	/* =no fstatat(2) */
-#define	AUE_FCHOWNAT		284	/* =fm fchownat(2) */
-#define	AUE_FUTIMESAT		285	/* =fm futimesat(2) */
-#define	AUE_UNLINKAT		286	/* =fd unlinkat(2) */
+#define	AUE_UMOUNT2		268	/* =as umount2(2) */
+#define	AUE_FSAT		269	/* =no obsolete */
+#define	AUE_OPENAT_R		270	/* =no obsolete */
+#define	AUE_OPENAT_RC		271	/* =no obsolete */
+#define	AUE_OPENAT_RT		272	/* =no obsolete */
+#define	AUE_OPENAT_RTC		273	/* =no obsolete */
+#define	AUE_OPENAT_W		274	/* =no obsolete */
+#define	AUE_OPENAT_WC		275	/* =no obsolete */
+#define	AUE_OPENAT_WT		276	/* =no obsolete */
+#define	AUE_OPENAT_WTC		277	/* =no obsolete */
+#define	AUE_OPENAT_RW		278	/* =no obsolete */
+#define	AUE_OPENAT_RWC		279	/* =no obsolete */
+#define	AUE_OPENAT_RWT		280	/* =no obsolete */
+#define	AUE_OPENAT_RWTC		281	/* =no obsolete */
+#define	AUE_RENAMEAT		282	/* =no obsolete */
+#define	AUE_FSTATAT		283	/* =no obsolete */
+#define	AUE_FCHOWNAT		284	/* =no obsolete */
+#define	AUE_FUTIMESAT		285	/* =no obsolete */
+#define	AUE_UNLINKAT		286	/* =no obsolete */
 #define	AUE_CLOCK_SETTIME	287	/* =as clock_settime(3RT) */
 #define	AUE_NTP_ADJTIME		288	/* =as ntp_adjtime(2) */
 #define	AUE_SETPPRIV		289	/* =pm setppriv(2) */
@@ -342,7 +342,7 @@ extern "C" {
 #define	AUE_PORTFS_DISSOCIATE	306	/* =fa portfs(2) - port disassociate */
 #define	AUE_SETSID		307	/* =pm setsid(2) */
 #define	AUE_SETPGID		308	/* =pm setpgid(2) */
-#define	AUE_FACCESSAT		309	/* =fa faccessat(2) */
+#define	AUE_FACCESSAT		309	/* =no obsolete */
 
 
 

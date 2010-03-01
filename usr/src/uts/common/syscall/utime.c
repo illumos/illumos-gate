@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,48 +115,6 @@ cfutimesat(int fd, char *fname, int nmflag, vattr_t *vap, int flags, int follow)
 	return (0);
 }
 
-/*
- * Expunge this function when futimesat() and utimes()
- * are expunged from the kernel.
- */
-static int
-get_timeval_vattr(struct timeval *tvptr, struct vattr *vattr, int *flags)
-{
-	struct timeval tv[2];
-
-	if (tvptr != NULL) {
-		if (get_udatamodel() == DATAMODEL_NATIVE) {
-			if (copyin(tvptr, tv, sizeof (tv)))
-				return (EFAULT);
-		} else {
-			struct timeval32 tv32[2];
-
-			if (copyin(tvptr, tv32, sizeof (tv32)))
-				return (EFAULT);
-
-			TIMEVAL32_TO_TIMEVAL(&tv[0], &tv32[0]);
-			TIMEVAL32_TO_TIMEVAL(&tv[1], &tv32[1]);
-		}
-
-		if (tv[0].tv_usec < 0 || tv[0].tv_usec >= MICROSEC ||
-		    tv[1].tv_usec < 0 || tv[1].tv_usec >= MICROSEC)
-			return (EINVAL);
-
-		vattr->va_atime.tv_sec = tv[0].tv_sec;
-		vattr->va_atime.tv_nsec = tv[0].tv_usec * 1000;
-		vattr->va_mtime.tv_sec = tv[1].tv_sec;
-		vattr->va_mtime.tv_nsec = tv[1].tv_usec * 1000;
-		*flags = ATTR_UTIME;
-	} else {
-		gethrestime(&vattr->va_atime);
-		vattr->va_mtime = vattr->va_atime;
-		*flags = 0;
-	}
-	vattr->va_mask = AT_ATIME | AT_MTIME;
-
-	return (0);
-}
-
 static int
 get_timespec_vattr(timespec_t *tsptr, struct vattr *vattr, int *flags)
 {
@@ -210,90 +168,6 @@ get_timespec_vattr(timespec_t *tsptr, struct vattr *vattr, int *flags)
 	}
 
 	return (0);
-}
-
-/*
- * The futimesat() system call is no longer invoked from libc.
- * The futimesat() function has been implemented in libc using calls
- * to futimens() and utimensat().  The kernel code for futimesat()
- * should be expunged as soon as there is no longer a need
- * to run Solaris 10 and prior versions of libc on the system.
- * This includes the calls to futimesat in common/syscall/fsat.c
- */
-int
-futimesat(int fd, char *fname, struct timeval *tvptr)
-{
-	struct vattr vattr;
-	int flags;
-	int error;
-
-	if ((error = get_timeval_vattr(tvptr, &vattr, &flags)) != 0)
-		return (set_errno(error));
-
-	return (cfutimesat(fd, fname, 2, &vattr, flags, FOLLOW));
-}
-
-/*
- * The utime() system call is no longer invoked from libc.
- * The utime() function has been implemented in libc using
- * a call to utimensat().  The kernel code for utime()
- * should be expunged as soon as there is no longer a need
- * to run Solaris 10 and prior versions of libc on the system.
- */
-int
-utime(char *fname, time_t *tptr)
-{
-	time_t tv[2];
-	struct vattr vattr;
-	int flags;
-
-	if (tptr != NULL) {
-		if (get_udatamodel() == DATAMODEL_NATIVE) {
-			if (copyin(tptr, tv, sizeof (tv)))
-				return (set_errno(EFAULT));
-		} else {
-			time32_t tv32[2];
-
-			if (copyin(tptr, &tv32, sizeof (tv32)))
-				return (set_errno(EFAULT));
-
-			tv[0] = (time_t)tv32[0];
-			tv[1] = (time_t)tv32[1];
-		}
-
-		vattr.va_atime.tv_sec = tv[0];
-		vattr.va_atime.tv_nsec = 0;
-		vattr.va_mtime.tv_sec = tv[1];
-		vattr.va_mtime.tv_nsec = 0;
-		flags = ATTR_UTIME;
-	} else {
-		gethrestime(&vattr.va_atime);
-		vattr.va_mtime = vattr.va_atime;
-		flags = 0;
-	}
-
-	vattr.va_mask = AT_ATIME|AT_MTIME;
-	return (cfutimesat(AT_FDCWD, fname, 1, &vattr, flags, FOLLOW));
-}
-
-/*
- * The utimes() system call is no longer invoked from libc.
- * The utimes() function has been implemented in libc using
- * a call to utimensat().  The kernel code for utimes()
- * should be expunged as soon as there is no longer a need
- * to run Solaris 10 and prior versions of libc on the system.
- */
-int
-utimes(char *fname, struct timeval *tvptr)
-{
-	struct vattr vattr;
-	int flags;
-	int error;
-
-	if ((error = get_timeval_vattr(tvptr, &vattr, &flags)) != 0)
-		return (set_errno(error));
-
-	return (cfutimesat(AT_FDCWD, fname, 1, &vattr, flags, FOLLOW));
 }
 
 int

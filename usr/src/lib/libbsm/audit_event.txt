@@ -68,10 +68,10 @@
 2:AUE_FORKALL:forkall(2):ps
 # AUE_OPEN is a placeholder and will not be generated
 3:AUE_OPEN:open(2) - place holder:no
-4:AUE_CREAT:creat(2):fc
+4:AUE_CREAT:creat(2):no
 5:AUE_LINK:link(2):fc
 6:AUE_UNLINK:unlink(2):fd
-7:AUE_EXEC:exec(2):ps,ex
+7:AUE_EXEC:exec(2):no
 8:AUE_CHDIR:chdir(2):pm
 9:AUE_MKNOD:mknod(2):fc
 10:AUE_CHMOD:chmod(2):fm
@@ -236,7 +236,7 @@
 199:AUE_OSTAT:old stat(2):no
 200:AUE_SETUID:setuid(2):pm
 201:AUE_STIME:old stime(2):as
-202:AUE_UTIME:old utime(2):fm
+202:AUE_UTIME:old utime(2):no
 203:AUE_NICE:old nice(2):pm
 204:AUE_OSETPGRP:old setpgrp(2):no
 205:AUE_SETGID:old setgid(2):pm
@@ -309,26 +309,25 @@
 266:AUE_SETAUDIT_ADDR:setaudit_addr(2):aa
 267:AUE_GETAUDIT_ADDR:getaudit_addr(2):aa
 268:AUE_UMOUNT2:umount2(2):as
-# AUE_FSAT is a placeholder and will not be generated
+# AUE_FSAT and all AUE_OPENAT_* codes are obsolete and will not be generated
 269:AUE_FSAT:fsat(2) - place holder:no
-270:AUE_OPENAT_R:openat(2) - read:fr
-271:AUE_OPENAT_RC:openat(2) - read,creat:fc,fr
-272:AUE_OPENAT_RT:openat(2) - read,trunc:fd,fr
-273:AUE_OPENAT_RTC:openat(2) - read,creat,trunc:fc,fd,fr
-274:AUE_OPENAT_W:openat(2) - write:fw
-275:AUE_OPENAT_WC:openat(2) - write,creat:fc,fw
-276:AUE_OPENAT_WT:openat(2) - write,trunc:fd,fw
-277:AUE_OPENAT_WTC:openat(2) - write,creat,trunc:fc,fd,fw
-278:AUE_OPENAT_RW:openat(2) - read,write:fr,fw
-279:AUE_OPENAT_RWC:openat(2) - read,write,creat:fc,fw,fr
-280:AUE_OPENAT_RWT:openat(2) - read,write,trunc:fd,fr,fw
-281:AUE_OPENAT_RWTC:openat(2) - read,write,creat,trunc:fc,fd,fw,fr
-282:AUE_RENAMEAT:renameat(2):fc,fd
-# AUE_FSTATAT is a potentially very high-volume event, use with caution
+270:AUE_OPENAT_R:openat(2) - read:no
+271:AUE_OPENAT_RC:openat(2) - read,creat:no
+272:AUE_OPENAT_RT:openat(2) - read,trunc:no
+273:AUE_OPENAT_RTC:openat(2) - read,creat,trunc:no
+274:AUE_OPENAT_W:openat(2) - write:no
+275:AUE_OPENAT_WC:openat(2) - write,creat:no
+276:AUE_OPENAT_WT:openat(2) - write,trunc:no
+277:AUE_OPENAT_WTC:openat(2) - write,creat,trunc:no
+278:AUE_OPENAT_RW:openat(2) - read,write:no
+279:AUE_OPENAT_RWC:openat(2) - read,write,creat:no
+280:AUE_OPENAT_RWT:openat(2) - read,write,trunc:no
+281:AUE_OPENAT_RWTC:openat(2) - read,write,creat,trunc:no
+282:AUE_RENAMEAT:renameat(2):no
 283:AUE_FSTATAT:fstatat(2):no
-284:AUE_FCHOWNAT:fchownat(2):fm
-285:AUE_FUTIMESAT:futimesat(2):fm
-286:AUE_UNLINKAT:unlinkat(2):fd
+284:AUE_FCHOWNAT:fchownat(2):no
+285:AUE_FUTIMESAT:futimesat(2):no
+286:AUE_UNLINKAT:unlinkat(2):no
 287:AUE_CLOCK_SETTIME:clock_settime(3RT):as
 288:AUE_NTP_ADJTIME:ntp_adjtime(2):as
 289:AUE_SETPPRIV:setppriv(2):pm
@@ -355,7 +354,7 @@
 #
 307:AUE_SETSID:setsid(2):pm
 308:AUE_SETPGID:setpgid(2):pm
-309:AUE_FACCESSAT:faccessat(2):fa
+309:AUE_FACCESSAT:faccessat(2):no
 #
 # user level audit events
 #	2048 -  6143	Reserved

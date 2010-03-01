@@ -20,20 +20,19 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/syscall.h>
+#include <sys/fcntl.h>
 
 int
 dup(int fd)
 {
 	int ret, fds;
 
-	if ((ret = _syscall(SYS_dup, fd)) == -1)
+	if ((ret = _syscall(SYS_fcntl, fd, F_DUPFD, 0)) == -1)
 		return (-1);
 
 	if ((fds = fd_get(fd)) != -1)

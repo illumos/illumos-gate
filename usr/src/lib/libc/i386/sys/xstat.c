@@ -24,47 +24,57 @@
  * Use is subject to license terms.
  */
 
-#include <sys/syscall.h>
+/*
+ * Wrapper functions to intercept calls to the obsolete
+ * _xstat(), _lxstat(), _fxstat() and _xmknod() functions
+ * and redirect them to the proper direct system calls.
+ */
+
+#include "lint.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/errno.h>
 
-extern int errno;
-
-int stat(path, buf)
-char *path;
-struct stat *buf;
+int
+_xstat(int version, const char *path, struct stat *statb)
 {
-	return(bc_stat(path, buf));
-}
-
-int bc_stat(path, buf)
-char *path;
-struct stat *buf;
-{
-	if (path == (char*)0) {
-		errno = EFAULT;
+	if (version != _STAT_VER) {
+		errno = EINVAL;
 		return (-1);
 	}
-	if ((buf == (struct stat*)0) || (buf == (struct stat*)-1)) {
-		errno = EFAULT;
+	return (stat(path, statb));
+}
+
+int
+_lxstat(int version, const char *path, struct stat *statb)
+{
+	if (version != _STAT_VER) {
+		errno = EINVAL;
 		return (-1);
 	}
-	return(stat_com(0, path, buf));
+	return (lstat(path, statb));
 }
 
-
-int lstat(path, buf)
-char *path;
-struct stat *buf;
+int
+_fxstat(int version, int fd, struct stat *statb)
 {
-	return(bc_lstat(path, buf));
+	if (version != _STAT_VER) {
+		errno = EINVAL;
+		return (-1);
+	}
+	return (fstat(fd, statb));
 }
 
-int bc_lstat(path, buf)
-char *path;
-struct stat *buf;
+int
+_xmknod(int version, const char *path, mode_t mode, dev_t dev)
 {
-	return(stat_com(1, path, buf));
+	if (version != _MKNOD_VER) {
+		errno = EINVAL;
+		return (-1);
+	}
+	return (mknod(path, mode, dev));
 }
-

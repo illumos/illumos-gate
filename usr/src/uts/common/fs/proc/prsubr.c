@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1056,7 +1056,7 @@ prgetlwpstatus32(kthread_t *t, lwpstatus32_t *sp, zone_t *zp)
 		} else
 			sp->pr_errpriv = lwp->lwp_badpriv;
 
-		if (t->t_sysnum == SYS_exec || t->t_sysnum == SYS_execve) {
+		if (t->t_sysnum == SYS_execve) {
 			up = PTOU(p);
 			sp->pr_sysarg[0] = 0;
 			sp->pr_sysarg[1] = (caddr32_t)up->u_argv;
@@ -1281,7 +1281,7 @@ prgetlwpstatus(kthread_t *t, lwpstatus_t *sp, zone_t *zp)
 		else
 			sp->pr_errpriv = lwp->lwp_badpriv;
 
-		if (t->t_sysnum == SYS_exec || t->t_sysnum == SYS_execve) {
+		if (t->t_sysnum == SYS_execve) {
 			up = PTOU(p);
 			sp->pr_sysarg[0] = 0;
 			sp->pr_sysarg[1] = (uintptr_t)up->u_argv;

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,8 +31,6 @@
 
 #ifndef _LIBC_H
 #define	_LIBC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <thread.h>
 #include <stdio.h>
@@ -118,6 +116,13 @@ extern enum fp_direction_type _QgetRD(void);
 #error Unknown architecture!
 #endif
 
+/*
+ * defined in open.c
+ */
+extern	int	__open(const char *, int, mode_t);
+extern	int	__open64(const char *, int, mode_t);
+extern	int	__openat(int, const char *, int, mode_t);
+extern	int	__openat64(int, const char *, int, mode_t);
 
 /*
  * defined in hex_bin.c

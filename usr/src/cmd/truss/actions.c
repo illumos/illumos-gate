@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -388,9 +388,13 @@ sysentry(private_t *pri, int dotrace)
 		nargs = stp->nargs;
 	pri->sys_nargs = nargs;
 
-	/* fetch and remember first argument if it's a string */
+	/*
+	 * Fetch and remember first argument if it's a string,
+	 * or second argument if SYS_openat or SYS_openat64.
+	 */
 	pri->sys_valid = FALSE;
-	if (nargs > 0 && stp->arg[0] == STG) {
+	if ((nargs > 0 && stp->arg[0] == STG) ||
+	    (nargs > 1 && (what == SYS_openat || what == SYS_openat64))) {
 		long offset;
 		uint32_t offset32;
 
@@ -399,9 +403,7 @@ sysentry(private_t *pri, int dotrace)
 		 * The address in pri->sys_args[0] refers to the old process
 		 * image.  We must fetch the string from the new image.
 		 */
-		if (Lsp->pr_why == PR_SYSEXIT &&
-		    (Lsp->pr_what == SYS_execve ||
-		    Lsp->pr_what == SYS_exec)) {
+		if (Lsp->pr_why == PR_SYSEXIT && what == SYS_execve) {
 			psinfo_t psinfo;
 			long argv;
 			auxv_t auxv[32];
@@ -428,8 +430,10 @@ sysentry(private_t *pri, int dotrace)
 					offset = offset32;
 				}
 			}
-		} else {
+		} else if (stp->arg[0] == STG) {
 			offset = pri->sys_args[0];
+		} else {
+			offset = pri->sys_args[1];
 		}
 		if ((s = fetchstring(pri, offset, PATH_MAX)) != NULL) {
 			pri->sys_valid = TRUE;
@@ -475,8 +479,10 @@ sysentry(private_t *pri, int dotrace)
 			arg = pri->sys_args[i];
 			x = stp->arg[i];
 
-			if (x == STG && !raw &&
-			    i == 0 && pri->sys_valid) {	/* already fetched */
+			if (!raw && pri->sys_valid &&
+			    ((i == 0 && x == STG) ||
+			    (i == 1 && (what == SYS_openat ||
+			    what == SYS_openat64)))) {	/* already fetched */
 				escape_string(pri, pri->sys_path);
 				argprinted = TRUE;
 			} else if (x != HID || raw) {
@@ -541,12 +547,10 @@ sysexit(private_t *pri, int dotrace)
 	switch (what) {
 	case SYS_exit:		/* these are traced on entry */
 	case SYS_lwp_exit:
-	case SYS_evtrapret:
 	case SYS_context:
 		istraced = dotrace && prismember(&trace, what);
 		break;
-	case SYS_exec:		/* these are normally traced on entry */
-	case SYS_execve:
+	case SYS_execve:	/* this is normally traced on entry */
 		istraced = dotrace && prismember(&trace, what);
 		if (pri->exec_string && *pri->exec_string) {
 			if (!cflag && istraced) { /* print exec() string now */
@@ -562,7 +566,8 @@ sysexit(private_t *pri, int dotrace)
 		/* FALLTHROUGH */
 	default:
 		/* we called sysentry() in main() for these */
-		if (what == SYS_open || what == SYS_open64)
+		if (what == SYS_openat || what == SYS_openat64 ||
+		    what == SYS_open || what == SYS_open64)
 			istraced = dotrace && prismember(&trace, what);
 		else
 			istraced = sysentry(pri, dotrace) && dotrace;
@@ -587,7 +592,8 @@ sysexit(private_t *pri, int dotrace)
 		if (what == SYS_forksys && subcode >= 3)
 			scp += subcode - 3;
 		else if (subcode != -1 &&
-		    (what != SYS_open && what != SYS_open64 &&
+		    (what != SYS_openat && what != SYS_openat64 &&
+		    what != SYS_open && what != SYS_open64 &&
 		    what != SYS_lwp_create))
 			scp += subcode;
 		scp->count++;
@@ -601,10 +607,7 @@ sysexit(private_t *pri, int dotrace)
 	raw = prismember(&rawout, what);
 
 	if (!cflag && istraced) {
-		if ((what == SYS_forkall ||
-		    what == SYS_vfork ||
-		    what == SYS_fork1 ||
-		    what == SYS_forksys) &&
+		if ((what == SYS_vfork || what == SYS_forksys) &&
 		    pri->Errno == 0 && pri->Rval2 != 0) {
 			pri->length &= ~07;
 			if (strlen(sysname(pri, what, raw? -1 : subcode)) < 6) {
@@ -620,8 +623,7 @@ sysexit(private_t *pri, int dotrace)
 			pri->length +=
 			    7 + printf("\t(returning as new lwp ...)");
 		}
-		if (pri->Errno != 0 ||
-		    (what != SYS_exec && what != SYS_execve)) {
+		if (pri->Errno != 0 || what != SYS_execve) {
 			/* prepare to print the return code */
 			pri->length >>= 3;
 			if (pri->length >= 6)
@@ -670,7 +672,7 @@ sysexit(private_t *pri, int dotrace)
 		}
 	} else {
 		/* show arguments on successful exec */
-		if (what == SYS_exec || what == SYS_execve) {
+		if (what == SYS_execve) {
 			if (!cflag && istraced)
 				showargs(pri, raw);
 		} else if (!cflag && istraced) {
@@ -818,10 +820,7 @@ sysexit(private_t *pri, int dotrace)
 			(void) fputc('\n', stdout);
 		}
 
-		if (what == SYS_forkall ||
-		    what == SYS_vfork ||
-		    what == SYS_fork1 ||
-		    what == SYS_forksys) {
+		if (what == SYS_vfork || what == SYS_forksys) {
 			if (pri->Rval2 == 0)		/* child was created */
 				pri->child = pri->Rval1;
 			else if (cflag && istraced)	/* this is the child */
@@ -843,7 +842,7 @@ sysexit(private_t *pri, int dotrace)
 		int fdp1 = (int)pri->sys_args[0] + 1; /* filedescriptor + 1 */
 
 		if (raw) {
-			if (what != SYS_exec && what != SYS_execve)
+			if (what != SYS_execve)
 				showpaths(pri, stp);
 			if (ISREAD(what) || ISWRITE(what)) {
 				if (pri->iob_buf[0] != '\0')
@@ -897,10 +896,14 @@ sysexit(private_t *pri, int dotrace)
 void
 showpaths(private_t *pri, const struct systable *stp)
 {
+	int what = pri->lwpstat->pr_what;
 	int i;
 
 	for (i = 0; i < pri->sys_nargs; i++) {
-		if ((stp->arg[i] == STG) ||
+		if (stp->arg[i] == ATC && (int)pri->sys_args[i] == AT_FDCWD) {
+			(void) printf("%s     0x%.8X: AT_FDCWD\n",
+			    pri->pname, AT_FDCWD);
+		} else if ((stp->arg[i] == STG) ||
 		    (stp->arg[i] == RST && !pri->Errno) ||
 		    (stp->arg[i] == RLK && !pri->Errno && pri->Rval1 > 0)) {
 			long addr = pri->sys_args[i];
@@ -908,7 +911,10 @@ showpaths(private_t *pri, const struct systable *stp)
 			    (stp->arg[i] == RLK)? (int)pri->Rval1 : PATH_MAX;
 			char *s;
 
-			if (i == 0 && pri->sys_valid)	/* already fetched */
+			if (pri->sys_valid &&
+			    ((i == 0 && stp->arg[0] == STG) ||
+			    (i == 1 && (what == SYS_openat ||
+			    what == SYS_openat64))))	/* already fetched */
 				s = pri->sys_path;
 			else
 				s = fetchstring(pri, addr,
@@ -965,7 +971,7 @@ showargs(private_t *pri, int raw)
 
 	(void) printf("  argc = %d\n", nargs);
 	if (raw)
-		showpaths(pri, &systable[SYS_exec]);
+		showpaths(pri, &systable[SYS_execve]);
 
 	show_cred(pri, FALSE);
 

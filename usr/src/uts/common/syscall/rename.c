@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,8 +31,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/isa_defs.h>
@@ -45,19 +43,6 @@
 #include <sys/debug.h>
 #include <sys/file.h>
 #include <sys/fcntl.h>
-
-/*
- * Rename or move an existing file.
- */
-int
-rename(char *from, char *to)
-{
-	int	error;
-
-	if (error = vn_rename(from, to, UIO_USERSPACE))
-		return (set_errno(error));
-	return (0);
-}
 
 /*
  * Rename a file relative to a given directory
@@ -136,4 +121,10 @@ renameat(int fromfd, char *old, int tofd, char *new)
 	if (error != 0)
 		return (set_errno(error));
 	return (error);
+}
+
+int
+rename(char *old, char *new)
+{
+	return (renameat(AT_FDCWD, old, AT_FDCWD, new));
 }

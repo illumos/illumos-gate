@@ -92,15 +92,6 @@ uint_t auxv_hwcap32 = 0;	/* 32-bit version of auxv_hwcap */
 #define	PSUIDFLAGS		(SNOCD|SUGID)
 
 /*
- * exec() - wrapper around exece providing NULL environment pointer
- */
-int
-exec(const char *fname, const char **argp)
-{
-	return (exece(fname, argp, NULL));
-}
-
-/*
  * exece() - system call wrapper around exec_common()
  */
 int

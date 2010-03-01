@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,8 +31,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Get file attribute information through a file name or a file descriptor.
@@ -63,17 +62,8 @@
  * to VOP_GETATTR
  */
 
-/*
- * nmflag has the following values
- *
- * 1 - Always do lookup.  i.e. stat, lstat.
- * 2 - Name is optional i.e. fstatat
- * 0 - Don't lookup name, vp is in file_p. i.e. fstat
- *
- */
 static int
-cstatat_getvp(int fd, char *name, int nmflag,
-    int follow, vnode_t **vp, cred_t **cred)
+cstatat_getvp(int fd, char *name, int follow, vnode_t **vp, cred_t **cred)
 {
 	vnode_t *startvp;
 	file_t *fp;
@@ -88,22 +78,15 @@ cstatat_getvp(int fd, char *name, int nmflag,
 	 */
 
 	if (fd == AT_FDCWD) {
-		if (name != NULL || nmflag != 2) {
-			startvp = NULL;
-			cr = CRED();
-			crhold(cr);
-		} else
-			return (EFAULT);
+		startvp = NULL;
+		cr = CRED();
+		crhold(cr);
 	} else {
 		char startchar;
 
-		if (nmflag == 1 || (nmflag == 2 && name != NULL)) {
-			if (copyin(name, &startchar, sizeof (char)))
-				return (EFAULT);
-		} else {
-			startchar = '\0';
-		}
-		if (startchar != '/' || nmflag == 0) {
+		if (copyin(name, &startchar, sizeof (char)))
+			return (EFAULT);
+		if (startchar != '/') {
 			if ((fp = getf(fd)) == NULL) {
 				return (EBADF);
 			}
@@ -123,24 +106,19 @@ cstatat_getvp(int fd, char *name, int nmflag,
 	if (audit_active)
 		audit_setfsat_path(1);
 
-
-	if (nmflag == 1 || (nmflag == 2 && name != NULL)) {
 lookup:
-		if (error = lookupnameat(name, UIO_USERSPACE, follow, NULLVPP,
-		    vp, startvp)) {
-			if ((error == ESTALE) &&
-			    fs_need_estale_retry(estale_retry++))
-				goto lookup;
-			if (startvp != NULL)
-				VN_RELE(startvp);
-			crfree(cr);
-			return (error);
-		}
+	if (error = lookupnameat(name, UIO_USERSPACE, follow, NULLVPP,
+	    vp, startvp)) {
+		if ((error == ESTALE) &&
+		    fs_need_estale_retry(estale_retry++))
+			goto lookup;
 		if (startvp != NULL)
 			VN_RELE(startvp);
-	} else {
-		*vp = startvp;
+		crfree(cr);
+		return (error);
 	}
+	if (startvp != NULL)
+		VN_RELE(startvp);
 
 	return (0);
 }
@@ -151,20 +129,8 @@ lookup:
  * N-bit kernel, N-bit applications, N-bit file offsets
  */
 
-static int cstatat(int, char *, int, struct stat *, int, int);
+static int cstatat(int, char *, struct stat *, int, int);
 static int cstat(vnode_t *vp, struct stat *, int, cred_t *);
-
-int
-stat(char *fname, struct stat *sb)
-{
-	return (cstatat(AT_FDCWD, fname, 1, sb, 0, ATTR_REAL));
-}
-
-int
-lstat(char *fname, struct stat *sb)
-{
-	return (cstatat(AT_FDCWD, fname, 1, sb, AT_SYMLINK_NOFOLLOW, 0));
-}
 
 /*
  * fstat can and should be fast, do an inline implementation here.
@@ -174,6 +140,8 @@ lstat(char *fname, struct stat *sb)
 		file_t *fp;					\
 		int error;					\
 								\
+		if (fd == AT_FDCWD)				\
+			return (set_errno(EFAULT));		\
 		if ((fp = getf(fd)) == NULL)			\
 			return (set_errno(EBADF));		\
 		if (audit_active)				\
@@ -194,47 +162,31 @@ fstat(int fd, struct stat *sb)
 int
 fstatat(int fd, char *name, struct stat *sb, int flags)
 {
-	return (cstatat(fd, name, 2, sb,
-	    flags & AT_SYMLINK_NOFOLLOW ? AT_SYMLINK_NOFOLLOW : 0,
-	    flags & _AT_TRIGGER ? ATTR_TRIGGER : 0));
-}
+	int followflag;
+	int csflags;
 
-#if defined(__i386) || defined(__i386_COMPAT)
+	if (name == NULL)
+		return (fstat(fd, sb));
 
-/*
- * Handle all the "extended" stat operations in the same way;
- * validate the version, then call the real handler.
- */
+	followflag = (flags & AT_SYMLINK_NOFOLLOW);
+	csflags = (flags & _AT_TRIGGER ? ATTR_TRIGGER : 0);
+	if (followflag == 0)
+		csflags |= ATTR_REAL;	/* flag for procfs lookups */
 
-#define	XSTAT_BODY(ver, f, s, fn)			\
-	return (ver != _STAT_VER ? set_errno(EINVAL) : fn(f, s));
-
-#endif	/* __i386 || __i386_COMPAT */
-
-#if defined(__i386)
-
-/*
- * Syscalls for i386 applications that issue {,l,f}xstat() directly
- */
-int
-xstat(int version, char *fname, struct stat *sb)
-{
-	XSTAT_BODY(version, fname, sb, stat)
+	return (cstatat(fd, name, sb, followflag, csflags));
 }
 
 int
-lxstat(int version, char *fname, struct stat *sb)
+stat(char *name, struct stat *sb)
 {
-	XSTAT_BODY(version, fname, sb, lstat)
+	return (fstatat(AT_FDCWD, name, sb, 0));
 }
 
 int
-fxstat(int version, int fd, struct stat *sb)
+lstat(char *name, struct stat *sb)
 {
-	XSTAT_BODY(version, fd, sb, fstat)
+	return (fstatat(AT_FDCWD, name, sb, AT_SYMLINK_NOFOLLOW));
 }
-
-#endif	/* __i386 */
 
 /*
  * Common code for stat(), lstat(), and fstat().
@@ -304,7 +256,7 @@ cstat(vnode_t *vp, struct stat *ubp, int flag, cred_t *cr)
 }
 
 static int
-cstatat(int fd, char *name, int nmflag, struct stat *sb, int follow, int flags)
+cstatat(int fd, char *name, struct stat *sb, int follow, int flags)
 {
 	vnode_t *vp;
 	int error;
@@ -314,16 +266,14 @@ cstatat(int fd, char *name, int nmflag, struct stat *sb, int follow, int flags)
 
 	link_follow = (follow == AT_SYMLINK_NOFOLLOW) ? NO_FOLLOW : FOLLOW;
 lookup:
-	if (error = cstatat_getvp(fd, name, nmflag, link_follow, &vp, &cred))
+	if (error = cstatat_getvp(fd, name, link_follow, &vp, &cred))
 		return (set_errno(error));
 	error = cstat(vp, sb, flags, cred);
 	crfree(cred);
 	VN_RELE(vp);
-out:
 	if (error != 0) {
 		if (error == ESTALE &&
-		    fs_need_estale_retry(estale_retry++) &&
-		    (nmflag == 1 || (nmflag == 2 && name != NULL)))
+		    fs_need_estale_retry(estale_retry++))
 			goto lookup;
 		return (set_errno(error));
 	}
@@ -335,19 +285,8 @@ out:
 /*
  * 64-bit kernel, 32-bit applications, 32-bit file offsets
  */
-static int cstatat32(int, char *, int, struct stat32 *, int, int);
+static int cstatat32(int, char *, struct stat32 *, int, int);
 static int cstat32(vnode_t *, struct stat32 *, int, cred_t *);
-int
-stat32(char *fname, struct stat32 *sb)
-{
-	return (cstatat32(AT_FDCWD, fname, 1, sb, 0, ATTR_REAL));
-}
-
-int
-lstat32(char *fname, struct stat32 *sb)
-{
-	return (cstatat32(AT_FDCWD, fname, 1, sb, AT_SYMLINK_NOFOLLOW, 0));
-}
 
 int
 fstat32(int fd, struct stat32 *sb)
@@ -358,35 +297,31 @@ fstat32(int fd, struct stat32 *sb)
 int
 fstatat32(int fd, char *name, struct stat32 *sb, int flags)
 {
-	return (cstatat32(fd, name, 2, sb,
-	    flags & AT_SYMLINK_NOFOLLOW ? AT_SYMLINK_NOFOLLOW : 0,
-	    flags & _AT_TRIGGER ? ATTR_TRIGGER : 0));
-}
+	int followflag;
+	int csflags;
 
-#if defined(__i386_COMPAT)
+	if (name == NULL)
+		return (fstat32(fd, sb));
 
-/*
- * Syscalls for i386 applications that issue {,l,f}xstat() directly
- */
-int
-xstat32(int version, char *fname, struct stat32 *sb)
-{
-	XSTAT_BODY(version, fname, sb, stat32)
-}
+	followflag = (flags & AT_SYMLINK_NOFOLLOW);
+	csflags = (flags & _AT_TRIGGER ? ATTR_TRIGGER : 0);
+	if (followflag == 0)
+		csflags |= ATTR_REAL;	/* flag for procfs lookups */
 
-int
-lxstat32(int version, char *fname, struct stat32 *sb)
-{
-	XSTAT_BODY(version, fname, sb, lstat32)
+	return (cstatat32(fd, name, sb, followflag, csflags));
 }
 
 int
-fxstat32(int version, int fd, struct stat32 *sb)
+stat32(char *name, struct stat32 *sb)
 {
-	XSTAT_BODY(version, fd, sb, fstat32)
+	return (fstatat32(AT_FDCWD, name, sb, 0));
 }
 
-#endif	/* __i386_COMPAT */
+int
+lstat32(char *name, struct stat32 *sb)
+{
+	return (fstatat32(AT_FDCWD, name, sb, AT_SYMLINK_NOFOLLOW));
+}
 
 static int
 cstat32(vnode_t *vp, struct stat32 *ubp, int flag, struct cred *cr)
@@ -444,8 +379,7 @@ cstat32(vnode_t *vp, struct stat32 *ubp, int flag, struct cred *cr)
 }
 
 static int
-cstatat32(int fd, char *name, int nmflag, struct stat32 *sb,
-    int follow, int flags)
+cstatat32(int fd, char *name, struct stat32 *sb, int follow, int flags)
 {
 	vnode_t *vp;
 	int error;
@@ -455,16 +389,14 @@ cstatat32(int fd, char *name, int nmflag, struct stat32 *sb,
 
 	link_follow = (follow == AT_SYMLINK_NOFOLLOW) ? NO_FOLLOW : FOLLOW;
 lookup:
-	if (error = cstatat_getvp(fd, name, nmflag, link_follow, &vp, &cred))
+	if (error = cstatat_getvp(fd, name, link_follow, &vp, &cred))
 		return (set_errno(error));
 	error = cstat32(vp, sb, flags, cred);
 	crfree(cred);
 	VN_RELE(vp);
-out:
 	if (error != 0) {
 		if (error == ESTALE &&
-		    fs_need_estale_retry(estale_retry++) &&
-		    (nmflag == 1 || (nmflag == 2 && name != NULL)))
+		    fs_need_estale_retry(estale_retry++))
 			goto lookup;
 		return (set_errno(error));
 	}
@@ -480,20 +412,8 @@ out:
  *
  * These routines are implemented differently on 64-bit kernels.
  */
-static int cstatat64(int, char *, int, struct stat64 *, int, int);
+static int cstatat64(int, char *, struct stat64 *, int, int);
 static int cstat64(vnode_t *, struct stat64 *, int, cred_t *);
-
-int
-stat64(char *fname, struct stat64 *sb)
-{
-	return (cstatat64(AT_FDCWD, fname, 1, sb, 0, ATTR_REAL));
-}
-
-int
-lstat64(char *fname, struct stat64 *sb)
-{
-	return (cstatat64(AT_FDCWD, fname, 1, sb, AT_SYMLINK_NOFOLLOW, 0));
-}
 
 int
 fstat64(int fd, struct stat64 *sb)
@@ -504,9 +424,30 @@ fstat64(int fd, struct stat64 *sb)
 int
 fstatat64(int fd, char *name, struct stat64 *sb, int flags)
 {
-	return (cstatat64(fd, name, 2, sb,
-	    flags & AT_SYMLINK_NOFOLLOW ? AT_SYMLINK_NOFOLLOW : 0,
-	    flags & _AT_TRIGGER ? ATTR_TRIGGER : 0));
+	int followflag;
+	int csflags;
+
+	if (name == NULL)
+		return (fstat64(fd, sb));
+
+	followflag = (flags & AT_SYMLINK_NOFOLLOW);
+	csflags = (flags & _AT_TRIGGER ? ATTR_TRIGGER : 0);
+	if (followflag == 0)
+		csflags |= ATTR_REAL;	/* flag for procfs lookups */
+
+	return (cstatat64(fd, name, sb, followflag, csflags));
+}
+
+int
+stat64(char *name, struct stat64 *sb)
+{
+	return (fstatat64(AT_FDCWD, name, sb, 0));
+}
+
+int
+lstat64(char *name, struct stat64 *sb)
+{
+	return (fstatat64(AT_FDCWD, name, sb, AT_SYMLINK_NOFOLLOW));
 }
 
 static int
@@ -546,8 +487,7 @@ cstat64(vnode_t *vp, struct stat64 *ubp, int flag, cred_t *cr)
 }
 
 static int
-cstatat64(int fd, char *name, int nmflag, struct stat64 *sb,
-    int follow, int flags)
+cstatat64(int fd, char *name, struct stat64 *sb, int follow, int flags)
 {
 	vnode_t *vp;
 	int error;
@@ -557,16 +497,14 @@ cstatat64(int fd, char *name, int nmflag, struct stat64 *sb,
 
 	link_follow = (follow == AT_SYMLINK_NOFOLLOW) ? NO_FOLLOW : FOLLOW;
 lookup:
-	if (error = cstatat_getvp(fd, name, nmflag, link_follow, &vp, &cred))
+	if (error = cstatat_getvp(fd, name, link_follow, &vp, &cred))
 		return (set_errno(error));
 	error = cstat64(vp, sb, flags, cred);
 	crfree(cred);
 	VN_RELE(vp);
-out:
 	if (error != 0) {
 		if (error == ESTALE &&
-		    fs_need_estale_retry(estale_retry++) &&
-		    (nmflag == 1 || (nmflag == 2 && name != NULL)))
+		    fs_need_estale_retry(estale_retry++))
 			goto lookup;
 		return (set_errno(error));
 	}
@@ -585,20 +523,8 @@ out:
  * differently from the way the 32-bit ABI defines it.
  */
 
-static int cstatat64_32(int, char *, int, struct stat64_32 *, int, int);
+static int cstatat64_32(int, char *, struct stat64_32 *, int, int);
 static int cstat64_32(vnode_t *, struct stat64_32 *, int, cred_t *);
-
-int
-stat64_32(char *fname, struct stat64_32 *sb)
-{
-	return (cstatat64_32(AT_FDCWD, fname, 1, sb, 0, ATTR_REAL));
-}
-
-int
-lstat64_32(char *fname, struct stat64_32 *sb)
-{
-	return (cstatat64_32(AT_FDCWD, fname, 1, sb, AT_SYMLINK_NOFOLLOW, 0));
-}
 
 int
 fstat64_32(int fd, struct stat64_32 *sb)
@@ -609,9 +535,30 @@ fstat64_32(int fd, struct stat64_32 *sb)
 int
 fstatat64_32(int fd, char *name, struct stat64_32 *sb, int flags)
 {
-	return (cstatat64_32(fd, name, 2, sb,
-	    flags & AT_SYMLINK_NOFOLLOW ? AT_SYMLINK_NOFOLLOW : 0,
-	    flags & _AT_TRIGGER ? ATTR_TRIGGER : 0));
+	int followflag;
+	int csflags;
+
+	if (name == NULL)
+		return (fstat64_32(fd, sb));
+
+	followflag = (flags & AT_SYMLINK_NOFOLLOW);
+	csflags = (flags & _AT_TRIGGER ? ATTR_TRIGGER : 0);
+	if (followflag == 0)
+		csflags |= ATTR_REAL;	/* flag for procfs lookups */
+
+	return (cstatat64_32(fd, name, sb, followflag, csflags));
+}
+
+int
+stat64_32(char *name, struct stat64_32 *sb)
+{
+	return (fstatat64_32(AT_FDCWD, name, sb, 0));
+}
+
+int
+lstat64_32(char *name, struct stat64_32 *sb)
+{
+	return (fstatat64_32(AT_FDCWD, name, sb, AT_SYMLINK_NOFOLLOW));
 }
 
 static int
@@ -659,8 +606,7 @@ cstat64_32(vnode_t *vp, struct stat64_32 *ubp, int flag, cred_t *cr)
 }
 
 static int
-cstatat64_32(int fd, char *name, int nmflag, struct stat64_32 *sb,
-    int follow, int flags)
+cstatat64_32(int fd, char *name, struct stat64_32 *sb, int follow, int flags)
 {
 	vnode_t  *vp;
 	int error;
@@ -670,16 +616,14 @@ cstatat64_32(int fd, char *name, int nmflag, struct stat64_32 *sb,
 
 	link_follow = (follow == AT_SYMLINK_NOFOLLOW) ? NO_FOLLOW : FOLLOW;
 lookup:
-	if (error = cstatat_getvp(fd, name, nmflag, link_follow, &vp, &cred))
+	if (error = cstatat_getvp(fd, name, link_follow, &vp, &cred))
 		return (set_errno(error));
 	error = cstat64_32(vp, sb, flags, cred);
 	crfree(cred);
 	VN_RELE(vp);
-out:
 	if (error != 0) {
 		if (error == ESTALE &&
-		    fs_need_estale_retry(estale_retry++) &&
-		    (nmflag == 1 || (nmflag == 2 && name != NULL)))
+		    fs_need_estale_retry(estale_retry++))
 			goto lookup;
 		return (set_errno(error));
 	}

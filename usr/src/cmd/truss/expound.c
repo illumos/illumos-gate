@@ -52,7 +52,6 @@
 #include <sys/shm.h>
 #include <sys/shm_impl.h>
 #include <sys/dirent.h>
-#include <sys/utime.h>
 #include <ustat.h>
 #include <fcntl.h>
 #include <time.h>
@@ -145,69 +144,6 @@ prtimestruc(private_t *pri, const char *name, timestruc_t *value)
 	    str,
 	    value->tv_sec,
 	    value->tv_nsec);
-}
-
-static void
-show_utime(private_t *pri)
-{
-	long offset;
-	struct utimbuf utimbuf;
-
-	if (pri->sys_nargs < 2 || (offset = pri->sys_args[1]) == NULL)
-		return;
-
-	if (data_model == PR_MODEL_NATIVE) {
-		if (Pread(Proc, &utimbuf, sizeof (utimbuf), offset)
-		    != sizeof (utimbuf))
-			return;
-	} else {
-		struct utimbuf32 utimbuf32;
-
-		if (Pread(Proc, &utimbuf32, sizeof (utimbuf32), offset)
-		    != sizeof (utimbuf32))
-			return;
-
-		utimbuf.actime = (time_t)utimbuf32.actime;
-		utimbuf.modtime = (time_t)utimbuf32.modtime;
-	}
-
-	/* print access and modification times */
-	prtime(pri, "at = ", utimbuf.actime);
-	prtime(pri, "mt = ", utimbuf.modtime);
-}
-
-static void
-show_utimes(private_t *pri, long offset)
-{
-	struct {
-		struct timeval	atime;
-		struct timeval	mtime;
-	} utimbuf;
-
-	if (offset == 0)
-		return;
-
-	if (data_model == PR_MODEL_NATIVE) {
-		if (Pread(Proc, &utimbuf, sizeof (utimbuf), offset)
-		    != sizeof (utimbuf))
-			return;
-	} else {
-		struct {
-			struct timeval32 atime;
-			struct timeval32 mtime;
-		} utimbuf32;
-
-		if (Pread(Proc, &utimbuf32, sizeof (utimbuf32), offset)
-		    != sizeof (utimbuf32))
-			return;
-
-		TIMEVAL32_TO_TIMEVAL(&utimbuf.atime, &utimbuf32.atime);
-		TIMEVAL32_TO_TIMEVAL(&utimbuf.mtime, &utimbuf32.mtime);
-	}
-
-	/* print access and modification times */
-	prtimeval(pri, "at = ", &utimbuf.atime);
-	prtimeval(pri, "mt = ", &utimbuf.mtime);
 }
 
 static void
@@ -2140,30 +2076,6 @@ show_all_pollfds(private_t *pri, long offset, int nfds)
 		(void) printf(
 		    "%s\t...last pollfd structure repeated %d time%s...\n",
 		    pri->pname, skip, (skip == 1 ? "" : "s"));
-}
-
-void
-show_poll(private_t *pri)
-{
-	long offset;
-	int nfds;
-	int serial = 0;
-
-	if (pri->sys_nargs < 2 || (offset = pri->sys_args[0]) == NULL ||
-	    (nfds = pri->sys_args[1]) <= 0)
-		return;
-
-	/* enter region of lengthy output */
-	if (nfds > 32) {
-		Eserialize();
-		serial = 1;
-	}
-
-	show_all_pollfds(pri, offset, nfds);
-
-	/* exit region of lengthy output */
-	if (serial)
-		Xserialize();
 }
 
 void
@@ -4829,12 +4741,6 @@ expound(private_t *pri, long r0, int raw)
 		what = Lsp->pr_syscall;
 
 	switch (what) {
-	case SYS_utime:
-		show_utime(pri);
-		break;
-	case SYS_utimes:
-		show_utimes(pri, (long)pri->sys_args[1]);
-		break;
 	case SYS_gettimeofday:
 		if (!err)
 			show_timeofday(pri);
@@ -4876,6 +4782,14 @@ expound(private_t *pri, long r0, int raw)
 			show_ioctl(pri, pri->sys_args[1],
 			    (long)pri->sys_args[2]);
 		break;
+	case SYS_fstatat:
+		if (!err && pri->sys_nargs >= 3)
+			show_stat(pri, (long)pri->sys_args[2]);
+		break;
+	case SYS_fstatat64:
+		if (!err && pri->sys_nargs >= 3)
+			show_stat64_32(pri, (long)pri->sys_args[2]);
+		break;
 	case SYS_stat:
 	case SYS_fstat:
 	case SYS_lstat:
@@ -4887,26 +4801,6 @@ expound(private_t *pri, long r0, int raw)
 	case SYS_lstat64:
 		if (!err && pri->sys_nargs >= 2)
 			show_stat64_32(pri, (long)pri->sys_args[1]);
-		break;
-	case SYS_fsat:
-		/*
-		 * subcodes for fstatat(), fstatat64(), futimesat().
-		 */
-		if (!err && pri->sys_nargs >= 4) {
-			if (pri->sys_args[0] == 3)
-				show_statat(pri, (long)pri->sys_args[3]);
-			else if (pri->sys_args[0] == 2)
-				show_stat64_32(pri, (long)pri->sys_args[3]);
-			else if (pri->sys_args[0] == 6)
-				show_utimes(pri, (long)pri->sys_args[3]);
-		}
-		break;
-	case SYS_xstat:
-	case SYS_fxstat:
-	case SYS_lxstat:
-		if (!err && pri->sys_nargs >= 3)
-			show_xstat(pri, (int)pri->sys_args[0],
-			    (long)pri->sys_args[2]);
 		break;
 	case SYS_statvfs:
 	case SYS_fstatvfs:
@@ -4984,9 +4878,6 @@ expound(private_t *pri, long r0, int raw)
 	case SYS_putmsg:
 	case SYS_putpmsg:
 		show_gp_msg(pri, what);
-		break;
-	case SYS_poll:
-		show_poll(pri);
 		break;
 	case SYS_pollsys:
 		show_pollsys(pri);
@@ -5120,7 +5011,6 @@ expound(private_t *pri, long r0, int raw)
 			show_int(pri, (long)pri->sys_args[1], "lwpid");
 		break;
 	case SYS_lwp_mutex_wakeup:
-	case SYS_lwp_mutex_lock:
 	case SYS_lwp_mutex_unlock:
 	case SYS_lwp_mutex_trylock:
 	case SYS_lwp_mutex_register:
@@ -5146,7 +5036,6 @@ expound(private_t *pri, long r0, int raw)
 		if (pri->sys_nargs > 0)
 			show_condvar(pri, (long)pri->sys_args[0]);
 		break;
-	case SYS_lwp_sema_wait:
 	case SYS_lwp_sema_trywait:
 	case SYS_lwp_sema_post:
 		if (pri->sys_nargs > 0)

@@ -1,14 +1,8 @@
-!	#ident	"%Z%%M%	%I%	%E% SMI"
-!
-! Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-! Use is subject to license terms.
-!
 ! CDDL HEADER START
 !
 ! The contents of this file are subject to the terms of the
-! Common Development and Distribution License, Version 1.0 only
-! (the "License").  You may not use this file except in compliance
-! with the License.
+! Common Development and Distribution License (the "License").
+! You may not use this file except in compliance with the License.
 !
 ! You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 ! or http://www.opensolaris.org/os/licensing.
@@ -23,13 +17,17 @@
 !
 ! CDDL HEADER END
 !
-
+! Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+! Use is subject to license terms.
+!
 !	SPARC support routines for 4.x compatibility dynamic linker.
 
 #include <sys/asm_linkage.h>		! N.B.: although this is the 4.x
 #include <sys/syscall.h>		! compatibility stuff, it actually
 					! runs only on the SVR4 base, and
 					! is compiled in an SVR4 .h environment
+
+#define	AT_FDCWD	0xffd19553
 
 ! ld.so bootstrap.  Called from crt0 of a dynamically linked program with:
 !	%i0:	version number (always 1)
@@ -86,9 +84,14 @@ _aout_reloc_write:
 
 	.global	_open, _mmap, _munmap, _read, _write, _lseek, _close
 	.global	_fstat, _sysconfig, __exit
-_open:
+_open:				! open(path, oflags, mode) =>
+	mov	%o2, %o3	! openat(AT_FDCWD, path, oflag, mode)
+	mov	%o1, %o2
+	mov	%o0, %o1
+	sethi	%hi(AT_FDCWD), %o0
+	or	%o0, %lo(AT_FDCWD), %o0
 	ba	__syscall
-	mov	SYS_open, %g1
+	mov	SYS_openat, %g1
 
 _mmap:
 	sethi	%hi(0x80000000), %g1	! MAP_NEW
@@ -116,9 +119,12 @@ _close:
 	ba	__syscall
 	mov	SYS_close, %g1
 
-_fstat:
+_fstat:				! fstat(fd, statb) =>
+	mov	%g0, %o3	! fstatat(fd, NULL, statb, 0)
+	mov	%o1, %o2
+	mov	%g0, %o1
 	ba	__syscall
-	mov	SYS_fstat, %g1
+	mov	SYS_fstatat, %g1
 
 _sysconfig:
 	ba	__syscall

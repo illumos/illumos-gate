@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -948,24 +949,58 @@ _init(void)
 	 * library.
 	 */
 	s10_emulation_table = kmem_zalloc(NSYSCALL, KM_SLEEP);
-	s10_emulation_table[SYS_exec] = 1;			/*  11 */
+	s10_emulation_table[S10_SYS_forkall] = 1;		/*   2 */
+	s10_emulation_table[S10_SYS_open] = 1;			/*   5 */
+	s10_emulation_table[S10_SYS_wait] = 1;			/*   7 */
+	s10_emulation_table[S10_SYS_creat] = 1;			/*   8 */
+	s10_emulation_table[S10_SYS_unlink] = 1;		/*  10 */
+	s10_emulation_table[S10_SYS_exec] = 1;			/*  11 */
+	s10_emulation_table[S10_SYS_chown] = 1;			/*  16 */
+	s10_emulation_table[S10_SYS_stat] = 1;			/*  18 */
+	s10_emulation_table[S10_SYS_umount] = 1;		/*  22 */
+	s10_emulation_table[S10_SYS_fstat] = 1;			/*  28 */
+	s10_emulation_table[S10_SYS_utime] = 1;			/*  30 */
+	s10_emulation_table[S10_SYS_access] = 1;		/*  33 */
+	s10_emulation_table[S10_SYS_dup] = 1;			/*  41 */
 	s10_emulation_table[SYS_ioctl] = 1;			/*  54 */
 	s10_emulation_table[SYS_execve] = 1;			/*  59 */
 	s10_emulation_table[SYS_acctctl] = 1;			/*  71 */
 	s10_emulation_table[S10_SYS_issetugid] = 1;		/*  75 */
+	s10_emulation_table[S10_SYS_fsat] = 1;			/*  76 */
+	s10_emulation_table[S10_SYS_rmdir] = 1;			/*  79 */
 	s10_emulation_table[SYS_getdents] = 1;			/*  81 */
+	s10_emulation_table[S10_SYS_poll] = 1;			/*  87 */
+	s10_emulation_table[S10_SYS_lstat] = 1;			/*  88 */
+	s10_emulation_table[S10_SYS_fchown] = 1;		/*  94 */
+#if defined(__x86)
+	s10_emulation_table[S10_SYS_xstat] = 1;			/* 123 */
+	s10_emulation_table[S10_SYS_lxstat] = 1;		/* 124 */
+	s10_emulation_table[S10_SYS_fxstat] = 1;		/* 125 */
+	s10_emulation_table[S10_SYS_xmknod] = 1;		/* 126 */
+#endif
+	s10_emulation_table[S10_SYS_lchown] = 1;		/* 130 */
+	s10_emulation_table[S10_SYS_rename] = 1;		/* 134 */
 	s10_emulation_table[SYS_uname] = 1;			/* 135 */
 	s10_emulation_table[SYS_systeminfo] = 1;		/* 139 */
-#ifdef	__amd64
+	s10_emulation_table[S10_SYS_fork1] = 1;			/* 143 */
+	s10_emulation_table[S10_SYS_lwp_sema_wait] = 1;		/* 147 */
+	s10_emulation_table[S10_SYS_utimes] = 1;		/* 154 */
+#if defined(__amd64)
 	s10_emulation_table[SYS_lwp_create] = 1;		/* 159 */
 	s10_emulation_table[SYS_lwp_private] = 1;		/* 166 */
 #endif	/* __amd64 */
+	s10_emulation_table[S10_SYS_lwp_mutex_lock] = 1;	/* 169 */
 	s10_emulation_table[SYS_pwrite] = 1;			/* 174 */
 	s10_emulation_table[SYS_auditsys] = 1;			/* 186 */
 	s10_emulation_table[SYS_sigqueue] = 1;			/* 190 */
 	s10_emulation_table[SYS_lwp_mutex_timedlock] = 1;	/* 210 */
 	s10_emulation_table[SYS_getdents64] = 1;		/* 213 */
+	s10_emulation_table[S10_SYS_stat64] = 1;		/* 215 */
+	s10_emulation_table[S10_SYS_lstat64] = 1;		/* 216 */
+	s10_emulation_table[S10_SYS_fstat64] = 1;		/* 217 */
 	s10_emulation_table[SYS_pwrite64] = 1;			/* 223 */
+	s10_emulation_table[S10_SYS_creat64] = 1;		/* 224 */
+	s10_emulation_table[S10_SYS_open64] = 1;		/* 225 */
 	s10_emulation_table[SYS_zone] = 1;			/* 227 */
 	s10_emulation_table[SYS_lwp_mutex_trylock] = 1;		/* 251 */
 

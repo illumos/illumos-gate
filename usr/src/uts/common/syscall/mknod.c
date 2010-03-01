@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,8 +31,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/isa_defs.h>
@@ -94,14 +93,3 @@ mknod(char *fname, mode_t fmode, dev_t dev)
 	VN_RELE(vp);
 	return (0);
 }
-
-#if defined(__i386) || defined(__i386_COMPAT)
-
-/*ARGSUSED*/
-int
-xmknod(int version, char *fname, mode_t fmode, dev_t dev)
-{
-	return (mknod(fname, fmode, dev));
-}
-
-#endif

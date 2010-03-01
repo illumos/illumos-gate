@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lint.h"
 #include <sys/param.h>
@@ -51,8 +49,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include "libc.h"
-
-extern int __fcntl_syscall(int fd, int cmd, ...);
 
 #if !defined(_LP64)
 /*
@@ -92,6 +88,6 @@ __fcntl(int fd, int cmd, ...)
 		return (res);
 
 	default:
-		return (__fcntl_syscall(fd, cmd, arg));
+		return (syscall(SYS_fcntl, fd, cmd, arg));
 	}
 }

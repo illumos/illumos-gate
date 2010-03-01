@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,7 +106,7 @@ typedef struct private {
 	char	raw_sig_name[SIG2STR_MAX+4]; /* name of known signal */
 	char	sig_name[12];	/* name of unknown signal */
 	char	flt_name[12];	/* name of unknown fault */
-	char	*sys_path;	/* first pathname given to syscall */
+	char	*sys_path;	/* pathname given to syscall */
 	size_t	sys_psize;	/* sizeof(*sys_path) */
 	int	sys_valid;	/* pathname was fetched and is valid */
 	char	*sys_string;	/* buffer for formatted syscall string */

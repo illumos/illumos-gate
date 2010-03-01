@@ -20,13 +20,11 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdio_ext.h>
@@ -160,9 +158,9 @@ insert_lwpid(lwpid_t lwpid)
 	if (i == truss_maxlwp) {
 		/* double the size of the array */
 		truss_lwpid = my_realloc(truss_lwpid,
-			truss_maxlwp * 2 * sizeof (lwpid_t), NULL);
+		    truss_maxlwp * 2 * sizeof (lwpid_t), NULL);
 		(void) memset(&truss_lwpid[truss_maxlwp], 0,
-			truss_maxlwp * sizeof (lwpid_t));
+		    truss_maxlwp * sizeof (lwpid_t));
 		truss_maxlwp *= 2;
 	}
 	truss_lwpid[i] = lwpid;
@@ -215,10 +213,10 @@ grab_lwp(lwpid_t who)
 	if ((Lwp = Lgrab(Proc, who, &gcode)) == NULL) {
 		if (gcode != G_NOPROC) {
 			(void) fprintf(stderr,
-				"%s: cannot grab LWP %u in process %d,"
-				" reason: %s\n",
-				command, who, (int)Pstatus(Proc)->pr_pid,
-				Lgrab_error(gcode));
+			    "%s: cannot grab LWP %u in process %d,"
+			    " reason: %s\n",
+			    command, who, (int)Pstatus(Proc)->pr_pid,
+			    Lgrab_error(gcode));
 			interrupt = SIGTERM;	/* post an interrupt */
 		}
 	}
@@ -429,10 +427,8 @@ main(int argc, char *argv[])
 		exit(2);
 
 	/* if -a or -e was specified, force tracing of exec() */
-	if (aflag || eflag) {
-		praddset(&trace, SYS_exec);
+	if (aflag || eflag)
 		praddset(&trace, SYS_execve);
-	}
 
 	/*
 	 * Make sure that all system calls, signals, and machine faults
@@ -448,7 +444,7 @@ main(int argc, char *argv[])
 	/* collect the specified process ids */
 	if (pflag && argc > 0) {
 		grab = my_malloc(argc * sizeof (proc_set_t),
-			"memory for process-ids");
+		    "memory for process-ids");
 		while (argc-- > 0)
 			pids(*argv++, grab);
 	}
@@ -456,11 +452,11 @@ main(int argc, char *argv[])
 	if (errflg || (argc <= 0 && ngrab <= 0)) {
 		(void) fprintf(stderr,
 	"usage:\t%s [-fcaeildDEF] [-[tTvx] [!]syscalls] [-[sS] [!]signals]\\\n",
-			command);
+		    command);
 		(void) fprintf(stderr,
 	"\t[-[mM] [!]faults] [-[rw] [!]fds] [-[uU] [!]libs:[:][!]funcs]\\\n");
 		(void) fprintf(stderr,
-	"\t[-o outfile]  command | -p pid[/lwps] ...\n");
+		    "\t[-o outfile]  command | -p pid[/lwps] ...\n");
 		exit(2);
 	}
 
@@ -473,31 +469,31 @@ main(int argc, char *argv[])
 			switch (err) {
 			case C_PERM:
 				(void) fprintf(stderr,
-					"%s: cannot trace set-id or "
-					"unreadable object file: %s\n",
-					command, path);
+				    "%s: cannot trace set-id or "
+				    "unreadable object file: %s\n",
+				    command, path);
 				break;
 			case C_LP64:
 				(void) fprintf(stderr,
-					"%s: cannot control _LP64 "
-					"program: %s\n",
-					command, path);
+				    "%s: cannot control _LP64 "
+				    "program: %s\n",
+				    command, path);
 				break;
 			case C_NOEXEC:
 				(void) fprintf(stderr,
-					"%s: cannot execute program: %s\n",
-					command, argv[0]);
+				    "%s: cannot execute program: %s\n",
+				    command, argv[0]);
 				break;
 			case C_NOENT:
 				(void) fprintf(stderr,
-					"%s: cannot find program: %s\n",
-					command, argv[0]);
+				    "%s: cannot find program: %s\n",
+				    command, argv[0]);
 				break;
 			case C_STRANGE:
 				break;
 			default:
 				(void) fprintf(stderr, "%s: %s\n",
-					command, Pcreate_error(err));
+				    command, Pcreate_error(err));
 				break;
 			}
 			exit(2);
@@ -516,7 +512,7 @@ main(int argc, char *argv[])
 		pri->length = 0;
 		if (!cflag && prismember(&trace, SYS_execve)) {
 			pri->exec_string = my_realloc(pri->exec_string,
-				strlen(pri->sys_string) + 1, NULL);
+			    strlen(pri->sys_string) + 1, NULL);
 			(void) strcpy(pri->exec_pname, pri->pname);
 			(void) strcpy(pri->exec_string, pri->sys_string);
 			pri->length += strlen(pri->sys_string);
@@ -631,7 +627,7 @@ main(int argc, char *argv[])
 			case -1:
 				(void) fprintf(stderr,
 			"%s: cannot fork to control process, pid# %d\n",
-					command, (int)set->pid);
+				    command, (int)set->pid);
 				/* FALLTHROUGH */
 			default:
 				(void) mutex_unlock(&truss_lock);
@@ -680,13 +676,12 @@ main(int argc, char *argv[])
 	praddset(&traceeven, SYS_exit);
 	praddset(&traceeven, SYS_lwp_create);
 	praddset(&traceeven, SYS_lwp_exit);
-	praddset(&traceeven, SYS_exec);
 	praddset(&traceeven, SYS_execve);
+	praddset(&traceeven, SYS_openat);
+	praddset(&traceeven, SYS_openat64);
 	praddset(&traceeven, SYS_open);
 	praddset(&traceeven, SYS_open64);
-	praddset(&traceeven, SYS_forkall);
 	praddset(&traceeven, SYS_vfork);
-	praddset(&traceeven, SYS_fork1);
 	praddset(&traceeven, SYS_forksys);
 
 	/* for I/O buffer dumps, force tracing of read()s and write()s */
@@ -721,15 +716,7 @@ main(int argc, char *argv[])
 		prdelset(&traceeven, SYS_context);
 	}
 
-	/* special case -- sysexit not traced by OS */
-	if (prismember(&trace, SYS_evtrapret)) {
-		(void) Psysentry(Proc, SYS_evtrapret, TRUE);
-		(void) Psysexit(Proc, SYS_evtrapret, FALSE);
-		prdelset(&traceeven, SYS_evtrapret);
-	}
-
 	/* special case -- trace exec() on entry to get the args */
-	(void) Psysentry(Proc, SYS_exec, TRUE);
 	(void) Psysentry(Proc, SYS_execve, TRUE);
 
 	/* special case -- sysexit never reached */
@@ -756,8 +743,7 @@ main(int argc, char *argv[])
 		 */
 		if ((Lsp->pr_why != PR_SYSENTRY &&
 		    Lsp->pr_why != PR_SYSEXIT) ||
-		    (Lsp->pr_what != SYS_exec &&
-		    Lsp->pr_what != SYS_execve)) {
+		    Lsp->pr_what != SYS_execve) {
 			establish_breakpoints();
 			establish_stacks();
 		}
@@ -813,7 +799,7 @@ main_thread(int first)
 	 * arrange not to leave it hung on the same system call.
 	 */
 	primary_lwp = (first && Pstate(Proc) == PS_STOP)?
-		Pstatus(Proc)->pr_lwp.pr_lwpid : 0;
+	    Pstatus(Proc)->pr_lwp.pr_lwpid : 0;
 
 	/*
 	 * Create worker threads to match the lwps in the target process.
@@ -977,10 +963,10 @@ worker_thread(void *arg)
 				who = 1;
 				Lfree(Lwp);
 				pri->Lwp = Lwp =
-					Lgrab(Proc, who, &gcode);
+				    Lgrab(Proc, who, &gcode);
 				if (Lwp == NULL)
 					abend("Lgrab error: ",
-						Lgrab_error(gcode));
+					    Lgrab_error(gcode));
 				pri->lwpstat = Lsp = Lstatus(Lwp);
 				(void) mutex_unlock(&truss_lock);
 				continue;
@@ -999,11 +985,11 @@ worker_thread(void *arg)
 			if (pri->sys_valid)
 				(void) printf(
 			"%s\t*** cannot trace across exec() of %s ***\n",
-					pri->pname, pri->sys_path);
+				    pri->pname, pri->sys_path);
 			else
 				(void) printf(
 				"%s\t*** lost control of process ***\n",
-					pri->pname);
+				    pri->pname);
 			pri->length = 0;
 			Flush();
 			(void) mutex_unlock(&truss_lock);
@@ -1011,7 +997,7 @@ worker_thread(void *arg)
 		}
 		if (Lstate(Lwp) != PS_STOP) {
 			(void) fprintf(stderr,
-				"%s: state = %d\n", command, Lstate(Lwp));
+			    "%s: state = %d\n", command, Lstate(Lwp));
 			abend(pri->pname, "uncaught status of subject lwp");
 		}
 
@@ -1104,7 +1090,6 @@ worker_thread(void *arg)
 			case SYS_exit:			/* exit() */
 			case SYS_lwp_exit:		/* lwp_exit() */
 			case SYS_context:		/* [get|set]context() */
-			case SYS_evtrapret:		/* evtrapret() */
 				if (dotrace && cflag &&
 				    prismember(&trace, what)) {
 					ow_in_effect = 1;
@@ -1132,7 +1117,7 @@ worker_thread(void *arg)
 					putpname(pri);
 					timestamp(pri);
 					pri->length +=
-						printf("%s\n", pri->sys_string);
+					    printf("%s\n", pri->sys_string);
 					Flush();
 				}
 				pri->sys_leng = 0;
@@ -1141,19 +1126,18 @@ worker_thread(void *arg)
 				if (what == SYS_exit)
 					exit_called = TRUE;
 				break;
-			case SYS_exec:
 			case SYS_execve:
 				(void) sysentry(pri, dotrace);
 				if (dotrace && !cflag &&
 				    prismember(&trace, what)) {
 					pri->exec_string =
-						my_realloc(pri->exec_string,
-						strlen(pri->sys_string) + 1,
-						NULL);
+					    my_realloc(pri->exec_string,
+					    strlen(pri->sys_string) + 1,
+					    NULL);
 					(void) strcpy(pri->exec_pname,
-						pri->pname);
+					    pri->pname);
 					(void) strcpy(pri->exec_string,
-						pri->sys_string);
+					    pri->sys_string);
 					pri->length += strlen(pri->sys_string);
 					pri->exec_lwpid = Lsp->pr_lwpid;
 				}
@@ -1174,14 +1158,24 @@ worker_thread(void *arg)
 			break;
 		case PR_SYSEXIT:
 			/* check for write open of a /proc file */
-			if ((what == SYS_open || what == SYS_open64)) {
+			if (what == SYS_openat || what == SYS_openat64 ||
+			    what == SYS_open || what == SYS_open64) {
+				int readonly;
+
 				(void) sysentry(pri, dotrace);
 				pri->Errno = Lsp->pr_errno;
 				pri->ErrPriv = Lsp->pr_errpriv;
+				readonly =
+				    ((what == SYS_openat ||
+				    what == SYS_openat64) &&
+				    pri->sys_nargs > 2 &&
+				    (pri->sys_args[2]&0x3) == O_RDONLY) ||
+				    ((what == SYS_open ||
+				    what == SYS_open64) &&
+				    pri->sys_nargs > 1 &&
+				    (pri->sys_args[1]&0x3) == O_RDONLY);
 				if ((pri->Errno == 0 || pri->Errno == EBUSY) &&
-				    pri->sys_valid &&
-				    (pri->sys_nargs > 1 &&
-				    (pri->sys_args[1]&0x3) != O_RDONLY)) {
+				    pri->sys_valid && !readonly) {
 					int rv = checkproc(pri);
 					if (rv == 1 && Fflag != PGRAB_FORCE) {
 						/*
@@ -1200,7 +1194,7 @@ worker_thread(void *arg)
 						}
 						sigusr1 = TRUE;
 						(void) mutex_unlock(
-							&truss_lock);
+						    &truss_lock);
 						goto out;
 					}
 					if (rv == 2) {
@@ -1216,8 +1210,7 @@ worker_thread(void *arg)
 					}
 				}
 			}
-			if ((what == SYS_exec || what == SYS_execve) &&
-			    pri->Errno == 0) {
+			if (what == SYS_execve && pri->Errno == 0) {
 				/*
 				 * Refresh the data model on exec() in case it
 				 * is different from the parent.  Lwait()
@@ -1252,8 +1245,7 @@ worker_thread(void *arg)
 			if (dotrace && Tflag && !first &&
 			    prismember(&syshang, what))
 				leave_it_hung = TRUE;
-			if ((what == SYS_exec || what == SYS_execve) &&
-			    pri->Errno == 0) {
+			if (what == SYS_execve && pri->Errno == 0) {
 				is_vfork_child = FALSE;
 				reset_breakpoints();
 				/*
@@ -1270,14 +1262,14 @@ worker_thread(void *arg)
 					 */
 					while (truss_nlwp > 1)
 						(void) cond_wait(&truss_cv,
-							&truss_lock);
+						    &truss_lock);
 					who = Lsp->pr_lwpid;
 					Lfree(Lwp);
 					pri->Lwp = Lwp =
-						Lgrab(Proc, who, &gcode);
+					    Lgrab(Proc, who, &gcode);
 					if (Lwp == NULL)
 						abend("Lgrab error: ",
-							Lgrab_error(gcode));
+						    Lgrab_error(gcode));
 					pri->lwpstat = Lsp = Lstatus(Lwp);
 				}
 			}
@@ -1285,8 +1277,8 @@ worker_thread(void *arg)
 		default:
 			req_flag = 0;
 			(void) fprintf(stderr,
-				"unknown reason for stopping: %d/%d\n",
-				Lsp->pr_why, what);
+			    "unknown reason for stopping: %d/%d\n",
+			    Lsp->pr_why, what);
 			abend(NULL, NULL);
 		}
 
@@ -1359,8 +1351,8 @@ worker_thread(void *arg)
 				(void) Lsetrun(Lwp, 0, PRCFAULT|PRSTOP);
 			} else {
 				(void) printf("%s\t*** Expected PR_FAULTED/"
-					"FLTTRACE stop following vfork()\n",
-					pri->pname);
+				    "FLTTRACE stop following vfork()\n",
+				    pri->pname);
 			}
 		}
 
@@ -1519,9 +1511,7 @@ out:
 			 */
 			(void) Pstop(Proc, MILLISEC);
 			clear_breakpoints();
-			(void) Psysexit(Proc, SYS_forkall, FALSE);
 			(void) Psysexit(Proc, SYS_vfork, FALSE);
-			(void) Psysexit(Proc, SYS_fork1, FALSE);
 			(void) Psysexit(Proc, SYS_forksys, FALSE);
 			(void) Punsetflags(Proc, PR_FORK);
 			Psync(Proc);
@@ -1555,8 +1545,8 @@ setup_basetime(hrtime_t basehrtime, struct timeval *basedate)
 		const char *ptime;
 		const char *pdst;
 		hrtime_t delta = basehrtime -
-			((hrtime_t)Cp->basetime.tv_sec * NANOSEC +
-			Cp->basetime.tv_nsec);
+		    ((hrtime_t)Cp->basetime.tv_sec * NANOSEC +
+		    Cp->basetime.tv_nsec);
 
 		if (delta > 0) {
 			basedate->tv_sec -= (time_t)(delta / NANOSEC);
@@ -2109,12 +2099,12 @@ report(private_t *pri, time_t lapse)	/* elapsed time, clock ticks */
 				(void) printf("faults -------------\n");
 
 			name = proc_fltname(i, pri->flt_name,
-				sizeof (pri->flt_name));
+			    sizeof (pri->flt_name));
 
 			(void) printf("%s%s\t%4ld\n", name,
-				(((int)strlen(name) < 8)?
-				    (const char *)"\t" : (const char *)""),
-				count);
+			    (((int)strlen(name) < 8)?
+			    (const char *)"\t" : (const char *)""),
+			    count);
 			total += count;
 		}
 	}
@@ -2127,9 +2117,9 @@ report(private_t *pri, time_t lapse)	/* elapsed time, clock ticks */
 				(void) printf("signals ------------\n");
 			name = signame(pri, i);
 			(void) printf("%s%s\t%4ld\n", name,
-				(((int)strlen(name) < 8)?
-				    (const char *)"\t" : (const char *)""),
-				count);
+			    (((int)strlen(name) < 8)?
+			    (const char *)"\t" : (const char *)""),
+			    count);
 			total += count;
 		}
 	}
@@ -2154,7 +2144,7 @@ report(private_t *pri, time_t lapse)	/* elapsed time, clock ticks */
 		qsort((void *)stbl, elem, sizeof (hentry_t),
 		    lib_sort);
 		(void) printf(
-			"\n%-20s %-40s %s\n", "Library:", "Function", "calls");
+		    "\n%-20s %-40s %s\n", "Library:", "Function", "calls");
 		for (i = 0; i < elem; i++) {
 			(void) printf("%-20s %-40s %ld\n", stbl[i].lib,
 			    stbl[i].key, stbl[i].count);
@@ -2179,7 +2169,7 @@ report(private_t *pri, time_t lapse)	/* elapsed time, clock ticks */
 		for (subcode = 0; subcode < n; subcode++, scp++) {
 			if ((count = scp->count) != 0 || scp->error) {
 				(void) printf("%-19.19s ",
-					sysname(pri, i, subcode));
+				    sysname(pri, i, subcode));
 
 				ticks = scp->stime;
 				accumulate(&ticktot, &ticks, &tickzero);
@@ -2275,11 +2265,11 @@ psargs(private_t *pri)
 
 	if (proc_get_psinfo(pid, &psinfo) == 0)
 		(void) printf("%spsargs: %.64s\n",
-			pri->pname, psinfo.pr_psargs);
+		    pri->pname, psinfo.pr_psargs);
 	else {
 		perror("psargs()");
 		(void) printf("%s\t*** Cannot read psinfo file for pid %d\n",
-			pri->pname, (int)pid);
+		    pri->pname, (int)pid);
 	}
 }
 
@@ -2293,7 +2283,7 @@ fetchstring(private_t *pri, long addr, int maxleng)
 	string[40] = '\0';
 	if (pri->str_bsize == 0)  /* initial allocation of string buffer */
 		pri->str_buffer =
-			my_malloc(pri->str_bsize = 16, "string buffer");
+		    my_malloc(pri->str_bsize = 16, "string buffer");
 	*pri->str_buffer = '\0';
 
 	for (nbyte = 40; nbyte == 40 && leng < maxleng; addr += 40) {
@@ -2303,8 +2293,8 @@ fetchstring(private_t *pri, long addr, int maxleng)
 		    (nbyte = strlen(string)) > 0) {
 			while (leng + nbyte >= pri->str_bsize)
 				pri->str_buffer =
-					my_realloc(pri->str_buffer,
-					pri->str_bsize *= 2, "string buffer");
+				    my_realloc(pri->str_buffer,
+				    pri->str_bsize *= 2, "string buffer");
 			(void) strcpy(pri->str_buffer+leng, string);
 			leng += nbyte;
 		}
@@ -2328,7 +2318,7 @@ show_cred(private_t *pri, int new)
 		return;
 	}
 
-	if (!cflag && prismember(&trace, SYS_exec)) {
+	if (!cflag && prismember(&trace, SYS_execve)) {
 		if (new)
 			credentials = cred;
 		if ((new && cred.pr_ruid != cred.pr_suid) ||
@@ -2336,19 +2326,19 @@ show_cred(private_t *pri, int new)
 		    cred.pr_suid != credentials.pr_suid)
 			(void) printf(
 		"%s    *** SUID: ruid/euid/suid = %d / %d / %d  ***\n",
-			pri->pname,
-			(int)cred.pr_ruid,
-			(int)cred.pr_euid,
-			(int)cred.pr_suid);
+			    pri->pname,
+			    (int)cred.pr_ruid,
+			    (int)cred.pr_euid,
+			    (int)cred.pr_suid);
 		if ((new && cred.pr_rgid != cred.pr_sgid) ||
 		    cred.pr_rgid != credentials.pr_rgid ||
 		    cred.pr_sgid != credentials.pr_sgid)
 			(void) printf(
 		"%s    *** SGID: rgid/egid/sgid = %d / %d / %d  ***\n",
-			pri->pname,
-			(int)cred.pr_rgid,
-			(int)cred.pr_egid,
-			(int)cred.pr_sgid);
+			    pri->pname,
+			    (int)cred.pr_rgid,
+			    (int)cred.pr_egid,
+			    (int)cred.pr_sgid);
 	}
 
 	credentials = cred;
@@ -2373,7 +2363,7 @@ control(private_t *pri, pid_t pid)
 	gps->fork_pid = getpid();	/* parent pid */
 	if ((childpid = fork()) == -1) {
 		(void) printf("%s\t*** Cannot fork() to control process #%d\n",
-			pri->pname, (int)pid);
+		    pri->pname, (int)pid);
 		Flush();
 		gps->fork_pid = 0;
 		(void) cond_broadcast(&gps->fork_cv);
@@ -2411,8 +2401,8 @@ control(private_t *pri, pid_t pid)
 	 */
 	if ((Proc = Pgrab(pid, PGRAB_RETAIN, &rc)) == NULL) {
 		(void) fprintf(stderr,
-			"%s: cannot control child process, pid# %d: %s\n",
-			command, (int)pid, Pgrab_error(rc));
+		    "%s: cannot control child process, pid# %d: %s\n",
+		    command, (int)pid, Pgrab_error(rc));
 		gps->fork_pid = childpid;
 		(void) cond_broadcast(&gps->fork_cv);
 		(void) mutex_unlock(&gps->fork_lock);
@@ -2470,7 +2460,7 @@ grabit(private_t *pri, proc_set_t *set)
 	 */
 	if ((Proc = Pgrab(set->pid, Fflag, &gcode)) == NULL) {
 		(void) fprintf(stderr, "%s: %s: %d\n",
-			command, Pgrab_error(gcode), (int)set->pid);
+		    command, Pgrab_error(gcode), (int)set->pid);
 		pri->lwpstat = NULL;
 		return (FALSE);
 	}
@@ -2516,8 +2506,8 @@ release(private_t *pri, pid_t pid)
 	    write(fd, (char *)ctl, sizeof (ctl)) < 0) {
 		perror("release()");
 		(void) printf(
-			"%s\t*** Cannot release child process, pid# %d\n",
-			pri->pname, (int)pid);
+		    "%s\t*** Cannot release child process, pid# %d\n",
+		    pri->pname, (int)pid);
 		Flush();
 	}
 	if (fd >= 0)	/* run-on-last-close sets the process running */
@@ -2658,7 +2648,7 @@ void
 letgo(private_t *pri)
 {
 	(void) printf("%s\t*** process otherwise traced, releasing ...\n",
-		pri->pname);
+	    pri->pname);
 }
 
 /*

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/errno.h>
 #include <sys/syscall.h>
@@ -83,7 +81,7 @@ bc_fstat(int fd, struct stat *buf)
 		return (-1);
 	}
 
-	if ((ret = _syscall(SYS_fstat, fd, &nb)) == -1)
+	if ((ret = _syscall(SYS_fstatat, fd, NULL, &nb, 0)) == -1)
 		return (ret);
 
 	cpstatbuf(buf, &nb);
@@ -96,10 +94,11 @@ bc_fstat(int fd, struct stat *buf)
 }
 
 int
-stat_com(int sysnum, char *path, struct stat *buf)
+stat_com(int lstat, char *path, struct stat *buf)
 {
 	int fd, ret;
 	struct n_stat nb;
+	int follow = lstat? AT_SYMLINK_NOFOLLOW : 0;
 
 	if (strcmp(path, "/etc/mtab") == 0) {
 /*
@@ -115,7 +114,7 @@ stat_com(int sysnum, char *path, struct stat *buf)
  *		close(fd);
  *		return(ret);
  */
-		ret = stat_com(sysnum, "/etc/mnttab", buf);
+		ret = stat_com(lstat, "/etc/mnttab", buf);
 		return(ret);
 	}
 	if (strcmp(path, "/etc/fstab") == 0) {
@@ -130,7 +129,8 @@ stat_com(int sysnum, char *path, struct stat *buf)
 	}
 	if (strcmp(path, "/etc/utmp") == 0 ||
 	    strcmp(path, "/var/adm/utmp") == 0) {
-		if ((ret = _syscall(sysnum, "/var/adm/utmpx", &nb)) != -1) {
+		if ((ret = _syscall(SYS_fstatat, AT_FDCWD,
+		    "/var/adm/utmpx", &nb, follow)) != -1) {
 			cpstatbuf(buf, &nb);
 			buf->st_size = getmodsize(buf->st_size,
 		       	    sizeof(struct utmpx), sizeof(struct compat_utmp));
@@ -138,7 +138,8 @@ stat_com(int sysnum, char *path, struct stat *buf)
 		return(ret);
 	}
 	if (strcmp(path, "/var/adm/wtmp") == 0) {
-		if ((ret = _syscall(sysnum, "/var/adm/wtmpx", &nb)) != -1) {
+		if ((ret = _syscall(SYS_fstatat, AT_FDCWD,
+		    "/var/adm/wtmpx", &nb, follow)) != -1) {
 			cpstatbuf(buf, &nb);
 			buf->st_size = getmodsize(buf->st_size,
 		       	    sizeof(struct utmpx), sizeof(struct compat_utmp));
@@ -156,7 +157,7 @@ stat_com(int sysnum, char *path, struct stat *buf)
 		return(ret);
 	}
 
-	if ((ret = _syscall(sysnum, path, &nb)) != -1)
+	if ((ret = _syscall(SYS_fstatat, AT_FDCWD, path, &nb, follow)) != -1)
 		cpstatbuf(buf, &nb);
 	return(ret);
 }

@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -253,9 +253,14 @@ acr_a_root() {
 		# if the sed fails.
 		#
 		if [ $bfu_alt_reality = "true" ] ; then
-			sed -e 's,^#!/bin/sh,#!/tmp/bfubin/sh,' \
+			sed -e 's,^#! */bin/sh,#!/tmp/bfubin/sh,' \
 			    -e 's,/usr/bin/,/tmp/bfubin/,g' \
 			    -e 's,/usr/bin:,/tmp/bfubin:,' \
+			    -e 's,/usr/sbin/,/tmp/bfubin/,g' \
+			    -e 's,/usr/sbin:,/tmp/bfubin:,' \
+			    -e 's,/lib/svc/bin/,/tmp/bfubin/,g' \
+			    -e 's,/bin/,/tmp/bfubin/,g' \
+			    -e 's,/sbin/,/tmp/bfubin/,g' \
 			    -e 's,installf,/tmp/bfubin/true,' \
 			    -e 's,removef,/tmp/bfubin/true,' \
 			    $scriptloc > $processedscript.$script
@@ -380,9 +385,13 @@ fi
 echo
 
 # workaround for 6644920
-BIN=bin
 cr_args=${root:+ -R $root}
-LD_LIBRARY_PATH=/tmp/bfulib PATH=/tmp/bfubin \
-    /tmp/bfubin/ksh $root/boot/solaris/$BIN/create_ramdisk $cr_args
+if [ -x /tmp/bfubin/create_ramdisk ] ; then
+	LD_LIBRARY_PATH=/tmp/bfulib PATH=/tmp/bfubin \
+	    /tmp/bfubin/ksh /tmp/bfubin/create_ramdisk $cr_args
+else
+	LD_LIBRARY_PATH=/tmp/bfulib PATH=/tmp/bfubin \
+	    /tmp/bfubin/ksh $root/boot/solaris/bin/create_ramdisk $cr_args
+fi
 
 print "Finished.  See $allresults for complete log."

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,21 +18,20 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1997-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/isa_defs.h>
-
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/fcntl.h>
 #include <sys/sysmacros.h>
 #include "libproc.h"
 
@@ -71,10 +69,9 @@ int
 pr_stat(struct ps_prochandle *Pr, const char *path, struct stat *buf)
 {
 	sysret_t rval;			/* return value from stat() */
-	argdes_t argd[3];		/* arg descriptors for stat() */
+	argdes_t argd[4];		/* arg descriptors for fstatat() */
 	argdes_t *adp = &argd[0];	/* first argument */
-	int syscall;			/* stat, xstat or stat64 */
-	int nargs = 2;			/* number of actual arguments */
+	int syscall;			/* SYS_fstatat or SYS_fstatat64 */
 	int error;
 #ifdef _LP64
 	struct stat64_32 statb64_32;
@@ -83,29 +80,19 @@ pr_stat(struct ps_prochandle *Pr, const char *path, struct stat *buf)
 	if (Pr == NULL)		/* no subject process */
 		return (stat(path, buf));
 
-	/*
-	 * This is filthy, but /proc reveals everything about the
-	 * system call interfaces, despite what the architects of the
-	 * header files may desire.  We have to know here whether we
-	 * are calling stat() or xstat() in the subject.
-	 */
-#if defined(_STAT_VER)
-	syscall = SYS_xstat;
-	nargs = 3;
-	adp->arg_value = _STAT_VER;
+	if (Pstatus(Pr)->pr_dmodel != PR_MODEL_NATIVE) {
+		/* 64-bit process controls 32-bit subject process */
+		syscall = SYS_fstatat64;
+	} else {
+		syscall = SYS_fstatat;
+	}
+
+	adp->arg_value = AT_FDCWD;
 	adp->arg_object = NULL;
 	adp->arg_type = AT_BYVAL;
 	adp->arg_inout = AI_INPUT;
 	adp->arg_size = 0;
-	adp++;			/* move to pathname argument */
-#else
-	if (Pstatus(Pr)->pr_dmodel != PR_MODEL_NATIVE) {
-		/* 64-bit process controls 32-bit subject process */
-		syscall = SYS_stat64;
-	} else {
-		syscall = SYS_stat;
-	}
-#endif
+	adp++;			/* move to path argument */
 
 	adp->arg_value = 0;
 	adp->arg_object = (void *)path;
@@ -129,8 +116,15 @@ pr_stat(struct ps_prochandle *Pr, const char *path, struct stat *buf)
 	adp->arg_object = buf;
 	adp->arg_size = sizeof (*buf);
 #endif	/* _LP64 */
+	adp++;			/* move to flags argument */
 
-	error = Psyscall(Pr, &rval, syscall, nargs, &argd[0]);
+	adp->arg_value = 0;
+	adp->arg_object = NULL;
+	adp->arg_type = AT_BYVAL;
+	adp->arg_inout = AI_INPUT;
+	adp->arg_size = 0;
+
+	error = Psyscall(Pr, &rval, syscall, 4, &argd[0]);
 
 	if (error) {
 		errno = (error > 0)? error : ENOSYS;
@@ -149,11 +143,10 @@ pr_stat(struct ps_prochandle *Pr, const char *path, struct stat *buf)
 int
 pr_lstat(struct ps_prochandle *Pr, const char *path, struct stat *buf)
 {
-	sysret_t rval;			/* return value from lstat() */
-	argdes_t argd[3];		/* arg descriptors for lstat() */
+	sysret_t rval;			/* return value from stat() */
+	argdes_t argd[4];		/* arg descriptors for fstatat() */
 	argdes_t *adp = &argd[0];	/* first argument */
-	int syscall;			/* lstat, lxstat or lstat64 */
-	int nargs = 2;			/* number of actual arguments */
+	int syscall;			/* SYS_fstatat or SYS_fstatat64 */
 	int error;
 #ifdef _LP64
 	struct stat64_32 statb64_32;
@@ -162,29 +155,19 @@ pr_lstat(struct ps_prochandle *Pr, const char *path, struct stat *buf)
 	if (Pr == NULL)		/* no subject process */
 		return (lstat(path, buf));
 
-	/*
-	 * This is filthy, but /proc reveals everything about the
-	 * system call interfaces, despite what the architects of the
-	 * header files may desire.  We have to know here whether we
-	 * are calling lstat() or lxstat() in the subject.
-	 */
-#if defined(_STAT_VER)
-	syscall = SYS_lxstat;
-	nargs = 3;
-	adp->arg_value = _STAT_VER;
+	if (Pstatus(Pr)->pr_dmodel != PR_MODEL_NATIVE) {
+		/* 64-bit process controls 32-bit subject process */
+		syscall = SYS_fstatat64;
+	} else {
+		syscall = SYS_fstatat;
+	}
+
+	adp->arg_value = AT_FDCWD;
 	adp->arg_object = NULL;
 	adp->arg_type = AT_BYVAL;
 	adp->arg_inout = AI_INPUT;
 	adp->arg_size = 0;
-	adp++;			/* move to pathname argument */
-#else
-	if (Pstatus(Pr)->pr_dmodel != PR_MODEL_NATIVE) {
-		/* 64-bit process controls 32-bit subject process */
-		syscall = SYS_lstat64;
-	} else {
-		syscall = SYS_lstat;
-	}
-#endif
+	adp++;			/* move to path argument */
 
 	adp->arg_value = 0;
 	adp->arg_object = (void *)path;
@@ -208,8 +191,15 @@ pr_lstat(struct ps_prochandle *Pr, const char *path, struct stat *buf)
 	adp->arg_object = buf;
 	adp->arg_size = sizeof (*buf);
 #endif	/* _LP64 */
+	adp++;			/* move to flags argument */
 
-	error = Psyscall(Pr, &rval, syscall, nargs, &argd[0]);
+	adp->arg_value = AT_SYMLINK_NOFOLLOW;
+	adp->arg_object = NULL;
+	adp->arg_type = AT_BYVAL;
+	adp->arg_inout = AI_INPUT;
+	adp->arg_size = 0;
+
+	error = Psyscall(Pr, &rval, syscall, 4, &argd[0]);
 
 	if (error) {
 		errno = (error > 0)? error : ENOSYS;
@@ -228,11 +218,10 @@ pr_lstat(struct ps_prochandle *Pr, const char *path, struct stat *buf)
 int
 pr_fstat(struct ps_prochandle *Pr, int fd, struct stat *buf)
 {
-	sysret_t rval;			/* return value from fstat() */
-	argdes_t argd[3];		/* arg descriptors for fstat() */
+	sysret_t rval;			/* return value from stat() */
+	argdes_t argd[4];		/* arg descriptors for fstatat() */
 	argdes_t *adp = &argd[0];	/* first argument */
-	int syscall;			/* fstat, fxstat or fstat64 */
-	int nargs = 2;			/* number of actual arguments */
+	int syscall;			/* SYS_fstatat or SYS_fstatat64 */
 	int error;
 #ifdef _LP64
 	struct stat64_32 statb64_32;
@@ -241,31 +230,21 @@ pr_fstat(struct ps_prochandle *Pr, int fd, struct stat *buf)
 	if (Pr == NULL)		/* no subject process */
 		return (fstat(fd, buf));
 
-	/*
-	 * This is filthy, but /proc reveals everything about the
-	 * system call interfaces, despite what the architects of the
-	 * header files may desire.  We have to know here whether we
-	 * are calling fstat() or fxstat() in the subject.
-	 */
-#if defined(_STAT_VER)
-	syscall = SYS_fxstat;
-	nargs = 3;
-	adp->arg_value = _STAT_VER;
+	if (Pstatus(Pr)->pr_dmodel != PR_MODEL_NATIVE) {
+		/* 64-bit process controls 32-bit subject process */
+		syscall = SYS_fstatat64;
+	} else {
+		syscall = SYS_fstatat;
+	}
+
+	adp->arg_value = fd;
 	adp->arg_object = NULL;
 	adp->arg_type = AT_BYVAL;
 	adp->arg_inout = AI_INPUT;
 	adp->arg_size = 0;
-	adp++;			/* move to fd argument */
-#else
-	if (Pstatus(Pr)->pr_dmodel != PR_MODEL_NATIVE) {
-		/* 64-bit process controls 32-bit subject process */
-		syscall = SYS_fstat64;
-	} else {
-		syscall = SYS_fstat;
-	}
-#endif
+	adp++;			/* move to path argument */
 
-	adp->arg_value = fd;
+	adp->arg_value = 0;
 	adp->arg_object = NULL;
 	adp->arg_type = AT_BYVAL;
 	adp->arg_inout = AI_INPUT;
@@ -287,8 +266,15 @@ pr_fstat(struct ps_prochandle *Pr, int fd, struct stat *buf)
 	adp->arg_object = buf;
 	adp->arg_size = sizeof (*buf);
 #endif	/* _LP64 */
+	adp++;			/* move to flags argument */
 
-	error = Psyscall(Pr, &rval, syscall, nargs, &argd[0]);
+	adp->arg_value = 0;
+	adp->arg_object = NULL;
+	adp->arg_type = AT_BYVAL;
+	adp->arg_inout = AI_INPUT;
+	adp->arg_size = 0;
+
+	error = Psyscall(Pr, &rval, syscall, 4, &argd[0]);
 
 	if (error) {
 		errno = (error > 0)? error : ENOSYS;
@@ -307,11 +293,10 @@ pr_fstat(struct ps_prochandle *Pr, int fd, struct stat *buf)
 int
 pr_stat64(struct ps_prochandle *Pr, const char *path, struct stat64 *buf)
 {
-	sysret_t rval;			/* return value from stat64() */
-	argdes_t argd[2];		/* arg descriptors for stat64() */
+	sysret_t rval;			/* return value from stat() */
+	argdes_t argd[4];		/* arg descriptors for fstatat() */
 	argdes_t *adp = &argd[0];	/* first argument */
-	int syscall;			/* stat or stat64 */
-	int nargs = 2;			/* number of actual arguments */
+	int syscall;			/* SYS_fstatat or SYS_fstatat64 */
 	int error;
 #ifdef _LP64
 	struct stat64_32 statb64_32;
@@ -325,11 +310,18 @@ pr_stat64(struct ps_prochandle *Pr, const char *path, struct stat64 *buf)
 		 * 32-bit native and
 		 * 64-bit process controls 32-bit subject process
 		 */
-		syscall = SYS_stat64;
+		syscall = SYS_fstatat64;
 	} else {
 		/* 64-bit native */
-		syscall = SYS_stat;
+		syscall = SYS_fstatat;
 	}
+
+	adp->arg_value = AT_FDCWD;
+	adp->arg_object = NULL;
+	adp->arg_type = AT_BYVAL;
+	adp->arg_inout = AI_INPUT;
+	adp->arg_size = 0;
+	adp++;			/* move to path argument */
 
 	adp->arg_value = 0;
 	adp->arg_object = (void *)path;
@@ -353,8 +345,15 @@ pr_stat64(struct ps_prochandle *Pr, const char *path, struct stat64 *buf)
 	adp->arg_object = buf;
 	adp->arg_size = sizeof (*buf);
 #endif	/* _LP64 */
+	adp++;			/* move to flags argument */
 
-	error = Psyscall(Pr, &rval, syscall, nargs, &argd[0]);
+	adp->arg_value = 0;
+	adp->arg_object = NULL;
+	adp->arg_type = AT_BYVAL;
+	adp->arg_inout = AI_INPUT;
+	adp->arg_size = 0;
+
+	error = Psyscall(Pr, &rval, syscall, 4, &argd[0]);
 
 	if (error) {
 		errno = (error > 0)? error : ENOSYS;
@@ -373,11 +372,10 @@ pr_stat64(struct ps_prochandle *Pr, const char *path, struct stat64 *buf)
 int
 pr_lstat64(struct ps_prochandle *Pr, const char *path, struct stat64 *buf)
 {
-	sysret_t rval;			/* return value from lstat64() */
-	argdes_t argd[2];		/* arg descriptors for lstat64() */
+	sysret_t rval;			/* return value from stat() */
+	argdes_t argd[4];		/* arg descriptors for fstatat() */
 	argdes_t *adp = &argd[0];	/* first argument */
-	int syscall;			/* lstat or lstat64 */
-	int nargs = 2;			/* number of actual arguments */
+	int syscall;			/* SYS_fstatat or SYS_fstatat64 */
 	int error;
 #ifdef _LP64
 	struct stat64_32 statb64_32;
@@ -391,11 +389,18 @@ pr_lstat64(struct ps_prochandle *Pr, const char *path, struct stat64 *buf)
 		 * 32-bit native and
 		 * 64-bit process controls 32-bit subject process
 		 */
-		syscall = SYS_lstat64;
+		syscall = SYS_fstatat64;
 	} else {
 		/* 64-bit native */
-		syscall = SYS_lstat;
+		syscall = SYS_fstatat;
 	}
+
+	adp->arg_value = AT_FDCWD;
+	adp->arg_object = NULL;
+	adp->arg_type = AT_BYVAL;
+	adp->arg_inout = AI_INPUT;
+	adp->arg_size = 0;
+	adp++;			/* move to path argument */
 
 	adp->arg_value = 0;
 	adp->arg_object = (void *)path;
@@ -419,8 +424,15 @@ pr_lstat64(struct ps_prochandle *Pr, const char *path, struct stat64 *buf)
 	adp->arg_object = buf;
 	adp->arg_size = sizeof (*buf);
 #endif	/* _LP64 */
+	adp++;			/* move to flags argument */
 
-	error = Psyscall(Pr, &rval, syscall, nargs, &argd[0]);
+	adp->arg_value = AT_SYMLINK_NOFOLLOW;
+	adp->arg_object = NULL;
+	adp->arg_type = AT_BYVAL;
+	adp->arg_inout = AI_INPUT;
+	adp->arg_size = 0;
+
+	error = Psyscall(Pr, &rval, syscall, 4, &argd[0]);
 
 	if (error) {
 		errno = (error > 0)? error : ENOSYS;
@@ -439,11 +451,10 @@ pr_lstat64(struct ps_prochandle *Pr, const char *path, struct stat64 *buf)
 int
 pr_fstat64(struct ps_prochandle *Pr, int fd, struct stat64 *buf)
 {
-	sysret_t rval;			/* return value from fstat64() */
-	argdes_t argd[2];		/* arg descriptors for fstat64() */
+	sysret_t rval;			/* return value from stat() */
+	argdes_t argd[4];		/* arg descriptors for fstatat() */
 	argdes_t *adp = &argd[0];	/* first argument */
-	int syscall;			/* fstat or fstat64 */
-	int nargs = 2;			/* number of actual arguments */
+	int syscall;			/* SYS_fstatat or SYS_fstatat64 */
 	int error;
 #ifdef _LP64
 	struct stat64_32 statb64_32;
@@ -457,13 +468,20 @@ pr_fstat64(struct ps_prochandle *Pr, int fd, struct stat64 *buf)
 		 * 32-bit native and
 		 * 64-bit process controls 32-bit subject process
 		 */
-		syscall = SYS_fstat64;
+		syscall = SYS_fstatat64;
 	} else {
 		/* 64-bit native */
-		syscall = SYS_fstat;
+		syscall = SYS_fstatat;
 	}
 
 	adp->arg_value = fd;
+	adp->arg_object = NULL;
+	adp->arg_type = AT_BYVAL;
+	adp->arg_inout = AI_INPUT;
+	adp->arg_size = 0;
+	adp++;			/* move to path argument */
+
+	adp->arg_value = 0;
 	adp->arg_object = NULL;
 	adp->arg_type = AT_BYVAL;
 	adp->arg_inout = AI_INPUT;
@@ -485,8 +503,15 @@ pr_fstat64(struct ps_prochandle *Pr, int fd, struct stat64 *buf)
 	adp->arg_object = buf;
 	adp->arg_size = sizeof (*buf);
 #endif	/* _LP64 */
+	adp++;			/* move to flags argument */
 
-	error = Psyscall(Pr, &rval, syscall, nargs, &argd[0]);
+	adp->arg_value = 0;
+	adp->arg_object = NULL;
+	adp->arg_type = AT_BYVAL;
+	adp->arg_inout = AI_INPUT;
+	adp->arg_size = 0;
+
+	error = Psyscall(Pr, &rval, syscall, 4, &argd[0]);
 
 	if (error) {
 		errno = (error > 0)? error : ENOSYS;

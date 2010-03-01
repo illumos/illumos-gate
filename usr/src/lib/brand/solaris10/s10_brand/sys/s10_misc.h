@@ -190,6 +190,44 @@ extern void s10_success(void);
  * From s10_brand.c
  */
 extern void _s10_abort(int, const char *, const char *, int);
+extern int s10_uucopy(const void *, void *, size_t);
+extern int s10_uucopystr(const void *, void *, size_t);
+
+/*
+ * From s10_deleted.c
+ */
+extern int s10_stat();
+extern int s10_lstat();
+extern int s10_fstat();
+extern int s10_stat64();
+extern int s10_lstat64();
+extern int s10_fstat64();
+extern int s10_open();
+extern int s10_open64();
+extern int s10_chown();
+extern int s10_lchown();
+extern int s10_fchown();
+extern int s10_unlink();
+extern int s10_rmdir();
+extern int s10_rename();
+extern int s10_access();
+extern int s10_creat();
+extern int s10_creat64();
+extern int s10_fork1();
+extern int s10_forkall();
+extern int s10_dup();
+extern int s10_poll();
+extern int s10_lwp_mutex_lock();
+extern int s10_lwp_sema_wait();
+extern int s10_utime();
+extern int s10_utimes();
+extern int s10_xstat();
+extern int s10_lxstat();
+extern int s10_fxstat();
+extern int s10_xmknod();
+extern int s10_fsat();
+extern int s10_umount();
+extern int s10_wait();
 
 #endif	/* !_ASM */
 

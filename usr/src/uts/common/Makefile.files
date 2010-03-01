@@ -172,7 +172,6 @@ GENUNIX_OBJS +=	\
 		fm.o		\
 		fork.o		\
 		vpm.o		\
-		fsat.o		\
 		fs_reparse.o	\
 		fs_subr.o	\
 		fsflush.o	\
@@ -279,7 +278,6 @@ GENUNIX_OBJS +=	\
 		process.o	\
 		rlimit.o	\
 		rmap.o		\
-		rmdir.o		\
 		rw.o		\
 		rwstlock.o	\
 		sad_conf.o	\

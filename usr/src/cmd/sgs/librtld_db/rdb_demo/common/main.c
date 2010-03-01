@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -117,7 +117,6 @@ init_proc()
 	 */
 	oper = PCSEXIT;
 	premptyset(&sysset);
-	praddset(&sysset, SYS_exec);
 	praddset(&sysset, SYS_execve);
 	if (writev(pfd, piov, 2) == -1)
 		perr("PCSEXIT");
@@ -233,8 +232,7 @@ main(int argc, char *argv[])
 	 * Make sure that it stopped where we expected.
 	 */
 	while ((pstatus.pr_lwp.pr_why == PR_SYSEXIT) &&
-	    ((pstatus.pr_lwp.pr_what == SYS_exec) ||
-	    (pstatus.pr_lwp.pr_what == SYS_execve))) {
+	    (pstatus.pr_lwp.pr_what == SYS_execve)) {
 		long	pflags = 0;
 		if (!(pstatus.pr_lwp.pr_reg[R_PS] & ERRBIT)) {
 			/* successfull exec(2) */
@@ -266,8 +264,7 @@ main(int argc, char *argv[])
 	 * Did we stop where we expected ?
 	 */
 	if ((pstatus.pr_lwp.pr_why != PR_SYSEXIT) ||
-	    ((pstatus.pr_lwp.pr_what != SYS_exec) &&
-	    (pstatus.pr_lwp.pr_what != SYS_execve))) {
+	    (pstatus.pr_lwp.pr_what != SYS_execve)) {
 		long	pflags = 0;
 
 		(void) fprintf(stderr, "Didn't catch the exec, why: %d "

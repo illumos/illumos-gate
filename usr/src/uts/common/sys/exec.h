@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -206,7 +206,6 @@ extern char aout_omagicstr[];
 extern char nomagicstr[];
 
 extern int exec_args(execa_t *, uarg_t *, intpdata_t *, void **);
-extern int exec(const char *fname, const char **argp);
 extern int exece(const char *fname, const char **argp, const char **envp);
 extern int exec_common(const char *fname, const char **argp,
     const char **envp, int brand_action);

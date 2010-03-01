@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "chkpath.h"
+#include <sys/fcntl.h>
 
 int
 rmdir(char *d)
@@ -34,7 +33,7 @@ rmdir(char *d)
 	int ret;
 
 	CHKNULL(d);
-	ret = _syscall(SYS_rmdir, d);
+	ret = _syscall(SYS_unlinkat, AT_FDCWD, d, AT_REMOVEDIR);
 	if (errno == EEXIST)
 		errno = ENOTEMPTY;
 	return (ret);

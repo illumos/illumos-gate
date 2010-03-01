@@ -18,14 +18,12 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#	ident	"%Z%%M%	%I%	%E% SMI"
 #
 nosys		NOSYS		/*   0 = 1, indir */
 exit		TRAP		/*   1 = 1, exit */
-forkall		TRAP		/*   2 = 0, fork */
+fork		SIMPLE		/*   2 = 0, fork */
 read		SIMPLE		/*   3 = 3, read */
 write		SIMPLE		/*   4 = 3, write */
 open		SIMPLE		/*   5 = 3, open */

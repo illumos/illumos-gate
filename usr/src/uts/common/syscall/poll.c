@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -615,28 +615,6 @@ pollout:
 #endif	/* DEBUG */
 
 	return (fdcnt);
-}
-
-/*
- * This system call trap exists solely for binary compatibility with
- * old statically-linked applications.  It is not called from libc.
- * It should be removed in the next release.
- */
-int
-poll(pollfd_t *fds, nfds_t nfds, int time_out)
-{
-	timespec_t ts;
-	timespec_t *tsp;
-
-	if (time_out < 0)
-		tsp = NULL;
-	else {
-		ts.tv_sec = time_out / MILLISEC;
-		ts.tv_nsec = (time_out % MILLISEC) * MICROSEC;
-		tsp = &ts;
-	}
-
-	return (poll_common(fds, nfds, tsp, NULL));
 }
 
 /*

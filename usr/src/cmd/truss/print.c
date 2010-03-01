@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -518,17 +518,6 @@ prt_smf(private_t *pri, int raw, long val) /* print streams message flags */
 		prt_hhx(pri, 0, val);
 		break;
 	}
-}
-
-void
-prt_plk(private_t *pri, int raw, long val)	/* print plock code */
-{
-	const char *s = raw? NULL : plockname(val);
-
-	if (s == NULL)
-		prt_dec(pri, 0, val);
-	else
-		outstring(pri, s);
 }
 
 void
@@ -2359,10 +2348,14 @@ prt_zga(private_t *pri, int raw, long val)
 void
 prt_atc(private_t *pri, int raw, long val)
 {
-	if (!raw && val == AT_FDCWD)
-		outstring(pri, "AT_FDCWD");
-	else
+	if ((int)val == AT_FDCWD) {
+		if (raw)
+			prt_hex(pri, 0, (uint_t)AT_FDCWD);
+		else
+			outstring(pri, "AT_FDCWD");
+	} else {
 		prt_dec(pri, 0, val);
+	}
 }
 
 /*
@@ -2633,7 +2626,7 @@ void (* const Print[])() = {
 	prt_sef,	/* SEF -- print semsys flags */
 	prt_shc,	/* SHC -- print shmsys command */
 	prt_shf,	/* SHF -- print shmsys flags */
-	prt_plk,	/* PLK -- print plock code */
+	prt_nov,	/* Was PLK, now available for reuse */
 	prt_sfs,	/* SFS -- print sysfs code */
 	prt_rst,	/* RST -- print string returned by syscall */
 	prt_smf,	/* SMF -- print streams message flags */

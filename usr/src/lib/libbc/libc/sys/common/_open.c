@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <fcntl.h>
@@ -104,7 +102,7 @@ open_com(char *path, int flags, int mode)
 		locbuf[inspt] = '\0';		/* make it a string */
 		strcat(locbuf, "old");		/* add "old" */
 		strcat(locbuf, loct+5);		/* add remainer of path */
-		return (_syscall(SYS_open, locbuf, nflags, mode));
+		return (_syscall(SYS_openat, AT_FDCWD, locbuf, nflags, mode));
 	}
 
 	if (strcmp(path, "/etc/mtab") == 0)
@@ -114,27 +112,30 @@ open_com(char *path, int flags, int mode)
 		return (open_mnt("/etc/vfstab", "fstab", nflags, mode));
 
 	if (strcmp(path, "/etc/printcap") == 0) {
-		if ((fd = _syscall(SYS_open, path, nflags, mode)) >= 0)
+		if ((fd = _syscall(SYS_openat, AT_FDCWD, path, nflags, mode))
+		    >= 0)
 			return (fd);
 		return (open_printcap());
 	}
 
 	if (strcmp(path, "/etc/utmp") == 0 ||
 	    strcmp(path, "/var/adm/utmp") == 0) {
-		fd = _syscall(SYS_open, "/var/adm/utmpx", nflags, mode);
+		fd = _syscall(SYS_openat,
+		    AT_FDCWD, "/var/adm/utmpx", nflags, mode);
 		if (fd >= 0)
 			fd_add(fd, UTMPX_MAGIC_FLAG);
 		return (fd);
 	}
 
 	if (strcmp(path, "/var/adm/wtmp") == 0) {
-		fd = _syscall(SYS_open, "/var/adm/wtmpx", nflags, mode);
+		fd = _syscall(SYS_openat,
+		    AT_FDCWD, "/var/adm/wtmpx", nflags, mode);
 		if (fd >= 0)
 			fd_add(fd, UTMPX_MAGIC_FLAG);
 		return (fd);
 	}
 
-	return (_syscall(SYS_open, path, nflags, mode));
+	return (_syscall(SYS_openat, AT_FDCWD, path, nflags, mode));
 }
 
 int
@@ -177,7 +178,7 @@ open_mnt(char *fname, char *tname, int flags, int mode)
 		fclose(fd_in);
 		fclose(fd_out);
 
-		fd = _syscall(SYS_open, tmp_name, O_RDONLY);
+		fd = _syscall(SYS_openat, AT_FDCWD, tmp_name, O_RDONLY);
 
 		if (fd == -1 || unlink(tmp_name) == -1)
 			return (-1);
@@ -318,7 +319,7 @@ _fopen(char *file, char *mode)
 	default:
 		return (NULL);
 	}
-	if ((fd = _syscall(SYS_open, file, oflag, 0666)) < 0)
+	if ((fd = _syscall(SYS_openat, AT_FDCWD, file, oflag, 0666)) < 0)
 		return (NULL);
 	iop->_cnt = 0;
 	iop->_file = fd;
@@ -357,7 +358,7 @@ open_printcap(void)
 	}
 	fclose(fd);
 
-	tmp_file = _syscall(SYS_open, tmp_name, O_RDONLY);
+	tmp_file = _syscall(SYS_openat, AT_FDCWD, tmp_name, O_RDONLY);
 	if (tmp_file == -1 || unlink(tmp_name) == -1)
 		return (-1);
 
@@ -380,7 +381,8 @@ getPrinterInfo(char *printerName, FILE *fd)
 	strcat(fullPath, printerName);
 	strcat(fullPath, PRINTER_CONFIG_FILE);
 
-	if ((config_fd = _syscall(SYS_open, fullPath, O_RDONLY)) == -1) {
+	if ((config_fd = _syscall(SYS_openat, AT_FDCWD, fullPath, O_RDONLY))
+	    == -1) {
 		free(fullPath);
 		return;
 	}
