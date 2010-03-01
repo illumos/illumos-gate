@@ -3740,7 +3740,8 @@ ld_update_outfile(Ofl_desc *ofl)
 		 * change the default.
 		 */
 		if (phdr->p_type == PT_SUNWSTACK) {
-			if ((sgp->sg_flags & FLG_SG_DISABLED) == 0)
+			if (((flags & FLG_OF_RELOBJ) == 0) &&
+			    ((sgp->sg_flags & FLG_SG_DISABLED) == 0))
 				ofl->ofl_phdr[phdrndx++] = *phdr;
 			continue;
 		}
