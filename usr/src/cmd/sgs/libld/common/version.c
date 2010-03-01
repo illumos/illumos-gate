@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -341,6 +341,14 @@ ld_vers_check_need(Ofl_desc *ofl)
 	Aliste		idx1;
 	Ifl_desc	*ifl;
 	Half		needndx;
+	Str_tbl		*strtbl;
+
+
+	/*
+	 * Determine which string table is appropriate.
+	 */
+	strtbl = (OFL_IS_STATIC_OBJ(ofl)) ? ofl->ofl_strtab :
+	    ofl->ofl_dynstrtab;
 
 	/*
 	 * Versym indexes for needed versions start with the next
@@ -426,8 +434,7 @@ ld_vers_check_need(Ofl_desc *ofl)
 				vip->vi_overndx = needndx++;
 
 				ofl->ofl_verneedsz += sizeof (Vernaux);
-				if (st_insert(ofl->ofl_dynstrtab,
-				    vip->vi_name) == -1)
+				if (st_insert(strtbl, vip->vi_name) == -1)
 					return (S_ERROR);
 				need++;
 			}
@@ -436,8 +443,7 @@ ld_vers_check_need(Ofl_desc *ofl)
 		if (need) {
 			ifl->ifl_flags |= FLG_IF_VERNEED;
 			ofl->ofl_verneedsz += sizeof (Verneed);
-			if (st_insert(ofl->ofl_dynstrtab,
-			    ifl->ifl_soname) == -1)
+			if (st_insert(strtbl, ifl->ifl_soname) == -1)
 				return (S_ERROR);
 		}
 	}
