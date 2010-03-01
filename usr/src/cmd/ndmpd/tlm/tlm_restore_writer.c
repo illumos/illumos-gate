@@ -129,6 +129,10 @@ static char *rs_new_name(struct rs_name_maker *rnp,
     int pos,
     char *path);
 
+static void rs_create_new_bkpath(char *bk_path,
+    char *path,
+    char *pbuf);
+
 typedef struct stack_ent {
 	char *se_name;
 	tlm_acls_t se_acls;
@@ -243,7 +247,9 @@ tar_getdir(tlm_commands_t *commands,
     char **sels, /* what to get off the tape */
     char **exls, /* what to leave behind */
     int	flags,
-    int	DAR, struct hardlink_q *hardlink_q)
+    int	DAR,
+    char *bk_path,
+    struct hardlink_q *hardlink_q)
 {
 	int	fp = 0;		/* file being restored ... */
 				/*  ...need to preserve across volume changes */
@@ -283,6 +289,7 @@ tar_getdir(tlm_commands_t *commands,
 	 */
 	char *tmplink_dir = NULL;
 	int dar_recovered = 0;
+	char *thname_buf;
 
 	/*
 	 * startup
@@ -292,11 +299,13 @@ tar_getdir(tlm_commands_t *commands,
 	longlink = ndmp_malloc(TLM_MAX_PATH_NAME);
 	hugename = ndmp_malloc(TLM_MAX_PATH_NAME);
 	parentlnk = ndmp_malloc(TLM_MAX_PATH_NAME);
+	thname_buf = ndmp_malloc(TLM_MAX_PATH_NAME);
 	name = ndmp_malloc(TLM_MAX_PATH_NAME);
 	acls = ndmp_malloc(sizeof (tlm_acls_t));
 	stp = cstack_new();
 	if (longname == NULL || longlink == NULL || hugename == NULL ||
-	    name == NULL || acls == NULL || stp == NULL || parentlnk == NULL) {
+	    name == NULL || acls == NULL || stp == NULL || parentlnk == NULL ||
+	    thname_buf == NULL) {
 		cstack_delete(stp);
 		free(longname);
 		free(longlink);
@@ -304,6 +313,7 @@ tar_getdir(tlm_commands_t *commands,
 		free(parentlnk);
 		free(name);
 		free(acls);
+		free(thname_buf);
 		return (-TLM_NO_SCRATCH_SPACE);
 	}
 
@@ -485,6 +495,8 @@ tar_getdir(tlm_commands_t *commands,
 		    tar_hdr->th_linkflag != LF_XATTR)
 			break;
 
+		rs_create_new_bkpath(bk_path, tar_hdr->th_name, thname_buf);
+
 		switch (tar_hdr->th_linkflag) {
 		case LF_MULTIVOL:
 			multi_volume = TRUE;
@@ -512,7 +524,8 @@ tar_getdir(tlm_commands_t *commands,
 
 				/* create a hardlink to hardlink_target */
 				file_name = (*longname == 0) ?
-				    tar_hdr->th_name : longname;
+				    thname_buf : longname;
+
 				if (!is_file_wanted(file_name, sels, exls,
 				    flags, &mchtype, &pos)) {
 					nmp = NULL;
@@ -605,7 +618,7 @@ tar_getdir(tlm_commands_t *commands,
 					    TLM_MAX_PATH_NAME);
 				} else {
 					(void) strlcpy(longname,
-					    tar_hdr->th_name,
+					    thname_buf,
 					    TLM_MAX_PATH_NAME);
 				}
 			}
@@ -774,7 +787,7 @@ tar_getdir(tlm_commands_t *commands,
 			}
 			break;
 		case LF_XATTR:
-			file_name = (*longname == 0) ? tar_hdr->th_name :
+			file_name = (*longname == 0) ? thname_buf :
 			    longname;
 
 			size_left = restore_xattr_hdr(&fp, parentlnk,
@@ -783,7 +796,7 @@ tar_getdir(tlm_commands_t *commands,
 
 			break;
 		case LF_SYMLINK:
-			file_name = (*longname == 0) ? tar_hdr->th_name :
+			file_name = (*longname == 0) ? thname_buf :
 			    longname;
 			link_name = (*longlink == 0) ?
 			    tar_hdr->th_linkname : longlink;
@@ -808,7 +821,7 @@ tar_getdir(tlm_commands_t *commands,
 			longlink[0] = 0;
 			break;
 		case LF_DIR:
-			file_name = *longname == 0 ? tar_hdr->th_name :
+			file_name = *longname == 0 ? thname_buf :
 			    longname;
 			if (is_file_wanted(file_name, sels, exls, flags,
 			    &mchtype, &pos)) {
@@ -843,7 +856,7 @@ tar_getdir(tlm_commands_t *commands,
 			longlink[0] = 0;
 			break;
 		case LF_FIFO:
-			file_name = *longname == 0 ? tar_hdr->th_name :
+			file_name = *longname == 0 ? thname_buf :
 			    longname;
 			if (is_file_wanted(file_name, sels, exls, flags,
 			    &mchtype, &pos)) {
@@ -928,6 +941,7 @@ tar_getdir(tlm_commands_t *commands,
 	free(longlink);
 	free(hugename);
 	free(name);
+	free(thname_buf);
 	return (rv);
 }
 
@@ -1014,7 +1028,7 @@ tar_getfile(tlm_backup_restore_arg_t *argp)
 	 */
 	NDMP_LOG(LOG_DEBUG, "start restore job %s", job);
 	erc = tar_getdir(commands, local_commands, job_stats, &rn, 1, 1,
-	    sels, exls, flags, 0, NULL);
+	    sels, exls, flags, 0, NULL, NULL);
 
 	/*
 	 * teardown
@@ -1532,13 +1546,9 @@ is_file_wanted(char *name,
 		return (TRUE);
 	}
 
-	uc_name = ndmp_malloc(TLM_MAX_PATH_NAME);
 	retry = ndmp_malloc(TLM_MAX_PATH_NAME);
-	if (uc_name == NULL || retry == NULL) {
-		free(uc_name);
-		free(retry);
+	if (retry == NULL)
 		return (FALSE);
-	}
 
 	if (IS_SET(flags, RSFLG_MATCH_WCARD))
 		cmp_fp = match;
@@ -1546,7 +1556,13 @@ is_file_wanted(char *name,
 		cmp_fp = strexactcmp;
 
 	namep = name + strspn(name, "/");
+
 	if (IS_SET(flags, RSFLG_IGNORE_CASE)) {
+		uc_name = ndmp_malloc(TLM_MAX_PATH_NAME);
+		if (uc_name == NULL) {
+			free(retry);
+			return (FALSE);
+		}
 		(void) strlcpy(uc_name, namep, TLM_MAX_PATH_NAME);
 		(void) strupr(uc_name);
 		namep = uc_name;
@@ -1593,7 +1609,6 @@ is_file_wanted(char *name,
 				*mchtype = PM_CHILD;
 			break;
 		}
-
 		/*
 		 * There is a special case for parent directories of a
 		 * selection.  If 'p_sel' is something like "*d1", the
@@ -1621,7 +1636,8 @@ is_file_wanted(char *name,
 	if (found && pos != NULL)
 		*pos = i;
 
-	free(uc_name);
+	if (IS_SET(flags, RSFLG_IGNORE_CASE))
+		free(uc_name);
 	free(retry);
 	return (found);
 }
@@ -1816,6 +1832,11 @@ create_hard_link(char *name_old, char *name_new,
 	}
 
 	erc = link(name_old, name_new);
+
+	/* Nothing to do if the destination already exists */
+	if (erc && (errno == EEXIST))
+		return (0);
+
 	if (erc) {
 		job_stats->js_errors++;
 		NDMP_LOG(LOG_DEBUG, "error %d (errno %d) hardlink [%s] to [%s]",
@@ -2153,6 +2174,31 @@ rs_new_name(struct rs_name_maker *rnp, char *buf, int pos, char *path)
 
 	return (*rnp->rn_fp)(rnp, buf, pos, path);
 }
+
+/*
+ * Clear the extra "/" in the tar header if exists
+ */
+static void
+rs_create_new_bkpath(char *bk_path, char *path, char *pbuf)
+{
+	char *p, *slashp;
+
+	if ((p = strstr(path, bk_path)) == NULL) {
+		(void) strlcpy(pbuf, path, TLM_MAX_PATH_NAME);
+		return;
+	}
+	if (*(p += strlen(bk_path)) == '/')
+		p++;
+
+	slashp = bk_path + strlen(bk_path) - 1;
+	if (*slashp == '/')
+		(void) snprintf(pbuf, TLM_MAX_PATH_NAME, "%s%s", bk_path, p);
+	else
+		(void) snprintf(pbuf, TLM_MAX_PATH_NAME, "%s/%s", bk_path, p);
+
+	NDMP_LOG(LOG_DEBUG, "old path [%s] new path [%s]", path, pbuf);
+}
+
 
 /*
  * Iterate over ZFS metadata stored in the backup stream and use the callback

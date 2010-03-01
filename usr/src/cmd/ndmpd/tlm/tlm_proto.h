@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -150,5 +150,6 @@ tar_getdir(tlm_commands_t *,
     char **,
     int,
     int,
+    char *,
     struct hardlink_q *);
 #endif	/* _TLM_PROTO_H */

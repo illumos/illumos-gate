@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3244,7 +3244,8 @@ ndmpd_dar_tar_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 		if (tm_tar_ops.tm_getdir != NULL) {
 			err = (tm_tar_ops.tm_getdir)(cmds, cmds->tcs_command,
 			    nlp->nlp_jstat, &rn, 1, 1, sels, &excl, flags,
-			    dar_index, session->hardlink_q);
+			    dar_index, nlp->nlp_backup_path,
+			    session->hardlink_q);
 		}
 
 		cmds->tcs_writer_count--;
@@ -3446,6 +3447,40 @@ ndmp_plugin_pre_restore(ndmp_context_t *ctxp, ndmpd_module_params_t *params,
 }
 
 /*
+ * get_absolute_path
+ *
+ * Get resolved path name which does not involve ".", ".." or extra
+ * "/" or symbolic links.
+ *
+ * e.g.
+ *
+ * /backup/path/ -> /backup/path
+ * /backup/path/. -> /backup/path
+ * /backup/path/../path/ -> /backup/path
+ * /link-to-backup-path -> /backup/path
+ *
+ * Returns:
+ * 	Pointer to the new path (allocated)
+ * 	NULL if the path doesnt exist
+ */
+static char *
+get_absolute_path(const char *bkpath)
+{
+	char *pbuf;
+	char *rv;
+
+	if (!(pbuf = ndmp_malloc(TLM_MAX_PATH_NAME)))
+		return (NULL);
+
+	if ((rv = realpath(bkpath, pbuf)) == NULL) {
+		NDMP_LOG(LOG_DEBUG, "Invalid path [%s] err=%d",
+		    bkpath, errno);
+	}
+	return (rv);
+}
+
+
+/*
  * Expands the format string and logs the resulting message to the
  * remote DMA
  */
@@ -3569,7 +3604,7 @@ ndmpd_rs_sar_tar_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 		if (tm_tar_ops.tm_getdir != NULL)
 			err = (tm_tar_ops.tm_getdir)(cmds, cmds->tcs_command,
 			    nlp->nlp_jstat, &rn, 1, 1, sels, &excl, flags, 0,
-			    session->hardlink_q);
+			    nlp->nlp_backup_path, session->hardlink_q);
 
 		cmds->tcs_writer_count--;
 		cmds->tcs_command->tc_ref--;
@@ -3665,6 +3700,10 @@ ndmp_backup_get_params_v3(ndmpd_session_t *session,
 		else if (!is_valid_backup_dir_v3(params, nlp->nlp_backup_path))
 			rv = NDMP_ILLEGAL_ARGS_ERR;
 	}
+
+	nlp->nlp_backup_path = get_absolute_path(nlp->nlp_backup_path);
+	if (!nlp->nlp_backup_path)
+		rv = NDMP_FILE_NOT_FOUND_ERR;
 
 	if (rv != NDMP_NO_ERR)
 		return (rv);
@@ -3777,6 +3816,7 @@ ndmpd_tar_backup_starter_v3(ndmpd_module_params_t *params)
 
 	/* nlp_params is allocated in start_backup_v3() */
 	NDMP_FREE(nlp->nlp_params);
+	NDMP_FREE(nlp->nlp_backup_path);
 
 	NS_DEC(nbk);
 	ndmp_session_unref(session);
