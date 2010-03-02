@@ -54,6 +54,7 @@ extern "C" {
 #define	NO_GPIO		0x00000001
 #define	NO_MIXER	0x00000002
 #define	NO_SPDIF	0x00000004
+#define	EN_PIN_BEEP	0x00000008
 
 #define	AUDIOHD_INTS		50
 #define	AUDIOHD_MAX_INTS	1500

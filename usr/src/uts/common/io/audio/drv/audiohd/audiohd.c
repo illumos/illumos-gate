@@ -147,7 +147,7 @@ static audiohd_codec_info_t audiohd_codecs[] = {
 	{0x10de0006, "nVidia MCP78 HDMI", 0x0},
 	{0x10de0007, "nVidia MCP7A HDMI", 0x0},
 	{0x10ec0260, "Realtek ALC260", (NO_GPIO)},
-	{0x10ec0262, "Realtek ALC262", (NO_GPIO)},
+	{0x10ec0262, "Realtek ALC262", (NO_GPIO | EN_PIN_BEEP)},
 	{0x10ec0268, "Realtek ALC268", 0x0},
 	{0x10ec0272, "Realtek ALC272", 0x0},
 	{0x10ec0662, "Realtek ALC662", 0x0},
@@ -242,6 +242,10 @@ audiohd_set_chipset_info(audiohd_state_t *statep)
 	case 0x10029442:
 		name = "ATI HD Audio";
 		vers = "Radeon HD 4850";
+		break;
+	case 0x1002aa30:
+		name = "ATI HD Audio";
+		vers = "HD 48x0";
 		break;
 	case 0x1002aa38:
 		name = "ATI HD Audio";
@@ -3159,6 +3163,21 @@ audiohd_create_widgets(hda_codec_t *codec)
 		case WTYPE_VOL_KNOB:
 			break;
 		case WTYPE_PIN:
+			/*
+			 * Some codec(like ALC262) don't provide beep widget,
+			 * it only has input Pin to connect an external beep
+			 * (maybe in motherboard or elsewhere). So we open
+			 * all PINs here in order to enable external beep
+			 * source.
+			 */
+			if ((codec->codec_info->flags & EN_PIN_BEEP) == 0) {
+				(void) audioha_codec_4bit_verb_get(statep,
+				    caddr, widget->wid_wid,
+				    AUDIOHDC_VERB_SET_AMP_MUTE,
+				    AUDIOHDC_AMP_SET_LR_OUTPUT |
+				    AUDIOHDC_GAIN_MAX);
+			}
+
 			audiohd_get_pin_config(widget);
 			break;
 		case WTYPE_BEEP:
@@ -4858,6 +4877,7 @@ audiohd_build_beep_path(hda_codec_t *codec)
 			for (wid = codec->first_wid; wid <= codec->last_wid;
 			    wid++) {
 				widget = codec->widget[wid];
+
 				if (widget->type == WTYPE_BEEP) {
 					path = (audiohd_path_t *)
 					    kmem_zalloc(sizeof (audiohd_path_t),
@@ -4978,6 +4998,27 @@ audiohd_finish_beep_path(hda_codec_t *codec)
 		path = codec->soft_statep->path[i];
 		if (!path || path->path_type != BEEP || path->codec != codec)
 			continue;
+		if (path->pin_nums == 0) {
+			widget = codec->widget[path->beep_wid];
+			if (widget->outamp_cap) {
+				(void) audioha_codec_4bit_verb_get(
+				    statep, caddr,
+				    path->beep_wid, AUDIOHDC_VERB_SET_AMP_MUTE,
+				    AUDIOHDC_AMP_SET_LR_OUTPUT |
+				    AUDIOHDC_GAIN_MAX);
+			}
+			if (widget->inamp_cap) {
+				(void) audioha_codec_4bit_verb_get(
+				    statep, caddr,
+				    path->beep_wid, AUDIOHDC_VERB_SET_AMP_MUTE,
+				    AUDIOHDC_AMP_SET_LR_INPUT |
+				    AUDIOHDC_GAIN_MAX |
+				    (widget->selconn <<
+				    AUDIOHDC_AMP_SET_INDEX_OFFSET));
+			}
+			continue;
+		}
+
 		for (j = 0; j < path->pin_nums; j++) {
 			wid = path->pin_wid[j];
 			widget = codec->widget[wid];
@@ -5003,7 +5044,7 @@ audiohd_finish_beep_path(hda_codec_t *codec)
 					    wid, AUDIOHDC_VERB_SET_AMP_MUTE,
 					    AUDIOHDC_AMP_SET_LR_OUTPUT |
 					    AUDIOHDC_GAIN_MAX);
-					}
+				}
 				if (widget->inamp_cap) {
 					(void) audioha_codec_4bit_verb_get(
 					    statep,
