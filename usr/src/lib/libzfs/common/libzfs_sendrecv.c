@@ -52,7 +52,7 @@
 extern void zfs_setprop_error(libzfs_handle_t *, zfs_prop_t, int, char *);
 
 static int zfs_receive_impl(libzfs_handle_t *, const char *, recvflags_t,
-    int, avl_tree_t *, char **);
+    int, const char *, nvlist_t *, avl_tree_t *, char **);
 
 static const zio_cksum_t zero_cksum = { 0 };
 
@@ -1639,19 +1639,19 @@ created_before(libzfs_handle_t *hdl, avl_tree_t *avl,
 
 static int
 recv_incremental_replication(libzfs_handle_t *hdl, const char *tofs,
-    recvflags_t flags, nvlist_t *stream_nv, avl_tree_t *stream_avl)
+    recvflags_t flags, nvlist_t *stream_nv, avl_tree_t *stream_avl,
+    nvlist_t *renamed)
 {
 	nvlist_t *local_nv;
 	avl_tree_t *local_avl;
 	nvpair_t *fselem, *nextfselem;
-	char *tosnap, *fromsnap;
+	char *fromsnap;
 	char newname[ZFS_MAXNAMELEN];
 	int error;
 	boolean_t needagain, progress, recursive;
 	char *s1, *s2;
 
 	VERIFY(0 == nvlist_lookup_string(stream_nv, "fromsnap", &fromsnap));
-	VERIFY(0 == nvlist_lookup_string(stream_nv, "tosnap", &tosnap));
 
 	recursive = (nvlist_lookup_boolean(stream_nv, "not_recursive") ==
 	    ENOENT);
@@ -1834,10 +1834,13 @@ again:
 			continue;
 		}
 
-		if (fromguid == 0 && flags.verbose) {
-			(void) printf("local fs %s does not have fromsnap "
-			    "(%s in stream); must have been deleted locally; "
-			    "ignoring\n", fsname, fromsnap);
+		if (fromguid == 0) {
+			if (flags.verbose) {
+				(void) printf("local fs %s does not have "
+				    "fromsnap (%s in stream); must have "
+				    "been deleted locally; ignoring\n",
+				    fsname, fromsnap);
+			}
 			continue;
 		}
 
@@ -1849,10 +1852,16 @@ again:
 		s1 = strrchr(fsname, '/');
 		s2 = strrchr(stream_fsname, '/');
 
-		/* check for rename */
+		/*
+		 * Check for rename. If the exact receive path is specified, it
+		 * does not count as a rename, but we still need to check the
+		 * datasets beneath it.
+		 */
 		if ((stream_parent_fromsnap_guid != 0 &&
+		    parent_fromsnap_guid != 0 &&
 		    stream_parent_fromsnap_guid != parent_fromsnap_guid) ||
-		    ((s1 != NULL) && (s2 != NULL) && strcmp(s1, s2) != 0)) {
+		    ((flags.isprefix || strcmp(tofs, fsname) != 0) &&
+		    (s1 != NULL) && (s2 != NULL) && strcmp(s1, s2) != 0)) {
 			nvlist_t *parent;
 			char tryname[ZFS_MAXNAMELEN];
 
@@ -1880,8 +1889,16 @@ again:
 				}
 			}
 
+			newname[0] = '\0';
+
 			error = recv_rename(hdl, fsname, tryname,
 			    strlen(tofs)+1, newname, flags);
+
+			if (renamed != NULL && newname[0] != '\0') {
+				VERIFY(0 == nvlist_add_boolean(renamed,
+				    newname));
+			}
+
 			if (error)
 				needagain = B_TRUE;
 			else
@@ -1910,21 +1927,18 @@ zfs_receive_package(libzfs_handle_t *hdl, int fd, const char *destname,
 	nvlist_t *stream_nv = NULL;
 	avl_tree_t *stream_avl = NULL;
 	char *fromsnap = NULL;
+	char *cp;
 	char tofs[ZFS_MAXNAMELEN];
+	char sendfs[ZFS_MAXNAMELEN];
 	char errbuf[1024];
 	dmu_replay_record_t drre;
 	int error;
 	boolean_t anyerr = B_FALSE;
 	boolean_t softerr = B_FALSE;
+	boolean_t recursive;
 
 	(void) snprintf(errbuf, sizeof (errbuf), dgettext(TEXT_DOMAIN,
 	    "cannot receive"));
-
-	if (strchr(destname, '@')) {
-		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-		    "can not specify snapshot name for multi-snapshot stream"));
-		return (zfs_error(hdl, EZFS_BADSTREAM, errbuf));
-	}
 
 	assert(drr->drr_type == DRR_BEGIN);
 	assert(drr->drr_u.drr_begin.drr_magic == DMU_BACKUP_MAGIC);
@@ -1941,6 +1955,16 @@ zfs_receive_package(libzfs_handle_t *hdl, int fd, const char *destname,
 			error = zfs_error(hdl, EZFS_BADSTREAM, errbuf);
 			goto out;
 		}
+	}
+
+	recursive = (nvlist_lookup_boolean(stream_nv, "not_recursive") ==
+	    ENOENT);
+
+	if (recursive && strchr(destname, '@')) {
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "cannot specify snapshot name for multi-snapshot stream"));
+		error = zfs_error(hdl, EZFS_BADSTREAM, errbuf);
+		goto out;
 	}
 
 	/*
@@ -1986,21 +2010,73 @@ zfs_receive_package(libzfs_handle_t *hdl, int fd, const char *destname,
 		}
 
 		if (fromsnap != NULL) {
+			nvlist_t *renamed = NULL;
+			nvpair_t *pair = NULL;
+
 			(void) strlcpy(tofs, destname, ZFS_MAXNAMELEN);
 			if (flags.isprefix) {
-				int i = strcspn(drr->drr_u.drr_begin.drr_toname,
-				    "/@");
+				struct drr_begin *drrb = &drr->drr_u.drr_begin;
+				int i;
+
+				if (flags.istail) {
+					cp = strrchr(drrb->drr_toname, '/');
+					if (cp == NULL) {
+						(void) strlcat(tofs, "/",
+						    ZFS_MAXNAMELEN);
+						i = 0;
+					} else {
+						i = (cp - drrb->drr_toname);
+					}
+				} else {
+					i = strcspn(drrb->drr_toname, "/@");
+				}
 				/* zfs_receive_one() will create_parents() */
-				(void) strlcat(tofs,
-				    &drr->drr_u.drr_begin.drr_toname[i],
+				(void) strlcat(tofs, &drrb->drr_toname[i],
 				    ZFS_MAXNAMELEN);
 				*strchr(tofs, '@') = '\0';
 			}
-			softerr = recv_incremental_replication(hdl, tofs,
-			    flags, stream_nv, stream_avl);
+
+			if (recursive && !flags.dryrun && !flags.nomount) {
+				VERIFY(0 == nvlist_alloc(&renamed,
+				    NV_UNIQUE_NAME, 0));
+			}
+
+			softerr = recv_incremental_replication(hdl, tofs, flags,
+			    stream_nv, stream_avl, renamed);
+
+			/* Unmount renamed filesystems before receiving. */
+			while ((pair = nvlist_next_nvpair(renamed,
+			    pair)) != NULL) {
+				zfs_handle_t *zhp;
+				prop_changelist_t *clp = NULL;
+
+				zhp = zfs_open(hdl, nvpair_name(pair),
+				    ZFS_TYPE_FILESYSTEM);
+				if (zhp != NULL) {
+					clp = changelist_gather(zhp,
+					    ZFS_PROP_MOUNTPOINT, 0, 0);
+					zfs_close(zhp);
+					if (clp != NULL) {
+						softerr |=
+						    changelist_prefix(clp);
+						changelist_free(clp);
+					}
+				}
+			}
+
+			nvlist_free(renamed);
 		}
 	}
 
+	/*
+	 * Get the fs specified by the first path in the stream (the top level
+	 * specified by 'zfs send') and pass it to each invocation of
+	 * zfs_receive_one().
+	 */
+	(void) strlcpy(sendfs, drr->drr_u.drr_begin.drr_toname,
+	    ZFS_MAXNAMELEN);
+	if ((cp = strchr(sendfs, '@')) != NULL)
+		*cp = '\0';
 
 	/* Finally, receive each contained stream */
 	do {
@@ -2012,7 +2088,7 @@ zfs_receive_package(libzfs_handle_t *hdl, int fd, const char *destname,
 		 * recv_skip() and return 0).
 		 */
 		error = zfs_receive_impl(hdl, destname, flags, fd,
-		    stream_avl, top_zfs);
+		    sendfs, stream_nv, stream_avl, top_zfs);
 		if (error == ENODATA) {
 			error = 0;
 			break;
@@ -2026,7 +2102,7 @@ zfs_receive_package(libzfs_handle_t *hdl, int fd, const char *destname,
 		 * renames again.
 		 */
 		softerr = recv_incremental_replication(hdl, tofs, flags,
-		    stream_nv, stream_avl);
+		    stream_nv, stream_avl, NULL);
 	}
 
 out:
@@ -2127,28 +2203,32 @@ recv_skip(libzfs_handle_t *hdl, int fd, boolean_t byteswap)
 static int
 zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
     recvflags_t flags, dmu_replay_record_t *drr,
-    dmu_replay_record_t *drr_noswap, avl_tree_t *stream_avl,
-    char **top_zfs)
+    dmu_replay_record_t *drr_noswap, const char *sendfs,
+    nvlist_t *stream_nv, avl_tree_t *stream_avl, char **top_zfs)
 {
 	zfs_cmd_t zc = { 0 };
 	time_t begin_time;
-	int ioctl_err, ioctl_errno, err, choplen;
+	int ioctl_err, ioctl_errno, err;
 	char *cp;
 	struct drr_begin *drrb = &drr->drr_u.drr_begin;
 	char errbuf[1024];
 	char prop_errbuf[1024];
-	char chopprefix[ZFS_MAXNAMELEN];
+	const char *chopprefix;
 	boolean_t newfs = B_FALSE;
 	boolean_t stream_wantsnewfs;
 	uint64_t parent_snapguid = 0;
 	prop_changelist_t *clp = NULL;
 	nvlist_t *snapprops_nvlist = NULL;
 	zprop_errflags_t prop_errflags;
+	boolean_t recursive;
 
 	begin_time = time(NULL);
 
 	(void) snprintf(errbuf, sizeof (errbuf), dgettext(TEXT_DOMAIN,
 	    "cannot receive"));
+
+	recursive = (nvlist_lookup_boolean(stream_nv, "not_recursive") ==
+	    ENOENT);
 
 	if (stream_avl != NULL) {
 		char *snapname;
@@ -2180,6 +2260,8 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 			return (-1);
 	}
 
+	cp = NULL;
+
 	/*
 	 * Determine how much of the snapshot name stored in the stream
 	 * we are going to tack on to the name they specified on the
@@ -2188,43 +2270,77 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 	 * If they specified a snapshot, chop the entire name stored in
 	 * the stream.
 	 */
-	(void) strcpy(chopprefix, drrb->drr_toname);
-	if (flags.isprefix) {
+	if (flags.istail) {
 		/*
-		 * They specified a fs with -d or -e. We want to tack on
-		 * everything but the first element of the sent snapshot path
-		 * (all but the pool name) in the case of -d, or only the tail
-		 * of the sent snapshot path in the case of -e.
+		 * A filesystem was specified with -e. We want to tack on only
+		 * the tail of the sent snapshot path.
 		 */
 		if (strchr(tosnap, '@')) {
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN, "invalid "
-			    "argument - snapshot not allowed with %s"),
-			    (flags.istail ? "-e" : "-d"));
+			    "argument - snapshot not allowed with -e"));
 			return (zfs_error(hdl, EZFS_INVALIDNAME, errbuf));
 		}
-		cp = (flags.istail ? strrchr(chopprefix, '/') :
-		    strchr(chopprefix, '/'));
-		if (cp == NULL)
-			cp = strchr(chopprefix, '@');
-		*cp = '\0';
+
+		chopprefix = strrchr(sendfs, '/');
+
+		if (chopprefix == NULL) {
+			/*
+			 * The tail is the poolname, so we need to
+			 * prepend a path separator.
+			 */
+			int len = strlen(drrb->drr_toname);
+			cp = malloc(len + 2);
+			cp[0] = '/';
+			(void) strcpy(&cp[1], drrb->drr_toname);
+			chopprefix = cp;
+		} else {
+			chopprefix = drrb->drr_toname + (chopprefix - sendfs);
+		}
+	} else if (flags.isprefix) {
+		/*
+		 * A filesystem was specified with -d. We want to tack on
+		 * everything but the first element of the sent snapshot path
+		 * (all but the pool name).
+		 */
+		if (strchr(tosnap, '@')) {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN, "invalid "
+			    "argument - snapshot not allowed with -d"));
+			return (zfs_error(hdl, EZFS_INVALIDNAME, errbuf));
+		}
+
+		chopprefix = strchr(drrb->drr_toname, '/');
+		if (chopprefix == NULL)
+			chopprefix = strchr(drrb->drr_toname, '@');
 	} else if (strchr(tosnap, '@') == NULL) {
 		/*
-		 * If they specified a filesystem without -d or -e, we want to
-		 * tack on everything after the fs specified in the first name
-		 * from the stream.
+		 * If a filesystem was specified without -d or -e, we want to
+		 * tack on everything after the fs specified by 'zfs send'.
 		 */
-		cp = strchr(chopprefix, '@');
-		*cp = '\0';
+		chopprefix = drrb->drr_toname + strlen(sendfs);
+	} else {
+		/* A snapshot was specified as an exact path (no -d or -e). */
+		if (recursive) {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "cannot specify snapshot name for multi-snapshot "
+			    "stream"));
+			return (zfs_error(hdl, EZFS_BADSTREAM, errbuf));
+		}
+		chopprefix = drrb->drr_toname + strlen(drrb->drr_toname);
 	}
-	choplen = strlen(chopprefix);
+
+	ASSERT(strstr(drrb->drr_toname, sendfs) == drrb->drr_toname);
+	ASSERT(chopprefix > drrb->drr_toname);
+	ASSERT(chopprefix <= drrb->drr_toname + strlen(drrb->drr_toname));
+	ASSERT(chopprefix[0] == '/' || chopprefix[0] == '@' ||
+	    chopprefix[0] == '\0');
 
 	/*
 	 * Determine name of destination snapshot, store in zc_value.
 	 */
 	(void) strcpy(zc.zc_top_ds, tosnap);
 	(void) strcpy(zc.zc_value, tosnap);
-	(void) strncat(zc.zc_value, drrb->drr_toname+choplen,
-	    sizeof (zc.zc_value));
+	(void) strncat(zc.zc_value, chopprefix, sizeof (zc.zc_value));
+	free(cp);
 	if (!zfs_name_valid(zc.zc_value, ZFS_TYPE_SNAPSHOT)) {
 		zcmd_free_nvlists(&zc);
 		return (zfs_error(hdl, EZFS_INVALIDNAME, errbuf));
@@ -2298,6 +2414,7 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 
 	if (zfs_dataset_exists(hdl, zc.zc_name, ZFS_TYPE_DATASET)) {
 		zfs_handle_t *zhp;
+
 		/*
 		 * Destination fs exists.  Therefore this should either
 		 * be an incremental, or the stream specifies a new fs
@@ -2305,7 +2422,6 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 		 * away (and have therefore specified -F and removed any
 		 * snapshots).
 		 */
-
 		if (stream_wantsnewfs) {
 			if (!flags.force) {
 				zcmd_free_nvlists(&zc);
@@ -2382,7 +2498,7 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 		 */
 		*cp = '\0';
 
-		if (flags.isprefix && !flags.dryrun &&
+		if (flags.isprefix && !flags.istail && !flags.dryrun &&
 		    create_parents(hdl, zc.zc_value, strlen(tosnap)) != 0) {
 			zcmd_free_nvlists(&zc);
 			return (zfs_error(hdl, EZFS_BADRESTORE, errbuf));
@@ -2459,7 +2575,7 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 		}
 	}
 
-	if (err && (ioctl_errno == ENOENT || ioctl_errno == ENODEV)) {
+	if (err && (ioctl_errno == ENOENT || ioctl_errno == EEXIST)) {
 		/*
 		 * It may be that this snapshot already exists,
 		 * in which case we want to consume & ignore it
@@ -2467,7 +2583,7 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 		 */
 		avl_tree_t *local_avl;
 		nvlist_t *local_nv, *fs;
-		char *cp = strchr(zc.zc_value, '@');
+		cp = strchr(zc.zc_value, '@');
 
 		/*
 		 * XXX Do this faster by just iterating over snaps in
@@ -2605,7 +2721,8 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 
 static int
 zfs_receive_impl(libzfs_handle_t *hdl, const char *tosnap, recvflags_t flags,
-    int infd, avl_tree_t *stream_avl, char **top_zfs)
+    int infd, const char *sendfs, nvlist_t *stream_nv, avl_tree_t *stream_avl,
+    char **top_zfs)
 {
 	int err;
 	dmu_replay_record_t drr, drr_noswap;
@@ -2683,8 +2800,22 @@ zfs_receive_impl(libzfs_handle_t *hdl, const char *tosnap, recvflags_t flags,
 	}
 
 	if (DMU_GET_STREAM_HDRTYPE(drrb->drr_versioninfo) == DMU_SUBSTREAM) {
+		char nonpackage_sendfs[ZFS_MAXNAMELEN];
+		if (sendfs == NULL) {
+			/*
+			 * We were not called from zfs_receive_package(). Get
+			 * the fs specified by 'zfs send'.
+			 */
+			char *cp;
+			(void) strlcpy(nonpackage_sendfs,
+			    drr.drr_u.drr_begin.drr_toname, ZFS_MAXNAMELEN);
+			if ((cp = strchr(nonpackage_sendfs, '@')) != NULL)
+				*cp = '\0';
+			sendfs = nonpackage_sendfs;
+		}
 		return (zfs_receive_one(hdl, infd, tosnap, flags,
-		    &drr, &drr_noswap, stream_avl, top_zfs));
+		    &drr, &drr_noswap, sendfs, stream_nv, stream_avl,
+		    top_zfs));
 	} else {  /* must be DMU_COMPOUNDSTREAM */
 		assert(DMU_GET_STREAM_HDRTYPE(drrb->drr_versioninfo) ==
 		    DMU_COMPOUNDSTREAM);
@@ -2706,7 +2837,8 @@ zfs_receive(libzfs_handle_t *hdl, const char *tosnap, recvflags_t flags,
 	char *top_zfs = NULL;
 	int err;
 
-	err = zfs_receive_impl(hdl, tosnap, flags, infd, stream_avl, &top_zfs);
+	err = zfs_receive_impl(hdl, tosnap, flags, infd, NULL, NULL,
+	    stream_avl, &top_zfs);
 
 	if (err == 0 && !flags.nomount && top_zfs) {
 		zfs_handle_t *zhp;
