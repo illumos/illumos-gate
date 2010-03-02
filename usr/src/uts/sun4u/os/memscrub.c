@@ -288,6 +288,11 @@ static struct memscrub_kstats {
 	{ "force_run",		KSTAT_DATA_UINT32 },
 	{ "errors_found",	KSTAT_DATA_UINT32 },
 };
+
+#define	MEMSCRUB_STAT_INC(stat)	memscrub_counts.stat.value.ui32++
+#define	MEMSCRUB_STAT_SET(stat, val) memscrub_counts.stat.value.ui32 = (val)
+#define	MEMSCRUB_STAT_NINC(stat, val) memscrub_counts.stat.value.ui32 += (val)
+
 static struct kstat *memscrub_ksp = (struct kstat *)NULL;
 
 static timeout_id_t memscrub_tid = 0;	/* keep track of timeout id */
@@ -409,7 +414,7 @@ memscrub_wakeup(void *c)
 void
 memscrub_run(void)
 {
-	memscrub_counts.force_run.value.ui32++;
+	MEMSCRUB_STAT_INC(force_run);
 	if (memscrub_tid) {
 		(void) untimeout(memscrub_tid);
 		memscrub_wakeup((void *)NULL);
@@ -510,7 +515,7 @@ memscrubber(void)
 			}
 		}
 
-		memscrub_counts.interval_ticks.value.ui32 = interval_ticks;
+		MEMSCRUB_STAT_SET(interval_ticks, interval_ticks);
 
 		/*
 		 * Did we just reach the end of memory? If we are at the
@@ -521,9 +526,8 @@ memscrubber(void)
 			time_t now = gethrestime_sec();
 
 			if (now >= deadline) {
-				memscrub_counts.done_late.value.ui32++;
-				memscrub_counts.late_sec.value.ui32 +=
-				    (now - deadline);
+				MEMSCRUB_STAT_INC(done_late);
+				MEMSCRUB_STAT_NINC(late_sec, now - deadline);
 				/*
 				 * past deadline, start right away
 				 */
@@ -536,9 +540,8 @@ memscrubber(void)
 				 * wait till previous deadline before re-start.
 				 */
 				interval_ticks = (deadline - now) * hz;
-				memscrub_counts.done_early.value.ui32++;
-				memscrub_counts.early_sec.value.ui32 +=
-				    (deadline - now);
+				MEMSCRUB_STAT_INC(done_early);
+				MEMSCRUB_STAT_NINC(early_sec, deadline - now);
 				deadline += memscrub_period_sec;
 			}
 			reached_end = 0;
@@ -1148,31 +1151,36 @@ memscrub_scan(uint_t blks, ms_paddr_t src)
 			 * is set.
 			 */
 			if (psz > MMU_PAGESIZE || scan_mmu_pagesize) {
-			    caddr_t vaddr = va;
-			    ms_paddr_t paddr = pa;
-			    int tmp = 0;
-			    for (; tmp < bpp; tmp += MEMSCRUB_BPP) {
-				/* Don't scrub retired pages */
-				if (page_retire_check(paddr, NULL) == 0) {
+				caddr_t vaddr = va;
+				ms_paddr_t paddr = pa;
+				int tmp = 0;
+				for (; tmp < bpp; tmp += MEMSCRUB_BPP) {
+					/* Don't scrub retired pages */
+					if (page_retire_check(paddr, NULL)
+					    == 0) {
+						vaddr += MMU_PAGESIZE;
+						paddr += MMU_PAGESIZE;
+						retired_pages++;
+						continue;
+					}
+					thread_affinity_set(curthread,
+					    CPU_CURRENT);
+					if (!on_trap(&otd, OT_DATA_EC)) {
+						memscrub_read(vaddr,
+						    MEMSCRUB_BPP);
+						cpu_check_ce(
+						    SCRUBBER_CEEN_CHECK,
+						    (uint64_t)paddr, vaddr,
+						    MMU_PAGESIZE);
+						no_trap();
+					} else {
+						no_trap();
+						MEMSCRUB_STAT_INC(errors_found);
+					}
+					thread_affinity_clear(curthread);
 					vaddr += MMU_PAGESIZE;
 					paddr += MMU_PAGESIZE;
-					retired_pages++;
-					continue;
 				}
-				thread_affinity_set(curthread, CPU_CURRENT);
-				if (!on_trap(&otd, OT_DATA_EC)) {
-				    memscrub_read(vaddr, MEMSCRUB_BPP);
-				    cpu_check_ce(SCRUBBER_CEEN_CHECK,
-					(uint64_t)paddr, vaddr, MMU_PAGESIZE);
-				    no_trap();
-				} else {
-				    no_trap();
-				    memscrub_counts.errors_found.value.ui32++;
-				}
-				thread_affinity_clear(curthread);
-				vaddr += MMU_PAGESIZE;
-				paddr += MMU_PAGESIZE;
-			    }
 			}
 		}
 		hat_unload(kas.a_hat, va, psz, HAT_UNLOAD_UNLOCK);
@@ -1215,9 +1223,22 @@ memscrub_induced_error(void)
 	add_to_page_retire_list = 1;
 }
 
+/*
+ * Called by page_retire() when toxic pages cannot be retired
+ * immediately and are scheduled for retire.  Memscrubber stops
+ * scrubbing them to avoid further CE/UEs.
+ */
+void
+memscrub_notify(ms_paddr_t pa)
+{
+	mutex_enter(&memscrub_lock);
+	if (!memscrub_page_retire_span_search(pa))
+		memscrub_page_retire_span_add(pa);
+	mutex_exit(&memscrub_lock);
+}
 
 /*
- * Called by memscrub_scan().
+ * Called by memscrub_scan() and memscrub_notify().
  * pa: physical address of span with CE/UE, add to global list.
  */
 static void
@@ -1272,7 +1293,7 @@ memscrub_page_retire_span_delete(ms_paddr_t pa)
 }
 
 /*
- * Called by memscrub_scan().
+ * Called by memscrub_scan() and memscrub_notify().
  * pa: physical address of span to be searched in global list.
  */
 static int

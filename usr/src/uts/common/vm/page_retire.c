@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -138,6 +138,7 @@
 #include <sys/mem_config.h>
 #include <sys/atomic.h>
 #include <sys/callb.h>
+#include <sys/kobj.h>
 #include <vm/page.h>
 #include <vm/vm_dep.h>
 #include <vm/as.h>
@@ -273,6 +274,8 @@ int page_retire_first_ue = 1;
  * setting things up. This is internal only and is not a tunable!
  */
 static int pr_enable = 0;
+
+static void (*memscrub_notify_func)(uint64_t);
 
 #ifdef	DEBUG
 struct page_retire_debug {
@@ -919,6 +922,9 @@ page_retire_init(void)
 		kstat_install(ksp);
 	}
 
+	memscrub_notify_func =
+	    (void(*)(uint64_t))kobj_getsymvalue("memscrub_notify", 0);
+
 	page_capture_register_callback(PC_RETIRE, -1, page_retire_pp_finish);
 	pr_enable = 1;
 }
@@ -1037,6 +1043,10 @@ page_retire(uint64_t pa, uchar_t reason)
 	if (PP_RETIRED(pp)) {
 		PR_DEBUG(prd_dup1);
 		return (page_retire_done(pp, PRD_DUPLICATE));
+	}
+
+	if (memscrub_notify_func != NULL) {
+		(void) memscrub_notify_func(pa);
 	}
 
 	if ((reason & PR_UE) && !PP_TOXIC(pp)) {
