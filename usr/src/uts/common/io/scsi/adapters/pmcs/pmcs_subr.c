@@ -1666,6 +1666,7 @@ pmcs_soft_reset(pmcs_hw_t *pwp, boolean_t no_restart)
 	/* Reset our queue indices and entries */
 	bzero(pwp->shadow_iqpi, sizeof (pwp->shadow_iqpi));
 	bzero(pwp->last_iqci, sizeof (pwp->last_iqci));
+	bzero(pwp->last_htag, sizeof (pwp->last_htag));
 	for (i = 0; i < PMCS_NIQ; i++) {
 		if (pwp->iqp[i]) {
 			bzero(pwp->iqp[i], PMCS_QENTRY_SIZE * pwp->ioq_depth);

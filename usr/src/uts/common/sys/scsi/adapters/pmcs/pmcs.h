@@ -423,8 +423,9 @@ struct pmcs_hw {
 	 * memory and update the card as needed.
 	 */
 	uint32_t	shadow_iqpi[PMCS_MAX_IQ];
-	uint32_t	last_iqci[PMCS_MAX_IQ];
 	uint32_t	iqpi_offset[PMCS_MAX_IQ];
+	uint32_t	last_iqci[PMCS_MAX_IQ];
+	uint32_t	last_htag[PMCS_MAX_IQ];
 	uint32_t	*iqp[PMCS_MAX_IQ];
 	kmutex_t	iqp_lock[PMCS_NIQ];
 

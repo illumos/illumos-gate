@@ -1880,7 +1880,10 @@ pmcs_add_more_chunks(pmcs_hw_t *pwp, unsigned long nsize)
 static void
 pmcs_check_forward_progress(pmcs_hw_t *pwp)
 {
+	pmcwork_t	*wrkp;
+	uint32_t	*iqp;
 	uint32_t	cur_iqci;
+	uint32_t	cur_work_idx;
 	uint32_t	cur_msgu_tick;
 	uint32_t	cur_iop_tick;
 	int 		i;
@@ -1892,22 +1895,41 @@ pmcs_check_forward_progress(pmcs_hw_t *pwp)
 		return;
 	}
 
-	/* Ensure that inbound work is getting picked up */
+	/*
+	 * Ensure that inbound work is getting picked up.  First, check to
+	 * see if new work has been posted.  If it has, ensure that the
+	 * work is moving forward by checking the consumer index and the
+	 * last_htag for the work being processed against what we saw last
+	 * time.  Note: we use the work structure's 'last_htag' because at
+	 * any given moment it could be freed back, thus clearing 'htag'
+	 * and setting 'last_htag' (see pmcs_pwork).
+	 */
 	for (i = 0; i < PMCS_NIQ; i++) {
 		cur_iqci = pmcs_rd_iqci(pwp, i);
+		iqp = &pwp->iqp[i][cur_iqci * (PMCS_QENTRY_SIZE >> 2)];
+		cur_work_idx = PMCS_TAG_INDEX(LE_32(*(iqp+1)));
+		wrkp = &pwp->work[cur_work_idx];
 		if (cur_iqci == pwp->shadow_iqpi[i]) {
 			pwp->last_iqci[i] = cur_iqci;
+			pwp->last_htag[i] = wrkp->last_htag;
 			continue;
 		}
-		if (cur_iqci == pwp->last_iqci[i]) {
+		if ((cur_iqci == pwp->last_iqci[i]) &&
+		    (wrkp->last_htag == pwp->last_htag[i])) {
 			pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
 			    "Inbound Queue stall detected, issuing reset");
 			goto hot_reset;
 		}
 		pwp->last_iqci[i] = cur_iqci;
+		pwp->last_htag[i] = wrkp->last_htag;
 	}
 
-	/* Check heartbeat on both the MSGU and IOP */
+	/*
+	 * Check heartbeat on both the MSGU and IOP.  It is unlikely that
+	 * we'd ever fail here, as the inbound queue monitoring code above
+	 * would detect a stall due to either of these elements being
+	 * stalled, but we might as well keep an eye on them.
+	 */
 	cur_msgu_tick = pmcs_rd_gst_tbl(pwp, PMCS_GST_MSGU_TICK);
 	if (cur_msgu_tick == pwp->last_msgu_tick) {
 		pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
