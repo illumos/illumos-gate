@@ -699,14 +699,6 @@ px_ib_ino_rem_intr(px_t *px_p, px_ino_pil_t *ipil_p, px_ih_t *ih_p)
 	/* Disable the interrupt */
 	PX_INTR_DISABLE(px_p->px_dip, sysino);
 
-	if (ipil_p->ipil_ih_size == 1) {
-		if (ih_lst != ih_p)
-			goto not_found;
-
-		/* No need to set head/tail as ino_p will be freed */
-		goto reset;
-	}
-
 	/* Busy wait on pending interrupt */
 	for (start_time = gethrtime(); !panicstr &&
 	    ((ret = px_lib_intr_getstate(dip, sysino, &intr_state))
@@ -727,7 +719,8 @@ px_ib_ino_rem_intr(px_t *px_p, px_ino_pil_t *ipil_p, px_ih_t *ih_p)
 	 * because of jabber we need to clear the pending state in case the
 	 * jabber has gone away.
 	 */
-	if (ino_p->ino_unclaimed_intrs > px_unclaimed_intr_max) {
+	if (ret == DDI_SUCCESS &&
+	    ino_p->ino_unclaimed_intrs > px_unclaimed_intr_max) {
 		cmn_err(CE_WARN, "%s%d: px_ib_ino_rem_intr: "
 		    "ino 0x%x has been unblocked",
 		    ddi_driver_name(dip), ddi_get_instance(dip), ino);
@@ -741,6 +734,14 @@ px_ib_ino_rem_intr(px_t *px_p, px_ino_pil_t *ipil_p, px_ih_t *ih_p)
 		    "ino 0x%x sysino 0x%x\n", ino, sysino);
 
 		return (ret);
+	}
+
+	if (ipil_p->ipil_ih_size == 1) {
+		if (ih_lst != ih_p)
+			goto not_found;
+
+		/* No need to set head/tail as ino_p will be freed */
+		goto reset;
 	}
 
 	/* Search the link list for ih_p */

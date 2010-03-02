@@ -952,6 +952,7 @@ px_add_intx_intr(dev_info_t *dip, dev_info_t *rdip,
 	px_ino_pil_t	*ipil_p, *ipil_list;
 	int32_t		weight;
 	int		ret = DDI_SUCCESS;
+	cpuid_t		curr_cpu;
 
 	ino = hdlp->ih_vector;
 
@@ -968,7 +969,7 @@ px_add_intx_intr(dev_info_t *dip, dev_info_t *rdip,
 	ino_p = px_ib_locate_ino(ib_p, ino);
 	ipil_list = ino_p ? ino_p->ino_ipil_p : NULL;
 
-	/* Sharing ino */
+	/* Sharing the INO using a PIL that already exists */
 	if (ino_p && (ipil_p = px_ib_ino_locate_ipil(ino_p, hdlp->ih_pri))) {
 		if (px_ib_intr_locate_ih(ipil_p, rdip, hdlp->ih_inum, 0, 0)) {
 			DBG(DBG_A_INTX, dip, "px_add_intx_intr: "
@@ -986,6 +987,44 @@ px_add_intx_intr(dev_info_t *dip, dev_info_t *rdip,
 			goto fail1;
 
 		goto ino_done;
+	}
+
+	/* Sharing the INO using a new PIL */
+	if (ipil_list != NULL) {
+		intr_state_t	intr_state;
+		hrtime_t	start_time;
+
+		/*
+		 * disable INO to avoid lopil race condition with
+		 * px_intx_intr
+		 */
+
+		if ((ret = px_lib_intr_gettarget(dip, ino_p->ino_sysino,
+		    &curr_cpu)) != DDI_SUCCESS) {
+			DBG(DBG_IB, dip,
+			    "px_add_intx_intr px_intr_gettarget() failed\n");
+
+			goto fail1;
+		}
+
+		/* Disable the interrupt */
+		PX_INTR_DISABLE(dip, ino_p->ino_sysino);
+
+		/* Busy wait on pending interrupt */
+		for (start_time = gethrtime(); !panicstr &&
+		    ((ret = px_lib_intr_getstate(dip, ino_p->ino_sysino,
+		    &intr_state)) == DDI_SUCCESS) &&
+		    (intr_state == INTR_DELIVERED_STATE); /* */) {
+			if (gethrtime() - start_time > px_intrpend_timeout) {
+				cmn_err(CE_WARN, "%s%d: px_add_intx_intr: "
+				    "pending sysino 0x%lx(ino 0x%x) timeout",
+				    ddi_driver_name(dip), ddi_get_instance(dip),
+				    ino_p->ino_sysino, ino_p->ino_ino);
+
+				ret = DDI_FAILURE;
+				goto fail1;
+			}
+		}
 	}
 
 	if (hdlp->ih_pri == 0)
@@ -1025,6 +1064,9 @@ px_add_intx_intr(dev_info_t *dip, dev_info_t *rdip,
 
 		/* Enable interrupt */
 		px_ib_intr_enable(px_p, ino_p->ino_cpuid, ino);
+	} else {
+		/* Re-enable interrupt */
+		PX_INTR_ENABLE(dip, ino_p->ino_sysino, curr_cpu);
 	}
 
 ino_done:
