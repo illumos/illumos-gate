@@ -73,6 +73,7 @@ extern "C" {
 #define	LDMA_NAME_SYSTEM		"agent-system"
 
 #define	LDMA_MSGSYS_GET_SYSINFO		0x01	/* get system info request */
+#define	LDMA_MSGSYS_GET_CHASSISNO	0x02	/* get chassis sno request */
 
 /*
  * LDoms Direct IO Agent
@@ -134,8 +135,27 @@ typedef enum ldma_request_status_t {
 typedef ldma_request_status_t (ldm_msg_func_t)(ds_ver_t *,
     ldma_message_header_t *, size_t, ldma_message_header_t **, size_t *);
 
+/*
+ * The domain service framework only allows connexion of a domain with
+ * the control domain. So agents not running in the control domain can
+ * only receive requests from the control domain. But, agents running
+ * on the control can receive requests from any domain.
+ *
+ * For agents running in the control domain, the LDMA_MSGFLG_ACCESS_*
+ * flags control whether messages sent by domains different from the
+ * control domain should be processed or not.
+ *
+ * If a message handler is defined with LDMA_MSGFLG_ACCESS_CONTROL then
+ * only messages sent by the control domain should be processed. Otherwise
+ * if a message handler is defined with LDMA_MSGFLG_ACCESS_ANY then messages
+ * sent by any domain can be processed.
+ */
+#define	LDMA_MSGFLG_ACCESS_CONTROL	0x00
+#define	LDMA_MSGFLG_ACCESS_ANY		0x01
+
 typedef struct ldma_msg_handler {
 	uint32_t		msg_type; 	/* message type */
+	uint32_t		msg_flags;	/* message flags */
 	ldm_msg_func_t		*msg_handler;	/* message handler */
 } ldma_msg_handler_t;
 

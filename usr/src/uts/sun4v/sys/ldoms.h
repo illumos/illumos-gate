@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,7 +31,7 @@
 extern "C" {
 #endif
 
-#include <sys/param.h>	/* for MAXHOSTNAMELEN */
+#include <sys/param.h>
 
 /*
  * Global LDoms definitions.
@@ -53,7 +53,7 @@ extern "C" {
 #define	LDOMS_MAX_DOMAINS	512
 
 /* maximum number of characters in the logical domain name */
-#define	LDOMS_MAX_NAME_LEN	MAXHOSTNAMELEN
+#define	LDOMS_MAX_NAME_LEN	MAXNAMELEN
 
 /*
  * Global flags that indicate what domaining features are

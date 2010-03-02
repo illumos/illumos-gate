@@ -48,6 +48,7 @@
 # SUNWhea
 #
 f none usr/include/asm/flush.h 644 root bin
+f none usr/include/libv12n.h 644 root bin
 f none usr/include/rpc/ib.h 644 root bin
 f none usr/include/sys/cmpregs.h 644 root bin
 f none usr/include/sys/dkmpio.h 644 root bin

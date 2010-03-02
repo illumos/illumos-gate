@@ -497,12 +497,14 @@ sparc_SUBDIRS= \
 	cmd/prtdscp \
 	cmd/prtfru \
 	cmd/sckmd \
+	cmd/virtinfo \
 	cmd/vntsd \
 	lib/libds \
 	lib/libdscp \
 	lib/libpri \
 	lib/libpcp \
 	lib/libtsalarm \
+	lib/libv12n \
 	lib/storage \
 	stand
 

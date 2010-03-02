@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,8 +54,10 @@ static ldm_msg_func_t ldma_dev_validate_nic;
 static ds_ver_t ldma_versions[] = { { 1, 0 } };
 
 static ldma_msg_handler_t ldma_handlers[] = {
-	{ LDMA_MSGDEV_VALIDATE_PATH,	ldma_dev_validate_path },
-	{ LDMA_MSGDEV_VALIDATE_NIC,	ldma_dev_validate_nic }
+	{ LDMA_MSGDEV_VALIDATE_PATH, LDMA_MSGFLG_ACCESS_CONTROL,
+	    ldma_dev_validate_path },
+	{ LDMA_MSGDEV_VALIDATE_NIC,  LDMA_MSGFLG_ACCESS_CONTROL,
+	    ldma_dev_validate_nic }
 };
 
 ldma_agent_info_t ldma_device_info = {

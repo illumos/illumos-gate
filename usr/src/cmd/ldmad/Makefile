@@ -30,24 +30,44 @@ SVCMETHOD=	ldoms-agents
 
 include ../Makefile.cmd
 
-SRCS=		ldmad.c			\
+
+LOCAL_SRCS=	ldmad.c			\
 		ldma_log.c		\
 		ldma_device.c		\
 		ldma_system.c		\
 		ldma_dio.c		\
 		mdesc_lib.c
 
+LOCAL_OBJS=	$(LOCAL_SRCS:%.c=%.o)
 
-OBJS=		$(SRCS:%.c=%.o)
+COMMONBASE = ../../common
+
+COMMON_SRCS =	mdesc_findname.c	\
+		mdesc_findnodeprop.c	\
+		mdesc_fini.c		\
+		mdesc_getpropval.c	\
+		mdesc_getpropstr.c	\
+		mdesc_init_intern.c	\
+		mdesc_nodecount.c	\
+		mdesc_rootnode.c	\
+		mdesc_scandag.c
+
+COMMON_OBJS =	$(COMMON_SRCS:%.c=%.o)
+
+OBJS = $(LOCAL_OBJS) $(COMMON_OBJS)
+SRCS = $(LOCAL_SRCS) $(COMMON_SRCS:%.c=$(COMMONBASE)/mdesc/%.c)
 
 ROOTCMDDIR=		$(ROOTLIB)/ldoms
 ROOTMANIFESTDIR=	$(ROOTSVCPLATFORMSUN4V)
 $(ROOTMANIFEST)		:= FILEMODE= 444
 
-LDLIBS +=	-lds -ldladm -ldevinfo
+LDLIBS +=	-lds -ldladm -ldevinfo -lpri
 INCS +=		-I$(ROOT)/usr/platform/sun4v/include/sys
+INCS +=		-I$(SRC)/uts/sun4v
 CPPFLAGS += 	$(INCS)
 C99MODE =	$(C99_ENABLE)
+
+LINTFLAGS += -erroff=E_BAD_PTR_CAST_ALIGN
 
 .KEEP_STATE:
 
@@ -67,3 +87,8 @@ clean:
 	$(RM) $(PROG) $(OBJS) $(LINT_FILES)
 
 include ../Makefile.targ
+
+%.o: $(COMMONBASE)/mdesc/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+

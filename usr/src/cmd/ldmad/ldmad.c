@@ -55,8 +55,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
+#include <synch.h>
 #include <syslog.h>
+#include <thread.h>
 #include <unistd.h>
+#include <sys/debug.h>
+#include <sys/ldoms.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -66,12 +70,17 @@
 #define	LDMA_MODULE	"ldm-agent-daemon"
 
 #define	LDMA_CONTROL_DOMAIN_DHDL	0	/* id of the control domain */
-#define	LDMA_DOMAIN_NAME_MAXLEN		MAXNAMELEN
+
+typedef struct ldma_connexion_t {
+	ds_hdl_t		hdl;		/* connexion handle */
+	ds_domain_hdl_t		dhdl;		/* connexion domain handle */
+	ds_ver_t		ver;		/* connexion version */
+} ldma_connexion_t;
 
 typedef struct ldma_agent {
 	ldma_agent_info_t	*info;		/* agent information */
-	ds_hdl_t		conn_hdl;	/* connexion handler */
-	ds_ver_t		conn_ver;	/* connexion version */
+	mutex_t			conn_lock;	/* connexion table lock */
+	ldma_connexion_t	conn[LDOMS_MAX_DOMAINS]; /* connexions */
 } ldma_agent_t;
 
 /* information about existing agents */
@@ -91,6 +100,106 @@ static ldma_agent_info_t *ldma_agent_infos[] = {
 
 static char *cmdname;
 static pid_t daemon_pid = 0;
+
+/*
+ * Lookup connexion in agent connexion table.
+ */
+static ldma_connexion_t *
+ldma_connexion_lookup(ldma_agent_t *agent, ds_hdl_t hdl)
+{
+	ldma_connexion_t *connp;
+	int i;
+
+	ASSERT(MUTEX_HELD(&agent->conn_lock));
+	for (connp = agent->conn, i = 0; i < LDOMS_MAX_DOMAINS; i++, connp++) {
+		if (connp->hdl == hdl)
+			return (connp);
+	}
+	return (NULL);
+}
+
+/*
+ * Add connextion to agent connexion table.
+ */
+static int
+ldma_connexion_add(ldma_agent_t *agent, ds_hdl_t hdl, ds_domain_hdl_t dhdl,
+    ds_ver_t *verp)
+{
+	ldma_connexion_t *connp;
+	ldma_connexion_t *availp = NULL;
+	int i;
+
+	(void) mutex_lock(&agent->conn_lock);
+	for (connp = agent->conn, i = 0; i < LDOMS_MAX_DOMAINS; i++, connp++) {
+		if (connp->hdl == hdl)
+			break;
+		if (availp == NULL && connp->hdl == DS_INVALID_HDL)
+			availp = connp;
+	}
+
+	if (i < LDOMS_MAX_DOMAINS) {
+		(void) mutex_unlock(&agent->conn_lock);
+		LDMA_INFO("agent %s hdl %llx already exists", agent->info->name,
+		    hdl);
+		return (0);
+	}
+
+	if (!availp) {
+		(void) mutex_unlock(&agent->conn_lock);
+		LDMA_INFO("agent %s too many connections", agent->info->name);
+		return (0);
+	}
+
+	LDMA_DBG("agent %s adding connection (%x) %llx, %llx, %d.%d",
+	    agent->info->name, availp, hdl, dhdl, verp->major, verp->minor);
+
+	availp->hdl = hdl;
+	availp->dhdl = dhdl;
+	availp->ver = *verp;
+	(void) mutex_unlock(&agent->conn_lock);
+	return (1);
+}
+
+/*
+ * Delete connexion from agent connexion table.
+ */
+static int
+ldma_connexion_delete(ldma_agent_t *agent, ds_hdl_t hdl)
+{
+	ldma_connexion_t *connp;
+
+	(void) mutex_lock(&agent->conn_lock);
+	if ((connp = ldma_connexion_lookup(agent, hdl)) == NULL) {
+		(void) mutex_unlock(&agent->conn_lock);
+		LDMA_INFO("agent %s connection delete failed to find %llx",
+		    agent->info->name, hdl);
+		return (0);
+	}
+
+	LDMA_DBG("agent %s deleting connection (%x) %llx", agent->info->name,
+	    connp, hdl);
+
+	connp->hdl = DS_INVALID_HDL;
+	connp->dhdl = 0;
+	connp->ver.major = 0;
+	connp->ver.minor = 0;
+	(void) mutex_unlock(&agent->conn_lock);
+	return (1);
+}
+
+/*
+ * Initialize connexion table.
+ */
+static void
+ldma_connexion_init(ldma_agent_t *agent)
+{
+	ldma_connexion_t *connp;
+	int i;
+
+	for (connp = agent->conn, i = 0; i < LDOMS_MAX_DOMAINS; i++, connp++) {
+		connp->hdl = DS_INVALID_HDL;
+	}
+}
 
 /*
  * Allocate a new message with the specified message number (msg_num),
@@ -141,9 +250,9 @@ ldma_reg_cb(ds_hdl_t hdl, ds_cb_arg_t arg, ds_ver_t *ver,
     ds_domain_hdl_t dhdl)
 {
 	ldma_agent_t *agent = (ldma_agent_t *)arg;
-	char dname[LDMA_DOMAIN_NAME_MAXLEN];
+	char dname[LDOMS_MAX_NAME_LEN];
 
-	if (ds_dom_hdl_to_name(dhdl, dname, LDMA_DOMAIN_NAME_MAXLEN) != 0) {
+	if (ds_dom_hdl_to_name(dhdl, dname, LDOMS_MAX_NAME_LEN) != 0) {
 		(void) strcpy(dname, "<unknown>");
 	}
 
@@ -151,19 +260,11 @@ ldma_reg_cb(ds_hdl_t hdl, ds_cb_arg_t arg, ds_ver_t *ver,
 	    agent->info->name, hdl, dhdl, dname, ver->major, ver->minor);
 
 	/*
-	 * Record client information if the connexion is from the control
-	 * domain. The domain service framework only allows connexion of a
-	 * domain with the control domain. However, if the agent is running
-	 * on the control domain then it can see connexions coming from any
-	 * domains. That's why we explicitly have to check if the connexion
-	 * is effectively with the control domain.
+	 * Record client information.  Access control is done on a
+	 * message-by-message basis upon receipt of the message.
 	 */
-	if (dhdl == LDMA_CONTROL_DOMAIN_DHDL) {
-		agent->conn_hdl = hdl;
-		agent->conn_ver.major = ver->major;
-		agent->conn_ver.minor = ver->minor;
-	} else {
-		LDMA_INFO("agent %s will ignore any request from distrusted "
+	if (!ldma_connexion_add(agent, hdl, dhdl, ver)) {
+		LDMA_INFO("agent %s failed to add connection from "
 		    "domain %s", agent->info->name, dname);
 	}
 }
@@ -179,13 +280,9 @@ ldma_unreg_cb(ds_hdl_t hdl, ds_cb_arg_t arg)
 
 	LDMA_DBG("%s: UNREGISTER hdl=%llx", agent->info->name, hdl);
 
-	if (agent->conn_hdl == hdl) {
-		agent->conn_hdl = 0;
-		agent->conn_ver.major = 0;
-		agent->conn_ver.minor = 0;
-	} else {
-		LDMA_INFO("agent %s has unregistered consumer from "
-		    "distrusted domain", agent->info->name);
+	if (!ldma_connexion_delete(agent, hdl)) {
+		LDMA_INFO("agent %s failed to unregister handle %llx",
+		    agent->info->name, hdl);
 	}
 }
 
@@ -203,6 +300,9 @@ ldma_data_cb(ds_hdl_t hdl, ds_cb_arg_t arg, void *buf, size_t len)
 	ldma_msg_handler_t *handler;
 	ldma_message_header_t *request = buf;
 	ldma_message_header_t *reply = NULL;
+	ldma_connexion_t *connp;
+	ds_ver_t conn_ver;
+	ds_domain_hdl_t conn_dhdl;
 	ldma_request_status_t status;
 	size_t request_dlen, reply_len, reply_dlen = 0;
 	int i;
@@ -220,8 +320,16 @@ ldma_data_cb(ds_hdl_t hdl, ds_cb_arg_t arg, void *buf, size_t len)
 	    "dlen=%d", agent->info->name, hdl, request->msg_num,
 	    request->msg_type, request->msg_info, request_dlen);
 
-	/* reject any request which is not from the control domain */
-	if (hdl != agent->conn_hdl) {
+	(void) mutex_lock(&agent->conn_lock);
+	connp = ldma_connexion_lookup(agent, hdl);
+	if (connp != NULL) {
+		conn_dhdl = connp->dhdl;
+		conn_ver = connp->ver;
+	}
+	(void) mutex_unlock(&agent->conn_lock);
+
+	/* reject any request which is not in the connexion table */
+	if (connp == NULL) {
 		LDMA_DBG("%s: DATA hdl=%llx, rejecting request from a "
 		    "distrusted domain", agent->info->name, hdl);
 		status = LDMA_REQ_DENIED;
@@ -245,6 +353,15 @@ ldma_data_cb(ds_hdl_t hdl, ds_cb_arg_t arg, void *buf, size_t len)
 		goto do_reply;
 	}
 
+	/* reject any request from a guest which is not allowed */
+	if ((conn_dhdl != LDMA_CONTROL_DOMAIN_DHDL) &&
+	    (handler->msg_flags & LDMA_MSGFLG_ACCESS_ANY) == 0) {
+		LDMA_DBG("%s: DATA hdl=%llx, rejecting request from a "
+		    "distrusted domain", agent->info->name, hdl);
+		status = LDMA_REQ_DENIED;
+		goto do_reply;
+	}
+
 	if (handler->msg_handler == NULL) {
 		/*
 		 * This type of message is defined by the agent but it
@@ -259,8 +376,8 @@ ldma_data_cb(ds_hdl_t hdl, ds_cb_arg_t arg, void *buf, size_t len)
 	}
 
 	/* invoke the message handler of the agent */
-	status = (*handler->msg_handler)(&agent->conn_ver, request,
-	    request_dlen, &reply, &reply_dlen);
+	status = (*handler->msg_handler)(&conn_ver, request, request_dlen,
+	    &reply, &reply_dlen);
 
 	LDMA_DBG("%s: DATA hdl=%llx, handler stat=%d reply=%p rlen=%d",
 	    agent->info->name, hdl, status, (void *)reply, reply_dlen);
@@ -330,9 +447,8 @@ ldma_register(ldma_agent_info_t *agent_info)
 		goto register_fail;
 
 	agent->info = agent_info;
-	agent->conn_hdl = 0;
-	agent->conn_ver.major = 0;
-	agent->conn_ver.minor = 0;
+	(void) mutex_init(&agent->conn_lock, USYNC_THREAD, NULL);
+	ldma_connexion_init(agent);
 
 	ds_cap.svc_id = agent_info->name;
 	ds_cap.vers = agent_info->vers;

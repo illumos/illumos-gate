@@ -285,7 +285,8 @@ sparc_SUBDIRS= .WAIT	\
 	librsc		\
 	storage		\
 	libpcp		\
-	libtsalarm
+	libtsalarm	\
+	libv12n
 
 FM_sparc_DEPLIBS= libpri
 
@@ -518,6 +519,7 @@ sparc_HDRSUBDIRS=	\
 	libds		\
 	libdscp		\
 	libpri		\
+	libv12n		\
 	storage
 
 all :=		TARGET= all
@@ -584,6 +586,7 @@ libdladm:	libdevinfo libinetutil libsocket libscf librcm libnvpair \
 		libexacct libnsl libkstat libcurses
 libdll: 	libast
 libdlpi:	libinetutil libdladm
+libds:		libsysevent
 libdscfg:	libnsctl libunistat libsocket libnsl
 libdtrace:	libproc libgen libctf
 libdtrace_jni:	libuutil libdtrace
@@ -648,6 +651,7 @@ libexacct/demo:	libexacct libproject libsocket libnsl
 libtsalarm:	libpcp
 smbsrv:		libsocket libnsl libmd libxnet libpthread librt \
 		libshare libidmap pkcs11 libsqlite libcryptoutil
+libv12n:	libds libuuid
 libvrrpadm:	libsocket libdladm libscf
 libvscan:	libscf
 scsi:		libnvpair

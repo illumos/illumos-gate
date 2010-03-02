@@ -500,6 +500,7 @@ sparc_SUBDIRS=		\
 	scadm		\
 	sckmd		\
 	sf880drd	\
+	virtinfo	\
 	vntsd
 
 #
@@ -759,6 +760,7 @@ sparc_MSGSUBDIRS=	\
 	fruadm		\
 	prtdscp		\
 	prtfru		\
+	virtinfo	\
 	vntsd
 
 i386_MSGSUBDIRS=	\

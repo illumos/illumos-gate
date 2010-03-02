@@ -68,7 +68,8 @@ static ds_ver_t ldma_dio_vers[] = { {1, 0} };
 static ldm_msg_func_t ldma_dio_pcidev_info_handler;
 
 static ldma_msg_handler_t ldma_dio_handlers[] = {
-	{MSGDIO_PCIDEV_INFO, ldma_dio_pcidev_info_handler},
+	{MSGDIO_PCIDEV_INFO, LDMA_MSGFLG_ACCESS_CONTROL,
+	    ldma_dio_pcidev_info_handler },
 };
 
 ldma_agent_info_t ldma_dio_info = {
