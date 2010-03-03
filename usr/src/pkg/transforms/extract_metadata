@@ -38,7 +38,7 @@
 #
 <transform set name=pkg.renamed value=true -> print PKGSTAT=renamed>
 <transform set name=pkg.obsolete value=true -> print PKGSTAT=obsolete>
-<transform set name=org.opensolaris.noincorp value=true -> print PKGSTAT=noincorp>
-<transform set name=org.opensolaris.noincorp -> drop>
 <transform set name=org.opensolaris.nodepend value=true -> print NODEPEND=true>
 <transform set name=org.opensolaris.nodepend -> drop>
+<transform set name=org.opensolaris.noincorp value=true -> print PKGSTAT=noincorp>
+<transform set name=org.opensolaris.noincorp -> drop>

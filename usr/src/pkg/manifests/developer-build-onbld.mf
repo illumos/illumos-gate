@@ -35,7 +35,6 @@ set name=info.classification \
 # have automated dependencies generated.  This allows the tools
 # to be upgraded without upgrading the entire system.
 #
-set name=org.opensolaris.nodepend value=true
 set name=org.opensolaris.noincorp value=true
 set name=variant.arch value=$(ARCH)
 set name=variant.opensolaris.zone value=global value=nonglobal

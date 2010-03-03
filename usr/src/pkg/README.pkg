@@ -356,6 +356,10 @@ empty it of all delivered content.  The old package should include:
 If there were "preserve" files in the package you're renaming, make
 sure to create original_name settings in the new package.
 
+If there was a org.opensolaris.noincorp property in the package being
+renamed, make sure you keep it in both the original and the renamed
+packages.
+
 EOFs and Removals
 -----------------
 
